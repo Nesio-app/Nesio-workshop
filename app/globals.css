@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --cream: #F7F5F0;
+  --beige: #E8E4DC;
+  --charcoal: #2C2C2C;
+  --dusty-pink: #C9A9A6;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-cream text-charcoal antialiased;
+}
+
+/* Subtle selection color */
+::selection {
+  @apply bg-dusty-pink-light text-charcoal;
+}
