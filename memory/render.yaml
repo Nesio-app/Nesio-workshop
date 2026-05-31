@@ -1,0 +1,76 @@
+# Full stack Blueprint: 1 free Postgres + 1 web service (Render allows one free DB per account).
+# Web and DB must share the same region — connectionString uses Render private network only.
+databases:
+  - name: nianguichu-db
+    plan: free
+    region: oregon
+    databaseName: memorial
+    user: memorial
+
+services:
+  - type: web
+    name: nianguichu
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: NPM_CONFIG_PRODUCTION=false npm ci && npx prisma generate && npx next build && node -e "const fs=require('fs');fs.writeFileSync('.deploy-version',process.env.RENDER_GIT_COMMIT||'unknown')"
+    startCommand: bash scripts/render-start.sh
+    healthCheckPath: /api/integrations/status
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: nianguichu-db
+          property: connectionString
+      - key: AUTH_SECRET
+        generateValue: true
+      # --- 必填：在 Render 控制台填入生产 URL（无末尾 /）---
+      - key: NEXT_PUBLIC_APP_URL
+        sync: false
+      # --- GitHub Pages 跨域 API + Cookie ---
+      - key: ALLOW_CROSS_ORIGIN
+        value: "true"
+      - key: CRON_SECRET
+        generateValue: true
+      # --- 线下支付收款码 / 对公（HTTPS 图片 URL）---
+      - key: PAYMENT_ALIPAY_QR_URL
+        sync: false
+      - key: PAYMENT_WECHAT_QR_URL
+        sync: false
+      - key: PAYMENT_BANK_NAME
+        value: "中国工商银行"
+      - key: PAYMENT_BANK_ACCOUNT
+        sync: false
+      - key: PAYMENT_BANK_HOLDER
+        sync: false
+      # --- Stripe（可选）---
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      # --- 对象存储 R2/S3（Render 磁盘不持久，强烈建议配置）---
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_ACCESS_KEY_ID
+        sync: false
+      - key: S3_SECRET_ACCESS_KEY
+        sync: false
+      - key: S3_ENDPOINT
+        sync: false
+      - key: S3_REGION
+        value: "auto"
+      - key: S3_PUBLIC_URL
+        sync: false
+      # --- 微信开放平台 · 网站应用扫码登录（可选）---
+      - key: WECHAT_APP_ID
+        sync: false
+      - key: WECHAT_APP_SECRET
+        sync: false
+      # --- Composio 邮件 / Notion（可选）---
+      - key: COMPOSIO_API_KEY
+        sync: false
+      - key: COMPOSIO_GMAIL_CONNECTED_ACCOUNT_ID
+        sync: false
+      - key: COMPOSIO_NOTION_CONNECTED_ACCOUNT_ID
+        sync: false
+      - key: NOTION_DATABASE_ID
+        sync: false
+      - key: MEMORIAL_EMAIL_FROM
+        sync: false

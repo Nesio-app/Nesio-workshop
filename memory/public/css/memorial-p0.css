@@ -1,0 +1,251 @@
+/* P0 情感交互：隐私、追思节律、记忆共创、祭奠心意 */
+
+.memorial-privacy-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 20px;
+  background: var(--paper2);
+  border-bottom: 1px solid var(--paper3);
+}
+.privacy-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.privacy-chip {
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--paper3);
+  background: #fff;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: "Noto Sans SC", sans-serif;
+  color: var(--ink2);
+  transition: all 0.2s;
+}
+.privacy-chip.active {
+  background: var(--ink, #1a1a1a);
+  color: #fff;
+  border-color: var(--ink, #1a1a1a);
+}
+.quiet-toggle {
+  padding: 6px 12px;
+  border-radius: 20px;
+  border: 1px solid rgba(184, 137, 42, 0.35);
+  background: rgba(184, 137, 42, 0.08);
+  font-size: 12px;
+  cursor: pointer;
+  font-family: "Noto Sans SC", sans-serif;
+  color: var(--ink2);
+}
+.quiet-toggle.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+
+body.quiet-mode #cart-fab,
+body.quiet-mode .shop-section,
+body.quiet-mode #tab-shop-li { display: none !important; }
+
+.p0-intro {
+  font-size: 14px;
+  line-height: 1.9;
+  color: var(--ink2);
+  margin-bottom: 20px;
+  max-width: 640px;
+}
+.p0-hint { font-size: 12px; opacity: 0.75; font-family: "Noto Sans SC", sans-serif; }
+.p0-empty {
+  text-align: center;
+  padding: 32px 16px;
+  color: var(--ink2);
+  opacity: 0.7;
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.anniversary-grid {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 28px;
+  max-width: 640px;
+}
+.anniversary-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px 18px;
+  border-left: 3px solid var(--gold);
+  box-shadow: 0 2px 10px var(--shadow);
+}
+.anniversary-card.past { opacity: 0.65; border-left-color: var(--paper3); }
+.anniversary-label {
+  font-family: var(--fw-display, "Cormorant Garamond", "Noto Serif SC", serif);
+  font-size: 18px;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+.anniversary-date { font-size: 13px; color: var(--gold); margin-bottom: 6px; }
+.anniversary-note {
+  font-size: 12px;
+  color: var(--ink2);
+  line-height: 1.6;
+  font-family: "Noto Sans SC", sans-serif;
+}
+.anniversary-countdown {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--red);
+  font-family: "Noto Sans SC", sans-serif;
+}
+
+.reminder-box {
+  background: #fff;
+  border-radius: 14px;
+  padding: 20px;
+  max-width: 640px;
+  box-shadow: 0 2px 12px var(--shadow);
+}
+.reminder-box h4 { font-size: 14px; margin-bottom: 12px; color: var(--ink); }
+.reminder-list {
+  margin-top: 12px;
+  padding-left: 18px;
+  font-size: 13px;
+  color: var(--ink2);
+}
+
+.memory-list { display: flex; flex-direction: column; gap: 12px; margin-top: 20px; }
+.memory-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 2px 10px var(--shadow);
+  border: 1px solid var(--paper3);
+}
+.memory-card.status-pending { border-style: dashed; border-color: var(--gold); }
+.memory-meta {
+  font-size: 11px;
+  color: var(--gold);
+  margin-bottom: 8px;
+  font-family: "Noto Sans SC", sans-serif;
+}
+.memory-card p { font-size: 14px; line-height: 1.85; color: var(--ink2); }
+.memory-status {
+  font-size: 11px;
+  margin-top: 8px;
+  color: var(--ink2);
+  opacity: 0.7;
+}
+.memory-approve-btn {
+  margin-top: 10px;
+  padding: 6px 12px;
+  font-size: 12px;
+  border: 1px solid var(--gold);
+  background: transparent;
+  color: var(--gold);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.comemorial-stream {
+  max-width: 640px;
+  border-left: 2px solid var(--paper3);
+  padding-left: 20px;
+}
+.comemorial-item { margin-bottom: 20px; position: relative; }
+.comemorial-item::before {
+  content: "";
+  position: absolute;
+  left: -25px;
+  top: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--gold);
+}
+.comemorial-time {
+  font-size: 11px;
+  color: var(--gold);
+  font-family: "Noto Sans SC", sans-serif;
+}
+.comemorial-who { font-size: 13px; color: var(--ink); margin: 4px 0; }
+.comemorial-msg {
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--ink2);
+  font-style: italic;
+}
+
+#ritual-modal .modal-box { max-width: 480px; }
+#ritual-modal textarea {
+  width: 100%;
+  min-height: 88px;
+  padding: 12px;
+  border: 1px solid var(--paper3);
+  border-radius: 10px;
+  font-family: "Noto Serif SC", serif;
+  font-size: 14px;
+  resize: vertical;
+  margin-bottom: 10px;
+  background: var(--paper);
+}
+#ritual-modal input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--paper3);
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-family: "Noto Serif SC", serif;
+}
+
+#create-page .create-inner,
+.page#create-page .page-content > .create-inner {
+  max-width: 520px;
+  margin: 40px auto;
+  padding: 0 20px 60px;
+}
+.create-steps {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin: 20px 0 28px;
+}
+.create-steps span {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--paper3);
+  font-size: 13px;
+  color: var(--ink2);
+}
+.create-steps span.on { background: var(--gold); color: #fff; }
+.create-field { margin-bottom: 16px; }
+.create-field label {
+  display: block;
+  font-size: 12px;
+  color: var(--ink2);
+  margin-bottom: 6px;
+  font-family: "Noto Sans SC", sans-serif;
+}
+.create-field input {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1px solid var(--paper3);
+  border-radius: 10px;
+  font-family: "Noto Serif SC", serif;
+}
+.create-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ink2);
+  margin-bottom: 20px;
+  cursor: pointer;
+}
+
+.profile-enter-hint {
+  text-align: center;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.55);
+  margin: -8px 0 12px;
+  font-weight: 300;
+}

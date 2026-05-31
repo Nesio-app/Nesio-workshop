@@ -1,0 +1,1686 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>念归处 · 华人数字纪念馆</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Noto+Serif+SC:wght@400;500;600&family=Noto+Sans+SC:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/memorial-p0.css">
+<link rel="stylesheet" href="css/memorial-farewelling.css">
+<meta name="robots" content="noindex,nofollow" id="meta-robots">
+<style>
+:root {
+  --ink:#1a1208;--ink2:#3d2b1a;--paper:#f5f0e8;--paper2:#ede8db;--paper3:#e4ddd0;
+  --gold:#b8892a;--gold2:#d4a843;--red:#8b2020;--red2:#c0392b;
+  --lotus:#c9736b;--green:#4a6741;--teal:#2e6b6b;--blue:#2c4a6e;
+  --shadow:rgba(26,18,8,0.15);--shadowDeep:rgba(26,18,8,0.3);
+}
+body[data-theme="ink-moon"]{--paper:#eef2f6;--ink:#1a2a3a;--gold:#5a7a9a;--green:#3a5a6a}
+body[data-theme="plum-snow"]{--paper:#f8f0f0;--ink:#2a1a1a;--gold:#a05050;--green:#6a4040}
+body[data-theme="bamboo-wind"]{--paper:#eef5ee;--ink:#1a2a1a;--gold:#4a7a4a;--green:#3a6a3a}
+body[data-theme="peach-spring"]{--paper:#faf0f4;--ink:#3a1a2a;--gold:#b06080;--green:#8a4060}
+body[data-theme="zen-cloud"]{--paper:#f4f2ee;--ink:#2a2a2a;--gold:#8a7a50;--green:#5a5a4a}
+body[data-theme="minimal"]{--paper:#f8f8f8;--ink:#222;--gold:#666;--green:#555}
+.gallery-placeholder{border-radius:12px 12px 0 0}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:'Noto Serif SC',serif;background:var(--paper);color:var(--ink);overflow-x:hidden}
+.page{display:none;min-height:100vh;animation:fadeIn .4s ease}
+.page.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* ===== TOP NAV ===== */
+.top-nav{position:fixed;top:0;left:0;right:0;z-index:1000;background:rgba(245,240,232,0.97);backdrop-filter:blur(10px);border-bottom:1px solid rgba(184,137,42,0.2);padding:0 20px}
+.nav-inner{max-width:1100px;margin:0 auto;display:flex;align-items:center;height:56px;gap:8px}
+.nav-logo{font-family:'Ma Shan Zheng',cursive;font-size:22px;color:var(--ink);cursor:pointer;flex-shrink:0;display:flex;align-items:center;gap:6px}
+.nav-logo span{font-size:11px;color:var(--gold);font-family:'Noto Serif SC',serif;font-weight:300;letter-spacing:2px}
+.nav-links{display:flex;gap:2px;flex:1;justify-content:center;overflow-x:auto}
+.nav-links::-webkit-scrollbar{display:none}
+.nav-link{padding:6px 10px;font-size:12px;color:var(--ink2);cursor:pointer;border-radius:6px;white-space:nowrap;transition:all .2s;font-family:'Noto Sans SC',sans-serif}
+.nav-link:hover,.nav-link.active{background:var(--gold);color:#fff}
+.nav-btn{padding:7px 14px;background:var(--red);color:#fff;border-radius:20px;font-size:12px;cursor:pointer;white-space:nowrap;border:none;font-family:'Noto Sans SC',sans-serif;flex-shrink:0}
+.nav-auth-slot{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.nav-auth-btn{padding:6px 10px;border:1px solid var(--paper3);background:#fff;border-radius:16px;font-size:11px;cursor:pointer;color:var(--ink2);font-family:'Noto Sans SC',sans-serif}
+.nav-auth-btn:hover{border-color:var(--gold);color:var(--ink)}
+.nav-auth-demo{background:var(--gold);color:#fff;border-color:var(--gold)}
+.nav-auth-user{font-size:11px;color:var(--ink2);max-width:88px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.auth-modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:9999;padding:20px}
+.auth-modal.open{display:flex}
+.auth-modal-box{background:#fff;border-radius:16px;padding:28px 24px;max-width:380px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.auth-title{font-family:'Ma Shan Zheng',cursive;font-size:26px;color:var(--ink);margin-bottom:6px}
+.auth-sub{font-size:13px;color:var(--ink2);margin-bottom:18px;line-height:1.6}
+.auth-field{margin-bottom:12px}
+.auth-field label{display:block;font-size:12px;color:var(--ink2);margin-bottom:4px}
+.auth-field input{width:100%;padding:10px 12px;border:1px solid var(--paper3);border-radius:8px;font-size:14px}
+.auth-submit{width:100%;margin-top:8px}
+.auth-switch{text-align:center;font-size:12px;color:var(--ink2);margin-top:14px}
+.auth-link{background:none;border:none;color:var(--gold);cursor:pointer;font-size:12px;padding:0}
+.auth-hint{font-size:11px;color:var(--ink2);opacity:.7;margin-top:12px;text-align:center}
+.memorial-api-banner{background:#fff8e8;border:1px solid #f0dfa0;border-radius:12px;padding:14px 16px;margin:12px 16px;display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.memorial-api-banner p{flex:1;font-size:13px;color:var(--ink2);margin:0;min-width:180px}
+.create-account-box{background:var(--paper2);border-radius:12px;padding:14px;margin-bottom:16px}
+.privacy-readonly{margin:0;font-size:13px;color:var(--ink2)}
+.page-content{padding-top:56px}
+
+/* ===== TOAST ===== */
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;z-index:9999;opacity:0;transition:all .3s;pointer-events:none;white-space:nowrap;font-family:'Noto Sans SC',sans-serif}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ===== MODAL ===== */
+.modal-overlay{position:fixed;inset:0;background:rgba(26,18,8,0.7);z-index:2000;display:none;align-items:center;justify-content:center;padding:20px}
+.modal-overlay.open{display:flex}
+.modal-box{background:var(--paper);border-radius:16px;max-width:600px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px var(--shadowDeep)}
+.modal-head{padding:20px 24px 16px;border-bottom:1px solid var(--paper3);display:flex;justify-content:space-between;align-items:center}
+.modal-head h3{font-family:'Ma Shan Zheng',cursive;font-size:20px;color:var(--ink)}
+.modal-close{width:30px;height:30px;border-radius:50%;border:none;background:var(--paper3);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center}
+.modal-body{padding:20px 24px}
+
+/* ===== HOMEPAGE ===== */
+.hero{min-height:calc(100vh - 56px);background:linear-gradient(160deg,#1a1208 0%,#2d1e0a 40%,#1a1208 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;overflow:hidden;padding:40px 20px}
+.hero-lanterns{position:absolute;top:0;left:0;right:0;height:100px;overflow:hidden}
+.lantern{position:absolute;top:-10px;width:14px;height:20px;border-radius:7px;animation:sway 3s ease-in-out infinite alternate}
+.lantern::after{content:'';position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);width:1px;height:8px;background:rgba(255,200,100,.4)}
+@keyframes sway{from{transform:rotate(-8deg)}to{transform:rotate(8deg)}}
+.petals-container{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.petal{position:absolute;width:8px;height:8px;background:rgba(201,115,107,.3);border-radius:50% 0;animation:fall linear infinite}
+@keyframes fall{0%{transform:translateY(-20px) rotate(0deg);opacity:0}10%{opacity:1}90%{opacity:.5}100%{transform:translateY(110vh) rotate(360deg);opacity:0}}
+.hero-deco{position:absolute;right:-60px;top:50%;transform:translateY(-50%);width:300px;height:400px;opacity:.06;font-family:'Ma Shan Zheng',cursive;font-size:160px;color:#fff;writing-mode:vertical-rl;white-space:nowrap;pointer-events:none}
+.hero-content{position:relative;z-index:2;text-align:center;max-width:600px}
+.hero-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(184,137,42,.15);border:1px solid rgba(184,137,42,.3);border-radius:20px;padding:5px 14px;font-size:11px;color:var(--gold2);letter-spacing:3px;margin-bottom:24px;font-family:'Noto Sans SC',sans-serif}
+.hero-title{font-family:'Ma Shan Zheng',cursive;font-size:clamp(48px,12vw,80px);color:#fff;line-height:1.1;margin-bottom:8px;text-shadow:0 4px 20px rgba(0,0,0,.5)}
+.hero-sub{font-size:13px;color:rgba(255,255,255,.5);letter-spacing:4px;margin-bottom:28px;font-family:'Noto Sans SC',sans-serif}
+.hero-tagline{font-size:16px;color:rgba(255,255,255,.8);line-height:1.8;margin-bottom:36px;font-weight:300}
+.hero-search{display:flex;gap:8px;max-width:420px;margin:0 auto 32px}
+.hero-search input{flex:1;padding:12px 18px;border-radius:25px;border:1px solid rgba(184,137,42,.3);background:rgba(255,255,255,.08);color:#fff;font-size:14px;font-family:'Noto Serif SC',serif;outline:none}
+.hero-search input::placeholder{color:rgba(255,255,255,.4)}
+.hero-search input:focus{border-color:var(--gold);background:rgba(255,255,255,.12)}
+.hero-search-btn{padding:12px 20px;background:var(--gold);border:none;border-radius:25px;color:#fff;cursor:pointer;font-size:14px;font-family:'Noto Serif SC',serif;white-space:nowrap}
+.hero-stats{display:flex;gap:24px;justify-content:center}
+.hero-stat{text-align:center}
+.hero-stat-num{font-family:'Ma Shan Zheng',cursive;font-size:28px;color:var(--gold2)}
+.hero-stat-label{font-size:11px;color:rgba(255,255,255,.4);font-family:'Noto Sans SC',sans-serif;letter-spacing:1px}
+
+.features-section{padding:60px 20px;background:var(--paper)}
+.section-header{text-align:center;margin-bottom:40px}
+.section-title{font-family:'Ma Shan Zheng',cursive;font-size:clamp(24px,5vw,36px);color:var(--ink);margin-bottom:8px}
+.section-sub{font-size:13px;color:var(--ink2);opacity:.7;letter-spacing:2px;font-family:'Noto Sans SC',sans-serif}
+.features-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;max-width:900px;margin:0 auto}
+.feature-card{background:#fff;border-radius:14px;padding:24px 16px;text-align:center;cursor:pointer;transition:all .3s;border:1px solid var(--paper3);box-shadow:0 2px 12px var(--shadow)}
+.feature-card:hover{transform:translateY(-4px);box-shadow:0 8px 24px var(--shadow);border-color:var(--gold)}
+.feature-icon{font-size:32px;margin-bottom:12px}
+.feature-name{font-size:14px;font-weight:500;color:var(--ink);margin-bottom:4px}
+.feature-desc{font-size:11px;color:var(--ink2);opacity:.7;line-height:1.5;font-family:'Noto Sans SC',sans-serif}
+
+.memorials-section{padding:40px 20px 60px;background:var(--paper2)}
+.memorials-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;max-width:900px;margin:0 auto}
+.memorial-card{background:#fff;border-radius:14px;overflow:hidden;cursor:pointer;transition:all .3s;box-shadow:0 2px 12px var(--shadow);border:1px solid var(--paper3)}
+.memorial-card:hover{transform:translateY(-4px);box-shadow:0 10px 30px var(--shadow)}
+.memorial-header{height:100px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+.memorial-avatar{width:70px;height:70px;border-radius:50%;border:3px solid rgba(255,255,255,.8);box-shadow:0 4px 12px rgba(0,0,0,.2);display:flex;align-items:center;justify-content:center;font-family:'Ma Shan Zheng',cursive;font-size:26px;color:#fff;position:relative;z-index:1}
+.memorial-body{padding:14px}
+.memorial-name{font-family:'Ma Shan Zheng',cursive;font-size:18px;color:var(--ink);margin-bottom:2px}
+.memorial-years{font-size:11px;color:var(--ink2);opacity:.6;font-family:'Noto Sans SC',sans-serif;margin-bottom:8px}
+.memorial-quote{font-size:12px;color:var(--ink2);line-height:1.6;opacity:.8;border-left:2px solid var(--gold);padding-left:8px}
+.memorial-footer{padding:10px 14px;border-top:1px solid var(--paper3);display:flex;justify-content:space-between;align-items:center}
+.memorial-acts{font-size:11px;color:var(--ink2);opacity:.6;font-family:'Noto Sans SC',sans-serif}
+.memorial-btn{padding:5px 12px;background:var(--gold);color:#fff;border-radius:12px;font-size:11px;border:none;cursor:pointer;font-family:'Noto Serif SC',serif}
+
+/* ===== PROFILE PAGE ===== */
+.profile-hero{background:linear-gradient(160deg,var(--ink) 0%,#2d1e0a 100%);padding:40px 20px 0;text-align:center;position:relative;overflow:hidden}
+.profile-hero-deco{position:absolute;inset:0;opacity:.05;background-image:repeating-linear-gradient(45deg,transparent,transparent 20px,rgba(184,137,42,.3) 20px,rgba(184,137,42,.3) 21px)}
+.profile-avatar-wrap{position:relative;display:inline-block;margin-bottom:16px}
+.profile-avatar{width:100px;height:100px;border-radius:50%;border:3px solid var(--gold);box-shadow:0 0 0 6px rgba(184,137,42,.15),0 8px 24px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;font-family:'Ma Shan Zheng',cursive;font-size:38px;color:#fff;position:relative;z-index:1}
+.profile-qr-badge{position:absolute;bottom:-4px;right:-4px;width:28px;height:28px;background:var(--gold);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid var(--paper);cursor:pointer}
+.profile-name{font-family:'Ma Shan Zheng',cursive;font-size:32px;color:#fff;margin-bottom:4px}
+.profile-years{font-size:13px;color:rgba(255,255,255,.5);letter-spacing:3px;margin-bottom:12px;font-family:'Noto Sans SC',sans-serif}
+.profile-motto{font-size:14px;color:rgba(255,255,255,.7);font-style:italic;margin-bottom:20px;max-width:400px;margin-left:auto;margin-right:auto;line-height:1.7}
+.tribute-bar{display:flex;gap:12px;justify-content:center;padding:16px 20px;background:rgba(0,0,0,.2)}
+.tribute-btn{display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;transition:transform .2s;background:none;border:none}
+.tribute-btn:hover{transform:scale(1.1)}
+.tribute-emoji{font-size:22px}
+.tribute-count{font-size:10px;color:rgba(255,255,255,.5);font-family:'Noto Sans SC',sans-serif}
+.tribute-label{font-size:9px;color:rgba(255,255,255,.4);font-family:'Noto Sans SC',sans-serif}
+.profile-tabs{display:flex;overflow-x:auto;background:var(--ink);border-bottom:1px solid rgba(255,255,255,.1)}
+.profile-tabs::-webkit-scrollbar{display:none}
+.profile-tab{padding:12px 16px;font-size:12px;color:rgba(255,255,255,.5);cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent;transition:all .2s;font-family:'Noto Sans SC',sans-serif;background:none;border:none;border-bottom:2px solid transparent}
+.profile-tab:hover{color:rgba(255,255,255,.8)}
+.profile-tab.active{color:var(--gold);border-bottom-color:var(--gold)}
+.tab-content{display:none;padding:24px 20px}
+.tab-content.active{display:block}
+
+/* bio tab */
+.bio-section{max-width:700px;margin:0 auto}
+.bio-intro{background:#fff;border-radius:14px;padding:24px;box-shadow:0 2px 12px var(--shadow);margin-bottom:20px}
+.bio-intro p{font-size:15px;line-height:2;color:var(--ink2)}
+.family-note{background:linear-gradient(135deg,#fff9f0,#fff);border:1px solid rgba(184,137,42,.2);border-radius:14px;padding:20px;position:relative}
+.family-note::before{content:'家\A属\A寄\A语';position:absolute;right:16px;top:16px;font-family:'Ma Shan Zheng',cursive;font-size:14px;color:var(--gold);opacity:.4;writing-mode:vertical-rl;white-space:pre}
+.family-note-text{font-size:14px;line-height:2;color:var(--ink2);padding-right:30px}
+
+/* gallery tab */
+.gallery-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.gallery-item{border-radius:10px;overflow:hidden;cursor:pointer;aspect-ratio:4/3;position:relative}
+.gallery-item:first-child{grid-column:span 2;aspect-ratio:16/7}
+.gallery-img{width:100%;height:100%;object-fit:cover;display:block}
+.gallery-svg{width:100%;height:100%}
+.gallery-caption{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,.7));padding:10px 12px;font-size:11px;color:#fff;font-family:'Noto Sans SC',sans-serif}
+
+/* timeline tab */
+.timeline{position:relative;padding-left:24px}
+.timeline::before{content:'';position:absolute;left:0;top:8px;bottom:0;width:2px;background:linear-gradient(to bottom,var(--gold),transparent)}
+.timeline-item{position:relative;padding-bottom:24px}
+.timeline-dot{position:absolute;left:-29px;top:4px;width:10px;height:10px;border-radius:50%;background:var(--gold);border:2px solid #fff;box-shadow:0 0 0 3px rgba(184,137,42,.2)}
+.timeline-year{font-size:11px;color:var(--gold);font-family:'Noto Sans SC',sans-serif;margin-bottom:4px;font-weight:500}
+.timeline-event{font-size:14px;color:var(--ink);margin-bottom:4px;font-weight:500}
+.timeline-desc{font-size:12px;color:var(--ink2);opacity:.7;line-height:1.7;font-family:'Noto Sans SC',sans-serif}
+
+/* guestbook tab */
+.guestbook-form{background:#fff;border-radius:14px;padding:20px;margin-bottom:24px;box-shadow:0 2px 12px var(--shadow)}
+.guestbook-form textarea{width:100%;padding:12px;border:1px solid var(--paper3);border-radius:10px;font-size:14px;font-family:'Noto Serif SC',serif;color:var(--ink);resize:none;min-height:80px;background:var(--paper);outline:none}
+.guestbook-form textarea:focus{border-color:var(--gold)}
+.form-row{display:flex;gap:8px;margin-top:10px}
+.form-row input{flex:1;padding:10px 12px;border:1px solid var(--paper3);border-radius:8px;font-size:13px;font-family:'Noto Serif SC',serif;background:var(--paper);outline:none;color:var(--ink)}
+.form-row input:focus{border-color:var(--gold)}
+.submit-btn{padding:10px 20px;background:var(--gold);color:#fff;border:none;border-radius:8px;font-size:13px;cursor:pointer;font-family:'Noto Serif SC',serif;white-space:nowrap}
+.messages-list{display:flex;flex-direction:column;gap:14px}
+.message-item{background:#fff;border-radius:12px;padding:16px;box-shadow:0 2px 8px var(--shadow)}
+.message-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.message-author{font-size:13px;font-weight:600;color:var(--ink)}
+.message-time{font-size:11px;color:var(--ink2);opacity:.5;font-family:'Noto Sans SC',sans-serif}
+.message-text{font-size:14px;color:var(--ink2);line-height:1.8}
+.message-candle{font-size:16px;margin-top:8px}
+
+/* family tab */
+.family-tree{max-width:500px;margin:0 auto}
+.family-person{display:flex;align-items:center;gap:12px;padding:12px;background:#fff;border-radius:10px;margin-bottom:8px;box-shadow:0 1px 6px var(--shadow)}
+.family-ava{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Ma Shan Zheng',cursive;font-size:16px;color:#fff;flex-shrink:0}
+.family-info .name{font-size:14px;font-weight:500;color:var(--ink)}
+.family-info .rel{font-size:11px;color:var(--gold);font-family:'Noto Sans SC',sans-serif}
+.family-group-title{font-size:11px;color:var(--ink2);opacity:.5;letter-spacing:2px;margin:16px 0 8px;font-family:'Noto Sans SC',sans-serif}
+
+/* events tab */
+.events-list{display:flex;flex-direction:column;gap:16px}
+.event-card{background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 2px 12px var(--shadow)}
+.event-card-head{padding:16px;background:linear-gradient(135deg,var(--teal),#1a4a4a);color:#fff}
+.event-card-type{font-size:10px;letter-spacing:2px;opacity:.7;margin-bottom:4px;font-family:'Noto Sans SC',sans-serif}
+.event-card-title{font-family:'Ma Shan Zheng',cursive;font-size:18px}
+.event-card-body{padding:14px 16px}
+.event-meta{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
+.event-meta-item{display:flex;align-items:flex-start;gap:8px;font-size:13px;color:var(--ink2)}
+.event-meta-icon{width:18px;flex-shrink:0;margin-top:1px;font-size:14px}
+.covid-notice{background:#fff3f3;border-left:3px solid var(--red);border-radius:0 8px 8px 0;padding:10px 12px;margin-bottom:14px}
+.covid-notice .title{font-size:11px;color:var(--red);font-weight:600;margin-bottom:6px;font-family:'Noto Sans SC',sans-serif}
+.covid-item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink2);margin-bottom:4px;font-family:'Noto Sans SC',sans-serif}
+.rsvp-row{display:flex;gap:8px;align-items:center}
+.rsvp-select{flex:1;padding:10px 12px;border:1px solid var(--paper3);border-radius:8px;font-size:13px;font-family:'Noto Serif SC',serif;background:var(--paper);color:var(--ink);outline:none}
+.rsvp-btn{padding:10px 16px;background:var(--teal);color:#fff;border:none;border-radius:8px;font-size:13px;cursor:pointer;font-family:'Noto Serif SC',serif;white-space:nowrap}
+.virtual-btns{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.virtual-btn{display:flex;align-items:center;gap:6px;padding:8px 12px;border:1px solid var(--paper3);border-radius:8px;font-size:12px;cursor:pointer;background:#fff;color:var(--ink2);font-family:'Noto Sans SC',sans-serif}
+.virtual-btn:hover{border-color:var(--teal);color:var(--teal)}
+.map-placeholder{height:140px;background:linear-gradient(135deg,#e8f5e9,#e0f2f1);border-radius:10px;margin-top:14px;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--teal);cursor:pointer;border:1px solid rgba(46,107,107,.2);font-family:'Noto Sans SC',sans-serif}
+
+/* grief tab */
+.articles-filter{display:flex;gap:8px;overflow-x:auto;margin-bottom:20px;padding-bottom:4px}
+.articles-filter::-webkit-scrollbar{display:none}
+.filter-tag{padding:6px 14px;border-radius:16px;border:1px solid var(--paper3);font-size:12px;cursor:pointer;white-space:nowrap;font-family:'Noto Sans SC',sans-serif;background:#fff;color:var(--ink2);transition:all .2s}
+.filter-tag.active,.filter-tag:hover{background:var(--teal);color:#fff;border-color:var(--teal)}
+.articles-grid{display:grid;gap:14px}
+.article-card{background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px var(--shadow);cursor:pointer;transition:all .3s}
+.article-card:hover{transform:translateY(-2px);box-shadow:0 6px 20px var(--shadow)}
+.article-card-img{height:100px;display:flex;align-items:center;justify-content:center;font-size:32px}
+.article-card-body{padding:14px}
+.article-cat{font-size:10px;color:var(--teal);font-weight:600;letter-spacing:1px;margin-bottom:4px;font-family:'Noto Sans SC',sans-serif}
+.article-title{font-size:14px;font-weight:500;color:var(--ink);margin-bottom:6px;line-height:1.5}
+.article-summary{font-size:12px;color:var(--ink2);opacity:.7;line-height:1.6;font-family:'Noto Sans SC',sans-serif}
+
+/* shop tab */
+.shop-trust{display:flex;gap:12px;padding:12px;background:linear-gradient(135deg,#fff9f0,#fff);border-radius:10px;margin-bottom:20px;border:1px solid rgba(184,137,42,.15)}
+.shop-trust-item{display:flex;flex-direction:column;align-items:center;gap:3px;flex:1;text-align:center}
+.shop-trust-item span:first-child{font-size:18px}
+.shop-trust-item span:last-child{font-size:9px;color:var(--ink2);opacity:.7;font-family:'Noto Sans SC',sans-serif}
+.shop-cats{display:flex;gap:8px;overflow-x:auto;margin-bottom:16px;padding-bottom:4px}
+.shop-cats::-webkit-scrollbar{display:none}
+.shop-cat{padding:6px 14px;border-radius:16px;border:1px solid var(--paper3);font-size:12px;cursor:pointer;white-space:nowrap;font-family:'Noto Sans SC',sans-serif;background:#fff;color:var(--ink2);transition:all .2s}
+.shop-cat.active,.shop-cat:hover{background:var(--red);color:#fff;border-color:var(--red)}
+.products-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.product-card{background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px var(--shadow);cursor:pointer;transition:all .3s}
+.product-card:hover{transform:translateY(-2px);box-shadow:0 6px 20px var(--shadow)}
+.product-img{height:110px;display:flex;align-items:center;justify-content:center;font-size:40px;position:relative}
+.product-badge{position:absolute;top:8px;right:8px;background:var(--red);color:#fff;font-size:9px;padding:2px 6px;border-radius:10px;font-family:'Noto Sans SC',sans-serif}
+.product-body{padding:10px}
+.product-name{font-size:12px;font-weight:500;color:var(--ink);margin-bottom:4px}
+.product-price{font-size:14px;color:var(--red);font-weight:600}
+.product-price span{font-size:10px;color:var(--ink2);opacity:.5;text-decoration:line-through;margin-left:4px;font-family:'Noto Sans SC',sans-serif}
+.add-cart-btn{width:100%;margin-top:8px;padding:7px;background:var(--red);color:#fff;border:none;border-radius:8px;font-size:11px;cursor:pointer;font-family:'Noto Serif SC',serif}
+
+/* ===== THEMES PAGE ===== */
+.themes-hero{background:linear-gradient(135deg,var(--ink) 0%,#2a1a08 100%);padding:50px 20px 40px;text-align:center}
+.themes-hero h1{font-family:'Ma Shan Zheng',cursive;font-size:36px;color:#fff;margin-bottom:8px}
+.themes-hero p{font-size:14px;color:rgba(255,255,255,.6);font-family:'Noto Sans SC',sans-serif}
+.themes-filter{display:flex;gap:8px;overflow-x:auto;padding:20px;background:var(--paper);max-width:900px;margin:0 auto}
+.themes-filter::-webkit-scrollbar{display:none}
+.themes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:20px;padding:0 20px 60px;max-width:900px;margin:0 auto}
+.theme-card{border-radius:16px;overflow:hidden;cursor:pointer;transition:all .3s;box-shadow:0 4px 16px var(--shadow);position:relative}
+.theme-card:hover{transform:translateY(-6px);box-shadow:0 12px 32px var(--shadowDeep)}
+.theme-card.selected{outline:3px solid var(--gold);outline-offset:2px}
+.theme-preview{height:140px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;position:relative;overflow:hidden}
+.theme-preview-name{font-family:'Ma Shan Zheng',cursive;font-size:20px;position:relative;z-index:1}
+.theme-preview-deco{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:60px;opacity:.12}
+.theme-info{padding:12px 14px;background:#fff}
+.theme-name{font-size:14px;font-weight:600;color:var(--ink);margin-bottom:4px}
+.theme-tags{display:flex;gap:4px;flex-wrap:wrap}
+.theme-tag{font-size:10px;color:var(--ink2);opacity:.6;background:var(--paper);border-radius:8px;padding:2px 6px;font-family:'Noto Sans SC',sans-serif}
+.theme-select-btn{width:100%;padding:8px;background:var(--gold);color:#fff;border:none;border-radius:0 0 16px 16px;font-size:12px;cursor:pointer;font-family:'Noto Serif SC',serif;margin-top:-1px}
+
+/* ===== OBITUARY PAGE ===== */
+.obit-hero{background:linear-gradient(135deg,#2c3e50 0%,#1a252f 100%);padding:50px 20px 40px;text-align:center}
+.obit-hero h1{font-family:'Ma Shan Zheng',cursive;font-size:36px;color:#fff;margin-bottom:8px}
+.obit-hero p{font-size:14px;color:rgba(255,255,255,.6);font-family:'Noto Sans SC',sans-serif}
+.obit-steps{display:flex;gap:0;max-width:600px;margin:0 auto 30px;padding:0 20px}
+.obit-step{flex:1;text-align:center;position:relative}
+.obit-step::after{content:'';position:absolute;top:14px;left:50%;right:-50%;height:2px;background:var(--paper3);z-index:0}
+.obit-step:last-child::after{display:none}
+.obit-step-num{width:28px;height:28px;border-radius:50%;background:var(--paper3);color:var(--ink2);font-size:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 6px;position:relative;z-index:1;font-family:'Noto Sans SC',sans-serif}
+.obit-step.done .obit-step-num{background:var(--green);color:#fff}
+.obit-step.active .obit-step-num{background:var(--gold);color:#fff}
+.obit-step-label{font-size:11px;color:var(--ink2);opacity:.7;font-family:'Noto Sans SC',sans-serif}
+.obit-form-wrap{max-width:600px;margin:0 auto;padding:0 20px 60px}
+.obit-step-content{background:#fff;border-radius:16px;padding:24px;box-shadow:0 4px 20px var(--shadow);margin-bottom:20px}
+.obit-step-content h3{font-family:'Ma Shan Zheng',cursive;font-size:20px;color:var(--ink);margin-bottom:16px}
+.form-field{margin-bottom:14px}
+.form-label{font-size:12px;color:var(--ink2);opacity:.8;margin-bottom:6px;display:block;font-family:'Noto Sans SC',sans-serif}
+.form-input{width:100%;padding:10px 14px;border:1px solid var(--paper3);border-radius:8px;font-size:14px;font-family:'Noto Serif SC',serif;background:var(--paper);color:var(--ink);outline:none;transition:.2s}
+.form-input:focus{border-color:var(--gold);background:#fff}
+.form-row-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.form-textarea{width:100%;padding:12px 14px;border:1px solid var(--paper3);border-radius:8px;font-size:14px;font-family:'Noto Serif SC',serif;background:var(--paper);color:var(--ink);outline:none;resize:none;min-height:100px;transition:.2s}
+.form-textarea:focus{border-color:var(--gold);background:#fff}
+.tags-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.virtue-tag{padding:6px 12px;border:1px solid var(--paper3);border-radius:16px;font-size:12px;cursor:pointer;font-family:'Noto Sans SC',sans-serif;background:#fff;color:var(--ink2);transition:all .2s}
+.virtue-tag.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+.ai-gen-btn{width:100%;padding:14px;background:linear-gradient(135deg,var(--blue),var(--teal));color:#fff;border:none;border-radius:10px;font-size:15px;cursor:pointer;font-family:'Noto Serif SC',serif;margin-bottom:16px}
+.ai-result{background:var(--paper);border-radius:12px;padding:20px;border:1px solid var(--paper3);min-height:200px;font-size:14px;line-height:2;color:var(--ink2)}
+.obit-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.obit-action-btn{padding:12px;border-radius:10px;font-size:13px;cursor:pointer;font-family:'Noto Serif SC',serif;text-align:center;border:1px solid var(--paper3);background:#fff;color:var(--ink2)}
+.obit-action-btn.primary{background:var(--gold);color:#fff;border-color:var(--gold)}
+.obit-nav-btns{display:flex;gap:10px;margin-top:20px}
+.obit-back-btn{flex:0 0 auto;padding:12px 20px;background:#fff;color:var(--ink2);border:1px solid var(--paper3);border-radius:10px;font-size:14px;cursor:pointer;font-family:'Noto Serif SC',serif}
+.obit-next-btn{flex:1;padding:12px;background:var(--gold);color:#fff;border:none;border-radius:10px;font-size:14px;cursor:pointer;font-family:'Noto Serif SC',serif}
+
+/* ===== PLANNING PAGE ===== */
+.planning-hero{background:linear-gradient(135deg,var(--green) 0%,#2d4a2a 100%);padding:50px 20px 40px;text-align:center}
+.planning-hero h1{font-family:'Ma Shan Zheng',cursive;font-size:36px;color:#fff;margin-bottom:8px}
+.planning-hero p{font-size:14px;color:rgba(255,255,255,.7);font-family:'Noto Sans SC',sans-serif}
+.planning-progress{max-width:600px;margin:0 auto;padding:0 20px}
+.progress-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;margin-top:24px}
+.progress-label{font-size:13px;color:var(--ink2);font-family:'Noto Sans SC',sans-serif}
+.progress-pct{font-size:13px;color:var(--green);font-weight:600}
+.progress-bar{height:6px;background:var(--paper3);border-radius:3px;overflow:hidden;margin-bottom:24px}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--green),var(--gold));border-radius:3px;transition:width .5s ease}
+.planning-cats{max-width:600px;margin:0 auto;padding:0 20px 60px}
+.planning-cat{margin-bottom:16px}
+.cat-header{display:flex;align-items:center;gap:10px;padding:14px 16px;background:#fff;border-radius:12px 12px 0 0;cursor:pointer;box-shadow:0 2px 8px var(--shadow);border-bottom:2px solid var(--green)}
+.cat-header.collapsed{border-radius:12px;border-bottom:none}
+.cat-icon{font-size:20px}
+.cat-title{font-size:15px;font-weight:600;color:var(--ink);flex:1}
+.cat-progress{font-size:11px;color:var(--green);font-family:'Noto Sans SC',sans-serif}
+.cat-arrow{font-size:12px;color:var(--ink2);opacity:.4;transition:transform .3s}
+.cat-header.collapsed .cat-arrow{transform:rotate(-90deg)}
+.cat-tasks{background:#fff;border-radius:0 0 12px 12px;padding:8px 16px 16px;box-shadow:0 4px 12px var(--shadow)}
+.task-item{display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid var(--paper3)}
+.task-item:last-child{border-bottom:none}
+.task-check{width:20px;height:20px;border-radius:6px;border:2px solid var(--paper3);flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;margin-top:1px}
+.task-check.done{background:var(--green);border-color:var(--green)}
+.task-check.done::after{content:'✓';color:#fff;font-size:12px}
+.task-text{flex:1}
+.task-title{font-size:14px;color:var(--ink);line-height:1.5}
+.task-desc{font-size:11px;color:var(--ink2);opacity:.6;margin-top:2px;line-height:1.5;font-family:'Noto Sans SC',sans-serif}
+.task-urgent{display:inline-block;font-size:9px;color:var(--red);background:#fff5f5;border-radius:4px;padding:1px 5px;margin-left:4px;font-family:'Noto Sans SC',sans-serif}
+
+/* ===== QR PAGE ===== */
+.qr-hero{background:linear-gradient(160deg,#0d1b2a 0%,#1a3040 100%);padding:60px 20px;text-align:center;position:relative;overflow:hidden}
+.qr-hero-circles{position:absolute;inset:0;overflow:hidden}
+.qr-circle{position:absolute;border-radius:50%;border:1px solid rgba(184,137,42,.1)}
+.qr-hero h1{font-family:'Ma Shan Zheng',cursive;font-size:clamp(28px,8vw,42px);color:#fff;margin-bottom:12px;position:relative;z-index:1}
+.qr-hero p{font-size:14px;color:rgba(255,255,255,.6);max-width:400px;margin:0 auto 30px;line-height:1.8;font-family:'Noto Sans SC',sans-serif;position:relative;z-index:1}
+.qr-demo{background:rgba(255,255,255,.05);border:1px solid rgba(184,137,42,.2);border-radius:20px;padding:24px;max-width:220px;margin:0 auto 30px;position:relative;z-index:1}
+.qr-demo-label{font-size:10px;color:rgba(255,255,255,.4);letter-spacing:2px;margin-bottom:12px;font-family:'Noto Sans SC',sans-serif}
+.qr-svg-wrap{background:#fff;border-radius:10px;padding:10px;margin-bottom:12px}
+.qr-demo-name{font-family:'Ma Shan Zheng',cursive;font-size:18px;color:rgba(255,255,255,.8);margin-bottom:4px}
+.qr-demo-years{font-size:11px;color:rgba(255,255,255,.4);font-family:'Noto Sans SC',sans-serif}
+.qr-features{display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:600px;margin:0 auto 40px;padding:0 20px;position:relative;z-index:1}
+.qr-feat{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:16px;text-align:center}
+.qr-feat-icon{font-size:24px;margin-bottom:8px}
+.qr-feat-title{font-size:13px;color:#fff;margin-bottom:4px}
+.qr-feat-desc{font-size:11px;color:rgba(255,255,255,.5);line-height:1.5;font-family:'Noto Sans SC',sans-serif}
+.qr-products{padding:40px 20px 60px;background:var(--paper)}
+.qr-product-cards{display:grid;gap:16px;max-width:600px;margin:0 auto}
+.qr-prod-card{background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px var(--shadow);display:flex}
+.qr-prod-visual{width:100px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:40px}
+.qr-prod-info{flex:1;padding:16px}
+.qr-prod-name{font-size:16px;font-weight:600;color:var(--ink);margin-bottom:4px}
+.qr-prod-desc{font-size:12px;color:var(--ink2);opacity:.7;line-height:1.6;margin-bottom:10px;font-family:'Noto Sans SC',sans-serif}
+.qr-prod-price{font-size:18px;color:var(--red);font-weight:600}
+.qr-prod-btn{float:right;padding:8px 16px;background:var(--ink);color:#fff;border:none;border-radius:8px;font-size:12px;cursor:pointer;font-family:'Noto Serif SC',serif}
+.qr-how{padding:0 20px 60px;background:var(--paper)}
+.qr-how-steps{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;max-width:600px;margin:0 auto}
+.qr-how-step{text-align:center;padding:20px 12px}
+.qr-how-num{width:40px;height:40px;border-radius:50%;background:var(--ink);color:var(--gold);font-family:'Ma Shan Zheng',cursive;font-size:20px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px}
+.qr-how-title{font-size:13px;font-weight:600;color:var(--ink);margin-bottom:4px}
+.qr-how-desc{font-size:11px;color:var(--ink2);opacity:.7;line-height:1.5;font-family:'Noto Sans SC',sans-serif}
+
+/* ===== MEMBOOK PAGE ===== */
+.membook-hero{background:linear-gradient(135deg,#1a0a2e 0%,#2d1854 100%);padding:50px 20px;text-align:center;position:relative;overflow:hidden}
+.book-float{position:relative;display:inline-block;margin-bottom:20px}
+.book-cover{width:120px;height:150px;background:linear-gradient(135deg,var(--gold),#8a6820);border-radius:4px 12px 12px 4px;margin:0 auto;display:flex;align-items:center;justify-content:center;box-shadow:-6px 6px 20px rgba(0,0,0,.5),4px 0 0 #7a5a10 inset;position:relative;animation:bookFloat 4s ease-in-out infinite}
+@keyframes bookFloat{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-12px) rotate(1deg)}}
+.book-cover-text{font-family:'Ma Shan Zheng',cursive;font-size:16px;color:rgba(255,255,255,.9);text-align:center;line-height:1.8}
+.membook-hero h1{font-family:'Ma Shan Zheng',cursive;font-size:32px;color:#fff;margin-bottom:8px;position:relative}
+.membook-hero p{font-size:14px;color:rgba(255,255,255,.6);max-width:400px;margin:0 auto;font-family:'Noto Sans SC',sans-serif;line-height:1.8}
+.membook-tools{padding:30px 20px;background:var(--paper)}
+.membook-tools-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;max-width:600px;margin:0 auto}
+.membook-tool{background:#fff;border-radius:14px;padding:18px;box-shadow:0 2px 12px var(--shadow);cursor:pointer;transition:all .3s}
+.membook-tool:hover{transform:translateY(-3px);box-shadow:0 8px 24px var(--shadow)}
+.membook-tool-icon{font-size:28px;margin-bottom:10px}
+.membook-tool-name{font-size:14px;font-weight:600;color:var(--ink);margin-bottom:4px}
+.membook-tool-desc{font-size:11px;color:var(--ink2);opacity:.7;line-height:1.5;font-family:'Noto Sans SC',sans-serif}
+.membook-pricing{padding:30px 20px 60px;background:var(--paper2)}
+.membook-price-cards{display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:500px;margin:0 auto}
+.membook-price-card{background:#fff;border-radius:16px;padding:22px;box-shadow:0 4px 20px var(--shadow);text-align:center}
+.membook-price-card.featured{background:linear-gradient(135deg,#1a0a2e,#2d1854);color:#fff}
+.membook-price-type{font-size:12px;letter-spacing:2px;margin-bottom:8px;font-family:'Noto Sans SC',sans-serif;opacity:.7}
+.membook-price-amount{font-family:'Ma Shan Zheng',cursive;font-size:36px;color:var(--gold);margin-bottom:4px}
+.membook-price-unit{font-size:11px;opacity:.6;margin-bottom:14px;font-family:'Noto Sans SC',sans-serif}
+.membook-price-features{text-align:left;margin-bottom:16px}
+.membook-price-feature{font-size:12px;padding:4px 0;border-bottom:1px solid rgba(0,0,0,.05);font-family:'Noto Sans SC',sans-serif;display:flex;align-items:center;gap:6px}
+.membook-price-btn{width:100%;padding:12px;border-radius:10px;font-size:13px;cursor:pointer;font-family:'Noto Serif SC',serif;border:none}
+
+/* ===== PRICING PAGE ===== */
+.pricing-hero{background:linear-gradient(135deg,var(--blue) 0%,#1a2a4a 100%);padding:50px 20px 40px;text-align:center}
+.pricing-hero h1{font-family:'Ma Shan Zheng',cursive;font-size:36px;color:#fff;margin-bottom:8px}
+.pricing-hero p{font-size:14px;color:rgba(255,255,255,.6);font-family:'Noto Sans SC',sans-serif}
+.pricing-cards{display:grid;gap:16px;max-width:700px;margin:0 auto;padding:30px 20px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.pricing-card{background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 4px 20px var(--shadow);position:relative;transition:transform .3s}
+.pricing-card:hover{transform:translateY(-4px)}
+.pricing-card.popular{border:2px solid var(--gold)}
+.popular-badge{position:absolute;top:14px;right:14px;background:var(--gold);color:#fff;font-size:10px;padding:3px 8px;border-radius:10px;font-family:'Noto Sans SC',sans-serif}
+.pricing-card-head{padding:24px 20px 20px;text-align:center}
+.plan-name{font-size:13px;letter-spacing:2px;color:var(--ink2);margin-bottom:8px;font-family:'Noto Sans SC',sans-serif}
+.plan-price{font-family:'Ma Shan Zheng',cursive;font-size:44px;color:var(--ink);line-height:1}
+.plan-price sup{font-size:20px;vertical-align:top;margin-top:10px}
+.plan-price span{font-size:14px;color:var(--ink2);opacity:.6;font-family:'Noto Sans SC',sans-serif}
+.plan-desc{font-size:12px;color:var(--ink2);opacity:.6;margin-top:8px;font-family:'Noto Sans SC',sans-serif}
+.plan-select-btn{width:calc(100% - 40px);margin:0 20px 20px;padding:12px;border-radius:10px;border:none;font-size:14px;cursor:pointer;font-family:'Noto Serif SC',serif}
+.plan-select-btn.free{background:var(--paper2);color:var(--ink2)}
+.plan-select-btn.premium{background:var(--gold);color:#fff}
+.plan-select-btn.lifetime{background:var(--ink);color:var(--gold)}
+.pricing-features{padding:0 20px;border-top:1px solid var(--paper3)}
+.pricing-feat-row{display:grid;grid-template-columns:1fr auto auto auto;gap:4px;padding:12px 0;border-bottom:1px solid var(--paper3);align-items:center;font-size:12px}
+.pricing-feat-row:last-child{border-bottom:none}
+.feat-name{color:var(--ink2);font-family:'Noto Sans SC',sans-serif}
+.feat-val{text-align:center;width:44px;font-size:13px}
+.feat-val.yes{color:var(--green)}
+.feat-val.no{color:var(--paper3)}
+.feat-val.unlimited{color:var(--gold);font-size:11px}
+.pricing-compare{max-width:700px;margin:0 auto;padding:0 20px 60px;overflow-x:auto}
+.compare-table{width:100%;border-collapse:collapse;font-size:12px;min-width:380px}
+.compare-table th{padding:12px 8px;text-align:center;background:var(--ink);color:#fff;font-family:'Noto Sans SC',sans-serif;font-weight:400}
+.compare-table th:first-child{text-align:left;border-radius:10px 0 0 0}
+.compare-table th:last-child{border-radius:0 10px 0 0}
+.compare-table td{padding:10px 8px;border-bottom:1px solid var(--paper3);text-align:center;font-family:'Noto Sans SC',sans-serif}
+.compare-table td:first-child{text-align:left;color:var(--ink2)}
+.compare-table tr:hover td{background:var(--paper)}
+
+/* ===== FLOATING CART ===== */
+.cart-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10050;display:none}
+.cart-backdrop.open{display:block}
+.cart-fab{position:fixed;bottom:20px;right:20px;width:50px;height:50px;background:var(--red);border-radius:50%;display:none;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(0,0,0,.3);cursor:pointer;z-index:10070;font-size:20px;border:none;color:#fff}
+.cart-fab.show{display:flex}
+.cart-badge{position:absolute;top:-4px;right:-4px;background:var(--gold);color:#fff;width:18px;height:18px;border-radius:50%;font-size:10px;display:flex;align-items:center;justify-content:center;font-family:'Noto Sans SC',sans-serif}
+.cart-drawer{position:fixed;bottom:0;left:0;right:0;background:var(--paper);border-radius:20px 20px 0 0;box-shadow:0 -8px 30px var(--shadowDeep);z-index:10080;transform:translateY(100%);transition:transform .3s;max-height:70vh;overflow-y:auto}
+.cart-drawer.open{transform:translateY(0)}
+.nav-cart-btn{padding:6px 10px;font-size:12px;background:var(--paper2);border:1px solid var(--paper3);border-radius:6px;cursor:pointer;font-family:'Noto Sans SC',sans-serif;color:var(--ink2);white-space:nowrap}
+.nav-cart-btn:hover{background:var(--gold);color:#fff;border-color:var(--gold)}
+.account-section-title{font-family:'Noto Serif SC',serif;font-size:16px;margin:24px 0 12px;color:var(--ink)}
+.account-memorial-list{display:flex;flex-direction:column;gap:10px}
+.account-memorial-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;background:var(--paper2);border-radius:10px}
+.account-memorial-meta{display:block;font-size:12px;color:var(--ink2);margin-top:4px}
+.nav-auth-user{background:none;border:none;cursor:pointer;font-size:12px;color:var(--ink);font-family:'Noto Sans SC',sans-serif;padding:6px 8px}
+.nav-auth-user:hover{color:var(--gold)}
+.cart-head{padding:16px 20px;border-bottom:1px solid var(--paper3);display:flex;justify-content:space-between;align-items:center}
+.cart-head h4{font-family:'Ma Shan Zheng',cursive;font-size:18px;color:var(--ink)}
+.cart-close{width:28px;height:28px;border-radius:50%;background:var(--paper3);border:none;cursor:pointer;font-size:14px}
+.cart-items{padding:12px 20px}
+.cart-item{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--paper3)}
+.cart-item-icon{font-size:28px;flex-shrink:0}
+.cart-item-name{flex:1;font-size:13px;color:var(--ink)}
+.cart-item-price{font-size:13px;color:var(--red);font-weight:600}
+.cart-item-del{width:24px;height:24px;border-radius:50%;background:var(--paper3);border:none;cursor:pointer;font-size:12px}
+.cart-total{padding:14px 20px;display:flex;justify-content:space-between;align-items:center;font-size:15px}
+.cart-total-num{color:var(--red);font-weight:600;font-size:18px}
+.cart-checkout{margin:0 20px 24px;padding:14px;background:var(--red);color:#fff;border:none;border-radius:10px;font-size:15px;cursor:pointer;font-family:'Noto Serif SC',serif;width:calc(100% - 40px)}
+
+/* ===== PHASE 2: guides, checkout, gallery ===== */
+.guides-hero{padding:48px 20px 24px;text-align:center;background:linear-gradient(180deg,var(--paper2),var(--paper))}
+.guides-hero h1{font-family:'Ma Shan Zheng',cursive;font-size:28px;color:var(--ink);margin-bottom:8px}
+.guides-hero p{font-size:14px;color:var(--ink2);line-height:1.8}
+.guides-section{padding:20px 20px 60px}
+.guides-admin{display:none;margin-bottom:24px;padding:20px;background:#fff;border-radius:12px;box-shadow:0 2px 12px var(--shadow)}
+.guides-admin h3{font-size:16px;margin-bottom:12px;color:var(--ink)}
+.guides-admin input,.guides-admin textarea,.guides-admin select{width:100%;margin-bottom:10px;padding:10px;border:1px solid var(--paper3);border-radius:8px;font-family:'Noto Sans SC',sans-serif;font-size:13px}
+.guides-admin textarea{min-height:120px;resize:vertical}
+.home-guides{padding:40px 20px;background:var(--paper2)}
+.home-guides .section-header{margin-bottom:16px}
+.checkout-grid{display:grid;gap:10px}
+.checkout-grid input,.checkout-grid textarea{width:100%;padding:10px;border:1px solid var(--paper3);border-radius:8px;font-size:13px;font-family:'Noto Sans SC',sans-serif}
+.checkout-grid textarea{min-height:60px;resize:vertical}
+.checkout-summary{background:var(--paper2);padding:12px;border-radius:8px;margin-bottom:12px;font-size:13px;line-height:1.8}
+.checkout-total-line{margin-top:8px;font-weight:600;color:var(--red)}
+.checkout-actions{display:grid;gap:8px;margin-top:12px}
+.checkout-actions .submit-btn.secondary{background:var(--ink);color:#fff}
+.product-detail-hero{height:160px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:64px}
+.product-detail-price{font-size:22px;color:var(--red);font-weight:600}
+.order-confirm{padding:60px 20px;text-align:center;max-width:480px;margin:0 auto}
+.order-confirm-icon{font-size:48px;margin-bottom:16px}
+.order-confirm h1{font-family:'Ma Shan Zheng',cursive;font-size:24px;margin-bottom:12px}
+.order-confirm-meta{font-size:14px;color:var(--ink2);line-height:2;margin-bottom:24px}
+.gallery-upload{margin-bottom:20px;padding:16px;background:var(--paper2);border-radius:12px}
+.gallery-upload-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
+.gallery-upload-row input[type=text]{flex:1;min-width:100px;padding:8px;border:1px solid var(--paper3);border-radius:8px;font-size:12px}
+.gallery-upload-hint{font-size:12px;color:var(--ink2)}
+.gallery-photo{width:100%;height:140px;object-fit:cover;border-radius:8px;cursor:pointer}
+.gallery-del{margin-top:6px;padding:4px 10px;font-size:11px;background:var(--paper3);border:none;border-radius:6px;cursor:pointer;color:var(--ink2)}
+.gallery-lightbox{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:900;display:none;align-items:center;justify-content:center;flex-direction:column;padding:20px}
+.gallery-lightbox.open{display:flex}
+.gallery-lightbox img{max-width:100%;max-height:70vh;border-radius:8px}
+.gallery-lightbox p{color:#fff;margin-top:12px;font-size:14px}
+.gallery-lightbox-close{position:absolute;top:20px;right:20px;background:#fff;border:none;border-radius:50%;width:36px;height:36px;cursor:pointer;font-size:18px}
+.auth-page{padding:48px 20px 80px;max-width:420px;margin:0 auto}
+.auth-page .auth-title{text-align:center;margin-bottom:8px}
+.auth-page .auth-sub{text-align:center;margin-bottom:20px}
+.tools-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;padding:20px}
+.tool-card{background:#fff;border-radius:14px;padding:20px 16px;text-align:center;border:1px solid var(--paper3);cursor:pointer;box-shadow:0 2px 12px var(--shadow)}
+.tool-card:hover{border-color:var(--gold);transform:translateY(-2px)}
+.tool-card-icon{font-size:32px;margin-bottom:8px}
+.tool-card-name{font-size:15px;font-weight:600;margin-bottom:4px}
+.tool-card-desc{font-size:12px;color:var(--ink2);font-family:'Noto Sans SC',sans-serif;line-height:1.6}
+.plaque-maker{padding:20px;display:grid;gap:20px;max-width:720px;margin:0 auto}
+.plaque-form{background:#fff;border-radius:14px;padding:20px;box-shadow:0 2px 12px var(--shadow)}
+.plaque-preview{background:linear-gradient(135deg,#2a2a2a,#1a1a1a);border-radius:14px;padding:24px;text-align:center;color:#e8dcc8;min-height:280px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px}
+.plaque-preview-name{font-family:'Ma Shan Zheng',cursive;font-size:28px}
+.plaque-preview-years{font-size:14px;opacity:.85}
+.plaque-preview-quote{font-size:13px;opacity:.75;max-width:260px;line-height:1.8}
+.shop-page-hero{padding:40px 20px 16px;text-align:center}
+.shop-page-hero h1{font-family:'Ma Shan Zheng',cursive;font-size:28px}
+</style>
+</head>
+<body>
+
+<!-- TOP NAV -->
+<nav class="top-nav">
+  <div class="nav-inner">
+    <div class="nav-logo" onclick="goPage('home')">念归处 <span>NIANGUICHU</span></div>
+    <div class="nav-links">
+      <div class="nav-link active" onclick="goPage('home')">首页</div>
+      <div class="nav-link" onclick="goPage('shop')">纪念商城</div>
+      <div class="nav-link" onclick="goPage('plaque')">铭牌定制</div>
+      <div class="nav-link" onclick="goPage('tools')">在线工具</div>
+      <div class="nav-link" onclick="goPage('guides')">丧葬百科</div>
+      <div class="nav-link" onclick="goPage('pricing')">会员</div>
+    </div>
+    <button type="button" class="nav-cart-btn" onclick="toggleCart()" title="购物车">🛒</button>
+    <div id="nav-auth-slot" class="nav-auth-slot"></div>
+    <button class="nav-btn" data-action="create-memorial">创建纪念馆</button>
+  </div>
+</nav>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- 祭奠心意模态 -->
+<div class="modal-overlay" id="ritual-modal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="ritual-modal-title">寄一份心意</h3>
+      <button type="button" class="modal-close" onclick="MemorialCore.closeRitualModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p id="ritual-modal-prompt" style="font-size:14px;line-height:1.8;color:var(--ink2);margin-bottom:12px"></p>
+      <textarea id="ritual-message" placeholder="这句话只有您和家族能看到。"></textarea>
+      <input type="text" id="ritual-author" placeholder="您的称呼（可选）" />
+      <button type="button" class="submit-btn" style="width:100%" onclick="MemorialCore.confirmRitual()">完成祭奠</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== HOME PAGE ==================== -->
+<div class="page active" id="page-home">
+  <div class="page-content">
+    <!-- HERO -->
+    <section class="hero">
+      <div class="hero-content">
+        <div class="hero-badge">Memorial &amp; remembrance</div>
+        <div class="hero-title">念归处</div>
+        <div class="hero-sub">华人数字纪念馆</div>
+        <div class="hero-tagline">以安静、清晰的方式保存生平与追思——<br>如同一篇值得反复阅读的纪念文章，留给家人与后代。</div>
+        <div class="hero-search">
+          <input type="text" placeholder="搜索纪念馆姓名…" id="searchInput">
+          <button class="hero-search-btn" onclick="doSearch()">搜索</button>
+        </div>
+        <div class="hero-stats">
+          <div class="hero-stat"><div class="hero-stat-num">12,847</div><div class="hero-stat-label">纪念馆</div></div>
+          <div class="hero-stat"><div class="hero-stat-num">89,320</div><div class="hero-stat-label">留言祈福</div></div>
+          <div class="hero-stat"><div class="hero-stat-num">240+</div><div class="hero-stat-label">合作殡仪馆</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FEATURES -->
+    <section class="features-section">
+      <div class="section-header">
+        <div class="section-title">平台功能</div>
+        <div class="section-sub">全方位守护珍贵记忆</div>
+      </div>
+      <div class="features-grid">
+        <div class="feature-card" onclick="goPage('profile-li')">
+          <div class="feature-icon">🏮</div>
+          <div class="feature-name">在线纪念馆</div>
+          <div class="feature-desc">永久保存生平照片影像留言</div>
+        </div>
+        <div class="feature-card" onclick="goPage('themes')">
+          <div class="feature-icon">🎨</div>
+          <div class="feature-name">精美主题</div>
+          <div class="feature-desc">50+中式主题模板个性定制</div>
+        </div>
+        <div class="feature-card" onclick="goPage('obituary')">
+          <div class="feature-icon">✍️</div>
+          <div class="feature-name">AI讣告撰写</div>
+          <div class="feature-desc">AI助手一键生成感人讣告</div>
+        </div>
+        <div class="feature-card" onclick="goPage('planning')">
+          <div class="feature-icon">📋</div>
+          <div class="feature-name">葬礼规划</div>
+          <div class="feature-desc">24项清单助您有序料理后事</div>
+        </div>
+        <div class="feature-card" onclick="goPage('qr')">
+          <div class="feature-icon">📱</div>
+          <div class="feature-name">QR铭牌</div>
+          <div class="feature-desc">扫码即达永久在线纪念馆</div>
+        </div>
+        <div class="feature-card" onclick="goPage('guides')">
+          <div class="feature-icon">📚</div>
+          <div class="feature-name">丧葬百科</div>
+          <div class="feature-desc">礼仪指南、悲伤疗愈与身后事务</div>
+        </div>
+        <div class="feature-card" onclick="goPage('membook')">
+          <div class="feature-icon">📖</div>
+          <div class="feature-name">纪念册</div>
+          <div class="feature-desc">精装印刷传家记忆</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- MEMORIALS -->
+    <section class="memorials-section">
+      <div class="section-header" style="padding-top:20px">
+        <div class="section-title">近期纪念馆</div>
+        <div class="section-sub">在此寄托思念</div>
+      </div>
+      <div class="memorials-grid">
+        <div class="memorial-card" onclick="goPage('profile-li')">
+          <div class="memorial-header" style="background:linear-gradient(135deg,#1a3a2a,#2d5a3a)">
+            <div class="memorial-avatar" style="background:linear-gradient(135deg,#4a7a5a,#2d5a3a)">明</div>
+          </div>
+          <div class="memorial-body">
+            <div class="memorial-name">李明德</div>
+            <div class="memorial-years">1938 — 2023 · 享年85岁</div>
+            <div class="memorial-quote">春蚕到死丝方尽，蜡炬成灰泪始干</div>
+          </div>
+          <div class="memorial-footer">
+            <div class="memorial-acts">🕯️ 3,247 次祭拜</div>
+            <button class="memorial-btn">前往纪念</button>
+          </div>
+        </div>
+        <div class="memorial-card" onclick="showToast('演示版仅开放李明德纪念馆，请点击第一张卡片')">
+          <div class="memorial-header" style="background:linear-gradient(135deg,#3a1a2a,#5a2a3a)">
+            <div class="memorial-avatar" style="background:linear-gradient(135deg,#7a3a5a,#5a2a3a)">秀</div>
+          </div>
+          <div class="memorial-body">
+            <div class="memorial-name">张秀英</div>
+            <div class="memorial-years">1945 — 2022 · 享年77岁</div>
+            <div class="memorial-quote">妈妈的手擀面，是世间最美的味道</div>
+          </div>
+          <div class="memorial-footer">
+            <div class="memorial-acts">🌸 2,108 次祭拜</div>
+            <button class="memorial-btn">前往纪念</button>
+          </div>
+        </div>
+        <div class="memorial-card" onclick="showToast('演示版仅开放李明德纪念馆，请点击第一张卡片')">
+          <div class="memorial-header" style="background:linear-gradient(135deg,#1a2a3a,#2a3a5a)">
+            <div class="memorial-avatar" style="background:linear-gradient(135deg,#3a5a7a,#2a3a5a)">淑</div>
+          </div>
+          <div class="memorial-body">
+            <div class="memorial-name">王淑兰</div>
+            <div class="memorial-years">1929 — 2021 · 享年92岁</div>
+            <div class="memorial-quote">经历百年风华，安然归于平静</div>
+          </div>
+          <div class="memorial-footer">
+            <div class="memorial-acts">☁️ 1,876 次祭拜</div>
+            <button class="memorial-btn">前往纪念</button>
+          </div>
+        </div>
+        <div class="memorial-card" onclick="showToast('更多纪念馆即将开放')">
+          <div class="memorial-header" style="background:linear-gradient(135deg,#2a1a0a,#4a2a10)">
+            <div class="memorial-avatar" style="background:linear-gradient(135deg,#7a4a20,#4a2a10)">+</div>
+          </div>
+          <div class="memorial-body">
+            <div class="memorial-name">更多纪念馆</div>
+            <div class="memorial-years">12,847 个纪念馆</div>
+            <div class="memorial-quote">每一位逝者都值得被温柔记住</div>
+          </div>
+          <div class="memorial-footer">
+            <div class="memorial-acts">🔍 搜索全部</div>
+            <button class="memorial-btn">浏览全部</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="home-guides">
+      <div class="section-header">
+        <div class="section-title">丧葬百科</div>
+        <div class="section-sub">读懂礼仪，温柔走过悲伤</div>
+      </div>
+      <div class="articles-grid" id="home-guides-grid"></div>
+      <div style="text-align:center;margin-top:20px">
+        <button class="submit-btn" onclick="goPage('guides')">浏览全部文章 →</button>
+      </div>
+    </section>
+  </div>
+</div>
+
+
+<!-- ==================== CREATE MEMORIAL ==================== -->
+<div class="page" id="page-create">
+  <div class="page-content">
+    <div class="create-inner"></div>
+  </div>
+</div>
+
+<!-- ==================== PROFILE: LI MINGDE ==================== -->
+<div class="page" id="page-profile-li">
+  <div class="page-content">
+    <div class="profile-hero">
+      <div class="profile-hero-deco"></div>
+      <div class="profile-avatar-wrap">
+        <div class="profile-avatar" style="background:linear-gradient(135deg,#4a7a5a,#2d5a3a)">明</div>
+        <div class="profile-qr-badge" onclick="goPage('qr')">📱</div>
+      </div>
+      <div class="profile-name">李明德</div>
+      <div class="profile-years">1938年4月3日 — 2023年11月18日 · 享年85岁</div>
+      <div class="profile-motto">「春蚕到死丝方尽，蜡炬成灰泪始干」<br>献身教育四十年，桃李满天下</div>
+      <p class="profile-enter-hint" id="profile-enter-hint"></p>
+      <div class="tribute-bar">
+        <button class="tribute-btn" onclick="addTribute(this,'蜡烛')"><span class="tribute-emoji">🕯️</span><span class="tribute-count" id="tc1">3,247</span><span class="tribute-label">点燃蜡烛</span></button>
+        <button class="tribute-btn" onclick="addTribute(this,'鲜花')"><span class="tribute-emoji">🌸</span><span class="tribute-count" id="tc2">2,186</span><span class="tribute-label">献花</span></button>
+        <button class="tribute-btn" onclick="addTribute(this,'焚香')"><span class="tribute-emoji">🪔</span><span class="tribute-count" id="tc3">1,840</span><span class="tribute-label">焚香</span></button>
+        <button class="tribute-btn" onclick="addTribute(this,'贡品')"><span class="tribute-emoji">🍊</span><span class="tribute-count" id="tc4">967</span><span class="tribute-label">供奉贡品</span></button>
+        <button class="tribute-btn" onclick="addTribute(this,'心语')"><span class="tribute-emoji">💌</span><span class="tribute-count" id="tc5">4,520</span><span class="tribute-label">寄心语</span></button>
+      </div>
+    </div>
+    <div class="profile-tabs">
+      <button class="profile-tab active" onclick="switchTab(this,'tab-bio-li')">生平故事</button>
+      <button class="profile-tab" onclick="switchTab(this,'tab-gallery-li')">影像相册</button>
+      <button class="profile-tab" onclick="switchTab(this,'tab-timeline-li')">人生历程</button>
+      <button class="profile-tab" onclick="switchTab(this,'tab-guestbook-li')">留言祈福</button>
+      <button class="profile-tab" onclick="switchTab(this,'tab-memory-li')">记忆共创</button>
+      <button class="profile-tab" onclick="switchTab(this,'tab-comemorial-li')">共祭时光</button>
+      <button class="profile-tab" onclick="switchTab(this,'tab-anniversary-li')">追思节律</button>
+      <button class="profile-tab" onclick="switchTab(this,'tab-family-li')">家族树</button>
+      <button class="profile-tab" onclick="switchTab(this,'tab-events-li')">纪念仪式</button>
+      <button class="profile-tab" onclick="switchTab(this,'tab-grief-li')">悲伤疗愈</button>
+      <button class="profile-tab" onclick="switchTab(this,'tab-shop-li')">纪念商店</button>
+    </div>
+
+    <!-- BIO (dynamic) -->
+    <div class="tab-content active" id="tab-bio-li"><p class="p0-empty" style="padding:24px">加载中…</p></div>
+
+    <!-- GALLERY (dynamic) -->
+    <div class="tab-content" id="tab-gallery-li"></div>
+
+    <!-- TIMELINE (dynamic) -->
+    <div class="tab-content" id="tab-timeline-li"></div>
+
+    <!-- P0: MEMORY CO-CREATE -->
+    <div class="tab-content" id="tab-memory-li"></div>
+    <!-- P0: CO-MEMORIAL STREAM -->
+    <div class="tab-content" id="tab-comemorial-li"></div>
+    <!-- P0: ANNIVERSARY RHYTHM -->
+    <div class="tab-content" id="tab-anniversary-li"></div>
+
+    <!-- GUESTBOOK -->
+    <div class="tab-content" id="tab-guestbook-li">
+      <div class="guestbook-form">
+        <textarea id="msgInput" placeholder="在此留下您对李明德先生的思念与祝福…" rows="3"></textarea>
+        <div class="form-row">
+          <input type="text" id="msgName" placeholder="您的姓名（可匿名）">
+          <button class="submit-btn" onclick="submitMsg()">发送留言</button>
+        </div>
+      </div>
+      <div class="messages-list" id="messages-li"></div>
+    </div>
+
+    <!-- FAMILY (dynamic) -->
+    <div class="tab-content" id="tab-family-li"></div>
+
+    <!-- EVENTS -->
+    <div class="tab-content" id="tab-events-li">
+      <div class="events-list">
+        <div class="event-card">
+          <div class="event-card-head">
+            <div class="event-card-type">线上 · 线下同步</div>
+            <div class="event-card-title">头七追思会</div>
+          </div>
+          <div class="event-card-body">
+            <div class="event-meta">
+              <div class="event-meta-item"><span class="event-meta-icon">🗓️</span><span>2023年11月25日（周日）上午10:00</span></div>
+              <div class="event-meta-item"><span class="event-meta-icon">📍</span><span>长沙市第一中学礼堂 / 线上同步直播</span></div>
+              <div class="event-meta-item"><span class="event-meta-icon">📝</span><span>在校同学、历届校友及亲友均可参加。现场设签到台，提供追思册供留言。线上参与者可通过腾讯会议实时连线。</span></div>
+            </div>
+            <div class="rsvp-row">
+              <select class="rsvp-select">
+                <option>是否参加？</option>
+                <option>线下出席</option>
+                <option>线上参与</option>
+                <option>无法参加，心意同在</option>
+              </select>
+              <button class="rsvp-btn" onclick="showToast('RSVP已提交，感谢您的参与')">确认回复</button>
+            </div>
+            <div class="virtual-btns">
+              <button class="virtual-btn" onclick="showToast('正在连接腾讯会议…')">📹 腾讯会议</button>
+              <button class="virtual-btn" onclick="showToast('正在连接微信视频…')">💬 微信视频</button>
+              <button class="virtual-btn" onclick="showToast('正在连接Zoom…')">🔵 Zoom</button>
+            </div>
+            <div class="map-placeholder" onclick="showToast('即将跳转地图')">🗺️ 查看地图导航 →</div>
+          </div>
+        </div>
+        <div class="event-card">
+          <div class="event-card-head" style="background:linear-gradient(135deg,var(--green),#1a3a1a)">
+            <div class="event-card-type">年度纪念</div>
+            <div class="event-card-title">周年忌日追思</div>
+          </div>
+          <div class="event-card-body">
+            <div class="event-meta">
+              <div class="event-meta-item"><span class="event-meta-icon">🗓️</span><span>2024年11月18日（周一）上午9:00</span></div>
+              <div class="event-meta-item"><span class="event-meta-icon">📍</span><span>岳麓山陵园 / 家庭私人仪式</span></div>
+            </div>
+            <div class="rsvp-row">
+              <select class="rsvp-select">
+                <option>是否参加？</option>
+                <option>参加</option>
+                <option>因故无法参加</option>
+              </select>
+              <button class="rsvp-btn" onclick="showToast('RSVP已提交')">确认回复</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- GRIEF -->
+    <div class="tab-content" id="tab-grief-li">
+      <div class="articles-filter">
+        <div class="filter-tag active" onclick="filterArticles(this,'all')">全部</div>
+        <div class="filter-tag" onclick="filterArticles(this,'grief')">悲伤疗愈</div>
+        <div class="filter-tag" onclick="filterArticles(this,'ritual')">丧礼礼仪</div>
+        <div class="filter-tag" onclick="filterArticles(this,'memory')">守护记忆</div>
+        <div class="filter-tag" onclick="filterArticles(this,'child')">与孩子谈生死</div>
+        <div class="filter-tag" onclick="filterArticles(this,'legal')">身后事务</div>
+      </div>
+      <div class="articles-grid" id="articles-li"></div>
+    </div>
+
+    <!-- SHOP -->
+    <div class="tab-content" id="tab-shop-li">
+      <div class="shop-trust">
+        <div class="shop-trust-item"><span>🚚</span><span>全国包邮</span></div>
+        <div class="shop-trust-item"><span>🎀</span><span>精美包装</span></div>
+        <div class="shop-trust-item"><span>🌸</span><span>当日发货</span></div>
+        <div class="shop-trust-item"><span>💝</span><span>品质保证</span></div>
+      </div>
+      <div class="shop-cats">
+        <div class="shop-cat active" onclick="filterShop(this,'all')">全部</div>
+        <div class="shop-cat" onclick="filterShop(this,'flower')">鲜花花圈</div>
+        <div class="shop-cat" onclick="filterShop(this,'candle')">蜡烛香品</div>
+        <div class="shop-cat" onclick="filterShop(this,'gift')">纪念礼品</div>
+        <div class="shop-cat" onclick="filterShop(this,'plant')">种植纪念树</div>
+      </div>
+      <div class="products-grid" id="shop-products-grid">
+        <p class="p0-empty" style="padding:24px;grid-column:1/-1">加载商品…</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ==================== THEMES PAGE ==================== -->
+<div class="page" id="page-themes">
+  <div class="page-content">
+    <div class="themes-hero">
+      <h1>主题模板</h1>
+      <p>50余款精心设计的中式主题，让纪念馆更具文化温度</p>
+    </div>
+    <div class="themes-filter">
+      <div class="filter-tag active" onclick="filterThemes(this,'all')">全部风格</div>
+      <div class="filter-tag" onclick="filterThemes(this,'ink')">水墨传统</div>
+      <div class="filter-tag" onclick="filterThemes(this,'floral')">花卉自然</div>
+      <div class="filter-tag" onclick="filterThemes(this,'modern')">简约现代</div>
+      <div class="filter-tag" onclick="filterThemes(this,'seasonal')">二十四节气</div>
+    </div>
+    <div class="themes-grid" id="themes-grid">
+      <!-- generated by JS -->
+    </div>
+  </div>
+</div>
+
+<!-- ==================== OBITUARY PAGE ==================== -->
+<div class="page" id="page-obituary">
+  <div class="page-content">
+    <div class="obit-hero">
+      <h1>AI讣告撰写助手</h1>
+      <p>用温柔的文字，为挚爱写下最后的告白</p>
+    </div>
+    <div style="padding:24px 20px 10px">
+      <div class="obit-steps">
+        <div class="obit-step active" id="obit-step-1"><div class="obit-step-num">1</div><div class="obit-step-label">基本信息</div></div>
+        <div class="obit-step" id="obit-step-2"><div class="obit-step-num">2</div><div class="obit-step-label">生平故事</div></div>
+        <div class="obit-step" id="obit-step-3"><div class="obit-step-num">3</div><div class="obit-step-label">预览发布</div></div>
+      </div>
+    </div>
+    <div class="obit-form-wrap">
+      <!-- Step 1 -->
+      <div id="obit-content-1">
+        <div class="obit-step-content">
+          <h3>基本信息</h3>
+          <div class="form-row-2">
+            <div class="form-field"><label class="form-label">姓名</label><input class="form-input" placeholder="逝者姓名" id="obit-name"></div>
+            <div class="form-field"><label class="form-label">性别</label>
+              <select class="form-input" id="obit-gender"><option>男</option><option>女</option></select>
+            </div>
+          </div>
+          <div class="form-row-2">
+            <div class="form-field"><label class="form-label">出生日期</label><input class="form-input" type="date" id="obit-dob"></div>
+            <div class="form-field"><label class="form-label">辞世日期</label><input class="form-input" type="date" id="obit-dod"></div>
+          </div>
+          <div class="form-field"><label class="form-label">出生地</label><input class="form-input" placeholder="如：湖南省长沙市" id="obit-birth"></div>
+          <div class="form-field"><label class="form-label">职业 / 身份</label><input class="form-input" placeholder="如：教师、工程师、家庭主妇…" id="obit-job"></div>
+          <div class="form-field"><label class="form-label">家庭关系</label><input class="form-input" placeholder="如：育有二子一女，孙子三名" id="obit-family"></div>
+        </div>
+        <button class="obit-next-btn" onclick="obitNext(2)">下一步：生平故事 →</button>
+      </div>
+      <!-- Step 2 -->
+      <div id="obit-content-2" style="display:none">
+        <div class="obit-step-content">
+          <h3>生平故事</h3>
+          <div class="form-field"><label class="form-label">主要成就与贡献</label><textarea class="form-textarea" id="obit-achievements" placeholder="工作成就、人生亮点、对家庭社会的贡献…"></textarea></div>
+          <div class="form-field"><label class="form-label">兴趣爱好与个性特质</label><textarea class="form-textarea" id="obit-hobbies" placeholder="喜欢的事情、让人难忘的特质、趣事…" style="min-height:80px"></textarea></div>
+          <div class="form-field">
+            <label class="form-label">性格词汇（可多选）</label>
+            <div class="tags-row" id="virtue-tags">
+              <div class="virtue-tag" onclick="toggleVirtue(this)">勤劳</div>
+              <div class="virtue-tag" onclick="toggleVirtue(this)">善良</div>
+              <div class="virtue-tag" onclick="toggleVirtue(this)">坚强</div>
+              <div class="virtue-tag" onclick="toggleVirtue(this)">幽默</div>
+              <div class="virtue-tag" onclick="toggleVirtue(this)">温柔</div>
+              <div class="virtue-tag" onclick="toggleVirtue(this)">智慧</div>
+              <div class="virtue-tag" onclick="toggleVirtue(this)">慷慨</div>
+              <div class="virtue-tag" onclick="toggleVirtue(this)">敬业</div>
+              <div class="virtue-tag" onclick="toggleVirtue(this)">乐观</div>
+              <div class="virtue-tag" onclick="toggleVirtue(this)">虔诚</div>
+            </div>
+          </div>
+          <div class="form-field"><label class="form-label">一句代表性的话（可选）</label><input class="form-input" placeholder="他/她常说的一句话，或家人想说的话…" id="obit-quote"></div>
+        </div>
+        <div class="obit-nav-btns">
+          <button class="obit-back-btn" onclick="obitNext(1)">← 返回</button>
+          <button class="obit-next-btn" onclick="obitGenerate()">✨ AI生成讣告初稿</button>
+        </div>
+      </div>
+      <!-- Step 3 -->
+      <div id="obit-content-3" style="display:none">
+        <div class="obit-step-content">
+          <h3>讣告预览</h3>
+          <div class="ai-result" id="obit-result">请完成前两步信息填写后，AI将为您生成感人的讣告初稿…</div>
+        </div>
+        <div class="obit-actions">
+          <div class="obit-action-btn" onclick="obitCopy()">📋 复制文本</div>
+          <div class="obit-action-btn" onclick="window.print()">📄 打印 / 存PDF</div>
+          <div class="obit-action-btn" onclick="showToast('报纸投稿功能筹备中，可先复制文本')">📰 投稿报纸</div>
+          <div class="obit-action-btn primary" onclick="obitPublish()">🏮 发布到纪念馆</div>
+        </div>
+        <div class="obit-nav-btns" style="margin-top:14px">
+          <button class="obit-back-btn" onclick="obitNext(2)">← 修改信息</button>
+          <button class="obit-next-btn" onclick="obitGenerate()" style="background:var(--blue)">🔄 重新生成</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== PLANNING PAGE ==================== -->
+<div class="page" id="page-planning">
+  <div class="page-content">
+    <div class="planning-hero">
+      <h1>葬礼规划清单</h1>
+      <p>在最艰难的时刻，让我们陪您有序前行</p>
+    </div>
+    <div class="planning-progress">
+      <div class="progress-header">
+        <span class="progress-label">完成进度</span>
+        <span class="progress-pct" id="pct-label">0 / 24 项</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" id="pct-bar" style="width:0%"></div></div>
+    </div>
+    <div class="planning-cats" id="planning-cats">
+      <!-- generated by JS -->
+    </div>
+  </div>
+</div>
+
+<!-- ==================== GUIDES PAGE ==================== -->
+<div class="page" id="page-guides">
+  <div class="page-content">
+    <div class="guides-hero">
+      <h1>丧葬百科</h1>
+      <p>礼仪指南、悲伤疗愈与身后事务——在艰难时刻，为您提供可靠参考</p>
+    </div>
+    <div class="guides-section">
+      <div class="guides-admin" id="guides-admin">
+        <h3>发布文章（内容管理员）</h3>
+        <input type="text" id="ga-title" placeholder="文章标题" />
+        <select id="ga-cat">
+          <option value="grief">悲伤疗愈</option>
+          <option value="ritual">丧礼礼仪</option>
+          <option value="memory">守护记忆</option>
+          <option value="child">与孩子谈生死</option>
+          <option value="legal">身后事务</option>
+          <option value="custom">自定义</option>
+        </select>
+        <input type="text" id="ga-catlabel" placeholder="分类显示名（如：丧礼礼仪）" />
+        <input type="text" id="ga-emoji" placeholder="图标 emoji（可选）" />
+        <input type="text" id="ga-summary" placeholder="摘要（列表页显示）" />
+        <textarea id="ga-body" placeholder="正文（段落之间空一行）"></textarea>
+        <button type="button" class="submit-btn" onclick="MemorialContent.submitGuideArticle()">发布</button>
+      </div>
+      <div class="articles-filter">
+        <div class="filter-tag active" onclick="filterArticles(this,'all','guides')">全部</div>
+        <div class="filter-tag" onclick="filterArticles(this,'grief','guides')">悲伤疗愈</div>
+        <div class="filter-tag" onclick="filterArticles(this,'ritual','guides')">丧礼礼仪</div>
+        <div class="filter-tag" onclick="filterArticles(this,'memory','guides')">守护记忆</div>
+        <div class="filter-tag" onclick="filterArticles(this,'child','guides')">与孩子谈生死</div>
+        <div class="filter-tag" onclick="filterArticles(this,'legal','guides')">身后事务</div>
+      </div>
+      <div class="articles-grid" id="guides-articles-grid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== AUTH PAGE ==================== -->
+<div class="page" id="page-auth">
+  <div class="page-content auth-page">
+    <div id="auth-page-body"></div>
+  </div>
+</div>
+
+<!-- ==================== ACCOUNT PAGE ==================== -->
+<div class="page" id="page-account">
+  <div class="page-content auth-page" style="max-width:520px">
+    <div id="account-page-body"></div>
+  </div>
+</div>
+
+<!-- ==================== SHOP PAGE ==================== -->
+<div class="page" id="page-shop">
+  <div class="page-content">
+    <div class="shop-page-hero">
+      <h1>纪念商城</h1>
+      <p style="font-size:14px;color:var(--ink2);margin-top:8px">鲜花、香品、纪念礼品与 QR 铭牌 — 全国配送</p>
+    </div>
+    <div style="padding:0 20px 60px">
+      <div class="shop-trust">
+        <div class="shop-trust-item"><span>🚚</span><span>全国包邮</span></div>
+        <div class="shop-trust-item"><span>🎀</span><span>精美包装</span></div>
+        <div class="shop-trust-item"><span>🌸</span><span>当日发货</span></div>
+        <div class="shop-trust-item"><span>💝</span><span>品质保证</span></div>
+      </div>
+      <div class="shop-cats" id="shop-page-cats">
+        <div class="shop-cat active" onclick="filterShop(this,'all')">全部</div>
+        <div class="shop-cat" onclick="filterShop(this,'flower')">鲜花花圈</div>
+        <div class="shop-cat" onclick="filterShop(this,'candle')">蜡烛香品</div>
+        <div class="shop-cat" onclick="filterShop(this,'gift')">纪念礼品</div>
+        <div class="shop-cat" onclick="filterShop(this,'plant')">种植纪念树</div>
+      </div>
+      <div class="products-grid" id="shop-page-grid">
+        <p class="p0-empty" style="padding:24px;grid-column:1/-1">加载商品…</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== PLAQUE MAKER PAGE ==================== -->
+<div class="page" id="page-plaque">
+  <div class="page-content">
+    <div class="guides-hero">
+      <h1>铭牌定制</h1>
+      <p>填写刻字信息，预览效果，一键加入购物车</p>
+    </div>
+    <div class="plaque-maker">
+      <div class="plaque-form">
+        <div class="auth-field"><label>逝者姓名</label><input id="plaque-name" type="text" value="李明德" oninput="MemorialCommerce.updatePlaquePreview()" /></div>
+        <div class="auth-field"><label>生卒年份</label><input id="plaque-years" type="text" value="1938 — 2023" oninput="MemorialCommerce.updatePlaquePreview()" /></div>
+        <div class="auth-field"><label>材质</label>
+          <select id="plaque-material" onchange="MemorialCommerce.updatePlaquePreview()">
+            <option value="stainless-plaque">不锈钢铭牌 ¥298</option>
+            <option value="brass-plaque">黄铜典藏铭牌 ¥588</option>
+            <option value="qr-plaque">QR二维码铭牌 ¥388</option>
+          </select>
+        </div>
+        <div class="auth-field"><label>刻字内容（挽联/诗句）</label><textarea id="plaque-inscription" rows="3" oninput="MemorialCommerce.updatePlaquePreview()">春蚕到死丝方尽，蜡炬成灰泪始干</textarea></div>
+        <button type="button" class="submit-btn" style="width:100%" onclick="MemorialCommerce.addPlaqueToCart()">加入购物车</button>
+        <button type="button" class="obit-back-btn" style="width:100%;margin-top:10px" onclick="goPage('shop')">浏览更多商品</button>
+      </div>
+      <div class="plaque-preview" id="plaque-preview">
+        <div id="plaque-preview-qr"></div>
+        <div class="plaque-preview-name" id="plaque-preview-name">李明德</div>
+        <div class="plaque-preview-years" id="plaque-preview-years">1938 — 2023</div>
+        <div class="plaque-preview-quote" id="plaque-preview-quote">春蚕到死丝方尽，蜡炬成灰泪始干</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== TOOLS PAGE ==================== -->
+<div class="page" id="page-tools">
+  <div class="page-content">
+    <div class="guides-hero">
+      <h1>在线工具</h1>
+      <p>讣告撰写、葬礼规划、纪念册与更多实用功能</p>
+    </div>
+    <div class="tools-grid">
+      <div class="tool-card" onclick="goPage('obituary')"><div class="tool-card-icon">✍️</div><div class="tool-card-name">AI 讣告撰写</div><div class="tool-card-desc">三步生成感人讣告并发布到纪念馆</div></div>
+      <div class="tool-card" onclick="goPage('planning')"><div class="tool-card-icon">📋</div><div class="tool-card-name">葬礼规划清单</div><div class="tool-card-desc">24 项任务清单，有序料理后事</div></div>
+      <div class="tool-card" onclick="goPage('membook')"><div class="tool-card-icon">📖</div><div class="tool-card-name">纪念册制作</div><div class="tool-card-desc">智能排版，支持数字版与精装印刷</div></div>
+      <div class="tool-card" onclick="goPage('themes')"><div class="tool-card-icon">🎨</div><div class="tool-card-name">主题模板</div><div class="tool-card-desc">50+ 中式纪念馆主题</div></div>
+      <div class="tool-card" onclick="goPage('qr')"><div class="tool-card-icon">📱</div><div class="tool-card-name">QR 铭牌介绍</div><div class="tool-card-desc">了解材质与订购流程</div></div>
+      <div class="tool-card" onclick="goPage('guides')"><div class="tool-card-icon">📚</div><div class="tool-card-name">丧葬百科</div><div class="tool-card-desc">礼仪、疗愈与身后事务指南</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== QR PAGE ==================== -->
+<div class="page" id="page-qr">
+  <div class="page-content">
+    <div class="qr-hero">
+      <div class="qr-hero-circles">
+        <div class="qr-circle" style="width:300px;height:300px;top:50%;left:50%;transform:translate(-50%,-50%)"></div>
+        <div class="qr-circle" style="width:500px;height:500px;top:50%;left:50%;transform:translate(-50%,-50%)"></div>
+        <div class="qr-circle" style="width:700px;height:700px;top:50%;left:50%;transform:translate(-50%,-50%)"></div>
+      </div>
+      <h1>QR扫码铭牌</h1>
+      <p>将数字纪念馆与实体墓碑相连——一块铭牌，承载永恒记忆</p>
+      <div class="qr-demo">
+        <div class="qr-demo-label">示意样品</div>
+        <div class="qr-svg-wrap">
+          <svg width="140" height="140" viewBox="0 0 140 140">
+            <rect width="140" height="140" fill="white"/>
+            <!-- QR pattern simulation -->
+            <rect x="10" y="10" width="50" height="50" fill="none" stroke="#000" stroke-width="4"/>
+            <rect x="20" y="20" width="30" height="30" fill="#000"/>
+            <rect x="80" y="10" width="50" height="50" fill="none" stroke="#000" stroke-width="4"/>
+            <rect x="90" y="20" width="30" height="30" fill="#000"/>
+            <rect x="10" y="80" width="50" height="50" fill="none" stroke="#000" stroke-width="4"/>
+            <rect x="20" y="90" width="30" height="30" fill="#000"/>
+            <rect x="70" y="70" width="8" height="8" fill="#000"/>
+            <rect x="82" y="70" width="8" height="8" fill="#000"/>
+            <rect x="94" y="70" width="8" height="8" fill="#000"/>
+            <rect x="106" y="70" width="8" height="8" fill="#000"/>
+            <rect x="118" y="70" width="8" height="8" fill="#000"/>
+            <rect x="70" y="82" width="8" height="8" fill="#000"/>
+            <rect x="94" y="82" width="8" height="8" fill="#000"/>
+            <rect x="118" y="82" width="8" height="8" fill="#000"/>
+            <rect x="70" y="94" width="8" height="8" fill="#000"/>
+            <rect x="82" y="94" width="8" height="8" fill="#000"/>
+            <rect x="106" y="94" width="8" height="8" fill="#000"/>
+            <rect x="70" y="106" width="8" height="8" fill="#000"/>
+            <rect x="94" y="106" width="8" height="8" fill="#000"/>
+            <rect x="106" y="106" width="8" height="8" fill="#000"/>
+            <rect x="118" y="106" width="8" height="8" fill="#000"/>
+            <rect x="70" y="118" width="8" height="8" fill="#000"/>
+            <rect x="82" y="118" width="8" height="8" fill="#000"/>
+            <rect x="94" y="118" width="8" height="8" fill="#000"/>
+            <rect x="118" y="118" width="8" height="8" fill="#000"/>
+          </svg>
+        </div>
+        <div class="qr-demo-name">李明德</div>
+        <div class="qr-demo-years">1938 — 2023</div>
+      </div>
+      <div class="qr-features">
+        <div class="qr-feat"><div class="qr-feat-icon">📱</div><div class="qr-feat-title">即扫即达</div><div class="qr-feat-desc">扫一扫直接进入纪念馆，无需搜索</div></div>
+        <div class="qr-feat"><div class="qr-feat-icon">🌧️</div><div class="qr-feat-title">防水防腐</div><div class="qr-feat-desc">户外专用材质，历经风雨永不褪色</div></div>
+        <div class="qr-feat"><div class="qr-feat-icon">♾️</div><div class="qr-feat-title">永久有效</div><div class="qr-feat-desc">链接永不失效，记忆永续传承</div></div>
+        <div class="qr-feat"><div class="qr-feat-icon">🎨</div><div class="qr-feat-title">定制刻字</div><div class="qr-feat-desc">姓名、年份、诗句均可激光雕刻</div></div>
+        <div class="qr-feat"><div class="qr-feat-icon">📦</div><div class="qr-feat-title">全国包邮</div><div class="qr-feat-desc">精美礼盒包装，7-15个工作日送达</div></div>
+        <div class="qr-feat"><div class="qr-feat-icon">🛠️</div><div class="qr-feat-title">专业安装</div><div class="qr-feat-desc">附带安装工具包，简单固定即可</div></div>
+      </div>
+    </div>
+    <div class="qr-products">
+      <div class="section-header"><div class="section-title">铭牌产品</div><div class="section-sub">三款材质，各有千秋</div></div>
+      <div class="qr-product-cards" id="qr-products-grid">
+        <p class="p0-empty" style="padding:16px">加载商品…</p>
+      </div>
+    </div>
+    <div class="qr-how">
+      <div class="section-header"><div class="section-title">使用流程</div><div class="section-sub">三步完成，简单明了</div></div>
+      <div class="qr-how-steps">
+        <div class="qr-how-step"><div class="qr-how-num">一</div><div class="qr-how-title">创建纪念馆</div><div class="qr-how-desc">在念归处创建您的数字纪念馆，上传照片资料</div></div>
+        <div class="qr-how-step"><div class="qr-how-num">二</div><div class="qr-how-title">订购铭牌</div><div class="qr-how-desc">选择材质款式，填写定制信息，我们负责制作</div></div>
+        <div class="qr-how-step"><div class="qr-how-num">三</div><div class="qr-how-title">安装使用</div><div class="qr-how-desc">收到铭牌后按说明安装，扫码即可访问纪念馆</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== MEMBOOK PAGE ==================== -->
+<div class="page" id="page-membook">
+  <div class="page-content">
+    <div class="membook-hero">
+      <div class="book-float">
+        <div class="book-cover">
+          <div class="book-cover-text">永<br>远<br>的<br>记<br>忆</div>
+        </div>
+      </div>
+      <h1>纪念册制作</h1>
+      <p>将散落的记忆凝聚成一本可以传家的精装纪念册</p>
+    </div>
+    <div class="membook-tools">
+      <div class="section-header"><div class="section-title">制作工具</div><div class="section-sub">六大功能，一键完成</div></div>
+      <div class="membook-tools-grid">
+        <div class="membook-tool" onclick="goPage('profile-li');switchTab(document.querySelector('#page-profile-li .profile-tab:nth-child(2)'),'tab-gallery-li')"><div class="membook-tool-icon">📸</div><div class="membook-tool-name">智能照片整理</div><div class="membook-tool-desc">在纪念馆相册上传与管理照片</div></div>
+        <div class="membook-tool" onclick="goPage('obituary')"><div class="membook-tool-icon">✍️</div><div class="membook-tool-name">AI传记撰写</div><div class="membook-tool-desc">智能生成传记，可反复修改润色</div></div>
+        <div class="membook-tool" onclick="goPage('obituary')"><div class="membook-tool-icon">🎬</div><div class="membook-tool-name">传记与讣告</div><div class="membook-tool-desc">使用 AI 讣告工具撰写并发布</div></div>
+        <div class="membook-tool" onclick="goPage('profile-li')"><div class="membook-tool-icon">💬</div><div class="membook-tool-name">家族留言板</div><div class="membook-tool-desc">汇集家人朋友的留言融入纪念册</div></div>
+        <div class="membook-tool" onclick="goPage('themes')"><div class="membook-tool-icon">🎨</div><div class="membook-tool-name">主题版式设计</div><div class="membook-tool-desc">50+中式版式，专业排版效果</div></div>
+        <div class="membook-tool" onclick="showToast('印刷下单功能即将上线')"><div class="membook-tool-icon">🖨️</div><div class="membook-tool-name">一键印刷下单</div><div class="membook-tool-desc">支持精装、平装，全国物流配送</div></div>
+      </div>
+    </div>
+    <div class="membook-pricing">
+      <div class="section-header"><div class="section-title">纪念册套餐</div></div>
+      <div class="membook-price-cards">
+        <div class="membook-price-card">
+          <div class="membook-price-type">数字版</div>
+          <div class="membook-price-amount">¥199</div>
+          <div class="membook-price-unit">永久收藏</div>
+          <div class="membook-price-features">
+            <div class="membook-price-feature">✓ PDF高清下载</div>
+            <div class="membook-price-feature">✓ 无限编辑修改</div>
+            <div class="membook-price-feature">✓ 在线分享链接</div>
+            <div class="membook-price-feature">✓ 50页容量</div>
+          </div>
+          <button class="membook-price-btn" style="background:var(--paper2);color:var(--ink)" onclick="goPage('obituary')">开始制作</button>
+        </div>
+        <div class="membook-price-card featured">
+          <div class="membook-price-type" style="color:rgba(255,255,255,.6)">精装实体版</div>
+          <div class="membook-price-amount">¥688</div>
+          <div class="membook-price-unit" style="color:rgba(255,255,255,.5)">含一本精装书</div>
+          <div class="membook-price-features">
+            <div class="membook-price-feature" style="color:rgba(255,255,255,.8);border-color:rgba(255,255,255,.1)">✓ 精装硬封面</div>
+            <div class="membook-price-feature" style="color:rgba(255,255,255,.8);border-color:rgba(255,255,255,.1)">✓ 120g哑光内页</div>
+            <div class="membook-price-feature" style="color:rgba(255,255,255,.8);border-color:rgba(255,255,255,.1)">✓ 全国包邮</div>
+            <div class="membook-price-feature" style="color:rgba(255,255,255,.8);border-color:rgba(255,255,255,.1)">✓ 100页容量</div>
+          </div>
+          <button class="membook-price-btn" style="background:var(--gold);color:#fff" onclick="goPage('shop')">立即订制</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== PRICING PAGE ==================== -->
+<div class="page" id="page-pricing">
+  <div class="page-content">
+    <div class="pricing-hero">
+      <h1>会员方案</h1>
+      <p>选择适合您的方案，让记忆永续传承</p>
+    </div>
+    <div class="pricing-cards">
+      <div class="pricing-card">
+        <div class="pricing-card-head">
+          <div class="plan-name">免费版</div>
+          <div class="plan-price"><sup>¥</sup>0</div>
+          <div class="plan-desc">基础纪念，永久免费</div>
+        </div>
+        <button class="plan-select-btn free" onclick="showToast('免费版已包含基础功能')">免费开始</button>
+        <div class="pricing-features">
+          <div class="pricing-feat-row"><span class="feat-name">纪念馆页面</span><span class="feat-val yes">✓</span><span></span><span></span></div>
+          <div class="pricing-feat-row"><span class="feat-name">照片上传</span><span class="feat-val">5张</span><span></span><span></span></div>
+          <div class="pricing-feat-row"><span class="feat-name">基础主题</span><span class="feat-val yes">✓</span><span></span><span></span></div>
+          <div class="pricing-feat-row"><span class="feat-name">留言功能</span><span class="feat-val yes">✓</span><span></span><span></span></div>
+          <div class="pricing-feat-row"><span class="feat-name">AI讣告</span><span class="feat-val no">✗</span><span></span><span></span></div>
+          <div class="pricing-feat-row"><span class="feat-name">视频上传</span><span class="feat-val no">✗</span><span></span><span></span></div>
+          <div class="pricing-feat-row"><span class="feat-name">自定义域名</span><span class="feat-val no">✗</span><span></span><span></span></div>
+        </div>
+      </div>
+      <div class="pricing-card popular">
+        <div class="popular-badge">最受欢迎</div>
+        <div class="pricing-card-head">
+          <div class="plan-name">高级版</div>
+          <div class="plan-price"><sup>¥</sup>399<span>/年</span></div>
+          <div class="plan-desc">完整功能，家族共享</div>
+        </div>
+        <button class="plan-select-btn premium" onclick="MemorialCommerce.purchaseMembership('plan-premium-year')">升级高级版 · ¥399</button>
+        <div class="pricing-features">
+          <div class="pricing-feat-row"><span class="feat-name">纪念馆页面</span><span class="feat-val yes">✓</span><span></span><span></span></div>
+          <div class="pricing-feat-row"><span class="feat-name">照片上传</span><span class="feat-val unlimited">无限</span><span></span><span></span></div>
+          <div class="pricing-feat-row"><span class="feat-name">全部主题</span><span class="feat-val yes">✓</span><span></span><span></span></div>
+          <div class="pricing-feat-row"><span class="feat-name">留言功能</span><span class="feat-val yes">✓</span><span></span><span></span></div>
+          <div class="pricing-feat-row"><span class="feat-name">AI讣告</span><span class="feat-val yes">✓</span><span></span><span></span></div>
+          <div class="pricing-feat-row"><span class="feat-name">视频上传</span><span class="feat-val unlimited">无限</span><span></span><span></span></div>
+          <div class="pricing-feat-row"><span class="feat-name">自定义域名</span><span class="feat-val yes">✓</span><span></span><span></span></div>
+        </div>
+      </div>
+      <div class="pricing-card">
+        <div class="pricing-card-head">
+          <div class="plan-name">终身版</div>
+          <div class="plan-price"><sup>¥</sup>999</div>
+          <div class="plan-desc">一次付费，永久拥有</div>
+        </div>
+        <button class="plan-select-btn lifetime" onclick="MemorialCommerce.purchaseMembership('plan-lifetime')">购买终身版 · ¥999</button>
+        <div class="pricing-features">
+          <div class="pricing-feat-row"><span class="feat-name">全部高级功能</span><span class="feat-val yes">✓</span><span></span><span></span></div>
+          <div class="pricing-feat-row"><span class="feat-name">多个纪念馆</span><span class="feat-val">最多5个</span><span></span><span></span></div>
+          <div class="pricing-feat-row"><span class="feat-name">优先客服</span><span class="feat-val yes">✓</span><span></span><span></span></div>
+          <div class="pricing-feat-row"><span class="feat-name">纪念册折扣</span><span class="feat-val">8折</span><span></span><span></span></div>
+          <div class="pricing-feat-row"><span class="feat-name">QR铭牌折扣</span><span class="feat-val">8折</span><span></span><span></span></div>
+          <div class="pricing-feat-row"><span class="feat-name">传承保障</span><span class="feat-val yes">✓</span><span></span><span></span></div>
+        </div>
+      </div>
+    </div>
+    <div class="pricing-compare">
+      <div class="section-header" style="margin-bottom:16px"><div class="section-title">详细对比</div></div>
+      <table class="compare-table">
+        <tr><th style="text-align:left;padding-left:12px">功能</th><th>免费</th><th>高级¥399/年</th><th>终身¥999</th></tr>
+        <tr><td>纪念馆页面</td><td>✓</td><td>✓</td><td>✓</td></tr>
+        <tr><td>照片存储</td><td>5张</td><td>∞</td><td>∞</td></tr>
+        <tr><td>视频存储</td><td>—</td><td>∞</td><td>∞</td></tr>
+        <tr><td>主题模板</td><td>3款</td><td>全部50+</td><td>全部50+</td></tr>
+        <tr><td>AI讣告助手</td><td>—</td><td>✓</td><td>✓</td></tr>
+        <tr><td>在线纪念仪式</td><td>—</td><td>✓</td><td>✓</td></tr>
+        <tr><td>背景音乐</td><td>—</td><td>✓</td><td>✓</td></tr>
+        <tr><td>多馆管理</td><td>1个</td><td>3个</td><td>5个</td></tr>
+        <tr><td>纪念册/QR铭牌折扣</td><td>—</td><td>9折</td><td>8折</td></tr>
+        <tr><td>专属客服</td><td>—</td><td>—</td><td>✓</td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== PRODUCT DETAIL PAGE ==================== -->
+<div class="page" id="page-product-detail">
+  <div class="page-content product-detail-page">
+    <div id="product-detail-root"></div>
+  </div>
+</div>
+
+<!-- ==================== PAYMENT PAGE ==================== -->
+<div class="page" id="page-payment">
+  <div class="page-content auth-page">
+    <div id="payment-page-body"></div>
+  </div>
+</div>
+
+<!-- ==================== ORDER CONFIRM ==================== -->
+<div class="page" id="page-order-confirm">
+  <div class="page-content">
+    <div class="order-confirm">
+      <div class="order-confirm-icon">✓</div>
+      <h1>订单已提交</h1>
+      <div class="order-confirm-meta">
+        订单号：<strong id="order-num">—</strong><br>
+        合计：<strong id="order-total">—</strong><br>
+        支付方式：<span id="order-method">—</span>
+      </div>
+      <button class="submit-btn" onclick="goPage('home')">返回首页</button>
+      <button class="obit-back-btn" style="margin-top:12px" onclick="goPage('profile-li')">继续追思</button>
+    </div>
+  </div>
+</div>
+
+<!-- AUTH MODAL -->
+<div class="auth-modal" id="auth-modal" onclick="if(event.target===this)MemorialAuth.close()">
+  <div class="auth-modal-box">
+    <button class="modal-close" type="button" style="float:right" onclick="MemorialAuth.close()">✕</button>
+    <div id="auth-modal-body"></div>
+  </div>
+</div>
+
+<!-- ARTICLE MODAL -->
+<div class="modal-overlay" id="article-modal">
+  <div class="modal-box">
+    <div class="modal-head"><h3 id="article-modal-title">文章标题</h3><button class="modal-close" onclick="closeModal('article-modal')">✕</button></div>
+    <div class="modal-body">
+      <p style="font-size:14px;line-height:2;color:var(--ink2)" id="article-modal-body">文章内容加载中…</p>
+    </div>
+  </div>
+</div>
+
+<!-- PRODUCT MODAL -->
+<div class="modal-overlay" id="product-modal">
+  <div class="modal-box">
+    <div class="modal-head"><h3 id="product-modal-title">商品详情</h3><button class="modal-close" onclick="closeModal('product-modal')">✕</button></div>
+    <div class="modal-body" id="product-modal-body"></div>
+  </div>
+</div>
+
+<!-- CHECKOUT MODAL -->
+<div class="modal-overlay" id="checkout-modal">
+  <div class="modal-box" style="max-width:520px">
+    <div class="modal-head"><h3>确认订单</h3><button class="modal-close" onclick="MemorialCommerce.closeCheckout()">✕</button></div>
+    <div class="modal-body">
+      <div id="checkout-summary" class="checkout-summary"></div>
+      <p id="checkout-digital-hint" class="checkout-digital-hint" style="display:none">数字会员服务无需填写收货地址，支付后为您开通。</p>
+      <div class="checkout-grid">
+        <input type="text" id="co-name" placeholder="联系人姓名 *" />
+        <input type="email" id="co-email" placeholder="联系邮箱 *" />
+        <input type="tel" id="co-phone" placeholder="手机号 *" />
+      </div>
+      <div id="checkout-shipping-block">
+        <div class="checkout-grid">
+          <input type="text" id="co-province" placeholder="省份 *" />
+          <input type="text" id="co-city" placeholder="城市 *" />
+          <input type="text" id="co-address" placeholder="详细地址 *" />
+          <input type="text" id="co-postal" placeholder="邮编（可选）" />
+        </div>
+      </div>
+      <textarea id="co-note" class="checkout-note" placeholder="备注（可选）"></textarea>
+      <fieldset class="payment-methods">
+        <legend>支付方式</legend>
+        <label class="pay-option"><input type="radio" name="pay-method" value="alipay" checked /> 支付宝</label>
+        <label class="pay-option"><input type="radio" name="pay-method" value="wechat" /> 微信支付</label>
+        <label class="pay-option"><input type="radio" name="pay-method" value="bank" /> 银行转账</label>
+        <label class="pay-option pay-option-stripe"><input type="radio" name="pay-method" value="stripe" /> Stripe（银行卡 / 支付宝 / 微信）</label>
+      </fieldset>
+      <button type="button" class="submit-btn" style="width:100%;margin-top:12px" onclick="MemorialCommerce.submitCheckout()">提交订单并支付</button>
+    </div>
+  </div>
+</div>
+
+<!-- GALLERY LIGHTBOX -->
+<div class="gallery-lightbox" id="gallery-lightbox" onclick="MemorialContent.closeGalleryLightbox()">
+  <button type="button" class="gallery-lightbox-close" onclick="event.stopPropagation();MemorialContent.closeGalleryLightbox()">✕</button>
+  <img id="gallery-lightbox-img" src="" alt="" onclick="event.stopPropagation()" />
+  <p id="gallery-lightbox-cap"></p>
+</div>
+
+<!-- CART DRAWER -->
+<div class="cart-backdrop" id="cart-backdrop" onclick="toggleCart()"></div>
+<div class="cart-fab" id="cart-fab" onclick="toggleCart()">🛒<span class="cart-badge" id="cart-badge">0</span></div>
+<div class="cart-drawer" id="cart-drawer">
+  <div class="cart-head"><h4>购物车</h4><button class="cart-close" onclick="toggleCart()">✕</button></div>
+  <div class="cart-items" id="cart-items"></div>
+  <div class="cart-total">合计：<span class="cart-total-num" id="cart-total">¥0</span></div>
+  <button class="cart-checkout" onclick="submitCartInquiry()">去结算 →</button>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/copy.js"></script>
+<script src="js/dates.js"></script>
+<script src="js/memorial-store.js"></script>
+<script src="js/memorial-api.js"></script>
+<script src="js/memorial-content.js"></script>
+<script src="js/memorial-commerce.js"></script>
+<script src="js/memorial-auth.js"></script>
+<script src="js/memorial-core.js"></script>
+<script>
+// ===== NAVIGATION =====
+function goPage(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-link').forEach(l=>l.classList.remove('active'));
+  const pg = document.getElementById(id.startsWith('page-')?id:'page-'+id);
+  if(pg){pg.classList.add('active');window.scrollTo(0,0);}
+  const map={'home':0,'shop':1,'plaque':2,'tools':3,'guides':4,'pricing':5};
+  const links=document.querySelectorAll('.nav-link');
+  const key=id.replace('profile-li','home').replace('profile-zhang','home').replace('profile-wang','home').replace('order-confirm','home').replace('auth','home').replace('account','home');
+  if(map[key]!==undefined) links[map[key]].classList.add('active');
+}
+
+// ===== TOAST =====
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2600);
+}
+
+// ===== PROFILE TABS =====
+function switchTab(btn,id){
+  const profileEl=btn.closest('.page');
+  profileEl.querySelectorAll('.profile-tab').forEach(t=>t.classList.remove('active'));
+  profileEl.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  const el=document.getElementById(id);
+  if(el)el.classList.add('active');
+}
+
+// ===== TRIBUTE (P0: 见 js/memorial-core.js · addTribute → 心意模态) =====
+
+// ===== GUESTBOOK =====
+function appendGuestbookDom(msg, name) {
+  const list=document.getElementById('messages-li');
+  if(!list) return;
+  const item=document.createElement('div');
+  item.className='message-item';
+  item.style.animation='fadeIn .3s ease';
+  item.innerHTML=`<div class="message-top"><span class="message-author">${name}</span><span class="message-time">刚刚</span></div><div class="message-text">${msg}</div><div class="message-candle">🕯️</div>`;
+  list.insertBefore(item,list.firstChild);
+}
+function submitMsg(){
+  const msg=document.getElementById('msgInput').value.trim();
+  const name=document.getElementById('msgName').value.trim()||'匿名访客';
+  if(!msg){showToast('请填写留言内容');return;}
+  if(window.MemorialCore){
+    MemorialCore.submitGuestbook(msg,name).then(()=>{
+      document.getElementById('msgInput').value='';
+      if(!MemorialCore.useApi) appendGuestbookDom(msg,name);
+    });
+    return;
+  }
+  appendGuestbookDom(msg,name);
+  document.getElementById('msgInput').value='';
+  showToast('留言已发布，感谢您的思念');
+}
+
+// ===== ARTICLES =====
+function filterArticles(el,cat,scope){
+  if(window.MemorialContent){MemorialContent.filterArticles(cat,el,scope);return;}
+  const root=scope==='guides'?document.getElementById('page-guides'):document.getElementById('tab-grief-li');
+  if(!root)return;
+  root.querySelectorAll('.articles-filter .filter-tag').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  root.querySelectorAll('.article-card').forEach(card=>{
+    card.style.display=(cat==='all'||card.dataset.cat===cat)?'block':'none';
+  });
+}
+function openArticle(id){
+  if(window.MemorialContent){MemorialContent.openArticle(id);return;}
+  document.getElementById('article-modal').classList.add('open');
+}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+
+// ===== OBITUARY =====
+let obitStep=1;
+function obitNext(step){
+  document.getElementById('obit-content-'+obitStep).style.display='none';
+  document.getElementById('obit-step-'+obitStep).classList.remove('active');
+  obitStep=step;
+  document.getElementById('obit-content-'+step).style.display='block';
+  document.getElementById('obit-step-'+step).classList.add('active');
+  if(step>1) document.getElementById('obit-step-'+(step-1)).classList.add('done');
+}
+function obitGenerate(){
+  const name=document.getElementById('obit-name').value||'先人';
+  const job=document.getElementById('obit-job').value||'';
+  const family=document.getElementById('obit-family').value||'';
+  const achievements=document.getElementById('obit-achievements').value||'';
+  const hobbies=document.getElementById('obit-hobbies').value||'';
+  const quote=document.getElementById('obit-quote').value||'';
+  const virtues=Array.from(document.querySelectorAll('.virtue-tag.active')).map(t=>t.textContent).join('、');
+  const result=document.getElementById('obit-result');
+  result.innerHTML='<em style="color:var(--gold)">✨ AI正在生成讣告初稿…</em>';
+  obitNext(3);
+  setTimeout(()=>{
+    result.innerHTML=`<p style="text-align:center;margin-bottom:16px;font-family:'Ma Shan Zheng',cursive;font-size:18px;color:var(--ink)">讣  告</p>
+<p>忍泪谨告亲友：吾家${name}（${job?'，'+job:''}），因病医治无效，于近日安详辞世。</p><br>
+<p>${name}先生/女士一生${virtues?'以'+virtues+'著称，':''}${achievements||'默默耕耘，为家庭与社会奉献了宝贵的一生。'}${family?'身后留有'+family+'。':''}</p><br>
+${hobbies?'<p>先生/女士生前'+hobbies+'，以此为乐，修身养性。</p><br>':''}\
+${quote?'<p>先生/女士生前常言："'+quote+'"此言将永存我们心间。</p><br>':''}\
+<p>斯人已逝，音容犹在。我们将永远铭记先生/女士的恩泽，并以此激励后辈，薪火相传。</p><br>
+<p style="text-align:right;font-size:13px;color:var(--ink2)">家属泣告</p>`;
+  },1800);
+}
+function toggleVirtue(el){el.classList.toggle('active');}
+function obitCopy(){
+  const el=document.getElementById('obit-result');
+  const text=el?el.innerText:'';
+  if(!text){showToast('请先生成讣告');return;}
+  navigator.clipboard.writeText(text).then(()=>showToast('已复制到剪贴板')).catch(()=>showToast('复制失败，请手动选择文本'));
+}
+function obitPublish(){
+  const html=document.getElementById('obit-result')?.innerHTML;
+  if(window.MemorialCore){MemorialCore.publishObituary(html);return;}
+  showToast('讣告已保存（离线演示）');
+}
+
+// ===== PLANNING =====
+const planningData=[
+  {icon:'🚨',title:'紧急事项（24小时内）',color:'#8b2020',tasks:[
+    {t:'联系殡仪馆',d:'告知逝者情况，预约遗体接运',urgent:true},
+    {t:'通知直系亲属',d:'电话告知子女、兄弟姐妹等近亲',urgent:true},
+    {t:'获取死亡证明',d:'由医院或急救人员出具，重要文件请妥善保管',urgent:true},
+    {t:'确认遗体安置',d:'选择暂存于医院太平间或直接联系殡仪馆'},
+  ]},
+  {icon:'📋',title:'48小时内',color:'var(--blue)',tasks:[
+    {t:'告知雇主或学校',d:'处理相关请假或告假手续'},
+    {t:'联系律师或遗嘱执行人',d:'如有遗嘱，尽早联系相关人员'},
+    {t:'安排照顾未成年子女',d:'如有需要，联系亲属或相关机构'},
+    {t:'发布讣告',d:'通过微信、报纸或本平台发布'},
+  ]},
+  {icon:'🏮',title:'丧礼准备',color:'var(--teal)',tasks:[
+    {t:'选定丧礼形式',d:'传统葬礼/火化/追思会，与家人协商'},
+    {t:'确定丧礼日期地点',d:'联系殡仪馆、寺庙或殡葬公司'},
+    {t:'准备遗照',d:'选择一张庄重清晰的照片放大洗印'},
+    {t:'安排司仪或主持人',d:'家属主持或聘请专业司仪'},
+    {t:'通知亲友',d:'电话、短信、微信群通知，提供时间地点'},
+    {t:'准备黑白孝服',d:'为直系亲属准备，各地习俗略有不同'},
+  ]},
+  {icon:'📝',title:'身后事务',color:'var(--green)',tasks:[
+    {t:'申请死亡登记',d:'携带相关证件前往户籍所在地民政局办理'},
+    {t:'处理银行账户',d:'冻结或注销逝者账户，办理遗产继承手续'},
+    {t:'处理遗产与财产',d:'按遗嘱或法定继承，如有争议建议聘请律师'},
+    {t:'注销相关证件',d:'身份证、驾照、护照、社保卡等'},
+    {t:'处理保险理赔',d:'联系各保险公司，提交理赔申请'},
+    {t:'整理遗物',d:'保留有纪念意义的物品，其余妥善处置'},
+  ]},
+  {icon:'💙',title:'心灵疗愈',color:'var(--lotus)',tasks:[
+    {t:'与家人共同追忆',d:'分享关于逝者的美好记忆，互相支持'},
+    {t:'创建数字纪念馆',d:'在念归处为逝者建立永久的线上纪念空间'},
+    {t:'寻求心理支持',d:'如长期无法走出悲伤，建议寻求专业心理咨询'},
+    {t:'参加悼念仪式',d:'头七、清明等节日，定期举行家庭追思'},
+  ]},
+];
+let taskState={};
+function renderPlanning(){
+  const container=document.getElementById('planning-cats');
+  container.innerHTML=planningData.map((cat,ci)=>`
+    <div class="planning-cat">
+      <div class="cat-header" onclick="toggleCat(this)" style="border-bottom-color:${cat.color}">
+        <span class="cat-icon">${cat.icon}</span>
+        <span class="cat-title">${cat.title}</span>
+        <span class="cat-progress" id="cat-prog-${ci}">0/${cat.tasks.length}</span>
+        <span class="cat-arrow">▼</span>
+      </div>
+      <div class="cat-tasks">${cat.tasks.map((task,ti)=>`
+        <div class="task-item">
+          <div class="task-check" id="tc-${ci}-${ti}" onclick="toggleTask(${ci},${ti})"></div>
+          <div class="task-text">
+            <div class="task-title">${task.t}${task.urgent?'<span class="task-urgent">紧急</span>':''}</div>
+            <div class="task-desc">${task.d}</div>
+          </div>
+        </div>`).join('')}
+      </div>
+    </div>`).join('');
+}
+function toggleCat(header){
+  const tasks=header.nextElementSibling;
+  const collapsed=header.classList.toggle('collapsed');
+  tasks.style.display=collapsed?'none':'block';
+}
+function toggleTask(ci,ti){
+  if(window.MemorialContent){MemorialContent.togglePlanningTask(ci,ti);return;}
+  const key=`${ci}-${ti}`;
+  taskState[key]=!taskState[key];
+  const el=document.getElementById(`tc-${ci}-${ti}`);
+  el.classList.toggle('done',taskState[key]);
+  updateProgress();
+}
+function updateProgress(){
+  const total=planningData.reduce((s,c)=>s+c.tasks.length,0);
+  const done=Object.values(taskState).filter(Boolean).length;
+  document.getElementById('pct-label').textContent=`${done} / ${total} 项`;
+  document.getElementById('pct-bar').style.width=`${(done/total)*100}%`;
+  planningData.forEach((cat,ci)=>{
+    const catDone=cat.tasks.filter((_,ti)=>taskState[`${ci}-${ti}`]).length;
+    const el=document.getElementById(`cat-prog-${ci}`);
+    if(el)el.textContent=`${catDone}/${cat.tasks.length}`;
+  });
+}
+
+// ===== THEMES (see js/memorial-content.js) =====
+function renderThemes(){
+  if(window.MemorialContent){
+    MemorialContent.renderThemesGrid(MemorialStore.get(MemorialCore?.slug)?.themeId||'ink-default');
+    return;
+  }
+}
+function selectTheme(i){/* legacy noop */ }
+function filterThemes(el,cat){
+  if(window.MemorialContent){MemorialContent.filterThemes(cat,el);return;}
+}
+
+// ===== SEARCH =====
+function doSearch(){
+  const q=document.getElementById('searchInput').value.trim();
+  if(!q){showToast('请输入姓名搜索');return;}
+  if(window.MemorialCore&&MemorialCore.useApi){
+    MemorialCore.searchAndOpen(q);
+    return;
+  }
+  if(q.includes('李明')||q.includes('明德')||q.toLowerCase().includes('li')){
+    goPage('profile-li');
+    showToast('已进入李明德纪念馆');
+    return;
+  }
+  showToast('正在搜索「'+q+'」的纪念馆…（离线模式仅支持演示馆）');
+}
+
+function initHero(){ /* editorial hero — no decorative animation */ }
+
+// ===== INIT =====
+document.addEventListener('DOMContentLoaded',()=>{
+  initHero();
+  taskState=MemorialContent?MemorialContent.loadPlanningState():{};
+  renderPlanning();
+  if(MemorialContent) MemorialContent.syncPlanningUI(taskState);
+  renderThemes();
+  const hint=document.getElementById('profile-enter-hint');
+  if(hint&&window.MEMORIAL_COPY) hint.textContent=MEMORIAL_COPY.enterMemorial('李明德');
+});
+</script>
+</body>
+</html>

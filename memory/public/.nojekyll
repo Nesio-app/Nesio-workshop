@@ -1,0 +1,2 @@
+# Prevent Jekyll from processing static assets on GitHub Pages
+public/.nojekyll

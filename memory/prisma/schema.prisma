@@ -1,0 +1,201 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  phone        String?  @unique
+  wechatOpenId String?  @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime @default(now())
+  memorials    Memorial[]
+  rituals      Ritual[]
+  fragments    MemoryFragment[]
+}
+
+model Memorial {
+  id             String   @id @default(cuid())
+  slug           String   @unique
+  ownerId        String
+  owner          User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name           String
+  birthDate      DateTime?
+  deathDate      DateTime
+  motto          String?
+  bioHtml        String?  @db.Text
+  familyNote     String?  @db.Text
+  themeId        String   @default("ink-default")
+  privacy        String   @default("family")
+  quietMode      Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  rituals              Ritual[]
+  fragments            MemoryFragment[]
+  reminders            Reminder[]
+  members              MemorialMember[]
+  notionSyncLogs       NotionSyncLog[]
+  timelineEvents       TimelineEvent[]
+  familyPeople         FamilyPerson[]
+  mediaItems           MemorialMedia[]
+}
+
+model TimelineEvent {
+  id          String   @id @default(cuid())
+  memorialId  String
+  memorial    Memorial @relation(fields: [memorialId], references: [id], onDelete: Cascade)
+  yearLabel   String
+  title       String
+  description String?
+  sortOrder   Int      @default(0)
+}
+
+model FamilyPerson {
+  id          String   @id @default(cuid())
+  memorialId  String
+  memorial    Memorial @relation(fields: [memorialId], references: [id], onDelete: Cascade)
+  groupLabel  String
+  name        String
+  relation    String
+  avatarChar  String?
+  sortOrder   Int      @default(0)
+}
+
+model MemorialMedia {
+  id          String   @id @default(cuid())
+  memorialId  String
+  memorial    Memorial @relation(fields: [memorialId], references: [id], onDelete: Cascade)
+  caption     String
+  emoji       String   @default("📸")
+  imageUrl    String?
+  yearLabel   String?
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+}
+
+model MemorialMember {
+  id         String   @id @default(cuid())
+  memorialId String
+  memorial   Memorial @relation(fields: [memorialId], references: [id], onDelete: Cascade)
+  email      String
+  role       String   @default("family")
+  inviteToken String? @unique
+  createdAt  DateTime @default(now())
+
+  @@unique([memorialId, email])
+}
+
+model Ritual {
+  id           String   @id @default(cuid())
+  memorialId   String
+  memorial     Memorial @relation(fields: [memorialId], references: [id], onDelete: Cascade)
+  type         String
+  message      String?
+  author       String?
+  authorUserId String?
+  authorUser   User?    @relation(fields: [authorUserId], references: [id], onDelete: SetNull)
+  createdAt    DateTime @default(now())
+}
+
+model MemoryFragment {
+  id           String   @id @default(cuid())
+  memorialId   String
+  memorial     Memorial @relation(fields: [memorialId], references: [id], onDelete: Cascade)
+  content      String
+  relation     String?
+  year         String?
+  author       String?
+  authorUserId String?
+  authorUser   User?    @relation(fields: [authorUserId], references: [id], onDelete: SetNull)
+  status       String   @default("pending")
+  createdAt    DateTime @default(now())
+}
+
+model Reminder {
+  id         String   @id @default(cuid())
+  memorialId String
+  memorial   Memorial @relation(fields: [memorialId], references: [id], onDelete: Cascade)
+  email      String
+  createdAt  DateTime @default(now())
+
+  @@unique([memorialId, email])
+}
+
+model ReminderDispatch {
+  id         String   @id @default(cuid())
+  memorialId String
+  email      String
+  eventKey   String
+  eventDate  DateTime
+  sentAt     DateTime @default(now())
+
+  @@unique([memorialId, email, eventKey, eventDate])
+}
+
+model NotionSyncLog {
+  id         String   @id @default(cuid())
+  memorialId String
+  memorial   Memorial @relation(fields: [memorialId], references: [id], onDelete: Cascade)
+  payload    String
+  status     String
+  createdAt  DateTime @default(now())
+}
+
+model Article {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  cat       String
+  catLabel  String
+  title     String
+  summary   String
+  body      String   @db.Text
+  emoji     String   @default("📖")
+  bgStyle   String   @default("linear-gradient(135deg,#e8f4f8,#d0e8f0)")
+  published Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  description String   @db.Text
+  priceCents  Int
+  listCents   Int?
+  category    String
+  emoji       String   @default("🛍️")
+  bgStyle     String   @default("linear-gradient(135deg,#f5f5f5,#e8e8e8)")
+  badge       String?
+  active      Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+}
+
+model OrderInquiry {
+  id               String   @id @default(cuid())
+  orderNumber      String   @unique
+  memorialSlug     String?
+  contactEmail     String
+  contactName      String?
+  contactPhone     String?
+  shippingAddress  String?
+  shippingCity     String?
+  shippingProvince String?
+  shippingPostal   String?
+  items            String
+  itemsJson        String?
+  note             String?
+  totalCents       Int      @default(0)
+  status           String   @default("pending")
+  paymentMethod    String   @default("inquiry")
+  stripeSessionId  String?
+  createdAt        DateTime @default(now())
+}
