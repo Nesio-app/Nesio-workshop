@@ -6,7 +6,7 @@
 
 | 地址 | 说明 |
 |------|------|
-| https://hanbing6228.github.io/memory/ | **静态演示**（P0 交互 + 浏览器 localStorage，无需登录） |
+| https://hanbing6228.github.io/DS_Profolio/memory/ | **静态演示**（中英文切换、样本纪念册；API 连 Render） |
 | Render / Vercel 部署后 | **完整产品**（账号、数据库、跨设备同步） |
 
 > GitHub Pages 曾误发布 README，已改为 workflow 部署 `public/` 目录，现已恢复完整网页。

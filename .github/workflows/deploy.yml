@@ -3,6 +3,7 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -28,10 +29,20 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build
+      - name: Build portfolio (static export)
         env:
           BASE_PATH: /${{ github.event.repository.name }}
         run: npm run build
+
+      - name: Bundle memorial static site
+        run: |
+          mkdir -p out/memory
+          cp -R memory/public/. out/memory/
+          touch out/.nojekyll out/memory/.nojekyll
+          test -f out/memory/index.html
+          test -f out/memory/js/memorial-i18n.js
+          test -f out/memory/content/membook-samples.json
+          echo "Memorial bundle OK ($(find out/memory -type f | wc -l) files)"
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
