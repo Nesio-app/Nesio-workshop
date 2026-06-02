@@ -1,0 +1,84 @@
+{
+  "articles": [
+    {
+      "id": "grief-stages",
+      "cat": "grief",
+      "catLabel": "Grief support",
+      "title": "Five stages of grief — each step deserves witness",
+      "summary": "After losing someone close, psychologists remind us: grief has no timetable, only your own rhythm…",
+      "emoji": "🌊",
+      "bg": "linear-gradient(135deg,#e8f4f8,#d0e8f0)",
+      "body": "Elisabeth Kübler-Ross described five common movements in grief: denial, anger, bargaining, depression, and acceptance. The order and timing differ for everyone, and people often revisit earlier stages.\n\nThere is no \"correct\" way to grieve. Allowing tears is not weakness — it is love finding a voice. If daily life feels impossible for more than two weeks, consider speaking with a licensed counselor.\n\nIn many families, traditions of stoicism can silence grief. Research suggests that suppressed mourning often prolongs distress. Shared remembrance — in person or on a digital memorial — can be a healthier path forward."
+    },
+    {
+      "id": "seven-seven",
+      "cat": "ritual",
+      "catLabel": "Funeral customs",
+      "title": "The forty-nine days of remembrance in Chinese tradition",
+      "summary": "From the first week to the forty-ninth day, each milestone reflects a long view of life and loss…",
+      "emoji": "🪔",
+      "bg": "linear-gradient(135deg,#f5f0e8,#ede0d0)",
+      "body": "In traditional Chinese practice, the soul is thought to pass through a forty-nine-day transition. Families may observe rituals every seven days — \"doing the sevens.\"\n\nThe first seventh day is often the most attended, when the departed is remembered at home. Later sevens continue prayers and offerings until the forty-ninth day, which closes the formal mourning period for many families.\n\nQingming Festival, Winter Solstice, and Double Ninth Day remain important times to sweep graves and tell stories. A digital memorial can extend these gatherings to relatives abroad."
+    },
+    {
+      "id": "digital-memory",
+      "cat": "memory",
+      "catLabel": "Keeping memory",
+      "title": "Preserving family memory in the digital age",
+      "summary": "Photos, recordings, letters — how to keep fragile heirlooms from fading…",
+      "emoji": "📸",
+      "bg": "linear-gradient(135deg,#f0e8f5,#e0d0ed)",
+      "body": "Family memory lives in albums, voice messages, and the stories told at dinner. Today we can gather them in one online memorial: images, tributes, and approved family contributions.\n\nBack up important files to both cloud and local drives. Label who, where, and when for each image. Invite relatives to submit short memories; a family moderator can approve them before they appear publicly.\n\nNianguichu offers family-only, public, or private visibility so remembrance stays respectful and lasting."
+    },
+    {
+      "id": "talk-to-children",
+      "cat": "child",
+      "catLabel": "Children & loss",
+      "title": "\"Where did Grandpa go?\" Talking about death with children",
+      "summary": "Children understand death differently at each age — gentle, honest language helps…",
+      "emoji": "🌱",
+      "bg": "linear-gradient(135deg,#f0f5e8,#d8edd0)",
+      "body": "Preschoolers may think death is reversible. School-age children grasp permanence but may blame themselves. Use clear words; avoid \"went to sleep\" or \"went on a trip,\" which can frighten them.\n\nLook at photos together, tell true stories, and let them ask questions. Long insomnia or withdrawal may signal a need for child-focused counseling.\n\nLeaving a message on the family memorial can become a simple ritual of goodbye that children help choose."
+    },
+    {
+      "id": "funeral-checklist",
+      "cat": "ritual",
+      "catLabel": "Funeral customs",
+      "title": "First 48 hours: a practical checklist",
+      "summary": "From the funeral home to notifying relatives — a calm order of tasks…",
+      "emoji": "📋",
+      "bg": "linear-gradient(135deg,#f0f0f8,#e0e0ed)",
+      "body": "The first two days after a death are often overwhelming. A sensible sequence: obtain the medical certificate of death, contact the funeral home, inform the closest family, decide temporary placement of the remains, and agree on the form and timing of services.\n\nAssign one relative for external calls and another for household coordination. Nianguichu's planning checklist can be checked off step by step so nothing important is missed in the fog of shock."
+    },
+    {
+      "id": "condolence-etiquette",
+      "cat": "ritual",
+      "catLabel": "Funeral customs",
+      "title": "Condolence visits: what to say and what to avoid",
+      "summary": "Words, gifts, and dress — respect without adding burden…",
+      "emoji": "🤝",
+      "bg": "linear-gradient(135deg,#f5f0e8,#ede0d0)",
+      "body": "Keep condolences brief and sincere: \"I am sorry for your loss\" or \"We are here with you.\" Avoid phrases that rush closure, such as \"They are in a better place\" or \"You must be strong.\"\n\nFlowers, wreaths, or condolence gifts vary by region. Dress modestly and speak softly. If you cannot attend, a message on the memorial page is a thoughtful alternative."
+    },
+    {
+      "id": "inheritance-basics",
+      "cat": "legal",
+      "catLabel": "After affairs",
+      "title": "Estate basics: five things families should know",
+      "summary": "Wills, statutory inheritance, accounts, and property — an overview…",
+      "emoji": "📜",
+      "bg": "linear-gradient(135deg,#eef0f5,#dde0ea)",
+      "body": "1. Determine whether a valid will exists. 2. If not, statutory heirs apply under local law. 3. Cancel accounts and notify banks with the death certificate. 4. Real estate and vehicles usually require notarized or court documents. 5. Complex estates warrant a qualified attorney.\n\nThis article is general information, not legal advice. Procedures differ by jurisdiction."
+    },
+    {
+      "id": "qingming-guide",
+      "cat": "memory",
+      "catLabel": "Keeping memory",
+      "title": "Qingming: blending tradition with online remembrance",
+      "summary": "Grave visits, offerings, and remote family participation…",
+      "emoji": "🌿",
+      "bg": "linear-gradient(135deg,#e8f5e8,#d0edd0)",
+      "body": "Qingming centers on honoring ancestors at the grave: flowers, simple food offerings, cleaning the site. Relatives far away can join by video or by lighting a candle on the family memorial.\n\nCheck cemetery hours in advance. After the visit, add a short remembrance paragraph online so the story stays with the next generation."
+    }
+  ]
+}

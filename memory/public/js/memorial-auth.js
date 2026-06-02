@@ -32,16 +32,24 @@ window.MemorialAuth = {
 
     if (this.user) {
       const label = this.user.name || this.user.email.split("@")[0];
+      const accountLabel = window.MemorialI18n
+        ? MemorialI18n.t("auth.account")
+        : "我的账户";
+      const logoutLabel = window.MemorialI18n
+        ? MemorialI18n.t("auth.logout")
+        : "退出";
       slot.innerHTML = `
-        <button type="button" class="nav-auth-user" title="${MemorialStore.escapeHtml(this.user.email)}" onclick="MemorialAuth.openAccount()">我的账户</button>
-        <button type="button" class="nav-auth-btn" onclick="MemorialAuth.logout()">退出</button>
+        <button type="button" class="nav-auth-user" title="${MemorialStore.escapeHtml(this.user.email)}" onclick="MemorialAuth.openAccount()">${accountLabel}</button>
+        <button type="button" class="nav-auth-btn" onclick="MemorialAuth.logout()">${logoutLabel}</button>
       `;
       return;
     }
 
+    const loginLabel = window.MemorialI18n ? MemorialI18n.t("auth.login") : "登录";
+    const demoLabel = window.MemorialI18n ? MemorialI18n.t("auth.demo") : "演示";
     slot.innerHTML = `
-      <button type="button" class="nav-auth-btn" onclick="MemorialAuth.openPage('login')">登录</button>
-      <button type="button" class="nav-auth-btn nav-auth-demo" onclick="MemorialAuth.demoLogin()">演示</button>
+      <button type="button" class="nav-auth-btn" onclick="MemorialAuth.openPage('login')">${loginLabel}</button>
+      <button type="button" class="nav-auth-btn nav-auth-demo" onclick="MemorialAuth.demoLogin()">${demoLabel}</button>
     `;
   },
 

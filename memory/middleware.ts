@@ -6,8 +6,15 @@ const ALLOWED_ORIGINS = [
   process.env.NEXT_PUBLIC_APP_URL,
 ].filter(Boolean) as string[];
 
+function isAllowedOrigin(origin: string) {
+  if (ALLOWED_ORIGINS.includes(origin)) return true;
+  if (/^https:\/\/[\w-]+\.github\.io$/i.test(origin)) return true;
+  if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin)) return true;
+  return false;
+}
+
 function corsHeaders(origin: string | null) {
-  if (!origin || !ALLOWED_ORIGINS.includes(origin)) return null;
+  if (!origin || !isAllowedOrigin(origin)) return null;
   return {
     "Access-Control-Allow-Origin": origin,
     "Access-Control-Allow-Credentials": "true",

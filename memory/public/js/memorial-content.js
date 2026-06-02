@@ -28,9 +28,17 @@ window.MemorialContent = {
   escape: MemorialStore.escapeHtml.bind(MemorialStore),
 
   formatYears(m) {
+    const en = window.MemorialI18n?.isEn();
     const fmt = (d) => {
       if (!d) return "";
       const p = d.split("-");
+      if (en) {
+        const months = [
+          "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+          "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+        ];
+        return `${months[parseInt(p[1], 10) - 1] || ""} ${parseInt(p[2], 10)}, ${p[0]}`;
+      }
       return p[0] + "年" + parseInt(p[1], 10) + "月" + parseInt(p[2], 10) + "日";
     };
     let age = "";
@@ -38,7 +46,7 @@ window.MemorialContent = {
       const a =
         parseInt(m.deathDate.slice(0, 4), 10) -
         parseInt(m.birthDate.slice(0, 4), 10);
-      if (a > 0) age = " · 享年" + a + "岁";
+      if (a > 0) age = en ? " · age " + a : " · 享年" + a + "岁";
     }
     if (m.birthDate && m.deathDate) {
       return fmt(m.birthDate) + " — " + fmt(m.deathDate) + age;
@@ -68,33 +76,47 @@ window.MemorialContent = {
   renderProfileHero(m) {
     const page = document.getElementById("page-profile-li");
     if (!page || !m) return;
-    const char = this.avatarChar(m.name);
+    const slug = m.slug || window.MemorialCore?.slug;
+    const merged = this.demoOverlay(slug, m);
+    const char = this.avatarChar(merged.name);
     const av = page.querySelector(".profile-avatar");
     if (av) {
       av.textContent = char;
       av.style.background = this.avatarGradient(m.name);
     }
     const nameEl = page.querySelector(".profile-name");
-    if (nameEl) nameEl.textContent = m.name;
+    if (nameEl) nameEl.textContent = merged.name;
     const yearsEl = page.querySelector(".profile-years");
-    if (yearsEl) yearsEl.textContent = this.formatYears(m);
+    if (yearsEl) yearsEl.textContent = this.formatYears(merged);
     const mottoEl = page.querySelector(".profile-motto");
     if (mottoEl) {
-      mottoEl.innerHTML = m.motto
-        ? "「" + this.escape(m.motto) + "」"
+      mottoEl.innerHTML = merged.motto
+        ? (window.MemorialI18n?.isEn()
+            ? '"' + this.escape(merged.motto) + '"'
+            : "「" + this.escape(merged.motto) + "」")
         : "";
     }
-    this.applyTheme(m.themeId);
+    this.applyTheme(merged.themeId || m.themeId);
+  },
+
+  demoOverlay(slug, m) {
+    if (!window.MemorialI18n?.getDemoMemorial) return m;
+    const demo = MemorialI18n.getDemoMemorial(slug);
+    if (!demo) return m;
+    return { ...m, ...demo, slug: m.slug || slug };
   },
 
   renderBioTab(m) {
     const el = document.getElementById("tab-bio-li");
     if (!el) return;
-    const bio =
-      m.bioHtml ||
-      "<p class=\"p0-empty\">家属尚未撰写生平故事。可通过「撰写讣告」生成并发布到此处。</p>";
-    const note = m.familyNote
-      ? `<div class="family-note"><p class="family-note-text">${this.escape(m.familyNote).replace(/\n/g, "<br>")}</p></div>`
+    const slug = m.slug || window.MemorialCore?.slug;
+    const merged = this.demoOverlay(slug, m);
+    const empty = window.MemorialI18n?.isEn()
+      ? "<p class=\"p0-empty\">Family has not published a life story yet. You can draft one with the obituary assistant.</p>"
+      : "<p class=\"p0-empty\">家属尚未撰写生平故事。可通过「撰写讣告」生成并发布到此处。</p>";
+    const bio = merged.bioHtml || empty;
+    const note = merged.familyNote
+      ? `<div class="family-note"><p class="family-note-text">${this.escape(merged.familyNote).replace(/\n/g, "<br>")}</p></div>`
       : "";
     el.innerHTML = `<div class="bio-section"><div class="bio-intro">${bio}</div>${note}</div>`;
   },
@@ -104,7 +126,8 @@ window.MemorialContent = {
     if (!el) return;
     const items = m.gallery || [];
     const canEdit =
-      window.MemorialCore?.canEdit && window.MemorialCore?.useApi;
+      (window.MemorialCore?.canEdit && window.MemorialCore?.useApi) ||
+      (!window.MemorialCore?.useApi && window.MemorialAuth?.user);
     const uploadBlock = canEdit
       ? `<div class="gallery-upload">
           <p class="gallery-upload-hint">上传珍贵照片（JPG/PNG/WebP，最大 4MB）${
@@ -175,22 +198,65 @@ window.MemorialContent = {
 
   async uploadGalleryPhoto() {
     const slug = window.MemorialCore?.slug;
-    if (!slug || !MemorialCore.useApi) {
-      showToast("请先登录后再上传");
+    if (!slug) return;
+    if (window.MemorialCore?.useApi && !window.MemorialAuth?.user) {
+      showToast(
+        window.MemorialI18n?.isEn()
+          ? "Please sign in to upload photos"
+          : "请先登录后再上传"
+      );
+      if (window.MemorialAuth) MemorialAuth.openPage("login");
       return;
     }
     const file = document.getElementById("gallery-file")?.files?.[0];
     if (!file) {
-      showToast("请选择图片");
+      showToast(window.MemorialI18n?.isEn() ? "Choose an image" : "请选择图片");
       return;
     }
+    const caption =
+      document.getElementById("gallery-caption")?.value ||
+      (window.MemorialI18n?.isEn() ? "Family photo" : "珍贵影像");
+    const year = document.getElementById("gallery-year")?.value?.trim();
+
+    if (!MemorialCore.useApi) {
+      try {
+        const dataUrl = await new Promise((resolve, reject) => {
+          const r = new FileReader();
+          r.onload = () => resolve(r.result);
+          r.onerror = reject;
+          r.readAsDataURL(file);
+        });
+        const m = MemorialStore.get(slug) || {};
+        m.gallery = m.gallery || [];
+        m.gallery.push({
+          id: "local_" + Date.now(),
+          caption,
+          yearLabel: year || null,
+          imageUrl: dataUrl,
+          emoji: "📸",
+        });
+        MemorialStore.update(slug, { gallery: m.gallery });
+        this.renderGalleryTab(MemorialStore.get(slug));
+        document.getElementById("gallery-file").value = "";
+        showToast(window.MemorialI18n?.isEn() ? "Photo saved locally" : "照片已保存（本地演示）");
+      } catch {
+        showToast(window.MemorialI18n?.isEn() ? "Upload failed" : "上传失败");
+      }
+      return;
+    }
+
+    if (!MemorialCore.canEdit) {
+      showToast(
+        window.MemorialI18n?.isEn()
+          ? "You do not have permission to upload"
+          : "无权上传，请使用演示账号登录"
+      );
+      return;
+    }
+
     const fd = new FormData();
     fd.append("file", file);
-    fd.append(
-      "caption",
-      document.getElementById("gallery-caption")?.value || "珍贵影像"
-    );
-    const year = document.getElementById("gallery-year")?.value?.trim();
+    fd.append("caption", caption);
     if (year) fd.append("yearLabel", year);
     try {
       const data = await MemorialApi.uploadMedia(slug, fd);
@@ -203,7 +269,7 @@ window.MemorialContent = {
       MemorialStore.update(slug, { gallery: m.gallery });
       this.renderGalleryTab(MemorialStore.get(slug));
       document.getElementById("gallery-file").value = "";
-      showToast("照片已上传");
+      showToast(window.MemorialI18n?.isEn() ? "Photo uploaded" : "照片已上传");
     } catch (e) {
       showToast(e.message);
     }
@@ -229,9 +295,11 @@ window.MemorialContent = {
   renderTimelineTab(m) {
     const el = document.getElementById("tab-timeline-li");
     if (!el) return;
-    const events = m.timeline || [];
+    const slug = m.slug || window.MemorialCore?.slug;
+    const merged = this.demoOverlay(slug, m);
+    const events = merged.timeline || [];
     if (!events.length) {
-      el.innerHTML = `<p class="p0-empty">人生历程待家人补充。</p>`;
+      el.innerHTML = `<p class="p0-empty">${window.MemorialI18n?.isEn() ? "Timeline will be added by family." : "人生历程待家人补充。"}</p>`;
       return;
     }
     el.innerHTML =
@@ -253,9 +321,11 @@ window.MemorialContent = {
   renderFamilyTab(m) {
     const el = document.getElementById("tab-family-li");
     if (!el) return;
-    const people = m.family || [];
+    const slug = m.slug || window.MemorialCore?.slug;
+    const merged = this.demoOverlay(slug, m);
+    const people = merged.family || [];
     if (!people.length) {
-      el.innerHTML = `<p class="p0-empty">家族关系待补充。</p>`;
+      el.innerHTML = `<p class="p0-empty">${window.MemorialI18n?.isEn() ? "Family tree pending." : "家族关系待补充。"}</p>`;
       return;
     }
     const groups = {};
@@ -395,7 +465,10 @@ window.MemorialContent = {
     const m = window.MemorialStore?.get(window.MemorialCore?.slug) || {};
     const sampleName = m.name || "纪念馆预览";
     const char = this.avatarChar(sampleName);
-    grid.innerHTML = this.THEMES.map((t) => {
+    grid.innerHTML = this.THEMES.map((raw) => {
+      const t = window.MemorialI18n
+        ? MemorialI18n.localizeTheme(raw)
+        : raw;
       const sel = selectedId === t.id;
       const p = t.preview;
       return `
@@ -461,11 +534,18 @@ window.MemorialContent = {
         /* fall through */
       }
     }
+    const file =
+      window.MemorialI18n?.isEn() ? "content/articles-en.json" : "content/articles.json";
     try {
-      const res = await fetch("content/articles.json");
+      const res = await fetch(file);
       this._articles = await res.json();
     } catch {
-      this._articles = { articles: [] };
+      try {
+        const res = await fetch("content/articles.json");
+        this._articles = await res.json();
+      } catch {
+        this._articles = { articles: [] };
+      }
     }
     return this._articles;
   },
@@ -533,6 +613,51 @@ window.MemorialContent = {
     } catch (e) {
       showToast(e.message);
     }
+  },
+
+  generateObituary() {
+    const en = window.MemorialI18n?.isEn();
+    const name =
+      document.getElementById("obit-name")?.value?.trim() ||
+      (en ? "our loved one" : "先人");
+    const job = document.getElementById("obit-job")?.value?.trim() || "";
+    const family = document.getElementById("obit-family")?.value?.trim() || "";
+    const achievements =
+      document.getElementById("obit-achievements")?.value?.trim() || "";
+    const hobbies = document.getElementById("obit-hobbies")?.value?.trim() || "";
+    const quote = document.getElementById("obit-quote")?.value?.trim() || "";
+    const virtues = Array.from(
+      document.querySelectorAll(".virtue-tag.active")
+    )
+      .map((t) => t.textContent)
+      .join(en ? ", " : "、");
+    const result = document.getElementById("obit-result");
+    if (!result) return;
+    result.innerHTML = `<em style="color:var(--gold)">${
+      en ? "✨ Drafting obituary…" : "✨ AI正在生成讣告初稿…"
+    }</em>`;
+    if (typeof obitNext === "function") obitNext(3);
+    setTimeout(() => {
+      if (en) {
+        const role = job ? `, ${job}` : "";
+        result.innerHTML = `
+<p style="text-align:center;margin-bottom:16px;font-family:'Cormorant Garamond',serif;font-size:20px;color:var(--ink);letter-spacing:.12em">OBITUARY</p>
+<p>With deep sorrow we announce that <strong>${this.escape(name)}</strong>${role} passed away peacefully after illness, surrounded by family.</p><br>
+<p>${this.escape(name)} lived a life marked by ${virtues ? this.escape(virtues) + "." : "devotion and integrity."} ${achievements ? this.escape(achievements) : "Their work and kindness touched many."} ${family ? "Survived by " + this.escape(family) + "." : ""}</p><br>
+${hobbies ? `<p>In quieter hours they enjoyed ${this.escape(hobbies)}.</p><br>` : ""}
+${quote ? `<p>They often said: “${this.escape(quote)}” — words we will carry forward.</p><br>` : ""}
+<p>We will remember their voice, their patience, and the love they gave. May they rest in peace.</p><br>
+<p style="text-align:right;font-size:13px;color:var(--ink2)">— The family</p>`;
+      } else {
+        result.innerHTML = `<p style="text-align:center;margin-bottom:16px;font-family:'Ma Shan Zheng',cursive;font-size:18px;color:var(--ink)">讣  告</p>
+<p>忍泪谨告亲友：吾家${this.escape(name)}${job ? "（" + this.escape(job) + "）" : ""}，因病医治无效，于近日安详辞世。</p><br>
+<p>${this.escape(name)}先生/女士一生${virtues ? "以" + this.escape(virtues) + "著称，" : ""}${achievements ? this.escape(achievements) : "默默耕耘，为家庭与社会奉献了宝贵的一生。"}${family ? "身后留有" + this.escape(family) + "。" : ""}</p><br>
+${hobbies ? `<p>先生/女士生前${this.escape(hobbies)}，以此为乐，修身养性。</p><br>` : ""}
+${quote ? `<p>先生/女士生前常言：「${this.escape(quote)}」此言将永存我们心间。</p><br>` : ""}
+<p>斯人已逝，音容犹在。我们将永远铭记先生/女士的恩泽，并以此激励后辈，薪火相传。</p><br>
+<p style="text-align:right;font-size:13px;color:var(--ink2)">家属泣告</p>`;
+      }
+    }, 1600);
   },
 
   async openArticle(id) {

@@ -51,19 +51,21 @@ window.MemorialCore = {
   parseAuthQuery() {
     const params = new URLSearchParams(location.search);
     if (params.get("wechat_login") === "1") {
-      showToast("微信登录成功");
+      showToast(
+        window.MemorialI18n?.toastMsg("微信登录成功") || "微信登录成功"
+      );
       if (window.MemorialAuth) MemorialAuth.refresh();
       history.replaceState({}, "", location.pathname);
     }
     const err = params.get("auth_error");
     if (err) {
-      const msg =
+      const zhMsg =
         err === "wechat_not_configured"
           ? "微信登录未配置"
           : err === "wechat_state_invalid"
             ? "微信授权已过期，请重试"
             : "微信登录失败，请改用邮箱或手机号";
-      showToast(msg);
+      showToast(window.MemorialI18n?.toastMsg(zhMsg) || zhMsg);
       history.replaceState({}, "", location.pathname);
     }
   },

@@ -1,0 +1,202 @@
+{
+  "samples": [
+    {
+      "id": "li-mingde-teacher",
+      "titleZh": "李明德 · 一位教师的共和国",
+      "titleEn": "Li Mingde · A Teacher's Republic",
+      "subtitleZh": "精装纪念册样本 · 48页",
+      "subtitleEn": "Sample memorial book · 48 pages",
+      "cover": { "gradient": "linear-gradient(160deg,#2d4a3a 0%,#1a2a22 55%,#0f1812 100%)", "deco": "师" },
+      "dedicationZh": "献给我们敬爱的父亲、丈夫与祖父 —— 李明德",
+      "dedicationEn": "For our beloved father, husband, and grandfather — Li Mingde",
+      "pages": [
+        {
+          "titleZh": "封面",
+          "titleEn": "Cover",
+          "blocks": [
+            { "type": "title", "zh": "李明德", "en": "Li Mingde" },
+            { "type": "subtitle", "zh": "1938 — 2024", "en": "1938 — 2024" },
+            { "type": "text", "zh": "春蚕到死丝尽，蜡炬成灰泪始干", "en": "Until the spring silkworm dies, its thread is spun; until the candle burns out, its tears run dry." }
+          ]
+        },
+        {
+          "titleZh": "序言",
+          "titleEn": "Foreword",
+          "blocks": [
+            { "type": "text", "zh": "父亲一生最骄傲的身份，不是职称，不是著作，而是「李老师」这三个字。学生们来信说，他们至今记得他朗读《春望》时停顿的那一秒。", "en": "The title Father was proudest of was not a rank or a book — it was Mr. Li. Former students still write that they remember the pause before he read Du Fu aloud." },
+            { "type": "quote", "zh": "—— 长子 李伟", "en": "— Li Wei, eldest son" }
+          ]
+        },
+        {
+          "titleZh": "苏州童年",
+          "titleEn": "Childhood in Suzhou",
+          "blocks": [
+            { "type": "text", "zh": "1938年，父亲生于苏州一条临水的小巷。祖父修钟表，祖母替人誊抄典籍。物质匮乏，精神却富足。", "en": "Born in 1938 in a canal-side lane in Suzhou. His father repaired clocks; his mother copied classical texts for neighbors. Material life was thin; the inner life was rich." },
+            { "type": "text", "zh": "他常替书铺跑腿换借阅卡，煤油灯下读到管理员关门才肯回家。", "en": "He ran errands for library cards and read by kerosene until the librarian sent him home." }
+          ]
+        },
+        {
+          "titleZh": "执教三十八年",
+          "titleEn": "Thirty-eight years in the classroom",
+          "blocks": [
+            { "type": "text", "zh": "1962年入职长沙一中，讲授唐宋诗词。他要求每周背诵十句，不是刁难，而是相信诗句会在某个雨天自己回来。", "en": "From 1962 he taught Tang and Song poetry at Changsha No. 1 Middle School. Ten lines memorized each week — not cruelty, but faith that the lines would return on some rainy day." },
+            { "type": "text", "zh": "1985年出版散文集《庭前落叶》，稿费全买了班级图书角。", "en": "In 1985 he published Leaves in the Courtyard; the royalties bought books for the class corner." }
+          ]
+        },
+        {
+          "titleZh": "家庭",
+          "titleEn": "Family",
+          "blocks": [
+            { "type": "text", "zh": "1968年与母亲陈美华成婚。后院种玫瑰，猫趴在《陶渊明集》上睡觉。周末厨房飘着墨香与桂花糕的味道。", "en": "He married Chen Meihua in 1968. Roses in the yard; the cat slept on Tao Yuanming. Weekends smelled of ink and osmanthus cake." },
+            { "type": "text", "zh": "妹妹李芳说：「爸从不大声说话，但家里每一扇窗都因为他而亮。」", "en": "His daughter Fang said: \"Father never raised his voice, yet every window in the house seemed lit because of him.\"" }
+          ]
+        },
+        {
+          "titleZh": "学生来信",
+          "titleEn": "Letters from students",
+          "blocks": [
+            { "type": "quote", "zh": "「您教会我的不是考点，而是如何在乱世里仍读一首诗。」", "en": "\"You did not teach me exam points — you taught me how to read a poem when the world is in turmoil.\"" },
+            { "type": "quote", "zh": "「退休二十年，我仍能在梦里听见您敲黑板的三下。」", "en": "\"Twenty years after your retirement, I still hear your three knocks on the board in dreams.\"" }
+          ]
+        },
+        {
+          "titleZh": "晚年",
+          "titleEn": "Later years",
+          "blocks": [
+            { "type": "text", "zh": "退休后与母亲每周日逛颐和园。他扫描家书、批改旧生的论文，说「教书人不退休，只是换一间教室」。", "en": "Retired, he walked the Summer Palace every Sunday with his wife. He scanned family letters and edited old students' drafts: \"Teachers do not retire — they change classrooms.\"" }
+          ]
+        },
+        {
+          "titleZh": "告别",
+          "titleEn": "Farewell",
+          "blocks": [
+            { "type": "text", "zh": "2024年深秋，父亲在家中安详离世，握着母亲的手。最后念的是王维：「空山不见人，但闻人语响。」", "en": "In autumn 2024 he passed at home, holding his wife's hand, murmuring Wang Wei: empty mountains, no one seen — only the echo of voices." },
+            { "type": "text", "zh": "这本册子由家人与学生在念归处共同整理。愿读者翻页时，仿佛仍坐在他的教室后排。", "en": "This book was compiled by family and students on Nianguichu. May each turn of the page feel like the back row of his classroom." }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "chen-meihua-garden",
+      "titleZh": "陈美华 · 最好的园丁",
+      "titleEn": "Chen Meihua · The finest gardener",
+      "subtitleZh": "伴侣纪念册样本 · 36页",
+      "subtitleEn": "Companion memorial book · 36 pages",
+      "cover": { "gradient": "linear-gradient(160deg,#5a3a4a 0%,#3a2030 50%,#2a1520 100%)", "deco": "梅" },
+      "dedicationZh": "献给我们的母亲、祖母 —— 陈美华",
+      "dedicationEn": "For our mother and grandmother — Chen Meihua",
+      "pages": [
+        {
+          "titleZh": "封面",
+          "titleEn": "Cover",
+          "blocks": [
+            { "type": "title", "zh": "陈美华", "en": "Chen Meihua" },
+            { "type": "subtitle", "zh": "1940 — 2025", "en": "1940 — 2025" },
+            { "type": "text", "zh": "花开有时，爱无绝期", "en": "Blossoms have their season; love does not end" }
+          ]
+        },
+        {
+          "titleZh": "她的花园",
+          "titleEn": "Her garden",
+          "blocks": [
+            { "type": "text", "zh": "母亲总说，花不会说话，但最懂人心。她在南城小院种了四十年玫瑰、月季与薄荷。", "en": "Mother said flowers do not speak, yet they understand us. For forty years she tended roses, tea roses, and mint in the southern courtyard." },
+            { "type": "text", "zh": "邻居来讨一枝，她必剪去刺，用旧报纸包好，附一张手写养护卡。", "en": "When neighbors asked for a stem, she stripped the thorns, wrapped it in newsprint, and added a handwritten care note." }
+          ]
+        },
+        {
+          "titleZh": "护士与母亲",
+          "titleEn": "Nurse and mother",
+          "blocks": [
+            { "type": "text", "zh": "青年时在县医院做护士，夜班后仍回家给三个孩子缝校服。她说：「疼要有人听见，才算被照顾。」", "en": "As a young county nurse, she sewed uniforms after night shifts. \"Pain must be heard to be cared for,\" she said." }
+          ]
+        },
+        {
+          "titleZh": "与明德的六十年",
+          "titleEn": "Six decades with Mingde",
+          "blocks": [
+            { "type": "text", "zh": "她与李明德先生相识于朋友介绍，婚礼只摆三桌。一生吵过架，却从未分开过夜。", "en": "She met Li Mingde through friends; their wedding had three tables. They argued, but never slept apart." },
+            { "type": "quote", "zh": "「他写字，我浇花 —— 这就是我们的共和国。」", "en": "\"He wrote; I watered — that was our republic.\"" }
+          ]
+        },
+        {
+          "titleZh": "孙辈记忆",
+          "titleEn": "Grandchildren remember",
+          "blocks": [
+            { "type": "text", "zh": "孙女小雨记得外婆教她辨认晨露与霜：「露水温柔，霜是冬天的信。」", "en": "Granddaughter Xiaoyu learned to tell dew from frost: \"Dew is gentle; frost is winter's letter.\"" },
+            { "type": "text", "zh": "外孙浩然把外婆的园艺笔记扫描进纪念馆，标题写：「奶奶的科学。」", "en": "Haoran scanned her garden journals into the memorial, titled Grandma's Science." }
+          ]
+        },
+        {
+          "titleZh": "尾声",
+          "titleEn": "Epilogue",
+          "blocks": [
+            { "type": "text", "zh": "2025年春，母亲在花季中离去。我们把她最爱的玫瑰瓣压在册页里，像把春天也留下。", "en": "She left in spring 2025, in blossom season. We pressed her favorite rose petals in these pages, keeping spring with us." }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "li-family-letters",
+      "titleZh": "李家家书 · 选编",
+      "titleEn": "The Li family letters · Selected",
+      "subtitleZh": "文献式纪念册 · 40页",
+      "subtitleEn": "Documentary memorial book · 40 pages",
+      "cover": { "gradient": "linear-gradient(160deg,#4a4a5a 0%,#2a2a35 60%,#1a1a22 100%)", "deco": "信" },
+      "dedicationZh": "李氏家族后人整理 · 1958—2024",
+      "dedicationEn": "Compiled by the Li family · 1958—2024",
+      "pages": [
+        {
+          "titleZh": "封面",
+          "titleEn": "Cover",
+          "blocks": [
+            { "type": "title", "zh": "李家家书", "en": "Family letters" },
+            { "type": "subtitle", "zh": "选编三十封", "en": "Thirty selected" }
+          ]
+        },
+        {
+          "titleZh": "编例",
+          "titleEn": "Editor's note",
+          "blocks": [
+            { "type": "text", "zh": "本册选自李家五口四代通信，原件多为毛笔或钢笔，部分已扫描存于念归处纪念馆。", "en": "This volume draws on four generations of Li family correspondence, scanned and preserved on the Nianguichu memorial." }
+          ]
+        },
+        {
+          "titleZh": "1958 · 父亲北上",
+          "titleEn": "1958 · Father goes north",
+          "blocks": [
+            { "type": "quote", "zh": "「华妹：火车已过黄河，北京冷，但心里热。勿念。明德」", "en": "\"Meihua: The train has crossed the Yellow River. Beijing is cold, but my heart is warm. Do not worry. — Mingde\"" }
+          ]
+        },
+        {
+          "titleZh": "1985 · 出版之日",
+          "titleEn": "1985 · Publication day",
+          "blocks": [
+            { "type": "quote", "zh": "「爸，样书到了。封面墨色正好，像您书房那方砚。周末带孩子们回去。」—— 李伟", "en": "\"Dad, the proof arrived. The ink is just right, like your study stone. We'll bring the children home this weekend.\" — Wei" }
+          ]
+        },
+        {
+          "titleZh": "2010 · 孙女留学",
+          "titleEn": "2010 · Granddaughter abroad",
+          "blocks": [
+            { "type": "quote", "zh": "「爷爷：伦敦下雨，我读您推荐的《陶渊明集》。想家。小雨」", "en": "\"Grandpa: Rain in London. I'm reading Tao Yuanming as you suggested. I miss home. — Xiaoyu\"" },
+            { "type": "quote", "zh": "「小雨：乡愁是功课，慢慢写。爷爷」", "en": "\"Xiaoyu: Homesickness is homework — write it slowly. — Grandpa\"" }
+          ]
+        },
+        {
+          "titleZh": "2024 · 最后一封",
+          "titleEn": "2024 · The last letter",
+          "blocks": [
+            { "type": "text", "zh": "李明德先生辞世后，家人在抽屉里发现未寄出的明信片，背面只有一句：「谢谢你们做我的孩子。」", "en": "After Mr. Li passed, the family found an unsent postcard in his drawer: \"Thank you for being my children.\"" }
+          ]
+        },
+        {
+          "titleZh": "封底",
+          "titleEn": "Colophon",
+          "blocks": [
+            { "type": "text", "zh": "数字版可于纪念馆下载；精装版支持定制烫金与家族谱系折页。", "en": "Digital PDF available from the memorial; print editions offer gold stamping and fold-out family trees." }
+          ]
+        }
+      ]
+    }
+  ]
+}

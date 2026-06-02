@@ -11,16 +11,20 @@ window.MemorialStore = {
       deathDate: "2023-11-18",
       motto: "春蚕到死丝尽，蜡炬成灰泪始干",
       bioHtml:
-        "<p>李明德先生，1938年4月3日出生于湖南省长沙市，2023年11月18日于家中安详辞世，享年85岁。</p><p>李先生自1962年起执教于长沙市第一中学，执教生涯长达36年，桃李满天下。</p>",
+        "<p>李明德先生，1938年4月3日出生于湖南省长沙市，2023年11月18日于家中安详辞世，享年85岁。</p><p>李先生自1962年起执教于北京师范大学中文系，执教生涯长达三十八年，桃李满天下。学生们记得他洗得发白的青布长衫、满手粉笔灰，以及朗读杜甫《春望》前那意味深长的一顿。</p><p>他出生于战乱年代的苏州，父亲是修表匠，母亲为邻里誊抄典籍。书籍稀少，少年明德以跑腿换借阅卡，在煤油灯下读到管理员关门才肯回家。</p><p>1968年与陈美华女士成婚，育有一子一女，后院种玫瑰，常引陶诗与猫为伴。退休后扫描家书、批改旧生论文，每周日与妻子逛颐和园。</p><p class=\"memorial-quote\">「教书人播下的是文字，收获的是被认真度过的一生。」</p>",
       familyNote:
         "父亲走了，带走了那扇永远亮着灯的窗。每个深夜，我们仍会想起您书房里飘出的墨香。",
       themeId: "ink-default",
       privacy: "family",
       quietMode: true,
       timeline: [
-        { yearLabel: "1938年", title: "出生于湖南长沙", description: "在书香门第中成长" },
-        { yearLabel: "1962年", title: "入职长沙市第一中学", description: "开始执教生涯" },
-        { yearLabel: "2023年", title: "安然辞世", description: "在家人陪伴下安详离去" },
+        { yearLabel: "1938年", title: "出生于苏州", description: "长子，父亲修表，母亲誊抄典籍" },
+        { yearLabel: "1960年", title: "考入北京师范大学", description: "攻读古典中文，以杜甫研究获奖" },
+        { yearLabel: "1968年", title: "与陈美华成婚", description: "简朴婚礼，西山读书度蜜月" },
+        { yearLabel: "1972年", title: "执教北师大", description: "讲授唐宋诗词，要求学生每周背诵十句" },
+        { yearLabel: "1985年", title: "出版《庭前落叶》", description: "散文集，稿费购入班级图书角" },
+        { yearLabel: "2005年", title: "退休", description: "廊下答疑，与女儿数字化家书" },
+        { yearLabel: "2023年", title: "家中辞世", description: "握妻子之手，念王维空山诗" },
       ],
       family: [
         { groupLabel: "配偶", name: "陈美华", relation: "妻子 · 相伴63载", avatarChar: "美" },

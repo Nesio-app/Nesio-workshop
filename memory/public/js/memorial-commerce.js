@@ -69,6 +69,7 @@ window.MemorialCommerce = {
   },
 
   productCard(p, detailFn) {
+    if (window.MemorialI18n) p = MemorialI18n.localizeProduct(p);
     const esc = MemorialStore.escapeHtml;
     const list =
       p.listPrice && p.listPrice > p.price
@@ -90,7 +91,13 @@ window.MemorialCommerce = {
       .join("");
     ["shop-products-grid", "shop-page-grid"].forEach((id) => {
       const el = document.getElementById(id);
-      if (el) el.innerHTML = html || '<p class="p0-empty" style="padding:24px;grid-column:1/-1">暂无商品</p>';
+      if (el) {
+        const empty =
+          window.MemorialI18n?.t("shop.empty") || "暂无商品";
+        el.innerHTML =
+          html ||
+          `<p class="p0-empty" style="padding:24px;grid-column:1/-1">${empty}</p>`;
+      }
     });
     const qr = document.getElementById("qr-products-grid");
     if (qr) {
@@ -263,18 +270,29 @@ window.MemorialCommerce = {
 
   openCheckout() {
     if (!this.cart.length) {
-      showToast("购物车为空");
+      showToast(window.MemorialI18n?.isEn() ? "Cart is empty" : "购物车为空");
       return;
     }
     const sum = this.cart.reduce((s, i) => s + i.price * i.qty, 0);
     if (sum <= 0) {
-      showToast("订单金额无效，请重新选择商品");
+      showToast(
+        window.MemorialI18n?.isEn()
+          ? "Invalid order total"
+          : "订单金额无效，请重新选择商品"
+      );
       return;
     }
     this.cartOpen = false;
     document.getElementById("cart-drawer")?.classList.remove("open");
     document.getElementById("cart-backdrop")?.classList.remove("open");
-    document.getElementById("checkout-modal")?.classList.add("open");
+    const checkout = document.getElementById("checkout-modal");
+    if (checkout) {
+      checkout.classList.add("open");
+      checkout.setAttribute("aria-hidden", "false");
+      checkout.scrollTop = 0;
+      document.body.style.overflow = "hidden";
+    }
+    this.renderCheckoutFormI18n();
 
     const digital = this.cartIsDigitalOnly();
     const shipBlock = document.getElementById("checkout-shipping-block");
@@ -321,7 +339,51 @@ window.MemorialCommerce = {
   },
 
   closeCheckout() {
-    document.getElementById("checkout-modal")?.classList.remove("open");
+    const checkout = document.getElementById("checkout-modal");
+    checkout?.classList.remove("open");
+    checkout?.setAttribute("aria-hidden", "true");
+    document.getElementById("cart-backdrop")?.classList.remove("open");
+    document.body.style.overflow = "";
+  },
+
+  renderCheckoutFormI18n() {
+    const I = window.MemorialI18n;
+    if (!I) return;
+    const t = (k, fb) => I.t(k) || fb;
+    const map = [
+      ["co-name", "checkout.name", "联系人姓名 *", "Contact name *"],
+      ["co-email", "checkout.email", "联系邮箱 *", "Email *"],
+      ["co-phone", "checkout.phone", "手机号 *", "Phone *"],
+      ["co-province", "checkout.province", "省份 *", "Province *"],
+      ["co-city", "checkout.city", "城市 *", "City *"],
+      ["co-address", "checkout.address", "详细地址 *", "Street address *"],
+      ["co-postal", "checkout.postal", "邮编（可选）", "Postal code (optional)"],
+      ["co-note", "checkout.note", "备注（可选）", "Note (optional)"],
+    ];
+    map.forEach(([id, key, zh, en]) => {
+      const el = document.getElementById(id);
+      if (el) el.placeholder = t(key, I.isEn() ? en : zh);
+    });
+    const hint = document.getElementById("checkout-digital-hint");
+    if (hint) {
+      hint.textContent = t(
+        "checkout.digitalHint",
+        I.isEn()
+          ? "Digital membership needs no shipping address."
+          : "数字会员服务无需填写收货地址，支付后为您开通。"
+      );
+    }
+    const legend = document.querySelector("#checkout-modal .payment-methods legend");
+    if (legend) legend.textContent = t("checkout.payLegend", I.isEn() ? "Payment" : "支付方式");
+    const submitBtn = document.querySelector("#checkout-modal .submit-btn");
+    if (submitBtn) {
+      submitBtn.textContent = t(
+        "checkout.submit",
+        I.isEn() ? "Place order & pay" : "提交订单并支付"
+      );
+    }
+    const head = document.querySelector("#checkout-modal .modal-head h3");
+    if (head) head.textContent = t("checkout.title", I.isEn() ? "Checkout" : "确认订单");
   },
 
   getSelectedPaymentMethod() {
@@ -356,12 +418,17 @@ window.MemorialCommerce = {
       paymentMethod: method,
     };
 
+    const I = window.MemorialI18n;
     if (!payload.contactName || !payload.contactPhone) {
-      showToast("请填写联系人姓名与手机号");
+      showToast(
+        I?.isEn()
+          ? "Please enter contact name and phone"
+          : "请填写联系人姓名与手机号"
+      );
       return;
     }
     if (!contactEmail || !contactEmail.includes("@")) {
-      showToast("请填写有效联系邮箱");
+      showToast(I?.isEn() ? "Please enter a valid email" : "请填写有效联系邮箱");
       return;
     }
     if (
@@ -370,9 +437,15 @@ window.MemorialCommerce = {
         !payload.shippingCity ||
         !payload.shippingProvince)
     ) {
-      showToast("实物商品请填写完整收货地址");
+      showToast(
+        I?.isEn()
+          ? "Please enter full shipping address"
+          : "实物商品请填写完整收货地址"
+      );
       return;
     }
+
+    const orderTotal = this.cart.reduce((s, i) => s + i.price * i.qty, 0);
 
     if (window.MemorialCore?.useApi) {
       try {
@@ -381,7 +454,6 @@ window.MemorialCommerce = {
         this.cart = [];
         this.saveCart();
         this.updateCartUI();
-        this.toggleCart();
         if (res.checkoutUrl) {
           window.location.href = res.checkoutUrl;
           return;
@@ -402,7 +474,11 @@ window.MemorialCommerce = {
     this.cart = [];
     this.saveCart();
     this.updateCartUI();
-    this.showOrderConfirm("NG-DEMO-" + Date.now().toString(36).toUpperCase(), payload.items.reduce((s,i)=>s+i.price*i.qty,0), "inquiry");
+    this.showOrderConfirm(
+      "NG-DEMO-" + Date.now().toString(36).toUpperCase(),
+      orderTotal,
+      "inquiry"
+    );
   },
 
   paymentMethodLabel(method) {
@@ -433,23 +509,24 @@ window.MemorialCommerce = {
       this.showOrderConfirm(orderNumber, total, method);
       return;
     }
+    const en = window.MemorialI18n?.isEn();
     const qr =
       payment.qrUrl
-        ? `<div class="payment-qr-wrap"><img src="${MemorialStore.escapeHtml(payment.qrUrl)}" alt="收款码" class="payment-qr" /></div>`
-        : `<p class="payment-no-qr">收款码由客服提供，请备注订单号完成支付。</p>`;
+        ? `<div class="payment-qr-wrap"><img src="${MemorialStore.escapeHtml(payment.qrUrl)}" alt="${en ? "QR code" : "收款码"}" class="payment-qr" /></div>`
+        : `<p class="payment-no-qr">${en ? "QR code will be sent by support — include your order number when paying." : "收款码由客服提供，请备注订单号完成支付。"}</p>`;
     const steps = (payment.steps || [])
       .map((s) => `<li>${MemorialStore.escapeHtml(s)}</li>`)
       .join("");
     body.innerHTML = `
       <div class="payment-page-card">
-        <p class="payment-page-kicker">待支付</p>
-        <h1 class="payment-page-title">${MemorialStore.escapeHtml(payment.title || "完成支付")}</h1>
+        <p class="payment-page-kicker">${en ? "Payment due" : "待支付"}</p>
+        <h1 class="payment-page-title">${MemorialStore.escapeHtml(payment.title || (en ? "Complete payment" : "完成支付"))}</h1>
         <p class="payment-page-amount">¥${Number(total).toFixed(2)}</p>
-        <p class="payment-page-order">订单号：<strong>${MemorialStore.escapeHtml(orderNumber)}</strong></p>
+        <p class="payment-page-order">${en ? "Order" : "订单号"}：<strong>${MemorialStore.escapeHtml(orderNumber)}</strong></p>
         ${qr}
         <ol class="payment-steps">${steps}</ol>
-        <button type="button" class="submit-btn" style="width:100%" onclick="MemorialCommerce.finishPayment('${MemorialStore.escapeHtml(orderNumber)}',${total},'${MemorialStore.escapeHtml(method)}')">我已完成支付</button>
-        <button type="button" class="obit-back-btn" style="width:100%;margin-top:10px" onclick="goPage('home')">返回首页</button>
+        <button type="button" class="submit-btn" style="width:100%" onclick="MemorialCommerce.finishPayment('${MemorialStore.escapeHtml(orderNumber)}',${total},'${MemorialStore.escapeHtml(method)}')">${en ? "I have paid" : "我已完成支付"}</button>
+        <button type="button" class="obit-back-btn" style="width:100%;margin-top:10px" onclick="goPage('home')">${en ? "Back to home" : "返回首页"}</button>
       </div>`;
     goPage("payment");
     window.scrollTo(0, 0);
