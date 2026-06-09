@@ -1,0 +1,10 @@
+node_modules/
+www/
+ios/App/Pods/
+ios/App/build/
+ios/DerivedData/
+config.local.js
+.DS_Store
+*.xcuserstate
+xcuserdata/
+.vercel

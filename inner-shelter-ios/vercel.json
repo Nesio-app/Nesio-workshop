@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "functions": {
+    "api/inner-shelter/chat.ts": {
+      "maxDuration": 30
+    },
+    "api/inner-shelter/health.ts": {
+      "maxDuration": 10
+    }
+  }
+}

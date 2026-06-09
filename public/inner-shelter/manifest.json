@@ -1,0 +1,19 @@
+{
+  "name": "Inner Shelter · 内在家园",
+  "short_name": "内在家园",
+  "description": "神经友好空间 · C-CPTSD 疗愈伴侣",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0d0f14",
+  "theme_color": "#0d0f14",
+  "lang": "zh-CN",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

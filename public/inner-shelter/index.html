@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0d0f14">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="内在家园">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.svg">
+<title>Inner Shelter · 内在家园</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;500;600&family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;500;600&family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap"></noscript>
+</head>
+<body>
+
+
+<!-- ONBOARDING -->
+<div class="onboard" id="onboard">
+  <div class="onboard-logo">🏡</div>
+  <div class="onboard-title">Inner Shelter<br><em style="color:var(--W)">内在家园</em></div>
+  <div class="onboard-sub">这里是你的神经友好空间。<br>没有打卡，没有催促，没有评判。<br>允许你碎掉，也允许你慢慢复原。</div>
+  <button class="onboard-btn" onclick="enterApp()">进入家园 →</button>
+  <div class="onboard-skip" onclick="enterApp()">直接开始</div>
+  <div style="margin-top:20px;font-size:11px;color:rgba(232,226,217,.25);letter-spacing:.5px">轻触按钮进入 · 不是加载中</div>
+</div>
+
+<div class="amb"><div class="o o1"></div><div class="o o2"></div><div class="o o3"></div></div>
+<div class="toast" id="toast"></div>
+
+<!-- FLASHBACK OVERLAY -->
+<div class="fbo" id="fbo">
+<div class="fbi">
+  <div class="fbcl" onclick="closeFB()">我好多了 ✓</div>
+  <div class="sbar" style="padding-top:22px">
+    <span style="font-size:13px;color:var(--muted)">Inner Shelter · 安全着陆中</span>
+    <span style="font-size:12px;color:var(--C)">🛡️ 保护模式</span>
+  </div>
+  <div style="padding:16px 24px 0">
+    <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--C);margin-bottom:8px">情感闪回 · 紧急着陆</div>
+    <div style="font-family:'DM Serif Display',serif;font-size:26px;line-height:1.25;color:var(--txt)">你现在是安全的。<br><span style="font-style:italic;color:var(--C)">这只是一段记忆。</span></div>
+    <div style="margin-top:8px;font-family:'Noto Serif SC',serif;font-size:13px;color:var(--muted);line-height:1.8">它无法再伤害你。你已经是成年人了。</div>
+  </div>
+  <div class="bstage">
+    <div class="bout"><div class="bbd"></div><div class="bctr"><div class="bnum" id="bnum">4</div><div class="bph" id="bph">吸气</div></div></div>
+    <div class="blbl" id="blbl">跟随光圈，平稳呼吸</div>
+    <div class="bsub">双手叠放胸口<br>感受心跳的节律，你在，你安全</div>
+  </div>
+  <div class="slbl" style="margin-bottom:12px">皮特·沃克 · 闪回管理步骤</div>
+  <div class="wlk" id="wlist">
+    <div class="ws cur"><span class="wn">1</span>在心里对自己说：我正在经历情感闪回。</div>
+    <div class="ws"><span class="wn">2</span>提醒自己：这只是来自过去的记忆，它已经无法再伤害我。</div>
+    <div class="ws"><span class="wn">3</span>感受自己的身体——我是安全的，我已经是成年人了。</div>
+    <div class="ws"><span class="wn">4</span>关掉内在挑剔者：此刻不需要评判自己，也不需要解决任何问题。</div>
+    <div class="ws"><span class="wn">5</span>把手放在胸口，感受那个小小的心跳。它一直都在。</div>
+    <div class="ws"><span class="wn">6</span>允许自己哭泣，允许自己颤抖。这是神经系统在释放。</div>
+    <div class="ws"><span class="wn">7</span>感觉好一些了吗？你不需要独自承担这一切。</div>
+  </div>
+  <div style="height:16px"></div>
+  <div class="slbl" style="margin-bottom:12px">⚡ TIPP · 物理级急救</div>
+  <div class="tipp">
+    <div class="tippH">当恐慌到极限时，跳过思考，直接用身体</div>
+    <div class="tippr" onclick="toast('🌊 走到水槽边，用常温冷水冲洗额头和手腕 30 秒，激活潜水反射，心率 5 秒内下降。')"><div class="tii">🌊</div><div class="tif"><h5>温度 Temperature</h5><p>冷水冲额头+手腕，激活迷走神经制动，5秒起效</p></div></div>
+    <div class="tippr" onclick="toast('💪 靠墙静蹲 1 分钟，或做 10 个 Deadbug。强行消耗过激的去甲肾上腺素。')"><div class="tii">💪</div><div class="tif"><h5>高强运动 Intense Exercise</h5><p>靠墙静蹲/Deadbug 1分钟，消耗过度激发的应激激素</p></div></div>
+    <div class="tippr" onclick="toast('✊ 双手握拳 5 秒，然后彻底张开，重复 3 次。让植物神经系统记住解冻的体感。')"><div class="tii">🤲</div><div class="tif"><h5>渐进放松 Progressive Relaxation</h5><p>握拳5秒→彻底松开，让身体记住"解冻"的感觉</p></div></div>
+    <div class="tippr" onclick="toast('😮 节奏呼吸：4秒吸→2秒屏→6秒呼，激活副交感神经刹车。')"><div class="tii">💨</div><div class="tif"><h5>节奏呼吸 Paced Breathing</h5><p>4秒吸→2秒屏→6秒呼，激活副交感"刹车"</p></div></div>
+  </div>
+  <div style="height:24px"></div>
+  <div style="padding:0 24px;text-align:center">
+    <div style="font-family:'Noto Serif SC',serif;font-size:13px;color:var(--muted);line-height:2">你不需要修复任何事情。<br>你只需要让身体知道，此刻是安全的。<br><span style="color:var(--C)">内在家园的门，永远为你敞开。</span></div>
+  </div>
+  <div style="height:40px"></div>
+</div>
+</div>
+
+<div id="app">
+
+<!-- HOME -->
+<div class="sc on" id="s-home">
+  <div class="sbar">
+    <span class="stime" id="t0">21:03</span>
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="ptpill" onclick="goTo('s-shop')">✨ <span class="pd">180</span> pts</div>
+      <div style="display:flex;gap:5px"><span style="font-size:11px;opacity:.5">📶</span><span style="font-size:11px;opacity:.5">🔋</span></div>
+    </div>
+  </div>
+  <div class="hero">
+    <div class="htag" id="htag">🌙 晚间模式 · 自动舒缓</div>
+    <div class="hname">你好，<em>Jennifer</em>。</div>
+    <div class="hdate" id="hdate">2026年6月8日 · 星期一</div>
+  </div>
+  <div class="enc">
+    <div class="enlbl">今日能量天气</div>
+    <div class="enrow">
+      <button class="enb" onclick="setEn('hi',this)"><span class="ei">🔥</span>高燃满电</button>
+      <button class="enb on" onclick="setEn('md',this)"><span class="ei">🌿</span>稳健充电</button>
+      <button class="enb" onclick="setEn('lo',this)"><span class="ei">🌙</span>低电运行</button>
+    </div>
+  </div>
+  <div class="soswrap">
+    <button class="sosb" onclick="openFB()">
+      <div class="sosring">🛡️</div>
+      <div class="sosi"><h3>我碎了 · 一键安全着陆</h3><p>陷入闪回或情绪崩溃时触发<br>系统立刻锁定任务，护送你着陆</p></div>
+    </button>
+  </div>
+  <div class="slbl">功能模块</div>
+  <div class="mgrid">
+    <div class="mc rd" onclick="goTo('s-ifs')"><div class="mi">🛡️</div><h4>IFS 阴影整合</h4><p>挑剔者去极化，内在和解</p></div>
+    <div class="mc pp" onclick="goTo('s-canvas')"><div class="mi">🫙</div><h4>情感倾倒画布</h4><p>零结构宣泄，AI细化解析</p></div>
+    <div class="mc gn" onclick="goTo('s-anchor')"><div class="mi">🐾</div><h4>物理锚点导航</h4><p>微动作接管，消除解离</p></div>
+    <div class="mc cl" onclick="goTo('s-pt')"><div class="mi">💪</div><h4>PT 物理治疗</h4><p>Verna方案 · 5个动作</p></div>
+    <div class="mc wm" onclick="goTo('s-journal')"><div class="mi">📓</div><h4>CBT 情绪日记</h4><p>6步认知重构</p></div>
+    <div class="mc gd" onclick="goTo('s-shop')"><div class="mi">🎁</div><h4>多巴胺商店</h4><p>✨ <span class="pd">180</span> pts 待使用</p></div>
+    <div class="mc gn" onclick="goTo('s-bgl')"><div class="mi">📊</div><h4>血糖日志</h4><p>目标&lt;140 · 步行是关键</p></div>
+    <div class="mc pp" onclick="goTo('s-ritual')"><div class="mi">🌙</div><h4>夜间断电仪式</h4><p>22:00 · 神经系统修复</p></div>
+  </div>
+  <div class="ltcard">
+    <div class="ltag">✦ 今日温暖肯定语 · AI生成</div>
+    <div class="lbody" id="lbody">Jennifer，今天你完成的每一件小事，无论大小，都是神经系统在慢性压力下真实的胜利。你不需要完美，你只需要继续存在。Maple 在等着你，大后方安全落锁，今晚可以安心休息。</div>
+    <div class="lclaim" id="lclaim" onclick="claimLetter()">🌟 阅读完成，领取 +30 PTS</div>
+  </div>
+  <div class="sp"></div>
+</div>
+
+<!-- IFS -->
+<div class="sc" id="s-ifs">
+  <div class="sbar"><span class="stime">21:03</span></div>
+  <div class="hdr"><div class="back" onclick="goBack()">← 返回</div><div class="htitle it">阴影整合舱</div><div class="hsub">IFS · 将批判转化为理解，挑剔者去极化</div></div>
+  <div style="height:14px"></div>
+  <div class="pillnav">
+    <button class="pbtn on" onclick="ifsTab(this,'ia')">✍️ 自由表达</button>
+    <button class="pbtn" onclick="ifsTab(this,'ib')">🧹 无损蒸发</button>
+  </div>
+  <div id="ia" class="iftab" style="display:flex;flex-direction:column;gap:14px;padding-top:14px">
+    <div class="ifsinp"><label>现在脑子里在说什么？</label><textarea id="ifsta" placeholder="我必须……我应该早就……全搞砸了……太失败了……" oninput="scanAnts(this.value)"></textarea></div>
+    <div class="antf" id="antf"><div class="antfl">⚠️ 检测到全有全无思维</div><div class="antft">这不是你的错，是保护者在用它唯一知道的方式照顾你。</div><div class="antch" id="antch"></div></div>
+    <button class="cta gn" onclick="runIFS()">🔍 解构我的内在声音</button>
+    <div class="ppcards" id="ppcards">
+      <div class="pc pro"><div class="pcl">🛡️ 保护者 · Protector Part</div><div class="pcb" id="protext"></div></div>
+      <div class="pc self"><div class="pcl">🧘 清醒自我 · Self Energy</div><div class="pcb" id="seltext"></div></div>
+    </div>
+    <div class="aib" id="ifsai"><div class="aib-l">✦ AI 洞察 <span class="dots" id="ifsdots" style="color:var(--P)"><span></span><span></span><span></span></span></div><div class="aib-t" id="ifsait"></div></div>
+    <div class="sp"></div>
+  </div>
+  <div id="ib" class="iftab" style="display:none;flex-direction:column;gap:14px;padding-top:14px">
+    <div style="padding:0 24px"><div style="font-family:'Noto Serif SC',serif;font-size:13px;color:var(--muted);line-height:1.9">未完成不是失败，是神经系统在保护你免受过载。<br>允许它们今天无损蒸发，明天以新的形态回来。</div></div>
+    <div class="evlist">
+      <div class="evi" id="ev1"><div class="evd r"></div><div class="evi-i"><h4>CFA L2 Ethics 精读 60分钟</h4><span>逾期 3天 · 神经系统已过载</span></div><button class="evbtn" onclick="evap('ev1')">✨ 蒸发</button></div>
+      <div class="evi" id="ev2"><div class="evd r"></div><div class="evi-i"><h4>MBA Week 2 录播课 × 2节</h4><span>逾期 1天 · 可穿插执行</span></div><button class="evbtn" onclick="evap('ev2')">✨ 蒸发</button></div>
+      <div class="evi" id="ev3"><div class="evd a"></div><div class="evi-i"><h4>血糖数据整理 Notion录入</h4><span>今日待完成 · 可延至明日</span></div><button class="evbtn" onclick="evap('ev3')">✨ 蒸发</button></div>
+      <div class="evi" id="ev4"><div class="evd a"></div><div class="evi-i"><h4>每日简报 · 复盘写作</h4><span>今日待完成</span></div><button class="evbtn" onclick="evap('ev4')">✨ 蒸发</button></div>
+      <div class="evi" id="ev5"><div class="evd g"></div><div class="evi-i"><h4>Maple 互动 · 肚皮贴贴 ✓</h4><span>已完成 · 大后方稳固</span></div><div style="font-size:18px;opacity:.5">✓</div></div>
+    </div>
+    <div class="sp"></div>
+  </div>
+</div>
+
+<!-- CANVAS -->
+<div class="sc" id="s-canvas">
+  <div class="sbar"><span class="stime">21:03</span></div>
+  <div class="hdr"><div class="back" onclick="goBack()">← 返回</div><div class="htitle it">情感倾倒画布</div><div class="hsub">零结构 · 允许混乱 · AI帮你看清情绪颗粒</div></div>
+  <div style="height:14px"></div>
+  <div class="cvbox"><div class="cvhint">☁️ 随意倾倒，不需要逻辑，不需要完整的句子</div><textarea class="cvta" id="cvta" placeholder="很烦，什么都不想做，感觉……" oninput="onCV(this.value)"></textarea><div class="cvtools"><button class="cvtb" onclick="clrCV()">清空</button><button class="cvtb" onclick="saveCV()">保存 +10pts</button></div></div>
+  <div class="bubrow" id="bubrow">
+    <div class="bub fe">😰 恐惧被评价</div><div class="bub ti">😮‍💨 带宽透支</div><div class="bub he">🌀 渴望撤退</div><div class="bub an">🔥 愤怒受压</div><div class="bub sh">😶 羞耻感</div>
+  </div>
+  <button class="cta pp" onclick="analyzeCV()">✦ AI拆解情绪颗粒</button>
+  <div class="granc" id="granc">
+    <div class="granl">情绪颗粒度分析</div>
+    <div class="grant" id="grant">正在解析……</div>
+    <div class="gbars">
+      <div class="gbar"><div class="gbl">恐惧/评价</div><div class="gbt"><div class="gbf f" id="gf"></div></div><div class="gbp" id="gfp">0%</div></div>
+      <div class="gbar"><div class="gbl">带宽透支</div><div class="gbt"><div class="gbf t" id="gt"></div></div><div class="gbp" id="gtp">0%</div></div>
+      <div class="gbar"><div class="gbl">渴望撤退</div><div class="gbt"><div class="gbf h" id="gh"></div></div><div class="gbp" id="ghp">0%</div></div>
+      <div class="gbar"><div class="gbl">愤怒受压</div><div class="gbt"><div class="gbf a" id="ga"></div></div><div class="gbp" id="gap2">0%</div></div>
+      <div class="gbar"><div class="gbl">羞耻感</div><div class="gbt"><div class="gbf s" id="gs"></div></div><div class="gbp" id="gsp">0%</div></div>
+    </div>
+  </div>
+  <div class="aib" id="cvai"><div class="aib-l">✦ 温暖回应 <span class="dots" id="cvdots" style="color:var(--P)"><span></span><span></span><span></span></span></div><div class="aib-t" id="cvait"></div></div>
+  <div class="sp"></div>
+</div>
+
+<!-- ANCHOR -->
+<div class="sc" id="s-anchor">
+  <div class="sbar"><span class="stime">21:03</span></div>
+  <div class="hdr"><div class="back" onclick="goBack()">← 返回</div><div class="htitle it">物理锚点导航</div><div class="hsub">消除解离 · 把疗愈落在身体里</div></div>
+  <div style="height:14px"></div>
+  <div class="ach"><div class="aci">🐾</div><div class="act">理智正式下班</div><div class="acd">当大脑失控时，让身体接管。<br>下面是为你准备的 2 分钟微动作盲盒。</div></div>
+  <div class="slbl" style="margin-top:6px">立刻可执行的物理微动作</div>
+  <div class="ar hl" onclick="toast('🐶 去找 Maple，让它趴在你腿上，用手抚摸它的背部 2 分钟。催产素会冲刷皮质醇。理智卸载，身体接管。')"><div class="aico">🐶</div><div class="atxt"><h4>和 Maple 贴贴 2 分钟</h4><p>催产素冲刷皮质醇，理智卸载。</p></div></div>
+  <div class="ar" onclick="start541()"><div class="aico cl">👁️</div><div class="atxt"><h4>5-4-3-2-1 接地练习</h4><p>用感官把神经系统拉回当下。点击开始引导。</p></div></div>
+  <div class="ar" onclick="toast('🌿 关灯，点亮熏香，22:00 芳香仪式开始。让嗅觉引领神经系统进入夜间恢复模式。')"><div class="aico wm">🌿</div><div class="atxt"><h4>22:00 芳香 + 红光仪式</h4><p>关闭屏幕，点燃熏香，红光仪器就绪。</p></div></div>
+  <div class="ar" onclick="goTo('s-pt')"><div class="aico pp">🦵</div><div class="atxt"><h4>开始 Verna PT</h4><p>5个动作，2-3组，20分钟神经重置。</p></div></div>
+  <div class="ar" onclick="toast('🚶 站起来，走到阳台或窗边，用双脚感受地面，深呼吸 5 次。')"><div class="aico rd">🦶</div><div class="atxt"><h4>起立 + 走动 2 分钟</h4><p>站起来这一个动作，会打破解离状态。</p></div></div>
+  <div class="aib" id="gcard" style="display:none"><div class="aib-l">👁️ 5-4-3-2-1 接地练习</div><div class="aib-t" id="gtxt"></div></div>
+  <div class="slbl">大后方安全状态</div>
+  <div class="stiles">
+    <div class="stile"><div class="si">🛡️</div><h5>大后方防线</h5><p>所有任务已落锁，今晚无需执行</p><div class="stbadge">安全 ✓</div></div>
+    <div class="stile"><div class="si">💤</div><h5>睡眠目标</h5><p>22:30 入睡，7小时修复窗口</p><div class="stbadge">已锁定</div></div>
+    <div class="stile"><div class="si">🔆</div><h5>红光仪器</h5><p>22:00 启动，持续 20 分钟</p><div class="stbadge">就绪</div></div>
+    <div class="stile"><div class="si">🐶</div><h5>Maple 状态</h5><p>在家，等你互动，随时可以贴贴</p><div class="stbadge">在线</div></div>
+  </div>
+  <div class="sp"></div>
+</div>
+
+<!-- PT -->
+<div class="sc" id="s-pt">
+  <div class="sbar"><span class="stime">21:03</span></div>
+  <div class="hdr"><div class="back" onclick="goBack()">← 返回</div><div class="htitle it">Verna PT · 物理治疗</div><div class="hsub">Mon/Wed/Fri · 5个动作 · 2-3组 × 8-10次</div></div>
+  <div style="height:14px"></div>
+  <div class="pth">
+    <div class="ptring"><svg viewBox="0 0 130 130"><circle class="ptr-tr" cx="65" cy="65" r="54"/><circle class="ptr-fi" id="ptrf" cx="65" cy="65" r="54"/></svg><div class="ptrl"><div class="ptc" id="ptcur">0</div><div class="ptt">/ 5</div></div></div>
+    <div class="ptttl" id="ptttl">点击动作开始计时</div>
+  </div>
+  <div class="pttb" id="pttb">
+    <div class="pttn" id="pttn">00</div>
+    <div class="ptti"><h4 id="pttn2">--</h4><p id="ptdt">准备好了吗？</p></div>
+    <div class="pttc"><button class="ptcb" id="ptplay" onclick="togglePT()">▶</button><button class="ptcb" onclick="resetPT()">↺</button></div>
+  </div>
+  <div class="slbl">训练动作</div>
+  <div class="ptexs">
+    <div class="ptex" id="px0" onclick="selEx(0)"><div class="pten">1</div><div class="ptei"><h4>Knee CARs</h4><p>膝关节全程环绕，提升关节液分泌</p></div><div class="ptsets">2-3组×10次</div></div>
+    <div class="ptex" id="px1" onclick="selEx(1)"><div class="pten">2</div><div class="ptei"><h4>Clamshells against wall</h4><p>髋外展激活，靠墙保持中立位</p></div><div class="ptsets">2-3组×10次</div></div>
+    <div class="ptex" id="px2" onclick="selEx(2)"><div class="pten">3</div><div class="ptei"><h4>Marching Bridge</h4><p>臀部激活 + 单腿稳定训练</p></div><div class="ptsets">2-3组×10次/腿</div></div>
+    <div class="ptex" id="px3" onclick="selEx(3)"><div class="pten">4</div><div class="ptei"><h4>Standing Clam</h4><p>站姿髋外展，功能性髋稳定</p></div><div class="ptsets">2-3组×10次/侧</div></div>
+    <div class="ptex" id="px4" onclick="selEx(4)"><div class="pten">5</div><div class="ptei"><h4>Soleus Raises</h4><p>比目鱼肌离心训练，膝关节减压</p></div><div class="ptsets">2-3组×15次</div></div>
+  </div>
+  <div class="sp"></div>
+</div>
+
+<!-- JOURNAL -->
+<div class="sc" id="s-journal">
+  <div class="sbar"><span class="stime">21:03</span></div>
+  <div class="hdr"><div class="back" onclick="goBack()">← 返回</div><div class="htitle it">情绪日记</div><div class="hsub">CBT 六段式认知重构 · 每次 5 分钟</div></div>
+  <div style="height:14px"></div>
+  <div class="pillnav"><button class="pbtn on" onclick="jTab(this,'jw')">✍️ 今日记录</button><button class="pbtn" onclick="jTab(this,'jh')">📚 历史回顾</button></div>
+  <div id="jw" style="display:flex;flex-direction:column;gap:12px;padding-top:14px">
+    <div style="padding:0 24px;display:flex;align-items:center;justify-content:space-between">
+      <div style="font-size:12px;color:var(--muted)" id="jdate">2026年6月8日</div>
+      <div style="display:flex;align-items:center;gap:8px"><div style="font-size:12px;color:var(--muted)">此刻心情</div><div style="font-size:22px" id="moodemi">😐</div></div>
+    </div>
+    <div style="padding:0 24px"><input type="range" class="msld" id="mslider" min="1" max="10" value="5" oninput="updMood(this.value)"></div>
+    <div class="cbtb">
+      <div class="cbtbl"><div class="cbtbh"><div class="cbtbn">1</div><div class="cbtbt">触发事件 · 发生了什么？</div></div><textarea id="c1" placeholder="客观描述触发情绪的具体事件……" rows="3"></textarea></div>
+      <div class="cbtbl"><div class="cbtbh"><div class="cbtbn">2</div><div class="cbtbt">自动思维 · 脑子里冒出了什么？</div></div><textarea id="c2" placeholder="第一反应是什么念头……" rows="3"></textarea></div>
+      <div class="cbtbl"><div class="cbtbh"><div class="cbtbn">3</div><div class="cbtbt">情绪体验 · 感受到了什么？</div></div><textarea id="c3" placeholder="愤怒？羞耻？恐惧？强度有多少？" rows="2"></textarea></div>
+      <div class="cbtbl"><div class="cbtbh"><div class="cbtbn">4</div><div class="cbtbt">身体感受 · 身体发生了什么？</div></div><textarea id="c4" placeholder="胸口发紧？胃部收缩？肩膀僵硬……" rows="2"></textarea></div>
+      <div class="cbtbl"><div class="cbtbh"><div class="cbtbn">5</div><div class="cbtbt">行为反应 · 我做了什么/想做什么？</div></div><textarea id="c5" placeholder="逃避？爆发？冻结？刷手机……" rows="2"></textarea></div>
+      <div class="cbtbl"><div class="cbtbh"><div class="cbtbn">6</div><div class="cbtbt">温柔反思 · 清醒自我会说什么？</div></div><textarea id="c6" placeholder="如果我的好朋友经历这些，我会对她说……" rows="3"></textarea></div>
+    </div>
+    <button class="cta pp" onclick="saveCBT()">💾 保存 · 领取 +20 PTS</button>
+    <button class="cta cl" onclick="runCBT()">✦ AI 温柔回应</button>
+    <div class="aib" id="jai"><div class="aib-l">✦ 温柔回应 <span class="dots" id="jdots" style="color:var(--P)"><span></span><span></span><span></span></span></div><div class="aib-t" id="jait"></div></div>
+    <div class="sp"></div>
+  </div>
+  <div id="jh" style="display:none;flex-direction:column;gap:14px;padding-top:14px">
+    <div class="histlist">
+      <div class="hitem" onclick="toast('📓 2026年6月7日 · 航班上的思维反刍，使用TIPP成功着陆。')"><div class="hhdr"><div class="hdate">2026年6月7日 21:30</div><div class="htype jn">情绪日记</div></div><div class="hprev">在飞机上脑子停不下来，开始反刍明天的工作……触发事件：看到邮件提醒。使用TIPP后成功着陆。</div></div>
+      <div class="hitem" onclick="toast('🫙 2026年6月5日 · 工作汇报前高强度焦虑，AI解析了背后的恐惧结构。')"><div class="hhdr"><div class="hdate">2026年6月5日 22:15</div><div class="htype cv">情感画布</div></div><div class="hprev">明天要给Brian做汇报，感觉什么都没准备好，整个人不想动……AI发现了40%是表现焦虑。</div></div>
+      <div class="hitem" onclick="toast('🛡️ 2026年6月3日 · IFS整合：内在挑剔者爆发，完成保护者→清醒自我的转换。')"><div class="hhdr"><div class="hdate">2026年6月3日 20:45</div><div class="htype if">IFS整合</div></div><div class="hprev">我又一次觉得自己什么都没做好。内在挑剔者全面爆发——必须、应该、都是我的错……</div></div>
+    </div>
+    <div class="sp"></div>
+  </div>
+</div>
+
+<!-- SHOP -->
+<div class="sc" id="s-shop">
+  <div class="sbar"><span class="stime">21:03</span></div>
+  <div class="hdr"><div class="back" onclick="goBack()">← 返回</div><div class="htitle it">多巴胺奖品商店</div><div class="hsub">你挣来的，你值得。用积分兑换真实的身体奖励。</div></div>
+  <div style="height:14px"></div>
+  <div class="shhead">
+    <div><div style="font-size:11px;color:var(--muted);margin-bottom:4px">当前积分</div><div class="shbig pd">180</div></div>
+    <div style="flex:1;padding-left:10px"><div class="shinfo"><h4>每次记录 +20～30 pts</h4><p>阅读肯定语 +30<br>完成CBT日记 +20<br>完成PT全程 +25</p></div></div>
+  </div>
+  <div class="slbl" style="margin-top:4px">立刻兑换</div>
+  <div class="shlist">
+    <div class="shr" onclick="redeem(30,'🐶 和 Maple 贴贴 10分钟','卸载所有现实逻辑，和Maple进行肚皮无障碍互动。')"><div class="shico">🐶</div><div class="shi"><h4>Maple 无逻辑贴贴 10min</h4><p>卸载所有现实任务，纯粹互动</p></div><div class="shc">30<span class="shcl">pts</span></div></div>
+    <div class="shr" onclick="redeem(50,'🛁 神经修复浴 20min','泡澡20分钟，禁止手机，纯体感恢复。')"><div class="shico">🛁</div><div class="shi"><h4>神经修复浴 20min</h4><p>泡澡，禁止手机，纯身体恢复</p></div><div class="shc">50<span class="shcl">pts</span></div></div>
+    <div class="shr" onclick="redeem(40,'🦶 足底按摩 40min','配上喜欢的播客，彻底放松。')"><div class="shico">🦶</div><div class="shi"><h4>足底按摩放松 40min</h4><p>+喜欢的播客，彻底神经松绑</p></div><div class="shc">40<span class="shcl">pts</span></div></div>
+    <div class="shr" onclick="redeem(20,'🍵 仪式感茶时光','泡茶，静坐，什么都不需要做。')"><div class="shico">🍵</div><div class="shi"><h4>仪式感茶时光</h4><p>泡茶，静坐，什么都不需要做</p></div><div class="shc">20<span class="shcl">pts</span></div></div>
+    <div class="shr" onclick="redeem(60,'🌡️ 桑拿/蒸汽浴','深度神经重置，彻底释放慢性应激激素。')"><div class="shico">🌡️</div><div class="shi"><h4>桑拿 / 蒸汽浴</h4><p>高温深度神经重置</p></div><div class="shc">60<span class="shcl">pts</span></div></div>
+    <div class="shr" onclick="redeem(25,'✍️ 书法/绘画 30min','右脑接管，让手带领心，不需要作品。')"><div class="shico">✍️</div><div class="shi"><h4>书法 / 绘画 30min</h4><p>右脑接管，让手带领心</p></div><div class="shc">25<span class="shcl">pts</span></div></div>
+    <div class="shr" onclick="redeem(35,'🎵 随心歌唱/舞动','不需要观众，只为神经系统服务。')"><div class="shico">🎵</div><div class="shi"><h4>随心歌唱 / 舞动</h4><p>不需要观众，只为自己</p></div><div class="shc">35<span class="shcl">pts</span></div></div>
+  </div>
+  <div class="sp"></div>
+</div>
+
+<!-- SETTINGS -->
+<div class="sc" id="s-more">
+  <div class="sbar"><span class="stime">21:03</span></div>
+  <div class="hdr"><div class="htitle it" style="font-size:26px">设置 · 个性化</div><div class="hsub">Inner Shelter · 属于你的神经友好空间</div></div>
+  <div style="height:16px"></div>
+  <div class="slbl">界面天气系统</div>
+  <div style="padding:8px 24px;font-size:12px;color:var(--muted);line-height:1.7">根据你的能量状态自动切换视觉质感。也可以手动选择今晚的氛围。</div>
+  <div class="wrow">
+    <div class="wb on" id="wd" onclick="setW('def',this)"><div class="wi">🌙</div><div class="wl">深夜</div></div>
+    <div class="wb" id="wn" onclick="setW('neon',this)"><div class="wi">💠</div><div class="wl">霓虹</div></div>
+    <div class="wb" id="wf" onclick="setW('forest',this)"><div class="wi">🌿</div><div class="wl">森林</div></div>
+    <div class="wb" id="wdu" onclick="setW('dusk',this)"><div class="wi">🌅</div><div class="wl">黄昏</div></div>
+  </div>
+  <div style="height:8px"></div>
+  <div class="slbl">提醒设置</div>
+  <div class="sgrp">
+    <div class="srow"><div class="srl"><div class="sico">⏰</div><div class="slb">每日简报提醒</div></div><div style="display:flex;align-items:center;gap:10px"><span class="sv">21:00</span><div class="tgl on" onclick="this.classList.toggle('on')"></div></div></div>
+    <div class="srow"><div class="srl"><div class="sico">🍽️</div><div class="slb">餐后步行提醒</div></div><div style="display:flex;align-items:center;gap:10px"><span class="sv">13:10 / 18:40</span><div class="tgl on" onclick="this.classList.toggle('on')"></div></div></div>
+    <div class="srow"><div class="srl"><div class="sico">🌿</div><div class="slb">22:00 芳香仪式</div></div><div class="tgl on" onclick="this.classList.toggle('on')"></div></div>
+    <div class="srow"><div class="srl"><div class="sico">💪</div><div class="slb">PT 训练提醒</div></div><div style="display:flex;align-items:center;gap:10px"><span class="sv">周一三五 20:00</span><div class="tgl on" onclick="this.classList.toggle('on')"></div></div></div>
+    <div class="srow"><div class="srl"><div class="sico">🎲</div><div class="slb">界面天气自动突变</div></div><div class="tgl on" onclick="this.classList.toggle('on')"></div></div>
+  </div>
+  <div style="height:8px"></div>
+  <div class="slbl">关于</div>
+  <div class="sgrp">
+    <div class="srow" onclick="toast('Inner Shelter v2.0 · 专为C-CPTSD疗愈设计 · 你的神经友好空间')"><div class="srl"><div class="sico">🏡</div><div class="slb">Inner Shelter · 内在家园</div></div><div class="sv">v 2.0</div></div>
+    <div class="srow" onclick="showLetter()"><div class="srl"><div class="sico">💌</div><div class="slb">给 Jennifer 的一封信</div></div><div class="sv">→</div></div>
+    <div class="srow" onclick="window.location.href='privacy.html'"><div class="srl"><div class="sico">🔒</div><div class="slb">隐私政策</div></div><div class="sv">→</div></div>
+    <div class="srow" onclick="resetPts()"><div class="srl"><div class="sico">✨</div><div class="slb">积分：<span class="pd">180</span> pts</div></div><div class="sv">重置</div></div>
+  </div>
+  <div style="padding:20px 24px 0">
+    <div style="font-family:'Noto Serif SC',serif;font-size:12px;color:var(--muted);line-height:2;text-align:center;border-top:1px solid var(--bdr);padding-top:16px">你不是坏掉的机器，<br>你是在高压下存活的人。<br><span style="color:var(--W)">内在家园的门，永远为你敞开。</span></div>
+  </div>
+  <div class="sp"></div>
+</div>
+
+<!-- BLOOD GLUCOSE TRACKER -->
+<div class="sc" id="s-bgl">
+  <div class="sbar"><span class="stime">21:03</span></div>
+  <div class="hdr"><div class="back" onclick="goBack()">← 返回</div><div class="htitle it">血糖日志</div><div class="hsub">目标 &lt;140 mg/dL · 饭后10分钟步行是关键变量</div></div>
+  <div style="height:14px"></div>
+
+  <div class="bgl-hero">
+    <div class="bgl-big safe" id="bglDisplay">--</div>
+    <div class="bgl-unit">mg/dL · 最近一次记录</div>
+    <div class="bgl-target">🎯 目标值 &lt;140 · 今日达标率 <span id="bglRate">--</span></div>
+  </div>
+
+  <div class="bgl-input-row">
+    <input class="bgl-input" id="bglInput" type="number" placeholder="输入血糖值" min="50" max="400">
+    <button class="bgl-log-btn" onclick="logBGL()">📊 记录</button>
+  </div>
+
+  <div class="bgl-context" id="bglCtx">
+    <div class="bgl-ctx" onclick="toggleCtx(this)">🍽️ 饭前</div>
+    <div class="bgl-ctx" onclick="toggleCtx(this)">⏱️ 饭后1h</div>
+    <div class="bgl-ctx" onclick="toggleCtx(this)">⏱️ 饭后2h</div>
+    <div class="bgl-ctx" onclick="toggleCtx(this)">🌙 空腹</div>
+    <div class="bgl-ctx" onclick="toggleCtx(this)">🚶 步行后</div>
+  </div>
+
+  <div class="bgl-chart">
+    <div class="bgl-chart-title">今日趋势</div>
+    <div class="bgl-chart-area" id="bglChart">
+      <div class="bgl-target-line"></div>
+      <div class="bgl-target-label">140</div>
+      <div class="bgl-bars" id="bglBars"></div>
+    </div>
+  </div>
+
+  <div class="bgl-insight">
+    <div class="bgl-insight-lbl">💡 关键洞察</div>
+    <div class="bgl-insight-txt" id="bglInsight">饭后 10 分钟内开始步行，是你控制餐后血糖峰值的单一最关键变量。哪怕只是在家里走动，也能显著降低峰值。</div>
+  </div>
+
+  <div class="bgl-walk-btn" id="bglWalkBtn" onclick="startWalkTimer()">
+    <div class="bgl-walk-ico">🚶</div>
+    <div class="bgl-walk-txt">
+      <h4>饭后步行计时器</h4>
+      <p>点击开始 10 分钟步行，<br>这是今晚最重要的健康微动作。</p>
+    </div>
+    <div class="bgl-walk-timer" id="bglWalkTimer">10:00</div>
+  </div>
+
+  <div class="slbl">今日记录</div>
+  <div style="margin:0 24px;display:flex;flex-direction:column;gap:8px" id="bglLog">
+    <div style="background:var(--surf);border:1px solid var(--bdr);border-radius:var(--rs);padding:12px 16px;display:flex;justify-content:space-between;align-items:center">
+      <div><span style="font-size:20px;font-family:'DM Serif Display',serif;color:var(--G)">118</span><span style="font-size:11px;color:var(--muted);margin-left:6px">mg/dL</span></div>
+      <div style="text-align:right"><div style="font-size:12px;color:var(--soft)">🍽️ 饭前</div><div style="font-size:11px;color:var(--muted)">12:30</div></div>
+    </div>
+    <div style="background:var(--surf);border:1px solid var(--bdr);border-radius:var(--rs);padding:12px 16px;display:flex;justify-content:space-between;align-items:center">
+      <div><span style="font-size:20px;font-family:'DM Serif Display',serif;color:var(--G)">134</span><span style="font-size:11px;color:var(--muted);margin-left:6px">mg/dL</span></div>
+      <div style="text-align:right"><div style="font-size:12px;color:var(--soft)">⏱️ 饭后1h · 🚶 步行后</div><div style="font-size:11px;color:var(--muted)">13:45</div></div>
+    </div>
+    <div style="background:var(--surf);border:1px solid rgba(212,149,106,.2);border-radius:var(--rs);padding:12px 16px;display:flex;justify-content:space-between;align-items:center">
+      <div><span style="font-size:20px;font-family:'DM Serif Display',serif;color:var(--W)">152</span><span style="font-size:11px;color:var(--muted);margin-left:6px">mg/dL</span></div>
+      <div style="text-align:right"><div style="font-size:12px;color:var(--soft)">⏱️ 饭后1h（未步行）</div><div style="font-size:11px;color:var(--muted)">19:10</div></div>
+    </div>
+  </div>
+
+  <div class="sp"></div>
+</div>
+
+<!-- NIGHT RITUAL -->
+<div class="sc" id="s-ritual">
+  <div class="sbar"><span class="stime">21:03</span></div>
+  <div class="hdr"><div class="back" onclick="goBack()">← 返回</div><div class="htitle it">夜间断电仪式</div><div class="hsub">22:00 · 让神经系统平稳进入修复模式</div></div>
+  <div style="height:20px"></div>
+
+  <div style="padding:0 24px;text-align:center">
+    <div class="ritual-orb"><div class="ritual-icon">🌙</div></div>
+    <div style="font-family:'Noto Serif SC',serif;font-size:14px;color:var(--muted);line-height:2">今天的使命已经完成。<br>大后方安全落锁，理智正式下班。<br><span style="color:var(--P)">让身体引领你进入修复的夜晚。</span></div>
+  </div>
+
+  <div class="slbl" style="margin-top:16px">断电检查清单</div>
+  <div class="ritual-steps">
+    <div class="ritual-step" id="rs0" onclick="checkRitual(0)">
+      <div class="ritual-step-ico">📱</div>
+      <div class="ritual-step-txt"><h4>手机屏幕调为暖光</h4><p>减少蓝光，让褪黑素正常分泌</p></div>
+      <div class="ritual-check" id="rc0">○</div>
+    </div>
+    <div class="ritual-step" id="rs1" onclick="checkRitual(1)">
+      <div class="ritual-step-ico">🔆</div>
+      <div class="ritual-step-txt"><h4>启动红光仪器 20分钟</h4><p>近红外光促进细胞修复与睡眠质量</p></div>
+      <div class="ritual-check" id="rc1">○</div>
+    </div>
+    <div class="ritual-step" id="rs2" onclick="checkRitual(2)">
+      <div class="ritual-step-ico">🌿</div>
+      <div class="ritual-step-txt"><h4>点燃熏香</h4><p>薰衣草或雪松，嗅觉触发放松反射</p></div>
+      <div class="ritual-check" id="rc2">○</div>
+    </div>
+    <div class="ritual-step" id="rs3" onclick="checkRitual(3)">
+      <div class="ritual-step-ico">🐶</div>
+      <div class="ritual-step-txt"><h4>和 Maple 告别互动</h4><p>2分钟贴贴，催产素帮助入眠</p></div>
+      <div class="ritual-check" id="rc3">○</div>
+    </div>
+    <div class="ritual-step" id="rs4" onclick="checkRitual(4)">
+      <div class="ritual-step-ico">📓</div>
+      <div class="ritual-step-txt"><h4>今日三件好事</h4><p>在心里默记或写下今天的三个小胜利</p></div>
+      <div class="ritual-check" id="rc4">○</div>
+    </div>
+    <div class="ritual-step" id="rs5" onclick="checkRitual(5)">
+      <div class="ritual-step-ico">🧘</div>
+      <div class="ritual-step-txt"><h4>身体扫描 2 分钟</h4><p>从头到脚，允许每块肌肉放松</p></div>
+      <div class="ritual-check" id="rc5">○</div>
+    </div>
+  </div>
+
+  <div style="margin:16px 24px 0;background:linear-gradient(135deg,rgba(168,155,196,.08),rgba(126,184,201,.06));border:1px solid rgba(168,155,196,.18);border-radius:var(--r);padding:18px;display:none" id="ritualComplete">
+    <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--P);margin-bottom:10px">✦ 今晚的仪式完成了</div>
+    <div style="font-family:'Noto Serif SC',serif;font-size:14px;color:var(--soft);line-height:1.95">Jennifer，你今晚温柔地照顾了自己。大后方安全，神经系统已经进入修复模式。祝你好眠。</div>
+    <div style="margin-top:12px;font-size:12px;color:var(--P);cursor:pointer" onclick="addPts(15);toast('🌙 +15 PTS · 断电仪式完成，好眠！')">🌙 完成仪式 · 领取 +15 PTS</div>
+  </div>
+
+  <div class="sp"></div>
+</div>
+
+<!-- TAB BAR -->
+<div class="tabs">
+  <div class="ti on" id="tb0" onclick="goTo('s-home')"><div class="tico">🏡</div><div class="tlbl">家</div></div>
+  <div class="ti" id="tb1" onclick="goTo('s-ifs')"><div class="tico">🛡️</div><div class="tlbl">整合</div></div>
+  <div class="ti" id="tb2" onclick="goTo('s-canvas')"><div class="tico">🫙</div><div class="tlbl">倾倒</div></div>
+  <div class="ti" id="tb3" onclick="goTo('s-anchor')"><div class="tico">🐾</div><div class="tlbl">锚点</div></div>
+  <div class="ti" id="tb4" onclick="goTo('s-more')"><div class="tico">⚙️</div><div class="tlbl">设置</div></div>
+</div>
+</div><!-- /app -->
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
