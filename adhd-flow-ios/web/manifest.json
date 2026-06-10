@@ -1,0 +1,19 @@
+{
+  "name": "ADHD Flow Planner · 轻推任务",
+  "short_name": "轻推任务",
+  "description": "ADHD 友好任务系统 · 轻推而非压迫",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f0ede6",
+  "theme_color": "#f0ede6",
+  "lang": "zh-CN",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

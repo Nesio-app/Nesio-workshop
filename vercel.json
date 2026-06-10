@@ -1,0 +1,16 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "buildCommand": "npm run build",
+  "installCommand": "npm ci",
+  "functions": {
+    "api/secretary/chat.ts": { "maxDuration": 30 },
+    "api/secretary/health.ts": { "maxDuration": 10 }
+  },
+  "rewrites": [
+    { "source": "/adhd-flow", "destination": "/adhd-flow/index.html" },
+    { "source": "/fitness", "destination": "/fitness/index.html" },
+    { "source": "/inner-shelter", "destination": "/inner-shelter/index.html" },
+    { "source": "/secretary", "destination": "/secretary/index.html" }
+  ]
+}

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#f3f1ec">
+  <title>AI 私人秘书 · 宝盒</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="sec-shell">
+    <header class="sec-header">
+      <a class="sec-back" href="../">← 庭院</a>
+      <div class="sec-title-wrap">
+        <p class="sec-eyebrow">宝盒 · 幕僚</p>
+        <h1 class="sec-title">AI 私人秘书</h1>
+      </div>
+      <button type="button" class="sec-clear" id="btnClear" title="清空对话">清空</button>
+    </header>
+
+    <main class="sec-main" id="chatMain" aria-live="polite"></main>
+
+    <footer class="sec-footer">
+      <form class="sec-form" id="chatForm">
+        <textarea
+          id="chatInput"
+          rows="1"
+          placeholder="说说此刻想理清的事…"
+          autocomplete="off"
+          maxlength="4000"
+        ></textarea>
+        <button type="submit" id="btnSend" aria-label="发送">↑</button>
+      </form>
+      <p class="sec-hint">Enter 发送 · Shift+Enter 换行</p>
+    </footer>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

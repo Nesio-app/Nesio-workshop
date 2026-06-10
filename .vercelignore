@@ -1,0 +1,21 @@
+memory/
+inner-shelter-ios/
+adhd-flow-ios/api/
+adhd-flow-ios/ios/
+adhd-flow-ios/node_modules/
+adhd-flow-ios/package.json
+adhd-flow-ios/package-lock.json
+adhd-flow-ios/capacitor.config.ts
+adhd-flow-ios/vercel.json
+fitness/node_modules/
+fitness/vercel.json
+fitness/package.json
+psych-tool-ios/
+questionbank-ios/
+reading-ios/
+storage-ios/
+weaver-ai/
+Project 1/
+**/.git/
+**/.env*
+forecasting_system.ipynb

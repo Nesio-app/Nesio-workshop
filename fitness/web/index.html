@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>熔归 RONG GUI v2</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="phone" id="app">
+<div class="sb"><span class="sbt" id="clock">9:41</span><div class="sbi"><span>⚡</span><span>●●●●</span><span>100%</span></div></div>
+
+<div class="main" id="mainScroll">
+
+<!-- HOME -->
+<div class="scr on" id="scr-home">
+  <div class="htop">
+    <div class="wm">熔<span>归</span></div>
+    <div class="ebadge">⚡ 满电冲刺</div>
+  </div>
+  <div class="ewrap">
+    <div class="erow"><span>神经系统电量</span><span>82%</span></div>
+    <div class="ebar"><div class="efill" style="width:82%"></div></div>
+  </div>
+  <div class="fuse" id="fuseCard" style="display:none">
+    <div class="fuse-t">⛔ AI 熔断介入</div>
+    <div class="fuse-b">今日 HRV 骤降 + 餐后血糖 158 mg/dL。不宜抗阻训练，AI 已将 Day A 课表一键熔断，替换为 15 分钟餐后低饱和度步行 + 肩关节 CARs 神经重置。</div>
+    <button class="fuse-btn" onclick="acceptFuse()">✓ 接受今日替代方案</button>
+  </div>
+  <div class="slcard card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px">
+      <span class="sl">昨晚睡眠</span><span style="font-size:10px;color:var(--mu)">Apple Health ↺</span>
+    </div>
+    <div class="sgrid">
+      <div class="sm"><div class="smv g">7.2</div><div class="smu">总时长h</div></div>
+      <div class="sm"><div class="smv c">2.1</div><div class="smu">深睡h</div></div>
+      <div class="sm"><div class="smv e">1.8</div><div class="smu">REMh</div></div>
+      <div class="sm"><div class="smv o">68</div><div class="smu">HRVms</div></div>
+    </div>
+  </div>
+  <div class="rcard">
+    <div class="rrow">
+      <div class="rscore">82</div>
+      <div class="rinfo">
+        <h3>黄金超补偿期</h3>
+        <p>深睡优质，HRV 历史高位。今日冲击 PR 成功率 88%。</p>
+      </div>
+    </div>
+  </div>
+  <button class="sbtn" onclick="startWorkout()">🔥 开始今日训练</button>
+  <div class="strow">
+    <div class="sc"><div class="scv" style="color:var(--ember)">4</div><div class="scl">本周训练</div></div>
+    <div class="sc"><div class="scv" style="color:var(--cool)">8,432</div><div class="scl">今日步数</div></div>
+    <div class="sc"><div class="scv" style="color:var(--gold)">380</div><div class="scl">积分</div></div>
+  </div>
+  <div class="gstrip card" onclick="switchTab('glucose')">
+    <div class="gdot gs" id="hgdot"></div>
+    <div class="gi">
+      <div class="gv"><span id="hgval">118</span><span class="gu"> mg/dL</span></div>
+      <div class="gs2" id="hgsub">餐后 1.5h · 安全区间 ✓</div>
+    </div>
+    <span style="color:var(--mu);font-size:16px">›</span>
+  </div>
+  <div class="emerg-strip" onclick="showEmerg()">
+    <span style="font-size:16px">🔴</span>
+    <span style="font-size:12px;color:rgba(248,113,113,.8)">安全着陆 · 一键中止训练</span>
+  </div>
+  <div class="pad"></div>
+</div>
+
+<!-- TRAIN -->
+<div class="scr" id="scr-train">
+  <div class="tr-hdr">
+    <div>
+      <div class="tr-title" id="trainTitle">训练 · Day A</div>
+      <div style="font-size:11px;color:var(--mu);margin-top:2px">Verna 计划 · 沙盒完成后解锁</div>
+    </div>
+    <div class="wksel" id="wksel"></div>
+  </div>
+  <div class="daytog">
+    <button class="db on" id="dab" onclick="selDay('A')">Day A · 下肢推</button>
+    <button class="db" id="dbb" onclick="selDay('B')">Day B · 下肢拉</button>
+  </div>
+  <div class="sandbox">
+    <div class="sb-top"><span>🛡️ 训练前沙盒</span><span id="sbp" style="font-size:10px">0 / 3 完成</span></div>
+    <div class="sbr" onclick="showSS()">
+      <div class="sbi2">🧴</div>
+      <div class="sbt2"><div class="st">皮肤防御 UV 4</div><div class="ss2">长按 2 秒 · 建立皮肤物理防线</div></div>
+      <div class="sst wt" id="stSun">⚪</div>
+    </div>
+    <div class="sbr" onclick="addWater()">
+      <div class="sbi2">💧</div>
+      <div class="sbt2">
+        <div class="st">水合状态</div>
+        <div class="ss2" id="hydTxt">已记录 500ml · 点击 +300ml</div>
+        <div class="hbar"><div class="hfill" id="hydFill" style="width:55%"></div></div>
+      </div>
+      <div class="sst ok" id="stHyd">✓</div>
+    </div>
+    <div class="sbr" onclick="startCARs()">
+      <div class="sbi2">🦾</div>
+      <div class="sbt2"><div class="st">关节激活 CARs</div><div class="ss2" id="carsSub">60 秒肩关节环绕 · 解锁动作库</div></div>
+      <div class="sst wt" id="stCars">⚪</div>
+    </div>
+  </div>
+  <div id="workoutList" style="opacity:.3;pointer-events:none;transition:opacity .5s"></div>
+  <div id="endWrap" style="display:none"><button class="endbtn" onclick="endWorkout()">🏁 结算今日训练</button></div>
+  <div class="pad"></div>
+</div>
+
+<!-- LIBRARY -->
+<div class="scr" id="scr-library">
+  <div class="ph"><div class="pt">动作库</div><div class="ps">三维筛选 · 点击查看详情</div></div>
+  <div class="scroll-row" id="mf">
+    <div class="chip eon" onclick="fl('all',this,'m')">全部</div>
+    <div class="chip" onclick="fl('glute',this,'m')">🍑 臀</div>
+    <div class="chip" onclick="fl('hip',this,'m')">🦋 髋</div>
+    <div class="chip" onclick="fl('core',this,'m')">💪 核心</div>
+    <div class="chip" onclick="fl('back',this,'m')">🔙 背</div>
+    <div class="chip" onclick="fl('chest',this,'m')">🫁 胸</div>
+    <div class="chip" onclick="fl('shoulder',this,'m')">🙆 肩</div>
+  </div>
+  <div class="scroll-row" id="ef">
+    <div class="chip con" onclick="fl('all',this,'e')">全部</div>
+    <div class="chip" onclick="fl('bodyweight',this,'e')">🤸 徒手</div>
+    <div class="chip" onclick="fl('dumbbell',this,'e')">🏋️ 哑铃</div>
+    <div class="chip" onclick="fl('bench',this,'e')">🛋️ 凳台</div>
+    <div class="chip" onclick="fl('wall',this,'e')">🧱 墙</div>
+  </div>
+  <div class="scroll-row" id="mvf">
+    <div class="chip con" onclick="fl('all',this,'mv')">所有模式</div>
+    <div class="chip" onclick="fl('squat',this,'mv')">🦵 蹲</div>
+    <div class="chip" onclick="fl('hinge',this,'mv')">🔄 髋铰链</div>
+    <div class="chip" onclick="fl('push',this,'mv')">👊 推</div>
+    <div class="chip" onclick="fl('pull',this,'mv')">💪 拉</div>
+    <div class="chip" onclick="fl('core_s',this,'mv')">⚡ 核心稳定</div>
+    <div class="chip" onclick="fl('mobility',this,'mv')">🌀 活动度</div>
+  </div>
+  <div id="libCards"></div>
+  <div class="pad"></div>
+</div>
+
+<!-- AI COACH -->
+<div class="scr" id="scr-coach">
+  <div class="ph"><div class="pt">AI 教练</div><div class="ps">基于你的身体数据 · 实时定制</div></div>
+  <div class="cprof">
+    <div class="cptt">已读取健康档案</div>
+    <div class="cppills">
+      <span class="cpill">血糖管理</span><span class="cpill">PT 康复</span>
+      <span class="cpill">HRV 监测</span><span class="cpill">膝关节</span>
+      <span class="cpill">睡眠联动</span><span class="cpill">Verna 4周</span>
+    </div>
+  </div>
+  <div class="chatarea" id="chatArea">
+    <div class="cm ai">
+      <div class="ailbl">🔥 熔归教练</div>
+      你好 Jennifer！已读取 Verna 4 周计划和健康档案。<br><br>
+      可以帮你<strong style="color:var(--tx)">定制今日计划、调整 RPE 负荷、分析动作要点，或基于今天的血糖和睡眠状态给出实时建议</strong>。
+    </div>
+  </div>
+  <div style="height:12px" id="chatPad"></div>
+</div>
+
+<!-- GLUCOSE -->
+<div class="scr" id="scr-glucose">
+  <div class="ph"><div class="pt">血糖控制台</div></div>
+  <div class="ghero card">
+    <div class="gccur">
+      <div class="gcbig s" id="gcBig">118</div>
+      <div><div class="gcunit">mg/dL</div><div style="font-size:11px;color:var(--mu)">餐后 1.5h</div></div>
+    </div>
+    <div style="font-size:12px;color:var(--mu);line-height:1.5">↘ 缓慢下降 · 目标 &lt;140 mg/dL · 安全区间 ✓</div>
+    <div class="gczones">
+      <div class="gz"><div class="zl">安全</div><div class="zv" style="color:var(--safe)">&lt;140</div></div>
+      <div class="gz"><div class="zl">预警</div><div class="zv" style="color:var(--warn)">140–160</div></div>
+      <div class="gz"><div class="zl">危险</div><div class="zv" style="color:var(--danger)">&gt;160</div></div>
+    </div>
+  </div>
+  <div class="wkcard" id="walkCard" style="display:none">
+    <div class="wkt">⚠️ 检测到餐后血糖偏高</div>
+    <p class="wkp">饭后 10 分钟内开始步行是控制血糖峰值的最关键变量。哪怕在家走动也能显著降低峰值。</p>
+    <button class="wks" onclick="startWalk()">🚶 启动 10 分钟步行计时器</button>
+  </div>
+  <div style="padding:12px 20px 6px;display:flex;justify-content:space-between;align-items:center">
+    <span class="sl">今日记录</span>
+    <button style="background:var(--edim);border:1px solid rgba(232,97,42,.2);border-radius:7px;padding:5px 11px;color:var(--ember);font-size:11px;font-weight:600;cursor:pointer" onclick="logHigh()">+ 录入</button>
+  </div>
+  <div class="loglist">
+    <div class="lrow"><div class="ltime">07:30</div><div class="lctx"><div class="ct">早餐前</div><div class="cn">空腹</div></div><div class="lval s">94</div></div>
+    <div class="lrow"><div class="ltime">09:00</div><div class="lctx"><div class="ct">早餐后 1h</div><div class="cn">2蛋+鳄梨+三文鱼</div></div><div class="lval s">118</div></div>
+    <div class="lrow" id="logRow3" style="display:none"><div class="ltime">现在</div><div class="lctx"><div class="ct">午餐后 1h</div><div class="cn">手动录入</div></div><div class="lval w">158</div></div>
+  </div>
+  <div class="pad"></div>
+</div>
+
+</div><!-- /main -->
+
+<div class="pbar" id="promptBar" style="display:none"></div>
+<div class="ibar" id="inputBar" style="display:none">
+  <input class="cinp" id="coachInp" placeholder="问教练任何问题..." />
+  <button class="sendbtn" onclick="sendMsg()">↑</button>
+</div>
+
+<div class="tabbar">
+  <div class="tab on" id="tab-home" onclick="switchTab('home')"><div class="ti">🏡</div><div class="tl">主页</div></div>
+  <div class="tab" id="tab-train" onclick="switchTab('train')"><div class="ti">🔥</div><div class="tl">训练</div></div>
+  <div class="tab" id="tab-library" onclick="switchTab('library')"><div class="ti">📚</div><div class="tl">动作库</div></div>
+  <div class="tab" id="tab-coach" onclick="switchTab('coach')"><div class="ti">🤖</div><div class="tl">AI 教练</div></div>
+  <div class="tab" id="tab-glucose" onclick="switchTab('glucose')"><div class="ti">🩸</div><div class="tl">血糖</div></div>
+</div>
+
+<!-- OVERLAYS -->
+<div class="ss-flash" id="ssFlash"></div>
+
+<div class="audio-fab" id="audioFab" onclick="toggleAudioPanel()" title="音乐与音效">🎵</div>
+<div class="audio-panel" id="audioPanel">
+  <div class="ap-hdr"><span>训练氛围</span><button type="button" onclick="toggleAudioPanel()">✕</button></div>
+  <div class="ap-row"><span>背景音乐</span><select id="bgmSelect" onchange="AudioEngine.setBgm(this.value)"></select></div>
+  <div class="ap-row"><span>音乐音量</span><input type="range" id="bgmVol" min="0" max="100" value="35" oninput="AudioEngine.setBgmVol(this.value/100)"></div>
+  <div class="ap-row"><span>提示音效</span><input type="range" id="sfxVol" min="0" max="100" value="70" oninput="AudioEngine.setSfxVol(this.value/100)"></div>
+  <label class="ap-chk"><input type="checkbox" id="sfxOn" checked onchange="AudioEngine.setEnabled(this.checked)"> 倒计时 / 组间提醒音</label>
+</div>
+
+<div class="hud" id="ssHud">
+  <div class="hud-scroll">
+  <div class="hudphase" id="hudPhase">第 1 组 / 共 2 组</div>
+  <div class="hudbig" id="hudBig" style="color:var(--ember)">A1</div>
+  <div class="hudex" id="hudEx">Split-Squat</div>
+  <div class="hudn" id="hudNote" style="display:none"></div>
+  <div id="hudMedia"></div>
+  <div class="hudtgt"><div class="hudw" id="hudW">体重</div><div class="hudr" id="hudR">× 6-8 次/侧</div></div>
+  <div class="rpew" id="rpeWrap">
+    <div class="rpelbl"><span>本组完成度 RPE</span><span id="rpeVal">7</span></div>
+    <input type="range" class="rpeslider" id="rpeSlider" min="1" max="10" value="7"
+      oninput="document.getElementById('rpeVal').textContent=this.value">
+    <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--mu);margin-top:4px"><span>轻松 1</span><span>力竭 10</span></div>
+  </div>
+  <button class="hudabtn next" id="hudBtn" onclick="hudAction()">✓ 完成本组</button>
+  <div class="hudskip" onclick="closeHud()">跳过 / 关闭</div>
+  </div>
+</div>
+
+<div class="resthud" id="restHud">
+  <div class="restlbl">组间修复</div>
+  <div class="resttimer hot" id="restTimer">90</div>
+  <div class="resthr"><span id="restHR">158</span><span class="bpm">bpm</span></div>
+  <div class="restmsg" id="restMsg">双手叠放，平稳呼吸，为下一超级组满电蓄能。</div>
+  <div class="microtask">
+    <div class="mtt">💡 组间微任务</div>
+    <div class="mtb" id="microBody">补水黄金期——喝一口水，用手掌轻拍臀大肌，建立意念肌肉联结。</div>
+    <button class="mtwbtn" onclick="logWater()">💧 已补水 +50ml</button>
+  </div>
+  <button class="restskip" id="restSkip" onclick="skipRest()">等待心率恢复...</button>
+</div>
+
+<div class="recov" id="recovOv">
+  <div style="font-size:19px;font-weight:700;text-align:center;margin-bottom:5px">🔥 训练完成，交感降温中</div>
+  <div style="font-size:12px;color:var(--mu);text-align:center;line-height:1.6;margin-bottom:16px;max-width:270px">启动副交感刹车，随着心率下降热能逐渐消散。</div>
+  <div class="hball hot" id="heatBall">🔥</div>
+  <div style="font-size:12px;color:var(--mu);text-align:center;margin-bottom:18px" id="recMsg">心率 <span id="recHR">162</span> bpm · 持续呼吸...</div>
+  <button class="recbtn hot" id="recBtn" onclick="advRecov()">启动副交感刹车 · 缓慢呼吸</button>
+</div>
+
+<div class="walkOv" id="walkOv">
+  <div style="font-size:20px;font-weight:700;margin-bottom:6px">🚶 饭后步行</div>
+  <div style="font-size:13px;color:var(--mu)">控制血糖峰值 · 哪怕在家走动也有效</div>
+  <div class="walkcircle"><div class="walknum" id="walkNum">10:00</div></div>
+  <div class="walkpts" id="walkPts">+10 PTS 🎉 血糖感谢你！</div>
+  <button class="walkbtn" id="walkBtn" onclick="walkAction()">开始走！</button>
+</div>
+
+<div class="ssOv" id="ssOv">
+  <div style="font-size:18px;font-weight:700;margin-bottom:6px">🌞 皮肤物理防线</div>
+  <div style="font-size:12px;color:var(--mu);line-height:1.6">当前紫外线 UV 4（中等偏高）<br>长按防晒图标 2 秒激活</div>
+  <div class="ssicon" id="ssIcon" onpointerdown="startSS()" onpointerup="stopSS()" onpointerleave="stopSS()">🧴</div>
+  <div class="ssprog"><div class="ssfill" id="ssFill"></div></div>
+  <div class="sshint" id="ssHint">长按 2 秒激活</div>
+</div>
+
+<div class="emergOv" id="emergOv">
+  <div class="emergh">安全着陆</div>
+  <div class="emergt">停止运动。走到水槽边，冷水冲洗手腕和额头 30 秒，强行激活潜水反射，降低心率。</div>
+  <div class="emergb">💧</div>
+  <div class="emergt">大后方安全落锁。你今天做的已经足够完美，理智正式下班。</div>
+  <button class="emergclose" onclick="closeEmerg()">我好多了，返回</button>
+</div>
+
+<div class="mtoast" id="mtoast">
+  <div class="mtok">⚡ 宏指令已执行</div>
+  <div class="mtmsg" id="mtmsg"></div>
+</div>
+
+<!-- DETAIL OVERLAY (outside phone flow, inside phone) -->
+<div class="dov" id="detailOv">
+  <div class="dovh">
+    <button class="backbtn" onclick="closeDetail()">&#8249;</button>
+    <div class="dovn" id="dovName">动作详情</div>
+  </div>
+  <div class="dovb" id="dovBody"></div>
+</div>
+
+</div><!-- /phone -->
+<script src="config.js"></script>
+<script src="media.js"></script>
+<script src="audio.js"></script>
+<script src="demo.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
+</user_query>

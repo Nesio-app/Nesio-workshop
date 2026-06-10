@@ -39,8 +39,9 @@ const config: Config = {
         },
       },
       fontFamily: {
-        serif: ['var(--font-playfair)', 'Georgia', 'serif'],
+        serif: ['var(--font-portal-serif)', 'var(--font-playfair)', 'Georgia', 'serif'],
         sans: ['var(--font-source-sans)', 'system-ui', 'sans-serif'],
+        portal: ['var(--font-portal-serif)', 'Georgia', 'serif'],
         'dict-fun': ['var(--font-dict-fun)', 'sans-serif'],
         'dict-sans': ['var(--font-dict-sans)', 'sans-serif'],
       },

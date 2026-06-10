@@ -16,5 +16,18 @@
     "paths": { "@/*": ["./*"] }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules", "memory"]
+  "exclude": [
+    "node_modules",
+    "memory",
+    "adhd-flow-ios",
+    "inner-shelter-ios",
+    "fitness",
+    "psych-tool-ios",
+    "questionbank-ios",
+    "reading-ios",
+    "storage-ios",
+    "weaver-ai",
+    "Project 1",
+    "api"
+  ]
 }

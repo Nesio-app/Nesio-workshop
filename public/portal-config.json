@@ -1,0 +1,148 @@
+{
+  "meta": {
+    "title": "宝盒",
+    "subtitle": "数字静谧庭院",
+    "energyQuotes": [
+      "理智在场，情感柔软。",
+      "今日不必证明什么，只需如实存在。",
+      "慢一点，深一点，稳一点。",
+      "把注意力还给此刻。"
+    ]
+  },
+  "zones": {
+    "kinetic": {
+      "title": "秩序与跃迁",
+      "subtitle": "对抗熵增，掌控颗粒度",
+      "tone": "cool"
+    },
+    "reflective": {
+      "title": "觉察与锚定",
+      "subtitle": "卸下防御，倾听内在",
+      "tone": "warm"
+    },
+    "manifest": {
+      "title": "体现与投射",
+      "subtitle": "肉体实相与命运推演",
+      "tone": "neutral"
+    }
+  },
+  "tools": [
+    {
+      "id": "secretary",
+      "name": "AI 私人秘书",
+      "nameEn": "Secretary",
+      "description": "幕僚 · 理清思绪与行动",
+      "url": "/secretary/",
+      "zone": "kinetic",
+      "hotkey": "a",
+      "command": "/ai",
+      "featured": true,
+      "icon": "✦",
+      "ready": true
+    },
+    {
+      "id": "plan",
+      "name": "计划",
+      "nameEn": "Plan",
+      "description": "总控台 · 轻推任务",
+      "url": "/adhd-flow/",
+      "zone": "kinetic",
+      "hotkey": "p",
+      "command": "/plan",
+      "featured": true,
+      "icon": "◈",
+      "ready": true
+    },
+    {
+      "id": "quiz",
+      "name": "刷题",
+      "nameEn": "Practice",
+      "description": "认知进化 · CFA",
+      "url": "/cfa/",
+      "zone": "kinetic",
+      "hotkey": "q",
+      "command": "/quiz",
+      "featured": false,
+      "icon": "◇",
+      "ready": false
+    },
+    {
+      "id": "inventory",
+      "name": "物品管理",
+      "nameEn": "Inventory",
+      "description": "空间秩序 · 收纳",
+      "url": "/inventory/",
+      "zone": "kinetic",
+      "hotkey": "i",
+      "command": "/inventory",
+      "featured": false,
+      "icon": "▣",
+      "ready": false
+    },
+    {
+      "id": "psychoanalysis",
+      "name": "精神分析",
+      "nameEn": "Psyche",
+      "description": "潜意识显影",
+      "url": "/analysis/",
+      "zone": "reflective",
+      "hotkey": "s",
+      "command": "/soul",
+      "featured": true,
+      "icon": "◎",
+      "ready": false
+    },
+    {
+      "id": "sanctuary",
+      "name": "心灵港湾",
+      "nameEn": "Sanctuary",
+      "description": "情绪安放 · 呼吸",
+      "url": "/inner-shelter/",
+      "zone": "reflective",
+      "hotkey": "h",
+      "command": "/harbor",
+      "featured": false,
+      "icon": "○",
+      "ready": true
+    },
+    {
+      "id": "reading",
+      "name": "读书",
+      "nameEn": "Reading",
+      "description": "思想输入 · 笔记",
+      "url": "/reading/",
+      "zone": "reflective",
+      "hotkey": "r",
+      "command": "/read",
+      "featured": false,
+      "icon": "▤",
+      "ready": false
+    },
+    {
+      "id": "fitness",
+      "name": "健身",
+      "nameEn": "Fitness",
+      "description": "肉体实相 · 熔归",
+      "url": "/fitness/",
+      "zone": "manifest",
+      "hotkey": "f",
+      "command": "/fitness",
+      "featured": true,
+      "icon": "△",
+      "ready": true
+    },
+    {
+      "id": "lifesim",
+      "name": "人生模拟",
+      "nameEn": "Life Sim",
+      "description": "命运推演 · 平行可能",
+      "url": "/lifesim/",
+      "zone": "manifest",
+      "hotkey": "l",
+      "command": "/life",
+      "featured": false,
+      "icon": "∞",
+      "ready": false
+    }
+  ]
+}

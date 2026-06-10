@@ -2,14 +2,20 @@
 function isNativeApp() {
   return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 }
+var INNER_SHELTER_API_HOST = 'https://inner-shelter-ios.vercel.app';
 function apiBase() {
-  return window.INNER_SHELTER_API || '';
+  if (window.INNER_SHELTER_API) return String(window.INNER_SHELTER_API).replace(/\/$/, '');
+  if (typeof location !== 'undefined') {
+    var h = location.hostname;
+    if (h === 'inner-shelter-ios.vercel.app' || h === 'localhost' || h === '127.0.0.1') return '';
+  }
+  return isNativeApp() ? INNER_SHELTER_API_HOST : INNER_SHELTER_API_HOST;
 }
 
 // ── STATE ──
 let pts = 180, cur = 's-home', hist = [], lclaimed = false;
 let ptAct = -1, ptTmr = null, ptSec = 0, ptRun = false, ptDone = 0;
-let bInt = null, bPh = 'in', bCt = 4, wIdx2 = 0, wTmr = null, g541s = 0;
+let wIdx2 = 0, wTmr = null, g541s = 0, g541Breath = false;
 let bglData = [];
 let bglCtxSelected = [];
 let walkTimerInt = null, walkSec = 600, walkRunning = false;
@@ -125,20 +131,339 @@ function setEn(lv, btn) {
 }
 
 // ── FLASHBACK ──
-function openFB() { document.getElementById('fbo').classList.add('open'); startB(); resetWlk(); schedWlk(); }
-function closeFB() { document.getElementById('fbo').classList.remove('open'); clearInterval(bInt); clearTimeout(wTmr); }
-function startB() {
-  bPh = 'in'; bCt = 4; rendB();
-  bInt = setInterval(() => {
-    bCt--;
-    if (bCt <= 0) { bPh = bPh === 'in' ? 'out' : 'in'; bCt = bPh === 'in' ? 4 : 6; }
-    rendB();
-  }, 1000);
+function openFB() {
+  document.getElementById('fbo').classList.add('open');
+  startBreathGuide('sos', { bgOnly: true, fbo: true, voice: true });
+  resetWlk(); schedWlk();
 }
-function rendB() {
-  document.getElementById('bnum').textContent = bCt;
-  document.getElementById('bph').textContent = bPh === 'in' ? '吸气' : '呼气';
-  document.getElementById('blbl').textContent = bPh === 'in' ? '深深吸气……' : '缓缓呼出……';
+function closeFB() {
+  document.getElementById('fbo').classList.remove('open');
+  stopBreathGuide(false);
+  clearTimeout(wTmr);
+}
+
+// ── BREATH GUIDE · 曼陀罗 + 男声 + 震动 ──
+var breathSess = { active: false, timer: null, phase: 'in', count: 0, mode: null, opts: null, cfg: null, cycle: 0, lastVoice: '', currentAudio: null };
+var breathVoice = null;
+
+function pickBreathVoice() {
+  if (!window.speechSynthesis) return null;
+  var vs = speechSynthesis.getVoices();
+  var zh = vs.filter(function (v) { return v.lang && v.lang.indexOf('zh') === 0; });
+  var maleRe = /li-mu|limu|li mu|ting-tong|tingong|yunjian|yunxi|yunjie|kang|han|male|男|xiang|bo/i;
+  for (var i = 0; i < zh.length; i++) {
+    if (maleRe.test(zh[i].name)) return zh[i];
+  }
+  return zh.find(function (v) { return v.lang === 'zh-CN'; }) || zh[0] || null;
+}
+if (window.speechSynthesis) {
+  speechSynthesis.onvoiceschanged = function () { breathVoice = pickBreathVoice(); };
+  breathVoice = pickBreathVoice();
+}
+
+var BREATH_CFG = {
+  sos:      { in: 4, hold: 0, out: 6, prep: true,  label: '安全着陆呼吸' },
+  paced:    { in: 4, hold: 2, out: 6, prep: true,  label: '节奏呼吸', cycles: 6 },
+  ground:   { in: 4, hold: 0, out: 4, prep: false, label: '接地呼吸' },
+  exercise: { in: 3, hold: 0, out: 3, prep: false, label: '运动呼吸' }
+};
+var BREATH_VOICE = {
+  prep: ['沉静下来', '将注意力放在呼吸上'],
+  in: ['吸气', '深深吸气'],
+  hold: ['屏息', '保持这一口气'],
+  out: ['呼气', '缓缓呼出'],
+  done: ['好样的', '你已经做得很好']
+};
+var BREATH_AUDIO = {
+  prep: ['prep_0', 'prep_1'],
+  in: ['in_0', 'in_1'],
+  hold: ['hold_0', 'hold_1'],
+  out: ['out_0', 'out_1'],
+  done: ['done_0', 'done_1'],
+  sos: ['sos_0', 'sos_1', 'sos_2']
+};
+var breathAudioPool = {};
+var breathAudioQueue = null;
+var breathAudioOk = true;
+
+function breathAudioSrc(id) {
+  return 'audio/breath/' + id + '.mp3';
+}
+
+function preloadBreathAudio() {
+  var ids = [];
+  Object.keys(BREATH_AUDIO).forEach(function (k) {
+    BREATH_AUDIO[k].forEach(function (id) { ids.push(id); });
+  });
+  ids.forEach(function (id) {
+    if (breathAudioPool[id]) return;
+    var a = new Audio(breathAudioSrc(id));
+    a.preload = 'auto';
+    breathAudioPool[id] = a;
+  });
+}
+
+function playBreathClip(id) {
+  return new Promise(function (resolve, reject) {
+    if (!breathAudioPool[id]) {
+      breathAudioPool[id] = new Audio(breathAudioSrc(id));
+      breathAudioPool[id].preload = 'auto';
+    }
+    var audio = breathAudioPool[id];
+    breathSess.currentAudio = audio;
+    audio.volume = 0.93;
+    audio.currentTime = 0;
+    function cleanup() {
+      audio.removeEventListener('ended', onEnd);
+      audio.removeEventListener('error', onErr);
+    }
+    function onEnd() { cleanup(); resolve(); }
+    function onErr() { cleanup(); reject(new Error('clip')); }
+    audio.addEventListener('ended', onEnd);
+    audio.addEventListener('error', onErr);
+    var p = audio.play();
+    if (p && p.catch) p.catch(reject);
+  });
+}
+
+function breathSpeakClips(ids) {
+  if (!ids || !ids.length) return;
+  stopBreathVoice(false);
+  var queue = { cancelled: false };
+  breathAudioQueue = queue;
+  var i = 0;
+  function next() {
+    if (queue.cancelled || i >= ids.length) return;
+    playBreathClip(ids[i]).then(function () {
+      if (queue.cancelled) return;
+      i++;
+      if (i < ids.length) setTimeout(next, 1100);
+    }).catch(function () {
+      breathAudioOk = false;
+      var lines = getBreathVoiceLines(breathSess.phase);
+      if (lines) breathSpeakParts(lines);
+    });
+  }
+  next();
+}
+
+function configureBreathUtterance(u) {
+  u.lang = 'zh-CN';
+  u.rate = 0.42;
+  u.pitch = 0.38;
+  u.volume = 0.78;
+  if (breathVoice) {
+    u.voice = breathVoice;
+  } else {
+    u.pitch = 0.32;
+  }
+}
+
+function breathSpeakParts(parts) {
+  if (!window.speechSynthesis || !parts || !parts.length) return;
+  try {
+    speechSynthesis.cancel();
+    var i = 0;
+    function sayNext() {
+      if (i >= parts.length) return;
+      var u = new SpeechSynthesisUtterance(parts[i]);
+      configureBreathUtterance(u);
+      u.onend = function () {
+        i++;
+        if (i < parts.length) setTimeout(sayNext, 1100);
+      };
+      speechSynthesis.speak(u);
+    }
+    sayNext();
+  } catch (e) { /* ignore */ }
+}
+
+function breathSpeak(text) {
+  if (!text) return;
+  if (Array.isArray(text)) breathSpeakParts(text);
+  else breathSpeakParts([text]);
+}
+
+function stopBreathVoice(clearPhase) {
+  if (breathAudioQueue) {
+    breathAudioQueue.cancelled = true;
+    breathAudioQueue = null;
+  }
+  if (breathSess.currentAudio) {
+    try {
+      breathSess.currentAudio.pause();
+      breathSess.currentAudio.currentTime = 0;
+    } catch (e) { /* ignore */ }
+    breathSess.currentAudio = null;
+  }
+  if (window.speechSynthesis) {
+    try { speechSynthesis.cancel(); } catch (e) { /* ignore */ }
+  }
+  if (clearPhase !== false) breathSess.lastVoice = '';
+}
+
+function getBreathVoiceLines(phase) {
+  var lines = BREATH_VOICE[phase];
+  if (!lines) return null;
+  lines = lines.slice();
+  if (breathSess.mode === 'sos' && phase === 'prep') {
+    lines.push('双手叠放胸口', '感受心跳的节律', '你在，你安全');
+  }
+  return lines;
+}
+
+function getBreathAudioClips(phase) {
+  var clips = (BREATH_AUDIO[phase] || []).slice();
+  if (breathSess.mode === 'sos' && phase === 'prep') {
+    clips = clips.concat(BREATH_AUDIO.sos);
+  }
+  return clips;
+}
+
+function speakBreathPhase(phase) {
+  if (!breathSess.opts || breathSess.opts.voice === false) return;
+  if (breathSess.lastVoice === phase) return;
+  breathSess.lastVoice = phase;
+  if (breathAudioOk) {
+    var clips = getBreathAudioClips(phase);
+    if (clips.length) {
+      breathSpeakClips(clips);
+      return;
+    }
+  }
+  var lines = getBreathVoiceLines(phase);
+  if (lines) breathSpeakParts(lines);
+}
+
+function hapticPulse(kind) {
+  try {
+    var cap = window.Capacitor && window.Capacitor.Plugins;
+    if (cap && cap.Haptics) {
+      if (kind === 'success') cap.Haptics.notification({ type: 'SUCCESS' }).catch(function () { });
+      else if (kind === 'heavy') cap.Haptics.impact({ style: 'HEAVY' }).catch(function () { });
+      else if (kind === 'medium') cap.Haptics.impact({ style: 'MEDIUM' }).catch(function () { });
+      else cap.Haptics.impact({ style: 'LIGHT' }).catch(function () { });
+      return;
+    }
+  } catch (e) { /* ignore */ }
+  if (!navigator.vibrate) return;
+  if (kind === 'success') navigator.vibrate([20, 40, 20]);
+  else if (kind === 'heavy') navigator.vibrate(28);
+  else if (kind === 'medium') navigator.vibrate(18);
+  else navigator.vibrate(10);
+}
+
+function setBreathUI(phase) {
+  document.body.classList.remove('breath-in', 'breath-out', 'breath-hold', 'breath-prep');
+  if (phase) document.body.classList.add('breath-' + phase);
+}
+
+function hapticForPhase(phase, count) {
+  var cfg = breathSess.cfg;
+  if (!cfg) return;
+  if (phase === 'prep') { hapticPulse('soft'); return; }
+  if (phase === 'in') {
+    hapticPulse(count <= 2 ? 'medium' : 'light');
+    return;
+  }
+  if (phase === 'hold') { hapticPulse('light'); return; }
+  if (phase === 'out') hapticPulse('light');
+}
+
+function breathPhaseChange() {
+  setBreathUI(breathSess.phase);
+  speakBreathPhase(breathSess.phase);
+}
+
+function breathTick() {
+  if (!breathSess.active) return;
+  var cfg = breathSess.cfg;
+  hapticForPhase(breathSess.phase, breathSess.count);
+  breathSess.count--;
+  if (breathSess.count > 0) return;
+
+  if (breathSess.phase === 'prep') {
+    breathSess.phase = 'in';
+    breathSess.count = cfg.in;
+  } else if (breathSess.phase === 'in') {
+    breathSess.phase = cfg.hold ? 'hold' : 'out';
+    breathSess.count = cfg.hold || cfg.out;
+    if (breathSess.phase === 'out') hapticPulse('medium');
+  } else if (breathSess.phase === 'hold') {
+    breathSess.phase = 'out';
+    breathSess.count = cfg.out;
+    hapticPulse('medium');
+  } else {
+    breathSess.phase = 'in';
+    breathSess.count = cfg.in;
+    breathSess.cycle++;
+    if (breathSess.opts && breathSess.opts.fullscreen && cfg.cycles && breathSess.cycle >= cfg.cycles) {
+      finishBreathGuide();
+      return;
+    }
+  }
+  breathPhaseChange();
+}
+
+function startBreathGuide(mode, opts) {
+  opts = opts || {};
+  var cfg = BREATH_CFG[mode];
+  if (!cfg) return;
+  if (breathSess.active) stopBreathGuide(false);
+  breathSess.mode = mode;
+  breathSess.opts = opts;
+  breathSess.cfg = cfg;
+  breathSess.active = true;
+  breathSess.cycle = 0;
+
+  var aura = document.getElementById('breathAura');
+  if (aura) {
+    aura.classList.add('on');
+    aura.classList.toggle('full', !!opts.fullscreen);
+    aura.classList.toggle('bg', !!opts.bgOnly && !opts.fullscreen);
+    aura.classList.toggle('fbo', !!opts.fbo);
+  }
+  document.body.classList.add('breath-on');
+  if (mode === 'exercise') document.body.classList.add('pt-breath');
+
+  if (cfg.prep) {
+    breathSess.phase = 'prep';
+    breathSess.count = 2;
+  } else {
+    breathSess.phase = 'in';
+    breathSess.count = cfg.in;
+  }
+  breathSess.lastVoice = '';
+  preloadBreathAudio();
+  breathPhaseChange();
+  clearInterval(breathSess.timer);
+  breathSess.timer = setInterval(breathTick, 1000);
+}
+
+function stopBreathGuide(showToast) {
+  breathSess.active = false;
+  clearInterval(breathSess.timer);
+  stopBreathVoice();
+  document.body.classList.remove('breath-on', 'breath-in', 'breath-out', 'breath-hold', 'breath-prep', 'pt-breath');
+  var aura = document.getElementById('breathAura');
+  if (aura) aura.classList.remove('on', 'full', 'bg', 'fbo');
+  if (showToast) toast('🌬 呼吸练习结束');
+}
+
+function finishBreathGuide() {
+  hapticPulse('success');
+  if (breathSess.opts && breathSess.opts.voice !== false) {
+    breathSess.lastVoice = '';
+    if (breathAudioOk) breathSpeakClips(BREATH_AUDIO.done);
+    else breathSpeakParts(BREATH_VOICE.done);
+    setTimeout(function () { stopBreathGuide(true); }, 6500);
+    return;
+  }
+  stopBreathGuide(true);
+}
+
+function startPacedBreath() {
+  startBreathGuide('paced', { fullscreen: true, voice: true });
 }
 function resetWlk() {
   wIdx2 = 0;
@@ -248,12 +573,20 @@ function start541() {
   const t = document.getElementById('gtxt');
   c.style.display = 'block';
   g541s = 0;
+  g541Breath = true;
+  startBreathGuide('ground', { bgOnly: true, voice: true });
   show541(t);
   setTimeout(() => document.getElementById('s-anchor').scrollTo({ top: c.offsetTop - 80, behavior: 'smooth' }), 100);
 }
 function show541(t) {
   typeIt(t, g541[g541s]);
-  if (g541s < g541.length - 1) { g541s++; setTimeout(() => show541(t), 9000); }
+  if (g541s < g541.length - 1) {
+    g541s++;
+    setTimeout(() => show541(t), 9000);
+  } else if (g541Breath) {
+    g541Breath = false;
+    setTimeout(function () { if (breathSess.mode === 'ground') stopBreathGuide(false); }, 9000);
+  }
 }
 
 // ── PT ──
@@ -277,18 +610,25 @@ function togglePT() {
   if (ptRun) {
     clearInterval(ptTmr); ptRun = false;
     document.getElementById('ptplay').textContent = '▶';
+    if (breathSess.mode === 'exercise') stopBreathGuide(false);
   } else {
     ptRun = true;
     document.getElementById('ptplay').textContent = '⏸';
+    startBreathGuide('exercise', { bgOnly: true, voice: true });
     ptTmr = setInterval(() => {
       ptSec--;
       document.getElementById('pttn').textContent = String(ptSec).padStart(2, '0');
-      if (ptSec <= 0) { clearInterval(ptTmr); ptRun = false; completeEx(ptAct); }
+      if (ptSec <= 0) {
+        clearInterval(ptTmr); ptRun = false;
+        if (breathSess.mode === 'exercise') stopBreathGuide(false);
+        completeEx(ptAct);
+      }
     }, 1000);
   }
 }
 function resetPT() {
   clearInterval(ptTmr); ptRun = false;
+  if (breathSess.mode === 'exercise') stopBreathGuide(false);
   if (ptAct >= 0) {
     ptSec = exD[ptAct].s;
     document.getElementById('pttn').textContent = String(ptSec).padStart(2, '0');
@@ -404,6 +744,10 @@ function enterApp() {
 
 // ── GENERATE LETTER ──
 async function generateLetter() {
+  const lb = document.getElementById('lbody');
+  if (!lb) return;
+  const prev = lb.textContent;
+  lb.textContent = '正在为你写今日肯定语……';
   try {
     const n = new Date();
     const dateStr = n.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
@@ -411,9 +755,11 @@ async function generateLetter() {
       '你是Jennifer的疗愈伴侣。写一封不超过100字的温暖肯定语。规则：用中文；冷静细腻，不说教，不鸡汤；先确认辛苦，再肯定今日的存在本身，语气像一个温暖的老朋友。不需要给动作建议。',
       '今天是' + dateStr + '，Jennifer完成了一天的工作和生活。请为她写今晚的温暖肯定语。'
     );
-    const lb = document.getElementById('lbody');
-    if (lb) lb.textContent = r;
-  } catch (e) { /* keep default */ }
+    lb.textContent = r;
+  } catch (e) {
+    lb.textContent = prev;
+    console.warn('[inner-shelter] AI letter failed:', e && e.message ? e.message : e);
+  }
 }
 
 // ── BLOOD GLUCOSE ──
@@ -530,9 +876,18 @@ function checkRitual(i) {
 }
 
 // ── AI CALL ──
-async function callAI(sys, usr) {
+function aiErrHint(msg) {
+  if (/quota|429|额度/i.test(msg)) {
+    toast('⚠️ Gemini 免费额度已用完，已显示预设文案。请更新 API Key 后重试');
+  } else if (/timeout/i.test(msg)) {
+    toast('AI 响应超时，已显示预设文案');
+  } else if (/fetch|network|Failed/i.test(msg)) {
+    toast('网络连接失败，已显示预设文案');
+  }
+}
+async function callAIOnce(sys, usr) {
   const ctrl = new AbortController();
-  const timer = setTimeout(function () { ctrl.abort(); }, 15000);
+  const timer = setTimeout(function () { ctrl.abort(); }, 30000);
   try {
     const res = await fetch(apiBase() + '/api/inner-shelter/chat', {
       method: 'POST',
@@ -540,13 +895,36 @@ async function callAI(sys, usr) {
       body: JSON.stringify({ system: sys, user: usr }),
       signal: ctrl.signal
     });
-    if (!res.ok) throw new Error('api error');
-    const d = await res.json();
-    if (!d.text) throw new Error('no text');
+    const d = await res.json().catch(function () { return {}; });
+    if (!res.ok) {
+      throw new Error(d.detail || d.error || ('HTTP ' + res.status));
+    }
+    if (!d.text) throw new Error(d.error || 'no text');
     return d.text;
+  } catch (e) {
+    if (e && e.name === 'AbortError') throw new Error('timeout');
+    throw e;
   } finally {
     clearTimeout(timer);
   }
+}
+async function callAI(sys, usr) {
+  var lastErr = 'unknown';
+  for (var attempt = 0; attempt < 3; attempt++) {
+    try {
+      return await callAIOnce(sys, usr);
+    } catch (e) {
+      lastErr = e && e.message ? e.message : String(e);
+      if (attempt < 2 && /quota|429|timeout/i.test(lastErr)) {
+        await new Promise(function (r) { setTimeout(r, 2000 * (attempt + 1)); });
+        continue;
+      }
+      aiErrHint(lastErr);
+      throw e;
+    }
+  }
+  aiErrHint(lastErr);
+  throw new Error(lastErr);
 }
 
 // ── TYPEWRITER ──

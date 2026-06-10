@@ -1,0 +1,252 @@
+// 肌肉高亮人体图 + 动态跟练演示
+const DemoPlayer = (() => {
+  const BODY_SVG = `<svg viewBox="0 0 120 200" class="body-svg" xmlns="http://www.w3.org/2000/svg">
+    <g class="body-base" fill="#1f2a3e" stroke="#2a3548" stroke-width="1">
+      <ellipse cx="60" cy="22" rx="16" ry="18"/>
+      <path d="M44 38 L76 38 L72 52 L48 52 Z"/>
+      <path class="mr chest" data-r="chest" d="M48 52 L72 52 L70 78 L50 78 Z"/>
+      <path class="mr shoulder" data-r="shoulder" d="M34 52 L48 52 L50 68 L38 68 Z M72 52 L86 52 L82 68 L70 68 Z"/>
+      <path class="mr core" data-r="core" d="M50 78 L70 78 L68 108 L52 108 Z"/>
+      <path class="mr back" data-r="back" d="M52 78 L68 78 L66 100 L54 100 Z" opacity=".5"/>
+      <path class="mr glute" data-r="glute" d="M50 108 L70 108 L68 128 L52 128 Z"/>
+      <path class="mr quad" data-r="quad" d="M50 128 L58 128 L56 168 L48 168 Z M62 128 L70 128 L72 168 L64 168 Z"/>
+      <path class="mr ham" data-r="ham" d="M48 128 L56 128 L54 165 L46 165 Z M64 128 L72 128 L74 165 L66 165 Z"/>
+      <path class="mr hip" data-r="hip" d="M48 108 L72 108 L70 132 L50 132 Z" opacity=".4"/>
+      <path class="mr tricep" data-r="tricep" d="M32 68 L38 68 L36 92 L30 92 Z M82 68 L88 68 L90 92 L84 92 Z"/>
+      <path class="mr calf" data-r="calf" d="M48 168 L56 168 L54 192 L50 192 Z M64 168 L72 168 L70 192 L66 192 Z"/>
+    </g>
+    <g class="demo-figure" fill="none" stroke="var(--ember)" stroke-width="3" stroke-linecap="round">
+      <circle class="df-head" cx="60" cy="18" r="8" fill="#2a3548"/>
+      <line class="df-torso" x1="60" y1="26" x2="60" y2="70"/>
+      <line class="df-arm-l" x1="60" y1="38" x2="40" y2="55"/>
+      <line class="df-arm-r" x1="60" y1="38" x2="80" y2="55"/>
+      <line class="df-leg-l" x1="60" y1="70" x2="48" y2="110"/>
+      <line class="df-leg-r" x1="60" y1="70" x2="72" y2="110"/>
+    </g>
+  </svg>`;
+
+  function renderMuscleMap(container, media) {
+    if (!container || !media) return;
+    const primary = media.primary || [];
+    const secondary = media.secondary || [];
+    container.innerHTML = BODY_SVG;
+    container.querySelectorAll('.mr').forEach((el) => {
+      const r = el.dataset.r;
+      el.classList.remove('on', 'on2');
+      if (primary.includes(r)) {
+        el.classList.add('on');
+        el.style.fill = MUSCLE_REGIONS[r]?.color || 'var(--ember)';
+      } else if (secondary.includes(r)) {
+        el.classList.add('on2');
+        el.style.fill = MUSCLE_REGIONS[r]?.color || 'var(--cool)';
+        el.style.opacity = '0.45';
+      }
+    });
+    const legend = document.createElement('div');
+    legend.className = 'muscle-legend';
+    [...primary, ...secondary].forEach((r, i) => {
+      const info = MUSCLE_REGIONS[r];
+      if (!info) return;
+      const span = document.createElement('span');
+      span.className = i < primary.length ? 'ml-p' : 'ml-s';
+      span.innerHTML = `<i style="background:${info.color}"></i>${info.zh}${i < primary.length ? ' · 主动' : ' · 协同'}`;
+      legend.appendChild(span);
+    });
+    container.appendChild(legend);
+  }
+
+  function setDemoType(wrap, type) {
+    if (!wrap) return;
+    wrap.className = 'demo-stage demo-' + (type || 'mobility');
+  }
+
+  function renderMediaPanel(container, ex, reps) {
+    if (!container || !ex) return;
+    const media = getMediaForExercise(ex);
+    const repInfo = parseRepTarget(reps || ex.reps || '8');
+    container.innerHTML = `
+      <div class="media-grid">
+        <div class="media-video-wrap" id="mediaVideoWrap">
+          <video class="media-video" id="mediaVideo" playsinline loop muted poster="${media.poster || ''}"></video>
+          <div class="media-video-ph" id="mediaVideoPh">
+            <div class="demo-stage demo-${media.demo}" id="demoAnim"></div>
+          </div>
+          <button type="button" class="media-src-btn" id="mediaSrcToggle" title="切换演示源">🎬 真人 / 动画</button>
+        </div>
+        <div class="media-muscles" id="muscleMapHost"></div>
+      </div>
+      <div class="follow-bar" id="followBar">
+        <div class="follow-phase" id="followPhase">准备</div>
+        <div class="follow-reps" id="followReps">${repInfo.mode === 'time' ? repInfo.target + '秒' : '0 / ' + repInfo.target}</div>
+        <button type="button" class="follow-btn" id="followBtn" onclick="toggleFollow()">▶ 开始跟练</button>
+      </div>
+      <div class="cue-strip" id="cueStrip">${ex.cues?.[0] || ''}</div>`;
+
+    const mapHost = container.querySelector('#muscleMapHost');
+    renderMuscleMap(mapHost, media);
+
+    const video = container.querySelector('#mediaVideo');
+    const ph = container.querySelector('#mediaVideoPh');
+    let useVideo = !!media.video;
+
+    function applySource() {
+      if (useVideo && media.video) {
+        video.src = media.video;
+        video.style.display = 'block';
+        ph.style.display = 'none';
+        video.play().catch(() => {
+          useVideo = false;
+          video.style.display = 'none';
+          ph.style.display = 'flex';
+          setDemoType(ph.querySelector('#demoAnim'), media.demo);
+        });
+      } else {
+        video.style.display = 'none';
+        ph.style.display = 'flex';
+        setDemoType(ph.querySelector('#demoAnim'), media.demo);
+      }
+    }
+    applySource();
+    container.querySelector('#mediaSrcToggle')?.addEventListener('click', () => {
+      useVideo = !useVideo;
+      applySource();
+    });
+    return { media, repInfo };
+  }
+
+  return { renderMuscleMap, renderMediaPanel, setDemoType, BODY_SVG };
+})();
+
+// ════ 跟练状态 ════
+let followActive = false;
+let followTimer = null;
+let followRep = 0;
+let followSide = 0;
+let followMeta = null;
+
+function toggleFollow() {
+  if (followActive) stopFollow();
+  else startFollow();
+}
+
+function startFollow() {
+  const ex = EX.find((e) => e.name === document.getElementById('hudEx')?.textContent?.replace(/备注.*/, '').trim());
+  if (!ex) return;
+  const reps = document.getElementById('hudR')?.textContent?.replace('× ', '') || '8';
+  followMeta = { ...getMediaForExercise(ex), ...parseRepTarget(reps) };
+  followActive = true;
+  followRep = 0;
+  followSide = 0;
+  const btn = document.getElementById('followBtn');
+  if (btn) { btn.textContent = '⏹ 停止跟练'; btn.classList.add('on'); }
+  AudioEngine.resume();
+  runCountdown(3, () => runFollowSet());
+}
+
+function stopFollow() {
+  followActive = false;
+  if (followTimer) clearTimeout(followTimer);
+  followTimer = null;
+  const btn = document.getElementById('followBtn');
+  if (btn) { btn.textContent = '▶ 开始跟练'; btn.classList.remove('on'); }
+  const phase = document.getElementById('followPhase');
+  const reps = document.getElementById('followReps');
+  if (phase) phase.textContent = '准备';
+  if (reps && followMeta) {
+    reps.textContent = followMeta.mode === 'time' ? followMeta.target + '秒' : '0 / ' + followMeta.target;
+  }
+  document.getElementById('demoAnim')?.classList.remove('phase-down', 'phase-up', 'phase-hold');
+}
+
+function runCountdown(n, done) {
+  const phase = document.getElementById('followPhase');
+  if (!followActive) return;
+  if (n > 0) {
+    if (phase) phase.textContent = n;
+    AudioEngine.playCount(n);
+    followTimer = setTimeout(() => runCountdown(n - 1, done), 900);
+  } else {
+    if (phase) phase.textContent = '开始！';
+    AudioEngine.playGo();
+    followTimer = setTimeout(done, 500);
+  }
+}
+
+function runFollowSet() {
+  if (!followActive || !followMeta) return;
+  const phase = document.getElementById('followPhase');
+  const repsEl = document.getElementById('followReps');
+  const anim = document.getElementById('demoAnim');
+  const tempo = followMeta.tempo || { down: 2, hold: 1, up: 1 };
+
+  if (followMeta.mode === 'time') {
+    let left = followMeta.target;
+    const tick = () => {
+      if (!followActive) return;
+      if (phase) phase.textContent = followMeta.perSide && followSide === 0 ? '左侧保持' : followMeta.perSide ? '右侧保持' : '保持';
+      if (repsEl) repsEl.textContent = left + ' 秒';
+      if (left <= 3 && left > 0) AudioEngine.playTick();
+      if (left <= 0) {
+        if (followMeta.perSide && followSide === 0) {
+          followSide = 1;
+          left = followMeta.target;
+          AudioEngine.playSetDone();
+          followTimer = setTimeout(tick, 600);
+          return;
+        }
+        AudioEngine.playSetDone();
+        if (phase) phase.textContent = '完成 ✓';
+        stopFollow();
+        return;
+      }
+      left--;
+      followTimer = setTimeout(tick, 1000);
+    };
+    tick();
+    return;
+  }
+
+  function nextRep() {
+    if (!followActive) return;
+    followRep++;
+    const sideLabel = followMeta.perSide ? (followSide === 0 ? ' · 左' : ' · 右') : '';
+    if (repsEl) repsEl.textContent = followRep + ' / ' + followMeta.target + sideLabel;
+    AudioEngine.playRep();
+
+    function phaseSeq(p, ms, next) {
+      if (!followActive) return;
+      if (phase) phase.textContent = p + sideLabel;
+      if (anim) {
+        anim.classList.remove('phase-down', 'phase-up', 'phase-hold');
+        if (p.includes('下放')) anim.classList.add('phase-down');
+        else if (p.includes('推起') || p.includes('起身')) anim.classList.add('phase-up');
+        else anim.classList.add('phase-hold');
+      }
+      AudioEngine.playPhase(p.includes('下放') ? 'down' : p.includes('推起') || p.includes('起身') ? 'up' : 'hold');
+      followTimer = setTimeout(next, ms * 1000);
+    }
+
+    phaseSeq('下放', tempo.down || 2, () =>
+      phaseSeq(tempo.hold ? '保持' : '推起', tempo.hold || 0, () =>
+        phaseSeq('推起', tempo.up || 1, () => {
+          if (followRep >= followMeta.target) {
+            if (followMeta.perSide && followSide === 0) {
+              followRep = 0;
+              followSide = 1;
+              AudioEngine.playSetDone();
+              if (phase) phase.textContent = '换边';
+              followTimer = setTimeout(() => runCountdown(3, nextRep), 800);
+              return;
+            }
+            AudioEngine.playSetDone();
+            if (phase) phase.textContent = '完成 ✓';
+            stopFollow();
+            return;
+          }
+          nextRep();
+        })
+      )
+    );
+  }
+  nextRep();
+}

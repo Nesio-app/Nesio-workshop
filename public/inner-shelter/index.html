@@ -31,6 +31,26 @@
 <div class="amb"><div class="o o1"></div><div class="o o2"></div><div class="o o3"></div></div>
 <div class="toast" id="toast"></div>
 
+<!-- BREATH AURA · 曼陀罗呼吸（纯视觉 + 男声引导） -->
+<div id="breathAura" aria-hidden="true">
+  <div class="ba-bg"></div>
+  <div class="ba-core">
+    <div class="ba-mandala" id="baMandala">
+      <div class="ba-soft"></div>
+      <div class="ba-ring ba-r1">
+        <span class="ba-p"></span><span class="ba-p"></span><span class="ba-p"></span><span class="ba-p"></span>
+        <span class="ba-p"></span><span class="ba-p"></span><span class="ba-p"></span><span class="ba-p"></span>
+      </div>
+      <div class="ba-ring ba-r2">
+        <span class="ba-p"></span><span class="ba-p"></span><span class="ba-p"></span><span class="ba-p"></span>
+        <span class="ba-p"></span><span class="ba-p"></span><span class="ba-p"></span>
+      </div>
+      <div class="ba-orb"></div>
+    </div>
+  </div>
+  <button type="button" class="ba-end" onclick="stopBreathGuide(true)" aria-label="结束呼吸练习"></button>
+</div>
+
 <!-- FLASHBACK OVERLAY -->
 <div class="fbo" id="fbo">
 <div class="fbi">
@@ -44,10 +64,10 @@
     <div style="font-family:'DM Serif Display',serif;font-size:26px;line-height:1.25;color:var(--txt)">你现在是安全的。<br><span style="font-style:italic;color:var(--C)">这只是一段记忆。</span></div>
     <div style="margin-top:8px;font-family:'Noto Serif SC',serif;font-size:13px;color:var(--muted);line-height:1.8">它无法再伤害你。你已经是成年人了。</div>
   </div>
-  <div class="bstage">
-    <div class="bout"><div class="bbd"></div><div class="bctr"><div class="bnum" id="bnum">4</div><div class="bph" id="bph">吸气</div></div></div>
-    <div class="blbl" id="blbl">跟随光圈，平稳呼吸</div>
-    <div class="bsub">双手叠放胸口<br>感受心跳的节律，你在，你安全</div>
+  <div class="bstage bstage-voice" aria-hidden="true">
+    <div class="bout"><div class="bbd"></div><div class="bctr"><div class="bnum" id="bnum"></div><div class="bph" id="bph"></div></div></div>
+    <div class="blbl" id="blbl"></div>
+    <div class="bsub">双手叠放胸口 · 感受心跳 · 跟随呼吸图案</div>
   </div>
   <div class="slbl" style="margin-bottom:12px">皮特·沃克 · 闪回管理步骤</div>
   <div class="wlk" id="wlist">
@@ -66,7 +86,7 @@
     <div class="tippr" onclick="toast('🌊 走到水槽边，用常温冷水冲洗额头和手腕 30 秒，激活潜水反射，心率 5 秒内下降。')"><div class="tii">🌊</div><div class="tif"><h5>温度 Temperature</h5><p>冷水冲额头+手腕，激活迷走神经制动，5秒起效</p></div></div>
     <div class="tippr" onclick="toast('💪 靠墙静蹲 1 分钟，或做 10 个 Deadbug。强行消耗过激的去甲肾上腺素。')"><div class="tii">💪</div><div class="tif"><h5>高强运动 Intense Exercise</h5><p>靠墙静蹲/Deadbug 1分钟，消耗过度激发的应激激素</p></div></div>
     <div class="tippr" onclick="toast('✊ 双手握拳 5 秒，然后彻底张开，重复 3 次。让植物神经系统记住解冻的体感。')"><div class="tii">🤲</div><div class="tif"><h5>渐进放松 Progressive Relaxation</h5><p>握拳5秒→彻底松开，让身体记住"解冻"的感觉</p></div></div>
-    <div class="tippr" onclick="toast('😮 节奏呼吸：4秒吸→2秒屏→6秒呼，激活副交感神经刹车。')"><div class="tii">💨</div><div class="tif"><h5>节奏呼吸 Paced Breathing</h5><p>4秒吸→2秒屏→6秒呼，激活副交感"刹车"</p></div></div>
+    <div class="tippr" onclick="startPacedBreath()"><div class="tii">💨</div><div class="tif"><h5>节奏呼吸 Paced Breathing</h5><p>4秒吸→2秒屏→6秒呼，渐变背景 + 震动引导</p></div></div>
   </div>
   <div style="height:24px"></div>
   <div style="padding:0 24px;text-align:center">
@@ -191,6 +211,7 @@
   <div class="ach"><div class="aci">🐾</div><div class="act">理智正式下班</div><div class="acd">当大脑失控时，让身体接管。<br>下面是为你准备的 2 分钟微动作盲盒。</div></div>
   <div class="slbl" style="margin-top:6px">立刻可执行的物理微动作</div>
   <div class="ar hl" onclick="toast('🐶 去找 Maple，让它趴在你腿上，用手抚摸它的背部 2 分钟。催产素会冲刷皮质醇。理智卸载，身体接管。')"><div class="aico">🐶</div><div class="atxt"><h4>和 Maple 贴贴 2 分钟</h4><p>催产素冲刷皮质醇，理智卸载。</p></div></div>
+  <div class="ar hl" onclick="startPacedBreath()"><div class="aico cl">💨</div><div class="atxt"><h4>节奏呼吸 · 全屏引导</h4><p>渐变色随呼吸起伏，手机震动感知。类似 Apple Watch 呼吸。</p></div></div>
   <div class="ar" onclick="start541()"><div class="aico cl">👁️</div><div class="atxt"><h4>5-4-3-2-1 接地练习</h4><p>用感官把神经系统拉回当下。点击开始引导。</p></div></div>
   <div class="ar" onclick="toast('🌿 关灯，点亮熏香，22:00 芳香仪式开始。让嗅觉引领神经系统进入夜间恢复模式。')"><div class="aico wm">🌿</div><div class="atxt"><h4>22:00 芳香 + 红光仪式</h4><p>关闭屏幕，点燃熏香，红光仪器就绪。</p></div></div>
   <div class="ar" onclick="goTo('s-pt')"><div class="aico pp">🦵</div><div class="atxt"><h4>开始 Verna PT</h4><p>5个动作，2-3组，20分钟神经重置。</p></div></div>

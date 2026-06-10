@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build && npm run bundle:toolbox",
+    "bundle:toolbox": "mkdir -p out/adhd-flow out/fitness && cp -R adhd-flow-ios/web/. out/adhd-flow/ && cp -R fitness/web/. out/fitness/",
     "start": "next start",
     "lint": "next lint"
   },
@@ -19,6 +20,7 @@
     "recharts": "^3.7.0"
   },
   "devDependencies": {
+    "@vercel/node": "^5.0.0",
     "@types/node": "^20.14.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
