@@ -1,4 +1,4 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { NextRequest, NextResponse } from 'next/server';
 
 const DEFAULT_MODELS = 'gemini-2.5-flash-lite,gemini-2.5-flash,gemini-1.5-flash-8b';
 
@@ -12,13 +12,13 @@ const SYSTEM_PROMPT = `你是「宝盒」里的 AI 私人秘书。语气沉静�
 
 原则：回答用简体中文；默认简洁（除非用户要求展开）；不编造用户未提供的事实；涉及专业医疗/法律时提醒寻求真人帮助。`;
 
-type ChatTurn = { role: 'user' | 'assistant'; content: string };
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
 
-function cors(res: VercelResponse) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-}
+type ChatTurn = { role: 'user' | 'assistant'; content: string };
 
 function getGoogleKey(): string | undefined {
   const raw =
@@ -140,29 +140,32 @@ function toGeminiContents(history: ChatTurn[], message: string) {
   return contents;
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  cors(res);
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: corsHeaders });
+}
 
-  if (req.method === 'OPTIONS') {
-    return res.status(204).end();
-  }
-
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
+export async function POST(req: NextRequest) {
   const key = getGoogleKey();
   if (!key) {
-    return res.status(503).json({
-      error: 'AI not configured',
-      hint: 'Set GEMINI_API_KEY in Vercel Environment Variables, then Redeploy',
-    });
+    return NextResponse.json(
+      {
+        error: 'AI not configured',
+        hint: 'Set GEMINI_API_KEY in Vercel Environment Variables, then Redeploy',
+      },
+      { status: 503, headers: corsHeaders }
+    );
   }
 
-  const body = req.body || {};
+  let body: { message?: string; prompt?: string; history?: unknown; maxTokens?: number };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400, headers: corsHeaders });
+  }
+
   const message = String(body.message || body.prompt || '').trim();
   if (!message) {
-    return res.status(400).json({ error: 'message required' });
+    return NextResponse.json({ error: 'message required' }, { status: 400, headers: corsHeaders });
   }
 
   const history = normalizeHistory(body.history);
@@ -171,14 +174,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const contents = toGeminiContents(history, message);
     const text = await chatWithGemini(contents, maxTokens, key);
-    return res.status(200).json({ text });
+    return NextResponse.json({ text }, { headers: corsHeaders });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[secretary/chat]', msg);
     const quota = isQuotaError(msg);
-    return res.status(quota ? 429 : 500).json({
-      error: quota ? 'quota_exceeded' : 'AI request failed',
-      detail: msg,
-    });
+    return NextResponse.json(
+      { error: quota ? 'quota_exceeded' : 'AI request failed', detail: msg },
+      { status: quota ? 429 : 500, headers: corsHeaders }
+    );
   }
 }

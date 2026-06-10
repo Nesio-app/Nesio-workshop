@@ -1,6 +1,8 @@
 /** @type {import('next').NextConfig} */
+const isVercel = !!process.env.VERCEL;
+
 const nextConfig = {
-  output: 'export',
+  ...(isVercel ? {} : { output: 'export' }),
   basePath: process.env.BASE_PATH || '',
   assetPrefix: process.env.BASE_PATH ? `${process.env.BASE_PATH}/` : '',
   env: {
