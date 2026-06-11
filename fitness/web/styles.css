@@ -480,3 +480,9 @@ body{background:#020408;color:var(--tx);font-family:-apple-system,'Helvetica Neu
 .ap-row select{flex:1;background:var(--card);border:1px solid var(--bd);border-radius:8px;color:var(--tx);font-size:11px;padding:5px}
 .ap-row input[type=range]{flex:1;max-width:110px}
 .ap-chk{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--mu2);margin-top:4px}
+
+@media (max-width:520px){
+  html,body{height:100%;overflow:hidden}
+  body{align-items:stretch;justify-content:stretch;background:var(--void)}
+  .phone{width:100%;max-width:100%;height:100dvh;border-radius:0;border:none;box-shadow:none}
+}

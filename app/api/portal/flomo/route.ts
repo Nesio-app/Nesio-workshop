@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { fetchFlomoMemos, isFlomoReadConfigured } from '@/lib/portal/flomo-api';
 
 export const dynamic = 'force-dynamic';
 
@@ -7,6 +8,27 @@ function webhookUrl(): string | null {
     process.env.FLOMO_WEBHOOK_URL?.trim() || process.env.FLOMO_API_URL?.trim();
   if (!raw) return null;
   return raw.endsWith('/') ? raw : `${raw}/`;
+}
+
+export async function GET(req: NextRequest) {
+  const limitParam = req.nextUrl.searchParams.get('limit');
+  const limit = limitParam ? Number.parseInt(limitParam, 10) : 50;
+
+  if (!isFlomoReadConfigured()) {
+    return NextResponse.json({
+      ok: false,
+      configured: false,
+      memos: [],
+      error: 'FLOMO_API_TOKEN not configured — add your Personal Token in Vercel env',
+    });
+  }
+
+  const result = await fetchFlomoMemos(Number.isFinite(limit) ? limit : 50);
+  if (!result.ok) {
+    return NextResponse.json(result, { status: result.configured ? 502 : 503 });
+  }
+
+  return NextResponse.json(result);
 }
 
 export async function POST(req: NextRequest) {
