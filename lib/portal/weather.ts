@@ -25,6 +25,22 @@ export interface WeatherSnapshot {
   forecastNote?: string;
 }
 
+const FETCH_TIMEOUT_MS = 8_000;
+
+async function fetchWithTimeout(
+  input: string,
+  init?: RequestInit,
+  timeoutMs = FETCH_TIMEOUT_MS,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export function simplifyPlaceName(raw: string): string {
   const t = raw.trim();
   if (!t) return '';
@@ -38,7 +54,7 @@ export async function reverseGeocode(lat: number, lon: number): Promise<string> 
     url.searchParams.set('latitude', String(lat));
     url.searchParams.set('longitude', String(lon));
     url.searchParams.set('localityLanguage', 'en');
-    const res = await fetch(url.toString());
+    const res = await fetchWithTimeout(url.toString());
     if (!res.ok) throw new Error('geo');
     const data = await res.json();
     const place = data.city || data.locality || '';
@@ -62,7 +78,7 @@ export async function fetchWeatherAt(
   url.searchParams.set('forecast_hours', '24');
   url.searchParams.set('timezone', timezone);
 
-  const res = await fetch(url.toString());
+  const res = await fetchWithTimeout(url.toString());
   if (!res.ok) throw new Error('weather');
   const data = await res.json();
 
@@ -92,7 +108,7 @@ export async function fetchWeatherAt(
   };
 }
 
-export function readGeo(): Promise<GeolocationPosition> {
+export function readGeo(timeoutMs = 4_000): Promise<GeolocationPosition> {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
       reject(new Error('no geo'));
@@ -100,7 +116,7 @@ export function readGeo(): Promise<GeolocationPosition> {
     }
     navigator.geolocation.getCurrentPosition(resolve, reject, {
       enableHighAccuracy: false,
-      timeout: 12_000,
+      timeout: timeoutMs,
       maximumAge: 300_000,
     });
   });

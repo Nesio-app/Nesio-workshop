@@ -3,7 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { formatLunarLine, nextHolidayLine } from '@/lib/portal/almanac';
+import { t } from '@/lib/portal/i18n';
 import { pickFreshQuote } from '@/lib/portal/quotes';
+import {
+  loadProfileSettings,
+  PROFILE_UPDATED_EVENT,
+  type PortalLocale,
+} from '@/lib/portal/profile';
 import type { CalendarEvent, PortalConfig, PortalTool } from '@/lib/portal/types';
 import { greetingForHour } from '@/lib/portal/greeting';
 import {
@@ -16,6 +22,7 @@ import ToolGrid from './ToolGrid';
 
 interface DashboardHomeProps {
   config: PortalConfig;
+  noteOpen?: boolean;
   onOpenNote: () => void;
   onOpenTool: (tool: PortalTool) => void;
 }
@@ -104,12 +111,17 @@ interface CalendarFeedStatus {
   error?: string;
 }
 
+const FIDELITY_HINT_KEY = 'treasurebox-fidelity-hint-dismissed';
+
 export default function DashboardHome({
   config,
+  noteOpen = false,
   onOpenNote,
   onOpenTool,
 }: DashboardHomeProps) {
   const profile = config.profile ?? { displayName: '婧' };
+  const [locale, setLocale] = useState<PortalLocale>('zh');
+  const [displayName, setDisplayName] = useState(profile.displayName);
   const fallbackLocation = config.location ?? {
     city: '上海',
     latitude: 31.2304,
@@ -124,6 +136,7 @@ export default function DashboardHome({
   const [calendarExpanded, setCalendarExpanded] = useState(false);
   const [calendarNote, setCalendarNote] = useState<string | null>(null);
   const [calendarFeeds, setCalendarFeeds] = useState<CalendarFeedStatus[]>([]);
+  const [fidelityHintDismissed, setFidelityHintDismissed] = useState(false);
   const quotePicked = useRef(false);
   const [dailyQuote, setDailyQuote] = useState('今天也要好好照顾自己。');
   const [quoteSaved, setQuoteSaved] = useState(false);
@@ -131,13 +144,20 @@ export default function DashboardHome({
   const lunarLine = useMemo(() => formatLunarLine(now), [now]);
   const holidayLine = useMemo(() => nextHolidayLine(now), [now]);
 
+  const syncProfile = () => {
+    const s = loadProfileSettings(profile.displayName);
+    setDisplayName(s.displayName);
+    setAvatarUrl(s.avatarUrl || profile.avatarUrl || '');
+    setLocale(s.locale);
+    document.documentElement.lang = s.locale === 'en' ? 'en' : 'zh-CN';
+  };
+
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('treasurebox-profile-avatar');
-      if (saved) setAvatarUrl(saved);
-      else if (profile.avatarUrl) setAvatarUrl(profile.avatarUrl);
-    } catch { /* ignore */ }
-  }, [profile.avatarUrl]);
+    syncProfile();
+    const onUpdate = () => syncProfile();
+    window.addEventListener(PROFILE_UPDATED_EVENT, onUpdate);
+    return () => window.removeEventListener(PROFILE_UPDATED_EVENT, onUpdate);
+  }, [profile.avatarUrl, profile.displayName]);
 
   useEffect(() => {
     if (quotePicked.current) return;
@@ -160,49 +180,67 @@ export default function DashboardHome({
   }, []);
 
   useEffect(() => {
+    try {
+      setFidelityHintDismissed(
+        sessionStorage.getItem(FIDELITY_HINT_KEY) === '1',
+      );
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
     const tz = fallbackLocation.timezone || 'Asia/Shanghai';
+    const configCity = simplifyPlaceName(fallbackLocation.city);
+    const pinToConfigCity =
+      fallbackLocation.useConfigCity !== false && Boolean(configCity);
 
-    async function loadWeather() {
-      setWeather((w) => ({ ...w, loading: true, error: false }));
+    async function applySnapshot(snap: Awaited<ReturnType<typeof fetchWeatherAt>>) {
+      if (cancelled) return;
+      setWeather({
+        loading: false,
+        temperature: snap.temperature,
+        unit: snap.unit,
+        condition: snap.condition,
+        placeName: snap.placeName,
+        forecastNote: snap.forecastNote,
+      });
+    }
+
+    async function loadWeather(refineGeo: boolean) {
+      if (!refineGeo) {
+        setWeather((w) => ({ ...w, loading: true, error: false }));
+      }
       try {
         let lat = fallbackLocation.latitude;
         let lon = fallbackLocation.longitude;
-        const configCity = simplifyPlaceName(fallbackLocation.city);
-        const pinToConfigCity =
-          fallbackLocation.useConfigCity !== false && Boolean(configCity);
         let place = configCity;
 
-        try {
-          const pos = await readGeo();
-          lat = pos.coords.latitude;
-          lon = pos.coords.longitude;
-          if (!pinToConfigCity) {
+        if (refineGeo && !pinToConfigCity) {
+          try {
+            const pos = await readGeo(3_500);
+            lat = pos.coords.latitude;
+            lon = pos.coords.longitude;
             const name = await reverseGeocode(lat, lon);
             if (name) place = simplifyPlaceName(name);
+          } catch {
+            /* keep config coords */
           }
-        } catch {
-          /* use fallback coords */
         }
 
-        const snap = await fetchWeatherAt(lat, lon, tz, place);
-        if (!cancelled) {
-          setWeather({
-            loading: false,
-            temperature: snap.temperature,
-            unit: snap.unit,
-            condition: snap.condition,
-            placeName: snap.placeName,
-            forecastNote: snap.forecastNote,
-          });
-        }
+        const snap = await fetchWeatherAt(lat, lon, tz, place || configCity);
+        await applySnapshot(snap);
       } catch {
-        if (!cancelled) setWeather({ loading: false, error: true });
+        if (!cancelled && !refineGeo) {
+          setWeather({ loading: false, error: true });
+        }
       }
     }
 
-    loadWeather();
-    const refresh = window.setInterval(loadWeather, 15 * 60_000);
+    loadWeather(false);
+    if (!pinToConfigCity) {
+      window.setTimeout(() => loadWeather(true), 0);
+    }
+    const refresh = window.setInterval(() => loadWeather(false), 15 * 60_000);
     return () => {
       cancelled = true;
       window.clearInterval(refresh);
@@ -212,6 +250,7 @@ export default function DashboardHome({
     fallbackLocation.longitude,
     fallbackLocation.city,
     fallbackLocation.timezone,
+    fallbackLocation.useConfigCity,
   ]);
 
   useEffect(() => {
@@ -254,39 +293,49 @@ export default function DashboardHome({
     : events.slice(0, CALENDAR_PREVIEW);
   const hasMoreEvents = events.length > CALENDAR_PREVIEW;
   const fidelityFeed = calendarFeeds.find((f) => f.label === 'Fidelity');
-  const fidelityHint =
-    fidelityFeed && !fidelityFeed.ok
-      ? `Fidelity 日历未同步${fidelityFeed.error ? `（${fidelityFeed.error}）` : ''}，请检查 Vercel 环境变量 FIDELITY。`
-      : null;
+  const googleOk = calendarFeeds.some((f) => f.label === 'Google' && f.ok);
+  const showFidelityHint =
+    fidelityFeed && !fidelityFeed.ok && !fidelityHintDismissed;
+  const dismissFidelityHint = () => {
+    setFidelityHintDismissed(true);
+    try {
+      sessionStorage.setItem(FIDELITY_HINT_KEY, '1');
+    } catch { /* ignore */ }
+  };
 
   return (
     <div className="portal-dash">
       <header className="portal-dash-hero">
-        <Link className="portal-avatar-link" href="/portfolio" aria-label="关于我">
+        <Link className="portal-avatar-link" href="/settings" aria-label={t(locale, 'openSettings')}>
           {displayAvatar ? (
             <img className="portal-dash-avatar" src={displayAvatar} alt="" width={48} height={48} />
           ) : (
             <div className="portal-dash-avatar portal-dash-avatar--initials" aria-hidden>
-              {initials(profile.displayName)}
+              {initials(displayName)}
             </div>
           )}
         </Link>
 
         <div className="portal-dash-greeting">
           <p className="portal-dash-greeting-line">{greeting}</p>
-          <p className="portal-dash-greeting-name">{profile.displayName}</p>
+          <p className="portal-dash-greeting-name">{displayName}</p>
         </div>
 
         <div className="portal-dash-hero-end">
           <button
             type="button"
-            className="portal-search-btn portal-search-btn--icon"
+            className={
+              'portal-search-btn portal-search-btn--note' +
+              (noteOpen ? ' portal-search-btn--active' : '')
+            }
             onClick={onOpenNote}
-            aria-label="打开笔记"
+            aria-label={t(locale, 'openNote')}
+            aria-expanded={noteOpen}
           >
             <span className="portal-search-icon portal-icon-blue" aria-hidden>
               📝
             </span>
+            <span className="portal-note-btn-label">{t(locale, 'noteLabel')}</span>
           </button>
         </div>
       </header>
@@ -297,7 +346,7 @@ export default function DashboardHome({
           type="button"
           className={'portal-quote-save' + (quoteSaved ? ' portal-quote-save--on' : '')}
           onClick={toggleSaveQuote}
-          aria-label={quoteSaved ? '已收藏' : '收藏这句话'}
+          aria-label={quoteSaved ? t(locale, 'quoteSaved') : t(locale, 'saveQuote')}
         >
           {quoteSaved ? '★' : '☆'}
         </button>
@@ -313,9 +362,9 @@ export default function DashboardHome({
 
         <article className="portal-widget portal-widget--weather">
           {weather.loading ? (
-            <p className="portal-widget-muted">加载中…</p>
+            <p className="portal-widget-muted">{t(locale, 'weatherLoading')}</p>
           ) : weather.error ? (
-            <p className="portal-widget-muted">暂无数据</p>
+            <p className="portal-widget-muted">{t(locale, 'weatherError')}</p>
           ) : (
             <>
               <p className="portal-widget-city">{cityName}</p>
@@ -335,16 +384,29 @@ export default function DashboardHome({
       <ToolGrid tools={config.tools} onOpenTool={onOpenTool} />
 
       <section className="portal-calendar" aria-label="日历">
-        <h2 className="portal-calendar-head">日历</h2>
-        {fidelityHint ? (
-          <p className="portal-calendar-feed-hint" role="status">
-            {fidelityHint}
-          </p>
+        <h2 className="portal-calendar-head">{t(locale, 'calendar')}</h2>
+        {showFidelityHint ? (
+          <div className="portal-calendar-feed-hint" role="status">
+            <span>
+              {googleOk
+                ? 'Fidelity 日历未同步'
+                : 'Fidelity 日历未同步，请检查 Vercel 环境变量 FIDELITY'}
+              {fidelityFeed?.error ? `（${fidelityFeed.error}）` : ''}
+            </span>
+            <button
+              type="button"
+              className="portal-calendar-feed-dismiss"
+              onClick={dismissFidelityHint}
+              aria-label="关闭提示"
+            >
+              ×
+            </button>
+          </div>
         ) : null}
 
         {events.length === 0 ? (
           <p className="portal-calendar-empty">
-            {calendarNote || '暂无即将到来的日程'}
+            {calendarNote || t(locale, 'calendarEmpty')}
           </p>
         ) : (
           <ul className="portal-calendar-list">
@@ -372,7 +434,9 @@ export default function DashboardHome({
             className="portal-calendar-more"
             onClick={() => setCalendarExpanded((v) => !v)}
           >
-            {calendarExpanded ? '收起' : `显示更多（${events.length - CALENDAR_PREVIEW}）`}
+            {calendarExpanded
+              ? t(locale, 'calendarCollapse')
+              : `${t(locale, 'calendarMore')}（${events.length - CALENDAR_PREVIEW}）`}
           </button>
         ) : null}
       </section>

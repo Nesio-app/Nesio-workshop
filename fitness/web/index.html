@@ -3,10 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>熔归 RONG GUI v2</title>
+<title>熔归 RONG GUI v3</title>
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="/portal-back.css">
 </head>
 <body>
+<a class="portal-back-link portal-back-link--dark" href="/">‹ 宝盒</a>
 <div class="phone" id="app">
 <div class="sb"><span class="sbt" id="clock">9:41</span><div class="sbi"><span>⚡</span><span>●●●●</span><span>100%</span></div></div>
 
@@ -14,10 +16,7 @@
 
 <!-- HOME -->
 <div class="scr on" id="scr-home">
-  <div class="htop">
-    <div class="wm">熔<span>归</span></div>
-    <div class="ebadge">⚡ 满电冲刺</div>
-  </div>
+  <div class="htop"><div class="wm">熔<span>归</span></div><div class="ebadge">⚡ 满电冲刺</div></div>
   <div class="ewrap">
     <div class="erow"><span>神经系统电量</span><span>82%</span></div>
     <div class="ebar"><div class="efill" style="width:82%"></div></div>
@@ -28,7 +27,7 @@
     <button class="fuse-btn" onclick="acceptFuse()">✓ 接受今日替代方案</button>
   </div>
   <div class="slcard card">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px">
+    <div style="display:flex;justify-content:space-between;margin-bottom:9px">
       <span class="sl">昨晚睡眠</span><span style="font-size:10px;color:var(--mu)">Apple Health ↺</span>
     </div>
     <div class="sgrid">
@@ -38,15 +37,10 @@
       <div class="sm"><div class="smv o">68</div><div class="smu">HRVms</div></div>
     </div>
   </div>
-  <div class="rcard">
-    <div class="rrow">
-      <div class="rscore">82</div>
-      <div class="rinfo">
-        <h3>黄金超补偿期</h3>
-        <p>深睡优质，HRV 历史高位。今日冲击 PR 成功率 88%。</p>
-      </div>
-    </div>
-  </div>
+  <div class="rcard"><div class="rrow">
+    <div class="rscore">82</div>
+    <div class="rinfo"><h3>黄金超补偿期</h3><p>深睡优质，HRV 历史高位。今日冲击 PR 成功率 88%。</p></div>
+  </div></div>
   <button class="sbtn" onclick="startWorkout()">🔥 开始今日训练</button>
   <div class="strow">
     <div class="sc"><div class="scv" style="color:var(--ember)">4</div><div class="scl">本周训练</div></div>
@@ -55,11 +49,9 @@
   </div>
   <div class="gstrip card" onclick="switchTab('glucose')">
     <div class="gdot gs" id="hgdot"></div>
-    <div class="gi">
-      <div class="gv"><span id="hgval">118</span><span class="gu"> mg/dL</span></div>
-      <div class="gs2" id="hgsub">餐后 1.5h · 安全区间 ✓</div>
-    </div>
-    <span style="color:var(--mu);font-size:16px">›</span>
+    <div class="gi"><div class="gv"><span id="hgval">118</span><span class="gu"> mg/dL</span></div>
+    <div class="gs2" id="hgsub">餐后 1.5h · 安全区间 ✓</div></div>
+    <span style="color:var(--mu)">›</span>
   </div>
   <div class="emerg-strip" onclick="showEmerg()">
     <span style="font-size:16px">🔴</span>
@@ -71,11 +63,18 @@
 <!-- TRAIN -->
 <div class="scr" id="scr-train">
   <div class="tr-hdr">
-    <div>
-      <div class="tr-title" id="trainTitle">训练 · Day A</div>
-      <div style="font-size:11px;color:var(--mu);margin-top:2px">Verna 计划 · 沙盒完成后解锁</div>
-    </div>
+    <div><div class="tr-title">训练</div>
+    <div style="font-size:11px;color:var(--mu);margin-top:2px">Verna 计划 · 沙盒完成后解锁</div></div>
     <div class="wksel" id="wksel"></div>
+  </div>
+  <!-- music + sound row -->
+  <div class="musicrow">
+    <span style="font-size:10px;color:var(--mu);flex-shrink:0">🎵</span>
+    <div class="chip" id="mc-rain" onclick="toggleMusic('rain',this)">🌧 雨声</div>
+    <div class="chip" id="mc-lofi" onclick="toggleMusic('lofi',this)">🎧 低保真</div>
+    <div class="chip" id="mc-forest" onclick="toggleMusic('forest',this)">🌲 森林</div>
+    <div class="chip" id="mc-drone" onclick="toggleMusic('drone',this)">🌌 静谧</div>
+    <div class="chip con" id="sfxChip" onclick="toggleSfx(this)">🔔 提示音开</div>
   </div>
   <div class="daytog">
     <button class="db on" id="dab" onclick="selDay('A')">Day A · 下肢推</button>
@@ -90,8 +89,7 @@
     </div>
     <div class="sbr" onclick="addWater()">
       <div class="sbi2">💧</div>
-      <div class="sbt2">
-        <div class="st">水合状态</div>
+      <div class="sbt2"><div class="st">水合状态</div>
         <div class="ss2" id="hydTxt">已记录 500ml · 点击 +300ml</div>
         <div class="hbar"><div class="hfill" id="hydFill" style="width:55%"></div></div>
       </div>
@@ -110,7 +108,7 @@
 
 <!-- LIBRARY -->
 <div class="scr" id="scr-library">
-  <div class="ph"><div class="pt">动作库</div><div class="ps">三维筛选 · 点击查看详情</div></div>
+  <div class="ph"><div class="pt">动作库</div><div class="ps">动态演示 · 三维筛选</div></div>
   <div class="scroll-row" id="mf">
     <div class="chip eon" onclick="fl('all',this,'m')">全部</div>
     <div class="chip" onclick="fl('glute',this,'m')">🍑 臀</div>
@@ -140,7 +138,7 @@
   <div class="pad"></div>
 </div>
 
-<!-- AI COACH -->
+<!-- COACH -->
 <div class="scr" id="scr-coach">
   <div class="ph"><div class="pt">AI 教练</div><div class="ps">基于你的身体数据 · 实时定制</div></div>
   <div class="cprof">
@@ -152,8 +150,7 @@
     </div>
   </div>
   <div class="chatarea" id="chatArea">
-    <div class="cm ai">
-      <div class="ailbl">🔥 熔归教练</div>
+    <div class="cm ai"><div class="ailbl">🔥 熔归教练</div>
       你好 Jennifer！已读取 Verna 4 周计划和健康档案。<br><br>
       可以帮你<strong style="color:var(--tx)">定制今日计划、调整 RPE 负荷、分析动作要点，或基于今天的血糖和睡眠状态给出实时建议</strong>。
     </div>
@@ -169,7 +166,7 @@
       <div class="gcbig s" id="gcBig">118</div>
       <div><div class="gcunit">mg/dL</div><div style="font-size:11px;color:var(--mu)">餐后 1.5h</div></div>
     </div>
-    <div style="font-size:12px;color:var(--mu);line-height:1.5">↘ 缓慢下降 · 目标 &lt;140 mg/dL · 安全区间 ✓</div>
+    <div style="font-size:12px;color:var(--mu)">↘ 缓慢下降 · 目标 &lt;140 mg/dL · 安全区间 ✓</div>
     <div class="gczones">
       <div class="gz"><div class="zl">安全</div><div class="zv" style="color:var(--safe)">&lt;140</div></div>
       <div class="gz"><div class="zl">预警</div><div class="zv" style="color:var(--warn)">140–160</div></div>
@@ -195,6 +192,13 @@
 
 </div><!-- /main -->
 
+<!-- music mini player -->
+<div class="music-mini" id="musicMini">
+  <div class="mm-eq"><span></span><span></span><span></span></div>
+  <div class="mm-name" id="mmName">雨声</div>
+  <button class="mm-stop" onclick="stopMusic()">停止</button>
+</div>
+
 <div class="pbar" id="promptBar" style="display:none"></div>
 <div class="ibar" id="inputBar" style="display:none">
   <input class="cinp" id="coachInp" placeholder="问教练任何问题..." />
@@ -212,23 +216,17 @@
 <!-- OVERLAYS -->
 <div class="ss-flash" id="ssFlash"></div>
 
-<div class="audio-fab" id="audioFab" onclick="toggleAudioPanel()" title="音乐与音效">🎵</div>
-<div class="audio-panel" id="audioPanel">
-  <div class="ap-hdr"><span>训练氛围</span><button type="button" onclick="toggleAudioPanel()">✕</button></div>
-  <div class="ap-row"><span>背景音乐</span><select id="bgmSelect" onchange="AudioEngine.setBgm(this.value)"></select></div>
-  <div class="ap-row"><span>音乐音量</span><input type="range" id="bgmVol" min="0" max="100" value="35" oninput="AudioEngine.setBgmVol(this.value/100)"></div>
-  <div class="ap-row"><span>提示音效</span><input type="range" id="sfxVol" min="0" max="100" value="70" oninput="AudioEngine.setSfxVol(this.value/100)"></div>
-  <label class="ap-chk"><input type="checkbox" id="sfxOn" checked onchange="AudioEngine.setEnabled(this.checked)"> 倒计时 / 组间提醒音</label>
-</div>
-
 <div class="hud" id="ssHud">
-  <div class="hud-scroll">
   <div class="hudphase" id="hudPhase">第 1 组 / 共 2 组</div>
   <div class="hudbig" id="hudBig" style="color:var(--ember)">A1</div>
   <div class="hudex" id="hudEx">Split-Squat</div>
+  <div class="hud-fig" id="hudFig"></div>
   <div class="hudn" id="hudNote" style="display:none"></div>
-  <div id="hudMedia"></div>
-  <div class="hudtgt"><div class="hudw" id="hudW">体重</div><div class="hudr" id="hudR">× 6-8 次/侧</div></div>
+  <div class="hudtgt">
+    <div><div class="hudw" id="hudW">体重</div></div>
+    <div><div class="hudr" id="hudR">× 6-8 次/侧</div></div>
+  </div>
+  <button class="hud-follow" onclick="openFollowFromHud()">▶ 动态跟练模式</button>
   <div class="rpew" id="rpeWrap">
     <div class="rpelbl"><span>本组完成度 RPE</span><span id="rpeVal">7</span></div>
     <input type="range" class="rpeslider" id="rpeSlider" min="1" max="10" value="7"
@@ -237,7 +235,6 @@
   </div>
   <button class="hudabtn next" id="hudBtn" onclick="hudAction()">✓ 完成本组</button>
   <div class="hudskip" onclick="closeHud()">跳过 / 关闭</div>
-  </div>
 </div>
 
 <div class="resthud" id="restHud">
@@ -247,17 +244,41 @@
   <div class="restmsg" id="restMsg">双手叠放，平稳呼吸，为下一超级组满电蓄能。</div>
   <div class="microtask">
     <div class="mtt">💡 组间微任务</div>
-    <div class="mtb" id="microBody">补水黄金期——喝一口水，用手掌轻拍臀大肌，建立意念肌肉联结。</div>
+    <div class="mtb" id="microBody">补水黄金期——喝一口水，轻拍今日主训肌群。</div>
     <button class="mtwbtn" onclick="logWater()">💧 已补水 +50ml</button>
   </div>
   <button class="restskip" id="restSkip" onclick="skipRest()">等待心率恢复...</button>
 </div>
 
+<!-- FOLLOW-ALONG -->
+<div class="followOv" id="followOv">
+  <div class="fo-top">
+    <div class="fo-name" id="foName">Split-Squat</div>
+    <button class="fo-close" onclick="closeFollow()">✕</button>
+  </div>
+  <div class="fo-figwrap">
+    <svg class="fo-ring" viewBox="0 0 280 280">
+      <circle cx="140" cy="140" r="132" stroke="rgba(255,255,255,.07)"/>
+      <circle cx="140" cy="140" r="132" stroke="var(--cool)" id="foRingArc"
+        stroke-dasharray="829" stroke-dashoffset="829" transform="rotate(-90 140 140)"/>
+    </svg>
+    <div class="fo-fig" id="foFig"></div>
+    <div class="fo-cd" id="foCd">3</div>
+  </div>
+  <div class="fo-phase ecc" id="foPhase">准备开始</div>
+  <div class="fo-rep"><span id="foRepNow">0</span><span> / <span id="foRepTgt">8</span> 次</span></div>
+  <div class="fo-btns">
+    <button class="fo-btn go" id="foGoBtn" onclick="followGo()">▶ 开始跟练</button>
+    <button class="fo-btn pause" onclick="followPause()" id="foPauseBtn" style="display:none">⏸ 暂停</button>
+  </div>
+  <div class="fo-tempo">节奏：3 秒离心下降（低音）→ 1 秒向心发力（高音）<br>每完成 1 次自动计数 · 完成目标自动结束</div>
+</div>
+
 <div class="recov" id="recovOv">
-  <div style="font-size:19px;font-weight:700;text-align:center;margin-bottom:5px">🔥 训练完成，交感降温中</div>
+  <div style="font-size:19px;font-weight:700;margin-bottom:5px">🔥 训练完成，交感降温中</div>
   <div style="font-size:12px;color:var(--mu);text-align:center;line-height:1.6;margin-bottom:16px;max-width:270px">启动副交感刹车，随着心率下降热能逐渐消散。</div>
   <div class="hball hot" id="heatBall">🔥</div>
-  <div style="font-size:12px;color:var(--mu);text-align:center;margin-bottom:18px" id="recMsg">心率 <span id="recHR">162</span> bpm · 持续呼吸...</div>
+  <div style="font-size:12px;color:var(--mu);margin-bottom:18px" id="recMsg">心率 <span id="recHR">162</span> bpm · 持续呼吸...</div>
   <button class="recbtn hot" id="recBtn" onclick="advRecov()">启动副交感刹车 · 缓慢呼吸</button>
 </div>
 
@@ -272,7 +293,7 @@
 <div class="ssOv" id="ssOv">
   <div style="font-size:18px;font-weight:700;margin-bottom:6px">🌞 皮肤物理防线</div>
   <div style="font-size:12px;color:var(--mu);line-height:1.6">当前紫外线 UV 4（中等偏高）<br>长按防晒图标 2 秒激活</div>
-  <div class="ssicon" id="ssIcon" onpointerdown="startSS()" onpointerup="stopSS()" onpointerleave="stopSS()">🧴</div>
+  <div class="ssicon" id="ssIcon" onpointerdown="startSScreen()" onpointerup="stopSScreen()" onpointerleave="stopSScreen()">🧴</div>
   <div class="ssprog"><div class="ssfill" id="ssFill"></div></div>
   <div class="sshint" id="ssHint">长按 2 秒激活</div>
 </div>
@@ -290,7 +311,7 @@
   <div class="mtmsg" id="mtmsg"></div>
 </div>
 
-<!-- DETAIL OVERLAY (outside phone flow, inside phone) -->
+<!-- DETAIL OVERLAY -->
 <div class="dov" id="detailOv">
   <div class="dovh">
     <button class="backbtn" onclick="closeDetail()">&#8249;</button>
@@ -300,11 +321,10 @@
 </div>
 
 </div><!-- /phone -->
+
+
+</div>
 <script src="config.js"></script>
-<script src="media.js"></script>
-<script src="audio.js"></script>
-<script src="demo.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
-</user_query>

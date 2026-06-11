@@ -1,0 +1,32 @@
+.portal-back-link {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 10px);
+  left: calc(env(safe-area-inset-left, 0px) + 10px);
+  z-index: 220;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.4rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(88, 140, 227, 0.28);
+  color: #588ce3;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-decoration: none;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 4px 14px rgba(88, 140, 227, 0.14);
+  touch-action: manipulation;
+}
+
+.portal-back-link:hover {
+  border-color: rgba(88, 140, 227, 0.45);
+}
+
+.portal-back-link--dark {
+  background: rgba(12, 16, 24, 0.82);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #96c7f3;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}

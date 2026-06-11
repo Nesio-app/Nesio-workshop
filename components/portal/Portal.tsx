@@ -87,6 +87,7 @@ export default function Portal() {
         <div className="portal-main">
           <DashboardHome
             config={config}
+            noteOpen={noteOpen}
             onOpenNote={() => setNoteOpen(true)}
             onOpenTool={openTool}
           />

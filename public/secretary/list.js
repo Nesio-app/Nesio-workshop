@@ -84,7 +84,10 @@ function renderList(filter) {
       (f.company || '').toLowerCase().includes(q),
   );
 
-  for (const f of rows) {
+  const readyRows = rows.filter((f) => f.ready);
+  const upcomingRows = rows.filter((f) => !f.ready);
+
+  for (const f of readyRows) {
     const a = document.createElement('a');
     a.className = 'wx-row-item';
     a.href = `/secretary/chat?friend=${encodeURIComponent(f.id)}`;
@@ -98,11 +101,35 @@ function renderList(filter) {
         </div>
         <div class="wx-row-bottom">
           <span class="wx-row-preview">${f.preview}</span>
-          ${f.ready ? '' : '<span class="wx-row-badge">待接</span>'}
         </div>
       </div>
     `;
     listEl.appendChild(a);
+  }
+
+  if (upcomingRows.length) {
+    const head = document.createElement('div');
+    head.className = 'wx-list-section';
+    head.textContent = '即将接入';
+    listEl.appendChild(head);
+
+    for (const f of upcomingRows) {
+      const row = document.createElement('div');
+      row.className = 'wx-row-item wx-row-item--muted';
+      row.innerHTML = `
+        <img class="wx-row-avatar" src="${withRoot(f.logo)}" alt="" width="48" height="48" loading="lazy" />
+        <div class="wx-row-body">
+          <div class="wx-row-top">
+            <span class="wx-row-name">${f.name}</span>
+            <span class="wx-row-badge">待接</span>
+          </div>
+          <div class="wx-row-bottom">
+            <span class="wx-row-preview">${f.tagline || f.preview}</span>
+          </div>
+        </div>
+      `;
+      listEl.appendChild(row);
+    }
   }
 }
 

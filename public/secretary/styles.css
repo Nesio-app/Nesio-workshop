@@ -164,6 +164,20 @@ html, body {
   flex-shrink: 0;
 }
 
+.wx-list-section {
+  padding: 0.65rem 1rem 0.35rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--wx-muted);
+  text-transform: uppercase;
+}
+
+.wx-row-item--muted {
+  opacity: 0.72;
+  pointer-events: none;
+}
+
 .wx-row-avatar--group {
   display: grid;
   place-items: center;
