@@ -1,0 +1,24 @@
+{
+  "name": "treasurebox-ios",
+  "version": "1.0.0",
+  "private": true,
+  "description": "宝盒 · 数字静谧庭院 — Capacitor iOS app",
+  "scripts": {
+    "sync": "node scripts/sync-www.mjs",
+    "cap:sync": "npm run sync && npx cap sync ios",
+    "ios": "npm run cap:sync && npx cap open ios",
+    "ios:run": "npm run cap:sync && npx cap run ios",
+    "assets": "npx capacitor-assets generate --ios"
+  },
+  "dependencies": {
+    "@capacitor/core": "^8.4.0",
+    "@capacitor/ios": "^8.4.0",
+    "@capacitor/splash-screen": "^8.0.1",
+    "@capacitor/status-bar": "^8.0.1"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.4.0",
+    "typescript": "^5.5.0"
+  }
+}

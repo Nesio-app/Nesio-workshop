@@ -55,7 +55,12 @@ export default function CommandBar({ tools, open, onOpenChange }: CommandBarProp
 
   const navigate = (tool: PortalTool) => {
     if (!tool.ready) return;
-    window.location.href = withBase(tool.url);
+    const href = withBase(tool.url);
+    if (href.startsWith('http')) {
+      window.open(href, '_blank', 'noopener,noreferrer');
+    } else {
+      window.location.href = href;
+    }
   };
 
   if (!open) return null;

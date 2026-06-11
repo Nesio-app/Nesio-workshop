@@ -17,6 +17,7 @@ export interface PortalTool {
   command: string;
   featured?: boolean;
   icon: string;
+  iconUrl?: string;
   ready?: boolean;
 }
 

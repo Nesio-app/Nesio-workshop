@@ -1,0 +1,5 @@
+node_modules/
+www/
+config.local.js
+.DS_Store
+DerivedData/

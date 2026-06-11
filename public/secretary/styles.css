@@ -1,183 +1,264 @@
 :root {
-  --bg: #f3f1ec;
-  --ink: #2a2a28;
-  --muted: #6f6d68;
-  --line: rgba(42, 42, 40, 0.1);
-  --user: #e8ecef;
-  --assistant: #f7f5f0;
-  --accent: #5c6f82;
+  --wx-blue: #588ce3;
+  --wx-blue-mid: #96c7f3;
+  --wx-blue-light: #cddefc;
+  --wx-bg: #ededed;
+  --wx-nav: #f7f7f7;
+  --wx-ink: #111;
+  --wx-muted: #888;
+  --wx-user-bubble: #95ec69;
+  --wx-assist-bubble: #fff;
+  --wx-line: rgba(0, 0, 0, 0.08);
 }
 
-* { box-sizing: border-box; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
 html, body {
   margin: 0;
-  min-height: 100%;
-  background: var(--bg);
-  color: var(--ink);
-  font-family: "Noto Serif SC", "Songti SC", Georgia, serif;
+  height: 100%;
+  overflow: hidden;
+  background: var(--wx-bg);
+  color: var(--wx-ink);
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
 }
 
-.sec-shell {
-  min-height: 100dvh;
-  max-width: 720px;
+.wx-app {
+  height: 100dvh;
+  max-width: 640px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom));
+  background: var(--wx-bg);
 }
 
-.sec-header {
+.wx-nav {
+  flex-shrink: 0;
   display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: start;
-  gap: 0.75rem;
-  padding-bottom: 0.75rem;
-  border-bottom: 1px solid var(--line);
+  grid-template-columns: 3rem 1fr 3rem;
+  align-items: center;
+  min-height: calc(44px + env(safe-area-inset-top));
+  padding-top: env(safe-area-inset-top);
+  background: var(--wx-nav);
+  border-bottom: 0.5px solid var(--wx-line);
 }
 
-.sec-back {
-  font-size: 0.82rem;
-  color: var(--muted);
-  text-decoration: none;
-  padding-top: 0.35rem;
-  font-family: system-ui, sans-serif;
-}
-
-.sec-back:hover { color: var(--ink); }
-
-.sec-eyebrow {
-  margin: 0;
-  font-size: 0.68rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--muted);
-  font-family: system-ui, sans-serif;
-}
-
-.sec-title {
-  margin: 0.2rem 0 0;
-  font-size: 1.35rem;
-  font-weight: 500;
-  letter-spacing: 0.06em;
-}
-
-.sec-clear {
-  border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.45);
-  color: var(--muted);
-  border-radius: 999px;
-  padding: 0.35rem 0.75rem;
-  font-size: 0.75rem;
+.wx-nav-back,
+.wx-nav-more {
+  border: none;
+  background: transparent;
+  color: var(--wx-ink);
+  font-size: 1.6rem;
+  line-height: 1;
   cursor: pointer;
-  font-family: system-ui, sans-serif;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
 }
 
-.sec-clear:hover { color: var(--ink); }
+.wx-nav-more {
+  font-size: 1.25rem;
+  letter-spacing: 0.12em;
+}
 
-.sec-main {
+.wx-nav-title {
+  margin: 0;
+  text-align: center;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.wx-chat {
   flex: 1;
   overflow-y: auto;
-  padding: 1.25rem 0;
+  -webkit-overflow-scrolling: touch;
+  padding: 0.75rem 0.65rem 1rem;
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
 }
 
-.sec-welcome {
-  color: var(--muted);
-  font-size: 0.92rem;
-  line-height: 1.7;
-  font-family: system-ui, sans-serif;
+.wx-time {
+  align-self: center;
+  font-size: 0.72rem;
+  color: var(--wx-muted);
+  background: rgba(0, 0, 0, 0.04);
+  padding: 0.2rem 0.55rem;
+  border-radius: 0.25rem;
 }
 
-.sec-bubble {
-  max-width: 92%;
-  padding: 0.85rem 1rem;
-  border-radius: 1rem;
-  line-height: 1.65;
+.wx-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  max-width: 100%;
+}
+
+.wx-row--user {
+  flex-direction: row-reverse;
+}
+
+.wx-avatar {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.35rem;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, var(--wx-blue-light), var(--wx-blue-mid));
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 0.95rem;
+  color: var(--wx-blue);
+}
+
+.wx-row--user .wx-avatar {
+  background: linear-gradient(135deg, #d8e8ff, var(--wx-blue-mid));
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.wx-bubble {
+  position: relative;
+  max-width: calc(100% - 3rem);
+  padding: 0.62rem 0.75rem;
+  border-radius: 0.35rem;
+  font-size: 0.95rem;
+  line-height: 1.55;
   white-space: pre-wrap;
   word-break: break-word;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
 }
 
-.sec-bubble--user {
-  align-self: flex-end;
-  background: var(--user);
-  border: 1px solid var(--line);
-  font-family: system-ui, sans-serif;
+.wx-bubble--assistant {
+  background: var(--wx-assist-bubble);
+  color: var(--wx-ink);
 }
 
-.sec-bubble--assistant {
-  align-self: flex-start;
-  background: var(--assistant);
-  border: 1px solid var(--line);
+.wx-bubble--assistant::before {
+  content: "";
+  position: absolute;
+  left: -6px;
+  top: 12px;
+  border: 6px solid transparent;
+  border-right-color: var(--wx-assist-bubble);
 }
 
-.sec-bubble--pending {
-  opacity: 0.65;
+.wx-bubble--user {
+  background: var(--wx-user-bubble);
+  color: var(--wx-ink);
+}
+
+.wx-bubble--user::before {
+  content: "";
+  position: absolute;
+  right: -6px;
+  top: 12px;
+  border: 6px solid transparent;
+  border-left-color: var(--wx-user-bubble);
+}
+
+.wx-bubble--pending {
+  color: var(--wx-muted);
   font-style: italic;
-  color: var(--muted);
 }
 
-.sec-bubble--error {
+.wx-bubble--error {
+  background: #fff3f0;
+  color: #b33;
   align-self: center;
-  color: #8b4513;
-  background: #faf3eb;
-  border-color: rgba(139, 69, 19, 0.15);
-  font-family: system-ui, sans-serif;
-  font-size: 0.85rem;
+  max-width: 90%;
+  font-size: 0.82rem;
 }
 
-.sec-footer {
-  border-top: 1px solid var(--line);
-  padding-top: 0.75rem;
+.wx-bubble--error::before { display: none; }
+
+.wx-welcome {
+  align-self: center;
+  text-align: center;
+  max-width: 18rem;
+  color: var(--wx-muted);
+  font-size: 0.82rem;
+  line-height: 1.65;
+  padding: 1rem 0.5rem;
 }
 
-.sec-form {
+.wx-bar {
+  flex-shrink: 0;
+  background: #f7f7f7;
+  border-top: 0.5px solid var(--wx-line);
+  padding: 0.45rem 0.5rem calc(0.45rem + env(safe-area-inset-bottom));
+}
+
+.wx-input-row {
   display: flex;
-  gap: 0.5rem;
   align-items: flex-end;
+  gap: 0.35rem;
 }
 
-.sec-form textarea {
-  flex: 1;
-  resize: none;
-  border: 1px solid var(--line);
-  border-radius: 1rem;
-  padding: 0.75rem 1rem;
-  font: 0.95rem/1.5 system-ui, sans-serif;
-  background: rgba(255, 255, 255, 0.55);
-  color: var(--ink);
-  max-height: 140px;
-}
-
-.sec-form textarea:focus {
-  outline: none;
-  border-color: rgba(92, 111, 130, 0.35);
-}
-
-.sec-form button {
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: var(--accent);
-  color: #fff;
-  font-size: 1.1rem;
-  cursor: pointer;
+.wx-tool-btn {
+  width: 2rem;
+  height: 2.25rem;
+  border: none;
+  background: transparent;
+  font-size: 1.15rem;
+  opacity: 0.45;
   flex-shrink: 0;
 }
 
-.sec-form button:disabled {
+.wx-input-wrap {
+  flex: 1;
+  background: #fff;
+  border: 0.5px solid var(--wx-line);
+  border-radius: 0.35rem;
+  min-height: 2.25rem;
+  display: flex;
+  align-items: center;
+}
+
+.wx-input-wrap textarea {
+  width: 100%;
+  border: none;
+  resize: none;
+  background: transparent;
+  padding: 0.45rem 0.55rem;
+  font: 0.95rem/1.45 -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+  color: var(--wx-ink);
+  max-height: 120px;
+}
+
+.wx-input-wrap textarea:focus { outline: none; }
+
+.wx-send {
+  border: none;
+  background: var(--wx-blue);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 500;
+  padding: 0 0.75rem;
+  height: 2.25rem;
+  border-radius: 0.35rem;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.wx-send:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
 
-.sec-hint {
-  margin: 0.45rem 0 0;
-  text-align: center;
-  font-size: 0.72rem;
-  color: var(--muted);
-  font-family: system-ui, sans-serif;
+@media (prefers-color-scheme: dark) {
+  :root {
+    --wx-bg: #111;
+    --wx-nav: #1a1a1a;
+    --wx-ink: #e8e8e8;
+    --wx-muted: #999;
+    --wx-assist-bubble: #2a2a2a;
+    --wx-line: rgba(255, 255, 255, 0.08);
+  }
+
+  .wx-bar { background: #1a1a1a; }
+  .wx-input-wrap { background: #2a2a2a; }
+  .wx-bubble--assistant::before { border-right-color: #2a2a2a; }
 }

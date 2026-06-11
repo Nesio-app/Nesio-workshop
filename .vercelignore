@@ -15,6 +15,9 @@ questionbank-ios/
 reading-ios/
 storage-ios/
 weaver-ai/
+treasurebox-ios/ios/
+treasurebox-ios/node_modules/
+treasurebox-ios/www/
 Project 1/
 **/.git/
 **/.env*

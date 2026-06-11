@@ -2,38 +2,42 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="theme-color" content="#f3f1ec">
-  <title>AI 私人秘书 · 宝盒</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#588ce3">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>AI 私人秘书</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="sec-shell">
-    <header class="sec-header">
-      <a class="sec-back" href="../">← 庭院</a>
-      <div class="sec-title-wrap">
-        <p class="sec-eyebrow">宝盒 · 幕僚</p>
-        <h1 class="sec-title">AI 私人秘书</h1>
-      </div>
-      <button type="button" class="sec-clear" id="btnClear" title="清空对话">清空</button>
+  <div class="wx-app">
+    <header class="wx-nav">
+      <a class="wx-nav-back" href="../" aria-label="返回">‹</a>
+      <h1 class="wx-nav-title">AI 私人秘书</h1>
+      <button type="button" class="wx-nav-more" id="btnClear" aria-label="清空对话">···</button>
     </header>
 
-    <main class="sec-main" id="chatMain" aria-live="polite"></main>
+    <main class="wx-chat" id="chatMain" aria-live="polite"></main>
 
-    <footer class="sec-footer">
-      <form class="sec-form" id="chatForm">
-        <textarea
-          id="chatInput"
-          rows="1"
-          placeholder="说说此刻想理清的事…"
-          autocomplete="off"
-          maxlength="4000"
-        ></textarea>
-        <button type="submit" id="btnSend" aria-label="发送">↑</button>
+    <footer class="wx-bar">
+      <form class="wx-input-row" id="chatForm">
+        <button type="button" class="wx-tool-btn" aria-hidden="true" tabindex="-1">🎤</button>
+        <div class="wx-input-wrap">
+          <textarea
+            id="chatInput"
+            rows="1"
+            placeholder="发消息…"
+            autocomplete="off"
+            maxlength="4000"
+            enterkeyhint="send"
+          ></textarea>
+        </div>
+        <button type="button" class="wx-tool-btn" aria-hidden="true" tabindex="-1">☺</button>
+        <button type="submit" class="wx-send" id="btnSend" aria-label="发送">发送</button>
       </form>
-      <p class="sec-hint">Enter 发送 · Shift+Enter 换行</p>
     </footer>
   </div>
+  <script src="config.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

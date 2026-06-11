@@ -70,7 +70,12 @@ export default function Portal() {
       const tool = config.tools.find((item) => item.hotkey === key && item.ready);
       if (tool) {
         event.preventDefault();
-        window.location.href = withBase(tool.url);
+        const href = withBase(tool.url);
+        if (href.startsWith('http')) {
+          window.open(href, '_blank', 'noopener,noreferrer');
+        } else {
+          window.location.href = href;
+        }
       }
     };
 

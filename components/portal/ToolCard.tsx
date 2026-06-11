@@ -8,15 +8,25 @@ interface ToolCardProps {
   zone: PortalZone;
 }
 
+function isExternalUrl(url: string): boolean {
+  return url.startsWith('http://') || url.startsWith('https://');
+}
+
 export default function ToolCard({ tool, zone }: ToolCardProps) {
   const href = tool.ready ? withBase(tool.url) : undefined;
+  const external = href ? isExternalUrl(href) : false;
   const breathe = zone.tone === 'warm' && tool.id === 'psychoanalysis';
+  const iconSrc = tool.iconUrl ? withBase(tool.iconUrl) : null;
 
   const content = (
     <>
       <div className="portal-card-top">
         <span className="portal-card-icon" aria-hidden>
-          {tool.icon}
+          {iconSrc ? (
+            <img className="portal-card-icon-img" src={iconSrc} alt="" width={28} height={28} />
+          ) : (
+            tool.icon
+          )}
         </span>
         {!tool.ready && <span className="portal-card-badge">筹备中</span>}
       </div>
@@ -29,7 +39,9 @@ export default function ToolCard({ tool, zone }: ToolCardProps) {
         <span className="portal-card-hotkey">
           <kbd>{tool.hotkey.toUpperCase()}</kbd>
         </span>
-        {tool.ready && <span className="portal-card-enter">进入 →</span>}
+        {tool.ready && (
+          <span className="portal-card-enter">{external ? '打开 ↗' : '进入 →'}</span>
+        )}
       </div>
     </>
   );
@@ -53,7 +65,11 @@ export default function ToolCard({ tool, zone }: ToolCardProps) {
   }
 
   return (
-    <a href={href} className={className}>
+    <a
+      href={href}
+      className={className}
+      {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+    >
       {content}
     </a>
   );
