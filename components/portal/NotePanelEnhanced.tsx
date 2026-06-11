@@ -42,7 +42,7 @@ function tryFlomoScheme(content: string, imageUrls: string[]) {
 
 function extractTags(content: string): string[] {
   const tagMatches = content.match(/#[\w\u4e00-\u9fff]+/g) || [];
-  return [...new Set(tagMatches)];
+  return Array.from(new Set(tagMatches));
 }
 
 function loadNotes(): Note[] {
