@@ -1,4 +1,13 @@
-const { withRoot, esc, toast, loadFriends, memberById, getGroups } = window.WxCommon;
+const {
+  withRoot,
+  esc,
+  toast,
+  loadFriends,
+  memberById,
+  getGroups,
+  saveNoteEntry,
+  loadFavoriteQuotes,
+} = window.WxCommon;
 
 const params = new URLSearchParams(location.search);
 const groupId = params.get('group');
@@ -192,11 +201,47 @@ function resizeInput() {
   input.style.height = Math.min(input.scrollHeight, 120) + 'px';
 }
 
+const pickPhoto = document.getElementById('pickPhoto');
+const pickFile = document.getElementById('pickFile');
+
 const attach = window.WxAttach.mountAttachSheet(
   document.getElementById('attachSheet'),
   document.getElementById('attachMask'),
   document.getElementById('attachGrid'),
+  {
+    photo: () => pickPhoto.click(),
+    file: () => pickFile.click(),
+    voice: () => toast('按住左侧麦克风说话'),
+    note: () => {
+      const text = input.value.trim() || prompt('写入 Note 的内容');
+      if (!text) return;
+      if (saveNoteEntry('chat', text, navTitle.textContent)) toast('已存入 Note');
+    },
+    favorite: () => {
+      const favs = loadFavoriteQuotes();
+      if (!favs.length) return toast('暂无收藏');
+      input.value = favs[0];
+      input.dispatchEvent(new Event('input'));
+    },
+    call: () => toast('语音通话功能开发中'),
+    video: () => toast('视频功能开发中'),
+    location: () => toast('位置功能开发中'),
+  },
 );
+
+pickPhoto?.addEventListener('change', async () => {
+  const file = pickPhoto.files?.[0];
+  pickPhoto.value = '';
+  if (!file) return;
+  await sendMessage(`[图片] ${file.name}`);
+});
+
+pickFile?.addEventListener('change', async () => {
+  const file = pickFile.files?.[0];
+  pickFile.value = '';
+  if (!file) return;
+  await sendMessage(`[文件] ${file.name}`);
+});
 
 form.addEventListener('submit', (e) => {
   e.preventDefault();
@@ -224,7 +269,7 @@ btnClear.addEventListener('click', () => {
 });
 
 btnPlus.addEventListener('click', () => attach.open());
-window.WxVoice.createVoiceInput(input, btnMic);
+window.WxVoice.createVoiceInput(input, btnMic, { holdToTalk: true });
 
 loadFriends()
   .then((friends) => {

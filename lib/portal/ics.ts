@@ -67,7 +67,7 @@ export function parseIcsEvents(icsText: string, limit = 12, calendarName = ''): 
   const flat = unfoldIcs(icsText);
   const blocks = flat.split('BEGIN:VEVENT').slice(1);
   const now = Date.now();
-  const horizon = now + 14 * 24 * 60 * 60 * 1000;
+  const horizon = now + 30 * 24 * 60 * 60 * 1000;
 
   const events = blocks
     .map((chunk) => eventFromBlock(chunk.split('END:VEVENT')[0] || '', calName))

@@ -91,6 +91,7 @@ html, body {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   background: var(--wx-list-bg);
+  padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
 }
 
 .wx-row-item {

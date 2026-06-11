@@ -17,6 +17,10 @@ const groupMask = document.getElementById('groupMask');
 const groupPick = document.getElementById('groupPick');
 const btnStartGroup = document.getElementById('btnStartGroup');
 const btnCreateGroup = document.getElementById('btnCreateGroup');
+const chatDock = document.getElementById('chatDock');
+const dockFab = document.getElementById('dockFab');
+const dockHandle = document.getElementById('dockHandle');
+const dockActions = document.getElementById('dockActions');
 let friends = [];
 let pickedIds = new Set();
 
@@ -119,6 +123,56 @@ function renderGroupPick() {
   }
 }
 
+function renderDockActions() {
+  dockActions.innerHTML = '';
+  const actions = [
+    { label: '发起群聊', icon: '👥', fn: () => openGroupSheet() },
+    { label: 'Gemini', icon: '✦', href: '/secretary/chat.html?friend=gemini' },
+    { label: '返回宝盒', icon: '盒', href: '../' },
+  ];
+  for (const a of actions) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'wx-dock-action';
+    btn.innerHTML = `<span>${a.icon}</span><span>${a.label}</span>`;
+    btn.addEventListener('click', () => {
+      if (a.href) location.href = a.href;
+      else if (a.fn) a.fn();
+      setDockOpen(false);
+    });
+    dockActions.appendChild(btn);
+  }
+  for (const f of friends.filter((x) => x.ready).slice(0, 4)) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'wx-dock-action';
+    btn.innerHTML = `<img src="${withRoot(f.logo)}" alt="" width="28" height="28" /><span>${f.name}</span>`;
+    btn.addEventListener('click', () => {
+      location.href = `/secretary/chat.html?friend=${encodeURIComponent(f.id)}`;
+    });
+    dockActions.appendChild(btn);
+  }
+}
+
+function setDockOpen(open) {
+  chatDock.dataset.open = open ? 'true' : 'false';
+}
+
+function setupDock() {
+  let startY = 0;
+  const toggle = () => setDockOpen(chatDock.dataset.open !== 'true');
+  dockFab.addEventListener('click', toggle);
+  dockHandle.addEventListener('click', toggle);
+  dockFab.addEventListener('touchstart', (e) => {
+    startY = e.touches[0].clientY;
+  }, { passive: true });
+  dockFab.addEventListener('touchend', (e) => {
+    const dy = startY - e.changedTouches[0].clientY;
+    if (dy > 40) setDockOpen(true);
+    else if (dy < -40) setDockOpen(false);
+  }, { passive: true });
+}
+
 async function loadTools() {
   try {
     const res = await fetch('/portal-config.json');
@@ -183,6 +237,8 @@ loadFriends()
   .then((data) => {
     friends = data;
     renderList();
+    renderDockActions();
+    setupDock();
   })
   .catch(() => {
     listEl.innerHTML = '<p class="wx-empty">无法加载好友列表</p>';

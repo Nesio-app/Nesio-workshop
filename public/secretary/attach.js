@@ -1,6 +1,5 @@
 const ATTACH_ITEMS = [
   { id: 'photo', label: '照片', icon: '🖼' },
-  { id: 'camera', label: '拍摄', icon: '📷' },
   { id: 'file', label: '文件', icon: '📎' },
   { id: 'voice', label: '语音', icon: '🎙' },
   { id: 'video', label: '视频', icon: '🎬' },
@@ -10,7 +9,7 @@ const ATTACH_ITEMS = [
   { id: 'location', label: '位置', icon: '📍' },
 ];
 
-function mountAttachSheet(sheetEl, maskEl, gridEl, onPick) {
+function mountAttachSheet(sheetEl, maskEl, gridEl, handlers = {}) {
   gridEl.innerHTML = '';
   for (const item of ATTACH_ITEMS) {
     const btn = document.createElement('button');
@@ -18,8 +17,9 @@ function mountAttachSheet(sheetEl, maskEl, gridEl, onPick) {
     btn.className = 'wx-sheet-tool';
     btn.innerHTML = `<span>${item.icon}</span><span>${item.label}</span>`;
     btn.addEventListener('click', () => {
-      if (onPick) onPick(item);
-      else window.WxCommon?.toast(`${item.label} 功能即将上线`);
+      const fn = handlers[item.id];
+      if (typeof fn === 'function') fn(item);
+      else window.WxCommon?.toast(`${item.label} 即将上线`);
       close();
     });
     gridEl.appendChild(btn);

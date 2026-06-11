@@ -72,6 +72,36 @@ function memberById(friends, id) {
   return friends.find((f) => f.id === id);
 }
 
+function saveNoteEntry(kind, content, title, attachments) {
+  try {
+    const raw = localStorage.getItem('treasurebox-notes');
+    const list = raw ? JSON.parse(raw) : [];
+    const notes = Array.isArray(list) ? list : [];
+    notes.unshift({
+      id: 'note-' + Date.now(),
+      kind: kind || 'note',
+      title: title || '智友',
+      content: content || '',
+      attachments: attachments || undefined,
+      createdAt: new Date().toISOString(),
+    });
+    localStorage.setItem('treasurebox-notes', JSON.stringify(notes.slice(0, 200)));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function loadFavoriteQuotes() {
+  try {
+    const raw = localStorage.getItem('treasurebox-favorite-quotes');
+    const list = raw ? JSON.parse(raw) : [];
+    return Array.isArray(list) ? list.filter(Boolean) : [];
+  } catch {
+    return [];
+  }
+}
+
 window.WxCommon = {
   withRoot,
   esc,
@@ -82,4 +112,6 @@ window.WxCommon = {
   addGroup,
   groupKey,
   memberById,
+  saveNoteEntry,
+  loadFavoriteQuotes,
 };

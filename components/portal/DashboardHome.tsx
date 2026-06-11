@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { pickFreshQuote } from '@/lib/portal/quotes';
 import Link from 'next/link';
+import { formatLunarLine, nextHolidayLine } from '@/lib/portal/almanac';
+import { pickFreshQuote } from '@/lib/portal/quotes';
 import type { CalendarEvent, PortalConfig, PortalTool } from '@/lib/portal/types';
 import { greetingForHour } from '@/lib/portal/greeting';
 import {
@@ -19,7 +20,6 @@ interface DashboardHomeProps {
   onOpenTool: (tool: PortalTool) => void;
 }
 
-const AVATAR_KEY = 'treasurebox-profile-avatar';
 const FAV_QUOTES_KEY = 'treasurebox-favorite-quotes';
 
 interface WeatherState {
@@ -76,7 +76,6 @@ export default function DashboardHome({
     timezone: 'Asia/Shanghai',
   };
 
-  const fileRef = useRef<HTMLInputElement>(null);
   const [now, setNow] = useState(() => new Date());
   const [avatarUrl, setAvatarUrl] = useState('');
   const [weather, setWeather] = useState<WeatherState>({ loading: true });
@@ -86,9 +85,12 @@ export default function DashboardHome({
   const [dailyQuote, setDailyQuote] = useState('今天也要好好照顾自己。');
   const [quoteSaved, setQuoteSaved] = useState(false);
 
+  const lunarLine = useMemo(() => formatLunarLine(now), [now]);
+  const holidayLine = useMemo(() => nextHolidayLine(now), [now]);
+
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(AVATAR_KEY);
+      const saved = localStorage.getItem('treasurebox-profile-avatar');
       if (saved) setAvatarUrl(saved);
       else if (profile.avatarUrl) setAvatarUrl(profile.avatarUrl);
     } catch { /* ignore */ }
@@ -196,33 +198,13 @@ export default function DashboardHome({
     } catch { /* ignore */ }
   };
 
-  const onAvatarPick = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !file.type.startsWith('image/')) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const data = String(reader.result || '');
-      if (data.length > 2_800_000) return;
-      setAvatarUrl(data);
-      try {
-        localStorage.setItem(AVATAR_KEY, data);
-      } catch { /* ignore */ }
-    };
-    reader.readAsDataURL(file);
-    e.target.value = '';
-  };
-
   const quoteLine = useMemo(() => dailyQuote, [dailyQuote]);
+  const cityName = weather.placeName || simplifyPlaceName(fallbackLocation.city);
 
   return (
     <div className="portal-dash">
       <header className="portal-dash-hero">
-        <button
-          type="button"
-          className="portal-avatar-upload"
-          onClick={() => fileRef.current?.click()}
-          aria-label="上传头像"
-        >
+        <Link className="portal-avatar-link" href="/portfolio" aria-label="关于我">
           {displayAvatar ? (
             <img className="portal-dash-avatar" src={displayAvatar} alt="" width={48} height={48} />
           ) : (
@@ -230,15 +212,7 @@ export default function DashboardHome({
               {initials(profile.displayName)}
             </div>
           )}
-          <span className="portal-avatar-upload-hint">换照片</span>
-        </button>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          className="portal-avatar-file"
-          onChange={onAvatarPick}
-        />
+        </Link>
 
         <p className="portal-dash-greeting">
           {greeting}，{profile.displayName}
@@ -276,22 +250,20 @@ export default function DashboardHome({
 
       <section className="portal-widgets" aria-label="概览">
         <article className="portal-widget portal-widget--clock">
-          <p className="portal-widget-label">时间</p>
           <p className="portal-widget-clock">{formatClock(now)}</p>
           <p className="portal-widget-date">{formatDateLine(now)}</p>
+          {lunarLine ? <p className="portal-widget-extra">{lunarLine}</p> : null}
+          {holidayLine ? <p className="portal-widget-extra portal-widget-extra--holiday">{holidayLine}</p> : null}
         </article>
 
         <article className="portal-widget portal-widget--weather">
-          <p className="portal-widget-label">
-            天气
-            {weather.placeName ? ` · ${weather.placeName}` : ''}
-          </p>
           {weather.loading ? (
-            <p className="portal-widget-muted">定位与天气加载中…</p>
+            <p className="portal-widget-muted">加载中…</p>
           ) : weather.error ? (
             <p className="portal-widget-muted">暂无数据</p>
           ) : (
             <>
+              <p className="portal-widget-city">{cityName}</p>
               <p className="portal-widget-temp">
                 {Math.round(weather.temperature ?? 0)}
                 <span>{weather.unit || '°C'}</span>
@@ -323,6 +295,9 @@ export default function DashboardHome({
                   <span className="portal-calendar-title">{ev.title}</span>
                   <span className="portal-calendar-time">{formatEventTime(ev)}</span>
                 </p>
+                {ev.source ? (
+                  <span className="portal-calendar-source">{ev.source}</span>
+                ) : null}
               </li>
             ))}
           </ul>

@@ -5,7 +5,7 @@
     "company": "Google",
     "tagline": "Google · 已连接",
     "ready": true,
-    "logo": "https://upload.wikimedia.org/wikipedia/commons/8/8a/Google_Gemini_logo.svg",
+    "logo": "/secretary/logos/gemini.svg",
     "preview": "我是你的幕僚，可以帮你理清待办与优先级。"
   },
   {
@@ -14,7 +14,7 @@
     "company": "Anthropic",
     "tagline": "Anthropic · 即将接入",
     "ready": false,
-    "logo": "https://upload.wikimedia.org/wikipedia/commons/7/78/Anthropic_logo.svg",
+    "logo": "/secretary/logos/claude.svg",
     "preview": "后续将接入 Claude API。"
   },
   {
@@ -23,7 +23,7 @@
     "company": "OpenAI",
     "tagline": "OpenAI · 即将接入",
     "ready": false,
-    "logo": "https://upload.wikimedia.org/wikipedia/commons/4/4d/OpenAI_Logo.svg",
+    "logo": "/secretary/logos/chatgpt.svg",
     "preview": "后续将接入 OpenAI API。"
   },
   {
@@ -32,7 +32,7 @@
     "company": "字节跳动",
     "tagline": "字节跳动 · 即将接入",
     "ready": false,
-    "logo": "https://lf-flow-web-cdn.doubao.com/obj/flow-doubao/doubao/logo-doubao-overflow.png",
+    "logo": "/secretary/logos/doubao.svg",
     "preview": "后续将接入豆包 API。"
   },
   {
@@ -41,7 +41,7 @@
     "company": "深度求索",
     "tagline": "深度求索 · 即将接入",
     "ready": false,
-    "logo": "https://avatars.githubusercontent.com/u/148330874?s=200&v=4",
+    "logo": "/secretary/logos/deepseek.svg",
     "preview": "后续将接入 DeepSeek API。"
   },
   {
@@ -50,7 +50,7 @@
     "company": "xAI",
     "tagline": "xAI · 即将接入",
     "ready": false,
-    "logo": "https://upload.wikimedia.org/wikipedia/commons/5/57/X_logo_2023_original.svg",
+    "logo": "/secretary/logos/grok.svg",
     "preview": "后续将接入 Grok API。"
   }
 ]

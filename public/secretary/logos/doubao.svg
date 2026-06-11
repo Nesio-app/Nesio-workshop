@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Doubao">
+  <rect width="64" height="64" rx="14" fill="#3b82f6"/>
+  <circle cx="32" cy="28" r="10" fill="#fff"/>
+  <path fill="#fff" d="M18 46c4-8 9-12 14-12s10 4 14 12H18z"/>
+</svg>

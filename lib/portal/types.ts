@@ -53,4 +53,5 @@ export interface CalendarEvent {
   end?: string;
   allDay?: boolean;
   calendarName?: string;
+  source?: string;
 }

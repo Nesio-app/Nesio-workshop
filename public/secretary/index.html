@@ -21,6 +21,15 @@
 
   <main class="wx-list" id="friendList" aria-label="AI 好友"></main>
 
+  <div class="wx-dock" id="chatDock" data-open="false">
+    <div class="wx-dock-handle" id="dockHandle" aria-hidden></div>
+    <div class="wx-dock-panel" id="dockPanel">
+      <p class="wx-dock-title">快速聊天</p>
+      <div class="wx-dock-actions" id="dockActions"></div>
+    </div>
+    <button type="button" class="wx-dock-fab" id="dockFab" aria-label="上滑打开聊天">💬</button>
+  </div>
+
   <nav class="wx-tabbar" aria-label="底部导航">
     <a class="wx-tab wx-tab--on" href="/secretary/"><span>智友</span></a>
     <a class="wx-tab" href="../"><span>宝盒</span></a>

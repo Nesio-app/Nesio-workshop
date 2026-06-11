@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import DashboardHome from './DashboardHome';
 import NotePanel from './NotePanel';
-import PortalQuickChat from './PortalQuickChat';
 import ToolFrame from './ToolFrame';
 import { DEFAULT_PORTAL_CONFIG } from '@/lib/portal/defaults';
 import { openToolHref, toolNeedsFullPage } from '@/lib/portal/open-tool';
@@ -94,7 +93,6 @@ export default function Portal() {
         </div>
       </div>
 
-      <PortalQuickChat />
       <NotePanel open={noteOpen} onOpenChange={setNoteOpen} />
     </div>
   );

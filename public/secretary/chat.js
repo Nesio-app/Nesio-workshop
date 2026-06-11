@@ -1,4 +1,12 @@
-const { withRoot, esc, toast, loadFriends, memberById } = window.WxCommon;
+const {
+  withRoot,
+  esc,
+  toast,
+  loadFriends,
+  memberById,
+  saveNoteEntry,
+  loadFavoriteQuotes,
+} = window.WxCommon;
 
 const params = new URLSearchParams(location.search);
 const friendId = params.get('friend') || 'gemini';
@@ -143,10 +151,105 @@ function resizeInput() {
   input.style.height = Math.min(input.scrollHeight, 120) + 'px';
 }
 
+const pickPhoto = document.getElementById('pickPhoto');
+const pickFile = document.getElementById('pickFile');
+const pickVideo = document.getElementById('pickVideo');
+
+function readFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+async function sendAttachmentMessage(label, extra) {
+  const text = `[${label}]${extra ? ' ' + extra : ''}`;
+  await sendMessage(text);
+}
+
+const attachHandlers = {
+  photo: () => pickPhoto.click(),
+  file: () => pickFile.click(),
+  video: () => pickVideo.click(),
+  voice: () => toast('按住左侧麦克风说话'),
+  call: () => toast('语音通话功能开发中'),
+  note: () => {
+    const text = input.value.trim() || prompt('写入 Note 的内容');
+    if (!text) return;
+    if (saveNoteEntry('chat', text, friend?.name || '智友')) toast('已存入 Note');
+    else toast('保存失败');
+  },
+  favorite: () => {
+    const favs = loadFavoriteQuotes();
+    if (!favs.length) {
+      toast('暂无收藏，可在宝盒首页点 ☆ 收藏语录');
+      return;
+    }
+    const pick = favs[0];
+    input.value = pick;
+    input.dispatchEvent(new Event('input'));
+    toast('已插入收藏语录');
+  },
+  location: () => {
+    if (!navigator.geolocation) {
+      toast('无法获取位置');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        input.value = `位置：${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+        input.dispatchEvent(new Event('input'));
+      },
+      () => toast('定位被拒绝'),
+    );
+  },
+};
+
+pickPhoto.addEventListener('change', async () => {
+  const file = pickPhoto.files?.[0];
+  pickPhoto.value = '';
+  if (!file) return;
+  if (file.size > 2_800_000) {
+    toast('图片过大');
+    return;
+  }
+  const data = await readFile(file);
+  saveNoteEntry('image', file.name, friend?.name, [{ type: 'image', url: data, name: file.name }]);
+  await sendAttachmentMessage('图片', file.name);
+});
+
+pickFile.addEventListener('change', async () => {
+  const file = pickFile.files?.[0];
+  pickFile.value = '';
+  if (!file) return;
+  if (file.size > 2_800_000) {
+    toast('文件过大');
+    return;
+  }
+  const data = await readFile(file);
+  saveNoteEntry('file', file.name, friend?.name, [{ type: 'file', url: data, name: file.name }]);
+  await sendAttachmentMessage('文件', file.name);
+});
+
+pickVideo.addEventListener('change', async () => {
+  const file = pickVideo.files?.[0];
+  pickVideo.value = '';
+  if (!file) return;
+  if (file.size > 5_000_000) {
+    toast('视频过大');
+    return;
+  }
+  await sendAttachmentMessage('视频', file.name);
+});
+
 const attach = window.WxAttach.mountAttachSheet(
   document.getElementById('attachSheet'),
   document.getElementById('attachMask'),
   document.getElementById('attachGrid'),
+  attachHandlers,
 );
 
 form.addEventListener('submit', (e) => {
@@ -176,7 +279,7 @@ btnClear.addEventListener('click', () => {
 
 btnPlus.addEventListener('click', () => attach.open());
 
-window.WxVoice.createVoiceInput(input, btnMic);
+window.WxVoice.createVoiceInput(input, btnMic, { holdToTalk: true });
 
 Promise.all([loadFriends(), checkSecretaryHealth()])
   .then(([friends, health]) => {

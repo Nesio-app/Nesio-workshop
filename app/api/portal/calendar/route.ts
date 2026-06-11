@@ -1,67 +1,77 @@
 import { NextResponse } from 'next/server';
 import { mergeCalendarEvents } from '@/lib/portal/calendar-filters';
-import { parseIcsEvents } from '@/lib/portal/ics';
+import { parseIcsEvents, parseCalendarName } from '@/lib/portal/ics';
 
-function calendarUrls(): string[] {
-  const urls: string[] = [];
-  const add = (raw?: string) => {
+type Feed = { url: string; label: string };
+
+function calendarFeeds(): Feed[] {
+  const feeds: Feed[] = [];
+  const add = (raw: string | undefined, label: string) => {
     const v = raw?.trim();
-    if (v && !urls.includes(v)) urls.push(v);
+    if (!v) return;
+    if (feeds.some((f) => f.url === v)) return;
+    feeds.push({ url: v, label });
   };
 
-  add(process.env.GOOGLE_CALENDAR_ICAL_URL);
-  add(process.env.GOOGLE_CALENDAR_ICS_URL);
-  add(process.env.FIDELITY);
-  add(process.env.FIDELITY_ICAL_URL);
-  add(process.env.FIDELITY_CALENDAR_ICAL_URL);
-  add(process.env.GOOGLE_CALENDAR_FIDELITY_ICAL_URL);
+  add(process.env.GOOGLE_CALENDAR_ICAL_URL, 'Google');
+  add(process.env.GOOGLE_CALENDAR_ICS_URL, 'Google');
+  add(process.env.FIDELITY, 'Fidelity');
+  add(process.env.FIDELITY_ICAL_URL, 'Fidelity');
+  add(process.env.FIDELITY_CALENDAR_ICAL_URL, 'Fidelity');
+  add(process.env.GOOGLE_CALENDAR_FIDELITY_ICAL_URL, 'Fidelity');
 
   const multi =
     process.env.CALENDAR_ICAL_URLS?.trim() ||
     process.env.GOOGLE_CALENDAR_ICAL_URLS?.trim();
   if (multi) {
-    for (const part of multi.split(',')) add(part);
+    multi.split(',').forEach((part, i) => add(part, `Calendar ${i + 1}`));
   }
 
-  return urls;
+  return feeds;
 }
 
-async function fetchIcsEvents(url: string) {
+async function fetchIcsEvents(url: string, fallbackLabel: string) {
   const res = await fetch(url, {
     headers: { 'User-Agent': 'TreasureBox/1.0' },
     next: { revalidate: 300 },
   });
   if (!res.ok) throw new Error(`fetch failed: ${res.status}`);
   const text = await res.text();
-  return parseIcsEvents(text, 40);
+  const calName = parseCalendarName(text) || fallbackLabel;
+  const events = parseIcsEvents(text, 60, calName);
+  return events.map((ev) => ({
+    ...ev,
+    calendarName: ev.calendarName || calName,
+    source: fallbackLabel,
+  }));
 }
 
 export async function GET() {
-  const urls = calendarUrls();
+  const feeds = calendarFeeds();
 
-  if (urls.length === 0) {
+  if (feeds.length === 0) {
     return NextResponse.json({
       ok: false,
       configured: false,
       events: [],
-      message: 'Set GOOGLE_CALENDAR_ICAL_URL on Vercel to sync calendars.',
+      message: 'Set GOOGLE_CALENDAR_ICAL_URL and FIDELITY on Vercel.',
     });
   }
 
   try {
     const lists = await Promise.all(
-      urls.map((url) =>
-        fetchIcsEvents(url).catch(() => [] as Awaited<ReturnType<typeof parseIcsEvents>>),
+      feeds.map((feed) =>
+        fetchIcsEvents(feed.url, feed.label).catch(() => []),
       ),
     );
 
-    const events = mergeCalendarEvents(lists, 3);
+    const events = mergeCalendarEvents(lists, 5);
 
     return NextResponse.json({
       ok: true,
       configured: true,
       events,
-      sources: urls.length,
+      sources: feeds.map((f) => f.label),
       fetchedAt: new Date().toISOString(),
     });
   } catch {

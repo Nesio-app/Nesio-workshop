@@ -1,4 +1,11 @@
-export type NoteKind = 'quote' | 'chat' | 'note' | 'misc';
+export type NoteKind = 'quote' | 'chat' | 'note' | 'link' | 'image' | 'file' | 'misc';
+
+export type NoteAttachment = {
+  type: 'link' | 'image' | 'file';
+  url: string;
+  name?: string;
+  mime?: string;
+};
 
 export interface TreasureNote {
   id: string;
@@ -6,6 +13,7 @@ export interface TreasureNote {
   title: string;
   content: string;
   createdAt: string;
+  attachments?: NoteAttachment[];
   readonly?: boolean;
 }
 
@@ -16,6 +24,9 @@ export const NOTE_KIND_LABELS: Record<NoteKind, string> = {
   quote: '语录',
   chat: '聊天',
   note: '随笔',
+  link: '链接',
+  image: '图片',
+  file: '文件',
   misc: '其他',
 };
 
@@ -59,7 +70,7 @@ export function loadAllNotes(): TreasureNote[] {
   const merged: TreasureNote[] = [];
 
   for (const note of [...favNotes, ...stored]) {
-    const key = `${note.kind}|${note.content}`;
+    const key = `${note.kind}|${note.content}|${note.attachments?.[0]?.url || ''}`;
     if (seen.has(key)) continue;
     seen.add(key);
     merged.push(note);
@@ -76,6 +87,7 @@ export function addNote(
   kind: NoteKind,
   content: string,
   title = '',
+  attachments?: NoteAttachment[],
 ): TreasureNote {
   const note: TreasureNote = {
     id: `note-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -83,6 +95,7 @@ export function addNote(
     title: title.trim() || NOTE_KIND_LABELS[kind],
     content: content.trim(),
     createdAt: new Date().toISOString(),
+    attachments: attachments?.length ? attachments : undefined,
   };
   const next = [note, ...loadStoredNotes()];
   saveStoredNotes(next);
@@ -98,7 +111,15 @@ export function searchNotes(notes: TreasureNote[], query: string): TreasureNote[
   const q = query.trim().toLowerCase();
   if (!q) return notes;
   return notes.filter((n) => {
-    const hay = `${n.title} ${n.content} ${NOTE_KIND_LABELS[n.kind]}`.toLowerCase();
+    const attachHay = (n.attachments || [])
+      .map((a) => `${a.name || ''} ${a.url}`)
+      .join(' ');
+    const hay =
+      `${n.title} ${n.content} ${attachHay} ${NOTE_KIND_LABELS[n.kind]}`.toLowerCase();
     return hay.includes(q);
   });
+}
+
+export function isUrl(text: string): boolean {
+  return /^https?:\/\//i.test(text.trim());
 }

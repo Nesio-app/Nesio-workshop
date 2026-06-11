@@ -21,6 +21,7 @@ export default function ToolGrid({ tools, onOpenTool }: ToolGridProps) {
               <button
                 type="button"
                 className="portal-tool-card"
+                data-zone={tool.zone}
                 onClick={() => onOpenTool(tool)}
                 title={tool.description}
               >

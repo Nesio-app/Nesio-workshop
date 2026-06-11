@@ -5,8 +5,10 @@ import {
   NOTE_KIND_LABELS,
   addNote,
   deleteNote,
+  isUrl,
   loadAllNotes,
   searchNotes,
+  type NoteAttachment,
   type NoteKind,
   type TreasureNote,
 } from '@/lib/portal/notes';
@@ -16,7 +18,25 @@ interface NotePanelProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const KINDS: Array<NoteKind | 'all'> = ['all', 'quote', 'chat', 'note', 'misc'];
+const KINDS: Array<NoteKind | 'all'> = [
+  'all',
+  'quote',
+  'note',
+  'link',
+  'image',
+  'file',
+  'chat',
+  'misc',
+];
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
 
 export default function NotePanel({ open, onOpenChange }: NotePanelProps) {
   const [query, setQuery] = useState('');
@@ -25,7 +45,10 @@ export default function NotePanel({ open, onOpenChange }: NotePanelProps) {
   const [draftKind, setDraftKind] = useState<NoteKind>('note');
   const [draftTitle, setDraftTitle] = useState('');
   const [draftContent, setDraftContent] = useState('');
+  const [pendingAttach, setPendingAttach] = useState<NoteAttachment | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const imageRef = useRef<HTMLInputElement>(null);
 
   const refresh = () => setNotes(loadAllNotes());
 
@@ -44,16 +67,37 @@ export default function NotePanel({ open, onOpenChange }: NotePanelProps) {
   }, [notes, query, kind]);
 
   const onSave = () => {
-    if (!draftContent.trim()) return;
-    addNote(draftKind, draftContent, draftTitle);
+    const text = draftContent.trim();
+    const attach = pendingAttach ? [pendingAttach] : undefined;
+    if (!text && !attach?.length) return;
+
+    let saveKind = draftKind;
+    if (attach?.[0]?.type === 'image') saveKind = 'image';
+    if (attach?.[0]?.type === 'file') saveKind = 'file';
+    if (!attach?.length && isUrl(text)) saveKind = 'link';
+
+    addNote(saveKind, text || attach?.[0]?.name || attach?.[0]?.url || '', draftTitle, attach);
     setDraftTitle('');
     setDraftContent('');
+    setPendingAttach(null);
     refresh();
   };
 
   const onDelete = (id: string) => {
     deleteNote(id);
     refresh();
+  };
+
+  const onPickFile = async (file: File, type: 'image' | 'file') => {
+    if (file.size > 2_800_000) return;
+    const url = await readFileAsDataUrl(file);
+    setPendingAttach({
+      type,
+      url,
+      name: file.name,
+      mime: file.type,
+    });
+    if (!draftTitle) setDraftTitle(file.name);
   };
 
   if (!open) return null;
@@ -82,7 +126,7 @@ export default function NotePanel({ open, onOpenChange }: NotePanelProps) {
           <input
             ref={inputRef}
             type="search"
-            placeholder="搜索语录、聊天、随笔…"
+            placeholder="搜索文字、链接、文件名…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className="portal-note-input"
@@ -132,13 +176,54 @@ export default function NotePanel({ open, onOpenChange }: NotePanelProps) {
             />
           </div>
           <textarea
-            placeholder="写下内容…"
+            placeholder="文字、链接，或添加附件…"
             value={draftContent}
             onChange={(e) => setDraftContent(e.target.value)}
             className="portal-note-textarea"
             rows={3}
           />
-          <button type="submit" className="portal-note-save" disabled={!draftContent.trim()}>
+          <div className="portal-note-attach-row">
+            <button type="button" className="portal-note-attach-btn" onClick={() => imageRef.current?.click()}>
+              图片
+            </button>
+            <button type="button" className="portal-note-attach-btn" onClick={() => fileRef.current?.click()}>
+              文件
+            </button>
+            {pendingAttach ? (
+              <span className="portal-note-pending">
+                {pendingAttach.name || pendingAttach.type}
+                <button type="button" onClick={() => setPendingAttach(null)} aria-label="移除">
+                  ×
+                </button>
+              </span>
+            ) : null}
+          </div>
+          <input
+            ref={imageRef}
+            type="file"
+            accept="image/*"
+            className="portal-avatar-file"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) onPickFile(f, 'image');
+              e.target.value = '';
+            }}
+          />
+          <input
+            ref={fileRef}
+            type="file"
+            className="portal-avatar-file"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) onPickFile(f, 'file');
+              e.target.value = '';
+            }}
+          />
+          <button
+            type="submit"
+            className="portal-note-save"
+            disabled={!draftContent.trim() && !pendingAttach}
+          >
             保存
           </button>
         </form>
@@ -163,7 +248,32 @@ export default function NotePanel({ open, onOpenChange }: NotePanelProps) {
                     </button>
                   ) : null}
                 </div>
-                <p className="portal-note-item-body">{note.content}</p>
+                {note.content ? <p className="portal-note-item-body">{note.content}</p> : null}
+                {(note.attachments || []).map((a, i) => (
+                  <div key={i} className="portal-note-attachment">
+                    {a.type === 'image' ? (
+                      <img src={a.url} alt={a.name || ''} className="portal-note-thumb" />
+                    ) : a.type === 'link' || isUrl(a.url) ? (
+                      <a href={a.url} target="_blank" rel="noopener noreferrer">
+                        {a.name || a.url}
+                      </a>
+                    ) : (
+                      <a href={a.url} download={a.name}>
+                        {a.name || '附件'}
+                      </a>
+                    )}
+                  </div>
+                ))}
+                {note.kind === 'link' && isUrl(note.content) && !note.attachments?.length ? (
+                  <a
+                    className="portal-note-link"
+                    href={note.content}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    打开链接
+                  </a>
+                ) : null}
               </li>
             ))
           )}
