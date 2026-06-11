@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import DashboardHome from './DashboardHome';
-import NotePanel from './NotePanel';
+import NotePanelEnhanced from './NotePanelEnhanced';
 import ToolFrame from './ToolFrame';
 import { DEFAULT_PORTAL_CONFIG } from '@/lib/portal/defaults';
 import { openToolHref, toolNeedsFullPage } from '@/lib/portal/open-tool';
@@ -74,7 +74,7 @@ export default function Portal() {
       <div className="portal-root portal-root--tool">
         <div className="portal-grain" aria-hidden />
         <ToolFrame tool={activeTool} onClose={() => setActiveTool(null)} />
-        <NotePanel open={noteOpen} onOpenChange={setNoteOpen} />
+        <NotePanelEnhanced open={noteOpen} onOpenChange={setNoteOpen} />
       </div>
     );
   }
@@ -94,7 +94,7 @@ export default function Portal() {
         </div>
       </div>
 
-      <NotePanel open={noteOpen} onOpenChange={setNoteOpen} />
+      <NotePanelEnhanced open={noteOpen} onOpenChange={setNoteOpen} />
     </div>
   );
 }
