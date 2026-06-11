@@ -708,11 +708,26 @@ body {
 
 .portal-dash-greeting {
   margin: 0;
-  font-size: clamp(1.05rem, 4vw, 1.35rem);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+}
+
+.portal-dash-greeting-line {
+  margin: 0;
+  font-size: clamp(0.95rem, 3.6vw, 1.1rem);
+  font-weight: 500;
+  color: var(--portal-muted);
+  line-height: 1.2;
+}
+
+.portal-dash-greeting-name {
+  margin: 0;
+  font-size: clamp(1.15rem, 4.5vw, 1.45rem);
   font-weight: 600;
   letter-spacing: -0.02em;
-  line-height: 1.2;
-  min-width: 0;
+  line-height: 1.15;
 }
 
 .portal-quote {
@@ -831,12 +846,43 @@ body {
   color: var(--portal-blue-deep);
 }
 
+.portal-calendar-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.portal-calendar-meta {
+  margin: 0.15rem 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
 .portal-calendar-source {
-  display: block;
   font-size: 0.58rem;
   color: var(--portal-muted);
-  margin-left: 1.1rem;
-  margin-top: 0.1rem;
+}
+
+.portal-calendar-countdown {
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: var(--portal-blue-deep);
+  font-variant-numeric: tabular-nums;
+}
+
+.portal-calendar-more {
+  margin-top: 0.45rem;
+  width: 100%;
+  border: 1px dashed rgba(88, 140, 227, 0.35);
+  background: rgba(205, 222, 252, 0.35);
+  color: var(--portal-blue-deep);
+  border-radius: 0.65rem;
+  padding: 0.45rem 0.65rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .portal-note-attach-row {
@@ -950,7 +996,10 @@ body {
 }
 
 .portal-tool-emoji {
-  font-size: 1.25rem;
+  font-size: 1.2rem;
+  line-height: 1;
+  color: var(--portal-blue-deep);
+  filter: saturate(0.85);
 }
 
 .portal-tool-name {

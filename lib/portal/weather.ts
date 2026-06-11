@@ -41,7 +41,7 @@ export async function reverseGeocode(lat: number, lon: number): Promise<string> 
     const res = await fetch(url.toString());
     if (!res.ok) throw new Error('geo');
     const data = await res.json();
-    const place = data.locality || data.city || '';
+    const place = data.city || data.locality || '';
     return simplifyPlaceName(place);
   } catch {
     return '';

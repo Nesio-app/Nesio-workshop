@@ -63,6 +63,40 @@ function formatEventTime(event: CalendarEvent): string {
   return `${a} – ${end.toLocaleTimeString('zh-CN', opts)}`;
 }
 
+function formatEventCountdown(event: CalendarEvent, at: Date): string {
+  const start = new Date(event.start);
+  const endMs = event.end ? new Date(event.end).getTime() : start.getTime() + 3_600_000;
+
+  if (event.allDay) {
+    const startDay = new Date(start);
+    startDay.setHours(0, 0, 0, 0);
+    const today = new Date(at);
+    today.setHours(0, 0, 0, 0);
+    const days = Math.round((startDay.getTime() - today.getTime()) / 86_400_000);
+    if (days === 0) return '今天';
+    if (days === 1) return '明天';
+    if (days > 0) return `${days} 天后`;
+    return '进行中';
+  }
+
+  const diff = start.getTime() - at.getTime();
+  if (diff <= 0) {
+    if (at.getTime() < endMs) return '进行中';
+    return '已结束';
+  }
+
+  const mins = Math.ceil(diff / 60_000);
+  if (mins < 60) return `${mins} 分钟后`;
+  const hours = Math.floor(mins / 60);
+  const rem = mins % 60;
+  if (hours < 24) return rem > 0 ? `${hours} 小时 ${rem} 分后` : `${hours} 小时后`;
+  const days = Math.floor(hours / 24);
+  const h = hours % 24;
+  return h > 0 ? `${days} 天 ${h} 小时后` : `${days} 天后`;
+}
+
+const CALENDAR_PREVIEW = 5;
+
 export default function DashboardHome({
   config,
   onOpenNote,
@@ -80,6 +114,7 @@ export default function DashboardHome({
   const [avatarUrl, setAvatarUrl] = useState('');
   const [weather, setWeather] = useState<WeatherState>({ loading: true });
   const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [calendarExpanded, setCalendarExpanded] = useState(false);
   const [calendarNote, setCalendarNote] = useState<string | null>(null);
   const quotePicked = useRef(false);
   const [dailyQuote, setDailyQuote] = useState('今天也要好好照顾自己。');
@@ -200,6 +235,10 @@ export default function DashboardHome({
 
   const quoteLine = useMemo(() => dailyQuote, [dailyQuote]);
   const cityName = weather.placeName || simplifyPlaceName(fallbackLocation.city);
+  const visibleEvents = calendarExpanded
+    ? events
+    : events.slice(0, CALENDAR_PREVIEW);
+  const hasMoreEvents = events.length > CALENDAR_PREVIEW;
 
   return (
     <div className="portal-dash">
@@ -214,14 +253,12 @@ export default function DashboardHome({
           )}
         </Link>
 
-        <p className="portal-dash-greeting">
-          {greeting}，{profile.displayName}
-        </p>
+        <div className="portal-dash-greeting">
+          <p className="portal-dash-greeting-line">{greeting}</p>
+          <p className="portal-dash-greeting-name">{profile.displayName}</p>
+        </div>
 
         <div className="portal-dash-hero-end">
-          <Link className="portal-dash-toplink-inline" href="/portfolio">
-            关于我
-          </Link>
           <button
             type="button"
             className="portal-search-btn portal-search-btn--inline"
@@ -288,20 +325,36 @@ export default function DashboardHome({
           </p>
         ) : (
           <ul className="portal-calendar-list">
-            {events.map((ev) => (
+            {visibleEvents.map((ev) => (
               <li key={ev.id} className="portal-calendar-event">
                 <span className="portal-calendar-dot" aria-hidden />
-                <p className="portal-calendar-line">
-                  <span className="portal-calendar-title">{ev.title}</span>
-                  <span className="portal-calendar-time">{formatEventTime(ev)}</span>
-                </p>
-                {ev.source ? (
-                  <span className="portal-calendar-source">{ev.source}</span>
-                ) : null}
+                <div className="portal-calendar-body">
+                  <p className="portal-calendar-line">
+                    <span className="portal-calendar-title">{ev.title}</span>
+                    <span className="portal-calendar-time">{formatEventTime(ev)}</span>
+                  </p>
+                  <p className="portal-calendar-meta">
+                    {ev.source ? (
+                      <span className="portal-calendar-source">{ev.source}</span>
+                    ) : null}
+                    <span className="portal-calendar-countdown">
+                      {formatEventCountdown(ev, now)}
+                    </span>
+                  </p>
+                </div>
               </li>
             ))}
           </ul>
         )}
+        {hasMoreEvents ? (
+          <button
+            type="button"
+            className="portal-calendar-more"
+            onClick={() => setCalendarExpanded((v) => !v)}
+          >
+            {calendarExpanded ? '收起' : `显示更多（${events.length - CALENDAR_PREVIEW}）`}
+          </button>
+        ) : null}
       </section>
     </div>
   );

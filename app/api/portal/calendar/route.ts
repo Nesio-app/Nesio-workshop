@@ -65,7 +65,7 @@ export async function GET() {
       ),
     );
 
-    const events = mergeCalendarEvents(lists, 5);
+    const events = mergeCalendarEvents(lists, 40);
 
     return NextResponse.json({
       ok: true,

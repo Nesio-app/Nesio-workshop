@@ -54,7 +54,7 @@ function renderList(filter) {
       .join('、');
     const a = document.createElement('a');
     a.className = 'wx-row-item wx-row-item--group';
-    a.href = `/secretary/group.html?group=${encodeURIComponent(g.id)}`;
+    a.href = `/secretary/group?group=${encodeURIComponent(g.id)}`;
     a.innerHTML = `
       <div class="wx-row-avatar wx-row-avatar--group" aria-hidden>群</div>
       <div class="wx-row-body">
@@ -81,7 +81,7 @@ function renderList(filter) {
   for (const f of rows) {
     const a = document.createElement('a');
     a.className = 'wx-row-item';
-    a.href = `/secretary/chat.html?friend=${encodeURIComponent(f.id)}`;
+    a.href = `/secretary/chat?friend=${encodeURIComponent(f.id)}`;
 
     a.innerHTML = `
       <img class="wx-row-avatar" src="${withRoot(f.logo)}" alt="${f.name}" width="48" height="48" loading="lazy" />
@@ -127,8 +127,8 @@ function renderDockActions() {
   dockActions.innerHTML = '';
   const actions = [
     { label: '发起群聊', icon: '👥', fn: () => openGroupSheet() },
-    { label: 'Gemini', icon: '✦', href: '/secretary/chat.html?friend=gemini' },
-    { label: '返回宝盒', icon: '盒', href: '../' },
+    { label: 'Gemini', icon: '✦', href: '/secretary/chat?friend=gemini' },
+    { label: '返回宝盒', icon: '盒', href: '/' },
   ];
   for (const a of actions) {
     const btn = document.createElement('button');
@@ -148,7 +148,7 @@ function renderDockActions() {
     btn.className = 'wx-dock-action';
     btn.innerHTML = `<img src="${withRoot(f.logo)}" alt="" width="28" height="28" /><span>${f.name}</span>`;
     btn.addEventListener('click', () => {
-      location.href = `/secretary/chat.html?friend=${encodeURIComponent(f.id)}`;
+      location.href = `/secretary/chat?friend=${encodeURIComponent(f.id)}`;
     });
     dockActions.appendChild(btn);
   }
@@ -227,7 +227,7 @@ btnStartGroup.addEventListener('click', () => {
   const group = addGroup(null, ids);
   closeSheet(groupSheet);
   if (group) {
-    location.href = `/secretary/group.html?group=${encodeURIComponent(group.id)}`;
+    location.href = `/secretary/group?group=${encodeURIComponent(group.id)}`;
   }
 });
 

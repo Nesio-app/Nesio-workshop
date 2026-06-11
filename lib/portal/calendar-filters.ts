@@ -33,6 +33,15 @@ export function isLunarEventTitle(title: string): boolean {
     return true;
   }
 
+  // Standalone lunar day markers from Google lunar feeds — e.g. 廿六、初十
+  if (
+    /^(初[一二三四五六七八九十]|十[一二三四五六七八九]|廿[一二三四五六七八九十]|二十[一二三四五六七八九]?|三十)$/.test(
+      t,
+    )
+  ) {
+    return true;
+  }
+
   return false;
 }
 

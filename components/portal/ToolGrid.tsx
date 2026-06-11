@@ -1,7 +1,6 @@
 'use client';
 
 import type { PortalTool } from '@/lib/portal/types';
-import { withBase } from '@/lib/portal/paths';
 
 interface ToolGridProps {
   tools: PortalTool[];
@@ -15,7 +14,6 @@ export default function ToolGrid({ tools, onOpenTool }: ToolGridProps) {
     <section className="portal-tools" aria-label="工具">
       <ul className="portal-tools-grid">
         {ready.map((tool) => {
-          const iconSrc = tool.iconUrl ? withBase(tool.iconUrl) : null;
           return (
             <li key={tool.id}>
               <button
@@ -26,11 +24,9 @@ export default function ToolGrid({ tools, onOpenTool }: ToolGridProps) {
                 title={tool.description}
               >
                 <span className="portal-tool-icon-wrap">
-                  {iconSrc ? (
-                    <img src={iconSrc} alt="" width={40} height={40} />
-                  ) : (
-                    <span className="portal-tool-emoji">{tool.icon}</span>
-                  )}
+                  <span className="portal-tool-emoji" aria-hidden>
+                    {tool.icon}
+                  </span>
                 </span>
                 <span className="portal-tool-name">{tool.name}</span>
               </button>

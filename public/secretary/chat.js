@@ -100,7 +100,10 @@ async function sendMessage(text) {
   if (busy || !text.trim()) return;
 
   if (!friend?.ready) {
-    showError(`${friend?.name || '该模型'} 即将接入，请先使用 Gemini。`);
+    showError(`${friend?.name || '该模型'} 尚未接入，正在为你打开 Gemini…`);
+    window.setTimeout(() => {
+      location.href = '/secretary/chat?friend=gemini';
+    }, 900);
     return;
   }
 
@@ -279,13 +282,19 @@ btnClear.addEventListener('click', () => {
 
 btnPlus.addEventListener('click', () => attach.open());
 
-window.WxVoice.createVoiceInput(input, btnMic, { holdToTalk: true });
+try {
+  window.WxVoice?.createVoiceInput(input, btnMic, { holdToTalk: true });
+} catch { /* voice optional */ }
 
 Promise.all([loadFriends(), checkSecretaryHealth()])
   .then(([friends, health]) => {
-    friend = memberById(friends, friendId) || friends[0];
+    friend = memberById(friends, friendId) || friends.find((f) => f.ready) || friends[0];
     if (!friend) {
       main.innerHTML = '<p class="wx-chat-tip">未找到该好友</p>';
+      return;
+    }
+    if (!friend.ready && friend.id !== 'gemini') {
+      location.replace('/secretary/chat?friend=gemini');
       return;
     }
     navTitle.textContent = friend.name;

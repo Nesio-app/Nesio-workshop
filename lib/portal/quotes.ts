@@ -2,6 +2,7 @@ import type { PortalConfig } from './types';
 
 const SHOWN_KEY = 'treasurebox-quote-shown';
 const POOL_KEY = 'treasurebox-quote-pool-id';
+const LAST_KEY = 'treasurebox-quote-last';
 
 const FALLBACK = '今天也要好好照顾自己。';
 
@@ -42,13 +43,31 @@ export function pickFreshQuote(config: PortalConfig): string {
   const remaining = pool.filter((q) => !shown.includes(q));
   const pickFrom = remaining.length > 0 ? remaining : pool;
 
-  const quote = pickFrom[Math.floor(Math.random() * pickFrom.length)];
+  const last = (() => {
+    try {
+      return sessionStorage.getItem(LAST_KEY) || '';
+    } catch {
+      return '';
+    }
+  })();
+
+  let candidates = pickFrom;
+  if (pickFrom.length > 1 && last) {
+    const withoutLast = pickFrom.filter((q) => q !== last);
+    if (withoutLast.length > 0) candidates = withoutLast;
+  }
+
+  const quote = candidates[Math.floor(Math.random() * candidates.length)];
 
   if (remaining.length > 0) {
     writeShown(poolId, [...shown, quote]);
   } else {
     writeShown(poolId, [quote]);
   }
+
+  try {
+    sessionStorage.setItem(LAST_KEY, quote);
+  } catch { /* ignore */ }
 
   return quote;
 }

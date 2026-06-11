@@ -4,9 +4,9 @@ import { useEffect, useRef, useState } from 'react';
 import { withBase } from '@/lib/portal/paths';
 
 const QUICK_LINKS = [
-  { label: '智友', href: '/secretary/', icon: '💬' },
-  { label: 'Gemini', href: '/secretary/chat.html?friend=gemini', icon: '✦' },
-  { label: '群聊', href: '/secretary/', icon: '👥' },
+  { label: '智友', href: '/secretary', icon: '💬' },
+  { label: 'Gemini', href: '/secretary/chat?friend=gemini', icon: '✦' },
+  { label: '群聊', href: '/secretary', icon: '👥' },
 ];
 
 export default function PortalQuickChat() {

@@ -283,7 +283,7 @@ loadFriends()
 
     members = memberIds.map((id) => memberById(friends, id)).filter(Boolean);
     if (members.length < 2) {
-      main.innerHTML = '<p class="wx-chat-tip">群聊至少需要 2 位 AI，<a href="/secretary/">返回</a></p>';
+      main.innerHTML = '<p class="wx-chat-tip">群聊至少需要 2 位 AI，<a href="/secretary">返回</a></p>';
       return;
     }
 
