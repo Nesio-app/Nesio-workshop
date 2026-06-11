@@ -1,5 +1,5 @@
-import Settings from '@/components/portal/Settings';
+import SettingsPageClient from '@/components/portal/SettingsPageClient';
 
 export default function SettingsPage() {
-  return <Settings />;
+  return <SettingsPageClient />;
 }

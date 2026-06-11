@@ -292,9 +292,10 @@ export default function DashboardHome({
 
   const quoteLine = useMemo(() => dailyQuote, [dailyQuote]);
   const cityName = weather.placeName || simplifyPlaceName(fallbackLocation.city);
+  const calendarTz = fallbackLocation.timezone || 'Asia/Shanghai';
   const upcomingEvents = useMemo(
-    () => filterTodayAndTomorrowEvents(events, now),
-    [events, now],
+    () => filterTodayAndTomorrowEvents(events, now, calendarTz),
+    [events, now, calendarTz],
   );
   const visibleEvents = calendarExpanded
     ? upcomingEvents
@@ -426,7 +427,7 @@ export default function DashboardHome({
                     <span className="portal-calendar-title">{ev.title}</span>
                     <span className="portal-calendar-schedule">
                       <span className="portal-calendar-date">
-                        {formatEventDayLabel(ev, now)}
+                        {formatEventDayLabel(ev, now, calendarTz)}
                       </span>
                       <span className="portal-calendar-time">{formatEventTime(ev)}</span>
                     </span>
