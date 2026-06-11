@@ -14,6 +14,7 @@
       <img class="wx-chat-nav-avatar" id="navAvatar" src="" alt="" width="28" height="28" hidden>
       <h1 class="wx-chat-nav-title" id="navTitle">对话</h1>
     </div>
+    <button type="button" class="wx-chat-call" id="btnCall" aria-label="语音通话">📞</button>
     <button type="button" class="wx-chat-more" id="btnClear" aria-label="更多">···</button>
   </header>
 
@@ -33,6 +34,16 @@
   <input type="file" id="pickFile" hidden>
   <input type="file" id="pickVideo" accept="video/*" hidden>
 
+  <div class="wx-voice-call" id="voiceCall" hidden>
+    <div class="wx-voice-call-panel">
+      <img class="wx-voice-call-avatar" id="voiceCallAvatar" src="" alt="" width="88" height="88">
+      <p class="wx-voice-call-name" id="voiceCallName">智友</p>
+      <p class="wx-voice-call-status" id="voiceCallStatus">正在聆听…</p>
+      <div class="wx-voice-call-wave" id="voiceCallWave" data-state="listening" aria-hidden></div>
+      <button type="button" class="wx-voice-call-hangup" id="voiceCallHangup">挂断</button>
+    </div>
+  </div>
+
   <div class="wx-sheet" id="attachSheet" hidden>
     <div class="wx-sheet-mask" id="attachMask"></div>
     <div class="wx-sheet-panel">
@@ -44,6 +55,7 @@
   <script src="/secretary/common.js" defer></script>
   <script src="/secretary/api.js" defer></script>
   <script src="/secretary/voice.js" defer></script>
+  <script src="/secretary/voice-call.js" defer></script>
   <script src="/secretary/attach.js" defer></script>
   <script src="/secretary/chat.js" defer></script>
 </body>

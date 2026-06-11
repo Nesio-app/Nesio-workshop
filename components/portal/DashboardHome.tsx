@@ -256,7 +256,7 @@ export default function DashboardHome({
   const fidelityFeed = calendarFeeds.find((f) => f.label === 'Fidelity');
   const fidelityHint =
     fidelityFeed && !fidelityFeed.ok
-      ? 'Fidelity 日历未同步：请在 Fidelity 重新生成私人 iCal 链接，并更新 Vercel 环境变量 FIDELITY。'
+      ? `Fidelity 日历未同步${fidelityFeed.error ? `（${fidelityFeed.error}）` : ''}，请检查 Vercel 环境变量 FIDELITY。`
       : null;
 
   return (

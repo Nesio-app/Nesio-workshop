@@ -23,6 +23,7 @@ const input = document.getElementById('chatInput');
 const btnClear = document.getElementById('btnClear');
 const btnPlus = document.getElementById('btnPlus');
 const btnMic = document.getElementById('btnMic');
+const btnCall = document.getElementById('btnCall');
 const navTitle = document.getElementById('navTitle');
 const navAvatar = document.getElementById('navAvatar');
 
@@ -32,6 +33,7 @@ const USER_AVATAR = '婧';
 let friend = null;
 let history = [];
 let busy = false;
+let liveVoiceCall = null;
 
 function loadHistory() {
   try {
@@ -102,19 +104,22 @@ function showError(text) {
   scrollBottom();
 }
 
-async function sendMessage(text) {
-  if (busy || !text.trim()) return;
+async function sendMessage(text, opts = {}) {
+  const fromVoice = Boolean(opts.fromVoice);
+  if (busy || !text.trim()) return { ok: false, error: 'busy' };
 
   if (!friend?.ready) {
-    showError(`${friend?.name || '该模型'} 尚未接入，正在为你打开 Gemini…`);
-    window.setTimeout(() => {
-      location.href = '/secretary/chat?friend=gemini';
-    }, 900);
-    return;
+    if (!fromVoice) {
+      showError(`${friend?.name || '该模型'} 尚未接入，正在为你打开 Gemini…`);
+      window.setTimeout(() => {
+        location.href = '/secretary/chat?friend=gemini';
+      }, 900);
+    }
+    return { ok: false, error: '模型未接入' };
   }
 
   busy = true;
-  input.disabled = true;
+  if (!fromVoice) input.disabled = true;
 
   history.push({ role: 'user', content: text.trim() });
   saveHistory();
@@ -131,31 +136,60 @@ async function sendMessage(text) {
 
     if (!ok) {
       const detail = data.detail || data.error || data.hint || '请求失败';
-      showError('暂时无法回应：' + detail);
+      if (!fromVoice) showError('暂时无法回应：' + detail);
       history.pop();
       saveHistory();
       render();
-      return;
+      return { ok: false, error: detail };
     }
 
     const reply = String(data.text || '').trim() || '（没有收到有效回复）';
     history.push({ role: 'assistant', content: reply });
     saveHistory();
     render();
-    if (window.WxVoice?.isVoiceCallMode?.()) {
-      window.WxVoice.speakText(reply);
-    }
+    return { ok: true, reply };
   } catch (err) {
     pending.remove();
-    showError('网络异常：' + (err?.message || '请检查网络'));
+    const msg = err?.message || '请检查网络';
+    if (!fromVoice) showError('网络异常：' + msg);
     history.pop();
     saveHistory();
     render();
+    return { ok: false, error: msg };
   } finally {
     busy = false;
-    input.disabled = false;
-    input.focus();
+    if (!fromVoice) {
+      input.disabled = false;
+      input.focus();
+    }
   }
+}
+
+function openLiveVoiceCall() {
+  if (!friend?.ready) {
+    toast(`${friend?.name || '该模型'} 尚未接入`);
+    return;
+  }
+  if (!liveVoiceCall) {
+    toast('语音通话未就绪');
+    return;
+  }
+  liveVoiceCall.open(friend);
+}
+
+function mountLiveVoiceCall() {
+  if (!window.WxVoiceCall?.createLiveVoiceCall) return;
+  liveVoiceCall = window.WxVoiceCall.createLiveVoiceCall({
+    overlayEl: document.getElementById('voiceCall'),
+    statusEl: document.getElementById('voiceCallStatus'),
+    avatarEl: document.getElementById('voiceCallAvatar'),
+    nameEl: document.getElementById('voiceCallName'),
+    waveEl: document.getElementById('voiceCallWave'),
+    hangupBtn: document.getElementById('voiceCallHangup'),
+    withRoot,
+    toast,
+    onSend: (text) => sendMessage(text, { fromVoice: true }),
+  });
 }
 
 function resizeInput() {
@@ -190,9 +224,8 @@ const attachHandlers = {
   },
   voice: () => toast('按住左侧麦克风说话，松手结束'),
   call: () => {
-    const on = !window.WxVoice?.isVoiceCallMode?.();
-    window.WxVoice?.setVoiceCallMode?.(on);
-    toast(on ? '语音模式：AI 回复将自动朗读' : '已退出语音模式');
+    attach.close();
+    openLiveVoiceCall();
   },
   note: () => {
     const text = input.value.trim() || prompt('写入 Note 的内容');
@@ -299,6 +332,10 @@ btnClear.addEventListener('click', () => {
 
 btnPlus.addEventListener('click', () => attach.open());
 
+if (btnCall) {
+  btnCall.addEventListener('click', () => openLiveVoiceCall());
+}
+
 try {
   window.WxVoice?.createVoiceInput(input, btnMic, { holdToTalk: true });
 } catch { /* voice optional */ }
@@ -318,6 +355,8 @@ Promise.all([loadFriends(), checkSecretaryHealth()])
     navAvatar.src = withRoot(friend.logo);
     navAvatar.hidden = false;
     document.title = friend.name;
+
+    mountLiveVoiceCall();
 
     loadHistory();
     render();

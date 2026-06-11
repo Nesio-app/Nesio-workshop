@@ -101,8 +101,6 @@ function createVoiceInput(inputEl, btnEl, options = {}) {
   return { supported: true, stop: stopListening, start: () => startListening(false) };
 }
 
-let voiceCallMode = false;
-
 function speakText(text, options = {}) {
   const synth = window.speechSynthesis;
   if (!synth || !text?.trim()) return false;
@@ -115,14 +113,23 @@ function speakText(text, options = {}) {
   return true;
 }
 
-function setVoiceCallMode(on) {
-  voiceCallMode = Boolean(on);
-  if (!voiceCallMode) window.speechSynthesis?.cancel();
-  return voiceCallMode;
-}
-
-function isVoiceCallMode() {
-  return voiceCallMode;
+function speakTextAsync(text, options = {}) {
+  const synth = window.speechSynthesis;
+  return new Promise((resolve) => {
+    if (!synth || !text?.trim()) {
+      resolve(false);
+      return;
+    }
+    synth.cancel();
+    const utter = new SpeechSynthesisUtterance(text.trim());
+    utter.lang = options.lang || 'zh-CN';
+    utter.rate = options.rate ?? 1;
+    utter.pitch = options.pitch ?? 1;
+    const done = () => resolve(true);
+    utter.onend = done;
+    utter.onerror = done;
+    synth.speak(utter);
+  });
 }
 
 function stopSpeaking() {
@@ -132,7 +139,6 @@ function stopSpeaking() {
 window.WxVoice = {
   createVoiceInput,
   speakText,
-  setVoiceCallMode,
-  isVoiceCallMode,
+  speakTextAsync,
   stopSpeaking,
 };
