@@ -113,6 +113,15 @@ function speakText(text, options = {}) {
   return true;
 }
 
+function pickZhVoice(synth) {
+  const voices = synth.getVoices();
+  return (
+    voices.find((v) => v.lang === 'zh-CN') ||
+    voices.find((v) => v.lang.startsWith('zh')) ||
+    null
+  );
+}
+
 function speakTextAsync(text, options = {}) {
   const synth = window.speechSynthesis;
   return new Promise((resolve) => {
@@ -120,15 +129,39 @@ function speakTextAsync(text, options = {}) {
       resolve(false);
       return;
     }
-    synth.cancel();
-    const utter = new SpeechSynthesisUtterance(text.trim());
-    utter.lang = options.lang || 'zh-CN';
-    utter.rate = options.rate ?? 1;
-    utter.pitch = options.pitch ?? 1;
-    const done = () => resolve(true);
-    utter.onend = done;
-    utter.onerror = done;
-    synth.speak(utter);
+
+    let settled = false;
+    const finish = (ok) => {
+      if (settled) return;
+      settled = true;
+      resolve(ok);
+    };
+
+    const run = () => {
+      synth.cancel();
+      const utter = new SpeechSynthesisUtterance(text.trim());
+      utter.lang = options.lang || 'zh-CN';
+      utter.rate = options.rate ?? 1;
+      utter.pitch = options.pitch ?? 1;
+      const voice = pickZhVoice(synth);
+      if (voice) utter.voice = voice;
+      utter.onend = () => finish(true);
+      utter.onerror = () => finish(false);
+      synth.speak(utter);
+      if (synth.paused) synth.resume();
+    };
+
+    if (synth.getVoices().length) {
+      run();
+    } else {
+      synth.onvoiceschanged = () => {
+        synth.onvoiceschanged = null;
+        run();
+      };
+      window.setTimeout(() => {
+        if (!settled) run();
+      }, 320);
+    }
   });
 }
 

@@ -165,7 +165,7 @@ async function sendMessage(text, opts = {}) {
   }
 }
 
-function openLiveVoiceCall() {
+async function openLiveVoiceCall() {
   if (!friend?.ready) {
     toast(`${friend?.name || '该模型'} 尚未接入`);
     return;
@@ -174,7 +174,7 @@ function openLiveVoiceCall() {
     toast('语音通话未就绪');
     return;
   }
-  liveVoiceCall.open(friend);
+  await liveVoiceCall.open(friend);
 }
 
 function mountLiveVoiceCall() {
@@ -182,6 +182,8 @@ function mountLiveVoiceCall() {
   liveVoiceCall = window.WxVoiceCall.createLiveVoiceCall({
     overlayEl: document.getElementById('voiceCall'),
     statusEl: document.getElementById('voiceCallStatus'),
+    transcriptEl: document.getElementById('voiceCallTranscript'),
+    talkBtn: document.getElementById('voiceCallTalk'),
     avatarEl: document.getElementById('voiceCallAvatar'),
     nameEl: document.getElementById('voiceCallName'),
     waveEl: document.getElementById('voiceCallWave'),

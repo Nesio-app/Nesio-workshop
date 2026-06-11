@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1, user-scalable=no">
-  <meta name="theme-color" content="#ededed">
+  <meta name="theme-color" content="#588ce3">
   <title>对话</title>
   <link rel="stylesheet" href="/secretary/styles.css">
 </head>
@@ -38,8 +38,10 @@
     <div class="wx-voice-call-panel">
       <img class="wx-voice-call-avatar" id="voiceCallAvatar" src="" alt="" width="88" height="88">
       <p class="wx-voice-call-name" id="voiceCallName">智友</p>
-      <p class="wx-voice-call-status" id="voiceCallStatus">正在聆听…</p>
-      <div class="wx-voice-call-wave" id="voiceCallWave" data-state="listening" aria-hidden></div>
+      <p class="wx-voice-call-status" id="voiceCallStatus">按住下方按钮说话</p>
+      <p class="wx-voice-call-transcript" id="voiceCallTranscript" aria-live="polite"></p>
+      <div class="wx-voice-call-wave" id="voiceCallWave" data-state="idle" aria-hidden></div>
+      <button type="button" class="wx-voice-call-talk" id="voiceCallTalk">按住说话</button>
       <button type="button" class="wx-voice-call-hangup" id="voiceCallHangup">挂断</button>
     </div>
   </div>

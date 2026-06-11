@@ -41,9 +41,10 @@ body {
   min-height: 100dvh;
   color: var(--portal-ink);
   background:
-    radial-gradient(ellipse 90% 55% at 15% 0%, rgba(150, 199, 243, 0.35), transparent 58%),
-    radial-gradient(ellipse 75% 50% at 90% 8%, rgba(205, 222, 252, 0.55), transparent 52%),
-    linear-gradient(180deg, #f8fbff 0%, var(--portal-bg) 100%);
+    radial-gradient(ellipse 85% 60% at 12% 0%, rgba(88, 140, 227, 0.22), transparent 55%),
+    radial-gradient(ellipse 70% 55% at 88% 6%, rgba(205, 222, 252, 0.65), transparent 50%),
+    linear-gradient(165deg, var(--portal-blue-light) 0%, var(--portal-blue-mid) 46%, var(--portal-blue-deep) 100%);
+  background-attachment: fixed;
   font-family: var(--font-source-sans), system-ui, sans-serif;
   position: relative;
   padding: 0;

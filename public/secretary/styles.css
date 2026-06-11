@@ -1,11 +1,15 @@
 :root {
-  --wx-bg: #ededed;
-  --wx-list-bg: #fff;
-  --wx-ink: #111;
-  --wx-muted: #888;
-  --wx-line: rgba(0, 0, 0, 0.08);
-  --wx-green: #95ec69;
-  --wx-nav: #f7f7f7;
+  /* Huemint gradient-3: #588ce3 · #96c7f3 · #cddefc */
+  --wx-blue-deep: #588ce3;
+  --wx-blue-mid: #96c7f3;
+  --wx-blue-light: #cddefc;
+  --wx-bg: #cddefc;
+  --wx-list-bg: rgba(255, 255, 255, 0.94);
+  --wx-ink: #1e2a3a;
+  --wx-muted: #5a6d82;
+  --wx-line: rgba(88, 140, 227, 0.2);
+  --wx-green: #96c7f3;
+  --wx-nav: rgba(255, 255, 255, 0.88);
   --wx-blue: #588ce3;
 }
 
@@ -16,7 +20,7 @@ html, body {
   height: 100%;
   font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
   color: var(--wx-ink);
-  background: var(--wx-bg);
+  background: linear-gradient(165deg, var(--wx-blue-light) 0%, var(--wx-blue-mid) 48%, var(--wx-blue-deep) 100%);
 }
 
 .wx-body {
@@ -201,7 +205,7 @@ html, body {
 
 /* ── Chat view ── */
 .wx-body--chat {
-  background: var(--wx-bg);
+  background: transparent;
 }
 
 .wx-chat-nav {
@@ -333,7 +337,7 @@ html, body {
 }
 
 .wx-msg--user .wx-msg-bubble {
-  background: var(--wx-green);
+  background: linear-gradient(145deg, var(--wx-blue-mid), var(--wx-blue-light));
   color: var(--wx-ink);
 }
 
@@ -683,7 +687,7 @@ body.wx-sheet-open { overflow: hidden; }
   z-index: 120;
   display: grid;
   place-items: center;
-  background: linear-gradient(165deg, #1a2744 0%, #0f172a 55%, #111827 100%);
+  background: linear-gradient(165deg, var(--wx-blue-deep) 0%, var(--wx-blue-mid) 52%, var(--wx-blue-light) 100%);
   padding: max(1.25rem, env(safe-area-inset-top)) 1.25rem max(1.5rem, env(safe-area-inset-bottom));
 }
 
@@ -713,7 +717,18 @@ body.wx-sheet-open { overflow: hidden; }
 .wx-voice-call-status {
   margin: 0;
   font-size: 0.92rem;
-  color: rgba(248, 250, 252, 0.78);
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.wx-voice-call-transcript {
+  margin: 0;
+  min-height: 2.5rem;
+  max-width: 18rem;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  color: #fff;
+  text-align: center;
+  opacity: 0.95;
 }
 
 .wx-voice-call-wave {
@@ -761,8 +776,29 @@ body.wx-sheet-open { overflow: hidden; }
   100% { transform: scale(1.35); opacity: 0; }
 }
 
+.wx-voice-call-talk {
+  width: min(100%, 14rem);
+  padding: 0.95rem 1.25rem;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--wx-blue-deep);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 10px 28px rgba(30, 42, 58, 0.18);
+  touch-action: none;
+  user-select: none;
+}
+
+.wx-voice-call-talk--on {
+  background: #fff;
+  transform: scale(0.98);
+  box-shadow: 0 6px 18px rgba(30, 42, 58, 0.22);
+}
+
 .wx-voice-call-hangup {
-  margin-top: 1.25rem;
+  margin-top: 0.75rem;
   width: 4.5rem;
   height: 4.5rem;
   border-radius: 999px;
