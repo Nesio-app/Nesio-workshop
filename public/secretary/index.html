@@ -9,6 +9,7 @@
 </head>
 <body class="wx-body wx-body--list">
   <header class="wx-top">
+    <button type="button" class="wx-top-add wx-top-add--left" id="btnCreateGroup" aria-label="发起群聊">👥</button>
     <h1 class="wx-top-title">智友</h1>
     <button type="button" class="wx-top-add" id="btnTools" aria-label="工具">＋</button>
   </header>
@@ -27,6 +28,15 @@
     <a class="wx-tab" href="../portfolio"><span>我</span></a>
   </nav>
 
+  <div class="wx-dock" id="chatDock" data-open="false">
+    <div class="wx-dock-handle" id="dockHandle" aria-hidden></div>
+    <div class="wx-dock-panel" id="dockPanel">
+      <p class="wx-dock-title">快速聊天</p>
+      <div class="wx-dock-actions" id="dockActions"></div>
+    </div>
+    <button type="button" class="wx-dock-fab" id="dockFab" aria-label="上滑打开聊天">💬</button>
+  </div>
+
   <div class="wx-sheet" id="toolSheet" hidden>
     <div class="wx-sheet-mask" id="toolMask"></div>
     <div class="wx-sheet-panel">
@@ -35,7 +45,17 @@
     </div>
   </div>
 
+  <div class="wx-sheet" id="groupSheet" hidden>
+    <div class="wx-sheet-mask" id="groupMask"></div>
+    <div class="wx-sheet-panel">
+      <p class="wx-sheet-title">发起群聊 · 选择 AI</p>
+      <div class="wx-group-pick" id="groupPick"></div>
+      <button type="button" class="wx-group-start" id="btnStartGroup" disabled>开始群聊</button>
+    </div>
+  </div>
+
   <script src="/secretary/config.js"></script>
+  <script src="/secretary/common.js"></script>
   <script src="/secretary/list.js"></script>
 </body>
 </html>

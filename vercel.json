@@ -8,6 +8,7 @@
     { "source": "/fitness", "destination": "/fitness/index.html" },
     { "source": "/inner-shelter", "destination": "/inner-shelter/index.html" },
     { "source": "/secretary", "destination": "/secretary/index.html" },
-    { "source": "/secretary/chat", "destination": "/secretary/chat.html" }
+    { "source": "/secretary/chat", "destination": "/secretary/chat.html" },
+    { "source": "/secretary/group", "destination": "/secretary/group.html" }
   ]
 }

@@ -51,10 +51,16 @@ html, body {
   right: 0.85rem;
   border: none;
   background: transparent;
-  font-size: 1.5rem;
+  font-size: 1.35rem;
   line-height: 1;
   color: var(--wx-ink);
   cursor: pointer;
+}
+
+.wx-top-add--left {
+  right: auto;
+  left: 0.85rem;
+  font-size: 1.15rem;
 }
 
 .wx-search {
@@ -151,6 +157,15 @@ html, body {
   border-radius: 0.2rem;
   padding: 0.05rem 0.25rem;
   flex-shrink: 0;
+}
+
+.wx-row-avatar--group {
+  display: grid;
+  place-items: center;
+  background: linear-gradient(145deg, #588ce3, #96c7f3);
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 700;
 }
 
 .wx-tabbar {
@@ -356,6 +371,40 @@ html, body {
   cursor: pointer;
 }
 
+.wx-mic--on {
+  opacity: 1;
+  color: #07c160;
+  transform: scale(1.08);
+}
+
+.wx-msg-content {
+  max-width: calc(100% - 3rem);
+}
+
+.wx-msg-sender {
+  margin: 0 0 0.15rem 0.15rem;
+  font-size: 0.68rem;
+  color: var(--wx-muted);
+}
+
+.wx-chat-nav-center--group {
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.wx-group-avatars {
+  display: flex;
+  gap: 0.15rem;
+}
+
+.wx-group-avatars img {
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 0.25rem;
+  object-fit: cover;
+  background: #eee;
+}
+
 .wx-chat-input-wrap {
   flex: 1;
   background: #fff;
@@ -450,3 +499,167 @@ html, body {
 }
 
 body.wx-sheet-open { overflow: hidden; }
+
+/* ── Group create ── */
+.wx-group-pick {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+  margin-bottom: 0.85rem;
+}
+
+.wx-group-option {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.5rem 0.55rem;
+  border-radius: 0.55rem;
+  background: #fff;
+  border: 0.5px solid var(--wx-line);
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.wx-group-option input { accent-color: var(--wx-blue); }
+
+.wx-group-option img {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.35rem;
+  object-fit: contain;
+  background: #f5f5f5;
+}
+
+.wx-group-start {
+  width: 100%;
+  border: none;
+  border-radius: 0.55rem;
+  padding: 0.65rem;
+  background: var(--wx-blue);
+  color: #fff;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.wx-group-start:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ── Bottom chat dock ── */
+.wx-dock {
+  position: fixed;
+  left: 50%;
+  bottom: calc(3.2rem + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  width: min(640px, 100%);
+  z-index: 30;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.wx-dock-panel {
+  width: min(92vw, 22rem);
+  background: #fff;
+  border-radius: 1rem 1rem 0.35rem 0.35rem;
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.12);
+  padding: 0.65rem 0.75rem 0.5rem;
+  margin-bottom: 0.35rem;
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 0.22s ease, transform 0.22s ease;
+  pointer-events: none;
+  max-height: 0;
+  overflow: hidden;
+}
+
+.wx-dock[data-open="true"] .wx-dock-panel {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+  max-height: 16rem;
+}
+
+.wx-dock-handle {
+  width: 2.5rem;
+  height: 0.28rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.15);
+  margin-bottom: 0.35rem;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.wx-dock-title {
+  margin: 0 0 0.5rem;
+  text-align: center;
+  font-size: 0.72rem;
+  color: var(--wx-muted);
+}
+
+.wx-dock-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.45rem;
+}
+
+.wx-dock-action {
+  border: none;
+  background: #f7f7f7;
+  border-radius: 0.65rem;
+  padding: 0.45rem 0.25rem;
+  font-size: 0.65rem;
+  color: var(--wx-ink);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.wx-dock-action img {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.35rem;
+  object-fit: contain;
+}
+
+.wx-dock-fab {
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(145deg, #588ce3, #7aa8ee);
+  color: #fff;
+  font-size: 1.35rem;
+  box-shadow: 0 8px 24px rgba(88, 140, 227, 0.45);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.wx-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(6rem + env(safe-area-inset-bottom));
+  transform: translateX(-50%) translateY(8px);
+  background: rgba(0, 0, 0, 0.78);
+  color: #fff;
+  padding: 0.5rem 0.85rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 50;
+  max-width: 90vw;
+  text-align: center;
+}
+
+.wx-toast--show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}

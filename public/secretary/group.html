@@ -4,15 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1, user-scalable=no">
   <meta name="theme-color" content="#ededed">
-  <title>对话</title>
+  <title>群聊</title>
   <link rel="stylesheet" href="/secretary/styles.css">
 </head>
 <body class="wx-body wx-body--chat">
   <header class="wx-chat-nav">
     <a class="wx-chat-back" href="/secretary/" aria-label="返回">‹</a>
-    <div class="wx-chat-nav-center">
-      <img class="wx-chat-nav-avatar" id="navAvatar" src="" alt="" width="28" height="28" hidden>
-      <h1 class="wx-chat-nav-title" id="navTitle">对话</h1>
+    <div class="wx-chat-nav-center wx-chat-nav-center--group">
+      <div class="wx-group-avatars" id="navAvatars"></div>
+      <h1 class="wx-chat-nav-title" id="navTitle">群聊</h1>
     </div>
     <button type="button" class="wx-chat-more" id="btnClear" aria-label="更多">···</button>
   </header>
@@ -23,7 +23,7 @@
     <form class="wx-chat-input-row" id="chatForm">
       <button type="button" class="wx-chat-icon-btn" id="btnMic" aria-label="语音输入">🎤</button>
       <div class="wx-chat-input-wrap">
-        <textarea id="chatInput" rows="1" placeholder="发消息…" maxlength="4000" enterkeyhint="send"></textarea>
+        <textarea id="chatInput" rows="1" placeholder="发消息到群聊…" maxlength="4000" enterkeyhint="send"></textarea>
       </div>
       <button type="button" class="wx-chat-icon-btn" id="btnPlus" aria-label="更多">⊕</button>
     </form>
@@ -41,6 +41,6 @@
   <script src="/secretary/api.js"></script>
   <script src="/secretary/voice.js"></script>
   <script src="/secretary/attach.js"></script>
-  <script src="/secretary/chat.js"></script>
+  <script src="/secretary/group.js"></script>
 </body>
 </html>

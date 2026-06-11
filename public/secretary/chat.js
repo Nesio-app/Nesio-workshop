@@ -1,3 +1,5 @@
+const { withRoot, esc, toast, loadFriends, memberById } = window.WxCommon;
+
 const params = new URLSearchParams(location.search);
 const friendId = params.get('friend') || 'gemini';
 
@@ -6,29 +8,16 @@ const form = document.getElementById('chatForm');
 const input = document.getElementById('chatInput');
 const btnClear = document.getElementById('btnClear');
 const btnPlus = document.getElementById('btnPlus');
+const btnMic = document.getElementById('btnMic');
 const navTitle = document.getElementById('navTitle');
 const navAvatar = document.getElementById('navAvatar');
-const toolSheet = document.getElementById('toolSheet');
-const toolMask = document.getElementById('toolMask');
-const toolGrid = document.getElementById('toolGrid');
 
 const STORAGE_KEY = `treasurebox-chat-${friendId}`;
-const USER_AVATAR = '我';
+const USER_AVATAR = '婧';
 
 let friend = null;
 let history = [];
 let busy = false;
-
-function esc(text) {
-  const d = document.createElement('div');
-  d.textContent = text;
-  return d.innerHTML;
-}
-
-function withRoot(path) {
-  if (path.startsWith('http') || path.startsWith('/')) return path;
-  return '/' + path;
-}
 
 function loadHistory() {
   try {
@@ -42,11 +31,12 @@ function loadHistory() {
 
 function saveHistory() {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(history.slice(-60)));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(history.slice(-80)));
   } catch { /* ignore */ }
 }
 
-function makeRow(role, content, extraClass) {
+function makeRow(turn) {
+  const role = turn.role;
   const row = document.createElement('div');
   row.className = 'wx-msg wx-msg--' + role;
 
@@ -54,7 +44,7 @@ function makeRow(role, content, extraClass) {
     const av = document.createElement('img');
     av.className = 'wx-msg-avatar';
     av.src = withRoot(friend.logo);
-    av.alt = '';
+    av.alt = friend.name;
     row.appendChild(av);
   } else if (role === 'user') {
     const av = document.createElement('div');
@@ -64,8 +54,8 @@ function makeRow(role, content, extraClass) {
   }
 
   const bubble = document.createElement('div');
-  bubble.className = 'wx-msg-bubble' + (extraClass ? ' ' + extraClass : '');
-  bubble.innerHTML = esc(content);
+  bubble.className = 'wx-msg-bubble' + (turn.extraClass ? ' ' + turn.extraClass : '');
+  bubble.innerHTML = esc(turn.content);
   row.appendChild(bubble);
   return row;
 }
@@ -85,7 +75,7 @@ function render() {
     return;
   }
   for (const turn of history) {
-    main.appendChild(makeRow(turn.role, turn.content));
+    main.appendChild(makeRow(turn));
   }
   scrollBottom();
 }
@@ -113,7 +103,7 @@ async function sendMessage(text) {
   saveHistory();
   render();
 
-  const pending = makeRow('assistant', '对方正在输入…', 'wx-msg-bubble--pending');
+  const pending = makeRow({ role: 'assistant', content: '对方正在输入…', extraClass: 'wx-msg-bubble--pending' });
   main.appendChild(pending);
   scrollBottom();
 
@@ -153,41 +143,11 @@ function resizeInput() {
   input.style.height = Math.min(input.scrollHeight, 120) + 'px';
 }
 
-async function loadTools() {
-  try {
-    const res = await fetch('/portal-config.json');
-    if (!res.ok) return;
-    const cfg = await res.json();
-    toolGrid.innerHTML = '';
-    for (const tool of cfg.tools || []) {
-      if (!tool.ready || tool.id === 'secretary') continue;
-      const icon = tool.iconUrl ? withRoot(tool.iconUrl) : '';
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'wx-sheet-tool';
-      btn.innerHTML = `
-        ${icon ? `<img src="${icon}" alt="" width="36" height="36" />` : `<span>${tool.icon}</span>`}
-        <span>${tool.name}</span>
-      `;
-      btn.addEventListener('click', () => {
-        const href = withRoot(tool.url);
-        if (href.startsWith('http')) window.open(href, '_blank', 'noopener,noreferrer');
-        else window.location.href = href;
-      });
-      toolGrid.appendChild(btn);
-    }
-  } catch { /* ignore */ }
-}
-
-function openSheet() {
-  toolSheet.hidden = false;
-  document.body.classList.add('wx-sheet-open');
-}
-
-function closeSheet() {
-  toolSheet.hidden = true;
-  document.body.classList.remove('wx-sheet-open');
-}
+const attach = window.WxAttach.mountAttachSheet(
+  document.getElementById('attachSheet'),
+  document.getElementById('attachMask'),
+  document.getElementById('attachGrid'),
+);
 
 form.addEventListener('submit', (e) => {
   e.preventDefault();
@@ -214,15 +174,13 @@ btnClear.addEventListener('click', () => {
   render();
 });
 
-btnPlus.addEventListener('click', openSheet);
-toolMask.addEventListener('click', closeSheet);
+btnPlus.addEventListener('click', () => attach.open());
 
-Promise.all([
-  fetch('/secretary/friends.json').then((r) => r.json()),
-  checkSecretaryHealth(),
-])
+window.WxVoice.createVoiceInput(input, btnMic);
+
+Promise.all([loadFriends(), checkSecretaryHealth()])
   .then(([friends, health]) => {
-    friend = (friends || []).find((f) => f.id === friendId) || friends?.[0];
+    friend = memberById(friends, friendId) || friends[0];
     if (!friend) {
       main.innerHTML = '<p class="wx-chat-tip">未找到该好友</p>';
       return;
@@ -243,5 +201,3 @@ Promise.all([
   .catch(() => {
     main.innerHTML = '<p class="wx-chat-tip">加载失败</p>';
   });
-
-loadTools();

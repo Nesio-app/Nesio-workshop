@@ -38,6 +38,7 @@ export interface PortalConfig {
     title: string;
     subtitle: string;
     energyQuotes: string[];
+    warmReminders?: string[];
   };
   profile?: PortalProfile;
   location?: PortalLocation;

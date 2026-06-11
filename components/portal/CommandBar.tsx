@@ -2,15 +2,15 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PortalTool } from '@/lib/portal/types';
-import { withBase } from '@/lib/portal/paths';
 
 interface CommandBarProps {
   tools: PortalTool[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onOpenTool: (tool: PortalTool) => void;
 }
 
-export default function CommandBar({ tools, open, onOpenChange }: CommandBarProps) {
+export default function CommandBar({ tools, open, onOpenChange, onOpenTool }: CommandBarProps) {
   const [query, setQuery] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -55,12 +55,7 @@ export default function CommandBar({ tools, open, onOpenChange }: CommandBarProp
 
   const navigate = (tool: PortalTool) => {
     if (!tool.ready) return;
-    const href = withBase(tool.url);
-    if (href.startsWith('http')) {
-      window.open(href, '_blank', 'noopener,noreferrer');
-    } else {
-      window.location.href = href;
-    }
+    onOpenTool(tool);
   };
 
   if (!open) return null;

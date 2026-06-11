@@ -1,25 +1,38 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import type { CalendarEvent, PortalConfig } from '@/lib/portal/types';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
+import type { CalendarEvent, PortalConfig, PortalTool } from '@/lib/portal/types';
 import { greetingForHour } from '@/lib/portal/greeting';
+import {
+  fetchWeatherAt,
+  readGeo,
+  reverseGeocode,
+} from '@/lib/portal/weather';
+import ToolGrid from './ToolGrid';
 
 interface DashboardHomeProps {
   config: PortalConfig;
+  onOpenSearch: () => void;
+  onOpenTool: (tool: PortalTool) => void;
 }
+
+const AVATAR_KEY = 'treasurebox-profile-avatar';
+const FAV_QUOTES_KEY = 'treasurebox-favorite-quotes';
 
 interface WeatherState {
   temperature?: number;
   unit?: string;
   condition?: string;
+  placeName?: string;
+  forecastNote?: string;
   loading: boolean;
   error?: boolean;
 }
 
 function initials(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-  return name.slice(0, 2) || '我';
+  const t = name.trim();
+  return t.slice(0, 1) || '婧';
 }
 
 function formatClock(date: Date): string {
@@ -48,43 +61,60 @@ function formatEventTime(event: CalendarEvent): string {
   return `${a} – ${end.toLocaleTimeString('zh-CN', opts)}`;
 }
 
-function dayLabel(iso: string): string {
-  const d = new Date(iso);
-  const today = new Date();
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-
-  const same = (a: Date, b: Date) =>
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate();
-
-  if (same(d, today)) {
-    return `今天 ${d.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })}`;
-  }
-  if (same(d, tomorrow)) {
-    return `明天 ${d.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })}`;
-  }
-  return d.toLocaleDateString('zh-CN', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-  });
+function pickDailyQuote(config: PortalConfig): string {
+  const pool = [
+    ...(config.meta.energyQuotes || []),
+    ...(config.meta.warmReminders || []),
+  ].filter(Boolean);
+  if (pool.length === 0) return '今天也要好好照顾自己。';
+  const day = new Date().toDateString();
+  let hash = 0;
+  for (let i = 0; i < day.length; i++) hash = (hash + day.charCodeAt(i) * (i + 1)) % pool.length;
+  return pool[hash];
 }
 
-export default function DashboardHome({ config }: DashboardHomeProps) {
-  const profile = config.profile ?? { displayName: 'Jing' };
-  const location = config.location ?? {
+export default function DashboardHome({
+  config,
+  onOpenSearch,
+  onOpenTool,
+}: DashboardHomeProps) {
+  const profile = config.profile ?? { displayName: '婧' };
+  const fallbackLocation = config.location ?? {
     city: '上海',
     latitude: 31.2304,
     longitude: 121.4737,
     timezone: 'Asia/Shanghai',
   };
 
+  const fileRef = useRef<HTMLInputElement>(null);
   const [now, setNow] = useState(() => new Date());
+  const [avatarUrl, setAvatarUrl] = useState('');
   const [weather, setWeather] = useState<WeatherState>({ loading: true });
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [calendarNote, setCalendarNote] = useState<string | null>(null);
+  const [dailyQuote, setDailyQuote] = useState(() => pickDailyQuote(config));
+  const [quoteSaved, setQuoteSaved] = useState(false);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(AVATAR_KEY);
+      if (saved) setAvatarUrl(saved);
+      else if (profile.avatarUrl) setAvatarUrl(profile.avatarUrl);
+    } catch { /* ignore */ }
+  }, [profile.avatarUrl]);
+
+  useEffect(() => {
+    setDailyQuote(pickDailyQuote(config));
+  }, [config]);
+
+  useEffect(() => {
+    try {
+      const favs: string[] = JSON.parse(localStorage.getItem(FAV_QUOTES_KEY) || '[]');
+      setQuoteSaved(Array.isArray(favs) && favs.includes(dailyQuote));
+    } catch {
+      setQuoteSaved(false);
+    }
+  }, [dailyQuote]);
 
   useEffect(() => {
     const t = window.setInterval(() => setNow(new Date()), 30_000);
@@ -92,32 +122,54 @@ export default function DashboardHome({ config }: DashboardHomeProps) {
   }, []);
 
   useEffect(() => {
-    const WMO: Record<number, string> = {
-      0: '晴', 1: '大部晴朗', 2: '多云', 3: '阴', 45: '雾', 61: '小雨', 63: '中雨', 65: '大雨', 80: '阵雨', 95: '雷雨',
-    };
-    const url = new URL('https://api.open-meteo.com/v1/forecast');
-    url.searchParams.set('latitude', String(location.latitude));
-    url.searchParams.set('longitude', String(location.longitude));
-    url.searchParams.set('current', 'temperature_2m,weather_code');
-    url.searchParams.set('timezone', location.timezone || 'Asia/Shanghai');
+    let cancelled = false;
+    const tz = fallbackLocation.timezone || 'Asia/Shanghai';
 
-    fetch(url.toString())
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (!data?.current) {
-          setWeather({ loading: false, error: true });
-          return;
+    async function loadWeather() {
+      setWeather((w) => ({ ...w, loading: true, error: false }));
+      try {
+        let lat = fallbackLocation.latitude;
+        let lon = fallbackLocation.longitude;
+        let place = fallbackLocation.city;
+
+        try {
+          const pos = await readGeo();
+          lat = pos.coords.latitude;
+          lon = pos.coords.longitude;
+          const name = await reverseGeocode(lat, lon);
+          if (name) place = name;
+        } catch {
+          /* use fallback coords */
         }
-        const code = Number(data.current.weather_code) || 0;
-        setWeather({
-          loading: false,
-          temperature: data.current.temperature_2m,
-          unit: data.current_units?.temperature_2m || '°C',
-          condition: WMO[code] || '未知',
-        });
-      })
-      .catch(() => setWeather({ loading: false, error: true }));
-  }, [location.latitude, location.longitude, location.timezone]);
+
+        const snap = await fetchWeatherAt(lat, lon, tz, place);
+        if (!cancelled) {
+          setWeather({
+            loading: false,
+            temperature: snap.temperature,
+            unit: snap.unit,
+            condition: snap.condition,
+            placeName: snap.placeName,
+            forecastNote: snap.forecastNote,
+          });
+        }
+      } catch {
+        if (!cancelled) setWeather({ loading: false, error: true });
+      }
+    }
+
+    loadWeather();
+    const refresh = window.setInterval(loadWeather, 15 * 60_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(refresh);
+    };
+  }, [
+    fallbackLocation.latitude,
+    fallbackLocation.longitude,
+    fallbackLocation.city,
+    fallbackLocation.timezone,
+  ]);
 
   useEffect(() => {
     fetch('/api/portal/calendar')
@@ -131,41 +183,103 @@ export default function DashboardHome({ config }: DashboardHomeProps) {
   }, []);
 
   const greeting = greetingForHour(now.getHours());
-  const groupedEvents = useMemo(() => {
-    const map = new Map<string, CalendarEvent[]>();
-    for (const ev of events) {
-      const key = dayLabel(ev.start);
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(ev);
-    }
-    return Array.from(map.entries());
-  }, [events]);
+  const displayAvatar = avatarUrl || profile.avatarUrl;
+
+  const toggleSaveQuote = () => {
+    try {
+      const raw = localStorage.getItem(FAV_QUOTES_KEY);
+      const favs: string[] = raw ? JSON.parse(raw) : [];
+      const list = Array.isArray(favs) ? favs : [];
+      if (list.includes(dailyQuote)) {
+        localStorage.setItem(
+          FAV_QUOTES_KEY,
+          JSON.stringify(list.filter((q) => q !== dailyQuote)),
+        );
+        setQuoteSaved(false);
+      } else {
+        localStorage.setItem(FAV_QUOTES_KEY, JSON.stringify([dailyQuote, ...list].slice(0, 40)));
+        setQuoteSaved(true);
+      }
+    } catch { /* ignore */ }
+  };
+
+  const onAvatarPick = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const data = String(reader.result || '');
+      if (data.length > 2_800_000) return;
+      setAvatarUrl(data);
+      try {
+        localStorage.setItem(AVATAR_KEY, data);
+      } catch { /* ignore */ }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const quoteLine = useMemo(() => dailyQuote, [dailyQuote]);
 
   return (
     <div className="portal-dash">
       <header className="portal-dash-hero">
-        <div className="portal-dash-identity">
-          {profile.avatarUrl ? (
-            <img
-              className="portal-dash-avatar"
-              src={profile.avatarUrl}
-              alt=""
-              width={56}
-              height={56}
-            />
+        <button
+          type="button"
+          className="portal-avatar-upload"
+          onClick={() => fileRef.current?.click()}
+          aria-label="上传头像"
+        >
+          {displayAvatar ? (
+            <img className="portal-dash-avatar" src={displayAvatar} alt="" width={48} height={48} />
           ) : (
             <div className="portal-dash-avatar portal-dash-avatar--initials" aria-hidden>
               {initials(profile.displayName)}
             </div>
           )}
-          <div>
-            <p className="portal-dash-greeting">
-              {greeting}，{profile.displayName}
-            </p>
-            <p className="portal-dash-sub">{config.meta.subtitle}</p>
-          </div>
+          <span className="portal-avatar-upload-hint">换照片</span>
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          className="portal-avatar-file"
+          onChange={onAvatarPick}
+        />
+
+        <p className="portal-dash-greeting">
+          {greeting}，{profile.displayName}
+        </p>
+
+        <div className="portal-dash-hero-end">
+          <Link className="portal-dash-toplink-inline" href="/portfolio">
+            栖页
+          </Link>
+          <button
+            type="button"
+            className="portal-search-btn portal-search-btn--inline"
+            onClick={onOpenSearch}
+            aria-label="搜索或命令"
+          >
+            <span className="portal-search-icon" aria-hidden>
+              ⌕
+            </span>
+            <span>搜索</span>
+          </button>
         </div>
       </header>
+
+      <section className="portal-quote" aria-label="今日话语">
+        <p className="portal-quote-text">{quoteLine}</p>
+        <button
+          type="button"
+          className={'portal-quote-save' + (quoteSaved ? ' portal-quote-save--on' : '')}
+          onClick={toggleSaveQuote}
+          aria-label={quoteSaved ? '已收藏' : '收藏这句话'}
+        >
+          {quoteSaved ? '★' : '☆'}
+        </button>
+      </section>
 
       <section className="portal-widgets" aria-label="概览">
         <article className="portal-widget portal-widget--clock">
@@ -175,9 +289,12 @@ export default function DashboardHome({ config }: DashboardHomeProps) {
         </article>
 
         <article className="portal-widget portal-widget--weather">
-          <p className="portal-widget-label">天气 · {location.city}</p>
+          <p className="portal-widget-label">
+            天气
+            {weather.placeName ? ` · ${weather.placeName}` : ''}
+          </p>
           {weather.loading ? (
-            <p className="portal-widget-muted">加载中…</p>
+            <p className="portal-widget-muted">定位与天气加载中…</p>
           ) : weather.error ? (
             <p className="portal-widget-muted">暂无数据</p>
           ) : (
@@ -187,37 +304,32 @@ export default function DashboardHome({ config }: DashboardHomeProps) {
                 <span>{weather.unit || '°C'}</span>
               </p>
               <p className="portal-widget-muted">{weather.condition}</p>
+              {weather.forecastNote ? (
+                <p className="portal-widget-forecast">{weather.forecastNote}</p>
+              ) : null}
             </>
           )}
         </article>
       </section>
 
-      <section className="portal-calendar" aria-label="重要日历">
-        <header className="portal-calendar-head">
-          <h2>重要日历</h2>
-          <span className="portal-calendar-src">Google</span>
-        </header>
+      <ToolGrid tools={config.tools} onOpenTool={onOpenTool} />
 
-        {groupedEvents.length === 0 ? (
+      <section className="portal-calendar" aria-label="日历">
+        <h2 className="portal-calendar-head">日历</h2>
+
+        {events.length === 0 ? (
           <p className="portal-calendar-empty">
-            {calendarNote || '未来两周暂无日程'}
+            {calendarNote || '暂无即将到来的日程'}
           </p>
         ) : (
           <ul className="portal-calendar-list">
-            {groupedEvents.map(([day, dayEvents]) => (
-              <li key={day} className="portal-calendar-day">
-                <p className="portal-calendar-day-label">{day}</p>
-                <ul>
-                  {dayEvents.map((ev) => (
-                    <li key={ev.id} className="portal-calendar-event">
-                      <span className="portal-calendar-dot" aria-hidden />
-                      <div>
-                        <p className="portal-calendar-title">{ev.title}</p>
-                        <p className="portal-calendar-time">{formatEventTime(ev)}</p>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
+            {events.map((ev) => (
+              <li key={ev.id} className="portal-calendar-event">
+                <span className="portal-calendar-dot" aria-hidden />
+                <p className="portal-calendar-line">
+                  <span className="portal-calendar-title">{ev.title}</span>
+                  <span className="portal-calendar-time">{formatEventTime(ev)}</span>
+                </p>
               </li>
             ))}
           </ul>
