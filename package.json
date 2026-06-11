@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build && npm run bundle:toolbox",
-    "bundle:toolbox": "mkdir -p out/adhd-flow out/fitness out/storage && cp -R adhd-flow-ios/web/. out/adhd-flow/ && cp -R fitness/web/. out/fitness/ && cp -R storage-web/. out/storage/",
+    "dev": "npm run bundle:toolbox && next dev",
+    "build": "npm run bundle:toolbox && next build",
+    "bundle:toolbox": "mkdir -p public/adhd-flow public/fitness public/storage && cp -R adhd-flow-ios/web/. public/adhd-flow/ && cp -R fitness/web/. public/fitness/ && cp -R storage-web/. public/storage/",
     "start": "next start",
     "lint": "next lint"
   },

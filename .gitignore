@@ -10,6 +10,9 @@
 # next.js
 /.next/
 /out/
+/public/adhd-flow/
+/public/fitness/
+/public/storage/
 
 # production
 /build

@@ -6,6 +6,7 @@
   "rewrites": [
     { "source": "/adhd-flow", "destination": "/adhd-flow/index.html" },
     { "source": "/fitness", "destination": "/fitness/index.html" },
+    { "source": "/fitness/", "destination": "/fitness/index.html" },
     { "source": "/inner-shelter", "destination": "/inner-shelter/index.html" },
     { "source": "/storage", "destination": "/storage/index.html" },
     { "source": "/secretary", "destination": "/secretary/index.html" },
