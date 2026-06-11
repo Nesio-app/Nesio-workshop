@@ -3,12 +3,6 @@
   "framework": "nextjs",
   "buildCommand": "npm run build",
   "installCommand": "npm ci",
-  "redirects": [
-    { "source": "/fitness", "destination": "/fitness/", "permanent": true },
-    { "source": "/storage", "destination": "/storage/", "permanent": true },
-    { "source": "/adhd-flow", "destination": "/adhd-flow/", "permanent": true },
-    { "source": "/inner-shelter", "destination": "/inner-shelter/", "permanent": true }
-  ],
   "rewrites": [
     { "source": "/adhd-flow", "destination": "/adhd-flow/index.html" },
     { "source": "/adhd-flow/", "destination": "/adhd-flow/index.html" },
