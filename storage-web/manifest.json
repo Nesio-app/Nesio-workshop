@@ -1,0 +1,10 @@
+{
+  "name": "大后方",
+  "short_name": "大后方",
+  "description": "Object Anchors · Impulse Guard 物品管理与理智消费",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0f",
+  "theme_color": "#0a0a0f",
+  "orientation": "portrait"
+}

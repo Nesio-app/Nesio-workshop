@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build && npm run bundle:toolbox",
-    "bundle:toolbox": "mkdir -p out/adhd-flow out/fitness out/storage && cp -R adhd-flow-ios/web/. out/adhd-flow/ && cp -R fitness/web/. out/fitness/ && cp -R storage-ios/web/. out/storage/",
+    "bundle:toolbox": "mkdir -p out/adhd-flow out/fitness out/storage && cp -R adhd-flow-ios/web/. out/adhd-flow/ && cp -R fitness/web/. out/fitness/ && cp -R storage-web/. out/storage/",
     "start": "next start",
     "lint": "next lint"
   },

@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "buildCommand": "npm run build",
-  "installCommand": "git submodule update --init --recursive && npm ci",
+  "installCommand": "npm ci",
   "rewrites": [
     { "source": "/adhd-flow", "destination": "/adhd-flow/index.html" },
     { "source": "/fitness", "destination": "/fitness/index.html" },
