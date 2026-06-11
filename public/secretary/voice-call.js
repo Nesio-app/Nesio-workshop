@@ -1,55 +1,62 @@
 /**
- * Live voice call — hold-to-talk (mobile) or auto-listen (desktop).
+ * Native-style Live voice — tap to join, always-on turn-taking, tap orb to interrupt.
  */
 function createLiveVoiceCall(options = {}) {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   const overlay = options.overlayEl;
   const statusEl = options.statusEl;
   const transcriptEl = options.transcriptEl;
-  const talkBtn = options.talkBtn;
+  const orbEl = options.orbEl;
   const avatarEl = options.avatarEl;
   const nameEl = options.nameEl;
-  const waveEl = options.waveEl;
   const hangupBtn = options.hangupBtn;
   const onSend = options.onSend;
   const toast = options.toast || (() => {});
 
-  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-  const useHoldMode = isMobile || !SpeechRecognition;
-
   let active = false;
-  let state = 'idle';
+  let state = 'connecting';
   let rec = null;
   let listening = false;
-  let holdActive = false;
+  let recStarting = false;
+  let micStream = null;
+  let stopMeter = null;
   let silenceTimer = null;
   let utterBuffer = '';
   let interimText = '';
-  let lastFinalAt = 0;
-  let starting = false;
+  let lastSpeechAt = 0;
 
-  const SILENCE_MS = 1500;
+  const SILENCE_MS = 1100;
+  const MIN_CHARS = 2;
 
   function setState(next) {
     state = next;
     if (statusEl) {
       const labels = {
-        idle: useHoldMode ? '按住下方按钮说话' : '正在聆听，直接说话即可',
-        listening: useHoldMode ? '正在听…松手发送' : '正在聆听…',
-        thinking: '正在思考…',
-        speaking: '正在说话…（可随时打断）',
+        connecting: '正在连接…',
+        listening: '请说话',
+        thinking: '思考中…',
+        speaking: '点击光球可打断',
       };
       statusEl.textContent = labels[next] || next;
     }
-    if (waveEl) waveEl.dataset.state = next;
-    if (talkBtn) {
-      talkBtn.classList.toggle('wx-voice-call-talk--on', next === 'listening');
-      talkBtn.textContent = next === 'listening' ? '松开发送' : '按住说话';
-    }
+    if (orbEl) orbEl.dataset.state = next;
   }
 
-  function updateTranscript(text) {
-    if (transcriptEl) transcriptEl.textContent = text || '';
+  function setOrbLevel(level) {
+    if (!orbEl || state !== 'listening') return;
+    const scale = 1 + Math.min(level * 0.45, 0.35);
+    orbEl.style.setProperty('--wx-orb-scale', String(scale));
+  }
+
+  function updateTranscript(text, role) {
+    if (!transcriptEl) return;
+    if (!text) {
+      transcriptEl.textContent = '';
+      transcriptEl.dataset.role = '';
+      return;
+    }
+    transcriptEl.dataset.role = role || 'user';
+    transcriptEl.textContent = text;
   }
 
   function clearSilenceTimer() {
@@ -59,25 +66,32 @@ function createLiveVoiceCall(options = {}) {
     }
   }
 
-  function scheduleSendCheck() {
-    if (useHoldMode) return;
+  function currentText() {
+    return `${utterBuffer}${interimText ? (utterBuffer ? ' ' : '') + interimText : ''}`.trim();
+  }
+
+  function scheduleEndOfTurn() {
     clearSilenceTimer();
     silenceTimer = window.setTimeout(() => {
-      if (!active || state === 'thinking' || holdActive) return;
-      const text = utterBuffer.trim();
-      if (!text) return;
-      if (Date.now() - lastFinalAt < SILENCE_MS - 80) return;
+      if (!active || state !== 'listening') return;
+      const text = currentText();
+      if (!text || text.length < MIN_CHARS) return;
+      if (Date.now() - lastSpeechAt < SILENCE_MS - 60) return;
       void flushAndSend(text);
     }, SILENCE_MS);
   }
 
-  async function flushAndSend(text) {
-    if (!active || !text.trim()) return;
-    utterBuffer = '';
-    interimText = '';
-    updateTranscript('');
+  function pauseListening() {
     clearSilenceTimer();
     safeStopRec();
+    utterBuffer = '';
+    interimText = '';
+  }
+
+  async function flushAndSend(text) {
+    if (!active || !text.trim()) return;
+    pauseListening();
+    updateTranscript(text.trim(), 'user');
 
     setState('thinking');
     let result = { ok: false };
@@ -91,24 +105,28 @@ function createLiveVoiceCall(options = {}) {
 
     if (!result.ok) {
       toast(result.error || '发送失败');
-      if (!useHoldMode) beginListening();
-      else setState('idle');
+      resumeListening();
       return;
     }
 
     const reply = String(result.reply || '').trim();
     if (!reply) {
-      if (!useHoldMode) beginListening();
-      else setState('idle');
+      resumeListening();
       return;
     }
 
+    updateTranscript(reply, 'assistant');
     setState('speaking');
     window.WxVoice?.stopSpeaking?.();
-    await window.WxVoice?.speakTextAsync?.(reply, { lang: 'zh-CN' });
+    await window.WxVoice?.speakLiveText?.(reply, { lang: 'zh-CN' });
     if (!active) return;
-    if (!useHoldMode) beginListening();
-    else setState('idle');
+    resumeListening();
+  }
+
+  function interruptSpeaking() {
+    if (state !== 'speaking') return;
+    window.WxVoice?.stopSpeaking?.();
+    resumeListening();
   }
 
   function safeStopRec() {
@@ -119,40 +137,36 @@ function createLiveVoiceCall(options = {}) {
     } catch { /* ignore */ }
   }
 
-  function safeStartRec() {
-    if (!rec || listening || starting) return;
-    starting = true;
+  function safeStartRec(allowSpeaking) {
+    if (!rec || !active || listening || recStarting) return;
+    if (state !== 'listening' && !(allowSpeaking && state === 'speaking')) return;
+
+    recStarting = true;
     window.setTimeout(() => {
-      starting = false;
-    }, 400);
+      recStarting = false;
+    }, 320);
+
     try {
       rec.start();
       listening = true;
-    } catch (err) {
+    } catch {
       listening = false;
-      const msg = String(err?.message || err || '');
-      if (/already|started/i.test(msg)) {
-        listening = true;
-        return;
-      }
       window.setTimeout(() => {
-        if (!active || listening) return;
+        if (!active || state !== 'listening' || listening) return;
         try {
           rec.start();
           listening = true;
         } catch {
-          toast('无法启动麦克风，请重试');
+          toast('麦克风繁忙，请稍候再试');
         }
-      }, 350);
+      }, 400);
     }
   }
 
-  function beginListening() {
-    if (!active || !rec || useHoldMode) return;
-    if (state === 'thinking') return;
+  function resumeListening() {
+    if (!active) return;
     utterBuffer = '';
     interimText = '';
-    updateTranscript('');
     setState('listening');
     safeStartRec();
   }
@@ -160,30 +174,35 @@ function createLiveVoiceCall(options = {}) {
   function handleResults(event) {
     if (!active) return;
 
-    if (state === 'speaking') {
-      window.WxVoice?.stopSpeaking?.();
-      utterBuffer = '';
-      setState('listening');
-    }
-
     let finals = '';
     let interim = '';
     for (let i = event.resultIndex; i < event.results.length; i++) {
       const r = event.results[i];
       const t = r[0]?.transcript || '';
+      if (!t) continue;
       if (r.isFinal) finals += t;
       else interim += t;
     }
 
+    if (state === 'speaking' && (finals || interim.trim().length >= MIN_CHARS)) {
+      interruptSpeaking();
+    }
+
+    if (state !== 'listening') return;
+
     if (finals) {
       utterBuffer = utterBuffer ? `${utterBuffer} ${finals}` : finals;
-      lastFinalAt = Date.now();
-      if (!useHoldMode) scheduleSendCheck();
+      lastSpeechAt = Date.now();
+      scheduleEndOfTurn();
     }
 
     interimText = interim;
-    const shown = `${utterBuffer}${interimText ? (utterBuffer ? ' ' : '') + interimText : ''}`.trim();
-    updateTranscript(shown || '…');
+    const shown = currentText();
+    updateTranscript(shown || '…', 'user');
+    if (interim.trim()) {
+      lastSpeechAt = Date.now();
+      scheduleEndOfTurn();
+    }
   }
 
   function setupRecognition() {
@@ -191,75 +210,46 @@ function createLiveVoiceCall(options = {}) {
     rec = new SpeechRecognition();
     rec.lang = 'zh-CN';
     rec.interimResults = true;
-    rec.continuous = !useHoldMode;
+    rec.continuous = true;
+    rec.maxAlternatives = 1;
 
     rec.onresult = handleResults;
 
     rec.onerror = (e) => {
       const err = e.error;
       if (err === 'not-allowed') toast('请允许麦克风权限');
-      else if (err === 'network') toast('语音识别需要网络连接');
-      else if (err !== 'aborted' && err !== 'no-speech') toast('语音识别中断，请重试');
+      else if (err === 'network') toast('语音识别需要网络');
+      else if (err !== 'aborted' && err !== 'no-speech') toast('语音识别中断');
       listening = false;
     };
 
     rec.onend = () => {
       listening = false;
-      if (!active || useHoldMode || holdActive) return;
-      if (state === 'listening' || state === 'speaking') {
-        window.setTimeout(() => {
-          if (active && !holdActive && state !== 'thinking') safeStartRec();
-        }, 300);
+      if (active && (state === 'listening' || state === 'speaking')) {
+        window.setTimeout(() => safeStartRec(state === 'speaking'), 120);
       }
     };
 
     return true;
   }
 
-  async function ensureMicAccess() {
+  async function openMic() {
     if (!navigator.mediaDevices?.getUserMedia) return true;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      stream.getTracks().forEach((t) => t.stop());
+      micStream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true },
+      });
+      stopMeter = window.WxVoice?.createMicMeter?.(micStream, setOrbLevel) || (() => {});
       return true;
     } catch {
-      toast('需要麦克风权限才能语音通话');
+      toast('需要麦克风权限才能 Live 对话');
       return false;
     }
   }
 
-  function bindTalkButton() {
-    if (!talkBtn) return;
-
-    const onDown = (e) => {
-      e.preventDefault();
-      if (!active || state === 'thinking' || state === 'speaking') return;
-      holdActive = true;
-      utterBuffer = '';
-      interimText = '';
-      updateTranscript('');
-      setState('listening');
-      safeStartRec();
-    };
-
-    const onUp = () => {
-      if (!holdActive) return;
-      holdActive = false;
-      safeStopRec();
-      const text = `${utterBuffer} ${interimText}`.trim();
-      if (text) void flushAndSend(text);
-      else setState('idle');
-    };
-
-    talkBtn.addEventListener('pointerdown', onDown);
-    talkBtn.addEventListener('pointerup', onUp);
-    talkBtn.addEventListener('pointerleave', onUp);
-    talkBtn.addEventListener('pointercancel', onUp);
-  }
-
   async function open(friend) {
     if (!SpeechRecognition) {
-      toast('当前浏览器不支持语音对话，请用 Chrome 或 Safari');
+      toast('请使用 Safari 或 Chrome 进行 Live 对话');
       return false;
     }
     if (!rec && !setupRecognition()) {
@@ -271,11 +261,11 @@ function createLiveVoiceCall(options = {}) {
       return false;
     }
 
-    const micOk = await ensureMicAccess();
-    if (!micOk) return false;
-
     active = true;
+    setState('connecting');
     if (overlay) overlay.hidden = false;
+    document.body.classList.add('wx-voice-call-open');
+
     if (friend) {
       if (avatarEl && friend.logo) {
         const root = options.withRoot || ((p) => p);
@@ -284,29 +274,38 @@ function createLiveVoiceCall(options = {}) {
       }
       if (nameEl) nameEl.textContent = friend.name || '智友';
     }
-    document.body.classList.add('wx-voice-call-open');
 
-    if (useHoldMode) setState('idle');
-    else beginListening();
+    window.WxVoice?.primeSpeech?.();
+
+    const micOk = await openMic();
+    if (!micOk) {
+      close();
+      return false;
+    }
+
+    resumeListening();
     return true;
   }
 
   function close() {
     active = false;
-    holdActive = false;
-    clearSilenceTimer();
-    safeStopRec();
+    pauseListening();
     window.WxVoice?.stopSpeaking?.();
-    utterBuffer = '';
-    interimText = '';
+    if (stopMeter) stopMeter();
+    stopMeter = null;
+    micStream = null;
     updateTranscript('');
-    setState('idle');
+    setState('connecting');
     if (overlay) overlay.hidden = true;
     document.body.classList.remove('wx-voice-call-open');
   }
 
   if (hangupBtn) hangupBtn.addEventListener('click', close);
-  bindTalkButton();
+  if (orbEl) {
+    orbEl.addEventListener('click', () => {
+      if (state === 'speaking') interruptSpeaking();
+    });
+  }
 
   return { open, close, isActive: () => active };
 }

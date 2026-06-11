@@ -183,10 +183,9 @@ function mountLiveVoiceCall() {
     overlayEl: document.getElementById('voiceCall'),
     statusEl: document.getElementById('voiceCallStatus'),
     transcriptEl: document.getElementById('voiceCallTranscript'),
-    talkBtn: document.getElementById('voiceCallTalk'),
+    orbEl: document.getElementById('voiceCallOrb'),
     avatarEl: document.getElementById('voiceCallAvatar'),
     nameEl: document.getElementById('voiceCallName'),
-    waveEl: document.getElementById('voiceCallWave'),
     hangupBtn: document.getElementById('voiceCallHangup'),
     withRoot,
     toast,
@@ -224,10 +223,10 @@ const attachHandlers = {
     toast('视频通话需 WebRTC 信令服务，下一版接入；可先发送短视频文件');
     pickVideo.click();
   },
-  voice: () => toast('按住左侧麦克风说话，松手结束'),
+  voice: () => toast('按住输入框旁麦克风可语音输入'),
   call: () => {
     attach.close();
-    openLiveVoiceCall();
+    void openLiveVoiceCall();
   },
   note: () => {
     const text = input.value.trim() || prompt('写入 Note 的内容');

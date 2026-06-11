@@ -101,6 +101,29 @@ function createVoiceInput(inputEl, btnEl, options = {}) {
   return { supported: true, stop: stopListening, start: () => startListening(false) };
 }
 
+function pickZhVoice(synth) {
+  const voices = synth.getVoices();
+  return (
+    voices.find((v) => v.lang === 'zh-CN') ||
+    voices.find((v) => v.lang.startsWith('zh')) ||
+    null
+  );
+}
+
+let liveSpeakGen = 0;
+
+function primeSpeech() {
+  const synth = window.speechSynthesis;
+  if (!synth) return;
+  const u = new SpeechSynthesisUtterance(' ');
+  u.volume = 0.01;
+  u.lang = 'zh-CN';
+  const voice = pickZhVoice(synth);
+  if (voice) u.voice = voice;
+  synth.speak(u);
+  synth.cancel();
+}
+
 function speakText(text, options = {}) {
   const synth = window.speechSynthesis;
   if (!synth || !text?.trim()) return false;
@@ -113,65 +136,106 @@ function speakText(text, options = {}) {
   return true;
 }
 
-function pickZhVoice(synth) {
-  const voices = synth.getVoices();
-  return (
-    voices.find((v) => v.lang === 'zh-CN') ||
-    voices.find((v) => v.lang.startsWith('zh')) ||
-    null
-  );
-}
-
-function speakTextAsync(text, options = {}) {
+function speakChunk(text, options, gen) {
   const synth = window.speechSynthesis;
   return new Promise((resolve) => {
-    if (!synth || !text?.trim()) {
+    if (!synth || !text?.trim() || gen !== liveSpeakGen) {
       resolve(false);
       return;
     }
-
-    let settled = false;
-    const finish = (ok) => {
-      if (settled) return;
-      settled = true;
-      resolve(ok);
-    };
-
-    const run = () => {
-      synth.cancel();
-      const utter = new SpeechSynthesisUtterance(text.trim());
-      utter.lang = options.lang || 'zh-CN';
-      utter.rate = options.rate ?? 1;
-      utter.pitch = options.pitch ?? 1;
-      const voice = pickZhVoice(synth);
-      if (voice) utter.voice = voice;
-      utter.onend = () => finish(true);
-      utter.onerror = () => finish(false);
-      synth.speak(utter);
-      if (synth.paused) synth.resume();
-    };
-
-    if (synth.getVoices().length) {
-      run();
-    } else {
-      synth.onvoiceschanged = () => {
-        synth.onvoiceschanged = null;
-        run();
-      };
-      window.setTimeout(() => {
-        if (!settled) run();
-      }, 320);
-    }
+    const utter = new SpeechSynthesisUtterance(text.trim());
+    utter.lang = options.lang || 'zh-CN';
+    utter.rate = options.rate ?? 1.05;
+    utter.pitch = options.pitch ?? 1;
+    const voice = pickZhVoice(synth);
+    if (voice) utter.voice = voice;
+    utter.onend = () => resolve(gen === liveSpeakGen);
+    utter.onerror = () => resolve(false);
+    synth.speak(utter);
+    if (synth.paused) synth.resume();
   });
 }
 
+function splitSpeakChunks(text) {
+  const parts = text
+    .split(/(?<=[。！？.!?；;])\s*/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return parts.length ? parts : [text.trim()];
+}
+
+async function speakLiveText(text, options = {}) {
+  const synth = window.speechSynthesis;
+  if (!synth || !text?.trim()) return false;
+
+  const gen = ++liveSpeakGen;
+  synth.cancel();
+
+  const run = async () => {
+    for (const chunk of splitSpeakChunks(text)) {
+      if (gen !== liveSpeakGen) return false;
+      const ok = await speakChunk(chunk, options, gen);
+      if (!ok || gen !== liveSpeakGen) return false;
+    }
+    return true;
+  };
+
+  if (synth.getVoices().length) return run();
+
+  return new Promise((resolve) => {
+    const start = () => {
+      synth.onvoiceschanged = null;
+      run().then(resolve);
+    };
+    synth.onvoiceschanged = start;
+    window.setTimeout(start, 280);
+  });
+}
+
+function speakTextAsync(text, options = {}) {
+  return speakLiveText(text, options);
+}
+
 function stopSpeaking() {
+  liveSpeakGen += 1;
   window.speechSynthesis?.cancel();
+}
+
+function createMicMeter(stream, onLevel) {
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx || !stream) return () => {};
+
+  const ctx = new Ctx();
+  const src = ctx.createMediaStreamSource(stream);
+  const analyser = ctx.createAnalyser();
+  analyser.fftSize = 256;
+  analyser.smoothingTimeConstant = 0.82;
+  src.connect(analyser);
+  const buf = new Uint8Array(analyser.frequencyBinCount);
+  let raf = 0;
+
+  const tick = () => {
+    analyser.getByteFrequencyData(buf);
+    let sum = 0;
+    for (let i = 0; i < buf.length; i++) sum += buf[i];
+    onLevel(sum / buf.length / 255);
+    raf = requestAnimationFrame(tick);
+  };
+  tick();
+
+  return () => {
+    cancelAnimationFrame(raf);
+    stream.getTracks().forEach((t) => t.stop());
+    ctx.close().catch(() => {});
+  };
 }
 
 window.WxVoice = {
   createVoiceInput,
+  primeSpeech,
   speakText,
   speakTextAsync,
+  speakLiveText,
   stopSpeaking,
+  createMicMeter,
 };
