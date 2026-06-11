@@ -71,6 +71,71 @@ export function isLunarEvent(
   return isLunarEventTitle(title);
 }
 
+const DEFAULT_CALENDAR_TZ = 'Asia/Shanghai';
+
+/** YYYY-MM-DD in the given IANA timezone. */
+export function calendarDayKey(date: Date, timeZone = DEFAULT_CALENDAR_TZ): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+}
+
+function addCalendarDays(dayKey: string, days: number): string {
+  const [y, m, d] = dayKey.split('-').map(Number);
+  const next = new Date(Date.UTC(y, m - 1, d + days));
+  return next.toISOString().slice(0, 10);
+}
+
+function eventEndMs(event: CalendarEvent, timeZone = DEFAULT_CALENDAR_TZ): number {
+  if (event.end) return new Date(event.end).getTime();
+  if (event.allDay) {
+    const dayKey = calendarDayKey(new Date(event.start), timeZone);
+    const [y, m, d] = dayKey.split('-').map(Number);
+    return Date.UTC(y, m - 1, d + 1) - 1;
+  }
+  return new Date(event.start).getTime() + 3_600_000;
+}
+
+/** Keep only events on today or tomorrow that have not ended yet. */
+export function filterTodayAndTomorrowEvents(
+  events: CalendarEvent[],
+  at = new Date(),
+  timeZone = DEFAULT_CALENDAR_TZ,
+): CalendarEvent[] {
+  const todayKey = calendarDayKey(at, timeZone);
+  const tomorrowKey = addCalendarDays(todayKey, 1);
+  const nowMs = at.getTime();
+
+  return events
+    .filter((event) => {
+      const startKey = calendarDayKey(new Date(event.start), timeZone);
+      if (startKey !== todayKey && startKey !== tomorrowKey) return false;
+      return eventEndMs(event, timeZone) > nowMs;
+    })
+    .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+}
+
+export function formatEventDayLabel(
+  event: CalendarEvent,
+  at = new Date(),
+  timeZone = DEFAULT_CALENDAR_TZ,
+): string {
+  const startKey = calendarDayKey(new Date(event.start), timeZone);
+  const todayKey = calendarDayKey(at, timeZone);
+  const tomorrowKey = addCalendarDays(todayKey, 1);
+  if (startKey === todayKey) return '今天';
+  if (startKey === tomorrowKey) return '明天';
+  return new Date(event.start).toLocaleDateString('zh-CN', {
+    timeZone,
+    month: 'long',
+    day: 'numeric',
+    weekday: 'short',
+  });
+}
+
 export function mergeCalendarEvents(
   lists: CalendarEvent[][],
   limit = 5,

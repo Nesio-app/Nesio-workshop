@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
-import { mergeCalendarEvents } from '@/lib/portal/calendar-filters';
+import {
+  filterTodayAndTomorrowEvents,
+  mergeCalendarEvents,
+} from '@/lib/portal/calendar-filters';
 import { parseIcsEvents, parseCalendarName } from '@/lib/portal/ics';
 
 type Feed = { url: string; label: string };
@@ -96,7 +99,8 @@ export async function GET() {
     }
   }
 
-  const events = mergeCalendarEvents(lists, 40);
+  const merged = mergeCalendarEvents(lists, 80);
+  const events = filterTodayAndTomorrowEvents(merged);
 
   return NextResponse.json(
     {

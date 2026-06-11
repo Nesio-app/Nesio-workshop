@@ -10,6 +10,10 @@ import {
   PROFILE_UPDATED_EVENT,
   type PortalLocale,
 } from '@/lib/portal/profile';
+import {
+  filterTodayAndTomorrowEvents,
+  formatEventDayLabel,
+} from '@/lib/portal/calendar-filters';
 import type { CalendarEvent, PortalConfig, PortalTool } from '@/lib/portal/types';
 import { greetingForHour } from '@/lib/portal/greeting';
 import {
@@ -288,10 +292,14 @@ export default function DashboardHome({
 
   const quoteLine = useMemo(() => dailyQuote, [dailyQuote]);
   const cityName = weather.placeName || simplifyPlaceName(fallbackLocation.city);
+  const upcomingEvents = useMemo(
+    () => filterTodayAndTomorrowEvents(events, now),
+    [events, now],
+  );
   const visibleEvents = calendarExpanded
-    ? events
-    : events.slice(0, CALENDAR_PREVIEW);
-  const hasMoreEvents = events.length > CALENDAR_PREVIEW;
+    ? upcomingEvents
+    : upcomingEvents.slice(0, CALENDAR_PREVIEW);
+  const hasMoreEvents = upcomingEvents.length > CALENDAR_PREVIEW;
   const fidelityFeed = calendarFeeds.find((f) => f.label === 'Fidelity');
   const googleOk = calendarFeeds.some((f) => f.label === 'Google' && f.ok);
   const showFidelityHint =
@@ -404,7 +412,7 @@ export default function DashboardHome({
           </div>
         ) : null}
 
-        {events.length === 0 ? (
+        {upcomingEvents.length === 0 ? (
           <p className="portal-calendar-empty">
             {calendarNote || t(locale, 'calendarEmpty')}
           </p>
@@ -416,7 +424,12 @@ export default function DashboardHome({
                 <div className="portal-calendar-body">
                   <p className="portal-calendar-line">
                     <span className="portal-calendar-title">{ev.title}</span>
-                    <span className="portal-calendar-time">{formatEventTime(ev)}</span>
+                    <span className="portal-calendar-schedule">
+                      <span className="portal-calendar-date">
+                        {formatEventDayLabel(ev, now)}
+                      </span>
+                      <span className="portal-calendar-time">{formatEventTime(ev)}</span>
+                    </span>
                   </p>
                   <p className="portal-calendar-meta">
                     <span className="portal-calendar-countdown">
@@ -436,7 +449,7 @@ export default function DashboardHome({
           >
             {calendarExpanded
               ? t(locale, 'calendarCollapse')
-              : `${t(locale, 'calendarMore')}（${events.length - CALENDAR_PREVIEW}）`}
+              : `${t(locale, 'calendarMore')}（${upcomingEvents.length - CALENDAR_PREVIEW}）`}
           </button>
         ) : null}
       </section>

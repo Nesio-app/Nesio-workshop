@@ -25,7 +25,13 @@ export default function ToolSidebar({ tools }: ToolSidebarProps) {
   return (
     <nav className="portal-rail" aria-label="工具">
       <div className="portal-rail-brand" title="宝盒">
-        <span className="portal-rail-mark">盒</span>
+        <img
+          className="portal-rail-mark"
+          src="/icons/treasurebox.svg"
+          alt=""
+          width={40}
+          height={40}
+        />
       </div>
       <ul className="portal-rail-list">
         {ready.map((tool) => {

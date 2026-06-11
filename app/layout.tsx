@@ -19,6 +19,10 @@ export const metadata: Metadata = {
   title: '宝盒 · 数字静谧庭院',
   description: '个人工具箱入口 — 秩序、觉察与体现的三舱静谧庭院。',
   manifest: '/manifest.json',
+  icons: {
+    icon: [{ url: '/icons/treasurebox.svg', type: 'image/svg+xml' }],
+    apple: [{ url: '/icons/treasurebox.svg', type: 'image/svg+xml' }],
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
