@@ -1,7 +1,7 @@
 'use client';
 
 import type { PortalTool, PortalZone } from '@/lib/portal/types';
-import { withBase } from '@/lib/portal/paths';
+import { ensureToolboxTrailingSlash, withBase } from '@/lib/portal/paths';
 
 interface ToolCardProps {
   tool: PortalTool;
@@ -13,7 +13,7 @@ function isExternalUrl(url: string): boolean {
 }
 
 export default function ToolCard({ tool, zone }: ToolCardProps) {
-  const href = tool.ready ? withBase(tool.url) : undefined;
+  const href = tool.ready ? ensureToolboxTrailingSlash(withBase(tool.url)) : undefined;
   const external = href ? isExternalUrl(href) : false;
   const breathe = zone.tone === 'warm' && tool.id === 'psychoanalysis';
   const iconSrc = tool.iconUrl ? withBase(tool.iconUrl) : null;

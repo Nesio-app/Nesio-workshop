@@ -1,14 +1,14 @@
 'use client';
 
 import type { PortalTool } from '@/lib/portal/types';
-import { withBase } from '@/lib/portal/paths';
+import { ensureToolboxTrailingSlash, withBase } from '@/lib/portal/paths';
 
 interface ToolSidebarProps {
   tools: PortalTool[];
 }
 
 function toolHref(tool: PortalTool): string | undefined {
-  return tool.ready ? withBase(tool.url) : undefined;
+  return tool.ready ? ensureToolboxTrailingSlash(withBase(tool.url)) : undefined;
 }
 
 function openTool(href: string) {

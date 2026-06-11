@@ -1,8 +1,8 @@
 import type { PortalTool } from './types';
-import { withBase } from './paths';
+import { ensureToolboxTrailingSlash, withBase } from './paths';
 
 export function toolOpenUrl(tool: PortalTool): string {
-  return withBase(tool.url);
+  return ensureToolboxTrailingSlash(withBase(tool.url));
 }
 
 /** External apps and 智友 break inside iframes (X-Frame-Options / nested UI). */
