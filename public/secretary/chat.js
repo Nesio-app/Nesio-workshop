@@ -142,6 +142,9 @@ async function sendMessage(text) {
     history.push({ role: 'assistant', content: reply });
     saveHistory();
     render();
+    if (window.WxVoice?.isVoiceCallMode?.()) {
+      window.WxVoice.speakText(reply);
+    }
   } catch (err) {
     pending.remove();
     showError('网络异常：' + (err?.message || '请检查网络'));
@@ -181,9 +184,16 @@ async function sendAttachmentMessage(label, extra) {
 const attachHandlers = {
   photo: () => pickPhoto.click(),
   file: () => pickFile.click(),
-  video: () => pickVideo.click(),
-  voice: () => toast('按住左侧麦克风说话'),
-  call: () => toast('语音通话功能开发中'),
+  video: () => {
+    toast('视频通话需 WebRTC 信令服务，下一版接入；可先发送短视频文件');
+    pickVideo.click();
+  },
+  voice: () => toast('按住左侧麦克风说话，松手结束'),
+  call: () => {
+    const on = !window.WxVoice?.isVoiceCallMode?.();
+    window.WxVoice?.setVoiceCallMode?.(on);
+    toast(on ? '语音模式：AI 回复将自动朗读' : '已退出语音模式');
+  },
   note: () => {
     const text = input.value.trim() || prompt('写入 Note 的内容');
     if (!text) return;

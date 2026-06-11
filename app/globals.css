@@ -653,6 +653,12 @@ body {
   font-size: 0.95rem;
 }
 
+/* Emoji tool/note icons — tint to portal blue palette */
+.portal-icon-blue {
+  color: var(--portal-blue-deep);
+  filter: grayscale(1) sepia(1) hue-rotate(186deg) saturate(4.5) brightness(0.9);
+}
+
 .portal-dash {
   flex: 1;
   display: flex;
@@ -1012,7 +1018,7 @@ body {
   font-size: 1.2rem;
   line-height: 1;
   color: var(--portal-blue-deep);
-  filter: saturate(0.85);
+  filter: grayscale(1) sepia(1) hue-rotate(186deg) saturate(4.5) brightness(0.9);
 }
 
 .portal-tool-name {
@@ -1039,6 +1045,16 @@ body {
   margin: 0 0 0.55rem;
   font-size: 0.88rem;
   font-weight: 600;
+}
+
+.portal-calendar-feed-hint {
+  margin: 0 0 0.45rem;
+  font-size: 0.68rem;
+  line-height: 1.45;
+  color: #b45309;
+  background: rgba(251, 191, 36, 0.12);
+  border-radius: 0.55rem;
+  padding: 0.35rem 0.5rem;
 }
 
 .portal-calendar-empty {

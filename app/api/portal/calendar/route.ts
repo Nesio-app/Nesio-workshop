@@ -42,7 +42,12 @@ function calendarFeeds(): Feed[] {
 
 async function fetchIcsEvents(url: string, fallbackLabel: string) {
   const res = await fetch(url, {
-    headers: { 'User-Agent': 'TreasureBox/1.0' },
+    headers: {
+      'User-Agent':
+        'Mozilla/5.0 (compatible; TreasureBox/1.0; +https://treasurebox-nu.vercel.app)',
+      Accept: 'text/calendar, text/plain, */*',
+    },
+    redirect: 'follow',
     next: { revalidate: 300 },
     cache: 'no-store',
   });

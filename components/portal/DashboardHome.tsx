@@ -95,7 +95,14 @@ function formatEventCountdown(event: CalendarEvent, at: Date): string {
   return h > 0 ? `${days} 天 ${h} 小时后` : `${days} 天后`;
 }
 
-const CALENDAR_PREVIEW = 5;
+const CALENDAR_PREVIEW = 3;
+
+interface CalendarFeedStatus {
+  label: string;
+  ok: boolean;
+  count: number;
+  error?: string;
+}
 
 export default function DashboardHome({
   config,
@@ -116,6 +123,7 @@ export default function DashboardHome({
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [calendarExpanded, setCalendarExpanded] = useState(false);
   const [calendarNote, setCalendarNote] = useState<string | null>(null);
+  const [calendarFeeds, setCalendarFeeds] = useState<CalendarFeedStatus[]>([]);
   const quotePicked = useRef(false);
   const [dailyQuote, setDailyQuote] = useState('今天也要好好照顾自己。');
   const [quoteSaved, setQuoteSaved] = useState(false);
@@ -211,6 +219,7 @@ export default function DashboardHome({
       .then((r) => r.json())
       .then((data) => {
         if (data.events?.length) setEvents(data.events);
+        if (Array.isArray(data.feeds)) setCalendarFeeds(data.feeds);
         if (!data.configured && data.message) setCalendarNote(data.message);
         else if (data.error) setCalendarNote('日历暂时无法加载');
       })
@@ -244,6 +253,11 @@ export default function DashboardHome({
     ? events
     : events.slice(0, CALENDAR_PREVIEW);
   const hasMoreEvents = events.length > CALENDAR_PREVIEW;
+  const fidelityFeed = calendarFeeds.find((f) => f.label === 'Fidelity');
+  const fidelityHint =
+    fidelityFeed && !fidelityFeed.ok
+      ? 'Fidelity 日历未同步：请在 Fidelity 重新生成私人 iCal 链接，并更新 Vercel 环境变量 FIDELITY。'
+      : null;
 
   return (
     <div className="portal-dash">
@@ -270,7 +284,7 @@ export default function DashboardHome({
             onClick={onOpenNote}
             aria-label="打开笔记"
           >
-            <span className="portal-search-icon" aria-hidden>
+            <span className="portal-search-icon portal-icon-blue" aria-hidden>
               📝
             </span>
           </button>
@@ -322,6 +336,11 @@ export default function DashboardHome({
 
       <section className="portal-calendar" aria-label="日历">
         <h2 className="portal-calendar-head">日历</h2>
+        {fidelityHint ? (
+          <p className="portal-calendar-feed-hint" role="status">
+            {fidelityHint}
+          </p>
+        ) : null}
 
         {events.length === 0 ? (
           <p className="portal-calendar-empty">

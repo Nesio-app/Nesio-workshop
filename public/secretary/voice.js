@@ -101,4 +101,38 @@ function createVoiceInput(inputEl, btnEl, options = {}) {
   return { supported: true, stop: stopListening, start: () => startListening(false) };
 }
 
-window.WxVoice = { createVoiceInput };
+let voiceCallMode = false;
+
+function speakText(text, options = {}) {
+  const synth = window.speechSynthesis;
+  if (!synth || !text?.trim()) return false;
+  synth.cancel();
+  const utter = new SpeechSynthesisUtterance(text.trim());
+  utter.lang = options.lang || 'zh-CN';
+  utter.rate = options.rate ?? 1;
+  utter.pitch = options.pitch ?? 1;
+  synth.speak(utter);
+  return true;
+}
+
+function setVoiceCallMode(on) {
+  voiceCallMode = Boolean(on);
+  if (!voiceCallMode) window.speechSynthesis?.cancel();
+  return voiceCallMode;
+}
+
+function isVoiceCallMode() {
+  return voiceCallMode;
+}
+
+function stopSpeaking() {
+  window.speechSynthesis?.cancel();
+}
+
+window.WxVoice = {
+  createVoiceInput,
+  speakText,
+  setVoiceCallMode,
+  isVoiceCallMode,
+  stopSpeaking,
+};

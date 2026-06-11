@@ -24,7 +24,7 @@ export default function ToolGrid({ tools, onOpenTool }: ToolGridProps) {
                 title={tool.description}
               >
                 <span className="portal-tool-icon-wrap">
-                  <span className="portal-tool-emoji" aria-hidden>
+                  <span className="portal-tool-emoji portal-icon-blue" aria-hidden>
                     {tool.icon}
                   </span>
                 </span>
