@@ -1,13 +1,19 @@
-const {
-  withRoot,
-  esc,
-  toast,
-  loadFriends,
-  memberById,
-  getGroups,
-  saveNoteEntry,
-  loadFavoriteQuotes,
-} = window.WxCommon;
+(function bootGroup() {
+  if (!window.WxCommon) {
+    requestAnimationFrame(bootGroup);
+    return;
+  }
+
+  const {
+    withRoot,
+    esc,
+    toast,
+    loadFriends,
+    memberById,
+    getGroups,
+    saveNoteEntry,
+    loadFavoriteQuotes,
+  } = window.WxCommon;
 
 const params = new URLSearchParams(location.search);
 const groupId = params.get('group');
@@ -309,3 +315,4 @@ loadFriends()
   .catch(() => {
     main.innerHTML = '<p class="wx-chat-tip">加载失败</p>';
   });
+})();

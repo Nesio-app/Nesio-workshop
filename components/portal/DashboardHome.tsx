@@ -160,14 +160,19 @@ export default function DashboardHome({
       try {
         let lat = fallbackLocation.latitude;
         let lon = fallbackLocation.longitude;
-        let place = simplifyPlaceName(fallbackLocation.city);
+        const configCity = simplifyPlaceName(fallbackLocation.city);
+        const pinToConfigCity =
+          fallbackLocation.useConfigCity !== false && Boolean(configCity);
+        let place = configCity;
 
         try {
           const pos = await readGeo();
           lat = pos.coords.latitude;
           lon = pos.coords.longitude;
-          const name = await reverseGeocode(lat, lon);
-          if (name) place = simplifyPlaceName(name);
+          if (!pinToConfigCity) {
+            const name = await reverseGeocode(lat, lon);
+            if (name) place = simplifyPlaceName(name);
+          }
         } catch {
           /* use fallback coords */
         }
@@ -261,14 +266,13 @@ export default function DashboardHome({
         <div className="portal-dash-hero-end">
           <button
             type="button"
-            className="portal-search-btn portal-search-btn--inline"
+            className="portal-search-btn portal-search-btn--icon"
             onClick={onOpenNote}
-            aria-label="打开 Note"
+            aria-label="打开笔记"
           >
             <span className="portal-search-icon" aria-hidden>
-              ✎
+              📝
             </span>
-            <span>Note</span>
           </button>
         </div>
       </header>
@@ -334,9 +338,6 @@ export default function DashboardHome({
                     <span className="portal-calendar-time">{formatEventTime(ev)}</span>
                   </p>
                   <p className="portal-calendar-meta">
-                    {ev.source ? (
-                      <span className="portal-calendar-source">{ev.source}</span>
-                    ) : null}
                     <span className="portal-calendar-countdown">
                       {formatEventCountdown(ev, now)}
                     </span>

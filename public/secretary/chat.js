@@ -1,12 +1,18 @@
-const {
-  withRoot,
-  esc,
-  toast,
-  loadFriends,
-  memberById,
-  saveNoteEntry,
-  loadFavoriteQuotes,
-} = window.WxCommon;
+(function bootChat() {
+  if (!window.WxCommon) {
+    requestAnimationFrame(bootChat);
+    return;
+  }
+
+  const {
+    withRoot,
+    esc,
+    toast,
+    loadFriends,
+    memberById,
+    saveNoteEntry,
+    loadFavoriteQuotes,
+  } = window.WxCommon;
 
 const params = new URLSearchParams(location.search);
 const friendId = params.get('friend') || 'gemini';
@@ -257,10 +263,11 @@ const attach = window.WxAttach.mountAttachSheet(
 
 form.addEventListener('submit', (e) => {
   e.preventDefault();
-  const text = input.value;
+  const text = input.value.trim();
+  if (!text) return;
   input.value = '';
   resizeInput();
-  sendMessage(text);
+  void sendMessage(text);
 });
 
 input.addEventListener('keydown', (e) => {
@@ -313,3 +320,4 @@ Promise.all([loadFriends(), checkSecretaryHealth()])
   .catch(() => {
     main.innerHTML = '<p class="wx-chat-tip">加载失败</p>';
   });
+})();

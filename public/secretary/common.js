@@ -102,6 +102,25 @@ function loadFavoriteQuotes() {
   }
 }
 
+function onReady(fn) {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', fn);
+  } else {
+    fn();
+  }
+}
+
+function whenWxCommon(fn) {
+  const run = () => {
+    if (!window.WxCommon) {
+      requestAnimationFrame(run);
+      return;
+    }
+    fn(window.WxCommon);
+  };
+  onReady(run);
+}
+
 window.WxCommon = {
   withRoot,
   esc,
@@ -114,4 +133,6 @@ window.WxCommon = {
   memberById,
   saveNoteEntry,
   loadFavoriteQuotes,
+  onReady,
+  whenWxCommon,
 };

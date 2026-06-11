@@ -635,6 +635,20 @@ body {
   align-self: center;
 }
 
+.portal-search-btn--icon {
+  align-self: center;
+  width: 2.05rem;
+  height: 2.05rem;
+  padding: 0;
+  justify-content: center;
+  border-radius: 0.7rem;
+}
+
+.portal-search-btn--icon .portal-search-icon {
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
 .portal-search-icon {
   font-size: 0.95rem;
 }
@@ -855,9 +869,8 @@ body {
   margin: 0.15rem 0 0;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 0.5rem;
-  flex-wrap: wrap;
 }
 
 .portal-calendar-source {

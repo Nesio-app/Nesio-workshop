@@ -3,14 +3,24 @@ import { mergeCalendarEvents } from '@/lib/portal/calendar-filters';
 import { parseIcsEvents, parseCalendarName } from '@/lib/portal/ics';
 
 type Feed = { url: string; label: string };
+type FeedResult = { label: string; ok: boolean; count: number; error?: string };
+
+function normalizeIcalUrl(raw: string): string {
+  const u = raw.trim();
+  if (u.startsWith('webcal://')) return `https://${u.slice('webcal://'.length)}`;
+  if (u.startsWith('http://')) return `https://${u.slice('http://'.length)}`;
+  return u;
+}
 
 function calendarFeeds(): Feed[] {
   const feeds: Feed[] = [];
   const add = (raw: string | undefined, label: string) => {
     const v = raw?.trim();
-    if (!v) return;
-    if (feeds.some((f) => f.url === v)) return;
-    feeds.push({ url: v, label });
+    if (!v || v === '""' || v === "''") return;
+    const url = normalizeIcalUrl(v);
+    if (!url.startsWith('https://')) return;
+    if (feeds.some((f) => f.url === url)) return;
+    feeds.push({ url, label });
   };
 
   add(process.env.GOOGLE_CALENDAR_ICAL_URL, 'Google');
@@ -34,11 +44,12 @@ async function fetchIcsEvents(url: string, fallbackLabel: string) {
   const res = await fetch(url, {
     headers: { 'User-Agent': 'TreasureBox/1.0' },
     next: { revalidate: 300 },
+    cache: 'no-store',
   });
   if (!res.ok) throw new Error(`fetch failed: ${res.status}`);
   const text = await res.text();
   const calName = parseCalendarName(text) || fallbackLabel;
-  const events = parseIcsEvents(text, 60, calName);
+  const events = parseIcsEvents(text, 90, calName);
   return events.map((ev) => ({
     ...ev,
     calendarName: ev.calendarName || calName,
@@ -54,30 +65,38 @@ export async function GET() {
       ok: false,
       configured: false,
       events: [],
+      feeds: [],
       message: 'Set GOOGLE_CALENDAR_ICAL_URL and FIDELITY on Vercel.',
     });
   }
 
-  try {
-    const lists = await Promise.all(
-      feeds.map((feed) =>
-        fetchIcsEvents(feed.url, feed.label).catch(() => []),
-      ),
-    );
+  const feedResults: FeedResult[] = [];
+  const lists: Awaited<ReturnType<typeof fetchIcsEvents>>[] = [];
 
-    const events = mergeCalendarEvents(lists, 40);
-
-    return NextResponse.json({
-      ok: true,
-      configured: true,
-      events,
-      sources: feeds.map((f) => f.label),
-      fetchedAt: new Date().toISOString(),
-    });
-  } catch {
-    return NextResponse.json(
-      { ok: false, configured: true, events: [], error: 'calendar parse failed' },
-      { status: 502 },
-    );
+  for (const feed of feeds) {
+    try {
+      const events = await fetchIcsEvents(feed.url, feed.label);
+      lists.push(events);
+      feedResults.push({ label: feed.label, ok: true, count: events.length });
+    } catch (err) {
+      lists.push([]);
+      feedResults.push({
+        label: feed.label,
+        ok: false,
+        count: 0,
+        error: err instanceof Error ? err.message : 'fetch failed',
+      });
+    }
   }
+
+  const events = mergeCalendarEvents(lists, 40);
+
+  return NextResponse.json({
+    ok: true,
+    configured: true,
+    events,
+    feeds: feedResults,
+    sources: feeds.map((f) => f.label),
+    fetchedAt: new Date().toISOString(),
+  });
 }

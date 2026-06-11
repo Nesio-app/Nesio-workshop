@@ -1,10 +1,16 @@
-const {
-  withRoot,
-  loadFriends,
-  getGroups,
-  addGroup,
-  toast,
-} = window.WxCommon;
+(function bootList() {
+  if (!window.WxCommon) {
+    requestAnimationFrame(bootList);
+    return;
+  }
+
+  const {
+    withRoot,
+    loadFriends,
+    getGroups,
+    addGroup,
+    toast,
+  } = window.WxCommon;
 
 const listEl = document.getElementById('friendList');
 const searchInput = document.getElementById('searchInput');
@@ -74,7 +80,7 @@ function renderList(filter) {
     (f) =>
       !q ||
       f.name.toLowerCase().includes(q) ||
-      f.tagline.toLowerCase().includes(q) ||
+      (f.tagline || '').toLowerCase().includes(q) ||
       (f.company || '').toLowerCase().includes(q),
   );
 
@@ -245,3 +251,4 @@ loadFriends()
   });
 
 loadTools();
+})();

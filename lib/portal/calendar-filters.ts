@@ -42,11 +42,32 @@ export function isLunarEventTitle(title: string): boolean {
     return true;
   }
 
+  // Lunar day + festival/term — e.g. 初五 端午、廿三 小暑
+  if (
+    /^(闰)?(初[一二三四五六七八九十]|十[一二三四五六七八九]|廿[一二三四五六七八九十]|二十[一二三四五六七八九]?|三十)\s+\S/.test(
+      t,
+    )
+  ) {
+    return true;
+  }
+
   return false;
 }
 
-export function isLunarEvent(title: string, calendarName = ''): boolean {
+/** UID patterns from embedded Chinese lunar calendar feeds. */
+export function isLunarEventId(id = ''): boolean {
+  const s = id.trim();
+  if (!s) return false;
+  return /lc@infinet\.github\.io|@lunar\.|huangli|chinese.?lunar/i.test(s);
+}
+
+export function isLunarEvent(
+  title: string,
+  calendarName = '',
+  id = '',
+): boolean {
   if (isLunarCalendarName(calendarName)) return true;
+  if (isLunarEventId(id)) return true;
   return isLunarEventTitle(title);
 }
 
@@ -59,7 +80,7 @@ export function mergeCalendarEvents(
 
   for (const list of lists) {
     for (const ev of list) {
-      if (isLunarEvent(ev.title, ev.calendarName)) continue;
+      if (isLunarEvent(ev.title, ev.calendarName, ev.id)) continue;
       const key = `${ev.title}|${ev.start}`;
       if (seen.has(key)) continue;
       seen.add(key);

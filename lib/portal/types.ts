@@ -31,6 +31,8 @@ export interface PortalLocation {
   latitude: number;
   longitude: number;
   timezone?: string;
+  /** When true, weather widget shows config city instead of reverse-geocode. */
+  useConfigCity?: boolean;
 }
 
 export interface PortalConfig {
