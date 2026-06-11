@@ -172,6 +172,20 @@
       "ready": true
     },
     {
+      "id": "health",
+      "name": "溯",
+      "nameEn": "SÙ Health",
+      "description": "血糖叙事 · 模式与 n-of-1 实验",
+      "url": "https://health-ios.vercel.app/",
+      "zone": "manifest",
+      "hotkey": "u",
+      "command": "/health",
+      "featured": true,
+      "icon": "🫀",
+      "iconUrl": "/icons/tools/health.svg",
+      "ready": true
+    },
+    {
       "id": "lifesim",
       "name": "人生",
       "nameEn": "Weaver",
