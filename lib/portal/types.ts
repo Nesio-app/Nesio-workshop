@@ -21,12 +21,34 @@ export interface PortalTool {
   ready?: boolean;
 }
 
+export interface PortalProfile {
+  displayName: string;
+  avatarUrl?: string;
+}
+
+export interface PortalLocation {
+  city: string;
+  latitude: number;
+  longitude: number;
+  timezone?: string;
+}
+
 export interface PortalConfig {
   meta: {
     title: string;
     subtitle: string;
     energyQuotes: string[];
   };
+  profile?: PortalProfile;
+  location?: PortalLocation;
   zones: Record<ZoneId, PortalZone>;
   tools: PortalTool[];
+}
+
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  start: string;
+  end?: string;
+  allDay?: boolean;
 }

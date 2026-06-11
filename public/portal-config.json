@@ -1,4 +1,14 @@
 {
+  "profile": {
+    "displayName": "Jing",
+    "avatarUrl": ""
+  },
+  "location": {
+    "city": "上海",
+    "latitude": 31.2304,
+    "longitude": 121.4737,
+    "timezone": "Asia/Shanghai"
+  },
   "meta": {
     "title": "宝盒",
     "subtitle": "数字静谧庭院",
@@ -29,9 +39,9 @@
   "tools": [
     {
       "id": "secretary",
-      "name": "AI 私人秘书",
-      "nameEn": "Secretary",
-      "description": "幕僚 · 理清思绪与行动",
+      "name": "智友",
+      "nameEn": "AI Friends",
+      "description": "微信式 AI 对话",
       "url": "/secretary/",
       "zone": "kinetic",
       "hotkey": "a",
@@ -43,9 +53,9 @@
     },
     {
       "id": "plan",
-      "name": "计划",
-      "nameEn": "Plan",
-      "description": "总控台 · 轻推任务",
+      "name": "轻推",
+      "nameEn": "Flow",
+      "description": "任务总控 · ADHD 友好",
       "url": "https://adhd-flow-ios.vercel.app/",
       "zone": "kinetic",
       "hotkey": "p",
@@ -57,9 +67,9 @@
     },
     {
       "id": "quiz",
-      "name": "刷题",
-      "nameEn": "Practice",
-      "description": "认知进化 · 题库",
+      "name": "题炉",
+      "nameEn": "Quiz",
+      "description": "CFA 刷题 · 认知进化",
       "url": "https://questionbank-ios.vercel.app/",
       "zone": "kinetic",
       "hotkey": "q",
@@ -71,10 +81,10 @@
     },
     {
       "id": "inventory",
-      "name": "找东西",
+      "name": "寻物",
       "nameEn": "Storage",
-      "description": "空间秩序 · 收纳",
-      "url": "https://storage.vercel.app/",
+      "description": "大后方 · 物品收纳",
+      "url": "https://storage-kohl.vercel.app/",
       "zone": "kinetic",
       "hotkey": "i",
       "command": "/storage",
@@ -85,9 +95,9 @@
     },
     {
       "id": "psychoanalysis",
-      "name": "心理咨询",
+      "name": "心镜",
       "nameEn": "Psych",
-      "description": "潜意识显影 · 对话",
+      "description": "心理咨询 · 潜意识对话",
       "url": "https://psych-tool-ios.vercel.app/",
       "zone": "reflective",
       "hotkey": "s",
@@ -99,9 +109,9 @@
     },
     {
       "id": "sanctuary",
-      "name": "心灵空间",
-      "nameEn": "Inner Shelter",
-      "description": "情绪安放 · 呼吸",
+      "name": "心栖",
+      "nameEn": "Shelter",
+      "description": "心灵空间 · 呼吸安放",
       "url": "https://inner-shelter-ios.vercel.app/",
       "zone": "reflective",
       "hotkey": "h",
@@ -113,9 +123,9 @@
     },
     {
       "id": "reading",
-      "name": "读书",
+      "name": "书阁",
       "nameEn": "Reading",
-      "description": "思想输入 · 笔记",
+      "description": "读书笔记 · 思想输入",
       "url": "https://reading-ios.vercel.app/",
       "zone": "reflective",
       "hotkey": "r",
@@ -127,10 +137,10 @@
     },
     {
       "id": "fitness",
-      "name": "健身",
+      "name": "熔归",
       "nameEn": "Fitness",
-      "description": "肉体实相 · 熔归",
-      "url": "https://fitness.vercel.app/",
+      "description": "健身训练 · 肉体实相",
+      "url": "https://fitness-psi-rouge.vercel.app/",
       "zone": "manifest",
       "hotkey": "f",
       "command": "/fitness",
@@ -141,10 +151,10 @@
     },
     {
       "id": "lifesim",
-      "name": "模拟人生",
+      "name": "命织",
       "nameEn": "Weaver",
-      "description": "命运推演 · 平行可能",
-      "url": "https://weaver-ai.vercel.app/",
+      "description": "模拟人生 · 命运推演",
+      "url": "https://weaver-ai-alpha.vercel.app/",
       "zone": "manifest",
       "hotkey": "l",
       "command": "/life",

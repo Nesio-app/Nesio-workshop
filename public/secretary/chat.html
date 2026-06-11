@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#ededed">
+  <title>对话</title>
+  <link rel="stylesheet" href="/secretary/styles.css">
+</head>
+<body class="wx-body wx-body--chat">
+  <header class="wx-chat-nav">
+    <a class="wx-chat-back" href="/secretary/" aria-label="返回">‹</a>
+    <div class="wx-chat-nav-center">
+      <img class="wx-chat-nav-avatar" id="navAvatar" src="" alt="" width="28" height="28" hidden>
+      <h1 class="wx-chat-nav-title" id="navTitle">对话</h1>
+    </div>
+    <button type="button" class="wx-chat-more" id="btnClear" aria-label="更多">···</button>
+  </header>
+
+  <main class="wx-chat-area" id="chatMain" aria-live="polite"></main>
+
+  <footer class="wx-chat-bar">
+    <form class="wx-chat-input-row" id="chatForm">
+      <button type="button" class="wx-chat-icon-btn" tabindex="-1" aria-hidden="true">🎤</button>
+      <div class="wx-chat-input-wrap">
+        <textarea id="chatInput" rows="1" placeholder="发消息…" maxlength="4000" enterkeyhint="send"></textarea>
+      </div>
+      <button type="button" class="wx-chat-icon-btn" id="btnPlus" aria-label="工具">⊕</button>
+    </form>
+  </footer>
+
+  <div class="wx-sheet" id="toolSheet" hidden>
+    <div class="wx-sheet-mask" id="toolMask"></div>
+    <div class="wx-sheet-panel">
+      <p class="wx-sheet-title">宝盒工具</p>
+      <div class="wx-sheet-grid" id="toolGrid"></div>
+    </div>
+  </div>
+
+  <script src="/secretary/config.js"></script>
+  <script src="/secretary/api.js"></script>
+  <script src="/secretary/chat.js"></script>
+</body>
+</html>

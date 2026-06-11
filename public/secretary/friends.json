@@ -1,0 +1,50 @@
+[
+  {
+    "id": "gemini",
+    "name": "Gemini",
+    "tagline": "Google · 已连接",
+    "ready": true,
+    "logo": "/icons/ai/gemini.svg",
+    "preview": "我是你的幕僚，可以帮你理清待办与优先级。"
+  },
+  {
+    "id": "claude",
+    "name": "Claude",
+    "tagline": "Anthropic · 即将接入",
+    "ready": false,
+    "logo": "/icons/ai/claude.svg",
+    "preview": "后续将接入 Claude API。"
+  },
+  {
+    "id": "chatgpt",
+    "name": "ChatGPT",
+    "tagline": "OpenAI · 即将接入",
+    "ready": false,
+    "logo": "/icons/ai/chatgpt.svg",
+    "preview": "后续将接入 OpenAI API。"
+  },
+  {
+    "id": "doubao",
+    "name": "豆包",
+    "tagline": "字节跳动 · 即将接入",
+    "ready": false,
+    "logo": "/icons/ai/doubao.svg",
+    "preview": "后续将接入豆包 API。"
+  },
+  {
+    "id": "deepseek",
+    "name": "DeepSeek",
+    "tagline": "深度求索 · 即将接入",
+    "ready": false,
+    "logo": "/icons/ai/deepseek.svg",
+    "preview": "后续将接入 DeepSeek API。"
+  },
+  {
+    "id": "grok",
+    "name": "Grok",
+    "tagline": "xAI · 即将接入",
+    "ready": false,
+    "logo": "/icons/ai/grok.svg",
+    "preview": "后续将接入 Grok API。"
+  }
+]

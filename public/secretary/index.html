@@ -3,41 +3,39 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1, user-scalable=no">
-  <meta name="theme-color" content="#588ce3">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <title>AI 私人秘书</title>
-  <link rel="stylesheet" href="styles.css">
+  <meta name="theme-color" content="#ededed">
+  <title>智友</title>
+  <link rel="stylesheet" href="/secretary/styles.css">
 </head>
-<body>
-  <div class="wx-app">
-    <header class="wx-nav">
-      <a class="wx-nav-back" href="../" aria-label="返回">‹</a>
-      <h1 class="wx-nav-title">AI 私人秘书</h1>
-      <button type="button" class="wx-nav-more" id="btnClear" aria-label="清空对话">···</button>
-    </header>
+<body class="wx-body wx-body--list">
+  <header class="wx-top">
+    <h1 class="wx-top-title">智友</h1>
+    <button type="button" class="wx-top-add" id="btnTools" aria-label="工具">＋</button>
+  </header>
 
-    <main class="wx-chat" id="chatMain" aria-live="polite"></main>
-
-    <footer class="wx-bar">
-      <form class="wx-input-row" id="chatForm">
-        <button type="button" class="wx-tool-btn" aria-hidden="true" tabindex="-1">🎤</button>
-        <div class="wx-input-wrap">
-          <textarea
-            id="chatInput"
-            rows="1"
-            placeholder="发消息…"
-            autocomplete="off"
-            maxlength="4000"
-            enterkeyhint="send"
-          ></textarea>
-        </div>
-        <button type="button" class="wx-tool-btn" aria-hidden="true" tabindex="-1">☺</button>
-        <button type="submit" class="wx-send" id="btnSend" aria-label="发送">发送</button>
-      </form>
-    </footer>
+  <div class="wx-search">
+    <span class="wx-search-icon" aria-hidden>⌕</span>
+    <input type="search" id="searchInput" placeholder="搜索" autocomplete="off" />
   </div>
-  <script src="config.js"></script>
-  <script src="app.js"></script>
+
+  <main class="wx-list" id="friendList" aria-label="AI 好友"></main>
+
+  <nav class="wx-tabbar" aria-label="底部导航">
+    <a class="wx-tab wx-tab--on" href="/secretary/"><span>智友</span></a>
+    <a class="wx-tab" href="../"><span>宝盒</span></a>
+    <a class="wx-tab" href="/secretary/chat.html?friend=gemini"><span>秘书</span></a>
+    <a class="wx-tab" href="../portfolio"><span>我</span></a>
+  </nav>
+
+  <div class="wx-sheet" id="toolSheet" hidden>
+    <div class="wx-sheet-mask" id="toolMask"></div>
+    <div class="wx-sheet-panel">
+      <p class="wx-sheet-title">宝盒工具</p>
+      <div class="wx-sheet-grid" id="toolGrid"></div>
+    </div>
+  </div>
+
+  <script src="/secretary/config.js"></script>
+  <script src="/secretary/list.js"></script>
 </body>
 </html>
