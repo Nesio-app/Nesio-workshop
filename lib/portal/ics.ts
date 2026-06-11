@@ -24,7 +24,7 @@ function parseIcsDate(value: string): Date | null {
   return new Date(+y, +mo - 1, +d, +h, +mi, +s);
 }
 
-function eventFromBlock(block: string): CalendarEvent | null {
+function eventFromBlock(block: string, calendarName = ''): CalendarEvent | null {
   const lines = block.split('\n');
   let uid = '';
   let summary = '';
@@ -53,17 +53,24 @@ function eventFromBlock(block: string): CalendarEvent | null {
     start: start.toISOString(),
     end: end?.toISOString(),
     allDay,
+    calendarName: calendarName || undefined,
   };
 }
 
-export function parseIcsEvents(icsText: string, limit = 12): CalendarEvent[] {
+export function parseCalendarName(icsText: string): string {
+  const m = unfoldIcs(icsText).match(/X-WR-CALNAME:([^\n\r]+)/);
+  return m ? m[1].trim() : '';
+}
+
+export function parseIcsEvents(icsText: string, limit = 12, calendarName = ''): CalendarEvent[] {
+  const calName = calendarName || parseCalendarName(icsText);
   const flat = unfoldIcs(icsText);
   const blocks = flat.split('BEGIN:VEVENT').slice(1);
   const now = Date.now();
   const horizon = now + 14 * 24 * 60 * 60 * 1000;
 
   const events = blocks
-    .map((chunk) => eventFromBlock(chunk.split('END:VEVENT')[0] || ''))
+    .map((chunk) => eventFromBlock(chunk.split('END:VEVENT')[0] || '', calName))
     .filter((e): e is CalendarEvent => Boolean(e))
     .filter((e) => {
       const t = new Date(e.start).getTime();

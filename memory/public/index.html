@@ -250,7 +250,10 @@ body.lang-en .nav-link,body.lang-en .nav-btn,body.lang-en .nav-auth-btn,body.lan
 .products-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
 .product-card{background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px var(--shadow);cursor:pointer;transition:all .3s}
 .product-card:hover{transform:translateY(-2px);box-shadow:0 6px 20px var(--shadow)}
-.product-img{height:110px;display:flex;align-items:center;justify-content:center;font-size:40px;position:relative}
+.product-img{height:110px;display:flex;align-items:center;justify-content:center;font-size:40px;position:relative;min-height:110px}
+.product-img--photo,.article-card-img--photo,.qr-prod-visual--photo{background-repeat:no-repeat;background-size:cover;background-position:center}
+.product-detail-visual.product-img--photo{min-height:240px;align-items:flex-end;justify-content:flex-start;padding:16px}
+.gallery-photo{width:100%;height:160px;object-fit:cover;display:block;border-radius:8px 8px 0 0}
 .product-badge{position:absolute;top:8px;right:8px;background:var(--red);color:#fff;font-size:9px;padding:2px 6px;border-radius:10px;font-family:'Noto Sans SC',sans-serif}
 .product-body{padding:10px}
 .product-name{font-size:12px;font-weight:500;color:var(--ink);margin-bottom:4px}
@@ -557,7 +560,7 @@ body.lang-en .nav-link,body.lang-en .nav-btn,body.lang-en .nav-auth-btn,body.lan
       <div class="nav-link" data-i18n="nav.guides" onclick="goPage('guides')">丧葬百科</div>
       <div class="nav-link" data-i18n="nav.pricing" onclick="goPage('pricing')">会员</div>
     </div>
-    <button type="button" id="lang-toggle" class="nav-lang-btn" onclick="MemorialI18n.toggle()" title="English">EN</button>
+    <button type="button" id="lang-toggle" class="nav-lang-btn" title="English">EN</button>
     <button type="button" class="nav-cart-btn" onclick="toggleCart()" data-i18n-title="nav.cart" title="购物车">🛒</button>
     <div id="nav-auth-slot" class="nav-auth-slot"></div>
     <button class="nav-btn" data-action="create-memorial" data-i18n="nav.create">创建纪念馆</button>
@@ -590,9 +593,9 @@ body.lang-en .nav-link,body.lang-en .nav-btn,body.lang-en .nav-auth-btn,body.lan
     <section class="hero">
       <div class="hero-content">
         <div class="hero-badge">Memorial &amp; remembrance</div>
-        <div class="hero-title">念归处</div>
-        <div class="hero-sub">华人数字纪念馆</div>
-        <div class="hero-tagline">以安静、清晰的方式保存生平与追思——<br>如同一篇值得反复阅读的纪念文章，留给家人与后代。</div>
+        <div class="hero-title" data-i18n="home.heroTitle">念归处</div>
+        <div class="hero-sub" data-i18n="home.heroSub">华人数字纪念馆</div>
+        <div class="hero-tagline" data-i18n="home.heroTagline">以安静、清晰的方式保存生平与追思——如同一篇值得反复阅读的纪念文章，留给家人与后代。</div>
         <div class="hero-search">
           <input type="text" placeholder="搜索纪念馆姓名…" id="searchInput">
           <button class="hero-search-btn" onclick="doSearch()">搜索</button>
@@ -860,12 +863,12 @@ body.lang-en .nav-link,body.lang-en .nav-btn,body.lang-en .nav-auth-btn,body.lan
     <!-- GRIEF -->
     <div class="tab-content" id="tab-grief-li">
       <div class="articles-filter">
-        <div class="filter-tag active" onclick="filterArticles(this,'all')">全部</div>
-        <div class="filter-tag" onclick="filterArticles(this,'grief')">悲伤疗愈</div>
-        <div class="filter-tag" onclick="filterArticles(this,'ritual')">丧礼礼仪</div>
-        <div class="filter-tag" onclick="filterArticles(this,'memory')">守护记忆</div>
-        <div class="filter-tag" onclick="filterArticles(this,'child')">与孩子谈生死</div>
-        <div class="filter-tag" onclick="filterArticles(this,'legal')">身后事务</div>
+        <div class="filter-tag active" data-filter-cat="all" onclick="filterArticles(this,'all')">全部</div>
+        <div class="filter-tag" data-filter-cat="grief" onclick="filterArticles(this,'grief')">悲伤疗愈</div>
+        <div class="filter-tag" data-filter-cat="ritual" onclick="filterArticles(this,'ritual')">丧礼礼仪</div>
+        <div class="filter-tag" data-filter-cat="memory" onclick="filterArticles(this,'memory')">守护记忆</div>
+        <div class="filter-tag" data-filter-cat="child" onclick="filterArticles(this,'child')">与孩子谈生死</div>
+        <div class="filter-tag" data-filter-cat="legal" onclick="filterArticles(this,'legal')">身后事务</div>
       </div>
       <div class="articles-grid" id="articles-li"></div>
     </div>
@@ -1021,8 +1024,8 @@ body.lang-en .nav-link,body.lang-en .nav-btn,body.lang-en .nav-auth-btn,body.lan
 <div class="page" id="page-guides">
   <div class="page-content">
     <div class="guides-hero">
-      <h1>丧葬百科</h1>
-      <p>礼仪指南、悲伤疗愈与身后事务——在艰难时刻，为您提供可靠参考</p>
+      <h1 data-i18n="guides.title">丧葬百科</h1>
+      <p data-i18n="guides.sub">礼仪指南、悲伤疗愈与身后事务——在艰难时刻，为您提供可靠参考</p>
     </div>
     <div class="guides-section">
       <div class="guides-admin" id="guides-admin">
@@ -1042,13 +1045,13 @@ body.lang-en .nav-link,body.lang-en .nav-btn,body.lang-en .nav-auth-btn,body.lan
         <textarea id="ga-body" placeholder="正文（段落之间空一行）"></textarea>
         <button type="button" class="submit-btn" onclick="MemorialContent.submitGuideArticle()">发布</button>
       </div>
-      <div class="articles-filter">
-        <div class="filter-tag active" onclick="filterArticles(this,'all','guides')">全部</div>
-        <div class="filter-tag" onclick="filterArticles(this,'grief','guides')">悲伤疗愈</div>
-        <div class="filter-tag" onclick="filterArticles(this,'ritual','guides')">丧礼礼仪</div>
-        <div class="filter-tag" onclick="filterArticles(this,'memory','guides')">守护记忆</div>
-        <div class="filter-tag" onclick="filterArticles(this,'child','guides')">与孩子谈生死</div>
-        <div class="filter-tag" onclick="filterArticles(this,'legal','guides')">身后事务</div>
+      <div class="articles-filter" id="guides-articles-filter">
+        <div class="filter-tag active" data-filter-cat="all" onclick="filterArticles(this,'all','guides')">全部</div>
+        <div class="filter-tag" data-filter-cat="grief" onclick="filterArticles(this,'grief','guides')">悲伤疗愈</div>
+        <div class="filter-tag" data-filter-cat="ritual" onclick="filterArticles(this,'ritual','guides')">丧礼礼仪</div>
+        <div class="filter-tag" data-filter-cat="memory" onclick="filterArticles(this,'memory','guides')">守护记忆</div>
+        <div class="filter-tag" data-filter-cat="child" onclick="filterArticles(this,'child','guides')">与孩子谈生死</div>
+        <div class="filter-tag" data-filter-cat="legal" onclick="filterArticles(this,'legal','guides')">身后事务</div>
       </div>
       <div class="articles-grid" id="guides-articles-grid"></div>
     </div>
@@ -1471,6 +1474,7 @@ body.lang-en .nav-link,body.lang-en .nav-btn,body.lang-en .nav-auth-btn,body.lan
 
 <script src="js/config.js"></script>
 <script src="js/copy.js"></script>
+<script src="js/memorial-visuals.js"></script>
 <script src="js/memorial-i18n.js"></script>
 <script src="js/dates.js"></script>
 <script src="js/memorial-store.js"></script>
@@ -1615,9 +1619,14 @@ const planningData=[
   ]},
 ];
 let taskState={};
+function activePlanningData(){
+  return window.MemorialI18n?.getPlanningData?.()||planningData;
+}
 function renderPlanning(){
+  const data=activePlanningData();
   const container=document.getElementById('planning-cats');
-  container.innerHTML=planningData.map((cat,ci)=>`
+  const urgentLabel=window.MemorialI18n?.t('planning.urgent')||'紧急';
+  container.innerHTML=data.map((cat,ci)=>`
     <div class="planning-cat">
       <div class="cat-header" onclick="toggleCat(this)" style="border-bottom-color:${cat.color}">
         <span class="cat-icon">${cat.icon}</span>
@@ -1629,7 +1638,7 @@ function renderPlanning(){
         <div class="task-item">
           <div class="task-check" id="tc-${ci}-${ti}" onclick="toggleTask(${ci},${ti})"></div>
           <div class="task-text">
-            <div class="task-title">${task.t}${task.urgent?'<span class="task-urgent">紧急</span>':''}</div>
+            <div class="task-title">${task.t}${task.urgent?'<span class="task-urgent">'+urgentLabel+'</span>':''}</div>
             <div class="task-desc">${task.d}</div>
           </div>
         </div>`).join('')}
@@ -1650,11 +1659,13 @@ function toggleTask(ci,ti){
   updateProgress();
 }
 function updateProgress(){
-  const total=planningData.reduce((s,c)=>s+c.tasks.length,0);
+  const data=activePlanningData();
+  const total=data.reduce((s,c)=>s+c.tasks.length,0);
   const done=Object.values(taskState).filter(Boolean).length;
-  document.getElementById('pct-label').textContent=`${done} / ${total} 项`;
+  const itemsLabel=window.MemorialI18n?.isEn()?' items':' 项';
+  document.getElementById('pct-label').textContent=`${done} / ${total}${itemsLabel}`;
   document.getElementById('pct-bar').style.width=`${(done/total)*100}%`;
-  planningData.forEach((cat,ci)=>{
+  data.forEach((cat,ci)=>{
     const catDone=cat.tasks.filter((_,ti)=>taskState[`${ci}-${ti}`]).length;
     const el=document.getElementById(`cat-prog-${ci}`);
     if(el)el.textContent=`${catDone}/${cat.tasks.length}`;
@@ -1699,8 +1710,12 @@ document.addEventListener('DOMContentLoaded',()=>{
   if(MemorialContent) MemorialContent.syncPlanningUI(taskState);
   if(window.MemorialMembook) MemorialMembook.renderPage();
   renderThemes();
-  const hint=document.getElementById('profile-enter-hint');
-  if(hint&&window.MEMORIAL_COPY) hint.textContent=MEMORIAL_COPY.enterMemorial('李明德');
+  if(window.MemorialI18n){
+    MemorialI18n.apply();
+  }else{
+    const hint=document.getElementById('profile-enter-hint');
+    if(hint&&window.MEMORIAL_COPY) hint.textContent=MEMORIAL_COPY.enterMemorial('李明德');
+  }
 });
 </script>
 </body>

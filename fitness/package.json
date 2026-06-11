@@ -1,0 +1,18 @@
+{
+  "name": "ronggui-fitness",
+  "version": "2.0.0",
+  "private": true,
+  "description": "熔归 RONG GUI — 智能健身训练应用",
+  "scripts": {
+    "sync": "node scripts/sync-www.mjs",
+    "vercel-build": "node scripts/sync-www.mjs",
+    "deploy": "bash scripts/deploy-api.sh"
+  },
+  "dependencies": {
+    "@vercel/node": "^5.1.14",
+    "openai": "^6.22.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0"
+  }
+}

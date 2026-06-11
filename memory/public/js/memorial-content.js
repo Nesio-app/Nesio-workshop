@@ -2,6 +2,70 @@
  * Dynamic profile tabs, themes, home grid, QR, articles
  */
 window.MemorialContent = {
+  /** 首页固定展示的示范纪念馆（API 模式下也会显示，不被公开列表覆盖） */
+  HOME_SHOWCASE: [
+    {
+      slug: "li-mingde",
+      avatarChar: "明",
+      headerGrad: "linear-gradient(135deg,#1a3a2a,#2d5a3a)",
+      avatarGrad: "linear-gradient(135deg,#4a7a5a,#2d5a3a)",
+      nameZh: "李明德",
+      nameEn: "Li Mingde",
+      yearsZh: "1938 — 2023 · 享年85岁",
+      yearsEn: "1938 — 2023 · age 85",
+      quoteZh: "春蚕到死丝尽，蜡炬成灰泪始干",
+      quoteEn: "The silkworm spins until death; the candle weeps until ash.",
+      actsZh: "🕯️ 3,247 次祭拜",
+      actsEn: "🕯️ 3,247 tributes",
+      featured: true,
+    },
+    {
+      slug: "zhang-xiuying",
+      avatarChar: "秀",
+      headerGrad: "linear-gradient(135deg,#3a1a2a,#5a2a3a)",
+      avatarGrad: "linear-gradient(135deg,#7a3a5a,#5a2a3a)",
+      nameZh: "张秀英",
+      nameEn: "Zhang Xiuying",
+      yearsZh: "1945 — 2022 · 享年77岁",
+      yearsEn: "1945 — 2022 · age 77",
+      quoteZh: "妈妈的手擀面，是世间最美的味道",
+      quoteEn: "Mother's hand-rolled noodles were the finest taste in the world.",
+      actsZh: "🌸 2,108 次祭拜",
+      actsEn: "🌸 2,108 tributes",
+      featured: true,
+    },
+    {
+      slug: "wang-shulan",
+      avatarChar: "淑",
+      headerGrad: "linear-gradient(135deg,#1a2a3a,#2a3a5a)",
+      avatarGrad: "linear-gradient(135deg,#3a5a7a,#2a3a5a)",
+      nameZh: "王淑兰",
+      nameEn: "Wang Shulan",
+      yearsZh: "1929 — 2021 · 享年92岁",
+      yearsEn: "1929 — 2021 · age 92",
+      quoteZh: "经历百年风华，安然归于平静",
+      quoteEn: "A century of grace, at peace at last.",
+      actsZh: "☁️ 1,876 次祭拜",
+      actsEn: "☁️ 1,876 tributes",
+      featured: true,
+    },
+    {
+      slug: "chen-meihua",
+      avatarChar: "梅",
+      headerGrad: "linear-gradient(135deg,#5a3a4a,#3a2030)",
+      avatarGrad: "linear-gradient(135deg,#8a5a6a,#5a3040)",
+      nameZh: "陈美华",
+      nameEn: "Chen Meihua",
+      yearsZh: "1940 — 2025 · 享年85岁",
+      yearsEn: "1940 — 2025 · age 85",
+      quoteZh: "花开有时，爱无绝期",
+      quoteEn: "Blossoms have their season; love does not end.",
+      actsZh: "🌹 1,542 次祭拜",
+      actsEn: "🌹 1,542 tributes",
+      featured: true,
+    },
+  ],
+
   THEMES: [
     { id: "ink-default", name: "默认墨韵", cat: "ink", desc: "米色纸感与深墨字，庄重耐看，适合大多数纪念馆", preview: { bg: "#f4f3f0", fg: "#1a1a1a", accent: "#5b7268", paper: "#fafaf8", deco: "墨" } },
     { id: "ink-moon", name: "月白如霜", cat: "ink", desc: "冷调蓝灰，宁静深远，适合文人学者", preview: { bg: "#eef2f6", fg: "#1a2a3a", accent: "#5a7a9a", paper: "#f8fafc", deco: "月" } },
@@ -19,13 +83,37 @@ window.MemorialContent = {
   ],
 
   themeCatLabel(cat) {
-    const map = { ink: "水墨传统", floral: "花卉自然", modern: "简约现代", seasonal: "节气时令" };
+    const en = window.MemorialI18n?.isEn();
+    const map = en
+      ? {
+          ink: "Ink tradition",
+          floral: "Floral",
+          modern: "Modern",
+          seasonal: "Seasons",
+        }
+      : {
+          ink: "水墨传统",
+          floral: "花卉自然",
+          modern: "简约现代",
+          seasonal: "节气时令",
+        };
     return map[cat] || cat;
   },
 
   _articles: null,
 
   escape: MemorialStore.escapeHtml.bind(MemorialStore),
+
+  normalizeGalleryItem(item) {
+    if (!item?.imageUrl) return item;
+    const url =
+      item.imageUrl.startsWith("data:") || item.imageUrl.startsWith("blob:")
+        ? item.imageUrl
+        : window.MemorialApi?.assetUrl
+          ? MemorialApi.assetUrl(item.imageUrl)
+          : item.imageUrl;
+    return { ...item, imageUrl: url };
+  },
 
   formatYears(m) {
     const en = window.MemorialI18n?.isEn();
@@ -101,9 +189,59 @@ window.MemorialContent = {
 
   demoOverlay(slug, m) {
     if (!window.MemorialI18n?.getDemoMemorial) return m;
-    const demo = MemorialI18n.getDemoMemorial(slug);
+    const demo = MemorialI18n.getDemoMemorial(slug, m);
     if (!demo) return m;
-    return { ...m, ...demo, slug: m.slug || slug };
+    const merged = { ...m, ...demo, slug: m.slug || slug };
+    if (demo.timeline?.length) merged.timeline = demo.timeline;
+    if (demo.family?.length) merged.family = demo.family;
+    return merged;
+  },
+
+  articleCatLabelEn(cat) {
+    const key = {
+      grief: "guides.filter.grief",
+      ritual: "guides.filter.ritual",
+      memory: "guides.filter.memory",
+      child: "guides.filter.child",
+      legal: "guides.filter.legal",
+      custom: "guides.filter.all",
+    }[cat];
+    return key && window.MemorialI18n?.t ? MemorialI18n.t(key) : cat;
+  },
+
+  async ensureArticleEnMap() {
+    if (this._articleEnMap) return this._articleEnMap;
+    try {
+      const res = await fetch("content/articles-en.json");
+      const data = await res.json();
+      this._articleEnMap = new Map(
+        (data.articles || []).map((a) => [a.id, a])
+      );
+    } catch {
+      this._articleEnMap = new Map();
+    }
+    return this._articleEnMap;
+  },
+
+  localizeArticle(article) {
+    if (!article || !window.MemorialI18n?.isEn()) return article;
+    const en = this._articleEnMap?.get(article.id);
+    if (en) {
+      return {
+        ...article,
+        title: en.title,
+        summary: en.summary,
+        catLabel: en.catLabel,
+        body: en.body,
+        bg: en.bg || article.bg,
+        emoji: en.emoji || article.emoji,
+      };
+    }
+    return {
+      ...article,
+      catLabel: this.articleCatLabelEn(article.cat) || article.catLabel,
+      zhOnly: true,
+    };
   },
 
   renderBioTab(m) {
@@ -124,22 +262,26 @@ window.MemorialContent = {
   renderGalleryTab(m) {
     const el = document.getElementById("tab-gallery-li");
     if (!el) return;
-    const items = m.gallery || [];
+    const items = (m.gallery || []).map((item) => this.normalizeGalleryItem(item));
     const canEdit =
       (window.MemorialCore?.canEdit && window.MemorialCore?.useApi) ||
       (!window.MemorialCore?.useApi && window.MemorialAuth?.user);
+    const en = window.MemorialI18n?.isEn();
+    const storageNote = window.MEMORIAL_CONFIG?.storageEnabled
+      ? en
+        ? " · cloud storage on"
+        : " · 已启用云存储"
+      : en
+        ? " · without cloud storage, uploads may not persist on free hosting"
+        : " · 未配置云存储时重启后图片可能丢失";
     const uploadBlock = canEdit
       ? `<div class="gallery-upload">
-          <p class="gallery-upload-hint">上传珍贵照片（JPG/PNG/WebP，最大 4MB）${
-            window.MEMORIAL_CONFIG?.storageEnabled
-              ? " · 已启用云存储"
-              : " · 未配置云存储时重启后图片可能丢失"
-          }</p>
+          <p class="gallery-upload-hint">${en ? "Upload photos (JPG/PNG/WebP, max 4MB)" : "上传珍贵照片（JPG/PNG/WebP，最大 4MB）"}${storageNote}</p>
           <div class="gallery-upload-row">
             <input type="file" id="gallery-file" accept="image/jpeg,image/png,image/webp,image/gif" />
-            <input type="text" id="gallery-caption" placeholder="照片说明" />
-            <input type="text" id="gallery-year" placeholder="年份（可选）" />
-            <button type="button" class="submit-btn" onclick="MemorialContent.uploadGalleryPhoto()">上传</button>
+            <input type="text" id="gallery-caption" placeholder="${en ? "Caption" : "照片说明"}" />
+            <input type="text" id="gallery-year" placeholder="${en ? "Year (optional)" : "年份（可选）"}" />
+            <button type="button" class="submit-btn" onclick="MemorialContent.uploadGalleryPhoto()">${en ? "Upload" : "上传"}</button>
           </div>
         </div>`
       : "";
@@ -152,11 +294,7 @@ window.MemorialContent = {
         ? `<div class="gallery-grid">` +
           items
             .map((item, idx) => {
-              const imgSrc = item.imageUrl
-                ? window.MemorialApi
-                  ? MemorialApi.assetUrl(item.imageUrl)
-                  : item.imageUrl
-                : "";
+              const imgSrc = item.imageUrl || "";
               const visual = imgSrc
                 ? `<img src="${this.escape(imgSrc)}" alt="${this.escape(item.caption)}" class="gallery-photo" onclick="MemorialContent.openGalleryLightbox(${idx})" loading="lazy" />`
                 : `<div class="gallery-placeholder" style="background:linear-gradient(135deg,#2d4a2a,#1a3a2a);min-height:140px;display:flex;align-items:center;justify-content:center;font-size:48px">${item.emoji || "📸"}</div>`;
@@ -389,58 +527,108 @@ window.MemorialContent = {
     this.renderGuestbookTab(m);
   },
 
-  async loadHomeMemorials(useApi) {
-    const grid = document.querySelector(".memorials-grid");
-    if (!grid) return;
-    if (!useApi) return;
+  homeShowcaseSlugs() {
+    return new Set(this.HOME_SHOWCASE.map((s) => s.slug));
+  },
 
-    try {
-      const data = await MemorialApi.listPublicMemorials();
-      const list = data.memorials || [];
-      if (!list.length) return;
+  renderHomeShowcaseCard(s) {
+    const en = window.MemorialI18n?.isEn();
+    const name = en ? s.nameEn : s.nameZh;
+    const years = en ? s.yearsEn : s.yearsZh;
+    const quote = en ? s.quoteEn : s.quoteZh;
+    const acts = en ? s.actsEn : s.actsZh;
+    const btn = window.MemorialI18n?.t("home.visitMemorial") || "前往纪念";
+    const slug = this.escape(s.slug);
+    return `
+        <div class="memorial-card" data-memorial-slug="${slug}" onclick="MemorialCore.openMemorial('${slug}')">
+          <div class="memorial-header" style="background:${s.headerGrad}">
+            <div class="memorial-avatar" style="background:${s.avatarGrad}">${this.escape(s.avatarChar)}</div>
+          </div>
+          <div class="memorial-body">
+            <div class="memorial-name">${this.escape(name)}</div>
+            <div class="memorial-years">${this.escape(years)}</div>
+            <div class="memorial-quote">${this.escape(quote)}</div>
+          </div>
+          <div class="memorial-footer">
+            <div class="memorial-acts">${this.escape(acts)}</div>
+            <button type="button" class="memorial-btn">${this.escape(btn)}</button>
+          </div>
+        </div>`;
+  },
 
-      const cards = list.slice(0, 3).map((m) => {
-        const char = this.avatarChar(m.name);
-        const grad = this.avatarGradient(m.name);
-        const birth = m.birthDate ? m.birthDate.slice(0, 4) : "—";
-        const death = m.deathDate ? m.deathDate.slice(0, 4) : "—";
-        return `
-        <div class="memorial-card" onclick="MemorialCore.openMemorial('${this.escape(m.slug)}')">
+  renderHomeApiCard(m) {
+    const en = window.MemorialI18n?.isEn();
+    const char = this.avatarChar(m.name);
+    const grad = this.avatarGradient(m.name);
+    const birth = m.birthDate ? m.birthDate.slice(0, 4) : "—";
+    const death = m.deathDate ? m.deathDate.slice(0, 4) : "—";
+    const years = en ? `${birth} — ${death}` : `${birth} — ${death}`;
+    const btn = window.MemorialI18n?.t("home.visitMemorial") || "前往纪念";
+    const acts = en ? "🕯️ Visit memorial" : "🕯️ 前往纪念";
+    const slug = this.escape(m.slug);
+    return `
+        <div class="memorial-card" data-memorial-slug="${slug}" onclick="MemorialCore.openMemorial('${slug}')">
           <div class="memorial-header" style="background:${grad}">
             <div class="memorial-avatar" style="background:${grad}">${char}</div>
           </div>
           <div class="memorial-body">
             <div class="memorial-name">${this.escape(m.name)}</div>
-            <div class="memorial-years">${birth} — ${death}</div>
+            <div class="memorial-years">${this.escape(years)}</div>
             <div class="memorial-quote">${this.escape(m.motto || "")}</div>
           </div>
           <div class="memorial-footer">
-            <div class="memorial-acts">🕯️ 前往纪念</div>
-            <button class="memorial-btn">进入纪念馆</button>
+            <div class="memorial-acts">${this.escape(acts)}</div>
+            <button type="button" class="memorial-btn">${this.escape(btn)}</button>
           </div>
         </div>`;
-      });
+  },
 
-      cards.push(`
-        <div class="memorial-card" onclick="goPage('create')">
+  renderHomeMoreCard() {
+    const en = window.MemorialI18n?.isEn();
+    const I = window.MemorialI18n;
+    const name = I?.t("home.moreMemorials") || (en ? "More memorials" : "更多纪念馆");
+    const years = en ? "12,847 memorials" : "12,847 个纪念馆";
+    const quote = en
+      ? "Everyone deserves to be remembered with tenderness."
+      : "每一位逝者都值得被温柔记住";
+    const acts = en ? "🔍 Search all" : "🔍 搜索全部";
+    const btn = I?.t("home.browseAll") || (en ? "Browse all" : "浏览全部");
+    return `
+        <div class="memorial-card" onclick="showToast('${en ? "Use search above to find a memorial" : "请使用上方搜索框查找纪念馆"}')">
           <div class="memorial-header" style="background:linear-gradient(135deg,#2a1a0a,#4a2a10)">
             <div class="memorial-avatar" style="background:linear-gradient(135deg,#7a4a20,#4a2a10)">+</div>
           </div>
           <div class="memorial-body">
-            <div class="memorial-name">创建纪念馆</div>
-            <div class="memorial-years">为亲人留下永恒记忆</div>
-            <div class="memorial-quote">每一位逝者都值得被温柔记住</div>
+            <div class="memorial-name">${this.escape(name)}</div>
+            <div class="memorial-years">${this.escape(years)}</div>
+            <div class="memorial-quote">${this.escape(quote)}</div>
           </div>
           <div class="memorial-footer">
-            <div class="memorial-acts">✨ 免费创建</div>
-            <button class="memorial-btn">开始创建</button>
+            <div class="memorial-acts">${this.escape(acts)}</div>
+            <button type="button" class="memorial-btn">${this.escape(btn)}</button>
           </div>
-        </div>`);
+        </div>`;
+  },
 
-      grid.innerHTML = cards.join("");
-    } catch (e) {
-      console.warn("home memorials:", e.message);
+  async loadHomeMemorials(useApi) {
+    const grid = document.querySelector(".memorials-grid");
+    if (!grid) return;
+
+    const cards = this.HOME_SHOWCASE.map((s) => this.renderHomeShowcaseCard(s));
+
+    if (useApi && window.MemorialApi) {
+      try {
+        const data = await MemorialApi.listPublicMemorials();
+        const showcase = this.homeShowcaseSlugs();
+        const list = (data.memorials || []).filter((m) => !showcase.has(m.slug));
+        list.slice(0, 4).forEach((m) => cards.push(this.renderHomeApiCard(m)));
+      } catch (e) {
+        console.warn("home memorials:", e.message);
+      }
     }
+
+    cards.push(this.renderHomeMoreCard());
+    grid.innerHTML = cards.join("");
   },
 
   renderQrDemo(slug, m) {
@@ -487,7 +675,15 @@ window.MemorialContent = {
           <div class="theme-name">${t.name}</div>
           <p class="theme-desc">${this.escape(t.desc || "")}</p>
         </div>
-        <button type="button" class="theme-select-btn" onclick="MemorialContent.pickTheme('${t.id}')">${sel ? "✓ 已应用" : "应用此主题"}</button>
+        <button type="button" class="theme-select-btn" onclick="MemorialContent.pickTheme('${t.id}')">${
+          sel
+            ? window.MemorialI18n?.isEn()
+              ? "✓ Applied"
+              : "✓ 已应用"
+            : window.MemorialI18n?.isEn()
+              ? "Apply theme"
+              : "应用此主题"
+        }</button>
       </div>`;
     }).join("");
   },
@@ -524,27 +720,47 @@ window.MemorialContent = {
   },
 
   async loadArticles(force) {
-    if (this._articles && !force) return this._articles;
+    const lang = window.MemorialI18n?.isEn() ? "en" : "zh";
+    if (this._articles && this._articlesLang === lang && !force) {
+      return this._articles;
+    }
+    await this.ensureArticleEnMap();
     if (window.MemorialCore?.useApi && window.MemorialApi) {
       try {
         const data = await MemorialApi.listArticles();
-        this._articles = { articles: data.articles || [] };
+        const articles = (data.articles || []).map((a) =>
+          lang === "en" ? this.localizeArticle(a) : a
+        );
+        this._articles = { articles };
+        this._articlesLang = lang;
         return this._articles;
       } catch {
         /* fall through */
       }
     }
-    const file =
-      window.MemorialI18n?.isEn() ? "content/articles-en.json" : "content/articles.json";
+    const file = lang === "en" ? "content/articles-en.json" : "content/articles.json";
     try {
       const res = await fetch(file);
-      this._articles = await res.json();
+      const data = await res.json();
+      this._articles = {
+        articles: (data.articles || []).map((a) =>
+          lang === "en" ? this.localizeArticle(a) : a
+        ),
+      };
+      this._articlesLang = lang;
     } catch {
       try {
         const res = await fetch("content/articles.json");
-        this._articles = await res.json();
+        const data = await res.json();
+        this._articles = {
+          articles: (data.articles || []).map((a) =>
+            lang === "en" ? this.localizeArticle(a) : a
+          ),
+        };
+        this._articlesLang = lang;
       } catch {
         this._articles = { articles: [] };
+        this._articlesLang = lang;
       }
     }
     return this._articles;
@@ -553,27 +769,36 @@ window.MemorialContent = {
   async renderArticlesGrid(containerId) {
     const el = document.getElementById(containerId);
     if (!el) return;
-    el.innerHTML = `<p class="p0-empty" style="padding:16px">加载中…</p>`;
+    const loading =
+      window.MemorialI18n?.t("articles.loading") || "加载中…";
+    el.innerHTML = `<p class="p0-empty" style="padding:16px">${loading}</p>`;
     const data = await this.loadArticles();
     const articles = data.articles || [];
     const list =
       containerId === "home-guides-grid" ? articles.slice(0, 3) : articles;
     if (!list.length) {
-      el.innerHTML = `<p class="p0-empty">暂无文章</p>`;
+      const empty =
+        window.MemorialI18n?.t("articles.empty") || "暂无文章";
+      el.innerHTML = `<p class="p0-empty">${empty}</p>`;
       return;
     }
     el.innerHTML = list
-      .map(
-        (a) => `
+      .map((a) => {
+        const photo =
+          window.MemorialVisuals?.articleImage(a.id) || a.image || null;
+        const imgStyle = photo
+          ? `background-image:linear-gradient(180deg,rgba(0,0,0,.05),rgba(0,0,0,.35)),url('${photo}');background-size:cover;background-position:center`
+          : `background:${a.bg || "linear-gradient(135deg,#e8f4f8,#d0e8f0)"}`;
+        return `
       <div class="article-card" data-cat="${a.cat}" onclick="MemorialContent.openArticle('${this.escape(a.id)}')">
-        <div class="article-card-img" style="background:${a.bg || "linear-gradient(135deg,#e8f4f8,#d0e8f0)"}">${a.emoji || "📖"}</div>
+        <div class="article-card-img article-card-img--photo" style="${imgStyle}">${photo ? "" : a.emoji || "📖"}</div>
         <div class="article-card-body">
           <div class="article-cat">${this.escape(a.catLabel)}</div>
           <div class="article-title">${this.escape(a.title)}</div>
           <div class="article-summary">${this.escape(a.summary)}</div>
         </div>
-      </div>`
-      )
+      </div>`;
+      })
       .join("");
   },
 
@@ -586,6 +811,7 @@ window.MemorialContent = {
       return;
     }
     box.style.display = "block";
+    window.MemorialI18n?.applyGuidesAdminForm?.();
   },
 
   async submitGuideArticle() {
@@ -661,6 +887,7 @@ ${quote ? `<p>先生/女士生前常言：「${this.escape(quote)}」此言将�
   },
 
   async openArticle(id) {
+    await this.ensureArticleEnMap();
     let article = null;
     if (window.MemorialCore?.useApi && window.MemorialApi) {
       try {
@@ -675,15 +902,25 @@ ${quote ? `<p>先生/女士生前常言：「${this.escape(quote)}」此言将�
       article = (data.articles || []).find((a) => a.id === id);
     }
     if (!article) {
-      showToast("文章加载失败");
+      showToast(
+        window.MemorialI18n?.isEn()
+          ? "Could not load article"
+          : "文章加载失败"
+      );
       return;
     }
+    article = this.localizeArticle(article);
     document.getElementById("article-modal-title").textContent = article.title;
+    const zhNote = article.zhOnly
+      ? `<p class="article-zh-only" style="margin-bottom:14px;padding:10px 12px;background:var(--paper2);border-radius:8px;font-size:13px;color:var(--ink2)">${this.escape(
+          window.MemorialI18n?.t("articles.zhOnly") || ""
+        )}</p>`
+      : "";
     const body = (article.body || article.summary || "")
       .split("\n\n")
       .map((p) => `<p style="margin-top:12px">${this.escape(p)}</p>`)
       .join("");
-    document.getElementById("article-modal-body").innerHTML = body;
+    document.getElementById("article-modal-body").innerHTML = zhNote + body;
     document.getElementById("article-modal").classList.add("open");
   },
 
@@ -718,9 +955,11 @@ ${quote ? `<p>先生/女士生前常言：「${this.escape(quote)}」此言将�
   },
 
   syncPlanningUI(state) {
-    if (!window.planningData) return;
+    const data =
+      window.MemorialI18n?.getPlanningData?.() || window.planningData;
+    if (!data) return;
     window.taskState = state || {};
-    planningData.forEach((cat, ci) => {
+    data.forEach((cat, ci) => {
       cat.tasks.forEach((_, ti) => {
         const key = ci + "-" + ti;
         const el = document.getElementById("tc-" + ci + "-" + ti);

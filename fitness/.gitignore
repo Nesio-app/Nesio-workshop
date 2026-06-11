@@ -1,0 +1,10 @@
+node_modules/
+.vercel/
+.env
+.env.*
+!.env.example
+config.local.js
+public/
+www/
+.DS_Store
+.vercel

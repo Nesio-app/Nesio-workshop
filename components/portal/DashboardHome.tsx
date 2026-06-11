@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { pickFreshQuote } from '@/lib/portal/quotes';
 import Link from 'next/link';
 import type { CalendarEvent, PortalConfig, PortalTool } from '@/lib/portal/types';
 import { greetingForHour } from '@/lib/portal/greeting';
@@ -8,12 +9,13 @@ import {
   fetchWeatherAt,
   readGeo,
   reverseGeocode,
+  simplifyPlaceName,
 } from '@/lib/portal/weather';
 import ToolGrid from './ToolGrid';
 
 interface DashboardHomeProps {
   config: PortalConfig;
-  onOpenSearch: () => void;
+  onOpenNote: () => void;
   onOpenTool: (tool: PortalTool) => void;
 }
 
@@ -61,21 +63,9 @@ function formatEventTime(event: CalendarEvent): string {
   return `${a} – ${end.toLocaleTimeString('zh-CN', opts)}`;
 }
 
-function pickDailyQuote(config: PortalConfig): string {
-  const pool = [
-    ...(config.meta.energyQuotes || []),
-    ...(config.meta.warmReminders || []),
-  ].filter(Boolean);
-  if (pool.length === 0) return '今天也要好好照顾自己。';
-  const day = new Date().toDateString();
-  let hash = 0;
-  for (let i = 0; i < day.length; i++) hash = (hash + day.charCodeAt(i) * (i + 1)) % pool.length;
-  return pool[hash];
-}
-
 export default function DashboardHome({
   config,
-  onOpenSearch,
+  onOpenNote,
   onOpenTool,
 }: DashboardHomeProps) {
   const profile = config.profile ?? { displayName: '婧' };
@@ -92,7 +82,8 @@ export default function DashboardHome({
   const [weather, setWeather] = useState<WeatherState>({ loading: true });
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [calendarNote, setCalendarNote] = useState<string | null>(null);
-  const [dailyQuote, setDailyQuote] = useState(() => pickDailyQuote(config));
+  const quotePicked = useRef(false);
+  const [dailyQuote, setDailyQuote] = useState('今天也要好好照顾自己。');
   const [quoteSaved, setQuoteSaved] = useState(false);
 
   useEffect(() => {
@@ -104,7 +95,9 @@ export default function DashboardHome({
   }, [profile.avatarUrl]);
 
   useEffect(() => {
-    setDailyQuote(pickDailyQuote(config));
+    if (quotePicked.current) return;
+    quotePicked.current = true;
+    setDailyQuote(pickFreshQuote(config));
   }, [config]);
 
   useEffect(() => {
@@ -130,14 +123,14 @@ export default function DashboardHome({
       try {
         let lat = fallbackLocation.latitude;
         let lon = fallbackLocation.longitude;
-        let place = fallbackLocation.city;
+        let place = simplifyPlaceName(fallbackLocation.city);
 
         try {
           const pos = await readGeo();
           lat = pos.coords.latitude;
           lon = pos.coords.longitude;
           const name = await reverseGeocode(lat, lon);
-          if (name) place = name;
+          if (name) place = simplifyPlaceName(name);
         } catch {
           /* use fallback coords */
         }
@@ -253,18 +246,18 @@ export default function DashboardHome({
 
         <div className="portal-dash-hero-end">
           <Link className="portal-dash-toplink-inline" href="/portfolio">
-            栖页
+            关于我
           </Link>
           <button
             type="button"
             className="portal-search-btn portal-search-btn--inline"
-            onClick={onOpenSearch}
-            aria-label="搜索或命令"
+            onClick={onOpenNote}
+            aria-label="打开 Note"
           >
             <span className="portal-search-icon" aria-hidden>
-              ⌕
+              ✎
             </span>
-            <span>搜索</span>
+            <span>Note</span>
           </button>
         </div>
       </header>

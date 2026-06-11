@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "installCommand": "npm install --omit=dev",
+  "buildCommand": "npm run vercel-build",
+  "outputDirectory": "public",
+  "functions": {
+    "api/fitness/chat.ts": {
+      "maxDuration": 30
+    },
+    "api/fitness/health.ts": {
+      "maxDuration": 10
+    }
+  }
+}

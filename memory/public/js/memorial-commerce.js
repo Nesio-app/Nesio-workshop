@@ -68,6 +68,17 @@ window.MemorialCommerce = {
     localStorage.setItem("nianguichu_cart_v1", JSON.stringify(this.cart));
   },
 
+  productPhotoStyle(p) {
+    const photo =
+      p.image ||
+      window.MemorialVisuals?.productImage(p.slug) ||
+      null;
+    if (photo) {
+      return `background-image:linear-gradient(180deg,rgba(0,0,0,.08),rgba(0,0,0,.45)),url('${photo}');background-size:cover;background-position:center;background-color:#1a1a1a`;
+    }
+    return `background:${p.bg || "#eee"}`;
+  },
+
   productCard(p, detailFn) {
     if (window.MemorialI18n) p = MemorialI18n.localizeProduct(p);
     const esc = MemorialStore.escapeHtml;
@@ -75,9 +86,12 @@ window.MemorialCommerce = {
       p.listPrice && p.listPrice > p.price
         ? `<span>¥${p.listPrice}</span>`
         : "";
+    const photo =
+      p.image || window.MemorialVisuals?.productImage(p.slug);
+    const imgInner = photo ? "" : p.emoji || "🛍️";
     return `
     <div class="product-card" data-cat="${p.category}" onclick="${detailFn}('${esc(p.slug)}')">
-      <div class="product-img" style="background:${p.bg || "#eee"}">${p.emoji || "🛍️"}${p.badge ? `<div class="product-badge">${esc(p.badge)}</div>` : ""}</div>
+      <div class="product-img product-img--photo" style="${this.productPhotoStyle(p)}">${imgInner}${p.badge ? `<div class="product-badge">${esc(p.badge)}</div>` : ""}</div>
       <div class="product-body">
         <div class="product-name">${esc(p.name)}</div>
         <div class="product-price">¥${p.price}${list}</div>
@@ -108,17 +122,22 @@ window.MemorialCommerce = {
         ? qrProducts
         : this.products.filter((p) => p.category === "gift").slice(0, 3);
       qr.innerHTML = list
-        .map(
-          (p) => `
+        .map((p) => {
+          const photo =
+            p.image || window.MemorialVisuals?.productImage(p.slug);
+          const vis = photo
+            ? `background-image:linear-gradient(180deg,rgba(0,0,0,.1),rgba(0,0,0,.5)),url('${photo}');background-size:cover;background-position:center`
+            : `background:${p.bg}`;
+          return `
         <div class="qr-prod-card">
-          <div class="qr-prod-visual" style="background:${p.bg}">${p.emoji}</div>
+          <div class="qr-prod-visual qr-prod-visual--photo" style="${vis}">${photo ? "" : p.emoji}</div>
           <div class="qr-prod-info">
             <div class="qr-prod-name">${MemorialStore.escapeHtml(p.name)}</div>
             <div class="qr-prod-desc">${MemorialStore.escapeHtml(p.description || "")}</div>
-            <div class="qr-prod-price">¥${p.price}<button class="qr-prod-btn" onclick="event.stopPropagation();MemorialCommerce.addBySlug('${MemorialStore.escapeHtml(p.slug)}')">加入购物车</button></div>
+            <div class="qr-prod-price">¥${p.price}<button class="qr-prod-btn" onclick="event.stopPropagation();MemorialCommerce.addBySlug('${MemorialStore.escapeHtml(p.slug)}')">${window.MemorialI18n?.t("shop.addToCart") || "加入购物车"}</button></div>
           </div>
-        </div>`
-        )
+        </div>`;
+        })
         .join("");
     }
   },
@@ -591,8 +610,8 @@ window.MemorialCommerce = {
     root.innerHTML = `
       <nav class="product-breadcrumb"><button type="button" class="obit-back-btn" onclick="goPage('shop')">← 返回商城</button></nav>
       <div class="product-detail-layout">
-        <div class="product-detail-visual" style="background:${p.bg || "#eee"}">
-          <span class="product-detail-emoji">${p.emoji || "🛍️"}</span>
+        <div class="product-detail-visual product-img--photo" style="${this.productPhotoStyle(p)}">
+          <span class="product-detail-emoji">${(p.image || window.MemorialVisuals?.productImage(p.slug)) ? "" : p.emoji || "🛍️"}</span>
           ${p.badge ? `<span class="product-detail-badge">${esc(p.badge)}</span>` : ""}
         </div>
         <div class="product-detail-main">

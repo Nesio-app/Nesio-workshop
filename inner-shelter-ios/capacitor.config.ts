@@ -10,6 +10,9 @@ const config: CapacitorConfig = {
     scheme: 'Inner Shelter',
   },
   plugins: {
+    CapacitorHttp: {
+      enabled: true,
+    },
     SplashScreen: {
       launchAutoHide: true,
       launchShowDuration: 2000,

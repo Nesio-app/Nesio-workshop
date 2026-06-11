@@ -5,6 +5,22 @@
 生产站点示例：`https://nianguichu.onrender.com`  
 GitHub Pages 静态站需额外配置 `NEXT_PUBLIC_API_URL` 指向该地址。
 
+## 代码在哪个仓库？
+
+| 用途 | 仓库 | 说明 |
+|------|------|------|
+| **Render 生产** | [github.com/hanbing6228/memory](https://github.com/hanbing6228/memory) | `nianguichu.onrender.com` 只监听这个仓库的 push |
+| 作品集 + 纪念馆源码副本 | [github.com/hanbing6228/DS_Profolio](https://github.com/hanbing6228/DS_Profolio) 的 `memory/` 目录 | 改这里后 **不会** 自动更新 Render |
+
+改完 `DS_Profolio` 后请运行 `./scripts/sync-to-memory-repo.sh`（或手动把 `memory/` 同步到 `hanbing6228/memory` 并 push），然后在 Render 控制台点 **Manual Deploy → Deploy latest commit**（若未开启 Auto-Deploy）。
+
+验证是否上线：
+
+```bash
+curl -s https://nianguichu.onrender.com/api/version   # version 应为最新 git 短 SHA
+curl -sI https://nianguichu.onrender.com/js/memorial-i18n.js | head -1   # 应为 HTTP/2 200
+```
+
 ---
 
 ## 一、在 Render 控制台填写

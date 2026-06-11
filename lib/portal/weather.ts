@@ -25,22 +25,24 @@ export interface WeatherSnapshot {
   forecastNote?: string;
 }
 
+export function simplifyPlaceName(raw: string): string {
+  const t = raw.trim();
+  if (!t) return '';
+  const first = t.split(',')[0].split('，')[0].trim();
+  return first;
+}
+
 export async function reverseGeocode(lat: number, lon: number): Promise<string> {
   try {
     const url = new URL('https://api.bigdatacloud.net/data/reverse-geocode-client');
     url.searchParams.set('latitude', String(lat));
     url.searchParams.set('longitude', String(lon));
-    url.searchParams.set('localityLanguage', 'zh');
+    url.searchParams.set('localityLanguage', 'en');
     const res = await fetch(url.toString());
     if (!res.ok) throw new Error('geo');
     const data = await res.json();
-    return (
-      data.locality ||
-      data.city ||
-      data.principalSubdivision ||
-      data.countryName ||
-      ''
-    );
+    const place = data.locality || data.city || '';
+    return simplifyPlaceName(place);
   } catch {
     return '';
   }

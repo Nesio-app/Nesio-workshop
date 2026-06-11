@@ -44,6 +44,15 @@ jobs:
           test -f out/memory/content/membook-samples.json
           echo "Memorial bundle OK ($(find out/memory -type f | wc -l) files)"
 
+      - name: Bundle toolbox static apps
+        run: |
+          mkdir -p out/adhd-flow out/fitness
+          cp -R adhd-flow-ios/web/. out/adhd-flow/
+          cp -R fitness/web/. out/fitness/
+          test -f out/adhd-flow/index.html
+          test -f out/fitness/index.html
+          echo "Toolbox apps OK (adhd-flow + fitness)"
+
       - name: Setup Pages
         uses: actions/configure-pages@v4
 

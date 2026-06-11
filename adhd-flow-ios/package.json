@@ -1,0 +1,27 @@
+{
+  "name": "adhd-flow-ios",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ADHD Flow Planner · 轻推任务系统 — Capacitor iOS app",
+  "scripts": {
+    "sync": "node scripts/sync-www.mjs",
+    "cap:sync": "npm run sync && npx cap sync ios",
+    "ios": "npm run cap:sync && npx cap open ios",
+    "ios:run": "npm run cap:sync && npx cap run ios",
+    "assets": "npx capacitor-assets generate --ios",
+    "vercel-build": "node scripts/sync-www.mjs",
+    "deploy:api": "bash scripts/deploy-api.sh"
+  },
+  "dependencies": {
+    "@capacitor/core": "^8.4.0",
+    "@capacitor/ios": "^8.4.0",
+    "@capacitor/splash-screen": "^8.0.1",
+    "@capacitor/status-bar": "^8.0.1",
+    "@vercel/node": "^5.1.14"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.4.0",
+    "typescript": "^5.5.0"
+  }
+}

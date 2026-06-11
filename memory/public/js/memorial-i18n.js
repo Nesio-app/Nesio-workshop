@@ -184,6 +184,10 @@ window.MemorialI18n = {
       "nav.cart": "购物车",
       "nav.create": "创建纪念馆",
       "home.brand": "念归处",
+      "home.heroTitle": "念归处",
+      "home.heroSub": "华人数字纪念馆",
+      "home.heroTagline":
+        "以安静、清晰的方式保存生平与追思——如同一篇值得反复阅读的纪念文章，留给家人与后代。",
       "home.stat.memorials": "纪念馆",
       "home.stat.messages": "留言祈福",
       "home.stat.partners": "合作殡仪馆",
@@ -254,6 +258,57 @@ window.MemorialI18n = {
       "pricing.freeBtn": "免费开始",
       "pricing.premiumBtn": "升级高级版 · ¥399",
       "pricing.lifetimeBtn": "购买终身版 · ¥999",
+      "pricing.freeDesc": "基础纪念，永久免费",
+      "pricing.premiumDesc": "完整功能，家族共享",
+      "pricing.lifetimeDesc": "一次付费，永久拥有",
+      "pricing.feat.memorialPage": "纪念馆页面",
+      "pricing.feat.photos": "照片上传",
+      "pricing.feat.basicThemes": "基础主题",
+      "pricing.feat.allThemes": "全部主题",
+      "pricing.feat.messages": "留言功能",
+      "pricing.feat.aiObit": "AI讣告",
+      "pricing.feat.video": "视频上传",
+      "pricing.feat.customDomain": "自定义域名",
+      "pricing.feat.allPremium": "全部高级功能",
+      "pricing.feat.multiMemorial": "多个纪念馆",
+      "pricing.feat.prioritySupport": "优先客服",
+      "pricing.feat.membookDiscount": "纪念册折扣",
+      "pricing.feat.plaqueDiscount": "QR铭牌折扣",
+      "pricing.feat.legacy": "传承保障",
+      "pricing.val.yes": "✓",
+      "pricing.val.no": "✗",
+      "pricing.val.dash": "—",
+      "pricing.val.photos5": "5张",
+      "pricing.val.unlimited": "无限",
+      "pricing.val.memorials1": "1个",
+      "pricing.val.memorials3": "3个",
+      "pricing.val.memorials5": "最多5个",
+      "pricing.val.themes3": "3款",
+      "pricing.val.themesAll": "全部50+",
+      "pricing.val.discount9": "9折",
+      "pricing.val.discount8": "8折",
+      "pricing.compare.feature": "功能",
+      "pricing.compare.freeCol": "免费",
+      "pricing.compare.premiumCol": "高级¥399/年",
+      "pricing.compare.lifetimeCol": "终身¥999",
+      "pricing.compare.row.memorialPage": "纪念馆页面",
+      "pricing.compare.row.photos": "照片存储",
+      "pricing.compare.row.video": "视频存储",
+      "pricing.compare.row.themes": "主题模板",
+      "pricing.compare.row.aiObit": "AI讣告助手",
+      "pricing.compare.row.ceremony": "在线纪念仪式",
+      "pricing.compare.row.music": "背景音乐",
+      "pricing.compare.row.multi": "多馆管理",
+      "pricing.compare.row.discount": "纪念册/QR铭牌折扣",
+      "pricing.compare.row.support": "专属客服",
+      "guides.admin.title": "发布文章（内容管理员）",
+      "guides.admin.titlePh": "文章标题",
+      "guides.admin.catCustom": "自定义",
+      "guides.admin.catLabelPh": "分类显示名（如：丧礼礼仪）",
+      "guides.admin.emojiPh": "图标 emoji（可选）",
+      "guides.admin.summaryPh": "摘要（列表页显示）",
+      "guides.admin.bodyPh": "正文（段落之间空一行）",
+      "guides.admin.publish": "发布",
       "checkout.title": "确认订单",
       "checkout.name": "联系人姓名 *",
       "checkout.email": "联系邮箱 *",
@@ -270,6 +325,88 @@ window.MemorialI18n = {
       "membook.samplesSub": "完整中英文内容，可在线翻页预览",
       "membook.pageTitle": "纪念册制作",
       "membook.pageSub": "将散落的记忆凝聚成一本可以传家的精装纪念册",
+      "guides.title": "丧葬百科",
+      "guides.sub": "礼仪指南、悲伤疗愈与身后事务——在艰难时刻，为您提供可靠参考",
+      "guides.filter.all": "全部",
+      "guides.filter.grief": "悲伤疗愈",
+      "guides.filter.ritual": "丧礼礼仪",
+      "guides.filter.memory": "守护记忆",
+      "guides.filter.child": "与孩子谈生死",
+      "guides.filter.legal": "身后事务",
+      "articles.loading": "加载中…",
+      "articles.empty": "暂无文章",
+      "shop.addToCart": "加入购物车",
+      "tools.card.obit": "AI 讣告撰写",
+      "tools.card.obitDesc": "三步生成感人讣告并发布到纪念馆",
+      "tools.card.plan": "葬礼规划清单",
+      "tools.card.planDesc": "24 项任务清单，有序料理后事",
+      "tools.card.membook": "纪念册制作",
+      "tools.card.membookDesc": "智能排版，支持数字版与精装印刷",
+      "tools.card.themes": "主题模板",
+      "tools.card.themesDesc": "50+ 中式纪念馆主题",
+      "tools.card.qr": "QR 铭牌介绍",
+      "tools.card.qrDesc": "了解材质与订购流程",
+      "tools.card.guides": "丧葬百科",
+      "tools.card.guidesDesc": "礼仪、疗愈与身后事务指南",
+      "obit.title": "AI讣告撰写助手",
+      "obit.sub": "用温柔的文字，为挚爱写下最后的告白",
+      "obit.step1": "基本信息",
+      "obit.step2": "生平故事",
+      "obit.step3": "预览发布",
+      "obit.h3.step1": "基本信息",
+      "obit.h3.step2": "生平故事",
+      "obit.h3.preview": "讣告预览",
+      "obit.label.name": "姓名",
+      "obit.label.gender": "性别",
+      "obit.label.dob": "出生日期",
+      "obit.label.dod": "辞世日期",
+      "obit.label.birthplace": "出生地",
+      "obit.label.job": "职业 / 身份",
+      "obit.label.family": "家庭关系",
+      "obit.label.achievements": "主要成就与贡献",
+      "obit.label.hobbies": "兴趣爱好与个性特质",
+      "obit.label.virtues": "性格词汇（可多选）",
+      "obit.label.quote": "一句代表性的话（可选）",
+      "obit.ph.name": "逝者姓名",
+      "obit.ph.birthplace": "如：湖南省长沙市",
+      "obit.ph.job": "如：教师、工程师、家庭主妇…",
+      "obit.ph.family": "如：育有二子一女，孙子三名",
+      "obit.ph.achievements": "工作成就、人生亮点、对家庭社会的贡献…",
+      "obit.ph.hobbies": "喜欢的事情、让人难忘的特质、趣事…",
+      "obit.ph.quote": "他/她常说的一句话，或家人想说的话…",
+      "obit.btn.next2": "下一步：生平故事 →",
+      "obit.btn.back": "← 返回",
+      "obit.btn.generate": "✨ AI生成讣告初稿",
+      "obit.btn.copy": "📋 复制文本",
+      "obit.btn.print": "📄 打印 / 存PDF",
+      "obit.btn.newspaper": "📰 投稿报纸",
+      "obit.btn.publish": "🏮 发布到纪念馆",
+      "obit.btn.edit": "← 修改信息",
+      "obit.btn.regenerate": "🔄 重新生成",
+      "obit.preview.wait": "请完成前两步信息填写后，AI将为您生成感人的讣告初稿…",
+      "plaque.label.name": "逝者姓名",
+      "plaque.label.years": "生卒年份",
+      "plaque.label.material": "材质",
+      "plaque.label.inscription": "刻字内容（挽联/诗句）",
+      "plaque.btn.cart": "加入购物车",
+      "plaque.btn.shop": "浏览更多商品",
+      "plaque.mat.stainless": "不锈钢铭牌 ¥298",
+      "plaque.mat.brass": "黄铜典藏铭牌 ¥588",
+      "plaque.mat.qr": "QR二维码铭牌 ¥388",
+      "articles.zhOnly": "此文暂无英文版，以下为中文原文。",
+      "planning.title": "葬礼规划清单",
+      "planning.sub": "在最艰难的时刻，让我们陪您有序前行",
+      "planning.progress": "完成进度",
+      "planning.urgent": "紧急",
+      "themes.title": "主题模板",
+      "themes.sub": "50余款精心设计的中式主题，让纪念馆更具文化温度",
+      "themes.filter.all": "全部风格",
+      "themes.filter.ink": "水墨传统",
+      "themes.filter.floral": "花卉自然",
+      "themes.filter.modern": "简约现代",
+      "themes.filter.seasonal": "二十四节气",
+      "qr.title": "QR扫码铭牌",
+      "qr.sub": "将数字纪念馆与实体墓碑相连——一块铭牌，承载永恒记忆",
     },
     en: {
       "nav.home": "Home",
@@ -281,6 +418,10 @@ window.MemorialI18n = {
       "nav.cart": "Cart",
       "nav.create": "Create memorial",
       "home.brand": "Nianguichu",
+      "home.heroTitle": "Nianguichu",
+      "home.heroSub": "Digital memorial for families",
+      "home.heroTagline":
+        "Preserve a life and the love around it—in a calm, lasting space your family can return to anytime.",
       "home.stat.memorials": "Memorials",
       "home.stat.messages": "Messages",
       "home.stat.partners": "Partner homes",
@@ -351,6 +492,57 @@ window.MemorialI18n = {
       "pricing.freeBtn": "Start free",
       "pricing.premiumBtn": "Upgrade · ¥399/yr",
       "pricing.lifetimeBtn": "Buy lifetime · ¥999",
+      "pricing.freeDesc": "Basic memorial, free forever",
+      "pricing.premiumDesc": "Full features for the whole family",
+      "pricing.lifetimeDesc": "One payment, yours forever",
+      "pricing.feat.memorialPage": "Memorial page",
+      "pricing.feat.photos": "Photo uploads",
+      "pricing.feat.basicThemes": "Basic themes",
+      "pricing.feat.allThemes": "All themes",
+      "pricing.feat.messages": "Guest messages",
+      "pricing.feat.aiObit": "AI obituary",
+      "pricing.feat.video": "Video uploads",
+      "pricing.feat.customDomain": "Custom domain",
+      "pricing.feat.allPremium": "All Premium features",
+      "pricing.feat.multiMemorial": "Multiple memorials",
+      "pricing.feat.prioritySupport": "Priority support",
+      "pricing.feat.membookDiscount": "Memorial book discount",
+      "pricing.feat.plaqueDiscount": "QR plaque discount",
+      "pricing.feat.legacy": "Legacy guarantee",
+      "pricing.val.yes": "✓",
+      "pricing.val.no": "✗",
+      "pricing.val.dash": "—",
+      "pricing.val.photos5": "5 photos",
+      "pricing.val.unlimited": "Unlimited",
+      "pricing.val.memorials1": "1",
+      "pricing.val.memorials3": "3",
+      "pricing.val.memorials5": "Up to 5",
+      "pricing.val.themes3": "3 themes",
+      "pricing.val.themesAll": "50+ themes",
+      "pricing.val.discount9": "10% off",
+      "pricing.val.discount8": "20% off",
+      "pricing.compare.feature": "Feature",
+      "pricing.compare.freeCol": "Free",
+      "pricing.compare.premiumCol": "Premium ¥399/yr",
+      "pricing.compare.lifetimeCol": "Lifetime ¥999",
+      "pricing.compare.row.memorialPage": "Memorial page",
+      "pricing.compare.row.photos": "Photo storage",
+      "pricing.compare.row.video": "Video storage",
+      "pricing.compare.row.themes": "Themes",
+      "pricing.compare.row.aiObit": "AI obituary assistant",
+      "pricing.compare.row.ceremony": "Online ceremonies",
+      "pricing.compare.row.music": "Background music",
+      "pricing.compare.row.multi": "Memorial sites",
+      "pricing.compare.row.discount": "Book / plaque discount",
+      "pricing.compare.row.support": "Dedicated support",
+      "guides.admin.title": "Publish article (content admin)",
+      "guides.admin.titlePh": "Article title",
+      "guides.admin.catCustom": "Custom",
+      "guides.admin.catLabelPh": "Category label (e.g. Funeral customs)",
+      "guides.admin.emojiPh": "Emoji icon (optional)",
+      "guides.admin.summaryPh": "Summary (shown in list)",
+      "guides.admin.bodyPh": "Body (blank line between paragraphs)",
+      "guides.admin.publish": "Publish",
       "checkout.title": "Checkout",
       "checkout.name": "Contact name *",
       "checkout.email": "Email *",
@@ -367,28 +559,110 @@ window.MemorialI18n = {
       "membook.samplesSub": "Full Chinese & English previews — flip through online",
       "membook.pageTitle": "Memorial books",
       "membook.pageSub": "Gather scattered memories into a heirloom-quality book",
+      "guides.title": "Guides & resources",
+      "guides.sub": "Ritual, grief, and practical guidance when you need it most",
+      "guides.filter.all": "All",
+      "guides.filter.grief": "Grief support",
+      "guides.filter.ritual": "Funeral customs",
+      "guides.filter.memory": "Keeping memory",
+      "guides.filter.child": "Children & loss",
+      "guides.filter.legal": "After affairs",
+      "articles.loading": "Loading…",
+      "articles.empty": "No articles yet",
+      "shop.addToCart": "Add to cart",
+      "tools.card.obit": "AI obituary",
+      "tools.card.obitDesc": "Draft and publish to the memorial in three steps",
+      "tools.card.plan": "Funeral checklist",
+      "tools.card.planDesc": "24 tasks to plan with clarity",
+      "tools.card.membook": "Memorial book",
+      "tools.card.membookDesc": "Layout for digital or print editions",
+      "tools.card.themes": "Themes",
+      "tools.card.themesDesc": "50+ memorial layouts",
+      "tools.card.qr": "QR plaques",
+      "tools.card.qrDesc": "Materials and ordering",
+      "tools.card.guides": "Guides",
+      "tools.card.guidesDesc": "Ritual, grief & practical help",
+      "obit.title": "AI obituary assistant",
+      "obit.sub": "Gentle words for a final farewell",
+      "obit.step1": "Basics",
+      "obit.step2": "Life story",
+      "obit.step3": "Preview",
+      "obit.h3.step1": "Basic information",
+      "obit.h3.step2": "Life story",
+      "obit.h3.preview": "Obituary preview",
+      "obit.label.name": "Full name",
+      "obit.label.gender": "Gender",
+      "obit.label.dob": "Date of birth",
+      "obit.label.dod": "Date of passing",
+      "obit.label.birthplace": "Place of birth",
+      "obit.label.job": "Occupation / role",
+      "obit.label.family": "Survived by",
+      "obit.label.achievements": "Achievements & contributions",
+      "obit.label.hobbies": "Interests & personality",
+      "obit.label.virtues": "Character (select any)",
+      "obit.label.quote": "A representative quote (optional)",
+      "obit.ph.name": "Name of the deceased",
+      "obit.ph.birthplace": "e.g. Changsha, Hunan",
+      "obit.ph.job": "e.g. teacher, engineer, homemaker…",
+      "obit.ph.family": "e.g. spouse, two children, three grandchildren",
+      "obit.ph.achievements": "Career highlights, community work, family legacy…",
+      "obit.ph.hobbies": "Hobbies, habits, stories people remember…",
+      "obit.ph.quote": "Words they often said, or words from the family…",
+      "obit.btn.next2": "Next: life story →",
+      "obit.btn.back": "← Back",
+      "obit.btn.generate": "✨ Generate draft",
+      "obit.btn.copy": "📋 Copy text",
+      "obit.btn.print": "📄 Print / save PDF",
+      "obit.btn.newspaper": "📰 Submit to newspaper",
+      "obit.btn.publish": "🏮 Publish to memorial",
+      "obit.btn.edit": "← Edit details",
+      "obit.btn.regenerate": "🔄 Regenerate",
+      "obit.preview.wait": "Complete steps 1–2, then AI will draft the obituary here…",
+      "plaque.label.name": "Name on plaque",
+      "plaque.label.years": "Years of life",
+      "plaque.label.material": "Material",
+      "plaque.label.inscription": "Inscription (verse or epitaph)",
+      "plaque.btn.cart": "Add to cart",
+      "plaque.btn.shop": "Browse more products",
+      "plaque.mat.stainless": "Stainless steel plaque · ¥298",
+      "plaque.mat.brass": "Brass heirloom plaque · ¥588",
+      "plaque.mat.qr": "QR code plaque · ¥388",
+      "articles.zhOnly": "English translation is not available yet. Original text below.",
+      "planning.title": "Funeral planning checklist",
+      "planning.sub": "A calm order of tasks in difficult days",
+      "planning.progress": "Progress",
+      "planning.urgent": "Urgent",
+      "themes.title": "Theme gallery",
+      "themes.sub": "50+ thoughtful layouts for your memorial",
+      "themes.filter.all": "All styles",
+      "themes.filter.ink": "Ink tradition",
+      "themes.filter.floral": "Floral",
+      "themes.filter.modern": "Modern",
+      "themes.filter.seasonal": "Seasons",
+      "qr.title": "QR memorial plaques",
+      "qr.sub": "Link stone and screen—one plaque, lasting memory",
     },
   },
 
   /** Map Chinese toast / inline text → translation key */
   toastKeys: {
-    微信登录成功: "toast.wechatOk",
-    微信登录未配置: "toast.wechatNotConfigured",
-    微信授权已过期，请重试: "toast.wechatStateInvalid",
-    微信登录失败，请改用邮箱或手机号: "toast.wechatFail",
-    请填写留言内容: "toast.guestbookRequired",
+    "微信登录成功": "toast.wechatOk",
+    "微信登录未配置": "toast.wechatNotConfigured",
+    "微信授权已过期，请重试": "toast.wechatStateInvalid",
+    "微信登录失败，请改用邮箱或手机号": "toast.wechatFail",
+    "请填写留言内容": "toast.guestbookRequired",
     "留言已发布，感谢您的思念": "toast.guestbookPosted",
-    请输入姓名搜索: "toast.searchRequired",
-    已进入李明德纪念馆: "toast.demoMemorialOpen",
-    请等待服务器连接: "toast.waitForServer",
-    请填写邮箱: "toast.emailRequired",
-    请写下一点记忆: "toast.memoryRequired",
-    已交给家族保存，待确认后展示: "toast.memoryPending",
-    请先生成讣告内容: "toast.obituaryRequired",
+    "请输入姓名搜索": "toast.searchRequired",
+    "已进入李明德纪念馆": "toast.demoMemorialOpen",
+    "请等待服务器连接": "toast.waitForServer",
+    "请填写邮箱": "toast.emailRequired",
+    "请写下一点记忆": "toast.memoryRequired",
+    "已交给家族保存，待确认后展示": "toast.memoryPending",
+    "请先生成讣告内容": "toast.obituaryRequired",
     "讣告已发布到纪念馆 · 生平故事": "toast.obituaryPublished",
-    免费版已包含基础功能: "toast.freePlan",
-    演示版仅开放李明德纪念馆，请点击第一张卡片: "toast.demoOnlyLi",
-    更多纪念馆即将开放: "toast.moreSoon",
+    "免费版已包含基础功能": "toast.freePlan",
+    "演示版仅开放李明德纪念馆，请点击第一张卡片": "toast.demoOnlyLi",
+    "更多纪念馆即将开放": "toast.moreSoon",
     "RSVP已提交，感谢您的参与": "toast.rsvpDone",
   },
 
@@ -520,6 +794,73 @@ window.MemorialI18n = {
     },
   },
 
+  planningDataEn: [
+    {
+      icon: "🚨",
+      title: "Within 24 hours",
+      color: "#8b2020",
+      tasks: [
+        { t: "Contact funeral home", d: "Report passing and arrange transport", urgent: true },
+        { t: "Notify close family", d: "Call children, siblings, and next of kin", urgent: true },
+        { t: "Obtain death certificate", d: "From hospital or coroner—keep originals safe", urgent: true },
+        { t: "Arrange remains", d: "Hospital morgue or direct to funeral provider" },
+      ],
+    },
+    {
+      icon: "📋",
+      title: "Within 48 hours",
+      color: "var(--blue)",
+      tasks: [
+        { t: "Notify employer or school", d: "Leave and bereavement paperwork" },
+        { t: "Contact executor or lawyer", d: "If a will exists, involve them early" },
+        { t: "Care for dependents", d: "Arrange guardianship if minors are involved" },
+        { t: "Publish obituary", d: "WeChat, newspaper, or this platform" },
+      ],
+    },
+    {
+      icon: "🏮",
+      title: "Funeral preparation",
+      color: "var(--teal)",
+      tasks: [
+        { t: "Choose service type", d: "Burial, cremation, or memorial—family agreement" },
+        { t: "Set date and venue", d: "Funeral home, temple, or ceremony space" },
+        { t: "Select portrait photo", d: "Clear, dignified image for displays" },
+        { t: "Arrange officiant", d: "Family member or professional host" },
+        { t: "Invite guests", d: "Share time, place, and any dress guidance" },
+        { t: "Prepare mourning attire", d: "Per local custom for close relatives" },
+      ],
+    },
+    {
+      icon: "📝",
+      title: "Estate & paperwork",
+      color: "var(--green)",
+      tasks: [
+        { t: "Register the death", d: "Civil affairs office with required documents" },
+        { t: "Bank accounts", d: "Freeze or close; begin inheritance steps" },
+        { t: "Property & assets", d: "Follow will or statutory rules; lawyer if disputed" },
+        { t: "Cancel ID documents", d: "ID card, license, passport, social insurance" },
+        { t: "Insurance claims", d: "Contact insurers with certificate" },
+        { t: "Belongings", d: "Keep heirlooms; dispose of the rest thoughtfully" },
+      ],
+    },
+    {
+      icon: "💙",
+      title: "Healing together",
+      color: "var(--lotus)",
+      tasks: [
+        { t: "Share memories", d: "Stories that comfort and connect family" },
+        { t: "Create online memorial", d: "A lasting Nianguichu space for all" },
+        { t: "Seek support", d: "Counseling if grief feels unmanageable" },
+        { t: "Mark anniversaries", d: "Qingming and family remembrance days" },
+      ],
+    },
+  ],
+
+  getPlanningData() {
+    if (this.isEn()) return this.planningDataEn;
+    return typeof planningData !== "undefined" ? planningData : [];
+  },
+
   featureCards: [
     { key: "home.feat.memorial", descKey: "home.feat.memorialDesc" },
     { key: "home.feat.themes", descKey: "home.feat.themesDesc" },
@@ -534,6 +875,26 @@ window.MemorialI18n = {
     const stored = localStorage.getItem(this.STORAGE_KEY);
     if (stored === "en" || stored === "zh") this.lang = stored;
     this.syncCopy();
+    this.bindLangButton();
+  },
+
+  bindLangButton() {
+    const attach = () => {
+      const btn = document.getElementById("lang-toggle");
+      if (!btn || btn.dataset.i18nBound === "1") return;
+      btn.dataset.i18nBound = "1";
+      btn.removeAttribute("onclick");
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.toggle();
+      });
+    };
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", attach);
+    } else {
+      attach();
+    }
   },
 
   isEn() {
@@ -592,9 +953,11 @@ window.MemorialI18n = {
     return { ...t, name: tr.name || t.name, desc: tr.desc || t.desc };
   },
 
-  getDemoMemorial(slug) {
+  getDemoMemorial(slug, memorial) {
     if (this.lang !== "en") return null;
-    return window.MemorialDemoContent?.[slug]?.en || null;
+    const key =
+      window.MemorialDemoContent?.resolveSlug?.(slug, memorial) || slug;
+    return window.MemorialDemoContent?.[key]?.en || null;
   },
 
   setLang(lang) {
@@ -644,6 +1007,7 @@ window.MemorialI18n = {
     this.applyFeatureCards();
     this.applyMemorialCardButtons();
     this.applyShopCats();
+    this.applySecondaryPages();
     this.applyLangButton();
     this.applyPricingPage();
     this.refreshDynamic();
@@ -652,46 +1016,502 @@ window.MemorialI18n = {
   applyPricingPage() {
     const page = document.getElementById("page-pricing");
     if (!page) return;
+    const t = (k) => this.t(k);
+    const setFeatVals = (card, vals) => {
+      card.querySelectorAll(".pricing-feat-row .feat-val").forEach((el, i) => {
+        if (vals[i] !== undefined) el.textContent = vals[i];
+      });
+    };
+    const sharedFeatKeys = [
+      "pricing.feat.memorialPage",
+      "pricing.feat.photos",
+      "pricing.feat.basicThemes",
+      "pricing.feat.messages",
+      "pricing.feat.aiObit",
+      "pricing.feat.video",
+      "pricing.feat.customDomain",
+    ];
+    const premiumFeatKeys = [
+      "pricing.feat.memorialPage",
+      "pricing.feat.photos",
+      "pricing.feat.allThemes",
+      "pricing.feat.messages",
+      "pricing.feat.aiObit",
+      "pricing.feat.video",
+      "pricing.feat.customDomain",
+    ];
+    const lifetimeFeatKeys = [
+      "pricing.feat.allPremium",
+      "pricing.feat.multiMemorial",
+      "pricing.feat.prioritySupport",
+      "pricing.feat.membookDiscount",
+      "pricing.feat.plaqueDiscount",
+      "pricing.feat.legacy",
+    ];
     const plans = page.querySelectorAll(".pricing-card");
     if (plans[0]) {
-      const n = plans[0].querySelector(".plan-name");
+      const head = plans[0].querySelector(".pricing-card-head");
+      const n = head?.querySelector(".plan-name");
+      const d = head?.querySelector(".plan-desc");
       const b = plans[0].querySelector(".plan-select-btn");
-      if (n) n.textContent = this.t("pricing.free");
-      if (b) b.textContent = this.t("pricing.freeBtn");
+      if (n) n.textContent = t("pricing.free");
+      if (d) d.textContent = t("pricing.freeDesc");
+      if (b) b.textContent = t("pricing.freeBtn");
+      plans[0].querySelectorAll(".feat-name").forEach((el, i) => {
+        if (sharedFeatKeys[i]) el.textContent = t(sharedFeatKeys[i]);
+      });
+      setFeatVals(plans[0], [
+        t("pricing.val.yes"),
+        t("pricing.val.photos5"),
+        t("pricing.val.yes"),
+        t("pricing.val.yes"),
+        t("pricing.val.no"),
+        t("pricing.val.no"),
+        t("pricing.val.no"),
+      ]);
     }
     if (plans[1]) {
-      const n = plans[1].querySelector(".plan-name");
+      const head = plans[1].querySelector(".pricing-card-head");
+      const n = head?.querySelector(".plan-name");
+      const d = head?.querySelector(".plan-desc");
       const b = plans[1].querySelector(".plan-select-btn");
       const badge = plans[1].querySelector(".popular-badge");
-      if (n) n.textContent = this.t("pricing.premium");
-      if (b) b.textContent = this.t("pricing.premiumBtn");
-      if (badge) badge.textContent = this.t("pricing.popular");
+      if (n) n.textContent = t("pricing.premium");
+      if (d) d.textContent = t("pricing.premiumDesc");
+      if (b) b.textContent = t("pricing.premiumBtn");
+      if (badge) badge.textContent = t("pricing.popular");
+      const perYear = plans[1].querySelector(".plan-price span");
+      if (perYear) perYear.textContent = this.isEn() ? "/yr" : "/年";
+      plans[1].querySelectorAll(".feat-name").forEach((el, i) => {
+        if (premiumFeatKeys[i]) el.textContent = t(premiumFeatKeys[i]);
+      });
+      setFeatVals(plans[1], [
+        t("pricing.val.yes"),
+        t("pricing.val.unlimited"),
+        t("pricing.val.yes"),
+        t("pricing.val.yes"),
+        t("pricing.val.yes"),
+        t("pricing.val.unlimited"),
+        t("pricing.val.yes"),
+      ]);
     }
     if (plans[2]) {
-      const n = plans[2].querySelector(".plan-name");
+      const head = plans[2].querySelector(".pricing-card-head");
+      const n = head?.querySelector(".plan-name");
+      const d = head?.querySelector(".plan-desc");
       const b = plans[2].querySelector(".plan-select-btn");
-      if (n) n.textContent = this.t("pricing.lifetime");
-      if (b) b.textContent = this.t("pricing.lifetimeBtn");
+      if (n) n.textContent = t("pricing.lifetime");
+      if (d) d.textContent = t("pricing.lifetimeDesc");
+      if (b) b.textContent = t("pricing.lifetimeBtn");
+      plans[2].querySelectorAll(".feat-name").forEach((el, i) => {
+        if (lifetimeFeatKeys[i]) el.textContent = t(lifetimeFeatKeys[i]);
+      });
+      setFeatVals(plans[2], [
+        t("pricing.val.yes"),
+        t("pricing.val.memorials5"),
+        t("pricing.val.yes"),
+        t("pricing.val.discount8"),
+        t("pricing.val.discount8"),
+        t("pricing.val.yes"),
+      ]);
     }
+    const table = page.querySelector(".compare-table");
+    if (table) {
+      const header = table.querySelector("tr");
+      if (header) {
+        const cells = header.querySelectorAll("th");
+        if (cells[0]) cells[0].textContent = t("pricing.compare.feature");
+        if (cells[1]) cells[1].textContent = t("pricing.compare.freeCol");
+        if (cells[2]) cells[2].textContent = t("pricing.compare.premiumCol");
+        if (cells[3]) cells[3].textContent = t("pricing.compare.lifetimeCol");
+      }
+      const rowKeys = [
+        "pricing.compare.row.memorialPage",
+        "pricing.compare.row.photos",
+        "pricing.compare.row.video",
+        "pricing.compare.row.themes",
+        "pricing.compare.row.aiObit",
+        "pricing.compare.row.ceremony",
+        "pricing.compare.row.music",
+        "pricing.compare.row.multi",
+        "pricing.compare.row.discount",
+        "pricing.compare.row.support",
+      ];
+      const rowVals = [
+        [t("pricing.val.yes"), t("pricing.val.yes"), t("pricing.val.yes")],
+        [t("pricing.val.photos5"), t("pricing.val.unlimited"), t("pricing.val.unlimited")],
+        [t("pricing.val.dash"), t("pricing.val.unlimited"), t("pricing.val.unlimited")],
+        [t("pricing.val.themes3"), t("pricing.val.themesAll"), t("pricing.val.themesAll")],
+        [t("pricing.val.dash"), t("pricing.val.yes"), t("pricing.val.yes")],
+        [t("pricing.val.dash"), t("pricing.val.yes"), t("pricing.val.yes")],
+        [t("pricing.val.dash"), t("pricing.val.yes"), t("pricing.val.yes")],
+        [t("pricing.val.memorials1"), t("pricing.val.memorials3"), t("pricing.val.memorials5")],
+        [t("pricing.val.dash"), t("pricing.val.discount9"), t("pricing.val.discount8")],
+        [t("pricing.val.dash"), t("pricing.val.dash"), t("pricing.val.yes")],
+      ];
+      table.querySelectorAll("tr").forEach((tr, idx) => {
+        if (idx === 0) return;
+        const rowIdx = idx - 1;
+        const cells = tr.querySelectorAll("td,th");
+        if (rowKeys[rowIdx] && cells[0]) cells[0].textContent = t(rowKeys[rowIdx]);
+        const vals = rowVals[rowIdx];
+        if (vals) {
+          if (cells[1]) cells[1].textContent = vals[0];
+          if (cells[2]) cells[2].textContent = vals[1];
+          if (cells[3]) cells[3].textContent = vals[2];
+        }
+      });
+    }
+  },
+
+  applyGuidesAdminForm() {
+    const box = document.getElementById("guides-admin");
+    if (!box) return;
+    const h3 = box.querySelector("h3");
+    if (h3) h3.textContent = this.t("guides.admin.title");
+    const title = document.getElementById("ga-title");
+    if (title) title.placeholder = this.t("guides.admin.titlePh");
+    const cat = document.getElementById("ga-cat");
+    if (cat) {
+      const catMap = {
+        grief: "guides.filter.grief",
+        ritual: "guides.filter.ritual",
+        memory: "guides.filter.memory",
+        child: "guides.filter.child",
+        legal: "guides.filter.legal",
+        custom: "guides.admin.catCustom",
+      };
+      [...cat.options].forEach((opt) => {
+        const key = catMap[opt.value];
+        if (key) opt.textContent = this.t(key);
+      });
+    }
+    const catLabel = document.getElementById("ga-catlabel");
+    if (catLabel) catLabel.placeholder = this.t("guides.admin.catLabelPh");
+    const emoji = document.getElementById("ga-emoji");
+    if (emoji) emoji.placeholder = this.t("guides.admin.emojiPh");
+    const summary = document.getElementById("ga-summary");
+    if (summary) summary.placeholder = this.t("guides.admin.summaryPh");
+    const body = document.getElementById("ga-body");
+    if (body) body.placeholder = this.t("guides.admin.bodyPh");
+    const btn = box.querySelector(".submit-btn");
+    if (btn) btn.textContent = this.t("guides.admin.publish");
   },
 
   applyWelcomeHero() {
     const c = window.MEMORIAL_COPY?.welcome;
     if (!c) return;
     const badge = document.querySelector(".hero-badge");
-    const title = document.querySelector(".hero-title");
-    const sub = document.querySelector(".hero-sub");
-    const tagline = document.querySelector(".hero-tagline");
     const search = document.getElementById("searchInput");
     const searchBtn = document.querySelector(".hero-search-btn");
     const createBtn = document.querySelector(".nav-btn[data-action='create-memorial']");
     if (badge && c.badge) badge.textContent = c.badge;
-    if (title && c.title) title.textContent = c.title;
-    if (sub && c.sub) sub.textContent = c.sub;
-    if (tagline && c.tagline) tagline.innerHTML = c.tagline;
     if (search && c.searchPlaceholder) search.placeholder = c.searchPlaceholder;
     if (searchBtn && c.searchBtn) searchBtn.textContent = c.searchBtn;
     if (createBtn && c.createCta) createBtn.textContent = c.createCta;
+  },
+
+  applySecondaryPages() {
+    this.applyToolsPage();
+    this.applyGuidesFilters();
+    this.applyGuidesAdminForm();
+    this.applyObituaryPage();
+    this.applyPlaquePage();
+    this.applyPlanningHero();
+    this.applyThemesHero();
+    this.applyQrPage();
+    const membookTools = document.querySelectorAll("#page-membook .membook-tool-name");
+    const membookKeys = [
+      "membook.tool.photo",
+      "membook.tool.bio",
+      "membook.tool.obit",
+      "membook.tool.board",
+    ];
+    const membookNamesZh = [
+      "智能照片整理",
+      "AI传记撰写",
+      "传记与讣告",
+      "家族留言板",
+    ];
+    const membookNamesEn = [
+      "Photo curation",
+      "AI biography",
+      "Obituary & tribute",
+      "Family messages",
+    ];
+    membookTools.forEach((el, i) => {
+      const name = this.isEn() ? membookNamesEn[i] : membookNamesZh[i];
+      if (name) el.textContent = name;
+    });
+    const membookToolTitle = document.querySelector(
+      "#page-membook .membook-tools .section-title"
+    );
+    if (membookToolTitle) {
+      membookToolTitle.textContent = this.isEn() ? "Book tools" : "制作工具";
+    }
+    const membookToolSub = document.querySelector(
+      "#page-membook .membook-tools .section-sub"
+    );
+    if (membookToolSub) {
+      membookToolSub.textContent = this.isEn()
+        ? "Six features, one workflow"
+        : "六大功能，一键完成";
+    }
+  },
+
+  applyToolsPage() {
+    const keys = [
+      ["tools.card.obit", "tools.card.obitDesc"],
+      ["tools.card.plan", "tools.card.planDesc"],
+      ["tools.card.membook", "tools.card.membookDesc"],
+      ["tools.card.themes", "tools.card.themesDesc"],
+      ["tools.card.qr", "tools.card.qrDesc"],
+      ["tools.card.guides", "tools.card.guidesDesc"],
+    ];
+    document.querySelectorAll("#page-tools .tool-card").forEach((card, i) => {
+      const pair = keys[i];
+      if (!pair) return;
+      const name = card.querySelector(".tool-card-name");
+      const desc = card.querySelector(".tool-card-desc");
+      if (name) name.textContent = this.t(pair[0]);
+      if (desc) desc.textContent = this.t(pair[1]);
+    });
+  },
+
+  applyGuidesFilters() {
+    const map = {
+      all: "guides.filter.all",
+      grief: "guides.filter.grief",
+      ritual: "guides.filter.ritual",
+      memory: "guides.filter.memory",
+      child: "guides.filter.child",
+      legal: "guides.filter.legal",
+    };
+    const applyFilter = (root) => {
+      if (!root) return;
+      root.querySelectorAll(".filter-tag").forEach((el, i) => {
+        const cat = el.getAttribute("data-filter-cat");
+        const key = cat && map[cat] ? map[cat] : Object.values(map)[i];
+        if (key) el.textContent = this.t(key);
+      });
+    };
+    applyFilter(document.getElementById("guides-articles-filter"));
+    applyFilter(document.querySelector("#tab-grief-li .articles-filter"));
+  },
+
+  applyObituaryPage() {
+    const hero = document.querySelector("#page-obituary .obit-hero");
+    if (hero) {
+      const h1 = hero.querySelector("h1");
+      const p = hero.querySelector("p");
+      if (h1) h1.textContent = this.t("obit.title");
+      if (p) p.textContent = this.t("obit.sub");
+    }
+    const steps = ["obit.step1", "obit.step2", "obit.step3"];
+    document.querySelectorAll("#page-obituary .obit-step-label").forEach((el, i) => {
+      if (steps[i]) el.textContent = this.t(steps[i]);
+    });
+    const en = this.isEn();
+    const virtuesZh = [
+      "勤劳", "善良", "坚强", "幽默", "温柔", "智慧", "慷慨", "敬业", "乐观", "虔诚",
+    ];
+    const virtuesEn = [
+      "Diligent", "Kind", "Resilient", "Humorous", "Gentle", "Wise", "Generous",
+      "Dedicated", "Optimistic", "Devout",
+    ];
+    document.querySelectorAll("#virtue-tags .virtue-tag").forEach((el, i) => {
+      el.textContent = en ? virtuesEn[i] : virtuesZh[i];
+    });
+    const gender = document.getElementById("obit-gender");
+    if (gender && gender.options.length >= 2) {
+      gender.options[0].text = en ? "Male" : "男";
+      gender.options[1].text = en ? "Female" : "女";
+    }
+    const labelForInput = (inputId, key) => {
+      const input = document.getElementById(inputId);
+      const lab = input?.closest(".form-field")?.querySelector(".form-label");
+      if (lab) lab.textContent = this.t(key);
+    };
+    const page = document.getElementById("page-obituary");
+    if (page) {
+      const h3s = page.querySelectorAll(".obit-step-content h3");
+      if (h3s[0]) h3s[0].textContent = this.t("obit.h3.step1");
+      if (h3s[1]) h3s[1].textContent = this.t("obit.h3.step2");
+      if (h3s[2]) h3s[2].textContent = this.t("obit.h3.preview");
+      labelForInput("obit-name", "obit.label.name");
+      labelForInput("obit-gender", "obit.label.gender");
+      labelForInput("obit-dob", "obit.label.dob");
+      labelForInput("obit-dod", "obit.label.dod");
+      labelForInput("obit-birth", "obit.label.birthplace");
+      labelForInput("obit-job", "obit.label.job");
+      labelForInput("obit-family", "obit.label.family");
+      labelForInput("obit-achievements", "obit.label.achievements");
+      labelForInput("obit-hobbies", "obit.label.hobbies");
+      labelForInput("obit-quote", "obit.label.quote");
+      const virtuesLab = document
+        .getElementById("virtue-tags")
+        ?.closest(".form-field")
+        ?.querySelector(".form-label");
+      if (virtuesLab) virtuesLab.textContent = this.t("obit.label.virtues");
+      const nameIn = document.getElementById("obit-name");
+      if (nameIn) nameIn.placeholder = this.t("obit.ph.name");
+      const birthIn = document.getElementById("obit-birth");
+      if (birthIn) birthIn.placeholder = this.t("obit.ph.birthplace");
+      const jobIn = document.getElementById("obit-job");
+      if (jobIn) jobIn.placeholder = this.t("obit.ph.job");
+      const famIn = document.getElementById("obit-family");
+      if (famIn) famIn.placeholder = this.t("obit.ph.family");
+      const achIn = document.getElementById("obit-achievements");
+      if (achIn) achIn.placeholder = this.t("obit.ph.achievements");
+      const hobIn = document.getElementById("obit-hobbies");
+      if (hobIn) hobIn.placeholder = this.t("obit.ph.hobbies");
+      const quoteIn = document.getElementById("obit-quote");
+      if (quoteIn) quoteIn.placeholder = this.t("obit.ph.quote");
+      const next1 = page.querySelector("#obit-content-1 .obit-next-btn");
+      if (next1) next1.textContent = this.t("obit.btn.next2");
+      const back2 = page.querySelector("#obit-content-2 .obit-back-btn");
+      const gen2 = page.querySelector("#obit-content-2 .obit-next-btn");
+      if (back2) back2.textContent = this.t("obit.btn.back");
+      if (gen2) gen2.textContent = this.t("obit.btn.generate");
+      const actions = page.querySelectorAll("#obit-content-3 .obit-action-btn");
+      const actionKeys = [
+        "obit.btn.copy",
+        "obit.btn.print",
+        "obit.btn.newspaper",
+        "obit.btn.publish",
+      ];
+      actions.forEach((btn, i) => {
+        if (actionKeys[i]) btn.textContent = this.t(actionKeys[i]);
+      });
+      const back3 = page.querySelector("#obit-content-3 .obit-back-btn");
+      const regen = page.querySelector("#obit-content-3 .obit-next-btn");
+      if (back3) back3.textContent = this.t("obit.btn.edit");
+      if (regen) regen.textContent = this.t("obit.btn.regenerate");
+      const result = document.getElementById("obit-result");
+      if (result && !result.querySelector("p")) {
+        result.textContent = this.t("obit.preview.wait");
+      }
+    }
+  },
+
+  applyPlaquePage() {
+    const page = document.getElementById("page-plaque");
+    if (!page) return;
+    const hero = page.querySelector(".plaque-hero");
+    if (hero) {
+      const h1 = hero.querySelector("h1");
+      const p = hero.querySelector("p");
+      if (h1) h1.textContent = this.t("plaque.title");
+      if (p) p.textContent = this.t("plaque.sub");
+    }
+    const labels = page.querySelectorAll(".plaque-form .auth-field label");
+    const labelKeys = [
+      "plaque.label.name",
+      "plaque.label.years",
+      "plaque.label.material",
+      "plaque.label.inscription",
+    ];
+    labels.forEach((lab, i) => {
+      if (labelKeys[i]) lab.textContent = this.t(labelKeys[i]);
+    });
+    const mat = document.getElementById("plaque-material");
+    if (mat && mat.options.length >= 3) {
+      mat.options[0].text = this.t("plaque.mat.stainless");
+      mat.options[1].text = this.t("plaque.mat.brass");
+      mat.options[2].text = this.t("plaque.mat.qr");
+    }
+    const cartBtn = page.querySelector(".plaque-form .submit-btn");
+    if (cartBtn) cartBtn.textContent = this.t("plaque.btn.cart");
+    const shopBtn = page.querySelector(".plaque-form .obit-back-btn");
+    if (shopBtn) shopBtn.textContent = this.t("plaque.btn.shop");
+  },
+
+  applyPlanningHero() {
+    const hero = document.querySelector("#page-planning .planning-hero");
+    if (hero) {
+      const h1 = hero.querySelector("h1");
+      const p = hero.querySelector("p");
+      if (h1) h1.textContent = this.t("planning.title");
+      if (p) p.textContent = this.t("planning.sub");
+    }
+    const prog = document.querySelector("#page-planning .progress-label");
+    if (prog) prog.textContent = this.t("planning.progress");
+    if (typeof renderPlanning === "function") {
+      renderPlanning();
+      if (window.MemorialContent) {
+        MemorialContent.syncPlanningUI(
+          MemorialContent.loadPlanningState()
+        );
+      }
+    }
+  },
+
+  applyThemesHero() {
+    const hero = document.querySelector("#page-themes .themes-hero");
+    if (hero) {
+      const h1 = hero.querySelector("h1");
+      const p = hero.querySelector("p");
+      if (h1) h1.textContent = this.t("themes.title");
+      if (p) p.textContent = this.t("themes.sub");
+    }
+    const themeFilters = [
+      "themes.filter.all",
+      "themes.filter.ink",
+      "themes.filter.floral",
+      "themes.filter.modern",
+      "themes.filter.seasonal",
+    ];
+    document.querySelectorAll("#page-themes .themes-filter .filter-tag").forEach((el, i) => {
+      if (themeFilters[i]) el.textContent = this.t(themeFilters[i]);
+    });
+    if (window.MemorialContent?.renderThemesGrid) {
+      MemorialContent.renderThemesGrid(
+        MemorialStore?.get(MemorialCore?.slug)?.themeId || "ink-default"
+      );
+    }
+  },
+
+  applyQrPage() {
+    const hero = document.querySelector("#page-qr .qr-hero");
+    if (!hero) return;
+    const h1 = hero.querySelector("h1");
+    const p = hero.querySelector("p");
+    if (h1) h1.textContent = this.t("qr.title");
+    if (p) p.textContent = this.t("qr.sub");
+    const demoLabel = hero.querySelector(".qr-demo-label");
+    if (demoLabel) demoLabel.textContent = this.isEn() ? "Sample" : "示意样品";
+    const feats = this.isEn()
+      ? [
+          ["Scan to visit", "Opens the memorial instantly—no search"],
+          ["Weatherproof", "Outdoor-grade, fade-resistant materials"],
+          ["Permanent link", "The URL stays valid for generations"],
+          ["Custom engraving", "Name, years, and verse laser-etched"],
+          ["Nationwide shipping", "Gift box, 7–15 business days"],
+          ["Easy install", "Mounting kit included"],
+        ]
+      : [
+          ["即扫即达", "扫一扫直接进入纪念馆，无需搜索"],
+          ["防水防腐", "户外专用材质，历经风雨永不褪色"],
+          ["永久有效", "链接永不失效，记忆永续传承"],
+          ["定制刻字", "姓名、年份、诗句均可激光雕刻"],
+          ["全国包邮", "精美礼盒包装，7-15个工作日送达"],
+          ["专业安装", "附带安装工具包，简单固定即可"],
+        ];
+    hero.querySelectorAll(".qr-feat").forEach((el, i) => {
+      if (!feats[i]) return;
+      const title = el.querySelector(".qr-feat-title");
+      const desc = el.querySelector(".qr-feat-desc");
+      if (title) title.textContent = feats[i][0];
+      if (desc) desc.textContent = feats[i][1];
+    });
+    const qrSec = document.querySelector("#page-qr .qr-products .section-title");
+    const qrSub = document.querySelector("#page-qr .qr-products .section-sub");
+    if (qrSec) qrSec.textContent = this.isEn() ? "Plaque products" : "铭牌产品";
+    if (qrSub) qrSub.textContent = this.isEn() ? "Three materials" : "三款材质，各有千秋";
+    const howTitle = document.querySelector("#page-qr .qr-how .section-title");
+    const howSub = document.querySelector("#page-qr .qr-how .section-sub");
+    if (howTitle) howTitle.textContent = this.isEn() ? "How it works" : "使用流程";
+    if (howSub) howSub.textContent = this.isEn() ? "Three simple steps" : "三步完成，简单明了";
   },
 
   applyFeatureCards() {
@@ -838,6 +1658,15 @@ window.MemorialI18n = {
       MemorialMembook.renderPage();
       if (wasReading) MemorialMembook.renderReader();
     }
+    if (window.MemorialContent?.loadHomeMemorials) {
+      MemorialContent.loadHomeMemorials(!!window.MemorialCore?.useApi);
+    }
+    if (typeof renderPlanning === "function" && document.getElementById("planning-cats")) {
+      renderPlanning();
+      if (window.MemorialContent) {
+        MemorialContent.syncPlanningUI(MemorialContent.loadPlanningState());
+      }
+    }
     if (window.MemorialCore?.refreshMemorialUI) {
       MemorialCore.refreshMemorialUI();
     }
@@ -847,6 +1676,7 @@ window.MemorialI18n = {
 MemorialI18n.bootstrap();
 
 document.addEventListener("DOMContentLoaded", () => {
+  MemorialI18n.bindLangButton();
   MemorialI18n.apply();
 });
 

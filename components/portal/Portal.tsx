@@ -1,16 +1,18 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import CommandBar from './CommandBar';
 import DashboardHome from './DashboardHome';
+import NotePanel from './NotePanel';
+import PortalQuickChat from './PortalQuickChat';
 import ToolFrame from './ToolFrame';
 import { DEFAULT_PORTAL_CONFIG } from '@/lib/portal/defaults';
+import { openToolHref, toolNeedsFullPage } from '@/lib/portal/open-tool';
 import { configUrl } from '@/lib/portal/paths';
 import type { PortalConfig, PortalTool } from '@/lib/portal/types';
 
 export default function Portal() {
   const [config, setConfig] = useState<PortalConfig>(DEFAULT_PORTAL_CONFIG);
-  const [commandOpen, setCommandOpen] = useState(false);
+  const [noteOpen, setNoteOpen] = useState(false);
   const [activeTool, setActiveTool] = useState<PortalTool | null>(null);
 
   useEffect(() => {
@@ -24,15 +26,19 @@ export default function Portal() {
 
   const openTool = (tool: PortalTool) => {
     if (!tool.ready) return;
+    if (toolNeedsFullPage(tool)) {
+      window.location.assign(openToolHref(tool));
+      return;
+    }
     setActiveTool(tool);
-    setCommandOpen(false);
+    setNoteOpen(false);
   };
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
-        setCommandOpen(true);
+        setNoteOpen(true);
         return;
       }
 
@@ -69,12 +75,7 @@ export default function Portal() {
       <div className="portal-root portal-root--tool">
         <div className="portal-grain" aria-hidden />
         <ToolFrame tool={activeTool} onClose={() => setActiveTool(null)} />
-        <CommandBar
-          tools={config.tools}
-          open={commandOpen}
-          onOpenChange={setCommandOpen}
-          onOpenTool={openTool}
-        />
+        <NotePanel open={noteOpen} onOpenChange={setNoteOpen} />
       </div>
     );
   }
@@ -87,18 +88,14 @@ export default function Portal() {
         <div className="portal-main">
           <DashboardHome
             config={config}
-            onOpenSearch={() => setCommandOpen(true)}
+            onOpenNote={() => setNoteOpen(true)}
             onOpenTool={openTool}
           />
         </div>
       </div>
 
-      <CommandBar
-        tools={config.tools}
-        open={commandOpen}
-        onOpenChange={setCommandOpen}
-        onOpenTool={openTool}
-      />
+      <PortalQuickChat />
+      <NotePanel open={noteOpen} onOpenChange={setNoteOpen} />
     </div>
   );
 }

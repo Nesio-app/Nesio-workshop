@@ -5,6 +5,14 @@ export function toolOpenUrl(tool: PortalTool): string {
   return withBase(tool.url);
 }
 
-export function isExternalToolUrl(href: string): boolean {
-  return href.startsWith('http://') || href.startsWith('https://');
+/** External apps and 智友 break inside iframes (X-Frame-Options / nested UI). */
+export function toolNeedsFullPage(tool: PortalTool): boolean {
+  const href = toolOpenUrl(tool);
+  if (tool.id === 'secretary') return true;
+  if (href.startsWith('http://') || href.startsWith('https://')) return true;
+  return false;
+}
+
+export function openToolHref(tool: PortalTool): string {
+  return toolOpenUrl(tool);
 }

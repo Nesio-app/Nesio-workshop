@@ -197,6 +197,90 @@
           ]
         }
       ]
+    },
+    {
+      "id": "chen-zhiyuan-engineer",
+      "titleZh": "陈志远 · 桥梁与河流",
+      "titleEn": "Chen Zhiyuan · Bridges and rivers",
+      "subtitleZh": "工程师纪念册 · 32页",
+      "subtitleEn": "Engineer's memorial book · 32 pages",
+      "cover": { "gradient": "linear-gradient(160deg,#2a3a5a 0%,#1a2535 55%,#0f1520 100%)", "deco": "桥" },
+      "dedicationZh": "献给父亲陈志远 —— 他把一生交给了两岸的人",
+      "dedicationEn": "For our father Chen Zhiyuan — who gave his life to the people between shores",
+      "pages": [
+        {
+          "titleZh": "封面",
+          "titleEn": "Cover",
+          "blocks": [
+            { "type": "title", "zh": "陈志远", "en": "Chen Zhiyuan" },
+            { "type": "subtitle", "zh": "1952 — 2024", "en": "1952 — 2024" },
+            { "type": "text", "zh": "架桥铺路，渡人亦渡己", "en": "He built bridges—carrying others, and himself, across" }
+          ]
+        },
+        {
+          "titleZh": "武汉少年",
+          "titleEn": "Boy in Wuhan",
+          "blocks": [
+            { "type": "text", "zh": "父亲生于长江边，少年时常在码头看船。他说第一次看见钢索斜拉桥，便知道这辈子要站在高处看水。", "en": "Born beside the Yangtze, he watched ferries as a boy. The first cable-stayed bridge he saw decided his life: he would work where water meets sky." }
+          ]
+        },
+        {
+          "titleZh": "三十年工地",
+          "titleEn": "Thirty years on site",
+          "blocks": [
+            { "type": "text", "zh": "参与七座大江大桥与无数乡村公路。他笔记本里记的不是里程，而是每一座桥下第一次通车的日期。", "en": "He helped build seven major river crossings and countless rural roads. His notebooks recorded not kilometers but the date each bridge first opened." }
+          ]
+        },
+        {
+          "titleZh": "尾声",
+          "titleEn": "Epilogue",
+          "blocks": [
+            { "type": "text", "zh": "2024年夏，父亲在工地旁的小院离世。我们把他常戴的安全帽放在册页里，像留一段未完工的河。", "en": "He passed in 2024 in the courtyard near his last site. We pressed his hard hat into these pages like an unfinished river." }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lin-xiaoling-nurse",
+      "titleZh": "林小玲 · 夜班的白光",
+      "titleEn": "Lin Xiaoling · Night-shift light",
+      "subtitleZh": "护士纪念册 · 28页",
+      "subtitleEn": "Nurse's memorial book · 28 pages",
+      "cover": { "gradient": "linear-gradient(160deg,#3a4a6a 0%,#253045 50%,#1a2030 100%)", "deco": "护" },
+      "dedicationZh": "献给我们的母亲、护士长林小玲",
+      "dedicationEn": "For our mother, head nurse Lin Xiaoling",
+      "pages": [
+        {
+          "titleZh": "封面",
+          "titleEn": "Cover",
+          "blocks": [
+            { "type": "title", "zh": "林小玲", "en": "Lin Xiaoling" },
+            { "type": "subtitle", "zh": "1956 — 2026", "en": "1956 — 2026" },
+            { "type": "text", "zh": "疼要有人听见，才算被照顾", "en": "Pain must be heard to be cared for" }
+          ]
+        },
+        {
+          "titleZh": "县医院",
+          "titleEn": "County hospital",
+          "blocks": [
+            { "type": "text", "zh": "小玲阿姨（母亲坚持我们叫她小玲）在夜班走廊走了四十年。她说护士的鞋跟声，是病人最安心的钟。", "en": "Mother asked us to call her Xiaoling, not \"Mom\" on the ward. For forty years her heels on the night corridor were the clock patients trusted." }
+          ]
+        },
+        {
+          "titleZh": "家人",
+          "titleEn": "Family",
+          "blocks": [
+            { "type": "text", "zh": "下班回家后她仍为我们缝校服。女儿说：「妈，您已经缝了整座医院。」她笑：「那再加三件。」", "en": "After shifts she sewed our uniforms. \"Mother, you've already stitched a whole hospital,\" her daughter said. She laughed: \"Then three more.\"" }
+          ]
+        },
+        {
+          "titleZh": "告别",
+          "titleEn": "Farewell",
+          "blocks": [
+            { "type": "text", "zh": "2026年春，她在花季中离去。同事们在纪念馆点亮了三千余支电子烛，像又一班从未结束的夜班。", "en": "She left in spring 2026. Colleagues lit more than three thousand candles on the memorial—another shift that never ends." }
+          ]
+        }
+      ]
     }
   ]
 }

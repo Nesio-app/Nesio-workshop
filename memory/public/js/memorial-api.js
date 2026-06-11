@@ -6,6 +6,7 @@ window.MemorialApi = {
 
   assetUrl(path) {
     if (!path) return "";
+    if (path.startsWith("data:") || path.startsWith("blob:")) return path;
     if (path.startsWith("http://") || path.startsWith("https://")) {
       try {
         const u = new URL(path);

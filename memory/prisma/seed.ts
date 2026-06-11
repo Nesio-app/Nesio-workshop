@@ -124,14 +124,65 @@ async function seedMemorialContent(memorialId: string) {
     ],
   });
 
+  const galleryPhotos = [
+    "https://images.unsplash.com/photo-1524178232363-1fb2b075b655?auto=format&fit=crop&w=900&q=80",
+    "https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=900&q=80",
+    "https://images.unsplash.com/photo-1564890369478-c89ca2ed55e5?auto=format&fit=crop&w=900&q=80",
+    "https://images.unsplash.com/photo-1511895426328-dc8714191300?auto=format&fit=crop&w=900&q=80",
+    "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?auto=format&fit=crop&w=900&q=80",
+    "https://images.unsplash.com/photo-1511379938547-c1f69419868d?auto=format&fit=crop&w=900&q=80",
+  ];
+
   await prisma.memorialMedia.createMany({
     data: [
-      { memorialId, caption: "1998年退休典礼 · 三千学子送别恩师", emoji: "📸", yearLabel: "1998年", sortOrder: 0 },
-      { memorialId, caption: "书法作品", emoji: "🖋️", yearLabel: "2015年", sortOrder: 1 },
-      { memorialId, caption: "茶道雅集", emoji: "🫖", yearLabel: "晚年", sortOrder: 2 },
-      { memorialId, caption: "全家福 · 2020年春节", emoji: "👨‍👩‍👧‍👦", yearLabel: "2020年", sortOrder: 3 },
-      { memorialId, caption: "《湖湘方言词典》出版", emoji: "📚", yearLabel: "2010年", sortOrder: 4 },
-      { memorialId, caption: "古琴雅奏", emoji: "🎻", yearLabel: "2018年", sortOrder: 5 },
+      {
+        memorialId,
+        caption: "1998年退休典礼 · 三千学子送别恩师",
+        emoji: "📸",
+        yearLabel: "1998年",
+        imageUrl: galleryPhotos[0],
+        sortOrder: 0,
+      },
+      {
+        memorialId,
+        caption: "书法作品",
+        emoji: "🖋️",
+        yearLabel: "2015年",
+        imageUrl: galleryPhotos[1],
+        sortOrder: 1,
+      },
+      {
+        memorialId,
+        caption: "茶道雅集",
+        emoji: "🫖",
+        yearLabel: "晚年",
+        imageUrl: galleryPhotos[2],
+        sortOrder: 2,
+      },
+      {
+        memorialId,
+        caption: "全家福 · 2020年春节",
+        emoji: "👨‍👩‍👧‍👦",
+        yearLabel: "2020年",
+        imageUrl: galleryPhotos[3],
+        sortOrder: 3,
+      },
+      {
+        memorialId,
+        caption: "《湖湘方言词典》出版",
+        emoji: "📚",
+        yearLabel: "2010年",
+        imageUrl: galleryPhotos[4],
+        sortOrder: 4,
+      },
+      {
+        memorialId,
+        caption: "古琴雅奏",
+        emoji: "🎻",
+        yearLabel: "2018年",
+        imageUrl: galleryPhotos[5],
+        sortOrder: 5,
+      },
     ],
   });
 }
@@ -230,7 +281,7 @@ async function main() {
       bioHtml: DEMO_BIO,
       familyNote: DEMO_FAMILY_NOTE,
       themeId: "ink-default",
-      privacy: "family",
+      privacy: "public",
       quietMode: true,
       members: { create: { email, role: "owner" } },
       rituals: {
@@ -258,10 +309,77 @@ async function main() {
       bioHtml: DEMO_BIO,
       familyNote: DEMO_FAMILY_NOTE,
       themeId: "ink-default",
+      privacy: "public",
     },
   });
 
   await seedMemorialContent(memorial.id);
+
+  const showcase = [
+    {
+      slug: "zhang-xiuying",
+      name: "张秀英",
+      birthDate: new Date("1945-03-12"),
+      deathDate: new Date("2022-08-20"),
+      motto: "妈妈的手擀面，是世间最美的味道",
+      themeId: "peach-spring",
+    },
+    {
+      slug: "wang-shulan",
+      name: "王淑兰",
+      birthDate: new Date("1929-11-05"),
+      deathDate: new Date("2021-04-18"),
+      motto: "经历百年风华，安然归于平静",
+      themeId: "bailu",
+    },
+    {
+      slug: "chen-meihua",
+      name: "陈美华",
+      birthDate: new Date("1940-06-18"),
+      deathDate: new Date("2025-03-22"),
+      motto: "花开有时，爱无绝期",
+      themeId: "plum-snow",
+    },
+  ];
+
+  for (const s of showcase) {
+    await prisma.memorial.upsert({
+      where: { slug: s.slug },
+      create: {
+        ...s,
+        ownerId: user.id,
+        bioHtml: `<p>${s.name}纪念馆示范内容，由念归处演示数据生成。</p>`,
+        privacy: "public",
+        quietMode: true,
+        members: { create: { email, role: "owner" } },
+      },
+      update: { privacy: "public", motto: s.motto, themeId: s.themeId },
+    });
+  }
+
+  await prisma.memorial.upsert({
+    where: { slug: "lin-xiaoling" },
+    create: {
+      slug: "lin-xiaoling",
+      ownerId: user.id,
+      name: "林小玲",
+      birthDate: new Date("1956-03-08"),
+      deathDate: new Date("2026-03-15"),
+      motto: "疼要有人听见，才算被照顾",
+      bioHtml:
+        "<p>林小玲女士，1956年生于湖南，2026年春安详离世。她在县医院夜班走廊走了四十年，是护士长，也是许多病人最安心的钟。</p><p>下班后她仍为我们缝校服。同事们在纪念馆点亮了三千余支电子烛。</p>",
+      familyNote: "献给我们的母亲、护士长林小玲。——子女",
+      themeId: "ink-moon",
+      privacy: "public",
+      quietMode: true,
+      members: { create: { email, role: "owner" } },
+    },
+    update: {
+      privacy: "public",
+      motto: "疼要有人听见，才算被照顾",
+      themeId: "ink-moon",
+    },
+  });
   await seedArticles();
   await seedProducts();
 

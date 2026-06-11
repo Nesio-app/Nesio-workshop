@@ -8,7 +8,6 @@ window.MemorialCore = {
   _needsLogin: false,
 
   async init() {
-    this.applyWelcomeCopy();
     this.bindCreateNav();
     this.parseUrlSlug();
     if (window.MemorialApi) {
@@ -25,6 +24,11 @@ window.MemorialCore = {
       await MemorialAuth.init(this.useApi);
     }
     if (this.useApi) await this.hydrateFromApi();
+    if (window.MemorialStore?.showcaseMemorialTemplates) {
+      Object.keys(MemorialStore.showcaseMemorialTemplates()).forEach((slug) =>
+        MemorialStore.ensureShowcaseMemorial(slug)
+      );
+    }
     this.refreshMemorialUI();
     if (window.MemorialContent) {
       MemorialContent.loadHomeMemorials(this.useApi);
@@ -132,7 +136,12 @@ window.MemorialCore = {
         quietMode: mem.quietMode,
         timeline: mem.timeline || [],
         family: mem.family || [],
-        gallery: mem.gallery || [],
+        gallery: (mem.gallery || []).map((item) => ({
+          ...item,
+          imageUrl: item.imageUrl
+            ? window.MemorialApi?.assetUrl(item.imageUrl) || item.imageUrl
+            : null,
+        })),
         tributeCounts: mem.tributeCounts || {},
         rituals: (mem.rituals || []).map((r) => ({
           id: r.id,
@@ -157,9 +166,17 @@ window.MemorialCore = {
         this._needsLogin = true;
         this.canEdit = false;
         console.warn("API hydrate needs login:", e.message);
+        if (window.MemorialStore?.get(this.slug)) {
+          this.refreshMemorialUI();
+        }
         return;
       }
       console.warn("API hydrate skipped:", e.message);
+      if (window.MemorialStore?.get(this.slug)) {
+        this._needsLogin = false;
+        this.refreshMemorialUI();
+        return;
+      }
       this.useApi = false;
       this._needsLogin = false;
     }
@@ -173,7 +190,16 @@ window.MemorialCore = {
 
   openMemorial(slug) {
     if (typeof goPage === "function") goPage("profile-li");
-    this.loadMemorial(slug).catch(console.error);
+    this.slug = slug;
+    if (window.MemorialStore?.ensureShowcaseMemorial) {
+      MemorialStore.ensureShowcaseMemorial(slug);
+    }
+    this.loadMemorial(slug).catch((e) => {
+      console.warn("openMemorial:", e.message);
+      if (window.MemorialStore?.get(slug)) {
+        this.refreshMemorialUI();
+      }
+    });
   },
 
   async publishObituary(html) {
@@ -202,6 +228,10 @@ window.MemorialCore = {
   },
 
   applyWelcomeCopy() {
+    if (window.MemorialI18n?.applyWelcomeHero) {
+      MemorialI18n.applyWelcomeHero();
+      return;
+    }
     const c = MEMORIAL_COPY.welcome;
     const badge = document.querySelector(".hero-badge");
     const tagline = document.querySelector(".hero-tagline");
