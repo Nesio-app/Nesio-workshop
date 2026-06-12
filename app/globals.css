@@ -793,8 +793,14 @@ body {
   gap: 0.5rem;
   padding: 0.65rem 0.75rem;
   border-radius: 1rem;
-  background: linear-gradient(135deg, rgba(205, 222, 252, 0.55), rgba(255, 255, 255, 0.75));
-  border: 1px solid var(--portal-line);
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.48), rgba(205, 222, 252, 0.38));
+  backdrop-filter: blur(24px) saturate(125%);
+  -webkit-backdrop-filter: blur(24px) saturate(125%);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.75),
+    0 12px 32px rgba(43, 84, 143, 0.12);
+  transform: translateZ(0);
   margin-bottom: 0.15rem;
 }
 
@@ -866,9 +872,16 @@ body {
 .portal-widget {
   border-radius: 1.15rem;
   padding: 0.75rem 0.85rem 0.8rem;
-  background: rgba(255, 255, 255, 0.82);
-  border: 1px solid var(--portal-line);
-  box-shadow: 0 10px 28px rgba(88, 140, 227, 0.06);
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.52), rgba(255, 255, 255, 0.38));
+  backdrop-filter: blur(28px) saturate(130%);
+  -webkit-backdrop-filter: blur(28px) saturate(130%);
+  border: 1px solid rgba(255, 255, 255, 0.58);
+  box-shadow:
+    inset 0 1px 1.5px rgba(255, 255, 255, 0.85),
+    inset 0 -6px 14px rgba(88, 140, 227, 0.06),
+    0 16px 40px rgba(43, 84, 143, 0.14),
+    0 4px 12px rgba(43, 84, 143, 0.07);
+  transform: translateZ(0);
   min-height: 6.75rem;
   display: flex;
   flex-direction: column;
@@ -1160,9 +1173,11 @@ body {
 
 .portal-tool-card {
   width: 100%;
-  border: 1px solid var(--portal-line);
+  border: 1px solid rgba(255, 255, 255, 0.55);
   border-radius: 1rem;
-  background: rgba(255, 255, 255, 0.78);
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.35));
+  backdrop-filter: blur(24px) saturate(125%);
+  -webkit-backdrop-filter: blur(24px) saturate(125%);
   padding: 0.55rem 0.35rem 0.5rem;
   cursor: pointer;
   display: flex;
@@ -1171,7 +1186,11 @@ body {
   gap: 0.35rem;
   touch-action: manipulation;
   transition: box-shadow 0.15s ease, border-color 0.15s ease;
-  box-shadow: 0 6px 16px rgba(88, 140, 227, 0.05);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.8),
+    0 10px 28px rgba(43, 84, 143, 0.12),
+    0 4px 10px rgba(43, 84, 143, 0.06);
+  transform: translateZ(0);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -1330,9 +1349,14 @@ body {
   z-index: 201;
   border-radius: 1.15rem;
   padding: 0.7rem 0.65rem 0.75rem;
-  background: rgba(255, 255, 255, 0.94);
-  border: 1px solid var(--portal-line);
-  box-shadow: 0 14px 36px rgba(88, 140, 227, 0.14);
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.52), rgba(255, 255, 255, 0.38));
+  backdrop-filter: blur(28px) saturate(130%);
+  -webkit-backdrop-filter: blur(28px) saturate(130%);
+  border: 1px solid rgba(255, 255, 255, 0.58);
+  box-shadow:
+    inset 0 1px 1.5px rgba(255, 255, 255, 0.85),
+    0 16px 40px rgba(43, 84, 143, 0.16);
+  transform: translateZ(0);
   animation: portal-treasure-in 0.22s ease-out;
 }
 
@@ -1388,9 +1412,16 @@ body {
   flex: 1;
   border-radius: 1.25rem;
   padding: 0.85rem 1rem 1rem;
-  background: rgba(255, 255, 255, 0.78);
-  border: 1px solid var(--portal-line);
-  box-shadow: 0 12px 32px rgba(88, 140, 227, 0.07);
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.36));
+  backdrop-filter: blur(28px) saturate(130%);
+  -webkit-backdrop-filter: blur(28px) saturate(130%);
+  border: 1px solid rgba(255, 255, 255, 0.58);
+  box-shadow:
+    inset 0 1px 1.5px rgba(255, 255, 255, 0.85),
+    inset 0 -6px 14px rgba(88, 140, 227, 0.06),
+    0 16px 40px rgba(43, 84, 143, 0.14),
+    0 4px 12px rgba(43, 84, 143, 0.07);
+  transform: translateZ(0);
   min-height: 8rem;
   display: flex;
   flex-direction: column;
@@ -2380,11 +2411,13 @@ body {
 /* ═══════════════════════ 1. 流动柔光背景 ═══════════════════════ */
 .portal-root--home{position:relative}
 .portal-root--home::before{
-  content:"";position:absolute;inset:-20% -10%;z-index:0;pointer-events:none;
+  content:"";position:absolute;inset:-25% -15%;z-index:0;pointer-events:none;
   background:
-    radial-gradient(34% 28% at 16% 12%, rgba(255,255,255,.35), transparent 64%),
-    radial-gradient(30% 26% at 86% 16%, rgba(205,222,252,.28), transparent 64%);
-  filter:blur(10px);
+    radial-gradient(40% 32% at 14% 10%, rgba(255,255,255,.55), transparent 58%),
+    radial-gradient(36% 30% at 82% 14%, rgba(150,199,243,.45), transparent 55%),
+    radial-gradient(28% 24% at 50% 88%, rgba(88,140,227,.22), transparent 60%);
+  filter:blur(14px);
+  opacity:1;
   animation:portalAurora 38s ease-in-out infinite alternate;
 }
 @media (prefers-reduced-motion: reduce){.portal-root--home::before{animation:none}}
@@ -2401,25 +2434,28 @@ body {
 .portal-calendar,
 .portal-treasure-inline,
 .portal-quote,
+.portal-tool-card,
 .portal-tool-icon-wrap,
 .portal-search-btn--note,
 .portal-quote-treasure-box{
   position:relative;
-  background:linear-gradient(150deg, rgba(255,255,255,.72), rgba(255,255,255,.5)) !important;
-  backdrop-filter:blur(30px) saturate(105%) brightness(1.05);
-  -webkit-backdrop-filter:blur(30px) saturate(105%) brightness(1.05);
-  border:1px solid transparent !important;
+  transform:translateZ(0);
+  background:linear-gradient(150deg, rgba(255,255,255,.55), rgba(255,255,255,.32)) !important;
+  backdrop-filter:blur(32px) saturate(140%) brightness(1.06);
+  -webkit-backdrop-filter:blur(32px) saturate(140%) brightness(1.06);
+  border:1px solid rgba(255,255,255,.62) !important;
   box-shadow:
     inset 0 1px 1.5px rgba(255,255,255,.95),
-    inset 0 -8px 18px rgba(88,140,227,.07),
-    0 16px 40px rgba(43,84,143,.16),
-    0 4px 12px rgba(43,84,143,.07) !important;
+    inset 0 -8px 18px rgba(88,140,227,.1),
+    0 18px 44px rgba(43,84,143,.2),
+    0 6px 14px rgba(43,84,143,.1) !important;
 }
 /* 镜面折射边（1px 渐变高光描边 — 液态玻璃的灵魂） */
 .portal-widget::after,
 .portal-calendar::after,
 .portal-treasure-inline::after,
 .portal-quote::after,
+.portal-tool-card::after,
 .portal-tool-icon-wrap::after,
 .portal-quote-treasure-box::after{
   content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;pointer-events:none;z-index:2;
@@ -2531,7 +2567,7 @@ body {
 /* 涟漪容器 + 元素（JS 添加 .om-ripple-host / 注入 .om-ripple） */
 .om-ripple-host{position:relative;overflow:hidden}
 .om-ripple{position:absolute;border-radius:50%;transform:translate(-50%,-50%) scale(0);
-  background:radial-gradient(circle, rgba(88,140,227,.35), rgba(88,140,227,0) 70%);
+  background:radial-gradient(circle, rgba(88,140,227,.55), rgba(88,140,227,0) 68%);
   pointer-events:none;z-index:5;animation:omRipple .6s ease-out forwards}
 @keyframes omRipple{to{transform:translate(-50%,-50%) scale(1);opacity:0}}
 

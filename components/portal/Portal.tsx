@@ -41,6 +41,29 @@ export default function Portal() {
   };
 
   useEffect(() => {
+    const rippleSel =
+      '.portal-tool-card,.portal-search-btn--note,.portal-quote-treasure,' +
+      '.portal-secretary-fab,.portal-avatar-link,.flomo-tool,.flomo-send';
+    const onPointerDown = (event: PointerEvent) => {
+      const host = (event.target as HTMLElement | null)?.closest(rippleSel);
+      if (!host) return;
+      host.classList.add('om-ripple-host');
+      const ripple = document.createElement('span');
+      ripple.className = 'om-ripple';
+      const rect = host.getBoundingClientRect();
+      const size = Math.max(rect.width, rect.height) * 1.4;
+      ripple.style.width = `${size}px`;
+      ripple.style.height = `${size}px`;
+      ripple.style.left = `${event.clientX - rect.left}px`;
+      ripple.style.top = `${event.clientY - rect.top}px`;
+      host.appendChild(ripple);
+      window.setTimeout(() => ripple.remove(), 600);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => document.removeEventListener('pointerdown', onPointerDown);
+  }, []);
+
+  useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
