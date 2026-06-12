@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FLOMO_DEMO_MEMOS } from '@/lib/portal/flomo-demo';
 import { t } from '@/lib/portal/i18n';
 import { loadProfileSettings } from '@/lib/portal/profile';
@@ -79,8 +79,27 @@ export default function NotePanelEnhanced({ open, onOpenChange }: NotePanelProps
   const [sending, setSending] = useState(false);
   const [status, setStatus] = useState<'idle' | 'ok' | 'err'>('idle');
   const [statusMsg, setStatusMsg] = useState('');
+  const [activeTag, setActiveTag] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const imageRef = useRef<HTMLInputElement>(null);
+
+  const tagIndex = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const memo of memos) {
+      for (const tag of memo.tags) {
+        const key = tag.startsWith('#') ? tag : `#${tag}`;
+        counts.set(key, (counts.get(key) || 0) + 1);
+      }
+    }
+    return Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
+  }, [memos]);
+
+  const filteredMemos = useMemo(() => {
+    if (!activeTag) return memos;
+    return memos.filter((m) =>
+      m.tags.some((t) => (t.startsWith('#') ? t : `#${t}`) === activeTag),
+    );
+  }, [memos, activeTag]);
 
   const loadMemos = useCallback(async () => {
     setLoadingMemos(true);
@@ -112,6 +131,7 @@ export default function NotePanelEnhanced({ open, onOpenChange }: NotePanelProps
       setStatusMsg('');
       setDraft('');
       setImages([]);
+      setActiveTag(null);
       void loadMemos();
       requestAnimationFrame(() => textareaRef.current?.focus());
     }
@@ -256,41 +276,73 @@ export default function NotePanelEnhanced({ open, onOpenChange }: NotePanelProps
           <span className="flomo-app-header-spacer" aria-hidden />
         </header>
 
-        {usingDemo ? (
-          <p className="flomo-app-banner">
-            演示笔记 · 发送走 FLOMO_WEBHOOK_URL；读取需另配 FLOMO_API_TOKEN（MCP 个人 Token）。
-          </p>
-        ) : null}
+        <div className="flomo-app-body">
+          <aside className="flomo-sidebar" aria-label="标签">
+            <button
+              type="button"
+              className={'flomo-sidebar-item' + (activeTag === null ? ' flomo-sidebar-item--on' : '')}
+              onClick={() => setActiveTag(null)}
+            >
+              <span className="flomo-sidebar-label">全部</span>
+              <span className="flomo-sidebar-count">{memos.length}</span>
+            </button>
+            {tagIndex.map(([tag, count]) => (
+              <button
+                key={tag}
+                type="button"
+                className={'flomo-sidebar-item' + (activeTag === tag ? ' flomo-sidebar-item--on' : '')}
+                onClick={() => setActiveTag(tag)}
+              >
+                <span className="flomo-sidebar-label">{tag}</span>
+                <span className="flomo-sidebar-count">{count}</span>
+              </button>
+            ))}
+          </aside>
 
-        <div className="flomo-timeline">
-          {loadingMemos ? (
-            <p className="flomo-timeline-empty">加载中…</p>
-          ) : memos.length === 0 ? (
-            <p className="flomo-timeline-empty">
-              {configured === false ? '配置 Token 后可显示 flomo 笔记' : '还没有 memo，写一条吧'}
-            </p>
-          ) : (
-            memos.map((memo) => (
-              <article key={memo.slug} className="flomo-memo-card">
-                <time className="flomo-memo-time" dateTime={memo.created_at}>
-                  {formatMemoDate(memo.created_at || memo.updated_at)}
-                </time>
-                <p className="flomo-memo-content">{memo.content}</p>
-                {memo.tags.length > 0 ? (
-                  <div className="flomo-memo-tags">
-                    {memo.tags.map((tag) => (
-                      <span key={`${memo.slug}-${tag}`} className="flomo-memo-tag">
-                        {tag.startsWith('#') ? tag : `#${tag}`}
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
-              </article>
-            ))
-          )}
-        </div>
+          <div className="flomo-main">
+            {usingDemo ? (
+              <p className="flomo-app-banner">
+                演示数据 · 发送走 Webhook；读取需 FLOMO_API_TOKEN
+              </p>
+            ) : null}
 
-        <div className="flomo-compose">
+            <div className="flomo-timeline">
+              {loadingMemos ? (
+                <p className="flomo-timeline-empty">加载中…</p>
+              ) : filteredMemos.length === 0 ? (
+                <p className="flomo-timeline-empty">
+                  {activeTag ? '该标签下暂无 memo' : '还没有 memo，写一条吧'}
+                </p>
+              ) : (
+                filteredMemos.map((memo) => (
+                  <article key={memo.slug} className="flomo-memo-card">
+                    <time className="flomo-memo-time" dateTime={memo.created_at}>
+                      {formatMemoDate(memo.created_at || memo.updated_at)}
+                    </time>
+                    <p className="flomo-memo-content">{memo.content}</p>
+                    {memo.tags.length > 0 ? (
+                      <div className="flomo-memo-tags">
+                        {memo.tags.map((tag) => {
+                          const label = tag.startsWith('#') ? tag : `#${tag}`;
+                          return (
+                            <button
+                              key={`${memo.slug}-${tag}`}
+                              type="button"
+                              className="flomo-memo-tag"
+                              onClick={() => setActiveTag(label)}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                  </article>
+                ))
+              )}
+            </div>
+
+            <div className="flomo-compose">
           <textarea
             ref={textareaRef}
             className="flomo-input"
@@ -427,6 +479,8 @@ export default function NotePanelEnhanced({ open, onOpenChange }: NotePanelProps
               e.target.value = '';
             }}
           />
+            </div>
+          </div>
         </div>
       </div>
     </div>

@@ -23,6 +23,7 @@ import {
   simplifyPlaceName,
 } from '@/lib/portal/weather';
 import ToolsTreasureInline from './ToolsTreasureSheet';
+import { withBase } from '@/lib/portal/paths';
 
 interface DashboardHomeProps {
   config: PortalConfig;
@@ -332,9 +333,13 @@ export default function DashboardHome({
           aria-label="打开宝盒工具"
           aria-expanded={treasureOpen}
         >
-          <span className="portal-quote-treasure-glyph" aria-hidden>
-            🎁
-          </span>
+          <img
+            className="portal-quote-treasure-icon"
+            src={withBase('/icons/treasurebox.svg')}
+            alt=""
+            width={22}
+            height={22}
+          />
         </button>
       </section>
 

@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import DashboardHome from './DashboardHome';
 import NotePanelEnhanced from './NotePanelEnhanced';
-import PortalBottomNav from './PortalBottomNav';
 import PortalSecretaryFab from './PortalSecretaryFab';
 import { DEFAULT_PORTAL_CONFIG } from '@/lib/portal/defaults';
 import { openToolHref } from '@/lib/portal/open-tool';
@@ -26,19 +25,6 @@ export default function Portal() {
   const openTool = (tool: PortalTool) => {
     if (!tool.ready) return;
     window.location.assign(openToolHref(tool));
-  };
-
-  const openTodo = () => {
-    const plan = config.tools.find((t) => t.id === 'plan' && t.ready);
-    if (plan) openTool(plan);
-  };
-
-  const scrollHome = () => {
-    if (window.location.pathname !== '/') {
-      window.location.assign('/');
-      return;
-    }
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   useEffect(() => {
@@ -89,15 +75,11 @@ export default function Portal() {
         </div>
       </div>
 
-      <div className="portal-chrome" aria-hidden={false}>
-        <PortalSecretaryFab />
-        <PortalBottomNav
-          noteOpen={noteOpen}
-          onHome={scrollHome}
-          onOpenNote={() => setNoteOpen(true)}
-          onOpenTodo={openTodo}
-        />
-      </div>
+      {!noteOpen ? (
+        <div className="portal-chrome">
+          <PortalSecretaryFab />
+        </div>
+      ) : null}
 
       <NotePanelEnhanced open={noteOpen} onOpenChange={setNoteOpen} />
     </>

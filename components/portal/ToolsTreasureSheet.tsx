@@ -35,14 +35,6 @@ export default function ToolsTreasureInline({
       <section className="portal-treasure-inline" role="region" aria-label="宝盒工具">
         <header className="portal-treasure-inline-head">
           <h2 className="portal-treasure-inline-title">宝盒</h2>
-          <button
-            type="button"
-            className="portal-treasure-inline-close"
-            onClick={onClose}
-            aria-label="关闭"
-          >
-            ×
-          </button>
         </header>
         <ToolGrid tools={tools} excludeIds={['secretary']} onOpenTool={handleOpen} />
       </section>
