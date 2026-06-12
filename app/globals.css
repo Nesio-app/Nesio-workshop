@@ -2521,7 +2521,7 @@ body {
   filter:none !important;
 }
 /* 线性图标（配合 ToolGrid.tsx 线性图标版） */
-.portal-tool-svg{width:1.4rem;height:1.4rem;color:var(--portal-blue);display:block;position:relative;z-index:3}
+.portal-tool-svg{width:1.65rem;height:1.65rem;display:block;position:relative;z-index:3;object-fit:contain;border-radius:.35rem}
 @media (hover:hover){
   .portal-tool-card:hover .portal-tool-icon-wrap{transform:translateY(-2px) scale(1.06)}
 }
