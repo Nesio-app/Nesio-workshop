@@ -35,7 +35,7 @@ def sample_corners(im, box=24):
     n = len(pixels)
     return (sum(p[0] for p in pixels)//n, sum(p[1] for p in pixels)//n, sum(p[2] for p in pixels)//n)
 
-def lighten(rgb, amount=0.28):
+def lighten(rgb, amount=0.62):
     r,g,b = rgb
     return (
         min(255, int(r + (255 - r) * amount)),
@@ -71,12 +71,12 @@ def make_icon(size, scale, name):
     print("wrote", name)
 
 for size, scale, name in [
-    (512, 0.82, "treasurebox-pwa-512.png"),
-    (512, 0.76, "treasurebox-pwa-512-maskable.png"),
-    (192, 0.82, "treasurebox-pwa-192.png"),
-    (180, 0.82, "treasurebox-pwa-180.png"),
-    (32, 0.88, "treasurebox-favicon-32.png"),
-    (16, 0.88, "treasurebox-favicon-16.png"),
+    (512, 0.97, "treasurebox-pwa-512.png"),
+    (512, 0.90, "treasurebox-pwa-512-maskable.png"),
+    (192, 0.97, "treasurebox-pwa-192.png"),
+    (180, 0.97, "treasurebox-pwa-180.png"),
+    (32, 0.98, "treasurebox-favicon-32.png"),
+    (16, 0.98, "treasurebox-favicon-16.png"),
 ]:
     make_icon(size, scale, name)
 

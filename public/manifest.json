@@ -4,7 +4,7 @@
   "description": "数字静谧庭院 — 个人工具箱",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#d3e5ec",
+  "background_color": "#e8f1f5",
   "theme_color": "#588ce3",
   "orientation": "portrait",
   "icons": [
