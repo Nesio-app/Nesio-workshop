@@ -5,14 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="theme-color" content="#0a0a0f">
+  <meta name="theme-color" content="#e7eefb">
   <title>大后方</title>
   <link rel="manifest" href="/storage/manifest.json">
   <link rel="stylesheet" href="/storage/styles.css">
-  <link rel="stylesheet" href="/portal-back.css">
+  <link rel="stylesheet" href="/storage/portal-back.css">
 </head>
 <body>
-<a class="portal-back-link portal-back-link--dark" href="/">‹ 宝盒</a>
+<a class="portal-back-link" href="/">‹ 宝盒</a>
 <div class="app-shell" id="app">
   <div class="statusbar">
     <span class="statusbar-time" id="clock">9:41</span>
@@ -25,22 +25,22 @@
       <div><div class="ptitle">视线永存</div><div class="psub" id="homeSub">Object Anchors</div></div>
       <div class="hbtn" onclick="openSheet('sh-settings')" title="设置">⚙️</div>
     </div>
-    <div class="sbar"><span>🔍</span><input placeholder="狗用的 · 止痒 · 备用枕巾…" oninput="liveSearch(this.value)" id="hsearch"></div>
+    <div class="sbar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg><input placeholder="狗用的 · 止痒 · 备用枕巾…" oninput="liveSearch(this.value)" id="hsearch"></div>
     <div class="scroll">
       <div id="searchOut" style="display:none;"></div>
       <div class="exp-ban" id="expBanner"><span style="font-size:17px;">⏰</span><div class="et" id="expBannerText"></div></div>
       <div class="wstrip">
-        <div style="font-size:10px;font-weight:600;color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-bottom:9px;">📡 透视眼 · 常驻感知</div>
+        <div style="font-size:10.5px;font-weight:700;color:var(--accent-deep);letter-spacing:0.8px;text-transform:uppercase;margin-bottom:11px;display:flex;align-items:center;gap:6px;"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="2.6"></circle></svg>透视眼 · 常驻感知</div>
         <div class="wrow" id="widgetRow"></div>
       </div>
       <div class="stitle">空间</div>
       <div id="spaceList"></div>
       <div class="stitle">🎰 多巴胺任务</div>
-      <div style="background:linear-gradient(135deg,rgba(255,140,66,.08),rgba(123,111,255,.06));border:1px solid rgba(255,140,66,.2);border-radius:var(--r);padding:13px;margin-bottom:10px;">
-        <div style="font-size:10px;font-weight:700;color:var(--orange);letter-spacing:1px;text-transform:uppercase;margin-bottom:5px;">⚡ 限时2分钟</div>
-        <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px;">书桌杂物堆 · 置信度 21%</div>
-        <div style="font-size:12px;color:var(--text3);line-height:1.5;margin-bottom:11px;">只需把最上面那件短袖挂回衣柜，不用整理全部。</div>
-        <button style="background:var(--orange);color:white;border:none;padding:8px 16px;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;" onclick="doomDone()">🎲 拉一下</button>
+      <div style="background:linear-gradient(135deg,#ffffff,#eaf2fe);border:1px solid var(--border2);border-radius:var(--r);padding:15px;margin-bottom:10px;box-shadow:var(--shadow-sm);">
+        <div style="font-size:10px;font-weight:800;color:var(--accent-deep);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">⚡ 限时2分钟</div>
+        <div style="font-size:14.5px;font-weight:700;color:var(--text);margin-bottom:5px;">书桌杂物堆 · 置信度 21%</div>
+        <div style="font-size:12px;color:var(--text2);line-height:1.55;margin-bottom:13px;font-weight:500;">只需把最上面那件短袖挂回衣柜，不用整理全部。</div>
+        <button style="background:linear-gradient(145deg,#5e96e8,#3f74d6);color:white;border:none;padding:9px 18px;border-radius:11px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;box-shadow:var(--shadow-blue);" onclick="doomDone()">🎲 拉一下</button>
       </div>
     </div>
   </div>
@@ -161,10 +161,10 @@
       </div>
     </div>
     <div class="scroll">
-      <div style="background:linear-gradient(135deg,rgba(123,111,255,.15),rgba(232,150,58,.1));border:1px solid rgba(123,111,255,.2);border-radius:var(--rlg);padding:20px;margin-bottom:16px;text-align:center;">
-        <div style="font-size:11px;font-weight:600;color:var(--accent2);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">当前余额</div>
-        <div style="font-size:42px;font-weight:800;color:var(--text);" id="shopPts">⬡ 650</div>
-        <div style="font-size:12px;color:var(--text3);margin-top:4px;">每次拦截冲动 · 积分自动充能</div>
+      <div style="background:radial-gradient(120% 90% at 85% 5%, rgba(120,180,240,.28), transparent 55%),linear-gradient(160deg,var(--freeze-1),var(--freeze-0));border:1px solid rgba(120,175,235,.25);border-radius:var(--rlg);padding:22px;margin-bottom:16px;text-align:center;box-shadow:var(--shadow-freeze);">
+        <div style="font-size:11px;font-weight:800;color:var(--frost);letter-spacing:1.2px;text-transform:uppercase;margin-bottom:7px;">当前余额</div>
+        <div style="font-size:44px;font-weight:800;color:#fff;letter-spacing:-1px;" id="shopPts">⬡ 650</div>
+        <div style="font-size:12px;color:rgba(213,230,250,.82);margin-top:5px;font-weight:500;">每次拦截冲动 · 积分自动充能</div>
       </div>
       <div class="stitle">🐾 实体奖励</div>
       <div class="card" style="display:flex;align-items:center;gap:13px;margin-bottom:9px;cursor:pointer;" onclick="redeemReward('Maple 贴贴 10 分钟',200)">
@@ -206,18 +206,12 @@
       </div>
     </div>
     <div class="scroll">
-      <div style="text-align:center;padding:24px 0 20px;">
-        <div style="font-size:72px;animation:foxBreath 3s ease-in-out infinite;margin-bottom:16px;">🦊</div>
-        <div style="font-size:17px;font-weight:700;margin-bottom:8px;">狐狸正在守护冷冻仓</div>
-        <div style="font-size:13px;color:var(--text2);line-height:1.7;max-width:280px;margin:0 auto;">这个商品还需要冷冻 <span style="color:var(--fox2);font-weight:700;" id="foxTimer">4h 32m</span>。在此期间，你的大脑在保护你。</div>
-      </div>
-      <div style="background:var(--surface2);border:1px solid rgba(232,150,58,.2);border-radius:var(--rlg);padding:20px;margin-bottom:14px;text-align:center;">
-        <div style="font-size:11px;font-weight:600;color:var(--fox);letter-spacing:1px;text-transform:uppercase;margin-bottom:14px;">呼吸练习 · 3分钟阻尼</div>
-        <div style="width:100px;height:100px;border-radius:50%;border:3px solid var(--fox);margin:0 auto 14px;display:flex;align-items:center;justify-content:center;animation:foxBreath 4s ease-in-out infinite;">
-          <div style="font-size:13px;font-weight:600;color:var(--fox2);" id="breathLabel">吸气</div>
-        </div>
-        <div style="font-size:12px;color:var(--text3);">跟随狐狸的节奏呼吸<br>冲动会在几分钟内自然平息</div>
-        <div style="margin-top:12px;font-size:11px;color:var(--fox);font-weight:600;" id="breathCount">剩余 3:00</div>
+      <div class="breath-scene">
+        <div class="bs-label">呼吸练习 · 3分钟阻尼</div>
+        <div class="breath-ring"><div style="font-size:34px;">🦊</div></div>
+        <div style="font-size:16px;font-weight:700;color:#fff;margin-bottom:8px;">狐狸正在守护冷冻仓</div>
+        <div class="bs-sub">这个商品还需要冷冻 <span style="color:#fff;font-weight:700;" id="foxTimer">4h 32m</span><br>跟随光环的节奏呼吸 · 冲动会在几分钟内自然平息</div>
+        <div style="margin-top:14px;font-size:12px;color:var(--frost);font-weight:700;" id="breathCount">剩余 3:00</div>
       </div>
       <button class="btn-fox" onclick="completeBreath()">✓ 完成 3 分钟呼吸 · +20 PTS</button>
     </div>
@@ -225,14 +219,14 @@
 
   <!-- TAB BAR -->
   <div class="tabbar">
-    <div class="tab on" id="t-home" onclick="switchTab('home')"><div class="tab-icon">🏠</div><span class="tab-label">主页</span></div>
-    <div class="tab" id="t-stats" onclick="switchTab('stats')"><div class="tab-icon">📊</div><span class="tab-label">统计</span></div>
+    <div class="tab on" id="t-home" onclick="switchTab('home')"><div class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"></path><path d="M5 9.5V20h14V9.5"></path><circle cx="12" cy="13" r="2.4"></circle></svg></div><span class="tab-label">主页</span></div>
+    <div class="tab" id="t-stats" onclick="switchTab('stats')"><div class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20V11"></path><path d="M12 20V4"></path><path d="M19 20v-6"></path></svg></div><span class="tab-label">统计</span></div>
     <div class="tab-center">
-      <button class="fab" onclick="openSheet('sh-add')">📷</button>
-      <span class="tab-label" style="color:var(--text3);margin-top:4px;">存档</span>
+      <button class="fab" onclick="openSheet('sh-add')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5h3l1.5-2.2h7L17 8.5h3V19H4Z"></path><circle cx="12" cy="13" r="3.4"></circle></svg></button>
+      <span class="tab-label">存档</span>
     </div>
-    <div class="tab" id="t-scan" onclick="switchTab('scan')"><div class="tab-icon">⬡</div><span class="tab-label">扫码</span></div>
-    <div class="tab" id="t-impulse" onclick="switchTab('impulse')"><div class="tab-icon">🦊</div><span class="tab-label">理智</span></div>
+    <div class="tab" id="t-scan" onclick="switchTab('scan')"><div class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8"></path><path d="M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8"></path><path d="M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16"></path><path d="M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16"></path><path d="M4 12h16"></path></svg></div><span class="tab-label">扫码</span></div>
+    <div class="tab" id="t-impulse" onclick="switchTab('impulse')"><div class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"></path><path d="M4.2 7l15.6 10"></path><path d="M19.8 7 4.2 17"></path><path d="M12 6l-2.6-2.4M12 6l2.6-2.4M12 18l-2.6 2.4M12 18l2.6 2.4"></path><path d="M5.6 9.3 4.9 6m-.7 3.3L1.6 9M18.4 14.7l.7 3.3m.7-3.3 2.6.3M18.4 9.3l.7-3.3m-.7 3.3 2.6-.3M5.6 14.7l-.7 3.3m.7-3.3-2.6.3"></path></svg></div><span class="tab-label">理智</span></div>
   </div>
 
   <!-- SHEET: ADD -->
@@ -422,8 +416,8 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js" defer></script>
 <script src="/storage/config.js"></script>
 <script src="/storage/qr.js"></script>
 <script src="/storage/guard.js"></script>
