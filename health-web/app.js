@@ -1,6 +1,12 @@
 (function () {
   'use strict';
   const D = window.SU_DATA;
+  if (!D || !Array.isArray(D.factors)) {
+    console.error('溯 SÙ: SU_DATA 未加载，请确认 data.js 可访问');
+    document.getElementById('scroll').innerHTML =
+      '<div class="card" style="margin:24px 16px"><p style="font-size:14px;color:var(--ink-soft)">数据加载失败，请刷新页面。若持续出现，请检查网络。</p></div>';
+    return;
+  }
   const TITLES = ['今日身体', '关联发现', '个人实验', '家庭档案', '溯医 AI'];
   const MEALS = [
     { t: '7:30', label: '早餐', peak: 116, icon: '🍳', x: 42 },
