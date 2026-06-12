@@ -5,6 +5,7 @@ import { withBase } from '@/lib/portal/paths';
 
 interface PortalBottomNavProps {
   noteOpen?: boolean;
+  treasureOpen?: boolean;
   onHome: () => void;
   onOpenNote: () => void;
   onOpenTodo: () => void;
@@ -12,6 +13,7 @@ interface PortalBottomNavProps {
 
 export default function PortalBottomNav({
   noteOpen = false,
+  treasureOpen = false,
   onHome,
   onOpenNote,
   onOpenTodo,
@@ -20,9 +22,12 @@ export default function PortalBottomNav({
     <nav className="portal-bottom-nav" aria-label="主导航">
       <button
         type="button"
-        className="portal-bottom-nav-btn"
+        className={
+          'portal-bottom-nav-btn' + (treasureOpen ? ' portal-bottom-nav-btn--active' : '')
+        }
         onClick={onHome}
         aria-label="宝盒"
+        aria-expanded={treasureOpen}
       >
         <img
           className="portal-bottom-nav-icon portal-bottom-nav-icon--svg"

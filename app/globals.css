@@ -700,7 +700,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
-  padding-bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
 }
 
 .portal-dash-hero {
@@ -831,21 +831,26 @@ body {
   touch-action: manipulation;
 }
 
-.portal-quote-treasure-icon {
-  display: block;
-  width: 1.65rem;
-  height: 1.65rem;
+.portal-quote-treasure-box {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
   border-radius: 0.45rem;
-  padding: 0.2rem;
   background: linear-gradient(145deg, #fff 0%, var(--portal-blue-light) 100%);
   border: 1px solid rgba(88, 140, 227, 0.28);
   box-shadow: 0 4px 12px rgba(88, 140, 227, 0.14);
-  filter: grayscale(1) sepia(1) hue-rotate(186deg) saturate(4.2) brightness(0.88);
 }
 
-.portal-quote-treasure--open .portal-quote-treasure-icon {
+.portal-quote-treasure--open .portal-quote-treasure-box {
   border-color: rgba(88, 140, 227, 0.55);
   box-shadow: 0 6px 16px rgba(88, 140, 227, 0.24);
+}
+
+.portal-quote-treasure-icon {
+  display: block;
+  width: 1.25rem;
+  height: 1.25rem;
 }
 
 .portal-note-btn-label {

@@ -191,23 +191,55 @@ html, body {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   border-top: 0.5px solid var(--wx-line);
-  background: #f7f7f7;
-  padding-bottom: env(safe-area-inset-bottom);
+  background: rgba(255, 255, 255, 0.94);
+  padding: 0.35rem 0.5rem calc(0.35rem + env(safe-area-inset-bottom));
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.wx-tabbar--icons {
+  position: fixed;
+  left: 50%;
+  bottom: calc(0.35rem + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 50;
+  width: min(22rem, calc(100vw - 1.5rem));
+  border-radius: 999px;
+  border: 0.5px solid var(--wx-line);
+  box-shadow: 0 8px 24px rgba(88, 140, 227, 0.12);
+}
+
+.wx-body--list {
+  padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
 }
 
 .wx-tab {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0.55rem 0;
+  padding: 0.45rem 0;
   font-size: 0.72rem;
   color: var(--wx-muted);
   text-decoration: none;
+  border-radius: 999px;
 }
 
 .wx-tab--on {
-  color: #07c160;
-  font-weight: 600;
+  background: rgba(88, 140, 227, 0.14);
+}
+
+.wx-tab-icon {
+  font-size: 1.15rem;
+  line-height: 1;
+  filter: grayscale(1) sepia(1) hue-rotate(186deg) saturate(4.2) brightness(0.88);
+}
+
+.wx-tab-icon--svg {
+  display: block;
+  width: 1.5rem;
+  height: 1.5rem;
+  filter: none;
+  border-radius: 0.35rem;
 }
 
 .wx-empty {

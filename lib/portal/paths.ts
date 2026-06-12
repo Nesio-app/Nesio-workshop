@@ -1,7 +1,6 @@
 const TOOLBOX_APP_PATHS = new Set([
   '/fitness',
   '/storage',
-  '/health',
   '/adhd-flow',
   '/inner-shelter',
 ]);
@@ -28,4 +27,10 @@ export function withBase(path: string): string {
 
 export function configUrl(): string {
   return withBase('/portal-config.json');
+}
+
+/** Next.js API routes respect `basePath` in production. */
+export function apiUrl(path: string): string {
+  const normalized = path.startsWith('/') ? path : `/${path}`;
+  return withBase(normalized);
 }

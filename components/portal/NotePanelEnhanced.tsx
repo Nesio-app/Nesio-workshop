@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FLOMO_DEMO_MEMOS } from '@/lib/portal/flomo-demo';
 import { t } from '@/lib/portal/i18n';
+import { apiUrl } from '@/lib/portal/paths';
 import { loadProfileSettings } from '@/lib/portal/profile';
 
 interface FlomoMemo {
@@ -79,6 +80,7 @@ export default function NotePanelEnhanced({ open, onOpenChange }: NotePanelProps
   const [sending, setSending] = useState(false);
   const [status, setStatus] = useState<'idle' | 'ok' | 'err'>('idle');
   const [statusMsg, setStatusMsg] = useState('');
+  const [readError, setReadError] = useState('');
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const imageRef = useRef<HTMLInputElement>(null);
@@ -104,7 +106,7 @@ export default function NotePanelEnhanced({ open, onOpenChange }: NotePanelProps
   const loadMemos = useCallback(async () => {
     setLoadingMemos(true);
     try {
-      const res = await fetch('/api/portal/flomo?limit=50', { cache: 'no-store' });
+      const res = await fetch(apiUrl('/api/portal/flomo?limit=50'), { cache: 'no-store' });
       const data = await res.json().catch(() => ({}));
       const isConfigured = Boolean(data.configured);
       setConfigured(isConfigured);
@@ -112,14 +114,20 @@ export default function NotePanelEnhanced({ open, onOpenChange }: NotePanelProps
       if (live.length > 0) {
         setMemos(live);
         setUsingDemo(false);
+      } else if (isConfigured && data.error) {
+        setMemos(FLOMO_DEMO_MEMOS);
+        setUsingDemo(true);
+        setReadError(data.error);
       } else {
         setMemos(FLOMO_DEMO_MEMOS);
         setUsingDemo(true);
+        setReadError('');
       }
     } catch {
       setConfigured(false);
       setMemos(FLOMO_DEMO_MEMOS);
       setUsingDemo(true);
+      setReadError('');
     } finally {
       setLoadingMemos(false);
     }
@@ -129,6 +137,7 @@ export default function NotePanelEnhanced({ open, onOpenChange }: NotePanelProps
     if (open) {
       setStatus('idle');
       setStatusMsg('');
+      setReadError('');
       setDraft('');
       setImages([]);
       setActiveTag(null);
@@ -182,7 +191,7 @@ export default function NotePanelEnhanced({ open, onOpenChange }: NotePanelProps
     for (const img of images) {
       const form = new FormData();
       form.append('file', img.file);
-      const res = await fetch('/api/portal/flomo/upload', { method: 'POST', body: form });
+      const res = await fetch(apiUrl('/api/portal/flomo/upload'), { method: 'POST', body: form });
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.url) urls.push(String(data.url));
     }
@@ -225,7 +234,7 @@ export default function NotePanelEnhanced({ open, onOpenChange }: NotePanelProps
         content = content ? `${content}\n\n${links}` : links;
       }
 
-      const res = await fetch('/api/portal/flomo', {
+      const res = await fetch(apiUrl('/api/portal/flomo'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content }),
@@ -302,7 +311,11 @@ export default function NotePanelEnhanced({ open, onOpenChange }: NotePanelProps
           <div className="flomo-main">
             {usingDemo ? (
               <p className="flomo-app-banner">
-                演示数据 · 发送走 Webhook；读取需 FLOMO_API_TOKEN
+                {configured === false
+                  ? '读取笔记需在 Vercel 配置 FLOMO_API_TOKEN（flomo MCP 个人 Token）；FLOMO_WEBHOOK_URL 仅用于发送'
+                  : readError
+                    ? `读取失败：${readError}`
+                    : '暂无笔记或读取失败，当前为演示数据'}
               </p>
             ) : null}
 

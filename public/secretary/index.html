@@ -21,20 +21,19 @@
 
   <main class="wx-list" id="friendList" aria-label="AI 好友"></main>
 
-  <div class="wx-dock" id="chatDock" data-open="false">
-    <div class="wx-dock-handle" id="dockHandle" aria-hidden></div>
-    <div class="wx-dock-panel" id="dockPanel">
-      <p class="wx-dock-title">快速聊天</p>
-      <div class="wx-dock-actions" id="dockActions"></div>
-    </div>
-    <button type="button" class="wx-dock-fab" id="dockFab" aria-label="上滑打开聊天">💬</button>
-  </div>
-
-  <nav class="wx-tabbar" aria-label="底部导航">
-    <a class="wx-tab wx-tab--on" href="/secretary"><span>智友</span></a>
-    <a class="wx-tab" href="/"><span>宝盒</span></a>
-    <a class="wx-tab" href="/secretary/chat?friend=gemini"><span>秘书</span></a>
-    <a class="wx-tab" href="/portfolio"><span>我</span></a>
+  <nav class="wx-tabbar wx-tabbar--icons" aria-label="底部导航">
+    <a class="wx-tab" href="/" aria-label="宝盒">
+      <img class="wx-tab-icon wx-tab-icon--svg" src="/icons/treasurebox.svg" width="24" height="24" alt="" />
+    </a>
+    <a class="wx-tab" href="/?note=1" aria-label="Note">
+      <span class="wx-tab-icon" aria-hidden>📝</span>
+    </a>
+    <a class="wx-tab" href="/adhd-flow/" aria-label="待办">
+      <span class="wx-tab-icon" aria-hidden>✅</span>
+    </a>
+    <a class="wx-tab" href="/settings" aria-label="我">
+      <span class="wx-tab-icon" aria-hidden>👤</span>
+    </a>
   </nav>
 
   <div class="wx-sheet" id="toolSheet" hidden>

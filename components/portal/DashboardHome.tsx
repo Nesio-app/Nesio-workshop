@@ -28,6 +28,8 @@ import { withBase } from '@/lib/portal/paths';
 interface DashboardHomeProps {
   config: PortalConfig;
   noteOpen?: boolean;
+  treasureOpen: boolean;
+  onTreasureOpenChange: (open: boolean) => void;
   onOpenNote: () => void;
   onOpenTool: (tool: PortalTool) => void;
 }
@@ -121,6 +123,8 @@ const FIDELITY_HINT_KEY = 'treasurebox-fidelity-hint-dismissed';
 export default function DashboardHome({
   config,
   noteOpen = false,
+  treasureOpen,
+  onTreasureOpenChange,
   onOpenNote,
   onOpenTool,
 }: DashboardHomeProps) {
@@ -144,8 +148,6 @@ export default function DashboardHome({
   const [fidelityHintDismissed, setFidelityHintDismissed] = useState(false);
   const quotePicked = useRef(false);
   const [dailyQuote, setDailyQuote] = useState('今天也要好好照顾自己。');
-  const [treasureOpen, setTreasureOpen] = useState(false);
-
   const lunarLine = useMemo(() => formatLunarLine(now), [now]);
   const holidayLine = useMemo(() => nextHolidayLine(now), [now]);
   const usHolidayLine = useMemo(() => nextUSHolidayLine(now), [now]);
@@ -329,17 +331,19 @@ export default function DashboardHome({
         <button
           type="button"
           className={'portal-quote-treasure' + (treasureOpen ? ' portal-quote-treasure--open' : '')}
-          onClick={() => setTreasureOpen((v) => !v)}
+          onClick={() => onTreasureOpenChange(!treasureOpen)}
           aria-label="打开宝盒工具"
           aria-expanded={treasureOpen}
         >
-          <img
-            className="portal-quote-treasure-icon"
-            src={withBase('/icons/treasurebox.svg')}
-            alt=""
-            width={22}
-            height={22}
-          />
+          <span className="portal-quote-treasure-box" aria-hidden>
+            <img
+              className="portal-quote-treasure-icon"
+              src={withBase('/icons/treasurebox.svg')}
+              alt=""
+              width={20}
+              height={20}
+            />
+          </span>
         </button>
       </section>
 
@@ -397,7 +401,7 @@ export default function DashboardHome({
       <ToolsTreasureInline
         tools={config.tools}
         open={treasureOpen}
-        onClose={() => setTreasureOpen(false)}
+        onClose={() => onTreasureOpenChange(false)}
         onOpenTool={onOpenTool}
       />
 
