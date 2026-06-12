@@ -216,24 +216,28 @@
 <div class="ss-flash" id="ssFlash"></div>
 
 <div class="hud" id="ssHud">
-  <div class="hudphase" id="hudPhase">第 1 组 / 共 2 组</div>
-  <div class="hudbig" id="hudBig" style="color:var(--ember)">A1</div>
-  <div class="hudex" id="hudEx">Split-Squat</div>
-  <div class="hud-fig" id="hudFig"></div>
-  <div class="hudn" id="hudNote" style="display:none"></div>
-  <div class="hudtgt">
-    <div><div class="hudw" id="hudW">体重</div></div>
-    <div><div class="hudr" id="hudR">× 6-8 次/侧</div></div>
+  <div class="hud-scroll">
+    <div class="hudphase" id="hudPhase">第 1 组 / 共 2 组</div>
+    <div class="hudbig" id="hudBig" style="color:var(--ember)">A1</div>
+    <div class="hudex" id="hudEx">Split-Squat</div>
+    <div id="hudMedia"></div>
+    <div class="hudn" id="hudNote" style="display:none"></div>
+    <div class="hudtgt">
+      <div><div class="hudw" id="hudW">体重</div></div>
+      <div><div class="hudr" id="hudR">× 6-8 次/侧</div></div>
+    </div>
   </div>
-  <button class="hud-follow" onclick="openFollowFromHud()">▶ 动态跟练模式</button>
-  <div class="rpew" id="rpeWrap">
-    <div class="rpelbl"><span>本组完成度 RPE</span><span id="rpeVal">7</span></div>
-    <input type="range" class="rpeslider" id="rpeSlider" min="1" max="10" value="7"
-      oninput="document.getElementById('rpeVal').textContent=this.value">
-    <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--mu);margin-top:4px"><span>轻松 1</span><span>力竭 10</span></div>
+  <div class="hud-foot">
+    <button class="hud-follow" type="button" onclick="openFollowFromHud()">▶ 动态跟练模式</button>
+    <div class="rpew" id="rpeWrap">
+      <div class="rpelbl"><span>本组完成度 RPE</span><span id="rpeVal">7</span></div>
+      <input type="range" class="rpeslider" id="rpeSlider" min="1" max="10" value="7"
+        oninput="document.getElementById('rpeVal').textContent=this.value">
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--mu);margin-top:4px"><span>轻松 1</span><span>力竭 10</span></div>
+    </div>
+    <button class="hudabtn next" id="hudBtn" onclick="hudAction()">✓ 完成本组</button>
+    <div class="hudskip" onclick="closeHud()">跳过 / 关闭</div>
   </div>
-  <button class="hudabtn next" id="hudBtn" onclick="hudAction()">✓ 完成本组</button>
-  <div class="hudskip" onclick="closeHud()">跳过 / 关闭</div>
 </div>
 
 <div class="resthud" id="restHud">
@@ -324,6 +328,9 @@
 
 </div>
 <script src="/fitness/config.js"></script>
+<script src="/fitness/media.js"></script>
+<script src="/fitness/audio.js"></script>
+<script src="/fitness/demo.js"></script>
 <script src="/fitness/app.js"></script>
 </body>
 </html>

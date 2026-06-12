@@ -312,7 +312,7 @@ export default function NotePanelEnhanced({ open, onOpenChange }: NotePanelProps
             {usingDemo ? (
               <p className="flomo-app-banner">
                 {configured === false
-                  ? '读取笔记需在 Vercel 配置 FLOMO_API_TOKEN（flomo MCP 个人 Token）；FLOMO_WEBHOOK_URL 仅用于发送'
+                  ? '在 Vercel 配置 FLOMO_WEBHOOK_URL 或 FLOMO_API_URL（完整 webhook 地址）以读取/发送；也可单独设置 FLOMO_API_TOKEN'
                   : readError
                     ? `读取失败：${readError}`
                     : '暂无笔记或读取失败，当前为演示数据'}

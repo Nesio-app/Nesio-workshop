@@ -30,10 +30,10 @@
     "id": "doubao",
     "name": "豆包",
     "company": "字节跳动",
-    "tagline": "字节跳动 · 即将接入",
-    "ready": false,
+    "tagline": "字节跳动 · 已连接",
+    "ready": true,
     "logo": "/secretary/logos/doubao.svg",
-    "preview": "后续将接入豆包 API。"
+    "preview": "豆包大模型，适合日常对话与中文任务。"
   },
   {
     "id": "deepseek",

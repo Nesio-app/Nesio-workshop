@@ -700,7 +700,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
-  padding-bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px));
 }
 
 .portal-dash-hero {

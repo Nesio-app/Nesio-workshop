@@ -19,7 +19,8 @@ export async function GET(req: NextRequest) {
       ok: false,
       configured: false,
       memos: [],
-      error: 'FLOMO_API_TOKEN not configured — add your Personal Token in Vercel env',
+      error:
+        'Set FLOMO_WEBHOOK_URL or FLOMO_API_URL (full webhook URL) or FLOMO_API_TOKEN in Vercel env',
     });
   }
 

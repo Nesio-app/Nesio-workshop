@@ -250,3 +250,195 @@ function runFollowSet() {
   }
   nextRep();
 }
+
+// ════ 全屏跟练浮层（HUD 入口）════
+let foActive = false;
+let foPaused = false;
+let foTimer = null;
+let foRep = 0;
+let foSide = 0;
+let foMeta = null;
+
+function openFollowFromHud() {
+  const name = document.getElementById('hudEx')?.textContent?.trim();
+  if (!name) return;
+  const ex = EX.find((e) => e.name === name);
+  const reps = document.getElementById('hudR')?.textContent?.replace('× ', '') || '8';
+  foMeta = ex
+    ? { ...getMediaForExercise(ex), ...parseRepTarget(reps) }
+    : { demo: 'mobility', tempo: { down: 2, hold: 1, up: 1 }, ...parseRepTarget(reps) };
+
+  document.getElementById('foName').textContent = name;
+  document.getElementById('foRepTgt').textContent = String(foMeta.target);
+  document.getElementById('foRepNow').textContent = '0';
+  document.getElementById('foCd').textContent = '3';
+  document.getElementById('foCd').classList.remove('show');
+  document.getElementById('foPhase').textContent = '准备开始';
+  document.getElementById('foPhase').className = 'fo-phase ecc';
+
+  const foFig = document.getElementById('foFig');
+  foFig.innerHTML = '';
+  const stage = document.createElement('div');
+  stage.className = 'demo-stage demo-' + (foMeta.demo || 'mobility');
+  stage.id = 'foDemoAnim';
+  foFig.appendChild(stage);
+
+  const arc = document.getElementById('foRingArc');
+  if (arc) arc.style.strokeDashoffset = '829';
+
+  document.getElementById('foGoBtn').style.display = '';
+  document.getElementById('foPauseBtn').style.display = 'none';
+  document.getElementById('foPauseBtn').textContent = '⏸ 暂停';
+  document.getElementById('followOv').classList.add('on');
+  foActive = false;
+  foPaused = false;
+  if (foTimer) clearTimeout(foTimer);
+  if (typeof AudioEngine !== 'undefined') AudioEngine.resume();
+}
+
+function closeFollow() {
+  foActive = false;
+  foPaused = false;
+  if (foTimer) clearTimeout(foTimer);
+  foTimer = null;
+  document.getElementById('followOv')?.classList.remove('on');
+}
+
+function followGo() {
+  if (!foMeta) return;
+  foActive = true;
+  foPaused = false;
+  foRep = 0;
+  foSide = 0;
+  document.getElementById('foGoBtn').style.display = 'none';
+  document.getElementById('foPauseBtn').style.display = '';
+  runFoCountdown(3, runFoSet);
+}
+
+function followPause() {
+  if (!foActive) return;
+  foPaused = !foPaused;
+  const btn = document.getElementById('foPauseBtn');
+  if (btn) btn.textContent = foPaused ? '▶ 继续' : '⏸ 暂停';
+}
+
+function runFoCountdown(n, done) {
+  const cd = document.getElementById('foCd');
+  const phase = document.getElementById('foPhase');
+  if (!foActive && n < 3) return;
+  if (foPaused) {
+    foTimer = setTimeout(() => runFoCountdown(n, done), 200);
+    return;
+  }
+  if (n > 0) {
+    if (cd) { cd.textContent = String(n); cd.classList.add('show'); }
+    if (phase) phase.textContent = '准备';
+    if (typeof AudioEngine !== 'undefined') AudioEngine.playCount(n);
+    foTimer = setTimeout(() => runFoCountdown(n - 1, done), 900);
+  } else {
+    if (cd) cd.classList.remove('show');
+    if (phase) phase.textContent = '开始！';
+    if (typeof AudioEngine !== 'undefined') AudioEngine.playGo();
+    foTimer = setTimeout(done, 500);
+  }
+}
+
+function updateFoRing(progress) {
+  const arc = document.getElementById('foRingArc');
+  if (!arc || !foMeta) return;
+  const total = foMeta.mode === 'time' ? foMeta.target : foMeta.target;
+  const p = Math.min(1, progress / total);
+  arc.style.strokeDashoffset = String(829 * (1 - p));
+}
+
+function runFoSet() {
+  if (!foActive || !foMeta) return;
+  const phase = document.getElementById('foPhase');
+  const repsEl = document.getElementById('foRepNow');
+  const anim = document.getElementById('foDemoAnim');
+  const tempo = foMeta.tempo || { down: 2, hold: 1, up: 1 };
+
+  if (foMeta.mode === 'time') {
+    let left = foMeta.target;
+    const tick = () => {
+      if (!foActive) return;
+      if (foPaused) { foTimer = setTimeout(tick, 200); return; }
+      if (phase) {
+        phase.textContent = foMeta.perSide && foSide === 0 ? '左侧保持' : foMeta.perSide ? '右侧保持' : '保持';
+        phase.className = 'fo-phase con';
+      }
+      if (repsEl) repsEl.textContent = String(left);
+      updateFoRing(foMeta.target - left);
+      if (left <= 3 && left > 0 && typeof AudioEngine !== 'undefined') AudioEngine.playTick();
+      if (left <= 0) {
+        if (foMeta.perSide && foSide === 0) {
+          foSide = 1;
+          left = foMeta.target;
+          if (typeof AudioEngine !== 'undefined') AudioEngine.playSetDone();
+          foTimer = setTimeout(tick, 600);
+          return;
+        }
+        if (typeof AudioEngine !== 'undefined') AudioEngine.playSetDone();
+        if (phase) phase.textContent = '完成 ✓';
+        closeFollow();
+        return;
+      }
+      left--;
+      foTimer = setTimeout(tick, 1000);
+    };
+    tick();
+    return;
+  }
+
+  function nextRep() {
+    if (!foActive) return;
+    if (foPaused) { foTimer = setTimeout(nextRep, 200); return; }
+    foRep++;
+    const sideLabel = foMeta.perSide ? (foSide === 0 ? ' · 左' : ' · 右') : '';
+    if (repsEl) repsEl.textContent = String(foRep);
+    updateFoRing(foRep);
+    if (typeof AudioEngine !== 'undefined') AudioEngine.playRep();
+
+    function phaseSeq(label, ms, next) {
+      if (!foActive) return;
+      if (foPaused) { foTimer = setTimeout(() => phaseSeq(label, ms, next), 200); return; }
+      if (phase) {
+        phase.textContent = label + sideLabel;
+        phase.className = 'fo-phase ' + (label.includes('下放') ? 'ecc' : 'con');
+      }
+      if (anim) {
+        anim.classList.remove('phase-down', 'phase-up', 'phase-hold');
+        if (label.includes('下放')) anim.classList.add('phase-down');
+        else if (label.includes('推起') || label.includes('起身')) anim.classList.add('phase-up');
+        else anim.classList.add('phase-hold');
+      }
+      if (typeof AudioEngine !== 'undefined') {
+        AudioEngine.playPhase(label.includes('下放') ? 'down' : label.includes('推起') || label.includes('起身') ? 'up' : 'hold');
+      }
+      foTimer = setTimeout(next, ms * 1000);
+    }
+
+    phaseSeq('下放', tempo.down || 2, () =>
+      phaseSeq(tempo.hold ? '保持' : '推起', tempo.hold || 0, () =>
+        phaseSeq('推起', tempo.up || 1, () => {
+          if (foRep >= foMeta.target) {
+            if (foMeta.perSide && foSide === 0) {
+              foRep = 0;
+              foSide = 1;
+              if (typeof AudioEngine !== 'undefined') AudioEngine.playSetDone();
+              if (phase) phase.textContent = '换边';
+              foTimer = setTimeout(() => runFoCountdown(3, nextRep), 800);
+              return;
+            }
+            if (typeof AudioEngine !== 'undefined') AudioEngine.playSetDone();
+            if (phase) phase.textContent = '完成 ✓';
+            closeFollow();
+            return;
+          }
+          nextRep();
+        })
+      )
+    );
+  }
+  nextRep();
+}

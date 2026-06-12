@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const DEFAULT_MODELS = 'gemini-2.5-flash-lite,gemini-2.5-flash,gemini-1.5-flash-8b';
+const DOUBAO_API_URL = 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
 
 const SYSTEM_PROMPT = `你是「宝盒」里的 AI 私人秘书。语气沉静、清晰、有温度，像一位值得信赖的幕僚。
 
@@ -27,6 +28,23 @@ function getGoogleKey(): string | undefined {
     process.env.GOOGLE_AI_API_KEY ||
     process.env.GOOGLE_API_KEY;
   return raw?.trim() || undefined;
+}
+
+function getDoubaoKey(): string | undefined {
+  const raw =
+    process.env.DOUBAO_API_KEY ||
+    process.env.ARK_API_KEY ||
+    process.env.VOLCENGINE_API_KEY;
+  return raw?.trim() || undefined;
+}
+
+function getDoubaoModelId(): string {
+  const endpoint = process.env.DOUBAO_ENDPOINT?.trim();
+  if (endpoint) return endpoint;
+  return (
+    process.env.DOUBAO_MODEL?.trim() ||
+    'doubao-pro-32k'
+  );
 }
 
 function sleep(ms: number) {
@@ -128,6 +146,48 @@ async function chatWithGemini(
   throw new Error(lastErr);
 }
 
+async function chatWithDoubao(
+  history: ChatTurn[],
+  message: string,
+  maxTokens: number,
+  key: string
+): Promise<string> {
+  const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
+    { role: 'system', content: SYSTEM_PROMPT },
+  ];
+  for (const turn of history) {
+    messages.push({ role: turn.role, content: turn.content });
+  }
+  messages.push({ role: 'user', content: message });
+
+  const res = await fetch(DOUBAO_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${key}`,
+    },
+    body: JSON.stringify({
+      model: getDoubaoModelId(),
+      messages,
+      max_tokens: Math.min(Math.max(maxTokens, 64), 4096),
+      temperature: 0.65,
+    }),
+  });
+
+  const data = (await res.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+    error?: { message?: string };
+  };
+
+  if (!res.ok) {
+    throw new Error(data?.error?.message || `Doubao HTTP ${res.status}`);
+  }
+
+  const text = data?.choices?.[0]?.message?.content?.trim();
+  if (!text) throw new Error('Empty response from Doubao');
+  return text;
+}
+
 function toGeminiContents(history: ChatTurn[], message: string) {
   const contents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
   for (const turn of history) {
@@ -145,18 +205,13 @@ export async function OPTIONS() {
 }
 
 export async function POST(req: NextRequest) {
-  const key = getGoogleKey();
-  if (!key) {
-    return NextResponse.json(
-      {
-        error: 'AI not configured',
-        hint: 'Set GEMINI_API_KEY in Vercel Environment Variables, then Redeploy',
-      },
-      { status: 503, headers: corsHeaders }
-    );
-  }
-
-  let body: { message?: string; prompt?: string; history?: unknown; maxTokens?: number };
+  let body: {
+    message?: string;
+    prompt?: string;
+    history?: unknown;
+    maxTokens?: number;
+    model?: string;
+  };
   try {
     body = await req.json();
   } catch {
@@ -170,14 +225,41 @@ export async function POST(req: NextRequest) {
 
   const history = normalizeHistory(body.history);
   const maxTokens = Number(body.maxTokens) || 1200;
+  const modelId = String(body.model || 'gemini').toLowerCase();
 
   try {
+    if (modelId === 'doubao') {
+      const key = getDoubaoKey();
+      if (!key) {
+        return NextResponse.json(
+          {
+            error: 'AI not configured',
+            hint: 'Set DOUBAO_API_KEY or ARK_API_KEY in Vercel Environment Variables',
+          },
+          { status: 503, headers: corsHeaders }
+        );
+      }
+      const text = await chatWithDoubao(history, message, maxTokens, key);
+      return NextResponse.json({ text, model: 'doubao' }, { headers: corsHeaders });
+    }
+
+    const key = getGoogleKey();
+    if (!key) {
+      return NextResponse.json(
+        {
+          error: 'AI not configured',
+          hint: 'Set GEMINI_API_KEY in Vercel Environment Variables, then Redeploy',
+        },
+        { status: 503, headers: corsHeaders }
+      );
+    }
+
     const contents = toGeminiContents(history, message);
     const text = await chatWithGemini(contents, maxTokens, key);
-    return NextResponse.json({ text }, { headers: corsHeaders });
+    return NextResponse.json({ text, model: 'gemini' }, { headers: corsHeaders });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error('[secretary/chat]', msg);
+    console.error('[secretary/chat]', modelId, msg);
     const quota = isQuotaError(msg);
     return NextResponse.json(
       { error: quota ? 'quota_exceeded' : 'AI request failed', detail: msg },

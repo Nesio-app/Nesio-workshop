@@ -11,10 +11,31 @@ export interface FlomoMemo {
   tags: string[];
 }
 
+function webhookEnvUrl(): string | null {
+  const raw =
+    process.env.FLOMO_WEBHOOK_URL?.trim() || process.env.FLOMO_API_URL?.trim();
+  return raw || null;
+}
+
+/** Extract webhook secret from `https://flomoapp.com/iwh/{userId}/{secret}/` */
+function secretFromWebhookUrl(url: string): string | null {
+  const match = url.match(/flomoapp\.com\/iwh\/[^/]+\/([^/?#]+)/i);
+  return match?.[1]?.trim() || null;
+}
+
 function flomoToken(): string | null {
-  const raw = process.env.FLOMO_API_TOKEN?.trim();
-  if (!raw) return null;
-  return raw.startsWith('Bearer ') ? raw : `Bearer ${raw}`;
+  const explicit = process.env.FLOMO_API_TOKEN?.trim();
+  if (explicit) {
+    return explicit.startsWith('Bearer ') ? explicit : `Bearer ${explicit}`;
+  }
+
+  const webhook = webhookEnvUrl();
+  if (webhook) {
+    const secret = secretFromWebhookUrl(webhook);
+    if (secret) return `Bearer ${secret}`;
+  }
+
+  return null;
 }
 
 function buildSignedParams(limit: number): Record<string, string> {
@@ -72,8 +93,12 @@ function parseMemo(raw: Record<string, unknown>): FlomoMemo {
   };
 }
 
+export function isFlomoWriteConfigured(): boolean {
+  return Boolean(webhookEnvUrl());
+}
+
 export function isFlomoReadConfigured(): boolean {
-  return Boolean(process.env.FLOMO_API_TOKEN?.trim());
+  return Boolean(flomoToken());
 }
 
 export async function fetchFlomoMemos(limit = 50): Promise<{
@@ -88,7 +113,8 @@ export async function fetchFlomoMemos(limit = 50): Promise<{
       ok: false,
       configured: false,
       memos: [],
-      error: 'FLOMO_API_TOKEN not configured',
+      error:
+        'Set FLOMO_WEBHOOK_URL or FLOMO_API_URL (full webhook URL) or FLOMO_API_TOKEN in Vercel env',
     };
   }
 
