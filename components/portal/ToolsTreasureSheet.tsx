@@ -3,24 +3,23 @@
 import type { PortalTool } from '@/lib/portal/types';
 import ToolGrid from './ToolGrid';
 
-interface ToolsTreasureInlineProps {
+interface ToolsTreasurePopupProps {
   tools: PortalTool[];
   open: boolean;
   onClose: () => void;
   onOpenTool: (tool: PortalTool) => void;
 }
 
-/** Inline toolbox between widgets and calendar; scrim dismisses on outside tap. */
-export default function ToolsTreasureInline({
+/** Floating toolbox overlay — not in document layout flow. */
+export default function ToolsTreasurePopup({
   tools,
   open,
   onClose,
   onOpenTool,
-}: ToolsTreasureInlineProps) {
+}: ToolsTreasurePopupProps) {
   if (!open) return null;
 
   const handleOpen = (tool: PortalTool) => {
-    onClose();
     onOpenTool(tool);
   };
 
@@ -32,9 +31,12 @@ export default function ToolsTreasureInline({
         aria-label="关闭工具箱"
         onClick={onClose}
       />
-      <section className="portal-treasure-inline" role="region" aria-label="宝盒工具">
-        <header className="portal-treasure-inline-head">
-          <h2 className="portal-treasure-inline-title">宝盒</h2>
+      <section className="portal-treasure-popup" role="dialog" aria-label="宝盒工具">
+        <header className="portal-treasure-popup-head">
+          <h2 className="portal-treasure-popup-title">宝盒</h2>
+          <button type="button" className="portal-treasure-popup-close" onClick={onClose} aria-label="关闭">
+            ×
+          </button>
         </header>
         <ToolGrid tools={tools} excludeIds={['secretary']} onOpenTool={handleOpen} />
       </section>

@@ -6,6 +6,9 @@ import { t } from '@/lib/portal/i18n';
 import { apiUrl } from '@/lib/portal/paths';
 import { loadProfileSettings } from '@/lib/portal/profile';
 
+const FLOMO_MEMO_LIMIT = 48;
+const MEMO_COLLAPSE_CHARS = 180;
+
 interface FlomoMemo {
   slug: string;
   content: string;
@@ -41,39 +44,66 @@ function tryFlomoScheme(content: string, imageUrls: string[]) {
   return true;
 }
 
-function extractTags(content: string): string[] {
-  const tagMatches = content.match(/#[\w\u4e00-\u9fff]+/g) || [];
-  return Array.from(new Set(tagMatches));
-}
-
 function formatFlomoReadError(error: string): string {
-  if (/登录|login|token|签名/i.test(error)) {
-    return '请先在 Vercel 配置有效的 FLOMO_API_TOKEN（flomo 设置 → MCP 个人 Token）';
+  if (/Local Storage|access_token|FLOMO_API_KEY|Webhook/i.test(error)) return error;
+  if (/登录|login|过期|无效/i.test(error)) {
+    return 'FLOMO_API_KEY 已过期，请重新从 Local Storage → me → access_token 复制';
   }
   return error;
 }
 
 function formatMemoDate(iso: string): string {
-  const date = new Date(iso);
+  const date = new Date(iso.replace(' ', 'T'));
   if (Number.isNaN(date.getTime())) return '';
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${y}-${m}-${d} ${hours}:${minutes} | API`;
+}
 
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
+function MemoCard({ memo, onTagClick }: { memo: FlomoMemo; onTagClick: (tag: string) => void }) {
+  const [expanded, setExpanded] = useState(false);
+  const content = memo.content.trim();
+  const needsExpand = content.length > MEMO_COLLAPSE_CHARS;
+  const shown = needsExpand && !expanded ? `${content.slice(0, MEMO_COLLAPSE_CHARS).trim()}…` : content;
 
-  if (diffMins < 1) return '刚刚';
-  if (diffMins < 60) return `${diffMins}分钟前`;
-  if (diffHours < 24) return `${diffHours}小时前`;
-  if (diffDays < 7) return `${diffDays}天前`;
-
-  return date.toLocaleDateString('zh-CN', {
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return (
+    <article className="flomo-memo-card">
+      <header className="flomo-memo-head">
+        <time className="flomo-memo-time" dateTime={memo.created_at}>
+          {formatMemoDate(memo.created_at || memo.updated_at)}
+        </time>
+        <button type="button" className="flomo-memo-menu" aria-label="更多" tabIndex={-1}>
+          ···
+        </button>
+      </header>
+      <p className="flomo-memo-content">{shown}</p>
+      {needsExpand && !expanded ? (
+        <button type="button" className="flomo-memo-expand" onClick={() => setExpanded(true)}>
+          展开
+        </button>
+      ) : null}
+      {memo.tags.length > 0 ? (
+        <div className="flomo-memo-tags">
+          {memo.tags.map((tag) => {
+            const label = tag.startsWith('#') ? tag : `#${tag}`;
+            return (
+              <button
+                key={`${memo.slug}-${tag}`}
+                type="button"
+                className="flomo-memo-tag"
+                onClick={() => onTagClick(label)}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </article>
+  );
 }
 
 export default function NotePanelEnhanced({ open, onOpenChange }: NotePanelProps) {
@@ -91,31 +121,46 @@ export default function NotePanelEnhanced({ open, onOpenChange }: NotePanelProps
   const [statusMsg, setStatusMsg] = useState('');
   const [readError, setReadError] = useState('');
   const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const imageRef = useRef<HTMLInputElement>(null);
 
+  const displayMemos = useMemo(() => memos.slice(0, FLOMO_MEMO_LIMIT), [memos]);
+
   const tagIndex = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const memo of memos) {
+    for (const memo of displayMemos) {
       for (const tag of memo.tags) {
         const key = tag.startsWith('#') ? tag : `#${tag}`;
         counts.set(key, (counts.get(key) || 0) + 1);
       }
     }
     return Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
-  }, [memos]);
+  }, [displayMemos]);
 
   const filteredMemos = useMemo(() => {
-    if (!activeTag) return memos;
-    return memos.filter((m) =>
-      m.tags.some((t) => (t.startsWith('#') ? t : `#${t}`) === activeTag),
-    );
-  }, [memos, activeTag]);
+    let list = displayMemos;
+    if (activeTag) {
+      list = list.filter((m) =>
+        m.tags.some((t) => (t.startsWith('#') ? t : `#${t}`) === activeTag),
+      );
+    }
+    const q = searchQuery.trim().toLowerCase();
+    if (q) {
+      list = list.filter((m) => m.content.toLowerCase().includes(q));
+    }
+    return list;
+  }, [displayMemos, activeTag, searchQuery]);
 
   const loadMemos = useCallback(async () => {
     setLoadingMemos(true);
     try {
-      const res = await fetch(apiUrl('/api/portal/flomo?limit=50'), { cache: 'no-store' });
+      const res = await fetch(apiUrl(`/api/portal/flomo?limit=${FLOMO_MEMO_LIMIT}`), {
+        cache: 'no-store',
+      });
       const data = await res.json().catch(() => ({}));
       const writeOk = Boolean(data.writeConfigured ?? data.configured);
       const readOk = Boolean(data.readConfigured);
@@ -124,15 +169,15 @@ export default function NotePanelEnhanced({ open, onOpenChange }: NotePanelProps
       setConfigured(writeOk || readOk);
       const live = data.ok && Array.isArray(data.memos) ? data.memos : [];
       if (live.length > 0) {
-        setMemos(live);
+        setMemos(live.slice(0, FLOMO_MEMO_LIMIT));
         setUsingDemo(false);
         setReadError('');
       } else if (data.error) {
-        setMemos(readOk || writeOk ? [] : FLOMO_DEMO_MEMOS);
+        setMemos(readOk || writeOk ? [] : FLOMO_DEMO_MEMOS.slice(0, FLOMO_MEMO_LIMIT));
         setUsingDemo(!readOk && !writeOk);
         setReadError(formatFlomoReadError(String(data.error)));
       } else {
-        setMemos(FLOMO_DEMO_MEMOS);
+        setMemos(FLOMO_DEMO_MEMOS.slice(0, FLOMO_MEMO_LIMIT));
         setUsingDemo(true);
         setReadError('');
       }
@@ -140,7 +185,7 @@ export default function NotePanelEnhanced({ open, onOpenChange }: NotePanelProps
       setConfigured(false);
       setReadConfigured(false);
       setWriteConfigured(false);
-      setMemos(FLOMO_DEMO_MEMOS);
+      setMemos(FLOMO_DEMO_MEMOS.slice(0, FLOMO_MEMO_LIMIT));
       setUsingDemo(true);
       setReadError('');
     } finally {
@@ -156,10 +201,27 @@ export default function NotePanelEnhanced({ open, onOpenChange }: NotePanelProps
       setDraft('');
       setImages([]);
       setActiveTag(null);
+      setSidebarOpen(false);
+      setComposeOpen(false);
+      setSearchOpen(false);
+      setSearchQuery('');
       void loadMemos();
-      requestAnimationFrame(() => textareaRef.current?.focus());
     }
   }, [open, loadMemos]);
+
+  useEffect(() => {
+    if (!sidebarOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSidebarOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [sidebarOpen]);
+
+  const openCompose = () => {
+    setComposeOpen(true);
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  };
 
   const insertAtCursor = (before: string, after = '') => {
     const el = textareaRef.current;
@@ -266,6 +328,7 @@ export default function NotePanelEnhanced({ open, onOpenChange }: NotePanelProps
       });
       setStatus('ok');
       setStatusMsg(t(locale, 'flomoSent'));
+      setComposeOpen(false);
       await loadMemos();
     } catch {
       setStatus('err');
@@ -290,226 +353,318 @@ export default function NotePanelEnhanced({ open, onOpenChange }: NotePanelProps
         <header className="flomo-app-header">
           <button
             type="button"
-            className="flomo-app-close"
-            onClick={() => onOpenChange(false)}
-            aria-label={t(locale, 'flomoClose')}
+            className="flomo-header-btn flomo-sidebar-toggle"
+            onClick={() => setSidebarOpen((v) => !v)}
+            aria-label={sidebarOpen ? '收起标签' : '展开标签'}
+            aria-expanded={sidebarOpen}
           >
-            ×
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path
+                d="M4 7h16M4 12h10M4 17h16"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+            </svg>
           </button>
           <h2 className="flomo-app-title">flomo</h2>
-          <span className="flomo-app-header-spacer" aria-hidden />
+          <button
+            type="button"
+            className={'flomo-header-btn flomo-search-toggle' + (searchOpen ? ' flomo-search-toggle--on' : '')}
+            onClick={() => setSearchOpen((v) => !v)}
+            aria-label="搜索"
+            aria-expanded={searchOpen}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <circle cx="11" cy="11" r="6.5" stroke="currentColor" strokeWidth="1.8" />
+              <path d="M16 16l4.5 4.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+          </button>
         </header>
 
+        {searchOpen ? (
+          <div className="flomo-search-bar">
+            <input
+              type="search"
+              className="flomo-search-input"
+              placeholder="搜索 memo…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              autoFocus
+            />
+          </div>
+        ) : null}
+
         <div className="flomo-app-body">
-          <aside className="flomo-sidebar" aria-label="标签">
+          {sidebarOpen ? (
             <button
               type="button"
-              className={'flomo-sidebar-item' + (activeTag === null ? ' flomo-sidebar-item--on' : '')}
-              onClick={() => setActiveTag(null)}
+              className="flomo-sidebar-backdrop"
+              aria-label="关闭标签栏"
+              onClick={() => setSidebarOpen(false)}
+            />
+          ) : null}
+          <aside
+            className={'flomo-sidebar' + (sidebarOpen ? ' flomo-sidebar--open' : '')}
+            aria-label="标签"
+            aria-hidden={!sidebarOpen}
+          >
+            <button
+              type="button"
+              className={
+                'flomo-sidebar-all' + (activeTag === null ? ' flomo-sidebar-all--on' : '')
+              }
+              onClick={() => {
+                setActiveTag(null);
+                setSidebarOpen(false);
+              }}
             >
-              <span className="flomo-sidebar-label">全部</span>
-              <span className="flomo-sidebar-count">{memos.length}</span>
+              全部
+              <span className="flomo-sidebar-all-count">{displayMemos.length}</span>
             </button>
+            <p className="flomo-sidebar-section">全部标签</p>
             {tagIndex.map(([tag, count]) => (
               <button
                 key={tag}
                 type="button"
                 className={'flomo-sidebar-item' + (activeTag === tag ? ' flomo-sidebar-item--on' : '')}
-                onClick={() => setActiveTag(tag)}
+                onClick={() => {
+                  setActiveTag(tag);
+                  setSidebarOpen(false);
+                }}
               >
-                <span className="flomo-sidebar-label">{tag}</span>
+                <span className="flomo-sidebar-hash">#</span>
+                <span className="flomo-sidebar-label">{tag.replace(/^#/, '')}</span>
                 <span className="flomo-sidebar-count">{count}</span>
               </button>
             ))}
           </aside>
 
-          <div className="flomo-main">
-            {readError || usingDemo || (!readConfigured && writeConfigured) ? (
+          <div className={'flomo-main' + (sidebarOpen ? ' flomo-main--dimmed' : '')}>
+            {usingDemo || readError || !readConfigured || configured === false ? (
               <p className="flomo-app-banner">
                 {readError
-                  ? `读取失败：${readError}`
+                  ? `读取失败：${formatFlomoReadError(readError)}`
                   : configured === false
-                    ? '发送：配置 FLOMO_WEBHOOK_URL；读取：配置 FLOMO_API_TOKEN（flomo MCP 个人 Token）'
+                    ? '请配置 FLOMO_WEBHOOK_URL（发送）与 FLOMO_API_KEY（读取 access_token）'
                     : !readConfigured && writeConfigured
-                      ? '已可发送；读取历史请在 Vercel 配置 FLOMO_API_TOKEN'
+                      ? '已可发送；读取需另配 FLOMO_API_KEY（Local Storage → me → access_token）'
                       : '暂无笔记，当前为演示数据'}
               </p>
             ) : null}
 
             <div className="flomo-timeline">
               {loadingMemos ? (
-                <p className="flomo-timeline-empty">加载中…</p>
+                <div className="flomo-timeline-skeleton" aria-hidden>
+                  {[0, 1, 2].map((i) => (
+                    <div key={i} className="flomo-memo-card flomo-memo-card--skeleton" />
+                  ))}
+                </div>
               ) : filteredMemos.length === 0 ? (
                 <p className="flomo-timeline-empty">
-                  {activeTag ? '该标签下暂无 memo' : '还没有 memo，写一条吧'}
+                  {activeTag || searchQuery ? '没有匹配的 memo' : '还没有 memo，写一条吧'}
                 </p>
               ) : (
                 filteredMemos.map((memo) => (
-                  <article key={memo.slug} className="flomo-memo-card">
-                    <time className="flomo-memo-time" dateTime={memo.created_at}>
-                      {formatMemoDate(memo.created_at || memo.updated_at)}
-                    </time>
-                    <p className="flomo-memo-content">{memo.content}</p>
-                    {memo.tags.length > 0 ? (
-                      <div className="flomo-memo-tags">
-                        {memo.tags.map((tag) => {
-                          const label = tag.startsWith('#') ? tag : `#${tag}`;
-                          return (
-                            <button
-                              key={`${memo.slug}-${tag}`}
-                              type="button"
-                              className="flomo-memo-tag"
-                              onClick={() => setActiveTag(label)}
-                            >
-                              {label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    ) : null}
-                  </article>
+                  <MemoCard key={memo.slug} memo={memo} onTagClick={setActiveTag} />
                 ))
               )}
             </div>
 
-            <div className="flomo-compose">
-          <textarea
-            ref={textareaRef}
-            className="flomo-input"
-            placeholder={t(locale, 'flomoPlaceholder')}
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            rows={3}
-            maxLength={5000}
-          />
+            {!composeOpen ? (
+              <button
+                type="button"
+                className="flomo-fab"
+                onClick={openCompose}
+                aria-label={t(locale, 'flomoPlaceholder')}
+              >
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+                </svg>
+              </button>
+            ) : (
+              <div className="flomo-compose flomo-compose--sheet">
+                <div className="flomo-compose-card">
+                  <textarea
+                    ref={textareaRef}
+                    className="flomo-input"
+                    placeholder={t(locale, 'flomoPlaceholder')}
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    rows={4}
+                    maxLength={5000}
+                  />
 
-          {images.length > 0 ? (
-            <div className="flomo-previews">
-              {images.map((img, i) => (
-                <div key={img.preview} className="flomo-preview">
-                  <img src={img.preview} alt="" />
-                  <button
-                    type="button"
-                    onClick={() => removeImage(i)}
-                    aria-label={t(locale, 'flomoClose')}
-                  >
-                    ×
-                  </button>
+                  {images.length > 0 ? (
+                    <div className="flomo-previews">
+                      {images.map((img, i) => (
+                        <div key={img.preview} className="flomo-preview">
+                          <img src={img.preview} alt="" />
+                          <button
+                            type="button"
+                            onClick={() => removeImage(i)}
+                            aria-label={t(locale, 'flomoClose')}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {statusMsg ? (
+                    <p
+                      className={'flomo-status' + (status === 'err' ? ' flomo-status--err' : '')}
+                      role="status"
+                    >
+                      {statusMsg}
+                    </p>
+                  ) : null}
+
+                  <footer className="flomo-toolbar">
+                    <button
+                      type="button"
+                      className="flomo-tool"
+                      onClick={() => insertAtCursor('#')}
+                      title={t(locale, 'flomoTag')}
+                      aria-label={t(locale, 'flomoTag')}
+                    >
+                      #
+                    </button>
+                    <button
+                      type="button"
+                      className="flomo-tool"
+                      onClick={() => imageRef.current?.click()}
+                      title={t(locale, 'flomoImage')}
+                      aria-label={t(locale, 'flomoImage')}
+                    >
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+                        <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="1.6" />
+                        <circle cx="8.5" cy="10" r="1.5" fill="currentColor" />
+                        <path
+                          d="M5 17l5-5 4 4 3-3 4 4"
+                          stroke="currentColor"
+                          strokeWidth="1.6"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </button>
+                    <span className="flomo-toolbar-divider" aria-hidden />
+                    <button
+                      type="button"
+                      className="flomo-tool flomo-tool--bold"
+                      onClick={() => insertAtCursor('**', '**')}
+                      title={t(locale, 'flomoBold')}
+                      aria-label={t(locale, 'flomoBold')}
+                    >
+                      B
+                    </button>
+                    <button
+                      type="button"
+                      className="flomo-tool"
+                      onClick={() => insertAtCursor('\n- ')}
+                      title={t(locale, 'flomoList')}
+                      aria-label={t(locale, 'flomoList')}
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+                        <path
+                          d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      className="flomo-tool"
+                      onClick={() => {
+                        const w = window as Window & {
+                          SpeechRecognition?: new () => {
+                            lang: string;
+                            start: () => void;
+                            onresult:
+                              | ((ev: {
+                                  results: { [i: number]: { [j: number]: { transcript: string } } };
+                                }) => void)
+                              | null;
+                          };
+                          webkitSpeechRecognition?: new () => {
+                            lang: string;
+                            start: () => void;
+                            onresult:
+                              | ((ev: {
+                                  results: { [i: number]: { [j: number]: { transcript: string } } };
+                                }) => void)
+                              | null;
+                          };
+                        };
+                        const SR = w.SpeechRecognition || w.webkitSpeechRecognition;
+                        if (!SR) return;
+                        const rec = new SR();
+                        rec.lang = locale === 'en' ? 'en-US' : 'zh-CN';
+                        rec.onresult = (ev) => {
+                          const chunk = ev.results[0]?.[0]?.transcript;
+                          if (chunk) setDraft((d) => (d ? `${d} ${chunk}` : chunk));
+                        };
+                        rec.start();
+                      }}
+                      title={t(locale, 'flomoVoice')}
+                      aria-label={t(locale, 'flomoVoice')}
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+                        <path
+                          d="M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4 16.5-12.5z"
+                          stroke="currentColor"
+                          strokeWidth="1.6"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </button>
+
+                    <button
+                      type="button"
+                      className="flomo-compose-dismiss"
+                      onClick={() => setComposeOpen(false)}
+                      aria-label="收起"
+                    >
+                      收起
+                    </button>
+
+                    <button
+                      type="button"
+                      className={'flomo-send' + (canSend ? ' flomo-send--on' : '')}
+                      disabled={!canSend}
+                      onClick={onSend}
+                      aria-label={t(locale, 'flomoSend')}
+                    >
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+                        <path
+                          d="M4 12l16-7-4 7 4 7-16-7z"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </button>
+                  </footer>
                 </div>
-              ))}
-            </div>
-          ) : null}
 
-          {statusMsg ? (
-            <p className={'flomo-status' + (status === 'err' ? ' flomo-status--err' : '')} role="status">
-              {statusMsg}
-            </p>
-          ) : null}
-
-          <footer className="flomo-toolbar">
-            <button
-              type="button"
-              className="flomo-tool"
-              onClick={() => insertAtCursor('#')}
-              title={t(locale, 'flomoTag')}
-              aria-label={t(locale, 'flomoTag')}
-            >
-              #
-            </button>
-            <button
-              type="button"
-              className="flomo-tool"
-              onClick={() => imageRef.current?.click()}
-              title={t(locale, 'flomoImage')}
-              aria-label={t(locale, 'flomoImage')}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="1.6" />
-                <circle cx="8.5" cy="10" r="1.5" fill="currentColor" />
-                <path d="M5 17l5-5 4 4 3-3 4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-            <span className="flomo-toolbar-divider" aria-hidden />
-            <button
-              type="button"
-              className="flomo-tool"
-              onClick={() => insertAtCursor('**', '**')}
-              title={t(locale, 'flomoBold')}
-              aria-label={t(locale, 'flomoBold')}
-            >
-              B
-            </button>
-            <button
-              type="button"
-              className="flomo-tool"
-              onClick={() => insertAtCursor('\n- ')}
-              title={t(locale, 'flomoList')}
-              aria-label={t(locale, 'flomoList')}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              </svg>
-            </button>
-            <button
-              type="button"
-              className="flomo-tool flomo-tool--mic"
-              onClick={() => {
-                const w = window as Window & {
-                  SpeechRecognition?: new () => {
-                    lang: string;
-                    start: () => void;
-                    onresult: ((ev: { results: { [i: number]: { [j: number]: { transcript: string } } } }) => void) | null;
-                  };
-                  webkitSpeechRecognition?: new () => {
-                    lang: string;
-                    start: () => void;
-                    onresult: ((ev: { results: { [i: number]: { [j: number]: { transcript: string } } } }) => void) | null;
-                  };
-                };
-                const SR = w.SpeechRecognition || w.webkitSpeechRecognition;
-                if (!SR) return;
-                const rec = new SR();
-                rec.lang = locale === 'en' ? 'en-US' : 'zh-CN';
-                rec.onresult = (ev) => {
-                  const chunk = ev.results[0]?.[0]?.transcript;
-                  if (chunk) setDraft((d) => (d ? `${d} ${chunk}` : chunk));
-                };
-                rec.start();
-              }}
-              title={t(locale, 'flomoVoice')}
-              aria-label={t(locale, 'flomoVoice')}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <rect x="9" y="3" width="6" height="11" rx="3" stroke="currentColor" strokeWidth="1.6" />
-                <path d="M5 11a7 7 0 0114 0M12 18v3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-              </svg>
-            </button>
-
-            <button
-              type="button"
-              className={'flomo-send flomo-send--flomo' + (canSend ? ' flomo-send--on' : '')}
-              disabled={!canSend}
-              onClick={onSend}
-              aria-label={t(locale, 'flomoSend')}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <path d="M4 12l16-7-4 7 4 7-16-7z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
-              </svg>
-            </button>
-          </footer>
-
-          <input
-            ref={imageRef}
-            type="file"
-            accept="image/*"
-            multiple
-            className="portal-avatar-file"
-            onChange={(e) => {
-              onPickImages(e.target.files);
-              e.target.value = '';
-            }}
-          />
-            </div>
+                <input
+                  ref={imageRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="portal-avatar-file"
+                  onChange={(e) => {
+                    onPickImages(e.target.files);
+                    e.target.value = '';
+                  }}
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>

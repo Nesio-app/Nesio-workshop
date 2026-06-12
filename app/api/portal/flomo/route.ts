@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   fetchFlomoMemos,
+  FLOMO_READ_SETUP_HINT,
   isFlomoReadConfigured,
   isFlomoWriteConfigured,
 } from '@/lib/portal/flomo-api';
@@ -16,7 +17,7 @@ function webhookUrl(): string | null {
 
 export async function GET(req: NextRequest) {
   const limitParam = req.nextUrl.searchParams.get('limit');
-  const limit = limitParam ? Number.parseInt(limitParam, 10) : 50;
+  const limit = limitParam ? Number.parseInt(limitParam, 10) : 48;
 
   const readConfigured = isFlomoReadConfigured();
   const writeConfigured = isFlomoWriteConfigured();
@@ -28,13 +29,11 @@ export async function GET(req: NextRequest) {
       readConfigured: false,
       writeConfigured,
       memos: [],
-      error: writeConfigured
-        ? '读取需单独配置 FLOMO_API_TOKEN（flomo 设置 → MCP 个人 Token）'
-        : '配置 FLOMO_WEBHOOK_URL 可发送；FLOMO_API_TOKEN 可读取历史',
+      error: FLOMO_READ_SETUP_HINT,
     });
   }
 
-  const result = await fetchFlomoMemos(Number.isFinite(limit) ? limit : 50);
+  const result = await fetchFlomoMemos(Number.isFinite(limit) ? limit : 48);
   if (!result.ok) {
     return NextResponse.json(result, { status: result.configured ? 502 : 503 });
   }

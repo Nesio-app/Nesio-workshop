@@ -17,11 +17,52 @@ function webhookEnvUrl(): string | null {
   return raw || null;
 }
 
-/** Read API needs a session/MCP token — webhook secret cannot list memos. */
-function flomoReadToken(): string | null {
-  const explicit = process.env.FLOMO_API_TOKEN?.trim();
-  if (!explicit) return null;
-  return explicit.startsWith('Bearer ') ? explicit : `Bearer ${explicit}`;
+function webhookUserId(): string | null {
+  const url = webhookEnvUrl();
+  if (!url) return null;
+  try {
+    const match = new URL(url).pathname.match(/\/iwh\/([^/]+)\//i);
+    if (!match) return null;
+    try {
+      return Buffer.from(match[1], 'base64').toString('utf8');
+    } catch {
+      return match[1];
+    }
+  } catch {
+    return null;
+  }
+}
+
+function extractAccessToken(raw: string): string | null {
+  let value = raw.replace(/^Bearer\s+/i, '').trim();
+  if (!value) return null;
+
+  if (value.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(value) as { access_token?: unknown };
+      if (typeof parsed.access_token === 'string' && parsed.access_token.trim()) {
+        value = parsed.access_token.trim();
+      }
+    } catch {
+      return null;
+    }
+  }
+
+  if (value.includes('|')) return value;
+
+  const userId = webhookUserId();
+  if (userId && value.length >= 16) return `${userId}|${value}`;
+
+  return null;
+}
+
+/** Session token for read API — not the webhook secret from 设置→API. */
+export function flomoReadAuthorization(): string | null {
+  const raw = process.env.FLOMO_API_KEY?.trim();
+  if (!raw) return null;
+  const token = extractAccessToken(raw);
+  if (!token) return null;
+  return `Bearer ${token}`;
 }
 
 function buildSignedParams(limit: number): Record<string, string> {
@@ -84,8 +125,11 @@ export function isFlomoWriteConfigured(): boolean {
 }
 
 export function isFlomoReadConfigured(): boolean {
-  return Boolean(process.env.FLOMO_API_TOKEN?.trim());
+  return Boolean(flomoReadAuthorization());
 }
+
+export const FLOMO_READ_SETUP_HINT =
+  '读取需另配 FLOMO_API_KEY：flomo 网页版 → F12 → Application → Local Storage → v.flomoapp.com → 键名 me → 复制 access_token（不是设置里的 Webhook 地址）';
 
 export async function fetchFlomoMemos(limit = 50): Promise<{
   ok: boolean;
@@ -95,18 +139,22 @@ export async function fetchFlomoMemos(limit = 50): Promise<{
   memos: FlomoMemo[];
   error?: string;
 }> {
-  const token = flomoReadToken();
   const writeConfigured = isFlomoWriteConfigured();
-  if (!token) {
+  const authorization = flomoReadAuthorization();
+
+  if (!authorization) {
+    const hasKey = Boolean(process.env.FLOMO_API_KEY?.trim());
     return {
       ok: false,
       configured: writeConfigured,
       readConfigured: false,
       writeConfigured,
       memos: [],
-      error: writeConfigured
-        ? '读取需单独配置 FLOMO_API_TOKEN（flomo 设置 → MCP 个人 Token）'
-        : '配置 FLOMO_WEBHOOK_URL 可发送；FLOMO_API_TOKEN 可读取历史',
+      error: hasKey
+        ? 'FLOMO_API_KEY 格式不对：需要 access_token（含 userId|...），不是 Webhook 密钥'
+        : writeConfigured
+          ? FLOMO_READ_SETUP_HINT
+          : '请先配置 FLOMO_WEBHOOK_URL（发送）与 FLOMO_API_KEY（读取）',
     };
   }
 
@@ -116,7 +164,7 @@ export async function fetchFlomoMemos(limit = 50): Promise<{
   try {
     const res = await fetch(`${FLOMO_UPDATED_URL}?${query}`, {
       method: 'GET',
-      headers: { authorization: token },
+      headers: { authorization },
       cache: 'no-store',
     });
 
@@ -133,13 +181,18 @@ export async function fetchFlomoMemos(limit = 50): Promise<{
     }
 
     if (data?.code !== 0 && data?.code !== undefined) {
+      const message = data?.message || 'flomo rejected request';
+      const needsLogin =
+        data?.code === -10 || /登录|login/i.test(String(message));
       return {
         ok: false,
         configured: true,
         readConfigured: true,
         writeConfigured,
         memos: [],
-        error: data?.message || 'flomo rejected request',
+        error: needsLogin
+          ? 'FLOMO_API_KEY 已过期，请重新从 Local Storage → me → access_token 复制'
+          : message,
       };
     }
 

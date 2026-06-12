@@ -6,13 +6,42 @@ import NotePanelEnhanced from './NotePanelEnhanced';
 import PortalSecretaryFab from './PortalSecretaryFab';
 import { DEFAULT_PORTAL_CONFIG } from '@/lib/portal/defaults';
 import { openToolHref } from '@/lib/portal/open-tool';
+import {
+  PORTAL_CACHE_KEYS,
+  readPortalCache,
+  TREASURE_TOOLBOX_KEY,
+  writePortalCache,
+} from '@/lib/portal/prefetch-cache';
 import { configUrl } from '@/lib/portal/paths';
 import type { PortalConfig, PortalTool } from '@/lib/portal/types';
+
+function readTreasureOpen(): boolean {
+  if (typeof sessionStorage === 'undefined') return false;
+  try {
+    return sessionStorage.getItem(TREASURE_TOOLBOX_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function setTreasurePersisted(open: boolean) {
+  if (typeof sessionStorage === 'undefined') return;
+  try {
+    if (open) sessionStorage.setItem(TREASURE_TOOLBOX_KEY, '1');
+    else sessionStorage.removeItem(TREASURE_TOOLBOX_KEY);
+  } catch {
+    /* ignore */
+  }
+}
 
 export default function Portal() {
   const [config, setConfig] = useState<PortalConfig>(DEFAULT_PORTAL_CONFIG);
   const [noteOpen, setNoteOpen] = useState(false);
   const [treasureOpen, setTreasureOpen] = useState(false);
+
+  useEffect(() => {
+    setTreasureOpen(readTreasureOpen());
+  }, []);
 
   useEffect(() => {
     fetch(configUrl())
@@ -21,6 +50,15 @@ export default function Portal() {
         if (data?.tools?.length) setConfig(data);
       })
       .catch(() => undefined);
+
+    fetch('/api/portal/calendar', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data && (data.events || data.feeds)) writePortalCache(PORTAL_CACHE_KEYS.calendar, data);
+      })
+      .catch(() => undefined);
+
+    fetch('/api/portal/flomo?limit=48', { cache: 'no-store' }).catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -37,7 +75,21 @@ export default function Portal() {
 
   const openTool = (tool: PortalTool) => {
     if (!tool.ready) return;
+    if (treasureOpen) setTreasurePersisted(true);
     window.location.assign(openToolHref(tool));
+  };
+
+  const handleTreasureOpenChange = (open: boolean) => {
+    setTreasureOpen(open);
+    setTreasurePersisted(open);
+  };
+
+  const handleNoteOpenChange = (open: boolean) => {
+    setNoteOpen(open);
+    if (open) {
+      setTreasureOpen(false);
+      setTreasurePersisted(false);
+    }
   };
 
   useEffect(() => {
@@ -105,8 +157,8 @@ export default function Portal() {
               config={config}
               noteOpen={noteOpen}
               treasureOpen={treasureOpen}
-              onTreasureOpenChange={setTreasureOpen}
-              onOpenNote={() => setNoteOpen(true)}
+              onTreasureOpenChange={handleTreasureOpenChange}
+              onOpenNote={() => handleNoteOpenChange(true)}
               onOpenTool={openTool}
             />
           </div>
@@ -119,7 +171,7 @@ export default function Portal() {
         </div>
       ) : null}
 
-      <NotePanelEnhanced open={noteOpen} onOpenChange={setNoteOpen} />
+      <NotePanelEnhanced open={noteOpen} onOpenChange={handleNoteOpenChange} />
     </>
   );
 }

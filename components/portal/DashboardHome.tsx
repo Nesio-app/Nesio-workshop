@@ -22,7 +22,12 @@ import {
   reverseGeocode,
   simplifyPlaceName,
 } from '@/lib/portal/weather';
-import ToolsTreasureInline from './ToolsTreasureSheet';
+import {
+  PORTAL_CACHE_KEYS,
+  readPortalCache,
+  writePortalCache,
+} from '@/lib/portal/prefetch-cache';
+import ToolsTreasurePopup from './ToolsTreasureSheet';
 import { DashboardNoteIcon, DashboardTreasureIcon } from './DashboardHeaderIcons';
 
 interface DashboardHomeProps {
@@ -141,11 +146,38 @@ export default function DashboardHome({
 
   const [now, setNow] = useState(() => new Date());
   const [avatarUrl, setAvatarUrl] = useState('');
-  const [weather, setWeather] = useState<WeatherState>({ loading: true });
-  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [weather, setWeather] = useState<WeatherState>(() => {
+    const cached = readPortalCache<{
+      temperatureC?: number;
+      temperatureF?: number;
+      condition?: string;
+      placeLabel?: string;
+      forecastNote?: string;
+      alert?: string;
+      geoResolved?: boolean;
+    }>(PORTAL_CACHE_KEYS.weather);
+    if (cached) {
+      return { ...cached, loading: false };
+    }
+    return { loading: true };
+  });
+  const [events, setEvents] = useState<CalendarEvent[]>(() => {
+    const cached = readPortalCache<{ events?: CalendarEvent[] }>(PORTAL_CACHE_KEYS.calendar);
+    return cached?.events?.length ? cached.events : [];
+  });
   const [calendarExpanded, setCalendarExpanded] = useState(false);
-  const [calendarNote, setCalendarNote] = useState<string | null>(null);
-  const [calendarFeeds, setCalendarFeeds] = useState<CalendarFeedStatus[]>([]);
+  const [calendarNote, setCalendarNote] = useState<string | null>(() => {
+    const cached = readPortalCache<{ message?: string; configured?: boolean; error?: string }>(
+      PORTAL_CACHE_KEYS.calendar,
+    );
+    if (cached && !cached.configured && cached.message) return cached.message;
+    if (cached?.error) return '日历暂时无法加载';
+    return null;
+  });
+  const [calendarFeeds, setCalendarFeeds] = useState<CalendarFeedStatus[]>(() => {
+    const cached = readPortalCache<{ feeds?: CalendarFeedStatus[] }>(PORTAL_CACHE_KEYS.calendar);
+    return cached?.feeds ?? [];
+  });
   const [fidelityHintDismissed, setFidelityHintDismissed] = useState(false);
   const quotePicked = useRef(false);
   const [dailyQuote, setDailyQuote] = useState('今天也要好好照顾自己。');
@@ -202,7 +234,7 @@ export default function DashboardHome({
       geoResolved: boolean,
     ) {
       if (cancelled) return;
-      setWeather({
+      const next: WeatherState = {
         loading: false,
         temperatureC: snap.temperatureC,
         temperatureF: snap.temperatureF,
@@ -211,11 +243,13 @@ export default function DashboardHome({
         forecastNote: snap.forecastNote,
         alert: snap.alert,
         geoResolved,
-      });
+      };
+      setWeather(next);
+      writePortalCache(PORTAL_CACHE_KEYS.weather, next);
     }
 
     async function loadWeather(useGeo: boolean) {
-      if (!useGeo) {
+      if (!useGeo && !readPortalCache(PORTAL_CACHE_KEYS.weather)) {
         setWeather((w) => ({ ...w, loading: true, error: false }));
       }
       try {
@@ -248,6 +282,14 @@ export default function DashboardHome({
     }
 
     loadWeather(!pinToConfigCity);
+    if (!pinToConfigCity) {
+      void fetchWeatherAt(
+        fallbackLocation.latitude,
+        fallbackLocation.longitude,
+        tz,
+        configPlaceLabel,
+      ).then((snap) => applySnapshot(snap, false));
+    }
     const refresh = window.setInterval(
       () => loadWeather(!pinToConfigCity),
       15 * 60_000,
@@ -269,10 +311,12 @@ export default function DashboardHome({
     fetch('/api/portal/calendar')
       .then((r) => r.json())
       .then((data) => {
+        writePortalCache(PORTAL_CACHE_KEYS.calendar, data);
         if (data.events?.length) setEvents(data.events);
         if (Array.isArray(data.feeds)) setCalendarFeeds(data.feeds);
         if (!data.configured && data.message) setCalendarNote(data.message);
         else if (data.error) setCalendarNote('日历暂时无法加载');
+        else setCalendarNote(null);
       })
       .catch(() => setCalendarNote('日历暂时无法加载'));
   }, []);
@@ -374,7 +418,11 @@ export default function DashboardHome({
 
         <article className="portal-widget portal-widget--weather">
           {weather.loading ? (
-            <p className="portal-widget-muted">{t(locale, 'weatherLoading')}</p>
+            <div className="portal-widget-skeleton" aria-hidden>
+              <span className="portal-widget-skeleton-line portal-widget-skeleton-line--lg" />
+              <span className="portal-widget-skeleton-line portal-widget-skeleton-line--sm" />
+              <span className="portal-widget-skeleton-line portal-widget-skeleton-line--xs" />
+            </div>
           ) : weather.error ? (
             <p className="portal-widget-muted">{t(locale, 'weatherError')}</p>
           ) : (
@@ -402,13 +450,6 @@ export default function DashboardHome({
           )}
         </article>
       </section>
-
-      <ToolsTreasureInline
-        tools={config.tools}
-        open={treasureOpen}
-        onClose={() => onTreasureOpenChange(false)}
-        onOpenTool={onOpenTool}
-      />
 
       <section className="portal-calendar" aria-label="日历">
         <h2 className="portal-calendar-head">{t(locale, 'calendar')}</h2>
@@ -473,6 +514,12 @@ export default function DashboardHome({
         ) : null}
       </section>
 
+      <ToolsTreasurePopup
+        tools={config.tools}
+        open={treasureOpen}
+        onClose={() => onTreasureOpenChange(false)}
+        onOpenTool={onOpenTool}
+      />
     </div>
   );
 }
