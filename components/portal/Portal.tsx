@@ -46,7 +46,7 @@ export default function Portal() {
       '.portal-secretary-fab,.portal-avatar-link,.flomo-tool,.flomo-send';
     const onPointerDown = (event: PointerEvent) => {
       const host = (event.target as HTMLElement | null)?.closest(rippleSel);
-      if (!host) return;
+      if (!host || host.classList.contains('portal-secretary-fab')) return;
       host.classList.add('om-ripple-host');
       const ripple = document.createElement('span');
       ripple.className = 'om-ripple';

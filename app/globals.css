@@ -2520,8 +2520,8 @@ body {
   /* 若仍用 emoji：去掉发灰的滤镜，回归清晰 */
   filter:none !important;
 }
-/* 线性图标（配合 ToolGrid.tsx 线性图标版） */
-.portal-tool-svg{width:1.65rem;height:1.65rem;display:block;position:relative;z-index:3;object-fit:contain;border-radius:.35rem}
+/* 线性图标（配合 ToolGridIcon.tsx） */
+.portal-tool-svg{width:1.35rem;height:1.35rem;display:block;position:relative;z-index:3;color:var(--portal-blue-deep)}
 @media (hover:hover){
   .portal-tool-card:hover .portal-tool-icon-wrap{transform:translateY(-2px) scale(1.06)}
 }
@@ -2565,7 +2565,9 @@ body {
 .portal-secretary-fab:active{transform:translateX(-50%) scale(.9)}
 
 /* 涟漪容器 + 元素（JS 添加 .om-ripple-host / 注入 .om-ripple） */
-.om-ripple-host{position:relative;overflow:hidden}
+.om-ripple-host{overflow:hidden}
+.om-ripple-host:not(.portal-secretary-fab){position:relative}
+.portal-secretary-fab.om-ripple-host{position:fixed}
 .om-ripple{position:absolute;border-radius:50%;transform:translate(-50%,-50%) scale(0);
   background:radial-gradient(circle, rgba(88,140,227,.55), rgba(88,140,227,0) 68%);
   pointer-events:none;z-index:5;animation:omRipple .6s ease-out forwards}
