@@ -12,7 +12,7 @@ function parseIcsDate(value: string): Date | null {
     const y = Number(raw.slice(0, 4));
     const m = Number(raw.slice(4, 6)) - 1;
     const d = Number(raw.slice(6, 8));
-    return new Date(y, m, d);
+    return new Date(Date.UTC(y, m, d));
   }
 
   const m = raw.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z?$/);

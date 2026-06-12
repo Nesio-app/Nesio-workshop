@@ -23,7 +23,7 @@ import {
   simplifyPlaceName,
 } from '@/lib/portal/weather';
 import ToolsTreasureInline from './ToolsTreasureSheet';
-import { withBase } from '@/lib/portal/paths';
+import { DashboardNoteIcon, DashboardTreasureIcon } from './DashboardHeaderIcons';
 
 interface DashboardHomeProps {
   config: PortalConfig;
@@ -39,11 +39,12 @@ interface WeatherState {
   temperature?: number;
   unit?: string;
   condition?: string;
-  placeName?: string;
+  placeLabel?: string;
   forecastNote?: string;
   alert?: string;
   loading: boolean;
   error?: boolean;
+  geoResolved?: boolean;
 }
 
 function initials(name: string): string {
@@ -190,57 +191,67 @@ export default function DashboardHome({
     let cancelled = false;
     const tz = fallbackLocation.timezone || 'Asia/Shanghai';
     const configCity = simplifyPlaceName(fallbackLocation.city);
-    const pinToConfigCity =
-      fallbackLocation.useConfigCity !== false && Boolean(configCity);
+    const configState = fallbackLocation.state?.trim() || '';
+    const configPlaceLabel = configState
+      ? `${configCity}, ${configState}`
+      : configCity;
+    const pinToConfigCity = fallbackLocation.useConfigCity === true;
 
-    async function applySnapshot(snap: Awaited<ReturnType<typeof fetchWeatherAt>>) {
+    async function applySnapshot(
+      snap: Awaited<ReturnType<typeof fetchWeatherAt>>,
+      geoResolved: boolean,
+    ) {
       if (cancelled) return;
       setWeather({
         loading: false,
         temperature: snap.temperature,
         unit: snap.unit,
         condition: snap.condition,
-        placeName: snap.placeName,
+        placeLabel: snap.placeLabel,
         forecastNote: snap.forecastNote,
         alert: snap.alert,
+        geoResolved,
       });
     }
 
-    async function loadWeather(refineGeo: boolean) {
-      if (!refineGeo) {
+    async function loadWeather(useGeo: boolean) {
+      if (!useGeo) {
         setWeather((w) => ({ ...w, loading: true, error: false }));
       }
       try {
         let lat = fallbackLocation.latitude;
         let lon = fallbackLocation.longitude;
-        let place = configCity;
+        let placeLabel = configPlaceLabel;
 
-        if (refineGeo && !pinToConfigCity) {
+        if (useGeo) {
           try {
-            const pos = await readGeo(3_500);
+            const pos = await readGeo(8_000);
             lat = pos.coords.latitude;
             lon = pos.coords.longitude;
-            const name = await reverseGeocode(lat, lon);
-            if (name) place = simplifyPlaceName(name);
+            const geo = await reverseGeocode(lat, lon);
+            if (geo.label) placeLabel = geo.label;
+            const snap = await fetchWeatherAt(lat, lon, tz, placeLabel);
+            await applySnapshot(snap, true);
+            return;
           } catch {
-            /* keep config coords */
+            /* fall back to config coords */
           }
         }
 
-        const snap = await fetchWeatherAt(lat, lon, tz, place || configCity);
-        await applySnapshot(snap);
+        const snap = await fetchWeatherAt(lat, lon, tz, placeLabel);
+        await applySnapshot(snap, false);
       } catch {
-        if (!cancelled && !refineGeo) {
+        if (!cancelled && !useGeo) {
           setWeather({ loading: false, error: true });
         }
       }
     }
 
-    loadWeather(false);
-    if (!pinToConfigCity) {
-      window.setTimeout(() => loadWeather(true), 0);
-    }
-    const refresh = window.setInterval(() => loadWeather(false), 15 * 60_000);
+    loadWeather(!pinToConfigCity);
+    const refresh = window.setInterval(
+      () => loadWeather(!pinToConfigCity),
+      15 * 60_000,
+    );
     return () => {
       cancelled = true;
       window.clearInterval(refresh);
@@ -250,6 +261,7 @@ export default function DashboardHome({
     fallbackLocation.longitude,
     fallbackLocation.city,
     fallbackLocation.timezone,
+    fallbackLocation.state,
     fallbackLocation.useConfigCity,
   ]);
 
@@ -269,7 +281,11 @@ export default function DashboardHome({
   const displayAvatar = avatarUrl || profile.avatarUrl;
 
   const quoteLine = useMemo(() => dailyQuote, [dailyQuote]);
-  const cityName = weather.placeName || simplifyPlaceName(fallbackLocation.city);
+  const placeLabel =
+    weather.placeLabel ||
+    (fallbackLocation.state
+      ? `${simplifyPlaceName(fallbackLocation.city)}, ${fallbackLocation.state}`
+      : simplifyPlaceName(fallbackLocation.city));
   const calendarTz = fallbackLocation.timezone || 'Asia/Shanghai';
   const upcomingEvents = useMemo(
     () => filterTodayAndTomorrowEvents(events, now, calendarTz),
@@ -319,9 +335,7 @@ export default function DashboardHome({
             aria-label={t(locale, 'openNote')}
             aria-expanded={noteOpen}
           >
-            <span className="portal-search-icon portal-icon-blue" aria-hidden>
-              📝
-            </span>
+            <DashboardNoteIcon />
           </button>
         </div>
       </header>
@@ -336,13 +350,7 @@ export default function DashboardHome({
           aria-expanded={treasureOpen}
         >
           <span className="portal-quote-treasure-box" aria-hidden>
-            <img
-              className="portal-quote-treasure-icon"
-              src={withBase('/icons/treasurebox.svg')}
-              alt=""
-              width={20}
-              height={20}
-            />
+            <DashboardTreasureIcon />
           </span>
         </button>
       </section>
@@ -371,18 +379,16 @@ export default function DashboardHome({
             <p className="portal-widget-muted">{t(locale, 'weatherError')}</p>
           ) : (
             <>
-              <div className="portal-widget-weather-head">
-                <p className="portal-widget-city">{cityName}</p>
-              </div>
-              <p className="portal-widget-weather-line">
+              <p className="portal-widget-weather-line portal-widget-weather-line--primary">
                 <span className="portal-widget-temp-val">
                   {Math.round(weather.temperature ?? 0)}
                 </span>
-                <span className="portal-widget-temp-unit">{weather.unit || '°C'}</span>
+                <span className="portal-widget-temp-unit">{weather.unit || '°F'}</span>
                 {weather.condition ? (
                   <span className="portal-widget-condition">{weather.condition}</span>
                 ) : null}
               </p>
+              <p className="portal-widget-place">{placeLabel}</p>
               {weather.forecastNote ? (
                 <p className="portal-widget-forecast">{weather.forecastNote}</p>
               ) : null}

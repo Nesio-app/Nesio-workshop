@@ -22,6 +22,8 @@ export interface WeatherSnapshot {
   unit: string;
   condition: string;
   placeName: string;
+  placeState?: string;
+  placeLabel: string;
   forecastNote?: string;
   alert?: string;
 }
@@ -80,7 +82,18 @@ async function fetchNWSAlert(lat: number, lon: number): Promise<string | undefin
   }
 }
 
-export async function reverseGeocode(lat: number, lon: number): Promise<string> {
+function formatStateCode(raw: string): string {
+  const t = raw.trim();
+  if (!t) return '';
+  if (/^US-[A-Z]{2}$/i.test(t)) return t.slice(3).toUpperCase();
+  if (/^[A-Z]{2}$/.test(t)) return t;
+  return t;
+}
+
+export async function reverseGeocode(
+  lat: number,
+  lon: number,
+): Promise<{ city: string; state: string; label: string }> {
   try {
     const url = new URL('https://api.bigdatacloud.net/data/reverse-geocode-client');
     url.searchParams.set('latitude', String(lat));
@@ -89,11 +102,21 @@ export async function reverseGeocode(lat: number, lon: number): Promise<string> 
     const res = await fetchWithTimeout(url.toString());
     if (!res.ok) throw new Error('geo');
     const data = await res.json();
-    const place = data.city || data.locality || '';
-    return simplifyPlaceName(place);
+    const city = simplifyPlaceName(
+      String(data.city || data.locality || data.principalSubdivision || ''),
+    );
+    const state = formatStateCode(
+      String(data.principalSubdivisionCode || data.principalSubdivision || ''),
+    );
+    const label = city && state ? `${city}, ${state}` : city || state;
+    return { city, state, label };
   } catch {
-    return '';
+    return { city: '', state: '', label: '' };
   }
+}
+
+function celsiusToFahrenheit(c: number): number {
+  return c * (9 / 5) + 32;
 }
 
 export async function fetchWeatherAt(
@@ -118,8 +141,9 @@ export async function fetchWeatherAt(
   const data = await res.json();
 
   const currentCode = Number(data.current?.weather_code) || 0;
-  const temp = data.current?.temperature_2m ?? 0;
-  const unit = data.current_units?.temperature_2m || '°C';
+  const tempC = Number(data.current?.temperature_2m) || 0;
+  const temp = Math.round(celsiusToFahrenheit(tempC));
+  const unit = '°F';
 
   let forecastNote: string | undefined;
   const codes: number[] = data.hourly?.weather_code || [];
@@ -134,11 +158,17 @@ export async function fetchWeatherAt(
     }
   }
 
+  const placeParts = fallbackPlace.split(',').map((s) => s.trim()).filter(Boolean);
+  const placeName = placeParts[0] || fallbackPlace;
+  const placeState = placeParts[1] || '';
+
   return {
     temperature: temp,
     unit,
     condition: wmoLabel(currentCode),
-    placeName: fallbackPlace,
+    placeName,
+    placeState,
+    placeLabel: placeState ? `${placeName}, ${placeState}` : placeName,
     forecastNote,
     alert,
   };
@@ -151,9 +181,9 @@ export function readGeo(timeoutMs = 4_000): Promise<GeolocationPosition> {
       return;
     }
     navigator.geolocation.getCurrentPosition(resolve, reject, {
-      enableHighAccuracy: false,
+      enableHighAccuracy: true,
       timeout: timeoutMs,
-      maximumAge: 300_000,
+      maximumAge: 60_000,
     });
   });
 }

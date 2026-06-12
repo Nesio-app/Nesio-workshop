@@ -89,6 +89,17 @@ function addCalendarDays(dayKey: string, days: number): string {
   return next.toISOString().slice(0, 10);
 }
 
+/** Calendar date for an event (all-day uses ICS date, not TZ-shifted instant). */
+export function eventStartDayKey(
+  event: CalendarEvent,
+  timeZone = DEFAULT_CALENDAR_TZ,
+): string {
+  if (event.allDay && event.start.length >= 10) {
+    return event.start.slice(0, 10);
+  }
+  return calendarDayKey(new Date(event.start), timeZone);
+}
+
 function eventEndMs(event: CalendarEvent, timeZone = DEFAULT_CALENDAR_TZ): number {
   if (event.end) return new Date(event.end).getTime();
   if (event.allDay) {
@@ -107,13 +118,14 @@ export function filterTodayAndTomorrowEvents(
 ): CalendarEvent[] {
   const todayKey = calendarDayKey(at, timeZone);
   const tomorrowKey = addCalendarDays(todayKey, 1);
-  const nowMs = at.getTime();
 
   return events
     .filter((event) => {
-      const startKey = calendarDayKey(new Date(event.start), timeZone);
+      const startKey = eventStartDayKey(event, timeZone);
       if (startKey !== todayKey && startKey !== tomorrowKey) return false;
-      return eventEndMs(event, timeZone) > nowMs;
+      if (startKey === tomorrowKey) return true;
+      // Today: keep all of today's agenda, including meetings that already ended.
+      return true;
     })
     .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
 }
@@ -123,7 +135,7 @@ export function formatEventDayLabel(
   at = new Date(),
   timeZone = DEFAULT_CALENDAR_TZ,
 ): string {
-  const startKey = calendarDayKey(new Date(event.start), timeZone);
+  const startKey = eventStartDayKey(event, timeZone);
   const todayKey = calendarDayKey(at, timeZone);
   const tomorrowKey = addCalendarDays(todayKey, 1);
   if (startKey === todayKey) return '今天';

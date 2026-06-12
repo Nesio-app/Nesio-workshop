@@ -28,10 +28,11 @@ export interface PortalProfile {
 
 export interface PortalLocation {
   city: string;
+  state?: string;
   latitude: number;
   longitude: number;
   timezone?: string;
-  /** When true, weather widget shows config city instead of reverse-geocode. */
+  /** When true, skip browser geolocation and pin to config coords. */
   useConfigCity?: boolean;
 }
 

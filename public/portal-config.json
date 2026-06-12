@@ -5,7 +5,8 @@
   },
   "location": {
     "city": "Cary",
-    "useConfigCity": true,
+    "state": "NC",
+    "useConfigCity": false,
     "latitude": 35.7915,
     "longitude": -78.7811,
     "timezone": "America/New_York"
