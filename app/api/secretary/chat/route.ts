@@ -34,6 +34,7 @@ function getGoogleKey(): string | undefined {
 
 function getDoubaoKey(): string | undefined {
   const raw =
+    process.env.DOUBAO_KEY ||
     process.env.DOUBAO_API_KEY ||
     process.env.ARK_API_KEY ||
     process.env.VOLCENGINE_API_KEY;
@@ -41,7 +42,7 @@ function getDoubaoKey(): string | undefined {
 }
 
 function getOpenAIKey(): string | undefined {
-  const raw = process.env.OPENAI_API_KEY;
+  const raw = process.env.OpenAI_KEY || process.env.OPENAI_API_KEY;
   return raw?.trim() || undefined;
 }
 
@@ -287,7 +288,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(
           {
             error: 'AI not configured',
-            hint: 'Set DOUBAO_API_KEY or ARK_API_KEY in Vercel Environment Variables',
+            hint: 'Set DOUBAO_KEY (or DOUBAO_API_KEY / ARK_API_KEY) in Vercel Environment Variables',
           },
           { status: 503, headers: corsHeaders }
         );
@@ -302,7 +303,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(
           {
             error: 'AI not configured',
-            hint: 'Set OPENAI_API_KEY in Vercel Environment Variables, then Redeploy',
+            hint: 'Set OpenAI_KEY (or OPENAI_API_KEY) in Vercel Environment Variables, then Redeploy',
           },
           { status: 503, headers: corsHeaders }
         );

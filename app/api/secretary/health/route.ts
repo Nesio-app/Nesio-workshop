@@ -11,6 +11,7 @@ function getGoogleKey(): string | undefined {
 
 function getDoubaoKey(): string | undefined {
   const raw =
+    process.env.DOUBAO_KEY ||
     process.env.DOUBAO_API_KEY ||
     process.env.ARK_API_KEY ||
     process.env.VOLCENGINE_API_KEY;
@@ -18,7 +19,8 @@ function getDoubaoKey(): string | undefined {
 }
 
 function getOpenAIKey(): string | undefined {
-  return process.env.OPENAI_API_KEY?.trim() || undefined;
+  const raw = process.env.OpenAI_KEY || process.env.OPENAI_API_KEY;
+  return raw?.trim() || undefined;
 }
 
 export async function GET() {
