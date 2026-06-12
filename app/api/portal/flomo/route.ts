@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { fetchFlomoMemos, isFlomoReadConfigured } from '@/lib/portal/flomo-api';
+import {
+  fetchFlomoMemos,
+  isFlomoReadConfigured,
+  isFlomoWriteConfigured,
+} from '@/lib/portal/flomo-api';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,13 +18,19 @@ export async function GET(req: NextRequest) {
   const limitParam = req.nextUrl.searchParams.get('limit');
   const limit = limitParam ? Number.parseInt(limitParam, 10) : 50;
 
-  if (!isFlomoReadConfigured()) {
+  const readConfigured = isFlomoReadConfigured();
+  const writeConfigured = isFlomoWriteConfigured();
+
+  if (!readConfigured) {
     return NextResponse.json({
       ok: false,
-      configured: false,
+      configured: writeConfigured,
+      readConfigured: false,
+      writeConfigured,
       memos: [],
-      error:
-        'Set FLOMO_WEBHOOK_URL or FLOMO_API_URL (full webhook URL) or FLOMO_API_TOKEN in Vercel env',
+      error: writeConfigured
+        ? '读取需单独配置 FLOMO_API_TOKEN（flomo 设置 → MCP 个人 Token）'
+        : '配置 FLOMO_WEBHOOK_URL 可发送；FLOMO_API_TOKEN 可读取历史',
     });
   }
 

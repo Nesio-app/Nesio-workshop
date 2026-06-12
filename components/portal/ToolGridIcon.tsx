@@ -30,7 +30,8 @@ const TOOL_ICONS: Record<string, JSX.Element> = {
   ),
   psychoanalysis: (
     <svg {...svgProps}>
-      <path d="M9 6.5C7 6.5 5.5 8 5.5 10s1.5 3.5 3.5 3.5M15 6.5c2 0 3.5 1.5 3.5 3.5s-1.5 3.5-3.5 3.5" />
+      <path d="M9 7c-2.2 0-3.5 1.6-3.5 3.8.2 1.6 1.2 2.8 3.5 3.2M15 7c2.2 0 3.5 1.6 3.5 3.8-.2 1.6-1.2 2.8-3.5 3.2" />
+      <path d="M10.5 6V5M13.5 6V5M10.5 19v-1M13.5 19v-1" />
     </svg>
   ),
   sanctuary: (

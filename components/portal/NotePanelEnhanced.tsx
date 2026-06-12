@@ -46,6 +46,13 @@ function extractTags(content: string): string[] {
   return Array.from(new Set(tagMatches));
 }
 
+function formatFlomoReadError(error: string): string {
+  if (/登录|login|token|签名/i.test(error)) {
+    return '请先在 Vercel 配置有效的 FLOMO_API_TOKEN（flomo 设置 → MCP 个人 Token）';
+  }
+  return error;
+}
+
 function formatMemoDate(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '';
@@ -73,6 +80,8 @@ export default function NotePanelEnhanced({ open, onOpenChange }: NotePanelProps
   const locale = loadProfileSettings().locale;
   const [memos, setMemos] = useState<FlomoMemo[]>([]);
   const [configured, setConfigured] = useState<boolean | null>(null);
+  const [readConfigured, setReadConfigured] = useState(false);
+  const [writeConfigured, setWriteConfigured] = useState(false);
   const [usingDemo, setUsingDemo] = useState(false);
   const [loadingMemos, setLoadingMemos] = useState(false);
   const [draft, setDraft] = useState('');
@@ -108,16 +117,20 @@ export default function NotePanelEnhanced({ open, onOpenChange }: NotePanelProps
     try {
       const res = await fetch(apiUrl('/api/portal/flomo?limit=50'), { cache: 'no-store' });
       const data = await res.json().catch(() => ({}));
-      const isConfigured = Boolean(data.configured);
-      setConfigured(isConfigured);
+      const writeOk = Boolean(data.writeConfigured ?? data.configured);
+      const readOk = Boolean(data.readConfigured);
+      setWriteConfigured(writeOk);
+      setReadConfigured(readOk);
+      setConfigured(writeOk || readOk);
       const live = data.ok && Array.isArray(data.memos) ? data.memos : [];
       if (live.length > 0) {
         setMemos(live);
         setUsingDemo(false);
-      } else if (isConfigured && data.error) {
-        setMemos(FLOMO_DEMO_MEMOS);
-        setUsingDemo(true);
-        setReadError(data.error);
+        setReadError('');
+      } else if (data.error) {
+        setMemos(readOk || writeOk ? [] : FLOMO_DEMO_MEMOS);
+        setUsingDemo(!readOk && !writeOk);
+        setReadError(formatFlomoReadError(String(data.error)));
       } else {
         setMemos(FLOMO_DEMO_MEMOS);
         setUsingDemo(true);
@@ -125,6 +138,8 @@ export default function NotePanelEnhanced({ open, onOpenChange }: NotePanelProps
       }
     } catch {
       setConfigured(false);
+      setReadConfigured(false);
+      setWriteConfigured(false);
       setMemos(FLOMO_DEMO_MEMOS);
       setUsingDemo(true);
       setReadError('');
@@ -309,13 +324,15 @@ export default function NotePanelEnhanced({ open, onOpenChange }: NotePanelProps
           </aside>
 
           <div className="flomo-main">
-            {usingDemo ? (
+            {readError || usingDemo || (!readConfigured && writeConfigured) ? (
               <p className="flomo-app-banner">
-                {configured === false
-                  ? '在 Vercel 配置 FLOMO_WEBHOOK_URL 或 FLOMO_API_URL（完整 webhook 地址）以读取/发送；也可单独设置 FLOMO_API_TOKEN'
-                  : readError
-                    ? `读取失败：${readError}`
-                    : '暂无笔记或读取失败，当前为演示数据'}
+                {readError
+                  ? `读取失败：${readError}`
+                  : configured === false
+                    ? '发送：配置 FLOMO_WEBHOOK_URL；读取：配置 FLOMO_API_TOKEN（flomo MCP 个人 Token）'
+                    : !readConfigured && writeConfigured
+                      ? '已可发送；读取历史请在 Vercel 配置 FLOMO_API_TOKEN'
+                      : '暂无笔记，当前为演示数据'}
               </p>
             ) : null}
 

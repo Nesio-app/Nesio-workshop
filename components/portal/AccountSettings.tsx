@@ -10,6 +10,7 @@ import {
   type PortalLocale,
 } from '@/lib/portal/profile';
 import type { PortalConfig } from '@/lib/portal/types';
+import PortalThemeToggle from './PortalThemeToggle';
 
 function initials(name: string): string {
   const t = name.trim();
@@ -113,6 +114,12 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
           onBlur={onNameBlur}
           maxLength={32}
         />
+      </section>
+
+      <section className="portal-settings-card">
+        <h2 className="portal-settings-label">外观</h2>
+        <p className="portal-settings-hint">选择固定日 / 夜，或随系统与时段自动切换宝盒主题。</p>
+        <PortalThemeToggle />
       </section>
 
       <section className="portal-settings-card">

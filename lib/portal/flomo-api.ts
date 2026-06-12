@@ -17,25 +17,11 @@ function webhookEnvUrl(): string | null {
   return raw || null;
 }
 
-/** Extract webhook secret from `https://flomoapp.com/iwh/{userId}/{secret}/` */
-function secretFromWebhookUrl(url: string): string | null {
-  const match = url.match(/flomoapp\.com\/iwh\/[^/]+\/([^/?#]+)/i);
-  return match?.[1]?.trim() || null;
-}
-
-function flomoToken(): string | null {
+/** Read API needs a session/MCP token — webhook secret cannot list memos. */
+function flomoReadToken(): string | null {
   const explicit = process.env.FLOMO_API_TOKEN?.trim();
-  if (explicit) {
-    return explicit.startsWith('Bearer ') ? explicit : `Bearer ${explicit}`;
-  }
-
-  const webhook = webhookEnvUrl();
-  if (webhook) {
-    const secret = secretFromWebhookUrl(webhook);
-    if (secret) return `Bearer ${secret}`;
-  }
-
-  return null;
+  if (!explicit) return null;
+  return explicit.startsWith('Bearer ') ? explicit : `Bearer ${explicit}`;
 }
 
 function buildSignedParams(limit: number): Record<string, string> {
@@ -98,23 +84,29 @@ export function isFlomoWriteConfigured(): boolean {
 }
 
 export function isFlomoReadConfigured(): boolean {
-  return Boolean(flomoToken());
+  return Boolean(process.env.FLOMO_API_TOKEN?.trim());
 }
 
 export async function fetchFlomoMemos(limit = 50): Promise<{
   ok: boolean;
   configured: boolean;
+  readConfigured: boolean;
+  writeConfigured: boolean;
   memos: FlomoMemo[];
   error?: string;
 }> {
-  const token = flomoToken();
+  const token = flomoReadToken();
+  const writeConfigured = isFlomoWriteConfigured();
   if (!token) {
     return {
       ok: false,
-      configured: false,
+      configured: writeConfigured,
+      readConfigured: false,
+      writeConfigured,
       memos: [],
-      error:
-        'Set FLOMO_WEBHOOK_URL or FLOMO_API_URL (full webhook URL) or FLOMO_API_TOKEN in Vercel env',
+      error: writeConfigured
+        ? '读取需单独配置 FLOMO_API_TOKEN（flomo 设置 → MCP 个人 Token）'
+        : '配置 FLOMO_WEBHOOK_URL 可发送；FLOMO_API_TOKEN 可读取历史',
     };
   }
 
@@ -133,6 +125,8 @@ export async function fetchFlomoMemos(limit = 50): Promise<{
       return {
         ok: false,
         configured: true,
+        readConfigured: true,
+        writeConfigured,
         memos: [],
         error: data?.message || `flomo ${res.status}`,
       };
@@ -142,6 +136,8 @@ export async function fetchFlomoMemos(limit = 50): Promise<{
       return {
         ok: false,
         configured: true,
+        readConfigured: true,
+        writeConfigured,
         memos: [],
         error: data?.message || 'flomo rejected request',
       };
@@ -153,9 +149,22 @@ export async function fetchFlomoMemos(limit = 50): Promise<{
       .map((row: Record<string, unknown>) => parseMemo(row))
       .filter((memo: FlomoMemo) => memo.slug && memo.content);
 
-    return { ok: true, configured: true, memos };
+    return {
+      ok: true,
+      configured: true,
+      readConfigured: true,
+      writeConfigured,
+      memos,
+    };
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'network error';
-    return { ok: false, configured: true, memos: [], error: msg };
+    return {
+      ok: false,
+      configured: true,
+      readConfigured: true,
+      writeConfigured,
+      memos: [],
+      error: msg,
+    };
   }
 }

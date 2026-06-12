@@ -38,13 +38,22 @@ export const viewport: Viewport = {
   themeColor: '#588ce3',
 };
 
+const THEME_BOOT = `(function(){try{var c=localStorage.getItem('treasurebox-theme')||'auto';var dark=window.matchMedia('(prefers-color-scheme: dark)').matches;var h=new Date().getHours();var t=c==='night'?'night':c==='day'?'day':((dark||h<6||h>=19)?'night':'day');document.documentElement.setAttribute('data-portal-theme',t);}catch(e){}})();`;
+
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <html lang="zh-CN" className={`${notoSerif.variable} ${sourceSans.variable}`}>
+    <html
+      lang="zh-CN"
+      className={`${notoSerif.variable} ${sourceSans.variable}`}
+      suppressHydrationWarning
+    >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />
+      </head>
       <body className="font-sans">{children}</body>
     </html>
   );

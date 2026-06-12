@@ -14,7 +14,6 @@ export default function PortalSecretaryFab() {
       <span className="portal-secretary-fab-icon" aria-hidden>
         💬
       </span>
-      <span className="portal-secretary-fab-label">智友</span>
     </Link>
   );
 }

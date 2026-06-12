@@ -793,14 +793,8 @@ body {
   gap: 0.5rem;
   padding: 0.65rem 0.75rem;
   border-radius: 1rem;
-  background: linear-gradient(150deg, rgba(255, 255, 255, 0.48), rgba(205, 222, 252, 0.38));
-  backdrop-filter: blur(24px) saturate(125%);
-  -webkit-backdrop-filter: blur(24px) saturate(125%);
-  border: 1px solid rgba(255, 255, 255, 0.55);
-  box-shadow:
-    inset 0 1px 1px rgba(255, 255, 255, 0.75),
-    0 12px 32px rgba(43, 84, 143, 0.12);
-  transform: translateZ(0);
+  background: linear-gradient(135deg, rgba(205, 222, 252, 0.55), rgba(255, 255, 255, 0.75));
+  border: 1px solid var(--portal-line);
   margin-bottom: 0.15rem;
 }
 
@@ -872,16 +866,9 @@ body {
 .portal-widget {
   border-radius: 1.15rem;
   padding: 0.75rem 0.85rem 0.8rem;
-  background: linear-gradient(150deg, rgba(255, 255, 255, 0.52), rgba(255, 255, 255, 0.38));
-  backdrop-filter: blur(28px) saturate(130%);
-  -webkit-backdrop-filter: blur(28px) saturate(130%);
-  border: 1px solid rgba(255, 255, 255, 0.58);
-  box-shadow:
-    inset 0 1px 1.5px rgba(255, 255, 255, 0.85),
-    inset 0 -6px 14px rgba(88, 140, 227, 0.06),
-    0 16px 40px rgba(43, 84, 143, 0.14),
-    0 4px 12px rgba(43, 84, 143, 0.07);
-  transform: translateZ(0);
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid var(--portal-line);
+  box-shadow: 0 10px 28px rgba(88, 140, 227, 0.06);
   min-height: 6.75rem;
   display: flex;
   flex-direction: column;
@@ -1173,11 +1160,9 @@ body {
 
 .portal-tool-card {
   width: 100%;
-  border: 1px solid rgba(255, 255, 255, 0.55);
+  border: 1px solid var(--portal-line);
   border-radius: 1rem;
-  background: linear-gradient(150deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.35));
-  backdrop-filter: blur(24px) saturate(125%);
-  -webkit-backdrop-filter: blur(24px) saturate(125%);
+  background: rgba(255, 255, 255, 0.78);
   padding: 0.55rem 0.35rem 0.5rem;
   cursor: pointer;
   display: flex;
@@ -1186,11 +1171,7 @@ body {
   gap: 0.35rem;
   touch-action: manipulation;
   transition: box-shadow 0.15s ease, border-color 0.15s ease;
-  box-shadow:
-    inset 0 1px 1px rgba(255, 255, 255, 0.8),
-    0 10px 28px rgba(43, 84, 143, 0.12),
-    0 4px 10px rgba(43, 84, 143, 0.06);
-  transform: translateZ(0);
+  box-shadow: 0 6px 16px rgba(88, 140, 227, 0.05);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -1295,10 +1276,8 @@ body {
   transform: translateX(-50%);
   z-index: 195;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.05rem;
   width: 2.85rem;
   height: 2.85rem;
   border-radius: 999px;
@@ -1320,17 +1299,9 @@ body {
 }
 
 .portal-secretary-fab-icon {
-  font-size: 1.1rem;
+  font-size: 1.2rem;
   line-height: 1;
   filter: grayscale(1) brightness(2.2);
-}
-
-.portal-secretary-fab-label {
-  font-size: 0.48rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  color: rgba(255, 255, 255, 0.95);
-  line-height: 1;
 }
 
 /* Inline treasure toolbox (between widgets & calendar) */
@@ -1349,14 +1320,9 @@ body {
   z-index: 201;
   border-radius: 1.15rem;
   padding: 0.7rem 0.65rem 0.75rem;
-  background: linear-gradient(150deg, rgba(255, 255, 255, 0.52), rgba(255, 255, 255, 0.38));
-  backdrop-filter: blur(28px) saturate(130%);
-  -webkit-backdrop-filter: blur(28px) saturate(130%);
-  border: 1px solid rgba(255, 255, 255, 0.58);
-  box-shadow:
-    inset 0 1px 1.5px rgba(255, 255, 255, 0.85),
-    0 16px 40px rgba(43, 84, 143, 0.16);
-  transform: translateZ(0);
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid var(--portal-line);
+  box-shadow: 0 14px 36px rgba(88, 140, 227, 0.14);
   animation: portal-treasure-in 0.22s ease-out;
 }
 
@@ -1412,16 +1378,9 @@ body {
   flex: 1;
   border-radius: 1.25rem;
   padding: 0.85rem 1rem 1rem;
-  background: linear-gradient(150deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.36));
-  backdrop-filter: blur(28px) saturate(130%);
-  -webkit-backdrop-filter: blur(28px) saturate(130%);
-  border: 1px solid rgba(255, 255, 255, 0.58);
-  box-shadow:
-    inset 0 1px 1.5px rgba(255, 255, 255, 0.85),
-    inset 0 -6px 14px rgba(88, 140, 227, 0.06),
-    0 16px 40px rgba(43, 84, 143, 0.14),
-    0 4px 12px rgba(43, 84, 143, 0.07);
-  transform: translateZ(0);
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid var(--portal-line);
+  box-shadow: 0 12px 32px rgba(88, 140, 227, 0.07);
   min-height: 8rem;
   display: flex;
   flex-direction: column;
@@ -2411,13 +2370,11 @@ body {
 /* ═══════════════════════ 1. 流动柔光背景 ═══════════════════════ */
 .portal-root--home{position:relative}
 .portal-root--home::before{
-  content:"";position:absolute;inset:-25% -15%;z-index:0;pointer-events:none;
+  content:"";position:absolute;inset:-20% -10%;z-index:0;pointer-events:none;
   background:
-    radial-gradient(40% 32% at 14% 10%, rgba(255,255,255,.55), transparent 58%),
-    radial-gradient(36% 30% at 82% 14%, rgba(150,199,243,.45), transparent 55%),
-    radial-gradient(28% 24% at 50% 88%, rgba(88,140,227,.22), transparent 60%);
-  filter:blur(14px);
-  opacity:1;
+    radial-gradient(34% 28% at 16% 12%, rgba(255,255,255,.35), transparent 64%),
+    radial-gradient(30% 26% at 86% 16%, rgba(205,222,252,.28), transparent 64%);
+  filter:blur(10px);
   animation:portalAurora 38s ease-in-out infinite alternate;
 }
 @media (prefers-reduced-motion: reduce){.portal-root--home::before{animation:none}}
@@ -2434,28 +2391,25 @@ body {
 .portal-calendar,
 .portal-treasure-inline,
 .portal-quote,
-.portal-tool-card,
 .portal-tool-icon-wrap,
 .portal-search-btn--note,
 .portal-quote-treasure-box{
   position:relative;
-  transform:translateZ(0);
-  background:linear-gradient(150deg, rgba(255,255,255,.55), rgba(255,255,255,.32)) !important;
-  backdrop-filter:blur(32px) saturate(140%) brightness(1.06);
-  -webkit-backdrop-filter:blur(32px) saturate(140%) brightness(1.06);
-  border:1px solid rgba(255,255,255,.62) !important;
+  background:linear-gradient(150deg, rgba(255,255,255,.72), rgba(255,255,255,.5)) !important;
+  backdrop-filter:blur(30px) saturate(105%) brightness(1.05);
+  -webkit-backdrop-filter:blur(30px) saturate(105%) brightness(1.05);
+  border:1px solid transparent !important;
   box-shadow:
     inset 0 1px 1.5px rgba(255,255,255,.95),
-    inset 0 -8px 18px rgba(88,140,227,.1),
-    0 18px 44px rgba(43,84,143,.2),
-    0 6px 14px rgba(43,84,143,.1) !important;
+    inset 0 -8px 18px rgba(88,140,227,.07),
+    0 16px 40px rgba(43,84,143,.16),
+    0 4px 12px rgba(43,84,143,.07) !important;
 }
 /* 镜面折射边（1px 渐变高光描边 — 液态玻璃的灵魂） */
 .portal-widget::after,
 .portal-calendar::after,
 .portal-treasure-inline::after,
 .portal-quote::after,
-.portal-tool-card::after,
 .portal-tool-icon-wrap::after,
 .portal-quote-treasure-box::after{
   content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;pointer-events:none;z-index:2;
@@ -2520,8 +2474,8 @@ body {
   /* 若仍用 emoji：去掉发灰的滤镜，回归清晰 */
   filter:none !important;
 }
-/* 线性图标（配合 ToolGridIcon.tsx） */
-.portal-tool-svg{width:1.35rem;height:1.35rem;display:block;position:relative;z-index:3;color:var(--portal-blue-deep)}
+/* 线性图标（配合 ToolGrid.tsx 线性图标版） */
+.portal-tool-svg{width:1.4rem;height:1.4rem;color:var(--portal-blue);display:block;position:relative;z-index:3}
 @media (hover:hover){
   .portal-tool-card:hover .portal-tool-icon-wrap{transform:translateY(-2px) scale(1.06)}
 }
@@ -2569,7 +2523,7 @@ body {
 .om-ripple-host:not(.portal-secretary-fab){position:relative}
 .portal-secretary-fab.om-ripple-host{position:fixed}
 .om-ripple{position:absolute;border-radius:50%;transform:translate(-50%,-50%) scale(0);
-  background:radial-gradient(circle, rgba(88,140,227,.55), rgba(88,140,227,0) 68%);
+  background:radial-gradient(circle, rgba(88,140,227,.35), rgba(88,140,227,0) 70%);
   pointer-events:none;z-index:5;animation:omRipple .6s ease-out forwards}
 @keyframes omRipple{to{transform:translate(-50%,-50%) scale(1);opacity:0}}
 
@@ -2681,3 +2635,192 @@ body {
      host.appendChild(r); setTimeout(()=>r.remove(),600);
    });
    ════════════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════════════
+   宝盒 Treasurebox · 夜间深色主题层  (DROP-IN)
+   ───────────────────────────────────────────────────────────────────────
+   用法：把本文件全部内容粘贴到  app/globals.css  的【最末尾】。
+   仅在 <html data-portal-theme="night"> 时生效；不写该属性 = 现状（日间）零改动。
+   主题属性由 PortalThemeToggle.tsx 写到 <html>，并由 layout <head> 的防闪脚本预设。
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* 平滑过渡（仅主题色，不影响交互动画） */
+html[data-portal-theme] .portal-root,
+html[data-portal-theme] .portal-widget,
+html[data-portal-theme] .portal-calendar,
+html[data-portal-theme] .portal-quote,
+html[data-portal-theme] .portal-tool-card,
+html[data-portal-theme] .portal-bottom-nav,
+html[data-portal-theme] .portal-treasure-inline,
+html[data-portal-theme] .portal-settings-card,
+html[data-portal-theme] .portal-note-panel,
+html[data-portal-theme] .portal-command-panel{
+  transition:background .5s ease, background-color .5s ease, color .45s ease,
+             border-color .5s ease, box-shadow .5s ease;
+}
+
+/* ── 1. 夜间调色板：覆盖 --portal-* 变量 ──
+   同时定义在 <html> 与 .portal-root 上：
+   .portal-root 那份用于击败 base globals 里 .portal-root 自带的浅色定义；
+   <html> 那份让 body 级浮层（速记 / 命令面板 / 设置）也能继承到。 */
+html[data-portal-theme="night"],
+html[data-portal-theme="night"] .portal-root{
+  --portal-blue-deep:#7fb0ee;
+  --portal-blue-mid:#5f8fd6;
+  --portal-blue-light:#2c4a78;
+  --portal-bg:#0e1626;
+  --portal-ink:#e7eefb;
+  --portal-muted:rgba(200,217,245,.6);
+  --portal-line:rgba(127,176,245,.16);
+  --portal-cool:#16243c;       --portal-cool-accent:#7fb0ee;
+  --portal-warm:#181f33;       --portal-warm-accent:#8fa0e0;
+  --portal-neutral:#141d30;    --portal-neutral-accent:#8fb0d8;
+}
+
+/* ── 2. 主页背景渐变（深蓝夜空） ── */
+html[data-portal-theme="night"] .portal-root--home,
+html[data-portal-theme="night"] .portal-root{
+  background:
+    radial-gradient(ellipse 85% 60% at 12% 0%, rgba(88,140,227,.22), transparent 55%),
+    radial-gradient(ellipse 70% 55% at 88% 6%, rgba(40,70,120,.5), transparent 52%),
+    linear-gradient(165deg,#1a2740 0%,#121d33 50%,#0a1322 100%);
+}
+html[data-portal-theme="night"] .portal-grain{opacity:.5}
+
+/* ── 3. 玻璃面：白→深 ── */
+html[data-portal-theme="night"] .portal-widget,
+html[data-portal-theme="night"] .portal-calendar,
+html[data-portal-theme="night"] .portal-tool-card,
+html[data-portal-theme="night"] .portal-search-btn,
+html[data-portal-theme="night"] .portal-rail-btn,
+html[data-portal-theme="night"] .portal-command-trigger,
+html[data-portal-theme="night"] .portal-settings-card{
+  background:rgba(255,255,255,.055) !important;
+  border-color:var(--portal-line);
+  box-shadow:0 10px 28px rgba(0,0,0,.4);
+}
+html[data-portal-theme="night"] .portal-treasure-inline{
+  background:rgba(255,255,255,.075) !important;
+  box-shadow:0 14px 36px rgba(0,0,0,.45);
+}
+html[data-portal-theme="night"] .portal-tool-icon-wrap{
+  background:linear-gradient(155deg,rgba(127,176,245,.2),rgba(255,255,255,.04)) !important;
+  border-color:rgba(127,176,245,.2);
+}
+/* emoji 工具图标在深色上的蓝色滤镜会发暗，去掉滤镜回归清晰 */
+html[data-portal-theme="night"] .portal-tool-emoji,
+html[data-portal-theme="night"] .portal-icon-blue{filter:none !important}
+
+/* 今日话语卡 */
+html[data-portal-theme="night"] .portal-quote{
+  background:linear-gradient(135deg,rgba(127,176,245,.16),rgba(255,255,255,.04)) !important;
+  border-color:var(--portal-line);
+}
+html[data-portal-theme="night"] .portal-quote-treasure-box{
+  background:linear-gradient(145deg,rgba(127,176,245,.28),rgba(40,74,120,.6)) !important;
+  border-color:rgba(127,176,245,.4);
+}
+
+/* 概览 widget 内的色块 */
+html[data-portal-theme="night"] .portal-widget-chip--us{background:rgba(200,217,245,.1)}
+
+/* ── 4. 栏 / 导航 / 浮层 ── */
+html[data-portal-theme="night"] .portal-rail,
+html[data-portal-theme="night"] .portal-frame-head{
+  background:rgba(14,22,38,.82) !important;border-color:var(--portal-line);
+}
+html[data-portal-theme="night"] .portal-bottom-nav{
+  background:rgba(14,22,38,.82) !important;border-color:var(--portal-line);
+  box-shadow:0 8px 28px rgba(0,0,0,.5);
+}
+html[data-portal-theme="night"] .portal-bottom-nav-btn--active{
+  background:linear-gradient(135deg,rgba(127,176,245,.3),rgba(88,140,227,.16));
+}
+html[data-portal-theme="night"] .portal-secretary-fab{border-color:rgba(220,235,255,.5)}
+
+/* 命令面板 (Cmd/Ctrl-K) */
+html[data-portal-theme="night"] .portal-command-overlay{background:rgba(4,8,16,.5)}
+html[data-portal-theme="night"] .portal-command-panel{
+  background:rgba(18,26,42,.97) !important;border-color:var(--portal-line);
+  box-shadow:0 24px 60px rgba(0,0,0,.6);
+}
+html[data-portal-theme="night"] .portal-command-input{color:var(--portal-ink)}
+html[data-portal-theme="night"] .portal-command-item[data-ready='true']:hover{background:rgba(127,176,245,.1)}
+
+/* 矩阵卡（命令/导航视图） */
+html[data-portal-theme="night"] .portal-card--cool{background:#16243c}
+html[data-portal-theme="night"] .portal-card--warm{background:#181f33}
+html[data-portal-theme="night"] .portal-card--neutral{background:#141d30}
+html[data-portal-theme="night"] .portal-card--ready:hover{
+  border-color:rgba(127,176,245,.3);box-shadow:0 10px 30px rgba(0,0,0,.4);
+}
+
+/* ── 5. 速记 Note 面板 ── */
+html[data-portal-theme="night"] .portal-note-overlay{background:rgba(4,10,22,.55)}
+html[data-portal-theme="night"] .portal-note-panel{
+  background:rgba(18,26,42,.97) !important;border-color:var(--portal-line);
+  box-shadow:0 20px 50px rgba(0,0,0,.55);
+}
+html[data-portal-theme="night"] .portal-note-input,
+html[data-portal-theme="night"] .portal-note-textarea,
+html[data-portal-theme="night"] .portal-note-select{
+  background:rgba(255,255,255,.06) !important;color:var(--portal-ink);border-color:var(--portal-line);
+}
+html[data-portal-theme="night"] .portal-note-item{
+  background:rgba(127,176,245,.1);border-color:rgba(127,176,245,.18);
+}
+html[data-portal-theme="night"] .portal-note-badge{background:rgba(127,176,245,.18)}
+html[data-portal-theme="night"] .portal-note-filter{background:rgba(255,255,255,.05)}
+
+/* ── 6. 设置页 ── */
+html[data-portal-theme="night"] .portal-settings-input{
+  background:rgba(255,255,255,.06) !important;color:var(--portal-ink);border-color:var(--portal-line);
+}
+html[data-portal-theme="night"] .portal-settings-lang-btn{background:rgba(255,255,255,.05)}
+html[data-portal-theme="night"] .portal-settings-toast{background:rgba(230,240,255,.92);color:#0e1626}
+
+/* ── 7. 速记 flomo 时间线（基础深色） ── */
+html[data-portal-theme="night"] .flomo-overlay{background:rgba(4,10,22,.5)}
+html[data-portal-theme="night"] .flomo-app,
+html[data-portal-theme="night"] .flomo-sheet{
+  background:#141d2e !important;box-shadow:0 18px 50px rgba(0,0,0,.55);
+}
+html[data-portal-theme="night"] .flomo-app-header,
+html[data-portal-theme="night"] .flomo-compose{
+  background:rgba(20,29,46,.96) !important;border-color:rgba(127,176,245,.12);
+}
+html[data-portal-theme="night"] .flomo-app-title{color:#e7eefb}
+html[data-portal-theme="night"] .flomo-sidebar{background:rgba(16,24,39,.6) !important;border-color:rgba(127,176,245,.1)}
+html[data-portal-theme="night"] .flomo-sidebar-label{color:#c2d2ea}
+html[data-portal-theme="night"] .flomo-memo-card{
+  background:rgba(255,255,255,.05) !important;box-shadow:0 1px 3px rgba(0,0,0,.3);
+}
+html[data-portal-theme="night"] .flomo-memo-content{color:#e7eefb}
+html[data-portal-theme="night"] .flomo-memo-time{color:#8fa3c0}
+html[data-portal-theme="night"] .flomo-input{color:#e7eefb}
+html[data-portal-theme="night"] .flomo-timeline{background:transparent}
+
+/* 注：进入工具的内嵌 iframe（.portal-frame-embed）是各自独立子应用，
+   其内部主题不在本层覆盖范围内——本层只负责宝盒 portal 外壳与浮层。 */
+
+/* ── 8. 主题切换分段控件（PortalThemeToggle 使用，日 / 夜均适用） ── */
+.portal-theme-seg{
+  display:flex;width:100%;gap:2px;padding:3px;border-radius:13px;
+  background:rgba(255,255,255,.55);border:1px solid var(--portal-line);
+}
+html[data-portal-theme="night"] .portal-theme-seg{background:rgba(255,255,255,.055)}
+.portal-theme-seg-btn{
+  flex:1;display:inline-flex;align-items:center;justify-content:center;gap:.4rem;
+  border:none;background:transparent;cursor:pointer;padding:.5rem .4rem;border-radius:10px;
+  font:inherit;font-size:.82rem;color:var(--portal-muted);
+  transition:background .25s cubic-bezier(.34,1.56,.64,1),color .25s ease;
+}
+.portal-theme-seg-icon{display:inline-flex}
+.portal-theme-seg-icon svg{width:14px;height:14px;display:block}
+.portal-theme-seg-btn.is-on{
+  background:linear-gradient(150deg,rgba(150,199,243,.4),rgba(88,140,227,.18));
+  color:var(--portal-blue-deep);
+  box-shadow:inset 0 1px 1px rgba(255,255,255,.6);
+}
+html[data-portal-theme="night"] .portal-theme-seg-btn.is-on{
+  color:#bcd6fb;box-shadow:inset 0 1px 1px rgba(255,255,255,.14);
+}

@@ -349,7 +349,6 @@ export default function DashboardHome({
 
       <section className="portal-widgets" aria-label="概览">
         <article className="portal-widget portal-widget--clock">
-          <p className="portal-widget-kicker">现在</p>
           <p className="portal-widget-clock">{formatClock(now)}</p>
           <p className="portal-widget-date">{formatDateLine(now)}</p>
           {lunarLine ? <p className="portal-widget-lunar">{lunarLine}</p> : null}
@@ -373,7 +372,6 @@ export default function DashboardHome({
           ) : (
             <>
               <div className="portal-widget-weather-head">
-                <p className="portal-widget-kicker">天气</p>
                 <p className="portal-widget-city">{cityName}</p>
               </div>
               <p className="portal-widget-weather-line">
@@ -385,13 +383,13 @@ export default function DashboardHome({
                   <span className="portal-widget-condition">{weather.condition}</span>
                 ) : null}
               </p>
+              {weather.forecastNote ? (
+                <p className="portal-widget-forecast">{weather.forecastNote}</p>
+              ) : null}
               {weather.alert ? (
                 <p className="portal-widget-alert" role="status">
                   ⚠ {weather.alert}
                 </p>
-              ) : null}
-              {weather.forecastNote ? (
-                <p className="portal-widget-forecast">{weather.forecastNote}</p>
               ) : null}
             </>
           )}
