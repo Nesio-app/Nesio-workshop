@@ -5,12 +5,9 @@ export function toolOpenUrl(tool: PortalTool): string {
   return ensureToolboxTrailingSlash(withBase(tool.url));
 }
 
-/** External apps and 智友 break inside iframes (X-Frame-Options / nested UI). */
-export function toolNeedsFullPage(tool: PortalTool): boolean {
-  const href = toolOpenUrl(tool);
-  if (tool.id === 'secretary') return true;
-  if (href.startsWith('http://') || href.startsWith('https://')) return true;
-  return false;
+/** All tools open via full-page navigation (no iframe embedding). */
+export function toolNeedsFullPage(_tool: PortalTool): boolean {
+  return true;
 }
 
 export function openToolHref(tool: PortalTool): string {

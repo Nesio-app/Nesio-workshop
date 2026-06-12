@@ -3,16 +3,16 @@
 import { useEffect, useState } from 'react';
 import DashboardHome from './DashboardHome';
 import NotePanelEnhanced from './NotePanelEnhanced';
-import ToolFrame from './ToolFrame';
+import PortalBottomNav from './PortalBottomNav';
+import PortalSecretaryFab from './PortalSecretaryFab';
 import { DEFAULT_PORTAL_CONFIG } from '@/lib/portal/defaults';
-import { openToolHref, toolNeedsFullPage } from '@/lib/portal/open-tool';
+import { openToolHref } from '@/lib/portal/open-tool';
 import { configUrl } from '@/lib/portal/paths';
 import type { PortalConfig, PortalTool } from '@/lib/portal/types';
 
 export default function Portal() {
   const [config, setConfig] = useState<PortalConfig>(DEFAULT_PORTAL_CONFIG);
   const [noteOpen, setNoteOpen] = useState(false);
-  const [activeTool, setActiveTool] = useState<PortalTool | null>(null);
 
   useEffect(() => {
     fetch(configUrl())
@@ -25,12 +25,20 @@ export default function Portal() {
 
   const openTool = (tool: PortalTool) => {
     if (!tool.ready) return;
-    if (toolNeedsFullPage(tool)) {
-      window.location.assign(openToolHref(tool));
+    window.location.assign(openToolHref(tool));
+  };
+
+  const openTodo = () => {
+    const plan = config.tools.find((t) => t.id === 'plan' && t.ready);
+    if (plan) openTool(plan);
+  };
+
+  const scrollHome = () => {
+    if (window.location.pathname !== '/') {
+      window.location.assign('/');
       return;
     }
-    setActiveTool(tool);
-    setNoteOpen(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   useEffect(() => {
@@ -52,11 +60,6 @@ export default function Portal() {
         return;
       }
 
-      if (event.key === 'Escape' && activeTool) {
-        setActiveTool(null);
-        return;
-      }
-
       const key = event.key.toLowerCase();
       const tool = config.tools.find((item) => item.hotkey === key && item.ready);
       if (tool) {
@@ -67,17 +70,7 @@ export default function Portal() {
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [config.tools, activeTool]);
-
-  if (activeTool) {
-    return (
-      <div className="portal-root portal-root--tool">
-        <div className="portal-grain" aria-hidden />
-        <ToolFrame tool={activeTool} onClose={() => setActiveTool(null)} />
-        <NotePanelEnhanced open={noteOpen} onOpenChange={setNoteOpen} />
-      </div>
-    );
-  }
+  }, [config.tools]);
 
   return (
     <div className="portal-root portal-root--home">
@@ -93,6 +86,14 @@ export default function Portal() {
           />
         </div>
       </div>
+
+      <PortalSecretaryFab />
+      <PortalBottomNav
+        noteOpen={noteOpen}
+        onHome={scrollHome}
+        onOpenNote={() => setNoteOpen(true)}
+        onOpenTodo={openTodo}
+      />
 
       <NotePanelEnhanced open={noteOpen} onOpenChange={setNoteOpen} />
     </div>

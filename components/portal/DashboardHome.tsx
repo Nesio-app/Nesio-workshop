@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { formatLunarLine, nextHolidayLine } from '@/lib/portal/almanac';
+import { formatLunarLine, nextHolidayLine, nextUSHolidayLine } from '@/lib/portal/almanac';
 import { t } from '@/lib/portal/i18n';
 import { pickFreshQuote } from '@/lib/portal/quotes';
 import {
@@ -22,7 +22,8 @@ import {
   reverseGeocode,
   simplifyPlaceName,
 } from '@/lib/portal/weather';
-import ToolGrid from './ToolGrid';
+import ToolsTreasureSheet from './ToolsTreasureSheet';
+import { withBase } from '@/lib/portal/paths';
 
 interface DashboardHomeProps {
   config: PortalConfig;
@@ -31,7 +32,6 @@ interface DashboardHomeProps {
   onOpenTool: (tool: PortalTool) => void;
 }
 
-const FAV_QUOTES_KEY = 'treasurebox-favorite-quotes';
 
 interface WeatherState {
   temperature?: number;
@@ -39,6 +39,7 @@ interface WeatherState {
   condition?: string;
   placeName?: string;
   forecastNote?: string;
+  alert?: string;
   loading: boolean;
   error?: boolean;
 }
@@ -143,10 +144,11 @@ export default function DashboardHome({
   const [fidelityHintDismissed, setFidelityHintDismissed] = useState(false);
   const quotePicked = useRef(false);
   const [dailyQuote, setDailyQuote] = useState('今天也要好好照顾自己。');
-  const [quoteSaved, setQuoteSaved] = useState(false);
+  const [treasureOpen, setTreasureOpen] = useState(false);
 
   const lunarLine = useMemo(() => formatLunarLine(now), [now]);
   const holidayLine = useMemo(() => nextHolidayLine(now), [now]);
+  const usHolidayLine = useMemo(() => nextUSHolidayLine(now), [now]);
 
   const syncProfile = () => {
     const s = loadProfileSettings(profile.displayName);
@@ -168,15 +170,6 @@ export default function DashboardHome({
     quotePicked.current = true;
     setDailyQuote(pickFreshQuote(config));
   }, [config]);
-
-  useEffect(() => {
-    try {
-      const favs: string[] = JSON.parse(localStorage.getItem(FAV_QUOTES_KEY) || '[]');
-      setQuoteSaved(Array.isArray(favs) && favs.includes(dailyQuote));
-    } catch {
-      setQuoteSaved(false);
-    }
-  }, [dailyQuote]);
 
   useEffect(() => {
     const t = window.setInterval(() => setNow(new Date()), 30_000);
@@ -207,6 +200,7 @@ export default function DashboardHome({
         condition: snap.condition,
         placeName: snap.placeName,
         forecastNote: snap.forecastNote,
+        alert: snap.alert,
       });
     }
 
@@ -272,24 +266,6 @@ export default function DashboardHome({
   const greeting = greetingForHour(now.getHours());
   const displayAvatar = avatarUrl || profile.avatarUrl;
 
-  const toggleSaveQuote = () => {
-    try {
-      const raw = localStorage.getItem(FAV_QUOTES_KEY);
-      const favs: string[] = raw ? JSON.parse(raw) : [];
-      const list = Array.isArray(favs) ? favs : [];
-      if (list.includes(dailyQuote)) {
-        localStorage.setItem(
-          FAV_QUOTES_KEY,
-          JSON.stringify(list.filter((q) => q !== dailyQuote)),
-        );
-        setQuoteSaved(false);
-      } else {
-        localStorage.setItem(FAV_QUOTES_KEY, JSON.stringify([dailyQuote, ...list].slice(0, 40)));
-        setQuoteSaved(true);
-      }
-    } catch { /* ignore */ }
-  };
-
   const quoteLine = useMemo(() => dailyQuote, [dailyQuote]);
   const cityName = weather.placeName || simplifyPlaceName(fallbackLocation.city);
   const calendarTz = fallbackLocation.timezone || 'Asia/Shanghai';
@@ -344,7 +320,6 @@ export default function DashboardHome({
             <span className="portal-search-icon portal-icon-blue" aria-hidden>
               📝
             </span>
-            <span className="portal-note-btn-label">{t(locale, 'noteLabel')}</span>
           </button>
         </div>
       </header>
@@ -353,11 +328,11 @@ export default function DashboardHome({
         <p className="portal-quote-text">{quoteLine}</p>
         <button
           type="button"
-          className={'portal-quote-save' + (quoteSaved ? ' portal-quote-save--on' : '')}
-          onClick={toggleSaveQuote}
-          aria-label={quoteSaved ? t(locale, 'quoteSaved') : t(locale, 'saveQuote')}
+          className="portal-quote-treasure"
+          onClick={() => setTreasureOpen(true)}
+          aria-label="打开宝盒工具"
         >
-          {quoteSaved ? '★' : '☆'}
+          <img src={withBase('/icons/treasurebox.svg')} alt="" width={28} height={28} />
         </button>
       </section>
 
@@ -367,6 +342,9 @@ export default function DashboardHome({
           <p className="portal-widget-date">{formatDateLine(now)}</p>
           {lunarLine ? <p className="portal-widget-extra">{lunarLine}</p> : null}
           {holidayLine ? <p className="portal-widget-extra portal-widget-extra--holiday">{holidayLine}</p> : null}
+          {usHolidayLine ? (
+            <p className="portal-widget-extra portal-widget-extra--us-holiday">{usHolidayLine}</p>
+          ) : null}
         </article>
 
         <article className="portal-widget portal-widget--weather">
@@ -377,11 +355,18 @@ export default function DashboardHome({
           ) : (
             <>
               <p className="portal-widget-city">{cityName}</p>
-              <p className="portal-widget-temp">
+              <p className="portal-widget-temp portal-widget-temp--inline">
                 {Math.round(weather.temperature ?? 0)}
                 <span>{weather.unit || '°C'}</span>
+                {weather.condition ? (
+                  <span className="portal-widget-condition">{weather.condition}</span>
+                ) : null}
               </p>
-              <p className="portal-widget-muted">{weather.condition}</p>
+              {weather.alert ? (
+                <p className="portal-widget-alert" role="status">
+                  ⚠ {weather.alert}
+                </p>
+              ) : null}
               {weather.forecastNote ? (
                 <p className="portal-widget-forecast">{weather.forecastNote}</p>
               ) : null}
@@ -389,8 +374,6 @@ export default function DashboardHome({
           )}
         </article>
       </section>
-
-      <ToolGrid tools={config.tools} onOpenTool={onOpenTool} />
 
       <section className="portal-calendar" aria-label="日历">
         <h2 className="portal-calendar-head">{t(locale, 'calendar')}</h2>
@@ -454,6 +437,13 @@ export default function DashboardHome({
           </button>
         ) : null}
       </section>
+
+      <ToolsTreasureSheet
+        tools={config.tools}
+        open={treasureOpen}
+        onClose={() => setTreasureOpen(false)}
+        onOpenTool={onOpenTool}
+      />
     </div>
   );
 }

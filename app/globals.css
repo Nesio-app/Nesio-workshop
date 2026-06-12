@@ -700,6 +700,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
 }
 
 .portal-dash-hero {
@@ -819,6 +820,27 @@ body {
   color: #e8a317;
 }
 
+.portal-quote-treasure {
+  border: none;
+  background: transparent;
+  line-height: 0;
+  cursor: pointer;
+  padding: 0.1rem;
+  flex-shrink: 0;
+  border-radius: 0.5rem;
+  touch-action: manipulation;
+}
+
+.portal-quote-treasure img {
+  display: block;
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
+.portal-note-btn-label {
+  display: none;
+}
+
 .portal-widget-forecast {
   margin: 0.35rem 0 0;
   font-size: 0.72rem;
@@ -878,6 +900,27 @@ body {
   margin-left: 0.1rem;
 }
 
+.portal-widget-temp--inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+
+.portal-widget-condition {
+  font-size: 0.82rem;
+  font-weight: 400;
+  color: var(--portal-muted);
+}
+
+.portal-widget-alert {
+  margin: 0.45rem 0 0;
+  font-size: 0.68rem;
+  line-height: 1.35;
+  color: #c0392b;
+  font-weight: 600;
+}
+
 .portal-widget-muted {
   margin: 0.35rem 0 0;
   font-size: 0.82rem;
@@ -893,6 +936,11 @@ body {
 
 .portal-widget-extra--holiday {
   color: var(--portal-blue-deep);
+}
+
+.portal-widget-extra--us-holiday {
+  color: var(--portal-muted);
+  font-size: 0.62rem;
 }
 
 .portal-widget-city {
@@ -1067,6 +1115,135 @@ body {
   line-height: 1;
   color: var(--portal-blue-deep);
   filter: grayscale(1) sepia(1) hue-rotate(186deg) saturate(4.5) brightness(0.9);
+}
+
+/* Bottom navigation + secretary FAB */
+.portal-bottom-nav {
+  position: fixed;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 0.35rem);
+  transform: translateX(-50%);
+  z-index: 180;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+  padding: 0.35rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--portal-line);
+  box-shadow: 0 8px 28px rgba(88, 140, 227, 0.14);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  max-width: min(22rem, calc(100vw - 1.5rem));
+}
+
+.portal-bottom-nav-btn {
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.portal-bottom-nav-btn--active {
+  background: linear-gradient(135deg, rgba(205, 222, 252, 0.85), rgba(150, 199, 243, 0.35));
+}
+
+.portal-bottom-nav-icon {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.portal-bottom-nav-icon--svg {
+  display: block;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 0.35rem;
+}
+
+.portal-secretary-fab {
+  position: fixed;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 3.65rem);
+  transform: translateX(-50%);
+  z-index: 181;
+  display: grid;
+  place-items: center;
+  width: 3.15rem;
+  height: 3.15rem;
+  border-radius: 999px;
+  background: linear-gradient(145deg, var(--portal-blue-mid), var(--portal-blue-deep));
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 10px 28px rgba(88, 140, 227, 0.35);
+  text-decoration: none;
+  touch-action: manipulation;
+}
+
+.portal-secretary-fab-icon {
+  font-size: 1.35rem;
+  line-height: 1;
+  filter: grayscale(1) brightness(2);
+}
+
+/* Treasure tools sheet */
+.portal-treasure-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.portal-treasure-sheet-backdrop {
+  position: absolute;
+  inset: 0;
+  border: none;
+  background: rgba(12, 18, 28, 0.38);
+  cursor: pointer;
+}
+
+.portal-treasure-sheet-panel {
+  position: relative;
+  width: min(100%, 28rem);
+  max-height: min(78vh, 32rem);
+  overflow: auto;
+  padding: 0.85rem 0.85rem calc(1rem + env(safe-area-inset-bottom, 0px));
+  border-radius: 1.25rem 1.25rem 0 0;
+  background: rgba(255, 255, 255, 0.97);
+  border: 1px solid var(--portal-line);
+  box-shadow: 0 -8px 40px rgba(88, 140, 227, 0.18);
+}
+
+.portal-treasure-sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.65rem;
+}
+
+.portal-treasure-sheet-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--portal-ink);
+}
+
+.portal-treasure-sheet-close {
+  border: none;
+  background: transparent;
+  font-size: 1.35rem;
+  line-height: 1;
+  color: var(--portal-muted);
+  cursor: pointer;
+  padding: 0.15rem 0.35rem;
 }
 
 .portal-tool-name {

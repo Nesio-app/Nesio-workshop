@@ -23,6 +23,7 @@ export interface WeatherSnapshot {
   condition: string;
   placeName: string;
   forecastNote?: string;
+  alert?: string;
 }
 
 const FETCH_TIMEOUT_MS = 8_000;
@@ -46,6 +47,37 @@ export function simplifyPlaceName(raw: string): string {
   if (!t) return '';
   const first = t.split(',')[0].split('，')[0].trim();
   return first;
+}
+
+async function fetchNWSAlert(lat: number, lon: number): Promise<string | undefined> {
+  try {
+    const url = `https://api.weather.gov/alerts/active?point=${lat},${lon}`;
+    const res = await fetchWithTimeout(url, {
+      headers: {
+        Accept: 'application/geo+json',
+        'User-Agent': 'PersonalWeb/1.0 (treasurebox portal)',
+      },
+    });
+    if (!res.ok) return undefined;
+    const data = await res.json();
+    const features = data?.features;
+    if (!Array.isArray(features) || features.length === 0) return undefined;
+
+    const severe = features.find(
+      (f: { properties?: { severity?: string } }) =>
+        f.properties?.severity === 'Extreme' || f.properties?.severity === 'Severe',
+    );
+    const pick = severe || features[0];
+    const props = pick?.properties;
+    if (!props) return undefined;
+
+    const event = props.event || props.headline;
+    if (!event) return undefined;
+    const headline = String(event).trim();
+    return headline.length > 80 ? `${headline.slice(0, 77)}…` : headline;
+  } catch {
+    return undefined;
+  }
 }
 
 export async function reverseGeocode(lat: number, lon: number): Promise<string> {
@@ -78,7 +110,10 @@ export async function fetchWeatherAt(
   url.searchParams.set('forecast_hours', '24');
   url.searchParams.set('timezone', timezone);
 
-  const res = await fetchWithTimeout(url.toString());
+  const [res, alert] = await Promise.all([
+    fetchWithTimeout(url.toString()),
+    fetchNWSAlert(lat, lon),
+  ]);
   if (!res.ok) throw new Error('weather');
   const data = await res.json();
 
@@ -105,6 +140,7 @@ export async function fetchWeatherAt(
     condition: wmoLabel(currentCode),
     placeName: fallbackPlace,
     forecastNote,
+    alert,
   };
 }
 

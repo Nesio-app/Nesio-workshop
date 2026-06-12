@@ -1,4 +1,8 @@
 .portal-back-link {
+  display: none !important;
+}
+
+.portal-back-link--legacy {
   position: fixed;
   top: calc(env(safe-area-inset-top, 0px) + 10px);
   left: calc(env(safe-area-inset-left, 0px) + 10px);
