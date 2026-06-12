@@ -20,8 +20,13 @@ export const metadata: Metadata = {
   description: '个人工具箱入口 — 秩序、觉察与体现的三舱静谧庭院。',
   manifest: '/manifest.json',
   icons: {
-    icon: [{ url: '/icons/treasurebox.svg', type: 'image/svg+xml' }],
-    apple: [{ url: '/icons/treasurebox.svg', type: 'image/svg+xml' }],
+    icon: [
+      { url: '/icons/treasurebox-pwa-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icons/treasurebox.svg', type: 'image/svg+xml' },
+    ],
+    apple: [
+      { url: '/icons/treasurebox-pwa-192.png', sizes: '192x192', type: 'image/png' },
+    ],
   },
   appleWebApp: {
     capable: true,

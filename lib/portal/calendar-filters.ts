@@ -103,7 +103,7 @@ export function eventStartDayKey(
 function eventEndMs(event: CalendarEvent, timeZone = DEFAULT_CALENDAR_TZ): number {
   if (event.end) return new Date(event.end).getTime();
   if (event.allDay) {
-    const dayKey = calendarDayKey(new Date(event.start), timeZone);
+    const dayKey = eventStartDayKey(event, timeZone);
     const [y, m, d] = dayKey.split('-').map(Number);
     return Date.UTC(y, m - 1, d + 1) - 1;
   }
@@ -118,14 +118,13 @@ export function filterTodayAndTomorrowEvents(
 ): CalendarEvent[] {
   const todayKey = calendarDayKey(at, timeZone);
   const tomorrowKey = addCalendarDays(todayKey, 1);
+  const nowMs = at.getTime();
 
   return events
     .filter((event) => {
       const startKey = eventStartDayKey(event, timeZone);
       if (startKey !== todayKey && startKey !== tomorrowKey) return false;
-      if (startKey === tomorrowKey) return true;
-      // Today: keep all of today's agenda, including meetings that already ended.
-      return true;
+      return eventEndMs(event, timeZone) > nowMs;
     })
     .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
 }

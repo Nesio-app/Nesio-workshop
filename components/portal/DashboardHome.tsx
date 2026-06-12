@@ -36,8 +36,8 @@ interface DashboardHomeProps {
 
 
 interface WeatherState {
-  temperature?: number;
-  unit?: string;
+  temperatureC?: number;
+  temperatureF?: number;
   condition?: string;
   placeLabel?: string;
   forecastNote?: string;
@@ -204,8 +204,8 @@ export default function DashboardHome({
       if (cancelled) return;
       setWeather({
         loading: false,
-        temperature: snap.temperature,
-        unit: snap.unit,
+        temperatureC: snap.temperatureC,
+        temperatureF: snap.temperatureF,
         condition: snap.condition,
         placeLabel: snap.placeLabel,
         forecastNote: snap.forecastNote,
@@ -380,10 +380,11 @@ export default function DashboardHome({
           ) : (
             <>
               <p className="portal-widget-weather-line portal-widget-weather-line--primary">
-                <span className="portal-widget-temp-val">
-                  {Math.round(weather.temperature ?? 0)}
-                </span>
-                <span className="portal-widget-temp-unit">{weather.unit || '°F'}</span>
+                <span className="portal-widget-temp-val">{weather.temperatureC ?? 0}</span>
+                <span className="portal-widget-temp-unit">°C</span>
+                <span className="portal-widget-temp-sep">/</span>
+                <span className="portal-widget-temp-val">{weather.temperatureF ?? 0}</span>
+                <span className="portal-widget-temp-unit">°F</span>
                 {weather.condition ? (
                   <span className="portal-widget-condition">{weather.condition}</span>
                 ) : null}

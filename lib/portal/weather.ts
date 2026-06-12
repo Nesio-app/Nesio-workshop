@@ -18,8 +18,8 @@ export function wmoLabel(code: number): string {
 }
 
 export interface WeatherSnapshot {
-  temperature: number;
-  unit: string;
+  temperatureC: number;
+  temperatureF: number;
   condition: string;
   placeName: string;
   placeState?: string;
@@ -90,10 +90,38 @@ function formatStateCode(raw: string): string {
   return t;
 }
 
+async function reverseGeocodeOpenMeteo(
+  lat: number,
+  lon: number,
+): Promise<{ city: string; state: string; label: string } | null> {
+  try {
+    const url = new URL('https://geocoding-api.open-meteo.com/v1/reverse');
+    url.searchParams.set('latitude', String(lat));
+    url.searchParams.set('longitude', String(lon));
+    url.searchParams.set('count', '1');
+    url.searchParams.set('language', 'en');
+    url.searchParams.set('format', 'json');
+    const res = await fetchWithTimeout(url.toString());
+    if (!res.ok) return null;
+    const data = await res.json();
+    const row = data?.results?.[0];
+    if (!row) return null;
+    const city = simplifyPlaceName(String(row.name || ''));
+    const state = formatStateCode(String(row.admin1 || ''));
+    const label = city && state ? `${city}, ${state}` : city || state;
+    return city ? { city, state, label } : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function reverseGeocode(
   lat: number,
   lon: number,
 ): Promise<{ city: string; state: string; label: string }> {
+  const openMeteo = await reverseGeocodeOpenMeteo(lat, lon);
+  if (openMeteo) return openMeteo;
+
   try {
     const url = new URL('https://api.bigdatacloud.net/data/reverse-geocode-client');
     url.searchParams.set('latitude', String(lat));
@@ -102,8 +130,9 @@ export async function reverseGeocode(
     const res = await fetchWithTimeout(url.toString());
     if (!res.ok) throw new Error('geo');
     const data = await res.json();
+    // Prefer suburb/town (locality) over metro name (city) — e.g. Cary not Raleigh.
     const city = simplifyPlaceName(
-      String(data.city || data.locality || data.principalSubdivision || ''),
+      String(data.locality || data.city || ''),
     );
     const state = formatStateCode(
       String(data.principalSubdivisionCode || data.principalSubdivision || ''),
@@ -141,9 +170,8 @@ export async function fetchWeatherAt(
   const data = await res.json();
 
   const currentCode = Number(data.current?.weather_code) || 0;
-  const tempC = Number(data.current?.temperature_2m) || 0;
-  const temp = Math.round(celsiusToFahrenheit(tempC));
-  const unit = '°F';
+  const tempC = Math.round(Number(data.current?.temperature_2m) || 0);
+  const tempF = Math.round(celsiusToFahrenheit(tempC));
 
   let forecastNote: string | undefined;
   const codes: number[] = data.hourly?.weather_code || [];
@@ -163,8 +191,8 @@ export async function fetchWeatherAt(
   const placeState = placeParts[1] || '';
 
   return {
-    temperature: temp,
-    unit,
+    temperatureC: tempC,
+    temperatureF: tempF,
     condition: wmoLabel(currentCode),
     placeName,
     placeState,
