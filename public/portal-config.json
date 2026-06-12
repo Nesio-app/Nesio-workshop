@@ -176,7 +176,7 @@
       "name": "溯",
       "nameEn": "SÙ Health",
       "description": "血糖叙事 · 模式与 n-of-1 实验",
-      "url": "https://health-ios.vercel.app/",
+      "url": "/health/",
       "zone": "manifest",
       "hotkey": "u",
       "command": "/health",

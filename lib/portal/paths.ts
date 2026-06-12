@@ -1,6 +1,7 @@
 const TOOLBOX_APP_PATHS = new Set([
   '/fitness',
   '/storage',
+  '/health',
   '/adhd-flow',
   '/inner-shelter',
 ]);

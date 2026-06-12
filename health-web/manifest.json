@@ -1,0 +1,19 @@
+{
+  "name": "溯 SÙ · 个人健康叙事",
+  "short_name": "溯 SÙ",
+  "description": "血糖故事 · 模式发现 · n-of-1 实验 · 系统体检",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#eef5fe",
+  "theme_color": "#eef5fe",
+  "lang": "zh-CN",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
