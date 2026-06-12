@@ -1,11 +1,36 @@
 'use client';
 
+import { useState } from 'react';
 import type { PortalTool } from '@/lib/portal/types';
+import { withBase } from '@/lib/portal/paths';
 
 interface ToolGridProps {
   tools: PortalTool[];
   excludeIds?: string[];
   onOpenTool: (tool: PortalTool) => void;
+}
+
+function ToolIcon({ tool }: { tool: PortalTool }) {
+  const [imgFailed, setImgFailed] = useState(false);
+  const src = tool.iconUrl ? withBase(tool.iconUrl) : '';
+
+  if (!src || imgFailed) {
+    return (
+      <span className="portal-tool-emoji portal-icon-blue" aria-hidden>
+        {tool.icon}
+      </span>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt=""
+      width={30}
+      height={30}
+      onError={() => setImgFailed(true)}
+    />
+  );
 }
 
 export default function ToolGrid({ tools, excludeIds = [], onOpenTool }: ToolGridProps) {
@@ -26,13 +51,7 @@ export default function ToolGrid({ tools, excludeIds = [], onOpenTool }: ToolGri
                 title={tool.description}
               >
                 <span className="portal-tool-icon-wrap">
-                  {tool.iconUrl ? (
-                    <img src={tool.iconUrl} alt="" width={30} height={30} />
-                  ) : (
-                    <span className="portal-tool-emoji portal-icon-blue" aria-hidden>
-                      {tool.icon}
-                    </span>
-                  )}
+                  <ToolIcon tool={tool} />
                 </span>
                 <span className="portal-tool-name">{tool.name}</span>
               </button>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { FLOMO_DEMO_MEMOS } from '@/lib/portal/flomo-demo';
 import { t } from '@/lib/portal/i18n';
 import { loadProfileSettings } from '@/lib/portal/profile';
 
@@ -71,6 +72,7 @@ export default function NotePanelEnhanced({ open, onOpenChange }: NotePanelProps
   const locale = loadProfileSettings().locale;
   const [memos, setMemos] = useState<FlomoMemo[]>([]);
   const [configured, setConfigured] = useState<boolean | null>(null);
+  const [usingDemo, setUsingDemo] = useState(false);
   const [loadingMemos, setLoadingMemos] = useState(false);
   const [draft, setDraft] = useState('');
   const [images, setImages] = useState<PendingImage[]>([]);
@@ -85,14 +87,20 @@ export default function NotePanelEnhanced({ open, onOpenChange }: NotePanelProps
     try {
       const res = await fetch('/api/portal/flomo?limit=50', { cache: 'no-store' });
       const data = await res.json().catch(() => ({}));
-      setConfigured(Boolean(data.configured));
-      if (data.ok && Array.isArray(data.memos)) {
-        setMemos(data.memos);
-      } else if (!data.configured) {
-        setMemos([]);
+      const isConfigured = Boolean(data.configured);
+      setConfigured(isConfigured);
+      const live = data.ok && Array.isArray(data.memos) ? data.memos : [];
+      if (live.length > 0) {
+        setMemos(live);
+        setUsingDemo(false);
+      } else {
+        setMemos(FLOMO_DEMO_MEMOS);
+        setUsingDemo(true);
       }
     } catch {
       setConfigured(false);
+      setMemos(FLOMO_DEMO_MEMOS);
+      setUsingDemo(true);
     } finally {
       setLoadingMemos(false);
     }
@@ -248,9 +256,9 @@ export default function NotePanelEnhanced({ open, onOpenChange }: NotePanelProps
           <span className="flomo-app-header-spacer" aria-hidden />
         </header>
 
-        {configured === false ? (
+        {usingDemo ? (
           <p className="flomo-app-banner">
-            读取笔记需要配置 FLOMO_API_TOKEN（flomo 设置 → MCP → Personal Token）。仍可通过下方发送新 memo。
+            演示笔记 · 发送走 FLOMO_WEBHOOK_URL；读取需另配 FLOMO_API_TOKEN（MCP 个人 Token）。
           </p>
         ) : null}
 

@@ -482,7 +482,9 @@ body{background:#020408;color:var(--tx);font-family:-apple-system,'Helvetica Neu
 .ap-chk{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--mu2);margin-top:4px}
 
 @media (max-width:520px){
-  html,body{height:100%;overflow:hidden}
+  html,body{height:100%;min-height:100dvh;overflow:hidden;background:var(--void)}
   body{align-items:stretch;justify-content:stretch;background:var(--void)}
-  .phone{width:100%;max-width:100%;height:100dvh;border-radius:0;border:none;box-shadow:none}
+  .phone{width:100%;max-width:100%;height:100dvh;min-height:100dvh;border-radius:0;border:none;box-shadow:none}
+  .sb{display:none}
+  .portal-back-link{display:none!important}
 }

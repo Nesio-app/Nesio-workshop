@@ -73,29 +73,33 @@ export default function Portal() {
   }, [config.tools]);
 
   return (
-    <div className="portal-root portal-root--home">
-      <div className="portal-grain" aria-hidden />
+    <>
+      <div className="portal-root portal-root--home">
+        <div className="portal-grain" aria-hidden />
 
-      <div className="portal-shell portal-shell--single">
-        <div className="portal-main">
-          <DashboardHome
-            config={config}
-            noteOpen={noteOpen}
-            onOpenNote={() => setNoteOpen(true)}
-            onOpenTool={openTool}
-          />
+        <div className="portal-shell portal-shell--single">
+          <div className="portal-main">
+            <DashboardHome
+              config={config}
+              noteOpen={noteOpen}
+              onOpenNote={() => setNoteOpen(true)}
+              onOpenTool={openTool}
+            />
+          </div>
         </div>
       </div>
 
-      <PortalSecretaryFab />
-      <PortalBottomNav
-        noteOpen={noteOpen}
-        onHome={scrollHome}
-        onOpenNote={() => setNoteOpen(true)}
-        onOpenTodo={openTodo}
-      />
+      <div className="portal-chrome" aria-hidden={false}>
+        <PortalSecretaryFab />
+        <PortalBottomNav
+          noteOpen={noteOpen}
+          onHome={scrollHome}
+          onOpenNote={() => setNoteOpen(true)}
+          onOpenTodo={openTodo}
+        />
+      </div>
 
       <NotePanelEnhanced open={noteOpen} onOpenChange={setNoteOpen} />
-    </div>
+    </>
   );
 }

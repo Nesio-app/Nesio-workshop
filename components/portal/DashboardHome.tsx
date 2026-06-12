@@ -22,8 +22,7 @@ import {
   reverseGeocode,
   simplifyPlaceName,
 } from '@/lib/portal/weather';
-import ToolsTreasureSheet from './ToolsTreasureSheet';
-import { withBase } from '@/lib/portal/paths';
+import ToolsTreasureInline from './ToolsTreasureSheet';
 
 interface DashboardHomeProps {
   config: PortalConfig;
@@ -328,22 +327,32 @@ export default function DashboardHome({
         <p className="portal-quote-text">{quoteLine}</p>
         <button
           type="button"
-          className="portal-quote-treasure"
-          onClick={() => setTreasureOpen(true)}
+          className={'portal-quote-treasure' + (treasureOpen ? ' portal-quote-treasure--open' : '')}
+          onClick={() => setTreasureOpen((v) => !v)}
           aria-label="打开宝盒工具"
+          aria-expanded={treasureOpen}
         >
-          <img src={withBase('/icons/treasurebox.svg')} alt="" width={28} height={28} />
+          <span className="portal-quote-treasure-glyph" aria-hidden>
+            🎁
+          </span>
         </button>
       </section>
 
       <section className="portal-widgets" aria-label="概览">
         <article className="portal-widget portal-widget--clock">
+          <p className="portal-widget-kicker">现在</p>
           <p className="portal-widget-clock">{formatClock(now)}</p>
           <p className="portal-widget-date">{formatDateLine(now)}</p>
-          {lunarLine ? <p className="portal-widget-extra">{lunarLine}</p> : null}
-          {holidayLine ? <p className="portal-widget-extra portal-widget-extra--holiday">{holidayLine}</p> : null}
-          {usHolidayLine ? (
-            <p className="portal-widget-extra portal-widget-extra--us-holiday">{usHolidayLine}</p>
+          {lunarLine ? <p className="portal-widget-lunar">{lunarLine}</p> : null}
+          {(holidayLine || usHolidayLine) ? (
+            <div className="portal-widget-chips">
+              {holidayLine ? (
+                <span className="portal-widget-chip portal-widget-chip--cn">{holidayLine}</span>
+              ) : null}
+              {usHolidayLine ? (
+                <span className="portal-widget-chip portal-widget-chip--us">{usHolidayLine}</span>
+              ) : null}
+            </div>
           ) : null}
         </article>
 
@@ -354,10 +363,15 @@ export default function DashboardHome({
             <p className="portal-widget-muted">{t(locale, 'weatherError')}</p>
           ) : (
             <>
-              <p className="portal-widget-city">{cityName}</p>
-              <p className="portal-widget-temp portal-widget-temp--inline">
-                {Math.round(weather.temperature ?? 0)}
-                <span>{weather.unit || '°C'}</span>
+              <div className="portal-widget-weather-head">
+                <p className="portal-widget-kicker">天气</p>
+                <p className="portal-widget-city">{cityName}</p>
+              </div>
+              <p className="portal-widget-weather-line">
+                <span className="portal-widget-temp-val">
+                  {Math.round(weather.temperature ?? 0)}
+                </span>
+                <span className="portal-widget-temp-unit">{weather.unit || '°C'}</span>
                 {weather.condition ? (
                   <span className="portal-widget-condition">{weather.condition}</span>
                 ) : null}
@@ -374,6 +388,13 @@ export default function DashboardHome({
           )}
         </article>
       </section>
+
+      <ToolsTreasureInline
+        tools={config.tools}
+        open={treasureOpen}
+        onClose={() => setTreasureOpen(false)}
+        onOpenTool={onOpenTool}
+      />
 
       <section className="portal-calendar" aria-label="日历">
         <h2 className="portal-calendar-head">{t(locale, 'calendar')}</h2>
@@ -438,12 +459,6 @@ export default function DashboardHome({
         ) : null}
       </section>
 
-      <ToolsTreasureSheet
-        tools={config.tools}
-        open={treasureOpen}
-        onClose={() => setTreasureOpen(false)}
-        onOpenTool={onOpenTool}
-      />
     </div>
   );
 }
