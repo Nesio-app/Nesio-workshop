@@ -35,7 +35,16 @@ def sample_corners(im, box=24):
     n = len(pixels)
     return (sum(p[0] for p in pixels)//n, sum(p[1] for p in pixels)//n, sum(p[2] for p in pixels)//n)
 
-BG = sample_corners(img)
+def lighten(rgb, amount=0.28):
+    r,g,b = rgb
+    return (
+        min(255, int(r + (255 - r) * amount)),
+        min(255, int(g + (255 - g) * amount)),
+        min(255, int(b + (255 - b) * amount)),
+    )
+
+orig_bg = sample_corners(img)
+BG = lighten(orig_bg)
 
 def color_dist(c1, c2):
     return sum((a-b)**2 for a,b in zip(c1,c2))**0.5
@@ -50,7 +59,7 @@ def isolate_crystal(im, bg, tol=32):
                 px[x,y] = (r,g,b,0)
     return out
 
-crystal = isolate_crystal(img, BG)
+crystal = isolate_crystal(img, orig_bg, 34)
 
 def make_icon(size, scale, name):
     canvas = Image.new("RGBA", (size, size), BG + (255,))
