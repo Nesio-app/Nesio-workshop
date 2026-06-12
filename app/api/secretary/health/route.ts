@@ -17,17 +17,24 @@ function getDoubaoKey(): string | undefined {
   return raw?.trim() || undefined;
 }
 
+function getOpenAIKey(): string | undefined {
+  return process.env.OPENAI_API_KEY?.trim() || undefined;
+}
+
 export async function GET() {
   const geminiKey = getGoogleKey();
   const doubaoKey = getDoubaoKey();
+  const openaiKey = getOpenAIKey();
   return NextResponse.json(
     {
       ok: true,
       service: 'secretary',
       gemini: !!geminiKey,
       doubao: !!doubaoKey,
+      chatgpt: !!openaiKey,
       model: process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite,gemini-2.5-flash',
       doubaoModel: process.env.DOUBAO_ENDPOINT || process.env.DOUBAO_MODEL || 'doubao-pro-32k',
+      openaiModel: process.env.OPENAI_MODEL || 'gpt-4o-mini',
     },
     {
       headers: { 'Access-Control-Allow-Origin': '*' },

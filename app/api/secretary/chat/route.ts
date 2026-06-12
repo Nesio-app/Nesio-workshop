@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const DEFAULT_MODELS = 'gemini-2.5-flash-lite,gemini-2.5-flash,gemini-1.5-flash-8b';
 const DOUBAO_API_URL = 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
+const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
+const DEFAULT_OPENAI_MODEL = 'gpt-4o-mini';
 
 const SYSTEM_PROMPT = `你是「宝盒」里的 AI 私人秘书。语气沉静、清晰、有温度，像一位值得信赖的幕僚。
 
@@ -36,6 +38,15 @@ function getDoubaoKey(): string | undefined {
     process.env.ARK_API_KEY ||
     process.env.VOLCENGINE_API_KEY;
   return raw?.trim() || undefined;
+}
+
+function getOpenAIKey(): string | undefined {
+  const raw = process.env.OPENAI_API_KEY;
+  return raw?.trim() || undefined;
+}
+
+function getOpenAIModelId(): string {
+  return process.env.OPENAI_MODEL?.trim() || DEFAULT_OPENAI_MODEL;
 }
 
 function getDoubaoModelId(): string {
@@ -146,6 +157,48 @@ async function chatWithGemini(
   throw new Error(lastErr);
 }
 
+async function chatWithOpenAI(
+  history: ChatTurn[],
+  message: string,
+  maxTokens: number,
+  key: string
+): Promise<string> {
+  const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
+    { role: 'system', content: SYSTEM_PROMPT },
+  ];
+  for (const turn of history) {
+    messages.push({ role: turn.role, content: turn.content });
+  }
+  messages.push({ role: 'user', content: message });
+
+  const res = await fetch(OPENAI_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${key}`,
+    },
+    body: JSON.stringify({
+      model: getOpenAIModelId(),
+      messages,
+      max_tokens: Math.min(Math.max(maxTokens, 64), 4096),
+      temperature: 0.65,
+    }),
+  });
+
+  const data = (await res.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+    error?: { message?: string };
+  };
+
+  if (!res.ok) {
+    throw new Error(data?.error?.message || `OpenAI HTTP ${res.status}`);
+  }
+
+  const text = data?.choices?.[0]?.message?.content?.trim();
+  if (!text) throw new Error('Empty response from OpenAI');
+  return text;
+}
+
 async function chatWithDoubao(
   history: ChatTurn[],
   message: string,
@@ -241,6 +294,21 @@ export async function POST(req: NextRequest) {
       }
       const text = await chatWithDoubao(history, message, maxTokens, key);
       return NextResponse.json({ text, model: 'doubao' }, { headers: corsHeaders });
+    }
+
+    if (modelId === 'chatgpt' || modelId === 'openai') {
+      const key = getOpenAIKey();
+      if (!key) {
+        return NextResponse.json(
+          {
+            error: 'AI not configured',
+            hint: 'Set OPENAI_API_KEY in Vercel Environment Variables, then Redeploy',
+          },
+          { status: 503, headers: corsHeaders }
+        );
+      }
+      const text = await chatWithOpenAI(history, message, maxTokens, key);
+      return NextResponse.json({ text, model: 'chatgpt' }, { headers: corsHeaders });
     }
 
     const key = getGoogleKey();

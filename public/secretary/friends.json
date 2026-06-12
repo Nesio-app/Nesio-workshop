@@ -21,10 +21,10 @@
     "id": "chatgpt",
     "name": "ChatGPT",
     "company": "OpenAI",
-    "tagline": "OpenAI · 即将接入",
-    "ready": false,
+    "tagline": "OpenAI · 已连接",
+    "ready": true,
     "logo": "/secretary/logos/chatgpt.svg",
-    "preview": "后续将接入 OpenAI API。"
+    "preview": "OpenAI 大模型，适合推理、写作与多轮对话。"
   },
   {
     "id": "doubao",
