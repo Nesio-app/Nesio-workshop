@@ -2354,3 +2354,292 @@ body {
   background: #30cf79;
   box-shadow: 0 4px 12px rgba(48, 207, 121, 0.35);
 }
+
+
+/* ╔══════════════════════════════════════════════════════════════════╗
+   ║  以下为「淡蓝玻璃升级层」—— 由统一设计规划追加，可整段删除回退   ║
+   ╚══════════════════════════════════════════════════════════════════╝ */
+/* ═══════════════════════════════════════════════════════════════════════
+   宝盒 Treasurebox · 淡蓝玻璃升级层  (DROP-IN)
+   ───────────────────────────────────────────────────────────────────────
+   用法：把本文件全部内容粘贴到  app/globals.css  的【最末尾】即可。
+   不改任何现有规则，仅用更高优先级覆盖视觉。功能 / 结构 / 逻辑零改动。
+   目标真实 class：.portal-* / .flomo-* —— 与现有组件完全对应。
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── 0. 补充别名变量（供本升级层使用） ── */
+.portal-root{
+  --portal-blue:#588ce3;
+  --portal-blue-strong:#3f6fc4;
+  --portal-success:#3fa88b;
+  --glass-tint:rgba(255,255,255,.62);
+  --glass-hi:rgba(255,255,255,.95);
+  --spring:cubic-bezier(.34,1.56,.64,1);
+}
+
+/* ═══════════════════════ 1. 流动柔光背景 ═══════════════════════ */
+.portal-root--home{position:relative}
+.portal-root--home::before{
+  content:"";position:absolute;inset:-20% -10%;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(34% 28% at 16% 12%, rgba(255,255,255,.35), transparent 64%),
+    radial-gradient(30% 26% at 86% 16%, rgba(205,222,252,.28), transparent 64%);
+  filter:blur(10px);
+  animation:portalAurora 38s ease-in-out infinite alternate;
+}
+@media (prefers-reduced-motion: reduce){.portal-root--home::before{animation:none}}
+@keyframes portalAurora{
+  0%{transform:translate3d(0,0,0) scale(1)}
+  50%{transform:translate3d(-3%,2%,0) scale(1.08)}
+  100%{transform:translate3d(3%,-2%,0) scale(1.04)}
+}
+.portal-shell,.portal-grain{position:relative;z-index:1}
+
+/* ═══════════════════════ 2. 液态玻璃材质 ═══════════════════════
+   苹果 iOS 玻璃：磨砂 + 镜面折射边 + 左上高光热点 + 分层投影      */
+.portal-widget,
+.portal-calendar,
+.portal-treasure-inline,
+.portal-quote,
+.portal-tool-icon-wrap,
+.portal-search-btn--note,
+.portal-quote-treasure-box{
+  position:relative;
+  background:linear-gradient(150deg, rgba(255,255,255,.72), rgba(255,255,255,.5)) !important;
+  backdrop-filter:blur(30px) saturate(105%) brightness(1.05);
+  -webkit-backdrop-filter:blur(30px) saturate(105%) brightness(1.05);
+  border:1px solid transparent !important;
+  box-shadow:
+    inset 0 1px 1.5px rgba(255,255,255,.95),
+    inset 0 -8px 18px rgba(88,140,227,.07),
+    0 16px 40px rgba(43,84,143,.16),
+    0 4px 12px rgba(43,84,143,.07) !important;
+}
+/* 镜面折射边（1px 渐变高光描边 — 液态玻璃的灵魂） */
+.portal-widget::after,
+.portal-calendar::after,
+.portal-treasure-inline::after,
+.portal-quote::after,
+.portal-tool-icon-wrap::after,
+.portal-quote-treasure-box::after{
+  content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;pointer-events:none;z-index:2;
+  background:linear-gradient(135deg, rgba(255,255,255,.95) 0%, rgba(255,255,255,.15) 38%, rgba(127,176,245,0) 55%, rgba(88,140,227,.45) 100%);
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;
+}
+/* 左上镜面高光热点 */
+.portal-widget::before,
+.portal-calendar::before,
+.portal-treasure-inline::before{
+  content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:1;
+  background:radial-gradient(60% 50% at 18% 8%, rgba(255,255,255,.6), transparent 60%);
+  opacity:.85;
+}
+.portal-widget > *,
+.portal-calendar > *,
+.portal-treasure-inline > *{position:relative;z-index:3}
+
+/* ═══════════════════════ 3. 衬线编辑感 ═══════════════════════ */
+.portal-dash-greeting-name,
+.portal-widget-clock,
+.portal-widget-temp-val{
+  font-family:var(--font-portal-serif),Georgia,serif !important;
+  font-weight:500 !important;letter-spacing:.02em;
+}
+.portal-quote-text{font-style:italic;line-height:1.5;padding-left:1.1rem;position:relative}
+.portal-quote-text::before{
+  content:"\201C";position:absolute;left:-.05rem;top:-.35rem;
+  font-family:var(--font-portal-serif),Georgia,serif;
+  font-size:1.9rem;line-height:1;color:var(--portal-blue);opacity:.4;
+}
+.portal-widget-kicker{letter-spacing:.2em !important;text-transform:uppercase;opacity:.65}
+
+/* ═══════════════════════ 4. 错峰入场动画 ═══════════════════════ */
+@media (prefers-reduced-motion: no-preference){
+  .portal-dash > *{animation:portalRise .7s cubic-bezier(.22,.61,.36,1) both}
+  .portal-dash-hero{animation-delay:.02s}
+  .portal-quote{animation-delay:.10s}
+  .portal-widgets{animation-delay:.18s}
+  .portal-treasure-inline{animation-delay:.26s}
+  .portal-calendar{animation-delay:.34s}
+  .portal-tools-grid > li{animation:portalRise .6s cubic-bezier(.22,.61,.36,1) both}
+  .portal-tools-grid > li:nth-child(1){animation-delay:.30s}
+  .portal-tools-grid > li:nth-child(2){animation-delay:.34s}
+  .portal-tools-grid > li:nth-child(3){animation-delay:.38s}
+  .portal-tools-grid > li:nth-child(4){animation-delay:.42s}
+  .portal-tools-grid > li:nth-child(5){animation-delay:.46s}
+  .portal-tools-grid > li:nth-child(6){animation-delay:.50s}
+  .portal-tools-grid > li:nth-child(7){animation-delay:.54s}
+  .portal-tools-grid > li:nth-child(8){animation-delay:.58s}
+  .portal-tools-grid > li:nth-child(9){animation-delay:.62s}
+}
+@keyframes portalRise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+/* ═══════════════════════ 5. 工具图标精修 ═══════════════════════ */
+.portal-tool-icon-wrap{
+  overflow:hidden;
+  transition:transform .28s var(--spring), box-shadow .2s ease;
+}
+.portal-tool-emoji{
+  /* 若仍用 emoji：去掉发灰的滤镜，回归清晰 */
+  filter:none !important;
+}
+/* 线性图标（配合 ToolGrid.tsx 线性图标版） */
+.portal-tool-svg{width:1.4rem;height:1.4rem;color:var(--portal-blue);display:block;position:relative;z-index:3}
+@media (hover:hover){
+  .portal-tool-card:hover .portal-tool-icon-wrap{transform:translateY(-2px) scale(1.06)}
+}
+
+/* ═══════════════════════ 6. FAB 脉冲光环 ═══════════════════════ */
+.portal-secretary-fab{
+  box-shadow:0 10px 28px rgba(88,140,227,.4), 0 2px 6px rgba(43,84,143,.2) !important;
+}
+.portal-secretary-fab-ring{border:2px solid rgba(127,176,245,.55)}
+@media (prefers-reduced-motion: no-preference){
+  .portal-secretary-fab-ring{animation:fabPulse 2.8s ease-out infinite}
+}
+@keyframes fabPulse{
+  0%{transform:scale(1);opacity:.7}
+  70%{transform:scale(1.5);opacity:0}
+  100%{transform:scale(1.5);opacity:0}
+}
+
+/* ═══════════════════════ 7. 点击交互：弹性回弹 ═══════════════════════
+   涟漪由极少量 JS 注入（见文件末尾说明），此处定义视觉。          */
+.portal-tool-card,
+.portal-search-btn--note,
+.portal-quote-treasure,
+.portal-secretary-fab,
+.portal-avatar-link,
+.flomo-tool,
+.flomo-send,
+.flomo-sidebar-item,
+.flomo-memo-tag,
+.flomo-app-close{
+  transition:transform .26s var(--spring) !important;
+  -webkit-tap-highlight-color:transparent;
+}
+.portal-tool-card:active,
+.portal-search-btn--note:active,
+.portal-quote-treasure:active,
+.portal-avatar-link:active,
+.flomo-tool:active,
+.flomo-send:active,
+.flomo-app-close:active{transform:scale(.92)}
+.portal-secretary-fab:active{transform:translateX(-50%) scale(.9)}
+
+/* 涟漪容器 + 元素（JS 添加 .om-ripple-host / 注入 .om-ripple） */
+.om-ripple-host{position:relative;overflow:hidden}
+.om-ripple{position:absolute;border-radius:50%;transform:translate(-50%,-50%) scale(0);
+  background:radial-gradient(circle, rgba(88,140,227,.35), rgba(88,140,227,0) 70%);
+  pointer-events:none;z-index:5;animation:omRipple .6s ease-out forwards}
+@keyframes omRipple{to{transform:translate(-50%,-50%) scale(1);opacity:0}}
+
+/* ════════════════════════════════════════════════════════════════════
+   8. 速记 flomo —— 玻璃化（覆盖原米白 #f7f6f3 / 白 #fff / 绿点缀）
+   ════════════════════════════════════════════════════════════════════ */
+.flomo-overlay{background:rgba(18,32,58,.34) !important;backdrop-filter:blur(8px) !important;-webkit-backdrop-filter:blur(8px) !important}
+.flomo-app,
+.flomo-sheet{
+  background:linear-gradient(180deg, #eef5fd 0%, #e3eefb 100%) !important;
+  border:1px solid rgba(255,255,255,.7) !important;
+  box-shadow:0 24px 60px rgba(43,84,143,.28), inset 0 1px 1px rgba(255,255,255,.8) !important;
+}
+.flomo-app-header{
+  background:linear-gradient(180deg, rgba(244,248,253,.92), rgba(244,248,253,.5)) !important;
+  backdrop-filter:blur(20px) saturate(120%);-webkit-backdrop-filter:blur(20px) saturate(120%);
+  border-bottom:1px solid rgba(255,255,255,.7) !important;
+}
+.flomo-app-title{font-family:var(--font-portal-serif),Georgia,serif !important;color:var(--portal-ink) !important}
+.flomo-sidebar{background:transparent !important;border-right:1px solid rgba(88,140,227,.12) !important}
+.flomo-sidebar-item--on{
+  background:linear-gradient(150deg, var(--portal-blue), var(--portal-blue-strong)) !important;
+  color:#fff !important;box-shadow:0 6px 16px rgba(88,140,227,.32) !important;
+}
+/* memo 卡片 → 玻璃 */
+.flomo-memo-card{
+  position:relative;
+  background:linear-gradient(150deg, rgba(255,255,255,.72), rgba(255,255,255,.5)) !important;
+  backdrop-filter:blur(26px) saturate(115%);-webkit-backdrop-filter:blur(26px) saturate(115%);
+  border:1px solid transparent !important;
+  box-shadow:inset 0 1px 1.5px rgba(255,255,255,.9), 0 10px 26px rgba(43,84,143,.1) !important;
+}
+.flomo-memo-card::after{
+  content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;pointer-events:none;
+  background:linear-gradient(135deg, rgba(255,255,255,.95), rgba(255,255,255,.1) 40%, rgba(88,140,227,.3) 100%);
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;
+}
+.flomo-memo-time{color:var(--portal-blue) !important;opacity:.6;font-weight:600}
+.flomo-memo-content{color:var(--portal-ink) !important}
+.flomo-memo-tag{color:var(--portal-blue) !important;background:rgba(88,140,227,.1) !important}
+/* 底部编辑器 → 浮起玻璃 */
+.flomo-compose{
+  background:linear-gradient(150deg, rgba(255,255,255,.85), rgba(255,255,255,.62)) !important;
+  backdrop-filter:blur(30px) saturate(130%);-webkit-backdrop-filter:blur(30px) saturate(130%);
+  border:1px solid rgba(255,255,255,.8) !important;
+  box-shadow:inset 0 1px 1.5px rgba(255,255,255,.95), 0 -2px 8px rgba(43,84,143,.04), 0 16px 40px rgba(43,84,143,.16) !important;
+  border-radius:1.2rem !important;
+}
+.flomo-toolbar{border-top:1px solid rgba(88,140,227,.14) !important}
+.flomo-tool{color:var(--portal-blue) !important;border-radius:.7rem !important}
+.flomo-tool:hover{background:rgba(88,140,227,.12) !important}
+.flomo-tool--mic{color:var(--portal-blue) !important}
+.flomo-toolbar-divider{background:rgba(88,140,227,.18) !important}
+.flomo-status{color:var(--portal-success) !important}
+.flomo-send--on{
+  background:linear-gradient(145deg, var(--portal-blue), var(--portal-blue-strong)) !important;
+  box-shadow:0 8px 20px rgba(88,140,227,.4), inset 0 1px 1px rgba(255,255,255,.5) !important;
+}
+.flomo-input{color:var(--portal-ink) !important}
+.flomo-input::placeholder{color:var(--portal-blue) !important;opacity:.4}
+
+/* ════════════════════════════════════════════════════════════════════
+   9. 设置 portal-settings —— 玻璃化
+   ════════════════════════════════════════════════════════════════════ */
+.portal-settings-title{font-family:var(--font-portal-serif),Georgia,serif !important}
+.portal-settings-card{
+  position:relative;
+  background:linear-gradient(150deg, rgba(255,255,255,.72), rgba(255,255,255,.5)) !important;
+  backdrop-filter:blur(26px) saturate(115%);-webkit-backdrop-filter:blur(26px) saturate(115%);
+  border:1px solid transparent !important;
+  box-shadow:inset 0 1px 1.5px rgba(255,255,255,.9), 0 10px 26px rgba(43,84,143,.1) !important;
+  border-radius:1.2rem !important;padding:1.1rem !important;
+}
+.portal-settings-card::after{
+  content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;pointer-events:none;
+  background:linear-gradient(135deg, rgba(255,255,255,.95), rgba(255,255,255,.12) 40%, rgba(88,140,227,.3) 100%);
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;
+}
+.portal-settings-card > *{position:relative;z-index:1}
+.portal-settings-avatar{
+  box-shadow:0 10px 24px rgba(88,140,227,.35), inset 0 1px 2px rgba(255,255,255,.5) !important;
+}
+.portal-settings-avatar--initials{
+  background:linear-gradient(145deg, var(--portal-blue), var(--portal-blue-strong)) !important;
+}
+.portal-settings-input:focus{
+  border-color:var(--portal-blue) !important;box-shadow:0 0 0 4px rgba(150,199,243,.3) !important;
+}
+.portal-settings-lang-btn--on{
+  background:linear-gradient(150deg, #fff, var(--portal-blue-light)) !important;
+  color:var(--portal-blue-strong) !important;
+  box-shadow:0 4px 12px rgba(88,140,227,.18), inset 0 1px 1px rgba(255,255,255,.9) !important;
+}
+/* 注：设置页改名 / 切语言为失焦自动保存，无独立保存按钮，故不再针对 save-btn */
+
+/* ════════════════════════════════════════════════════════════════════
+   ▲ 可选：涟漪交互 JS （非必需，纯锦上添花）
+   把下面这段放进一个 Client 组件的 useEffect 里，或任意全局脚本：
+   ────────────────────────────────────────────────────────────────────
+   const sel='.portal-tool-card,.portal-search-btn--note,.portal-quote-treasure,'
+            +'.portal-secretary-fab,.portal-avatar-link,.flomo-tool,.flomo-send';
+   document.addEventListener('pointerdown',e=>{
+     const host=e.target.closest(sel); if(!host) return;
+     host.classList.add('om-ripple-host');
+     const r=document.createElement('span'); r.className='om-ripple';
+     const b=host.getBoundingClientRect(), s=Math.max(b.width,b.height)*1.4;
+     r.style.width=r.style.height=s+'px';
+     r.style.left=(e.clientX-b.left)+'px'; r.style.top=(e.clientY-b.top)+'px';
+     host.appendChild(r); setTimeout(()=>r.remove(),600);
+   });
+   ════════════════════════════════════════════════════════════════════ */
