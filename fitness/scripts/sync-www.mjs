@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const src = join(root, 'web');
-const files = ['index.html', 'styles.css', 'theme-skin.css', 'app.js', 'icons.js'];
+const files = ['index.html', 'styles.css', 'theme-skin.css', 'portal-embed.css', 'app.js', 'icons.js'];
 
 let apiUrl = '';
 if (process.env.VERCEL) {

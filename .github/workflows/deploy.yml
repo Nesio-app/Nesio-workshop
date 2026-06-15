@@ -54,6 +54,7 @@ jobs:
           test -f out/adhd-flow/index.html
           test -f out/fitness/index.html
           test -f out/fitness/theme-skin.css
+          test -f out/fitness/portal-embed.css
           test -f out/fitness/icons.js
           echo "Toolbox apps OK (adhd-flow + fitness)"
 

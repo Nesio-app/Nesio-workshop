@@ -185,9 +185,12 @@ body{ background:var(--appbg); }
 /* 难度小圆点 */
 .tag .rgi.dot, .tag .rgi{ vertical-align:-.1em; }
 
-/* ===================== 明暗 切换条（侧面缩小）===================== */
+/* ===================== 明暗 切换条（顶栏右侧，不挡内容）===================== */
 .rg-switch{
-  position:absolute; top:50%; right:6px; transform:translateY(-50%);
+  position:absolute;
+  top:calc(44px + env(safe-area-inset-top, 0px) + 6px);
+  right:10px;
+  transform:none;
   display:flex; flex-direction:column; gap:0; z-index:25;
   font-family:-apple-system,'Helvetica Neue',sans-serif;
   pointer-events:none;
@@ -210,11 +213,12 @@ body{ background:var(--appbg); }
 
 /* ===================== AI 教练悬浮按钮 + 面板 ===================== */
 .coach-fab{
-  position:absolute; right:14px; bottom:94px; z-index:18;
+  position:absolute; right:14px;
+  bottom:calc(86px + env(safe-area-inset-bottom, 0px)); z-index:18;
   width:48px; height:48px; border-radius:50%; border:1px solid var(--eglow);
-  background:linear-gradient(145deg, var(--ember), #c44d1f);
-  color:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center;
-  box-shadow:0 8px 22px rgba(232,97,42,.32);
+  background:linear-gradient(145deg, var(--btn1), var(--btn2));
+  color:var(--onBtn); cursor:pointer; display:flex; align-items:center; justify-content:center;
+  box-shadow:0 8px 22px var(--eglow);
   transition:transform .15s, opacity .2s;
 }
 .coach-fab .rgi, .coach-fab{ font-size:0; }
@@ -268,3 +272,37 @@ body{ background:var(--appbg); }
 /* 图例点改为热力色，与高亮一致 */
 .bodymap-box .bmd.p{ background:linear-gradient(135deg,#ffa24d,#f23030); box-shadow:0 0 7px rgba(255,90,45,.5); }
 .bodymap-box .bmd.s{ background:linear-gradient(135deg,#ffd58a,#ffab4d); box-shadow:none; }
+
+/* ===================== 真机全屏（去掉桌面预览手机框）===================== */
+@media (max-width: 520px), (hover: none) and (pointer: coarse) {
+  body{
+    align-items:stretch;
+    justify-content:flex-start;
+    background:var(--void);
+    padding:0;
+  }
+  .phone{
+    width:100%;
+    max-width:100%;
+    height:100dvh;
+    max-height:100dvh;
+    min-height:100dvh;
+    border-radius:0;
+    border:none;
+    box-shadow:none;
+  }
+  .rg-switch{
+    top:calc(44px + env(safe-area-inset-top, 0px) + 4px);
+    right:8px;
+  }
+  .coach-fab{
+    right:12px;
+    bottom:calc(78px + env(safe-area-inset-bottom, 0px));
+  }
+  body.portal-embed .phone{
+    padding-top:env(safe-area-inset-top, 0px);
+  }
+  body.portal-embed .rg-switch{
+    top:calc(44px + env(safe-area-inset-top, 0px) + 34px);
+  }
+}

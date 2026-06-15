@@ -741,6 +741,10 @@ body {
   flex-shrink: 0;
 }
 
+.portal-dash-hero-end .portal-quote-treasure {
+  padding: 0.15rem;
+}
+
 .portal-dash-toplink-inline {
   font-size: 0.68rem;
   color: var(--portal-muted);

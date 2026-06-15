@@ -381,22 +381,22 @@ export default function DashboardHome({
           >
             <DashboardNoteIcon />
           </button>
+          <button
+            type="button"
+            className={'portal-quote-treasure' + (treasureOpen ? ' portal-quote-treasure--open' : '')}
+            onClick={() => onTreasureOpenChange(!treasureOpen)}
+            aria-label="打开宝盒工具"
+            aria-expanded={treasureOpen}
+          >
+            <span className="portal-quote-treasure-box" aria-hidden>
+              <DashboardTreasureIcon />
+            </span>
+          </button>
         </div>
       </header>
 
       <section className="portal-quote" aria-label="今日话语">
         <p className="portal-quote-text">{quoteLine}</p>
-        <button
-          type="button"
-          className={'portal-quote-treasure' + (treasureOpen ? ' portal-quote-treasure--open' : '')}
-          onClick={() => onTreasureOpenChange(!treasureOpen)}
-          aria-label="打开宝盒工具"
-          aria-expanded={treasureOpen}
-        >
-          <span className="portal-quote-treasure-box" aria-hidden>
-            <DashboardTreasureIcon />
-          </span>
-        </button>
       </section>
 
       <section className="portal-widgets" aria-label="概览">
