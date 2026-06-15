@@ -2,7 +2,6 @@ const TOOLBOX_APP_PATHS = new Set([
   '/fitness',
   '/storage',
   '/adhd-flow',
-  '/inner-shelter',
 ]);
 
 /** Toolbox HTML apps use relative assets; URL must end with / or CSS/JS 404. */

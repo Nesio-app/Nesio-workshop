@@ -134,6 +134,7 @@ export default function DashboardHome({
   onOpenNote,
   onOpenTool,
 }: DashboardHomeProps) {
+  const treasureAnchorRef = useRef<HTMLButtonElement>(null);
   const profile = config.profile ?? { displayName: '婧' };
   const [locale, setLocale] = useState<PortalLocale>('zh');
   const [displayName, setDisplayName] = useState(profile.displayName);
@@ -382,6 +383,7 @@ export default function DashboardHome({
             <DashboardNoteIcon />
           </button>
           <button
+            ref={treasureAnchorRef}
             type="button"
             className={'portal-quote-treasure' + (treasureOpen ? ' portal-quote-treasure--open' : '')}
             onClick={() => onTreasureOpenChange(!treasureOpen)}
@@ -517,6 +519,7 @@ export default function DashboardHome({
       <ToolsTreasurePopup
         tools={config.tools}
         open={treasureOpen}
+        anchorRef={treasureAnchorRef}
         onClose={() => onTreasureOpenChange(false)}
         onOpenTool={onOpenTool}
       />

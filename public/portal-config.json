@@ -135,7 +135,7 @@
       "name": "冥想",
       "nameEn": "Shelter",
       "description": "心灵空间 · 呼吸安放",
-      "url": "/inner-shelter/",
+      "url": "https://inner-shelter-ios.vercel.app/",
       "zone": "reflective",
       "hotkey": "h",
       "command": "/harbor",

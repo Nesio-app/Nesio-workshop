@@ -1406,9 +1406,10 @@ body {
 
 .portal-treasure-popup {
   position: fixed;
-  left: 50%;
-  bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
-  transform: translateX(-50%);
+  top: var(--treasure-top, -9999px);
+  right: var(--treasure-right, 1rem);
+  left: auto;
+  bottom: auto;
   z-index: 201;
   width: min(calc(100vw - 1.5rem), 22rem);
   max-height: min(52dvh, 20rem);
@@ -1419,8 +1420,17 @@ body {
   background: rgba(255, 255, 255, 0.94);
   border: 1px solid var(--portal-line);
   box-shadow: 0 14px 36px rgba(88, 140, 227, 0.14);
-  animation: portal-treasure-in 0.22s ease-out;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
   isolation: isolate;
+}
+
+.portal-treasure-popup--ready {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  animation: portal-treasure-in 0.22s ease-out;
 }
 
 .portal-treasure-popup > * {
@@ -1472,11 +1482,11 @@ body {
 @keyframes portal-treasure-in {
   from {
     opacity: 0;
-    transform: translateX(-50%) translateY(0.35rem);
+    transform: scale(0.97);
   }
   to {
     opacity: 1;
-    transform: translateX(-50%) translateY(0);
+    transform: scale(1);
   }
 }
 
