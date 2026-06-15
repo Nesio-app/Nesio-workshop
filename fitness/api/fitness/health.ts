@@ -5,6 +5,6 @@ export default function handler(_req: VercelRequest, res: VercelResponse) {
   res.status(200).json({
     ok: true,
     service: 'ronggui-fitness',
-    version: '2.0.0',
+    version: '3.1.0',
   });
 }

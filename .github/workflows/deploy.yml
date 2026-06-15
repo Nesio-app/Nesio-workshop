@@ -46,11 +46,15 @@ jobs:
 
       - name: Bundle toolbox static apps
         run: |
+          rm -rf out/fitness
           mkdir -p out/adhd-flow out/fitness
           cp -R adhd-flow-ios/web/. out/adhd-flow/
           cp -R fitness/web/. out/fitness/
+          echo "window.FITNESS_API='https://fitness-psi-rouge.vercel.app';" > out/fitness/config.js
           test -f out/adhd-flow/index.html
           test -f out/fitness/index.html
+          test -f out/fitness/theme-skin.css
+          test -f out/fitness/icons.js
           echo "Toolbox apps OK (adhd-flow + fitness)"
 
       - name: Setup Pages

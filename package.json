@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "npm run bundle:toolbox && next dev",
     "build": "npm run bundle:toolbox && next build",
-    "bundle:toolbox": "mkdir -p public/adhd-flow public/fitness public/storage public/health && cp -R adhd-flow-ios/web/. public/adhd-flow/ && cp -R fitness/web/. public/fitness/ && cp -R storage-web/. public/storage/ && cp -R health-web/. public/health/ && node -e \"const fs=require('fs');const p='public/adhd-flow/config.js';fs.writeFileSync(p,'window.ADHD_FLOW_API=\\'https://adhd-flow-ios.vercel.app\\';\\n');\"",
+    "bundle:toolbox": "mkdir -p public/adhd-flow public/fitness public/storage public/health && rm -rf public/fitness && mkdir -p public/fitness && cp -R adhd-flow-ios/web/. public/adhd-flow/ && cp -R fitness/web/. public/fitness/ && cp -R storage-web/. public/storage/ && cp -R health-web/. public/health/ && node -e \"const fs=require('fs');fs.writeFileSync('public/adhd-flow/config.js','window.ADHD_FLOW_API=\\'https://adhd-flow-ios.vercel.app\\';\\n');fs.writeFileSync('public/fitness/config.js','window.FITNESS_API=\\'https://fitness-psi-rouge.vercel.app\\';\\n');\"",
     "start": "next start",
     "lint": "next lint"
   },

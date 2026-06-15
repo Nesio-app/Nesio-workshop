@@ -1,13 +1,17 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-scheme="courtyard" data-mode="day">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>熔归 RONG GUI v3</title>
-<link rel="stylesheet" href="/fitness/styles.css">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>熔归 RONG GUI v3.1</title>
+<link rel="stylesheet" href="styles.css?v=3.1.2">
+<link rel="stylesheet" href="theme-skin.css?v=3.1.2">
 <link rel="stylesheet" href="/portal-back.css">
 </head>
 <body>
+<a class="portal-back-link portal-back-link--dark" href="/" id="portalBack" hidden>‹ 宝盒</a>
 <div class="phone" id="app">
 <div class="sb"><span class="sbt" id="clock">9:41</span><div class="sbi"><span>⚡</span><span>●●●●</span><span>100%</span></div></div>
 
@@ -137,26 +141,6 @@
   <div class="pad"></div>
 </div>
 
-<!-- COACH -->
-<div class="scr" id="scr-coach">
-  <div class="ph"><div class="pt">AI 教练</div><div class="ps">基于你的身体数据 · 实时定制</div></div>
-  <div class="cprof">
-    <div class="cptt">已读取健康档案</div>
-    <div class="cppills">
-      <span class="cpill">血糖管理</span><span class="cpill">PT 康复</span>
-      <span class="cpill">HRV 监测</span><span class="cpill">膝关节</span>
-      <span class="cpill">睡眠联动</span><span class="cpill">Verna 4周</span>
-    </div>
-  </div>
-  <div class="chatarea" id="chatArea">
-    <div class="cm ai"><div class="ailbl">🔥 熔归教练</div>
-      你好 Jennifer！已读取 Verna 4 周计划和健康档案。<br><br>
-      可以帮你<strong style="color:var(--tx)">定制今日计划、调整 RPE 负荷、分析动作要点，或基于今天的血糖和睡眠状态给出实时建议</strong>。
-    </div>
-  </div>
-  <div style="height:12px" id="chatPad"></div>
-</div>
-
 <!-- GLUCOSE -->
 <div class="scr" id="scr-glucose">
   <div class="ph"><div class="pt">血糖控制台</div></div>
@@ -198,17 +182,12 @@
   <button class="mm-stop" onclick="stopMusic()">停止</button>
 </div>
 
-<div class="pbar" id="promptBar" style="display:none"></div>
-<div class="ibar" id="inputBar" style="display:none">
-  <input class="cinp" id="coachInp" placeholder="问教练任何问题..." />
-  <button class="sendbtn" onclick="sendMsg()">↑</button>
-</div>
+<button type="button" class="coach-fab" id="coachFab" onclick="openCoach()" aria-label="AI 教练">🤖</button>
 
 <div class="tabbar">
   <div class="tab on" id="tab-home" onclick="switchTab('home')"><div class="ti">🏡</div><div class="tl">主页</div></div>
   <div class="tab" id="tab-train" onclick="switchTab('train')"><div class="ti">🔥</div><div class="tl">训练</div></div>
   <div class="tab" id="tab-library" onclick="switchTab('library')"><div class="ti">📚</div><div class="tl">动作库</div></div>
-  <div class="tab" id="tab-coach" onclick="switchTab('coach')"><div class="ti">🤖</div><div class="tl">AI 教练</div></div>
   <div class="tab" id="tab-glucose" onclick="switchTab('glucose')"><div class="ti">🩸</div><div class="tl">血糖</div></div>
 </div>
 
@@ -216,28 +195,24 @@
 <div class="ss-flash" id="ssFlash"></div>
 
 <div class="hud" id="ssHud">
-  <div class="hud-scroll">
-    <div class="hudphase" id="hudPhase">第 1 组 / 共 2 组</div>
-    <div class="hudbig" id="hudBig" style="color:var(--ember)">A1</div>
-    <div class="hudex" id="hudEx">Split-Squat</div>
-    <div id="hudMedia"></div>
-    <div class="hudn" id="hudNote" style="display:none"></div>
-    <div class="hudtgt">
-      <div><div class="hudw" id="hudW">体重</div></div>
-      <div><div class="hudr" id="hudR">× 6-8 次/侧</div></div>
-    </div>
+  <div class="hudphase" id="hudPhase">第 1 组 / 共 2 组</div>
+  <div class="hudbig" id="hudBig" style="color:var(--ember)">A1</div>
+  <div class="hudex" id="hudEx">Split-Squat</div>
+  <div class="hud-fig" id="hudFig"></div>
+  <div class="hudn" id="hudNote" style="display:none"></div>
+  <div class="hudtgt">
+    <div><div class="hudw" id="hudW">体重</div></div>
+    <div><div class="hudr" id="hudR">× 6-8 次/侧</div></div>
   </div>
-  <div class="hud-foot">
-    <button class="hud-follow" type="button" onclick="openFollowFromHud()">▶ 动态跟练模式</button>
-    <div class="rpew" id="rpeWrap">
-      <div class="rpelbl"><span>本组完成度 RPE</span><span id="rpeVal">7</span></div>
-      <input type="range" class="rpeslider" id="rpeSlider" min="1" max="10" value="7"
-        oninput="document.getElementById('rpeVal').textContent=this.value">
-      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--mu);margin-top:4px"><span>轻松 1</span><span>力竭 10</span></div>
-    </div>
-    <button class="hudabtn next" id="hudBtn" onclick="hudAction()">✓ 完成本组</button>
-    <div class="hudskip" onclick="closeHud()">跳过 / 关闭</div>
+  <button class="hud-follow" onclick="openFollowFromHud()">▶ 动态跟练模式</button>
+  <div class="rpew" id="rpeWrap">
+    <div class="rpelbl"><span>本组完成度 RPE</span><span id="rpeVal">7</span></div>
+    <input type="range" class="rpeslider" id="rpeSlider" min="1" max="10" value="7"
+      oninput="document.getElementById('rpeVal').textContent=this.value">
+    <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--mu);margin-top:4px"><span>轻松 1</span><span>力竭 10</span></div>
   </div>
+  <button class="hudabtn next" id="hudBtn" onclick="hudAction()">✓ 完成本组</button>
+  <div class="hudskip" onclick="closeHud()">跳过 / 关闭</div>
 </div>
 
 <div class="resthud" id="restHud">
@@ -314,6 +289,36 @@
   <div class="mtmsg" id="mtmsg"></div>
 </div>
 
+<!-- AI COACH OVERLAY -->
+<div class="coachOv" id="coachOv">
+  <div class="coachOv-hdr">
+    <div><div class="pt">AI 教练</div><div class="ps">基于你的身体数据 · 实时定制</div></div>
+    <button type="button" class="coachOv-close" onclick="closeCoach()" aria-label="关闭">✕</button>
+  </div>
+  <div class="coachOv-body" id="coachScroll">
+    <div class="cprof">
+      <div class="cptt">已读取健康档案</div>
+      <div class="cppills">
+        <span class="cpill">血糖管理</span><span class="cpill">PT 康复</span>
+        <span class="cpill">HRV 监测</span><span class="cpill">膝关节</span>
+        <span class="cpill">睡眠联动</span><span class="cpill">Verna 4周</span>
+      </div>
+    </div>
+    <div class="chatarea" id="chatArea">
+      <div class="cm ai"><div class="ailbl">🔥 熔归教练</div>
+        你好 Jennifer！已读取 Verna 4 周计划和健康档案。<br><br>
+        可以帮你<strong style="color:var(--tx)">定制今日计划、调整 RPE 负荷、分析动作要点，或基于今天的血糖和睡眠状态给出实时建议</strong>。
+      </div>
+    </div>
+    <div style="height:12px" id="chatPad"></div>
+  </div>
+  <div class="pbar" id="promptBar"></div>
+  <div class="ibar" id="inputBar">
+    <input class="cinp" id="coachInp" placeholder="问教练任何问题..." />
+    <button class="sendbtn" onclick="sendMsg()">↑</button>
+  </div>
+</div>
+
 <!-- DETAIL OVERLAY -->
 <div class="dov" id="detailOv">
   <div class="dovh">
@@ -324,13 +329,46 @@
 </div>
 
 </div><!-- /phone -->
+<script src="config.js?v=3.1.2"></script>
+<script src="app.js?v=3.1.2"></script>
+<script src="icons.js?v=3.1.2"></script>
+<script>
+(function(){var b=document.getElementById('portalBack');if(b&&location.pathname.indexOf('/fitness')!==-1)b.hidden=false;}());
+</script>
+<script>
+/* ---- 主题：紫金（锁定）+ 星空 + 日/夜切换（可整段删除）---- */
+(function(){
+  const root=document.documentElement;
+  root.dataset.scheme='courtyard';                // 锁定静谧庭院（门户同款蓝）
+  try{ const m=localStorage.getItem('rg-mode'); if(m) root.dataset.mode=m; }catch(e){}
 
+  // starfield
+  const phone=document.querySelector('.phone');
+  if(phone && !phone.querySelector('.rg-stars')){
+    function mb(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+    const rnd=mb(20260614), wrap=document.createElement('div'); wrap.className='rg-stars';
+    for(let i=0;i<44;i++){ const big=rnd()>0.86, s=document.createElement('span'); s.className='rg-star';
+      s.style.top=(rnd()*100).toFixed(2)+'%'; s.style.left=(rnd()*100).toFixed(2)+'%';
+      const sz=(big?1.8+rnd()*1.3:0.7+rnd()*1).toFixed(2); s.style.width=sz+'px'; s.style.height=sz+'px';
+      s.style.opacity=(big?0.55+rnd()*0.4:0.18+rnd()*0.4).toFixed(2); wrap.appendChild(s); }
+    phone.insertBefore(wrap, phone.firstChild);
+  }
 
-</div>
-<script src="/fitness/config.js"></script>
-<script src="/fitness/media.js"></script>
-<script src="/fitness/audio.js"></script>
-<script src="/fitness/demo.js"></script>
-<script src="/fitness/app.js"></script>
+  // 日/夜 切换条
+  const sw=document.createElement('div'); sw.className='rg-switch';
+  sw.innerHTML=
+    '<div class="rg-seg" data-grp="mode">'+
+      '<button data-mode="night">夜</button>'+
+      '<button data-mode="day">日</button>'+
+    '</div>';
+  if(phone) phone.appendChild(sw);
+  function sync(){ sw.querySelectorAll('button').forEach(b=>
+    b.setAttribute('aria-pressed', b.dataset.mode===(root.dataset.mode||'night'))); }
+  sw.addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return;
+    root.dataset.mode=b.dataset.mode; try{localStorage.setItem('rg-mode',b.dataset.mode)}catch(e){}
+    sync(); });
+  sync();
+})();
+</script>
 </body>
 </html>

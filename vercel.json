@@ -3,6 +3,14 @@
   "framework": "nextjs",
   "buildCommand": "npm run build",
   "installCommand": "npm ci",
+  "headers": [
+    {
+      "source": "/fitness/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }
+      ]
+    }
+  ],
   "rewrites": [
     { "source": "/adhd-flow", "destination": "/adhd-flow/index.html" },
     { "source": "/adhd-flow/", "destination": "/adhd-flow/index.html" },
