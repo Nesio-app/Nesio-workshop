@@ -1420,6 +1420,12 @@ body {
   border: 1px solid var(--portal-line);
   box-shadow: 0 14px 36px rgba(88, 140, 227, 0.14);
   animation: portal-treasure-in 0.22s ease-out;
+  isolation: isolate;
+}
+
+.portal-treasure-popup > * {
+  position: relative;
+  z-index: 2;
 }
 
 .portal-treasure-popup-head {
@@ -2744,7 +2750,6 @@ body {
    苹果 iOS 玻璃：磨砂 + 镜面折射边 + 左上高光热点 + 分层投影      */
 .portal-widget,
 .portal-calendar,
-.portal-treasure-popup,
 .portal-quote,
 .portal-tool-icon-wrap{
   position:relative;
@@ -2761,7 +2766,6 @@ body {
 /* 镜面折射边（1px 渐变高光描边 — 液态玻璃的灵魂） */
 .portal-widget::after,
 .portal-calendar::after,
-.portal-treasure-popup::after,
 .portal-quote::after,
 .portal-tool-icon-wrap::after{
   content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;pointer-events:none;z-index:2;
@@ -2771,15 +2775,14 @@ body {
 }
 /* 左上镜面高光热点 */
 .portal-widget::before,
-.portal-calendar::before,
-.portal-treasure-popup::before{
+.portal-calendar::before{
   content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:1;
   background:radial-gradient(60% 50% at 18% 8%, rgba(255,255,255,.6), transparent 60%);
   opacity:.85;
 }
 .portal-widget > *,
-.portal-calendar > *,
-.portal-treasure-popup > *{position:relative;z-index:3}
+.portal-calendar > *{
+  position:relative;z-index:3}
 
 /* ═══════════════════════ 3. 衬线编辑感 ═══════════════════════ */
 .portal-dash-greeting-name,
@@ -2802,7 +2805,6 @@ body {
   .portal-dash-hero{animation-delay:.02s}
   .portal-quote{animation-delay:.10s}
   .portal-widgets{animation-delay:.18s}
-  .portal-treasure-popup{animation-delay:.26s}
   .portal-calendar{animation-delay:.34s}
   .portal-tools-grid > li{animation:portalRise .6s cubic-bezier(.22,.61,.36,1) both}
   .portal-tools-grid > li:nth-child(1){animation-delay:.30s}
