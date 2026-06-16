@@ -117,6 +117,20 @@
       "ready": true
     },
     {
+      "id": "finance",
+      "name": "理财",
+      "nameEn": "Finance",
+      "description": "家庭财务 · 现金流与净值",
+      "url": "https://finance-gamma-swart.vercel.app/",
+      "zone": "kinetic",
+      "hotkey": "g",
+      "command": "/finance",
+      "featured": false,
+      "icon": "💰",
+      "iconUrl": "/icons/tools/finance.svg",
+      "ready": true
+    },
+    {
       "id": "psychoanalysis",
       "name": "咨询",
       "nameEn": "Psych",

@@ -28,6 +28,12 @@ const TOOL_ICONS: Record<string, JSX.Element> = {
       <path d="M12 4.5v15M5.5 8 12 11.5 18.5 8" />
     </svg>
   ),
+  finance: (
+    <svg {...svgProps}>
+      <path d="M12 6.5c-3.5 0-6 2.5-6 5.5s2.5 5.5 6 5.5 6 2.5 6 5.5-2.5 5.5-6 5.5" />
+      <path d="M9.5 4.5v15M14.5 4.5v15" />
+    </svg>
+  ),
   psychoanalysis: (
     <svg {...svgProps}>
       <path d="M9 7c-2.2 0-3.5 1.6-3.5 3.8.2 1.6 1.2 2.8 3.5 3.2M15 7c2.2 0 3.5 1.6 3.5 3.8-.2 1.6-1.2 2.8-3.5 3.2" />
