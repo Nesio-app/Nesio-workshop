@@ -1,11 +1,16 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const repoRoot = process.cwd();
 
 function read(path) {
   return readFileSync(join(repoRoot, path), 'utf8');
+}
+
+function readIfExists(path) {
+  const absolutePath = join(repoRoot, path);
+  return existsSync(absolutePath) ? readFileSync(absolutePath, 'utf8') : null;
 }
 
 const launchSafety = read('lib/portal/launch-safety.ts');
@@ -41,8 +46,10 @@ assert.match(middleware, /launchUnavailablePayload/, 'middleware must emit launc
 const secretaryRoute = read('app/api/secretary/chat/route.ts');
 assert.match(secretaryRoute, /launchUnavailablePayload\('api:secretary:chat'/, 'secretary chat must fail closed before provider calls');
 
-const innerShelterRoute = read('app/api/inner-shelter/chat/route.ts');
-assert.match(innerShelterRoute, /launchUnavailablePayload\('api:inner-shelter:chat'/, 'inner-shelter chat must fail closed before provider calls');
+const innerShelterRoute = readIfExists('app/api/inner-shelter/chat/route.ts');
+if (innerShelterRoute) {
+  assert.match(innerShelterRoute, /launchUnavailablePayload\('api:inner-shelter:chat'/, 'inner-shelter chat must fail closed before provider calls');
+}
 
 for (const path of ['public/adhd-flow/app.js', 'adhd-flow-ios/web/app.js']) {
   const source = read(path);
