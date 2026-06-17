@@ -69,10 +69,17 @@
       "zone": "kinetic",
       "hotkey": "a",
       "command": "/ai",
-      "featured": true,
+      "featured": false,
       "icon": "💬",
       "iconUrl": "/icons/tools/secretary.svg",
-      "ready": true
+      "ready": false,
+      "status": "gated",
+      "integrationMode": "contract-only",
+      "owner": "CEO",
+      "maintainer": "Qiao",
+      "responsibleAgent": "Qiao",
+      "evidenceOwner": "Sina",
+      "gateOwner": "CEO"
     },
     {
       "id": "plan",
@@ -86,7 +93,12 @@
       "featured": true,
       "icon": "✅",
       "iconUrl": "/icons/tools/plan.svg",
-      "ready": true
+      "ready": true,
+      "owner": "CEO",
+      "maintainer": "Qiao",
+      "responsibleAgent": "Qiao",
+      "evidenceOwner": "Sina",
+      "gateOwner": "CEO"
     },
     {
       "id": "quiz",
@@ -100,7 +112,14 @@
       "featured": false,
       "icon": "📚",
       "iconUrl": "/icons/tools/quiz.svg",
-      "ready": true
+      "ready": false,
+      "status": "gated",
+      "integrationMode": "contract-only",
+      "owner": "CEO",
+      "maintainer": "Qiao",
+      "responsibleAgent": "Qiao",
+      "evidenceOwner": "Sina",
+      "gateOwner": "CEO"
     },
     {
       "id": "inventory",
@@ -114,7 +133,12 @@
       "featured": false,
       "icon": "📦",
       "iconUrl": "/icons/tools/storage.svg",
-      "ready": true
+      "ready": true,
+      "owner": "CEO",
+      "maintainer": "Qiao",
+      "responsibleAgent": "Qiao",
+      "evidenceOwner": "Sina",
+      "gateOwner": "CEO"
     },
     {
       "id": "psychoanalysis",
@@ -125,10 +149,17 @@
       "zone": "reflective",
       "hotkey": "s",
       "command": "/soul",
-      "featured": true,
+      "featured": false,
       "icon": "🧠",
       "iconUrl": "/icons/tools/psych.svg",
-      "ready": true
+      "ready": false,
+      "status": "gated",
+      "integrationMode": "contract-only",
+      "owner": "CEO",
+      "maintainer": "Qiao",
+      "responsibleAgent": "Qiao",
+      "evidenceOwner": "Sina",
+      "gateOwner": "CEO"
     },
     {
       "id": "sanctuary",
@@ -142,21 +173,33 @@
       "featured": false,
       "icon": "🧘",
       "iconUrl": "/icons/tools/sanctuary.svg",
-      "ready": true
+      "ready": false,
+      "status": "gated",
+      "integrationMode": "contract-only",
+      "owner": "CEO",
+      "maintainer": "Qiao",
+      "responsibleAgent": "Qiao",
+      "evidenceOwner": "Sina",
+      "gateOwner": "CEO"
     },
     {
       "id": "reading",
       "name": "阅读",
       "nameEn": "Reading",
       "description": "读书笔记 · 思想输入",
-      "url": "https://reading-ios.vercel.app/",
+      "url": "/reading/",
       "zone": "reflective",
       "hotkey": "r",
       "command": "/read",
       "featured": false,
       "icon": "📖",
       "iconUrl": "/icons/tools/reading.svg",
-      "ready": true
+      "ready": true,
+      "owner": "CEO",
+      "maintainer": "Qiao",
+      "responsibleAgent": "Qiao",
+      "evidenceOwner": "Sina",
+      "gateOwner": "CEO"
     },
     {
       "id": "fitness",
@@ -167,10 +210,15 @@
       "zone": "manifest",
       "hotkey": "f",
       "command": "/fitness",
-      "featured": true,
+      "featured": false,
       "icon": "💪",
       "iconUrl": "/icons/tools/fitness.svg",
-      "ready": true
+      "ready": true,
+      "owner": "CEO",
+      "maintainer": "Qiao",
+      "responsibleAgent": "Qiao",
+      "evidenceOwner": "Sina",
+      "gateOwner": "CEO"
     },
     {
       "id": "health",
@@ -181,10 +229,38 @@
       "zone": "manifest",
       "hotkey": "u",
       "command": "/health",
-      "featured": true,
+      "featured": false,
       "icon": "🫀",
       "iconUrl": "/icons/tools/health.svg",
-      "ready": true
+      "ready": false,
+      "status": "gated",
+      "integrationMode": "contract-only",
+      "owner": "CEO",
+      "maintainer": "Qiao",
+      "responsibleAgent": "Qiao",
+      "evidenceOwner": "Sina",
+      "gateOwner": "CEO"
+    },
+    {
+      "id": "finance",
+      "name": "财务",
+      "nameEn": "Finance",
+      "description": "现金流 · 预算与风险监控",
+      "url": "https://finance-gamma-swart.vercel.app/",
+      "zone": "manifest",
+      "hotkey": "m",
+      "command": "/finance",
+      "featured": false,
+      "icon": "💰",
+      "iconUrl": "/icons/tools/finance.svg",
+      "ready": false,
+      "status": "gated",
+      "integrationMode": "contract-only",
+      "owner": "CEO",
+      "maintainer": "Qiao",
+      "responsibleAgent": "Qiao",
+      "evidenceOwner": "Sina",
+      "gateOwner": "CEO"
     },
     {
       "id": "lifesim",
@@ -198,7 +274,14 @@
       "featured": false,
       "icon": "🎲",
       "iconUrl": "/icons/tools/lifesim.svg",
-      "ready": true
+      "ready": false,
+      "status": "gated",
+      "integrationMode": "contract-only",
+      "owner": "CEO",
+      "maintainer": "Qiao",
+      "responsibleAgent": "Qiao",
+      "evidenceOwner": "Sina",
+      "gateOwner": "CEO"
     }
   ]
 }
