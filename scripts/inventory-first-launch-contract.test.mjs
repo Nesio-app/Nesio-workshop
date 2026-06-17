@@ -21,6 +21,7 @@ assert.equal(contract.launchFlow, 'purchase-memory');
 assert.equal(contract.implementation, 'local-demo-contract-only');
 assert.deepEqual(contract.schema.fields, [
   'id',
+  'schemaVersion',
   'name',
   'category',
   'locationHint',
@@ -30,6 +31,12 @@ assert.deepEqual(contract.schema.fields, [
   'updatedAt',
   'mode',
 ]);
+assert.equal(contract.schema.schemaVersion, 'LocalInventoryItem@v1');
+assert.equal(contract.schema.tableSchemaVersions.local_profile, 'LocalProfile@v1');
+assert.equal(contract.schema.tableSchemaVersions.inventory_items, 'LocalInventoryItem@v1');
+assert.equal(contract.schema.tableSchemaVersions.inventory_store, 'LocalInventoryStore@v1');
+assert.equal(contract.schema.tableSchemaVersions.local_data_root, 'BaoheLocalDataRoot@v1');
+assert.equal(contract.schema.dataVersion, 'baohe-local-data-v1');
 
 assert.equal(contract.schema.purchaseMemory.allowedPurpose, 'ordinary_purchase_memory_only');
 assert.equal(contract.schema.purchaseMemory.financialAdviceAllowed, false);
@@ -87,6 +94,10 @@ assert.notEqual(personalItems[0], personalSentinel[0], 'personal read should ret
 
 const exportContract = buildLocalInventoryExportContract({ mode: 'demo' });
 assert.equal(exportContract.action, 'local_inventory_export');
+assert.equal(exportContract.schemaVersion, 'LocalInventoryItem@v1');
+assert.equal(exportContract.dataVersion, 'baohe-local-data-v1');
+assert.equal(exportContract.coversLocalProfile, true);
+assert.equal(exportContract.coversInventoryTables, true);
 assert.equal(exportContract.externalSideEffects, false);
 assert.equal(exportContract.cloudSyncEnabled, false);
 assert.equal(exportContract.externalAuthEnabled, false);
@@ -96,6 +107,10 @@ assert.equal(exportContract.writesRealData, false);
 
 const deleteContract = buildLocalInventoryDeleteContract({ mode: 'personal' });
 assert.equal(deleteContract.action, 'local_inventory_delete');
+assert.equal(deleteContract.schemaVersion, 'LocalInventoryItem@v1');
+assert.equal(deleteContract.dataVersion, 'baohe-local-data-v1');
+assert.equal(deleteContract.coversLocalProfile, true);
+assert.equal(deleteContract.coversInventoryTables, true);
 assert.equal(deleteContract.externalSideEffects, false);
 assert.equal(deleteContract.cloudSyncEnabled, false);
 assert.equal(deleteContract.externalAuthEnabled, false);
@@ -108,6 +123,19 @@ assert.equal(resetContract.action, 'demo_inventory_reset');
 assert.equal(resetContract.readsPersonalData, false);
 assert.equal(resetContract.writesPersonalData, false);
 assert.equal(resetContract.externalSideEffects, false);
+
+assert.equal(contract.localProfile.profileKind, 'local_profile');
+assert.equal(contract.localProfile.accountSystemEnabled, false);
+assert.equal(contract.localProfile.serverUserIdEnabled, false);
+assert.equal(contract.localProfile.schemaVersion, 'LocalProfile@v1');
+assert.equal(contract.migrationSmokeCheck.enabled, true);
+assert.equal(contract.migrationSmokeCheck.autoMigratesRealUserData, false);
+assert.equal(contract.migrationSmokeCheck.rollbackSafe, true);
+assert.equal(contract.cloudGuard.cloudEnabled, false);
+assert.equal(contract.cloudGuard.cloudSyncEnabled, false);
+assert.equal(contract.cloudGuard.realCloudProviderConnected, false);
+assert.equal(contract.reinstallRefreshGuarantee.emptyLocalStorageCreatesFreshProfile, true);
+assert.equal(contract.reinstallRefreshGuarantee.refreshPreservesRootStore, true);
 
 const reportOutput = execFileSync('node', [join(scriptDir, 'report-module-registry.mjs')], {
   cwd: repoRoot,

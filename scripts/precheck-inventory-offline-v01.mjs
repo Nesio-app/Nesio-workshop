@@ -11,8 +11,15 @@ const requiredAppMarkers = [
   'function chooseFirstLaunchMode(',
   'function exportAllLocalData(',
   'function clearPersonalData(',
+  'function deleteAllLocalLaunchData(',
   'function resetDemoData(',
   'function restoreLatestBackup(',
+  'function archiveItem(',
+  'function deleteItem(',
+  'function activeItems(',
+  'locationHint',
+  'createdAt',
+  'updatedAt',
   'purchaseMemory',
   'dataBoundary',
   'demo',
@@ -61,6 +68,8 @@ for (const [label, source] of [
     'id="mWorth"',
     'id="fWorth"',
     'portal-back-link',
+    'href="../index.html"',
+    'deleteAllLocalLaunchData()',
   ]) {
     if (!source.includes(marker)) failures.push(`${label} missing marker: ${marker}`);
   }
@@ -70,7 +79,7 @@ for (const [label, source] of [
   ['storage-web/styles.css', css],
   ['public/storage/styles.css', publicCss],
 ]) {
-  for (const marker of ['.first-launch', '.first-launch.show', '.memory-card', '.ta']) {
+  for (const marker of ['.first-launch', '.first-launch.show', '.memory-card', '.ta', '.no-data-state']) {
     if (!source.includes(marker)) failures.push(`${label} missing marker: ${marker}`);
   }
 }

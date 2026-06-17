@@ -309,6 +309,11 @@ html, body {
   box-shadow: var(--shadow-sm);
 }
 .card2 { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--r); padding: 14px; margin-bottom: 10px; }
+.no-data-state {
+  text-align: center;
+  color: var(--text2);
+  line-height: 1.55;
+}
 
 .icard { display: flex; gap: 12px; align-items: flex-start; cursor: pointer; transition: transform 0.18s; }
 .icard:active { transform: scale(0.98); }

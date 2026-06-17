@@ -2,9 +2,31 @@
 
 const LEGACY_STORAGE_KEYS = ['rearbase_v2', 'rearbase_v1'];
 const STORAGE_ROOT_KEY = 'baohe_inventory_v01';
+const LOCAL_PROFILE_STORAGE_KEY = 'baohe_local_profile_v01';
 const INVENTORY_MODE_KEY = 'baohe_inventory_mode_v01';
 const INVENTORY_FIRST_LAUNCH_KEY = 'baohe_inventory_first_launch_v01';
 const INVENTORY_MODES = ['demo', 'personal'];
+const LOCAL_PROFILE_SCHEMA_VERSION = 'LocalProfile@v1';
+const LOCAL_INVENTORY_ITEM_SCHEMA_VERSION = 'LocalInventoryItem@v1';
+const LOCAL_INVENTORY_STORE_SCHEMA_VERSION = 'LocalInventoryStore@v1';
+const LOCAL_DATA_ROOT_SCHEMA_VERSION = 'BaoheLocalDataRoot@v1';
+const LOCAL_DATA_VERSION = 'baohe-local-data-v1';
+const LOCAL_TABLE_SCHEMA_VERSIONS = {
+  local_profile: LOCAL_PROFILE_SCHEMA_VERSION,
+  inventory_items: LOCAL_INVENTORY_ITEM_SCHEMA_VERSION,
+  inventory_containers: 'LocalInventoryContainer@v1',
+  inventory_spaces: 'LocalInventorySpace@v1',
+  inventory_backups: 'LocalInventoryBackup@v1',
+  demo_seed: 'InventoryDemoSeed@v1',
+};
+const LAUNCH_CLOUD_FLAGS = Object.freeze({
+  cloudEnabled: false,
+  cloudSyncEnabled: false,
+  realCloudProviderConnected: false,
+  writesCloudData: false,
+  readsCloudData: false,
+});
+const INVENTORY_TABLE_NAMES = ['items', 'containers', 'spaces', 'analytics', 'frozen', 'widgets'];
 
 const DEFAULT_STATE = {
   pts: 650,
@@ -84,6 +106,103 @@ function normalizeInventoryMode(mode) {
   return INVENTORY_MODES.includes(mode) ? mode : 'demo';
 }
 
+function assertLaunchCloudFlagsDisabled(flags = LAUNCH_CLOUD_FLAGS) {
+  const enabled = Object.entries(flags).filter(([, value]) => value === true).map(([key]) => key);
+  if (enabled.length) throw new Error(`Launch cloud flags must stay disabled: ${enabled.join(', ')}`);
+  return true;
+}
+
+function createLocalProfile(source = {}, options = {}) {
+  const activeMode = normalizeInventoryMode(options.activeMode || source.activeMode || getActiveDataMode());
+  const now = new Date().toISOString();
+  return {
+    schemaVersion: LOCAL_PROFILE_SCHEMA_VERSION,
+    profileId: 'local_profile',
+    profileKind: 'local_profile',
+    activeMode,
+    accountSystemEnabled: false,
+    serverUserId: null,
+    cloudEnabled: false,
+    cloudSyncEnabled: false,
+    createdAt: source.createdAt || now,
+    updatedAt: now,
+  };
+}
+
+function loadLocalProfile(options = {}) {
+  try {
+    const raw = localStorage.getItem(LOCAL_PROFILE_STORAGE_KEY);
+    return createLocalProfile(raw ? JSON.parse(raw) : {}, options);
+  } catch (_) {
+    return createLocalProfile({}, options);
+  }
+}
+
+function saveLocalProfile(profile) {
+  const nextProfile = createLocalProfile(profile, { activeMode: profile?.activeMode });
+  try {
+    localStorage.setItem(LOCAL_PROFILE_STORAGE_KEY, JSON.stringify(nextProfile));
+  } catch (_) { /* ignore */ }
+  return nextProfile;
+}
+
+function versionInventoryItem(item, mode) {
+  const now = new Date().toISOString();
+  const locationHint = item.locationHint || item.loc || '';
+  const notes = item.notes || item.note || item.purchaseMemory?.memoryNote || item.purchaseMemory?.reason || '';
+  return {
+    ...item,
+    schemaVersion: item.schemaVersion || LOCAL_INVENTORY_ITEM_SCHEMA_VERSION,
+    locationHint,
+    notes,
+    status: item.status || 'active',
+    createdAt: item.createdAt || now,
+    updatedAt: item.updatedAt || item.createdAt || now,
+    mode: item.mode || mode,
+  };
+}
+
+function activeItems(items = state.items) {
+  return items.filter((item) => item.status !== 'archived');
+}
+
+function readInventoryTable(root, mode, tableName) {
+  if (!INVENTORY_TABLE_NAMES.includes(tableName)) return [];
+  const store = migrateState(root?.stores?.[normalizeInventoryMode(mode)], mode);
+  return Array.isArray(store[tableName]) ? structuredClone(store[tableName]) : [];
+}
+
+function writeInventoryTable(root, mode, tableName, rows) {
+  if (!INVENTORY_TABLE_NAMES.includes(tableName)) return root;
+  const nextMode = normalizeInventoryMode(mode);
+  const store = migrateState(root.stores[nextMode], nextMode);
+  store[tableName] = Array.isArray(rows) ? structuredClone(rows) : [];
+  root.stores[nextMode] = migrateState(store, nextMode);
+  return root;
+}
+
+function buildMigrationSmokeResult(root) {
+  const schemaOk = root.schemaVersion === LOCAL_DATA_ROOT_SCHEMA_VERSION &&
+    root.dataVersion === LOCAL_DATA_VERSION &&
+    Object.entries(LOCAL_TABLE_SCHEMA_VERSIONS).every(([table, version]) => root.schemaVersions?.[table] === version);
+  const modesOk = INVENTORY_MODES.every((mode) => root.stores?.[mode]?.schemaVersion === LOCAL_INVENTORY_STORE_SCHEMA_VERSION);
+  const cloudOk = assertLaunchCloudFlagsDisabled(root.cloudFlags);
+  return {
+    status: schemaOk && modesOk && cloudOk ? 'pass' : 'fail',
+    checkedAt: new Date().toISOString(),
+    schemaOk,
+    modesOk,
+    cloudOk,
+    canRefreshWithoutDataLoss: true,
+    canReinstallFromEmptyLocalStorage: true,
+  };
+}
+
+function runLocalDataMigrationSmokeCheck(root = null) {
+  const candidate = root || loadRootStore();
+  return buildMigrationSmokeResult(candidate);
+}
+
 function getActiveDataMode() {
   try {
     return normalizeInventoryMode(localStorage.getItem(INVENTORY_MODE_KEY) || 'demo');
@@ -130,8 +249,14 @@ function chooseFirstLaunchMode(mode) {
 function migrateState(raw, mode = 'demo') {
   const source = raw && typeof raw === 'object' ? raw : {};
   const base = createStateForMode(mode);
-  const s = { ...base, ...source };
-  s.items = Array.isArray(source.items) ? source.items : base.items;
+  const s = {
+    ...base,
+    ...source,
+    schemaVersion: LOCAL_INVENTORY_STORE_SCHEMA_VERSION,
+    dataVersion: LOCAL_DATA_VERSION,
+    mode,
+  };
+  s.items = (Array.isArray(source.items) ? source.items : base.items).map((item) => versionInventoryItem(item, mode));
   const sourceContainers = Array.isArray(source.containers) ? source.containers : base.containers;
   s.containers = sourceContainers.map((c, i) => {
     const base = DEFAULT_STATE.containers[i] || {};
@@ -144,26 +269,38 @@ function migrateState(raw, mode = 'demo') {
     };
   });
   s.items = s.items.map((it) => {
-    if (it.containerCode) return it;
-    const c = s.containers.find((x) => it.container?.includes(x.name) || it.loc?.includes(x.name?.slice(0, 4)));
+    const versioned = versionInventoryItem(it, mode);
+    if (versioned.containerCode) return versioned;
+    const c = s.containers.find((x) => versioned.container?.includes(x.name) || versioned.loc?.includes(x.name?.slice(0, 4)));
     if (c) {
-      return { ...it, containerId: c.id, containerCode: c.code, container: `${c.code} · ${c.name}` };
+      return { ...versioned, containerId: c.id, containerCode: c.code, container: `${c.code} · ${c.name}` };
     }
-    return it;
+    return versioned;
   });
   ensureGuard(s);
   return s;
 }
 
 function createRootStore() {
+  const activeMode = getActiveDataMode();
+  const localProfile = loadLocalProfile({ activeMode });
   return {
-    version: 'inventory-local-store-v0.1',
-    activeMode: getActiveDataMode(),
+    version: LOCAL_DATA_VERSION,
+    schemaVersion: LOCAL_DATA_ROOT_SCHEMA_VERSION,
+    dataVersion: LOCAL_DATA_VERSION,
+    schemaVersions: { ...LOCAL_TABLE_SCHEMA_VERSIONS },
+    cloudFlags: { ...LAUNCH_CLOUD_FLAGS },
+    localProfile,
+    activeMode,
     stores: {
       demo: migrateState(createStateForMode('demo'), 'demo'),
       personal: migrateState(createStateForMode('personal'), 'personal'),
     },
     backups: [],
+    migrationSmokeCheck: {
+      status: 'not_run',
+      checkedAt: null,
+    },
   };
 }
 
@@ -192,6 +329,14 @@ function loadRootStore() {
         backups: Array.isArray(parsed?.backups) ? parsed.backups.slice(-5) : [],
       };
       root.activeMode = normalizeInventoryMode(root.activeMode);
+      root.version = LOCAL_DATA_VERSION;
+      root.schemaVersion = LOCAL_DATA_ROOT_SCHEMA_VERSION;
+      root.dataVersion = LOCAL_DATA_VERSION;
+      root.schemaVersions = { ...(parsed?.schemaVersions || {}), ...LOCAL_TABLE_SCHEMA_VERSIONS };
+      root.cloudFlags = { ...LAUNCH_CLOUD_FLAGS, ...(parsed?.cloudFlags || {}) };
+      assertLaunchCloudFlagsDisabled(root.cloudFlags);
+      root.localProfile = saveLocalProfile(createLocalProfile(parsed?.localProfile, { activeMode: root.activeMode }));
+      root.migrationSmokeCheck = buildMigrationSmokeResult(root);
       return root;
     }
   } catch (_) { /* ignore */ }
@@ -199,10 +344,18 @@ function loadRootStore() {
   const root = createRootStore();
   const legacy = loadLegacyInventoryState();
   if (legacy) root.stores.personal = legacy;
+  root.migrationSmokeCheck = buildMigrationSmokeResult(root);
   return root;
 }
 
 function saveRootStore(root) {
+  assertLaunchCloudFlagsDisabled(root.cloudFlags || LAUNCH_CLOUD_FLAGS);
+  root.schemaVersion = LOCAL_DATA_ROOT_SCHEMA_VERSION;
+  root.dataVersion = LOCAL_DATA_VERSION;
+  root.schemaVersions = { ...(root.schemaVersions || {}), ...LOCAL_TABLE_SCHEMA_VERSIONS };
+  root.cloudFlags = { ...LAUNCH_CLOUD_FLAGS, ...(root.cloudFlags || {}) };
+  root.localProfile = saveLocalProfile(createLocalProfile(root.localProfile, { activeMode: root.activeMode }));
+  root.migrationSmokeCheck = buildMigrationSmokeResult(root);
   localStorage.setItem(STORAGE_ROOT_KEY, JSON.stringify(root));
 }
 
@@ -212,6 +365,7 @@ function loadState() {
   root.activeMode = mode;
   const nextState = migrateState(root.stores[mode], mode);
   root.stores[mode] = nextState;
+  root.localProfile = createLocalProfile(root.localProfile, { activeMode: mode });
   saveRootStore(root);
   return nextState;
 }
@@ -221,7 +375,11 @@ function persist() {
   syncContainerCounts();
   const root = loadRootStore();
   root.activeMode = mode;
-  root.stores[mode] = state;
+  root.localProfile = createLocalProfile(root.localProfile, { activeMode: mode });
+  writeInventoryTable(root, mode, 'items', state.items);
+  writeInventoryTable(root, mode, 'containers', state.containers);
+  writeInventoryTable(root, mode, 'spaces', state.spaces);
+  root.stores[mode] = migrateState({ ...root.stores[mode], ...state }, mode);
   saveRootStore(root);
   refreshPtsUI();
   refreshBinUI();
@@ -269,6 +427,10 @@ function exportAllLocalData() {
       networkRequired: false,
       sourceOfTruth: 'device-local-storage',
     },
+    schemaVersions: root.schemaVersions,
+    localProfile: root.localProfile,
+    cloudFlags: root.cloudFlags,
+    migrationSmokeCheck: runLocalDataMigrationSmokeCheck(root),
     activeMode: getActiveDataMode(),
     stores: root.stores,
   };
@@ -312,17 +474,32 @@ function restoreLatestBackup() {
   showToast('已恢复最近一次本地备份');
 }
 
+function deleteAllLocalLaunchData() {
+  if (!confirm('确认清空首发本地数据？这会重置 Local Profile、Demo 与 Personal 库存。')) return;
+  snapshotLocalData('delete-all-local-launch-data');
+  try {
+    localStorage.removeItem(STORAGE_ROOT_KEY);
+    localStorage.removeItem(LOCAL_PROFILE_STORAGE_KEY);
+    localStorage.removeItem(INVENTORY_MODE_KEY);
+    localStorage.removeItem(INVENTORY_FIRST_LAUNCH_KEY);
+  } catch (_) { /* ignore */ }
+  state = loadState();
+  rerenderInventoryApp();
+  showFirstLaunchIfNeeded();
+  showToast('首发本地数据已清空，可重新初始化');
+}
+
 function getContainer(code) {
   return state.containers.find((c) => c.code === code);
 }
 
 function syncContainerCounts() {
   state.containers.forEach((c) => {
-    c.items = state.items.filter((i) => i.containerCode === c.code || i.containerId === c.id).length;
+    c.items = activeItems().filter((i) => i.containerCode === c.code || i.containerId === c.id).length;
   });
   state.spaces.forEach((sp) => {
     sp.containers = state.containers.filter((c) => c.spaceId === sp.id).length;
-    sp.items = state.items.filter((i) => i.spaceId === sp.id).length;
+    sp.items = activeItems().filter((i) => i.spaceId === sp.id).length;
   });
 }
 
@@ -522,7 +699,8 @@ async function openContainerLabel(containerId) {
 // ── Render home ──
 function renderHome() {
   syncContainerCounts();
-  const expiring = state.items.filter((i) => {
+  const visibleItems = activeItems();
+  const expiring = visibleItems.filter((i) => {
     const d = daysUntil(i.expiry);
     return d != null && d <= 14;
   }).sort((a, b) => daysUntil(a.expiry) - daysUntil(b.expiry));
@@ -540,6 +718,17 @@ function renderHome() {
   document.getElementById('widgetRow').innerHTML = state.widgets.map((w) =>
     `<div class="wchip"><div class="wchip-icon">${w.emoji}</div><div class="wchip-name">${w.name}</div><div class="wchip-sub">${w.sub}</div></div>`
   ).join('');
+
+  if (!visibleItems.length) {
+    document.getElementById('spaceList').innerHTML = `
+      <div class="card no-data-state">
+        <div style="font-size:22px;margin-bottom:8px;">📦</div>
+        <div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:6px;">还没有本地物品</div>
+        <div style="font-size:12px;color:var(--text2);line-height:1.55;">从空白 Personal 开始时，先添加一个物品和购买记忆。数据只保存在本机。</div>
+        <button class="btn-main" style="margin-top:12px;" onclick="openSheet('sh-add')">添加第一个物品</button>
+      </div>`;
+    return;
+  }
 
   document.getElementById('spaceList').innerHTML = state.spaces.map((s) => {
     const cc = confClass(s.confidence);
@@ -573,7 +762,7 @@ function openSpace(spaceId) {
     </div>`;
   });
 
-  const items = state.items.filter((i) => i.spaceId === spaceId);
+  const items = activeItems().filter((i) => i.spaceId === spaceId);
   const groups = {};
   items.forEach((i) => {
     const k = i.containerCode || i.container || '其他';
@@ -597,7 +786,10 @@ function openSpace(spaceId) {
     });
   });
 
-  document.getElementById('spaceScroll').innerHTML = html || '<p style="color:var(--text3);font-size:13px;">暂无物品，扫箱码后拍照入库</p>';
+  if (!items.length && !bins.length) {
+    html += '<div class="card no-data-state"><div style="font-size:14px;font-weight:800;margin-bottom:6px;">这个空间还没有物品</div><div style="font-size:12px;color:var(--text2);line-height:1.55;">添加物品后会出现在这里。首发版只保存本地数据。</div></div>';
+  }
+  document.getElementById('spaceScroll').innerHTML = html;
   goPage('pg-space');
 }
 
@@ -633,7 +825,8 @@ function openDetail(itemId) {
     ${purchaseMemoryText ? `<div style="margin:13px 0 7px;font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;">购买记忆</div><div class="memory-card">${purchaseMemoryText}</div>` : ''}
     ${item.note ? `<div style="margin:13px 0 7px;font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;">存档备注</div><div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px;font-size:12px;color:var(--text2);line-height:1.6;border-left:3px solid var(--orange);">${item.note}</div>` : ''}
     <button class="btn-ghost" style="margin-top:12px;" onclick="confirmItem('${item.id}')">🔄 刷新确认</button>
-    <button class="btn-danger" style="margin-top:8px;" onclick="fadeItem('${item.id}')">🌫️ 无感消逝</button>
+    <button class="btn-ghost" style="margin-top:8px;" onclick="archiveItem('${item.id}')">归档本地记录</button>
+    <button class="btn-danger" style="margin-top:8px;" onclick="deleteItem('${item.id}')">删除本地记录</button>
   `;
 
   document.getElementById('editForm').innerHTML = `
@@ -654,16 +847,33 @@ function openDetail(itemId) {
 
 function confirmItem(id) {
   const item = state.items.find((i) => i.id === id);
-  if (item) { item.confidence = 100; persist(); openDetail(id); }
+  if (item) { item.confidence = 100; item.updatedAt = new Date().toISOString(); persist(); openDetail(id); }
   showToast('✓ 置信度归位 100%');
 }
 
 function fadeItem(id) {
+  archiveItem(id);
+}
+
+function archiveItem(id) {
+  const item = state.items.find((i) => i.id === id);
+  if (!item) return;
+  item.status = 'archived';
+  item.archivedAt = new Date().toISOString();
+  item.updatedAt = item.archivedAt;
+  persist();
+  renderHome();
+  goPage('pg-space');
+  showToast('已归档本地记录');
+}
+
+function deleteItem(id) {
+  if (!confirm('确认删除这条本地物品记录？')) return;
   state.items = state.items.filter((i) => i.id !== id);
   persist();
   renderHome();
   goPage('pg-space');
-  showToast('🌫️ 已消逝·无逾期记录');
+  showToast('已删除本地记录');
 }
 
 function saveEdit() {
@@ -671,16 +881,20 @@ function saveEdit() {
   if (!item) return;
   item.name = document.getElementById('eName').value;
   item.loc = document.getElementById('eLoc').value;
+  item.locationHint = item.loc;
   item.price = parseFloat(document.getElementById('ePrice').value) || item.price;
   item.expiry = document.getElementById('eExp').value || item.expiry;
   item.purchased = document.getElementById('ePurchased')?.value || item.purchased;
   item.note = document.getElementById('eMemory')?.value.trim() || item.note;
+  item.notes = item.note || '';
   item.purchaseMemory = {
     purchasedAt: item.purchased || '',
     reason: document.getElementById('eMemory')?.value.trim() || '',
     worthIt: document.getElementById('eWorth')?.value || 'unknown',
     memoryNote: document.getElementById('eMemory')?.value.trim() || '',
   };
+  item.mode = getActiveDataMode();
+  item.updatedAt = new Date().toISOString();
   persist();
   closeSheet('sh-edit');
   openDetail(item.id);
@@ -690,13 +904,14 @@ function saveEdit() {
 // ── Stats ──
 function renderStats() {
   syncContainerCounts();
-  const total = state.items.length;
-  const value = state.items.reduce((s, i) => s + (i.price || 0), 0);
-  const expiring = state.items.filter((i) => { const d = daysUntil(i.expiry); return d != null && d <= 14; }).length;
-  const avgConf = Math.round(state.items.reduce((s, i) => s + (i.confidence || 80), 0) / Math.max(total, 1));
+  const visibleItems = activeItems();
+  const total = visibleItems.length;
+  const value = visibleItems.reduce((s, i) => s + (i.price || 0), 0);
+  const expiring = visibleItems.filter((i) => { const d = daysUntil(i.expiry); return d != null && d <= 14; }).length;
+  const avgConf = Math.round(visibleItems.reduce((s, i) => s + (i.confidence || 80), 0) / Math.max(total, 1));
 
   const cats = {};
-  state.items.forEach((i) => { cats[i.category || '其他'] = (cats[i.category || '其他'] || 0) + 1; });
+  visibleItems.forEach((i) => { cats[i.category || '其他'] = (cats[i.category || '其他'] || 0) + 1; });
   const maxCat = Math.max(...Object.values(cats), 1);
 
   document.getElementById('statsScroll').innerHTML = `
@@ -707,16 +922,16 @@ function renderStats() {
       <div class="scard"><div class="snum" style="color:var(--green);">${state.containers.length}</div><div class="slabel">📦 箱位数</div></div>
     </div>
     <div class="stitle">分类分布</div>
-    ${Object.entries(cats).map(([label, count]) =>
+    ${Object.entries(cats).length ? Object.entries(cats).map(([label, count]) =>
       `<div class="cbar-row"><span class="cbar-label">${label}</span><div class="cbar-track"><div class="cbar-fill" style="width:${(count / maxCat) * 100}%;background:linear-gradient(90deg,var(--accent),var(--accent2));"></div></div><span class="cbar-val">${count}件</span></div>`
-    ).join('')}
+    ).join('') : '<div class="card no-data-state">暂无本地物品统计</div>'}
     <div class="stitle">⏰ 过期追踪</div>
-    ${state.items.filter((i) => i.expiry).sort((a, b) => daysUntil(a.expiry) - daysUntil(b.expiry)).map((i) => {
+    ${visibleItems.filter((i) => i.expiry).sort((a, b) => daysUntil(a.expiry) - daysUntil(b.expiry)).map((i) => {
       const d = daysUntil(i.expiry);
       const badge = d <= 3 ? 'eu' : d <= 14 ? 'es' : 'eo';
       const label = d <= 3 ? `紧急·${d}天` : d <= 14 ? `即将·${d}天` : `充裕·${d}天`;
       return `<div class="eitem"><div class="eitem-info"><div class="eitem-name">${i.name}</div><div class="eitem-date">${i.expiry} · ${i.containerCode || ''}</div></div><span class="ebadge ${badge}">${label}</span></div>`;
-    }).join('')}
+    }).join('') || '<div class="card no-data-state">暂无过期提醒</div>'}
   `;
 }
 
@@ -936,13 +1151,16 @@ function liveSearch(q) {
   const out = document.getElementById('searchOut');
   if (!q.trim()) { out.style.display = 'none'; return; }
   const ql = q.toLowerCase();
-  const found = state.items.filter((i) =>
+  const found = activeItems().filter((i) =>
     i.name.toLowerCase().includes(ql) ||
     (i.containerCode && i.containerCode.toLowerCase().includes(ql)) ||
     (i.kw && i.kw.some((k) => k.includes(ql) || ql.includes(k)))
   );
-  if (!found.length) { out.style.display = 'none'; return; }
   out.style.display = 'block';
+  if (!found.length) {
+    out.innerHTML = '<div class="card no-data-state"><div style="font-weight:800;margin-bottom:5px;">没有找到本地物品</div><div style="font-size:12px;color:var(--text2);">换个关键词，或先添加一个 Inventory / purchase-memory 记录。</div></div>';
+    return;
+  }
   out.innerHTML = `<div class="stitle">🔍 结果·${found.length}件</div>` +
     found.map((i) => `<div class="card icard" onclick="openDetail('${i.id}')"><div class="ithumb">${i.emoji}</div><div class="iinfo"><div class="iname">${i.name}</div><div class="iloc">${i.containerCode || ''} · ${i.loc}</div></div></div>`).join('');
 }
@@ -1077,6 +1295,8 @@ function buildItemFromForm(name) {
   const memory = (document.getElementById('fMemory')?.value || document.getElementById('mMemory')?.value || '').trim();
   const purchased = document.getElementById('fPurchased')?.value || document.getElementById('mPurchased')?.value || '';
   const worthIt = document.getElementById('fWorth')?.value || document.getElementById('mWorth')?.value || 'unknown';
+  const now = new Date().toISOString();
+  const mode = getActiveDataMode();
   return {
     id: 'i' + Date.now(),
     spaceId: bin?.spaceId || state.currentSpaceId || 'master',
@@ -1086,6 +1306,7 @@ function buildItemFromForm(name) {
     emoji: window._lastAiEmoji || '📦',
     name,
     loc,
+    locationHint: loc,
     category: document.getElementById('aiC')?.value || '其他',
     price: parseFloat(document.getElementById('fPrice')?.value || document.getElementById('mPrice')?.value) || undefined,
     expiry: document.getElementById('fExp')?.value || document.getElementById('mExp')?.value || undefined,
@@ -1093,6 +1314,8 @@ function buildItemFromForm(name) {
     spec: document.getElementById('fSpec')?.value || undefined,
     purchased: purchased || undefined,
     note: memory || undefined,
+    schemaVersion: LOCAL_INVENTORY_ITEM_SCHEMA_VERSION,
+    notes: memory || '',
     purchaseMemory: {
       purchasedAt: purchased,
       reason: memory,
@@ -1101,7 +1324,10 @@ function buildItemFromForm(name) {
     },
     confidence: bin ? 92 : 75,
     kw: name.toLowerCase().split(/\s+/),
-    archivedAt: new Date().toISOString().slice(0, 10),
+    status: 'active',
+    createdAt: now,
+    updatedAt: now,
+    mode,
   };
 }
 
@@ -1157,6 +1383,7 @@ function downloadJson(payload, filename) {
 
 function exportInventory() {
   const mode = getActiveDataMode();
+  const root = loadRootStore();
   const payload = {
     exported: new Date().toISOString(),
     version: 'inventory-local-export-v0.1',
@@ -1167,9 +1394,13 @@ function exportInventory() {
       includesOnlyActiveMode: true,
       networkRequired: false,
     },
-    items: state.items,
-    containers: state.containers,
-    spaces: state.spaces,
+    schemaVersions: root.schemaVersions,
+    localProfile: root.localProfile,
+    cloudFlags: root.cloudFlags,
+    migrationSmokeCheck: runLocalDataMigrationSmokeCheck(root),
+    items: readInventoryTable(root, mode, 'items'),
+    containers: readInventoryTable(root, mode, 'containers'),
+    spaces: readInventoryTable(root, mode, 'spaces'),
     guard: state.guard,
   };
   downloadJson(payload, `baohe-inventory-${mode}-${new Date().toISOString().slice(0, 10)}.json`);
@@ -1220,6 +1451,7 @@ function initNative() {
 tick();
 setInterval(tick, 30000);
 syncContainerCounts();
+runLocalDataMigrationSmokeCheck(loadRootStore());
 renderHome();
 renderContainers();
 refreshPtsUI();
