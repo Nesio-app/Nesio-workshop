@@ -4,6 +4,9 @@ const LEGACY_STORAGE_KEYS = ['rearbase_v2', 'rearbase_v1'];
 const STORAGE_ROOT_KEY = 'baohe_inventory_v01';
 const LOCAL_PROFILE_STORAGE_KEY = 'baohe_local_profile_v01';
 const LOCAL_BACKUP_METADATA_KEY = 'baohe_local_backup_meta_v01';
+const INVENTORY_INDEXEDDB_NAME = 'baohe_inventory_local_db_v01';
+const INVENTORY_INDEXEDDB_STORE = 'local_root_store';
+const INVENTORY_INDEXEDDB_ROOT_ID = 'baohe-local-root';
 const INVENTORY_MODE_KEY = 'baohe_inventory_mode_v01';
 const INVENTORY_FIRST_LAUNCH_KEY = 'baohe_inventory_first_launch_v01';
 const INVENTORY_MODES = ['demo', 'personal'];
@@ -200,6 +203,90 @@ function backupReminderStatus(metadata = loadLocalBackupMetadata()) {
     return `超过 ${LOCAL_BACKUP_REMINDER_DAYS} 天未备份`;
   }
   return '备份状态正常';
+}
+
+function openInventoryIndexedDb() {
+  if (typeof indexedDB === 'undefined') return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const request = indexedDB.open(INVENTORY_INDEXEDDB_NAME, 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(INVENTORY_INDEXEDDB_STORE)) {
+        db.createObjectStore(INVENTORY_INDEXEDDB_STORE, { keyPath: 'id' });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => resolve(null);
+  });
+}
+
+function saveRootStoreToIndexedDb(root) {
+  openInventoryIndexedDb().then((db) => {
+    if (!db) return;
+    const tx = db.transaction(INVENTORY_INDEXEDDB_STORE, 'readwrite');
+    tx.objectStore(INVENTORY_INDEXEDDB_STORE).put({
+      id: INVENTORY_INDEXEDDB_ROOT_ID,
+      savedAt: new Date().toISOString(),
+      root,
+      boundary: {
+        indexedDbMirrorEnabled: true,
+        localStorageCompatibility: true,
+        cloudSyncEnabled: false,
+      },
+    });
+    tx.oncomplete = () => db.close();
+    tx.onerror = () => db.close();
+  }).catch(() => undefined);
+}
+
+function restoreRootStoreFromIndexedDb() {
+  return openInventoryIndexedDb().then((db) => new Promise((resolve) => {
+    if (!db) {
+      resolve(null);
+      return;
+    }
+    const tx = db.transaction(INVENTORY_INDEXEDDB_STORE, 'readonly');
+    const request = tx.objectStore(INVENTORY_INDEXEDDB_STORE).get(INVENTORY_INDEXEDDB_ROOT_ID);
+    request.onsuccess = () => {
+      db.close();
+      resolve(request.result?.root || null);
+    };
+    request.onerror = () => {
+      db.close();
+      resolve(null);
+    };
+  })).catch(() => null);
+}
+
+function deleteRootStoreFromIndexedDb() {
+  openInventoryIndexedDb().then((db) => {
+    if (!db) return;
+    const tx = db.transaction(INVENTORY_INDEXEDDB_STORE, 'readwrite');
+    tx.objectStore(INVENTORY_INDEXEDDB_STORE).delete(INVENTORY_INDEXEDDB_ROOT_ID);
+    tx.oncomplete = () => db.close();
+    tx.onerror = () => db.close();
+  }).catch(() => undefined);
+}
+
+function bootstrapRootStoreFromIndexedDb() {
+  try {
+    if (localStorage.getItem(STORAGE_ROOT_KEY)) return;
+  } catch (_) {
+    return;
+  }
+  restoreRootStoreFromIndexedDb().then((root) => {
+    if (!root) return;
+    try {
+      localStorage.setItem(STORAGE_ROOT_KEY, JSON.stringify(root));
+      if (root.activeMode) localStorage.setItem(INVENTORY_MODE_KEY, normalizeInventoryMode(root.activeMode));
+    } catch (_) {
+      return;
+    }
+    state = loadState();
+    rerenderInventoryApp();
+    showFirstLaunchIfNeeded();
+    showToast('已从本机 IndexedDB 恢复本地数据');
+  }).catch(() => undefined);
 }
 
 function versionInventoryItem(item, mode) {
@@ -414,6 +501,7 @@ function saveRootStore(root) {
   root.localProfile.lastSavedAt = new Date().toISOString();
   root.migrationSmokeCheck = buildMigrationSmokeResult(root);
   localStorage.setItem(STORAGE_ROOT_KEY, JSON.stringify(root));
+  saveRootStoreToIndexedDb(root);
 }
 
 function loadState() {
@@ -468,6 +556,8 @@ function buildLocalBackupPayload(root = loadRootStore()) {
       userManagedFileBackup: true,
       restoreSupported: true,
       filesAppRecommended: true,
+      indexedDbMirrorEnabled: true,
+      localStorageCompatibility: true,
       readsRealData: false,
       writesRealData: false,
       cloudSyncEnabled: false,
@@ -629,6 +719,7 @@ function deleteAllLocalLaunchData() {
     localStorage.removeItem(INVENTORY_MODE_KEY);
     localStorage.removeItem(INVENTORY_FIRST_LAUNCH_KEY);
   } catch (_) { /* ignore */ }
+  deleteRootStoreFromIndexedDb();
   state = loadState();
   rerenderInventoryApp();
   showFirstLaunchIfNeeded();
@@ -1598,6 +1689,12 @@ function initNative() {
   scheduleGuardNotifications(ensureGuard(state));
 }
 
+function registerInventoryServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  if (window.location.protocol === 'file:') return;
+  navigator.serviceWorker.register('sw.js').catch(() => undefined);
+}
+
 // ── Boot ──
 tick();
 setInterval(tick, 30000);
@@ -1609,4 +1706,6 @@ refreshPtsUI();
 refreshBinUI();
 renderGuardUI();
 initNative();
+registerInventoryServiceWorker();
+bootstrapRootStoreFromIndexedDb();
 showFirstLaunchIfNeeded();
