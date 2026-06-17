@@ -72,7 +72,8 @@ function card(tool) {
 }
 
 function buildShellHtml() {
-  const cards = iosPortalConfig.tools.map(card).join('\n');
+  const launchSurfaceTools = iosPortalConfig.tools.filter((tool) => launchReadyIds.has(tool.id));
+  const cards = launchSurfaceTools.map(card).join('\n');
   return `<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -108,7 +109,7 @@ function buildShellHtml() {
     </header>
     <section class="hero">
       <strong>首发路径已收敛到本地可用能力。</strong>
-      <span>高风险 AI、财务、健康、心理、支付、外部授权和通知能力保持未来 / gated 状态。当前主流程是进入收纳，完成 Inventory 本地体验。</span>
+      <span>当前主流程是进入收纳，完成 Inventory 本地体验。其他工具保留在内部 registry，不在首发界面展示或承诺。</span>
       <a class="primary-flow" href="storage/index.html">进入收纳 Inventory <span>→</span></a>
     </section>
     <section class="grid" aria-label="宝盒工具">

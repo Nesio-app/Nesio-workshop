@@ -24,7 +24,10 @@ assert.match(index, /宝盒/, 'iOS shell must render Baohe brand');
 assert.match(index, /viewport-fit=cover/, 'iOS shell must use mobile safe-area viewport');
 assert.match(index, /href="storage\/index\.html"/, 'iOS shell must link to Inventory flow');
 assert.match(index, /data-module-id="inventory"/, 'Inventory card must be present');
-assert.match(index, /data-status="gated"/, 'gated future modules must be visible as unavailable');
+for (const hiddenLaunchModule of ['secretary', 'plan', 'quiz', 'psychoanalysis', 'sanctuary', 'reading', 'fitness', 'health', 'finance', 'lifesim']) {
+  assert.doesNotMatch(index, new RegExp(`data-module-id="${hiddenLaunchModule}"`), `${hiddenLaunchModule} must not be shown to ordinary first-launch iOS users`);
+}
+assert.doesNotMatch(index, /data-status="gated"/, 'ordinary first-launch iOS users should not see gated module cards');
 assert.doesNotMatch(index, /https:\/\/[^"']+\.vercel\.app/, 'iOS shell must not embed production module URLs');
 assert.doesNotMatch(index, /StoreKit|purchase|payment/i, 'iOS shell must not expose payment runtime');
 
