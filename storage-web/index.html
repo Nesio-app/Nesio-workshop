@@ -7,13 +7,25 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#e7eefb">
   <title>大后方</title>
-  <link rel="manifest" href="/storage/manifest.json">
-  <link rel="stylesheet" href="/storage/styles.css">
-  <link rel="stylesheet" href="/storage/portal-back.css">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="/portal-back.css">
 </head>
 <body>
 <a class="portal-back-link" href="/">‹ 宝盒</a>
 <div class="app-shell" id="app">
+  <div class="first-launch" id="firstLaunch" aria-modal="true" role="dialog" aria-labelledby="firstLaunchTitle">
+    <div class="first-launch-card">
+      <div class="first-launch-kicker">Baohe Purchase Memory</div>
+      <h1 id="firstLaunchTitle">先从购买记忆开始</h1>
+      <p>首发版只做本地 Inventory。你可以用 Demo 快速试一遍，也可以从空白 Personal 数据开始。</p>
+      <div class="first-launch-actions">
+        <button class="btn-main" onclick="chooseFirstLaunchMode('demo')">使用 Demo 体验</button>
+        <button class="btn-ghost" onclick="chooseFirstLaunchMode('personal')">空白开始</button>
+      </div>
+      <div class="first-launch-note">本地数据 · 无云同步 · 无支付 · 无外部授权</div>
+    </div>
+  </div>
   <div class="statusbar">
     <span class="statusbar-time" id="clock">9:41</span>
     <div class="statusbar-right" id="ptsBadge">⬡ 650 PTS</div>
@@ -254,10 +266,15 @@
           </div>
           <div class="bin-pill" id="addBinPill">箱码：未绑定</div>
           <div class="fg"><div class="fl">📍 放在哪儿</div><input class="fi" id="fLoc" placeholder="主卧镜子后面…"></div>
+          <div class="fg"><div class="fl">🧠 为什么买 / 购买记忆</div><textarea class="fi ta" id="fMemory" placeholder="当时为什么买？解决了什么问题？"></textarea></div>
           <div class="fg"><div class="fl">图层</div><div class="lp" id="layerPick"><div class="lo sel" data-layer="顶层">顶层</div><div class="lo" data-layer="中层">中层</div><div class="lo" data-layer="底层">底层</div></div></div>
           <div class="frow">
             <div class="fg"><div class="fl">💰 价格</div><input class="fi" id="fPrice" type="number" placeholder="0"></div>
             <div class="fg"><div class="fl">⏰ 过期日</div><input class="fi" id="fExp" type="date"></div>
+          </div>
+          <div class="frow">
+            <div class="fg"><div class="fl">📅 购买时间</div><input class="fi" id="fPurchased" type="date"></div>
+            <div class="fg"><div class="fl">值不值</div><select class="fi" id="fWorth"><option value="unknown">未判断</option><option value="yes">值得</option><option value="mixed">一般</option><option value="no">后悔</option></select></div>
           </div>
           <div class="fg"><div class="fl">📏 规格</div><input class="fi" id="fSpec" placeholder="100ml · 型号…"></div>
           <button class="btn-main" onclick="saveItem()">⚡ 存档 · 卸载记忆</button>
@@ -265,9 +282,14 @@
         <div id="sadd-manual" style="display:none;">
           <div class="fg"><div class="fl">物品名称</div><input class="fi" id="mName" placeholder="止痒喷雾…"></div>
           <div class="fg"><div class="fl">📍 位置</div><input class="fi" id="mLoc" placeholder="主卧镜子后面…"></div>
+          <div class="fg"><div class="fl">🧠 为什么买 / 购买记忆</div><textarea class="fi ta" id="mMemory" placeholder="比如：当时为了旅行收纳线材，后来证明很有用。"></textarea></div>
           <div class="frow">
             <div class="fg"><div class="fl">💰 价格</div><input class="fi" id="mPrice" type="number" placeholder="0"></div>
             <div class="fg"><div class="fl">⏰ 过期日</div><input class="fi" id="mExp" type="date"></div>
+          </div>
+          <div class="frow">
+            <div class="fg"><div class="fl">📅 购买时间</div><input class="fi" id="mPurchased" type="date"></div>
+            <div class="fg"><div class="fl">值不值</div><select class="fi" id="mWorth"><option value="unknown">未判断</option><option value="yes">值得</option><option value="mixed">一般</option><option value="no">后悔</option></select></div>
           </div>
           <button class="btn-main" onclick="saveManualItem()">⚡ 存档</button>
         </div>
@@ -408,9 +430,23 @@
       <div class="shdr"><span class="shtitle">⚙️ 设置</span><button class="shclose" onclick="closeSheet('sh-settings')">✕</button></div>
       <div class="shscroll">
         <div class="drow"><span class="drow-l">API</span><span class="drow-v" id="settingsApi">—</span></div>
+        <div class="drow"><span class="drow-l">数据模式</span><span class="drow-v" id="settingsStorage">—</span></div>
+        <div class="fg" style="margin-top:10px;">
+          <div class="fl">当前数据域</div>
+          <select class="fi" id="settingsMode" onchange="switchDataMode(this.value)">
+            <option value="demo">Demo</option>
+            <option value="personal">Personal</option>
+          </select>
+        </div>
+        <div class="drow"><span class="drow-l">本地数量</span><span class="drow-v" id="settingsCounts">—</span></div>
+        <div class="drow"><span class="drow-l">恢复点</span><span class="drow-v" id="settingsBackups">—</span></div>
         <div class="drow"><span class="drow-l">当前箱码</span><span class="drow-v" id="settingsBin">—</span></div>
         <button class="btn-ghost" style="margin-top:12px;" onclick="clearActiveBin()">清除当前箱码</button>
-        <button class="btn-ghost" style="margin-top:8px;" onclick="exportInventory()">导出库存 JSON</button>
+        <button class="btn-ghost" style="margin-top:8px;" onclick="exportInventory()">导出当前数据 JSON</button>
+        <button class="btn-ghost" style="margin-top:8px;" onclick="exportAllLocalData()">导出全部本地数据 JSON</button>
+        <button class="btn-ghost" style="margin-top:8px;" onclick="restoreLatestBackup()">恢复最近一次本地备份</button>
+        <button class="btn-ghost" style="margin-top:8px;" onclick="resetDemoData()">重置 Demo 数据</button>
+        <button class="btn-ghost" style="margin-top:8px;" onclick="clearPersonalData()">清空 Personal 数据</button>
       </div>
     </div>
   </div>
@@ -418,9 +454,9 @@
 
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js" defer></script>
-<script src="/storage/config.js"></script>
-<script src="/storage/qr.js"></script>
-<script src="/storage/guard.js"></script>
-<script src="/storage/app.js"></script>
+<script src="config.js"></script>
+<script src="qr.js"></script>
+<script src="guard.js"></script>
+<script src="app.js"></script>
 </body>
 </html>

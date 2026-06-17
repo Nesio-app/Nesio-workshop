@@ -1,6 +1,9 @@
 /* 大后方 · Object Anchors + Impulse Guard */
 
-const STORAGE_KEY = 'rearbase_v2';
+const LEGACY_STORAGE_KEYS = ['rearbase_v2', 'rearbase_v1'];
+const STORAGE_ROOT_KEY = 'baohe_inventory_v01';
+const INVENTORY_MODE_KEY = 'baohe_inventory_mode_v01';
+const INVENTORY_MODES = ['demo', 'personal'];
 
 const DEFAULT_STATE = {
   pts: 650,
@@ -50,10 +53,59 @@ let state = loadState();
 let selectedLayer = '顶层';
 let qrScanning = false;
 
-function migrateState(raw) {
-  const s = { ...DEFAULT_STATE, ...raw };
-  s.items = raw.items || DEFAULT_STATE.items;
-  s.containers = (raw.containers || DEFAULT_STATE.containers).map((c, i) => {
+function cloneDefaultState() {
+  return structuredClone(DEFAULT_STATE);
+}
+
+function createPersonalState() {
+  const s = cloneDefaultState();
+  s.pts = 0;
+  s.savedTotal = 0;
+  s.declines = 0;
+  s.currentSpaceId = 'master';
+  s.currentItemId = null;
+  s.activeContainerCode = null;
+  s.analytics = [];
+  s.frozen = [];
+  s.widgets = [];
+  s.containers = [];
+  s.items = [];
+  s.spaces = s.spaces.map((space) => ({ ...space, items: 0, containers: 0, confidence: 0 }));
+  ensureGuard(s);
+  return s;
+}
+
+function createStateForMode(mode) {
+  return mode === 'personal' ? createPersonalState() : cloneDefaultState();
+}
+
+function normalizeInventoryMode(mode) {
+  return INVENTORY_MODES.includes(mode) ? mode : 'demo';
+}
+
+function getActiveDataMode() {
+  try {
+    return normalizeInventoryMode(localStorage.getItem(INVENTORY_MODE_KEY) || 'demo');
+  } catch (_) {
+    return 'demo';
+  }
+}
+
+function setActiveDataMode(mode) {
+  const nextMode = normalizeInventoryMode(mode);
+  try {
+    localStorage.setItem(INVENTORY_MODE_KEY, nextMode);
+  } catch (_) { /* ignore */ }
+  return nextMode;
+}
+
+function migrateState(raw, mode = 'demo') {
+  const source = raw && typeof raw === 'object' ? raw : {};
+  const base = createStateForMode(mode);
+  const s = { ...base, ...source };
+  s.items = Array.isArray(source.items) ? source.items : base.items;
+  const sourceContainers = Array.isArray(source.containers) ? source.containers : base.containers;
+  s.containers = sourceContainers.map((c, i) => {
     const base = DEFAULT_STATE.containers[i] || {};
     return {
       ...base,
@@ -75,21 +127,161 @@ function migrateState(raw) {
   return s;
 }
 
-function loadState() {
+function createRootStore() {
+  return {
+    version: 'inventory-local-store-v0.1',
+    activeMode: getActiveDataMode(),
+    stores: {
+      demo: migrateState(createStateForMode('demo'), 'demo'),
+      personal: migrateState(createStateForMode('personal'), 'personal'),
+    },
+    backups: [],
+  };
+}
+
+function loadLegacyInventoryState() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('rearbase_v1');
-    if (raw) return migrateState(JSON.parse(raw));
+    for (const key of LEGACY_STORAGE_KEYS) {
+      const raw = localStorage.getItem(key);
+      if (raw) return migrateState(JSON.parse(raw), 'personal');
+    }
   } catch (_) { /* ignore */ }
-  const s = structuredClone(DEFAULT_STATE);
-  ensureGuard(s);
-  return s;
+  return null;
+}
+
+function loadRootStore() {
+  try {
+    const raw = localStorage.getItem(STORAGE_ROOT_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      const root = {
+        ...createRootStore(),
+        ...parsed,
+        stores: {
+          demo: migrateState(parsed?.stores?.demo, 'demo'),
+          personal: migrateState(parsed?.stores?.personal, 'personal'),
+        },
+        backups: Array.isArray(parsed?.backups) ? parsed.backups.slice(-5) : [],
+      };
+      root.activeMode = normalizeInventoryMode(root.activeMode);
+      return root;
+    }
+  } catch (_) { /* ignore */ }
+
+  const root = createRootStore();
+  const legacy = loadLegacyInventoryState();
+  if (legacy) root.stores.personal = legacy;
+  return root;
+}
+
+function saveRootStore(root) {
+  localStorage.setItem(STORAGE_ROOT_KEY, JSON.stringify(root));
+}
+
+function loadState() {
+  const mode = setActiveDataMode(getActiveDataMode());
+  const root = loadRootStore();
+  root.activeMode = mode;
+  const nextState = migrateState(root.stores[mode], mode);
+  root.stores[mode] = nextState;
+  saveRootStore(root);
+  return nextState;
 }
 
 function persist() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  const mode = getActiveDataMode();
+  syncContainerCounts();
+  const root = loadRootStore();
+  root.activeMode = mode;
+  root.stores[mode] = state;
+  saveRootStore(root);
   refreshPtsUI();
   refreshBinUI();
+}
+
+function snapshotLocalData(action) {
+  const root = loadRootStore();
+  root.backups.push({
+    action,
+    createdAt: new Date().toISOString(),
+    activeMode: getActiveDataMode(),
+    stores: structuredClone(root.stores),
+  });
+  root.backups = root.backups.slice(-5);
+  saveRootStore(root);
+}
+
+function rerenderInventoryApp() {
   syncContainerCounts();
+  renderHome();
+  renderContainers();
+  refreshPtsUI();
+  refreshBinUI();
+  renderGuardUI();
+  const activePage = document.querySelector('.page.active')?.id;
+  if (activePage === 'pg-stats') renderStats();
+  if (document.getElementById('sh-settings')?.classList.contains('open')) renderSettings();
+}
+
+function switchDataMode(mode) {
+  const nextMode = setActiveDataMode(mode);
+  state = loadState();
+  rerenderInventoryApp();
+  showToast(`已切换到 ${nextMode === 'personal' ? 'Personal' : 'Demo'} 数据`);
+}
+
+function exportAllLocalData() {
+  const root = loadRootStore();
+  const payload = {
+    exported: new Date().toISOString(),
+    version: root.version,
+    dataBoundary: {
+      modes: INVENTORY_MODES,
+      demoPersonalSeparated: true,
+      networkRequired: false,
+      sourceOfTruth: 'device-local-storage',
+    },
+    activeMode: getActiveDataMode(),
+    stores: root.stores,
+  };
+  downloadJson(payload, `baohe-inventory-all-local-${new Date().toISOString().slice(0, 10)}.json`);
+  showToast('已导出全部本地数据 JSON');
+}
+
+function clearPersonalData() {
+  if (!confirm('确认清空 Personal 本地库存数据？Demo 数据不会被删除。')) return;
+  snapshotLocalData('clear-personal');
+  const root = loadRootStore();
+  root.stores.personal = createStateForMode('personal');
+  saveRootStore(root);
+  switchDataMode('personal');
+  showToast('Personal 本地数据已清空');
+}
+
+function resetDemoData() {
+  if (!confirm('确认重置 Demo 数据？Personal 数据不会被删除。')) return;
+  snapshotLocalData('reset-demo');
+  const root = loadRootStore();
+  root.stores.demo = createStateForMode('demo');
+  saveRootStore(root);
+  switchDataMode('demo');
+  showToast('Demo 数据已重置');
+}
+
+function restoreLatestBackup() {
+  const root = loadRootStore();
+  const backup = root.backups.pop();
+  if (!backup) { showToast('暂无可恢复备份'); return; }
+  root.stores = {
+    demo: migrateState(backup.stores?.demo, 'demo'),
+    personal: migrateState(backup.stores?.personal, 'personal'),
+  };
+  root.activeMode = normalizeInventoryMode(backup.activeMode);
+  saveRootStore(root);
+  setActiveDataMode(root.activeMode);
+  state = loadState();
+  rerenderInventoryApp();
+  showToast('已恢复最近一次本地备份');
 }
 
 function getContainer(code) {
@@ -782,12 +974,22 @@ function handleAddPhoto(e) {
 }
 
 async function analyzeImage(dataUrl, mimeType, cb) {
+  const FIRST_LAUNCH_IMAGE_AI_ENABLED = false;
   const api = window.STORAGE_API;
   const b64 = dataUrl.split(',')[1];
 
+  if (!FIRST_LAUNCH_IMAGE_AI_ENABLED) {
+    void api;
+    void b64;
+    void mimeType;
+    cb({ name: '', category: '', pao: '', expiry: '', spec: '', price: '' }, '首发版本暂不启用 AI 图片识别，请手动填写');
+    return;
+  }
+
   if (api) {
     try {
-      const resp = await fetch(api + '/api/identify', {
+      const endpoint = api + '/api/identify';
+      const resp = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image: b64, mimeType }),
@@ -872,16 +1074,43 @@ function doomDone() {
 }
 
 function renderSettings() {
-  document.getElementById('settingsApi').textContent = window.STORAGE_API || '未配置（演示）';
+  const mode = getActiveDataMode();
+  const root = loadRootStore();
+  document.getElementById('settingsApi').textContent = window.STORAGE_API || '未配置（离线优先）';
   document.getElementById('settingsBin').textContent = state.activeContainerCode || '无';
+  document.getElementById('settingsMode').value = mode;
+  document.getElementById('settingsStorage').textContent = `本机存储 · ${mode} · 无网络可用`;
+  document.getElementById('settingsCounts').textContent = `Demo ${root.stores.demo.items.length} 件 / Personal ${root.stores.personal.items.length} 件`;
+  document.getElementById('settingsBackups').textContent = `${root.backups.length} 个本地恢复点`;
+}
+
+function downloadJson(payload, filename) {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
 function exportInventory() {
-  const blob = new Blob([JSON.stringify({ exported: new Date().toISOString(), items: state.items, containers: state.containers }, null, 2)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'rearbase-inventory.json';
-  a.click();
+  const mode = getActiveDataMode();
+  const payload = {
+    exported: new Date().toISOString(),
+    version: 'inventory-local-export-v0.1',
+    mode,
+    dataBoundary: {
+      sourceOfTruth: 'device-local-storage',
+      demoPersonalSeparated: true,
+      includesOnlyActiveMode: true,
+      networkRequired: false,
+    },
+    items: state.items,
+    containers: state.containers,
+    spaces: state.spaces,
+    guard: state.guard,
+  };
+  downloadJson(payload, `baohe-inventory-${mode}-${new Date().toISOString().slice(0, 10)}.json`);
   showToast('已导出库存 JSON');
 }
 
