@@ -1,45 +1,108 @@
-# Personal Brand Website
+# Treasurebox / Baohe
 
-A **Quiet Luxury** personal site: professional portfolio (Data Scientist / CFA Candidate) and personal introduction for high-quality connections.
+Treasurebox is a modular toolbox app. The current launch surface is intentionally small: a unified shell plus the Inventory / purchase-memory tool.
 
-## Stack
+This repository keeps the broader module registry, contracts, and iOS shell work in one place, but most modules are not part of the public first-launch promise yet.
 
-- **Next.js 14** (App Router)
-- **Tailwind CSS** (custom palette: cream, beige, charcoal, dusty pink)
-- **Framer Motion** (subtle animations)
-- **Vercel**-ready
+## Current Launch Scope
 
-## Run locally
+Public first-launch scope:
+
+- Shell / module registry
+- Inventory / purchase-memory
+- Local-first data storage
+- Export and delete for launch-local data
+- Static paywall preview state
+- Approval-gated visibility for non-launch modules
+- Capacitor iOS shell
+
+Not publicly promised for first launch:
+
+- AI runtime behavior
+- Health, mental health, finance, or therapeutic outcomes
+- Real cloud sync
+- Real account system
+- Real StoreKit purchase / restore / receipt validation
+- Real external service authorization
+- Production notifications
+
+Approval Gate always takes priority over Paywall. Paid state never means a gated module or risky action is safe to use.
+
+## Module Status
+
+The repo contains multiple historical or sandbox tools. Only Inventory / purchase-memory is launch-visible for normal users.
+
+Other modules may remain in the internal registry as sandbox, gated, hidden, or future candidates. They should not be described as public product commitments until their contracts, data boundary, QA, privacy copy, and App Store wording are approved.
+
+## Data Boundary
+
+Current data layer:
+
+- Local profile only: `LocalProfile@v1`
+- Local data root: `BaoheLocalDataRoot@v1`
+- Inventory item schema: `LocalInventoryItem@v1`
+- Inventory store schema: `LocalInventoryStore@v1`
+- Cloud flags must remain disabled for first launch
+
+The launch-local data layer supports local initialization, read/write helpers, export, delete/reset, and migration smoke checks. It does not use a real cloud database or server user identity.
+
+## iOS
+
+The iOS shell lives in `treasurebox-ios/`.
+
+Verified local build target:
+
+```bash
+cd treasurebox-ios
+npm run cap:sync
+DEVELOPER_DIR=/Users/jing/Downloads/Xcode.app/Contents/Developer xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
+```
+
+The current iOS shell intentionally avoids optional native splash/status-bar plugins because the previous plugin versions were incompatible with the installed Capacitor/Xcode build path.
+
+## Development
+
+Install dependencies:
 
 ```bash
 npm install
+```
+
+Run the web shell:
+
+```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Build:
 
-## AI Dictionary
+```bash
+npm run build
+```
 
-Open **[http://localhost:3000/dictionary](http://localhost:3000/dictionary)** (or use the “AI Dictionary” link on the home page).
+Core checks:
 
-- **Look up** words/phrases: choose your native and target language (top 10 world languages), then type and hit “Look up”. You get a definition in your language, an AI-generated image, two example sentences with translations, and a casual usage note.
-- **Pronunciation**: Use the play buttons next to the term and each example for natural-sounding TTS in the target language.
-- **Notebook**: Save any result with “Save to Notebook”. In the Notebook you can “Make up a story” so the AI weaves your saved words into a short story to help you remember them.
-- **Study**: Flashcards from your notebook—front: word + image; back: definition + example. Tap to flip.
+```bash
+npm run report:modules
+npm run test:qa:static
+npm run test:launch-surface
+npm run precheck:local-data-launch
+npm run precheck:no-real-data
+```
 
-**Setup:** Copy `.env.example` to `.env` and set `OPENAI_API_KEY` (used for definitions, images, TTS, and story generation).
+Some reports may return review warnings for known non-runtime items, such as Data Aggregation review warnings. Do not treat report-only visibility as remediation done.
 
-## 念归处 Memorial (`memory/`)
+## Release Gate
 
-Static memorial SPA with bilingual UI, shop/checkout, and sample memorial books. See `memory/DEPLOY-RENDER.md` for API deployment.
+The following actions require CEO approval before execution:
 
-## Customize
+- TestFlight or App Store submission
+- Production deploy decisions
+- Real cloud database connection
+- Real account or identity binding
+- Real StoreKit products, prices, purchase, restore, or receipt validation
+- External service authorization
+- Notification sending
+- Public claims about AI, health, finance, mental health, therapy, or outcomes
 
-1. **Hero photo**: Add your image as `public/hero.jpg` (or update `components/Hero.tsx` to use Next.js `Image` with that path).
-2. **Contact email**: In `components/Contact.tsx`, replace `hello@example.com` with your email.
-3. **Portfolio**: Edit the `projects` array in `components/Portfolio.tsx`.
-4. **Life & Interests**: Add real images and/or update labels in `components/LifeInterests.tsx`.
-
-## Deploy on Vercel
-
-Push to GitHub and import the repo in [Vercel](https://vercel.com); the default build settings work as-is.
+Local development, static contract checks, local iOS builds, and report-only QA do not require that gate.
