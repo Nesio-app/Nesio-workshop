@@ -253,7 +253,7 @@ export default function Portal() {
     if (!shouldShellOpenTool(runtimeTool?.shellRuntime)) return;
     if (isToolKilledByLocalFeatureControl(tool)) return;
     if (treasureOpen) setTreasurePersisted(true);
-    const href = openToolHref(tool);
+    const href = openToolHref(tool, launchSurfaceContext);
     if (!href) return;
     window.location.assign(href);
   }, [launchSurfaceContext, treasureOpen]);
