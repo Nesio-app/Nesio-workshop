@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { launchUnavailablePayload } from '@/lib/portal/launch-safety';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -74,6 +75,13 @@ export async function OPTIONS() {
 }
 
 export async function POST(req: NextRequest) {
+  if (process.env.NEXT_PUBLIC_BAOHE_FIRST_LAUNCH_RISK_ISOLATION !== 'off') {
+    return NextResponse.json(
+      launchUnavailablePayload('api:inner-shelter:chat', 'sanctuary'),
+      { status: 403, headers: corsHeaders },
+    );
+  }
+
   const googleKey = getGoogleKey();
   const openaiKey = process.env.OPENAI_API_KEY?.trim();
 
