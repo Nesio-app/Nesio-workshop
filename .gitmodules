@@ -1,3 +1,15 @@
 [submodule "storage-ios"]
 	path = storage-ios
 	url = https://github.com/hanbing6228/storage.git
+[submodule "psych-tool-ios"]
+	path = psych-tool-ios
+	url = https://github.com/hanbing6228/consult.git
+[submodule "questionbank-ios"]
+	path = questionbank-ios
+	url = https://github.com/hanbing6228/questionbank.git
+[submodule "reading-ios"]
+	path = reading-ios
+	url = https://github.com/hanbing6228/reading.git
+[submodule "weaver-ai"]
+	path = weaver-ai
+	url = https://github.com/hanbing6228/Weaver.git
