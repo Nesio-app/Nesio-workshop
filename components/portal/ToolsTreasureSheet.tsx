@@ -5,9 +5,9 @@ import { createPortal } from 'react-dom';
 import type { PortalTool } from '@/lib/portal/types';
 import type { PortalLocale } from '@/lib/portal/profile';
 import {
-  filterToolsForLaunchSurface,
   readLaunchSurfaceContextFromBrowser,
 } from '@/lib/portal/launch-surface.mjs';
+import { resolveShellRuntimeTools } from '@/lib/portal/shell-runtime-resolver.mjs';
 import { t } from '@/lib/portal/i18n';
 import { formatStatusSummaryLine, type ToolForShellState } from './tool-state';
 import ToolGrid from './ToolGrid';
@@ -100,7 +100,7 @@ export default function ToolsTreasurePopup({
   }, [open, anchorRef]);
 
   const visibleTools = useMemo(
-    () => filterToolsForLaunchSurface(tools, launchContext).filter((tool: PortalTool) => tool.id !== 'secretary'),
+    () => resolveShellRuntimeTools(tools, launchContext).visibleTools.filter((tool: PortalTool) => tool.id !== 'secretary'),
     [tools, launchContext],
   );
 

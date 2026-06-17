@@ -9,9 +9,15 @@ import { openToolHref } from '@/lib/portal/open-tool';
 import {
   applyFeatureControlToolGate,
   applyFirstLaunchToolGate,
-  isFirstLaunchGatedModuleId,
   isToolKilledByLocalFeatureControl,
 } from '@/lib/portal/launch-safety';
+import {
+  readLaunchSurfaceContextFromBrowser,
+} from '@/lib/portal/launch-surface.mjs';
+import {
+  resolveShellRuntimeTools,
+  shouldShellOpenTool,
+} from '@/lib/portal/shell-runtime-resolver.mjs';
 import { buildPortalShellManifest } from '@/lib/portal/module-manifest';
 import {
   fetchDecModules,
@@ -29,6 +35,20 @@ import type { PortalConfig, PortalDecMetadata, PortalTool } from '@/lib/portal/t
 import { type ToolForShellState } from './tool-state';
 
 const DEC_METADATA_TTL_MS = 30_000;
+
+function normalizeLaunchSurfaceContext(raw: {
+  viewerRole?: unknown;
+  testerAllowlist?: unknown;
+  testerCohort?: unknown;
+}) {
+  return {
+    viewerRole: raw.viewerRole === 'tester' ? 'tester' as const : 'public' as const,
+    testerAllowlist: Array.isArray(raw.testerAllowlist)
+      ? raw.testerAllowlist.filter((item): item is string => typeof item === 'string')
+      : [],
+    testerCohort: typeof raw.testerCohort === 'string' ? raw.testerCohort : null,
+  };
+}
 
 function readTreasureOpen(): boolean {
   if (typeof sessionStorage === 'undefined') return false;
@@ -139,6 +159,11 @@ export default function Portal() {
   );
   const [noteOpen, setNoteOpen] = useState(false);
   const [treasureOpen, setTreasureOpen] = useState(false);
+  const [launchSurfaceContext, setLaunchSurfaceContext] = useState({
+    viewerRole: 'public' as 'public' | 'tester',
+    testerAllowlist: [] as string[],
+    testerCohort: null as string | null,
+  });
   const configWithDecMetadata = useMemo(
     () => mergePortalConfigWithDecMetadata(config, decModules),
     [config, decModules],
@@ -158,9 +183,14 @@ export default function Portal() {
   }, [configWithDecMetadata, decShellRoutes]);
 
   const shellManifest = useMemo(() => buildPortalShellManifest(configWithShellState), [configWithShellState]);
+  const shellRuntime = useMemo(
+    () => resolveShellRuntimeTools(shellManifest.tools, launchSurfaceContext),
+    [shellManifest.tools, launchSurfaceContext],
+  );
 
   useEffect(() => {
     setTreasureOpen(readTreasureOpen());
+    setLaunchSurfaceContext(normalizeLaunchSurfaceContext(readLaunchSurfaceContextFromBrowser()));
   }, []);
 
   useEffect(() => {
@@ -219,14 +249,14 @@ export default function Portal() {
   }, []);
 
   const openTool = useCallback((tool: PortalTool) => {
-    if (!tool.ready) return;
+    const runtimeTool = resolveShellRuntimeTools([tool], launchSurfaceContext).tools[0];
+    if (!shouldShellOpenTool(runtimeTool?.shellRuntime)) return;
     if (isToolKilledByLocalFeatureControl(tool)) return;
-    if (isFirstLaunchGatedModuleId(tool.id)) return;
     if (treasureOpen) setTreasurePersisted(true);
     const href = openToolHref(tool);
     if (!href) return;
     window.location.assign(href);
-  }, [treasureOpen]);
+  }, [launchSurfaceContext, treasureOpen]);
 
   const handleTreasureOpenChange = (open: boolean) => {
     setTreasureOpen(open);
@@ -284,7 +314,7 @@ export default function Portal() {
       }
 
       const key = event.key.toLowerCase();
-      const tool = shellManifest.tools.find((item) => item.hotkey === key && item.ready);
+      const tool = shellRuntime.openableTools.find((item) => item.hotkey === key);
       if (tool) {
         event.preventDefault();
         openTool(tool);
@@ -293,7 +323,7 @@ export default function Portal() {
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [shellManifest.tools, openTool]);
+  }, [shellRuntime.openableTools, openTool]);
 
   return (
     <>
@@ -304,7 +334,7 @@ export default function Portal() {
           <div className="portal-main">
               <DashboardHome
               config={configWithDecMetadata}
-              shellTools={shellManifest.tools}
+              shellTools={shellRuntime.visibleTools}
               noteOpen={noteOpen}
               treasureOpen={treasureOpen}
               onTreasureOpenChange={handleTreasureOpenChange}
