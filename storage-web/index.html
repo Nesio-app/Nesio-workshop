@@ -440,10 +440,16 @@
         </div>
         <div class="drow"><span class="drow-l">本地数量</span><span class="drow-v" id="settingsCounts">—</span></div>
         <div class="drow"><span class="drow-l">恢复点</span><span class="drow-v" id="settingsBackups">—</span></div>
+        <div class="drow"><span class="drow-l">本地账户</span><span class="drow-v" id="settingsProfile">—</span></div>
+        <div class="drow"><span class="drow-l">最近保存</span><span class="drow-v" id="settingsLastSaved">—</span></div>
+        <div class="drow"><span class="drow-l">最近备份</span><span class="drow-v" id="settingsLastBackup">—</span></div>
+        <div class="drow"><span class="drow-l">备份提醒</span><span class="drow-v" id="settingsBackupReminder">—</span></div>
         <div class="drow"><span class="drow-l">当前箱码</span><span class="drow-v" id="settingsBin">—</span></div>
+        <input id="localBackupFile" type="file" accept="application/json,.json" style="display:none" onchange="handleLocalBackupFile(this)">
         <button class="btn-ghost" style="margin-top:12px;" onclick="clearActiveBin()">清除当前箱码</button>
         <button class="btn-ghost" style="margin-top:8px;" onclick="exportInventory()">导出当前数据 JSON</button>
-        <button class="btn-ghost" style="margin-top:8px;" onclick="exportAllLocalData()">导出全部本地数据 JSON</button>
+        <button class="btn-ghost" style="margin-top:8px;" onclick="exportAllLocalData()">导出到文件 / iCloud Drive</button>
+        <button class="btn-ghost" style="margin-top:8px;" onclick="triggerLocalBackupImport()">从文件恢复备份</button>
         <button class="btn-ghost" style="margin-top:8px;" onclick="restoreLatestBackup()">恢复最近一次本地备份</button>
         <button class="btn-ghost" style="margin-top:8px;" onclick="resetDemoData()">重置 Demo 数据</button>
         <button class="btn-ghost" style="margin-top:8px;" onclick="clearPersonalData()">清空 Personal 数据</button>
