@@ -14,6 +14,11 @@ import { buildToolDataVersioningContract } from '../lib/portal/tool-data-version
 import { buildUserIdentityUpgradeContract } from '../lib/portal/user-identity-upgrade-contract.mjs';
 import { buildOfflineSyncConflictContract } from '../lib/portal/offline-sync-conflict-contract.mjs';
 import { buildCloudReadinessContract } from '../lib/portal/cloud-readiness-contract.mjs';
+import {
+  LAUNCH_SURFACE_VERSION_V0,
+  buildLaunchReadinessSummary,
+  resolveLaunchSurfaceState,
+} from '../lib/portal/launch-surface.mjs';
 
 const repoRoot = fileURLToPath(new URL('..', import.meta.url));
 const configPath = join(repoRoot, 'public', 'portal-config.json');
@@ -1913,6 +1918,48 @@ const launchSkuSummary = {
   launchSkuAppStoreReady: false,
   warningCount: launchSkuWarnings.length,
 };
+const launchSurfaceTools = tools.map((tool) => ({
+  ...tool,
+  launchStatus: launchStatusForTool(tool),
+  toolLifecycle: lifecycleForTool(tool).lifecycle,
+  prodExposure: tool.toolManifest?.prodExposure,
+  entitlementPolicy: {
+    paywallState: tool.shellEntitlement.paywallState,
+  },
+}));
+const launchSurfaceTesterAllowlist = launchSurfaceTools
+  .filter((tool) => resolveLaunchSurfaceState(tool, { viewerRole: 'public' }).prodExposure === 'tester_only')
+  .map((tool) => tool.id);
+const launchSurfaceEntries = launchSurfaceTools.map((tool) => {
+  const publicState = resolveLaunchSurfaceState(tool, { viewerRole: 'public' });
+  const testerState = resolveLaunchSurfaceState(tool, {
+    viewerRole: 'tester',
+    testerAllowlist: launchSurfaceTesterAllowlist,
+  });
+  return {
+    moduleId: tool.id,
+    label: tool.name,
+    launchStatus: publicState.launchStatus,
+    toolLifecycle: publicState.toolLifecycle,
+    prodExposure: publicState.prodExposure,
+    visibleForPublic: publicState.visible,
+    visibleForTester: testerState.visible,
+    shellAction: publicState.shellAction,
+    testerShellAction: testerState.shellAction,
+    paywallState: publicState.paywallState,
+    paywallBehavior: publicState.paywallBehavior,
+    approvalGateState: publicState.approvalGateState,
+    blockedByApprovalGate: publicState.blockedByApprovalGate,
+    blockedByPaywallGate: publicState.blockedByPaywallGate,
+    approvalGateOverridesPaywallGate: publicState.approvalGateOverridesPaywallGate,
+    betaBadgeRequiredForTester: testerState.betaBadgeRequired,
+    appStoreMentionAllowed: publicState.appStoreMentionAllowed,
+    screenshotSafe: publicState.screenshotSafe,
+  };
+});
+const launchSurfaceSummary = buildLaunchReadinessSummary(launchSurfaceTools, {
+  testerAllowlist: launchSurfaceTesterAllowlist,
+});
 function permissionConsentEntryForTool(tool) {
   const sensitiveCapabilities = [...(SENSITIVE_CAPABILITY_BY_MODULE[tool.id] || [])];
   const isHighRiskSensitive = ['secretary', 'health', 'finance', 'psychoanalysis'].includes(tool.id);
@@ -2196,6 +2243,13 @@ const evidenceSummary = {
     futurePaidModuleCount: launchSkuSummary.futurePaidModuleCount,
     launchSkuAppStoreReady: launchSkuSummary.launchSkuAppStoreReady,
     launchSkuWarningCount: launchSkuSummary.warningCount,
+    launchSurfaceVersion: LAUNCH_SURFACE_VERSION_V0,
+    launchSurfacePublicVisibleModuleCount: launchSurfaceSummary.publicVisibleModuleCount,
+    launchSurfaceTesterVisibleSandboxModuleCount: launchSurfaceSummary.testerVisibleSandboxModuleCount,
+    launchSurfacePublicHiddenHighRiskModuleCount: launchSurfaceSummary.publicHiddenHighRiskModuleCount,
+    launchSurfaceAppStoreReady: launchSurfaceSummary.launchSurfaceAppStoreReady,
+    launchSurfaceRealPurchaseEnabled: launchSurfaceSummary.realPurchaseEnabled,
+    launchSurfaceStoreKitEnabled: launchSurfaceSummary.storeKitEnabled,
     permissionConsentToolCount: permissionConsentSummary.toolCount,
     permissionConsentRequiredCount: permissionConsentSummary.consentRequiredCount,
     permissionConsentSensitiveDisabledCount: permissionConsentSummary.sensitiveDisabledCount,
@@ -2430,6 +2484,30 @@ const evidenceSummary = {
     },
     modules: launchSkuModules,
     warnings: launchSkuWarnings,
+  },
+  launchSurface: {
+    version: LAUNCH_SURFACE_VERSION_V0,
+    implementation: 'manifest-driven-shell-visibility-contract',
+    firstLaunchPromise: 'Shell + Inventory / purchase-memory',
+    appStoreReady: false,
+    boundaries: {
+      reportAndShellVisibilityOnly: true,
+      storeKitEnabled: false,
+      realPurchaseEnabled: false,
+      externalAuthEnabled: false,
+      cloudSyncEnabled: false,
+      appStoreSubmissionEnabled: false,
+      changesPaymentRuntime: false,
+      approvalGateOverridesPaywallGate: true,
+    },
+    testerAllowlistPolicy: {
+      source: 'local_query_or_storage_allowlist',
+      accountSystemRequired: false,
+      externalFeatureFlagSaaS: false,
+      defaultPublicUserSeesSandbox: false,
+    },
+    summary: launchSurfaceSummary,
+    entries: launchSurfaceEntries,
   },
   permissionConsent: permissionConsentContract,
   featureControl: featureControlContract,
