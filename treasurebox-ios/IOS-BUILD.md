@@ -14,9 +14,14 @@ npm install
 npm run sync
 ```
 
-`sync` 会在父目录生成 `out/`（静态导出），复制到 `www/`，并注入 API 地址：
+`sync` 会生成 iOS 首发本地静态 bundle 到 `treasurebox-ios/www/`：
 
-- `https://treasurebox-nu.vercel.app`（秘书与线上 API）
+- `index.html`：宝盒 Shell
+- `storage/`：首发 Inventory 本地流程
+- `portal-config.json`：首发工具状态
+- `icons/`：本地图标资源
+
+首发 bundle 默认不注入线上 API，不连接 StoreKit，不触发真实通知，不调用真实 AI/财务/健康/心理外部服务。
 
 ## 打开 Xcode
 
@@ -37,8 +42,17 @@ npm run cap:sync
 npm run ios:run
 ```
 
+## 本地验证
+
+```bash
+npm run sync
+npm run test:ios-shell
+npm run cap:sync
+xcodebuild -list -project ios/App/App.xcodeproj
+```
+
 ## 说明
 
-- 首页为宝盒庭院，各工具链接到独立 Vercel 部署（Safari 内打开）。
-- AI 秘书在 App 内走线上 `/api/secretary/chat`。
+- 首页为宝盒 Shell；高风险能力只显示为未来 / gated / 不可用。
+- 首发主路径为 `收纳 Inventory`，在 App 内本地打开。
 - 修改门户或秘书后：根目录改代码 → `treasurebox-ios` 里再 `npm run sync`。
