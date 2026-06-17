@@ -17,6 +17,33 @@ function getGoogleKey(): string | undefined {
   return raw?.trim() || undefined;
 }
 
+function getInnerShelterApiUrl(): string {
+  return (
+    process.env.INNER_SHELTER_API_URL?.trim() || 'https://inner-shelter-ios.vercel.app'
+  ).replace(/\/$/, '');
+}
+
+async function chatViaInnerShelterProxy(prompt: string): Promise<string> {
+  const base = getInnerShelterApiUrl();
+  const res = await fetch(`${base}/api/inner-shelter/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      system: 'You are a concise, ADHD-friendly productivity assistant.',
+      user: prompt,
+    }),
+  });
+
+  const data = (await res.json()) as { text?: string; error?: string; detail?: string };
+  if (!res.ok) {
+    throw new Error(data?.detail || data?.error || `Proxy HTTP ${res.status}`);
+  }
+
+  const text = data?.text?.trim();
+  if (!text) throw new Error('Empty proxy response');
+  return text;
+}
+
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
@@ -109,20 +136,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const key = getGoogleKey();
-  if (!key) {
-    return res.status(503).json({
-      error: 'AI not configured',
-      hint: 'Set GEMINI_API_KEY in Vercel Environment Variables, then Redeploy',
-    });
-  }
+  const proxyUrl = getInnerShelterApiUrl();
 
   const { prompt, maxTokens = 1000 } = req.body || {};
   if (!prompt || typeof prompt !== 'string') {
     return res.status(400).json({ error: 'prompt required' });
   }
 
+  if (!key && !proxyUrl) {
+    return res.status(503).json({
+      error: 'AI not configured',
+      hint: 'Set GEMINI_API_KEY in Vercel, or INNER_SHELTER_API_URL for shared proxy',
+    });
+  }
+
   try {
-    const text = await chatWithGemini(String(prompt), Number(maxTokens) || 1000, key);
+    const text = key
+      ? await chatWithGemini(String(prompt), Number(maxTokens) || 1000, key)
+      : await chatViaInnerShelterProxy(String(prompt));
     return res.status(200).json({ text });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

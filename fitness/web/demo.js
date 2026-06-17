@@ -25,11 +25,31 @@ const DemoPlayer = (() => {
     </g>
   </svg>`;
 
+  function demoClass(type) {
+    return String(type || 'mobility').replace(/[^a-z0-9_-]/gi, '') || 'mobility';
+  }
+
+  function div(className, id) {
+    const el = document.createElement('div');
+    if (className) el.className = className;
+    if (id) el.id = id;
+    return el;
+  }
+
+  function parseStaticSvg(svgText) {
+    const doc = new DOMParser().parseFromString(svgText, 'image/svg+xml');
+    return document.importNode(doc.documentElement, true);
+  }
+
+  function appendText(parent, text) {
+    parent.appendChild(document.createTextNode(text));
+  }
+
   function renderMuscleMap(container, media) {
     if (!container || !media) return;
     const primary = media.primary || [];
     const secondary = media.secondary || [];
-    container.innerHTML = BODY_SVG;
+    container.replaceChildren(parseStaticSvg(BODY_SVG));
     container.querySelectorAll('.mr').forEach((el) => {
       const r = el.dataset.r;
       el.classList.remove('on', 'on2');
@@ -49,7 +69,10 @@ const DemoPlayer = (() => {
       if (!info) return;
       const span = document.createElement('span');
       span.className = i < primary.length ? 'ml-p' : 'ml-s';
-      span.innerHTML = `<i style="background:${info.color}"></i>${info.zh}${i < primary.length ? ' · 主动' : ' · 协同'}`;
+      const swatch = document.createElement('i');
+      swatch.style.background = info.color;
+      span.appendChild(swatch);
+      appendText(span, `${info.zh}${i < primary.length ? ' · 主动' : ' · 协同'}`);
       legend.appendChild(span);
     });
     container.appendChild(legend);
@@ -57,36 +80,59 @@ const DemoPlayer = (() => {
 
   function setDemoType(wrap, type) {
     if (!wrap) return;
-    wrap.className = 'demo-stage demo-' + (type || 'mobility');
+    wrap.className = 'demo-stage demo-' + demoClass(type);
   }
 
   function renderMediaPanel(container, ex, reps) {
     if (!container || !ex) return;
     const media = getMediaForExercise(ex);
     const repInfo = parseRepTarget(reps || ex.reps || '8');
-    container.innerHTML = `
-      <div class="media-grid">
-        <div class="media-video-wrap" id="mediaVideoWrap">
-          <video class="media-video" id="mediaVideo" playsinline loop muted poster="${media.poster || ''}"></video>
-          <div class="media-video-ph" id="mediaVideoPh">
-            <div class="demo-stage demo-${media.demo}" id="demoAnim"></div>
-          </div>
-          <button type="button" class="media-src-btn" id="mediaSrcToggle" title="切换演示源">🎬 真人 / 动画</button>
-        </div>
-        <div class="media-muscles" id="muscleMapHost"></div>
-      </div>
-      <div class="follow-bar" id="followBar">
-        <div class="follow-phase" id="followPhase">准备</div>
-        <div class="follow-reps" id="followReps">${repInfo.mode === 'time' ? repInfo.target + '秒' : '0 / ' + repInfo.target}</div>
-        <button type="button" class="follow-btn" id="followBtn" onclick="toggleFollow()">▶ 开始跟练</button>
-      </div>
-      <div class="cue-strip" id="cueStrip">${ex.cues?.[0] || ''}</div>`;
+    container.replaceChildren();
+
+    const mediaGrid = div('media-grid');
+    const videoWrap = div('media-video-wrap', 'mediaVideoWrap');
+    const video = document.createElement('video');
+    video.className = 'media-video';
+    video.id = 'mediaVideo';
+    video.playsInline = true;
+    video.loop = true;
+    video.muted = true;
+    if (media.poster) video.poster = media.poster;
+
+    const ph = div('media-video-ph', 'mediaVideoPh');
+    ph.appendChild(div('demo-stage demo-' + demoClass(media.demo), 'demoAnim'));
+
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'media-src-btn';
+    toggle.id = 'mediaSrcToggle';
+    toggle.title = '切换演示源';
+    toggle.textContent = '🎬 真人 / 动画';
+
+    videoWrap.append(video, ph, toggle);
+    mediaGrid.append(videoWrap, div('media-muscles', 'muscleMapHost'));
+
+    const followBar = div('follow-bar', 'followBar');
+    const phase = div('follow-phase', 'followPhase');
+    phase.textContent = '准备';
+    const followReps = div('follow-reps', 'followReps');
+    followReps.textContent = repInfo.mode === 'time' ? repInfo.target + '秒' : '0 / ' + repInfo.target;
+    const followBtn = document.createElement('button');
+    followBtn.type = 'button';
+    followBtn.className = 'follow-btn';
+    followBtn.id = 'followBtn';
+    followBtn.setAttribute('onclick', 'toggleFollow()');
+    followBtn.textContent = '▶ 开始跟练';
+    followBar.append(phase, followReps, followBtn);
+
+    const cueStrip = div('cue-strip', 'cueStrip');
+    cueStrip.textContent = ex.cues?.[0] || '';
+
+    container.append(mediaGrid, followBar, cueStrip);
 
     const mapHost = container.querySelector('#muscleMapHost');
     renderMuscleMap(mapHost, media);
 
-    const video = container.querySelector('#mediaVideo');
-    const ph = container.querySelector('#mediaVideoPh');
     let useVideo = !!media.video;
 
     function applySource() {
@@ -277,9 +323,10 @@ function openFollowFromHud() {
   document.getElementById('foPhase').className = 'fo-phase ecc';
 
   const foFig = document.getElementById('foFig');
-  foFig.innerHTML = '';
+  foFig.replaceChildren();
   const stage = document.createElement('div');
-  stage.className = 'demo-stage demo-' + (foMeta.demo || 'mobility');
+  const foDemo = String(foMeta.demo || 'mobility').replace(/[^a-z0-9_-]/gi, '') || 'mobility';
+  stage.className = 'demo-stage demo-' + foDemo;
   stage.id = 'foDemoAnim';
   foFig.appendChild(stage);
 

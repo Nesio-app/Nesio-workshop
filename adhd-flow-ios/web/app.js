@@ -196,12 +196,20 @@ function switchTabFromMore(name) {
 // ══════════════════════════════════════════
 // CLAUDE API
 // ══════════════════════════════════════════
+const FIRST_LAUNCH_AI_ENABLED = false;
+const FIRST_LAUNCH_EXTERNAL_AUTH_ENABLED = false;
+
 function apiBase() {
   const b = (typeof window !== 'undefined' && window.ADHD_FLOW_API) || '';
   return b ? String(b).replace(/\/$/, '') : '';
 }
 
 async function callClaude(prompt, maxTokens = 1000) {
+  void prompt;
+  void maxTokens;
+  if (!FIRST_LAUNCH_AI_ENABLED) {
+    throw new Error('first_launch_ai_gated');
+  }
   const endpoint = `${apiBase()}/api/adhd-flow/chat`;
   const resp = await fetch(endpoint, {
     method: 'POST',
@@ -367,7 +375,7 @@ function renderAll(){renderAllTasks();renderPriority();renderFlow();renderDone()
 
 function taskHTML(t){
   if(!isVisibleInEnergy(t)) return '';
-  const tid = JSON.stringify(String(t.id));
+  const tid = "'" + String(t.id) + "'";
   return `<li class="task-item" style="animation:taskSlide .2s ease">
     <input type="checkbox" class="task-check" ${t.done?'checked':''} onchange="completeTask(${tid})">
     <div class="task-body">
@@ -415,10 +423,10 @@ function renderFlow(){
       <div id="sp-${String(t.id)}" class="subtask-panel"></div>
       <div id="micro-${String(t.id)}" class="micro-result"></div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
-        <button class="btn-ai" style="font-size:13px;padding:8px 14px" onclick="checkDefense('${escH(t.text.replace(/'/g,"\\'"))}',()=>completeTask(${JSON.stringify(String(t.id))}))">✓ 完成了</button>
-        <button class="btn-secondary" style="font-size:12px;padding:8px 12px" onclick="breakdownTask(${JSON.stringify(String(t.id))})">✦ 拆步骤</button>
-        <button class="btn-secondary" style="font-size:12px;padding:8px 12px" onclick="shredTask(${JSON.stringify(String(t.id))})">⚡ 粉碎</button>
-        <button class="btn-secondary" style="font-size:12px;padding:8px 12px" onclick="cyclePriority(${JSON.stringify(String(t.id))})">调优先级</button>
+        <button class="btn-ai" style="font-size:13px;padding:8px 14px" onclick="checkDefense('${escH(t.text.replace(/'/g,"\\'"))}',()=>completeTask('${t.id}'))">✓ 完成了</button>
+        <button class="btn-secondary" style="font-size:12px;padding:8px 12px" onclick="breakdownTask('${t.id}')">✦ 拆步骤</button>
+        <button class="btn-secondary" style="font-size:12px;padding:8px 12px" onclick="shredTask('${t.id}')">⚡ 粉碎</button>
+        <button class="btn-secondary" style="font-size:12px;padding:8px 12px" onclick="cyclePriority('${t.id}')">调优先级</button>
       </div>`:''}
     </div>`).join('');
   if(pending.length>5) container.innerHTML+=`<p style="text-align:center;color:var(--muted);font-size:12px;margin-top:10px">还有${pending.length-5}件任务待处理</p>`;
@@ -450,7 +458,7 @@ function updateHeaderCounts(){
   document.getElementById('doneNum').textContent=cnt;
   // Stars
   const starsRow=document.getElementById('starsRow');
-  starsRow.innerHTML='⭐'.repeat(Math.min(cnt,10));
+  starsRow.textContent='⭐'.repeat(Math.min(cnt,10));
   // Streak badge
   const sb=document.getElementById('streakBadge');
   if(streak>=3){sb.style.display='inline-flex';sb.textContent=`🔥 Combo ×${streak}！积分×2`;}
@@ -484,8 +492,8 @@ function showCombo(s,pts){
   const area=document.getElementById('comboBadgeArea');
   const el=document.createElement('div');
   el.className='combo-badge';
-  el.innerHTML=`🔥 Combo ×${s}！+${pts}分（×2翻倍）`;
-  area.innerHTML='';area.appendChild(el);
+  el.textContent=`🔥 Combo ×${s}！+${pts}分（×2翻倍）`;
+  area.replaceChildren(el);
   setTimeout(()=>el.remove(),3000);
 }
 function deleteTask(id){tasks=tasks.filter(t=>t.id!=id);streak=0;saveTasks();renderAll();}
@@ -720,7 +728,12 @@ function makeICSEvent(title,dateStr,startTime,durationMin,desc){
 }
 function syncBlockToCalendar(idx){
   const b=generatedBlocks[idx];if(!b)return;
-  window.open(makeGCalURL(b.title,todayDateStr(),b.time,b.duration||60,b.detail||''),'_blank');
+  if (!FIRST_LAUNCH_EXTERNAL_AUTH_ENABLED) {
+    showToast('首发版本暂不启用 Google 日历同步');
+    return;
+  }
+  const href = makeGCalURL(b.title,todayDateStr(),b.time,b.duration||60,b.detail||'');
+  window.open(href,'_blank');
   const btn=document.getElementById('tbc-'+idx);if(btn){btn.textContent='✓';btn.classList.add('synced');}
   showToast('已打开Google日历，确认后保存');
 }
@@ -737,7 +750,12 @@ async function syncAllToCalendar(){
 function syncTaskToCalendar(id){
   const t=tasks.find(t=>t.id==id);if(!t)return;
   const ti=document.getElementById('calt-'+id);const timeVal=ti?ti.value:'09:00';
-  window.open(makeGCalURL(t.text.substring(0,60),todayDateStr(),timeVal,60,t.text),'_blank');
+  if (!FIRST_LAUNCH_EXTERNAL_AUTH_ENABLED) {
+    showToast('首发版本暂不启用 Google 日历同步');
+    return;
+  }
+  const href = makeGCalURL(t.text.substring(0,60),todayDateStr(),timeVal,60,t.text);
+  window.open(href,'_blank');
   const btn=document.getElementById('calb-'+id);if(btn){btn.textContent='✓';btn.classList.add('synced');}
   showToast('已打开Google日历');
 }
@@ -849,4 +867,61 @@ function init(){
   // render
   renderAll();renderWordCloud();renderAdapt();renderWorkout();renderInsightUI();updatePomoDisplay();
 }
+if (window.Capacitor?.isNativePlatform?.()) {
+  document.body.classList.add('capacitor-native');
+} else if (window.matchMedia?.('(display-mode: standalone)')?.matches) {
+  document.body.classList.add('standalone-pwa');
+}
+
 init();
+
+// ══════════════════════════════════════════
+// THEME (day / night)  —— 顶部按钮切换，本地记忆
+// ══════════════════════════════════════════
+const SVG_NS='http://www.w3.org/2000/svg';
+function createThemeSvg(kind){
+  const svg=document.createElementNS(SVG_NS,'svg');
+  svg.setAttribute('viewBox','0 0 24 24');
+  svg.setAttribute('width','16');
+  svg.setAttribute('height','16');
+  svg.setAttribute('fill','none');
+  svg.setAttribute('stroke','currentColor');
+  svg.setAttribute('stroke-width','1.9');
+  svg.setAttribute('stroke-linecap','round');
+  svg.setAttribute('stroke-linejoin','round');
+  if(kind==='sun'){
+    const circle=document.createElementNS(SVG_NS,'circle');
+    circle.setAttribute('cx','12');circle.setAttribute('cy','12');circle.setAttribute('r','3.7');
+    const rays=document.createElementNS(SVG_NS,'path');
+    rays.setAttribute('d','M12 2.5v2.2M12 19.3v2.2M4.4 4.4l1.6 1.6M18 18l1.6 1.6M21.5 12h-2.2M4.7 12H2.5M18 6l1.6-1.6M6 18l-1.6 1.6');
+    svg.append(circle,rays);
+  }else{
+    const moon=document.createElementNS(SVG_NS,'path');
+    moon.setAttribute('d','M20 14.4A7.5 7.5 0 0 1 9.6 4 7.5 7.5 0 1 0 20 14.4z');
+    svg.appendChild(moon);
+  }
+  return svg;
+}
+function isNight(){return document.documentElement.getAttribute('data-theme')==='night'||document.body.getAttribute('data-theme')==='night';}
+function updateThemeIcon(){const t=document.getElementById('themeToggle');if(t)t.replaceChildren(createThemeSvg(isNight()?'sun':'moon'));}
+function setThemeColor(mode){const m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content',mode==='night'?'#0b1322':'#eef4fd');}
+function applyTheme(mode){
+  const els=[document.documentElement,document.body];
+  els.forEach(function(el){if(!el)return;if(mode==='night')el.setAttribute('data-theme','night');else el.removeAttribute('data-theme');});
+  setThemeColor(mode);updateThemeIcon();
+}
+const _themeMQL=window.matchMedia?window.matchMedia('(prefers-color-scheme: dark)'):null;
+function savedThemePref(){try{return localStorage.getItem('adhd_theme');}catch(e){return null;}}
+function effectiveTheme(){const s=savedThemePref();if(s==='night'||s==='day')return s;return (_themeMQL&&_themeMQL.matches)?'night':'day';}
+function toggleTheme(){
+  const next=isNight()?'day':'night';
+  applyTheme(next);
+  try{localStorage.setItem('adhd_theme',next);}catch(e){}
+  if(typeof showToast==='function')showToast(next==='night'?'🌙 夜晚模式已开启':'☀️ 白天模式已开启');
+}
+if(_themeMQL){var _onSys=function(){var s=savedThemePref();if(s!=='night'&&s!=='day')applyTheme(effectiveTheme());};if(_themeMQL.addEventListener)_themeMQL.addEventListener('change',_onSys);else if(_themeMQL.addListener)_themeMQL.addListener(_onSys);}
+(function initTheme(){
+  applyTheme(effectiveTheme());
+  var btn=document.getElementById('themeToggle');
+  if(btn){btn.title='点按切换 · 双击跟随系统';btn.addEventListener('dblclick',function(ev){ev.preventDefault();try{localStorage.removeItem('adhd_theme');}catch(e){}applyTheme(effectiveTheme());if(typeof showToast==='function')showToast('🌗 已恢复跟随系统');});}
+})();

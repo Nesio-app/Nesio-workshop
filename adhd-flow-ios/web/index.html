@@ -3,17 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#f0ede6">
+<meta name="theme-color" content="#eef4fd">
+<script>(function(){try{var s=localStorage.getItem('adhd_theme');var dark=(s==='night')||(s!=='day'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(dark){document.documentElement.setAttribute('data-theme','night');var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content','#0b1322');}}catch(e){}})();</script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="轻推任务">
-<link rel="manifest" href="/adhd-flow/manifest.json">
-<link rel="apple-touch-icon" href="/adhd-flow/icon.svg">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon.svg">
 <title>ADHD Flow Planner · 轻推任务系统</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700;900&family=Space+Mono:wght@400;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" media="print" onload="this.media='all'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700;900&family=Space+Mono:wght@400;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap"></noscript>
-<link rel="stylesheet" href="/adhd-flow/styles.css">
+<link rel="stylesheet" href="/styles.css">
 <link rel="stylesheet" href="/portal-back.css">
 </head>
 <body>
@@ -24,7 +25,10 @@
   <div class="header-label">ADHD FLOW PLANNER</div>
   <div class="header-row">
     <div class="header-title">轻推任务系统</div>
-    <button class="help-btn" type="button" onclick="openHelp()" aria-label="帮助">?</button>
+    <div style="margin-left:auto;display:flex;gap:8px">
+      <button class="help-btn theme-toggle" type="button" id="themeToggle" onclick="toggleTheme()" aria-label="切换夜间模式"></button>
+      <button class="help-btn" type="button" onclick="openHelp()" aria-label="帮助">?</button>
+    </div>
   </div>
   <div class="energy-bar">
     <span style="font-size:11px;color:var(--muted)">今日状态：</span>
@@ -41,13 +45,13 @@
     <div class="tab-nav" id="tabNav">
       <button class="tab-btn active" type="button" data-tab="todo" onclick="switchTab('todo',this)">Todo</button>
       <button class="tab-btn" type="button" data-tab="priority" onclick="switchTab('priority',this)">优先级</button>
-      <button class="tab-btn" type="button" data-tab="flow" onclick="switchTab('flow',this)">⏱ 流程</button>
-      <button class="tab-btn" type="button" data-tab="done" onclick="switchTab('done',this)">🌟 Done</button>
-      <button class="tab-btn" type="button" data-tab="shop" onclick="switchTab('shop',this)">🏪 积分</button>
+      <button class="tab-btn" type="button" data-tab="flow" onclick="switchTab('flow',this)"><svg class="tab-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13.2" r="7.4"/><path d="M12 13.2V9"/><path d="M12 13.2l3 1.7"/><path d="M9.4 3.3h5.2"/></svg>流程</button>
+      <button class="tab-btn" type="button" data-tab="done" onclick="switchTab('done',this)"><svg class="tab-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.2l2.3 4.85 5.3.74-3.85 3.7.93 5.25L12 16.9l-4.7 1.84.93-5.25L4.4 9.79l5.3-.74z"/></svg>Done</button>
+      <button class="tab-btn" type="button" data-tab="shop" onclick="switchTab('shop',this)"><svg class="tab-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13.6 3.4H20v6.4l-8.4 8.4-6.4-6.4z"/><circle cx="16.2" cy="7.2" r="1.3" fill="currentColor" stroke="none"/></svg>积分</button>
       <button class="tab-btn" type="button" data-tab="parking" onclick="switchTab('parking',this)">停车场</button>
       <button class="tab-btn" type="button" data-tab="chores" onclick="switchTab('chores',this)">家务</button>
       <button class="tab-btn" type="button" data-tab="insights" onclick="switchTab('insights',this)">洞察</button>
-      <button class="tab-btn" type="button" data-tab="schedule" onclick="switchTab('schedule',this)">📅 日程</button>
+      <button class="tab-btn" type="button" data-tab="schedule" onclick="switchTab('schedule',this)"><svg class="tab-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M4 9.5h16M8.5 3v4M15.5 3v4"/></svg>日程</button>
       <button class="tab-btn" type="button" data-tab="adapt" onclick="switchTab('adapt',this)">适配</button>
     </div>
   </div>
@@ -246,14 +250,14 @@
     <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
       <div style="flex:1;min-width:110px">
         <div style="font-size:11px;color:var(--muted);margin-bottom:3px">开始时间</div>
-        <input type="time" id="schedStartTime" value="09:00" style="width:100%;padding:9px 12px;border:none;background:#f7f5f0;border-radius:var(--rs);font-size:14px;outline:none;font-family:inherit">
+        <input type="time" id="schedStartTime" value="09:00" style="width:100%;padding:9px 12px;border:none;background:var(--soft);border-radius:var(--rs);font-size:14px;outline:none;font-family:inherit">
       </div>
       <div style="flex:1;min-width:110px">
         <div style="font-size:11px;color:var(--muted);margin-bottom:3px">结束时间</div>
-        <input type="time" id="schedEndTime" value="21:00" style="width:100%;padding:9px 12px;border:none;background:#f7f5f0;border-radius:var(--rs);font-size:14px;outline:none;font-family:inherit">
+        <input type="time" id="schedEndTime" value="21:00" style="width:100%;padding:9px 12px;border:none;background:var(--soft);border-radius:var(--rs);font-size:14px;outline:none;font-family:inherit">
       </div>
     </div>
-    <input id="schedContext" placeholder="补充信息：今天 WFH，下午3点有会议…" style="width:100%;padding:10px 14px;border:none;background:#f7f5f0;border-radius:var(--rs);font-size:13px;outline:none;font-family:inherit;color:var(--text);margin-bottom:10px">
+    <input id="schedContext" placeholder="补充信息：今天 WFH，下午3点有会议…" style="width:100%;padding:10px 14px;border:none;background:var(--soft);border-radius:var(--rs);font-size:13px;outline:none;font-family:inherit;color:var(--text);margin-bottom:10px">
     <button class="btn-ai" type="button" id="schedGenBtn" onclick="generateSchedule()" style="width:100%;justify-content:center">
       <span id="schedBtnIcon">📅</span><span id="schedBtnText">AI 生成今日日程</span>
     </button>
@@ -294,14 +298,14 @@
 </div>
 
 <nav class="bottom-nav" id="bottomNav" aria-label="主导航">
-  <button type="button" class="bottom-nav-btn active" data-tab="todo" onclick="switchTab('todo',this)"><span class="bn-icon">📝</span><span>Todo</span></button>
-  <button type="button" class="bottom-nav-btn" data-tab="priority" onclick="switchTab('priority',this)"><span class="bn-icon">🎯</span><span>优先</span></button>
-  <button type="button" class="bottom-nav-btn" data-tab="flow" onclick="switchTab('flow',this)"><span class="bn-icon">⏱</span><span>流程</span></button>
-  <button type="button" class="bottom-nav-btn" data-tab="done" onclick="switchTab('done',this)"><span class="bn-icon">🌟</span><span>Done</span></button>
-  <button type="button" class="bottom-nav-btn" data-tab="more" onclick="openMoreSheet()"><span class="bn-icon">⋯</span><span>更多</span></button>
+  <button type="button" class="bottom-nav-btn active" data-tab="todo" onclick="switchTab('todo',this)"><span class="bn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="12" height="17" rx="2.5"/><path d="M9.5 3.4h5v2.7h-5z"/><path d="M9 11.6l1.6 1.6L14 9.8"/><path d="M9 16.6h6"/></svg></span><span>Todo</span></button>
+  <button type="button" class="bottom-nav-btn" data-tab="priority" onclick="switchTab('priority',this)"><span class="bn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1.1" fill="currentColor" stroke="none"/></svg></span><span>优先</span></button>
+  <button type="button" class="bottom-nav-btn" data-tab="flow" onclick="switchTab('flow',this)"><span class="bn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13.2" r="7.4"/><path d="M12 13.2V9"/><path d="M12 13.2l3 1.7"/><path d="M9.4 3.3h5.2"/></svg></span><span>流程</span></button>
+  <button type="button" class="bottom-nav-btn" data-tab="done" onclick="switchTab('done',this)"><span class="bn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.2l2.3 4.85 5.3.74-3.85 3.7.93 5.25L12 16.9l-4.7 1.84.93-5.25L4.4 9.79l5.3-.74z"/></svg></span><span>Done</span></button>
+  <button type="button" class="bottom-nav-btn" data-tab="more" onclick="openMoreSheet()"><span class="bn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="6.5" height="6.5" rx="2"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="2"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="2"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="2"/></svg></span><span>更多</span></button>
 </nav>
 
-<button class="quick-add-fab" type="button" id="quickAddFab" onclick="toggleQuickAdd()" title="快速停车" aria-label="快速停车">📥</button>
+<button class="quick-add-fab" type="button" id="quickAddFab" onclick="toggleQuickAdd()" title="快速停车" aria-label="快速停车"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 13l2.4-7h11.2L20 13"/><path d="M4 13v3.5A2.5 2.5 0 0 0 6.5 19h11A2.5 2.5 0 0 0 20 16.5V13"/><path d="M4 13h4l1.4 2.2h5.2L16 13h4"/></svg></button>
 <div class="quick-add-panel" id="quickAddPanel">
   <div style="font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:600">📥 脑带宽卸载舱</div>
   <input class="quick-add-input" id="quickAddInput" placeholder="随手记，回车直接进停车场…" enterkeyhint="done" onkeydown="if(event.key==='Enter')quickAddSubmit()">
@@ -350,7 +354,7 @@
 </div>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
-<script src="/adhd-flow/config.js"></script>
-<script src="/adhd-flow/app.js"></script>
+<script src="/config.js"></script>
+<script src="/app.js"></script>
 </body>
 </html>

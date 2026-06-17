@@ -3,6 +3,7 @@
 const LEGACY_STORAGE_KEYS = ['rearbase_v2', 'rearbase_v1'];
 const STORAGE_ROOT_KEY = 'baohe_inventory_v01';
 const INVENTORY_MODE_KEY = 'baohe_inventory_mode_v01';
+const INVENTORY_FIRST_LAUNCH_KEY = 'baohe_inventory_first_launch_v01';
 const INVENTORY_MODES = ['demo', 'personal'];
 
 const DEFAULT_STATE = {
@@ -97,6 +98,33 @@ function setActiveDataMode(mode) {
     localStorage.setItem(INVENTORY_MODE_KEY, nextMode);
   } catch (_) { /* ignore */ }
   return nextMode;
+}
+
+function hasCompletedFirstLaunch() {
+  try {
+    return localStorage.getItem(INVENTORY_FIRST_LAUNCH_KEY) === 'done';
+  } catch (_) {
+    return false;
+  }
+}
+
+function markFirstLaunchDone() {
+  try {
+    localStorage.setItem(INVENTORY_FIRST_LAUNCH_KEY, 'done');
+  } catch (_) { /* ignore */ }
+}
+
+function showFirstLaunchIfNeeded() {
+  const el = document.getElementById('firstLaunch');
+  if (!el) return;
+  el.classList.toggle('show', !hasCompletedFirstLaunch());
+}
+
+function chooseFirstLaunchMode(mode) {
+  switchDataMode(mode);
+  markFirstLaunchDone();
+  document.getElementById('firstLaunch')?.classList.remove('show');
+  if (mode === 'personal' && state.items.length === 0) openSheet('sh-add');
 }
 
 function migrateState(raw, mode = 'demo') {
@@ -579,6 +607,14 @@ function openDetail(itemId) {
   if (!item) return;
 
   const d = daysUntil(item.expiry);
+  const purchaseMemory = item.purchaseMemory || {};
+  const purchaseMemoryText = purchaseMemory.reason || purchaseMemory.memoryNote || item.note || '';
+  const worthLabel = {
+    yes: '值得',
+    mixed: '一般',
+    no: '后悔',
+    unknown: '未判断',
+  }[purchaseMemory.worthIt || 'unknown'];
   document.getElementById('detailScroll').innerHTML = `
     <div class="dhero">
       <div style="font-size:60px;">${item.emoji}</div>
@@ -590,9 +626,11 @@ function openDetail(itemId) {
     ${item.confidence ? `<div style="margin-bottom:14px;"><div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-bottom:4px;"><span>视觉置信度</span><span>${item.confidence}%</span></div><div class="cbar" style="height:5px;"><div class="cfill ${confClass(item.confidence)}" style="width:${item.confidence}%"></div></div></div>` : ''}
     ${item.price ? `<div class="drow"><span class="drow-l">💰 价格</span><span class="drow-v">$${item.price.toFixed(2)}</span></div>` : ''}
     ${item.spec ? `<div class="drow"><span class="drow-l">📏 规格</span><span class="drow-v">${item.spec}</span></div>` : ''}
-    ${item.purchased ? `<div class="drow"><span class="drow-l">📅 购入</span><span class="drow-v">${item.purchased}</span></div>` : ''}
+    ${item.purchased || purchaseMemory.purchasedAt ? `<div class="drow"><span class="drow-l">📅 购入</span><span class="drow-v">${purchaseMemory.purchasedAt || item.purchased}</span></div>` : ''}
+    <div class="drow"><span class="drow-l">值不值</span><span class="drow-v">${worthLabel}</span></div>
     ${item.expiry ? `<div class="drow"><span class="drow-l">⏰ 过期</span><span class="drow-v" style="color:var(--orange);">${item.expiry}${d != null ? ' · ' + d + '天后' : ''}</span></div>` : ''}
     ${item.pao ? `<div class="drow"><span class="drow-l">🧴 PAO</span><span class="drow-v">${item.pao}</span></div>` : ''}
+    ${purchaseMemoryText ? `<div style="margin:13px 0 7px;font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;">购买记忆</div><div class="memory-card">${purchaseMemoryText}</div>` : ''}
     ${item.note ? `<div style="margin:13px 0 7px;font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;">存档备注</div><div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px;font-size:12px;color:var(--text2);line-height:1.6;border-left:3px solid var(--orange);">${item.note}</div>` : ''}
     <button class="btn-ghost" style="margin-top:12px;" onclick="confirmItem('${item.id}')">🔄 刷新确认</button>
     <button class="btn-danger" style="margin-top:8px;" onclick="fadeItem('${item.id}')">🌫️ 无感消逝</button>
@@ -601,8 +639,13 @@ function openDetail(itemId) {
   document.getElementById('editForm').innerHTML = `
     <div class="fg"><div class="fl">物品名称</div><input class="fi" id="eName" value="${item.name}"></div>
     <div class="fg"><div class="fl">📍 位置</div><input class="fi" id="eLoc" value="${item.loc}"></div>
+    <div class="fg"><div class="fl">🧠 购买记忆</div><textarea class="fi ta" id="eMemory">${purchaseMemoryText}</textarea></div>
     <div class="fg"><div class="fl">💰 价格</div><input class="fi" id="ePrice" type="number" value="${item.price || ''}"></div>
     <div class="fg"><div class="fl">⏰ 过期</div><input class="fi" id="eExp" type="date" value="${item.expiry || ''}"></div>
+    <div class="frow">
+      <div class="fg"><div class="fl">📅 购买时间</div><input class="fi" id="ePurchased" type="date" value="${purchaseMemory.purchasedAt || item.purchased || ''}"></div>
+      <div class="fg"><div class="fl">值不值</div><select class="fi" id="eWorth"><option value="unknown" ${(purchaseMemory.worthIt || 'unknown') === 'unknown' ? 'selected' : ''}>未判断</option><option value="yes" ${purchaseMemory.worthIt === 'yes' ? 'selected' : ''}>值得</option><option value="mixed" ${purchaseMemory.worthIt === 'mixed' ? 'selected' : ''}>一般</option><option value="no" ${purchaseMemory.worthIt === 'no' ? 'selected' : ''}>后悔</option></select></div>
+    </div>
     <button class="btn-main" onclick="saveEdit()">保存</button>
   `;
 
@@ -630,6 +673,14 @@ function saveEdit() {
   item.loc = document.getElementById('eLoc').value;
   item.price = parseFloat(document.getElementById('ePrice').value) || item.price;
   item.expiry = document.getElementById('eExp').value || item.expiry;
+  item.purchased = document.getElementById('ePurchased')?.value || item.purchased;
+  item.note = document.getElementById('eMemory')?.value.trim() || item.note;
+  item.purchaseMemory = {
+    purchasedAt: item.purchased || '',
+    reason: document.getElementById('eMemory')?.value.trim() || '',
+    worthIt: document.getElementById('eWorth')?.value || 'unknown',
+    memoryNote: document.getElementById('eMemory')?.value.trim() || '',
+  };
   persist();
   closeSheet('sh-edit');
   openDetail(item.id);
@@ -1023,6 +1074,9 @@ function buildItemFromForm(name) {
   const bin = state.activeContainerCode ? getContainer(state.activeContainerCode) : null;
   const locInput = document.getElementById('fLoc')?.value || document.getElementById('mLoc')?.value || '';
   const loc = locInput ? locInput + '·' + selectedLayer : (bin ? bin.loc + '·' + selectedLayer : '未指定·' + selectedLayer);
+  const memory = (document.getElementById('fMemory')?.value || document.getElementById('mMemory')?.value || '').trim();
+  const purchased = document.getElementById('fPurchased')?.value || document.getElementById('mPurchased')?.value || '';
+  const worthIt = document.getElementById('fWorth')?.value || document.getElementById('mWorth')?.value || 'unknown';
   return {
     id: 'i' + Date.now(),
     spaceId: bin?.spaceId || state.currentSpaceId || 'master',
@@ -1037,6 +1091,14 @@ function buildItemFromForm(name) {
     expiry: document.getElementById('fExp')?.value || document.getElementById('mExp')?.value || undefined,
     pao: document.getElementById('aiPAO')?.value || undefined,
     spec: document.getElementById('fSpec')?.value || undefined,
+    purchased: purchased || undefined,
+    note: memory || undefined,
+    purchaseMemory: {
+      purchasedAt: purchased,
+      reason: memory,
+      worthIt,
+      memoryNote: memory,
+    },
     confidence: bin ? 92 : 75,
     kw: name.toLowerCase().split(/\s+/),
     archivedAt: new Date().toISOString().slice(0, 10),
@@ -1164,3 +1226,4 @@ refreshPtsUI();
 refreshBinUI();
 renderGuardUI();
 initNative();
+showFirstLaunchIfNeeded();

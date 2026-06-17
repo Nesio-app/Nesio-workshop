@@ -63,6 +63,65 @@ html, body {
   -webkit-font-smoothing: antialiased;
 }
 
+.first-launch {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: calc(22px + var(--safe-top)) 18px calc(22px + var(--safe-bottom));
+  background: rgba(231, 238, 251, 0.92);
+  backdrop-filter: blur(18px);
+}
+
+.first-launch.show { display: flex; }
+
+.first-launch-card {
+  width: min(100%, 420px);
+  background: linear-gradient(160deg, #ffffff, #eaf2fe);
+  border: 1px solid var(--border2);
+  border-radius: var(--rlg);
+  padding: 24px;
+  box-shadow: var(--shadow-lg);
+}
+
+.first-launch-kicker {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--accent-deep);
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.first-launch h1 {
+  font-size: 25px;
+  line-height: 1.16;
+  margin-bottom: 10px;
+  letter-spacing: 0;
+}
+
+.first-launch p {
+  color: var(--text2);
+  font-size: 13px;
+  line-height: 1.6;
+  margin-bottom: 16px;
+}
+
+.first-launch-actions {
+  display: grid;
+  gap: 9px;
+}
+
+.first-launch-note {
+  margin-top: 13px;
+  color: var(--text3);
+  font-size: 11px;
+  text-align: center;
+  line-height: 1.45;
+}
+
 .app-shell {
   width: 100%;
   height: 100%;
@@ -1051,6 +1110,18 @@ html, body {
 .drow-l { font-size: 12.5px; color: var(--text3); font-weight: 600; }
 .drow-v { font-size: 12.5px; color: var(--text); font-weight: 700; }
 
+.memory-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 12px;
+  font-size: 12px;
+  color: var(--text2);
+  line-height: 1.6;
+  border-left: 3px solid var(--accent);
+  box-shadow: var(--shadow-sm);
+}
+
 .sbar {
   margin: 0 18px 12px;
   background: var(--surface);
@@ -1142,6 +1213,12 @@ html, body {
 body.native .statusbar { display: none; }
 body.native .app-shell { padding-top: var(--safe-top); }
 body.native .portal-back-link { display: none; }
+
+.ta {
+  min-height: 82px;
+  resize: vertical;
+  line-height: 1.5;
+}
 
 /* Warehouse / QR scan */
 .active-bin {

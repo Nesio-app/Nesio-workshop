@@ -1,8 +1,12 @@
 {
-  "name": "adhd-flow-ios",
+  "name": "lifeflow",
   "version": "1.0.0",
   "private": true,
-  "description": "ADHD Flow Planner · 轻推任务系统 — Capacitor iOS app",
+  "description": "LifeFlow · ADHD Flow Planner — Capacitor iOS + PWA",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hanbing6228/lifeflow.git"
+  },
   "scripts": {
     "sync": "node scripts/sync-www.mjs",
     "cap:sync": "npm run sync && npx cap sync ios",

@@ -4,7 +4,15 @@ import { fileURLToPath } from 'url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const src = join(root, 'web');
-const files = ['index.html', 'styles.css', 'app.js', 'manifest.json', 'icon.svg', 'privacy.html'];
+const files = [
+  'index.html',
+  'styles.css',
+  'app.js',
+  'manifest.json',
+  'icon.svg',
+  'privacy.html',
+  'portal-back.css',
+];
 
 function readApiUrl(filePath) {
   const lines = readFileSync(filePath, 'utf8').split('\n');

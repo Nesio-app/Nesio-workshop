@@ -1,0 +1,270 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   熔归 RONG GUI — 配色皮肤 (theme-skin.css)
+   在 styles.css 之后引入。重映射现有令牌 + 液态玻璃 + 星空。
+   切换：在 <html> 上设 data-scheme / data-mode。
+     scheme: sapphire(子夜金) | jade(曜石翡翠) | amethyst(紫晶星云)
+     mode:   night(夜) | day(日)
+   所有页面与训练浮层自动套用，无需逐页修改。
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ---- 由强调色派生的光晕 / 淡底（强调色一变，这些自动跟变）---- */
+:root{
+  --eglow: color-mix(in oklab, var(--ember) 36%, transparent);
+  --edim:  color-mix(in oklab, var(--ember) 14%, transparent);
+  --cglow: color-mix(in oklab, var(--cool) 30%, transparent);
+  --cdim:  color-mix(in oklab, var(--cool) 13%, transparent);
+  --gdim:  color-mix(in oklab, var(--gold) 14%, transparent);
+  --ldim:  color-mix(in oklab, var(--lav) 13%, transparent);
+  --sdim:  color-mix(in oklab, var(--sky) 13%, transparent);
+  --neb1:  color-mix(in oklab, var(--ember) 24%, transparent);
+  --neb2:  color-mix(in oklab, var(--cool) 16%, transparent);
+}
+
+/* ===================== 中性层（按 日/夜 切换）===================== */
+[data-mode="night"]{
+  --appbg:#05070b;
+  --bg1:#0b0e16; --bg2:#06080e; --star:rgba(255,255,255,.92);
+  --void:#0b0f18;
+  --card:rgba(255,255,255,.055); --card2:rgba(255,255,255,.085); --card3:rgba(255,255,255,.12);
+  --glassBar:rgba(14,18,28,.6);
+  --bd:rgba(255,255,255,.1); --bd2:rgba(255,255,255,.17);
+  --glassHi:rgba(255,255,255,.18); --shadow:rgba(0,0,0,.5);
+  --tx:#eef1f7; --mu:rgba(238,241,247,.45); --mu2:rgba(238,241,247,.66);
+}
+[data-mode="day"]{
+  --appbg:#dfe4f0;
+  --bg1:#eef2fa; --bg2:#e2e8f4; --star:rgba(70,85,130,.3);
+  --void:#f3f5fb;
+  --card:rgba(255,255,255,.56); --card2:rgba(255,255,255,.72); --card3:rgba(255,255,255,.84);
+  --glassBar:rgba(255,255,255,.74);
+  --bd:rgba(255,255,255,.85); --bd2:rgba(120,135,170,.28);
+  --glassHi:rgba(255,255,255,.95); --shadow:rgba(40,55,100,.16);
+  --tx:#1b2336; --mu:rgba(27,35,54,.5); --mu2:rgba(27,35,54,.72);
+}
+
+/* ===================== 强调层（按 配色 × 日/夜 切换）===================== */
+/* 子夜金 Sapphire */
+[data-scheme="sapphire"][data-mode="night"]{
+  --ember:#e6c889; --cool:#82acea; --gold:#e6c889; --lav:#b0a3e0; --sky:#82acea;
+  --btn1:#efd49a; --btn2:#cda85f; --onBtn:#2a2008;
+  --safe:#83cfa2; --warn:#e3b277; --danger:#e08a8a;
+}
+[data-scheme="sapphire"][data-mode="day"]{
+  --ember:#a37c2c; --cool:#3d68b0; --gold:#a37c2c; --lav:#6a5bb0; --sky:#3d68b0;
+  --btn1:#2d518f; --btn2:#17284a; --onBtn:#f4f7fd;
+  --safe:#3f9d6b; --warn:#bd8636; --danger:#c25b5b;
+}
+/* 曜石翡翠 Jade */
+[data-scheme="jade"][data-mode="night"]{
+  --ember:#5ccaa2; --cool:#b9c8c1; --gold:#d9c88c; --lav:#8fd0c0; --sky:#7fc8e0;
+  --btn1:#6ed8b0; --btn2:#46a884; --onBtn:#04140e;
+  --safe:#6cd0a4; --warn:#e3b277; --danger:#e08a8a;
+}
+[data-scheme="jade"][data-mode="day"]{
+  --ember:#1f8a6b; --cool:#5a7d72; --gold:#a8842f; --lav:#3f8a7a; --sky:#3a87a8;
+  --btn1:#23987a; --btn2:#137256; --onBtn:#f2fbf7;
+  --safe:#3f9d6b; --warn:#bd8636; --danger:#c25b5b;
+}
+/* 紫金 Amethyst & Gold（紫为主 + 香槟金辅）*/
+[data-scheme="amethyst"][data-mode="night"]{
+  --ember:#bfa3ee; --cool:#dcc188; --gold:#e3cc92; --lav:#c6abef; --sky:#b39ae8;
+  --btn1:#c6abef; --btn2:#9d7cd6; --onBtn:#1a1030;
+  --safe:#88cfa8; --warn:#e3b277; --danger:#e0899a;
+}
+[data-scheme="amethyst"][data-mode="day"]{
+  --ember:#6a4ea8; --cool:#9a7d2e; --gold:#9c7d2c; --lav:#7458b4; --sky:#6a5bb0;
+  --btn1:#7458b4; --btn2:#553d8c; --onBtn:#f6f2fc;
+  --safe:#3f9d6b; --warn:#bd8636; --danger:#c25b5b;
+}
+
+/* ════ 静谧庭院 Serene Courtyard（移植 treasurebox 门户蓝：#588ce3 / #96c7f3 / #cddefc）════ */
+/* 浅色 = 数字静谧庭院（明亮蓝）；夜色 = 深蓝夜空 */
+[data-scheme="courtyard"][data-mode="day"]{
+  /* 中性层 */
+  --appbg:#dce8f8; --bg1:#f1f6fd; --bg2:#d6e6fb; --star:rgba(88,140,227,.28);
+  --void:#eef5fd;
+  --card:rgba(255,255,255,.62); --card2:rgba(255,255,255,.8); --card3:rgba(255,255,255,.92);
+  --glassBar:rgba(255,255,255,.8);
+  --bd:rgba(255,255,255,.85); --bd2:rgba(88,140,227,.2);
+  --glassHi:rgba(255,255,255,.95); --shadow:rgba(40,80,150,.16);
+  --tx:#1e2a3a; --mu:rgba(30,42,58,.5); --mu2:rgba(30,42,58,.74);
+  /* 强调层（门户蓝）*/
+  --ember:#3f6fc4; --cool:#6b8fc9; --gold:#5f8fd6; --lav:#7aa0d8; --sky:#588ce3;
+  --btn1:#588ce3; --btn2:#3f6fc4; --onBtn:#ffffff;
+  --safe:#3fa88b; --warn:#cf9542; --danger:#d2685f;
+}
+[data-scheme="courtyard"][data-mode="night"]{
+  /* 中性层 */
+  --appbg:#070d18; --bg1:#1a2740; --bg2:#0a1322; --star:rgba(200,217,245,.85);
+  --void:#0c1426;
+  --card:rgba(255,255,255,.055); --card2:rgba(255,255,255,.085); --card3:rgba(255,255,255,.12);
+  --glassBar:rgba(14,22,40,.62);
+  --bd:rgba(127,176,245,.16); --bd2:rgba(127,176,245,.24);
+  --glassHi:rgba(255,255,255,.14); --shadow:rgba(0,0,0,.45);
+  --tx:#e7eefb; --mu:rgba(200,217,245,.5); --mu2:rgba(200,217,245,.72);
+  /* 强调层 */
+  --ember:#7fb0ee; --cool:#5f8fd6; --gold:#8fb0e8; --lav:#9ab4ee; --sky:#7fb0ee;
+  --btn1:#7fb0ee; --btn2:#5f8fd6; --onBtn:#0a1322;
+  --safe:#4fb89a; --warn:#e0b277; --danger:#e08a8a;
+}
+
+/* ===================== 背景 / 星空 ===================== */
+body{ background:var(--appbg); }
+.phone{
+  background:
+    radial-gradient(135% 80% at 18% -8%, var(--neb1), transparent 58%),
+    radial-gradient(120% 72% at 96% 26%, var(--neb2), transparent 55%),
+    linear-gradient(168deg, var(--bg1), var(--bg2));
+  border-color:var(--bd2);
+}
+.rg-stars{ position:absolute; inset:0; z-index:0; pointer-events:none; }
+.rg-star{ position:absolute; border-radius:50%; background:var(--star); box-shadow:0 0 4px var(--star); }
+/* 把常驻的页面层抬到星空之上（浮层仍保留各自更高的 z-index）*/
+.phone>.sb,.phone>.main,.phone>.tabbar,.phone>.pbar,.phone>.ibar{ position:relative; z-index:1; }
+
+/* ===================== 液态玻璃表面 ===================== */
+.card,.sc,.slcard,.gstrip,.ghero,.rcard,.lcard,.cprof,
+.daytog,.chip,.wb,.db,.sbr,.exrow,.lcicon,.cm,.gz,
+.microtask,.hudtgt,.cinp,.music-mini,.mtoast,.pc,.backbtn,
+.fo-close,.sandbox,.ss-pair{
+  -webkit-backdrop-filter:blur(20px) saturate(1.35);
+  backdrop-filter:blur(20px) saturate(1.35);
+}
+.card,.slcard,.gstrip,.ghero,.rcard,.lcard,.cprof,.sc,.strow .sc{
+  box-shadow:0 10px 30px -12px var(--shadow), inset 0 1px 0 var(--glassHi);
+}
+.sb{ background:var(--void); }
+.tabbar{ background:var(--glassBar); box-shadow:inset 0 1px 0 var(--glassHi); }
+
+/* ===================== 按钮 / 渐变（强调色重定向）===================== */
+.efill{ background:linear-gradient(90deg,var(--cool),var(--ember)); }
+.sbtn{
+  background:linear-gradient(135deg,var(--btn1),var(--btn2));
+  color:var(--onBtn);
+  box-shadow:0 12px 30px -10px var(--eglow), inset 0 1px 0 rgba(255,255,255,.3);
+}
+.db.on{ background:linear-gradient(135deg,var(--btn1),var(--btn2)); color:var(--onBtn); }
+.sendbtn{ background:var(--btn1); color:var(--onBtn); }
+.fo-btn.go,.hudabtn.next,.recbtn.hot{
+  background:linear-gradient(135deg,var(--btn1),var(--btn2)); color:var(--onBtn);
+}
+.follow-btn{ background:linear-gradient(135deg,var(--btn1),var(--btn2)); color:var(--onBtn); }
+.endbtn{ background:linear-gradient(135deg,var(--cool),color-mix(in oklab,var(--cool) 64%,#000 36%)); }
+.rcard{ background:linear-gradient(135deg,var(--edim),transparent); border-color:var(--eglow); }
+.cm.user{ border-color:var(--eglow); }
+.neural{ background:linear-gradient(135deg,var(--edim),transparent); }
+.rpeslider::-webkit-slider-thumb{ background:var(--ember); box-shadow:0 0 8px var(--eglow); }
+
+/* 录入按钮（血糖页内联样式用了写死的橙）——交给强调色 */
+.loglist + *, .ghero ~ div button{ }
+
+/* 让“满电冲刺”徽标、电量数字等保持强调色（已是 token，自动跟随）*/
+
+/* ===================== 统一线性图标 (icons.js) ===================== */
+.rgi{ display:inline-flex; align-items:center; justify-content:center;
+  width:1em; height:1em; vertical-align:-.14em; line-height:0; flex-shrink:0; }
+.rgi svg{ width:100%; height:100%; display:block;
+  stroke:currentColor; fill:none; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
+.rgi.fill svg, .rgi svg [fill="currentColor"]{ }
+
+/* 标签栏图标：未选 muted，选中 主色（紫）并发光 */
+.tab .ti{ color:var(--mu2); display:flex; align-items:center; justify-content:center; }
+.tab.on .ti{ color:var(--ember); }
+.tab .ti .rgi{ width:24px; height:24px; }
+.tab.on .ti .rgi svg{ filter:drop-shadow(0 0 6px var(--eglow)); }
+
+/* 各处图标尺寸微调 */
+.sbtn .rgi, .endbtn .rgi, .wks .rgi{ width:1.05em; height:1.05em; margin-right:2px; }
+.chip .rgi, .pc .rgi, .tag .rgi{ width:1.05em; height:1.05em; }
+.ailbl .rgi{ color:var(--ember); }
+.ebadge .rgi{ width:1em; height:1em; }
+.sbi .rgi{ width:13px; height:13px; }
+/* 沙盒状态图标 */
+.sst .rgi{ width:1.1em; height:1.1em; }
+.sst.ok{ color:var(--safe); }
+/* 难度小圆点 */
+.tag .rgi.dot, .tag .rgi{ vertical-align:-.1em; }
+
+/* ===================== 明暗 切换条（侧面缩小）===================== */
+.rg-switch{
+  position:absolute; top:50%; right:6px; transform:translateY(-50%);
+  display:flex; flex-direction:column; gap:0; z-index:25;
+  font-family:-apple-system,'Helvetica Neue',sans-serif;
+  pointer-events:none;
+}
+.rg-seg{
+  display:flex; flex-direction:column; gap:2px; padding:3px; border-radius:10px;
+  background:rgba(20,24,34,.55); border:1px solid rgba(255,255,255,.1);
+  -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px);
+  pointer-events:auto;
+}
+.rg-seg button{
+  appearance:none; border:none; cursor:pointer; font-family:inherit;
+  padding:4px 6px; min-width:28px; border-radius:7px;
+  font-size:10px; font-weight:600; letter-spacing:.2px;
+  color:rgba(255,255,255,.5); background:transparent; transition:all .18s;
+  display:inline-flex; align-items:center; justify-content:center;
+}
+.rg-seg button[aria-pressed="true"]{ color:#fff; background:rgba(255,255,255,.14); }
+.rg-seg .d{ width:7px; height:7px; border-radius:50%; }
+
+/* ===================== AI 教练悬浮按钮 + 面板 ===================== */
+.coach-fab{
+  position:absolute; right:14px; bottom:94px; z-index:18;
+  width:48px; height:48px; border-radius:50%; border:1px solid var(--eglow);
+  background:linear-gradient(145deg, var(--ember), #c44d1f);
+  color:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center;
+  box-shadow:0 8px 22px rgba(232,97,42,.32);
+  transition:transform .15s, opacity .2s;
+}
+.coach-fab .rgi, .coach-fab{ font-size:0; }
+.coach-fab svg{ width:22px; height:22px; stroke:#fff; }
+.coach-fab:active{ transform:scale(.94); }
+.coach-fab.hidden{ opacity:0; pointer-events:none; transform:scale(.85); }
+
+.coachOv{
+  position:absolute; inset:0; z-index:65; background:var(--void);
+  display:none; flex-direction:column;
+}
+.coachOv.on{ display:flex; }
+.coachOv-hdr{
+  flex-shrink:0; padding:12px 16px 8px; display:flex; align-items:flex-start;
+  justify-content:space-between; gap:10px; border-bottom:1px solid var(--bd);
+  background:color-mix(in oklab, var(--void) 92%, transparent);
+}
+.coachOv-hdr .pt{ font-size:20px; font-weight:800; letter-spacing:-.5px; }
+.coachOv-hdr .ps{ font-size:11px; color:var(--mu); margin-top:2px; }
+.coachOv-close{
+  width:30px; height:30px; border-radius:50%; border:1px solid var(--bd2);
+  background:var(--card); color:var(--mu2); font-size:14px; cursor:pointer; flex-shrink:0;
+}
+.coachOv-body{
+  flex:1; overflow-y:auto; overflow-x:hidden; scrollbar-width:none;
+  padding-bottom:8px;
+}
+.coachOv-body::-webkit-scrollbar{ display:none; }
+.coachOv .pbar{ display:flex; padding:6px 16px; }
+.coachOv .ibar{
+  display:flex; padding:7px 16px 12px; gap:9px; align-items:center;
+  background:var(--void); border-top:1px solid var(--bd); flex-shrink:0;
+}
+
+/* ===================== 肌肉激活图谱（解剖版 + 热力高亮）===================== */
+.bodymap-box svg .body-base{ fill:color-mix(in oklab, var(--tx) 7%, transparent); stroke:color-mix(in oklab, var(--tx) 12%, transparent); stroke-width:.5; }
+.bodymap-box svg .body-deco{ fill:color-mix(in oklab, var(--tx) 10%, transparent); stroke:none; }
+.bodymap-box svg .bm-seam{ fill:none; stroke:color-mix(in oklab, var(--tx) 26%, transparent); stroke-width:.7; stroke-linecap:round; }
+.bodymap-box svg .bm-label{ font-size:9px; fill:var(--mu); letter-spacing:1px; }
+.bodymap-box svg .muscle-r{
+  fill:color-mix(in oklab, var(--tx) 14%, transparent);
+  stroke:color-mix(in oklab, var(--tx) 22%, transparent);
+  stroke-width:.6; transition:fill .4s, filter .4s;
+}
+.bodymap-box svg .muscle-r.hi-p{
+  fill:url(#heatP) !important; stroke:#ff7a45; stroke-width:.8;
+  filter:drop-shadow(0 0 3.5px rgba(255,90,45,.6));
+  animation:mpulse 1.7s ease-in-out infinite;
+}
+.bodymap-box svg .muscle-r.hi-s{ fill:url(#heatS) !important; stroke:#ffbf66; stroke-width:.7; opacity:1; }
+/* 图例点改为热力色，与高亮一致 */
+.bodymap-box .bmd.p{ background:linear-gradient(135deg,#ffa24d,#f23030); box-shadow:0 0 7px rgba(255,90,45,.5); }
+.bodymap-box .bmd.s{ background:linear-gradient(135deg,#ffd58a,#ffab4d); box-shadow:none; }
