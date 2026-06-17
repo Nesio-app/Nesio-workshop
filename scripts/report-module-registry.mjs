@@ -8,9 +8,12 @@ import { buildInventoryFirstLaunchContract } from '../lib/portal/inventory-first
 import { buildModuleAdapterContract } from '../lib/portal/module-adapter-contract.mjs';
 import { buildStandaloneAppReadinessContract } from '../lib/portal/standalone-app-readiness-contract.mjs';
 import { buildSecurityIncidentReadinessContract } from '../lib/portal/security-incident-readiness-contract.mjs';
+import { buildModuleProductContractV0 } from '../lib/portal/module-product-contract-v0.mjs';
+import { buildWebSurfaceContractV0 } from '../lib/portal/web-surface-contract-v0.mjs';
 import { buildToolDataVersioningContract } from '../lib/portal/tool-data-versioning-contract.mjs';
 import { buildUserIdentityUpgradeContract } from '../lib/portal/user-identity-upgrade-contract.mjs';
 import { buildOfflineSyncConflictContract } from '../lib/portal/offline-sync-conflict-contract.mjs';
+import { buildCloudReadinessContract } from '../lib/portal/cloud-readiness-contract.mjs';
 
 const repoRoot = fileURLToPath(new URL('..', import.meta.url));
 const configPath = join(repoRoot, 'public', 'portal-config.json');
@@ -2052,6 +2055,12 @@ const securityIncidentReadinessContract = buildSecurityIncidentReadinessContract
   reportToolsWithLaunchState,
   featureControlModules,
 );
+const moduleProductContract = buildModuleProductContractV0(reportToolsWithLaunchState);
+const webSurfaceContract = buildWebSurfaceContractV0({
+  modules: reportToolsWithLaunchState,
+  moduleProductContract,
+  mobileAppIntegration: mobileAppIntegrationContract,
+});
 const moduleAdapterContract = buildModuleAdapterContract(launchSkuModules.filter((entry) => entry.moduleId !== 'shell').map((entry) => {
   const tool = tools.find((candidate) => candidate.id === entry.moduleId);
   return {
@@ -2066,6 +2075,10 @@ const toolDataVersioningContract = buildToolDataVersioningContract(tools.map((to
 })));
 const userIdentityUpgradeContract = buildUserIdentityUpgradeContract(config);
 const offlineSyncConflictContract = buildOfflineSyncConflictContract(reportToolsWithLaunchState);
+const cloudReadinessContract = buildCloudReadinessContract({
+  userIdentityUpgrade: userIdentityUpgradeContract,
+  offlineSyncConflict: offlineSyncConflictContract,
+});
 const toolLifecycleSummary = {
   version: TOOL_LIFECYCLE_VERSION,
   stageVocabulary: [...TOOL_LIFECYCLE_STAGES],
@@ -2201,6 +2214,19 @@ const evidenceSummary = {
     securityIncidentHighRiskModuleCount: securityIncidentReadinessContract.summary.highRiskModuleCount,
     securityIncidentRealActionEnabledCount: securityIncidentReadinessContract.summary.realActionEnabledCount,
     securityIncidentWarningCount: securityIncidentReadinessContract.summary.warningCount,
+    moduleProductContractVersion: moduleProductContract.version,
+    moduleProductContractModuleCount: moduleProductContract.summary.moduleCount,
+    moduleProductPublicVisibleCount: moduleProductContract.summary.publicVisibleCount,
+    moduleProductAppStoreMentionAllowedCount: moduleProductContract.summary.appStoreMentionAllowedCount,
+    moduleProductWarningCount: moduleProductContract.summary.warningCount,
+    moduleTrustBoundaryHighTrustCount: moduleProductContract.moduleTrustBoundary.summary.highTrustModuleCount,
+    coreObjectModelGroupCount: Object.keys(moduleProductContract.coreObjectModels.groups).length,
+    webSurfaceContractVersion: webSurfaceContract.version,
+    mobileWebSupported: webSurfaceContract.summary.mobileWebSupported,
+    pwaSupported: webSurfaceContract.summary.pwaSupported,
+    desktopPreviewOnly: webSurfaceContract.summary.desktopPreviewOnly,
+    desktopDashboardEnabled: webSurfaceContract.summary.desktopDashboardEnabled,
+    webSurfaceWarningCount: webSurfaceContract.summary.warningCount,
     toolLifecycleVersion: toolLifecycleSummary.version,
     toolLifecycleLaunchableCount: toolLifecycleSummary.launchableToolCount,
     toolLifecycleSandboxCount: toolLifecycleSummary.sandboxToolCount,
@@ -2237,6 +2263,12 @@ const evidenceSummary = {
     offlineQueueEnabledNow: offlineSyncConflictContract.summary.offlineQueueEnabledNow,
     syncConflictModelReadable: offlineSyncConflictContract.summary.syncConflictModelReadable,
     inventorySyncReadiness: offlineSyncConflictContract.summary.inventorySyncReadiness,
+    cloudReadinessVersion: cloudReadinessContract.summary.cloudReadinessVersion,
+    cloudEnabled: cloudReadinessContract.summary.cloudEnabled,
+    realCloudProviderConnected: cloudReadinessContract.summary.realCloudProviderConnected,
+    cloudProviderCandidateCount: cloudReadinessContract.summary.cloudProviderCandidateCount,
+    inventoryCloudSchemaDraftReady: cloudReadinessContract.summary.inventoryCloudSchemaDraftReady,
+    futureCloudEligibleTableCount: cloudReadinessContract.summary.futureCloudEligibleTableCount,
     qaLine: boundaryWarnings.length === 0 && experienceServiceWarnings.length === 0 && aggregationWarnings.length === 0 && approvalGateWarnings.length === 0 && shellRouteWarnings.length === 0 && registryDriftWarnings.length === 0 && artifactVisibilityWarnings.length === 0 && artifactStatusVisibilityWarnings.length === 0 && shellDiscoveryBoundaryWarnings.length === 0 && mobileAppBoundaryWarnings.length === 0
       ? `PASS: ${readyModules.length}/${tools.length} modules ready; all local static modules have public index files.`
       : `WARN: ${boundaryWarnings.length} module boundary warning(s), ${experienceServiceWarnings.length} Experience Services warning(s), ${dataAggregationReviewWarningCount} Data Aggregation review warning(s), ${dataAggregationRuntimeBlockerCount} Data Aggregation runtime-blocking warning(s), ${approvalGateWarnings.length} Approval Gate warning(s), ${shellRouteWarnings.length} Shell Route warning(s), ${registryDriftWarnings.length} Registry Drift warning(s), ${artifactVisibilityWarnings.length} Artifact Visibility warning(s), ${artifactStatusVisibilityWarnings.length} Artifact Status Visibility warning(s), ${shellDiscoveryBoundaryWarnings.length} Shell Discovery warning(s), ${mobileAppBoundaryWarnings.length} Mobile App Integration warning(s) need QA review.`,
@@ -2403,6 +2435,10 @@ const evidenceSummary = {
   featureControl: featureControlContract,
   standaloneAppReadiness: standaloneAppReadinessContract,
   securityIncidentReadiness: securityIncidentReadinessContract,
+  moduleProductContract,
+  moduleTrustBoundary: moduleProductContract.moduleTrustBoundary,
+  coreObjectModels: moduleProductContract.coreObjectModels,
+  webSurfaceContract,
   toolLifecycle: {
     version: TOOL_LIFECYCLE_VERSION,
     stageVocabulary: [...TOOL_LIFECYCLE_STAGES],
@@ -2433,6 +2469,7 @@ const evidenceSummary = {
   toolDataVersioning: toolDataVersioningContract,
   userIdentityUpgrade: userIdentityUpgradeContract,
   offlineSyncConflict: offlineSyncConflictContract,
+  cloudReadiness: cloudReadinessContract,
   moduleDataBus: {
     implementation: moduleDataBus.implementation,
     summary: moduleDataBus.summary,
