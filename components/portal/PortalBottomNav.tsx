@@ -2,6 +2,9 @@
 
 import Link from 'next/link';
 import { withBase } from '@/lib/portal/paths';
+import { t } from '@/lib/portal/i18n';
+import { loadProfileSettings } from '@/lib/portal/profile';
+import type { PortalLocale } from '@/lib/portal/profile';
 
 interface PortalBottomNavProps {
   noteOpen?: boolean;
@@ -18,15 +21,17 @@ export default function PortalBottomNav({
   onOpenNote,
   onOpenTodo,
 }: PortalBottomNavProps) {
+  const locale: PortalLocale = loadProfileSettings().locale;
+
   return (
-    <nav className="portal-bottom-nav" aria-label="主导航">
+    <nav className="portal-bottom-nav" aria-label={t(locale, 'portalBottomNavLabel')}>
       <button
         type="button"
         className={
           'portal-bottom-nav-btn' + (treasureOpen ? ' portal-bottom-nav-btn--active' : '')
         }
         onClick={onHome}
-        aria-label="宝盒"
+        aria-label={t(locale, 'portalBottomNavHome')}
         aria-expanded={treasureOpen}
       >
         <img
@@ -43,7 +48,7 @@ export default function PortalBottomNav({
           'portal-bottom-nav-btn' + (noteOpen ? ' portal-bottom-nav-btn--active' : '')
         }
         onClick={onOpenNote}
-        aria-label="Note"
+        aria-label={t(locale, 'portalBottomNavNote')}
         aria-expanded={noteOpen}
       >
         <span className="portal-bottom-nav-icon portal-icon-blue" aria-hidden>
@@ -54,7 +59,7 @@ export default function PortalBottomNav({
         type="button"
         className="portal-bottom-nav-btn"
         onClick={onOpenTodo}
-        aria-label="待办"
+        aria-label={t(locale, 'portalBottomNavTodo')}
       >
         <span className="portal-bottom-nav-icon portal-icon-blue" aria-hidden>
           ✅
@@ -63,7 +68,7 @@ export default function PortalBottomNav({
       <Link
         href={withBase('/settings')}
         className="portal-bottom-nav-btn"
-        aria-label="我"
+        aria-label={t(locale, 'portalBottomNavMe')}
       >
         <span className="portal-bottom-nav-icon portal-icon-blue" aria-hidden>
           👤

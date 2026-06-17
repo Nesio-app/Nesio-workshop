@@ -47,7 +47,9 @@ function tryFlomoScheme(content: string, imageUrls: string[]) {
 function formatFlomoReadError(error: string): string {
   if (/Local Storage|access_token|FLOMO_API_KEY|Webhook/i.test(error)) return error;
   if (/登录|login|过期|无效/i.test(error)) {
-    return 'FLOMO_API_KEY 已过期，请重新从 Local Storage → me → access_token 复制';
+    return t(loadProfileSettings().locale, 'notePanelReadFailPrefix', {
+      msg: t(loadProfileSettings().locale, 'notePanelTokenExpired'),
+    });
   }
   return error;
 }
@@ -75,14 +77,14 @@ function MemoCard({ memo, onTagClick }: { memo: FlomoMemo; onTagClick: (tag: str
         <time className="flomo-memo-time" dateTime={memo.created_at}>
           {formatMemoDate(memo.created_at || memo.updated_at)}
         </time>
-        <button type="button" className="flomo-memo-menu" aria-label="更多" tabIndex={-1}>
+        <button type="button" className="flomo-memo-menu" aria-label={t(loadProfileSettings().locale, 'flomoMenuMore')} tabIndex={-1}>
           ···
         </button>
       </header>
       <p className="flomo-memo-content">{shown}</p>
       {needsExpand && !expanded ? (
         <button type="button" className="flomo-memo-expand" onClick={() => setExpanded(true)}>
-          展开
+          {t(loadProfileSettings().locale, 'flomoExpand')}
         </button>
       ) : null}
       {memo.tags.length > 0 ? (
@@ -347,7 +349,7 @@ export default function NotePanelEnhanced({ open, onOpenChange }: NotePanelProps
       <div
         className="flomo-app"
         role="dialog"
-        aria-label="flomo"
+        aria-label={t(locale, 'flomoTitle')}
         onClick={(e) => e.stopPropagation()}
       >
         <header className="flomo-app-header">
@@ -355,7 +357,9 @@ export default function NotePanelEnhanced({ open, onOpenChange }: NotePanelProps
             type="button"
             className="flomo-header-btn flomo-sidebar-toggle"
             onClick={() => setSidebarOpen((v) => !v)}
-            aria-label={sidebarOpen ? '收起标签' : '展开标签'}
+            aria-label={sidebarOpen
+              ? t(locale, 'notePanelToggleCollapsed')
+              : t(locale, 'notePanelToggleExpanded')}
             aria-expanded={sidebarOpen}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -367,12 +371,12 @@ export default function NotePanelEnhanced({ open, onOpenChange }: NotePanelProps
               />
             </svg>
           </button>
-          <h2 className="flomo-app-title">flomo</h2>
+          <h2 className="flomo-app-title">{t(locale, 'flomoTitle')}</h2>
           <button
             type="button"
             className={'flomo-header-btn flomo-search-toggle' + (searchOpen ? ' flomo-search-toggle--on' : '')}
             onClick={() => setSearchOpen((v) => !v)}
-            aria-label="搜索"
+            aria-label={t(locale, 'notePanelSearch')}
             aria-expanded={searchOpen}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -387,7 +391,7 @@ export default function NotePanelEnhanced({ open, onOpenChange }: NotePanelProps
             <input
               type="search"
               className="flomo-search-input"
-              placeholder="搜索 memo…"
+              placeholder={t(locale, 'notePanelSearchPlaceholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               autoFocus
@@ -400,13 +404,13 @@ export default function NotePanelEnhanced({ open, onOpenChange }: NotePanelProps
             <button
               type="button"
               className="flomo-sidebar-backdrop"
-              aria-label="关闭标签栏"
+              aria-label={t(locale, 'notePanelCloseSidebar')}
               onClick={() => setSidebarOpen(false)}
             />
           ) : null}
           <aside
             className={'flomo-sidebar' + (sidebarOpen ? ' flomo-sidebar--open' : '')}
-            aria-label="标签"
+            aria-label={t(locale, 'notePanelTag')}
             aria-hidden={!sidebarOpen}
           >
             <button
@@ -419,10 +423,10 @@ export default function NotePanelEnhanced({ open, onOpenChange }: NotePanelProps
                 setSidebarOpen(false);
               }}
             >
-              全部
+              {t(locale, 'notePanelTagAll')}
               <span className="flomo-sidebar-all-count">{displayMemos.length}</span>
             </button>
-            <p className="flomo-sidebar-section">全部标签</p>
+            <p className="flomo-sidebar-section">{t(locale, 'notePanelAllTags')}</p>
             {tagIndex.map(([tag, count]) => (
               <button
                 key={tag}
@@ -444,12 +448,12 @@ export default function NotePanelEnhanced({ open, onOpenChange }: NotePanelProps
             {usingDemo || readError || !readConfigured || configured === false ? (
               <p className="flomo-app-banner">
                 {readError
-                  ? `读取失败：${formatFlomoReadError(readError)}`
-                  : configured === false
-                    ? '请配置 FLOMO_WEBHOOK_URL（发送）与 FLOMO_API_KEY（读取 access_token）'
-                    : !readConfigured && writeConfigured
-                      ? '已可发送；读取需另配 FLOMO_API_KEY（Local Storage → me → access_token）'
-                      : '暂无笔记，当前为演示数据'}
+                  ? t(locale, 'notePanelReadFailPrefix', { msg: formatFlomoReadError(readError) })
+                    : configured === false
+                      ? t(locale, 'notePanelNeedConfig')
+                      : !readConfigured && writeConfigured
+                        ? t(locale, 'notePanelReadNeedKey')
+                        : t(locale, 'notePanelDemoData')}
               </p>
             ) : null}
 
@@ -462,7 +466,7 @@ export default function NotePanelEnhanced({ open, onOpenChange }: NotePanelProps
                 </div>
               ) : filteredMemos.length === 0 ? (
                 <p className="flomo-timeline-empty">
-                  {activeTag || searchQuery ? '没有匹配的 memo' : '还没有 memo，写一条吧'}
+                  {activeTag || searchQuery ? t(locale, 'notePanelNoMatch') : t(locale, 'notePanelNoMemo')}
                 </p>
               ) : (
                 filteredMemos.map((memo) => (
@@ -628,9 +632,9 @@ export default function NotePanelEnhanced({ open, onOpenChange }: NotePanelProps
                       type="button"
                       className="flomo-compose-dismiss"
                       onClick={() => setComposeOpen(false)}
-                      aria-label="收起"
+                      aria-label={t(locale, 'notePanelCollapse')}
                     >
-                      收起
+                      {t(locale, 'notePanelCollapse')}
                     </button>
 
                     <button

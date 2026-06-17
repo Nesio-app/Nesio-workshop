@@ -1,17 +1,21 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { withBase } from '@/lib/portal/paths';
+import { ensureToolboxTrailingSlash, withBase } from '@/lib/portal/paths';
+import { loadProfileSettings } from '@/lib/portal/profile';
+import type { PortalLocale } from '@/lib/portal/profile';
+import { t } from '@/lib/portal/i18n';
 
-const QUICK_LINKS = [
-  { label: '智友', href: '/secretary', icon: '💬' },
-  { label: 'Gemini', href: '/secretary/chat?friend=gemini', icon: '✦' },
-  { label: '群聊', href: '/secretary', icon: '👥' },
+const QUICK_LINKS: Array<{ key: 'quickChatActionSecretary' | 'quickChatActionGemini' | 'quickChatActionGroup'; href: string; icon: string }> = [
+  { key: 'quickChatActionSecretary', href: ensureToolboxTrailingSlash('/secretary'), icon: '💬' },
+  { key: 'quickChatActionGemini', href: withBase('/secretary/chat.html?friend=gemini'), icon: '✦' },
+  { key: 'quickChatActionGroup', href: withBase('/secretary/group.html'), icon: '👥' },
 ];
 
 export default function PortalQuickChat() {
   const [open, setOpen] = useState(false);
   const startY = useRef(0);
+  const locale: PortalLocale = loadProfileSettings().locale;
 
   useEffect(() => {
     if (!open) return;
@@ -27,26 +31,26 @@ export default function PortalQuickChat() {
       <div
         className="portal-quick-chat-panel"
         role="region"
-        aria-label="快速聊天"
+        aria-label={t(locale, 'quickChatLabel')}
         aria-hidden={!open}
       >
         <button
           type="button"
           className="portal-quick-chat-handle"
           onClick={() => setOpen((v) => !v)}
-          aria-label={open ? '收起' : '展开快速聊天'}
+          aria-label={open ? t(locale, 'quickChatToggleExpanded') : t(locale, 'quickChatToggle')}
         />
-        <p className="portal-quick-chat-title">快速聊天</p>
+        <p className="portal-quick-chat-title">{t(locale, 'quickChatTitle')}</p>
         <div className="portal-quick-chat-actions">
           {QUICK_LINKS.map((link) => (
             <a
-              key={link.label}
+              key={link.key}
               className="portal-quick-chat-action"
-              href={withBase(link.href)}
+              href={link.href}
               onClick={() => setOpen(false)}
             >
               <span aria-hidden>{link.icon}</span>
-              <span>{link.label}</span>
+              <span>{t(locale, link.key)}</span>
             </a>
           ))}
         </div>
@@ -55,7 +59,7 @@ export default function PortalQuickChat() {
       <button
         type="button"
         className="portal-quick-chat-fab"
-        aria-label="上滑打开聊天"
+        aria-label={t(locale, 'quickChatOpenGesture')}
         onClick={() => setOpen((v) => !v)}
         onTouchStart={(e) => {
           startY.current = e.touches[0].clientY;

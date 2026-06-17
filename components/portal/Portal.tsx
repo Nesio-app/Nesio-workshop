@@ -1,11 +1,23 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import DashboardHome from './DashboardHome';
 import NotePanelEnhanced from './NotePanelEnhanced';
 import PortalSecretaryFab from './PortalSecretaryFab';
 import { DEFAULT_PORTAL_CONFIG } from '@/lib/portal/defaults';
 import { openToolHref } from '@/lib/portal/open-tool';
+import {
+  applyFeatureControlToolGate,
+  applyFirstLaunchToolGate,
+  isFirstLaunchGatedModuleId,
+  isToolKilledByLocalFeatureControl,
+} from '@/lib/portal/launch-safety';
+import { buildPortalShellManifest } from '@/lib/portal/module-manifest';
+import {
+  fetchDecModules,
+  readDecDataError,
+  type DecModulesPayload,
+} from '@/lib/portal/dec-data-client';
 import {
   PORTAL_CACHE_KEYS,
   readPortalCache,
@@ -13,7 +25,10 @@ import {
   writePortalCache,
 } from '@/lib/portal/prefetch-cache';
 import { configUrl } from '@/lib/portal/paths';
-import type { PortalConfig, PortalTool } from '@/lib/portal/types';
+import type { PortalConfig, PortalDecMetadata, PortalTool } from '@/lib/portal/types';
+import { type ToolForShellState } from './tool-state';
+
+const DEC_METADATA_TTL_MS = 30_000;
 
 function readTreasureOpen(): boolean {
   if (typeof sessionStorage === 'undefined') return false;
@@ -34,10 +49,115 @@ function setTreasurePersisted(open: boolean) {
   }
 }
 
+function parseDecMetaFromModules(payload: DecModulesPayload): Map<string, PortalDecMetadata> {
+  const moduleMeta = new Map<string, PortalDecMetadata>();
+  if (!payload.ok || !('modules' in payload) || !Array.isArray(payload.modules)) return moduleMeta;
+
+  for (const entry of payload.modules) {
+    if (!entry || typeof entry !== 'object') continue;
+    const moduleId = typeof (entry as { moduleId?: unknown }).moduleId === 'string'
+      ? (entry as { moduleId?: string }).moduleId
+      : '';
+    const mode = typeof (entry as { mode?: unknown }).mode === 'string'
+      ? (entry as { mode?: string }).mode
+      : '';
+    if (!moduleId || !mode) continue;
+
+    const normalized = entry as {
+      dependencyCount?: unknown;
+      ownedData?: unknown;
+      emittedEvents?: unknown;
+      approvalRequiredActions?: unknown;
+      dependencyDataKeys?: unknown;
+    };
+
+    moduleMeta.set(moduleId, {
+      moduleId,
+      mode,
+      dependencyCount: typeof normalized.dependencyCount === 'number' ? normalized.dependencyCount : undefined,
+      ownedDataCount: Array.isArray(normalized.ownedData) ? normalized.ownedData.length : undefined,
+      emittedEventsCount: Array.isArray(normalized.emittedEvents) ? normalized.emittedEvents.length : undefined,
+      approvalActionCount:
+        typeof normalized.approvalRequiredActions === 'object' && Array.isArray(normalized.approvalRequiredActions)
+          ? normalized.approvalRequiredActions.length
+          : undefined,
+      dependencyDataKeys: Array.isArray(normalized.dependencyDataKeys)
+        ? normalized.dependencyDataKeys
+        : undefined,
+    });
+  }
+  return moduleMeta;
+}
+
+function parseDecShellRoutesFromModules(
+  payload: DecModulesPayload,
+): Map<string, Pick<ToolForShellState, 'entryStatus' | 'modeAvailability' | 'emptyStateKey' | 'approvalGateKeys'>> {
+  const routes = new Map<string, Pick<ToolForShellState, 'entryStatus' | 'modeAvailability' | 'emptyStateKey' | 'approvalGateKeys'>>();
+  if (!payload.ok || !payload.shellRoutes || !Array.isArray(payload.shellRoutes.routes)) return routes;
+
+  for (const route of payload.shellRoutes.routes) {
+    if (!route || typeof route !== 'object') continue;
+    const moduleId = typeof (route as { moduleId?: unknown }).moduleId === 'string'
+      ? (route as { moduleId?: string }).moduleId
+      : '';
+    if (!moduleId) continue;
+
+    routes.set(moduleId, {
+      entryStatus: (route as { entryStatus?: unknown }).entryStatus,
+      modeAvailability: (route as { modeAvailability?: unknown }).modeAvailability,
+      emptyStateKey: (route as { emptyStateKey?: unknown }).emptyStateKey,
+      approvalGateKeys: (route as { approvalGateKeys?: unknown }).approvalGateKeys,
+    });
+  }
+
+  return routes;
+}
+
+function mergePortalConfigWithDecMetadata(
+  config: PortalConfig,
+  moduleMeta: Map<string, PortalDecMetadata>,
+): PortalConfig {
+  if (!moduleMeta.size) return config;
+  return {
+    ...config,
+    tools: config.tools.map((tool) => {
+      const meta = moduleMeta.get(tool.id);
+      if (!meta) return tool;
+      return {
+        ...tool,
+        decMeta: meta,
+      };
+    }),
+  };
+}
+
 export default function Portal() {
   const [config, setConfig] = useState<PortalConfig>(DEFAULT_PORTAL_CONFIG);
+  const [decModules, setDecModules] = useState<Map<string, PortalDecMetadata>>(new Map());
+  const [decShellRoutes, setDecShellRoutes] = useState<ReturnType<typeof parseDecShellRoutesFromModules>>(
+    new Map(),
+  );
   const [noteOpen, setNoteOpen] = useState(false);
   const [treasureOpen, setTreasureOpen] = useState(false);
+  const configWithDecMetadata = useMemo(
+    () => mergePortalConfigWithDecMetadata(config, decModules),
+    [config, decModules],
+  );
+  const configWithShellState = useMemo(() => {
+    const tools = configWithDecMetadata.tools.map((rawTool) => {
+      const tool = applyFeatureControlToolGate(applyFirstLaunchToolGate(rawTool));
+      const shellState = decShellRoutes.get(tool.id);
+      const mergedTool = shellState ? ({ ...tool, ...shellState } as ToolForShellState) : tool;
+      return applyFeatureControlToolGate(applyFirstLaunchToolGate(mergedTool));
+    });
+
+    return {
+      ...configWithDecMetadata,
+      tools,
+    };
+  }, [configWithDecMetadata, decShellRoutes]);
+
+  const shellManifest = useMemo(() => buildPortalShellManifest(configWithShellState), [configWithShellState]);
 
   useEffect(() => {
     setTreasureOpen(readTreasureOpen());
@@ -51,6 +171,27 @@ export default function Portal() {
       })
       .catch(() => undefined);
 
+    const cachedDecModules = readPortalCache<DecModulesPayload>(PORTAL_CACHE_KEYS.decModules);
+    if (cachedDecModules?.ok) {
+      setDecModules(parseDecMetaFromModules(cachedDecModules));
+      setDecShellRoutes(parseDecShellRoutesFromModules(cachedDecModules));
+    }
+
+    let mounted = true;
+    void fetchDecModules({ force: false, ttl: DEC_METADATA_TTL_MS })
+      .then((payload) => {
+        if (!mounted || payload.ok === false) return;
+        const map = parseDecMetaFromModules(payload);
+        const shellRouteMap = parseDecShellRoutesFromModules(payload);
+        setDecModules(map);
+        setDecShellRoutes(shellRouteMap);
+        if (map.size) writePortalCache(PORTAL_CACHE_KEYS.decModules, payload);
+      })
+      .catch((error: unknown) => {
+        if (!mounted) return;
+        console.error('DEC modules prefetch failed:', readDecDataError(error));
+      });
+
     fetch('/api/portal/calendar', { cache: 'no-store' })
       .then((r) => r.json())
       .then((data) => {
@@ -59,6 +200,10 @@ export default function Portal() {
       .catch(() => undefined);
 
     fetch('/api/portal/flomo?limit=48', { cache: 'no-store' }).catch(() => undefined);
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -73,11 +218,15 @@ export default function Portal() {
     }
   }, []);
 
-  const openTool = (tool: PortalTool) => {
+  const openTool = useCallback((tool: PortalTool) => {
     if (!tool.ready) return;
+    if (isToolKilledByLocalFeatureControl(tool)) return;
+    if (isFirstLaunchGatedModuleId(tool.id)) return;
     if (treasureOpen) setTreasurePersisted(true);
-    window.location.assign(openToolHref(tool));
-  };
+    const href = openToolHref(tool);
+    if (!href) return;
+    window.location.assign(href);
+  }, [treasureOpen]);
 
   const handleTreasureOpenChange = (open: boolean) => {
     setTreasureOpen(open);
@@ -135,7 +284,7 @@ export default function Portal() {
       }
 
       const key = event.key.toLowerCase();
-      const tool = config.tools.find((item) => item.hotkey === key && item.ready);
+      const tool = shellManifest.tools.find((item) => item.hotkey === key && item.ready);
       if (tool) {
         event.preventDefault();
         openTool(tool);
@@ -144,7 +293,7 @@ export default function Portal() {
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [config.tools]);
+  }, [shellManifest.tools, openTool]);
 
   return (
     <>
@@ -153,8 +302,9 @@ export default function Portal() {
 
         <div className="portal-shell portal-shell--single">
           <div className="portal-main">
-            <DashboardHome
-              config={config}
+              <DashboardHome
+              config={configWithDecMetadata}
+              shellTools={shellManifest.tools}
               noteOpen={noteOpen}
               treasureOpen={treasureOpen}
               onTreasureOpenChange={handleTreasureOpenChange}
