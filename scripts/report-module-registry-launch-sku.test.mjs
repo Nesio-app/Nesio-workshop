@@ -8,6 +8,7 @@ const repoRoot = join(scriptDir, '..');
 const output = execFileSync('node', [join(scriptDir, 'report-module-registry.mjs')], {
   cwd: repoRoot,
   encoding: 'utf8',
+  maxBuffer: 1024 * 1024 * 20,
 });
 const report = JSON.parse(output);
 
@@ -20,10 +21,17 @@ assert.equal(report.summary.launchSkuAppStoreReady, false);
 assert.equal(report.summary.launchableModuleCount, 2);
 assert.equal(report.summary.excludedFromLaunchCount, 10);
 assert.equal(report.summary.futurePaidModuleCount, 6);
+assert.equal(report.summary.toolLifecycleVersion, 'tool-lifecycle-v0');
+assert.equal(report.summary.toolLifecycleLaunchableCount, 1);
+assert.equal(report.summary.toolLifecycleSandboxCount, 10);
+assert.equal(report.summary.toolLifecycleReadyForCandidateReviewCount, 10);
 
 const statusByModule = new Map(report.launchSku.modules.map((entry) => [entry.moduleId, entry]));
 assert.equal(statusByModule.get('shell').launchStatus, 'launchable');
 assert.equal(statusByModule.get('inventory').launchStatus, 'launchable');
+assert.equal(statusByModule.get('inventory').toolLifecycle, 'launchable');
+assert.equal(statusByModule.get('inventory').toolLifecycleStage, 5);
+assert.equal(statusByModule.get('inventory').nextLifecycleTarget, 'monetized');
 
 const launchableModules = report.launchSku.modules.filter((entry) => entry.launchStatus === 'launchable');
 assert.deepEqual(launchableModules.map((entry) => entry.moduleId).sort(), ['inventory', 'shell']);
@@ -39,9 +47,27 @@ for (const moduleId of ['finance', 'health', 'psychoanalysis', 'secretary']) {
   assert.equal(entry.excludedFromLaunch, true, `${moduleId} must be excluded from launch`);
 }
 
+const lifecycleByModule = new Map(report.toolLifecycle.modules.map((entry) => [entry.moduleId, entry]));
+assert.equal(report.toolLifecycle.version, 'tool-lifecycle-v0');
+assert.deepEqual(report.toolLifecycle.summary.launchableModuleIds, ['inventory']);
+assert.equal(report.toolLifecycle.summary.nextCandidateModuleIds.length, report.summary.moduleCount - 1);
+for (const [moduleId, entry] of lifecycleByModule) {
+  if (moduleId === 'inventory') {
+    assert.equal(entry.lifecycle, 'launchable');
+    assert.equal(entry.lifecycleStage, 5);
+    assert.equal(entry.readyForCandidateReview, false);
+    continue;
+  }
+  assert.equal(entry.lifecycle, 'sandbox', `${moduleId} should remain sandbox`);
+  assert.equal(entry.lifecycleStage, 3, `${moduleId} should be stage 3`);
+  assert.equal(entry.nextLifecycleTarget, 'candidate', `${moduleId} should be preparing for candidate`);
+  assert.equal(entry.nextLifecycleStage, 4, `${moduleId} should target stage 4`);
+  assert.equal(entry.readyForCandidateReview, true, `${moduleId} should be ready for candidate review`);
+}
+
 const finance = statusByModule.get('finance');
 assert.equal(finance.launchStatus, 'hidden');
-assert.equal(finance.mobileStrategy, 'not_ready');
+assert.equal(finance.mobileStrategy, 'native_bridge_deferred');
 assert.equal(finance.needsCeoGate, true);
 
 const inventory = statusByModule.get('inventory');

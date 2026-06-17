@@ -31,6 +31,7 @@ export function writePortalCache<T>(key: string, data: T): void {
 export const PORTAL_CACHE_KEYS = {
   calendar: 'treasurebox-cache-calendar',
   weather: 'treasurebox-cache-weather',
+  decModules: 'treasurebox-cache-dec-modules',
 } as const;
 
 export const TREASURE_TOOLBOX_KEY = 'treasurebox-toolbox-open';

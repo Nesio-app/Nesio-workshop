@@ -5,6 +5,12 @@ import { buildModuleRegistry } from '../lib/portal/module-manager-core.mjs';
 import { buildLocalDataRecordsV0 } from '../lib/portal/local-data-records.mjs';
 import { buildModuleDataBus } from '../lib/portal/module-data-bus.mjs';
 import { buildInventoryFirstLaunchContract } from '../lib/portal/inventory-first-launch-contract.mjs';
+import { buildModuleAdapterContract } from '../lib/portal/module-adapter-contract.mjs';
+import { buildStandaloneAppReadinessContract } from '../lib/portal/standalone-app-readiness-contract.mjs';
+import { buildSecurityIncidentReadinessContract } from '../lib/portal/security-incident-readiness-contract.mjs';
+import { buildToolDataVersioningContract } from '../lib/portal/tool-data-versioning-contract.mjs';
+import { buildUserIdentityUpgradeContract } from '../lib/portal/user-identity-upgrade-contract.mjs';
+import { buildOfflineSyncConflictContract } from '../lib/portal/offline-sync-conflict-contract.mjs';
 
 const repoRoot = fileURLToPath(new URL('..', import.meta.url));
 const configPath = join(repoRoot, 'public', 'portal-config.json');
@@ -114,6 +120,23 @@ const LAUNCH_SKU_VERSION = 'launch-sku-v0';
 const LAUNCH_SKU_KEY = 'shell_inventory_purchase_memory';
 const LAUNCH_BUSINESS_MODULE_IDS = Object.freeze(['inventory']);
 const LAUNCH_INCLUDED_MODULE_IDS = Object.freeze(['shell', ...LAUNCH_BUSINESS_MODULE_IDS]);
+const TOOL_LIFECYCLE_VERSION = 'tool-lifecycle-v0';
+const TOOL_LIFECYCLE_STAGES = Object.freeze([
+  'idea',
+  'prototype',
+  'sandbox',
+  'candidate',
+  'launchable',
+  'monetized',
+]);
+const TOOL_LIFECYCLE_STAGE_NUMBERS = Object.freeze({
+  idea: 1,
+  prototype: 2,
+  sandbox: 3,
+  candidate: 4,
+  launchable: 5,
+  monetized: 6,
+});
 const FUTURE_PAID_MODULE_IDS = Object.freeze([
   'plan',
   'sanctuary',
@@ -132,6 +155,50 @@ const INTERNAL_REGISTRY_ONLY_MODULE_IDS = Object.freeze([
   ...FUTURE_PAID_MODULE_IDS,
   ...GATED_LAUNCH_MODULE_IDS,
   ...HIDDEN_LAUNCH_MODULE_IDS,
+]);
+const PERMISSION_CONSENT_VERSION = 'permission-consent-versioning-v0';
+const PRIVACY_POLICY_VERSION = 'privacy-policy-draft-v0';
+const RE_CONSENT_TRIGGERS = Object.freeze([
+  'new_data_type',
+  'new_external_service',
+  'new_ai_processing',
+  'new_health_sensitive_capability',
+  'new_finance_sensitive_capability',
+  'new_psychoanalysis_sensitive_capability',
+  'privacy_policy_version_change',
+  'permission_purpose_version_change',
+]);
+const INVENTORY_PERMISSION_PURPOSES = Object.freeze([
+  {
+    permissionKey: 'camera',
+    purposeVersion: 'inventory.camera.capture-v0',
+    purposeString: '拍摄物品照片用于本机收纳记录；首发版本不上传、不做外部 AI 识别。',
+    consentRequired: true,
+    runtimeEnabled: true,
+  },
+  {
+    permissionKey: 'photo_library',
+    purposeVersion: 'inventory.photo.import-v0',
+    purposeString: '选择本机照片用于本机收纳记录；首发版本不上传、不做外部 AI 识别。',
+    consentRequired: true,
+    runtimeEnabled: true,
+  },
+]);
+const SENSITIVE_CAPABILITY_BY_MODULE = Object.freeze({
+  secretary: Object.freeze(['ai_prompt_processing', 'external_ai_provider']),
+  health: Object.freeze(['health_sensitive_data', 'health_pattern_analysis']),
+  finance: Object.freeze(['finance_sensitive_data', 'financial_action_context']),
+  psychoanalysis: Object.freeze(['mental_health_sensitive_context', 'psychoanalysis_session']),
+  sanctuary: Object.freeze(['wellness_sensitive_context']),
+  plan: Object.freeze(['task_behavior_context']),
+  fitness: Object.freeze(['fitness_body_context']),
+});
+const FEATURE_CONTROL_VERSION = 'feature-control-contract-v0';
+const FEATURE_CONTROL_HIGH_RISK_MODULES = Object.freeze([
+  'finance',
+  'secretary',
+  'health',
+  'psychoanalysis',
 ]);
 
 function buildWarningEnvelope(tool, warning) {
@@ -340,14 +407,40 @@ function launchStatusForTool(tool) {
   return 'internal_registry_only';
 }
 
+function lifecycleForTool(tool) {
+  const lifecycle = LAUNCH_BUSINESS_MODULE_IDS.includes(tool.id) ? 'launchable' : 'sandbox';
+  const nextLifecycleTarget = lifecycle === 'launchable' ? 'monetized' : 'candidate';
+
+  return {
+    version: TOOL_LIFECYCLE_VERSION,
+    lifecycle,
+    lifecycleStage: TOOL_LIFECYCLE_STAGE_NUMBERS[lifecycle],
+    nextLifecycleTarget,
+    nextLifecycleStage: TOOL_LIFECYCLE_STAGE_NUMBERS[nextLifecycleTarget],
+    readyForCandidateReview: lifecycle === 'sandbox',
+    launchEligible: lifecycle === 'launchable',
+    monetizationEligible: lifecycle === 'launchable',
+    canChangeRapidly: lifecycle === 'sandbox',
+  };
+}
+
 function launchSkuModuleEntryForTool(tool, mobileEntryByModuleId) {
   const launchStatus = launchStatusForTool(tool);
   const excludedFromLaunch = !LAUNCH_BUSINESS_MODULE_IDS.includes(tool.id);
   const mobileEntry = mobileEntryByModuleId.get(tool.id) || {};
+  const lifecycle = lifecycleForTool(tool);
 
   return {
     moduleId: tool.id,
     label: tool.name,
+    toolLifecycle: lifecycle.lifecycle,
+    toolLifecycleStage: lifecycle.lifecycleStage,
+    nextLifecycleTarget: lifecycle.nextLifecycleTarget,
+    nextLifecycleStage: lifecycle.nextLifecycleStage,
+    readyForCandidateReview: lifecycle.readyForCandidateReview,
+    launchEligible: lifecycle.launchEligible,
+    monetizationEligible: lifecycle.monetizationEligible,
+    canChangeRapidly: lifecycle.canChangeRapidly,
     launchStatus,
     internalRegistryOnly: INTERNAL_REGISTRY_ONLY_MODULE_IDS.includes(tool.id),
     excludedFromLaunch,
@@ -370,8 +463,8 @@ function launchSkuModuleEntryForTool(tool, mobileEntryByModuleId) {
 }
 
 function mobileStrategyForTool(tool) {
+  if (tool.integrationMode === 'static-report-only' || tool.integrationMode === 'contract-only') return 'native_bridge_deferred';
   if (!tool.ready) return 'not_ready';
-  if (tool.integrationMode === 'static-report-only') return 'native_bridge_deferred';
   if (tool.routeKind === 'local-static-module' || tool.routeKind === 'local-shell-route') return 'embedded_static';
   return 'external_webview_gated';
 }
@@ -622,6 +715,7 @@ const tools = registry.modules.map((module) => {
     syncedDirectoryExists: syncedTool ? existsSync(join(repoRoot, syncedTool.directory)) : null,
     configuredUrl: module.configuredUrl,
     normalizedPath: module.normalizedPath,
+    dataContract: module.dataContract,
     publicIndex,
     publicIndexPath: module.publicIndexPath,
     openHref: module.openHref,
@@ -1747,6 +1841,14 @@ const mobileEntryByModuleId = new Map(mobileAppEntries.map((entry) => [entry.mod
 const launchSkuShellEntry = {
   moduleId: 'shell',
   label: registry.shell.name,
+  toolLifecycle: 'launchable',
+  toolLifecycleStage: TOOL_LIFECYCLE_STAGE_NUMBERS.launchable,
+  nextLifecycleTarget: 'monetized',
+  nextLifecycleStage: TOOL_LIFECYCLE_STAGE_NUMBERS.monetized,
+  readyForCandidateReview: false,
+  launchEligible: true,
+  monetizationEligible: false,
+  canChangeRapidly: false,
   launchStatus: 'launchable',
   internalRegistryOnly: false,
   excludedFromLaunch: false,
@@ -1807,6 +1909,179 @@ const launchSkuSummary = {
   gatedModuleCount: launchSkuModules.filter((entry) => entry.launchStatus === 'gated').length,
   launchSkuAppStoreReady: false,
   warningCount: launchSkuWarnings.length,
+};
+function permissionConsentEntryForTool(tool) {
+  const sensitiveCapabilities = [...(SENSITIVE_CAPABILITY_BY_MODULE[tool.id] || [])];
+  const isHighRiskSensitive = ['secretary', 'health', 'finance', 'psychoanalysis'].includes(tool.id);
+  const permissions = tool.id === 'inventory' ? [...INVENTORY_PERMISSION_PURPOSES] : [];
+  const consentRequired = isHighRiskSensitive || permissions.some((permission) => permission.consentRequired);
+  const runtimeEnabled = isHighRiskSensitive ? false : launchStatusForTool(tool) === 'launchable';
+
+  return {
+    moduleId: tool.id,
+    label: tool.name,
+    consentRequired,
+    defaultConsentState: consentRequired ? 'not_requested' : 'not_required',
+    runtimeEnabled,
+    consentVersion: `${tool.id}.consent-v0`,
+    capabilityConsentVersion: `${tool.id}.capability-consent-v0`,
+    privacyPolicyVersion: PRIVACY_POLICY_VERSION,
+    permissions,
+    sensitiveCapabilities,
+    capabilityLevelConsent: sensitiveCapabilities.map((capabilityKey) => ({
+      capabilityKey,
+      consentRequired: true,
+      consentVersion: `${tool.id}.${capabilityKey}.consent-v0`,
+      runtimeEnabled: false,
+    })),
+    reConsentTriggers: [...RE_CONSENT_TRIGGERS],
+    auditSafeSummary: {
+      includesContent: false,
+      includesPersonalData: false,
+      includesPrompt: false,
+      includesHealthData: false,
+      includesFinanceData: false,
+      includesPsychoanalysisContent: false,
+      fields: [
+        'moduleId',
+        'consentVersion',
+        'privacyPolicyVersion',
+        'consentRequired',
+        'runtimeEnabled',
+        'sensitiveCapabilityCount',
+      ],
+    },
+    auditSafeSummaryIncludesContent: false,
+  };
+}
+const permissionConsentTools = tools.map(permissionConsentEntryForTool);
+const permissionConsentSummary = {
+  version: PERMISSION_CONSENT_VERSION,
+  toolCount: permissionConsentTools.length,
+  consentRequiredCount: permissionConsentTools.filter((entry) => entry.consentRequired).length,
+  sensitiveDisabledCount: permissionConsentTools.filter((entry) => (
+    entry.consentRequired && entry.runtimeEnabled === false && entry.sensitiveCapabilities.length > 0
+  )).length,
+  permissionPurposeCount: permissionConsentTools.reduce((count, entry) => count + entry.permissions.length, 0),
+  privacyPolicyVersion: PRIVACY_POLICY_VERSION,
+  realConsentModalEnabled: false,
+};
+const permissionConsentContract = {
+  version: PERMISSION_CONSENT_VERSION,
+  implementation: 'report-only-contract',
+  privacyPolicy: {
+    version: PRIVACY_POLICY_VERSION,
+    recordable: true,
+    legalCommitmentGenerated: false,
+    publicPolicyFinalized: false,
+  },
+  reConsentTriggers: [...RE_CONSENT_TRIGGERS],
+  boundaries: {
+    reportOnly: true,
+    realConsentModalEnabled: false,
+    legalCommitmentGenerated: false,
+    realSensitiveProcessingEnabled: false,
+    writesConsentRecords: false,
+    externalConsentServiceEnabled: false,
+  },
+  summary: permissionConsentSummary,
+  tools: permissionConsentTools,
+};
+function featureControlEntryForTool(tool) {
+  const launchStatus = launchStatusForTool(tool);
+  const killed = false;
+  const canOpenAtRuntime = !killed && launchStatus === 'launchable' && tool.ready === true;
+  const highRisk = FEATURE_CONTROL_HIGH_RISK_MODULES.includes(tool.id);
+
+  return {
+    moduleId: tool.id,
+    label: tool.name,
+    killSwitchKey: `kill.module.${tool.id}`,
+    featureKillSwitchKeys: [
+      `kill.feature.${tool.id}.external_service`,
+      ...(highRisk ? [`kill.feature.${tool.id}.sensitive_runtime`] : []),
+    ],
+    sandboxExposureSwitchKey: `expose.sandbox.${tool.id}`,
+    minimumAppVersion: '1.0.0',
+    maintenanceModeKey: `maintenance.module.${tool.id}`,
+    incidentBannerKey: `incident.module.${tool.id}`,
+    localFallbackConfig: true,
+    canBeKilled: true,
+    killed,
+    defaultFailClosed: highRisk || launchStatus !== 'launchable',
+    canOpenAtRuntime,
+    entryActionEnabled: canOpenAtRuntime,
+    deletesUserData: false,
+    launchStatus,
+  };
+}
+const featureControlModules = tools.map(featureControlEntryForTool);
+const featureControlSummary = {
+  version: FEATURE_CONTROL_VERSION,
+  moduleCount: featureControlModules.length,
+  killSwitchCapableModuleCount: featureControlModules.filter((entry) => entry.canBeKilled).length,
+  killedModuleCount: featureControlModules.filter((entry) => entry.killed).length,
+  entryActionEnabledCount: featureControlModules.filter((entry) => entry.entryActionEnabled).length,
+  remoteFeatureControlEnabled: false,
+};
+const featureControlContract = {
+  version: FEATURE_CONTROL_VERSION,
+  implementation: 'local-static-config',
+  summary: featureControlSummary,
+  readyToCandidateModuleIds: featureControlModules
+    .filter((entry) => entry.entryActionEnabled)
+    .map((entry) => entry.moduleId),
+  boundaries: {
+    remoteConfigEnabled: false,
+    realtimePushEnabled: false,
+    productionIncidentNotificationEnabled: false,
+    deletesUserData: false,
+    localStaticConfigOnly: true,
+    changesDataRetention: false,
+  },
+  modules: featureControlModules,
+};
+const reportToolsWithLaunchState = tools.map((tool) => ({
+  ...tool,
+  launchStatus: launchStatusForTool(tool),
+  toolLifecycle: lifecycleForTool(tool).lifecycle,
+  prodExposure: tool.prodExposure || tool.toolManifest?.prodExposure,
+}));
+const standaloneAppReadinessContract = buildStandaloneAppReadinessContract(reportToolsWithLaunchState);
+const securityIncidentReadinessContract = buildSecurityIncidentReadinessContract(
+  reportToolsWithLaunchState,
+  featureControlModules,
+);
+const moduleAdapterContract = buildModuleAdapterContract(launchSkuModules.filter((entry) => entry.moduleId !== 'shell').map((entry) => {
+  const tool = tools.find((candidate) => candidate.id === entry.moduleId);
+  return {
+    ...tool,
+    launchStatus: entry.launchStatus,
+    toolLifecycle: entry.toolLifecycle,
+  };
+}));
+const toolDataVersioningContract = buildToolDataVersioningContract(tools.map((tool) => ({
+  ...tool,
+  launchStatus: launchStatusForTool(tool),
+})));
+const userIdentityUpgradeContract = buildUserIdentityUpgradeContract(config);
+const offlineSyncConflictContract = buildOfflineSyncConflictContract(reportToolsWithLaunchState);
+const toolLifecycleSummary = {
+  version: TOOL_LIFECYCLE_VERSION,
+  stageVocabulary: [...TOOL_LIFECYCLE_STAGES],
+  stageNumbers: { ...TOOL_LIFECYCLE_STAGE_NUMBERS },
+  totalModuleCount: tools.length,
+  launchableToolCount: tools.filter((tool) => lifecycleForTool(tool).lifecycle === 'launchable').length,
+  sandboxToolCount: tools.filter((tool) => lifecycleForTool(tool).lifecycle === 'sandbox').length,
+  candidateToolCount: tools.filter((tool) => lifecycleForTool(tool).lifecycle === 'candidate').length,
+  readyForCandidateReviewCount: tools.filter((tool) => lifecycleForTool(tool).readyForCandidateReview).length,
+  rapidChangeAllowedCount: tools.filter((tool) => lifecycleForTool(tool).canChangeRapidly).length,
+  nextCandidateModuleIds: tools
+    .filter((tool) => lifecycleForTool(tool).nextLifecycleTarget === 'candidate')
+    .map((tool) => tool.id),
+  launchableModuleIds: tools
+    .filter((tool) => lifecycleForTool(tool).lifecycle === 'launchable')
+    .map((tool) => tool.id),
 };
 const aggregationReportStatus = boundaryWarnings.length || experienceServiceWarnings.length || aggregationWarnings.length
   ? 'warning'
@@ -1908,12 +2183,60 @@ const evidenceSummary = {
     futurePaidModuleCount: launchSkuSummary.futurePaidModuleCount,
     launchSkuAppStoreReady: launchSkuSummary.launchSkuAppStoreReady,
     launchSkuWarningCount: launchSkuSummary.warningCount,
+    permissionConsentToolCount: permissionConsentSummary.toolCount,
+    permissionConsentRequiredCount: permissionConsentSummary.consentRequiredCount,
+    permissionConsentSensitiveDisabledCount: permissionConsentSummary.sensitiveDisabledCount,
+    permissionPurposeCount: permissionConsentSummary.permissionPurposeCount,
+    privacyPolicyVersion: permissionConsentSummary.privacyPolicyVersion,
+    featureControlModuleCount: featureControlSummary.moduleCount,
+    killSwitchCapableModuleCount: featureControlSummary.killSwitchCapableModuleCount,
+    killedModuleCount: featureControlSummary.killedModuleCount,
+    featureControlEntryActionEnabledCount: featureControlSummary.entryActionEnabledCount,
+    remoteFeatureControlEnabled: featureControlSummary.remoteFeatureControlEnabled,
+    standaloneReadinessVersion: standaloneAppReadinessContract.version,
+    standaloneReadinessReadyNowCount: standaloneAppReadinessContract.summary.readyNowCount,
+    standaloneReadinessPossibleLaterCount: standaloneAppReadinessContract.summary.possibleLaterCount,
+    standaloneReadinessWarningCount: standaloneAppReadinessContract.summary.warningCount,
+    securityIncidentReadinessVersion: securityIncidentReadinessContract.version,
+    securityIncidentHighRiskModuleCount: securityIncidentReadinessContract.summary.highRiskModuleCount,
+    securityIncidentRealActionEnabledCount: securityIncidentReadinessContract.summary.realActionEnabledCount,
+    securityIncidentWarningCount: securityIncidentReadinessContract.summary.warningCount,
+    toolLifecycleVersion: toolLifecycleSummary.version,
+    toolLifecycleLaunchableCount: toolLifecycleSummary.launchableToolCount,
+    toolLifecycleSandboxCount: toolLifecycleSummary.sandboxToolCount,
+    toolLifecycleReadyForCandidateReviewCount: toolLifecycleSummary.readyForCandidateReviewCount,
+    toolLifecycleRapidChangeAllowedCount: toolLifecycleSummary.rapidChangeAllowedCount,
     inventoryFirstLaunchDemoItemCount: inventoryFirstLaunchSummary.demoFixtureItemCount,
     inventoryFirstLaunchReadsRealData: inventoryFirstLaunchSummary.readsRealData,
     inventoryFirstLaunchWritesRealData: inventoryFirstLaunchSummary.writesRealData,
     inventoryFirstLaunchCloudSyncEnabled: inventoryFirstLaunchSummary.cloudSyncEnabled,
     inventoryFirstLaunchExternalAuthEnabled: inventoryFirstLaunchSummary.externalAuthEnabled,
     inventoryFirstLaunchPaymentIntegrationEnabled: inventoryFirstLaunchSummary.paymentIntegrationEnabled,
+    toolManifestVersion: registry.toolManifest.version,
+    toolManifestModuleCount: registry.toolManifest.summary.moduleCount,
+    toolManifestMissingRequiredFieldCount: registry.toolManifest.summary.missingRequiredFieldCount,
+    toolManifestWarningCount: registry.toolManifest.summary.warningCount,
+    toolManifestPublicModuleCount: registry.toolManifest.summary.publicModuleCount,
+    toolManifestTesterOnlyModuleCount: registry.toolManifest.summary.testerOnlyModuleCount,
+    moduleAdapterContractVersion: moduleAdapterContract.version,
+    modularMonolithArchitecture: moduleAdapterContract.architecture,
+    standaloneAppModuleCount: moduleAdapterContract.summary.standaloneAppCount,
+    extractableNowCount: moduleAdapterContract.summary.extractableNowCount,
+    adapterContractWarningCount: moduleAdapterContract.summary.warningCount,
+    toolDataVersioningContractVersion: toolDataVersioningContract.version,
+    toolDataMigrationPlanCoverageCount: toolDataVersioningContract.summary.migrationPlanCoverageCount,
+    toolDataRealMigrationEnabledCount: toolDataVersioningContract.summary.realMigrationEnabledCount,
+    toolDataCeoGateRequiredForRealMigration: toolDataVersioningContract.boundaries.realDataMigrationRequiresCeoGate,
+    toolDataVersioningWarningCount: toolDataVersioningContract.summary.warningCount,
+    accountSystemEnabled: userIdentityUpgradeContract.summary.accountSystemEnabled,
+    currentProfileKind: userIdentityUpgradeContract.summary.currentProfileKind,
+    serverUserIdEnabled: userIdentityUpgradeContract.summary.serverUserIdEnabled,
+    identityUpgradePathReadable: userIdentityUpgradeContract.summary.identityUpgradePathReadable,
+    syncEnabledModuleCount: offlineSyncConflictContract.summary.syncEnabledModuleCount,
+    cloudSyncEnabled: offlineSyncConflictContract.summary.cloudSyncEnabled,
+    offlineQueueEnabledNow: offlineSyncConflictContract.summary.offlineQueueEnabledNow,
+    syncConflictModelReadable: offlineSyncConflictContract.summary.syncConflictModelReadable,
+    inventorySyncReadiness: offlineSyncConflictContract.summary.inventorySyncReadiness,
     qaLine: boundaryWarnings.length === 0 && experienceServiceWarnings.length === 0 && aggregationWarnings.length === 0 && approvalGateWarnings.length === 0 && shellRouteWarnings.length === 0 && registryDriftWarnings.length === 0 && artifactVisibilityWarnings.length === 0 && artifactStatusVisibilityWarnings.length === 0 && shellDiscoveryBoundaryWarnings.length === 0 && mobileAppBoundaryWarnings.length === 0
       ? `PASS: ${readyModules.length}/${tools.length} modules ready; all local static modules have public index files.`
       : `WARN: ${boundaryWarnings.length} module boundary warning(s), ${experienceServiceWarnings.length} Experience Services warning(s), ${dataAggregationReviewWarningCount} Data Aggregation review warning(s), ${dataAggregationRuntimeBlockerCount} Data Aggregation runtime-blocking warning(s), ${approvalGateWarnings.length} Approval Gate warning(s), ${shellRouteWarnings.length} Shell Route warning(s), ${registryDriftWarnings.length} Registry Drift warning(s), ${artifactVisibilityWarnings.length} Artifact Visibility warning(s), ${artifactStatusVisibilityWarnings.length} Artifact Status Visibility warning(s), ${shellDiscoveryBoundaryWarnings.length} Shell Discovery warning(s), ${mobileAppBoundaryWarnings.length} Mobile App Integration warning(s) need QA review.`,
@@ -2076,10 +2399,40 @@ const evidenceSummary = {
     modules: launchSkuModules,
     warnings: launchSkuWarnings,
   },
+  permissionConsent: permissionConsentContract,
+  featureControl: featureControlContract,
+  standaloneAppReadiness: standaloneAppReadinessContract,
+  securityIncidentReadiness: securityIncidentReadinessContract,
+  toolLifecycle: {
+    version: TOOL_LIFECYCLE_VERSION,
+    stageVocabulary: [...TOOL_LIFECYCLE_STAGES],
+    summary: toolLifecycleSummary,
+    modules: tools.map((tool) => ({
+      moduleId: tool.id,
+      label: tool.name,
+      ...lifecycleForTool(tool),
+      launchStatus: launchStatusForTool(tool),
+      approvalGateState: tool.shellEntitlement.approvalGateState,
+      paywallState: tool.shellEntitlement.paywallState,
+      needsCeoGate: mobileEntryByModuleId.get(tool.id)?.needsCeoGate === true,
+    })),
+    policy: {
+      inventoryTargetStage: 'launchable',
+      nonInventoryTargetStage: 'sandbox',
+      nonInventoryNextStage: 'candidate',
+      monetizedRequiresLaunchable: true,
+      realDataExternalAiPaymentRequiresCeoGate: true,
+    },
+  },
   inventoryFirstLaunch: {
     contract: inventoryFirstLaunchContract,
     summary: inventoryFirstLaunchSummary,
   },
+  toolManifest: registry.toolManifest,
+  moduleAdapterContract,
+  toolDataVersioning: toolDataVersioningContract,
+  userIdentityUpgrade: userIdentityUpgradeContract,
+  offlineSyncConflict: offlineSyncConflictContract,
   moduleDataBus: {
     implementation: moduleDataBus.implementation,
     summary: moduleDataBus.summary,

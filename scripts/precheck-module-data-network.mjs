@@ -545,6 +545,7 @@ async function main() {
     const reportResult = spawnSync('node', ['scripts/report-module-registry.mjs'], {
       stdio: ['ignore', 'pipe', 'pipe'],
       encoding: 'utf8',
+      maxBuffer: 1024 * 1024 * 20,
     });
     if (reportResult.status !== 0) {
       fail('local report generation failed', {

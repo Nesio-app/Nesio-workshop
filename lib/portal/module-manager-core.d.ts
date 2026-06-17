@@ -12,6 +12,106 @@ export interface ModuleCapabilities {
   approvalRequiredActions: string[];
 }
 
+export type ToolLifecycleV0 =
+  | 'idea'
+  | 'prototype'
+  | 'sandbox'
+  | 'candidate'
+  | 'launchable'
+  | 'monetized';
+export type ToolLaunchStatusV0 =
+  | 'launchable'
+  | 'internal_registry_only'
+  | 'gated'
+  | 'hidden'
+  | 'future_paid'
+  | 'excluded_from_launch';
+export type ToolProdExposureV0 = 'hidden' | 'tester_only' | 'beta_opt_in' | 'public';
+export type ToolDataNamespaceV0 = 'demo' | 'tester_sandbox' | 'personal' | 'production_shared';
+export type ToolDeprecationPolicyV0 =
+  | 'none'
+  | 'hide_only'
+  | 'export_then_hide'
+  | 'replace_with_module'
+  | 'ceo_gate_required';
+
+export interface ToolEntitlementPolicyV0 {
+  required: boolean;
+  entitlementKey: string;
+  paywallState: string;
+  reportOnly: true;
+  changesRuntimeBehavior: false;
+}
+
+export interface ToolDeprecationPolicyRecordV0 {
+  policy: ToolDeprecationPolicyV0;
+  deprecatedAt: string | null;
+  replacementModuleId: string | null;
+  userDataAction: string;
+  exportBeforeRemoval: boolean;
+  retentionDays: number | null;
+  entitlementImpact: string;
+  appStoreImpact: string;
+}
+
+export interface ToolManifestV0 {
+  version: 'tool-manifest-v0';
+  moduleId: string;
+  displayName: {
+    zh: string;
+    en: string;
+  };
+  toolLifecycle: ToolLifecycleV0;
+  launchStatus: ToolLaunchStatusV0;
+  prodExposure: ToolProdExposureV0;
+  dataNamespace: ToolDataNamespaceV0;
+  routeKind: ModuleRouteKind;
+  openHref: string;
+  returnHref: string;
+  ownedData: string[];
+  consumedData: string[];
+  emittedEvents: string[];
+  allowedActions: string[];
+  approvalRequiredActions: string[];
+  entitlementPolicy: ToolEntitlementPolicyV0;
+  mobileStrategy: string;
+  deprecationPolicy: ToolDeprecationPolicyRecordV0;
+  source: string;
+  reportOnly: true;
+  changesRuntimeBehavior: false;
+  requiredFieldStatus: 'complete' | 'incomplete';
+  missingRequiredFields: string[];
+}
+
+export interface ToolManifestRegistryV0 {
+  version: 'tool-manifest-v0';
+  implementation: 'manifest-driven-static-contract';
+  boundaries: {
+    readsManifestOnly: true;
+    dynamicPluginMarketplace: false;
+    remotePluginLoading: false;
+    externalAuthorization: false;
+    migratesRealData: false;
+    writesRealData: false;
+    changesRuntimeBehavior: false;
+  };
+  vocabularies: Record<string, readonly string[]>;
+  requiredFields: readonly string[];
+  summary: {
+    moduleCount: number;
+    launchableModuleCount: number;
+    sandboxModuleCount: number;
+    publicModuleCount: number;
+    testerOnlyModuleCount: number;
+    hiddenModuleCount: number;
+    deprecatedModuleCount: number;
+    missingRequiredFieldCount: number;
+    warningCount: number;
+  };
+  manifests: ToolManifestV0[];
+  warnings: Array<Record<string, unknown>>;
+}
+
 export interface ModuleDataKeyOwnership {
   ownerModuleId: string | null;
   sharingKind: 'shared' | 'module_private' | 'external_domain' | 'inferred';
@@ -64,6 +164,14 @@ export interface ModuleRegistryEntry {
   openHref: string;
   returnHref: string;
   publicIndexPath: string | null;
+  toolManifest?: ToolManifestV0;
+  toolLifecycle?: ToolLifecycleV0;
+  launchStatus?: ToolLaunchStatusV0;
+  prodExposure?: ToolProdExposureV0;
+  dataNamespace?: ToolDataNamespaceV0;
+  entitlementPolicy?: ToolEntitlementPolicyV0;
+  mobileStrategy?: string;
+  deprecationPolicy?: ToolDeprecationPolicyRecordV0;
   capabilities: ModuleCapabilities;
   ownedData: string[];
   consumedData: string[];
@@ -561,6 +669,7 @@ export interface ModuleRegistry {
   artifactStatusVisibility: ArtifactStatusVisibilityContract;
   shellDiscoveryEntrySlice: ShellDiscoveryEntryContract;
   mobileAppIntegration: MobileAppIntegrationContract;
+  toolManifest: ToolManifestRegistryV0;
   modules: ModuleRegistryEntry[];
 }
 

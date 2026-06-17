@@ -8,6 +8,7 @@ const repoRoot = join(scriptDir, '..');
 const output = execFileSync('node', [join(scriptDir, 'report-module-registry.mjs')], {
   cwd: repoRoot,
   encoding: 'utf8',
+  maxBuffer: 1024 * 1024 * 20,
 });
 const report = JSON.parse(output);
 

@@ -3,6 +3,16 @@
     "displayName": "婧",
     "avatarUrl": ""
   },
+  "identity": {
+    "currentProfileKind": "local_profile",
+    "localProfileKey": "local_profile",
+    "accountSystemEnabled": false,
+    "serverUserIdEnabled": false,
+    "realAuthEnabled": false,
+    "appleSignInEnabled": false,
+    "oauthEnabled": false,
+    "cloudIdentityEnabled": false
+  },
   "location": {
     "city": "Cary",
     "state": "NC",
@@ -79,7 +89,14 @@
       "maintainer": "Qiao",
       "responsibleAgent": "Qiao",
       "evidenceOwner": "Sina",
-      "gateOwner": "CEO"
+      "gateOwner": "CEO",
+      "dataContract": {
+        "schemaVersion": "SecretaryConversation@v0",
+        "dataVersion": "secretary-contract-data-v0",
+        "demoDataVersion": "secretary-demo-seed-v0",
+        "migrationRequired": false,
+        "migrationStatus": "future_migration_needed"
+      }
     },
     {
       "id": "plan",
@@ -98,7 +115,14 @@
       "maintainer": "Qiao",
       "responsibleAgent": "Qiao",
       "evidenceOwner": "Sina",
-      "gateOwner": "CEO"
+      "gateOwner": "CEO",
+      "dataContract": {
+        "schemaVersion": "PlanTask@v0",
+        "dataVersion": "plan-local-data-v0",
+        "demoDataVersion": "plan-demo-seed-v0",
+        "migrationRequired": false,
+        "migrationStatus": "not_required"
+      }
     },
     {
       "id": "quiz",
@@ -119,7 +143,14 @@
       "maintainer": "Qiao",
       "responsibleAgent": "Qiao",
       "evidenceOwner": "Sina",
-      "gateOwner": "CEO"
+      "gateOwner": "CEO",
+      "dataContract": {
+        "schemaVersion": "QuizExternalProgress@v0",
+        "dataVersion": "quiz-contract-data-v0",
+        "demoDataVersion": "quiz-demo-seed-v0",
+        "migrationRequired": false,
+        "migrationStatus": "future_migration_needed"
+      }
     },
     {
       "id": "inventory",
@@ -138,7 +169,14 @@
       "maintainer": "Qiao",
       "responsibleAgent": "Qiao",
       "evidenceOwner": "Sina",
-      "gateOwner": "CEO"
+      "gateOwner": "CEO",
+      "dataContract": {
+        "schemaVersion": "LocalInventoryItem@v1",
+        "dataVersion": "inventory-local-data-v1",
+        "demoDataVersion": "inventory-demo-seed-v1",
+        "migrationRequired": false,
+        "migrationStatus": "not_required"
+      }
     },
     {
       "id": "psychoanalysis",
@@ -159,7 +197,14 @@
       "maintainer": "Qiao",
       "responsibleAgent": "Qiao",
       "evidenceOwner": "Sina",
-      "gateOwner": "CEO"
+      "gateOwner": "CEO",
+      "dataContract": {
+        "schemaVersion": "PsychoanalysisExternalSession@v0",
+        "dataVersion": "psychoanalysis-contract-data-v0",
+        "demoDataVersion": "psychoanalysis-demo-seed-v0",
+        "migrationRequired": false,
+        "migrationStatus": "future_migration_needed"
+      }
     },
     {
       "id": "sanctuary",
@@ -180,7 +225,14 @@
       "maintainer": "Qiao",
       "responsibleAgent": "Qiao",
       "evidenceOwner": "Sina",
-      "gateOwner": "CEO"
+      "gateOwner": "CEO",
+      "dataContract": {
+        "schemaVersion": "SanctuarySession@v0",
+        "dataVersion": "sanctuary-local-data-v0",
+        "demoDataVersion": "sanctuary-demo-seed-v0",
+        "migrationRequired": false,
+        "migrationStatus": "future_migration_needed"
+      }
     },
     {
       "id": "reading",
@@ -199,7 +251,14 @@
       "maintainer": "Qiao",
       "responsibleAgent": "Qiao",
       "evidenceOwner": "Sina",
-      "gateOwner": "CEO"
+      "gateOwner": "CEO",
+      "dataContract": {
+        "schemaVersion": "ReadingNote@v0",
+        "dataVersion": "reading-local-data-v0",
+        "demoDataVersion": "reading-demo-seed-v0",
+        "migrationRequired": false,
+        "migrationStatus": "not_required"
+      }
     },
     {
       "id": "fitness",
@@ -218,7 +277,14 @@
       "maintainer": "Qiao",
       "responsibleAgent": "Qiao",
       "evidenceOwner": "Sina",
-      "gateOwner": "CEO"
+      "gateOwner": "CEO",
+      "dataContract": {
+        "schemaVersion": "FitnessWorkout@v0",
+        "dataVersion": "fitness-local-data-v0",
+        "demoDataVersion": "fitness-demo-seed-v0",
+        "migrationRequired": false,
+        "migrationStatus": "not_required"
+      }
     },
     {
       "id": "health",
@@ -239,7 +305,14 @@
       "maintainer": "Qiao",
       "responsibleAgent": "Qiao",
       "evidenceOwner": "Sina",
-      "gateOwner": "CEO"
+      "gateOwner": "CEO",
+      "dataContract": {
+        "schemaVersion": "HealthExternalLog@v0",
+        "dataVersion": "health-contract-data-v0",
+        "demoDataVersion": "health-demo-seed-v0",
+        "migrationRequired": false,
+        "migrationStatus": "future_migration_needed"
+      }
     },
     {
       "id": "finance",
@@ -260,7 +333,14 @@
       "maintainer": "Qiao",
       "responsibleAgent": "Qiao",
       "evidenceOwner": "Sina",
-      "gateOwner": "CEO"
+      "gateOwner": "CEO",
+      "dataContract": {
+        "schemaVersion": "FinanceExternalRecord@v0",
+        "dataVersion": "finance-contract-data-v0",
+        "demoDataVersion": "finance-demo-seed-v0",
+        "migrationRequired": false,
+        "migrationStatus": "future_migration_needed"
+      }
     },
     {
       "id": "lifesim",
@@ -281,7 +361,14 @@
       "maintainer": "Qiao",
       "responsibleAgent": "Qiao",
       "evidenceOwner": "Sina",
-      "gateOwner": "CEO"
+      "gateOwner": "CEO",
+      "dataContract": {
+        "schemaVersion": "LifeSimScenario@v0",
+        "dataVersion": "lifesim-contract-data-v0",
+        "demoDataVersion": "lifesim-demo-seed-v0",
+        "migrationRequired": false,
+        "migrationStatus": "future_migration_needed"
+      }
     }
   ]
 }

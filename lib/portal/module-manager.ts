@@ -67,6 +67,15 @@ export type {
   ShellRouteEvidenceKind,
   ShellRouteEvidenceLink,
   ShellRouteReportingContract,
+  ToolDataNamespaceV0,
+  ToolDeprecationPolicyRecordV0,
+  ToolDeprecationPolicyV0,
+  ToolEntitlementPolicyV0,
+  ToolLaunchStatusV0,
+  ToolLifecycleV0,
+  ToolManifestRegistryV0,
+  ToolManifestV0,
+  ToolProdExposureV0,
 } from './module-manager-core';
 export type {
   BuildLocalDataRecordsOptions,

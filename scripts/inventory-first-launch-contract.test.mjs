@@ -112,6 +112,7 @@ assert.equal(resetContract.externalSideEffects, false);
 const reportOutput = execFileSync('node', [join(scriptDir, 'report-module-registry.mjs')], {
   cwd: repoRoot,
   encoding: 'utf8',
+  maxBuffer: 1024 * 1024 * 20,
 });
 const report = JSON.parse(reportOutput);
 assert.equal(report.inventoryFirstLaunch.contract.version, contract.version);
