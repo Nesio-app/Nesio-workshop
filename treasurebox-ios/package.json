@@ -5,6 +5,7 @@
   "description": "宝盒 · 数字静谧庭院 — Capacitor iOS app",
   "scripts": {
     "sync": "node scripts/sync-www.mjs",
+    "test:ios-shell": "node scripts/precheck-ios-shell.mjs && node scripts/precheck-ios-release-config.mjs",
     "cap:sync": "npm run sync && npx cap sync ios",
     "ios": "npm run cap:sync && npx cap open ios",
     "ios:run": "npm run cap:sync && npx cap run ios",
@@ -12,9 +13,7 @@
   },
   "dependencies": {
     "@capacitor/core": "^8.4.0",
-    "@capacitor/ios": "^8.4.0",
-    "@capacitor/splash-screen": "^8.0.1",
-    "@capacitor/status-bar": "^8.0.1"
+    "@capacitor/ios": "^8.4.0"
   },
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",

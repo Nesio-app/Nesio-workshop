@@ -1,19 +1,27 @@
 'use client';
 
 import type { PortalTool, PortalZone } from '@/lib/portal/types';
+import { getToolStatusLabel, type ToolForShellState } from './tool-state';
 import { ensureToolboxTrailingSlash, withBase } from '@/lib/portal/paths';
+import { t } from '@/lib/portal/i18n';
+import type { PortalLocale } from '@/lib/portal/profile';
 
 interface ToolCardProps {
   tool: PortalTool;
   zone: PortalZone;
+  locale?: PortalLocale;
 }
 
 function isExternalUrl(url: string): boolean {
   return url.startsWith('http://') || url.startsWith('https://');
 }
 
-export default function ToolCard({ tool, zone }: ToolCardProps) {
-  const href = tool.ready ? ensureToolboxTrailingSlash(withBase(tool.url)) : undefined;
+function toolStatusLabel(tool: PortalTool, locale: PortalLocale = 'zh'): string {
+  return getToolStatusLabel(tool as ToolForShellState, locale);
+}
+
+export default function ToolCard({ tool, zone, locale = 'zh' }: ToolCardProps) {
+  const href = tool.ready ? ensureToolboxTrailingSlash(tool.url) : undefined;
   const external = href ? isExternalUrl(href) : false;
   const breathe = zone.tone === 'warm' && tool.id === 'psychoanalysis';
   const iconSrc = tool.iconUrl ? withBase(tool.iconUrl) : null;
@@ -28,7 +36,7 @@ export default function ToolCard({ tool, zone }: ToolCardProps) {
             tool.icon
           )}
         </span>
-        {!tool.ready && <span className="portal-card-badge">筹备中</span>}
+        <span className="portal-card-badge">{toolStatusLabel(tool, locale)}</span>
       </div>
       <div className="portal-card-body">
         <h3 className="portal-card-name">{tool.name}</h3>
@@ -40,7 +48,7 @@ export default function ToolCard({ tool, zone }: ToolCardProps) {
           <kbd>{tool.hotkey.toUpperCase()}</kbd>
         </span>
         {tool.ready && (
-          <span className="portal-card-enter">{external ? '打开 ↗' : '进入 →'}</span>
+          <span className="portal-card-enter">{external ? t(locale, 'shellToolOpen') : t(locale, 'shellToolEnter')}</span>
         )}
       </div>
     </>
@@ -57,11 +65,7 @@ export default function ToolCard({ tool, zone }: ToolCardProps) {
     .join(' ');
 
   if (!href) {
-    return (
-      <article className={className} aria-disabled="true">
-        {content}
-      </article>
-    );
+    return <article className={className}>{content}</article>;
   }
 
   return (

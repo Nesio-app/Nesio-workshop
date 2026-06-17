@@ -662,8 +662,10 @@ body {
 
 .portal-search-btn--note {
   align-self: center;
-  width: 2.55rem;
-  height: 2.55rem;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
   padding: 0;
   justify-content: center;
   border-radius: 0.75rem;
@@ -847,12 +849,26 @@ body {
   color: #e8a317;
 }
 
+.portal-quote-treasure-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
 .portal-quote-treasure {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
   border: none;
   background: transparent;
   line-height: 0;
   cursor: pointer;
-  padding: 0.1rem;
+  padding: 0;
   flex-shrink: 0;
   border-radius: 0.5rem;
   touch-action: manipulation;
@@ -877,6 +893,28 @@ body {
   display: block;
   width: 1.25rem;
   height: 1.25rem;
+}
+
+.portal-tool-entry-hint {
+  position: absolute;
+  right: calc(100% + 0.45rem);
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  max-width: 8rem;
+  white-space: nowrap;
+  padding: 0.32rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(88, 140, 227, 0.16);
+  box-shadow: 0 8px 20px rgba(88, 140, 227, 0.12);
+  color: var(--portal-blue-deep);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.2;
+  animation: portal-tool-hint-in 0.28s ease-out;
+  pointer-events: none;
 }
 
 .portal-note-btn-label {
@@ -1249,6 +1287,7 @@ body {
 
 .portal-tool-card {
   width: 100%;
+  min-height: 5.75rem;
   border: 1px solid var(--portal-line);
   border-radius: 1rem;
   background: rgba(255, 255, 255, 0.78);
@@ -1442,6 +1481,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 0.5rem;
   margin-bottom: 0.45rem;
   padding: 0 0.15rem;
 }
@@ -1454,9 +1494,18 @@ body {
   letter-spacing: 0.06em;
 }
 
+.portal-treasure-popup-meta {
+  margin: 0.16rem 0 0;
+  color: var(--portal-muted);
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: 0;
+}
+
 .portal-treasure-popup-close {
-  width: 1.75rem;
-  height: 1.75rem;
+  min-width: 44px;
+  min-height: 44px;
   border: none;
   border-radius: 999px;
   background: rgba(88, 140, 227, 0.1);
@@ -1464,6 +1513,9 @@ body {
   font-size: 1.1rem;
   line-height: 1;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .portal-treasure-popup .portal-tools {
@@ -1490,12 +1542,36 @@ body {
   }
 }
 
+@keyframes portal-tool-hint-in {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) translateX(0.25rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+  }
+}
+
 .portal-tool-name {
   font-size: 0.68rem;
   font-weight: 600;
   color: var(--portal-ink);
   line-height: 1.2;
   text-align: center;
+}
+
+.portal-tool-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1rem;
+  max-width: 100%;
+  color: var(--portal-muted);
+  font-size: 0.58rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0;
+  white-space: nowrap;
 }
 
 .portal-calendar {
@@ -2815,6 +2891,10 @@ body {
   .portal-dash-hero{animation-delay:.02s}
   .portal-quote{animation-delay:.10s}
   .portal-widgets{animation-delay:.18s}
+  .portal-treasure-popup{
+    animation:portalTreasureRise .22s cubic-bezier(.22,.61,.36,1) both;
+    animation-delay:.26s;
+  }
   .portal-calendar{animation-delay:.34s}
   .portal-tools-grid > li{animation:portalRise .6s cubic-bezier(.22,.61,.36,1) both}
   .portal-tools-grid > li:nth-child(1){animation-delay:.30s}
@@ -2828,6 +2908,10 @@ body {
   .portal-tools-grid > li:nth-child(9){animation-delay:.62s}
 }
 @keyframes portalRise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes portalTreasureRise{
+  from{opacity:0;transform:translateX(-50%) translateY(14px)}
+  to{opacity:1;transform:translateX(-50%)}
+}
 
 /* ═══════════════════════ 5. 工具图标精修 ═══════════════════════ */
 .portal-tool-icon-wrap{

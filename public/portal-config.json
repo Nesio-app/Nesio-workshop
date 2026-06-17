@@ -3,6 +3,16 @@
     "displayName": "婧",
     "avatarUrl": ""
   },
+  "identity": {
+    "currentProfileKind": "local_profile",
+    "localProfileKey": "local_profile",
+    "accountSystemEnabled": false,
+    "serverUserIdEnabled": false,
+    "realAuthEnabled": false,
+    "appleSignInEnabled": false,
+    "oauthEnabled": false,
+    "cloudIdentityEnabled": false
+  },
   "location": {
     "city": "Cary",
     "state": "NC",
@@ -69,10 +79,24 @@
       "zone": "kinetic",
       "hotkey": "a",
       "command": "/ai",
-      "featured": true,
+      "featured": false,
       "icon": "💬",
       "iconUrl": "/icons/tools/secretary.svg",
-      "ready": true
+      "ready": false,
+      "status": "gated",
+      "integrationMode": "contract-only",
+      "owner": "CEO",
+      "maintainer": "Qiao",
+      "responsibleAgent": "Qiao",
+      "evidenceOwner": "Sina",
+      "gateOwner": "CEO",
+      "dataContract": {
+        "schemaVersion": "SecretaryConversation@v0",
+        "dataVersion": "secretary-contract-data-v0",
+        "demoDataVersion": "secretary-demo-seed-v0",
+        "migrationRequired": false,
+        "migrationStatus": "future_migration_needed"
+      }
     },
     {
       "id": "plan",
@@ -86,7 +110,19 @@
       "featured": true,
       "icon": "✅",
       "iconUrl": "/icons/tools/plan.svg",
-      "ready": true
+      "ready": true,
+      "owner": "CEO",
+      "maintainer": "Qiao",
+      "responsibleAgent": "Qiao",
+      "evidenceOwner": "Sina",
+      "gateOwner": "CEO",
+      "dataContract": {
+        "schemaVersion": "PlanTask@v0",
+        "dataVersion": "plan-local-data-v0",
+        "demoDataVersion": "plan-demo-seed-v0",
+        "migrationRequired": false,
+        "migrationStatus": "not_required"
+      }
     },
     {
       "id": "quiz",
@@ -100,7 +136,21 @@
       "featured": false,
       "icon": "📚",
       "iconUrl": "/icons/tools/quiz.svg",
-      "ready": true
+      "ready": false,
+      "status": "gated",
+      "integrationMode": "contract-only",
+      "owner": "CEO",
+      "maintainer": "Qiao",
+      "responsibleAgent": "Qiao",
+      "evidenceOwner": "Sina",
+      "gateOwner": "CEO",
+      "dataContract": {
+        "schemaVersion": "QuizExternalProgress@v0",
+        "dataVersion": "quiz-contract-data-v0",
+        "demoDataVersion": "quiz-demo-seed-v0",
+        "migrationRequired": false,
+        "migrationStatus": "future_migration_needed"
+      }
     },
     {
       "id": "inventory",
@@ -114,21 +164,19 @@
       "featured": false,
       "icon": "📦",
       "iconUrl": "/icons/tools/storage.svg",
-      "ready": true
-    },
-    {
-      "id": "finance",
-      "name": "理财",
-      "nameEn": "Finance",
-      "description": "家庭财务 · 现金流与净值",
-      "url": "https://finance-gamma-swart.vercel.app/",
-      "zone": "kinetic",
-      "hotkey": "g",
-      "command": "/finance",
-      "featured": false,
-      "icon": "💰",
-      "iconUrl": "/icons/tools/finance.svg",
-      "ready": true
+      "ready": true,
+      "owner": "CEO",
+      "maintainer": "Qiao",
+      "responsibleAgent": "Qiao",
+      "evidenceOwner": "Sina",
+      "gateOwner": "CEO",
+      "dataContract": {
+        "schemaVersion": "LocalInventoryItem@v1",
+        "dataVersion": "inventory-local-data-v1",
+        "demoDataVersion": "inventory-demo-seed-v1",
+        "migrationRequired": false,
+        "migrationStatus": "not_required"
+      }
     },
     {
       "id": "psychoanalysis",
@@ -139,10 +187,24 @@
       "zone": "reflective",
       "hotkey": "s",
       "command": "/soul",
-      "featured": true,
+      "featured": false,
       "icon": "🧠",
       "iconUrl": "/icons/tools/psych.svg",
-      "ready": true
+      "ready": false,
+      "status": "gated",
+      "integrationMode": "contract-only",
+      "owner": "CEO",
+      "maintainer": "Qiao",
+      "responsibleAgent": "Qiao",
+      "evidenceOwner": "Sina",
+      "gateOwner": "CEO",
+      "dataContract": {
+        "schemaVersion": "PsychoanalysisExternalSession@v0",
+        "dataVersion": "psychoanalysis-contract-data-v0",
+        "demoDataVersion": "psychoanalysis-demo-seed-v0",
+        "migrationRequired": false,
+        "migrationStatus": "future_migration_needed"
+      }
     },
     {
       "id": "sanctuary",
@@ -156,21 +218,47 @@
       "featured": false,
       "icon": "🧘",
       "iconUrl": "/icons/tools/sanctuary.svg",
-      "ready": true
+      "ready": false,
+      "status": "gated",
+      "integrationMode": "contract-only",
+      "owner": "CEO",
+      "maintainer": "Qiao",
+      "responsibleAgent": "Qiao",
+      "evidenceOwner": "Sina",
+      "gateOwner": "CEO",
+      "dataContract": {
+        "schemaVersion": "SanctuarySession@v0",
+        "dataVersion": "sanctuary-local-data-v0",
+        "demoDataVersion": "sanctuary-demo-seed-v0",
+        "migrationRequired": false,
+        "migrationStatus": "future_migration_needed"
+      }
     },
     {
       "id": "reading",
       "name": "阅读",
       "nameEn": "Reading",
       "description": "读书笔记 · 思想输入",
-      "url": "https://reading-ios.vercel.app/",
+      "url": "/reading/",
       "zone": "reflective",
       "hotkey": "r",
       "command": "/read",
       "featured": false,
       "icon": "📖",
       "iconUrl": "/icons/tools/reading.svg",
-      "ready": true
+      "ready": true,
+      "owner": "CEO",
+      "maintainer": "Qiao",
+      "responsibleAgent": "Qiao",
+      "evidenceOwner": "Sina",
+      "gateOwner": "CEO",
+      "dataContract": {
+        "schemaVersion": "ReadingNote@v0",
+        "dataVersion": "reading-local-data-v0",
+        "demoDataVersion": "reading-demo-seed-v0",
+        "migrationRequired": false,
+        "migrationStatus": "not_required"
+      }
     },
     {
       "id": "fitness",
@@ -181,10 +269,22 @@
       "zone": "manifest",
       "hotkey": "f",
       "command": "/fitness",
-      "featured": true,
+      "featured": false,
       "icon": "💪",
       "iconUrl": "/icons/tools/fitness.svg",
-      "ready": true
+      "ready": true,
+      "owner": "CEO",
+      "maintainer": "Qiao",
+      "responsibleAgent": "Qiao",
+      "evidenceOwner": "Sina",
+      "gateOwner": "CEO",
+      "dataContract": {
+        "schemaVersion": "FitnessWorkout@v0",
+        "dataVersion": "fitness-local-data-v0",
+        "demoDataVersion": "fitness-demo-seed-v0",
+        "migrationRequired": false,
+        "migrationStatus": "not_required"
+      }
     },
     {
       "id": "health",
@@ -195,10 +295,52 @@
       "zone": "manifest",
       "hotkey": "u",
       "command": "/health",
-      "featured": true,
+      "featured": false,
       "icon": "🫀",
       "iconUrl": "/icons/tools/health.svg",
-      "ready": true
+      "ready": false,
+      "status": "gated",
+      "integrationMode": "contract-only",
+      "owner": "CEO",
+      "maintainer": "Qiao",
+      "responsibleAgent": "Qiao",
+      "evidenceOwner": "Sina",
+      "gateOwner": "CEO",
+      "dataContract": {
+        "schemaVersion": "HealthExternalLog@v0",
+        "dataVersion": "health-contract-data-v0",
+        "demoDataVersion": "health-demo-seed-v0",
+        "migrationRequired": false,
+        "migrationStatus": "future_migration_needed"
+      }
+    },
+    {
+      "id": "finance",
+      "name": "财务",
+      "nameEn": "Finance",
+      "description": "现金流 · 预算与风险监控",
+      "url": "https://finance-gamma-swart.vercel.app/",
+      "zone": "manifest",
+      "hotkey": "m",
+      "command": "/finance",
+      "featured": false,
+      "icon": "💰",
+      "iconUrl": "/icons/tools/finance.svg",
+      "ready": false,
+      "status": "gated",
+      "integrationMode": "contract-only",
+      "owner": "CEO",
+      "maintainer": "Qiao",
+      "responsibleAgent": "Qiao",
+      "evidenceOwner": "Sina",
+      "gateOwner": "CEO",
+      "dataContract": {
+        "schemaVersion": "FinanceExternalRecord@v0",
+        "dataVersion": "finance-contract-data-v0",
+        "demoDataVersion": "finance-demo-seed-v0",
+        "migrationRequired": false,
+        "migrationStatus": "future_migration_needed"
+      }
     },
     {
       "id": "lifesim",
@@ -212,7 +354,21 @@
       "featured": false,
       "icon": "🎲",
       "iconUrl": "/icons/tools/lifesim.svg",
-      "ready": true
+      "ready": false,
+      "status": "gated",
+      "integrationMode": "contract-only",
+      "owner": "CEO",
+      "maintainer": "Qiao",
+      "responsibleAgent": "Qiao",
+      "evidenceOwner": "Sina",
+      "gateOwner": "CEO",
+      "dataContract": {
+        "schemaVersion": "LifeSimScenario@v0",
+        "dataVersion": "lifesim-contract-data-v0",
+        "demoDataVersion": "lifesim-demo-seed-v0",
+        "migrationRequired": false,
+        "migrationStatus": "future_migration_needed"
+      }
     }
   ]
 }

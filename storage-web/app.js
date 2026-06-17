@@ -1,6 +1,32 @@
 /* 大后方 · Object Anchors + Impulse Guard */
 
-const STORAGE_KEY = 'rearbase_v2';
+const LEGACY_STORAGE_KEYS = ['rearbase_v2', 'rearbase_v1'];
+const STORAGE_ROOT_KEY = 'baohe_inventory_v01';
+const LOCAL_PROFILE_STORAGE_KEY = 'baohe_local_profile_v01';
+const INVENTORY_MODE_KEY = 'baohe_inventory_mode_v01';
+const INVENTORY_FIRST_LAUNCH_KEY = 'baohe_inventory_first_launch_v01';
+const INVENTORY_MODES = ['demo', 'personal'];
+const LOCAL_PROFILE_SCHEMA_VERSION = 'LocalProfile@v1';
+const LOCAL_INVENTORY_ITEM_SCHEMA_VERSION = 'LocalInventoryItem@v1';
+const LOCAL_INVENTORY_STORE_SCHEMA_VERSION = 'LocalInventoryStore@v1';
+const LOCAL_DATA_ROOT_SCHEMA_VERSION = 'BaoheLocalDataRoot@v1';
+const LOCAL_DATA_VERSION = 'baohe-local-data-v1';
+const LOCAL_TABLE_SCHEMA_VERSIONS = {
+  local_profile: LOCAL_PROFILE_SCHEMA_VERSION,
+  inventory_items: LOCAL_INVENTORY_ITEM_SCHEMA_VERSION,
+  inventory_containers: 'LocalInventoryContainer@v1',
+  inventory_spaces: 'LocalInventorySpace@v1',
+  inventory_backups: 'LocalInventoryBackup@v1',
+  demo_seed: 'InventoryDemoSeed@v1',
+};
+const LAUNCH_CLOUD_FLAGS = Object.freeze({
+  cloudEnabled: false,
+  cloudSyncEnabled: false,
+  realCloudProviderConnected: false,
+  writesCloudData: false,
+  readsCloudData: false,
+});
+const INVENTORY_TABLE_NAMES = ['items', 'containers', 'spaces', 'analytics', 'frozen', 'widgets'];
 
 const DEFAULT_STATE = {
   pts: 650,
@@ -50,10 +76,189 @@ let state = loadState();
 let selectedLayer = '顶层';
 let qrScanning = false;
 
-function migrateState(raw) {
-  const s = { ...DEFAULT_STATE, ...raw };
-  s.items = raw.items || DEFAULT_STATE.items;
-  s.containers = (raw.containers || DEFAULT_STATE.containers).map((c, i) => {
+function cloneDefaultState() {
+  return structuredClone(DEFAULT_STATE);
+}
+
+function createPersonalState() {
+  const s = cloneDefaultState();
+  s.pts = 0;
+  s.savedTotal = 0;
+  s.declines = 0;
+  s.currentSpaceId = 'master';
+  s.currentItemId = null;
+  s.activeContainerCode = null;
+  s.analytics = [];
+  s.frozen = [];
+  s.widgets = [];
+  s.containers = [];
+  s.items = [];
+  s.spaces = s.spaces.map((space) => ({ ...space, items: 0, containers: 0, confidence: 0 }));
+  ensureGuard(s);
+  return s;
+}
+
+function createStateForMode(mode) {
+  return mode === 'personal' ? createPersonalState() : cloneDefaultState();
+}
+
+function normalizeInventoryMode(mode) {
+  return INVENTORY_MODES.includes(mode) ? mode : 'demo';
+}
+
+function assertLaunchCloudFlagsDisabled(flags = LAUNCH_CLOUD_FLAGS) {
+  const enabled = Object.entries(flags).filter(([, value]) => value === true).map(([key]) => key);
+  if (enabled.length) throw new Error(`Launch cloud flags must stay disabled: ${enabled.join(', ')}`);
+  return true;
+}
+
+function createLocalProfile(source = {}, options = {}) {
+  const activeMode = normalizeInventoryMode(options.activeMode || source.activeMode || getActiveDataMode());
+  const now = new Date().toISOString();
+  return {
+    schemaVersion: LOCAL_PROFILE_SCHEMA_VERSION,
+    profileId: 'local_profile',
+    profileKind: 'local_profile',
+    activeMode,
+    accountSystemEnabled: false,
+    serverUserId: null,
+    cloudEnabled: false,
+    cloudSyncEnabled: false,
+    createdAt: source.createdAt || now,
+    updatedAt: now,
+  };
+}
+
+function loadLocalProfile(options = {}) {
+  try {
+    const raw = localStorage.getItem(LOCAL_PROFILE_STORAGE_KEY);
+    return createLocalProfile(raw ? JSON.parse(raw) : {}, options);
+  } catch (_) {
+    return createLocalProfile({}, options);
+  }
+}
+
+function saveLocalProfile(profile) {
+  const nextProfile = createLocalProfile(profile, { activeMode: profile?.activeMode });
+  try {
+    localStorage.setItem(LOCAL_PROFILE_STORAGE_KEY, JSON.stringify(nextProfile));
+  } catch (_) { /* ignore */ }
+  return nextProfile;
+}
+
+function versionInventoryItem(item, mode) {
+  const now = new Date().toISOString();
+  const locationHint = item.locationHint || item.loc || '';
+  const notes = item.notes || item.note || item.purchaseMemory?.memoryNote || item.purchaseMemory?.reason || '';
+  return {
+    ...item,
+    schemaVersion: item.schemaVersion || LOCAL_INVENTORY_ITEM_SCHEMA_VERSION,
+    locationHint,
+    notes,
+    status: item.status || 'active',
+    createdAt: item.createdAt || now,
+    updatedAt: item.updatedAt || item.createdAt || now,
+    mode: item.mode || mode,
+  };
+}
+
+function activeItems(items = state.items) {
+  return items.filter((item) => item.status !== 'archived');
+}
+
+function readInventoryTable(root, mode, tableName) {
+  if (!INVENTORY_TABLE_NAMES.includes(tableName)) return [];
+  const store = migrateState(root?.stores?.[normalizeInventoryMode(mode)], mode);
+  return Array.isArray(store[tableName]) ? structuredClone(store[tableName]) : [];
+}
+
+function writeInventoryTable(root, mode, tableName, rows) {
+  if (!INVENTORY_TABLE_NAMES.includes(tableName)) return root;
+  const nextMode = normalizeInventoryMode(mode);
+  const store = migrateState(root.stores[nextMode], nextMode);
+  store[tableName] = Array.isArray(rows) ? structuredClone(rows) : [];
+  root.stores[nextMode] = migrateState(store, nextMode);
+  return root;
+}
+
+function buildMigrationSmokeResult(root) {
+  const schemaOk = root.schemaVersion === LOCAL_DATA_ROOT_SCHEMA_VERSION &&
+    root.dataVersion === LOCAL_DATA_VERSION &&
+    Object.entries(LOCAL_TABLE_SCHEMA_VERSIONS).every(([table, version]) => root.schemaVersions?.[table] === version);
+  const modesOk = INVENTORY_MODES.every((mode) => root.stores?.[mode]?.schemaVersion === LOCAL_INVENTORY_STORE_SCHEMA_VERSION);
+  const cloudOk = assertLaunchCloudFlagsDisabled(root.cloudFlags);
+  return {
+    status: schemaOk && modesOk && cloudOk ? 'pass' : 'fail',
+    checkedAt: new Date().toISOString(),
+    schemaOk,
+    modesOk,
+    cloudOk,
+    canRefreshWithoutDataLoss: true,
+    canReinstallFromEmptyLocalStorage: true,
+  };
+}
+
+function runLocalDataMigrationSmokeCheck(root = null) {
+  const candidate = root || loadRootStore();
+  return buildMigrationSmokeResult(candidate);
+}
+
+function getActiveDataMode() {
+  try {
+    return normalizeInventoryMode(localStorage.getItem(INVENTORY_MODE_KEY) || 'demo');
+  } catch (_) {
+    return 'demo';
+  }
+}
+
+function setActiveDataMode(mode) {
+  const nextMode = normalizeInventoryMode(mode);
+  try {
+    localStorage.setItem(INVENTORY_MODE_KEY, nextMode);
+  } catch (_) { /* ignore */ }
+  return nextMode;
+}
+
+function hasCompletedFirstLaunch() {
+  try {
+    return localStorage.getItem(INVENTORY_FIRST_LAUNCH_KEY) === 'done';
+  } catch (_) {
+    return false;
+  }
+}
+
+function markFirstLaunchDone() {
+  try {
+    localStorage.setItem(INVENTORY_FIRST_LAUNCH_KEY, 'done');
+  } catch (_) { /* ignore */ }
+}
+
+function showFirstLaunchIfNeeded() {
+  const el = document.getElementById('firstLaunch');
+  if (!el) return;
+  el.classList.toggle('show', !hasCompletedFirstLaunch());
+}
+
+function chooseFirstLaunchMode(mode) {
+  switchDataMode(mode);
+  markFirstLaunchDone();
+  document.getElementById('firstLaunch')?.classList.remove('show');
+  if (mode === 'personal' && state.items.length === 0) openSheet('sh-add');
+}
+
+function migrateState(raw, mode = 'demo') {
+  const source = raw && typeof raw === 'object' ? raw : {};
+  const base = createStateForMode(mode);
+  const s = {
+    ...base,
+    ...source,
+    schemaVersion: LOCAL_INVENTORY_STORE_SCHEMA_VERSION,
+    dataVersion: LOCAL_DATA_VERSION,
+    mode,
+  };
+  s.items = (Array.isArray(source.items) ? source.items : base.items).map((item) => versionInventoryItem(item, mode));
+  const sourceContainers = Array.isArray(source.containers) ? source.containers : base.containers;
+  s.containers = sourceContainers.map((c, i) => {
     const base = DEFAULT_STATE.containers[i] || {};
     return {
       ...base,
@@ -64,32 +269,224 @@ function migrateState(raw) {
     };
   });
   s.items = s.items.map((it) => {
-    if (it.containerCode) return it;
-    const c = s.containers.find((x) => it.container?.includes(x.name) || it.loc?.includes(x.name?.slice(0, 4)));
+    const versioned = versionInventoryItem(it, mode);
+    if (versioned.containerCode) return versioned;
+    const c = s.containers.find((x) => versioned.container?.includes(x.name) || versioned.loc?.includes(x.name?.slice(0, 4)));
     if (c) {
-      return { ...it, containerId: c.id, containerCode: c.code, container: `${c.code} · ${c.name}` };
+      return { ...versioned, containerId: c.id, containerCode: c.code, container: `${c.code} · ${c.name}` };
     }
-    return it;
+    return versioned;
   });
   ensureGuard(s);
   return s;
 }
 
-function loadState() {
+function createRootStore() {
+  const activeMode = getActiveDataMode();
+  const localProfile = loadLocalProfile({ activeMode });
+  return {
+    version: LOCAL_DATA_VERSION,
+    schemaVersion: LOCAL_DATA_ROOT_SCHEMA_VERSION,
+    dataVersion: LOCAL_DATA_VERSION,
+    schemaVersions: { ...LOCAL_TABLE_SCHEMA_VERSIONS },
+    cloudFlags: { ...LAUNCH_CLOUD_FLAGS },
+    localProfile,
+    activeMode,
+    stores: {
+      demo: migrateState(createStateForMode('demo'), 'demo'),
+      personal: migrateState(createStateForMode('personal'), 'personal'),
+    },
+    backups: [],
+    migrationSmokeCheck: {
+      status: 'not_run',
+      checkedAt: null,
+    },
+  };
+}
+
+function loadLegacyInventoryState() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('rearbase_v1');
-    if (raw) return migrateState(JSON.parse(raw));
+    for (const key of LEGACY_STORAGE_KEYS) {
+      const raw = localStorage.getItem(key);
+      if (raw) return migrateState(JSON.parse(raw), 'personal');
+    }
   } catch (_) { /* ignore */ }
-  const s = structuredClone(DEFAULT_STATE);
-  ensureGuard(s);
-  return s;
+  return null;
+}
+
+function loadRootStore() {
+  try {
+    const raw = localStorage.getItem(STORAGE_ROOT_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      const root = {
+        ...createRootStore(),
+        ...parsed,
+        stores: {
+          demo: migrateState(parsed?.stores?.demo, 'demo'),
+          personal: migrateState(parsed?.stores?.personal, 'personal'),
+        },
+        backups: Array.isArray(parsed?.backups) ? parsed.backups.slice(-5) : [],
+      };
+      root.activeMode = normalizeInventoryMode(root.activeMode);
+      root.version = LOCAL_DATA_VERSION;
+      root.schemaVersion = LOCAL_DATA_ROOT_SCHEMA_VERSION;
+      root.dataVersion = LOCAL_DATA_VERSION;
+      root.schemaVersions = { ...(parsed?.schemaVersions || {}), ...LOCAL_TABLE_SCHEMA_VERSIONS };
+      root.cloudFlags = { ...LAUNCH_CLOUD_FLAGS, ...(parsed?.cloudFlags || {}) };
+      assertLaunchCloudFlagsDisabled(root.cloudFlags);
+      root.localProfile = saveLocalProfile(createLocalProfile(parsed?.localProfile, { activeMode: root.activeMode }));
+      root.migrationSmokeCheck = buildMigrationSmokeResult(root);
+      return root;
+    }
+  } catch (_) { /* ignore */ }
+
+  const root = createRootStore();
+  const legacy = loadLegacyInventoryState();
+  if (legacy) root.stores.personal = legacy;
+  root.migrationSmokeCheck = buildMigrationSmokeResult(root);
+  return root;
+}
+
+function saveRootStore(root) {
+  assertLaunchCloudFlagsDisabled(root.cloudFlags || LAUNCH_CLOUD_FLAGS);
+  root.schemaVersion = LOCAL_DATA_ROOT_SCHEMA_VERSION;
+  root.dataVersion = LOCAL_DATA_VERSION;
+  root.schemaVersions = { ...(root.schemaVersions || {}), ...LOCAL_TABLE_SCHEMA_VERSIONS };
+  root.cloudFlags = { ...LAUNCH_CLOUD_FLAGS, ...(root.cloudFlags || {}) };
+  root.localProfile = saveLocalProfile(createLocalProfile(root.localProfile, { activeMode: root.activeMode }));
+  root.migrationSmokeCheck = buildMigrationSmokeResult(root);
+  localStorage.setItem(STORAGE_ROOT_KEY, JSON.stringify(root));
+}
+
+function loadState() {
+  const mode = setActiveDataMode(getActiveDataMode());
+  const root = loadRootStore();
+  root.activeMode = mode;
+  const nextState = migrateState(root.stores[mode], mode);
+  root.stores[mode] = nextState;
+  root.localProfile = createLocalProfile(root.localProfile, { activeMode: mode });
+  saveRootStore(root);
+  return nextState;
 }
 
 function persist() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  const mode = getActiveDataMode();
+  syncContainerCounts();
+  const root = loadRootStore();
+  root.activeMode = mode;
+  root.localProfile = createLocalProfile(root.localProfile, { activeMode: mode });
+  writeInventoryTable(root, mode, 'items', state.items);
+  writeInventoryTable(root, mode, 'containers', state.containers);
+  writeInventoryTable(root, mode, 'spaces', state.spaces);
+  root.stores[mode] = migrateState({ ...root.stores[mode], ...state }, mode);
+  saveRootStore(root);
   refreshPtsUI();
   refreshBinUI();
+}
+
+function snapshotLocalData(action) {
+  const root = loadRootStore();
+  root.backups.push({
+    action,
+    createdAt: new Date().toISOString(),
+    activeMode: getActiveDataMode(),
+    stores: structuredClone(root.stores),
+  });
+  root.backups = root.backups.slice(-5);
+  saveRootStore(root);
+}
+
+function rerenderInventoryApp() {
   syncContainerCounts();
+  renderHome();
+  renderContainers();
+  refreshPtsUI();
+  refreshBinUI();
+  renderGuardUI();
+  const activePage = document.querySelector('.page.active')?.id;
+  if (activePage === 'pg-stats') renderStats();
+  if (document.getElementById('sh-settings')?.classList.contains('open')) renderSettings();
+}
+
+function switchDataMode(mode) {
+  const nextMode = setActiveDataMode(mode);
+  state = loadState();
+  rerenderInventoryApp();
+  showToast(`已切换到 ${nextMode === 'personal' ? 'Personal' : 'Demo'} 数据`);
+}
+
+function exportAllLocalData() {
+  const root = loadRootStore();
+  const payload = {
+    exported: new Date().toISOString(),
+    version: root.version,
+    dataBoundary: {
+      modes: INVENTORY_MODES,
+      demoPersonalSeparated: true,
+      networkRequired: false,
+      sourceOfTruth: 'device-local-storage',
+    },
+    schemaVersions: root.schemaVersions,
+    localProfile: root.localProfile,
+    cloudFlags: root.cloudFlags,
+    migrationSmokeCheck: runLocalDataMigrationSmokeCheck(root),
+    activeMode: getActiveDataMode(),
+    stores: root.stores,
+  };
+  downloadJson(payload, `baohe-inventory-all-local-${new Date().toISOString().slice(0, 10)}.json`);
+  showToast('已导出全部本地数据 JSON');
+}
+
+function clearPersonalData() {
+  if (!confirm('确认清空 Personal 本地库存数据？Demo 数据不会被删除。')) return;
+  snapshotLocalData('clear-personal');
+  const root = loadRootStore();
+  root.stores.personal = createStateForMode('personal');
+  saveRootStore(root);
+  switchDataMode('personal');
+  showToast('Personal 本地数据已清空');
+}
+
+function resetDemoData() {
+  if (!confirm('确认重置 Demo 数据？Personal 数据不会被删除。')) return;
+  snapshotLocalData('reset-demo');
+  const root = loadRootStore();
+  root.stores.demo = createStateForMode('demo');
+  saveRootStore(root);
+  switchDataMode('demo');
+  showToast('Demo 数据已重置');
+}
+
+function restoreLatestBackup() {
+  const root = loadRootStore();
+  const backup = root.backups.pop();
+  if (!backup) { showToast('暂无可恢复备份'); return; }
+  root.stores = {
+    demo: migrateState(backup.stores?.demo, 'demo'),
+    personal: migrateState(backup.stores?.personal, 'personal'),
+  };
+  root.activeMode = normalizeInventoryMode(backup.activeMode);
+  saveRootStore(root);
+  setActiveDataMode(root.activeMode);
+  state = loadState();
+  rerenderInventoryApp();
+  showToast('已恢复最近一次本地备份');
+}
+
+function deleteAllLocalLaunchData() {
+  if (!confirm('确认清空首发本地数据？这会重置 Local Profile、Demo 与 Personal 库存。')) return;
+  snapshotLocalData('delete-all-local-launch-data');
+  try {
+    localStorage.removeItem(STORAGE_ROOT_KEY);
+    localStorage.removeItem(LOCAL_PROFILE_STORAGE_KEY);
+    localStorage.removeItem(INVENTORY_MODE_KEY);
+    localStorage.removeItem(INVENTORY_FIRST_LAUNCH_KEY);
+  } catch (_) { /* ignore */ }
+  state = loadState();
+  rerenderInventoryApp();
+  showFirstLaunchIfNeeded();
+  showToast('首发本地数据已清空，可重新初始化');
 }
 
 function getContainer(code) {
@@ -98,11 +495,11 @@ function getContainer(code) {
 
 function syncContainerCounts() {
   state.containers.forEach((c) => {
-    c.items = state.items.filter((i) => i.containerCode === c.code || i.containerId === c.id).length;
+    c.items = activeItems().filter((i) => i.containerCode === c.code || i.containerId === c.id).length;
   });
   state.spaces.forEach((sp) => {
     sp.containers = state.containers.filter((c) => c.spaceId === sp.id).length;
-    sp.items = state.items.filter((i) => i.spaceId === sp.id).length;
+    sp.items = activeItems().filter((i) => i.spaceId === sp.id).length;
   });
 }
 
@@ -302,7 +699,8 @@ async function openContainerLabel(containerId) {
 // ── Render home ──
 function renderHome() {
   syncContainerCounts();
-  const expiring = state.items.filter((i) => {
+  const visibleItems = activeItems();
+  const expiring = visibleItems.filter((i) => {
     const d = daysUntil(i.expiry);
     return d != null && d <= 14;
   }).sort((a, b) => daysUntil(a.expiry) - daysUntil(b.expiry));
@@ -320,6 +718,17 @@ function renderHome() {
   document.getElementById('widgetRow').innerHTML = state.widgets.map((w) =>
     `<div class="wchip"><div class="wchip-icon">${w.emoji}</div><div class="wchip-name">${w.name}</div><div class="wchip-sub">${w.sub}</div></div>`
   ).join('');
+
+  if (!visibleItems.length) {
+    document.getElementById('spaceList').innerHTML = `
+      <div class="card no-data-state">
+        <div style="font-size:22px;margin-bottom:8px;">📦</div>
+        <div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:6px;">还没有本地物品</div>
+        <div style="font-size:12px;color:var(--text2);line-height:1.55;">从空白 Personal 开始时，先添加一个物品和购买记忆。数据只保存在本机。</div>
+        <button class="btn-main" style="margin-top:12px;" onclick="openSheet('sh-add')">添加第一个物品</button>
+      </div>`;
+    return;
+  }
 
   document.getElementById('spaceList').innerHTML = state.spaces.map((s) => {
     const cc = confClass(s.confidence);
@@ -353,7 +762,7 @@ function openSpace(spaceId) {
     </div>`;
   });
 
-  const items = state.items.filter((i) => i.spaceId === spaceId);
+  const items = activeItems().filter((i) => i.spaceId === spaceId);
   const groups = {};
   items.forEach((i) => {
     const k = i.containerCode || i.container || '其他';
@@ -377,7 +786,10 @@ function openSpace(spaceId) {
     });
   });
 
-  document.getElementById('spaceScroll').innerHTML = html || '<p style="color:var(--text3);font-size:13px;">暂无物品，扫箱码后拍照入库</p>';
+  if (!items.length && !bins.length) {
+    html += '<div class="card no-data-state"><div style="font-size:14px;font-weight:800;margin-bottom:6px;">这个空间还没有物品</div><div style="font-size:12px;color:var(--text2);line-height:1.55;">添加物品后会出现在这里。首发版只保存本地数据。</div></div>';
+  }
+  document.getElementById('spaceScroll').innerHTML = html;
   goPage('pg-space');
 }
 
@@ -387,6 +799,14 @@ function openDetail(itemId) {
   if (!item) return;
 
   const d = daysUntil(item.expiry);
+  const purchaseMemory = item.purchaseMemory || {};
+  const purchaseMemoryText = purchaseMemory.reason || purchaseMemory.memoryNote || item.note || '';
+  const worthLabel = {
+    yes: '值得',
+    mixed: '一般',
+    no: '后悔',
+    unknown: '未判断',
+  }[purchaseMemory.worthIt || 'unknown'];
   document.getElementById('detailScroll').innerHTML = `
     <div class="dhero">
       <div style="font-size:60px;">${item.emoji}</div>
@@ -398,19 +818,27 @@ function openDetail(itemId) {
     ${item.confidence ? `<div style="margin-bottom:14px;"><div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-bottom:4px;"><span>视觉置信度</span><span>${item.confidence}%</span></div><div class="cbar" style="height:5px;"><div class="cfill ${confClass(item.confidence)}" style="width:${item.confidence}%"></div></div></div>` : ''}
     ${item.price ? `<div class="drow"><span class="drow-l">💰 价格</span><span class="drow-v">$${item.price.toFixed(2)}</span></div>` : ''}
     ${item.spec ? `<div class="drow"><span class="drow-l">📏 规格</span><span class="drow-v">${item.spec}</span></div>` : ''}
-    ${item.purchased ? `<div class="drow"><span class="drow-l">📅 购入</span><span class="drow-v">${item.purchased}</span></div>` : ''}
+    ${item.purchased || purchaseMemory.purchasedAt ? `<div class="drow"><span class="drow-l">📅 购入</span><span class="drow-v">${purchaseMemory.purchasedAt || item.purchased}</span></div>` : ''}
+    <div class="drow"><span class="drow-l">值不值</span><span class="drow-v">${worthLabel}</span></div>
     ${item.expiry ? `<div class="drow"><span class="drow-l">⏰ 过期</span><span class="drow-v" style="color:var(--orange);">${item.expiry}${d != null ? ' · ' + d + '天后' : ''}</span></div>` : ''}
     ${item.pao ? `<div class="drow"><span class="drow-l">🧴 PAO</span><span class="drow-v">${item.pao}</span></div>` : ''}
+    ${purchaseMemoryText ? `<div style="margin:13px 0 7px;font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;">购买记忆</div><div class="memory-card">${purchaseMemoryText}</div>` : ''}
     ${item.note ? `<div style="margin:13px 0 7px;font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;">存档备注</div><div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px;font-size:12px;color:var(--text2);line-height:1.6;border-left:3px solid var(--orange);">${item.note}</div>` : ''}
     <button class="btn-ghost" style="margin-top:12px;" onclick="confirmItem('${item.id}')">🔄 刷新确认</button>
-    <button class="btn-danger" style="margin-top:8px;" onclick="fadeItem('${item.id}')">🌫️ 无感消逝</button>
+    <button class="btn-ghost" style="margin-top:8px;" onclick="archiveItem('${item.id}')">归档本地记录</button>
+    <button class="btn-danger" style="margin-top:8px;" onclick="deleteItem('${item.id}')">删除本地记录</button>
   `;
 
   document.getElementById('editForm').innerHTML = `
     <div class="fg"><div class="fl">物品名称</div><input class="fi" id="eName" value="${item.name}"></div>
     <div class="fg"><div class="fl">📍 位置</div><input class="fi" id="eLoc" value="${item.loc}"></div>
+    <div class="fg"><div class="fl">🧠 购买记忆</div><textarea class="fi ta" id="eMemory">${purchaseMemoryText}</textarea></div>
     <div class="fg"><div class="fl">💰 价格</div><input class="fi" id="ePrice" type="number" value="${item.price || ''}"></div>
     <div class="fg"><div class="fl">⏰ 过期</div><input class="fi" id="eExp" type="date" value="${item.expiry || ''}"></div>
+    <div class="frow">
+      <div class="fg"><div class="fl">📅 购买时间</div><input class="fi" id="ePurchased" type="date" value="${purchaseMemory.purchasedAt || item.purchased || ''}"></div>
+      <div class="fg"><div class="fl">值不值</div><select class="fi" id="eWorth"><option value="unknown" ${(purchaseMemory.worthIt || 'unknown') === 'unknown' ? 'selected' : ''}>未判断</option><option value="yes" ${purchaseMemory.worthIt === 'yes' ? 'selected' : ''}>值得</option><option value="mixed" ${purchaseMemory.worthIt === 'mixed' ? 'selected' : ''}>一般</option><option value="no" ${purchaseMemory.worthIt === 'no' ? 'selected' : ''}>后悔</option></select></div>
+    </div>
     <button class="btn-main" onclick="saveEdit()">保存</button>
   `;
 
@@ -419,16 +847,33 @@ function openDetail(itemId) {
 
 function confirmItem(id) {
   const item = state.items.find((i) => i.id === id);
-  if (item) { item.confidence = 100; persist(); openDetail(id); }
+  if (item) { item.confidence = 100; item.updatedAt = new Date().toISOString(); persist(); openDetail(id); }
   showToast('✓ 置信度归位 100%');
 }
 
 function fadeItem(id) {
+  archiveItem(id);
+}
+
+function archiveItem(id) {
+  const item = state.items.find((i) => i.id === id);
+  if (!item) return;
+  item.status = 'archived';
+  item.archivedAt = new Date().toISOString();
+  item.updatedAt = item.archivedAt;
+  persist();
+  renderHome();
+  goPage('pg-space');
+  showToast('已归档本地记录');
+}
+
+function deleteItem(id) {
+  if (!confirm('确认删除这条本地物品记录？')) return;
   state.items = state.items.filter((i) => i.id !== id);
   persist();
   renderHome();
   goPage('pg-space');
-  showToast('🌫️ 已消逝·无逾期记录');
+  showToast('已删除本地记录');
 }
 
 function saveEdit() {
@@ -436,8 +881,20 @@ function saveEdit() {
   if (!item) return;
   item.name = document.getElementById('eName').value;
   item.loc = document.getElementById('eLoc').value;
+  item.locationHint = item.loc;
   item.price = parseFloat(document.getElementById('ePrice').value) || item.price;
   item.expiry = document.getElementById('eExp').value || item.expiry;
+  item.purchased = document.getElementById('ePurchased')?.value || item.purchased;
+  item.note = document.getElementById('eMemory')?.value.trim() || item.note;
+  item.notes = item.note || '';
+  item.purchaseMemory = {
+    purchasedAt: item.purchased || '',
+    reason: document.getElementById('eMemory')?.value.trim() || '',
+    worthIt: document.getElementById('eWorth')?.value || 'unknown',
+    memoryNote: document.getElementById('eMemory')?.value.trim() || '',
+  };
+  item.mode = getActiveDataMode();
+  item.updatedAt = new Date().toISOString();
   persist();
   closeSheet('sh-edit');
   openDetail(item.id);
@@ -447,13 +904,14 @@ function saveEdit() {
 // ── Stats ──
 function renderStats() {
   syncContainerCounts();
-  const total = state.items.length;
-  const value = state.items.reduce((s, i) => s + (i.price || 0), 0);
-  const expiring = state.items.filter((i) => { const d = daysUntil(i.expiry); return d != null && d <= 14; }).length;
-  const avgConf = Math.round(state.items.reduce((s, i) => s + (i.confidence || 80), 0) / Math.max(total, 1));
+  const visibleItems = activeItems();
+  const total = visibleItems.length;
+  const value = visibleItems.reduce((s, i) => s + (i.price || 0), 0);
+  const expiring = visibleItems.filter((i) => { const d = daysUntil(i.expiry); return d != null && d <= 14; }).length;
+  const avgConf = Math.round(visibleItems.reduce((s, i) => s + (i.confidence || 80), 0) / Math.max(total, 1));
 
   const cats = {};
-  state.items.forEach((i) => { cats[i.category || '其他'] = (cats[i.category || '其他'] || 0) + 1; });
+  visibleItems.forEach((i) => { cats[i.category || '其他'] = (cats[i.category || '其他'] || 0) + 1; });
   const maxCat = Math.max(...Object.values(cats), 1);
 
   document.getElementById('statsScroll').innerHTML = `
@@ -464,16 +922,16 @@ function renderStats() {
       <div class="scard"><div class="snum" style="color:var(--green);">${state.containers.length}</div><div class="slabel">📦 箱位数</div></div>
     </div>
     <div class="stitle">分类分布</div>
-    ${Object.entries(cats).map(([label, count]) =>
+    ${Object.entries(cats).length ? Object.entries(cats).map(([label, count]) =>
       `<div class="cbar-row"><span class="cbar-label">${label}</span><div class="cbar-track"><div class="cbar-fill" style="width:${(count / maxCat) * 100}%;background:linear-gradient(90deg,var(--accent),var(--accent2));"></div></div><span class="cbar-val">${count}件</span></div>`
-    ).join('')}
+    ).join('') : '<div class="card no-data-state">暂无本地物品统计</div>'}
     <div class="stitle">⏰ 过期追踪</div>
-    ${state.items.filter((i) => i.expiry).sort((a, b) => daysUntil(a.expiry) - daysUntil(b.expiry)).map((i) => {
+    ${visibleItems.filter((i) => i.expiry).sort((a, b) => daysUntil(a.expiry) - daysUntil(b.expiry)).map((i) => {
       const d = daysUntil(i.expiry);
       const badge = d <= 3 ? 'eu' : d <= 14 ? 'es' : 'eo';
       const label = d <= 3 ? `紧急·${d}天` : d <= 14 ? `即将·${d}天` : `充裕·${d}天`;
       return `<div class="eitem"><div class="eitem-info"><div class="eitem-name">${i.name}</div><div class="eitem-date">${i.expiry} · ${i.containerCode || ''}</div></div><span class="ebadge ${badge}">${label}</span></div>`;
-    }).join('')}
+    }).join('') || '<div class="card no-data-state">暂无过期提醒</div>'}
   `;
 }
 
@@ -693,13 +1151,16 @@ function liveSearch(q) {
   const out = document.getElementById('searchOut');
   if (!q.trim()) { out.style.display = 'none'; return; }
   const ql = q.toLowerCase();
-  const found = state.items.filter((i) =>
+  const found = activeItems().filter((i) =>
     i.name.toLowerCase().includes(ql) ||
     (i.containerCode && i.containerCode.toLowerCase().includes(ql)) ||
     (i.kw && i.kw.some((k) => k.includes(ql) || ql.includes(k)))
   );
-  if (!found.length) { out.style.display = 'none'; return; }
   out.style.display = 'block';
+  if (!found.length) {
+    out.innerHTML = '<div class="card no-data-state"><div style="font-weight:800;margin-bottom:5px;">没有找到本地物品</div><div style="font-size:12px;color:var(--text2);">换个关键词，或先添加一个 Inventory / purchase-memory 记录。</div></div>';
+    return;
+  }
   out.innerHTML = `<div class="stitle">🔍 结果·${found.length}件</div>` +
     found.map((i) => `<div class="card icard" onclick="openDetail('${i.id}')"><div class="ithumb">${i.emoji}</div><div class="iinfo"><div class="iname">${i.name}</div><div class="iloc">${i.containerCode || ''} · ${i.loc}</div></div></div>`).join('');
 }
@@ -782,12 +1243,22 @@ function handleAddPhoto(e) {
 }
 
 async function analyzeImage(dataUrl, mimeType, cb) {
+  const FIRST_LAUNCH_IMAGE_AI_ENABLED = false;
   const api = window.STORAGE_API;
   const b64 = dataUrl.split(',')[1];
 
+  if (!FIRST_LAUNCH_IMAGE_AI_ENABLED) {
+    void api;
+    void b64;
+    void mimeType;
+    cb({ name: '', category: '', pao: '', expiry: '', spec: '', price: '' }, '首发版本暂不启用 AI 图片识别，请手动填写');
+    return;
+  }
+
   if (api) {
     try {
-      const resp = await fetch(api + '/api/identify', {
+      const endpoint = api + '/api/identify';
+      const resp = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image: b64, mimeType }),
@@ -821,6 +1292,11 @@ function buildItemFromForm(name) {
   const bin = state.activeContainerCode ? getContainer(state.activeContainerCode) : null;
   const locInput = document.getElementById('fLoc')?.value || document.getElementById('mLoc')?.value || '';
   const loc = locInput ? locInput + '·' + selectedLayer : (bin ? bin.loc + '·' + selectedLayer : '未指定·' + selectedLayer);
+  const memory = (document.getElementById('fMemory')?.value || document.getElementById('mMemory')?.value || '').trim();
+  const purchased = document.getElementById('fPurchased')?.value || document.getElementById('mPurchased')?.value || '';
+  const worthIt = document.getElementById('fWorth')?.value || document.getElementById('mWorth')?.value || 'unknown';
+  const now = new Date().toISOString();
+  const mode = getActiveDataMode();
   return {
     id: 'i' + Date.now(),
     spaceId: bin?.spaceId || state.currentSpaceId || 'master',
@@ -830,14 +1306,28 @@ function buildItemFromForm(name) {
     emoji: window._lastAiEmoji || '📦',
     name,
     loc,
+    locationHint: loc,
     category: document.getElementById('aiC')?.value || '其他',
     price: parseFloat(document.getElementById('fPrice')?.value || document.getElementById('mPrice')?.value) || undefined,
     expiry: document.getElementById('fExp')?.value || document.getElementById('mExp')?.value || undefined,
     pao: document.getElementById('aiPAO')?.value || undefined,
     spec: document.getElementById('fSpec')?.value || undefined,
+    purchased: purchased || undefined,
+    note: memory || undefined,
+    schemaVersion: LOCAL_INVENTORY_ITEM_SCHEMA_VERSION,
+    notes: memory || '',
+    purchaseMemory: {
+      purchasedAt: purchased,
+      reason: memory,
+      worthIt,
+      memoryNote: memory,
+    },
     confidence: bin ? 92 : 75,
     kw: name.toLowerCase().split(/\s+/),
-    archivedAt: new Date().toISOString().slice(0, 10),
+    status: 'active',
+    createdAt: now,
+    updatedAt: now,
+    mode,
   };
 }
 
@@ -872,16 +1362,48 @@ function doomDone() {
 }
 
 function renderSettings() {
-  document.getElementById('settingsApi').textContent = window.STORAGE_API || '未配置（演示）';
+  const mode = getActiveDataMode();
+  const root = loadRootStore();
+  document.getElementById('settingsApi').textContent = window.STORAGE_API || '未配置（离线优先）';
   document.getElementById('settingsBin').textContent = state.activeContainerCode || '无';
+  document.getElementById('settingsMode').value = mode;
+  document.getElementById('settingsStorage').textContent = `本机存储 · ${mode} · 无网络可用`;
+  document.getElementById('settingsCounts').textContent = `Demo ${root.stores.demo.items.length} 件 / Personal ${root.stores.personal.items.length} 件`;
+  document.getElementById('settingsBackups').textContent = `${root.backups.length} 个本地恢复点`;
+}
+
+function downloadJson(payload, filename) {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
 function exportInventory() {
-  const blob = new Blob([JSON.stringify({ exported: new Date().toISOString(), items: state.items, containers: state.containers }, null, 2)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'rearbase-inventory.json';
-  a.click();
+  const mode = getActiveDataMode();
+  const root = loadRootStore();
+  const payload = {
+    exported: new Date().toISOString(),
+    version: 'inventory-local-export-v0.1',
+    mode,
+    dataBoundary: {
+      sourceOfTruth: 'device-local-storage',
+      demoPersonalSeparated: true,
+      includesOnlyActiveMode: true,
+      networkRequired: false,
+    },
+    schemaVersions: root.schemaVersions,
+    localProfile: root.localProfile,
+    cloudFlags: root.cloudFlags,
+    migrationSmokeCheck: runLocalDataMigrationSmokeCheck(root),
+    items: readInventoryTable(root, mode, 'items'),
+    containers: readInventoryTable(root, mode, 'containers'),
+    spaces: readInventoryTable(root, mode, 'spaces'),
+    guard: state.guard,
+  };
+  downloadJson(payload, `baohe-inventory-${mode}-${new Date().toISOString().slice(0, 10)}.json`);
   showToast('已导出库存 JSON');
 }
 
@@ -929,9 +1451,11 @@ function initNative() {
 tick();
 setInterval(tick, 30000);
 syncContainerCounts();
+runLocalDataMigrationSmokeCheck(loadRootStore());
 renderHome();
 renderContainers();
 refreshPtsUI();
 refreshBinUI();
 renderGuardUI();
 initNative();
+showFirstLaunchIfNeeded();

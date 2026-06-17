@@ -14,7 +14,7 @@ import PortalThemeToggle from './PortalThemeToggle';
 
 function initials(name: string): string {
   const t = name.trim();
-  return t.slice(0, 1) || '婧';
+  return t.slice(0, 1);
 }
 
 interface AccountSettingsProps {
@@ -22,7 +22,7 @@ interface AccountSettingsProps {
 }
 
 export default function AccountSettings({ config }: AccountSettingsProps) {
-  const fallbackName = config.profile?.displayName || '婧';
+  const fallbackName = config.profile?.displayName || t('zh', 'profileDefaultName');
   const fileRef = useRef<HTMLInputElement>(null);
   const [displayName, setDisplayName] = useState(fallbackName);
   const [avatarUrl, setAvatarUrl] = useState('');
@@ -113,12 +113,13 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
           onChange={(e) => setDisplayName(e.target.value)}
           onBlur={onNameBlur}
           maxLength={32}
+          placeholder={t(locale, 'nameInputPlaceholder')}
         />
       </section>
 
       <section className="portal-settings-card">
-        <h2 className="portal-settings-label">外观</h2>
-        <p className="portal-settings-hint">选择固定日 / 夜，或随系统与时段自动切换宝盒主题。</p>
+        <h2 className="portal-settings-label">{t(locale, 'portalAppearanceTitle')}</h2>
+        <p className="portal-settings-hint">{t(locale, 'portalAppearanceHint')}</p>
         <PortalThemeToggle />
       </section>
 

@@ -1,0 +1,19 @@
+BEGIN;
+
+DROP INDEX IF EXISTS idx_artifact_record_state_priority_updated;
+DROP INDEX IF EXISTS idx_artifact_record_state_kind_priority_updated;
+DROP INDEX IF EXISTS idx_artifact_record_owner_needs_updated;
+DROP INDEX IF EXISTS idx_artifact_record_priority_updated;
+DROP INDEX IF EXISTS idx_handoff_record_status_needs_parsed;
+DROP INDEX IF EXISTS idx_handoff_record_owner_status_parsed_updated;
+DROP INDEX IF EXISTS idx_handoff_record_artifact_status_parsed;
+DROP INDEX IF EXISTS idx_gate_decision_status_needs_updated;
+DROP INDEX IF EXISTS idx_gate_decision_category_status_updated;
+DROP INDEX IF EXISTS idx_gate_decision_owner_status_updated;
+DROP INDEX IF EXISTS idx_event_log_module_type_artifact_created;
+DROP INDEX IF EXISTS idx_event_log_artifact_event_type_created;
+DROP INDEX IF EXISTS idx_module_data_contract_module_contract;
+DROP INDEX IF EXISTS idx_data_key_ownership_scope_owner;
+DROP INDEX IF EXISTS idx_data_key_ownership_sharing_kind_scope;
+
+COMMIT;

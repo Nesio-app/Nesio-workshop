@@ -7,6 +7,10 @@ import { parseIcsEvents, parseCalendarName } from '@/lib/portal/ics';
 type Feed = { url: string; label: string };
 type FeedResult = { label: string; ok: boolean; count: number; error?: string };
 
+function privateFeedAccessEnabled(): boolean {
+  return process.env.CALENDAR_PRIVATE_FEEDS_ENABLED === 'true';
+}
+
 function normalizeIcalUrl(raw: string): string {
   const u = raw.trim();
   if (u.startsWith('webcal://')) return `https://${u.slice('webcal://'.length)}`;
@@ -66,15 +70,37 @@ async function fetchIcsEvents(url: string, fallbackLabel: string) {
 
 export async function GET() {
   const feeds = calendarFeeds();
+  const enabled = privateFeedAccessEnabled();
 
   if (feeds.length === 0) {
     return NextResponse.json({
       ok: false,
       configured: false,
+      enabled,
       events: [],
       feeds: [],
       message: 'Set GOOGLE_CALENDAR_ICAL_URL and FIDELITY on Vercel.',
     });
+  }
+
+  if (!enabled) {
+    return NextResponse.json(
+      {
+        ok: false,
+        configured: true,
+        enabled: false,
+        events: [],
+        feeds: feeds.map((feed) => ({
+          label: feed.label,
+          ok: false,
+          count: 0,
+          error: 'calendar private feeds disabled',
+        })),
+        sources: feeds.map((f) => f.label),
+        message: 'Calendar private feeds disabled. Set CALENDAR_PRIVATE_FEEDS_ENABLED=true to enable configured feeds.',
+      },
+      { headers: { 'Cache-Control': 'no-store, max-age=0' } },
+    );
   }
 
   const feedResults: FeedResult[] = [];
@@ -102,6 +128,7 @@ export async function GET() {
     {
       ok: true,
       configured: true,
+      enabled: true,
       events,
       feeds: feedResults,
       sources: feeds.map((f) => f.label),

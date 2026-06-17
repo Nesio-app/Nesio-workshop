@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { launchUnavailablePayload } from '@/lib/portal/launch-safety';
 
 const DEFAULT_MODELS = 'gemini-2.5-flash-lite,gemini-2.5-flash,gemini-1.5-flash-8b';
 const DOUBAO_API_URL = 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
@@ -259,6 +260,13 @@ export async function OPTIONS() {
 }
 
 export async function POST(req: NextRequest) {
+  if (process.env.NEXT_PUBLIC_BAOHE_FIRST_LAUNCH_RISK_ISOLATION !== 'off') {
+    return NextResponse.json(
+      launchUnavailablePayload('api:secretary:chat', 'secretary'),
+      { status: 403, headers: corsHeaders },
+    );
+  }
+
   let body: {
     message?: string;
     prompt?: string;

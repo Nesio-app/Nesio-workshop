@@ -27,15 +27,15 @@ export default function Settings() {
   }, []);
 
   const handleSave = () => {
-    const trimmedName = displayName.trim() || '婧';
-    saveProfileSettings({
-      displayName: trimmedName,
-      avatarUrl,
-      locale,
-    });
-    setDisplayName(trimmedName);
-    setSaveMsg(t(locale, 'settingsSaved'));
-    setTimeout(() => setSaveMsg(''), 2000);
+    const trimmedName = displayName.trim() || t(locale, 'profileDefaultName');
+      saveProfileSettings({
+        displayName: trimmedName,
+        avatarUrl,
+        locale,
+      });
+      setDisplayName(trimmedName);
+      setSaveMsg(t(locale, 'settingsSaved'));
+      setTimeout(() => setSaveMsg(''), 2000);
   };
 
   const handleLanguageChange = (newLocale: PortalLocale) => {
@@ -58,7 +58,7 @@ export default function Settings() {
       setSaveMsg(t(locale, 'settingsSaved'));
       setTimeout(() => setSaveMsg(''), 2000);
     } catch {
-      setSaveMsg('头像上传失败');
+      setSaveMsg(t(locale, 'shellErrorAvatarUpload'));
       setTimeout(() => setSaveMsg(''), 2000);
     }
 
@@ -121,14 +121,14 @@ export default function Settings() {
           <label htmlFor="settings-name" className="portal-settings-label">
             {t(locale, 'settingsName')}
           </label>
-          <input
-            id="settings-name"
-            type="text"
-            value={displayName}
-            onChange={handleNameChange}
-            className="portal-settings-input"
-            placeholder="Enter your name"
-          />
+            <input
+              id="settings-name"
+              type="text"
+              value={displayName}
+              onChange={handleNameChange}
+              className="portal-settings-input"
+              placeholder={t(locale, 'nameInputPlaceholder')}
+            />
         </section>
 
         {/* Language Section */}

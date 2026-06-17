@@ -1,3 +1,3 @@
-// Copy to config.local.js and set your deployed API URL (Vercel).
-// Example: window.ADHD_FLOW_API = 'https://adhd-flow-planner.vercel.app';
-window.ADHD_FLOW_API = '';
+// Copy to config.local.js for iOS / local Capacitor builds.
+// Web on Vercel uses same-origin API; native app needs the production URL.
+window.ADHD_FLOW_API = 'https://adhd-flow-ios.vercel.app';

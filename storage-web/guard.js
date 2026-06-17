@@ -1,5 +1,7 @@
 /* 理智消费 · 购物 App 冷冻 & 提醒 */
 
+const FIRST_LAUNCH_NOTIFICATIONS_ENABLED = false;
+
 const DEFAULT_BLOCKED_APPS = [
   { id: 'taobao', name: '淘宝', emoji: '🛒', enabled: true, tip: '用「分享」把商品丢进冷冻仓' },
   { id: 'jd', name: '京东', emoji: '📦', enabled: true, tip: '结账前先看冷冻仓' },
@@ -56,6 +58,8 @@ function deactivateShoppingShield(guard) {
 }
 
 async function scheduleGuardNotifications(guard) {
+  void guard;
+  if (!FIRST_LAUNCH_NOTIFICATIONS_ENABLED) return;
   const cap = window.Capacitor?.Plugins?.LocalNotifications;
   if (!cap) return;
 

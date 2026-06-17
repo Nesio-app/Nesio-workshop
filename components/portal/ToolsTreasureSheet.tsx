@@ -1,28 +1,65 @@
 'use client';
 
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import type { PortalTool } from '@/lib/portal/types';
+import type { PortalLocale } from '@/lib/portal/profile';
+import {
+  filterToolsForLaunchSurface,
+  readLaunchSurfaceContextFromBrowser,
+} from '@/lib/portal/launch-surface.mjs';
+import { t } from '@/lib/portal/i18n';
+import { formatStatusSummaryLine, type ToolForShellState } from './tool-state';
 import ToolGrid from './ToolGrid';
+
+interface LaunchSurfaceContext {
+  viewerRole: 'public' | 'tester';
+  testerAllowlist: string[];
+  testerCohort?: string | null;
+}
+
+function normalizeLaunchContext(raw: {
+  viewerRole?: string;
+  testerAllowlist?: unknown;
+  testerCohort?: unknown;
+}): LaunchSurfaceContext {
+  return {
+    viewerRole: raw.viewerRole === 'tester' ? 'tester' : 'public',
+    testerAllowlist: Array.isArray(raw.testerAllowlist)
+      ? raw.testerAllowlist.filter((item): item is string => typeof item === 'string')
+      : [],
+    testerCohort: typeof raw.testerCohort === 'string' ? raw.testerCohort : null,
+  };
+}
 
 interface ToolsTreasurePopupProps {
   tools: PortalTool[];
   open: boolean;
-  anchorRef: React.RefObject<HTMLElement | null>;
+  anchorRef: RefObject<HTMLElement | null>;
+  locale?: PortalLocale;
   onClose: () => void;
   onOpenTool: (tool: PortalTool) => void;
 }
 
-/** Floating toolbox overlay — not in document layout flow. */
+/** Floating toolbox overlay — launch visibility is resolved before rendering. */
 export default function ToolsTreasurePopup({
   tools,
   open,
   anchorRef,
+  locale = 'zh',
   onClose,
   onOpenTool,
 }: ToolsTreasurePopupProps) {
   const popupRef = useRef<HTMLElement>(null);
   const [placed, setPlaced] = useState(false);
+  const [launchContext, setLaunchContext] = useState<LaunchSurfaceContext>({
+    viewerRole: 'public',
+    testerAllowlist: [],
+  });
+
+  useEffect(() => {
+    setLaunchContext(normalizeLaunchContext(readLaunchSurfaceContextFromBrowser()));
+  }, []);
 
   useLayoutEffect(() => {
     if (!open) {
@@ -62,11 +99,15 @@ export default function ToolsTreasurePopup({
     };
   }, [open, anchorRef]);
 
+  const visibleTools = useMemo(
+    () => filterToolsForLaunchSurface(tools, launchContext).filter((tool: PortalTool) => tool.id !== 'secretary'),
+    [tools, launchContext],
+  );
+
   if (!open) return null;
 
-  const handleOpen = (tool: PortalTool) => {
-    onOpenTool(tool);
-  };
+  const toolsWithShellState = visibleTools as ToolForShellState[];
+  const statusSummaryLine = formatStatusSummaryLine(toolsWithShellState, locale);
 
   if (typeof document === 'undefined') return null;
 
@@ -75,22 +116,38 @@ export default function ToolsTreasurePopup({
       <button
         type="button"
         className="portal-treasure-scrim"
-        aria-label="关闭工具箱"
+        aria-label={t(locale, 'shellCloseTreasure')}
         onClick={onClose}
       />
       <section
         ref={popupRef}
         className={'portal-treasure-popup' + (placed ? ' portal-treasure-popup--ready' : '')}
         role="dialog"
-        aria-label="宝盒工具"
+        aria-label={t(locale, 'shellTreasurePopupAriaLabel')}
       >
         <header className="portal-treasure-popup-head">
-          <h2 className="portal-treasure-popup-title">宝盒</h2>
-          <button type="button" className="portal-treasure-popup-close" onClick={onClose} aria-label="关闭">
-            ×
+          <div>
+            <h2 className="portal-treasure-popup-title">
+              {t(locale, 'shellTreasureTitleTemplate', { count: visibleTools.length })}
+            </h2>
+            <p className="portal-treasure-popup-meta">{statusSummaryLine}</p>
+          </div>
+          <button
+            type="button"
+            className="portal-treasure-popup-close"
+            onClick={onClose}
+            aria-label={t(locale, 'shellClose')}
+          >
+            x
           </button>
         </header>
-        <ToolGrid tools={tools} excludeIds={['secretary']} onOpenTool={handleOpen} />
+        <ToolGrid
+          tools={visibleTools}
+          excludeIds={['secretary']}
+          showStatus
+          locale={locale}
+          onOpenTool={onOpenTool}
+        />
       </section>
     </>,
     document.body,

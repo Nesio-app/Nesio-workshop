@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { launchUnavailablePayload } from '@/lib/portal/launch-safety';
 
 function getGoogleKey(): string | undefined {
   const raw =
@@ -24,21 +25,19 @@ function getOpenAIKey(): string | undefined {
 }
 
 export async function GET() {
-  const geminiKey = getGoogleKey();
-  const doubaoKey = getDoubaoKey();
-  const openaiKey = getOpenAIKey();
   return NextResponse.json(
     {
-      ok: true,
+      ...launchUnavailablePayload('api:secretary:health', 'secretary'),
       service: 'secretary',
-      gemini: !!geminiKey,
-      doubao: !!doubaoKey,
-      chatgpt: !!openaiKey,
-      model: process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite,gemini-2.5-flash',
-      doubaoModel: process.env.DOUBAO_ENDPOINT || process.env.DOUBAO_MODEL || 'doubao-pro-32k',
-      openaiModel: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+      gemini: false,
+      doubao: false,
+      chatgpt: false,
+      model: null,
+      doubaoModel: null,
+      openaiModel: null,
     },
     {
+      status: 403,
       headers: { 'Access-Control-Allow-Origin': '*' },
     }
   );

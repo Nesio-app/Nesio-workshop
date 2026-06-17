@@ -1,11 +1,9 @@
 {
   "name": "大后方 · Storage",
   "short_name": "大后方",
-  "description": "Object Anchors · Impulse Guard 物品管理与理智消费",
-  "start_url": "/storage/",
+  "start_url": ".",
   "display": "standalone",
   "background_color": "#e7eefb",
   "theme_color": "#e7eefb",
-  "orientation": "portrait",
-  "icons": [{ "src": "/storage/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }]
 }

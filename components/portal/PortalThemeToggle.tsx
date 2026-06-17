@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { t } from '@/lib/portal/i18n';
+import { loadProfileSettings, type PortalLocale } from '@/lib/portal/profile';
 
 type ThemeChoice = 'day' | 'night' | 'auto';
 const KEY = 'treasurebox-theme';
@@ -25,10 +27,11 @@ function apply(choice: ThemeChoice) {
   }
 }
 
-const OPTIONS: { value: ThemeChoice; label: string; icon: React.ReactNode }[] = [
+type ThemeLabelKey = 'themeDay' | 'themeNight' | 'themeAuto';
+const OPTIONS: { value: ThemeChoice; labelKey: ThemeLabelKey; icon: React.ReactNode }[] = [
   {
     value: 'day',
-    label: '日',
+    labelKey: 'themeDay',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="4" />
@@ -38,7 +41,7 @@ const OPTIONS: { value: ThemeChoice; label: string; icon: React.ReactNode }[] = 
   },
   {
     value: 'night',
-    label: '夜',
+    labelKey: 'themeNight',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
         <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
@@ -47,7 +50,7 @@ const OPTIONS: { value: ThemeChoice; label: string; icon: React.ReactNode }[] = 
   },
   {
     value: 'auto',
-    label: '随系统',
+    labelKey: 'themeAuto',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="9" />
@@ -59,6 +62,7 @@ const OPTIONS: { value: ThemeChoice; label: string; icon: React.ReactNode }[] = 
 
 export default function PortalThemeToggle() {
   const [choice, setChoice] = useState<ThemeChoice>('auto');
+  const [locale, setLocale] = useState<PortalLocale>('zh');
 
   useEffect(() => {
     let saved: ThemeChoice = 'auto';
@@ -68,6 +72,7 @@ export default function PortalThemeToggle() {
       /* ignore */
     }
     setChoice(saved);
+    setLocale(loadProfileSettings().locale);
     apply(saved);
 
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
@@ -95,7 +100,7 @@ export default function PortalThemeToggle() {
   };
 
   return (
-    <div className="portal-theme-seg" role="group" aria-label="主题">
+    <div className="portal-theme-seg" role="group" aria-label={t(locale, 'themeToggleLabel')}>
       {OPTIONS.map((o) => (
         <button
           key={o.value}
@@ -107,7 +112,7 @@ export default function PortalThemeToggle() {
           <span className="portal-theme-seg-icon" aria-hidden>
             {o.icon}
           </span>
-          {o.label}
+          {t(locale, o.labelKey)}
         </button>
       ))}
     </div>

@@ -19,6 +19,24 @@ export interface PortalTool {
   icon: string;
   iconUrl?: string;
   ready?: boolean;
+  status?: 'ready' | 'gated' | 'report-only' | 'not_ready';
+  integrationMode?: 'local' | 'external' | 'static-report-only' | 'contract-only';
+  owner?: string;
+  maintainer?: string;
+  responsibleAgent?: string;
+  evidenceOwner?: string;
+  gateOwner?: string;
+  decMeta?: PortalDecMetadata;
+}
+
+export interface PortalDecMetadata {
+  moduleId: string;
+  mode: string;
+  dependencyCount?: number;
+  ownedDataCount?: number;
+  emittedEventsCount?: number;
+  approvalActionCount?: number;
+  dependencyDataKeys?: string[];
 }
 
 export interface PortalProfile {

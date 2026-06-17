@@ -2,6 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PortalTool } from '@/lib/portal/types';
+import { loadProfileSettings } from '@/lib/portal/profile';
+import { t } from '@/lib/portal/i18n';
+import type { PortalLocale } from '@/lib/portal/profile';
 
 interface CommandBarProps {
   tools: PortalTool[];
@@ -13,6 +16,7 @@ interface CommandBarProps {
 export default function CommandBar({ tools, open, onOpenChange, onOpenTool }: CommandBarProps) {
   const [query, setQuery] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const [locale, setLocale] = useState<PortalLocale>('zh');
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -33,6 +37,7 @@ export default function CommandBar({ tools, open, onOpenChange, onOpenTool }: Co
   }, [query, tools]);
 
   useEffect(() => {
+    setLocale(loadProfileSettings().locale);
     if (open) {
       setQuery('');
       requestAnimationFrame(() => inputRef.current?.focus());
@@ -69,7 +74,7 @@ export default function CommandBar({ tools, open, onOpenChange, onOpenTool }: Co
       <div
         className="portal-command-panel"
         role="dialog"
-        aria-label="全局命令"
+        aria-label={t(locale, 'commandPaletteAriaLabel')}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="portal-command-input-wrap">
@@ -78,7 +83,7 @@ export default function CommandBar({ tools, open, onOpenChange, onOpenTool }: Co
             ref={inputRef}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="搜索工具，或输入 /plan、/soul …"
+            placeholder={t(locale, 'commandPalettePlaceholder')}
             className="portal-command-input"
             onKeyDown={(event) => {
               if (event.key === 'Enter' && results[0]) {
@@ -92,7 +97,7 @@ export default function CommandBar({ tools, open, onOpenChange, onOpenTool }: Co
 
         <ul className="portal-command-list">
           {results.length === 0 ? (
-            <li className="portal-command-empty">没有匹配的入口</li>
+            <li className="portal-command-empty">{t(locale, 'commandPaletteEmpty')}</li>
           ) : (
             results.map((tool) => (
               <li key={tool.id}>

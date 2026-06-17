@@ -1,18 +1,8 @@
-const TOOLBOX_APP_PATHS = new Set([
-  '/fitness',
-  '/storage',
-  '/adhd-flow',
-]);
+import { getModuleOpenHref } from './module-routes.mjs';
 
-/** Toolbox HTML apps use relative assets; URL must end with / or CSS/JS 404. */
+/** Toolbox HTML apps are served from public/<tool>/index.html in Next dev/export. */
 export function ensureToolboxTrailingSlash(path: string): string {
-  if (path.startsWith('http://') || path.startsWith('https://')) return path;
-  const base = process.env.NEXT_PUBLIC_BASE_PATH || '';
-  const normalized = path.startsWith('/') ? path : `/${path}`;
-  const full = `${base}${normalized}`;
-  const bare = full.replace(/\/+$/, '') || '/';
-  if (TOOLBOX_APP_PATHS.has(bare)) return `${bare}/`;
-  return full;
+  return getModuleOpenHref(path, process.env.NEXT_PUBLIC_BASE_PATH || '');
 }
 
 export function withBase(path: string): string {

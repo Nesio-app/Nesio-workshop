@@ -2,8 +2,13 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-echo "=== ADHD Flow Planner API · Vercel 部署 ==="
+echo "=== LifeFlow · Vercel 部署 ==="
 echo ""
+echo "Git 已连通：通常只需 git push origin main，Vercel 会自动部署。"
+echo "本脚本用于手动触发或首次链接本地 .vercel。"
+echo ""
+
+PRODUCTION_URL="${LIFEFLOW_PRODUCTION_URL:-https://adhd-flow-ios.vercel.app}"
 
 if ! command -v npx &>/dev/null; then
   echo "需要 Node.js / npx"
@@ -11,7 +16,7 @@ if ! command -v npx &>/dev/null; then
 fi
 
 if [ -z "${GEMINI_API_KEY:-}" ]; then
-  echo "提示：部署后在 Vercel 控制台设置 GEMINI_API_KEY"
+  echo "提示：在 Vercel 项目 adhd-flow-ios 设置 GEMINI_API_KEY（可与 inner-shelter-ios 相同）"
 fi
 
 echo "1. 登录 Vercel（若未登录）"
@@ -20,6 +25,10 @@ npx vercel login || true
 echo ""
 echo "2. 部署到生产环境"
 DEPLOY_URL=$(npx vercel --prod --yes 2>&1 | tee /dev/stderr | grep -oE 'https://[a-zA-Z0-9.-]+\.vercel\.app' | tail -1)
+if [ -z "$DEPLOY_URL" ]; then
+  DEPLOY_URL="$PRODUCTION_URL"
+  echo "   使用默认 Production URL: $DEPLOY_URL"
+fi
 
 if [ -z "$DEPLOY_URL" ]; then
   echo ""
