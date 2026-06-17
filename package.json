@@ -50,6 +50,9 @@
     "test:db:readonly": "npm run report:external-bridge",
     "test:precheck": "npm run precheck:no-real-data && npm run precheck:inventory-offline && npm run precheck:local-data-launch && npm run precheck:module-data-network && npm run precheck:mobile-app",
     "test:qa:static": "npm run report:modules && npm run test:contracts && npm run test:security && npm run test:precheck",
+    "test:e2e": "playwright test",
+    "test:e2e:shell": "playwright test e2e/shell-discovery.spec.ts",
+    "test:e2e:pwa": "playwright test e2e/storage-local-backup.spec.ts",
     "precheck:inventory-offline": "node scripts/precheck-inventory-offline-v01.mjs",
     "precheck:local-data-launch": "node scripts/precheck-local-data-launch-readiness.mjs",
     "precheck:module-data-network": "node scripts/precheck-module-data-network.mjs --offline",
@@ -69,10 +72,11 @@
     "recharts": "^3.7.0"
   },
   "devDependencies": {
-    "@vercel/node": "^5.0.0",
+    "@playwright/test": "^1.61.0",
     "@types/node": "^20.14.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
+    "@vercel/node": "^5.0.0",
     "autoprefixer": "^10.4.19",
     "eslint": "^8.57.0",
     "eslint-config-next": "14.2.5",

@@ -604,6 +604,8 @@ function importAllLocalDataPayload(payload) {
   nextRoot.backups = Array.isArray(payload.backups) ? payload.backups.slice(-5) : [];
   saveRootStore(nextRoot);
   setActiveDataMode(nextRoot.activeMode);
+  markFirstLaunchDone();
+  document.getElementById('firstLaunch')?.classList.remove('show');
   saveLocalBackupMetadata({
     lastBackupImportedAt: new Date().toISOString(),
     lastBackupFileName: payload.fileName || '本地备份 JSON',
