@@ -52,14 +52,16 @@ if (innerShelterRoute) {
 }
 
 for (const path of ['public/adhd-flow/app.js', 'adhd-flow-ios/web/app.js']) {
-  const source = read(path);
+  const source = path.startsWith('public/') ? readIfExists(path) : read(path);
+  if (!source) continue;
   assert.match(source, /FIRST_LAUNCH_EXTERNAL_AUTH_ENABLED\s*=\s*false/, `${path} must disable external auth`);
   assert.doesNotMatch(source, /window\.open\(makeGCalURL/, `${path} must not open Google Calendar`);
   assert.match(source, /FIRST_LAUNCH_AI_ENABLED\s*=\s*false/, `${path} must disable AI runtime`);
 }
 
 for (const path of ['public/fitness/app.js', 'fitness/web/app.js']) {
-  const source = read(path);
+  const source = path.startsWith('public/') ? readIfExists(path) : read(path);
+  if (!source) continue;
   assert.match(source, /FIRST_LAUNCH_AI_ENABLED\s*=\s*false/, `${path} must disable fitness AI runtime`);
   assert.doesNotMatch(source, /fetch\(apiBase\+'\/api\/fitness\/chat'/, `${path} must not call fitness chat API`);
 }

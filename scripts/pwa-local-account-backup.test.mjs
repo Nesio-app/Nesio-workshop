@@ -38,6 +38,8 @@ const requiredHtmlMarkers = [
   'id="settingsLastSaved"',
   'id="settingsLastBackup"',
   'id="settingsBackupReminder"',
+  'class="card local-recovery-warning"',
+  '浏览器清理缓存可能移除本地数据',
   'id="localBackupFile"',
   'accept="application/json,.json"',
   'triggerLocalBackupImport()',

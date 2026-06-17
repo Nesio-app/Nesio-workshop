@@ -473,7 +473,14 @@ function launchSkuModuleEntryForTool(tool, mobileEntryByModuleId) {
 function mobileStrategyForTool(tool) {
   if (tool.integrationMode === 'static-report-only' || tool.integrationMode === 'contract-only') return 'native_bridge_deferred';
   if (!tool.ready) return 'not_ready';
-  if (tool.routeKind === 'local-static-module' || tool.routeKind === 'local-shell-route') return 'embedded_static';
+  const launchSurface = resolveLaunchSurfaceState(tool, { viewerRole: 'public' });
+  if ((tool.routeKind === 'local-static-module' || tool.routeKind === 'local-shell-route') &&
+    launchSurface.launchStatus === 'launchable' &&
+    launchSurface.prodExposure === 'public' &&
+    tool.publicIndex === true) {
+    return 'embedded_static';
+  }
+  if (tool.routeKind === 'local-static-module' || tool.routeKind === 'local-shell-route') return 'native_bridge_deferred';
   return 'external_webview_gated';
 }
 

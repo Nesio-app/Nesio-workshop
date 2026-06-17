@@ -1,7 +1,6 @@
 const CACHE_NAME = 'baohe-storage-pwa-cache-v1';
 
 const PRECACHE_URLS = [
-  './',
   './index.html',
   './app.js',
   './styles.css',

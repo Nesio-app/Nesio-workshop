@@ -26,14 +26,19 @@ assert.equal(plan.implementation, 'local-manifest-driven-static-bundler');
 assert.equal(plan.boundaries.noExternalServiceCalls, true);
 assert.equal(plan.boundaries.noRealDataMigration, true);
 assert.equal(plan.boundaries.noRuntimePluginLoading, true);
-assert.equal(plan.entries.length >= 4, true);
+assert.equal(plan.exposureMode, 'public_launch_only');
+assert.deepEqual(plan.entries.map((entry) => entry.moduleId), ['inventory']);
 
 const entryByModuleId = new Map(plan.entries.map((entry) => [entry.moduleId, entry]));
+const excludedByModuleId = new Map(plan.excludedEntries.map((entry) => [entry.moduleId, entry]));
 assert.equal(entryByModuleId.get('inventory')?.sourceDir, 'storage-web');
 assert.equal(entryByModuleId.get('inventory')?.publicPath, 'storage');
-assert.equal(entryByModuleId.get('plan')?.sourceDir, 'adhd-flow-ios/web');
-assert.equal(entryByModuleId.get('fitness')?.sourceDir, 'fitness/web');
-assert.equal(entryByModuleId.get('health')?.sourceDir, 'health-web');
+assert.equal(entryByModuleId.has('plan'), false, 'default public bundle must not include sandbox plan');
+assert.equal(entryByModuleId.has('fitness'), false, 'default public bundle must not include sandbox fitness');
+assert.equal(entryByModuleId.has('health'), false, 'default public bundle must not include gated health');
+assert.equal(excludedByModuleId.has('plan'), true, 'sandbox plan must be listed as excluded from public bundle');
+assert.equal(excludedByModuleId.has('fitness'), true, 'sandbox fitness must be listed as excluded from public bundle');
+assert.equal(excludedByModuleId.has('health'), true, 'gated health must be listed as excluded from public bundle');
 
 for (const entry of plan.entries) {
   assert.equal(entry.manifestVersion, 'tool-manifest-v0');
@@ -50,11 +55,9 @@ try {
   const applied = JSON.parse(applyOutput);
   assert.equal(applied.applied, true);
   assert.equal(existsSync(join(tempRoot, 'storage', 'index.html')), true);
-  assert.equal(existsSync(join(tempRoot, 'adhd-flow', 'app.js')), true);
-  assert.equal(existsSync(join(tempRoot, 'fitness', 'app.js')), true);
-  assert.equal(existsSync(join(tempRoot, 'health', 'index.html')), true);
-  assert.equal(readFileSync(join(tempRoot, 'adhd-flow', 'config.js'), 'utf8').includes('https://'), false);
-  assert.equal(readFileSync(join(tempRoot, 'fitness', 'config.js'), 'utf8').includes('https://'), false);
+  assert.equal(existsSync(join(tempRoot, 'adhd-flow', 'app.js')), false, 'default public bundle must not write sandbox plan assets');
+  assert.equal(existsSync(join(tempRoot, 'fitness', 'app.js')), false, 'default public bundle must not write sandbox fitness assets');
+  assert.equal(existsSync(join(tempRoot, 'health', 'index.html')), false, 'default public bundle must not write gated health assets');
 } finally {
   rmSync(tempRoot, { recursive: true, force: true });
 }

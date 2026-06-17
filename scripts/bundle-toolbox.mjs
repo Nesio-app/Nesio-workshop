@@ -2,11 +2,13 @@ import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } fr
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildModuleRegistry } from '../lib/portal/module-manager-core.mjs';
+import { resolveLaunchSurfaceState } from '../lib/portal/launch-surface.mjs';
 
 const repoRoot = fileURLToPath(new URL('..', import.meta.url));
 const config = JSON.parse(readFileSync(join(repoRoot, 'public', 'portal-config.json'), 'utf8'));
 const args = process.argv.slice(2);
 const dryRun = args.includes('--dry-run');
+const includeSandbox = args.includes('--include-sandbox');
 const outDirArgIndex = args.indexOf('--out-dir');
 const publicRoot = outDirArgIndex >= 0
   ? (isAbsolute(args[outDirArgIndex + 1] || '')
@@ -15,6 +17,10 @@ const publicRoot = outDirArgIndex >= 0
   : join(repoRoot, 'public');
 
 const PACKAGE_SOURCES = Object.freeze({
+  secretary: {
+    sourceDir: 'public/secretary',
+    publicPath: 'secretary',
+  },
   plan: {
     sourceDir: 'adhd-flow-ios/web',
     publicPath: 'adhd-flow',
@@ -33,6 +39,10 @@ const PACKAGE_SOURCES = Object.freeze({
     sourceDir: 'health-web',
     publicPath: 'health',
   },
+  reading: {
+    sourceDir: 'public/reading',
+    publicPath: 'reading',
+  },
 });
 
 function assertInsidePublic(targetPath) {
@@ -45,14 +55,26 @@ function assertInsidePublic(targetPath) {
 function buildBundlePlan() {
   const registry = buildModuleRegistry(config);
   const manifestById = new Map(registry.toolManifest.manifests.map((manifest) => [manifest.moduleId, manifest]));
-  const entries = Object.entries(PACKAGE_SOURCES).map(([moduleId, packageSource]) => {
+  const allEntries = Object.entries(PACKAGE_SOURCES).map(([moduleId, packageSource]) => {
     const manifest = manifestById.get(moduleId);
+    const tool = registry.modules.find((entry) => entry.id === moduleId) || { id: moduleId, ready: false };
+    const launchSurface = resolveLaunchSurfaceState({
+      ...tool,
+      launchStatus: manifest?.launchStatus || tool.launchStatus,
+      prodExposure: manifest?.prodExposure || tool.prodExposure,
+      toolLifecycle: manifest?.toolLifecycle || tool.toolLifecycle,
+      approvalRequiredActions: manifest?.approvalRequiredActions || tool.approvalRequiredActions || [],
+      entitlementPolicy: manifest?.entitlementPolicy || tool.entitlementPolicy,
+    }, { viewerRole: 'public' });
     const generatedConfig = packageSource.generatedConfig || null;
     return {
       moduleId,
       manifestVersion: manifest?.version || null,
       launchStatus: manifest?.launchStatus || null,
       prodExposure: manifest?.prodExposure || null,
+      shellAction: launchSurface.shellAction,
+      visibleForPublic: launchSurface.visible,
+      appStoreMentionAllowed: launchSurface.appStoreMentionAllowed,
       mobileStrategy: manifest?.mobileStrategy || null,
       sourceDir: packageSource.sourceDir,
       publicPath: packageSource.publicPath,
@@ -61,6 +83,11 @@ function buildBundlePlan() {
       generatedConfigHasExternalUrl: generatedConfig ? /https?:\/\//i.test(generatedConfig) : false,
     };
   });
+  const entries = allEntries.filter((entry) => {
+    if (includeSandbox) return entry.launchStatus !== 'hidden' && entry.launchStatus !== 'gated';
+    return entry.launchStatus === 'launchable' && entry.prodExposure === 'public' && entry.shellAction === 'open';
+  });
+  const excludedEntries = allEntries.filter((entry) => !entries.some((included) => included.moduleId === entry.moduleId));
 
   return {
     version: 'toolbox-bundle-plan-v0',
@@ -73,12 +100,20 @@ function buildBundlePlan() {
       noCloudSync: true,
       noPaymentRuntime: true,
     },
+    exposureMode: includeSandbox ? 'sandbox_explicit' : 'public_launch_only',
     outputRoot: publicRoot,
     entries,
+    excludedEntries,
   };
 }
 
 function applyBundle(plan) {
+  for (const entry of plan.excludedEntries || []) {
+    const targetDir = join(publicRoot, entry.publicPath);
+    assertInsidePublic(targetDir);
+    rmSync(targetDir, { recursive: true, force: true });
+  }
+
   for (const entry of plan.entries) {
     if (!entry.sourceExists) {
       throw new Error(`Missing source directory for ${entry.moduleId}: ${entry.sourceDir}`);

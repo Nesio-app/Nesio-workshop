@@ -1108,10 +1108,13 @@ function archiveItem(id) {
 
 function deleteItem(id) {
   if (!confirm('确认删除这条本地物品记录？')) return;
+  const deleted = state.items.find((i) => i.id === id);
+  const nextSpaceId = deleted?.spaceId || state.currentSpaceId || 'master';
   state.items = state.items.filter((i) => i.id !== id);
+  state.currentItemId = null;
   persist();
   renderHome();
-  goPage('pg-space');
+  openSpace(nextSpaceId);
   showToast('已删除本地记录');
 }
 

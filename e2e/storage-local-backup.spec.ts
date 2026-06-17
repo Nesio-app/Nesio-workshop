@@ -7,7 +7,7 @@ async function clearInventoryState(page: Page) {
     localStorage.clear();
 
     const registrations = await navigator.serviceWorker?.getRegistrations?.();
-    registrations?.forEach((registration) => registration.unregister());
+    await Promise.all((registrations || []).map((registration) => registration.unregister()));
 
     await new Promise<void>((resolve) => {
       const request = indexedDB.deleteDatabase(databaseName);
@@ -32,7 +32,7 @@ async function returnHome(page: Page) {
 }
 
 test('storage PWA exports local data and restores it after clearing', async ({ page }) => {
-  test.setTimeout(60_000);
+  test.setTimeout(90_000);
 
   await page.goto('/storage/index.html');
   await clearInventoryState(page);
@@ -55,9 +55,29 @@ test('storage PWA exports local data and restores it after clearing', async ({ p
   await expect(page.getByText('E2E 购买记忆物品')).toBeVisible();
   await returnHome(page);
 
+  await page.locator('#hsearch').fill('E2E 购买记忆物品');
+  await expect(page.locator('#searchOut')).toBeVisible();
+  await expect(page.locator('#searchOut')).toContainText('E2E 购买记忆物品');
+  await page.locator('#searchOut .icard', { hasText: 'E2E 购买记忆物品' }).click();
+  await expect(page.locator('#pg-detail.active')).toBeVisible();
+
+  await page.locator('#pg-detail .hbtn').click();
+  await expect(page.locator('#sh-edit')).toHaveClass(/open/);
+  await page.locator('#eName').fill('E2E 编辑后物品');
+  await page.locator('#eMemory').fill('编辑后的购买记忆仍然只保存在本地');
+  await page.locator('#eWorth').selectOption('mixed');
+  await page.locator('#sh-edit').getByRole('button', { name: '保存' }).click();
+  await expect(page.locator('#pg-detail')).toContainText('E2E 编辑后物品');
+  await expect(page.locator('#pg-detail')).toContainText('编辑后的购买记忆仍然只保存在本地');
+  await page.locator('#pg-detail .back').click();
+  await returnHome(page);
+
+  await page.locator('#hsearch').fill('E2E 编辑后物品');
+  await expect(page.locator('#searchOut')).toContainText('E2E 编辑后物品');
+
   await page.reload();
   await openMasterSpace(page);
-  await expect(page.getByText('E2E 购买记忆物品')).toBeVisible();
+  await expect(page.getByText('E2E 编辑后物品')).toBeVisible();
   await returnHome(page);
 
   await page.locator('.hbtn[title="设置"]').click();
@@ -67,19 +87,62 @@ test('storage PWA exports local data and restores it after clearing', async ({ p
   ]).then(([result]) => result);
   const backupPath = await download.path();
   expect(backupPath).toBeTruthy();
+  await page.locator('#sh-settings .shclose').click();
+  await expect(page.locator('#sh-settings')).not.toHaveClass(/open/);
 
-  page.once('dialog', (dialog) => dialog.accept());
-  await page.getByRole('button', { name: '清空首发本地数据' }).click();
-  await expect(page.getByText('E2E 购买记忆物品')).toBeHidden();
+  await openMasterSpace(page);
+  await page.getByText('E2E 编辑后物品').click();
+  await expect(page.locator('#pg-detail.active')).toBeVisible();
+  const deleteDialog = page.waitForEvent('dialog').then((dialog) => dialog.accept());
+  await page.locator('#pg-detail.active').getByRole('button', { name: '删除本地记录' }).click({ force: true });
+  await deleteDialog;
+  await expect.poll(async () => page.evaluate(() => {
+    const root = JSON.parse(localStorage.getItem('baohe_inventory_v01') || '{}');
+    return (root.stores?.personal?.items || []).filter((item: { name?: string }) => item.name === 'E2E 编辑后物品').length;
+  })).toBe(0);
+  await expect(page.locator('#spaceScroll .iname', { hasText: 'E2E 编辑后物品' })).toHaveCount(0);
+  await returnHome(page);
+
+  await page.locator('.hbtn[title="设置"]').click();
+  const clearDialog = page.waitForEvent('dialog').then((dialog) => dialog.accept());
+  await page.getByRole('button', { name: '清空首发本地数据' }).click({ force: true });
+  await clearDialog;
+  await expect(page.locator('#spaceScroll .iname', { hasText: 'E2E 编辑后物品' })).toHaveCount(0);
 
   await page.locator('#localBackupFile').setInputFiles(backupPath!);
   await page.locator('#sh-settings .shclose').click();
   await expect(page.locator('#sh-settings')).not.toHaveClass(/open/);
   await openMasterSpace(page);
-  await expect(page.getByText('E2E 购买记忆物品')).toBeVisible();
+  await expect(page.locator('#spaceScroll .iname', { hasText: 'E2E 编辑后物品' })).toBeVisible();
   await returnHome(page);
 
   await page.reload();
   await openMasterSpace(page);
-  await expect(page.getByText('E2E 购买记忆物品')).toBeVisible();
+  await expect(page.locator('#spaceScroll .iname', { hasText: 'E2E 编辑后物品' })).toBeVisible();
+  await returnHome(page);
+
+  const hasController = async () => page.evaluate(async () => {
+    if (!('serviceWorker' in navigator)) return false;
+    await Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise((resolve) => setTimeout(resolve, 3000)),
+    ]);
+    if (navigator.serviceWorker.controller) return true;
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => resolve(false), 1000);
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        clearTimeout(timer);
+        resolve(true);
+      }, { once: true });
+    });
+  });
+  if (!(await hasController())) {
+    await page.reload();
+  }
+  await expect.poll(hasController, { timeout: 10_000 }).toBe(true);
+  await page.context().setOffline(true);
+  await page.reload();
+  await expect(page.locator('#pg-home.active')).toBeVisible();
+  await expect(page.locator('#homeSub')).toContainText(/Demo|Personal|Object Anchors/);
+  await page.context().setOffline(false);
 });
