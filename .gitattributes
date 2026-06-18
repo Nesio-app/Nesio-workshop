@@ -15,3 +15,11 @@
 /treasurebox-ios/ios/App/App/public/** linguist-vendored
 /index.html linguist-vendored
 /styles.css linguist-vendored
+
+# Supporting report/contract scripts are repo tooling, not the primary app language.
+/scripts/** linguist-generated
+/lib/**/*.mjs linguist-generated
+
+# Legacy embedded memory web assets should not dominate this product repo's language bar.
+/memory/public/** linguist-vendored
+/memory/scripts/** linguist-generated
