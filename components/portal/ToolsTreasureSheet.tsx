@@ -105,9 +105,14 @@ export default function ToolsTreasurePopup({
   const visibleTools = useMemo(
     () => {
       const runtimeTools = resolveShellRuntimeTools(tools, launchContext).visibleTools;
-      return personalLabMode
-        ? runtimeTools
-        : runtimeTools.filter((tool: PortalTool) => tool.id !== 'secretary');
+      if (personalLabMode) return runtimeTools;
+
+      const secretaryTool = tools.find((tool) => tool.id === 'secretary');
+      if (!secretaryTool || runtimeTools.some((tool) => tool.id === 'secretary')) {
+        return runtimeTools;
+      }
+
+      return [secretaryTool, ...runtimeTools];
     },
     [tools, launchContext, personalLabMode],
   );
@@ -151,8 +156,7 @@ export default function ToolsTreasurePopup({
         </header>
         <ToolGrid
           tools={visibleTools}
-          excludeIds={personalLabMode ? [] : ['secretary']}
-          includeNotReady={personalLabMode}
+          includeNotReady
           showStatus
           locale={locale}
           onOpenTool={onOpenTool}

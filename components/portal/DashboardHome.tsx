@@ -33,6 +33,7 @@ import { DashboardNoteIcon, DashboardTreasureIcon } from './DashboardHeaderIcons
 interface DashboardHomeProps {
   config: PortalConfig;
   shellTools?: PortalTool[];
+  toolboxTools?: PortalTool[];
   noteOpen?: boolean;
   treasureOpen: boolean;
   onTreasureOpenChange: (open: boolean) => void;
@@ -136,6 +137,7 @@ const FIDELITY_HINT_KEY = 'treasurebox-fidelity-hint-dismissed';
 export default function DashboardHome({
   config,
   shellTools,
+  toolboxTools,
   noteOpen = false,
   treasureOpen,
   onTreasureOpenChange,
@@ -188,7 +190,7 @@ export default function DashboardHome({
     return cached?.feeds ?? [];
   });
   const [fidelityHintDismissed, setFidelityHintDismissed] = useState(false);
-  const popupTools = shellTools ?? config.tools;
+  const popupTools = toolboxTools ?? shellTools ?? config.tools;
   const quotePicked = useRef(false);
   const [dailyQuote, setDailyQuote] = useState(pickFreshQuote(config));
   const lunarLine = useMemo(() => formatLunarLine(now), [now]);

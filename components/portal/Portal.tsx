@@ -338,6 +338,7 @@ export default function Portal() {
               <DashboardHome
               config={configWithDecMetadata}
               shellTools={shellRuntime.visibleTools}
+              toolboxTools={shellManifest.tools}
               noteOpen={noteOpen}
               treasureOpen={treasureOpen}
               onTreasureOpenChange={handleTreasureOpenChange}
