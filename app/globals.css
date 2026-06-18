@@ -1516,11 +1516,11 @@ body {
 }
 
 .portal-treasure-popup-close {
-  width: 44px;
-  height: 44px;
-  min-width: 44px;
-  min-height: 44px;
-  flex: 0 0 44px;
+  width: 45px;
+  height: 45px;
+  min-width: 45px;
+  min-height: 45px;
+  flex: 0 0 45px;
   border: none;
   border-radius: 999px;
   padding: 0;
