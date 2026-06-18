@@ -1,0 +1,17 @@
+# Keep embedded static tool bundles from dominating GitHub language stats.
+/public/secretary/** linguist-vendored
+/public/storage/** linguist-vendored
+/public/icons/** linguist-vendored
+/storage-web/** linguist-vendored
+/storage-ios/web/** linguist-vendored
+/fitness/web/** linguist-vendored
+/adhd-flow-ios/web/** linguist-vendored
+/health-web/** linguist-vendored
+/questionbank-ios/web/** linguist-vendored
+/reading-ios/web/** linguist-vendored
+/psych-tool-ios/web/** linguist-vendored
+/weaver-ai/client/** linguist-vendored
+/treasurebox-ios/www/** linguist-vendored
+/treasurebox-ios/ios/App/App/public/** linguist-vendored
+/index.html linguist-vendored
+/styles.css linguist-vendored
