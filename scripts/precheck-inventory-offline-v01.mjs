@@ -79,13 +79,17 @@ for (const [label, source] of [
     'id="mWorth"',
     'id="fWorth"',
     'portal-back-link',
-    'href="../index.html"',
+    'href="/"',
     'deleteAllLocalLaunchData()',
     'id="localBackupFile"',
     'triggerLocalBackupImport()',
     'handleLocalBackupFile(this)',
   ]) {
     if (!source.includes(marker)) failures.push(`${label} missing marker: ${marker}`);
+  }
+
+  if (source.includes('href="../index.html"') || source.includes('href="index.html"')) {
+    failures.push(`${label} must not link back to /index.html; use href="/" for the Shell route`);
   }
 }
 

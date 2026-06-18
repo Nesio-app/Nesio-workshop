@@ -40,6 +40,7 @@ test('storage PWA exports local data and restores it after clearing', async ({ p
   await expect(page.locator('.tabbar')).toBeVisible();
   await expect(page.locator('.tab', { hasText: '主页' })).toBeVisible();
   await expect(page.locator('.portal-back-link')).toBeVisible();
+  await expect(page.locator('.portal-back-link')).toHaveAttribute('href', '/');
   await expect(page.locator('#hsearch')).toBeVisible();
   await expect.poll(() => page.evaluate(() => {
     const tabs = document.querySelector('.tabbar');
