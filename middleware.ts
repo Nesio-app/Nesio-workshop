@@ -1,10 +1,24 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { isFirstLaunchBlockedPath, launchUnavailablePayload } from './lib/portal/launch-safety';
+import {
+  isFirstLaunchBlockedPath,
+  isPersonalLabAiRequestAllowed,
+  launchUnavailablePayload,
+} from './lib/portal/launch-safety';
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  if (pathname === '/storage') {
+    const url = request.nextUrl.clone();
+    url.pathname = '/storage/index.html';
+    return NextResponse.rewrite(url);
+  }
+
   if (!isFirstLaunchBlockedPath(pathname)) {
+    return NextResponse.next();
+  }
+
+  if (pathname.startsWith('/api/secretary') && isPersonalLabAiRequestAllowed(request)) {
     return NextResponse.next();
   }
 
@@ -33,6 +47,7 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
+    '/storage',
     '/secretary/:path*',
     '/inner-shelter/:path*',
     '/health/:path*',

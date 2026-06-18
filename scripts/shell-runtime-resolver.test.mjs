@@ -73,6 +73,19 @@ assert.equal(testerPlan.shellAction, 'show_static_locked_preview');
 assert.equal(testerPlan.betaBadgeRequired, true);
 assert.equal(shouldShellOpenTool(testerPlan), false);
 
+const personalLabPlan = resolveShellRuntimeState(tools[1], { viewerRole: 'personal_lab' });
+assert.equal(personalLabPlan.visible, true);
+assert.equal(personalLabPlan.openEnabled, true);
+assert.equal(personalLabPlan.shellAction, 'open_lab_preview');
+assert.equal(personalLabPlan.personalLabMode, true);
+assert.equal(shouldShellOpenTool(personalLabPlan), true);
+
+const personalLabFinance = resolveShellRuntimeState(tools[2], { viewerRole: 'personal_lab' });
+assert.equal(personalLabFinance.visible, true);
+assert.equal(personalLabFinance.openEnabled, true);
+assert.equal(personalLabFinance.blockedByApprovalGate, true);
+assert.equal(personalLabFinance.realRuntimeEnabled, false);
+
 const publicFinance = resolveShellRuntimeState(tools[2], { viewerRole: 'public' });
 assert.equal(publicFinance.visible, false);
 assert.equal(publicFinance.openEnabled, false);
@@ -94,6 +107,10 @@ assert.deepEqual(
     testerAllowlist: ['plan'],
   }).visibleTools.map((tool) => tool.id),
   ['inventory', 'plan'],
+);
+assert.deepEqual(
+  resolveShellRuntimeTools(tools, { viewerRole: 'personal_lab' }).openableTools.map((tool) => tool.id),
+  ['inventory', 'plan', 'finance', 'health'],
 );
 
 console.log('shell runtime resolver tests passed');

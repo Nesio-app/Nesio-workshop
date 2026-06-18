@@ -1697,7 +1697,7 @@ function initNative() {
 function registerInventoryServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   if (window.location.protocol === 'file:') return;
-  navigator.serviceWorker.register('sw.js').catch(() => undefined);
+  navigator.serviceWorker.register('/storage/sw.js').catch(() => undefined);
 }
 
 // ── Boot ──

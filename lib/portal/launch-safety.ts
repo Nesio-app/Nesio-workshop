@@ -64,6 +64,30 @@ export function isFirstLaunchBlockedPath(pathname: string): boolean {
   );
 }
 
+function isPersonalLabAiEnvEnabled(): boolean {
+  return process.env.BAOHE_PERSONAL_LAB_AI_ENABLED === '1' ||
+    process.env.BAOHE_PERSONAL_LAB_AI_ENABLED === 'true';
+}
+
+function hasPersonalLabAccessMarker(request: {
+  headers: Headers;
+  nextUrl?: { searchParams?: URLSearchParams };
+}): boolean {
+  const headerMode = request.headers.get('x-baohe-access-mode') || '';
+  const queryMode = request.nextUrl?.searchParams?.get('baohePersonal') ||
+    request.nextUrl?.searchParams?.get('baohePersonalLab') ||
+    request.nextUrl?.searchParams?.get('baohe_personal_lab') ||
+    '';
+  return headerMode === 'personal_lab' || queryMode === '1' || queryMode === 'personal_lab';
+}
+
+export function isPersonalLabAiRequestAllowed(request: {
+  headers: Headers;
+  nextUrl?: { searchParams?: URLSearchParams };
+}): boolean {
+  return isPersonalLabAiEnvEnabled() && hasPersonalLabAccessMarker(request);
+}
+
 export function launchUnavailablePayload(kind: string, id?: string) {
   return {
     ok: false,

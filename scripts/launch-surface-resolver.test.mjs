@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import {
   buildLaunchReadinessSummary,
   filterToolsForLaunchSurface,
+  resolveTesterCohort,
   resolveLaunchSurfaceState,
 } from '../lib/portal/launch-surface.mjs';
 
@@ -71,6 +72,22 @@ assert.equal(testerPlan.visible, true);
 assert.equal(testerPlan.shellAction, 'show_static_locked_preview');
 assert.equal(testerPlan.betaBadgeRequired, true);
 
+const testerCohort = resolveTesterCohort('reading-lab');
+assert.deepEqual(testerCohort.moduleIds, ['reading', 'plan', 'inventory']);
+assert.equal(testerCohort.source, 'local_cohort_code');
+
+const personalLabPlan = resolveLaunchSurfaceState(sampleTools[1], { viewerRole: 'personal_lab' });
+assert.equal(personalLabPlan.visible, true);
+assert.equal(personalLabPlan.shellAction, 'open_lab_preview');
+assert.equal(personalLabPlan.betaBadgeRequired, true);
+assert.equal(personalLabPlan.reason, 'personal_lab');
+
+const personalLabFinance = resolveLaunchSurfaceState(sampleTools[2], { viewerRole: 'personal_lab' });
+assert.equal(personalLabFinance.visible, true);
+assert.equal(personalLabFinance.shellAction, 'open_lab_preview');
+assert.equal(personalLabFinance.blockedByApprovalGate, true);
+assert.equal(personalLabFinance.appStoreMentionAllowed, false);
+
 const publicFinance = resolveLaunchSurfaceState(sampleTools[2], { viewerRole: 'public' });
 assert.equal(publicFinance.visible, false);
 assert.equal(publicFinance.approvalGateState, 'required');
@@ -85,11 +102,17 @@ assert.deepEqual(
   filterToolsForLaunchSurface(sampleTools, { viewerRole: 'tester', testerAllowlist: ['plan'] }).map((tool) => tool.id),
   ['inventory', 'plan'],
 );
+assert.deepEqual(
+  filterToolsForLaunchSurface(sampleTools, { viewerRole: 'personal_lab' }).map((tool) => tool.id),
+  ['inventory', 'plan', 'finance', 'health'],
+);
 
 const readiness = buildLaunchReadinessSummary(sampleTools, { testerAllowlist: ['plan'] });
 assert.equal(readiness.firstLaunchPromise, 'Shell + Inventory / purchase-memory');
 assert.deepEqual(readiness.publicVisibleModuleIds, ['inventory']);
 assert.deepEqual(readiness.testerVisibleSandboxModuleIds, ['plan']);
+assert.deepEqual(readiness.personalLabVisibleModuleIds.sort(), ['finance', 'health', 'inventory', 'plan']);
+assert.equal(readiness.personalLabRealRuntimeEnabled, false);
 assert.deepEqual(readiness.publicHiddenHighRiskModuleIds.sort(), ['finance', 'health']);
 assert.equal(readiness.approvalGateOverridesPaywallGate, true);
 assert.equal(readiness.realPurchaseEnabled, false);
@@ -105,6 +128,8 @@ assert.equal(report.launchSurface.version, 'launch-surface-v0');
 assert.equal(report.launchSurface.summary.firstLaunchPromise, 'Shell + Inventory / purchase-memory');
 assert.deepEqual(report.launchSurface.summary.publicVisibleModuleIds, ['inventory']);
 assert.equal(report.launchSurface.summary.publicVisibleModuleCount, 1);
+assert.equal(report.launchSurface.summary.personalLabVisibleModuleCount, report.summary.moduleCount);
+assert.equal(report.launchSurface.summary.personalLabRealRuntimeEnabled, false);
 assert.ok(report.launchSurface.summary.testerVisibleSandboxModuleCount > 0, 'tester allowlist should expose sandbox tools in report');
 assert.equal(report.launchSurface.summary.testerVisibleSandboxModuleIds.includes('plan'), true);
 assert.equal(report.launchSurface.summary.testerVisibleSandboxModuleIds.includes('reading'), true);
@@ -122,6 +147,8 @@ const reportFinance = report.launchSurface.entries.find((entry) => entry.moduleI
 assert.equal(reportInventory.visibleForPublic, true);
 assert.equal(reportInventory.shellAction, 'open');
 assert.equal(reportFinance.visibleForPublic, false);
+assert.equal(reportFinance.visibleForPersonalLab, true);
+assert.equal(reportFinance.personalLabShellAction, 'open_lab_preview');
 assert.equal(reportFinance.approvalGateOverridesPaywallGate, true);
 
 console.log('launch surface resolver tests passed');

@@ -1,0 +1,47 @@
+{
+  "version": "release-package-manifest-v01",
+  "canonicalDomain": "www.nesio.app",
+  "launchSku": "shell_inventory_purchase_memory",
+  "launchSkuAppStoreReady": false,
+  "canonicalIosProject": "treasurebox-ios",
+  "includedRuntimeSurfaces": [
+    "app",
+    "components/portal",
+    "lib/portal",
+    "public",
+    "public/storage",
+    "storage-web",
+    "treasurebox-ios"
+  ],
+  "excludedSurfaceKinds": [
+    "notebooks",
+    "prototype",
+    "historical-ios",
+    "external-service-sandbox",
+    "unrelated-local-noise"
+  ],
+  "inactiveIosProjects": [
+    "adhd-flow-ios",
+    "questionbank-ios",
+    "psych-tool-ios",
+    "reading-ios",
+    "storage-ios"
+  ],
+  "ceoGateRequiredFor": [
+    "TestFlight",
+    "App Store submission",
+    "real user external distribution",
+    "real data sync",
+    "payment",
+    "external authorization",
+    "cloud account",
+    "AI runtime",
+    "health data",
+    "finance data"
+  ],
+  "releaseNotes": [
+    "Only Shell + Inventory / purchase-memory is launch-claimable.",
+    "Sandbox, gated, hidden, and future-paid modules remain internal registry surfaces.",
+    "The release package must not include prototype notebooks or inactive historical iOS projects as active launch surfaces."
+  ]
+}

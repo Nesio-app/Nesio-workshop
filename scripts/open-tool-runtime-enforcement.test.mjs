@@ -52,8 +52,11 @@ const health = {
 assert.equal(openToolHref(inventory, { viewerRole: 'public' }), '/storage/');
 assert.equal(openToolHref(plan, { viewerRole: 'public' }), '');
 assert.equal(openToolHref(plan, { viewerRole: 'tester', testerAllowlist: ['plan'] }), '');
+assert.equal(openToolHref(plan, { viewerRole: 'personal_lab' }), '/adhd-flow/');
 assert.equal(openToolHref(finance, { viewerRole: 'tester', testerAllowlist: ['finance'] }), '');
+assert.equal(openToolHref(finance, { viewerRole: 'personal_lab' }), 'https://finance.example.test/');
 assert.equal(openToolHref(health, { viewerRole: 'tester', testerAllowlist: ['health'] }), '');
+assert.equal(openToolHref(health, { viewerRole: 'personal_lab' }), 'https://health.example.test/');
 assert.equal(openToolHref({ ...inventory, featureControl: { killed: true } }, { viewerRole: 'public' }), '');
 
 console.log('open-tool runtime enforcement tests passed');

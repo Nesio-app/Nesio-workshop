@@ -1,5 +1,65 @@
 import { expect, test } from '@playwright/test';
 
+test('mobile dashboard quote and widgets do not overlap', async ({ page }) => {
+  await page.goto('/');
+
+  const quote = page.locator('.portal-quote');
+  const widgets = page.locator('.portal-widget');
+  await expect(quote).toBeVisible();
+  await expect(widgets).toHaveCount(2);
+
+  const layout = await page.evaluate(() => {
+    type Box = {
+      className: string;
+      top: number;
+      right: number;
+      bottom: number;
+      left: number;
+      width: number;
+      height: number;
+    };
+
+    const boxes = Array.from(document.querySelectorAll<HTMLElement>('.portal-quote, .portal-widget'))
+      .map((element) => {
+        const rect = element.getBoundingClientRect();
+        return {
+          className: element.className,
+          top: rect.top,
+          right: rect.right,
+          bottom: rect.bottom,
+          left: rect.left,
+          width: rect.width,
+          height: rect.height,
+        };
+      });
+
+    const [quoteBox, firstWidget, secondWidget] = boxes;
+    const overlaps = (a: Box, b: Box) => {
+      return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+    };
+
+    if (!quoteBox || !firstWidget || !secondWidget) {
+      return {
+        boxes,
+        quoteOverlapsFirstWidget: true,
+        firstWidgetOverlapsSecondWidget: true,
+        hasHorizontalOverflow: true,
+      };
+    }
+
+    return {
+      boxes,
+      quoteOverlapsFirstWidget: overlaps(quoteBox, firstWidget),
+      firstWidgetOverlapsSecondWidget: overlaps(firstWidget, secondWidget),
+      hasHorizontalOverflow: document.documentElement.scrollWidth > window.innerWidth + 1,
+    };
+  });
+
+  expect(layout.quoteOverlapsFirstWidget).toBe(false);
+  expect(layout.firstWidgetOverlapsSecondWidget).toBe(false);
+  expect(layout.hasHorizontalOverflow).toBe(false);
+});
+
 test('shell toolbox opens, keeps its open state after refresh, and closes', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => {
@@ -40,4 +100,26 @@ test('shell toolbox opens, keeps its open state after refresh, and closes', asyn
 
   await page.reload();
   await expect(page.locator('.portal-treasure-popup')).toBeHidden();
+});
+
+test('personal lab toolbox exposes every registered tool for testing', async ({ page }) => {
+  await page.goto('/?baohePersonalLab=1');
+  await page.evaluate(() => {
+    sessionStorage.clear();
+  });
+  await page.reload();
+
+  const treasureButton = page.getByRole('button', { name: /打开宝盒工具/ });
+  await expect(treasureButton).toBeVisible();
+  await treasureButton.click({ force: true });
+
+  const popup = page.locator('.portal-treasure-popup');
+  await expect(popup).toBeVisible();
+  const toolButtons = popup.locator('.portal-tool-card');
+  await expect(toolButtons.first()).toBeVisible();
+  await expect.poll(() => toolButtons.count()).toBeGreaterThanOrEqual(11);
+
+  for (const name of ['智友', '待办', '刷题', '收纳', '咨询', '冥想', '阅读', '健身', '溯', '财务', '人生']) {
+    await expect(popup.getByRole('button', { name: new RegExp(name) })).toBeVisible();
+  }
 });

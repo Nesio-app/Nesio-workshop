@@ -8,9 +8,10 @@ import {
 } from './open-tool.mjs';
 
 interface ShellRuntimeContext {
-  viewerRole?: 'public' | 'tester';
+  viewerRole?: 'public' | 'tester' | 'personal_lab';
   testerAllowlist?: string[];
   testerCohort?: string | null;
+  testerCode?: string | null;
 }
 
 export function toolOpenUrl(tool: PortalTool): string {

@@ -13,7 +13,7 @@ import { formatStatusSummaryLine, type ToolForShellState } from './tool-state';
 import ToolGrid from './ToolGrid';
 
 interface LaunchSurfaceContext {
-  viewerRole: 'public' | 'tester';
+  viewerRole: 'public' | 'tester' | 'personal_lab';
   testerAllowlist: string[];
   testerCohort?: string | null;
 }
@@ -24,7 +24,9 @@ function normalizeLaunchContext(raw: {
   testerCohort?: unknown;
 }): LaunchSurfaceContext {
   return {
-    viewerRole: raw.viewerRole === 'tester' ? 'tester' : 'public',
+    viewerRole: raw.viewerRole === 'personal_lab'
+      ? 'personal_lab'
+      : raw.viewerRole === 'tester' ? 'tester' : 'public',
     testerAllowlist: Array.isArray(raw.testerAllowlist)
       ? raw.testerAllowlist.filter((item): item is string => typeof item === 'string')
       : [],
@@ -99,9 +101,15 @@ export default function ToolsTreasurePopup({
     };
   }, [open, anchorRef]);
 
+  const personalLabMode = launchContext.viewerRole === 'personal_lab';
   const visibleTools = useMemo(
-    () => resolveShellRuntimeTools(tools, launchContext).visibleTools.filter((tool: PortalTool) => tool.id !== 'secretary'),
-    [tools, launchContext],
+    () => {
+      const runtimeTools = resolveShellRuntimeTools(tools, launchContext).visibleTools;
+      return personalLabMode
+        ? runtimeTools
+        : runtimeTools.filter((tool: PortalTool) => tool.id !== 'secretary');
+    },
+    [tools, launchContext, personalLabMode],
   );
 
   if (!open) return null;
@@ -143,7 +151,8 @@ export default function ToolsTreasurePopup({
         </header>
         <ToolGrid
           tools={visibleTools}
-          excludeIds={['secretary']}
+          excludeIds={personalLabMode ? [] : ['secretary']}
+          includeNotReady={personalLabMode}
           showStatus
           locale={locale}
           onOpenTool={onOpenTool}
