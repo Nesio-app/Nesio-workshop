@@ -923,11 +923,12 @@ body {
 
 .portal-widgets {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.65rem;
 }
 
 .portal-widget {
+  min-width: 0;
   border-radius: 1.15rem;
   padding: 0.75rem 0.85rem 0.8rem;
   background: rgba(255, 255, 255, 0.82);
@@ -965,6 +966,9 @@ body {
   font-variant-numeric: tabular-nums;
   line-height: 1;
   color: var(--portal-ink);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .portal-widget-date {
@@ -973,6 +977,7 @@ body {
   font-weight: 500;
   color: var(--portal-muted);
   line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 
 .portal-widget-lunar {
@@ -981,6 +986,7 @@ body {
   color: var(--portal-muted);
   line-height: 1.3;
   opacity: 0.9;
+  overflow-wrap: anywhere;
 }
 
 .portal-widget-chips {
@@ -1032,6 +1038,7 @@ body {
   align-items: baseline;
   gap: 0.15rem 0.3rem;
   line-height: 1.1;
+  min-width: 0;
 }
 
 .portal-widget-weather-line--primary {
@@ -1044,6 +1051,7 @@ body {
   font-weight: 600;
   color: var(--portal-blue-deep);
   line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 
 .portal-widget-temp-sep {
@@ -1059,6 +1067,7 @@ body {
   letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
   color: var(--portal-ink);
+  min-width: 0;
 }
 
 .portal-widget-temp-unit {
@@ -1092,6 +1101,7 @@ body {
   font-size: 0.7rem;
   font-weight: 500;
   color: var(--portal-muted);
+  overflow-wrap: anywhere;
 }
 
 .portal-widget-alert {
@@ -1103,6 +1113,7 @@ body {
   padding: 0.2rem 0.35rem;
   border-radius: 0.35rem;
   background: rgba(251, 191, 36, 0.12);
+  overflow-wrap: anywhere;
 }
 
 .portal-widget-forecast {
@@ -1111,6 +1122,7 @@ body {
   color: var(--portal-blue-deep);
   line-height: 1.3;
   opacity: 0.9;
+  overflow-wrap: anywhere;
 }
 
 .portal-widget-muted {
@@ -2123,7 +2135,21 @@ body {
   }
 
   .portal-widgets {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 430px) {
+  .portal-widgets {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .portal-widget {
+    min-height: 0;
+  }
+
+  .portal-widget-weather-line {
+    row-gap: 0.08rem;
   }
 }
 

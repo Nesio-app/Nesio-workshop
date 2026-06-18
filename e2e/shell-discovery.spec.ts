@@ -1,5 +1,65 @@
 import { expect, test } from '@playwright/test';
 
+test('mobile dashboard quote and widgets do not overlap', async ({ page }) => {
+  await page.goto('/');
+
+  const quote = page.locator('.portal-quote');
+  const widgets = page.locator('.portal-widget');
+  await expect(quote).toBeVisible();
+  await expect(widgets).toHaveCount(2);
+
+  const layout = await page.evaluate(() => {
+    type Box = {
+      className: string;
+      top: number;
+      right: number;
+      bottom: number;
+      left: number;
+      width: number;
+      height: number;
+    };
+
+    const boxes = Array.from(document.querySelectorAll<HTMLElement>('.portal-quote, .portal-widget'))
+      .map((element) => {
+        const rect = element.getBoundingClientRect();
+        return {
+          className: element.className,
+          top: rect.top,
+          right: rect.right,
+          bottom: rect.bottom,
+          left: rect.left,
+          width: rect.width,
+          height: rect.height,
+        };
+      });
+
+    const [quoteBox, firstWidget, secondWidget] = boxes;
+    const overlaps = (a: Box, b: Box) => {
+      return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+    };
+
+    if (!quoteBox || !firstWidget || !secondWidget) {
+      return {
+        boxes,
+        quoteOverlapsFirstWidget: true,
+        firstWidgetOverlapsSecondWidget: true,
+        hasHorizontalOverflow: true,
+      };
+    }
+
+    return {
+      boxes,
+      quoteOverlapsFirstWidget: overlaps(quoteBox, firstWidget),
+      firstWidgetOverlapsSecondWidget: overlaps(firstWidget, secondWidget),
+      hasHorizontalOverflow: document.documentElement.scrollWidth > window.innerWidth + 1,
+    };
+  });
+
+  expect(layout.quoteOverlapsFirstWidget).toBe(false);
+  expect(layout.firstWidgetOverlapsSecondWidget).toBe(false);
+  expect(layout.hasHorizontalOverflow).toBe(false);
+});
+
 test('shell toolbox opens, keeps its open state after refresh, and closes', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => {
