@@ -23,6 +23,8 @@
 .DS_Store
 *.pem
 /var/
+/README 2.md
+/inner-shelter-ios/
 database/*.db
 database/*.sqlite
 database/**/*.db

@@ -4,6 +4,18 @@ Treasurebox is a modular toolbox app. The current beta path is intentionally sma
 
 This repository keeps the broader module registry, contracts, and iOS shell work in one place, but most modules are not part of the public first-launch promise yet.
 
+## Repository Boundary
+
+This repository is product code for Treasurebox / Baohe only. Personal portfolio and academic data science artifacts have been extracted to:
+
+- https://github.com/hanbing6228/jing-duan-ds-portfolio
+
+Do not add notebooks, class assignments, portfolio pages, or personal homepage assets back into this repository.
+
+## License
+
+This project is licensed under the MIT License. See `LICENSE`.
+
 ## Current Launch Scope
 
 Public PWA beta scope:

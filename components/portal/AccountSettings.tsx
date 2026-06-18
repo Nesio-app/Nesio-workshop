@@ -175,10 +175,6 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
         </button>
       </section>
 
-      <p className="portal-settings-foot">
-        <Link href="/portfolio">{t(locale, 'portfolioLink')} →</Link>
-      </p>
-
       {toast ? <div className="portal-settings-toast" role="status">{toast}</div> : null}
     </div>
   );
