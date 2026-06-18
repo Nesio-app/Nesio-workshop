@@ -4,6 +4,31 @@ export const dynamic = 'force-dynamic';
 
 const QUOTE_URL = 'https://v1.hitokoto.cn/?c=i&c=k&encode=json';
 const MAX_QUOTE_LENGTH = 140;
+const BLOCKED_TERMS = [
+  '死',
+  '亡',
+  '病',
+  '杀',
+  '恨',
+  '愁',
+  '悲',
+  '伤',
+  '泪',
+  '孤',
+  '墓',
+  '沙场',
+  '马革',
+  '离别',
+  '断肠',
+];
+
+const POSITIVE_FALLBACK_QUOTES = [
+  '你已经在路上了，今天只需要再往前一点点。',
+  '慢一点，深一点，稳一点。',
+  '先完成一个小闭环，再决定下一件事。',
+  '允许自己慢慢来，也允许事情变好。',
+  '把复杂留给系统，把下一步留给自己。',
+];
 
 function asTrimmedString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -18,6 +43,14 @@ function normalizeQuote(payload: unknown): string | null {
   if (!source) return quote;
   const line = `${quote} —— ${source}`;
   return line.length <= MAX_QUOTE_LENGTH ? line : quote;
+}
+
+function isPositiveEnough(quote: string): boolean {
+  return !BLOCKED_TERMS.some((term) => quote.includes(term));
+}
+
+function fallbackQuote(): string {
+  return POSITIVE_FALLBACK_QUOTES[Math.floor(Math.random() * POSITIVE_FALLBACK_QUOTES.length)];
 }
 
 async function fetchQuoteWithTimeout(ms: number): Promise<Response> {
@@ -40,6 +73,16 @@ export async function GET() {
     if (!response.ok) throw new Error(`quote upstream ${response.status}`);
     const quote = normalizeQuote(await response.json());
     if (!quote) throw new Error('quote upstream returned unusable payload');
+    if (!isPositiveEnough(quote)) {
+      return NextResponse.json(
+        { ok: true, quote: fallbackQuote(), source: 'positive_fallback' },
+        {
+          headers: {
+            'Cache-Control': 'public, s-maxage=900, stale-while-revalidate=3600',
+          },
+        },
+      );
+    }
     return NextResponse.json(
       { ok: true, quote, source: 'hitokoto' },
       {
