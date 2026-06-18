@@ -3,9 +3,14 @@
 const LEGACY_STORAGE_KEYS = ['rearbase_v2', 'rearbase_v1'];
 const STORAGE_ROOT_KEY = 'baohe_inventory_v01';
 const LOCAL_PROFILE_STORAGE_KEY = 'baohe_local_profile_v01';
+const LOCAL_BACKUP_METADATA_KEY = 'baohe_local_backup_meta_v01';
+const INVENTORY_INDEXEDDB_NAME = 'baohe_inventory_local_db_v01';
+const INVENTORY_INDEXEDDB_STORE = 'local_root_store';
+const INVENTORY_INDEXEDDB_ROOT_ID = 'baohe-local-root';
 const INVENTORY_MODE_KEY = 'baohe_inventory_mode_v01';
 const INVENTORY_FIRST_LAUNCH_KEY = 'baohe_inventory_first_launch_v01';
 const INVENTORY_MODES = ['demo', 'personal'];
+const LOCAL_BACKUP_REMINDER_DAYS = 7;
 const LOCAL_PROFILE_SCHEMA_VERSION = 'LocalProfile@v1';
 const LOCAL_INVENTORY_ITEM_SCHEMA_VERSION = 'LocalInventoryItem@v1';
 const LOCAL_INVENTORY_STORE_SCHEMA_VERSION = 'LocalInventoryStore@v1';
@@ -119,13 +124,17 @@ function createLocalProfile(source = {}, options = {}) {
     schemaVersion: LOCAL_PROFILE_SCHEMA_VERSION,
     profileId: 'local_profile',
     profileKind: 'local_profile',
+    displayName: source.displayName || '本机用户',
+    deviceLabel: source.deviceLabel || '此设备',
     activeMode,
     accountSystemEnabled: false,
     serverUserId: null,
     cloudEnabled: false,
     cloudSyncEnabled: false,
+    serverAccountEnabled: false,
     createdAt: source.createdAt || now,
     updatedAt: now,
+    lastSavedAt: source.lastSavedAt || now,
   };
 }
 
@@ -144,6 +153,140 @@ function saveLocalProfile(profile) {
     localStorage.setItem(LOCAL_PROFILE_STORAGE_KEY, JSON.stringify(nextProfile));
   } catch (_) { /* ignore */ }
   return nextProfile;
+}
+
+function loadLocalBackupMetadata() {
+  try {
+    const raw = localStorage.getItem(LOCAL_BACKUP_METADATA_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return {
+      lastBackupExportedAt: parsed.lastBackupExportedAt || null,
+      lastBackupImportedAt: parsed.lastBackupImportedAt || null,
+      lastBackupFileName: parsed.lastBackupFileName || null,
+      reminderDays: LOCAL_BACKUP_REMINDER_DAYS,
+    };
+  } catch (_) {
+    return {
+      lastBackupExportedAt: null,
+      lastBackupImportedAt: null,
+      lastBackupFileName: null,
+      reminderDays: LOCAL_BACKUP_REMINDER_DAYS,
+    };
+  }
+}
+
+function saveLocalBackupMetadata(next = {}) {
+  const current = loadLocalBackupMetadata();
+  const metadata = {
+    ...current,
+    ...next,
+    reminderDays: LOCAL_BACKUP_REMINDER_DAYS,
+  };
+  try {
+    localStorage.setItem(LOCAL_BACKUP_METADATA_KEY, JSON.stringify(metadata));
+  } catch (_) { /* ignore */ }
+  return metadata;
+}
+
+function formatLocalDateTime(value) {
+  if (!value) return '尚无';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '尚无';
+  return d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+
+function backupReminderStatus(metadata = loadLocalBackupMetadata()) {
+  const last = metadata.lastBackupExportedAt || metadata.lastBackupImportedAt;
+  if (!last) return '建议现在导出一次备份';
+  const ageDays = (Date.now() - new Date(last).getTime()) / 86400000;
+  if (!Number.isFinite(ageDays) || ageDays >= LOCAL_BACKUP_REMINDER_DAYS) {
+    return `超过 ${LOCAL_BACKUP_REMINDER_DAYS} 天未备份`;
+  }
+  return '备份状态正常';
+}
+
+function openInventoryIndexedDb() {
+  if (typeof indexedDB === 'undefined') return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const request = indexedDB.open(INVENTORY_INDEXEDDB_NAME, 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(INVENTORY_INDEXEDDB_STORE)) {
+        db.createObjectStore(INVENTORY_INDEXEDDB_STORE, { keyPath: 'id' });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => resolve(null);
+  });
+}
+
+function saveRootStoreToIndexedDb(root) {
+  openInventoryIndexedDb().then((db) => {
+    if (!db) return;
+    const tx = db.transaction(INVENTORY_INDEXEDDB_STORE, 'readwrite');
+    tx.objectStore(INVENTORY_INDEXEDDB_STORE).put({
+      id: INVENTORY_INDEXEDDB_ROOT_ID,
+      savedAt: new Date().toISOString(),
+      root,
+      boundary: {
+        indexedDbMirrorEnabled: true,
+        localStorageCompatibility: true,
+        cloudSyncEnabled: false,
+      },
+    });
+    tx.oncomplete = () => db.close();
+    tx.onerror = () => db.close();
+  }).catch(() => undefined);
+}
+
+function restoreRootStoreFromIndexedDb() {
+  return openInventoryIndexedDb().then((db) => new Promise((resolve) => {
+    if (!db) {
+      resolve(null);
+      return;
+    }
+    const tx = db.transaction(INVENTORY_INDEXEDDB_STORE, 'readonly');
+    const request = tx.objectStore(INVENTORY_INDEXEDDB_STORE).get(INVENTORY_INDEXEDDB_ROOT_ID);
+    request.onsuccess = () => {
+      db.close();
+      resolve(request.result?.root || null);
+    };
+    request.onerror = () => {
+      db.close();
+      resolve(null);
+    };
+  })).catch(() => null);
+}
+
+function deleteRootStoreFromIndexedDb() {
+  openInventoryIndexedDb().then((db) => {
+    if (!db) return;
+    const tx = db.transaction(INVENTORY_INDEXEDDB_STORE, 'readwrite');
+    tx.objectStore(INVENTORY_INDEXEDDB_STORE).delete(INVENTORY_INDEXEDDB_ROOT_ID);
+    tx.oncomplete = () => db.close();
+    tx.onerror = () => db.close();
+  }).catch(() => undefined);
+}
+
+function bootstrapRootStoreFromIndexedDb() {
+  try {
+    if (localStorage.getItem(STORAGE_ROOT_KEY)) return;
+  } catch (_) {
+    return;
+  }
+  restoreRootStoreFromIndexedDb().then((root) => {
+    if (!root) return;
+    try {
+      localStorage.setItem(STORAGE_ROOT_KEY, JSON.stringify(root));
+      if (root.activeMode) localStorage.setItem(INVENTORY_MODE_KEY, normalizeInventoryMode(root.activeMode));
+    } catch (_) {
+      return;
+    }
+    state = loadState();
+    rerenderInventoryApp();
+    showFirstLaunchIfNeeded();
+    showToast('已从本机 IndexedDB 恢复本地数据');
+  }).catch(() => undefined);
 }
 
 function versionInventoryItem(item, mode) {
@@ -355,8 +498,10 @@ function saveRootStore(root) {
   root.schemaVersions = { ...(root.schemaVersions || {}), ...LOCAL_TABLE_SCHEMA_VERSIONS };
   root.cloudFlags = { ...LAUNCH_CLOUD_FLAGS, ...(root.cloudFlags || {}) };
   root.localProfile = saveLocalProfile(createLocalProfile(root.localProfile, { activeMode: root.activeMode }));
+  root.localProfile.lastSavedAt = new Date().toISOString();
   root.migrationSmokeCheck = buildMigrationSmokeResult(root);
   localStorage.setItem(STORAGE_ROOT_KEY, JSON.stringify(root));
+  saveRootStoreToIndexedDb(root);
 }
 
 function loadState() {
@@ -397,6 +542,80 @@ function snapshotLocalData(action) {
   saveRootStore(root);
 }
 
+function buildLocalBackupPayload(root = loadRootStore()) {
+  const exportedAt = new Date().toISOString();
+  return {
+    backupKind: 'baohe-local-backup-v1',
+    exported: exportedAt,
+    version: root.version,
+    dataBoundary: {
+      modes: INVENTORY_MODES,
+      demoPersonalSeparated: true,
+      networkRequired: false,
+      sourceOfTruth: 'device-local-storage',
+      userManagedFileBackup: true,
+      restoreSupported: true,
+      filesAppRecommended: true,
+      indexedDbMirrorEnabled: true,
+      localStorageCompatibility: true,
+      readsRealData: false,
+      writesRealData: false,
+      cloudSyncEnabled: false,
+      externalAuthEnabled: false,
+      serverAccountEnabled: false,
+      paymentIntegrationEnabled: false,
+    },
+    schemaVersions: root.schemaVersions,
+    localProfile: root.localProfile,
+    backupMetadata: loadLocalBackupMetadata(),
+    cloudFlags: root.cloudFlags,
+    migrationSmokeCheck: runLocalDataMigrationSmokeCheck(root),
+    activeMode: getActiveDataMode(),
+    stores: root.stores,
+  };
+}
+
+function validateLocalBackupPayload(payload) {
+  if (!payload || typeof payload !== 'object') throw new Error('备份文件无效');
+  if (payload.backupKind !== 'baohe-local-backup-v1') throw new Error('不是宝盒本地备份文件');
+  if (!payload.stores || typeof payload.stores !== 'object') throw new Error('备份缺少本地数据');
+  if (!payload.stores.demo || !payload.stores.personal) throw new Error('备份缺少 demo/personal 隔离数据');
+  if (payload.dataBoundary?.cloudSyncEnabled === true || payload.dataBoundary?.externalAuthEnabled === true) {
+    throw new Error('备份边界不符合首发本地模式');
+  }
+  return true;
+}
+
+function importAllLocalDataPayload(payload) {
+  validateLocalBackupPayload(payload);
+  snapshotLocalData('import-all-local-backup');
+  const nextRoot = createRootStore();
+  nextRoot.version = LOCAL_DATA_VERSION;
+  nextRoot.schemaVersion = LOCAL_DATA_ROOT_SCHEMA_VERSION;
+  nextRoot.dataVersion = LOCAL_DATA_VERSION;
+  nextRoot.schemaVersions = { ...(payload.schemaVersions || {}), ...LOCAL_TABLE_SCHEMA_VERSIONS };
+  nextRoot.cloudFlags = { ...LAUNCH_CLOUD_FLAGS };
+  nextRoot.activeMode = normalizeInventoryMode(payload.activeMode);
+  nextRoot.localProfile = createLocalProfile(payload.localProfile, { activeMode: nextRoot.activeMode });
+  nextRoot.stores = {
+    demo: migrateState(payload.stores.demo, 'demo'),
+    personal: migrateState(payload.stores.personal, 'personal'),
+  };
+  nextRoot.backups = Array.isArray(payload.backups) ? payload.backups.slice(-5) : [];
+  saveRootStore(nextRoot);
+  setActiveDataMode(nextRoot.activeMode);
+  markFirstLaunchDone();
+  document.getElementById('firstLaunch')?.classList.remove('show');
+  saveLocalBackupMetadata({
+    lastBackupImportedAt: new Date().toISOString(),
+    lastBackupFileName: payload.fileName || '本地备份 JSON',
+  });
+  state = loadState();
+  rerenderInventoryApp();
+  showFirstLaunchIfNeeded();
+  return true;
+}
+
 function rerenderInventoryApp() {
   syncContainerCounts();
   renderHome();
@@ -418,24 +637,43 @@ function switchDataMode(mode) {
 
 function exportAllLocalData() {
   const root = loadRootStore();
-  const payload = {
-    exported: new Date().toISOString(),
-    version: root.version,
-    dataBoundary: {
-      modes: INVENTORY_MODES,
-      demoPersonalSeparated: true,
-      networkRequired: false,
-      sourceOfTruth: 'device-local-storage',
-    },
-    schemaVersions: root.schemaVersions,
-    localProfile: root.localProfile,
-    cloudFlags: root.cloudFlags,
-    migrationSmokeCheck: runLocalDataMigrationSmokeCheck(root),
-    activeMode: getActiveDataMode(),
-    stores: root.stores,
+  const payload = buildLocalBackupPayload(root);
+  const filename = `baohe-local-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  downloadJson(payload, filename);
+  saveLocalBackupMetadata({
+    lastBackupExportedAt: payload.exported,
+    lastBackupFileName: filename,
+  });
+  renderSettings();
+  showToast('已导出本地备份，可保存到文件/iCloud Drive');
+}
+
+function triggerLocalBackupImport() {
+  document.getElementById('localBackupFile')?.click();
+}
+
+function handleLocalBackupFile(input) {
+  const file = input?.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const payload = JSON.parse(String(reader.result || '{}'));
+      payload.fileName = file.name;
+      importAllLocalDataPayload(payload);
+      renderSettings();
+      showToast('已从本地备份恢复');
+    } catch (error) {
+      showToast(error?.message || '恢复失败');
+    } finally {
+      if (input) input.value = '';
+    }
   };
-  downloadJson(payload, `baohe-inventory-all-local-${new Date().toISOString().slice(0, 10)}.json`);
-  showToast('已导出全部本地数据 JSON');
+  reader.onerror = () => {
+    showToast('无法读取备份文件');
+    if (input) input.value = '';
+  };
+  reader.readAsText(file);
 }
 
 function clearPersonalData() {
@@ -483,6 +721,7 @@ function deleteAllLocalLaunchData() {
     localStorage.removeItem(INVENTORY_MODE_KEY);
     localStorage.removeItem(INVENTORY_FIRST_LAUNCH_KEY);
   } catch (_) { /* ignore */ }
+  deleteRootStoreFromIndexedDb();
   state = loadState();
   rerenderInventoryApp();
   showFirstLaunchIfNeeded();
@@ -869,10 +1108,13 @@ function archiveItem(id) {
 
 function deleteItem(id) {
   if (!confirm('确认删除这条本地物品记录？')) return;
+  const deleted = state.items.find((i) => i.id === id);
+  const nextSpaceId = deleted?.spaceId || state.currentSpaceId || 'master';
   state.items = state.items.filter((i) => i.id !== id);
+  state.currentItemId = null;
   persist();
   renderHome();
-  goPage('pg-space');
+  openSpace(nextSpaceId);
   showToast('已删除本地记录');
 }
 
@@ -1364,12 +1606,17 @@ function doomDone() {
 function renderSettings() {
   const mode = getActiveDataMode();
   const root = loadRootStore();
+  const metadata = loadLocalBackupMetadata();
   document.getElementById('settingsApi').textContent = window.STORAGE_API || '未配置（离线优先）';
   document.getElementById('settingsBin').textContent = state.activeContainerCode || '无';
   document.getElementById('settingsMode').value = mode;
   document.getElementById('settingsStorage').textContent = `本机存储 · ${mode} · 无网络可用`;
   document.getElementById('settingsCounts').textContent = `Demo ${root.stores.demo.items.length} 件 / Personal ${root.stores.personal.items.length} 件`;
   document.getElementById('settingsBackups').textContent = `${root.backups.length} 个本地恢复点`;
+  document.getElementById('settingsProfile').textContent = `${root.localProfile.displayName} · ${root.localProfile.deviceLabel}`;
+  document.getElementById('settingsLastSaved').textContent = formatLocalDateTime(root.localProfile.lastSavedAt || root.localProfile.updatedAt);
+  document.getElementById('settingsLastBackup').textContent = `${formatLocalDateTime(metadata.lastBackupExportedAt || metadata.lastBackupImportedAt)}${metadata.lastBackupFileName ? ' · ' + metadata.lastBackupFileName : ''}`;
+  document.getElementById('settingsBackupReminder').textContent = backupReminderStatus(metadata);
 }
 
 function downloadJson(payload, filename) {
@@ -1447,6 +1694,12 @@ function initNative() {
   scheduleGuardNotifications(ensureGuard(state));
 }
 
+function registerInventoryServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  if (window.location.protocol === 'file:') return;
+  navigator.serviceWorker.register('sw.js').catch(() => undefined);
+}
+
 // ── Boot ──
 tick();
 setInterval(tick, 30000);
@@ -1458,4 +1711,6 @@ refreshPtsUI();
 refreshBinUI();
 renderGuardUI();
 initNative();
+registerInventoryServiceWorker();
+bootstrapRootStoreFromIndexedDb();
 showFirstLaunchIfNeeded();

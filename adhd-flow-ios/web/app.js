@@ -1,6 +1,9 @@
 // ══════════════════════════════════════════
 // DATA SEEDS
 // ══════════════════════════════════════════
+const FIRST_LAUNCH_EXTERNAL_AUTH_ENABLED = false;
+const FIRST_LAUNCH_AI_ENABLED = false;
+
 const SEED_TASKS = [
   {id:1001,text:'🎓 确认 MBA 毕业典礼：登录链接 / 时间 / 着装就绪',priority:'p0',done:false},
   {id:1002,text:'07:30 洗脸：温水冲脸 → 3滴兰蔻粉水拍额头+口周+脖子（两颊严禁清洁剂）',priority:'p0',done:false},
@@ -202,6 +205,9 @@ function apiBase() {
 }
 
 async function callClaude(prompt, maxTokens = 1000) {
+  if (!FIRST_LAUNCH_AI_ENABLED) {
+    throw new Error('AI runtime is disabled for Baohe first-launch.');
+  }
   const endpoint = `${apiBase()}/api/adhd-flow/chat`;
   const resp = await fetch(endpoint, {
     method: 'POST',
@@ -718,9 +724,16 @@ function makeICSEvent(title,dateStr,startTime,durationMin,desc){
   function fmt(d){return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+'T'+String(d.getHours()).padStart(2,'0')+String(d.getMinutes()).padStart(2,'0')+'00';}
   return `BEGIN:VEVENT\r\nUID:adhd-${Date.now()}-${Math.random().toString(36).slice(2)}@fp\r\nDTSTAMP:${fmt(new Date())}Z\r\nDTSTART:${fmt(s)}\r\nDTEND:${fmt(e)}\r\nSUMMARY:${title.replace(/,/g,'\\,')}\r\nDESCRIPTION:${(desc||'').replace(/,/g,'\\,')}\r\nEND:VEVENT\r\n`;
 }
+function openExternalCalendar(url){
+  if (!FIRST_LAUNCH_EXTERNAL_AUTH_ENABLED) {
+    showToast('首发版暂不连接外部日历');
+    return;
+  }
+  window.open(url,'_blank');
+}
 function syncBlockToCalendar(idx){
   const b=generatedBlocks[idx];if(!b)return;
-  window.open(makeGCalURL(b.title,todayDateStr(),b.time,b.duration||60,b.detail||''),'_blank');
+  openExternalCalendar(makeGCalURL(b.title,todayDateStr(),b.time,b.duration||60,b.detail||''));
   const btn=document.getElementById('tbc-'+idx);if(btn){btn.textContent='✓';btn.classList.add('synced');}
   showToast('已打开Google日历，确认后保存');
 }
@@ -737,7 +750,7 @@ async function syncAllToCalendar(){
 function syncTaskToCalendar(id){
   const t=tasks.find(t=>t.id==id);if(!t)return;
   const ti=document.getElementById('calt-'+id);const timeVal=ti?ti.value:'09:00';
-  window.open(makeGCalURL(t.text.substring(0,60),todayDateStr(),timeVal,60,t.text),'_blank');
+  openExternalCalendar(makeGCalURL(t.text.substring(0,60),todayDateStr(),timeVal,60,t.text));
   const btn=document.getElementById('calb-'+id);if(btn){btn.textContent='✓';btn.classList.add('synced');}
   showToast('已打开Google日历');
 }

@@ -1,4 +1,6 @@
 // ════════════════ AUDIO ENGINE ════════════════
+const FIRST_LAUNCH_AI_ENABLED = false;
+
 const AE={
   ctx:null, sfx:true,
   init(){
@@ -847,6 +849,11 @@ async function sendMsg(){
   const inp=document.getElementById('coachInp');
   const q=inp.value.trim();if(!q)return;
   inp.value='';addMsg('user',q);addTyping();
+  if (!FIRST_LAUNCH_AI_ENABLED) {
+    removeTyping();
+    addMsg('ai','首发版暂不启用 AI 私教，仅保留本地训练记录。');
+    return;
+  }
   const sys=`你是 Jennifer（Jing）的私人 AI 训练教练，名叫"熔归教练"。
 
 【Jennifer 健康档案】
@@ -871,7 +878,7 @@ Day B超级组：Glute Bridge March+Bench Dips / Step-Up+Shoulder Taps(放慢) /
 
   try{
     const apiBase=window.FITNESS_API||'';
-    const res=await fetch(apiBase+'/api/fitness/chat',{
+    const res=await fetch(`${apiBase}/api/fitness/chat`,{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({system:sys,user:q})
     });

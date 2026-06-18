@@ -10,6 +10,9 @@ const requiredAppMarkers = [
   'function switchDataMode(',
   'function chooseFirstLaunchMode(',
   'function exportAllLocalData(',
+  'function importAllLocalDataPayload(',
+  'function triggerLocalBackupImport(',
+  'function handleLocalBackupFile(',
   'function clearPersonalData(',
   'function deleteAllLocalLaunchData(',
   'function resetDemoData(',
@@ -22,6 +25,9 @@ const requiredAppMarkers = [
   'updatedAt',
   'purchaseMemory',
   'dataBoundary',
+  'userManagedFileBackup: true',
+  'cloudSyncEnabled: false',
+  'externalAuthEnabled: false',
   'demo',
   'personal',
 ];
@@ -70,6 +76,9 @@ for (const [label, source] of [
     'portal-back-link',
     'href="../index.html"',
     'deleteAllLocalLaunchData()',
+    'id="localBackupFile"',
+    'triggerLocalBackupImport()',
+    'handleLocalBackupFile(this)',
   ]) {
     if (!source.includes(marker)) failures.push(`${label} missing marker: ${marker}`);
   }

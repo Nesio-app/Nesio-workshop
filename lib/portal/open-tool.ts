@@ -1,23 +1,32 @@
 import type { PortalTool } from './types';
-import { getModuleOpenHref } from './module-manifest';
-import { classifyModuleRouteKind } from './module-routes.mjs';
-import { isFirstLaunchGatedModuleId, isToolKilledByLocalFeatureControl } from './launch-safety';
+import { isToolKilledByLocalFeatureControl } from './launch-safety';
+import {
+  openToolHref as openToolHrefRuntime,
+  toolNeedsFullPage as toolNeedsFullPageRuntime,
+  toolOpenUrl as toolOpenUrlRuntime,
+  toolRouteKind as toolRouteKindRuntime,
+} from './open-tool.mjs';
+
+interface ShellRuntimeContext {
+  viewerRole?: 'public' | 'tester';
+  testerAllowlist?: string[];
+  testerCohort?: string | null;
+}
 
 export function toolOpenUrl(tool: PortalTool): string {
-  return getModuleOpenHref(tool);
+  return toolOpenUrlRuntime(tool);
 }
 
 export function toolRouteKind(tool: PortalTool) {
-  return classifyModuleRouteKind(tool.url);
+  return toolRouteKindRuntime(tool);
 }
 
 /** All tools open via full-page navigation (no iframe embedding). */
-export function toolNeedsFullPage(_tool: PortalTool): boolean {
-  return true;
+export function toolNeedsFullPage(tool: PortalTool): boolean {
+  return toolNeedsFullPageRuntime(tool);
 }
 
-export function openToolHref(tool: PortalTool): string {
+export function openToolHref(tool: PortalTool, context: ShellRuntimeContext = {}): string {
   if (isToolKilledByLocalFeatureControl(tool)) return '';
-  if (isFirstLaunchGatedModuleId(tool.id)) return '';
-  return toolOpenUrl(tool);
+  return openToolHrefRuntime(tool, context);
 }

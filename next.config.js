@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const isVercel = !!process.env.VERCEL;
-const shouldExport = process.env.NODE_ENV === 'production' && !isVercel;
+const shouldExport = process.env.NEXT_OUTPUT_MODE === 'export' && !isVercel;
 
 const nextConfig = {
   ...(shouldExport ? { output: 'export' } : {}),

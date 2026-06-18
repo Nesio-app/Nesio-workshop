@@ -1,20 +1,19 @@
 # Treasurebox / Baohe
 
-Treasurebox is a modular toolbox app. The current launch surface is intentionally small: a unified shell plus the Inventory / purchase-memory tool.
+Treasurebox is a modular toolbox app. The current beta path is intentionally small: a PWA shell plus the Inventory / purchase-memory tool.
 
 This repository keeps the broader module registry, contracts, and iOS shell work in one place, but most modules are not part of the public first-launch promise yet.
 
 ## Current Launch Scope
 
-Public first-launch scope:
+Public PWA beta scope:
 
-- Shell / module registry
+- PWA web shell / module registry
 - Inventory / purchase-memory
 - Local-first data storage
-- Export and delete for launch-local data
+- Local file export / restore and delete for launch-local data
 - Static paywall preview state
 - Approval-gated visibility for non-launch modules
-- Capacitor iOS shell
 
 Not publicly promised for first launch:
 
@@ -46,11 +45,23 @@ Current data layer:
 
 The launch-local data layer supports local initialization, read/write helpers, export, delete/reset, and migration smoke checks. It does not use a real cloud database or server user identity.
 
+## PWA Beta
+
+The current testable path is the web/PWA surface. It is local-first and does not require accounts, cloud sync, StoreKit, or external service authorization.
+
+Run locally:
+
+```bash
+npm run dev
+```
+
+The launch-visible tool is Inventory / purchase-memory. Other modules can remain registered for internal sandbox or future planning, but ordinary users should not see them as public commitments.
+
 ## iOS
 
-The iOS shell lives in `treasurebox-ios/`.
+The iOS shell lives in `treasurebox-ios/` and is kept as a later packaging path. It is not the current beta release target.
 
-Verified local build target:
+Previously verified local build target:
 
 ```bash
 cd treasurebox-ios

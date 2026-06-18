@@ -1504,10 +1504,14 @@ body {
 }
 
 .portal-treasure-popup-close {
+  width: 44px;
+  height: 44px;
   min-width: 44px;
   min-height: 44px;
+  flex: 0 0 44px;
   border: none;
   border-radius: 999px;
+  padding: 0;
   background: rgba(88, 140, 227, 0.1);
   color: var(--portal-muted);
   font-size: 1.1rem;

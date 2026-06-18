@@ -473,7 +473,14 @@ function launchSkuModuleEntryForTool(tool, mobileEntryByModuleId) {
 function mobileStrategyForTool(tool) {
   if (tool.integrationMode === 'static-report-only' || tool.integrationMode === 'contract-only') return 'native_bridge_deferred';
   if (!tool.ready) return 'not_ready';
-  if (tool.routeKind === 'local-static-module' || tool.routeKind === 'local-shell-route') return 'embedded_static';
+  const launchSurface = resolveLaunchSurfaceState(tool, { viewerRole: 'public' });
+  if ((tool.routeKind === 'local-static-module' || tool.routeKind === 'local-shell-route') &&
+    launchSurface.launchStatus === 'launchable' &&
+    launchSurface.prodExposure === 'public' &&
+    tool.publicIndex === true) {
+    return 'embedded_static';
+  }
+  if (tool.routeKind === 'local-static-module' || tool.routeKind === 'local-shell-route') return 'native_bridge_deferred';
   return 'external_webview_gated';
 }
 
@@ -902,8 +909,43 @@ const inventoryFirstLaunchSummary = {
 };
 
 const readyModules = tools.filter((tool) => tool.ready);
+const launchExposureEntries = tools.map((tool) => {
+  const publicState = resolveLaunchSurfaceState(tool, { viewerRole: 'public' });
+  const intentionalLaunchExclusion = !tool.boundaryOk &&
+    publicState.visible === false &&
+    publicState.shellAction === 'hide_for_public' &&
+    publicState.appStoreMentionAllowed === false;
+
+  return {
+    moduleId: tool.id,
+    routeKind: tool.routeKind,
+    configuredUrl: tool.configuredUrl,
+    publicIndexPath: tool.publicIndexPath,
+    publicIndex: tool.publicIndex,
+    launchStatus: publicState.launchStatus,
+    prodExposure: publicState.prodExposure,
+    visibleForPublic: publicState.visibleForPublic,
+    shellAction: publicState.shellAction,
+    appStoreMentionAllowed: publicState.appStoreMentionAllowed,
+    screenshotSafe: publicState.screenshotSafe,
+    reason: intentionalLaunchExclusion ? 'not_in_public_launch_surface' : publicState.reason,
+    releaseBlocker: !tool.boundaryOk && !intentionalLaunchExclusion,
+    intentionalExclusion: intentionalLaunchExclusion,
+    resolverSource: 'resolveLaunchSurfaceState',
+    evidenceFields: [
+      'routeKind',
+      'publicIndex',
+      'launchSurface.public.launchStatus',
+      'launchSurface.public.prodExposure',
+      'launchSurface.public.shellAction',
+      'launchSurface.public.appStoreMentionAllowed',
+    ],
+  };
+});
+const launchExposureIntentionalExclusions = launchExposureEntries.filter((entry) => entry.intentionalExclusion);
+const launchExposureReleaseBlockers = launchExposureEntries.filter((entry) => entry.releaseBlocker);
 const boundaryWarnings = tools
-  .filter((tool) => !tool.boundaryOk)
+  .filter((tool) => launchExposureReleaseBlockers.some((entry) => entry.moduleId === tool.id))
   .map((tool) => buildWarningEnvelope(tool, {
     id: tool.id,
     warningKind: 'boundary',
@@ -919,6 +961,22 @@ const boundaryWarnings = tools
       : 'Synced module expectation and registry boundary are inconsistent.',
     evidenceFields: ['configuredUrl', 'routeKind', 'expectedRouteKind'],
   }));
+const launchExposureSemantics = {
+  version: 'launch-exposure-semantics-v0',
+  resolverSource: 'resolveLaunchSurfaceState',
+  releaseBlockerCount: launchExposureReleaseBlockers.length,
+  intentionalExclusionCount: launchExposureIntentionalExclusions.length,
+  publicLaunchEmbeddedModules: launchExposureEntries
+    .filter((entry) => (
+      entry.launchStatus === 'launchable' &&
+      entry.prodExposure === 'public' &&
+      entry.shellAction === 'open' &&
+      entry.publicIndex === true
+    ))
+    .map((entry) => entry.moduleId),
+  intentionalExclusions: launchExposureIntentionalExclusions,
+  releaseBlockers: launchExposureReleaseBlockers,
+};
 const experienceServiceWarnings = tools
   .filter((tool) => tool.experienceServices.unknownApprovalRequiredActions.length > 0)
   .map((tool) => buildWarningEnvelope(tool, {
@@ -1272,11 +1330,12 @@ const registryDriftGateWarnings = tools
   ));
 const registryDriftLinkWarnings = tools
   .map((tool) => {
+    const launchExposure = launchExposureEntries.find((entry) => entry.moduleId === tool.id);
     const missingFields = [
       !hasText(tool.openHref) ? 'openHref' : null,
       !hasText(tool.returnHref) ? 'returnHref' : null,
-      tool.routeKind === 'local-static-module' && !hasText(tool.publicIndexPath) ? 'publicIndexPath' : null,
-      tool.routeKind === 'local-static-module' && !tool.publicIndex ? 'publicIndex' : null,
+      tool.routeKind === 'local-static-module' && launchExposure?.intentionalExclusion !== true && !hasText(tool.publicIndexPath) ? 'publicIndexPath' : null,
+      tool.routeKind === 'local-static-module' && launchExposure?.intentionalExclusion !== true && !tool.publicIndex ? 'publicIndex' : null,
     ].filter(Boolean);
     return missingFields.length > 0
       ? driftGuardWarning(tool, 'missing_link', 'Module registry entry is missing route link evidence.', missingFields)
@@ -2200,6 +2259,8 @@ const evidenceSummary = {
     unconnectedRouteCount: shellRouteSummary.unconnectedRouteCount,
     gatedRouteCount: shellRouteSummary.gatedRouteCount,
     boundaryWarningCount: boundaryWarnings.length,
+    launchExposureIntentionalExclusionCount: launchExposureSemantics.intentionalExclusionCount,
+    launchExposureReleaseBlockerCount: launchExposureSemantics.releaseBlockerCount,
     experienceServiceWarningCount: experienceServiceWarnings.length,
     dataAggregationWarningCount: aggregationWarnings.length,
     approvalGateWarningCount: approvalGateWarnings.length,
@@ -2324,8 +2385,8 @@ const evidenceSummary = {
     inventoryCloudSchemaDraftReady: cloudReadinessContract.summary.inventoryCloudSchemaDraftReady,
     futureCloudEligibleTableCount: cloudReadinessContract.summary.futureCloudEligibleTableCount,
     qaLine: boundaryWarnings.length === 0 && experienceServiceWarnings.length === 0 && aggregationWarnings.length === 0 && approvalGateWarnings.length === 0 && shellRouteWarnings.length === 0 && registryDriftWarnings.length === 0 && artifactVisibilityWarnings.length === 0 && artifactStatusVisibilityWarnings.length === 0 && shellDiscoveryBoundaryWarnings.length === 0 && mobileAppBoundaryWarnings.length === 0
-      ? `PASS: ${readyModules.length}/${tools.length} modules ready; all local static modules have public index files.`
-      : `WARN: ${boundaryWarnings.length} module boundary warning(s), ${experienceServiceWarnings.length} Experience Services warning(s), ${dataAggregationReviewWarningCount} Data Aggregation review warning(s), ${dataAggregationRuntimeBlockerCount} Data Aggregation runtime-blocking warning(s), ${approvalGateWarnings.length} Approval Gate warning(s), ${shellRouteWarnings.length} Shell Route warning(s), ${registryDriftWarnings.length} Registry Drift warning(s), ${artifactVisibilityWarnings.length} Artifact Visibility warning(s), ${artifactStatusVisibilityWarnings.length} Artifact Status Visibility warning(s), ${shellDiscoveryBoundaryWarnings.length} Shell Discovery warning(s), ${mobileAppBoundaryWarnings.length} Mobile App Integration warning(s) need QA review.`,
+      ? `PASS: ${readyModules.length}/${tools.length} modules ready; ${launchExposureSemantics.intentionalExclusionCount} intentional launch exclusion(s) are hidden from the public bundle.`
+      : `WARN: ${boundaryWarnings.length} module boundary warning(s), ${launchExposureSemantics.intentionalExclusionCount} intentional launch exclusion(s), ${experienceServiceWarnings.length} Experience Services warning(s), ${dataAggregationReviewWarningCount} Data Aggregation review warning(s), ${dataAggregationRuntimeBlockerCount} Data Aggregation runtime-blocking warning(s), ${approvalGateWarnings.length} Approval Gate warning(s), ${shellRouteWarnings.length} Shell Route warning(s), ${registryDriftWarnings.length} Registry Drift warning(s), ${artifactVisibilityWarnings.length} Artifact Visibility warning(s), ${artifactStatusVisibilityWarnings.length} Artifact Status Visibility warning(s), ${shellDiscoveryBoundaryWarnings.length} Shell Discovery warning(s), ${mobileAppBoundaryWarnings.length} Mobile App Integration warning(s) need QA review.`,
   },
   shell: {
     title: registry.shell.name,
@@ -2338,13 +2399,15 @@ const evidenceSummary = {
     localShellRoutes: tools.filter((tool) => tool.routeKind === 'local-shell-route').map((tool) => tool.id),
     externalLinks: tools.filter((tool) => tool.routeKind === 'external-link').map((tool) => tool.id),
     syncedEmbeddedModules: tools
-      .filter((tool) => tool.syncedDirectory && tool.routeKind === 'local-static-module')
+      .filter((tool) => tool.syncedDirectory && mobileStrategyForTool(tool) === 'embedded_static')
       .map((tool) => tool.id),
+    publicLaunchEmbeddedModules: launchExposureSemantics.publicLaunchEmbeddedModules,
     syncedExternalLinks: tools
       .filter((tool) => tool.syncedDirectory && tool.routeKind === 'external-link')
       .map((tool) => tool.id),
     boundaryWarnings,
   },
+  launchExposureSemantics,
   contracts: {
     capabilities: Object.fromEntries(tools.map((tool) => [tool.id, tool.capabilities])),
     data: Object.fromEntries(tools.map((tool) => [tool.id, {
