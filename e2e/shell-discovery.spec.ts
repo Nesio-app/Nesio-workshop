@@ -121,14 +121,41 @@ test('secretary floating button opens the restored secretary page', async ({ pag
   await page.reload();
 
   await page.locator('.portal-quick-chat-fab').click({ force: true });
-  await expect(page.locator('.portal-quick-chat--open')).toBeVisible();
-  await page.locator('.portal-quick-chat--open').getByRole('link', { name: /智友/ }).click();
   await expect(page).toHaveURL(/\/secretary\/?$/);
   await expect(page.locator('body')).toContainText(/智友|Gemini|ChatGPT|豆包/);
 
   await page.goto('/');
   await page.getByRole('button', { name: /打开宝盒工具/ }).click({ force: true });
   await expect(page.locator('.portal-treasure-popup').getByRole('button', { name: /智友/ })).toHaveCount(0);
+});
+
+test('dashboard header actions keep aligned 44px hit targets', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('.portal-dash-hero-end')).toBeVisible();
+  const boxes = await page.evaluate(() => {
+    const [noteButton, treasureButton] = Array.from(
+      document.querySelectorAll('.portal-dash-hero-end button'),
+    );
+    const note = noteButton?.getBoundingClientRect();
+    const treasure = treasureButton?.getBoundingClientRect();
+    return note && treasure
+      ? {
+          noteTop: note.top,
+          treasureTop: treasure.top,
+          noteWidth: note.width,
+          noteHeight: note.height,
+          treasureWidth: treasure.width,
+          treasureHeight: treasure.height,
+        }
+      : null;
+  });
+
+  expect(boxes).not.toBeNull();
+  expect(Math.abs((boxes?.noteTop ?? 0) - (boxes?.treasureTop ?? 0))).toBeLessThanOrEqual(1);
+  expect(boxes?.noteWidth ?? 0).toBeGreaterThanOrEqual(44);
+  expect(boxes?.noteHeight ?? 0).toBeGreaterThanOrEqual(44);
+  expect(boxes?.treasureWidth ?? 0).toBeGreaterThanOrEqual(44);
+  expect(boxes?.treasureHeight ?? 0).toBeGreaterThanOrEqual(44);
 });
 
 test('personal lab toolbox exposes non-secretary registered tools for testing', async ({ page }) => {

@@ -219,6 +219,22 @@ export default function DashboardHome({
   }, [config]);
 
   useEffect(() => {
+    let cancelled = false;
+    fetch('/api/portal/quote', { cache: 'no-store' })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload) => {
+        const quote = typeof payload?.quote === 'string' ? payload.quote.trim() : '';
+        if (!cancelled && payload?.ok === true && quote.length >= 4 && quote.length <= 140) {
+          setDailyQuote(quote);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     const t = window.setInterval(() => setNow(new Date()), 30_000);
     return () => window.clearInterval(t);
   }, []);
