@@ -1426,8 +1426,12 @@ body {
   box-shadow:
     0 8px 22px rgba(88, 140, 227, 0.35),
     0 0 0 4px rgba(88, 140, 227, 0.1);
+  padding: 0;
+  font: inherit;
   text-decoration: none;
   touch-action: manipulation;
+  appearance: none;
+  cursor: pointer;
 }
 
 .portal-secretary-fab-ring {
@@ -3323,10 +3327,10 @@ html[data-portal-theme="night"] .portal-root{
 html[data-portal-theme="night"] .portal-root--home,
 html[data-portal-theme="night"] .portal-root{
   background:
-    radial-gradient(ellipse 85% 60% at 12% 0%, rgba(88,140,227,.22), transparent 55%),
-    radial-gradient(ellipse 70% 55% at 88% 6%, rgba(40,70,120,.5), transparent 52%),
-    linear-gradient(165deg,#1a2740 0%,#121d33 50%,#0a1322 100%);
+    radial-gradient(ellipse 70% 55% at 88% 6%, rgba(40,70,120,.28), transparent 52%),
+    linear-gradient(165deg,#17233a 0%,#111c31 50%,#0a1322 100%);
 }
+html[data-portal-theme="night"] .portal-root--home::before{display:none}
 html[data-portal-theme="night"] .portal-grain{opacity:.5}
 
 /* ── 3. 玻璃面：白→深 ── */

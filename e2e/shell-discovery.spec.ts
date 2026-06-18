@@ -113,6 +113,28 @@ test('shell toolbox opens, keeps its open state after refresh, and closes', asyn
   await expect(page.locator('.portal-treasure-popup')).toBeHidden();
 });
 
+test('secretary entry points open quick chat without leaving shell', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => {
+    sessionStorage.clear();
+  });
+  await page.reload();
+
+  await page.locator('.portal-secretary-fab').click({ force: true });
+  await expect(page.locator('.portal-quick-chat--open')).toBeVisible();
+  await expect(page).not.toHaveURL(/\/secretary\/?$/);
+
+  await page.reload();
+
+  const treasureButton = page.getByRole('button', { name: /打开宝盒工具/ });
+  await treasureButton.click({ force: true });
+  const popup = page.locator('.portal-treasure-popup');
+  await expect(popup).toBeVisible();
+  await popup.getByRole('button', { name: /智友/ }).click({ force: true });
+  await expect(page.locator('.portal-quick-chat--open')).toBeVisible();
+  await expect(page).not.toHaveURL(/\/secretary\/?$/);
+});
+
 test('personal lab toolbox exposes every registered tool for testing', async ({ page }) => {
   await page.goto('/?baohePersonalLab=1');
   await page.evaluate(() => {

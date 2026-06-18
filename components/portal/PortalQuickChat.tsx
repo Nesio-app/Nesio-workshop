@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { loadProfileSettings } from '@/lib/portal/profile';
 import type { PortalLocale } from '@/lib/portal/profile';
 import { t } from '@/lib/portal/i18n';
@@ -8,14 +8,19 @@ import { t } from '@/lib/portal/i18n';
 type ChatTurn = { role: 'user' | 'assistant'; content: string };
 type Provider = 'gemini' | 'openai' | 'doubao';
 
+type PortalQuickChatProps = {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+};
+
 const PROVIDERS: Array<{ id: Provider; label: string }> = [
   { id: 'gemini', label: 'Gemini' },
   { id: 'openai', label: 'ChatGPT' },
   { id: 'doubao', label: '豆包' },
 ];
 
-export default function PortalQuickChat() {
-  const [open, setOpen] = useState(false);
+export default function PortalQuickChat({ open: controlledOpen, onOpenChange }: PortalQuickChatProps = {}) {
+  const [localOpen, setLocalOpen] = useState(false);
   const [message, setMessage] = useState('');
   const [provider, setProvider] = useState<Provider>('gemini');
   const [history, setHistory] = useState<ChatTurn[]>([]);
@@ -23,6 +28,12 @@ export default function PortalQuickChat() {
   const [sending, setSending] = useState(false);
   const startY = useRef(0);
   const locale: PortalLocale = loadProfileSettings().locale;
+  const open = controlledOpen ?? localOpen;
+  const setOpen = useCallback((next: boolean | ((value: boolean) => boolean)) => {
+    const value = typeof next === 'function' ? next(open) : next;
+    if (onOpenChange) onOpenChange(value);
+    else setLocalOpen(value);
+  }, [onOpenChange, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -31,7 +42,7 @@ export default function PortalQuickChat() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open]);
+  }, [open, setOpen]);
 
   async function sendMessage() {
     const text = message.trim();

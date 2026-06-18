@@ -162,6 +162,7 @@ export default function Portal() {
   );
   const [noteOpen, setNoteOpen] = useState(false);
   const [treasureOpen, setTreasureOpen] = useState(false);
+  const [quickChatOpen, setQuickChatOpen] = useState(false);
   const [launchSurfaceContext, setLaunchSurfaceContext] = useState({
     viewerRole: 'public' as 'public' | 'tester' | 'personal_lab',
     testerAllowlist: [] as string[],
@@ -252,6 +253,13 @@ export default function Portal() {
   }, []);
 
   const openTool = useCallback((tool: PortalTool) => {
+    if (tool.id === 'secretary') {
+      setTreasureOpen(false);
+      setTreasurePersisted(false);
+      setQuickChatOpen(true);
+      return;
+    }
+
     const runtimeTool = resolveShellRuntimeTools([tool], launchSurfaceContext).tools[0];
     if (!shouldShellOpenTool(runtimeTool?.shellRuntime)) return;
     if (isToolKilledByLocalFeatureControl(tool)) return;
@@ -351,8 +359,8 @@ export default function Portal() {
 
       {!noteOpen ? (
         <div className="portal-chrome">
-          <PortalSecretaryFab />
-          {launchSurfaceContext.viewerRole === 'personal_lab' ? <PortalQuickChat /> : null}
+          <PortalSecretaryFab onOpen={() => setQuickChatOpen(true)} />
+          <PortalQuickChat open={quickChatOpen} onOpenChange={setQuickChatOpen} />
         </div>
       ) : null}
 
