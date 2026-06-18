@@ -9,6 +9,7 @@ import { t } from '@/lib/portal/i18n';
 interface ToolGridProps {
   tools: PortalTool[];
   excludeIds?: string[];
+  includeNotReady?: boolean;
   showStatus?: boolean;
   locale?: PortalLocale;
   onOpenTool: (tool: PortalTool) => void;
@@ -21,12 +22,13 @@ function toolStatusLabel(tool: PortalTool, locale: PortalLocale = 'zh'): string 
 export default function ToolGrid({
   tools,
   excludeIds = [],
+  includeNotReady = false,
   showStatus = false,
   locale = 'zh',
   onOpenTool,
 }: ToolGridProps) {
   const exclude = new Set(excludeIds);
-  const ready = tools.filter((t) => t.ready && !exclude.has(t.id));
+  const ready = tools.filter((t) => (includeNotReady || t.ready) && !exclude.has(t.id));
 
   return (
     <section className="portal-tools" aria-label={t(locale, 'shellToolLabel')}>

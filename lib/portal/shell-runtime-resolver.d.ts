@@ -1,9 +1,10 @@
 import type { PortalTool } from './types';
 
 export interface ShellRuntimeContext {
-  viewerRole?: 'public' | 'tester';
+  viewerRole?: 'public' | 'tester' | 'personal_lab';
   testerAllowlist?: string[];
   testerCohort?: string | null;
+  testerCode?: string | null;
 }
 
 export interface ShellRuntimeState {
@@ -14,6 +15,7 @@ export interface ShellRuntimeState {
   visible: boolean;
   visibleForPublic: boolean;
   visibleForTester: boolean;
+  visibleForPersonalLab: boolean;
   reason: string;
   shellAction: string;
   approvalGateState: string;
@@ -24,6 +26,8 @@ export interface ShellRuntimeState {
   paywallBehavior: string;
   realPurchaseEnabled: boolean;
   storeKitEnabled: boolean;
+  realRuntimeEnabled: boolean;
+  personalLabMode: boolean;
   betaBadgeRequired: boolean;
   appStoreMentionAllowed: boolean;
   screenshotSafe: boolean;

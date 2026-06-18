@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import DashboardHome from './DashboardHome';
 import NotePanelEnhanced from './NotePanelEnhanced';
+import PortalQuickChat from './PortalQuickChat';
 import PortalSecretaryFab from './PortalSecretaryFab';
 import { DEFAULT_PORTAL_CONFIG } from '@/lib/portal/defaults';
 import { openToolHref } from '@/lib/portal/open-tool';
@@ -42,7 +43,9 @@ function normalizeLaunchSurfaceContext(raw: {
   testerCohort?: unknown;
 }) {
   return {
-    viewerRole: raw.viewerRole === 'tester' ? 'tester' as const : 'public' as const,
+    viewerRole: raw.viewerRole === 'personal_lab'
+      ? 'personal_lab' as const
+      : raw.viewerRole === 'tester' ? 'tester' as const : 'public' as const,
     testerAllowlist: Array.isArray(raw.testerAllowlist)
       ? raw.testerAllowlist.filter((item): item is string => typeof item === 'string')
       : [],
@@ -160,7 +163,7 @@ export default function Portal() {
   const [noteOpen, setNoteOpen] = useState(false);
   const [treasureOpen, setTreasureOpen] = useState(false);
   const [launchSurfaceContext, setLaunchSurfaceContext] = useState({
-    viewerRole: 'public' as 'public' | 'tester',
+    viewerRole: 'public' as 'public' | 'tester' | 'personal_lab',
     testerAllowlist: [] as string[],
     testerCohort: null as string | null,
   });
@@ -348,6 +351,7 @@ export default function Portal() {
       {!noteOpen ? (
         <div className="portal-chrome">
           <PortalSecretaryFab />
+          {launchSurfaceContext.viewerRole === 'personal_lab' ? <PortalQuickChat /> : null}
         </div>
       ) : null}
 

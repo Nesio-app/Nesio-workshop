@@ -1,19 +1,26 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { ensureToolboxTrailingSlash, withBase } from '@/lib/portal/paths';
 import { loadProfileSettings } from '@/lib/portal/profile';
 import type { PortalLocale } from '@/lib/portal/profile';
 import { t } from '@/lib/portal/i18n';
 
-const QUICK_LINKS: Array<{ key: 'quickChatActionSecretary' | 'quickChatActionGemini' | 'quickChatActionGroup'; href: string; icon: string }> = [
-  { key: 'quickChatActionSecretary', href: ensureToolboxTrailingSlash('/secretary'), icon: '💬' },
-  { key: 'quickChatActionGemini', href: withBase('/secretary/chat.html?friend=gemini'), icon: '✦' },
-  { key: 'quickChatActionGroup', href: withBase('/secretary/group.html'), icon: '👥' },
+type ChatTurn = { role: 'user' | 'assistant'; content: string };
+type Provider = 'gemini' | 'openai' | 'doubao';
+
+const PROVIDERS: Array<{ id: Provider; label: string }> = [
+  { id: 'gemini', label: 'Gemini' },
+  { id: 'openai', label: 'ChatGPT' },
+  { id: 'doubao', label: '豆包' },
 ];
 
 export default function PortalQuickChat() {
   const [open, setOpen] = useState(false);
+  const [message, setMessage] = useState('');
+  const [provider, setProvider] = useState<Provider>('gemini');
+  const [history, setHistory] = useState<ChatTurn[]>([]);
+  const [status, setStatus] = useState('');
+  const [sending, setSending] = useState(false);
   const startY = useRef(0);
   const locale: PortalLocale = loadProfileSettings().locale;
 
@@ -25,6 +32,45 @@ export default function PortalQuickChat() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [open]);
+
+  async function sendMessage() {
+    const text = message.trim();
+    if (!text || sending) return;
+    const nextHistory = [...history, { role: 'user' as const, content: text }];
+    setHistory(nextHistory);
+    setMessage('');
+    setSending(true);
+    setStatus('');
+
+    try {
+      const response = await fetch('/api/secretary/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-baohe-access-mode': 'personal_lab',
+        },
+        body: JSON.stringify({
+          message: text,
+          history,
+          model: provider,
+          maxTokens: 900,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data?.hint || data?.detail || data?.error || `HTTP ${response.status}`);
+      }
+      const answer = String(data?.text || '').trim();
+      if (!answer) throw new Error('智友暂时没有返回内容');
+      setHistory([...nextHistory, { role: 'assistant' as const, content: answer }].slice(-8));
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : '智友请求失败');
+      setHistory(history);
+      setMessage(text);
+    } finally {
+      setSending(false);
+    }
+  }
 
   return (
     <div className={'portal-quick-chat' + (open ? ' portal-quick-chat--open' : '')}>
@@ -40,19 +86,40 @@ export default function PortalQuickChat() {
           onClick={() => setOpen((v) => !v)}
           aria-label={open ? t(locale, 'quickChatToggleExpanded') : t(locale, 'quickChatToggle')}
         />
-        <p className="portal-quick-chat-title">{t(locale, 'quickChatTitle')}</p>
+        <p className="portal-quick-chat-title">{t(locale, 'quickChatTitle')} · Personal</p>
         <div className="portal-quick-chat-actions">
-          {QUICK_LINKS.map((link) => (
-            <a
-              key={link.key}
-              className="portal-quick-chat-action"
-              href={link.href}
-              onClick={() => setOpen(false)}
+          {PROVIDERS.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className={'portal-quick-chat-action' + (provider === item.id ? ' portal-quick-chat-action--active' : '')}
+              onClick={() => setProvider(item.id)}
             >
-              <span aria-hidden>{link.icon}</span>
-              <span>{t(locale, link.key)}</span>
-            </a>
+              {item.label}
+            </button>
           ))}
+        </div>
+        <div className="portal-quick-chat-thread" aria-live="polite">
+          {history.slice(-4).map((turn, index) => (
+            <p key={`${turn.role}-${index}`} className={`portal-quick-chat-msg portal-quick-chat-msg--${turn.role}`}>
+              {turn.content}
+            </p>
+          ))}
+          {status ? <p className="portal-quick-chat-error">{status}</p> : null}
+        </div>
+        <div className="portal-quick-chat-input-row">
+          <input
+            value={message}
+            onChange={(event) => setMessage(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') void sendMessage();
+            }}
+            placeholder="问智友一句..."
+            aria-label="智友输入"
+          />
+          <button type="button" onClick={() => void sendMessage()} disabled={sending || !message.trim()}>
+            {sending ? '...' : '发送'}
+          </button>
         </div>
       </div>
 

@@ -2011,10 +2011,89 @@ body {
   gap: 0.2rem;
   padding: 0.45rem 0.25rem;
   border-radius: 0.65rem;
+  border: 1px solid transparent;
   background: rgba(205, 222, 252, 0.35);
   color: var(--portal-blue-deep);
   text-decoration: none;
   font-size: 0.68rem;
+  cursor: pointer;
+  font: inherit;
+}
+
+.portal-quick-chat-action--active {
+  border-color: rgba(88, 140, 227, 0.5);
+  background: rgba(88, 140, 227, 0.16);
+}
+
+.portal-quick-chat-thread {
+  max-height: 8.5rem;
+  overflow: auto;
+  margin: 0.55rem 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.portal-quick-chat-msg,
+.portal-quick-chat-error {
+  margin: 0;
+  padding: 0.45rem 0.55rem;
+  border-radius: 0.65rem;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.portal-quick-chat-msg--user {
+  justify-self: end;
+  max-width: 86%;
+  background: rgba(88, 140, 227, 0.16);
+  color: var(--portal-blue-deep);
+}
+
+.portal-quick-chat-msg--assistant {
+  justify-self: start;
+  max-width: 92%;
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--portal-ink);
+}
+
+.portal-quick-chat-error {
+  background: rgba(170, 54, 54, 0.08);
+  color: #963636;
+}
+
+.portal-quick-chat-input-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.4rem;
+}
+
+.portal-quick-chat-input-row input {
+  min-width: 0;
+  height: 2.35rem;
+  border: 1px solid var(--portal-line);
+  border-radius: 0.7rem;
+  padding: 0 0.65rem;
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--portal-ink);
+  font: inherit;
+}
+
+.portal-quick-chat-input-row button {
+  min-width: 3.4rem;
+  height: 2.35rem;
+  border: 0;
+  border-radius: 0.7rem;
+  background: var(--portal-blue);
+  color: white;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.portal-quick-chat-input-row button:disabled {
+  opacity: 0.52;
+  cursor: not-allowed;
 }
 
 .portal-quick-chat-fab {

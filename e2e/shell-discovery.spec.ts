@@ -41,3 +41,25 @@ test('shell toolbox opens, keeps its open state after refresh, and closes', asyn
   await page.reload();
   await expect(page.locator('.portal-treasure-popup')).toBeHidden();
 });
+
+test('personal lab toolbox exposes every registered tool for testing', async ({ page }) => {
+  await page.goto('/?baohePersonalLab=1');
+  await page.evaluate(() => {
+    sessionStorage.clear();
+  });
+  await page.reload();
+
+  const treasureButton = page.getByRole('button', { name: /打开宝盒工具/ });
+  await expect(treasureButton).toBeVisible();
+  await treasureButton.click({ force: true });
+
+  const popup = page.locator('.portal-treasure-popup');
+  await expect(popup).toBeVisible();
+  const toolButtons = popup.locator('.portal-tool-card');
+  await expect(toolButtons.first()).toBeVisible();
+  await expect.poll(() => toolButtons.count()).toBeGreaterThanOrEqual(11);
+
+  for (const name of ['智友', '待办', '刷题', '收纳', '咨询', '冥想', '阅读', '健身', '溯', '财务', '人生']) {
+    await expect(popup.getByRole('button', { name: new RegExp(name) })).toBeVisible();
+  }
+});

@@ -34,6 +34,18 @@ async function returnHome(page: Page) {
 test('storage PWA exports local data and restores it after clearing', async ({ page }) => {
   test.setTimeout(90_000);
 
+  await page.goto('/storage');
+  await expect(page.locator('#pg-home.active')).toBeVisible();
+  await expect(page.locator('#homeSub')).toContainText(/Demo|Personal|Object Anchors/);
+  await expect(page.locator('.tabbar')).toBeVisible();
+  await expect(page.locator('.tab', { hasText: '主页' })).toBeVisible();
+  await expect(page.locator('.portal-back-link')).toBeVisible();
+  await expect(page.locator('#hsearch')).toBeVisible();
+  await expect.poll(() => page.evaluate(() => {
+    const tabs = document.querySelector('.tabbar');
+    return tabs ? getComputedStyle(tabs).position : '';
+  })).toBe('fixed');
+
   await page.goto('/storage/index.html');
   await clearInventoryState(page);
   await page.reload();
@@ -105,7 +117,7 @@ test('storage PWA exports local data and restores it after clearing', async ({ p
 
   await page.locator('.hbtn[title="设置"]').click();
   const clearDialog = page.waitForEvent('dialog').then((dialog) => dialog.accept());
-  await page.getByRole('button', { name: '清空首发本地数据' }).click({ force: true });
+  await page.locator('#sh-settings').getByRole('button', { name: '清空首发本地数据' }).click({ force: true });
   await clearDialog;
   await expect(page.locator('#spaceScroll .iname', { hasText: 'E2E 编辑后物品' })).toHaveCount(0);
 

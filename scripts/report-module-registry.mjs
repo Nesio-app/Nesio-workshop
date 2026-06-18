@@ -1995,6 +1995,7 @@ const launchSurfaceEntries = launchSurfaceTools.map((tool) => {
     viewerRole: 'tester',
     testerAllowlist: launchSurfaceTesterAllowlist,
   });
+  const personalLabState = resolveLaunchSurfaceState(tool, { viewerRole: 'personal_lab' });
   return {
     moduleId: tool.id,
     label: tool.name,
@@ -2003,8 +2004,10 @@ const launchSurfaceEntries = launchSurfaceTools.map((tool) => {
     prodExposure: publicState.prodExposure,
     visibleForPublic: publicState.visible,
     visibleForTester: testerState.visible,
+    visibleForPersonalLab: personalLabState.visible,
     shellAction: publicState.shellAction,
     testerShellAction: testerState.shellAction,
+    personalLabShellAction: personalLabState.shellAction,
     paywallState: publicState.paywallState,
     paywallBehavior: publicState.paywallBehavior,
     approvalGateState: publicState.approvalGateState,
@@ -2012,6 +2015,8 @@ const launchSurfaceEntries = launchSurfaceTools.map((tool) => {
     blockedByPaywallGate: publicState.blockedByPaywallGate,
     approvalGateOverridesPaywallGate: publicState.approvalGateOverridesPaywallGate,
     betaBadgeRequiredForTester: testerState.betaBadgeRequired,
+    betaBadgeRequiredForPersonalLab: personalLabState.betaBadgeRequired,
+    personalLabRealRuntimeEnabled: personalLabState.realRuntimeEnabled,
     appStoreMentionAllowed: publicState.appStoreMentionAllowed,
     screenshotSafe: publicState.screenshotSafe,
   };

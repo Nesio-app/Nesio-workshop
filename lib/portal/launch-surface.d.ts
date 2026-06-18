@@ -1,9 +1,10 @@
 import type { PortalTool } from './types';
 
 export interface LaunchSurfaceContext {
-  viewerRole: 'public' | 'tester';
+  viewerRole: 'public' | 'tester' | 'personal_lab';
   testerAllowlist: string[];
   testerCohort?: string | null;
+  testerCode?: string | null;
 }
 
 export interface LaunchSurfaceState {
@@ -14,6 +15,7 @@ export interface LaunchSurfaceState {
   visible: boolean;
   visibleForPublic: boolean;
   visibleForTester: boolean;
+  visibleForPersonalLab: boolean;
   reason: string;
   shellAction: string;
   approvalGateState: string;
@@ -24,12 +26,20 @@ export interface LaunchSurfaceState {
   paywallBehavior: string;
   realPurchaseEnabled: boolean;
   storeKitEnabled: boolean;
+  realRuntimeEnabled: boolean;
+  personalLabMode: boolean;
   betaBadgeRequired: boolean;
   appStoreMentionAllowed: boolean;
   screenshotSafe: boolean;
 }
 
 export const LAUNCH_SURFACE_VERSION_V0: 'launch-surface-v0';
+
+export function resolveTesterCohort(cohortCode?: string | null): {
+  code: string | null;
+  source: 'local_cohort_code' | 'none';
+  moduleIds: string[];
+};
 
 export function resolveLaunchSurfaceState(
   tool: PortalTool & Record<string, unknown>,

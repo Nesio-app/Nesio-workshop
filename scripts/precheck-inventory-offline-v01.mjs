@@ -67,6 +67,11 @@ for (const [label, source] of [
 ]) {
   for (const marker of [
     'id="firstLaunch"',
+    'href="/storage/styles.css"',
+    'src="/storage/app.js"',
+    'src="/storage/config.js"',
+    'src="/storage/qr.js"',
+    'src="/storage/guard.js"',
     "chooseFirstLaunchMode('demo')",
     "chooseFirstLaunchMode('personal')",
     'id="mMemory"',
