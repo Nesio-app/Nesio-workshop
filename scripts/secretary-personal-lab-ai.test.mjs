@@ -10,6 +10,9 @@ const middleware = read('middleware.ts');
 const route = read('app/api/secretary/chat/route.ts');
 const portal = read('components/portal/Portal.tsx');
 const quickChat = read('components/portal/PortalQuickChat.tsx');
+const secretaryIndex = read('public/secretary/index.html');
+const secretaryChat = read('public/secretary/chat.js');
+const secretaryApi = read('public/secretary/api.js');
 
 assert.match(launchSafety, /BAOHE_PERSONAL_LAB_AI_ENABLED/, 'personal lab AI must be env-gated');
 assert.match(launchSafety, /isPersonalLabAiRequestAllowed/, 'personal lab AI request helper must exist');
@@ -22,9 +25,13 @@ assert.match(route, /isPersonalLabAiRequestAllowed/, 'secretary chat route must 
 assert.match(route, /launchUnavailablePayload\('api:secretary:chat'/, 'secretary chat must still fail closed by default');
 
 assert.match(portal, /PortalQuickChat/, 'home portal must mount quick chat');
-assert.match(quickChat, /\/api\/secretary\/chat/, 'quick chat must call secretary chat API');
-assert.match(quickChat, /x-baohe-access-mode/, 'quick chat must send personal lab access header');
-assert.match(quickChat, /personal_lab/, 'quick chat must be scoped to personal lab mode');
-assert.match(quickChat, /chatgpt|openai|gemini|doubao/, 'quick chat must expose provider selection for lab AI checks');
+assert.match(quickChat, /\/secretary/, 'home quick chat must link to the secretary app');
+assert.match(quickChat, /\/secretary\/chat\?friend=gemini/, 'home quick chat must deep-link to Gemini chat');
+assert.match(secretaryIndex, /list\.js/, 'secretary app list page must be present');
+assert.match(secretaryChat, /sendSecretaryMessage/, 'secretary chat page must call API helper');
+assert.match(secretaryApi, /\/api\/secretary\/chat/, 'secretary app must call secretary chat API');
+assert.match(secretaryApi, /x-baohe-access-mode/, 'secretary app must send personal lab access header');
+assert.match(secretaryApi, /personal_lab/, 'secretary app must be scoped to personal lab mode');
+assert.match(secretaryChat, /gemini|openai|doubao/, 'secretary app must expose provider routing');
 
 console.log('secretary personal lab AI tests passed');

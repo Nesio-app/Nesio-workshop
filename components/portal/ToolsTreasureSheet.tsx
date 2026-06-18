@@ -101,20 +101,14 @@ export default function ToolsTreasurePopup({
     };
   }, [open, anchorRef]);
 
-  const personalLabMode = launchContext.viewerRole === 'personal_lab';
   const visibleTools = useMemo(
     () => {
-      const runtimeTools = resolveShellRuntimeTools(tools, launchContext).visibleTools;
-      if (personalLabMode) return runtimeTools;
-
-      const secretaryTool = tools.find((tool) => tool.id === 'secretary');
-      if (!secretaryTool || runtimeTools.some((tool) => tool.id === 'secretary')) {
-        return runtimeTools;
-      }
-
-      return [secretaryTool, ...runtimeTools];
+      return resolveShellRuntimeTools(
+        tools.filter((tool) => tool.id !== 'secretary'),
+        launchContext,
+      ).visibleTools;
     },
-    [tools, launchContext, personalLabMode],
+    [tools, launchContext],
   );
 
   if (!open) return null;

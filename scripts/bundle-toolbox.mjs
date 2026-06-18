@@ -84,6 +84,7 @@ function buildBundlePlan() {
     };
   });
   const entries = allEntries.filter((entry) => {
+    if (entry.moduleId === 'secretary') return true;
     if (includeSandbox) return entry.launchStatus !== 'hidden' && entry.launchStatus !== 'gated';
     return entry.launchStatus === 'launchable' && entry.prodExposure === 'public' && entry.shellAction === 'open';
   });
@@ -121,6 +122,9 @@ function applyBundle(plan) {
     const sourceDir = join(repoRoot, entry.sourceDir);
     const targetDir = join(publicRoot, entry.publicPath);
     assertInsidePublic(targetDir);
+    if (resolve(sourceDir) === resolve(targetDir)) {
+      continue;
+    }
     rmSync(targetDir, { recursive: true, force: true });
     mkdirSync(dirname(targetDir), { recursive: true });
     cpSync(sourceDir, targetDir, { recursive: true });

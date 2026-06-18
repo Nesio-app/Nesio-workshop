@@ -25,7 +25,6 @@ for (const id of ['secretary', 'quiz', 'psychoanalysis', 'sanctuary', 'health', 
 }
 
 for (const path of [
-  '/secretary',
   '/inner-shelter',
   '/health',
   '/api/secretary',

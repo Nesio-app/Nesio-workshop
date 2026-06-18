@@ -13,7 +13,6 @@ export const FIRST_LAUNCH_GATED_MODULE_IDS = new Set([
 ]);
 
 export const FIRST_LAUNCH_BLOCKED_PATH_PREFIXES = [
-  '/secretary',
   '/inner-shelter',
   '/health',
   '/api/secretary',

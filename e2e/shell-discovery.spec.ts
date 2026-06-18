@@ -81,7 +81,7 @@ test('shell toolbox opens, keeps its open state after refresh, and closes', asyn
   const popup = page.locator('.portal-treasure-popup');
   await expect(popup).toBeVisible();
   await expect(popup.locator('.portal-treasure-popup-title')).toContainText(/宝盒|工具/);
-  await expect(popup.getByRole('button', { name: /智友/ })).toBeVisible();
+  await expect(popup.getByRole('button', { name: /智友/ })).toHaveCount(0);
   await expect(popup.getByRole('button', { name: /收纳/ })).toBeVisible();
 
   await page.waitForTimeout(450);
@@ -93,7 +93,7 @@ test('shell toolbox opens, keeps its open state after refresh, and closes', asyn
 
   const toolButtons = popup.locator('.portal-tool-card');
   await expect(toolButtons.first()).toBeVisible();
-  expect(await toolButtons.count()).toBeGreaterThanOrEqual(2);
+  expect(await toolButtons.count()).toBe(1);
 
   const firstToolBox = await toolButtons.first().boundingBox();
   expect(firstToolBox?.width ?? 0).toBeGreaterThanOrEqual(44);
@@ -113,29 +113,25 @@ test('shell toolbox opens, keeps its open state after refresh, and closes', asyn
   await expect(page.locator('.portal-treasure-popup')).toBeHidden();
 });
 
-test('secretary entry points open quick chat without leaving shell', async ({ page }) => {
+test('secretary floating button opens the restored secretary page', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => {
     sessionStorage.clear();
   });
   await page.reload();
 
-  await page.locator('.portal-secretary-fab').click({ force: true });
+  await page.locator('.portal-quick-chat-fab').click({ force: true });
   await expect(page.locator('.portal-quick-chat--open')).toBeVisible();
-  await expect(page).not.toHaveURL(/\/secretary\/?$/);
+  await page.locator('.portal-quick-chat--open').getByRole('link', { name: /智友/ }).click();
+  await expect(page).toHaveURL(/\/secretary\/?$/);
+  await expect(page.locator('body')).toContainText(/智友|Gemini|ChatGPT|豆包/);
 
-  await page.reload();
-
-  const treasureButton = page.getByRole('button', { name: /打开宝盒工具/ });
-  await treasureButton.click({ force: true });
-  const popup = page.locator('.portal-treasure-popup');
-  await expect(popup).toBeVisible();
-  await popup.getByRole('button', { name: /智友/ }).click({ force: true });
-  await expect(page.locator('.portal-quick-chat--open')).toBeVisible();
-  await expect(page).not.toHaveURL(/\/secretary\/?$/);
+  await page.goto('/');
+  await page.getByRole('button', { name: /打开宝盒工具/ }).click({ force: true });
+  await expect(page.locator('.portal-treasure-popup').getByRole('button', { name: /智友/ })).toHaveCount(0);
 });
 
-test('personal lab toolbox exposes every registered tool for testing', async ({ page }) => {
+test('personal lab toolbox exposes non-secretary registered tools for testing', async ({ page }) => {
   await page.goto('/?baohePersonalLab=1');
   await page.evaluate(() => {
     sessionStorage.clear();
@@ -150,9 +146,27 @@ test('personal lab toolbox exposes every registered tool for testing', async ({ 
   await expect(popup).toBeVisible();
   const toolButtons = popup.locator('.portal-tool-card');
   await expect(toolButtons.first()).toBeVisible();
-  await expect.poll(() => toolButtons.count()).toBeGreaterThanOrEqual(11);
+  await expect.poll(() => toolButtons.count()).toBeGreaterThanOrEqual(10);
 
-  for (const name of ['智友', '待办', '刷题', '收纳', '咨询', '冥想', '阅读', '健身', '溯', '财务', '人生']) {
+  await expect(popup.getByRole('button', { name: /智友/ })).toHaveCount(0);
+  for (const name of ['待办', '刷题', '收纳', '咨询', '冥想', '阅读', '健身', '溯', '财务', '人生']) {
     await expect(popup.getByRole('button', { name: new RegExp(name) })).toBeVisible();
   }
+});
+
+test('personal lab mode persists after activation and can be cleared', async ({ page }) => {
+  await page.goto('/?baohePersonalLab=1');
+  await page.waitForFunction(() => window.localStorage.getItem('baohe_personal_lab') === '1');
+  await page.goto('/');
+  await page.getByRole('button', { name: /打开宝盒工具/ }).click({ force: true });
+  await expect.poll(() => page.locator('.portal-treasure-popup .portal-tool-card').count()).toBeGreaterThanOrEqual(10);
+
+  await page.goto('/?baohePublic=1');
+  await page.waitForFunction(() => window.localStorage.getItem('baohe_personal_lab') !== '1');
+  await page.evaluate(() => {
+    sessionStorage.clear();
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: /打开宝盒工具/ }).click({ force: true });
+  await expect.poll(() => page.locator('.portal-treasure-popup .portal-tool-card').count()).toBe(1);
 });

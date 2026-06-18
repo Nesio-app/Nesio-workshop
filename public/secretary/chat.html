@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#588ce3">
+  <title>对话</title>
+  <link rel="stylesheet" href="/secretary/styles.css">
+</head>
+<body class="wx-body wx-body--chat">
+  <header class="wx-chat-nav">
+    <a class="wx-chat-back" href="/secretary" aria-label="返回">‹</a>
+    <div class="wx-chat-nav-center">
+      <img class="wx-chat-nav-avatar" id="navAvatar" src="" alt="" width="28" height="28" hidden>
+      <h1 class="wx-chat-nav-title" id="navTitle">对话</h1>
+    </div>
+    <button type="button" class="wx-chat-call" id="btnCall" aria-label="语音通话">📞</button>
+    <button type="button" class="wx-chat-more" id="btnClear" aria-label="更多">···</button>
+  </header>
+
+  <main class="wx-chat-area" id="chatMain" aria-live="polite"></main>
+
+  <footer class="wx-chat-bar">
+    <form class="wx-chat-input-row" id="chatForm">
+      <button type="button" class="wx-chat-icon-btn" id="btnMic" aria-label="语音输入">🎤</button>
+      <div class="wx-chat-input-wrap">
+        <textarea id="chatInput" rows="1" placeholder="发消息…" maxlength="4000" enterkeyhint="send"></textarea>
+      </div>
+      <button type="button" class="wx-chat-icon-btn" id="btnPlus" aria-label="更多">⊕</button>
+    </form>
+  </footer>
+
+  <input type="file" id="pickPhoto" accept="image/*" hidden>
+  <input type="file" id="pickFile" hidden>
+  <input type="file" id="pickVideo" accept="video/*" hidden>
+
+  <div class="wx-voice-call" id="voiceCall" hidden>
+    <div class="wx-voice-call-panel">
+      <img class="wx-voice-call-avatar" id="voiceCallAvatar" src="" alt="" width="88" height="88">
+      <p class="wx-voice-call-name" id="voiceCallName">智友</p>
+      <p class="wx-voice-call-status" id="voiceCallStatus">正在连接…</p>
+      <p class="wx-voice-call-transcript" id="voiceCallTranscript" aria-live="polite"></p>
+      <button type="button" class="wx-voice-call-orb" id="voiceCallOrb" data-state="connecting" aria-label="Live 对话光球">
+        <span class="wx-voice-call-orb-core" aria-hidden></span>
+        <span class="wx-voice-call-orb-ring wx-voice-call-orb-ring--a" aria-hidden></span>
+        <span class="wx-voice-call-orb-ring wx-voice-call-orb-ring--b" aria-hidden></span>
+      </button>
+      <button type="button" class="wx-voice-call-hangup" id="voiceCallHangup" aria-label="结束通话">结束</button>
+    </div>
+  </div>
+
+  <div class="wx-sheet" id="attachSheet" hidden>
+    <div class="wx-sheet-mask" id="attachMask"></div>
+    <div class="wx-sheet-panel">
+      <div class="wx-sheet-grid" id="attachGrid"></div>
+    </div>
+  </div>
+
+  <script src="/secretary/config.js" defer></script>
+  <script src="/secretary/common.js" defer></script>
+  <script src="/secretary/api.js" defer></script>
+  <script src="/secretary/voice.js" defer></script>
+  <script src="/secretary/voice-call.js" defer></script>
+  <script src="/secretary/attach.js" defer></script>
+  <script src="/secretary/chat.js" defer></script>
+</body>
+</html>

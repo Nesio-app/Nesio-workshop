@@ -1,0 +1,56 @@
+[
+  {
+    "id": "gemini",
+    "name": "Gemini",
+    "company": "Google",
+    "tagline": "Google · 已连接",
+    "ready": true,
+    "logo": "/secretary/logos/gemini.svg",
+    "preview": "我是你的幕僚，可以帮你理清待办与优先级。"
+  },
+  {
+    "id": "claude",
+    "name": "Claude",
+    "company": "Anthropic",
+    "tagline": "Anthropic · 即将接入",
+    "ready": false,
+    "logo": "/secretary/logos/claude.svg",
+    "preview": "后续将接入 Claude API。"
+  },
+  {
+    "id": "chatgpt",
+    "name": "ChatGPT",
+    "company": "OpenAI",
+    "tagline": "OpenAI · 即将接入",
+    "ready": false,
+    "logo": "/secretary/logos/chatgpt.svg",
+    "preview": "后续将接入 OpenAI API。"
+  },
+  {
+    "id": "doubao",
+    "name": "豆包",
+    "company": "字节跳动",
+    "tagline": "字节跳动 · 即将接入",
+    "ready": false,
+    "logo": "/secretary/logos/doubao.svg",
+    "preview": "后续将接入豆包 API。"
+  },
+  {
+    "id": "deepseek",
+    "name": "DeepSeek",
+    "company": "深度求索",
+    "tagline": "深度求索 · 即将接入",
+    "ready": false,
+    "logo": "/secretary/logos/deepseek.svg",
+    "preview": "后续将接入 DeepSeek API。"
+  },
+  {
+    "id": "grok",
+    "name": "Grok",
+    "company": "xAI",
+    "tagline": "xAI · 即将接入",
+    "ready": false,
+    "logo": "/secretary/logos/grok.svg",
+    "preview": "后续将接入 Grok API。"
+  }
+]
