@@ -158,6 +158,32 @@ test('dashboard header actions keep aligned 44px hit targets', async ({ page }) 
   expect(boxes?.treasureHeight ?? 0).toBeGreaterThanOrEqual(44);
 });
 
+test('daily quote settings can choose positive categories and frequency', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('.portal-quote').click({ force: true });
+  await expect(page.getByRole('dialog', { name: /金句设置/ })).toBeVisible();
+
+  await page.getByRole('button', { name: '每天' }).click();
+  await page.getByRole('button', { name: '诗意' }).click();
+  await page.getByLabel('关闭金句设置').click();
+
+  const stored = await page.evaluate(() => localStorage.getItem('treasurebox-quote-preferences-v1'));
+  expect(stored).toContain('"frequency":"daily"');
+  expect(stored).toContain('"classic"');
+});
+
+test('settings calendar link appears on dashboard calendar card', async ({ page }) => {
+  await page.goto('/settings');
+  const calendarUrl = 'https://calendar.google.com/calendar/u/0/r';
+  await page.locator('#settings-calendar-url').fill(calendarUrl);
+  await page.getByRole('button', { name: '保存日历链接' }).click();
+
+  await page.goto('/');
+  const openLink = page.locator('.portal-calendar-open-link', { hasText: '打开' });
+  await expect(openLink).toBeVisible();
+  await expect(openLink).toHaveAttribute('href', calendarUrl);
+});
+
 test('personal lab toolbox exposes non-secretary registered tools for testing', async ({ page }) => {
   await page.goto('/?baohePersonalLab=1');
   await page.evaluate(() => {

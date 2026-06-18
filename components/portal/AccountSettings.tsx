@@ -9,6 +9,10 @@ import {
   saveProfileSettings,
   type PortalLocale,
 } from '@/lib/portal/profile';
+import {
+  loadCalendarLinkSettings,
+  saveCalendarLinkSettings,
+} from '@/lib/portal/calendar-links';
 import type { PortalConfig } from '@/lib/portal/types';
 import PortalThemeToggle from './PortalThemeToggle';
 
@@ -27,6 +31,7 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
   const [displayName, setDisplayName] = useState(fallbackName);
   const [avatarUrl, setAvatarUrl] = useState('');
   const [locale, setLocale] = useState<PortalLocale>('zh');
+  const [calendarUrl, setCalendarUrl] = useState('');
   const [toast, setToast] = useState('');
 
   useEffect(() => {
@@ -34,6 +39,7 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
     setDisplayName(s.displayName);
     setAvatarUrl(s.avatarUrl);
     setLocale(s.locale);
+    setCalendarUrl(loadCalendarLinkSettings().googleCalendarUrl);
     document.documentElement.lang = s.locale === 'en' ? 'en' : 'zh-CN';
   }, [fallbackName]);
 
@@ -61,6 +67,12 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
   const onLocaleChange = (next: PortalLocale) => {
     setLocale(next);
     saveProfileSettings({ locale: next });
+    showToast('settingsSaved');
+  };
+
+  const onCalendarSave = () => {
+    const next = saveCalendarLinkSettings({ googleCalendarUrl: calendarUrl });
+    setCalendarUrl(next.googleCalendarUrl);
     showToast('settingsSaved');
   };
 
@@ -141,6 +153,26 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
             {t(locale, 'settingsLangEn')}
           </button>
         </div>
+      </section>
+
+      <section className="portal-settings-card" id="calendar">
+        <label className="portal-settings-label" htmlFor="settings-calendar-url">
+          Google Calendar
+        </label>
+        <p className="portal-settings-hint">
+          粘贴 Google Calendar 网页链接后，首页日历卡片可点击进入。真实事件同步仍保持关闭，避免私人日程暴露在公开站点。
+        </p>
+        <input
+          id="settings-calendar-url"
+          className="portal-settings-input"
+          type="url"
+          value={calendarUrl}
+          onChange={(event) => setCalendarUrl(event.target.value)}
+          placeholder="https://calendar.google.com/calendar/..."
+        />
+        <button type="button" className="portal-settings-secondary-btn" onClick={onCalendarSave}>
+          保存日历链接
+        </button>
       </section>
 
       <p className="portal-settings-foot">

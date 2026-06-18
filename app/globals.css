@@ -839,12 +839,131 @@ body {
   margin-bottom: 0.15rem;
 }
 
+.portal-quote--button {
+  width: 100%;
+  border: 1px solid var(--portal-line);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
 .portal-quote-text {
   margin: 0;
   flex: 1;
   font-size: 0.84rem;
   line-height: 1.55;
   color: var(--portal-ink);
+}
+
+.portal-quote-settings {
+  position: fixed;
+  inset: 0;
+  z-index: 240;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0.75rem 0.75rem calc(0.75rem + env(safe-area-inset-bottom));
+  background: rgba(18, 32, 58, 0.22);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.portal-quote-settings-sheet {
+  width: min(100%, 24rem);
+  border-radius: 1.1rem;
+  border: 1px solid rgba(255, 255, 255, 0.68);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 18px 48px rgba(30, 54, 96, 0.22);
+  padding: 0.85rem;
+}
+
+.portal-quote-settings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.portal-quote-settings-head h2 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.portal-quote-settings-head button {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(205, 222, 252, 0.58);
+  color: var(--portal-blue-deep);
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+.portal-quote-settings-hint {
+  margin: 0.2rem 0 0.75rem;
+  color: var(--portal-muted);
+  font-size: 0.72rem;
+  line-height: 1.55;
+}
+
+.portal-quote-settings-group {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 0.75rem;
+}
+
+.portal-quote-settings-label {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--portal-ink);
+}
+
+.portal-quote-settings-chips,
+.portal-quote-settings-frequency {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.4rem;
+}
+
+.portal-quote-settings-chip,
+.portal-quote-settings-frequency button {
+  min-height: 44px;
+  border: 1px solid rgba(88, 140, 227, 0.16);
+  border-radius: 0.7rem;
+  background: rgba(205, 222, 252, 0.32);
+  color: var(--portal-blue-deep);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.portal-quote-settings-chip--on,
+.portal-quote-settings-frequency button.is-on {
+  border-color: rgba(88, 140, 227, 0.5);
+  background: linear-gradient(145deg, rgba(205, 222, 252, 0.9), rgba(150, 199, 243, 0.5));
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.55);
+}
+
+.portal-quote-settings-range {
+  width: 100%;
+  accent-color: var(--portal-blue-deep);
+}
+
+.portal-quote-settings-frequency {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.portal-quote-settings-toggle {
+  min-height: 44px;
+  margin-top: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--portal-ink);
+  font-size: 0.75rem;
+  font-weight: 600;
 }
 
 .portal-quote-save {
@@ -1633,10 +1752,36 @@ body {
   flex-direction: column;
 }
 
+.portal-calendar--clickable {
+  cursor: pointer;
+}
+
+.portal-calendar-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.55rem;
+}
+
 .portal-calendar-head {
-  margin: 0 0 0.55rem;
+  margin: 0;
   font-size: 0.88rem;
   font-weight: 600;
+}
+
+.portal-calendar-open-link {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.65rem;
+  border-radius: 999px;
+  background: rgba(205, 222, 252, 0.42);
+  color: var(--portal-blue-deep);
+  text-decoration: none;
+  font-size: 0.72rem;
+  font-weight: 700;
 }
 
 .portal-calendar-feed-hint {
@@ -2323,6 +2468,20 @@ body {
   font: inherit;
   font-size: 0.9rem;
   background: rgba(255, 255, 255, 0.9);
+}
+
+.portal-settings-secondary-btn {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 0.55rem;
+  border: 1px solid rgba(88, 140, 227, 0.28);
+  border-radius: 0.72rem;
+  background: rgba(205, 222, 252, 0.46);
+  color: var(--portal-blue-deep);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 .portal-settings-lang {

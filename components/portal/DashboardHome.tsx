@@ -4,7 +4,23 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { formatLunarLine, nextHolidayLine, nextUSHolidayLine } from '@/lib/portal/almanac';
 import { t } from '@/lib/portal/i18n';
-import { pickFreshQuote } from '@/lib/portal/quotes';
+import {
+  DEFAULT_QUOTE_PREFERENCES,
+  isQuoteCacheFresh,
+  loadQuotePreferences,
+  pickFreshQuote,
+  QUOTE_CATEGORY_LABELS,
+  QUOTE_FREQUENCY_LABELS,
+  rememberCurrentQuote,
+  saveQuotePreferences,
+  type QuoteCategory,
+  type QuoteFrequency,
+  type QuotePreferences,
+} from '@/lib/portal/quotes';
+import {
+  CALENDAR_LINK_UPDATED_EVENT,
+  loadCalendarLinkSettings,
+} from '@/lib/portal/calendar-links';
 import {
   loadProfileSettings,
   PROFILE_UPDATED_EVENT,
@@ -192,7 +208,10 @@ export default function DashboardHome({
   const [fidelityHintDismissed, setFidelityHintDismissed] = useState(false);
   const popupTools = toolboxTools ?? shellTools ?? config.tools;
   const quotePicked = useRef(false);
-  const [dailyQuote, setDailyQuote] = useState(pickFreshQuote(config));
+  const [quotePreferences, setQuotePreferences] = useState<QuotePreferences>(DEFAULT_QUOTE_PREFERENCES);
+  const [quoteSettingsOpen, setQuoteSettingsOpen] = useState(false);
+  const [dailyQuote, setDailyQuote] = useState(() => pickFreshQuote(config, DEFAULT_QUOTE_PREFERENCES));
+  const [calendarLinkUrl, setCalendarLinkUrl] = useState('');
   const lunarLine = useMemo(() => formatLunarLine(now), [now]);
   const holidayLine = useMemo(() => nextHolidayLine(now), [now]);
   const usHolidayLine = useMemo(() => nextUSHolidayLine(now), [now]);
@@ -213,26 +232,47 @@ export default function DashboardHome({
   }, [syncProfile]);
 
   useEffect(() => {
-    if (quotePicked.current) return;
-    quotePicked.current = true;
-    setDailyQuote(pickFreshQuote(config));
+    const prefs = loadQuotePreferences();
+    setQuotePreferences(prefs);
+    setDailyQuote(pickFreshQuote(config, prefs));
   }, [config]);
 
   useEffect(() => {
+    const syncCalendarLink = () => {
+      setCalendarLinkUrl(loadCalendarLinkSettings().googleCalendarUrl);
+    };
+    syncCalendarLink();
+    window.addEventListener(CALENDAR_LINK_UPDATED_EVENT, syncCalendarLink);
+    return () => window.removeEventListener(CALENDAR_LINK_UPDATED_EVENT, syncCalendarLink);
+  }, []);
+
+  useEffect(() => {
+    if (quotePicked.current) return;
+    quotePicked.current = true;
+    setDailyQuote(pickFreshQuote(config, quotePreferences));
+  }, [config, quotePreferences]);
+
+  useEffect(() => {
     let cancelled = false;
+    const shouldFetchExternal = quotePreferences.externalEnabled
+      && !isQuoteCacheFresh(quotePreferences.frequency);
+    if (!shouldFetchExternal) return () => {
+      cancelled = true;
+    };
     fetch('/api/portal/quote', { cache: 'no-store' })
       .then((response) => (response.ok ? response.json() : null))
       .then((payload) => {
         const quote = typeof payload?.quote === 'string' ? payload.quote.trim() : '';
         if (!cancelled && payload?.ok === true && quote.length >= 4 && quote.length <= 140) {
           setDailyQuote(quote);
+          rememberCurrentQuote(quote, 'external');
         }
       })
       .catch(() => undefined);
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [quotePreferences.externalEnabled, quotePreferences.frequency]);
 
   useEffect(() => {
     const t = window.setInterval(() => setNow(new Date()), 30_000);
@@ -377,6 +417,43 @@ export default function DashboardHome({
       sessionStorage.setItem(FIDELITY_HINT_KEY, '1');
     } catch { /* ignore */ }
   };
+  const updateQuoteCategories = (category: QuoteCategory) => {
+    const current = quotePreferences.categories;
+    const nextCategories = current.includes(category)
+      ? current.filter((item) => item !== category)
+      : [...current, category];
+    const next = saveQuotePreferences({
+      ...quotePreferences,
+      categories: nextCategories.length ? nextCategories : [category],
+    });
+    setQuotePreferences(next);
+    setDailyQuote(pickFreshQuote(config, next, { force: true }));
+  };
+
+  const updateQuoteFrequency = (frequency: QuoteFrequency) => {
+    const next = saveQuotePreferences({ ...quotePreferences, frequency });
+    setQuotePreferences(next);
+    setDailyQuote(pickFreshQuote(config, next, { force: true }));
+  };
+
+  const updateExternalQuotes = (enabled: boolean) => {
+    const next = saveQuotePreferences({ ...quotePreferences, externalEnabled: enabled });
+    setQuotePreferences(next);
+  };
+
+  const openCalendarLink = () => {
+    if (!calendarLinkUrl) return;
+    window.location.href = calendarLinkUrl;
+  };
+
+  const onCalendarKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
+    if (!calendarLinkUrl) return;
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      openCalendarLink();
+    }
+  };
+
   return (
     <div className="portal-dash">
       <header className="portal-dash-hero">
@@ -423,9 +500,77 @@ export default function DashboardHome({
         </div>
       </header>
 
-      <section className="portal-quote" aria-label={t(locale, 'dashboardQuoteLabel')}>
+      <button
+        type="button"
+        className="portal-quote portal-quote--button"
+        aria-label={`${t(locale, 'dashboardQuoteLabel')}，点击设置`}
+        onClick={() => setQuoteSettingsOpen(true)}
+      >
         <p className="portal-quote-text">{quoteLine}</p>
-      </section>
+      </button>
+      {quoteSettingsOpen ? (
+        <div className="portal-quote-settings" role="dialog" aria-modal="true" aria-label="金句设置">
+          <div className="portal-quote-settings-sheet">
+            <div className="portal-quote-settings-head">
+              <h2>金句设置</h2>
+              <button type="button" onClick={() => setQuoteSettingsOpen(false)} aria-label="关闭金句设置">×</button>
+            </div>
+            <p className="portal-quote-settings-hint">选择想看到的金句类型和刷新频率。设置只保存在本机浏览器。</p>
+            <div className="portal-quote-settings-group">
+              <span className="portal-quote-settings-label">分类</span>
+              <div className="portal-quote-settings-chips">
+                {(Object.keys(QUOTE_CATEGORY_LABELS) as QuoteCategory[]).map((category) => (
+                  <button
+                    key={category}
+                    type="button"
+                    className={'portal-quote-settings-chip' + (quotePreferences.categories.includes(category) ? ' portal-quote-settings-chip--on' : '')}
+                    onClick={() => updateQuoteCategories(category)}
+                    aria-pressed={quotePreferences.categories.includes(category)}
+                  >
+                    {QUOTE_CATEGORY_LABELS[category]}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="portal-quote-settings-group">
+              <label className="portal-quote-settings-label" htmlFor="quote-frequency">切换频率</label>
+              <input
+                id="quote-frequency"
+                className="portal-quote-settings-range"
+                type="range"
+                min="0"
+                max="2"
+                step="1"
+                value={(['each_open', 'hourly', 'daily'] as QuoteFrequency[]).indexOf(quotePreferences.frequency)}
+                onChange={(event) => {
+                  const next = (['each_open', 'hourly', 'daily'] as QuoteFrequency[])[Number(event.target.value)] ?? 'hourly';
+                  updateQuoteFrequency(next);
+                }}
+              />
+              <div className="portal-quote-settings-frequency">
+                {(Object.keys(QUOTE_FREQUENCY_LABELS) as QuoteFrequency[]).map((frequency) => (
+                  <button
+                    key={frequency}
+                    type="button"
+                    className={quotePreferences.frequency === frequency ? 'is-on' : ''}
+                    onClick={() => updateQuoteFrequency(frequency)}
+                  >
+                    {QUOTE_FREQUENCY_LABELS[frequency]}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <label className="portal-quote-settings-toggle">
+              <input
+                type="checkbox"
+                checked={quotePreferences.externalEnabled}
+                onChange={(event) => updateExternalQuotes(event.target.checked)}
+              />
+              <span>允许公共外部金句补充</span>
+            </label>
+          </div>
+        </div>
+      ) : null}
 
       <section className="portal-widgets" aria-label={t(locale, 'dashboardSummaryLabel')}>
         <article className="portal-widget portal-widget--clock">
@@ -479,8 +624,25 @@ export default function DashboardHome({
         </article>
       </section>
 
-      <section className="portal-calendar" aria-label={t(locale, 'dashboardCalendarLabel')}>
-        <h2 className="portal-calendar-head">{t(locale, 'calendar')}</h2>
+      <section
+        className={'portal-calendar' + (calendarLinkUrl ? ' portal-calendar--clickable' : '')}
+        aria-label={t(locale, 'dashboardCalendarLabel')}
+        role={calendarLinkUrl ? 'link' : undefined}
+        tabIndex={calendarLinkUrl ? 0 : undefined}
+        onClick={(event) => {
+          if ((event.target as HTMLElement).closest('button,a')) return;
+          openCalendarLink();
+        }}
+        onKeyDown={onCalendarKeyDown}
+      >
+        <div className="portal-calendar-head-row">
+          <h2 className="portal-calendar-head">{t(locale, 'calendar')}</h2>
+          {calendarLinkUrl ? (
+            <a className="portal-calendar-open-link" href={calendarLinkUrl}>打开</a>
+          ) : (
+            <Link className="portal-calendar-open-link" href="/settings#calendar">接入</Link>
+          )}
+        </div>
         {showFidelityHint ? (
           <div className="portal-calendar-feed-hint" role="status">
             <span>
