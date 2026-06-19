@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  isPersonalLabAiRequestAllowed,
+  isSecretaryAiRequestAllowed,
   launchUnavailablePayload,
 } from '@/lib/portal/launch-safety';
 
@@ -265,7 +265,7 @@ export async function OPTIONS() {
 export async function POST(req: NextRequest) {
   if (
     process.env.NEXT_PUBLIC_BAOHE_FIRST_LAUNCH_RISK_ISOLATION !== 'off' &&
-    !isPersonalLabAiRequestAllowed(req)
+    !isSecretaryAiRequestAllowed(req)
   ) {
     return NextResponse.json(
       launchUnavailablePayload('api:secretary:chat', 'secretary'),

@@ -88,6 +88,38 @@ export function isPersonalLabAiRequestAllowed(request: {
   return isPersonalLabAiEnvEnabled() && hasPersonalLabAccessMarker(request);
 }
 
+function readRuntimeEnv(name: string): string {
+  const value = process.env[name];
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function hasProductionAiProviderKey(): boolean {
+  return Boolean(
+    readRuntimeEnv('OPENAI_API_KEY') ||
+    readRuntimeEnv('OpenAI_KEY') ||
+    readRuntimeEnv('GEMINI_API_KEY') ||
+    readRuntimeEnv('GOOGLE_GENERATIVE_AI_API_KEY') ||
+    readRuntimeEnv('GOOGLE_AI_API_KEY') ||
+    readRuntimeEnv('GOOGLE_API_KEY') ||
+    readRuntimeEnv('DOUBAO_KEY') ||
+    readRuntimeEnv('DOUBAO_API_KEY') ||
+    readRuntimeEnv('ARK_API_KEY') ||
+    readRuntimeEnv('VOLCENGINE_API_KEY'),
+  );
+}
+
+export function isProductionActivationAiRuntimeEnabled(): boolean {
+  return readRuntimeEnv('BAOHE_AI_PROVIDER_MODE').toLowerCase() === 'production' &&
+    hasProductionAiProviderKey();
+}
+
+export function isSecretaryAiRequestAllowed(request: {
+  headers: Headers;
+  nextUrl?: { searchParams?: URLSearchParams };
+}): boolean {
+  return isPersonalLabAiRequestAllowed(request) || isProductionActivationAiRuntimeEnabled();
+}
+
 export function launchUnavailablePayload(kind: string, id?: string) {
   return {
     ok: false,

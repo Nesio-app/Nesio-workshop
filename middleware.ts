@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import {
   isFirstLaunchBlockedPath,
-  isPersonalLabAiRequestAllowed,
+  isSecretaryAiRequestAllowed,
   launchUnavailablePayload,
 } from './lib/portal/launch-safety';
 
@@ -18,7 +18,10 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (pathname.startsWith('/api/secretary') && isPersonalLabAiRequestAllowed(request)) {
+  if (
+    (pathname.startsWith('/api/secretary') || pathname.startsWith('/secretary')) &&
+    isSecretaryAiRequestAllowed(request)
+  ) {
     return NextResponse.next();
   }
 

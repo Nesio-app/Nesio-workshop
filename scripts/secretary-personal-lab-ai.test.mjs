@@ -15,12 +15,13 @@ const secretaryApi = read('public/secretary/api.js');
 
 assert.match(launchSafety, /BAOHE_PERSONAL_LAB_AI_ENABLED/, 'personal lab AI must be env-gated');
 assert.match(launchSafety, /isPersonalLabAiRequestAllowed/, 'personal lab AI request helper must exist');
+assert.match(launchSafety, /isSecretaryAiRequestAllowed/, 'secretary AI must support a combined lab-or-production gate');
 assert.match(launchSafety, /x-baohe-access-mode/, 'personal lab AI must require an explicit access-mode header');
 
-assert.match(middleware, /isPersonalLabAiRequestAllowed/, 'middleware must let approved personal lab AI requests reach route handlers');
+assert.match(middleware, /isSecretaryAiRequestAllowed/, 'middleware must let approved secretary AI requests reach route handlers');
 assert.match(middleware, /pathname\.startsWith\('\/api\/secretary'\)/, 'middleware allowance must stay scoped to secretary API');
 
-assert.match(route, /isPersonalLabAiRequestAllowed/, 'secretary chat route must check personal lab AI gate');
+assert.match(route, /isSecretaryAiRequestAllowed/, 'secretary chat route must check the combined secretary AI gate');
 assert.match(route, /launchUnavailablePayload\('api:secretary:chat'/, 'secretary chat must still fail closed by default');
 
 assert.doesNotMatch(portal, /PortalQuickChat/, 'public home portal must not mount secretary quick chat');

@@ -1,5 +1,9 @@
-import { NextResponse } from 'next/server';
-import { launchUnavailablePayload } from '@/lib/portal/launch-safety';
+import { NextRequest, NextResponse } from 'next/server';
+import {
+  isProductionActivationAiRuntimeEnabled,
+  isSecretaryAiRequestAllowed,
+  launchUnavailablePayload,
+} from '@/lib/portal/launch-safety';
 
 function getGoogleKey(): string | undefined {
   const raw =
@@ -24,17 +28,54 @@ function getOpenAIKey(): string | undefined {
   return raw?.trim() || undefined;
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const gemini = Boolean(getGoogleKey());
+  const doubao = Boolean(getDoubaoKey());
+  const chatgpt = Boolean(getOpenAIKey());
+  const allowed = isSecretaryAiRequestAllowed(req);
+  const productionActivation = {
+    aiProviderMode: process.env.BAOHE_AI_PROVIDER_MODE || 'disabled',
+    aiRuntimeEnabled: isProductionActivationAiRuntimeEnabled(),
+    configuredProviders: {
+      gemini,
+      doubao,
+      chatgpt,
+    },
+  };
+
+  if (allowed) {
+    return NextResponse.json(
+      {
+        ok: true,
+        service: 'secretary',
+        status: 'ready',
+        behaviorEnabled: true,
+        gemini,
+        doubao,
+        chatgpt,
+        model: gemini ? (process.env.GEMINI_MODEL || 'gemini-default') : null,
+        doubaoModel: doubao ? (process.env.DOUBAO_MODEL || process.env.DOUBAO_ENDPOINT || 'doubao-pro-32k') : null,
+        openaiModel: chatgpt ? (process.env.OPENAI_MODEL || 'gpt-4o-mini') : null,
+        productionActivation,
+      },
+      {
+        status: 200,
+        headers: { 'Access-Control-Allow-Origin': '*' },
+      },
+    );
+  }
+
   return NextResponse.json(
     {
       ...launchUnavailablePayload('api:secretary:health', 'secretary'),
       service: 'secretary',
-      gemini: false,
-      doubao: false,
-      chatgpt: false,
+      gemini,
+      doubao,
+      chatgpt,
       model: null,
       doubaoModel: null,
       openaiModel: null,
+      productionActivation,
     },
     {
       status: 403,
