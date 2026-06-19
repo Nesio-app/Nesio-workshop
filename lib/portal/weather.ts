@@ -51,6 +51,15 @@ export function simplifyPlaceName(raw: string): string {
   return first;
 }
 
+function normalizeLocalPlaceName(raw: string): string {
+  const t = simplifyPlaceName(raw)
+    .replace(/^Town(ship)? of\s+/i, '')
+    .replace(/\s+Township$/i, '')
+    .trim();
+  if (/^Cedar Fork$/i.test(t)) return 'Cary';
+  return t;
+}
+
 async function fetchNWSAlert(lat: number, lon: number): Promise<string | undefined> {
   try {
     const url = `https://api.weather.gov/alerts/active?point=${lat},${lon}`;
@@ -106,7 +115,7 @@ async function reverseGeocodeOpenMeteo(
     const data = await res.json();
     const row = data?.results?.[0];
     if (!row) return null;
-    const city = simplifyPlaceName(String(row.name || ''));
+    const city = normalizeLocalPlaceName(String(row.name || ''));
     const state = formatStateCode(String(row.admin1 || ''));
     const label = city && state ? `${city}, ${state}` : city || state;
     return city ? { city, state, label } : null;
@@ -131,7 +140,7 @@ export async function reverseGeocode(
     if (!res.ok) throw new Error('geo');
     const data = await res.json();
     // Prefer suburb/town (locality) over metro name (city) — e.g. Cary not Raleigh.
-    const city = simplifyPlaceName(
+    const city = normalizeLocalPlaceName(
       String(data.locality || data.city || ''),
     );
     const state = formatStateCode(

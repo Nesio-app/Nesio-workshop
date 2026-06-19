@@ -69,17 +69,22 @@ test('capture V14 mobile runtime screenshots', async ({ page }) => {
   await page.getByRole('navigation', { name: /宝盒导航/ }).getByRole('button', { name: '工具箱' }).click();
   await expect(page.getByRole('heading', { name: '工具箱' })).toBeVisible();
   await expect(page.getByLabel('我的工具')).toBeVisible();
-  await expect(page.getByLabel('数据深度')).toBeVisible();
   await expect(page.getByLabel('可添加')).toBeVisible();
+  await expect(page.getByLabel('个性化推荐')).toBeVisible();
   await expect(page.getByLabel('工具包')).toBeVisible();
+  await expect(page.getByLabel('数据深度')).toHaveCount(0);
   await page.waitForTimeout(500);
-  await capture('06-tool-packs-discovery', 'Toolbox discovery screen with V14 data-depth cards and packs.');
+  await capture('06-tool-packs-discovery', 'Toolbox screen with V14 data cards, personalized recommendation, addable tools, and packs.');
 
   await page.goto('/settings');
+  await expect(page.getByRole('heading', { name: '个人数据' })).toBeVisible();
   await expect(page.getByText('宝盒学到的')).toBeVisible();
   await expect(page.getByText('个性化偏好')).toBeVisible();
+  await capture('08-me-personal-data', 'Profile analysis and learned memories without app settings mixed in.');
+  await page.getByLabel('进入软件设置').click();
+  await expect(page.getByRole('heading', { name: '软件设置' })).toBeVisible();
   await expect(page.getByRole('region', { name: '连接与安全' })).toBeVisible();
-  await capture('08-me-connections-safety', 'Profile analysis, learned memories, preferences, connections and safety boundary.');
+  await capture('09-software-settings', 'Software settings page with connections and safety boundary.');
 
   await page.goto('/storage');
   const firstLaunch = page.locator('#firstLaunch');

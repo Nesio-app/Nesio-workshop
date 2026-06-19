@@ -76,14 +76,12 @@ test('V14 warm coach home exposes one primary next action and inventory pack', a
   await page.reload();
 
   await expect(page.getByText('做不完也没关系')).toBeVisible();
-  await expect(page.getByRole('button', { name: /开始 2 分钟/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /稍后提醒/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /粉碎任务/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /下一条/ })).toBeVisible();
   await expect(page.locator('.portal-v13-primary-action')).toHaveCount(1);
-
-  await expect(page.getByText('轻启动包')).toBeVisible();
-  await expect(page.getByRole('button', { name: /待办.*粉碎任务/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /物品库.*购买记忆/ })).toBeVisible();
-  await expect(page.getByText('健康 / 金融 / 心理 / 自动化')).toBeVisible();
+  await expect(page.getByText('物品库')).toBeVisible();
+  await expect(page.locator('.portal-widgets')).toBeHidden();
+  await expect(page.locator('.portal-calendar')).toBeHidden();
 
   const primaryButtons = page.locator('.portal-v13-primary-action');
   await expect(primaryButtons).toHaveCount(1);
@@ -117,6 +115,7 @@ test('V14 first launch onboarding saves local name and coach style', async ({ pa
   await expect(page.getByRole('dialog', { name: /欢迎来到宝盒/ })).toBeVisible();
   await expect(page.getByText('不需要注册 · 稍后随时连接账号')).toBeVisible();
   await page.getByLabel('怎么称呼你').fill('Jing');
+  await page.getByRole('button', { name: '继续' }).click();
   await page.getByRole('button', { name: '温暖陪伴' }).click();
   await page.getByRole('button', { name: '继续' }).click();
 
@@ -142,16 +141,20 @@ test('V14 bottom nav opens AI Friends as gated stable hub preview', async ({ pag
   await expect(nav.getByRole('button', { name: '工具箱' })).toBeVisible();
 
   await nav.getByRole('button', { name: '智友' }).click();
-  const dialog = page.getByRole('dialog', { name: /智友/ });
-  await expect(dialog).toBeVisible();
-  for (const text of ['群聊', '单聊', '记录', 'ChatGPT', 'Claude', 'Gemini', 'Flomo', '物品库', '待办']) {
-    await expect(dialog.getByText(text, { exact: true })).toBeVisible();
+  const aiPage = page.getByRole('region', { name: '智友' });
+  await expect(aiPage).toBeVisible();
+  await expect(aiPage.getByRole('heading', { name: '智友' })).toBeVisible();
+  for (const text of ['产品脑暴群', 'ChatGPT', 'Claude', 'Gemini', '豆包']) {
+    await expect(aiPage.locator('.portal-ai-conversation-title').filter({ hasText: text }).first()).toBeVisible();
   }
-  await expect(dialog.getByText(/外部 AI 自动化尚未启用/)).toBeVisible();
+  await aiPage.getByRole('button', { name: /^ChatGPT / }).click();
+  await expect(page.getByLabel('当前对话').getByText('ChatGPT')).toBeVisible();
+  await expect(page.getByLabel('当前对话').getByPlaceholder(/发消息/)).toBeVisible();
+  await expect(aiPage.getByLabel('智友能力').getByRole('button', { name: /Live/ })).toBeVisible();
   await expect(page).not.toHaveURL(/\/secretary/);
 });
 
-test('shell toolbox opens, keeps its open state after refresh, and closes', async ({ page }) => {
+test('shell toolbox opens as V14 screen, returns home, and does not reopen after refresh', async ({ page }) => {
   await page.goto('/');
   await markOnboardingDone(page);
   await page.evaluate(() => {
@@ -159,7 +162,8 @@ test('shell toolbox opens, keeps its open state after refresh, and closes', asyn
   });
   await page.reload();
 
-  const treasureButton = page.getByRole('button', { name: /打开宝盒工具/ });
+  const nav = page.getByRole('navigation', { name: /宝盒导航/ });
+  const treasureButton = nav.getByRole('button', { name: '工具箱' });
   await expect(treasureButton).toBeVisible();
 
   const triggerBox = await treasureButton.boundingBox();
@@ -168,48 +172,39 @@ test('shell toolbox opens, keeps its open state after refresh, and closes', asyn
 
   await treasureButton.click({ force: true });
 
-  const popup = page.locator('.portal-treasure-popup');
-  await expect(popup).toBeVisible();
-  await expect(popup.locator('.portal-treasure-popup-title')).toContainText(/宝盒|工具/);
-  await expect(popup.getByRole('button', { name: /智友/ })).toHaveCount(0);
-  const pack = popup.getByLabel('工具包发现');
-  await expect(pack).toBeVisible();
-  await expect(pack.getByText('轻启动包')).toBeVisible();
-  await expect(pack.getByRole('button', { name: /待办.*粉碎任务/ })).toBeVisible();
-  await expect(pack.getByRole('button', { name: /物品库.*购买记忆/ })).toBeVisible();
-  await expect(pack.getByText(/健康 \/ 金融 \/ 心理 \/ 自动化仍需确认/)).toBeVisible();
-  await expect(popup.getByRole('button', { name: /待办，/ })).toBeVisible();
-  await expect(popup.getByRole('button', { name: /收纳，/ })).toBeVisible();
+  const toolbox = page.getByRole('region', { name: '工具箱' });
+  await expect(toolbox).toBeVisible();
+  await expect(toolbox.getByRole('heading', { name: '工具箱' })).toBeVisible();
+  await expect(toolbox.getByRole('region', { name: '我的工具' })).toBeVisible();
+  await expect(toolbox.getByRole('region', { name: '可添加' })).toBeVisible();
+  await expect(toolbox.getByRole('region', { name: '个性化推荐' })).toBeVisible();
+  await expect(toolbox.getByRole('region', { name: '工具包' })).toBeVisible();
+  await expect(toolbox.getByText(/健康 \/ 金融 \/ 心理 \/ 自动化仍需确认/)).toBeVisible();
+  await expect(toolbox.getByRole('button', { name: /智友/ })).toHaveCount(0);
+  await expect(toolbox.getByRole('button', { name: /家居物品/ })).toBeVisible();
+  await expect(toolbox.getByRole('button', { name: /任务清单/ })).toBeVisible();
 
   await page.waitForTimeout(450);
-  const popupBox = await popup.boundingBox();
+  const toolboxBox = await toolbox.boundingBox();
   const viewport = page.viewportSize();
-  expect(popupBox?.x ?? -1).toBeGreaterThanOrEqual(0);
-  expect((popupBox?.x ?? 0) + (popupBox?.width ?? Number.POSITIVE_INFINITY))
+  expect(toolboxBox?.x ?? -1).toBeGreaterThanOrEqual(0);
+  expect((toolboxBox?.x ?? 0) + (toolboxBox?.width ?? Number.POSITIVE_INFINITY))
     .toBeLessThanOrEqual(viewport?.width ?? 390);
 
-  const toolButtons = popup.locator('.portal-tool-card');
+  const toolButtons = toolbox.locator('.portal-treasure-data-card');
   await expect(toolButtons.first()).toBeVisible();
-  expect(await toolButtons.count()).toBe(2);
+  expect(await toolButtons.count()).toBeGreaterThanOrEqual(6);
 
   const firstToolBox = await toolButtons.first().boundingBox();
   expect(firstToolBox?.width ?? 0).toBeGreaterThanOrEqual(44);
   expect(firstToolBox?.height ?? 0).toBeGreaterThanOrEqual(44);
-  const packButtonBox = await pack.getByRole('button', { name: /待办.*粉碎任务/ }).boundingBox();
+  const packButtonBox = await toolbox.getByRole('button', { name: /效率日常包/ }).boundingBox();
   expect(packButtonBox?.height ?? 0).toBeGreaterThanOrEqual(44);
 
+  await nav.getByRole('button', { name: '首页' }).click();
+  await expect(page.getByRole('region', { name: '工具箱' })).toHaveCount(0);
   await page.reload();
-  await expect(page.locator('.portal-treasure-popup')).toBeVisible();
-
-  const closeButton = page.locator('.portal-treasure-popup-close');
-  const closeBox = await closeButton.boundingBox();
-  expect(closeBox?.width ?? 0).toBeGreaterThanOrEqual(44);
-  expect(closeBox?.height ?? 0).toBeGreaterThanOrEqual(44);
-  await closeButton.click({ force: true });
-  await expect(page.locator('.portal-treasure-popup')).toBeHidden();
-
-  await page.reload();
-  await expect(page.locator('.portal-treasure-popup')).toBeHidden();
+  await expect(page.getByRole('region', { name: '工具箱' })).toHaveCount(0);
 });
 
 test('secretary public surface stays gated outside launch scope', async ({ page }) => {
@@ -226,38 +221,17 @@ test('secretary public surface stays gated outside launch scope', async ({ page 
   await expect(page.locator('body')).toContainText(/能力暂未开放|gated|暂未开放/);
 
   await page.goto('/');
-  await page.getByRole('button', { name: /打开宝盒工具/ }).click({ force: true });
-  await expect(page.locator('.portal-treasure-popup').getByRole('button', { name: /智友/ })).toHaveCount(0);
+  await page.getByRole('navigation', { name: /宝盒导航/ }).getByRole('button', { name: '工具箱' }).click();
+  await expect(page.getByRole('region', { name: '工具箱' }).getByRole('button', { name: /智友/ })).toHaveCount(0);
 });
 
-test('dashboard header actions keep aligned 44px hit targets', async ({ page }) => {
+test('dashboard V14 header stays compact and hides legacy widgets', async ({ page }) => {
   await page.goto('/');
   await markOnboardingDone(page);
-  await expect(page.locator('.portal-dash-hero-end')).toBeVisible();
-  const boxes = await page.evaluate(() => {
-    const [noteButton, treasureButton] = Array.from(
-      document.querySelectorAll('.portal-dash-hero-end button'),
-    );
-    const note = noteButton?.getBoundingClientRect();
-    const treasure = treasureButton?.getBoundingClientRect();
-    return note && treasure
-      ? {
-          noteTop: note.top,
-          treasureTop: treasure.top,
-          noteWidth: note.width,
-          noteHeight: note.height,
-          treasureWidth: treasure.width,
-          treasureHeight: treasure.height,
-        }
-      : null;
-  });
-
-  expect(boxes).not.toBeNull();
-  expect(Math.abs((boxes?.noteTop ?? 0) - (boxes?.treasureTop ?? 0))).toBeLessThanOrEqual(1);
-  expect(boxes?.noteWidth ?? 0).toBeGreaterThanOrEqual(44);
-  expect(boxes?.noteHeight ?? 0).toBeGreaterThanOrEqual(44);
-  expect(boxes?.treasureWidth ?? 0).toBeGreaterThanOrEqual(44);
-  expect(boxes?.treasureHeight ?? 0).toBeGreaterThanOrEqual(44);
+  await expect(page.locator('.portal-dash-hero-time')).toBeVisible();
+  await expect(page.locator('.portal-dash-hero-time small')).toContainText(/,\s*[A-Z]{2}/);
+  await expect(page.locator('.portal-widgets')).toBeHidden();
+  await expect(page.locator('.portal-calendar')).toBeHidden();
 });
 
 test('daily quote settings can choose positive categories and frequency', async ({ page }) => {
@@ -275,20 +249,25 @@ test('daily quote settings can choose positive categories and frequency', async 
   expect(stored).toContain('"classic"');
 });
 
-test('settings calendar link appears on dashboard calendar card', async ({ page }) => {
+test('settings calendar link lives in software settings, not homepage calendar card', async ({ page }) => {
   await page.goto('/settings');
+  await page.getByLabel('进入软件设置').click();
   const calendarUrl = 'https://calendar.google.com/calendar/u/0/r';
   await page.locator('#settings-calendar-url').fill(calendarUrl);
   await page.getByRole('button', { name: '保存日历链接' }).click();
 
   await page.goto('/');
-  const openLink = page.locator('.portal-calendar-open-link', { hasText: '打开' });
-  await expect(openLink).toBeVisible();
-  await expect(openLink).toHaveAttribute('href', calendarUrl);
+  await expect(page.locator('.portal-calendar')).toBeHidden();
+  const stored = await page.evaluate(() => localStorage.getItem('treasurebox-calendar-links-v1'));
+  expect(stored).toContain(calendarUrl);
 });
 
 test('settings exposes V14 connections and safety boundary', async ({ page }) => {
   await page.goto('/settings');
+  await expect(page.getByRole('heading', { name: '个人数据' })).toBeVisible();
+  await expect(page.getByText('宝盒学到的')).toBeVisible();
+  await page.getByLabel('进入软件设置').click();
+  await expect(page.getByRole('heading', { name: '软件设置' })).toBeVisible();
   const safety = page.getByRole('region', { name: '连接与安全' });
   await expect(safety).toBeVisible();
   await expect(safety.getByText('连接性强，但所有授权都要确认。')).toBeVisible();
@@ -308,19 +287,19 @@ test('personal lab toolbox exposes non-secretary registered tools for testing', 
   });
   await page.reload();
 
-  const treasureButton = page.getByRole('button', { name: /打开宝盒工具/ });
+  const treasureButton = page.getByRole('navigation', { name: /宝盒导航/ }).getByRole('button', { name: '工具箱' });
   await expect(treasureButton).toBeVisible();
   await treasureButton.click({ force: true });
 
-  const popup = page.locator('.portal-treasure-popup');
-  await expect(popup).toBeVisible();
-  const toolButtons = popup.locator('.portal-tool-card');
+  const toolbox = page.getByRole('region', { name: '工具箱' });
+  await expect(toolbox).toBeVisible();
+  const toolButtons = toolbox.locator('.portal-treasure-data-card, .portal-treasure-screen-grid button, .portal-treasure-package-list button');
   await expect(toolButtons.first()).toBeVisible();
   await expect.poll(() => toolButtons.count()).toBeGreaterThanOrEqual(10);
 
-  await expect(popup.getByRole('button', { name: /智友/ })).toHaveCount(0);
-  for (const name of ['待办', '刷题', '收纳', '咨询', '冥想', '阅读', '健身', '溯', '财务', '人生']) {
-    await expect(popup.locator('.portal-tool-card', { hasText: name })).toBeVisible();
+  await expect(toolbox.getByRole('button', { name: /智友/ })).toHaveCount(0);
+  for (const name of ['任务清单', '家居物品', '阅读追踪', '健身记录', '健康档案', '效率日常包', 'AI 助理包']) {
+    await expect(toolbox.getByText(name)).toBeVisible();
   }
 });
 
@@ -329,8 +308,8 @@ test('personal lab mode persists after activation and can be cleared', async ({ 
   await markOnboardingDone(page);
   await page.waitForFunction(() => window.localStorage.getItem('baohe_personal_lab') === '1');
   await page.goto('/');
-  await page.getByRole('button', { name: /打开宝盒工具/ }).click({ force: true });
-  await expect.poll(() => page.locator('.portal-treasure-popup .portal-tool-card').count()).toBeGreaterThanOrEqual(10);
+  await page.getByRole('navigation', { name: /宝盒导航/ }).getByRole('button', { name: '工具箱' }).click();
+  await expect.poll(() => page.locator('.portal-treasure-screen button').count()).toBeGreaterThanOrEqual(10);
 
   await page.goto('/?baohePublic=1');
   await page.waitForFunction(() => window.localStorage.getItem('baohe_personal_lab') !== '1');
@@ -338,6 +317,7 @@ test('personal lab mode persists after activation and can be cleared', async ({ 
     sessionStorage.clear();
   });
   await page.goto('/');
-  await page.getByRole('button', { name: /打开宝盒工具/ }).click({ force: true });
-  await expect.poll(() => page.locator('.portal-treasure-popup .portal-tool-card').count()).toBe(2);
+  await page.getByRole('navigation', { name: /宝盒导航/ }).getByRole('button', { name: '工具箱' }).click();
+  await expect(page.getByRole('region', { name: '工具箱' })).toBeVisible();
+  await expect(page.locator('.portal-treasure-screen button').first()).toBeVisible();
 });

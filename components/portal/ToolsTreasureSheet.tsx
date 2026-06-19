@@ -170,13 +170,6 @@ export default function ToolsTreasurePopup({
           </div>
         </header>
 
-        <section className="portal-treasure-discovery-hero" aria-label="本周推荐">
-          <p>本周推荐</p>
-          <h2>礼物管家</h2>
-          <span>记录亲友喜好与重要日期，到时温柔提醒并由 AI 帮你挑礼物。</span>
-          <button type="button">＋ 加入工作台</button>
-        </section>
-
         <section className="portal-treasure-screen-section" aria-label="我的工具">
           <h2>我的工具</h2>
           <div className="portal-treasure-data-grid">
@@ -197,22 +190,10 @@ export default function ToolsTreasurePopup({
                     <b>{entry.name}</b>
                     <small>{entry.value}</small>
                   </span>
-                  <span className="portal-treasure-data-track" aria-hidden>
-                    <i style={{ width: `${entry.progress}%` }} />
-                  </span>
                 </button>
               );
             })}
           </div>
-        </section>
-
-        <section className="portal-treasure-depth-summary" aria-label="数据深度">
-          <h2>数据深度</h2>
-          <p>越丰富，宝盒越懂你</p>
-          <div className="portal-treasure-depth-bar" aria-label={`了解程度 ${personalizationProfile.memoryProgress}%`}>
-            <span style={{ width: `${personalizationProfile.memoryProgress}%` }} />
-          </div>
-          <small>{personalizationProfile.memoryProgressLabel}</small>
         </section>
 
         <section className="portal-treasure-screen-section" aria-label="可添加">
@@ -235,6 +216,13 @@ export default function ToolsTreasurePopup({
           </div>
         </section>
 
+        <section className="portal-treasure-discovery-hero" aria-label="个性化推荐">
+          <p>个性化推荐</p>
+          <h2>礼物管家</h2>
+          <span>根据你的重要日期和亲友偏好推荐。当前使用 mock 数据，推荐算法后续接入。</span>
+          <button type="button">＋ 加入工作台</button>
+        </section>
+
         <section className="portal-treasure-screen-section" aria-label="工具包">
           <h2>工具包</h2>
           <div className="portal-treasure-package-list">
@@ -246,7 +234,7 @@ export default function ToolsTreasurePopup({
             <button type="button">
               <span aria-hidden>✦</span>
               <b>AI 助理包</b>
-              <small>智友 · 笔记 · 日程同步</small>
+              <small>笔记 · 日程同步 · 后续接入</small>
             </button>
             <button type="button">
               <span aria-hidden>＋</span>

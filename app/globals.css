@@ -5553,6 +5553,278 @@ html[data-portal-theme="night"] .portal-settings-input{
 html[data-portal-theme="night"] .portal-settings-lang-btn{background:rgba(255,255,255,.05)}
 html[data-portal-theme="night"] .portal-settings-toast{background:rgba(230,240,255,.92);color:#0e1626}
 
+/* V14 polish pass: keep the runtime aligned with the mobile HTML design. */
+.portal-dash > .portal-widgets,
+.portal-dash > .portal-calendar {
+  display: none !important;
+}
+
+.portal-dash-hero {
+  grid-template-columns: 3rem minmax(4.2rem, auto) minmax(0, 1fr);
+  gap: 0.5rem;
+}
+
+.portal-dash-greeting {
+  width: max-content;
+  max-width: 4.8rem;
+}
+
+.portal-dash-greeting-line,
+.portal-dash-greeting-name {
+  white-space: nowrap;
+}
+
+.portal-dash-hero-time {
+  min-width: 0;
+  max-width: 11.5rem;
+}
+
+.portal-dash-hero-time small {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.portal-quote-settings {
+  align-items: center;
+  background: rgba(18, 32, 58, 0.14);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
+.portal-crush-sheet {
+  align-items: center !important;
+  justify-content: center !important;
+  padding: calc(0.75rem + env(safe-area-inset-top, 0px)) 0.9rem calc(6.8rem + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+.portal-crush-sheet-backdrop {
+  background: rgba(18, 32, 58, 0.14) !important;
+  backdrop-filter: blur(2px) !important;
+  -webkit-backdrop-filter: blur(2px) !important;
+}
+
+.portal-crush-sheet-card {
+  width: min(100%, 22.5rem) !important;
+  max-height: min(74dvh, 34rem) !important;
+  margin: auto !important;
+  overflow-y: auto;
+}
+
+.portal-personal-profile-card {
+  border-radius: 1.1rem;
+  background: transparent;
+  box-shadow: none;
+}
+
+.portal-personal-profile-main {
+  min-height: 4.4rem;
+  border-radius: 1rem;
+  padding: 0.55rem 0.25rem;
+}
+
+.portal-personal-avatar-edit {
+  width: 4rem;
+  height: 4rem;
+  border: 0;
+  border-radius: 1rem;
+  padding: 0;
+  background: transparent;
+  overflow: hidden;
+}
+
+.portal-personal-avatar-edit .portal-settings-avatar,
+.portal-personal-avatar-edit .portal-personal-profile-avatar {
+  width: 4rem;
+  height: 4rem;
+  border-radius: 1rem;
+}
+
+.portal-personal-settings-arrow,
+.portal-settings-back--button {
+  min-width: 44px;
+  min-height: 44px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #9ba5c0;
+  font: inherit;
+  font-size: 1.6rem;
+  font-weight: 900;
+}
+
+.portal-personal-demo-switch {
+  display: none !important;
+}
+
+.portal-ai-preview {
+  padding: 1.95rem 1.05rem 7.9rem;
+  min-height: calc(100dvh - 5.6rem);
+}
+
+.portal-ai-screen-head {
+  grid-template-columns: 2.9rem minmax(0, 1fr) 2.9rem;
+}
+
+.portal-ai-screen-icon-btn {
+  min-width: 2.9rem;
+  min-height: 2.9rem;
+  font-size: 1.15rem;
+}
+
+.portal-ai-conversation-list {
+  margin: 0;
+  border-radius: 0.95rem;
+  max-height: 23.5rem;
+  overflow-y: auto;
+}
+
+.portal-ai-conversation {
+  grid-template-columns: 3.35rem minmax(0, 1fr) 2.6rem;
+  min-height: 4.9rem;
+  padding: 0.72rem 0.85rem;
+}
+
+.portal-ai-conversation--active {
+  background: rgba(74, 108, 247, 0.08);
+}
+
+.portal-ai-active-chat {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.78rem;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.84);
+  box-shadow: 0 12px 28px rgba(74, 108, 247, 0.1);
+}
+
+.portal-ai-active-chat > div {
+  display: grid;
+  grid-template-columns: 2.35rem minmax(0, 1fr);
+  gap: 0.55rem;
+  align-items: center;
+}
+
+.portal-ai-active-avatar {
+  width: 2.35rem;
+  height: 2.35rem;
+  display: grid;
+  place-items: center;
+  border-radius: 0.75rem;
+  color: #fff;
+  font-weight: 900;
+}
+
+.portal-ai-active-chat p,
+.portal-ai-active-chat b,
+.portal-ai-active-chat small {
+  display: block;
+  margin: 0;
+  min-width: 0;
+}
+
+.portal-ai-active-chat b {
+  font-size: 0.9rem;
+}
+
+.portal-ai-active-chat small {
+  overflow: hidden;
+  color: #5a6690;
+  font-size: 0.68rem;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.portal-ai-active-chat input {
+  width: 100%;
+  min-height: 2.65rem;
+  border: 1px solid #d8e2fb;
+  border-radius: 999px;
+  padding: 0 0.9rem;
+  background: rgba(244, 247, 255, 0.9);
+  font: inherit;
+  font-size: 0.78rem;
+}
+
+.portal-ai-screen-capabilities {
+  margin-top: 0;
+}
+
+.portal-treasure-screen {
+  min-height: calc(100dvh - 5.6rem);
+  padding: 1.45rem 0.95rem 8.6rem;
+}
+
+.portal-treasure-screen-head {
+  margin-bottom: 0.7rem;
+}
+
+.portal-treasure-screen-section {
+  margin-top: 0.85rem;
+}
+
+.portal-treasure-data-grid {
+  gap: 0.55rem;
+}
+
+.portal-treasure-data-card {
+  min-height: 5.15rem;
+  grid-template-columns: 2rem minmax(0, 1fr);
+  grid-template-rows: auto;
+  align-items: center;
+  gap: 0.55rem;
+  border-radius: 1.05rem;
+  padding: 0.78rem 0.72rem;
+}
+
+.portal-treasure-data-icon {
+  font-size: 1.55rem;
+}
+
+.portal-treasure-data-copy b {
+  font-size: 0.9rem;
+  line-height: 1.15;
+  word-break: keep-all;
+}
+
+.portal-treasure-data-copy small {
+  font-size: 0.72rem;
+}
+
+.portal-treasure-data-track,
+.portal-treasure-depth-summary {
+  display: none !important;
+}
+
+.portal-treasure-screen-grid {
+  gap: 0.55rem;
+}
+
+.portal-treasure-screen-grid button {
+  min-height: 5.75rem;
+  border-radius: 0.95rem;
+  padding: 0.55rem 0.35rem;
+}
+
+.portal-treasure-screen-grid b {
+  font-size: 0.76rem;
+  line-height: 1.15;
+}
+
+.portal-treasure-discovery-hero {
+  margin-top: 1.05rem;
+  margin-bottom: 0.85rem;
+}
+
+.portal-treasure-package-list {
+  padding-bottom: 1.2rem;
+}
+
+.portal-bottom-nav {
+  z-index: 230;
+}
+
 /* ── 7. 速记 flomo 时间线（基础深色） ── */
 html[data-portal-theme="night"] .flomo-overlay{background:rgba(4,10,22,.5)}
 html[data-portal-theme="night"] .flomo-app,

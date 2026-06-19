@@ -1,5 +1,7 @@
 'use client';
 
+import { useMemo, useState } from 'react';
+
 interface PortalAiFriendsPreviewProps {
   open: boolean;
   onClose: () => void;
@@ -69,7 +71,18 @@ const conversations = [
   },
 ];
 
-export default function PortalAiFriendsPreview({ open, onClose }: PortalAiFriendsPreviewProps) {
+export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewProps) {
+  const [query, setQuery] = useState('');
+  const [activeId, setActiveId] = useState('smart');
+  const filteredConversations = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return conversations;
+    return conversations.filter((item) =>
+      `${item.name} ${item.tag ?? ''} ${item.preview}`.toLowerCase().includes(needle),
+    );
+  }, [query]);
+  const activeConversation = conversations.find((item) => item.id === activeId) ?? conversations[0];
+
   if (!open) return null;
 
   return (
@@ -86,16 +99,22 @@ export default function PortalAiFriendsPreview({ open, onClose }: PortalAiFriend
 
       <label className="portal-ai-screen-search">
         <span aria-hidden>⌕</span>
-        <input type="search" placeholder="搜索" />
+        <input
+          type="search"
+          placeholder="搜索"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+        />
       </label>
 
       <div className="portal-ai-conversation-list">
-        {conversations.map((item) => (
+        {filteredConversations.map((item) => (
           <button
             key={item.id}
             type="button"
-            className="portal-ai-conversation"
-            onClick={onClose}
+            className={'portal-ai-conversation' + (item.id === activeId ? ' portal-ai-conversation--active' : '')}
+            onClick={() => setActiveId(item.id)}
+            aria-pressed={item.id === activeId}
           >
             <span className={`portal-ai-conversation-avatar ${item.className}`} aria-hidden>
               {item.avatar}
@@ -114,6 +133,22 @@ export default function PortalAiFriendsPreview({ open, onClose }: PortalAiFriend
           </button>
         ))}
       </div>
+
+      <section className="portal-ai-active-chat" aria-label="当前对话">
+        <div>
+          <span className={`portal-ai-active-avatar ${activeConversation.className}`} aria-hidden>
+            {activeConversation.avatar}
+          </span>
+          <p>
+            <b>{activeConversation.name}</b>
+            <small>{activeConversation.preview}</small>
+          </p>
+        </div>
+        <label>
+          <span className="sr-only">输入消息</span>
+          <input placeholder="发消息、图片、语音或文件..." />
+        </label>
+      </section>
 
       <div className="portal-ai-screen-capabilities" aria-label="智友能力">
         <button type="button">📷<span>图片</span></button>

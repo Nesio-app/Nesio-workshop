@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-19T17:18:45.007Z",
+  "generatedAt": "2026-06-19T18:23:46.494Z",
   "viewport": {
     "width": 390,
     "height": 844
@@ -34,12 +34,17 @@
     {
       "name": "06-tool-packs-discovery",
       "path": "outputs/v14-runtime-screenshots/06-tool-packs-discovery.png",
-      "note": "Toolbox discovery screen with V14 data-depth cards and packs."
+      "note": "Toolbox screen with V14 data cards, personalized recommendation, addable tools, and packs."
     },
     {
-      "name": "08-me-connections-safety",
-      "path": "outputs/v14-runtime-screenshots/08-me-connections-safety.png",
-      "note": "Profile analysis, learned memories, preferences, connections and safety boundary."
+      "name": "08-me-personal-data",
+      "path": "outputs/v14-runtime-screenshots/08-me-personal-data.png",
+      "note": "Profile analysis and learned memories without app settings mixed in."
+    },
+    {
+      "name": "09-software-settings",
+      "path": "outputs/v14-runtime-screenshots/09-software-settings.png",
+      "note": "Software settings page with connections and safety boundary."
     },
     {
       "name": "07-inventory-purchase-memory",
