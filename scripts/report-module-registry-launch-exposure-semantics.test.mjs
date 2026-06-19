@@ -24,7 +24,7 @@ const exclusions = new Map(report.launchExposureSemantics.intentionalExclusions.
   entry,
 ]));
 
-for (const moduleId of ['reading', 'secretary', 'plan', 'fitness']) {
+for (const moduleId of ['reading', 'plan', 'fitness']) {
   const entry = exclusions.get(moduleId);
   assert.equal(entry?.reason, 'not_in_public_launch_surface', `${moduleId} must be an intentional launch exclusion`);
   assert.equal(entry.releaseBlocker, false, `${moduleId} must not be a release blocker`);
@@ -32,12 +32,25 @@ for (const moduleId of ['reading', 'secretary', 'plan', 'fitness']) {
   assert.equal(entry.evidenceFields.includes('launchSurface.public.shellAction'), true);
 }
 
+const secretary = report.tools.find((entry) => entry.id === 'secretary');
+assert.equal(secretary?.publicIndex, true, 'secretary static page must be preserved for the home chat button');
+assert.equal(
+  report.boundaries.publicLaunchEmbeddedModules.includes('secretary'),
+  false,
+  'secretary must not be part of the public launch embedded module surface',
+);
+assert.equal(
+  report.boundaries.syncedEmbeddedModules.includes('secretary'),
+  false,
+  'secretary must not be treated as a public synced embedded tool',
+);
+assert.equal(secretary?.shellEntitlement?.blockedByApprovalGate, true, 'secretary remains gated at module contract level');
+
 for (const warning of report.boundaries.boundaryWarnings) {
   assert.notEqual(warning.reason, 'Static route validation requires public/index for local static modules.');
 }
 
 assert.deepEqual(report.boundaries.publicLaunchEmbeddedModules, ['inventory']);
 assert.equal(report.boundaries.syncedEmbeddedModules.includes('reading'), false);
-assert.equal(report.boundaries.syncedEmbeddedModules.includes('secretary'), false);
 
 console.log('report-module-registry launch exposure semantics tests passed');

@@ -26,7 +26,7 @@ assert.match(route, /launchUnavailablePayload\('api:secretary:chat'/, 'secretary
 
 assert.match(portal, /PortalQuickChat/, 'home portal must mount quick chat');
 assert.match(quickChat, /\/secretary/, 'home quick chat must link to the secretary app');
-assert.match(quickChat, /\/secretary\/chat\?friend=gemini/, 'home quick chat must deep-link to Gemini chat');
+assert.doesNotMatch(quickChat, /\/secretary\/chat\?friend=gemini/, 'home quick chat must open the secretary list, not a quick Gemini chat');
 assert.match(secretaryIndex, /list\.js/, 'secretary app list page must be present');
 assert.match(secretaryChat, /sendSecretaryMessage/, 'secretary chat page must call API helper');
 assert.match(secretaryApi, /\/api\/secretary\/chat/, 'secretary app must call secretary chat API');

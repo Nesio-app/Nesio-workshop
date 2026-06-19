@@ -32,7 +32,7 @@ export default function PortalQuickChat() {
     <div className="portal-quick-chat">
       <a
         className="portal-quick-chat-fab"
-        href={withBase('/secretary/chat?friend=gemini')}
+        href={withBase('/secretary')}
         aria-label="打开智友"
       >
         <SecretaryChatIcon />

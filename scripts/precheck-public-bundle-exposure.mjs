@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 const repoRoot = fileURLToPath(new URL('..', import.meta.url));
 const publicRoot = join(repoRoot, 'public');
 
-const allowedPublicToolDirs = new Set(['storage']);
+const allowedPublicToolDirs = new Set(['storage', 'secretary']);
 const knownNonLaunchToolDirs = new Set([
   'adhd-flow',
   'fitness',
@@ -23,7 +23,13 @@ const bundlePlan = JSON.parse(execFileSync('node', [join(repoRoot, 'scripts', 'b
 }));
 
 assert.equal(bundlePlan.exposureMode, 'public_launch_only');
-assert.deepEqual(bundlePlan.entries.map((entry) => entry.moduleId), ['inventory']);
+assert.deepEqual(
+  bundlePlan.entries.filter((entry) => entry.visibleForPublic).map((entry) => entry.moduleId),
+  ['inventory'],
+);
+const secretaryEntry = bundlePlan.entries.find((entry) => entry.moduleId === 'secretary');
+assert.equal(secretaryEntry?.visibleForPublic, false, 'secretary may be preserved as a direct chat page but must not be public toolbox surface');
+assert.equal(secretaryEntry?.shellAction, 'hide_for_public');
 
 const publicDirs = existsSync(publicRoot)
   ? readdirSync(publicRoot, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name)

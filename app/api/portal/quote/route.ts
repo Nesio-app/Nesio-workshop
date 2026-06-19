@@ -20,6 +20,29 @@ const BLOCKED_TERMS = [
   '马革',
   '离别',
   '断肠',
+  '并无新事',
+];
+const POSITIVE_TERMS = [
+  '希望',
+  '勇气',
+  '温柔',
+  '平安',
+  '安心',
+  '晴',
+  '春',
+  '花',
+  '笑',
+  '爱',
+  '光明',
+  '成长',
+  '梦想',
+  '前进',
+  '稳',
+  '允许',
+  '变好',
+  '完成',
+  '路上',
+  '一点点',
 ];
 
 const POSITIVE_FALLBACK_QUOTES = [
@@ -46,7 +69,8 @@ function normalizeQuote(payload: unknown): string | null {
 }
 
 function isPositiveEnough(quote: string): boolean {
-  return !BLOCKED_TERMS.some((term) => quote.includes(term));
+  if (BLOCKED_TERMS.some((term) => quote.includes(term))) return false;
+  return POSITIVE_TERMS.some((term) => quote.includes(term));
 }
 
 function fallbackQuote(): string {
@@ -93,8 +117,8 @@ export async function GET() {
     );
   } catch {
     return NextResponse.json(
-      { ok: false, quote: null, source: 'local_fallback' },
-      { headers: { 'Cache-Control': 'no-store' } },
+      { ok: true, quote: fallbackQuote(), source: 'local_fallback' },
+      { headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=900' } },
     );
   }
 }

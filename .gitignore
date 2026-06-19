@@ -21,6 +21,7 @@
 
 # misc
 .DS_Store
+*.icloud
 *.pem
 /var/
 /README 2.md
