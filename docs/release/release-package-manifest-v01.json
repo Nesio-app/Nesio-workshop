@@ -18,7 +18,16 @@
     "prototype",
     "historical-ios",
     "external-service-sandbox",
+    "independent-memory-app",
     "unrelated-local-noise"
+  ],
+  "independentApps": [
+    {
+      "path": "memory",
+      "status": "needs_boundary_decision",
+      "releasePackageIncluded": false,
+      "notes": "Independent app shape; do not include in Baohe launch package without explicit decision."
+    }
   ],
   "inactiveIosProjects": [
     "adhd-flow-ios",

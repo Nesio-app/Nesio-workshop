@@ -14,6 +14,7 @@
     "db:seed-demo": "node scripts/db-local.mjs seed-demo",
     "db:sync-artifact-records": "node scripts/db-local.mjs sync-artifact-records",
     "report:external-bridge": "node scripts/report-external-bridge.mjs --markdown",
+    "report:repository-boundaries": "node scripts/report-repository-boundaries.mjs",
     "db:bootstrap": "npm run db:migrate && npm run db:seed-demo && npm run db:status",
     "db:bootstrap:full": "npm run db:migrate && npm run db:seed-demo && npm run db:sync-artifact-records && npm run db:status",
     "db:status": "node scripts/db-local.mjs status",

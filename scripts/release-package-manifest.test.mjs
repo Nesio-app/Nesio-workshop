@@ -20,9 +20,13 @@ if (!manifest) {
     if (!manifest.includedRuntimeSurfaces?.includes(entry)) failures.push(`includedRuntimeSurfaces missing: ${entry}`);
   }
 
-  for (const entry of ['notebooks', 'prototype', 'historical-ios']) {
+  for (const entry of ['notebooks', 'prototype', 'historical-ios', 'independent-memory-app']) {
     if (!manifest.excludedSurfaceKinds?.includes(entry)) failures.push(`excludedSurfaceKinds missing: ${entry}`);
   }
+
+  const memoryApp = manifest.independentApps?.find((entry) => entry.path === 'memory');
+  if (!memoryApp) failures.push('independentApps must classify memory');
+  if (memoryApp?.releasePackageIncluded !== false) failures.push('memory must not be included in Baohe release package');
 
   for (const gate of ['TestFlight', 'App Store submission', 'real user external distribution', 'real data sync', 'payment', 'external authorization']) {
     if (!manifest.ceoGateRequiredFor?.includes(gate)) failures.push(`ceoGateRequiredFor missing: ${gate}`);

@@ -35,6 +35,19 @@ moving, deleting, or migrating anything.
 
 Goal: stop `memory/` from polluting Baohe product boundaries.
 
+Current scan command:
+
+```bash
+npm run report:repository-boundaries
+```
+
+Current state:
+
+- No Baohe runtime dependency should import `memory/`.
+- `memory/` still has an independent app shape.
+- Legacy GitHub Pages deployment currently references `memory/public` and
+  sandbox tool bundles; treat this as `needs_decision`, not as a runtime import.
+
 Recommended safe sequence:
 
 1. Mark `memory/` as an external or archived app in docs.
@@ -56,6 +69,10 @@ Do not do automatically:
 
 CEO Gate needed if cleanup touches real user data, production deploys, external
 auth, database migration, or public service availability.
+
+Important: changing `.github/workflows/deploy.yml` can alter a public GitHub
+Pages surface. Do not remove the `memory` bundle from that workflow until the
+desired public availability is confirmed.
 
 ## B. Lib Portal Boundary
 
