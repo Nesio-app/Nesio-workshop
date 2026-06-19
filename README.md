@@ -12,6 +12,11 @@ This repository is product code for Treasurebox / Baohe only. Personal portfolio
 
 Do not add notebooks, class assignments, portfolio pages, or personal homepage assets back into this repository.
 
+Architecture and boundary references:
+
+- `lib/portal/ARCHITECTURE.md`
+- `docs/repository-boundary-cleanup.md`
+
 ## License
 
 This project is licensed under the MIT License. See `LICENSE`.
