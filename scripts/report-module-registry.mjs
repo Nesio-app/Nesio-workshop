@@ -14,6 +14,7 @@ import { buildToolDataVersioningContract } from '../lib/portal/tool-data-version
 import { buildUserIdentityUpgradeContract } from '../lib/portal/user-identity-upgrade-contract.mjs';
 import { buildOfflineSyncConflictContract } from '../lib/portal/offline-sync-conflict-contract.mjs';
 import { buildCloudReadinessContract } from '../lib/portal/cloud-readiness-contract.mjs';
+import { buildProductionActivationContract } from '../lib/portal/production-activation-contract.mjs';
 import {
   LAUNCH_SURFACE_VERSION_V0,
   buildLaunchReadinessSummary,
@@ -2189,6 +2190,7 @@ const cloudReadinessContract = buildCloudReadinessContract({
   userIdentityUpgrade: userIdentityUpgradeContract,
   offlineSyncConflict: offlineSyncConflictContract,
 });
+const productionActivationContract = buildProductionActivationContract();
 const toolLifecycleSummary = {
   version: TOOL_LIFECYCLE_VERSION,
   stageVocabulary: [...TOOL_LIFECYCLE_STAGES],
@@ -2388,6 +2390,12 @@ const evidenceSummary = {
     cloudProviderCandidateCount: cloudReadinessContract.summary.cloudProviderCandidateCount,
     inventoryCloudSchemaDraftReady: cloudReadinessContract.summary.inventoryCloudSchemaDraftReady,
     futureCloudEligibleTableCount: cloudReadinessContract.summary.futureCloudEligibleTableCount,
+    productionActivationVersion: productionActivationContract.version,
+    productionActivationCeoApproved: productionActivationContract.summary.ceoApproved,
+    productionActivationProviderCount: productionActivationContract.summary.providerCount,
+    productionActivationConfiguredProviderCount: productionActivationContract.summary.configuredProviderCount,
+    productionActivationMissingEnvProviderCount: productionActivationContract.summary.missingEnvProviderCount,
+    productionActivationReady: productionActivationContract.summary.productionReady,
     qaLine: boundaryWarnings.length === 0 && experienceServiceWarnings.length === 0 && aggregationWarnings.length === 0 && approvalGateWarnings.length === 0 && shellRouteWarnings.length === 0 && registryDriftWarnings.length === 0 && artifactVisibilityWarnings.length === 0 && artifactStatusVisibilityWarnings.length === 0 && shellDiscoveryBoundaryWarnings.length === 0 && mobileAppBoundaryWarnings.length === 0
       ? `PASS: ${readyModules.length}/${tools.length} modules ready; ${launchExposureSemantics.intentionalExclusionCount} intentional launch exclusion(s) are hidden from the public bundle.`
       : `WARN: ${boundaryWarnings.length} module boundary warning(s), ${launchExposureSemantics.intentionalExclusionCount} intentional launch exclusion(s), ${experienceServiceWarnings.length} Experience Services warning(s), ${dataAggregationReviewWarningCount} Data Aggregation review warning(s), ${dataAggregationRuntimeBlockerCount} Data Aggregation runtime-blocking warning(s), ${approvalGateWarnings.length} Approval Gate warning(s), ${shellRouteWarnings.length} Shell Route warning(s), ${registryDriftWarnings.length} Registry Drift warning(s), ${artifactVisibilityWarnings.length} Artifact Visibility warning(s), ${artifactStatusVisibilityWarnings.length} Artifact Status Visibility warning(s), ${shellDiscoveryBoundaryWarnings.length} Shell Discovery warning(s), ${mobileAppBoundaryWarnings.length} Mobile App Integration warning(s) need QA review.`,
@@ -2615,6 +2623,7 @@ const evidenceSummary = {
   userIdentityUpgrade: userIdentityUpgradeContract,
   offlineSyncConflict: offlineSyncConflictContract,
   cloudReadiness: cloudReadinessContract,
+  productionActivation: productionActivationContract,
   moduleDataBus: {
     implementation: moduleDataBus.implementation,
     summary: moduleDataBus.summary,
