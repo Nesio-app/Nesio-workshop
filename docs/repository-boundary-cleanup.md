@@ -94,6 +94,18 @@ Next small slices:
 Goal: keep external tool code visible without turning every tool into a release
 blocker.
 
+Doctor command:
+
+```bash
+npm run doctor:submodules
+```
+
+Expected remediation when a checkout is missing submodule contents:
+
+```bash
+git submodule update --init --recursive
+```
+
 Policy:
 
 - Baohe main app owns Shell, registry, launch surface, local Inventory, and
@@ -103,6 +115,8 @@ Policy:
 - Submodule updates should be intentional, reviewed, and paired with a short
   reason: "source refresh", "bug fix needed by Baohe", or "contract review".
 - Do not update all submodules casually before release QA.
+- Do not migrate all submodules to npm workspaces or Turborepo as a default
+  cleanup step.
 
 Suggested states:
 
@@ -118,6 +132,33 @@ Current recommended classification:
 - `questionbank-ios`: `sandbox_reference` / future paid or learning path.
 - `reading-ios`: `sandbox_reference` / future paid or learning path.
 - `weaver-ai`: `contract_reference` / gated strategy-risk module.
+
+Why not Turborepo now:
+
+- The current submodules are mostly iOS or standalone app references, not shared
+  TypeScript packages with a common build graph.
+- Baohe's immediate release risk is launch surface clarity, local data safety,
+  and PWA/iOS wrapper stability, not monorepo build orchestration.
+- Moving every tool now would create a large file/history migration before the
+  product surface is stable.
+- A future monorepo can still happen selectively when a tool becomes
+  `launchable`, has shared runtime contracts, or needs a single release train
+  with Baohe.
+
+Selective migration trigger:
+
+- The tool is launchable or monetized.
+- The tool shares code with Shell, local data adapters, entitlement, or E2E
+  tests.
+- Keeping it as a submodule causes repeated build, QA, or release failures.
+- The tool has a clear owner and rollback plan.
+
+Until then, the supported near-term pattern is:
+
+1. keep submodules classified;
+2. run the doctor check during handoff or release prep;
+3. update only the submodule required by the current task;
+4. document the reason for any submodule pointer change.
 
 ## D. Homepage Quieting
 

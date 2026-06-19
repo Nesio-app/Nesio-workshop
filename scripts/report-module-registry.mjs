@@ -125,8 +125,8 @@ const ENTITLEMENT_BUNDLES = Object.freeze([
   },
 ]);
 const LAUNCH_SKU_VERSION = 'launch-sku-v0';
-const LAUNCH_SKU_KEY = 'shell_inventory_purchase_memory';
-const LAUNCH_BUSINESS_MODULE_IDS = Object.freeze(['inventory']);
+const LAUNCH_SKU_KEY = 'shell_inventory_todo_purchase_memory';
+const LAUNCH_BUSINESS_MODULE_IDS = Object.freeze(['inventory', 'plan']);
 const LAUNCH_INCLUDED_MODULE_IDS = Object.freeze(['shell', ...LAUNCH_BUSINESS_MODULE_IDS]);
 const TOOL_LIFECYCLE_VERSION = 'tool-lifecycle-v0';
 const TOOL_LIFECYCLE_STAGES = Object.freeze([
@@ -146,7 +146,6 @@ const TOOL_LIFECYCLE_STAGE_NUMBERS = Object.freeze({
   monetized: 6,
 });
 const FUTURE_PAID_MODULE_IDS = Object.freeze([
-  'plan',
   'sanctuary',
   'reading',
   'fitness',
@@ -1949,15 +1948,15 @@ const launchSkuWarnings = [
       moduleId: tool.id,
       warningKind: 'high_risk_module_launchable',
       issue: 'High-risk module must not be launchable in first App Store SKU.',
-      reason: 'Launch SKU is limited to Shell + Inventory / purchase-memory.',
+      reason: 'Launch SKU is limited to Shell + Inventory / purchase-memory + Todo.',
       owner: 'Qiao',
       evidenceFields: ['launchSku.modules.launchStatus'],
     })),
-  ...(launchSkuModules.filter((entry) => entry.launchStatus === 'launchable').length === 2
+  ...(launchSkuModules.filter((entry) => entry.launchStatus === 'launchable').length === 3
     ? []
     : [{
         warningKind: 'launchable_module_count_mismatch',
-        issue: 'First-launch SKU must have exactly Shell + Inventory as launchable.',
+        issue: 'First-launch SKU must have exactly Shell + Inventory + Todo as launchable.',
         reason: 'Avoid making all 11 modules look App Store launchable.',
         owner: 'Qiao',
         evidenceFields: ['launchSku.modules'],
@@ -2533,7 +2532,7 @@ const evidenceSummary = {
   launchSku: {
     version: LAUNCH_SKU_VERSION,
     skuKey: LAUNCH_SKU_KEY,
-    label: 'Shell + Inventory / purchase-memory',
+    label: 'Shell + Inventory / purchase-memory + Todo',
     includedModuleIds: [...LAUNCH_INCLUDED_MODULE_IDS],
     launchableBusinessModuleIds: [...LAUNCH_BUSINESS_MODULE_IDS],
     launchSkuAppStoreReady: false,
@@ -2556,7 +2555,7 @@ const evidenceSummary = {
   launchSurface: {
     version: LAUNCH_SURFACE_VERSION_V0,
     implementation: 'manifest-driven-shell-visibility-contract',
-    firstLaunchPromise: 'Shell + Inventory / purchase-memory',
+    firstLaunchPromise: 'Shell + Inventory / purchase-memory + Todo',
     appStoreReady: false,
     boundaries: {
       reportAndShellVisibilityOnly: true,

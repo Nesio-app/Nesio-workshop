@@ -1,8 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import PortalAiFriendsPreview from './PortalAiFriendsPreview';
+import PortalBottomNav from './PortalBottomNav';
 import DashboardHome from './DashboardHome';
 import NotePanelEnhanced from './NotePanelEnhanced';
+import PortalOnboarding from './PortalOnboarding';
+import ToolsTreasurePopup from './ToolsTreasureSheet';
 import { DEFAULT_PORTAL_CONFIG } from '@/lib/portal/defaults';
 import { openToolHref } from '@/lib/portal/open-tool';
 import {
@@ -159,7 +163,9 @@ export default function Portal() {
     new Map(),
   );
   const [noteOpen, setNoteOpen] = useState(false);
+  const [aiFriendsOpen, setAiFriendsOpen] = useState(false);
   const [treasureOpen, setTreasureOpen] = useState(false);
+  const [activeSurface, setActiveSurface] = useState<'home' | 'ai' | 'tools'>('home');
   const [launchSurfaceContext, setLaunchSurfaceContext] = useState({
     viewerRole: 'public' as 'public' | 'tester' | 'personal_lab',
     testerAllowlist: [] as string[],
@@ -262,14 +268,38 @@ export default function Portal() {
   const handleTreasureOpenChange = (open: boolean) => {
     setTreasureOpen(open);
     setTreasurePersisted(open);
+    if (open) {
+      setActiveSurface('tools');
+      setAiFriendsOpen(false);
+    } else {
+      setActiveSurface('home');
+    }
   };
 
   const handleNoteOpenChange = (open: boolean) => {
     setNoteOpen(open);
     if (open) {
+      setAiFriendsOpen(false);
       setTreasureOpen(false);
+      setActiveSurface('home');
       setTreasurePersisted(false);
     }
+  };
+
+  const handleHome = () => {
+    setActiveSurface('home');
+    setAiFriendsOpen(false);
+    setNoteOpen(false);
+    setTreasureOpen(false);
+    setTreasurePersisted(false);
+  };
+
+  const handleAiFriendsOpen = () => {
+    setActiveSurface('ai');
+    setAiFriendsOpen(true);
+    setNoteOpen(false);
+    setTreasureOpen(false);
+    setTreasurePersisted(false);
   };
 
   useEffect(() => {
@@ -333,21 +363,42 @@ export default function Portal() {
 
         <div className="portal-shell portal-shell--single">
           <div className="portal-main">
+            {activeSurface === 'ai' ? (
+              <PortalAiFriendsPreview open onClose={() => setActiveSurface('home')} />
+            ) : activeSurface === 'tools' ? (
+              <ToolsTreasurePopup
+                tools={shellManifest.tools}
+                open
+                variant="screen"
+                locale="zh"
+                onClose={handleHome}
+                onOpenTool={openTool}
+              />
+            ) : (
               <DashboardHome
-              config={configWithDecMetadata}
-              shellTools={shellRuntime.visibleTools}
-              toolboxTools={shellManifest.tools}
-              noteOpen={noteOpen}
-              treasureOpen={treasureOpen}
-              onTreasureOpenChange={handleTreasureOpenChange}
-              onOpenNote={() => handleNoteOpenChange(true)}
-              onOpenTool={openTool}
-            />
+                config={configWithDecMetadata}
+                shellTools={shellRuntime.visibleTools}
+                toolboxTools={shellManifest.tools}
+                noteOpen={noteOpen}
+                treasureOpen={treasureOpen}
+                onTreasureOpenChange={handleTreasureOpenChange}
+                onOpenNote={() => handleNoteOpenChange(true)}
+                onOpenTool={openTool}
+              />
+            )}
           </div>
         </div>
       </div>
 
       <NotePanelEnhanced open={noteOpen} onOpenChange={handleNoteOpenChange} />
+      <PortalBottomNav
+        aiFriendsOpen={activeSurface === 'ai'}
+        treasureOpen={activeSurface === 'tools'}
+        onHome={handleHome}
+        onOpenAiFriends={handleAiFriendsOpen}
+        onOpenTreasure={() => handleTreasureOpenChange(activeSurface !== 'tools')}
+      />
+      <PortalOnboarding />
     </>
   );
 }

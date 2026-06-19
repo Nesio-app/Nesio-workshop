@@ -22,10 +22,10 @@ const tools = [
     name: '今日',
     url: '/adhd-flow/',
     ready: true,
-    launchStatus: 'future_paid',
-    prodExposure: 'tester_only',
-    toolLifecycle: 'sandbox',
-    entitlementPolicy: { paywallState: 'locked' },
+    launchStatus: 'launchable',
+    prodExposure: 'public',
+    toolLifecycle: 'launchable',
+    entitlementPolicy: { paywallState: 'free' },
     approvalRequiredActions: [],
   },
   {
@@ -59,19 +59,19 @@ assert.equal(publicInventory.reason, 'public_launch');
 assert.equal(shouldShellOpenTool(publicInventory), true);
 
 const publicPlan = resolveShellRuntimeState(tools[1], { viewerRole: 'public' });
-assert.equal(publicPlan.visible, false);
-assert.equal(publicPlan.openEnabled, false);
-assert.equal(publicPlan.shellAction, 'hide_for_public');
+assert.equal(publicPlan.visible, true);
+assert.equal(publicPlan.openEnabled, true);
+assert.equal(publicPlan.shellAction, 'open');
 
 const testerPlan = resolveShellRuntimeState(tools[1], {
   viewerRole: 'tester',
   testerAllowlist: ['plan'],
 });
 assert.equal(testerPlan.visible, true);
-assert.equal(testerPlan.openEnabled, false);
-assert.equal(testerPlan.shellAction, 'show_static_locked_preview');
-assert.equal(testerPlan.betaBadgeRequired, true);
-assert.equal(shouldShellOpenTool(testerPlan), false);
+assert.equal(testerPlan.openEnabled, true);
+assert.equal(testerPlan.shellAction, 'open');
+assert.equal(testerPlan.betaBadgeRequired, false);
+assert.equal(shouldShellOpenTool(testerPlan), true);
 
 const personalLabPlan = resolveShellRuntimeState(tools[1], { viewerRole: 'personal_lab' });
 assert.equal(personalLabPlan.visible, true);
@@ -99,7 +99,7 @@ assert.equal(publicHealth.blockedByApprovalGate, true);
 
 assert.deepEqual(
   resolveShellRuntimeTools(tools, { viewerRole: 'public' }).visibleTools.map((tool) => tool.id),
-  ['inventory'],
+  ['inventory', 'plan'],
 );
 assert.deepEqual(
   resolveShellRuntimeTools(tools, {

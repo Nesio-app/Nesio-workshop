@@ -13,10 +13,10 @@ if (!manifest) {
   failures.push('docs/release/release-package-manifest-v01.json is missing');
 } else {
   if (manifest.canonicalDomain !== 'www.nesio.app') failures.push('canonicalDomain must be www.nesio.app');
-  if (manifest.launchSku !== 'shell_inventory_purchase_memory') failures.push('launchSku must be shell_inventory_purchase_memory');
+  if (manifest.launchSku !== 'shell_inventory_todo_purchase_memory') failures.push('launchSku must be shell_inventory_todo_purchase_memory');
   if (manifest.canonicalIosProject !== 'treasurebox-ios') failures.push('canonicalIosProject must be treasurebox-ios');
 
-  for (const entry of ['storage-web', 'public/storage', 'treasurebox-ios']) {
+  for (const entry of ['storage-web', 'public/storage', 'adhd-flow-ios', 'public/adhd-flow', 'treasurebox-ios']) {
     if (!manifest.includedRuntimeSurfaces?.includes(entry)) failures.push(`includedRuntimeSurfaces missing: ${entry}`);
   }
 

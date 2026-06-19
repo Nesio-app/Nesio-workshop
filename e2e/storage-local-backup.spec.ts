@@ -42,6 +42,14 @@ test('storage PWA exports local data and restores it after clearing', async ({ p
   await expect(page.locator('.portal-back-link')).toBeVisible();
   await expect(page.locator('.portal-back-link')).toHaveAttribute('href', '/');
   await expect(page.locator('#hsearch')).toBeVisible();
+  const launchSurface = page.getByLabel('物品库首发能力');
+  await expect(launchSurface).toBeVisible();
+  await expect(launchSurface.getByText('Inventory / purchase-memory')).toBeVisible();
+  await expect(launchSurface.getByRole('button', { name: /快速添加.*购买记忆/ })).toBeVisible();
+  await expect(launchSurface.getByRole('button', { name: /导出 \/ 删除.*本地数据自控/ })).toBeVisible();
+  for (const state of ['已收好', '冷静期', '待处理', '补货提醒']) {
+    await expect(launchSurface.getByText(state)).toBeVisible();
+  }
   await expect.poll(() => page.evaluate(() => {
     const tabs = document.querySelector('.tabbar');
     return tabs ? getComputedStyle(tabs).position : '';

@@ -1,33 +1,40 @@
 export type PortalLocale = 'zh' | 'en';
+export type PortalCoachStyle = 'minimal' | 'warm' | 'professional';
 
 export interface PortalProfileSettings {
   displayName: string;
   avatarUrl: string;
   locale: PortalLocale;
+  coachStyle: PortalCoachStyle;
 }
 
 const KEYS = {
   avatar: 'treasurebox-profile-avatar',
   displayName: 'treasurebox-profile-name',
   locale: 'treasurebox-locale',
+  coachStyle: 'treasurebox-coach-style',
 } as const;
 
 export const PROFILE_UPDATED_EVENT = 'treasurebox-profile-updated';
 
 export function loadProfileSettings(fallbackName = '婧'): PortalProfileSettings {
   if (typeof window === 'undefined') {
-    return { displayName: fallbackName, avatarUrl: '', locale: 'zh' };
+    return { displayName: fallbackName, avatarUrl: '', locale: 'zh', coachStyle: 'warm' };
   }
   try {
     const localeRaw = localStorage.getItem(KEYS.locale);
     const locale: PortalLocale = localeRaw === 'en' ? 'en' : 'zh';
+    const coachStyleRaw = localStorage.getItem(KEYS.coachStyle);
+    const coachStyle: PortalCoachStyle =
+      coachStyleRaw === 'minimal' || coachStyleRaw === 'professional' ? coachStyleRaw : 'warm';
     return {
       displayName: localStorage.getItem(KEYS.displayName) || fallbackName,
       avatarUrl: localStorage.getItem(KEYS.avatar) || '',
       locale,
+      coachStyle,
     };
   } catch {
-    return { displayName: fallbackName, avatarUrl: '', locale: 'zh' };
+    return { displayName: fallbackName, avatarUrl: '', locale: 'zh', coachStyle: 'warm' };
   }
 }
 
@@ -44,6 +51,9 @@ export function saveProfileSettings(patch: Partial<PortalProfileSettings>) {
     if (patch.locale !== undefined) {
       localStorage.setItem(KEYS.locale, patch.locale);
       document.documentElement.lang = patch.locale === 'en' ? 'en' : 'zh-CN';
+    }
+    if (patch.coachStyle !== undefined) {
+      localStorage.setItem(KEYS.coachStyle, patch.coachStyle);
     }
     window.dispatchEvent(new CustomEvent(PROFILE_UPDATED_EVENT));
   } catch { /* ignore */ }

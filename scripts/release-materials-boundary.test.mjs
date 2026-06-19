@@ -12,7 +12,7 @@ if (!doc) {
 } else {
   for (const marker of [
     'www.nesio.app',
-    'Shell + Inventory / purchase-memory',
+    'Shell + Inventory / purchase-memory + Todo',
     '不承诺 AI',
     '不承诺心理',
     '不承诺健康',

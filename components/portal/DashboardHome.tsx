@@ -43,8 +43,14 @@ import {
   readPortalCache,
   writePortalCache,
 } from '@/lib/portal/prefetch-cache';
+import {
+  getBaohePersonalizationProfile,
+  readBaohePersonalizationStage,
+  rememberBaoheInsightFeedback,
+  rememberBaoheInsightShown,
+  shouldShowBaoheInsight,
+} from '@/lib/portal/personalization-insights';
 import ToolsTreasurePopup from './ToolsTreasureSheet';
-import { DashboardNoteIcon, DashboardTreasureIcon } from './DashboardHeaderIcons';
 
 interface DashboardHomeProps {
   config: PortalConfig;
@@ -206,6 +212,14 @@ export default function DashboardHome({
     return cached?.feeds ?? [];
   });
   const [fidelityHintDismissed, setFidelityHintDismissed] = useState(false);
+  const [reminderDeferred, setReminderDeferred] = useState(false);
+  const [crushTaskOpen, setCrushTaskOpen] = useState(false);
+  const [crushTaskSplitLevel, setCrushTaskSplitLevel] = useState(0);
+  const [crushTaskDone, setCrushTaskDone] = useState(false);
+  const [personalization, setPersonalization] = useState(() => getBaohePersonalizationProfile());
+  const [showPersonalizationInsight, setShowPersonalizationInsight] = useState(false);
+  const [insightDismissed, setInsightDismissed] = useState(false);
+  const [insightFeedback, setInsightFeedback] = useState<'positive' | 'negative' | null>(null);
   const popupTools = toolboxTools ?? shellTools ?? config.tools;
   const quotePicked = useRef(false);
   const [quotePreferences, setQuotePreferences] = useState<QuotePreferences>(DEFAULT_QUOTE_PREFERENCES);
@@ -230,6 +244,14 @@ export default function DashboardHome({
     window.addEventListener(PROFILE_UPDATED_EVENT, onUpdate);
     return () => window.removeEventListener(PROFILE_UPDATED_EVENT, onUpdate);
   }, [syncProfile]);
+
+  useEffect(() => {
+    const profile = getBaohePersonalizationProfile(readBaohePersonalizationStage());
+    setPersonalization(profile);
+    const shouldShow = shouldShowBaoheInsight(profile);
+    setShowPersonalizationInsight(shouldShow);
+    if (shouldShow) rememberBaoheInsightShown();
+  }, []);
 
   useEffect(() => {
     const prefs = loadQuotePreferences();
@@ -411,6 +433,14 @@ export default function DashboardHome({
   const googleOk = calendarFeeds.some((f) => f.label === 'Google' && f.ok);
   const showFidelityHint =
     fidelityFeed && !fidelityFeed.ok && !fidelityHintDismissed;
+  const inventoryTool = useMemo(
+    () => popupTools.find((tool) => tool.id === 'inventory') ?? config.tools.find((tool) => tool.id === 'inventory'),
+    [config.tools, popupTools],
+  );
+  const planTool = useMemo(
+    () => popupTools.find((tool) => tool.id === 'plan') ?? config.tools.find((tool) => tool.id === 'plan'),
+    [config.tools, popupTools],
+  );
   const dismissFidelityHint = () => {
     setFidelityHintDismissed(true);
     try {
@@ -472,31 +502,13 @@ export default function DashboardHome({
           <p className="portal-dash-greeting-name">{displayName || t(locale, 'profileDefaultName')}</p>
         </div>
 
-        <div className="portal-dash-hero-end">
-          <button
-            type="button"
-            className={
-              'portal-search-btn portal-search-btn--note' +
-              (noteOpen ? ' portal-search-btn--active' : '')
-            }
-            onClick={onOpenNote}
-            aria-label={t(locale, 'openNote')}
-            aria-expanded={noteOpen}
-          >
-            <DashboardNoteIcon />
-          </button>
-          <button
-            ref={treasureAnchorRef}
-            type="button"
-            className={'portal-quote-treasure' + (treasureOpen ? ' portal-quote-treasure--open' : '')}
-            onClick={() => onTreasureOpenChange(!treasureOpen)}
-            aria-label={t(locale, 'openTreasure')}
-            aria-expanded={treasureOpen}
-          >
-            <span className="portal-quote-treasure-box" aria-hidden>
-              <DashboardTreasureIcon />
-            </span>
-          </button>
+        <div className="portal-dash-hero-time" aria-label="当前时间与天气">
+          <span>{formatClock(now, locale)}</span>
+          <small>
+            {weather.loading || weather.error
+              ? placeLabel
+              : `${placeLabel} · ${weather.temperatureC ?? 0}°C`}
+          </small>
         </div>
       </header>
 
@@ -508,6 +520,9 @@ export default function DashboardHome({
       >
         <p className="portal-quote-text">{quoteLine}</p>
       </button>
+      {personalization.dayBadge ? (
+        <p className="portal-v14-day-badge">{personalization.dayBadge}</p>
+      ) : null}
       {quoteSettingsOpen ? (
         <div className="portal-quote-settings" role="dialog" aria-modal="true" aria-label="金句设置">
           <div className="portal-quote-settings-sheet">
@@ -569,6 +584,196 @@ export default function DashboardHome({
               <span>允许公共外部金句补充</span>
             </label>
           </div>
+        </div>
+      ) : null}
+
+      <section className="portal-v13-coach" aria-label="今日教练行动">
+        <button type="button" className="portal-v13-remind-bar" onClick={() => setCalendarExpanded((v) => !v)}>
+          <span className="portal-v13-remind-dot" aria-hidden />
+          <span>今天有 <b>{upcomingEvents.length || 3} 件事</b> · 有 <b>1 件</b>今天处理会更从容</span>
+          <small>看看 ›</small>
+        </button>
+
+        <div className="portal-v13-count-hero">
+          <div className="portal-v13-count-left">
+            <p>重要日期</p>
+            <div><strong>5</strong><span>天</span></div>
+            <h2>妈妈生日</h2>
+          </div>
+          <div className="portal-v13-count-right">
+            <p>今日能量</p>
+            <div className="portal-v13-energy-bars" aria-hidden>
+              <span />
+              <span />
+              <span />
+              <span className="is-empty" />
+            </div>
+            <span>昨晚睡得好，身体在慢慢回升</span>
+            <button type="button">此刻心情 ›</button>
+          </div>
+        </div>
+
+        {showPersonalizationInsight && !insightDismissed ? (
+          <section className="portal-v14-insight-card" aria-label="宝盒发现了一件关于你的事">
+            {insightFeedback ? (
+              <p className="portal-v14-insight-feedback">
+                {insightFeedback === 'positive' ? '感谢反馈，我会记住这个规律' : '明白了，继续观察调整'}
+              </p>
+            ) : (
+              <>
+                <div className="portal-v14-insight-head">
+                  <span aria-hidden>🔍</span>
+                  <b>宝盒发现了一件关于你的事</b>
+                  <button type="button" onClick={() => setInsightDismissed(true)} aria-label="关闭洞察">×</button>
+                </div>
+                <p>{personalization.insightBody}</p>
+                  <small>{personalization.insightSource}</small>
+                  <div className="portal-v14-insight-actions">
+                  <button type="button" onClick={() => {
+                    rememberBaoheInsightFeedback(personalization, true);
+                    setInsightFeedback('positive');
+                  }}>👍 这很准确</button>
+                  <button type="button" onClick={() => {
+                    rememberBaoheInsightFeedback(personalization, false);
+                    setInsightFeedback('negative');
+                  }}>不太对</button>
+                </div>
+              </>
+            )}
+          </section>
+        ) : null}
+
+        <div className="portal-v13-action-card portal-v13-action-card--html">
+          <div className="portal-v13-action-content" onClick={() => setCrushTaskOpen(true)} role="presentation">
+            <p className="portal-v13-kicker">温馨提醒</p>
+            <p className="portal-v13-action-copy">妈妈生日还有几天，要不要现在花两分钟挑个礼物？<em>定制相册</em>或<em>护肤套装</em>都很贴心，做不完也没关系。</p>
+          </div>
+          <div className="portal-v13-action-row">
+            <button
+              type="button"
+              className="portal-v13-primary-action"
+              onClick={() => setCrushTaskOpen(true)}
+              disabled={!planTool}
+            >
+              粉碎任务
+            </button>
+            <button
+              type="button"
+              className="portal-v13-secondary-action"
+              onClick={() => setReminderDeferred(true)}
+            >
+              {reminderDeferred ? '已换一条' : '下一条'}
+            </button>
+          </div>
+        </div>
+
+        <article className="portal-v13-inventory-card" onClick={() => inventoryTool && onOpenTool(inventoryTool)}>
+          <div className="portal-v13-inventory-head">
+            <span aria-hidden>📦</span>
+            <b>物品库</b>
+            <small>本周清单</small>
+          </div>
+          <h2>可整理本周补货清单</h2>
+          <div className="portal-v13-inventory-rows">
+            <p><span>全脂牛奶 · 冰箱</span><b>补货</b></p>
+            <p><span>维生素 C · 药柜</span><b>补货</b></p>
+            <p><span>保湿护肤霜 · 梳妆台</span><b>关注</b></p>
+          </div>
+          <p className="portal-v13-inventory-ai">提前备好，生活从容 · 可让智友帮你处理</p>
+          <div className="portal-v13-inventory-actions">
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                if (inventoryTool) onOpenTool(inventoryTool);
+              }}
+            >
+              ＋ 记录物品
+            </button>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                if (inventoryTool) onOpenTool(inventoryTool);
+              }}
+            >
+              查看全部
+            </button>
+          </div>
+        </article>
+      </section>
+
+      {crushTaskOpen ? (
+        <div className="portal-crush-sheet" role="presentation">
+          <button
+            type="button"
+            className="portal-crush-sheet-backdrop"
+            aria-label="关闭粉碎任务"
+            onClick={() => setCrushTaskOpen(false)}
+          />
+          <section
+            className="portal-crush-sheet-card"
+            role="dialog"
+            aria-modal="true"
+            aria-label="粉碎任务"
+          >
+            <div className="portal-crush-sheet-handle" aria-hidden />
+            <div className="portal-crush-sheet-head">
+              <div>
+                <p className="portal-v13-kicker">粉碎任务</p>
+                <h2>先完成最小的一件事</h2>
+              </div>
+              <button
+                type="button"
+                className="portal-crush-sheet-close"
+                onClick={() => setCrushTaskOpen(false)}
+              >
+                <span aria-hidden>×</span>
+                <span className="sr-only">关闭粉碎任务</span>
+              </button>
+            </div>
+            <p className="portal-crush-sheet-copy">
+              {crushTaskSplitLevel > 0
+                ? '再小一点：只写下第一步，不需要完成全部。'
+                : '把一件卡住的事拆到 2 分钟能开始的大小。'}
+            </p>
+            <ol className="portal-crush-step-list" aria-label="粉碎步骤">
+              <li className={crushTaskDone ? 'is-done' : ''}>
+                <span>{crushTaskDone ? '已完成' : '第一步'}</span>
+                <strong>{crushTaskSplitLevel > 0 ? '写下任务名字' : '选一个最小动作'}</strong>
+              </li>
+              <li>
+                <span>下一步</span>
+                <strong>打开待办保存或继续拆分</strong>
+              </li>
+            </ol>
+            <div className="portal-crush-sheet-actions">
+              <button
+                type="button"
+                className="portal-crush-sheet-primary"
+                onClick={() => setCrushTaskDone(true)}
+              >
+                完成这一步
+              </button>
+              <button
+                type="button"
+                className="portal-crush-sheet-secondary"
+                onClick={() => setCrushTaskSplitLevel((level) => Math.min(level + 1, 1))}
+              >
+                再拆小一点
+              </button>
+            </div>
+            <button
+              type="button"
+              className="portal-crush-sheet-link"
+              onClick={() => {
+                if (planTool) onOpenTool(planTool);
+              }}
+              disabled={!planTool}
+            >
+              打开待办
+            </button>
+          </section>
         </div>
       ) : null}
 

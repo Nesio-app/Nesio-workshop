@@ -1,0 +1,961 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>宝盒首页 UX 动态预览｜Luma v0</title>
+  <style>
+    :root {
+      --blue: #588ce3;
+      --blue-2: #8dbbf4;
+      --blue-3: #d9e8ff;
+      --ink: #1e2a3a;
+      --muted: #607286;
+      --line: rgba(88, 140, 227, 0.16);
+      --surface: rgba(255, 255, 255, 0.76);
+      --glass: rgba(255, 255, 255, 0.58);
+      --shadow: 0 24px 70px rgba(38, 79, 135, 0.2);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 18% 6%, rgba(255,255,255,.94), transparent 28%),
+        radial-gradient(circle at 85% 8%, rgba(88,140,227,.28), transparent 30%),
+        linear-gradient(145deg, #eef6ff 0%, #d9e9ff 42%, #b9d4fb 100%);
+      overflow-x: hidden;
+    }
+
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+
+    .page {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: minmax(300px, 460px) minmax(380px, 1fr) minmax(260px, 360px);
+      gap: 28px;
+      align-items: center;
+      padding: 34px;
+    }
+
+    .brief, .control {
+      border: 1px solid rgba(255,255,255,.72);
+      background: rgba(255,255,255,.42);
+      box-shadow: 0 18px 56px rgba(49,91,150,.13);
+      backdrop-filter: blur(18px);
+      border-radius: 28px;
+      padding: 26px;
+    }
+
+    .eyebrow {
+      margin: 0 0 12px;
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      max-width: 9em;
+      font-size: clamp(40px, 4.8vw, 70px);
+      line-height: .98;
+      letter-spacing: 0;
+    }
+
+    .lead {
+      margin: 20px 0 0;
+      max-width: 32em;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.75;
+    }
+
+    .principles {
+      display: grid;
+      gap: 12px;
+      margin-top: 26px;
+    }
+
+    .principle {
+      display: grid;
+      grid-template-columns: 34px 1fr;
+      gap: 12px;
+      align-items: center;
+      padding: 13px;
+      border-radius: 18px;
+      background: rgba(255,255,255,.5);
+      border: 1px solid var(--line);
+      color: #31445d;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .num {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: 12px;
+      color: var(--blue);
+      background: linear-gradient(145deg, #fff, var(--blue-3));
+      font-weight: 900;
+    }
+
+    .stage {
+      display: grid;
+      place-items: center;
+      min-width: 0;
+    }
+
+    .phone {
+      position: relative;
+      width: min(390px, 100%);
+      height: 812px;
+      border-radius: 44px;
+      padding: 13px;
+      background: linear-gradient(145deg, rgba(255,255,255,.95), rgba(218,233,255,.78));
+      box-shadow:
+        0 30px 90px rgba(32,76,142,.28),
+        inset 0 1px 2px rgba(255,255,255,.95);
+    }
+
+    .screen {
+      position: relative;
+      height: 100%;
+      overflow: hidden;
+      border-radius: 34px;
+      background:
+        radial-gradient(circle at 14% -10%, rgba(255,255,255,1), transparent 30%),
+        linear-gradient(165deg, #f7fbff 0%, #eef6ff 52%, #dfeeff 100%);
+    }
+
+    .status {
+      height: 42px;
+      padding: 14px 23px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .bars {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+      color: #15233a;
+      font-size: 11px;
+    }
+
+    .home {
+      height: calc(100% - 42px);
+      overflow-y: auto;
+      padding: 6px 18px 112px;
+      scrollbar-width: none;
+    }
+    .home::-webkit-scrollbar { display: none; }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 48px 1fr auto;
+      gap: 12px;
+      align-items: center;
+      padding-top: 2px;
+    }
+
+    .avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 16px;
+      display: grid;
+      place-items: center;
+      color: var(--blue);
+      font-weight: 900;
+      background: linear-gradient(145deg, #fff, #dceaff);
+      box-shadow: 0 10px 28px rgba(88,140,227,.18);
+    }
+
+    .greeting p { margin: 0; }
+    .greeting .sub { color: var(--muted); font-size: 14px; font-weight: 650; }
+    .greeting .name { margin-top: 2px; font-size: 22px; font-weight: 850; letter-spacing: 0; }
+
+    .hero-actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    .icon-btn {
+      position: relative;
+      width: 44px;
+      height: 44px;
+      border: 0;
+      border-radius: 14px;
+      background: transparent;
+      color: var(--blue);
+      display: grid;
+      place-items: center;
+      transition: transform .18s ease, background .18s ease;
+    }
+    .icon-btn:active { transform: scale(.94); }
+    .icon-btn.active { background: rgba(88,140,227,.11); }
+    .icon-btn svg { width: 23px; height: 23px; stroke-width: 2.2; }
+
+    .micro-hint {
+      position: absolute;
+      top: 50px;
+      right: 0;
+      white-space: nowrap;
+      padding: 7px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.93);
+      color: var(--blue);
+      font-size: 11px;
+      font-weight: 850;
+      box-shadow: 0 10px 26px rgba(88,140,227,.16);
+      animation: floatIn .35s ease both;
+    }
+
+    .headline {
+      margin-top: 20px;
+      padding: 18px;
+      border-radius: 24px;
+      border: 1px solid rgba(255,255,255,.72);
+      background: linear-gradient(145deg, rgba(255,255,255,.82), rgba(224,238,255,.76));
+      box-shadow: 0 16px 44px rgba(88,140,227,.13);
+    }
+
+    .headline-kicker {
+      margin: 0 0 8px;
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: .08em;
+    }
+
+    .headline h2 {
+      margin: 0;
+      max-width: 11em;
+      font-size: 28px;
+      line-height: 1.06;
+      letter-spacing: 0;
+    }
+
+    .headline p {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .headline-actions {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .primary, .secondary {
+      min-height: 46px;
+      border-radius: 15px;
+      border: 0;
+      padding: 0 14px;
+      font-size: 13px;
+      font-weight: 850;
+    }
+    .primary {
+      background: linear-gradient(145deg, #75a8f2, #4f83dc);
+      color: white;
+      box-shadow: 0 10px 24px rgba(88,140,227,.26);
+    }
+    .secondary {
+      background: rgba(88,140,227,.1);
+      color: var(--blue);
+    }
+
+    .section-title {
+      margin: 20px 2px 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      font-size: 14px;
+      font-weight: 900;
+    }
+    .section-title span:last-child {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 750;
+    }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+    .mini-card, .tool-card, .activity, .quote {
+      border: 1px solid rgba(255,255,255,.78);
+      background: rgba(255,255,255,.68);
+      box-shadow: 0 10px 26px rgba(88,140,227,.09);
+      border-radius: 18px;
+    }
+
+    .mini-card {
+      min-height: 92px;
+      padding: 14px;
+    }
+    .mini-card b { display: block; font-size: 13px; }
+    .mini-card span { display: block; margin-top: 8px; color: var(--muted); font-size: 12px; line-height: 1.35; }
+
+    .tools-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+
+    .tool-card {
+      min-height: 104px;
+      padding: 12px 10px;
+      text-align: left;
+      border-color: rgba(88,140,227,.13);
+    }
+    .tool-icon {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: 13px;
+      background: linear-gradient(145deg, #fff, var(--blue-3));
+      color: var(--blue);
+      font-weight: 900;
+    }
+    .tool-card b { display: block; margin-top: 10px; font-size: 12px; }
+    .badge {
+      display: inline-flex;
+      margin-top: 6px;
+      padding: 3px 7px;
+      border-radius: 999px;
+      background: rgba(88,140,227,.1);
+      color: var(--blue);
+      font-size: 10px;
+      font-weight: 850;
+    }
+    .badge.lab { background: rgba(146,110,214,.12); color: #7156b8; }
+    .badge.gated { background: rgba(117,126,144,.1); color: #657184; }
+
+    .activity {
+      padding: 13px 14px;
+      display: grid;
+      gap: 12px;
+    }
+    .activity-row {
+      display: grid;
+      grid-template-columns: 30px 1fr auto;
+      gap: 10px;
+      align-items: center;
+    }
+    .dot {
+      width: 30px;
+      height: 30px;
+      display: grid;
+      place-items: center;
+      border-radius: 12px;
+      background: rgba(88,140,227,.11);
+      color: var(--blue);
+      font-size: 13px;
+      font-weight: 900;
+    }
+    .activity-row b { display: block; font-size: 12px; }
+    .activity-row span { color: var(--muted); font-size: 11px; }
+    .activity-row small { color: var(--muted); font-size: 10px; font-weight: 750; }
+
+    .quote {
+      margin-top: 14px;
+      padding: 13px 14px;
+      color: #344c6a;
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .bottom-nav {
+      position: absolute;
+      left: 50%;
+      bottom: 12px;
+      transform: translateX(-50%);
+      width: calc(100% - 38px);
+      height: 62px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 4px;
+      padding: 7px;
+      border-radius: 999px;
+      border: 1px solid rgba(88,140,227,.13);
+      background: rgba(255,255,255,.86);
+      box-shadow: 0 12px 32px rgba(88,140,227,.14);
+      backdrop-filter: blur(16px);
+    }
+    .nav-item {
+      border: 0;
+      border-radius: 999px;
+      background: transparent;
+      color: #75869a;
+      display: grid;
+      place-items: center;
+      gap: 2px;
+      font-size: 10px;
+      font-weight: 800;
+    }
+    .nav-item.active {
+      color: var(--blue);
+      background: rgba(88,140,227,.11);
+    }
+    .nav-item svg { width: 18px; height: 18px; }
+
+    .assistant-fab {
+      position: absolute;
+      left: 50%;
+      bottom: 26px;
+      transform: translateX(-50%);
+      width: 50px;
+      height: 50px;
+      border-radius: 999px;
+      border: 2px solid rgba(255,255,255,.95);
+      background: linear-gradient(145deg, #8bbcf8, #588ce3);
+      color: white;
+      box-shadow: 0 12px 26px rgba(88,140,227,.35);
+      display: grid;
+      place-items: center;
+      z-index: 5;
+    }
+    .assistant-fab.public {
+      opacity: .42;
+      background: linear-gradient(145deg, #d5e1f2, #aab8cc);
+      box-shadow: 0 8px 18px rgba(80,90,110,.16);
+    }
+
+    .drawer, .capture {
+      position: absolute;
+      inset: auto 14px 86px 14px;
+      border-radius: 24px;
+      border: 1px solid rgba(255,255,255,.84);
+      background: rgba(250,253,255,.96);
+      box-shadow: 0 24px 60px rgba(28,65,120,.26);
+      padding: 16px;
+      transform: translateY(18px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s ease, transform .2s ease;
+      z-index: 8;
+    }
+    .drawer.open, .capture.open {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+    .drawer-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: start;
+      margin-bottom: 12px;
+    }
+    .drawer h3, .capture h3 { margin: 0; font-size: 16px; }
+    .drawer p, .capture p { margin: 4px 0 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+    .close {
+      width: 44px;
+      height: 44px;
+      border: 0;
+      border-radius: 999px;
+      background: rgba(88,140,227,.1);
+      color: var(--blue);
+      font-size: 20px;
+    }
+    .drawer-list {
+      display: grid;
+      gap: 8px;
+    }
+    .drawer-item, .capture-action {
+      min-height: 50px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(255,255,255,.72);
+      display: grid;
+      grid-template-columns: 34px 1fr auto;
+      gap: 10px;
+      align-items: center;
+      padding: 8px 10px;
+      text-align: left;
+    }
+    .drawer-item b, .capture-action b { display: block; font-size: 12px; }
+    .drawer-item span, .capture-action span { display: block; color: var(--muted); font-size: 11px; margin-top: 2px; }
+
+    .inventory-panel {
+      display: none;
+      position: absolute;
+      inset: 42px 0 0;
+      background: linear-gradient(165deg, #f8fbff, #e9f3ff);
+      z-index: 7;
+      padding: 10px 18px 112px;
+      overflow-y: auto;
+      animation: fadeIn .22s ease;
+    }
+    .inventory-panel.open { display: block; }
+    .back-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 50px;
+    }
+    .back-row button {
+      width: 44px;
+      height: 44px;
+      border: 0;
+      background: transparent;
+      color: var(--blue);
+      font-size: 24px;
+    }
+    .back-row h2 { margin: 0; font-size: 18px; }
+    .empty {
+      margin-top: 20px;
+      padding: 24px 18px;
+      border-radius: 26px;
+      border: 1px solid rgba(255,255,255,.82);
+      background: rgba(255,255,255,.68);
+      text-align: center;
+    }
+    .empty-icon {
+      margin: 0 auto 14px;
+      width: 64px;
+      height: 64px;
+      border-radius: 22px;
+      display: grid;
+      place-items: center;
+      color: var(--blue);
+      background: linear-gradient(145deg, #fff, var(--blue-3));
+      font-size: 28px;
+      font-weight: 900;
+    }
+    .empty h3 { margin: 0; font-size: 20px; }
+    .empty p { margin: 10px 0 18px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+    .form {
+      display: none;
+      margin-top: 14px;
+      padding: 14px;
+      border-radius: 20px;
+      background: rgba(255,255,255,.72);
+      border: 1px solid var(--line);
+    }
+    .form.open { display: grid; gap: 10px; }
+    .form input {
+      width: 100%;
+      height: 46px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(255,255,255,.8);
+      padding: 0 12px;
+      color: var(--ink);
+    }
+    .saved {
+      display: none;
+      margin-top: 14px;
+    }
+    .saved.open { display: block; }
+    .item-card {
+      padding: 14px;
+      border-radius: 20px;
+      border: 1px solid rgba(255,255,255,.82);
+      background: rgba(255,255,255,.72);
+    }
+    .item-card b { display: block; font-size: 15px; }
+    .item-card span { display: block; margin-top: 6px; color: var(--muted); font-size: 12px; }
+
+    .control h2 { margin: 0 0 8px; font-size: 22px; }
+    .control p { margin: 0 0 18px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+    .segmented {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      padding: 5px;
+      border-radius: 18px;
+      background: rgba(255,255,255,.52);
+      border: 1px solid var(--line);
+    }
+    .segmented button {
+      min-height: 42px;
+      border: 0;
+      border-radius: 14px;
+      background: transparent;
+      color: var(--muted);
+      font-weight: 850;
+    }
+    .segmented button.active {
+      color: white;
+      background: linear-gradient(145deg, #75a8f2, #4f83dc);
+      box-shadow: 0 8px 18px rgba(88,140,227,.22);
+    }
+    .control-actions {
+      display: grid;
+      gap: 8px;
+      margin-top: 18px;
+    }
+    .control-actions button {
+      min-height: 44px;
+      border: 1px solid var(--line);
+      border-radius: 15px;
+      background: rgba(255,255,255,.58);
+      color: #31445d;
+      font-weight: 800;
+      text-align: left;
+      padding: 0 12px;
+    }
+    .notes {
+      margin-top: 18px;
+      padding-top: 16px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.65;
+    }
+
+    .toast {
+      position: absolute;
+      left: 22px;
+      right: 22px;
+      bottom: 88px;
+      z-index: 20;
+      min-height: 44px;
+      border-radius: 16px;
+      background: rgba(30,42,58,.9);
+      color: #fff;
+      display: grid;
+      place-items: center;
+      padding: 10px 14px;
+      font-size: 12px;
+      font-weight: 800;
+      opacity: 0;
+      transform: translateY(10px);
+      pointer-events: none;
+      transition: opacity .2s ease, transform .2s ease;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    @keyframes floatIn {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @media (max-width: 1120px) {
+      .page {
+        grid-template-columns: 1fr;
+        align-items: start;
+      }
+      .brief, .control { max-width: 720px; margin: 0 auto; }
+      .stage { order: -1; }
+    }
+
+    @media (max-width: 520px) {
+      .page { padding: 0; gap: 0; }
+      .brief, .control {
+        border-radius: 0;
+        box-shadow: none;
+      }
+      .phone {
+        width: 100vw;
+        height: 100dvh;
+        border-radius: 0;
+        padding: 0;
+      }
+      .screen { border-radius: 0; }
+      .brief, .control { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="brief" aria-label="设计方向">
+      <p class="eyebrow">Baohe Home UX v0</p>
+      <h1>把复杂后台，收进一个宝盒。</h1>
+      <p class="lead">
+        首页不是营销页，也不是模块列表。它应该像 iPhone 一样让复杂能力在后台运转，
+        前台只给用户一个清楚、温柔、可行动的个人工作台。
+      </p>
+      <div class="principles">
+        <div class="principle"><span class="num">1</span><span>首屏先让用户完成一件事：记录一件物品或购买。</span></div>
+        <div class="principle"><span class="num">2</span><span>宝盒是工具包抽屉；笔记是 Capture 动作，不成为主 Tab。</span></div>
+        <div class="principle"><span class="num">3</span><span>智友保留为核心未来入口，但 Public 与 Lab 明确分层。</span></div>
+        <div class="principle"><span class="num">4</span><span>所有工具共用底层状态语言，不在每个工具里重复设计。</span></div>
+      </div>
+    </section>
+
+    <section class="stage" aria-label="手机动态预览">
+      <div class="phone">
+        <div class="screen">
+          <div class="status">
+            <span>9:41</span>
+            <span class="bars">●●● 5G ▰</span>
+          </div>
+
+          <section class="home" id="home">
+            <header class="hero">
+              <div class="avatar">婧</div>
+              <div class="greeting">
+                <p class="sub">早安，宝盒已为你整理好</p>
+                <p class="name">今天从这里开始</p>
+              </div>
+              <div class="hero-actions">
+                <button class="icon-btn" id="captureBtn" aria-label="记录">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 5v14M5 12h14"/></svg>
+                </button>
+                <button class="icon-btn" id="treasureBtn" aria-label="宝盒工具">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 8l8-4 8 4-8 4-8-4Z"/><path d="M4 8v8l8 4 8-4V8"/><path d="M12 12v8"/></svg>
+                  <span class="micro-hint" id="hint">9 个工具在这里</span>
+                </button>
+              </div>
+            </header>
+
+            <article class="headline">
+              <p class="headline-kicker">首发主路径</p>
+              <h2>记录一件东西，宝盒会替你收好线索。</h2>
+              <p>购买、物品、保修、链接、备注先进入 Inventory。复杂分类和连接关系留给后台。</p>
+              <div class="headline-actions">
+                <button class="primary" id="openInventory">记录物品</button>
+                <button class="secondary" id="viewInventory">查看</button>
+              </div>
+            </article>
+
+            <div class="section-title"><span>今日概览</span><span>背景服务，不抢主线</span></div>
+            <div class="grid-2">
+              <div class="mini-card"><b>纽约 23°C</b><span>晴，适合处理轻量任务</span></div>
+              <div class="mini-card"><b>日程空档</b><span>下午 2:00 后可安排深度工作</span></div>
+            </div>
+
+            <div class="section-title"><span>常用工具包</span><span>查看全部</span></div>
+            <div class="tools-row">
+              <button class="tool-card" id="toolInventory"><span class="tool-icon">□</span><b>购买记忆</b><span class="badge">Ready</span></button>
+              <button class="tool-card" id="toolAI"><span class="tool-icon">◎</span><b>智友</b><span class="badge lab" id="aiBadge">Lab only</span></button>
+              <button class="tool-card" id="toolCustom"><span class="tool-icon">＋</span><b>自定义包</b><span class="badge gated">Later</span></button>
+            </div>
+
+            <div class="section-title"><span>最近动态</span><span>让用户看见项目在动</span></div>
+            <div class="activity">
+              <div class="activity-row">
+                <span class="dot">1</span>
+                <div><b>购买记忆已准备</b><span>可记录第一条物品</span></div>
+                <small>active</small>
+              </div>
+              <div class="activity-row">
+                <span class="dot">2</span>
+                <div><b>工具包状态同步</b><span>Ready / Lab / Gated 共用一套语言</span></div>
+                <small>QA</small>
+              </div>
+            </div>
+
+            <div class="quote">今日一句：宝盒不是更多软件，而是把软件背后的复杂连接收起来。</div>
+          </section>
+
+          <section class="inventory-panel" id="inventoryPanel" aria-label="Inventory 首发路径">
+            <div class="back-row">
+              <button id="backHome" aria-label="返回">‹</button>
+              <h2>购买记忆</h2>
+            </div>
+            <div class="empty">
+              <div class="empty-icon">□</div>
+              <h3>先记录一件东西</h3>
+              <p>名称、购买地、链接、保修、备注都可以先粗略保存。宝盒以后再帮你连接和整理。</p>
+              <button class="primary" id="startForm">添加第一条</button>
+            </div>
+            <div class="form" id="itemForm">
+              <input id="itemName" value="MacBook 充电器" aria-label="物品名称" />
+              <input value="Apple Store / 保修链接待补" aria-label="来源" />
+              <button class="primary" id="saveItem">保存到宝盒</button>
+            </div>
+            <div class="saved" id="savedItem">
+              <div class="item-card">
+                <b>MacBook 充电器</b>
+                <span>已保存：来源、备注、后续可补保修和发票。</span>
+                <span class="badge">local first</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="drawer" id="drawer" aria-label="宝盒工具抽屉">
+            <div class="drawer-head">
+              <div>
+                <h3>宝盒 / 9 个工具</h3>
+                <p>工具包是抽屉，不是新的首页。状态清楚，不能用的不要伪装成可用。</p>
+              </div>
+              <button class="close" id="closeDrawer" aria-label="关闭">×</button>
+            </div>
+            <div class="drawer-list">
+              <button class="drawer-item" data-open-inventory><span class="tool-icon">□</span><div><b>购买记忆</b><span>首发可用路径</span></div><span class="badge">Ready</span></button>
+              <button class="drawer-item" id="drawerAI"><span class="tool-icon">◎</span><div><b>智友</b><span id="aiLine">Public 暂不开放</span></div><span class="badge lab" id="drawerAiBadge">Lab only</span></button>
+              <button class="drawer-item"><span class="tool-icon">◇</span><div><b>财务 / 健康 / 心理</b><span>即使付费也需安全 Gate</span></div><span class="badge gated">Gated</span></button>
+            </div>
+          </section>
+
+          <section class="capture" id="capture" aria-label="Capture 动作">
+            <div class="drawer-head">
+              <div>
+                <h3>记录</h3>
+                <p>笔记是入口动作：记一下、贴链接、存到工具包。</p>
+              </div>
+              <button class="close" id="closeCapture" aria-label="关闭">×</button>
+            </div>
+            <button class="capture-action"><span class="tool-icon">✎</span><div><b>快速笔记</b><span>进入 Baohe Note 或第三方</span></div><span></span></button>
+            <button class="capture-action" data-open-inventory><span class="tool-icon">□</span><div><b>保存到购买记忆</b><span>首发推荐路径</span></div><span></span></button>
+            <button class="capture-action" id="captureAI"><span class="tool-icon">◎</span><div><b>发给智友</b><span id="captureAiText">Lab only</span></div><span></span></button>
+          </section>
+
+          <button class="assistant-fab public" id="assistantFab" aria-label="智友">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"><path d="M12 3c4 0 7 2.6 7 6.2 0 3.7-3 6.3-7 6.3-.8 0-1.6-.1-2.3-.3L5 18l1.5-4C5.5 12.8 5 11.1 5 9.2 5 5.6 8 3 12 3Z"/></svg>
+          </button>
+
+          <nav class="bottom-nav" aria-label="底部导航">
+            <button class="nav-item active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 10.5 12 4l8 6.5V20H4Z"/></svg><span>首页</span></button>
+            <button class="nav-item" id="navInventory"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 8l8-4 8 4-8 4-8-4Z"/><path d="M4 8v8l8 4 8-4V8"/></svg><span>物品</span></button>
+            <button class="nav-item" id="navTools"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/></svg><span>工具包</span></button>
+            <button class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM4 21a8 8 0 0 1 16 0"/></svg><span>我的</span></button>
+          </nav>
+
+          <div class="toast" id="toast">已保存</div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="control" aria-label="预览控制">
+      <h2>预览控制</h2>
+      <p>切换 Public / Lab，观察首页如何同时保留智友愿景，又不向首发用户承诺未开放能力。</p>
+      <div class="segmented">
+        <button class="active" id="publicMode">Public</button>
+        <button id="labMode">Lab</button>
+      </div>
+      <div class="control-actions">
+        <button id="ctrlTreasure">打开宝盒工具抽屉</button>
+        <button id="ctrlCapture">打开记录入口</button>
+        <button id="ctrlInventory">进入 Inventory 首发路径</button>
+        <button id="ctrlReset">重置预览</button>
+      </div>
+      <div class="notes">
+        首页设计底线：不把宝盒做成营销页；不把笔记做成主 Tab；不让付费或 Lab 状态看起来等于安全可用；移动端所有主操作保持 44px 以上触控目标。
+      </div>
+    </aside>
+  </main>
+
+  <script>
+    const state = { mode: "public" };
+    const $ = (id) => document.getElementById(id);
+    const drawer = $("drawer");
+    const capture = $("capture");
+    const inventoryPanel = $("inventoryPanel");
+    const toast = $("toast");
+    const treasureBtn = $("treasureBtn");
+    const hint = $("hint");
+
+    function showToast(text) {
+      toast.textContent = text;
+      toast.classList.add("show");
+      clearTimeout(showToast.timer);
+      showToast.timer = setTimeout(() => toast.classList.remove("show"), 1500);
+    }
+
+    function closePanels() {
+      drawer.classList.remove("open");
+      capture.classList.remove("open");
+      treasureBtn.classList.remove("active");
+    }
+
+    function openDrawer() {
+      capture.classList.remove("open");
+      drawer.classList.toggle("open");
+      treasureBtn.classList.toggle("active", drawer.classList.contains("open"));
+      hint.style.display = "none";
+    }
+
+    function openCapture() {
+      drawer.classList.remove("open");
+      treasureBtn.classList.remove("active");
+      capture.classList.toggle("open");
+    }
+
+    function openInventory() {
+      closePanels();
+      inventoryPanel.classList.add("open");
+    }
+
+    function setMode(mode) {
+      state.mode = mode;
+      const isLab = mode === "lab";
+      $("publicMode").classList.toggle("active", !isLab);
+      $("labMode").classList.toggle("active", isLab);
+      $("assistantFab").classList.toggle("public", !isLab);
+      $("aiBadge").textContent = isLab ? "Lab" : "Lab only";
+      $("drawerAiBadge").textContent = isLab ? "Lab" : "Lab only";
+      $("aiLine").textContent = isLab ? "可进入 AI 聚合对话预览" : "Public 暂不开放";
+      $("captureAiText").textContent = isLab ? "发给 AI 群聊预览" : "Lab only";
+      showToast(isLab ? "Lab mode: 智友可见" : "Public mode: 未开放能力降噪");
+    }
+
+    $("treasureBtn").addEventListener("click", openDrawer);
+    $("ctrlTreasure").addEventListener("click", openDrawer);
+    $("closeDrawer").addEventListener("click", closePanels);
+    $("captureBtn").addEventListener("click", openCapture);
+    $("ctrlCapture").addEventListener("click", openCapture);
+    $("closeCapture").addEventListener("click", closePanels);
+    $("openInventory").addEventListener("click", openInventory);
+    $("viewInventory").addEventListener("click", openInventory);
+    $("toolInventory").addEventListener("click", openInventory);
+    $("navInventory").addEventListener("click", openInventory);
+    $("ctrlInventory").addEventListener("click", openInventory);
+    document.querySelectorAll("[data-open-inventory]").forEach((btn) => btn.addEventListener("click", openInventory));
+    $("backHome").addEventListener("click", () => inventoryPanel.classList.remove("open"));
+    $("startForm").addEventListener("click", () => {
+      $("itemForm").classList.add("open");
+      showToast("先粗略记录，之后再补全");
+    });
+    $("saveItem").addEventListener("click", () => {
+      $("itemForm").classList.remove("open");
+      $("savedItem").classList.add("open");
+      showToast("已保存到本机宝盒");
+    });
+    $("publicMode").addEventListener("click", () => setMode("public"));
+    $("labMode").addEventListener("click", () => setMode("lab"));
+    $("assistantFab").addEventListener("click", () => {
+      if (state.mode === "public") showToast("智友为 Lab only，Public 首页不承诺可用");
+      else showToast("打开智友聚合对话预览");
+    });
+    $("toolAI").addEventListener("click", () => {
+      if (state.mode === "public") showToast("Public 模式：智友暂不开放");
+      else showToast("Lab 模式：进入智友");
+    });
+    $("drawerAI").addEventListener("click", () => {
+      if (state.mode === "public") showToast("Public 模式：智友暂不开放");
+      else showToast("Lab 模式：进入智友");
+    });
+    $("captureAI").addEventListener("click", () => {
+      if (state.mode === "public") showToast("Public 模式不显示真实 AI 执行承诺");
+      else showToast("发送到 AI 群聊预览");
+    });
+    $("navTools").addEventListener("click", openDrawer);
+    $("ctrlReset").addEventListener("click", () => {
+      closePanels();
+      inventoryPanel.classList.remove("open");
+      $("itemForm").classList.remove("open");
+      $("savedItem").classList.remove("open");
+      setMode("public");
+      hint.style.display = "";
+      showToast("预览已重置");
+    });
+
+    setTimeout(() => { if (hint) hint.style.display = "none"; }, 4200);
+  </script>
+</body>
+</html>

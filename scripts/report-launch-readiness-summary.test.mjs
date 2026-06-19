@@ -16,11 +16,11 @@ const summary = JSON.parse(output);
 assert.equal(summary.version, 'launch-readiness-summary-v0');
 assert.equal(summary.generatedFrom, 'report-module-registry.mjs');
 assert.equal(summary.status, 'candidate_not_release_ready');
-assert.equal(summary.firstLaunchPromise, 'Shell + Inventory / purchase-memory');
+assert.equal(summary.firstLaunchPromise, 'Shell + Inventory / purchase-memory + Todo');
 assert.equal(summary.appStoreReady, false);
 assert.equal(summary.testFlightReady, false);
-assert.deepEqual(summary.ordinaryUserPublicModules, ['inventory']);
-assert.deepEqual(summary.launchableModules.sort(), ['inventory', 'shell']);
+assert.deepEqual(summary.ordinaryUserPublicModules, ['plan', 'inventory']);
+assert.deepEqual(summary.launchableModules.sort(), ['inventory', 'plan', 'shell']);
 assert.equal(summary.excludedFromLaunchModules.includes('finance'), true);
 assert.equal(summary.excludedFromLaunchModules.includes('health'), true);
 assert.equal(summary.excludedFromLaunchModules.includes('psychoanalysis'), true);
@@ -53,7 +53,7 @@ const markdown = execFileSync('node', [join(scriptDir, 'report-launch-readiness-
   maxBuffer: 1024 * 1024 * 40,
 });
 assert.match(markdown, /Baohe Launch Readiness Summary v0/);
-assert.match(markdown, /Ordinary user public modules: inventory/);
+assert.match(markdown, /Ordinary user public modules: plan, inventory/);
 assert.match(markdown, /App Store ready: false/);
 
 console.log('launch readiness summary tests passed');

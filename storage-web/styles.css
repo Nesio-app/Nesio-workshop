@@ -318,6 +318,110 @@ html, body {
   line-height: 1.55;
 }
 
+.launch-surface-card {
+  margin: 0 18px 12px;
+  border: 1px solid rgba(74, 134, 224, 0.18);
+  border-radius: var(--r);
+  padding: 13px;
+  background:
+    linear-gradient(135deg, rgba(74, 134, 224, 0.1), rgba(255, 255, 255, 0.78)),
+    var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.launch-surface-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.launch-surface-kicker {
+  margin-bottom: 3px;
+  color: var(--accent-deep);
+  font-size: 9.5px;
+  font-weight: 850;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+
+.launch-surface-head h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.35;
+  font-weight: 850;
+}
+
+.launch-surface-head > span {
+  flex: 0 0 auto;
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0 9px;
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--accent-deep);
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.launch-surface-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 11px;
+}
+
+.launch-surface-actions button {
+  min-height: 46px;
+  border: 1px solid rgba(74, 134, 224, 0.18);
+  border-radius: 12px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.launch-surface-actions span,
+.launch-surface-actions small {
+  display: block;
+}
+
+.launch-surface-actions span {
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.launch-surface-actions small {
+  margin-top: 2px;
+  color: var(--text3);
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.launch-surface-states {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.launch-surface-states span {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0 9px;
+  background: rgba(74, 134, 224, 0.09);
+  color: var(--text2);
+  font-size: 10px;
+  font-weight: 750;
+}
+
 .icard { display: flex; gap: 12px; align-items: flex-start; cursor: pointer; transition: transform 0.18s; }
 .icard:active { transform: scale(0.98); }
 

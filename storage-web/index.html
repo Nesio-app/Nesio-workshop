@@ -38,6 +38,25 @@
       <div class="hbtn" onclick="openSheet('sh-settings')" title="设置">⚙️</div>
     </div>
     <div class="sbar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg><input placeholder="狗用的 · 止痒 · 备用枕巾…" oninput="liveSearch(this.value)" id="hsearch"></div>
+    <section class="launch-surface-card" aria-label="物品库首发能力">
+      <div class="launch-surface-head">
+        <div>
+          <div class="launch-surface-kicker">Inventory / purchase-memory</div>
+          <h2>先把物品和购买记忆留在本机</h2>
+        </div>
+        <span>Local-only</span>
+      </div>
+      <div class="launch-surface-actions">
+        <button type="button" onclick="openSheet('sh-add')"><span>快速添加</span><small>物品 + 购买记忆</small></button>
+        <button type="button" onclick="openSheet('sh-settings')"><span>导出 / 删除</span><small>本地数据自控</small></button>
+      </div>
+      <div class="launch-surface-states">
+        <span>已收好</span>
+        <span>冷静期</span>
+        <span>待处理</span>
+        <span>补货提醒</span>
+      </div>
+    </section>
     <div class="scroll">
       <div id="searchOut" style="display:none;"></div>
       <div class="exp-ban" id="expBanner"><span style="font-size:17px;">⏰</span><div class="et" id="expBannerText"></div></div>

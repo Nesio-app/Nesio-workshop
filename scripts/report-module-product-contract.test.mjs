@@ -31,10 +31,11 @@ assert.equal(report.summary.coreObjectModelGroupCount, 3);
 const byModule = new Map(report.moduleProductContract.modules.map((entry) => [entry.moduleId, entry]));
 const appStoreMentionable = report.moduleProductContract.modules
   .filter((entry) => entry.appStore.appStoreMentionAllowed)
-  .map((entry) => entry.moduleId);
-assert.deepEqual(appStoreMentionable, ['inventory']);
-assert.equal(report.summary.moduleProductAppStoreMentionAllowedCount, 1);
-assert.equal(report.summary.moduleProductPublicVisibleCount, 1);
+  .map((entry) => entry.moduleId)
+  .sort();
+assert.deepEqual(appStoreMentionable, ['inventory', 'plan']);
+assert.equal(report.summary.moduleProductAppStoreMentionAllowedCount, 2);
+assert.equal(report.summary.moduleProductPublicVisibleCount, 2);
 
 for (const moduleId of ['finance', 'health', 'psychoanalysis', 'secretary', 'lifesim']) {
   const entry = byModule.get(moduleId);
@@ -48,8 +49,10 @@ const launchCohorts = report.moduleProductContract.modules.reduce((counts, entry
   counts[entry.launchCohort] = (counts[entry.launchCohort] || 0) + 1;
   return counts;
 }, {});
-assert.equal(launchCohorts.first_launch, 1);
+assert.equal(launchCohorts.first_launch, 2);
 assert.equal(byModule.get('inventory').launchCohort, 'first_launch');
 assert.equal(byModule.get('inventory').appStore.marketingClaim.includes('购买记忆'), true);
+assert.equal(byModule.get('plan').launchCohort, 'first_launch');
+assert.equal(byModule.get('plan').appStore.marketingClaim.includes('小动作'), true);
 
 console.log('report module product contract tests passed');

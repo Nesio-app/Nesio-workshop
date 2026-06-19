@@ -1,79 +1,68 @@
 'use client';
 
-import Link from 'next/link';
+import type { CSSProperties } from 'react';
 import { withBase } from '@/lib/portal/paths';
-import { t } from '@/lib/portal/i18n';
-import { loadProfileSettings } from '@/lib/portal/profile';
-import type { PortalLocale } from '@/lib/portal/profile';
 
 interface PortalBottomNavProps {
-  noteOpen?: boolean;
+  aiFriendsOpen?: boolean;
   treasureOpen?: boolean;
   onHome: () => void;
-  onOpenNote: () => void;
-  onOpenTodo: () => void;
+  onOpenAiFriends: () => void;
+  onOpenTreasure: () => void;
 }
 
 export default function PortalBottomNav({
-  noteOpen = false,
+  aiFriendsOpen = false,
   treasureOpen = false,
   onHome,
-  onOpenNote,
-  onOpenTodo,
+  onOpenAiFriends,
+  onOpenTreasure,
 }: PortalBottomNavProps) {
-  const locale: PortalLocale = loadProfileSettings().locale;
-
   return (
-    <nav className="portal-bottom-nav" aria-label={t(locale, 'portalBottomNavLabel')}>
+    <nav className="portal-bottom-nav" aria-label="宝盒导航">
+      <button
+        type="button"
+        className="portal-bottom-nav-btn"
+        onClick={onHome}
+        aria-label="首页"
+      >
+        <span className="portal-bottom-nav-icon portal-bottom-nav-icon--symbol" aria-hidden>
+          ⌂
+        </span>
+        <span className="portal-bottom-nav-label">首页</span>
+      </button>
+      <button
+        type="button"
+        className={
+          'portal-bottom-nav-btn' + (aiFriendsOpen ? ' portal-bottom-nav-btn--active' : '')
+        }
+        onClick={onOpenAiFriends}
+        aria-label="智友"
+        aria-expanded={aiFriendsOpen}
+      >
+        <span
+          className="portal-bottom-nav-icon portal-bottom-nav-icon--mask"
+          style={{ '--portal-bottom-nav-icon-url': `url(${withBase('/icons/tools/secretary.svg')})` } as CSSProperties}
+          aria-hidden
+        />
+        <span className="portal-bottom-nav-label">智友</span>
+      </button>
       <button
         type="button"
         className={
           'portal-bottom-nav-btn' + (treasureOpen ? ' portal-bottom-nav-btn--active' : '')
         }
-        onClick={onHome}
-        aria-label={t(locale, 'portalBottomNavHome')}
+        onClick={onOpenTreasure}
+        aria-label="工具箱"
         aria-expanded={treasureOpen}
       >
-        <img
-          className="portal-bottom-nav-icon portal-bottom-nav-icon--svg"
-          src={withBase('/icons/treasurebox.svg')}
-          alt=""
-          width={24}
-          height={24}
+        <span
+          className="portal-bottom-nav-icon portal-bottom-nav-icon--mask"
+          style={{ '--portal-bottom-nav-icon-url': `url(${withBase('/icons/treasurebox.svg')})` } as CSSProperties}
+          aria-hidden
         />
+        <span className="portal-bottom-nav-label">工具箱</span>
       </button>
-      <button
-        type="button"
-        className={
-          'portal-bottom-nav-btn' + (noteOpen ? ' portal-bottom-nav-btn--active' : '')
-        }
-        onClick={onOpenNote}
-        aria-label={t(locale, 'portalBottomNavNote')}
-        aria-expanded={noteOpen}
-      >
-        <span className="portal-bottom-nav-icon portal-icon-blue" aria-hidden>
-          📝
-        </span>
-      </button>
-      <button
-        type="button"
-        className="portal-bottom-nav-btn"
-        onClick={onOpenTodo}
-        aria-label={t(locale, 'portalBottomNavTodo')}
-      >
-        <span className="portal-bottom-nav-icon portal-icon-blue" aria-hidden>
-          ✅
-        </span>
-      </button>
-      <Link
-        href={withBase('/settings')}
-        className="portal-bottom-nav-btn"
-        aria-label={t(locale, 'portalBottomNavMe')}
-      >
-        <span className="portal-bottom-nav-icon portal-icon-blue" aria-hidden>
-          👤
-        </span>
-      </Link>
     </nav>
   );
 }

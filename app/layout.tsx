@@ -1,19 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { Noto_Serif_SC, Source_Sans_3 } from 'next/font/google';
 import './globals.css';
-
-const notoSerif = Noto_Serif_SC({
-  subsets: ['latin'],
-  weight: ['400', '500', '600'],
-  variable: '--font-portal-serif',
-  display: 'swap',
-});
-
-const sourceSans = Source_Sans_3({
-  subsets: ['latin'],
-  variable: '--font-source-sans',
-  display: 'swap',
-});
 
 export const metadata: Metadata = {
   title: '宝盒 · 数字静谧庭院',
@@ -53,7 +39,6 @@ export default function RootLayout({
   return (
     <html
       lang="zh-CN"
-      className={`${notoSerif.variable} ${sourceSans.variable}`}
       suppressHydrationWarning
     >
       <head>

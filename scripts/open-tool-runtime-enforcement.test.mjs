@@ -18,10 +18,10 @@ const plan = {
   name: '今日',
   url: '/adhd-flow/',
   ready: true,
-  launchStatus: 'future_paid',
-  prodExposure: 'tester_only',
-  toolLifecycle: 'sandbox',
-  entitlementPolicy: { paywallState: 'locked' },
+  launchStatus: 'launchable',
+  prodExposure: 'public',
+  toolLifecycle: 'launchable',
+  entitlementPolicy: { paywallState: 'free' },
   approvalRequiredActions: [],
 };
 
@@ -50,8 +50,8 @@ const health = {
 };
 
 assert.equal(openToolHref(inventory, { viewerRole: 'public' }), '/storage/');
-assert.equal(openToolHref(plan, { viewerRole: 'public' }), '');
-assert.equal(openToolHref(plan, { viewerRole: 'tester', testerAllowlist: ['plan'] }), '');
+assert.equal(openToolHref(plan, { viewerRole: 'public' }), '/adhd-flow/');
+assert.equal(openToolHref(plan, { viewerRole: 'tester', testerAllowlist: ['plan'] }), '/adhd-flow/');
 assert.equal(openToolHref(plan, { viewerRole: 'personal_lab' }), '/adhd-flow/');
 assert.equal(openToolHref(finance, { viewerRole: 'tester', testerAllowlist: ['finance'] }), '');
 assert.equal(openToolHref(finance, { viewerRole: 'personal_lab' }), 'https://finance.example.test/');

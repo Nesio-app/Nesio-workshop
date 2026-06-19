@@ -62,6 +62,29 @@ function parseGitmodules(raw) {
   return modules;
 }
 
+const submoduleClassification = {
+  'storage-ios': {
+    state: 'active_launch_dependency',
+    launchSurface: 'inventory_lineage_only',
+  },
+  'psych-tool-ios': {
+    state: 'contract_reference',
+    launchSurface: 'not_public_launch_surface',
+  },
+  'questionbank-ios': {
+    state: 'sandbox_reference',
+    launchSurface: 'not_public_launch_surface',
+  },
+  'reading-ios': {
+    state: 'sandbox_reference',
+    launchSurface: 'not_public_launch_surface',
+  },
+  'weaver-ai': {
+    state: 'contract_reference',
+    launchSurface: 'not_public_launch_surface',
+  },
+};
+
 const rawRuntimeReferences = rg([
   '-n',
   'memory/|from [\'"]\\.\\.?/memory|from [\'"]memory|require\\([\'"]\\.\\.?/memory|@/memory|/memory',
@@ -103,7 +126,13 @@ const memoryIndicators = [
   'memory/DEPLOY.md',
 ].filter((file) => existsSync(join(repoRoot, file)));
 
-const submodules = parseGitmodules(read('.gitmodules'));
+const submodules = parseGitmodules(read('.gitmodules')).map((entry) => ({
+  ...entry,
+  ...(submoduleClassification[entry.path] ?? {
+    state: 'unclassified',
+    launchSurface: 'not_public_launch_surface',
+  }),
+}));
 
 const report = {
   version: 'repository-boundary-report-v0',
@@ -127,10 +156,13 @@ const report = {
   submodules: {
     count: submodules.length,
     entries: submodules,
+    doctorCommand: 'npm run doctor:submodules',
+    initCommand: 'git submodule update --init --recursive',
     policy: {
       updateAllCasuallyBeforeRelease: false,
       requiresIntentionalReason: true,
       launchSurfaceImpliedBySubmodule: false,
+      migrateAllToTurborepoNow: false,
     },
   },
   deploymentReferences,

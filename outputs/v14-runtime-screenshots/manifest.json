@@ -1,0 +1,50 @@
+{
+  "generatedAt": "2026-06-19T17:18:45.007Z",
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "sourceSpec": "/Users/jing/Downloads/treasureboxredesign 14.html",
+  "screenshots": [
+    {
+      "name": "01-onboarding-name",
+      "path": "outputs/v14-runtime-screenshots/01-onboarding-name.png",
+      "note": "Onboarding display name frame."
+    },
+    {
+      "name": "02-onboarding-coach-style",
+      "path": "outputs/v14-runtime-screenshots/02-onboarding-coach-style.png",
+      "note": "Onboarding coach style frame."
+    },
+    {
+      "name": "03-home-warm-coach",
+      "path": "outputs/v14-runtime-screenshots/03-home-warm-coach.png",
+      "note": "Home warm coach with V14 insight-aware launch surface."
+    },
+    {
+      "name": "04-crush-task-sheet",
+      "path": "outputs/v14-runtime-screenshots/04-crush-task-sheet.png",
+      "note": "Task-crushing bottom sheet."
+    },
+    {
+      "name": "05-ai-friends-stable-hub",
+      "path": "outputs/v14-runtime-screenshots/05-ai-friends-stable-hub.png",
+      "note": "AI Friends conversation list, group chat, and attachment affordances."
+    },
+    {
+      "name": "06-tool-packs-discovery",
+      "path": "outputs/v14-runtime-screenshots/06-tool-packs-discovery.png",
+      "note": "Toolbox discovery screen with V14 data-depth cards and packs."
+    },
+    {
+      "name": "08-me-connections-safety",
+      "path": "outputs/v14-runtime-screenshots/08-me-connections-safety.png",
+      "note": "Profile analysis, learned memories, preferences, connections and safety boundary."
+    },
+    {
+      "name": "07-inventory-purchase-memory",
+      "path": "outputs/v14-runtime-screenshots/07-inventory-purchase-memory.png",
+      "note": "Inventory purchase-memory first-launch surface."
+    }
+  ]
+}
