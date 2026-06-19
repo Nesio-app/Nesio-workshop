@@ -26,6 +26,18 @@
 /var/
 /README 2.md
 /inner-shelter-ios/
+/Airbnb_Price_Prediction2.pptx
+/Milestone3_Jing_Duan.ipynb
+/Project 1/
+/app/portfolio/
+/components/About.tsx
+/components/Contact.tsx
+/components/Hero.tsx
+/components/LifeInterests.tsx
+/components/Portfolio.tsx
+/components/Values.tsx
+/forecasting_system.ipynb
+/milestone2_Jing_Duan.pdf
 database/*.db
 database/*.sqlite
 database/**/*.db
