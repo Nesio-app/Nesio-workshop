@@ -158,12 +158,18 @@ interface CalendarFeedStatus {
 const FIDELITY_HINT_KEY = 'treasurebox-fidelity-hint-dismissed';
 
 const MOOD_OPTIONS = [
-  { key: 'calm', label: '慢慢来', color: '#36b7e5' },
-  { key: 'warm', label: '温暖', color: '#16b994' },
+  { key: 'calm', label: '慢慢来', color: '#38bdf8' },
+  { key: 'safe', label: '安心', color: '#2dd4bf' },
+  { key: 'restored', label: '回暖', color: '#22c55e' },
   { key: 'focused', label: '专注', color: '#4a6cf7' },
+  { key: 'hopeful', label: '有希望', color: '#7c8cff' },
+  { key: 'creative', label: '想象力', color: '#a855f7' },
+  { key: 'tender', label: '需要照顾', color: '#ec4899' },
+  { key: 'anxious', label: '有点焦虑', color: '#ef4444' },
+  { key: 'alert', label: '警觉', color: '#f97316' },
+  { key: 'bright', label: '轻快', color: '#facc15' },
+  { key: 'grounded', label: '稳住', color: '#94a3b8' },
   { key: 'low', label: '低能量', color: '#8b7cf6' },
-  { key: 'bright', label: '轻快', color: '#f39a2e' },
-  { key: 'tender', label: '需要被照顾', color: '#ef5f8f' },
 ] as const;
 
 type MoodOption = (typeof MOOD_OPTIONS)[number];
@@ -186,6 +192,8 @@ export default function DashboardHome({
   onOpenAiFriends,
 }: DashboardHomeProps) {
   const treasureAnchorRef = useRef<HTMLButtonElement>(null);
+  const moodWheelRef = useRef<HTMLDivElement>(null);
+  const moodPointerMovedRef = useRef(false);
   const profile = config.profile ?? { displayName: t('zh', 'profileDefaultName') };
   const [locale, setLocale] = useState<PortalLocale>('zh');
   const [displayName, setDisplayName] = useState(profile.displayName);
@@ -302,13 +310,23 @@ export default function DashboardHome({
   const chooseMood = (mood: MoodOption) => {
     setSelectedMood(mood);
     setHoveredMood(mood);
-    setMoodPickerOpen(false);
     try {
       window.localStorage.setItem('treasurebox-v14-mood', mood.key);
     } catch {
       // local mood is optional.
     }
   };
+
+  const moodFromPointer = useCallback((clientX: number, clientY: number) => {
+    const rect = moodWheelRef.current?.getBoundingClientRect();
+    if (!rect) return selectedMood;
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const angle = (Math.atan2(clientY - cy, clientX - cx) * 180) / Math.PI;
+    const normalized = (angle + 450) % 360;
+    const index = Math.floor(normalized / (360 / MOOD_OPTIONS.length)) % MOOD_OPTIONS.length;
+    return MOOD_OPTIONS[index] ?? selectedMood;
+  }, [selectedMood]);
 
   const handleInsightFeedback = (positive: boolean) => {
     rememberBaoheInsightFeedback(personalization, positive);
@@ -562,11 +580,13 @@ export default function DashboardHome({
 
         <div className="portal-dash-hero-time" aria-label="当前时间与天气">
           <span>{formatClock(now, locale)}</span>
+          <em>{formatDateLine(now, locale)}</em>
           <small>
             {weather.loading || weather.error
               ? placeLabel
               : `${placeLabel} · ${weather.temperatureC ?? 0}°C`}
           </small>
+          {weather.alert ? <i>⚠ {weather.alert}</i> : null}
         </div>
       </header>
 
@@ -636,17 +656,17 @@ export default function DashboardHome({
 
       <section className="portal-v13-coach" aria-label="今日教练行动">
         <button type="button" className="portal-v13-remind-bar" onClick={() => setScheduleSheetOpen(true)}>
-          <span className="portal-v13-remind-dot" aria-hidden />
           <span>今天有 <b>{upcomingEvents.length || 3} 件事</b> · 有 <b>1 件</b>今天处理会更从容</span>
-          <small>看看 ›</small>
+          <small>›</small>
         </button>
 
         <div className="portal-v13-count-hero">
-          <div className="portal-v13-count-left">
-            <p>重要日期</p>
-            <div><strong>5</strong><span>天</span></div>
-            <h2>妈妈生日</h2>
-          </div>
+            <div className="portal-v13-count-left">
+              <p>重要日期</p>
+              <div><strong>5</strong><span>天</span></div>
+              <h2>妈妈生日</h2>
+              <small>{usHolidayLine || holidayLine || '下一个节假日 · 可在设置中切换国家'}</small>
+            </div>
           <div className="portal-v13-count-right">
             <button
               type="button"
@@ -870,24 +890,48 @@ export default function DashboardHome({
           <section className="portal-mood-card" role="dialog" aria-modal="true" aria-label="此刻心情">
             <h2>此刻心情</h2>
             <p style={{ color: hoveredMood.color }}>{hoveredMood.label}</p>
-            <div className="portal-mood-wheel" aria-label="心情轮">
+            <div
+              ref={moodWheelRef}
+              className="portal-mood-wheel"
+              aria-label="心情轮"
+              role="slider"
+              aria-valuemin={0}
+              aria-valuemax={MOOD_OPTIONS.length - 1}
+              aria-valuenow={MOOD_OPTIONS.findIndex((mood) => mood.key === hoveredMood.key)}
+              aria-valuetext={hoveredMood.label}
+              tabIndex={0}
+              onPointerDown={(event) => {
+                moodPointerMovedRef.current = false;
+                setHoveredMood(moodFromPointer(event.clientX, event.clientY));
+              }}
+              onPointerMove={(event) => {
+                moodPointerMovedRef.current = true;
+                setHoveredMood(moodFromPointer(event.clientX, event.clientY));
+              }}
+              onPointerUp={(event) => {
+                if (!moodPointerMovedRef.current) {
+                  setMoodPickerOpen(false);
+                  return;
+                }
+                chooseMood(moodFromPointer(event.clientX, event.clientY));
+              }}
+            >
               {MOOD_OPTIONS.map((mood, index) => (
-                <button
+                <span
                   key={mood.key}
-                  type="button"
                   style={{
                     '--mood-color': mood.color,
                     '--mood-index': index,
+                    '--mood-count': MOOD_OPTIONS.length,
                   } as CSSProperties}
-                  aria-label={mood.label}
-                  onMouseEnter={() => setHoveredMood(mood)}
-                  onTouchStart={() => setHoveredMood(mood)}
-                  onPointerUp={() => chooseMood(mood)}
-                  onClick={() => chooseMood(mood)}
+                  aria-hidden
                 />
               ))}
             </div>
-            <small>轻触任意色区选择心情</small>
+            <small>按住滑动选择，松手后保留在这里；点背景返回主页</small>
+            <button type="button" className="portal-mood-done" onClick={() => setMoodPickerOpen(false)}>
+              完成
+            </button>
           </section>
         </div>
       ) : null}
@@ -906,17 +950,17 @@ export default function DashboardHome({
             <button type="button" onClick={() => setReminderDetail('task')}>
               <span>先做这一件就好</span>
               <b>回复王总邮件</b>
-              <small>建议今天</small>
+              <small><em>开始 14:30</em><em>建议今天</em></small>
             </button>
             <button type="button" onClick={() => setReminderDetail('meeting')}>
               <span>今日安排</span>
               <b>产品会议</b>
-              <small>还剩 4 小时</small>
+              <small><em>开始 15:00</em><em>还剩 4 小时</em></small>
             </button>
             <button type="button" onClick={() => setReminderDetail('task')}>
               <span>不急，有空再看</span>
               <b>准备季度报告</b>
-              <small>本周内</small>
+              <small><em>开始 周五</em><em>本周内</em></small>
             </button>
           </section>
         </div>

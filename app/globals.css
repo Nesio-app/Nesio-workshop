@@ -1005,6 +1005,22 @@ body {
   font-weight: 650;
 }
 
+.portal-dash-hero-time em,
+.portal-dash-hero-time i {
+  max-width: 100%;
+  overflow: hidden;
+  color: rgba(90,102,144,.78);
+  font-size: 0.58rem;
+  font-style: normal;
+  font-weight: 720;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+}
+
+.portal-dash-hero-time i {
+  color: #b8661f;
+}
+
 .portal-v14-day-badge {
   display: inline-block;
   align-self: flex-start;
@@ -6911,4 +6927,293 @@ html[data-portal-theme="night"] .portal-theme-seg-btn.is-on{
   color: #7d88aa;
   font-size: 0.76rem;
   font-weight: 720;
+}
+
+/* V14 repair pass: interaction visibility, modal clarity, and mobile safe area. */
+.portal-ai-preview--screen {
+  min-height: calc(100dvh - 5.6rem);
+  padding-top: 1rem !important;
+  padding-bottom: calc(12.4rem + env(safe-area-inset-bottom)) !important;
+}
+
+.portal-ai-workspace-head,
+.portal-ai-search-head {
+  margin-bottom: 0.55rem !important;
+}
+
+.portal-ai-workspace-head h1,
+.portal-ai-search-head h1 {
+  font-size: 1.18rem !important;
+}
+
+.portal-ai-screen-icon-btn {
+  width: 2.65rem !important;
+  height: 2.65rem !important;
+  min-width: 44px !important;
+  min-height: 44px !important;
+}
+
+.portal-ai-thread {
+  max-height: calc(100dvh - 17.4rem) !important;
+  padding-bottom: 1rem !important;
+}
+
+.portal-ai-composer {
+  bottom: calc(5.85rem + env(safe-area-inset-bottom)) !important;
+  gap: 0.35rem !important;
+  background: linear-gradient(180deg, rgba(239,244,255,.08), rgba(239,244,255,.92) 24%, rgba(239,244,255,.98)) !important;
+}
+
+.portal-ai-capability-rail {
+  margin-bottom: 0.15rem;
+}
+
+.portal-ai-call-button {
+  border-color: transparent !important;
+  background: transparent !important;
+  color: #3b57d7 !important;
+  box-shadow: none !important;
+}
+
+.portal-ai-call-button span {
+  color: #3b57d7;
+}
+
+.portal-ai-conversation-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 535;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.portal-ai-conversation-scrim {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(15,23,51,.22);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+}
+
+.portal-ai-conversation-sheet > section {
+  position: relative;
+  z-index: 1;
+  width: min(23rem, calc(100vw - 2rem));
+  max-height: min(72dvh, 34rem);
+  overflow-y: auto;
+  display: grid;
+  gap: 0.15rem;
+  border: 1px solid rgba(255,255,255,.72);
+  border-radius: 1.35rem;
+  padding: 0.9rem;
+  background: rgba(255,255,255,.92);
+  box-shadow: 0 24px 70px rgba(18,34,72,.22);
+}
+
+.portal-ai-conversation-sheet h2 {
+  margin: 0.45rem 0 0.4rem;
+  color: #0f1733;
+  font-size: 1rem;
+  font-weight: 900;
+}
+
+.portal-ai-modal-layer {
+  place-items: center !important;
+  align-items: center !important;
+  background: rgba(15,23,51,.22);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+}
+
+.portal-ai-modal-scrim {
+  background: rgba(15,23,51,.22) !important;
+}
+
+.portal-ai-call-sheet {
+  width: min(23rem, calc(100vw - 2rem));
+  border-radius: 1.45rem !important;
+  padding-bottom: 1.2rem !important;
+  background: rgba(255,255,255,.94) !important;
+}
+
+.portal-ai-modal-layer--call {
+  background: rgba(10,16,34,.68) !important;
+  backdrop-filter: blur(5px) !important;
+  -webkit-backdrop-filter: blur(5px) !important;
+}
+
+.portal-ai-video-call {
+  background: rgba(13,22,51,.9) !important;
+}
+
+.portal-treasure-screen {
+  min-height: calc(100dvh - 5.6rem);
+  padding-bottom: calc(14rem + env(safe-area-inset-bottom)) !important;
+}
+
+.portal-treasure-package-list {
+  padding-bottom: 7rem !important;
+}
+
+.portal-treasure-data-grid {
+  align-items: stretch;
+}
+
+.portal-treasure-data-card {
+  min-height: 6.15rem !important;
+}
+
+.portal-treasure-data-track {
+  display: block !important;
+}
+
+.portal-treasure-depth-summary {
+  display: none !important;
+}
+
+.portal-mood-sheet,
+.portal-reminder-sheet {
+  align-items: center !important;
+  place-items: center !important;
+}
+
+.portal-mood-backdrop,
+.portal-reminder-backdrop,
+.portal-purchased-tools-backdrop {
+  background: rgba(15,23,51,.22) !important;
+  backdrop-filter: blur(5px) !important;
+  -webkit-backdrop-filter: blur(5px) !important;
+}
+
+.portal-mood-card,
+.portal-reminder-card {
+  border-radius: 1.35rem !important;
+  background: rgba(255,255,255,.9) !important;
+}
+
+.portal-reminder-card {
+  max-height: min(68dvh, 32rem) !important;
+  padding-bottom: 1.05rem !important;
+}
+
+.portal-reminder-card > button:not(.portal-reminder-primary):not(.portal-reminder-record):not(.portal-reminder-close) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.3rem 0.8rem;
+  align-items: center;
+}
+
+.portal-reminder-card > button:not(.portal-reminder-primary):not(.portal-reminder-record):not(.portal-reminder-close) span,
+.portal-reminder-card > button:not(.portal-reminder-primary):not(.portal-reminder-record):not(.portal-reminder-close) b {
+  grid-column: 1;
+}
+
+.portal-reminder-card > button:not(.portal-reminder-primary):not(.portal-reminder-record):not(.portal-reminder-close) small {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  text-align: right;
+}
+
+.portal-reminder-card button small em {
+  display: block;
+  color: inherit;
+  font-style: normal;
+  line-height: 1.35;
+}
+
+.portal-mood-card {
+  padding: 1.15rem 1.1rem 1.05rem !important;
+}
+
+.portal-mood-wheel {
+  width: 10.25rem !important;
+  height: 10.25rem !important;
+  touch-action: none;
+  cursor: crosshair;
+  background: conic-gradient(
+    #38bdf8 0deg 30deg,
+    #2dd4bf 30deg 60deg,
+    #22c55e 60deg 90deg,
+    #4a6cf7 90deg 120deg,
+    #7c8cff 120deg 150deg,
+    #a855f7 150deg 180deg,
+    #ec4899 180deg 210deg,
+    #ef4444 210deg 240deg,
+    #f97316 240deg 270deg,
+    #facc15 270deg 300deg,
+    #94a3b8 300deg 330deg,
+    #8b7cf6 330deg 360deg
+  ) !important;
+  box-shadow: inset 0 0 0 2.9rem rgba(255,255,255,.95), 0 0 0 0.7rem rgba(255,255,255,.38) !important;
+}
+
+.portal-mood-wheel span {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 2.65rem;
+  height: 2.65rem;
+  margin: -1.325rem;
+  border-radius: 999px;
+  background: var(--mood-color);
+  opacity: 0.16;
+  transform: rotate(calc(var(--mood-index) * 30deg)) translateY(-4.3rem);
+}
+
+.portal-mood-done {
+  min-height: 2.55rem;
+  min-width: 7rem;
+  border: 0;
+  border-radius: 999px;
+  background: #4a6cf7;
+  color: #fff;
+  font: inherit;
+  font-weight: 850;
+}
+
+.portal-v13-remind-bar {
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  border-left: 0 !important;
+}
+
+.portal-v13-remind-dot {
+  display: none !important;
+}
+
+.portal-v13-remind-bar span:not(.portal-v13-remind-dot) {
+  grid-column: 1;
+}
+
+.portal-v13-remind-bar small {
+  grid-column: 2;
+  font-size: 1rem !important;
+}
+
+.portal-v13-count-left small {
+  display: block;
+  margin-top: 0.35rem;
+  color: rgba(74,108,247,.8);
+  font-size: 0.68rem;
+  font-weight: 760;
+  line-height: 1.3;
+}
+
+.portal-v13-action-content {
+  padding-right: 3.6rem !important;
+}
+
+.portal-v13-ai-tip {
+  top: 0.9rem !important;
+  right: 0.85rem !important;
+  bottom: auto !important;
+}
+
+.portal-settings-back--button {
+  justify-content: flex-start !important;
+  width: max-content !important;
+  padding-inline: 0 !important;
+  font-size: 0.86rem !important;
 }

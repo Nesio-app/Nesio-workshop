@@ -79,6 +79,9 @@ const recentConversations = [
 export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewProps) {
   const [composer, setComposer] = useState('');
   const [surface, setSurface] = useState<'chat' | 'search'>('chat');
+  const [attachmentTrayOpen, setAttachmentTrayOpen] = useState(false);
+  const [searchToolsOpen, setSearchToolsOpen] = useState(false);
+  const [conversationListOpen, setConversationListOpen] = useState(false);
   const [callSheetOpen, setCallSheetOpen] = useState(false);
   const [videoCallOpen, setVideoCallOpen] = useState(false);
   const [audioCallOpen, setAudioCallOpen] = useState(false);
@@ -100,11 +103,13 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
   const startNewThread = () => {
     setSurface('chat');
     setComposer('');
+    setConversationListOpen(true);
     setUtilityNotice('已新建一条集合对话，可以直接 @AI 或 @工具。');
     requestAnimationFrame(() => composerRef.current?.focus());
   };
 
   const openAttachmentTray = () => {
+    setAttachmentTrayOpen((value) => !value);
     setUtilityNotice('图片、文件、语音会先作为本地意图保留；真实上传与外部授权后续再开。');
   };
 
@@ -142,20 +147,35 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
           </header>
           <label className="portal-ai-search-input">
             <span aria-hidden>⌕</span>
-            <input type="search" placeholder="搜索对话、笔记、AI 建议..." />
+            <input
+              type="search"
+              placeholder="搜索对话、笔记、AI 建议..."
+              onFocus={() => setSearchToolsOpen(true)}
+              onChange={() => setSearchToolsOpen(true)}
+            />
           </label>
-          <div className="portal-ai-search-grid" aria-label="搜索分类">
-            {searchShortcuts.map(([icon, label]) => (
-              <button key={label} type="button">
-                <span aria-hidden>{icon}</span>
-                <b>{label}</b>
-              </button>
-            ))}
-          </div>
+          {searchToolsOpen ? (
+            <div className="portal-ai-search-grid" aria-label="搜索分类">
+              {searchShortcuts.map(([icon, label]) => (
+                <button key={label} type="button">
+                  <span aria-hidden>{icon}</span>
+                  <b>{label}</b>
+                </button>
+              ))}
+            </div>
+          ) : null}
           <section className="portal-ai-recent" aria-label="最近对话">
             <h2>最近对话</h2>
             {recentConversations.map((item) => (
-              <button key={item.id} type="button" className="portal-ai-recent-row">
+              <button
+                key={item.id}
+                type="button"
+                className="portal-ai-recent-row"
+                onClick={() => {
+                  setSurface('chat');
+                  setUtilityNotice(`已切换到 ${item.title} 对话。`);
+                }}
+              >
                 <span className="portal-ai-conversation-avatar" aria-hidden>
                   {item.avatar}
                 </span>
@@ -185,13 +205,11 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
               >
                 ⌕
               </button>
-              <button type="button" className="portal-ai-screen-icon-btn" aria-label="新建对话" onClick={startNewThread}>
+              <button type="button" className="portal-ai-screen-icon-btn" aria-label="打开对话列表" onClick={() => setConversationListOpen(true)}>
                 💬
               </button>
             </div>
           </header>
-
-          <p className="portal-ai-intelligence-pill">🧠 智能模式 · {utilityNotice}</p>
 
           <section className="portal-ai-thread" aria-label="集合对话">
             <p className="portal-ai-message portal-ai-message--user">帮我想个送妈妈的生日礼物，预算 300</p>
@@ -219,13 +237,15 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
           </section>
 
           <div className="portal-ai-composer">
-            <div className="portal-ai-capability-rail" aria-label="智友快捷能力">
-              <button type="button">📷<span>图片</span></button>
-              <button type="button">📎<span>文件</span></button>
-              <button type="button">🎙<span>语音</span></button>
-              <button type="button" onClick={() => setCallSheetOpen(true)}>📞<span>实时</span></button>
-              <button type="button">📝<span>笔记</span></button>
-            </div>
+            {attachmentTrayOpen ? (
+              <div className="portal-ai-capability-rail" aria-label="智友快捷能力">
+                <button type="button">📷<span>图片</span></button>
+                <button type="button">📎<span>文件</span></button>
+                <button type="button">🎙<span>语音</span></button>
+                <button type="button" onClick={() => setCallSheetOpen(true)}>📞<span>实时</span></button>
+                <button type="button">📝<span>笔记</span></button>
+              </div>
+            ) : null}
             <p>输入框搞定一切： @AI 拉它进来 · @Flomo 存笔记 · @物品库 记物品</p>
             <div className="portal-ai-composer-row">
               <button type="button" className="portal-ai-round-action" aria-label="添加附件" onClick={openAttachmentTray}>＋</button>
@@ -259,6 +279,36 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
               </div>
             ) : null}
           </div>
+
+          {conversationListOpen ? (
+            <div className="portal-ai-conversation-sheet" role="dialog" aria-modal="true" aria-label="AI 对话列表">
+              <button type="button" className="portal-ai-conversation-scrim" aria-label="关闭 AI 对话列表" onClick={() => setConversationListOpen(false)} />
+              <section>
+                <span className="portal-ai-sheet-handle" aria-hidden />
+                <h2>所有 AI 对话</h2>
+                {recentConversations.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className="portal-ai-recent-row"
+                    onClick={() => {
+                      setConversationListOpen(false);
+                      setSurface('chat');
+                      setUtilityNotice(`已切换到 ${item.title} 对话。`);
+                    }}
+                  >
+                    <span className="portal-ai-conversation-avatar" aria-hidden>{item.avatar}</span>
+                    <span>
+                      <b>{item.title}{item.tag ? <small>{item.tag}</small> : null}</b>
+                      <em>{item.preview}</em>
+                    </span>
+                    <i>{item.time}</i>
+                    {item.unread ? <strong>{item.unread}</strong> : null}
+                  </button>
+                ))}
+              </section>
+            </div>
+          ) : null}
 
           {typeof document !== 'undefined' && callSheetOpen ? createPortal(
             <div className="portal-ai-modal-layer">

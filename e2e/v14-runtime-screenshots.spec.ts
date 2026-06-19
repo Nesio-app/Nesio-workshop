@@ -59,7 +59,7 @@ test('capture V14 mobile runtime screenshots', async ({ page }) => {
 
   await page.getByRole('navigation', { name: /宝盒导航/ }).getByRole('button', { name: '智友' }).click();
   await expect(page.getByRole('heading', { name: '智友' })).toBeVisible();
-  await expect(page.getByText(/一个输入框，后台自动调度 AI 与工具/)).toBeVisible();
+  await expect(page.getByText(/一个输入框，后台自动调度 AI 与工具/)).toHaveCount(0);
   await expect(page.getByLabel('智友集合输入框')).toBeVisible();
   await capture('05-ai-friends-unified-chat', 'AI Friends unified chat workspace with one composer and multi-agent messages.');
 
@@ -70,7 +70,11 @@ test('capture V14 mobile runtime screenshots', async ({ page }) => {
 
   await page.getByRole('button', { name: '搜索' }).click();
   await expect(page.getByRole('region', { name: '智友搜索' })).toBeVisible();
-  await expect(page.getByPlaceholder(/搜索对话、笔记、AI 建议/)).toBeVisible();
+  const searchInput = page.getByPlaceholder(/搜索对话、笔记、AI 建议/);
+  await expect(searchInput).toBeVisible();
+  await expect(page.getByRole('button', { name: /AI 建议/ })).toHaveCount(0);
+  await searchInput.focus();
+  await expect(page.getByRole('button', { name: /AI 建议/ })).toBeVisible();
   await capture('05c-ai-friends-search', 'AI Friends search surface with shortcut grid and recent conversations.');
   await page.getByRole('button', { name: '返回智友' }).click();
 

@@ -190,6 +190,9 @@ export default function ToolsTreasurePopup({
                     <b>{entry.name}</b>
                     <small>{entry.value}</small>
                   </span>
+                  <span className="portal-treasure-data-track" aria-hidden>
+                    <i style={{ width: `${entry.progress}%` }} />
+                  </span>
                 </button>
               );
             })}

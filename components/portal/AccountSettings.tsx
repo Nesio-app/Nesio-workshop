@@ -35,6 +35,146 @@ const LANGUAGE_OPTIONS = [
   ['th', 'ไทย'],
 ] as const;
 
+type DisplayLanguage = (typeof LANGUAGE_OPTIONS)[number][0];
+
+const DISPLAY_LANGUAGE_KEY = 'treasurebox-display-language-v1';
+
+const SETTINGS_COPY: Record<DisplayLanguage, {
+  back: string;
+  settingsTitle: string;
+  appearanceTitle: string;
+  appearanceHint: string;
+  language: string;
+  connections: string;
+  connectionsHint: string;
+  localFirst: string;
+}> = {
+  zh: {
+    back: '返回',
+    settingsTitle: '软件设置',
+    appearanceTitle: '外观',
+    appearanceHint: '选择固定日 / 夜，或随系统与时段自动切换宝盒主题。',
+    language: '显示语言',
+    connections: '连接与安全',
+    connectionsHint: '连接性强，但所有授权都要确认。',
+    localFirst: '本地优先',
+  },
+  en: {
+    back: 'Back',
+    settingsTitle: 'App Settings',
+    appearanceTitle: 'Appearance',
+    appearanceHint: 'Choose day/night themes, or follow system and time automatically.',
+    language: 'Display language',
+    connections: 'Connections & Safety',
+    connectionsHint: 'Connections are powerful, but every authorization needs confirmation.',
+    localFirst: 'Local-first',
+  },
+  'zh-TW': {
+    back: '返回',
+    settingsTitle: '軟體設定',
+    appearanceTitle: '外觀',
+    appearanceHint: '選擇固定日 / 夜，或隨系統與時段自動切換主題。',
+    language: '顯示語言',
+    connections: '連線與安全',
+    connectionsHint: '連線能力很強，但所有授權都要確認。',
+    localFirst: '本機優先',
+  },
+  ja: {
+    back: '戻る',
+    settingsTitle: 'アプリ設定',
+    appearanceTitle: '表示',
+    appearanceHint: '昼/夜テーマ、またはシステムと時間に合わせて切り替えます。',
+    language: '表示言語',
+    connections: '接続と安全',
+    connectionsHint: '接続は強力ですが、すべての認可には確認が必要です。',
+    localFirst: 'ローカル優先',
+  },
+  ko: {
+    back: '뒤로',
+    settingsTitle: '앱 설정',
+    appearanceTitle: '화면',
+    appearanceHint: '낮/밤 테마를 선택하거나 시스템과 시간에 맞춰 전환합니다.',
+    language: '표시 언어',
+    connections: '연결 및 안전',
+    connectionsHint: '연결 기능은 강력하지만 모든 권한은 확인이 필요합니다.',
+    localFirst: '로컬 우선',
+  },
+  fr: {
+    back: 'Retour',
+    settingsTitle: 'Réglages',
+    appearanceTitle: 'Apparence',
+    appearanceHint: 'Choisissez le mode jour/nuit ou suivez le système et l’heure.',
+    language: 'Langue',
+    connections: 'Connexions et sécurité',
+    connectionsHint: 'Les connexions sont puissantes, chaque autorisation doit être confirmée.',
+    localFirst: 'Local d’abord',
+  },
+  de: {
+    back: 'Zurück',
+    settingsTitle: 'App-Einstellungen',
+    appearanceTitle: 'Darstellung',
+    appearanceHint: 'Tag/Nacht wählen oder System und Uhrzeit folgen.',
+    language: 'Anzeigesprache',
+    connections: 'Verbindungen & Sicherheit',
+    connectionsHint: 'Verbindungen sind mächtig, jede Autorisierung braucht Bestätigung.',
+    localFirst: 'Lokal zuerst',
+  },
+  es: {
+    back: 'Atrás',
+    settingsTitle: 'Ajustes',
+    appearanceTitle: 'Apariencia',
+    appearanceHint: 'Elige día/noche o sigue el sistema y la hora.',
+    language: 'Idioma',
+    connections: 'Conexiones y seguridad',
+    connectionsHint: 'Las conexiones son potentes, toda autorización requiere confirmación.',
+    localFirst: 'Local primero',
+  },
+  it: {
+    back: 'Indietro',
+    settingsTitle: 'Impostazioni',
+    appearanceTitle: 'Aspetto',
+    appearanceHint: 'Scegli giorno/notte o segui sistema e orario.',
+    language: 'Lingua',
+    connections: 'Connessioni e sicurezza',
+    connectionsHint: 'Le connessioni sono potenti, ogni autorizzazione va confermata.',
+    localFirst: 'Prima locale',
+  },
+  pt: {
+    back: 'Voltar',
+    settingsTitle: 'Configurações',
+    appearanceTitle: 'Aparência',
+    appearanceHint: 'Escolha dia/noite ou siga o sistema e o horário.',
+    language: 'Idioma',
+    connections: 'Conexões e segurança',
+    connectionsHint: 'Conexões são fortes, toda autorização precisa de confirmação.',
+    localFirst: 'Local primeiro',
+  },
+  vi: {
+    back: 'Quay lại',
+    settingsTitle: 'Cài đặt',
+    appearanceTitle: 'Giao diện',
+    appearanceHint: 'Chọn ngày/đêm hoặc theo hệ thống và thời gian.',
+    language: 'Ngôn ngữ hiển thị',
+    connections: 'Kết nối & an toàn',
+    connectionsHint: 'Kết nối rất mạnh, mọi quyền đều cần xác nhận.',
+    localFirst: 'Ưu tiên cục bộ',
+  },
+  th: {
+    back: 'กลับ',
+    settingsTitle: 'การตั้งค่า',
+    appearanceTitle: 'รูปลักษณ์',
+    appearanceHint: 'เลือกโหมดกลางวัน/กลางคืน หรือทำตามระบบและเวลา',
+    language: 'ภาษาที่แสดง',
+    connections: 'การเชื่อมต่อและความปลอดภัย',
+    connectionsHint: 'การเชื่อมต่อทรงพลัง แต่ทุกสิทธิ์ต้องได้รับการยืนยัน',
+    localFirst: 'Local-first',
+  },
+};
+
+function normalizeDisplayLanguage(value: string | null | undefined): DisplayLanguage {
+  return LANGUAGE_OPTIONS.some(([code]) => code === value) ? value as DisplayLanguage : 'zh';
+}
+
 function initials(name: string): string {
   const t = name.trim();
   return t.slice(0, 1);
@@ -50,6 +190,7 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
   const [displayName, setDisplayName] = useState(fallbackName);
   const [avatarUrl, setAvatarUrl] = useState('');
   const [locale, setLocale] = useState<PortalLocale>('zh');
+  const [displayLanguage, setDisplayLanguage] = useState<DisplayLanguage>('zh');
   const [calendarUrl, setCalendarUrl] = useState('');
   const [toast, setToast] = useState('');
   const [personalizationStage, setPersonalizationStage] = useState<BaohePersonalizationStage>('day_34');
@@ -61,6 +202,7 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
     setDisplayName(s.displayName);
     setAvatarUrl(s.avatarUrl);
     setLocale(s.locale);
+    setDisplayLanguage(normalizeDisplayLanguage(localStorage.getItem(DISPLAY_LANGUAGE_KEY) || s.locale));
     setCalendarUrl(loadCalendarLinkSettings().googleCalendarUrl);
     setPersonalizationStage(readBaohePersonalizationStage());
     document.documentElement.lang = s.locale === 'en' ? 'en' : 'zh-CN';
@@ -80,11 +222,17 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
     } catch { /* ignore */ }
   };
 
-  const onLocaleChange = (next: PortalLocale) => {
-    setLocale(next);
-    saveProfileSettings({ locale: next });
+  const onDisplayLanguageChange = (next: DisplayLanguage) => {
+    setDisplayLanguage(next);
+    localStorage.setItem(DISPLAY_LANGUAGE_KEY, next);
+    const profileLocale: PortalLocale = next === 'en' ? 'en' : 'zh';
+    setLocale(profileLocale);
+    saveProfileSettings({ locale: profileLocale });
+    document.documentElement.lang = next;
     showToast('settingsSaved');
   };
+
+  const copy = SETTINGS_COPY[displayLanguage] ?? SETTINGS_COPY.zh;
 
   const safetyRows = [
     {
@@ -114,9 +262,9 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
       {showAppSettings ? (
         <header className="portal-settings-head">
           <button type="button" className="portal-settings-back portal-settings-back--button" onClick={() => setShowAppSettings(false)}>
-            ‹ 个人数据
+            ‹ {copy.back}
           </button>
-          <h1 className="portal-settings-title">软件设置</h1>
+          <h1 className="portal-settings-title">{copy.settingsTitle}</h1>
         </header>
       ) : null}
 
@@ -215,18 +363,18 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
       ) : (
         <>
           <section className="portal-settings-card">
-        <h2 className="portal-settings-label">{t(locale, 'portalAppearanceTitle')}</h2>
-        <p className="portal-settings-hint">{t(locale, 'portalAppearanceHint')}</p>
+        <h2 className="portal-settings-label">{copy.appearanceTitle}</h2>
+        <p className="portal-settings-hint">{copy.appearanceHint}</p>
         <PortalThemeToggle />
       </section>
 
       <section className="portal-settings-card">
-        <h2 className="portal-settings-label">{t(locale, 'settingsLanguage')}</h2>
+        <h2 className="portal-settings-label">{copy.language}</h2>
         <select
           className="portal-settings-input portal-settings-select"
           aria-label="语言"
-          value={locale}
-          onChange={(event) => onLocaleChange((event.target.value === 'en' ? 'en' : 'zh') as PortalLocale)}
+          value={displayLanguage}
+          onChange={(event) => onDisplayLanguageChange(normalizeDisplayLanguage(event.target.value))}
         >
           {LANGUAGE_OPTIONS.map(([value, label]) => (
             <option key={value} value={value}>{label}</option>
@@ -237,10 +385,10 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
       <section className="portal-settings-card portal-settings-safety" aria-label="连接与安全">
         <div className="portal-settings-safety-head">
           <div>
-            <h2 className="portal-settings-label">连接与安全</h2>
-            <p className="portal-settings-hint">连接性强，但所有授权都要确认。</p>
+            <h2 className="portal-settings-label">{copy.connections}</h2>
+            <p className="portal-settings-hint">{copy.connectionsHint}</p>
           </div>
-          <span>Local-first</span>
+          <span>{copy.localFirst}</span>
         </div>
         <ul className="portal-settings-safety-list">
           {safetyRows.map((row) => (

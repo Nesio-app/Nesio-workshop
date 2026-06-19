@@ -161,8 +161,9 @@ test('V14 bottom nav opens AI Friends as unified chat workspace', async ({ page 
   const aiPage = page.getByRole('region', { name: '智友' });
   await expect(aiPage).toBeVisible();
   await expect(aiPage.getByRole('heading', { name: '智友' })).toBeVisible();
-  await expect(aiPage.getByText(/一个输入框，后台自动调度 AI 与工具/)).toBeVisible();
+  await expect(aiPage.getByText(/一个输入框，后台自动调度 AI 与工具/)).toHaveCount(0);
   await expect(aiPage.getByText(/已综合 Claude · ChatGPT 的回答/)).toBeVisible();
+  await expect(aiPage.locator('.portal-ai-capability-rail')).toHaveCount(0);
 
   const composer = aiPage.getByLabel('智友集合输入框');
   await expect(composer).toBeVisible();
@@ -176,15 +177,19 @@ test('V14 bottom nav opens AI Friends as unified chat workspace', async ({ page 
   await expect(composer).toHaveValue(/@Claude/);
 
   await aiPage.getByRole('button', { name: '添加附件' }).click();
-  await expect(aiPage.getByText(/图片、文件、语音会先作为本地意图保留/)).toBeVisible();
-  await aiPage.getByRole('button', { name: '新建对话' }).click();
-  await expect(aiPage.getByText(/已新建一条集合对话/)).toBeVisible();
-  await expect(composer).toHaveValue('');
+  await expect(aiPage.locator('.portal-ai-capability-rail')).toBeVisible();
+  await aiPage.getByRole('button', { name: '打开对话列表' }).click();
+  await expect(page.getByRole('dialog', { name: 'AI 对话列表' })).toBeVisible();
+  await page.getByRole('dialog', { name: 'AI 对话列表' }).getByRole('button', { name: /^ChatGPT / }).click();
+  await expect(aiPage).toBeVisible();
 
   await aiPage.getByRole('button', { name: '搜索' }).click();
   const searchPanel = page.getByRole('region', { name: '智友搜索' });
   await expect(searchPanel).toBeVisible();
-  await expect(searchPanel.getByPlaceholder(/搜索对话、笔记、AI 建议/)).toBeVisible();
+  const searchInput = searchPanel.getByPlaceholder(/搜索对话、笔记、AI 建议/);
+  await expect(searchInput).toBeVisible();
+  await expect(searchPanel.getByRole('button', { name: /AI 建议/ })).toHaveCount(0);
+  await searchInput.focus();
   await expect(searchPanel.getByRole('button', { name: /AI 建议/ })).toBeVisible();
   await expect(searchPanel.getByText('最近对话')).toBeVisible();
   await searchPanel.getByRole('button', { name: '返回智友' }).click();
@@ -326,7 +331,7 @@ test('settings exposes V14 connections and safety boundary', async ({ page }) =>
   const safety = page.getByRole('region', { name: '连接与安全' });
   await expect(safety).toBeVisible();
   await expect(safety.getByText('连接性强，但所有授权都要确认。')).toBeVisible();
-  await expect(safety.getByText('Local-first')).toBeVisible();
+  await expect(safety.getByText(/本地优先|Local-first/)).toBeVisible();
   for (const text of ['Google Calendar', '智友 AI', '健康 / 金融 / 心理', '自动化与外部授权']) {
     await expect(safety.getByText(text)).toBeVisible();
   }
