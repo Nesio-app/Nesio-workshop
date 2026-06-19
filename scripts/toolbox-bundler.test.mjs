@@ -61,7 +61,7 @@ try {
   const applied = JSON.parse(applyOutput);
   assert.equal(applied.applied, true);
   assert.equal(existsSync(join(tempRoot, 'storage', 'index.html')), true);
-  assert.equal(existsSync(join(tempRoot, 'secretary', 'index.html')), true, 'secretary direct entry must be preserved for the home chat button');
+  assert.equal(existsSync(join(tempRoot, 'secretary', 'index.html')), true, 'secretary assets may be preserved only behind first-launch middleware gate');
   assert.equal(existsSync(join(tempRoot, 'adhd-flow', 'app.js')), false, 'default public bundle must not write sandbox plan assets');
   assert.equal(existsSync(join(tempRoot, 'fitness', 'app.js')), false, 'default public bundle must not write sandbox fitness assets');
   assert.equal(existsSync(join(tempRoot, 'health', 'index.html')), false, 'default public bundle must not write gated health assets');

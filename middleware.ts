@@ -14,24 +14,6 @@ export function middleware(request: NextRequest) {
     return NextResponse.rewrite(url);
   }
 
-  if (pathname === '/secretary') {
-    const url = request.nextUrl.clone();
-    url.pathname = '/secretary/index.html';
-    return NextResponse.rewrite(url);
-  }
-
-  if (pathname === '/secretary/chat') {
-    const url = request.nextUrl.clone();
-    url.pathname = '/secretary/chat.html';
-    return NextResponse.rewrite(url);
-  }
-
-  if (pathname === '/secretary/group') {
-    const url = request.nextUrl.clone();
-    url.pathname = '/secretary/group.html';
-    return NextResponse.rewrite(url);
-  }
-
   if (!isFirstLaunchBlockedPath(pathname)) {
     return NextResponse.next();
   }

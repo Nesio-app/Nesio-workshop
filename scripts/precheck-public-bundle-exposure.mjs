@@ -31,6 +31,17 @@ const secretaryEntry = bundlePlan.entries.find((entry) => entry.moduleId === 'se
 assert.equal(secretaryEntry?.visibleForPublic, false, 'secretary may be preserved as a direct chat page but must not be public toolbox surface');
 assert.equal(secretaryEntry?.shellAction, 'hide_for_public');
 
+const launchSafety = execFileSync('node', ['-e', "const fs=require('fs'); process.stdout.write(fs.readFileSync('lib/portal/launch-safety.ts','utf8'))"], {
+  cwd: repoRoot,
+  encoding: 'utf8',
+});
+const middleware = execFileSync('node', ['-e', "const fs=require('fs'); process.stdout.write(fs.readFileSync('middleware.ts','utf8'))"], {
+  cwd: repoRoot,
+  encoding: 'utf8',
+});
+assert.match(launchSafety, /['"]\/secretary['"]/, 'secretary direct URL must be first-launch blocked');
+assert.doesNotMatch(middleware, /pathname === ['"]\/secretary['"][\s\S]{0,160}\/secretary\/index\.html/, 'middleware must not rewrite /secretary to the static app in public launch');
+
 const publicDirs = existsSync(publicRoot)
   ? readdirSync(publicRoot, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name)
   : [];

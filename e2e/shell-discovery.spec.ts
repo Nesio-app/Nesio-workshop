@@ -113,16 +113,17 @@ test('shell toolbox opens, keeps its open state after refresh, and closes', asyn
   await expect(page.locator('.portal-treasure-popup')).toBeHidden();
 });
 
-test('secretary floating button opens the restored secretary page', async ({ page }) => {
+test('secretary public surface stays gated outside launch scope', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => {
     sessionStorage.clear();
   });
   await page.reload();
 
-  await page.locator('.portal-quick-chat-fab').click({ force: true });
-  await expect(page).toHaveURL(/\/secretary\/?$/);
-  await expect(page.locator('body')).toContainText(/智友|Gemini|ChatGPT|豆包/);
+  await expect(page.locator('.portal-quick-chat-fab')).toHaveCount(0);
+  const response = await page.goto('/secretary');
+  expect(response?.status()).toBe(403);
+  await expect(page.locator('body')).toContainText(/能力暂未开放|gated|暂未开放/);
 
   await page.goto('/');
   await page.getByRole('button', { name: /打开宝盒工具/ }).click({ force: true });

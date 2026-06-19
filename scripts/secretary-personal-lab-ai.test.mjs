@@ -9,7 +9,6 @@ const launchSafety = read('lib/portal/launch-safety.ts');
 const middleware = read('middleware.ts');
 const route = read('app/api/secretary/chat/route.ts');
 const portal = read('components/portal/Portal.tsx');
-const quickChat = read('components/portal/PortalQuickChat.tsx');
 const secretaryIndex = read('public/secretary/index.html');
 const secretaryChat = read('public/secretary/chat.js');
 const secretaryApi = read('public/secretary/api.js');
@@ -24,9 +23,8 @@ assert.match(middleware, /pathname\.startsWith\('\/api\/secretary'\)/, 'middlewa
 assert.match(route, /isPersonalLabAiRequestAllowed/, 'secretary chat route must check personal lab AI gate');
 assert.match(route, /launchUnavailablePayload\('api:secretary:chat'/, 'secretary chat must still fail closed by default');
 
-assert.match(portal, /PortalQuickChat/, 'home portal must mount quick chat');
-assert.match(quickChat, /\/secretary/, 'home quick chat must link to the secretary app');
-assert.doesNotMatch(quickChat, /\/secretary\/chat\?friend=gemini/, 'home quick chat must open the secretary list, not a quick Gemini chat');
+assert.doesNotMatch(portal, /PortalQuickChat/, 'public home portal must not mount secretary quick chat');
+assert.doesNotMatch(middleware, /pathname === ['"]\/secretary['"][\s\S]{0,160}\/secretary\/index\.html/, 'middleware must not expose /secretary static page');
 assert.match(secretaryIndex, /list\.js/, 'secretary app list page must be present');
 assert.match(secretaryChat, /sendSecretaryMessage/, 'secretary chat page must call API helper');
 assert.match(secretaryApi, /\/api\/secretary\/chat/, 'secretary app must call secretary chat API');
