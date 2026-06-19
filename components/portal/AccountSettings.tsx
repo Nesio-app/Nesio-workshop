@@ -268,41 +268,43 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
         </header>
       ) : null}
 
-      <section className="portal-personal-profile-card">
-        <div className="portal-personal-profile-main">
-          <button type="button" className="portal-personal-avatar-edit" onClick={() => fileRef.current?.click()} aria-label="更换头像">
-            {avatarUrl ? (
-              <img src={avatarUrl} alt="" className="portal-settings-avatar" width={64} height={64} />
-            ) : (
-              <span className="portal-personal-profile-avatar" aria-hidden>
-                {initials(displayName)}
-              </span>
-            )}
-          </button>
-          <span>
-            <b>{displayName}</b>
-            <small>已使用第 {personalization.daysSinceStart} 天</small>
-          </span>
-          <Link href="/portfolio" className="portal-personal-settings-arrow" aria-label="进入个人主页">
-            主页
-          </Link>
-        </div>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          className="portal-avatar-file"
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) onPickAvatar(f);
-            e.target.value = '';
-          }}
-        />
-      </section>
+      {!showAppSettings ? (
+        <section className="portal-personal-profile-card">
+          <div className="portal-personal-profile-main">
+            <button type="button" className="portal-personal-avatar-edit" onClick={() => fileRef.current?.click()} aria-label="更换头像">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="" className="portal-settings-avatar" width={64} height={64} />
+              ) : (
+                <span className="portal-personal-profile-avatar" aria-hidden>
+                  {initials(displayName)}
+                </span>
+              )}
+            </button>
+            <span>
+              <b>{displayName}</b>
+              <small>已使用第 {personalization.daysSinceStart} 天</small>
+            </span>
+            <Link href="/portfolio" className="portal-personal-settings-arrow" aria-label="进入个人主页">
+              主页
+            </Link>
+          </div>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            className="portal-avatar-file"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) onPickAvatar(f);
+              e.target.value = '';
+            }}
+          />
+        </section>
+      ) : null}
 
       {!showAppSettings ? (
         <button type="button" className="portal-personal-software-settings" onClick={() => setShowAppSettings(true)}>
-          软件设置
+          设置
         </button>
       ) : null}
 

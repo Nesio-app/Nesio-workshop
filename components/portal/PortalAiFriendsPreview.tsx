@@ -16,10 +16,10 @@ type MentionTarget = {
 };
 
 const mentionTargets: MentionTarget[] = [
-  { key: 'claude', label: '@Claude', description: '单独问 Claude，它会加入对话', avatar: 'AI' },
-  { key: 'chatgpt', label: '@ChatGPT', description: '单独问 ChatGPT', avatar: 'G' },
-  { key: 'gemini', label: '@Gemini', description: '单独问 Gemini', avatar: '✦' },
-  { key: 'flomo', label: '@Flomo', description: '这条消息自动记入笔记序列', avatar: 'F' },
+  { key: 'claude', label: '@Claude', description: '长文推理 / 方案拆解', avatar: 'AI' },
+  { key: 'chatgpt', label: '@ChatGPT', description: '写作推理 / 日常助手', avatar: 'G' },
+  { key: 'gemini', label: '@Gemini', description: '多模态 / 实时信息', avatar: '✦' },
+  { key: 'flomo', label: '@Flomo', description: '保存为笔记', avatar: 'F' },
   { key: 'inventory', label: '@物品库', description: '记一个物品 / 查到期', avatar: '📦' },
 ];
 
@@ -85,8 +85,11 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
   const [callSheetOpen, setCallSheetOpen] = useState(false);
   const [videoCallOpen, setVideoCallOpen] = useState(false);
   const [audioCallOpen, setAudioCallOpen] = useState(false);
-  const [utilityNotice, setUtilityNotice] = useState('一个输入框，后台自动调度 AI 与工具');
+  const [utilityNotice, setUtilityNotice] = useState('');
+  const [localAttachments, setLocalAttachments] = useState<string[]>([]);
   const composerRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const mentionNeedle = useMemo(() => {
     const match = composer.match(/@([\w\u4e00-\u9fa5]*)$/);
@@ -129,6 +132,19 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
       }
       return `${value}${value.endsWith(' ') || value.length === 0 ? '' : ' '}${target.label} `;
     });
+  };
+
+  const addLocalAttachment = (kind: string, fileName?: string) => {
+    const label = fileName ? `${kind}：${fileName}` : kind;
+    setLocalAttachments((items) => [label, ...items].slice(0, 3));
+    setUtilityNotice(`${label} 已作为本地意图加入；真实上传后续单独授权。`);
+  };
+
+  const addFlomoNoteIntent = () => {
+    setComposer((value) => `${value}${value.endsWith(' ') || value.length === 0 ? '' : ' '}@Flomo `);
+    setLocalAttachments((items) => ['笔记：将本条保存到 Flomo', ...items].slice(0, 3));
+    setUtilityNotice('已准备 Flomo 笔记意图，发送后会进入本地 mock 记录。');
+    requestAnimationFrame(() => composerRef.current?.focus());
   };
 
   return (
@@ -239,14 +255,22 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
           <div className="portal-ai-composer">
             {attachmentTrayOpen ? (
               <div className="portal-ai-capability-rail" aria-label="智友快捷能力">
-                <button type="button">📷<span>图片</span></button>
-                <button type="button">📎<span>文件</span></button>
-                <button type="button">🎙<span>语音</span></button>
+                <button type="button" onClick={() => imageInputRef.current?.click()}>📷<span>图片</span></button>
+                <button type="button" onClick={() => fileInputRef.current?.click()}>📎<span>文件</span></button>
+                <button type="button" onClick={() => setAudioCallOpen(true)}>🎙<span>语音</span></button>
                 <button type="button" onClick={() => setCallSheetOpen(true)}>📞<span>实时</span></button>
-                <button type="button">📝<span>笔记</span></button>
+                <button type="button" onClick={addFlomoNoteIntent}>📝<span>笔记</span></button>
               </div>
             ) : null}
             <p>输入框搞定一切： @AI 拉它进来 · @Flomo 存笔记 · @物品库 记物品</p>
+            {(utilityNotice || localAttachments.length > 0) ? (
+              <div className="portal-ai-local-status" aria-live="polite">
+                {localAttachments.map((item) => (
+                  <span key={item}>{item}</span>
+                ))}
+                <small>{utilityNotice}</small>
+              </div>
+            ) : null}
             <div className="portal-ai-composer-row">
               <button type="button" className="portal-ai-round-action" aria-label="添加附件" onClick={openAttachmentTray}>＋</button>
               <button type="button" className="portal-ai-round-action" aria-label="@ 调度" onClick={openMentionMenu}>@</button>
@@ -262,6 +286,27 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
                 📞<span>通话</span>
               </button>
             </div>
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/*"
+              className="portal-ai-hidden-input"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) addLocalAttachment('图片', file.name);
+                event.target.value = '';
+              }}
+            />
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="portal-ai-hidden-input"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) addLocalAttachment('文件', file.name);
+                event.target.value = '';
+              }}
+            />
             {mentionOptions.length ? (
               <div className="portal-ai-mention-menu" role="listbox" aria-label="@ 调度候选">
                 {mentionOptions.map((target) => (

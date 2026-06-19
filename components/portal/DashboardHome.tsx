@@ -264,6 +264,21 @@ export default function DashboardHome({
   const lunarLine = useMemo(() => formatLunarLine(now), [now]);
   const holidayLine = useMemo(() => nextHolidayLine(now), [now]);
   const usHolidayLine = useMemo(() => nextUSHolidayLine(now), [now]);
+  const crushSteps = useMemo(() => {
+    if (crushTaskSplitLevel <= 0) {
+      return [
+        '想想妈妈最近提过、喜欢的东西',
+        '在智友里看看 AI 推荐的几个方案',
+        '选一个，确认 5 天内能到货',
+      ];
+    }
+    const scale = crushTaskSplitLevel + 1;
+    return [
+      `第 ${scale} 次拆分：先写下 1 个关键词`,
+      `把范围缩小到 ${Math.max(1, 4 - crushTaskSplitLevel)} 个选择`,
+      crushTaskSplitLevel > 2 ? '只做下一分钟能完成的小动作' : '决定一个，或者明天再定也行',
+    ];
+  }, [crushTaskSplitLevel]);
 
   const syncProfile = useCallback(() => {
     const s = loadProfileSettings(profile.displayName);
@@ -829,24 +844,24 @@ export default function DashboardHome({
             </div>
             <p className="portal-crush-sheet-copy">
               {crushTaskSplitLevel > 0
-                ? '我把它拆成更小的 3 步。做不完、想跳过都可以，你已经在往前走了。'
+                ? `我把它继续拆细到第 ${crushTaskSplitLevel + 1} 层。做不完、想跳过都可以，你已经在往前走了。`
                 : '我把它拆成几个小步骤。做不完、想跳过都可以，你已经在往前走了。'}
             </p>
             <ol className="portal-crush-step-list" aria-label="粉碎步骤">
               <li className={crushTaskDone ? 'is-done' : ''}>
                 <span>{crushTaskDone ? '✓ 已拆成更小的 3 步' : '第一步'}</span>
-                <strong>{crushTaskSplitLevel > 0 ? '先花 1 分钟随手记下想法' : '想想妈妈最近提过、喜欢的东西'}</strong>
-                <button type="button" onClick={() => setCrushTaskSplitLevel(1)}>↳ 还是太大？再拆细</button>
+                <strong>{crushSteps[0]}</strong>
+                <button type="button" onClick={() => setCrushTaskSplitLevel((level) => level + 1)}>↳ 还是太大？再拆细</button>
               </li>
               <li>
                 <span>第二步</span>
-                <strong>在智友里看看 AI 推荐的几个方案</strong>
-                <button type="button" onClick={onOpenAiFriends}>↳ 还是太大？再拆细</button>
+                <strong>{crushSteps[1]}</strong>
+                <button type="button" onClick={() => setCrushTaskSplitLevel((level) => level + 1)}>↳ 还是太大？再拆细</button>
               </li>
               <li>
                 <span>第三步</span>
-                <strong>选一个，确认 5 天内能到货</strong>
-                <button type="button" onClick={() => setCrushTaskSplitLevel(1)}>↳ 还是太大？再拆细</button>
+                <strong>{crushSteps[2]}</strong>
+                <button type="button" onClick={() => setCrushTaskSplitLevel((level) => level + 1)}>↳ 还是太大？再拆细</button>
               </li>
             </ol>
             <div className="portal-crush-sheet-actions">
@@ -860,7 +875,7 @@ export default function DashboardHome({
               <button
                 type="button"
                 className="portal-crush-sheet-secondary"
-                onClick={() => setCrushTaskSplitLevel((level) => Math.min(level + 1, 1))}
+                onClick={() => setCrushTaskOpen(false)}
               >
                 稍后
               </button>

@@ -178,6 +178,12 @@ test('V14 bottom nav opens AI Friends as unified chat workspace', async ({ page 
 
   await aiPage.getByRole('button', { name: '添加附件' }).click();
   await expect(aiPage.locator('.portal-ai-capability-rail')).toBeVisible();
+  await aiPage.getByRole('button', { name: '笔记' }).click();
+  await expect(composer).toHaveValue(/@Flomo/);
+  await expect(aiPage.getByText(/笔记：将本条保存到 Flomo/)).toBeVisible();
+  await aiPage.locator('.portal-ai-capability-rail').getByRole('button', { name: '语音' }).click();
+  await expect(page.getByRole('dialog', { name: 'AI 实时语音通话' })).toBeVisible();
+  await page.getByRole('dialog', { name: 'AI 实时语音通话' }).getByRole('button', { name: '结束' }).click();
   await aiPage.getByRole('button', { name: '打开对话列表' }).click();
   await expect(page.getByRole('dialog', { name: 'AI 对话列表' })).toBeVisible();
   await page.getByRole('dialog', { name: 'AI 对话列表' }).getByRole('button', { name: /^ChatGPT / }).click();
@@ -314,7 +320,7 @@ test('daily quote settings can choose positive categories and frequency', async 
 
 test('settings keeps software controls lean and does not expose calendar link card', async ({ page }) => {
   await page.goto('/settings');
-  await page.getByRole('button', { name: '软件设置' }).click();
+  await page.getByRole('button', { name: '设置' }).click();
   await expect(page.locator('#settings-calendar-url')).toHaveCount(0);
   await expect(page.getByLabel('语言')).toBeVisible();
 
@@ -326,8 +332,9 @@ test('settings exposes V14 connections and safety boundary', async ({ page }) =>
   await page.goto('/settings');
   await expect(page.getByText('宝盒学到的')).toBeVisible();
   await expect(page.getByLabel('进入个人主页')).toBeVisible();
-  await page.getByRole('button', { name: '软件设置' }).click();
+  await page.getByRole('button', { name: '设置' }).click();
   await expect(page.getByRole('heading', { name: '软件设置' })).toBeVisible();
+  await expect(page.getByLabel('进入个人主页')).toHaveCount(0);
   const safety = page.getByRole('region', { name: '连接与安全' });
   await expect(safety).toBeVisible();
   await expect(safety.getByText('连接性强，但所有授权都要确认。')).toBeVisible();
