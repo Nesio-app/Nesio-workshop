@@ -1,8 +1,5 @@
 'use client';
 
-import type { CSSProperties } from 'react';
-import { withBase } from '@/lib/portal/paths';
-
 interface PortalBottomNavProps {
   aiFriendsOpen?: boolean;
   treasureOpen?: boolean;
@@ -40,11 +37,7 @@ export default function PortalBottomNav({
         aria-label="智友"
         aria-expanded={aiFriendsOpen}
       >
-        <span
-          className="portal-bottom-nav-icon portal-bottom-nav-icon--mask"
-          style={{ '--portal-bottom-nav-icon-url': `url(${withBase('/icons/tools/secretary.svg')})` } as CSSProperties}
-          aria-hidden
-        />
+        <span className="portal-bottom-nav-icon portal-bottom-nav-icon--symbol" aria-hidden>✦</span>
         <span className="portal-bottom-nav-label">智友</span>
       </button>
       <button
@@ -56,11 +49,7 @@ export default function PortalBottomNav({
         aria-label="工具箱"
         aria-expanded={treasureOpen}
       >
-        <span
-          className="portal-bottom-nav-icon portal-bottom-nav-icon--mask"
-          style={{ '--portal-bottom-nav-icon-url': `url(${withBase('/icons/treasurebox.svg')})` } as CSSProperties}
-          aria-hidden
-        />
+        <span className="portal-bottom-nav-icon portal-bottom-nav-icon--symbol" aria-hidden>▦</span>
         <span className="portal-bottom-nav-label">工具箱</span>
       </button>
     </nav>

@@ -166,6 +166,7 @@ export default function Portal() {
   const [aiFriendsOpen, setAiFriendsOpen] = useState(false);
   const [treasureOpen, setTreasureOpen] = useState(false);
   const [activeSurface, setActiveSurface] = useState<'home' | 'ai' | 'tools'>('home');
+  const [purchasedToolsOpen, setPurchasedToolsOpen] = useState(false);
   const [launchSurfaceContext, setLaunchSurfaceContext] = useState({
     viewerRole: 'public' as 'public' | 'tester' | 'personal_lab',
     testerAllowlist: [] as string[],
@@ -287,10 +288,15 @@ export default function Portal() {
   };
 
   const handleHome = () => {
+    if (activeSurface === 'home') {
+      setPurchasedToolsOpen((open) => !open);
+      return;
+    }
     setActiveSurface('home');
     setAiFriendsOpen(false);
     setNoteOpen(false);
     setTreasureOpen(false);
+    setPurchasedToolsOpen(false);
     setTreasurePersisted(false);
   };
 
@@ -299,6 +305,7 @@ export default function Portal() {
     setAiFriendsOpen(true);
     setNoteOpen(false);
     setTreasureOpen(false);
+    setPurchasedToolsOpen(false);
     setTreasurePersisted(false);
   };
 
@@ -384,6 +391,7 @@ export default function Portal() {
                 onTreasureOpenChange={handleTreasureOpenChange}
                 onOpenNote={() => handleNoteOpenChange(true)}
                 onOpenTool={openTool}
+                onOpenAiFriends={handleAiFriendsOpen}
               />
             )}
           </div>
@@ -391,6 +399,39 @@ export default function Portal() {
       </div>
 
       <NotePanelEnhanced open={noteOpen} onOpenChange={handleNoteOpenChange} />
+      {purchasedToolsOpen ? (
+        <div className="portal-purchased-tools" role="presentation">
+          <button
+            type="button"
+            className="portal-purchased-tools-backdrop"
+            aria-label="关闭已购买工具"
+            onClick={() => setPurchasedToolsOpen(false)}
+          />
+          <section className="portal-purchased-tools-card" role="dialog" aria-modal="true" aria-label="已购买工具">
+            <span className="portal-crush-sheet-handle" aria-hidden />
+            <button type="button" onClick={() => setPurchasedToolsOpen(false)}>
+              <span aria-hidden>📦</span>
+              <b>物品库</b>
+              <small>3 件即将到期</small>
+            </button>
+            <button type="button" onClick={() => setPurchasedToolsOpen(false)}>
+              <span aria-hidden>💰</span>
+              <b>支出记录</b>
+              <small>本周 ¥949</small>
+            </button>
+            <button type="button" onClick={() => setPurchasedToolsOpen(false)}>
+              <span aria-hidden>✅</span>
+              <b>待办清单</b>
+              <small>3 项待处理</small>
+            </button>
+            <button type="button" onClick={() => handleTreasureOpenChange(true)}>
+              <span aria-hidden>＋</span>
+              <b>添加更多工具</b>
+              <small>去工具箱发现</small>
+            </button>
+          </section>
+        </div>
+      ) : null}
       <PortalBottomNav
         aiFriendsOpen={activeSurface === 'ai'}
         treasureOpen={activeSurface === 'tools'}

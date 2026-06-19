@@ -1154,6 +1154,28 @@ body {
   font-weight: 750;
 }
 
+.portal-v14-mood-trigger {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 0.45rem;
+  border-top: 0 !important;
+  padding: 0 !important;
+}
+
+.portal-v14-mood-trigger i {
+  width: 1.55rem;
+  height: 1.55rem;
+  display: inline-block;
+  border-radius: 999px;
+  box-shadow: inset 0 1px 1px rgba(255,255,255,.5);
+}
+
+.portal-v14-mood-trigger em {
+  margin-left: auto;
+  color: #9ba5c0;
+  font-style: normal;
+}
+
 .portal-v14-insight-card {
   display: grid;
   gap: 0.58rem;
@@ -1228,6 +1250,15 @@ body {
   font-size: 0.82rem !important;
 }
 
+.portal-v14-insight-feedback--standalone {
+  min-height: 2.7rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(74, 108, 247, 0.12);
+  border-radius: 0.95rem;
+  background: rgba(255,255,255,.74);
+}
+
 .portal-v13-status-card,
 .portal-v13-action-card,
 .portal-v13-pack-card {
@@ -1296,7 +1327,25 @@ body {
 }
 
 .portal-v13-action-content {
+  position: relative;
   padding: 0.95rem 1rem 0.7rem;
+}
+
+.portal-v13-ai-tip {
+  position: absolute;
+  right: 0.85rem;
+  bottom: 0.65rem;
+  width: 2.4rem;
+  height: 2.4rem;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(74,108,247,.1);
+  color: #4a6cf7;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 900;
 }
 
 .portal-v13-action-copy {
@@ -1628,6 +1677,20 @@ body {
   border-radius: 1rem;
   background: #f4f6ff;
   border: 1px solid #e3e7f6;
+}
+
+.portal-crush-step-list li button {
+  grid-column: 2;
+  justify-self: start;
+  min-height: 2rem;
+  border: 0;
+  border-radius: 0.55rem;
+  padding: 0 0.55rem;
+  background: rgba(74,108,247,.08);
+  color: #3453d1;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 850;
 }
 
 .portal-crush-step-list li span {
@@ -6421,4 +6484,289 @@ html[data-portal-theme="night"] .portal-theme-seg-btn.is-on{
   color: #fff;
   font: inherit;
   font-weight: 850;
+}
+
+/* V14 interaction repair: sheets, safe areas, and action feedback */
+.portal-ai-preview--screen {
+  padding-bottom: calc(15.6rem + env(safe-area-inset-bottom)) !important;
+}
+
+.portal-ai-thread {
+  max-height: calc(100dvh - 22.4rem) !important;
+}
+
+.portal-ai-composer {
+  bottom: calc(7.35rem + env(safe-area-inset-bottom)) !important;
+}
+
+.portal-treasure-screen {
+  padding-bottom: calc(11.75rem + env(safe-area-inset-bottom)) !important;
+}
+
+.portal-treasure-package-list {
+  padding-bottom: 3.5rem !important;
+}
+
+.portal-ai-modal-layer {
+  z-index: 520 !important;
+}
+
+.portal-ai-modal-layer--call {
+  background:
+    radial-gradient(circle at 50% 28%, rgba(90,95,246,.28), transparent 34%),
+    rgba(7,12,30,.88) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.portal-ai-video-call {
+  border: 1px solid rgba(255,255,255,.24);
+  background: rgba(13,22,51,.94) !important;
+}
+
+.portal-mood-sheet,
+.portal-reminder-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: grid;
+  place-items: center;
+  padding: 1.1rem;
+}
+
+.portal-reminder-sheet {
+  align-items: end;
+}
+
+.portal-mood-backdrop,
+.portal-reminder-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(15,23,51,.34);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.portal-mood-card,
+.portal-reminder-card {
+  position: relative;
+  z-index: 1;
+  width: min(21rem, calc(100vw - 2rem));
+  border: 1px solid rgba(255,255,255,.72);
+  border-radius: 1.35rem;
+  background: rgba(255,255,255,.84);
+  color: #0f1733;
+  box-shadow: 0 24px 80px rgba(18,34,72,.24);
+}
+
+.portal-mood-card {
+  display: grid;
+  justify-items: center;
+  gap: 0.65rem;
+  padding: 1.1rem;
+}
+
+.portal-mood-card h2,
+.portal-mood-card p,
+.portal-mood-card small {
+  margin: 0;
+}
+
+.portal-mood-card h2,
+.portal-reminder-card h2 {
+  font-size: 1rem;
+  font-weight: 900;
+}
+
+.portal-mood-card p {
+  font-size: 0.9rem;
+  font-weight: 850;
+}
+
+.portal-mood-wheel {
+  position: relative;
+  width: 9.5rem;
+  height: 9.5rem;
+  border-radius: 50%;
+  background: conic-gradient(#ef5f8f 0 60deg, #f04444 60deg 120deg, #f39a2e 120deg 180deg, #e6cd2f 180deg 240deg, #16b994 240deg 300deg, #36b7e5 300deg 360deg);
+  box-shadow: inset 0 0 0 2.15rem rgba(255,255,255,.96);
+}
+
+.portal-mood-wheel button {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 3.2rem;
+  height: 3.2rem;
+  margin: -1.6rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--mood-color);
+  transform: rotate(calc(var(--mood-index) * 60deg)) translateY(-3.5rem);
+  opacity: 0.18;
+}
+
+.portal-mood-wheel button:focus-visible,
+.portal-mood-wheel button:hover {
+  opacity: 0.44;
+  outline: 2px solid rgba(74,108,247,.4);
+}
+
+.portal-reminder-card {
+  max-height: min(76dvh, 34rem);
+  overflow-y: auto;
+  display: grid;
+  gap: 0.4rem;
+  padding: 1rem 1.05rem calc(1.1rem + env(safe-area-inset-bottom));
+  border-radius: 1.35rem 1.35rem 0 0;
+}
+
+.portal-reminder-card button {
+  min-height: 3.4rem;
+  border: 0;
+  border-bottom: 1px solid rgba(15,23,51,.08);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+}
+
+.portal-reminder-card button span,
+.portal-reminder-card button b,
+.portal-reminder-card button small {
+  display: block;
+}
+
+.portal-reminder-card button span,
+.portal-reminder-card p {
+  color: #7d88aa;
+  font-size: 0.72rem;
+  font-weight: 760;
+}
+
+.portal-reminder-card button b {
+  margin-top: 0.22rem;
+  color: #0f1733;
+  font-size: 0.92rem;
+  font-weight: 880;
+}
+
+.portal-reminder-card button small {
+  margin-top: 0.12rem;
+  color: #d9832e;
+  font-size: 0.72rem;
+  font-weight: 820;
+}
+
+.portal-reminder-card--detail p {
+  margin: 0.15rem 0;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.portal-reminder-primary,
+.portal-reminder-record {
+  min-height: 3rem !important;
+  display: grid;
+  place-items: center;
+  border-radius: 0.85rem !important;
+  background: linear-gradient(135deg, #2450d8, #653df0) !important;
+  color: #fff !important;
+  text-align: center !important;
+  font-weight: 900 !important;
+}
+
+.portal-reminder-record {
+  background: rgba(74,108,247,.08) !important;
+  color: #2450d8 !important;
+}
+
+.portal-reminder-close {
+  justify-self: end;
+  min-width: 5rem;
+  border: 1px solid rgba(15,23,51,.12) !important;
+  border-radius: 0.85rem !important;
+  text-align: center !important;
+}
+
+.portal-settings-select {
+  appearance: auto;
+}
+
+.portal-purchased-tools {
+  position: fixed;
+  inset: 0;
+  z-index: 510;
+  display: grid;
+  align-items: end;
+}
+
+.portal-purchased-tools-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(15,23,51,.32);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.portal-purchased-tools-card {
+  position: relative;
+  z-index: 1;
+  width: min(24rem, calc(100vw - 1.5rem));
+  justify-self: center;
+  display: grid;
+  gap: 0;
+  margin-bottom: calc(5.1rem + env(safe-area-inset-bottom));
+  border: 1px solid rgba(255,255,255,.7);
+  border-radius: 1.4rem;
+  padding: 0.8rem 0.9rem;
+  background: rgba(255,255,255,.9);
+  box-shadow: 0 24px 70px rgba(18,34,72,.24);
+}
+
+.portal-purchased-tools-card button {
+  min-height: 3.45rem;
+  display: grid;
+  grid-template-columns: 2.6rem minmax(0, 1fr);
+  gap: 0.65rem;
+  align-items: center;
+  border: 0;
+  border-bottom: 1px solid rgba(15,23,51,.08);
+  background: transparent;
+  color: #0f1733;
+  text-align: left;
+  font: inherit;
+}
+
+.portal-purchased-tools-card button:last-child {
+  border-bottom: 0;
+}
+
+.portal-purchased-tools-card button span {
+  grid-row: 1 / span 2;
+  width: 2.25rem;
+  height: 2.25rem;
+  display: grid;
+  place-items: center;
+  border-radius: 0.75rem;
+  background: #eef2ff;
+}
+
+.portal-purchased-tools-card button b,
+.portal-purchased-tools-card button small {
+  display: block;
+  min-width: 0;
+}
+
+.portal-purchased-tools-card button b {
+  font-size: 0.92rem;
+  font-weight: 900;
+}
+
+.portal-purchased-tools-card button small {
+  color: #7d88aa;
+  font-size: 0.76rem;
+  font-weight: 720;
 }

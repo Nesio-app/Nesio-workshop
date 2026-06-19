@@ -94,9 +94,11 @@ test('V14 warm coach home exposes one primary next action and inventory pack', a
   await primaryButtons.first().click();
   const crushSheet = page.getByRole('dialog', { name: /粉碎任务/ });
   await expect(crushSheet).toBeVisible();
-  await expect(crushSheet.getByText(/先完成最小的一件事/)).toBeVisible();
+  await expect(crushSheet.getByText(/给妈妈准备生日礼物/)).toBeVisible();
+  await expect(crushSheet.getByText(/想想妈妈最近提过、喜欢的东西/)).toBeVisible();
+  await expect(crushSheet.getByRole('button', { name: /还是太大？再拆细/ }).first()).toBeVisible();
   await expect(crushSheet.getByRole('button', { name: '完成这一步' })).toBeVisible();
-  await expect(crushSheet.getByRole('button', { name: '再拆小一点' })).toBeVisible();
+  await expect(crushSheet.getByRole('button', { name: '稍后' })).toBeVisible();
   await expect(crushSheet.getByRole('button', { name: '打开待办' })).toBeVisible();
 
   await crushSheet.getByRole('button', { name: '打开待办' }).click();
@@ -149,7 +151,7 @@ test('V14 bottom nav opens AI Friends as unified chat workspace', async ({ page 
 
   const composer = aiPage.getByLabel('智友集合输入框');
   await expect(composer).toBeVisible();
-  await composer.fill('@');
+  await aiPage.getByRole('button', { name: '@ 调度' }).click();
   const mentionMenu = page.getByRole('listbox', { name: '@ 调度候选' });
   await expect(mentionMenu).toBeVisible();
   for (const text of ['@Claude', '@ChatGPT', '@Gemini', '@Flomo', '@物品库']) {
@@ -157,6 +159,12 @@ test('V14 bottom nav opens AI Friends as unified chat workspace', async ({ page 
   }
   await mentionMenu.getByRole('option', { name: /@Claude/ }).click();
   await expect(composer).toHaveValue(/@Claude/);
+
+  await aiPage.getByRole('button', { name: '添加附件' }).click();
+  await expect(aiPage.getByText(/图片、文件、语音会先作为本地意图保留/)).toBeVisible();
+  await aiPage.getByRole('button', { name: '新建对话' }).click();
+  await expect(aiPage.getByText(/已新建一条集合对话/)).toBeVisible();
+  await expect(composer).toHaveValue('');
 
   await aiPage.getByRole('button', { name: '搜索' }).click();
   const searchPanel = page.getByRole('region', { name: '智友搜索' });
@@ -172,6 +180,11 @@ test('V14 bottom nav opens AI Friends as unified chat workspace', async ({ page 
   await expect(callSheet.getByRole('button', { name: /视频通话/ })).toBeVisible();
   await expect(callSheet.getByRole('button', { name: /音频通话/ })).toBeVisible();
   await expect(callSheet.getByText('虚拟形象')).toHaveCount(0);
+  await callSheet.getByRole('button', { name: /音频通话/ }).click();
+  await expect(page.getByRole('dialog', { name: 'AI 实时语音通话' })).toBeVisible();
+  await page.getByRole('dialog', { name: 'AI 实时语音通话' }).getByRole('button', { name: '结束' }).click();
+  await aiPage.getByRole('button', { name: '通话' }).click();
+  await expect(callSheet).toBeVisible();
   await callSheet.getByRole('button', { name: /视频通话/ }).click();
   await expect(page.getByRole('dialog', { name: 'AI 虚拟形象视频通话' })).toBeVisible();
   await expect(page).not.toHaveURL(/\/secretary/);
@@ -272,17 +285,14 @@ test('daily quote settings can choose positive categories and frequency', async 
   expect(stored).toContain('"classic"');
 });
 
-test('settings calendar link lives in software settings, not homepage calendar card', async ({ page }) => {
+test('settings keeps software controls lean and does not expose calendar link card', async ({ page }) => {
   await page.goto('/settings');
   await page.getByLabel('进入软件设置').click();
-  const calendarUrl = 'https://calendar.google.com/calendar/u/0/r';
-  await page.locator('#settings-calendar-url').fill(calendarUrl);
-  await page.getByRole('button', { name: '保存日历链接' }).click();
+  await expect(page.locator('#settings-calendar-url')).toHaveCount(0);
+  await expect(page.getByLabel('语言')).toBeVisible();
 
   await page.goto('/');
   await expect(page.locator('.portal-calendar')).toBeHidden();
-  const stored = await page.evaluate(() => localStorage.getItem('treasurebox-calendar-links-v1'));
-  expect(stored).toContain(calendarUrl);
 });
 
 test('settings exposes V14 connections and safety boundary', async ({ page }) => {

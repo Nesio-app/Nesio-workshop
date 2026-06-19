@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 interface PortalAiFriendsPreviewProps {
@@ -81,6 +81,9 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
   const [surface, setSurface] = useState<'chat' | 'search'>('chat');
   const [callSheetOpen, setCallSheetOpen] = useState(false);
   const [videoCallOpen, setVideoCallOpen] = useState(false);
+  const [audioCallOpen, setAudioCallOpen] = useState(false);
+  const [utilityNotice, setUtilityNotice] = useState('一个输入框，后台自动调度 AI 与工具');
+  const composerRef = useRef<HTMLInputElement>(null);
 
   const mentionNeedle = useMemo(() => {
     const match = composer.match(/@([\w\u4e00-\u9fa5]*)$/);
@@ -93,6 +96,26 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
   }, [mentionNeedle]);
 
   if (!open) return null;
+
+  const startNewThread = () => {
+    setSurface('chat');
+    setComposer('');
+    setUtilityNotice('已新建一条集合对话，可以直接 @AI 或 @工具。');
+    requestAnimationFrame(() => composerRef.current?.focus());
+  };
+
+  const openAttachmentTray = () => {
+    setUtilityNotice('图片、文件、语音会先作为本地意图保留；真实上传与外部授权后续再开。');
+  };
+
+  const openMentionMenu = () => {
+    setSurface('chat');
+    setComposer((value) => {
+      if (/@[\w\u4e00-\u9fa5]*$/.test(value)) return value;
+      return `${value}${value.endsWith(' ') || value.length === 0 ? '' : ' '}@`;
+    });
+    requestAnimationFrame(() => composerRef.current?.focus());
+  };
 
   const insertMention = (target: MentionTarget) => {
     setComposer((value) => {
@@ -113,7 +136,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
               <span className="sr-only">返回智友</span>
             </button>
             <h1>搜索</h1>
-            <button type="button" className="portal-ai-screen-icon-btn" aria-label="新建对话">
+            <button type="button" className="portal-ai-screen-icon-btn" aria-label="新建对话" onClick={startNewThread}>
               +
             </button>
           </header>
@@ -162,13 +185,13 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
               >
                 ⌕
               </button>
-              <button type="button" className="portal-ai-screen-icon-btn" aria-label="新建对话">
+              <button type="button" className="portal-ai-screen-icon-btn" aria-label="新建对话" onClick={startNewThread}>
                 💬
               </button>
             </div>
           </header>
 
-          <p className="portal-ai-intelligence-pill">🧠 智能模式 · 一个输入框，后台自动调度 AI 与工具</p>
+          <p className="portal-ai-intelligence-pill">🧠 智能模式 · {utilityNotice}</p>
 
           <section className="portal-ai-thread" aria-label="集合对话">
             <p className="portal-ai-message portal-ai-message--user">帮我想个送妈妈的生日礼物，预算 300</p>
@@ -205,15 +228,16 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
             </div>
             <p>输入框搞定一切： @AI 拉它进来 · @Flomo 存笔记 · @物品库 记物品</p>
             <div className="portal-ai-composer-row">
-              <button type="button" className="portal-ai-round-action" aria-label="添加附件">＋</button>
-              <button type="button" className="portal-ai-round-action" aria-label="@ 调度">@</button>
+              <button type="button" className="portal-ai-round-action" aria-label="添加附件" onClick={openAttachmentTray}>＋</button>
+              <button type="button" className="portal-ai-round-action" aria-label="@ 调度" onClick={openMentionMenu}>@</button>
               <input
+                ref={composerRef}
                 aria-label="智友集合输入框"
                 value={composer}
                 onChange={(event) => setComposer(event.target.value)}
                 placeholder="发消息给智友..."
               />
-              <button type="button" className="portal-ai-round-action" aria-label="语音输入">🎙</button>
+              <button type="button" className="portal-ai-round-action" aria-label="语音输入" onClick={() => setAudioCallOpen(true)}>🎙</button>
               <button type="button" className="portal-ai-call-button" aria-label="通话" onClick={() => setCallSheetOpen(true)}>
                 📞<span>通话</span>
               </button>
@@ -250,7 +274,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
                   </p>
                   <i aria-hidden>›</i>
                 </button>
-                <button type="button" onClick={() => setCallSheetOpen(false)}>
+                <button type="button" onClick={() => { setCallSheetOpen(false); setAudioCallOpen(true); }}>
                   <span aria-hidden>🎙</span>
                   <p>
                     <b>音频通话</b>
@@ -258,6 +282,18 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
                   </p>
                   <i aria-hidden>›</i>
                 </button>
+              </section>
+            </div>,
+            document.body,
+          ) : null}
+
+          {typeof document !== 'undefined' && audioCallOpen ? createPortal(
+            <div className="portal-ai-modal-layer portal-ai-modal-layer--call">
+              <section className="portal-ai-video-call" role="dialog" aria-modal="true" aria-label="AI 实时语音通话">
+                <div className="portal-ai-video-avatar" aria-hidden>🎙</div>
+                <p>正在连接实时语音通话</p>
+                <small>Mock Live · 后续接入 Gemini Live 类实时语音模型</small>
+                <button type="button" onClick={() => setAudioCallOpen(false)}>结束</button>
               </section>
             </div>,
             document.body,

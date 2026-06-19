@@ -31,7 +31,7 @@ const sourceChecks = [
   ['components/portal/DashboardHome.tsx', '温馨提醒'],
   ['components/portal/DashboardHome.tsx', '粉碎任务'],
   ['components/portal/DashboardHome.tsx', '物品库'],
-  ['components/portal/DashboardHome.tsx', '再拆小一点'],
+  ['components/portal/DashboardHome.tsx', '还是太大？再拆细'],
   ['components/portal/PortalAiFriendsPreview.tsx', '一个输入框，后台自动调度 AI 与工具'],
   ['components/portal/PortalAiFriendsPreview.tsx', '@Claude'],
   ['components/portal/PortalAiFriendsPreview.tsx', '@Flomo'],

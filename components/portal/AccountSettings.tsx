@@ -11,7 +11,6 @@ import {
 } from '@/lib/portal/profile';
 import {
   loadCalendarLinkSettings,
-  saveCalendarLinkSettings,
 } from '@/lib/portal/calendar-links';
 import {
   getBaohePersonalizationProfile,
@@ -20,6 +19,21 @@ import {
 } from '@/lib/portal/personalization-insights';
 import type { PortalConfig } from '@/lib/portal/types';
 import PortalThemeToggle from './PortalThemeToggle';
+
+const LANGUAGE_OPTIONS = [
+  ['zh', '简体中文'],
+  ['en', 'English'],
+  ['zh-TW', '繁體中文'],
+  ['ja', '日本語'],
+  ['ko', '한국어'],
+  ['fr', 'Français'],
+  ['de', 'Deutsch'],
+  ['es', 'Español'],
+  ['it', 'Italiano'],
+  ['pt', 'Português'],
+  ['vi', 'Tiếng Việt'],
+  ['th', 'ไทย'],
+] as const;
 
 function initials(name: string): string {
   const t = name.trim();
@@ -66,22 +80,9 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
     } catch { /* ignore */ }
   };
 
-  const onNameBlur = () => {
-    const name = displayName.trim() || fallbackName;
-    setDisplayName(name);
-    saveProfileSettings({ displayName: name });
-    showToast('settingsSaved');
-  };
-
   const onLocaleChange = (next: PortalLocale) => {
     setLocale(next);
     saveProfileSettings({ locale: next });
-    showToast('settingsSaved');
-  };
-
-  const onCalendarSave = () => {
-    const next = saveCalendarLinkSettings({ googleCalendarUrl: calendarUrl });
-    setCalendarUrl(next.googleCalendarUrl);
     showToast('settingsSaved');
   };
 
@@ -212,21 +213,6 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
       ) : (
         <>
           <section className="portal-settings-card">
-            <label className="portal-settings-label" htmlFor="profile-name">
-              {t(locale, 'settingsName')}
-            </label>
-            <input
-              id="profile-name"
-              className="portal-settings-input"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              onBlur={onNameBlur}
-              maxLength={32}
-              placeholder={t(locale, 'nameInputPlaceholder')}
-            />
-          </section>
-
-          <section className="portal-settings-card">
         <h2 className="portal-settings-label">{t(locale, 'portalAppearanceTitle')}</h2>
         <p className="portal-settings-hint">{t(locale, 'portalAppearanceHint')}</p>
         <PortalThemeToggle />
@@ -234,42 +220,16 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
 
       <section className="portal-settings-card">
         <h2 className="portal-settings-label">{t(locale, 'settingsLanguage')}</h2>
-        <div className="portal-settings-lang">
-          <button
-            type="button"
-            className={'portal-settings-lang-btn' + (locale === 'zh' ? ' portal-settings-lang-btn--on' : '')}
-            onClick={() => onLocaleChange('zh')}
-          >
-            {t(locale, 'settingsLangZh')}
-          </button>
-          <button
-            type="button"
-            className={'portal-settings-lang-btn' + (locale === 'en' ? ' portal-settings-lang-btn--on' : '')}
-            onClick={() => onLocaleChange('en')}
-          >
-            {t(locale, 'settingsLangEn')}
-          </button>
-        </div>
-      </section>
-
-      <section className="portal-settings-card" id="calendar">
-        <label className="portal-settings-label" htmlFor="settings-calendar-url">
-          Google Calendar
-        </label>
-        <p className="portal-settings-hint">
-          粘贴 Google Calendar 网页链接后，首页日历卡片可点击进入。真实事件同步仍保持关闭，避免私人日程暴露在公开站点。
-        </p>
-        <input
-          id="settings-calendar-url"
-          className="portal-settings-input"
-          type="url"
-          value={calendarUrl}
-          onChange={(event) => setCalendarUrl(event.target.value)}
-          placeholder="https://calendar.google.com/calendar/..."
-        />
-        <button type="button" className="portal-settings-secondary-btn" onClick={onCalendarSave}>
-          保存日历链接
-        </button>
+        <select
+          className="portal-settings-input portal-settings-select"
+          aria-label="语言"
+          value={locale}
+          onChange={(event) => onLocaleChange((event.target.value === 'en' ? 'en' : 'zh') as PortalLocale)}
+        >
+          {LANGUAGE_OPTIONS.map(([value, label]) => (
+            <option key={value} value={value}>{label}</option>
+          ))}
+        </select>
       </section>
 
       <section className="portal-settings-card portal-settings-safety" aria-label="连接与安全">

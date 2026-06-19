@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import Link from 'next/link';
 import { formatLunarLine, nextHolidayLine, nextUSHolidayLine } from '@/lib/portal/almanac';
 import { t } from '@/lib/portal/i18n';
@@ -61,6 +61,7 @@ interface DashboardHomeProps {
   onTreasureOpenChange: (open: boolean) => void;
   onOpenNote: () => void;
   onOpenTool: (tool: PortalTool) => void;
+  onOpenAiFriends?: () => void;
 }
 
 
@@ -156,6 +157,23 @@ interface CalendarFeedStatus {
 
 const FIDELITY_HINT_KEY = 'treasurebox-fidelity-hint-dismissed';
 
+const MOOD_OPTIONS = [
+  { key: 'calm', label: '慢慢来', color: '#36b7e5' },
+  { key: 'warm', label: '温暖', color: '#16b994' },
+  { key: 'focused', label: '专注', color: '#4a6cf7' },
+  { key: 'low', label: '低能量', color: '#8b7cf6' },
+  { key: 'bright', label: '轻快', color: '#f39a2e' },
+  { key: 'tender', label: '需要被照顾', color: '#ef5f8f' },
+] as const;
+
+type MoodOption = (typeof MOOD_OPTIONS)[number];
+
+const INSIGHT_FEEDBACK_COPY = [
+  '收到，我会越来越懂你的节奏。',
+  '记下来了，下一次提醒会更贴近你。',
+  '谢谢你校准我，宝盒会慢慢变聪明。',
+];
+
 export default function DashboardHome({
   config,
   shellTools,
@@ -165,6 +183,7 @@ export default function DashboardHome({
   onTreasureOpenChange,
   onOpenNote,
   onOpenTool,
+  onOpenAiFriends,
 }: DashboardHomeProps) {
   const treasureAnchorRef = useRef<HTMLButtonElement>(null);
   const profile = config.profile ?? { displayName: t('zh', 'profileDefaultName') };
@@ -220,6 +239,13 @@ export default function DashboardHome({
   const [showPersonalizationInsight, setShowPersonalizationInsight] = useState(false);
   const [insightDismissed, setInsightDismissed] = useState(false);
   const [insightFeedback, setInsightFeedback] = useState<'positive' | 'negative' | null>(null);
+  const [insightFeedbackCopy, setInsightFeedbackCopy] = useState(INSIGHT_FEEDBACK_COPY[0]);
+  const [selectedMood, setSelectedMood] = useState<MoodOption>(MOOD_OPTIONS[0]);
+  const [hoveredMood, setHoveredMood] = useState<MoodOption>(MOOD_OPTIONS[0]);
+  const [moodPickerOpen, setMoodPickerOpen] = useState(false);
+  const [scheduleSheetOpen, setScheduleSheetOpen] = useState(false);
+  const [reminderDetail, setReminderDetail] = useState<'task' | 'meeting' | null>(null);
+  const [meetingRecording, setMeetingRecording] = useState(false);
   const popupTools = toolboxTools ?? shellTools ?? config.tools;
   const quotePicked = useRef(false);
   const [quotePreferences, setQuotePreferences] = useState<QuotePreferences>(DEFAULT_QUOTE_PREFERENCES);
@@ -258,6 +284,37 @@ export default function DashboardHome({
     setQuotePreferences(prefs);
     setDailyQuote(pickFreshQuote(config, prefs));
   }, [config]);
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem('treasurebox-v14-mood');
+      const match = MOOD_OPTIONS.find((mood) => mood.key === stored);
+      if (match) {
+        setSelectedMood(match);
+        setHoveredMood(match);
+      }
+    } catch {
+      // local mood is optional.
+    }
+  }, []);
+
+  const chooseMood = (mood: MoodOption) => {
+    setSelectedMood(mood);
+    setHoveredMood(mood);
+    setMoodPickerOpen(false);
+    try {
+      window.localStorage.setItem('treasurebox-v14-mood', mood.key);
+    } catch {
+      // local mood is optional.
+    }
+  };
+
+  const handleInsightFeedback = (positive: boolean) => {
+    rememberBaoheInsightFeedback(personalization, positive);
+    setInsightFeedback(positive ? 'positive' : 'negative');
+    setInsightFeedbackCopy(INSIGHT_FEEDBACK_COPY[Math.floor(Math.random() * INSIGHT_FEEDBACK_COPY.length)] ?? INSIGHT_FEEDBACK_COPY[0]);
+    setInsightDismissed(true);
+  };
 
   useEffect(() => {
     const syncCalendarLink = () => {
@@ -588,7 +645,7 @@ export default function DashboardHome({
       ) : null}
 
       <section className="portal-v13-coach" aria-label="今日教练行动">
-        <button type="button" className="portal-v13-remind-bar" onClick={() => setCalendarExpanded((v) => !v)}>
+        <button type="button" className="portal-v13-remind-bar" onClick={() => setScheduleSheetOpen(true)}>
           <span className="portal-v13-remind-dot" aria-hidden />
           <span>今天有 <b>{upcomingEvents.length || 3} 件事</b> · 有 <b>1 件</b>今天处理会更从容</span>
           <small>看看 ›</small>
@@ -609,37 +666,37 @@ export default function DashboardHome({
               <span className="is-empty" />
             </div>
             <span>昨晚睡得好，身体在慢慢回升</span>
-            <button type="button">此刻心情 ›</button>
+            <button
+              type="button"
+              className="portal-v14-mood-trigger"
+              onClick={() => setMoodPickerOpen(true)}
+            >
+              <i style={{ background: selectedMood.color }} aria-hidden />
+              {selectedMood.label}
+              <em aria-hidden>›</em>
+            </button>
           </div>
         </div>
 
+        {insightFeedback ? (
+          <p className="portal-v14-insight-feedback portal-v14-insight-feedback--standalone" role="status">
+            {insightFeedbackCopy}
+          </p>
+        ) : null}
+
         {showPersonalizationInsight && !insightDismissed ? (
           <section className="portal-v14-insight-card" aria-label="宝盒发现了一件关于你的事">
-            {insightFeedback ? (
-              <p className="portal-v14-insight-feedback">
-                {insightFeedback === 'positive' ? '感谢反馈，我会记住这个规律' : '明白了，继续观察调整'}
-              </p>
-            ) : (
-              <>
-                <div className="portal-v14-insight-head">
-                  <span aria-hidden>🔍</span>
-                  <b>宝盒发现了一件关于你的事</b>
-                  <button type="button" onClick={() => setInsightDismissed(true)} aria-label="关闭洞察">×</button>
-                </div>
-                <p>{personalization.insightBody}</p>
-                  <small>{personalization.insightSource}</small>
-                  <div className="portal-v14-insight-actions">
-                  <button type="button" onClick={() => {
-                    rememberBaoheInsightFeedback(personalization, true);
-                    setInsightFeedback('positive');
-                  }}>👍 这很准确</button>
-                  <button type="button" onClick={() => {
-                    rememberBaoheInsightFeedback(personalization, false);
-                    setInsightFeedback('negative');
-                  }}>不太对</button>
-                </div>
-              </>
-            )}
+            <div className="portal-v14-insight-head">
+              <span aria-hidden>🔍</span>
+              <b>宝盒发现了一件关于你的事</b>
+              <button type="button" onClick={() => setInsightDismissed(true)} aria-label="关闭洞察">×</button>
+            </div>
+            <p>{personalization.insightBody}</p>
+            <small>{personalization.insightSource}</small>
+            <div className="portal-v14-insight-actions">
+              <button type="button" onClick={() => handleInsightFeedback(true)}>👍 这很准确</button>
+              <button type="button" onClick={() => handleInsightFeedback(false)}>不太对</button>
+            </div>
           </section>
         ) : null}
 
@@ -647,6 +704,17 @@ export default function DashboardHome({
           <div className="portal-v13-action-content" onClick={() => setCrushTaskOpen(true)} role="presentation">
             <p className="portal-v13-kicker">温馨提醒</p>
             <p className="portal-v13-action-copy">妈妈生日还有几天，要不要现在花两分钟挑个礼物？<em>定制相册</em>或<em>护肤套装</em>都很贴心，做不完也没关系。</p>
+            <button
+              type="button"
+              className="portal-v13-ai-tip"
+              aria-label="问智友下一步"
+              onClick={(event) => {
+                event.stopPropagation();
+                onOpenAiFriends?.();
+              }}
+            >
+              ✦
+            </button>
           </div>
           <div className="portal-v13-action-row">
             <button
@@ -721,7 +789,7 @@ export default function DashboardHome({
             <div className="portal-crush-sheet-head">
               <div>
                 <p className="portal-v13-kicker">粉碎任务</p>
-                <h2>先完成最小的一件事</h2>
+                <h2>给妈妈准备生日礼物</h2>
               </div>
               <button
                 type="button"
@@ -734,17 +802,24 @@ export default function DashboardHome({
             </div>
             <p className="portal-crush-sheet-copy">
               {crushTaskSplitLevel > 0
-                ? '再小一点：只写下第一步，不需要完成全部。'
-                : '把一件卡住的事拆到 2 分钟能开始的大小。'}
+                ? '我把它拆成更小的 3 步。做不完、想跳过都可以，你已经在往前走了。'
+                : '我把它拆成几个小步骤。做不完、想跳过都可以，你已经在往前走了。'}
             </p>
             <ol className="portal-crush-step-list" aria-label="粉碎步骤">
               <li className={crushTaskDone ? 'is-done' : ''}>
-                <span>{crushTaskDone ? '已完成' : '第一步'}</span>
-                <strong>{crushTaskSplitLevel > 0 ? '写下任务名字' : '选一个最小动作'}</strong>
+                <span>{crushTaskDone ? '✓ 已拆成更小的 3 步' : '第一步'}</span>
+                <strong>{crushTaskSplitLevel > 0 ? '先花 1 分钟随手记下想法' : '想想妈妈最近提过、喜欢的东西'}</strong>
+                <button type="button" onClick={() => setCrushTaskSplitLevel(1)}>↳ 还是太大？再拆细</button>
               </li>
               <li>
-                <span>下一步</span>
-                <strong>打开待办保存或继续拆分</strong>
+                <span>第二步</span>
+                <strong>在智友里看看 AI 推荐的几个方案</strong>
+                <button type="button" onClick={onOpenAiFriends}>↳ 还是太大？再拆细</button>
+              </li>
+              <li>
+                <span>第三步</span>
+                <strong>选一个，确认 5 天内能到货</strong>
+                <button type="button" onClick={() => setCrushTaskSplitLevel(1)}>↳ 还是太大？再拆细</button>
               </li>
             </ol>
             <div className="portal-crush-sheet-actions">
@@ -753,14 +828,14 @@ export default function DashboardHome({
                 className="portal-crush-sheet-primary"
                 onClick={() => setCrushTaskDone(true)}
               >
-                完成这一步
+              完成这一步
               </button>
               <button
                 type="button"
                 className="portal-crush-sheet-secondary"
                 onClick={() => setCrushTaskSplitLevel((level) => Math.min(level + 1, 1))}
               >
-                再拆小一点
+                稍后
               </button>
             </div>
             <button
@@ -773,6 +848,108 @@ export default function DashboardHome({
             >
               打开待办
             </button>
+          </section>
+        </div>
+      ) : null}
+
+      {moodPickerOpen ? (
+        <div className="portal-mood-sheet" role="presentation">
+          <button
+            type="button"
+            className="portal-mood-backdrop"
+            aria-label="关闭心情选择"
+            onClick={() => setMoodPickerOpen(false)}
+          />
+          <section className="portal-mood-card" role="dialog" aria-modal="true" aria-label="此刻心情">
+            <h2>此刻心情</h2>
+            <p style={{ color: hoveredMood.color }}>{hoveredMood.label}</p>
+            <div className="portal-mood-wheel" aria-label="心情轮">
+              {MOOD_OPTIONS.map((mood, index) => (
+                <button
+                  key={mood.key}
+                  type="button"
+                  style={{
+                    '--mood-color': mood.color,
+                    '--mood-index': index,
+                  } as CSSProperties}
+                  aria-label={mood.label}
+                  onMouseEnter={() => setHoveredMood(mood)}
+                  onTouchStart={() => setHoveredMood(mood)}
+                  onPointerUp={() => chooseMood(mood)}
+                  onClick={() => chooseMood(mood)}
+                />
+              ))}
+            </div>
+            <small>轻触任意色区选择心情</small>
+          </section>
+        </div>
+      ) : null}
+
+      {scheduleSheetOpen ? (
+        <div className="portal-reminder-sheet" role="presentation">
+          <button
+            type="button"
+            className="portal-reminder-backdrop"
+            aria-label="关闭今日安排"
+            onClick={() => setScheduleSheetOpen(false)}
+          />
+          <section className="portal-reminder-card" role="dialog" aria-modal="true" aria-label="今日安排">
+            <span className="portal-crush-sheet-handle" aria-hidden />
+            <h2>陪你看见 · 今天可以做的事</h2>
+            <button type="button" onClick={() => setReminderDetail('task')}>
+              <span>先做这一件就好</span>
+              <b>回复王总邮件</b>
+              <small>建议今天</small>
+            </button>
+            <button type="button" onClick={() => setReminderDetail('meeting')}>
+              <span>今日安排</span>
+              <b>产品会议</b>
+              <small>还剩 4 小时</small>
+            </button>
+            <button type="button" onClick={() => setReminderDetail('task')}>
+              <span>不急，有空再看</span>
+              <b>准备季度报告</b>
+              <small>本周内</small>
+            </button>
+          </section>
+        </div>
+      ) : null}
+
+      {reminderDetail ? (
+        <div className="portal-reminder-sheet" role="presentation">
+          <button
+            type="button"
+            className="portal-reminder-backdrop"
+            aria-label="关闭提醒详情"
+            onClick={() => setReminderDetail(null)}
+          />
+          <section className="portal-reminder-card portal-reminder-card--detail" role="dialog" aria-modal="true" aria-label={reminderDetail === 'meeting' ? '会议提醒' : '提醒详情'}>
+            <span className="portal-crush-sheet-handle" aria-hidden />
+            {reminderDetail === 'meeting' ? (
+              <>
+                <p className="portal-v13-kicker">会议提醒</p>
+                <h2>产品会议</h2>
+                <p>产品团队周会，15:00 @ 会议室 B</p>
+                <p><b>时间 / 还剩 4 小时</b></p>
+                <button type="button" className="portal-reminder-primary">📹 加入 Zoom 会议</button>
+                <button
+                  type="button"
+                  className="portal-reminder-record"
+                  onClick={() => setMeetingRecording(true)}
+                >
+                  ▶ {meetingRecording ? '会议记录已开始，结束后生成纪要' : '开始 AI 会议记录'}
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="portal-v13-kicker">提醒详情</p>
+                <h2>回复王总邮件</h2>
+                <p>关于 Q3 预算调整方案，回一句也算往前走了一步。</p>
+                <p><b>时间 / 建议今天</b></p>
+                <button type="button" className="portal-reminder-primary" onClick={onOpenAiFriends}>✦ 在智友里处理</button>
+              </>
+            )}
+            <button type="button" className="portal-reminder-close" onClick={() => setReminderDetail(null)}>关闭</button>
           </section>
         </div>
       ) : null}
