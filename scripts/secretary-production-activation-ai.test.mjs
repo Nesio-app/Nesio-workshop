@@ -35,6 +35,11 @@ assert.match(
   /isSecretaryAiRequestAllowed/,
   'middleware must use the combined secretary AI gate',
 );
+assert.match(
+  middleware,
+  /pathname === ['"]\/api\/secretary\/health['"][\s\S]{0,160}NextResponse\.next/,
+  'secretary health endpoint must bypass middleware so it can report readiness diagnostics',
+);
 assert.doesNotMatch(
   middleware,
   /pathname\.startsWith\('\/api\/secretary'\) && isPersonalLabAiRequestAllowed/,

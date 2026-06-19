@@ -14,6 +14,10 @@ export function middleware(request: NextRequest) {
     return NextResponse.rewrite(url);
   }
 
+  if (pathname === '/api/secretary/health') {
+    return NextResponse.next();
+  }
+
   if (!isFirstLaunchBlockedPath(pathname)) {
     return NextResponse.next();
   }
