@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-19T18:23:46.494Z",
+  "generatedAt": "2026-06-19T18:55:00.534Z",
   "viewport": {
     "width": 390,
     "height": 844
@@ -27,9 +27,29 @@
       "note": "Task-crushing bottom sheet."
     },
     {
-      "name": "05-ai-friends-stable-hub",
-      "path": "outputs/v14-runtime-screenshots/05-ai-friends-stable-hub.png",
-      "note": "AI Friends conversation list, group chat, and attachment affordances."
+      "name": "05-ai-friends-unified-chat",
+      "path": "outputs/v14-runtime-screenshots/05-ai-friends-unified-chat.png",
+      "note": "AI Friends unified chat workspace with one composer and multi-agent messages."
+    },
+    {
+      "name": "05b-ai-friends-mention-menu",
+      "path": "outputs/v14-runtime-screenshots/05b-ai-friends-mention-menu.png",
+      "note": "AI Friends @ routing menu for AI and tool context."
+    },
+    {
+      "name": "05c-ai-friends-search",
+      "path": "outputs/v14-runtime-screenshots/05c-ai-friends-search.png",
+      "note": "AI Friends search surface with shortcut grid and recent conversations."
+    },
+    {
+      "name": "05d-ai-friends-live-call-sheet",
+      "path": "outputs/v14-runtime-screenshots/05d-ai-friends-live-call-sheet.png",
+      "note": "Live call sheet with video/audio only; video implies avatar call."
+    },
+    {
+      "name": "05e-ai-friends-video-call-mock",
+      "path": "outputs/v14-runtime-screenshots/05e-ai-friends-video-call-mock.png",
+      "note": "Mock AI avatar video call surface."
     },
     {
       "name": "06-tool-packs-discovery",

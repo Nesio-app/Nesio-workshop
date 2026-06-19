@@ -1,162 +1,281 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 interface PortalAiFriendsPreviewProps {
   open: boolean;
   onClose: () => void;
 }
 
-const conversations = [
+type MentionTarget = {
+  key: string;
+  label: string;
+  description: string;
+  avatar: string;
+};
+
+const mentionTargets: MentionTarget[] = [
+  { key: 'claude', label: '@Claude', description: '单独问 Claude，它会加入对话', avatar: 'AI' },
+  { key: 'chatgpt', label: '@ChatGPT', description: '单独问 ChatGPT', avatar: 'G' },
+  { key: 'gemini', label: '@Gemini', description: '单独问 Gemini', avatar: '✦' },
+  { key: 'flomo', label: '@Flomo', description: '这条消息自动记入笔记序列', avatar: 'F' },
+  { key: 'inventory', label: '@物品库', description: '记一个物品 / 查到期', avatar: '📦' },
+];
+
+const searchShortcuts = [
+  ['🗓', '日期'],
+  ['✦', 'AI 建议'],
+  ['📝', '笔记'],
+  ['📦', '物品'],
+  ['💰', '支出'],
+  ['✅', '待办'],
+  ['📷', '图片'],
+  ['📞', '通话'],
+  ['📎', '文件'],
+];
+
+const recentConversations = [
   {
     id: 'smart',
-    name: '智友',
+    title: '智友',
     tag: '智能调度',
-    avatar: '✦',
-    className: 'portal-ai-conversation-avatar--smart',
     preview: '综合建议：定制相册配手写卡片最暖心...',
+    avatar: '✦',
     time: '11:20',
     unread: '2',
   },
   {
     id: 'group',
-    name: '产品脑暴群',
+    title: '产品脑暴群',
     tag: '群聊',
-    avatar: '👥',
-    className: 'portal-ai-conversation-avatar--group',
     preview: 'Claude、ChatGPT、Gemini：3 个 AI 正在讨论方案...',
+    avatar: '👥',
     time: '10:05',
   },
   {
     id: 'claude',
-    name: 'Claude',
+    title: 'Claude',
+    preview: '可以考虑定制相册，附上手写信，300 元内...',
     avatar: 'AI',
-    className: 'portal-ai-conversation-avatar--claude',
-    preview: 'Anthropic · 即将接入',
-    time: '待接',
+    time: '昨天',
   },
   {
     id: 'chatgpt',
-    name: 'ChatGPT',
+    title: 'ChatGPT',
+    preview: '护肤礼盒很受欢迎，兰蔻套装 300 元左右...',
     avatar: 'G',
-    className: 'portal-ai-conversation-avatar--chatgpt',
-    preview: 'OpenAI 大模型，适合推理、写作与多步骤任务...',
-    time: '19:56',
+    time: '昨天',
   },
   {
     id: 'gemini',
-    name: 'Gemini',
-    avatar: '✦',
-    className: 'portal-ai-conversation-avatar--gemini',
-    preview: '我是你的幕僚，可以帮你理清待办与优先级...',
-    time: '19:56',
-  },
-  {
-    id: 'doubao',
-    name: '豆包',
-    avatar: '◐',
-    className: 'portal-ai-conversation-avatar--doubao',
-    preview: '豆包大模型，适合日常对话与中文任务。',
-    time: '19:56',
-  },
-  {
-    id: 'inventory',
-    name: '物品库 Agent',
-    tag: '工具',
-    avatar: '📦',
-    className: 'portal-ai-conversation-avatar--inventory',
-    preview: '牛奶后天到期，需要我加入购物清单吗？',
-    time: '08:00',
-    unread: '1',
+    title: 'Gemini',
+    preview: '300 元做定制相册很充裕，加急运费留 50...',
+    avatar: 'G',
+    time: '昨天',
   },
 ];
 
 export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewProps) {
-  const [query, setQuery] = useState('');
-  const [activeId, setActiveId] = useState('smart');
-  const filteredConversations = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    if (!needle) return conversations;
-    return conversations.filter((item) =>
-      `${item.name} ${item.tag ?? ''} ${item.preview}`.toLowerCase().includes(needle),
-    );
-  }, [query]);
-  const activeConversation = conversations.find((item) => item.id === activeId) ?? conversations[0];
+  const [composer, setComposer] = useState('');
+  const [surface, setSurface] = useState<'chat' | 'search'>('chat');
+  const [callSheetOpen, setCallSheetOpen] = useState(false);
+  const [videoCallOpen, setVideoCallOpen] = useState(false);
+
+  const mentionNeedle = useMemo(() => {
+    const match = composer.match(/@([\w\u4e00-\u9fa5]*)$/);
+    return match?.[1]?.toLowerCase() ?? null;
+  }, [composer]);
+
+  const mentionOptions = useMemo(() => {
+    if (mentionNeedle === null) return [];
+    return mentionTargets.filter((target) => target.label.toLowerCase().includes(mentionNeedle));
+  }, [mentionNeedle]);
 
   if (!open) return null;
 
+  const insertMention = (target: MentionTarget) => {
+    setComposer((value) => {
+      if (/@[\w\u4e00-\u9fa5]*$/.test(value)) {
+        return value.replace(/@[\w\u4e00-\u9fa5]*$/, `${target.label} `);
+      }
+      return `${value}${value.endsWith(' ') || value.length === 0 ? '' : ' '}${target.label} `;
+    });
+  };
+
   return (
     <section className="portal-ai-preview portal-ai-preview--screen" aria-label="智友">
-      <header className="portal-ai-screen-head">
-        <button type="button" className="portal-ai-screen-icon-btn" aria-label="群聊">
-          👥
-        </button>
-        <h1>智友</h1>
-        <button type="button" className="portal-ai-screen-icon-btn" aria-label="新建对话">
-          +
-        </button>
-      </header>
+      {surface === 'search' ? (
+        <section className="portal-ai-search-surface" aria-label="智友搜索">
+          <header className="portal-ai-search-head">
+            <button type="button" className="portal-ai-screen-icon-btn" onClick={() => setSurface('chat')}>
+              <span aria-hidden>←</span>
+              <span className="sr-only">返回智友</span>
+            </button>
+            <h1>搜索</h1>
+            <button type="button" className="portal-ai-screen-icon-btn" aria-label="新建对话">
+              +
+            </button>
+          </header>
+          <label className="portal-ai-search-input">
+            <span aria-hidden>⌕</span>
+            <input type="search" placeholder="搜索对话、笔记、AI 建议..." />
+          </label>
+          <div className="portal-ai-search-grid" aria-label="搜索分类">
+            {searchShortcuts.map(([icon, label]) => (
+              <button key={label} type="button">
+                <span aria-hidden>{icon}</span>
+                <b>{label}</b>
+              </button>
+            ))}
+          </div>
+          <section className="portal-ai-recent" aria-label="最近对话">
+            <h2>最近对话</h2>
+            {recentConversations.map((item) => (
+              <button key={item.id} type="button" className="portal-ai-recent-row">
+                <span className="portal-ai-conversation-avatar" aria-hidden>
+                  {item.avatar}
+                </span>
+                <span>
+                  <b>
+                    {item.title}
+                    {item.tag ? <small>{item.tag}</small> : null}
+                  </b>
+                  <em>{item.preview}</em>
+                </span>
+                <i>{item.time}</i>
+                {item.unread ? <strong>{item.unread}</strong> : null}
+              </button>
+            ))}
+          </section>
+        </section>
+      ) : (
+        <>
+          <header className="portal-ai-workspace-head">
+            <h1>智友</h1>
+            <div>
+              <button
+                type="button"
+                className="portal-ai-screen-icon-btn"
+                aria-label="搜索"
+                onClick={() => setSurface('search')}
+              >
+                ⌕
+              </button>
+              <button type="button" className="portal-ai-screen-icon-btn" aria-label="新建对话">
+                💬
+              </button>
+            </div>
+          </header>
 
-      <label className="portal-ai-screen-search">
-        <span aria-hidden>⌕</span>
-        <input
-          type="search"
-          placeholder="搜索"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-        />
-      </label>
+          <p className="portal-ai-intelligence-pill">🧠 智能模式 · 一个输入框，后台自动调度 AI 与工具</p>
 
-      <div className="portal-ai-conversation-list">
-        {filteredConversations.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            className={'portal-ai-conversation' + (item.id === activeId ? ' portal-ai-conversation--active' : '')}
-            onClick={() => setActiveId(item.id)}
-            aria-pressed={item.id === activeId}
-          >
-            <span className={`portal-ai-conversation-avatar ${item.className}`} aria-hidden>
-              {item.avatar}
-            </span>
-            <span className="portal-ai-conversation-body">
-              <span className="portal-ai-conversation-title">
-                {item.name}
-                {item.tag ? <small>{item.tag}</small> : null}
-              </span>
-              <span className="portal-ai-conversation-preview">{item.preview}</span>
-            </span>
-            <span className="portal-ai-conversation-meta">
-              <span>{item.time}</span>
-              {item.unread ? <b>{item.unread}</b> : null}
-            </span>
-          </button>
-        ))}
-      </div>
+          <section className="portal-ai-thread" aria-label="集合对话">
+            <p className="portal-ai-message portal-ai-message--user">帮我想个送妈妈的生日礼物，预算 300</p>
+            <p className="portal-ai-thread-note">已综合 Claude · ChatGPT 的回答</p>
+            <div className="portal-ai-message-row">
+              <span className="portal-ai-bot-avatar" aria-hidden>✦</span>
+              <p className="portal-ai-message portal-ai-message--assistant">
+                综合建议：<b>定制相册</b>（¥150–200）配手写卡片最暖心；想更实用可选<b>护肤礼盒</b>（¥280–320）。慢慢看，要我帮你比价吗？
+              </p>
+            </div>
+            <p className="portal-ai-message portal-ai-message--user">@Flomo 周五前买好牛奶</p>
+            <div className="portal-ai-message-row">
+              <span className="portal-ai-bot-avatar portal-ai-bot-avatar--flomo" aria-hidden>F</span>
+              <p className="portal-ai-message portal-ai-message--assistant portal-ai-message--compact">
+                收到～ <b>✓ 已记入 Flomo 笔记序列</b>
+              </p>
+            </div>
+            <p className="portal-ai-message portal-ai-message--user">@Gemini 你怎么看这个礼物预算？</p>
+            <div className="portal-ai-message-row">
+              <span className="portal-ai-bot-avatar portal-ai-bot-avatar--gemini" aria-hidden>G</span>
+              <p className="portal-ai-message portal-ai-message--assistant">
+                300 元做定制相册很充裕，建议留 50 元加急运费，确保 5 天内到。
+              </p>
+            </div>
+          </section>
 
-      <section className="portal-ai-active-chat" aria-label="当前对话">
-        <div>
-          <span className={`portal-ai-active-avatar ${activeConversation.className}`} aria-hidden>
-            {activeConversation.avatar}
-          </span>
-          <p>
-            <b>{activeConversation.name}</b>
-            <small>{activeConversation.preview}</small>
-          </p>
-        </div>
-        <label>
-          <span className="sr-only">输入消息</span>
-          <input placeholder="发消息、图片、语音或文件..." />
-        </label>
-      </section>
+          <div className="portal-ai-composer">
+            <div className="portal-ai-capability-rail" aria-label="智友快捷能力">
+              <button type="button">📷<span>图片</span></button>
+              <button type="button">📎<span>文件</span></button>
+              <button type="button">🎙<span>语音</span></button>
+              <button type="button" onClick={() => setCallSheetOpen(true)}>📞<span>实时</span></button>
+              <button type="button">📝<span>笔记</span></button>
+            </div>
+            <p>输入框搞定一切： @AI 拉它进来 · @Flomo 存笔记 · @物品库 记物品</p>
+            <div className="portal-ai-composer-row">
+              <button type="button" className="portal-ai-round-action" aria-label="添加附件">＋</button>
+              <button type="button" className="portal-ai-round-action" aria-label="@ 调度">@</button>
+              <input
+                aria-label="智友集合输入框"
+                value={composer}
+                onChange={(event) => setComposer(event.target.value)}
+                placeholder="发消息给智友..."
+              />
+              <button type="button" className="portal-ai-round-action" aria-label="语音输入">🎙</button>
+              <button type="button" className="portal-ai-call-button" aria-label="通话" onClick={() => setCallSheetOpen(true)}>
+                📞<span>通话</span>
+              </button>
+            </div>
+            {mentionOptions.length ? (
+              <div className="portal-ai-mention-menu" role="listbox" aria-label="@ 调度候选">
+                {mentionOptions.map((target) => (
+                  <button
+                    key={target.key}
+                    type="button"
+                    role="option"
+                    aria-selected="false"
+                    onClick={() => insertMention(target)}
+                  >
+                    <b>{target.label}</b>
+                    <span>{target.description}</span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
 
-      <div className="portal-ai-screen-capabilities" aria-label="智友能力">
-        <button type="button">📷<span>图片</span></button>
-        <button type="button">📎<span>文件</span></button>
-        <button type="button">🎙<span>语音</span></button>
-        <button type="button">📞<span>Live</span></button>
-        <button type="button">👥<span>群聊</span></button>
-      </div>
+          {typeof document !== 'undefined' && callSheetOpen ? createPortal(
+            <div className="portal-ai-modal-layer">
+              <button type="button" className="portal-ai-modal-scrim" aria-label="关闭通话选项" onClick={() => setCallSheetOpen(false)} />
+              <section className="portal-ai-call-sheet" role="dialog" aria-modal="true" aria-label="Live 通话">
+                <span className="portal-ai-sheet-handle" aria-hidden />
+                <h2>Live 通话</h2>
+                <button type="button" onClick={() => { setCallSheetOpen(false); setVideoCallOpen(true); }}>
+                  <span aria-hidden>📹</span>
+                  <p>
+                    <b>视频通话</b>
+                    <small>和智友面对面，实时回应</small>
+                  </p>
+                  <i aria-hidden>›</i>
+                </button>
+                <button type="button" onClick={() => setCallSheetOpen(false)}>
+                  <span aria-hidden>🎙</span>
+                  <p>
+                    <b>音频通话</b>
+                    <small>语音实时对话，解放双手</small>
+                  </p>
+                  <i aria-hidden>›</i>
+                </button>
+              </section>
+            </div>,
+            document.body,
+          ) : null}
+
+          {typeof document !== 'undefined' && videoCallOpen ? createPortal(
+            <div className="portal-ai-modal-layer portal-ai-modal-layer--call">
+              <section className="portal-ai-video-call" role="dialog" aria-modal="true" aria-label="AI 虚拟形象视频通话">
+                <div className="portal-ai-video-avatar" aria-hidden>✦</div>
+                <p>正在连接智友虚拟形象</p>
+                <small>Mock Live · 后续接入实时语音/视频模型</small>
+                <button type="button" onClick={() => setVideoCallOpen(false)}>结束</button>
+              </section>
+            </div>,
+            document.body,
+          ) : null}
+        </>
+      )}
     </section>
   );
 }

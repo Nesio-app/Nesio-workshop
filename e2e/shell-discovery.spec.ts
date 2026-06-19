@@ -131,7 +131,7 @@ test('V14 first launch onboarding saves local name and coach style', async ({ pa
   expect(stored).toEqual({ done: '1', name: 'Jing', style: 'warm' });
 });
 
-test('V14 bottom nav opens AI Friends as gated stable hub preview', async ({ page }) => {
+test('V14 bottom nav opens AI Friends as unified chat workspace', async ({ page }) => {
   await page.goto('/');
   await markOnboardingDone(page);
 
@@ -144,13 +144,36 @@ test('V14 bottom nav opens AI Friends as gated stable hub preview', async ({ pag
   const aiPage = page.getByRole('region', { name: '智友' });
   await expect(aiPage).toBeVisible();
   await expect(aiPage.getByRole('heading', { name: '智友' })).toBeVisible();
-  for (const text of ['产品脑暴群', 'ChatGPT', 'Claude', 'Gemini', '豆包']) {
-    await expect(aiPage.locator('.portal-ai-conversation-title').filter({ hasText: text }).first()).toBeVisible();
+  await expect(aiPage.getByText(/一个输入框，后台自动调度 AI 与工具/)).toBeVisible();
+  await expect(aiPage.getByText(/已综合 Claude · ChatGPT 的回答/)).toBeVisible();
+
+  const composer = aiPage.getByLabel('智友集合输入框');
+  await expect(composer).toBeVisible();
+  await composer.fill('@');
+  const mentionMenu = page.getByRole('listbox', { name: '@ 调度候选' });
+  await expect(mentionMenu).toBeVisible();
+  for (const text of ['@Claude', '@ChatGPT', '@Gemini', '@Flomo', '@物品库']) {
+    await expect(mentionMenu.getByRole('option', { name: new RegExp(text) })).toBeVisible();
   }
-  await aiPage.getByRole('button', { name: /^ChatGPT / }).click();
-  await expect(page.getByLabel('当前对话').getByText('ChatGPT')).toBeVisible();
-  await expect(page.getByLabel('当前对话').getByPlaceholder(/发消息/)).toBeVisible();
-  await expect(aiPage.getByLabel('智友能力').getByRole('button', { name: /Live/ })).toBeVisible();
+  await mentionMenu.getByRole('option', { name: /@Claude/ }).click();
+  await expect(composer).toHaveValue(/@Claude/);
+
+  await aiPage.getByRole('button', { name: '搜索' }).click();
+  const searchPanel = page.getByRole('region', { name: '智友搜索' });
+  await expect(searchPanel).toBeVisible();
+  await expect(searchPanel.getByPlaceholder(/搜索对话、笔记、AI 建议/)).toBeVisible();
+  await expect(searchPanel.getByRole('button', { name: /AI 建议/ })).toBeVisible();
+  await expect(searchPanel.getByText('最近对话')).toBeVisible();
+  await searchPanel.getByRole('button', { name: '返回智友' }).click();
+
+  await aiPage.getByRole('button', { name: '通话' }).click();
+  const callSheet = page.getByRole('dialog', { name: 'Live 通话' });
+  await expect(callSheet).toBeVisible();
+  await expect(callSheet.getByRole('button', { name: /视频通话/ })).toBeVisible();
+  await expect(callSheet.getByRole('button', { name: /音频通话/ })).toBeVisible();
+  await expect(callSheet.getByText('虚拟形象')).toHaveCount(0);
+  await callSheet.getByRole('button', { name: /视频通话/ }).click();
+  await expect(page.getByRole('dialog', { name: 'AI 虚拟形象视频通话' })).toBeVisible();
   await expect(page).not.toHaveURL(/\/secretary/);
 });
 

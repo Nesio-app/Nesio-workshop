@@ -5888,3 +5888,537 @@ html[data-portal-theme="night"] .portal-theme-seg-btn.is-on{
 .portal-quote-treasure-box::before{
   display:none !important;
 }
+
+/* V14 AI Friends unified workspace */
+.portal-ai-preview--screen {
+  position: relative;
+  min-height: calc(100dvh - 5.6rem);
+  padding: 1.55rem 1rem 9.2rem;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 18%, rgba(255,255,255,.55), transparent 32%),
+    linear-gradient(180deg, rgba(239,244,255,.96), rgba(122,185,247,.9));
+}
+
+.portal-ai-workspace-head,
+.portal-ai-search-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: .75rem;
+  margin-bottom: .85rem;
+}
+
+.portal-ai-search-head {
+  grid-template-columns: 2.9rem minmax(0, 1fr) 2.9rem;
+}
+
+.portal-ai-workspace-head h1,
+.portal-ai-search-head h1 {
+  margin: 0;
+  color: #0b1531;
+  font-size: 1.32rem;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.portal-ai-workspace-head > div {
+  display: flex;
+  gap: .55rem;
+}
+
+.portal-ai-intelligence-pill {
+  margin: 0 0 .85rem;
+  padding: .7rem .9rem;
+  border-radius: .85rem;
+  background: rgba(255,255,255,.36);
+  color: #4a6cf7;
+  font-size: .78rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.portal-ai-thread {
+  display: grid;
+  gap: .75rem;
+  max-height: calc(100dvh - 18.2rem);
+  overflow-y: auto;
+  padding: .15rem 0 1rem;
+}
+
+.portal-ai-thread-note {
+  margin: -.2rem 0 0;
+  color: #92a0bf;
+  text-align: center;
+  font-size: .76rem;
+  font-weight: 750;
+}
+
+.portal-ai-message-row {
+  display: grid;
+  grid-template-columns: 2.45rem minmax(0, 1fr);
+  gap: .6rem;
+  align-items: start;
+}
+
+.portal-ai-bot-avatar,
+.portal-ai-active-avatar {
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  color: #fff;
+  font-weight: 900;
+  background: linear-gradient(135deg, #5867f5, #7d54ee);
+}
+
+.portal-ai-bot-avatar {
+  width: 2.45rem;
+  height: 2.45rem;
+  margin-top: .12rem;
+}
+
+.portal-ai-bot-avatar--flomo {
+  background: #f07e2d;
+}
+
+.portal-ai-bot-avatar--gemini {
+  background: linear-gradient(135deg, #4a75ff, #ff7a18);
+}
+
+.portal-ai-message {
+  max-width: 82%;
+  margin: 0;
+  padding: .74rem .9rem;
+  border-radius: 1.05rem;
+  color: #0b1531;
+  background: rgba(255,255,255,.92);
+  font-size: .85rem;
+  font-weight: 720;
+  line-height: 1.55;
+  box-shadow: 0 1px 1px rgba(45,62,110,.04), 0 10px 26px rgba(74,108,247,.08);
+}
+
+.portal-ai-message b {
+  color: #4a6cf7;
+}
+
+.portal-ai-message--user {
+  justify-self: end;
+  background: #4f6cff;
+  color: #fff;
+  box-shadow: none;
+}
+
+.portal-ai-message--assistant {
+  max-width: 100%;
+}
+
+.portal-ai-message--compact b {
+  color: #35bf7e;
+}
+
+.portal-ai-composer {
+  position: fixed;
+  left: max(.65rem, env(safe-area-inset-left));
+  right: max(.65rem, env(safe-area-inset-right));
+  bottom: calc(4.95rem + env(safe-area-inset-bottom));
+  z-index: 220;
+  display: grid;
+  gap: .45rem;
+  padding-top: .45rem;
+  border-top: 1px solid rgba(74,108,247,.1);
+  background: linear-gradient(180deg, rgba(239,244,255,.1), rgba(239,244,255,.96) 24%, rgba(239,244,255,.98));
+}
+
+.portal-ai-capability-rail {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: .5rem;
+}
+
+.portal-ai-capability-rail button,
+.portal-ai-search-grid button {
+  min-height: 3.55rem;
+  border: 1px solid #dce5f9;
+  border-radius: .8rem;
+  background: rgba(255,255,255,.94);
+  color: #53628d;
+  font: inherit;
+  font-weight: 780;
+  cursor: pointer;
+}
+
+.portal-ai-capability-rail button {
+  display: grid;
+  place-items: center;
+  gap: .18rem;
+  font-size: 1.1rem;
+}
+
+.portal-ai-capability-rail span {
+  font-size: .58rem;
+}
+
+.portal-ai-composer > p {
+  margin: 0;
+  color: #9aa6c3;
+  text-align: center;
+  font-size: .62rem;
+  font-weight: 760;
+}
+
+.portal-ai-composer-row {
+  display: grid;
+  grid-template-columns: 2.8rem 2.8rem minmax(0, 1fr) 2.8rem 3.45rem;
+  align-items: center;
+  gap: .5rem;
+}
+
+.portal-ai-composer-row input {
+  width: 100%;
+  min-height: 2.7rem;
+  border: 1px solid #dce5f9;
+  border-radius: 999px;
+  background: rgba(255,255,255,.96);
+  color: #0b1531;
+  padding: 0 .9rem;
+  font: inherit;
+  font-size: .8rem;
+  font-weight: 720;
+  outline: none;
+}
+
+.portal-ai-round-action,
+.portal-ai-call-button {
+  min-width: 2.7rem;
+  min-height: 2.7rem;
+  border: 1px solid #dce5f9;
+  border-radius: 999px;
+  background: rgba(255,255,255,.96);
+  color: #4a6cf7;
+  font: inherit;
+  font-size: 1.25rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.portal-ai-call-button {
+  display: grid;
+  place-items: center;
+  gap: 0;
+  border-color: transparent;
+  background: #5a5ff6;
+  color: #fff;
+  font-size: 1rem;
+}
+
+.portal-ai-call-button span {
+  font-size: .55rem;
+  font-weight: 850;
+}
+
+.portal-ai-mention-menu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + .55rem);
+  overflow: hidden;
+  border: 1px solid #dce5f9;
+  border-radius: 1rem;
+  background: rgba(255,255,255,.98);
+  box-shadow: 0 18px 42px rgba(45,62,110,.16);
+}
+
+.portal-ai-mention-menu button {
+  width: 100%;
+  min-height: 3.05rem;
+  display: grid;
+  grid-template-columns: 5.2rem minmax(0, 1fr);
+  gap: .55rem;
+  align-items: center;
+  border: 0;
+  border-bottom: 1px solid rgba(15,23,51,.06);
+  background: transparent;
+  color: #53628d;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.portal-ai-mention-menu b {
+  color: #4a6cf7;
+  font-weight: 900;
+}
+
+.portal-ai-mention-menu span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: .72rem;
+  font-weight: 720;
+}
+
+.portal-ai-search-surface {
+  display: grid;
+  gap: .75rem;
+}
+
+.portal-ai-search-input {
+  min-height: 3.35rem;
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  padding: 0 .85rem;
+  border: 1px solid #dce5f9;
+  border-radius: .85rem;
+  background: rgba(255,255,255,.95);
+  color: #95a0bb;
+}
+
+.portal-ai-search-input input {
+  width: 100%;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  font-size: .86rem;
+  font-weight: 760;
+}
+
+.portal-ai-search-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  overflow: hidden;
+  border: 1px solid #dce5f9;
+  border-radius: .9rem;
+  background: rgba(255,255,255,.9);
+}
+
+.portal-ai-search-grid button {
+  border: 0;
+  border-right: 1px solid #dce5f9;
+  border-bottom: 1px solid #dce5f9;
+  border-radius: 0;
+  background: transparent;
+}
+
+.portal-ai-search-grid button:nth-child(3n) {
+  border-right: 0;
+}
+
+.portal-ai-search-grid span,
+.portal-ai-search-grid b {
+  display: block;
+}
+
+.portal-ai-search-grid b {
+  margin-top: .35rem;
+  font-size: .74rem;
+}
+
+.portal-ai-recent h2 {
+  margin: .35rem 0 .6rem;
+  color: #9aa6c3;
+  font-size: .72rem;
+  font-weight: 820;
+}
+
+.portal-ai-recent-row {
+  width: 100%;
+  min-height: 4.65rem;
+  display: grid;
+  grid-template-columns: 3.45rem minmax(0, 1fr) 2.2rem;
+  gap: .72rem;
+  align-items: center;
+  border: 0;
+  background: transparent;
+  color: #0b1531;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.portal-ai-recent-row span:not(.portal-ai-conversation-avatar),
+.portal-ai-recent-row b,
+.portal-ai-recent-row em {
+  min-width: 0;
+  display: block;
+}
+
+.portal-ai-recent-row b {
+  font-size: .92rem;
+  font-weight: 900;
+}
+
+.portal-ai-recent-row b small {
+  margin-left: .35rem;
+  color: #4a6cf7;
+  font-size: .58rem;
+}
+
+.portal-ai-recent-row em {
+  margin-top: .2rem;
+  overflow: hidden;
+  color: #53628d;
+  font-size: .76rem;
+  font-style: normal;
+  font-weight: 720;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.portal-ai-recent-row i {
+  color: #9aa6c3;
+  font-size: .68rem;
+  font-style: normal;
+  font-weight: 760;
+}
+
+.portal-ai-recent-row strong {
+  grid-column: 3;
+  justify-self: end;
+  width: 1.15rem;
+  height: 1.15rem;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: #e05252;
+  color: #fff;
+  font-size: .62rem;
+}
+
+.portal-ai-modal-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 310;
+  display: grid;
+  align-items: end;
+}
+
+.portal-ai-modal-scrim {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(7,12,30,.45);
+}
+
+.portal-ai-call-sheet {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: .5rem;
+  padding: 1.3rem 1.35rem calc(1.2rem + env(safe-area-inset-bottom));
+  border-radius: 1.65rem 1.65rem 0 0;
+  background: rgba(255,255,255,.98);
+  color: #0b1531;
+}
+
+.portal-ai-sheet-handle {
+  width: 2.4rem;
+  height: .26rem;
+  justify-self: center;
+  border-radius: 999px;
+  background: #dce5f9;
+}
+
+.portal-ai-call-sheet h2 {
+  margin: .55rem 0 .6rem;
+  font-size: 1rem;
+  font-weight: 900;
+}
+
+.portal-ai-call-sheet button {
+  min-height: 4.4rem;
+  display: grid;
+  grid-template-columns: 3rem minmax(0, 1fr) auto;
+  gap: .85rem;
+  align-items: center;
+  border: 0;
+  border-bottom: 1px solid rgba(15,23,51,.07);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.portal-ai-call-sheet button span {
+  width: 2.65rem;
+  height: 2.65rem;
+  display: grid;
+  place-items: center;
+  border-radius: .8rem;
+  background: #eef2ff;
+}
+
+.portal-ai-call-sheet b,
+.portal-ai-call-sheet small {
+  display: block;
+}
+
+.portal-ai-call-sheet p {
+  min-width: 0;
+  margin: 0;
+}
+
+.portal-ai-call-sheet b {
+  font-weight: 900;
+}
+
+.portal-ai-call-sheet small,
+.portal-ai-call-sheet i {
+  color: #9aa6c3;
+  font-style: normal;
+  font-weight: 720;
+}
+
+.portal-ai-modal-layer--call {
+  place-items: center;
+  background: radial-gradient(circle at 50% 28%, rgba(90,95,246,.5), rgba(7,12,30,.92));
+}
+
+.portal-ai-video-call {
+  width: min(18rem, calc(100vw - 2rem));
+  display: grid;
+  justify-items: center;
+  gap: .6rem;
+  padding: 1.5rem;
+  border-radius: 1.4rem;
+  background: rgba(255,255,255,.12);
+  color: #fff;
+  text-align: center;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.22), 0 24px 80px rgba(0,0,0,.36);
+}
+
+.portal-ai-video-avatar {
+  width: 6.6rem;
+  height: 6.6rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #5867f5, #f39a2e);
+  font-size: 2.8rem;
+  box-shadow: 0 0 0 1rem rgba(255,255,255,.08);
+}
+
+.portal-ai-video-call p,
+.portal-ai-video-call small {
+  margin: 0;
+}
+
+.portal-ai-video-call p {
+  font-weight: 900;
+}
+
+.portal-ai-video-call button {
+  min-width: 6rem;
+  min-height: 2.55rem;
+  margin-top: .35rem;
+  border: 0;
+  border-radius: 999px;
+  background: #ff4f5f;
+  color: #fff;
+  font: inherit;
+  font-weight: 850;
+}
