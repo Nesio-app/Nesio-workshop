@@ -105,6 +105,21 @@ test('V14 warm coach home exposes one primary next action and inventory pack', a
   await expect(page).toHaveURL(/\/adhd-flow\/?/);
 });
 
+test('V14 home polish hides day badge and gates health dashboard from energy card', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => localStorage.setItem('treasurebox-onboarding-v14-done', '1'));
+  await page.reload();
+
+  await expect(page.getByText(/第 34 天/)).toHaveCount(0);
+  await expect(page.locator('.portal-v13-count-left strong')).toHaveCSS('color', 'rgb(74, 108, 247)');
+  await expect(page.locator('.portal-quote')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+
+  await page.getByRole('button', { name: /今日能量/ }).click();
+  const gate = page.getByRole('dialog', { name: '健康工具未购买' });
+  await expect(gate).toBeVisible();
+  await expect(gate.getByRole('button', { name: '去工具箱购买' })).toBeVisible();
+});
+
 test('V14 first launch onboarding saves local name and coach style', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => {
@@ -272,8 +287,15 @@ test('dashboard V14 header stays compact and hides legacy widgets', async ({ pag
 
 test('daily quote settings can choose positive categories and frequency', async ({ page }) => {
   await page.goto('/');
+  await page.evaluate(() => sessionStorage.clear());
   await markOnboardingDone(page);
-  await page.locator('.portal-quote').click({ force: true });
+  if (await page.locator('.portal-ai-preview').isVisible()) {
+    await page.getByRole('navigation', { name: /宝盒导航/ }).getByRole('button', { name: '首页' }).click({ force: true });
+  }
+  const quote = page.locator('.portal-quote');
+  await expect(quote).toBeVisible();
+  await quote.scrollIntoViewIfNeeded();
+  await quote.evaluate((element) => (element as HTMLButtonElement).click());
   await expect(page.getByRole('dialog', { name: /金句设置/ })).toBeVisible();
 
   await page.getByRole('button', { name: '每天' }).click();
@@ -287,7 +309,7 @@ test('daily quote settings can choose positive categories and frequency', async 
 
 test('settings keeps software controls lean and does not expose calendar link card', async ({ page }) => {
   await page.goto('/settings');
-  await page.getByLabel('进入软件设置').click();
+  await page.getByRole('button', { name: '软件设置' }).click();
   await expect(page.locator('#settings-calendar-url')).toHaveCount(0);
   await expect(page.getByLabel('语言')).toBeVisible();
 
@@ -297,9 +319,9 @@ test('settings keeps software controls lean and does not expose calendar link ca
 
 test('settings exposes V14 connections and safety boundary', async ({ page }) => {
   await page.goto('/settings');
-  await expect(page.getByRole('heading', { name: '个人数据' })).toBeVisible();
   await expect(page.getByText('宝盒学到的')).toBeVisible();
-  await page.getByLabel('进入软件设置').click();
+  await expect(page.getByLabel('进入个人主页')).toBeVisible();
+  await page.getByRole('button', { name: '软件设置' }).click();
   await expect(page.getByRole('heading', { name: '软件设置' })).toBeVisible();
   const safety = page.getByRole('region', { name: '连接与安全' });
   await expect(safety).toBeVisible();

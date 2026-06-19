@@ -94,11 +94,10 @@ test('capture V14 mobile runtime screenshots', async ({ page }) => {
   await capture('06-tool-packs-discovery', 'Toolbox screen with V14 data cards, personalized recommendation, addable tools, and packs.');
 
   await page.goto('/settings');
-  await expect(page.getByRole('heading', { name: '个人数据' })).toBeVisible();
   await expect(page.getByText('宝盒学到的')).toBeVisible();
   await expect(page.getByText('个性化偏好')).toBeVisible();
   await capture('08-me-personal-data', 'Profile analysis and learned memories without app settings mixed in.');
-  await page.getByLabel('进入软件设置').click();
+  await page.getByRole('button', { name: '软件设置' }).click();
   await expect(page.getByRole('heading', { name: '软件设置' })).toBeVisible();
   await expect(page.getByRole('region', { name: '连接与安全' })).toBeVisible();
   await capture('09-software-settings', 'Software settings page with connections and safety boundary.');

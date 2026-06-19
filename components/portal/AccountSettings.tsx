@@ -111,18 +111,14 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
 
   return (
     <div className="portal-settings">
-      <header className="portal-settings-head">
-        {showAppSettings ? (
+      {showAppSettings ? (
+        <header className="portal-settings-head">
           <button type="button" className="portal-settings-back portal-settings-back--button" onClick={() => setShowAppSettings(false)}>
             ‹ 个人数据
           </button>
-        ) : (
-          <Link href="/" className="portal-settings-back">
-            ‹ {t(locale, 'settingsBack')}
-          </Link>
-        )}
-        <h1 className="portal-settings-title">{showAppSettings ? '软件设置' : '个人数据'}</h1>
-      </header>
+          <h1 className="portal-settings-title">软件设置</h1>
+        </header>
+      ) : null}
 
       <section className="portal-personal-profile-card">
         <div className="portal-personal-profile-main">
@@ -139,9 +135,9 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
             <b>{displayName}</b>
             <small>已使用第 {personalization.daysSinceStart} 天</small>
           </span>
-          <button type="button" className="portal-personal-settings-arrow" onClick={() => setShowAppSettings(true)} aria-label="进入软件设置">
-            ›
-          </button>
+          <Link href="/portfolio" className="portal-personal-settings-arrow" aria-label="进入个人主页">
+            主页
+          </Link>
         </div>
         <input
           ref={fileRef}
@@ -155,6 +151,12 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
           }}
         />
       </section>
+
+      {!showAppSettings ? (
+        <button type="button" className="portal-personal-software-settings" onClick={() => setShowAppSettings(true)}>
+          软件设置
+        </button>
+      ) : null}
 
       {!showAppSettings ? (
         <>

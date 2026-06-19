@@ -246,6 +246,7 @@ export default function DashboardHome({
   const [scheduleSheetOpen, setScheduleSheetOpen] = useState(false);
   const [reminderDetail, setReminderDetail] = useState<'task' | 'meeting' | null>(null);
   const [meetingRecording, setMeetingRecording] = useState(false);
+  const [healthGateOpen, setHealthGateOpen] = useState(false);
   const popupTools = toolboxTools ?? shellTools ?? config.tools;
   const quotePicked = useRef(false);
   const [quotePreferences, setQuotePreferences] = useState<QuotePreferences>(DEFAULT_QUOTE_PREFERENCES);
@@ -569,17 +570,6 @@ export default function DashboardHome({
         </div>
       </header>
 
-      <button
-        type="button"
-        className="portal-quote portal-quote--button"
-        aria-label={`${t(locale, 'dashboardQuoteLabel')}，点击设置`}
-        onClick={() => setQuoteSettingsOpen(true)}
-      >
-        <p className="portal-quote-text">{quoteLine}</p>
-      </button>
-      {personalization.dayBadge ? (
-        <p className="portal-v14-day-badge">{personalization.dayBadge}</p>
-      ) : null}
       {quoteSettingsOpen ? (
         <div className="portal-quote-settings" role="dialog" aria-modal="true" aria-label="金句设置">
           <div className="portal-quote-settings-sheet">
@@ -658,14 +648,21 @@ export default function DashboardHome({
             <h2>妈妈生日</h2>
           </div>
           <div className="portal-v13-count-right">
-            <p>今日能量</p>
-            <div className="portal-v13-energy-bars" aria-hidden>
-              <span />
-              <span />
-              <span />
-              <span className="is-empty" />
-            </div>
-            <span>昨晚睡得好，身体在慢慢回升</span>
+            <button
+              type="button"
+              className="portal-v13-energy-button"
+              aria-label="今日能量，打开健康工具"
+              onClick={() => setHealthGateOpen(true)}
+            >
+              <p>今日能量</p>
+              <div className="portal-v13-energy-bars" aria-hidden>
+                <span />
+                <span />
+                <span />
+                <span className="is-empty" />
+              </div>
+              <span>昨晚睡得好，身体在慢慢回升</span>
+            </button>
             <button
               type="button"
               className="portal-v14-mood-trigger"
@@ -769,6 +766,16 @@ export default function DashboardHome({
             </button>
           </div>
         </article>
+
+        <button
+          type="button"
+          className="portal-quote portal-quote--button"
+          aria-label={`${t(locale, 'dashboardQuoteLabel')}，点击设置`}
+          onClick={() => setQuoteSettingsOpen(true)}
+          onPointerUp={() => setQuoteSettingsOpen(true)}
+        >
+          <p className="portal-quote-text">{quoteLine}</p>
+        </button>
       </section>
 
       {crushTaskOpen ? (
@@ -950,6 +957,34 @@ export default function DashboardHome({
               </>
             )}
             <button type="button" className="portal-reminder-close" onClick={() => setReminderDetail(null)}>关闭</button>
+          </section>
+        </div>
+      ) : null}
+
+      {healthGateOpen ? (
+        <div className="portal-reminder-sheet" role="presentation">
+          <button
+            type="button"
+            className="portal-reminder-backdrop"
+            aria-label="关闭健康工具提示"
+            onClick={() => setHealthGateOpen(false)}
+          />
+          <section className="portal-reminder-card portal-reminder-card--detail" role="dialog" aria-modal="true" aria-label="健康工具未购买">
+            <span className="portal-crush-sheet-handle" aria-hidden />
+            <p className="portal-v13-kicker">健康工具</p>
+            <h2>健康 Dashboard 尚未加入工作台</h2>
+            <p>今日能量可以先作为本地观察保留。要查看完整健康工具，请先到工具箱购买或加入。</p>
+            <button
+              type="button"
+              className="portal-reminder-primary"
+              onClick={() => {
+                setHealthGateOpen(false);
+                onTreasureOpenChange(true);
+              }}
+            >
+              去工具箱购买
+            </button>
+            <button type="button" className="portal-reminder-close" onClick={() => setHealthGateOpen(false)}>稍后</button>
           </section>
         </div>
       ) : null}

@@ -6694,6 +6694,148 @@ html[data-portal-theme="night"] .portal-theme-seg-btn.is-on{
   appearance: auto;
 }
 
+/* V14 feedback polish: unify surfaces and keep launch UI calm. */
+.portal-v13-coach {
+  gap: 0.72rem;
+}
+
+.portal-v13-remind-bar,
+.portal-v14-insight-card,
+.portal-v14-insight-feedback--standalone,
+.portal-v13-action-card,
+.portal-v13-inventory-card,
+.portal-v13-pack-card,
+.portal-personal-profile-card,
+.portal-personal-memory-list article,
+.portal-personal-preferences > div,
+.portal-settings-card {
+  background: linear-gradient(150deg, rgba(255,255,255,.72), rgba(255,255,255,.5)) !important;
+  border-color: rgba(255,255,255,.72) !important;
+  box-shadow: 0 16px 40px rgba(43,84,143,.12), inset 0 1px 1.5px rgba(255,255,255,.82) !important;
+}
+
+.portal-quote {
+  order: 99;
+  min-height: auto !important;
+  margin: 0.2rem 0 calc(6.35rem + env(safe-area-inset-bottom, 0px));
+  padding: 0.2rem 0.35rem !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  position: relative;
+  z-index: 4;
+}
+
+.portal-quote::before,
+.portal-quote::after {
+  display: none !important;
+}
+
+.portal-quote-text {
+  color: rgba(15,23,51,.78);
+  font-size: 0.88rem;
+}
+
+.portal-v13-remind-bar,
+.portal-v13-action-card--html {
+  border-left: 0 !important;
+}
+
+.portal-v13-remind-dot {
+  background: #4a6cf7;
+}
+
+.portal-v13-count-hero {
+  margin-top: -0.2rem;
+  padding-bottom: 0.45rem;
+  border-bottom: 0 !important;
+}
+
+.portal-v13-count-right {
+  border-left: 0 !important;
+  padding-left: 0.6rem;
+}
+
+.portal-v13-count-left strong {
+  color: #4a6cf7 !important;
+}
+
+.portal-v13-energy-button {
+  width: 100%;
+  display: grid;
+  gap: 0.36rem;
+  min-height: 4.1rem;
+  margin: 0;
+  border: 0 !important;
+  border-top: 0 !important;
+  border-radius: 0.95rem;
+  padding: 0.55rem 0.65rem !important;
+  background: rgba(255,255,255,.18) !important;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+}
+
+.portal-v13-energy-button p {
+  margin: 0;
+}
+
+.portal-v13-energy-button > span {
+  color: #5a6690;
+  font-size: 0.72rem;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+.portal-v13-count-right > .portal-v14-mood-trigger {
+  margin-top: 0.15rem;
+}
+
+.portal-v13-action-row button,
+.portal-crush-sheet-actions button,
+.portal-reminder-primary,
+.portal-reminder-close,
+.portal-v13-inventory-actions button,
+.portal-v14-insight-actions button {
+  border-radius: 1rem !important;
+}
+
+.portal-personal-learned {
+  border-top: 0 !important;
+  border-bottom: 0 !important;
+}
+
+.portal-personal-settings-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 3.4rem;
+  min-height: 2.35rem;
+  padding: 0 0.75rem;
+  border-radius: 999px;
+  background: rgba(255,255,255,.62);
+  color: #4a6cf7;
+  text-decoration: none;
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+.portal-personal-software-settings {
+  justify-self: end;
+  min-height: 2.35rem;
+  margin-top: -0.45rem;
+  border: 0;
+  border-radius: 999px;
+  padding: 0 0.85rem;
+  background: rgba(255,255,255,.48);
+  color: #5a6690;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 780;
+}
+
 .portal-purchased-tools {
   position: fixed;
   inset: 0;
