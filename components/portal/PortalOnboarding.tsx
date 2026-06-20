@@ -55,7 +55,7 @@ export default function PortalOnboarding() {
     <div className="portal-onboarding" role="dialog" aria-modal="true" aria-labelledby="portal-onboarding-title">
       <div className="portal-onboarding-card">
         <p className="portal-onboarding-kicker">Nesio V14</p>
-        <h1 id="portal-onboarding-title">欢迎来到宝盒</h1>
+        <h1 id="portal-onboarding-title">欢迎来到 Nesio</h1>
         {step === 'name' ? (
           <>
             <p className="portal-onboarding-copy">先告诉我怎么称呼你</p>

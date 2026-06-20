@@ -11,6 +11,10 @@ const portalConfig = JSON.parse(readFileSync(join(root, 'public', 'portal-config
 const i18n = readFileSync(join(root, 'lib', 'portal', 'i18n.ts'), 'utf8');
 const zhI18n = i18n.slice(i18n.indexOf('  zh: {'), i18n.indexOf('  en: {'));
 const onboarding = readFileSync(join(root, 'components', 'portal', 'PortalOnboarding.tsx'), 'utf8');
+const bottomNav = readFileSync(join(root, 'components', 'portal', 'PortalBottomNav.tsx'), 'utf8');
+const dashboardHome = readFileSync(join(root, 'components', 'portal', 'DashboardHome.tsx'), 'utf8');
+const toolsTreasureSheet = readFileSync(join(root, 'components', 'portal', 'ToolsTreasureSheet.tsx'), 'utf8');
+const personalizationInsights = readFileSync(join(root, 'lib', 'portal', 'personalization-insights.ts'), 'utf8');
 const storageSourceHome = readFileSync(join(root, 'storage-web', 'index.html'), 'utf8');
 const storageHome = readFileSync(join(root, 'public', 'storage', 'index.html'), 'utf8');
 const calendarRoute = readFileSync(join(root, 'app', 'api', 'portal', 'calendar', 'route.ts'), 'utf8');
@@ -54,6 +58,16 @@ assert.doesNotMatch(calendarRoute, /TreasureBox|Treasure Box|Nosio/, 'External-f
 assert.doesNotMatch(secretaryList, /宝盒工具|>宝盒<|Baohe|Treasure Box|TreasureBox|Nosio/, 'Public Secretary list chrome must use Nesio naming.');
 assert.doesNotMatch(secretaryListJs, /返回宝盒|Baohe|Treasure Box|TreasureBox|Nosio/, 'Public Secretary actions must use Nesio naming.');
 assert.doesNotMatch(secretaryApi, /treasurebox-nu\.vercel\.app|Nosio/, 'Secretary API public fallback must use the Nesio domain.');
+for (const [name, source] of [
+  ['PortalOnboarding', onboarding],
+  ['PortalBottomNav', bottomNav],
+  ['DashboardHome', dashboardHome],
+  ['ToolsTreasureSheet', toolsTreasureSheet],
+  ['personalization-insights', personalizationInsights],
+  ['public Secretary chat actions', secretaryListJs],
+]) {
+  assert.doesNotMatch(source, /宝盒/, `${name} public-facing copy must use Nesio instead of 宝盒.`);
+}
 assert.match(onboarding, /Nesio/, 'Public onboarding copy should mention Nesio.');
 assert.match(storageSourceHome, /Nesio Purchase Memory/, 'Inventory source first-launch kicker should mention Nesio.');
 assert.match(storageHome, /Nesio Purchase Memory/, 'Inventory first-launch kicker should mention Nesio.');

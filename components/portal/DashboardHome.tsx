@@ -181,7 +181,7 @@ type MoodOption = (typeof MOOD_OPTIONS)[number];
 const INSIGHT_FEEDBACK_COPY = [
   '收到，我会越来越懂你的节奏。',
   '记下来了，下一次提醒会更贴近你。',
-  '谢谢你校准我，宝盒会慢慢变聪明。',
+  '谢谢你校准我，Nesio 会慢慢变聪明。',
 ];
 
 export default function DashboardHome({
@@ -765,10 +765,10 @@ export default function DashboardHome({
         ) : null}
 
         {showPersonalizationInsight && !insightDismissed ? (
-          <section className="portal-v14-insight-card" aria-label="宝盒发现了一件关于你的事">
+          <section className="portal-v14-insight-card" aria-label="Nesio 发现了一件关于你的事">
             <div className="portal-v14-insight-head">
               <span aria-hidden>🔍</span>
-              <b>宝盒发现了一件关于你的事</b>
+              <b>Nesio 发现了一件关于你的事</b>
               <button type="button" onClick={() => setInsightDismissed(true)} aria-label="关闭洞察">×</button>
             </div>
             <p>{personalization.insightBody}</p>

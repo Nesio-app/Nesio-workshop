@@ -226,7 +226,7 @@ const attachHandlers = {
   favorite: () => {
     const favs = loadFavoriteQuotes();
     if (!favs.length) {
-      toast('暂无收藏，可在宝盒首页点 ☆ 收藏语录');
+      toast('暂无收藏，可在 Nesio 首页点 ☆ 收藏语录');
       return;
     }
     const pick = favs[0];

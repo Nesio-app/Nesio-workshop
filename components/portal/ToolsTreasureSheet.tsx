@@ -219,7 +219,7 @@ export default function ToolsTreasurePopup({
       kind: 'package',
       id,
       label,
-      message: `${label} 已选中。宝盒会优先围绕这组工具整理首页入口。`,
+      message: `${label} 已选中。Nesio 会优先围绕这组工具整理首页入口。`,
     });
   }
 
