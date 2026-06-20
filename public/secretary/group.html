@@ -32,6 +32,21 @@
   <input type="file" id="pickPhoto" accept="image/*" hidden>
   <input type="file" id="pickFile" hidden>
 
+  <div class="wx-voice-call" id="voiceCall" hidden>
+    <div class="wx-voice-call-panel">
+      <img class="wx-voice-call-avatar" id="voiceCallAvatar" src="" alt="" width="88" height="88">
+      <p class="wx-voice-call-name" id="voiceCallName">群聊</p>
+      <p class="wx-voice-call-status" id="voiceCallStatus">正在连接…</p>
+      <p class="wx-voice-call-transcript" id="voiceCallTranscript" aria-live="polite"></p>
+      <button type="button" class="wx-voice-call-orb" id="voiceCallOrb" data-state="connecting" aria-label="Live 对话光球">
+        <span class="wx-voice-call-orb-core" aria-hidden></span>
+        <span class="wx-voice-call-orb-ring wx-voice-call-orb-ring--a" aria-hidden></span>
+        <span class="wx-voice-call-orb-ring wx-voice-call-orb-ring--b" aria-hidden></span>
+      </button>
+      <button type="button" class="wx-voice-call-hangup" id="voiceCallHangup" aria-label="结束通话">结束</button>
+    </div>
+  </div>
+
   <div class="wx-sheet" id="attachSheet" hidden>
     <div class="wx-sheet-mask" id="attachMask"></div>
     <div class="wx-sheet-panel">
@@ -43,6 +58,7 @@
   <script src="/secretary/common.js" defer></script>
   <script src="/secretary/api.js" defer></script>
   <script src="/secretary/voice.js" defer></script>
+  <script src="/secretary/voice-call.js" defer></script>
   <script src="/secretary/attach.js" defer></script>
   <script src="/secretary/group.js" defer></script>
 </body>
