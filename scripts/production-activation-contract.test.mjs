@@ -52,6 +52,7 @@ const configuredEnv = {
   GEMINI_API_KEY: 'gemini',
   DOUBAO_API_KEY: 'doubao',
   ANTHROPIC_API_KEY: 'anthropic',
+  CALENDAR_PRIVATE_FEEDS_ENABLED: 'true',
   GOOGLE_CALENDAR_ICS_URL: 'https://calendar.example/secret.ics',
   FLOMO_WEBHOOK_URL: 'https://flomo.example/iwh/demo/',
   FLOMO_API_KEY: 'flomo',
@@ -78,6 +79,29 @@ assert.equal(aliasProviders.get('ai_gemini')?.configured, true, 'Gemini must hon
 assert.deepEqual(aliasProviders.get('ai_gemini')?.missingEnv, [], 'Gemini alias should satisfy missing env checks.');
 assert.equal(aliasProviders.get('ai_openai')?.configured, true, 'OpenAI must honor legacy OpenAI_KEY alias.');
 assert.deepEqual(aliasProviders.get('ai_openai')?.missingEnv, [], 'OpenAI alias should satisfy missing env checks.');
+
+const calendarUrlOnlyReport = buildProductionActivationContract({
+  env: {
+    GOOGLE_CALENDAR_ICAL_URL: 'https://calendar.example/private.ics',
+  },
+});
+const calendarUrlOnly = calendarUrlOnlyReport.providers.find((provider) => provider.id === 'google_calendar');
+assert.equal(calendarUrlOnly?.configured, false, 'Google Calendar activation must not pass without private feed gate.');
+assert.deepEqual(
+  calendarUrlOnly?.missingEnv,
+  ['CALENDAR_PRIVATE_FEEDS_ENABLED'],
+  'Google Calendar activation must surface the missing private feed gate.',
+);
+
+const calendarAliasReport = buildProductionActivationContract({
+  env: {
+    CALENDAR_PRIVATE_FEEDS_ENABLED: 'true',
+    GOOGLE_CALENDAR_ICS_URL: 'https://calendar.example/private.ics',
+  },
+});
+const calendarAlias = calendarAliasReport.providers.find((provider) => provider.id === 'google_calendar');
+assert.equal(calendarAlias?.configured, true, 'Google Calendar must honor ICS URL aliases when the private feed gate is enabled.');
+assert.deepEqual(calendarAlias?.missingEnv, [], 'Google Calendar alias should satisfy URL checks while keeping the gate required.');
 
 const flomoReadOnlyReport = buildProductionActivationContract({
   env: {

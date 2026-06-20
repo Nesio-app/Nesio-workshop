@@ -165,7 +165,7 @@ export function buildProductionRuntimeStatus(env: EnvMap = process.env) {
     googleCalendar: status(env, {
       id: 'google_calendar',
       label: 'Google Calendar',
-      requiredEnv: [],
+      requiredEnv: ['CALENDAR_PRIVATE_FEEDS_ENABLED'],
       alternateGroups: [['GOOGLE_CALENDAR_ICAL_URL', 'GOOGLE_CALENDAR_ICS_URL', 'GOOGLE_CALENDAR_ICAL_URLS']],
     }),
     flomo: status(env, {
