@@ -53,6 +53,7 @@ const configuredEnv = {
   DOUBAO_API_KEY: 'doubao',
   ANTHROPIC_API_KEY: 'anthropic',
   GOOGLE_CALENDAR_ICS_URL: 'https://calendar.example/secret.ics',
+  FLOMO_WEBHOOK_URL: 'https://flomo.example/iwh/demo/',
   FLOMO_API_KEY: 'flomo',
 };
 
@@ -77,5 +78,41 @@ assert.equal(aliasProviders.get('ai_gemini')?.configured, true, 'Gemini must hon
 assert.deepEqual(aliasProviders.get('ai_gemini')?.missingEnv, [], 'Gemini alias should satisfy missing env checks.');
 assert.equal(aliasProviders.get('ai_openai')?.configured, true, 'OpenAI must honor legacy OpenAI_KEY alias.');
 assert.deepEqual(aliasProviders.get('ai_openai')?.missingEnv, [], 'OpenAI alias should satisfy missing env checks.');
+
+const flomoReadOnlyReport = buildProductionActivationContract({
+  env: {
+    FLOMO_API_KEY: 'flomo-read-token',
+  },
+});
+const flomoReadOnly = flomoReadOnlyReport.providers.find((provider) => provider.id === 'flomo');
+assert.equal(flomoReadOnly?.configured, false, 'Flomo production activation must not pass with read token only.');
+assert.deepEqual(
+  flomoReadOnly?.missingEnv,
+  ['FLOMO_WEBHOOK_URL'],
+  'Flomo production activation must surface the missing send webhook URL.',
+);
+
+const flomoWriteOnlyReport = buildProductionActivationContract({
+  env: {
+    FLOMO_WEBHOOK_URL: 'https://flomo.example/iwh/demo/',
+  },
+});
+const flomoWriteOnly = flomoWriteOnlyReport.providers.find((provider) => provider.id === 'flomo');
+assert.equal(flomoWriteOnly?.configured, false, 'Flomo production activation must not pass with send webhook only.');
+assert.deepEqual(
+  flomoWriteOnly?.missingEnv,
+  ['FLOMO_API_KEY'],
+  'Flomo production activation must surface the missing read access token.',
+);
+
+const flomoAliasReport = buildProductionActivationContract({
+  env: {
+    FLOMO_API_URL: 'https://flomo.example/iwh/demo/',
+    FLOMO_API_KEY: 'flomo-read-token',
+  },
+});
+const flomoAlias = flomoAliasReport.providers.find((provider) => provider.id === 'flomo');
+assert.equal(flomoAlias?.configured, true, 'Flomo must honor FLOMO_API_URL as a send URL alias.');
+assert.deepEqual(flomoAlias?.missingEnv, [], 'Flomo alias should satisfy send URL checks while keeping read key required.');
 
 console.log('production activation contract tests passed');
