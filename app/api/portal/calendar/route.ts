@@ -50,7 +50,7 @@ async function fetchIcsEvents(url: string, fallbackLabel: string) {
   const res = await fetch(url, {
     headers: {
       'User-Agent':
-        'Mozilla/5.0 (compatible; TreasureBox/1.0; +https://treasurebox-nu.vercel.app)',
+        'Mozilla/5.0 (compatible; Nesio/1.0; +https://www.nesio.app)',
       Accept: 'text/calendar, text/plain, */*',
     },
     redirect: 'follow',

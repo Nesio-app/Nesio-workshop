@@ -8,6 +8,9 @@ const layout = readFileSync(join(root, 'app', 'layout.tsx'), 'utf8');
 const manifest = JSON.parse(readFileSync(join(root, 'public', 'manifest.json'), 'utf8'));
 const portalConfig = JSON.parse(readFileSync(join(root, 'public', 'portal-config.json'), 'utf8'));
 const i18n = readFileSync(join(root, 'lib', 'portal', 'i18n.ts'), 'utf8');
+const onboarding = readFileSync(join(root, 'components', 'portal', 'PortalOnboarding.tsx'), 'utf8');
+const storageHome = readFileSync(join(root, 'public', 'storage', 'index.html'), 'utf8');
+const calendarRoute = readFileSync(join(root, 'app', 'api', 'portal', 'calendar', 'route.ts'), 'utf8');
 
 assert.match(layout, /title:\s*'Nesio\b/, 'App metadata title must use the public product name Nesio.');
 assert.match(layout, /appleWebApp:[\s\S]*title:\s*'Nesio'/, 'Apple Web App title must use Nesio.');
@@ -23,5 +26,10 @@ assert.doesNotMatch(
   /宝盒|Treasure Box|TreasureBox/,
   'PWA manifest must not expose old product names.',
 );
+assert.doesNotMatch(onboarding, /Baohe|Treasure Box|TreasureBox|Nosio/, 'Public onboarding copy must use Nesio naming.');
+assert.doesNotMatch(storageHome, /Baohe|Treasure Box|TreasureBox|Nosio/, 'Public Inventory first-launch copy must use Nesio naming.');
+assert.doesNotMatch(calendarRoute, /TreasureBox|Treasure Box|Nosio/, 'External-facing calendar User-Agent must use Nesio naming.');
+assert.match(onboarding, /Nesio/, 'Public onboarding copy should mention Nesio.');
+assert.match(storageHome, /Nesio Purchase Memory/, 'Inventory first-launch kicker should mention Nesio.');
 
 console.log('Nesio public branding contract OK');
