@@ -546,12 +546,12 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
       {surface === 'search' ? (
         <section className="portal-ai-search-surface" aria-label="智友搜索">
           <header className="portal-ai-search-head">
-            <button type="button" className="portal-ai-screen-icon-btn" onClick={() => setSurface('chat')}>
+            <button type="button" className="portal-ai-screen-icon-btn" data-runtime-action="ai-return-from-search" onClick={() => setSurface('chat')}>
               <span aria-hidden>←</span>
               <span className="sr-only">返回智友</span>
             </button>
             <h1>搜索</h1>
-            <button type="button" className="portal-ai-screen-icon-btn" aria-label="新建对话" onClick={startNewThread}>
+            <button type="button" className="portal-ai-screen-icon-btn" aria-label="新建对话" data-runtime-action="ai-start-new-thread" onClick={startNewThread}>
               +
             </button>
           </header>
@@ -567,7 +567,12 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
           {searchToolsOpen ? (
             <div className="portal-ai-search-grid" aria-label="搜索分类">
               {searchShortcuts.map((shortcut) => (
-                <button key={shortcut.action} type="button" onClick={() => handleSearchShortcut(shortcut.action)}>
+                <button
+                  key={shortcut.action}
+                  type="button"
+                  data-runtime-action={`ai-search-shortcut-${shortcut.action}`}
+                  onClick={() => handleSearchShortcut(shortcut.action)}
+                >
                   <span aria-hidden>{shortcut.icon}</span>
                   <b>{t(locale, shortcut.labelKey)}</b>
                 </button>
@@ -582,6 +587,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
                 type="button"
                 className={`portal-ai-recent-row${activeConversationId === item.id ? ' portal-ai-recent-row--active' : ''}`}
                 aria-pressed={activeConversationId === item.id}
+                data-runtime-action={`ai-select-conversation-${item.id}`}
                 onClick={() => selectConversation(item)}
               >
                 <span className="portal-ai-conversation-avatar" aria-hidden>
@@ -609,6 +615,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
                 type="button"
                 className="portal-ai-screen-icon-btn"
                 aria-label="搜索"
+                data-runtime-action="ai-open-search"
                 onClick={() => setSurface('search')}
               >
                 ⌕
@@ -619,6 +626,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
                 aria-label="打开对话列表"
                 aria-expanded={conversationListOpen}
                 aria-controls="portal-ai-conversation-list"
+                data-runtime-action="ai-open-conversation-list"
                 onClick={openConversationList}
               >
                 💬
@@ -684,6 +692,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
                     className={activeCapability === capability.id ? 'is-active' : ''}
                     aria-pressed={activeCapability === capability.id}
                     aria-controls={capability.id === 'audio' ? 'portal-ai-audio-call' : capability.id === 'live' ? 'portal-ai-call-sheet' : undefined}
+                    data-runtime-action={`ai-capability-${capability.id}`}
                     onClick={() => handleCapabilityAction(capability.id)}
                   >
                     {capability.icon}
@@ -708,6 +717,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
                 aria-label="添加附件"
                 aria-expanded={attachmentTrayOpen}
                 aria-controls="portal-ai-capability-rail"
+                data-runtime-action="ai-open-attachment-tray"
                 onClick={openAttachmentTray}
               >
                 ＋
@@ -718,6 +728,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
                 aria-label="@ 调度"
                 aria-expanded={mentionOptions.length > 0}
                 aria-controls="portal-ai-mention-menu"
+                data-runtime-action="ai-open-mention-menu"
                 onClick={openMentionMenu}
               >
                 @
@@ -741,6 +752,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
                 aria-label="语音输入"
                 aria-expanded={audioCallOpen}
                 aria-controls="portal-ai-audio-call"
+                data-runtime-action="ai-open-audio-call"
                 onClick={openAudioCall}
               >
                 🎙
@@ -751,6 +763,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
                 aria-label="通话"
                 aria-expanded={callSheetOpen || videoCallOpen || audioCallOpen}
                 aria-controls="portal-ai-call-sheet"
+                data-runtime-action="ai-open-live-call"
                 onClick={openCallSheet}
               >
                 📞<span>通话</span>
@@ -785,6 +798,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
                     type="button"
                     role="option"
                     aria-selected="false"
+                    data-runtime-action={`ai-insert-mention-${target.key}`}
                     onClick={() => insertMention(target)}
                   >
                     {target.iconSrc ? (
@@ -810,6 +824,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
                     type="button"
                     className={`portal-ai-recent-row${activeConversationId === item.id ? ' portal-ai-recent-row--active' : ''}`}
                     aria-pressed={activeConversationId === item.id}
+                    data-runtime-action={`ai-select-conversation-${item.id}`}
                     onClick={() => selectConversation(item)}
                   >
                     <span className="portal-ai-conversation-avatar" aria-hidden>
