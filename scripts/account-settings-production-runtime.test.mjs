@@ -9,10 +9,14 @@ for (const marker of [
   'createAppApiClient',
   'fetchProductionRuntimeHealth',
   'fetchAuthSession',
+  'fetchCloudProfileSettings',
+  'saveCloudProfileSettings',
   'startAuth',
   'logoutAuth',
   'runtimeStatus',
   'authSession',
+  'cloudProfileStatus',
+  'syncCloudProfileSettings',
   'authFeedback',
   'authEmail',
   'authPhone',
@@ -32,6 +36,11 @@ assert.ok(source.includes('provider_not_configured'), 'AccountSettings must surf
 assert.ok(source.includes('window.location.assign'), 'OAuth auth start must be able to navigate to redirect URL');
 assert.ok(source.includes('authSession?.loggedIn'), 'AccountSettings must display real session login status');
 assert.ok(source.includes('onLogoutAuth'), 'AccountSettings must expose a logout action');
+assert.ok(source.includes('saveProfileSettings(nextProfile)'), 'AccountSettings must persist merged cloud profile settings locally');
+assert.ok(source.includes('await client.saveCloudProfileSettings'), 'AccountSettings must write profile edits to cloud profile settings');
+assert.ok(source.includes("setCloudProfileStatus('local_only')"), 'AccountSettings must fall back to local-only when cloud profile sync is unavailable');
+assert.ok(source.includes("setCloudProfileStatus('synced')"), 'AccountSettings must surface synced cloud profile state');
+assert.match(source, /catch[\s\S]*setCloudProfileStatus\('local_only'\)/, 'Cloud profile failures must not block local settings');
 assert.ok(source.includes('退出登录'), 'AccountSettings must render a logout button label');
 assert.match(source, /type="email"/, 'AccountSettings must provide an email input before starting email auth');
 assert.match(source, /type="tel"/, 'AccountSettings must provide a phone input before starting phone auth');

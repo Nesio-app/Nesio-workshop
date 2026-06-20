@@ -7,6 +7,7 @@ import {
   loadProfileSettings,
   readAvatarFile,
   saveProfileSettings,
+  type PortalCoachStyle,
   type PortalLocale,
 } from '@/lib/portal/profile';
 import {
@@ -16,6 +17,7 @@ import {
   createAppApiClient,
   type AuthSessionResponse,
   type AuthStartProvider,
+  type CloudProfileSettings,
   type ProductionProviderStatus,
   type ProductionRuntimeHealthResponse,
 } from '@/lib/portal/app-api-client';
@@ -43,6 +45,7 @@ const LANGUAGE_OPTIONS = [
 ] as const;
 
 type DisplayLanguage = (typeof LANGUAGE_OPTIONS)[number][0];
+type CloudProfileStatus = 'idle' | 'loading' | 'synced' | 'local_only' | 'not_signed_in' | 'error';
 
 const DISPLAY_LANGUAGE_KEY = 'treasurebox-display-language-v1';
 
@@ -182,6 +185,30 @@ function normalizeDisplayLanguage(value: string | null | undefined): DisplayLang
   return LANGUAGE_OPTIONS.some(([code]) => code === value) ? value as DisplayLanguage : 'zh';
 }
 
+function normalizeProfileLocale(value: string | null | undefined): PortalLocale {
+  return value === 'en' ? 'en' : 'zh';
+}
+
+function normalizeCoachStyle(value: string | null | undefined): PortalCoachStyle {
+  return value === 'minimal' || value === 'professional' ? value : 'warm';
+}
+
+function normalizeCloudProfileSettings(
+  settings: CloudProfileSettings | undefined,
+  fallbackName: string,
+) {
+  return {
+    displayName: typeof settings?.displayName === 'string' && settings.displayName.trim()
+      ? settings.displayName.trim()
+      : fallbackName,
+    avatarUrl: typeof settings?.avatarUrl === 'string' ? settings.avatarUrl : '',
+    locale: normalizeProfileLocale(settings?.locale),
+    coachStyle: normalizeCoachStyle(settings?.coachStyle),
+    displayLanguage: normalizeDisplayLanguage(settings?.displayLanguage || settings?.locale),
+    calendarUrl: typeof settings?.calendarUrl === 'string' ? settings.calendarUrl : '',
+  };
+}
+
 function initials(name: string): string {
   const t = name.trim();
   return t.slice(0, 1);
@@ -207,6 +234,7 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
   const [authFeedback, setAuthFeedback] = useState('');
   const [authEmail, setAuthEmail] = useState('');
   const [authPhone, setAuthPhone] = useState('');
+  const [cloudProfileStatus, setCloudProfileStatus] = useState<CloudProfileStatus>('idle');
   const [personalizationStage, setPersonalizationStage] = useState<BaohePersonalizationStage>('day_34');
   const [showAppSettings, setShowAppSettings] = useState(false);
   const personalization = getBaohePersonalizationProfile(personalizationStage);
@@ -255,9 +283,58 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
     };
   }, []);
 
+  useEffect(() => {
+    let alive = true;
+    const client = createAppApiClient();
+    setCloudProfileStatus('loading');
+    client
+      .fetchCloudProfileSettings()
+      .then((result) => {
+        if (!alive) return;
+        if (result.ok && result.settings) {
+          const next = normalizeCloudProfileSettings(result.settings, fallbackName);
+          const nextProfile = {
+            displayName: next.displayName,
+            avatarUrl: next.avatarUrl,
+            locale: next.locale,
+            coachStyle: next.coachStyle,
+          };
+          setDisplayName(next.displayName);
+          setAvatarUrl(next.avatarUrl);
+          setLocale(next.locale);
+          setDisplayLanguage(next.displayLanguage);
+          setCalendarUrl(next.calendarUrl);
+          saveProfileSettings(nextProfile);
+          localStorage.setItem(DISPLAY_LANGUAGE_KEY, next.displayLanguage);
+          document.documentElement.lang = next.displayLanguage;
+          setCloudProfileStatus('synced');
+          return;
+        }
+        setCloudProfileStatus(result.error === 'not_signed_in' ? 'not_signed_in' : 'local_only');
+      })
+      .catch(() => {
+        if (alive) setCloudProfileStatus('local_only');
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, [fallbackName]);
+
   const showToast = (key: PortalStringKey) => {
     setToast(t(locale, key));
     window.setTimeout(() => setToast(''), 1800);
+  };
+
+  const syncCloudProfileSettings = async (settings: CloudProfileSettings) => {
+    setCloudProfileStatus('loading');
+    try {
+      const client = createAppApiClient();
+      const result = await client.saveCloudProfileSettings(settings);
+      setCloudProfileStatus(result.ok ? 'synced' : result.error === 'not_signed_in' ? 'not_signed_in' : 'local_only');
+    } catch {
+      setCloudProfileStatus('local_only');
+    }
   };
 
   const onPickAvatar = async (file: File) => {
@@ -265,6 +342,13 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
       const dataUrl = await readAvatarFile(file);
       setAvatarUrl(dataUrl);
       saveProfileSettings({ avatarUrl: dataUrl });
+      void syncCloudProfileSettings({
+        displayName,
+        avatarUrl: dataUrl,
+        locale,
+        displayLanguage,
+        calendarUrl,
+      });
       showToast('settingsSaved');
     } catch { /* ignore */ }
   };
@@ -275,9 +359,24 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
     const profileLocale: PortalLocale = next === 'en' ? 'en' : 'zh';
     setLocale(profileLocale);
     saveProfileSettings({ locale: profileLocale });
+    void syncCloudProfileSettings({
+      displayName,
+      avatarUrl,
+      locale: profileLocale,
+      displayLanguage: next,
+      calendarUrl,
+    });
     document.documentElement.lang = next;
     showToast('settingsSaved');
   };
+
+  const cloudProfileStatusLabel = (() => {
+    if (cloudProfileStatus === 'synced') return '已同步';
+    if (cloudProfileStatus === 'loading') return '同步中';
+    if (cloudProfileStatus === 'not_signed_in') return '未登录';
+    if (cloudProfileStatus === 'error') return '同步失败';
+    return '本机保存';
+  })();
 
   const formatProviderStatus = (provider?: ProductionProviderStatus): string => {
     if (!provider) return runtimeLoading ? '检查中' : '未连接';
@@ -379,6 +478,13 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
       label: 'Cloud DB',
       status: formatProviderStatus(runtimeStatus?.cloud.database),
       detail: formatProviderDetail(runtimeStatus?.cloud.database),
+    },
+    {
+      label: 'Profile Settings',
+      status: cloudProfileStatusLabel,
+      detail: cloudProfileStatus === 'synced'
+        ? '头像、语言等个人设置已通过云端 profile settings 合约同步。'
+        : '头像、语言等个人设置会先保存在本机；登录和云端可用时再同步。',
     },
     {
       label: 'Google Calendar',
