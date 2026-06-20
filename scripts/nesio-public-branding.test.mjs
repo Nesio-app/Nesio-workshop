@@ -21,6 +21,9 @@ const calendarRoute = readFileSync(join(root, 'app', 'api', 'portal', 'calendar'
 const secretaryList = readFileSync(join(root, 'public', 'secretary', 'index.html'), 'utf8');
 const secretaryListJs = readFileSync(join(root, 'public', 'secretary', 'list.js'), 'utf8');
 const secretaryApi = readFileSync(join(root, 'public', 'secretary', 'api.js'), 'utf8');
+const moduleManagerCore = readFileSync(join(root, 'lib', 'portal', 'module-manager-core.mjs'), 'utf8');
+const moduleManagerTs = readFileSync(join(root, 'lib', 'portal', 'module-manager.ts'), 'utf8');
+const secretaryChatRoute = readFileSync(join(root, 'app', 'api', 'secretary', 'chat', 'route.ts'), 'utf8');
 
 assert.match(layout, /title:\s*'Nesio\b/, 'App metadata title must use the public product name Nesio.');
 assert.match(layout, /appleWebApp:[\s\S]*title:\s*'Nesio'/, 'Apple Web App title must use Nesio.');
@@ -58,6 +61,21 @@ assert.doesNotMatch(calendarRoute, /TreasureBox|Treasure Box|Nosio/, 'External-f
 assert.doesNotMatch(secretaryList, /宝盒工具|>宝盒<|Baohe|Treasure Box|TreasureBox|Nosio/, 'Public Secretary list chrome must use Nesio naming.');
 assert.doesNotMatch(secretaryListJs, /返回宝盒|Baohe|Treasure Box|TreasureBox|Nosio/, 'Public Secretary actions must use Nesio naming.');
 assert.doesNotMatch(secretaryApi, /treasurebox-nu\.vercel\.app|Nosio/, 'Secretary API public fallback must use the Nesio domain.');
+assert.doesNotMatch(
+  moduleManagerCore,
+  /firstScreenHint:\s*'宝盒|dialogTitlePattern:\s*'宝盒|appName:\s*'宝盒'/,
+  'Runtime/report shell contract labels must use Nesio, not 宝盒.',
+);
+assert.doesNotMatch(
+  moduleManagerTs,
+  /meta:\s*\{\s*title:\s*'宝盒'/,
+  'Portal module fallback shell metadata must use Nesio, not 宝盒.',
+);
+assert.doesNotMatch(
+  secretaryChatRoute,
+  /你是「宝盒」|在宝盒智友中的角色/,
+  'AI-facing Secretary system prompts must use Nesio naming.',
+);
 for (const [name, source] of [
   ['PortalOnboarding', onboarding],
   ['PortalBottomNav', bottomNav],

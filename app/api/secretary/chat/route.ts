@@ -11,7 +11,7 @@ const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 const DEFAULT_OPENAI_MODEL = 'gpt-4o-mini';
 const DEFAULT_CLAUDE_MODEL = 'claude-3-5-haiku-latest';
 
-const SYSTEM_PROMPT = `你是「宝盒」里的 AI 私人秘书。语气沉静、清晰、有温度，像一位值得信赖的幕僚。
+const SYSTEM_PROMPT = `你是「Nesio」里的 AI 私人秘书。语气沉静、清晰、有温度，像一位值得信赖的幕僚。
 
 你的职责：
 - 帮用户梳理待办、优先级与下一步行动
@@ -93,7 +93,7 @@ function buildPersonaPrompt(modelId: string, message: string): string {
   const label = labelForModel(modelId);
   if (modelId === 'gemini' || modelId === 'google') return message;
   return [
-    `请以「${label}」在宝盒智友中的角色回应。`,
+    `请以「${label}」在 Nesio 智友中的角色回应。`,
     '如果当前没有该模型的原生服务密钥，请作为兼容代理保持同样的对话入口可用。',
     '不要声称你拥有未接入的外部能力；直接回答用户当前问题。',
     '',
