@@ -7,6 +7,7 @@ import ts from 'typescript';
 
 const routePath = new URL('./route.ts', import.meta.url);
 const fixturePath = new URL('./__fixtures__/mock-private.ics', import.meta.url);
+let mockCalendarAccessCookie = '';
 
 function parseMockIcsEvents(text, limit, calendarName) {
   const summary = text.match(/^SUMMARY:(.+)$/m)?.[1]?.trim();
@@ -40,6 +41,8 @@ function loadRoute() {
     process,
     fetch: global.fetch,
     Date,
+    URL,
+    URLSearchParams,
     console,
     require(specifier) {
       if (specifier === 'next/server') {
@@ -48,6 +51,19 @@ function loadRoute() {
             json(body, init = {}) {
               return { body, init };
             },
+          },
+        };
+      }
+      if (specifier === 'next/headers') {
+        return {
+          cookies() {
+            return {
+              get(name) {
+                return name === 'nesio_google_calendar_access' && mockCalendarAccessCookie
+                  ? { value: mockCalendarAccessCookie }
+                  : undefined;
+              },
+            };
           },
         };
       }
@@ -137,12 +153,50 @@ async function testConfiguredFeedUsesMockOnlyWhenGateEnabled() {
   assert.equal(response.body.events[0].title, 'Sensitive Private Meeting');
 }
 
+async function testOauthCookieReadsGoogleCalendarApiWithoutIcsEnv() {
+  clearCalendarEnv();
+  mockCalendarAccessCookie = 'google-access-token';
+  const fetchedUrls = [];
+  global.fetch = async (url, init = {}) => {
+    fetchedUrls.push({ url: String(url), authorization: init.headers?.Authorization || init.headers?.authorization || '' });
+    return {
+      ok: true,
+      async json() {
+        return {
+          items: [
+            {
+              id: 'google-event-1',
+              summary: 'Google OAuth Event',
+              start: { dateTime: '2099-02-01T10:00:00-05:00' },
+              end: { dateTime: '2099-02-01T10:30:00-05:00' },
+              htmlLink: 'https://calendar.google.com/event?eid=1',
+            },
+          ],
+        };
+      },
+    };
+  };
+
+  const { GET } = loadRoute();
+  const response = await GET();
+
+  assert.equal(fetchedUrls.length, 1);
+  assert.match(fetchedUrls[0].url, /https:\/\/www\.googleapis\.com\/calendar\/v3\/calendars\/primary\/events/);
+  assert.equal(fetchedUrls[0].authorization, 'Bearer google-access-token');
+  assert.equal(response.body.ok, true);
+  assert.equal(response.body.provider, 'google_calendar_oauth');
+  assert.equal(response.body.events[0].title, 'Google OAuth Event');
+  assert.equal(response.body.events[0].source, 'Google Calendar');
+}
+
 const originalFetch = global.fetch;
 try {
   await testConfiguredFeedFailsClosedWithoutGate();
   await testConfiguredFeedUsesMockOnlyWhenGateEnabled();
+  await testOauthCookieReadsGoogleCalendarApiWithoutIcsEnv();
   console.log('calendar fail-closed route tests passed');
 } finally {
   global.fetch = originalFetch;
+  mockCalendarAccessCookie = '';
   clearCalendarEnv();
 }
