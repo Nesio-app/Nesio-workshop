@@ -5,9 +5,11 @@ import path from "node:path";
 const repoRoot = process.cwd();
 const globalsPath = path.join(repoRoot, "app", "globals.css");
 const packagePath = path.join(repoRoot, "package.json");
+const assetContractPath = path.join(repoRoot, "lib", "portal", "nesio-design-system-assets.mjs");
 
 const globals = fs.readFileSync(globalsPath, "utf8");
 const pkg = JSON.parse(fs.readFileSync(packagePath, "utf8"));
+const assetContract = fs.readFileSync(assetContractPath, "utf8");
 
 function includesToken(name, value) {
   assert.match(
@@ -87,5 +89,47 @@ assert.match(
   /test:nesio-design-system/,
   "Expected test:contracts to include test:nesio-design-system",
 );
+
+const requiredToolIcons = [
+  "storage",
+  "plan",
+  "reading",
+  "fitness",
+  "quiz",
+  "sanctuary",
+  "psych",
+  "health",
+  "finance",
+  "lifesim",
+  "secretary",
+];
+
+const requiredAiIcons = ["claude", "chatgpt", "gemini", "doubao", "deepseek", "grok"];
+
+assert.match(
+  assetContract,
+  /NESIO_DESIGN_SYSTEM_ASSET_VERSION\s*=\s*"nesio-design-system-v0"/,
+  "Expected a versioned Nesio design-system asset contract",
+);
+assert.match(assetContract, /nesioToolIcons/, "Expected a shared tool icon registry");
+assert.match(assetContract, /nesioAiIcons/, "Expected a shared AI icon registry");
+assert.match(assetContract, /nesioBrandAssets/, "Expected a shared brand asset registry");
+
+for (const icon of requiredToolIcons) {
+  const iconPath = path.join(repoRoot, "public", "icons", "tools", `${icon}.svg`);
+  assert.ok(fs.existsSync(iconPath), `Expected synced tool icon ${iconPath}`);
+  assert.match(assetContract, new RegExp(`${icon}\\s*:`), `Expected tool icon ${icon} in asset contract`);
+}
+
+for (const icon of requiredAiIcons) {
+  const iconPath = path.join(repoRoot, "public", "icons", "ai", `${icon}.svg`);
+  assert.ok(fs.existsSync(iconPath), `Expected synced AI icon ${iconPath}`);
+  assert.match(assetContract, new RegExp(`${icon}\\s*:`), `Expected AI icon ${icon} in asset contract`);
+}
+
+for (const icon of ["treasurebox.svg", "treasurebox-pwa-192.png", "treasurebox-pwa-512.png"]) {
+  const iconPath = path.join(repoRoot, "public", "icons", icon);
+  assert.ok(fs.existsSync(iconPath), `Expected synced brand asset ${iconPath}`);
+}
 
 console.log("Nesio design system integration contract OK");
