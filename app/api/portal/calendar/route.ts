@@ -7,6 +7,11 @@ import { parseIcsEvents, parseCalendarName } from '@/lib/portal/ics';
 
 type Feed = { url: string; label: string };
 type FeedResult = { label: string; ok: boolean; count: number; error?: string };
+type GoogleTokenResponse = {
+  access_token?: string;
+  refresh_token?: string;
+  expires_in?: number;
+};
 type GoogleCalendarItem = {
   id?: string;
   summary?: string;
@@ -15,6 +20,11 @@ type GoogleCalendarItem = {
   start?: { dateTime?: string; date?: string };
   end?: { dateTime?: string; date?: string };
 };
+
+function envValue(key: string): string {
+  const value = process.env[key];
+  return typeof value === 'string' ? value.trim() : '';
+}
 
 function privateFeedAccessEnabled(): boolean {
   return process.env.CALENDAR_PRIVATE_FEEDS_ENABLED === 'true';
@@ -81,6 +91,35 @@ function googleCalendarAccessToken(): string {
   return cookies().get('nesio_google_calendar_access')?.value || '';
 }
 
+function googleCalendarRefreshToken(): string {
+  return cookies().get('nesio_google_calendar_refresh')?.value || '';
+}
+
+function setCalendarCookies(response: NextResponse, session: GoogleTokenResponse | null) {
+  if (!session?.access_token) return response;
+
+  const secure = process.env.NODE_ENV === 'production';
+  const maxAge = Number.isFinite(session.expires_in) && session.expires_in ? session.expires_in : 60 * 60;
+  response.cookies.set('nesio_google_calendar_access', session.access_token, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure,
+    path: '/',
+    maxAge,
+  });
+  if (session.refresh_token) {
+    response.cookies.set('nesio_google_calendar_refresh', session.refresh_token, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure,
+      path: '/',
+      maxAge: 60 * 60 * 24 * 90,
+    });
+  }
+
+  return response;
+}
+
 function mapGoogleCalendarItem(item: GoogleCalendarItem) {
   const start = item.start?.dateTime || item.start?.date || '';
   const end = item.end?.dateTime || item.end?.date || start;
@@ -94,6 +133,27 @@ function mapGoogleCalendarItem(item: GoogleCalendarItem) {
     source: 'Google Calendar',
     url: item.htmlLink || '',
   };
+}
+
+async function refreshGoogleCalendarSession(refreshToken: string): Promise<GoogleTokenResponse | null> {
+  const clientId = envValue('GOOGLE_CLIENT_ID');
+  const clientSecret = envValue('GOOGLE_CLIENT_SECRET');
+  if (!clientId || !clientSecret || !refreshToken) return null;
+
+  const response = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: refreshToken,
+      grant_type: 'refresh_token',
+    }),
+    cache: 'no-store',
+  });
+
+  if (!response.ok) return null;
+  return response.json() as Promise<GoogleTokenResponse>;
 }
 
 async function fetchGoogleOAuthEvents(accessToken: string) {
@@ -122,6 +182,7 @@ async function fetchGoogleOAuthEvents(accessToken: string) {
 
 export async function GET() {
   const accessToken = googleCalendarAccessToken();
+  const refreshToken = googleCalendarRefreshToken();
   if (accessToken) {
     try {
       const events = await fetchGoogleOAuthEvents(accessToken);
@@ -139,6 +200,30 @@ export async function GET() {
         { headers: { 'Cache-Control': 'no-store, max-age=0' } },
       );
     } catch (err) {
+      const refreshedSession = await refreshGoogleCalendarSession(refreshToken);
+      if (refreshedSession?.access_token) {
+        try {
+          const events = await fetchGoogleOAuthEvents(refreshedSession.access_token);
+          const response = NextResponse.json(
+            {
+              ok: true,
+              configured: true,
+              enabled: true,
+              provider: 'google_calendar_oauth',
+              status: 'calendar_session_refreshed',
+              events,
+              feeds: [{ label: 'Google Calendar', ok: true, count: events.length }],
+              sources: ['Google Calendar'],
+              fetchedAt: new Date().toISOString(),
+            },
+            { headers: { 'Cache-Control': 'no-store, max-age=0' } },
+          );
+          return setCalendarCookies(response, refreshedSession);
+        } catch {
+          // Fall through to the original safe OAuth fetch error below.
+        }
+      }
+
       return NextResponse.json(
         {
           ok: false,

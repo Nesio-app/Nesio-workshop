@@ -8,6 +8,7 @@ import ts from 'typescript';
 const routePath = new URL('./route.ts', import.meta.url);
 const fixturePath = new URL('./__fixtures__/mock-private.ics', import.meta.url);
 let mockCalendarAccessCookie = '';
+let mockCalendarRefreshCookie = '';
 
 function parseMockIcsEvents(text, limit, calendarName) {
   const summary = text.match(/^SUMMARY:(.+)$/m)?.[1]?.trim();
@@ -49,7 +50,17 @@ function loadRoute() {
         return {
           NextResponse: {
             json(body, init = {}) {
-              return { body, init };
+              const response = {
+                body,
+                init,
+                cookiesSet: [],
+                cookies: {
+                  set(name, value, options = {}) {
+                    response.cookiesSet.push({ name, value, options });
+                  },
+                },
+              };
+              return response;
             },
           },
         };
@@ -59,9 +70,9 @@ function loadRoute() {
           cookies() {
             return {
               get(name) {
-                return name === 'nesio_google_calendar_access' && mockCalendarAccessCookie
-                  ? { value: mockCalendarAccessCookie }
-                  : undefined;
+                if (name === 'nesio_google_calendar_access' && mockCalendarAccessCookie) return { value: mockCalendarAccessCookie };
+                if (name === 'nesio_google_calendar_refresh' && mockCalendarRefreshCookie) return { value: mockCalendarRefreshCookie };
+                return undefined;
               },
             };
           },
@@ -189,14 +200,96 @@ async function testOauthCookieReadsGoogleCalendarApiWithoutIcsEnv() {
   assert.equal(response.body.events[0].source, 'Google Calendar');
 }
 
+async function testOauthRefreshCookieRecoversExpiredCalendarAccess() {
+  clearCalendarEnv();
+  mockCalendarAccessCookie = 'expired-google-access-token';
+  mockCalendarRefreshCookie = 'google-refresh-token';
+  process.env.GOOGLE_CLIENT_ID = 'google-client-id';
+  process.env.GOOGLE_CLIENT_SECRET = 'google-client-secret';
+  const fetchedUrls = [];
+  const authorizations = [];
+
+  global.fetch = async (url, init = {}) => {
+    const urlText = String(url);
+    fetchedUrls.push(urlText);
+    authorizations.push(init.headers?.Authorization || init.headers?.authorization || '');
+
+    if (urlText.includes('/calendar/v3/calendars/primary/events') && authorizations.at(-1) === 'Bearer expired-google-access-token') {
+      return {
+        ok: false,
+        status: 401,
+        async json() {
+          return {};
+        },
+      };
+    }
+
+    if (urlText === 'https://oauth2.googleapis.com/token') {
+      const body = init.body?.toString?.() || '';
+      assert.match(body, /grant_type=refresh_token/);
+      assert.match(body, /refresh_token=google-refresh-token/);
+      return {
+        ok: true,
+        async json() {
+          return {
+            access_token: 'fresh-google-access-token',
+            refresh_token: 'fresh-google-refresh-token',
+            expires_in: 3600,
+          };
+        },
+      };
+    }
+
+    if (urlText.includes('/calendar/v3/calendars/primary/events') && authorizations.at(-1) === 'Bearer fresh-google-access-token') {
+      return {
+        ok: true,
+        async json() {
+          return {
+            items: [
+              {
+                id: 'google-event-refreshed',
+                summary: 'Refreshed Google OAuth Event',
+                start: { dateTime: '2099-03-01T10:00:00-05:00' },
+                end: { dateTime: '2099-03-01T10:30:00-05:00' },
+              },
+            ],
+          };
+        },
+      };
+    }
+
+    throw new Error(`Unexpected fetch in refresh test: ${urlText}`);
+  };
+
+  const { GET } = loadRoute();
+  const response = await GET();
+
+  assert.equal(response.body.ok, true);
+  assert.equal(response.body.provider, 'google_calendar_oauth');
+  assert.equal(response.body.status, 'calendar_session_refreshed');
+  assert.equal(response.body.events[0].title, 'Refreshed Google OAuth Event');
+  assert.deepEqual(
+    fetchedUrls.map((url) => (url === 'https://oauth2.googleapis.com/token' ? url : new URL(url).origin + new URL(url).pathname)),
+    [
+      'https://www.googleapis.com/calendar/v3/calendars/primary/events',
+      'https://oauth2.googleapis.com/token',
+      'https://www.googleapis.com/calendar/v3/calendars/primary/events',
+    ],
+  );
+  assert.equal(response.cookiesSet.find((cookie) => cookie.name === 'nesio_google_calendar_access')?.value, 'fresh-google-access-token');
+  assert.equal(response.cookiesSet.find((cookie) => cookie.name === 'nesio_google_calendar_refresh')?.value, 'fresh-google-refresh-token');
+}
+
 const originalFetch = global.fetch;
 try {
   await testConfiguredFeedFailsClosedWithoutGate();
   await testConfiguredFeedUsesMockOnlyWhenGateEnabled();
   await testOauthCookieReadsGoogleCalendarApiWithoutIcsEnv();
+  await testOauthRefreshCookieRecoversExpiredCalendarAccess();
   console.log('calendar fail-closed route tests passed');
 } finally {
   global.fetch = originalFetch;
   mockCalendarAccessCookie = '';
+  mockCalendarRefreshCookie = '';
   clearCalendarEnv();
 }
