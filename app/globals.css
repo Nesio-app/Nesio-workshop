@@ -4632,7 +4632,7 @@ body {
 
 .portal-settings-safety-list li {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   gap: 0.65rem;
   align-items: start;
   min-height: 44px;
@@ -4672,6 +4672,24 @@ body {
 
 .portal-settings-safety-list .portal-settings-auth-actions {
   grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.portal-settings-provider-action {
+  min-width: 4.25rem;
+  min-height: 44px;
+  border: 1px solid rgba(74, 108, 247, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--portal-blue-deep);
+  font: inherit;
+  font-size: 0.62rem;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.portal-settings-provider-action:disabled {
+  border-color: rgba(129, 147, 184, 0.14);
+  color: rgba(96, 112, 145, 0.58);
 }
 
 .portal-settings-auth-buttons {

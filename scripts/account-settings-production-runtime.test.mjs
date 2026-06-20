@@ -12,6 +12,8 @@ for (const marker of [
   'providerActionsById',
   'formatProviderActionStatus',
   'formatProviderActionDetail',
+  'onOpenProviderAction',
+  'portal-settings-provider-action',
   'fetchAuthSession',
   'fetchCloudProfileSettings',
   'saveCloudProfileSettings',
@@ -42,6 +44,9 @@ for (const label of ['Gemini', 'Google Calendar', 'Cloud DB', 'Email', 'Google',
 
 assert.ok(source.includes('provider_not_configured'), 'AccountSettings must surface fail-closed auth errors');
 assert.ok(source.includes('window.location.assign'), 'OAuth auth start must be able to navigate to redirect URL');
+assert.ok(source.includes('window.location.href = provider.startEndpoint'), 'Provider action rows must be able to navigate to real runtime endpoints');
+assert.ok(source.includes('provider.serverOnly'), 'Provider action rows must not expose server-only capabilities as clickable frontend actions');
+assert.ok(source.includes("provider.actionStatus !== 'ready'"), 'Provider action rows must disable actions until runtime marks them ready');
 assert.ok(source.includes('authSession?.loggedIn'), 'AccountSettings must display real session login status');
 assert.ok(source.includes('onLogoutAuth'), 'AccountSettings must expose a logout action');
 assert.ok(source.includes('saveProfileSettings(nextProfile)'), 'AccountSettings must persist merged cloud profile settings locally');

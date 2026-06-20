@@ -410,6 +410,25 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
     return '已配置，但生产开关尚未启用。';
   };
 
+  const onOpenProviderAction = (provider?: ProductionRuntimeProviderAction) => {
+    if (!provider) {
+      setAuthFeedback('正在读取连接状态，请稍后再试。');
+      return;
+    }
+    if (provider.serverOnly) {
+      setAuthFeedback(`${provider.label} 是服务端能力，不从前端直接触发。`);
+      return;
+    }
+    if (provider.actionStatus !== 'ready' || !provider.startEndpoint) {
+      const reason = provider.missingEnv.length
+        ? `缺少：${provider.missingEnv.slice(0, 3).join(' / ')}`
+        : '生产运行态尚未标记为可使用';
+      setAuthFeedback(`${provider.label} 暂不可用：${reason}`);
+      return;
+    }
+    window.location.href = provider.startEndpoint;
+  };
+
   const onStartAuth = async (provider: AuthStartProvider) => {
     if (provider === 'email' && !authEmail.trim()) {
       setAuthFeedback('请先输入邮箱。');
@@ -471,36 +490,47 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
 
   const copy = SETTINGS_COPY[displayLanguage] ?? SETTINGS_COPY.zh;
 
-  const safetyRows = [
+  const safetyRows: Array<{
+    label: string;
+    status: string;
+    detail: string;
+    provider?: ProductionRuntimeProviderAction;
+  }> = [
     {
       label: 'Email',
       status: formatProviderActionStatus(providerActionsById.email),
       detail: formatProviderActionDetail(providerActionsById.email),
+      provider: providerActionsById.email,
     },
     {
       label: 'Google',
       status: formatProviderActionStatus(providerActionsById.google),
       detail: formatProviderActionDetail(providerActionsById.google),
+      provider: providerActionsById.google,
     },
     {
       label: 'WeChat',
       status: formatProviderActionStatus(providerActionsById.wechat),
       detail: formatProviderActionDetail(providerActionsById.wechat),
+      provider: providerActionsById.wechat,
     },
     {
       label: 'Phone',
       status: formatProviderActionStatus(providerActionsById.phone),
       detail: formatProviderActionDetail(providerActionsById.phone),
+      provider: providerActionsById.phone,
     },
     {
       label: 'Cloud DB',
       status: formatProviderActionStatus(providerActionsById.cloud_database),
       detail: formatProviderActionDetail(providerActionsById.cloud_database),
+      provider: providerActionsById.cloud_database,
     },
     {
       label: 'Cloud Storage',
       status: formatProviderActionStatus(providerActionsById.cloud_storage),
       detail: formatProviderActionDetail(providerActionsById.cloud_storage),
+      provider: providerActionsById.cloud_storage,
     },
     {
       label: 'Profile Settings',
@@ -515,16 +545,19 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
       detail: providerActionsById.google_calendar?.enabled
         ? '生产环境已检测到日历连接。'
         : (calendarUrl ? '本机已保存日历链接；生产读取仍以环境配置为准。' : formatProviderActionDetail(providerActionsById.google_calendar)),
+      provider: providerActionsById.google_calendar,
     },
     {
       label: 'Gemini',
       status: formatProviderActionStatus(providerActionsById.gemini),
       detail: formatProviderActionDetail(providerActionsById.gemini),
+      provider: providerActionsById.gemini,
     },
     {
       label: 'Flomo',
       status: formatProviderActionStatus(providerActionsById.flomo),
       detail: formatProviderActionDetail(providerActionsById.flomo),
+      provider: providerActionsById.flomo,
     },
     {
       label: '健康 / 金融 / 心理',
@@ -725,6 +758,16 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
                 <p>{row.detail}</p>
               </div>
               <span>{row.status}</span>
+              {'provider' in row ? (
+                <button
+                  type="button"
+                  className="portal-settings-provider-action"
+                  disabled={!row.provider || row.provider.serverOnly || row.provider.actionStatus !== 'ready'}
+                  onClick={() => onOpenProviderAction(row.provider)}
+                >
+                  {row.provider?.serverOnly ? '服务端' : row.provider?.actionStatus === 'ready' ? '打开' : '待配置'}
+                </button>
+              ) : null}
             </li>
           ))}
         </ul>
