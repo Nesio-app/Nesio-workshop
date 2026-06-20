@@ -26,6 +26,7 @@ const requiredKeys = [
   'authNeedEmail',
   'authNeedPhone',
   'authConnecting',
+  'authUseSignInForm',
   'authRedirecting',
   'authOtpSent',
   'authProviderNotConfiguredTemplate',

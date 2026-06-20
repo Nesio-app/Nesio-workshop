@@ -342,7 +342,11 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
       }));
       return;
     }
-    window.location.href = provider.startEndpoint;
+    if (provider.startEndpoint === '/api/auth/start') {
+      setAuthFeedback(t(locale, 'authUseSignInForm'));
+      return;
+    }
+    window.location.assign(provider.startEndpoint);
   };
 
   const onStartAuth = async (provider: AuthStartProvider) => {
