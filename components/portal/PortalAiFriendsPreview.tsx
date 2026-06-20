@@ -365,16 +365,31 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
     });
   };
 
+  function appendLocalAssistantMessage(content: string, provider: SecretaryChatProvider = 'gemini') {
+    setRuntimeMessages((items) => [
+      ...items,
+      {
+        role: 'assistant',
+        content,
+        provider,
+      },
+    ]);
+  }
+
   const addLocalAttachment = (kind: string, fileName?: string) => {
     const label = fileName ? `${kind}：${fileName}` : kind;
+    const notice = t(locale, 'aiFriendsLocalAttachmentTemplate', { label });
     setLocalAttachments((items) => [label, ...items].slice(0, 3));
-    setUtilityNotice(t(locale, 'aiFriendsLocalAttachmentTemplate', { label }));
+    setUtilityNotice(notice);
+    appendLocalAssistantMessage(notice);
   };
 
   const addFlomoNoteIntent = () => {
+    const notice = t(locale, 'aiFriendsFlomoIntentNotice');
     setComposer((value) => `${value}${value.endsWith(' ') || value.length === 0 ? '' : ' '}@Flomo `);
     setLocalAttachments((items) => ['笔记：将本条保存到 Flomo', ...items].slice(0, 3));
-    setUtilityNotice(t(locale, 'aiFriendsFlomoIntentNotice'));
+    setUtilityNotice(notice);
+    appendLocalAssistantMessage(notice, 'gemini');
     requestAnimationFrame(() => composerRef.current?.focus());
   };
 

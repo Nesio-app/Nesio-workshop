@@ -167,6 +167,13 @@ assert(
 );
 
 assert(
+  /function appendLocalAssistantMessage/.test(component) &&
+    /const addLocalAttachment[\s\S]*appendLocalAssistantMessage/.test(component) &&
+    /const addFlomoNoteIntent[\s\S]*appendLocalAssistantMessage/.test(component),
+  'PortalAiFriendsPreview local attachment and note controls must append visible chat messages instead of only transient notices.',
+);
+
+assert(
   pkg.scripts['test:portal-ai-friends-runtime'] === 'node scripts/portal-ai-friends-runtime.test.mjs',
   'package.json must expose test:portal-ai-friends-runtime.',
 );
