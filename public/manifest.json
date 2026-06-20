@@ -1,7 +1,7 @@
 {
-  "name": "宝盒",
-  "short_name": "宝盒",
-  "description": "数字静谧庭院 — 个人工具箱",
+  "name": "Nesio",
+  "short_name": "Nesio",
+  "description": "Nesio — mobile-first personal life kit",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#e8f1f5",

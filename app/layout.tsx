@@ -2,8 +2,8 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: '宝盒 · 数字静谧庭院',
-  description: '个人工具箱入口 — 秩序、觉察与体现的三舱静谧庭院。',
+  title: 'Nesio · Personal Life Kit',
+  description: 'Nesio is a mobile-first personal life kit for local-first tools, AI friends, and daily context.',
   manifest: '/manifest.json',
   icons: {
     icon: [
@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: '宝盒',
+    title: 'Nesio',
   },
 };
 

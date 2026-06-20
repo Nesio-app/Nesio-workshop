@@ -65,6 +65,7 @@
     "test:nesio-design-system": "node scripts/nesio-design-system-integration.test.mjs",
     "test:nesio-design-system-source": "node scripts/nesio-design-system-source-contract.test.mjs",
     "test:nesio-design-system-provenance": "node scripts/nesio-design-system-provenance.test.mjs",
+    "test:nesio-public-branding": "node scripts/nesio-public-branding.test.mjs",
     "test:nesio-runtime-colors": "node scripts/nesio-runtime-color-tokens.test.mjs",
     "test:nesio-runtime-overlay-alignment": "node scripts/nesio-runtime-overlay-alignment.test.mjs",
     "test:provider-feedback-i18n": "node scripts/provider-feedback-i18n.test.mjs",
