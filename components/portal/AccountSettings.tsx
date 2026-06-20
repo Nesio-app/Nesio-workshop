@@ -48,6 +48,7 @@ type DisplayLanguage = (typeof LANGUAGE_OPTIONS)[number][0];
 type CloudProfileStatus = 'idle' | 'loading' | 'synced' | 'local_only' | 'not_signed_in' | 'error';
 
 const DISPLAY_LANGUAGE_KEY = 'treasurebox-display-language-v1';
+const OBSERVATION_PUSH_KEY = 'treasurebox-observation-push-enabled-v1';
 
 const SETTINGS_COPY: Record<DisplayLanguage, {
   back: string;
@@ -238,6 +239,7 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
   const [personalizationStage, setPersonalizationStage] = useState<BaohePersonalizationStage>('day_34');
   const [showAppSettings, setShowAppSettings] = useState(false);
   const [showLearningProgress, setShowLearningProgress] = useState(false);
+  const [observationPushEnabled, setObservationPushEnabled] = useState(true);
   const personalization = getBaohePersonalizationProfile(personalizationStage);
 
   useEffect(() => {
@@ -248,8 +250,9 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
     setDisplayLanguage(normalizeDisplayLanguage(localStorage.getItem(DISPLAY_LANGUAGE_KEY) || s.locale));
     setCalendarUrl(loadCalendarLinkSettings().googleCalendarUrl);
     setPersonalizationStage(readBaohePersonalizationStage());
+    setObservationPushEnabled(localStorage.getItem(OBSERVATION_PUSH_KEY) === 'false' ? false : personalization.preferences.observationPushEnabled);
     document.documentElement.lang = s.locale === 'en' ? 'en' : 'zh-CN';
-  }, [fallbackName]);
+  }, [fallbackName, personalization.preferences.observationPushEnabled]);
 
   useEffect(() => {
     let alive = true;
@@ -368,6 +371,15 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
       calendarUrl,
     });
     document.documentElement.lang = next;
+    showToast('settingsSaved');
+  };
+
+  const onObservationPushToggle = () => {
+    setObservationPushEnabled((current) => {
+      const next = !current;
+      localStorage.setItem(OBSERVATION_PUSH_KEY, String(next));
+      return next;
+    });
     showToast('settingsSaved');
   };
 
@@ -738,7 +750,13 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
             </div>
             <div>
               <span>允许洞察推送</span>
-              <button type="button" className={personalization.preferences.observationPushEnabled ? 'is-on' : ''} aria-label="允许洞察推送" />
+              <button
+                type="button"
+                className={observationPushEnabled ? 'is-on' : ''}
+                aria-label="允许洞察推送"
+                aria-pressed={observationPushEnabled}
+                onClick={onObservationPushToggle}
+              />
             </div>
           </section>
         </>
