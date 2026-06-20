@@ -20,6 +20,13 @@ function buttonBlockByLabel(label) {
   return block;
 }
 
+function buttonBlockByRuntimeAction(action) {
+  const blocks = component.match(/<button\b[\s\S]*?<\/button>/g) || [];
+  const block = blocks.find((candidate) => candidate.includes(`data-runtime-action="${action}"`));
+  assert.ok(block, `Expected button with data-runtime-action="${action}".`);
+  return block;
+}
+
 const openConversationList = functionBody('openConversationList');
 for (const required of [
   'setSurface(\'chat\')',
@@ -33,7 +40,7 @@ for (const required of [
   assert.match(openConversationList, new RegExp(required.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `openConversationList must call ${required}.`);
 }
 
-const chatListButton = buttonBlockByLabel('打开对话列表');
+const chatListButton = buttonBlockByRuntimeAction('ai-open-conversation-list');
 assert.match(chatListButton, /aria-expanded=\{conversationListOpen\}/, 'Conversation list button must expose expanded state.');
 assert.match(chatListButton, /aria-controls="portal-ai-conversation-list"/, 'Conversation list button must point at its sheet.');
 assert.match(chatListButton, /onClick=\{openConversationList\}/, 'Conversation list button must use the shared handler.');
@@ -45,7 +52,7 @@ assert.match(
   'Conversation list sheet must have a stable id for the trigger.',
 );
 
-const mentionButton = buttonBlockByLabel('@ 调度');
+const mentionButton = buttonBlockByRuntimeAction('ai-open-mention-menu');
 assert.match(mentionButton, /aria-expanded=\{mentionOptions\.length > 0\}/, '@ button must expose whether mention candidates are visible.');
 assert.match(mentionButton, /aria-controls="portal-ai-mention-menu"/, '@ button must point at mention candidates.');
 assert.match(mentionButton, /data-runtime-action="ai-open-mention-menu"/, '@ button must expose a traceable runtime action.');
@@ -55,20 +62,20 @@ assert.match(
   'Mention candidates must have a stable id for the @ trigger.',
 );
 
-const audioButton = buttonBlockByLabel('语音输入');
+const audioButton = buttonBlockByRuntimeAction('ai-open-audio-call');
 assert.match(audioButton, /aria-expanded=\{audioCallOpen\}/, 'Voice button must expose audio call state.');
 assert.match(audioButton, /onClick=\{openAudioCall\}/, 'Voice button must open the audio call flow.');
 assert.match(audioButton, /data-runtime-action="ai-open-audio-call"/, 'Voice button must expose a traceable runtime action.');
 
-const callButton = buttonBlockByLabel('通话');
+const callButton = buttonBlockByRuntimeAction('ai-open-live-call');
 assert.match(callButton, /aria-expanded=\{callSheetOpen \|\| videoCallOpen \|\| audioCallOpen\}/, 'Call button must expose live call state.');
 assert.match(callButton, /onClick=\{openCallSheet\}/, 'Call button must open live call options.');
 assert.match(callButton, /data-runtime-action="ai-open-live-call"/, 'Call button must expose a traceable runtime action.');
 
-const searchButton = buttonBlockByLabel('搜索');
+const searchButton = buttonBlockByRuntimeAction('ai-open-search');
 assert.match(searchButton, /data-runtime-action="ai-open-search"/, 'Search button must expose a traceable runtime action.');
 
-const attachmentButton = buttonBlockByLabel('添加附件');
+const attachmentButton = buttonBlockByRuntimeAction('ai-open-attachment-tray');
 assert.match(attachmentButton, /data-runtime-action="ai-open-attachment-tray"/, 'Attachment button must expose a traceable runtime action.');
 
 assert.match(

@@ -542,16 +542,16 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
   };
 
   return (
-    <section className="portal-ai-preview portal-ai-preview--screen" aria-label="智友" data-active-conversation={activeConversationId}>
+    <section className="portal-ai-preview portal-ai-preview--screen" aria-label={t(locale, 'aiFriendsTitle')} data-active-conversation={activeConversationId}>
       {surface === 'search' ? (
-        <section className="portal-ai-search-surface" aria-label="智友搜索">
+        <section className="portal-ai-search-surface" aria-label={t(locale, 'aiFriendsSearchAriaLabel')}>
           <header className="portal-ai-search-head">
             <button type="button" className="portal-ai-screen-icon-btn" data-runtime-action="ai-return-from-search" onClick={() => setSurface('chat')}>
               <span aria-hidden>←</span>
-              <span className="sr-only">返回智友</span>
+              <span className="sr-only">{t(locale, 'aiFriendsBackToChat')}</span>
             </button>
-            <h1>搜索</h1>
-            <button type="button" className="portal-ai-screen-icon-btn" aria-label="新建对话" data-runtime-action="ai-start-new-thread" onClick={startNewThread}>
+            <h1>{t(locale, 'aiFriendsSearchTitle')}</h1>
+            <button type="button" className="portal-ai-screen-icon-btn" aria-label={t(locale, 'aiFriendsNewConversation')} data-runtime-action="ai-start-new-thread" onClick={startNewThread}>
               +
             </button>
           </header>
@@ -565,7 +565,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
             />
           </label>
           {searchToolsOpen ? (
-            <div className="portal-ai-search-grid" aria-label="搜索分类">
+            <div className="portal-ai-search-grid" aria-label={t(locale, 'aiFriendsSearchCategoriesLabel')}>
               {searchShortcuts.map((shortcut) => (
                 <button
                   key={shortcut.action}
@@ -579,8 +579,8 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
               ))}
             </div>
           ) : null}
-          <section className="portal-ai-recent" aria-label="最近对话">
-            <h2>最近对话</h2>
+          <section className="portal-ai-recent" aria-label={t(locale, 'aiFriendsRecentConversationsLabel')}>
+            <h2>{t(locale, 'aiFriendsRecentConversationsLabel')}</h2>
             {recentConversations.map((item) => (
               <button
                 key={item.id}
@@ -609,12 +609,12 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
       ) : (
         <>
           <header className="portal-ai-workspace-head">
-            <h1>智友</h1>
+            <h1>{t(locale, 'aiFriendsTitle')}</h1>
             <div>
               <button
                 type="button"
                 className="portal-ai-screen-icon-btn"
-                aria-label="搜索"
+                aria-label={t(locale, 'aiFriendsOpenSearch')}
                 data-runtime-action="ai-open-search"
                 onClick={() => setSurface('search')}
               >
@@ -623,7 +623,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
               <button
                 type="button"
                 className="portal-ai-screen-icon-btn"
-                aria-label="打开对话列表"
+                aria-label={t(locale, 'aiFriendsOpenConversationList')}
                 aria-expanded={conversationListOpen}
                 aria-controls="portal-ai-conversation-list"
                 data-runtime-action="ai-open-conversation-list"
@@ -634,7 +634,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
             </div>
           </header>
 
-          <section className="portal-ai-thread" aria-label="集合对话">
+          <section className="portal-ai-thread" aria-label={t(locale, 'aiFriendsThreadLabel')}>
             <p className="portal-ai-runtime-status" aria-live="polite">
               {aiRuntimeStatus}
             </p>
@@ -684,7 +684,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
 
           <div className="portal-ai-composer">
             {attachmentTrayOpen ? (
-              <div id="portal-ai-capability-rail" className="portal-ai-capability-rail" aria-label="智友快捷能力">
+              <div id="portal-ai-capability-rail" className="portal-ai-capability-rail" aria-label={t(locale, 'aiFriendsCapabilityRailLabel')}>
                 {AI_CAPABILITIES.map((capability) => (
                   <button
                     key={capability.id}
@@ -714,7 +714,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
               <button
                 type="button"
                 className="portal-ai-round-action"
-                aria-label="添加附件"
+                aria-label={t(locale, 'aiFriendsAddAttachment')}
                 aria-expanded={attachmentTrayOpen}
                 aria-controls="portal-ai-capability-rail"
                 data-runtime-action="ai-open-attachment-tray"
@@ -725,7 +725,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
               <button
                 type="button"
                 className="portal-ai-round-action"
-                aria-label="@ 调度"
+                aria-label={t(locale, 'aiFriendsMentionDispatch')}
                 aria-expanded={mentionOptions.length > 0}
                 aria-controls="portal-ai-mention-menu"
                 data-runtime-action="ai-open-mention-menu"
@@ -735,7 +735,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
               </button>
               <input
                 ref={composerRef}
-                aria-label="智友集合输入框"
+                aria-label={t(locale, 'aiFriendsInputLabel')}
                 value={composer}
                 onChange={(event) => setComposer(event.target.value)}
                 onKeyDown={(event) => {
@@ -791,7 +791,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
               }}
             />
             {mentionOptions.length ? (
-              <div id="portal-ai-mention-menu" className="portal-ai-mention-menu" role="listbox" aria-label="@ 调度候选">
+              <div id="portal-ai-mention-menu" className="portal-ai-mention-menu" role="listbox" aria-label={t(locale, 'aiFriendsMentionMenuLabel')}>
                 {mentionOptions.map((target) => (
                   <button
                     key={target.key}
@@ -813,8 +813,8 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
           </div>
 
           {conversationListOpen ? (
-            <div id="portal-ai-conversation-list" className="portal-ai-conversation-sheet" role="dialog" aria-modal="true" aria-label="AI 对话列表">
-              <button type="button" className="portal-ai-conversation-scrim" aria-label="关闭 AI 对话列表" onClick={() => setConversationListOpen(false)} />
+            <div id="portal-ai-conversation-list" className="portal-ai-conversation-sheet" role="dialog" aria-modal="true" aria-label={t(locale, 'aiFriendsConversationListAriaLabel')}>
+              <button type="button" className="portal-ai-conversation-scrim" aria-label={t(locale, 'aiFriendsCloseConversationList')} onClick={() => setConversationListOpen(false)} />
               <section>
                 <span className="portal-ai-sheet-handle" aria-hidden />
                 <h2>{t(locale, 'aiFriendsConversationListTitle')}</h2>
@@ -844,7 +844,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
 
           {typeof document !== 'undefined' && callSheetOpen ? createPortal(
             <div className="portal-ai-modal-layer">
-              <button type="button" className="portal-ai-modal-scrim" aria-label="关闭通话选项" onClick={() => setCallSheetOpen(false)} />
+              <button type="button" className="portal-ai-modal-scrim" aria-label={t(locale, 'aiFriendsCloseCallOptions')} onClick={() => setCallSheetOpen(false)} />
               <section id="portal-ai-call-sheet" className="portal-ai-call-sheet" role="dialog" aria-modal="true" aria-label={t(locale, 'aiFriendsCallSheetTitle')}>
                 <span className="portal-ai-sheet-handle" aria-hidden />
                 <h2>{t(locale, 'aiFriendsCallSheetTitle')}</h2>
