@@ -237,6 +237,7 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
   const [cloudProfileStatus, setCloudProfileStatus] = useState<CloudProfileStatus>('idle');
   const [personalizationStage, setPersonalizationStage] = useState<BaohePersonalizationStage>('day_34');
   const [showAppSettings, setShowAppSettings] = useState(false);
+  const [showLearningProgress, setShowLearningProgress] = useState(false);
   const personalization = getBaohePersonalizationProfile(personalizationStage);
 
   useEffect(() => {
@@ -697,7 +698,30 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
             ) : (
               <div className="portal-personal-empty">再用几天，宝盒就会有新发现。</div>
             )}
-            <button type="button" className="portal-personal-progress-link">查看全部学习进展 →</button>
+            {showLearningProgress ? (
+              <div className="portal-personal-progress-detail" id="portal-personal-progress-detail">
+                <h3>全部学习进展</h3>
+                <ul>
+                  {personalization.memories.map((memory) => (
+                    <li key={memory.id}>
+                      <b>{memory.category}</b>
+                      <span>{memory.text}</span>
+                      <small>证据 {memory.evidenceCount} 条 · 置信度 {memory.confidence}%</small>
+                    </li>
+                  ))}
+                </ul>
+                <p>偏好：{personalization.preferences.pace}节奏 · 推送时间 {personalization.preferences.pushTime}</p>
+              </div>
+            ) : null}
+            <button
+              type="button"
+              className="portal-personal-progress-link"
+              aria-expanded={showLearningProgress}
+              aria-controls="portal-personal-progress-detail"
+              onClick={() => setShowLearningProgress((value) => !value)}
+            >
+              {showLearningProgress ? '收起学习进展 ↑' : '查看全部学习进展 →'}
+            </button>
           </section>
 
           <section className="portal-personal-preferences">

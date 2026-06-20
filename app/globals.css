@@ -4416,6 +4416,61 @@ body {
   font-weight: 780;
 }
 
+.portal-personal-progress-detail {
+  display: grid;
+  gap: 0.65rem;
+  border-radius: 1rem;
+  padding: 0.9rem;
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow: inset 0 0 0 1px rgba(126, 151, 219, 0.16);
+}
+
+.portal-personal-progress-detail h3,
+.portal-personal-progress-detail p {
+  margin: 0;
+}
+
+.portal-personal-progress-detail h3 {
+  color: #0f1733;
+  font-size: 0.95rem;
+  font-weight: 880;
+}
+
+.portal-personal-progress-detail ul {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.portal-personal-progress-detail li {
+  display: grid;
+  gap: 0.18rem;
+  border-radius: 0.85rem;
+  padding: 0.65rem 0.72rem;
+  background: rgba(244, 247, 255, 0.82);
+}
+
+.portal-personal-progress-detail b {
+  color: #4a6cf7;
+  font-size: 0.78rem;
+  font-weight: 820;
+}
+
+.portal-personal-progress-detail span {
+  color: #0f1733;
+  font-size: 0.9rem;
+  font-weight: 780;
+}
+
+.portal-personal-progress-detail small,
+.portal-personal-progress-detail p {
+  color: #8b96b2;
+  font-size: 0.78rem;
+  font-weight: 720;
+}
+
 .portal-personal-preferences {
   display: grid;
   gap: 0.8rem;
