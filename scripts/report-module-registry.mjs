@@ -15,6 +15,7 @@ import { buildUserIdentityUpgradeContract } from '../lib/portal/user-identity-up
 import { buildOfflineSyncConflictContract } from '../lib/portal/offline-sync-conflict-contract.mjs';
 import { buildCloudReadinessContract } from '../lib/portal/cloud-readiness-contract.mjs';
 import { buildProductionActivationContract } from '../lib/portal/production-activation-contract.mjs';
+import { buildAiProviderRouterContract } from '../lib/portal/ai-provider-router-contract.mjs';
 import { nesioDesignSystemContract } from '../lib/portal/nesio-design-system-contract.mjs';
 import { nesioDesignSystemAssets } from '../lib/portal/nesio-design-system-assets.mjs';
 import {
@@ -2193,6 +2194,7 @@ const cloudReadinessContract = buildCloudReadinessContract({
   offlineSyncConflict: offlineSyncConflictContract,
 });
 const productionActivationContract = buildProductionActivationContract();
+const aiProviderRouterContract = buildAiProviderRouterContract();
 const nesioDesignSystemSummary = {
   canonicalName: 'Nesio',
   originalDownloadName: 'Nosio',
@@ -2412,6 +2414,11 @@ const evidenceSummary = {
     productionActivationConfiguredProviderCount: productionActivationContract.summary.configuredProviderCount,
     productionActivationMissingEnvProviderCount: productionActivationContract.summary.missingEnvProviderCount,
     productionActivationReady: productionActivationContract.summary.productionReady,
+    aiProviderRouterVersion: aiProviderRouterContract.summary.aiProviderRouterVersion,
+    aiProviderConfiguredCount: aiProviderRouterContract.summary.aiProviderConfiguredCount,
+    aiProviderEnabledCount: aiProviderRouterContract.summary.aiProviderEnabledCount,
+    aiRealProviderCallsEnabled: aiProviderRouterContract.summary.aiRealProviderCallsEnabled,
+    defaultAiProvider: aiProviderRouterContract.summary.defaultAiProvider,
     nesioDesignSystemVersion: nesioDesignSystemContract.version,
     nesioRuntimeSurfaceCount: nesioDesignSystemSummary.runtimeSurfaceCount,
     nesioDesignSystemGuardrailCount: nesioDesignSystemSummary.guardrailCount,
@@ -2659,6 +2666,7 @@ const evidenceSummary = {
   userIdentityUpgrade: userIdentityUpgradeContract,
   offlineSyncConflict: offlineSyncConflictContract,
   cloudReadiness: cloudReadinessContract,
+  aiProviderRouter: aiProviderRouterContract,
   productionActivation: productionActivationContract,
   moduleDataBus: {
     implementation: moduleDataBus.implementation,
