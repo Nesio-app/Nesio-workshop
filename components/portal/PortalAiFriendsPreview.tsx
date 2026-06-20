@@ -278,6 +278,11 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
 
   const startNewThread = () => {
     setSurface('chat');
+    setAttachmentTrayOpen(false);
+    setSearchToolsOpen(false);
+    setCallSheetOpen(false);
+    setAudioCallOpen(false);
+    setVideoCallOpen(false);
     setComposer('');
     setActiveConversationId('smart');
     setConversationListOpen(true);
@@ -288,6 +293,8 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
   const selectConversation = (item: RecentConversation) => {
     setActiveConversationId(item.id);
     setConversationListOpen(false);
+    setAttachmentTrayOpen(false);
+    setCallSheetOpen(false);
     setSurface('chat');
     setComposer(getConversationComposerIntent(item.id));
     setUtilityNotice(t(locale, 'aiFriendsConversationSwitchedTemplate', { title: item.title }));
@@ -295,17 +302,46 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
   };
 
   const openAttachmentTray = () => {
+    setConversationListOpen(false);
+    setSearchToolsOpen(false);
+    setCallSheetOpen(false);
+    setAudioCallOpen(false);
+    setVideoCallOpen(false);
     setAttachmentTrayOpen((value) => !value);
     setUtilityNotice(t(locale, 'aiFriendsAttachmentTrayNotice'));
   };
 
   const openMentionMenu = () => {
     setSurface('chat');
+    setAttachmentTrayOpen(false);
+    setConversationListOpen(false);
+    setSearchToolsOpen(false);
+    setCallSheetOpen(false);
     setComposer((value) => {
       if (/@[\w\u4e00-\u9fa5]*$/.test(value)) return value;
       return `${value}${value.endsWith(' ') || value.length === 0 ? '' : ' '}@`;
     });
     requestAnimationFrame(() => composerRef.current?.focus());
+  };
+
+  const openCallSheet = () => {
+    setAttachmentTrayOpen(false);
+    setConversationListOpen(false);
+    setSearchToolsOpen(false);
+    setAudioCallOpen(false);
+    setVideoCallOpen(false);
+    setCallSheetOpen(true);
+    setUtilityNotice(t(locale, 'aiFriendsLiveIntentNotice'));
+  };
+
+  const openAudioCall = () => {
+    setAttachmentTrayOpen(false);
+    setConversationListOpen(false);
+    setSearchToolsOpen(false);
+    setCallSheetOpen(false);
+    setVideoCallOpen(false);
+    setAudioCallOpen(true);
+    setUtilityNotice(t(locale, 'aiFriendsAudioConnecting'));
   };
 
   const insertMention = (target: MentionTarget) => {
@@ -343,10 +379,10 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
         fileInputRef.current?.click();
         return;
       case 'audio':
-        setAudioCallOpen(true);
+        openAudioCall();
         return;
       case 'live':
-        setCallSheetOpen(true);
+        openCallSheet();
         return;
       case 'note':
         addFlomoNoteIntent();
@@ -389,8 +425,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
         setUtilityNotice(t(locale, 'aiFriendsImageIntentNotice'));
         return;
       case '通话':
-        setCallSheetOpen(true);
-        setUtilityNotice(t(locale, 'aiFriendsLiveIntentNotice'));
+        openCallSheet();
         return;
       case '文件':
         fileInputRef.current?.click();
@@ -672,8 +707,8 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
                 }}
                 placeholder={t(locale, 'aiFriendsComposerPlaceholder')}
               />
-              <button type="button" className="portal-ai-round-action" aria-label="语音输入" aria-controls="portal-ai-audio-call" onClick={() => setAudioCallOpen(true)}>🎙</button>
-              <button type="button" className="portal-ai-call-button" aria-label="通话" aria-controls="portal-ai-call-sheet" onClick={() => setCallSheetOpen(true)}>
+              <button type="button" className="portal-ai-round-action" aria-label="语音输入" aria-controls="portal-ai-audio-call" onClick={openAudioCall}>🎙</button>
+              <button type="button" className="portal-ai-call-button" aria-label="通话" aria-controls="portal-ai-call-sheet" onClick={openCallSheet}>
                 📞<span>通话</span>
               </button>
             </div>

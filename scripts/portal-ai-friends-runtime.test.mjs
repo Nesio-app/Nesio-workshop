@@ -112,7 +112,7 @@ assert(
 assert(
   /case '图片'[\s\S]*imageInputRef\.current\?\.click\(\)/.test(component) &&
     /case '文件'[\s\S]*fileInputRef\.current\?\.click\(\)/.test(component) &&
-    /case '通话'[\s\S]*setCallSheetOpen\(true\)/.test(component),
+    /case '通话'[\s\S]*openCallSheet\(\)/.test(component),
   'PortalAiFriendsPreview search shortcuts must wire image, file, and call actions.',
 );
 
@@ -156,8 +156,8 @@ assert(
 );
 
 assert(
-  /aria-label="语音输入"[\s\S]*aria-controls="portal-ai-audio-call"[\s\S]*setAudioCallOpen\(true\)/.test(component) &&
-    /aria-label="通话"[\s\S]*aria-controls="portal-ai-call-sheet"[\s\S]*setCallSheetOpen\(true\)/.test(component),
+  /aria-label="语音输入"[\s\S]*aria-controls="portal-ai-audio-call"[\s\S]*onClick=\{openAudioCall\}/.test(component) &&
+    /aria-label="通话"[\s\S]*aria-controls="portal-ai-call-sheet"[\s\S]*onClick=\{openCallSheet\}/.test(component),
   'PortalAiFriendsPreview voice and call buttons must point to real call surfaces.',
 );
 
