@@ -93,8 +93,41 @@ async function scheduleGuardNotifications(guard) {
   } catch (_) { /* web / denied */ }
 }
 
+function renderScreenTimeGuide(message) {
+  let panel = document.querySelector('[data-storage-guard-guide]');
+  if (!panel) {
+    panel = document.createElement('section');
+    panel.className = 'storage-guard-guide';
+    panel.setAttribute('data-storage-guard-guide', 'true');
+    panel.setAttribute('role', 'dialog');
+    panel.setAttribute('aria-modal', 'false');
+    panel.setAttribute('aria-label', '屏幕使用时间设置说明');
+    panel.innerHTML = `
+      <div class="storage-guard-guide__card">
+        <button class="storage-guard-guide__close" type="button" aria-label="关闭">×</button>
+        <strong>配合 iOS 屏幕使用时间</strong>
+        <p></p>
+      </div>
+    `;
+    document.body.appendChild(panel);
+    panel.querySelector('.storage-guard-guide__close')?.addEventListener('click', () => {
+      panel.hidden = true;
+    });
+  }
+
+  const body = panel.querySelector('p');
+  if (body) {
+    body.textContent = '';
+    message.split('\n').map((line) => line.trim()).filter(Boolean).forEach((line, index) => {
+      if (index > 0) body.appendChild(document.createElement('br'));
+      body.appendChild(document.createTextNode(line));
+    });
+  }
+  panel.hidden = false;
+}
+
 function openScreenTimeGuide() {
   const msg = 'iOS 无法由 App 直接冻结其他应用。建议：\n\n1. 设置 → 屏幕使用时间 → App 限额\n2. 为淘宝/京东等设每日 0 分钟或「停用时间」\n3. 配合本 App「购物冷冻盾」作心理刹车';
   if (typeof showToast === 'function') showToast('📱 请用屏幕使用时间配合冷冻盾');
-  alert(msg);
+  renderScreenTimeGuide(msg);
 }
