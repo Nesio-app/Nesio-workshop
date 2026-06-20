@@ -178,6 +178,21 @@ export type AuthLogoutResponse = {
   supabaseRevoked?: boolean;
 };
 
+export type SecretaryChatProvider = 'gemini' | 'chatgpt' | 'openai' | 'doubao';
+
+export type SecretaryChatTurn = {
+  role: 'user' | 'assistant';
+  content: string;
+};
+
+export type SecretaryChatResponse = {
+  text?: string;
+  model?: SecretaryChatProvider | 'gemini' | 'chatgpt' | 'doubao' | string;
+  error?: string;
+  detail?: string;
+  hint?: string;
+};
+
 type ClientOptions = {
   fetcher?: AppApiFetch;
   baseUrl?: string;
@@ -193,6 +208,7 @@ const APP_API_ENDPOINTS = {
   authStart: '/api/auth/start',
   authSession: '/api/auth/session',
   authLogout: '/api/auth/logout',
+  secretaryChat: '/api/secretary/chat',
 } as const;
 
 function buildUrl(baseUrl: string, path: string, params?: Record<string, string | number | boolean | undefined>) {
@@ -298,6 +314,34 @@ export function createAppApiClient(options: ClientOptions = {}) {
     logoutAuth(): Promise<AuthLogoutResponse> {
       return readJsonAllowError(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.authLogout), {
         method: 'POST',
+      });
+    },
+
+    sendSecretaryMessage({
+      provider,
+      message,
+      history = [],
+      maxTokens = 1200,
+      personalLab = true,
+    }: {
+      provider: SecretaryChatProvider;
+      message: string;
+      history?: SecretaryChatTurn[];
+      maxTokens?: number;
+      personalLab?: boolean;
+    }): Promise<SecretaryChatResponse> {
+      return readJsonAllowError(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.secretaryChat), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(personalLab ? { 'x-baohe-access-mode': 'personal_lab' } : {}),
+        },
+        body: JSON.stringify({
+          model: provider,
+          message,
+          history,
+          maxTokens,
+        }),
       });
     },
   };
