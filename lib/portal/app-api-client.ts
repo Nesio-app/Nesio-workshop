@@ -92,6 +92,66 @@ export type UserDataDeleteResponse = AppApiEnvelope & {
   wouldDelete: string[];
 };
 
+export type ProductionProviderStatus = {
+  id: string;
+  label: string;
+  configured: boolean;
+  enabled: boolean;
+  missingEnv: string[];
+};
+
+export type ProductionRuntimeHealthResponse = {
+  ok: boolean;
+  service: 'portal-production-runtime';
+  version: 'production-runtime-v0';
+  safePublicStatus: true;
+  secretsRedacted: true;
+  accountAuth: {
+    enabled: boolean;
+    providers: Record<'email' | 'google' | 'wechat' | 'phone', ProductionProviderStatus>;
+  };
+  cloud: {
+    database: ProductionProviderStatus;
+    storage: ProductionProviderStatus;
+  };
+  ai: {
+    enabled: boolean;
+    providers: Record<'gemini' | 'doubao' | 'chatgpt', ProductionProviderStatus>;
+  };
+  thirdParty: {
+    googleCalendar: ProductionProviderStatus;
+    flomo: ProductionProviderStatus;
+  };
+  summary: {
+    providerCount: number;
+    enabledProviderCount: number;
+    missingProviderCount: number;
+    productionRuntimeReady: boolean;
+  };
+};
+
+export type AuthStartProvider = 'email' | 'google' | 'wechat' | 'phone';
+
+export type AuthStartResponse = {
+  safePublicStatus: true;
+  secretsRedacted: true;
+  ok: boolean;
+  provider?: AuthStartProvider;
+  action?: 'redirect' | 'otp_sent';
+  url?: string;
+  status?: ProductionProviderStatus;
+  error?:
+    | 'invalid_json'
+    | 'unsupported_provider'
+    | 'provider_not_configured'
+    | 'missing_email'
+    | 'missing_phone'
+    | 'missing_supabase_config'
+    | 'supabase_otp_failed'
+    | string;
+  supportedProviders?: AuthStartProvider[];
+};
+
 type ClientOptions = {
   fetcher?: AppApiFetch;
   baseUrl?: string;
@@ -103,6 +163,8 @@ const APP_API_ENDPOINTS = {
   entitlements: '/api/entitlements',
   userDataExport: '/api/user-data/export',
   userDataDelete: '/api/user-data/delete',
+  productionRuntimeHealth: '/api/portal/production/health',
+  authStart: '/api/auth/start',
 } as const;
 
 function buildUrl(baseUrl: string, path: string, params?: Record<string, string | number | boolean | undefined>) {
@@ -127,6 +189,18 @@ async function readJson<T>(fetcher: AppApiFetch, url: string, init?: RequestInit
   if (!response.ok) {
     throw new Error(`App API request failed: ${response.status} ${response.statusText}`);
   }
+
+  return response.json() as Promise<T>;
+}
+
+async function readJsonAllowError<T>(fetcher: AppApiFetch, url: string, init?: RequestInit): Promise<T> {
+  const response = await fetcher(url, {
+    ...init,
+    headers: {
+      accept: 'application/json',
+      ...init?.headers,
+    },
+  });
 
   return response.json() as Promise<T>;
 }
@@ -157,6 +231,35 @@ export function createAppApiClient(options: ClientOptions = {}) {
     deleteUserData({ dryRun = true }: { dryRun?: boolean } = {}): Promise<UserDataDeleteResponse> {
       return readJson(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.userDataDelete, { dryRun: dryRun ? 1 : 0 }), {
         method: 'POST',
+      });
+    },
+
+    fetchProductionRuntimeHealth(): Promise<ProductionRuntimeHealthResponse> {
+      return readJson(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.productionRuntimeHealth));
+    },
+
+    startAuth({
+      provider,
+      email,
+      phone,
+      redirectTo,
+    }: {
+      provider: AuthStartProvider;
+      email?: string;
+      phone?: string;
+      redirectTo?: string;
+    }): Promise<AuthStartResponse> {
+      return readJsonAllowError(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.authStart), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          provider,
+          email,
+          phone,
+          redirectTo,
+        }),
       });
     },
   };
