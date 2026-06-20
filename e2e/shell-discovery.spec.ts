@@ -388,3 +388,46 @@ test('personal lab mode persists after activation and can be cleared', async ({ 
   await expect(page.getByRole('region', { name: '工具箱' })).toBeVisible();
   await expect(page.locator('.portal-treasure-screen button').first()).toBeVisible();
 });
+
+test('V14 AI friends and toolbox content stay clear of bottom navigation', async ({ page }) => {
+  await page.goto('/?baohePersonalLab=1');
+  await markOnboardingDone(page);
+
+  const nav = page.getByRole('navigation', { name: /底部导航|Bottom navigation|宝盒导航/ });
+  await expect(nav).toBeVisible();
+
+  await nav.getByRole('button', { name: '智友' }).click();
+  const aiPage = page.getByRole('region', { name: '智友' });
+  await expect(aiPage).toBeVisible();
+  await aiPage.getByRole('button', { name: '添加附件' }).click();
+  await expect(aiPage.locator('.portal-ai-capability-rail')).toBeVisible();
+
+  const aiClearance = await page.evaluate(() => {
+    const navRect = document.querySelector<HTMLElement>('.portal-bottom-nav')?.getBoundingClientRect();
+    const composerRect = document.querySelector<HTMLElement>('.portal-ai-composer')?.getBoundingClientRect();
+    const railRect = document.querySelector<HTMLElement>('.portal-ai-capability-rail')?.getBoundingClientRect();
+    return {
+      composerBottom: composerRect?.bottom ?? 0,
+      railBottom: railRect?.bottom ?? 0,
+      navTop: navRect?.top ?? 0,
+    };
+  });
+  expect(aiClearance.composerBottom).toBeLessThanOrEqual(aiClearance.navTop - 8);
+  expect(aiClearance.railBottom).toBeLessThanOrEqual(aiClearance.navTop - 8);
+
+  await nav.getByRole('button', { name: '工具箱' }).click();
+  const toolbox = page.getByRole('region', { name: '工具箱' });
+  await expect(toolbox).toBeVisible();
+  const lastPackage = page.locator('.portal-treasure-package-list button').last();
+  await lastPackage.scrollIntoViewIfNeeded();
+
+  const toolboxClearance = await page.evaluate(() => {
+    const navRect = document.querySelector<HTMLElement>('.portal-bottom-nav')?.getBoundingClientRect();
+    const lastPackRect = Array.from(document.querySelectorAll<HTMLElement>('.portal-treasure-package-list button')).at(-1)?.getBoundingClientRect();
+    return {
+      lastPackBottom: lastPackRect?.bottom ?? 0,
+      navTop: navRect?.top ?? 0,
+    };
+  });
+  expect(toolboxClearance.lastPackBottom).toBeLessThanOrEqual(toolboxClearance.navTop - 8);
+});
