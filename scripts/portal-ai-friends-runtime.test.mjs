@@ -95,6 +95,16 @@ assert(
 );
 
 assert(
+  !component.includes('disabled={aiSending}'),
+  'PortalAiFriendsPreview composer input must stay inspectable while sending instead of becoming a dead disabled control.',
+);
+
+assert(
+  component.includes('正在连接中，上一条消息还在路上。'),
+  'PortalAiFriendsPreview must explain repeat send attempts while a message is already sending.',
+);
+
+assert(
   component.includes("handleSearchShortcut") && /searchShortcuts\.map[\s\S]*onClick=\{\(\) => handleSearchShortcut\(label\)\}/.test(component),
   'PortalAiFriendsPreview search shortcut buttons must perform real actions instead of being inert.',
 );

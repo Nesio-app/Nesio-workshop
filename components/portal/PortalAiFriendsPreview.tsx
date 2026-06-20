@@ -397,8 +397,12 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
 
   const sendComposerMessage = async () => {
     const rawMessage = composer.trim();
-    if (!rawMessage || aiSending) {
-      if (!rawMessage) setUtilityNotice('先写一句想问智友的话，或用 @ 拉入一个 AI。');
+    if (aiSending) {
+      setUtilityNotice('正在连接中，上一条消息还在路上。');
+      return;
+    }
+    if (!rawMessage) {
+      setUtilityNotice('先写一句想问智友的话，或用 @ 拉入一个 AI。');
       return;
     }
 
@@ -653,7 +657,6 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
                   }
                 }}
                 placeholder="发消息给智友..."
-                disabled={aiSending}
               />
               <button type="button" className="portal-ai-round-action" aria-label="语音输入" aria-controls="portal-ai-audio-call" onClick={() => setAudioCallOpen(true)}>🎙</button>
               <button type="button" className="portal-ai-call-button" aria-label="通话" aria-controls="portal-ai-call-sheet" onClick={() => setCallSheetOpen(true)}>
