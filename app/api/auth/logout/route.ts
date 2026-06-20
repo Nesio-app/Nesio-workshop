@@ -17,7 +17,18 @@ function safeJson(body: Record<string, unknown>, status = 200) {
   );
 }
 
-function expireAuthCookie(response: NextResponse, name: 'baohe_auth_access' | 'baohe_auth_refresh') {
+function expireAuthCookie(
+  response: NextResponse,
+  name:
+    | 'baohe_auth_access'
+    | 'baohe_auth_refresh'
+    | 'baohe_auth_provider'
+    | 'baohe_wechat_openid'
+    | 'baohe_wechat_unionid'
+    | 'baohe_wechat_refresh'
+    | 'nesio_google_calendar_access'
+    | 'nesio_google_calendar_refresh',
+) {
   response.cookies.set(name, '', {
     httpOnly: true,
     sameSite: 'lax',
@@ -59,6 +70,12 @@ export async function POST() {
 
   expireAuthCookie(response, 'baohe_auth_access');
   expireAuthCookie(response, 'baohe_auth_refresh');
+  expireAuthCookie(response, 'baohe_auth_provider');
+  expireAuthCookie(response, 'baohe_wechat_openid');
+  expireAuthCookie(response, 'baohe_wechat_unionid');
+  expireAuthCookie(response, 'baohe_wechat_refresh');
+  expireAuthCookie(response, 'nesio_google_calendar_access');
+  expireAuthCookie(response, 'nesio_google_calendar_refresh');
 
   return response;
 }

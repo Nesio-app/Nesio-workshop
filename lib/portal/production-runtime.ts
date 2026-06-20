@@ -25,6 +25,23 @@ function envAny(env: EnvMap, keys: string[]): boolean {
   return keys.some((key) => Boolean(envValue(env, key)));
 }
 
+function hasAiProviderKey(env: EnvMap): boolean {
+  return envAny(env, [
+    'OPENAI_API_KEY',
+    'OpenAI_KEY',
+    'GEMINI_API_KEY',
+    'GOOGLE_GENERATIVE_AI_API_KEY',
+    'GOOGLE_AI_API_KEY',
+    'GOOGLE_API_KEY',
+    'DOUBAO_KEY',
+    'DOUBAO_API_KEY',
+    'ARK_API_KEY',
+    'VOLCENGINE_API_KEY',
+    'ANTHROPIC_API_KEY',
+    'CLAUDE_API_KEY',
+  ]);
+}
+
 function status(
   env: EnvMap,
   entry: {
@@ -74,7 +91,10 @@ export function buildProductionRuntimeStatus(env: EnvMap = process.env) {
   const authEnabled = envValue(env, 'BAOHE_AUTH_ENABLED').toLowerCase() === 'true';
   const cloudDbEnabled = envValue(env, 'CLOUD_DB_ENABLED').toLowerCase() === 'true';
   const cloudStorageEnabled = envValue(env, 'CLOUD_STORAGE_ENABLED').toLowerCase() === 'true';
-  const aiEnabled = envValue(env, 'BAOHE_AI_PROVIDER_MODE').toLowerCase() === 'production';
+  const launchIsolationDisabled = envValue(env, 'NEXT_PUBLIC_BAOHE_FIRST_LAUNCH_RISK_ISOLATION').toLowerCase() === 'off';
+  const aiModeEnabled = envValue(env, 'BAOHE_AI_PROVIDER_MODE').toLowerCase() === 'production';
+  const aiProviderConfigured = hasAiProviderKey(env);
+  const aiEnabled = aiProviderConfigured && (aiModeEnabled || launchIsolationDisabled);
 
   const accountAuth = {
     enabled: authEnabled,
@@ -133,28 +153,28 @@ export function buildProductionRuntimeStatus(env: EnvMap = process.env) {
       gemini: status(env, {
         id: 'gemini',
         label: 'Gemini',
-        requiredEnv: ['BAOHE_AI_PROVIDER_MODE'],
+        requiredEnv: [],
         alternateGroups: [['GEMINI_API_KEY', 'GOOGLE_GENERATIVE_AI_API_KEY', 'GOOGLE_AI_API_KEY', 'GOOGLE_API_KEY']],
         enabledWhen: aiEnabled,
       }),
       doubao: status(env, {
         id: 'doubao',
         label: 'Doubao',
-        requiredEnv: ['BAOHE_AI_PROVIDER_MODE'],
+        requiredEnv: [],
         alternateGroups: [['DOUBAO_KEY', 'DOUBAO_API_KEY', 'ARK_API_KEY', 'VOLCENGINE_API_KEY']],
         enabledWhen: aiEnabled,
       }),
       chatgpt: status(env, {
         id: 'chatgpt',
         label: 'ChatGPT',
-        requiredEnv: ['BAOHE_AI_PROVIDER_MODE'],
+        requiredEnv: [],
         alternateGroups: [['OPENAI_API_KEY', 'OpenAI_KEY']],
         enabledWhen: aiEnabled,
       }),
       claude: status(env, {
         id: 'claude',
         label: 'Claude',
-        requiredEnv: ['BAOHE_AI_PROVIDER_MODE'],
+        requiredEnv: [],
         alternateGroups: [['ANTHROPIC_API_KEY', 'CLAUDE_API_KEY']],
         enabledWhen: aiEnabled,
       }),
@@ -286,10 +306,11 @@ export function getSupabaseAuthorizeUrl(provider: string, redirectTo: string, en
 
 export function getWechatAuthorizeUrl(redirectTo: string, env: EnvMap = process.env): string {
   const appId = envValue(env, 'WECHAT_APP_ID');
-  const redirect = envValue(env, 'WECHAT_REDIRECT_URI') || redirectTo;
+  const redirect = new URL(envValue(env, 'WECHAT_REDIRECT_URI') || redirectTo);
+  redirect.searchParams.set('provider', 'wechat');
   const url = new URL('https://open.weixin.qq.com/connect/qrconnect');
   url.searchParams.set('appid', appId);
-  url.searchParams.set('redirect_uri', redirect);
+  url.searchParams.set('redirect_uri', redirect.toString());
   url.searchParams.set('response_type', 'code');
   url.searchParams.set('scope', envValue(env, 'WECHAT_OAUTH_SCOPE') || 'snsapi_login');
   url.searchParams.set('state', 'nesio');

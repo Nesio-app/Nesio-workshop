@@ -7,6 +7,17 @@ type SupabaseTokenResponse = {
   token_type?: string;
 };
 
+type WechatTokenResponse = {
+  access_token?: string;
+  refresh_token?: string;
+  expires_in?: number;
+  openid?: string;
+  scope?: string;
+  unionid?: string;
+  errcode?: number;
+  errmsg?: string;
+};
+
 const SUPABASE_OTP_TYPES = new Set(['signup', 'magiclink', 'recovery', 'invite', 'email_change', 'email', 'sms', 'phone']);
 
 function envValue(key: string): string {
@@ -45,6 +56,47 @@ function setAuthCookies(response: NextResponse, session: SupabaseTokenResponse) 
   }
 }
 
+function setWechatCookies(response: NextResponse, session: WechatTokenResponse) {
+  const secure = process.env.NODE_ENV === 'production';
+  const maxAge = Number.isFinite(session.expires_in) && session.expires_in ? session.expires_in : 60 * 60 * 24 * 30;
+  const cookies = response.cookies;
+
+  cookies.set('baohe_auth_provider', 'wechat', {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure,
+    path: '/',
+    maxAge,
+  });
+  if (session.openid) {
+    cookies.set('baohe_wechat_openid', session.openid, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure,
+      path: '/',
+      maxAge,
+    });
+  }
+  if (session.unionid) {
+    cookies.set('baohe_wechat_unionid', session.unionid, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure,
+      path: '/',
+      maxAge,
+    });
+  }
+  if (session.refresh_token) {
+    cookies.set('baohe_wechat_refresh', session.refresh_token, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure,
+      path: '/',
+      maxAge: 60 * 60 * 24 * 30,
+    });
+  }
+}
+
 async function exchangeSupabaseCode(code: string, redirectTo: string): Promise<SupabaseTokenResponse | null> {
   const supabaseUrl = envValue('SUPABASE_URL');
   const supabaseAnonKey = envValue('SUPABASE_ANON_KEY');
@@ -66,6 +118,24 @@ async function exchangeSupabaseCode(code: string, redirectTo: string): Promise<S
 
   if (!response.ok) return null;
   return response.json() as Promise<SupabaseTokenResponse>;
+}
+
+async function exchangeWechatCode(code: string): Promise<WechatTokenResponse | null> {
+  const appId = envValue('WECHAT_APP_ID');
+  const appSecret = envValue('WECHAT_APP_SECRET');
+  if (!appId || !appSecret || !code) return null;
+
+  const url = new URL('https://api.weixin.qq.com/sns/oauth2/access_token');
+  url.searchParams.set('appid', appId);
+  url.searchParams.set('secret', appSecret);
+  url.searchParams.set('code', code);
+  url.searchParams.set('grant_type', 'authorization_code');
+
+  const response = await fetch(url, { cache: 'no-store' });
+  if (!response.ok) return null;
+  const session = (await response.json()) as WechatTokenResponse;
+  if (!session.openid || session.errcode) return null;
+  return session;
 }
 
 async function verifySupabaseOtp(tokenHash: string, type: string): Promise<SupabaseTokenResponse | null> {
@@ -109,6 +179,20 @@ export async function GET(req: NextRequest) {
     });
 
     return NextResponse.redirect(target);
+  }
+
+  if (provider === 'wechat' && code) {
+    const session = await exchangeWechatCode(code);
+    const target = safeRedirectUrl(req, {
+      safePublicStatus: 'true',
+      secretsRedacted: 'true',
+      auth: session?.openid ? 'auth_callback_received' : 'auth_callback_failed',
+      provider,
+      status: session?.openid ? 'session_established' : 'wechat_exchange_failed',
+    });
+    const response = NextResponse.redirect(target);
+    if (session?.openid) setWechatCookies(response, session);
+    return response;
   }
 
   if (code) {

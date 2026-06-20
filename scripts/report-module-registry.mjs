@@ -2202,7 +2202,7 @@ const flomoProductionProvider = productionActivationProvidersById.get('flomo');
 const aiProviderRouterContract = buildAiProviderRouterContract();
 const nesioDesignSystemSummary = {
   canonicalName: 'Nesio',
-  originalDownloadName: 'Nosio',
+  originalDownloadName: 'Nesio',
   runtimeSurfaceCount: nesioDesignSystemContract.runtimeSurfaces.length,
   requiredTokenFileCount: nesioDesignSystemContract.source.requiredTokenFiles.length,
   requiredComponentFileCount: nesioDesignSystemContract.source.requiredComponentFiles.length,

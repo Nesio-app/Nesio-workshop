@@ -111,16 +111,26 @@ function hasProductionAiProviderKey(): boolean {
   );
 }
 
+export function isLaunchIsolationDisabled(): boolean {
+  return readRuntimeEnv('NEXT_PUBLIC_BAOHE_FIRST_LAUNCH_RISK_ISOLATION').toLowerCase() === 'off';
+}
+
 export function isProductionActivationAiRuntimeEnabled(): boolean {
   return readRuntimeEnv('BAOHE_AI_PROVIDER_MODE').toLowerCase() === 'production' &&
     hasProductionAiProviderKey();
+}
+
+export function isLiveRuntimeAiEnabled(): boolean {
+  return isLaunchIsolationDisabled() && hasProductionAiProviderKey();
 }
 
 export function isSecretaryAiRequestAllowed(request: {
   headers: Headers;
   nextUrl?: { searchParams?: URLSearchParams };
 }): boolean {
-  return isPersonalLabAiRequestAllowed(request) || isProductionActivationAiRuntimeEnabled();
+  return isPersonalLabAiRequestAllowed(request) ||
+    isProductionActivationAiRuntimeEnabled() ||
+    isLiveRuntimeAiEnabled();
 }
 
 export function launchUnavailablePayload(kind: string, id?: string) {

@@ -43,6 +43,24 @@ assert.match(
   'DashboardHome must preserve local Google Calendar link fallback while supporting runtime provider readiness.',
 );
 
+assert.match(
+  source,
+  /const calendarProviderConnectUrl = calendarProviderReady\s*\?\s*\(calendarProviderAction\?\.startEndpoint \|\| '\/api\/portal\/calendar\/connect'\)\s*:\s*'';/,
+  'DashboardHome must derive a Google Calendar OAuth connect URL from the ready provider action.',
+);
+
+assert.match(
+  source,
+  /if \(calendarProviderConnectUrl\)[\s\S]*window\.location\.href = calendarProviderConnectUrl;/,
+  'DashboardHome calendar action must navigate ready Google Calendar providers into OAuth connect instead of only refreshing.',
+);
+
+assert.match(
+  source,
+  /calendarProviderConnectUrl \?[\s\S]*'接入'/,
+  'DashboardHome must label the ready Google Calendar OAuth action as connect.',
+);
+
 assert.equal(
   packageJson.scripts['test:dashboard-calendar-provider-action'],
   'node scripts/dashboard-calendar-provider-action.test.mjs',

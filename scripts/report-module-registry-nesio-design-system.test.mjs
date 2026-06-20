@@ -20,7 +20,7 @@ assert.equal(report.nesioDesignSystem.source.importedFrom, '/Users/jing/Download
 assert.equal(report.nesioDesignSystem.source.productionImportMode, 'lift-token-values-not-wholesale-css-import');
 
 assert.equal(report.nesioDesignSystem.summary.canonicalName, 'Nesio');
-assert.equal(report.nesioDesignSystem.summary.originalDownloadName, 'Nosio');
+assert.equal(report.nesioDesignSystem.summary.originalDownloadName, 'Nesio');
 assert.equal(report.nesioDesignSystem.summary.runtimeSurfaceCount >= 12, true);
 assert.equal(report.nesioDesignSystem.summary.requiredTokenFileCount, 5);
 assert.equal(report.nesioDesignSystem.summary.requiredComponentFileCount, 9);

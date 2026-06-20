@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
+  isLaunchIsolationDisabled,
   isProductionActivationAiRuntimeEnabled,
+  isLiveRuntimeAiEnabled,
   isSecretaryAiRequestAllowed,
   launchUnavailablePayload,
 } from '@/lib/portal/launch-safety';
@@ -95,6 +97,8 @@ export async function GET(req: NextRequest) {
   const defaultProvider = gemini ? 'gemini' : chatgpt ? 'chatgpt' : claude ? 'claude' : doubao ? 'doubao' : null;
   const productionActivation = {
     aiProviderMode: process.env.BAOHE_AI_PROVIDER_MODE || 'disabled',
+    launchIsolationDisabled: isLaunchIsolationDisabled(),
+    liveRuntimeEnabled: isLiveRuntimeAiEnabled(),
     aiRuntimeEnabled: isProductionActivationAiRuntimeEnabled(),
     configuredProviders,
     defaultProvider,

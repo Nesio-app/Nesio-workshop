@@ -24,6 +24,9 @@ const secretaryApi = readFileSync(join(root, 'public', 'secretary', 'api.js'), '
 const moduleManagerCore = readFileSync(join(root, 'lib', 'portal', 'module-manager-core.mjs'), 'utf8');
 const moduleManagerTs = readFileSync(join(root, 'lib', 'portal', 'module-manager.ts'), 'utf8');
 const secretaryChatRoute = readFileSync(join(root, 'app', 'api', 'secretary', 'chat', 'route.ts'), 'utf8');
+const portfolioPage = readFileSync(join(root, 'app', 'portfolio', 'page.tsx'), 'utf8');
+const webSurfaceContract = readFileSync(join(root, 'lib', 'portal', 'web-surface-contract-v0.mjs'), 'utf8');
+const appApiContract = readFileSync(join(root, 'lib', 'portal', 'app-api-contract-v0.mjs'), 'utf8');
 
 assert.match(layout, /title:\s*'Nesio\b/, 'App metadata title must use the public product name Nesio.');
 assert.match(layout, /appleWebApp:[\s\S]*title:\s*'Nesio'/, 'Apple Web App title must use Nesio.');
@@ -76,6 +79,14 @@ assert.doesNotMatch(
   /你是「宝盒」|在宝盒智友中的角色/,
   'AI-facing Secretary system prompts must use Nesio naming.',
 );
+assert.doesNotMatch(portfolioPage, />宝盒</, 'Public portfolio nav must use Nesio naming.');
+assert.doesNotMatch(
+  webSurfaceContract,
+  /Baohe v0\.1 is a mobile-first personal toolbox/,
+  'Public web-surface positioning must use Nesio naming.',
+);
+assert.doesNotMatch(appApiContract, /Baohe Local Demo/, 'Local API fixture display name must use Nesio naming.');
+assert.doesNotMatch(moduleManagerCore, /config\.meta\?\.title \|\| '宝盒'/, 'Shell fallback name must use Nesio naming.');
 for (const [name, source] of [
   ['PortalOnboarding', onboarding],
   ['PortalBottomNav', bottomNav],
@@ -92,6 +103,13 @@ assert.match(storageHome, /Nesio Purchase Memory/, 'Inventory first-launch kicke
 assert.match(secretaryList, /Nesio/, 'Public Secretary list chrome should mention Nesio.');
 assert.match(secretaryListJs, /返回 Nesio/, 'Public Secretary dock should return to Nesio.');
 assert.match(secretaryApi, /https:\/\/www\.nesio\.app/, 'Secretary API public fallback should use www.nesio.app.');
+assert.match(
+  portfolioPage,
+  /<Link href="\/"[\s\S]*Nesio[\s\S]*<\/Link>/,
+  'Public portfolio nav should mention Nesio.',
+);
+assert.match(webSurfaceContract, /Nesio v0\.1 is a mobile-first personal toolbox/, 'Web-surface positioning should mention Nesio.');
+assert.match(appApiContract, /Nesio Local Demo/, 'Local API fixture display name should mention Nesio.');
 assert.match(
   pkg.scripts['test:contracts'],
   /test:nesio-public-branding/,

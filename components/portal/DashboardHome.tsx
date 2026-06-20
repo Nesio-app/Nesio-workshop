@@ -533,12 +533,11 @@ export default function DashboardHome({
 
   const calendarProviderReady =
     calendarProviderAction?.actionStatus === 'ready' && !calendarProviderAction?.serverOnly;
-  const calendarActionLabel = calendarLinkUrl
-    ? '打开'
-    : calendarProviderReady
-      ? '刷新'
-      : '接入';
-  const calendarClickable = Boolean(calendarLinkUrl);
+  const calendarProviderConnectUrl = calendarProviderReady
+    ? (calendarProviderAction?.startEndpoint || '/api/portal/calendar/connect')
+    : '';
+  const calendarActionLabel = calendarLinkUrl ? '打开' : calendarProviderConnectUrl ? '接入' : '接入';
+  const calendarClickable = Boolean(calendarLinkUrl || calendarProviderConnectUrl);
 
   const greeting = greetingForHour(now.getHours());
   const displayAvatar = avatarUrl || profile.avatarUrl;
@@ -610,8 +609,8 @@ export default function DashboardHome({
       openCalendarLink();
       return;
     }
-    if (calendarProviderReady) {
-      refreshCalendar();
+    if (calendarProviderConnectUrl) {
+      window.location.href = calendarProviderConnectUrl;
     }
   };
 
@@ -1165,7 +1164,7 @@ export default function DashboardHome({
           <h2 className="portal-calendar-head">{t(locale, 'calendar')}</h2>
           {calendarLinkUrl ? (
             <a className="portal-calendar-open-link" href={calendarLinkUrl}>{calendarActionLabel}</a>
-          ) : calendarProviderReady ? (
+          ) : calendarProviderConnectUrl ? (
             <button
               type="button"
               className="portal-calendar-open-link"

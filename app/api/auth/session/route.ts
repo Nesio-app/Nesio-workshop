@@ -118,6 +118,8 @@ export async function GET() {
   const cookieStore = cookies();
   const accessCookie = cookieStore.get('baohe_auth_access')?.value || '';
   const refreshCookie = cookieStore.get('baohe_auth_refresh')?.value || '';
+  const authProviderCookie = cookieStore.get('baohe_auth_provider')?.value || '';
+  const wechatOpenidCookie = cookieStore.get('baohe_wechat_openid')?.value || '';
 
   if (accessCookie) {
     const user = await fetchSupabaseUser(accessCookie);
@@ -134,6 +136,22 @@ export async function GET() {
         return signedInResponse(refreshedUser, true, refreshedSession);
       }
     }
+  }
+
+  if (authProviderCookie === 'wechat' && wechatOpenidCookie) {
+    return safeJson({
+      ok: true,
+      loggedIn: true,
+      hasRefreshToken: false,
+      status: 'signed_in',
+      user: {
+        id: `wechat_openid:${wechatOpenidCookie}`,
+        email: '',
+        phone: '',
+        provider: 'wechat',
+        providers: ['wechat'],
+      },
+    });
   }
 
   if (!accessCookie) {
