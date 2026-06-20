@@ -19,6 +19,10 @@ const files = [
 const requiredAppMarkers = [
   'CLOUD_INVENTORY_ENDPOINT',
   "'/api/cloud/inventory'",
+  'function evaluateLaunchCloudReadiness(',
+  'cloudReadiness',
+  "status: blocked.length ? 'local_only'",
+  'localDataBoundaryPreserved: true',
   'function buildCloudInventorySnapshotItems(',
   'function applyCloudInventorySnapshotItems(',
   'async function saveInventoryCloudSnapshot(',
@@ -33,6 +37,10 @@ const requiredAppMarkers = [
   'cloud_write_failed',
   'not_signed_in',
   'cloud_not_configured',
+];
+
+const forbiddenAppMarkers = [
+  'throw new Error(`Launch cloud flags must stay disabled:',
 ];
 
 const requiredHtmlMarkers = [
@@ -52,6 +60,10 @@ for (const file of files) {
 
   for (const marker of requiredAppMarkers) {
     if (!app.includes(marker)) failures.push(`${file.label}/app.js missing marker: ${marker}`);
+  }
+
+  for (const marker of forbiddenAppMarkers) {
+    if (app.includes(marker)) failures.push(`${file.label}/app.js should not hard-crash launch cloud readiness: ${marker}`);
   }
 
   for (const marker of requiredHtmlMarkers) {

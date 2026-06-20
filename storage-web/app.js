@@ -112,9 +112,28 @@ function normalizeInventoryMode(mode) {
   return INVENTORY_MODES.includes(mode) ? mode : 'demo';
 }
 
-function assertLaunchCloudFlagsDisabled(flags = LAUNCH_CLOUD_FLAGS) {
+function evaluateLaunchCloudReadiness(flags = LAUNCH_CLOUD_FLAGS) {
   const enabled = Object.entries(flags).filter(([, value]) => value === true).map(([key]) => key);
-  if (enabled.length) throw new Error(`Launch cloud flags must stay disabled: ${enabled.join(', ')}`);
+  const blocked = enabled.filter((key) => ['cloudSyncEnabled', 'realCloudProviderConnected', 'writesCloudData', 'readsCloudData'].includes(key));
+  const adapterAvailable = typeof fetch === 'function' && CLOUD_INVENTORY_ENDPOINT.startsWith('/api/cloud/');
+  return {
+    status: blocked.length ? 'local_only' : enabled.length && adapterAvailable ? 'cloud_snapshot_ready' : 'local_only',
+    enabled,
+    blocked,
+    adapterAvailable,
+    endpoint: CLOUD_INVENTORY_ENDPOINT,
+    localDataBoundaryPreserved: true,
+    runtimeSyncEnabled: false,
+    message: blocked.length
+      ? `云运行同步保持关闭：${blocked.join(', ')}`
+      : enabled.length
+        ? '云快照通道已准备，Inventory 仍保持本地优先'
+        : '本地优先，云快照未启用',
+  };
+}
+
+function assertLaunchCloudFlagsDisabled(flags = LAUNCH_CLOUD_FLAGS) {
+  evaluateLaunchCloudReadiness(flags);
   return true;
 }
 
@@ -434,6 +453,7 @@ function createRootStore() {
     dataVersion: LOCAL_DATA_VERSION,
     schemaVersions: { ...LOCAL_TABLE_SCHEMA_VERSIONS },
     cloudFlags: { ...LAUNCH_CLOUD_FLAGS },
+    cloudReadiness: evaluateLaunchCloudReadiness(LAUNCH_CLOUD_FLAGS),
     localProfile,
     activeMode,
     stores: {
@@ -478,7 +498,7 @@ function loadRootStore() {
       root.dataVersion = LOCAL_DATA_VERSION;
       root.schemaVersions = { ...(parsed?.schemaVersions || {}), ...LOCAL_TABLE_SCHEMA_VERSIONS };
       root.cloudFlags = { ...LAUNCH_CLOUD_FLAGS, ...(parsed?.cloudFlags || {}) };
-      assertLaunchCloudFlagsDisabled(root.cloudFlags);
+      root.cloudReadiness = evaluateLaunchCloudReadiness(root.cloudFlags);
       root.localProfile = saveLocalProfile(createLocalProfile(parsed?.localProfile, { activeMode: root.activeMode }));
       root.migrationSmokeCheck = buildMigrationSmokeResult(root);
       return root;
@@ -498,6 +518,7 @@ function saveRootStore(root) {
   root.dataVersion = LOCAL_DATA_VERSION;
   root.schemaVersions = { ...(root.schemaVersions || {}), ...LOCAL_TABLE_SCHEMA_VERSIONS };
   root.cloudFlags = { ...LAUNCH_CLOUD_FLAGS, ...(root.cloudFlags || {}) };
+  root.cloudReadiness = evaluateLaunchCloudReadiness(root.cloudFlags);
   root.localProfile = saveLocalProfile(createLocalProfile(root.localProfile, { activeMode: root.activeMode }));
   root.localProfile.lastSavedAt = new Date().toISOString();
   root.migrationSmokeCheck = buildMigrationSmokeResult(root);
@@ -571,6 +592,7 @@ function buildLocalBackupPayload(root = loadRootStore()) {
     localProfile: root.localProfile,
     backupMetadata: loadLocalBackupMetadata(),
     cloudFlags: root.cloudFlags,
+    cloudReadiness: root.cloudReadiness || evaluateLaunchCloudReadiness(root.cloudFlags),
     migrationSmokeCheck: runLocalDataMigrationSmokeCheck(root),
     activeMode: getActiveDataMode(),
     stores: root.stores,
