@@ -46,6 +46,25 @@ const requiredKeys = [
   'aiFriendsAudioConnecting',
   'aiFriendsVideoConnecting',
   'aiFriendsEndCall',
+  'aiFriendsCapabilityImage',
+  'aiFriendsCapabilityFile',
+  'aiFriendsCapabilityAudio',
+  'aiFriendsCapabilityLive',
+  'aiFriendsCapabilityNote',
+  'aiFriendsSearchDate',
+  'aiFriendsSearchAiSuggestion',
+  'aiFriendsSearchNote',
+  'aiFriendsSearchInventory',
+  'aiFriendsSearchExpense',
+  'aiFriendsSearchTodo',
+  'aiFriendsSearchImage',
+  'aiFriendsSearchCall',
+  'aiFriendsSearchFile',
+  'aiFriendsMentionClaudeDescription',
+  'aiFriendsMentionChatGptDescription',
+  'aiFriendsMentionGeminiDescription',
+  'aiFriendsMentionFlomoDescription',
+  'aiFriendsMentionInventoryDescription',
 ];
 
 for (const key of requiredKeys) {
@@ -81,9 +100,43 @@ for (const forbidden of [
   '语音实时对话，解放双手',
   '正在连接实时语音通话',
   '正在连接智友虚拟形象',
+  "label: '图片'",
+  "label: '文件'",
+  "label: '语音'",
+  "label: '实时'",
+  "label: '笔记'",
+  "description: '长文推理 / 方案拆解'",
+  "description: '写作推理 / 日常助手'",
+  "description: '多模态 / 实时信息'",
+  "description: '保存为笔记'",
+  "description: '记一个物品 / 查到期'",
+  "['🗓', '日期']",
+  "['✦', 'AI 建议']",
+  "['📝', '笔记']",
+  "['📦', '物品']",
+  "['💰', '支出']",
+  "['✅', '待办']",
+  "['📷', '图片']",
+  "['📞', '通话']",
+  "['📎', '文件']",
 ]) {
   assert(!aiFriends.includes(forbidden), `PortalAiFriendsPreview still contains hard-coded interaction text: ${forbidden}`);
 }
+
+assert(
+  aiFriends.includes('labelKey: PortalStringKey'),
+  'AI capability labels must use PortalStringKey.',
+);
+
+assert(
+  aiFriends.includes('descriptionKey: PortalStringKey'),
+  'Mention target descriptions must use PortalStringKey.',
+);
+
+assert(
+  aiFriends.includes('type SearchShortcutAction'),
+  'Search shortcuts must use stable action ids instead of localized labels.',
+);
 
 assert(
   pkg.scripts['test:ai-friends-interaction-i18n'] === 'node scripts/ai-friends-interaction-i18n.test.mjs',

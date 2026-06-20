@@ -23,7 +23,7 @@ interface PortalAiFriendsPreviewProps {
 type MentionTarget = {
   key: string;
   label: string;
-  description: string;
+  descriptionKey: PortalStringKey;
   avatar: string;
   iconSrc?: string;
 };
@@ -37,35 +37,37 @@ type AiCapabilityId = 'image' | 'file' | 'audio' | 'live' | 'note';
 const AI_CAPABILITIES: Array<{
   id: AiCapabilityId;
   icon: string;
-  label: string;
+  labelKey: PortalStringKey;
   noticeKey: PortalStringKey;
 }> = [
-  { id: 'image', icon: '📷', label: '图片', noticeKey: 'aiFriendsImageIntentNotice' },
-  { id: 'file', icon: '📎', label: '文件', noticeKey: 'aiFriendsFileIntentNotice' },
-  { id: 'audio', icon: '🎙', label: '语音', noticeKey: 'aiFriendsAudioConnecting' },
-  { id: 'live', icon: '📞', label: '实时', noticeKey: 'aiFriendsLiveIntentNotice' },
-  { id: 'note', icon: '📝', label: '笔记', noticeKey: 'aiFriendsFlomoIntentNotice' },
+  { id: 'image', icon: '📷', labelKey: 'aiFriendsCapabilityImage', noticeKey: 'aiFriendsImageIntentNotice' },
+  { id: 'file', icon: '📎', labelKey: 'aiFriendsCapabilityFile', noticeKey: 'aiFriendsFileIntentNotice' },
+  { id: 'audio', icon: '🎙', labelKey: 'aiFriendsCapabilityAudio', noticeKey: 'aiFriendsAudioConnecting' },
+  { id: 'live', icon: '📞', labelKey: 'aiFriendsCapabilityLive', noticeKey: 'aiFriendsLiveIntentNotice' },
+  { id: 'note', icon: '📝', labelKey: 'aiFriendsCapabilityNote', noticeKey: 'aiFriendsFlomoIntentNotice' },
 ];
 
 const mentionTargets: MentionTarget[] = [
-  { key: 'claude', label: '@Claude', description: '长文推理 / 方案拆解', avatar: 'AI', iconSrc: nesioAiIcons.claude },
-  { key: 'chatgpt', label: '@ChatGPT', description: '写作推理 / 日常助手', avatar: 'G', iconSrc: nesioAiIcons.chatgpt },
-  { key: 'gemini', label: '@Gemini', description: '多模态 / 实时信息', avatar: '✦', iconSrc: nesioAiIcons.gemini },
-  { key: 'flomo', label: '@Flomo', description: '保存为笔记', avatar: 'F' },
-  { key: 'inventory', label: '@物品库', description: '记一个物品 / 查到期', avatar: '📦', iconSrc: nesioToolIcons.storage },
+  { key: 'claude', label: '@Claude', descriptionKey: 'aiFriendsMentionClaudeDescription', avatar: 'AI', iconSrc: nesioAiIcons.claude },
+  { key: 'chatgpt', label: '@ChatGPT', descriptionKey: 'aiFriendsMentionChatGptDescription', avatar: 'G', iconSrc: nesioAiIcons.chatgpt },
+  { key: 'gemini', label: '@Gemini', descriptionKey: 'aiFriendsMentionGeminiDescription', avatar: '✦', iconSrc: nesioAiIcons.gemini },
+  { key: 'flomo', label: '@Flomo', descriptionKey: 'aiFriendsMentionFlomoDescription', avatar: 'F' },
+  { key: 'inventory', label: '@物品库', descriptionKey: 'aiFriendsMentionInventoryDescription', avatar: '📦', iconSrc: nesioToolIcons.storage },
 ];
 
+type SearchShortcutAction = 'date' | 'aiSuggestion' | 'note' | 'inventory' | 'expense' | 'todo' | 'image' | 'call' | 'file';
+
 const searchShortcuts = [
-  ['🗓', '日期'],
-  ['✦', 'AI 建议'],
-  ['📝', '笔记'],
-  ['📦', '物品'],
-  ['💰', '支出'],
-  ['✅', '待办'],
-  ['📷', '图片'],
-  ['📞', '通话'],
-  ['📎', '文件'],
-];
+  { icon: '🗓', labelKey: 'aiFriendsSearchDate', action: 'date' },
+  { icon: '✦', labelKey: 'aiFriendsSearchAiSuggestion', action: 'aiSuggestion' },
+  { icon: '📝', labelKey: 'aiFriendsSearchNote', action: 'note' },
+  { icon: '📦', labelKey: 'aiFriendsSearchInventory', action: 'inventory' },
+  { icon: '💰', labelKey: 'aiFriendsSearchExpense', action: 'expense' },
+  { icon: '✅', labelKey: 'aiFriendsSearchTodo', action: 'todo' },
+  { icon: '📷', labelKey: 'aiFriendsSearchImage', action: 'image' },
+  { icon: '📞', labelKey: 'aiFriendsSearchCall', action: 'call' },
+  { icon: '📎', labelKey: 'aiFriendsSearchFile', action: 'file' },
+] satisfies Array<{ icon: string; labelKey: PortalStringKey; action: SearchShortcutAction }>;
 
 const recentConversations = [
   {
@@ -392,42 +394,42 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
     }
   };
 
-  const handleSearchShortcut = (label: string) => {
+  const handleSearchShortcut = (action: SearchShortcutAction) => {
     setSurface('chat');
     setSearchToolsOpen(false);
 
-    switch (label) {
-      case '日期':
+    switch (action) {
+      case 'date':
         setComposer('@Gemini 帮我看今天接下来最重要的安排。');
         setUtilityNotice(t(locale, 'aiFriendsCalendarIntentNotice'));
         break;
-      case 'AI 建议':
+      case 'aiSuggestion':
         setComposer('@Gemini ');
         setUtilityNotice(t(locale, 'aiFriendsRecommendationIntentNotice'));
         break;
-      case '笔记':
+      case 'note':
         addFlomoNoteIntent();
         return;
-      case '物品':
+      case 'inventory':
         setComposer('@物品库 记一个物品：');
         setUtilityNotice(t(locale, 'aiFriendsInventoryIntentNotice'));
         break;
-      case '支出':
+      case 'expense':
         setComposer('@豆包 记录一笔支出：');
         setUtilityNotice(t(locale, 'aiFriendsExpenseIntentNotice'));
         break;
-      case '待办':
+      case 'todo':
         setComposer('@Flomo 待办：');
         setUtilityNotice(t(locale, 'aiFriendsTodoIntentNotice'));
         break;
-      case '图片':
+      case 'image':
         imageInputRef.current?.click();
         setUtilityNotice(t(locale, 'aiFriendsImageIntentNotice'));
         return;
-      case '通话':
+      case 'call':
         openCallSheet();
         return;
-      case '文件':
+      case 'file':
         fileInputRef.current?.click();
         setUtilityNotice(t(locale, 'aiFriendsFileIntentNotice'));
         return;
@@ -554,10 +556,10 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
           </label>
           {searchToolsOpen ? (
             <div className="portal-ai-search-grid" aria-label="搜索分类">
-              {searchShortcuts.map(([icon, label]) => (
-                <button key={label} type="button" onClick={() => handleSearchShortcut(label)}>
-                  <span aria-hidden>{icon}</span>
-                  <b>{label}</b>
+              {searchShortcuts.map((shortcut) => (
+                <button key={shortcut.action} type="button" onClick={() => handleSearchShortcut(shortcut.action)}>
+                  <span aria-hidden>{shortcut.icon}</span>
+                  <b>{t(locale, shortcut.labelKey)}</b>
                 </button>
               ))}
             </div>
@@ -668,7 +670,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
                     onClick={() => handleCapabilityAction(capability.id)}
                   >
                     {capability.icon}
-                    <span>{capability.label}</span>
+                    <span>{t(locale, capability.labelKey)}</span>
                   </button>
                 ))}
               </div>
@@ -747,7 +749,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
                       <Image src={target.iconSrc} alt="" className="portal-ai-mention-icon" width={30} height={30} />
                     ) : null}
                     <b>{target.label}</b>
-                    <span>{target.description}</span>
+                    <span>{t(locale, target.descriptionKey)}</span>
                   </button>
                 ))}
               </div>

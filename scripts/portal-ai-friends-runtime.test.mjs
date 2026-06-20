@@ -105,14 +105,14 @@ assert(
 );
 
 assert(
-  component.includes("handleSearchShortcut") && /searchShortcuts\.map[\s\S]*onClick=\{\(\) => handleSearchShortcut\(label\)\}/.test(component),
+  component.includes("handleSearchShortcut") && /searchShortcuts\.map[\s\S]*onClick=\{\(\) => handleSearchShortcut\(shortcut\.action\)\}/.test(component),
   'PortalAiFriendsPreview search shortcut buttons must perform real actions instead of being inert.',
 );
 
 assert(
-  /case '图片'[\s\S]*imageInputRef\.current\?\.click\(\)/.test(component) &&
-    /case '文件'[\s\S]*fileInputRef\.current\?\.click\(\)/.test(component) &&
-    /case '通话'[\s\S]*openCallSheet\(\)/.test(component),
+  /case 'image'[\s\S]*imageInputRef\.current\?\.click\(\)/.test(component) &&
+    /case 'file'[\s\S]*fileInputRef\.current\?\.click\(\)/.test(component) &&
+    /case 'call'[\s\S]*openCallSheet\(\)/.test(component),
   'PortalAiFriendsPreview search shortcuts must wire image, file, and call actions.',
 );
 
