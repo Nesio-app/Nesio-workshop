@@ -26,6 +26,9 @@ for (const marker of [
   'authFeedback',
   'authEmail',
   'authPhone',
+  'onInspectServerProviderAction',
+  'formatProviderActionButtonLabel',
+  'isProviderActionDisabled',
 ]) {
   assert.ok(source.includes(marker), `AccountSettings must wire production runtime marker: ${marker}`);
 }
@@ -45,8 +48,11 @@ for (const label of ['Gemini', 'Google Calendar', 'Cloud DB', 'Email', 'Google',
 assert.ok(source.includes('provider_not_configured'), 'AccountSettings must surface fail-closed auth errors');
 assert.ok(source.includes('window.location.assign'), 'OAuth auth start must be able to navigate to redirect URL');
 assert.ok(source.includes('window.location.href = provider.startEndpoint'), 'Provider action rows must be able to navigate to real runtime endpoints');
-assert.ok(source.includes('provider.serverOnly'), 'Provider action rows must not expose server-only capabilities as clickable frontend actions');
-assert.ok(source.includes("provider.actionStatus !== 'ready'"), 'Provider action rows must disable actions until runtime marks them ready');
+assert.ok(source.includes('provider.serverOnly'), 'Provider action rows must distinguish server-only capabilities');
+assert.ok(source.includes('onInspectServerProviderAction(provider)'), 'Server-only provider actions must be clickable diagnostics, not disabled dead buttons');
+assert.ok(!source.includes(`disabled={!row.provider || row.provider.serverOnly || row.provider.actionStatus !== 'ready'}`), 'Server-only provider action buttons must not be disabled just because they are server-only');
+assert.ok(source.includes("provider.actionStatus !== 'ready' && provider.actionStatus !== 'server_ready'"), 'Provider action rows must only disable when runtime is neither ready nor server_ready');
+assert.ok(source.includes('disabled={isProviderActionDisabled(row.provider)}'), 'Provider action row disabled state must use shared ready/server_ready resolver');
 assert.ok(source.includes('authSession?.loggedIn'), 'AccountSettings must display real session login status');
 assert.ok(source.includes('onLogoutAuth'), 'AccountSettings must expose a logout action');
 assert.ok(source.includes('saveProfileSettings(nextProfile)'), 'AccountSettings must persist merged cloud profile settings locally');

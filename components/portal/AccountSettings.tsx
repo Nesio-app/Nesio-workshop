@@ -410,13 +410,36 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
     return '已配置，但生产开关尚未启用。';
   };
 
+  const onInspectServerProviderAction = (provider: ProductionRuntimeProviderAction) => {
+    if (provider.actionStatus === 'server_ready') {
+      setAuthFeedback(`${provider.label} 服务端已可用：${provider.safeUserAction}。`);
+      return;
+    }
+    if (provider.missingEnv.length) {
+      setAuthFeedback(`${provider.label} 仍缺配置：${provider.missingEnv.slice(0, 4).join(' / ')}。`);
+      return;
+    }
+    setAuthFeedback(`${provider.label} 已配置，但生产运行态尚未开启。`);
+  };
+
+  const formatProviderActionButtonLabel = (provider?: ProductionRuntimeProviderAction): string => {
+    if (!provider) return '检查中';
+    if (provider.serverOnly) return '检查';
+    if (provider.actionStatus === 'ready') return '打开';
+    return '待配置';
+  };
+
+  const isProviderActionDisabled = (provider?: ProductionRuntimeProviderAction): boolean => {
+    return !provider || (provider.actionStatus !== 'ready' && provider.actionStatus !== 'server_ready');
+  };
+
   const onOpenProviderAction = (provider?: ProductionRuntimeProviderAction) => {
     if (!provider) {
       setAuthFeedback('正在读取连接状态，请稍后再试。');
       return;
     }
     if (provider.serverOnly) {
-      setAuthFeedback(`${provider.label} 是服务端能力，不从前端直接触发。`);
+      onInspectServerProviderAction(provider);
       return;
     }
     if (provider.actionStatus !== 'ready' || !provider.startEndpoint) {
@@ -762,10 +785,10 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
                 <button
                   type="button"
                   className="portal-settings-provider-action"
-                  disabled={!row.provider || row.provider.serverOnly || row.provider.actionStatus !== 'ready'}
+                  disabled={isProviderActionDisabled(row.provider)}
                   onClick={() => onOpenProviderAction(row.provider)}
                 >
-                  {row.provider?.serverOnly ? '服务端' : row.provider?.actionStatus === 'ready' ? '打开' : '待配置'}
+                  {formatProviderActionButtonLabel(row.provider)}
                 </button>
               ) : null}
             </li>
