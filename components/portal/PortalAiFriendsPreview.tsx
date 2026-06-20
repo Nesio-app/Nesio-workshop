@@ -749,7 +749,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
               <button
                 type="button"
                 className="portal-ai-round-action"
-                aria-label="语音输入"
+                aria-label={t(locale, 'aiFriendsVoiceInput')}
                 aria-expanded={audioCallOpen}
                 aria-controls="portal-ai-audio-call"
                 data-runtime-action="ai-open-audio-call"
@@ -760,7 +760,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
               <button
                 type="button"
                 className="portal-ai-call-button"
-                aria-label="通话"
+                aria-label={t(locale, 'aiFriendsCall')}
                 aria-expanded={callSheetOpen || videoCallOpen || audioCallOpen}
                 aria-controls="portal-ai-call-sheet"
                 data-runtime-action="ai-open-live-call"

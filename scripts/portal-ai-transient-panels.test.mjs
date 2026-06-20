@@ -49,7 +49,7 @@ assert.match(
 );
 assert.match(
   component,
-  /aria-label="通话"[\s\S]*onClick=\{openCallSheet\}/,
+  /aria-label=\{t\(locale, 'aiFriendsCall'\)\}[\s\S]*onClick=\{openCallSheet\}/,
   'The composer call button must use the shared openCallSheet handler.',
 );
 
@@ -61,7 +61,7 @@ assert.match(
 );
 assert.match(
   component,
-  /aria-label="语音输入"[\s\S]*onClick=\{openAudioCall\}/,
+  /aria-label=\{t\(locale, 'aiFriendsVoiceInput'\)\}[\s\S]*onClick=\{openAudioCall\}/,
   'The composer voice button must use the shared openAudioCall handler.',
 );
 

@@ -156,8 +156,8 @@ assert(
 );
 
 assert(
-  /aria-label="语音输入"[\s\S]*aria-controls="portal-ai-audio-call"[\s\S]*onClick=\{openAudioCall\}/.test(component) &&
-    /aria-label="通话"[\s\S]*aria-controls="portal-ai-call-sheet"[\s\S]*onClick=\{openCallSheet\}/.test(component),
+  /aria-label=\{t\(locale, 'aiFriendsVoiceInput'\)\}[\s\S]*aria-controls="portal-ai-audio-call"[\s\S]*onClick=\{openAudioCall\}/.test(component) &&
+    /aria-label=\{t\(locale, 'aiFriendsCall'\)\}[\s\S]*aria-controls="portal-ai-call-sheet"[\s\S]*onClick=\{openCallSheet\}/.test(component),
   'PortalAiFriendsPreview voice and call buttons must point to real call surfaces.',
 );
 
