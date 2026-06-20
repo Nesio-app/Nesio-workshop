@@ -12,8 +12,16 @@ const portal = read('components/portal/Portal.tsx');
 const secretaryIndex = read('public/secretary/index.html');
 const secretaryChat = read('public/secretary/chat.js');
 const secretaryApi = read('public/secretary/api.js');
+const personalLabGateBody = launchSafety.match(
+  /export function isPersonalLabAiRequestAllowed[\s\S]*?\n}\n/,
+)?.[0] || '';
 
-assert.match(launchSafety, /BAOHE_PERSONAL_LAB_AI_ENABLED/, 'personal lab AI must be env-gated');
+assert.match(launchSafety, /BAOHE_PERSONAL_LAB_AI_ENABLED/, 'personal lab AI must keep an explicit env override gate');
+assert.match(
+  personalLabGateBody,
+  /hasPersonalLabAccessMarker\(request\)[\s\S]*hasProductionAiProviderKey\(\)/,
+  'personal lab AI must also open when an explicit personal_lab request has a configured provider key.',
+);
 assert.match(launchSafety, /isPersonalLabAiRequestAllowed/, 'personal lab AI request helper must exist');
 assert.match(launchSafety, /isSecretaryAiRequestAllowed/, 'secretary AI must support a combined lab-or-production gate');
 assert.match(launchSafety, /x-baohe-access-mode/, 'personal lab AI must require an explicit access-mode header');

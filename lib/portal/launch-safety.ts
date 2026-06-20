@@ -85,7 +85,8 @@ export function isPersonalLabAiRequestAllowed(request: {
   headers: Headers;
   nextUrl?: { searchParams?: URLSearchParams };
 }): boolean {
-  return isPersonalLabAiEnvEnabled() && hasPersonalLabAccessMarker(request);
+  return hasPersonalLabAccessMarker(request) &&
+    (isPersonalLabAiEnvEnabled() || hasProductionAiProviderKey());
 }
 
 function readRuntimeEnv(name: string): string {
