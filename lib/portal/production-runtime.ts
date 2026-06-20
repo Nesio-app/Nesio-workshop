@@ -165,8 +165,7 @@ export function buildProductionRuntimeStatus(env: EnvMap = process.env) {
     googleCalendar: status(env, {
       id: 'google_calendar',
       label: 'Google Calendar',
-      requiredEnv: ['CALENDAR_PRIVATE_FEEDS_ENABLED'],
-      alternateGroups: [['GOOGLE_CALENDAR_ICAL_URL', 'GOOGLE_CALENDAR_ICS_URL', 'GOOGLE_CALENDAR_ICAL_URLS']],
+      requiredEnv: ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET'],
     }),
     flomo: status(env, {
       id: 'flomo',
@@ -239,8 +238,8 @@ export function buildProductionRuntimeStatus(env: EnvMap = process.env) {
     }),
     action(thirdParty.googleCalendar, {
       category: 'third_party',
-      startEndpoint: '/api/portal/calendar',
-      safeUserAction: 'read_google_calendar_preview',
+      startEndpoint: '/api/portal/calendar/connect',
+      safeUserAction: 'authorize_google_calendar_readonly',
     }),
     action(thirdParty.flomo, {
       category: 'third_party',

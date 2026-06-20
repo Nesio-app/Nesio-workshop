@@ -13,14 +13,17 @@ const authStartRoute = read('app/api/auth/start/route.ts');
 const authCallbackRoute = read('app/api/auth/callback/route.ts');
 const authSessionRoute = read('app/api/auth/session/route.ts');
 const authLogoutRoute = read('app/api/auth/logout/route.ts');
+const calendarConnectRoute = read('app/api/portal/calendar/connect/route.ts');
+const calendarOAuthCallbackRoute = read('app/api/portal/calendar/oauth/callback/route.ts');
 const runtimeHelper = read('lib/portal/production-runtime.ts');
 const packageJson = JSON.parse(read('package.json'));
 
-for (const source of [healthRoute, authStartRoute, authCallbackRoute, authSessionRoute, authLogoutRoute]) {
+for (const source of [healthRoute, authStartRoute, authCallbackRoute, authSessionRoute, authLogoutRoute, calendarConnectRoute, calendarOAuthCallbackRoute]) {
   assert.match(source, /redact|safe|public/i, 'production runtime routes must explicitly redact or expose only safe status');
   assert.doesNotMatch(source, /SUPABASE_SERVICE_ROLE_KEY[^?].*NextResponse\.json/s, 'routes must not return service role secrets');
   assert.doesNotMatch(source, /WECHAT_APP_SECRET[^?].*NextResponse\.json/s, 'routes must not return WeChat secrets');
   assert.doesNotMatch(source, /OPENAI_API_KEY[^?].*NextResponse\.json/s, 'routes must not return AI secrets');
+  assert.doesNotMatch(source, /GOOGLE_CLIENT_SECRET[^?].*NextResponse\.json/s, 'routes must not return Google client secrets');
 }
 
 assert.match(healthRoute, /GET\(/, 'production health route must expose GET');
@@ -65,6 +68,13 @@ assert.match(authLogoutRoute, /baohe_auth_refresh/, 'auth logout must clear the 
 assert.match(authLogoutRoute, /maxAge:\s*0/, 'auth logout must expire auth cookies');
 assert.match(authLogoutRoute, /auth\/v1\/logout/, 'auth logout should best-effort revoke the Supabase session when configured');
 assert.match(runtimeHelper, /state', 'nesio'|state", "nesio"/, 'WeChat OAuth state should use Nesio naming.');
+assert.match(calendarConnectRoute, /https:\/\/accounts\.google\.com\/o\/oauth2\/v2\/auth/, 'Google Calendar connect must redirect through Google OAuth.');
+assert.match(calendarConnectRoute, /calendar\.readonly/, 'Google Calendar connect must request calendar readonly scope.');
+assert.match(calendarConnectRoute, /provider_not_configured/, 'Google Calendar connect must fail closed when OAuth config is missing.');
+assert.match(calendarOAuthCallbackRoute, /oauth2\.googleapis\.com\/token/, 'Google Calendar callback must exchange the OAuth code for tokens.');
+assert.match(calendarOAuthCallbackRoute, /nesio_google_calendar_access/, 'Google Calendar callback must store access token in an httpOnly cookie.');
+assert.match(calendarOAuthCallbackRoute, /nesio_google_calendar_refresh/, 'Google Calendar callback must store refresh token in an httpOnly cookie.');
+assert.match(runtimeHelper, /google_calendar[\s\S]*\/api\/portal\/calendar\/connect/, 'Google Calendar provider action must point users at OAuth connect.');
 
 assert.equal(
   packageJson.scripts['test:production-runtime-surface'],
