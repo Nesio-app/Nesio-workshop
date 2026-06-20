@@ -371,11 +371,11 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
   };
 
   const cloudProfileStatusLabel = (() => {
-    if (cloudProfileStatus === 'synced') return '已同步';
-    if (cloudProfileStatus === 'loading') return '同步中';
-    if (cloudProfileStatus === 'not_signed_in') return '未登录';
-    if (cloudProfileStatus === 'error') return '同步失败';
-    return '本机保存';
+    if (cloudProfileStatus === 'synced') return t(locale, 'providerStatusSynced');
+    if (cloudProfileStatus === 'loading') return t(locale, 'providerStatusSyncing');
+    if (cloudProfileStatus === 'not_signed_in') return t(locale, 'providerStatusNotSignedIn');
+    if (cloudProfileStatus === 'error') return t(locale, 'providerStatusSyncFailed');
+    return t(locale, 'providerStatusLocalSaved');
   })();
 
   const providerActionsById = useMemo(() => {
@@ -389,49 +389,62 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
   }, [runtimeStatus?.providerActionMatrix]);
 
   const formatProviderActionStatus = (provider?: ProductionRuntimeProviderAction): string => {
-    if (!provider) return runtimeLoading ? '检查中' : '未连接';
-    if (provider.actionStatus === 'ready') return '可使用';
-    if (provider.actionStatus === 'server_ready') return '服务端可用';
-    if (provider.configured) return '待开启';
-    return '缺配置';
+    if (!provider) return runtimeLoading ? t(locale, 'providerStatusChecking') : t(locale, 'providerStatusNotConnected');
+    if (provider.actionStatus === 'ready') return t(locale, 'providerStatusReady');
+    if (provider.actionStatus === 'server_ready') return t(locale, 'providerStatusServerReady');
+    if (provider.configured) return t(locale, 'providerStatusPendingEnable');
+    return t(locale, 'providerStatusMissingConfig');
   };
 
   const formatProviderActionDetail = (provider?: ProductionRuntimeProviderAction): string => {
-    if (!provider) return '正在读取生产运行状态。';
+    if (!provider) return t(locale, 'providerDetailLoadingRuntime');
     if (provider.actionStatus === 'ready') {
       return provider.startEndpoint
-        ? `已连接到 ${provider.startEndpoint}，动作：${provider.safeUserAction}。`
-        : `已启用，动作：${provider.safeUserAction}。`;
+        ? t(locale, 'providerDetailReadyWithEndpointTemplate', {
+          endpoint: provider.startEndpoint,
+          action: provider.safeUserAction,
+        })
+        : t(locale, 'providerDetailReadyTemplate', { action: provider.safeUserAction });
     }
     if (provider.actionStatus === 'server_ready') {
-      return `服务端能力已准备；${provider.safeUserAction} 不从前端直接触发。`;
+      return t(locale, 'providerDetailServerReadyTemplate', { action: provider.safeUserAction });
     }
-    if (provider.missingEnv.length) return `缺少：${provider.missingEnv.slice(0, 3).join(' / ')}${provider.missingEnv.length > 3 ? '…' : ''}`;
-    return '已配置，但生产开关尚未启用。';
+    if (provider.missingEnv.length) {
+      return t(locale, 'providerDetailMissingEnvTemplate', {
+        missing: `${provider.missingEnv.slice(0, 3).join(' / ')}${provider.missingEnv.length > 3 ? '…' : ''}`,
+      });
+    }
+    return t(locale, 'providerDetailConfiguredButDisabled');
   };
 
   const onInspectServerProviderAction = (provider: ProductionRuntimeProviderAction) => {
     if (provider.actionStatus === 'server_ready') {
-      setAuthFeedback(`${provider.label} 服务端已可用：${provider.safeUserAction}。`);
+      setAuthFeedback(t(locale, 'providerServerReadyFeedbackTemplate', {
+        provider: provider.label,
+        action: provider.safeUserAction,
+      }));
       return;
     }
     if (provider.missingEnv.length) {
-      setAuthFeedback(`${provider.label} 仍缺配置：${provider.missingEnv.slice(0, 4).join(' / ')}。`);
+      setAuthFeedback(t(locale, 'providerStillMissingConfigTemplate', {
+        provider: provider.label,
+        missing: provider.missingEnv.slice(0, 4).join(' / '),
+      }));
       return;
     }
-    setAuthFeedback(`${provider.label} 已配置，但生产运行态尚未开启。`);
+    setAuthFeedback(t(locale, 'providerConfiguredButRuntimeOffTemplate', { provider: provider.label }));
   };
 
   const formatProviderActionButtonLabel = (provider?: ProductionRuntimeProviderAction): string => {
-    if (!provider) return '检查中';
-    if (provider.serverOnly) return '检查';
-    if (provider.actionStatus === 'ready') return '打开';
-    return '待配置';
+    if (!provider) return t(locale, 'providerActionChecking');
+    if (provider.serverOnly) return t(locale, 'providerActionInspect');
+    if (provider.actionStatus === 'ready') return t(locale, 'providerActionOpen');
+    return t(locale, 'providerActionPendingConfig');
   };
 
   const onOpenProviderAction = (provider?: ProductionRuntimeProviderAction) => {
     if (!provider) {
-      setAuthFeedback('正在读取连接状态，请稍后再试。');
+      setAuthFeedback(t(locale, 'providerReadStateLater'));
       return;
     }
     if (provider.serverOnly) {
@@ -453,14 +466,14 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
 
   const onStartAuth = async (provider: AuthStartProvider) => {
     if (provider === 'email' && !authEmail.trim()) {
-      setAuthFeedback('请先输入邮箱。');
+      setAuthFeedback(t(locale, 'authNeedEmail'));
       return;
     }
     if (provider === 'phone' && !authPhone.trim()) {
-      setAuthFeedback('请先输入手机号。');
+      setAuthFeedback(t(locale, 'authNeedPhone'));
       return;
     }
-    setAuthFeedback('正在连接…');
+    setAuthFeedback(t(locale, 'authConnecting'));
     try {
       const client = createAppApiClient();
       const result = await client.startAuth({
@@ -469,30 +482,33 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
         phone: authPhone.trim(),
       });
       if (result.ok && result.action === 'redirect' && result.url) {
-        setAuthFeedback('正在跳转授权页面…');
+        setAuthFeedback(t(locale, 'authRedirecting'));
         window.location.assign(result.url);
         return;
       }
       if (result.ok && result.action === 'otp_sent') {
-        setAuthFeedback('验证码已发送，请检查邮箱或手机。');
+        setAuthFeedback(t(locale, 'authOtpSent'));
         return;
       }
       if (result.error === 'provider_not_configured') {
-        setAuthFeedback(`${provider} 登录尚未配置：${result.status?.missingEnv.slice(0, 3).join(' / ') || '缺少环境变量'}`);
+        setAuthFeedback(t(locale, 'authProviderNotConfiguredTemplate', {
+          provider,
+          reason: result.status?.missingEnv.slice(0, 3).join(' / ') || t(locale, 'authMissingEnvFallback'),
+        }));
         return;
       }
-      setAuthFeedback(result.error || '暂时无法开始登录。');
+      setAuthFeedback(result.error || t(locale, 'authStartFailed'));
     } catch {
-      setAuthFeedback('连接登录服务失败，请稍后再试。');
+      setAuthFeedback(t(locale, 'authServiceFailed'));
     }
   };
 
   const onLogoutAuth = async () => {
     if (!authSession?.loggedIn) {
-      setAuthFeedback('当前未登录，无需退出。');
+      setAuthFeedback(t(locale, 'authNotLoggedIn'));
       return;
     }
-    setAuthFeedback('正在退出…');
+    setAuthFeedback(t(locale, 'authSigningOut'));
     try {
       const client = createAppApiClient();
       const result = await client.logoutAuth();
@@ -505,12 +521,12 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
           hasRefreshToken: false,
           status: 'signed_out',
         });
-        setAuthFeedback('已退出登录。');
+        setAuthFeedback(t(locale, 'authSignedOut'));
         return;
       }
-      setAuthFeedback('退出登录失败，请稍后再试。');
+      setAuthFeedback(t(locale, 'authLogoutFailed'));
     } catch {
-      setAuthFeedback('连接退出服务失败，请稍后再试。');
+      setAuthFeedback(t(locale, 'authLogoutServiceFailed'));
     }
   };
 
@@ -562,15 +578,15 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
       label: 'Profile Settings',
       status: cloudProfileStatusLabel,
       detail: cloudProfileStatus === 'synced'
-        ? '头像、语言等个人设置已通过云端 profile settings 合约同步。'
-        : '头像、语言等个人设置会先保存在本机；登录和云端可用时再同步。',
+        ? t(locale, 'profileSettingsSyncedDetail')
+        : t(locale, 'profileSettingsLocalDetail'),
     },
     {
       label: 'Google Calendar',
       status: formatProviderActionStatus(providerActionsById.google_calendar),
       detail: providerActionsById.google_calendar?.enabled
-        ? '生产环境已检测到日历连接。'
-        : (calendarUrl ? '本机已保存日历链接；生产读取仍以环境配置为准。' : formatProviderActionDetail(providerActionsById.google_calendar)),
+        ? t(locale, 'googleCalendarConnectedDetail')
+        : (calendarUrl ? t(locale, 'googleCalendarLocalLinkDetail') : formatProviderActionDetail(providerActionsById.google_calendar)),
       provider: providerActionsById.google_calendar,
     },
     {
@@ -586,14 +602,14 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
       provider: providerActionsById.flomo,
     },
     {
-      label: '健康 / 金融 / 心理',
-      status: '受保护',
-      detail: '高信任模块不进入首发公开承诺，不提供建议、诊断、交易或真实账户动作。',
+      label: t(locale, 'trustModulesProtectedLabel'),
+      status: t(locale, 'trustModulesProtectedStatus'),
+      detail: t(locale, 'trustModulesProtectedDetail'),
     },
     {
-      label: '自动化与外部授权',
-      status: '关闭',
-      detail: '付费或连接不等于可以安全执行；外部授权和自动执行仍需 CEO Gate。',
+      label: t(locale, 'automationExternalAuthLabel'),
+      status: t(locale, 'automationExternalAuthStatus'),
+      detail: t(locale, 'automationExternalAuthDetail'),
     },
   ];
 
@@ -735,16 +751,18 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
         <ul className="portal-settings-safety-list">
           <li className="portal-settings-auth-actions">
             <div>
-              <strong>账户登录</strong>
+              <strong>{t(locale, 'authLoginTitle')}</strong>
               <p>
                 {authSessionLoading
-                  ? '正在读取登录状态。'
+                  ? t(locale, 'authLoginLoading')
                   : authSession?.loggedIn
-                    ? `已登录${authSession.user?.email ? `：${authSession.user.email}` : authSession.user?.phone ? `：${authSession.user.phone}` : ''}`
-                    : '邮件、Google、微信、电话都会走生产授权入口；未配置时会明确失败原因。'}
+                    ? t(locale, 'authLoggedInTemplate', {
+                      identity: authSession.user?.email || authSession.user?.phone || t(locale, 'authStatusLoggedIn'),
+                    })
+                    : t(locale, 'authLoginHelp')}
               </p>
             </div>
-            <span>{authSession?.loggedIn ? '已登录' : runtimeStatus?.accountAuth.enabled ? '已开启' : '待配置'}</span>
+            <span>{authSession?.loggedIn ? t(locale, 'authStatusLoggedIn') : runtimeStatus?.accountAuth.enabled ? t(locale, 'authStatusEnabled') : t(locale, 'authStatusPendingConfig')}</span>
             <div className="portal-settings-auth-inputs">
               <label>
                 <span>Email</span>
@@ -774,7 +792,7 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
               <button type="button" onClick={() => onStartAuth('google')}>Google</button>
               <button type="button" onClick={() => onStartAuth('wechat')}>WeChat</button>
               <button type="button" onClick={() => onStartAuth('phone')}>Phone</button>
-              <button type="button" onClick={onLogoutAuth}>退出登录</button>
+              <button type="button" onClick={onLogoutAuth}>{t(locale, 'authSignOut')}</button>
             </div>
           </li>
           {safetyRows.map((row) => (
