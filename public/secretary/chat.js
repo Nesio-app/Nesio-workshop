@@ -206,10 +206,13 @@ const attachHandlers = {
   photo: () => pickPhoto.click(),
   file: () => pickFile.click(),
   video: () => {
-    toast('视频通话需 WebRTC 信令服务，下一版接入；可先发送短视频文件');
-    pickVideo.click();
+    attach.close();
+    void openLiveVoiceCall();
   },
-  voice: () => toast('按住输入框旁麦克风可语音输入'),
+  voice: () => {
+    attach.close();
+    void openLiveVoiceCall();
+  },
   call: () => {
     attach.close();
     void openLiveVoiceCall();

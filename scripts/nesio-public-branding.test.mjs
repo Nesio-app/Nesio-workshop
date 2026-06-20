@@ -13,6 +13,9 @@ const onboarding = readFileSync(join(root, 'components', 'portal', 'PortalOnboar
 const storageSourceHome = readFileSync(join(root, 'storage-web', 'index.html'), 'utf8');
 const storageHome = readFileSync(join(root, 'public', 'storage', 'index.html'), 'utf8');
 const calendarRoute = readFileSync(join(root, 'app', 'api', 'portal', 'calendar', 'route.ts'), 'utf8');
+const secretaryList = readFileSync(join(root, 'public', 'secretary', 'index.html'), 'utf8');
+const secretaryListJs = readFileSync(join(root, 'public', 'secretary', 'list.js'), 'utf8');
+const secretaryApi = readFileSync(join(root, 'public', 'secretary', 'api.js'), 'utf8');
 
 assert.match(layout, /title:\s*'Nesio\b/, 'App metadata title must use the public product name Nesio.');
 assert.match(layout, /appleWebApp:[\s\S]*title:\s*'Nesio'/, 'Apple Web App title must use Nesio.');
@@ -32,9 +35,15 @@ assert.doesNotMatch(onboarding, /Baohe|Treasure Box|TreasureBox|Nosio/, 'Public 
 assert.doesNotMatch(storageSourceHome, /Baohe|Treasure Box|TreasureBox|Nosio/, 'Inventory source first-launch copy must use Nesio naming.');
 assert.doesNotMatch(storageHome, /Baohe|Treasure Box|TreasureBox|Nosio/, 'Public Inventory first-launch copy must use Nesio naming.');
 assert.doesNotMatch(calendarRoute, /TreasureBox|Treasure Box|Nosio/, 'External-facing calendar User-Agent must use Nesio naming.');
+assert.doesNotMatch(secretaryList, /宝盒工具|>宝盒<|Baohe|Treasure Box|TreasureBox|Nosio/, 'Public Secretary list chrome must use Nesio naming.');
+assert.doesNotMatch(secretaryListJs, /返回宝盒|Baohe|Treasure Box|TreasureBox|Nosio/, 'Public Secretary actions must use Nesio naming.');
+assert.doesNotMatch(secretaryApi, /treasurebox-nu\.vercel\.app|Nosio/, 'Secretary API public fallback must use the Nesio domain.');
 assert.match(onboarding, /Nesio/, 'Public onboarding copy should mention Nesio.');
 assert.match(storageSourceHome, /Nesio Purchase Memory/, 'Inventory source first-launch kicker should mention Nesio.');
 assert.match(storageHome, /Nesio Purchase Memory/, 'Inventory first-launch kicker should mention Nesio.');
+assert.match(secretaryList, /Nesio/, 'Public Secretary list chrome should mention Nesio.');
+assert.match(secretaryListJs, /返回 Nesio/, 'Public Secretary dock should return to Nesio.');
+assert.match(secretaryApi, /https:\/\/www\.nesio\.app/, 'Secretary API public fallback should use www.nesio.app.');
 assert.match(
   pkg.scripts['test:contracts'],
   /test:nesio-public-branding/,

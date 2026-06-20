@@ -3,14 +3,14 @@ function apiBase() {
     const v = String(window.SECRETARY_API).replace(/\/$/, '');
     if (v) return v;
   }
-  if (typeof location === 'undefined') return 'https://treasurebox-nu.vercel.app';
+  if (typeof location === 'undefined') return 'https://www.nesio.app';
 
   const { protocol, hostname, origin } = location;
   if (protocol === 'capacitor:' || protocol === 'file:' || hostname === 'localhost') {
-    return 'https://treasurebox-nu.vercel.app';
+    return 'https://www.nesio.app';
   }
   if (origin && origin !== 'null') return origin.replace(/\/$/, '');
-  return 'https://treasurebox-nu.vercel.app';
+  return 'https://www.nesio.app';
 }
 
 async function checkSecretaryHealth() {

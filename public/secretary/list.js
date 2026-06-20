@@ -133,7 +133,7 @@ function renderDockActions() {
   const actions = [
     { label: '发起群聊', icon: '👥', fn: () => openGroupSheet() },
     { label: 'Gemini', icon: '✦', href: '/secretary/chat?friend=gemini' },
-    { label: '返回宝盒', icon: '盒', href: '/' },
+    { label: '返回 Nesio', icon: '盒', href: '/' },
   ];
   for (const a of actions) {
     const btn = document.createElement('button');

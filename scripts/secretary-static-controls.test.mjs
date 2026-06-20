@@ -9,14 +9,37 @@ function read(relativePath) {
 }
 
 const packageJson = JSON.parse(read('package.json'));
+const chatHtml = read('public/secretary/chat.html');
+const chatJs = read('public/secretary/chat.js');
 const groupHtml = read('public/secretary/group.html');
 const groupJs = read('public/secretary/group.js');
 
-for (const inertCopy of ['语音通话功能开发中', '视频功能开发中', '位置功能开发中']) {
+for (const inertCopy of ['语音通话功能开发中', '视频功能开发中', '视频通话需 WebRTC 信令服务', '位置功能开发中']) {
+  assert.doesNotMatch(
+    chatJs,
+    new RegExp(inertCopy),
+    `Secretary chat controls must not fall back to inert "${inertCopy}" toasts.`,
+  );
   assert.doesNotMatch(
     groupJs,
     new RegExp(inertCopy),
     `Secretary group controls must not fall back to inert "${inertCopy}" toasts.`,
+  );
+}
+
+for (const id of [
+  'voiceCall',
+  'voiceCallStatus',
+  'voiceCallTranscript',
+  'voiceCallAvatar',
+  'voiceCallName',
+  'voiceCallOrb',
+  'voiceCallHangup',
+]) {
+  assert.match(
+    chatHtml,
+    new RegExp(`id="${id}"`),
+    `Secretary chat page must include shared Live call overlay node #${id}.`,
   );
 }
 
@@ -41,7 +64,17 @@ assert.match(
   /src="\/secretary\/voice-call\.js"/,
   'Secretary group page must load the shared Live call controller.',
 );
+assert.match(
+  chatHtml,
+  /src="\/secretary\/voice-call\.js"/,
+  'Secretary chat page must load the shared Live call controller.',
+);
 
+assert.match(
+  chatJs,
+  /createLiveVoiceCall/,
+  'Secretary chat page must mount the shared Live voice call controller.',
+);
 assert.match(
   groupJs,
   /createLiveVoiceCall/,
@@ -51,6 +84,11 @@ assert.match(
   groupJs,
   /openGroupLiveCall/,
   'Secretary group page must expose a real call opener for audio and video actions.',
+);
+assert.match(
+  chatJs,
+  /video:\s*\(\)\s*=>\s*\{[\s\S]*openLiveVoiceCall\(\)/,
+  'Secretary chat video attachment must open the shared Live call flow.',
 );
 assert.match(
   groupJs,
