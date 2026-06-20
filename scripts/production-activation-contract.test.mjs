@@ -64,4 +64,18 @@ assert.equal(configuredReport.summary.missingEnvProviderCount, 0);
 assert.equal(configuredReport.summary.enabledSwitchCount, configuredReport.summary.runtimeSwitchCount);
 assert.ok(configuredReport.providers.every((provider) => provider.runtimeEnabled === true));
 
+const aliasEnvReport = buildProductionActivationContract({
+  env: {
+    BAOHE_AI_PROVIDER_MODE: 'production',
+    GOOGLE_GENERATIVE_AI_API_KEY: 'gemini-alias',
+    OpenAI_KEY: 'openai-legacy-alias',
+  },
+});
+
+const aliasProviders = new Map(aliasEnvReport.providers.map((provider) => [provider.id, provider]));
+assert.equal(aliasProviders.get('ai_gemini')?.configured, true, 'Gemini must honor Google Generative AI key aliases.');
+assert.deepEqual(aliasProviders.get('ai_gemini')?.missingEnv, [], 'Gemini alias should satisfy missing env checks.');
+assert.equal(aliasProviders.get('ai_openai')?.configured, true, 'OpenAI must honor legacy OpenAI_KEY alias.');
+assert.deepEqual(aliasProviders.get('ai_openai')?.missingEnv, [], 'OpenAI alias should satisfy missing env checks.');
+
 console.log('production activation contract tests passed');
