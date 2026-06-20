@@ -72,6 +72,14 @@ const requiredKeys = [
   'automationExternalAuthLabel',
   'automationExternalAuthStatus',
   'automationExternalAuthDetail',
+  'accountSettingsBack',
+  'accountSettingsTitle',
+  'accountSettingsAppearanceTitle',
+  'accountSettingsAppearanceHint',
+  'accountSettingsLanguage',
+  'accountSettingsConnections',
+  'accountSettingsConnectionsHint',
+  'accountSettingsLocalFirst',
 ];
 
 for (const key of requiredKeys) {
@@ -111,6 +119,11 @@ for (const forbidden of [
   '正在读取连接状态，请稍后再试。',
   '高信任模块不进入首发公开承诺，不提供建议、诊断、交易或真实账户动作。',
   '付费或连接不等于可以安全执行；外部授权和自动执行仍需 CEO Gate。',
+  'const SETTINGS_COPY',
+  'settingsTitle: \'软件设置\'',
+  'appearanceTitle: \'外观\'',
+  'connections: \'连接与安全\'',
+  'localFirst: \'本地优先\'',
 ]) {
   assert(!accountSettings.includes(forbidden), `AccountSettings still contains hard-coded auth/runtime text: ${forbidden}`);
 }
@@ -123,6 +136,16 @@ assert(
 assert(
   accountSettings.includes("t(locale, 'providerStatusReady')"),
   'AccountSettings must use shared i18n for provider status labels.',
+);
+
+assert(
+  accountSettings.includes("t(locale, 'accountSettingsTitle')"),
+  'AccountSettings app settings title must use shared i18n.',
+);
+
+assert(
+  accountSettings.includes("t(locale, 'accountSettingsConnectionsHint')"),
+  'AccountSettings connection hint must use shared i18n.',
 );
 
 assert(
