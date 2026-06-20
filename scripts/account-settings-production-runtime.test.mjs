@@ -34,6 +34,7 @@ for (const marker of [
 
 for (const provider of ['email', 'google', 'wechat', 'phone']) {
   assert.ok(source.includes(`onStartAuth('${provider}')`), `AccountSettings must expose ${provider} auth start`);
+  assert.ok(source.includes(`data-runtime-action="auth-start-${provider}"`), `AccountSettings must expose a traceable auth action marker for ${provider}`);
 }
 
 for (const providerId of ['email', 'google', 'wechat', 'phone', 'cloud_database', 'cloud_storage', 'gemini', 'google_calendar', 'flomo']) {
@@ -47,6 +48,8 @@ for (const label of ['Gemini', 'Google Calendar', 'Cloud DB', 'Email', 'Google',
 assert.ok(source.includes('provider_not_configured'), 'AccountSettings must surface fail-closed auth errors');
 assert.ok(source.includes('window.location.assign'), 'OAuth auth start must be able to navigate to redirect URL');
 assert.ok(source.includes('window.location.href = provider.startEndpoint'), 'Provider action rows must be able to navigate to real runtime endpoints');
+assert.ok(source.includes('data-provider-action-id={row.provider?.id || row.label}'), 'Provider action rows must expose traceable provider action ids for QA');
+assert.ok(source.includes('data-runtime-action="provider-open-or-inspect"'), 'Provider action rows must expose a traceable runtime action marker');
 assert.ok(source.includes('provider.serverOnly'), 'Provider action rows must distinguish server-only capabilities');
 assert.ok(source.includes('onInspectServerProviderAction(provider)'), 'Server-only provider actions must be clickable diagnostics, not disabled dead buttons');
 assert.ok(!source.includes(`disabled={!row.provider || row.provider.serverOnly || row.provider.actionStatus !== 'ready'}`), 'Server-only provider action buttons must not be disabled just because they are server-only');
@@ -63,6 +66,9 @@ assert.ok(source.includes("setCloudProfileStatus('local_only')"), 'AccountSettin
 assert.ok(source.includes("setCloudProfileStatus('synced')"), 'AccountSettings must surface synced cloud profile state');
 assert.match(source, /catch[\s\S]*setCloudProfileStatus\('local_only'\)/, 'Cloud profile failures must not block local settings');
 assert.ok(source.includes("t(locale, 'authSignOut')"), 'AccountSettings must render a localized logout button label');
+assert.ok(source.includes('data-runtime-action="auth-logout"'), 'AccountSettings must expose a traceable logout action marker');
+assert.ok(source.includes('role="status"'), 'AccountSettings auth/provider feedback must be announced as status text');
+assert.ok(source.includes('aria-live="polite"'), 'AccountSettings auth/provider feedback must use a polite live region');
 assert.ok(!source.includes('disabled={!authSession?.loggedIn}'), 'Logout must remain clickable so signed-out users get immediate local feedback');
 assert.ok(source.includes("t(locale, 'authNotLoggedIn')"), 'Logout must explain locally when the user is already signed out');
 assert.match(source, /type="email"/, 'AccountSettings must provide an email input before starting email auth');

@@ -830,11 +830,11 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
               </label>
             </div>
             <div className="portal-settings-auth-buttons">
-              <button type="button" onClick={() => onStartAuth('email')}>Email</button>
-              <button type="button" onClick={() => onStartAuth('google')}>Google</button>
-              <button type="button" onClick={() => onStartAuth('wechat')}>WeChat</button>
-              <button type="button" onClick={() => onStartAuth('phone')}>Phone</button>
-              <button type="button" onClick={onLogoutAuth}>{t(locale, 'authSignOut')}</button>
+              <button type="button" data-runtime-action="auth-start-email" onClick={() => onStartAuth('email')}>Email</button>
+              <button type="button" data-runtime-action="auth-start-google" onClick={() => onStartAuth('google')}>Google</button>
+              <button type="button" data-runtime-action="auth-start-wechat" onClick={() => onStartAuth('wechat')}>WeChat</button>
+              <button type="button" data-runtime-action="auth-start-phone" onClick={() => onStartAuth('phone')}>Phone</button>
+              <button type="button" data-runtime-action="auth-logout" onClick={onLogoutAuth}>{t(locale, 'authSignOut')}</button>
             </div>
           </li>
           {safetyRows.map((row) => (
@@ -848,6 +848,8 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
                 <button
                   type="button"
                   className="portal-settings-provider-action"
+                  data-runtime-action="provider-open-or-inspect"
+                  data-provider-action-id={row.provider?.id || row.label}
                   onClick={() => onOpenProviderAction(row.provider)}
                 >
                   {formatProviderActionButtonLabel(row.provider)}
@@ -856,7 +858,11 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
             </li>
           ))}
         </ul>
-        {authFeedback ? <p className="portal-settings-auth-feedback">{authFeedback}</p> : null}
+        {authFeedback ? (
+          <p className="portal-settings-auth-feedback" role="status" aria-live="polite">
+            {authFeedback}
+          </p>
+        ) : null}
       </section>
         </>
       )}
