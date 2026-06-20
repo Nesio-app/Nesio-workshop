@@ -108,6 +108,8 @@ export async function POST(req: NextRequest) {
   }
 
   const redirectTo = body.redirectTo || getAuthRedirectUrl(req.url);
+  const email = body.email?.trim() || '';
+  const phone = body.phone?.trim() || '';
 
   if (provider === 'google') {
     return safeJson({
@@ -128,12 +130,12 @@ export async function POST(req: NextRequest) {
   }
 
   if (provider === 'email') {
-    if (!body.email) return safeJson({ ok: false, error: 'missing_email' }, 400);
-    const result = await requestSupabaseOtp({ email: body.email, redirectTo });
+    if (!email) return safeJson({ ok: false, error: 'missing_email' }, 400);
+    const result = await requestSupabaseOtp({ email, redirectTo });
     return safeJson({ ...result, provider }, result.status);
   }
 
-  if (!body.phone) return safeJson({ ok: false, error: 'missing_phone' }, 400);
-  const result = await requestSupabaseOtp({ phone: body.phone, redirectTo });
+  if (!phone) return safeJson({ ok: false, error: 'missing_phone' }, 400);
+  const result = await requestSupabaseOtp({ phone, redirectTo });
   return safeJson({ ...result, provider }, result.status);
 }

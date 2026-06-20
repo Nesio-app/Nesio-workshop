@@ -35,6 +35,10 @@ assert.match(authStartRoute, /google/, 'auth start must support Google provider'
 assert.match(authStartRoute, /wechat/, 'auth start must support WeChat provider');
 assert.match(authStartRoute, /phone/, 'auth start must support phone provider');
 assert.match(authStartRoute, /503/, 'auth start must fail closed when provider config is missing');
+assert.match(authStartRoute, /const email = body\.email\?\.trim\(\) \|\| ''/, 'auth start must trim email before validating OTP input.');
+assert.match(authStartRoute, /const phone = body\.phone\?\.trim\(\) \|\| ''/, 'auth start must trim phone before validating OTP input.');
+assert.match(authStartRoute, /requestSupabaseOtp\(\{ email, redirectTo \}\)/, 'auth start must send the trimmed email to Supabase OTP.');
+assert.match(authStartRoute, /requestSupabaseOtp\(\{ phone, redirectTo \}\)/, 'auth start must send the trimmed phone to Supabase OTP.');
 assert.match(authCallbackRoute, /GET\(/, 'auth callback route must expose GET');
 assert.match(authCallbackRoute, /NextResponse\.redirect/, 'auth callback must redirect back to the Shell instead of 404ing');
 assert.match(authCallbackRoute, /auth_callback_received/, 'auth callback must expose safe callback status');
