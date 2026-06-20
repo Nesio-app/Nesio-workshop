@@ -70,10 +70,15 @@ for (const [name, source] of [
     /disabled=\{!canSend\}/,
     `${name} send button must remain clickable so empty drafts can show local feedback.`,
   );
-  assert.match(
+  assert.doesNotMatch(
     source,
     /disabled=\{sending\}/,
-    `${name} send button should only disable while a send is already in flight.`,
+    `${name} send button must stay clickable while sending so repeat taps can explain the in-flight state.`,
+  );
+  assert.match(
+    source,
+    /t\(locale, 'flomoSendInFlight'\)/,
+    `${name} must explain repeat send taps while a note is already sending.`,
   );
   assert.match(
     source,
