@@ -129,11 +129,21 @@ const recentConversations = [
 
 type RecentConversation = (typeof recentConversations)[number];
 
-function resolveSecretaryProvider(composer: string): SecretaryChatProvider {
+function resolveSecretaryProvider(composer: string, conversationId: string): SecretaryChatProvider {
   const normalized = composer.toLowerCase();
   if (normalized.includes('@claude')) return 'claude';
   if (normalized.includes('@chatgpt')) return 'chatgpt';
   if (normalized.includes('@豆包') || normalized.includes('@doubao')) return 'doubao';
+  switch (conversationId) {
+    case 'claude':
+      return 'claude';
+    case 'chatgpt':
+      return 'chatgpt';
+    case 'gemini':
+      return 'gemini';
+    default:
+      break;
+  }
   return 'gemini';
 }
 
@@ -517,7 +527,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
       return;
     }
 
-    const provider = resolveSecretaryProvider(composer);
+    const provider = resolveSecretaryProvider(composer, activeConversationId);
     const providerAction = aiProviderActionsById[provider];
     const secretaryProvider = secretaryProviderMatrixById[provider];
     const secretaryProviderReady = secretaryProvider?.runtimeAvailable && secretaryProvider?.chatEndpoint === '/api/secretary/chat';

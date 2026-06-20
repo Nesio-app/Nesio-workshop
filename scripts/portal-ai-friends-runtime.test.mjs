@@ -99,14 +99,22 @@ assert(
 );
 
 assert(
-  /const provider = resolveSecretaryProvider\(composer\)/.test(component) &&
+  /const provider = resolveSecretaryProvider\(composer,\s*activeConversationId\)/.test(component) &&
     /provider,\s*\n\s*message/.test(component),
-  'PortalAiFriendsPreview must resolve provider from @mentions before calling Secretary Chat.',
+  'PortalAiFriendsPreview must resolve provider from @mentions or the selected AI conversation before calling Secretary Chat.',
 );
 
 assert(
   /normalized\.includes\('@claude'\)[\s\S]*return 'claude'/.test(component),
   'PortalAiFriendsPreview must route @Claude to the Claude provider instead of falling back to Gemini.',
+);
+
+assert(
+  /function resolveSecretaryProvider\(composer: string,\s*conversationId: string\)/.test(component) &&
+    /case 'claude':[\s\S]*return 'claude'/.test(component) &&
+    /case 'chatgpt':[\s\S]*return 'chatgpt'/.test(component) &&
+    /case 'gemini':[\s\S]*return 'gemini'/.test(component),
+  'PortalAiFriendsPreview must route selected AI conversations to their provider even when the composer has no @mention.',
 );
 
 assert(
