@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { t, type PortalStringKey } from '@/lib/portal/i18n';
 import {
   loadProfileSettings,
@@ -18,7 +18,7 @@ import {
   type AuthSessionResponse,
   type AuthStartProvider,
   type CloudProfileSettings,
-  type ProductionProviderStatus,
+  type ProductionRuntimeProviderAction,
   type ProductionRuntimeHealthResponse,
 } from '@/lib/portal/app-api-client';
 import {
@@ -378,18 +378,36 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
     return '本机保存';
   })();
 
-  const formatProviderStatus = (provider?: ProductionProviderStatus): string => {
+  const providerActionsById = useMemo(() => {
+    return (runtimeStatus?.providerActionMatrix || []).reduce<Record<string, ProductionRuntimeProviderAction>>(
+      (index, action) => {
+        index[action.id] = action;
+        return index;
+      },
+      {},
+    );
+  }, [runtimeStatus?.providerActionMatrix]);
+
+  const formatProviderActionStatus = (provider?: ProductionRuntimeProviderAction): string => {
     if (!provider) return runtimeLoading ? '检查中' : '未连接';
-    if (provider.enabled) return '已启用';
-    if (provider.configured) return '已配置';
+    if (provider.actionStatus === 'ready') return '可使用';
+    if (provider.actionStatus === 'server_ready') return '服务端可用';
+    if (provider.configured) return '待开启';
     return '缺配置';
   };
 
-  const formatProviderDetail = (provider?: ProductionProviderStatus): string => {
+  const formatProviderActionDetail = (provider?: ProductionRuntimeProviderAction): string => {
     if (!provider) return '正在读取生产运行状态。';
-    if (provider.enabled) return '已从生产运行状态确认启用。';
+    if (provider.actionStatus === 'ready') {
+      return provider.startEndpoint
+        ? `已连接到 ${provider.startEndpoint}，动作：${provider.safeUserAction}。`
+        : `已启用，动作：${provider.safeUserAction}。`;
+    }
+    if (provider.actionStatus === 'server_ready') {
+      return `服务端能力已准备；${provider.safeUserAction} 不从前端直接触发。`;
+    }
     if (provider.missingEnv.length) return `缺少：${provider.missingEnv.slice(0, 3).join(' / ')}${provider.missingEnv.length > 3 ? '…' : ''}`;
-    return '已配置，但开关尚未启用。';
+    return '已配置，但生产开关尚未启用。';
   };
 
   const onStartAuth = async (provider: AuthStartProvider) => {
@@ -456,28 +474,33 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
   const safetyRows = [
     {
       label: 'Email',
-      status: formatProviderStatus(runtimeStatus?.accountAuth.providers.email),
-      detail: formatProviderDetail(runtimeStatus?.accountAuth.providers.email),
+      status: formatProviderActionStatus(providerActionsById.email),
+      detail: formatProviderActionDetail(providerActionsById.email),
     },
     {
       label: 'Google',
-      status: formatProviderStatus(runtimeStatus?.accountAuth.providers.google),
-      detail: formatProviderDetail(runtimeStatus?.accountAuth.providers.google),
+      status: formatProviderActionStatus(providerActionsById.google),
+      detail: formatProviderActionDetail(providerActionsById.google),
     },
     {
       label: 'WeChat',
-      status: formatProviderStatus(runtimeStatus?.accountAuth.providers.wechat),
-      detail: formatProviderDetail(runtimeStatus?.accountAuth.providers.wechat),
+      status: formatProviderActionStatus(providerActionsById.wechat),
+      detail: formatProviderActionDetail(providerActionsById.wechat),
     },
     {
       label: 'Phone',
-      status: formatProviderStatus(runtimeStatus?.accountAuth.providers.phone),
-      detail: formatProviderDetail(runtimeStatus?.accountAuth.providers.phone),
+      status: formatProviderActionStatus(providerActionsById.phone),
+      detail: formatProviderActionDetail(providerActionsById.phone),
     },
     {
       label: 'Cloud DB',
-      status: formatProviderStatus(runtimeStatus?.cloud.database),
-      detail: formatProviderDetail(runtimeStatus?.cloud.database),
+      status: formatProviderActionStatus(providerActionsById.cloud_database),
+      detail: formatProviderActionDetail(providerActionsById.cloud_database),
+    },
+    {
+      label: 'Cloud Storage',
+      status: formatProviderActionStatus(providerActionsById.cloud_storage),
+      detail: formatProviderActionDetail(providerActionsById.cloud_storage),
     },
     {
       label: 'Profile Settings',
@@ -488,20 +511,20 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
     },
     {
       label: 'Google Calendar',
-      status: formatProviderStatus(runtimeStatus?.thirdParty.googleCalendar),
-      detail: runtimeStatus?.thirdParty.googleCalendar.enabled
+      status: formatProviderActionStatus(providerActionsById.google_calendar),
+      detail: providerActionsById.google_calendar?.enabled
         ? '生产环境已检测到日历连接。'
-        : (calendarUrl ? '本机已保存日历链接；生产读取仍以环境配置为准。' : formatProviderDetail(runtimeStatus?.thirdParty.googleCalendar)),
+        : (calendarUrl ? '本机已保存日历链接；生产读取仍以环境配置为准。' : formatProviderActionDetail(providerActionsById.google_calendar)),
     },
     {
       label: 'Gemini',
-      status: formatProviderStatus(runtimeStatus?.ai.providers.gemini),
-      detail: formatProviderDetail(runtimeStatus?.ai.providers.gemini),
+      status: formatProviderActionStatus(providerActionsById.gemini),
+      detail: formatProviderActionDetail(providerActionsById.gemini),
     },
     {
       label: 'Flomo',
-      status: formatProviderStatus(runtimeStatus?.thirdParty.flomo),
-      detail: formatProviderDetail(runtimeStatus?.thirdParty.flomo),
+      status: formatProviderActionStatus(providerActionsById.flomo),
+      detail: formatProviderActionDetail(providerActionsById.flomo),
     },
     {
       label: '健康 / 金融 / 心理',

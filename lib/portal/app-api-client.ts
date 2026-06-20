@@ -100,6 +100,14 @@ export type ProductionProviderStatus = {
   missingEnv: string[];
 };
 
+export type ProductionRuntimeProviderAction = ProductionProviderStatus & {
+  category: 'account_auth' | 'cloud' | 'ai' | 'third_party';
+  actionStatus: 'ready' | 'server_ready' | 'configure_required';
+  startEndpoint: string | null;
+  safeUserAction: string;
+  serverOnly: boolean;
+};
+
 export type ProductionRuntimeHealthResponse = {
   ok: boolean;
   service: 'portal-production-runtime';
@@ -122,10 +130,13 @@ export type ProductionRuntimeHealthResponse = {
     googleCalendar: ProductionProviderStatus;
     flomo: ProductionProviderStatus;
   };
+  providerActionMatrix: ProductionRuntimeProviderAction[];
   summary: {
     providerCount: number;
     enabledProviderCount: number;
     missingProviderCount: number;
+    actionableProviderCount: number;
+    blockedProviderCount: number;
     productionRuntimeReady: boolean;
   };
 };

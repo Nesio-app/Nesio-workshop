@@ -8,6 +8,10 @@ const packageJson = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package
 for (const marker of [
   'createAppApiClient',
   'fetchProductionRuntimeHealth',
+  'providerActionMatrix',
+  'providerActionsById',
+  'formatProviderActionStatus',
+  'formatProviderActionDetail',
   'fetchAuthSession',
   'fetchCloudProfileSettings',
   'saveCloudProfileSettings',
@@ -26,6 +30,10 @@ for (const marker of [
 
 for (const provider of ['email', 'google', 'wechat', 'phone']) {
   assert.ok(source.includes(`onStartAuth('${provider}')`), `AccountSettings must expose ${provider} auth start`);
+}
+
+for (const providerId of ['email', 'google', 'wechat', 'phone', 'cloud_database', 'cloud_storage', 'gemini', 'google_calendar', 'flomo']) {
+  assert.ok(source.includes(`providerActionsById.${providerId}`), `AccountSettings must consume provider action matrix for ${providerId}`);
 }
 
 for (const label of ['Gemini', 'Google Calendar', 'Cloud DB', 'Email', 'Google', 'WeChat', 'Phone']) {

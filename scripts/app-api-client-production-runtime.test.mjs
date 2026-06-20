@@ -7,6 +7,10 @@ const packageJson = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package
 
 for (const marker of [
   'ProductionRuntimeHealthResponse',
+  'ProductionRuntimeProviderAction',
+  'providerActionMatrix',
+  'actionableProviderCount',
+  'blockedProviderCount',
   'AuthStartProvider',
   'AuthStartResponse',
   'AuthSessionResponse',
