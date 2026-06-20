@@ -3054,11 +3054,6 @@ body {
   touch-action: manipulation;
 }
 
-.portal-treasure-my-grid button:disabled {
-  cursor: not-allowed;
-  opacity: 0.68;
-}
-
 .portal-treasure-my-grid button.is-ready {
   border-color: rgba(74, 108, 247, 0.26);
   background: rgba(244, 246, 255, 0.94);
@@ -3233,10 +3228,6 @@ body {
   color: #0f1733;
   font: inherit;
   box-shadow: 0 8px 24px rgba(74, 108, 247, 0.06);
-}
-
-.portal-treasure-screen-grid button:disabled {
-  opacity: 0.72;
 }
 
 .portal-treasure-screen-grid button.is-selected,
