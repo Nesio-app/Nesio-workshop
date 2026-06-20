@@ -121,6 +121,27 @@ const STRINGS = {
     accountSettingsConnections: '连接与安全',
     accountSettingsConnectionsHint: '连接性强，但所有授权都要确认。',
     accountSettingsLocalFirst: '本地优先',
+    accountSettingsAvatarChange: '更换头像',
+    accountSettingsHomepage: '主页',
+    accountSettingsHomepageAriaLabel: '进入个人主页',
+    accountSettingsUsageDaysTemplate: '已使用第 {days} 天',
+    accountSettingsOpenSoftwareSettings: '设置',
+    accountSettingsLearnedTitle: '宝盒学到的',
+    accountSettingsMemoryCountTemplate: '{count} 条记忆',
+    accountSettingsMemoryConfidenceTemplate: '置信度 {confidence}%',
+    accountSettingsMemoryStrengthTemplate: '强度 {strength}',
+    accountSettingsMemoryEmpty: '再用几天，宝盒就会有新发现。',
+    accountSettingsProgressTitle: '全部学习进展',
+    accountSettingsMemoryEvidenceTemplate: '证据 {count} 条 · 置信度 {confidence}%',
+    accountSettingsPreferenceSummaryTemplate: '偏好：{pace}节奏 · 推送时间 {pushTime}',
+    accountSettingsCollapseProgress: '收起学习进展 ↑',
+    accountSettingsViewAllProgress: '查看全部学习进展 →',
+    accountSettingsPreferencesTitle: '个性化偏好',
+    accountSettingsPacePreference: '节奏偏好',
+    accountSettingsPaceEfficient: '高效',
+    accountSettingsPushTime: '推送时间',
+    accountSettingsObservationPush: '允许洞察推送',
+    accountSettingsLanguageAriaLabel: '语言',
     dashboardDefaultCity: '上海',
     shellErrorAvatarUpload: '头像上传失败',
     profileDefaultName: '婧',
@@ -396,6 +417,27 @@ const STRINGS = {
     accountSettingsConnections: 'Connections & Safety',
     accountSettingsConnectionsHint: 'Connections are powerful, but every authorization needs confirmation.',
     accountSettingsLocalFirst: 'Local-first',
+    accountSettingsAvatarChange: 'Change avatar',
+    accountSettingsHomepage: 'Home',
+    accountSettingsHomepageAriaLabel: 'Open public profile',
+    accountSettingsUsageDaysTemplate: 'Day {days} of use',
+    accountSettingsOpenSoftwareSettings: 'Settings',
+    accountSettingsLearnedTitle: 'What Nesio learned',
+    accountSettingsMemoryCountTemplate: '{count} memories',
+    accountSettingsMemoryConfidenceTemplate: 'Confidence {confidence}%',
+    accountSettingsMemoryStrengthTemplate: 'Strength {strength}',
+    accountSettingsMemoryEmpty: 'Use it a few more days and Nesio will find new patterns.',
+    accountSettingsProgressTitle: 'All learning progress',
+    accountSettingsMemoryEvidenceTemplate: '{count} evidence item(s) · confidence {confidence}%',
+    accountSettingsPreferenceSummaryTemplate: 'Preference: {pace} pace · push time {pushTime}',
+    accountSettingsCollapseProgress: 'Collapse progress ↑',
+    accountSettingsViewAllProgress: 'View all progress →',
+    accountSettingsPreferencesTitle: 'Personal preferences',
+    accountSettingsPacePreference: 'Pace preference',
+    accountSettingsPaceEfficient: 'Efficient',
+    accountSettingsPushTime: 'Push time',
+    accountSettingsObservationPush: 'Allow insight push',
+    accountSettingsLanguageAriaLabel: 'Language',
     shellErrorAvatarUpload: 'Avatar upload failed',
     dashboardEventAllDay: 'All day',
     dashboardEventToday: 'Today',
@@ -560,4 +602,28 @@ export function t(locale: PortalLocale, key: PortalStringKey, params?: Record<st
     next = next.replace(`{${k}}`, String(v));
   }
   return next;
+}
+
+export function formatAccountSettingsUsageDays(locale: PortalLocale, days: number): string {
+  return t(locale, 'accountSettingsUsageDaysTemplate', { days });
+}
+
+export function formatAccountSettingsMemoryCount(locale: PortalLocale, count: number): string {
+  return t(locale, 'accountSettingsMemoryCountTemplate', { count });
+}
+
+export function formatAccountSettingsMemoryConfidence(locale: PortalLocale, confidence: number): string {
+  return t(locale, 'accountSettingsMemoryConfidenceTemplate', { confidence });
+}
+
+export function formatAccountSettingsMemoryStrength(locale: PortalLocale, strength: number): string {
+  return t(locale, 'accountSettingsMemoryStrengthTemplate', { strength });
+}
+
+export function formatAccountSettingsMemoryEvidence(locale: PortalLocale, count: number, confidence: number): string {
+  return t(locale, 'accountSettingsMemoryEvidenceTemplate', { count, confidence });
+}
+
+export function formatAccountSettingsPreferenceSummary(locale: PortalLocale, pace: string, pushTime: string): string {
+  return t(locale, 'accountSettingsPreferenceSummaryTemplate', { pace, pushTime });
 }

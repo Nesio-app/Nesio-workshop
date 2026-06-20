@@ -2,7 +2,16 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { t, type PortalStringKey } from '@/lib/portal/i18n';
+import {
+  formatAccountSettingsMemoryConfidence,
+  formatAccountSettingsMemoryCount,
+  formatAccountSettingsMemoryEvidence,
+  formatAccountSettingsMemoryStrength,
+  formatAccountSettingsPreferenceSummary,
+  formatAccountSettingsUsageDays,
+  t,
+  type PortalStringKey,
+} from '@/lib/portal/i18n';
 import {
   loadProfileSettings,
   readAvatarFile,
@@ -514,7 +523,7 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
       {!showAppSettings ? (
         <section className="portal-personal-profile-card">
           <div className="portal-personal-profile-main">
-            <button type="button" className="portal-personal-avatar-edit" onClick={() => fileRef.current?.click()} aria-label="更换头像">
+            <button type="button" className="portal-personal-avatar-edit" onClick={() => fileRef.current?.click()} aria-label={t(locale, 'accountSettingsAvatarChange')}>
               {avatarUrl ? (
                 <img src={avatarUrl} alt="" className="portal-settings-avatar" width={64} height={64} />
               ) : (
@@ -525,10 +534,10 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
             </button>
             <span>
               <b>{displayName}</b>
-              <small>已使用第 {personalization.daysSinceStart} 天</small>
+              <small>{formatAccountSettingsUsageDays(locale, personalization.daysSinceStart)}</small>
             </span>
-            <Link href="/portfolio" className="portal-personal-settings-arrow" aria-label="进入个人主页">
-              主页
+            <Link href="/portfolio" className="portal-personal-settings-arrow" aria-label={t(locale, 'accountSettingsHomepageAriaLabel')}>
+              {t(locale, 'accountSettingsHomepage')}
             </Link>
           </div>
           <input
@@ -547,7 +556,7 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
 
       {!showAppSettings ? (
         <button type="button" className="portal-personal-software-settings" onClick={() => setShowAppSettings(true)}>
-          设置
+          {t(locale, 'accountSettingsOpenSoftwareSettings')}
         </button>
       ) : null}
 
@@ -555,8 +564,8 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
         <>
           <section className="portal-personal-learned">
             <div className="portal-personal-learned-head">
-              <h2>宝盒学到的</h2>
-              <span>{personalization.memoryCount} 条记忆</span>
+              <h2>{t(locale, 'accountSettingsLearnedTitle')}</h2>
+              <span>{formatAccountSettingsMemoryCount(locale, personalization.memoryCount)}</span>
               <small>{personalization.summary}</small>
             </div>
             <div className="portal-personal-progress-row">
@@ -571,9 +580,9 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
                     <span>{memory.category}</span>
                     <div>
                       <b>{memory.text}</b>
-                      <small>置信度 {memory.confidence}%</small>
+                      <small>{formatAccountSettingsMemoryConfidence(locale, memory.confidence)}</small>
                     </div>
-                    <i aria-label={`强度 ${memory.strength}`}>
+                    <i aria-label={formatAccountSettingsMemoryStrength(locale, memory.strength)}>
                       {Array.from({ length: 3 }, (_, index) => (
                         <em key={index} className={index < memory.strength ? 'is-on' : ''} />
                       ))}
@@ -582,21 +591,21 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
                 ))}
               </div>
             ) : (
-              <div className="portal-personal-empty">再用几天，宝盒就会有新发现。</div>
+              <div className="portal-personal-empty">{t(locale, 'accountSettingsMemoryEmpty')}</div>
             )}
             {showLearningProgress ? (
               <div className="portal-personal-progress-detail" id="portal-personal-progress-detail">
-                <h3>全部学习进展</h3>
+                <h3>{t(locale, 'accountSettingsProgressTitle')}</h3>
                 <ul>
                   {personalization.memories.map((memory) => (
                     <li key={memory.id}>
                       <b>{memory.category}</b>
                       <span>{memory.text}</span>
-                      <small>证据 {memory.evidenceCount} 条 · 置信度 {memory.confidence}%</small>
+                      <small>{formatAccountSettingsMemoryEvidence(locale, memory.evidenceCount, memory.confidence)}</small>
                     </li>
                   ))}
                 </ul>
-                <p>偏好：{personalization.preferences.pace}节奏 · 推送时间 {personalization.preferences.pushTime}</p>
+                <p>{formatAccountSettingsPreferenceSummary(locale, personalization.preferences.pace, personalization.preferences.pushTime)}</p>
               </div>
             ) : null}
             <button
@@ -606,28 +615,28 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
               aria-controls="portal-personal-progress-detail"
               onClick={() => setShowLearningProgress((value) => !value)}
             >
-              {showLearningProgress ? '收起学习进展 ↑' : '查看全部学习进展 →'}
+              {showLearningProgress ? t(locale, 'accountSettingsCollapseProgress') : t(locale, 'accountSettingsViewAllProgress')}
             </button>
           </section>
 
           <section className="portal-personal-preferences">
-            <h2>个性化偏好</h2>
+            <h2>{t(locale, 'accountSettingsPreferencesTitle')}</h2>
             <div>
-              <span>节奏偏好</span>
+              <span>{t(locale, 'accountSettingsPacePreference')}</span>
               <b>{personalization.preferences.pace}</b>
-              <small>高效</small>
+              <small>{t(locale, 'accountSettingsPaceEfficient')}</small>
             </div>
             <div>
-              <span>推送时间</span>
+              <span>{t(locale, 'accountSettingsPushTime')}</span>
               <b>{personalization.preferences.pushTime}</b>
               <i aria-hidden>›</i>
             </div>
             <div>
-              <span>允许洞察推送</span>
+              <span>{t(locale, 'accountSettingsObservationPush')}</span>
               <button
                 type="button"
                 className={observationPushEnabled ? 'is-on' : ''}
-                aria-label="允许洞察推送"
+                aria-label={t(locale, 'accountSettingsObservationPush')}
                 aria-pressed={observationPushEnabled}
                 onClick={onObservationPushToggle}
               />
@@ -646,7 +655,7 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
         <h2 className="portal-settings-label">{t(locale, 'accountSettingsLanguage')}</h2>
         <select
           className="portal-settings-input portal-settings-select"
-          aria-label="语言"
+          aria-label={t(locale, 'accountSettingsLanguageAriaLabel')}
           value={displayLanguage}
           onChange={(event) => onDisplayLanguageChange(normalizeDisplayLanguage(event.target.value))}
         >

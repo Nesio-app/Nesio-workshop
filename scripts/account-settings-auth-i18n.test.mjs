@@ -81,6 +81,27 @@ const requiredKeys = [
   'accountSettingsConnections',
   'accountSettingsConnectionsHint',
   'accountSettingsLocalFirst',
+  'accountSettingsAvatarChange',
+  'accountSettingsHomepage',
+  'accountSettingsHomepageAriaLabel',
+  'accountSettingsUsageDaysTemplate',
+  'accountSettingsOpenSoftwareSettings',
+  'accountSettingsLearnedTitle',
+  'accountSettingsMemoryCountTemplate',
+  'accountSettingsMemoryConfidenceTemplate',
+  'accountSettingsMemoryStrengthTemplate',
+  'accountSettingsMemoryEmpty',
+  'accountSettingsProgressTitle',
+  'accountSettingsMemoryEvidenceTemplate',
+  'accountSettingsPreferenceSummaryTemplate',
+  'accountSettingsCollapseProgress',
+  'accountSettingsViewAllProgress',
+  'accountSettingsPreferencesTitle',
+  'accountSettingsPacePreference',
+  'accountSettingsPaceEfficient',
+  'accountSettingsPushTime',
+  'accountSettingsObservationPush',
+  'accountSettingsLanguageAriaLabel',
 ];
 
 for (const key of requiredKeys) {
@@ -125,6 +146,23 @@ for (const forbidden of [
   'appearanceTitle: \'外观\'',
   'connections: \'连接与安全\'',
   'localFirst: \'本地优先\'',
+  'aria-label="更换头像"',
+  'aria-label="进入个人主页"',
+  'aria-label={`强度 ${memory.strength}`}',
+  '已使用第 {personalization.daysSinceStart} 天',
+  '宝盒学到的',
+  '置信度 {memory.confidence}%',
+  '再用几天，宝盒就会有新发现。',
+  '全部学习进展',
+  '证据 {memory.evidenceCount} 条 · 置信度 {memory.confidence}%',
+  '偏好：{personalization.preferences.pace}节奏 · 推送时间 {personalization.preferences.pushTime}',
+  '收起学习进展 ↑',
+  '查看全部学习进展 →',
+  '个性化偏好',
+  '节奏偏好',
+  '推送时间',
+  '允许洞察推送',
+  'aria-label="语言"',
 ]) {
   assert(!accountSettings.includes(forbidden), `AccountSettings still contains hard-coded auth/runtime text: ${forbidden}`);
 }
@@ -147,6 +185,26 @@ assert(
 assert(
   accountSettings.includes("t(locale, 'accountSettingsConnectionsHint')"),
   'AccountSettings connection hint must use shared i18n.',
+);
+
+assert(
+  accountSettings.includes("formatAccountSettingsUsageDays(locale, personalization.daysSinceStart)"),
+  'AccountSettings usage days text must use shared i18n formatter.',
+);
+
+assert(
+  accountSettings.includes("formatAccountSettingsMemoryConfidence(locale, memory.confidence)"),
+  'AccountSettings memory confidence text must use shared i18n formatter.',
+);
+
+assert(
+  accountSettings.includes("formatAccountSettingsMemoryStrength(locale, memory.strength)"),
+  'AccountSettings memory strength aria text must use shared i18n formatter.',
+);
+
+assert(
+  accountSettings.includes("formatAccountSettingsPreferenceSummary(locale, personalization.preferences.pace, personalization.preferences.pushTime)"),
+  'AccountSettings preference summary must use shared i18n formatter.',
 );
 
 assert(
