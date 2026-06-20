@@ -86,10 +86,10 @@ assert.match(
   /href = `\/secretary\/group\?group=\$\{encodeURIComponent\(g\.id\)\}`/,
   'Secretary list should build group links through /secretary/group.',
 );
-assert.match(
+assert.doesNotMatch(
   secretaryChat,
-  /location\.href = '\/secretary\/chat\?friend=gemini'/,
-  'Secretary chat fallback should use extensionless /secretary/chat.',
+  /location\.(?:href|replace)\s*=\s*['"]\/secretary\/chat\?friend=gemini/,
+  'Secretary chat must not force visible AI entries back to Gemini.',
 );
 
 assert.match(storageIndex, /href="\/"/, 'Storage must expose a root return link back to Baohe shell.');

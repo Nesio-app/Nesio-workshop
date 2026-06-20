@@ -12,45 +12,45 @@
     "id": "claude",
     "name": "Claude",
     "company": "Anthropic",
-    "tagline": "Anthropic · 即将接入",
+    "tagline": "Anthropic · 兼容路由",
     "ready": false,
     "logo": "/secretary/logos/claude.svg",
-    "preview": "后续将接入 Claude API。"
+    "preview": "适合长文本、分析与温和建议；无原生 key 时由 Gemini 代理。"
   },
   {
     "id": "chatgpt",
     "name": "ChatGPT",
     "company": "OpenAI",
-    "tagline": "OpenAI · 即将接入",
+    "tagline": "OpenAI · 兼容路由",
     "ready": false,
     "logo": "/secretary/logos/chatgpt.svg",
-    "preview": "后续将接入 OpenAI API。"
+    "preview": "适合推理、写作与多步骤整理；无原生 key 时由 Gemini 代理。"
   },
   {
     "id": "doubao",
     "name": "豆包",
     "company": "字节跳动",
-    "tagline": "字节跳动 · 即将接入",
+    "tagline": "字节跳动 · 兼容路由",
     "ready": false,
     "logo": "/secretary/logos/doubao.svg",
-    "preview": "后续将接入豆包 API。"
+    "preview": "适合中文日常对话与轻量整理；无原生 key 时由 Gemini 代理。"
   },
   {
     "id": "deepseek",
     "name": "DeepSeek",
     "company": "深度求索",
-    "tagline": "深度求索 · 即将接入",
+    "tagline": "深度求索 · 兼容路由",
     "ready": false,
     "logo": "/secretary/logos/deepseek.svg",
-    "preview": "后续将接入 DeepSeek API。"
+    "preview": "适合推理与拆解问题；当前通过 Gemini 兼容代理。"
   },
   {
     "id": "grok",
     "name": "Grok",
     "company": "xAI",
-    "tagline": "xAI · 即将接入",
+    "tagline": "xAI · 兼容路由",
     "ready": false,
     "logo": "/secretary/logos/grok.svg",
-    "preview": "后续将接入 Grok API。"
+    "preview": "适合开放式讨论与反向视角；当前通过 Gemini 兼容代理。"
   }
 ]

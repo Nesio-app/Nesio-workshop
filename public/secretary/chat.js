@@ -108,16 +108,6 @@ async function sendMessage(text, opts = {}) {
   const fromVoice = Boolean(opts.fromVoice);
   if (busy || !text.trim()) return { ok: false, error: 'busy' };
 
-  if (!friend?.ready) {
-    if (!fromVoice) {
-      showError(`${friend?.name || '该模型'} 尚未接入，正在为你打开 Gemini…`);
-      window.setTimeout(() => {
-        location.href = '/secretary/chat?friend=gemini';
-      }, 900);
-    }
-    return { ok: false, error: '模型未接入' };
-  }
-
   busy = true;
   if (!fromVoice) input.disabled = true;
 
@@ -166,10 +156,6 @@ async function sendMessage(text, opts = {}) {
 }
 
 async function openLiveVoiceCall() {
-  if (!friend?.ready) {
-    toast(`${friend?.name || '该模型'} 尚未接入`);
-    return;
-  }
   if (!liveVoiceCall) {
     toast('语音通话未就绪');
     return;
@@ -348,10 +334,6 @@ Promise.all([loadFriends(), checkSecretaryHealth()])
       main.innerHTML = '<p class="wx-chat-tip">未找到该好友</p>';
       return;
     }
-    if (!friend.ready && friend.id !== 'gemini') {
-      location.replace('/secretary/chat?friend=gemini');
-      return;
-    }
     navTitle.textContent = friend.name;
     navAvatar.src = withRoot(friend.logo);
     navAvatar.hidden = false;
@@ -363,7 +345,7 @@ Promise.all([loadFriends(), checkSecretaryHealth()])
     render();
     input.focus();
 
-    if (friend.ready && !health.ok) {
+    if (!health.ok) {
       showError('AI 服务未就绪，请稍后重试或检查 Vercel 环境变量 GEMINI_API_KEY。');
     }
   })

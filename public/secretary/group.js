@@ -117,20 +117,10 @@ function showError(text) {
 }
 
 async function replyAs(member, userText, priorHistory) {
-  if (!member.ready) {
-    return {
-      role: 'assistant',
-      content: `${member.name} 尚未接入，敬请期待。`,
-      senderId: member.id,
-      senderName: member.name,
-      logo: member.logo,
-    };
-  }
-
   const persona = `你正在与用户的群聊中，请以 ${member.name}（${member.company || member.name}）的身份，用简短自然的中文回复，一两段即可。`;
   const wrapped = `${persona}\n\n用户说：${userText}`;
 
-  const { ok, data } = await sendSecretaryMessage(wrapped, priorHistory, 'gemini');
+  const { ok, data } = await sendSecretaryMessage(wrapped, priorHistory, member.id || 'gemini');
   if (!ok) {
     return {
       role: 'assistant',

@@ -74,6 +74,33 @@ function getDoubaoModelId(): string {
   );
 }
 
+function labelForModel(modelId: string): string {
+  const labels: Record<string, string> = {
+    gemini: 'Gemini',
+    google: 'Gemini',
+    chatgpt: 'ChatGPT',
+    openai: 'ChatGPT',
+    claude: 'Claude',
+    anthropic: 'Claude',
+    doubao: '豆包',
+    deepseek: 'DeepSeek',
+    grok: 'Grok',
+  };
+  return labels[modelId] || modelId;
+}
+
+function buildPersonaPrompt(modelId: string, message: string): string {
+  const label = labelForModel(modelId);
+  if (modelId === 'gemini' || modelId === 'google') return message;
+  return [
+    `请以「${label}」在宝盒智友中的角色回应。`,
+    '如果当前没有该模型的原生服务密钥，请作为兼容代理保持同样的对话入口可用。',
+    '不要声称你拥有未接入的外部能力；直接回答用户当前问题。',
+    '',
+    `用户说：${message}`,
+  ].join('\n');
+}
+
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
@@ -171,6 +198,17 @@ async function chatWithGemini(
     }
   }
   throw new Error(lastErr);
+}
+
+async function chatWithGeminiFallback(
+  history: ChatTurn[],
+  message: string,
+  maxTokens: number,
+  key: string,
+  requestedModel: string
+): Promise<string> {
+  const contents = toGeminiContents(history, buildPersonaPrompt(requestedModel, message));
+  return chatWithGemini(contents, maxTokens, key);
 }
 
 async function chatWithOpenAI(
@@ -356,13 +394,18 @@ export async function POST(req: NextRequest) {
     if (modelId === 'doubao') {
       const key = getDoubaoKey();
       if (!key) {
-        return NextResponse.json(
-          {
-            error: 'AI not configured',
-            hint: 'Set DOUBAO_KEY (or DOUBAO_API_KEY / ARK_API_KEY) in Vercel Environment Variables',
-          },
-          { status: 503, headers: corsHeaders }
-        );
+        const fallbackKey = getGoogleKey();
+        if (!fallbackKey) {
+          return NextResponse.json(
+            {
+              error: 'AI not configured',
+              hint: 'Set DOUBAO_KEY or GEMINI_API_KEY in Vercel Environment Variables',
+            },
+            { status: 503, headers: corsHeaders }
+          );
+        }
+        const text = await chatWithGeminiFallback(history, message, maxTokens, fallbackKey, modelId);
+        return NextResponse.json({ text, model: 'gemini', requestedModel: modelId, fallback: true }, { headers: corsHeaders });
       }
       const text = await chatWithDoubao(history, message, maxTokens, key);
       return NextResponse.json({ text, model: 'doubao' }, { headers: corsHeaders });
@@ -371,13 +414,18 @@ export async function POST(req: NextRequest) {
     if (modelId === 'chatgpt' || modelId === 'openai') {
       const key = getOpenAIKey();
       if (!key) {
-        return NextResponse.json(
-          {
-            error: 'AI not configured',
-            hint: 'Set OpenAI_KEY (or OPENAI_API_KEY) in Vercel Environment Variables, then Redeploy',
-          },
-          { status: 503, headers: corsHeaders }
-        );
+        const fallbackKey = getGoogleKey();
+        if (!fallbackKey) {
+          return NextResponse.json(
+            {
+              error: 'AI not configured',
+              hint: 'Set OpenAI_KEY or GEMINI_API_KEY in Vercel Environment Variables',
+            },
+            { status: 503, headers: corsHeaders }
+          );
+        }
+        const text = await chatWithGeminiFallback(history, message, maxTokens, fallbackKey, modelId);
+        return NextResponse.json({ text, model: 'gemini', requestedModel: modelId, fallback: true }, { headers: corsHeaders });
       }
       const text = await chatWithOpenAI(history, message, maxTokens, key);
       return NextResponse.json({ text, model: 'chatgpt' }, { headers: corsHeaders });
@@ -386,16 +434,36 @@ export async function POST(req: NextRequest) {
     if (modelId === 'claude' || modelId === 'anthropic') {
       const key = getAnthropicKey();
       if (!key) {
+        const fallbackKey = getGoogleKey();
+        if (!fallbackKey) {
+          return NextResponse.json(
+            {
+              error: 'AI not configured',
+              hint: 'Set ANTHROPIC_API_KEY or GEMINI_API_KEY in Vercel Environment Variables',
+            },
+            { status: 503, headers: corsHeaders }
+          );
+        }
+        const text = await chatWithGeminiFallback(history, message, maxTokens, fallbackKey, modelId);
+        return NextResponse.json({ text, model: 'gemini', requestedModel: modelId, fallback: true }, { headers: corsHeaders });
+      }
+      const text = await chatWithClaude(history, message, maxTokens, key);
+      return NextResponse.json({ text, model: 'claude' }, { headers: corsHeaders });
+    }
+
+    if (modelId === 'deepseek' || modelId === 'grok') {
+      const fallbackKey = getGoogleKey();
+      if (!fallbackKey) {
         return NextResponse.json(
           {
             error: 'AI not configured',
-            hint: 'Set ANTHROPIC_API_KEY (or CLAUDE_API_KEY) in Vercel Environment Variables, then Redeploy',
+            hint: 'Set GEMINI_API_KEY in Vercel Environment Variables for AI compatibility routing',
           },
           { status: 503, headers: corsHeaders }
         );
       }
-      const text = await chatWithClaude(history, message, maxTokens, key);
-      return NextResponse.json({ text, model: 'claude' }, { headers: corsHeaders });
+      const text = await chatWithGeminiFallback(history, message, maxTokens, fallbackKey, modelId);
+      return NextResponse.json({ text, model: 'gemini', requestedModel: modelId, fallback: true }, { headers: corsHeaders });
     }
 
     const key = getGoogleKey();
