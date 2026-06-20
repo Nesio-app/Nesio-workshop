@@ -5,6 +5,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   createAppApiClient,
+  type ProductionRuntimeHealthResponse,
+  type ProductionRuntimeProviderAction,
   type SecretaryChatProvider,
   type SecretaryChatTurn,
   type SecretaryHealthResponse,
@@ -171,6 +173,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
   const [activeCapability, setActiveCapability] = useState<AiCapabilityId | null>(null);
   const [utilityNotice, setUtilityNotice] = useState('');
   const [secretaryHealth, setSecretaryHealth] = useState<SecretaryHealthResponse | null>(null);
+  const [productionRuntimeStatus, setProductionRuntimeStatus] = useState<ProductionRuntimeHealthResponse | null>(null);
   const [aiRuntimeStatus, setAiRuntimeStatus] = useState('正在检查智友 AI 连接...');
   const [localAttachments, setLocalAttachments] = useState<string[]>([]);
   const composerRef = useRef<HTMLInputElement>(null);
@@ -214,6 +217,24 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
     };
   }, [appApiClient]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function readProductionRuntimeStatus() {
+      try {
+        const status = await appApiClient.fetchProductionRuntimeHealth();
+        if (!cancelled) setProductionRuntimeStatus(status);
+      } catch {
+        if (!cancelled) setProductionRuntimeStatus(null);
+      }
+    }
+
+    readProductionRuntimeStatus();
+    return () => {
+      cancelled = true;
+    };
+  }, [appApiClient]);
+
   const mentionNeedle = useMemo(() => {
     const match = composer.match(/@([\w\u4e00-\u9fa5]*)$/);
     return match?.[1]?.toLowerCase() ?? null;
@@ -235,6 +256,15 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
     if (configuredProviders.length) return `${configuredProviders.join(' / ')} 可用`;
     return aiRuntimeStatus;
   }, [aiRuntimeStatus, secretaryHealth]);
+
+  const aiProviderActionsById = useMemo(() => {
+    return (productionRuntimeStatus?.providerActionMatrix || [])
+      .filter((provider) => provider.category === 'ai' && provider.actionStatus === 'ready')
+      .reduce<Record<string, ProductionRuntimeProviderAction>>((index, provider) => {
+        index[provider.id] = provider;
+        return index;
+      }, {});
+  }, [productionRuntimeStatus?.providerActionMatrix]);
 
   if (!open) return null;
 
@@ -373,6 +403,21 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
     }
 
     const provider = resolveSecretaryProvider(composer);
+    const providerAction = aiProviderActionsById[provider];
+    if (!providerAction || providerAction.startEndpoint !== '/api/secretary/chat') {
+      const runtimeProvider = productionRuntimeStatus?.providerActionMatrix.find((item) => item.id === provider);
+      const missing = runtimeProvider?.missingEnv?.length ? `缺少：${runtimeProvider.missingEnv.slice(0, 3).join(' / ')}` : '生产运行态尚未标记为可用';
+      setUtilityNotice(`${getProviderLabel(provider)} 暂不可用：${missing}`);
+      setRuntimeMessages((items) => [
+        ...items,
+        {
+          role: 'assistant',
+          content: `${getProviderLabel(provider)} 暂不可用：${missing}`,
+          provider,
+        },
+      ]);
+      return;
+    }
     const message = stripAssistantMentions(rawMessage) || rawMessage;
     const history: SecretaryChatTurn[] = runtimeMessages
       .slice(-8)
@@ -386,7 +431,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
 
     try {
       const result = await appApiClient.sendSecretaryMessage({
-        provider: resolveSecretaryProvider(composer),
+        provider,
         message,
         history,
         personalLab: true,

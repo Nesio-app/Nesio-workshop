@@ -31,6 +31,25 @@ assert(
 );
 
 assert(
+  component.includes("fetchProductionRuntimeHealth") &&
+    component.includes("productionRuntimeStatus") &&
+    component.includes("aiProviderActionsById"),
+  'PortalAiFriendsPreview must read production runtime providerActionMatrix before presenting AI provider actions.',
+);
+
+assert(
+  /providerActionMatrix[\s\S]*category === 'ai'/.test(component) &&
+    /provider\.actionStatus === 'ready'/.test(component),
+  'PortalAiFriendsPreview must filter usable AI providers from providerActionMatrix readiness.',
+);
+
+assert(
+  /const providerAction = aiProviderActionsById\[provider\]/.test(component) &&
+    /providerAction\.startEndpoint !== '\/api\/secretary\/chat'/.test(component),
+  'PortalAiFriendsPreview must verify selected AI provider routes through the Secretary Chat endpoint before sending.',
+);
+
+assert(
   apiClient.includes("secretaryHealth: '/api/secretary/health'") &&
     apiClient.includes("fetchSecretaryHealth") &&
     apiClient.includes("'x-baohe-access-mode': 'personal_lab'"),
@@ -60,7 +79,8 @@ assert(
 );
 
 assert(
-  /provider:\s*resolveSecretaryProvider\(composer\)/.test(component),
+  /const provider = resolveSecretaryProvider\(composer\)/.test(component) &&
+    /provider,\s*\n\s*message/.test(component),
   'PortalAiFriendsPreview must resolve provider from @mentions before calling Secretary Chat.',
 );
 
