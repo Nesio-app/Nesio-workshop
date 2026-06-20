@@ -11,6 +11,8 @@ for (const marker of [
   'startAuth',
   'runtimeStatus',
   'authFeedback',
+  'authEmail',
+  'authPhone',
 ]) {
   assert.ok(source.includes(marker), `AccountSettings must wire production runtime marker: ${marker}`);
 }
@@ -25,6 +27,10 @@ for (const label of ['Gemini', 'Google Calendar', 'Cloud DB', 'Email', 'Google',
 
 assert.ok(source.includes('provider_not_configured'), 'AccountSettings must surface fail-closed auth errors');
 assert.ok(source.includes('window.location.assign'), 'OAuth auth start must be able to navigate to redirect URL');
+assert.match(source, /type="email"/, 'AccountSettings must provide an email input before starting email auth');
+assert.match(source, /type="tel"/, 'AccountSettings must provide a phone input before starting phone auth');
+assert.ok(source.includes('email: authEmail.trim()'), 'AccountSettings must send the email value to auth start');
+assert.ok(source.includes('phone: authPhone.trim()'), 'AccountSettings must send the phone value to auth start');
 
 assert.equal(
   packageJson.scripts['test:account-settings-production-runtime'],

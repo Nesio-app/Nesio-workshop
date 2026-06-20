@@ -202,6 +202,8 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
   const [runtimeStatus, setRuntimeStatus] = useState<ProductionRuntimeHealthResponse | null>(null);
   const [runtimeLoading, setRuntimeLoading] = useState(true);
   const [authFeedback, setAuthFeedback] = useState('');
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPhone, setAuthPhone] = useState('');
   const [personalizationStage, setPersonalizationStage] = useState<BaohePersonalizationStage>('day_34');
   const [showAppSettings, setShowAppSettings] = useState(false);
   const personalization = getBaohePersonalizationProfile(personalizationStage);
@@ -277,10 +279,22 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
   };
 
   const onStartAuth = async (provider: AuthStartProvider) => {
+    if (provider === 'email' && !authEmail.trim()) {
+      setAuthFeedback('请先输入邮箱。');
+      return;
+    }
+    if (provider === 'phone' && !authPhone.trim()) {
+      setAuthFeedback('请先输入手机号。');
+      return;
+    }
     setAuthFeedback('正在连接…');
     try {
       const client = createAppApiClient();
-      const result = await client.startAuth({ provider });
+      const result = await client.startAuth({
+        provider,
+        email: authEmail.trim(),
+        phone: authPhone.trim(),
+      });
       if (result.ok && result.action === 'redirect' && result.url) {
         setAuthFeedback('正在跳转授权页面…');
         window.location.assign(result.url);
@@ -499,6 +513,30 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
               <p>邮件、Google、微信、电话都会走生产授权入口；未配置时会明确失败原因。</p>
             </div>
             <span>{runtimeStatus?.accountAuth.enabled ? '已开启' : '待配置'}</span>
+            <div className="portal-settings-auth-inputs">
+              <label>
+                <span>Email</span>
+                <input
+                  type="email"
+                  inputMode="email"
+                  autoComplete="email"
+                  placeholder="you@example.com"
+                  value={authEmail}
+                  onChange={(event) => setAuthEmail(event.target.value)}
+                />
+              </label>
+              <label>
+                <span>Phone</span>
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  placeholder="+1 555 000 0000"
+                  value={authPhone}
+                  onChange={(event) => setAuthPhone(event.target.value)}
+                />
+              </label>
+            </div>
             <div className="portal-settings-auth-buttons">
               <button type="button" onClick={() => onStartAuth('email')}>Email</button>
               <button type="button" onClick={() => onStartAuth('google')}>Google</button>

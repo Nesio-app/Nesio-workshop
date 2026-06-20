@@ -4602,6 +4602,40 @@ body {
   gap: 0.45rem;
 }
 
+.portal-settings-auth-inputs {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.45rem;
+}
+
+.portal-settings-auth-inputs label {
+  display: grid;
+  gap: 0.25rem;
+  color: var(--portal-muted);
+  font-size: 0.62rem;
+  font-weight: 800;
+}
+
+.portal-settings-auth-inputs input {
+  min-height: 44px;
+  width: 100%;
+  border: 1px solid rgba(74, 108, 247, 0.14);
+  border-radius: 0.8rem;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--portal-ink);
+  padding: 0 0.75rem;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 760;
+  outline: none;
+}
+
+.portal-settings-auth-inputs input:focus {
+  border-color: rgba(74, 108, 247, 0.42);
+  box-shadow: 0 0 0 3px rgba(74, 108, 247, 0.1);
+}
+
 .portal-settings-auth-buttons button {
   min-height: 44px;
   border: 1px solid rgba(74, 108, 247, 0.18);

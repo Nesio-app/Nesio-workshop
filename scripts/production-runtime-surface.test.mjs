@@ -10,10 +10,11 @@ function read(path) {
 
 const healthRoute = read('app/api/portal/production/health/route.ts');
 const authStartRoute = read('app/api/auth/start/route.ts');
+const authCallbackRoute = read('app/api/auth/callback/route.ts');
 const runtimeHelper = read('lib/portal/production-runtime.ts');
 const packageJson = JSON.parse(read('package.json'));
 
-for (const source of [healthRoute, authStartRoute]) {
+for (const source of [healthRoute, authStartRoute, authCallbackRoute]) {
   assert.match(source, /redact|safe|public/i, 'production runtime routes must explicitly redact or expose only safe status');
   assert.doesNotMatch(source, /SUPABASE_SERVICE_ROLE_KEY[^?].*NextResponse\.json/s, 'routes must not return service role secrets');
   assert.doesNotMatch(source, /WECHAT_APP_SECRET[^?].*NextResponse\.json/s, 'routes must not return WeChat secrets');
@@ -32,6 +33,10 @@ assert.match(authStartRoute, /google/, 'auth start must support Google provider'
 assert.match(authStartRoute, /wechat/, 'auth start must support WeChat provider');
 assert.match(authStartRoute, /phone/, 'auth start must support phone provider');
 assert.match(authStartRoute, /503/, 'auth start must fail closed when provider config is missing');
+assert.match(authCallbackRoute, /GET\(/, 'auth callback route must expose GET');
+assert.match(authCallbackRoute, /NextResponse\.redirect/, 'auth callback must redirect back to the Shell instead of 404ing');
+assert.match(authCallbackRoute, /auth_callback_received/, 'auth callback must expose safe callback status');
+assert.doesNotMatch(authCallbackRoute, /access_token.*searchParams\.set/s, 'auth callback must not echo access tokens into redirect URLs');
 
 assert.equal(
   packageJson.scripts['test:production-runtime-surface'],
