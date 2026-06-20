@@ -29,7 +29,7 @@ for (const key of [
 }
 
 assert(
-  aiFriends.includes("import { t } from '@/lib/portal/i18n'"),
+  aiFriends.includes("from '@/lib/portal/i18n'") && aiFriends.includes('t(locale,'),
   'PortalAiFriendsPreview must use the shared i18n helper for runtime feedback.',
 );
 

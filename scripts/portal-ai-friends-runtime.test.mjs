@@ -100,7 +100,7 @@ assert(
 );
 
 assert(
-  component.includes('正在连接中，上一条消息还在路上。'),
+  component.includes("t(locale, 'aiFriendsBusyNotice')"),
   'PortalAiFriendsPreview must explain repeat send attempts while a message is already sending.',
 );
 

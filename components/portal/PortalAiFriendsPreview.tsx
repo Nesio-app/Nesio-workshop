@@ -11,7 +11,7 @@ import {
   type SecretaryChatTurn,
   type SecretaryHealthResponse,
 } from '@/lib/portal/app-api-client';
-import { t } from '@/lib/portal/i18n';
+import { t, type PortalStringKey } from '@/lib/portal/i18n';
 import { nesioAiIcons, nesioToolIcons } from '@/lib/portal/nesio-design-system-assets.mjs';
 import { loadProfileSettings, type PortalLocale } from '@/lib/portal/profile';
 
@@ -38,13 +38,13 @@ const AI_CAPABILITIES: Array<{
   id: AiCapabilityId;
   icon: string;
   label: string;
-  notice: string;
+  noticeKey: PortalStringKey;
 }> = [
-  { id: 'image', icon: '📷', label: '图片', notice: '请选择图片，当前先作为本地意图保留。' },
-  { id: 'file', icon: '📎', label: '文件', notice: '请选择文件，当前先作为本地意图保留。' },
-  { id: 'audio', icon: '🎙', label: '语音', notice: '正在准备实时语音通话。' },
-  { id: 'live', icon: '📞', label: '实时', notice: '已打开实时通话选项。' },
-  { id: 'note', icon: '📝', label: '笔记', notice: '已准备 Flomo 笔记意图。' },
+  { id: 'image', icon: '📷', label: '图片', noticeKey: 'aiFriendsImageIntentNotice' },
+  { id: 'file', icon: '📎', label: '文件', noticeKey: 'aiFriendsFileIntentNotice' },
+  { id: 'audio', icon: '🎙', label: '语音', noticeKey: 'aiFriendsAudioConnecting' },
+  { id: 'live', icon: '📞', label: '实时', noticeKey: 'aiFriendsLiveIntentNotice' },
+  { id: 'note', icon: '📝', label: '笔记', noticeKey: 'aiFriendsFlomoIntentNotice' },
 ];
 
 const mentionTargets: MentionTarget[] = [
@@ -177,7 +177,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
   const [utilityNotice, setUtilityNotice] = useState('');
   const [secretaryHealth, setSecretaryHealth] = useState<SecretaryHealthResponse | null>(null);
   const [productionRuntimeStatus, setProductionRuntimeStatus] = useState<ProductionRuntimeHealthResponse | null>(null);
-  const [aiRuntimeStatus, setAiRuntimeStatus] = useState('正在检查智友 AI 连接...');
+  const [aiRuntimeStatus, setAiRuntimeStatus] = useState(t('zh', 'aiFriendsStatusChecking'));
   const [localAttachments, setLocalAttachments] = useState<string[]>([]);
   const composerRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -206,15 +206,15 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
           ].filter(Boolean);
           setAiRuntimeStatus(
             configuredProviders.length
-              ? `已连接 ${configuredProviders.join(' / ')}`
-              : '智友通道已打开，但还没有检测到可用 AI Key',
+              ? t(locale, 'providerAiConnectedTemplate', { provider: configuredProviders.join(' / ') })
+              : t(locale, 'aiFriendsStatusEnabledNoKeys'),
           );
           return;
         }
-        setAiRuntimeStatus(health.message || '智友 AI 尚未通过运行时开关');
+        setAiRuntimeStatus(health.message || t(locale, 'aiFriendsStatusRuntimeOff'));
       } catch (error) {
         if (!cancelled) {
-          setAiRuntimeStatus(error instanceof Error ? error.message : '智友 AI 连接检查失败');
+          setAiRuntimeStatus(error instanceof Error ? error.message : t(locale, 'aiFriendsStatusCheckFailed'));
         }
       }
     }
@@ -223,7 +223,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
     return () => {
       cancelled = true;
     };
-  }, [appApiClient]);
+  }, [appApiClient, locale]);
 
   useEffect(() => {
     let cancelled = false;
@@ -281,7 +281,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
     setComposer('');
     setActiveConversationId('smart');
     setConversationListOpen(true);
-    setUtilityNotice('已新建一条集合对话，可以直接 @AI 或 @工具。');
+    setUtilityNotice(t(locale, 'aiFriendsNewThreadNotice'));
     requestAnimationFrame(() => composerRef.current?.focus());
   };
 
@@ -290,13 +290,13 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
     setConversationListOpen(false);
     setSurface('chat');
     setComposer(getConversationComposerIntent(item.id));
-    setUtilityNotice(`已切换到 ${item.title} 对话，可以继续输入或 @ 拉入其他 AI。`);
+    setUtilityNotice(t(locale, 'aiFriendsConversationSwitchedTemplate', { title: item.title }));
     requestAnimationFrame(() => composerRef.current?.focus());
   };
 
   const openAttachmentTray = () => {
     setAttachmentTrayOpen((value) => !value);
-    setUtilityNotice('图片、文件、语音会先作为本地意图保留；真实上传与外部授权后续再开。');
+    setUtilityNotice(t(locale, 'aiFriendsAttachmentTrayNotice'));
   };
 
   const openMentionMenu = () => {
@@ -320,20 +320,20 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
   const addLocalAttachment = (kind: string, fileName?: string) => {
     const label = fileName ? `${kind}：${fileName}` : kind;
     setLocalAttachments((items) => [label, ...items].slice(0, 3));
-    setUtilityNotice(`${label} 已作为本地意图加入；真实上传后续单独授权。`);
+    setUtilityNotice(t(locale, 'aiFriendsLocalAttachmentTemplate', { label }));
   };
 
   const addFlomoNoteIntent = () => {
     setComposer((value) => `${value}${value.endsWith(' ') || value.length === 0 ? '' : ' '}@Flomo `);
     setLocalAttachments((items) => ['笔记：将本条保存到 Flomo', ...items].slice(0, 3));
-    setUtilityNotice('已准备 Flomo 笔记意图，发送后会进入本地 mock 记录。');
+    setUtilityNotice(t(locale, 'aiFriendsFlomoIntentNotice'));
     requestAnimationFrame(() => composerRef.current?.focus());
   };
 
   const handleCapabilityAction = (capabilityId: AiCapabilityId) => {
     setActiveCapability(capabilityId);
     const capability = AI_CAPABILITIES.find((item) => item.id === capabilityId);
-    if (capability) setUtilityNotice(capability.notice);
+    if (capability) setUtilityNotice(t(locale, capability.noticeKey));
 
     switch (capabilityId) {
       case 'image':
@@ -363,38 +363,38 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
     switch (label) {
       case '日期':
         setComposer('@Gemini 帮我看今天接下来最重要的安排。');
-        setUtilityNotice('已准备日期与日程咨询。');
+        setUtilityNotice(t(locale, 'aiFriendsCalendarIntentNotice'));
         break;
       case 'AI 建议':
         setComposer('@Gemini ');
-        setUtilityNotice('已切到 AI 建议输入。');
+        setUtilityNotice(t(locale, 'aiFriendsRecommendationIntentNotice'));
         break;
       case '笔记':
         addFlomoNoteIntent();
         return;
       case '物品':
         setComposer('@物品库 记一个物品：');
-        setUtilityNotice('已准备物品库记录意图。');
+        setUtilityNotice(t(locale, 'aiFriendsInventoryIntentNotice'));
         break;
       case '支出':
         setComposer('@豆包 记录一笔支出：');
-        setUtilityNotice('已准备支出记录意图。');
+        setUtilityNotice(t(locale, 'aiFriendsExpenseIntentNotice'));
         break;
       case '待办':
         setComposer('@Flomo 待办：');
-        setUtilityNotice('已准备待办记录意图。');
+        setUtilityNotice(t(locale, 'aiFriendsTodoIntentNotice'));
         break;
       case '图片':
         imageInputRef.current?.click();
-        setUtilityNotice('请选择图片，当前先保留为本地意图。');
+        setUtilityNotice(t(locale, 'aiFriendsImageIntentNotice'));
         return;
       case '通话':
         setCallSheetOpen(true);
-        setUtilityNotice('已打开实时通话选项。');
+        setUtilityNotice(t(locale, 'aiFriendsLiveIntentNotice'));
         return;
       case '文件':
         fileInputRef.current?.click();
-        setUtilityNotice('请选择文件，当前先保留为本地意图。');
+        setUtilityNotice(t(locale, 'aiFriendsFileIntentNotice'));
         return;
       default:
         setComposer('');
@@ -406,11 +406,11 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
   const sendComposerMessage = async () => {
     const rawMessage = composer.trim();
     if (aiSending) {
-      setUtilityNotice('正在连接中，上一条消息还在路上。');
+      setUtilityNotice(t(locale, 'aiFriendsBusyNotice'));
       return;
     }
     if (!rawMessage) {
-      setUtilityNotice('先写一句想问智友的话，或用 @ 拉入一个 AI。');
+      setUtilityNotice(t(locale, 'aiFriendsEmptyMessageNotice'));
       return;
     }
 
@@ -512,7 +512,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
             <span aria-hidden>⌕</span>
             <input
               type="search"
-              placeholder="搜索对话、笔记、AI 建议..."
+              placeholder={t(locale, 'aiFriendsSearchPlaceholder')}
               onFocus={() => setSearchToolsOpen(true)}
               onChange={() => setSearchToolsOpen(true)}
             />
@@ -638,7 +638,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
                 ))}
               </div>
             ) : null}
-            <p>输入框搞定一切： @AI 拉它进来 · @Flomo 存笔记 · @物品库 记物品</p>
+            <p>{t(locale, 'aiFriendsComposerHint')}</p>
             {(utilityNotice || localAttachments.length > 0) ? (
               <div className="portal-ai-local-status" aria-live="polite">
                 {localAttachments.map((item) => (
@@ -670,7 +670,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
                     void sendComposerMessage();
                   }
                 }}
-                placeholder="发消息给智友..."
+                placeholder={t(locale, 'aiFriendsComposerPlaceholder')}
               />
               <button type="button" className="portal-ai-round-action" aria-label="语音输入" aria-controls="portal-ai-audio-call" onClick={() => setAudioCallOpen(true)}>🎙</button>
               <button type="button" className="portal-ai-call-button" aria-label="通话" aria-controls="portal-ai-call-sheet" onClick={() => setCallSheetOpen(true)}>
@@ -724,7 +724,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
               <button type="button" className="portal-ai-conversation-scrim" aria-label="关闭 AI 对话列表" onClick={() => setConversationListOpen(false)} />
               <section>
                 <span className="portal-ai-sheet-handle" aria-hidden />
-                <h2>所有 AI 对话</h2>
+                <h2>{t(locale, 'aiFriendsConversationListTitle')}</h2>
                 {recentConversations.map((item) => (
                   <button
                     key={item.id}
@@ -751,22 +751,22 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
           {typeof document !== 'undefined' && callSheetOpen ? createPortal(
             <div className="portal-ai-modal-layer">
               <button type="button" className="portal-ai-modal-scrim" aria-label="关闭通话选项" onClick={() => setCallSheetOpen(false)} />
-              <section id="portal-ai-call-sheet" className="portal-ai-call-sheet" role="dialog" aria-modal="true" aria-label="Live 通话">
+              <section id="portal-ai-call-sheet" className="portal-ai-call-sheet" role="dialog" aria-modal="true" aria-label={t(locale, 'aiFriendsCallSheetTitle')}>
                 <span className="portal-ai-sheet-handle" aria-hidden />
-                <h2>Live 通话</h2>
+                <h2>{t(locale, 'aiFriendsCallSheetTitle')}</h2>
                 <button type="button" onClick={() => { setCallSheetOpen(false); setVideoCallOpen(true); }}>
                   <span aria-hidden>📹</span>
                   <p>
-                    <b>视频通话</b>
-                    <small>和智友面对面，实时回应</small>
+                    <b>{t(locale, 'aiFriendsVideoCallTitle')}</b>
+                    <small>{t(locale, 'aiFriendsVideoCallSubtitle')}</small>
                   </p>
                   <i aria-hidden>›</i>
                 </button>
                 <button type="button" onClick={() => { setCallSheetOpen(false); setAudioCallOpen(true); }}>
                   <span aria-hidden>🎙</span>
                   <p>
-                    <b>音频通话</b>
-                    <small>语音实时对话，解放双手</small>
+                    <b>{t(locale, 'aiFriendsAudioCallTitle')}</b>
+                    <small>{t(locale, 'aiFriendsAudioCallSubtitle')}</small>
                   </p>
                   <i aria-hidden>›</i>
                 </button>
@@ -777,11 +777,11 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
 
           {typeof document !== 'undefined' && audioCallOpen ? createPortal(
             <div className="portal-ai-modal-layer portal-ai-modal-layer--call">
-              <section id="portal-ai-audio-call" className="portal-ai-video-call" role="dialog" aria-modal="true" aria-label="AI 实时语音通话">
+              <section id="portal-ai-audio-call" className="portal-ai-video-call" role="dialog" aria-modal="true" aria-label={t(locale, 'aiFriendsAudioCallTitle')}>
                 <div className="portal-ai-video-avatar" aria-hidden>🎙</div>
-                <p>正在连接实时语音通话</p>
+                <p>{t(locale, 'aiFriendsAudioConnecting')}</p>
                 <small>{liveProviderSummary}</small>
-                <button type="button" onClick={() => setAudioCallOpen(false)}>结束</button>
+                <button type="button" onClick={() => setAudioCallOpen(false)}>{t(locale, 'aiFriendsEndCall')}</button>
               </section>
             </div>,
             document.body,
@@ -789,11 +789,11 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
 
           {typeof document !== 'undefined' && videoCallOpen ? createPortal(
             <div className="portal-ai-modal-layer portal-ai-modal-layer--call">
-              <section className="portal-ai-video-call" role="dialog" aria-modal="true" aria-label="AI 虚拟形象视频通话">
+              <section className="portal-ai-video-call" role="dialog" aria-modal="true" aria-label={t(locale, 'aiFriendsVideoCallTitle')}>
                 <div className="portal-ai-video-avatar" aria-hidden>✦</div>
-                <p>正在连接智友虚拟形象</p>
+                <p>{t(locale, 'aiFriendsVideoConnecting')}</p>
                 <small>{liveProviderSummary}</small>
-                <button type="button" onClick={() => setVideoCallOpen(false)}>结束</button>
+                <button type="button" onClick={() => setVideoCallOpen(false)}>{t(locale, 'aiFriendsEndCall')}</button>
               </section>
             </div>,
             document.body,
