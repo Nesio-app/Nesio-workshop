@@ -6,6 +6,7 @@ const root = process.cwd();
 const component = fs.readFileSync(path.join(root, 'components', 'portal', 'NotePanelEnhanced.tsx'), 'utf8');
 const basicComponent = fs.readFileSync(path.join(root, 'components', 'portal', 'NotePanel.tsx'), 'utf8');
 const runtime = fs.readFileSync(path.join(root, 'lib', 'portal', 'production-runtime.ts'), 'utf8');
+const i18n = fs.readFileSync(path.join(root, 'lib', 'portal', 'i18n.ts'), 'utf8');
 const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 
 for (const marker of [
@@ -60,6 +61,35 @@ assert.match(
   /if \(!flomoRuntimeReady\)[\s\S]*setStatus\('err'\)/,
   'NotePanelEnhanced must fail closed with visible status when Flomo is not runtime-ready.',
 );
+
+assert.doesNotMatch(
+  component,
+  /className="flomo-memo-menu"[\s\S]{0,180}tabIndex=\{-1\}/,
+  'Memo more button must stay reachable and focusable.',
+);
+
+assert.match(
+  component,
+  /className="flomo-memo-menu"[\s\S]{0,260}onClick=\{\(\) => setMenuOpen\(\(open\) => !open\)\}/,
+  'Memo more button must toggle a real local action menu.',
+);
+
+assert.match(
+  component,
+  /role="menu"[\s\S]*flomoCopyMemo/,
+  'Memo action menu must expose a localized copy action.',
+);
+
+assert.match(
+  component,
+  /navigator\.clipboard\.writeText\(content\)/,
+  'Memo copy action must write the memo content through navigator.clipboard.',
+);
+
+for (const key of ['flomoCopyMemo', 'flomoMemoCopied', 'flomoMemoCopyFailed']) {
+  assert.match(component, new RegExp(key), `NotePanelEnhanced must use i18n key ${key}.`);
+  assert.match(i18n, new RegExp(`${key}:`), `i18n dictionary must define key ${key}.`);
+}
 
 for (const [name, source] of [
   ['NotePanelEnhanced', component],
