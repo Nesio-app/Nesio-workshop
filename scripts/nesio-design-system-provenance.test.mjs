@@ -54,7 +54,7 @@ assert.match(readme, /warm coach/i, 'Design-system readme must preserve the warm
 assert.match(readme, /The day \*\*and\*\* night palettes here are taken directly from the shipped shell/, 'Design system must remain documentation of the shipped shell, not a redesign source.');
 
 const manifest = JSON.parse(readFileSync(assertRepoFile('_ds_manifest.json'), 'utf8'));
-assert.equal(manifest.namespace, 'NosioDesignSystem_d76dec', 'Expected preserved upstream design-system namespace provenance.');
+assert.equal(manifest.namespace, 'NesioDesignSystem_d76dec', 'Expected repo-local design-system namespace to use canonical Nesio naming.');
 assert.ok(
   manifest.cards.some((card) => card.path === 'ui_kits/shell/index.html'),
   'Expected shell UI kit to remain available as reference provenance.',
@@ -108,7 +108,7 @@ for (const filePath of runtimeFiles) {
   const source = readFileSync(filePath, 'utf8');
   assert.doesNotMatch(
     source,
-    /NosioDesignSystem_d76dec|_ds_bundle|ui_kits\/shell\/Home\.jsx|design-system\/nesio\/styles\.css/,
+    /NesioDesignSystem_d76dec|NosioDesignSystem_d76dec|_ds_bundle|ui_kits\/shell\/Home\.jsx|design-system\/nesio\/styles\.css/,
     `${filePath} must not directly import the design-system demo bundle or sample shell.`,
   );
 }

@@ -77,6 +77,6 @@ Casing/tone: lowercase, gentle, present-tense, second-person but never imperativ
 | `guidelines/` | Foundation specimen cards (Design System tab). |
 | `assets/` | Tool icons, AI icons, brand crystal. |
 
-**Namespace:** components are exposed at `window.NosioDesignSystem_d76dec.<Name>`.
+**Namespace:** components are exposed at `window.NesioDesignSystem_d76dec.<Name>`.
 
 > Set the file type to **Design System** in the Share menu so your org can use it.

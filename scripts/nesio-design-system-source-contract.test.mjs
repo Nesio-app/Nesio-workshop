@@ -22,6 +22,12 @@ assert.equal(
 );
 
 assert.equal(
+  contract.nesioDesignSystemSource.sourceName,
+  "Nesio Design System",
+  "Expected the canonical product/design-system name to be Nesio, not Nosio.",
+);
+
+assert.equal(
   contract.nesioDesignSystemSource.importedFrom,
   "/Users/jing/Downloads/Nosio Design System",
   "Expected the original imported design-system path to be preserved as provenance only.",

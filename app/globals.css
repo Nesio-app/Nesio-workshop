@@ -7969,7 +7969,7 @@ html[data-portal-theme="night"] .portal-bottom-nav-btn--active {
   background: rgba(117,160,255,.2) !important;
 }
 
-/* Nosio runtime alignment: keep Shell / 智友 / 工具箱 / 设置 clear of the fixed nav
+/* Nesio runtime alignment: keep Shell / 智友 / 工具箱 / 设置 clear of the fixed nav
    and use one liquid-glass contract for popovers across day and night. */
 .portal-dashboard-root,
 .portal-ai-preview--screen,

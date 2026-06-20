@@ -1,7 +1,7 @@
 /* Nesio · 宝盒 — Home shell screen.
    Composes the design-system components over the liquid-glass courtyard. */
 const { ToolModuleCard, ReminderCard, QuoteCard, WeatherTime, FloatingButton, Button } =
-  window.NosioDesignSystem_d76dec;
+  window.NesioDesignSystem_d76dec;
 
 const TOOL_ICON = (i) => `../../assets/icons/tools/${i}.svg`;
 const AI_ICON = (i) => `../../assets/icons/ai/${i}.svg`;

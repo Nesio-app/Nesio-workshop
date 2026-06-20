@@ -1,8 +1,8 @@
-/* @ds-bundle: {"format":3,"namespace":"NosioDesignSystem_d76dec","components":[{"name":"Button","sourcePath":"components/core/Button.jsx"},{"name":"FloatingButton","sourcePath":"components/core/FloatingButton.jsx"},{"name":"GlassCard","sourcePath":"components/core/GlassCard.jsx"},{"name":"Input","sourcePath":"components/core/Input.jsx"},{"name":"StatusBadge","sourcePath":"components/core/StatusBadge.jsx"},{"name":"QuoteCard","sourcePath":"components/portal/QuoteCard.jsx"},{"name":"ReminderCard","sourcePath":"components/portal/ReminderCard.jsx"},{"name":"ToolModuleCard","sourcePath":"components/portal/ToolModuleCard.jsx"},{"name":"WeatherTime","sourcePath":"components/portal/WeatherTime.jsx"},{"name":"LOCALES","sourcePath":"lib/i18n.js"},{"name":"LOCALE_LABELS","sourcePath":"lib/i18n.js"},{"name":"STRINGS","sourcePath":"lib/i18n.js"}],"sourceHashes":{"components/core/Button.jsx":"912e5f280f5c","components/core/FloatingButton.jsx":"e7d874e9b328","components/core/GlassCard.jsx":"5a973c63f306","components/core/Input.jsx":"b9bfd76ff2d7","components/core/StatusBadge.jsx":"d84ed828304e","components/portal/QuoteCard.jsx":"220a6d07c01e","components/portal/ReminderCard.jsx":"c4eb41bff35b","components/portal/ToolModuleCard.jsx":"f67d5eb1d3bf","components/portal/WeatherTime.jsx":"4f091c4c7bf4","lib/i18n.js":"17972f5f1021","ui_kits/shell/Home.jsx":"d72feb7e1bf6","ui_kits/shell/data.js":"56f76621a915"},"inlinedExternals":[],"unexposedExports":[{"name":"t","sourcePath":"lib/i18n.js"}]} */
+/* @ds-bundle: {"format":3,"namespace":"NesioDesignSystem_d76dec","components":[{"name":"Button","sourcePath":"components/core/Button.jsx"},{"name":"FloatingButton","sourcePath":"components/core/FloatingButton.jsx"},{"name":"GlassCard","sourcePath":"components/core/GlassCard.jsx"},{"name":"Input","sourcePath":"components/core/Input.jsx"},{"name":"StatusBadge","sourcePath":"components/core/StatusBadge.jsx"},{"name":"QuoteCard","sourcePath":"components/portal/QuoteCard.jsx"},{"name":"ReminderCard","sourcePath":"components/portal/ReminderCard.jsx"},{"name":"ToolModuleCard","sourcePath":"components/portal/ToolModuleCard.jsx"},{"name":"WeatherTime","sourcePath":"components/portal/WeatherTime.jsx"},{"name":"LOCALES","sourcePath":"lib/i18n.js"},{"name":"LOCALE_LABELS","sourcePath":"lib/i18n.js"},{"name":"STRINGS","sourcePath":"lib/i18n.js"}],"sourceHashes":{"components/core/Button.jsx":"912e5f280f5c","components/core/FloatingButton.jsx":"e7d874e9b328","components/core/GlassCard.jsx":"5a973c63f306","components/core/Input.jsx":"b9bfd76ff2d7","components/core/StatusBadge.jsx":"d84ed828304e","components/portal/QuoteCard.jsx":"220a6d07c01e","components/portal/ReminderCard.jsx":"c4eb41bff35b","components/portal/ToolModuleCard.jsx":"f67d5eb1d3bf","components/portal/WeatherTime.jsx":"4f091c4c7bf4","lib/i18n.js":"17972f5f1021","ui_kits/shell/Home.jsx":"d72feb7e1bf6","ui_kits/shell/data.js":"56f76621a915"},"inlinedExternals":[],"unexposedExports":[{"name":"t","sourcePath":"lib/i18n.js"}]} */
 
 (() => {
 
-const __ds_ns = (window.NosioDesignSystem_d76dec = window.NosioDesignSystem_d76dec || {});
+const __ds_ns = (window.NesioDesignSystem_d76dec = window.NesioDesignSystem_d76dec || {});
 
 const __ds_scope = {};
 
@@ -971,7 +971,7 @@ const {
   WeatherTime,
   FloatingButton,
   Button
-} = window.NosioDesignSystem_d76dec;
+} = window.NesioDesignSystem_d76dec;
 const TOOL_ICON = i => `../../assets/icons/tools/${i}.svg`;
 const AI_ICON = i => `../../assets/icons/ai/${i}.svg`;
 function Home() {
