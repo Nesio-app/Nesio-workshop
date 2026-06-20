@@ -1,4 +1,4 @@
-import type { PortalLocale } from './profile';
+import { portalLocaleToDictionaryLocale, type PortalLocale } from './profile';
 
 const STRINGS = {
   zh: {
@@ -670,7 +670,8 @@ const STRINGS = {
 export type PortalStringKey = keyof typeof STRINGS.zh;
 
 export function t(locale: PortalLocale, key: PortalStringKey, params?: Record<string, string | number>): string {
-  const text = (STRINGS[locale][key] ?? STRINGS.zh[key]) as string;
+  const dictionaryLocale = portalLocaleToDictionaryLocale(locale);
+  const text = (STRINGS[dictionaryLocale][key] ?? STRINGS.zh[key]) as string;
   if (!params) return text;
 
   let next = text;

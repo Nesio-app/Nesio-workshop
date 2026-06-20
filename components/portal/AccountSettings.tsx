@@ -14,6 +14,8 @@ import {
 } from '@/lib/portal/i18n';
 import {
   loadProfileSettings,
+  normalizePortalLocale,
+  portalLocaleToHtmlLang,
   readAvatarFile,
   saveProfileSettings,
   type PortalCoachStyle,
@@ -64,7 +66,7 @@ function normalizeDisplayLanguage(value: string | null | undefined): DisplayLang
 }
 
 function normalizeProfileLocale(value: string | null | undefined): PortalLocale {
-  return value === 'en' ? 'en' : 'zh';
+  return normalizePortalLocale(value);
 }
 
 function normalizeCoachStyle(value: string | null | undefined): PortalCoachStyle {
@@ -128,7 +130,7 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
     setCalendarUrl(loadCalendarLinkSettings().googleCalendarUrl);
     setPersonalizationStage(readBaohePersonalizationStage());
     setObservationPushEnabled(localStorage.getItem(OBSERVATION_PUSH_KEY) === 'false' ? false : personalization.preferences.observationPushEnabled);
-    document.documentElement.lang = s.locale === 'en' ? 'en' : 'zh-CN';
+    document.documentElement.lang = portalLocaleToHtmlLang(s.locale);
   }, [fallbackName, personalization.preferences.observationPushEnabled]);
 
   useEffect(() => {
@@ -237,7 +239,7 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
   const onDisplayLanguageChange = (next: DisplayLanguage) => {
     setDisplayLanguage(next);
     localStorage.setItem(DISPLAY_LANGUAGE_KEY, next);
-    const profileLocale: PortalLocale = next === 'en' ? 'en' : 'zh';
+    const profileLocale: PortalLocale = normalizePortalLocale(next);
     setLocale(profileLocale);
     saveProfileSettings({ locale: profileLocale });
     void syncCloudProfileSettings({
@@ -247,7 +249,7 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
       displayLanguage: next,
       calendarUrl,
     });
-    document.documentElement.lang = next;
+    document.documentElement.lang = portalLocaleToHtmlLang(profileLocale);
     showToast('settingsSaved');
   };
 
