@@ -80,7 +80,7 @@ const FIRST_USE_PROFILE: BaohePersonalizationProfile = {
     remindBarText: '今天先从一件小事开始',
     energyNote: '宝盒正在了解你的节奏',
     actionCardText: '先把最小的一步放下来，之后再慢慢整理。',
-    moodDotColor: '#f6c90e',
+    moodDotColor: 'var(--status-gentle)',
     dayBadge: null,
   },
   dataDepth: [
@@ -124,7 +124,7 @@ const DAY_34_PROFILE: BaohePersonalizationProfile = {
     remindBarText: '妈妈生日还有几天，要不要现在花两分钟挑个礼物？',
     energyNote: '昨晚睡得好，身体在慢慢回升',
     actionCardText: '妈妈生日还有几天，要不要现在花两分钟挑个礼物？定制相册或护肤套装都很贴心，做不完也没关系。',
-    moodDotColor: '#74b9ff',
+    moodDotColor: 'var(--status-calm)',
     dayBadge: '第 34 天 · 越来越了解你',
   },
   dayBadge: '第 34 天 · 越来越了解你',

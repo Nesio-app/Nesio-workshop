@@ -162,18 +162,18 @@ interface CalendarFeedStatus {
 const FIDELITY_HINT_KEY = 'treasurebox-fidelity-hint-dismissed';
 
 const MOOD_OPTIONS = [
-  { key: 'calm', label: '慢慢来', color: '#38bdf8' },
-  { key: 'safe', label: '安心', color: '#2dd4bf' },
-  { key: 'restored', label: '回暖', color: '#22c55e' },
-  { key: 'focused', label: '专注', color: '#4a6cf7' },
-  { key: 'hopeful', label: '有希望', color: '#7c8cff' },
-  { key: 'creative', label: '想象力', color: '#a855f7' },
-  { key: 'tender', label: '需要照顾', color: '#ec4899' },
-  { key: 'anxious', label: '有点焦虑', color: '#ef4444' },
-  { key: 'alert', label: '警觉', color: '#f97316' },
-  { key: 'bright', label: '轻快', color: '#facc15' },
-  { key: 'grounded', label: '稳住', color: '#94a3b8' },
-  { key: 'low', label: '低能量', color: '#8b7cf6' },
+  { key: 'calm', label: '慢慢来', color: 'var(--status-calm)' },
+  { key: 'safe', label: '安心', color: 'var(--status-go)' },
+  { key: 'restored', label: '回暖', color: 'var(--status-go)' },
+  { key: 'focused', label: '专注', color: 'var(--portal-cool-accent)' },
+  { key: 'hopeful', label: '有希望', color: 'var(--portal-neutral-accent)' },
+  { key: 'creative', label: '想象力', color: 'var(--portal-warm-accent)' },
+  { key: 'tender', label: '需要照顾', color: 'var(--status-calm)' },
+  { key: 'anxious', label: '有点焦虑', color: 'var(--status-gentle)' },
+  { key: 'alert', label: '警觉', color: 'var(--status-gentle)' },
+  { key: 'bright', label: '轻快', color: 'var(--portal-blue-deep)' },
+  { key: 'grounded', label: '稳住', color: 'var(--portal-muted)' },
+  { key: 'low', label: '低能量', color: 'var(--portal-neutral-accent)' },
 ] as const;
 
 type MoodOption = (typeof MOOD_OPTIONS)[number];
