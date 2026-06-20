@@ -8,8 +8,11 @@ const packageJson = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package
 for (const marker of [
   'createAppApiClient',
   'fetchProductionRuntimeHealth',
+  'fetchAuthSession',
   'startAuth',
+  'logoutAuth',
   'runtimeStatus',
+  'authSession',
   'authFeedback',
   'authEmail',
   'authPhone',
@@ -27,6 +30,9 @@ for (const label of ['Gemini', 'Google Calendar', 'Cloud DB', 'Email', 'Google',
 
 assert.ok(source.includes('provider_not_configured'), 'AccountSettings must surface fail-closed auth errors');
 assert.ok(source.includes('window.location.assign'), 'OAuth auth start must be able to navigate to redirect URL');
+assert.ok(source.includes('authSession?.loggedIn'), 'AccountSettings must display real session login status');
+assert.ok(source.includes('onLogoutAuth'), 'AccountSettings must expose a logout action');
+assert.ok(source.includes('退出登录'), 'AccountSettings must render a logout button label');
 assert.match(source, /type="email"/, 'AccountSettings must provide an email input before starting email auth');
 assert.match(source, /type="tel"/, 'AccountSettings must provide a phone input before starting phone auth');
 assert.ok(source.includes('email: authEmail.trim()'), 'AccountSettings must send the email value to auth start');

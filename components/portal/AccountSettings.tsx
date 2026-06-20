@@ -14,6 +14,7 @@ import {
 } from '@/lib/portal/calendar-links';
 import {
   createAppApiClient,
+  type AuthSessionResponse,
   type AuthStartProvider,
   type ProductionProviderStatus,
   type ProductionRuntimeHealthResponse,
@@ -201,6 +202,8 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
   const [toast, setToast] = useState('');
   const [runtimeStatus, setRuntimeStatus] = useState<ProductionRuntimeHealthResponse | null>(null);
   const [runtimeLoading, setRuntimeLoading] = useState(true);
+  const [authSession, setAuthSession] = useState<AuthSessionResponse | null>(null);
+  const [authSessionLoading, setAuthSessionLoading] = useState(true);
   const [authFeedback, setAuthFeedback] = useState('');
   const [authEmail, setAuthEmail] = useState('');
   const [authPhone, setAuthPhone] = useState('');
@@ -223,6 +226,7 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
     let alive = true;
     const client = createAppApiClient();
     setRuntimeLoading(true);
+    setAuthSessionLoading(true);
     client
       .fetchProductionRuntimeHealth()
       .then((status) => {
@@ -233,6 +237,17 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
       })
       .finally(() => {
         if (alive) setRuntimeLoading(false);
+      });
+    client
+      .fetchAuthSession()
+      .then((session) => {
+        if (alive) setAuthSession(session);
+      })
+      .catch(() => {
+        if (alive) setAuthSession(null);
+      })
+      .finally(() => {
+        if (alive) setAuthSessionLoading(false);
       });
 
     return () => {
@@ -311,6 +326,29 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
       setAuthFeedback(result.error || '暂时无法开始登录。');
     } catch {
       setAuthFeedback('连接登录服务失败，请稍后再试。');
+    }
+  };
+
+  const onLogoutAuth = async () => {
+    setAuthFeedback('正在退出…');
+    try {
+      const client = createAppApiClient();
+      const result = await client.logoutAuth();
+      if (result.ok && result.signedOut) {
+        setAuthSession({
+          safePublicStatus: true,
+          secretsRedacted: true,
+          ok: true,
+          loggedIn: false,
+          hasRefreshToken: false,
+          status: 'signed_out',
+        });
+        setAuthFeedback('已退出登录。');
+        return;
+      }
+      setAuthFeedback('退出登录失败，请稍后再试。');
+    } catch {
+      setAuthFeedback('连接退出服务失败，请稍后再试。');
     }
   };
 
@@ -510,9 +548,15 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
           <li className="portal-settings-auth-actions">
             <div>
               <strong>账户登录</strong>
-              <p>邮件、Google、微信、电话都会走生产授权入口；未配置时会明确失败原因。</p>
+              <p>
+                {authSessionLoading
+                  ? '正在读取登录状态。'
+                  : authSession?.loggedIn
+                    ? `已登录${authSession.user?.email ? `：${authSession.user.email}` : authSession.user?.phone ? `：${authSession.user.phone}` : ''}`
+                    : '邮件、Google、微信、电话都会走生产授权入口；未配置时会明确失败原因。'}
+              </p>
             </div>
-            <span>{runtimeStatus?.accountAuth.enabled ? '已开启' : '待配置'}</span>
+            <span>{authSession?.loggedIn ? '已登录' : runtimeStatus?.accountAuth.enabled ? '已开启' : '待配置'}</span>
             <div className="portal-settings-auth-inputs">
               <label>
                 <span>Email</span>
@@ -542,6 +586,7 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
               <button type="button" onClick={() => onStartAuth('google')}>Google</button>
               <button type="button" onClick={() => onStartAuth('wechat')}>WeChat</button>
               <button type="button" onClick={() => onStartAuth('phone')}>Phone</button>
+              <button type="button" onClick={onLogoutAuth} disabled={!authSession?.loggedIn}>退出登录</button>
             </div>
           </li>
           {safetyRows.map((row) => (
