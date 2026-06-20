@@ -36,7 +36,14 @@ assert.match(authStartRoute, /503/, 'auth start must fail closed when provider c
 assert.match(authCallbackRoute, /GET\(/, 'auth callback route must expose GET');
 assert.match(authCallbackRoute, /NextResponse\.redirect/, 'auth callback must redirect back to the Shell instead of 404ing');
 assert.match(authCallbackRoute, /auth_callback_received/, 'auth callback must expose safe callback status');
-assert.doesNotMatch(authCallbackRoute, /access_token.*searchParams\.set/s, 'auth callback must not echo access tokens into redirect URLs');
+assert.match(authCallbackRoute, /auth\/v1\/token/, 'auth callback must exchange Supabase authorization code for a session');
+assert.match(authCallbackRoute, /grant_type['"]?\s*:\s*['"]authorization_code/, 'auth callback must use authorization_code grant');
+assert.match(authCallbackRoute, /cookies\.set\(['"]baohe_auth_access/, 'auth callback must store access token in an httpOnly cookie');
+assert.match(authCallbackRoute, /cookies\.set\(['"]baohe_auth_refresh/, 'auth callback must store refresh token in an httpOnly cookie');
+assert.match(authCallbackRoute, /httpOnly:\s*true/, 'auth callback cookies must be httpOnly');
+assert.match(authCallbackRoute, /sameSite:\s*['"]lax['"]/, 'auth callback cookies must use SameSite=Lax');
+assert.doesNotMatch(authCallbackRoute, /searchParams\.set\(['"]access_token/, 'auth callback must not echo access tokens into redirect URLs');
+assert.doesNotMatch(authCallbackRoute, /searchParams\.set\(['"]refresh_token/, 'auth callback must not echo refresh tokens into redirect URLs');
 
 assert.equal(
   packageJson.scripts['test:production-runtime-surface'],
