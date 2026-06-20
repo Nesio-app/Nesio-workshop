@@ -7968,3 +7968,28 @@ html[data-portal-theme="night"] .portal-ai-capability-rail button {
 html[data-portal-theme="night"] .portal-bottom-nav-btn--active {
   background: rgba(117,160,255,.2) !important;
 }
+
+/* Nosio runtime alignment: keep Shell / 智友 / 工具箱 / 设置 clear of the fixed nav
+   and use one liquid-glass contract for popovers across day and night. */
+.portal-dashboard-root,
+.portal-ai-preview--screen,
+.portal-treasure-screen,
+.portal-settings {
+  padding-bottom: var(--portal-bottom-nav-clearance) !important;
+}
+
+.portal-bottom-nav {
+  background: var(--glass-bg-pop) !important;
+  border-color: var(--glass-border) !important;
+  box-shadow: var(--shadow-pop), var(--glass-highlight) !important;
+  backdrop-filter: blur(var(--modal-card-blur)) saturate(var(--modal-card-saturate)) !important;
+  -webkit-backdrop-filter: blur(var(--modal-card-blur)) saturate(var(--modal-card-saturate)) !important;
+}
+
+html[data-portal-theme="night"] .portal-bottom-nav {
+  background: var(--glass-bg-pop) !important;
+  border-color: var(--glass-border) !important;
+  box-shadow: var(--shadow-pop), var(--glass-highlight) !important;
+  backdrop-filter: blur(var(--modal-card-blur)) saturate(var(--modal-card-saturate)) !important;
+  -webkit-backdrop-filter: blur(var(--modal-card-blur)) saturate(var(--modal-card-saturate)) !important;
+}
