@@ -429,11 +429,11 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
 
           <div className="portal-ai-composer">
             {attachmentTrayOpen ? (
-              <div className="portal-ai-capability-rail" aria-label="智友快捷能力">
+              <div id="portal-ai-capability-rail" className="portal-ai-capability-rail" aria-label="智友快捷能力">
                 <button type="button" onClick={() => imageInputRef.current?.click()}>📷<span>图片</span></button>
                 <button type="button" onClick={() => fileInputRef.current?.click()}>📎<span>文件</span></button>
-                <button type="button" onClick={() => setAudioCallOpen(true)}>🎙<span>语音</span></button>
-                <button type="button" onClick={() => setCallSheetOpen(true)}>📞<span>实时</span></button>
+                <button type="button" aria-controls="portal-ai-audio-call" onClick={() => setAudioCallOpen(true)}>🎙<span>语音</span></button>
+                <button type="button" aria-controls="portal-ai-call-sheet" onClick={() => setCallSheetOpen(true)}>📞<span>实时</span></button>
                 <button type="button" onClick={addFlomoNoteIntent}>📝<span>笔记</span></button>
               </div>
             ) : null}
@@ -447,7 +447,16 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
               </div>
             ) : null}
             <div className="portal-ai-composer-row">
-              <button type="button" className="portal-ai-round-action" aria-label="添加附件" onClick={openAttachmentTray}>＋</button>
+              <button
+                type="button"
+                className="portal-ai-round-action"
+                aria-label="添加附件"
+                aria-expanded={attachmentTrayOpen}
+                aria-controls="portal-ai-capability-rail"
+                onClick={openAttachmentTray}
+              >
+                ＋
+              </button>
               <button type="button" className="portal-ai-round-action" aria-label="@ 调度" onClick={openMentionMenu}>@</button>
               <input
                 ref={composerRef}
@@ -463,8 +472,8 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
                 placeholder="发消息给智友..."
                 disabled={aiSending}
               />
-              <button type="button" className="portal-ai-round-action" aria-label="语音输入" onClick={() => setAudioCallOpen(true)}>🎙</button>
-              <button type="button" className="portal-ai-call-button" aria-label="通话" onClick={() => setCallSheetOpen(true)}>
+              <button type="button" className="portal-ai-round-action" aria-label="语音输入" aria-controls="portal-ai-audio-call" onClick={() => setAudioCallOpen(true)}>🎙</button>
+              <button type="button" className="portal-ai-call-button" aria-label="通话" aria-controls="portal-ai-call-sheet" onClick={() => setCallSheetOpen(true)}>
                 📞<span>通话</span>
               </button>
             </div>
@@ -537,7 +546,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
           {typeof document !== 'undefined' && callSheetOpen ? createPortal(
             <div className="portal-ai-modal-layer">
               <button type="button" className="portal-ai-modal-scrim" aria-label="关闭通话选项" onClick={() => setCallSheetOpen(false)} />
-              <section className="portal-ai-call-sheet" role="dialog" aria-modal="true" aria-label="Live 通话">
+              <section id="portal-ai-call-sheet" className="portal-ai-call-sheet" role="dialog" aria-modal="true" aria-label="Live 通话">
                 <span className="portal-ai-sheet-handle" aria-hidden />
                 <h2>Live 通话</h2>
                 <button type="button" onClick={() => { setCallSheetOpen(false); setVideoCallOpen(true); }}>
@@ -563,7 +572,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
 
           {typeof document !== 'undefined' && audioCallOpen ? createPortal(
             <div className="portal-ai-modal-layer portal-ai-modal-layer--call">
-              <section className="portal-ai-video-call" role="dialog" aria-modal="true" aria-label="AI 实时语音通话">
+              <section id="portal-ai-audio-call" className="portal-ai-video-call" role="dialog" aria-modal="true" aria-label="AI 实时语音通话">
                 <div className="portal-ai-video-avatar" aria-hidden>🎙</div>
                 <p>正在连接实时语音通话</p>
                 <small>Mock Live · 后续接入 Gemini Live 类实时语音模型</small>

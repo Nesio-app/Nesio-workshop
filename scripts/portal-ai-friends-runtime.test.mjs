@@ -69,6 +69,19 @@ assert(
 );
 
 assert(
+  component.includes('id="portal-ai-capability-rail"') &&
+    component.includes('aria-expanded={attachmentTrayOpen}') &&
+    component.includes('aria-controls="portal-ai-capability-rail"'),
+  'PortalAiFriendsPreview plus button must expose the attachment tray expanded/collapsed state.',
+);
+
+assert(
+  /aria-label="语音输入"[\s\S]*aria-controls="portal-ai-audio-call"[\s\S]*setAudioCallOpen\(true\)/.test(component) &&
+    /aria-label="通话"[\s\S]*aria-controls="portal-ai-call-sheet"[\s\S]*setCallSheetOpen\(true\)/.test(component),
+  'PortalAiFriendsPreview voice and call buttons must point to real call surfaces.',
+);
+
+assert(
   component.includes("result.error") && component.includes("result.detail"),
   'PortalAiFriendsPreview must surface Secretary Chat API errors instead of failing silently.',
 );
