@@ -38,7 +38,7 @@ test('capture V14 mobile runtime screenshots', async ({ page }) => {
     localStorage.removeItem('treasurebox-personalization-insight-suppressed-until:insight-friday-productivity');
   });
   await page.reload();
-  await expect(page.getByRole('dialog', { name: /欢迎来到宝盒/ })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: /欢迎来到 Nesio/ })).toBeVisible();
   await capture('01-onboarding-name', 'Onboarding display name frame.');
 
   await page.getByLabel('怎么称呼你').fill('Jing');
@@ -98,7 +98,7 @@ test('capture V14 mobile runtime screenshots', async ({ page }) => {
   await capture('06-tool-packs-discovery', 'Toolbox screen with V14 data cards, personalized recommendation, addable tools, and packs.');
 
   await page.goto('/settings');
-  await expect(page.getByText('宝盒学到的')).toBeVisible();
+  await expect(page.getByText('Nesio 学到的')).toBeVisible();
   await expect(page.getByText('个性化偏好')).toBeVisible();
   await capture('08-me-personal-data', 'Profile analysis and learned memories without app settings mixed in.');
   await page.getByRole('button', { name: '设置' }).click();

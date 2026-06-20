@@ -129,14 +129,14 @@ test('V14 first launch onboarding saves local name and coach style', async ({ pa
   });
   await page.reload();
 
-  await expect(page.getByRole('dialog', { name: /欢迎来到宝盒/ })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: /欢迎来到 Nesio/ })).toBeVisible();
   await expect(page.getByText('不需要注册 · 稍后随时连接账号')).toBeVisible();
   await page.getByLabel('怎么称呼你').fill('Jing');
   await page.getByRole('button', { name: '继续' }).click();
   await page.getByRole('button', { name: '温暖陪伴' }).click();
   await page.getByRole('button', { name: '继续' }).click();
 
-  await expect(page.getByRole('dialog', { name: /欢迎来到宝盒/ })).toHaveCount(0);
+  await expect(page.getByRole('dialog', { name: /欢迎来到 Nesio/ })).toHaveCount(0);
   await expect(page.getByText('Jing')).toBeVisible();
   await expect(page.getByText('做不完也没关系')).toBeVisible();
 
@@ -330,7 +330,7 @@ test('settings keeps software controls lean and does not expose calendar link ca
 
 test('settings exposes V14 connections and safety boundary', async ({ page }) => {
   await page.goto('/settings');
-  await expect(page.getByText('宝盒学到的')).toBeVisible();
+  await expect(page.getByText('Nesio 学到的')).toBeVisible();
   await expect(page.getByLabel('进入个人主页')).toBeVisible();
   await page.getByRole('button', { name: '设置' }).click();
   await expect(page.getByRole('heading', { name: '软件设置' })).toBeVisible();

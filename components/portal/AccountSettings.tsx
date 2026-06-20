@@ -486,6 +486,11 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
       provider: providerActionsById.google_calendar,
     },
     {
+      label: t(locale, 'aiFriendsSafetyLabel'),
+      status: t(locale, 'aiFriendsSafetyStatus'),
+      detail: t(locale, 'aiFriendsSafetyDetail'),
+    },
+    {
       label: 'Gemini',
       status: formatProviderActionStatus(providerActionsById.gemini),
       detail: formatProviderActionDetail(providerActionsById.gemini),
