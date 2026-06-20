@@ -1,8 +1,10 @@
 'use client';
 
+import Image from 'next/image';
 import { useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { createAppApiClient, type SecretaryChatProvider, type SecretaryChatTurn } from '@/lib/portal/app-api-client';
+import { nesioAiIcons, nesioToolIcons } from '@/lib/portal/nesio-design-system-assets.mjs';
 
 interface PortalAiFriendsPreviewProps {
   open: boolean;
@@ -14,6 +16,7 @@ type MentionTarget = {
   label: string;
   description: string;
   avatar: string;
+  iconSrc?: string;
 };
 
 type RuntimeMessage = SecretaryChatTurn & {
@@ -36,11 +39,11 @@ const AI_CAPABILITIES: Array<{
 ];
 
 const mentionTargets: MentionTarget[] = [
-  { key: 'claude', label: '@Claude', description: '长文推理 / 方案拆解', avatar: 'AI' },
-  { key: 'chatgpt', label: '@ChatGPT', description: '写作推理 / 日常助手', avatar: 'G' },
-  { key: 'gemini', label: '@Gemini', description: '多模态 / 实时信息', avatar: '✦' },
+  { key: 'claude', label: '@Claude', description: '长文推理 / 方案拆解', avatar: 'AI', iconSrc: nesioAiIcons.claude },
+  { key: 'chatgpt', label: '@ChatGPT', description: '写作推理 / 日常助手', avatar: 'G', iconSrc: nesioAiIcons.chatgpt },
+  { key: 'gemini', label: '@Gemini', description: '多模态 / 实时信息', avatar: '✦', iconSrc: nesioAiIcons.gemini },
   { key: 'flomo', label: '@Flomo', description: '保存为笔记', avatar: 'F' },
-  { key: 'inventory', label: '@物品库', description: '记一个物品 / 查到期', avatar: '📦' },
+  { key: 'inventory', label: '@物品库', description: '记一个物品 / 查到期', avatar: '📦', iconSrc: nesioToolIcons.storage },
 ];
 
 const searchShortcuts = [
@@ -62,6 +65,7 @@ const recentConversations = [
     tag: '智能调度',
     preview: '综合建议：定制相册配手写卡片最暖心...',
     avatar: '✦',
+    iconSrc: nesioAiIcons.gemini,
     time: '11:20',
     unread: '2',
   },
@@ -71,6 +75,7 @@ const recentConversations = [
     tag: '群聊',
     preview: 'Claude、ChatGPT、Gemini：3 个 AI 正在讨论方案...',
     avatar: '👥',
+    iconSrc: nesioToolIcons.secretary,
     time: '10:05',
   },
   {
@@ -78,6 +83,7 @@ const recentConversations = [
     title: 'Claude',
     preview: '可以考虑定制相册，附上手写信，300 元内...',
     avatar: 'AI',
+    iconSrc: nesioAiIcons.claude,
     time: '昨天',
   },
   {
@@ -85,6 +91,7 @@ const recentConversations = [
     title: 'ChatGPT',
     preview: '护肤礼盒很受欢迎，兰蔻套装 300 元左右...',
     avatar: 'G',
+    iconSrc: nesioAiIcons.chatgpt,
     time: '昨天',
   },
   {
@@ -92,6 +99,7 @@ const recentConversations = [
     title: 'Gemini',
     preview: '300 元做定制相册很充裕，加急运费留 50...',
     avatar: 'G',
+    iconSrc: nesioAiIcons.gemini,
     time: '昨天',
   },
 ];
@@ -412,7 +420,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
                 onClick={() => selectConversation(item)}
               >
                 <span className="portal-ai-conversation-avatar" aria-hidden>
-                  {item.avatar}
+                  <Image src={item.iconSrc} alt="" className="portal-ai-conversation-icon" width={54} height={54} />
                 </span>
                 <span>
                   <b>
@@ -580,6 +588,9 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
                     aria-selected="false"
                     onClick={() => insertMention(target)}
                   >
+                    {target.iconSrc ? (
+                      <Image src={target.iconSrc} alt="" className="portal-ai-mention-icon" width={30} height={30} />
+                    ) : null}
                     <b>{target.label}</b>
                     <span>{target.description}</span>
                   </button>
@@ -602,7 +613,9 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
                     aria-pressed={activeConversationId === item.id}
                     onClick={() => selectConversation(item)}
                   >
-                    <span className="portal-ai-conversation-avatar" aria-hidden>{item.avatar}</span>
+                    <span className="portal-ai-conversation-avatar" aria-hidden>
+                      <Image src={item.iconSrc} alt="" className="portal-ai-conversation-icon" width={54} height={54} />
+                    </span>
                     <span>
                       <b>{item.title}{item.tag ? <small>{item.tag}</small> : null}</b>
                       <em>{item.preview}</em>

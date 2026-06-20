@@ -60,6 +60,16 @@ assert(
 );
 
 assert(
+  component.includes("nesioAiIcons") &&
+    component.includes("nesioToolIcons") &&
+    component.includes("iconSrc") &&
+    /import Image from 'next\/image'/.test(component) &&
+    /<Image[\s\S]*src=\{item\.iconSrc\}[\s\S]*className="portal-ai-conversation-icon"/.test(component) &&
+    /<Image[\s\S]*src=\{target\.iconSrc\}[\s\S]*className="portal-ai-mention-icon"/.test(component),
+  'PortalAiFriendsPreview must render recent conversations and @mentions with Nesio design-system icon assets.',
+);
+
+assert(
   /case 'claude'[\s\S]*@Claude/.test(component) &&
     /case 'chatgpt'[\s\S]*@ChatGPT/.test(component) &&
     /case 'gemini'[\s\S]*@Gemini/.test(component) &&
