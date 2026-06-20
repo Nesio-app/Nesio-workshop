@@ -2402,6 +2402,8 @@ const evidenceSummary = {
     cloudEnabled: cloudReadinessContract.summary.cloudEnabled,
     realCloudProviderConnected: cloudReadinessContract.summary.realCloudProviderConnected,
     cloudProviderCandidateCount: cloudReadinessContract.summary.cloudProviderCandidateCount,
+    configuredCloudProviderCount: cloudReadinessContract.summary.configuredCloudProviderCount,
+    enabledCloudProviderCount: cloudReadinessContract.summary.enabledCloudProviderCount,
     inventoryCloudSchemaDraftReady: cloudReadinessContract.summary.inventoryCloudSchemaDraftReady,
     futureCloudEligibleTableCount: cloudReadinessContract.summary.futureCloudEligibleTableCount,
     productionActivationVersion: productionActivationContract.version,

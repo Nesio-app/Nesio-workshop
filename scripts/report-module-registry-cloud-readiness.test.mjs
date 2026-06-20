@@ -13,7 +13,7 @@ const output = execFileSync('node', [join(scriptDir, 'report-module-registry.mjs
 const report = JSON.parse(output);
 
 assert.equal(report.cloudReadiness.version, 'cloud-readiness-contract-v0');
-assert.equal(report.cloudReadiness.implementation, 'report-only');
+assert.equal(report.cloudReadiness.implementation, 'runtime-aware-contract');
 assert.equal(report.cloudReadiness.boundaries.cloudEnabled, false);
 assert.equal(report.cloudReadiness.boundaries.realCloudProviderConnected, false);
 assert.equal(report.cloudReadiness.boundaries.networkRequestsEnabled, false);
@@ -25,6 +25,13 @@ assert.deepEqual(
   report.cloudReadiness.providerCandidates.map((candidate) => candidate.provider),
   ['supabase', 'neon', 'firebase', 'turso', 'self_hosted_postgres'],
 );
+assert.equal(report.cloudReadiness.runtimeCloudReadiness.providerCount, 2);
+assert.equal(report.cloudReadiness.runtimeCloudReadiness.configuredProviderCount, 0);
+assert.equal(report.cloudReadiness.runtimeCloudReadiness.enabledProviderCount, 0);
+assert.equal(report.cloudReadiness.runtimeCloudReadiness.providers.database.id, 'cloud_database');
+assert.equal(report.cloudReadiness.runtimeCloudReadiness.providers.database.secretsRedacted, true);
+assert.equal(report.cloudReadiness.runtimeCloudReadiness.providers.storage.id, 'cloud_storage');
+assert.equal(report.cloudReadiness.runtimeCloudReadiness.providers.storage.secretsRedacted, true);
 assert.ok(report.cloudReadiness.providerSelectionCriteria.includes('data_export_portability'));
 assert.ok(report.cloudReadiness.providerSelectionCriteria.includes('delete_semantics_verifiable'));
 assert.ok(report.cloudReadiness.providerSelectionCriteria.includes('offline_first_sync_fit'));
@@ -70,6 +77,8 @@ assert.equal(report.summary.cloudReadinessVersion, 'cloud-readiness-contract-v0'
 assert.equal(report.summary.cloudEnabled, false);
 assert.equal(report.summary.realCloudProviderConnected, false);
 assert.equal(report.summary.cloudProviderCandidateCount, 5);
+assert.equal(report.summary.configuredCloudProviderCount, 0);
+assert.equal(report.summary.enabledCloudProviderCount, 0);
 assert.equal(report.summary.inventoryCloudSchemaDraftReady, true);
 assert.equal(report.summary.futureCloudEligibleTableCount, 2);
 
