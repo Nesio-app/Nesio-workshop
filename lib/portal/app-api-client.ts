@@ -270,9 +270,22 @@ export type SecretaryHealthResponse = {
   doubaoModel?: string | null;
   openaiModel?: string | null;
   claudeModel?: string | null;
+  defaultProvider?: 'gemini' | 'chatgpt' | 'claude' | 'doubao' | null;
+  chatEndpoint?: '/api/secretary/chat' | string;
+  providerMatrix?: Array<{
+    provider: 'gemini' | 'chatgpt' | 'claude' | 'doubao' | string;
+    label: string;
+    nativeConfigured: boolean;
+    fallbackProvider: 'gemini' | string | null;
+    runtimeAvailable: boolean;
+    chatEndpoint: '/api/secretary/chat' | string;
+    model: string | null;
+  }>;
   productionActivation?: {
     aiProviderMode: string;
     aiRuntimeEnabled: boolean;
+    defaultProvider?: 'gemini' | 'chatgpt' | 'claude' | 'doubao' | null;
+    chatEndpoint?: '/api/secretary/chat' | string;
     configuredProviders: {
       gemini: boolean;
       doubao: boolean;

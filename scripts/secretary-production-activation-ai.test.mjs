@@ -65,5 +65,25 @@ assert.match(
   /productionActivation/,
   'secretary health route must expose production activation readiness',
 );
+assert.match(
+  healthRoute,
+  /providerMatrix/,
+  'secretary health route must expose providerMatrix for AI provider routing diagnostics',
+);
+assert.match(
+  healthRoute,
+  /fallbackProvider/,
+  'secretary health route must explain Gemini compatibility fallback for providers without native keys',
+);
+assert.match(
+  healthRoute,
+  /chatEndpoint:\s*'\/api\/secretary\/chat'/,
+  'secretary health route must expose the real chat endpoint used by all AI friends',
+);
+assert.match(
+  healthRoute,
+  /const defaultProvider = gemini \? 'gemini' : chatgpt \? 'chatgpt' : claude \? 'claude' : doubao \? 'doubao' : null;/,
+  'secretary health route must expose a default provider derived from configured keys',
+);
 
 console.log('secretary production activation AI tests passed');
