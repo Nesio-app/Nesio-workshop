@@ -70,6 +70,11 @@ assert.match(
 );
 assert.match(
   globals,
+  /portal-ai-modal-layer,\s*[\s\S]*portal-crush-sheet[\s\S]*portal-purchased-tools-sheet\s*\{[\s\S]*place-items:\s*center/,
+  "Expected all V14 interaction sheets, including crush task, to share centered Nesio modal layer placement",
+);
+assert.match(
+  globals,
   /portal-ai-call-sheet[\s\S]*background:\s*var\(--modal-card-bg\)/,
   "Expected shared modal cards to use the Nesio modal card background token",
 );
@@ -77,6 +82,11 @@ assert.match(
   globals,
   /portal-ai-call-sheet[\s\S]*backdrop-filter:\s*blur\(var\(--modal-card-blur\)\) saturate\(var\(--modal-card-saturate\)\)/,
   "Expected shared modal cards to use the Nesio modal card blur tokens",
+);
+assert.match(
+  globals,
+  /portal-ai-call-sheet,\s*[\s\S]*portal-crush-sheet-card[\s\S]*portal-purchased-tools-card\s*\{[\s\S]*background:\s*var\(--modal-card-bg\)/,
+  "Expected all V14 interaction cards, including crush task, to share the Nesio modal card surface",
 );
 
 assert.equal(

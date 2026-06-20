@@ -7596,6 +7596,7 @@ html[data-portal-theme="night"] .portal-theme-seg-btn.is-on{
 
 .portal-ai-modal-layer,
 .portal-ai-conversation-sheet,
+.portal-crush-sheet,
 .portal-mood-sheet,
 .portal-reminder-sheet,
 .portal-purchased-tools-sheet {
@@ -7612,6 +7613,7 @@ html[data-portal-theme="night"] .portal-theme-seg-btn.is-on{
 
 .portal-ai-modal-scrim,
 .portal-ai-conversation-scrim,
+.portal-crush-sheet-backdrop,
 .portal-mood-backdrop,
 .portal-reminder-backdrop,
 .portal-purchased-tools-backdrop {
@@ -7622,6 +7624,7 @@ html[data-portal-theme="night"] .portal-theme-seg-btn.is-on{
 
 .portal-ai-call-sheet,
 .portal-ai-conversation-sheet > section,
+.portal-crush-sheet-card,
 .portal-mood-card,
 .portal-reminder-card,
 .portal-purchased-tools-card {
