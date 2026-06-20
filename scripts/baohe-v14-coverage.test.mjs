@@ -69,6 +69,17 @@ for (const [relativePath, text] of sourceChecks) {
 
 const toolboxSource = readFileSync(join(repoRoot, 'components/portal/ToolsTreasureSheet.tsx'), 'utf8');
 const aiFriendsSource = readFileSync(join(repoRoot, 'components/portal/PortalAiFriendsPreview.tsx'), 'utf8');
+const dashboardSource = readFileSync(join(repoRoot, 'components/portal/DashboardHome.tsx'), 'utf8');
+assert.doesNotMatch(
+  dashboardSource,
+  /disabled=\{!planTool\}/,
+  'DashboardHome must not disable visible task controls when the plan module is unavailable; it needs a local fallback action.',
+);
+assert.match(
+  dashboardSource,
+  /setReminderDetail\('task'\)/,
+  'DashboardHome plan fallback must open the local task/reminder detail sheet.',
+);
 assert.match(
   aiFriendsSource,
   /AI_CAPABILITIES\.map[\s\S]{0,1200}onClick=\{\(\) => handleCapabilityAction\(capability\.id\)/,

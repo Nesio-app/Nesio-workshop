@@ -801,7 +801,6 @@ export default function DashboardHome({
               type="button"
               className="portal-v13-primary-action"
               onClick={() => setCrushTaskOpen(true)}
-              disabled={!planTool}
             >
               粉碎任务
             </button>
@@ -932,9 +931,12 @@ export default function DashboardHome({
               type="button"
               className="portal-crush-sheet-link"
               onClick={() => {
-                if (planTool) onOpenTool(planTool);
+                if (planTool) {
+                  onOpenTool(planTool);
+                  return;
+                }
+                setReminderDetail('task');
               }}
-              disabled={!planTool}
             >
               打开待办
             </button>
