@@ -45,8 +45,10 @@ assert(
 
 assert(
   /const providerAction = aiProviderActionsById\[provider\]/.test(component) &&
-    /providerAction\.startEndpoint !== '\/api\/secretary\/chat'/.test(component),
-  'PortalAiFriendsPreview must verify selected AI provider routes through the Secretary Chat endpoint before sending.',
+    /const secretaryProvider = secretaryProviderMatrixById\[provider\]/.test(component) &&
+    /const secretaryProviderReady = secretaryProvider\?\.runtimeAvailable && secretaryProvider\?\.chatEndpoint === '\/api\/secretary\/chat';/.test(component) &&
+    /const productionProviderReady = providerAction\?\.startEndpoint === '\/api\/secretary\/chat';/.test(component),
+  'PortalAiFriendsPreview must verify selected AI provider routes through the Secretary providerMatrix or production runtime before sending.',
 );
 
 assert(
@@ -65,6 +67,24 @@ assert(
   /configuredProviders[\s\S]*gemini[\s\S]*chatgpt[\s\S]*claude/.test(component) ||
     /secretaryHealth[\s\S]*gemini[\s\S]*secretaryHealth[\s\S]*chatgpt[\s\S]*secretaryHealth[\s\S]*claude/.test(component),
   'PortalAiFriendsPreview must surface configured AI providers from Secretary health.',
+);
+
+assert(
+  component.includes("providerMatrix") &&
+    component.includes("runtimeAvailable") &&
+    component.includes("fallbackProvider"),
+  'PortalAiFriendsPreview must consume Secretary health providerMatrix with runtime and fallback status.',
+);
+
+assert(
+  /secretaryProviderMatrixById[\s\S]*provider\.provider/.test(component) &&
+    /const secretaryProvider = secretaryProviderMatrixById\[provider\]/.test(component),
+  'PortalAiFriendsPreview must index providerMatrix by provider before sending messages.',
+);
+
+assert(
+  /secretaryProvider\?\.runtimeAvailable[\s\S]*secretaryProvider\?\.chatEndpoint === '\/api\/secretary\/chat'/.test(component),
+  'PortalAiFriendsPreview must allow Gemini-fallback providers when providerMatrix marks them runtimeAvailable.',
 );
 
 assert(

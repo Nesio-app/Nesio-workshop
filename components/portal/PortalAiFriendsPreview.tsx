@@ -285,15 +285,28 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
 
   const liveProviderSummary = useMemo(() => {
     if (!secretaryHealth) return aiRuntimeStatus;
-    const configuredProviders = [
-      secretaryHealth.gemini ? 'Gemini' : null,
-      secretaryHealth.chatgpt ? 'ChatGPT' : null,
-      secretaryHealth.claude ? 'Claude' : null,
-      secretaryHealth.doubao ? t(locale, 'aiFriendsProviderDoubaoLabel') : null,
-    ].filter(Boolean);
+    const configuredProviders = secretaryHealth.providerMatrix?.length
+      ? secretaryHealth.providerMatrix
+        .filter((provider) => provider.runtimeAvailable)
+        .map((provider) => provider.fallbackProvider
+          ? t(locale, 'providerAiFallbackTemplate', { provider: provider.label, fallback: provider.fallbackProvider })
+          : provider.label)
+      : [
+        secretaryHealth.gemini ? 'Gemini' : null,
+        secretaryHealth.chatgpt ? 'ChatGPT' : null,
+        secretaryHealth.claude ? 'Claude' : null,
+        secretaryHealth.doubao ? t(locale, 'aiFriendsProviderDoubaoLabel') : null,
+      ].filter(Boolean);
     if (configuredProviders.length) return t(locale, 'aiFriendsProvidersAvailableTemplate', { providers: configuredProviders.join(' / ') });
     return aiRuntimeStatus;
   }, [aiRuntimeStatus, locale, secretaryHealth]);
+
+  const secretaryProviderMatrixById = useMemo(() => {
+    return (secretaryHealth?.providerMatrix || []).reduce<Record<string, NonNullable<SecretaryHealthResponse['providerMatrix']>[number]>>((index, provider) => {
+      index[provider.provider] = provider;
+      return index;
+    }, {});
+  }, [secretaryHealth?.providerMatrix]);
 
   const aiProviderActionsById = useMemo(() => {
     return (productionRuntimeStatus?.providerActionMatrix || [])
@@ -506,11 +519,15 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
 
     const provider = resolveSecretaryProvider(composer);
     const providerAction = aiProviderActionsById[provider];
-    if (!providerAction || providerAction.startEndpoint !== '/api/secretary/chat') {
+    const secretaryProvider = secretaryProviderMatrixById[provider];
+    const secretaryProviderReady = secretaryProvider?.runtimeAvailable && secretaryProvider?.chatEndpoint === '/api/secretary/chat';
+    const productionProviderReady = providerAction?.startEndpoint === '/api/secretary/chat';
+    if (!secretaryProviderReady && !productionProviderReady) {
       const runtimeProvider = productionRuntimeStatus?.providerActionMatrix.find((item) => item.id === provider);
-      const missing = runtimeProvider?.missingEnv?.length
-        ? t(locale, 'providerMissingEnv', { missing: runtimeProvider.missingEnv.slice(0, 3).join(' / ') })
-        : t(locale, 'providerRuntimeNotReady');
+      let missing = t(locale, 'providerRuntimeNotReady');
+      if (!secretaryProvider && runtimeProvider?.missingEnv?.length) {
+        missing = t(locale, 'providerMissingEnv', { missing: runtimeProvider.missingEnv.slice(0, 3).join(' / ') });
+      }
       const unavailable = t(locale, 'providerUnavailableTemplate', {
         provider: getProviderLabel(locale, provider),
         reason: missing,
