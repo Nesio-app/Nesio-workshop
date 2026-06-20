@@ -6,6 +6,14 @@ export type ProductionRuntimeProviderStatus = {
   missingEnv: string[];
 };
 
+export type ProductionRuntimeProviderAction = ProductionRuntimeProviderStatus & {
+  category: 'account_auth' | 'cloud' | 'ai' | 'third_party';
+  actionStatus: 'ready' | 'server_ready' | 'configure_required';
+  startEndpoint: string | null;
+  safeUserAction: string;
+  serverOnly: boolean;
+};
+
 type EnvMap = Record<string, string | undefined>;
 
 function envValue(env: EnvMap, key: string): string {
@@ -39,6 +47,26 @@ function status(
     configured,
     enabled: configured && (entry.enabledWhen ?? true),
     missingEnv: allMissing,
+  };
+}
+
+function action(
+  provider: ProductionRuntimeProviderStatus,
+  entry: {
+    category: ProductionRuntimeProviderAction['category'];
+    startEndpoint: string | null;
+    safeUserAction: string;
+    serverOnly?: boolean;
+  },
+): ProductionRuntimeProviderAction {
+  const serverOnly = entry.serverOnly ?? false;
+  return {
+    ...provider,
+    category: entry.category,
+    actionStatus: provider.enabled ? (serverOnly ? 'server_ready' : 'ready') : 'configure_required',
+    startEndpoint: entry.startEndpoint,
+    safeUserAction: entry.safeUserAction,
+    serverOnly,
   };
 }
 
@@ -155,6 +183,72 @@ export function buildProductionRuntimeStatus(env: EnvMap = process.env) {
     ...Object.values(thirdParty),
   ];
 
+  const providerActionMatrix = [
+    action(accountAuth.providers.email, {
+      category: 'account_auth',
+      startEndpoint: '/api/auth/start',
+      safeUserAction: 'request_email_otp',
+    }),
+    action(accountAuth.providers.google, {
+      category: 'account_auth',
+      startEndpoint: '/api/auth/start',
+      safeUserAction: 'redirect_google_oauth',
+    }),
+    action(accountAuth.providers.wechat, {
+      category: 'account_auth',
+      startEndpoint: '/api/auth/start',
+      safeUserAction: 'redirect_wechat_oauth',
+    }),
+    action(accountAuth.providers.phone, {
+      category: 'account_auth',
+      startEndpoint: '/api/auth/start',
+      safeUserAction: 'request_phone_otp',
+    }),
+    action(cloud.database, {
+      category: 'cloud',
+      startEndpoint: null,
+      safeUserAction: 'server_data_store_only',
+      serverOnly: true,
+    }),
+    action(cloud.storage, {
+      category: 'cloud',
+      startEndpoint: null,
+      safeUserAction: 'server_file_store_only',
+      serverOnly: true,
+    }),
+    action(ai.providers.gemini, {
+      category: 'ai',
+      startEndpoint: '/api/secretary/chat',
+      safeUserAction: 'send_secretary_message_to_gemini',
+    }),
+    action(ai.providers.chatgpt, {
+      category: 'ai',
+      startEndpoint: '/api/secretary/chat',
+      safeUserAction: 'send_secretary_message_to_chatgpt',
+    }),
+    action(ai.providers.doubao, {
+      category: 'ai',
+      startEndpoint: '/api/secretary/chat',
+      safeUserAction: 'send_secretary_message_to_doubao',
+    }),
+    action(ai.providers.claude, {
+      category: 'ai',
+      startEndpoint: '/api/secretary/chat',
+      safeUserAction: 'send_secretary_message_to_claude',
+    }),
+    action(thirdParty.googleCalendar, {
+      category: 'third_party',
+      startEndpoint: '/api/portal/calendar',
+      safeUserAction: 'read_google_calendar_preview',
+    }),
+    action(thirdParty.flomo, {
+      category: 'third_party',
+      startEndpoint: null,
+      safeUserAction: 'capture_note_when_flomo_configured',
+      serverOnly: true,
+    }),
+  ];
+
   return {
     version: 'production-runtime-v0',
     safePublicStatus: true,
@@ -163,10 +257,13 @@ export function buildProductionRuntimeStatus(env: EnvMap = process.env) {
     cloud,
     ai,
     thirdParty,
+    providerActionMatrix,
     summary: {
       providerCount: allProviders.length,
       enabledProviderCount: allProviders.filter((provider) => provider.enabled).length,
       missingProviderCount: allProviders.filter((provider) => !provider.configured).length,
+      actionableProviderCount: providerActionMatrix.filter((provider) => provider.actionStatus === 'ready').length,
+      blockedProviderCount: providerActionMatrix.filter((provider) => provider.actionStatus === 'configure_required').length,
       productionRuntimeReady: allProviders.every((provider) => provider.enabled),
     },
   };
