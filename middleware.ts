@@ -23,7 +23,7 @@ export function middleware(request: NextRequest) {
   }
 
   if (
-    (pathname.startsWith('/api/secretary') || pathname.startsWith('/secretary')) &&
+    pathname.startsWith('/api/secretary') &&
     isSecretaryAiRequestAllowed(request)
   ) {
     return NextResponse.next();

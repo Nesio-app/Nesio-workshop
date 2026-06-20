@@ -2024,9 +2024,13 @@ body {
   width: 45px;
   height: 45px;
   border-radius: 0.75rem;
-  background: transparent;
-  border: none;
-  box-shadow: none;
+  background: rgba(240, 247, 255, 0.72);
+  border: 1px solid rgba(153, 185, 238, 0.42);
+  box-shadow:
+    0 12px 28px rgba(47, 95, 157, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
 }
 
 .portal-quote-treasure--open .portal-quote-treasure-box {
@@ -6284,14 +6288,20 @@ html[data-portal-theme="night"] .portal-theme-seg-btn.is-on{
   color:#bcd6fb;box-shadow:inset 0 1px 1px rgba(255,255,255,.14);
 }
 
-/* Header note + treasure buttons blend into hero/quote area */
-.portal-search-btn--note,
-.portal-quote-treasure-box{
+/* Header note blends into hero/quote area; treasure keeps a visible shell entry hit target. */
+.portal-search-btn--note{
   background:transparent !important;
   backdrop-filter:none !important;
   -webkit-backdrop-filter:none !important;
   border:none !important;
   box-shadow:none !important;
+}
+.portal-quote-treasure-box{
+  background:rgba(240,247,255,.72) !important;
+  backdrop-filter:blur(16px) saturate(140%) !important;
+  -webkit-backdrop-filter:blur(16px) saturate(140%) !important;
+  border:1px solid rgba(153,185,238,.42) !important;
+  box-shadow:0 12px 28px rgba(47,95,157,.12),inset 0 1px 0 rgba(255,255,255,.55) !important;
 }
 .portal-search-btn--note::after,
 .portal-search-btn--note::before,

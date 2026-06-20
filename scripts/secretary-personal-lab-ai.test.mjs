@@ -28,6 +28,19 @@ assert.match(launchSafety, /x-baohe-access-mode/, 'personal lab AI must require 
 
 assert.match(middleware, /isSecretaryAiRequestAllowed/, 'middleware must let approved secretary AI requests reach route handlers');
 assert.match(middleware, /pathname\.startsWith\('\/api\/secretary'\)/, 'middleware allowance must stay scoped to secretary API');
+const secretaryAllowBlock = middleware.match(
+  /if \(\s*[\s\S]*?isSecretaryAiRequestAllowed\(request\)[\s\S]*?\)\s*\{\s*return NextResponse\.next\(\);\s*\}/,
+)?.[0] || '';
+assert.match(
+  secretaryAllowBlock,
+  /pathname\.startsWith\('\/api\/secretary'\)/,
+  'approved secretary AI runtime must only bypass isolation for API route handlers.',
+);
+assert.doesNotMatch(
+  secretaryAllowBlock,
+  /pathname\.startsWith\('\/secretary'\)/,
+  'approved secretary AI runtime must not expose the public /secretary page bundle.',
+);
 
 assert.match(route, /isSecretaryAiRequestAllowed/, 'secretary chat route must check the combined secretary AI gate');
 assert.match(route, /launchUnavailablePayload\('api:secretary:chat'/, 'secretary chat must still fail closed by default');
