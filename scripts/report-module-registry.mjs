@@ -2194,6 +2194,11 @@ const cloudReadinessContract = buildCloudReadinessContract({
   offlineSyncConflict: offlineSyncConflictContract,
 });
 const productionActivationContract = buildProductionActivationContract();
+const productionActivationProvidersById = new Map(
+  productionActivationContract.providers.map((provider) => [provider.id, provider]),
+);
+const googleCalendarProductionProvider = productionActivationProvidersById.get('google_calendar');
+const flomoProductionProvider = productionActivationProvidersById.get('flomo');
 const aiProviderRouterContract = buildAiProviderRouterContract();
 const nesioDesignSystemSummary = {
   canonicalName: 'Nesio',
@@ -2415,6 +2420,14 @@ const evidenceSummary = {
     productionActivationConfiguredProviderCount: productionActivationContract.summary.configuredProviderCount,
     productionActivationMissingEnvProviderCount: productionActivationContract.summary.missingEnvProviderCount,
     productionActivationReady: productionActivationContract.summary.productionReady,
+    googleCalendarProviderStatus: googleCalendarProductionProvider?.status || 'unknown',
+    googleCalendarConfigured: googleCalendarProductionProvider?.configured === true,
+    googleCalendarRuntimeEnabled: googleCalendarProductionProvider?.runtimeEnabled === true,
+    googleCalendarMissingEnv: googleCalendarProductionProvider?.missingEnv || [],
+    flomoProviderStatus: flomoProductionProvider?.status || 'unknown',
+    flomoConfigured: flomoProductionProvider?.configured === true,
+    flomoRuntimeEnabled: flomoProductionProvider?.runtimeEnabled === true,
+    flomoMissingEnv: flomoProductionProvider?.missingEnv || [],
     aiProviderRouterVersion: aiProviderRouterContract.summary.aiProviderRouterVersion,
     aiProviderConfiguredCount: aiProviderRouterContract.summary.aiProviderConfiguredCount,
     aiProviderEnabledCount: aiProviderRouterContract.summary.aiProviderEnabledCount,
