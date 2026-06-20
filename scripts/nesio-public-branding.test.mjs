@@ -9,6 +9,7 @@ const manifest = JSON.parse(readFileSync(join(root, 'public', 'manifest.json'), 
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
 const portalConfig = JSON.parse(readFileSync(join(root, 'public', 'portal-config.json'), 'utf8'));
 const i18n = readFileSync(join(root, 'lib', 'portal', 'i18n.ts'), 'utf8');
+const zhI18n = i18n.slice(i18n.indexOf('  zh: {'), i18n.indexOf('  en: {'));
 const onboarding = readFileSync(join(root, 'components', 'portal', 'PortalOnboarding.tsx'), 'utf8');
 const storageSourceHome = readFileSync(join(root, 'storage-web', 'index.html'), 'utf8');
 const storageHome = readFileSync(join(root, 'public', 'storage', 'index.html'), 'utf8');
@@ -25,6 +26,21 @@ assert.match(manifest.description, /^Nesio\b/, 'PWA manifest description must st
 assert.equal(portalConfig.meta?.title, 'Nesio', 'Portal config public title must be Nesio.');
 assert.match(i18n, /shellBrand:\s*'Nesio'/, 'English shell brand must be Nesio.');
 assert.match(i18n, /portalBottomNavHome:\s*'Nesio'/, 'English bottom-nav home label must be Nesio.');
+for (const key of [
+  'settingsBack',
+  'openTreasure',
+  'shellBrand',
+  'shellTreasurePopupAriaLabel',
+  'shellTreasureTitleTemplate',
+  'portalBottomNavHome',
+  'portalAppearanceHint',
+  'accountSettingsAppearanceHint',
+  'accountSettingsLearnedTitle',
+  'accountSettingsMemoryEmpty',
+]) {
+  const zhEntry = new RegExp(`${key}:\\s*'[^']*Nesio[^']*'`);
+  assert.match(zhI18n, zhEntry, `Chinese i18n public brand key ${key} must use Nesio.`);
+}
 assert.doesNotMatch(layout, /title:\s*'宝盒|title:\s*'Treasure Box/, 'Public app metadata must not expose the old product name.');
 assert.doesNotMatch(
   JSON.stringify(manifest),
