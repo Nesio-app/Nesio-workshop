@@ -22,18 +22,29 @@ const form = document.getElementById('chatForm');
 const input = document.getElementById('chatInput');
 const btnClear = document.getElementById('btnClear');
 const btnPlus = document.getElementById('btnPlus');
+const btnMention = document.getElementById('btnMention');
 const btnMic = document.getElementById('btnMic');
 const btnCall = document.getElementById('btnCall');
 const navTitle = document.getElementById('navTitle');
 const navAvatar = document.getElementById('navAvatar');
+const mentionPanel = document.getElementById('mentionPanel');
+const mentionList = document.getElementById('mentionList');
 
 const STORAGE_KEY = `treasurebox-chat-${friendId}`;
 const USER_AVATAR = '婧';
 
 let friend = null;
+let friendsCache = [];
 let history = [];
 let busy = false;
 let liveVoiceCall = null;
+
+const TOOL_MENTIONS = [
+  { id: 'flomo', name: 'Flomo', desc: '把消息保存为笔记', token: '@Flomo' },
+  { id: 'inventory', name: '物品库', desc: '记一个物品 / 查到期', token: '@物品库' },
+  { id: 'calendar', name: '日期', desc: '查看日程与提醒', token: '@日期' },
+  { id: 'todo', name: '待办', desc: '整理下一步行动', token: '@待办' },
+];
 
 function loadHistory() {
   try {
@@ -94,6 +105,77 @@ function render() {
     main.appendChild(makeRow(turn));
   }
   scrollBottom();
+}
+
+function mentionCandidates(query) {
+  const q = (query || '').trim().toLowerCase();
+  const aiRows = friendsCache.map((item) => ({
+    id: item.id,
+    name: item.name,
+    desc: item.preview || item.tagline || item.company || '',
+    token: `@${item.name}`,
+    logo: item.logo,
+  }));
+  return [...aiRows, ...TOOL_MENTIONS].filter((item) => {
+    if (!q) return true;
+    return item.name.toLowerCase().includes(q) ||
+      item.id.toLowerCase().includes(q) ||
+      item.token.toLowerCase().includes(q) ||
+      item.desc.toLowerCase().includes(q);
+  }).slice(0, 8);
+}
+
+function currentMentionQuery() {
+  const cursor = input.selectionStart || input.value.length;
+  const before = input.value.slice(0, cursor);
+  const match = before.match(/(?:^|\s)@([^\s@]*)$/);
+  return match ? match[1] : null;
+}
+
+function closeMentionPanel() {
+  mentionPanel.hidden = true;
+}
+
+function insertMention(token) {
+  const cursor = input.selectionStart || input.value.length;
+  const before = input.value.slice(0, cursor);
+  const after = input.value.slice(cursor);
+  const replaced = before.match(/(?:^|\s)@([^\s@]*)$/)
+    ? before.replace(/(?:^|\s)@([^\s@]*)$/, (segment) => {
+        const prefix = segment.startsWith(' ') ? ' ' : '';
+        return `${prefix}${token} `;
+      })
+    : `${before}${before && !before.endsWith(' ') ? ' ' : ''}${token} `;
+  input.value = `${replaced}${after}`;
+  input.focus();
+  const nextCursor = replaced.length;
+  input.setSelectionRange(nextCursor, nextCursor);
+  input.dispatchEvent(new Event('input'));
+  closeMentionPanel();
+}
+
+function renderMentionPanel(query = '') {
+  const rows = mentionCandidates(query);
+  mentionList.innerHTML = '';
+  for (const row of rows) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'wx-mention-row';
+    btn.setAttribute('role', 'option');
+    const avatar = row.logo
+      ? `<img src="${withRoot(row.logo)}" alt="" width="32" height="32" />`
+      : `<span class="wx-mention-avatar">${esc(row.token.slice(1, 2))}</span>`;
+    btn.innerHTML = `
+      ${avatar}
+      <span class="wx-mention-body">
+        <strong>${esc(row.token)}</strong>
+        <small>${esc(row.desc)}</small>
+      </span>
+    `;
+    btn.addEventListener('click', () => insertMention(row.token));
+    mentionList.appendChild(btn);
+  }
+  mentionPanel.hidden = false;
 }
 
 function showError(text) {
@@ -310,7 +392,15 @@ input.addEventListener('keydown', (e) => {
   }
 });
 
-input.addEventListener('input', resizeInput);
+input.addEventListener('input', () => {
+  resizeInput();
+  const query = currentMentionQuery();
+  if (query === null) {
+    closeMentionPanel();
+    return;
+  }
+  renderMentionPanel(query);
+});
 
 btnClear.addEventListener('click', () => {
   if (busy) return;
@@ -321,6 +411,12 @@ btnClear.addEventListener('click', () => {
 });
 
 btnPlus.addEventListener('click', () => attach.open());
+btnMention.addEventListener('click', () => renderMentionPanel(''));
+document.addEventListener('click', (event) => {
+  if (mentionPanel.hidden) return;
+  if (mentionPanel.contains(event.target) || btnMention.contains(event.target) || input.contains(event.target)) return;
+  closeMentionPanel();
+});
 
 if (btnCall) {
   btnCall.addEventListener('click', () => openLiveVoiceCall());
@@ -332,6 +428,7 @@ try {
 
 Promise.all([loadFriends(), checkSecretaryHealth()])
   .then(([friends, health]) => {
+    friendsCache = friends;
     friend = memberById(friends, friendId) || friends.find((f) => f.ready) || friends[0];
     if (!friend) {
       main.innerHTML = '<p class="wx-chat-tip">未找到该好友</p>';

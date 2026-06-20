@@ -11,6 +11,7 @@ function read(relativePath) {
 const packageJson = JSON.parse(read('package.json'));
 const chatHtml = read('public/secretary/chat.html');
 const chatJs = read('public/secretary/chat.js');
+const chatCss = read('public/secretary/styles.css');
 const groupHtml = read('public/secretary/group.html');
 const groupJs = read('public/secretary/group.js');
 
@@ -89,6 +90,46 @@ assert.match(
   chatJs,
   /video:\s*\(\)\s*=>\s*\{[\s\S]*openLiveVoiceCall\(\)/,
   'Secretary chat video attachment must open the shared Live call flow.',
+);
+assert.match(
+  chatHtml,
+  /id="btnMention"/,
+  'Secretary chat page must include a real @ mention button.',
+);
+assert.match(
+  chatHtml,
+  /id="mentionPanel"/,
+  'Secretary chat page must include a mention suggestion panel.',
+);
+assert.match(
+  chatJs,
+  /const TOOL_MENTIONS = \[/,
+  'Secretary chat @ panel must include tool mention candidates.',
+);
+assert.match(
+  chatJs,
+  /Flomo[\s\S]*物品库[\s\S]*日期[\s\S]*待办/,
+  'Secretary chat @ panel must expose AI-adjacent tool shortcuts.',
+);
+assert.match(
+  chatJs,
+  /currentMentionQuery/,
+  'Secretary chat input must detect typed @ mention queries.',
+);
+assert.match(
+  chatJs,
+  /btnMention\.addEventListener\('click'[\s\S]*renderMentionPanel/,
+  'Secretary chat @ button must open the mention panel.',
+);
+assert.match(
+  chatJs,
+  /insertMention/,
+  'Secretary chat @ panel must insert selected mentions into the composer.',
+);
+assert.match(
+  chatCss,
+  /\.wx-mention-panel/,
+  'Secretary chat @ panel must have visible mobile styling.',
 );
 assert.match(
   groupJs,
