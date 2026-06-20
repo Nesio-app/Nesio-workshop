@@ -52,8 +52,9 @@ assert.ok(source.includes('onInspectServerProviderAction(provider)'), 'Server-on
 assert.ok(!source.includes(`disabled={!row.provider || row.provider.serverOnly || row.provider.actionStatus !== 'ready'}`), 'Server-only provider action buttons must not be disabled just because they are server-only');
 assert.ok(!source.includes('disabled={isProviderActionDisabled(row.provider)}'), 'Provider action buttons must stay clickable so unavailable providers can explain missing configuration');
 assert.ok(!source.includes('const isProviderActionDisabled'), 'Provider action disabled resolver must be removed now that buttons are inspectable');
-assert.ok(source.includes('生产运行态尚未标记为可使用'), 'Unavailable provider actions must explain why they cannot start');
-assert.ok(source.includes('缺少：${provider.missingEnv.slice(0, 3).join'), 'Unavailable provider actions must identify missing configuration');
+assert.ok(source.includes("t(locale, 'providerRuntimeNotReady'"), 'Unavailable provider actions must explain why they cannot start');
+assert.ok(source.includes("t(locale, 'providerMissingEnv'"), 'Unavailable provider actions must identify missing configuration');
+assert.ok(source.includes("t(locale, 'providerUnavailableTemplate'"), 'Unavailable provider actions must use localized feedback');
 assert.ok(source.includes('authSession?.loggedIn'), 'AccountSettings must display real session login status');
 assert.ok(source.includes('onLogoutAuth'), 'AccountSettings must expose a logout action');
 assert.ok(source.includes('saveProfileSettings(nextProfile)'), 'AccountSettings must persist merged cloud profile settings locally');

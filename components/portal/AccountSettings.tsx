@@ -440,9 +440,12 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
     }
     if (provider.actionStatus !== 'ready' || !provider.startEndpoint) {
       const reason = provider.missingEnv.length
-        ? `缺少：${provider.missingEnv.slice(0, 3).join(' / ')}`
-        : '生产运行态尚未标记为可使用';
-      setAuthFeedback(`${provider.label} 暂不可用：${reason}`);
+        ? t(locale, 'providerMissingEnv', { missing: provider.missingEnv.slice(0, 3).join(' / ') })
+        : t(locale, 'providerRuntimeNotReady');
+      setAuthFeedback(t(locale, 'providerUnavailableTemplate', {
+        provider: provider.label,
+        reason,
+      }));
       return;
     }
     window.location.href = provider.startEndpoint;

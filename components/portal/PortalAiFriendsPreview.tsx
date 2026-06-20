@@ -11,7 +11,9 @@ import {
   type SecretaryChatTurn,
   type SecretaryHealthResponse,
 } from '@/lib/portal/app-api-client';
+import { t } from '@/lib/portal/i18n';
 import { nesioAiIcons, nesioToolIcons } from '@/lib/portal/nesio-design-system-assets.mjs';
+import { loadProfileSettings, type PortalLocale } from '@/lib/portal/profile';
 
 interface PortalAiFriendsPreviewProps {
   open: boolean;
@@ -159,6 +161,7 @@ function stripAssistantMentions(message: string): string {
 }
 
 export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewProps) {
+  const [locale, setLocale] = useState<PortalLocale>('zh');
   const [composer, setComposer] = useState('');
   const [runtimeMessages, setRuntimeMessages] = useState<RuntimeMessage[]>([]);
   const [aiSending, setAiSending] = useState(false);
@@ -180,6 +183,11 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
   const imageInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const appApiClient = useMemo(() => createAppApiClient(), []);
+
+  useEffect(() => {
+    const settings = loadProfileSettings();
+    setLocale(settings.locale);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -410,13 +418,19 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
     const providerAction = aiProviderActionsById[provider];
     if (!providerAction || providerAction.startEndpoint !== '/api/secretary/chat') {
       const runtimeProvider = productionRuntimeStatus?.providerActionMatrix.find((item) => item.id === provider);
-      const missing = runtimeProvider?.missingEnv?.length ? `缺少：${runtimeProvider.missingEnv.slice(0, 3).join(' / ')}` : '生产运行态尚未标记为可用';
-      setUtilityNotice(`${getProviderLabel(provider)} 暂不可用：${missing}`);
+      const missing = runtimeProvider?.missingEnv?.length
+        ? t(locale, 'providerMissingEnv', { missing: runtimeProvider.missingEnv.slice(0, 3).join(' / ') })
+        : t(locale, 'providerRuntimeNotReady');
+      const unavailable = t(locale, 'providerUnavailableTemplate', {
+        provider: getProviderLabel(provider),
+        reason: missing,
+      });
+      setUtilityNotice(unavailable);
       setRuntimeMessages((items) => [
         ...items,
         {
           role: 'assistant',
-          content: `${getProviderLabel(provider)} 暂不可用：${missing}`,
+          content: unavailable,
           provider,
         },
       ]);
@@ -431,7 +445,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
     setRuntimeMessages((items) => [...items, userMessage]);
     setComposer('');
     setAiSending(true);
-    setUtilityNotice(`正在连接 ${getProviderLabel(provider)}...`);
+    setUtilityNotice(t(locale, 'providerAiConnectingTemplate', { provider: getProviderLabel(provider) }));
 
     try {
       const result = await appApiClient.sendSecretaryMessage({
@@ -450,14 +464,14 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
             provider,
           },
         ]);
-        setUtilityNotice(`已连接 ${result.model || provider}。`);
+        setUtilityNotice(t(locale, 'providerAiConnectedTemplate', { provider: result.model || provider }));
       } else {
-        const errorText = [result.error, result.detail, result.hint].filter(Boolean).join(' · ') || 'AI 暂时不可用';
+        const errorText = [result.error, result.detail, result.hint].filter(Boolean).join(' · ') || t(locale, 'providerAiUnavailable');
         setRuntimeMessages((items) => [
           ...items,
           {
             role: 'assistant',
-            content: `暂时没有连上：${errorText}`,
+            content: t(locale, 'providerAiNotConnectedTemplate', { reason: errorText }),
             provider,
           },
         ]);
@@ -469,7 +483,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
         ...items,
         {
           role: 'assistant',
-          content: `暂时没有连上：${errorText}`,
+          content: t(locale, 'providerAiNotConnectedTemplate', { reason: errorText }),
           provider,
         },
       ]);

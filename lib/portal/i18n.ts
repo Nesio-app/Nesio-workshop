@@ -127,6 +127,13 @@ const STRINGS = {
     notePanelTokenExpired: 'FLOMO_API_KEY 已过期，请重新从 Local Storage → me → access_token 复制',
     nameInputPlaceholder: '输入你的名字',
     flomoTitle: 'flomo',
+    providerMissingEnv: '缺少：{missing}',
+    providerRuntimeNotReady: '生产运行态尚未标记为可用',
+    providerUnavailableTemplate: '{provider} 暂不可用：{reason}',
+    providerAiUnavailable: 'AI 暂时不可用',
+    providerAiNotConnectedTemplate: '暂时没有连上：{reason}',
+    providerAiConnectingTemplate: '正在连接 {provider}...',
+    providerAiConnectedTemplate: '已连接 {provider}。',
   },
   en: {
     settingsTitle: 'Account',
@@ -254,6 +261,13 @@ const STRINGS = {
     notePanelTokenExpired: 'FLOMO_API_KEY expired. Re-copy the access_token from Local Storage → me → access_token',
     nameInputPlaceholder: 'Enter your name',
     flomoTitle: 'flomo',
+    providerMissingEnv: 'Missing: {missing}',
+    providerRuntimeNotReady: 'Production runtime is not marked ready yet',
+    providerUnavailableTemplate: '{provider} is unavailable: {reason}',
+    providerAiUnavailable: 'AI is temporarily unavailable',
+    providerAiNotConnectedTemplate: 'Could not connect yet: {reason}',
+    providerAiConnectingTemplate: 'Connecting {provider}...',
+    providerAiConnectedTemplate: 'Connected to {provider}.',
   },
 } as const;
 
