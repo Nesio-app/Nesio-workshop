@@ -15,6 +15,8 @@ import { buildUserIdentityUpgradeContract } from '../lib/portal/user-identity-up
 import { buildOfflineSyncConflictContract } from '../lib/portal/offline-sync-conflict-contract.mjs';
 import { buildCloudReadinessContract } from '../lib/portal/cloud-readiness-contract.mjs';
 import { buildProductionActivationContract } from '../lib/portal/production-activation-contract.mjs';
+import { nesioDesignSystemContract } from '../lib/portal/nesio-design-system-contract.mjs';
+import { nesioDesignSystemAssets } from '../lib/portal/nesio-design-system-assets.mjs';
 import {
   LAUNCH_SURFACE_VERSION_V0,
   buildLaunchReadinessSummary,
@@ -2191,6 +2193,17 @@ const cloudReadinessContract = buildCloudReadinessContract({
   offlineSyncConflict: offlineSyncConflictContract,
 });
 const productionActivationContract = buildProductionActivationContract();
+const nesioDesignSystemSummary = {
+  canonicalName: 'Nesio',
+  originalDownloadName: 'Nosio',
+  runtimeSurfaceCount: nesioDesignSystemContract.runtimeSurfaces.length,
+  requiredTokenFileCount: nesioDesignSystemContract.source.requiredTokenFiles.length,
+  guardrailCount: Object.keys(nesioDesignSystemContract.guardrails).length,
+  wholesaleUiReplacementAllowed: nesioDesignSystemContract.guardrails.noWholesaleUiReplacement !== true,
+  shellKitReferenceOnly: nesioDesignSystemContract.guardrails.shellKitIsReferenceOnly === true,
+  allModalsUseSharedGlassTokens: nesioDesignSystemContract.guardrails.allModalsUseSharedGlassTokens === true,
+  allTouchTargetsAtLeast44px: nesioDesignSystemContract.guardrails.allTouchTargetsAtLeast44px === true,
+};
 const toolLifecycleSummary = {
   version: TOOL_LIFECYCLE_VERSION,
   stageVocabulary: [...TOOL_LIFECYCLE_STAGES],
@@ -2396,6 +2409,10 @@ const evidenceSummary = {
     productionActivationConfiguredProviderCount: productionActivationContract.summary.configuredProviderCount,
     productionActivationMissingEnvProviderCount: productionActivationContract.summary.missingEnvProviderCount,
     productionActivationReady: productionActivationContract.summary.productionReady,
+    nesioDesignSystemVersion: nesioDesignSystemContract.version,
+    nesioRuntimeSurfaceCount: nesioDesignSystemSummary.runtimeSurfaceCount,
+    nesioDesignSystemGuardrailCount: nesioDesignSystemSummary.guardrailCount,
+    nesioDesignSystemWholesaleUiReplacementAllowed: nesioDesignSystemSummary.wholesaleUiReplacementAllowed,
     qaLine: boundaryWarnings.length === 0 && experienceServiceWarnings.length === 0 && aggregationWarnings.length === 0 && approvalGateWarnings.length === 0 && shellRouteWarnings.length === 0 && registryDriftWarnings.length === 0 && artifactVisibilityWarnings.length === 0 && artifactStatusVisibilityWarnings.length === 0 && shellDiscoveryBoundaryWarnings.length === 0 && mobileAppBoundaryWarnings.length === 0
       ? `PASS: ${readyModules.length}/${tools.length} modules ready; ${launchExposureSemantics.intentionalExclusionCount} intentional launch exclusion(s) are hidden from the public bundle.`
       : `WARN: ${boundaryWarnings.length} module boundary warning(s), ${launchExposureSemantics.intentionalExclusionCount} intentional launch exclusion(s), ${experienceServiceWarnings.length} Experience Services warning(s), ${dataAggregationReviewWarningCount} Data Aggregation review warning(s), ${dataAggregationRuntimeBlockerCount} Data Aggregation runtime-blocking warning(s), ${approvalGateWarnings.length} Approval Gate warning(s), ${shellRouteWarnings.length} Shell Route warning(s), ${registryDriftWarnings.length} Registry Drift warning(s), ${artifactVisibilityWarnings.length} Artifact Visibility warning(s), ${artifactStatusVisibilityWarnings.length} Artifact Status Visibility warning(s), ${shellDiscoveryBoundaryWarnings.length} Shell Discovery warning(s), ${mobileAppBoundaryWarnings.length} Mobile App Integration warning(s) need QA review.`,
@@ -2592,6 +2609,22 @@ const evidenceSummary = {
   moduleTrustBoundary: moduleProductContract.moduleTrustBoundary,
   coreObjectModels: moduleProductContract.coreObjectModels,
   webSurfaceContract,
+  nesioDesignSystem: {
+    version: nesioDesignSystemContract.version,
+    source: nesioDesignSystemContract.source,
+    tokens: nesioDesignSystemContract.tokens,
+    runtimeSurfaces: nesioDesignSystemContract.runtimeSurfaces,
+    guardrails: nesioDesignSystemContract.guardrails,
+    assets: nesioDesignSystemAssets,
+    summary: nesioDesignSystemSummary,
+    boundaries: {
+      reportOnly: true,
+      changesRuntimeBehavior: false,
+      importsDownloadDirectoryAtRuntime: false,
+      importsDesignSystemDemoBundleAtRuntime: false,
+      wholesaleUiReplacementAllowed: false,
+    },
+  },
   toolLifecycle: {
     version: TOOL_LIFECYCLE_VERSION,
     stageVocabulary: [...TOOL_LIFECYCLE_STAGES],
