@@ -293,6 +293,6 @@ export function getWechatAuthorizeUrl(redirectTo: string, env: EnvMap = process.
   url.searchParams.set('redirect_uri', redirect);
   url.searchParams.set('response_type', 'code');
   url.searchParams.set('scope', envValue(env, 'WECHAT_OAUTH_SCOPE') || 'snsapi_login');
-  url.searchParams.set('state', 'baohe');
+  url.searchParams.set('state', 'nesio');
   return `${url.toString()}#wechat_redirect`;
 }

@@ -44,6 +44,9 @@ assert.match(authCallbackRoute, /NextResponse\.redirect/, 'auth callback must re
 assert.match(authCallbackRoute, /auth_callback_received/, 'auth callback must expose safe callback status');
 assert.match(authCallbackRoute, /auth\/v1\/token/, 'auth callback must exchange Supabase authorization code for a session');
 assert.match(authCallbackRoute, /grant_type['"]?\s*:\s*['"]authorization_code/, 'auth callback must use authorization_code grant');
+assert.match(authCallbackRoute, /token_hash/, 'auth callback must support Supabase email and phone OTP token_hash callback links');
+assert.match(authCallbackRoute, /auth\/v1\/verify/, 'auth callback must verify Supabase token_hash OTP callbacks');
+assert.match(authCallbackRoute, /SUPABASE_OTP_TYPES/, 'auth callback must allowlist Supabase OTP callback types');
 assert.match(authCallbackRoute, /cookies\.set\(['"]baohe_auth_access/, 'auth callback must store access token in an httpOnly cookie');
 assert.match(authCallbackRoute, /cookies\.set\(['"]baohe_auth_refresh/, 'auth callback must store refresh token in an httpOnly cookie');
 assert.match(authCallbackRoute, /httpOnly:\s*true/, 'auth callback cookies must be httpOnly');
@@ -61,6 +64,7 @@ assert.match(authLogoutRoute, /baohe_auth_access/, 'auth logout must clear the a
 assert.match(authLogoutRoute, /baohe_auth_refresh/, 'auth logout must clear the refresh cookie');
 assert.match(authLogoutRoute, /maxAge:\s*0/, 'auth logout must expire auth cookies');
 assert.match(authLogoutRoute, /auth\/v1\/logout/, 'auth logout should best-effort revoke the Supabase session when configured');
+assert.match(runtimeHelper, /state', 'nesio'|state", "nesio"/, 'WeChat OAuth state should use Nesio naming.');
 
 assert.equal(
   packageJson.scripts['test:production-runtime-surface'],

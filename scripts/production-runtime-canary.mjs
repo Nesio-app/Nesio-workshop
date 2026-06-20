@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
-const baseUrl = (process.env.BAOHE_CANARY_BASE_URL || 'https://treasurebox-nu.vercel.app').replace(/\/$/, '');
+const baseUrl = (process.env.BAOHE_CANARY_BASE_URL || 'https://www.nesio.app').replace(/\/$/, '');
 
 async function fetchJson(path, init) {
   try {
