@@ -35,6 +35,12 @@
   --shadow-raise: 0 12px 32px rgba(88, 140, 227, 0.14);
   --shadow-pop: 0 24px 60px rgba(30, 30, 28, 0.12);
   --shadow-fab: 0 8px 24px rgba(88, 140, 227, 0.28);
+  --modal-backdrop-bg: rgba(16, 28, 54, 0.18);
+  --modal-backdrop-blur: 2.5px;
+  --modal-backdrop-saturate: 125%;
+  --modal-card-bg: rgba(248, 251, 255, 0.9);
+  --modal-card-blur: 16px;
+  --modal-card-saturate: 150%;
   --radius-xs: 0.5rem;
   --radius-sm: 0.75rem;
   --radius-md: 1rem;
@@ -75,6 +81,8 @@ html[data-portal-theme="night"] .portal-root {
   --shadow-raise: 0 12px 32px rgba(0, 0, 0, 0.5);
   --shadow-pop: 0 24px 60px rgba(0, 0, 0, 0.6);
   --shadow-fab: 0 8px 28px rgba(0, 0, 0, 0.5);
+  --modal-backdrop-bg: rgba(13, 22, 48, 0.52);
+  --modal-card-bg: rgba(22, 36, 68, 0.88);
 }
 
 .nesio-glass {
@@ -7498,9 +7506,9 @@ html[data-portal-theme="night"] .portal-theme-seg-btn.is-on{
   display: grid !important;
   place-items: center !important;
   padding: 1rem !important;
-  background: rgba(16,28,54,.18) !important;
-  backdrop-filter: blur(2.5px) saturate(125%) !important;
-  -webkit-backdrop-filter: blur(2.5px) saturate(125%) !important;
+  background: var(--modal-backdrop-bg) !important;
+  backdrop-filter: blur(var(--modal-backdrop-blur)) saturate(var(--modal-backdrop-saturate)) !important;
+  -webkit-backdrop-filter: blur(var(--modal-backdrop-blur)) saturate(var(--modal-backdrop-saturate)) !important;
 }
 
 .portal-ai-modal-scrim,
@@ -7526,10 +7534,10 @@ html[data-portal-theme="night"] .portal-theme-seg-btn.is-on{
   margin: 0 !important;
   border: 1px solid rgba(255,255,255,.78) !important;
   border-radius: 1.45rem !important;
-  background: rgba(248,251,255,.9) !important;
+  background: var(--modal-card-bg) !important;
   box-shadow: 0 24px 70px rgba(19,35,76,.22) !important;
-  backdrop-filter: blur(16px) saturate(150%) !important;
-  -webkit-backdrop-filter: blur(16px) saturate(150%) !important;
+  backdrop-filter: blur(var(--modal-card-blur)) saturate(var(--modal-card-saturate)) !important;
+  -webkit-backdrop-filter: blur(var(--modal-card-blur)) saturate(var(--modal-card-saturate)) !important;
 }
 
 .portal-reminder-card {
@@ -7537,7 +7545,7 @@ html[data-portal-theme="night"] .portal-theme-seg-btn.is-on{
 }
 
 .portal-ai-modal-layer--call {
-  background: rgba(13,22,48,.52) !important;
+  background: var(--modal-backdrop-bg) !important;
 }
 
 .portal-ai-video-call {

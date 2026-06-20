@@ -32,6 +32,10 @@ includesToken("--shadow-card", "0 10px 28px rgba(88, 140, 227, 0.08)");
 includesToken("--shadow-raise", "0 12px 32px rgba(88, 140, 227, 0.14)");
 includesToken("--shadow-pop", "0 24px 60px rgba(30, 30, 28, 0.12)");
 includesToken("--tap-min", "44px");
+includesToken("--modal-backdrop-blur", "2.5px");
+includesToken("--modal-backdrop-bg", "rgba(16, 28, 54, 0.18)");
+includesToken("--modal-card-blur", "16px");
+includesToken("--modal-card-bg", "rgba(248, 251, 255, 0.9)");
 includesToken("--radius-md", "1rem");
 includesToken("--radius-lg", "1.25rem");
 includesToken("--radius-xl", "1.75rem");
@@ -56,6 +60,21 @@ assert.match(
   globals,
   /\.nesio-glass\s*\{[\s\S]*box-shadow:\s*var\(--shadow-card\),\s*var\(--glass-highlight\)/,
   "Expected .nesio-glass to include the design-system inner highlight",
+);
+assert.match(
+  globals,
+  /portal-ai-modal-layer[\s\S]*backdrop-filter:\s*blur\(var\(--modal-backdrop-blur\)\) saturate\(var\(--modal-backdrop-saturate\)\)/,
+  "Expected shared modal layers to use Nesio modal backdrop tokens",
+);
+assert.match(
+  globals,
+  /portal-ai-call-sheet[\s\S]*background:\s*var\(--modal-card-bg\)/,
+  "Expected shared modal cards to use the Nesio modal card background token",
+);
+assert.match(
+  globals,
+  /portal-ai-call-sheet[\s\S]*backdrop-filter:\s*blur\(var\(--modal-card-blur\)\) saturate\(var\(--modal-card-saturate\)\)/,
+  "Expected shared modal cards to use the Nesio modal card blur tokens",
 );
 
 assert.equal(
