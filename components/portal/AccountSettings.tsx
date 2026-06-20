@@ -489,6 +489,10 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
   };
 
   const onLogoutAuth = async () => {
+    if (!authSession?.loggedIn) {
+      setAuthFeedback('当前未登录，无需退出。');
+      return;
+    }
     setAuthFeedback('正在退出…');
     try {
       const client = createAppApiClient();
@@ -771,7 +775,7 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
               <button type="button" onClick={() => onStartAuth('google')}>Google</button>
               <button type="button" onClick={() => onStartAuth('wechat')}>WeChat</button>
               <button type="button" onClick={() => onStartAuth('phone')}>Phone</button>
-              <button type="button" onClick={onLogoutAuth} disabled={!authSession?.loggedIn}>退出登录</button>
+              <button type="button" onClick={onLogoutAuth}>退出登录</button>
             </div>
           </li>
           {safetyRows.map((row) => (

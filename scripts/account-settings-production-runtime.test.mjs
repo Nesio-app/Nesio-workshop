@@ -61,6 +61,8 @@ assert.ok(source.includes("setCloudProfileStatus('local_only')"), 'AccountSettin
 assert.ok(source.includes("setCloudProfileStatus('synced')"), 'AccountSettings must surface synced cloud profile state');
 assert.match(source, /catch[\s\S]*setCloudProfileStatus\('local_only'\)/, 'Cloud profile failures must not block local settings');
 assert.ok(source.includes('退出登录'), 'AccountSettings must render a logout button label');
+assert.ok(!source.includes('disabled={!authSession?.loggedIn}'), 'Logout must remain clickable so signed-out users get immediate local feedback');
+assert.ok(source.includes('当前未登录，无需退出。'), 'Logout must explain locally when the user is already signed out');
 assert.match(source, /type="email"/, 'AccountSettings must provide an email input before starting email auth');
 assert.match(source, /type="tel"/, 'AccountSettings must provide a phone input before starting phone auth');
 assert.ok(source.includes('email: authEmail.trim()'), 'AccountSettings must send the email value to auth start');
