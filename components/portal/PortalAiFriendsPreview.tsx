@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { createAppApiClient, type SecretaryChatProvider, type SecretaryChatTurn } from '@/lib/portal/app-api-client';
 
 interface PortalAiFriendsPreviewProps {
   open: boolean;
@@ -13,6 +14,10 @@ type MentionTarget = {
   label: string;
   description: string;
   avatar: string;
+};
+
+type RuntimeMessage = SecretaryChatTurn & {
+  provider?: SecretaryChatProvider;
 };
 
 const mentionTargets: MentionTarget[] = [
@@ -76,8 +81,24 @@ const recentConversations = [
   },
 ];
 
+function resolveSecretaryProvider(composer: string): SecretaryChatProvider {
+  const normalized = composer.toLowerCase();
+  if (normalized.includes('@chatgpt')) return 'chatgpt';
+  if (normalized.includes('@豆包') || normalized.includes('@doubao')) return 'doubao';
+  return 'gemini';
+}
+
+function stripAssistantMentions(message: string): string {
+  return message
+    .replace(/@(Claude|ChatGPT|Gemini|豆包|Doubao)\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewProps) {
   const [composer, setComposer] = useState('');
+  const [runtimeMessages, setRuntimeMessages] = useState<RuntimeMessage[]>([]);
+  const [aiSending, setAiSending] = useState(false);
   const [surface, setSurface] = useState<'chat' | 'search'>('chat');
   const [attachmentTrayOpen, setAttachmentTrayOpen] = useState(false);
   const [searchToolsOpen, setSearchToolsOpen] = useState(false);
@@ -90,6 +111,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
   const composerRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const appApiClient = useMemo(() => createAppApiClient(), []);
 
   const mentionNeedle = useMemo(() => {
     const match = composer.match(/@([\w\u4e00-\u9fa5]*)$/);
@@ -145,6 +167,72 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
     setLocalAttachments((items) => ['笔记：将本条保存到 Flomo', ...items].slice(0, 3));
     setUtilityNotice('已准备 Flomo 笔记意图，发送后会进入本地 mock 记录。');
     requestAnimationFrame(() => composerRef.current?.focus());
+  };
+
+  const sendComposerMessage = async () => {
+    const rawMessage = composer.trim();
+    if (!rawMessage || aiSending) {
+      if (!rawMessage) setUtilityNotice('先写一句想问智友的话，或用 @ 拉入一个 AI。');
+      return;
+    }
+
+    const provider = resolveSecretaryProvider(composer);
+    const message = stripAssistantMentions(rawMessage) || rawMessage;
+    const history: SecretaryChatTurn[] = runtimeMessages
+      .slice(-8)
+      .map(({ role, content }) => ({ role, content }));
+    const userMessage: RuntimeMessage = { role: 'user', content: rawMessage, provider };
+
+    setRuntimeMessages((items) => [...items, userMessage]);
+    setComposer('');
+    setAiSending(true);
+    setUtilityNotice(`正在连接 ${provider === 'chatgpt' ? 'ChatGPT' : provider === 'doubao' ? '豆包' : 'Gemini'}...`);
+
+    try {
+      const result = await appApiClient.sendSecretaryMessage({
+        provider: resolveSecretaryProvider(composer),
+        message,
+        history,
+        personalLab: true,
+      });
+
+      if (result.text) {
+        setRuntimeMessages((items) => [
+          ...items,
+          {
+            role: 'assistant',
+            content: result.text || '',
+            provider,
+          },
+        ]);
+        setUtilityNotice(`已连接 ${result.model || provider}。`);
+      } else {
+        const errorText = [result.error, result.detail, result.hint].filter(Boolean).join(' · ') || 'AI 暂时不可用';
+        setRuntimeMessages((items) => [
+          ...items,
+          {
+            role: 'assistant',
+            content: `暂时没有连上：${errorText}`,
+            provider,
+          },
+        ]);
+        setUtilityNotice(errorText);
+      }
+    } catch (error) {
+      const errorText = error instanceof Error ? error.message : String(error);
+      setRuntimeMessages((items) => [
+        ...items,
+        {
+          role: 'assistant',
+          content: `暂时没有连上：${errorText}`,
+          provider,
+        },
+      ]);
+      setUtilityNotice(errorText);
+    } finally {
+      setAiSending(false);
+      requestAnimationFrame(() => composerRef.current?.focus());
+    }
   };
 
   return (
@@ -250,6 +338,20 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
                 300 元做定制相册很充裕，建议留 50 元加急运费，确保 5 天内到。
               </p>
             </div>
+            {runtimeMessages.map((message, index) => (
+              message.role === 'user' ? (
+                <p key={`${message.role}-${index}`} className="portal-ai-message portal-ai-message--user">
+                  {message.content}
+                </p>
+              ) : (
+                <div key={`${message.role}-${index}`} className="portal-ai-message-row">
+                  <span className="portal-ai-bot-avatar" aria-hidden>
+                    {message.provider === 'chatgpt' ? 'G' : message.provider === 'doubao' ? '豆' : '✦'}
+                  </span>
+                  <p className="portal-ai-message portal-ai-message--assistant">{message.content}</p>
+                </div>
+              )
+            ))}
           </section>
 
           <div className="portal-ai-composer">
@@ -279,7 +381,14 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
                 aria-label="智友集合输入框"
                 value={composer}
                 onChange={(event) => setComposer(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault();
+                    void sendComposerMessage();
+                  }
+                }}
                 placeholder="发消息给智友..."
+                disabled={aiSending}
               />
               <button type="button" className="portal-ai-round-action" aria-label="语音输入" onClick={() => setAudioCallOpen(true)}>🎙</button>
               <button type="button" className="portal-ai-call-button" aria-label="通话" onClick={() => setCallSheetOpen(true)}>
