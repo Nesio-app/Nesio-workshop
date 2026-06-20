@@ -2200,6 +2200,7 @@ const nesioDesignSystemSummary = {
   originalDownloadName: 'Nosio',
   runtimeSurfaceCount: nesioDesignSystemContract.runtimeSurfaces.length,
   requiredTokenFileCount: nesioDesignSystemContract.source.requiredTokenFiles.length,
+  requiredComponentFileCount: nesioDesignSystemContract.source.requiredComponentFiles.length,
   guardrailCount: Object.keys(nesioDesignSystemContract.guardrails).length,
   wholesaleUiReplacementAllowed: nesioDesignSystemContract.guardrails.noWholesaleUiReplacement !== true,
   shellKitReferenceOnly: nesioDesignSystemContract.guardrails.shellKitIsReferenceOnly === true,

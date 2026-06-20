@@ -28,6 +28,12 @@ assert.equal(
 );
 
 assert.equal(
+  contract.nesioDesignSystemSource.namespace,
+  "NesioDesignSystem_d76dec",
+  "Expected the repo-local design-system namespace to use canonical Nesio naming.",
+);
+
+assert.equal(
   contract.nesioDesignSystemSource.importedFrom,
   "/Users/jing/Downloads/Nosio Design System",
   "Expected the original imported design-system path to be preserved as provenance only.",
@@ -43,6 +49,10 @@ assert.ok(
   fs.existsSync(path.join(designSystemRoot, "_ds_manifest.json")),
   "Expected repo-local design-system manifest.",
 );
+assert.ok(
+  fs.existsSync(path.join(designSystemRoot, "_ds_bundle.js")),
+  "Expected repo-local design-system bundle for reference provenance.",
+);
 
 assert.deepEqual(
   contract.nesioDesignSystemSource.requiredTokenFiles,
@@ -56,10 +66,33 @@ assert.deepEqual(
   "Expected production contract to keep the downloadable design system token order",
 );
 
+assert.deepEqual(
+  contract.nesioDesignSystemSource.requiredComponentFiles,
+  [
+    "components/core/Button.jsx",
+    "components/core/FloatingButton.jsx",
+    "components/core/GlassCard.jsx",
+    "components/core/Input.jsx",
+    "components/core/StatusBadge.jsx",
+    "components/portal/QuoteCard.jsx",
+    "components/portal/ReminderCard.jsx",
+    "components/portal/ToolModuleCard.jsx",
+    "components/portal/WeatherTime.jsx",
+  ],
+  "Expected production contract to track the design-system component source files",
+);
+
 for (const tokenFile of contract.nesioDesignSystemSource.requiredTokenFiles) {
   assert.ok(
     fs.existsSync(path.join(designSystemRoot, tokenFile)),
     `Expected repo-local design-system token file ${tokenFile}`,
+  );
+}
+
+for (const componentFile of contract.nesioDesignSystemSource.requiredComponentFiles) {
+  assert.ok(
+    fs.existsSync(path.join(designSystemRoot, componentFile)),
+    `Expected repo-local design-system component file ${componentFile}`,
   );
 }
 

@@ -14,6 +14,7 @@ const report = JSON.parse(output);
 
 assert.equal(report.nesioDesignSystem.version, 'nesio-design-system-v0');
 assert.equal(report.nesioDesignSystem.source.sourceName, 'Nesio Design System');
+assert.equal(report.nesioDesignSystem.source.namespace, 'NesioDesignSystem_d76dec');
 assert.equal(report.nesioDesignSystem.source.sourcePath, 'design-system/nesio');
 assert.equal(report.nesioDesignSystem.source.importedFrom, '/Users/jing/Downloads/Nosio Design System');
 assert.equal(report.nesioDesignSystem.source.productionImportMode, 'lift-token-values-not-wholesale-css-import');
@@ -22,6 +23,7 @@ assert.equal(report.nesioDesignSystem.summary.canonicalName, 'Nesio');
 assert.equal(report.nesioDesignSystem.summary.originalDownloadName, 'Nosio');
 assert.equal(report.nesioDesignSystem.summary.runtimeSurfaceCount >= 12, true);
 assert.equal(report.nesioDesignSystem.summary.requiredTokenFileCount, 5);
+assert.equal(report.nesioDesignSystem.summary.requiredComponentFileCount, 9);
 assert.equal(report.nesioDesignSystem.summary.guardrailCount >= 7, true);
 assert.equal(report.nesioDesignSystem.summary.wholesaleUiReplacementAllowed, false);
 assert.equal(report.nesioDesignSystem.summary.shellKitReferenceOnly, true);
