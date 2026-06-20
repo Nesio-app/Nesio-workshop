@@ -178,6 +178,27 @@ export type AuthLogoutResponse = {
   supabaseRevoked?: boolean;
 };
 
+export type CloudProfileSettings = {
+  displayName?: string;
+  avatarUrl?: string;
+  locale?: string;
+  displayLanguage?: string;
+  coachStyle?: string;
+  theme?: string;
+  calendarUrl?: string;
+};
+
+export type CloudProfileSettingsResponse = {
+  safePublicStatus: true;
+  secretsRedacted: true;
+  ok: boolean;
+  readsCloud: boolean;
+  writesCloud: boolean;
+  settings?: CloudProfileSettings;
+  updatedAt?: string | null;
+  error?: 'cloud_not_configured' | 'not_signed_in' | 'cloud_read_failed' | 'cloud_write_failed' | string;
+};
+
 export type SecretaryChatProvider = 'gemini' | 'chatgpt' | 'openai' | 'doubao';
 
 export type SecretaryChatTurn = {
@@ -208,6 +229,7 @@ const APP_API_ENDPOINTS = {
   authStart: '/api/auth/start',
   authSession: '/api/auth/session',
   authLogout: '/api/auth/logout',
+  cloudProfileSettings: '/api/cloud/profile-settings',
   secretaryChat: '/api/secretary/chat',
 } as const;
 
@@ -314,6 +336,20 @@ export function createAppApiClient(options: ClientOptions = {}) {
     logoutAuth(): Promise<AuthLogoutResponse> {
       return readJsonAllowError(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.authLogout), {
         method: 'POST',
+      });
+    },
+
+    fetchCloudProfileSettings(): Promise<CloudProfileSettingsResponse> {
+      return readJsonAllowError(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.cloudProfileSettings));
+    },
+
+    saveCloudProfileSettings(settings: CloudProfileSettings): Promise<CloudProfileSettingsResponse> {
+      return readJsonAllowError(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.cloudProfileSettings), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ settings }),
       });
     },
 
