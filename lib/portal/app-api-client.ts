@@ -210,6 +210,38 @@ export type CloudProfileSettingsResponse = {
   error?: 'cloud_not_configured' | 'not_signed_in' | 'cloud_read_failed' | 'cloud_write_failed' | string;
 };
 
+export type CloudInventorySnapshotItem = InventoryItemRecord & {
+  schemaVersion?: 'LocalInventoryItem@v1' | string;
+  locationHint?: string;
+  notes?: string;
+  purchaseMemory?: Record<string, unknown>;
+  createdAt?: string;
+  updatedAt?: string;
+  mode?: InventoryMode;
+};
+
+export type CloudInventorySnapshotResponse = {
+  safePublicStatus: true;
+  secretsRedacted: true;
+  ok: boolean;
+  cloudInventorySnapshot: true;
+  readsCloud: boolean;
+  writesCloud: boolean;
+  items?: CloudInventorySnapshotItem[];
+  itemCount?: number;
+  savedCount?: number;
+  rejectedCount?: number;
+  deletedMissingCount?: number;
+  updatedAt?: string | null;
+  error?:
+    | 'cloud_not_configured'
+    | 'not_signed_in'
+    | 'cloud_read_failed'
+    | 'cloud_write_failed'
+    | 'invalid_json'
+    | string;
+};
+
 export type SecretaryChatProvider = 'gemini' | 'chatgpt' | 'openai' | 'doubao' | 'claude' | 'anthropic';
 
 export type SecretaryChatTurn = {
@@ -269,6 +301,7 @@ const APP_API_ENDPOINTS = {
   authSession: '/api/auth/session',
   authLogout: '/api/auth/logout',
   cloudProfileSettings: '/api/cloud/profile-settings',
+  cloudInventory: '/api/cloud/inventory',
   secretaryChat: '/api/secretary/chat',
   secretaryHealth: '/api/secretary/health',
 } as const;
@@ -390,6 +423,26 @@ export function createAppApiClient(options: ClientOptions = {}) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ settings }),
+      });
+    },
+
+    fetchCloudInventorySnapshot(): Promise<CloudInventorySnapshotResponse> {
+      return readJsonAllowError(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.cloudInventory));
+    },
+
+    saveCloudInventorySnapshot({
+      items,
+      deleteMissing = false,
+    }: {
+      items: CloudInventorySnapshotItem[];
+      deleteMissing?: boolean;
+    }): Promise<CloudInventorySnapshotResponse> {
+      return readJsonAllowError(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.cloudInventory), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ items, deleteMissing }),
       });
     },
 
