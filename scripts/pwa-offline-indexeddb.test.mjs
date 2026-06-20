@@ -28,7 +28,7 @@ const appMarkers = [
 ];
 
 const htmlMarkers = [
-  '<script src="app.js"></script>',
+  '<script src="/storage/app.js"></script>',
 ];
 
 const swMarkers = [
