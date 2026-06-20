@@ -4,6 +4,7 @@ import path from 'node:path';
 
 const root = process.cwd();
 const component = fs.readFileSync(path.join(root, 'components', 'portal', 'NotePanelEnhanced.tsx'), 'utf8');
+const basicComponent = fs.readFileSync(path.join(root, 'components', 'portal', 'NotePanel.tsx'), 'utf8');
 const runtime = fs.readFileSync(path.join(root, 'lib', 'portal', 'production-runtime.ts'), 'utf8');
 const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 
@@ -59,6 +60,27 @@ assert.match(
   /if \(!flomoRuntimeReady\)[\s\S]*setStatus\('err'\)/,
   'NotePanelEnhanced must fail closed with visible status when Flomo is not runtime-ready.',
 );
+
+for (const [name, source] of [
+  ['NotePanelEnhanced', component],
+  ['NotePanel', basicComponent],
+]) {
+  assert.doesNotMatch(
+    source,
+    /disabled=\{!canSend\}/,
+    `${name} send button must remain clickable so empty drafts can show local feedback.`,
+  );
+  assert.match(
+    source,
+    /disabled=\{sending\}/,
+    `${name} send button should only disable while a send is already in flight.`,
+  );
+  assert.match(
+    source,
+    /if \(!text && images\.length === 0\)[\s\S]*flomoNeedContent/,
+    `${name} must show local feedback when send is tapped with no content.`,
+  );
+}
 
 assert.equal(
   packageJson.scripts['test:note-panel-flomo-provider-action'],

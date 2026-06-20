@@ -677,7 +677,7 @@ export default function NotePanelEnhanced({ open, onOpenChange }: NotePanelProps
                     <button
                       type="button"
                       className={'flomo-send' + (canSend ? ' flomo-send--on' : '')}
-                      disabled={!canSend}
+                      disabled={sending}
                       onClick={onSend}
                       aria-label={t(locale, 'flomoSend')}
                     >
