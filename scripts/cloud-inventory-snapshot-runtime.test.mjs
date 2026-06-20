@@ -21,7 +21,9 @@ for (const marker of [
   'SUPABASE_ANON_KEY',
   'SUPABASE_SERVICE_ROLE_KEY',
   'baohe_auth_access',
+  'baohe_auth_refresh',
   '/auth/v1/user',
+  'grant_type=refresh_token',
   '/rest/v1/inventory_items',
   'cloud_not_configured',
   'not_signed_in',
@@ -33,6 +35,7 @@ for (const marker of [
   'writesCloud',
   'cloudInventorySnapshot',
   'LocalInventoryItem@v1',
+  'setRefreshedAuthCookies',
 ]) {
   assert.ok(route.includes(marker), `cloud inventory route missing marker: ${marker}`);
 }

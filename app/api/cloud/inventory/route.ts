@@ -7,6 +7,12 @@ type SupabaseUserResponse = {
   phone?: string;
 };
 
+type SupabaseTokenResponse = {
+  access_token?: string;
+  refresh_token?: string;
+  expires_in?: number;
+};
+
 type CloudInventoryItem = {
   id: string;
   schemaVersion: 'LocalInventoryItem@v1';
@@ -80,8 +86,7 @@ function getCloudConfig() {
   };
 }
 
-async function getSignedInUser(config: ReturnType<typeof getCloudConfig>): Promise<SupabaseUserResponse | null> {
-  const accessToken = cookies().get('baohe_auth_access')?.value || '';
+async function fetchSignedInUser(config: ReturnType<typeof getCloudConfig>, accessToken: string): Promise<SupabaseUserResponse | null> {
   if (!accessToken) return null;
 
   const response = await fetch(`${config.supabaseUrl}/auth/v1/user`, {
@@ -94,6 +99,62 @@ async function getSignedInUser(config: ReturnType<typeof getCloudConfig>): Promi
 
   if (!response.ok) return null;
   return response.json() as Promise<SupabaseUserResponse>;
+}
+
+async function refreshSupabaseSession(config: ReturnType<typeof getCloudConfig>, refreshToken: string): Promise<SupabaseTokenResponse | null> {
+  if (!refreshToken) return null;
+
+  const response = await fetch(`${config.supabaseUrl}/auth/v1/token?grant_type=refresh_token`, {
+    method: 'POST',
+    headers: {
+      apikey: config.anonKey,
+      Authorization: `Bearer ${config.anonKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ refresh_token: refreshToken }),
+    cache: 'no-store',
+  });
+
+  if (!response.ok) return null;
+  return response.json() as Promise<SupabaseTokenResponse>;
+}
+
+function setRefreshedAuthCookies(response: NextResponse, session?: SupabaseTokenResponse | null) {
+  if (!session?.access_token) return response;
+  const secure = process.env.NODE_ENV === 'production';
+  const maxAge = Number.isFinite(session.expires_in) && session.expires_in ? session.expires_in : 60 * 60;
+  response.cookies.set('baohe_auth_access', session.access_token, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure,
+    path: '/',
+    maxAge,
+  });
+  if (session.refresh_token) {
+    response.cookies.set('baohe_auth_refresh', session.refresh_token, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure,
+      path: '/',
+      maxAge: 60 * 60 * 24 * 30,
+    });
+  }
+  return response;
+}
+
+async function getSignedInUser(config: ReturnType<typeof getCloudConfig>): Promise<{
+  user: SupabaseUserResponse | null;
+  refreshedSession: SupabaseTokenResponse | null;
+}> {
+  const cookieStore = cookies();
+  const accessToken = cookieStore.get('baohe_auth_access')?.value || '';
+  const refreshToken = cookieStore.get('baohe_auth_refresh')?.value || '';
+  const user = await fetchSignedInUser(config, accessToken);
+  if (user?.id) return { user, refreshedSession: null };
+
+  const refreshedSession = await refreshSupabaseSession(config, refreshToken);
+  const refreshedUser = await fetchSignedInUser(config, refreshedSession?.access_token || '');
+  return { user: refreshedUser, refreshedSession: refreshedUser?.id ? refreshedSession : null };
 }
 
 function restHeaders(config: ReturnType<typeof getCloudConfig>) {
@@ -206,7 +267,8 @@ export async function GET() {
     );
   }
 
-  const user = await getSignedInUser(config);
+  const userSession = await getSignedInUser(config);
+  const user = userSession.user;
   if (!user?.id) {
     return safeJson(
       {
@@ -234,14 +296,14 @@ export async function GET() {
     const rows = (await response.json()) as Array<{ item?: unknown; updated_at?: string }>;
     const items = rows.map((row) => sanitizeInventoryItem(row.item)).filter((item): item is CloudInventoryItem => Boolean(item));
 
-    return safeJson({
+    return setRefreshedAuthCookies(safeJson({
       ok: true,
       readsCloud: true,
       writesCloud: false,
       items,
       itemCount: items.length,
       updatedAt: rows[0]?.updated_at || null,
-    });
+    }), userSession.refreshedSession);
   } catch {
     return safeJson(
       {
@@ -269,7 +331,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const user = await getSignedInUser(config);
+  const userSession = await getSignedInUser(config);
+  const user = userSession.user;
   if (!user?.id) {
     return safeJson(
       {
@@ -352,7 +415,7 @@ export async function POST(request: NextRequest) {
       deletedMissingCount = missingLocalIds.length;
     }
 
-    return safeJson({
+    return setRefreshedAuthCookies(safeJson({
       ok: true,
       readsCloud: rawBody.deleteMissing === true,
       writesCloud: true,
@@ -360,7 +423,7 @@ export async function POST(request: NextRequest) {
       rejectedCount,
       deletedMissingCount,
       updatedAt,
-    });
+    }), userSession.refreshedSession);
   } catch {
     return safeJson(
       {

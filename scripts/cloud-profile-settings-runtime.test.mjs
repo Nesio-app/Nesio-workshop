@@ -21,7 +21,9 @@ for (const marker of [
   'SUPABASE_SERVICE_ROLE_KEY',
   'SUPABASE_ANON_KEY',
   'baohe_auth_access',
+  'baohe_auth_refresh',
   '/auth/v1/user',
+  'grant_type=refresh_token',
   '/rest/v1/profile_settings',
   'cloud_not_configured',
   'not_signed_in',
@@ -31,6 +33,7 @@ for (const marker of [
   'secretsRedacted',
   'writesCloud',
   'readsCloud',
+  'setRefreshedAuthCookies',
 ]) {
   assert.ok(route.includes(marker), `route missing marker: ${marker}`);
 }
