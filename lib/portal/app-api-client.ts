@@ -214,6 +214,34 @@ export type SecretaryChatResponse = {
   hint?: string;
 };
 
+export type SecretaryHealthResponse = {
+  ok: boolean;
+  service: 'secretary';
+  status?: 'ready' | string;
+  behaviorEnabled?: boolean;
+  gemini: boolean;
+  doubao: boolean;
+  chatgpt: boolean;
+  claude: boolean;
+  model?: string | null;
+  doubaoModel?: string | null;
+  openaiModel?: string | null;
+  claudeModel?: string | null;
+  productionActivation?: {
+    aiProviderMode: string;
+    aiRuntimeEnabled: boolean;
+    configuredProviders: {
+      gemini: boolean;
+      doubao: boolean;
+      chatgpt: boolean;
+      claude: boolean;
+    };
+  };
+  reason?: string;
+  statusCode?: number;
+  message?: string;
+};
+
 type ClientOptions = {
   fetcher?: AppApiFetch;
   baseUrl?: string;
@@ -231,6 +259,7 @@ const APP_API_ENDPOINTS = {
   authLogout: '/api/auth/logout',
   cloudProfileSettings: '/api/cloud/profile-settings',
   secretaryChat: '/api/secretary/chat',
+  secretaryHealth: '/api/secretary/health',
 } as const;
 
 function buildUrl(baseUrl: string, path: string, params?: Record<string, string | number | boolean | undefined>) {
@@ -350,6 +379,14 @@ export function createAppApiClient(options: ClientOptions = {}) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ settings }),
+      });
+    },
+
+    fetchSecretaryHealth({ personalLab = true }: { personalLab?: boolean } = {}): Promise<SecretaryHealthResponse> {
+      return readJsonAllowError(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.secretaryHealth), {
+        headers: {
+          ...(personalLab ? { 'x-baohe-access-mode': 'personal_lab' } : {}),
+        },
       });
     },
 

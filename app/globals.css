@@ -6287,6 +6287,24 @@ html[data-portal-theme="night"] .portal-theme-seg-btn.is-on{
   color: #4a6cf7;
 }
 
+.portal-ai-runtime-status {
+  justify-self: start;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 0 .1rem;
+  padding: .48rem .7rem;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  background: var(--glass-bg);
+  color: #52618c;
+  font-size: .64rem;
+  font-weight: 760;
+  line-height: 1.35;
+  box-shadow: var(--shadow-card);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+}
+
 .portal-ai-message--user {
   justify-self: end;
   background: #4f6cff;

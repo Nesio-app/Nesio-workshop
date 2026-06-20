@@ -3,9 +3,13 @@ import { join } from 'node:path';
 
 const root = process.cwd();
 const componentPath = join(root, 'components/portal/PortalAiFriendsPreview.tsx');
+const apiClientPath = join(root, 'lib/portal/app-api-client.ts');
+const cssPath = join(root, 'app/globals.css');
 const packagePath = join(root, 'package.json');
 
 const component = readFileSync(componentPath, 'utf8');
+const apiClient = readFileSync(apiClientPath, 'utf8');
+const css = readFileSync(cssPath, 'utf8');
 const pkg = JSON.parse(readFileSync(packagePath, 'utf8'));
 
 function assert(condition, message) {
@@ -17,6 +21,37 @@ function assert(condition, message) {
 assert(
   component.includes("createAppApiClient") && component.includes("sendSecretaryMessage"),
   'PortalAiFriendsPreview must send composer messages through the Secretary Chat API client.',
+);
+
+assert(
+  component.includes("fetchSecretaryHealth") &&
+    component.includes("aiRuntimeStatus") &&
+    component.includes("secretaryHealth"),
+  'PortalAiFriendsPreview must read Secretary AI runtime health with personal lab access before presenting live AI controls.',
+);
+
+assert(
+  apiClient.includes("secretaryHealth: '/api/secretary/health'") &&
+    apiClient.includes("fetchSecretaryHealth") &&
+    apiClient.includes("'x-baohe-access-mode': 'personal_lab'"),
+  'App API client must expose Secretary health and send personal lab access for health diagnostics.',
+);
+
+assert(
+  !component.includes("Mock Live"),
+  'PortalAiFriendsPreview live call surfaces must not present AI runtime as mock once health diagnostics exist.',
+);
+
+assert(
+  /configuredProviders[\s\S]*gemini[\s\S]*chatgpt[\s\S]*claude/.test(component) ||
+    /secretaryHealth[\s\S]*gemini[\s\S]*secretaryHealth[\s\S]*chatgpt[\s\S]*secretaryHealth[\s\S]*claude/.test(component),
+  'PortalAiFriendsPreview must surface configured AI providers from Secretary health.',
+);
+
+assert(
+  /\.portal-ai-runtime-status\b/.test(css) &&
+    /portal-ai-runtime-status[\s\S]*background:\s*var\(--glass-bg\)/.test(css),
+  'PortalAiFriendsPreview runtime status must use the shared glass surface tokens.',
 );
 
 assert(

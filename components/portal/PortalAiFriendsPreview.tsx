@@ -1,9 +1,14 @@
 'use client';
 
 import Image from 'next/image';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { createAppApiClient, type SecretaryChatProvider, type SecretaryChatTurn } from '@/lib/portal/app-api-client';
+import {
+  createAppApiClient,
+  type SecretaryChatProvider,
+  type SecretaryChatTurn,
+  type SecretaryHealthResponse,
+} from '@/lib/portal/app-api-client';
 import { nesioAiIcons, nesioToolIcons } from '@/lib/portal/nesio-design-system-assets.mjs';
 
 interface PortalAiFriendsPreviewProps {
@@ -165,11 +170,49 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
   const [audioCallOpen, setAudioCallOpen] = useState(false);
   const [activeCapability, setActiveCapability] = useState<AiCapabilityId | null>(null);
   const [utilityNotice, setUtilityNotice] = useState('');
+  const [secretaryHealth, setSecretaryHealth] = useState<SecretaryHealthResponse | null>(null);
+  const [aiRuntimeStatus, setAiRuntimeStatus] = useState('正在检查智友 AI 连接...');
   const [localAttachments, setLocalAttachments] = useState<string[]>([]);
   const composerRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const appApiClient = useMemo(() => createAppApiClient(), []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function readSecretaryHealth() {
+      try {
+        const health = await appApiClient.fetchSecretaryHealth({ personalLab: true });
+        if (cancelled) return;
+        setSecretaryHealth(health);
+        if (health.ok && health.behaviorEnabled) {
+          const configuredProviders = [
+            health.gemini ? 'Gemini' : null,
+            health.chatgpt ? 'ChatGPT' : null,
+            health.claude ? 'Claude' : null,
+            health.doubao ? '豆包' : null,
+          ].filter(Boolean);
+          setAiRuntimeStatus(
+            configuredProviders.length
+              ? `已连接 ${configuredProviders.join(' / ')}`
+              : '智友通道已打开，但还没有检测到可用 AI Key',
+          );
+          return;
+        }
+        setAiRuntimeStatus(health.message || '智友 AI 尚未通过运行时开关');
+      } catch (error) {
+        if (!cancelled) {
+          setAiRuntimeStatus(error instanceof Error ? error.message : '智友 AI 连接检查失败');
+        }
+      }
+    }
+
+    readSecretaryHealth();
+    return () => {
+      cancelled = true;
+    };
+  }, [appApiClient]);
 
   const mentionNeedle = useMemo(() => {
     const match = composer.match(/@([\w\u4e00-\u9fa5]*)$/);
@@ -180,6 +223,18 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
     if (mentionNeedle === null) return [];
     return mentionTargets.filter((target) => target.label.toLowerCase().includes(mentionNeedle));
   }, [mentionNeedle]);
+
+  const liveProviderSummary = useMemo(() => {
+    if (!secretaryHealth) return aiRuntimeStatus;
+    const configuredProviders = [
+      secretaryHealth.gemini ? 'Gemini' : null,
+      secretaryHealth.chatgpt ? 'ChatGPT' : null,
+      secretaryHealth.claude ? 'Claude' : null,
+      secretaryHealth.doubao ? '豆包' : null,
+    ].filter(Boolean);
+    if (configuredProviders.length) return `${configuredProviders.join(' / ')} 可用`;
+    return aiRuntimeStatus;
+  }, [aiRuntimeStatus, secretaryHealth]);
 
   if (!open) return null;
 
@@ -455,6 +510,9 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
           </header>
 
           <section className="portal-ai-thread" aria-label="集合对话">
+            <p className="portal-ai-runtime-status" aria-live="polite">
+              {aiRuntimeStatus}
+            </p>
             <p className="portal-ai-message portal-ai-message--user">帮我想个送妈妈的生日礼物，预算 300</p>
             <p className="portal-ai-thread-note">已综合 Claude · ChatGPT 的回答</p>
             <div className="portal-ai-message-row">
@@ -660,7 +718,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
               <section id="portal-ai-audio-call" className="portal-ai-video-call" role="dialog" aria-modal="true" aria-label="AI 实时语音通话">
                 <div className="portal-ai-video-avatar" aria-hidden>🎙</div>
                 <p>正在连接实时语音通话</p>
-                <small>Mock Live · 后续接入 Gemini Live 类实时语音模型</small>
+                <small>{liveProviderSummary}</small>
                 <button type="button" onClick={() => setAudioCallOpen(false)}>结束</button>
               </section>
             </div>,
@@ -672,7 +730,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
               <section className="portal-ai-video-call" role="dialog" aria-modal="true" aria-label="AI 虚拟形象视频通话">
                 <div className="portal-ai-video-avatar" aria-hidden>✦</div>
                 <p>正在连接智友虚拟形象</p>
-                <small>Mock Live · 后续接入实时语音/视频模型</small>
+                <small>{liveProviderSummary}</small>
                 <button type="button" onClick={() => setVideoCallOpen(false)}>结束</button>
               </section>
             </div>,
