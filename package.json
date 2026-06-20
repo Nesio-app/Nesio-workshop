@@ -55,7 +55,7 @@
     "test:module-product-report": "node scripts/report-module-product-contract.test.mjs",
     "test:web-surface": "node scripts/web-surface-contract-v0.test.mjs",
     "test:web-surface-report": "node scripts/report-web-surface-contract.test.mjs",
-    "test:user-identity-upgrade": "node scripts/report-module-registry-user-identity-upgrade.test.mjs",
+    "test:user-identity-upgrade": "node scripts/report-module-registry-user-identity-upgrade.test.mjs && node scripts/user-identity-runtime-env.test.mjs",
     "test:offline-sync-conflict": "node scripts/report-module-registry-offline-sync-conflict.test.mjs",
     "test:cloud-readiness": "node scripts/report-module-registry-cloud-readiness.test.mjs",
     "test:local-data-records": "node scripts/local-data-records.test.mjs && node scripts/local-data-records-dashboard.test.mjs",

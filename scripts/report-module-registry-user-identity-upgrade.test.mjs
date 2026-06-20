@@ -13,7 +13,7 @@ const output = execFileSync('node', [join(scriptDir, 'report-module-registry.mjs
 const report = JSON.parse(output);
 
 assert.equal(report.userIdentityUpgrade.version, 'user-identity-upgrade-contract-v0');
-assert.equal(report.userIdentityUpgrade.implementation, 'report-only');
+assert.equal(report.userIdentityUpgrade.implementation, 'runtime-aware-contract');
 assert.equal(report.userIdentityUpgrade.currentIdentity.profileKind, 'local_profile');
 assert.equal(report.userIdentityUpgrade.currentIdentity.accountSystemEnabled, false);
 assert.equal(report.userIdentityUpgrade.currentIdentity.serverUserId, null);
@@ -24,8 +24,20 @@ assert.equal(report.userIdentityUpgrade.boundaries.cloudIdentityEnabled, false);
 assert.equal(report.userIdentityUpgrade.boundaries.createsUsersTable, false);
 assert.equal(report.userIdentityUpgrade.boundaries.realAccountLinkingEnabled, false);
 assert.equal(report.userIdentityUpgrade.boundaries.realAuthRequiresCeoGate, true);
+assert.deepEqual(
+  report.userIdentityUpgrade.supportedAuthProviders,
+  ['email', 'google', 'wechat', 'phone'],
+);
+assert.equal(report.userIdentityUpgrade.runtimeAuthReadiness.providerCount, 4);
+for (const provider of ['email', 'google', 'wechat', 'phone']) {
+  assert.equal(report.userIdentityUpgrade.runtimeAuthReadiness.providers[provider].startEndpoint, '/api/auth/start');
+  assert.equal(report.userIdentityUpgrade.runtimeAuthReadiness.providers[provider].secretsRedacted, true);
+}
+assert.equal(report.userIdentityUpgrade.identityBoundaryReport.authStartEndpoint, '/api/auth/start');
+assert.equal(report.userIdentityUpgrade.summary.supportedAuthProviderCount, 4);
 
 assert.equal(report.summary.accountSystemEnabled, false);
+assert.equal(report.summary.supportedAuthProviderCount, 4);
 assert.equal(report.summary.currentProfileKind, 'local_profile');
 assert.equal(report.summary.serverUserIdEnabled, false);
 assert.equal(report.summary.identityUpgradePathReadable, true);

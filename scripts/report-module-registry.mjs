@@ -2389,6 +2389,7 @@ const evidenceSummary = {
     toolDataCeoGateRequiredForRealMigration: toolDataVersioningContract.boundaries.realDataMigrationRequiresCeoGate,
     toolDataVersioningWarningCount: toolDataVersioningContract.summary.warningCount,
     accountSystemEnabled: userIdentityUpgradeContract.summary.accountSystemEnabled,
+    supportedAuthProviderCount: userIdentityUpgradeContract.summary.supportedAuthProviderCount,
     currentProfileKind: userIdentityUpgradeContract.summary.currentProfileKind,
     serverUserIdEnabled: userIdentityUpgradeContract.summary.serverUserIdEnabled,
     identityUpgradePathReadable: userIdentityUpgradeContract.summary.identityUpgradePathReadable,
