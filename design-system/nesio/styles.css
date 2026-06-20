@@ -1,0 +1,10 @@
+/* ───────────────────────────────────────────────────────────
+   Nesio · 宝盒 Design System — global entry
+   Consumers link THIS file only. It is a list of @imports.
+   Day + Night themes via <html data-portal-theme="day|night">.
+   ─────────────────────────────────────────────────────────── */
+@import "./tokens/fonts.css";
+@import "./tokens/colors.css";
+@import "./tokens/typography.css";
+@import "./tokens/spacing.css";
+@import "./tokens/effects.css";

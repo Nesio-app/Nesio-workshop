@@ -1,0 +1,25 @@
+<!-- @dsCard group="Spacing" viewport="700x170" name="Radius scale" subtitle="xs 8 · sm 12 · md 16 · lg 20 · xl 28 · pill" -->
+<!DOCTYPE html>
+<html data-portal-theme="day" lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  body { margin: 0; font-family: var(--font-sans); color: var(--portal-ink); background: var(--portal-bg); padding: 24px; }
+  .row { display: flex; gap: 16px; align-items: center; }
+  .col { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .box { width: 64px; height: 64px; background: color-mix(in srgb, var(--portal-cool) 80%, white); border: 1px solid var(--portal-line); }
+  .n { font-size: 0.64rem; color: var(--portal-muted); }
+</style>
+</head>
+<body>
+  <div class="row">
+    <div class="col"><div class="box" style="border-radius: var(--radius-xs);"></div><span class="n">xs · 8</span></div>
+    <div class="col"><div class="box" style="border-radius: var(--radius-sm);"></div><span class="n">sm · 12</span></div>
+    <div class="col"><div class="box" style="border-radius: var(--radius-md);"></div><span class="n">md · 16</span></div>
+    <div class="col"><div class="box" style="border-radius: var(--radius-lg);"></div><span class="n">lg · 20</span></div>
+    <div class="col"><div class="box" style="border-radius: var(--radius-xl);"></div><span class="n">xl · 28</span></div>
+    <div class="col"><div class="box" style="border-radius: var(--radius-pill);"></div><span class="n">pill</span></div>
+  </div>
+</body>
+</html>

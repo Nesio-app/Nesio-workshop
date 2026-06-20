@@ -11,7 +11,7 @@
   --font-portal-serif: "Songti SC", "STSong", "Noto Serif CJK SC", Georgia, "Times New Roman", serif;
 }
 
-/* Nesio Design System v0: shared tokens from /Users/jing/Downloads/Nosio Design System.
+/* Nesio Design System v0: shared tokens from design-system/nesio.
    This is a contract layer first; page-level UI should adopt these tokens incrementally. */
 :root,
 .portal-root {

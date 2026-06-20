@@ -1,0 +1,87 @@
+/* ═══════════════════════════════════════════════════════════
+   COLORS — Nesio · 宝盒
+   Anchored on the existing day palette (huemint gradient-3):
+   #588ce3 · #96c7f3 · #cddefc
+   The night palette is the matching counterpart shipped with
+   the live shell. DO NOT change these hues — the shell UI is final.
+
+   Theme switch: <html data-portal-theme="day">  (default)
+                 <html data-portal-theme="night">
+   Tokens live on BOTH :root and .portal-root so body-level
+   overlays (note panel, command bar, settings) inherit too.
+   ═══════════════════════════════════════════════════════════ */
+
+:root,
+.portal-root {
+  /* ── Brand blues (day) ── */
+  --portal-blue-deep: #588ce3;   /* primary action / accent      */
+  --portal-blue-mid:  #96c7f3;   /* secondary / gradient mid     */
+  --portal-blue-light:#cddefc;   /* tint / gradient base         */
+
+  /* ── Surface & ink (day) ── */
+  --portal-bg:    #f4f8fd;        /* app base behind glass        */
+  --portal-ink:   #1e2a3a;        /* primary text                 */
+  --portal-muted: #5a6d82;        /* secondary text / labels      */
+  --portal-line:  rgba(88, 140, 227, 0.14); /* hairline borders   */
+
+  /* ── Zone tones (three cabins) ──
+     cool = 秩序与跃迁 · warm = 觉察与锚定 · neutral = 体现与投射 */
+  --portal-cool:           #e8f2fc;
+  --portal-cool-accent:    #588ce3;
+  --portal-warm:           #edf4fc;
+  --portal-warm-accent:    #4a7fd4;
+  --portal-neutral:        #e6eef9;
+  --portal-neutral-accent: #6b8fc9;
+
+  /* ── Status (warm-coach palette) ──
+     Soft by default. Red is RESERVED for real safety / expiry risk.
+     Everyday "to-do / pending" uses amber, blue-gray or green. */
+  --status-go:        #5a9e7a;  /* done / good / on track       */
+  --status-go-soft:   #d9ece1;
+  --status-gentle:    #c9923f;  /* pending / soft nudge (amber) */
+  --status-gentle-soft:#f3e4cc;
+  --status-calm:      #6b8fc9;  /* informational / neutral note */
+  --status-calm-soft: #dfe8f6;
+  --status-risk:      #cf6b6b;  /* REAL risk only (expiry/safety)*/
+  --status-risk-soft: #f5d9d9;
+
+  /* ── App background gradient (day) ── */
+  --portal-bg-gradient:
+    radial-gradient(ellipse 85% 60% at 12% 0%, rgba(88, 140, 227, 0.22), transparent 55%),
+    radial-gradient(ellipse 70% 55% at 88% 6%, rgba(205, 222, 252, 0.65), transparent 50%),
+    linear-gradient(165deg, var(--portal-blue-light) 0%, var(--portal-blue-mid) 46%, var(--portal-blue-deep) 100%);
+}
+
+/* ═══ NIGHT ═══ Matching counterpart palette (ships with shell) */
+html[data-portal-theme="night"],
+html[data-portal-theme="night"] .portal-root,
+[data-portal-theme="night"] {
+  --portal-blue-deep:  #7fb0ee;
+  --portal-blue-mid:   #5f8fd6;
+  --portal-blue-light: #2c4a78;
+
+  --portal-bg:    #0e1626;
+  --portal-ink:   #e7eefb;
+  --portal-muted: rgba(200, 217, 245, 0.6);
+  --portal-line:  rgba(127, 176, 245, 0.16);
+
+  --portal-cool:           #16243c;
+  --portal-cool-accent:    #7fb0ee;
+  --portal-warm:           #181f33;
+  --portal-warm-accent:    #8fb6ef;
+  --portal-neutral:        #141d30;
+  --portal-neutral-accent: #9bb6e0;
+
+  --status-go:        #6fb893;
+  --status-go-soft:   rgba(111, 184, 147, 0.18);
+  --status-gentle:    #d9ab63;
+  --status-gentle-soft:rgba(217, 171, 99, 0.18);
+  --status-calm:      #9bb6e0;
+  --status-calm-soft: rgba(155, 182, 224, 0.16);
+  --status-risk:      #e08585;
+  --status-risk-soft: rgba(224, 133, 133, 0.18);
+
+  --portal-bg-gradient:
+    radial-gradient(ellipse 70% 55% at 88% 6%, rgba(40, 70, 120, 0.28), transparent 52%),
+    linear-gradient(165deg, #17233a 0%, #111c31 50%, #0a1322 100%);
+}

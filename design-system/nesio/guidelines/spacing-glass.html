@@ -1,0 +1,26 @@
+<!-- @dsCard group="Spacing" viewport="700x210" name="Liquid glass & shadows" subtitle="Frosted surfaces over the gradient — day & night" -->
+<!DOCTYPE html>
+<html data-portal-theme="day" lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  html,body { margin: 0; }
+  body { font-family: var(--font-sans); padding: 0; min-height: 100vh; display: flex; }
+  .pane { flex: 1; padding: 24px; display: flex; gap: 14px; align-items: center; justify-content: center; }
+  .day { background: var(--portal-bg-gradient); }
+  .glass { width: 130px; height: 110px; border-radius: var(--radius-lg); border: 1px solid var(--glass-border); backdrop-filter: blur(var(--glass-blur)); -webkit-backdrop-filter: blur(var(--glass-blur)); display: flex; flex-direction: column; justify-content: flex-end; padding: 12px; box-sizing: border-box; }
+  .lbl { font-size: 0.64rem; font-weight: 600; }
+</style>
+</head>
+<body>
+  <div class="pane day" data-portal-theme="day">
+    <div class="glass" style="background: var(--glass-bg); box-shadow: var(--shadow-card);"><span class="lbl" style="color: var(--portal-ink);">glass-bg<br>0.42</span></div>
+    <div class="glass" style="background: var(--glass-bg-solid); box-shadow: var(--shadow-card), var(--glass-highlight);"><span class="lbl" style="color: var(--portal-ink);">glass-solid<br>0.82</span></div>
+  </div>
+  <div class="pane" data-portal-theme="night" style="background: linear-gradient(165deg,#17233a,#0a1322);">
+    <div class="glass" style="background: rgba(255,255,255,0.055); box-shadow: 0 10px 28px rgba(0,0,0,0.4);"><span class="lbl" style="color:#e7eefb;">night glass<br>0.055</span></div>
+    <div class="glass" style="background: rgba(255,255,255,0.09); box-shadow: 0 12px 32px rgba(0,0,0,0.5);"><span class="lbl" style="color:#e7eefb;">raised<br>0.09</span></div>
+  </div>
+</body>
+</html>

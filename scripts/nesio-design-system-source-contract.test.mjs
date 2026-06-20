@@ -15,6 +15,29 @@ assert.equal(
   "Expected a versioned Nesio design system contract",
 );
 
+assert.equal(
+  contract.nesioDesignSystemSource.sourcePath,
+  "design-system/nesio",
+  "Expected the source design system to live inside the repo, not in Downloads.",
+);
+
+assert.equal(
+  contract.nesioDesignSystemSource.importedFrom,
+  "/Users/jing/Downloads/Nosio Design System",
+  "Expected the original imported design-system path to be preserved as provenance only.",
+);
+
+const designSystemRoot = path.join(repoRoot, contract.nesioDesignSystemSource.sourcePath);
+assert.ok(fs.existsSync(designSystemRoot), "Expected repo-local design-system/nesio directory.");
+assert.ok(
+  fs.existsSync(path.join(designSystemRoot, "readme.md")),
+  "Expected repo-local design-system readme.",
+);
+assert.ok(
+  fs.existsSync(path.join(designSystemRoot, "_ds_manifest.json")),
+  "Expected repo-local design-system manifest.",
+);
+
 assert.deepEqual(
   contract.nesioDesignSystemSource.requiredTokenFiles,
   [
@@ -26,6 +49,13 @@ assert.deepEqual(
   ],
   "Expected production contract to keep the downloadable design system token order",
 );
+
+for (const tokenFile of contract.nesioDesignSystemSource.requiredTokenFiles) {
+  assert.ok(
+    fs.existsSync(path.join(designSystemRoot, tokenFile)),
+    `Expected repo-local design-system token file ${tokenFile}`,
+  );
+}
 
 assert.equal(
   contract.nesioDesignSystemSource.productionImportMode,

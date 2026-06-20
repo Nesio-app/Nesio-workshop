@@ -1,0 +1,26 @@
+<!-- @dsCard group="Colors" viewport="700x190" name="Night palette" subtitle="The matching counterpart — deep blue night sky, luminous glass" -->
+<!DOCTYPE html>
+<html data-portal-theme="night" lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  html, body { margin: 0; }
+  body { font-family: var(--font-sans); background: var(--portal-bg-gradient); padding: 22px; min-height: 100vh; box-sizing: border-box; }
+  .row { display: flex; gap: 12px; }
+  .sw { flex: 1; border-radius: var(--radius-md); padding: 12px; min-height: 90px; display: flex; flex-direction: column; justify-content: flex-end; border: 1px solid var(--portal-line); }
+  .name { font-size: var(--text-xs); font-weight: 600; color: var(--portal-ink); }
+  .hex { font-size: 0.66rem; color: var(--portal-muted); }
+  .glass { background: var(--glass-bg-solid); backdrop-filter: blur(12px); }
+</style>
+</head>
+<body>
+  <div class="row">
+    <div class="sw" style="background: var(--portal-blue-deep);"><span class="name" style="color:#0e1626;">blue-deep</span><span class="hex" style="color:#0e1626;">#7fb0ee</span></div>
+    <div class="sw" style="background: var(--portal-blue-mid);"><span class="name" style="color:#0e1626;">blue-mid</span><span class="hex" style="color:#0e1626;">#5f8fd6</span></div>
+    <div class="sw" style="background: var(--portal-blue-light);"><span class="name">blue-light</span><span class="hex">#2c4a78</span></div>
+    <div class="sw glass"><span class="name">glass</span><span class="hex">white 5.5%</span></div>
+    <div class="sw" style="background:#0e1626;"><span class="name">bg</span><span class="hex">#0e1626</span></div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,30 @@
+<!-- @dsCard group="Brand" viewport="700x230" name="Logo · 水晶 crystal mark" subtitle="The treasure box facet over the day & night gradient" -->
+<!DOCTYPE html>
+<html data-portal-theme="day" lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  html,body { margin: 0; }
+  body { font-family: var(--font-sans); display: flex; min-height: 100vh; }
+  .pane { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
+  .day { background: var(--portal-bg-gradient); }
+  .night { background: linear-gradient(165deg,#17233a,#0a1322); }
+  img { width: 96px; height: 96px; border-radius: var(--radius-lg); }
+  .name { font-family: var(--font-serif); font-size: var(--text-h2); font-weight: 600; }
+  .en { font-size: var(--text-xs); letter-spacing: var(--tracking-wide); text-transform: uppercase; }
+</style>
+</head>
+<body>
+  <div class="pane day">
+    <img src="../assets/logo/treasurebox-192.png" alt="宝盒">
+    <div class="name" style="color: var(--portal-ink);">宝盒</div>
+    <div class="en" style="color: var(--portal-muted);">Nesio · Treasure Box</div>
+  </div>
+  <div class="pane night">
+    <img src="../assets/logo/treasurebox-192.png" alt="宝盒">
+    <div class="name" style="color:#e7eefb;">数字静谧庭院</div>
+    <div class="en" style="color: rgba(200,217,245,0.6);">A quiet digital courtyard</div>
+  </div>
+</body>
+</html>
