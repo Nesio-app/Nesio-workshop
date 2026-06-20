@@ -3561,9 +3561,11 @@ body {
   align-items: center;
   justify-content: center;
   padding: 0 0.65rem;
+  border: 0;
   border-radius: 999px;
   background: rgba(205, 222, 252, 0.42);
   color: var(--portal-blue-deep);
+  cursor: pointer;
   text-decoration: none;
   font-size: 0.72rem;
   font-weight: 700;

@@ -44,6 +44,10 @@ import {
   writePortalCache,
 } from '@/lib/portal/prefetch-cache';
 import {
+  createAppApiClient,
+  type ProductionRuntimeProviderAction,
+} from '@/lib/portal/app-api-client';
+import {
   getBaohePersonalizationProfile,
   readBaohePersonalizationStage,
   rememberBaoheInsightFeedback,
@@ -238,6 +242,8 @@ export default function DashboardHome({
     const cached = readPortalCache<{ feeds?: CalendarFeedStatus[] }>(PORTAL_CACHE_KEYS.calendar);
     return cached?.feeds ?? [];
   });
+  const [calendarProviderAction, setCalendarProviderAction] =
+    useState<ProductionRuntimeProviderAction | null>(null);
   const [fidelityHintDismissed, setFidelityHintDismissed] = useState(false);
   const [reminderDeferred, setReminderDeferred] = useState(false);
   const [crushTaskOpen, setCrushTaskOpen] = useState(false);
@@ -357,6 +363,25 @@ export default function DashboardHome({
     syncCalendarLink();
     window.addEventListener(CALENDAR_LINK_UPDATED_EVENT, syncCalendarLink);
     return () => window.removeEventListener(CALENDAR_LINK_UPDATED_EVENT, syncCalendarLink);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const client = createAppApiClient();
+    client.fetchProductionRuntimeHealth()
+      .then((runtime) => {
+        if (cancelled) return;
+        const provider = runtime.providerActionMatrix.find(
+          (provider) => provider.id === 'google_calendar',
+        );
+        setCalendarProviderAction(provider ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setCalendarProviderAction(null);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -488,7 +513,7 @@ export default function DashboardHome({
     fallbackLocation.useConfigCity,
   ]);
 
-  useEffect(() => {
+  const refreshCalendar = useCallback(() => {
     fetch('/api/portal/calendar')
       .then((r) => r.json())
       .then((data) => {
@@ -501,6 +526,19 @@ export default function DashboardHome({
       })
       .catch(() => setCalendarNote(t(locale, 'dashboardFidelityUnavailable')));
   }, [locale]);
+
+  useEffect(() => {
+    refreshCalendar();
+  }, [refreshCalendar]);
+
+  const calendarProviderReady =
+    calendarProviderAction?.actionStatus === 'ready' && !calendarProviderAction?.serverOnly;
+  const calendarActionLabel = calendarLinkUrl
+    ? '打开'
+    : calendarProviderReady
+      ? '刷新'
+      : '接入';
+  const calendarClickable = Boolean(calendarLinkUrl);
 
   const greeting = greetingForHour(now.getHours());
   const displayAvatar = avatarUrl || profile.avatarUrl;
@@ -567,11 +605,21 @@ export default function DashboardHome({
     window.location.href = calendarLinkUrl;
   };
 
+  const handleCalendarAction = () => {
+    if (calendarLinkUrl) {
+      openCalendarLink();
+      return;
+    }
+    if (calendarProviderReady) {
+      refreshCalendar();
+    }
+  };
+
   const onCalendarKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
-    if (!calendarLinkUrl) return;
+    if (!calendarClickable) return;
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
-      openCalendarLink();
+      handleCalendarAction();
     }
   };
 
@@ -1101,22 +1149,30 @@ export default function DashboardHome({
       </section>
 
       <section
-        className={'portal-calendar' + (calendarLinkUrl ? ' portal-calendar--clickable' : '')}
+        className={'portal-calendar' + (calendarClickable ? ' portal-calendar--clickable' : '')}
         aria-label={t(locale, 'dashboardCalendarLabel')}
-        role={calendarLinkUrl ? 'link' : undefined}
-        tabIndex={calendarLinkUrl ? 0 : undefined}
+        role={calendarClickable ? 'link' : undefined}
+        tabIndex={calendarClickable ? 0 : undefined}
         onClick={(event) => {
           if ((event.target as HTMLElement).closest('button,a')) return;
-          openCalendarLink();
+          if (calendarClickable) handleCalendarAction();
         }}
         onKeyDown={onCalendarKeyDown}
       >
         <div className="portal-calendar-head-row">
           <h2 className="portal-calendar-head">{t(locale, 'calendar')}</h2>
           {calendarLinkUrl ? (
-            <a className="portal-calendar-open-link" href={calendarLinkUrl}>打开</a>
+            <a className="portal-calendar-open-link" href={calendarLinkUrl}>{calendarActionLabel}</a>
+          ) : calendarProviderReady ? (
+            <button
+              type="button"
+              className="portal-calendar-open-link"
+              onClick={handleCalendarAction}
+            >
+              {calendarActionLabel}
+            </button>
           ) : (
-            <Link className="portal-calendar-open-link" href="/settings#calendar">接入</Link>
+            <Link className="portal-calendar-open-link" href="/settings#calendar">{calendarActionLabel}</Link>
           )}
         </div>
         {showFidelityHint ? (
