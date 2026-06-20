@@ -35,6 +35,18 @@ assert(
 );
 
 assert(
+  component.includes("handleSearchShortcut") && /searchShortcuts\.map[\s\S]*onClick=\{\(\) => handleSearchShortcut\(label\)\}/.test(component),
+  'PortalAiFriendsPreview search shortcut buttons must perform real actions instead of being inert.',
+);
+
+assert(
+  /case '图片'[\s\S]*imageInputRef\.current\?\.click\(\)/.test(component) &&
+    /case '文件'[\s\S]*fileInputRef\.current\?\.click\(\)/.test(component) &&
+    /case '通话'[\s\S]*setCallSheetOpen\(true\)/.test(component),
+  'PortalAiFriendsPreview search shortcuts must wire image, file, and call actions.',
+);
+
+assert(
   component.includes("result.error") && component.includes("result.detail"),
   'PortalAiFriendsPreview must surface Secretary Chat API errors instead of failing silently.',
 );

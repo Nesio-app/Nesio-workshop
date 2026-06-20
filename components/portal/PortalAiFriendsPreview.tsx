@@ -169,6 +169,53 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
     requestAnimationFrame(() => composerRef.current?.focus());
   };
 
+  const handleSearchShortcut = (label: string) => {
+    setSurface('chat');
+    setSearchToolsOpen(false);
+
+    switch (label) {
+      case '日期':
+        setComposer('@Gemini 帮我看今天接下来最重要的安排。');
+        setUtilityNotice('已准备日期与日程咨询。');
+        break;
+      case 'AI 建议':
+        setComposer('@Gemini ');
+        setUtilityNotice('已切到 AI 建议输入。');
+        break;
+      case '笔记':
+        addFlomoNoteIntent();
+        return;
+      case '物品':
+        setComposer('@物品库 记一个物品：');
+        setUtilityNotice('已准备物品库记录意图。');
+        break;
+      case '支出':
+        setComposer('@豆包 记录一笔支出：');
+        setUtilityNotice('已准备支出记录意图。');
+        break;
+      case '待办':
+        setComposer('@Flomo 待办：');
+        setUtilityNotice('已准备待办记录意图。');
+        break;
+      case '图片':
+        imageInputRef.current?.click();
+        setUtilityNotice('请选择图片，当前先保留为本地意图。');
+        return;
+      case '通话':
+        setCallSheetOpen(true);
+        setUtilityNotice('已打开实时通话选项。');
+        return;
+      case '文件':
+        fileInputRef.current?.click();
+        setUtilityNotice('请选择文件，当前先保留为本地意图。');
+        return;
+      default:
+        setComposer('');
+    }
+
+    requestAnimationFrame(() => composerRef.current?.focus());
+  };
+
   const sendComposerMessage = async () => {
     const rawMessage = composer.trim();
     if (!rawMessage || aiSending) {
@@ -261,7 +308,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
           {searchToolsOpen ? (
             <div className="portal-ai-search-grid" aria-label="搜索分类">
               {searchShortcuts.map(([icon, label]) => (
-                <button key={label} type="button">
+                <button key={label} type="button" onClick={() => handleSearchShortcut(label)}>
                   <span aria-hidden>{icon}</span>
                   <b>{label}</b>
                 </button>
