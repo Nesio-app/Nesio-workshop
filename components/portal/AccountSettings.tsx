@@ -429,10 +429,6 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
     return '待配置';
   };
 
-  const isProviderActionDisabled = (provider?: ProductionRuntimeProviderAction): boolean => {
-    return !provider || (provider.actionStatus !== 'ready' && provider.actionStatus !== 'server_ready');
-  };
-
   const onOpenProviderAction = (provider?: ProductionRuntimeProviderAction) => {
     if (!provider) {
       setAuthFeedback('正在读取连接状态，请稍后再试。');
@@ -789,7 +785,6 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
                 <button
                   type="button"
                   className="portal-settings-provider-action"
-                  disabled={isProviderActionDisabled(row.provider)}
                   onClick={() => onOpenProviderAction(row.provider)}
                 >
                   {formatProviderActionButtonLabel(row.provider)}
