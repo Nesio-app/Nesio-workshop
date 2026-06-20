@@ -22,7 +22,8 @@ interface PortalAiFriendsPreviewProps {
 
 type MentionTarget = {
   key: string;
-  label: string;
+  labelKey?: PortalStringKey;
+  label?: string;
   descriptionKey: PortalStringKey;
   avatar: string;
   iconSrc?: string;
@@ -52,7 +53,7 @@ const mentionTargets: MentionTarget[] = [
   { key: 'chatgpt', label: '@ChatGPT', descriptionKey: 'aiFriendsMentionChatGptDescription', avatar: 'G', iconSrc: nesioAiIcons.chatgpt },
   { key: 'gemini', label: '@Gemini', descriptionKey: 'aiFriendsMentionGeminiDescription', avatar: '✦', iconSrc: nesioAiIcons.gemini },
   { key: 'flomo', label: '@Flomo', descriptionKey: 'aiFriendsMentionFlomoDescription', avatar: 'F' },
-  { key: 'inventory', label: '@物品库', descriptionKey: 'aiFriendsMentionInventoryDescription', avatar: '📦', iconSrc: nesioToolIcons.storage },
+  { key: 'inventory', labelKey: 'aiFriendsMentionInventoryLabel', descriptionKey: 'aiFriendsMentionInventoryDescription', avatar: '📦', iconSrc: nesioToolIcons.storage },
 ];
 
 type SearchShortcutAction = 'date' | 'aiSuggestion' | 'note' | 'inventory' | 'expense' | 'todo' | 'image' | 'call' | 'file';
@@ -72,9 +73,9 @@ const searchShortcuts = [
 const recentConversations = [
   {
     id: 'smart',
-    title: '智友',
-    tag: '智能调度',
-    preview: '综合建议：定制相册配手写卡片最暖心...',
+    titleKey: 'aiFriendsRecentSmartTitle',
+    tagKey: 'aiFriendsRecentSmartTag',
+    previewKey: 'aiFriendsRecentSmartPreview',
     avatar: '✦',
     iconSrc: nesioAiIcons.gemini,
     time: '11:20',
@@ -82,9 +83,9 @@ const recentConversations = [
   },
   {
     id: 'group',
-    title: '产品脑暴群',
-    tag: '群聊',
-    preview: 'Claude、ChatGPT、Gemini：3 个 AI 正在讨论方案...',
+    titleKey: 'aiFriendsRecentGroupTitle',
+    tagKey: 'aiFriendsRecentGroupTag',
+    previewKey: 'aiFriendsRecentGroupPreview',
     avatar: '👥',
     iconSrc: nesioToolIcons.secretary,
     time: '10:05',
@@ -92,28 +93,39 @@ const recentConversations = [
   {
     id: 'claude',
     title: 'Claude',
-    preview: '可以考虑定制相册，附上手写信，300 元内...',
+    previewKey: 'aiFriendsRecentClaudePreview',
     avatar: 'AI',
     iconSrc: nesioAiIcons.claude,
-    time: '昨天',
+    timeKey: 'aiFriendsRecentYesterday',
   },
   {
     id: 'chatgpt',
     title: 'ChatGPT',
-    preview: '护肤礼盒很受欢迎，兰蔻套装 300 元左右...',
+    previewKey: 'aiFriendsRecentChatGptPreview',
     avatar: 'G',
     iconSrc: nesioAiIcons.chatgpt,
-    time: '昨天',
+    timeKey: 'aiFriendsRecentYesterday',
   },
   {
     id: 'gemini',
     title: 'Gemini',
-    preview: '300 元做定制相册很充裕，加急运费留 50...',
+    previewKey: 'aiFriendsRecentGeminiPreview',
     avatar: 'G',
     iconSrc: nesioAiIcons.gemini,
-    time: '昨天',
+    timeKey: 'aiFriendsRecentYesterday',
   },
-];
+] satisfies Array<{
+  id: string;
+  title?: string;
+  titleKey?: PortalStringKey;
+  tagKey?: PortalStringKey;
+  previewKey: PortalStringKey;
+  avatar: string;
+  iconSrc: string;
+  time?: string;
+  timeKey?: PortalStringKey;
+  unread?: string;
+}>;
 
 type RecentConversation = (typeof recentConversations)[number];
 
@@ -125,7 +137,7 @@ function resolveSecretaryProvider(composer: string): SecretaryChatProvider {
   return 'gemini';
 }
 
-function getProviderLabel(provider: SecretaryChatProvider): string {
+function getProviderLabel(locale: PortalLocale, provider: SecretaryChatProvider): string {
   switch (provider) {
     case 'claude':
     case 'anthropic':
@@ -134,10 +146,17 @@ function getProviderLabel(provider: SecretaryChatProvider): string {
     case 'openai':
       return 'ChatGPT';
     case 'doubao':
-      return '豆包';
+      return t(locale, 'aiFriendsProviderDoubaoLabel');
     default:
       return 'Gemini';
   }
+}
+
+function getProviderAvatarLabel(locale: PortalLocale, provider: SecretaryChatProvider | undefined): string {
+  if (provider === 'chatgpt' || provider === 'openai') return 'G';
+  if (provider === 'doubao') return t(locale, 'aiFriendsProviderDoubaoAvatar');
+  if (provider === 'claude' || provider === 'anthropic') return 'C';
+  return '✦';
 }
 
 function getConversationComposerIntent(conversationId: string): string {
@@ -186,6 +205,12 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
   const fileInputRef = useRef<HTMLInputElement>(null);
   const appApiClient = useMemo(() => createAppApiClient(), []);
 
+  const mentionLabel = (target: MentionTarget) => target.label ?? (target.labelKey ? t(locale, target.labelKey) : '');
+
+  const conversationTitle = (item: RecentConversation) => item.title ?? (item.titleKey ? t(locale, item.titleKey) : '');
+
+  const conversationTime = (item: RecentConversation) => item.time ?? (item.timeKey ? t(locale, item.timeKey) : '');
+
   useEffect(() => {
     const settings = loadProfileSettings();
     setLocale(settings.locale);
@@ -204,7 +229,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
             health.gemini ? 'Gemini' : null,
             health.chatgpt ? 'ChatGPT' : null,
             health.claude ? 'Claude' : null,
-            health.doubao ? '豆包' : null,
+            health.doubao ? t(locale, 'aiFriendsProviderDoubaoLabel') : null,
           ].filter(Boolean);
           setAiRuntimeStatus(
             configuredProviders.length
@@ -252,8 +277,11 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
 
   const mentionOptions = useMemo(() => {
     if (mentionNeedle === null) return [];
-    return mentionTargets.filter((target) => target.label.toLowerCase().includes(mentionNeedle));
-  }, [mentionNeedle]);
+    return mentionTargets.filter((target) => {
+      const label = target.label ?? (target.labelKey ? t(locale, target.labelKey) : '');
+      return label.toLowerCase().includes(mentionNeedle);
+    });
+  }, [locale, mentionNeedle]);
 
   const liveProviderSummary = useMemo(() => {
     if (!secretaryHealth) return aiRuntimeStatus;
@@ -261,11 +289,11 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
       secretaryHealth.gemini ? 'Gemini' : null,
       secretaryHealth.chatgpt ? 'ChatGPT' : null,
       secretaryHealth.claude ? 'Claude' : null,
-      secretaryHealth.doubao ? '豆包' : null,
+      secretaryHealth.doubao ? t(locale, 'aiFriendsProviderDoubaoLabel') : null,
     ].filter(Boolean);
-    if (configuredProviders.length) return `${configuredProviders.join(' / ')} 可用`;
+    if (configuredProviders.length) return t(locale, 'aiFriendsProvidersAvailableTemplate', { providers: configuredProviders.join(' / ') });
     return aiRuntimeStatus;
-  }, [aiRuntimeStatus, secretaryHealth]);
+  }, [aiRuntimeStatus, locale, secretaryHealth]);
 
   const aiProviderActionsById = useMemo(() => {
     return (productionRuntimeStatus?.providerActionMatrix || [])
@@ -299,7 +327,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
     setCallSheetOpen(false);
     setSurface('chat');
     setComposer(getConversationComposerIntent(item.id));
-    setUtilityNotice(t(locale, 'aiFriendsConversationSwitchedTemplate', { title: item.title }));
+    setUtilityNotice(t(locale, 'aiFriendsConversationSwitchedTemplate', { title: conversationTitle(item) }));
     requestAnimationFrame(() => composerRef.current?.focus());
   };
 
@@ -359,9 +387,9 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
   const insertMention = (target: MentionTarget) => {
     setComposer((value) => {
       if (/@[\w\u4e00-\u9fa5]*$/.test(value)) {
-        return value.replace(/@[\w\u4e00-\u9fa5]*$/, `${target.label} `);
+        return value.replace(/@[\w\u4e00-\u9fa5]*$/, `${mentionLabel(target)} `);
       }
-      return `${value}${value.endsWith(' ') || value.length === 0 ? '' : ' '}${target.label} `;
+      return `${value}${value.endsWith(' ') || value.length === 0 ? '' : ' '}${mentionLabel(target)} `;
     });
   };
 
@@ -387,7 +415,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
   const addFlomoNoteIntent = () => {
     const notice = t(locale, 'aiFriendsFlomoIntentNotice');
     setComposer((value) => `${value}${value.endsWith(' ') || value.length === 0 ? '' : ' '}@Flomo `);
-    setLocalAttachments((items) => ['笔记：将本条保存到 Flomo', ...items].slice(0, 3));
+    setLocalAttachments((items) => [t(locale, 'aiFriendsLocalFlomoAttachment'), ...items].slice(0, 3));
     setUtilityNotice(notice);
     appendLocalAssistantMessage(notice, 'gemini');
     requestAnimationFrame(() => composerRef.current?.focus());
@@ -425,7 +453,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
 
     switch (action) {
       case 'date':
-        setComposer('@Gemini 帮我看今天接下来最重要的安排。');
+        setComposer(t(locale, 'aiFriendsCalendarComposerIntent'));
         setUtilityNotice(t(locale, 'aiFriendsCalendarIntentNotice'));
         break;
       case 'aiSuggestion':
@@ -436,15 +464,15 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
         addFlomoNoteIntent();
         return;
       case 'inventory':
-        setComposer('@物品库 记一个物品：');
+        setComposer(t(locale, 'aiFriendsInventoryComposerIntent'));
         setUtilityNotice(t(locale, 'aiFriendsInventoryIntentNotice'));
         break;
       case 'expense':
-        setComposer('@豆包 记录一笔支出：');
+        setComposer(t(locale, 'aiFriendsExpenseComposerIntent'));
         setUtilityNotice(t(locale, 'aiFriendsExpenseIntentNotice'));
         break;
       case 'todo':
-        setComposer('@Flomo 待办：');
+        setComposer(t(locale, 'aiFriendsTodoComposerIntent'));
         setUtilityNotice(t(locale, 'aiFriendsTodoIntentNotice'));
         break;
       case 'image':
@@ -484,7 +512,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
         ? t(locale, 'providerMissingEnv', { missing: runtimeProvider.missingEnv.slice(0, 3).join(' / ') })
         : t(locale, 'providerRuntimeNotReady');
       const unavailable = t(locale, 'providerUnavailableTemplate', {
-        provider: getProviderLabel(provider),
+        provider: getProviderLabel(locale, provider),
         reason: missing,
       });
       setUtilityNotice(unavailable);
@@ -507,7 +535,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
     setRuntimeMessages((items) => [...items, userMessage]);
     setComposer('');
     setAiSending(true);
-    setUtilityNotice(t(locale, 'providerAiConnectingTemplate', { provider: getProviderLabel(provider) }));
+    setUtilityNotice(t(locale, 'providerAiConnectingTemplate', { provider: getProviderLabel(locale, provider) }));
 
     try {
       const result = await appApiClient.sendSecretaryMessage({
@@ -610,12 +638,12 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
                 </span>
                 <span>
                   <b>
-                    {item.title}
-                    {item.tag ? <small>{item.tag}</small> : null}
+                    {conversationTitle(item)}
+                    {item.tagKey ? <small>{t(locale, item.tagKey)}</small> : null}
                   </b>
-                  <em>{item.preview}</em>
+                  <em>{t(locale, item.previewKey)}</em>
                 </span>
-                <i>{item.time}</i>
+                <i>{conversationTime(item)}</i>
                 {item.unread ? <strong>{item.unread}</strong> : null}
               </button>
             ))}
@@ -653,27 +681,29 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
             <p className="portal-ai-runtime-status" aria-live="polite">
               {aiRuntimeStatus}
             </p>
-            <p className="portal-ai-message portal-ai-message--user">帮我想个送妈妈的生日礼物，预算 300</p>
-            <p className="portal-ai-thread-note">已综合 Claude · ChatGPT 的回答</p>
+            <p className="portal-ai-message portal-ai-message--user">{t(locale, 'aiFriendsDemoUserGiftRequest')}</p>
+            <p className="portal-ai-thread-note">{t(locale, 'aiFriendsDemoThreadNote')}</p>
             <div className="portal-ai-message-row">
               <span className="portal-ai-bot-avatar" aria-hidden>✦</span>
               <p className="portal-ai-message portal-ai-message--assistant">
-                综合建议：<b>定制相册</b>（¥150–200）配手写卡片最暖心；想更实用可选<b>护肤礼盒</b>（¥280–320）。慢慢看，要我帮你比价吗？
+                {t(locale, 'aiFriendsDemoAssistantGiftPrefix')}
+                <b>{t(locale, 'aiFriendsDemoAssistantGiftAlbum')}</b>
+                {t(locale, 'aiFriendsDemoAssistantGiftMiddle')}
+                <b>{t(locale, 'aiFriendsDemoAssistantGiftSkincare')}</b>
+                {t(locale, 'aiFriendsDemoAssistantGiftSuffix')}
               </p>
             </div>
-            <p className="portal-ai-message portal-ai-message--user">@Flomo 周五前买好牛奶</p>
+            <p className="portal-ai-message portal-ai-message--user">{t(locale, 'aiFriendsDemoFlomoRequest')}</p>
             <div className="portal-ai-message-row">
               <span className="portal-ai-bot-avatar portal-ai-bot-avatar--flomo" aria-hidden>F</span>
               <p className="portal-ai-message portal-ai-message--assistant portal-ai-message--compact">
-                收到～ <b>✓ 已记入 Flomo 笔记序列</b>
+                {t(locale, 'aiFriendsDemoFlomoSaved')}
               </p>
             </div>
-            <p className="portal-ai-message portal-ai-message--user">@Gemini 你怎么看这个礼物预算？</p>
+            <p className="portal-ai-message portal-ai-message--user">{t(locale, 'aiFriendsDemoGeminiRequest')}</p>
             <div className="portal-ai-message-row">
               <span className="portal-ai-bot-avatar portal-ai-bot-avatar--gemini" aria-hidden>G</span>
-              <p className="portal-ai-message portal-ai-message--assistant">
-                300 元做定制相册很充裕，建议留 50 元加急运费，确保 5 天内到。
-              </p>
+              <p className="portal-ai-message portal-ai-message--assistant">{t(locale, 'aiFriendsDemoGeminiAnswer')}</p>
             </div>
             {runtimeMessages.map((message, index) => (
               message.role === 'user' ? (
@@ -683,13 +713,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
               ) : (
                 <div key={`${message.role}-${index}`} className="portal-ai-message-row">
                   <span className="portal-ai-bot-avatar" aria-hidden>
-                    {message.provider === 'chatgpt' || message.provider === 'openai'
-                      ? 'G'
-                      : message.provider === 'doubao'
-                        ? '豆'
-                        : message.provider === 'claude' || message.provider === 'anthropic'
-                          ? 'C'
-                          : '✦'}
+                    {getProviderAvatarLabel(locale, message.provider)}
                   </span>
                   <p className="portal-ai-message portal-ai-message--assistant">{message.content}</p>
                 </div>
@@ -781,7 +805,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
                 data-runtime-action="ai-open-live-call"
                 onClick={openCallSheet}
               >
-                📞<span>通话</span>
+                📞<span>{t(locale, 'aiFriendsCall')}</span>
               </button>
             </div>
             <input
@@ -791,7 +815,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
               className="portal-ai-hidden-input"
               onChange={(event) => {
                 const file = event.target.files?.[0];
-                if (file) addLocalAttachment('图片', file.name);
+                if (file) addLocalAttachment(t(locale, 'aiFriendsImageAttachmentKind'), file.name);
                 event.target.value = '';
               }}
             />
@@ -801,7 +825,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
               className="portal-ai-hidden-input"
               onChange={(event) => {
                 const file = event.target.files?.[0];
-                if (file) addLocalAttachment('文件', file.name);
+                if (file) addLocalAttachment(t(locale, 'aiFriendsFileAttachmentKind'), file.name);
                 event.target.value = '';
               }}
             />
@@ -819,7 +843,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
                     {target.iconSrc ? (
                       <Image src={target.iconSrc} alt="" className="portal-ai-mention-icon" width={30} height={30} />
                     ) : null}
-                    <b>{target.label}</b>
+                    <b>{mentionLabel(target)}</b>
                     <span>{t(locale, target.descriptionKey)}</span>
                   </button>
                 ))}
@@ -846,10 +870,10 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
                       <Image src={item.iconSrc} alt="" className="portal-ai-conversation-icon" width={54} height={54} />
                     </span>
                     <span>
-                      <b>{item.title}{item.tag ? <small>{item.tag}</small> : null}</b>
-                      <em>{item.preview}</em>
+                      <b>{conversationTitle(item)}{item.tagKey ? <small>{t(locale, item.tagKey)}</small> : null}</b>
+                      <em>{t(locale, item.previewKey)}</em>
                     </span>
-                    <i>{item.time}</i>
+                    <i>{conversationTime(item)}</i>
                     {item.unread ? <strong>{item.unread}</strong> : null}
                   </button>
                 ))}

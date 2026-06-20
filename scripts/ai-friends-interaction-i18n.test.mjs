@@ -85,6 +85,38 @@ const requiredKeys = [
   'aiFriendsMentionGeminiDescription',
   'aiFriendsMentionFlomoDescription',
   'aiFriendsMentionInventoryDescription',
+  'aiFriendsMentionInventoryLabel',
+  'aiFriendsRecentSmartTitle',
+  'aiFriendsRecentSmartTag',
+  'aiFriendsRecentSmartPreview',
+  'aiFriendsRecentGroupTitle',
+  'aiFriendsRecentGroupTag',
+  'aiFriendsRecentGroupPreview',
+  'aiFriendsRecentClaudePreview',
+  'aiFriendsRecentChatGptPreview',
+  'aiFriendsRecentGeminiPreview',
+  'aiFriendsRecentYesterday',
+  'aiFriendsDemoUserGiftRequest',
+  'aiFriendsDemoThreadNote',
+  'aiFriendsDemoAssistantGiftPrefix',
+  'aiFriendsDemoAssistantGiftAlbum',
+  'aiFriendsDemoAssistantGiftMiddle',
+  'aiFriendsDemoAssistantGiftSkincare',
+  'aiFriendsDemoAssistantGiftSuffix',
+  'aiFriendsDemoFlomoRequest',
+  'aiFriendsDemoFlomoSaved',
+  'aiFriendsDemoGeminiRequest',
+  'aiFriendsDemoGeminiAnswer',
+  'aiFriendsLocalFlomoAttachment',
+  'aiFriendsImageAttachmentKind',
+  'aiFriendsFileAttachmentKind',
+  'aiFriendsProvidersAvailableTemplate',
+  'aiFriendsProviderDoubaoLabel',
+  'aiFriendsProviderDoubaoAvatar',
+  'aiFriendsCalendarComposerIntent',
+  'aiFriendsInventoryComposerIntent',
+  'aiFriendsExpenseComposerIntent',
+  'aiFriendsTodoComposerIntent',
 ];
 
 for (const key of requiredKeys) {
@@ -152,6 +184,37 @@ for (const forbidden of [
   "description: '多模态 / 实时信息'",
   "description: '保存为笔记'",
   "description: '记一个物品 / 查到期'",
+  "label: '@物品库'",
+  "title: '智友'",
+  "tag: '智能调度'",
+  "preview: '综合建议：定制相册配手写卡片最暖心...'",
+  "title: '产品脑暴群'",
+  "tag: '群聊'",
+  "preview: 'Claude、ChatGPT、Gemini：3 个 AI 正在讨论方案...'",
+  "preview: '可以考虑定制相册，附上手写信，300 元内...'",
+  "preview: '护肤礼盒很受欢迎，兰蔻套装 300 元左右...'",
+  "preview: '300 元做定制相册很充裕，加急运费留 50...'",
+  "time: '昨天'",
+  '帮我想个送妈妈的生日礼物，预算 300',
+  '已综合 Claude · ChatGPT 的回答',
+  '综合建议：',
+  '定制相册',
+  '护肤礼盒',
+  '慢慢看，要我帮你比价吗？',
+  '@Flomo 周五前买好牛奶',
+  '收到～',
+  '已记入 Flomo 笔记序列',
+  '@Gemini 你怎么看这个礼物预算？',
+  '300 元做定制相册很充裕，建议留 50 元加急运费，确保 5 天内到。',
+  "'笔记：将本条保存到 Flomo'",
+  "addLocalAttachment('图片'",
+  "addLocalAttachment('文件'",
+  '📞<span>通话</span>',
+  "return `${configuredProviders.join(' / ')} 可用`",
+  "setComposer('@Gemini 帮我看今天接下来最重要的安排。')",
+  "setComposer('@物品库 记一个物品：')",
+  "setComposer('@豆包 记录一笔支出：')",
+  "setComposer('@Flomo 待办：')",
   "['🗓', '日期']",
   "['✦', 'AI 建议']",
   "['📝', '笔记']",
@@ -173,6 +236,24 @@ assert(
 assert(
   aiFriends.includes('descriptionKey: PortalStringKey'),
   'Mention target descriptions must use PortalStringKey.',
+);
+
+assert(
+  aiFriends.includes('labelKey: PortalStringKey'),
+  'Mention target labels must use PortalStringKey.',
+);
+
+assert(
+  aiFriends.includes("t(locale, item.titleKey)") &&
+    aiFriends.includes("t(locale, item.previewKey)") &&
+    aiFriends.includes("item.tagKey ? <small>{t(locale, item.tagKey)}</small> : null"),
+  'Recent AI conversations must render title/tag/preview through i18n.',
+);
+
+assert(
+  aiFriends.includes("t(locale, 'aiFriendsDemoUserGiftRequest')") &&
+    aiFriends.includes("t(locale, 'aiFriendsDemoGeminiAnswer')"),
+  'Default AI friend demo thread must render through i18n.',
 );
 
 assert(
