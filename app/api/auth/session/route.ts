@@ -27,6 +27,37 @@ function safeJson(body: Record<string, unknown>, status = 200) {
   );
 }
 
+type SupabaseTokenResponse = {
+  access_token?: string;
+  refresh_token?: string;
+  expires_in?: number;
+};
+
+function setRefreshedAuthCookies(response: NextResponse, session: SupabaseTokenResponse | null) {
+  if (!session?.access_token) return response;
+
+  const secure = process.env.NODE_ENV === 'production';
+  const maxAge = Number.isFinite(session.expires_in) && session.expires_in ? session.expires_in : 60 * 60;
+  response.cookies.set('baohe_auth_access', session.access_token, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure,
+    path: '/',
+    maxAge,
+  });
+  if (session.refresh_token) {
+    response.cookies.set('baohe_auth_refresh', session.refresh_token, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure,
+      path: '/',
+      maxAge: 60 * 60 * 24 * 30,
+    });
+  }
+
+  return response;
+}
+
 async function fetchSupabaseUser(accessToken: string): Promise<SupabaseUserResponse | null> {
   const supabaseUrl = envValue('SUPABASE_URL');
   const supabaseAnonKey = envValue('SUPABASE_ANON_KEY');
@@ -44,10 +75,66 @@ async function fetchSupabaseUser(accessToken: string): Promise<SupabaseUserRespo
   return response.json() as Promise<SupabaseUserResponse>;
 }
 
+async function refreshSupabaseSession(refreshToken: string): Promise<SupabaseTokenResponse | null> {
+  const supabaseUrl = envValue('SUPABASE_URL');
+  const supabaseAnonKey = envValue('SUPABASE_ANON_KEY');
+  if (!supabaseUrl || !supabaseAnonKey || !refreshToken) return null;
+
+  const response = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=refresh_token`, {
+    method: 'POST',
+    headers: {
+      apikey: supabaseAnonKey,
+      Authorization: `Bearer ${supabaseAnonKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      refresh_token: refreshToken,
+    }),
+  });
+
+  if (!response.ok) return null;
+  return response.json() as Promise<SupabaseTokenResponse>;
+}
+
+function signedInResponse(user: SupabaseUserResponse, hasRefreshToken: boolean, refreshedSession: SupabaseTokenResponse | null = null) {
+  const response = safeJson({
+    ok: true,
+    loggedIn: true,
+    hasRefreshToken,
+    status: refreshedSession?.access_token ? 'session_refreshed' : 'signed_in',
+    user: {
+      id: user.id,
+      email: user.email || '',
+      phone: user.phone || '',
+      provider: user.app_metadata?.provider || '',
+      providers: user.app_metadata?.providers || [],
+    },
+  });
+
+  return setRefreshedAuthCookies(response, refreshedSession);
+}
+
 export async function GET() {
   const cookieStore = cookies();
   const accessCookie = cookieStore.get('baohe_auth_access')?.value || '';
   const refreshCookie = cookieStore.get('baohe_auth_refresh')?.value || '';
+
+  if (accessCookie) {
+    const user = await fetchSupabaseUser(accessCookie);
+    if (user?.id) {
+      return signedInResponse(user, Boolean(refreshCookie));
+    }
+  }
+
+  if (refreshCookie) {
+    const refreshedSession = await refreshSupabaseSession(refreshCookie);
+    if (refreshedSession?.access_token) {
+      const refreshedUser = await fetchSupabaseUser(refreshedSession.access_token);
+      if (refreshedUser?.id) {
+        return signedInResponse(refreshedUser, true, refreshedSession);
+      }
+    }
+  }
 
   if (!accessCookie) {
     return safeJson({
@@ -58,27 +145,10 @@ export async function GET() {
     });
   }
 
-  const user = await fetchSupabaseUser(accessCookie);
-  if (!user?.id) {
-    return safeJson({
-      ok: true,
-      loggedIn: false,
-      hasRefreshToken: Boolean(refreshCookie),
-      status: 'session_unverified',
-    });
-  }
-
   return safeJson({
     ok: true,
-    loggedIn: true,
+    loggedIn: false,
     hasRefreshToken: Boolean(refreshCookie),
-    status: 'signed_in',
-    user: {
-      id: user.id,
-      email: user.email || '',
-      phone: user.phone || '',
-      provider: user.app_metadata?.provider || '',
-      providers: user.app_metadata?.providers || [],
-    },
+    status: 'session_unverified',
   });
 }

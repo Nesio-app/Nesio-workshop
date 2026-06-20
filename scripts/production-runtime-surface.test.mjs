@@ -58,7 +58,11 @@ assert.doesNotMatch(authCallbackRoute, /searchParams\.set\(['"]access_token/, 'a
 assert.doesNotMatch(authCallbackRoute, /searchParams\.set\(['"]refresh_token/, 'auth callback must not echo refresh tokens into redirect URLs');
 assert.match(authSessionRoute, /GET\(/, 'auth session route must expose GET');
 assert.match(authSessionRoute, /cookies\(\).*baohe_auth_access|cookieStore\.get\(['"]baohe_auth_access/, 'auth session must read the access cookie');
+assert.match(authSessionRoute, /cookieStore\.get\(['"]baohe_auth_refresh/, 'auth session must read the refresh cookie');
 assert.match(authSessionRoute, /auth\/v1\/user/, 'auth session must verify the session with Supabase user endpoint when configured');
+assert.match(authSessionRoute, /grant_type=refresh_token/, 'auth session must refresh an expired Supabase access session when a refresh cookie exists');
+assert.match(authSessionRoute, /cookies\.set\(['"]baohe_auth_access/, 'auth session must persist refreshed access cookies');
+assert.match(authSessionRoute, /cookies\.set\(['"]baohe_auth_refresh/, 'auth session must persist refreshed refresh cookies');
 assert.match(authSessionRoute, /loggedIn/, 'auth session must expose a safe loggedIn status');
 assert.match(authSessionRoute, /secretsRedacted:\s*true/, 'auth session must mark secrets as redacted');
 assert.doesNotMatch(authSessionRoute, /access_token.*NextResponse\.json|refresh_token.*NextResponse\.json/s, 'auth session must not return raw tokens');
