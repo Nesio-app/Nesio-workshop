@@ -41,6 +41,7 @@
   --modal-card-bg: rgba(248, 251, 255, 0.9);
   --modal-card-blur: 16px;
   --modal-card-saturate: 150%;
+  --portal-bottom-nav-clearance: calc(10.9rem + env(safe-area-inset-bottom));
   --radius-xs: 0.5rem;
   --radius-sm: 0.75rem;
   --radius-md: 1rem;
@@ -6022,7 +6023,7 @@ html[data-portal-theme="night"] .portal-settings-toast{background:rgba(230,240,2
 }
 
 .portal-ai-preview {
-  padding: 1.95rem 1.05rem 7.9rem;
+  padding: 1.95rem 1.05rem var(--portal-bottom-nav-clearance);
   min-height: calc(100dvh - 5.6rem);
 }
 
@@ -7256,7 +7257,7 @@ html[data-portal-theme="night"] .portal-theme-seg-btn.is-on{
 .portal-ai-preview--screen {
   min-height: calc(100dvh - 5.6rem);
   padding-top: 1rem !important;
-  padding-bottom: calc(12.4rem + env(safe-area-inset-bottom)) !important;
+  padding-bottom: var(--portal-bottom-nav-clearance) !important;
 }
 
 .portal-ai-workspace-head,
@@ -7373,7 +7374,7 @@ html[data-portal-theme="night"] .portal-theme-seg-btn.is-on{
 
 .portal-treasure-screen {
   min-height: calc(100dvh - 5.6rem);
-  padding-bottom: calc(14rem + env(safe-area-inset-bottom)) !important;
+  padding-bottom: var(--portal-bottom-nav-clearance) !important;
 }
 
 .portal-treasure-package-list {
@@ -7544,7 +7545,7 @@ html[data-portal-theme="night"] .portal-theme-seg-btn.is-on{
 /* V14 runtime consolidation: modal geometry, AI workspace, toolbox density, and global liquid glass themes. */
 .portal-ai-preview--screen {
   min-height: calc(100dvh - 5.35rem) !important;
-  padding: 0.9rem 1.15rem calc(10.9rem + env(safe-area-inset-bottom)) !important;
+  padding: 0.9rem 1.15rem var(--portal-bottom-nav-clearance) !important;
   overflow-y: auto !important;
 }
 
@@ -7561,7 +7562,7 @@ html[data-portal-theme="night"] .portal-theme-seg-btn.is-on{
 .portal-ai-thread {
   max-height: none !important;
   min-height: 0 !important;
-  padding: 0.15rem 0 calc(7.9rem + env(safe-area-inset-bottom)) !important;
+  padding: 0.15rem 0 var(--portal-bottom-nav-clearance) !important;
   gap: 0.62rem !important;
   overflow: visible !important;
 }
@@ -7744,7 +7745,7 @@ html[data-portal-theme="night"] .portal-theme-seg-btn.is-on{
 
 .portal-treasure-screen {
   padding-inline: clamp(0.65rem, 3vw, 1rem) !important;
-  padding-bottom: calc(11.3rem + env(safe-area-inset-bottom)) !important;
+  padding-bottom: var(--portal-bottom-nav-clearance) !important;
 }
 
 .portal-treasure-screen-section {
