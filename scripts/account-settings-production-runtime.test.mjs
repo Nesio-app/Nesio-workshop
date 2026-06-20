@@ -49,6 +49,8 @@ assert.ok(source.includes('provider_not_configured'), 'AccountSettings must surf
 assert.ok(source.includes('window.location.assign'), 'OAuth auth start must be able to navigate to redirect URL');
 assert.ok(!source.includes('window.location.href = provider.startEndpoint'), 'Provider action fallback must not navigate directly to POST-only auth start endpoints');
 assert.ok(source.includes("provider.startEndpoint === '/api/auth/start'"), 'Provider action fallback must detect auth start endpoints and route users through the sign-in form action');
+assert.ok(source.includes("provider.id === 'google' || provider.id === 'wechat'"), 'OAuth provider action rows must start Google/WeChat auth directly.');
+assert.ok(source.includes('onStartAuth(provider.id)'), 'OAuth provider action rows must reuse the real auth-start flow.');
 assert.ok(source.includes('data-provider-action-id={row.provider?.id || row.label}'), 'Provider action rows must expose traceable provider action ids for QA');
 assert.ok(source.includes('data-runtime-action="provider-open-or-inspect"'), 'Provider action rows must expose a traceable runtime action marker');
 assert.ok(source.includes('provider.serverOnly'), 'Provider action rows must distinguish server-only capabilities');

@@ -343,6 +343,10 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
       return;
     }
     if (provider.startEndpoint === '/api/auth/start') {
+      if (provider.id === 'google' || provider.id === 'wechat') {
+        void onStartAuth(provider.id);
+        return;
+      }
       setAuthFeedback(t(locale, 'authUseSignInForm'));
       return;
     }
