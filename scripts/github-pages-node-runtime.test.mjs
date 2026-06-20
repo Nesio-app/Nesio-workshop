@@ -17,15 +17,25 @@ assert.match(
 );
 
 const nodeVersionMatch = workflow.match(/node-version:\s*['"]?(\d+)/);
-assert.ok(nodeVersionMatch, 'GitHub Pages deploy workflow must pin an explicit Node version.');
+assert.ok(nodeVersionMatch, 'release workflow must pin an explicit Node version.');
 assert.ok(
   Number(nodeVersionMatch[1]) >= 22,
-  'GitHub Pages deploy workflow must use Node 22+ while build-time routes import node:sqlite.',
+  'release workflow must use Node 22+ while build-time routes import node:sqlite.',
+);
+assert.doesNotMatch(
+  workflow,
+  /actions\/deploy-pages|actions\/upload-pages-artifact/,
+  'server-runtime builds must not be deployed through GitHub Pages; use Vercel for runtime APIs.',
+);
+assert.doesNotMatch(
+  workflow,
+  /Build .*static export/i,
+  'workflow must not describe the runtime build as a static export.',
 );
 assert.equal(
   packageJson.scripts['test:github-pages-node-runtime'],
   'node scripts/github-pages-node-runtime.test.mjs',
-  'package.json must expose the GitHub Pages Node runtime regression test.',
+  'package.json must expose the release Node/runtime regression test.',
 );
 assert.match(
   packageJson.scripts['test:security'],

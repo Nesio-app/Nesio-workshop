@@ -917,7 +917,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
                 <button type="button" onClick={() => { setCallSheetOpen(false); setVideoCallOpen(true); }}>
                   <span aria-hidden>📹</span>
                   <p>
-                    <b>{t(locale, 'aiFriendsVideoCallTitle')}</b>
+                    <b>{t(locale, 'aiFriendsVideoCallOptionTitle')}</b>
                     <small>{t(locale, 'aiFriendsVideoCallSubtitle')}</small>
                   </p>
                   <i aria-hidden>›</i>
@@ -925,7 +925,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
                 <button type="button" onClick={() => { setCallSheetOpen(false); setAudioCallOpen(true); }}>
                   <span aria-hidden>🎙</span>
                   <p>
-                    <b>{t(locale, 'aiFriendsAudioCallTitle')}</b>
+                    <b>{t(locale, 'aiFriendsAudioCallOptionTitle')}</b>
                     <small>{t(locale, 'aiFriendsAudioCallSubtitle')}</small>
                   </p>
                   <i aria-hidden>›</i>

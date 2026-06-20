@@ -39,7 +39,17 @@ const middleware = execFileSync('node', ['-e', "const fs=require('fs'); process.
   encoding: 'utf8',
 });
 assert.match(launchSafety, /['"]\/secretary['"]/, 'secretary direct URL must be first-launch blocked');
-assert.doesNotMatch(middleware, /pathname === ['"]\/secretary['"][\s\S]{0,160}\/secretary\/index\.html/, 'middleware must not rewrite /secretary to the static app in public launch');
+assert.match(
+  middleware,
+  /pathname\.startsWith\(['"]\/secretary['"]\)\s*&&\s*isSecretaryPageRequestAllowed\(request\)/,
+  'middleware may only expose /secretary when the explicit personal/lab page gate allows it',
+);
+const secretaryGateIndex = middleware.indexOf('isSecretaryPageRequestAllowed(request)');
+const secretaryRewriteIndex = middleware.indexOf("url.pathname = '/secretary/index.html'");
+assert.ok(
+  secretaryGateIndex >= 0 && secretaryRewriteIndex > secretaryGateIndex,
+  'middleware must only rewrite /secretary after the explicit personal/lab page gate check',
+);
 
 const publicDirs = existsSync(publicRoot)
   ? readdirSync(publicRoot, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name)
