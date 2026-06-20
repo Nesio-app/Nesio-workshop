@@ -171,7 +171,8 @@ export function buildProductionRuntimeStatus(env: EnvMap = process.env) {
     flomo: status(env, {
       id: 'flomo',
       label: 'Flomo',
-      requiredEnv: ['FLOMO_API_KEY'],
+      requiredEnv: [],
+      alternateGroups: [['FLOMO_WEBHOOK_URL', 'FLOMO_API_URL']],
     }),
   };
 
@@ -243,7 +244,7 @@ export function buildProductionRuntimeStatus(env: EnvMap = process.env) {
     }),
     action(thirdParty.flomo, {
       category: 'third_party',
-      startEndpoint: null,
+      startEndpoint: '/api/portal/flomo',
       safeUserAction: 'capture_note_when_flomo_configured',
       serverOnly: true,
     }),

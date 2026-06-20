@@ -29,6 +29,8 @@ assert.match(runtime, /claude[\s\S]*?\/api\/secretary\/chat/, 'Claude should rou
 assert.match(runtime, /cloud_database[\s\S]*serverOnly:\s*true/, 'cloud database must be server-only');
 assert.match(runtime, /cloud_storage[\s\S]*serverOnly:\s*true/, 'cloud storage must be server-only');
 assert.match(runtime, /google_calendar[\s\S]*\/api\/portal\/calendar/, 'Google Calendar should route through portal calendar endpoint');
+assert.match(runtime, /flomo[\s\S]*\/api\/portal\/flomo/, 'Flomo should route through portal Flomo endpoint');
+assert.match(runtime, /flomo[\s\S]*serverOnly:\s*true/, 'Flomo must stay server-only so the browser never receives Flomo secrets');
 
 assert.match(runtime, /actionableProviderCount/, 'summary must include actionableProviderCount');
 assert.match(runtime, /blockedProviderCount/, 'summary must include blockedProviderCount');

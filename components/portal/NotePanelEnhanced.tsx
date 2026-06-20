@@ -5,6 +5,10 @@ import { FLOMO_DEMO_MEMOS } from '@/lib/portal/flomo-demo';
 import { t } from '@/lib/portal/i18n';
 import { apiUrl } from '@/lib/portal/paths';
 import { loadProfileSettings } from '@/lib/portal/profile';
+import {
+  createAppApiClient,
+  type ProductionRuntimeProviderAction,
+} from '@/lib/portal/app-api-client';
 
 const FLOMO_MEMO_LIMIT = 48;
 const MEMO_COLLAPSE_CHARS = 180;
@@ -127,6 +131,8 @@ export default function NotePanelEnhanced({ open, onOpenChange }: NotePanelProps
   const [composeOpen, setComposeOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [flomoProviderAction, setFlomoProviderAction] =
+    useState<ProductionRuntimeProviderAction | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const imageRef = useRef<HTMLInputElement>(null);
 
@@ -194,6 +200,26 @@ export default function NotePanelEnhanced({ open, onOpenChange }: NotePanelProps
       setLoadingMemos(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    const client = createAppApiClient();
+    client.fetchProductionRuntimeHealth()
+      .then((runtime) => {
+        if (cancelled) return;
+        const provider = runtime.providerActionMatrix.find(
+          (provider) => provider.id === 'flomo',
+        );
+        setFlomoProviderAction(provider ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setFlomoProviderAction(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
 
   useEffect(() => {
     if (open) {
@@ -282,6 +308,17 @@ export default function NotePanelEnhanced({ open, onOpenChange }: NotePanelProps
     if (!text && images.length === 0) {
       setStatus('err');
       setStatusMsg(t(locale, 'flomoNeedContent'));
+      return;
+    }
+
+    const flomoRuntimeReady =
+      flomoProviderAction?.actionStatus === 'server_ready' &&
+      flomoProviderAction?.startEndpoint === '/api/portal/flomo' &&
+      flomoProviderAction?.serverOnly === true;
+
+    if (!flomoRuntimeReady) {
+      setStatus('err');
+      setStatusMsg(t(locale, 'notePanelFlomoNotReady'));
       return;
     }
 
