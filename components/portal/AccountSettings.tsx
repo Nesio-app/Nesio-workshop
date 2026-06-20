@@ -13,6 +13,12 @@ import {
   loadCalendarLinkSettings,
 } from '@/lib/portal/calendar-links';
 import {
+  createAppApiClient,
+  type AuthStartProvider,
+  type ProductionProviderStatus,
+  type ProductionRuntimeHealthResponse,
+} from '@/lib/portal/app-api-client';
+import {
   getBaohePersonalizationProfile,
   readBaohePersonalizationStage,
   type BaohePersonalizationStage,
@@ -193,6 +199,9 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
   const [displayLanguage, setDisplayLanguage] = useState<DisplayLanguage>('zh');
   const [calendarUrl, setCalendarUrl] = useState('');
   const [toast, setToast] = useState('');
+  const [runtimeStatus, setRuntimeStatus] = useState<ProductionRuntimeHealthResponse | null>(null);
+  const [runtimeLoading, setRuntimeLoading] = useState(true);
+  const [authFeedback, setAuthFeedback] = useState('');
   const [personalizationStage, setPersonalizationStage] = useState<BaohePersonalizationStage>('day_34');
   const [showAppSettings, setShowAppSettings] = useState(false);
   const personalization = getBaohePersonalizationProfile(personalizationStage);
@@ -207,6 +216,27 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
     setPersonalizationStage(readBaohePersonalizationStage());
     document.documentElement.lang = s.locale === 'en' ? 'en' : 'zh-CN';
   }, [fallbackName]);
+
+  useEffect(() => {
+    let alive = true;
+    const client = createAppApiClient();
+    setRuntimeLoading(true);
+    client
+      .fetchProductionRuntimeHealth()
+      .then((status) => {
+        if (alive) setRuntimeStatus(status);
+      })
+      .catch(() => {
+        if (alive) setRuntimeStatus(null);
+      })
+      .finally(() => {
+        if (alive) setRuntimeLoading(false);
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const showToast = (key: PortalStringKey) => {
     setToast(t(locale, key));
@@ -232,18 +262,88 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
     showToast('settingsSaved');
   };
 
+  const formatProviderStatus = (provider?: ProductionProviderStatus): string => {
+    if (!provider) return runtimeLoading ? '检查中' : '未连接';
+    if (provider.enabled) return '已启用';
+    if (provider.configured) return '已配置';
+    return '缺配置';
+  };
+
+  const formatProviderDetail = (provider?: ProductionProviderStatus): string => {
+    if (!provider) return '正在读取生产运行状态。';
+    if (provider.enabled) return '已从生产运行状态确认启用。';
+    if (provider.missingEnv.length) return `缺少：${provider.missingEnv.slice(0, 3).join(' / ')}${provider.missingEnv.length > 3 ? '…' : ''}`;
+    return '已配置，但开关尚未启用。';
+  };
+
+  const onStartAuth = async (provider: AuthStartProvider) => {
+    setAuthFeedback('正在连接…');
+    try {
+      const client = createAppApiClient();
+      const result = await client.startAuth({ provider });
+      if (result.ok && result.action === 'redirect' && result.url) {
+        setAuthFeedback('正在跳转授权页面…');
+        window.location.assign(result.url);
+        return;
+      }
+      if (result.ok && result.action === 'otp_sent') {
+        setAuthFeedback('验证码已发送，请检查邮箱或手机。');
+        return;
+      }
+      if (result.error === 'provider_not_configured') {
+        setAuthFeedback(`${provider} 登录尚未配置：${result.status?.missingEnv.slice(0, 3).join(' / ') || '缺少环境变量'}`);
+        return;
+      }
+      setAuthFeedback(result.error || '暂时无法开始登录。');
+    } catch {
+      setAuthFeedback('连接登录服务失败，请稍后再试。');
+    }
+  };
+
   const copy = SETTINGS_COPY[displayLanguage] ?? SETTINGS_COPY.zh;
 
   const safetyRows = [
     {
-      label: 'Google Calendar',
-      status: calendarUrl ? '已保存链接' : '未连接',
-      detail: '首页只打开你保存的日历链接；私人事件同步保持关闭。',
+      label: 'Email',
+      status: formatProviderStatus(runtimeStatus?.accountAuth.providers.email),
+      detail: formatProviderDetail(runtimeStatus?.accountAuth.providers.email),
     },
     {
-      label: '智友 AI',
-      status: '预览中',
-      detail: '可作为稳定对话中枢展示；外部 AI 自动化和文件/语音/Live 需要另行确认。',
+      label: 'Google',
+      status: formatProviderStatus(runtimeStatus?.accountAuth.providers.google),
+      detail: formatProviderDetail(runtimeStatus?.accountAuth.providers.google),
+    },
+    {
+      label: 'WeChat',
+      status: formatProviderStatus(runtimeStatus?.accountAuth.providers.wechat),
+      detail: formatProviderDetail(runtimeStatus?.accountAuth.providers.wechat),
+    },
+    {
+      label: 'Phone',
+      status: formatProviderStatus(runtimeStatus?.accountAuth.providers.phone),
+      detail: formatProviderDetail(runtimeStatus?.accountAuth.providers.phone),
+    },
+    {
+      label: 'Cloud DB',
+      status: formatProviderStatus(runtimeStatus?.cloud.database),
+      detail: formatProviderDetail(runtimeStatus?.cloud.database),
+    },
+    {
+      label: 'Google Calendar',
+      status: formatProviderStatus(runtimeStatus?.thirdParty.googleCalendar),
+      detail: runtimeStatus?.thirdParty.googleCalendar.enabled
+        ? '生产环境已检测到日历连接。'
+        : (calendarUrl ? '本机已保存日历链接；生产读取仍以环境配置为准。' : formatProviderDetail(runtimeStatus?.thirdParty.googleCalendar)),
+    },
+    {
+      label: 'Gemini',
+      status: formatProviderStatus(runtimeStatus?.ai.providers.gemini),
+      detail: formatProviderDetail(runtimeStatus?.ai.providers.gemini),
+    },
+    {
+      label: 'Flomo',
+      status: formatProviderStatus(runtimeStatus?.thirdParty.flomo),
+      detail: formatProviderDetail(runtimeStatus?.thirdParty.flomo),
     },
     {
       label: '健康 / 金融 / 心理',
@@ -393,6 +493,19 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
           <span>{copy.localFirst}</span>
         </div>
         <ul className="portal-settings-safety-list">
+          <li className="portal-settings-auth-actions">
+            <div>
+              <strong>账户登录</strong>
+              <p>邮件、Google、微信、电话都会走生产授权入口；未配置时会明确失败原因。</p>
+            </div>
+            <span>{runtimeStatus?.accountAuth.enabled ? '已开启' : '待配置'}</span>
+            <div className="portal-settings-auth-buttons">
+              <button type="button" onClick={() => onStartAuth('email')}>Email</button>
+              <button type="button" onClick={() => onStartAuth('google')}>Google</button>
+              <button type="button" onClick={() => onStartAuth('wechat')}>WeChat</button>
+              <button type="button" onClick={() => onStartAuth('phone')}>Phone</button>
+            </div>
+          </li>
           {safetyRows.map((row) => (
             <li key={row.label}>
               <div>
@@ -403,6 +516,7 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
             </li>
           ))}
         </ul>
+        {authFeedback ? <p className="portal-settings-auth-feedback">{authFeedback}</p> : null}
       </section>
         </>
       )}
