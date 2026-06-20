@@ -30,6 +30,11 @@ assert(
 );
 
 assert(
+  /normalized\.includes\('@claude'\)[\s\S]*return 'claude'/.test(component),
+  'PortalAiFriendsPreview must route @Claude to the Claude provider instead of falling back to Gemini.',
+);
+
+assert(
   component.includes("aiSending") && component.includes("onKeyDown"),
   'PortalAiFriendsPreview composer must expose sending state and Enter-to-send behavior.',
 );

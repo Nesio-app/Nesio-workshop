@@ -85,9 +85,25 @@ type RecentConversation = (typeof recentConversations)[number];
 
 function resolveSecretaryProvider(composer: string): SecretaryChatProvider {
   const normalized = composer.toLowerCase();
+  if (normalized.includes('@claude')) return 'claude';
   if (normalized.includes('@chatgpt')) return 'chatgpt';
   if (normalized.includes('@豆包') || normalized.includes('@doubao')) return 'doubao';
   return 'gemini';
+}
+
+function getProviderLabel(provider: SecretaryChatProvider): string {
+  switch (provider) {
+    case 'claude':
+    case 'anthropic':
+      return 'Claude';
+    case 'chatgpt':
+    case 'openai':
+      return 'ChatGPT';
+    case 'doubao':
+      return '豆包';
+    default:
+      return 'Gemini';
+  }
 }
 
 function getConversationComposerIntent(conversationId: string): string {
@@ -261,7 +277,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
     setRuntimeMessages((items) => [...items, userMessage]);
     setComposer('');
     setAiSending(true);
-    setUtilityNotice(`正在连接 ${provider === 'chatgpt' ? 'ChatGPT' : provider === 'doubao' ? '豆包' : 'Gemini'}...`);
+    setUtilityNotice(`正在连接 ${getProviderLabel(provider)}...`);
 
     try {
       const result = await appApiClient.sendSecretaryMessage({
@@ -419,7 +435,13 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
               ) : (
                 <div key={`${message.role}-${index}`} className="portal-ai-message-row">
                   <span className="portal-ai-bot-avatar" aria-hidden>
-                    {message.provider === 'chatgpt' ? 'G' : message.provider === 'doubao' ? '豆' : '✦'}
+                    {message.provider === 'chatgpt' || message.provider === 'openai'
+                      ? 'G'
+                      : message.provider === 'doubao'
+                        ? '豆'
+                        : message.provider === 'claude' || message.provider === 'anthropic'
+                          ? 'C'
+                          : '✦'}
                   </span>
                   <p className="portal-ai-message portal-ai-message--assistant">{message.content}</p>
                 </div>

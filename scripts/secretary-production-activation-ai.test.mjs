@@ -31,6 +31,11 @@ assert.match(
   'production AI runtime gate must require at least one provider key',
 );
 assert.match(
+  launchSafety,
+  /ANTHROPIC_API_KEY|CLAUDE_API_KEY/,
+  'production AI runtime gate must accept Anthropic/Claude provider keys',
+);
+assert.match(
   middleware,
   /isSecretaryAiRequestAllowed/,
   'middleware must use the combined secretary AI gate',

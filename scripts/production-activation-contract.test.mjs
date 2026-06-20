@@ -26,6 +26,7 @@ for (const id of [
   'ai_openai',
   'ai_gemini',
   'ai_doubao',
+  'ai_anthropic',
   'google_calendar',
   'flomo',
 ]) {
@@ -50,6 +51,7 @@ const configuredEnv = {
   OPENAI_API_KEY: 'openai',
   GEMINI_API_KEY: 'gemini',
   DOUBAO_API_KEY: 'doubao',
+  ANTHROPIC_API_KEY: 'anthropic',
   GOOGLE_CALENDAR_ICS_URL: 'https://calendar.example/secret.ics',
   FLOMO_API_KEY: 'flomo',
 };

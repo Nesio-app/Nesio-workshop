@@ -116,7 +116,7 @@ export type ProductionRuntimeHealthResponse = {
   };
   ai: {
     enabled: boolean;
-    providers: Record<'gemini' | 'doubao' | 'chatgpt', ProductionProviderStatus>;
+    providers: Record<'gemini' | 'doubao' | 'chatgpt' | 'claude', ProductionProviderStatus>;
   };
   thirdParty: {
     googleCalendar: ProductionProviderStatus;
@@ -199,7 +199,7 @@ export type CloudProfileSettingsResponse = {
   error?: 'cloud_not_configured' | 'not_signed_in' | 'cloud_read_failed' | 'cloud_write_failed' | string;
 };
 
-export type SecretaryChatProvider = 'gemini' | 'chatgpt' | 'openai' | 'doubao';
+export type SecretaryChatProvider = 'gemini' | 'chatgpt' | 'openai' | 'doubao' | 'claude' | 'anthropic';
 
 export type SecretaryChatTurn = {
   role: 'user' | 'assistant';
@@ -208,7 +208,7 @@ export type SecretaryChatTurn = {
 
 export type SecretaryChatResponse = {
   text?: string;
-  model?: SecretaryChatProvider | 'gemini' | 'chatgpt' | 'doubao' | string;
+  model?: SecretaryChatProvider | string;
   error?: string;
   detail?: string;
   hint?: string;

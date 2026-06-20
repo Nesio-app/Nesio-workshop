@@ -7,7 +7,9 @@ import {
 const DEFAULT_MODELS = 'gemini-2.5-flash-lite,gemini-2.5-flash,gemini-1.5-flash-8b';
 const DOUBAO_API_URL = 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
+const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 const DEFAULT_OPENAI_MODEL = 'gpt-4o-mini';
+const DEFAULT_CLAUDE_MODEL = 'claude-3-5-haiku-latest';
 
 const SYSTEM_PROMPT = `你是「宝盒」里的 AI 私人秘书。语气沉静、清晰、有温度，像一位值得信赖的幕僚。
 
@@ -50,8 +52,17 @@ function getOpenAIKey(): string | undefined {
   return raw?.trim() || undefined;
 }
 
+function getAnthropicKey(): string | undefined {
+  const raw = process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY;
+  return raw?.trim() || undefined;
+}
+
 function getOpenAIModelId(): string {
   return process.env.OPENAI_MODEL?.trim() || DEFAULT_OPENAI_MODEL;
+}
+
+function getClaudeModelId(): string {
+  return process.env.CLAUDE_MODEL?.trim() || process.env.ANTHROPIC_MODEL?.trim() || DEFAULT_CLAUDE_MODEL;
 }
 
 function getDoubaoModelId(): string {
@@ -204,6 +215,52 @@ async function chatWithOpenAI(
   return text;
 }
 
+async function chatWithClaude(
+  history: ChatTurn[],
+  message: string,
+  maxTokens: number,
+  key: string
+): Promise<string> {
+  const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [];
+  for (const turn of history) {
+    messages.push({ role: turn.role, content: turn.content });
+  }
+  messages.push({ role: 'user', content: message });
+
+  const res = await fetch(ANTHROPIC_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': key,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: getClaudeModelId(),
+      system: SYSTEM_PROMPT,
+      messages,
+      max_tokens: Math.min(Math.max(maxTokens, 64), 4096),
+      temperature: 0.65,
+    }),
+  });
+
+  const data = (await res.json()) as {
+    content?: Array<{ type?: string; text?: string }>;
+    error?: { message?: string };
+  };
+
+  if (!res.ok) {
+    throw new Error(data?.error?.message || `Claude HTTP ${res.status}`);
+  }
+
+  const text = data?.content
+    ?.map((part) => part?.text)
+    .filter(Boolean)
+    .join('\n')
+    .trim();
+  if (!text) throw new Error('Empty response from Claude');
+  return text;
+}
+
 async function chatWithDoubao(
   history: ChatTurn[],
   message: string,
@@ -324,6 +381,21 @@ export async function POST(req: NextRequest) {
       }
       const text = await chatWithOpenAI(history, message, maxTokens, key);
       return NextResponse.json({ text, model: 'chatgpt' }, { headers: corsHeaders });
+    }
+
+    if (modelId === 'claude' || modelId === 'anthropic') {
+      const key = getAnthropicKey();
+      if (!key) {
+        return NextResponse.json(
+          {
+            error: 'AI not configured',
+            hint: 'Set ANTHROPIC_API_KEY (or CLAUDE_API_KEY) in Vercel Environment Variables, then Redeploy',
+          },
+          { status: 503, headers: corsHeaders }
+        );
+      }
+      const text = await chatWithClaude(history, message, maxTokens, key);
+      return NextResponse.json({ text, model: 'claude' }, { headers: corsHeaders });
     }
 
     const key = getGoogleKey();

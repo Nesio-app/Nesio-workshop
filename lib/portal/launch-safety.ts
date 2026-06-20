@@ -104,7 +104,9 @@ function hasProductionAiProviderKey(): boolean {
     readRuntimeEnv('DOUBAO_KEY') ||
     readRuntimeEnv('DOUBAO_API_KEY') ||
     readRuntimeEnv('ARK_API_KEY') ||
-    readRuntimeEnv('VOLCENGINE_API_KEY'),
+    readRuntimeEnv('VOLCENGINE_API_KEY') ||
+    readRuntimeEnv('ANTHROPIC_API_KEY') ||
+    readRuntimeEnv('CLAUDE_API_KEY'),
   );
 }
 

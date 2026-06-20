@@ -28,10 +28,16 @@ function getOpenAIKey(): string | undefined {
   return raw?.trim() || undefined;
 }
 
+function getAnthropicKey(): string | undefined {
+  const raw = process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY;
+  return raw?.trim() || undefined;
+}
+
 export async function GET(req: NextRequest) {
   const gemini = Boolean(getGoogleKey());
   const doubao = Boolean(getDoubaoKey());
   const chatgpt = Boolean(getOpenAIKey());
+  const claude = Boolean(getAnthropicKey());
   const allowed = isSecretaryAiRequestAllowed(req);
   const productionActivation = {
     aiProviderMode: process.env.BAOHE_AI_PROVIDER_MODE || 'disabled',
@@ -40,6 +46,7 @@ export async function GET(req: NextRequest) {
       gemini,
       doubao,
       chatgpt,
+      claude,
     },
   };
 
@@ -53,9 +60,11 @@ export async function GET(req: NextRequest) {
         gemini,
         doubao,
         chatgpt,
+        claude,
         model: gemini ? (process.env.GEMINI_MODEL || 'gemini-default') : null,
         doubaoModel: doubao ? (process.env.DOUBAO_MODEL || process.env.DOUBAO_ENDPOINT || 'doubao-pro-32k') : null,
         openaiModel: chatgpt ? (process.env.OPENAI_MODEL || 'gpt-4o-mini') : null,
+        claudeModel: claude ? (process.env.CLAUDE_MODEL || process.env.ANTHROPIC_MODEL || 'claude-3-5-haiku-latest') : null,
         productionActivation,
       },
       {
@@ -72,9 +81,11 @@ export async function GET(req: NextRequest) {
       gemini,
       doubao,
       chatgpt,
+      claude,
       model: null,
       doubaoModel: null,
       openaiModel: null,
+      claudeModel: null,
       productionActivation,
     },
     {

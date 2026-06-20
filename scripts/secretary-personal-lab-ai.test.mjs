@@ -31,6 +31,8 @@ assert.match(secretaryChat, /sendSecretaryMessage/, 'secretary chat page must ca
 assert.match(secretaryApi, /\/api\/secretary\/chat/, 'secretary app must call secretary chat API');
 assert.match(secretaryApi, /x-baohe-access-mode/, 'secretary app must send personal lab access header');
 assert.match(secretaryApi, /personal_lab/, 'secretary app must be scoped to personal lab mode');
-assert.match(secretaryChat, /gemini|openai|doubao/, 'secretary app must expose provider routing');
+assert.match(secretaryChat, /gemini|openai|doubao|claude/, 'secretary app must expose provider routing');
+assert.match(route, /modelId === 'claude'|modelId === 'anthropic'/, 'secretary chat route must branch Claude/Anthropic separately');
+assert.match(route, /ANTHROPIC_API_KEY|CLAUDE_API_KEY/, 'secretary chat route must support Claude provider env names without hard-coding secrets');
 
 console.log('secretary personal lab AI tests passed');

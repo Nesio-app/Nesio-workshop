@@ -123,6 +123,13 @@ export function buildProductionRuntimeStatus(env: EnvMap = process.env) {
         alternateGroups: [['OPENAI_API_KEY', 'OpenAI_KEY']],
         enabledWhen: aiEnabled,
       }),
+      claude: status(env, {
+        id: 'claude',
+        label: 'Claude',
+        requiredEnv: ['BAOHE_AI_PROVIDER_MODE'],
+        alternateGroups: [['ANTHROPIC_API_KEY', 'CLAUDE_API_KEY']],
+        enabledWhen: aiEnabled,
+      }),
     },
   };
 
