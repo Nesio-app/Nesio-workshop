@@ -52,6 +52,12 @@
   --rlg: 26px;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --modal-backdrop-bg: rgba(16, 28, 54, 0.18);
+  --modal-backdrop-blur: 2.5px;
+  --modal-card-bg: rgba(248, 251, 255, 0.9);
+  --modal-card-blur: 16px;
+  --modal-card-saturate: 145%;
+  --tap-min: 44px;
 }
 
 html, body {
@@ -1132,12 +1138,12 @@ html, body {
 
 .storage-guard-guide__card {
   position: relative;
-  border: 1px solid rgba(150, 199, 243, 0.55);
+  border: 1px solid var(--frost-line);
   border-radius: 24px;
-  background: rgba(248, 251, 255, 0.9);
+  background: var(--modal-card-bg);
   box-shadow: var(--shadow-lg);
-  backdrop-filter: blur(16px) saturate(145%);
-  -webkit-backdrop-filter: blur(16px) saturate(145%);
+  backdrop-filter: blur(var(--modal-card-blur)) saturate(var(--modal-card-saturate));
+  -webkit-backdrop-filter: blur(var(--modal-card-blur)) saturate(var(--modal-card-saturate));
   color: var(--text);
   padding: 18px 58px 18px 18px;
 }
@@ -1160,11 +1166,11 @@ html, body {
   position: absolute;
   top: 10px;
   right: 10px;
-  width: 44px;
-  height: 44px;
+  width: var(--tap-min);
+  height: var(--tap-min);
   border: 0;
   border-radius: 999px;
-  background: rgba(205, 222, 252, 0.62);
+  background: var(--ice);
   color: var(--accent-deep);
   font-size: 20px;
   font-weight: 700;
