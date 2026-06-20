@@ -47,6 +47,28 @@ assert(
 );
 
 assert(
+  component.includes("activeConversationId") &&
+    component.includes("setActiveConversationId") &&
+    component.includes("selectConversation") &&
+    /recentConversations\.map[\s\S]*onClick=\{\(\) => selectConversation\(item\)\}/.test(component),
+  'PortalAiFriendsPreview recent conversation rows must select a real active conversation instead of only showing a notice.',
+);
+
+assert(
+  /case 'claude'[\s\S]*@Claude/.test(component) &&
+    /case 'chatgpt'[\s\S]*@ChatGPT/.test(component) &&
+    /case 'gemini'[\s\S]*@Gemini/.test(component) &&
+    /case 'group'[\s\S]*@Claude @ChatGPT @Gemini/.test(component),
+  'PortalAiFriendsPreview conversation selection must prepare the composer for the selected AI or group.',
+);
+
+assert(
+  component.includes("aria-pressed={activeConversationId === item.id}") ||
+    component.includes("portal-ai-recent-row--active"),
+  'PortalAiFriendsPreview must expose active conversation state for accessibility and QA.',
+);
+
+assert(
   component.includes("result.error") && component.includes("result.detail"),
   'PortalAiFriendsPreview must surface Secretary Chat API errors instead of failing silently.',
 );

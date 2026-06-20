@@ -6479,6 +6479,11 @@ html[data-portal-theme="night"] .portal-theme-seg-btn.is-on{
   cursor: pointer;
 }
 
+.portal-ai-recent-row--active {
+  border-radius: 1.05rem;
+  background: rgba(74, 108, 247, 0.08);
+}
+
 .portal-ai-recent-row span:not(.portal-ai-conversation-avatar),
 .portal-ai-recent-row b,
 .portal-ai-recent-row em {

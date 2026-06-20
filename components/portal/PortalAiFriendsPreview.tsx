@@ -81,11 +81,28 @@ const recentConversations = [
   },
 ];
 
+type RecentConversation = (typeof recentConversations)[number];
+
 function resolveSecretaryProvider(composer: string): SecretaryChatProvider {
   const normalized = composer.toLowerCase();
   if (normalized.includes('@chatgpt')) return 'chatgpt';
   if (normalized.includes('@豆包') || normalized.includes('@doubao')) return 'doubao';
   return 'gemini';
+}
+
+function getConversationComposerIntent(conversationId: string): string {
+  switch (conversationId) {
+    case 'claude':
+      return '@Claude ';
+    case 'chatgpt':
+      return '@ChatGPT ';
+    case 'gemini':
+      return '@Gemini ';
+    case 'group':
+      return '@Claude @ChatGPT @Gemini ';
+    default:
+      return '';
+  }
 }
 
 function stripAssistantMentions(message: string): string {
@@ -100,6 +117,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
   const [runtimeMessages, setRuntimeMessages] = useState<RuntimeMessage[]>([]);
   const [aiSending, setAiSending] = useState(false);
   const [surface, setSurface] = useState<'chat' | 'search'>('chat');
+  const [activeConversationId, setActiveConversationId] = useState('smart');
   const [attachmentTrayOpen, setAttachmentTrayOpen] = useState(false);
   const [searchToolsOpen, setSearchToolsOpen] = useState(false);
   const [conversationListOpen, setConversationListOpen] = useState(false);
@@ -128,8 +146,18 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
   const startNewThread = () => {
     setSurface('chat');
     setComposer('');
+    setActiveConversationId('smart');
     setConversationListOpen(true);
     setUtilityNotice('已新建一条集合对话，可以直接 @AI 或 @工具。');
+    requestAnimationFrame(() => composerRef.current?.focus());
+  };
+
+  const selectConversation = (item: RecentConversation) => {
+    setActiveConversationId(item.id);
+    setConversationListOpen(false);
+    setSurface('chat');
+    setComposer(getConversationComposerIntent(item.id));
+    setUtilityNotice(`已切换到 ${item.title} 对话，可以继续输入或 @ 拉入其他 AI。`);
     requestAnimationFrame(() => composerRef.current?.focus());
   };
 
@@ -283,7 +311,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
   };
 
   return (
-    <section className="portal-ai-preview portal-ai-preview--screen" aria-label="智友">
+    <section className="portal-ai-preview portal-ai-preview--screen" aria-label="智友" data-active-conversation={activeConversationId}>
       {surface === 'search' ? (
         <section className="portal-ai-search-surface" aria-label="智友搜索">
           <header className="portal-ai-search-head">
@@ -321,11 +349,9 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
               <button
                 key={item.id}
                 type="button"
-                className="portal-ai-recent-row"
-                onClick={() => {
-                  setSurface('chat');
-                  setUtilityNotice(`已切换到 ${item.title} 对话。`);
-                }}
+                className={`portal-ai-recent-row${activeConversationId === item.id ? ' portal-ai-recent-row--active' : ''}`}
+                aria-pressed={activeConversationId === item.id}
+                onClick={() => selectConversation(item)}
               >
                 <span className="portal-ai-conversation-avatar" aria-hidden>
                   {item.avatar}
@@ -491,12 +517,9 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
                   <button
                     key={item.id}
                     type="button"
-                    className="portal-ai-recent-row"
-                    onClick={() => {
-                      setConversationListOpen(false);
-                      setSurface('chat');
-                      setUtilityNotice(`已切换到 ${item.title} 对话。`);
-                    }}
+                    className={`portal-ai-recent-row${activeConversationId === item.id ? ' portal-ai-recent-row--active' : ''}`}
+                    aria-pressed={activeConversationId === item.id}
+                    onClick={() => selectConversation(item)}
                   >
                     <span className="portal-ai-conversation-avatar" aria-hidden>{item.avatar}</span>
                     <span>
