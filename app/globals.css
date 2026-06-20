@@ -6332,6 +6332,13 @@ html[data-portal-theme="night"] .portal-theme-seg-btn.is-on{
   font-size: 1.1rem;
 }
 
+.portal-ai-capability-rail button.is-active {
+  border-color: rgba(88, 140, 227, 0.48);
+  background: rgba(255,255,255,.98);
+  color: #3656db;
+  box-shadow: 0 10px 24px rgba(74,108,247,.16), inset 0 1px 0 rgba(255,255,255,.7);
+}
+
 .portal-ai-capability-rail span {
   font-size: .58rem;
 }

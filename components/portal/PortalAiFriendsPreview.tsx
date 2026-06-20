@@ -20,6 +20,21 @@ type RuntimeMessage = SecretaryChatTurn & {
   provider?: SecretaryChatProvider;
 };
 
+type AiCapabilityId = 'image' | 'file' | 'audio' | 'live' | 'note';
+
+const AI_CAPABILITIES: Array<{
+  id: AiCapabilityId;
+  icon: string;
+  label: string;
+  notice: string;
+}> = [
+  { id: 'image', icon: '📷', label: '图片', notice: '请选择图片，当前先作为本地意图保留。' },
+  { id: 'file', icon: '📎', label: '文件', notice: '请选择文件，当前先作为本地意图保留。' },
+  { id: 'audio', icon: '🎙', label: '语音', notice: '正在准备实时语音通话。' },
+  { id: 'live', icon: '📞', label: '实时', notice: '已打开实时通话选项。' },
+  { id: 'note', icon: '📝', label: '笔记', notice: '已准备 Flomo 笔记意图。' },
+];
+
 const mentionTargets: MentionTarget[] = [
   { key: 'claude', label: '@Claude', description: '长文推理 / 方案拆解', avatar: 'AI' },
   { key: 'chatgpt', label: '@ChatGPT', description: '写作推理 / 日常助手', avatar: 'G' },
@@ -140,6 +155,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
   const [callSheetOpen, setCallSheetOpen] = useState(false);
   const [videoCallOpen, setVideoCallOpen] = useState(false);
   const [audioCallOpen, setAudioCallOpen] = useState(false);
+  const [activeCapability, setActiveCapability] = useState<AiCapabilityId | null>(null);
   const [utilityNotice, setUtilityNotice] = useState('');
   const [localAttachments, setLocalAttachments] = useState<string[]>([]);
   const composerRef = useRef<HTMLInputElement>(null);
@@ -211,6 +227,32 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
     setLocalAttachments((items) => ['笔记：将本条保存到 Flomo', ...items].slice(0, 3));
     setUtilityNotice('已准备 Flomo 笔记意图，发送后会进入本地 mock 记录。');
     requestAnimationFrame(() => composerRef.current?.focus());
+  };
+
+  const handleCapabilityAction = (capabilityId: AiCapabilityId) => {
+    setActiveCapability(capabilityId);
+    const capability = AI_CAPABILITIES.find((item) => item.id === capabilityId);
+    if (capability) setUtilityNotice(capability.notice);
+
+    switch (capabilityId) {
+      case 'image':
+        imageInputRef.current?.click();
+        return;
+      case 'file':
+        fileInputRef.current?.click();
+        return;
+      case 'audio':
+        setAudioCallOpen(true);
+        return;
+      case 'live':
+        setCallSheetOpen(true);
+        return;
+      case 'note':
+        addFlomoNoteIntent();
+        return;
+      default:
+        requestAnimationFrame(() => composerRef.current?.focus());
+    }
   };
 
   const handleSearchShortcut = (label: string) => {
@@ -452,11 +494,19 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
           <div className="portal-ai-composer">
             {attachmentTrayOpen ? (
               <div id="portal-ai-capability-rail" className="portal-ai-capability-rail" aria-label="智友快捷能力">
-                <button type="button" onClick={() => imageInputRef.current?.click()}>📷<span>图片</span></button>
-                <button type="button" onClick={() => fileInputRef.current?.click()}>📎<span>文件</span></button>
-                <button type="button" aria-controls="portal-ai-audio-call" onClick={() => setAudioCallOpen(true)}>🎙<span>语音</span></button>
-                <button type="button" aria-controls="portal-ai-call-sheet" onClick={() => setCallSheetOpen(true)}>📞<span>实时</span></button>
-                <button type="button" onClick={addFlomoNoteIntent}>📝<span>笔记</span></button>
+                {AI_CAPABILITIES.map((capability) => (
+                  <button
+                    key={capability.id}
+                    type="button"
+                    className={activeCapability === capability.id ? 'is-active' : ''}
+                    aria-pressed={activeCapability === capability.id}
+                    aria-controls={capability.id === 'audio' ? 'portal-ai-audio-call' : capability.id === 'live' ? 'portal-ai-call-sheet' : undefined}
+                    onClick={() => handleCapabilityAction(capability.id)}
+                  >
+                    {capability.icon}
+                    <span>{capability.label}</span>
+                  </button>
+                ))}
               </div>
             ) : null}
             <p>输入框搞定一切： @AI 拉它进来 · @Flomo 存笔记 · @物品库 记物品</p>

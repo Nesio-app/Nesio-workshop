@@ -37,6 +37,9 @@ const sourceChecks = [
   ['components/portal/PortalAiFriendsPreview.tsx', '@Flomo'],
   ['components/portal/PortalAiFriendsPreview.tsx', 'Live 通话'],
   ['components/portal/PortalAiFriendsPreview.tsx', 'AI 虚拟形象视频通话'],
+  ['components/portal/PortalAiFriendsPreview.tsx', 'AI_CAPABILITIES'],
+  ['components/portal/PortalAiFriendsPreview.tsx', 'activeCapability'],
+  ['components/portal/PortalAiFriendsPreview.tsx', 'handleCapabilityAction'],
   ['components/portal/ToolsTreasureSheet.tsx', '工具箱'],
   ['components/portal/ToolsTreasureSheet.tsx', '个性化推荐'],
   ['components/portal/ToolsTreasureSheet.tsx', '我的工具'],
@@ -65,6 +68,17 @@ for (const [relativePath, text] of sourceChecks) {
 }
 
 const toolboxSource = readFileSync(join(repoRoot, 'components/portal/ToolsTreasureSheet.tsx'), 'utf8');
+const aiFriendsSource = readFileSync(join(repoRoot, 'components/portal/PortalAiFriendsPreview.tsx'), 'utf8');
+assert.match(
+  aiFriendsSource,
+  /AI_CAPABILITIES\.map[\s\S]{0,1200}onClick=\{\(\) => handleCapabilityAction\(capability\.id\)/,
+  'AI Friends capability rail must be metadata-driven and every visible capability button must have a runtime action.',
+);
+assert.match(
+  aiFriendsSource,
+  /aria-pressed=\{activeCapability === capability\.id\}/,
+  'AI Friends capability buttons must expose active state feedback.',
+);
 assert.doesNotMatch(
   toolboxSource,
   /portal-treasure-screen-grid[\s\S]{0,900}<button key=\{label\} type="button" disabled>/,
