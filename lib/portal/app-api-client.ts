@@ -152,6 +152,32 @@ export type AuthStartResponse = {
   supportedProviders?: AuthStartProvider[];
 };
 
+export type AuthSessionUser = {
+  id: string;
+  email: string;
+  phone: string;
+  provider: string;
+  providers: string[];
+};
+
+export type AuthSessionResponse = {
+  safePublicStatus: true;
+  secretsRedacted: true;
+  ok: boolean;
+  loggedIn: boolean;
+  hasRefreshToken: boolean;
+  status: 'signed_out' | 'signed_in' | 'session_unverified' | string;
+  user?: AuthSessionUser;
+};
+
+export type AuthLogoutResponse = {
+  safePublicStatus: true;
+  secretsRedacted: true;
+  ok: boolean;
+  signedOut: boolean;
+  supabaseRevoked?: boolean;
+};
+
 type ClientOptions = {
   fetcher?: AppApiFetch;
   baseUrl?: string;
@@ -165,6 +191,8 @@ const APP_API_ENDPOINTS = {
   userDataDelete: '/api/user-data/delete',
   productionRuntimeHealth: '/api/portal/production/health',
   authStart: '/api/auth/start',
+  authSession: '/api/auth/session',
+  authLogout: '/api/auth/logout',
 } as const;
 
 function buildUrl(baseUrl: string, path: string, params?: Record<string, string | number | boolean | undefined>) {
@@ -238,6 +266,10 @@ export function createAppApiClient(options: ClientOptions = {}) {
       return readJson(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.productionRuntimeHealth));
     },
 
+    fetchAuthSession(): Promise<AuthSessionResponse> {
+      return readJsonAllowError(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.authSession));
+    },
+
     startAuth({
       provider,
       email,
@@ -260,6 +292,12 @@ export function createAppApiClient(options: ClientOptions = {}) {
           phone,
           redirectTo,
         }),
+      });
+    },
+
+    logoutAuth(): Promise<AuthLogoutResponse> {
+      return readJsonAllowError(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.authLogout), {
+        method: 'POST',
       });
     },
   };

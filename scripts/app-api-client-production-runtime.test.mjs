@@ -9,19 +9,26 @@ for (const marker of [
   'ProductionRuntimeHealthResponse',
   'AuthStartProvider',
   'AuthStartResponse',
+  'AuthSessionResponse',
+  'AuthLogoutResponse',
   'fetchProductionRuntimeHealth',
   'startAuth',
+  'fetchAuthSession',
+  'logoutAuth',
 ]) {
   assert.ok(source.includes(marker), `missing production runtime client marker: ${marker}`);
 }
 
-for (const endpoint of ['/api/portal/production/health', '/api/auth/start']) {
+for (const endpoint of ['/api/portal/production/health', '/api/auth/start', '/api/auth/session', '/api/auth/logout']) {
   assert.ok(source.includes(endpoint), `missing production runtime endpoint: ${endpoint}`);
 }
 
 assert.ok(source.includes('safePublicStatus'), 'production runtime client must model safe public status');
 assert.ok(source.includes('secretsRedacted'), 'production runtime client must model secret redaction');
 assert.ok(source.includes('provider_not_configured'), 'auth client must preserve fail-closed auth errors for UI display');
+assert.ok(source.includes('loggedIn'), 'auth session client must expose loggedIn status');
+assert.ok(source.includes('signedOut'), 'auth logout client must expose signedOut status');
+assert.ok(source.includes("method: 'POST'"), 'auth logout client must use POST');
 
 assert.equal(
   packageJson.scripts['test:app-api-client-production-runtime'],

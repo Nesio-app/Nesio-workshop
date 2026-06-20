@@ -11,10 +11,12 @@ function read(path) {
 const healthRoute = read('app/api/portal/production/health/route.ts');
 const authStartRoute = read('app/api/auth/start/route.ts');
 const authCallbackRoute = read('app/api/auth/callback/route.ts');
+const authSessionRoute = read('app/api/auth/session/route.ts');
+const authLogoutRoute = read('app/api/auth/logout/route.ts');
 const runtimeHelper = read('lib/portal/production-runtime.ts');
 const packageJson = JSON.parse(read('package.json'));
 
-for (const source of [healthRoute, authStartRoute, authCallbackRoute]) {
+for (const source of [healthRoute, authStartRoute, authCallbackRoute, authSessionRoute, authLogoutRoute]) {
   assert.match(source, /redact|safe|public/i, 'production runtime routes must explicitly redact or expose only safe status');
   assert.doesNotMatch(source, /SUPABASE_SERVICE_ROLE_KEY[^?].*NextResponse\.json/s, 'routes must not return service role secrets');
   assert.doesNotMatch(source, /WECHAT_APP_SECRET[^?].*NextResponse\.json/s, 'routes must not return WeChat secrets');
@@ -44,6 +46,17 @@ assert.match(authCallbackRoute, /httpOnly:\s*true/, 'auth callback cookies must 
 assert.match(authCallbackRoute, /sameSite:\s*['"]lax['"]/, 'auth callback cookies must use SameSite=Lax');
 assert.doesNotMatch(authCallbackRoute, /searchParams\.set\(['"]access_token/, 'auth callback must not echo access tokens into redirect URLs');
 assert.doesNotMatch(authCallbackRoute, /searchParams\.set\(['"]refresh_token/, 'auth callback must not echo refresh tokens into redirect URLs');
+assert.match(authSessionRoute, /GET\(/, 'auth session route must expose GET');
+assert.match(authSessionRoute, /cookies\(\).*baohe_auth_access|cookieStore\.get\(['"]baohe_auth_access/, 'auth session must read the access cookie');
+assert.match(authSessionRoute, /auth\/v1\/user/, 'auth session must verify the session with Supabase user endpoint when configured');
+assert.match(authSessionRoute, /loggedIn/, 'auth session must expose a safe loggedIn status');
+assert.match(authSessionRoute, /secretsRedacted:\s*true/, 'auth session must mark secrets as redacted');
+assert.doesNotMatch(authSessionRoute, /access_token.*NextResponse\.json|refresh_token.*NextResponse\.json/s, 'auth session must not return raw tokens');
+assert.match(authLogoutRoute, /POST\(/, 'auth logout route must expose POST');
+assert.match(authLogoutRoute, /baohe_auth_access/, 'auth logout must clear the access cookie');
+assert.match(authLogoutRoute, /baohe_auth_refresh/, 'auth logout must clear the refresh cookie');
+assert.match(authLogoutRoute, /maxAge:\s*0/, 'auth logout must expire auth cookies');
+assert.match(authLogoutRoute, /auth\/v1\/logout/, 'auth logout should best-effort revoke the Supabase session when configured');
 
 assert.equal(
   packageJson.scripts['test:production-runtime-surface'],
