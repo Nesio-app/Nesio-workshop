@@ -336,6 +336,16 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
     setUtilityNotice(t(locale, 'aiFriendsLiveIntentNotice'));
   };
 
+  const openConversationList = () => {
+    setSurface('chat');
+    setAttachmentTrayOpen(false);
+    setSearchToolsOpen(false);
+    setCallSheetOpen(false);
+    setAudioCallOpen(false);
+    setVideoCallOpen(false);
+    setConversationListOpen(true);
+  };
+
   const openAudioCall = () => {
     setAttachmentTrayOpen(false);
     setConversationListOpen(false);
@@ -603,7 +613,14 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
               >
                 ⌕
               </button>
-              <button type="button" className="portal-ai-screen-icon-btn" aria-label="打开对话列表" onClick={() => setConversationListOpen(true)}>
+              <button
+                type="button"
+                className="portal-ai-screen-icon-btn"
+                aria-label="打开对话列表"
+                aria-expanded={conversationListOpen}
+                aria-controls="portal-ai-conversation-list"
+                onClick={openConversationList}
+              >
                 💬
               </button>
             </div>
@@ -695,7 +712,16 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
               >
                 ＋
               </button>
-              <button type="button" className="portal-ai-round-action" aria-label="@ 调度" onClick={openMentionMenu}>@</button>
+              <button
+                type="button"
+                className="portal-ai-round-action"
+                aria-label="@ 调度"
+                aria-expanded={mentionOptions.length > 0}
+                aria-controls="portal-ai-mention-menu"
+                onClick={openMentionMenu}
+              >
+                @
+              </button>
               <input
                 ref={composerRef}
                 aria-label="智友集合输入框"
@@ -709,8 +735,24 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
                 }}
                 placeholder={t(locale, 'aiFriendsComposerPlaceholder')}
               />
-              <button type="button" className="portal-ai-round-action" aria-label="语音输入" aria-controls="portal-ai-audio-call" onClick={openAudioCall}>🎙</button>
-              <button type="button" className="portal-ai-call-button" aria-label="通话" aria-controls="portal-ai-call-sheet" onClick={openCallSheet}>
+              <button
+                type="button"
+                className="portal-ai-round-action"
+                aria-label="语音输入"
+                aria-expanded={audioCallOpen}
+                aria-controls="portal-ai-audio-call"
+                onClick={openAudioCall}
+              >
+                🎙
+              </button>
+              <button
+                type="button"
+                className="portal-ai-call-button"
+                aria-label="通话"
+                aria-expanded={callSheetOpen || videoCallOpen || audioCallOpen}
+                aria-controls="portal-ai-call-sheet"
+                onClick={openCallSheet}
+              >
                 📞<span>通话</span>
               </button>
             </div>
@@ -736,7 +778,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
               }}
             />
             {mentionOptions.length ? (
-              <div className="portal-ai-mention-menu" role="listbox" aria-label="@ 调度候选">
+              <div id="portal-ai-mention-menu" className="portal-ai-mention-menu" role="listbox" aria-label="@ 调度候选">
                 {mentionOptions.map((target) => (
                   <button
                     key={target.key}
@@ -757,7 +799,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
           </div>
 
           {conversationListOpen ? (
-            <div className="portal-ai-conversation-sheet" role="dialog" aria-modal="true" aria-label="AI 对话列表">
+            <div id="portal-ai-conversation-list" className="portal-ai-conversation-sheet" role="dialog" aria-modal="true" aria-label="AI 对话列表">
               <button type="button" className="portal-ai-conversation-scrim" aria-label="关闭 AI 对话列表" onClick={() => setConversationListOpen(false)} />
               <section>
                 <span className="portal-ai-sheet-handle" aria-hidden />
