@@ -74,11 +74,15 @@ function hasPersonalLabAccessMarker(request: {
   nextUrl?: { searchParams?: URLSearchParams };
 }): boolean {
   const headerMode = request.headers.get('x-baohe-access-mode') || '';
+  const cookie = request.headers.get('cookie') || '';
   const queryMode = request.nextUrl?.searchParams?.get('baohePersonal') ||
     request.nextUrl?.searchParams?.get('baohePersonalLab') ||
     request.nextUrl?.searchParams?.get('baohe_personal_lab') ||
     '';
-  return headerMode === 'personal_lab' || queryMode === '1' || queryMode === 'personal_lab';
+  return headerMode === 'personal_lab' ||
+    queryMode === '1' ||
+    queryMode === 'personal_lab' ||
+    /(?:^|;\s*)baohe_personal_lab=1(?:;|$)/.test(cookie);
 }
 
 export function isPersonalLabAiRequestAllowed(request: {
@@ -131,6 +135,13 @@ export function isSecretaryAiRequestAllowed(request: {
   return isPersonalLabAiRequestAllowed(request) ||
     isProductionActivationAiRuntimeEnabled() ||
     isLiveRuntimeAiEnabled();
+}
+
+export function isSecretaryPageRequestAllowed(request: {
+  headers: Headers;
+  nextUrl?: { searchParams?: URLSearchParams };
+}): boolean {
+  return isPersonalLabAiRequestAllowed(request);
 }
 
 export function launchUnavailablePayload(kind: string, id?: string) {

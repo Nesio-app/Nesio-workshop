@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import {
   isFirstLaunchBlockedPath,
   isSecretaryAiRequestAllowed,
+  isSecretaryPageRequestAllowed,
   launchUnavailablePayload,
 } from './lib/portal/launch-safety';
 
@@ -27,6 +28,33 @@ export function middleware(request: NextRequest) {
     isSecretaryAiRequestAllowed(request)
   ) {
     return NextResponse.next();
+  }
+
+  if (
+    pathname.startsWith('/secretary') &&
+    isSecretaryPageRequestAllowed(request)
+  ) {
+    const url = request.nextUrl.clone();
+    if (pathname === '/secretary' || pathname === '/secretary/') {
+      url.pathname = '/secretary/index.html';
+    }
+    const response = pathname === '/secretary' || pathname === '/secretary/'
+      ? NextResponse.rewrite(url)
+      : NextResponse.next();
+    const queryMode = request.nextUrl.searchParams.get('baohePersonal') ||
+      request.nextUrl.searchParams.get('baohePersonalLab') ||
+      request.nextUrl.searchParams.get('baohe_personal_lab') ||
+      '';
+    if (queryMode === '1' || queryMode === 'personal_lab') {
+      response.cookies.set('baohe_personal_lab', '1', {
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: request.nextUrl.protocol === 'https:',
+        path: '/secretary',
+        maxAge: 60 * 60 * 24 * 7,
+      });
+    }
+    return response;
   }
 
   const payload = launchUnavailablePayload(pathname.startsWith('/api/') ? 'api' : 'page', pathname);
