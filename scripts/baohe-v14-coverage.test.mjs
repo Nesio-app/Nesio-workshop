@@ -41,6 +41,9 @@ const sourceChecks = [
   ['components/portal/ToolsTreasureSheet.tsx', '个性化推荐'],
   ['components/portal/ToolsTreasureSheet.tsx', '我的工具'],
   ['components/portal/ToolsTreasureSheet.tsx', '效率日常包'],
+  ['components/portal/ToolsTreasureSheet.tsx', 'selectedToolboxAction'],
+  ['components/portal/ToolsTreasureSheet.tsx', 'handleAddTool'],
+  ['components/portal/ToolsTreasureSheet.tsx', 'handleSelectPackage'],
   ['lib/portal/personalization-insights.ts', '家居物品'],
   ['lib/portal/personalization-insights.ts', '任务清单'],
   ['lib/portal/personalization-insights.ts', '第 34 天'],
@@ -60,5 +63,32 @@ for (const [relativePath, text] of sourceChecks) {
   const content = readFileSync(join(repoRoot, relativePath), 'utf8');
   assert.match(content, new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `${relativePath} must contain ${text}`);
 }
+
+const toolboxSource = readFileSync(join(repoRoot, 'components/portal/ToolsTreasureSheet.tsx'), 'utf8');
+assert.doesNotMatch(
+  toolboxSource,
+  /portal-treasure-screen-grid[\s\S]{0,900}<button key=\{label\} type="button" disabled>/,
+  'Toolbox addable tools must not render disabled buttons; every visible control needs a local action.',
+);
+assert.match(
+  toolboxSource,
+  /portal-treasure-discovery-hero[\s\S]{0,1000}onClick=\{\(\) => handleAddTool\('gift-concierge'/,
+  'Toolbox recommendation CTA must record a real local add action.',
+);
+assert.match(
+  toolboxSource,
+  /TOOL_PACKAGES[\s\S]{0,260}'efficiency-daily'/,
+  'Toolbox package metadata must include the efficiency daily package.',
+);
+assert.match(
+  toolboxSource,
+  /portal-treasure-package-list[\s\S]{0,260}TOOL_PACKAGES\.map/,
+  'Toolbox package cards must be sourced from package metadata.',
+);
+assert.match(
+  toolboxSource,
+  /onClick=\{\(\) => handleSelectPackage\(pack\.id, pack\.label\)/,
+  'Toolbox package cards must update local selection state.',
+);
 
 console.log('baohe V14 runtime implementation tests passed');

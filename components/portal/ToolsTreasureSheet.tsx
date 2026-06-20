@@ -76,6 +76,43 @@ const MY_TOOL_PREVIEWS = [
   },
 ] as const;
 
+const ADDABLE_TOOLS = [
+  ['📖', 'reading-tracker', '阅读追踪'],
+  ['🏋️', 'fitness-log', '健身记录'],
+  ['🌱', 'habit-tracker', '习惯追踪'],
+  ['🚗', 'vehicle-manager', '车辆管理'],
+  ['💊', 'health-records', '健康档案'],
+  ['🏡', 'home-maintenance', '家居维护'],
+] as const;
+
+const TOOL_PACKAGES = [
+  {
+    id: 'efficiency-daily',
+    icon: '⚡',
+    label: '效率日常包',
+    description: '物品库 · 待办 · 习惯追踪',
+  },
+  {
+    id: 'ai-assistant',
+    icon: '✦',
+    label: 'AI 助理包',
+    description: '笔记 · 日程同步 · 后续接入',
+  },
+  {
+    id: 'custom-toolbox',
+    icon: '＋',
+    label: '自定义工具包',
+    description: '选择你的工具组合',
+  },
+] as const;
+
+type ToolboxAction = {
+  kind: 'tool' | 'package';
+  id: string;
+  label: string;
+  message: string;
+};
+
 function dataDepthToneClass(item: BaoheDataDepthItem): string {
   return `portal-treasure-data-card--${item.tone}`;
 }
@@ -97,6 +134,7 @@ export default function ToolsTreasurePopup({
     testerAllowlist: [],
   });
   const [personalizationProfile, setPersonalizationProfile] = useState(() => getBaohePersonalizationProfile());
+  const [selectedToolboxAction, setSelectedToolboxAction] = useState<ToolboxAction | null>(null);
 
   useEffect(() => {
     setLaunchContext(normalizeLaunchContext(readLaunchSurfaceContextFromBrowser()));
@@ -158,6 +196,24 @@ export default function ToolsTreasurePopup({
   const planTool = visibleTools.find((tool) => tool.id === 'plan');
   const inventoryTool = visibleTools.find((tool) => tool.id === 'inventory');
 
+  function handleAddTool(id: string, label: string) {
+    setSelectedToolboxAction({
+      kind: 'tool',
+      id,
+      label,
+      message: `${label} 已加入本地工作台请求。等对应模块开放后，会从这里继续。`,
+    });
+  }
+
+  function handleSelectPackage(id: string, label: string) {
+    setSelectedToolboxAction({
+      kind: 'package',
+      id,
+      label,
+      message: `${label} 已选中。宝盒会优先围绕这组工具整理首页入口。`,
+    });
+  }
+
   if (typeof document === 'undefined') return null;
 
   if (variant === 'screen') {
@@ -169,6 +225,14 @@ export default function ToolsTreasurePopup({
             <p>发现适合你的工具，一键加入工作台</p>
           </div>
         </header>
+
+        {selectedToolboxAction ? (
+          <section className="portal-treasure-action-status" aria-live="polite">
+            <span>{selectedToolboxAction.kind === 'package' ? '已选择工具包' : '已加入请求'}</span>
+            <b>{selectedToolboxAction.label}</b>
+            <small>{selectedToolboxAction.message}</small>
+          </section>
+        ) : null}
 
         <section className="portal-treasure-screen-section" aria-label="我的工具">
           <h2>我的工具</h2>
@@ -202,18 +266,16 @@ export default function ToolsTreasurePopup({
         <section className="portal-treasure-screen-section" aria-label="可添加">
           <h2>可添加</h2>
           <div className="portal-treasure-screen-grid">
-            {[
-              ['📖', '阅读追踪'],
-              ['🏋️', '健身记录'],
-              ['🌱', '习惯追踪'],
-              ['🚗', '车辆管理'],
-              ['💊', '健康档案'],
-              ['🏡', '家居维护'],
-            ].map(([icon, label]) => (
-              <button key={label} type="button" disabled>
+            {ADDABLE_TOOLS.map(([icon, id, label]) => (
+              <button
+                key={id}
+                type="button"
+                className={selectedToolboxAction?.id === id ? 'is-selected' : ''}
+                onClick={() => handleAddTool(id, label)}
+              >
                 <span className="portal-treasure-screen-icon" aria-hidden>{icon}</span>
                 <b>{label}</b>
-                <small>＋ 添加</small>
+                <small>{selectedToolboxAction?.id === id ? '已加入' : '＋ 添加'}</small>
               </button>
             ))}
           </div>
@@ -222,28 +284,27 @@ export default function ToolsTreasurePopup({
         <section className="portal-treasure-discovery-hero" aria-label="个性化推荐">
           <p>个性化推荐</p>
           <h2>礼物管家</h2>
-          <span>根据你的重要日期和亲友偏好推荐。当前使用 mock 数据，推荐算法后续接入。</span>
-          <button type="button">＋ 加入工作台</button>
+          <span>根据你的重要日期和亲友偏好推荐。当前先保存为本地工作台请求，算法接入后会继续优化。</span>
+          <button type="button" onClick={() => handleAddTool('gift-concierge', '礼物管家')}>
+            {selectedToolboxAction?.id === 'gift-concierge' ? '已加入工作台' : '＋ 加入工作台'}
+          </button>
         </section>
 
         <section className="portal-treasure-screen-section" aria-label="工具包">
           <h2>工具包</h2>
           <div className="portal-treasure-package-list">
-            <button type="button">
-              <span aria-hidden>⚡</span>
-              <b>效率日常包</b>
-              <small>物品库 · 待办 · 习惯追踪</small>
-            </button>
-            <button type="button">
-              <span aria-hidden>✦</span>
-              <b>AI 助理包</b>
-              <small>笔记 · 日程同步 · 后续接入</small>
-            </button>
-            <button type="button">
-              <span aria-hidden>＋</span>
-              <b>自定义工具包</b>
-              <small>选择你的工具组合</small>
-            </button>
+            {TOOL_PACKAGES.map((pack) => (
+              <button
+                key={pack.id}
+                type="button"
+                className={selectedToolboxAction?.id === pack.id ? 'is-selected' : ''}
+                onClick={() => handleSelectPackage(pack.id, pack.label)}
+              >
+                <span aria-hidden>{pack.icon}</span>
+                <b>{pack.label}</b>
+                <small>{pack.description}</small>
+              </button>
+            ))}
           </div>
         </section>
 

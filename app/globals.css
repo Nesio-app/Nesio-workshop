@@ -3113,6 +3113,36 @@ body {
   font-weight: 650;
 }
 
+.portal-treasure-action-status {
+  display: grid;
+  gap: 0.2rem;
+  margin: 0 0 0.9rem;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  padding: 0.78rem 0.9rem;
+  background: var(--glass-bg-solid);
+  color: var(--portal-ink);
+  box-shadow: var(--shadow-card), var(--glass-highlight);
+}
+
+.portal-treasure-action-status span {
+  color: var(--portal-blue-deep);
+  font-size: 0.62rem;
+  font-weight: 850;
+}
+
+.portal-treasure-action-status b {
+  font-size: 0.88rem;
+  font-weight: 900;
+}
+
+.portal-treasure-action-status small {
+  color: var(--portal-muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
 .portal-treasure-discovery-hero {
   display: grid;
   gap: 0.42rem;
@@ -3198,6 +3228,13 @@ body {
 
 .portal-treasure-screen-grid button:disabled {
   opacity: 0.72;
+}
+
+.portal-treasure-screen-grid button.is-selected,
+.portal-treasure-package-list button.is-selected {
+  border-color: rgba(88, 140, 227, 0.42);
+  background: var(--glass-bg-raised);
+  box-shadow: var(--shadow-raise), var(--glass-highlight);
 }
 
 .portal-treasure-screen-grid button.is-owned {
