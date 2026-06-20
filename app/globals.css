@@ -7902,12 +7902,15 @@ html[data-portal-theme="night"] .portal-ai-screen-icon-btn {
 
 html[data-portal-theme="night"] .portal-ai-call-sheet,
 html[data-portal-theme="night"] .portal-ai-conversation-sheet > section,
+html[data-portal-theme="night"] .portal-crush-sheet-card,
 html[data-portal-theme="night"] .portal-mood-card,
 html[data-portal-theme="night"] .portal-reminder-card,
 html[data-portal-theme="night"] .portal-purchased-tools-card {
   border-color: rgba(255,255,255,.28) !important;
-  background: rgba(22,36,68,.88) !important;
+  background: var(--modal-card-bg) !important;
   color: #edf5ff !important;
+  backdrop-filter: blur(var(--modal-card-blur)) saturate(var(--modal-card-saturate)) !important;
+  -webkit-backdrop-filter: blur(var(--modal-card-blur)) saturate(var(--modal-card-saturate)) !important;
 }
 
 html[data-portal-theme="night"] .portal-ai-mention-menu,
