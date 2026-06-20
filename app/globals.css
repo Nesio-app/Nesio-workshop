@@ -3292,6 +3292,22 @@ body {
   opacity: 1;
 }
 
+.portal-treasure-data-card.is-requestable,
+.portal-treasure-my-grid button.is-requestable {
+  cursor: pointer;
+}
+
+.portal-treasure-data-card.is-requestable .portal-treasure-data-copy small,
+.portal-treasure-my-grid button.is-requestable small {
+  color: #6f7fa6;
+}
+
+.portal-treasure-data-card.is-selected,
+.portal-treasure-my-grid button.is-selected {
+  outline: 2px solid rgba(88, 140, 227, 0.42);
+  box-shadow: 0 12px 28px rgba(74, 108, 247, 0.14);
+}
+
 .portal-treasure-data-icon {
   grid-row: 1;
   color: #4a6cf7;

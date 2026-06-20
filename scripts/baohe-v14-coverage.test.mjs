@@ -84,6 +84,21 @@ assert.doesNotMatch(
   /portal-treasure-screen-grid[\s\S]{0,900}<button key=\{label\} type="button" disabled>/,
   'Toolbox addable tools must not render disabled buttons; every visible control needs a local action.',
 );
+assert.doesNotMatch(
+  toolboxSource,
+  /portal-treasure-data-grid[\s\S]{0,1400}disabled=\{!tool\}/,
+  'Toolbox owned/data cards must not disable missing modules; they need an add/purchase/request action.',
+);
+assert.doesNotMatch(
+  toolboxSource,
+  /portal-treasure-my-grid[\s\S]{0,1400}disabled=\{!tool\}/,
+  'Toolbox popup preview cards must not disable missing modules; they need an add/purchase/request action.',
+);
+assert.match(
+  toolboxSource,
+  /handleRequestToolAccess[\s\S]{0,900}kind:\s*'tool'/,
+  'Toolbox missing module cards must route to a local access request action.',
+);
 assert.match(
   toolboxSource,
   /portal-treasure-discovery-hero[\s\S]{0,1000}onClick=\{\(\) => handleAddTool\('gift-concierge'/,

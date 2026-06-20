@@ -205,6 +205,15 @@ export default function ToolsTreasurePopup({
     });
   }
 
+  function handleRequestToolAccess(id: string, label: string) {
+    setSelectedToolboxAction({
+      kind: 'tool',
+      id,
+      label,
+      message: `${label} 还没有加入当前工作台。我已先保存为本地开启请求；可在工具箱继续购买/加入。`,
+    });
+  }
+
   function handleSelectPackage(id: string, label: string) {
     setSelectedToolboxAction({
       kind: 'package',
@@ -239,13 +248,13 @@ export default function ToolsTreasurePopup({
           <div className="portal-treasure-data-grid">
             {personalizationProfile.dataDepth.map((entry) => {
               const tool = entry.id === 'home_items' ? inventoryTool : entry.id === 'tasks' ? planTool : null;
+              const isSelected = selectedToolboxAction?.id === entry.id;
               return (
                 <button
                   key={entry.id}
                   type="button"
-                  className={`portal-treasure-data-card ${dataDepthToneClass(entry)}${tool ? ' is-owned' : ''}`}
-                  onClick={tool ? () => onOpenTool(tool) : undefined}
-                  disabled={!tool}
+                  className={`portal-treasure-data-card ${dataDepthToneClass(entry)}${tool ? ' is-owned' : ' is-requestable'}${isSelected ? ' is-selected' : ''}`}
+                  onClick={tool ? () => onOpenTool(tool) : () => handleRequestToolAccess(entry.id, entry.name)}
                 >
                   <span className="portal-treasure-data-icon" aria-hidden>
                     {entry.icon}
@@ -374,13 +383,13 @@ export default function ToolsTreasurePopup({
           <div className="portal-treasure-my-grid">
             {MY_TOOL_PREVIEWS.map((entry) => {
               const tool = entry.id === 'inventory' ? inventoryTool : null;
+              const isSelected = selectedToolboxAction?.id === entry.id;
               return (
                 <button
                   key={entry.id}
                   type="button"
-                  className={tool ? 'is-ready' : ''}
-                  onClick={tool ? () => onOpenTool(tool) : undefined}
-                  disabled={!tool}
+                  className={`${tool ? 'is-ready' : 'is-requestable'}${isSelected ? ' is-selected' : ''}`}
+                  onClick={tool ? () => onOpenTool(tool) : () => handleRequestToolAccess(entry.id, entry.label)}
                 >
                   <span>{entry.label}</span>
                   <small>{entry.description} · {entry.status}</small>
