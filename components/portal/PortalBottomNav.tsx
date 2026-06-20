@@ -1,5 +1,8 @@
 'use client';
 
+import type { CSSProperties } from 'react';
+import { nesioBrandAssets, nesioToolIcons } from '@/lib/portal/nesio-design-system-assets.mjs';
+
 interface PortalBottomNavProps {
   aiFriendsOpen?: boolean;
   treasureOpen?: boolean;
@@ -8,6 +11,10 @@ interface PortalBottomNavProps {
   onOpenTreasure: () => void;
 }
 
+type PortalBottomNavCssProperties = CSSProperties & {
+  '--portal-bottom-nav-icon-url'?: string;
+};
+
 export default function PortalBottomNav({
   aiFriendsOpen = false,
   treasureOpen = false,
@@ -15,43 +22,52 @@ export default function PortalBottomNav({
   onOpenAiFriends,
   onOpenTreasure,
 }: PortalBottomNavProps) {
+  const bottomNavItems = [
+    {
+      key: 'home',
+      label: '首页',
+      iconUrl: nesioBrandAssets.crystal,
+      active: false,
+      expanded: undefined,
+      onClick: onHome,
+    },
+    {
+      key: 'ai',
+      label: '智友',
+      iconUrl: nesioToolIcons.secretary,
+      active: aiFriendsOpen,
+      expanded: aiFriendsOpen,
+      onClick: onOpenAiFriends,
+    },
+    {
+      key: 'toolbox',
+      label: '工具箱',
+      iconUrl: nesioToolIcons.storage,
+      active: treasureOpen,
+      expanded: treasureOpen,
+      onClick: onOpenTreasure,
+    },
+  ];
+
   return (
     <nav className="portal-bottom-nav" aria-label="宝盒导航">
-      <button
-        type="button"
-        className="portal-bottom-nav-btn"
-        onClick={onHome}
-        aria-label="首页"
-      >
-        <span className="portal-bottom-nav-icon portal-bottom-nav-icon--symbol" aria-hidden>
-          ⌂
-        </span>
-        <span className="portal-bottom-nav-label">首页</span>
-      </button>
-      <button
-        type="button"
-        className={
-          'portal-bottom-nav-btn' + (aiFriendsOpen ? ' portal-bottom-nav-btn--active' : '')
-        }
-        onClick={onOpenAiFriends}
-        aria-label="智友"
-        aria-expanded={aiFriendsOpen}
-      >
-        <span className="portal-bottom-nav-icon portal-bottom-nav-icon--symbol" aria-hidden>✦</span>
-        <span className="portal-bottom-nav-label">智友</span>
-      </button>
-      <button
-        type="button"
-        className={
-          'portal-bottom-nav-btn' + (treasureOpen ? ' portal-bottom-nav-btn--active' : '')
-        }
-        onClick={onOpenTreasure}
-        aria-label="工具箱"
-        aria-expanded={treasureOpen}
-      >
-        <span className="portal-bottom-nav-icon portal-bottom-nav-icon--symbol" aria-hidden>▦</span>
-        <span className="portal-bottom-nav-label">工具箱</span>
-      </button>
+      {bottomNavItems.map((item) => (
+        <button
+          key={item.key}
+          type="button"
+          className={'portal-bottom-nav-btn' + (item.active ? ' portal-bottom-nav-btn--active' : '')}
+          onClick={item.onClick}
+          aria-label={item.label}
+          aria-expanded={item.expanded}
+        >
+          <span
+            className="portal-bottom-nav-icon portal-bottom-nav-icon--mask"
+            style={{ '--portal-bottom-nav-icon-url': `url("${item.iconUrl}")` } as PortalBottomNavCssProperties}
+            aria-hidden
+          />
+          <span className="portal-bottom-nav-label">{item.label}</span>
+        </button>
+      ))}
     </nav>
   );
 }
