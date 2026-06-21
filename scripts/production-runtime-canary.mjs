@@ -175,18 +175,62 @@ for (const staticPath of ['/secretary/index.html', '/secretary/chat.html']) {
   );
 }
 
-const authGoogle = await fetchJson('/api/auth/start', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ provider: 'google' }),
-});
-check(
-  authGoogle.response.status === 503 || authGoogle.body?.action === 'redirect',
-  'Google auth start either redirects when configured or fails closed',
-  authGoogle.body,
-);
-if (authGoogle.response.status === 503) {
-  check(authGoogle.body?.error === 'provider_not_configured', 'Google auth fail-closed explains provider_not_configured', authGoogle.body);
+const authProviderCanaryMatrix = [
+  {
+    provider: 'email',
+    message: 'email auth start is wired and validates input or fails closed',
+    acceptedErrors: ['missing_email', 'provider_not_configured', 'canonical_domain_mismatch'],
+    acceptedAction: 'otp_sent',
+  },
+  {
+    provider: 'google',
+    message: 'Google auth start either redirects when configured or fails closed',
+    acceptedErrors: ['provider_not_configured', 'canonical_domain_mismatch'],
+    acceptedAction: 'redirect',
+  },
+  {
+    provider: 'wechat',
+    message: 'wechat auth start either redirects when configured or fails closed',
+    acceptedErrors: ['provider_not_configured', 'canonical_domain_mismatch'],
+    acceptedAction: 'redirect',
+  },
+  {
+    provider: 'phone',
+    message: 'phone auth start is wired and validates input or fails closed',
+    acceptedErrors: ['missing_phone', 'provider_not_configured', 'canonical_domain_mismatch'],
+    acceptedAction: 'otp_sent',
+  },
+];
+
+for (const authProvider of authProviderCanaryMatrix) {
+  const authResult = await fetchJson('/api/auth/start', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ provider: authProvider.provider }),
+  });
+  check(
+    authResult.body?.safePublicStatus === true && authResult.body?.secretsRedacted === true,
+    `${authProvider.provider} auth start returns safe JSON`,
+    authResult.body,
+  );
+  check(
+    authResult.body?.action === authProvider.acceptedAction ||
+      authProvider.acceptedErrors.includes(authResult.body?.error),
+    authProvider.message,
+    {
+      status: authResult.response.status,
+      action: authResult.body?.action,
+      error: authResult.body?.error,
+      setupTask: authResult.body?.setupTask,
+    },
+  );
+  if (authResult.response.status === 503) {
+    check(
+      ['provider_not_configured', 'canonical_domain_mismatch'].includes(authResult.body?.error),
+      `${authProvider.provider} auth fail-closed explains configuration or domain state`,
+      authResult.body,
+    );
+  }
 }
 
 const gemini = await fetchJson('/api/secretary/chat', {
