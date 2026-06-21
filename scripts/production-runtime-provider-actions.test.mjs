@@ -1,11 +1,19 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import ts from 'typescript';
 
 const root = process.cwd();
 const runtime = fs.readFileSync(path.join(root, 'lib', 'portal', 'production-runtime.ts'), 'utf8');
 const healthRoute = fs.readFileSync(path.join(root, 'app', 'api', 'portal', 'production', 'health', 'route.ts'), 'utf8');
 const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+const compiledRuntime = ts.transpileModule(runtime, {
+  compilerOptions: {
+    module: ts.ModuleKind.ESNext,
+    target: ts.ScriptTarget.ES2022,
+  },
+});
+const runtimeModule = await import(`data:text/javascript;base64,${Buffer.from(compiledRuntime.outputText).toString('base64')}`);
 
 assert.match(runtime, /providerActionMatrix/, 'production runtime status must expose providerActionMatrix');
 assert.match(runtime, /setupTaskMatrix/, 'production runtime status must expose setupTaskMatrix for launchable provider setup');
@@ -54,6 +62,45 @@ assert.match(
   packageJson.scripts['test:contracts'],
   /test:production-runtime-provider-actions/,
   'test:contracts must include provider action matrix coverage',
+);
+
+const allowedHostRuntime = runtimeModule.buildProductionRuntimeStatus({
+  BAOHE_CANONICAL_DOMAIN: 'www.nesio.app',
+  BAOHE_ALLOWED_RUNTIME_HOSTS: 'https://treasurebox-nu.vercel.app, preview.nesio.app:443',
+  BAOHE_AUTH_ENABLED: 'true',
+  SUPABASE_URL: 'https://example.supabase.co',
+  SUPABASE_ANON_KEY: 'anon',
+  GOOGLE_CLIENT_ID: 'google-client',
+  GOOGLE_CLIENT_SECRET: 'google-secret',
+}, {
+  requestHost: 'treasurebox-nu.vercel.app',
+});
+assert.equal(
+  allowedHostRuntime.canonicalDomainMatchesRequestHost,
+  true,
+  'full URL entries in BAOHE_ALLOWED_RUNTIME_HOSTS should allow matching runtime hosts.',
+);
+assert.deepEqual(
+  allowedHostRuntime.canonicalDomainAllowedHosts,
+  ['www.nesio.app', 'treasurebox-nu.vercel.app', 'preview.nesio.app'],
+  'canonicalDomainAllowedHosts should expose normalized canonical and allowed runtime hosts.',
+);
+
+const blockedHostRuntime = runtimeModule.buildProductionRuntimeStatus({
+  BAOHE_CANONICAL_DOMAIN: 'www.nesio.app',
+  BAOHE_ALLOWED_RUNTIME_HOSTS: 'treasurebox-nu.vercel.app',
+  BAOHE_AUTH_ENABLED: 'true',
+  SUPABASE_URL: 'https://example.supabase.co',
+  SUPABASE_ANON_KEY: 'anon',
+  GOOGLE_CLIENT_ID: 'google-client',
+  GOOGLE_CLIENT_SECRET: 'google-secret',
+}, {
+  requestHost: 'unknown.example.com',
+});
+assert.equal(
+  blockedHostRuntime.setupTaskMatrix.find((task) => task.id === 'google')?.blockedReason,
+  'canonical_domain_mismatch',
+  'unknown production hosts must continue to fail closed for OAuth auth setup.',
 );
 
 console.log('production runtime provider action matrix tests passed');

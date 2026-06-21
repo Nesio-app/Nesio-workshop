@@ -38,7 +38,13 @@ function envList(env: EnvMap, key: string): string[] {
 }
 
 function normalizeHost(host: string): string {
-  return host.split(':')[0].toLowerCase();
+  const value = host.trim();
+  if (!value) return '';
+  try {
+    return new URL(value.includes('://') ? value : `https://${value}`).hostname.toLowerCase();
+  } catch {
+    return value.split(':')[0].toLowerCase();
+  }
 }
 
 function hasAiProviderKey(env: EnvMap): boolean {
