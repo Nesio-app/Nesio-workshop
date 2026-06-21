@@ -18,9 +18,9 @@ const personalizationInsights = readFileSync(join(root, 'lib', 'portal', 'person
 const storageSourceHome = readFileSync(join(root, 'storage-web', 'index.html'), 'utf8');
 const storageHome = readFileSync(join(root, 'public', 'storage', 'index.html'), 'utf8');
 const calendarRoute = readFileSync(join(root, 'app', 'api', 'portal', 'calendar', 'route.ts'), 'utf8');
-const secretaryList = readFileSync(join(root, 'public', 'secretary', 'index.html'), 'utf8');
-const secretaryListJs = readFileSync(join(root, 'public', 'secretary', 'list.js'), 'utf8');
-const secretaryApi = readFileSync(join(root, 'public', 'secretary', 'api.js'), 'utf8');
+const secretaryList = readFileSync(join(root, 'tools', 'secretary', 'index.html'), 'utf8');
+const secretaryListJs = readFileSync(join(root, 'tools', 'secretary', 'list.js'), 'utf8');
+const secretaryApi = readFileSync(join(root, 'tools', 'secretary', 'api.js'), 'utf8');
 const moduleManagerCore = readFileSync(join(root, 'lib', 'portal', 'module-manager-core.mjs'), 'utf8');
 const moduleManagerTs = readFileSync(join(root, 'lib', 'portal', 'module-manager.ts'), 'utf8');
 const secretaryChatRoute = readFileSync(join(root, 'app', 'api', 'secretary', 'chat', 'route.ts'), 'utf8');
@@ -61,8 +61,8 @@ assert.doesNotMatch(onboarding, /Baohe|Treasure Box|TreasureBox|Nosio/, 'Public 
 assert.doesNotMatch(storageSourceHome, /Baohe|Treasure Box|TreasureBox|Nosio/, 'Inventory source first-launch copy must use Nesio naming.');
 assert.doesNotMatch(storageHome, /Baohe|Treasure Box|TreasureBox|Nosio/, 'Public Inventory first-launch copy must use Nesio naming.');
 assert.doesNotMatch(calendarRoute, /TreasureBox|Treasure Box|Nosio/, 'External-facing calendar User-Agent must use Nesio naming.');
-assert.doesNotMatch(secretaryList, /宝盒工具|>宝盒<|Baohe|Treasure Box|TreasureBox|Nosio/, 'Public Secretary list chrome must use Nesio naming.');
-assert.doesNotMatch(secretaryListJs, /返回宝盒|Baohe|Treasure Box|TreasureBox|Nosio/, 'Public Secretary actions must use Nesio naming.');
+assert.doesNotMatch(secretaryList, /宝盒工具|>宝盒<|Baohe|Treasure Box|TreasureBox|Nosio/, 'Secretary gated-source list chrome must use Nesio naming.');
+assert.doesNotMatch(secretaryListJs, /返回宝盒|Baohe|Treasure Box|TreasureBox|Nosio/, 'Secretary gated-source actions must use Nesio naming.');
 assert.doesNotMatch(secretaryApi, /treasurebox-nu\.vercel\.app|Nosio/, 'Secretary API public fallback must use the Nesio domain.');
 assert.doesNotMatch(
   moduleManagerCore,
@@ -93,15 +93,15 @@ for (const [name, source] of [
   ['DashboardHome', dashboardHome],
   ['ToolsTreasureSheet', toolsTreasureSheet],
   ['personalization-insights', personalizationInsights],
-  ['public Secretary chat actions', secretaryListJs],
+  ['Secretary gated-source chat actions', secretaryListJs],
 ]) {
   assert.doesNotMatch(source, /宝盒/, `${name} public-facing copy must use Nesio instead of 宝盒.`);
 }
 assert.match(onboarding, /Nesio/, 'Public onboarding copy should mention Nesio.');
 assert.match(storageSourceHome, /Nesio Purchase Memory/, 'Inventory source first-launch kicker should mention Nesio.');
 assert.match(storageHome, /Nesio Purchase Memory/, 'Inventory first-launch kicker should mention Nesio.');
-assert.match(secretaryList, /Nesio/, 'Public Secretary list chrome should mention Nesio.');
-assert.match(secretaryListJs, /返回 Nesio/, 'Public Secretary dock should return to Nesio.');
+assert.match(secretaryList, /Nesio/, 'Secretary gated-source list chrome should mention Nesio.');
+assert.match(secretaryListJs, /返回 Nesio/, 'Secretary gated-source dock should return to Nesio.');
 assert.match(secretaryApi, /https:\/\/www\.nesio\.app/, 'Secretary API public fallback should use www.nesio.app.');
 assert.match(
   portfolioPage,

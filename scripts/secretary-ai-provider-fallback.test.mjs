@@ -9,10 +9,10 @@ function read(relativePath) {
 }
 
 const packageJson = JSON.parse(read('package.json'));
-const friends = JSON.parse(read('public/secretary/friends.json'));
-const chatJs = read('public/secretary/chat.js');
-const listJs = read('public/secretary/list.js');
-const groupJs = read('public/secretary/group.js');
+const friends = JSON.parse(read('tools/secretary/friends.json'));
+const chatJs = read('tools/secretary/chat.js');
+const listJs = read('tools/secretary/list.js');
+const groupJs = read('tools/secretary/group.js');
 const route = read('app/api/secretary/chat/route.ts');
 
 const aiIds = friends.map((friend) => friend.id);

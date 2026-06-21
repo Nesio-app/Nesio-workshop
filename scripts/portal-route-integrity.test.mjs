@@ -51,17 +51,17 @@ for (const route of [
   assertMiddlewareMatcher(route);
 }
 
-const secretaryIndex = read('public/secretary/index.html');
-const secretaryList = read('public/secretary/list.js');
-const secretaryChat = read('public/secretary/chat.js');
-const secretaryGroup = read('public/secretary/group.js');
+const secretaryIndex = read('tools/secretary/index.html');
+const secretaryList = read('tools/secretary/list.js');
+const secretaryChat = read('tools/secretary/chat.js');
+const secretaryGroup = read('tools/secretary/group.js');
 const storageIndex = read('public/storage/index.html');
 
 for (const [name, source] of [
-  ['public/secretary/index.html', secretaryIndex],
-  ['public/secretary/list.js', secretaryList],
-  ['public/secretary/chat.js', secretaryChat],
-  ['public/secretary/group.js', secretaryGroup],
+  ['tools/secretary/index.html', secretaryIndex],
+  ['tools/secretary/list.js', secretaryList],
+  ['tools/secretary/chat.js', secretaryChat],
+  ['tools/secretary/group.js', secretaryGroup],
   ['public/storage/index.html', storageIndex],
 ]) {
   assert.doesNotMatch(source, /\/index\.html\b/, `${name} must not navigate to /index.html`);

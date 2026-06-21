@@ -18,7 +18,7 @@ const publicRoot = outDirArgIndex >= 0
 
 const PACKAGE_SOURCES = Object.freeze({
   secretary: {
-    sourceDir: 'public/secretary',
+    sourceDir: 'tools/secretary',
     publicPath: 'secretary',
   },
   plan: {
@@ -84,7 +84,7 @@ function buildBundlePlan() {
     };
   });
   const entries = allEntries.filter((entry) => {
-    if (entry.moduleId === 'secretary') return true;
+    if (entry.moduleId === 'secretary') return includeSandbox;
     if (includeSandbox) return entry.launchStatus !== 'hidden' && entry.launchStatus !== 'gated';
     return entry.launchStatus === 'launchable' && entry.prodExposure === 'public' && entry.shellAction === 'open';
   });
