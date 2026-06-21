@@ -12,15 +12,20 @@ const packageJson = JSON.parse(read('package.json'));
 
 assert.match(
   `${decDataApi}\n${moduleDataNetworkDb}`,
-  /node:sqlite/,
-  'server-side data APIs currently use node:sqlite and require a Node runtime that supports it.',
+  /require\(['"]node:sqlite['"]\)|import\(['"]node:sqlite['"]\)/,
+  'server-side data APIs may use node:sqlite only through runtime lazy loading.',
+);
+assert.doesNotMatch(
+  `${decDataApi}\n${moduleDataNetworkDb}`,
+  /import\s+\{?\s*DatabaseSync[\s\S]{0,80}from ['"]node:sqlite['"]/,
+  'server-side data APIs must not statically import node:sqlite during Next page data collection.',
 );
 
 const nodeVersionMatch = workflow.match(/node-version:\s*['"]?(\d+)/);
 assert.ok(nodeVersionMatch, 'release workflow must pin an explicit Node version.');
 assert.ok(
   Number(nodeVersionMatch[1]) >= 22,
-  'release workflow must use Node 22+ while build-time routes import node:sqlite.',
+  'release workflow must use Node 22+ for runtime sqlite support when DB mode is enabled.',
 );
 assert.doesNotMatch(
   workflow,

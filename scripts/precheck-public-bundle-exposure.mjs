@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -38,6 +38,7 @@ const middleware = execFileSync('node', ['-e', "const fs=require('fs'); process.
   cwd: repoRoot,
   encoding: 'utf8',
 });
+const vercelConfig = JSON.parse(readFileSync(join(repoRoot, 'vercel.json'), 'utf8'));
 assert.match(launchSafety, /['"]\/secretary['"]/, 'secretary direct URL must be first-launch blocked');
 assert.match(
   middleware,
@@ -49,6 +50,11 @@ const secretaryRewriteIndex = middleware.indexOf("url.pathname = '/secretary/ind
 assert.ok(
   secretaryGateIndex >= 0 && secretaryRewriteIndex > secretaryGateIndex,
   'middleware must only rewrite /secretary after the explicit personal/lab page gate check',
+);
+assert.deepEqual(
+  (vercelConfig.rewrites || []).filter((rewrite) => String(rewrite.source || '').startsWith('/secretary')),
+  [],
+  'vercel rewrites must not expose /secretary static bundle outside middleware/lab gate',
 );
 
 const publicDirs = existsSync(publicRoot)

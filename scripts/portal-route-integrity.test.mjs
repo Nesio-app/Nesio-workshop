@@ -30,13 +30,15 @@ function assertMiddlewareMatcher(route) {
 for (const [source, destination] of [
   ['/storage', '/storage/index.html'],
   ['/storage/', '/storage/index.html'],
-  ['/secretary', '/secretary/index.html'],
-  ['/secretary/', '/secretary/index.html'],
-  ['/secretary/chat', '/secretary/chat.html'],
-  ['/secretary/group', '/secretary/group.html'],
 ]) {
   assertRewrite(source, destination);
 }
+
+assert.deepEqual(
+  (vercelJson.rewrites || []).filter((rewrite) => String(rewrite.source || '').startsWith('/secretary')),
+  [],
+  'Secretary must not be exposed by public Vercel rewrites; middleware/lab gate owns this route.',
+);
 
 for (const route of [
   '/storage',
