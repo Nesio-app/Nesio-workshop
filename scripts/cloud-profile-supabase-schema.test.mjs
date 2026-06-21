@@ -17,7 +17,8 @@ const pkg = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
 
 for (const marker of [
   'CREATE TABLE IF NOT EXISTS public.profile_settings',
-  'user_id uuid PRIMARY KEY',
+  'identity_key text PRIMARY KEY',
+  'user_id uuid REFERENCES auth.users',
   'settings jsonb NOT NULL DEFAULT',
   'updated_at timestamptz NOT NULL DEFAULT now()',
   'ALTER TABLE public.profile_settings ENABLE ROW LEVEL SECURITY',
@@ -34,6 +35,8 @@ assert.match(
   'settings must be constrained to a JSON object.',
 );
 assert.match(route, /\/rest\/v1\/profile_settings/, 'cloud profile route must target profile_settings.');
+assert.match(route, /identity_key/, 'cloud profile route must use provider-neutral identity_key for Supabase and linked third-party auth.');
+assert.match(route, /deriveCloudIdentity/, 'cloud profile route must derive a provider-neutral cloud identity.');
 assert.match(readme, /supabase-profile-settings-v1\.sql/, 'database README must document the Supabase profile settings schema.');
 assert.equal(
   pkg.scripts['test:cloud-profile-supabase-schema'],

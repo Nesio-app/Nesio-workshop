@@ -4,6 +4,7 @@ import {
   buildProductionRuntimeStatus,
   type ProductionRuntimeSetupTask,
 } from '@/lib/portal/production-runtime';
+import { deriveCloudIdentity } from '@/lib/portal/cloud-identity';
 
 type SupabaseUserResponse = {
   id?: string;
@@ -266,9 +267,9 @@ function sanitizeInventoryItems(input: unknown): { items: CloudInventoryItem[]; 
   return { items, rejectedCount };
 }
 
-async function readExistingLocalIds(config: ReturnType<typeof getCloudConfig>, userId: string): Promise<string[]> {
+async function readExistingLocalIds(config: ReturnType<typeof getCloudConfig>, identityKey: string): Promise<string[]> {
   const url = new URL('/rest/v1/inventory_items', config.supabaseUrl);
-  url.searchParams.set('user_id', `eq.${userId}`);
+  url.searchParams.set('identity_key', `eq.${identityKey}`);
   url.searchParams.set('deleted_at', 'is.null');
   url.searchParams.set('select', 'local_id');
 
@@ -299,7 +300,8 @@ export async function GET(request: NextRequest) {
 
   const userSession = await getSignedInUser(config);
   const user = userSession.user;
-  if (!user?.id) {
+  const cloudIdentity = deriveCloudIdentity(user);
+  if (!cloudIdentity) {
     return safeJson(
       {
         ok: false,
@@ -313,7 +315,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const url = new URL('/rest/v1/inventory_items', config.supabaseUrl);
-    url.searchParams.set('user_id', `eq.${user.id}`);
+    url.searchParams.set('identity_key', `eq.${cloudIdentity.identityKey}`);
     url.searchParams.set('deleted_at', 'is.null');
     url.searchParams.set('select', 'local_id,item,updated_at');
     url.searchParams.set('order', 'updated_at.desc');
@@ -365,7 +367,8 @@ export async function POST(request: NextRequest) {
 
   const userSession = await getSignedInUser(config);
   const user = userSession.user;
-  if (!user?.id) {
+  const cloudIdentity = deriveCloudIdentity(user);
+  if (!cloudIdentity) {
     return safeJson(
       {
         ok: false,
@@ -399,7 +402,7 @@ export async function POST(request: NextRequest) {
   try {
     if (items.length > 0) {
       const url = new URL('/rest/v1/inventory_items', config.supabaseUrl);
-      url.searchParams.set('on_conflict', 'user_id,local_id');
+      url.searchParams.set('on_conflict', 'identity_key,local_id');
       const response = await fetch(url.toString(), {
         method: 'POST',
         headers: {
@@ -408,7 +411,8 @@ export async function POST(request: NextRequest) {
         },
         body: JSON.stringify(
           items.map((item) => ({
-            user_id: user.id,
+            identity_key: cloudIdentity.identityKey,
+            user_id: cloudIdentity.userId,
             local_id: item.id,
             schema_version: LOCAL_INVENTORY_ITEM_SCHEMA_VERSION,
             item: {
@@ -426,12 +430,12 @@ export async function POST(request: NextRequest) {
 
     let deletedMissingCount = 0;
     if (rawBody.deleteMissing === true) {
-      const existingLocalIds = await readExistingLocalIds(config, user.id);
+      const existingLocalIds = await readExistingLocalIds(config, cloudIdentity.identityKey);
       const keptLocalIds = new Set(items.map((item) => item.id));
       const missingLocalIds = existingLocalIds.filter((localId) => !keptLocalIds.has(localId));
       for (const localId of missingLocalIds) {
         const url = new URL('/rest/v1/inventory_items', config.supabaseUrl);
-        url.searchParams.set('user_id', `eq.${user.id}`);
+        url.searchParams.set('identity_key', `eq.${cloudIdentity.identityKey}`);
         url.searchParams.set('local_id', `eq.${localId}`);
         const response = await fetch(url.toString(), {
           method: 'PATCH',

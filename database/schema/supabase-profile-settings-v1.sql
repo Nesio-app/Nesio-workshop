@@ -1,9 +1,11 @@
 -- Nesio cloud profile settings v1
 -- Apply manually in Supabase SQL editor before enabling CLOUD_DB_ENABLED=true.
 -- This schema supports app/api/cloud/profile-settings/route.ts.
+-- identity_key supports Supabase auth users and linked third-party auth identities.
 
 CREATE TABLE IF NOT EXISTS public.profile_settings (
-  user_id uuid PRIMARY KEY REFERENCES auth.users (id) ON DELETE CASCADE,
+  identity_key text PRIMARY KEY,
+  user_id uuid REFERENCES auth.users (id) ON DELETE CASCADE,
   settings jsonb NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(settings) = 'object'),
   updated_at timestamptz NOT NULL DEFAULT now(),
   created_at timestamptz NOT NULL DEFAULT now()
@@ -12,24 +14,27 @@ CREATE TABLE IF NOT EXISTS public.profile_settings (
 CREATE INDEX IF NOT EXISTS idx_profile_settings_updated_at
   ON public.profile_settings (updated_at DESC);
 
+CREATE INDEX IF NOT EXISTS idx_profile_settings_user_updated
+  ON public.profile_settings (user_id, updated_at DESC)
+  WHERE user_id IS NOT NULL;
+
 ALTER TABLE public.profile_settings ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "profile_settings_select_own"
   ON public.profile_settings
   FOR SELECT
   TO authenticated
-  USING (auth.uid() = user_id);
+  USING (user_id IS NOT NULL AND auth.uid() = user_id);
 
 CREATE POLICY "profile_settings_insert_own"
   ON public.profile_settings
   FOR INSERT
   TO authenticated
-  WITH CHECK (auth.uid() = user_id);
+  WITH CHECK (user_id IS NOT NULL AND auth.uid() = user_id);
 
 CREATE POLICY "profile_settings_update_own"
   ON public.profile_settings
   FOR UPDATE
   TO authenticated
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
-
+  USING (user_id IS NOT NULL AND auth.uid() = user_id)
+  WITH CHECK (user_id IS NOT NULL AND auth.uid() = user_id);

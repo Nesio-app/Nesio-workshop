@@ -4,6 +4,7 @@ import {
   buildProductionRuntimeStatus,
   type ProductionRuntimeSetupTask,
 } from '@/lib/portal/production-runtime';
+import { deriveCloudIdentity } from '@/lib/portal/cloud-identity';
 
 type SupabaseUserResponse = {
   id?: string;
@@ -207,7 +208,8 @@ export async function GET(request: NextRequest) {
 
   const userSession = await getSignedInUser(config);
   const user = userSession.user;
-  if (!user?.id) {
+  const cloudIdentity = deriveCloudIdentity(user);
+  if (!cloudIdentity) {
     return safeJson(
       {
         ok: false,
@@ -221,7 +223,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const url = new URL('/rest/v1/profile_settings', config.supabaseUrl);
-    url.searchParams.set('user_id', `eq.${user.id}`);
+    url.searchParams.set('identity_key', `eq.${cloudIdentity.identityKey}`);
     url.searchParams.set('select', 'settings,updated_at');
     url.searchParams.set('limit', '1');
 
@@ -271,7 +273,8 @@ export async function POST(request: NextRequest) {
 
   const userSession = await getSignedInUser(config);
   const user = userSession.user;
-  if (!user?.id) {
+  const cloudIdentity = deriveCloudIdentity(user);
+  if (!cloudIdentity) {
     return safeJson(
       {
         ok: false,
@@ -302,7 +305,8 @@ export async function POST(request: NextRequest) {
         Prefer: 'resolution=merge-duplicates,return=representation',
       },
       body: JSON.stringify({
-        user_id: user.id,
+        identity_key: cloudIdentity.identityKey,
+        user_id: cloudIdentity.userId,
         settings,
         updated_at: updatedAt,
       }),
