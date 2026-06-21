@@ -184,6 +184,41 @@ check(
   cloudProfileSettings.body,
 );
 
+const userDataExport = await fetchJson('/api/user-data/export');
+check(
+  userDataExport.response.ok &&
+    userDataExport.body?.contract === 'api-contract-v0' &&
+    userDataExport.body?.exportKind === 'mock-local-export',
+  'user data export endpoint returns local contract JSON',
+  userDataExport.body,
+);
+check(
+  userDataExport.body?.includesRealUserData === false &&
+    userDataExport.body?.boundaries?.readsRealUserData === false &&
+    userDataExport.body?.boundaries?.writesRealUserData === false &&
+    userDataExport.body?.boundaries?.writesCloud === false,
+  'user data export does not include real user data',
+  userDataExport.body,
+);
+
+const userDataDelete = await fetchJson('/api/user-data/delete', { method: 'POST' });
+check(
+  userDataDelete.response.ok &&
+    userDataDelete.body?.contract === 'api-contract-v0' &&
+    userDataDelete.body?.deleteKind === 'mock-local-delete' &&
+    userDataDelete.body?.dryRun === true,
+  'user data delete endpoint returns dry-run local contract JSON',
+  userDataDelete.body,
+);
+check(
+  userDataDelete.body?.deletesRealUserData === false &&
+    userDataDelete.body?.deletesCloudData === false &&
+    userDataDelete.body?.boundaries?.writesRealUserData === false &&
+    userDataDelete.body?.boundaries?.writesCloud === false,
+  'user data delete does not delete real or cloud data',
+  userDataDelete.body,
+);
+
 const calendar = await fetchJson('/api/portal/calendar');
 check(calendar.response.ok, 'calendar endpoint returns 2xx', calendar.body);
 check(calendar.body?.configured === true, 'calendar endpoint reports configured feed runtime', calendar.body);
