@@ -29,6 +29,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Prepare toolbox static assets
+        run: npm run bundle:toolbox
+
       - name: Run release guardrails
         run: npm run test:security
 

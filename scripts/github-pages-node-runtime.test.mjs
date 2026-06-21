@@ -42,6 +42,11 @@ assert.doesNotMatch(
   /Build .*static export/i,
   'workflow must not describe the runtime build as a static export.',
 );
+assert.match(
+  workflow,
+  /run:\s*npm run bundle:toolbox[\s\S]*?run:\s*npm run test:security/,
+  'release workflow must generate toolbox static config before security prechecks read public tool assets.',
+);
 assert.equal(
   packageJson.scripts['test:github-pages-node-runtime'],
   'node scripts/github-pages-node-runtime.test.mjs',
