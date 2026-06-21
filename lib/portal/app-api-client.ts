@@ -283,6 +283,44 @@ export type CloudProfileSettingsResponse = {
   error?: 'cloud_not_configured' | 'not_signed_in' | 'cloud_read_failed' | 'cloud_write_failed' | string;
 };
 
+export type CloudStatusResponse = {
+  safePublicStatus: true;
+  secretsRedacted: true;
+  cloudStatus: true;
+  ok: boolean;
+  readsCloud: false;
+  writesCloud: false;
+  service: 'portal-cloud-status';
+  version: 'cloud-status-v0';
+  endpoints: {
+    profileSettingsEndpoint: '/api/cloud/profile-settings';
+    inventoryEndpoint: '/api/cloud/inventory';
+  };
+  tables: {
+    profileSettings: 'profile_settings';
+    inventoryItems: 'inventory_items';
+  };
+  authSession: {
+    accessCookiePresent: boolean;
+    refreshCookiePresent: boolean;
+    linkedProvider: string;
+    canAttemptCloudRead: boolean;
+  };
+  cloud: ProductionRuntimeHealthResponse['cloud'];
+  setupTasks: {
+    database?: ProductionRuntimeSetupTask;
+    storage?: ProductionRuntimeSetupTask;
+  };
+  setupTaskMatrix: ProductionRuntimeSetupTask[];
+  summary: {
+    cloudDatabaseReady: boolean;
+    cloudStorageReady: boolean;
+    signedInCookiePresent: boolean;
+    canonicalDomainReady: boolean;
+    cloudBlockedReason: ProductionRuntimeSetupTask['blockedReason'];
+  };
+};
+
 export type CloudInventorySnapshotItem = InventoryItemRecord & {
   schemaVersion?: 'LocalInventoryItem@v1' | string;
   locationHint?: string;
@@ -387,6 +425,7 @@ const APP_API_ENDPOINTS = {
   authStart: '/api/auth/start',
   authSession: '/api/auth/session',
   authLogout: '/api/auth/logout',
+  cloudStatus: '/api/cloud/status',
   cloudProfileSettings: '/api/cloud/profile-settings',
   cloudInventory: '/api/cloud/inventory',
   secretaryChat: '/api/secretary/chat',
@@ -501,6 +540,10 @@ export function createAppApiClient(options: ClientOptions = {}) {
       return readJsonAllowError(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.authLogout), {
         method: 'POST',
       });
+    },
+
+    fetchCloudStatus(): Promise<CloudStatusResponse> {
+      return readJsonAllowError(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.cloudStatus));
     },
 
     fetchCloudProfileSettings(): Promise<CloudProfileSettingsResponse> {
