@@ -39,6 +39,7 @@ import {
   PROFILE_UPDATED_EVENT,
   type PortalLocale,
 } from '@/lib/portal/profile';
+import { t } from '@/lib/portal/i18n';
 import type { PortalConfig, PortalDecMetadata, PortalTool } from '@/lib/portal/types';
 import { type ToolForShellState } from './tool-state';
 
@@ -421,30 +422,30 @@ export default function Portal() {
           <button
             type="button"
             className="portal-purchased-tools-backdrop"
-            aria-label="关闭已购买工具"
+            aria-label={t(locale, 'purchasedToolsClose')}
             onClick={() => setPurchasedToolsOpen(false)}
           />
-          <section className="portal-purchased-tools-card" role="dialog" aria-modal="true" aria-label="已购买工具">
+          <section className="portal-purchased-tools-card" role="dialog" aria-modal="true" aria-label={t(locale, 'purchasedToolsTitle')}>
             <span className="portal-crush-sheet-handle" aria-hidden />
             <button type="button" onClick={() => setPurchasedToolsOpen(false)}>
               <span aria-hidden>📦</span>
-              <b>物品库</b>
-              <small>3 件即将到期</small>
+              <b>{t(locale, 'purchasedToolsInventoryTitle')}</b>
+              <small>{t(locale, 'purchasedToolsInventoryStatus')}</small>
             </button>
             <button type="button" onClick={() => setPurchasedToolsOpen(false)}>
               <span aria-hidden>💰</span>
-              <b>支出记录</b>
-              <small>本周 ¥949</small>
+              <b>{t(locale, 'purchasedToolsSpendingTitle')}</b>
+              <small>{t(locale, 'purchasedToolsSpendingStatus')}</small>
             </button>
             <button type="button" onClick={() => setPurchasedToolsOpen(false)}>
               <span aria-hidden>✅</span>
-              <b>待办清单</b>
-              <small>3 项待处理</small>
+              <b>{t(locale, 'purchasedToolsTodoTitle')}</b>
+              <small>{t(locale, 'purchasedToolsTodoStatus')}</small>
             </button>
             <button type="button" onClick={() => handleTreasureOpenChange(true)}>
               <span aria-hidden>＋</span>
-              <b>添加更多工具</b>
-              <small>去工具箱发现</small>
+              <b>{t(locale, 'purchasedToolsAddMoreTitle')}</b>
+              <small>{t(locale, 'purchasedToolsAddMoreStatus')}</small>
             </button>
           </section>
         </div>

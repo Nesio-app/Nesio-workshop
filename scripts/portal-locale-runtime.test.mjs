@@ -5,6 +5,7 @@ const root = process.cwd();
 const profilePath = join(root, 'lib', 'portal', 'profile.ts');
 const accountSettingsPath = join(root, 'components', 'portal', 'AccountSettings.tsx');
 const dashboardHomePath = join(root, 'components', 'portal', 'DashboardHome.tsx');
+const portalPath = join(root, 'components', 'portal', 'Portal.tsx');
 const toolsTreasureSheetPath = join(root, 'components', 'portal', 'ToolsTreasureSheet.tsx');
 const i18nPath = join(root, 'lib', 'portal', 'i18n.ts');
 const packagePath = join(root, 'package.json');
@@ -12,6 +13,7 @@ const packagePath = join(root, 'package.json');
 const profile = readFileSync(profilePath, 'utf8');
 const accountSettings = readFileSync(accountSettingsPath, 'utf8');
 const dashboardHome = readFileSync(dashboardHomePath, 'utf8');
+const portal = readFileSync(portalPath, 'utf8');
 const toolsTreasureSheet = readFileSync(toolsTreasureSheetPath, 'utf8');
 const i18n = readFileSync(i18nPath, 'utf8');
 const pkg = JSON.parse(readFileSync(packagePath, 'utf8'));
@@ -169,6 +171,16 @@ for (const key of [
   'dashboardHealthGateHeading',
   'dashboardHealthGateBuy',
   'dashboardHealthGateLater',
+  'purchasedToolsClose',
+  'purchasedToolsTitle',
+  'purchasedToolsInventoryTitle',
+  'purchasedToolsInventoryStatus',
+  'purchasedToolsSpendingTitle',
+  'purchasedToolsSpendingStatus',
+  'purchasedToolsTodoTitle',
+  'purchasedToolsTodoStatus',
+  'purchasedToolsAddMoreTitle',
+  'purchasedToolsAddMoreStatus',
   'dashboardHeaderTimeWeatherAriaLabel',
   'dashboardQuoteSettingsTitle',
   'dashboardQuoteSettingsClose',
@@ -263,6 +275,23 @@ for (const key of [
   assert(
     dashboardHome.includes(`t(locale, '${key}'`),
     `DashboardHome must render ${key} through the shared i18n dictionary.`,
+  );
+}
+for (const key of [
+  'purchasedToolsClose',
+  'purchasedToolsTitle',
+  'purchasedToolsInventoryTitle',
+  'purchasedToolsInventoryStatus',
+  'purchasedToolsSpendingTitle',
+  'purchasedToolsSpendingStatus',
+  'purchasedToolsTodoTitle',
+  'purchasedToolsTodoStatus',
+  'purchasedToolsAddMoreTitle',
+  'purchasedToolsAddMoreStatus',
+]) {
+  assert(
+    portal.includes(`t(locale, '${key}'`),
+    `Portal must render ${key} through the shared i18n dictionary.`,
   );
 }
 for (const key of [
@@ -402,6 +431,23 @@ for (const phrase of [
   assert(
     !dashboardHome.includes(phrase),
     `DashboardHome must not hard-code visible phrase: ${phrase}`,
+  );
+}
+for (const phrase of [
+  '关闭已购买工具',
+  '已购买工具',
+  '物品库',
+  '3 件即将到期',
+  '支出记录',
+  '本周 ¥949',
+  '待办清单',
+  '3 项待处理',
+  '添加更多工具',
+  '去工具箱发现',
+]) {
+  assert(
+    !portal.includes(phrase),
+    `Portal must not hard-code purchased-tools phrase: ${phrase}`,
   );
 }
 assert(
