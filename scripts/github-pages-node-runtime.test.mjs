@@ -27,6 +27,11 @@ assert.ok(
   Number(nodeVersionMatch[1]) >= 22,
   'release workflow must use Node 22+ for runtime sqlite support when DB mode is enabled.',
 );
+assert.match(
+  workflow,
+  /pull_request:\s*\n\s*branches:\s*\[main\]/,
+  'release verification must run on PRs to main so runtime/build regressions are visible before merge.',
+);
 assert.doesNotMatch(
   workflow,
   /actions\/deploy-pages|actions\/upload-pages-artifact/,
