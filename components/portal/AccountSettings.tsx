@@ -29,8 +29,9 @@ import {
   type AuthSessionResponse,
   type AuthStartProvider,
   type CloudProfileSettings,
-  type ProductionRuntimeProviderAction,
   type ProductionRuntimeHealthResponse,
+  type ProductionRuntimeProviderAction,
+  type ProductionRuntimeSetupTask,
 } from '@/lib/portal/app-api-client';
 import {
   getBaohePersonalizationProfile,
@@ -279,6 +280,15 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
       {},
     );
   }, [runtimeStatus?.providerActionMatrix]);
+  const setupTasksById = useMemo(() => {
+    return (runtimeStatus?.setupTaskMatrix || []).reduce<Record<string, ProductionRuntimeSetupTask>>(
+      (index, task) => {
+        index[task.id] = task;
+        return index;
+      },
+      {},
+    );
+  }, [runtimeStatus?.setupTaskMatrix]);
   const runtimeMissingEnvList = useMemo(() => {
     return Array.from(new Set(
       (runtimeStatus?.providerActionMatrix || []).flatMap((provider) => provider.missingEnv),
@@ -297,16 +307,29 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
       && !runtimeStatus.canonicalDomainMatchesRequestHost,
   );
 
-  const formatProviderActionStatus = (provider?: ProductionRuntimeProviderAction): string => {
+  const formatProviderActionStatus = (
+    provider?: ProductionRuntimeProviderAction,
+    providerSetupTask?: ProductionRuntimeSetupTask,
+  ): string => {
     if (!provider) return runtimeLoading ? t(locale, 'providerStatusChecking') : t(locale, 'providerStatusNotConnected');
+    if (providerSetupTask?.blockedReason === 'canonical_domain_mismatch') return t(locale, 'providerStatusPendingEnable');
     if (provider.actionStatus === 'ready') return t(locale, 'providerStatusReady');
     if (provider.actionStatus === 'server_ready') return t(locale, 'providerStatusServerReady');
     if (provider.configured) return t(locale, 'providerStatusPendingEnable');
     return t(locale, 'providerStatusMissingConfig');
   };
 
-  const formatProviderActionDetail = (provider?: ProductionRuntimeProviderAction): string => {
+  const formatProviderActionDetail = (
+    provider?: ProductionRuntimeProviderAction,
+    providerSetupTask?: ProductionRuntimeSetupTask,
+  ): string => {
     if (!provider) return t(locale, 'providerDetailLoadingRuntime');
+    if (providerSetupTask?.blockedReason === 'canonical_domain_mismatch') {
+      return t(locale, 'providerSetupBlockedCanonicalDomain', {
+        canonical: runtimeStatus?.canonicalDomain || 'www.nesio.app',
+        host: runtimeStatus?.requestHost || '',
+      });
+    }
     if (provider.actionStatus === 'ready') {
       return provider.startEndpoint
         ? t(locale, 'providerDetailReadyWithEndpointTemplate', {
@@ -354,6 +377,14 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
   const onOpenProviderAction = (provider?: ProductionRuntimeProviderAction) => {
     if (!provider) {
       setAuthFeedback(t(locale, 'providerReadStateLater'));
+      return;
+    }
+    const providerSetupTask = setupTasksById[provider.id];
+    if (providerSetupTask?.blockedReason === 'canonical_domain_mismatch') {
+      setAuthFeedback(t(locale, 'providerSetupBlockedCanonicalDomain', {
+        canonical: runtimeStatus?.canonicalDomain || 'www.nesio.app',
+        host: runtimeStatus?.requestHost || '',
+      }));
       return;
     }
     if (provider.serverOnly) {
@@ -471,38 +502,38 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
   }> = [
     {
       label: 'Email',
-      status: formatProviderActionStatus(providerActionsById.email),
-      detail: formatProviderActionDetail(providerActionsById.email),
+      status: formatProviderActionStatus(providerActionsById.email, setupTasksById.email),
+      detail: formatProviderActionDetail(providerActionsById.email, setupTasksById.email),
       provider: providerActionsById.email,
     },
     {
       label: 'Google',
-      status: formatProviderActionStatus(providerActionsById.google),
-      detail: formatProviderActionDetail(providerActionsById.google),
+      status: formatProviderActionStatus(providerActionsById.google, setupTasksById.google),
+      detail: formatProviderActionDetail(providerActionsById.google, setupTasksById.google),
       provider: providerActionsById.google,
     },
     {
       label: 'WeChat',
-      status: formatProviderActionStatus(providerActionsById.wechat),
-      detail: formatProviderActionDetail(providerActionsById.wechat),
+      status: formatProviderActionStatus(providerActionsById.wechat, setupTasksById.wechat),
+      detail: formatProviderActionDetail(providerActionsById.wechat, setupTasksById.wechat),
       provider: providerActionsById.wechat,
     },
     {
       label: 'Phone',
-      status: formatProviderActionStatus(providerActionsById.phone),
-      detail: formatProviderActionDetail(providerActionsById.phone),
+      status: formatProviderActionStatus(providerActionsById.phone, setupTasksById.phone),
+      detail: formatProviderActionDetail(providerActionsById.phone, setupTasksById.phone),
       provider: providerActionsById.phone,
     },
     {
       label: 'Cloud DB',
-      status: formatProviderActionStatus(providerActionsById.cloud_database),
-      detail: formatProviderActionDetail(providerActionsById.cloud_database),
+      status: formatProviderActionStatus(providerActionsById.cloud_database, setupTasksById.cloud_database),
+      detail: formatProviderActionDetail(providerActionsById.cloud_database, setupTasksById.cloud_database),
       provider: providerActionsById.cloud_database,
     },
     {
       label: 'Cloud Storage',
-      status: formatProviderActionStatus(providerActionsById.cloud_storage),
-      detail: formatProviderActionDetail(providerActionsById.cloud_storage),
+      status: formatProviderActionStatus(providerActionsById.cloud_storage, setupTasksById.cloud_storage),
+      detail: formatProviderActionDetail(providerActionsById.cloud_storage, setupTasksById.cloud_storage),
       provider: providerActionsById.cloud_storage,
     },
     {
@@ -514,10 +545,10 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
     },
     {
       label: 'Google Calendar',
-      status: formatProviderActionStatus(providerActionsById.google_calendar),
+      status: formatProviderActionStatus(providerActionsById.google_calendar, setupTasksById.google_calendar),
       detail: providerActionsById.google_calendar?.enabled
         ? t(locale, 'googleCalendarConnectedDetail')
-        : (calendarUrl ? t(locale, 'googleCalendarLocalLinkDetail') : formatProviderActionDetail(providerActionsById.google_calendar)),
+        : (calendarUrl ? t(locale, 'googleCalendarLocalLinkDetail') : formatProviderActionDetail(providerActionsById.google_calendar, setupTasksById.google_calendar)),
       provider: providerActionsById.google_calendar,
     },
     {
@@ -527,14 +558,14 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
     },
     {
       label: 'Gemini',
-      status: formatProviderActionStatus(providerActionsById.gemini),
-      detail: formatProviderActionDetail(providerActionsById.gemini),
+      status: formatProviderActionStatus(providerActionsById.gemini, setupTasksById.gemini),
+      detail: formatProviderActionDetail(providerActionsById.gemini, setupTasksById.gemini),
       provider: providerActionsById.gemini,
     },
     {
       label: 'Flomo',
-      status: formatProviderActionStatus(providerActionsById.flomo),
-      detail: formatProviderActionDetail(providerActionsById.flomo),
+      status: formatProviderActionStatus(providerActionsById.flomo, setupTasksById.flomo),
+      detail: formatProviderActionDetail(providerActionsById.flomo, setupTasksById.flomo),
       provider: providerActionsById.flomo,
     },
     {

@@ -11,6 +11,8 @@ for (const marker of [
   'fetchProductionRuntimeHealth',
   'providerActionMatrix',
   'providerActionsById',
+  'ProductionRuntimeSetupTask',
+  'setupTasksById',
   'formatProviderActionStatus',
   'formatProviderActionDetail',
   'onOpenProviderAction',
@@ -34,6 +36,8 @@ for (const marker of [
   'runtimeCanonicalDomainMismatch',
   'runtimeSetupTaskSummary',
   'runtimeSetupTasksBlocked',
+  'providerSetupTask?.blockedReason',
+  'providerSetupBlockedCanonicalDomain',
   'onCopyMissingRuntimeEnv',
   'runtimeCopyMissingEnv',
   'portal-settings-runtime-summary',
@@ -70,6 +74,9 @@ assert.ok(!source.includes('const isProviderActionDisabled'), 'Provider action d
 assert.ok(source.includes("t(locale, 'providerRuntimeNotReady'"), 'Unavailable provider actions must explain why they cannot start');
 assert.ok(source.includes("t(locale, 'providerMissingEnv'"), 'Unavailable provider actions must identify missing configuration');
 assert.ok(source.includes("t(locale, 'providerUnavailableTemplate'"), 'Unavailable provider actions must use localized feedback');
+assert.ok(source.includes("t(locale, 'providerSetupBlockedCanonicalDomain'"), 'Provider actions blocked by canonical domain mismatch must use explicit localized feedback');
+assert.ok(source.includes('runtimeStatus?.canonicalDomain'), 'Provider setup feedback must include the canonical production domain');
+assert.ok(source.includes('runtimeStatus?.requestHost'), 'Provider setup feedback must include the current request host');
 assert.ok(source.includes('authSession?.loggedIn'), 'AccountSettings must display real session login status');
 assert.ok(source.includes('onLogoutAuth'), 'AccountSettings must expose a logout action');
 assert.ok(source.includes('saveProfileSettings(nextProfile)'), 'AccountSettings must persist merged cloud profile settings locally');
@@ -99,6 +106,7 @@ assert.ok(apiClient.includes('requestHost: string'), 'Production runtime health 
 assert.ok(apiClient.includes('canonicalDomainMatchesRequestHost: boolean'), 'Production runtime health type must expose canonical host match');
 assert.ok(apiClient.includes('canonicalDomainReady: boolean'), 'Production runtime summary type must expose canonical domain readiness');
 assert.ok(apiClient.includes('setupTaskMatrix: ProductionRuntimeSetupTask[]'), 'Production runtime health type must expose setupTaskMatrix');
+assert.ok(apiClient.includes("blockedReason: 'missing_env' | 'canonical_domain_mismatch' | 'provider_disabled' | null"), 'Production setup task type must expose blockedReason vocabulary');
 assert.ok(apiClient.includes('blockedSetupTaskCount: number'), 'Production runtime summary type must expose blocked setup task count');
 
 assert.equal(
