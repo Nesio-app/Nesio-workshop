@@ -57,6 +57,47 @@ async function fetchJson(path, init) {
   }
 }
 
+async function fetchHeaders(path) {
+  try {
+    const args = ['-s', '-I', `${baseUrl}${path}`];
+    const { stdout } = await execFileAsync('curl', args, { maxBuffer: 1024 * 1024 });
+    const statusLine = stdout.split('\n').find((line) => line.toLowerCase().startsWith('http/')) || '';
+    const status = Number(statusLine.match(/\s(\d{3})\s?/)?.[1] || 0);
+    const headers = Object.fromEntries(
+      stdout
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line.includes(':'))
+        .map((line) => {
+          const splitAt = line.indexOf(':');
+          return [line.slice(0, splitAt).toLowerCase(), line.slice(splitAt + 1).trim()];
+        }),
+    );
+    return {
+      response: {
+        ok: status >= 200 && status < 300,
+        status,
+      },
+      headers,
+      rawHeaders: stdout,
+    };
+  } catch (error) {
+    return {
+      response: {
+        ok: false,
+        status: 0,
+      },
+      headers: {},
+      error: {
+        error: 'network_failure',
+        message: error instanceof Error ? error.message : String(error),
+        baseUrl,
+        path,
+      },
+    };
+  }
+}
+
 async function fetchRedirect(path) {
   try {
     const args = ['-s', '-D', '-', '-o', '/dev/null', '-w', '\n%{http_code}', `${baseUrl}${path}`];
@@ -106,6 +147,33 @@ function check(condition, message, details) {
   }
   console.log(`PASS ${message}`);
 }
+
+const runtimePreflight = await fetchHeaders('/api/portal/production/health');
+const serverHeader = String(runtimePreflight.headers?.server || '');
+const matchedPath = String(runtimePreflight.headers?.['x-matched-path'] || '');
+const isVercelRuntime =
+  runtimePreflight.response.ok &&
+  /vercel/i.test(serverHeader) &&
+  matchedPath === '/api/portal/production/health';
+check(
+  isVercelRuntime,
+  'canonical domain is routed to the Vercel/Next runtime',
+  {
+    error: 'dns_or_runtime_mismatch',
+    baseUrl,
+    status: runtimePreflight.response.status,
+    server: serverHeader,
+    matchedPath,
+    expected: {
+      server: 'Vercel',
+      matchedPath: '/api/portal/production/health',
+      dns: 'A www.nesio.app 76.76.21.21 or Vercel nameservers',
+    },
+    rawHeaders: runtimePreflight.rawHeaders,
+    networkError: runtimePreflight.error,
+  },
+);
+if (!isVercelRuntime) process.exit();
 
 const health = await fetchJson('/api/portal/production/health');
 check(health.response.ok, 'production health endpoint returns 2xx', health.body);

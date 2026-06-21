@@ -7,6 +7,9 @@ const packageJson = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package
 
 for (const marker of [
   '/api/portal/production/health',
+  'fetchHeaders',
+  'canonical domain is routed to the Vercel/Next runtime',
+  'dns_or_runtime_mismatch',
   '/api/portal/production/activation-checklist',
   '/api/cloud/status',
   '/api/cloud/inventory',
