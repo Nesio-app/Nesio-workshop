@@ -8,6 +8,7 @@ const packageJson = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package
 for (const marker of [
   '/api/portal/production/health',
   '/api/cloud/status',
+  '/api/cloud/inventory',
   '/api/auth/start',
   '/secretary',
   '/secretary/index.html',
@@ -20,6 +21,8 @@ for (const marker of [
   'Secretary static deep link is not publicly served',
   'cloud status endpoint returns 2xx',
   'cloud status reports safe read-only diagnostics',
+  'cloud inventory snapshot endpoint returns safe JSON',
+  'cloud inventory snapshot is ready or fails closed with a clear reason',
   'profileSettingsEndpoint',
   'inventoryEndpoint',
   'baseUrl',

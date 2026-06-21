@@ -91,6 +91,31 @@ check(
   cloudStatus.body?.summary,
 );
 
+const cloudInventory = await fetchJson('/api/cloud/inventory');
+check(
+  cloudInventory.body?.safePublicStatus === true &&
+    cloudInventory.body?.secretsRedacted === true &&
+    cloudInventory.body?.cloudInventorySnapshot === true,
+  'cloud inventory snapshot endpoint returns safe JSON',
+  cloudInventory.body,
+);
+check(
+  cloudInventory.response.ok ||
+    ['cloud_not_configured', 'not_signed_in', 'cloud_read_failed'].includes(cloudInventory.body?.error),
+  'cloud inventory snapshot is ready or fails closed with a clear reason',
+  {
+    status: cloudInventory.response.status,
+    error: cloudInventory.body?.error,
+    setupTask: cloudInventory.body?.setupTask,
+  },
+);
+check(
+  cloudInventory.body?.readsCloud === false ||
+    (cloudInventory.response.ok && Array.isArray(cloudInventory.body?.items)),
+  'cloud inventory snapshot does not claim cloud reads unless it returns items',
+  cloudInventory.body,
+);
+
 const calendar = await fetchJson('/api/portal/calendar');
 check(calendar.response.ok, 'calendar endpoint returns 2xx', calendar.body);
 check(calendar.body?.configured === true, 'calendar endpoint reports configured feed runtime', calendar.body);
