@@ -14,6 +14,7 @@ const chatJs = read('public/secretary/chat.js');
 const chatCss = read('public/secretary/styles.css');
 const groupHtml = read('public/secretary/group.html');
 const groupJs = read('public/secretary/group.js');
+const attachJs = read('public/secretary/attach.js');
 
 for (const inertCopy of ['语音通话功能开发中', '视频功能开发中', '视频通话需 WebRTC 信令服务', '位置功能开发中']) {
   assert.doesNotMatch(
@@ -27,6 +28,27 @@ for (const inertCopy of ['语音通话功能开发中', '视频功能开发中',
     `Secretary group controls must not fall back to inert "${inertCopy}" toasts.`,
   );
 }
+
+assert.doesNotMatch(
+  attachJs,
+  /即将上线/,
+  'Secretary shared attachment sheet must not default missing handlers to inert coming-soon toasts.',
+);
+assert.match(
+  attachJs,
+  /function defaultAttachAction/,
+  'Secretary shared attachment sheet must expose a default local action for every tool.',
+);
+assert.match(
+  attachJs,
+  /saveNoteEntry\('attachment_action'/,
+  'Secretary shared attachment fallback must persist a local action record instead of dropping the click.',
+);
+assert.match(
+  attachJs,
+  /window\.WxCommon\?\.toast\(`已记录/,
+  'Secretary shared attachment fallback must give immediate user feedback for handled clicks.',
+);
 
 for (const id of [
   'voiceCall',
