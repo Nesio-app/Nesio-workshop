@@ -80,6 +80,15 @@ check(
   secretaryPage.body,
 );
 
+for (const staticPath of ['/secretary/index.html', '/secretary/chat.html']) {
+  const secretaryStaticPage = await fetchJson(staticPath);
+  check(
+    secretaryStaticPage.response.status === 403 || secretaryStaticPage.response.status === 404,
+    `Secretary static deep link is not publicly served: ${staticPath}`,
+    secretaryStaticPage.body,
+  );
+}
+
 const authGoogle = await fetchJson('/api/auth/start', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
