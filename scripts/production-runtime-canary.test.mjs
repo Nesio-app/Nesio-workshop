@@ -8,8 +8,10 @@ const packageJson = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package
 for (const marker of [
   '/api/portal/production/health',
   '/api/auth/start',
+  '/secretary',
   '/api/secretary/chat',
   'provider_not_configured',
+  'first_launch_gated',
   '宝盒Gemini在线',
   'html_or_non_json_response',
   'baseUrl',

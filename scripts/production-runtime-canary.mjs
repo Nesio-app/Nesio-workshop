@@ -68,6 +68,18 @@ check(health.body?.safePublicStatus === true, 'production health is safe public 
 check(health.body?.secretsRedacted === true, 'production health redacts secrets', health.body);
 check(health.body?.ai?.providers?.gemini?.enabled === true, 'Gemini is enabled in production runtime health', health.body?.ai);
 
+const secretaryPage = await fetchJson('/secretary');
+check(
+  secretaryPage.response.status === 403,
+  'Secretary page direct URL is first_launch_gated for public production visitors',
+  secretaryPage.body,
+);
+check(
+  secretaryPage.body?.error === 'html_or_non_json_response',
+  'Secretary page direct URL does not expose a JSON/chat runtime surface',
+  secretaryPage.body,
+);
+
 const authGoogle = await fetchJson('/api/auth/start', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
