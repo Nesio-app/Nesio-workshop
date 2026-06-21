@@ -148,6 +148,64 @@ export type ProductionRuntimeHealthResponse = {
     blockedProviderCount: number;
     setupTaskCount: number;
     blockedSetupTaskCount: number;
+    categoryReadinessSummary: Record<
+      ProductionRuntimeProviderAction['category'],
+      {
+        total: number;
+        ready: number;
+        serverReady: number;
+        blocked: number;
+      }
+    >;
+    canonicalDomainReady: boolean;
+    productionRuntimeReady: boolean;
+  };
+};
+
+export type ProductionActivationChecklistEntry = {
+  id: string;
+  label: string;
+  category: ProductionRuntimeProviderAction['category'];
+  configured: boolean;
+  enabled: boolean;
+  actionStatus: ProductionRuntimeProviderAction['actionStatus'];
+  startEndpoint: string | null;
+  safeUserAction: string;
+  serverOnly: boolean;
+  missingEnv: string[];
+  blockedReason: ProductionRuntimeSetupTask['blockedReason'];
+  requiresCanonicalDomain: boolean;
+  nextAction:
+    | 'ready_for_user_action'
+    | 'ready_server_side'
+    | 'set_missing_environment_variables'
+    | 'verify_canonical_domain_or_allowed_runtime_host'
+    | 'enable_provider_runtime_switch'
+    | 'review_provider_configuration'
+    | string;
+};
+
+export type ProductionActivationChecklistResponse = {
+  ok: boolean;
+  service: 'portal-production-activation-checklist';
+  version: 'production-activation-checklist-v0';
+  safePublicStatus: true;
+  secretsRedacted: true;
+  canonicalDomain: string;
+  requestHost: string;
+  canonicalDomainMatchesRequestHost: boolean;
+  categorySummary: ProductionRuntimeHealthResponse['summary']['categoryReadinessSummary'];
+  activationChecklist: ProductionActivationChecklistEntry[];
+  readyActions: ProductionActivationChecklistEntry[];
+  blockedActions: ProductionActivationChecklistEntry[];
+  nextSetupActions: Array<Pick<
+    ProductionActivationChecklistEntry,
+    'id' | 'label' | 'category' | 'blockedReason' | 'missingEnv' | 'requiresCanonicalDomain' | 'nextAction'
+  >>;
+  summary: {
+    providerCount: number;
+    readyActionCount: number;
+    blockedActionCount: number;
     canonicalDomainReady: boolean;
     productionRuntimeReady: boolean;
   };
@@ -324,6 +382,7 @@ const APP_API_ENDPOINTS = {
   userDataExport: '/api/user-data/export',
   userDataDelete: '/api/user-data/delete',
   productionRuntimeHealth: '/api/portal/production/health',
+  productionActivationChecklist: '/api/portal/production/activation-checklist',
   authStart: '/api/auth/start',
   authSession: '/api/auth/session',
   authLogout: '/api/auth/logout',
@@ -402,6 +461,10 @@ export function createAppApiClient(options: ClientOptions = {}) {
 
     fetchProductionRuntimeHealth(): Promise<ProductionRuntimeHealthResponse> {
       return readJson(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.productionRuntimeHealth));
+    },
+
+    fetchProductionActivationChecklist(): Promise<ProductionActivationChecklistResponse> {
+      return readJson(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.productionActivationChecklist));
     },
 
     fetchAuthSession(): Promise<AuthSessionResponse> {
