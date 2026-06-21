@@ -23,6 +23,12 @@ const requiredKeys = [
   'authStatusEnabled',
   'authStatusPendingConfig',
   'authSignOut',
+  'authEmailLabel',
+  'authGoogleLabel',
+  'authWechatLabel',
+  'authPhoneLabel',
+  'authEmailPlaceholder',
+  'authPhonePlaceholder',
   'authNeedEmail',
   'authNeedPhone',
   'authConnecting',
@@ -163,6 +169,12 @@ for (const forbidden of [
   '推送时间',
   '允许洞察推送',
   'aria-label="语言"',
+  '<span>Email</span>',
+  '<span>Phone</span>',
+  '>Email</button>',
+  '>Google</button>',
+  '>WeChat</button>',
+  '>Phone</button>',
 ]) {
   assert(!accountSettings.includes(forbidden), `AccountSettings still contains hard-coded auth/runtime text: ${forbidden}`);
 }
@@ -170,6 +182,20 @@ for (const forbidden of [
 assert(
   accountSettings.includes("t(locale, 'authNeedEmail')"),
   'AccountSettings must use shared i18n for missing email feedback.',
+);
+
+assert(
+  accountSettings.includes("t(locale, 'authEmailLabel')") &&
+    accountSettings.includes("t(locale, 'authGoogleLabel')") &&
+    accountSettings.includes("t(locale, 'authWechatLabel')") &&
+    accountSettings.includes("t(locale, 'authPhoneLabel')"),
+  'AccountSettings must use shared i18n for auth provider labels.',
+);
+
+assert(
+  accountSettings.includes("placeholder={t(locale, 'authEmailPlaceholder')}") &&
+    accountSettings.includes("placeholder={t(locale, 'authPhonePlaceholder')}"),
+  'AccountSettings must use shared i18n for auth input placeholders.',
 );
 
 assert(

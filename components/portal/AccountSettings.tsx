@@ -510,50 +510,50 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
     provider?: ProductionRuntimeProviderAction;
   }> = [
     {
-      label: 'Email',
+      label: t(locale, 'authEmailLabel'),
       status: formatProviderActionStatus(providerActionsById.email, setupTasksById.email),
       detail: formatProviderActionDetail(providerActionsById.email, setupTasksById.email),
       provider: providerActionsById.email,
     },
     {
-      label: 'Google',
+      label: t(locale, 'authGoogleLabel'),
       status: formatProviderActionStatus(providerActionsById.google, setupTasksById.google),
       detail: formatProviderActionDetail(providerActionsById.google, setupTasksById.google),
       provider: providerActionsById.google,
     },
     {
-      label: 'WeChat',
+      label: t(locale, 'authWechatLabel'),
       status: formatProviderActionStatus(providerActionsById.wechat, setupTasksById.wechat),
       detail: formatProviderActionDetail(providerActionsById.wechat, setupTasksById.wechat),
       provider: providerActionsById.wechat,
     },
     {
-      label: 'Phone',
+      label: t(locale, 'authPhoneLabel'),
       status: formatProviderActionStatus(providerActionsById.phone, setupTasksById.phone),
       detail: formatProviderActionDetail(providerActionsById.phone, setupTasksById.phone),
       provider: providerActionsById.phone,
     },
     {
-      label: 'Cloud DB',
+      label: t(locale, 'providerCloudDatabaseLabel'),
       status: formatProviderActionStatus(providerActionsById.cloud_database, setupTasksById.cloud_database),
       detail: formatProviderActionDetail(providerActionsById.cloud_database, setupTasksById.cloud_database),
       provider: providerActionsById.cloud_database,
     },
     {
-      label: 'Cloud Storage',
+      label: t(locale, 'providerCloudStorageLabel'),
       status: formatProviderActionStatus(providerActionsById.cloud_storage, setupTasksById.cloud_storage),
       detail: formatProviderActionDetail(providerActionsById.cloud_storage, setupTasksById.cloud_storage),
       provider: providerActionsById.cloud_storage,
     },
     {
-      label: 'Profile Settings',
+      label: t(locale, 'providerProfileSettingsLabel'),
       status: cloudProfileStatusLabel,
       detail: cloudProfileStatus === 'synced'
         ? t(locale, 'profileSettingsSyncedDetail')
         : t(locale, 'profileSettingsLocalDetail'),
     },
     {
-      label: 'Google Calendar',
+      label: t(locale, 'providerGoogleCalendarLabel'),
       status: formatProviderActionStatus(providerActionsById.google_calendar, setupTasksById.google_calendar),
       detail: providerActionsById.google_calendar?.enabled
         ? t(locale, 'googleCalendarConnectedDetail')
@@ -566,13 +566,13 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
       detail: t(locale, 'aiFriendsSafetyDetail'),
     },
     {
-      label: 'Gemini',
+      label: t(locale, 'providerGeminiLabel'),
       status: formatProviderActionStatus(providerActionsById.gemini, setupTasksById.gemini),
       detail: formatProviderActionDetail(providerActionsById.gemini, setupTasksById.gemini),
       provider: providerActionsById.gemini,
     },
     {
-      label: 'Flomo',
+      label: t(locale, 'providerFlomoLabel'),
       status: formatProviderActionStatus(providerActionsById.flomo, setupTasksById.flomo),
       detail: formatProviderActionDetail(providerActionsById.flomo, setupTasksById.flomo),
       provider: providerActionsById.flomo,
@@ -807,33 +807,33 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
             <span>{authSession?.loggedIn ? t(locale, 'authStatusLoggedIn') : runtimeStatus?.accountAuth.enabled ? t(locale, 'authStatusEnabled') : t(locale, 'authStatusPendingConfig')}</span>
             <div className="portal-settings-auth-inputs">
               <label>
-                <span>Email</span>
+                <span>{t(locale, 'authEmailLabel')}</span>
                 <input
                   type="email"
                   inputMode="email"
                   autoComplete="email"
-                  placeholder="you@example.com"
+                  placeholder={t(locale, 'authEmailPlaceholder')}
                   value={authEmail}
                   onChange={(event) => setAuthEmail(event.target.value)}
                 />
               </label>
               <label>
-                <span>Phone</span>
+                <span>{t(locale, 'authPhoneLabel')}</span>
                 <input
                   type="tel"
                   inputMode="tel"
                   autoComplete="tel"
-                  placeholder="+1 555 000 0000"
+                  placeholder={t(locale, 'authPhonePlaceholder')}
                   value={authPhone}
                   onChange={(event) => setAuthPhone(event.target.value)}
                 />
               </label>
             </div>
             <div className="portal-settings-auth-buttons">
-              <button type="button" data-runtime-action="auth-start-email" onClick={() => onStartAuth('email')}>Email</button>
-              <button type="button" data-runtime-action="auth-start-google" onClick={() => onStartAuth('google')}>Google</button>
-              <button type="button" data-runtime-action="auth-start-wechat" onClick={() => onStartAuth('wechat')}>WeChat</button>
-              <button type="button" data-runtime-action="auth-start-phone" onClick={() => onStartAuth('phone')}>Phone</button>
+              <button type="button" data-runtime-action="auth-start-email" onClick={() => onStartAuth('email')}>{t(locale, 'authEmailLabel')}</button>
+              <button type="button" data-runtime-action="auth-start-google" onClick={() => onStartAuth('google')}>{t(locale, 'authGoogleLabel')}</button>
+              <button type="button" data-runtime-action="auth-start-wechat" onClick={() => onStartAuth('wechat')}>{t(locale, 'authWechatLabel')}</button>
+              <button type="button" data-runtime-action="auth-start-phone" onClick={() => onStartAuth('phone')}>{t(locale, 'authPhoneLabel')}</button>
               <button type="button" data-runtime-action="auth-logout" onClick={onLogoutAuth}>{t(locale, 'authSignOut')}</button>
             </div>
           </li>
