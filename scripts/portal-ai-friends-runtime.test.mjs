@@ -190,6 +190,14 @@ assert(
 );
 
 assert(
+  component.includes('resolveActiveProviderReadiness') &&
+    component.includes('appendProviderUnavailableMessage') &&
+    /const openCallSheet = \(\) => \{[\s\S]*const readiness = resolveActiveProviderReadiness\(\);[\s\S]*if \(!readiness\.ready\) \{[\s\S]*appendProviderUnavailableMessage\(readiness\);[\s\S]*return;[\s\S]*setCallSheetOpen\(true\)/.test(component) &&
+    /const openAudioCall = \(\) => \{[\s\S]*const readiness = resolveActiveProviderReadiness\(\);[\s\S]*if \(!readiness\.ready\) \{[\s\S]*appendProviderUnavailableMessage\(readiness\);[\s\S]*return;[\s\S]*setAudioCallOpen\(true\)/.test(component),
+  'PortalAiFriendsPreview live and voice controls must use runtime readiness before opening call surfaces.',
+);
+
+assert(
   component.includes("result.error") && component.includes("result.detail"),
   'PortalAiFriendsPreview must surface Secretary Chat API errors instead of failing silently.',
 );

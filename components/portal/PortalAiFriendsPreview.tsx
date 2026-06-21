@@ -33,6 +33,12 @@ type RuntimeMessage = SecretaryChatTurn & {
   provider?: SecretaryChatProvider;
 };
 
+type ActiveProviderReadiness = {
+  provider: SecretaryChatProvider;
+  ready: boolean;
+  reason: string;
+};
+
 type AiCapabilityId = 'image' | 'file' | 'audio' | 'live' | 'note';
 
 const AI_CAPABILITIES: Array<{
@@ -378,6 +384,11 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
   };
 
   const openCallSheet = () => {
+    const readiness = resolveActiveProviderReadiness();
+    if (!readiness.ready) {
+      appendProviderUnavailableMessage(readiness);
+      return;
+    }
     setAttachmentTrayOpen(false);
     setConversationListOpen(false);
     setSearchToolsOpen(false);
@@ -398,6 +409,11 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
   };
 
   const openAudioCall = () => {
+    const readiness = resolveActiveProviderReadiness();
+    if (!readiness.ready) {
+      appendProviderUnavailableMessage(readiness);
+      return;
+    }
     setAttachmentTrayOpen(false);
     setConversationListOpen(false);
     setSearchToolsOpen(false);
@@ -423,6 +439,41 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
         role: 'assistant',
         content,
         provider,
+      },
+    ]);
+  }
+
+  function resolveActiveProviderReadiness(): ActiveProviderReadiness {
+    const provider = resolveSecretaryProvider(composer, activeConversationId);
+    const providerAction = aiProviderActionsById[provider];
+    const secretaryProvider = secretaryProviderMatrixById[provider];
+    const secretaryProviderReady = secretaryProvider?.runtimeAvailable && secretaryProvider?.chatEndpoint === '/api/secretary/chat';
+    const productionProviderReady = providerAction?.startEndpoint === '/api/secretary/chat';
+
+    if (secretaryProviderReady || productionProviderReady) {
+      return { provider, ready: true, reason: '' };
+    }
+
+    const runtimeProvider = productionRuntimeStatus?.providerActionMatrix.find((item) => item.id === provider);
+    let reason = t(locale, 'providerRuntimeNotReady');
+    if (!secretaryProvider && runtimeProvider?.missingEnv?.length) {
+      reason = t(locale, 'providerMissingEnv', { missing: runtimeProvider.missingEnv.slice(0, 3).join(' / ') });
+    }
+    return { provider, ready: false, reason };
+  }
+
+  function appendProviderUnavailableMessage(readiness: ActiveProviderReadiness) {
+    const unavailable = t(locale, 'providerUnavailableTemplate', {
+      provider: getProviderLabel(locale, readiness.provider),
+      reason: readiness.reason,
+    });
+    setUtilityNotice(unavailable);
+    setRuntimeMessages((items) => [
+      ...items,
+      {
+        role: 'assistant',
+        content: unavailable,
+        provider: readiness.provider,
       },
     ]);
   }
@@ -527,30 +578,10 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
       return;
     }
 
-    const provider = resolveSecretaryProvider(composer, activeConversationId);
-    const providerAction = aiProviderActionsById[provider];
-    const secretaryProvider = secretaryProviderMatrixById[provider];
-    const secretaryProviderReady = secretaryProvider?.runtimeAvailable && secretaryProvider?.chatEndpoint === '/api/secretary/chat';
-    const productionProviderReady = providerAction?.startEndpoint === '/api/secretary/chat';
-    if (!secretaryProviderReady && !productionProviderReady) {
-      const runtimeProvider = productionRuntimeStatus?.providerActionMatrix.find((item) => item.id === provider);
-      let missing = t(locale, 'providerRuntimeNotReady');
-      if (!secretaryProvider && runtimeProvider?.missingEnv?.length) {
-        missing = t(locale, 'providerMissingEnv', { missing: runtimeProvider.missingEnv.slice(0, 3).join(' / ') });
-      }
-      const unavailable = t(locale, 'providerUnavailableTemplate', {
-        provider: getProviderLabel(locale, provider),
-        reason: missing,
-      });
-      setUtilityNotice(unavailable);
-      setRuntimeMessages((items) => [
-        ...items,
-        {
-          role: 'assistant',
-          content: unavailable,
-          provider,
-        },
-      ]);
+    const readiness = resolveActiveProviderReadiness();
+    const provider = readiness.provider;
+    if (!readiness.ready) {
+      appendProviderUnavailableMessage(readiness);
       return;
     }
     const message = stripAssistantMentions(rawMessage) || rawMessage;
