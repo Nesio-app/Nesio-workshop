@@ -87,7 +87,14 @@ function action(
   };
 }
 
-export function buildProductionRuntimeStatus(env: EnvMap = process.env) {
+export function buildProductionRuntimeStatus(
+  env: EnvMap = process.env,
+  context: { requestHost?: string | null } = {},
+) {
+  const canonicalDomain = envValue(env, 'BAOHE_CANONICAL_DOMAIN') || 'www.nesio.app';
+  const requestHost = (context.requestHost || '').split(':')[0].toLowerCase();
+  const canonicalHost = canonicalDomain.split(':')[0].toLowerCase();
+  const canonicalDomainMatchesRequestHost = Boolean(requestHost) && requestHost === canonicalHost;
   const authEnabled = envValue(env, 'BAOHE_AUTH_ENABLED').toLowerCase() === 'true';
   const cloudDbEnabled = envValue(env, 'CLOUD_DB_ENABLED').toLowerCase() === 'true';
   const cloudStorageEnabled = envValue(env, 'CLOUD_STORAGE_ENABLED').toLowerCase() === 'true';
@@ -273,6 +280,9 @@ export function buildProductionRuntimeStatus(env: EnvMap = process.env) {
     version: 'production-runtime-v0',
     safePublicStatus: true,
     secretsRedacted: true,
+    canonicalDomain,
+    requestHost,
+    canonicalDomainMatchesRequestHost,
     accountAuth,
     cloud,
     ai,
@@ -284,6 +294,7 @@ export function buildProductionRuntimeStatus(env: EnvMap = process.env) {
       missingProviderCount: allProviders.filter((provider) => !provider.configured).length,
       actionableProviderCount: providerActionMatrix.filter((provider) => provider.actionStatus === 'ready').length,
       blockedProviderCount: providerActionMatrix.filter((provider) => provider.actionStatus === 'configure_required').length,
+      canonicalDomainReady: canonicalDomainMatchesRequestHost,
       productionRuntimeReady: allProviders.every((provider) => provider.enabled),
     },
   };

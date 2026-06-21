@@ -27,10 +27,16 @@ for (const source of [healthRoute, authStartRoute, authCallbackRoute, authSessio
 }
 
 assert.match(healthRoute, /GET\(/, 'production health route must expose GET');
+assert.match(healthRoute, /request:\s*Request/, 'production health route must inspect the incoming request.');
+assert.match(healthRoute, /canonicalHost|requestHost/, 'production health route must pass host context into safe status.');
 assert.match(runtimeHelper, /accountAuth/, 'production health must summarize account auth readiness');
 assert.match(runtimeHelper, /cloud/, 'production health must summarize cloud readiness');
 assert.match(runtimeHelper, /thirdParty/, 'production health must summarize third-party readiness');
 assert.match(runtimeHelper, /ai/, 'production health must summarize AI readiness');
+assert.match(runtimeHelper, /canonicalDomain/, 'production health must expose the configured canonical domain.');
+assert.match(runtimeHelper, /requestHost/, 'production health must expose the safe request host.');
+assert.match(runtimeHelper, /canonicalDomainMatchesRequestHost/, 'production health must expose whether the request host matches canonical domain.');
+assert.match(runtimeHelper, /canonicalDomainReady/, 'production readiness summary must include canonical domain readiness.');
 
 assert.match(authStartRoute, /POST\(/, 'auth start route must expose POST');
 assert.match(authStartRoute, /email/, 'auth start must support email provider');
