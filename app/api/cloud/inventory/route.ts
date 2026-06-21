@@ -1,5 +1,9 @@
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
+import {
+  buildProductionRuntimeStatus,
+  type ProductionRuntimeSetupTask,
+} from '@/lib/portal/production-runtime';
 
 type SupabaseUserResponse = {
   id?: string;
@@ -84,6 +88,15 @@ function getCloudConfig() {
     anonKey,
     serviceRoleKey,
   };
+}
+
+function getCloudDatabaseSetupTask(request?: NextRequest): ProductionRuntimeSetupTask | undefined {
+  const status = buildProductionRuntimeStatus(process.env, {
+    requestHost: request?.headers.get('host'),
+  });
+  return status.setupTaskMatrix.find(
+    (task) => task.id === 'cloud_database' && task.category === 'cloud',
+  );
 }
 
 async function fetchSignedInUser(config: ReturnType<typeof getCloudConfig>, accessToken: string): Promise<SupabaseUserResponse | null> {
@@ -253,13 +266,15 @@ async function readExistingLocalIds(config: ReturnType<typeof getCloudConfig>, u
   return rows.map((row) => row.local_id).filter((value): value is string => Boolean(value));
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const config = getCloudConfig();
   if (!config.configured) {
+    const setupTask = getCloudDatabaseSetupTask(request);
     return safeJson(
       {
         ok: false,
         error: 'cloud_not_configured',
+        setupTask,
         readsCloud: false,
         writesCloud: false,
       },
@@ -320,10 +335,12 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const config = getCloudConfig();
   if (!config.configured) {
+    const setupTask = getCloudDatabaseSetupTask(request);
     return safeJson(
       {
         ok: false,
         error: 'cloud_not_configured',
+        setupTask,
         readsCloud: false,
         writesCloud: false,
       },

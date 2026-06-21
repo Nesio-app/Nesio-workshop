@@ -1,4 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import {
+  buildProductionRuntimeStatus,
+  type ProductionRuntimeSetupTask,
+} from '@/lib/portal/production-runtime';
 
 const GOOGLE_CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.readonly';
 
@@ -25,20 +29,33 @@ function callbackUrl(req: NextRequest): string {
   return `${url.origin}/api/portal/calendar/oauth/callback`;
 }
 
+function getGoogleCalendarSetupTask(req: NextRequest): ProductionRuntimeSetupTask | undefined {
+  const status = buildProductionRuntimeStatus(process.env, {
+    requestHost: req.headers.get('host'),
+  });
+  return status.setupTaskMatrix.find(
+    (task) => task.id === 'google_calendar' && task.category === 'third_party',
+  );
+}
+
 export async function GET(req: NextRequest) {
   const clientId = envValue('GOOGLE_CLIENT_ID');
   const clientSecretConfigured = Boolean(envValue('GOOGLE_CLIENT_SECRET'));
+  const setupTask = getGoogleCalendarSetupTask(req);
 
-  if (!clientId || !clientSecretConfigured) {
+  if (setupTask?.blockedReason || !clientId || !clientSecretConfigured) {
     return safeJson(
       {
         ok: false,
-        error: 'provider_not_configured',
+        error: setupTask?.blockedReason === 'canonical_domain_mismatch'
+          ? 'canonical_domain_mismatch'
+          : 'provider_not_configured',
         provider: 'google_calendar',
         missingEnv: [
           ...(!clientId ? ['GOOGLE_CLIENT_ID'] : []),
           ...(!clientSecretConfigured ? ['GOOGLE_CLIENT_SECRET'] : []),
         ],
+        setupTask,
       },
       503,
     );

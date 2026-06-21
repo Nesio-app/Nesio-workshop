@@ -5,6 +5,7 @@ import {
   getSupabaseAuthorizeUrl,
   getWechatAuthorizeUrl,
   type ProductionRuntimeProviderStatus,
+  type ProductionRuntimeSetupTask,
 } from '@/lib/portal/production-runtime';
 
 type AuthProvider = 'email' | 'google' | 'wechat' | 'phone';
@@ -25,9 +26,19 @@ function safeJson(body: Record<string, unknown>, status = 200) {
   );
 }
 
-function getProviderStatus(provider: AuthProvider): ProductionRuntimeProviderStatus {
-  const status = buildProductionRuntimeStatus();
-  return status.accountAuth.providers[provider];
+function getProviderGate(req: NextRequest, provider: AuthProvider): {
+  providerStatus: ProductionRuntimeProviderStatus;
+  setupTask?: ProductionRuntimeSetupTask;
+} {
+  const status = buildProductionRuntimeStatus(process.env, {
+    requestHost: req.headers.get('host'),
+  });
+  return {
+    providerStatus: status.accountAuth.providers[provider],
+    setupTask: status.setupTaskMatrix.find(
+      (task) => task.category === 'account_auth' && task.id === provider,
+    ),
+  };
 }
 
 async function requestSupabaseOtp(payload: { email?: string; phone?: string; redirectTo: string }) {
@@ -94,14 +105,17 @@ export async function POST(req: NextRequest) {
     return safeJson({ ok: false, error: 'unsupported_provider', supportedProviders: AUTH_PROVIDERS }, 400);
   }
 
-  const providerStatus = getProviderStatus(provider);
-  if (!providerStatus.enabled) {
+  const { providerStatus, setupTask } = getProviderGate(req, provider);
+  if (setupTask?.blockedReason || !providerStatus.enabled) {
     return safeJson(
       {
         ok: false,
-        error: 'provider_not_configured',
+        error: setupTask?.blockedReason === 'canonical_domain_mismatch'
+          ? 'canonical_domain_mismatch'
+          : 'provider_not_configured',
         provider,
         status: providerStatus,
+        setupTask,
       },
       503,
     );
