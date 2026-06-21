@@ -7774,7 +7774,7 @@ html[data-portal-theme="night"] .portal-theme-seg-btn.is-on{
 .portal-purchased-tools-sheet {
   position: fixed !important;
   inset: 0 !important;
-  z-index: 560 !important;
+  z-index: 700 !important;
   display: grid !important;
   place-items: center !important;
   padding: 1rem !important;
