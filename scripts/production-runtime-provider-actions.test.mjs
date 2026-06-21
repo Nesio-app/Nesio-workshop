@@ -44,6 +44,9 @@ assert.match(runtime, /cloud_database[\s\S]*serverOnly:\s*true/, 'cloud database
 assert.match(runtime, /cloud_storage[\s\S]*serverOnly:\s*true/, 'cloud storage must be server-only');
 assert.match(runtime, /google_calendar[\s\S]*\/api\/portal\/calendar\/connect/, 'Google Calendar should route through the OAuth connect endpoint');
 assert.match(runtime, /google_calendar[\s\S]*requiredEnv:\s*\['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET'\]/, 'Google Calendar runtime readiness must require OAuth client configuration.');
+assert.match(runtime, /google_calendar_ical_readonly/, 'Google Calendar iCal feed readiness must be reported separately from OAuth.');
+assert.match(runtime, /GOOGLE_CALENDAR_ICAL_URL/, 'Google Calendar iCal readiness must recognize configured read-only feed URLs.');
+assert.match(runtime, /CALENDAR_PRIVATE_FEEDS_ENABLED/, 'Google Calendar iCal readiness must require the private feed runtime switch.');
 assert.match(runtime, /flomo[\s\S]*\/api\/portal\/flomo/, 'Flomo should route through portal Flomo endpoint');
 assert.match(runtime, /flomo[\s\S]*serverOnly:\s*true/, 'Flomo must stay server-only so the browser never receives Flomo secrets');
 
@@ -146,6 +149,35 @@ assert.deepEqual(
   supabasePhoneRuntime.accountAuth.providers.phone.missingEnv,
   [],
   'phone auth should not require unused SMS_PROVIDER app env variables.',
+);
+
+const calendarFeedRuntime = runtimeModule.buildProductionRuntimeStatus({
+  BAOHE_CANONICAL_DOMAIN: 'www.nesio.app',
+  BAOHE_ALLOWED_RUNTIME_HOSTS: 'treasurebox-nu.vercel.app',
+  CALENDAR_PRIVATE_FEEDS_ENABLED: 'true',
+  GOOGLE_CALENDAR_ICAL_URL: 'https://calendar.google.com/calendar/ical/private/basic.ics',
+}, {
+  requestHost: 'treasurebox-nu.vercel.app',
+});
+assert.equal(
+  calendarFeedRuntime.thirdParty.googleCalendarIcalReadonly.enabled,
+  true,
+  'Google Calendar read-only iCal should be enabled when private feeds are enabled and an iCal URL is configured.',
+);
+assert.equal(
+  calendarFeedRuntime.thirdParty.googleCalendar.enabled,
+  false,
+  'Google Calendar OAuth should remain separate and blocked when OAuth client config is absent.',
+);
+assert.equal(
+  calendarFeedRuntime.providerActionMatrix.find((provider) => provider.id === 'google_calendar_ical_readonly')?.actionStatus,
+  'server_ready',
+  'Google Calendar read-only iCal should appear as a server-ready third-party provider.',
+);
+assert.equal(
+  calendarFeedRuntime.providerActionMatrix.find((provider) => provider.id === 'google_calendar')?.actionStatus,
+  'configure_required',
+  'Google Calendar OAuth should still explain missing OAuth setup separately.',
 );
 
 console.log('production runtime provider action matrix tests passed');

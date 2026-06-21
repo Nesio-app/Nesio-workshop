@@ -74,6 +74,19 @@ function hasAiProviderKey(env: EnvMap): boolean {
   ]);
 }
 
+function calendarFeedConfigured(env: EnvMap): boolean {
+  return envAny(env, [
+    'GOOGLE_CALENDAR_ICAL_URL',
+    'GOOGLE_CALENDAR_ICS_URL',
+    'FIDELITY',
+    'FIDELITY_ICAL_URL',
+    'FIDELITY_CALENDAR_ICAL_URL',
+    'GOOGLE_CALENDAR_FIDELITY_ICAL_URL',
+    'CALENDAR_ICAL_URLS',
+    'GOOGLE_CALENDAR_ICAL_URLS',
+  ]);
+}
+
 function status(
   env: EnvMap,
   entry: {
@@ -182,6 +195,7 @@ export function buildProductionRuntimeStatus(
   const aiModeEnabled = envValue(env, 'BAOHE_AI_PROVIDER_MODE').toLowerCase() === 'production';
   const aiProviderConfigured = hasAiProviderKey(env);
   const aiEnabled = aiProviderConfigured && (aiModeEnabled || launchIsolationDisabled);
+  const privateCalendarFeedsEnabled = envValue(env, 'CALENDAR_PRIVATE_FEEDS_ENABLED').toLowerCase() === 'true';
 
   const accountAuth = {
     enabled: authEnabled,
@@ -269,6 +283,22 @@ export function buildProductionRuntimeStatus(
   };
 
   const thirdParty = {
+    googleCalendarIcalReadonly: status(env, {
+      id: 'google_calendar_ical_readonly',
+      label: 'Google Calendar iCal read-only',
+      requiredEnv: ['CALENDAR_PRIVATE_FEEDS_ENABLED'],
+      alternateGroups: [[
+        'GOOGLE_CALENDAR_ICAL_URL',
+        'GOOGLE_CALENDAR_ICS_URL',
+        'FIDELITY',
+        'FIDELITY_ICAL_URL',
+        'FIDELITY_CALENDAR_ICAL_URL',
+        'GOOGLE_CALENDAR_FIDELITY_ICAL_URL',
+        'CALENDAR_ICAL_URLS',
+        'GOOGLE_CALENDAR_ICAL_URLS',
+      ]],
+      enabledWhen: privateCalendarFeedsEnabled && calendarFeedConfigured(env),
+    }),
     googleCalendar: status(env, {
       id: 'google_calendar',
       label: 'Google Calendar',
@@ -342,6 +372,12 @@ export function buildProductionRuntimeStatus(
       category: 'ai',
       startEndpoint: '/api/secretary/chat',
       safeUserAction: 'send_secretary_message_to_claude',
+    }),
+    action(thirdParty.googleCalendarIcalReadonly, {
+      category: 'third_party',
+      startEndpoint: '/api/portal/calendar',
+      safeUserAction: 'read_google_calendar_ical_feed',
+      serverOnly: true,
     }),
     action(thirdParty.googleCalendar, {
       category: 'third_party',
