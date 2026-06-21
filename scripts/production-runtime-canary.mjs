@@ -68,6 +68,29 @@ check(health.body?.safePublicStatus === true, 'production health is safe public 
 check(health.body?.secretsRedacted === true, 'production health redacts secrets', health.body);
 check(health.body?.ai?.providers?.gemini?.enabled === true, 'Gemini is enabled in production runtime health', health.body?.ai);
 
+const cloudStatus = await fetchJson('/api/cloud/status');
+check(cloudStatus.response.ok, 'cloud status endpoint returns 2xx', cloudStatus.body);
+check(
+  cloudStatus.body?.safePublicStatus === true &&
+    cloudStatus.body?.secretsRedacted === true &&
+    cloudStatus.body?.readsCloud === false &&
+    cloudStatus.body?.writesCloud === false,
+  'cloud status reports safe read-only diagnostics',
+  cloudStatus.body,
+);
+check(
+  cloudStatus.body?.endpoints?.profileSettingsEndpoint === '/api/cloud/profile-settings' &&
+    cloudStatus.body?.endpoints?.inventoryEndpoint === '/api/cloud/inventory',
+  'cloud status exposes cloud profile and inventory endpoints',
+  cloudStatus.body?.endpoints,
+);
+check(
+  typeof cloudStatus.body?.summary?.cloudDatabaseReady === 'boolean' &&
+    (cloudStatus.body.summary.cloudDatabaseReady === true || cloudStatus.body.summary.cloudBlockedReason),
+  'cloud status explains cloud database readiness',
+  cloudStatus.body?.summary,
+);
+
 const calendar = await fetchJson('/api/portal/calendar');
 check(calendar.response.ok, 'calendar endpoint returns 2xx', calendar.body);
 check(calendar.body?.configured === true, 'calendar endpoint reports configured feed runtime', calendar.body);

@@ -7,6 +7,7 @@ const packageJson = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package
 
 for (const marker of [
   '/api/portal/production/health',
+  '/api/cloud/status',
   '/api/auth/start',
   '/secretary',
   '/secretary/index.html',
@@ -17,6 +18,10 @@ for (const marker of [
   '宝盒Gemini在线',
   'html_or_non_json_response',
   'Secretary static deep link is not publicly served',
+  'cloud status endpoint returns 2xx',
+  'cloud status reports safe read-only diagnostics',
+  'profileSettingsEndpoint',
+  'inventoryEndpoint',
   'baseUrl',
   'rawPreview',
 ]) {
