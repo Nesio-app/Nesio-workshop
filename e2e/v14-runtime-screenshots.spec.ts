@@ -3,6 +3,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const screenshotDir = join(process.cwd(), 'outputs/v14-runtime-screenshots');
+const BOTTOM_NAV_NAME = /Nesio 导航|底部导航|Bottom navigation|宝盒导航/;
 
 async function saveShot(page: Page, name: string) {
   await page.screenshot({
@@ -57,7 +58,7 @@ test('capture V14 mobile runtime screenshots', async ({ page }) => {
   await capture('04-crush-task-sheet', 'Task-crushing bottom sheet.');
   await page.locator('.portal-crush-sheet-close').click();
 
-  await page.getByRole('navigation', { name: /宝盒导航/ }).getByRole('button', { name: '智友' }).click();
+  await page.getByRole('navigation', { name: BOTTOM_NAV_NAME }).getByRole('button', { name: '智友' }).click();
   await expect(page.getByRole('heading', { name: '智友' })).toBeVisible();
   await expect(page.getByText(/一个输入框，后台自动调度 AI 与工具/)).toHaveCount(0);
   await expect(page.getByLabel('智友集合输入框')).toBeVisible();
@@ -87,7 +88,7 @@ test('capture V14 mobile runtime screenshots', async ({ page }) => {
   await capture('05e-ai-friends-video-call-mock', 'Mock AI avatar video call surface.');
   await page.getByRole('button', { name: '结束' }).click();
 
-  await page.getByRole('navigation', { name: /宝盒导航/ }).getByRole('button', { name: '工具箱' }).click();
+  await page.getByRole('navigation', { name: BOTTOM_NAV_NAME }).getByRole('button', { name: '工具箱' }).click();
   await expect(page.getByRole('heading', { name: '工具箱' })).toBeVisible();
   await expect(page.getByLabel('我的工具')).toBeVisible();
   await expect(page.getByLabel('可添加')).toBeVisible();

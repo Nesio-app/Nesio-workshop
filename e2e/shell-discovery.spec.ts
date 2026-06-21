@@ -1,10 +1,16 @@
 import { expect, test, type Page } from '@playwright/test';
 
+const BOTTOM_NAV_NAME = /Nesio 导航|底部导航|Bottom navigation|宝盒导航/;
+
 async function markOnboardingDone(page: Page) {
   await page.evaluate(() => {
     localStorage.setItem('treasurebox-onboarding-v14-done', '1');
   });
   await page.reload();
+}
+
+function bottomNav(page: Page) {
+  return page.getByRole('navigation', { name: BOTTOM_NAV_NAME });
 }
 
 test('mobile dashboard quote and widgets do not overlap', async ({ page }) => {
@@ -152,7 +158,7 @@ test('V14 bottom nav opens AI Friends as unified chat workspace', async ({ page 
   await page.goto('/');
   await markOnboardingDone(page);
 
-  const nav = page.getByRole('navigation', { name: /底部导航|Bottom navigation|宝盒导航/ });
+  const nav = bottomNav(page);
   await expect(nav.getByRole('button', { name: '首页' })).toBeVisible();
   await expect(nav.getByRole('button', { name: '智友' })).toBeVisible();
   await expect(nav.getByRole('button', { name: '工具箱' })).toBeVisible();
@@ -224,7 +230,7 @@ test('shell toolbox opens as V14 screen, returns home, and does not reopen after
   });
   await page.reload();
 
-  const nav = page.getByRole('navigation', { name: /宝盒导航/ });
+  const nav = bottomNav(page);
   const treasureButton = nav.getByRole('button', { name: '工具箱' });
   await expect(treasureButton).toBeVisible();
 
@@ -283,7 +289,7 @@ test('secretary public surface stays gated outside launch scope', async ({ page 
   await expect(page.locator('body')).toContainText(/能力暂未开放|gated|暂未开放/);
 
   await page.goto('/');
-  await page.getByRole('navigation', { name: /宝盒导航/ }).getByRole('button', { name: '工具箱' }).click();
+  await bottomNav(page).getByRole('button', { name: '工具箱' }).click();
   await expect(page.getByRole('region', { name: '工具箱' }).getByRole('button', { name: /智友/ })).toHaveCount(0);
 });
 
@@ -301,7 +307,7 @@ test('daily quote settings can choose positive categories and frequency', async 
   await page.evaluate(() => sessionStorage.clear());
   await markOnboardingDone(page);
   if (await page.locator('.portal-ai-preview').isVisible()) {
-    await page.getByRole('navigation', { name: /宝盒导航/ }).getByRole('button', { name: '首页' }).click({ force: true });
+    await bottomNav(page).getByRole('button', { name: '首页' }).click({ force: true });
   }
   const quote = page.locator('.portal-quote');
   await expect(quote).toBeVisible();
@@ -354,7 +360,7 @@ test('personal lab toolbox exposes non-secretary registered tools for testing', 
   });
   await page.reload();
 
-  const treasureButton = page.getByRole('navigation', { name: /宝盒导航/ }).getByRole('button', { name: '工具箱' });
+  const treasureButton = bottomNav(page).getByRole('button', { name: '工具箱' });
   await expect(treasureButton).toBeVisible();
   await treasureButton.click({ force: true });
 
@@ -375,7 +381,7 @@ test('personal lab mode persists after activation and can be cleared', async ({ 
   await markOnboardingDone(page);
   await page.waitForFunction(() => window.localStorage.getItem('baohe_personal_lab') === '1');
   await page.goto('/');
-  await page.getByRole('navigation', { name: /宝盒导航/ }).getByRole('button', { name: '工具箱' }).click();
+  await bottomNav(page).getByRole('button', { name: '工具箱' }).click();
   await expect.poll(() => page.locator('.portal-treasure-screen button').count()).toBeGreaterThanOrEqual(10);
 
   await page.goto('/?baohePublic=1');
@@ -384,7 +390,7 @@ test('personal lab mode persists after activation and can be cleared', async ({ 
     sessionStorage.clear();
   });
   await page.goto('/');
-  await page.getByRole('navigation', { name: /宝盒导航/ }).getByRole('button', { name: '工具箱' }).click();
+  await bottomNav(page).getByRole('button', { name: '工具箱' }).click();
   await expect(page.getByRole('region', { name: '工具箱' })).toBeVisible();
   await expect(page.locator('.portal-treasure-screen button').first()).toBeVisible();
 });
@@ -393,7 +399,7 @@ test('V14 AI friends and toolbox content stay clear of bottom navigation', async
   await page.goto('/?baohePersonalLab=1');
   await markOnboardingDone(page);
 
-  const nav = page.getByRole('navigation', { name: /底部导航|Bottom navigation|宝盒导航/ });
+  const nav = bottomNav(page);
   await expect(nav).toBeVisible();
 
   await nav.getByRole('button', { name: '智友' }).click();
