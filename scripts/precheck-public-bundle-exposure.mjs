@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 const repoRoot = fileURLToPath(new URL('..', import.meta.url));
 const publicRoot = join(repoRoot, 'public');
 
-const allowedPublicToolDirs = new Set(['adhd-flow', 'storage', 'secretary']);
+const allowedPublicToolDirs = new Set(['adhd-flow', 'storage']);
 const knownNonLaunchToolDirs = new Set([
   'fitness',
   'health',
@@ -26,9 +26,10 @@ assert.deepEqual(
   bundlePlan.entries.filter((entry) => entry.visibleForPublic).map((entry) => entry.moduleId),
   ['plan', 'inventory'],
 );
-const secretaryEntry = bundlePlan.entries.find((entry) => entry.moduleId === 'secretary');
-assert.equal(secretaryEntry?.visibleForPublic, false, 'secretary may be preserved as a direct chat page but must not be public toolbox surface');
+const secretaryEntry = (bundlePlan.excludedEntries || []).find((entry) => entry.moduleId === 'secretary');
+assert.equal(secretaryEntry?.visibleForPublic, false, 'secretary must not be visible on the public toolbox surface');
 assert.equal(secretaryEntry?.shellAction, 'hide_for_public');
+assert.equal(secretaryEntry?.sourceDir, 'tools/secretary', 'secretary static source must live outside public/');
 
 const launchSafety = execFileSync('node', ['-e', "const fs=require('fs'); process.stdout.write(fs.readFileSync('lib/portal/launch-safety.ts','utf8'))"], {
   cwd: repoRoot,
@@ -55,6 +56,12 @@ assert.deepEqual(
   (vercelConfig.rewrites || []).filter((rewrite) => String(rewrite.source || '').startsWith('/secretary')),
   [],
   'vercel rewrites must not expose /secretary static bundle outside middleware/lab gate',
+);
+
+assert.equal(
+  existsSync(join(publicRoot, 'secretary')),
+  false,
+  'public/secretary must not be present in production public assets because static hosts bypass middleware gates.',
 );
 
 const publicDirs = existsSync(publicRoot)

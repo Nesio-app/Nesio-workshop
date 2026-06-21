@@ -9,12 +9,12 @@ function read(relativePath) {
 }
 
 const packageJson = JSON.parse(read('package.json'));
-const chatHtml = read('public/secretary/chat.html');
-const chatJs = read('public/secretary/chat.js');
-const chatCss = read('public/secretary/styles.css');
-const groupHtml = read('public/secretary/group.html');
-const groupJs = read('public/secretary/group.js');
-const attachJs = read('public/secretary/attach.js');
+const chatHtml = read('tools/secretary/chat.html');
+const chatJs = read('tools/secretary/chat.js');
+const chatCss = read('tools/secretary/styles.css');
+const groupHtml = read('tools/secretary/group.html');
+const groupJs = read('tools/secretary/group.js');
+const attachJs = read('tools/secretary/attach.js');
 
 for (const inertCopy of ['语音通话功能开发中', '视频功能开发中', '视频通话需 WebRTC 信令服务', '位置功能开发中']) {
   assert.doesNotMatch(

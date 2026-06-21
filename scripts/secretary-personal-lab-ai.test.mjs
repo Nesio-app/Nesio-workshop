@@ -9,9 +9,9 @@ const launchSafety = read('lib/portal/launch-safety.ts');
 const middleware = read('middleware.ts');
 const route = read('app/api/secretary/chat/route.ts');
 const portal = read('components/portal/Portal.tsx');
-const secretaryIndex = read('public/secretary/index.html');
-const secretaryChat = read('public/secretary/chat.js');
-const secretaryApi = read('public/secretary/api.js');
+const secretaryIndex = read('tools/secretary/index.html');
+const secretaryChat = read('tools/secretary/chat.js');
+const secretaryApi = read('tools/secretary/api.js');
 const personalLabGateBody = launchSafety.match(
   /export function isPersonalLabAiRequestAllowed[\s\S]*?\n}\n/,
 )?.[0] || '';

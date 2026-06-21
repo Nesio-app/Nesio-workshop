@@ -51,7 +51,7 @@ export default function PortalBottomNav({
   ];
 
   return (
-    <nav className="portal-bottom-nav" aria-label="宝盒导航">
+    <nav className="portal-bottom-nav" aria-label="Nesio 导航">
       {bottomNavItems.map((item) => (
         <button
           key={item.key}
