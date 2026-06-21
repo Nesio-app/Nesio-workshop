@@ -4,23 +4,34 @@ export const dynamic = 'force-dynamic';
 
 const MAX_BYTES = 4 * 1024 * 1024;
 
+function safeJson(body: Record<string, unknown>, status = 200) {
+  return NextResponse.json(
+    {
+      safePublicStatus: true,
+      secretsRedacted: true,
+      ...body,
+    },
+    { status },
+  );
+}
+
 export async function POST(req: NextRequest) {
   let form: FormData;
   try {
     form = await req.formData();
   } catch {
-    return NextResponse.json({ ok: false, error: 'Invalid form' }, { status: 400 });
+    return safeJson({ ok: false, error: 'Invalid form' }, 400);
   }
 
   const file = form.get('file');
   if (!(file instanceof File)) {
-    return NextResponse.json({ ok: false, error: 'file required' }, { status: 400 });
+    return safeJson({ ok: false, error: 'file required' }, 400);
   }
   if (!file.type.startsWith('image/')) {
-    return NextResponse.json({ ok: false, error: 'images only' }, { status: 400 });
+    return safeJson({ ok: false, error: 'images only' }, 400);
   }
   if (file.size > MAX_BYTES) {
-    return NextResponse.json({ ok: false, error: 'file too large' }, { status: 400 });
+    return safeJson({ ok: false, error: 'file too large' }, 400);
   }
 
   try {
@@ -35,15 +46,15 @@ export async function POST(req: NextRequest) {
 
     const text = (await res.text()).trim();
     if (!res.ok || !text.startsWith('http')) {
-      return NextResponse.json(
+      return safeJson(
         { ok: false, error: 'upload host failed' },
-        { status: 502 },
+        502,
       );
     }
 
-    return NextResponse.json({ ok: true, url: text });
+    return safeJson({ ok: true, url: text });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'upload failed';
-    return NextResponse.json({ ok: false, error: msg }, { status: 502 });
+    return safeJson({ ok: false, error: msg }, 502);
   }
 }

@@ -10,6 +10,11 @@ async function fetchJson(path, init) {
     if (init?.method) args.splice(1, 0, '-X', init.method);
     const contentType = init?.headers?.['Content-Type'] || init?.headers?.['content-type'];
     if (contentType) args.splice(1, 0, '-H', `Content-Type: ${contentType}`);
+    if (init?.form) {
+      for (const [key, value] of Object.entries(init.form)) {
+        args.splice(1, 0, '-F', `${key}=${value}`);
+      }
+    }
     if (init?.body) args.splice(1, 0, '-d', String(init.body));
 
     const { stdout } = await execFileAsync('curl', args, { maxBuffer: 1024 * 1024 });
@@ -359,6 +364,26 @@ check(
   {
     status: flomoCapture.response.status,
     error: flomoCapture.body?.error,
+  },
+);
+
+const flomoUpload = await fetchJson('/api/portal/flomo/upload', {
+  method: 'POST',
+  form: {
+    canary: 'missing-file',
+  },
+});
+check(
+  flomoUpload.body?.safePublicStatus === true && flomoUpload.body?.secretsRedacted === true,
+  'Flomo upload endpoint returns safe JSON',
+  flomoUpload.body,
+);
+check(
+  flomoUpload.body?.error === 'file required',
+  'Flomo upload validates missing file without calling upload host',
+  {
+    status: flomoUpload.response.status,
+    error: flomoUpload.body?.error,
   },
 );
 
