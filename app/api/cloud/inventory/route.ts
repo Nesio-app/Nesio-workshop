@@ -162,12 +162,27 @@ async function getSignedInUser(config: ReturnType<typeof getCloudConfig>): Promi
   const cookieStore = cookies();
   const accessToken = cookieStore.get('baohe_auth_access')?.value || '';
   const refreshToken = cookieStore.get('baohe_auth_refresh')?.value || '';
+  const authProvider = cookieStore.get('baohe_auth_provider')?.value || '';
+  const wechatOpenid = cookieStore.get('baohe_wechat_openid')?.value || '';
   const user = await fetchSignedInUser(config, accessToken);
   if (user?.id) return { user, refreshedSession: null };
 
   const refreshedSession = await refreshSupabaseSession(config, refreshToken);
   const refreshedUser = await fetchSignedInUser(config, refreshedSession?.access_token || '');
-  return { user: refreshedUser, refreshedSession: refreshedUser?.id ? refreshedSession : null };
+  if (refreshedUser?.id) {
+    return { user: refreshedUser, refreshedSession };
+  }
+
+  if (authProvider === 'wechat' && wechatOpenid) {
+    return {
+      user: {
+        id: `wechat_openid:${wechatOpenid}`,
+      },
+      refreshedSession: null,
+    };
+  }
+
+  return { user: null, refreshedSession: null };
 }
 
 function restHeaders(config: ReturnType<typeof getCloudConfig>) {
