@@ -4,11 +4,13 @@ import { join } from 'node:path';
 const root = process.cwd();
 const profilePath = join(root, 'lib', 'portal', 'profile.ts');
 const accountSettingsPath = join(root, 'components', 'portal', 'AccountSettings.tsx');
+const dashboardHomePath = join(root, 'components', 'portal', 'DashboardHome.tsx');
 const i18nPath = join(root, 'lib', 'portal', 'i18n.ts');
 const packagePath = join(root, 'package.json');
 
 const profile = readFileSync(profilePath, 'utf8');
 const accountSettings = readFileSync(accountSettingsPath, 'utf8');
+const dashboardHome = readFileSync(dashboardHomePath, 'utf8');
 const i18n = readFileSync(i18nPath, 'utf8');
 const pkg = JSON.parse(readFileSync(packagePath, 'utf8'));
 
@@ -85,6 +87,14 @@ assert(
 assert(
   !accountSettings.includes("next === 'en' ? 'en' : 'zh'"),
   'AccountSettings language selector must preserve every supported language code.',
+);
+assert(
+  dashboardHome.includes('portalLocaleToHtmlLang'),
+  'DashboardHome should use the shared HTML lang mapper.',
+);
+assert(
+  !dashboardHome.includes("s.locale === 'en' ? 'en' : 'zh-CN'"),
+  'DashboardHome must not collapse every non-English locale to zh-CN.',
 );
 assert(
   i18n.includes('portalLocaleToDictionaryLocale'),

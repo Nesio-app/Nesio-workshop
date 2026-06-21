@@ -24,6 +24,7 @@ import {
 import {
   loadProfileSettings,
   PROFILE_UPDATED_EVENT,
+  portalLocaleToHtmlLang,
   type PortalLocale,
 } from '@/lib/portal/profile';
 import {
@@ -291,7 +292,7 @@ export default function DashboardHome({
     setDisplayName(s.displayName);
     setAvatarUrl(s.avatarUrl || profile.avatarUrl || '');
     setLocale(s.locale);
-    document.documentElement.lang = s.locale === 'en' ? 'en' : 'zh-CN';
+    document.documentElement.lang = portalLocaleToHtmlLang(s.locale);
   }, [profile.avatarUrl, profile.displayName]);
 
   useEffect(() => {
@@ -397,7 +398,8 @@ export default function DashboardHome({
     if (!shouldFetchExternal) return () => {
       cancelled = true;
     };
-    fetch('/api/portal/quote', { cache: 'no-store' })
+    const quoteQuery = new URLSearchParams({ locale });
+    fetch(`/api/portal/quote?${quoteQuery.toString()}`, { cache: 'no-store' })
       .then((response) => (response.ok ? response.json() : null))
       .then((payload) => {
         const quote = typeof payload?.quote === 'string' ? payload.quote.trim() : '';
@@ -410,7 +412,7 @@ export default function DashboardHome({
     return () => {
       cancelled = true;
     };
-  }, [quotePreferences.externalEnabled, quotePreferences.frequency]);
+  }, [locale, quotePreferences.externalEnabled, quotePreferences.frequency]);
 
   useEffect(() => {
     const t = window.setInterval(() => setNow(new Date()), 30_000);

@@ -45,13 +45,24 @@ const POSITIVE_TERMS = [
   '一点点',
 ];
 
-const POSITIVE_FALLBACK_QUOTES = [
-  '你已经在路上了，今天只需要再往前一点点。',
-  '慢一点，深一点，稳一点。',
-  '先完成一个小闭环，再决定下一件事。',
-  '允许自己慢慢来，也允许事情变好。',
-  '把复杂留给系统，把下一步留给自己。',
-];
+type QuoteLocale = 'zh' | 'en';
+
+const POSITIVE_FALLBACK_QUOTES_BY_LOCALE: Record<QuoteLocale, string[]> = {
+  zh: [
+    '你已经在路上了，今天只需要再往前一点点。',
+    '慢一点，深一点，稳一点。',
+    '先完成一个小闭环，再决定下一件事。',
+    '允许自己慢慢来，也允许事情变好。',
+    '把复杂留给系统，把下一步留给自己。',
+  ],
+  en: [
+    'You are not behind. You are growing at your own rhythm.',
+    'Start with the smallest honest step.',
+    'Let today be steady, not perfect.',
+    'You can move gently and still move forward.',
+    'Keep the next step simple enough to begin.',
+  ],
+};
 
 function asTrimmedString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -73,8 +84,13 @@ function isPositiveEnough(quote: string): boolean {
   return POSITIVE_TERMS.some((term) => quote.includes(term));
 }
 
-function fallbackQuote(): string {
-  return POSITIVE_FALLBACK_QUOTES[Math.floor(Math.random() * POSITIVE_FALLBACK_QUOTES.length)];
+function normalizeQuoteLocale(value: string | null | undefined): QuoteLocale {
+  return value === 'en' ? 'en' : 'zh';
+}
+
+function fallbackQuote(locale: QuoteLocale): string {
+  const quotes = POSITIVE_FALLBACK_QUOTES_BY_LOCALE[locale];
+  return quotes[Math.floor(Math.random() * quotes.length)];
 }
 
 async function fetchQuoteWithTimeout(ms: number): Promise<Response> {
@@ -91,7 +107,16 @@ async function fetchQuoteWithTimeout(ms: number): Promise<Response> {
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const locale = normalizeQuoteLocale(new URL(request.url).searchParams.get('locale'));
+
+  if (locale === 'en') {
+    return NextResponse.json(
+      { ok: true, quote: fallbackQuote(locale), source: 'local_fallback', locale: 'en' },
+      { headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=900' } },
+    );
+  }
+
   try {
     const response = await fetchQuoteWithTimeout(1800);
     if (!response.ok) throw new Error(`quote upstream ${response.status}`);
@@ -99,7 +124,7 @@ export async function GET() {
     if (!quote) throw new Error('quote upstream returned unusable payload');
     if (!isPositiveEnough(quote)) {
       return NextResponse.json(
-        { ok: true, quote: fallbackQuote(), source: 'positive_fallback' },
+        { ok: true, quote: fallbackQuote(locale), source: 'positive_fallback', locale },
         {
           headers: {
             'Cache-Control': 'public, s-maxage=900, stale-while-revalidate=3600',
@@ -108,7 +133,7 @@ export async function GET() {
       );
     }
     return NextResponse.json(
-      { ok: true, quote, source: 'hitokoto' },
+      { ok: true, quote, source: 'hitokoto', locale },
       {
         headers: {
           'Cache-Control': 'public, s-maxage=1800, stale-while-revalidate=86400',
@@ -117,7 +142,7 @@ export async function GET() {
     );
   } catch {
     return NextResponse.json(
-      { ok: true, quote: fallbackQuote(), source: 'local_fallback' },
+      { ok: true, quote: fallbackQuote(locale), source: 'local_fallback', locale },
       { headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=900' } },
     );
   }
