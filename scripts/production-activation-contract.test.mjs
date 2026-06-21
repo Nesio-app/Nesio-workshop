@@ -42,12 +42,8 @@ const configuredEnv = {
   SUPABASE_ANON_KEY: 'anon',
   SUPABASE_SERVICE_ROLE_KEY: 'service',
   SUPABASE_STORAGE_BUCKET: 'baohe',
-  GOOGLE_CLIENT_ID: 'google-client',
-  GOOGLE_CLIENT_SECRET: 'google-secret',
   WECHAT_APP_ID: 'wechat-app',
   WECHAT_APP_SECRET: 'wechat-secret',
-  SMS_PROVIDER: 'twilio',
-  SMS_PROVIDER_API_KEY: 'sms',
   OPENAI_API_KEY: 'openai',
   GEMINI_API_KEY: 'gemini',
   DOUBAO_API_KEY: 'doubao',
@@ -65,6 +61,17 @@ assert.equal(configuredReport.summary.configuredProviderCount, configuredReport.
 assert.equal(configuredReport.summary.missingEnvProviderCount, 0);
 assert.equal(configuredReport.summary.enabledSwitchCount, configuredReport.summary.runtimeSwitchCount);
 assert.ok(configuredReport.providers.every((provider) => provider.runtimeEnabled === true));
+const configuredProviders = new Map(configuredReport.providers.map((provider) => [provider.id, provider]));
+assert.deepEqual(
+  configuredProviders.get('auth_google')?.missingEnv,
+  [],
+  'Google account activation must not require GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET in this app runtime when Supabase brokers OAuth.',
+);
+assert.deepEqual(
+  configuredProviders.get('auth_phone')?.missingEnv,
+  [],
+  'Phone account activation must not require SMS_PROVIDER env in this app runtime when Supabase Auth brokers OTP delivery.',
+);
 
 const aliasEnvReport = buildProductionActivationContract({
   env: {

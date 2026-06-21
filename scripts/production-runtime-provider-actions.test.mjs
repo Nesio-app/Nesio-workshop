@@ -44,6 +44,13 @@ assert.match(runtime, /cloud_database[\s\S]*serverOnly:\s*true/, 'cloud database
 assert.match(runtime, /cloud_storage[\s\S]*serverOnly:\s*true/, 'cloud storage must be server-only');
 assert.match(runtime, /google_calendar[\s\S]*\/api\/portal\/calendar\/connect/, 'Google Calendar should route through the OAuth connect endpoint');
 assert.match(runtime, /google_calendar[\s\S]*requiredEnv:\s*\['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET'\]/, 'Google Calendar runtime readiness must require OAuth client configuration.');
+const googleAccountLoginBlock = runtime.match(/google:\s*status\(env,\s*\{[\s\S]*?label:\s*'Google login'[\s\S]*?\}\),/)?.[0] || '';
+assert.ok(googleAccountLoginBlock, 'production runtime must expose a Google account login provider block.');
+assert.doesNotMatch(
+  googleAccountLoginBlock,
+  /GOOGLE_CLIENT_ID|GOOGLE_CLIENT_SECRET/,
+  'Google account login must not require Google client secrets in this app runtime when Supabase brokers OAuth.',
+);
 assert.match(runtime, /google_calendar_ical_readonly/, 'Google Calendar iCal feed readiness must be reported separately from OAuth.');
 assert.match(runtime, /GOOGLE_CALENDAR_ICAL_URL/, 'Google Calendar iCal readiness must recognize configured read-only feed URLs.');
 assert.match(runtime, /CALENDAR_PRIVATE_FEEDS_ENABLED/, 'Google Calendar iCal readiness must require the private feed runtime switch.');
@@ -74,8 +81,6 @@ const allowedHostRuntime = runtimeModule.buildProductionRuntimeStatus({
   BAOHE_AUTH_ENABLED: 'true',
   SUPABASE_URL: 'https://example.supabase.co',
   SUPABASE_ANON_KEY: 'anon',
-  GOOGLE_CLIENT_ID: 'google-client',
-  GOOGLE_CLIENT_SECRET: 'google-secret',
 }, {
   requestHost: 'treasurebox-nu.vercel.app',
 });
@@ -121,8 +126,6 @@ const blockedHostRuntime = runtimeModule.buildProductionRuntimeStatus({
   BAOHE_AUTH_ENABLED: 'true',
   SUPABASE_URL: 'https://example.supabase.co',
   SUPABASE_ANON_KEY: 'anon',
-  GOOGLE_CLIENT_ID: 'google-client',
-  GOOGLE_CLIENT_SECRET: 'google-secret',
 }, {
   requestHost: 'unknown.example.com',
 });
@@ -149,6 +152,16 @@ assert.deepEqual(
   supabasePhoneRuntime.accountAuth.providers.phone.missingEnv,
   [],
   'phone auth should not require unused SMS_PROVIDER app env variables.',
+);
+assert.equal(
+  supabasePhoneRuntime.accountAuth.providers.google.enabled,
+  true,
+  'Google auth should be ready when Supabase Auth is configured; Google OAuth client secrets are configured in Supabase, not this app runtime.',
+);
+assert.deepEqual(
+  supabasePhoneRuntime.accountAuth.providers.google.missingEnv,
+  [],
+  'Google auth should not require GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET in this app runtime.',
 );
 
 const calendarFeedRuntime = runtimeModule.buildProductionRuntimeStatus({

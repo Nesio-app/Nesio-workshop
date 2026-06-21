@@ -6,12 +6,8 @@ const contract = buildUserIdentityUpgradeContract({
     BAOHE_AUTH_ENABLED: 'true',
     SUPABASE_URL: 'https://example.supabase.co',
     SUPABASE_ANON_KEY: 'anon-key',
-    GOOGLE_CLIENT_ID: 'google-client',
-    GOOGLE_CLIENT_SECRET: 'google-secret',
     WECHAT_APP_ID: 'wechat-app',
     WECHAT_APP_SECRET: 'wechat-secret',
-    SMS_PROVIDER: 'twilio',
-    SMS_PROVIDER_API_KEY: 'sms-key',
   },
 });
 
@@ -28,5 +24,7 @@ assert.equal(contract.runtimeAuthReadiness.providers.google.enabled, true);
 assert.equal(contract.runtimeAuthReadiness.providers.wechat.enabled, true);
 assert.equal(contract.runtimeAuthReadiness.providers.phone.enabled, true);
 assert.equal(contract.runtimeAuthReadiness.providers.google.secretsRedacted, true);
+assert.deepEqual(contract.runtimeAuthReadiness.providers.google.missingEnvCount, 0);
+assert.deepEqual(contract.runtimeAuthReadiness.providers.phone.missingEnvCount, 0);
 
 console.log('user identity runtime env tests passed');

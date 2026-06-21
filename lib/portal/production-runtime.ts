@@ -209,13 +209,7 @@ export function buildProductionRuntimeStatus(
       google: status(env, {
         id: 'google',
         label: 'Google login',
-        requiredEnv: [
-          'BAOHE_AUTH_ENABLED',
-          'SUPABASE_URL',
-          'SUPABASE_ANON_KEY',
-          'GOOGLE_CLIENT_ID',
-          'GOOGLE_CLIENT_SECRET',
-        ],
+        requiredEnv: ['BAOHE_AUTH_ENABLED', 'SUPABASE_URL', 'SUPABASE_ANON_KEY'],
         enabledWhen: authEnabled,
       }),
       wechat: status(env, {
