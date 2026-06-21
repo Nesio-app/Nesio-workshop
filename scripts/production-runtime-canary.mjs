@@ -116,6 +116,29 @@ check(
   cloudInventory.body,
 );
 
+const cloudProfileSettings = await fetchJson('/api/cloud/profile-settings');
+check(
+  cloudProfileSettings.body?.safePublicStatus === true &&
+    cloudProfileSettings.body?.secretsRedacted === true,
+  'cloud profile settings endpoint returns safe JSON',
+  cloudProfileSettings.body,
+);
+check(
+  cloudProfileSettings.response.ok ||
+    ['cloud_not_configured', 'not_signed_in', 'cloud_read_failed'].includes(cloudProfileSettings.body?.error),
+  'cloud profile settings is ready or fails closed with a clear reason',
+  {
+    status: cloudProfileSettings.response.status,
+    error: cloudProfileSettings.body?.error,
+    setupTask: cloudProfileSettings.body?.setupTask,
+  },
+);
+check(
+  cloudProfileSettings.body?.writesCloud === false,
+  'cloud profile settings GET does not write cloud data',
+  cloudProfileSettings.body,
+);
+
 const calendar = await fetchJson('/api/portal/calendar');
 check(calendar.response.ok, 'calendar endpoint returns 2xx', calendar.body);
 check(calendar.body?.configured === true, 'calendar endpoint reports configured feed runtime', calendar.body);
