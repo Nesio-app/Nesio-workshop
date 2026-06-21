@@ -285,6 +285,11 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
     )).sort();
   }, [runtimeStatus?.providerActionMatrix]);
   const runtimeReadinessSummary = runtimeStatus?.summary;
+  const runtimeCanonicalDomainMismatch = Boolean(
+    runtimeStatus
+      && runtimeStatus.requestHost
+      && !runtimeStatus.canonicalDomainMatchesRequestHost,
+  );
 
   const formatProviderActionStatus = (provider?: ProductionRuntimeProviderAction): string => {
     if (!provider) return runtimeLoading ? t(locale, 'providerStatusChecking') : t(locale, 'providerStatusNotConnected');
@@ -713,6 +718,11 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
                     enabled: String(runtimeReadinessSummary.enabledProviderCount),
                     total: String(runtimeReadinessSummary.providerCount),
                   })
+                  : runtimeCanonicalDomainMismatch
+                    ? t(locale, 'runtimeCanonicalDomainMismatch', {
+                      canonical: runtimeStatus?.canonicalDomain || 'www.nesio.app',
+                      host: runtimeStatus?.requestHost || '',
+                    })
                   : t(locale, 'runtimeReadinessBlocked', {
                     enabled: String(runtimeReadinessSummary?.enabledProviderCount || 0),
                     total: String(runtimeReadinessSummary?.providerCount || 0),

@@ -114,6 +114,9 @@ export type ProductionRuntimeHealthResponse = {
   version: 'production-runtime-v0';
   safePublicStatus: true;
   secretsRedacted: true;
+  canonicalDomain: string;
+  requestHost: string;
+  canonicalDomainMatchesRequestHost: boolean;
   accountAuth: {
     enabled: boolean;
     providers: Record<'email' | 'google' | 'wechat' | 'phone', ProductionProviderStatus>;
@@ -137,6 +140,7 @@ export type ProductionRuntimeHealthResponse = {
     missingProviderCount: number;
     actionableProviderCount: number;
     blockedProviderCount: number;
+    canonicalDomainReady: boolean;
     productionRuntimeReady: boolean;
   };
 };

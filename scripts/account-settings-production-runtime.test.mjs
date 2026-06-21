@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const source = fs.readFileSync(path.join(process.cwd(), 'components', 'portal', 'AccountSettings.tsx'), 'utf8');
+const apiClient = fs.readFileSync(path.join(process.cwd(), 'lib', 'portal', 'app-api-client.ts'), 'utf8');
 const packageJson = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf8'));
 
 for (const marker of [
@@ -30,6 +31,7 @@ for (const marker of [
   'formatProviderActionButtonLabel',
   'runtimeMissingEnvList',
   'runtimeReadinessSummary',
+  'runtimeCanonicalDomainMismatch',
   'onCopyMissingRuntimeEnv',
   'runtimeCopyMissingEnv',
   'portal-settings-runtime-summary',
@@ -87,6 +89,12 @@ assert.ok(source.includes('data-runtime-action="runtime-copy-missing-env"'), 'Ac
 assert.ok(source.includes('navigator.clipboard.writeText'), 'AccountSettings must copy missing runtime env names for configuration handoff');
 assert.ok(source.includes("t(locale, 'runtimeReadinessTitle'"), 'AccountSettings must localize the runtime readiness summary title');
 assert.ok(source.includes("t(locale, 'runtimeMissingEnvCopied'"), 'AccountSettings must acknowledge copied runtime configuration gaps');
+assert.ok(source.includes("t(locale, 'runtimeCanonicalDomainMismatch'"), 'AccountSettings must explain canonical domain mismatch');
+assert.ok(source.includes('canonicalDomainMatchesRequestHost'), 'AccountSettings must consume canonical domain readiness from production health');
+assert.ok(apiClient.includes('canonicalDomain: string'), 'Production runtime health type must expose canonicalDomain');
+assert.ok(apiClient.includes('requestHost: string'), 'Production runtime health type must expose requestHost');
+assert.ok(apiClient.includes('canonicalDomainMatchesRequestHost: boolean'), 'Production runtime health type must expose canonical host match');
+assert.ok(apiClient.includes('canonicalDomainReady: boolean'), 'Production runtime summary type must expose canonical domain readiness');
 
 assert.equal(
   packageJson.scripts['test:account-settings-production-runtime'],
