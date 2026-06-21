@@ -52,6 +52,46 @@ async function fetchJson(path, init) {
   }
 }
 
+async function fetchRedirect(path) {
+  try {
+    const args = ['-s', '-D', '-', '-o', '/dev/null', '-w', '\n%{http_code}', `${baseUrl}${path}`];
+    const { stdout } = await execFileAsync('curl', args, { maxBuffer: 1024 * 1024 });
+    const splitAt = stdout.lastIndexOf('\n');
+    const rawHeaders = splitAt >= 0 ? stdout.slice(0, splitAt) : stdout;
+    const status = splitAt >= 0 ? Number(stdout.slice(splitAt + 1)) : 0;
+    const location = rawHeaders
+      .split('\n')
+      .find((line) => line.toLowerCase().startsWith('location:'))
+      ?.slice('location:'.length)
+      .trim();
+
+    return {
+      response: {
+        ok: status >= 300 && status < 400 && Boolean(location),
+        status,
+      },
+      headers: {
+        location,
+      },
+      rawHeaders,
+    };
+  } catch (error) {
+    return {
+      response: {
+        ok: false,
+        status: 0,
+      },
+      headers: {},
+      error: {
+        error: 'network_failure',
+        message: error instanceof Error ? error.message : String(error),
+        baseUrl,
+        path,
+      },
+    };
+  }
+}
+
 function check(condition, message, details) {
   if (!condition) {
     console.error(`FAIL ${message}`);
@@ -232,6 +272,49 @@ for (const authProvider of authProviderCanaryMatrix) {
     );
   }
 }
+
+const authSession = await fetchJson('/api/auth/session');
+check(
+  authSession.body?.safePublicStatus === true && authSession.body?.secretsRedacted === true,
+  'auth session endpoint returns safe JSON',
+  authSession.body,
+);
+check(
+  authSession.response.ok &&
+    authSession.body?.ok === true &&
+    authSession.body?.loggedIn === false &&
+    authSession.body?.status === 'signed_out' &&
+    authSession.body?.user === undefined,
+  'auth session reports signed-out state without exposing secrets',
+  authSession.body,
+);
+
+const authLogout = await fetchJson('/api/auth/logout', { method: 'POST' });
+check(
+  authLogout.body?.safePublicStatus === true && authLogout.body?.secretsRedacted === true,
+  'auth logout endpoint returns safe JSON',
+  authLogout.body,
+);
+check(
+  authLogout.response.ok && authLogout.body?.ok === true && authLogout.body?.signedOut === true,
+  'auth logout is idempotent for signed-out users',
+  authLogout.body,
+);
+
+const authCallback = await fetchRedirect('/api/auth/callback');
+check(
+  authCallback.response.ok &&
+    authCallback.headers.location?.includes('safePublicStatus=true') &&
+    authCallback.headers.location?.includes('secretsRedacted=true') &&
+    authCallback.headers.location?.includes('auth=auth_callback_received') &&
+    authCallback.headers.location?.includes('status=callback_received'),
+  'auth callback without code redirects safely',
+  {
+    status: authCallback.response.status,
+    location: authCallback.headers.location,
+    error: authCallback.error,
+  },
+);
 
 const gemini = await fetchJson('/api/secretary/chat', {
   method: 'POST',
