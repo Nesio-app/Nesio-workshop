@@ -166,12 +166,14 @@ export type AuthStartResponse = {
   error?:
     | 'invalid_json'
     | 'unsupported_provider'
+    | 'canonical_domain_mismatch'
     | 'provider_not_configured'
     | 'missing_email'
     | 'missing_phone'
     | 'missing_supabase_config'
     | 'supabase_otp_failed'
     | string;
+  setupTask?: ProductionRuntimeSetupTask;
   supportedProviders?: AuthStartProvider[];
 };
 
