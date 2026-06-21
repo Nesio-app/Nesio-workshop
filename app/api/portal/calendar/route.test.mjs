@@ -164,6 +164,31 @@ async function testConfiguredFeedUsesMockOnlyWhenGateEnabled() {
   assert.equal(response.body.events[0].title, 'Sensitive Private Meeting');
 }
 
+async function testPrivateFeedGateAcceptsTrimmedVercelEnvValue() {
+  clearCalendarEnv();
+  process.env.GOOGLE_CALENDAR_ICAL_URL = 'https://example.test/private.ics';
+  process.env.CALENDAR_PRIVATE_FEEDS_ENABLED = ' TRUE \n';
+  const mockIcs = fs.readFileSync(fixturePath, 'utf8');
+  const fetchedUrls = [];
+  global.fetch = async (url) => {
+    fetchedUrls.push(String(url));
+    return {
+      ok: true,
+      async text() {
+        return mockIcs;
+      },
+    };
+  };
+
+  const { GET } = loadRoute();
+  const response = await GET();
+
+  assert.deepEqual(fetchedUrls, ['https://example.test/private.ics']);
+  assert.equal(response.body.ok, true);
+  assert.equal(response.body.enabled, true);
+  assert.equal(response.body.events[0].title, 'Sensitive Private Meeting');
+}
+
 async function testOauthCookieReadsGoogleCalendarApiWithoutIcsEnv() {
   clearCalendarEnv();
   mockCalendarAccessCookie = 'google-access-token';
@@ -284,6 +309,7 @@ const originalFetch = global.fetch;
 try {
   await testConfiguredFeedFailsClosedWithoutGate();
   await testConfiguredFeedUsesMockOnlyWhenGateEnabled();
+  await testPrivateFeedGateAcceptsTrimmedVercelEnvValue();
   await testOauthCookieReadsGoogleCalendarApiWithoutIcsEnv();
   await testOauthRefreshCookieRecoversExpiredCalendarAccess();
   console.log('calendar fail-closed route tests passed');

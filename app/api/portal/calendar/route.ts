@@ -27,7 +27,7 @@ function envValue(key: string): string {
 }
 
 function privateFeedAccessEnabled(): boolean {
-  return process.env.CALENDAR_PRIVATE_FEEDS_ENABLED === 'true';
+  return envValue('CALENDAR_PRIVATE_FEEDS_ENABLED').toLowerCase() === 'true';
 }
 
 function normalizeIcalUrl(raw: string): string {
