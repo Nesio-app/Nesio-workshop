@@ -9,6 +9,7 @@ const packageJson = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package
 for (const marker of [
   'createAppApiClient',
   'fetchProductionRuntimeHealth',
+  'fetchCloudStatus',
   'fetchProductionActivationChecklist',
   'activationChecklistStatus',
   'nextSetupActions',
@@ -27,6 +28,7 @@ for (const marker of [
   'startAuth',
   'logoutAuth',
   'runtimeStatus',
+  'cloudStatus',
   'authSession',
   'cloudProfileStatus',
   'syncCloudProfileSettings',
@@ -45,6 +47,10 @@ for (const marker of [
   'onCopyMissingRuntimeEnv',
   'runtimeCopyMissingEnv',
   'portal-settings-runtime-summary',
+  'portal-settings-cloud-status-summary',
+  'cloudStatus?.summary.cloudDatabaseReady',
+  'cloudStatus?.endpoints.profileSettingsEndpoint',
+  'cloudStatus?.endpoints.inventoryEndpoint',
 ]) {
   assert.ok(source.includes(marker), `AccountSettings must wire production runtime marker: ${marker}`);
 }
@@ -130,6 +136,10 @@ assert.ok(apiClient.includes("blockedReason: 'missing_env' | 'canonical_domain_m
 assert.ok(apiClient.includes('blockedSetupTaskCount: number'), 'Production runtime summary type must expose blocked setup task count');
 assert.ok(apiClient.includes('ProductionActivationChecklistResponse'), 'App API client must expose production activation checklist response type');
 assert.ok(apiClient.includes('fetchProductionActivationChecklist'), 'App API client must expose production activation checklist fetcher');
+assert.ok(apiClient.includes('CloudStatusResponse'), 'App API client must expose cloud status response type');
+assert.ok(apiClient.includes('fetchCloudStatus'), 'App API client must expose cloud status fetcher');
+assert.ok(apiClient.includes("profileSettingsEndpoint: '/api/cloud/profile-settings'"), 'Cloud status type must expose profile settings endpoint');
+assert.ok(apiClient.includes("inventoryEndpoint: '/api/cloud/inventory'"), 'Cloud status type must expose inventory endpoint');
 
 assert.equal(
   packageJson.scripts['test:account-settings-production-runtime'],

@@ -30,6 +30,7 @@ import {
   type AuthSessionResponse,
   type AuthStartProvider,
   type CloudProfileSettings,
+  type CloudStatusResponse,
   type ProductionActivationChecklistResponse,
   type ProductionRuntimeHealthResponse,
   type ProductionRuntimeProviderAction,
@@ -102,6 +103,7 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
   const [calendarUrl, setCalendarUrl] = useState('');
   const [toast, setToast] = useState('');
   const [runtimeStatus, setRuntimeStatus] = useState<ProductionRuntimeHealthResponse | null>(null);
+  const [cloudStatus, setCloudStatus] = useState<CloudStatusResponse | null>(null);
   const [activationChecklistStatus, setActivationChecklistStatus] = useState<ProductionActivationChecklistResponse | null>(null);
   const [runtimeLoading, setRuntimeLoading] = useState(true);
   const [authSession, setAuthSession] = useState<AuthSessionResponse | null>(null);
@@ -143,6 +145,14 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
       })
       .finally(() => {
         if (alive) setRuntimeLoading(false);
+      });
+    client
+      .fetchCloudStatus()
+      .then((status) => {
+        if (alive) setCloudStatus(status);
+      })
+      .catch(() => {
+        if (alive) setCloudStatus(null);
       });
     client
       .fetchProductionActivationChecklist()
@@ -330,6 +340,18 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
       && runtimeStatus.requestHost
       && !runtimeStatus.canonicalDomainMatchesRequestHost,
   );
+  const cloudStatusDatabaseLabel = cloudStatus?.summary.cloudDatabaseReady
+    ? t(locale, 'cloudStatusReady')
+    : t(locale, 'cloudStatusNeedsSetup');
+  const cloudStatusStorageLabel = cloudStatus?.summary.cloudStorageReady
+    ? t(locale, 'cloudStatusReady')
+    : t(locale, 'cloudStatusNeedsSetup');
+  const cloudStatusDetail = cloudStatus
+    ? t(locale, 'cloudStatusEndpointDetail', {
+      profile: cloudStatus?.endpoints.profileSettingsEndpoint,
+      inventory: cloudStatus?.endpoints.inventoryEndpoint,
+    })
+    : t(locale, 'cloudStatusLoading');
 
   const formatProviderActionStatus = (
     provider?: ProductionRuntimeProviderAction,
@@ -811,6 +833,20 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
               ? t(locale, 'runtimeCopyMissingEnv')
               : t(locale, 'runtimeNoMissingEnv')}
           </button>
+        </div>
+        <div className="portal-settings-runtime-summary" data-runtime-action="portal-settings-cloud-status-summary">
+          <div>
+            <strong>{t(locale, 'cloudStatusTitle')}</strong>
+            <p>{cloudStatusDetail}</p>
+            <small>
+              {t(locale, 'cloudStatusReadOnlyDetail', {
+                database: cloudStatusDatabaseLabel,
+                storage: cloudStatusStorageLabel,
+                reason: cloudStatus?.summary.cloudBlockedReason || t(locale, 'cloudStatusNoBlocker'),
+              })}
+            </small>
+          </div>
+          <span>{cloudStatus?.summary.signedInCookiePresent ? t(locale, 'cloudStatusSignedIn') : t(locale, 'cloudStatusSignedOut')}</span>
         </div>
         <ul className="portal-settings-safety-list">
           <li className="portal-settings-auth-actions">
