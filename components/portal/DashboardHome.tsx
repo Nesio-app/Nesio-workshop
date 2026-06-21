@@ -163,27 +163,29 @@ interface CalendarFeedStatus {
 const FIDELITY_HINT_KEY = 'treasurebox-fidelity-hint-dismissed';
 
 const MOOD_OPTIONS = [
-  { key: 'calm', label: '慢慢来', color: 'var(--status-calm)' },
-  { key: 'safe', label: '安心', color: 'var(--status-go)' },
-  { key: 'restored', label: '回暖', color: 'var(--status-go)' },
-  { key: 'focused', label: '专注', color: 'var(--portal-cool-accent)' },
-  { key: 'hopeful', label: '有希望', color: 'var(--portal-neutral-accent)' },
-  { key: 'creative', label: '想象力', color: 'var(--portal-warm-accent)' },
-  { key: 'tender', label: '需要照顾', color: 'var(--status-calm)' },
-  { key: 'anxious', label: '有点焦虑', color: 'var(--status-gentle)' },
-  { key: 'alert', label: '警觉', color: 'var(--status-gentle)' },
-  { key: 'bright', label: '轻快', color: 'var(--portal-blue-deep)' },
-  { key: 'grounded', label: '稳住', color: 'var(--portal-muted)' },
-  { key: 'low', label: '低能量', color: 'var(--portal-neutral-accent)' },
+  { key: 'calm', labelKey: 'dashboardMoodCalm', color: 'var(--status-calm)' },
+  { key: 'safe', labelKey: 'dashboardMoodSafe', color: 'var(--status-go)' },
+  { key: 'restored', labelKey: 'dashboardMoodRestored', color: 'var(--status-go)' },
+  { key: 'focused', labelKey: 'dashboardMoodFocused', color: 'var(--portal-cool-accent)' },
+  { key: 'hopeful', labelKey: 'dashboardMoodHopeful', color: 'var(--portal-neutral-accent)' },
+  { key: 'creative', labelKey: 'dashboardMoodCreative', color: 'var(--portal-warm-accent)' },
+  { key: 'tender', labelKey: 'dashboardMoodTender', color: 'var(--status-calm)' },
+  { key: 'anxious', labelKey: 'dashboardMoodAnxious', color: 'var(--status-gentle)' },
+  { key: 'alert', labelKey: 'dashboardMoodAlert', color: 'var(--status-gentle)' },
+  { key: 'bright', labelKey: 'dashboardMoodBright', color: 'var(--portal-blue-deep)' },
+  { key: 'grounded', labelKey: 'dashboardMoodGrounded', color: 'var(--portal-muted)' },
+  { key: 'low', labelKey: 'dashboardMoodLow', color: 'var(--portal-neutral-accent)' },
 ] as const;
 
 type MoodOption = (typeof MOOD_OPTIONS)[number];
 
-const INSIGHT_FEEDBACK_COPY = [
-  '收到，我会越来越懂你的节奏。',
-  '记下来了，下一次提醒会更贴近你。',
-  '谢谢你校准我，Nesio 会慢慢变聪明。',
-];
+const INSIGHT_FEEDBACK_KEYS = [
+  'dashboardInsightPositiveFeedback',
+  'dashboardInsightNegativeFeedback',
+  'dashboardInsightNeutralFeedback',
+] as const;
+
+type InsightFeedbackKey = (typeof INSIGHT_FEEDBACK_KEYS)[number];
 
 export default function DashboardHome({
   config,
@@ -254,7 +256,7 @@ export default function DashboardHome({
   const [showPersonalizationInsight, setShowPersonalizationInsight] = useState(false);
   const [insightDismissed, setInsightDismissed] = useState(false);
   const [insightFeedback, setInsightFeedback] = useState<'positive' | 'negative' | null>(null);
-  const [insightFeedbackCopy, setInsightFeedbackCopy] = useState(INSIGHT_FEEDBACK_COPY[0]);
+  const [insightFeedbackKey, setInsightFeedbackKey] = useState<InsightFeedbackKey>(INSIGHT_FEEDBACK_KEYS[0]);
   const [selectedMood, setSelectedMood] = useState<MoodOption>(MOOD_OPTIONS[0]);
   const [hoveredMood, setHoveredMood] = useState<MoodOption>(MOOD_OPTIONS[0]);
   const [moodPickerOpen, setMoodPickerOpen] = useState(false);
@@ -274,18 +276,20 @@ export default function DashboardHome({
   const crushSteps = useMemo(() => {
     if (crushTaskSplitLevel <= 0) {
       return [
-        '想想妈妈最近提过、喜欢的东西',
-        '在智友里看看 AI 推荐的几个方案',
-        '选一个，确认 5 天内能到货',
+        t(locale, 'dashboardCrushStepRememberGiftHints'),
+        t(locale, 'dashboardCrushStepAskAiOptions'),
+        t(locale, 'dashboardCrushStepConfirmDelivery'),
       ];
     }
     const scale = crushTaskSplitLevel + 1;
     return [
-      `第 ${scale} 次拆分：先写下 1 个关键词`,
-      `把范围缩小到 ${Math.max(1, 4 - crushTaskSplitLevel)} 个选择`,
-      crushTaskSplitLevel > 2 ? '只做下一分钟能完成的小动作' : '决定一个，或者明天再定也行',
+      t(locale, 'dashboardCrushStepKeywordTemplate', { level: scale }),
+      t(locale, 'dashboardCrushStepNarrowOptionsTemplate', { count: Math.max(1, 4 - crushTaskSplitLevel) }),
+      crushTaskSplitLevel > 2
+        ? t(locale, 'dashboardCrushStepOneMinuteAction')
+        : t(locale, 'dashboardCrushStepDecideTomorrow'),
     ];
-  }, [crushTaskSplitLevel]);
+  }, [crushTaskSplitLevel, locale]);
 
   const syncProfile = useCallback(() => {
     const s = loadProfileSettings(profile.displayName);
@@ -353,7 +357,7 @@ export default function DashboardHome({
   const handleInsightFeedback = (positive: boolean) => {
     rememberBaoheInsightFeedback(personalization, positive);
     setInsightFeedback(positive ? 'positive' : 'negative');
-    setInsightFeedbackCopy(INSIGHT_FEEDBACK_COPY[Math.floor(Math.random() * INSIGHT_FEEDBACK_COPY.length)] ?? INSIGHT_FEEDBACK_COPY[0]);
+    setInsightFeedbackKey(INSIGHT_FEEDBACK_KEYS[Math.floor(Math.random() * INSIGHT_FEEDBACK_KEYS.length)] ?? INSIGHT_FEEDBACK_KEYS[0]);
     setInsightDismissed(true);
   };
 
@@ -660,7 +664,7 @@ export default function DashboardHome({
           <p className="portal-dash-greeting-name">{displayName || t(locale, 'profileDefaultName')}</p>
         </div>
 
-        <div className="portal-dash-hero-time" aria-label="当前时间与天气">
+        <div className="portal-dash-hero-time" aria-label={t(locale, 'dashboardHeaderTimeWeatherAriaLabel')}>
           <span>{formatClock(now, locale)}</span>
           <em>{formatDateLine(now, locale)}</em>
           <small>
@@ -673,15 +677,15 @@ export default function DashboardHome({
       </header>
 
       {quoteSettingsOpen ? (
-        <div className="portal-quote-settings" role="dialog" aria-modal="true" aria-label="金句设置">
+        <div className="portal-quote-settings" role="dialog" aria-modal="true" aria-label={t(locale, 'dashboardQuoteSettingsTitle')}>
           <div className="portal-quote-settings-sheet">
             <div className="portal-quote-settings-head">
-              <h2>金句设置</h2>
-              <button type="button" onClick={() => setQuoteSettingsOpen(false)} aria-label="关闭金句设置">×</button>
+              <h2>{t(locale, 'dashboardQuoteSettingsTitle')}</h2>
+              <button type="button" onClick={() => setQuoteSettingsOpen(false)} aria-label={t(locale, 'dashboardQuoteSettingsClose')}>×</button>
             </div>
-            <p className="portal-quote-settings-hint">选择想看到的金句类型和刷新频率。设置只保存在本机浏览器。</p>
+            <p className="portal-quote-settings-hint">{t(locale, 'dashboardQuoteSettingsHint')}</p>
             <div className="portal-quote-settings-group">
-              <span className="portal-quote-settings-label">分类</span>
+              <span className="portal-quote-settings-label">{t(locale, 'dashboardQuoteSettingsCategories')}</span>
               <div className="portal-quote-settings-chips">
                 {(Object.keys(QUOTE_CATEGORY_LABELS) as QuoteCategory[]).map((category) => (
                   <button
@@ -697,7 +701,7 @@ export default function DashboardHome({
               </div>
             </div>
             <div className="portal-quote-settings-group">
-              <label className="portal-quote-settings-label" htmlFor="quote-frequency">切换频率</label>
+              <label className="portal-quote-settings-label" htmlFor="quote-frequency">{t(locale, 'dashboardQuoteSettingsFrequency')}</label>
               <input
                 id="quote-frequency"
                 className="portal-quote-settings-range"
@@ -730,40 +734,40 @@ export default function DashboardHome({
                 checked={quotePreferences.externalEnabled}
                 onChange={(event) => updateExternalQuotes(event.target.checked)}
               />
-              <span>允许公共外部金句补充</span>
+              <span>{t(locale, 'dashboardQuoteSettingsExternal')}</span>
             </label>
           </div>
         </div>
       ) : null}
 
-      <section className="portal-v13-coach" aria-label="今日教练行动">
+      <section className="portal-v13-coach" aria-label={t(locale, 'dashboardCoachActionAriaLabel')}>
         <button type="button" className="portal-v13-remind-bar" onClick={() => setScheduleSheetOpen(true)}>
-          <span>今天有 <b>{upcomingEvents.length || 3} 件事</b> · 有 <b>1 件</b>今天处理会更从容</span>
+          <span>{t(locale, 'dashboardCoachEventSummaryTemplate', { count: upcomingEvents.length || 3 })}</span>
           <small>›</small>
         </button>
 
         <div className="portal-v13-count-hero">
             <div className="portal-v13-count-left">
-              <p>重要日期</p>
+              <p>{t(locale, 'dashboardImportantDate')}</p>
               <div><strong>5</strong><span>天</span></div>
-              <h2>妈妈生日</h2>
-              <small>{usHolidayLine || holidayLine || '下一个节假日 · 可在设置中切换国家'}</small>
+              <h2>{t(locale, 'dashboardMomBirthday')}</h2>
+              <small>{usHolidayLine || holidayLine || t(locale, 'dashboardNextHolidayFallback')}</small>
             </div>
           <div className="portal-v13-count-right">
             <button
               type="button"
               className="portal-v13-energy-button"
-              aria-label="今日能量，打开健康工具"
+              aria-label={t(locale, 'dashboardEnergyAriaLabel')}
               onClick={() => setHealthGateOpen(true)}
             >
-              <p>今日能量</p>
+              <p>{t(locale, 'dashboardEnergyTitle')}</p>
               <div className="portal-v13-energy-bars" aria-hidden>
                 <span />
                 <span />
                 <span />
                 <span className="is-empty" />
               </div>
-              <span>昨晚睡得好，身体在慢慢回升</span>
+              <span>{t(locale, 'dashboardEnergyBody')}</span>
             </button>
             <button
               type="button"
@@ -771,7 +775,7 @@ export default function DashboardHome({
               onClick={() => setMoodPickerOpen(true)}
             >
               <i style={{ background: selectedMood.color }} aria-hidden />
-              {selectedMood.label}
+              {t(locale, selectedMood.labelKey)}
               <em aria-hidden>›</em>
             </button>
           </div>
@@ -779,22 +783,22 @@ export default function DashboardHome({
 
         {insightFeedback ? (
           <p className="portal-v14-insight-feedback portal-v14-insight-feedback--standalone" role="status">
-            {insightFeedbackCopy}
+            {t(locale, insightFeedbackKey)}
           </p>
         ) : null}
 
         {showPersonalizationInsight && !insightDismissed ? (
-          <section className="portal-v14-insight-card" aria-label="Nesio 发现了一件关于你的事">
+          <section className="portal-v14-insight-card" aria-label={t(locale, 'dashboardInsightTitle')}>
             <div className="portal-v14-insight-head">
               <span aria-hidden>🔍</span>
-              <b>Nesio 发现了一件关于你的事</b>
-              <button type="button" onClick={() => setInsightDismissed(true)} aria-label="关闭洞察">×</button>
+              <b>{t(locale, 'dashboardInsightTitle')}</b>
+              <button type="button" onClick={() => setInsightDismissed(true)} aria-label={t(locale, 'dashboardInsightClose')}>×</button>
             </div>
             <p>{personalization.insightBody}</p>
             <small>{personalization.insightSource}</small>
             <div className="portal-v14-insight-actions">
-              <button type="button" onClick={() => handleInsightFeedback(true)}>👍 这很准确</button>
-              <button type="button" onClick={() => handleInsightFeedback(false)}>不太对</button>
+              <button type="button" onClick={() => handleInsightFeedback(true)}>👍 {t(locale, 'dashboardInsightAccurate')}</button>
+              <button type="button" onClick={() => handleInsightFeedback(false)}>{t(locale, 'dashboardInsightNotQuite')}</button>
             </div>
           </section>
         ) : null}
@@ -802,7 +806,13 @@ export default function DashboardHome({
         <div className="portal-v13-action-card portal-v13-action-card--html">
           <div className="portal-v13-action-content" onClick={() => setCrushTaskOpen(true)} role="presentation">
             <p className="portal-v13-kicker">温馨提醒</p>
-            <p className="portal-v13-action-copy">妈妈生日还有几天，要不要现在花两分钟挑个礼物？<em>定制相册</em>或<em>护肤套装</em>都很贴心，做不完也没关系。</p>
+            <p className="portal-v13-action-copy">
+              {t(locale, 'dashboardGiftReminderPrefix')}
+              <em>{t(locale, 'dashboardGiftReminderAlbum')}</em>
+              {t(locale, 'dashboardGiftReminderMiddle')}
+              <em>{t(locale, 'dashboardGiftReminderSkincare')}</em>
+              {t(locale, 'dashboardGiftReminderSuffix')}
+            </p>
             <button
               type="button"
               className="portal-v13-ai-tip"
@@ -973,7 +983,7 @@ export default function DashboardHome({
           />
           <section className="portal-mood-card" role="dialog" aria-modal="true" aria-label="此刻心情">
             <h2>此刻心情</h2>
-            <p style={{ color: hoveredMood.color }}>{hoveredMood.label}</p>
+            <p style={{ color: hoveredMood.color }}>{t(locale, hoveredMood.labelKey)}</p>
             <div
               ref={moodWheelRef}
               className="portal-mood-wheel"
@@ -982,7 +992,7 @@ export default function DashboardHome({
               aria-valuemin={0}
               aria-valuemax={MOOD_OPTIONS.length - 1}
               aria-valuenow={MOOD_OPTIONS.findIndex((mood) => mood.key === hoveredMood.key)}
-              aria-valuetext={hoveredMood.label}
+              aria-valuetext={t(locale, hoveredMood.labelKey)}
               tabIndex={0}
               onPointerDown={(event) => {
                 moodPointerMovedRef.current = false;
@@ -1108,7 +1118,7 @@ export default function DashboardHome({
             <span className="portal-crush-sheet-handle" aria-hidden />
             <p className="portal-v13-kicker">健康工具</p>
             <h2>健康 Dashboard 尚未加入工作台</h2>
-            <p>今日能量可以先作为本地观察保留。要查看完整健康工具，请先到工具箱购买或加入。</p>
+            <p>{t(locale, 'dashboardHealthGateBody')}</p>
             <button
               type="button"
               className="portal-reminder-primary"
