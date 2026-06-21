@@ -909,7 +909,7 @@ export default function DashboardHome({
         <button
           type="button"
           className="portal-quote portal-quote--button"
-          aria-label={`${t(locale, 'dashboardQuoteLabel')}，点击设置`}
+          aria-label={`${t(locale, 'dashboardQuoteLabel')}，${t(locale, 'dashboardQuoteOpenSettingsLabel')}`}
           onClick={() => setQuoteSettingsOpen(true)}
           onPointerUp={() => setQuoteSettingsOpen(true)}
         >
@@ -935,7 +935,7 @@ export default function DashboardHome({
             <div className="portal-crush-sheet-head">
               <div>
                 <p className="portal-v13-kicker">{t(locale, 'dashboardCrushTaskButton')}</p>
-                <h2>给妈妈准备生日礼物</h2>
+                <h2>{t(locale, 'dashboardCrushGiftTitle')}</h2>
               </div>
               <button
                 type="button"
@@ -951,21 +951,21 @@ export default function DashboardHome({
                 ? t(locale, 'dashboardCrushSplitStatusTemplate', { level: crushTaskSplitLevel + 1 })
                 : t(locale, 'dashboardCrushSplitIntro')}
             </p>
-            <ol className="portal-crush-step-list" aria-label="粉碎步骤">
+            <ol className="portal-crush-step-list" aria-label={t(locale, 'dashboardCrushStepListLabel')}>
               <li className={crushTaskDone ? 'is-done' : ''}>
-                <span>{crushTaskDone ? '✓ 已拆成更小的 3 步' : '第一步'}</span>
+                <span>{crushTaskDone ? t(locale, 'dashboardCrushStepDoneLabel') : t(locale, 'dashboardCrushFirstStepLabel')}</span>
                 <strong>{crushSteps[0]}</strong>
-                <button type="button" onClick={() => setCrushTaskSplitLevel((level) => level + 1)}>↳ 还是太大？再拆细</button>
+                <button type="button" onClick={() => setCrushTaskSplitLevel((level) => level + 1)}>{t(locale, 'dashboardCrushSplitMore')}</button>
               </li>
               <li>
-                <span>第二步</span>
+                <span>{t(locale, 'dashboardCrushSecondStepLabel')}</span>
                 <strong>{crushSteps[1]}</strong>
-                <button type="button" onClick={() => setCrushTaskSplitLevel((level) => level + 1)}>↳ 还是太大？再拆细</button>
+                <button type="button" onClick={() => setCrushTaskSplitLevel((level) => level + 1)}>{t(locale, 'dashboardCrushSplitMore')}</button>
               </li>
               <li>
-                <span>第三步</span>
+                <span>{t(locale, 'dashboardCrushThirdStepLabel')}</span>
                 <strong>{crushSteps[2]}</strong>
-                <button type="button" onClick={() => setCrushTaskSplitLevel((level) => level + 1)}>↳ 还是太大？再拆细</button>
+                <button type="button" onClick={() => setCrushTaskSplitLevel((level) => level + 1)}>{t(locale, 'dashboardCrushSplitMore')}</button>
               </li>
             </ol>
             <div className="portal-crush-sheet-actions">
@@ -974,14 +974,14 @@ export default function DashboardHome({
                 className="portal-crush-sheet-primary"
                 onClick={() => setCrushTaskDone(true)}
               >
-              完成这一步
+                {t(locale, 'dashboardCrushFinishStep')}
               </button>
               <button
                 type="button"
                 className="portal-crush-sheet-secondary"
                 onClick={() => setCrushTaskOpen(false)}
               >
-                稍后
+                {t(locale, 'dashboardCrushLater')}
               </button>
             </div>
             <button
@@ -995,7 +995,7 @@ export default function DashboardHome({
                 setReminderDetail('task');
               }}
             >
-              打开待办
+              {t(locale, 'dashboardCrushOpenTodo')}
             </button>
           </section>
         </div>
@@ -1006,16 +1006,16 @@ export default function DashboardHome({
           <button
             type="button"
             className="portal-mood-backdrop"
-            aria-label="关闭心情选择"
+            aria-label={t(locale, 'dashboardMoodClose')}
             onClick={() => setMoodPickerOpen(false)}
           />
-          <section className="portal-mood-card" role="dialog" aria-modal="true" aria-label="此刻心情">
-            <h2>此刻心情</h2>
+          <section className="portal-mood-card" role="dialog" aria-modal="true" aria-label={t(locale, 'dashboardMoodTitle')}>
+            <h2>{t(locale, 'dashboardMoodTitle')}</h2>
             <p style={{ color: hoveredMood.color }}>{t(locale, hoveredMood.labelKey)}</p>
             <div
               ref={moodWheelRef}
               className="portal-mood-wheel"
-              aria-label="心情轮"
+              aria-label={t(locale, 'dashboardMoodWheelLabel')}
               role="slider"
               aria-valuemin={0}
               aria-valuemax={MOOD_OPTIONS.length - 1}
@@ -1050,9 +1050,9 @@ export default function DashboardHome({
                 />
               ))}
             </div>
-            <small>按住滑动选择，松手后保留在这里；点背景返回主页</small>
+            <small>{t(locale, 'dashboardMoodInstruction')}</small>
             <button type="button" className="portal-mood-done" onClick={() => setMoodPickerOpen(false)}>
-              完成
+              {t(locale, 'dashboardMoodDone')}
             </button>
           </section>
         </div>
@@ -1139,13 +1139,13 @@ export default function DashboardHome({
           <button
             type="button"
             className="portal-reminder-backdrop"
-            aria-label="关闭健康工具提示"
+            aria-label={t(locale, 'dashboardHealthGateClose')}
             onClick={() => setHealthGateOpen(false)}
           />
-          <section className="portal-reminder-card portal-reminder-card--detail" role="dialog" aria-modal="true" aria-label="健康工具未购买">
+          <section className="portal-reminder-card portal-reminder-card--detail" role="dialog" aria-modal="true" aria-label={t(locale, 'dashboardHealthGateHeading')}>
             <span className="portal-crush-sheet-handle" aria-hidden />
-            <p className="portal-v13-kicker">健康工具</p>
-            <h2>健康 Dashboard 尚未加入工作台</h2>
+            <p className="portal-v13-kicker">{t(locale, 'dashboardHealthGateTitle')}</p>
+            <h2>{t(locale, 'dashboardHealthGateHeading')}</h2>
             <p>{t(locale, 'dashboardHealthGateBody')}</p>
             <button
               type="button"
@@ -1155,9 +1155,9 @@ export default function DashboardHome({
                 onTreasureOpenChange(true);
               }}
             >
-              去工具箱购买
+              {t(locale, 'dashboardHealthGateBuy')}
             </button>
-            <button type="button" className="portal-reminder-close" onClick={() => setHealthGateOpen(false)}>稍后</button>
+            <button type="button" className="portal-reminder-close" onClick={() => setHealthGateOpen(false)}>{t(locale, 'dashboardHealthGateLater')}</button>
           </section>
         </div>
       ) : null}
