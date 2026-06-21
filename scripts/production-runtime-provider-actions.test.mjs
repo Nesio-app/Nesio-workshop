@@ -8,10 +8,13 @@ const healthRoute = fs.readFileSync(path.join(root, 'app', 'api', 'portal', 'pro
 const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 
 assert.match(runtime, /providerActionMatrix/, 'production runtime status must expose providerActionMatrix');
+assert.match(runtime, /setupTaskMatrix/, 'production runtime status must expose setupTaskMatrix for launchable provider setup');
 assert.match(runtime, /actionStatus/, 'providerActionMatrix entries must expose actionStatus');
 assert.match(runtime, /startEndpoint/, 'providerActionMatrix entries must expose startEndpoint');
 assert.match(runtime, /safeUserAction/, 'providerActionMatrix entries must expose safeUserAction');
 assert.match(runtime, /serverOnly/, 'providerActionMatrix entries must distinguish server-only capabilities');
+assert.match(runtime, /blockedReason/, 'setupTaskMatrix entries must explain why provider setup is blocked');
+assert.match(runtime, /requiresCanonicalDomain/, 'setupTaskMatrix entries must show whether canonical domain readiness is required');
 
 for (const provider of ['email', 'google', 'wechat', 'phone']) {
   assert.match(
@@ -35,6 +38,8 @@ assert.match(runtime, /flomo[\s\S]*serverOnly:\s*true/, 'Flomo must stay server-
 
 assert.match(runtime, /actionableProviderCount/, 'summary must include actionableProviderCount');
 assert.match(runtime, /blockedProviderCount/, 'summary must include blockedProviderCount');
+assert.match(runtime, /setupTaskCount/, 'summary must include setupTaskCount');
+assert.match(runtime, /blockedSetupTaskCount/, 'summary must include blockedSetupTaskCount');
 assert.match(healthRoute, /buildProductionRuntimeStatus/, 'production health route must return the full runtime status matrix');
 
 assert.equal(

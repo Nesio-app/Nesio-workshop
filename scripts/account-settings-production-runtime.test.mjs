@@ -32,6 +32,8 @@ for (const marker of [
   'runtimeMissingEnvList',
   'runtimeReadinessSummary',
   'runtimeCanonicalDomainMismatch',
+  'runtimeSetupTaskSummary',
+  'runtimeSetupTasksBlocked',
   'onCopyMissingRuntimeEnv',
   'runtimeCopyMissingEnv',
   'portal-settings-runtime-summary',
@@ -88,6 +90,7 @@ assert.ok(source.includes('phone: authPhone.trim()'), 'AccountSettings must send
 assert.ok(source.includes('data-runtime-action="runtime-copy-missing-env"'), 'AccountSettings must expose a copyable missing env runtime action');
 assert.ok(source.includes('navigator.clipboard.writeText'), 'AccountSettings must copy missing runtime env names for configuration handoff');
 assert.ok(source.includes("t(locale, 'runtimeReadinessTitle'"), 'AccountSettings must localize the runtime readiness summary title');
+assert.ok(source.includes("t(locale, 'runtimeSetupTasksBlocked'"), 'AccountSettings must localize setup task blocked count');
 assert.ok(source.includes("t(locale, 'runtimeMissingEnvCopied'"), 'AccountSettings must acknowledge copied runtime configuration gaps');
 assert.ok(source.includes("t(locale, 'runtimeCanonicalDomainMismatch'"), 'AccountSettings must explain canonical domain mismatch');
 assert.ok(source.includes('canonicalDomainMatchesRequestHost'), 'AccountSettings must consume canonical domain readiness from production health');
@@ -95,6 +98,8 @@ assert.ok(apiClient.includes('canonicalDomain: string'), 'Production runtime hea
 assert.ok(apiClient.includes('requestHost: string'), 'Production runtime health type must expose requestHost');
 assert.ok(apiClient.includes('canonicalDomainMatchesRequestHost: boolean'), 'Production runtime health type must expose canonical host match');
 assert.ok(apiClient.includes('canonicalDomainReady: boolean'), 'Production runtime summary type must expose canonical domain readiness');
+assert.ok(apiClient.includes('setupTaskMatrix: ProductionRuntimeSetupTask[]'), 'Production runtime health type must expose setupTaskMatrix');
+assert.ok(apiClient.includes('blockedSetupTaskCount: number'), 'Production runtime summary type must expose blocked setup task count');
 
 assert.equal(
   packageJson.scripts['test:account-settings-production-runtime'],

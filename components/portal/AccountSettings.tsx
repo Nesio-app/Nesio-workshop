@@ -285,6 +285,12 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
     )).sort();
   }, [runtimeStatus?.providerActionMatrix]);
   const runtimeReadinessSummary = runtimeStatus?.summary;
+  const runtimeSetupTaskSummary = runtimeReadinessSummary
+    ? {
+      blocked: runtimeReadinessSummary.blockedSetupTaskCount,
+      total: runtimeReadinessSummary.setupTaskCount,
+    }
+    : null;
   const runtimeCanonicalDomainMismatch = Boolean(
     runtimeStatus
       && runtimeStatus.requestHost
@@ -729,6 +735,14 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
                     missing: String(runtimeReadinessSummary?.missingProviderCount || 0),
                   })}
             </p>
+            {runtimeSetupTaskSummary ? (
+              <small>
+                {t(locale, 'runtimeSetupTasksBlocked', {
+                  blocked: String(runtimeSetupTaskSummary.blocked),
+                  total: String(runtimeSetupTaskSummary.total),
+                })}
+              </small>
+            ) : null}
           </div>
           <button type="button" data-runtime-action="runtime-copy-missing-env" onClick={onCopyMissingRuntimeEnv}>
             {runtimeMissingEnvList.length

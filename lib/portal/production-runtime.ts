@@ -14,6 +14,11 @@ export type ProductionRuntimeProviderAction = ProductionRuntimeProviderStatus & 
   serverOnly: boolean;
 };
 
+export type ProductionRuntimeSetupTask = ProductionRuntimeProviderAction & {
+  blockedReason: 'missing_env' | 'canonical_domain_mismatch' | 'provider_disabled' | null;
+  requiresCanonicalDomain: boolean;
+};
+
 type EnvMap = Record<string, string | undefined>;
 
 function envValue(env: EnvMap, key: string): string {
@@ -84,6 +89,31 @@ function action(
     startEndpoint: entry.startEndpoint,
     safeUserAction: entry.safeUserAction,
     serverOnly,
+  };
+}
+
+function requiresCanonicalDomain(provider: ProductionRuntimeProviderAction): boolean {
+  return provider.category === 'account_auth' ||
+    provider.safeUserAction === 'authorize_google_calendar_readonly';
+}
+
+function setupTask(
+  provider: ProductionRuntimeProviderAction,
+  context: { canonicalDomainMatchesRequestHost: boolean },
+): ProductionRuntimeSetupTask {
+  const needsCanonicalDomain = requiresCanonicalDomain(provider);
+  const blockedReason = provider.missingEnv.length > 0
+    ? 'missing_env'
+    : needsCanonicalDomain && !context.canonicalDomainMatchesRequestHost
+      ? 'canonical_domain_mismatch'
+      : !provider.enabled && !provider.serverOnly
+        ? 'provider_disabled'
+        : null;
+
+  return {
+    ...provider,
+    blockedReason,
+    requiresCanonicalDomain: needsCanonicalDomain,
   };
 }
 
@@ -275,6 +305,9 @@ export function buildProductionRuntimeStatus(
       serverOnly: true,
     }),
   ];
+  const setupTaskMatrix = providerActionMatrix.map((provider) => setupTask(provider, {
+    canonicalDomainMatchesRequestHost,
+  }));
 
   return {
     version: 'production-runtime-v0',
@@ -288,12 +321,15 @@ export function buildProductionRuntimeStatus(
     ai,
     thirdParty,
     providerActionMatrix,
+    setupTaskMatrix,
     summary: {
       providerCount: allProviders.length,
       enabledProviderCount: allProviders.filter((provider) => provider.enabled).length,
       missingProviderCount: allProviders.filter((provider) => !provider.configured).length,
       actionableProviderCount: providerActionMatrix.filter((provider) => provider.actionStatus === 'ready').length,
       blockedProviderCount: providerActionMatrix.filter((provider) => provider.actionStatus === 'configure_required').length,
+      setupTaskCount: setupTaskMatrix.length,
+      blockedSetupTaskCount: setupTaskMatrix.filter((task) => task.blockedReason).length,
       canonicalDomainReady: canonicalDomainMatchesRequestHost,
       productionRuntimeReady: allProviders.every((provider) => provider.enabled),
     },

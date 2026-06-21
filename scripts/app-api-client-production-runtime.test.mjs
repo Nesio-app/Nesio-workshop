@@ -8,9 +8,13 @@ const packageJson = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package
 for (const marker of [
   'ProductionRuntimeHealthResponse',
   'ProductionRuntimeProviderAction',
+  'ProductionRuntimeSetupTask',
   'providerActionMatrix',
+  'setupTaskMatrix',
   'actionableProviderCount',
   'blockedProviderCount',
+  'setupTaskCount',
+  'blockedSetupTaskCount',
   'AuthStartProvider',
   'AuthStartResponse',
   'AuthSessionResponse',
@@ -33,6 +37,8 @@ for (const endpoint of ['/api/portal/production/health', '/api/auth/start', '/ap
 assert.ok(source.includes('safePublicStatus'), 'production runtime client must model safe public status');
 assert.ok(source.includes('secretsRedacted'), 'production runtime client must model secret redaction');
 assert.ok(source.includes('provider_not_configured'), 'auth client must preserve fail-closed auth errors for UI display');
+assert.ok(source.includes('blockedReason'), 'production runtime client must expose setup task blocked reasons');
+assert.ok(source.includes('requiresCanonicalDomain'), 'production runtime client must expose canonical-domain setup requirements');
 assert.ok(source.includes('loggedIn'), 'auth session client must expose loggedIn status');
 assert.ok(source.includes('signedOut'), 'auth logout client must expose signedOut status');
 assert.ok(source.includes("method: 'POST'"), 'auth logout client must use POST');

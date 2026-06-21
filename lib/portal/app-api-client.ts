@@ -108,6 +108,11 @@ export type ProductionRuntimeProviderAction = ProductionProviderStatus & {
   serverOnly: boolean;
 };
 
+export type ProductionRuntimeSetupTask = ProductionRuntimeProviderAction & {
+  blockedReason: 'missing_env' | 'canonical_domain_mismatch' | 'provider_disabled' | null;
+  requiresCanonicalDomain: boolean;
+};
+
 export type ProductionRuntimeHealthResponse = {
   ok: boolean;
   service: 'portal-production-runtime';
@@ -134,12 +139,15 @@ export type ProductionRuntimeHealthResponse = {
     flomo: ProductionProviderStatus;
   };
   providerActionMatrix: ProductionRuntimeProviderAction[];
+  setupTaskMatrix: ProductionRuntimeSetupTask[];
   summary: {
     providerCount: number;
     enabledProviderCount: number;
     missingProviderCount: number;
     actionableProviderCount: number;
     blockedProviderCount: number;
+    setupTaskCount: number;
+    blockedSetupTaskCount: number;
     canonicalDomainReady: boolean;
     productionRuntimeReady: boolean;
   };
