@@ -269,6 +269,7 @@ export type CloudProfileSettings = {
   coachStyle?: string;
   theme?: string;
   calendarUrl?: string;
+  observationPushEnabled?: boolean;
 };
 
 export type CloudProfileSettingsResponse = {

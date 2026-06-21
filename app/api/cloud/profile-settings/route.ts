@@ -26,9 +26,21 @@ type ProfileSettings = {
   coachStyle?: string;
   theme?: string;
   calendarUrl?: string;
+  observationPushEnabled?: boolean;
 };
 
 const allowedSettingsKeys = [
+  'displayName',
+  'avatarUrl',
+  'locale',
+  'displayLanguage',
+  'coachStyle',
+  'theme',
+  'calendarUrl',
+  'observationPushEnabled',
+] as const;
+
+const stringSettingsKeys = [
   'displayName',
   'avatarUrl',
   'locale',
@@ -84,12 +96,15 @@ function sanitizeSettings(input: unknown): ProfileSettings {
   const raw = input as Record<string, unknown>;
   const output: ProfileSettings = {};
 
-  for (const key of allowedSettingsKeys) {
+  for (const key of stringSettingsKeys) {
     const value = raw[key];
     if (typeof value !== 'string') continue;
     const trimmed = value.trim();
     if (trimmed.length > 2000) continue;
     output[key] = trimmed;
+  }
+  if (typeof raw.observationPushEnabled === 'boolean') {
+    output.observationPushEnabled = raw.observationPushEnabled;
   }
 
   return output;

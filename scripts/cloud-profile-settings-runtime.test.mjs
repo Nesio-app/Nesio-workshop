@@ -42,13 +42,14 @@ for (const marker of [
 }
 
 assert.ok(
-  /allowedSettingsKeys[\s\S]*displayName[\s\S]*locale[\s\S]*coachStyle[\s\S]*calendarUrl/.test(route),
+  /allowedSettingsKeys[\s\S]*displayName[\s\S]*locale[\s\S]*coachStyle[\s\S]*calendarUrl[\s\S]*observationPushEnabled/.test(route),
   'route must sanitize profile settings through an allowedSettingsKeys allowlist',
 );
 assert.ok(!/SERVICE_ROLE_KEY[\s\S]{0,120}NextResponse\.json/.test(route), 'route must never serialize the service role key');
 
 for (const marker of [
   'CloudProfileSettings',
+  'observationPushEnabled?: boolean',
   'CloudProfileSettingsResponse',
   'cloudProfileSettings',
   '/api/cloud/profile-settings',

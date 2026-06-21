@@ -61,9 +61,14 @@ function normalizeCoachStyle(value: string | null | undefined): PortalCoachStyle
   return value === 'minimal' || value === 'professional' ? value : 'warm';
 }
 
+function normalizeObservationPushEnabled(value: unknown, fallback: boolean): boolean {
+  return typeof value === 'boolean' ? value : fallback;
+}
+
 function normalizeCloudProfileSettings(
   settings: CloudProfileSettings | undefined,
   fallbackName: string,
+  fallbackObservationPushEnabled: boolean,
 ) {
   return {
     displayName: typeof settings?.displayName === 'string' && settings.displayName.trim()
@@ -74,6 +79,7 @@ function normalizeCloudProfileSettings(
     coachStyle: normalizeCoachStyle(settings?.coachStyle),
     displayLanguage: normalizeDisplayLanguage(settings?.displayLanguage || settings?.locale),
     calendarUrl: typeof settings?.calendarUrl === 'string' ? settings.calendarUrl : '',
+    observationPushEnabled: normalizeObservationPushEnabled(settings?.observationPushEnabled, fallbackObservationPushEnabled),
   };
 }
 
@@ -172,7 +178,11 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
       .then((result) => {
         if (!alive) return;
         if (result.ok && result.settings) {
-          const next = normalizeCloudProfileSettings(result.settings, fallbackName);
+          const next = normalizeCloudProfileSettings(
+            result.settings,
+            fallbackName,
+            localStorage.getItem(OBSERVATION_PUSH_KEY) === 'false' ? false : personalization.preferences.observationPushEnabled,
+          );
           const nextProfile = {
             displayName: next.displayName,
             avatarUrl: next.avatarUrl,
@@ -184,8 +194,10 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
           setLocale(next.locale);
           setDisplayLanguage(next.displayLanguage);
           setCalendarUrl(next.calendarUrl);
+          setObservationPushEnabled(next.observationPushEnabled);
           saveProfileSettings(nextProfile);
           localStorage.setItem(DISPLAY_LANGUAGE_KEY, next.displayLanguage);
+          localStorage.setItem(OBSERVATION_PUSH_KEY, String(next.observationPushEnabled));
           document.documentElement.lang = portalLocaleToHtmlLang(next.displayLanguage);
           setCloudProfileStatus('synced');
           return;
@@ -199,7 +211,7 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
     return () => {
       alive = false;
     };
-  }, [fallbackName]);
+  }, [fallbackName, personalization.preferences.observationPushEnabled]);
 
   const showToast = (key: PortalStringKey) => {
     setToast(t(locale, key));
@@ -228,6 +240,7 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
         locale,
         displayLanguage,
         calendarUrl,
+        observationPushEnabled,
       });
       showToast('settingsSaved');
     } catch { /* ignore */ }
@@ -245,6 +258,7 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
       locale: profileLocale,
       displayLanguage: next,
       calendarUrl,
+      observationPushEnabled,
     });
     document.documentElement.lang = portalLocaleToHtmlLang(profileLocale);
     showToast('settingsSaved');
@@ -254,6 +268,14 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
     setObservationPushEnabled((current) => {
       const next = !current;
       localStorage.setItem(OBSERVATION_PUSH_KEY, String(next));
+      void syncCloudProfileSettings({
+        displayName,
+        avatarUrl,
+        locale,
+        displayLanguage,
+        calendarUrl,
+        observationPushEnabled: next,
+      });
       return next;
     });
     showToast('settingsSaved');
