@@ -113,6 +113,23 @@ check(health.body?.safePublicStatus === true, 'production health is safe public 
 check(health.body?.secretsRedacted === true, 'production health redacts secrets', health.body);
 check(health.body?.ai?.providers?.gemini?.enabled === true, 'Gemini is enabled in production runtime health', health.body?.ai);
 
+const activationChecklist = await fetchJson('/api/portal/production/activation-checklist');
+check(activationChecklist.response.ok, 'production activation checklist endpoint returns 2xx', activationChecklist.body);
+check(
+  activationChecklist.body?.safePublicStatus === true &&
+    activationChecklist.body?.secretsRedacted === true &&
+    Array.isArray(activationChecklist.body?.activationChecklist),
+  'production activation checklist redacts secrets and is safe public status',
+  activationChecklist.body,
+);
+check(
+  ['account_auth', 'cloud', 'ai', 'third_party'].every((category) =>
+    Object.prototype.hasOwnProperty.call(activationChecklist.body?.categorySummary || {}, category),
+  ),
+  'production activation checklist reports account cloud AI and third party readiness',
+  activationChecklist.body?.categorySummary,
+);
+
 const cloudStatus = await fetchJson('/api/cloud/status');
 check(cloudStatus.response.ok, 'cloud status endpoint returns 2xx', cloudStatus.body);
 check(

@@ -7,6 +7,7 @@ const packageJson = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package
 
 for (const marker of [
   '/api/portal/production/health',
+  '/api/portal/production/activation-checklist',
   '/api/cloud/status',
   '/api/cloud/inventory',
   '/api/cloud/profile-settings',
@@ -47,6 +48,9 @@ for (const marker of [
   'html_or_non_json_response',
   'Secretary static deep link is not publicly served',
   'cloud status endpoint returns 2xx',
+  'production activation checklist endpoint returns 2xx',
+  'production activation checklist redacts secrets and is safe public status',
+  'production activation checklist reports account cloud AI and third party readiness',
   'cloud status reports safe read-only diagnostics',
   'cloud inventory snapshot endpoint returns safe JSON',
   'cloud inventory snapshot is ready or fails closed with a clear reason',
