@@ -2545,6 +2545,17 @@ body {
   font: inherit;
 }
 
+.portal-bottom-nav-btn.portal-quote-treasure {
+  display: grid;
+  min-width: 4.4rem;
+  min-height: 3.35rem;
+  height: 3.35rem;
+  padding: 0.25rem 0.6rem;
+  line-height: 1;
+  border-radius: 1.1rem;
+  background: transparent;
+}
+
 .portal-bottom-nav-btn--active {
   background: linear-gradient(135deg, rgba(205, 222, 252, 0.85), rgba(150, 199, 243, 0.35));
 }

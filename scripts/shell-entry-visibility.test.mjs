@@ -8,12 +8,25 @@ const read = (file) => readFileSync(join(root, file), 'utf8');
 const css = read('app/globals.css');
 const dashboard = read('components/portal/DashboardHome.tsx');
 const portal = read('components/portal/Portal.tsx');
+const bottomNav = read('components/portal/PortalBottomNav.tsx');
 const packageJson = JSON.parse(read('package.json'));
 
 assert.match(
-  `${dashboard}\n${portal}`,
+  `${dashboard}\n${portal}\n${bottomNav}`,
   /portal-quote-treasure/,
   'Dashboard must keep the treasure entry button mounted for shell discovery.',
+);
+
+assert.match(
+  bottomNav,
+  /legacyShellEntryClass:\s*['"]portal-quote-treasure['"]/,
+  'V14 bottom toolbox nav must keep the legacy shell discovery selector for regression smoke.',
+);
+
+assert.match(
+  css,
+  /\.portal-bottom-nav-btn\.portal-quote-treasure\s*\{/,
+  'Bottom toolbox nav must locally reset the legacy shell entry class so V14 navigation styling is preserved.',
 );
 
 const treasureBoxBlocks = [...css.matchAll(/\.portal-quote-treasure-box\s*\{([\s\S]*?)\}/g)].map((match) => match[1]);

@@ -46,6 +46,7 @@ export default function PortalBottomNav({
       active: treasureOpen,
       expanded: treasureOpen,
       onClick: onOpenTreasure,
+      legacyShellEntryClass: 'portal-quote-treasure',
     },
   ];
 
@@ -55,7 +56,11 @@ export default function PortalBottomNav({
         <button
           key={item.key}
           type="button"
-          className={'portal-bottom-nav-btn' + (item.active ? ' portal-bottom-nav-btn--active' : '')}
+          className={
+            'portal-bottom-nav-btn' +
+            (item.active ? ' portal-bottom-nav-btn--active' : '') +
+            (item.legacyShellEntryClass ? ` ${item.legacyShellEntryClass}` : '')
+          }
           onClick={item.onClick}
           aria-label={item.label}
           aria-expanded={item.expanded}
