@@ -3,6 +3,7 @@ import {
   isSecretaryAiRequestAllowed,
   launchUnavailablePayload,
 } from '@/lib/portal/launch-safety';
+import { normalizePortalLocale, type PortalLocale } from '@/lib/portal/profile';
 
 const DEFAULT_MODELS = 'gemini-2.5-flash-lite,gemini-2.5-flash,gemini-1.5-flash-8b';
 const DOUBAO_API_URL = 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
@@ -11,7 +12,20 @@ const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 const DEFAULT_OPENAI_MODEL = 'gpt-4o-mini';
 const DEFAULT_CLAUDE_MODEL = 'claude-3-5-haiku-latest';
 
-const SYSTEM_PROMPT = `你是「Nesio」里的 AI 私人秘书。语气沉静、清晰、有温度，像一位值得信赖的幕僚。
+function buildSecretarySystemPrompt(locale: PortalLocale): string {
+  if (locale === 'en') {
+    return `You are the AI private secretary inside Nesio. Your tone is calm, clear, warm, and trustworthy.
+
+Your responsibilities:
+- Help the user organize tasks, priorities, and next actions
+- Turn vague anxiety into small executable steps
+- Create short memos, reviews, and decision tradeoffs
+- When the user is tired, settle emotions before efficiency
+
+Principles: answer in English unless the user asks otherwise; stay concise by default; do not invent facts the user has not provided; for medical or legal topics, remind the user to seek qualified human help.`;
+  }
+
+  return `你是「Nesio」里的 AI 私人秘书。语气沉静、清晰、有温度，像一位值得信赖的幕僚。
 
 你的职责：
 - 帮用户梳理待办、优先级与下一步行动
@@ -20,6 +34,7 @@ const SYSTEM_PROMPT = `你是「Nesio」里的 AI 私人秘书。语气沉静、
 - 在用户疲惫时先安顿情绪，再谈效率
 
 原则：回答用简体中文；默认简洁（除非用户要求展开）；不编造用户未提供的事实；涉及专业医疗/法律时提醒寻求真人帮助。`;
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -89,9 +104,22 @@ function labelForModel(modelId: string): string {
   return labels[modelId] || modelId;
 }
 
-function buildPersonaPrompt(modelId: string, message: string): string {
+function buildSecretaryPersonaPrompt(
+  locale: PortalLocale,
+  modelId: string,
+  message: string
+): string {
   const label = labelForModel(modelId);
   if (modelId === 'gemini' || modelId === 'google') return message;
+  if (locale === 'en') {
+    return [
+      `Please respond as "${label}" in Nesio AI Friends.`,
+      'If the native service key for this model is not configured, keep the same chat entry usable as a compatibility proxy.',
+      'Do not claim unavailable external capabilities; answer the user directly.',
+      '',
+      `User said: ${message}`,
+    ].join('\n');
+  }
   return [
     `请以「${label}」在 Nesio 智友中的角色回应。`,
     '如果当前没有该模型的原生服务密钥，请作为兼容代理保持同样的对话入口可用。',
@@ -135,7 +163,8 @@ async function generateWithModel(
   model: string,
   contents: Array<{ role: string; parts: Array<{ text: string }> }>,
   maxTokens: number,
-  key: string
+  key: string,
+  systemPrompt: string
 ): Promise<string> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`;
   let lastErr = `No response from ${model}`;
@@ -145,7 +174,7 @@ async function generateWithModel(
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+        systemInstruction: { parts: [{ text: systemPrompt }] },
         contents,
         generationConfig: {
           maxOutputTokens: Math.min(Math.max(maxTokens, 64), 4096),
@@ -181,7 +210,8 @@ async function generateWithModel(
 async function chatWithGemini(
   contents: Array<{ role: string; parts: Array<{ text: string }> }>,
   maxTokens: number,
-  key: string
+  key: string,
+  systemPrompt: string
 ): Promise<string> {
   const models = (process.env.GEMINI_MODEL || DEFAULT_MODELS)
     .split(',')
@@ -191,7 +221,7 @@ async function chatWithGemini(
   let lastErr = 'No models tried';
   for (const model of models) {
     try {
-      return await generateWithModel(model, contents, maxTokens, key);
+      return await generateWithModel(model, contents, maxTokens, key, systemPrompt);
     } catch (err) {
       lastErr = err instanceof Error ? err.message : String(err);
       if (!isQuotaError(lastErr)) continue;
@@ -205,20 +235,22 @@ async function chatWithGeminiFallback(
   message: string,
   maxTokens: number,
   key: string,
-  requestedModel: string
+  requestedModel: string,
+  locale: PortalLocale
 ): Promise<string> {
-  const contents = toGeminiContents(history, buildPersonaPrompt(requestedModel, message));
-  return chatWithGemini(contents, maxTokens, key);
+  const contents = toGeminiContents(history, buildSecretaryPersonaPrompt(locale, requestedModel, message));
+  return chatWithGemini(contents, maxTokens, key, buildSecretarySystemPrompt(locale));
 }
 
 async function chatWithOpenAI(
   history: ChatTurn[],
   message: string,
   maxTokens: number,
-  key: string
+  key: string,
+  systemPrompt: string
 ): Promise<string> {
   const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
-    { role: 'system', content: SYSTEM_PROMPT },
+    { role: 'system', content: systemPrompt },
   ];
   for (const turn of history) {
     messages.push({ role: turn.role, content: turn.content });
@@ -257,7 +289,8 @@ async function chatWithClaude(
   history: ChatTurn[],
   message: string,
   maxTokens: number,
-  key: string
+  key: string,
+  systemPrompt: string
 ): Promise<string> {
   const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [];
   for (const turn of history) {
@@ -274,7 +307,7 @@ async function chatWithClaude(
     },
     body: JSON.stringify({
       model: getClaudeModelId(),
-      system: SYSTEM_PROMPT,
+      system: systemPrompt,
       messages,
       max_tokens: Math.min(Math.max(maxTokens, 64), 4096),
       temperature: 0.65,
@@ -303,10 +336,11 @@ async function chatWithDoubao(
   history: ChatTurn[],
   message: string,
   maxTokens: number,
-  key: string
+  key: string,
+  systemPrompt: string
 ): Promise<string> {
   const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
-    { role: 'system', content: SYSTEM_PROMPT },
+    { role: 'system', content: systemPrompt },
   ];
   for (const turn of history) {
     messages.push({ role: turn.role, content: turn.content });
@@ -374,6 +408,7 @@ export async function POST(req: NextRequest) {
     history?: unknown;
     maxTokens?: number;
     model?: string;
+    locale?: string;
   };
   try {
     body = await req.json();
@@ -389,6 +424,8 @@ export async function POST(req: NextRequest) {
   const history = normalizeHistory(body.history);
   const maxTokens = Number(body.maxTokens) || 1200;
   const modelId = String(body.model || 'gemini').toLowerCase();
+  const locale = normalizePortalLocale(body.locale);
+  const systemPrompt = buildSecretarySystemPrompt(locale);
 
   try {
     if (modelId === 'doubao') {
@@ -404,10 +441,10 @@ export async function POST(req: NextRequest) {
             { status: 503, headers: corsHeaders }
           );
         }
-        const text = await chatWithGeminiFallback(history, message, maxTokens, fallbackKey, modelId);
+        const text = await chatWithGeminiFallback(history, message, maxTokens, fallbackKey, modelId, locale);
         return NextResponse.json({ text, model: 'gemini', requestedModel: modelId, fallback: true }, { headers: corsHeaders });
       }
-      const text = await chatWithDoubao(history, message, maxTokens, key);
+      const text = await chatWithDoubao(history, message, maxTokens, key, systemPrompt);
       return NextResponse.json({ text, model: 'doubao' }, { headers: corsHeaders });
     }
 
@@ -424,10 +461,10 @@ export async function POST(req: NextRequest) {
             { status: 503, headers: corsHeaders }
           );
         }
-        const text = await chatWithGeminiFallback(history, message, maxTokens, fallbackKey, modelId);
+        const text = await chatWithGeminiFallback(history, message, maxTokens, fallbackKey, modelId, locale);
         return NextResponse.json({ text, model: 'gemini', requestedModel: modelId, fallback: true }, { headers: corsHeaders });
       }
-      const text = await chatWithOpenAI(history, message, maxTokens, key);
+      const text = await chatWithOpenAI(history, message, maxTokens, key, systemPrompt);
       return NextResponse.json({ text, model: 'chatgpt' }, { headers: corsHeaders });
     }
 
@@ -444,10 +481,10 @@ export async function POST(req: NextRequest) {
             { status: 503, headers: corsHeaders }
           );
         }
-        const text = await chatWithGeminiFallback(history, message, maxTokens, fallbackKey, modelId);
+        const text = await chatWithGeminiFallback(history, message, maxTokens, fallbackKey, modelId, locale);
         return NextResponse.json({ text, model: 'gemini', requestedModel: modelId, fallback: true }, { headers: corsHeaders });
       }
-      const text = await chatWithClaude(history, message, maxTokens, key);
+      const text = await chatWithClaude(history, message, maxTokens, key, systemPrompt);
       return NextResponse.json({ text, model: 'claude' }, { headers: corsHeaders });
     }
 
@@ -462,7 +499,7 @@ export async function POST(req: NextRequest) {
           { status: 503, headers: corsHeaders }
         );
       }
-      const text = await chatWithGeminiFallback(history, message, maxTokens, fallbackKey, modelId);
+      const text = await chatWithGeminiFallback(history, message, maxTokens, fallbackKey, modelId, locale);
       return NextResponse.json({ text, model: 'gemini', requestedModel: modelId, fallback: true }, { headers: corsHeaders });
     }
 
@@ -478,7 +515,7 @@ export async function POST(req: NextRequest) {
     }
 
     const contents = toGeminiContents(history, message);
-    const text = await chatWithGemini(contents, maxTokens, key);
+    const text = await chatWithGemini(contents, maxTokens, key, systemPrompt);
     return NextResponse.json({ text, model: 'gemini' }, { headers: corsHeaders });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

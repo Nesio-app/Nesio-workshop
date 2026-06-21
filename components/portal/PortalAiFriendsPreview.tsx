@@ -570,6 +570,7 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
         message,
         history,
         personalLab: true,
+        locale,
       });
 
       if (result.text) {

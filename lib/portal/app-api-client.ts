@@ -487,12 +487,14 @@ export function createAppApiClient(options: ClientOptions = {}) {
       history = [],
       maxTokens = 1200,
       personalLab = true,
+      locale,
     }: {
       provider: SecretaryChatProvider;
       message: string;
       history?: SecretaryChatTurn[];
       maxTokens?: number;
       personalLab?: boolean;
+      locale?: string;
     }): Promise<SecretaryChatResponse> {
       return readJsonAllowError(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.secretaryChat), {
         method: 'POST',
@@ -505,6 +507,7 @@ export function createAppApiClient(options: ClientOptions = {}) {
           message,
           history,
           maxTokens,
+          locale,
         }),
       });
     },
