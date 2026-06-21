@@ -1063,26 +1063,26 @@ export default function DashboardHome({
           <button
             type="button"
             className="portal-reminder-backdrop"
-            aria-label="关闭今日安排"
+            aria-label={t(locale, 'dashboardScheduleClose')}
             onClick={() => setScheduleSheetOpen(false)}
           />
-          <section className="portal-reminder-card" role="dialog" aria-modal="true" aria-label="今日安排">
+          <section className="portal-reminder-card" role="dialog" aria-modal="true" aria-label={t(locale, 'dashboardScheduleTodayLabel')}>
             <span className="portal-crush-sheet-handle" aria-hidden />
-            <h2>陪你看见 · 今天可以做的事</h2>
+            <h2>{t(locale, 'dashboardScheduleTitle')}</h2>
             <button type="button" onClick={() => setReminderDetail('task')}>
-              <span>先做这一件就好</span>
-              <b>回复王总邮件</b>
-              <small><em>开始 14:30</em><em>建议今天</em></small>
+              <span>{t(locale, 'dashboardScheduleFirstLabel')}</span>
+              <b>{t(locale, 'dashboardScheduleTaskEmail')}</b>
+              <small><em>{t(locale, 'dashboardScheduleStart1430')}</em><em>{t(locale, 'dashboardScheduleSuggestedToday')}</em></small>
             </button>
             <button type="button" onClick={() => setReminderDetail('meeting')}>
-              <span>今日安排</span>
-              <b>产品会议</b>
-              <small><em>开始 15:00</em><em>还剩 4 小时</em></small>
+              <span>{t(locale, 'dashboardScheduleTodayLabel')}</span>
+              <b>{t(locale, 'dashboardScheduleMeetingTitle')}</b>
+              <small><em>{t(locale, 'dashboardScheduleStart1500')}</em><em>{t(locale, 'dashboardScheduleRemaining4Hours')}</em></small>
             </button>
             <button type="button" onClick={() => setReminderDetail('task')}>
-              <span>不急，有空再看</span>
-              <b>准备季度报告</b>
-              <small><em>开始 周五</em><em>本周内</em></small>
+              <span>{t(locale, 'dashboardScheduleLaterLabel')}</span>
+              <b>{t(locale, 'dashboardScheduleQuarterlyReport')}</b>
+              <small><em>{t(locale, 'dashboardScheduleStartFriday')}</em><em>{t(locale, 'dashboardScheduleThisWeek')}</em></small>
             </button>
           </section>
         </div>
@@ -1093,43 +1093,43 @@ export default function DashboardHome({
           <button
             type="button"
             className="portal-reminder-backdrop"
-            aria-label="关闭提醒详情"
+            aria-label={t(locale, 'dashboardReminderDetailClose')}
             onClick={() => setReminderDetail(null)}
           />
-          <section className="portal-reminder-card portal-reminder-card--detail" role="dialog" aria-modal="true" aria-label={reminderDetail === 'meeting' ? '会议提醒' : '提醒详情'}>
+          <section className="portal-reminder-card portal-reminder-card--detail" role="dialog" aria-modal="true" aria-label={reminderDetail === 'meeting' ? t(locale, 'dashboardReminderMeetingLabel') : t(locale, 'dashboardReminderDetailLabel')}>
             <span className="portal-crush-sheet-handle" aria-hidden />
             {reminderDetail === 'meeting' ? (
               <>
-                <p className="portal-v13-kicker">会议提醒</p>
-                <h2>产品会议</h2>
-                <p>产品团队周会，15:00 @ 会议室 B</p>
-                <p><b>时间 / 还剩 4 小时</b></p>
+                <p className="portal-v13-kicker">{t(locale, 'dashboardReminderMeetingLabel')}</p>
+                <h2>{t(locale, 'dashboardScheduleMeetingTitle')}</h2>
+                <p>{t(locale, 'dashboardMeetingDescription')}</p>
+                <p><b>{t(locale, 'dashboardMeetingTimeRemaining')}</b></p>
                 <button
                   type="button"
                   className="portal-reminder-primary"
                   data-runtime-action="dashboard-open-meeting-link"
                   onClick={openMeetingJoinUrl}
                 >
-                  📹 {meetingEvent?.url ? '加入会议' : '连接日历查看会议'}
+                  📹 {meetingEvent?.url ? t(locale, 'dashboardMeetingJoin') : t(locale, 'dashboardMeetingConnectCalendar')}
                 </button>
                 <button
                   type="button"
                   className="portal-reminder-record"
                   onClick={() => setMeetingRecording(true)}
                 >
-                  ▶ {meetingRecording ? '会议记录已开始，结束后生成纪要' : '开始 AI 会议记录'}
+                  ▶ {meetingRecording ? t(locale, 'dashboardMeetingRecordingStarted') : t(locale, 'dashboardMeetingRecordingStart')}
                 </button>
               </>
             ) : (
               <>
-                <p className="portal-v13-kicker">提醒详情</p>
-                <h2>回复王总邮件</h2>
-                <p>关于 Q3 预算调整方案，回一句也算往前走了一步。</p>
-                <p><b>时间 / 建议今天</b></p>
-                <button type="button" className="portal-reminder-primary" onClick={onOpenAiFriends}>✦ 在智友里处理</button>
+                <p className="portal-v13-kicker">{t(locale, 'dashboardReminderDetailLabel')}</p>
+                <h2>{t(locale, 'dashboardScheduleTaskEmail')}</h2>
+                <p>{t(locale, 'dashboardTaskDetailBody')}</p>
+                <p><b>{t(locale, 'dashboardTaskTimeSuggested')}</b></p>
+                <button type="button" className="portal-reminder-primary" onClick={onOpenAiFriends}>✦ {t(locale, 'dashboardTaskHandleInAiFriends')}</button>
               </>
             )}
-            <button type="button" className="portal-reminder-close" onClick={() => setReminderDetail(null)}>关闭</button>
+            <button type="button" className="portal-reminder-close" onClick={() => setReminderDetail(null)}>{t(locale, 'dashboardReminderClose')}</button>
           </section>
         </div>
       ) : null}
