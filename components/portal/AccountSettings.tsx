@@ -30,6 +30,7 @@ import {
   type AuthSessionResponse,
   type AuthStartProvider,
   type CloudProfileSettings,
+  type ProductionActivationChecklistResponse,
   type ProductionRuntimeHealthResponse,
   type ProductionRuntimeProviderAction,
   type ProductionRuntimeSetupTask,
@@ -95,6 +96,7 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
   const [calendarUrl, setCalendarUrl] = useState('');
   const [toast, setToast] = useState('');
   const [runtimeStatus, setRuntimeStatus] = useState<ProductionRuntimeHealthResponse | null>(null);
+  const [activationChecklistStatus, setActivationChecklistStatus] = useState<ProductionActivationChecklistResponse | null>(null);
   const [runtimeLoading, setRuntimeLoading] = useState(true);
   const [authSession, setAuthSession] = useState<AuthSessionResponse | null>(null);
   const [authSessionLoading, setAuthSessionLoading] = useState(true);
@@ -135,6 +137,14 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
       })
       .finally(() => {
         if (alive) setRuntimeLoading(false);
+      });
+    client
+      .fetchProductionActivationChecklist()
+      .then((status) => {
+        if (alive) setActivationChecklistStatus(status);
+      })
+      .catch(() => {
+        if (alive) setActivationChecklistStatus(null);
       });
     client
       .fetchAuthSession()
@@ -276,15 +286,21 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
     );
   }, [runtimeStatus?.setupTaskMatrix]);
   const runtimeMissingEnvList = useMemo(() => {
+    const nextSetupActions = activationChecklistStatus?.nextSetupActions;
+    if (nextSetupActions?.length) {
+      return Array.from(new Set(
+        nextSetupActions.flatMap((provider) => provider.missingEnv),
+      )).sort();
+    }
     return Array.from(new Set(
       (runtimeStatus?.providerActionMatrix || []).flatMap((provider) => provider.missingEnv),
     )).sort();
-  }, [runtimeStatus?.providerActionMatrix]);
+  }, [activationChecklistStatus?.nextSetupActions, runtimeStatus?.providerActionMatrix]);
   const runtimeReadinessSummary = runtimeStatus?.summary;
   const runtimeSetupTaskSummary = runtimeReadinessSummary
     ? {
-      blocked: runtimeReadinessSummary.blockedSetupTaskCount,
-      total: runtimeReadinessSummary.setupTaskCount,
+      blocked: activationChecklistStatus?.blockedActions.length ?? runtimeReadinessSummary.blockedSetupTaskCount,
+      total: activationChecklistStatus?.activationChecklist.length ?? runtimeReadinessSummary.setupTaskCount,
     }
     : null;
   const runtimeCanonicalDomainMismatch = Boolean(

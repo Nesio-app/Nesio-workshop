@@ -9,6 +9,10 @@ const packageJson = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package
 for (const marker of [
   'createAppApiClient',
   'fetchProductionRuntimeHealth',
+  'fetchProductionActivationChecklist',
+  'activationChecklistStatus',
+  'nextSetupActions',
+  'ProductionActivationChecklistResponse',
   'providerActionMatrix',
   'providerActionsById',
   'ProductionRuntimeSetupTask',
@@ -112,6 +116,8 @@ assert.ok(apiClient.includes("canonical_domain_mismatch"), 'Auth start response 
 assert.ok(apiClient.includes('setupTask?: ProductionRuntimeSetupTask'), 'Auth start response type must expose setupTask for actionable UI feedback');
 assert.ok(apiClient.includes("blockedReason: 'missing_env' | 'canonical_domain_mismatch' | 'provider_disabled' | null"), 'Production setup task type must expose blockedReason vocabulary');
 assert.ok(apiClient.includes('blockedSetupTaskCount: number'), 'Production runtime summary type must expose blocked setup task count');
+assert.ok(apiClient.includes('ProductionActivationChecklistResponse'), 'App API client must expose production activation checklist response type');
+assert.ok(apiClient.includes('fetchProductionActivationChecklist'), 'App API client must expose production activation checklist fetcher');
 
 assert.equal(
   packageJson.scripts['test:account-settings-production-runtime'],
