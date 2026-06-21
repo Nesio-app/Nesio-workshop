@@ -247,6 +247,8 @@ export default function DashboardHome({
   });
   const [calendarProviderAction, setCalendarProviderAction] =
     useState<ProductionRuntimeProviderAction | null>(null);
+  const [calendarServerFeedAction, setCalendarServerFeedAction] =
+    useState<ProductionRuntimeProviderAction | null>(null);
   const [fidelityHintDismissed, setFidelityHintDismissed] = useState(false);
   const [reminderDeferred, setReminderDeferred] = useState(false);
   const [crushTaskOpen, setCrushTaskOpen] = useState(false);
@@ -379,10 +381,17 @@ export default function DashboardHome({
         const provider = runtime.providerActionMatrix.find(
           (provider) => provider.id === 'google_calendar',
         );
+        const serverFeedProvider = runtime.providerActionMatrix.find(
+          (provider) => provider.id === 'google_calendar_ical_readonly',
+        );
         setCalendarProviderAction(provider ?? null);
+        setCalendarServerFeedAction(serverFeedProvider ?? null);
       })
       .catch(() => {
-        if (!cancelled) setCalendarProviderAction(null);
+        if (!cancelled) {
+          setCalendarProviderAction(null);
+          setCalendarServerFeedAction(null);
+        }
       });
     return () => {
       cancelled = true;
@@ -539,11 +548,13 @@ export default function DashboardHome({
 
   const calendarProviderReady =
     calendarProviderAction?.actionStatus === 'ready' && !calendarProviderAction?.serverOnly;
+  const calendarServerFeedReady =
+    calendarServerFeedAction?.actionStatus === 'server_ready' && calendarServerFeedAction?.serverOnly;
   const calendarProviderConnectUrl = calendarProviderReady
     ? (calendarProviderAction?.startEndpoint || '/api/portal/calendar/connect')
     : '';
-  const calendarActionLabel = calendarLinkUrl ? '打开' : calendarProviderConnectUrl ? '接入' : '接入';
-  const calendarClickable = Boolean(calendarLinkUrl || calendarProviderConnectUrl);
+  const calendarActionLabel = calendarLinkUrl ? '打开' : calendarServerFeedReady ? '已接入' : calendarProviderConnectUrl ? '接入' : '接入';
+  const calendarClickable = Boolean(calendarLinkUrl || calendarServerFeedReady || calendarProviderConnectUrl);
 
   const greeting = greetingForHour(now.getHours());
   const displayAvatar = avatarUrl || profile.avatarUrl;
@@ -631,6 +642,10 @@ export default function DashboardHome({
   const handleCalendarAction = () => {
     if (calendarLinkUrl) {
       openCalendarLink();
+      return;
+    }
+    if (calendarServerFeedReady) {
+      refreshCalendar();
       return;
     }
     if (calendarProviderConnectUrl) {

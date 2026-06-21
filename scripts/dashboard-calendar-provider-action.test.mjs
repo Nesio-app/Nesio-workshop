@@ -12,7 +12,9 @@ for (const marker of [
   'fetchProductionRuntimeHealth',
   'providerActionMatrix',
   'calendarProviderAction',
+  'calendarServerFeedAction',
   'google_calendar',
+  'google_calendar_ical_readonly',
   'loadCalendarLinkSettings',
   'CALENDAR_LINK_UPDATED_EVENT',
 ]) {
@@ -27,8 +29,20 @@ assert.match(
 
 assert.match(
   source,
+  /providerActionMatrix[\s\S]*provider\.id === 'google_calendar_ical_readonly'/,
+  'DashboardHome must derive Google Calendar iCal read-only state from providerActionMatrix.',
+);
+
+assert.match(
+  source,
   /calendarProviderAction\?\.actionStatus === 'ready'/,
   'DashboardHome must distinguish ready Google Calendar provider actions.',
+);
+
+assert.match(
+  source,
+  /calendarServerFeedAction\?\.actionStatus === 'server_ready'/,
+  'DashboardHome must distinguish server-ready iCal calendar provider actions.',
 );
 
 assert.match(
@@ -39,8 +53,20 @@ assert.match(
 
 assert.match(
   source,
+  /calendarServerFeedReady[\s\S]*calendarServerFeedAction\?\.serverOnly/,
+  'DashboardHome must treat server-only iCal feeds as display-ready but not frontend navigation.',
+);
+
+assert.match(
+  source,
   /calendarLinkUrl[\s\S]*calendarProviderReady/,
   'DashboardHome must preserve local Google Calendar link fallback while supporting runtime provider readiness.',
+);
+
+assert.match(
+  source,
+  /calendarLinkUrl[\s\S]*calendarServerFeedReady[\s\S]*calendarProviderReady/,
+  'DashboardHome must place server-ready iCal feed state between local links and OAuth connect state.',
 );
 
 assert.match(
@@ -59,6 +85,12 @@ assert.match(
   source,
   /calendarProviderConnectUrl \?[\s\S]*'接入'/,
   'DashboardHome must label the ready Google Calendar OAuth action as connect.',
+);
+
+assert.match(
+  source,
+  /calendarServerFeedReady \?[\s\S]*'已接入'/,
+  'DashboardHome must show server-ready iCal calendar feeds as connected.',
 );
 
 assert.match(
