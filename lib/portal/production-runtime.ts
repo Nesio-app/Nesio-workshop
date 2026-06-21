@@ -19,6 +19,16 @@ export type ProductionRuntimeSetupTask = ProductionRuntimeProviderAction & {
   requiresCanonicalDomain: boolean;
 };
 
+export type ProductionRuntimeCategoryReadiness = Record<
+  ProductionRuntimeProviderAction['category'],
+  {
+    total: number;
+    ready: number;
+    serverReady: number;
+    blocked: number;
+  }
+>;
+
 type EnvMap = Record<string, string | undefined>;
 
 function envValue(env: EnvMap, key: string): string {
@@ -132,6 +142,27 @@ function setupTask(
     blockedReason,
     requiresCanonicalDomain: needsCanonicalDomain,
   };
+}
+
+function categoryReadinessSummary(
+  providers: ProductionRuntimeProviderAction[],
+): ProductionRuntimeCategoryReadiness {
+  const summary: ProductionRuntimeCategoryReadiness = {
+    account_auth: { total: 0, ready: 0, serverReady: 0, blocked: 0 },
+    cloud: { total: 0, ready: 0, serverReady: 0, blocked: 0 },
+    ai: { total: 0, ready: 0, serverReady: 0, blocked: 0 },
+    third_party: { total: 0, ready: 0, serverReady: 0, blocked: 0 },
+  };
+
+  for (const provider of providers) {
+    const bucket = summary[provider.category];
+    bucket.total += 1;
+    if (provider.actionStatus === 'ready') bucket.ready += 1;
+    if (provider.actionStatus === 'server_ready') bucket.serverReady += 1;
+    if (provider.actionStatus === 'configure_required') bucket.blocked += 1;
+  }
+
+  return summary;
 }
 
 export function buildProductionRuntimeStatus(
@@ -351,6 +382,7 @@ export function buildProductionRuntimeStatus(
       blockedProviderCount: providerActionMatrix.filter((provider) => provider.actionStatus === 'configure_required').length,
       setupTaskCount: setupTaskMatrix.length,
       blockedSetupTaskCount: setupTaskMatrix.filter((task) => task.blockedReason).length,
+      categoryReadinessSummary: categoryReadinessSummary(providerActionMatrix),
       canonicalDomainReady: canonicalDomainMatchesRequestHost,
       productionRuntimeReady: allProviders.every((provider) => provider.enabled),
     },

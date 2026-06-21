@@ -51,6 +51,7 @@ assert.match(runtime, /actionableProviderCount/, 'summary must include actionabl
 assert.match(runtime, /blockedProviderCount/, 'summary must include blockedProviderCount');
 assert.match(runtime, /setupTaskCount/, 'summary must include setupTaskCount');
 assert.match(runtime, /blockedSetupTaskCount/, 'summary must include blockedSetupTaskCount');
+assert.match(runtime, /categoryReadinessSummary/, 'summary must include categoryReadinessSummary for account/cloud/AI/third-party readiness.');
 assert.match(healthRoute, /buildProductionRuntimeStatus/, 'production health route must return the full runtime status matrix');
 
 assert.equal(
@@ -84,6 +85,31 @@ assert.deepEqual(
   allowedHostRuntime.canonicalDomainAllowedHosts,
   ['www.nesio.app', 'treasurebox-nu.vercel.app', 'preview.nesio.app'],
   'canonicalDomainAllowedHosts should expose normalized canonical and allowed runtime hosts.',
+);
+assert.deepEqual(
+  Object.keys(allowedHostRuntime.summary.categoryReadinessSummary),
+  ['account_auth', 'cloud', 'ai', 'third_party'],
+  'categoryReadinessSummary should expose stable readiness buckets for the launch control surface.',
+);
+assert.deepEqual(
+  allowedHostRuntime.summary.categoryReadinessSummary.account_auth,
+  {
+    total: 4,
+    ready: 3,
+    serverReady: 0,
+    blocked: 1,
+  },
+  'account auth readiness should count email/google/phone ready and WeChat blocked when its env is absent.',
+);
+assert.deepEqual(
+  allowedHostRuntime.summary.categoryReadinessSummary.cloud,
+  {
+    total: 2,
+    ready: 0,
+    serverReady: 0,
+    blocked: 2,
+  },
+  'cloud readiness should separately summarize server-side cloud DB/storage setup.',
 );
 
 const blockedHostRuntime = runtimeModule.buildProductionRuntimeStatus({
