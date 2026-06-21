@@ -113,6 +113,24 @@ assert.match(
 
 assert.match(
   source,
+  /fetch\('\/api\/portal\/calendar',\s*\{\s*cache:\s*'no-store'\s*\}\)/,
+  'DashboardHome calendar refresh must bypass browser cache so connected feeds replace stale unavailable hints.',
+);
+
+assert.match(
+  source,
+  /setEvents\(Array\.isArray\(data\.events\) \? data\.events : \[\]\)/,
+  'DashboardHome calendar refresh must clear stale cached events when the runtime returns no events.',
+);
+
+assert.match(
+  source,
+  /setCalendarFeeds\(Array\.isArray\(data\.feeds\) \? data\.feeds : \[\]\)/,
+  'DashboardHome calendar refresh must clear stale feed status when the runtime returns no feeds.',
+);
+
+assert.match(
+  source,
   /data-runtime-action="dashboard-open-meeting-link"[\s\S]*onClick=\{openMeetingJoinUrl\}/,
   'DashboardHome meeting join CTA must be wired to its runtime handler.',
 );

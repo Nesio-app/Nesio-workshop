@@ -529,12 +529,12 @@ export default function DashboardHome({
   ]);
 
   const refreshCalendar = useCallback(() => {
-    fetch('/api/portal/calendar')
+    fetch('/api/portal/calendar', { cache: 'no-store' })
       .then((r) => r.json())
       .then((data) => {
         writePortalCache(PORTAL_CACHE_KEYS.calendar, data);
-        if (data.events?.length) setEvents(data.events);
-        if (Array.isArray(data.feeds)) setCalendarFeeds(data.feeds);
+        setEvents(Array.isArray(data.events) ? data.events : []);
+        setCalendarFeeds(Array.isArray(data.feeds) ? data.feeds : []);
         if (!data.configured && data.message) setCalendarNote(data.message);
         else if (data.error) setCalendarNote(t(locale, 'dashboardFidelityUnavailable'));
         else setCalendarNote(null);

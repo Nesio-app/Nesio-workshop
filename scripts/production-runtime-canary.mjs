@@ -68,6 +68,21 @@ check(health.body?.safePublicStatus === true, 'production health is safe public 
 check(health.body?.secretsRedacted === true, 'production health redacts secrets', health.body);
 check(health.body?.ai?.providers?.gemini?.enabled === true, 'Gemini is enabled in production runtime health', health.body?.ai);
 
+const calendar = await fetchJson('/api/portal/calendar');
+check(calendar.response.ok, 'calendar endpoint returns 2xx', calendar.body);
+check(calendar.body?.configured === true, 'calendar endpoint reports configured feed runtime', calendar.body);
+check(calendar.body?.enabled === true, 'calendar endpoint reports enabled feed runtime', calendar.body);
+check(Array.isArray(calendar.body?.events), 'calendar endpoint returns an events array', calendar.body);
+check((calendar.body?.events?.length || 0) > 0, 'calendar endpoint returns at least one event', {
+  eventCount: calendar.body?.events?.length || 0,
+  feeds: calendar.body?.feeds,
+});
+check(
+  Array.isArray(calendar.body?.sources) && calendar.body.sources.includes('Google'),
+  'calendar endpoint includes Google as a live source',
+  calendar.body?.sources,
+);
+
 const secretaryPage = await fetchJson('/secretary');
 check(
   secretaryPage.response.status === 403,
