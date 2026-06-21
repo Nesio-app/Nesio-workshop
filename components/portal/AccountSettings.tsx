@@ -15,6 +15,7 @@ import {
 import {
   loadProfileSettings,
   normalizePortalLocale,
+  PORTAL_LOCALE_OPTIONS,
   portalLocaleToHtmlLang,
   readAvatarFile,
   saveProfileSettings,
@@ -41,29 +42,14 @@ import {
 import type { PortalConfig } from '@/lib/portal/types';
 import PortalThemeToggle from './PortalThemeToggle';
 
-const LANGUAGE_OPTIONS = [
-  ['zh', '简体中文'],
-  ['en', 'English'],
-  ['zh-TW', '繁體中文'],
-  ['ja', '日本語'],
-  ['ko', '한국어'],
-  ['fr', 'Français'],
-  ['de', 'Deutsch'],
-  ['es', 'Español'],
-  ['it', 'Italiano'],
-  ['pt', 'Português'],
-  ['vi', 'Tiếng Việt'],
-  ['th', 'ไทย'],
-] as const;
-
-type DisplayLanguage = (typeof LANGUAGE_OPTIONS)[number][0];
+type DisplayLanguage = PortalLocale;
 type CloudProfileStatus = 'idle' | 'loading' | 'synced' | 'local_only' | 'not_signed_in' | 'error';
 
 const DISPLAY_LANGUAGE_KEY = 'treasurebox-display-language-v1';
 const OBSERVATION_PUSH_KEY = 'treasurebox-observation-push-enabled-v1';
 
 function normalizeDisplayLanguage(value: string | null | undefined): DisplayLanguage {
-  return LANGUAGE_OPTIONS.some(([code]) => code === value) ? value as DisplayLanguage : 'zh';
+  return normalizePortalLocale(value);
 }
 
 function normalizeProfileLocale(value: string | null | undefined): PortalLocale {
@@ -190,7 +176,7 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
           setCalendarUrl(next.calendarUrl);
           saveProfileSettings(nextProfile);
           localStorage.setItem(DISPLAY_LANGUAGE_KEY, next.displayLanguage);
-          document.documentElement.lang = next.displayLanguage;
+          document.documentElement.lang = portalLocaleToHtmlLang(next.displayLanguage);
           setCloudProfileStatus('synced');
           return;
         }
@@ -737,7 +723,7 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
           value={displayLanguage}
           onChange={(event) => onDisplayLanguageChange(normalizeDisplayLanguage(event.target.value))}
         >
-          {LANGUAGE_OPTIONS.map(([value, label]) => (
+          {PORTAL_LOCALE_OPTIONS.map(([value, label]) => (
             <option key={value} value={value}>{label}</option>
           ))}
         </select>

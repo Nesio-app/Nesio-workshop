@@ -16,6 +16,21 @@ export const SUPPORTED_PORTAL_LOCALES = [
 export type PortalLocale = (typeof SUPPORTED_PORTAL_LOCALES)[number];
 export type PortalCoachStyle = 'minimal' | 'warm' | 'professional';
 
+export const PORTAL_LOCALE_OPTIONS: ReadonlyArray<readonly [PortalLocale, string]> = Object.freeze([
+  ['zh', '简体中文'],
+  ['en', 'English'],
+  ['zh-TW', '繁體中文'],
+  ['ja', '日本語'],
+  ['ko', '한국어'],
+  ['fr', 'Français'],
+  ['de', 'Deutsch'],
+  ['es', 'Español'],
+  ['it', 'Italiano'],
+  ['pt', 'Português'],
+  ['vi', 'Tiếng Việt'],
+  ['th', 'ไทย'],
+]);
+
 export interface PortalProfileSettings {
   displayName: string;
   avatarUrl: string;

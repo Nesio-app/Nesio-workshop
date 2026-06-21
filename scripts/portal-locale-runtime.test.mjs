@@ -43,6 +43,10 @@ assert(
   'Profile settings should expose a single supported locale list.',
 );
 assert(
+  profile.includes('PORTAL_LOCALE_OPTIONS'),
+  'Profile settings should expose display labels from the same locale contract.',
+);
+assert(
   profile.includes('normalizePortalLocale'),
   'Profile settings should normalize saved/cloud locale values instead of ad hoc checks.',
 );
@@ -65,6 +69,18 @@ assert(
 assert(
   accountSettings.includes('portalLocaleToHtmlLang'),
   'AccountSettings should use the shared HTML lang mapper.',
+);
+assert(
+  accountSettings.includes('PORTAL_LOCALE_OPTIONS'),
+  'AccountSettings language dropdown should render from the shared locale contract.',
+);
+assert(
+  !accountSettings.includes('const LANGUAGE_OPTIONS'),
+  'AccountSettings must not keep a duplicate language option list.',
+);
+assert(
+  !accountSettings.includes('document.documentElement.lang = next.displayLanguage'),
+  'Cloud display language sync must use portalLocaleToHtmlLang instead of raw portal locale codes.',
 );
 assert(
   !accountSettings.includes("next === 'en' ? 'en' : 'zh'"),
