@@ -61,6 +61,30 @@ assert.match(
   'DashboardHome must label the ready Google Calendar OAuth action as connect.',
 );
 
+assert.match(
+  source,
+  /const meetingJoinUrl = /,
+  'DashboardHome meeting reminder must derive a real runtime join URL.',
+);
+
+assert.match(
+  source,
+  /const openMeetingJoinUrl = /,
+  'DashboardHome meeting reminder must expose a runtime handler for its join action.',
+);
+
+assert.match(
+  source,
+  /meetingJoinUrl[\s\S]*calendarProviderConnectUrl[\s\S]*calendarLinkUrl[\s\S]*'\/settings'/,
+  'DashboardHome meeting join action must fall back from event URL to provider connect, local calendar link, then settings.',
+);
+
+assert.match(
+  source,
+  /data-runtime-action="dashboard-open-meeting-link"[\s\S]*onClick=\{openMeetingJoinUrl\}/,
+  'DashboardHome meeting join CTA must be wired to its runtime handler.',
+);
+
 assert.equal(
   packageJson.scripts['test:dashboard-calendar-provider-action'],
   'node scripts/dashboard-calendar-provider-action.test.mjs',

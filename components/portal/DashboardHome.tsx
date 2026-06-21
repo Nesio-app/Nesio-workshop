@@ -553,6 +553,24 @@ export default function DashboardHome({
     () => filterTodayAndTomorrowEvents(events, now, calendarTz),
     [events, now, calendarTz],
   );
+  const meetingEvent = useMemo(
+    () => upcomingEvents.find((event) => {
+      const eventText = [
+        event.title,
+        event.calendarName,
+        event.source,
+        event.description,
+        event.location,
+        event.url,
+      ].filter(Boolean).join(' ');
+      return /meeting|会议|zoom|meet|call|产品/i.test(eventText);
+    }) ?? upcomingEvents.find((event) => Boolean(event.url)),
+    [upcomingEvents],
+  );
+  const meetingJoinUrl = meetingEvent?.url || calendarProviderConnectUrl || calendarLinkUrl || '/settings';
+  const openMeetingJoinUrl = useCallback(() => {
+    window.location.href = meetingJoinUrl;
+  }, [meetingJoinUrl]);
   const visibleEvents = calendarExpanded
     ? upcomingEvents
     : upcomingEvents.slice(0, CALENDAR_PREVIEW);
@@ -1046,7 +1064,14 @@ export default function DashboardHome({
                 <h2>产品会议</h2>
                 <p>产品团队周会，15:00 @ 会议室 B</p>
                 <p><b>时间 / 还剩 4 小时</b></p>
-                <button type="button" className="portal-reminder-primary">📹 加入 Zoom 会议</button>
+                <button
+                  type="button"
+                  className="portal-reminder-primary"
+                  data-runtime-action="dashboard-open-meeting-link"
+                  onClick={openMeetingJoinUrl}
+                >
+                  📹 {meetingEvent?.url ? '加入会议' : '连接日历查看会议'}
+                </button>
                 <button
                   type="button"
                   className="portal-reminder-record"
