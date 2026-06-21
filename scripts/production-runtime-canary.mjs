@@ -316,6 +316,52 @@ check(
   },
 );
 
+const calendarConnectRedirect = await fetchRedirect('/api/portal/calendar/connect');
+if (calendarConnectRedirect.response.ok) {
+  check(
+    calendarConnectRedirect.headers.location?.startsWith('https://accounts.google.com/') &&
+      calendarConnectRedirect.headers.location?.includes('calendar.readonly'),
+    'Google Calendar connect either redirects when configured or fails closed',
+    {
+      status: calendarConnectRedirect.response.status,
+      location: calendarConnectRedirect.headers.location,
+    },
+  );
+} else {
+  const calendarConnect = await fetchJson('/api/portal/calendar/connect');
+  check(
+    calendarConnect.body?.safePublicStatus === true &&
+      calendarConnect.body?.secretsRedacted === true &&
+      ['provider_not_configured', 'canonical_domain_mismatch'].includes(calendarConnect.body?.error),
+    'Google Calendar connect either redirects when configured or fails closed',
+    {
+      status: calendarConnect.response.status,
+      error: calendarConnect.body?.error,
+      setupTask: calendarConnect.body?.setupTask,
+    },
+  );
+}
+
+const flomoCapture = await fetchJson('/api/portal/flomo', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ content: '' }),
+});
+check(
+  flomoCapture.body?.safePublicStatus === true && flomoCapture.body?.secretsRedacted === true,
+  'Flomo capture endpoint returns safe JSON',
+  flomoCapture.body,
+);
+check(
+  flomoCapture.body?.error === 'content required' ||
+    ['FLOMO_WEBHOOK_URL not configured', 'Invalid JSON'].includes(flomoCapture.body?.error),
+  'Flomo capture validates empty content or fails closed',
+  {
+    status: flomoCapture.response.status,
+    error: flomoCapture.body?.error,
+  },
+);
+
 const gemini = await fetchJson('/api/secretary/chat', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
