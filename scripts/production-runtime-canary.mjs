@@ -184,6 +184,41 @@ check(
   cloudProfileSettings.body,
 );
 
+const modulesContract = await fetchJson('/api/modules');
+check(
+  modulesContract.response.ok &&
+    modulesContract.body?.contract === 'api-contract-v0' &&
+    Array.isArray(modulesContract.body?.modules) &&
+    ['shell', 'inventory', 'plan'].every((moduleId) =>
+      modulesContract.body.modules.some((module) => module.moduleId === moduleId && module.status === 'enabled'),
+    ),
+  'modules endpoint returns core Shell and launch module contract',
+  modulesContract.body,
+);
+
+const inventoryContract = await fetchJson('/api/inventory');
+check(
+  inventoryContract.response.ok &&
+    inventoryContract.body?.contract === 'api-contract-v0' &&
+    inventoryContract.body?.mode === 'demo' &&
+    inventoryContract.body?.personalDataRead === false &&
+    Array.isArray(inventoryContract.body?.items),
+  'inventory endpoint returns demo inventory without personal data reads',
+  inventoryContract.body,
+);
+
+const entitlementsContract = await fetchJson('/api/entitlements');
+check(
+  entitlementsContract.response.ok &&
+    entitlementsContract.body?.contract === 'api-contract-v0' &&
+    Array.isArray(entitlementsContract.body?.entitlements) &&
+    ['shell', 'inventory'].every((moduleId) =>
+      entitlementsContract.body.entitlements.some((entry) => entry.moduleId === moduleId && entry.status === 'active'),
+    ),
+  'entitlements endpoint returns local active Shell and Inventory entitlements',
+  entitlementsContract.body,
+);
+
 const userDataExport = await fetchJson('/api/user-data/export');
 check(
   userDataExport.response.ok &&
