@@ -182,7 +182,7 @@ export function buildProductionRuntimeStatus(
       phone: status(env, {
         id: 'phone',
         label: 'Phone login',
-        requiredEnv: ['BAOHE_AUTH_ENABLED', 'SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SMS_PROVIDER', 'SMS_PROVIDER_API_KEY'],
+        requiredEnv: ['BAOHE_AUTH_ENABLED', 'SUPABASE_URL', 'SUPABASE_ANON_KEY'],
         enabledWhen: authEnabled,
       }),
     },

@@ -103,4 +103,23 @@ assert.equal(
   'unknown production hosts must continue to fail closed for OAuth auth setup.',
 );
 
+const supabasePhoneRuntime = runtimeModule.buildProductionRuntimeStatus({
+  BAOHE_CANONICAL_DOMAIN: 'www.nesio.app',
+  BAOHE_AUTH_ENABLED: 'true',
+  SUPABASE_URL: 'https://example.supabase.co',
+  SUPABASE_ANON_KEY: 'anon',
+}, {
+  requestHost: 'www.nesio.app',
+});
+assert.equal(
+  supabasePhoneRuntime.accountAuth.providers.phone.enabled,
+  true,
+  'phone auth should be ready when Supabase Auth is configured; SMS delivery is configured inside Supabase, not this app runtime.',
+);
+assert.deepEqual(
+  supabasePhoneRuntime.accountAuth.providers.phone.missingEnv,
+  [],
+  'phone auth should not require unused SMS_PROVIDER app env variables.',
+);
+
 console.log('production runtime provider action matrix tests passed');
