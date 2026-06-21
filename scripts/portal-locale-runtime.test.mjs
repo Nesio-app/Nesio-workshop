@@ -5,12 +5,14 @@ const root = process.cwd();
 const profilePath = join(root, 'lib', 'portal', 'profile.ts');
 const accountSettingsPath = join(root, 'components', 'portal', 'AccountSettings.tsx');
 const dashboardHomePath = join(root, 'components', 'portal', 'DashboardHome.tsx');
+const toolsTreasureSheetPath = join(root, 'components', 'portal', 'ToolsTreasureSheet.tsx');
 const i18nPath = join(root, 'lib', 'portal', 'i18n.ts');
 const packagePath = join(root, 'package.json');
 
 const profile = readFileSync(profilePath, 'utf8');
 const accountSettings = readFileSync(accountSettingsPath, 'utf8');
 const dashboardHome = readFileSync(dashboardHomePath, 'utf8');
+const toolsTreasureSheet = readFileSync(toolsTreasureSheetPath, 'utf8');
 const i18n = readFileSync(i18nPath, 'utf8');
 const pkg = JSON.parse(readFileSync(packagePath, 'utf8'));
 
@@ -100,6 +102,36 @@ assert(
   i18n.includes('portalLocaleToDictionaryLocale'),
   'i18n should use an explicit dictionary fallback for locales without full translations yet.',
 );
+for (const key of [
+  'toolboxTitle',
+  'toolboxSubtitle',
+  'toolboxMyTools',
+  'toolboxAddable',
+  'toolboxPackageSection',
+  'toolboxTrustBoundary',
+]) {
+  assert(
+    i18n.includes(`${key}:`),
+    `i18n must define ${key} for toolbox runtime copy.`,
+  );
+  assert(
+    toolsTreasureSheet.includes(`t(locale, '${key}'`),
+    `ToolsTreasureSheet must render ${key} through the shared i18n dictionary.`,
+  );
+}
+for (const phrase of [
+  '>工具箱<',
+  '>我的工具<',
+  '>可添加<',
+  '>工具包<',
+  '健康 / 金融 / 心理 / 自动化仍需确认后开放。',
+  '发现适合你的工具，一键加入工作台',
+]) {
+  assert(
+    !toolsTreasureSheet.includes(phrase),
+    `ToolsTreasureSheet must not hard-code toolbox phrase: ${phrase}`,
+  );
+}
 assert(
   pkg.scripts['test:portal-locale-runtime'] === 'node scripts/portal-locale-runtime.test.mjs',
   'package.json must expose test:portal-locale-runtime.',

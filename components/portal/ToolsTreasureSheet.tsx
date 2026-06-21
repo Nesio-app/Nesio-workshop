@@ -201,7 +201,7 @@ export default function ToolsTreasurePopup({
       kind: 'tool',
       id,
       label,
-      message: `${label} 已加入本地工作台请求。等对应模块开放后，会从这里继续。`,
+      message: t(locale, 'toolboxLocalRequestTemplate', { label }),
     });
   }
 
@@ -210,7 +210,7 @@ export default function ToolsTreasurePopup({
       kind: 'tool',
       id,
       label,
-      message: `${label} 还没有加入当前工作台。我已先保存为本地开启请求；可在工具箱继续购买/加入。`,
+      message: t(locale, 'toolboxAccessRequestTemplate', { label }),
     });
   }
 
@@ -219,7 +219,7 @@ export default function ToolsTreasurePopup({
       kind: 'package',
       id,
       label,
-      message: `${label} 已选中。Nesio 会优先围绕这组工具整理首页入口。`,
+      message: t(locale, 'toolboxPackageSelectedTemplate', { label }),
     });
   }
 
@@ -227,24 +227,28 @@ export default function ToolsTreasurePopup({
 
   if (variant === 'screen') {
     return (
-      <section className="portal-treasure-screen" aria-label="工具箱">
+      <section className="portal-treasure-screen" aria-label={t(locale, 'toolboxTitle')}>
         <header className="portal-treasure-screen-head">
           <div>
-            <h1>工具箱</h1>
-            <p>发现适合你的工具，一键加入工作台</p>
+            <h1>{t(locale, 'toolboxTitle')}</h1>
+            <p>{t(locale, 'toolboxSubtitle')}</p>
           </div>
         </header>
 
         {selectedToolboxAction ? (
           <section className="portal-treasure-action-status" aria-live="polite">
-            <span>{selectedToolboxAction.kind === 'package' ? '已选择工具包' : '已加入请求'}</span>
+            <span>
+              {selectedToolboxAction.kind === 'package'
+                ? t(locale, 'toolboxSelectedPackage')
+                : t(locale, 'toolboxJoinedRequest')}
+            </span>
             <b>{selectedToolboxAction.label}</b>
             <small>{selectedToolboxAction.message}</small>
           </section>
         ) : null}
 
-        <section className="portal-treasure-screen-section" aria-label="我的工具">
-          <h2>我的工具</h2>
+        <section className="portal-treasure-screen-section" aria-label={t(locale, 'toolboxMyTools')}>
+          <h2>{t(locale, 'toolboxMyTools')}</h2>
           <div className="portal-treasure-data-grid">
             {personalizationProfile.dataDepth.map((entry) => {
               const tool = entry.id === 'home_items' ? inventoryTool : entry.id === 'tasks' ? planTool : null;
@@ -272,8 +276,8 @@ export default function ToolsTreasurePopup({
           </div>
         </section>
 
-        <section className="portal-treasure-screen-section" aria-label="可添加">
-          <h2>可添加</h2>
+        <section className="portal-treasure-screen-section" aria-label={t(locale, 'toolboxAddable')}>
+          <h2>{t(locale, 'toolboxAddable')}</h2>
           <div className="portal-treasure-screen-grid">
             {ADDABLE_TOOLS.map(([icon, id, label]) => (
               <button
@@ -284,23 +288,23 @@ export default function ToolsTreasurePopup({
               >
                 <span className="portal-treasure-screen-icon" aria-hidden>{icon}</span>
                 <b>{label}</b>
-                <small>{selectedToolboxAction?.id === id ? '已加入' : '＋ 添加'}</small>
+                <small>{selectedToolboxAction?.id === id ? t(locale, 'toolboxAdded') : t(locale, 'toolboxAdd')}</small>
               </button>
             ))}
           </div>
         </section>
 
-        <section className="portal-treasure-discovery-hero" aria-label="个性化推荐">
-          <p>个性化推荐</p>
-          <h2>礼物管家</h2>
-          <span>根据你的重要日期和亲友偏好推荐。当前先保存为本地工作台请求，算法接入后会继续优化。</span>
-          <button type="button" onClick={() => handleAddTool('gift-concierge', '礼物管家')}>
-            {selectedToolboxAction?.id === 'gift-concierge' ? '已加入工作台' : '＋ 加入工作台'}
+        <section className="portal-treasure-discovery-hero" aria-label={t(locale, 'toolboxPersonalizedRecommendation')}>
+          <p>{t(locale, 'toolboxPersonalizedRecommendation')}</p>
+          <h2>{t(locale, 'toolboxGiftConcierge')}</h2>
+          <span>{t(locale, 'toolboxGiftConciergeDescription')}</span>
+          <button type="button" onClick={() => handleAddTool('gift-concierge', t(locale, 'toolboxGiftConcierge'))}>
+            {selectedToolboxAction?.id === 'gift-concierge' ? t(locale, 'toolboxJoinedWorkspace') : t(locale, 'toolboxJoinWorkspace')}
           </button>
         </section>
 
-        <section className="portal-treasure-screen-section" aria-label="工具包">
-          <h2>工具包</h2>
+        <section className="portal-treasure-screen-section" aria-label={t(locale, 'toolboxPackageSection')}>
+          <h2>{t(locale, 'toolboxPackageSection')}</h2>
           <div className="portal-treasure-package-list">
             {TOOL_PACKAGES.map((pack) => (
               <button
@@ -318,7 +322,7 @@ export default function ToolsTreasurePopup({
         </section>
 
         <p className="portal-treasure-screen-boundary">
-          健康 / 金融 / 心理 / 自动化仍需确认后开放。
+          {t(locale, 'toolboxTrustBoundary')}
         </p>
       </section>
     );
@@ -354,31 +358,31 @@ export default function ToolsTreasurePopup({
             x
           </button>
         </header>
-        <section className="portal-treasure-pack" aria-label="工具包发现">
+        <section className="portal-treasure-pack" aria-label={t(locale, 'toolboxPackageSection')}>
           <div className="portal-treasure-pack-head">
-            <span>轻启动包</span>
-            <small>今日可用</small>
+            <span>{t(locale, 'toolboxStarterPack')}</span>
+            <small>{t(locale, 'toolboxAvailableToday')}</small>
           </div>
           <div className="portal-treasure-pack-actions">
             {planTool ? (
               <button type="button" onClick={() => onOpenTool(planTool)}>
-                <span>待办</span>
-                <small>粉碎任务</small>
+                <span>{t(locale, 'toolboxTodo')}</span>
+                <small>{t(locale, 'toolboxBreakTask')}</small>
               </button>
             ) : null}
             {inventoryTool ? (
               <button type="button" onClick={() => onOpenTool(inventoryTool)}>
-                <span>物品库</span>
-                <small>购买记忆</small>
+                <span>{t(locale, 'toolboxInventory')}</span>
+                <small>{t(locale, 'toolboxPurchaseMemory')}</small>
               </button>
             ) : null}
           </div>
-          <p>健康 / 金融 / 心理 / 自动化仍需确认后开放。</p>
+          <p>{t(locale, 'toolboxTrustBoundary')}</p>
         </section>
-        <section className="portal-treasure-my-tools" aria-label="我的工具">
+        <section className="portal-treasure-my-tools" aria-label={t(locale, 'toolboxMyTools')}>
           <div className="portal-treasure-pack-head">
-            <span>我的工具</span>
-            <small>首发只开放安全入口</small>
+            <span>{t(locale, 'toolboxMyTools')}</span>
+            <small>{t(locale, 'toolboxSafeLaunchOnly')}</small>
           </div>
           <div className="portal-treasure-my-grid">
             {MY_TOOL_PREVIEWS.map((entry) => {
