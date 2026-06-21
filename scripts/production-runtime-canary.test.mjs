@@ -11,6 +11,9 @@ for (const marker of [
   '/api/secretary/chat',
   'provider_not_configured',
   '宝盒Gemini在线',
+  'html_or_non_json_response',
+  'baseUrl',
+  'rawPreview',
 ]) {
   assert.ok(source.includes(marker), `missing production canary marker: ${marker}`);
 }

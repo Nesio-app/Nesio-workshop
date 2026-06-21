@@ -28,6 +28,11 @@ for (const marker of [
   'authPhone',
   'onInspectServerProviderAction',
   'formatProviderActionButtonLabel',
+  'runtimeMissingEnvList',
+  'runtimeReadinessSummary',
+  'onCopyMissingRuntimeEnv',
+  'runtimeCopyMissingEnv',
+  'portal-settings-runtime-summary',
 ]) {
   assert.ok(source.includes(marker), `AccountSettings must wire production runtime marker: ${marker}`);
 }
@@ -78,6 +83,10 @@ assert.match(source, /type="email"/, 'AccountSettings must provide an email inpu
 assert.match(source, /type="tel"/, 'AccountSettings must provide a phone input before starting phone auth');
 assert.ok(source.includes('email: authEmail.trim()'), 'AccountSettings must send the email value to auth start');
 assert.ok(source.includes('phone: authPhone.trim()'), 'AccountSettings must send the phone value to auth start');
+assert.ok(source.includes('data-runtime-action="runtime-copy-missing-env"'), 'AccountSettings must expose a copyable missing env runtime action');
+assert.ok(source.includes('navigator.clipboard.writeText'), 'AccountSettings must copy missing runtime env names for configuration handoff');
+assert.ok(source.includes("t(locale, 'runtimeReadinessTitle'"), 'AccountSettings must localize the runtime readiness summary title');
+assert.ok(source.includes("t(locale, 'runtimeMissingEnvCopied'"), 'AccountSettings must acknowledge copied runtime configuration gaps');
 
 assert.equal(
   packageJson.scripts['test:account-settings-production-runtime'],

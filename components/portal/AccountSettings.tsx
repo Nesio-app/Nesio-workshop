@@ -279,6 +279,12 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
       {},
     );
   }, [runtimeStatus?.providerActionMatrix]);
+  const runtimeMissingEnvList = useMemo(() => {
+    return Array.from(new Set(
+      (runtimeStatus?.providerActionMatrix || []).flatMap((provider) => provider.missingEnv),
+    )).sort();
+  }, [runtimeStatus?.providerActionMatrix]);
+  const runtimeReadinessSummary = runtimeStatus?.summary;
 
   const formatProviderActionStatus = (provider?: ProductionRuntimeProviderAction): string => {
     if (!provider) return runtimeLoading ? t(locale, 'providerStatusChecking') : t(locale, 'providerStatusNotConnected');
@@ -427,6 +433,22 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
       setAuthFeedback(t(locale, 'authLogoutFailed'));
     } catch {
       setAuthFeedback(t(locale, 'authLogoutServiceFailed'));
+    }
+  };
+
+  const onCopyMissingRuntimeEnv = async () => {
+    if (!runtimeMissingEnvList.length) {
+      setAuthFeedback(t(locale, 'runtimeAllConfigured'));
+      return;
+    }
+    const text = runtimeMissingEnvList.join('\n');
+    try {
+      await navigator.clipboard.writeText(text);
+      setAuthFeedback(t(locale, 'runtimeMissingEnvCopied', { count: String(runtimeMissingEnvList.length) }));
+    } catch {
+      setAuthFeedback(t(locale, 'runtimeMissingEnvFallback', {
+        missing: runtimeMissingEnvList.slice(0, 8).join(' / '),
+      }));
     }
   };
 
@@ -679,6 +701,30 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
             <p className="portal-settings-hint">{t(locale, 'accountSettingsConnectionsHint')}</p>
           </div>
           <span>{t(locale, 'accountSettingsLocalFirst')}</span>
+        </div>
+        <div className="portal-settings-runtime-summary" data-runtime-action="runtime-readiness-summary">
+          <div>
+            <strong>{t(locale, 'runtimeReadinessTitle')}</strong>
+            <p>
+              {runtimeLoading
+                ? t(locale, 'runtimeReadinessLoading')
+                : runtimeReadinessSummary?.productionRuntimeReady
+                  ? t(locale, 'runtimeReadinessReady', {
+                    enabled: String(runtimeReadinessSummary.enabledProviderCount),
+                    total: String(runtimeReadinessSummary.providerCount),
+                  })
+                  : t(locale, 'runtimeReadinessBlocked', {
+                    enabled: String(runtimeReadinessSummary?.enabledProviderCount || 0),
+                    total: String(runtimeReadinessSummary?.providerCount || 0),
+                    missing: String(runtimeReadinessSummary?.missingProviderCount || 0),
+                  })}
+            </p>
+          </div>
+          <button type="button" data-runtime-action="runtime-copy-missing-env" onClick={onCopyMissingRuntimeEnv}>
+            {runtimeMissingEnvList.length
+              ? t(locale, 'runtimeCopyMissingEnv')
+              : t(locale, 'runtimeNoMissingEnv')}
+          </button>
         </div>
         <ul className="portal-settings-safety-list">
           <li className="portal-settings-auth-actions">

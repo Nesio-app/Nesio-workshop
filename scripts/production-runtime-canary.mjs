@@ -16,10 +16,22 @@ async function fetchJson(path, init) {
     const splitAt = stdout.lastIndexOf('\n');
     const rawBody = splitAt >= 0 ? stdout.slice(0, splitAt) : stdout;
     const status = splitAt >= 0 ? Number(stdout.slice(splitAt + 1)) : 0;
-    const body = rawBody ? JSON.parse(rawBody) : {};
+    let body;
+    try {
+      body = rawBody ? JSON.parse(rawBody) : {};
+    } catch {
+      body = {
+        error: 'html_or_non_json_response',
+        message: 'Expected JSON but received HTML or another non-JSON response. Check that the canonical domain points to the Next/Vercel runtime.',
+        baseUrl,
+        path,
+        status,
+        rawPreview: rawBody.slice(0, 160),
+      };
+    }
     return {
       response: {
-        ok: status >= 200 && status < 300,
+        ok: status >= 200 && status < 300 && body?.error !== 'html_or_non_json_response',
         status,
       },
       body,
@@ -33,6 +45,7 @@ async function fetchJson(path, init) {
       body: {
         error: 'network_failure',
         message: error instanceof Error ? error.message : String(error),
+        baseUrl,
         path,
       },
     };
