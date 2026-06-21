@@ -35,6 +35,21 @@ function finalContractRuleFor(selector, requiredFragment) {
   return rule;
 }
 
+function numericZIndex(rule, label) {
+  const match = rule.match(/z-index:\s*(\d+)/);
+  assert.ok(match, `Expected ${label} to define a numeric z-index.`);
+  return Number(match[1]);
+}
+
+function maxZIndexFor(selector, label) {
+  const values = groupedRulesFor(selector)
+    .map((rule) => rule.match(/z-index:\s*(\d+)/))
+    .filter(Boolean)
+    .map((match) => Number(match[1]));
+  assert.ok(values.length > 0, `Expected ${label} to define at least one numeric z-index.`);
+  return Math.max(...values);
+}
+
 for (const token of [
   '--modal-backdrop-bg',
   '--modal-backdrop-blur',
@@ -87,6 +102,13 @@ const tokenizedBottomNavRule = finalBottomNavRules.find((rule) =>
   /blur\(var\(--modal-card-blur\)\) saturate\(var\(--modal-card-saturate\)\)/.test(rule),
 );
 assert.ok(tokenizedBottomNavRule, 'Bottom nav must have a final tokenized glass rule.');
+
+const overlayZIndex = numericZIndex(overlayRule, 'runtime overlay layer');
+const bottomNavZIndex = maxZIndexFor('.portal-bottom-nav', 'bottom nav');
+assert.ok(
+  overlayZIndex > bottomNavZIndex,
+  `Runtime overlays must stack above the bottom nav so open sheets are clickable. overlay=${overlayZIndex}, bottomNav=${bottomNavZIndex}`,
+);
 
 const nightBottomNavRules = css.match(/html\[data-portal-theme="night"\] \.portal-bottom-nav\s*\{[\s\S]*?\n\}/g) || [];
 const nightBottomNavRule = nightBottomNavRules.find((rule) => /background:\s*var\(--glass-bg-pop\)/.test(rule));
