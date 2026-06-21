@@ -365,6 +365,58 @@ for (const authProvider of authProviderCanaryMatrix) {
   }
 }
 
+const emailAuthDryRun = await fetchJson('/api/auth/start', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    provider: 'email',
+    email: 'canary@example.com',
+    dryRun: true,
+  }),
+});
+check(
+  emailAuthDryRun.body?.safePublicStatus === true &&
+    emailAuthDryRun.body?.secretsRedacted === true &&
+    emailAuthDryRun.body?.error !== 'missing_email' &&
+    (emailAuthDryRun.body?.action === 'otp_dry_run' ||
+      ['provider_not_configured', 'canonical_domain_mismatch'].includes(emailAuthDryRun.body?.error)),
+  'email auth start dry-run accepts a real email payload without sending OTP',
+  emailAuthDryRun.body,
+);
+if (emailAuthDryRun.body?.action === 'otp_dry_run') {
+  check(
+    emailAuthDryRun.body?.noExternalOtpSent === true,
+    'email auth start dry-run does not send external OTP',
+    emailAuthDryRun.body,
+  );
+}
+
+const phoneAuthDryRun = await fetchJson('/api/auth/start', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    provider: 'phone',
+    phone: '+15555550123',
+    dryRun: true,
+  }),
+});
+check(
+  phoneAuthDryRun.body?.safePublicStatus === true &&
+    phoneAuthDryRun.body?.secretsRedacted === true &&
+    phoneAuthDryRun.body?.error !== 'missing_phone' &&
+    (phoneAuthDryRun.body?.action === 'otp_dry_run' ||
+      ['provider_not_configured', 'canonical_domain_mismatch'].includes(phoneAuthDryRun.body?.error)),
+  'phone auth start dry-run accepts a real phone payload without sending OTP',
+  phoneAuthDryRun.body,
+);
+if (phoneAuthDryRun.body?.action === 'otp_dry_run') {
+  check(
+    phoneAuthDryRun.body?.noExternalOtpSent === true,
+    'phone auth start dry-run does not send external OTP',
+    phoneAuthDryRun.body,
+  );
+}
+
 const authSession = await fetchJson('/api/auth/session');
 check(
   authSession.body?.safePublicStatus === true && authSession.body?.secretsRedacted === true,

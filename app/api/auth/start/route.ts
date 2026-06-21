@@ -92,6 +92,7 @@ export async function POST(req: NextRequest) {
     email?: string;
     phone?: string;
     redirectTo?: string;
+    dryRun?: boolean;
   };
 
   try {
@@ -145,11 +146,29 @@ export async function POST(req: NextRequest) {
 
   if (provider === 'email') {
     if (!email) return safeJson({ ok: false, error: 'missing_email' }, 400);
+    if (body.dryRun === true) {
+      return safeJson({
+        ok: true,
+        provider,
+        action: 'otp_dry_run',
+        dryRun: true,
+        noExternalOtpSent: true,
+      });
+    }
     const result = await requestSupabaseOtp({ email, redirectTo });
     return safeJson({ ...result, provider }, result.status);
   }
 
   if (!phone) return safeJson({ ok: false, error: 'missing_phone' }, 400);
+  if (body.dryRun === true) {
+    return safeJson({
+      ok: true,
+      provider,
+      action: 'otp_dry_run',
+      dryRun: true,
+      noExternalOtpSent: true,
+    });
+  }
   const result = await requestSupabaseOtp({ phone, redirectTo });
   return safeJson({ ...result, provider }, result.status);
 }
