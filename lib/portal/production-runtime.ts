@@ -30,6 +30,17 @@ function envAny(env: EnvMap, keys: string[]): boolean {
   return keys.some((key) => Boolean(envValue(env, key)));
 }
 
+function envList(env: EnvMap, key: string): string[] {
+  return envValue(env, key)
+    .split(',')
+    .map((value) => normalizeHost(value.trim()))
+    .filter(Boolean);
+}
+
+function normalizeHost(host: string): string {
+  return host.split(':')[0].toLowerCase();
+}
+
 function hasAiProviderKey(env: EnvMap): boolean {
   return envAny(env, [
     'OPENAI_API_KEY',
@@ -122,9 +133,11 @@ export function buildProductionRuntimeStatus(
   context: { requestHost?: string | null } = {},
 ) {
   const canonicalDomain = envValue(env, 'BAOHE_CANONICAL_DOMAIN') || 'www.nesio.app';
-  const requestHost = (context.requestHost || '').split(':')[0].toLowerCase();
-  const canonicalHost = canonicalDomain.split(':')[0].toLowerCase();
-  const canonicalDomainMatchesRequestHost = Boolean(requestHost) && requestHost === canonicalHost;
+  const requestHost = normalizeHost(context.requestHost || '');
+  const canonicalHost = normalizeHost(canonicalDomain);
+  const allowedRuntimeHosts = envList(env, 'BAOHE_ALLOWED_RUNTIME_HOSTS');
+  const canonicalDomainAllowedHosts = Array.from(new Set([canonicalHost, ...allowedRuntimeHosts].filter(Boolean)));
+  const canonicalDomainMatchesRequestHost = Boolean(requestHost) && canonicalDomainAllowedHosts.includes(requestHost);
   const authEnabled = envValue(env, 'BAOHE_AUTH_ENABLED').toLowerCase() === 'true';
   const cloudDbEnabled = envValue(env, 'CLOUD_DB_ENABLED').toLowerCase() === 'true';
   const cloudStorageEnabled = envValue(env, 'CLOUD_STORAGE_ENABLED').toLowerCase() === 'true';
@@ -315,6 +328,8 @@ export function buildProductionRuntimeStatus(
     secretsRedacted: true,
     canonicalDomain,
     requestHost,
+    allowedRuntimeHosts,
+    canonicalDomainAllowedHosts,
     canonicalDomainMatchesRequestHost,
     accountAuth,
     cloud,

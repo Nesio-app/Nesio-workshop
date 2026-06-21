@@ -15,6 +15,9 @@ assert.match(runtime, /safeUserAction/, 'providerActionMatrix entries must expos
 assert.match(runtime, /serverOnly/, 'providerActionMatrix entries must distinguish server-only capabilities');
 assert.match(runtime, /blockedReason/, 'setupTaskMatrix entries must explain why provider setup is blocked');
 assert.match(runtime, /requiresCanonicalDomain/, 'setupTaskMatrix entries must show whether canonical domain readiness is required');
+assert.match(runtime, /BAOHE_ALLOWED_RUNTIME_HOSTS/, 'production runtime must support an explicit allowed runtime host list for OAuth rollout.');
+assert.match(runtime, /allowedRuntimeHosts/, 'production runtime status must expose the allowed runtime hosts for diagnostics.');
+assert.match(runtime, /canonicalDomainAllowedHosts/, 'production runtime must evaluate canonical host plus allowed runtime host aliases.');
 
 for (const provider of ['email', 'google', 'wechat', 'phone']) {
   assert.match(
