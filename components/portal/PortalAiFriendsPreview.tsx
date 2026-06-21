@@ -387,7 +387,6 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
     const readiness = resolveActiveProviderReadiness();
     if (!readiness.ready) {
       appendProviderUnavailableMessage(readiness);
-      return;
     }
     setAttachmentTrayOpen(false);
     setConversationListOpen(false);
@@ -412,7 +411,6 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
     const readiness = resolveActiveProviderReadiness();
     if (!readiness.ready) {
       appendProviderUnavailableMessage(readiness);
-      return;
     }
     setAttachmentTrayOpen(false);
     setConversationListOpen(false);

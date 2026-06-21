@@ -34,6 +34,11 @@ import {
   writePortalCache,
 } from '@/lib/portal/prefetch-cache';
 import { configUrl } from '@/lib/portal/paths';
+import {
+  loadProfileSettings,
+  PROFILE_UPDATED_EVENT,
+  type PortalLocale,
+} from '@/lib/portal/profile';
 import type { PortalConfig, PortalDecMetadata, PortalTool } from '@/lib/portal/types';
 import { type ToolForShellState } from './tool-state';
 
@@ -167,6 +172,7 @@ export default function Portal() {
   const [treasureOpen, setTreasureOpen] = useState(false);
   const [activeSurface, setActiveSurface] = useState<'home' | 'ai' | 'tools'>('home');
   const [purchasedToolsOpen, setPurchasedToolsOpen] = useState(false);
+  const [locale, setLocale] = useState<PortalLocale>('zh');
   const [launchSurfaceContext, setLaunchSurfaceContext] = useState({
     viewerRole: 'public' as 'public' | 'tester' | 'personal_lab',
     testerAllowlist: [] as string[],
@@ -199,6 +205,17 @@ export default function Portal() {
   useEffect(() => {
     setTreasureOpen(readTreasureOpen());
     setLaunchSurfaceContext(normalizeLaunchSurfaceContext(readLaunchSurfaceContextFromBrowser()));
+    setLocale(loadProfileSettings().locale);
+  }, []);
+
+  useEffect(() => {
+    const syncLocale = () => setLocale(loadProfileSettings().locale);
+    window.addEventListener(PROFILE_UPDATED_EVENT, syncLocale);
+    window.addEventListener('storage', syncLocale);
+    return () => {
+      window.removeEventListener(PROFILE_UPDATED_EVENT, syncLocale);
+      window.removeEventListener('storage', syncLocale);
+    };
   }, []);
 
   useEffect(() => {
@@ -377,7 +394,7 @@ export default function Portal() {
                 tools={shellManifest.tools}
                 open
                 variant="screen"
-                locale="zh"
+                locale={locale}
                 onClose={handleHome}
                 onOpenTool={openTool}
               />
@@ -435,6 +452,7 @@ export default function Portal() {
       <PortalBottomNav
         aiFriendsOpen={activeSurface === 'ai'}
         treasureOpen={activeSurface === 'tools'}
+        locale={locale}
         onHome={handleHome}
         onOpenAiFriends={handleAiFriendsOpen}
         onOpenTreasure={() => handleTreasureOpenChange(activeSurface !== 'tools')}

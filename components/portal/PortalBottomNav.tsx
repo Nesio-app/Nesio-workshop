@@ -1,11 +1,14 @@
 'use client';
 
 import type { CSSProperties } from 'react';
+import { t } from '@/lib/portal/i18n';
 import { nesioBrandAssets, nesioToolIcons } from '@/lib/portal/nesio-design-system-assets.mjs';
+import type { PortalLocale } from '@/lib/portal/profile';
 
 interface PortalBottomNavProps {
   aiFriendsOpen?: boolean;
   treasureOpen?: boolean;
+  locale?: PortalLocale;
   onHome: () => void;
   onOpenAiFriends: () => void;
   onOpenTreasure: () => void;
@@ -18,6 +21,7 @@ type PortalBottomNavCssProperties = CSSProperties & {
 export default function PortalBottomNav({
   aiFriendsOpen = false,
   treasureOpen = false,
+  locale = 'zh',
   onHome,
   onOpenAiFriends,
   onOpenTreasure,
@@ -25,7 +29,7 @@ export default function PortalBottomNav({
   const bottomNavItems = [
     {
       key: 'home',
-      label: '首页',
+      label: t(locale, 'portalBottomNavHomeShell'),
       iconUrl: nesioBrandAssets.crystal,
       active: false,
       expanded: undefined,
@@ -33,7 +37,7 @@ export default function PortalBottomNav({
     },
     {
       key: 'ai',
-      label: '智友',
+      label: t(locale, 'aiFriendsTitle'),
       iconUrl: nesioToolIcons.secretary,
       active: aiFriendsOpen,
       expanded: aiFriendsOpen,
@@ -41,7 +45,7 @@ export default function PortalBottomNav({
     },
     {
       key: 'toolbox',
-      label: '工具箱',
+      label: t(locale, 'toolboxTitle'),
       iconUrl: nesioToolIcons.storage,
       active: treasureOpen,
       expanded: treasureOpen,
@@ -51,7 +55,7 @@ export default function PortalBottomNav({
   ];
 
   return (
-    <nav className="portal-bottom-nav" aria-label="Nesio 导航">
+    <nav className="portal-bottom-nav" aria-label={t(locale, 'portalBottomNavShellAriaLabel')}>
       {bottomNavItems.map((item) => (
         <button
           key={item.key}
