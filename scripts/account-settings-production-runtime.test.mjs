@@ -59,6 +59,8 @@ for (const label of ['Gemini', 'Google Calendar', 'Cloud DB', 'Email', 'Google',
 }
 
 assert.ok(source.includes('provider_not_configured'), 'AccountSettings must surface fail-closed auth errors');
+assert.ok(source.includes("result.error === 'canonical_domain_mismatch'"), 'AccountSettings must surface canonical domain mismatch from auth start responses');
+assert.ok(source.includes("t(locale, 'providerSetupBlockedCanonicalDomain'"), 'Auth start canonical mismatch must use the same explicit canonical-domain feedback as provider actions');
 assert.ok(source.includes('window.location.assign'), 'OAuth auth start must be able to navigate to redirect URL');
 assert.ok(!source.includes('window.location.href = provider.startEndpoint'), 'Provider action fallback must not navigate directly to POST-only auth start endpoints');
 assert.ok(source.includes("provider.startEndpoint === '/api/auth/start'"), 'Provider action fallback must detect auth start endpoints and route users through the sign-in form action');
@@ -106,6 +108,8 @@ assert.ok(apiClient.includes('requestHost: string'), 'Production runtime health 
 assert.ok(apiClient.includes('canonicalDomainMatchesRequestHost: boolean'), 'Production runtime health type must expose canonical host match');
 assert.ok(apiClient.includes('canonicalDomainReady: boolean'), 'Production runtime summary type must expose canonical domain readiness');
 assert.ok(apiClient.includes('setupTaskMatrix: ProductionRuntimeSetupTask[]'), 'Production runtime health type must expose setupTaskMatrix');
+assert.ok(apiClient.includes("canonical_domain_mismatch"), 'Auth start response type must include canonical_domain_mismatch errors');
+assert.ok(apiClient.includes('setupTask?: ProductionRuntimeSetupTask'), 'Auth start response type must expose setupTask for actionable UI feedback');
 assert.ok(apiClient.includes("blockedReason: 'missing_env' | 'canonical_domain_mismatch' | 'provider_disabled' | null"), 'Production setup task type must expose blockedReason vocabulary');
 assert.ok(apiClient.includes('blockedSetupTaskCount: number'), 'Production runtime summary type must expose blocked setup task count');
 

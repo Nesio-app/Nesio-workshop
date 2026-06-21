@@ -438,6 +438,13 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
         setAuthFeedback(t(locale, 'authOtpSent'));
         return;
       }
+      if (result.error === 'canonical_domain_mismatch') {
+        setAuthFeedback(t(locale, 'providerSetupBlockedCanonicalDomain', {
+          canonical: runtimeStatus?.canonicalDomain || 'www.nesio.app',
+          host: runtimeStatus?.requestHost || '',
+        }));
+        return;
+      }
       if (result.error === 'provider_not_configured') {
         setAuthFeedback(t(locale, 'authProviderNotConfiguredTemplate', {
           provider,
