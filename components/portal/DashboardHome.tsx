@@ -920,8 +920,8 @@ export default function DashboardHome({
             </div>
             <p className="portal-crush-sheet-copy">
               {crushTaskSplitLevel > 0
-                ? `我把它继续拆细到第 ${crushTaskSplitLevel + 1} 层。做不完、想跳过都可以，你已经在往前走了。`
-                : '我把它拆成几个小步骤。做不完、想跳过都可以，你已经在往前走了。'}
+                ? t(locale, 'dashboardCrushSplitStatusTemplate', { level: crushTaskSplitLevel + 1 })
+                : t(locale, 'dashboardCrushSplitIntro')}
             </p>
             <ol className="portal-crush-step-list" aria-label="粉碎步骤">
               <li className={crushTaskDone ? 'is-done' : ''}>

@@ -103,6 +103,12 @@ test('V14 warm coach home exposes one primary next action and inventory pack', a
   await expect(crushSheet.getByText(/给妈妈准备生日礼物/)).toBeVisible();
   await expect(crushSheet.getByText(/想想妈妈最近提过、喜欢的东西/)).toBeVisible();
   await expect(crushSheet.getByRole('button', { name: /还是太大？再拆细/ }).first()).toBeVisible();
+  await crushSheet.getByRole('button', { name: /还是太大？再拆细/ }).first().click();
+  await expect(crushSheet.getByText(/已继续拆到第 2 层/)).toBeVisible();
+  await expect(crushSheet.getByText(/第 2 次拆分/)).toBeVisible();
+  await crushSheet.getByRole('button', { name: /还是太大？再拆细/ }).first().click();
+  await expect(crushSheet.getByText(/已继续拆到第 3 层/)).toBeVisible();
+  await expect(crushSheet.getByText(/第 3 次拆分/)).toBeVisible();
   await expect(crushSheet.getByRole('button', { name: '完成这一步' })).toBeVisible();
   await expect(crushSheet.getByRole('button', { name: '稍后' })).toBeVisible();
   await expect(crushSheet.getByRole('button', { name: '打开待办' })).toBeVisible();
