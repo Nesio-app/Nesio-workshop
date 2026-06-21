@@ -604,6 +604,18 @@ export default function DashboardHome({
     () => popupTools.find((tool) => tool.id === 'plan') ?? config.tools.find((tool) => tool.id === 'plan'),
     [config.tools, popupTools],
   );
+  const healthTool = useMemo(
+    () => popupTools.find((tool) => tool.id === 'health') ?? config.tools.find((tool) => tool.id === 'health'),
+    [config.tools, popupTools],
+  );
+  const openHealthRuntime = useCallback(() => {
+    const healthIsAvailable = healthTool?.ready || healthTool?.status === 'ready';
+    if (healthTool && healthIsAvailable) {
+      onOpenTool(healthTool);
+      return;
+    }
+    setHealthGateOpen(true);
+  }, [healthTool, onOpenTool]);
   const dismissFidelityHint = () => {
     setFidelityHintDismissed(true);
     try {
@@ -773,7 +785,8 @@ export default function DashboardHome({
               type="button"
               className="portal-v13-energy-button"
               aria-label={t(locale, 'dashboardEnergyAriaLabel')}
-              onClick={() => setHealthGateOpen(true)}
+              data-runtime-action="open-health-dashboard"
+              onClick={openHealthRuntime}
             >
               <p>{t(locale, 'dashboardEnergyTitle')}</p>
               <div className="portal-v13-energy-bars" aria-hidden>
