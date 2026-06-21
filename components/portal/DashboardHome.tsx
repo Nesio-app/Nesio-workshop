@@ -833,7 +833,7 @@ export default function DashboardHome({
 
         <div className="portal-v13-action-card portal-v13-action-card--html">
           <div className="portal-v13-action-content" onClick={() => setCrushTaskOpen(true)} role="presentation">
-            <p className="portal-v13-kicker">温馨提醒</p>
+            <p className="portal-v13-kicker">{t(locale, 'dashboardReminderKicker')}</p>
             <p className="portal-v13-action-copy">
               {t(locale, 'dashboardGiftReminderPrefix')}
               <em>{t(locale, 'dashboardGiftReminderAlbum')}</em>
@@ -844,7 +844,7 @@ export default function DashboardHome({
             <button
               type="button"
               className="portal-v13-ai-tip"
-              aria-label="问智友下一步"
+              aria-label={t(locale, 'dashboardAskAiNextStep')}
               onClick={(event) => {
                 event.stopPropagation();
                 onOpenAiFriends?.();
@@ -859,14 +859,14 @@ export default function DashboardHome({
               className="portal-v13-primary-action"
               onClick={() => setCrushTaskOpen(true)}
             >
-              粉碎任务
+              {t(locale, 'dashboardCrushTaskButton')}
             </button>
             <button
               type="button"
               className="portal-v13-secondary-action"
               onClick={() => setReminderDeferred(true)}
             >
-              {reminderDeferred ? '已换一条' : '下一条'}
+              {reminderDeferred ? t(locale, 'dashboardReminderDeferred') : t(locale, 'dashboardReminderNext')}
             </button>
           </div>
         </div>
@@ -874,16 +874,16 @@ export default function DashboardHome({
         <article className="portal-v13-inventory-card" onClick={() => inventoryTool && onOpenTool(inventoryTool)}>
           <div className="portal-v13-inventory-head">
             <span aria-hidden>📦</span>
-            <b>物品库</b>
-            <small>本周清单</small>
+            <b>{t(locale, 'dashboardInventoryTitle')}</b>
+            <small>{t(locale, 'dashboardInventoryWeeklyList')}</small>
           </div>
-          <h2>可整理本周补货清单</h2>
+          <h2>{t(locale, 'dashboardInventoryWeeklyRestockTitle')}</h2>
           <div className="portal-v13-inventory-rows">
-            <p><span>全脂牛奶 · 冰箱</span><b>补货</b></p>
-            <p><span>维生素 C · 药柜</span><b>补货</b></p>
-            <p><span>保湿护肤霜 · 梳妆台</span><b>关注</b></p>
+            <p><span>{t(locale, 'dashboardInventoryMilkLine')}</span><b>{t(locale, 'dashboardInventoryRestockAction')}</b></p>
+            <p><span>{t(locale, 'dashboardInventoryVitaminLine')}</span><b>{t(locale, 'dashboardInventoryRestockAction')}</b></p>
+            <p><span>{t(locale, 'dashboardInventorySkincareLine')}</span><b>{t(locale, 'dashboardInventoryWatchAction')}</b></p>
           </div>
-          <p className="portal-v13-inventory-ai">提前备好，生活从容 · 可让智友帮你处理</p>
+          <p className="portal-v13-inventory-ai">{t(locale, 'dashboardInventoryAiHint')}</p>
           <div className="portal-v13-inventory-actions">
             <button
               type="button"
@@ -892,7 +892,7 @@ export default function DashboardHome({
                 if (inventoryTool) onOpenTool(inventoryTool);
               }}
             >
-              ＋ 记录物品
+              ＋ {t(locale, 'dashboardInventoryAddItem')}
             </button>
             <button
               type="button"
@@ -901,7 +901,7 @@ export default function DashboardHome({
                 if (inventoryTool) onOpenTool(inventoryTool);
               }}
             >
-              查看全部
+              {t(locale, 'dashboardInventoryViewAll')}
             </button>
           </div>
         </article>
@@ -922,19 +922,19 @@ export default function DashboardHome({
           <button
             type="button"
             className="portal-crush-sheet-backdrop"
-            aria-label="关闭粉碎任务"
+            aria-label={t(locale, 'dashboardCrushTaskClose')}
             onClick={() => setCrushTaskOpen(false)}
           />
           <section
             className="portal-crush-sheet-card"
             role="dialog"
             aria-modal="true"
-            aria-label="粉碎任务"
+            aria-label={t(locale, 'dashboardCrushTaskButton')}
           >
             <div className="portal-crush-sheet-handle" aria-hidden />
             <div className="portal-crush-sheet-head">
               <div>
-                <p className="portal-v13-kicker">粉碎任务</p>
+                <p className="portal-v13-kicker">{t(locale, 'dashboardCrushTaskButton')}</p>
                 <h2>给妈妈准备生日礼物</h2>
               </div>
               <button
@@ -943,7 +943,7 @@ export default function DashboardHome({
                 onClick={() => setCrushTaskOpen(false)}
               >
                 <span aria-hidden>×</span>
-                <span className="sr-only">关闭粉碎任务</span>
+                <span className="sr-only">{t(locale, 'dashboardCrushTaskClose')}</span>
               </button>
             </div>
             <p className="portal-crush-sheet-copy">
