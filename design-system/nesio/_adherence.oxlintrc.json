@@ -1,0 +1,332 @@
+{
+  "plugins": [
+    "react",
+    "import"
+  ],
+  "rules": {
+    "react/forbid-elements": [
+      "warn",
+      {
+        "forbid": []
+      }
+    ],
+    "no-restricted-imports": [
+      "warn",
+      {
+        "patterns": [
+          {
+            "group": [
+              "components/core/**",
+              "components/portal/**",
+              "lib/**",
+              "ui_kits/shell/**"
+            ],
+            "message": "Import design-system components from 'index.js', not component internals."
+          }
+        ]
+      }
+    ],
+    "no-restricted-syntax": [
+      "warn",
+      {
+        "selector": "Literal[value=/#[0-9a-fA-F]{3,8}\\b/]",
+        "message": "Raw hex color — use a design-system color token via var()."
+      },
+      {
+        "selector": "Literal[value=/\\b\\d+px\\b/]",
+        "message": "Raw px value — use a design-system spacing token via var()."
+      },
+      {
+        "selector": "Literal[value=/font-family\\s*:\\s*(?!['\\\"]?(?:Noto Sans SC|Noto Sans JP|Noto Sans KR|Noto Serif SC))/i]",
+        "message": "Font not provided by the design system. Available: Noto Sans SC, Noto Sans JP, Noto Sans KR, Noto Serif SC."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='Button'] > JSXAttribute > JSXIdentifier[name!=/^(?:variant|size|tone|pill|full|disabled|iconLeft|iconRight|children|key|ref|className|style|children)$/]",
+        "message": "<Button> doesn't accept that prop. Declared props: variant, size, tone, pill, full, disabled, iconLeft, iconRight, children."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='Button'] > JSXAttribute[name.name='variant'] > Literal[value!=/^(?:primary|secondary|soft|ghost)$/]",
+        "message": "<Button> variant must be one of 'primary' | 'secondary' | 'soft' | 'ghost'."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='Button'] > JSXAttribute[name.name='size'] > Literal[value!=/^(?:sm|md|lg)$/]",
+        "message": "<Button> size must be one of 'sm' | 'md' | 'lg'."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='Button'] > JSXAttribute[name.name='tone'] > Literal[value!=/^(?:brand|risk)$/]",
+        "message": "<Button> tone must be one of 'brand' | 'risk'."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='FloatingButton'] > JSXAttribute > JSXIdentifier[name!=/^(?:icon|label|accent|position|size|key|ref|className|style|children)$/]",
+        "message": "<FloatingButton> doesn't accept that prop. Declared props: icon, label, accent, position, size."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='FloatingButton'] > JSXAttribute[name.name='position'] > Literal[value!=/^(?:br|bl|tr|tl)$/]",
+        "message": "<FloatingButton> position must be one of 'br' | 'bl' | 'tr' | 'tl'."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='GlassCard'] > JSXAttribute > JSXIdentifier[name!=/^(?:tone|raised|interactive|padding|radius|children|key|ref|className|style|children)$/]",
+        "message": "<GlassCard> doesn't accept that prop. Declared props: tone, raised, interactive, padding, radius, children."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='GlassCard'] > JSXAttribute[name.name='tone'] > Literal[value!=/^(?:plain|cool|warm|neutral)$/]",
+        "message": "<GlassCard> tone must be one of 'plain' | 'cool' | 'warm' | 'neutral'."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='Input'] > JSXAttribute > JSXIdentifier[name!=/^(?:label|hint|multiline|rows|style|key|ref|className|style|children)$/]",
+        "message": "<Input> doesn't accept that prop. Declared props: label, hint, multiline, rows, style."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='QuoteCard'] > JSXAttribute > JSXIdentifier[name!=/^(?:quote|label|saved|onSave|style|key|ref|className|style|children)$/]",
+        "message": "<QuoteCard> doesn't accept that prop. Declared props: quote, label, saved, onSave, style."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='ReminderItem'] > JSXAttribute > JSXIdentifier[name!=/^(?:kind|text|status|action|key|ref|className|style|children)$/]",
+        "message": "<ReminderItem> doesn't accept that prop. Declared props: kind, text, status, action."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='ReminderItem'] > JSXAttribute[name.name='status'] > Literal[value!=/^(?:go|gentle|calm|risk)$/]",
+        "message": "<ReminderItem> status must be one of 'go' | 'gentle' | 'calm' | 'risk'."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='StatusBadge'] > JSXAttribute > JSXIdentifier[name!=/^(?:status|dot|children|style|key|ref|className|style|children)$/]",
+        "message": "<StatusBadge> doesn't accept that prop. Declared props: status, dot, children, style."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='StatusBadge'] > JSXAttribute[name.name='status'] > Literal[value!=/^(?:go|gentle|calm|risk)$/]",
+        "message": "<StatusBadge> status must be one of 'go' | 'gentle' | 'calm' | 'risk'."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='ToolModuleCard'] > JSXAttribute > JSXIdentifier[name!=/^(?:icon|name|nameEn|tone|status|locked|onOpen|children|style|key|ref|className|style|children)$/]",
+        "message": "<ToolModuleCard> doesn't accept that prop. Declared props: icon, name, nameEn, tone, status, locked, onOpen, children, style."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='ToolModuleCard'] > JSXAttribute[name.name='tone'] > Literal[value!=/^(?:cool|warm|neutral)$/]",
+        "message": "<ToolModuleCard> tone must be one of 'cool' | 'warm' | 'neutral'."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='WeatherTime'] > JSXAttribute > JSXIdentifier[name!=/^(?:time|date|temp|condition|place|align|style|key|ref|className|style|children)$/]",
+        "message": "<WeatherTime> doesn't accept that prop. Declared props: time, date, temp, condition, place, align, style."
+      },
+      {
+        "selector": "JSXOpeningElement[name.name='WeatherTime'] > JSXAttribute[name.name='align'] > Literal[value!=/^(?:right|left)$/]",
+        "message": "<WeatherTime> align must be one of 'right' | 'left'."
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": [
+        "**/index.js"
+      ],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    }
+  ],
+  "x-omelette": {
+    "components": {
+      "Button": {
+        "replaces": []
+      },
+      "FloatingButton": {
+        "replaces": []
+      },
+      "GlassCard": {
+        "replaces": []
+      },
+      "Input": {
+        "replaces": []
+      },
+      "QuoteCard": {
+        "replaces": []
+      },
+      "ReminderItem": {
+        "replaces": []
+      },
+      "StatusBadge": {
+        "replaces": []
+      },
+      "ToolModuleCard": {
+        "replaces": []
+      },
+      "WeatherTime": {
+        "replaces": []
+      }
+    },
+    "tokens": [
+      "--container-max",
+      "--container-pad",
+      "--dur",
+      "--dur-fast",
+      "--dur-slow",
+      "--ease-out",
+      "--ease-soft",
+      "--font-portal-serif",
+      "--font-sans",
+      "--font-serif",
+      "--font-source-sans",
+      "--glass-bg",
+      "--glass-bg-pop",
+      "--glass-bg-raised",
+      "--glass-bg-solid",
+      "--glass-blur",
+      "--glass-border",
+      "--glass-highlight",
+      "--leading-relaxed",
+      "--leading-snug",
+      "--leading-tight",
+      "--portal-bg",
+      "--portal-bg-gradient",
+      "--portal-blue-deep",
+      "--portal-blue-light",
+      "--portal-blue-mid",
+      "--portal-cool",
+      "--portal-cool-accent",
+      "--portal-ink",
+      "--portal-line",
+      "--portal-muted",
+      "--portal-neutral",
+      "--portal-neutral-accent",
+      "--portal-warm",
+      "--portal-warm-accent",
+      "--radius-lg",
+      "--radius-md",
+      "--radius-pill",
+      "--radius-sm",
+      "--radius-xl",
+      "--radius-xs",
+      "--shadow-card",
+      "--shadow-fab",
+      "--shadow-pop",
+      "--shadow-raise",
+      "--space-0",
+      "--space-1",
+      "--space-10",
+      "--space-12",
+      "--space-16",
+      "--space-2",
+      "--space-3",
+      "--space-4",
+      "--space-5",
+      "--space-6",
+      "--space-8",
+      "--status-calm",
+      "--status-calm-soft",
+      "--status-gentle",
+      "--status-gentle-soft",
+      "--status-go",
+      "--status-go-soft",
+      "--status-risk",
+      "--status-risk-soft",
+      "--tap-min",
+      "--text-body",
+      "--text-display",
+      "--text-h1",
+      "--text-h2",
+      "--text-h3",
+      "--text-overline",
+      "--text-sm",
+      "--text-xs",
+      "--tracking-label",
+      "--tracking-normal",
+      "--tracking-tight",
+      "--tracking-wide",
+      "--weight-bold",
+      "--weight-light",
+      "--weight-medium",
+      "--weight-regular",
+      "--weight-semibold"
+    ],
+    "tokenKinds": {
+      "--portal-blue-deep": "color",
+      "--portal-blue-mid": "color",
+      "--portal-blue-light": "color",
+      "--portal-bg": "color",
+      "--portal-ink": "color",
+      "--portal-muted": "color",
+      "--portal-line": "color",
+      "--portal-cool": "color",
+      "--portal-cool-accent": "color",
+      "--portal-warm": "color",
+      "--portal-warm-accent": "color",
+      "--portal-neutral": "color",
+      "--portal-neutral-accent": "color",
+      "--status-go": "color",
+      "--status-go-soft": "color",
+      "--status-gentle": "color",
+      "--status-gentle-soft": "color",
+      "--status-calm": "color",
+      "--status-calm-soft": "color",
+      "--status-risk": "color",
+      "--status-risk-soft": "color",
+      "--portal-bg-gradient": "color",
+      "--font-sans": "font",
+      "--font-serif": "font",
+      "--font-source-sans": "font",
+      "--font-portal-serif": "font",
+      "--weight-light": "font",
+      "--weight-regular": "font",
+      "--weight-medium": "font",
+      "--weight-semibold": "font",
+      "--weight-bold": "font",
+      "--text-display": "font",
+      "--text-h1": "font",
+      "--text-h2": "font",
+      "--text-h3": "font",
+      "--text-body": "font",
+      "--text-sm": "font",
+      "--text-xs": "font",
+      "--text-overline": "font",
+      "--leading-tight": "font",
+      "--leading-snug": "font",
+      "--leading-relaxed": "font",
+      "--tracking-tight": "font",
+      "--tracking-normal": "font",
+      "--tracking-label": "font",
+      "--tracking-wide": "font",
+      "--space-0": "spacing",
+      "--space-1": "spacing",
+      "--space-2": "spacing",
+      "--space-3": "spacing",
+      "--space-4": "spacing",
+      "--space-5": "spacing",
+      "--space-6": "spacing",
+      "--space-8": "spacing",
+      "--space-10": "spacing",
+      "--space-12": "spacing",
+      "--space-16": "spacing",
+      "--radius-xs": "radius",
+      "--radius-sm": "radius",
+      "--radius-md": "radius",
+      "--radius-lg": "radius",
+      "--radius-xl": "radius",
+      "--radius-pill": "radius",
+      "--container-max": "spacing",
+      "--container-pad": "spacing",
+      "--tap-min": "spacing",
+      "--glass-blur": "spacing",
+      "--glass-bg": "color",
+      "--glass-bg-raised": "color",
+      "--glass-bg-solid": "color",
+      "--glass-bg-pop": "color",
+      "--glass-border": "color",
+      "--glass-highlight": "shadow",
+      "--shadow-card": "shadow",
+      "--shadow-raise": "shadow",
+      "--shadow-pop": "shadow",
+      "--shadow-fab": "shadow",
+      "--ease-soft": "other",
+      "--ease-out": "other",
+      "--dur-fast": "other",
+      "--dur": "other",
+      "--dur-slow": "other"
+    },
+    "fontFamilies": [
+      "Noto Sans JP",
+      "Noto Sans KR",
+      "Noto Sans SC",
+      "Noto Serif SC"
+    ]
+  }
+}

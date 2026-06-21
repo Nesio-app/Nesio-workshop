@@ -5,6 +5,10 @@ import { FLOMO_DEMO_MEMOS } from '@/lib/portal/flomo-demo';
 import { t } from '@/lib/portal/i18n';
 import { apiUrl } from '@/lib/portal/paths';
 import { loadProfileSettings } from '@/lib/portal/profile';
+import {
+  createAppApiClient,
+  type ProductionRuntimeProviderAction,
+} from '@/lib/portal/app-api-client';
 
 const FLOMO_MEMO_LIMIT = 48;
 const MEMO_COLLAPSE_CHARS = 180;
@@ -66,10 +70,23 @@ function formatMemoDate(iso: string): string {
 }
 
 function MemoCard({ memo, onTagClick }: { memo: FlomoMemo; onTagClick: (tag: string) => void }) {
+  const locale = loadProfileSettings().locale;
   const [expanded, setExpanded] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'failed'>('idle');
   const content = memo.content.trim();
   const needsExpand = content.length > MEMO_COLLAPSE_CHARS;
   const shown = needsExpand && !expanded ? `${content.slice(0, MEMO_COLLAPSE_CHARS).trim()}…` : content;
+
+  const copyMemo = async () => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopyStatus('copied');
+      setMenuOpen(false);
+    } catch {
+      setCopyStatus('failed');
+    }
+  };
 
   return (
     <article className="flomo-memo-card">
@@ -77,14 +94,32 @@ function MemoCard({ memo, onTagClick }: { memo: FlomoMemo; onTagClick: (tag: str
         <time className="flomo-memo-time" dateTime={memo.created_at}>
           {formatMemoDate(memo.created_at || memo.updated_at)}
         </time>
-        <button type="button" className="flomo-memo-menu" aria-label={t(loadProfileSettings().locale, 'flomoMenuMore')} tabIndex={-1}>
+        <button
+          type="button"
+          className="flomo-memo-menu"
+          aria-label={t(locale, 'flomoMenuMore')}
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen((open) => !open)}
+        >
           ···
         </button>
+        {menuOpen ? (
+          <div className="flomo-memo-action-menu" role="menu">
+            <button type="button" role="menuitem" onClick={copyMemo}>
+              {t(locale, 'flomoCopyMemo')}
+            </button>
+          </div>
+        ) : null}
       </header>
+      {copyStatus !== 'idle' ? (
+        <p className="flomo-memo-action-status" role="status">
+          {t(locale, copyStatus === 'copied' ? 'flomoMemoCopied' : 'flomoMemoCopyFailed')}
+        </p>
+      ) : null}
       <p className="flomo-memo-content">{shown}</p>
       {needsExpand && !expanded ? (
         <button type="button" className="flomo-memo-expand" onClick={() => setExpanded(true)}>
-          {t(loadProfileSettings().locale, 'flomoExpand')}
+          {t(locale, 'flomoExpand')}
         </button>
       ) : null}
       {memo.tags.length > 0 ? (
@@ -127,6 +162,8 @@ export default function NotePanelEnhanced({ open, onOpenChange }: NotePanelProps
   const [composeOpen, setComposeOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [flomoProviderAction, setFlomoProviderAction] =
+    useState<ProductionRuntimeProviderAction | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const imageRef = useRef<HTMLInputElement>(null);
 
@@ -194,6 +231,26 @@ export default function NotePanelEnhanced({ open, onOpenChange }: NotePanelProps
       setLoadingMemos(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    const client = createAppApiClient();
+    client.fetchProductionRuntimeHealth()
+      .then((runtime) => {
+        if (cancelled) return;
+        const provider = runtime.providerActionMatrix.find(
+          (provider) => provider.id === 'flomo',
+        );
+        setFlomoProviderAction(provider ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setFlomoProviderAction(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
 
   useEffect(() => {
     if (open) {
@@ -279,9 +336,25 @@ export default function NotePanelEnhanced({ open, onOpenChange }: NotePanelProps
 
   const onSend = async () => {
     const text = draft.trim();
+    if (sending) {
+      setStatus('idle');
+      setStatusMsg(t(locale, 'flomoSendInFlight'));
+      return;
+    }
     if (!text && images.length === 0) {
       setStatus('err');
       setStatusMsg(t(locale, 'flomoNeedContent'));
+      return;
+    }
+
+    const flomoRuntimeReady =
+      flomoProviderAction?.actionStatus === 'server_ready' &&
+      flomoProviderAction?.startEndpoint === '/api/portal/flomo' &&
+      flomoProviderAction?.serverOnly === true;
+
+    if (!flomoRuntimeReady) {
+      setStatus('err');
+      setStatusMsg(t(locale, 'notePanelFlomoNotReady'));
       return;
     }
 
@@ -342,7 +415,7 @@ export default function NotePanelEnhanced({ open, onOpenChange }: NotePanelProps
 
   if (!open) return null;
 
-  const canSend = (draft.trim().length > 0 || images.length > 0) && !sending;
+  const canSend = draft.trim().length > 0 || images.length > 0;
 
   return (
     <div className="flomo-overlay" role="presentation" onClick={() => onOpenChange(false)}>
@@ -640,7 +713,6 @@ export default function NotePanelEnhanced({ open, onOpenChange }: NotePanelProps
                     <button
                       type="button"
                       className={'flomo-send' + (canSend ? ' flomo-send--on' : '')}
-                      disabled={!canSend}
                       onClick={onSend}
                       aria-label={t(locale, 'flomoSend')}
                     >

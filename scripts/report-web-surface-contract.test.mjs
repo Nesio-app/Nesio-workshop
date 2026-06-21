@@ -17,7 +17,8 @@ assert.equal(report.webSurfaceContract.primaryExperience, 'mobile_web_pwa');
 assert.equal(report.webSurfaceContract.mobileWeb.supportLevel, 'official');
 assert.equal(report.webSurfaceContract.desktopWeb.supportLevel, 'preview_compatibility');
 assert.equal(report.webSurfaceContract.desktopWeb.desktopSaasDashboardEnabled, false);
-assert.deepEqual(report.webSurfaceContract.mobileWeb.launchScope.publicModuleIds, ['shell', 'inventory']);
+assert.deepEqual(report.webSurfaceContract.mobileWeb.launchScope.publicModuleIds, ['shell', 'inventory', 'plan']);
+assert.equal(report.webSurfaceContract.mobileWeb.launchScope.todoTaskSupportRequired, true);
 
 assert.equal(report.summary.webSurfaceContractVersion, 'web-surface-contract-v0');
 assert.equal(report.summary.mobileWebSupported, true);

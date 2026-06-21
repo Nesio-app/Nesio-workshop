@@ -17,6 +17,42 @@ Architecture and boundary references:
 - `lib/portal/ARCHITECTURE.md`
 - `docs/repository-boundary-cleanup.md`
 
+## Submodules
+
+This repo intentionally still uses Git submodules for several historical or
+sandbox tool codebases. They are integration references, not automatic public
+launch promises.
+
+Clone with submodules when you need to inspect or build those external tool
+references:
+
+```bash
+git clone --recursive https://github.com/hanbing6228/treasurebox.git
+```
+
+If you already cloned without submodules:
+
+```bash
+git submodule update --init --recursive
+```
+
+Check local submodule health:
+
+```bash
+npm run doctor:submodules
+```
+
+Current policy:
+
+- Do not update all submodules casually before release QA.
+- Do not infer public launch scope from a submodule existing on disk.
+- Inventory/storage lineage is the only current launch-adjacent submodule
+  reference.
+- Psychology, reading, question bank, and Weaver/AI references stay sandbox or
+  contract-only unless a separate gate changes their product status.
+- Do not migrate to Turborepo or npm workspaces until a tool becomes launchable
+  or monetized and genuinely shares enough build/runtime code with Baohe.
+
 ## License
 
 This project is licensed under the MIT License. See `LICENSE`.

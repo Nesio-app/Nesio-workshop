@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none" role="img" aria-label="treasure box">
+  <defs>
+    <linearGradient id="tb-bg" x1="6" y1="4" x2="42" y2="44" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#a8d4f7"></stop>
+      <stop offset="0.55" stop-color="#6ba8eb"></stop>
+      <stop offset="1" stop-color="#4a7fd4"></stop>
+    </linearGradient>
+    <linearGradient id="tb-lid" x1="10" y1="13" x2="38" y2="24" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff"></stop>
+      <stop offset="1" stop-color="#d4e8fc"></stop>
+    </linearGradient>
+    <linearGradient id="tb-body" x1="10" y1="24" x2="38" y2="40" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f0f7ff"></stop>
+      <stop offset="1" stop-color="#b8d4f5"></stop>
+    </linearGradient>
+    <linearGradient id="tb-clasp" x1="22" y1="21" x2="26" y2="25" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff8e8"></stop>
+      <stop offset="1" stop-color="#e8c86a"></stop>
+    </linearGradient>
+    <filter id="tb-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="1.5" stdDeviation="1.2" flood-color="#2a5080" flood-opacity="0.22"></feDropShadow>
+    </filter>
+  </defs>
+  <rect width="48" height="48" rx="12" fill="url(#tb-bg)"></rect>
+  <g filter="url(#tb-shadow)">
+    <path d="M10.5 25.2 24 31.8 37.5 25.2V35.8L24 42.2 10.5 35.8V25.2Z" fill="url(#tb-body)" stroke="#fff" stroke-width="0.75" stroke-opacity="0.55"></path>
+    <path d="M10.5 23.4 24 17.2 37.5 23.4 24 29.6 10.5 23.4Z" fill="url(#tb-lid)" stroke="#fff" stroke-width="0.75" stroke-opacity="0.7"></path>
+    <path d="M10.5 23.4 24 17.2 37.5 23.4" stroke="#588ce3" stroke-width="0.6" stroke-opacity="0.35"></path>
+    <rect x="21.2" y="22.1" width="5.6" height="3.2" rx="1.2" fill="url(#tb-clasp)" stroke="#fff" stroke-width="0.5" stroke-opacity="0.65"></rect>
+    <path d="M24 19.8v2.1" stroke="#c9a227" stroke-width="0.9" stroke-linecap="round"></path>
+  </g>
+  <circle cx="34.5" cy="11.5" r="1.1" fill="#fff" opacity="0.85"></circle>
+  <circle cx="31.8" cy="9.2" r="0.55" fill="#fff" opacity="0.55"></circle>
+</svg>

@@ -35,6 +35,7 @@ let groupMeta = null;
 let history = [];
 let busy = false;
 let storageKey = '';
+let liveVoiceCall = null;
 
 function loadHistory() {
   try {
@@ -116,20 +117,10 @@ function showError(text) {
 }
 
 async function replyAs(member, userText, priorHistory) {
-  if (!member.ready) {
-    return {
-      role: 'assistant',
-      content: `${member.name} 尚未接入，敬请期待。`,
-      senderId: member.id,
-      senderName: member.name,
-      logo: member.logo,
-    };
-  }
-
   const persona = `你正在与用户的群聊中，请以 ${member.name}（${member.company || member.name}）的身份，用简短自然的中文回复，一两段即可。`;
   const wrapped = `${persona}\n\n用户说：${userText}`;
 
-  const { ok, data } = await sendSecretaryMessage(wrapped, priorHistory, 'gemini');
+  const { ok, data } = await sendSecretaryMessage(wrapped, priorHistory, member.id || 'gemini');
   if (!ok) {
     return {
       role: 'assistant',
@@ -202,6 +193,72 @@ async function sendMessage(text) {
   input.focus();
 }
 
+function mountGroupLiveVoiceCall() {
+  if (!window.WxVoiceCall?.createLiveVoiceCall) return;
+  liveVoiceCall = window.WxVoiceCall.createLiveVoiceCall({
+    overlayEl: document.getElementById('voiceCall'),
+    statusEl: document.getElementById('voiceCallStatus'),
+    transcriptEl: document.getElementById('voiceCallTranscript'),
+    orbEl: document.getElementById('voiceCallOrb'),
+    avatarEl: document.getElementById('voiceCallAvatar'),
+    nameEl: document.getElementById('voiceCallName'),
+    hangupBtn: document.getElementById('voiceCallHangup'),
+    withRoot,
+    toast,
+    onSend: async (text) => {
+      await sendMessage(text);
+      const lastAssistant = [...history].reverse().find((turn) => turn.role === 'assistant');
+      return {
+        ok: true,
+        reply: lastAssistant?.content || '群聊已收到，我会继续陪你往前走一步。',
+      };
+    },
+  });
+}
+
+async function openGroupLiveCall(kind) {
+  if (!liveVoiceCall) {
+    mountGroupLiveVoiceCall();
+  }
+  if (!liveVoiceCall) {
+    toast('Live 通话正在准备');
+    return;
+  }
+  const title = navTitle.textContent || '群聊';
+  const firstReadyMember = members.find((member) => member.logo) || members[0];
+  await liveVoiceCall.open({
+    id: groupMeta?.id || `group-${kind}`,
+    name: kind === 'video' ? `${title} · 视频` : `${title} · 语音`,
+    logo: firstReadyMember?.logo || '/secretary/icons/gemini.svg',
+  });
+}
+
+function insertLocationText(text) {
+  input.value = text;
+  input.dispatchEvent(new Event('input'));
+  input.focus();
+}
+
+function insertBrowserLocation() {
+  if (!navigator.geolocation?.getCurrentPosition) {
+    insertLocationText('位置：请手动补充当前位置');
+    toast('已插入位置占位');
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      const { latitude, longitude } = position.coords;
+      insertLocationText(`位置：${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+      toast('已插入当前位置');
+    },
+    () => {
+      insertLocationText('位置：定位未授权，请手动补充当前位置');
+      toast('定位未授权，已插入位置占位');
+    },
+    { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 },
+  );
+}
+
 function resizeInput() {
   input.style.height = 'auto';
   input.style.height = Math.min(input.scrollHeight, 120) + 'px';
@@ -229,9 +286,15 @@ const attach = window.WxAttach.mountAttachSheet(
       input.value = favs[0];
       input.dispatchEvent(new Event('input'));
     },
-    call: () => toast('语音通话功能开发中'),
-    video: () => toast('视频功能开发中'),
-    location: () => toast('位置功能开发中'),
+    call: () => {
+      attach.close();
+      void openGroupLiveCall('audio');
+    },
+    video: () => {
+      attach.close();
+      void openGroupLiveCall('video');
+    },
+    location: () => insertBrowserLocation(),
   },
 );
 
@@ -276,6 +339,7 @@ btnClear.addEventListener('click', () => {
 
 btnPlus.addEventListener('click', () => attach.open());
 window.WxVoice.createVoiceInput(input, btnMic, { holdToTalk: true });
+mountGroupLiveVoiceCall();
 
 loadFriends()
   .then((friends) => {

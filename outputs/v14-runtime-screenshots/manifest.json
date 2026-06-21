@@ -1,0 +1,75 @@
+{
+  "generatedAt": "2026-06-19T20:12:16.713Z",
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "sourceSpec": "/Users/jing/Downloads/treasureboxredesign 14.html",
+  "screenshots": [
+    {
+      "name": "01-onboarding-name",
+      "path": "outputs/v14-runtime-screenshots/01-onboarding-name.png",
+      "note": "Onboarding display name frame."
+    },
+    {
+      "name": "02-onboarding-coach-style",
+      "path": "outputs/v14-runtime-screenshots/02-onboarding-coach-style.png",
+      "note": "Onboarding coach style frame."
+    },
+    {
+      "name": "03-home-warm-coach",
+      "path": "outputs/v14-runtime-screenshots/03-home-warm-coach.png",
+      "note": "Home warm coach with V14 insight-aware launch surface."
+    },
+    {
+      "name": "04-crush-task-sheet",
+      "path": "outputs/v14-runtime-screenshots/04-crush-task-sheet.png",
+      "note": "Task-crushing bottom sheet."
+    },
+    {
+      "name": "05-ai-friends-unified-chat",
+      "path": "outputs/v14-runtime-screenshots/05-ai-friends-unified-chat.png",
+      "note": "AI Friends unified chat workspace with one composer and multi-agent messages."
+    },
+    {
+      "name": "05b-ai-friends-mention-menu",
+      "path": "outputs/v14-runtime-screenshots/05b-ai-friends-mention-menu.png",
+      "note": "AI Friends @ routing menu for AI and tool context."
+    },
+    {
+      "name": "05c-ai-friends-search",
+      "path": "outputs/v14-runtime-screenshots/05c-ai-friends-search.png",
+      "note": "AI Friends search surface with shortcut grid and recent conversations."
+    },
+    {
+      "name": "05d-ai-friends-live-call-sheet",
+      "path": "outputs/v14-runtime-screenshots/05d-ai-friends-live-call-sheet.png",
+      "note": "Live call sheet with video/audio only; video implies avatar call."
+    },
+    {
+      "name": "05e-ai-friends-video-call-mock",
+      "path": "outputs/v14-runtime-screenshots/05e-ai-friends-video-call-mock.png",
+      "note": "Mock AI avatar video call surface."
+    },
+    {
+      "name": "06-tool-packs-discovery",
+      "path": "outputs/v14-runtime-screenshots/06-tool-packs-discovery.png",
+      "note": "Toolbox screen with V14 data cards, personalized recommendation, addable tools, and packs."
+    },
+    {
+      "name": "08-me-personal-data",
+      "path": "outputs/v14-runtime-screenshots/08-me-personal-data.png",
+      "note": "Profile analysis and learned memories without app settings mixed in."
+    },
+    {
+      "name": "09-software-settings",
+      "path": "outputs/v14-runtime-screenshots/09-software-settings.png",
+      "note": "Software settings page with connections and safety boundary."
+    },
+    {
+      "name": "07-inventory-purchase-memory",
+      "path": "outputs/v14-runtime-screenshots/07-inventory-purchase-memory.png",
+      "note": "Inventory purchase-memory first-launch surface."
+    }
+  ]
+}

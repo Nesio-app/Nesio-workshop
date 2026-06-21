@@ -74,18 +74,74 @@ function hasPersonalLabAccessMarker(request: {
   nextUrl?: { searchParams?: URLSearchParams };
 }): boolean {
   const headerMode = request.headers.get('x-baohe-access-mode') || '';
+  const cookie = request.headers.get('cookie') || '';
   const queryMode = request.nextUrl?.searchParams?.get('baohePersonal') ||
     request.nextUrl?.searchParams?.get('baohePersonalLab') ||
     request.nextUrl?.searchParams?.get('baohe_personal_lab') ||
     '';
-  return headerMode === 'personal_lab' || queryMode === '1' || queryMode === 'personal_lab';
+  return headerMode === 'personal_lab' ||
+    queryMode === '1' ||
+    queryMode === 'personal_lab' ||
+    /(?:^|;\s*)baohe_personal_lab=1(?:;|$)/.test(cookie);
 }
 
 export function isPersonalLabAiRequestAllowed(request: {
   headers: Headers;
   nextUrl?: { searchParams?: URLSearchParams };
 }): boolean {
-  return isPersonalLabAiEnvEnabled() && hasPersonalLabAccessMarker(request);
+  return hasPersonalLabAccessMarker(request) &&
+    (isPersonalLabAiEnvEnabled() || hasProductionAiProviderKey());
+}
+
+function readRuntimeEnv(name: string): string {
+  const value = process.env[name];
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function hasProductionAiProviderKey(): boolean {
+  return Boolean(
+    readRuntimeEnv('OPENAI_API_KEY') ||
+    readRuntimeEnv('OpenAI_KEY') ||
+    readRuntimeEnv('GEMINI_API_KEY') ||
+    readRuntimeEnv('GOOGLE_GENERATIVE_AI_API_KEY') ||
+    readRuntimeEnv('GOOGLE_AI_API_KEY') ||
+    readRuntimeEnv('GOOGLE_API_KEY') ||
+    readRuntimeEnv('DOUBAO_KEY') ||
+    readRuntimeEnv('DOUBAO_API_KEY') ||
+    readRuntimeEnv('ARK_API_KEY') ||
+    readRuntimeEnv('VOLCENGINE_API_KEY') ||
+    readRuntimeEnv('ANTHROPIC_API_KEY') ||
+    readRuntimeEnv('CLAUDE_API_KEY'),
+  );
+}
+
+export function isLaunchIsolationDisabled(): boolean {
+  return readRuntimeEnv('NEXT_PUBLIC_BAOHE_FIRST_LAUNCH_RISK_ISOLATION').toLowerCase() === 'off';
+}
+
+export function isProductionActivationAiRuntimeEnabled(): boolean {
+  return readRuntimeEnv('BAOHE_AI_PROVIDER_MODE').toLowerCase() === 'production' &&
+    hasProductionAiProviderKey();
+}
+
+export function isLiveRuntimeAiEnabled(): boolean {
+  return isLaunchIsolationDisabled() && hasProductionAiProviderKey();
+}
+
+export function isSecretaryAiRequestAllowed(request: {
+  headers: Headers;
+  nextUrl?: { searchParams?: URLSearchParams };
+}): boolean {
+  return isPersonalLabAiRequestAllowed(request) ||
+    isProductionActivationAiRuntimeEnabled() ||
+    isLiveRuntimeAiEnabled();
+}
+
+export function isSecretaryPageRequestAllowed(request: {
+  headers: Headers;
+  nextUrl?: { searchParams?: URLSearchParams };
+}): boolean {
+  return isPersonalLabAiRequestAllowed(request);
 }
 
 export function launchUnavailablePayload(kind: string, id?: string) {

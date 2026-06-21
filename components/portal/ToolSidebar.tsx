@@ -1,9 +1,11 @@
 'use client';
 
+import Image from 'next/image';
 import type { PortalTool } from '@/lib/portal/types';
-import { ensureToolboxTrailingSlash, withBase } from '@/lib/portal/paths';
+import { ensureToolboxTrailingSlash } from '@/lib/portal/paths';
 import type { PortalLocale } from '@/lib/portal/profile';
 import { t } from '@/lib/portal/i18n';
+import { getNesioToolIcon, nesioBrandAssets } from '@/lib/portal/nesio-design-system-assets.mjs';
 
 interface ToolSidebarProps {
   tools: PortalTool[];
@@ -28,9 +30,9 @@ export default function ToolSidebar({ tools, locale = 'zh' }: ToolSidebarProps) 
   return (
     <nav className="portal-rail" aria-label={t(locale, 'shellToolLabel')}>
       <div className="portal-rail-brand" title={t(locale, 'shellBrand')}>
-        <img
+        <Image
           className="portal-rail-mark"
-          src="/icons/treasurebox.svg"
+          src={nesioBrandAssets.crystal}
           alt=""
           width={40}
           height={40}
@@ -39,7 +41,7 @@ export default function ToolSidebar({ tools, locale = 'zh' }: ToolSidebarProps) 
       <ul className="portal-rail-list">
         {ready.map((tool) => {
           const href = toolHref(tool);
-          const iconSrc = tool.iconUrl ? withBase(tool.iconUrl) : null;
+          const iconSrc = getNesioToolIcon(tool.id, tool.iconUrl);
           return (
             <li key={tool.id}>
               <button
@@ -50,7 +52,7 @@ export default function ToolSidebar({ tools, locale = 'zh' }: ToolSidebarProps) 
                 onClick={() => href && openTool(href)}
               >
                 {iconSrc ? (
-                  <img src={iconSrc} alt="" width={26} height={26} />
+                  <Image src={iconSrc} alt="" width={26} height={26} />
                 ) : (
                   <span className="portal-rail-emoji">{tool.icon}</span>
                 )}

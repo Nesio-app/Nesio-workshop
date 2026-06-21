@@ -1,0 +1,24 @@
+<!-- @dsCard group="Colors" viewport="700x180" name="Status — warm-coach palette" subtitle="Soft by default. Red is reserved for real expiry / safety risk only." -->
+<!DOCTYPE html>
+<html data-portal-theme="day" lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  body { margin: 0; font-family: var(--font-sans); background: var(--portal-bg); padding: 22px; }
+  .row { display: flex; gap: 12px; }
+  .chip { flex: 1; border-radius: var(--radius-sm); padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .pill { align-self: flex-start; font-size: 0.68rem; font-weight: 600; padding: 4px 10px; border-radius: 999px; }
+  .label { font-size: var(--text-xs); font-weight: 600; }
+  .use { font-size: 0.66rem; color: var(--portal-muted); line-height: 1.35; }
+</style>
+</head>
+<body>
+  <div class="row">
+    <div class="chip" style="background: var(--status-go-soft);"><span class="pill" style="background: var(--status-go); color:#fff;">在路上</span><span class="label" style="color: var(--status-go);">go</span><span class="use">完成 · 良好 · 已就绪</span></div>
+    <div class="chip" style="background: var(--status-gentle-soft);"><span class="pill" style="background: var(--status-gentle); color:#fff;">可以稍后</span><span class="label" style="color: var(--status-gentle);">gentle</span><span class="use">待办 · 轻提醒（琥珀）</span></div>
+    <div class="chip" style="background: var(--status-calm-soft);"><span class="pill" style="background: var(--status-calm); color:#fff;">看见</span><span class="label" style="color: var(--status-calm);">calm</span><span class="use">信息 · 中性陪伴</span></div>
+    <div class="chip" style="background: var(--status-risk-soft);"><span class="pill" style="background: var(--status-risk); color:#fff;">即将过期</span><span class="label" style="color: var(--status-risk);">risk</span><span class="use">仅真实安全 / 到期</span></div>
+  </div>
+</body>
+</html>

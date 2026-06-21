@@ -38,7 +38,11 @@ for (const moduleId of ['finance', 'secretary', 'health', 'psychoanalysis']) {
 const inventory = report.featureControl.modules.find((entry) => entry.moduleId === 'inventory');
 assert.equal(inventory.canBeKilled, true);
 assert.equal(inventory.entryActionEnabled, true);
-assert.deepEqual(report.featureControl.readyToCandidateModuleIds, ['inventory']);
+
+const plan = report.featureControl.modules.find((entry) => entry.moduleId === 'plan');
+assert.equal(plan.canBeKilled, true);
+assert.equal(plan.entryActionEnabled, true);
+assert.deepEqual(report.featureControl.readyToCandidateModuleIds, ['plan', 'inventory']);
 
 const launchSafety = readFileSync(join(repoRoot, 'lib/portal/launch-safety.ts'), 'utf8');
 assert.match(launchSafety, /isLocalKillSwitchActive/, 'launch-safety must expose local kill switch check');

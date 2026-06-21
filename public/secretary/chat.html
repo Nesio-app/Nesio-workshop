@@ -23,12 +23,17 @@
   <footer class="wx-chat-bar">
     <form class="wx-chat-input-row" id="chatForm">
       <button type="button" class="wx-chat-icon-btn" id="btnMic" aria-label="语音输入">🎤</button>
+      <button type="button" class="wx-chat-icon-btn wx-chat-icon-btn--mention" id="btnMention" aria-label="@ AI 与工具">@</button>
       <div class="wx-chat-input-wrap">
         <textarea id="chatInput" rows="1" placeholder="发消息…" maxlength="4000" enterkeyhint="send"></textarea>
       </div>
       <button type="button" class="wx-chat-icon-btn" id="btnPlus" aria-label="更多">⊕</button>
     </form>
   </footer>
+
+  <div class="wx-mention-panel" id="mentionPanel" hidden>
+    <div class="wx-mention-list" id="mentionList" role="listbox" aria-label="@ AI 与工具"></div>
+  </div>
 
   <input type="file" id="pickPhoto" accept="image/*" hidden>
   <input type="file" id="pickFile" hidden>

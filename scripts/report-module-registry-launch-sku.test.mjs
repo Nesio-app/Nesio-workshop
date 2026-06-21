@@ -13,18 +13,18 @@ const output = execFileSync('node', [join(scriptDir, 'report-module-registry.mjs
 const report = JSON.parse(output);
 
 assert.equal(report.launchSku.version, 'launch-sku-v0');
-assert.equal(report.launchSku.skuKey, 'shell_inventory_purchase_memory');
+assert.equal(report.launchSku.skuKey, 'shell_inventory_todo_purchase_memory');
 assert.equal(report.launchSku.launchSkuAppStoreReady, false);
-assert.deepEqual(report.launchSku.includedModuleIds, ['shell', 'inventory']);
-assert.deepEqual(report.launchSku.launchableBusinessModuleIds, ['inventory']);
+assert.deepEqual(report.launchSku.includedModuleIds, ['shell', 'inventory', 'plan']);
+assert.deepEqual(report.launchSku.launchableBusinessModuleIds, ['inventory', 'plan']);
 assert.equal(report.summary.launchSkuAppStoreReady, false);
-assert.equal(report.summary.launchableModuleCount, 2);
-assert.equal(report.summary.excludedFromLaunchCount, 10);
-assert.equal(report.summary.futurePaidModuleCount, 6);
+assert.equal(report.summary.launchableModuleCount, 3);
+assert.equal(report.summary.excludedFromLaunchCount, 9);
+assert.equal(report.summary.futurePaidModuleCount, 5);
 assert.equal(report.summary.toolLifecycleVersion, 'tool-lifecycle-v0');
-assert.equal(report.summary.toolLifecycleLaunchableCount, 1);
-assert.equal(report.summary.toolLifecycleSandboxCount, 10);
-assert.equal(report.summary.toolLifecycleReadyForCandidateReviewCount, 10);
+assert.equal(report.summary.toolLifecycleLaunchableCount, 2);
+assert.equal(report.summary.toolLifecycleSandboxCount, 9);
+assert.equal(report.summary.toolLifecycleReadyForCandidateReviewCount, 9);
 
 const statusByModule = new Map(report.launchSku.modules.map((entry) => [entry.moduleId, entry]));
 assert.equal(statusByModule.get('shell').launchStatus, 'launchable');
@@ -32,9 +32,11 @@ assert.equal(statusByModule.get('inventory').launchStatus, 'launchable');
 assert.equal(statusByModule.get('inventory').toolLifecycle, 'launchable');
 assert.equal(statusByModule.get('inventory').toolLifecycleStage, 5);
 assert.equal(statusByModule.get('inventory').nextLifecycleTarget, 'monetized');
+assert.equal(statusByModule.get('plan').launchStatus, 'launchable');
+assert.equal(statusByModule.get('plan').toolLifecycle, 'launchable');
 
 const launchableModules = report.launchSku.modules.filter((entry) => entry.launchStatus === 'launchable');
-assert.deepEqual(launchableModules.map((entry) => entry.moduleId).sort(), ['inventory', 'shell']);
+assert.deepEqual(launchableModules.map((entry) => entry.moduleId).sort(), ['inventory', 'plan', 'shell']);
 assert.equal(
   report.launchSku.modules.every((entry) => entry.launchStatus === 'launchable'),
   false,
@@ -49,10 +51,10 @@ for (const moduleId of ['finance', 'health', 'psychoanalysis', 'secretary']) {
 
 const lifecycleByModule = new Map(report.toolLifecycle.modules.map((entry) => [entry.moduleId, entry]));
 assert.equal(report.toolLifecycle.version, 'tool-lifecycle-v0');
-assert.deepEqual(report.toolLifecycle.summary.launchableModuleIds, ['inventory']);
-assert.equal(report.toolLifecycle.summary.nextCandidateModuleIds.length, report.summary.moduleCount - 1);
+assert.deepEqual(report.toolLifecycle.summary.launchableModuleIds.sort(), ['inventory', 'plan']);
+assert.equal(report.toolLifecycle.summary.nextCandidateModuleIds.length, report.summary.moduleCount - 2);
 for (const [moduleId, entry] of lifecycleByModule) {
-  if (moduleId === 'inventory') {
+  if (moduleId === 'inventory' || moduleId === 'plan') {
     assert.equal(entry.lifecycle, 'launchable');
     assert.equal(entry.lifecycleStage, 5);
     assert.equal(entry.readyForCandidateReview, false);
@@ -75,6 +77,11 @@ assert.equal(inventory.isLaunchBusinessModule, true);
 assert.equal(inventory.entitlementKey != null, true);
 assert.equal(inventory.entitlementChangesLaunchStatus, false);
 assert.equal(inventory.approvalGateOverridesPaywallGate, true);
+
+const plan = statusByModule.get('plan');
+assert.equal(plan.isLaunchBusinessModule, true);
+assert.equal(plan.entitlementChangesLaunchStatus, false);
+assert.equal(plan.approvalGateOverridesPaywallGate, true);
 
 for (const entry of report.launchSku.modules) {
   assert.equal(entry.entitlementChangesLaunchStatus, false);

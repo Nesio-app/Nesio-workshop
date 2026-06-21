@@ -1,0 +1,8 @@
+/* ───────────────────────────────────────────────────────────
+   Fonts — multilingual 简体中文 / English / 日本語 / 한국어
+   Body  : Noto Sans SC/JP/KR  (思源黑体 / Source Han Sans family)
+   Display: Noto Serif SC      (思源宋体, used for quotes + brand)
+   Loaded from Google Fonts. If you self-host, replace this @import
+   with @font-face rules pointing at local woff2 files.
+   ─────────────────────────────────────────────────────────── */
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&family=Noto+Sans+KR:wght@400;500;700&family=Noto+Serif+SC:wght@400;500;600;700&display=swap");

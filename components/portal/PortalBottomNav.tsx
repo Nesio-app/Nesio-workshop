@@ -1,79 +1,78 @@
 'use client';
 
-import Link from 'next/link';
-import { withBase } from '@/lib/portal/paths';
-import { t } from '@/lib/portal/i18n';
-import { loadProfileSettings } from '@/lib/portal/profile';
-import type { PortalLocale } from '@/lib/portal/profile';
+import type { CSSProperties } from 'react';
+import { nesioBrandAssets, nesioToolIcons } from '@/lib/portal/nesio-design-system-assets.mjs';
 
 interface PortalBottomNavProps {
-  noteOpen?: boolean;
+  aiFriendsOpen?: boolean;
   treasureOpen?: boolean;
   onHome: () => void;
-  onOpenNote: () => void;
-  onOpenTodo: () => void;
+  onOpenAiFriends: () => void;
+  onOpenTreasure: () => void;
 }
 
+type PortalBottomNavCssProperties = CSSProperties & {
+  '--portal-bottom-nav-icon-url'?: string;
+};
+
 export default function PortalBottomNav({
-  noteOpen = false,
+  aiFriendsOpen = false,
   treasureOpen = false,
   onHome,
-  onOpenNote,
-  onOpenTodo,
+  onOpenAiFriends,
+  onOpenTreasure,
 }: PortalBottomNavProps) {
-  const locale: PortalLocale = loadProfileSettings().locale;
+  const bottomNavItems = [
+    {
+      key: 'home',
+      label: '首页',
+      iconUrl: nesioBrandAssets.crystal,
+      active: false,
+      expanded: undefined,
+      onClick: onHome,
+    },
+    {
+      key: 'ai',
+      label: '智友',
+      iconUrl: nesioToolIcons.secretary,
+      active: aiFriendsOpen,
+      expanded: aiFriendsOpen,
+      onClick: onOpenAiFriends,
+    },
+    {
+      key: 'toolbox',
+      label: '工具箱',
+      iconUrl: nesioToolIcons.storage,
+      active: treasureOpen,
+      expanded: treasureOpen,
+      onClick: onOpenTreasure,
+      legacyShellEntryClass: 'portal-quote-treasure',
+    },
+  ];
 
   return (
-    <nav className="portal-bottom-nav" aria-label={t(locale, 'portalBottomNavLabel')}>
-      <button
-        type="button"
-        className={
-          'portal-bottom-nav-btn' + (treasureOpen ? ' portal-bottom-nav-btn--active' : '')
-        }
-        onClick={onHome}
-        aria-label={t(locale, 'portalBottomNavHome')}
-        aria-expanded={treasureOpen}
-      >
-        <img
-          className="portal-bottom-nav-icon portal-bottom-nav-icon--svg"
-          src={withBase('/icons/treasurebox.svg')}
-          alt=""
-          width={24}
-          height={24}
-        />
-      </button>
-      <button
-        type="button"
-        className={
-          'portal-bottom-nav-btn' + (noteOpen ? ' portal-bottom-nav-btn--active' : '')
-        }
-        onClick={onOpenNote}
-        aria-label={t(locale, 'portalBottomNavNote')}
-        aria-expanded={noteOpen}
-      >
-        <span className="portal-bottom-nav-icon portal-icon-blue" aria-hidden>
-          📝
-        </span>
-      </button>
-      <button
-        type="button"
-        className="portal-bottom-nav-btn"
-        onClick={onOpenTodo}
-        aria-label={t(locale, 'portalBottomNavTodo')}
-      >
-        <span className="portal-bottom-nav-icon portal-icon-blue" aria-hidden>
-          ✅
-        </span>
-      </button>
-      <Link
-        href={withBase('/settings')}
-        className="portal-bottom-nav-btn"
-        aria-label={t(locale, 'portalBottomNavMe')}
-      >
-        <span className="portal-bottom-nav-icon portal-icon-blue" aria-hidden>
-          👤
-        </span>
-      </Link>
+    <nav className="portal-bottom-nav" aria-label="宝盒导航">
+      {bottomNavItems.map((item) => (
+        <button
+          key={item.key}
+          type="button"
+          className={
+            'portal-bottom-nav-btn' +
+            (item.active ? ' portal-bottom-nav-btn--active' : '') +
+            (item.legacyShellEntryClass ? ` ${item.legacyShellEntryClass}` : '')
+          }
+          onClick={item.onClick}
+          aria-label={item.label}
+          aria-expanded={item.expanded}
+        >
+          <span
+            className="portal-bottom-nav-icon portal-bottom-nav-icon--mask"
+            style={{ '--portal-bottom-nav-icon-url': `url("${item.iconUrl}")` } as PortalBottomNavCssProperties}
+            aria-hidden
+          />
+          <span className="portal-bottom-nav-label">{item.label}</span>
+        </button>
+      ))}
     </nav>
   );
 }

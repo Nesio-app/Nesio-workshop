@@ -1,0 +1,53 @@
+<!-- @dsCard group="Components" viewport="700x520" name="Portal — Tool modules, Reminder, Quote, Weather" subtitle="Live tool windows, 陪你看见, 今日话语, clock" -->
+<!DOCTYPE html>
+<html data-portal-theme="day" lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<style>
+  html,body { margin: 0; }
+  body { font-family: var(--font-sans); background: var(--portal-bg-gradient); padding: 24px; min-height: 100vh; box-sizing: border-box; }
+  .wrap { display: flex; flex-direction: column; gap: 18px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+</style>
+</head>
+<body>
+  <div id="root" class="wrap"></div>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script src="../../_ds_bundle.js"></script>
+  <script type="text/babel">
+    const { ToolModuleCard, ReminderCard, QuoteCard, WeatherTime } = window.NesioDesignSystem_d76dec;
+    function Demo() {
+      return (
+        <>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <WeatherTime time="09:41" date="6月19日 星期四" temp="24°" condition="多云" place="上海" />
+          </div>
+          <div className="grid">
+            <ToolModuleCard icon="../../assets/icons/tools/storage.svg" name="收纳" nameEn="Storage" tone="cool" status={{ status: 'gentle', label: '3 件将到期' }} onOpen={() => {}}>
+              <strong style={{ fontSize: 'var(--text-h3)' }}>牛奶 · 酸奶 · 鸡蛋</strong>
+              <span style={{ color: 'var(--portal-muted)', fontSize: 'var(--text-xs)' }}>最近 3 天内到期</span>
+            </ToolModuleCard>
+            <ToolModuleCard icon="../../assets/icons/tools/fitness.svg" name="健身" nameEn="Fitness" tone="neutral" status={{ status: 'go', label: '已连续 5 天' }} onOpen={() => {}}>
+              <strong style={{ fontSize: 'var(--text-h3)' }}>今天 · 下肢</strong>
+              <span style={{ color: 'var(--portal-muted)', fontSize: 'var(--text-xs)' }}>约 28 分钟</span>
+            </ToolModuleCard>
+            <ToolModuleCard icon="../../assets/icons/tools/finance.svg" name="财务" nameEn="Finance" tone="neutral" locked>
+              <span style={{ color: 'var(--portal-muted)', fontSize: 'var(--text-sm)' }}>未开通 · 在工具箱中开启</span>
+            </ToolModuleCard>
+          </div>
+          <ReminderCard subtitle="基于你的数据 · 今天 3 件" items={[
+            { kind: '重要日期', text: '妈妈的生日还有 3 天，要不要先想个小礼物？', status: 'calm', action: '记一笔' },
+            { kind: '下一步', text: '把昨天的想法保存下来，明天再决定也可以。', status: 'gentle', action: '保存想法' },
+            { kind: '到期', text: '冰箱里的牛奶 3 天后到期。', status: 'risk', action: '查看收纳' },
+          ]} />
+          <QuoteCard quote="把大事拆小，把今天过好就够了。" />
+        </>
+      );
+    }
+    ReactDOM.createRoot(document.getElementById('root')).render(<Demo />);
+  </script>
+</body>
+</html>

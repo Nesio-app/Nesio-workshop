@@ -70,7 +70,18 @@ assert.equal(inventory.shellDisplay.stateLabel, '可进入');
 assert.ok(inventory.primaryAction.includes('购买记忆'));
 assert.ok(inventory.doNotPromise.some((text) => text.includes('自动识别所有物品')));
 
-for (const moduleId of ['plan', 'reading', 'sanctuary']) {
+const plan = byModule.get('plan');
+assert.equal(plan.launchCohort, 'first_launch');
+assert.equal(plan.riskTier, 'low');
+assert.equal(plan.appStore.publicVisible, true);
+assert.equal(plan.appStore.appStoreMentionAllowed, true);
+assert.equal(plan.trustBoundary.canStoreLocalData, true);
+assert.equal(plan.trustBoundary.requiresCEOApproval, false);
+assert.equal(plan.shellDisplay.stateLabel, '可进入');
+assert.ok(plan.primaryAction.includes('粉碎任务'));
+assert.ok(plan.doNotPromise.some((text) => text.includes('AI 自动执行')));
+
+for (const moduleId of ['reading', 'sanctuary']) {
   const entry = byModule.get(moduleId);
   assert.equal(entry.launchCohort, 'sandbox', `${moduleId} should stay sandbox`);
   assert.equal(entry.appStore.publicVisible, false, `${moduleId} should not be public visible`);

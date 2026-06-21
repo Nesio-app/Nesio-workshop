@@ -29,20 +29,21 @@ assert.equal(plan.boundaries.noRuntimePluginLoading, true);
 assert.equal(plan.exposureMode, 'public_launch_only');
 assert.deepEqual(
   plan.entries.filter((entry) => entry.visibleForPublic).map((entry) => entry.moduleId),
-  ['inventory'],
-  'default public-visible bundle surface must only expose inventory',
+  ['plan', 'inventory'],
+  'default public-visible bundle surface must expose only Todo and Inventory',
 );
 
 const entryByModuleId = new Map(plan.entries.map((entry) => [entry.moduleId, entry]));
 const excludedByModuleId = new Map(plan.excludedEntries.map((entry) => [entry.moduleId, entry]));
 assert.equal(entryByModuleId.get('inventory')?.sourceDir, 'storage-web');
 assert.equal(entryByModuleId.get('inventory')?.publicPath, 'storage');
+assert.equal(entryByModuleId.get('plan')?.sourceDir, 'adhd-flow-ios/web');
+assert.equal(entryByModuleId.get('plan')?.publicPath, 'adhd-flow');
 assert.equal(entryByModuleId.get('secretary')?.visibleForPublic, false, 'secretary static app may be preserved but must remain hidden from the public toolbox');
 assert.equal(entryByModuleId.get('secretary')?.shellAction, 'hide_for_public');
-assert.equal(entryByModuleId.has('plan'), false, 'default public bundle must not include sandbox plan');
 assert.equal(entryByModuleId.has('fitness'), false, 'default public bundle must not include sandbox fitness');
 assert.equal(entryByModuleId.has('health'), false, 'default public bundle must not include gated health');
-assert.equal(excludedByModuleId.has('plan'), true, 'sandbox plan must be listed as excluded from public bundle');
+assert.equal(excludedByModuleId.has('plan'), false, 'launch Todo must not be excluded from public bundle');
 assert.equal(excludedByModuleId.has('fitness'), true, 'sandbox fitness must be listed as excluded from public bundle');
 assert.equal(excludedByModuleId.has('health'), true, 'gated health must be listed as excluded from public bundle');
 
@@ -62,7 +63,7 @@ try {
   assert.equal(applied.applied, true);
   assert.equal(existsSync(join(tempRoot, 'storage', 'index.html')), true);
   assert.equal(existsSync(join(tempRoot, 'secretary', 'index.html')), true, 'secretary assets may be preserved only behind first-launch middleware gate');
-  assert.equal(existsSync(join(tempRoot, 'adhd-flow', 'app.js')), false, 'default public bundle must not write sandbox plan assets');
+  assert.equal(existsSync(join(tempRoot, 'adhd-flow', 'app.js')), true, 'default public bundle must write launch Todo assets');
   assert.equal(existsSync(join(tempRoot, 'fitness', 'app.js')), false, 'default public bundle must not write sandbox fitness assets');
   assert.equal(existsSync(join(tempRoot, 'health', 'index.html')), false, 'default public bundle must not write gated health assets');
 } finally {

@@ -9,6 +9,20 @@ const ATTACH_ITEMS = [
   { id: 'location', label: '位置', icon: '📍' },
 ];
 
+function defaultAttachAction(item) {
+  const title = item?.label || '附件';
+  const content = `用户点击了智友附件功能：${title}`;
+  const saveNoteEntry = window.WxCommon?.saveNoteEntry;
+  const saved = typeof saveNoteEntry === 'function'
+    ? saveNoteEntry('attachment_action', content, '智友附件')
+    : false;
+  if (saved) {
+    window.WxCommon?.toast(`已记录${title}动作`);
+  } else {
+    window.WxCommon?.toast(`${title}已收到`);
+  }
+}
+
 function mountAttachSheet(sheetEl, maskEl, gridEl, handlers = {}) {
   gridEl.innerHTML = '';
   for (const item of ATTACH_ITEMS) {
@@ -19,7 +33,7 @@ function mountAttachSheet(sheetEl, maskEl, gridEl, handlers = {}) {
     btn.addEventListener('click', () => {
       const fn = handlers[item.id];
       if (typeof fn === 'function') fn(item);
-      else window.WxCommon?.toast(`${item.label} 即将上线`);
+      else defaultAttachAction(item);
       close();
     });
     gridEl.appendChild(btn);
@@ -39,4 +53,4 @@ function mountAttachSheet(sheetEl, maskEl, gridEl, handlers = {}) {
   return { open, close };
 }
 
-window.WxAttach = { mountAttachSheet, ATTACH_ITEMS };
+window.WxAttach = { mountAttachSheet, ATTACH_ITEMS, defaultAttachAction };

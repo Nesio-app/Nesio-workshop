@@ -4,12 +4,12 @@ Canonical domain: `www.nesio.app`
 
 ## Public Launch Promise
 
-Baohe v0.1 only promises `Shell + Inventory / purchase-memory`.
+Baohe v0.1 only promises `Shell + Inventory / purchase-memory + Todo`.
 
 The public product description should say:
 
 - Mobile-first personal toolbox for remembering where things are and why purchases happened.
-- Local Inventory and purchase-memory flow.
+- Local Inventory, purchase-memory, and Todo task support.
 - Demo mode and blank local start.
 - Local export, local restore, local reset, and local delete controls.
 - No account required for the first-launch local path.
@@ -33,8 +33,8 @@ These URLs must exist before TestFlight public external testing or App Store sub
 
 ## App Review Notes Boundary
 
-Review notes should describe the app as a local-first Inventory / purchase-memory tool. Any AI, psychology, health, finance, payment, external authorization, real cloud sync, TestFlight external distribution, App Store submission, or real user data launch requires CEO Gate before execution.
+Review notes should describe the app as a local-first Inventory / purchase-memory and Todo task-support tool. Any AI, psychology, health, finance, payment, external authorization, real cloud sync, TestFlight external distribution, App Store submission, or real user data launch requires CEO Gate before execution.
 
 ## Screenshot Boundary
 
-Screenshots may show Shell, Inventory entry, demo mode, add item, purchase memory, search, export, restore, reset, delete, and return to Shell. Screenshots must not show hidden sandbox modules as public promises.
+Screenshots may show Shell, Inventory entry, Todo entry, demo mode, add item, purchase memory, local task support, search, export, restore, reset, delete, and return to Shell. Screenshots must not show hidden sandbox modules as public promises.

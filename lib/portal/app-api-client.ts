@@ -92,6 +92,224 @@ export type UserDataDeleteResponse = AppApiEnvelope & {
   wouldDelete: string[];
 };
 
+export type ProductionProviderStatus = {
+  id: string;
+  label: string;
+  configured: boolean;
+  enabled: boolean;
+  missingEnv: string[];
+};
+
+export type ProductionRuntimeProviderAction = ProductionProviderStatus & {
+  category: 'account_auth' | 'cloud' | 'ai' | 'third_party';
+  actionStatus: 'ready' | 'server_ready' | 'configure_required';
+  startEndpoint: string | null;
+  safeUserAction: string;
+  serverOnly: boolean;
+};
+
+export type ProductionRuntimeSetupTask = ProductionRuntimeProviderAction & {
+  blockedReason: 'missing_env' | 'canonical_domain_mismatch' | 'provider_disabled' | null;
+  requiresCanonicalDomain: boolean;
+};
+
+export type ProductionRuntimeHealthResponse = {
+  ok: boolean;
+  service: 'portal-production-runtime';
+  version: 'production-runtime-v0';
+  safePublicStatus: true;
+  secretsRedacted: true;
+  canonicalDomain: string;
+  requestHost: string;
+  canonicalDomainMatchesRequestHost: boolean;
+  accountAuth: {
+    enabled: boolean;
+    providers: Record<'email' | 'google' | 'wechat' | 'phone', ProductionProviderStatus>;
+  };
+  cloud: {
+    database: ProductionProviderStatus;
+    storage: ProductionProviderStatus;
+  };
+  ai: {
+    enabled: boolean;
+    providers: Record<'gemini' | 'doubao' | 'chatgpt' | 'claude', ProductionProviderStatus>;
+  };
+  thirdParty: {
+    googleCalendar: ProductionProviderStatus;
+    flomo: ProductionProviderStatus;
+  };
+  providerActionMatrix: ProductionRuntimeProviderAction[];
+  setupTaskMatrix: ProductionRuntimeSetupTask[];
+  summary: {
+    providerCount: number;
+    enabledProviderCount: number;
+    missingProviderCount: number;
+    actionableProviderCount: number;
+    blockedProviderCount: number;
+    setupTaskCount: number;
+    blockedSetupTaskCount: number;
+    canonicalDomainReady: boolean;
+    productionRuntimeReady: boolean;
+  };
+};
+
+export type AuthStartProvider = 'email' | 'google' | 'wechat' | 'phone';
+
+export type AuthStartResponse = {
+  safePublicStatus: true;
+  secretsRedacted: true;
+  ok: boolean;
+  provider?: AuthStartProvider;
+  action?: 'redirect' | 'otp_sent';
+  url?: string;
+  status?: ProductionProviderStatus;
+  error?:
+    | 'invalid_json'
+    | 'unsupported_provider'
+    | 'provider_not_configured'
+    | 'missing_email'
+    | 'missing_phone'
+    | 'missing_supabase_config'
+    | 'supabase_otp_failed'
+    | string;
+  supportedProviders?: AuthStartProvider[];
+};
+
+export type AuthSessionUser = {
+  id: string;
+  email: string;
+  phone: string;
+  provider: string;
+  providers: string[];
+};
+
+export type AuthSessionResponse = {
+  safePublicStatus: true;
+  secretsRedacted: true;
+  ok: boolean;
+  loggedIn: boolean;
+  hasRefreshToken: boolean;
+  status: 'signed_out' | 'signed_in' | 'session_unverified' | string;
+  user?: AuthSessionUser;
+};
+
+export type AuthLogoutResponse = {
+  safePublicStatus: true;
+  secretsRedacted: true;
+  ok: boolean;
+  signedOut: boolean;
+  supabaseRevoked?: boolean;
+};
+
+export type CloudProfileSettings = {
+  displayName?: string;
+  avatarUrl?: string;
+  locale?: string;
+  displayLanguage?: string;
+  coachStyle?: string;
+  theme?: string;
+  calendarUrl?: string;
+};
+
+export type CloudProfileSettingsResponse = {
+  safePublicStatus: true;
+  secretsRedacted: true;
+  ok: boolean;
+  readsCloud: boolean;
+  writesCloud: boolean;
+  settings?: CloudProfileSettings;
+  updatedAt?: string | null;
+  error?: 'cloud_not_configured' | 'not_signed_in' | 'cloud_read_failed' | 'cloud_write_failed' | string;
+};
+
+export type CloudInventorySnapshotItem = InventoryItemRecord & {
+  schemaVersion?: 'LocalInventoryItem@v1' | string;
+  locationHint?: string;
+  notes?: string;
+  purchaseMemory?: Record<string, unknown>;
+  createdAt?: string;
+  updatedAt?: string;
+  mode?: InventoryMode;
+};
+
+export type CloudInventorySnapshotResponse = {
+  safePublicStatus: true;
+  secretsRedacted: true;
+  ok: boolean;
+  cloudInventorySnapshot: true;
+  readsCloud: boolean;
+  writesCloud: boolean;
+  items?: CloudInventorySnapshotItem[];
+  itemCount?: number;
+  savedCount?: number;
+  rejectedCount?: number;
+  deletedMissingCount?: number;
+  updatedAt?: string | null;
+  error?:
+    | 'cloud_not_configured'
+    | 'not_signed_in'
+    | 'cloud_read_failed'
+    | 'cloud_write_failed'
+    | 'invalid_json'
+    | string;
+};
+
+export type SecretaryChatProvider = 'gemini' | 'chatgpt' | 'openai' | 'doubao' | 'claude' | 'anthropic';
+
+export type SecretaryChatTurn = {
+  role: 'user' | 'assistant';
+  content: string;
+};
+
+export type SecretaryChatResponse = {
+  text?: string;
+  model?: SecretaryChatProvider | string;
+  error?: string;
+  detail?: string;
+  hint?: string;
+};
+
+export type SecretaryHealthResponse = {
+  ok: boolean;
+  service: 'secretary';
+  status?: 'ready' | string;
+  behaviorEnabled?: boolean;
+  gemini: boolean;
+  doubao: boolean;
+  chatgpt: boolean;
+  claude: boolean;
+  model?: string | null;
+  doubaoModel?: string | null;
+  openaiModel?: string | null;
+  claudeModel?: string | null;
+  defaultProvider?: 'gemini' | 'chatgpt' | 'claude' | 'doubao' | null;
+  chatEndpoint?: '/api/secretary/chat' | string;
+  providerMatrix?: Array<{
+    provider: 'gemini' | 'chatgpt' | 'claude' | 'doubao' | string;
+    label: string;
+    nativeConfigured: boolean;
+    fallbackProvider: 'gemini' | string | null;
+    runtimeAvailable: boolean;
+    chatEndpoint: '/api/secretary/chat' | string;
+    model: string | null;
+  }>;
+  productionActivation?: {
+    aiProviderMode: string;
+    aiRuntimeEnabled: boolean;
+    defaultProvider?: 'gemini' | 'chatgpt' | 'claude' | 'doubao' | null;
+    chatEndpoint?: '/api/secretary/chat' | string;
+    configuredProviders: {
+      gemini: boolean;
+      doubao: boolean;
+      chatgpt: boolean;
+      claude: boolean;
+    };
+  };
+  reason?: string;
+  statusCode?: number;
+  message?: string;
+};
+
 type ClientOptions = {
   fetcher?: AppApiFetch;
   baseUrl?: string;
@@ -103,6 +321,14 @@ const APP_API_ENDPOINTS = {
   entitlements: '/api/entitlements',
   userDataExport: '/api/user-data/export',
   userDataDelete: '/api/user-data/delete',
+  productionRuntimeHealth: '/api/portal/production/health',
+  authStart: '/api/auth/start',
+  authSession: '/api/auth/session',
+  authLogout: '/api/auth/logout',
+  cloudProfileSettings: '/api/cloud/profile-settings',
+  cloudInventory: '/api/cloud/inventory',
+  secretaryChat: '/api/secretary/chat',
+  secretaryHealth: '/api/secretary/health',
 } as const;
 
 function buildUrl(baseUrl: string, path: string, params?: Record<string, string | number | boolean | undefined>) {
@@ -127,6 +353,18 @@ async function readJson<T>(fetcher: AppApiFetch, url: string, init?: RequestInit
   if (!response.ok) {
     throw new Error(`App API request failed: ${response.status} ${response.statusText}`);
   }
+
+  return response.json() as Promise<T>;
+}
+
+async function readJsonAllowError<T>(fetcher: AppApiFetch, url: string, init?: RequestInit): Promise<T> {
+  const response = await fetcher(url, {
+    ...init,
+    headers: {
+      accept: 'application/json',
+      ...init?.headers,
+    },
+  });
 
   return response.json() as Promise<T>;
 }
@@ -157,6 +395,115 @@ export function createAppApiClient(options: ClientOptions = {}) {
     deleteUserData({ dryRun = true }: { dryRun?: boolean } = {}): Promise<UserDataDeleteResponse> {
       return readJson(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.userDataDelete, { dryRun: dryRun ? 1 : 0 }), {
         method: 'POST',
+      });
+    },
+
+    fetchProductionRuntimeHealth(): Promise<ProductionRuntimeHealthResponse> {
+      return readJson(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.productionRuntimeHealth));
+    },
+
+    fetchAuthSession(): Promise<AuthSessionResponse> {
+      return readJsonAllowError(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.authSession));
+    },
+
+    startAuth({
+      provider,
+      email,
+      phone,
+      redirectTo,
+    }: {
+      provider: AuthStartProvider;
+      email?: string;
+      phone?: string;
+      redirectTo?: string;
+    }): Promise<AuthStartResponse> {
+      return readJsonAllowError(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.authStart), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          provider,
+          email,
+          phone,
+          redirectTo,
+        }),
+      });
+    },
+
+    logoutAuth(): Promise<AuthLogoutResponse> {
+      return readJsonAllowError(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.authLogout), {
+        method: 'POST',
+      });
+    },
+
+    fetchCloudProfileSettings(): Promise<CloudProfileSettingsResponse> {
+      return readJsonAllowError(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.cloudProfileSettings));
+    },
+
+    saveCloudProfileSettings(settings: CloudProfileSettings): Promise<CloudProfileSettingsResponse> {
+      return readJsonAllowError(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.cloudProfileSettings), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ settings }),
+      });
+    },
+
+    fetchCloudInventorySnapshot(): Promise<CloudInventorySnapshotResponse> {
+      return readJsonAllowError(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.cloudInventory));
+    },
+
+    saveCloudInventorySnapshot({
+      items,
+      deleteMissing = false,
+    }: {
+      items: CloudInventorySnapshotItem[];
+      deleteMissing?: boolean;
+    }): Promise<CloudInventorySnapshotResponse> {
+      return readJsonAllowError(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.cloudInventory), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ items, deleteMissing }),
+      });
+    },
+
+    fetchSecretaryHealth({ personalLab = true }: { personalLab?: boolean } = {}): Promise<SecretaryHealthResponse> {
+      return readJsonAllowError(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.secretaryHealth), {
+        headers: {
+          ...(personalLab ? { 'x-baohe-access-mode': 'personal_lab' } : {}),
+        },
+      });
+    },
+
+    sendSecretaryMessage({
+      provider,
+      message,
+      history = [],
+      maxTokens = 1200,
+      personalLab = true,
+    }: {
+      provider: SecretaryChatProvider;
+      message: string;
+      history?: SecretaryChatTurn[];
+      maxTokens?: number;
+      personalLab?: boolean;
+    }): Promise<SecretaryChatResponse> {
+      return readJsonAllowError(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.secretaryChat), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(personalLab ? { 'x-baohe-access-mode': 'personal_lab' } : {}),
+        },
+        body: JSON.stringify({
+          model: provider,
+          message,
+          history,
+          maxTokens,
+        }),
       });
     },
   };

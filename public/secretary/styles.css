@@ -445,6 +445,90 @@ html, body {
 
 .wx-chat-input-wrap textarea:focus { outline: none; }
 
+.wx-chat-icon-btn--mention {
+  color: var(--wx-blue);
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.wx-mention-panel[hidden] {
+  display: none !important;
+}
+
+.wx-mention-panel {
+  position: fixed;
+  left: 50%;
+  bottom: calc(7.1rem + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 48;
+  width: min(92vw, 22rem);
+  max-height: 17rem;
+  overflow: hidden;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.92);
+  border: 0.5px solid rgba(180, 194, 220, 0.8);
+  box-shadow: 0 18px 48px rgba(35, 56, 94, 0.18);
+  backdrop-filter: blur(18px);
+}
+
+.wx-mention-list {
+  max-height: 17rem;
+  overflow: auto;
+  padding: 0.35rem 0;
+}
+
+.wx-mention-row {
+  width: 100%;
+  min-height: 3.4rem;
+  border: none;
+  border-bottom: 0.5px solid rgba(210, 219, 235, 0.8);
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.55rem 0.75rem;
+  text-align: left;
+  color: var(--wx-ink);
+  cursor: pointer;
+}
+
+.wx-mention-row:last-child {
+  border-bottom: none;
+}
+
+.wx-mention-row img,
+.wx-mention-avatar {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.65rem;
+  flex: 0 0 auto;
+  object-fit: contain;
+  background: #eef4ff;
+  display: grid;
+  place-items: center;
+  color: var(--wx-blue);
+  font-weight: 800;
+}
+
+.wx-mention-body {
+  min-width: 0;
+  display: grid;
+  gap: 0.12rem;
+}
+
+.wx-mention-body strong {
+  font-size: 0.9rem;
+  color: var(--wx-blue);
+}
+
+.wx-mention-body small {
+  color: var(--wx-muted);
+  font-size: 0.76rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* ── Tool sheet (+ menu) ── */
 .wx-sheet[hidden] { display: none; }
 

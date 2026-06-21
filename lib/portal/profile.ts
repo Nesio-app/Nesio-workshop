@@ -1,33 +1,67 @@
-export type PortalLocale = 'zh' | 'en';
+export const SUPPORTED_PORTAL_LOCALES = [
+  'zh',
+  'en',
+  'zh-TW',
+  'ja',
+  'ko',
+  'fr',
+  'de',
+  'es',
+  'it',
+  'pt',
+  'vi',
+  'th',
+] as const;
+
+export type PortalLocale = (typeof SUPPORTED_PORTAL_LOCALES)[number];
+export type PortalCoachStyle = 'minimal' | 'warm' | 'professional';
 
 export interface PortalProfileSettings {
   displayName: string;
   avatarUrl: string;
   locale: PortalLocale;
+  coachStyle: PortalCoachStyle;
 }
 
 const KEYS = {
   avatar: 'treasurebox-profile-avatar',
   displayName: 'treasurebox-profile-name',
   locale: 'treasurebox-locale',
+  coachStyle: 'treasurebox-coach-style',
 } as const;
 
 export const PROFILE_UPDATED_EVENT = 'treasurebox-profile-updated';
 
+export function normalizePortalLocale(value: string | null | undefined): PortalLocale {
+  return SUPPORTED_PORTAL_LOCALES.includes(value as PortalLocale) ? value as PortalLocale : 'zh';
+}
+
+export function portalLocaleToHtmlLang(locale: PortalLocale): string {
+  return locale === 'zh' ? 'zh-CN' : locale;
+}
+
+export function portalLocaleToDictionaryLocale(locale: PortalLocale): 'zh' | 'en' {
+  return locale === 'zh' || locale === 'zh-TW' ? 'zh' : 'en';
+}
+
 export function loadProfileSettings(fallbackName = '婧'): PortalProfileSettings {
   if (typeof window === 'undefined') {
-    return { displayName: fallbackName, avatarUrl: '', locale: 'zh' };
+    return { displayName: fallbackName, avatarUrl: '', locale: 'zh', coachStyle: 'warm' };
   }
   try {
     const localeRaw = localStorage.getItem(KEYS.locale);
-    const locale: PortalLocale = localeRaw === 'en' ? 'en' : 'zh';
+    const locale = normalizePortalLocale(localeRaw);
+    const coachStyleRaw = localStorage.getItem(KEYS.coachStyle);
+    const coachStyle: PortalCoachStyle =
+      coachStyleRaw === 'minimal' || coachStyleRaw === 'professional' ? coachStyleRaw : 'warm';
     return {
       displayName: localStorage.getItem(KEYS.displayName) || fallbackName,
       avatarUrl: localStorage.getItem(KEYS.avatar) || '',
       locale,
+      coachStyle,
     };
   } catch {
-    return { displayName: fallbackName, avatarUrl: '', locale: 'zh' };
+    return { displayName: fallbackName, avatarUrl: '', locale: 'zh', coachStyle: 'warm' };
   }
 }
 
@@ -43,7 +77,10 @@ export function saveProfileSettings(patch: Partial<PortalProfileSettings>) {
     }
     if (patch.locale !== undefined) {
       localStorage.setItem(KEYS.locale, patch.locale);
-      document.documentElement.lang = patch.locale === 'en' ? 'en' : 'zh-CN';
+      document.documentElement.lang = portalLocaleToHtmlLang(patch.locale);
+    }
+    if (patch.coachStyle !== undefined) {
+      localStorage.setItem(KEYS.coachStyle, patch.coachStyle);
     }
     window.dispatchEvent(new CustomEvent(PROFILE_UPDATED_EVENT));
   } catch { /* ignore */ }

@@ -128,7 +128,7 @@ export function buildModuleRegistry(config: PortalConfig): ModuleRegistry {
 
 export function buildPortalModule(tool: PortalTool): PortalModule {
   return buildPortalModuleRegistry({
-    meta: { title: '宝盒', subtitle: '', energyQuotes: [] },
+    meta: { title: 'Nesio', subtitle: '', energyQuotes: [] },
     zones: {
       kinetic: { title: '', subtitle: '', tone: 'cool' },
       reflective: { title: '', subtitle: '', tone: 'warm' },

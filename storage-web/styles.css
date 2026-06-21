@@ -52,6 +52,12 @@
   --rlg: 26px;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --modal-backdrop-bg: rgba(16, 28, 54, 0.18);
+  --modal-backdrop-blur: 2.5px;
+  --modal-card-bg: rgba(248, 251, 255, 0.9);
+  --modal-card-blur: 16px;
+  --modal-card-saturate: 145%;
+  --tap-min: 44px;
 }
 
 html, body {
@@ -316,6 +322,110 @@ html, body {
   text-align: center;
   color: var(--text2);
   line-height: 1.55;
+}
+
+.launch-surface-card {
+  margin: 0 18px 12px;
+  border: 1px solid rgba(74, 134, 224, 0.18);
+  border-radius: var(--r);
+  padding: 13px;
+  background:
+    linear-gradient(135deg, rgba(74, 134, 224, 0.1), rgba(255, 255, 255, 0.78)),
+    var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.launch-surface-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.launch-surface-kicker {
+  margin-bottom: 3px;
+  color: var(--accent-deep);
+  font-size: 9.5px;
+  font-weight: 850;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+
+.launch-surface-head h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.35;
+  font-weight: 850;
+}
+
+.launch-surface-head > span {
+  flex: 0 0 auto;
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0 9px;
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--accent-deep);
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.launch-surface-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 11px;
+}
+
+.launch-surface-actions button {
+  min-height: 46px;
+  border: 1px solid rgba(74, 134, 224, 0.18);
+  border-radius: 12px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.launch-surface-actions span,
+.launch-surface-actions small {
+  display: block;
+}
+
+.launch-surface-actions span {
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.launch-surface-actions small {
+  margin-top: 2px;
+  color: var(--text3);
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.launch-surface-states {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.launch-surface-states span {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0 9px;
+  background: rgba(74, 134, 224, 0.09);
+  color: var(--text2);
+  font-size: 10px;
+  font-weight: 750;
 }
 
 .icard { display: flex; gap: 12px; align-items: flex-start; cursor: pointer; transition: transform 0.18s; }
@@ -1013,6 +1123,58 @@ html, body {
   box-shadow: 0 12px 36px rgba(18, 35, 66, 0.4);
   pointer-events: none;
   animation: tpop 0.22s ease, tfade 0.3s ease 2.1s forwards;
+}
+
+.storage-guard-guide {
+  position: fixed;
+  left: 50%;
+  bottom: calc(104px + var(--safe-bottom));
+  width: min(360px, calc(100vw - 32px));
+  transform: translateX(-50%);
+  z-index: 620;
+}
+
+.storage-guard-guide[hidden] { display: none; }
+
+.storage-guard-guide__card {
+  position: relative;
+  border: 1px solid var(--frost-line);
+  border-radius: 24px;
+  background: var(--modal-card-bg);
+  box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(var(--modal-card-blur)) saturate(var(--modal-card-saturate));
+  -webkit-backdrop-filter: blur(var(--modal-card-blur)) saturate(var(--modal-card-saturate));
+  color: var(--text);
+  padding: 18px 58px 18px 18px;
+}
+
+.storage-guard-guide__card strong {
+  display: block;
+  font-size: 15px;
+  line-height: 1.35;
+  margin-bottom: 8px;
+}
+
+.storage-guard-guide__card p {
+  color: var(--text2);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.7;
+}
+
+.storage-guard-guide__close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  border: 0;
+  border-radius: 999px;
+  background: var(--ice);
+  color: var(--accent-deep);
+  font-size: 20px;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 @keyframes tpop {

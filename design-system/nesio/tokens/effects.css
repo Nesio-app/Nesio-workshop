@@ -1,0 +1,88 @@
+/* ═══════════════════════════════════════════════════════════
+   EFFECTS — Nesio · 宝盒
+   Liquid glass, shadows, motion, grain. Theme-aware.
+   ═══════════════════════════════════════════════════════════ */
+
+:root,
+[data-portal-theme="day"] {
+  /* ── Liquid glass (day): airy white frost ── */
+  --glass-blur: 12px;
+  --glass-bg:        rgba(255, 255, 255, 0.42);  /* rails, chips      */
+  --glass-bg-raised: rgba(255, 255, 255, 0.62);  /* hover / triggers  */
+  --glass-bg-solid:  rgba(255, 255, 255, 0.82);  /* widgets, content  */
+  --glass-bg-pop:    rgba(252, 251, 248, 0.96);  /* modals, sheets    */
+  --glass-border:    var(--portal-line);
+  --glass-highlight: inset 0 1px 1px rgba(255, 255, 255, 0.7); /* @kind shadow */
+
+  /* ── Shadows ── */
+  --shadow-card:  0 10px 28px rgba(88, 140, 227, 0.08);
+  --shadow-raise: 0 12px 32px rgba(88, 140, 227, 0.14);
+  --shadow-pop:   0 24px 60px rgba(30, 30, 28, 0.12);
+  --shadow-fab:   0 8px 24px rgba(88, 140, 227, 0.28);
+}
+
+/* ── Liquid glass (night): faint luminous film ── */
+[data-portal-theme="night"] {
+  --glass-bg:        rgba(255, 255, 255, 0.055);
+  --glass-bg-raised: rgba(255, 255, 255, 0.09);
+  --glass-bg-solid:  rgba(255, 255, 255, 0.07);
+  --glass-bg-pop:    rgba(18, 26, 42, 0.97);
+  --glass-border:    var(--portal-line);
+  --glass-highlight: inset 0 1px 1px rgba(255, 255, 255, 0.12); /* @kind shadow */
+
+  --shadow-card:  0 10px 28px rgba(0, 0, 0, 0.4);
+  --shadow-raise: 0 12px 32px rgba(0, 0, 0, 0.5);
+  --shadow-pop:   0 24px 60px rgba(0, 0, 0, 0.6);
+  --shadow-fab:   0 8px 28px rgba(0, 0, 0, 0.5);
+}
+
+:root {
+  /* ── Motion ── */
+  --ease-soft:  cubic-bezier(0.22, 0.61, 0.36, 1); /* @kind other */
+  --ease-out:   cubic-bezier(0.16, 1, 0.3, 1); /* @kind other */
+  --dur-fast: 0.2s; /* @kind other */
+  --dur:      0.3s; /* @kind other */
+  --dur-slow: 0.6s; /* @kind other */
+}
+
+/* ── Reusable glass surface helper ── */
+.nesio-glass {
+  background: var(--glass-bg-solid);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card), var(--glass-highlight);
+}
+
+/* ── Grain overlay (the courtyard's quiet texture) ── */
+.portal-grain {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.4;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+}
+[data-portal-theme="night"] .portal-grain { opacity: 0.5; }
+
+/* ── Tap ripple (soft, used on cards / fabs) ── */
+@keyframes nesio-ripple {
+  from { transform: scale(0); opacity: 0.35; }
+  to   { transform: scale(1); opacity: 0; }
+}
+.om-ripple {
+  position: absolute;
+  border-radius: 999px;
+  background: currentColor;
+  transform: translate(-50%, -50%) scale(0);
+  pointer-events: none;
+  animation: nesio-ripple 0.6s var(--ease-out) forwards;
+}
+.om-ripple-host { position: relative; overflow: hidden; }
+
+/* ── Gentle entrance ── */
+@keyframes nesio-fade-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

@@ -1,0 +1,47 @@
+/* ═══════════════════════════════════════════════════════════
+   TYPOGRAPHY — Nesio · 宝盒
+   Humanist multilingual sans for body; serif for quiet display.
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── Families ──
+     The CJK families cascade so every script (zh/ja/ko) finds a glyph. */
+  --font-sans:
+    "Noto Sans SC", "Noto Sans JP", "Noto Sans KR",
+    -apple-system, "PingFang SC", "Hiragino Sans", "Microsoft YaHei",
+    system-ui, sans-serif;
+  --font-serif:
+    "Noto Serif SC", "Songti SC", "Hiragino Mincho ProN", Georgia, serif;
+  /* Aliases used by the live shell */
+  --font-source-sans: var(--font-sans);
+  --font-portal-serif: var(--font-serif);
+
+  /* ── Weights ── */
+  --weight-light: 300;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  /* ── Type scale (rem, 16px base) ──
+     Calm rhythm — generous line-height, modest contrast. */
+  --text-display: 2.25rem;   /* 36 — hero / greeting        */
+  --text-h1:      1.6rem;    /* 26 — page title             */
+  --text-h2:      1.3rem;    /* 21 — section / quote        */
+  --text-h3:      1.075rem;  /* 17 — card title             */
+  --text-body:    0.95rem;   /* 15 — body                   */
+  --text-sm:      0.85rem;   /* 14 — secondary              */
+  --text-xs:      0.75rem;   /* 12 — caption                */
+  --text-overline:0.68rem;   /* 11 — uppercase label        */
+
+  /* ── Line heights ── */
+  --leading-tight: 1.25;
+  --leading-snug:  1.45;
+  --leading-relaxed: 1.7;    /* quotes / reading            */
+
+  /* ── Letter spacing ── */
+  --tracking-tight: -0.01em;
+  --tracking-normal: 0;
+  --tracking-label: 0.14em;  /* overlines / status chips    */
+  --tracking-wide:  0.22em;  /* eyebrow labels              */
+}

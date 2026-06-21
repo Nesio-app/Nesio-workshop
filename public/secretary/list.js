@@ -98,7 +98,6 @@ function renderList(filter) {
         </div>
         <div class="wx-row-bottom">
           <span class="wx-row-preview">${f.preview}</span>
-          ${f.ready ? '' : '<span class="wx-row-badge">待接</span>'}
         </div>
       </div>
     `;
@@ -134,7 +133,7 @@ function renderDockActions() {
   const actions = [
     { label: '发起群聊', icon: '👥', fn: () => openGroupSheet() },
     { label: 'Gemini', icon: '✦', href: '/secretary/chat?friend=gemini' },
-    { label: '返回宝盒', icon: '盒', href: '/' },
+    { label: '返回 Nesio', icon: '盒', href: '/' },
   ];
   for (const a of actions) {
     const btn = document.createElement('button');
@@ -148,7 +147,7 @@ function renderDockActions() {
     });
     dockActions.appendChild(btn);
   }
-  for (const f of friends.filter((x) => x.ready).slice(0, 4)) {
+  for (const f of friends.slice(0, 4)) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'wx-dock-action';

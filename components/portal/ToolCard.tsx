@@ -1,10 +1,12 @@
 'use client';
 
+import Image from 'next/image';
 import type { PortalTool, PortalZone } from '@/lib/portal/types';
 import { getToolStatusLabel, type ToolForShellState } from './tool-state';
-import { ensureToolboxTrailingSlash, withBase } from '@/lib/portal/paths';
+import { ensureToolboxTrailingSlash } from '@/lib/portal/paths';
 import { t } from '@/lib/portal/i18n';
 import type { PortalLocale } from '@/lib/portal/profile';
+import { getNesioToolIcon } from '@/lib/portal/nesio-design-system-assets.mjs';
 
 interface ToolCardProps {
   tool: PortalTool;
@@ -24,14 +26,14 @@ export default function ToolCard({ tool, zone, locale = 'zh' }: ToolCardProps) {
   const href = tool.ready ? ensureToolboxTrailingSlash(tool.url) : undefined;
   const external = href ? isExternalUrl(href) : false;
   const breathe = zone.tone === 'warm' && tool.id === 'psychoanalysis';
-  const iconSrc = tool.iconUrl ? withBase(tool.iconUrl) : null;
+  const iconSrc = getNesioToolIcon(tool.id, tool.iconUrl);
 
   const content = (
     <>
       <div className="portal-card-top">
         <span className="portal-card-icon" aria-hidden>
           {iconSrc ? (
-            <img className="portal-card-icon-img" src={iconSrc} alt="" width={28} height={28} />
+            <Image className="portal-card-icon-img" src={iconSrc} alt="" width={28} height={28} />
           ) : (
             tool.icon
           )}

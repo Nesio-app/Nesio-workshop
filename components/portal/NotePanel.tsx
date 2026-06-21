@@ -103,6 +103,11 @@ export default function NotePanel({ open, onOpenChange }: NotePanelProps) {
 
   const onSend = async () => {
     const text = draft.trim();
+    if (sending) {
+      setStatus('idle');
+      setStatusMsg(t(locale, 'flomoSendInFlight'));
+      return;
+    }
     if (!text && images.length === 0) {
       setStatus('err');
       setStatusMsg(t(locale, 'flomoNeedContent'));
@@ -165,7 +170,7 @@ export default function NotePanel({ open, onOpenChange }: NotePanelProps) {
 
   if (!open) return null;
 
-  const canSend = (draft.trim().length > 0 || images.length > 0) && !sending;
+  const canSend = draft.trim().length > 0 || images.length > 0;
 
   return (
     <div className="flomo-overlay" role="presentation" onClick={() => onOpenChange(false)}>
@@ -295,7 +300,6 @@ export default function NotePanel({ open, onOpenChange }: NotePanelProps) {
           <button
             type="button"
             className={'flomo-send' + (canSend ? ' flomo-send--on' : '')}
-            disabled={!canSend}
             onClick={onSend}
             aria-label={t(locale, 'flomoSend')}
           >

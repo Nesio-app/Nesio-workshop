@@ -6,17 +6,17 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#e7eefb">
-  <title>大后方</title>
+  <title>Nesio Inventory</title>
   <link rel="manifest" href="/storage/manifest.json">
   <link rel="stylesheet" href="/storage/styles.css">
   <link rel="stylesheet" href="/storage/portal-back.css">
 </head>
 <body>
-<a class="portal-back-link" href="/">‹ 宝盒</a>
+<a class="portal-back-link" href="/">‹ Nesio</a>
 <div class="app-shell" id="app">
   <div class="first-launch" id="firstLaunch" aria-modal="true" role="dialog" aria-labelledby="firstLaunchTitle">
     <div class="first-launch-card">
-      <div class="first-launch-kicker">Baohe Purchase Memory</div>
+      <div class="first-launch-kicker">Nesio Purchase Memory</div>
       <h1 id="firstLaunchTitle">先从购买记忆开始</h1>
       <p>首发版只做本地 Inventory。你可以用 Demo 快速试一遍，也可以从空白 Personal 数据开始。</p>
       <div class="first-launch-actions">
@@ -38,6 +38,25 @@
       <div class="hbtn" onclick="openSheet('sh-settings')" title="设置">⚙️</div>
     </div>
     <div class="sbar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg><input placeholder="狗用的 · 止痒 · 备用枕巾…" oninput="liveSearch(this.value)" id="hsearch"></div>
+    <section class="launch-surface-card" aria-label="物品库首发能力">
+      <div class="launch-surface-head">
+        <div>
+          <div class="launch-surface-kicker">Inventory / purchase-memory</div>
+          <h2>先把物品和购买记忆留在本机</h2>
+        </div>
+        <span>Local-only</span>
+      </div>
+      <div class="launch-surface-actions">
+        <button type="button" onclick="openSheet('sh-add')"><span>快速添加</span><small>物品 + 购买记忆</small></button>
+        <button type="button" onclick="openSheet('sh-settings')"><span>导出 / 删除</span><small>本地数据自控</small></button>
+      </div>
+      <div class="launch-surface-states">
+        <span>已收好</span>
+        <span>冷静期</span>
+        <span>待处理</span>
+        <span>补货提醒</span>
+      </div>
+    </section>
     <div class="scroll">
       <div id="searchOut" style="display:none;"></div>
       <div class="exp-ban" id="expBanner"><span style="font-size:17px;">⏰</span><div class="et" id="expBannerText"></div></div>
@@ -447,6 +466,13 @@
         <div class="card local-recovery-warning" style="margin-top:10px;">
           <div style="font-size:12.5px;font-weight:800;margin-bottom:5px;">本地数据提醒</div>
           <div style="font-size:12px;color:var(--text2);line-height:1.55;">浏览器清理缓存可能移除本地数据。首发版无云同步，建议定期导出备份到文件 / iCloud Drive。</div>
+        </div>
+        <div class="card" id="settingsCloudSnapshot" style="margin-top:10px;">
+          <div style="font-size:12.5px;font-weight:800;margin-bottom:5px;">云端 Personal 快照</div>
+          <div style="font-size:12px;color:var(--text2);line-height:1.55;">仅保存 Personal 库存快照；Demo 不上传，自动后台同步仍关闭。</div>
+          <div class="drow" style="padding:8px 0 0;"><span class="drow-l">云端状态</span><span class="drow-v" id="settingsCloudSnapshotStatus">—</span></div>
+          <button class="btn-ghost" style="margin-top:8px;" onclick="saveInventoryCloudSnapshot()">保存 Personal 到云端</button>
+          <button class="btn-ghost" style="margin-top:8px;" onclick="restoreInventoryCloudSnapshot()">从云端恢复 Personal</button>
         </div>
         <div class="drow"><span class="drow-l">当前箱码</span><span class="drow-v" id="settingsBin">—</span></div>
         <input id="localBackupFile" type="file" accept="application/json,.json" style="display:none" onchange="handleLocalBackupFile(this)">

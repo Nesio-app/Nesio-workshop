@@ -22,18 +22,29 @@ const form = document.getElementById('chatForm');
 const input = document.getElementById('chatInput');
 const btnClear = document.getElementById('btnClear');
 const btnPlus = document.getElementById('btnPlus');
+const btnMention = document.getElementById('btnMention');
 const btnMic = document.getElementById('btnMic');
 const btnCall = document.getElementById('btnCall');
 const navTitle = document.getElementById('navTitle');
 const navAvatar = document.getElementById('navAvatar');
+const mentionPanel = document.getElementById('mentionPanel');
+const mentionList = document.getElementById('mentionList');
 
 const STORAGE_KEY = `treasurebox-chat-${friendId}`;
 const USER_AVATAR = '婧';
 
 let friend = null;
+let friendsCache = [];
 let history = [];
 let busy = false;
 let liveVoiceCall = null;
+
+const TOOL_MENTIONS = [
+  { id: 'flomo', name: 'Flomo', desc: '把消息保存为笔记', token: '@Flomo' },
+  { id: 'inventory', name: '物品库', desc: '记一个物品 / 查到期', token: '@物品库' },
+  { id: 'calendar', name: '日期', desc: '查看日程与提醒', token: '@日期' },
+  { id: 'todo', name: '待办', desc: '整理下一步行动', token: '@待办' },
+];
 
 function loadHistory() {
   try {
@@ -96,6 +107,77 @@ function render() {
   scrollBottom();
 }
 
+function mentionCandidates(query) {
+  const q = (query || '').trim().toLowerCase();
+  const aiRows = friendsCache.map((item) => ({
+    id: item.id,
+    name: item.name,
+    desc: item.preview || item.tagline || item.company || '',
+    token: `@${item.name}`,
+    logo: item.logo,
+  }));
+  return [...aiRows, ...TOOL_MENTIONS].filter((item) => {
+    if (!q) return true;
+    return item.name.toLowerCase().includes(q) ||
+      item.id.toLowerCase().includes(q) ||
+      item.token.toLowerCase().includes(q) ||
+      item.desc.toLowerCase().includes(q);
+  }).slice(0, 8);
+}
+
+function currentMentionQuery() {
+  const cursor = input.selectionStart || input.value.length;
+  const before = input.value.slice(0, cursor);
+  const match = before.match(/(?:^|\s)@([^\s@]*)$/);
+  return match ? match[1] : null;
+}
+
+function closeMentionPanel() {
+  mentionPanel.hidden = true;
+}
+
+function insertMention(token) {
+  const cursor = input.selectionStart || input.value.length;
+  const before = input.value.slice(0, cursor);
+  const after = input.value.slice(cursor);
+  const replaced = before.match(/(?:^|\s)@([^\s@]*)$/)
+    ? before.replace(/(?:^|\s)@([^\s@]*)$/, (segment) => {
+        const prefix = segment.startsWith(' ') ? ' ' : '';
+        return `${prefix}${token} `;
+      })
+    : `${before}${before && !before.endsWith(' ') ? ' ' : ''}${token} `;
+  input.value = `${replaced}${after}`;
+  input.focus();
+  const nextCursor = replaced.length;
+  input.setSelectionRange(nextCursor, nextCursor);
+  input.dispatchEvent(new Event('input'));
+  closeMentionPanel();
+}
+
+function renderMentionPanel(query = '') {
+  const rows = mentionCandidates(query);
+  mentionList.innerHTML = '';
+  for (const row of rows) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'wx-mention-row';
+    btn.setAttribute('role', 'option');
+    const avatar = row.logo
+      ? `<img src="${withRoot(row.logo)}" alt="" width="32" height="32" />`
+      : `<span class="wx-mention-avatar">${esc(row.token.slice(1, 2))}</span>`;
+    btn.innerHTML = `
+      ${avatar}
+      <span class="wx-mention-body">
+        <strong>${esc(row.token)}</strong>
+        <small>${esc(row.desc)}</small>
+      </span>
+    `;
+    btn.addEventListener('click', () => insertMention(row.token));
+    mentionList.appendChild(btn);
+  }
+  mentionPanel.hidden = false;
+}
+
 function showError(text) {
   const el = document.createElement('div');
   el.className = 'wx-msg-bubble wx-msg-bubble--error';
@@ -107,16 +189,6 @@ function showError(text) {
 async function sendMessage(text, opts = {}) {
   const fromVoice = Boolean(opts.fromVoice);
   if (busy || !text.trim()) return { ok: false, error: 'busy' };
-
-  if (!friend?.ready) {
-    if (!fromVoice) {
-      showError(`${friend?.name || '该模型'} 尚未接入，正在为你打开 Gemini…`);
-      window.setTimeout(() => {
-        location.href = '/secretary/chat?friend=gemini';
-      }, 900);
-    }
-    return { ok: false, error: '模型未接入' };
-  }
 
   busy = true;
   if (!fromVoice) input.disabled = true;
@@ -166,10 +238,6 @@ async function sendMessage(text, opts = {}) {
 }
 
 async function openLiveVoiceCall() {
-  if (!friend?.ready) {
-    toast(`${friend?.name || '该模型'} 尚未接入`);
-    return;
-  }
   if (!liveVoiceCall) {
     toast('语音通话未就绪');
     return;
@@ -220,10 +288,13 @@ const attachHandlers = {
   photo: () => pickPhoto.click(),
   file: () => pickFile.click(),
   video: () => {
-    toast('视频通话需 WebRTC 信令服务，下一版接入；可先发送短视频文件');
-    pickVideo.click();
+    attach.close();
+    void openLiveVoiceCall();
   },
-  voice: () => toast('按住输入框旁麦克风可语音输入'),
+  voice: () => {
+    attach.close();
+    void openLiveVoiceCall();
+  },
   call: () => {
     attach.close();
     void openLiveVoiceCall();
@@ -237,7 +308,7 @@ const attachHandlers = {
   favorite: () => {
     const favs = loadFavoriteQuotes();
     if (!favs.length) {
-      toast('暂无收藏，可在宝盒首页点 ☆ 收藏语录');
+      toast('暂无收藏，可在 Nesio 首页点 ☆ 收藏语录');
       return;
     }
     const pick = favs[0];
@@ -321,7 +392,15 @@ input.addEventListener('keydown', (e) => {
   }
 });
 
-input.addEventListener('input', resizeInput);
+input.addEventListener('input', () => {
+  resizeInput();
+  const query = currentMentionQuery();
+  if (query === null) {
+    closeMentionPanel();
+    return;
+  }
+  renderMentionPanel(query);
+});
 
 btnClear.addEventListener('click', () => {
   if (busy) return;
@@ -332,6 +411,12 @@ btnClear.addEventListener('click', () => {
 });
 
 btnPlus.addEventListener('click', () => attach.open());
+btnMention.addEventListener('click', () => renderMentionPanel(''));
+document.addEventListener('click', (event) => {
+  if (mentionPanel.hidden) return;
+  if (mentionPanel.contains(event.target) || btnMention.contains(event.target) || input.contains(event.target)) return;
+  closeMentionPanel();
+});
 
 if (btnCall) {
   btnCall.addEventListener('click', () => openLiveVoiceCall());
@@ -343,13 +428,10 @@ try {
 
 Promise.all([loadFriends(), checkSecretaryHealth()])
   .then(([friends, health]) => {
+    friendsCache = friends;
     friend = memberById(friends, friendId) || friends.find((f) => f.ready) || friends[0];
     if (!friend) {
       main.innerHTML = '<p class="wx-chat-tip">未找到该好友</p>';
-      return;
-    }
-    if (!friend.ready && friend.id !== 'gemini') {
-      location.replace('/secretary/chat?friend=gemini');
       return;
     }
     navTitle.textContent = friend.name;
@@ -363,7 +445,7 @@ Promise.all([loadFriends(), checkSecretaryHealth()])
     render();
     input.focus();
 
-    if (friend.ready && !health.ok) {
+    if (!health.ok) {
       showError('AI 服务未就绪，请稍后重试或检查 Vercel 环境变量 GEMINI_API_KEY。');
     }
   })

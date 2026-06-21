@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
 import { mergeCalendarEvents } from '@/lib/portal/calendar-filters';
@@ -6,6 +7,24 @@ import { parseIcsEvents, parseCalendarName } from '@/lib/portal/ics';
 
 type Feed = { url: string; label: string };
 type FeedResult = { label: string; ok: boolean; count: number; error?: string };
+type GoogleTokenResponse = {
+  access_token?: string;
+  refresh_token?: string;
+  expires_in?: number;
+};
+type GoogleCalendarItem = {
+  id?: string;
+  summary?: string;
+  description?: string;
+  htmlLink?: string;
+  start?: { dateTime?: string; date?: string };
+  end?: { dateTime?: string; date?: string };
+};
+
+function envValue(key: string): string {
+  const value = process.env[key];
+  return typeof value === 'string' ? value.trim() : '';
+}
 
 function privateFeedAccessEnabled(): boolean {
   return process.env.CALENDAR_PRIVATE_FEEDS_ENABLED === 'true';
@@ -50,7 +69,7 @@ async function fetchIcsEvents(url: string, fallbackLabel: string) {
   const res = await fetch(url, {
     headers: {
       'User-Agent':
-        'Mozilla/5.0 (compatible; TreasureBox/1.0; +https://treasurebox-nu.vercel.app)',
+        'Mozilla/5.0 (compatible; Nesio/1.0; +https://www.nesio.app)',
       Accept: 'text/calendar, text/plain, */*',
     },
     redirect: 'follow',
@@ -68,7 +87,166 @@ async function fetchIcsEvents(url: string, fallbackLabel: string) {
   }));
 }
 
+function googleCalendarAccessToken(): string {
+  return cookies().get('nesio_google_calendar_access')?.value || '';
+}
+
+function googleCalendarRefreshToken(): string {
+  return cookies().get('nesio_google_calendar_refresh')?.value || '';
+}
+
+function setCalendarCookies(response: NextResponse, session: GoogleTokenResponse | null) {
+  if (!session?.access_token) return response;
+
+  const secure = process.env.NODE_ENV === 'production';
+  const maxAge = Number.isFinite(session.expires_in) && session.expires_in ? session.expires_in : 60 * 60;
+  response.cookies.set('nesio_google_calendar_access', session.access_token, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure,
+    path: '/',
+    maxAge,
+  });
+  if (session.refresh_token) {
+    response.cookies.set('nesio_google_calendar_refresh', session.refresh_token, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure,
+      path: '/',
+      maxAge: 60 * 60 * 24 * 90,
+    });
+  }
+
+  return response;
+}
+
+function mapGoogleCalendarItem(item: GoogleCalendarItem) {
+  const start = item.start?.dateTime || item.start?.date || '';
+  const end = item.end?.dateTime || item.end?.date || start;
+  return {
+    id: item.id || `${item.summary || 'google-event'}-${start}`,
+    title: item.summary || 'Untitled event',
+    description: item.description || '',
+    start,
+    end,
+    calendarName: 'Google Calendar',
+    source: 'Google Calendar',
+    url: item.htmlLink || '',
+  };
+}
+
+async function refreshGoogleCalendarSession(refreshToken: string): Promise<GoogleTokenResponse | null> {
+  const clientId = envValue('GOOGLE_CLIENT_ID');
+  const clientSecret = envValue('GOOGLE_CLIENT_SECRET');
+  if (!clientId || !clientSecret || !refreshToken) return null;
+
+  const response = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: refreshToken,
+      grant_type: 'refresh_token',
+    }),
+    cache: 'no-store',
+  });
+
+  if (!response.ok) return null;
+  return response.json() as Promise<GoogleTokenResponse>;
+}
+
+async function fetchGoogleOAuthEvents(accessToken: string) {
+  const now = new Date();
+  const timeMin = now.toISOString();
+  const timeMax = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000).toISOString();
+  const url = new URL('https://www.googleapis.com/calendar/v3/calendars/primary/events');
+  url.searchParams.set('singleEvents', 'true');
+  url.searchParams.set('orderBy', 'startTime');
+  url.searchParams.set('maxResults', '80');
+  url.searchParams.set('timeMin', timeMin);
+  url.searchParams.set('timeMax', timeMax);
+
+  const res = await fetch(url.toString(), {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: 'application/json',
+    },
+    cache: 'no-store',
+  });
+  if (!res.ok) throw new Error(`google calendar fetch failed: ${res.status}`);
+  const data = await res.json().catch(() => ({}));
+  const rows = Array.isArray(data?.items) ? data.items : [];
+  return rows.map((item: GoogleCalendarItem) => mapGoogleCalendarItem(item));
+}
+
 export async function GET() {
+  const accessToken = googleCalendarAccessToken();
+  const refreshToken = googleCalendarRefreshToken();
+  if (accessToken) {
+    try {
+      const events = await fetchGoogleOAuthEvents(accessToken);
+      return NextResponse.json(
+        {
+          ok: true,
+          configured: true,
+          enabled: true,
+          provider: 'google_calendar_oauth',
+          events,
+          feeds: [{ label: 'Google Calendar', ok: true, count: events.length }],
+          sources: ['Google Calendar'],
+          fetchedAt: new Date().toISOString(),
+        },
+        { headers: { 'Cache-Control': 'no-store, max-age=0' } },
+      );
+    } catch (err) {
+      const refreshedSession = await refreshGoogleCalendarSession(refreshToken);
+      if (refreshedSession?.access_token) {
+        try {
+          const events = await fetchGoogleOAuthEvents(refreshedSession.access_token);
+          const response = NextResponse.json(
+            {
+              ok: true,
+              configured: true,
+              enabled: true,
+              provider: 'google_calendar_oauth',
+              status: 'calendar_session_refreshed',
+              events,
+              feeds: [{ label: 'Google Calendar', ok: true, count: events.length }],
+              sources: ['Google Calendar'],
+              fetchedAt: new Date().toISOString(),
+            },
+            { headers: { 'Cache-Control': 'no-store, max-age=0' } },
+          );
+          return setCalendarCookies(response, refreshedSession);
+        } catch {
+          // Fall through to the original safe OAuth fetch error below.
+        }
+      }
+
+      return NextResponse.json(
+        {
+          ok: false,
+          configured: true,
+          enabled: true,
+          provider: 'google_calendar_oauth',
+          events: [],
+          feeds: [
+            {
+              label: 'Google Calendar',
+              ok: false,
+              count: 0,
+              error: err instanceof Error ? err.message : 'fetch failed',
+            },
+          ],
+          sources: ['Google Calendar'],
+          message: 'Google Calendar OAuth token could not fetch events.',
+        },
+        { status: 502, headers: { 'Cache-Control': 'no-store, max-age=0' } },
+      );
+    }
+  }
+
   const feeds = calendarFeeds();
   const enabled = privateFeedAccessEnabled();
 

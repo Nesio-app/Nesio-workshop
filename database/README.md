@@ -26,6 +26,13 @@
 - `TREASUREBOX_MODULE_DATA_DB`：`true/false` 控制 API 是否读取 DB（默认 true）
 - `report:external-bridge` 使用 `DB` 时会回显 `external_connection` 状态，用于确认外部连接桩准备完成。
 
+## Supabase 云数据库准备
+- `schema/supabase-profile-settings-v1.sql`：账号设置云同步表。启用 `CLOUD_DB_ENABLED=true` 前，需要先在 Supabase SQL Editor 手动执行。
+- `schema/supabase-inventory-items-v1.sql`：Inventory personal 快照表。启用前同样需要手动执行；当前只支持用户显式触发的 cloud snapshot，不做后台自动同步。
+- 当前云 profile API 只读写 `public.profile_settings.settings` 的 allowlist 字段；服务端保管 service role key，浏览器不会接触密钥。
+- 当前云 inventory API 只读写 `LocalInventoryItem@v1` personal mode 的 allowlist 字段；demo 数据不会写入云端，支付/银行卡/收据导入/财务建议字段会被拒绝。
+- RLS 规则限制普通 authenticated 用户只能访问自己的 `user_id` 行；服务端 route 仍会先通过 `baohe_auth_access` 校验当前用户。
+
 ## 说明
 - 当前只做本地 demo scaffold，不涉及真实用户数据持久化。
 - 真实外部服务、Notion 写入与生产数据库需单独审批并单独接入。

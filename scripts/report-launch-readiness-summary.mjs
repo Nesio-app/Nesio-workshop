@@ -61,7 +61,7 @@ function buildLaunchReadinessSummary(report) {
     version: 'launch-readiness-summary-v0',
     generatedFrom: 'report-module-registry.mjs',
     status: releaseBlockers.length ? 'candidate_not_release_ready' : 'ready_for_release_review',
-    firstLaunchPromise: launchSurface.firstLaunchPromise || launchSku.label || 'Shell + Inventory / purchase-memory',
+    firstLaunchPromise: launchSurface.firstLaunchPromise || launchSku.label || 'Shell + Inventory / purchase-memory + Todo',
     appStoreReady: false,
     testFlightReady: false,
     ordinaryUserPublicModules: unique(launchSurface.publicVisibleModuleIds || []),

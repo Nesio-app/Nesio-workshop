@@ -14,6 +14,10 @@ import { buildToolDataVersioningContract } from '../lib/portal/tool-data-version
 import { buildUserIdentityUpgradeContract } from '../lib/portal/user-identity-upgrade-contract.mjs';
 import { buildOfflineSyncConflictContract } from '../lib/portal/offline-sync-conflict-contract.mjs';
 import { buildCloudReadinessContract } from '../lib/portal/cloud-readiness-contract.mjs';
+import { buildProductionActivationContract } from '../lib/portal/production-activation-contract.mjs';
+import { buildAiProviderRouterContract } from '../lib/portal/ai-provider-router-contract.mjs';
+import { nesioDesignSystemContract } from '../lib/portal/nesio-design-system-contract.mjs';
+import { nesioDesignSystemAssets } from '../lib/portal/nesio-design-system-assets.mjs';
 import {
   LAUNCH_SURFACE_VERSION_V0,
   buildLaunchReadinessSummary,
@@ -125,8 +129,8 @@ const ENTITLEMENT_BUNDLES = Object.freeze([
   },
 ]);
 const LAUNCH_SKU_VERSION = 'launch-sku-v0';
-const LAUNCH_SKU_KEY = 'shell_inventory_purchase_memory';
-const LAUNCH_BUSINESS_MODULE_IDS = Object.freeze(['inventory']);
+const LAUNCH_SKU_KEY = 'shell_inventory_todo_purchase_memory';
+const LAUNCH_BUSINESS_MODULE_IDS = Object.freeze(['inventory', 'plan']);
 const LAUNCH_INCLUDED_MODULE_IDS = Object.freeze(['shell', ...LAUNCH_BUSINESS_MODULE_IDS]);
 const TOOL_LIFECYCLE_VERSION = 'tool-lifecycle-v0';
 const TOOL_LIFECYCLE_STAGES = Object.freeze([
@@ -146,7 +150,6 @@ const TOOL_LIFECYCLE_STAGE_NUMBERS = Object.freeze({
   monetized: 6,
 });
 const FUTURE_PAID_MODULE_IDS = Object.freeze([
-  'plan',
   'sanctuary',
   'reading',
   'fitness',
@@ -1949,15 +1952,15 @@ const launchSkuWarnings = [
       moduleId: tool.id,
       warningKind: 'high_risk_module_launchable',
       issue: 'High-risk module must not be launchable in first App Store SKU.',
-      reason: 'Launch SKU is limited to Shell + Inventory / purchase-memory.',
+      reason: 'Launch SKU is limited to Shell + Inventory / purchase-memory + Todo.',
       owner: 'Qiao',
       evidenceFields: ['launchSku.modules.launchStatus'],
     })),
-  ...(launchSkuModules.filter((entry) => entry.launchStatus === 'launchable').length === 2
+  ...(launchSkuModules.filter((entry) => entry.launchStatus === 'launchable').length === 3
     ? []
     : [{
         warningKind: 'launchable_module_count_mismatch',
-        issue: 'First-launch SKU must have exactly Shell + Inventory as launchable.',
+        issue: 'First-launch SKU must have exactly Shell + Inventory + Todo as launchable.',
         reason: 'Avoid making all 11 modules look App Store launchable.',
         owner: 'Qiao',
         evidenceFields: ['launchSku.modules'],
@@ -2190,6 +2193,25 @@ const cloudReadinessContract = buildCloudReadinessContract({
   userIdentityUpgrade: userIdentityUpgradeContract,
   offlineSyncConflict: offlineSyncConflictContract,
 });
+const productionActivationContract = buildProductionActivationContract();
+const productionActivationProvidersById = new Map(
+  productionActivationContract.providers.map((provider) => [provider.id, provider]),
+);
+const googleCalendarProductionProvider = productionActivationProvidersById.get('google_calendar');
+const flomoProductionProvider = productionActivationProvidersById.get('flomo');
+const aiProviderRouterContract = buildAiProviderRouterContract();
+const nesioDesignSystemSummary = {
+  canonicalName: 'Nesio',
+  originalDownloadName: 'Nesio',
+  runtimeSurfaceCount: nesioDesignSystemContract.runtimeSurfaces.length,
+  requiredTokenFileCount: nesioDesignSystemContract.source.requiredTokenFiles.length,
+  requiredComponentFileCount: nesioDesignSystemContract.source.requiredComponentFiles.length,
+  guardrailCount: Object.keys(nesioDesignSystemContract.guardrails).length,
+  wholesaleUiReplacementAllowed: nesioDesignSystemContract.guardrails.noWholesaleUiReplacement !== true,
+  shellKitReferenceOnly: nesioDesignSystemContract.guardrails.shellKitIsReferenceOnly === true,
+  allModalsUseSharedGlassTokens: nesioDesignSystemContract.guardrails.allModalsUseSharedGlassTokens === true,
+  allTouchTargetsAtLeast44px: nesioDesignSystemContract.guardrails.allTouchTargetsAtLeast44px === true,
+};
 const toolLifecycleSummary = {
   version: TOOL_LIFECYCLE_VERSION,
   stageVocabulary: [...TOOL_LIFECYCLE_STAGES],
@@ -2375,6 +2397,7 @@ const evidenceSummary = {
     toolDataCeoGateRequiredForRealMigration: toolDataVersioningContract.boundaries.realDataMigrationRequiresCeoGate,
     toolDataVersioningWarningCount: toolDataVersioningContract.summary.warningCount,
     accountSystemEnabled: userIdentityUpgradeContract.summary.accountSystemEnabled,
+    supportedAuthProviderCount: userIdentityUpgradeContract.summary.supportedAuthProviderCount,
     currentProfileKind: userIdentityUpgradeContract.summary.currentProfileKind,
     serverUserIdEnabled: userIdentityUpgradeContract.summary.serverUserIdEnabled,
     identityUpgradePathReadable: userIdentityUpgradeContract.summary.identityUpgradePathReadable,
@@ -2387,8 +2410,33 @@ const evidenceSummary = {
     cloudEnabled: cloudReadinessContract.summary.cloudEnabled,
     realCloudProviderConnected: cloudReadinessContract.summary.realCloudProviderConnected,
     cloudProviderCandidateCount: cloudReadinessContract.summary.cloudProviderCandidateCount,
+    configuredCloudProviderCount: cloudReadinessContract.summary.configuredCloudProviderCount,
+    enabledCloudProviderCount: cloudReadinessContract.summary.enabledCloudProviderCount,
     inventoryCloudSchemaDraftReady: cloudReadinessContract.summary.inventoryCloudSchemaDraftReady,
     futureCloudEligibleTableCount: cloudReadinessContract.summary.futureCloudEligibleTableCount,
+    productionActivationVersion: productionActivationContract.version,
+    productionActivationCeoApproved: productionActivationContract.summary.ceoApproved,
+    productionActivationProviderCount: productionActivationContract.summary.providerCount,
+    productionActivationConfiguredProviderCount: productionActivationContract.summary.configuredProviderCount,
+    productionActivationMissingEnvProviderCount: productionActivationContract.summary.missingEnvProviderCount,
+    productionActivationReady: productionActivationContract.summary.productionReady,
+    googleCalendarProviderStatus: googleCalendarProductionProvider?.status || 'unknown',
+    googleCalendarConfigured: googleCalendarProductionProvider?.configured === true,
+    googleCalendarRuntimeEnabled: googleCalendarProductionProvider?.runtimeEnabled === true,
+    googleCalendarMissingEnv: googleCalendarProductionProvider?.missingEnv || [],
+    flomoProviderStatus: flomoProductionProvider?.status || 'unknown',
+    flomoConfigured: flomoProductionProvider?.configured === true,
+    flomoRuntimeEnabled: flomoProductionProvider?.runtimeEnabled === true,
+    flomoMissingEnv: flomoProductionProvider?.missingEnv || [],
+    aiProviderRouterVersion: aiProviderRouterContract.summary.aiProviderRouterVersion,
+    aiProviderConfiguredCount: aiProviderRouterContract.summary.aiProviderConfiguredCount,
+    aiProviderEnabledCount: aiProviderRouterContract.summary.aiProviderEnabledCount,
+    aiRealProviderCallsEnabled: aiProviderRouterContract.summary.aiRealProviderCallsEnabled,
+    defaultAiProvider: aiProviderRouterContract.summary.defaultAiProvider,
+    nesioDesignSystemVersion: nesioDesignSystemContract.version,
+    nesioRuntimeSurfaceCount: nesioDesignSystemSummary.runtimeSurfaceCount,
+    nesioDesignSystemGuardrailCount: nesioDesignSystemSummary.guardrailCount,
+    nesioDesignSystemWholesaleUiReplacementAllowed: nesioDesignSystemSummary.wholesaleUiReplacementAllowed,
     qaLine: boundaryWarnings.length === 0 && experienceServiceWarnings.length === 0 && aggregationWarnings.length === 0 && approvalGateWarnings.length === 0 && shellRouteWarnings.length === 0 && registryDriftWarnings.length === 0 && artifactVisibilityWarnings.length === 0 && artifactStatusVisibilityWarnings.length === 0 && shellDiscoveryBoundaryWarnings.length === 0 && mobileAppBoundaryWarnings.length === 0
       ? `PASS: ${readyModules.length}/${tools.length} modules ready; ${launchExposureSemantics.intentionalExclusionCount} intentional launch exclusion(s) are hidden from the public bundle.`
       : `WARN: ${boundaryWarnings.length} module boundary warning(s), ${launchExposureSemantics.intentionalExclusionCount} intentional launch exclusion(s), ${experienceServiceWarnings.length} Experience Services warning(s), ${dataAggregationReviewWarningCount} Data Aggregation review warning(s), ${dataAggregationRuntimeBlockerCount} Data Aggregation runtime-blocking warning(s), ${approvalGateWarnings.length} Approval Gate warning(s), ${shellRouteWarnings.length} Shell Route warning(s), ${registryDriftWarnings.length} Registry Drift warning(s), ${artifactVisibilityWarnings.length} Artifact Visibility warning(s), ${artifactStatusVisibilityWarnings.length} Artifact Status Visibility warning(s), ${shellDiscoveryBoundaryWarnings.length} Shell Discovery warning(s), ${mobileAppBoundaryWarnings.length} Mobile App Integration warning(s) need QA review.`,
@@ -2533,7 +2581,7 @@ const evidenceSummary = {
   launchSku: {
     version: LAUNCH_SKU_VERSION,
     skuKey: LAUNCH_SKU_KEY,
-    label: 'Shell + Inventory / purchase-memory',
+    label: 'Shell + Inventory / purchase-memory + Todo',
     includedModuleIds: [...LAUNCH_INCLUDED_MODULE_IDS],
     launchableBusinessModuleIds: [...LAUNCH_BUSINESS_MODULE_IDS],
     launchSkuAppStoreReady: false,
@@ -2556,7 +2604,7 @@ const evidenceSummary = {
   launchSurface: {
     version: LAUNCH_SURFACE_VERSION_V0,
     implementation: 'manifest-driven-shell-visibility-contract',
-    firstLaunchPromise: 'Shell + Inventory / purchase-memory',
+    firstLaunchPromise: 'Shell + Inventory / purchase-memory + Todo',
     appStoreReady: false,
     boundaries: {
       reportAndShellVisibilityOnly: true,
@@ -2585,6 +2633,22 @@ const evidenceSummary = {
   moduleTrustBoundary: moduleProductContract.moduleTrustBoundary,
   coreObjectModels: moduleProductContract.coreObjectModels,
   webSurfaceContract,
+  nesioDesignSystem: {
+    version: nesioDesignSystemContract.version,
+    source: nesioDesignSystemContract.source,
+    tokens: nesioDesignSystemContract.tokens,
+    runtimeSurfaces: nesioDesignSystemContract.runtimeSurfaces,
+    guardrails: nesioDesignSystemContract.guardrails,
+    assets: nesioDesignSystemAssets,
+    summary: nesioDesignSystemSummary,
+    boundaries: {
+      reportOnly: true,
+      changesRuntimeBehavior: false,
+      importsDownloadDirectoryAtRuntime: false,
+      importsDesignSystemDemoBundleAtRuntime: false,
+      wholesaleUiReplacementAllowed: false,
+    },
+  },
   toolLifecycle: {
     version: TOOL_LIFECYCLE_VERSION,
     stageVocabulary: [...TOOL_LIFECYCLE_STAGES],
@@ -2616,6 +2680,8 @@ const evidenceSummary = {
   userIdentityUpgrade: userIdentityUpgradeContract,
   offlineSyncConflict: offlineSyncConflictContract,
   cloudReadiness: cloudReadinessContract,
+  aiProviderRouter: aiProviderRouterContract,
+  productionActivation: productionActivationContract,
   moduleDataBus: {
     implementation: moduleDataBus.implementation,
     summary: moduleDataBus.summary,

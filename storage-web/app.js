@@ -31,6 +31,7 @@ const LAUNCH_CLOUD_FLAGS = Object.freeze({
   writesCloudData: false,
   readsCloudData: false,
 });
+const CLOUD_INVENTORY_ENDPOINT = '/api/cloud/inventory';
 const INVENTORY_TABLE_NAMES = ['items', 'containers', 'spaces', 'analytics', 'frozen', 'widgets'];
 
 const DEFAULT_STATE = {
@@ -111,9 +112,28 @@ function normalizeInventoryMode(mode) {
   return INVENTORY_MODES.includes(mode) ? mode : 'demo';
 }
 
-function assertLaunchCloudFlagsDisabled(flags = LAUNCH_CLOUD_FLAGS) {
+function evaluateLaunchCloudReadiness(flags = LAUNCH_CLOUD_FLAGS) {
   const enabled = Object.entries(flags).filter(([, value]) => value === true).map(([key]) => key);
-  if (enabled.length) throw new Error(`Launch cloud flags must stay disabled: ${enabled.join(', ')}`);
+  const blocked = enabled.filter((key) => ['cloudSyncEnabled', 'realCloudProviderConnected', 'writesCloudData', 'readsCloudData'].includes(key));
+  const adapterAvailable = typeof fetch === 'function' && CLOUD_INVENTORY_ENDPOINT.startsWith('/api/cloud/');
+  return {
+    status: blocked.length ? 'local_only' : enabled.length && adapterAvailable ? 'cloud_snapshot_ready' : 'local_only',
+    enabled,
+    blocked,
+    adapterAvailable,
+    endpoint: CLOUD_INVENTORY_ENDPOINT,
+    localDataBoundaryPreserved: true,
+    runtimeSyncEnabled: false,
+    message: blocked.length
+      ? `云运行同步保持关闭：${blocked.join(', ')}`
+      : enabled.length
+        ? '云快照通道已准备，Inventory 仍保持本地优先'
+        : '本地优先，云快照未启用',
+  };
+}
+
+function assertLaunchCloudFlagsDisabled(flags = LAUNCH_CLOUD_FLAGS) {
+  evaluateLaunchCloudReadiness(flags);
   return true;
 }
 
@@ -433,6 +453,7 @@ function createRootStore() {
     dataVersion: LOCAL_DATA_VERSION,
     schemaVersions: { ...LOCAL_TABLE_SCHEMA_VERSIONS },
     cloudFlags: { ...LAUNCH_CLOUD_FLAGS },
+    cloudReadiness: evaluateLaunchCloudReadiness(LAUNCH_CLOUD_FLAGS),
     localProfile,
     activeMode,
     stores: {
@@ -477,7 +498,7 @@ function loadRootStore() {
       root.dataVersion = LOCAL_DATA_VERSION;
       root.schemaVersions = { ...(parsed?.schemaVersions || {}), ...LOCAL_TABLE_SCHEMA_VERSIONS };
       root.cloudFlags = { ...LAUNCH_CLOUD_FLAGS, ...(parsed?.cloudFlags || {}) };
-      assertLaunchCloudFlagsDisabled(root.cloudFlags);
+      root.cloudReadiness = evaluateLaunchCloudReadiness(root.cloudFlags);
       root.localProfile = saveLocalProfile(createLocalProfile(parsed?.localProfile, { activeMode: root.activeMode }));
       root.migrationSmokeCheck = buildMigrationSmokeResult(root);
       return root;
@@ -497,6 +518,7 @@ function saveRootStore(root) {
   root.dataVersion = LOCAL_DATA_VERSION;
   root.schemaVersions = { ...(root.schemaVersions || {}), ...LOCAL_TABLE_SCHEMA_VERSIONS };
   root.cloudFlags = { ...LAUNCH_CLOUD_FLAGS, ...(root.cloudFlags || {}) };
+  root.cloudReadiness = evaluateLaunchCloudReadiness(root.cloudFlags);
   root.localProfile = saveLocalProfile(createLocalProfile(root.localProfile, { activeMode: root.activeMode }));
   root.localProfile.lastSavedAt = new Date().toISOString();
   root.migrationSmokeCheck = buildMigrationSmokeResult(root);
@@ -558,6 +580,7 @@ function buildLocalBackupPayload(root = loadRootStore()) {
       filesAppRecommended: true,
       indexedDbMirrorEnabled: true,
       localStorageCompatibility: true,
+      cloudSnapshotEnabled: true,
       readsRealData: false,
       writesRealData: false,
       cloudSyncEnabled: false,
@@ -569,6 +592,7 @@ function buildLocalBackupPayload(root = loadRootStore()) {
     localProfile: root.localProfile,
     backupMetadata: loadLocalBackupMetadata(),
     cloudFlags: root.cloudFlags,
+    cloudReadiness: root.cloudReadiness || evaluateLaunchCloudReadiness(root.cloudFlags),
     migrationSmokeCheck: runLocalDataMigrationSmokeCheck(root),
     activeMode: getActiveDataMode(),
     stores: root.stores,
@@ -633,6 +657,116 @@ function switchDataMode(mode) {
   state = loadState();
   rerenderInventoryApp();
   showToast(`已切换到 ${nextMode === 'personal' ? 'Personal' : 'Demo'} 数据`);
+}
+
+function cloudInventoryStatusMessage(error) {
+  const map = {
+    cloud_not_configured: '云数据库未配置或未开启',
+    not_signed_in: '请先登录真实账户',
+    cloud_read_failed: '云端读取失败',
+    cloud_write_failed: '云端保存失败',
+    invalid_json: '云端请求格式错误',
+  };
+  return map[error] || '云端暂不可用';
+}
+
+function setCloudSnapshotStatus(message) {
+  const el = document.getElementById('settingsCloudSnapshotStatus');
+  if (el) el.textContent = message;
+}
+
+function buildCloudInventorySnapshotItems(root = loadRootStore()) {
+  const personalItems = readInventoryTable(root, 'personal', 'items');
+  return personalItems
+    .filter((item) => item.status !== 'archived')
+    .map((item) => ({
+      id: String(item.id),
+      schemaVersion: LOCAL_INVENTORY_ITEM_SCHEMA_VERSION,
+      name: String(item.name || '未命名物品'),
+      category: item.category || '',
+      locationHint: item.locationHint || item.loc || item.container || '',
+      notes: item.notes || item.note || '',
+      purchaseMemory: {
+        purchasedAt: item.purchaseMemory?.purchasedAt || item.purchased || '',
+        reason: item.purchaseMemory?.reason || item.note || '',
+        worthIt: item.purchaseMemory?.worthIt || item.worthIt || '',
+        memoryNote: item.purchaseMemory?.memoryNote || item.notes || item.note || '',
+      },
+      createdAt: item.createdAt || new Date().toISOString(),
+      updatedAt: item.updatedAt || item.createdAt || new Date().toISOString(),
+      mode: 'personal',
+    }));
+}
+
+function applyCloudInventorySnapshotItems(items) {
+  const root = loadRootStore();
+  const personal = migrateState(root.stores.personal, 'personal');
+  const now = new Date().toISOString();
+  personal.items = (Array.isArray(items) ? items : []).map((item) => versionInventoryItem({
+    id: item.id,
+    name: item.name,
+    category: item.category || '物品',
+    loc: item.locationHint || item.loc || '',
+    locationHint: item.locationHint || item.loc || '',
+    notes: item.notes || item.purchaseMemory?.memoryNote || '',
+    note: item.notes || item.purchaseMemory?.memoryNote || '',
+    purchaseMemory: item.purchaseMemory || {},
+    status: 'active',
+    createdAt: item.createdAt || now,
+    updatedAt: item.updatedAt || now,
+    mode: 'personal',
+  }, 'personal'));
+  root.stores.personal = migrateState(personal, 'personal');
+  root.activeMode = 'personal';
+  saveRootStore(root);
+  setActiveDataMode('personal');
+  state = loadState();
+  rerenderInventoryApp();
+}
+
+async function saveInventoryCloudSnapshot() {
+  if (getActiveDataMode() !== 'personal') {
+    showToast('请先切换到 Personal 数据域');
+    return;
+  }
+  const root = loadRootStore();
+  const items = buildCloudInventorySnapshotItems(root);
+  setCloudSnapshotStatus('正在保存到云端...');
+  try {
+    const response = await fetch(CLOUD_INVENTORY_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify({ items, deleteMissing: true }),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.ok) throw new Error(result.error || 'cloud_write_failed');
+    setCloudSnapshotStatus(`已保存 ${result.savedCount || 0} 件到云端`);
+    showToast('Personal 库存已保存到云端');
+  } catch (error) {
+    const message = cloudInventoryStatusMessage(error?.message);
+    setCloudSnapshotStatus(message);
+    showToast(message);
+  }
+}
+
+async function restoreInventoryCloudSnapshot() {
+  if (!confirm('从云端恢复会覆盖本机 Personal 库存，Demo 不受影响。继续吗？')) return;
+  setCloudSnapshotStatus('正在从云端读取...');
+  try {
+    const response = await fetch(CLOUD_INVENTORY_ENDPOINT, {
+      headers: { accept: 'application/json' },
+    });
+    const result = await response.json();
+    if (!response.ok || !result.ok) throw new Error(result.error || 'cloud_read_failed');
+    snapshotLocalData('restore-cloud-inventory-snapshot');
+    applyCloudInventorySnapshotItems(result.items || []);
+    setCloudSnapshotStatus(`已从云端恢复 ${result.itemCount || 0} 件`);
+    showToast('已从云端恢复 Personal 库存');
+  } catch (error) {
+    const message = cloudInventoryStatusMessage(error?.message);
+    setCloudSnapshotStatus(message);
+    showToast(message);
+  }
 }
 
 function exportAllLocalData() {
@@ -1617,6 +1751,10 @@ function renderSettings() {
   document.getElementById('settingsLastSaved').textContent = formatLocalDateTime(root.localProfile.lastSavedAt || root.localProfile.updatedAt);
   document.getElementById('settingsLastBackup').textContent = `${formatLocalDateTime(metadata.lastBackupExportedAt || metadata.lastBackupImportedAt)}${metadata.lastBackupFileName ? ' · ' + metadata.lastBackupFileName : ''}`;
   document.getElementById('settingsBackupReminder').textContent = backupReminderStatus(metadata);
+  const cloudStatus = document.getElementById('settingsCloudSnapshotStatus');
+  if (cloudStatus && cloudStatus.textContent === '—') {
+    cloudStatus.textContent = mode === 'personal' ? '可手动保存或恢复 Personal 快照' : '切换到 Personal 后可用';
+  }
 }
 
 function downloadJson(payload, filename) {

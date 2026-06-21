@@ -75,4 +75,7 @@ export interface CalendarEvent {
   allDay?: boolean;
   calendarName?: string;
   source?: string;
+  description?: string;
+  location?: string;
+  url?: string;
 }

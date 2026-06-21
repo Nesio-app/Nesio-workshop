@@ -1,0 +1,56 @@
+<!-- @dsCard group="Components" viewport="700x340" name="Core — Button, Input, Badge, Glass, FAB" subtitle="Buttons, status, glass surface, floating entry" -->
+<!DOCTYPE html>
+<html data-portal-theme="day" lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<style>
+  html,body { margin: 0; }
+  body { font-family: var(--font-sans); background: var(--portal-bg-gradient); padding: 24px; min-height: 100vh; box-sizing: border-box; }
+  .wrap { display: flex; flex-direction: column; gap: 16px; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .panel { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-start; }
+</style>
+</head>
+<body>
+  <div id="root" class="wrap"></div>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script src="../../_ds_bundle.js"></script>
+  <script type="text/babel">
+    const { Button, Input, StatusBadge, GlassCard, FloatingButton } = window.NesioDesignSystem_d76dec;
+    function Demo() {
+      return (
+        <>
+          <div className="row">
+            <Button variant="primary">记录这件物品</Button>
+            <Button variant="secondary">查看收纳</Button>
+            <Button variant="soft">稍后再看</Button>
+            <Button variant="ghost">跳过</Button>
+            <Button variant="primary" tone="risk" size="sm">立即处理</Button>
+          </div>
+          <div className="row">
+            <StatusBadge status="go" dot>在路上</StatusBadge>
+            <StatusBadge status="gentle" dot>可以稍后</StatusBadge>
+            <StatusBadge status="calm" dot>看见</StatusBadge>
+            <StatusBadge status="risk" dot>3 天后过期</StatusBadge>
+          </div>
+          <div className="panel">
+            <GlassCard tone="cool" interactive style={{ width: 220 }}>
+              <h3 style={{ margin: '0 0 6px', fontSize: 'var(--text-h3)' }}>收纳 · Storage</h3>
+              <p style={{ margin: 0, color: 'var(--portal-muted)', fontSize: 'var(--text-sm)' }}>3 件物品即将过期</p>
+            </GlassCard>
+            <div style={{ width: 220 }}>
+              <Input label="现在的想法是…" placeholder="写点什么…" multiline rows={2} />
+            </div>
+          </div>
+          <FloatingButton icon="💬" accent label="智友" position="br" />
+          <FloatingButton icon="✎" position="bl" />
+        </>
+      );
+    }
+    ReactDOM.createRoot(document.getElementById('root')).render(<Demo />);
+  </script>
+</body>
+</html>

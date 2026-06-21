@@ -24,7 +24,7 @@ const exclusions = new Map(report.launchExposureSemantics.intentionalExclusions.
   entry,
 ]));
 
-for (const moduleId of ['reading', 'plan', 'fitness']) {
+for (const moduleId of ['reading', 'fitness']) {
   const entry = exclusions.get(moduleId);
   assert.equal(entry?.reason, 'not_in_public_launch_surface', `${moduleId} must be an intentional launch exclusion`);
   assert.equal(entry.releaseBlocker, false, `${moduleId} must not be a release blocker`);
@@ -50,7 +50,7 @@ for (const warning of report.boundaries.boundaryWarnings) {
   assert.notEqual(warning.reason, 'Static route validation requires public/index for local static modules.');
 }
 
-assert.deepEqual(report.boundaries.publicLaunchEmbeddedModules, ['inventory']);
+assert.deepEqual(report.boundaries.publicLaunchEmbeddedModules, ['plan', 'inventory']);
 assert.equal(report.boundaries.syncedEmbeddedModules.includes('reading'), false);
 
 console.log('report-module-registry launch exposure semantics tests passed');

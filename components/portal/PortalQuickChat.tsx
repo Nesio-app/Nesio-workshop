@@ -1,42 +1,77 @@
 'use client';
 
-import { withBase } from '@/lib/portal/paths';
+import { useEffect, useRef, useState } from 'react';
+import { ensureToolboxTrailingSlash, withBase } from '@/lib/portal/paths';
+import { loadProfileSettings } from '@/lib/portal/profile';
+import type { PortalLocale } from '@/lib/portal/profile';
+import { t } from '@/lib/portal/i18n';
 
-function SecretaryChatIcon() {
-  return (
-    <svg
-      className="portal-quick-chat-fab-icon"
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      fill="none"
-    >
-      <path
-        d="M7.25 17.4H6.1c-1.35 0-2.45-1.1-2.45-2.45V7.6c0-1.35 1.1-2.45 2.45-2.45h11.8c1.35 0 2.45 1.1 2.45 2.45v7.35c0 1.35-1.1 2.45-2.45 2.45h-5.75L7.25 20v-2.6Z"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M8.25 11.25h.01M12 11.25h.01M15.75 11.25h.01"
-        stroke="currentColor"
-        strokeWidth="2.2"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
+const QUICK_LINKS: Array<{ key: 'quickChatActionSecretary' | 'quickChatActionGemini' | 'quickChatActionGroup'; href: string; icon: string }> = [
+  { key: 'quickChatActionSecretary', href: ensureToolboxTrailingSlash('/secretary'), icon: '💬' },
+  { key: 'quickChatActionGemini', href: withBase('/secretary/chat.html?friend=gemini'), icon: '✦' },
+  { key: 'quickChatActionGroup', href: withBase('/secretary/group.html'), icon: '👥' },
+];
 
 export default function PortalQuickChat() {
+  const [open, setOpen] = useState(false);
+  const startY = useRef(0);
+  const locale: PortalLocale = loadProfileSettings().locale;
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open]);
+
   return (
-    <div className="portal-quick-chat">
-      <a
-        className="portal-quick-chat-fab"
-        href={withBase('/secretary')}
-        aria-label="打开智友"
+    <div className={'portal-quick-chat' + (open ? ' portal-quick-chat--open' : '')}>
+      <div
+        className="portal-quick-chat-panel"
+        role="region"
+        aria-label={t(locale, 'quickChatLabel')}
+        aria-hidden={!open}
       >
-        <SecretaryChatIcon />
-      </a>
+        <button
+          type="button"
+          className="portal-quick-chat-handle"
+          onClick={() => setOpen((v) => !v)}
+          aria-label={open ? t(locale, 'quickChatToggleExpanded') : t(locale, 'quickChatToggle')}
+        />
+        <p className="portal-quick-chat-title">{t(locale, 'quickChatTitle')}</p>
+        <div className="portal-quick-chat-actions">
+          {QUICK_LINKS.map((link) => (
+            <a
+              key={link.key}
+              className="portal-quick-chat-action"
+              href={link.href}
+              onClick={() => setOpen(false)}
+            >
+              <span aria-hidden>{link.icon}</span>
+              <span>{t(locale, link.key)}</span>
+            </a>
+          ))}
+        </div>
+      </div>
+
+      <button
+        type="button"
+        className="portal-quick-chat-fab"
+        aria-label={t(locale, 'quickChatOpenGesture')}
+        onClick={() => setOpen((v) => !v)}
+        onTouchStart={(e) => {
+          startY.current = e.touches[0].clientY;
+        }}
+        onTouchEnd={(e) => {
+          const dy = startY.current - e.changedTouches[0].clientY;
+          if (dy > 48) setOpen(true);
+          else if (dy < -48) setOpen(false);
+        }}
+      >
+        💬
+      </button>
     </div>
   );
 }
