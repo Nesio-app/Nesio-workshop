@@ -20,6 +20,8 @@
 - `npm run db:flow`：打印当前数据连通图（模块 -> 模块 + dataKey），用于核对跨模块数据流
 - `npm run db:down`：回滚最近一次 migration
 - `npm run db:probe`：与 status 同功能，用于运维检查
+- `npm run cloud:supabase:preflight -- --offline`：启用真实 Supabase 云数据库前的离线预检，核对 env 与 schema 文件但不访问网络
+- `npm run cloud:supabase:preflight -- --live --strict`：在 Supabase env 配好后检查两张 REST 表是否可访问；输出会隐藏所有密钥
 
 ## 环境变量
 - `BAOHE_DB_PATH`：SQLite 文件路径（默认 `./database/treasurebox-local.db`）
