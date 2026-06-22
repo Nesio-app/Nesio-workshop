@@ -47,10 +47,16 @@ writeFileSync(
 );
 
 writeFileSync(
+  path.join(componentDir, 'DemoPanel 2.tsx'),
+  'export const copied = "复制副本不算 UI 文案";\n',
+  'utf8',
+);
+
+writeFileSync(
   path.join(appDir, 'page.tsx'),
   [
     'export default function SettingsPage() {',
-    '  return <main><h1>软件设置</h1><button>Google Calendar</button></main>;',
+    '  return <main><h1>软件设置</h1><button>Google Calendar</button><button>Settings</button></main>;',
     '}',
     '',
   ].join('\n'),
@@ -96,12 +102,20 @@ assert.ok(
   'component UI findings should be reported',
 );
 assert.ok(
-  report.findings.some((finding) => finding.match === 'Google Calendar'),
-  'user-facing English labels should be reported',
+  report.findings.some((finding) => finding.match === 'Settings'),
+  'generic user-facing English labels should be reported',
+);
+assert.ok(
+  report.findings.every((finding) => finding.match !== 'Google Calendar'),
+  'provider and product proper nouns should not be reported as translation drift',
 );
 assert.ok(
   report.findings.every((finding) => !finding.file.includes('ignored.test')),
   'test fixtures should be excluded from UI string scan',
+);
+assert.ok(
+  report.findings.every((finding) => !finding.file.includes('DemoPanel 2')),
+  'local duplicate files should be excluded from UI string scan',
 );
 assert.deepEqual(report.boundaries, {
   implementation: 'static-ui-string-scan',

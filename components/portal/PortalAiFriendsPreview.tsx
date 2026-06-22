@@ -135,11 +135,20 @@ const recentConversations = [
 
 type RecentConversation = (typeof recentConversations)[number];
 
+const DOUBAO_PROVIDER_ALIASES = ['@doubao'];
+
+function getDoubaoMentionAlias(locale: PortalLocale): string {
+  return `@${t(locale, 'aiFriendsProviderDoubaoLabel')}`;
+}
+
 function resolveSecretaryProvider(composer: string, conversationId: string): SecretaryChatProvider {
   const normalized = composer.toLowerCase();
   if (normalized.includes('@claude')) return 'claude';
   if (normalized.includes('@chatgpt')) return 'chatgpt';
-  if (normalized.includes('@豆包') || normalized.includes('@doubao')) return 'doubao';
+  if (
+    normalized.includes(getDoubaoMentionAlias('zh').toLowerCase()) ||
+    DOUBAO_PROVIDER_ALIASES.some((alias) => normalized.includes(alias))
+  ) return 'doubao';
   switch (conversationId) {
     case 'claude':
       return 'claude';
@@ -191,8 +200,9 @@ function getConversationComposerIntent(conversationId: string): string {
 }
 
 function stripAssistantMentions(message: string): string {
+  const doubaoLabel = t('zh', 'aiFriendsProviderDoubaoLabel');
   return message
-    .replace(/@(Claude|ChatGPT|Gemini|豆包|Doubao)\b/gi, '')
+    .replace(new RegExp(`@(Claude|ChatGPT|Gemini|${doubaoLabel}|Doubao)\\b`, 'gi'), '')
     .replace(/\s+/g, ' ')
     .trim();
 }

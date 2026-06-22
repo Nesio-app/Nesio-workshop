@@ -7,6 +7,7 @@ const accountSettingsPath = join(root, 'components', 'portal', 'AccountSettings.
 const dashboardHomePath = join(root, 'components', 'portal', 'DashboardHome.tsx');
 const portalPath = join(root, 'components', 'portal', 'Portal.tsx');
 const toolsTreasureSheetPath = join(root, 'components', 'portal', 'ToolsTreasureSheet.tsx');
+const portalAiFriendsPreviewPath = join(root, 'components', 'portal', 'PortalAiFriendsPreview.tsx');
 const i18nPath = join(root, 'lib', 'portal', 'i18n.ts');
 const packagePath = join(root, 'package.json');
 
@@ -15,6 +16,7 @@ const accountSettings = readFileSync(accountSettingsPath, 'utf8');
 const dashboardHome = readFileSync(dashboardHomePath, 'utf8');
 const portal = readFileSync(portalPath, 'utf8');
 const toolsTreasureSheet = readFileSync(toolsTreasureSheetPath, 'utf8');
+const portalAiFriendsPreview = readFileSync(portalAiFriendsPreviewPath, 'utf8');
 const i18n = readFileSync(i18nPath, 'utf8');
 const pkg = JSON.parse(readFileSync(packagePath, 'utf8'));
 
@@ -111,6 +113,35 @@ for (const key of [
   'toolboxAddable',
   'toolboxPackageSection',
   'toolboxTrustBoundary',
+]) {
+  assert(
+    toolsTreasureSheet.includes(`t(locale, '${key}'`),
+    `ToolsTreasureSheet must render ${key} through the shared i18n dictionary.`,
+  );
+}
+for (const key of [
+  'toolboxMyInventoryLabel',
+  'toolboxMyInventoryDescription',
+  'toolboxMyInventoryStatus',
+  'toolboxMySpendingLabel',
+  'toolboxMySpendingDescription',
+  'toolboxPendingStatus',
+  'toolboxMyDatesLabel',
+  'toolboxMyDatesDescription',
+  'toolboxMyLaterLabel',
+  'toolboxMyLaterDescription',
+  'toolboxReadingTracker',
+  'toolboxFitnessLog',
+  'toolboxHabitTracker',
+  'toolboxVehicleManager',
+  'toolboxHealthRecords',
+  'toolboxHomeMaintenance',
+  'toolboxEfficiencyDailyPack',
+  'toolboxEfficiencyDailyDescription',
+  'toolboxAiAssistantPack',
+  'toolboxAiAssistantDescription',
+  'toolboxCustomPack',
+  'toolboxCustomPackDescription',
   'dashboardMoodCalm',
   'dashboardMoodSafe',
   'dashboardMoodRestored',
@@ -227,6 +258,7 @@ for (const key of [
   'dashboardInsightClose',
   'dashboardInsightAccurate',
   'dashboardInsightNotQuite',
+  'aiFriendsProviderDoubaoLabel',
 ]) {
   assert(
     i18n.includes(`${key}:`),
@@ -371,6 +403,14 @@ for (const key of [
   );
 }
 assert(
+  portalAiFriendsPreview.includes("t(locale, 'aiFriendsProviderDoubaoLabel'"),
+  'PortalAiFriendsPreview must use the shared i18n dictionary for the Doubao provider label.',
+);
+assert(
+  !portalAiFriendsPreview.includes('豆包'),
+  'PortalAiFriendsPreview must not hard-code the Doubao provider label.',
+);
+assert(
   dashboardHome.includes('t(locale, selectedMood.labelKey)'),
   'DashboardHome selected mood copy must render through the shared i18n dictionary.',
 );
@@ -389,10 +429,45 @@ for (const key of [
   'toolboxAddable',
   'toolboxPackageSection',
   'toolboxTrustBoundary',
+  'toolboxMyInventoryLabel',
+  'toolboxMyInventoryDescription',
+  'toolboxMyInventoryStatus',
+  'toolboxMySpendingLabel',
+  'toolboxMySpendingDescription',
+  'toolboxPendingStatus',
+  'toolboxMyDatesLabel',
+  'toolboxMyDatesDescription',
+  'toolboxMyLaterLabel',
+  'toolboxMyLaterDescription',
+  'toolboxReadingTracker',
+  'toolboxFitnessLog',
+  'toolboxHabitTracker',
+  'toolboxVehicleManager',
+  'toolboxHealthRecords',
+  'toolboxHomeMaintenance',
+  'toolboxEfficiencyDailyPack',
+  'toolboxEfficiencyDailyDescription',
+  'toolboxAiAssistantPack',
+  'toolboxAiAssistantDescription',
+  'toolboxCustomPack',
+  'toolboxCustomPackDescription',
 ]) {
   assert(
-    toolsTreasureSheet.includes(`t(locale, '${key}'`),
-    `ToolsTreasureSheet must render ${key} through the shared i18n dictionary.`,
+    toolsTreasureSheet.includes(`'${key}'`),
+    `ToolsTreasureSheet data should reference ${key} instead of raw visible copy.`,
+  );
+}
+for (const expression of [
+  't(locale, entry.labelKey)',
+  't(locale, entry.descriptionKey)',
+  't(locale, entry.statusKey)',
+  't(locale, tool.labelKey)',
+  't(locale, pack.labelKey)',
+  't(locale, pack.descriptionKey)',
+]) {
+  assert(
+    toolsTreasureSheet.includes(expression),
+    `ToolsTreasureSheet must resolve dynamic toolbox copy through ${expression}.`,
   );
 }
 for (const phrase of [
@@ -402,6 +477,27 @@ for (const phrase of [
   '>工具包<',
   '健康 / 金融 / 心理 / 自动化仍需确认后开放。',
   '发现适合你的工具，一键加入工作台',
+  '购买记忆',
+  '今日可用',
+  '支出记录',
+  '本地预览',
+  '待确认',
+  '重要日期',
+  '链接/预览',
+  '稍后处理',
+  '整理入口',
+  '阅读追踪',
+  '健身记录',
+  '习惯追踪',
+  '车辆管理',
+  '健康档案',
+  '家居维护',
+  '效率日常包',
+  '物品库 · 待办 · 习惯追踪',
+  '助理包',
+  '笔记 · 日程同步 · 后续接入',
+  '自定义工具包',
+  '选择你的工具组合',
 ]) {
   assert(
     !toolsTreasureSheet.includes(phrase),

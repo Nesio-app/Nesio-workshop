@@ -14,6 +14,7 @@ import {
 } from '@/lib/portal/personalization-insights';
 import { resolveShellRuntimeTools } from '@/lib/portal/shell-runtime-resolver.mjs';
 import { t } from '@/lib/portal/i18n';
+import type { PortalStringKey } from '@/lib/portal/i18n';
 import { formatStatusSummaryLine, type ToolForShellState } from './tool-state';
 import ToolGrid from './ToolGrid';
 
@@ -52,59 +53,73 @@ interface ToolsTreasurePopupProps {
 const MY_TOOL_PREVIEWS = [
   {
     id: 'inventory',
-    label: '物品库',
-    description: '购买记忆',
-    status: '今日可用',
+    labelKey: 'toolboxMyInventoryLabel',
+    descriptionKey: 'toolboxMyInventoryDescription',
+    statusKey: 'toolboxMyInventoryStatus',
   },
   {
     id: 'spending-record',
-    label: '支出记录',
-    description: '本地预览',
-    status: '待确认',
+    labelKey: 'toolboxMySpendingLabel',
+    descriptionKey: 'toolboxMySpendingDescription',
+    statusKey: 'toolboxPendingStatus',
   },
   {
     id: 'important-dates',
-    label: '重要日期',
-    description: '链接/预览',
-    status: '待确认',
+    labelKey: 'toolboxMyDatesLabel',
+    descriptionKey: 'toolboxMyDatesDescription',
+    statusKey: 'toolboxPendingStatus',
   },
   {
     id: 'later-processing',
-    label: '稍后处理',
-    description: '整理入口',
-    status: '待确认',
+    labelKey: 'toolboxMyLaterLabel',
+    descriptionKey: 'toolboxMyLaterDescription',
+    statusKey: 'toolboxPendingStatus',
   },
-] as const;
+] as const satisfies ReadonlyArray<{
+  id: string;
+  labelKey: PortalStringKey;
+  descriptionKey: PortalStringKey;
+  statusKey: PortalStringKey;
+}>;
 
 const ADDABLE_TOOLS = [
-  ['📖', 'reading-tracker', '阅读追踪'],
-  ['🏋️', 'fitness-log', '健身记录'],
-  ['🌱', 'habit-tracker', '习惯追踪'],
-  ['🚗', 'vehicle-manager', '车辆管理'],
-  ['💊', 'health-records', '健康档案'],
-  ['🏡', 'home-maintenance', '家居维护'],
-] as const;
+  { icon: '📖', id: 'reading-tracker', labelKey: 'toolboxReadingTracker' },
+  { icon: '🏋️', id: 'fitness-log', labelKey: 'toolboxFitnessLog' },
+  { icon: '🌱', id: 'habit-tracker', labelKey: 'toolboxHabitTracker' },
+  { icon: '🚗', id: 'vehicle-manager', labelKey: 'toolboxVehicleManager' },
+  { icon: '💊', id: 'health-records', labelKey: 'toolboxHealthRecords' },
+  { icon: '🏡', id: 'home-maintenance', labelKey: 'toolboxHomeMaintenance' },
+] as const satisfies ReadonlyArray<{
+  icon: string;
+  id: string;
+  labelKey: PortalStringKey;
+}>;
 
 const TOOL_PACKAGES = [
   {
     id: 'efficiency-daily',
     icon: '⚡',
-    label: '效率日常包',
-    description: '物品库 · 待办 · 习惯追踪',
+    labelKey: 'toolboxEfficiencyDailyPack',
+    descriptionKey: 'toolboxEfficiencyDailyDescription',
   },
   {
     id: 'ai-assistant',
     icon: '✦',
-    label: 'AI 助理包',
-    description: '笔记 · 日程同步 · 后续接入',
+    labelKey: 'toolboxAiAssistantPack',
+    descriptionKey: 'toolboxAiAssistantDescription',
   },
   {
     id: 'custom-toolbox',
     icon: '＋',
-    label: '自定义工具包',
-    description: '选择你的工具组合',
+    labelKey: 'toolboxCustomPack',
+    descriptionKey: 'toolboxCustomPackDescription',
   },
-] as const;
+] as const satisfies ReadonlyArray<{
+  id: string;
+  icon: string;
+  labelKey: PortalStringKey;
+  descriptionKey: PortalStringKey;
+}>;
 
 type ToolboxAction = {
   kind: 'tool' | 'package';
@@ -279,18 +294,21 @@ export default function ToolsTreasurePopup({
         <section className="portal-treasure-screen-section" aria-label={t(locale, 'toolboxAddable')}>
           <h2>{t(locale, 'toolboxAddable')}</h2>
           <div className="portal-treasure-screen-grid">
-            {ADDABLE_TOOLS.map(([icon, id, label]) => (
+            {ADDABLE_TOOLS.map((tool) => {
+              const label = t(locale, tool.labelKey);
+              return (
               <button
-                key={id}
+                key={tool.id}
                 type="button"
-                className={selectedToolboxAction?.id === id ? 'is-selected' : ''}
-                onClick={() => handleAddTool(id, label)}
+                className={selectedToolboxAction?.id === tool.id ? 'is-selected' : ''}
+                onClick={() => handleAddTool(tool.id, label)}
               >
-                <span className="portal-treasure-screen-icon" aria-hidden>{icon}</span>
+                <span className="portal-treasure-screen-icon" aria-hidden>{tool.icon}</span>
                 <b>{label}</b>
-                <small>{selectedToolboxAction?.id === id ? t(locale, 'toolboxAdded') : t(locale, 'toolboxAdd')}</small>
+                <small>{selectedToolboxAction?.id === tool.id ? t(locale, 'toolboxAdded') : t(locale, 'toolboxAdd')}</small>
               </button>
-            ))}
+              );
+            })}
           </div>
         </section>
 
@@ -306,18 +324,21 @@ export default function ToolsTreasurePopup({
         <section className="portal-treasure-screen-section" aria-label={t(locale, 'toolboxPackageSection')}>
           <h2>{t(locale, 'toolboxPackageSection')}</h2>
           <div className="portal-treasure-package-list">
-            {TOOL_PACKAGES.map((pack) => (
+            {TOOL_PACKAGES.map((pack) => {
+              const label = t(locale, pack.labelKey);
+              return (
               <button
                 key={pack.id}
                 type="button"
                 className={selectedToolboxAction?.id === pack.id ? 'is-selected' : ''}
-                onClick={() => handleSelectPackage(pack.id, pack.label)}
+                onClick={() => handleSelectPackage(pack.id, label)}
               >
                 <span aria-hidden>{pack.icon}</span>
-                <b>{pack.label}</b>
-                <small>{pack.description}</small>
+                <b>{label}</b>
+                <small>{t(locale, pack.descriptionKey)}</small>
               </button>
-            ))}
+              );
+            })}
           </div>
         </section>
 
@@ -388,15 +409,18 @@ export default function ToolsTreasurePopup({
             {MY_TOOL_PREVIEWS.map((entry) => {
               const tool = entry.id === 'inventory' ? inventoryTool : null;
               const isSelected = selectedToolboxAction?.id === entry.id;
+              const label = t(locale, entry.labelKey);
+              const description = t(locale, entry.descriptionKey);
+              const status = t(locale, entry.statusKey);
               return (
                 <button
                   key={entry.id}
                   type="button"
                   className={`${tool ? 'is-ready' : 'is-requestable'}${isSelected ? ' is-selected' : ''}`}
-                  onClick={tool ? () => onOpenTool(tool) : () => handleRequestToolAccess(entry.id, entry.label)}
+                  onClick={tool ? () => onOpenTool(tool) : () => handleRequestToolAccess(entry.id, label)}
                 >
-                  <span>{entry.label}</span>
-                  <small>{entry.description} · {entry.status}</small>
+                  <span>{label}</span>
+                  <small>{description} · {status}</small>
                 </button>
               );
             })}

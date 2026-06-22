@@ -23,11 +23,12 @@ const SCAN_EXTENSIONS = new Set([
 ]);
 
 const SKIP_FILE_RE = /(^|\/)(.*\.(test|spec)\.(js|jsx|ts|tsx)|route\.test\.mjs|report-i18n-hardcode\.mjs|i18n-hardcode-scan\.test\.mjs)$/;
+const LOCAL_DUPLICATE_FILE_RE = /(^|\/)[^/]+ 2\.(js|jsx|ts|tsx)$/;
 
 const CJK_UI_TEXT_RE = /[\u3400-\u9fff][\u3400-\u9fffA-Za-z0-9 /·，。！？、：“”‘’《》（）【】\-]+/g;
 
 const USER_FACING_ENGLISH_RE =
-  /\b(?:Google Calendar|Local-first|Display name|Appearance|Language|Settings|Account|Home|Inventory|ChatGPT|Gemini|Claude|Live|Search)\b/g;
+  /\b(?:Local-first|Display name|Appearance|Language|Settings|Account|Home|Inventory|Live|Search)\b/g;
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
@@ -218,6 +219,7 @@ async function walkDirectory(root, dir, files) {
 
 function shouldScanFile(file) {
   if (SKIP_FILE_RE.test(file)) return false;
+  if (LOCAL_DUPLICATE_FILE_RE.test(file)) return false;
   return SCAN_EXTENSIONS.has(path.extname(file));
 }
 
