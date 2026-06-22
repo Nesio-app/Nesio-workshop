@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -33,7 +34,17 @@ for (const moduleId of ['reading', 'fitness']) {
 }
 
 const secretary = report.tools.find((entry) => entry.id === 'secretary');
-assert.equal(secretary?.publicIndex, true, 'secretary static page must be preserved for the home chat button');
+assert.equal(secretary?.publicIndex, false, 'secretary must not ship as a public static bundle');
+assert.equal(
+  existsSync(join(repoRoot, 'tools', 'secretary', 'index.html')),
+  true,
+  'secretary source page must be preserved for the gated lab route',
+);
+assert.equal(
+  existsSync(join(repoRoot, 'app', 'secretary', '[[...path]]', 'route.ts')),
+  true,
+  'secretary must be served through the explicit lab gate route',
+);
 assert.equal(
   report.boundaries.publicLaunchEmbeddedModules.includes('secretary'),
   false,

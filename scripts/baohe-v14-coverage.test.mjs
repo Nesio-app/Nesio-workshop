@@ -27,11 +27,16 @@ for (const text of requiredReportText) {
 }
 
 const sourceChecks = [
-  ['components/portal/PortalOnboarding.tsx', '欢迎来到 Nesio'],
-  ['components/portal/DashboardHome.tsx', '温馨提醒'],
-  ['components/portal/DashboardHome.tsx', '粉碎任务'],
-  ['components/portal/DashboardHome.tsx', '物品库'],
-  ['components/portal/DashboardHome.tsx', '还是太大？再拆细'],
+  ['components/portal/PortalOnboarding.tsx', 'onboardingTitle'],
+  ['lib/portal/i18n.ts', '欢迎来到 Nesio'],
+  ['components/portal/DashboardHome.tsx', 'dashboardReminderKicker'],
+  ['lib/portal/i18n.ts', '温馨提醒'],
+  ['components/portal/DashboardHome.tsx', 'dashboardCrushTaskButton'],
+  ['lib/portal/i18n.ts', '粉碎任务'],
+  ['components/portal/DashboardHome.tsx', 'dashboardInventoryTitle'],
+  ['lib/portal/i18n.ts', '物品库'],
+  ['components/portal/DashboardHome.tsx', 'dashboardCrushSplitMore'],
+  ['lib/portal/i18n.ts', '还是太大？再拆细'],
   ['components/portal/PortalAiFriendsPreview.tsx', 'aiFriendsComposerHint'],
   ['components/portal/PortalAiFriendsPreview.tsx', '@Claude'],
   ['components/portal/PortalAiFriendsPreview.tsx', '@Flomo'],
@@ -132,7 +137,7 @@ assert.match(
 );
 assert.match(
   toolboxSource,
-  /onClick=\{\(\) => handleSelectPackage\(pack\.id, pack\.label\)/,
+  /onClick=\{\(\) => handleSelectPackage\(pack\.id, label\)/,
   'Toolbox package cards must update local selection state.',
 );
 
