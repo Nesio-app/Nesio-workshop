@@ -6,6 +6,7 @@ const root = process.cwd();
 const read = (file) => readFileSync(join(root, file), 'utf8');
 
 const route = read('app/api/secretary/chat/route.ts');
+const promptCatalog = read('lib/portal/secretary-ai-prompt-catalog.mjs');
 const packageJson = JSON.parse(read('package.json'));
 
 assert.match(
@@ -15,13 +16,13 @@ assert.match(
 );
 assert.match(
   route,
-  /function buildSecretarySystemPrompt\(locale: PortalLocale\)/,
-  'secretary chat route must build system prompts from the requested portal locale.',
+  /secretary-ai-prompt-catalog\.mjs/,
+  'secretary chat route must import the shared secretary prompt catalog.',
 );
 assert.match(
   route,
-  /function buildSecretaryPersonaPrompt\(\s*locale: PortalLocale,\s*modelId: string,\s*message: string\s*\)/,
-  'secretary chat route must build fallback persona prompts from the requested portal locale.',
+  /buildSecretarySystemPrompt\(locale\)/,
+  'secretary chat provider calls must use the locale-aware system prompt from the prompt catalog.',
 );
 assert.match(
   route,
@@ -35,13 +36,18 @@ assert.match(
 );
 assert.match(
   route,
-  /buildSecretarySystemPrompt\(locale\)/,
-  'secretary chat provider calls must use the locale-aware system prompt.',
-);
-assert.match(
-  route,
   /buildSecretaryPersonaPrompt\(locale, requestedModel, message\)/,
   'Gemini fallback routing must use the locale-aware persona prompt.',
+);
+assert.doesNotMatch(
+  route,
+  /你是「Nesio」里的 AI 私人秘书/,
+  'secretary chat route must not own Simplified Chinese system prompt copy.',
+);
+assert.doesNotMatch(
+  route,
+  /请以「\$\{label\}」在 Nesio 智友中的角色回应/,
+  'secretary chat route must not own Simplified Chinese persona prompt copy.',
 );
 assert.doesNotMatch(
   route,
@@ -49,7 +55,17 @@ assert.doesNotMatch(
   'secretary chat route must not keep a single Simplified-Chinese-only system prompt.',
 );
 assert.match(
-  route,
+  promptCatalog,
+  /export function buildSecretarySystemPrompt/,
+  'secretary prompt catalog must expose the locale-aware system prompt builder.',
+);
+assert.match(
+  promptCatalog,
+  /export function buildSecretaryPersonaPrompt/,
+  'secretary prompt catalog must expose the locale-aware persona prompt builder.',
+);
+assert.match(
+  promptCatalog,
   /Please respond as "\$\{label\}" in Nesio AI Friends\./,
   'secretary fallback persona prompt must include an English locale branch.',
 );

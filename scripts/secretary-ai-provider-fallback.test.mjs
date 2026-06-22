@@ -14,6 +14,7 @@ const chatJs = read('tools/secretary/chat.js');
 const listJs = read('tools/secretary/list.js');
 const groupJs = read('tools/secretary/group.js');
 const route = read('app/api/secretary/chat/route.ts');
+const promptCatalog = read('lib/portal/secretary-ai-prompt-catalog.mjs');
 
 const aiIds = friends.map((friend) => friend.id);
 for (const id of ['gemini', 'claude', 'chatgpt', 'doubao', 'deepseek', 'grok']) {
@@ -47,9 +48,14 @@ assert.doesNotMatch(
 );
 
 assert.match(
-  route,
-  /function buildPersonaPrompt/,
+  promptCatalog,
+  /export function buildSecretaryPersonaPrompt/,
   'Secretary API must build persona prompts for provider fallback routing.',
+);
+assert.match(
+  route,
+  /secretary-ai-prompt-catalog\.mjs/,
+  'Secretary API must import fallback persona prompts from the shared prompt catalog.',
 );
 assert.match(
   route,
