@@ -27,6 +27,16 @@ LiteSpeed even after Vercel says the project is deployed.
 
 ## Verification Commands
 
+Generate the release status summary first:
+
+```bash
+npm run report:release-status
+```
+
+This report intentionally separates the canonical domain state from the
+fallback QA domain state, so `www.nesio.app` cannot be mistaken for ready while
+DNS still points outside Vercel.
+
 Check the canonical domain:
 
 ```bash
