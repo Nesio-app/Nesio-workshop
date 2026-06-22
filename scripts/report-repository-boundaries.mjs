@@ -43,6 +43,20 @@ function rg(args) {
   }
 }
 
+function git(args) {
+  try {
+    const output = execFileSync('git', args, {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    return output.trim().split('\n').filter(Boolean);
+  } catch (error) {
+    if (error.status === 1) return [];
+    throw error;
+  }
+}
+
 function parseGitmodules(raw) {
   const modules = [];
   let current = null;
@@ -60,6 +74,21 @@ function parseGitmodules(raw) {
     if (url) current.url = url[1].trim();
   }
   return modules;
+}
+
+function detectLocalDuplicateNoise() {
+  const untracked = git(['ls-files', '--others', '--exclude-standard']);
+  const duplicateNoiseFiles = untracked.filter((file) => /(?:^|\/)[^/]+ \d+\.[^/]+$/.test(file));
+  return {
+    duplicateNoisePattern: 'space-number-copy',
+    localDuplicateNoiseCount: duplicateNoiseFiles.length,
+    localDuplicateNoiseFiles: duplicateNoiseFiles,
+    status: duplicateNoiseFiles.length > 0 ? 'needs_local_cleanup' : 'clean',
+    readOnly: true,
+    recommendedNextAction: duplicateNoiseFiles.length > 0
+      ? 'Review and delete or locally exclude duplicate copy files after confirming they are not intentional work.'
+      : 'No local duplicate copy files detected.',
+  };
 }
 
 const submoduleClassification = {
@@ -134,6 +163,8 @@ const submodules = parseGitmodules(read('.gitmodules')).map((entry) => ({
   }),
 }));
 
+const hygiene = detectLocalDuplicateNoise();
+
 const report = {
   version: 'repository-boundary-report-v0',
   status: runtimeReferences.length === 0 && deploymentReferences.length === 0 ? 'pass' : 'needs_decision',
@@ -143,6 +174,7 @@ const report = {
     doesNotModifyMemory: true,
     doesNotModifySubmodules: true,
     doesNotChangeDeployment: true,
+    doesNotDeleteLocalNoise: hygiene.readOnly,
   },
   memory: {
     path: 'memory',
@@ -165,6 +197,7 @@ const report = {
       migrateAllToTurborepoNow: false,
     },
   },
+  hygiene,
   deploymentReferences,
   ceoGateRequiredFor: [
     'deleting memory',
