@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
+const source = readFileSync('scripts/report-repository-boundaries.mjs', 'utf8');
 const output = execFileSync('node', ['scripts/report-repository-boundaries.mjs'], {
   encoding: 'utf8',
 });
@@ -30,6 +31,16 @@ assert.equal(
   report.hygiene.duplicateNoisePattern,
   'space-number-copy',
   'repository boundary report must name the duplicate-noise detection pattern',
+);
+assert.match(
+  source,
+  /ENOENT[\s\S]*gitGrep/,
+  'repository boundary report must fall back when rg is unavailable in CI',
+);
+assert.match(
+  source,
+  /git['"],\s*grepArgs/,
+  'repository boundary report must provide a git grep fallback for CI',
 );
 assert.ok(
   gitignore.includes('* 2.*'),

@@ -38,6 +38,25 @@ function rg(args) {
     });
     return output.trim().split('\n').filter(Boolean);
   } catch (error) {
+    if (error.code === 'ENOENT') return gitGrep(args);
+    if (error.status === 1) return [];
+    throw error;
+  }
+}
+
+function gitGrep(args) {
+  const [lineFlag, pattern, ...targets] = args;
+  const grepArgs = ['grep'];
+  if (lineFlag === '-n') grepArgs.push('-n');
+  grepArgs.push('-E', pattern, '--', ...targets);
+  try {
+    const output = execFileSync('git', grepArgs, {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    return output.trim().split('\n').filter(Boolean);
+  } catch (error) {
     if (error.status === 1) return [];
     throw error;
   }
