@@ -55,6 +55,8 @@ writeFileSync(
 writeFileSync(
   path.join(appDir, 'page.tsx'),
   [
+    '/* Language Section */',
+    'export function Home() { return null; }',
     'export default function SettingsPage() {',
     '  return <main><h1>软件设置</h1><button>Google Calendar</button><button>Settings</button></main>;',
     '}',
@@ -108,6 +110,10 @@ assert.ok(
 assert.ok(
   report.findings.every((finding) => finding.match !== 'Google Calendar'),
   'provider and product proper nouns should not be reported as translation drift',
+);
+assert.ok(
+  report.findings.every((finding) => finding.match !== 'Home' && finding.match !== 'Language'),
+  'English identifiers and comments should not be reported as user-facing labels',
 );
 assert.ok(
   report.findings.every((finding) => !finding.file.includes('ignored.test')),

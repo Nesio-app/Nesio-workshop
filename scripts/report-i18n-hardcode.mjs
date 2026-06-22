@@ -78,6 +78,8 @@ async function main() {
 }
 
 function extractFindings({ file, line, text, kind, re }) {
+  if (kind === 'userFacingEnglish' && !mayContainUserFacingEnglish(text)) return [];
+
   re.lastIndex = 0;
   const findings = [];
 
@@ -101,6 +103,16 @@ function extractFindings({ file, line, text, kind, re }) {
   }
 
   return findings;
+}
+
+function mayContainUserFacingEnglish(text) {
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+  if (trimmed.startsWith('//')) return false;
+  if (trimmed.startsWith('/*') || trimmed.startsWith('*') || trimmed.startsWith('*/')) return false;
+  if (/^(export\s+)?(default\s+)?function\s+\w+\s*\(/.test(trimmed)) return false;
+  if (/^(export\s+)?(default\s+)?class\s+\w+/.test(trimmed)) return false;
+  return /['"`>]/.test(text);
 }
 
 function buildReport({ scanRoots, files, findings }) {
