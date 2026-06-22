@@ -150,6 +150,14 @@ function countBy(entries, key) {
   }, {});
 }
 
+function countDuplicateNoiseByTopLevel(files) {
+  return files.reduce((counts, file) => {
+    const [topLevel] = file.split('/');
+    counts[topLevel] = (counts[topLevel] ?? 0) + 1;
+    return counts;
+  }, {});
+}
+
 function parseGitmodules(raw) {
   const modules = [];
   let current = null;
@@ -196,6 +204,12 @@ function detectLocalDuplicateNoise() {
     duplicateNoisePattern: 'space-number-copy',
     localDuplicateNoiseCount: duplicateNoiseFiles.length,
     localDuplicateNoiseFiles: duplicateNoiseFiles,
+    duplicateNoiseSummary: {
+      cleanupCandidateCount: duplicateNoiseFiles.length,
+      byTopLevel: countDuplicateNoiseByTopLevel(duplicateNoiseFiles),
+      cleanupPolicy: 'explicit_owner_approval_required',
+      destructiveCleanupPerformed: false,
+    },
     trackedDirtyFileCount: trackedDirtyFiles.length,
     trackedDirtySummary: {
       byCategory: trackedDirtyByCategory,

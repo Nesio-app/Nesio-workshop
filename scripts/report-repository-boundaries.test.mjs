@@ -29,6 +29,24 @@ assert.equal(
   'space-number-copy',
   'repository boundary report must name the duplicate-noise detection pattern',
 );
+assert.ok(
+  report.hygiene.duplicateNoiseSummary,
+  'repository boundary report must summarize duplicate noise files',
+);
+assert.equal(
+  typeof report.hygiene.duplicateNoiseSummary.cleanupCandidateCount,
+  'number',
+  'duplicate noise summary must expose cleanup candidate count',
+);
+assert.ok(
+  report.hygiene.duplicateNoiseSummary.byTopLevel,
+  'duplicate noise summary must group files by top-level directory',
+);
+assert.equal(
+  report.hygiene.duplicateNoiseSummary.cleanupCandidateCount,
+  report.hygiene.localDuplicateNoiseCount,
+  'duplicate cleanup candidate count must match duplicate noise count',
+);
 assert.equal(
   report.boundaries.doesNotDeleteLocalNoise,
   true,
