@@ -34,6 +34,24 @@ assert.equal(
   true,
   'repository boundary report must be read-only and never delete local noise files',
 );
+assert.equal(
+  typeof report.hygiene.trackedDirtyFileCount,
+  'number',
+  'repository boundary report must count tracked dirty files',
+);
+assert.ok(
+  Array.isArray(report.hygiene.trackedDirtyFiles),
+  'repository boundary report must list tracked dirty files',
+);
+assert.equal(
+  report.hygiene.trackedDirtyPolicy,
+  'report_only_no_restore',
+  'repository boundary report must not restore tracked dirty files',
+);
+assert.equal(
+  report.boundaries.doesNotRestoreTrackedDirtyFiles,
+  true,
+  'repository boundary report must never restore tracked dirty files',
+);
 
 console.log('Repository boundary report contract passed');
-

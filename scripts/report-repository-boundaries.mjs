@@ -57,6 +57,20 @@ function git(args) {
   }
 }
 
+function gitStatusShort() {
+  try {
+    const output = execFileSync('git', ['status', '--short'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    return output.split('\n').filter(Boolean);
+  } catch (error) {
+    if (error.status === 1) return [];
+    throw error;
+  }
+}
+
 function parseGitmodules(raw) {
   const modules = [];
   let current = null;
@@ -79,14 +93,25 @@ function parseGitmodules(raw) {
 function detectLocalDuplicateNoise() {
   const untracked = git(['ls-files', '--others', '--exclude-standard']);
   const duplicateNoiseFiles = untracked.filter((file) => /(?:^|\/)[^/]+ \d+\.[^/]+$/.test(file));
+  const trackedDirtyFiles = gitStatusShort()
+    .filter((line) => !line.startsWith('??') && !line.startsWith('!!'))
+    .map((line) => {
+      const status = line.slice(0, 2);
+      const file = line.slice(3);
+      return { status, file };
+    });
+  const hasLocalHygieneNoise = duplicateNoiseFiles.length > 0 || trackedDirtyFiles.length > 0;
   return {
     duplicateNoisePattern: 'space-number-copy',
     localDuplicateNoiseCount: duplicateNoiseFiles.length,
     localDuplicateNoiseFiles: duplicateNoiseFiles,
-    status: duplicateNoiseFiles.length > 0 ? 'needs_local_cleanup' : 'clean',
+    trackedDirtyFileCount: trackedDirtyFiles.length,
+    trackedDirtyFiles,
+    trackedDirtyPolicy: 'report_only_no_restore',
+    status: hasLocalHygieneNoise ? 'needs_local_cleanup' : 'clean',
     readOnly: true,
-    recommendedNextAction: duplicateNoiseFiles.length > 0
-      ? 'Review and delete or locally exclude duplicate copy files after confirming they are not intentional work.'
+    recommendedNextAction: hasLocalHygieneNoise
+      ? 'Review duplicate copy files and tracked dirty files separately; delete or restore only after explicit owner approval.'
       : 'No local duplicate copy files detected.',
   };
 }
@@ -175,6 +200,7 @@ const report = {
     doesNotModifySubmodules: true,
     doesNotChangeDeployment: true,
     doesNotDeleteLocalNoise: hygiene.readOnly,
+    doesNotRestoreTrackedDirtyFiles: hygiene.trackedDirtyPolicy === 'report_only_no_restore',
   },
   memory: {
     path: 'memory',
