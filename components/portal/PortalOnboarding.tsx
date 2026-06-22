@@ -5,19 +5,21 @@ import {
   loadProfileSettings,
   saveProfileSettings,
   type PortalCoachStyle,
+  type PortalLocale,
 } from '@/lib/portal/profile';
+import { t, type PortalStringKey } from '@/lib/portal/i18n';
 
 const ONBOARDING_DONE_KEY = 'treasurebox-onboarding-v14-done';
 const LEGACY_ONBOARDING_DONE_KEY = 'treasurebox-onboarding-v13-done';
 
 const STYLE_OPTIONS: Array<{
   id: PortalCoachStyle;
-  label: string;
-  hint: string;
+  labelKey: PortalStringKey;
+  hintKey: PortalStringKey;
 }> = [
-  { id: 'minimal', label: '极简清透', hint: '少一点话，直接开始。' },
-  { id: 'warm', label: '温暖陪伴', hint: '温柔一点，慢慢推进。' },
-  { id: 'professional', label: '专业高效', hint: '更像工作台和教练。' },
+  { id: 'minimal', labelKey: 'onboardingStyleMinimalLabel', hintKey: 'onboardingStyleMinimalHint' },
+  { id: 'warm', labelKey: 'onboardingStyleWarmLabel', hintKey: 'onboardingStyleWarmHint' },
+  { id: 'professional', labelKey: 'onboardingStyleProfessionalLabel', hintKey: 'onboardingStyleProfessionalHint' },
 ];
 
 export default function PortalOnboarding() {
@@ -25,6 +27,7 @@ export default function PortalOnboarding() {
   const [step, setStep] = useState<'name' | 'style'>('name');
   const [displayName, setDisplayName] = useState('婧');
   const [coachStyle, setCoachStyle] = useState<PortalCoachStyle>('warm');
+  const [locale, setLocale] = useState<PortalLocale>('zh');
 
   useEffect(() => {
     try {
@@ -32,6 +35,7 @@ export default function PortalOnboarding() {
       const profile = loadProfileSettings();
       setDisplayName(profile.displayName || '婧');
       setCoachStyle(profile.coachStyle);
+      setLocale(profile.locale);
       setStep('name');
       setVisible(true);
     } catch {
@@ -55,14 +59,14 @@ export default function PortalOnboarding() {
     <div className="portal-onboarding" role="dialog" aria-modal="true" aria-labelledby="portal-onboarding-title">
       <div className="portal-onboarding-card">
         <p className="portal-onboarding-kicker">Nesio V14</p>
-        <h1 id="portal-onboarding-title">欢迎来到 Nesio</h1>
+        <h1 id="portal-onboarding-title">{t(locale, 'onboardingTitle')}</h1>
         {step === 'name' ? (
           <>
-            <p className="portal-onboarding-copy">先告诉我怎么称呼你</p>
-            <p className="portal-onboarding-note">不需要注册 · 稍后随时连接账号</p>
+            <p className="portal-onboarding-copy">{t(locale, 'onboardingNameCopy')}</p>
+            <p className="portal-onboarding-note">{t(locale, 'onboardingNameNote')}</p>
 
             <label className="portal-onboarding-label" htmlFor="portal-onboarding-name">
-              怎么称呼你
+              {t(locale, 'onboardingNameLabel')}
             </label>
             <input
               id="portal-onboarding-name"
@@ -78,15 +82,15 @@ export default function PortalOnboarding() {
               className="portal-onboarding-continue"
               onClick={() => setStep('style')}
             >
-              继续
+              {t(locale, 'onboardingContinue')}
             </button>
           </>
         ) : (
           <>
-            <p className="portal-onboarding-copy">选择一种陪伴风格</p>
-            <p className="portal-onboarding-note">风格只影响微文案和 AI 回复，不改变导航路径</p>
+            <p className="portal-onboarding-copy">{t(locale, 'onboardingStyleCopy')}</p>
+            <p className="portal-onboarding-note">{t(locale, 'onboardingStyleNote')}</p>
 
-            <div className="portal-onboarding-styles" aria-label="选择陪伴风格">
+            <div className="portal-onboarding-styles" aria-label={t(locale, 'onboardingStyleAriaLabel')}>
               {STYLE_OPTIONS.map((option) => (
                 <button
                   key={option.id}
@@ -98,14 +102,14 @@ export default function PortalOnboarding() {
                   onClick={() => setCoachStyle(option.id)}
                   aria-pressed={coachStyle === option.id}
                 >
-                  <span>{option.label}</span>
-                  <small>{option.hint}</small>
+                  <span>{t(locale, option.labelKey)}</span>
+                  <small>{t(locale, option.hintKey)}</small>
                 </button>
               ))}
             </div>
 
             <button type="button" className="portal-onboarding-continue" onClick={submit}>
-              继续
+              {t(locale, 'onboardingContinue')}
             </button>
           </>
         )}

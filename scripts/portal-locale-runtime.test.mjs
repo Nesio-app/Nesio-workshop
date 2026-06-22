@@ -8,6 +8,7 @@ const dashboardHomePath = join(root, 'components', 'portal', 'DashboardHome.tsx'
 const portalPath = join(root, 'components', 'portal', 'Portal.tsx');
 const toolsTreasureSheetPath = join(root, 'components', 'portal', 'ToolsTreasureSheet.tsx');
 const portalAiFriendsPreviewPath = join(root, 'components', 'portal', 'PortalAiFriendsPreview.tsx');
+const portalOnboardingPath = join(root, 'components', 'portal', 'PortalOnboarding.tsx');
 const i18nPath = join(root, 'lib', 'portal', 'i18n.ts');
 const packagePath = join(root, 'package.json');
 
@@ -17,6 +18,7 @@ const dashboardHome = readFileSync(dashboardHomePath, 'utf8');
 const portal = readFileSync(portalPath, 'utf8');
 const toolsTreasureSheet = readFileSync(toolsTreasureSheetPath, 'utf8');
 const portalAiFriendsPreview = readFileSync(portalAiFriendsPreviewPath, 'utf8');
+const portalOnboarding = readFileSync(portalOnboardingPath, 'utf8');
 const i18n = readFileSync(i18nPath, 'utf8');
 const pkg = JSON.parse(readFileSync(packagePath, 'utf8'));
 
@@ -259,6 +261,20 @@ for (const key of [
   'dashboardInsightAccurate',
   'dashboardInsightNotQuite',
   'aiFriendsProviderDoubaoLabel',
+  'onboardingTitle',
+  'onboardingNameCopy',
+  'onboardingNameNote',
+  'onboardingNameLabel',
+  'onboardingContinue',
+  'onboardingStyleCopy',
+  'onboardingStyleNote',
+  'onboardingStyleAriaLabel',
+  'onboardingStyleMinimalLabel',
+  'onboardingStyleMinimalHint',
+  'onboardingStyleWarmLabel',
+  'onboardingStyleWarmHint',
+  'onboardingStyleProfessionalLabel',
+  'onboardingStyleProfessionalHint',
 ]) {
   assert(
     i18n.includes(`${key}:`),
@@ -410,6 +426,63 @@ assert(
   !portalAiFriendsPreview.includes('豆包'),
   'PortalAiFriendsPreview must not hard-code the Doubao provider label.',
 );
+for (const key of [
+  'onboardingTitle',
+  'onboardingNameCopy',
+  'onboardingNameNote',
+  'onboardingNameLabel',
+  'onboardingContinue',
+  'onboardingStyleCopy',
+  'onboardingStyleNote',
+  'onboardingStyleAriaLabel',
+]) {
+  assert(
+    portalOnboarding.includes(`t(locale, '${key}'`),
+    `PortalOnboarding must render ${key} through the shared i18n dictionary.`,
+  );
+}
+for (const key of [
+  'onboardingStyleMinimalLabel',
+  'onboardingStyleMinimalHint',
+  'onboardingStyleWarmLabel',
+  'onboardingStyleWarmHint',
+  'onboardingStyleProfessionalLabel',
+  'onboardingStyleProfessionalHint',
+]) {
+  assert(
+    portalOnboarding.includes(`'${key}'`),
+    `PortalOnboarding style data should reference ${key} instead of raw visible copy.`,
+  );
+}
+for (const expression of [
+  't(locale, option.labelKey)',
+  't(locale, option.hintKey)',
+]) {
+  assert(
+    portalOnboarding.includes(expression),
+    `PortalOnboarding must resolve dynamic style copy through ${expression}.`,
+  );
+}
+for (const phrase of [
+  '欢迎来到 Nesio',
+  '先告诉我怎么称呼你',
+  '不需要注册 · 稍后随时连接账号',
+  '怎么称呼你',
+  '继续',
+  '选择一种陪伴风格',
+  '风格只影响微文案和 AI 回复，不改变导航路径',
+  '极简清透',
+  '少一点话，直接开始。',
+  '温暖陪伴',
+  '温柔一点，慢慢推进。',
+  '专业高效',
+  '更像工作台和教练。',
+]) {
+  assert(
+    !portalOnboarding.includes(phrase),
+    `PortalOnboarding must not hard-code onboarding phrase: ${phrase}`,
+  );
+}
 assert(
   dashboardHome.includes('t(locale, selectedMood.labelKey)'),
   'DashboardHome selected mood copy must render through the shared i18n dictionary.',
