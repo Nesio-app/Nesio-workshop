@@ -6,6 +6,7 @@ import {
   isSecretaryAiRequestAllowed,
   launchUnavailablePayload,
 } from '@/lib/portal/launch-safety';
+import { labelForSecretaryModel } from '@/lib/portal/secretary-ai-prompt-catalog.mjs';
 
 function getGoogleKey(): string | undefined {
   const raw =
@@ -44,7 +45,7 @@ function buildProviderMatrix(configured: {
   return [
     {
       provider: 'gemini',
-      label: 'Gemini',
+      label: labelForSecretaryModel('gemini'),
       nativeConfigured: configured.gemini,
       fallbackProvider: null,
       runtimeAvailable: configured.gemini,
@@ -53,7 +54,7 @@ function buildProviderMatrix(configured: {
     },
     {
       provider: 'chatgpt',
-      label: 'ChatGPT',
+      label: labelForSecretaryModel('chatgpt'),
       nativeConfigured: configured.chatgpt,
       fallbackProvider: configured.chatgpt ? null : (configured.gemini ? 'gemini' : null),
       runtimeAvailable: configured.chatgpt || configured.gemini,
@@ -62,7 +63,7 @@ function buildProviderMatrix(configured: {
     },
     {
       provider: 'claude',
-      label: 'Claude',
+      label: labelForSecretaryModel('claude'),
       nativeConfigured: configured.claude,
       fallbackProvider: configured.claude ? null : (configured.gemini ? 'gemini' : null),
       runtimeAvailable: configured.claude || configured.gemini,
@@ -71,7 +72,7 @@ function buildProviderMatrix(configured: {
     },
     {
       provider: 'doubao',
-      label: '豆包',
+      label: labelForSecretaryModel('doubao'),
       nativeConfigured: configured.doubao,
       fallbackProvider: configured.doubao ? null : (configured.gemini ? 'gemini' : null),
       runtimeAvailable: configured.doubao || configured.gemini,

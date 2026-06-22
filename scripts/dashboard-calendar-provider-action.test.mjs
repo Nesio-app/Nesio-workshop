@@ -4,6 +4,7 @@ import path from 'node:path';
 
 const root = process.cwd();
 const source = fs.readFileSync(path.join(root, 'components', 'portal', 'DashboardHome.tsx'), 'utf8');
+const calendarClassifierPath = path.join(root, 'lib', 'portal', 'calendar-event-classifier.mjs');
 const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 
 for (const marker of [
@@ -83,14 +84,37 @@ assert.match(
 
 assert.match(
   source,
-  /calendarProviderConnectUrl \?[\s\S]*'接入'/,
-  'DashboardHome must label the ready Google Calendar OAuth action as connect.',
+  /t\(locale, 'googleCalendarConnectAction'\)/,
+  'DashboardHome must label the ready Google Calendar OAuth action through i18n.',
 );
 
 assert.match(
   source,
-  /calendarServerFeedReady \?[\s\S]*'已接入'/,
-  'DashboardHome must show server-ready iCal calendar feeds as connected.',
+  /t\(locale, 'googleCalendarConnectedAction'\)/,
+  'DashboardHome must show server-ready iCal calendar feeds as connected through i18n.',
+);
+
+assert.doesNotMatch(
+  source,
+  /'接入'|'已接入'|'打开'/,
+  'DashboardHome calendar action label must not keep raw visible action copy.',
+);
+
+assert.ok(
+  fs.existsSync(calendarClassifierPath),
+  'calendar event classifier must keep meeting keyword rules outside DashboardHome.',
+);
+
+assert.match(
+  source,
+  /calendar-event-classifier\.mjs/,
+  'DashboardHome must import the shared calendar event classifier.',
+);
+
+assert.doesNotMatch(
+  source,
+  /meeting\|会议\|zoom\|meet\|call\|产品\/i/,
+  'DashboardHome must not own meeting keyword rules directly.',
 );
 
 assert.match(

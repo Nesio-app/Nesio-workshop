@@ -31,6 +31,7 @@ import {
   filterTodayAndTomorrowEvents,
   formatEventDayLabel,
 } from '@/lib/portal/calendar-filters';
+import { looksLikeMeetingEvent } from '@/lib/portal/calendar-event-classifier.mjs';
 import type { CalendarEvent, PortalConfig, PortalTool } from '@/lib/portal/types';
 import { greetingForHour } from '@/lib/portal/greeting';
 import {
@@ -553,7 +554,13 @@ export default function DashboardHome({
   const calendarProviderConnectUrl = calendarProviderReady
     ? (calendarProviderAction?.startEndpoint || '/api/portal/calendar/connect')
     : '';
-  const calendarActionLabel = calendarLinkUrl ? '打开' : calendarServerFeedReady ? '已接入' : calendarProviderConnectUrl ? '接入' : '接入';
+  const calendarActionLabel = calendarLinkUrl
+    ? t(locale, 'providerActionOpen')
+    : calendarServerFeedReady
+      ? t(locale, 'googleCalendarConnectedAction')
+      : calendarProviderConnectUrl
+        ? t(locale, 'googleCalendarConnectAction')
+        : t(locale, 'googleCalendarConnectAction');
   const calendarClickable = Boolean(calendarLinkUrl || calendarServerFeedReady || calendarProviderConnectUrl);
 
   const greeting = greetingForHour(now.getHours());
@@ -571,17 +578,7 @@ export default function DashboardHome({
     [events, now, calendarTz],
   );
   const meetingEvent = useMemo(
-    () => upcomingEvents.find((event) => {
-      const eventText = [
-        event.title,
-        event.calendarName,
-        event.source,
-        event.description,
-        event.location,
-        event.url,
-      ].filter(Boolean).join(' ');
-      return /meeting|会议|zoom|meet|call|产品/i.test(eventText);
-    }) ?? upcomingEvents.find((event) => Boolean(event.url)),
+    () => upcomingEvents.find((event) => looksLikeMeetingEvent(event)) ?? upcomingEvents.find((event) => Boolean(event.url)),
     [upcomingEvents],
   );
   const meetingJoinUrl = meetingEvent?.url || calendarProviderConnectUrl || calendarLinkUrl || '/settings';

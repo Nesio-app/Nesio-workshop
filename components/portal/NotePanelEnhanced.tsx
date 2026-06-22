@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FLOMO_DEMO_MEMOS } from '@/lib/portal/flomo-demo';
+import { isFlomoAuthErrorMessage } from '@/lib/portal/flomo-error-classifier.mjs';
 import { t } from '@/lib/portal/i18n';
 import { apiUrl } from '@/lib/portal/paths';
 import { loadProfileSettings } from '@/lib/portal/profile';
@@ -50,7 +51,7 @@ function tryFlomoScheme(content: string, imageUrls: string[]) {
 
 function formatFlomoReadError(error: string): string {
   if (/Local Storage|access_token|FLOMO_API_KEY|Webhook/i.test(error)) return error;
-  if (/登录|login|过期|无效/i.test(error)) {
+  if (isFlomoAuthErrorMessage(error)) {
     return t(loadProfileSettings().locale, 'notePanelReadFailPrefix', {
       msg: t(loadProfileSettings().locale, 'notePanelTokenExpired'),
     });

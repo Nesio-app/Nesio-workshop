@@ -5,6 +5,7 @@ import {
   isFlomoReadConfigured,
   isFlomoWriteConfigured,
 } from '@/lib/portal/flomo-api';
+import { providerActionCopy } from '@/lib/portal/provider-action-copy-catalog.mjs';
 
 export const dynamic = 'force-dynamic';
 
@@ -101,7 +102,7 @@ export async function POST(req: NextRequest) {
 
     return safeJson({
       ok: true,
-      message: data?.message || '已记录',
+      message: data?.message || providerActionCopy('flomoRecorded'),
       slug: data?.memo?.slug,
     });
   } catch (e) {

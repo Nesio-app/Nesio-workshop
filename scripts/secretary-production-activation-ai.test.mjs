@@ -72,6 +72,16 @@ assert.match(
 );
 assert.match(
   healthRoute,
+  /secretary-ai-prompt-catalog\.mjs/,
+  'secretary health route must import model labels from the shared prompt catalog',
+);
+assert.doesNotMatch(
+  healthRoute,
+  /label:\s*'豆包'/,
+  'secretary health route must not own localized provider labels directly',
+);
+assert.match(
+  healthRoute,
   /fallbackProvider/,
   'secretary health route must explain Gemini compatibility fallback for providers without native keys',
 );
