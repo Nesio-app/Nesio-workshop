@@ -49,8 +49,13 @@ assert.match(
 );
 assert.match(
   workflow,
-  /run:\s*npm run report:release-status/,
+  /npm run report:release-status/,
   'release workflow must print the release status report so fallback QA and canonical DNS blockers are visible in CI.',
+);
+assert.match(
+  workflow,
+  /GITHUB_STEP_SUMMARY/,
+  'release workflow must also append release status to the GitHub step summary for quick operator review.',
 );
 assert.equal(
   packageJson.scripts['test:github-pages-node-runtime'],
