@@ -43,6 +43,15 @@ Check the canonical domain:
 npm run precheck:domain-routing
 ```
 
+Run the strict release-ready gate after DNS changes:
+
+```bash
+npm run precheck:release-ready
+```
+
+This command intentionally fails while `www.nesio.app` routes outside Vercel.
+It should pass only when the canonical domain reaches the Vercel / Next runtime.
+
 Expected passing evidence:
 
 - `ok: true`
@@ -57,6 +66,7 @@ Check the fallback Vercel domain while DNS is pending:
 
 ```bash
 BAOHE_DOMAIN_PRECHECK_URL=https://treasurebox-nu.vercel.app npm run precheck:domain-routing
+BAOHE_RELEASE_READY_URL=https://treasurebox-nu.vercel.app npm run precheck:release-ready
 BAOHE_CANARY_BASE_URL=https://treasurebox-nu.vercel.app npm run canary:production-runtime
 ```
 

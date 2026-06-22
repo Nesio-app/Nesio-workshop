@@ -58,7 +58,9 @@ function buildReleaseStatus(readiness = readLaunchReadiness()) {
     },
     commands: {
       canonicalDomainPrecheck: 'npm run precheck:domain-routing',
+      canonicalReleaseReadyPrecheck: 'npm run precheck:release-ready',
       fallbackDomainPrecheck: `BAOHE_DOMAIN_PRECHECK_URL=${fallbackQaDomain} npm run precheck:domain-routing`,
+      fallbackReleaseReadyPrecheck: `BAOHE_RELEASE_READY_URL=${fallbackQaDomain} npm run precheck:release-ready`,
       fallbackRuntimeCanary: `BAOHE_CANARY_BASE_URL=${fallbackQaDomain} npm run canary:production-runtime`,
       latestGithubRuns: 'gh run list --branch main --limit 3',
       releaseStaticQa: 'npm run test:qa:static',

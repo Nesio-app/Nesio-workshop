@@ -37,9 +37,14 @@ assert.equal(status.appStoreSubmissionReady, false);
 assert.equal(status.testFlightSubmissionReady, false);
 assert.equal(status.needsCeoGateForPublicRelease, true);
 assert.equal(status.commands.canonicalDomainPrecheck, 'npm run precheck:domain-routing');
+assert.equal(status.commands.canonicalReleaseReadyPrecheck, 'npm run precheck:release-ready');
 assert.equal(
   status.commands.fallbackDomainPrecheck,
   'BAOHE_DOMAIN_PRECHECK_URL=https://treasurebox-nu.vercel.app npm run precheck:domain-routing',
+);
+assert.equal(
+  status.commands.fallbackReleaseReadyPrecheck,
+  'BAOHE_RELEASE_READY_URL=https://treasurebox-nu.vercel.app npm run precheck:release-ready',
 );
 assert.equal(
   status.commands.fallbackRuntimeCanary,
