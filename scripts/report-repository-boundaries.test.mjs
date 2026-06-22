@@ -70,5 +70,29 @@ assert.equal(
   true,
   'repository boundary report must never restore tracked dirty files',
 );
+assert.ok(
+  report.releaseReadiness,
+  'repository boundary report must expose release readiness separately from contract status',
+);
+assert.equal(
+  typeof report.releaseReadiness.ready,
+  'boolean',
+  'release readiness must expose a boolean ready flag',
+);
+assert.ok(
+  Array.isArray(report.releaseReadiness.blockers),
+  'release readiness must list blockers',
+);
+if (report.hygiene.localDuplicateNoiseCount > 0 || report.hygiene.trackedDirtyFileCount > 0) {
+  assert.equal(
+    report.releaseReadiness.ready,
+    false,
+    'local hygiene noise must prevent local release readiness from being misreported',
+  );
+  assert.ok(
+    report.releaseReadiness.blockers.includes('local_hygiene_needs_cleanup'),
+    'release readiness must identify local hygiene cleanup as the blocker',
+  );
+}
 
 console.log('Repository boundary report contract passed');

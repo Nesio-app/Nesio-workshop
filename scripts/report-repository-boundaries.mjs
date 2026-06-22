@@ -225,10 +225,26 @@ const submodules = parseGitmodules(read('.gitmodules')).map((entry) => ({
 }));
 
 const hygiene = detectLocalDuplicateNoise();
+const boundaryBlockers = [];
+if (runtimeReferences.length > 0) boundaryBlockers.push('memory_runtime_references_present');
+if (deploymentReferences.length > 0) boundaryBlockers.push('deployment_references_need_decision');
+const localHygieneBlockers = [];
+if (hygiene.localDuplicateNoiseCount > 0 || hygiene.trackedDirtyFileCount > 0) {
+  localHygieneBlockers.push('local_hygiene_needs_cleanup');
+}
 
 const report = {
   version: 'repository-boundary-report-v0',
-  status: runtimeReferences.length === 0 && deploymentReferences.length === 0 ? 'pass' : 'needs_decision',
+  status: boundaryBlockers.length === 0 ? 'pass' : 'needs_decision',
+  releaseReadiness: {
+    ready: boundaryBlockers.length === 0 && localHygieneBlockers.length === 0,
+    contractStatus: boundaryBlockers.length === 0 ? 'pass' : 'needs_decision',
+    localHygieneStatus: hygiene.status,
+    blockers: [...boundaryBlockers, ...localHygieneBlockers],
+    recommendedNextAction: localHygieneBlockers.length > 0
+      ? 'Do not treat this local checkout as release-ready until duplicate copy files and tracked dirty files are reviewed or cleaned.'
+      : 'Repository boundary report has no local hygiene blockers.',
+  },
   boundaries: {
     noRuntimeDependencyOnMemory: runtimeReferences.length === 0,
     memoryIndependentAppShape: memoryIndicators.length >= 3,
