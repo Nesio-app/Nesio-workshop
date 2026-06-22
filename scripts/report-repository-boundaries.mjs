@@ -71,6 +71,42 @@ function gitStatusShort() {
   }
 }
 
+function classifyTrackedDirtyFile(file) {
+  if (/^(components|app|public|storage-web)\//.test(file)) {
+    return {
+      category: 'ui_or_runtime_surface',
+      releaseRisk: 'review_before_release',
+      recommendedNextAction: 'Inspect as a user-visible or runtime behavior change; commit only with focused QA evidence or restore after owner approval.',
+    };
+  }
+  if (/^lib\/portal\//.test(file)) {
+    return {
+      category: 'portal_contract_or_runtime',
+      releaseRisk: 'contract_review_required',
+      recommendedNextAction: 'Verify affected report/runtime contracts before committing; do not bundle with unrelated UI changes.',
+    };
+  }
+  if (/^(scripts|e2e)\//.test(file)) {
+    return {
+      category: 'verification_tooling',
+      releaseRisk: 'low_if_tests_pass',
+      recommendedNextAction: 'Run the relevant test command and commit as a focused verification-tooling change.',
+    };
+  }
+  if (/^(docs|outputs)\//.test(file)) {
+    return {
+      category: 'artifact_or_documentation',
+      releaseRisk: 'documentation_review',
+      recommendedNextAction: 'Confirm the artifact is intentional evidence before committing.',
+    };
+  }
+  return {
+    category: 'unclassified_tracked_change',
+    releaseRisk: 'needs_owner_review',
+    recommendedNextAction: 'Inspect the diff and assign an owner before committing or restoring.',
+  };
+}
+
 function parseGitmodules(raw) {
   const modules = [];
   let current = null;
@@ -98,7 +134,7 @@ function detectLocalDuplicateNoise() {
     .map((line) => {
       const status = line.slice(0, 2);
       const file = line.slice(3);
-      return { status, file };
+      return { status, file, ...classifyTrackedDirtyFile(file) };
     });
   const hasLocalHygieneNoise = duplicateNoiseFiles.length > 0 || trackedDirtyFiles.length > 0;
   return {

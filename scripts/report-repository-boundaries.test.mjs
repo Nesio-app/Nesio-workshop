@@ -43,6 +43,23 @@ assert.ok(
   Array.isArray(report.hygiene.trackedDirtyFiles),
   'repository boundary report must list tracked dirty files',
 );
+for (const entry of report.hygiene.trackedDirtyFiles) {
+  assert.equal(
+    typeof entry.category,
+    'string',
+    'tracked dirty file entries must expose a release hygiene category',
+  );
+  assert.equal(
+    typeof entry.releaseRisk,
+    'string',
+    'tracked dirty file entries must expose release risk',
+  );
+  assert.equal(
+    typeof entry.recommendedNextAction,
+    'string',
+    'tracked dirty file entries must expose a next action',
+  );
+}
 assert.equal(
   report.hygiene.trackedDirtyPolicy,
   'report_only_no_restore',
