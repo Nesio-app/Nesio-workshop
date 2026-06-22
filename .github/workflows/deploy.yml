@@ -35,6 +35,9 @@ jobs:
       - name: Run release guardrails
         run: npm run test:security
 
+      - name: Report release status
+        run: npm run report:release-status
+
       - name: Build Vercel-compatible app
         env:
           BASE_PATH: /${{ github.event.repository.name }}

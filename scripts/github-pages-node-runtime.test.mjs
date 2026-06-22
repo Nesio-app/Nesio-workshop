@@ -47,6 +47,11 @@ assert.match(
   /run:\s*npm run bundle:toolbox[\s\S]*?run:\s*npm run test:security/,
   'release workflow must generate toolbox static config before security prechecks read public tool assets.',
 );
+assert.match(
+  workflow,
+  /run:\s*npm run report:release-status/,
+  'release workflow must print the release status report so fallback QA and canonical DNS blockers are visible in CI.',
+);
 assert.equal(
   packageJson.scripts['test:github-pages-node-runtime'],
   'node scripts/github-pages-node-runtime.test.mjs',
