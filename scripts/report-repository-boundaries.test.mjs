@@ -59,6 +59,21 @@ assert.ok(
 );
 for (const entry of report.hygiene.trackedDirtyFiles) {
   assert.equal(
+    typeof entry.diffLineCount,
+    'number',
+    'tracked dirty file entries must expose diff line count',
+  );
+  assert.equal(
+    typeof entry.addedLineCount,
+    'number',
+    'tracked dirty file entries must expose added line count',
+  );
+  assert.equal(
+    typeof entry.removedLineCount,
+    'number',
+    'tracked dirty file entries must expose removed line count',
+  );
+  assert.equal(
     typeof entry.category,
     'string',
     'tracked dirty file entries must expose a release hygiene category',

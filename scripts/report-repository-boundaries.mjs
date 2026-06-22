@@ -71,6 +71,42 @@ function gitStatusShort() {
   }
 }
 
+function gitDiffNumstat() {
+  try {
+    const output = execFileSync('git', ['diff', '--numstat'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    return output.split('\n').filter(Boolean);
+  } catch (error) {
+    if (error.status === 1) return [];
+    throw error;
+  }
+}
+
+function parseNumstatCount(value) {
+  return value === '-' ? 0 : Number(value);
+}
+
+function getTrackedDirtyDiffStats() {
+  return Object.fromEntries(
+    gitDiffNumstat().map((line) => {
+      const [added, removed, file] = line.split('\t');
+      const addedLineCount = parseNumstatCount(added);
+      const removedLineCount = parseNumstatCount(removed);
+      return [
+        file,
+        {
+          addedLineCount,
+          removedLineCount,
+          diffLineCount: addedLineCount + removedLineCount,
+        },
+      ];
+    }),
+  );
+}
+
 function classifyTrackedDirtyFile(file) {
   if (/^(components|app|public|storage-web)\//.test(file)) {
     return {
@@ -136,12 +172,22 @@ function parseGitmodules(raw) {
 function detectLocalDuplicateNoise() {
   const untracked = git(['ls-files', '--others', '--exclude-standard']);
   const duplicateNoiseFiles = untracked.filter((file) => /(?:^|\/)[^/]+ \d+\.[^/]+$/.test(file));
+  const trackedDirtyDiffStats = getTrackedDirtyDiffStats();
   const trackedDirtyFiles = gitStatusShort()
     .filter((line) => !line.startsWith('??') && !line.startsWith('!!'))
     .map((line) => {
       const status = line.slice(0, 2);
       const file = line.slice(3);
-      return { status, file, ...classifyTrackedDirtyFile(file) };
+      return {
+        status,
+        file,
+        ...(trackedDirtyDiffStats[file] ?? {
+          addedLineCount: 0,
+          removedLineCount: 0,
+          diffLineCount: 0,
+        }),
+        ...classifyTrackedDirtyFile(file),
+      };
     });
   const trackedDirtyByCategory = countBy(trackedDirtyFiles, 'category');
   const trackedDirtyByReleaseRisk = countBy(trackedDirtyFiles, 'releaseRisk');
