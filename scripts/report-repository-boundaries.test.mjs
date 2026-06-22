@@ -40,6 +40,20 @@ assert.equal(
   'repository boundary report must count tracked dirty files',
 );
 assert.ok(
+  report.hygiene.trackedDirtySummary,
+  'repository boundary report must summarize tracked dirty files',
+);
+assert.equal(
+  typeof report.hygiene.trackedDirtySummary.uiOrRuntimeSurfaceCount,
+  'number',
+  'tracked dirty summary must count UI/runtime surface files',
+);
+assert.equal(
+  typeof report.hygiene.trackedDirtySummary.reviewBeforeReleaseCount,
+  'number',
+  'tracked dirty summary must count review-before-release files',
+);
+assert.ok(
   Array.isArray(report.hygiene.trackedDirtyFiles),
   'repository boundary report must list tracked dirty files',
 );

@@ -107,6 +107,13 @@ function classifyTrackedDirtyFile(file) {
   };
 }
 
+function countBy(entries, key) {
+  return entries.reduce((counts, entry) => {
+    counts[entry[key]] = (counts[entry[key]] ?? 0) + 1;
+    return counts;
+  }, {});
+}
+
 function parseGitmodules(raw) {
   const modules = [];
   let current = null;
@@ -136,12 +143,20 @@ function detectLocalDuplicateNoise() {
       const file = line.slice(3);
       return { status, file, ...classifyTrackedDirtyFile(file) };
     });
+  const trackedDirtyByCategory = countBy(trackedDirtyFiles, 'category');
+  const trackedDirtyByReleaseRisk = countBy(trackedDirtyFiles, 'releaseRisk');
   const hasLocalHygieneNoise = duplicateNoiseFiles.length > 0 || trackedDirtyFiles.length > 0;
   return {
     duplicateNoisePattern: 'space-number-copy',
     localDuplicateNoiseCount: duplicateNoiseFiles.length,
     localDuplicateNoiseFiles: duplicateNoiseFiles,
     trackedDirtyFileCount: trackedDirtyFiles.length,
+    trackedDirtySummary: {
+      byCategory: trackedDirtyByCategory,
+      byReleaseRisk: trackedDirtyByReleaseRisk,
+      uiOrRuntimeSurfaceCount: trackedDirtyByCategory.ui_or_runtime_surface ?? 0,
+      reviewBeforeReleaseCount: trackedDirtyByReleaseRisk.review_before_release ?? 0,
+    },
     trackedDirtyFiles,
     trackedDirtyPolicy: 'report_only_no_restore',
     status: hasLocalHygieneNoise ? 'needs_local_cleanup' : 'clean',
