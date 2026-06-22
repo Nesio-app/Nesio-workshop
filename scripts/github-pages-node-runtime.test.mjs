@@ -54,6 +54,11 @@ assert.equal(
 );
 assert.match(
   packageJson.scripts['test:security'],
+  /test:release-contracts[\s\S]*test:github-pages-node-runtime/,
+  'test:security must include release contracts before GitHub Pages Node runtime coverage.',
+);
+assert.match(
+  packageJson.scripts['test:security'],
   /test:github-pages-node-runtime/,
   'test:security must include GitHub Pages Node runtime coverage.',
 );
