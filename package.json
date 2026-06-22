@@ -135,6 +135,8 @@
     "precheck:module-data-network": "node scripts/precheck-module-data-network.mjs --offline",
     "precheck:mobile-app": "node scripts/precheck-mobile-app-integration.mjs",
     "precheck:no-real-data": "node scripts/precheck-no-real-data.mjs",
+    "precheck:domain-routing": "node scripts/precheck-domain-routing.mjs",
+    "test:domain-routing-precheck": "node scripts/precheck-domain-routing.test.mjs",
     "start": "next start",
     "lint": "next lint",
     "test:nesio-runtime-layout": "node scripts/nesio-runtime-layout-contract.test.mjs",
