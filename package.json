@@ -39,7 +39,7 @@
     "test:release-materials": "node scripts/release-materials-boundary.test.mjs",
     "test:release-package-manifest": "node scripts/release-package-manifest.test.mjs",
     "test:repository-boundaries": "node scripts/report-repository-boundaries.test.mjs",
-    "test:release-contracts": "npm run test:release-serial-check && npm run test:release-materials && npm run test:release-package-manifest && npm run test:repository-boundaries",
+    "test:release-contracts": "npm run test:release-serial-check && npm run test:release-materials && npm run test:release-package-manifest && npm run test:repository-boundaries && npm run test:tool-icons-design-system",
     "precheck:public-bundle-exposure": "node scripts/precheck-public-bundle-exposure.mjs",
     "test:open-tool-runtime": "node scripts/open-tool-runtime-enforcement.test.mjs",
     "test:app-api-client": "node scripts/app-api-client-contract-v01.test.mjs",

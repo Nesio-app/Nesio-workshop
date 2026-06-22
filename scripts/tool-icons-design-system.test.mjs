@@ -65,4 +65,9 @@ assert(
   'test:contracts must include tool icon design-system coverage.',
 );
 
+assert(
+  pkg.scripts['test:release-contracts'].includes('test:tool-icons-design-system'),
+  'test:release-contracts must include tool icon design-system coverage.',
+);
+
 console.log('tool-icons-design-system checks passed');
