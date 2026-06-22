@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 
 const output = execFileSync('node', ['scripts/report-repository-boundaries.mjs'], {
   encoding: 'utf8',
 });
 const report = JSON.parse(output);
+const gitignore = readFileSync('.gitignore', 'utf8');
 
 assert.equal(
   report.version,
@@ -28,6 +30,10 @@ assert.equal(
   report.hygiene.duplicateNoisePattern,
   'space-number-copy',
   'repository boundary report must name the duplicate-noise detection pattern',
+);
+assert.ok(
+  gitignore.includes('* 2.*'),
+  '.gitignore must ignore local space-number copy files without deleting them',
 );
 assert.ok(
   report.hygiene.duplicateNoiseSummary,
