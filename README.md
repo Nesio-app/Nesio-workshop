@@ -110,6 +110,14 @@ npm run dev
 
 The launch-visible tool is Inventory / purchase-memory. Other modules can remain registered for internal sandbox or future planning, but ordinary users should not see them as public commitments.
 
+Public domain routing:
+
+- Canonical domain target: `www.nesio.app`
+- Current QA fallback: `https://treasurebox-nu.vercel.app`
+- Domain routing runbook: `docs/release/domain-routing-runbook.md`
+- Verify canonical DNS/runtime routing with `npm run precheck:domain-routing`
+- If `www.nesio.app` reports `server: "LiteSpeed"`, DNS still points to the old hosting provider and the fallback Vercel domain should be used for QA.
+
 ## iOS
 
 The iOS shell lives in `treasurebox-ios/` and is kept as a later packaging path. It is not the current beta release target.
