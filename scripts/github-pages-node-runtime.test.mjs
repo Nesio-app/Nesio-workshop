@@ -62,6 +62,16 @@ assert.match(
   /npm run report:release-status -- --markdown >> "\$GITHUB_STEP_SUMMARY"[\s\S]*npm run report:release-evidence -- --markdown >> "\$GITHUB_STEP_SUMMARY"/,
   'release workflow must append release status and release evidence to the GitHub step summary for quick operator review.',
 );
+assert.match(
+  workflow,
+  /mkdir -p release-evidence[\s\S]*npm run report:release-evidence > release-evidence\/release-evidence\.json[\s\S]*npm run report:release-evidence -- --markdown > release-evidence\/release-evidence\.md/,
+  'release workflow must write machine-readable and markdown release evidence files before uploading artifacts.',
+);
+assert.match(
+  workflow,
+  /actions\/upload-artifact@v4[\s\S]*name:\s*release-evidence[\s\S]*path:\s*release-evidence\//,
+  'release workflow must upload release evidence as a downloadable artifact for QA and CEO review.',
+);
 assert.equal(
   packageJson.scripts['test:github-pages-node-runtime'],
   'node scripts/github-pages-node-runtime.test.mjs',

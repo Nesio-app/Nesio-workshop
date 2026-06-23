@@ -37,10 +37,19 @@ jobs:
 
       - name: Report release status
         run: |
+          mkdir -p release-evidence
           npm run report:release-status
           npm run report:release-status -- --markdown >> "$GITHUB_STEP_SUMMARY"
           npm run report:release-evidence
           npm run report:release-evidence -- --markdown >> "$GITHUB_STEP_SUMMARY"
+          npm run report:release-evidence > release-evidence/release-evidence.json
+          npm run report:release-evidence -- --markdown > release-evidence/release-evidence.md
+
+      - name: Upload release evidence artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-evidence
+          path: release-evidence/
 
       - name: Build Vercel-compatible app
         env:
