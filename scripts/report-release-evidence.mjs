@@ -78,6 +78,7 @@ function buildReleaseEvidence(releaseStatus = readReleaseStatus()) {
       `BAOHE_RELEASE_READY_URL=${fallbackQaDomain} npm run precheck:release-ready`,
       `BAOHE_CANARY_BASE_URL=${fallbackQaDomain} npm run canary:production-runtime`,
       'gh run list --branch main --limit 3',
+      'gh run download <run-id> --name release-evidence --dir release-evidence',
     ],
     blockers,
     handoff: {

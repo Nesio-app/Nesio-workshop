@@ -41,6 +41,10 @@ assert.equal(
   evidence.evidenceCommands.includes('BAOHE_RELEASE_READY_URL=https://treasurebox-nu.vercel.app npm run precheck:release-ready'),
   true,
 );
+assert.equal(
+  evidence.evidenceCommands.includes('gh run download <run-id> --name release-evidence --dir release-evidence'),
+  true,
+);
 assert.equal(evidence.blockers.length > 0, true);
 assert.equal(evidence.git.branch.length > 0, true);
 assert.equal(typeof evidence.git.commit, 'string');
@@ -55,6 +59,7 @@ assert.match(markdown, /Baohe Release Evidence v0/);
 assert.match(markdown, /Public release ready: false/);
 assert.match(markdown, /Fallback QA ready: true/);
 assert.match(markdown, /www\.nesio\.app/);
+assert.match(markdown, /gh run download <run-id> --name release-evidence --dir release-evidence/);
 
 assert.match(
   domainRunbook,
