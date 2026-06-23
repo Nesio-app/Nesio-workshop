@@ -61,6 +61,16 @@ The artifact contains:
 - `release-evidence.json` for machine-readable QA and CEO evidence.
 - `release-evidence.md` for human-readable handoff review.
 
+Verify the downloaded artifact before using it as QA or CEO evidence:
+
+```bash
+npm run verify:release-evidence-artifact -- release-evidence
+```
+
+This command checks that the JSON and Markdown evidence agree on fallback QA
+readiness, public-release false, the canonical DNS blocker, CEO gate state, and
+artifact download instructions.
+
 Check the canonical domain:
 
 ```bash

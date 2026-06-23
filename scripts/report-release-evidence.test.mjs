@@ -81,5 +81,10 @@ assert.match(
   /release-evidence\.json[\s\S]*release-evidence\.md/,
   'domain routing runbook must list the JSON and Markdown files contained in the release evidence artifact.',
 );
+assert.match(
+  domainRunbook,
+  /npm run verify:release-evidence-artifact -- release-evidence/,
+  'domain routing runbook must tell QA how to verify the downloaded release evidence artifact.',
+);
 
 console.log('release evidence report tests passed');
