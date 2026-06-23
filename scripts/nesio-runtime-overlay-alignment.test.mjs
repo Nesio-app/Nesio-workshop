@@ -56,7 +56,6 @@ for (const token of [
   '--modal-card-bg',
   '--modal-card-blur',
   '--modal-card-saturate',
-  '--portal-bottom-nav-clearance',
 ]) {
   assert.match(css, new RegExp(`${token}:`), `Expected ${token} token to exist.`);
 }
@@ -92,22 +91,22 @@ const runtimeClearanceMatch = css.match(/^\.portal-dashboard-root,[\s\S]*?^\.por
 assert.ok(runtimeClearanceMatch, 'Expected a shared runtime surface bottom-clearance rule.');
 assert.match(
   runtimeClearanceMatch[0],
-  /padding-bottom:\s*var\(--portal-bottom-nav-clearance\)\s*!important/,
-  'Home, AI, toolbox, and settings surfaces must reserve bottom nav clearance.',
+  /padding-bottom:\s*calc\(2rem \+ env\(safe-area-inset-bottom\)\)\s*!important/,
+  'Home, AI, toolbox, and settings surfaces must reserve mobile safe-area clearance without the old bottom nav.',
 );
 
 const finalBottomNavRules = css.match(/\.portal-bottom-nav\s*\{[\s\S]*?\n\}/g) || [];
 const tokenizedBottomNavRule = finalBottomNavRules.find((rule) =>
+  /display:\s*none\s*!important/.test(rule) &&
   /background:\s*var\(--glass-bg-pop\)/.test(rule) &&
   /blur\(var\(--modal-card-blur\)\) saturate\(var\(--modal-card-saturate\)\)/.test(rule),
 );
-assert.ok(tokenizedBottomNavRule, 'Bottom nav must have a final tokenized glass rule.');
+assert.ok(tokenizedBottomNavRule, 'Legacy bottom nav must have a final hidden tokenized glass rule.');
 
 const overlayZIndex = numericZIndex(overlayRule, 'runtime overlay layer');
-const bottomNavZIndex = maxZIndexFor('.portal-bottom-nav', 'bottom nav');
 assert.ok(
-  overlayZIndex > bottomNavZIndex,
-  `Runtime overlays must stack above the bottom nav so open sheets are clickable. overlay=${overlayZIndex}, bottomNav=${bottomNavZIndex}`,
+  overlayZIndex >= 700,
+  `Runtime overlays must stack above normal page chrome so open sheets are clickable. overlay=${overlayZIndex}`,
 );
 
 const nightBottomNavRules = css.match(/html\[data-portal-theme="night"\] \.portal-bottom-nav\s*\{[\s\S]*?\n\}/g) || [];
@@ -116,7 +115,7 @@ assert.ok(nightBottomNavRule, 'Expected a night-specific tokenized bottom nav ru
 assert.match(
   nightBottomNavRule,
   /background:\s*var\(--glass-bg-pop\)\s*!important/,
-  'Night bottom nav must use the shared pop glass surface.',
+  'Night legacy bottom nav rule must still use the shared pop glass surface if restored later.',
 );
 assert.match(
   nightBottomNavRule,

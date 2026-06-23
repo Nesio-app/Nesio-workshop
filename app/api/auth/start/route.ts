@@ -12,6 +12,27 @@ type AuthProvider = 'email' | 'google' | 'wechat' | 'phone';
 
 const AUTH_PROVIDERS: AuthProvider[] = ['email', 'google', 'wechat', 'phone'];
 
+function createAuthStartAuditId(): string {
+  const randomId = globalThis.crypto?.randomUUID?.();
+  if (randomId) return randomId;
+  return `auth-start-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function logAuthStartAudit(
+  event: 'auth_start_request' | 'auth_start_success' | 'auth_start_failure',
+  payload: Record<string, string | number | boolean | null>,
+) {
+  const safePayload = {
+    surface: 'auth_start',
+    ...payload,
+  };
+  if (event === 'auth_start_failure') {
+    console.warn(event, safePayload);
+    return;
+  }
+  console.info(event, safePayload);
+}
+
 function safeJson(body: Record<string, unknown>, status = 200) {
   return NextResponse.json(
     {
@@ -87,6 +108,7 @@ async function requestSupabaseOtp(payload: { email?: string; phone?: string; red
 }
 
 export async function POST(req: NextRequest) {
+  const auditId = createAuthStartAuditId();
   let body: {
     provider?: string;
     email?: string;
@@ -98,16 +120,31 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return safeJson({ ok: false, error: 'invalid_json' }, 400);
+    logAuthStartAudit('auth_start_failure', { auditId, provider: null, reason: 'invalid_json' });
+    return safeJson({ ok: false, error: 'invalid_json', auditId }, 400);
   }
 
   const provider = body.provider as AuthProvider | undefined;
+  logAuthStartAudit('auth_start_request', {
+    auditId,
+    provider: provider || null,
+    dryRun: body.dryRun === true,
+    hasEmail: Boolean(body.email?.trim()),
+    hasPhone: Boolean(body.phone?.trim()),
+  });
+
   if (!provider || !AUTH_PROVIDERS.includes(provider)) {
-    return safeJson({ ok: false, error: 'unsupported_provider', supportedProviders: AUTH_PROVIDERS }, 400);
+    logAuthStartAudit('auth_start_failure', { auditId, provider: provider || null, reason: 'unsupported_provider' });
+    return safeJson({ ok: false, error: 'unsupported_provider', supportedProviders: AUTH_PROVIDERS, auditId }, 400);
   }
 
   const { providerStatus, setupTask } = getProviderGate(req, provider);
   if (setupTask?.blockedReason || !providerStatus.enabled) {
+    logAuthStartAudit('auth_start_failure', {
+      auditId,
+      provider,
+      reason: setupTask?.blockedReason || 'provider_not_configured',
+    });
     return safeJson(
       {
         ok: false,
@@ -115,6 +152,7 @@ export async function POST(req: NextRequest) {
           ? 'canonical_domain_mismatch'
           : 'provider_not_configured',
         provider,
+        auditId,
         status: providerStatus,
         setupTask,
       },
@@ -127,48 +165,76 @@ export async function POST(req: NextRequest) {
   const phone = body.phone?.trim() || '';
 
   if (provider === 'google') {
+    logAuthStartAudit('auth_start_success', { auditId, provider, action: 'redirect' });
     return safeJson({
       ok: true,
       provider,
+      auditId,
       action: 'redirect',
       url: getSupabaseAuthorizeUrl('google', redirectTo),
     });
   }
 
   if (provider === 'wechat') {
+    logAuthStartAudit('auth_start_success', { auditId, provider, action: 'redirect' });
     return safeJson({
       ok: true,
       provider,
+      auditId,
       action: 'redirect',
       url: getWechatAuthorizeUrl(redirectTo),
     });
   }
 
   if (provider === 'email') {
-    if (!email) return safeJson({ ok: false, error: 'missing_email' }, 400);
+    if (!email) {
+      logAuthStartAudit('auth_start_failure', { auditId, provider, reason: 'missing_email' });
+      return safeJson({ ok: false, error: 'missing_email', auditId }, 400);
+    }
     if (body.dryRun === true) {
+      logAuthStartAudit('auth_start_success', { auditId, provider, action: 'otp_dry_run' });
       return safeJson({
         ok: true,
         provider,
+        auditId,
         action: 'otp_dry_run',
         dryRun: true,
         noExternalOtpSent: true,
       });
     }
     const result = await requestSupabaseOtp({ email, redirectTo });
-    return safeJson({ ...result, provider }, result.status);
+    logAuthStartAudit(result.ok ? 'auth_start_success' : 'auth_start_failure', {
+      auditId,
+      provider,
+      action: result.action || null,
+      reason: result.ok ? 'otp_sent' : (result.error || 'otp_failed'),
+      status: result.status,
+    });
+    return safeJson({ ...result, provider, auditId }, result.status);
   }
 
-  if (!phone) return safeJson({ ok: false, error: 'missing_phone' }, 400);
+  if (!phone) {
+    logAuthStartAudit('auth_start_failure', { auditId, provider, reason: 'missing_phone' });
+    return safeJson({ ok: false, error: 'missing_phone', auditId }, 400);
+  }
   if (body.dryRun === true) {
+    logAuthStartAudit('auth_start_success', { auditId, provider, action: 'otp_dry_run' });
     return safeJson({
       ok: true,
       provider,
+      auditId,
       action: 'otp_dry_run',
       dryRun: true,
       noExternalOtpSent: true,
     });
   }
   const result = await requestSupabaseOtp({ phone, redirectTo });
-  return safeJson({ ...result, provider }, result.status);
+  logAuthStartAudit(result.ok ? 'auth_start_success' : 'auth_start_failure', {
+    auditId,
+    provider,
+    action: result.action || null,
+    reason: result.ok ? 'otp_sent' : (result.error || 'otp_failed'),
+    status: result.status,
+  });
+  return safeJson({ ...result, provider, auditId }, result.status);
 }

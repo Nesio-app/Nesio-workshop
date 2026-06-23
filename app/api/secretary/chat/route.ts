@@ -24,6 +24,27 @@ const corsHeaders = {
 
 type ChatTurn = { role: 'user' | 'assistant'; content: string };
 
+function createSecretaryAiAuditId(): string {
+  const randomId = globalThis.crypto?.randomUUID?.();
+  if (randomId) return randomId;
+  return `secretary-ai-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function logSecretaryAiAudit(
+  event: 'secretary_ai_request' | 'secretary_ai_success' | 'secretary_ai_failure',
+  payload: Record<string, string | number | boolean | null>,
+) {
+  const safePayload = {
+    surface: 'secretary_chat',
+    ...payload,
+  };
+  if (event === 'secretary_ai_failure') {
+    console.warn(event, safePayload);
+    return;
+  }
+  console.info(event, safePayload);
+}
+
 function getGoogleKey(): string | undefined {
   const raw =
     process.env.GEMINI_API_KEY ||
@@ -332,12 +353,14 @@ export async function OPTIONS() {
 }
 
 export async function POST(req: NextRequest) {
+  const auditId = createSecretaryAiAuditId();
+
   if (
     process.env.NEXT_PUBLIC_BAOHE_FIRST_LAUNCH_RISK_ISOLATION !== 'off' &&
     !isSecretaryAiRequestAllowed(req)
   ) {
     return NextResponse.json(
-      launchUnavailablePayload('api:secretary:chat', 'secretary'),
+      { ...launchUnavailablePayload('api:secretary:chat', 'secretary'), auditId },
       { status: 403, headers: corsHeaders },
     );
   }
@@ -353,12 +376,12 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400, headers: corsHeaders });
+    return NextResponse.json({ error: 'Invalid JSON', auditId }, { status: 400, headers: corsHeaders });
   }
 
   const message = String(body.message || body.prompt || '').trim();
   if (!message) {
-    return NextResponse.json({ error: 'message required' }, { status: 400, headers: corsHeaders });
+    return NextResponse.json({ error: 'message required', auditId }, { status: 400, headers: corsHeaders });
   }
 
   const history = normalizeHistory(body.history);
@@ -366,6 +389,14 @@ export async function POST(req: NextRequest) {
   const modelId = String(body.model || 'gemini').toLowerCase();
   const locale = normalizePortalLocale(body.locale);
   const systemPrompt = buildSecretarySystemPrompt(locale);
+
+  logSecretaryAiAudit('secretary_ai_request', {
+    auditId,
+    requestedModel: modelId,
+    historyTurns: history.length,
+    locale,
+    messageLength: message.length,
+  });
 
   try {
     if (modelId === 'doubao') {
@@ -377,15 +408,18 @@ export async function POST(req: NextRequest) {
             {
               error: 'AI not configured',
               hint: 'Set DOUBAO_KEY or GEMINI_API_KEY in Vercel Environment Variables',
+              auditId,
             },
             { status: 503, headers: corsHeaders }
           );
         }
         const text = await chatWithGeminiFallback(history, message, maxTokens, fallbackKey, modelId, locale);
-        return NextResponse.json({ text, model: 'gemini', requestedModel: modelId, fallback: true }, { headers: corsHeaders });
+        logSecretaryAiAudit('secretary_ai_success', { auditId, requestedModel: modelId, provider: 'gemini', fallback: true });
+        return NextResponse.json({ text, model: 'gemini', requestedModel: modelId, fallback: true, auditId, runtime: { provider: 'gemini', requestedModel: modelId, fallback: true } }, { headers: corsHeaders });
       }
       const text = await chatWithDoubao(history, message, maxTokens, key, systemPrompt);
-      return NextResponse.json({ text, model: 'doubao' }, { headers: corsHeaders });
+      logSecretaryAiAudit('secretary_ai_success', { auditId, requestedModel: modelId, provider: 'doubao', fallback: false });
+      return NextResponse.json({ text, model: 'doubao', auditId, runtime: { provider: 'doubao', requestedModel: modelId, fallback: false } }, { headers: corsHeaders });
     }
 
     if (modelId === 'chatgpt' || modelId === 'openai') {
@@ -397,15 +431,18 @@ export async function POST(req: NextRequest) {
             {
               error: 'AI not configured',
               hint: 'Set OpenAI_KEY or GEMINI_API_KEY in Vercel Environment Variables',
+              auditId,
             },
             { status: 503, headers: corsHeaders }
           );
         }
         const text = await chatWithGeminiFallback(history, message, maxTokens, fallbackKey, modelId, locale);
-        return NextResponse.json({ text, model: 'gemini', requestedModel: modelId, fallback: true }, { headers: corsHeaders });
+        logSecretaryAiAudit('secretary_ai_success', { auditId, requestedModel: modelId, provider: 'gemini', fallback: true });
+        return NextResponse.json({ text, model: 'gemini', requestedModel: modelId, fallback: true, auditId, runtime: { provider: 'gemini', requestedModel: modelId, fallback: true } }, { headers: corsHeaders });
       }
       const text = await chatWithOpenAI(history, message, maxTokens, key, systemPrompt);
-      return NextResponse.json({ text, model: 'chatgpt' }, { headers: corsHeaders });
+      logSecretaryAiAudit('secretary_ai_success', { auditId, requestedModel: modelId, provider: 'chatgpt', fallback: false });
+      return NextResponse.json({ text, model: 'chatgpt', auditId, runtime: { provider: 'chatgpt', requestedModel: modelId, fallback: false } }, { headers: corsHeaders });
     }
 
     if (modelId === 'claude' || modelId === 'anthropic') {
@@ -417,15 +454,18 @@ export async function POST(req: NextRequest) {
             {
               error: 'AI not configured',
               hint: 'Set ANTHROPIC_API_KEY or GEMINI_API_KEY in Vercel Environment Variables',
+              auditId,
             },
             { status: 503, headers: corsHeaders }
           );
         }
         const text = await chatWithGeminiFallback(history, message, maxTokens, fallbackKey, modelId, locale);
-        return NextResponse.json({ text, model: 'gemini', requestedModel: modelId, fallback: true }, { headers: corsHeaders });
+        logSecretaryAiAudit('secretary_ai_success', { auditId, requestedModel: modelId, provider: 'gemini', fallback: true });
+        return NextResponse.json({ text, model: 'gemini', requestedModel: modelId, fallback: true, auditId, runtime: { provider: 'gemini', requestedModel: modelId, fallback: true } }, { headers: corsHeaders });
       }
       const text = await chatWithClaude(history, message, maxTokens, key, systemPrompt);
-      return NextResponse.json({ text, model: 'claude' }, { headers: corsHeaders });
+      logSecretaryAiAudit('secretary_ai_success', { auditId, requestedModel: modelId, provider: 'claude', fallback: false });
+      return NextResponse.json({ text, model: 'claude', auditId, runtime: { provider: 'claude', requestedModel: modelId, fallback: false } }, { headers: corsHeaders });
     }
 
     if (modelId === 'deepseek' || modelId === 'grok') {
@@ -435,12 +475,14 @@ export async function POST(req: NextRequest) {
           {
             error: 'AI not configured',
             hint: 'Set GEMINI_API_KEY in Vercel Environment Variables for AI compatibility routing',
+            auditId,
           },
           { status: 503, headers: corsHeaders }
         );
       }
       const text = await chatWithGeminiFallback(history, message, maxTokens, fallbackKey, modelId, locale);
-      return NextResponse.json({ text, model: 'gemini', requestedModel: modelId, fallback: true }, { headers: corsHeaders });
+      logSecretaryAiAudit('secretary_ai_success', { auditId, requestedModel: modelId, provider: 'gemini', fallback: true });
+      return NextResponse.json({ text, model: 'gemini', requestedModel: modelId, fallback: true, auditId, runtime: { provider: 'gemini', requestedModel: modelId, fallback: true } }, { headers: corsHeaders });
     }
 
     const key = getGoogleKey();
@@ -449,6 +491,7 @@ export async function POST(req: NextRequest) {
         {
           error: 'AI not configured',
           hint: 'Set GEMINI_API_KEY in Vercel Environment Variables, then Redeploy',
+          auditId,
         },
         { status: 503, headers: corsHeaders }
       );
@@ -456,13 +499,19 @@ export async function POST(req: NextRequest) {
 
     const contents = toGeminiContents(history, message);
     const text = await chatWithGemini(contents, maxTokens, key, systemPrompt);
-    return NextResponse.json({ text, model: 'gemini' }, { headers: corsHeaders });
+    logSecretaryAiAudit('secretary_ai_success', { auditId, requestedModel: modelId, provider: 'gemini', fallback: false });
+    return NextResponse.json({ text, model: 'gemini', auditId, runtime: { provider: 'gemini', requestedModel: modelId, fallback: false } }, { headers: corsHeaders });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error('[secretary/chat]', modelId, msg);
     const quota = isQuotaError(msg);
+    logSecretaryAiAudit('secretary_ai_failure', {
+      auditId,
+      requestedModel: modelId,
+      errorCode: quota ? 'quota_exceeded' : 'provider_request_failed',
+      status: quota ? 429 : 500,
+    });
     return NextResponse.json(
-      { error: quota ? 'quota_exceeded' : 'AI request failed', detail: msg },
+      { error: quota ? 'quota_exceeded' : 'AI request failed', detail: msg, auditId },
       { status: quota ? 429 : 500, headers: corsHeaders }
     );
   }

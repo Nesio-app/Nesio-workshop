@@ -184,17 +184,17 @@ assert(
 );
 
 assert(
-  /aria-label=\{t\(locale, 'aiFriendsVoiceInput'\)\}[\s\S]*aria-controls="portal-ai-audio-call"[\s\S]*onClick=\{openAudioCall\}/.test(component) &&
-    /aria-label=\{t\(locale, 'aiFriendsCall'\)\}[\s\S]*aria-controls="portal-ai-call-sheet"[\s\S]*onClick=\{openCallSheet\}/.test(component),
-  'PortalAiFriendsPreview voice and call buttons must point to real call surfaces.',
+  /AI_CAPABILITIES\.map[\s\S]*aria-controls=\{capability\.id === 'audio' \? 'portal-ai-audio-call' : capability\.id === 'live' \? 'portal-ai-call-sheet' : undefined\}/.test(component) &&
+    /onClick=\{\(\) => handleCapabilityAction\(capability\.id\)\}/.test(component),
+  'PortalAiFriendsPreview must keep voice and live call surfaces reachable from the plus capability rail instead of crowding the composer.',
 );
 
 assert(
   component.includes('resolveActiveProviderReadiness') &&
     component.includes('appendProviderUnavailableMessage') &&
-    /const openCallSheet = \(\) => \{[\s\S]*const readiness = resolveActiveProviderReadiness\(\);[\s\S]*if \(!readiness\.ready\) \{[\s\S]*appendProviderUnavailableMessage\(readiness\);[\s\S]*return;[\s\S]*setCallSheetOpen\(true\)/.test(component) &&
-    /const openAudioCall = \(\) => \{[\s\S]*const readiness = resolveActiveProviderReadiness\(\);[\s\S]*if \(!readiness\.ready\) \{[\s\S]*appendProviderUnavailableMessage\(readiness\);[\s\S]*return;[\s\S]*setAudioCallOpen\(true\)/.test(component),
-  'PortalAiFriendsPreview live and voice controls must use runtime readiness before opening call surfaces.',
+    /const openCallSheet = \(\) => \{[\s\S]*const readiness = resolveActiveProviderReadiness\(\);[\s\S]*setCallSheetOpen\(true\);[\s\S]*if \(!readiness\.ready\) \{[\s\S]*appendProviderUnavailableMessage\(readiness\);[\s\S]*return;/.test(component) &&
+    /const openAudioCall = \(\) => \{[\s\S]*const readiness = resolveActiveProviderReadiness\(\);[\s\S]*setAudioCallOpen\(true\);[\s\S]*if \(!readiness\.ready\) \{[\s\S]*appendProviderUnavailableMessage\(readiness\);[\s\S]*return;/.test(component),
+  'PortalAiFriendsPreview live and voice controls must open visible failure-protected surfaces when runtime readiness is degraded.',
 );
 
 assert(

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+const GOOGLE_CALENDAR_OAUTH_STATE_COOKIE = 'nesio_google_calendar_oauth_state';
+
 type GoogleTokenResponse = {
   access_token?: string;
   refresh_token?: string;
@@ -18,6 +20,31 @@ function safeRedirectUrl(req: NextRequest, params: Record<string, string>) {
     if (value) target.searchParams.set(key, value);
   }
   return target;
+}
+
+function createCalendarOAuthAuditId(state: string): string {
+  const [, auditId] = state.split(':');
+  if (auditId) return auditId;
+  const randomId = globalThis.crypto?.randomUUID?.();
+  if (randomId) return randomId;
+  return `calendar-oauth-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function logCalendarOAuthAudit(
+  event: 'calendar_oauth_callback' | 'calendar_oauth_failure' | 'calendar_oauth_success',
+  payload: Record<string, string | number | boolean | null>,
+) {
+  if (event === 'calendar_oauth_failure') {
+    console.warn(event, {
+      provider: 'google_calendar',
+      ...payload,
+    });
+    return;
+  }
+  console.info(event, {
+    provider: 'google_calendar',
+    ...payload,
+  });
 }
 
 function callbackUrl(req: NextRequest): string {
@@ -76,28 +103,69 @@ export async function GET(req: NextRequest) {
   const source = new URL(req.url);
   const error = source.searchParams.get('error') || '';
   const code = source.searchParams.get('code') || '';
+  const returnedState = source.searchParams.get('state') || '';
+  const storedState = req.cookies.get(GOOGLE_CALENDAR_OAUTH_STATE_COOKIE)?.value || '';
+  const auditId = createCalendarOAuthAuditId(returnedState || storedState);
+
+  logCalendarOAuthAudit('calendar_oauth_callback', {
+    auditId,
+    hasCode: Boolean(code),
+    hasError: Boolean(error),
+    statePresent: Boolean(returnedState),
+  });
+
+  if (!returnedState || !storedState || returnedState !== storedState) {
+    logCalendarOAuthAudit('calendar_oauth_failure', {
+      auditId,
+      reason: 'calendar_oauth_state_mismatch',
+    });
+    const response = NextResponse.redirect(
+      safeRedirectUrl(req, {
+        safePublicStatus: 'true',
+        secretsRedacted: 'true',
+        calendar: 'google_oauth_failed',
+        status: 'calendar_oauth_state_mismatch',
+        auditId,
+      }),
+    );
+    response.cookies.delete(GOOGLE_CALENDAR_OAUTH_STATE_COOKIE);
+    return response;
+  }
 
   if (error) {
-    return NextResponse.redirect(
+    logCalendarOAuthAudit('calendar_oauth_failure', {
+      auditId,
+      reason: error,
+    });
+    const response = NextResponse.redirect(
       safeRedirectUrl(req, {
         safePublicStatus: 'true',
         secretsRedacted: 'true',
         calendar: 'google_oauth_failed',
         status: error,
+        auditId,
       }),
     );
+    response.cookies.delete(GOOGLE_CALENDAR_OAUTH_STATE_COOKIE);
+    return response;
   }
 
   const session = await exchangeGoogleCode(code, req);
+  logCalendarOAuthAudit(session?.access_token ? 'calendar_oauth_success' : 'calendar_oauth_failure', {
+    auditId,
+    reason: session?.access_token ? 'calendar_session_established' : 'calendar_token_exchange_failed',
+  });
   const response = NextResponse.redirect(
     safeRedirectUrl(req, {
       safePublicStatus: 'true',
       secretsRedacted: 'true',
       calendar: session?.access_token ? 'google_oauth_connected' : 'google_oauth_failed',
       status: session?.access_token ? 'calendar_session_established' : 'calendar_token_exchange_failed',
+      auditId,
     }),
   );
 
+  response.cookies.delete(GOOGLE_CALENDAR_OAUTH_STATE_COOKIE);
   if (session?.access_token) setCalendarCookies(response, session);
   return response;
 }

@@ -37,7 +37,6 @@ const sourceChecks = [
   ['lib/portal/i18n.ts', '物品库'],
   ['components/portal/DashboardHome.tsx', 'dashboardCrushSplitMore'],
   ['lib/portal/i18n.ts', '还是太大？再拆细'],
-  ['components/portal/PortalAiFriendsPreview.tsx', 'aiFriendsComposerHint'],
   ['components/portal/PortalAiFriendsPreview.tsx', '@Claude'],
   ['components/portal/PortalAiFriendsPreview.tsx', '@Flomo'],
   ['components/portal/PortalAiFriendsPreview.tsx', 'aiFriendsCallSheetTitle'],
@@ -94,6 +93,11 @@ assert.match(
   aiFriendsSource,
   /AI_CAPABILITIES\.map[\s\S]{0,1200}onClick=\{\(\) => handleCapabilityAction\(capability\.id\)/,
   'AI Friends capability rail must be metadata-driven and every visible capability button must have a runtime action.',
+);
+assert.doesNotMatch(
+  aiFriendsSource,
+  /aiFriendsComposerHint/,
+  'AI Friends must not render the old persistent composer hint under the V14 clean bottom composer.',
 );
 assert.match(
   aiFriendsSource,

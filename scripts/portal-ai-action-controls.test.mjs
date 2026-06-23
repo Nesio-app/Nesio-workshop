@@ -62,16 +62,6 @@ assert.match(
   'Mention candidates must have a stable id for the @ trigger.',
 );
 
-const audioButton = buttonBlockByRuntimeAction('ai-open-audio-call');
-assert.match(audioButton, /aria-expanded=\{audioCallOpen\}/, 'Voice button must expose audio call state.');
-assert.match(audioButton, /onClick=\{openAudioCall\}/, 'Voice button must open the audio call flow.');
-assert.match(audioButton, /data-runtime-action="ai-open-audio-call"/, 'Voice button must expose a traceable runtime action.');
-
-const callButton = buttonBlockByRuntimeAction('ai-open-live-call');
-assert.match(callButton, /aria-expanded=\{callSheetOpen \|\| videoCallOpen \|\| audioCallOpen\}/, 'Call button must expose live call state.');
-assert.match(callButton, /onClick=\{openCallSheet\}/, 'Call button must open live call options.');
-assert.match(callButton, /data-runtime-action="ai-open-live-call"/, 'Call button must expose a traceable runtime action.');
-
 const searchButton = buttonBlockByRuntimeAction('ai-open-search');
 assert.match(searchButton, /data-runtime-action="ai-open-search"/, 'Search button must expose a traceable runtime action.');
 
@@ -100,6 +90,18 @@ assert.match(
   component,
   /data-runtime-action=\{`ai-capability-\$\{capability\.id\}`\}/,
   'Capability rail buttons must expose traceable runtime actions per capability.',
+);
+
+assert.match(
+  component,
+  /id:\s*'audio'[\s\S]*id:\s*'live'/,
+  'Voice and live controls must stay available through the plus capability rail.',
+);
+
+assert.match(
+  component,
+  /case 'audio':[\s\S]*openAudioCall\(\);[\s\S]*case 'live':[\s\S]*openCallSheet\(\);/,
+  'Plus capability rail must dispatch audio and live actions to the shared call handlers.',
 );
 
 assert.equal(

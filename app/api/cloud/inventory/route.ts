@@ -75,6 +75,27 @@ function safeJson(body: Record<string, unknown>, status = 200) {
   );
 }
 
+function createCloudRuntimeAuditId(): string {
+  const randomId = globalThis.crypto?.randomUUID?.();
+  if (randomId) return randomId;
+  return `cloud-runtime-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function logCloudRuntimeAudit(
+  event: 'cloud_runtime_request' | 'cloud_runtime_success' | 'cloud_runtime_failure',
+  payload: Record<string, string | number | boolean | null>,
+) {
+  const safePayload = {
+    resource: 'inventory_items',
+    ...payload,
+  };
+  if (event === 'cloud_runtime_failure') {
+    console.warn(event, safePayload);
+    return;
+  }
+  console.info(event, safePayload);
+}
+
 function getCloudConfig() {
   const enabled = envValue('CLOUD_DB_ENABLED').toLowerCase() === 'true';
   const supabaseUrl = envValue('SUPABASE_URL');
@@ -283,13 +304,17 @@ async function readExistingLocalIds(config: ReturnType<typeof getCloudConfig>, i
 }
 
 export async function GET(request: NextRequest) {
+  const auditId = createCloudRuntimeAuditId();
+  logCloudRuntimeAudit('cloud_runtime_request', { auditId, method: 'GET', readsCloud: true, writesCloud: false });
   const config = getCloudConfig();
   if (!config.configured) {
     const setupTask = getCloudDatabaseSetupTask(request);
+    logCloudRuntimeAudit('cloud_runtime_failure', { auditId, method: 'GET', reason: 'cloud_not_configured' });
     return safeJson(
       {
         ok: false,
         error: 'cloud_not_configured',
+        auditId,
         setupTask,
         readsCloud: false,
         writesCloud: false,
@@ -302,10 +327,12 @@ export async function GET(request: NextRequest) {
   const user = userSession.user;
   const cloudIdentity = deriveCloudIdentity(user);
   if (!cloudIdentity) {
+    logCloudRuntimeAudit('cloud_runtime_failure', { auditId, method: 'GET', reason: 'not_signed_in' });
     return safeJson(
       {
         ok: false,
         error: 'not_signed_in',
+        auditId,
         readsCloud: false,
         writesCloud: false,
       },
@@ -328,8 +355,10 @@ export async function GET(request: NextRequest) {
     const rows = (await response.json()) as Array<{ item?: unknown; updated_at?: string }>;
     const items = rows.map((row) => sanitizeInventoryItem(row.item)).filter((item): item is CloudInventoryItem => Boolean(item));
 
+    logCloudRuntimeAudit('cloud_runtime_success', { auditId, method: 'GET', readsCloud: true, writesCloud: false, itemCount: items.length });
     return setRefreshedAuthCookies(safeJson({
       ok: true,
+      auditId,
       readsCloud: true,
       writesCloud: false,
       items,
@@ -337,10 +366,12 @@ export async function GET(request: NextRequest) {
       updatedAt: rows[0]?.updated_at || null,
     }), userSession.refreshedSession);
   } catch {
+    logCloudRuntimeAudit('cloud_runtime_failure', { auditId, method: 'GET', reason: 'cloud_read_failed' });
     return safeJson(
       {
         ok: false,
         error: 'cloud_read_failed',
+        auditId,
         readsCloud: false,
         writesCloud: false,
       },
@@ -350,13 +381,17 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const auditId = createCloudRuntimeAuditId();
+  logCloudRuntimeAudit('cloud_runtime_request', { auditId, method: 'POST', readsCloud: false, writesCloud: true });
   const config = getCloudConfig();
   if (!config.configured) {
     const setupTask = getCloudDatabaseSetupTask(request);
+    logCloudRuntimeAudit('cloud_runtime_failure', { auditId, method: 'POST', reason: 'cloud_not_configured' });
     return safeJson(
       {
         ok: false,
         error: 'cloud_not_configured',
+        auditId,
         setupTask,
         readsCloud: false,
         writesCloud: false,
@@ -369,10 +404,12 @@ export async function POST(request: NextRequest) {
   const user = userSession.user;
   const cloudIdentity = deriveCloudIdentity(user);
   if (!cloudIdentity) {
+    logCloudRuntimeAudit('cloud_runtime_failure', { auditId, method: 'POST', reason: 'not_signed_in' });
     return safeJson(
       {
         ok: false,
         error: 'not_signed_in',
+        auditId,
         readsCloud: false,
         writesCloud: false,
       },
@@ -384,10 +421,12 @@ export async function POST(request: NextRequest) {
   try {
     body = await request.json();
   } catch {
+    logCloudRuntimeAudit('cloud_runtime_failure', { auditId, method: 'POST', reason: 'invalid_json' });
     return safeJson(
       {
         ok: false,
         error: 'invalid_json',
+        auditId,
         readsCloud: false,
         writesCloud: false,
       },
@@ -451,8 +490,18 @@ export async function POST(request: NextRequest) {
       deletedMissingCount = missingLocalIds.length;
     }
 
+    logCloudRuntimeAudit('cloud_runtime_success', {
+      auditId,
+      method: 'POST',
+      readsCloud: rawBody.deleteMissing === true,
+      writesCloud: true,
+      savedCount: items.length,
+      rejectedCount,
+      deletedMissingCount,
+    });
     return setRefreshedAuthCookies(safeJson({
       ok: true,
+      auditId,
       readsCloud: rawBody.deleteMissing === true,
       writesCloud: true,
       savedCount: items.length,
@@ -461,10 +510,12 @@ export async function POST(request: NextRequest) {
       updatedAt,
     }), userSession.refreshedSession);
   } catch {
+    logCloudRuntimeAudit('cloud_runtime_failure', { auditId, method: 'POST', reason: 'cloud_write_failed' });
     return safeJson(
       {
         ok: false,
         error: 'cloud_write_failed',
+        auditId,
         readsCloud: false,
         writesCloud: false,
       },

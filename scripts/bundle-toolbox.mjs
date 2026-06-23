@@ -84,7 +84,7 @@ function buildBundlePlan() {
     };
   });
   const entries = allEntries.filter((entry) => {
-    if (entry.moduleId === 'secretary') return includeSandbox;
+    if (entry.moduleId === 'secretary') return true;
     if (includeSandbox) return entry.launchStatus !== 'hidden' && entry.launchStatus !== 'gated';
     return entry.launchStatus === 'launchable' && entry.prodExposure === 'public' && entry.shellAction === 'open';
   });
@@ -108,6 +108,29 @@ function buildBundlePlan() {
   };
 }
 
+function ensureStaticAppBaseHref(entry, targetDir) {
+  const indexPath = join(targetDir, 'index.html');
+  if (!existsSync(indexPath)) return;
+  const baseHref = `/${entry.publicPath}/`;
+  let html = readFileSync(indexPath, 'utf8');
+  if (new RegExp(`<base\\s+href=["']${baseHref.replace('/', '\\/')}["']`, 'i').test(html)) {
+    return;
+  }
+  if (/<base\s/i.test(html)) {
+    html = html.replace(/<base[^>]*>/i, `<base href="${baseHref}">`);
+  } else {
+    html = html.replace(/<head([^>]*)>/i, `<head$1>\n  <base href="${baseHref}">`);
+  }
+  html = html
+    .replace(/\b(href|src)="\/(app\.js|config\.js|styles\.css|portal-back\.css|manifest\.json|icon\.svg)"/g, `$1="${baseHref}$2"`)
+    .replace(/\b(href|src)='\/(app\.js|config\.js|styles\.css|portal-back\.css|manifest\.json|icon\.svg)'/g, `$1='${baseHref}$2'`);
+  writeFileSync(indexPath, html, 'utf8');
+}
+
+function shouldCopyBundleEntry(sourcePath) {
+  return !/[\\/][^\\/]+ 2\.[^\\/]+$/.test(sourcePath);
+}
+
 function applyBundle(plan) {
   for (const entry of plan.excludedEntries || []) {
     const targetDir = join(publicRoot, entry.publicPath);
@@ -127,12 +150,13 @@ function applyBundle(plan) {
     }
     rmSync(targetDir, { recursive: true, force: true });
     mkdirSync(dirname(targetDir), { recursive: true });
-    cpSync(sourceDir, targetDir, { recursive: true });
+    cpSync(sourceDir, targetDir, { recursive: true, filter: shouldCopyBundleEntry });
 
     const packageSource = PACKAGE_SOURCES[entry.moduleId];
     if (packageSource.generatedConfig) {
       writeFileSync(join(targetDir, 'config.js'), packageSource.generatedConfig, 'utf8');
     }
+    ensureStaticAppBaseHref(entry, targetDir);
   }
 }
 

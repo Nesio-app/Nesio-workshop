@@ -8,16 +8,16 @@ const read = (file) => readFileSync(join(root, file), 'utf8');
 const routePath = 'app/secretary/[[...path]]/route.ts';
 const packageJson = JSON.parse(read('package.json'));
 
-assert.equal(existsSync(join(root, 'public', 'secretary')), false, 'secretary must remain outside public static assets.');
-assert.equal(existsSync(join(root, 'tools', 'secretary', 'index.html')), true, 'gated secretary source must remain available.');
-assert.equal(existsSync(join(root, routePath)), true, 'secretary must have a server-gated route for lab access.');
+assert.equal(existsSync(join(root, 'public', 'secretary', 'index.html')), true, 'V14 Secretary static app must be bundled for the active 智友 route.');
+assert.equal(existsSync(join(root, 'tools', 'secretary', 'index.html')), true, 'Secretary source must remain available for the static bundle.');
+assert.equal(existsSync(join(root, routePath)), true, 'secretary server route must remain as a fallback for non-static lab paths.');
 
 const route = read(routePath);
 
-assert.match(route, /isSecretaryPageRequestAllowed/, 'server route must use the existing secretary page gate.');
-assert.match(route, /tools['"],\s*['"]secretary/, 'server route must serve from tools/secretary, not public/secretary.');
-assert.match(route, /launchUnavailablePayload\('page:secretary'/, 'server route must fail closed for public visitors.');
-assert.match(route, /status:\s*403/, 'server route must return 403 for public visitors.');
+assert.match(route, /isSecretaryPageRequestAllowed/, 'fallback server route must keep the existing secretary page gate.');
+assert.match(route, /tools['"],\s*['"]secretary/, 'fallback server route must serve from tools/secretary if middleware does not handle the static route.');
+assert.match(route, /launchUnavailablePayload\('page:secretary'/, 'fallback server route must fail closed when explicitly reached without lab access.');
+assert.match(route, /status:\s*403/, 'fallback server route must return 403 when explicitly reached without lab access.');
 assert.match(route, /index\.html/, 'server route must default /secretary to the lab list page.');
 assert.match(route, /Content-Type/, 'server route must set content type for served lab assets.');
 assert.doesNotMatch(route, /writeFile|rmSync|cpSync|mkdirSync/, 'server route must not write files or copy assets at runtime.');

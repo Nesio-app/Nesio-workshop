@@ -47,10 +47,10 @@ assert.match(
   /setConversationListOpen\(false\)/,
   'Opening live call options must close the conversation list.',
 );
-assert.match(
+assert.doesNotMatch(
   component,
   /aria-label=\{t\(locale, 'aiFriendsCall'\)\}[\s\S]*onClick=\{openCallSheet\}/,
-  'The composer call button must use the shared openCallSheet handler.',
+  'The composer must not expose a persistent call button; live call opens from the plus capability rail.',
 );
 
 const openAudioCall = functionBody('openAudioCall');
@@ -59,10 +59,16 @@ assert.match(
   /setAttachmentTrayOpen\(false\)/,
   'Opening voice call must close the attachment rail.',
 );
-assert.match(
+assert.doesNotMatch(
   component,
   /aria-label=\{t\(locale, 'aiFriendsVoiceInput'\)\}[\s\S]*onClick=\{openAudioCall\}/,
-  'The composer voice button must use the shared openAudioCall handler.',
+  'The composer must not expose a persistent voice button; voice opens from the plus capability rail.',
+);
+
+assert.match(
+  component,
+  /AI_CAPABILITIES\.map[\s\S]*onClick=\{\(\) => handleCapabilityAction\(capability\.id\)\}/,
+  'The plus capability rail must own transient voice/live/image/file/note actions.',
 );
 
 assert.equal(

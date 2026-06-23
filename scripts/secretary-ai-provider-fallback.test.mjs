@@ -64,7 +64,7 @@ assert.match(
 );
 assert.match(
   route,
-  /return NextResponse\.json\(\{ text, model: 'gemini', requestedModel: modelId, fallback: true \}/,
+  /return NextResponse\.json\(\{ text, model: 'gemini', requestedModel: modelId, fallback: true,[\s\S]{0,180}runtime: \{ provider: 'gemini', requestedModel: modelId, fallback: true \}/,
   'Secretary API fallback responses must identify the requested model and fallback state.',
 );
 for (const id of ['deepseek', 'grok']) {

@@ -395,16 +395,16 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
 
   const openCallSheet = () => {
     const readiness = resolveActiveProviderReadiness();
-    if (!readiness.ready) {
-      appendProviderUnavailableMessage(readiness);
-      return;
-    }
     setAttachmentTrayOpen(false);
     setConversationListOpen(false);
     setSearchToolsOpen(false);
     setAudioCallOpen(false);
     setVideoCallOpen(false);
     setCallSheetOpen(true);
+    if (!readiness.ready) {
+      appendProviderUnavailableMessage(readiness);
+      return;
+    }
     setUtilityNotice(t(locale, 'aiFriendsLiveIntentNotice'));
   };
 
@@ -420,16 +420,16 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
 
   const openAudioCall = () => {
     const readiness = resolveActiveProviderReadiness();
-    if (!readiness.ready) {
-      appendProviderUnavailableMessage(readiness);
-      return;
-    }
     setAttachmentTrayOpen(false);
     setConversationListOpen(false);
     setSearchToolsOpen(false);
     setCallSheetOpen(false);
     setVideoCallOpen(false);
     setAudioCallOpen(true);
+    if (!readiness.ready) {
+      appendProviderUnavailableMessage(readiness);
+      return;
+    }
     setUtilityNotice(t(locale, 'aiFriendsAudioConnecting'));
   };
 
@@ -809,7 +809,6 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
                 ))}
               </div>
             ) : null}
-            <p>{t(locale, 'aiFriendsComposerHint')}</p>
             {(utilityNotice || localAttachments.length > 0) ? (
               <div className="portal-ai-local-status" aria-live="polite">
                 {localAttachments.map((item) => (
@@ -854,28 +853,6 @@ export default function PortalAiFriendsPreview({ open }: PortalAiFriendsPreviewP
                 }}
                 placeholder={t(locale, 'aiFriendsComposerPlaceholder')}
               />
-              <button
-                type="button"
-                className="portal-ai-round-action"
-                aria-label={t(locale, 'aiFriendsVoiceInput')}
-                aria-expanded={audioCallOpen}
-                aria-controls="portal-ai-audio-call"
-                data-runtime-action="ai-open-audio-call"
-                onClick={openAudioCall}
-              >
-                🎙
-              </button>
-              <button
-                type="button"
-                className="portal-ai-call-button"
-                aria-label={t(locale, 'aiFriendsCall')}
-                aria-expanded={callSheetOpen || videoCallOpen || audioCallOpen}
-                aria-controls="portal-ai-call-sheet"
-                data-runtime-action="ai-open-live-call"
-                onClick={openCallSheet}
-              >
-                📞<span>{t(locale, 'aiFriendsCall')}</span>
-              </button>
             </div>
             <input
               ref={imageInputRef}

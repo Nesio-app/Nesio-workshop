@@ -68,15 +68,10 @@ for (const [name, source] of [
   assert.doesNotMatch(source, /href=["']#|javascript:void|about:blank/, `${name} must not expose fake navigation links`);
 }
 
-assert.match(
+assert.doesNotMatch(
   secretaryIndex,
-  /href="\/secretary"/,
-  'Secretary list tab should point to the extensionless /secretary route.',
-);
-assert.match(
-  secretaryIndex,
-  /href="\/secretary\/chat\?friend=gemini"/,
-  'Secretary tab should point to the extensionless chat route.',
+  /wx-tabbar|aria-label="底部导航"|href="\/secretary\/chat\?friend=gemini"/,
+  'Secretary list page must not keep the removed bottom navigation or fixed Gemini tab link.',
 );
 assert.match(
   secretaryList,

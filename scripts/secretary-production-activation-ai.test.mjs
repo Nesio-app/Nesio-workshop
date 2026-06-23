@@ -56,6 +56,31 @@ assert.match(
   'secretary chat route must use combined secretary AI gate',
 );
 assert.match(
+  route,
+  /createSecretaryAiAuditId/,
+  'secretary chat route must create a per-request audit id for production AI calls',
+);
+assert.match(
+  route,
+  /secretary_ai_request/,
+  'secretary chat route must log a redacted AI request audit event',
+);
+assert.match(
+  route,
+  /secretary_ai_failure/,
+  'secretary chat route must log a redacted AI failure audit event',
+);
+assert.match(
+  route,
+  /auditId/,
+  'secretary chat responses must include an auditId for support/debug correlation',
+);
+assert.doesNotMatch(
+  route,
+  /console\.(?:info|warn|error)\([^\n]*(?:key|apiKey|Authorization|Bearer)/,
+  'secretary AI audit logs must not print API keys or Authorization headers',
+);
+assert.match(
   healthRoute,
   /isSecretaryAiRequestAllowed/,
   'secretary health route must report through the combined gate',

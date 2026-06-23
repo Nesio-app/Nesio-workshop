@@ -9,12 +9,29 @@ function read(relativePath) {
 }
 
 const packageJson = JSON.parse(read('package.json'));
+const listHtml = read('tools/secretary/index.html');
 const chatHtml = read('tools/secretary/chat.html');
 const chatJs = read('tools/secretary/chat.js');
 const chatCss = read('tools/secretary/styles.css');
 const groupHtml = read('tools/secretary/group.html');
 const groupJs = read('tools/secretary/group.js');
 const attachJs = read('tools/secretary/attach.js');
+
+assert.doesNotMatch(
+  listHtml,
+  /wx-tabbar|aria-label="底部导航"|<span>首页<\/span>|<span>工具箱<\/span>/,
+  'Secretary list page must not render the old Shell bottom navigation.',
+);
+assert.doesNotMatch(
+  chatCss,
+  /\.wx-tabbar|\.wx-tab\b|\.wx-tab--on/,
+  'Secretary stylesheet must not keep old bottom tabbar rules.',
+);
+assert.match(
+  chatCss,
+  /\.wx-list\s*\{[\s\S]*padding-bottom: calc\(1rem \+ env\(safe-area-inset-bottom\)\)/,
+  'Secretary list page should reserve only safe-area padding after removing the old bottom navigation.',
+);
 
 for (const inertCopy of ['语音通话功能开发中', '视频功能开发中', '视频通话需 WebRTC 信令服务', '位置功能开发中']) {
   assert.doesNotMatch(

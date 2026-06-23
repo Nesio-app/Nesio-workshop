@@ -8,22 +8,22 @@ const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
 
 assert.match(
   css,
-  /--portal-bottom-nav-clearance:\s*calc\(12\.4rem \+ env\(safe-area-inset-bottom\)\)/,
-  'Nesio runtime layout must define one shared bottom-nav clearance token large enough for the fixed nav and AI composer.',
+  /\.portal-bottom-nav\s*\{[\s\S]*?display:\s*none\s*!important;/,
+  'Nesio runtime layout must hide the legacy bottom nav on V14 mobile-first surfaces.',
 );
 
 for (const selector of ['portal-ai-preview--screen', 'portal-treasure-screen']) {
   assert.match(
     css,
-    new RegExp(`\\.${selector}\\s*\\{[\\s\\S]*padding(?:-bottom)?\\s*:[^;]*var\\(--portal-bottom-nav-clearance\\)`, 'm'),
-    `${selector} must reserve bottom nav space through --portal-bottom-nav-clearance.`,
+    new RegExp(`\\.${selector}\\s*\\{[\\s\\S]*(?:padding|scroll-padding)(?:-bottom)?\\s*:[^;]*env\\(safe-area-inset-bottom\\)`, 'm'),
+    `${selector} must reserve mobile safe-area space without the old bottom nav.`,
   );
 }
 
 assert.match(
   css,
-  /portal-ai-thread[\s\S]*padding:[^;]*var\(--portal-bottom-nav-clearance\)/,
-  'AI thread must reserve composer/bottom-nav space through the shared clearance token.',
+  /portal-ai-thread[\s\S]*padding:[^;]*7\.4rem \+ env\(safe-area-inset-bottom\)/,
+  'AI thread must reserve composer space without the old bottom nav.',
 );
 
 assert.doesNotMatch(

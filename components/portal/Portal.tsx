@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import PortalAiFriendsPreview from './PortalAiFriendsPreview';
-import PortalBottomNav from './PortalBottomNav';
 import DashboardHome from './DashboardHome';
 import NotePanelEnhanced from './NotePanelEnhanced';
 import PortalOnboarding from './PortalOnboarding';
@@ -450,14 +449,6 @@ export default function Portal() {
           </section>
         </div>
       ) : null}
-      <PortalBottomNav
-        aiFriendsOpen={activeSurface === 'ai'}
-        treasureOpen={activeSurface === 'tools'}
-        locale={locale}
-        onHome={handleHome}
-        onOpenAiFriends={handleAiFriendsOpen}
-        onOpenTreasure={() => handleTreasureOpenChange(activeSurface !== 'tools')}
-      />
       <PortalOnboarding />
     </>
   );

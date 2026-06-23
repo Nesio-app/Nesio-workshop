@@ -41,7 +41,7 @@
   --modal-card-bg: rgba(248, 251, 255, 0.9);
   --modal-card-blur: 16px;
   --modal-card-saturate: 150%;
-  --portal-bottom-nav-clearance: calc(12.4rem + env(safe-area-inset-bottom));
+  --portal-bottom-nav-clearance: calc(15.2rem + env(safe-area-inset-bottom));
   --radius-xs: 0.5rem;
   --radius-sm: 0.75rem;
   --radius-md: 1rem;
@@ -6567,7 +6567,7 @@ html[data-portal-theme="night"] .portal-theme-seg-btn.is-on{
 
 .portal-ai-composer-row {
   display: grid;
-  grid-template-columns: 2.8rem 2.8rem minmax(0, 1fr) 2.8rem 3.45rem;
+  grid-template-columns: 2.8rem 2.8rem minmax(0, 1fr);
   align-items: center;
   gap: .5rem;
 }
@@ -8033,32 +8033,32 @@ html[data-portal-theme="night"] .portal-bottom-nav-btn--active {
   background: rgba(117,160,255,.2) !important;
 }
 
-/* Nesio runtime alignment: keep Shell / 智友 / 工具箱 / 设置 clear of the fixed nav
-   and use one liquid-glass contract for popovers across day and night. */
+/* Nesio runtime alignment: use one liquid-glass contract for popovers across day and night. */
 .portal-dashboard-root,
 .portal-ai-preview--screen,
 .portal-treasure-screen,
 .portal-settings {
-  padding-bottom: var(--portal-bottom-nav-clearance) !important;
+  padding-bottom: calc(2rem + env(safe-area-inset-bottom)) !important;
 }
 
 .portal-ai-preview--screen {
-  scroll-padding-bottom: calc(var(--portal-bottom-nav-clearance) + 8.5rem) !important;
+  scroll-padding-bottom: calc(7.2rem + env(safe-area-inset-bottom)) !important;
 }
 
 .portal-ai-thread {
-  padding: 0.15rem 0 calc(var(--portal-bottom-nav-clearance) + 8.5rem) !important;
+  padding: 0.15rem 0 calc(7.4rem + env(safe-area-inset-bottom)) !important;
 }
 
 .portal-treasure-screen {
-  scroll-padding-bottom: var(--portal-bottom-nav-clearance) !important;
+  scroll-padding-bottom: calc(2rem + env(safe-area-inset-bottom)) !important;
 }
 
 .portal-treasure-package-list {
-  padding-bottom: calc(var(--portal-bottom-nav-clearance) + 2rem) !important;
+  padding-bottom: calc(2.5rem + env(safe-area-inset-bottom)) !important;
 }
 
 .portal-bottom-nav {
+  display: none !important;
   background: var(--glass-bg-pop) !important;
   border-color: var(--glass-border) !important;
   box-shadow: var(--shadow-pop), var(--glass-highlight) !important;
@@ -8072,4 +8072,34 @@ html[data-portal-theme="night"] .portal-bottom-nav {
   box-shadow: var(--shadow-pop), var(--glass-highlight) !important;
   backdrop-filter: blur(var(--modal-card-blur)) saturate(var(--modal-card-saturate)) !important;
   -webkit-backdrop-filter: blur(var(--modal-card-blur)) saturate(var(--modal-card-saturate)) !important;
+}
+
+/* V14 release blocker repair: AI Friends, Shell, and Toolbox own their full screens
+   without the old bottom navigation layer. */
+.portal-ai-preview--screen {
+  padding-bottom: calc(6.8rem + env(safe-area-inset-bottom)) !important;
+  scroll-padding-bottom: calc(7.2rem + env(safe-area-inset-bottom)) !important;
+}
+
+.portal-ai-thread {
+  padding-bottom: calc(7.4rem + env(safe-area-inset-bottom)) !important;
+}
+
+.portal-ai-composer {
+  bottom: calc(.85rem + env(safe-area-inset-bottom)) !important;
+}
+
+.portal-ai-composer > p {
+  display: none !important;
+}
+
+.portal-dashboard-root,
+.portal-treasure-screen,
+.portal-settings {
+  padding-bottom: calc(2rem + env(safe-area-inset-bottom)) !important;
+}
+
+.portal-treasure-screen,
+.portal-treasure-package-list {
+  padding-bottom: calc(2.5rem + env(safe-area-inset-bottom)) !important;
 }

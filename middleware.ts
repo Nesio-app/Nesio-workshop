@@ -15,6 +15,34 @@ export function middleware(request: NextRequest) {
     return NextResponse.rewrite(url);
   }
 
+  if (pathname === '/adhd-flow' || pathname === '/adhd-flow/') {
+    const url = request.nextUrl.clone();
+    url.pathname = '/adhd-flow/index.html';
+    return NextResponse.rewrite(url);
+  }
+
+  if (pathname === '/secretary' || pathname === '/secretary/') {
+    const url = request.nextUrl.clone();
+    url.pathname = '/secretary/index.html';
+    return NextResponse.rewrite(url);
+  }
+
+  if (pathname === '/secretary/chat') {
+    const url = request.nextUrl.clone();
+    url.pathname = '/secretary/chat.html';
+    return NextResponse.rewrite(url);
+  }
+
+  if (pathname === '/secretary/group') {
+    const url = request.nextUrl.clone();
+    url.pathname = '/secretary/group.html';
+    return NextResponse.rewrite(url);
+  }
+
+  if (/^\/secretary\/[^?]+\.(?:css|js|json|svg|png|jpg|jpeg|webp|ico)$/i.test(pathname)) {
+    return NextResponse.next();
+  }
+
   if (pathname === '/api/secretary/health') {
     return NextResponse.next();
   }
@@ -83,6 +111,7 @@ export function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     '/storage',
+    '/adhd-flow',
     '/secretary',
     '/secretary/chat',
     '/secretary/group',

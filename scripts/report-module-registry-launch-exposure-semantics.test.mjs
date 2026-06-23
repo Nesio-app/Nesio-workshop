@@ -34,16 +34,21 @@ for (const moduleId of ['reading', 'fitness']) {
 }
 
 const secretary = report.tools.find((entry) => entry.id === 'secretary');
-assert.equal(secretary?.publicIndex, false, 'secretary must not ship as a public static bundle');
+assert.equal(secretary?.publicIndex, true, 'secretary must ship its static runtime bundle so 智友 can open.');
 assert.equal(
   existsSync(join(repoRoot, 'tools', 'secretary', 'index.html')),
   true,
-  'secretary source page must be preserved for the gated lab route',
+  'secretary source page must be preserved for the runtime bundle source of truth',
+);
+assert.equal(
+  existsSync(join(repoRoot, 'public', 'secretary', 'index.html')),
+  true,
+  'secretary runtime bundle must exist under public/secretary for the active 智友 route',
 );
 assert.equal(
   existsSync(join(repoRoot, 'app', 'secretary', '[[...path]]', 'route.ts')),
   true,
-  'secretary must be served through the explicit lab gate route',
+  'secretary must keep the explicit server fallback route for non-static paths',
 );
 assert.equal(
   report.boundaries.publicLaunchEmbeddedModules.includes('secretary'),
