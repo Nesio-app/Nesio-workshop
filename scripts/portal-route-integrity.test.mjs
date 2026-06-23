@@ -40,6 +40,12 @@ assert.deepEqual(
   'Secretary must not be exposed by public Vercel rewrites; middleware/lab gate owns this route.',
 );
 
+assert.match(
+  middleware,
+  /\?:html\|css\|js\|json\|svg\|png\|jpg\|jpeg\|webp\|ico/,
+  'Secretary middleware must allow rewritten static HTML and assets through after extensionless route rewrites.',
+);
+
 for (const route of [
   '/storage',
   '/secretary',

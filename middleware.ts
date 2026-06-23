@@ -39,7 +39,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.rewrite(url);
   }
 
-  if (/^\/secretary\/[^?]+\.(?:css|js|json|svg|png|jpg|jpeg|webp|ico)$/i.test(pathname)) {
+  if (/^\/secretary\/[^?]+\.(?:html|css|js|json|svg|png|jpg|jpeg|webp|ico)$/i.test(pathname)) {
     return NextResponse.next();
   }
 
