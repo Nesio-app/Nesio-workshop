@@ -14,14 +14,14 @@ assert.match(
 
 assert.match(
   css,
-  /\.portal-ai-thread\s*\{[\s\S]*?padding-bottom:\s*calc\(7\.4rem \+ env\(safe-area-inset-bottom\)\) !important;/,
-  'AI Friends thread must reserve space for its fixed composer without the Shell bottom nav.',
+  /\.portal-ai-thread\s*\{[\s\S]*?padding-bottom:\s*calc\(5\.8rem \+ env\(safe-area-inset-bottom\)\) !important;/,
+  'AI Friends thread must reserve only fixed-composer space without the Shell bottom nav.',
 );
 
 assert.match(
   css,
-  /\.portal-ai-preview--screen\s*\{[\s\S]*?scroll-padding-bottom:\s*calc\(7\.2rem \+ env\(safe-area-inset-bottom\)\) !important;/,
-  'AI Friends screen scroll position must keep focused content above its composer.',
+  /\.portal-ai-preview--screen\s*\{[\s\S]*?scroll-padding-bottom:\s*calc\(5\.2rem \+ env\(safe-area-inset-bottom\)\) !important;/,
+  'AI Friends screen scroll position must keep focused content above its composer without old bottom navigation clearance.',
 );
 
 assert.match(

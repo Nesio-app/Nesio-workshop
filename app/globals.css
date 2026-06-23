@@ -8077,12 +8077,12 @@ html[data-portal-theme="night"] .portal-bottom-nav {
 /* V14 release blocker repair: AI Friends, Shell, and Toolbox own their full screens
    without the old bottom navigation layer. */
 .portal-ai-preview--screen {
-  padding-bottom: calc(6.8rem + env(safe-area-inset-bottom)) !important;
-  scroll-padding-bottom: calc(7.2rem + env(safe-area-inset-bottom)) !important;
+  padding-bottom: calc(4.9rem + env(safe-area-inset-bottom)) !important;
+  scroll-padding-bottom: calc(5.2rem + env(safe-area-inset-bottom)) !important;
 }
 
 .portal-ai-thread {
-  padding-bottom: calc(7.4rem + env(safe-area-inset-bottom)) !important;
+  padding-bottom: calc(5.8rem + env(safe-area-inset-bottom)) !important;
 }
 
 .portal-ai-composer {
