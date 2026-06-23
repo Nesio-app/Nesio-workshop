@@ -66,5 +66,15 @@ assert.match(
   /Release Evidence|release evidence/i,
   'domain routing runbook must explain that release evidence is the QA and CEO handoff packet.',
 );
+assert.match(
+  domainRunbook,
+  /gh run download .*--name release-evidence/,
+  'domain routing runbook must tell QA how to download the release evidence artifact.',
+);
+assert.match(
+  domainRunbook,
+  /release-evidence\.json[\s\S]*release-evidence\.md/,
+  'domain routing runbook must list the JSON and Markdown files contained in the release evidence artifact.',
+);
 
 console.log('release evidence report tests passed');

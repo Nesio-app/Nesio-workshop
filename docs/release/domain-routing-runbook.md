@@ -48,6 +48,19 @@ Release Evidence is the handoff packet for Ming QA and CEO review. It combines
 the release status, fallback QA decision, canonical DNS blocker, required
 commands, and public-release gate conditions in one machine-readable summary.
 
+Download the Release Evidence artifact from the latest Release Verification run
+when QA needs the CI-generated packet:
+
+```bash
+gh run list --branch main --limit 5
+gh run download <run-id> --name release-evidence --dir release-evidence
+```
+
+The artifact contains:
+
+- `release-evidence.json` for machine-readable QA and CEO evidence.
+- `release-evidence.md` for human-readable handoff review.
+
 Check the canonical domain:
 
 ```bash
