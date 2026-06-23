@@ -57,6 +57,37 @@ async function fetchJson(path, init) {
   }
 }
 
+async function fetchText(path) {
+  try {
+    const args = ['-s', '-w', '\n%{http_code}', `${baseUrl}${path}`];
+    const { stdout } = await execFileAsync('curl', args, { maxBuffer: 1024 * 1024 });
+    const splitAt = stdout.lastIndexOf('\n');
+    const body = splitAt >= 0 ? stdout.slice(0, splitAt) : stdout;
+    const status = splitAt >= 0 ? Number(stdout.slice(splitAt + 1)) : 0;
+    return {
+      response: {
+        ok: status >= 200 && status < 300,
+        status,
+      },
+      body,
+    };
+  } catch (error) {
+    return {
+      response: {
+        ok: false,
+        status: 0,
+      },
+      body: '',
+      error: {
+        error: 'network_failure',
+        message: error instanceof Error ? error.message : String(error),
+        baseUrl,
+        path,
+      },
+    };
+  }
+}
+
 async function fetchHeaders(path) {
   try {
     const args = ['-s', '-I', `${baseUrl}${path}`];
@@ -354,24 +385,61 @@ check(
   calendar.body?.sources,
 );
 
-const secretaryPage = await fetchJson('/secretary');
+const secretaryPage = await fetchText('/secretary');
 check(
-  secretaryPage.response.status === 403,
-  'Secretary page direct URL is first_launch_gated for public production visitors',
-  secretaryPage.body,
+  secretaryPage.response.ok &&
+    /<html[\s\S]*<title>智友<\/title>[\s\S]*id="friendList"[\s\S]*\/secretary\/list\.js/.test(secretaryPage.body),
+  'Secretary page direct URL is publicly available as the production AI friends surface',
+  {
+    status: secretaryPage.response.status,
+    rawPreview: secretaryPage.body.slice(0, 220),
+    networkError: secretaryPage.error,
+  },
 );
 check(
-  secretaryPage.body?.error === 'html_or_non_json_response',
-  'Secretary page direct URL does not expose a JSON/chat runtime surface',
-  secretaryPage.body,
+  !/wx-tabbar|aria-label="底部导航"|<span>首页<\/span>|<span>工具箱<\/span>|输入框搞定一切|语音会先作为本地草稿/.test(
+    secretaryPage.body,
+  ),
+  'Secretary page does not expose the removed old bottom nav or local-draft helper copy',
+  {
+    status: secretaryPage.response.status,
+  },
+);
+
+const secretaryFriends = await fetchJson('/secretary/friends.json');
+check(
+  secretaryFriends.response.ok &&
+    Array.isArray(secretaryFriends.body) &&
+    ['gemini', 'chatgpt', 'doubao'].every((id) =>
+      secretaryFriends.body.some((friend) => friend.id === id && friend.name && friend.preview),
+    ),
+  'Secretary friends catalog exposes connected AI options for the production AI friends surface',
+  {
+    status: secretaryFriends.response.status,
+    friendIds: Array.isArray(secretaryFriends.body) ? secretaryFriends.body.map((friend) => friend.id) : [],
+    error: secretaryFriends.body?.error,
+  },
 );
 
 for (const staticPath of ['/secretary/index.html', '/secretary/chat.html']) {
-  const secretaryStaticPage = await fetchJson(staticPath);
+  const secretaryStaticPage = await fetchText(staticPath);
   check(
-    secretaryStaticPage.response.status === 403 || secretaryStaticPage.response.status === 404,
-    `Secretary static deep link is not publicly served: ${staticPath}`,
-    secretaryStaticPage.body,
+    secretaryStaticPage.response.ok && /<html/.test(secretaryStaticPage.body),
+    `Secretary static deep link is served through the production AI friends surface: ${staticPath}`,
+    {
+      status: secretaryStaticPage.response.status,
+      rawPreview: secretaryStaticPage.body.slice(0, 220),
+      networkError: secretaryStaticPage.error,
+    },
+  );
+  check(
+    !/wx-tabbar|aria-label="底部导航"|<span>首页<\/span>|<span>工具箱<\/span>|输入框搞定一切|语音会先作为本地草稿/.test(
+      secretaryStaticPage.body,
+    ),
+    `Secretary static deep link has no removed controls: ${staticPath}`,
+    {
+      status: secretaryStaticPage.response.status,
+    },
   );
 }
 
