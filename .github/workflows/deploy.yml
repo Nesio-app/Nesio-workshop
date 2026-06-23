@@ -39,6 +39,8 @@ jobs:
         run: |
           npm run report:release-status
           npm run report:release-status -- --markdown >> "$GITHUB_STEP_SUMMARY"
+          npm run report:release-evidence
+          npm run report:release-evidence -- --markdown >> "$GITHUB_STEP_SUMMARY"
 
       - name: Build Vercel-compatible app
         env:

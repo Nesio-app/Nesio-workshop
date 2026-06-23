@@ -54,8 +54,13 @@ assert.match(
 );
 assert.match(
   workflow,
-  /GITHUB_STEP_SUMMARY/,
-  'release workflow must also append release status to the GitHub step summary for quick operator review.',
+  /npm run report:release-evidence/,
+  'release workflow must print the release evidence report so QA and CEO can review gate evidence from CI.',
+);
+assert.match(
+  workflow,
+  /npm run report:release-status -- --markdown >> "\$GITHUB_STEP_SUMMARY"[\s\S]*npm run report:release-evidence -- --markdown >> "\$GITHUB_STEP_SUMMARY"/,
+  'release workflow must append release status and release evidence to the GitHub step summary for quick operator review.',
 );
 assert.equal(
   packageJson.scripts['test:github-pages-node-runtime'],
