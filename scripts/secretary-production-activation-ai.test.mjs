@@ -77,6 +77,26 @@ assert.match(
 );
 assert.doesNotMatch(
   route,
+  /DEFAULT_MODELS\s*=\s*['"][^'"]*gemini-1\./,
+  'secretary Gemini defaults must not include retired Gemini 1.x models',
+);
+assert.match(
+  route,
+  /getGeminiModelCandidates/,
+  'secretary chat route must normalize Gemini model candidates before production calls',
+);
+assert.match(
+  route,
+  /isRetiredGeminiModel/,
+  'secretary chat route must filter retired Gemini model ids from env/default candidates',
+);
+assert.match(
+  route,
+  /gemini-flash-latest/,
+  'secretary Gemini fallback must include the current Flash latest alias',
+);
+assert.doesNotMatch(
+  route,
   /console\.(?:info|warn|error)\([^\n]*(?:key|apiKey|Authorization|Bearer)/,
   'secretary AI audit logs must not print API keys or Authorization headers',
 );

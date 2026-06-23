@@ -9,7 +9,7 @@ import {
   buildSecretarySystemPrompt,
 } from '@/lib/portal/secretary-ai-prompt-catalog.mjs';
 
-const DEFAULT_MODELS = 'gemini-2.5-flash-lite,gemini-2.5-flash,gemini-1.5-flash-8b';
+const DEFAULT_MODELS = 'gemini-2.5-flash,gemini-2.5-flash-lite,gemini-flash-latest,gemini-3.5-flash';
 const DOUBAO_API_URL = 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
@@ -106,6 +106,24 @@ function isQuotaError(msg: string): boolean {
   return /quota|rate limit|429|resource_exhausted/i.test(msg);
 }
 
+function isRetiredGeminiModel(model: string): boolean {
+  return /^gemini-1\./i.test(model);
+}
+
+function getGeminiModelCandidates(): string[] {
+  const configuredModels = (process.env.GEMINI_MODEL || '')
+    .split(',')
+    .map((m) => m.trim())
+    .filter(Boolean)
+    .filter((m) => !isRetiredGeminiModel(m));
+  const defaultModels = DEFAULT_MODELS
+    .split(',')
+    .map((m) => m.trim())
+    .filter(Boolean)
+    .filter((m) => !isRetiredGeminiModel(m));
+  return Array.from(new Set([...configuredModels, ...defaultModels]));
+}
+
 function normalizeHistory(raw: unknown): ChatTurn[] {
   if (!Array.isArray(raw)) return [];
   const out: ChatTurn[] = [];
@@ -174,10 +192,7 @@ async function chatWithGemini(
   key: string,
   systemPrompt: string
 ): Promise<string> {
-  const models = (process.env.GEMINI_MODEL || DEFAULT_MODELS)
-    .split(',')
-    .map((m) => m.trim())
-    .filter(Boolean);
+  const models = getGeminiModelCandidates();
 
   let lastErr = 'No models tried';
   for (const model of models) {
