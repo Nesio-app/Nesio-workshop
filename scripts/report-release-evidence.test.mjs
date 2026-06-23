@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(scriptDir, '..');
 const packageJson = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8'));
+const domainRunbook = readFileSync(join(repoRoot, 'docs/release/domain-routing-runbook.md'), 'utf8');
 
 assert.equal(
   packageJson.scripts['report:release-evidence'],
@@ -54,5 +55,16 @@ assert.match(markdown, /Baohe Release Evidence v0/);
 assert.match(markdown, /Public release ready: false/);
 assert.match(markdown, /Fallback QA ready: true/);
 assert.match(markdown, /www\.nesio\.app/);
+
+assert.match(
+  domainRunbook,
+  /npm run report:release-evidence/,
+  'domain routing runbook must tell operators how to generate the release evidence packet.',
+);
+assert.match(
+  domainRunbook,
+  /Release Evidence|release evidence/i,
+  'domain routing runbook must explain that release evidence is the QA and CEO handoff packet.',
+);
 
 console.log('release evidence report tests passed');

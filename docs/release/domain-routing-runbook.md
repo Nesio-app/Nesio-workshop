@@ -37,6 +37,17 @@ This report intentionally separates the canonical domain state from the
 fallback QA domain state, so `www.nesio.app` cannot be mistaken for ready while
 DNS still points outside Vercel.
 
+Generate the Release Evidence packet before QA or CEO handoff:
+
+```bash
+npm run report:release-evidence
+npm run report:release-evidence -- --markdown
+```
+
+Release Evidence is the handoff packet for Ming QA and CEO review. It combines
+the release status, fallback QA decision, canonical DNS blocker, required
+commands, and public-release gate conditions in one machine-readable summary.
+
 Check the canonical domain:
 
 ```bash
