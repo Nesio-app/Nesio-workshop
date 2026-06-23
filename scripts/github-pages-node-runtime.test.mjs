@@ -11,6 +11,17 @@ const moduleDataNetworkDb = read('lib/portal/module-data-network-db.mjs');
 const packageJson = JSON.parse(read('package.json'));
 
 assert.match(
+  workflow,
+  /actions\/checkout@v7/,
+  'release workflow must use actions/checkout@v7 to avoid deprecated Node 20 action runtime warnings.',
+);
+assert.match(
+  workflow,
+  /actions\/setup-node@v6/,
+  'release workflow must use actions/setup-node@v6 to avoid deprecated Node 20 action runtime warnings.',
+);
+
+assert.match(
   `${decDataApi}\n${moduleDataNetworkDb}`,
   /require\(['"]node:sqlite['"]\)|import\(['"]node:sqlite['"]\)/,
   'server-side data APIs may use node:sqlite only through runtime lazy loading.',
@@ -69,7 +80,7 @@ assert.match(
 );
 assert.match(
   workflow,
-  /actions\/upload-artifact@v4[\s\S]*name:\s*release-evidence[\s\S]*path:\s*release-evidence\//,
+  /actions\/upload-artifact@v7[\s\S]*name:\s*release-evidence[\s\S]*path:\s*release-evidence\//,
   'release workflow must upload release evidence as a downloadable artifact for QA and CEO review.',
 );
 assert.equal(
