@@ -23,6 +23,9 @@ if (!manifest) {
   for (const entry of ['notebooks', 'prototype', 'historical-ios', 'independent-memory-app']) {
     if (!manifest.excludedSurfaceKinds?.includes(entry)) failures.push(`excludedSurfaceKinds missing: ${entry}`);
   }
+  for (const pattern of ['scripts/* 2.mjs', '**/* 2.*']) {
+    if (!manifest.excludedFileGlobs?.includes(pattern)) failures.push(`excludedFileGlobs missing: ${pattern}`);
+  }
 
   const memoryApp = manifest.independentApps?.find((entry) => entry.path === 'memory');
   if (!memoryApp) failures.push('independentApps must classify memory');

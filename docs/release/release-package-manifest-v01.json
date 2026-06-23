@@ -23,6 +23,10 @@
     "independent-memory-app",
     "unrelated-local-noise"
   ],
+  "excludedFileGlobs": [
+    "scripts/* 2.mjs",
+    "**/* 2.*"
+  ],
   "independentApps": [
     {
       "path": "memory",
