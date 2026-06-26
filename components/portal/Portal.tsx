@@ -205,29 +205,65 @@ export default function Portal() {
   }, []);
 
   // Handle OAuth callbacks from connectors (Calendar, Gmail)
-  // The callback redirects to /?connector=xxx&status=connected
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+
+    // Gmail callback: ?connector=gmail&status=connected
     const connector = params.get('connector');
     const status = params.get('status');
+
+    // Calendar callback: ?calendar=google_oauth_connected&status=calendar_session_established
+    const calendarParam = params.get('calendar');
+    const calendarStatus = params.get('status') || '';
+
     const oauthError = params.get('error');
 
-    if (!connector) return;
+    // Detect calendar connection
+    const calendarConnected = calendarParam === 'google_oauth_connected' ||
+      calendarStatus === 'calendar_session_established';
+
+    if (!connector && !calendarParam) return;
 
     // Clean URL immediately
     params.delete('connector'); params.delete('status'); params.delete('error');
+    params.delete('calendar'); params.delete('safePublicStatus'); params.delete('secretsRedacted');
     const qs = params.toString();
     window.history.replaceState({}, '', `${window.location.pathname}${qs ? `?${qs}` : ''}`);
 
-    if (status === 'connected') {
-      // Save connector state to localStorage so ConnectorsHub shows it correctly
+    function saveConnector(id: string) {
       try {
         const saved = JSON.parse(localStorage.getItem('nesio-connectors-v1') || '{}');
-        saved[connector] = true;
+        saved[id] = true;
         localStorage.setItem('nesio-connectors-v1', JSON.stringify(saved));
       } catch { /* ignore */ }
+    }
 
-      // Show a toast and trigger connector refresh
+    function triggerCalendarRefresh() {
+      setTimeout(() => {
+        fetch('/api/portal/calendar', { cache: 'no-store' })
+          .then((r) => r.json())
+          .then((data: { events?: unknown[]; feeds?: unknown }) => {
+            if (data?.events || data?.feeds) {
+              import('@/lib/portal/prefetch-cache').then(({ writePortalCache, PORTAL_CACHE_KEYS }) => {
+                writePortalCache(PORTAL_CACHE_KEYS.calendar, data);
+                window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
+              });
+            }
+          })
+          .catch(() => undefined);
+      }, 500);
+    }
+
+    // Handle Calendar OAuth callback (?calendar=google_oauth_connected)
+    if (calendarConnected) {
+      saveConnector('calendar');
+      window.dispatchEvent(new CustomEvent('nesio-connector-connected', { detail: { connector: 'calendar' } }));
+      triggerCalendarRefresh();
+      return;
+    }
+
+    if (status === 'connected' && connector) {
+      saveConnector(connector);
       window.dispatchEvent(new CustomEvent('nesio-connector-connected', { detail: { connector } }));
 
       // Auto-sync Gmail after OAuth
@@ -247,21 +283,8 @@ export default function Portal() {
         }, 1000);
       }
 
-      // Trigger calendar refresh
       if (connector === 'calendar') {
-        setTimeout(() => {
-          fetch('/api/portal/calendar', { cache: 'no-store' })
-            .then((r) => r.json())
-            .then((data: { events?: unknown[]; feeds?: unknown }) => {
-              if (data?.events || data?.feeds) {
-                import('@/lib/portal/prefetch-cache').then(({ writePortalCache, PORTAL_CACHE_KEYS }) => {
-                  writePortalCache(PORTAL_CACHE_KEYS.calendar, data);
-                  window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
-                });
-              }
-            })
-            .catch(() => undefined);
-        }, 500);
+        triggerCalendarRefresh();
       }
     } else if (oauthError) {
       console.warn(`[nesio] connector ${connector} oauth error:`, oauthError);

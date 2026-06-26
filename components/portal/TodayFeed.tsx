@@ -7,6 +7,7 @@ import { getRecentNodes } from '@/lib/portal/life-graph';
 import { learnFromFeedback } from '@/lib/portal/mirror-profile';
 import { runConnectors } from '@/lib/portal/connectors';
 import VoiceBrief from './VoiceBrief';
+import DailyBriefCard from './DailyBriefCard';
 
 // Fallback mock cards shown before real signals load
 const MOCK_CARDS: RecommendationCard[] = [
@@ -277,6 +278,9 @@ export default function TodayFeed({ onOpenMemory }: { onOpenMemory?: () => void 
           <NightTimeline />
         ) : (
           <>
+            {/* Always-present daily overview card */}
+            <DailyBriefCard />
+
             <div className="nesio-today-greeting">
               <h1 className="nesio-today-greeting-title">{greeting}，{displayName}。</h1>
               <p className="nesio-today-greeting-sub">
