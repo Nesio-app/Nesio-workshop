@@ -1,180 +1,211 @@
-# Treasurebox / Baohe
+# Nesio
 
-Treasurebox is a modular toolbox app. The current beta path is intentionally small: a PWA shell plus the Inventory / purchase-memory tool.
+# **Know Less. Live More.**
 
-This repository keeps the broader module registry, contracts, and iOS shell work in one place, but most modules are not part of the public first-launch promise yet.
+### **Design More. Execute Less.**
 
-## Repository Boundary
+*A personal system that helps people capture everyday life, recover forgotten context, and reduce cognitive load.*
 
-This repository is product code for Treasurebox / Baohe only. Personal portfolio and academic data science artifacts have been extracted to:
+<p align="center">
+  <img src="./docs/images/hero.png" alt="Nesio" width="100%">
+</p>
 
-- https://github.com/hanbing6228/jing-duan-ds-portfolio
+---
 
-Do not add notebooks, class assignments, portfolio pages, or personal homepage assets back into this repository.
+## What is Nesio?
 
-Architecture and boundary references:
+Nesio is a personal life system built for people who carry too much in their heads.
 
-- `lib/portal/ARCHITECTURE.md`
-- `docs/repository-boundary-cleanup.md`
+Instead of asking you to organize life into folders, databases, and endless reminders, Nesio quietly remembers what matters and helps you find it again when you need it.
 
-## Submodules
+It isn't built to help you remember more.
 
-This repo intentionally still uses Git submodules for several historical or
-sandbox tool codebases. They are integration references, not automatic public
-launch promises.
+It's built so you don't have to.
 
-Clone with submodules when you need to inspect or build those external tool
-references:
+---
 
-```bash
-git clone --recursive https://github.com/hanbing6228/treasurebox.git
-```
+## Why?
 
-If you already cloned without submodules:
+We rarely lose information.
 
-```bash
-git submodule update --init --recursive
-```
+We lose context.
 
-Check local submodule health:
+* Where did I put my passport?
+* Why did I save this document?
+* Who was this gift for?
+* What happened in yesterday's meeting?
+* What was I supposed to do next?
 
-```bash
-npm run doctor:submodules
-```
+Finding information is easy.
 
-Current policy:
+Recovering context is hard.
 
-- Do not update all submodules casually before release QA.
-- Do not infer public launch scope from a submodule existing on disk.
-- Inventory/storage lineage is the only current launch-adjacent submodule
-  reference.
-- Psychology, reading, question bank, and Weaver/AI references stay sandbox or
-  contract-only unless a separate gate changes their product status.
-- Do not migrate to Turborepo or npm workspaces until a tool becomes launchable
-  or monetized and genuinely shares enough build/runtime code with Baohe.
+That's what Nesio is built for.
 
-## License
+---
 
-This project is licensed under the MIT License. See `LICENSE`.
+## Core Experience
 
-## Current Launch Scope
+### 📅 Today
 
-Public PWA beta scope:
+A calm daily feed.
 
-- PWA web shell / module registry
-- Inventory / purchase-memory
-- Local-first data storage
-- Local file export / restore and delete for launch-local data
-- Static paywall preview state
-- Approval-gated visibility for non-launch modules
+Only the few things that deserve your attention today.
 
-Not publicly promised for first launch:
+No dashboards.
 
-- AI runtime behavior
-- Health, mental health, finance, or therapeutic outcomes
-- Real cloud sync
-- Real account system
-- Real StoreKit purchase / restore / receipt validation
-- Real external service authorization
-- Production notifications
+No information overload.
 
-Approval Gate always takes priority over Paywall. Paid state never means a gated module or risky action is safe to use.
+---
 
-## Module Status
+### 🎤 Tell Nesio
 
-The repo contains multiple historical or sandbox tools. Only Inventory / purchase-memory is launch-visible for normal users.
+Capture life naturally.
 
-Other modules may remain in the internal registry as sandbox, gated, hidden, or future candidates. They should not be described as public product commitments until their contracts, data boundary, QA, privacy copy, and App Store wording are approved.
+* Speak
+* Take a photo
+* Share a link
+* Upload a document
 
-## Data Boundary
+No folders.
 
-Current data layer:
+No tags.
 
-- Local profile only: `LocalProfile@v1`
-- Local data root: `BaoheLocalDataRoot@v1`
-- Inventory item schema: `LocalInventoryItem@v1`
-- Inventory store schema: `LocalInventoryStore@v1`
-- Cloud flags must remain disabled for first launch
+No setup.
 
-The launch-local data layer supports local initialization, read/write helpers, export, delete/reset, and migration smoke checks. It does not use a real cloud database or server user identity.
+---
 
-## PWA Beta
+### 🧠 Memory
 
-The current testable path is the web/PWA surface. It is local-first and does not require accounts, cloud sync, StoreKit, or external service authorization.
+Memory isn't a file manager.
 
-Run locally:
+It's a living record of your life.
 
-```bash
-npm run dev
-```
+People.
 
-The launch-visible tool is Inventory / purchase-memory. Other modules can remain registered for internal sandbox or future planning, but ordinary users should not see them as public commitments.
+Places.
 
-Public domain routing:
+Objects.
 
-- Canonical domain target: `www.nesio.app`
-- Current QA fallback: `https://treasurebox-nu.vercel.app`
-- Domain routing runbook: `docs/release/domain-routing-runbook.md`
-- Verify canonical DNS/runtime routing with `npm run precheck:domain-routing`
-- If `www.nesio.app` reports `server: "LiteSpeed"`, DNS still points to the old hosting provider and the fallback Vercel domain should be used for QA.
+Documents.
 
-## iOS
+Promises.
 
-The iOS shell lives in `treasurebox-ios/` and is kept as a later packaging path. It is not the current beta release target.
+Moments.
 
-Previously verified local build target:
+Everything stays connected.
 
-```bash
-cd treasurebox-ios
-npm run cap:sync
-DEVELOPER_DIR=/Users/jing/Downloads/Xcode.app/Contents/Developer xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
-```
+---
 
-The current iOS shell intentionally avoids optional native splash/status-bar plugins because the previous plugin versions were incompatible with the installed Capacitor/Xcode build path.
+### ✨ Context Recovery
+
+The first milestone of Nesio.
+
+Tell it once.
+
+Forget safely.
+
+When you need it again, Nesio brings back not only the information—but also the surrounding context.
+
+---
+
+## Design Principles
+
+* Reduce cognitive load.
+* Capture should be easier than remembering.
+* Technology should interrupt less.
+* Every suggestion should be understandable.
+* Simplicity is a feature.
+
+---
+
+## Technology
+
+### Frontend
+
+* Next.js
+* React
+* TypeScript
+* Tailwind CSS
+
+### Backend
+
+* Supabase
+* PostgreSQL
+
+### AI & Intelligence
+
+* OpenAI
+* Structured Outputs
+* Embeddings
+* Context Reasoning
+
+### Integrations
+
+* Google Calendar
+* Gmail
+* Google Drive
+* Voice
+* Photos
+
+---
+
+## Roadmap
+
+### ✅ Available
+
+* Today
+* Memory
+* Voice Capture
+* Image Capture
+* File Upload
+* Connectors
+* Context Engine
+
+### 🚧 In Progress
+
+* Context Recovery
+* Future Guidance
+* Life Graph
+* Personal Intelligence
+
+### ⏳ Planned
+
+* Family Workspace
+* Shared Memory
+* Ambient Intelligence
+* Cross-device Experiences
+
+---
 
 ## Development
 
-Install dependencies:
-
 ```bash
+git clone https://github.com/hanbing6228/treasurebox.git
+
+cd treasurebox
+
 npm install
-```
 
-Run the web shell:
-
-```bash
 npm run dev
 ```
 
-Build:
+---
 
-```bash
-npm run build
-```
+## Vision
 
-Core checks:
+The future doesn't need another note-taking app.
 
-```bash
-npm run report:modules
-npm run test:qa:static
-npm run test:launch-surface
-npm run precheck:local-data-launch
-npm run precheck:no-real-data
-```
+It doesn't need another chatbot.
 
-Some reports may return review warnings for known non-runtime items, such as Data Aggregation review warnings. Do not treat report-only visibility as remediation done.
+It needs software that quietly helps people live with less mental effort.
 
-## Release Gate
+Nesio is one step toward that future.
 
-The following actions require CEO approval before execution:
+---
 
-- TestFlight or App Store submission
-- Production deploy decisions
-- Real cloud database connection
-- Real account or identity binding
-- Real StoreKit products, prices, purchase, restore, or receipt validation
-- External service authorization
-- Notification sending
-- Public claims about AI, health, finance, mental health, therapy, or outcomes
+<p align="center">
 
-Local development, static contract checks, local iOS builds, and report-only QA do not require that gate.
+**Know Less. Live More.**
+
+</p>
