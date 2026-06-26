@@ -38,6 +38,8 @@ import {
 } from '@/lib/portal/prefetch-cache';
 import { configUrl } from '@/lib/portal/paths';
 import { loadProfileSettings, PROFILE_UPDATED_EVENT, type PortalLocale } from '@/lib/portal/profile';
+import { runConnectors } from '@/lib/portal/connectors';
+import { pruneDisposableSignals } from '@/lib/life-domain';
 import type { PortalConfig, PortalDecMetadata, PortalTool } from '@/lib/portal/types';
 import { type ToolForShellState } from './tool-state';
 
@@ -180,6 +182,13 @@ export default function Portal() {
   useEffect(() => {
     setLaunchSurfaceContext(normalizeLaunchSurfaceContext(readLaunchSurfaceContextFromBrowser()));
     setLocale(loadProfileSettings().locale);
+  }, []);
+
+  // Platform Runtime: the shell drives Integration collection + Pruning.
+  // The Experience layer (Today) only consumes results, never calls connectors.
+  useEffect(() => {
+    pruneDisposableSignals();
+    runConnectors().catch(() => undefined);
   }, []);
 
   useEffect(() => {

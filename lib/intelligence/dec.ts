@@ -32,6 +32,7 @@ import {
   hasEvidence,
   type Recommendation,
 } from '../life-domain/recommendation';
+import { checkPlatformHealth, type PlatformHealth } from './platform-health';
 
 function tomorrowISO(): string {
   const d = new Date();
@@ -239,6 +240,7 @@ export interface DECOutput {
   lifeState: LifeState;
   cards: RecommendationCard[];
   recommendations: Recommendation[];
+  health: PlatformHealth;
 }
 
 export function runDEC(): DECOutput {
@@ -246,12 +248,17 @@ export function runDEC(): DECOutput {
   const signals = getRecentSignals();
   const lifeState = computeLifeState();
 
+  // Platform self-awareness: check data health before reasoning (§2.2).
+  const health = checkPlatformHealth();
+
   const eventSignals = signals.filter((s) => s.type === 'event' && s.source === 'calendar');
   const healthSignals = signals.filter((s) => s.type === 'symptom');
 
+  // When degraded (stale / thin / low-confidence data), retreat to the
+  // single-domain rule engine — skip cross-signal inference (ruleLoadReduction).
   const candidates: (RecommendationCard | null)[] = [
     ruleMeetingBrief(eventSignals),
-    ruleLoadReduction(lifeState),       // cross-signal — DEC-only
+    ...(health.degraded ? [] : [ruleLoadReduction(lifeState)]), // cross-signal — DEC-only, gated on health
     ruleWeatherCoat(weather, healthSignals),
     ruleHealthState(weather, healthSignals),
     ruleFamilyCommitment(signals),
@@ -281,7 +288,7 @@ export function runDEC(): DECOutput {
   // Back-link recommended guidance into the Life State
   lifeState.recommendedGuidanceIds = recommendations.map((r) => r.id);
 
-  return { lifeState, cards, recommendations };
+  return { lifeState, cards, recommendations, health };
 }
 
 /** Backward-compatible: existing Today UI consumes view-model cards. */

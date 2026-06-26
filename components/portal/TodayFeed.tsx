@@ -5,9 +5,7 @@ import { loadProfileSettings } from '@/lib/portal/profile';
 import { recordCardFeedback, type RecommendationCard } from '@/lib/portal/reasoning-engine';
 import { generateTodayCards } from '@/lib/intelligence';
 import { getRecentNodes } from '@/lib/portal/life-graph';
-import { pruneDisposableSignals } from '@/lib/life-domain';
 import { learnFromFeedback } from '@/lib/portal/mirror-profile';
-import { runConnectors } from '@/lib/portal/connectors';
 import VoiceBrief from './VoiceBrief';
 import DailyBriefCard from './DailyBriefCard';
 import LifeStateCard from './LifeStateCard';
@@ -247,16 +245,12 @@ export default function TodayFeed({ onOpenMemory }: { onOpenMemory?: () => void 
     });
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-portal-theme'] });
 
-    // Pruning Engine: clear expired Disposable signals before reasoning.
-    pruneDisposableSignals();
-
-    // Load initial cards (may be mock or cached-signal cards)
+    // Load initial cards (may be mock or cached-signal cards).
+    // Note: connector collection + pruning are driven by the platform shell
+    // (Portal.tsx), not the Experience layer — Today only consumes results.
     const real = generateTodayCards();
     setCards(real.length > 0 ? real : MOCK_CARDS);
     setMemoryCount(getRecentNodes().length);
-
-    // Run connectors (weather + calendar) — updates cache then fires events
-    runConnectors().catch(() => undefined);
 
     const refresh = () => {
       const updated = generateTodayCards();

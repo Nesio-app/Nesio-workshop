@@ -10,9 +10,23 @@ import { useEffect, useRef, useState } from 'react';
 import { loadProfileSettings } from '@/lib/portal/profile';
 import { readPortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
 import { getRecentNodes } from '@/lib/portal/life-graph';
-import type { BriefSegment } from '@/app/api/portal/daily-brief/route';
 import type { CalendarEvent } from '@/lib/portal/types';
-import type { WeatherSnapshot } from '@/lib/portal/weather';
+
+// View-model types owned by the Today surface (Platform Leak Check: Today must
+// not import Integration DTOs — it consumes its own normalized view shapes).
+interface BriefSegment {
+  id: string;
+  type: 'greeting' | 'weather' | 'calendar' | 'email' | 'memory' | 'closing';
+  text: string;
+  voice: 'nova' | 'alloy' | 'echo';
+  emoji: string;
+}
+interface WeatherView {
+  temperatureC: number;
+  condition: string;
+  forecastNote?: string;
+  placeLabel?: string;
+}
 
 const BRIEF_CACHE_KEY = 'nesio-daily-brief-cache';
 
@@ -25,7 +39,7 @@ function todayKey(): string {
 type PlayState = 'idle' | 'loading' | 'playing' | 'paused' | 'done';
 
 export default function DailyBriefCard() {
-  const [weather, setWeather] = useState<WeatherSnapshot | null>(null);
+  const [weather, setWeather] = useState<WeatherView | null>(null);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [segments, setSegments] = useState<BriefSegment[]>([]);
   const [playState, setPlayState] = useState<PlayState>('idle');
@@ -49,13 +63,13 @@ export default function DailyBriefCard() {
     } catch { /* ignore */ }
 
     // Load signals
-    const w = readPortalCache<WeatherSnapshot>(PORTAL_CACHE_KEYS.weather);
+    const w = readPortalCache<WeatherView>(PORTAL_CACHE_KEYS.weather);
     setWeather(w);
     const cal = readPortalCache<{ events?: CalendarEvent[] }>(PORTAL_CACHE_KEYS.calendar);
     setEvents(cal?.events?.filter((e) => new Date(e.start).getTime() > Date.now()).slice(0, 3) || []);
 
     const onUpdate = () => {
-      setWeather(readPortalCache<WeatherSnapshot>(PORTAL_CACHE_KEYS.weather));
+      setWeather(readPortalCache<WeatherView>(PORTAL_CACHE_KEYS.weather));
       const c = readPortalCache<{ events?: CalendarEvent[] }>(PORTAL_CACHE_KEYS.calendar);
       setEvents(c?.events?.filter((e) => new Date(e.start).getTime() > Date.now()).slice(0, 3) || []);
     };

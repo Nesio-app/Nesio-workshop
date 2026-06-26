@@ -9,3 +9,4 @@
  */
 
 export * from './dec';
+export * from './platform-health';
