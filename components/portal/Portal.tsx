@@ -204,6 +204,70 @@ export default function Portal() {
     };
   }, []);
 
+  // Handle OAuth callbacks from connectors (Calendar, Gmail)
+  // The callback redirects to /?connector=xxx&status=connected
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const connector = params.get('connector');
+    const status = params.get('status');
+    const oauthError = params.get('error');
+
+    if (!connector) return;
+
+    // Clean URL immediately
+    params.delete('connector'); params.delete('status'); params.delete('error');
+    const qs = params.toString();
+    window.history.replaceState({}, '', `${window.location.pathname}${qs ? `?${qs}` : ''}`);
+
+    if (status === 'connected') {
+      // Save connector state to localStorage so ConnectorsHub shows it correctly
+      try {
+        const saved = JSON.parse(localStorage.getItem('nesio-connectors-v1') || '{}');
+        saved[connector] = true;
+        localStorage.setItem('nesio-connectors-v1', JSON.stringify(saved));
+      } catch { /* ignore */ }
+
+      // Show a toast and trigger connector refresh
+      window.dispatchEvent(new CustomEvent('nesio-connector-connected', { detail: { connector } }));
+
+      // Auto-sync Gmail after OAuth
+      if (connector === 'gmail') {
+        setTimeout(() => {
+          fetch('/api/portal/gmail')
+            .then((r) => r.json())
+            .then((data: { ok?: boolean; nodes?: Array<Record<string, unknown>>; count?: number }) => {
+              if (data.ok && data.nodes?.length) {
+                import('@/lib/portal/life-graph').then(({ addLifeNode }) => {
+                  data.nodes!.forEach((n) => addLifeNode(n as Parameters<typeof addLifeNode>[0]));
+                  window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
+                });
+              }
+            })
+            .catch(() => undefined);
+        }, 1000);
+      }
+
+      // Trigger calendar refresh
+      if (connector === 'calendar') {
+        setTimeout(() => {
+          fetch('/api/portal/calendar', { cache: 'no-store' })
+            .then((r) => r.json())
+            .then((data: { events?: unknown[]; feeds?: unknown }) => {
+              if (data?.events || data?.feeds) {
+                import('@/lib/portal/prefetch-cache').then(({ writePortalCache, PORTAL_CACHE_KEYS }) => {
+                  writePortalCache(PORTAL_CACHE_KEYS.calendar, data);
+                  window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
+                });
+              }
+            })
+            .catch(() => undefined);
+        }, 500);
+      }
+    } else if (oauthError) {
+      console.warn(`[nesio] connector ${connector} oauth error:`, oauthError);
+    }
+  }, []);
+
   useEffect(() => {
     fetch(configUrl())
       .then((res) => (res.ok ? res.json() : null))
