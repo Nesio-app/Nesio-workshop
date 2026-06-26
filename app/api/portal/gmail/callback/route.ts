@@ -1,9 +1,9 @@
 /**
  * GET /api/portal/gmail/callback
- * Receives OAuth code from Google, exchanges for access+refresh tokens,
- * stores in HttpOnly cookies, redirects back to app.
+ * Receives OAuth code, exchanges for tokens, stores per-user via lib/portal/integrations.
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { saveIntegrationToken, setTokenCookiesOnResponse } from '@/lib/portal/integrations';
 
 const STATE_COOKIE = 'nesio_gmail_oauth_state';
 
@@ -22,40 +22,28 @@ type TokenResponse = {
   access_token?: string;
   refresh_token?: string;
   expires_in?: number;
+  scope?: string;
   error?: string;
 };
-
-function setGmailCookies(response: NextResponse, token: TokenResponse) {
-  const secure = process.env.NODE_ENV === 'production';
-  const maxAge = token.expires_in ?? 3600;
-  if (token.access_token) {
-    response.cookies.set('nesio_gmail_access', token.access_token, {
-      httpOnly: true, sameSite: 'lax', secure, path: '/', maxAge,
-    });
-  }
-  if (token.refresh_token) {
-    response.cookies.set('nesio_gmail_refresh', token.refresh_token, {
-      httpOnly: true, sameSite: 'lax', secure, path: '/', maxAge: 60 * 60 * 24 * 30,
-    });
-  }
-}
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const code = searchParams.get('code');
+  const error = searchParams.get('error');
   const state = searchParams.get('state');
   const stateCookie = req.cookies.get(STATE_COOKIE)?.value;
 
+  if (error === 'access_denied') {
+    return NextResponse.redirect(new URL('/?connector=gmail&error=access_denied', req.url));
+  }
   if (!code) {
     return NextResponse.redirect(new URL('/?connector=gmail&error=no_code', req.url));
   }
-
-  // State validation (relaxed — just check prefix)
-  if (!state?.startsWith('nesio_gmail:') || (stateCookie && stateCookie !== state)) {
+  if (stateCookie && state && stateCookie !== state) {
     return NextResponse.redirect(new URL('/?connector=gmail&error=state_mismatch', req.url));
   }
 
-  // Exchange code for tokens
+  // Exchange code → tokens
   const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -72,11 +60,25 @@ export async function GET(req: NextRequest) {
 
   if (!token.access_token) {
     console.error('gmail_oauth_token_failed', token.error);
-    return NextResponse.redirect(new URL(`/?connector=gmail&error=${token.error || 'token_failed'}`, req.url));
+    return NextResponse.redirect(
+      new URL(`/?connector=gmail&error=${encodeURIComponent(token.error || 'token_failed')}`, req.url),
+    );
   }
 
-  const response = NextResponse.redirect(new URL('/?connector=gmail&status=connected', req.url));
-  setGmailCookies(response, token);
-  response.cookies.delete(STATE_COOKIE);
-  return response;
+  // Save token per user (Supabase + cookies)
+  const savedTokens = await saveIntegrationToken(
+    'gmail',
+    {
+      accessToken: token.access_token,
+      refreshToken: token.refresh_token,
+      expiresAt: token.expires_in ? Date.now() + token.expires_in * 1000 : undefined,
+      scope: token.scope,
+    },
+    req,
+  );
+
+  const redirect = NextResponse.redirect(new URL('/?connector=gmail&status=connected', req.url));
+  setTokenCookiesOnResponse(redirect, 'gmail', savedTokens);
+  redirect.cookies.delete(STATE_COOKIE);
+  return redirect;
 }
