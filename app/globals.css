@@ -10565,3 +10565,152 @@ html[data-portal-theme="night"] .nesio-profile-auth-banner { background: rgba(88
   align-items: center;
   gap: 0.75rem;
 }
+
+/* ─── VoiceBrief ─── */
+.nesio-voice-brief-overlay {
+  position: fixed; inset: 0; z-index: 400; display: flex; align-items: flex-end;
+}
+.nesio-voice-brief-backdrop {
+  position: absolute; inset: 0; background: rgba(10,20,45,0.45);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+.nesio-voice-brief-card {
+  position: relative; z-index: 1; width: 100%;
+  background: linear-gradient(160deg, #1a2d58 0%, #0d1a36 100%);
+  border-top-left-radius: 1.5rem; border-top-right-radius: 1.5rem;
+  padding: 0 1.25rem calc(2.5rem + env(safe-area-inset-bottom));
+  box-shadow: 0 -8px 40px rgba(0,0,0,0.3);
+  animation: sheetSlideUp 0.3s var(--ease-out);
+}
+.nesio-voice-brief-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  padding: 1rem 0 0.75rem; gap: 0.75rem;
+}
+.nesio-voice-brief-kicker {
+  font-size: 0.68rem; font-weight: 600; color: #96c7f3;
+  text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.2rem;
+}
+.nesio-voice-brief-title {
+  font-size: 1.05rem; font-weight: 700; color: #e8eefa; letter-spacing: -0.01em;
+}
+.nesio-voice-brief-viz {
+  display: flex; align-items: center; gap: 2px; height: 2.5rem; margin-bottom: 0.75rem;
+}
+.nesio-voice-brief-bar {
+  width: 3px; border-radius: 2px; background: rgba(88,140,227,0.3); min-height: 4px; flex-shrink: 0;
+}
+.nesio-voice-brief-bar--active { background: var(--portal-blue-mid); }
+.nesio-voice-brief-progress-track {
+  height: 3px; background: rgba(255,255,255,0.1); border-radius: 999px; margin-bottom: 0.85rem; overflow: hidden;
+}
+.nesio-voice-brief-progress-fill {
+  height: 100%; background: var(--portal-blue-deep); border-radius: 999px; transition: width 0.3s linear;
+}
+.nesio-voice-brief-script {
+  font-size: 0.8rem; color: #8fa3c0; line-height: 1.55; margin-bottom: 1.25rem;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+.nesio-voice-brief-controls {
+  display: flex; align-items: center; justify-content: center; gap: 1.5rem;
+}
+.nesio-voice-brief-btn {
+  width: 2.8rem; height: 2.8rem; border-radius: 50%; background: rgba(255,255,255,0.1);
+  color: #e8eefa; display: flex; align-items: center; justify-content: center;
+}
+.nesio-voice-brief-play-btn {
+  width: 3.8rem; height: 3.8rem; border-radius: 50%;
+  background: var(--portal-blue-deep); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 20px rgba(88,140,227,0.5);
+  transition: transform 0.15s;
+}
+.nesio-voice-brief-play-btn:active { transform: scale(0.9); }
+
+/* ─── VoiceInputSheet intent label ─── */
+.nesio-voice-intent-label {
+  font-size: 0.73rem; color: var(--portal-blue-deep); margin: -0.15rem 0 0.6rem;
+  display: flex; align-items: center; gap: 0.3rem;
+}
+html[data-portal-theme="night"] .nesio-voice-intent-label { color: #96c7f3; }
+
+/* ─── ConnectorsHub ─── */
+.nesio-connector-row {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.75rem 0; border-bottom: 1px solid var(--portal-line);
+}
+.nesio-connector-icon {
+  width: 2.4rem; height: 2.4rem; border-radius: 0.6rem;
+  display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0;
+}
+.nesio-connector-body { flex: 1; min-width: 0; }
+.nesio-connector-name { font-size: 0.88rem; font-weight: 600; color: var(--portal-ink); display: flex; align-items: center; gap: 0.4rem; }
+html[data-portal-theme="night"] .nesio-connector-name { color: #e8eefa; }
+.nesio-connector-desc { font-size: 0.71rem; color: var(--portal-muted); margin-top: 0.1rem; }
+.nesio-connector-sync { font-size: 0.68rem; color: #10b981; margin-top: 0.1rem; }
+.nesio-connector-soon { font-size: 0.62rem; font-weight: 600; color: var(--portal-muted); background: rgba(0,0,0,0.06); padding: 0.1rem 0.4rem; border-radius: 999px; }
+.nesio-connector-connect {
+  font-size: 0.75rem; font-weight: 700; color: #fff; background: var(--portal-blue-deep);
+  padding: 0.3rem 0.85rem; border-radius: 999px; flex-shrink: 0;
+}
+.nesio-connector-disconnect {
+  font-size: 0.75rem; font-weight: 600; color: #ef4444;
+  background: rgba(239,68,68,0.08); padding: 0.3rem 0.75rem; border-radius: 999px; flex-shrink: 0;
+}
+
+/* ─── HealthLogger ─── */
+.nesio-health-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.nesio-health-chip {
+  font-size: 0.78rem; font-weight: 500; padding: 0.35rem 0.75rem;
+  border-radius: 999px; border: 1.5px solid rgba(88,140,227,0.2);
+  color: var(--portal-muted); transition: all 0.15s;
+}
+.nesio-health-chip--active { background: var(--portal-blue-deep); color: #fff; border-color: var(--portal-blue-deep); }
+.nesio-health-sleep-row { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.nesio-health-sleep-btn {
+  font-size: 0.78rem; font-weight: 600; padding: 0.35rem 0.6rem;
+  border-radius: 0.5rem; border: 1.5px solid rgba(88,140,227,0.18);
+  color: var(--portal-muted); transition: all 0.15s;
+}
+.nesio-health-sleep-btn--active { background: rgba(88,140,227,0.1); color: var(--portal-blue-deep); border-color: var(--portal-blue-deep); }
+.nesio-health-energy-row { display: flex; gap: 0.5rem; }
+.nesio-health-energy-btn {
+  font-size: 0.75rem; padding: 0.35rem 0.55rem; border-radius: 0.5rem;
+  border: 1.5px solid rgba(88,140,227,0.15); color: var(--portal-muted); transition: all 0.15s;
+}
+.nesio-health-energy-btn--active { background: rgba(88,140,227,0.1); border-color: var(--portal-blue-deep); }
+.nesio-health-mood-row { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+.nesio-health-mood-btn {
+  font-size: 0.78rem; padding: 0.35rem 0.7rem; border-radius: 999px;
+  border: 1.5px solid rgba(88,140,227,0.15); color: var(--portal-muted); transition: all 0.15s;
+}
+.nesio-health-mood-btn--active { background: rgba(88,140,227,0.1); border-color: var(--portal-blue-deep); color: var(--portal-blue-deep); }
+
+/* ─── Mirror Profile Card ─── */
+.nesio-mirror-card {
+  background: rgba(88,140,227,0.06); border: 1px solid rgba(88,140,227,0.14);
+  border-radius: 1rem; padding: 0.85rem 0.9rem; margin-bottom: 1rem;
+}
+html[data-portal-theme="night"] .nesio-mirror-card { background: rgba(88,140,227,0.1); }
+.nesio-mirror-header { display: flex; align-items: center; gap: 0.65rem; }
+.nesio-mirror-icon { font-size: 1.3rem; }
+.nesio-mirror-title { font-size: 0.88rem; font-weight: 700; color: var(--portal-ink); }
+html[data-portal-theme="night"] .nesio-mirror-title { color: #e8eefa; }
+.nesio-mirror-sub { font-size: 0.7rem; color: var(--portal-muted); margin-top: 0.05rem; }
+.nesio-mirror-mode {
+  margin-left: auto; font-size: 0.68rem; font-weight: 600; color: var(--portal-blue-deep);
+  background: rgba(88,140,227,0.1); padding: 0.18rem 0.55rem; border-radius: 999px; flex-shrink: 0;
+}
+.nesio-mirror-domain-row {
+  display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.35rem;
+}
+.nesio-mirror-domain-label { font-size: 0.72rem; color: var(--portal-muted); min-width: 6rem; }
+.nesio-mirror-bar-track {
+  flex: 1; height: 5px; background: rgba(88,140,227,0.12); border-radius: 999px; overflow: hidden;
+}
+.nesio-mirror-bar-fill { height: 100%; background: var(--portal-blue-deep); border-radius: 999px; }
+.nesio-mirror-domain-pct { font-size: 0.68rem; font-weight: 600; color: var(--portal-blue-deep); min-width: 2rem; text-align: right; }
+.nesio-mirror-times { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.nesio-mirror-time-chip {
+  font-size: 0.7rem; font-weight: 500; color: var(--portal-blue-deep);
+  background: rgba(88,140,227,0.1); padding: 0.18rem 0.6rem; border-radius: 999px;
+}

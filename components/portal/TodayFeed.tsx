@@ -6,6 +6,7 @@ import { generateTodayCards, recordCardFeedback, type RecommendationCard } from 
 import { getRecentNodes } from '@/lib/portal/life-graph';
 import { learnFromFeedback } from '@/lib/portal/mirror-profile';
 import { runConnectors } from '@/lib/portal/connectors';
+import VoiceBrief from './VoiceBrief';
 
 // Fallback mock cards shown before real signals load
 const MOCK_CARDS: RecommendationCard[] = [
@@ -61,44 +62,50 @@ const MOCK_CARDS: RecommendationCard[] = [
 ];
 
 function AudioCard({ card, onFeedback }: { card: RecommendationCard; onFeedback: (f: RecommendationCard['feedback']) => void }) {
-  const [playing, setPlaying] = useState(false);
+  const [briefOpen, setBriefOpen] = useState(false);
   return (
-    <div className="nesio-today-card nesio-today-card--audio">
-      <div className="nesio-today-card-header">
-        <span className="nesio-today-card-domain">{card.domainLabel}</span>
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <span className="nesio-today-card-duration">90 秒</span>
-          <FeedbackMenu onFeedback={onFeedback} />
+    <>
+      <div className="nesio-today-card nesio-today-card--audio">
+        <div className="nesio-today-card-header">
+          <span className="nesio-today-card-domain">{card.domainLabel}</span>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <span className="nesio-today-card-duration">90 秒</span>
+            <FeedbackMenu onFeedback={onFeedback} />
+          </div>
         </div>
-      </div>
-      <div className="nesio-today-card-row">
-        <span className="nesio-today-card-icon-wrap" style={{ background: card.iconBg }}>{card.icon}</span>
-        <div>
-          <h3 className="nesio-today-card-title">{card.title}</h3>
-          <p className="nesio-today-card-body">{card.body}</p>
+        <div className="nesio-today-card-row">
+          <span className="nesio-today-card-icon-wrap" style={{ background: card.iconBg }}>{card.icon}</span>
+          <div>
+            <h3 className="nesio-today-card-title">{card.title}</h3>
+            <p className="nesio-today-card-body">{card.body}</p>
+          </div>
         </div>
-      </div>
-      <div className="nesio-today-audio-player">
-        <button type="button" className="nesio-today-audio-play" onClick={() => setPlaying(!playing)} aria-label={playing ? '暂停' : '播放'}>
-          {playing ? (
-            <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
-          ) : (
+        {/* Waveform teaser */}
+        <div className="nesio-today-audio-player" style={{ cursor: 'pointer' }} onClick={() => setBriefOpen(true)}>
+          <span className="nesio-today-audio-play">
             <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><polygon points="5,3 19,12 5,21"/></svg>
-          )}
-        </button>
-        <div className="nesio-today-audio-wave" aria-hidden>
-          {Array.from({ length: 24 }, (_, i) => (
-            <span key={i} className={`nesio-today-audio-bar${playing ? ' nesio-today-audio-bar--active' : ''}`}
-              style={{ height: `${8 + Math.sin(i * 0.7) * 6}px`, animationDelay: `${i * 0.05}s` }} />
-          ))}
+          </span>
+          <div className="nesio-today-audio-wave" aria-hidden>
+            {Array.from({ length: 24 }, (_, i) => (
+              <span key={i} className="nesio-today-audio-bar"
+                style={{ height: `${8 + Math.sin(i * 0.7) * 6}px` }} />
+            ))}
+          </div>
+          <span className="nesio-today-audio-time">~90s</span>
         </div>
-        <span className="nesio-today-audio-time">1:30</span>
+        <div className="nesio-today-card-actions">
+          <button type="button" className="nesio-today-btn nesio-today-btn--primary" onClick={() => { setBriefOpen(true); onFeedback('useful'); }}>{card.primaryAction}</button>
+          {card.secondaryAction && <button type="button" className="nesio-today-btn nesio-today-btn--ghost" onClick={() => onFeedback('not_now')}>{card.secondaryAction}</button>}
+        </div>
       </div>
-      <div className="nesio-today-card-actions">
-        <button type="button" className="nesio-today-btn nesio-today-btn--primary" onClick={() => setPlaying(true)}>{card.primaryAction}</button>
-        {card.secondaryAction && <button type="button" className="nesio-today-btn nesio-today-btn--ghost" onClick={() => onFeedback('not_now')}>{card.secondaryAction}</button>}
-      </div>
-    </div>
+      <VoiceBrief
+        open={briefOpen}
+        onClose={() => setBriefOpen(false)}
+        title={card.title}
+        body={card.body}
+        points={card.evidence.map((e) => `${e.label}：${e.value}`)}
+      />
+    </>
   );
 }
 

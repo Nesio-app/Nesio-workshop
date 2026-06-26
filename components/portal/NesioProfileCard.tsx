@@ -4,8 +4,11 @@ import { useEffect, useState } from 'react';
 import { loadProfileSettings } from '@/lib/portal/profile';
 import { getRecentNodes } from '@/lib/portal/life-graph';
 import { ToneSheet, PrivacySheet, SpacesSheet, SubscriptionSheet } from './SettingsSheets';
+import ConnectorsHub from './ConnectorsHub';
+import HealthLogger from './HealthLogger';
+import MirrorProfileCard from './MirrorProfileCard';
 
-type ActiveSheet = 'tone' | 'privacy' | 'spaces' | 'subscription' | null;
+type ActiveSheet = 'tone' | 'privacy' | 'spaces' | 'subscription' | 'connectors' | 'health' | null;
 
 export default function NesioProfileCard() {
   const [displayName, setDisplayName] = useState('Jessy');
@@ -54,6 +57,15 @@ export default function NesioProfileCard() {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="20" height="20">
           <rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>
         </svg>), iconBg: '#fef9c3', label: '订阅', sublabel: 'Nesio Plus · 管理计划' },
+    { key: 'connectors' as ActiveSheet, icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="20" height="20">
+          <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/>
+          <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/>
+        </svg>), iconBg: '#dbeafe', label: '数据接入', sublabel: 'Gmail · Calendar · 天气 · Tesla' },
+    { key: 'health' as ActiveSheet, icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="20" height="20">
+          <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+        </svg>), iconBg: '#fce7f3', label: '健康记录', sublabel: '记录今日症状、睡眠、精力' },
   ];
 
   return (
@@ -82,10 +94,13 @@ export default function NesioProfileCard() {
           </a>
         )}
 
+        {/* Mirror Profile card */}
+        <MirrorProfileCard embedded />
+
         {/* Menu */}
         <nav className="nesio-profile-menu" aria-label="设置菜单">
           {menuItems.map((item) => (
-            <button key={item.key} type="button" className="nesio-profile-menu-item" onClick={() => setActiveSheet(item.key)}>
+            <button key={String(item.key)} type="button" className="nesio-profile-menu-item" onClick={() => setActiveSheet(item.key)}>
               <span className="nesio-profile-menu-icon" style={{ background: item.iconBg }}>{item.icon}</span>
               <div className="nesio-profile-menu-text">
                 <span className="nesio-profile-menu-label">{item.label}</span>
@@ -102,6 +117,8 @@ export default function NesioProfileCard() {
       <PrivacySheet open={activeSheet === 'privacy'} onClose={() => setActiveSheet(null)} />
       <SpacesSheet open={activeSheet === 'spaces'} onClose={() => setActiveSheet(null)} />
       <SubscriptionSheet open={activeSheet === 'subscription'} onClose={() => setActiveSheet(null)} />
+      <ConnectorsHub open={activeSheet === 'connectors'} onClose={() => setActiveSheet(null)} />
+      <HealthLogger open={activeSheet === 'health'} onClose={() => setActiveSheet(null)} />
     </>
   );
 }
