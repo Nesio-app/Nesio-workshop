@@ -14,6 +14,7 @@ import {
   type LifeState,
   type DimensionLevel,
 } from '@/lib/life-domain';
+import { loadProfileSettings } from '@/lib/portal/profile';
 
 const LEVEL_COLOR: Record<DimensionLevel, string> = {
   good: '#10b981',
@@ -31,6 +32,7 @@ const LEVEL_LABEL: Record<DimensionLevel, string> = {
 
 export default function LifeStateCard() {
   const [state, setState] = useState<LifeState | null>(null);
+  const [aiExplanation, setAiExplanation] = useState<string>('');
   const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
@@ -43,6 +45,43 @@ export default function LifeStateCard() {
       window.removeEventListener('nesio-connectors-refreshed', recompute);
     };
   }, []);
+
+  // Fetch a natural-language explanation (PRD: hybrid rules + AI summary).
+  // Cached per state snapshot so it does not refetch on every render.
+  useEffect(() => {
+    if (!state) return;
+    const known = state.dimensions.filter((d) => d.level !== 'unknown');
+    if (!known.length) return;
+
+    const cacheKey = `nesio-lifestate-ai-${state.stateId}`;
+    try {
+      const cached = sessionStorage.getItem(cacheKey);
+      if (cached) { setAiExplanation(cached); return; }
+    } catch { /* ignore */ }
+
+    const controller = new AbortController();
+    fetch('/api/portal/life-state', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
+      body: JSON.stringify({
+        displayName: loadProfileSettings().displayName,
+        dimensions: known.map((d) => ({ dimension: d.dimension, label: dimensionLabel(d.dimension), level: d.level, note: d.note })),
+        risks: state.risks,
+        opportunities: state.opportunities,
+        timeWindow: state.timeWindow,
+      }),
+    })
+      .then((r) => r.json())
+      .then((data: { ok?: boolean; explanation?: string }) => {
+        if (data.ok && data.explanation) {
+          setAiExplanation(data.explanation);
+          try { sessionStorage.setItem(cacheKey, data.explanation); } catch { /* ignore */ }
+        }
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [state?.stateId]);
 
   if (!state) return null;
 
@@ -61,7 +100,7 @@ export default function LifeStateCard() {
         </div>
         <div className="nesio-lifestate-head-text">
           <p className="nesio-lifestate-kicker">当前状态 · Life State</p>
-          <p className="nesio-lifestate-explanation">{state.explanation}</p>
+          <p className="nesio-lifestate-explanation">{aiExplanation || state.explanation}</p>
         </div>
         <svg className={`nesio-lifestate-chevron${expanded ? ' nesio-lifestate-chevron--open' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
           <path d="M6 9l6 6 6-6" />

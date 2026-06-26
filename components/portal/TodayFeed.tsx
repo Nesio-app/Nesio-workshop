@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { loadProfileSettings } from '@/lib/portal/profile';
-import { generateTodayCards, recordCardFeedback, type RecommendationCard } from '@/lib/portal/reasoning-engine';
+import { recordCardFeedback, type RecommendationCard } from '@/lib/portal/reasoning-engine';
+import { generateTodayCards } from '@/lib/intelligence';
 import { getRecentNodes } from '@/lib/portal/life-graph';
 import { learnFromFeedback } from '@/lib/portal/mirror-profile';
 import { runConnectors } from '@/lib/portal/connectors';

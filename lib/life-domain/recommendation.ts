@@ -62,7 +62,8 @@ export function cardToRecommendation(card: RecommendationCard): Recommendation {
     category: DOMAIN_TO_CATEGORY[card.domain] ?? 'general',
     recommendation: card.title,
     reasoningSummary: card.body,
-    evidenceIds: card.evidence.map((e) => e.source + (e.value ? `:${e.value}` : '')),
+    // Prefer traceable Signal ids; fall back to a source:value ref.
+    evidenceIds: card.evidence.map((e) => e.signalId ?? `${e.source}:${e.value}`),
     confidence: card.confidence,
     impact: card.evidence.find((e) => e.label.includes('影响'))?.value ?? '',
     actionOptions: [
