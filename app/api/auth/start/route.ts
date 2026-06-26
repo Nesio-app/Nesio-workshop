@@ -138,6 +138,28 @@ export async function POST(req: NextRequest) {
     return safeJson({ ok: false, error: 'unsupported_provider', supportedProviders: AUTH_PROVIDERS, auditId }, 400);
   }
 
+  const redirectTo = body.redirectTo || getAuthRedirectUrl(req.url);
+  const email = body.email?.trim() || '';
+  const phone = body.phone?.trim() || '';
+
+  // Google OAuth: bypass canonical-domain check — only requires SUPABASE_URL + ANON_KEY
+  if (provider === 'google') {
+    const supabaseUrl = process.env.SUPABASE_URL?.trim();
+    const supabaseKey = process.env.SUPABASE_ANON_KEY?.trim();
+    if (!supabaseUrl || !supabaseKey) {
+      logAuthStartAudit('auth_start_failure', { auditId, provider, reason: 'missing_supabase_config' });
+      return safeJson({ ok: false, error: 'provider_not_configured', provider, auditId }, 503);
+    }
+    logAuthStartAudit('auth_start_success', { auditId, provider, action: 'redirect' });
+    return safeJson({
+      ok: true,
+      provider,
+      auditId,
+      action: 'redirect',
+      url: getSupabaseAuthorizeUrl('google', redirectTo),
+    });
+  }
+
   const { providerStatus, setupTask } = getProviderGate(req, provider);
   if (setupTask?.blockedReason || !providerStatus.enabled) {
     logAuthStartAudit('auth_start_failure', {
@@ -158,21 +180,6 @@ export async function POST(req: NextRequest) {
       },
       503,
     );
-  }
-
-  const redirectTo = body.redirectTo || getAuthRedirectUrl(req.url);
-  const email = body.email?.trim() || '';
-  const phone = body.phone?.trim() || '';
-
-  if (provider === 'google') {
-    logAuthStartAudit('auth_start_success', { auditId, provider, action: 'redirect' });
-    return safeJson({
-      ok: true,
-      provider,
-      auditId,
-      action: 'redirect',
-      url: getSupabaseAuthorizeUrl('google', redirectTo),
-    });
   }
 
   if (provider === 'wechat') {
