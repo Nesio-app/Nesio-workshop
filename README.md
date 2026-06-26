@@ -46,7 +46,7 @@ That's what Nesio is built for.
 
 ## Core Experience
 
-### 📅 Today
+###  Today
 
 A calm daily feed.
 
@@ -58,7 +58,7 @@ No information overload.
 
 ---
 
-### 🎤 Tell Nesio
+###  Tell Nesio
 
 Capture life naturally.
 
@@ -75,7 +75,7 @@ No setup.
 
 ---
 
-### 🧠 Memory
+###  Memory
 
 Memory isn't a file manager.
 
@@ -97,7 +97,7 @@ Everything stays connected.
 
 ---
 
-### ✨ Context Recovery
+###  Context Recovery
 
 The first milestone of Nesio.
 
@@ -152,7 +152,7 @@ When you need it again, Nesio brings back not only the information—but also th
 
 ## Roadmap
 
-### ✅ Available
+###  Available
 
 * Today
 * Memory
@@ -162,14 +162,14 @@ When you need it again, Nesio brings back not only the information—but also th
 * Connectors
 * Context Engine
 
-### 🚧 In Progress
+###  In Progress
 
 * Context Recovery
 * Future Guidance
 * Life Graph
 * Personal Intelligence
 
-### ⏳ Planned
+###  Planned
 
 * Family Workspace
 * Shared Memory
