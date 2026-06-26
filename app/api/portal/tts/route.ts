@@ -1,0 +1,64 @@
+/**
+ * POST /api/portal/tts
+ * Text-to-speech using OpenAI TTS API.
+ * Returns audio/mpeg stream.
+ * Falls back to returning the script as text if no API key.
+ */
+import { NextRequest, NextResponse } from 'next/server';
+
+function getOpenAIKey(): string {
+  return (process.env.OpenAI_KEY || process.env.OPENAI_API_KEY || '').trim();
+}
+
+export async function POST(req: NextRequest) {
+  const { text, voice = 'nova', speed = 1.0 } = await req.json() as {
+    text: string;
+    voice?: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
+    speed?: number;
+  };
+
+  if (!text?.trim()) {
+    return NextResponse.json({ ok: false, error: 'empty_text' }, { status: 400 });
+  }
+
+  const key = getOpenAIKey();
+  if (!key) {
+    // No key — return text for client-side TTS fallback
+    return NextResponse.json({ ok: false, error: 'no_api_key', fallbackText: text });
+  }
+
+  try {
+    const res = await fetch('https://api.openai.com/v1/audio/speech', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'tts-1',
+        input: text.slice(0, 4096),
+        voice,
+        speed: Math.max(0.25, Math.min(4.0, speed)),
+        response_format: 'mp3',
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      return NextResponse.json({ ok: false, error: err }, { status: res.status });
+    }
+
+    const audioBuffer = await res.arrayBuffer();
+    return new NextResponse(audioBuffer, {
+      headers: {
+        'Content-Type': 'audio/mpeg',
+        'Cache-Control': 'public, max-age=3600',
+      },
+    });
+  } catch (err) {
+    return NextResponse.json(
+      { ok: false, error: err instanceof Error ? err.message : 'tts_failed' },
+      { status: 500 },
+    );
+  }
+}

@@ -12,6 +12,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { addLifeNode } from '@/lib/portal/life-graph';
 import { routeIntent } from '@/lib/portal/intent-router';
+import MeetingRecorder from './MeetingRecorder';
 
 interface VoiceInputSheetProps { open: boolean; onClose: () => void; }
 
@@ -25,6 +26,7 @@ const QUICK_INTENTS = [
 type SendState = 'idle' | 'analyzing' | 'saved' | 'error';
 
 export default function VoiceInputSheet({ open, onClose }: VoiceInputSheetProps) {
+  const [mode, setMode] = useState<'note' | 'meeting'>('note');
   const [text, setText] = useState('');
   const [listening, setListening] = useState(false);
   const [sendState, setSendState] = useState<SendState>('idle');
@@ -135,14 +137,26 @@ export default function VoiceInputSheet({ open, onClose }: VoiceInputSheetProps)
   if (!open) return null;
 
   return (
-    <div className="nesio-voice-sheet" role="dialog" aria-modal="true" aria-label="说一句">
+    <>
+    {/* Meeting recorder takes over when in meeting mode */}
+    <MeetingRecorder open={mode === 'meeting'} onClose={() => { setMode('note'); onClose(); }} />
+
+    <div className="nesio-voice-sheet" role="dialog" aria-modal="true" aria-label="说一句" style={{ display: mode === 'meeting' ? 'none' : undefined }}>
       <div className="nesio-voice-sheet-backdrop" onClick={onClose} />
       <div className="nesio-voice-sheet-card">
         <div className="nesio-sheet-handle" aria-hidden />
 
         <div className="nesio-voice-sheet-header">
           <h2 className="nesio-voice-sheet-title">说一句</h2>
-          <button type="button" className="nesio-voice-sheet-close" onClick={onClose} aria-label="关闭">✕</button>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <button type="button"
+              style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--portal-blue-deep)', background: 'rgba(88,140,227,0.1)', padding: '0.2rem 0.6rem', borderRadius: '999px' }}
+              onClick={() => { stopListening(); setMode('meeting'); }}
+              title="切换到会议记录模式">
+              🎙 会议记录
+            </button>
+            <button type="button" className="nesio-voice-sheet-close" onClick={onClose} aria-label="关闭">✕</button>
+          </div>
         </div>
 
         {/* Transcript */}
@@ -230,5 +244,6 @@ export default function VoiceInputSheet({ open, onClose }: VoiceInputSheetProps)
         ) : null}
       </div>
     </div>
+    </>
   );
 }
