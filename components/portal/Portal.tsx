@@ -188,6 +188,13 @@ export default function Portal() {
     };
   }, []);
 
+  // Allow TodayFeed empty state to open Tell Nesio
+  useEffect(() => {
+    const handler = () => setActiveSurface((s) => s === 'tell' ? 'today' : 'tell');
+    window.addEventListener('nesio-open-tell', handler);
+    return () => window.removeEventListener('nesio-open-tell', handler);
+  }, []);
+
   useEffect(() => {
     fetch(configUrl())
       .then((res) => (res.ok ? res.json() : null))

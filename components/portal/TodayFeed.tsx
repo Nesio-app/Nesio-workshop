@@ -279,15 +279,35 @@ export default function TodayFeed({ onOpenMemory }: { onOpenMemory?: () => void 
               </p>
             </div>
 
-            <div className="nesio-today-cards">
-              {cards.map((card) =>
-                card.type === 'audio' ? (
-                  <AudioCard key={card.id} card={card} onFeedback={(f) => handleFeedback(card.id, f)} />
-                ) : (
-                  <StandardCard key={card.id} card={card} onFeedback={(f) => handleFeedback(card.id, f)} />
-                )
-              )}
-            </div>
+            {cards.length > 0 ? (
+              <div className="nesio-today-cards">
+                {cards.map((card) =>
+                  card.type === 'audio' ? (
+                    <AudioCard key={card.id} card={card} onFeedback={(f) => handleFeedback(card.id, f)} />
+                  ) : (
+                    <StandardCard key={card.id} card={card} onFeedback={(f) => handleFeedback(card.id, f)} />
+                  )
+                )}
+              </div>
+            ) : (
+              <div className="nesio-today-empty">
+                <div className="nesio-today-empty-icon" aria-hidden>✦</div>
+                <h3 className="nesio-today-empty-title">今天的事都处理好了</h3>
+                <p className="nesio-today-empty-sub">Nesio 持续关注你的日历、天气和记忆。有新动态会第一时间出现在这里。</p>
+                <div className="nesio-today-empty-actions">
+                  <button type="button" className="nesio-today-empty-action" onClick={onOpenMemory}>
+                    <span>🗂</span> 看看 Memory
+                  </button>
+                  <button type="button" className="nesio-today-empty-action"
+                    onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-tell'))}>
+                    <span>✦</span> 告诉 Nesio 新事情
+                  </button>
+                </div>
+                <p className="nesio-today-empty-hint">
+                  提示：说「记住 xxx」或拍一下物品，明天 Today 会基于这些记忆生成建议。
+                </p>
+              </div>
+            )}
 
             <button type="button" className="nesio-today-memory-link" onClick={onOpenMemory}>
               在 Memory 里看 {memoryCount > 0 ? `（${memoryCount} 条）` : ''} ›
