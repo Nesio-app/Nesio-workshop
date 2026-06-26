@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import TodayFeed from './TodayFeed';
 import MemoryTab from './MemoryTab';
-import TellNesioSheet from './TellNesioSheet';
+import TellNesioSheet, { type CaptureMode } from './TellNesioSheet';
+import CameraSheet from './CameraSheet';
+import VoiceInputSheet from './VoiceInputSheet';
+import ShareSheet from './ShareSheet';
 import PortalBottomNav from './PortalBottomNav';
 import PortalAiFriendsPreview from './PortalAiFriendsPreview';
 import NotePanelEnhanced from './NotePanelEnhanced';
@@ -141,6 +144,7 @@ export default function Portal() {
     ReturnType<typeof parseDecShellRoutesFromModules>
   >(new Map());
   const [activeSurface, setActiveSurface] = useState<ActiveSurface>('today');
+  const [captureMode, setCaptureMode] = useState<CaptureMode | null>(null);
   const [noteOpen, setNoteOpen] = useState(false);
   const [locale, setLocale] = useState<PortalLocale>('zh');
   const [launchSurfaceContext, setLaunchSurfaceContext] = useState({
@@ -188,11 +192,16 @@ export default function Portal() {
     };
   }, []);
 
-  // Allow TodayFeed empty state to open Tell Nesio
+  // Allow TodayFeed empty state / other surfaces to open Tell Nesio or capture directly
   useEffect(() => {
     const handler = () => setActiveSurface((s) => s === 'tell' ? 'today' : 'tell');
+    const voiceHandler = () => setCaptureMode('voice');
     window.addEventListener('nesio-open-tell', handler);
-    return () => window.removeEventListener('nesio-open-tell', handler);
+    window.addEventListener('nesio-open-voice', voiceHandler);
+    return () => {
+      window.removeEventListener('nesio-open-tell', handler);
+      window.removeEventListener('nesio-open-voice', voiceHandler);
+    };
   }, []);
 
   useEffect(() => {
@@ -281,6 +290,7 @@ export default function Portal() {
         <TellNesioSheet
           open={activeSurface === 'tell'}
           onClose={() => setActiveSurface('today')}
+          onCapture={(mode) => setCaptureMode(mode)}
         />
 
         <PortalBottomNav
@@ -291,6 +301,11 @@ export default function Portal() {
           onMemory={() => setActiveSurface('memory')}
         />
       </div>
+
+      {/* Capture sheets — rendered at root level, independent of TellNesioSheet state */}
+      <CameraSheet open={captureMode === 'camera'} onClose={() => setCaptureMode(null)} />
+      <VoiceInputSheet open={captureMode === 'voice'} onClose={() => setCaptureMode(null)} />
+      <ShareSheet open={captureMode === 'share'} onClose={() => setCaptureMode(null)} />
 
       <NotePanelEnhanced open={noteOpen} onOpenChange={setNoteOpen} />
       <PortalOnboarding />
