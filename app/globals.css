@@ -10988,3 +10988,19 @@ html[data-portal-theme="night"] .nesio-brief-signal-val { color: #e8eefa; }
 }
 
 html[data-portal-theme="night"] .nesio-brief-now-playing-text { color: #c5d4ea; }
+
+/* ─── Connector token / shortcuts box ─── */
+.nesio-connector-token-box {
+  background: rgba(88,140,227,0.05);
+  border: 1px solid rgba(88,140,227,0.14);
+  border-radius: 0.75rem;
+  padding: 0.7rem 0.85rem;
+  margin: 0 0 0.5rem 3rem;
+}
+html[data-portal-theme="night"] .nesio-connector-token-box {
+  background: rgba(88,140,227,0.1);
+  border-color: rgba(88,140,227,0.2);
+}
+.nesio-connector-token-box code {
+  font-family: ui-monospace, monospace;
+}

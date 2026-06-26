@@ -5,191 +5,207 @@ import { addLifeNode, type LifeNode } from '@/lib/portal/life-graph';
 
 interface ConnectorsHubProps { open: boolean; onClose: () => void; }
 
-type ConnectorId = 'calendar' | 'gmail' | 'weather' | 'health' | 'tesla';
+type ConnMethod = 'oauth' | 'geo' | 'file' | 'server' | 'token' | 'shortcuts';
+type NodeInput = Omit<LifeNode, 'id' | 'createdAt'>;
 
-interface ConnectorStatus {
-  id: ConnectorId;
+interface ConnectorDef {
+  id: string;
   name: string;
   icon: string;
   iconBg: string;
   description: string;
-  connected: boolean;
-  syncing?: boolean;
-  lastSync?: string;
-  nodeCount?: number;
+  method: ConnMethod;
+  /** token connectors: the API endpoint to POST { token } to */
+  syncEndpoint?: string;
+  /** token connectors: where to get the token */
+  tokenHint?: string;
+  /** shortcuts connectors: the source id for /api/portal/ingest */
+  ingestSource?: string;
   comingSoon?: boolean;
 }
 
+const CONNECTORS: ConnectorDef[] = [
+  { id: 'calendar', name: 'Google Calendar', icon: '📅', iconBg: '#dbeafe', method: 'oauth', description: '读取日程，生成会议提醒和准备 Brief' },
+  { id: 'gmail', name: 'Gmail', icon: '📧', iconBg: '#fce7f3', method: 'oauth', description: '从邮件自动抽取人物、日期、承诺' },
+  { id: 'weather', name: '地理位置 · 天气', icon: '🌤', iconBg: '#fef3c7', method: 'geo', description: '基于实时天气生成外出和健康建议' },
+  { id: 'flomo', name: 'Flomo', icon: '📝', iconBg: '#e0e7ff', method: 'server', syncEndpoint: '/api/portal/flomo?limit=30', description: '同步 flomo 笔记，提取想法与记录' },
+  { id: 'notion', name: 'Notion', icon: '📓', iconBg: '#f3f4f6', method: 'token', syncEndpoint: '/api/portal/notion', tokenHint: 'notion.so/my-integrations → 新建集成 → 复制 Internal Integration Secret，并把页面共享给它', description: '同步最近编辑的页面，提取项目与想法' },
+  { id: 'toggl', name: 'Toggl Track', icon: '⏱', iconBg: '#fee2e2', method: 'token', syncEndpoint: '/api/portal/toggl', tokenHint: 'track.toggl.com → Profile → API Token', description: '同步时间记录，了解你的专注分布' },
+  { id: 'health', name: 'Apple Health 导出', icon: '🩷', iconBg: '#fce7f3', method: 'file', description: '上传 export.xml，提取步数、睡眠、心率' },
+  { id: 'reminder', name: 'Apple 提醒事项', icon: '✅', iconBg: '#fef3c7', method: 'shortcuts', ingestSource: 'reminder', description: '通过快捷指令推送提醒，自动转为承诺' },
+  { id: 'keep', name: 'Keep 健康', icon: '🏃', iconBg: '#d1fae5', method: 'shortcuts', ingestSource: 'keep', description: '通过快捷指令推送运动数据' },
+  { id: 'wechat_reading', name: '微信读书', icon: '📖', iconBg: '#dcfce7', method: 'shortcuts', ingestSource: 'wechat_reading', description: '通过快捷指令推送阅读进度与笔记' },
+  { id: 'tesla', name: 'Tesla', icon: '🚗', iconBg: '#d1fae5', method: 'oauth', description: '电量、行程信号，自动提醒充电', comingSoon: true },
+];
+
 const CONNECTORS_KEY = 'nesio-connectors-v1';
+const TOKENS_KEY = 'nesio-connector-tokens-v1';
 
 function loadConnectors(): Record<string, boolean> {
-  try { return JSON.parse(localStorage.getItem(CONNECTORS_KEY) || '{}'); }
-  catch { return {}; }
+  try { return JSON.parse(localStorage.getItem(CONNECTORS_KEY) || '{}'); } catch { return {}; }
 }
-function saveConnector(id: string, connected: boolean) {
+function saveConnectorState(id: string, connected: boolean) {
   const saved = loadConnectors();
-  if (connected) saved[id] = true;
-  else delete saved[id];
+  if (connected) saved[id] = true; else delete saved[id];
   try { localStorage.setItem(CONNECTORS_KEY, JSON.stringify(saved)); } catch { /* ignore */ }
 }
-
-// Check URL params on mount for OAuth callback results
-function checkOAuthCallback(): { connector?: string; status?: string; error?: string } {
-  if (typeof window === 'undefined') return {};
-  const params = new URLSearchParams(window.location.search);
-  const connector = params.get('connector') || undefined;
-  const status = params.get('status') || undefined;
-  const error = params.get('error') || undefined;
-  if (connector) {
-    // Clean URL
-    params.delete('connector'); params.delete('status'); params.delete('error');
-    const qs = params.toString();
-    window.history.replaceState({}, '', `${window.location.pathname}${qs ? `?${qs}` : ''}`);
-  }
-  return { connector, status, error };
+function loadToken(id: string): string {
+  try { return JSON.parse(localStorage.getItem(TOKENS_KEY) || '{}')[id] || ''; } catch { return ''; }
+}
+function saveToken(id: string, token: string) {
+  try {
+    const all = JSON.parse(localStorage.getItem(TOKENS_KEY) || '{}');
+    if (token) all[id] = token; else delete all[id];
+    localStorage.setItem(TOKENS_KEY, JSON.stringify(all));
+  } catch { /* ignore */ }
 }
 
 export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
   const fileRef = useRef<HTMLInputElement>(null);
-  const [statuses, setStatuses] = useState<ConnectorStatus[]>([]);
-  const [syncResult, setSyncResult] = useState<{ id: string; count: number } | null>(null);
-  const [oauthError, setOauthError] = useState('');
+  const [connected, setConnected] = useState<Record<string, boolean>>({});
+  const [syncing, setSyncing] = useState<string | null>(null);
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
+  const [tokenInputFor, setTokenInputFor] = useState<string | null>(null);
+  const [tokenValue, setTokenValue] = useState('');
+  const [shortcutsFor, setShortcutsFor] = useState<string | null>(null);
+  const [ingestUrl, setIngestUrl] = useState('');
 
   useEffect(() => {
     if (!open) return;
-
+    setConnected(loadConnectors());
+    setIngestUrl(`${window.location.origin}/api/portal/ingest`);
     // Check OAuth callback
-    const { connector, status, error } = checkOAuthCallback();
-    if (connector && status === 'connected') {
-      saveConnector(connector, true);
-      if (connector === 'gmail') setTimeout(() => syncGmail(), 500);
-    }
-    if (error) setOauthError(`连接失败：${error}`);
-    else setOauthError('');
-
-    const saved = loadConnectors();
-    setStatuses([
-      { id: 'calendar', name: 'Google Calendar', icon: '📅', iconBg: '#dbeafe', description: '读取日程，生成会议提醒和准备 Brief', connected: saved['calendar'] ?? false },
-      { id: 'gmail', name: 'Gmail', icon: '📧', iconBg: '#fce7f3', description: '从邮件自动抽取人物、日期、承诺，存入 Memory', connected: saved['gmail'] ?? false },
-      { id: 'weather', name: '地理位置 · 天气', icon: '🌤', iconBg: '#fef3c7', description: '基于实时天气生成外出提醒和健康建议', connected: saved['weather'] ?? false },
-      { id: 'health', name: 'Apple Health 导出', icon: '🩷', iconBg: '#fce7f3', description: '上传 Apple Health 的 export.xml，自动提取步数、睡眠、心率', connected: saved['health'] ?? false },
-      { id: 'tesla', name: 'Tesla', icon: '🚗', iconBg: '#d1fae5', description: '电量、行程信号，自动提醒充电', connected: false, comingSoon: true },
-    ]);
+    const params = new URLSearchParams(window.location.search);
+    const err = params.get('error');
+    if (err) showToast(`连接失败：${err}`, false);
   }, [open]);
 
-  function updateStatus(id: ConnectorId, patch: Partial<ConnectorStatus>) {
-    setStatuses((prev) => prev.map((s) => s.id === id ? { ...s, ...patch } : s));
+  function showToast(msg: string, ok: boolean) {
+    setToast({ msg, ok });
+    setTimeout(() => setToast(null), 3500);
   }
 
-  async function handleConnect(connector: ConnectorStatus) {
-    if (connector.comingSoon) return;
+  function saveNodes(nodes: Array<Omit<NodeInput, 'source'>>, source: LifeNode['source']) {
+    nodes.forEach((n) => addLifeNode({ ...n, source } as NodeInput));
+    window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
+  }
 
-    if (connector.id === 'gmail') {
-      // Real OAuth redirect
-      window.location.href = '/api/portal/gmail/connect';
-      return;
-    }
+  // ── Token-based sync (Notion, Toggl) ──
+  async function syncToken(c: ConnectorDef) {
+    const token = loadToken(c.id);
+    if (!token) { setTokenInputFor(c.id); setTokenValue(''); return; }
+    setSyncing(c.id);
+    try {
+      const res = await fetch(c.syncEndpoint!, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
+      });
+      const data = await res.json() as { ok?: boolean; nodes?: NodeInput[]; error?: string };
+      if (!data.ok) {
+        if (data.error === 'invalid_token') { saveToken(c.id, ''); setTokenInputFor(c.id); setTokenValue(''); showToast('Token 无效，请重新输入', false); }
+        else showToast(`同步失败：${data.error || '未知'}`, false);
+        setSyncing(null);
+        return;
+      }
+      const n = data.nodes || [];
+      saveNodes(n, c.id === 'toggl' ? 'system' : 'manual');
+      saveConnectorState(c.id, true);
+      setConnected((p) => ({ ...p, [c.id]: true }));
+      setCounts((p) => ({ ...p, [c.id]: n.length }));
+      showToast(`已提取 ${n.length} 个节点`, true);
+    } catch { showToast('网络错误', false); }
+    setSyncing(null);
+  }
 
-    if (connector.id === 'calendar') {
-      window.location.href = '/api/portal/calendar/connect';
-      return;
-    }
+  function submitToken(c: ConnectorDef) {
+    if (!tokenValue.trim()) return;
+    saveToken(c.id, tokenValue.trim());
+    setTokenInputFor(null);
+    syncToken(c);
+  }
 
-    if (connector.id === 'weather') {
-      updateStatus('weather', { syncing: true });
+  // ── Server-configured sync (Flomo) ──
+  async function syncFlomo(c: ConnectorDef) {
+    setSyncing(c.id);
+    try {
+      const res = await fetch(c.syncEndpoint!);
+      const data = await res.json() as { ok?: boolean; memos?: Array<{ content: string; created_at: string; tags: string[] }>; error?: string };
+      if (!data.ok) { showToast(`Flomo 未配置或同步失败`, false); setSyncing(null); return; }
+      const memos = data.memos || [];
+      const nodes: Array<Omit<NodeInput, 'source'>> = memos.slice(0, 20).map((m) => ({
+        type: 'preference' as const,
+        name: m.content.replace(/<[^>]+>/g, '').slice(0, 40),
+        attributes: { source: 'Flomo', created: m.created_at },
+        relations: [],
+        tags: ['Flomo', ...(m.tags || [])],
+        confidence: 0.9,
+        rawInput: m.content.replace(/<[^>]+>/g, '').slice(0, 200),
+      }));
+      saveNodes(nodes, 'manual');
+      saveConnectorState(c.id, true);
+      setConnected((p) => ({ ...p, [c.id]: true }));
+      setCounts((p) => ({ ...p, [c.id]: nodes.length }));
+      showToast(`已同步 ${nodes.length} 条 flomo 笔记`, true);
+    } catch { showToast('网络错误', false); }
+    setSyncing(null);
+  }
+
+  // ── OAuth / Geo / File ──
+  function handleConnect(c: ConnectorDef) {
+    if (c.comingSoon) return;
+    if (c.id === 'gmail') { window.location.href = '/api/portal/gmail/connect'; return; }
+    if (c.id === 'calendar') { window.location.href = '/api/portal/calendar/connect'; return; }
+    if (c.method === 'geo') {
+      setSyncing(c.id);
       navigator.geolocation.getCurrentPosition(
-        () => {
-          saveConnector('weather', true);
-          updateStatus('weather', { connected: true, syncing: false, lastSync: '刚刚' });
-          window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
-        },
-        () => {
-          updateStatus('weather', { syncing: false });
-          alert('位置权限被拒绝，请在浏览器设置→网站设置→位置中允许。');
-        },
+        () => { saveConnectorState('weather', true); setConnected((p) => ({ ...p, weather: true })); setSyncing(null); window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed')); showToast('位置已授权', true); },
+        () => { setSyncing(null); showToast('位置权限被拒绝', false); },
         { timeout: 8000 },
       );
       return;
     }
-
-    if (connector.id === 'health') {
-      fileRef.current?.click();
-      return;
-    }
-  }
-
-  async function syncGmail() {
-    updateStatus('gmail', { syncing: true });
-    try {
-      const res = await fetch('/api/portal/gmail');
-      const data = await res.json() as { ok?: boolean; nodes?: Array<Omit<LifeNode, 'id' | 'createdAt'>>; count?: number; error?: string; connectUrl?: string };
-
-      if (!data.ok) {
-        if (data.connectUrl) {
-          setOauthError('Gmail 授权已过期，请重新连接。');
-          saveConnector('gmail', false);
-          updateStatus('gmail', { connected: false, syncing: false });
-        } else {
-          setOauthError(`同步失败：${data.error || '未知错误'}`);
-          updateStatus('gmail', { syncing: false });
-        }
-        return;
-      }
-
-      const count = data.nodes?.length || 0;
-      data.nodes?.forEach((node) => addLifeNode({ ...node, source: 'email' }));
-      saveConnector('gmail', true);
-      updateStatus('gmail', { connected: true, syncing: false, lastSync: '刚刚', nodeCount: count });
-      setSyncResult({ id: 'gmail', count });
-      window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
-    } catch {
-      updateStatus('gmail', { syncing: false });
-      setOauthError('Gmail 同步失败，请检查网络连接。');
-    }
+    if (c.id === 'health') { fileRef.current?.click(); return; }
+    if (c.method === 'token') { syncToken(c); return; }
+    if (c.method === 'server') { syncFlomo(c); return; }
+    if (c.method === 'shortcuts') { setShortcutsFor(c.id); return; }
   }
 
   async function handleHealthFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = '';
-
-    updateStatus('health', { syncing: true });
+    if (file.name.endsWith('.zip')) { showToast('请先解压 zip，上传里面的 export.xml', false); return; }
+    setSyncing('health');
     try {
-      let text = '';
-      if (file.name.endsWith('.zip')) {
-        // Can't unzip in browser easily — instruct user
-        alert('请先在 Apple 健康 App 中导出，解压 zip 后上传里面的 export.xml 文件。');
-        updateStatus('health', { syncing: false });
-        return;
-      }
-      text = await file.text();
-
-      const res = await fetch('/api/portal/health', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ xml: text }),
-      });
-      const data = await res.json() as { ok?: boolean; nodes?: Array<Omit<LifeNode, 'id' | 'createdAt'>>; count?: number };
-
+      const text = await file.text();
+      const res = await fetch('/api/portal/health', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ xml: text }) });
+      const data = await res.json() as { ok?: boolean; nodes?: NodeInput[]; count?: number };
       if (data.ok && data.nodes?.length) {
-        data.nodes.forEach((node) => addLifeNode({ ...node, source: 'system' }));
-        saveConnector('health', true);
-        updateStatus('health', { connected: true, syncing: false, lastSync: '刚刚', nodeCount: data.count });
-        setSyncResult({ id: 'health', count: data.count || 0 });
-        window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
-      }
-    } catch {
-      updateStatus('health', { syncing: false });
-      setOauthError('健康数据解析失败。');
-    }
+        saveNodes(data.nodes, 'system');
+        saveConnectorState('health', true);
+        setConnected((p) => ({ ...p, health: true }));
+        setCounts((p) => ({ ...p, health: data.count || 0 }));
+        showToast(`已提取 ${data.count} 个健康节点`, true);
+      } else showToast('未识别到健康数据', false);
+    } catch { showToast('解析失败', false); }
+    setSyncing(null);
   }
 
-  function handleDisconnect(id: ConnectorId) {
-    saveConnector(id, false);
-    updateStatus(id, { connected: false, lastSync: undefined, nodeCount: undefined });
+  function disconnect(id: string) {
+    saveConnectorState(id, false);
+    saveToken(id, '');
+    setConnected((p) => ({ ...p, [id]: false }));
+  }
+
+  function copyIngestUrl() {
+    navigator.clipboard?.writeText(ingestUrl).then(() => showToast('接入地址已复制', true)).catch(() => {});
   }
 
   if (!open) return null;
+
+  const def = (id: string) => CONNECTORS.find((c) => c.id === id)!;
 
   return (
     <div className="nesio-settings-sheet-overlay" role="dialog" aria-modal="true" aria-label="数据接入">
@@ -203,64 +219,87 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
         </div>
         <p className="nesio-settings-sheet-desc">连接外部信号源，让 Today Feed 出现真实数据驱动的建议。</p>
 
-        {oauthError && (
-          <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '0.75rem', padding: '0.65rem 0.85rem', marginBottom: '0.75rem', fontSize: '0.8rem', color: '#ef4444' }}>
-            {oauthError}
-          </div>
-        )}
-
-        {syncResult && (
-          <div style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '0.75rem', padding: '0.65rem 0.85rem', marginBottom: '0.75rem', fontSize: '0.8rem', color: '#059669' }}>
-            ✓ 已提取 {syncResult.count} 个记忆节点存入 Life Graph
+        {toast && (
+          <div style={{ background: toast.ok ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)', border: `1px solid ${toast.ok ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'}`, borderRadius: '0.75rem', padding: '0.65rem 0.85rem', marginBottom: '0.75rem', fontSize: '0.8rem', color: toast.ok ? '#059669' : '#ef4444' }}>
+            {toast.ok ? '✓ ' : ''}{toast.msg}
           </div>
         )}
 
         <div className="nesio-settings-sheet-body">
-          {statuses.map((c) => (
-            <div key={c.id} className="nesio-connector-row">
-              <span className="nesio-connector-icon" style={{ background: c.iconBg }}>{c.icon}</span>
-              <div className="nesio-connector-body">
-                <p className="nesio-connector-name">
-                  {c.name}
-                  {c.comingSoon && <span className="nesio-connector-soon">即将上线</span>}
-                </p>
-                <p className="nesio-connector-desc">{c.description}</p>
-                {c.connected && (
-                  <p className="nesio-connector-sync">
-                    {c.syncing ? '同步中…' : `上次同步：${c.lastSync || '—'}`}
-                    {c.nodeCount ? `  ·  ${c.nodeCount} 个节点` : ''}
-                  </p>
-                )}
-              </div>
+          {CONNECTORS.map((c) => {
+            const isConn = connected[c.id];
+            const isSync = syncing === c.id;
+            const cnt = counts[c.id];
+            return (
+              <div key={c.id}>
+                <div className="nesio-connector-row">
+                  <span className="nesio-connector-icon" style={{ background: c.iconBg }}>{c.icon}</span>
+                  <div className="nesio-connector-body">
+                    <p className="nesio-connector-name">
+                      {c.name}
+                      {c.comingSoon && <span className="nesio-connector-soon">即将上线</span>}
+                      {c.method === 'shortcuts' && !c.comingSoon && <span className="nesio-connector-soon" style={{ background: 'rgba(88,140,227,0.12)', color: 'var(--portal-blue-deep)' }}>快捷指令</span>}
+                    </p>
+                    <p className="nesio-connector-desc">{c.description}</p>
+                    {isConn && <p className="nesio-connector-sync">{isSync ? '同步中…' : '已连接'}{cnt ? `  ·  ${cnt} 个节点` : ''}</p>}
+                  </div>
 
-              {c.comingSoon ? (
-                <span style={{ fontSize: '0.7rem', color: 'var(--portal-muted)', flexShrink: 0 }}>敬请期待</span>
-              ) : c.connected ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', flexShrink: 0 }}>
-                  {c.id === 'gmail' && (
-                    <button type="button" className="nesio-connector-connect" onClick={syncGmail} disabled={c.syncing}>
-                      {c.syncing ? '…' : '同步'}
+                  {c.comingSoon ? (
+                    <span style={{ fontSize: '0.7rem', color: 'var(--portal-muted)', flexShrink: 0 }}>敬请期待</span>
+                  ) : c.method === 'shortcuts' ? (
+                    <button type="button" className="nesio-connector-connect" onClick={() => setShortcutsFor(shortcutsFor === c.id ? null : c.id)} style={{ flexShrink: 0 }}>
+                      {shortcutsFor === c.id ? '收起' : '设置'}
+                    </button>
+                  ) : isConn && (c.method === 'token' || c.method === 'server') ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', flexShrink: 0 }}>
+                      <button type="button" className="nesio-connector-connect" onClick={() => c.method === 'server' ? syncFlomo(c) : syncToken(c)} disabled={isSync}>{isSync ? '…' : '同步'}</button>
+                      <button type="button" className="nesio-connector-disconnect" onClick={() => disconnect(c.id)}>断开</button>
+                    </div>
+                  ) : isConn ? (
+                    <button type="button" className="nesio-connector-disconnect" onClick={() => disconnect(c.id)} style={{ flexShrink: 0 }}>断开</button>
+                  ) : (
+                    <button type="button" className="nesio-connector-connect" onClick={() => handleConnect(c)} disabled={isSync} style={{ flexShrink: 0 }}>
+                      {isSync ? '…' : c.method === 'file' ? '上传' : c.method === 'token' || c.method === 'server' ? '接入' : '接入'}
                     </button>
                   )}
-                  <button type="button" className="nesio-connector-disconnect" onClick={() => handleDisconnect(c.id)}>断开</button>
                 </div>
-              ) : (
-                <button type="button" className="nesio-connector-connect" onClick={() => handleConnect(c)}
-                  disabled={c.syncing} style={{ flexShrink: 0 }}>
-                  {c.syncing ? '…' : c.id === 'health' ? '上传' : '接入'}
-                </button>
-              )}
-            </div>
-          ))}
 
-          {/* Apple Health instructions */}
-          <div style={{ marginTop: '1rem', background: 'rgba(88,140,227,0.05)', border: '1px dashed rgba(88,140,227,0.2)', borderRadius: '0.75rem', padding: '0.75rem 0.85rem', fontSize: '0.75rem', color: 'var(--portal-muted)', lineHeight: '1.6' }}>
-            <strong style={{ color: 'var(--portal-ink)', display: 'block', marginBottom: '0.3rem' }}>如何导出 Apple Health 数据</strong>
-            健康 App → 右上角头像 → 导出健康数据 → 解压 zip → 上传 export.xml
-          </div>
+                {/* Token input */}
+                {tokenInputFor === c.id && (
+                  <div className="nesio-connector-token-box">
+                    <p style={{ fontSize: '0.72rem', color: 'var(--portal-muted)', marginBottom: '0.5rem', lineHeight: 1.5 }}>{c.tokenHint}</p>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <input className="nesio-ob-input" style={{ marginBottom: 0, flex: 1, fontSize: '0.8rem' }} type="password" placeholder="粘贴 Token…" value={tokenValue} onChange={(e) => setTokenValue(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submitToken(c); }} autoFocus />
+                      <button type="button" className="nesio-connector-connect" onClick={() => submitToken(c)} disabled={!tokenValue.trim()}>连接</button>
+                    </div>
+                  </div>
+                )}
 
-          <div style={{ marginTop: '0.85rem', fontSize: '0.72rem', color: 'var(--portal-muted)', textAlign: 'center' }}>
-            所有数据仅在你的设备上处理和存储
+                {/* Shortcuts setup */}
+                {shortcutsFor === c.id && (
+                  <div className="nesio-connector-token-box">
+                    <p style={{ fontSize: '0.75rem', color: 'var(--portal-ink)', fontWeight: 600, marginBottom: '0.4rem' }}>通过 iOS 快捷指令接入</p>
+                    <ol style={{ fontSize: '0.72rem', color: 'var(--portal-muted)', lineHeight: 1.7, paddingLeft: '1.1rem', marginBottom: '0.6rem' }}>
+                      <li>打开「快捷指令」App，新建快捷指令</li>
+                      <li>添加动作「获取 URL 内容」</li>
+                      <li>URL 填下方地址，方法选 <strong>POST</strong></li>
+                      <li>请求体 JSON：<code style={{ fontSize: '0.68rem' }}>{`{"source":"${c.ingestSource}","content":"数据内容"}`}</code></li>
+                      <li>可设为自动化，定时推送</li>
+                    </ol>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      <code style={{ flex: 1, fontSize: '0.68rem', background: 'rgba(88,140,227,0.08)', padding: '0.4rem 0.6rem', borderRadius: '0.5rem', wordBreak: 'break-all', color: 'var(--portal-ink)' }}>{ingestUrl}</code>
+                      <button type="button" className="nesio-connector-connect" onClick={copyIngestUrl} style={{ flexShrink: 0 }}>复制</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          <div style={{ marginTop: '1rem', fontSize: '0.72rem', color: 'var(--portal-muted)', textAlign: 'center', lineHeight: 1.6 }}>
+            有 API 的（Gmail / Calendar / Notion / Toggl / Flomo）直接连接；<br />
+            没有公开 API 的（提醒事项 / Keep / 微信读书）通过快捷指令推送。<br />
+            所有数据仅在你的设备上处理和存储。
           </div>
         </div>
       </div>
