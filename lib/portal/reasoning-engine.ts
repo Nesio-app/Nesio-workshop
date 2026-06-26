@@ -4,13 +4,13 @@
  * Pipeline:
  *   Connectors (weather, calendar, life-graph) → normalize → score → rank → emit cards
  *
- * MVP: rule-based. Each rule checks signal conditions and emits a typed card.
- * Future: LLM reasoning layer can be added on top of this same interface.
+ * Rule-based MVP. Each rule checks signal conditions and emits a typed card.
  */
 
 import { getRecentNodes } from './life-graph';
 import { PORTAL_CACHE_KEYS, readPortalCache } from './prefetch-cache';
 import type { CalendarEvent } from './types';
+import type { WeatherSnapshot } from './weather';
 
 export type CardDomain = 'weather' | 'work' | 'family' | 'home' | 'health' | 'vehicle' | 'learning' | 'finance';
 
@@ -39,12 +39,6 @@ export interface RecommendationCard {
   feedback?: 'useful' | 'wrong' | 'not_now' | 'too_much';
 }
 
-interface WeatherSignal {
-  temperatureC?: number;
-  condition?: string;
-  forecastNote?: string;
-}
-
 function tomorrowISO(): string {
   const d = new Date();
   d.setDate(d.getDate() + 1);
@@ -57,35 +51,38 @@ function todayEndISO(): string {
   return d.toISOString();
 }
 
-/** Score = urgency * confidence * 0.5 + timing bonus */
+/** score = urgency * confidence * 0.5 + timing bonus */
 function score(card: RecommendationCard): number {
   const timingBonus = new Date(card.expiresAt).getTime() - Date.now() < 3_600_000 ? 0.2 : 0;
   return card.urgency * card.confidence * 0.5 + timingBonus;
 }
 
-/** Rule: weather drop + health signal → coat reminder */
-function ruleWeatherCoat(weather: WeatherSignal, healthNodes: ReturnType<typeof getRecentNodes>): RecommendationCard | null {
-  const note = weather.forecastNote?.toLowerCase() || '';
-  const cold = note.includes('降温') || note.includes('cold') || (weather.temperatureC !== undefined && weather.temperatureC < 15);
+// ── Rules ──────────────────────────────────────────────
+
+/** Weather drop + optional health signal → coat reminder */
+function ruleWeatherCoat(weather: WeatherSnapshot | null, hasHealthIssue: boolean): RecommendationCard | null {
+  if (!weather) return null;
+  const note = (weather.forecastNote || '').toLowerCase();
+  const cold = note.includes('降温') || note.includes('cold') || note.includes('rain') ||
+    note.includes('雨') || weather.temperatureC < 15;
   if (!cold) return null;
 
-  const sick = healthNodes.some((n) => n.type === 'health_state' && n.attributes['status'] === 'recovering');
   return {
     id: 'weather-coat',
     domain: 'weather',
     domainLabel: '未来引导',
-    confidence: sick ? 0.93 : 0.78,
+    confidence: hasHealthIssue ? 0.93 : 0.78,
     urgency: 3,
     icon: '🌧',
     iconBg: '#f59e0b',
     title: '把外套放到门口',
-    body: sick
-      ? `明天${weather.forecastNote}，你最近身体还在恢复，提前备好外套。`
-      : `明天${weather.forecastNote}，出门前别忘了外套。`,
-    tags: ['天气 · 降温', ...(sick ? ['健康 · 恢复中'] : [])],
+    body: hasHealthIssue
+      ? `明天${weather.forecastNote || '降温'}，你最近身体还在恢复，提前备好外套。`
+      : `${weather.forecastNote ? `预计${weather.forecastNote}` : '明天气温较低'}，出门前备好外套。`,
+    tags: [`天气 · ${weather.condition}`, ...(hasHealthIssue ? ['健康 · 恢复中'] : [])],
     evidence: [
-      { source: 'weather', label: '天气预报', value: weather.forecastNote || '降温' },
-      ...(sick ? [{ source: 'life-graph', label: '健康状态', value: '恢复中' }] : []),
+      { source: 'weather', label: '天气', value: `${weather.temperatureC}°C, ${weather.condition}` },
+      ...(weather.forecastNote ? [{ source: 'weather', label: '预报', value: weather.forecastNote }] : []),
     ],
     primaryAction: '好的，放门口',
     secondaryAction: '稍后',
@@ -94,27 +91,32 @@ function ruleWeatherCoat(weather: WeatherSignal, healthNodes: ReturnType<typeof 
   };
 }
 
-/** Rule: upcoming meeting → audio brief card */
+/** Upcoming meeting within 14h → audio brief card */
 function ruleMeetingBrief(events: CalendarEvent[]): RecommendationCard | null {
   const now = Date.now();
   const next = events.find((e) => {
     const start = new Date(e.start).getTime();
-    return start > now && start - now < 14 * 3_600_000; // within 14h
+    return start > now && start - now < 14 * 3_600_000;
   });
   if (!next) return null;
 
   const startTime = new Date(next.start).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+  const isSoon = new Date(next.start).getTime() - now < 3_600_000;
+
   return {
     id: `meeting-${next.id || next.start}`,
     domain: 'work',
     domainLabel: '语音简报',
     confidence: 0.88,
-    urgency: 4,
+    urgency: isSoon ? 5 : 4,
     icon: '🎙',
     iconBg: '#6366f1',
-    title: `${next.title || '会议'}，不用翻笔记`,
-    body: `今天 ${startTime} 的会，Nesio 整理了关键提醒。`,
-    evidence: [{ source: 'calendar', label: '日历', value: next.title || '会议' }],
+    title: `${next.title || '即将开始的会'}，不用翻笔记`,
+    body: `${isSoon ? '马上' : `今天 ${startTime}`}的会，Nesio 整理了关键提醒。${next.location ? ` 地点：${next.location}` : ''}`,
+    evidence: [
+      { source: 'calendar', label: '日历', value: next.title || '会议' },
+      { source: 'calendar', label: '时间', value: startTime },
+    ],
     primaryAction: '查看',
     secondaryAction: '改时间',
     type: 'audio',
@@ -122,58 +124,119 @@ function ruleMeetingBrief(events: CalendarEvent[]): RecommendationCard | null {
   };
 }
 
-/** Rule: life graph object with upcoming deadline → family card */
+/** Life graph commitment / object with no recent action → family card */
 function ruleFamilyCommitment(): RecommendationCard | null {
   const nodes = getRecentNodes(20);
-  const commitments = nodes.filter((n) => n.type === 'commitment' || n.type === 'object');
-  if (!commitments.length) return null;
-  const top = commitments[0];
+  const top = nodes.find((n) => n.type === 'commitment' || n.type === 'object' || n.type === 'event');
+  if (!top) return null;
+
   return {
     id: `family-${top.id}`,
     domain: 'family',
     domainLabel: '家庭提醒',
-    confidence: 0.88,
+    confidence: top.confidence,
     urgency: 3,
-    icon: '🎁',
-    iconBg: '#10b981',
+    icon: top.type === 'object' ? '📦' : top.type === 'event' ? '📅' : '🤝',
+    iconBg: '#d1fae5',
     title: top.name,
-    body: top.rawInput || `来自你的 Memory 记录。`,
+    body: top.rawInput || `来自你的 Memory 记录 · ${new Date(top.createdAt).toLocaleDateString('zh-CN')}`,
     evidence: [{ source: 'life-graph', label: '记忆', value: top.name }],
     primaryAction: '好的',
-    secondaryAction: '在 Memory 里看',
+    secondaryAction: '在 Memory 看',
     type: 'standard',
     expiresAt: tomorrowISO(),
   };
 }
 
-/** Main entry point: generate ranked cards from available signals */
+/** Health signal from life graph → gentle health reminder */
+function ruleHealthState(weather: WeatherSnapshot | null): RecommendationCard | null {
+  const nodes = getRecentNodes(30);
+  const health = nodes.find((n) => n.type === 'health_state');
+  if (!health) return null;
+
+  const cold = weather && weather.temperatureC < 15;
+  return {
+    id: `health-${health.id}`,
+    domain: 'health',
+    domainLabel: '健康关注',
+    confidence: 0.82,
+    urgency: cold ? 4 : 2,
+    icon: '🩷',
+    iconBg: '#fce7f3',
+    title: `注意${health.name}`,
+    body: cold
+      ? `气温下降，注意保暖，配合${health.name}的恢复。`
+      : `记录显示你最近${health.name}，注意休息。`,
+    evidence: [
+      { source: 'life-graph', label: '健康记录', value: health.name },
+      ...(cold ? [{ source: 'weather', label: '气温', value: `${weather!.temperatureC}°C` }] : []),
+    ],
+    primaryAction: '记录今天状态',
+    secondaryAction: '稍后',
+    type: 'standard',
+    expiresAt: tomorrowISO(),
+  };
+}
+
+// ── Main entry ──────────────────────────────────────────
+
 export function generateTodayCards(): RecommendationCard[] {
-  const weatherRaw = readPortalCache<Record<string, unknown>>('nesio-weather-v1') as WeatherSignal | null;
+  // Read from the same cache key that Portal.tsx writes
+  const weatherRaw = readPortalCache<WeatherSnapshot>(PORTAL_CACHE_KEYS.weather);
   const calendarRaw = readPortalCache<{ events?: CalendarEvent[] }>(PORTAL_CACHE_KEYS.calendar);
   const events = calendarRaw?.events ?? [];
-  const lifeNodes = getRecentNodes(20);
-  const healthNodes = lifeNodes.filter((n) => n.type === 'health_state');
+  const lifeNodes = getRecentNodes(30);
+  const hasHealthIssue = lifeNodes.some((n) => n.type === 'health_state');
 
-  const candidates: RecommendationCard[] = [
-    ruleWeatherCoat(weatherRaw ?? {}, healthNodes),
-    ruleMeetingBrief(events),
+  const candidates: (RecommendationCard | null)[] = [
+    ruleMeetingBrief(events),           // urgency 4-5, show first if meeting soon
+    ruleWeatherCoat(weatherRaw, hasHealthIssue),
+    ruleHealthState(weatherRaw),
     ruleFamilyCommitment(),
-  ].filter((c): c is RecommendationCard => c !== null);
+  ];
 
+  // Filter dismissed/snoozed cards from feedback store
+  const feedback = readCardFeedbackAll();
   return candidates
+    .filter((c): c is RecommendationCard => c !== null)
+    .filter((c) => {
+      const fb = feedback[c.id];
+      if (!fb) return true;
+      if (fb.feedback === 'too_much') return false;
+      if (fb.feedback === 'useful') return false;
+      if (fb.feedback === 'not_now') {
+        // snooze 4h
+        return Date.now() - new Date(fb.at).getTime() > 4 * 3_600_000;
+      }
+      return true;
+    })
     .sort((a, b) => score(b) - score(a))
     .slice(0, 5);
 }
 
-/** Feedback — stores user reaction to a card, used for future ranking tuning */
+// ── Feedback ────────────────────────────────────────────
+
 const FEEDBACK_KEY = 'nesio-card-feedback-v1';
+
+type FeedbackRecord = { feedback: RecommendationCard['feedback']; at: string };
+
+function readCardFeedbackAll(): Record<string, FeedbackRecord> {
+  if (typeof window === 'undefined') return {};
+  try {
+    return JSON.parse(localStorage.getItem(FEEDBACK_KEY) || '{}') as Record<string, FeedbackRecord>;
+  } catch {
+    return {};
+  }
+}
 
 export function recordCardFeedback(cardId: string, feedback: RecommendationCard['feedback']): void {
   if (typeof window === 'undefined') return;
   try {
-    const existing = JSON.parse(localStorage.getItem(FEEDBACK_KEY) || '{}');
+    const existing = readCardFeedbackAll();
     existing[cardId] = { feedback, at: new Date().toISOString() };
     localStorage.setItem(FEEDBACK_KEY, JSON.stringify(existing));
+    // Notify mirror profile
+    window.dispatchEvent(new CustomEvent('nesio-feedback-recorded', { detail: { cardId, feedback } }));
   } catch {
     /* ignore */
   }

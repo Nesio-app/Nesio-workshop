@@ -9703,3 +9703,374 @@ details[open] .nesio-settings-legacy-toggle::before {
   color: var(--portal-muted);
   font-size: 0.88rem;
 }
+
+/* ─────────────────────────────────────────────
+   Nesio Onboarding & First-use Tips
+───────────────────────────────────────────── */
+
+/* Overlay */
+.nesio-ob-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+}
+
+.nesio-ob-bg {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(160deg, #1a2d58 0%, #0d1a36 100%);
+}
+
+.nesio-ob-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 22rem;
+  background: rgba(255, 255, 255, 0.97);
+  border-radius: 1.5rem;
+  padding: 1.75rem 1.5rem 1.5rem;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3);
+  animation: obCardIn 0.35s var(--ease-out);
+}
+
+html[data-portal-theme="night"] .nesio-ob-card {
+  background: rgba(18, 28, 54, 0.98);
+  border: 1px solid rgba(88, 140, 227, 0.2);
+}
+
+@keyframes obCardIn {
+  from { opacity: 0; transform: translateY(24px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Progress dots */
+.nesio-ob-progress {
+  display: flex;
+  gap: 0.4rem;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
+.nesio-ob-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: rgba(88, 140, 227, 0.2);
+  transition: background 0.25s, width 0.25s;
+}
+
+.nesio-ob-dot--active {
+  background: var(--portal-blue-deep);
+  width: 1.2rem;
+  border-radius: 999px;
+}
+
+.nesio-ob-dot--done { background: rgba(88, 140, 227, 0.45); }
+
+/* Step shared */
+.nesio-ob-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0;
+  animation: obStepIn 0.28s var(--ease-out);
+}
+
+@keyframes obStepIn {
+  from { opacity: 0; transform: translateX(12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* Welcome step */
+.nesio-ob-logo-wrap {
+  width: 4rem;
+  height: 4rem;
+  border-radius: 1.1rem;
+  background: linear-gradient(135deg, #6ea8f0, #3d6dd4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.85rem;
+  box-shadow: 0 8px 24px rgba(88, 140, 227, 0.35);
+}
+
+.nesio-ob-logo {
+  width: 2.4rem;
+  height: 2.4rem;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
+}
+
+.nesio-ob-brand {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--portal-ink);
+  letter-spacing: -0.03em;
+  margin-bottom: 0.1rem;
+}
+
+html[data-portal-theme="night"] .nesio-ob-brand { color: #e8eefa; }
+
+.nesio-ob-tagline {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--portal-blue-deep);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 0.9rem;
+}
+
+.nesio-ob-desc {
+  font-size: 0.88rem;
+  color: var(--portal-muted);
+  line-height: 1.55;
+  margin-bottom: 1.25rem;
+}
+
+html[data-portal-theme="night"] .nesio-ob-desc { color: #8fa3c0; }
+
+/* Language row */
+.nesio-ob-lang-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.nesio-ob-lang-btn {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border: 1.5px solid rgba(88, 140, 227, 0.25);
+  color: var(--portal-muted);
+  transition: all 0.15s;
+}
+
+.nesio-ob-lang-btn--active {
+  background: var(--portal-blue-deep);
+  color: #fff;
+  border-color: var(--portal-blue-deep);
+}
+
+/* Name / other steps */
+.nesio-ob-step-icon {
+  font-size: 2.2rem;
+  margin-bottom: 0.75rem;
+}
+
+.nesio-ob-step-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--portal-ink);
+  letter-spacing: -0.02em;
+  margin-bottom: 0.4rem;
+}
+
+html[data-portal-theme="night"] .nesio-ob-step-title { color: #e8eefa; }
+
+.nesio-ob-step-sub {
+  font-size: 0.82rem;
+  color: var(--portal-muted);
+  line-height: 1.5;
+  margin-bottom: 1.1rem;
+}
+
+html[data-portal-theme="night"] .nesio-ob-step-sub { color: #8fa3c0; }
+
+/* Input */
+.nesio-ob-input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1.5px solid rgba(88, 140, 227, 0.25);
+  border-radius: 0.85rem;
+  font-size: 0.95rem;
+  color: var(--portal-ink);
+  background: rgba(88, 140, 227, 0.04);
+  outline: none;
+  margin-bottom: 0.85rem;
+  transition: border-color 0.15s;
+}
+
+.nesio-ob-input:focus { border-color: var(--portal-blue-deep); }
+
+html[data-portal-theme="night"] .nesio-ob-input {
+  background: rgba(88, 140, 227, 0.1);
+  border-color: rgba(88, 140, 227, 0.25);
+  color: #e8eefa;
+}
+
+.nesio-ob-input::placeholder { color: var(--portal-muted); }
+
+/* Buttons */
+.nesio-ob-primary-btn {
+  width: 100%;
+  padding: 0.85rem;
+  background: var(--portal-blue-deep);
+  color: #fff;
+  border-radius: 999px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  text-align: center;
+  box-shadow: 0 4px 16px rgba(88, 140, 227, 0.35);
+  transition: opacity 0.15s, transform 0.15s;
+  margin-bottom: 0.6rem;
+}
+
+.nesio-ob-primary-btn:disabled { opacity: 0.45; }
+.nesio-ob-primary-btn:not(:disabled):active { transform: scale(0.97); }
+
+.nesio-ob-auth-btn {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1.5px solid rgba(88, 140, 227, 0.22);
+  border-radius: 0.85rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--portal-ink);
+  background: rgba(88, 140, 227, 0.04);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  margin-bottom: 0.6rem;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+html[data-portal-theme="night"] .nesio-ob-auth-btn { color: #e8eefa; background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.12); }
+
+.nesio-ob-auth-btn:hover { background: rgba(88, 140, 227, 0.09); border-color: rgba(88, 140, 227, 0.35); }
+
+.nesio-ob-auth-btn--google {
+  border-color: rgba(66, 133, 244, 0.35);
+  background: rgba(66, 133, 244, 0.04);
+}
+
+.nesio-ob-skip-btn {
+  font-size: 0.78rem;
+  color: var(--portal-muted);
+  padding: 0.4rem;
+  margin-top: 0.1rem;
+  display: block;
+  text-align: center;
+}
+
+.nesio-ob-error {
+  font-size: 0.78rem;
+  color: #ef4444;
+  text-align: center;
+  margin: 0.25rem 0 0.5rem;
+}
+
+/* ─── First-use Tips Overlay ─── */
+.nesio-tips-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 450;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  padding-bottom: calc(5.5rem + env(safe-area-inset-bottom) + 0.5rem);
+  background: rgba(10, 18, 40, 0.55);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+
+/* Highlight ring around nav area */
+.nesio-tips-hl {
+  position: fixed;
+  border-radius: 999px;
+  pointer-events: none;
+  box-shadow: 0 0 0 4px rgba(88, 140, 227, 0.7), 0 0 0 8px rgba(88, 140, 227, 0.2);
+  transition: all 0.35s var(--ease-out);
+}
+
+.nesio-tips-hl--today {
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 0.5rem);
+  left: calc(50% - 11rem);
+  width: 5.5rem;
+  height: 3.8rem;
+}
+
+.nesio-tips-hl--center {
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 0.3rem);
+  left: calc(50% - 1.8rem);
+  width: 3.6rem;
+  height: 3.6rem;
+}
+
+.nesio-tips-hl--memory {
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 0.5rem);
+  right: calc(50% - 11rem);
+  width: 5.5rem;
+  height: 3.8rem;
+}
+
+.nesio-tips-card {
+  background: rgba(255, 255, 255, 0.97);
+  border-radius: 1.5rem 1.5rem 0 0;
+  width: 100%;
+  padding: 0 1.5rem 1.75rem;
+  box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.18);
+  animation: sheetSlideUp 0.3s var(--ease-out);
+}
+
+html[data-portal-theme="night"] .nesio-tips-card { background: rgba(16, 26, 52, 0.98); border-top: 1px solid rgba(88,140,227,0.2); }
+
+.nesio-tips-dots {
+  display: flex;
+  gap: 0.4rem;
+  justify-content: center;
+  padding: 0.8rem 0 0.5rem;
+}
+
+.nesio-tips-dot {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: rgba(88, 140, 227, 0.2);
+}
+
+.nesio-tips-dot--active {
+  background: var(--portal-blue-deep);
+  width: 1rem;
+  border-radius: 999px;
+}
+
+.nesio-tips-emoji {
+  font-size: 2rem;
+  text-align: center;
+  margin: 0.5rem 0 0.6rem;
+}
+
+.nesio-tips-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--portal-ink);
+  text-align: center;
+  margin-bottom: 0.4rem;
+}
+
+html[data-portal-theme="night"] .nesio-tips-title { color: #e8eefa; }
+
+.nesio-tips-body {
+  font-size: 0.85rem;
+  color: var(--portal-muted);
+  text-align: center;
+  line-height: 1.55;
+  margin-bottom: 1.1rem;
+}
+
+html[data-portal-theme="night"] .nesio-tips-body { color: #8fa3c0; }
+
+.nesio-tips-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}

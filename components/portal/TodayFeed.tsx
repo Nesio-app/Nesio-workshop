@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { loadProfileSettings } from '@/lib/portal/profile';
 import { generateTodayCards, recordCardFeedback, type RecommendationCard } from '@/lib/portal/reasoning-engine';
 import { getRecentNodes } from '@/lib/portal/life-graph';
+import { learnFromFeedback } from '@/lib/portal/mirror-profile';
+import { runConnectors } from '@/lib/portal/connectors';
 
 // Fallback mock cards shown before real signals load
 const MOCK_CARDS: RecommendationCard[] = [
@@ -212,26 +214,38 @@ export default function TodayFeed({ onOpenMemory }: { onOpenMemory?: () => void 
     });
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-portal-theme'] });
 
-    // Load real cards from reasoning engine, fall back to mock
+    // Load initial cards (may be mock or cached-signal cards)
     const real = generateTodayCards();
     setCards(real.length > 0 ? real : MOCK_CARDS);
     setMemoryCount(getRecentNodes().length);
 
-    const onGraphUpdate = () => {
+    // Run connectors (weather + calendar) — updates cache then fires events
+    runConnectors().catch(() => undefined);
+
+    const refresh = () => {
       const updated = generateTodayCards();
       setCards(updated.length > 0 ? updated : MOCK_CARDS);
       setMemoryCount(getRecentNodes().length);
     };
-    window.addEventListener('nesio-life-graph-updated', onGraphUpdate);
+
+    window.addEventListener('nesio-life-graph-updated', refresh);
+    window.addEventListener('nesio-connectors-refreshed', refresh);
+    window.addEventListener('nesio-weather-updated', refresh);
+    window.addEventListener('nesio-calendar-updated', refresh);
 
     return () => {
       observer.disconnect();
-      window.removeEventListener('nesio-life-graph-updated', onGraphUpdate);
+      window.removeEventListener('nesio-life-graph-updated', refresh);
+      window.removeEventListener('nesio-connectors-refreshed', refresh);
+      window.removeEventListener('nesio-weather-updated', refresh);
+      window.removeEventListener('nesio-calendar-updated', refresh);
     };
   }, []);
 
   function handleFeedback(cardId: string, feedback: RecommendationCard['feedback']) {
+    const card = cards.find((c) => c.id === cardId);
     recordCardFeedback(cardId, feedback);
+    if (card) learnFromFeedback(card.domain, feedback);
     if (feedback === 'too_much' || feedback === 'useful') {
       setCards((prev) => prev.filter((c) => c.id !== cardId));
     }
