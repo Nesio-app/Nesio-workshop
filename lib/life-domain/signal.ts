@@ -12,7 +12,7 @@
  * adapted on read. This keeps the running app intact.
  */
 
-import { getLifeGraph, type LifeNode, type LifeNodeType, type LifeNodeSource } from '../portal/life-graph';
+import { getLifeGraph, deleteLifeNode, type LifeNode, type LifeNodeType, type LifeNodeSource } from '../portal/life-graph';
 
 export type SignalSource =
   | 'voice'
@@ -44,6 +44,16 @@ export type SignalType =
 
 export type SignalSensitivity = 'normal' | 'private' | 'health' | 'financial' | 'family' | 'work';
 
+/**
+ * Retention policy (PRD v3.0 §2.3) — drives the Pruning Engine.
+ * AlwaysAlive: core family/assets/major health → never pruned, always hot.
+ * LongLiving:  long-term knowledge/finance → no physical delete, warm-compress.
+ * Normal:      meetings/todos → 30-90d inactivity → cold/dormant.
+ * Disposable:  weather/transient notices/voice scraps → consumed within 24h,
+ *              must not pollute the long-term Life Graph.
+ */
+export type RetentionPolicy = 'AlwaysAlive' | 'LongLiving' | 'Normal' | 'Disposable';
+
 export interface EntityRef {
   id: string;
   type: string;
@@ -67,6 +77,7 @@ export interface Signal {
   entities: EntityRef[];
   confidence: number; // 0-1
   sensitivity: SignalSensitivity;
+  retentionPolicy: RetentionPolicy;
   evidence: SignalSourceRef;
   tags?: string[];
 }
@@ -101,6 +112,24 @@ function inferSensitivity(node: LifeNode): SignalSensitivity {
   return 'normal';
 }
 
+function inferRetention(node: LifeNode): RetentionPolicy {
+  const tags = (node.tags || []).join(' ').toLowerCase();
+  // Core family / major assets / major health → never prune
+  if (tags.includes('家庭') || tags.includes('family') || tags.includes('tesla') || node.type === 'person') {
+    return 'AlwaysAlive';
+  }
+  // Long-term knowledge / finance
+  if (tags.includes('finance') || tags.includes('财务') || tags.includes('读书') ||
+      tags.includes('learning') || tags.includes('notion') || node.type === 'preference') {
+    return 'LongLiving';
+  }
+  // Transient: weather / one-off notices / quick voice scraps with no entities
+  const transient = tags.includes('天气') || tags.includes('weather') ||
+    (node.source === 'voice' && node.relations.length === 0 && !node.rawInput);
+  if (transient) return 'Disposable';
+  return 'Normal';
+}
+
 /** Convert a legacy Life Graph node into a normalized Signal */
 export function lifeNodeToSignal(node: LifeNode): Signal {
   const occurredAt =
@@ -119,6 +148,7 @@ export function lifeNodeToSignal(node: LifeNode): Signal {
     entities: node.relations.map((r) => ({ id: r.targetId, type: r.relation, name: r.targetId })),
     confidence: node.confidence,
     sensitivity: inferSensitivity(node),
+    retentionPolicy: inferRetention(node),
     evidence: { source: NODE_SOURCE_TO_SIGNAL[node.source] ?? 'manual', externalId: node.id, raw: node.rawInput },
     tags: node.tags,
   };
@@ -126,9 +156,17 @@ export function lifeNodeToSignal(node: LifeNode): Signal {
 
 // ── Signal queries ───────────────────────────────────────────────────────────
 
-/** Get all signals, projected from the Life Graph (newest first). */
+const DISPOSABLE_TTL_MS = 24 * 3_600_000;
+
+function isExpiredDisposable(s: Signal): boolean {
+  return s.retentionPolicy === 'Disposable' &&
+    Date.now() - new Date(s.capturedAt).getTime() > DISPOSABLE_TTL_MS;
+}
+
+/** Get all signals, projected from the Life Graph (newest first).
+ *  Expired Disposable signals are filtered out so they never reach reasoning. */
 export function getSignals(opts?: { since?: number; sources?: SignalSource[]; types?: SignalType[] }): Signal[] {
-  let signals = getLifeGraph().map(lifeNodeToSignal);
+  let signals = getLifeGraph().map(lifeNodeToSignal).filter((s) => !isExpiredDisposable(s));
   if (opts?.since) {
     signals = signals.filter((s) => new Date(s.capturedAt).getTime() >= opts.since!);
   }
@@ -139,6 +177,20 @@ export function getSignals(opts?: { since?: number; sources?: SignalSource[]; ty
     signals = signals.filter((s) => opts.types!.includes(s.type));
   }
   return signals.sort((a, b) => new Date(b.capturedAt).getTime() - new Date(a.capturedAt).getTime());
+}
+
+/**
+ * Pruning Engine (PRD §2.3) — physically delete expired Disposable nodes from
+ * the Life Graph so transient data (weather, one-off scraps) never accumulates.
+ * Safe to call on app mount. Returns the number of nodes pruned.
+ */
+export function pruneDisposableSignals(): number {
+  if (typeof window === 'undefined') return 0;
+  const expired = getLifeGraph()
+    .filter((node) => isExpiredDisposable(lifeNodeToSignal(node)));
+  if (!expired.length) return 0;
+  expired.forEach((node) => deleteLifeNode(node.id));
+  return expired.length;
 }
 
 /** Signals captured within the last N hours. */

@@ -11158,3 +11158,69 @@ html[data-portal-theme="night"] .nesio-lifestate-dim-label { color: #e8eefa; }
   color: var(--portal-muted);
   margin-top: 0.5rem;
 }
+
+/* ─── Progressive Collapse card (PRD §5.1 zero-burden) ─── */
+.nesio-today-card--collapse .nesio-today-card-row {
+  align-items: center;
+  margin-bottom: 0.7rem;
+}
+.nesio-today-card--collapse .nesio-today-card-title {
+  margin-bottom: 0;
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
+.nesio-today-why-btn {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--portal-muted);
+  padding: 0.5rem 0.9rem;
+  border-radius: 999px;
+  background: transparent;
+  transition: color 0.15s, background 0.15s;
+}
+.nesio-today-why-btn:active { background: rgba(88,140,227,0.08); }
+
+.nesio-today-evidence {
+  margin-top: 0.75rem;
+  padding-top: 0.7rem;
+  border-top: 1px dashed var(--portal-line);
+  animation: nesioEvidenceSlide 0.22s var(--ease-out);
+}
+@keyframes nesioEvidenceSlide {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.nesio-today-evidence-text {
+  font-size: 0.82rem;
+  color: var(--portal-ink);
+  line-height: 1.5;
+  margin-bottom: 0.55rem;
+}
+html[data-portal-theme="night"] .nesio-today-evidence-text { color: #c5d4ea; }
+
+.nesio-today-evidence-refs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.nesio-today-evidence-chip {
+  font-size: 0.68rem;
+  color: var(--portal-blue-deep);
+  background: rgba(88,140,227,0.1);
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+}
+html[data-portal-theme="night"] .nesio-today-evidence-chip { color: #96c7f3; background: rgba(88,140,227,0.18); }
+
+.nesio-today-evidence-conf {
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: #d97706;
+  background: #fef3c7;
+  padding: 0.16rem 0.5rem;
+  border-radius: 999px;
+}

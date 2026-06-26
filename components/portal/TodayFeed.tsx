@@ -5,6 +5,7 @@ import { loadProfileSettings } from '@/lib/portal/profile';
 import { recordCardFeedback, type RecommendationCard } from '@/lib/portal/reasoning-engine';
 import { generateTodayCards } from '@/lib/intelligence';
 import { getRecentNodes } from '@/lib/portal/life-graph';
+import { pruneDisposableSignals } from '@/lib/life-domain';
 import { learnFromFeedback } from '@/lib/portal/mirror-profile';
 import { runConnectors } from '@/lib/portal/connectors';
 import VoiceBrief from './VoiceBrief';
@@ -136,41 +137,63 @@ function FeedbackMenu({ onFeedback }: { onFeedback: (f: RecommendationCard['feed
   );
 }
 
+/** 45-char physical fuse (PRD §5.1): the causal explanation in the evidence
+ *  drawer is hard-capped so scan-reading never causes second-order fatigue. */
+const EVIDENCE_CHAR_CAP = 45;
+function capEvidence(text: string): string {
+  return text.length > EVIDENCE_CHAR_CAP ? text.slice(0, EVIDENCE_CHAR_CAP - 1) + '…' : text;
+}
+
+/**
+ * Progressive Collapse card (PRD §5.1). Default state = "0 explanation burden":
+ * one high-precision line + primary action. Evidence/reasoning stay hidden
+ * until the user actively asks「为什么」, then a ≤45-char drawer slides out.
+ */
 function StandardCard({ card, onFeedback }: { card: RecommendationCard; onFeedback: (f: RecommendationCard['feedback']) => void }) {
   const [done, setDone] = useState(false);
+  const [why, setWhy] = useState(false);
   if (done) return null;
+
   return (
-    <div className="nesio-today-card">
-      <div className="nesio-today-card-header">
-        <span className="nesio-today-card-domain">{card.domainLabel}</span>
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <span className="nesio-today-card-conf">
-            <span className="nesio-today-card-conf-dot" />
-            {Math.round(card.confidence * 100)}% 把握
-          </span>
-          <FeedbackMenu onFeedback={onFeedback} />
-        </div>
-      </div>
+    <div className="nesio-today-card nesio-today-card--collapse">
+      {/* Always-visible: one-line suggestion + actions */}
       <div className="nesio-today-card-row">
         <span className="nesio-today-card-icon-wrap" style={{ background: card.iconBg }}>{card.icon}</span>
-        <div>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <h3 className="nesio-today-card-title">{card.title}</h3>
-          <p className="nesio-today-card-body">{card.body}</p>
         </div>
+        <FeedbackMenu onFeedback={onFeedback} />
       </div>
-      {card.tags && (
-        <div className="nesio-today-card-tags">
-          {card.tags.map((tag) => <span key={tag} className="nesio-today-card-tag">{tag}</span>)}
-        </div>
-      )}
+
       <div className="nesio-today-card-actions">
         <button type="button" className="nesio-today-btn nesio-today-btn--primary"
           onClick={() => { setDone(true); onFeedback('useful'); }}>{card.primaryAction}</button>
-        {card.secondaryAction && (
-          <button type="button" className="nesio-today-btn nesio-today-btn--ghost"
-            onClick={() => onFeedback('not_now')}>{card.secondaryAction}</button>
-        )}
+        <button type="button" className="nesio-today-why-btn"
+          onClick={() => setWhy((v) => !v)} aria-expanded={why}>
+          为什么{why ? ' ↑' : ' ↓'}
+        </button>
       </div>
+
+      {/* Evidence drawer — only on demand, ≤45 chars */}
+      {why && (
+        <div className="nesio-today-evidence">
+          <p className="nesio-today-evidence-text">{capEvidence(card.body)}</p>
+          {card.evidence.length > 0 && (
+            <div className="nesio-today-evidence-refs">
+              {card.evidence.slice(0, 3).map((e, i) => (
+                <span key={i} className="nesio-today-evidence-chip" title={e.signalId || ''}>
+                  {e.label}：{e.value.length > 16 ? e.value.slice(0, 15) + '…' : e.value}
+                </span>
+              ))}
+              <span className="nesio-today-evidence-conf">{Math.round(card.confidence * 100)}% 把握</span>
+            </div>
+          )}
+          {card.secondaryAction && (
+            <button type="button" className="nesio-today-btn nesio-today-btn--ghost"
+              style={{ marginTop: '0.6rem' }} onClick={() => onFeedback('not_now')}>{card.secondaryAction}</button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -223,6 +246,9 @@ export default function TodayFeed({ onOpenMemory }: { onOpenMemory?: () => void 
       setIsNight(document.documentElement.getAttribute('data-portal-theme') === 'night');
     });
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-portal-theme'] });
+
+    // Pruning Engine: clear expired Disposable signals before reasoning.
+    pruneDisposableSignals();
 
     // Load initial cards (may be mock or cached-signal cards)
     const real = generateTodayCards();

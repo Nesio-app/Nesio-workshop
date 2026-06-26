@@ -44,6 +44,26 @@ function todayEndISO(): string {
   return d.toISOString();
 }
 
+// ── Governance guardrails (PRD v3.0 Stage 1) ────────────────────────────────
+
+/** Confidence Threshold (§2.2). Below this, the pipeline physically degrades —
+ *  the card never reaches Today. Silence beats a confident-sounding guess. */
+const CONFIDENCE_FLOOR = 0.6;
+
+/** Attention Budget (§2.1). Today shows at most 3 cards; the rest sink to the
+ *  console and never crowd the home surface. */
+const TODAY_CARD_BUDGET = 3;
+
+/** Two-Domain Constraint Sandbox (§4.2). DEC v1 only allows these cross-domain
+ *  pairs. Single-domain rules are unconstrained. This caps GIGO from unbounded
+ *  full-graph reasoning. Declared here as the contract each cross-domain rule
+ *  must fit; widening the sandbox is a deliberate, reviewable change. */
+export const DEC_SANDBOX_PAIRS = [
+  ['health', 'calendar'],
+  ['health', 'weather'],
+  ['task', 'calendar'],
+] as const;
+
 /** Build an evidence ref that traces back to a real Signal. */
 function signalEvidence(sig: Signal, label: string): EvidenceRef {
   return {
@@ -240,6 +260,8 @@ export function runDEC(): DECOutput {
   const feedback = readCardFeedbackAll();
   const cards = candidates
     .filter((c): c is RecommendationCard => c !== null)
+    // Confidence Threshold: physically degrade low-confidence guesses.
+    .filter((c) => c.confidence >= CONFIDENCE_FLOOR)
     .filter((c) => {
       const fb = feedback[c.id];
       if (!fb) return true;
@@ -248,7 +270,8 @@ export function runDEC(): DECOutput {
       return true;
     })
     .sort((a, b) => scoreCard(b) - scoreCard(a))
-    .slice(0, 5);
+    // Attention Budget:末位淘汰，首页最多 3 张。
+    .slice(0, TODAY_CARD_BUDGET);
 
   // Canonical recommendations, gated on evidence (PRD: no evidence → not Today)
   const recommendations = cards
