@@ -7,7 +7,7 @@
 *A personal system that helps people capture everyday life, recover forgotten context, and reduce cognitive load.*
 
 <p align="center">
-  <img src="./docs/images/hero.png" alt="Nesio" width="100%">
+  <img src="./docs/hero.png" alt="Nesio" width="100%">
 </p>
 
 ---
