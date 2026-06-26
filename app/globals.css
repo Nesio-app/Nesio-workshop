@@ -8882,3 +8882,824 @@ html[data-portal-theme="night"] .nesio-memory-card-title { color: #e8eefa; }
   color: #e8eefa;
   text-shadow: 0 1px 4px rgba(0,0,0,0.4);
 }
+
+/* ─── Tell Nesio: Fan Layout ─── */
+.nesio-tell-fan {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 0;
+  padding-bottom: 0.5rem;
+  /* Fan: voice center-top, camera lower-left, share lower-right */
+}
+
+.nesio-tell-fan-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  animation: tellFanIn 0.22s var(--ease-out) both;
+  animation-delay: var(--delay, 0s);
+}
+
+@keyframes tellFanIn {
+  from { opacity: 0; transform: translateY(24px) scale(0.8); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Left (camera) — drop down 20px relative to center voice */
+.nesio-tell-fan-btn--left  { transform: translateY(20px); margin-right: 1.5rem; }
+.nesio-tell-fan-btn--right { transform: translateY(20px); margin-left: 1.5rem; }
+.nesio-tell-fan-btn--center { } /* baseline */
+
+.nesio-tell-fan-icon {
+  width: 3.6rem;
+  height: 3.6rem;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.92);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.18);
+  color: var(--portal-blue-deep);
+  transition: transform 0.15s;
+}
+
+.nesio-tell-fan-icon--voice {
+  width: 4.2rem;
+  height: 4.2rem;
+  background: var(--portal-blue-deep);
+  color: #fff;
+  box-shadow: 0 6px 28px rgba(88,140,227,0.5);
+}
+
+.nesio-tell-fan-btn:active .nesio-tell-fan-icon { transform: scale(0.88); }
+
+.nesio-tell-fan-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #e8eefa;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+  white-space: nowrap;
+}
+
+/* ─── Voice Input Sheet ─── */
+.nesio-voice-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  display: flex;
+  align-items: flex-end;
+}
+
+.nesio-voice-sheet-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(10,20,45,0.4);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.nesio-voice-sheet-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  background: var(--glass-bg-pop);
+  border-top-left-radius: 1.5rem;
+  border-top-right-radius: 1.5rem;
+  padding: 0 1.25rem calc(2.5rem + env(safe-area-inset-bottom));
+  box-shadow: 0 -8px 40px rgba(0,0,0,0.15);
+  animation: sheetSlideUp 0.28s var(--ease-out);
+}
+
+html[data-portal-theme="night"] .nesio-voice-sheet-card {
+  background: rgba(16,26,50,0.97);
+}
+
+@keyframes sheetSlideUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+.nesio-sheet-handle {
+  width: 2.5rem;
+  height: 0.22rem;
+  background: rgba(0,0,0,0.15);
+  border-radius: 999px;
+  margin: 0.65rem auto 0;
+}
+
+html[data-portal-theme="night"] .nesio-sheet-handle { background: rgba(255,255,255,0.15); }
+
+.nesio-voice-sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 0 0.75rem;
+}
+
+.nesio-voice-sheet-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--portal-ink);
+}
+
+html[data-portal-theme="night"] .nesio-voice-sheet-title { color: #e8eefa; }
+
+.nesio-voice-sheet-close {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.07);
+  color: var(--portal-muted);
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+html[data-portal-theme="night"] .nesio-voice-sheet-close { background: rgba(255,255,255,0.1); color: #8fa3c0; }
+
+.nesio-voice-transcript {
+  min-height: 4.5rem;
+  background: rgba(88,140,227,0.06);
+  border: 1px solid rgba(88,140,227,0.14);
+  border-radius: 0.85rem;
+  padding: 0.85rem 1rem;
+  font-size: 0.95rem;
+  color: var(--portal-ink);
+  line-height: 1.5;
+  margin-bottom: 1rem;
+}
+
+html[data-portal-theme="night"] .nesio-voice-transcript { color: #e8eefa; background: rgba(88,140,227,0.1); }
+
+.nesio-voice-transcript-placeholder { color: var(--portal-muted); font-style: italic; }
+
+.nesio-voice-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+  min-height: 2rem;
+}
+
+.nesio-voice-wave {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.nesio-voice-wave-bar {
+  width: 3px;
+  height: 1rem;
+  background: var(--portal-blue-deep);
+  border-radius: 2px;
+  animation: voiceWave 0.6s ease-in-out infinite alternate;
+}
+
+@keyframes voiceWave {
+  from { transform: scaleY(0.4); opacity: 0.5; }
+  to   { transform: scaleY(1.4); opacity: 1; }
+}
+
+.nesio-voice-status-label { font-size: 0.78rem; color: var(--portal-muted); }
+
+.nesio-voice-quick {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.nesio-voice-quick-btn {
+  background: rgba(88,140,227,0.1);
+  color: var(--portal-blue-deep);
+  border-radius: 999px;
+  padding: 0.35rem 0.9rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+html[data-portal-theme="night"] .nesio-voice-quick-btn { background: rgba(88,140,227,0.2); color: #96c7f3; }
+
+.nesio-voice-input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: rgba(88,140,227,0.06);
+  border: 1px solid rgba(88,140,227,0.14);
+  border-radius: 999px;
+  padding: 0.5rem 0.6rem 0.5rem 0.9rem;
+  margin-bottom: 0.85rem;
+}
+
+html[data-portal-theme="night"] .nesio-voice-input-row { background: rgba(88,140,227,0.1); border-color: rgba(88,140,227,0.2); }
+
+.nesio-voice-input-spark { color: var(--portal-blue-mid); font-size: 0.85rem; }
+
+.nesio-voice-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 0.88rem;
+  color: var(--portal-ink);
+}
+
+html[data-portal-theme="night"] .nesio-voice-input { color: #e8eefa; }
+.nesio-voice-input::placeholder { color: var(--portal-muted); }
+
+.nesio-voice-mic-btn {
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 50%;
+  background: var(--portal-blue-deep);
+  color: #fff;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.nesio-voice-mic-btn--active { background: #ef4444; animation: recordPulse 0.9s ease-in-out infinite; }
+
+.nesio-voice-send-btn {
+  width: 100%;
+  padding: 0.8rem;
+  background: var(--portal-blue-deep);
+  color: #fff;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: center;
+  box-shadow: 0 4px 16px rgba(88,140,227,0.35);
+}
+
+.nesio-voice-saved {
+  text-align: center;
+  color: #10b981;
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 0.5rem;
+}
+
+/* ─── Camera Sheet ─── */
+.nesio-camera-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  background: #0c1524;
+  display: flex;
+  flex-direction: column;
+  animation: sheetSlideUp 0.25s var(--ease-out);
+}
+
+.nesio-camera-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: calc(env(safe-area-inset-top, 0px) + 0.75rem) 1rem 0.75rem;
+}
+
+.nesio-camera-close {
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.12);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nesio-camera-title {
+  color: #e8eefa;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.nesio-camera-viewfinder {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: #111c2e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nesio-camera-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.nesio-camera-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.nesio-camera-corners { position: absolute; inset: 1rem; pointer-events: none; }
+
+.nesio-camera-corner {
+  position: absolute;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-color: rgba(255,255,255,0.6);
+  border-style: solid;
+}
+.nesio-camera-corner--tl { top: 0; left: 0; border-width: 2px 0 0 2px; border-radius: 3px 0 0 0; }
+.nesio-camera-corner--tr { top: 0; right: 0; border-width: 2px 2px 0 0; border-radius: 0 3px 0 0; }
+.nesio-camera-corner--bl { bottom: 0; left: 0; border-width: 0 0 2px 2px; border-radius: 0 0 0 3px; }
+.nesio-camera-corner--br { bottom: 0; right: 0; border-width: 0 2px 2px 0; border-radius: 0 0 3px 0; }
+
+.nesio-camera-recognizing {
+  position: absolute;
+  top: 0.75rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(10,20,45,0.75);
+  border: 1px solid rgba(88,140,227,0.3);
+  border-radius: 999px;
+  padding: 0.3rem 0.85rem;
+  font-size: 0.75rem;
+  color: #96c7f3;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+}
+
+.nesio-camera-recognizing-dot {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: #96c7f3;
+  animation: blink 1s ease-in-out infinite;
+}
+
+@keyframes blink { 50% { opacity: 0.2; } }
+
+.nesio-camera-gallery-btn {
+  background: var(--portal-blue-deep);
+  color: #fff;
+  padding: 0.6rem 1.5rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.nesio-camera-result {
+  background: rgba(16,26,50,0.95);
+  border-top: 1px solid rgba(88,140,227,0.2);
+  padding: 0.9rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  transition: background 0.2s;
+}
+
+.nesio-camera-result--saved { background: rgba(16,70,40,0.95); }
+
+.nesio-camera-result-row {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.nesio-camera-result-icon {
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 0.5rem;
+  background: rgba(88,140,227,0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.nesio-camera-result-name {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #e8eefa;
+}
+
+.nesio-camera-result-hint {
+  font-size: 0.72rem;
+  color: #8fa3c0;
+  margin-top: 0.15rem;
+}
+
+.nesio-camera-save-btn {
+  background: var(--portal-blue-deep);
+  color: #fff;
+  padding: 0.5rem 1.1rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 2px 10px rgba(88,140,227,0.4);
+}
+
+.nesio-camera-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 1rem 2rem calc(env(safe-area-inset-bottom, 0px) + 1.25rem);
+  background: #0c1524;
+}
+
+.nesio-camera-ctrl-btn {
+  width: 2.8rem;
+  height: 2.8rem;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nesio-camera-shutter {
+  width: 4.2rem;
+  height: 4.2rem;
+  border-radius: 50%;
+  background: #fff;
+  border: 4px solid rgba(255,255,255,0.4);
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.2);
+}
+
+.nesio-camera-shutter:active { transform: scale(0.92); }
+
+/* ─── Share Sheet ─── */
+.nesio-share-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  display: flex;
+  align-items: flex-end;
+}
+
+.nesio-share-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(10,20,45,0.4);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.nesio-share-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  background: var(--glass-bg-pop);
+  border-top-left-radius: 1.5rem;
+  border-top-right-radius: 1.5rem;
+  padding: 0 1.25rem calc(2.5rem + env(safe-area-inset-bottom));
+  box-shadow: 0 -8px 40px rgba(0,0,0,0.15);
+  animation: sheetSlideUp 0.28s var(--ease-out);
+}
+
+html[data-portal-theme="night"] .nesio-share-card { background: rgba(16,26,50,0.97); }
+
+.nesio-share-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 0 0.5rem;
+}
+
+.nesio-share-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--portal-ink);
+}
+
+html[data-portal-theme="night"] .nesio-share-title { color: #e8eefa; }
+
+.nesio-share-close {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.07);
+  color: var(--portal-muted);
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+html[data-portal-theme="night"] .nesio-share-close { background: rgba(255,255,255,0.1); color: #8fa3c0; }
+
+.nesio-share-desc {
+  font-size: 0.82rem;
+  color: var(--portal-muted);
+  line-height: 1.5;
+  margin-bottom: 1rem;
+}
+
+.nesio-share-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.nesio-share-action-btn {
+  background: rgba(88,140,227,0.07);
+  border: 1px solid rgba(88,140,227,0.15);
+  border-radius: 1rem;
+  padding: 1.1rem 0.75rem 0.9rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--portal-ink);
+  transition: background 0.15s;
+}
+
+html[data-portal-theme="night"] .nesio-share-action-btn { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.1); color: #e8eefa; }
+
+.nesio-share-action-btn:active { background: rgba(88,140,227,0.15); }
+
+.nesio-share-action-icon {
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 0.65rem;
+  background: rgba(88,140,227,0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--portal-blue-deep);
+}
+
+.nesio-share-recent-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--portal-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.6rem;
+}
+
+.nesio-share-parsed-card {
+  background: rgba(88,140,227,0.06);
+  border: 1px solid rgba(88,140,227,0.12);
+  border-radius: 0.85rem;
+  padding: 0.85rem 0.9rem;
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+html[data-portal-theme="night"] .nesio-share-parsed-card { background: rgba(88,140,227,0.1); border-color: rgba(88,140,227,0.2); }
+
+.nesio-share-parsed-icon {
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 0.5rem;
+  background: rgba(88,140,227,0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.nesio-share-parsed-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--portal-ink);
+  margin-bottom: 0.15rem;
+}
+
+html[data-portal-theme="night"] .nesio-share-parsed-title { color: #e8eefa; }
+
+.nesio-share-parsed-source {
+  font-size: 0.72rem;
+  color: var(--portal-muted);
+  margin-bottom: 0.5rem;
+}
+
+.nesio-share-parsed-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.nesio-share-meta-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.7rem;
+  color: var(--portal-muted);
+  background: rgba(88,140,227,0.1);
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+}
+
+.nesio-share-save-btn {
+  width: 100%;
+  padding: 0.9rem;
+  background: var(--portal-blue-deep);
+  color: #fff;
+  border-radius: 999px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  text-align: center;
+  box-shadow: 0 4px 16px rgba(88,140,227,0.35);
+}
+
+/* ─── Today Feed: Feedback Menu ─── */
+.nesio-today-feedback-menu {
+  position: absolute;
+  top: 1.5rem;
+  right: 0;
+  background: var(--glass-bg-pop);
+  border: 1px solid var(--portal-line);
+  border-radius: 0.75rem;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  overflow: hidden;
+  z-index: 10;
+  min-width: 8rem;
+}
+
+html[data-portal-theme="night"] .nesio-today-feedback-menu { background: rgba(18,28,52,0.97); }
+
+.nesio-today-feedback-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.55rem 0.85rem;
+  font-size: 0.78rem;
+  color: var(--portal-ink);
+  transition: background 0.12s;
+}
+
+html[data-portal-theme="night"] .nesio-today-feedback-menu button { color: #c5d4ea; }
+
+.nesio-today-feedback-menu button:hover { background: rgba(88,140,227,0.08); }
+
+/* ─── Profile / Settings ─── */
+.nesio-profile-card {
+  padding: 0.75rem 1.1rem 1rem;
+}
+
+.nesio-profile-card-top {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  margin-bottom: 1.25rem;
+}
+
+.nesio-profile-avatar-lg {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  background: var(--portal-blue-deep);
+  color: #fff;
+  font-size: 1.25rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.nesio-profile-name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--portal-ink);
+}
+
+html[data-portal-theme="night"] .nesio-profile-name { color: #e8eefa; }
+
+.nesio-profile-days {
+  font-size: 0.78rem;
+  color: var(--portal-muted);
+  margin-top: 0.1rem;
+}
+
+.nesio-profile-stat {
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.nesio-profile-stat-num {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--portal-blue-deep);
+}
+
+.nesio-profile-stat-label {
+  font-size: 0.62rem;
+  color: var(--portal-muted);
+}
+
+.nesio-profile-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.nesio-profile-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  background: var(--glass-bg-solid);
+  border: 1px solid var(--portal-line);
+  border-radius: 1rem;
+  padding: 0.85rem 0.9rem;
+  text-decoration: none;
+  box-shadow: var(--shadow-card);
+  transition: background 0.15s;
+}
+
+html[data-portal-theme="night"] .nesio-profile-menu-item { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.1); }
+
+.nesio-profile-menu-item:active { background: rgba(88,140,227,0.08); }
+
+.nesio-profile-menu-icon {
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 0.65rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--portal-blue-deep);
+  flex-shrink: 0;
+}
+
+.nesio-profile-menu-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.nesio-profile-menu-label {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--portal-ink);
+}
+
+html[data-portal-theme="night"] .nesio-profile-menu-label { color: #e8eefa; }
+
+.nesio-profile-menu-sublabel {
+  font-size: 0.72rem;
+  color: var(--portal-muted);
+}
+
+.nesio-profile-menu-chevron {
+  color: var(--portal-muted);
+  flex-shrink: 0;
+}
+
+/* Settings legacy accordion */
+.nesio-settings-legacy {
+  margin: 1.5rem 1.1rem 0;
+}
+
+.nesio-settings-legacy-toggle {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--portal-muted);
+  cursor: pointer;
+  padding: 0.5rem 0;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.nesio-settings-legacy-toggle::before {
+  content: '›';
+  font-size: 1rem;
+  transition: transform 0.2s;
+}
+
+details[open] .nesio-settings-legacy-toggle::before {
+  transform: rotate(90deg);
+}
+
+/* Memory empty state */
+.nesio-memory-empty {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: var(--portal-muted);
+  font-size: 0.88rem;
+}

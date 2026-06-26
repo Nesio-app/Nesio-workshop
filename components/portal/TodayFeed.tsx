@@ -2,90 +2,87 @@
 
 import { useEffect, useState } from 'react';
 import { loadProfileSettings } from '@/lib/portal/profile';
+import { generateTodayCards, recordCardFeedback, type RecommendationCard } from '@/lib/portal/reasoning-engine';
+import { getRecentNodes } from '@/lib/portal/life-graph';
 
-interface RecommendationCard {
-  id: string;
-  domain: string;
-  domainLabel: string;
-  confidence: number;
-  icon: string;
-  iconBg: string;
-  title: string;
-  body: string;
-  tags?: string[];
-  primaryAction: string;
-  secondaryAction?: string;
-  type?: 'standard' | 'audio' | 'compact';
-}
-
+// Fallback mock cards shown before real signals load
 const MOCK_CARDS: RecommendationCard[] = [
   {
-    id: 'coat',
+    id: 'coat-demo',
     domain: 'weather',
     domainLabel: '未来引导',
-    confidence: 92,
+    confidence: 0.92,
+    urgency: 3,
     icon: '🌧',
     iconBg: '#f59e0b',
     title: '把灰色外套放到门口',
     body: '明天午后会降温，你昨天记到嗓子还没全好。',
     tags: ['天气 · 降温', '健康 · 感冒记录'],
+    evidence: [],
     primaryAction: '好的，放门口',
     secondaryAction: '稍后',
     type: 'standard',
+    expiresAt: new Date(Date.now() + 8 * 3600000).toISOString(),
   },
   {
-    id: 'meeting',
+    id: 'meeting-demo',
     domain: 'work',
     domainLabel: '语音简报',
-    confidence: 90,
+    confidence: 0.88,
+    urgency: 4,
     icon: '🎙',
     iconBg: '#6366f1',
     title: '明早的会，不用翻笔记',
     body: '昨天的会我整理成了 3 个音频重点，明早 9:10 提醒你。',
+    evidence: [],
     primaryAction: '播放',
     secondaryAction: '改时间',
     type: 'audio',
+    expiresAt: new Date(Date.now() + 12 * 3600000).toISOString(),
   },
   {
-    id: 'gift',
+    id: 'gift-demo',
     domain: 'family',
     domainLabel: '家庭未来',
-    confidence: 96,
+    confidence: 0.96,
+    urgency: 3,
     icon: '🎁',
     iconBg: '#10b981',
     title: 'Linda 的礼物已经有了',
     body: '储物间蓝盒子 · 生日还有 3 天，需要包装。',
+    evidence: [],
     primaryAction: '好的',
     secondaryAction: '去 Memory 看',
     type: 'standard',
+    expiresAt: new Date(Date.now() + 72 * 3600000).toISOString(),
   },
 ];
 
-function AudioCard({ card }: { card: RecommendationCard }) {
+function AudioCard({ card, onFeedback }: { card: RecommendationCard; onFeedback: (f: RecommendationCard['feedback']) => void }) {
   const [playing, setPlaying] = useState(false);
   return (
     <div className="nesio-today-card nesio-today-card--audio">
       <div className="nesio-today-card-header">
         <span className="nesio-today-card-domain">{card.domainLabel}</span>
-        <span className="nesio-today-card-duration">90 秒</span>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <span className="nesio-today-card-duration">90 秒</span>
+          <FeedbackMenu onFeedback={onFeedback} />
+        </div>
       </div>
       <div className="nesio-today-card-row">
-        <span className="nesio-today-card-icon-wrap" style={{ background: card.iconBg }}>
-          {card.icon}
-        </span>
+        <span className="nesio-today-card-icon-wrap" style={{ background: card.iconBg }}>{card.icon}</span>
         <div>
           <h3 className="nesio-today-card-title">{card.title}</h3>
           <p className="nesio-today-card-body">{card.body}</p>
         </div>
       </div>
       <div className="nesio-today-audio-player">
-        <button
-          type="button"
-          className="nesio-today-audio-play"
-          onClick={() => setPlaying(!playing)}
-          aria-label={playing ? '暂停' : '播放'}
-        >
-          {playing ? '⏸' : '▶'}
+        <button type="button" className="nesio-today-audio-play" onClick={() => setPlaying(!playing)} aria-label={playing ? '暂停' : '播放'}>
+          {playing ? (
+            <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+          ) : (
+            <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><polygon points="5,3 19,12 5,21"/></svg>
+          )}
         </button>
         <div className="nesio-today-audio-wave" aria-hidden>
           {Array.from({ length: 24 }, (_, i) => (
@@ -96,32 +93,54 @@ function AudioCard({ card }: { card: RecommendationCard }) {
         <span className="nesio-today-audio-time">1:30</span>
       </div>
       <div className="nesio-today-card-actions">
-        <button type="button" className="nesio-today-btn nesio-today-btn--primary"
-          onClick={() => setPlaying(true)}>{card.primaryAction}</button>
-        {card.secondaryAction && (
-          <button type="button" className="nesio-today-btn nesio-today-btn--ghost">{card.secondaryAction}</button>
-        )}
+        <button type="button" className="nesio-today-btn nesio-today-btn--primary" onClick={() => setPlaying(true)}>{card.primaryAction}</button>
+        {card.secondaryAction && <button type="button" className="nesio-today-btn nesio-today-btn--ghost" onClick={() => onFeedback('not_now')}>{card.secondaryAction}</button>}
       </div>
     </div>
   );
 }
 
-function StandardCard({ card }: { card: RecommendationCard }) {
+function FeedbackMenu({ onFeedback }: { onFeedback: (f: RecommendationCard['feedback']) => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ position: 'relative' }}>
+      <button type="button" style={{ fontSize: '1rem', color: 'var(--portal-muted)', padding: '0 0.2rem' }} onClick={() => setOpen(!open)} aria-label="反馈">···</button>
+      {open && (
+        <div className="nesio-today-feedback-menu" role="menu">
+          {[
+            { key: 'useful', label: '✓ 有帮助' },
+            { key: 'wrong', label: '✗ 不准确' },
+            { key: 'not_now', label: '稍后' },
+            { key: 'too_much', label: '不要再提' },
+          ].map((item) => (
+            <button key={item.key} type="button" role="menuitem"
+              onClick={() => { onFeedback(item.key as RecommendationCard['feedback']); setOpen(false); }}>
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StandardCard({ card, onFeedback }: { card: RecommendationCard; onFeedback: (f: RecommendationCard['feedback']) => void }) {
   const [done, setDone] = useState(false);
   if (done) return null;
   return (
     <div className="nesio-today-card">
       <div className="nesio-today-card-header">
         <span className="nesio-today-card-domain">{card.domainLabel}</span>
-        <span className="nesio-today-card-conf">
-          <span className="nesio-today-card-conf-dot" />
-          {card.confidence}% 把握
-        </span>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <span className="nesio-today-card-conf">
+            <span className="nesio-today-card-conf-dot" />
+            {Math.round(card.confidence * 100)}% 把握
+          </span>
+          <FeedbackMenu onFeedback={onFeedback} />
+        </div>
       </div>
       <div className="nesio-today-card-row">
-        <span className="nesio-today-card-icon-wrap" style={{ background: card.iconBg }}>
-          {card.icon}
-        </span>
+        <span className="nesio-today-card-icon-wrap" style={{ background: card.iconBg }}>{card.icon}</span>
         <div>
           <h3 className="nesio-today-card-title">{card.title}</h3>
           <p className="nesio-today-card-body">{card.body}</p>
@@ -129,16 +148,15 @@ function StandardCard({ card }: { card: RecommendationCard }) {
       </div>
       {card.tags && (
         <div className="nesio-today-card-tags">
-          {card.tags.map((tag) => (
-            <span key={tag} className="nesio-today-card-tag">{tag}</span>
-          ))}
+          {card.tags.map((tag) => <span key={tag} className="nesio-today-card-tag">{tag}</span>)}
         </div>
       )}
       <div className="nesio-today-card-actions">
         <button type="button" className="nesio-today-btn nesio-today-btn--primary"
-          onClick={() => setDone(true)}>{card.primaryAction}</button>
+          onClick={() => { setDone(true); onFeedback('useful'); }}>{card.primaryAction}</button>
         {card.secondaryAction && (
-          <button type="button" className="nesio-today-btn nesio-today-btn--ghost">{card.secondaryAction}</button>
+          <button type="button" className="nesio-today-btn nesio-today-btn--ghost"
+            onClick={() => onFeedback('not_now')}>{card.secondaryAction}</button>
         )}
       </div>
     </div>
@@ -180,18 +198,44 @@ function NightTimeline() {
 export default function TodayFeed({ onOpenMemory }: { onOpenMemory?: () => void }) {
   const [displayName, setDisplayName] = useState('Jessy');
   const [isNight, setIsNight] = useState(false);
+  const [cards, setCards] = useState<RecommendationCard[]>([]);
+  const [memoryCount, setMemoryCount] = useState(0);
 
   useEffect(() => {
     const profile = loadProfileSettings();
     if (profile.displayName) setDisplayName(profile.displayName);
+
     const theme = document.documentElement.getAttribute('data-portal-theme');
     setIsNight(theme === 'night');
     const observer = new MutationObserver(() => {
       setIsNight(document.documentElement.getAttribute('data-portal-theme') === 'night');
     });
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-portal-theme'] });
-    return () => observer.disconnect();
+
+    // Load real cards from reasoning engine, fall back to mock
+    const real = generateTodayCards();
+    setCards(real.length > 0 ? real : MOCK_CARDS);
+    setMemoryCount(getRecentNodes().length);
+
+    const onGraphUpdate = () => {
+      const updated = generateTodayCards();
+      setCards(updated.length > 0 ? updated : MOCK_CARDS);
+      setMemoryCount(getRecentNodes().length);
+    };
+    window.addEventListener('nesio-life-graph-updated', onGraphUpdate);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('nesio-life-graph-updated', onGraphUpdate);
+    };
   }, []);
+
+  function handleFeedback(cardId: string, feedback: RecommendationCard['feedback']) {
+    recordCardFeedback(cardId, feedback);
+    if (feedback === 'too_much' || feedback === 'useful') {
+      setCards((prev) => prev.filter((c) => c.id !== cardId));
+    }
+  }
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? '早上好' : hour < 18 ? '下午好' : '晚上好';
@@ -204,9 +248,7 @@ export default function TodayFeed({ onOpenMemory }: { onOpenMemory?: () => void 
           <img src="/icons/treasurebox-pwa-192.png" alt="Nesio" className="nesio-today-brand-icon" />
           <span className="nesio-today-brand-name">Nesio</span>
         </div>
-        <a href="/settings" className="nesio-today-avatar" aria-label="我的设置">
-          {initials}
-        </a>
+        <a href="/settings" className="nesio-today-avatar" aria-label="我的设置">{initials}</a>
       </header>
 
       <div className="nesio-today-scroll">
@@ -216,25 +258,25 @@ export default function TodayFeed({ onOpenMemory }: { onOpenMemory?: () => void 
           <>
             <div className="nesio-today-greeting">
               <h1 className="nesio-today-greeting-title">{greeting}，{displayName}。</h1>
-              <p className="nesio-today-greeting-sub">今天，三件事想轻轻让你看见。</p>
+              <p className="nesio-today-greeting-sub">
+                {cards.length > 0
+                  ? `今天，${cards.length} 件事想轻轻让你看见。`
+                  : '今天暂时没有新建议，保持稳定就是好状态。'}
+              </p>
             </div>
 
             <div className="nesio-today-cards">
-              {MOCK_CARDS.map((card) =>
+              {cards.map((card) =>
                 card.type === 'audio' ? (
-                  <AudioCard key={card.id} card={card} />
+                  <AudioCard key={card.id} card={card} onFeedback={(f) => handleFeedback(card.id, f)} />
                 ) : (
-                  <StandardCard key={card.id} card={card} />
+                  <StandardCard key={card.id} card={card} onFeedback={(f) => handleFeedback(card.id, f)} />
                 )
               )}
             </div>
 
-            <button
-              type="button"
-              className="nesio-today-memory-link"
-              onClick={onOpenMemory}
-            >
-              在 Memory 里看 &rsaquo;
+            <button type="button" className="nesio-today-memory-link" onClick={onOpenMemory}>
+              在 Memory 里看 {memoryCount > 0 ? `（${memoryCount} 条）` : ''} ›
             </button>
           </>
         )}
