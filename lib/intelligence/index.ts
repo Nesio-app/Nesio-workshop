@@ -10,3 +10,5 @@
 
 export * from './dec';
 export * from './platform-health';
+export * from './contracts';
+export * from './registry';
