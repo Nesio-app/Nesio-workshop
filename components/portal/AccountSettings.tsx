@@ -8,7 +8,6 @@ import {
   formatAccountSettingsMemoryEvidence,
   formatAccountSettingsMemoryStrength,
   formatAccountSettingsPreferenceSummary,
-  formatAccountSettingsUsageDays,
   t,
   type PortalStringKey,
 } from '@/lib/portal/i18n';
@@ -632,6 +631,9 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
       detail: t(locale, 'automationExternalAuthDetail'),
     },
   ];
+  const visibleMemories = showLearningProgress
+    ? personalization.memories
+    : personalization.memories.slice(0, 1);
 
   return (
     <div className="portal-settings">
@@ -658,7 +660,6 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
             </button>
             <span>
               <b>{displayName}</b>
-              <small>{formatAccountSettingsUsageDays(locale, personalization.daysSinceStart)}</small>
             </span>
             <Link href="/portfolio" className="portal-personal-settings-arrow" aria-label={t(locale, 'accountSettingsHomepageAriaLabel')}>
               {t(locale, 'accountSettingsHomepage')}
@@ -699,7 +700,7 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
             <p>{personalization.memoryProgressLabel}</p>
             {personalization.memories.length ? (
               <div className="portal-personal-memory-list">
-                {personalization.memories.map((memory) => (
+                {visibleMemories.map((memory) => (
                   <article key={memory.category}>
                     <span>{memory.category}</span>
                     <div>
@@ -732,39 +733,17 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
                 <p>{formatAccountSettingsPreferenceSummary(locale, personalization.preferences.pace, personalization.preferences.pushTime)}</p>
               </div>
             ) : null}
-            <button
-              type="button"
-              className="portal-personal-progress-link"
-              aria-expanded={showLearningProgress}
-              aria-controls="portal-personal-progress-detail"
-              onClick={() => setShowLearningProgress((value) => !value)}
-            >
-              {showLearningProgress ? t(locale, 'accountSettingsCollapseProgress') : t(locale, 'accountSettingsViewAllProgress')}
-            </button>
-          </section>
-
-          <section className="portal-personal-preferences">
-            <h2>{t(locale, 'accountSettingsPreferencesTitle')}</h2>
-            <div>
-              <span>{t(locale, 'accountSettingsPacePreference')}</span>
-              <b>{personalization.preferences.pace}</b>
-              <small>{t(locale, 'accountSettingsPaceEfficient')}</small>
-            </div>
-            <div>
-              <span>{t(locale, 'accountSettingsPushTime')}</span>
-              <b>{personalization.preferences.pushTime}</b>
-              <i aria-hidden>›</i>
-            </div>
-            <div>
-              <span>{t(locale, 'accountSettingsObservationPush')}</span>
+            {personalization.memories.length > 1 ? (
               <button
                 type="button"
-                className={observationPushEnabled ? 'is-on' : ''}
-                aria-label={t(locale, 'accountSettingsObservationPush')}
-                aria-pressed={observationPushEnabled}
-                onClick={onObservationPushToggle}
-              />
-            </div>
+                className="portal-personal-progress-link"
+                aria-expanded={showLearningProgress}
+                aria-controls="portal-personal-progress-detail"
+                onClick={() => setShowLearningProgress((value) => !value)}
+              >
+                {showLearningProgress ? t(locale, 'accountSettingsCollapseProgress') : t(locale, 'accountSettingsViewAllProgress')}
+              </button>
+            ) : null}
           </section>
         </>
       ) : (

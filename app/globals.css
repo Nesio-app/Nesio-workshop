@@ -7906,7 +7906,7 @@ html[data-portal-theme="night"] .portal-theme-seg-btn.is-on{
 }
 
 .portal-personal-software-settings::after {
-  content: "设置";
+  content: "高级设置";
   font-size: 0.9rem;
 }
 
@@ -8228,6 +8228,15 @@ html[data-portal-theme="night"] .nesio-bottom-nav-btn--active {
   height: 1.75rem;
   border-radius: 0.45rem;
   object-fit: contain;
+}
+
+.nesio-memory-brand-icon {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 50%;
+  object-fit: contain;
+  background: transparent;
+  box-shadow: none;
 }
 
 .nesio-today-brand-name {

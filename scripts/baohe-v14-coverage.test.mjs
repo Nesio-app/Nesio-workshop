@@ -27,8 +27,8 @@ for (const text of requiredReportText) {
 }
 
 const sourceChecks = [
-  ['components/portal/PortalOnboarding.tsx', 'onboardingTitle'],
-  ['lib/portal/i18n.ts', '欢迎来到 Nesio'],
+  ['components/portal/PortalOnboarding.tsx', 'Know Less. Live More.'],
+  ['components/portal/PortalOnboarding.tsx', '把重要的事放进来，需要时找得到。'],
   ['components/portal/DashboardHome.tsx', 'dashboardReminderKicker'],
   ['lib/portal/i18n.ts', '温馨提醒'],
   ['components/portal/DashboardHome.tsx', 'dashboardCrushTaskButton'],
@@ -53,15 +53,12 @@ const sourceChecks = [
   ['components/portal/ToolsTreasureSheet.tsx', 'handleSelectPackage'],
   ['lib/portal/personalization-insights.ts', '家居物品'],
   ['lib/portal/personalization-insights.ts', '任务清单'],
-  ['lib/portal/personalization-insights.ts', '第 34 天'],
   ['lib/portal/personalization-insights.ts', 'shouldShowBaoheInsight'],
   ['lib/portal/personalization-insights.ts', 'rememberBaoheInsightFeedback'],
   ['components/portal/AccountSettings.tsx', 'accountSettingsLearnedTitle'],
-  ['lib/portal/i18n.ts', 'Nesio 学到的'],
+  ['lib/portal/i18n.ts', 'Nesio 整理出的线索'],
   ['components/portal/AccountSettings.tsx', 'formatAccountSettingsMemoryConfidence'],
-  ['lib/portal/i18n.ts', '置信度'],
-  ['components/portal/AccountSettings.tsx', 'accountSettingsPreferencesTitle'],
-  ['lib/portal/i18n.ts', '个性化偏好'],
+  ['lib/portal/i18n.ts', '建议确认程度'],
   ['components/portal/AccountSettings.tsx', 'accountSettingsTitle'],
   ['lib/portal/i18n.ts', '软件设置'],
   ['components/portal/AccountSettings.tsx', 'accountSettingsConnections'],

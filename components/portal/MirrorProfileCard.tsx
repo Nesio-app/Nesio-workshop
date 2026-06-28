@@ -39,6 +39,7 @@ function describeTime(score: number): string {
 
 export default function MirrorProfileCard({ embedded = false }: { embedded?: boolean }) {
   const [profile, setProfile] = useState<MirrorProfile | null>(null);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     const load = () => setProfile(getMirrorProfile());
@@ -53,6 +54,7 @@ export default function MirrorProfileCard({ embedded = false }: { embedded?: boo
   const domainEntries = Object.entries(profile.domainWeights)
     .sort(([, a], [, b]) => b - a)
     .slice(0, 5);
+  const visibleDomainEntries = expanded ? domainEntries : domainEntries.slice(0, 1);
 
   const bestTimes = HOUR_GROUPS
     .map((g) => ({ ...g, score: avg(g.hours.map((h) => profile.hourEngagement[h])) }))
@@ -76,7 +78,7 @@ export default function MirrorProfileCard({ embedded = false }: { embedded?: boo
       {domainEntries.length > 0 && (
         <>
           <p className="nesio-settings-section-label" style={{ marginTop: '0.75rem' }}>经常出现</p>
-          {domainEntries.map(([domain, weight]) => (
+          {visibleDomainEntries.map(([domain, weight]) => (
             <div key={domain} className="nesio-mirror-domain-row">
               <span className="nesio-mirror-domain-label">{DOMAIN_LABELS[domain] || domain}</span>
               <div className="nesio-mirror-bar-track">
@@ -88,7 +90,7 @@ export default function MirrorProfileCard({ embedded = false }: { embedded?: boo
         </>
       )}
 
-      {profile.feedbackCount > 5 && (
+      {profile.feedbackCount > 5 && expanded && (
         <>
           <p className="nesio-settings-section-label" style={{ marginTop: '0.85rem' }}>最佳提醒时段</p>
           <div className="nesio-mirror-times">
@@ -99,6 +101,17 @@ export default function MirrorProfileCard({ embedded = false }: { embedded?: boo
             ))}
           </div>
         </>
+      )}
+
+      {domainEntries.length > 1 && (
+        <button
+          type="button"
+          className="nesio-settings-toggle-btn"
+          style={{ marginTop: '0.85rem' }}
+          onClick={() => setExpanded((value) => !value)}
+        >
+          {expanded ? '收起' : '更多'}
+        </button>
       )}
 
       {profile.feedbackCount > 0 && (

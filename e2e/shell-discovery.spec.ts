@@ -342,9 +342,9 @@ test('settings keeps software controls lean and does not expose calendar link ca
 
 test('settings exposes V14 connections and safety boundary', async ({ page }) => {
   await page.goto('/settings');
-  await expect(page.getByText('Nesio 学到的')).toBeVisible();
+  await expect(page.getByText('Nesio 整理出的线索')).toBeVisible();
   await expect(page.getByLabel('进入个人主页')).toBeVisible();
-  await page.getByRole('button', { name: '设置' }).click();
+  await page.getByRole('button', { name: '高级设置' }).click();
   await expect(page.getByRole('heading', { name: '软件设置' })).toBeVisible();
   await expect(page.getByLabel('进入个人主页')).toHaveCount(0);
   const safety = page.getByRole('region', { name: '连接与安全' });

@@ -155,7 +155,6 @@ for (const forbidden of [
   'aria-label="更换头像"',
   'aria-label="进入个人主页"',
   'aria-label={`强度 ${memory.strength}`}',
-  '已使用第 {personalization.daysSinceStart} 天',
   '宝盒学到的',
   '置信度 {memory.confidence}%',
   '再用几天，宝盒就会有新发现。',
@@ -214,8 +213,8 @@ assert(
 );
 
 assert(
-  accountSettings.includes("formatAccountSettingsUsageDays(locale, personalization.daysSinceStart)"),
-  'AccountSettings usage days text must use shared i18n formatter.',
+  !accountSettings.includes("formatAccountSettingsUsageDays(locale, personalization.daysSinceStart)"),
+  'AccountSettings should not render usage-day copy in the public personal profile summary.',
 );
 
 assert(

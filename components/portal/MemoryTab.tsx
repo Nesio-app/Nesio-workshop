@@ -69,8 +69,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
       <div className="nesio-memory-root">
         <header className="nesio-today-header">
           <div className="nesio-today-brand">
-            <img src="/icons/treasurebox-pwa-192.png" alt="Nesio" className="nesio-today-brand-icon" />
-            <span className="nesio-today-brand-name">Memory</span>
+            <img src="/icons/treasurebox-pwa-192.png" alt="Nesio" className="nesio-memory-brand-icon" />
           </div>
           <a href="/settings" className="nesio-today-avatar" aria-label="我的设置">{initials}</a>
         </header>

@@ -12,7 +12,6 @@ type ActiveSheet = 'tone' | 'privacy' | 'spaces' | 'subscription' | 'connectors'
 
 export default function NesioProfileCard() {
   const [displayName, setDisplayName] = useState('Jessy');
-  const [daysUsed, setDaysUsed] = useState(0);
   const [memoryCount, setMemoryCount] = useState(0);
   const [activeSheet, setActiveSheet] = useState<ActiveSheet>(null);
   const [isSignedIn, setIsSignedIn] = useState(false);
@@ -21,13 +20,6 @@ export default function NesioProfileCard() {
     const profile = loadProfileSettings();
     if (profile.displayName) setDisplayName(profile.displayName);
     setMemoryCount(getRecentNodes(100).length);
-
-    try {
-      const firstKey = 'nesio-first-open';
-      const first = localStorage.getItem(firstKey);
-      if (!first) { localStorage.setItem(firstKey, new Date().toISOString()); setDaysUsed(1); }
-      else setDaysUsed(Math.max(1, Math.floor((Date.now() - new Date(first).getTime()) / 86_400_000)));
-    } catch { /* ignore */ }
 
     // Check auth session
     fetch('/api/auth/session').then((r) => r.json()).then((d: { ok?: boolean }) => setIsSignedIn(!!d?.ok)).catch(() => {});
@@ -84,7 +76,6 @@ export default function NesioProfileCard() {
           <div className="nesio-profile-avatar-lg">{initials}</div>
           <div style={{ flex: 1 }}>
             <p className="nesio-profile-name">{displayName}</p>
-            <p className="nesio-profile-days">你已经整理了 {daysUsed} 天生活线索</p>
           </div>
           {memoryCount > 0 && (
             <div className="nesio-profile-stat">
