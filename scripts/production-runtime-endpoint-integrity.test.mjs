@@ -14,6 +14,22 @@ const compiledRuntime = ts.transpileModule(runtimeSource, {
 });
 const runtimeModule = await import(`data:text/javascript;base64,${Buffer.from(compiledRuntime.outputText).toString('base64')}`);
 
+assert.equal(
+  runtimeModule.normalizeSupabaseRuntimeUrl('vfxwyruitfefbftjzwbg'),
+  'https://vfxwyruitfefbftjzwbg.supabase.co',
+  'bare Supabase project refs must normalize to a usable Supabase API URL.',
+);
+assert.equal(
+  runtimeModule.normalizeSupabaseRuntimeUrl('example.supabase.co'),
+  'https://example.supabase.co',
+  'bare Supabase hostnames must normalize to https URLs.',
+);
+assert.equal(
+  runtimeModule.normalizeSupabaseRuntimeUrl('https://example.supabase.co/'),
+  'https://example.supabase.co',
+  'normalized Supabase URLs should not keep trailing slashes.',
+);
+
 const runtime = runtimeModule.buildProductionRuntimeStatus({
   BAOHE_CANONICAL_DOMAIN: 'www.nesio.app',
   BAOHE_ALLOWED_RUNTIME_HOSTS: 'treasurebox-nu.vercel.app',

@@ -4,6 +4,7 @@ import {
   getAuthRedirectUrl,
   getSupabaseAuthorizeUrl,
   getWechatAuthorizeUrl,
+  normalizeSupabaseRuntimeUrl,
   type ProductionRuntimeProviderStatus,
   type ProductionRuntimeSetupTask,
 } from '@/lib/portal/production-runtime';
@@ -63,7 +64,7 @@ function getProviderGate(req: NextRequest, provider: AuthProvider): {
 }
 
 async function requestSupabaseOtp(payload: { email?: string; phone?: string; redirectTo: string }) {
-  const supabaseUrl = process.env.SUPABASE_URL?.trim();
+  const supabaseUrl = normalizeSupabaseRuntimeUrl(process.env.SUPABASE_URL || '');
   const supabaseAnonKey = process.env.SUPABASE_ANON_KEY?.trim();
 
   if (!supabaseUrl || !supabaseAnonKey) {
@@ -145,7 +146,7 @@ export async function POST(req: NextRequest) {
 
   // Google OAuth: bypass canonical-domain check — only requires SUPABASE_URL + ANON_KEY
     if (provider === 'google') {
-      const supabaseUrl = process.env.SUPABASE_URL?.trim();
+      const supabaseUrl = normalizeSupabaseRuntimeUrl(process.env.SUPABASE_URL || '');
       const supabaseKey = process.env.SUPABASE_ANON_KEY?.trim();
       if (!supabaseUrl || !supabaseKey) {
         logAuthStartAudit('auth_start_failure', { auditId, provider, reason: 'missing_supabase_config' });

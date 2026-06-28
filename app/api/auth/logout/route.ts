@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { normalizeSupabaseRuntimeUrl } from '@/lib/portal/production-runtime';
 
 function envValue(key: string): string {
   const value = process.env[key];
@@ -39,7 +40,7 @@ function expireAuthCookie(
 }
 
 async function revokeSupabaseSession(accessToken: string): Promise<boolean> {
-  const supabaseUrl = envValue('SUPABASE_URL');
+  const supabaseUrl = normalizeSupabaseRuntimeUrl(envValue('SUPABASE_URL'));
   const supabaseAnonKey = envValue('SUPABASE_ANON_KEY');
   if (!supabaseUrl || !supabaseAnonKey || !accessToken) return false;
 

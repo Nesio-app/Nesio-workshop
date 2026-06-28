@@ -2,6 +2,7 @@ import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import {
   buildProductionRuntimeStatus,
+  normalizeSupabaseRuntimeUrl,
   type ProductionRuntimeSetupTask,
 } from '@/lib/portal/production-runtime';
 import { deriveCloudIdentity } from '@/lib/portal/cloud-identity';
@@ -98,7 +99,7 @@ function logCloudRuntimeAudit(
 
 function getCloudConfig() {
   const enabled = envValue('CLOUD_DB_ENABLED').toLowerCase() === 'true';
-  const supabaseUrl = envValue('SUPABASE_URL');
+  const supabaseUrl = normalizeSupabaseRuntimeUrl(envValue('SUPABASE_URL'));
   const anonKey = envValue('SUPABASE_ANON_KEY');
   const serviceRoleKey = envValue('SUPABASE_SERVICE_ROLE_KEY');
   const configured = enabled && Boolean(supabaseUrl && anonKey && serviceRoleKey);

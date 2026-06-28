@@ -36,6 +36,22 @@ function envValue(env: EnvMap, key: string): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+export function normalizeSupabaseRuntimeUrl(value: string): string {
+  const trimmed = value.trim().replace(/\/+$/, '');
+  if (!trimmed) return '';
+  const withHost = trimmed.includes('://')
+    ? trimmed
+    : trimmed.includes('.')
+      ? `https://${trimmed}`
+      : `https://${trimmed}.supabase.co`;
+  try {
+    const url = new URL(withHost);
+    return url.origin;
+  } catch {
+    return '';
+  }
+}
+
 function envAny(env: EnvMap, keys: string[]): boolean {
   return keys.some((key) => Boolean(envValue(env, key)));
 }
@@ -427,7 +443,7 @@ export function getAuthRedirectUrl(requestUrl: string, env: EnvMap = process.env
 }
 
 export function getSupabaseAuthorizeUrl(provider: string, redirectTo: string, env: EnvMap = process.env): string {
-  const supabaseUrl = envValue(env, 'SUPABASE_URL');
+  const supabaseUrl = normalizeSupabaseRuntimeUrl(envValue(env, 'SUPABASE_URL'));
   const url = new URL('/auth/v1/authorize', supabaseUrl);
   url.searchParams.set('provider', provider);
   url.searchParams.set('redirect_to', redirectTo);

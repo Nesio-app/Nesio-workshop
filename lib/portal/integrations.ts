@@ -5,6 +5,7 @@
  */
 
 import { cookies } from 'next/headers';
+import { normalizeSupabaseRuntimeUrl } from '@/lib/portal/production-runtime';
 
 export type IntegrationProvider = 'gmail' | 'calendar';
 
@@ -27,7 +28,7 @@ function envValue(key: string): string {
 // ── Supabase ─────────────────────────────────────────────────────────────────
 
 export async function getSupabaseUserId(accessToken: string): Promise<string | null> {
-  const url = envValue('SUPABASE_URL');
+  const url = normalizeSupabaseRuntimeUrl(envValue('SUPABASE_URL'));
   if (!url || !accessToken) return null;
   try {
     const res = await fetch(`${url}/auth/v1/user`, {
@@ -43,7 +44,7 @@ export async function getSupabaseUserId(accessToken: string): Promise<string | n
 }
 
 async function supabaseRequest(method: string, path: string, userToken: string, body?: unknown): Promise<Response> {
-  const url = envValue('SUPABASE_URL');
+  const url = normalizeSupabaseRuntimeUrl(envValue('SUPABASE_URL'));
   const key = envValue('SUPABASE_SERVICE_ROLE_KEY') || envValue('SUPABASE_ANON_KEY');
   return fetch(`${url}/rest/v1/${path}`, {
     method,

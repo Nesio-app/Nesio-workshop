@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { normalizeSupabaseRuntimeUrl } from '@/lib/portal/production-runtime';
 
 type SupabaseTokenResponse = {
   access_token?: string;
@@ -98,7 +99,7 @@ function setWechatCookies(response: NextResponse, session: WechatTokenResponse) 
 }
 
 async function exchangeSupabaseCode(code: string, redirectTo: string): Promise<SupabaseTokenResponse | null> {
-  const supabaseUrl = envValue('SUPABASE_URL');
+  const supabaseUrl = normalizeSupabaseRuntimeUrl(envValue('SUPABASE_URL'));
   const supabaseAnonKey = envValue('SUPABASE_ANON_KEY');
   if (!supabaseUrl || !supabaseAnonKey) return null;
 
@@ -139,7 +140,7 @@ async function exchangeWechatCode(code: string): Promise<WechatTokenResponse | n
 }
 
 async function verifySupabaseOtp(tokenHash: string, type: string): Promise<SupabaseTokenResponse | null> {
-  const supabaseUrl = envValue('SUPABASE_URL');
+  const supabaseUrl = normalizeSupabaseRuntimeUrl(envValue('SUPABASE_URL'));
   const supabaseAnonKey = envValue('SUPABASE_ANON_KEY');
   const otpType = SUPABASE_OTP_TYPES.has(type) ? type : '';
   if (!supabaseUrl || !supabaseAnonKey || !tokenHash || !otpType) return null;

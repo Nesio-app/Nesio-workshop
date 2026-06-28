@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { normalizeSupabaseRuntimeUrl } from '@/lib/portal/production-runtime';
 
 type SupabaseUserResponse = {
   id?: string;
@@ -59,7 +60,7 @@ function setRefreshedAuthCookies(response: NextResponse, session: SupabaseTokenR
 }
 
 async function fetchSupabaseUser(accessToken: string): Promise<SupabaseUserResponse | null> {
-  const supabaseUrl = envValue('SUPABASE_URL');
+  const supabaseUrl = normalizeSupabaseRuntimeUrl(envValue('SUPABASE_URL'));
   const supabaseAnonKey = envValue('SUPABASE_ANON_KEY');
   if (!supabaseUrl || !supabaseAnonKey || !accessToken) return null;
 
@@ -76,7 +77,7 @@ async function fetchSupabaseUser(accessToken: string): Promise<SupabaseUserRespo
 }
 
 async function refreshSupabaseSession(refreshToken: string): Promise<SupabaseTokenResponse | null> {
-  const supabaseUrl = envValue('SUPABASE_URL');
+  const supabaseUrl = normalizeSupabaseRuntimeUrl(envValue('SUPABASE_URL'));
   const supabaseAnonKey = envValue('SUPABASE_ANON_KEY');
   if (!supabaseUrl || !supabaseAnonKey || !refreshToken) return null;
 
