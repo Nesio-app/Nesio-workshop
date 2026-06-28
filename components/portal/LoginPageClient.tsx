@@ -5,15 +5,33 @@ import { loadProfileSettings, saveProfileSettings, type PortalLocale } from '@/l
 
 type AuthState = 'idle' | 'loading' | 'email_sent' | 'error';
 
-async function startAuth(provider: string, email?: string): Promise<{ ok: boolean; url?: string; error?: string }> {
+async function startAuth(provider: string, email?: string): Promise<{ ok: boolean; url?: string; error?: string; status?: number }> {
   try {
     const res = await fetch('/api/auth/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ provider, email, redirectTo: window.location.origin + '/' }),
     });
-    return await res.json() as { ok: boolean; url?: string; error?: string };
+    const text = await res.text();
+    const data = text ? JSON.parse(text) as { ok?: boolean; url?: string; error?: string } : {};
+    return { ok: Boolean(data.ok), url: data.url, error: data.error, status: res.status };
   } catch { return { ok: false, error: 'network' }; }
+}
+
+function friendlyAuthError(error: string | undefined, zh: boolean): string {
+  if (error === 'provider_not_configured' || error === 'missing_supabase_config') {
+    return zh ? '登录服务还没有配置好，请先本地使用。' : 'Sign-in is not configured yet. You can use Nesio locally.';
+  }
+  if (error === 'supabase_otp_failed') {
+    return zh ? '登录邮件没有发出，请稍后再试，或先本地使用。' : 'The sign-in email was not sent. Try again later or use Nesio locally.';
+  }
+  if (error === 'auth_start_exception') {
+    return zh ? '登录服务暂时不可用，请先本地使用。' : 'Sign-in is temporarily unavailable. You can use Nesio locally.';
+  }
+  if (error === 'network') {
+    return zh ? '连接登录服务失败，请检查网络后再试。' : 'Could not reach the sign-in service. Check your connection and try again.';
+  }
+  return zh ? '发送失败，请检查邮箱地址或先本地使用。' : 'Failed to send. Check your email or use Nesio locally.';
 }
 
 export default function LoginPageClient() {
@@ -32,7 +50,7 @@ export default function LoginPageClient() {
     setState('loading'); setError('');
     const r = await startAuth('google');
     if (r.ok && r.url) { window.location.href = r.url; }
-    else { setError(zh ? 'Google 登录暂未配置。' : 'Google sign-in not configured.'); setState('error'); }
+    else { setError(friendlyAuthError(r.error, zh)); setState('error'); }
   }
 
   async function handleEmail() {
@@ -40,7 +58,7 @@ export default function LoginPageClient() {
     setState('loading'); setError('');
     const r = await startAuth('email', email.trim());
     if (r.ok) { setState('email_sent'); }
-    else { setError(zh ? '发送失败，请检查邮箱地址。' : 'Failed to send. Check your email.'); setState('error'); }
+    else { setError(friendlyAuthError(r.error, zh)); setState('error'); }
   }
 
   return (
@@ -49,7 +67,7 @@ export default function LoginPageClient() {
       <div className="nesio-login-card">
         {/* Logo */}
         <div className="nesio-login-logo-row">
-          <img src="/icons/treasurebox-pwa-192.png" alt="Nesio" className="nesio-ob-logo" style={{ width: '2.8rem', height: '2.8rem', borderRadius: '0.7rem' }} />
+          <img src="/icons/treasurebox-pwa-192.png" alt="Nesio" className="nesio-login-logo-img" />
           <span className="nesio-ob-brand" style={{ fontSize: '1.3rem' }}>Nesio</span>
         </div>
 

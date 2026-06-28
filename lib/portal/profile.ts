@@ -101,6 +101,15 @@ export function saveProfileSettings(patch: Partial<PortalProfileSettings>) {
   } catch { /* ignore */ }
 }
 
+export function clearProfileIdentity() {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem(KEYS.displayName);
+    localStorage.removeItem(KEYS.avatar);
+    window.dispatchEvent(new CustomEvent(PROFILE_UPDATED_EVENT));
+  } catch { /* ignore */ }
+}
+
 export function readAvatarFile(file: File, maxBytes = 2_400_000): Promise<string> {
   return new Promise((resolve, reject) => {
     if (!file.type.startsWith('image/')) {

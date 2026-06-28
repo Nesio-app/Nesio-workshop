@@ -10,13 +10,14 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { addLifeNode, searchLifeGraph, type LifeNode } from '@/lib/portal/life-graph';
+import { addLifeNode, isPrivateExternalNode, searchLifeGraph, type LifeNode } from '@/lib/portal/life-graph';
 import { routeIntent } from '@/lib/portal/intent-router';
 import MeetingRecorder from './MeetingRecorder';
 
 interface VoiceInputSheetProps {
   open: boolean;
   intent?: 'note' | 'ask';
+  canUsePrivateData?: boolean;
   onClose: () => void;
 }
 
@@ -29,7 +30,7 @@ const QUICK_INTENTS = [
 
 type SendState = 'idle' | 'analyzing' | 'saved' | 'error';
 
-export default function VoiceInputSheet({ open, intent = 'note', onClose }: VoiceInputSheetProps) {
+export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateData = false, onClose }: VoiceInputSheetProps) {
   const [mode, setMode] = useState<'note' | 'meeting'>('note');
   const [text, setText] = useState('');
   const [listening, setListening] = useState(false);
@@ -110,7 +111,8 @@ export default function VoiceInputSheet({ open, intent = 'note', onClose }: Voic
 
     if (isAskMode) {
       stopListening();
-      setAskResults(searchLifeGraph(t).slice(0, 4));
+      const matches = searchLifeGraph(t).filter((node) => canUsePrivateData || !isPrivateExternalNode(node));
+      setAskResults(matches.slice(0, 4));
       setSendState('saved');
       return;
     }

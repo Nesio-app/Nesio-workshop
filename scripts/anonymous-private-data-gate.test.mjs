@@ -120,9 +120,19 @@ assertBefore(
 );
 assertBefore(
   memoryTab,
-  'if (!canUsePrivateData)',
-  'setNodes(getRecentNodes(30));',
-  'MemoryTab must check the private-data gate before reading local Life Graph nodes.',
+  'visibleMemoryNodes',
+  'const results',
+  'MemoryTab must filter private external calendar/email nodes before rendering signed-out Memory results.',
+);
+assert.match(
+  memoryTab,
+  /isPrivateExternalNode/,
+  'MemoryTab must use the Life Graph private external-node classifier instead of hiding all local records.',
+);
+assert.doesNotMatch(
+  memoryTab,
+  /if \(!canUsePrivateData\) \{\s*setNodes\(\[\]\);/,
+  'Signed-out Memory should keep local voice/photo/manual records visible while filtering external private nodes.',
 );
 
 assert.match(

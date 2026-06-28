@@ -9225,6 +9225,9 @@ html[data-portal-theme="night"] .nesio-voice-input { color: #e8eefa; }
   display: flex;
   flex-direction: column;
   animation: sheetSlideUp 0.25s var(--ease-out);
+  -webkit-touch-callout: none;
+  user-select: none;
+  touch-action: manipulation;
 }
 
 .nesio-camera-header {
@@ -9265,6 +9268,14 @@ html[data-portal-theme="night"] .nesio-voice-input { color: #e8eefa; }
   width: 100%;
   height: 100%;
   object-fit: cover;
+  -webkit-touch-callout: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+.camera-callout-none {
+  -webkit-touch-callout: none;
+  user-select: none;
 }
 
 .nesio-camera-fallback {
@@ -9411,6 +9422,105 @@ html[data-portal-theme="night"] .nesio-voice-input { color: #e8eefa; }
 }
 
 .nesio-camera-shutter:active { transform: scale(0.92); }
+
+/* ─── Ask guide ─── */
+.nesio-ask-guide {
+  position: fixed;
+  inset: 0;
+  z-index: 430;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+}
+
+.nesio-ask-guide-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(14, 28, 55, 0.28);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.nesio-ask-guide-card {
+  position: relative;
+  width: min(21rem, 100%);
+  border-radius: 1.45rem;
+  padding: 1.15rem;
+  background: rgba(246, 250, 255, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  box-shadow: 0 22px 55px rgba(24, 61, 120, 0.22);
+  color: var(--portal-ink);
+  text-align: left;
+}
+
+html[data-portal-theme="night"] .nesio-ask-guide-card {
+  background: rgba(22, 34, 62, 0.88);
+  border-color: rgba(155, 185, 235, 0.22);
+  color: #e8eefa;
+}
+
+.nesio-ask-guide-kicker {
+  margin: 0.6rem 0 0.3rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--portal-blue-deep);
+}
+
+.nesio-ask-guide-card h2 {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 800;
+}
+
+.nesio-ask-guide-card p {
+  margin-top: 0.55rem;
+  color: var(--portal-muted);
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.nesio-ask-guide-examples {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-top: 0.85rem;
+}
+
+.nesio-ask-guide-examples span {
+  display: block;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.9rem;
+  background: rgba(88, 140, 227, 0.11);
+  color: var(--portal-ink);
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+html[data-portal-theme="night"] .nesio-ask-guide-examples span {
+  color: #dce7f8;
+  background: rgba(112, 156, 230, 0.18);
+}
+
+.nesio-ask-guide-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin-top: 1rem;
+}
+
+.nesio-ask-guide-actions .nesio-ob-primary-btn {
+  flex: 1;
+  margin: 0;
+}
+
+.nesio-ask-guide-later {
+  min-height: 2.75rem;
+  padding: 0 0.85rem;
+  border-radius: 999px;
+  color: var(--portal-muted);
+  font-weight: 700;
+}
 
 /* ─── Share Sheet ─── */
 .nesio-share-overlay {
@@ -10188,6 +10298,14 @@ html[data-portal-theme="night"] .nesio-login-card {
   justify-content: center;
   gap: 0.6rem;
   margin-bottom: 1.5rem;
+}
+
+.nesio-login-logo-img {
+  width: 2.8rem;
+  height: 2.8rem;
+  border-radius: 0.7rem;
+  object-fit: contain;
+  filter: none;
 }
 
 .nesio-login-tabs {

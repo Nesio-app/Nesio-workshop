@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { loadProfileSettings } from '@/lib/portal/profile';
+import { clearProfileIdentity, loadProfileSettings } from '@/lib/portal/profile';
 import { getRecentNodes } from '@/lib/portal/life-graph';
 import { ToneSheet, PrivacySheet, SpacesSheet, SubscriptionSheet } from './SettingsSheets';
 import ConnectorsHub from './ConnectorsHub';
@@ -35,6 +35,8 @@ export default function NesioProfileCard() {
     try {
       await fetch('/api/auth/logout', { method: 'POST', cache: 'no-store' });
     } catch { /* ignore */ }
+    clearProfileIdentity();
+    setDisplayName('我');
     setIsSignedIn(false);
     window.location.href = '/';
   }

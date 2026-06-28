@@ -109,94 +109,121 @@ async function requestSupabaseOtp(payload: { email?: string; phone?: string; red
 
 export async function POST(req: NextRequest) {
   const auditId = createAuthStartAuditId();
-  let body: {
-    provider?: string;
-    email?: string;
-    phone?: string;
-    redirectTo?: string;
-    dryRun?: boolean;
-  };
-
   try {
-    body = await req.json();
-  } catch {
-    logAuthStartAudit('auth_start_failure', { auditId, provider: null, reason: 'invalid_json' });
-    return safeJson({ ok: false, error: 'invalid_json', auditId }, 400);
-  }
+    let body: {
+      provider?: string;
+      email?: string;
+      phone?: string;
+      redirectTo?: string;
+      dryRun?: boolean;
+    };
 
-  const provider = body.provider as AuthProvider | undefined;
-  logAuthStartAudit('auth_start_request', {
-    auditId,
-    provider: provider || null,
-    dryRun: body.dryRun === true,
-    hasEmail: Boolean(body.email?.trim()),
-    hasPhone: Boolean(body.phone?.trim()),
-  });
+    try {
+      body = await req.json();
+    } catch {
+      logAuthStartAudit('auth_start_failure', { auditId, provider: null, reason: 'invalid_json' });
+      return safeJson({ ok: false, error: 'invalid_json', auditId }, 400);
+    }
 
-  if (!provider || !AUTH_PROVIDERS.includes(provider)) {
-    logAuthStartAudit('auth_start_failure', { auditId, provider: provider || null, reason: 'unsupported_provider' });
-    return safeJson({ ok: false, error: 'unsupported_provider', supportedProviders: AUTH_PROVIDERS, auditId }, 400);
-  }
+    const provider = body.provider as AuthProvider | undefined;
+    logAuthStartAudit('auth_start_request', {
+      auditId,
+      provider: provider || null,
+      dryRun: body.dryRun === true,
+      hasEmail: Boolean(body.email?.trim()),
+      hasPhone: Boolean(body.phone?.trim()),
+    });
 
-  const redirectTo = body.redirectTo || getAuthRedirectUrl(req.url);
-  const email = body.email?.trim() || '';
-  const phone = body.phone?.trim() || '';
+    if (!provider || !AUTH_PROVIDERS.includes(provider)) {
+      logAuthStartAudit('auth_start_failure', { auditId, provider: provider || null, reason: 'unsupported_provider' });
+      return safeJson({ ok: false, error: 'unsupported_provider', supportedProviders: AUTH_PROVIDERS, auditId }, 400);
+    }
+
+    const redirectTo = body.redirectTo || getAuthRedirectUrl(req.url);
+    const email = body.email?.trim() || '';
+    const phone = body.phone?.trim() || '';
 
   // Google OAuth: bypass canonical-domain check — only requires SUPABASE_URL + ANON_KEY
-  if (provider === 'google') {
-    const supabaseUrl = process.env.SUPABASE_URL?.trim();
-    const supabaseKey = process.env.SUPABASE_ANON_KEY?.trim();
-    if (!supabaseUrl || !supabaseKey) {
-      logAuthStartAudit('auth_start_failure', { auditId, provider, reason: 'missing_supabase_config' });
-      return safeJson({ ok: false, error: 'provider_not_configured', provider, auditId }, 503);
-    }
-    logAuthStartAudit('auth_start_success', { auditId, provider, action: 'redirect' });
-    return safeJson({
-      ok: true,
-      provider,
-      auditId,
-      action: 'redirect',
-      url: getSupabaseAuthorizeUrl('google', redirectTo),
-    });
-  }
-
-  const { providerStatus, setupTask } = getProviderGate(req, provider);
-  if (setupTask?.blockedReason || !providerStatus.enabled) {
-    logAuthStartAudit('auth_start_failure', {
-      auditId,
-      provider,
-      reason: setupTask?.blockedReason || 'provider_not_configured',
-    });
-    return safeJson(
-      {
-        ok: false,
-        error: setupTask?.blockedReason === 'canonical_domain_mismatch'
-          ? 'canonical_domain_mismatch'
-          : 'provider_not_configured',
+    if (provider === 'google') {
+      const supabaseUrl = process.env.SUPABASE_URL?.trim();
+      const supabaseKey = process.env.SUPABASE_ANON_KEY?.trim();
+      if (!supabaseUrl || !supabaseKey) {
+        logAuthStartAudit('auth_start_failure', { auditId, provider, reason: 'missing_supabase_config' });
+        return safeJson({ ok: false, error: 'provider_not_configured', provider, auditId }, 503);
+      }
+      logAuthStartAudit('auth_start_success', { auditId, provider, action: 'redirect' });
+      return safeJson({
+        ok: true,
         provider,
         auditId,
-        status: providerStatus,
-        setupTask,
-      },
-      503,
-    );
-  }
+        action: 'redirect',
+        url: getSupabaseAuthorizeUrl('google', redirectTo),
+      });
+    }
 
-  if (provider === 'wechat') {
-    logAuthStartAudit('auth_start_success', { auditId, provider, action: 'redirect' });
-    return safeJson({
-      ok: true,
-      provider,
-      auditId,
-      action: 'redirect',
-      url: getWechatAuthorizeUrl(redirectTo),
-    });
-  }
+    const { providerStatus, setupTask } = getProviderGate(req, provider);
+    if (setupTask?.blockedReason || !providerStatus.enabled) {
+      logAuthStartAudit('auth_start_failure', {
+        auditId,
+        provider,
+        reason: setupTask?.blockedReason || 'provider_not_configured',
+      });
+      return safeJson(
+        {
+          ok: false,
+          error: setupTask?.blockedReason === 'canonical_domain_mismatch'
+            ? 'canonical_domain_mismatch'
+            : 'provider_not_configured',
+          provider,
+          auditId,
+          status: providerStatus,
+          setupTask,
+        },
+        503,
+      );
+    }
 
-  if (provider === 'email') {
-    if (!email) {
-      logAuthStartAudit('auth_start_failure', { auditId, provider, reason: 'missing_email' });
-      return safeJson({ ok: false, error: 'missing_email', auditId }, 400);
+    if (provider === 'wechat') {
+      logAuthStartAudit('auth_start_success', { auditId, provider, action: 'redirect' });
+      return safeJson({
+        ok: true,
+        provider,
+        auditId,
+        action: 'redirect',
+        url: getWechatAuthorizeUrl(redirectTo),
+      });
+    }
+
+    if (provider === 'email') {
+      if (!email) {
+        logAuthStartAudit('auth_start_failure', { auditId, provider, reason: 'missing_email' });
+        return safeJson({ ok: false, error: 'missing_email', auditId }, 400);
+      }
+      if (body.dryRun === true) {
+        logAuthStartAudit('auth_start_success', { auditId, provider, action: 'otp_dry_run' });
+        return safeJson({
+          ok: true,
+          provider,
+          auditId,
+          action: 'otp_dry_run',
+          dryRun: true,
+          noExternalOtpSent: true,
+        });
+      }
+      const result = await requestSupabaseOtp({ email, redirectTo });
+      logAuthStartAudit(result.ok ? 'auth_start_success' : 'auth_start_failure', {
+        auditId,
+        provider,
+        action: result.action || null,
+        reason: result.ok ? 'otp_sent' : (result.error || 'otp_failed'),
+        status: result.status,
+      });
+      return safeJson({ ...result, provider, auditId }, result.status);
+    }
+
+    if (!phone) {
+      logAuthStartAudit('auth_start_failure', { auditId, provider, reason: 'missing_phone' });
+      return safeJson({ ok: false, error: 'missing_phone', auditId }, 400);
     }
     if (body.dryRun === true) {
       logAuthStartAudit('auth_start_success', { auditId, provider, action: 'otp_dry_run' });
@@ -209,7 +236,7 @@ export async function POST(req: NextRequest) {
         noExternalOtpSent: true,
       });
     }
-    const result = await requestSupabaseOtp({ email, redirectTo });
+    const result = await requestSupabaseOtp({ phone, redirectTo });
     logAuthStartAudit(result.ok ? 'auth_start_success' : 'auth_start_failure', {
       auditId,
       provider,
@@ -218,30 +245,9 @@ export async function POST(req: NextRequest) {
       status: result.status,
     });
     return safeJson({ ...result, provider, auditId }, result.status);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'unknown_error';
+    logAuthStartAudit('auth_start_failure', { auditId, provider: null, reason: 'auth_start_exception' });
+    return safeJson({ ok: false, error: 'auth_start_exception', auditId, message }, 500);
   }
-
-  if (!phone) {
-    logAuthStartAudit('auth_start_failure', { auditId, provider, reason: 'missing_phone' });
-    return safeJson({ ok: false, error: 'missing_phone', auditId }, 400);
-  }
-  if (body.dryRun === true) {
-    logAuthStartAudit('auth_start_success', { auditId, provider, action: 'otp_dry_run' });
-    return safeJson({
-      ok: true,
-      provider,
-      auditId,
-      action: 'otp_dry_run',
-      dryRun: true,
-      noExternalOtpSent: true,
-    });
-  }
-  const result = await requestSupabaseOtp({ phone, redirectTo });
-  logAuthStartAudit(result.ok ? 'auth_start_success' : 'auth_start_failure', {
-    auditId,
-    provider,
-    action: result.action || null,
-    reason: result.ok ? 'otp_sent' : (result.error || 'otp_failed'),
-    status: result.status,
-  });
-  return safeJson({ ...result, provider, auditId }, result.status);
 }

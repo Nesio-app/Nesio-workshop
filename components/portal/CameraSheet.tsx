@@ -12,6 +12,12 @@ interface AnalysisResult {
   nodes: AnalyzedNode[];
 }
 
+class AnalyzeImageError extends Error {
+  constructor(public readonly code: string) {
+    super(code);
+  }
+}
+
 // Compress image to JPEG under 800KB
 async function compressImage(canvas: HTMLCanvasElement): Promise<string> {
   let quality = 0.85;
@@ -29,8 +35,8 @@ async function analyzeImage(base64: string): Promise<AnalysisResult> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ type: 'image', content: '请识别图中的物品、人物、场景，提取为结构化记忆节点。', imageBase64: base64, mimeType: 'image/jpeg' }),
   });
-  const data = await res.json() as { ok?: boolean; nodes?: AnalyzedNode[]; summary?: string };
-  if (!data.ok || !data.nodes?.length) throw new Error('no_result');
+  const data = await res.json() as { ok?: boolean; nodes?: AnalyzedNode[]; summary?: string; error?: string };
+  if (!data.ok || !data.nodes?.length) throw new AnalyzeImageError(data.error || 'no_result');
   return { nodes: data.nodes, summary: data.summary || '识别完成' };
 }
 
@@ -47,6 +53,23 @@ function confidenceLabel(confidence: number): string {
   if (confidence >= 0.82) return '比较确定';
   if (confidence >= 0.58) return '可能相关';
   return '建议确认';
+}
+
+function buildPendingImageResult(name = '图片线索'): AnalysisResult {
+  return {
+    summary: '已先保存为待确认图片线索。登录或 Lab 模式后可自动识别标签。',
+    nodes: [
+      {
+        type: 'object',
+        name,
+        attributes: { status: '待确认', note: '图片已保存，标签等待你确认或登录后自动识别。' },
+        relations: [],
+        tags: ['图片', '待确认'],
+        source: 'photo',
+        confidence: 0.45,
+      },
+    ],
+  };
 }
 
 export default function CameraSheet({ open, onClose }: CameraSheetProps) {
@@ -137,9 +160,15 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
       const res = await analyzeImage(base64);
       setResult(res);
       setPhase('result');
-    } catch {
-      setError('识别失败。请重试或从相册选择。');
-      setPhase('live');
+    } catch (err: unknown) {
+      if (err instanceof AnalyzeImageError && err.code === 'ai_auth_required') {
+        setResult(buildPendingImageResult());
+        setPhase('result');
+        return;
+      }
+      setError('识别失败。你可以先保存为待确认图片线索。');
+      setResult(buildPendingImageResult());
+      setPhase('result');
     }
   }
 
@@ -161,11 +190,7 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
         setResult(res);
         setPhase('result');
       } catch {
-        // Fallback: treat as unknown object
-        setResult({
-          nodes: [{ type: 'object', name: file.name.replace(/\.[^.]+$/, ''), attributes: {}, relations: [], tags: ['相册'], source: 'photo', confidence: 0.6 }],
-          summary: '已添加到 Memory',
-        });
+        setResult(buildPendingImageResult(file.name.replace(/\.[^.]+$/, '') || '图片线索'));
         setPhase('result');
       }
     };
@@ -245,7 +270,14 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
         {/* Captured photo preview */}
         {(phase === 'analyzing' || phase === 'result' || phase === 'saved') && capturedPreview && (
           /* eslint-disable-next-line @next/next/no-img-element */
-          <img src={capturedPreview} alt="拍摄的照片" className="nesio-camera-video" style={{ objectFit: 'cover' }} />
+          <img
+            src={capturedPreview}
+            alt="拍摄的照片"
+            className="nesio-camera-video camera-callout-none"
+            style={{ objectFit: 'cover' }}
+            draggable={false}
+            onContextMenu={(e) => e.preventDefault()}
+          />
         )}
 
         {/* No camera fallback */}
@@ -316,7 +348,7 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
           </div>
           <div className="nesio-camera-result-actions">
             <button type="button" className="nesio-camera-save-btn" onClick={saveAll}>
-              存入 Life Graph ({result.nodes.length} 条)
+              存入 Memory ({result.nodes.length} 条)
             </button>
             <button type="button" className="nesio-camera-retake-btn" onClick={retake}>重拍</button>
           </div>
@@ -325,7 +357,7 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
 
       {phase === 'saved' && (
         <div className="nesio-camera-result-panel" style={{ textAlign: 'center', padding: '1.25rem' }}>
-          <p style={{ color: '#10b981', fontSize: '1.1rem', fontWeight: 700 }}>✓ 已存入 Life Graph</p>
+          <p style={{ color: '#10b981', fontSize: '1.1rem', fontWeight: 700 }}>✓ 已存入 Memory</p>
         </div>
       )}
 

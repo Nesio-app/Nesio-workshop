@@ -10,6 +10,8 @@ const dailyBrief = read('components/portal/DailyBriefCard.tsx');
 const lifeState = read('components/portal/LifeStateCard.tsx');
 const profileCard = read('components/portal/NesioProfileCard.tsx');
 const loginPage = read('components/portal/LoginPageClient.tsx');
+const authStartRoute = read('app/api/auth/start/route.ts');
+const analyzeRoute = read('app/api/portal/analyze/route.ts');
 const shareSheet = read('components/portal/ShareSheet.tsx');
 const nodeDetail = read('components/portal/MemoryNodeDetail.tsx');
 const bottomNav = read('components/portal/PortalBottomNav.tsx');
@@ -31,6 +33,31 @@ assert.match(
   cameraSheet,
   /先选一张照片|从相册 \/ 文件中选择/,
   'Camera fallback must include an upload alternative for blocked or unsupported camera access.',
+);
+assert.match(
+  cameraSheet,
+  /onContextMenu=\{\(e\) => e\.preventDefault\(\)\}|draggable=\{false\}|camera-callout-none/,
+  'Camera captured preview must suppress iOS image callout/context menu.',
+);
+assert.doesNotMatch(
+  cameraSheet,
+  /存入 Life Graph|已存入 Life Graph/,
+  'Camera user-facing copy must say Memory instead of Life Graph.',
+);
+assert.match(
+  cameraSheet,
+  /待确认图片线索|登录或 Lab 模式后可自动识别标签|ai_auth_required/,
+  'Camera must degrade honestly when AI image analysis is not authorized.',
+);
+assert.match(
+  analyzeRoute,
+  /ai_auth_required/,
+  'Analyze API must not silently run fake image extraction when anonymous AI is blocked.',
+);
+assert.match(
+  analyzeRoute,
+  /baohe_auth_access|cookies\.get/,
+  'Analyze API should allow real AI for authenticated sessions while anonymous calls remain gated.',
 );
 
 assert.match(
@@ -64,15 +91,22 @@ assert.match(memoryTab, /散落的线索，回头找得到|重要的事，慢慢
 assert.doesNotMatch(memoryTab, /你的生活，连成一张图|Life Graph|识别图中/, 'Memory copy must avoid omniscient graph or machine-task phrasing.');
 assert.doesNotMatch(memoryTab, /登录后查看你的 Memory|去登录|接入 Gmail/, 'Memory empty state should not force login or early Gmail connection.');
 assert.match(memoryTab, /这里会放你以后想找回的东西|娃娃在蓝盒子里|上次买的药|Jim 的会议提醒|放进来第一件|登录同步/, 'Memory empty state should prioritize local-first value before login sync.');
+assert.match(memoryTab, /isPrivateExternalNode|visibleMemoryNodes/, 'Memory should show local records while filtering private external calendar/email nodes when signed out.');
+assert.doesNotMatch(memoryTab, /setNodes\(\[\]\);\s*return undefined;/, 'Signed-out Memory must not hide local voice/photo/manual records.');
 assert.doesNotMatch(memoryTab, /aria-label="语音问宝盒"|nesio-memory-search-voice/, 'Memory search should stay focused on typed retrieval; voice ask belongs to the center N long press.');
 assert.match(bottomNav, /onPointerDown=\{startLongPress\}[\s\S]*长按提问/, 'Center N button must expose long-press ask behavior.');
-assert.match(portal, /onAsk=\{\(\) => \{[\s\S]*setCaptureMode\('voice'\)/, 'Portal must route center N long press to the voice ask surface.');
+assert.match(portal, /ASK_GUIDE_KEY|setAskGuideOpen\(true\)|问宝盒/, 'Portal must show a first-use ask guide when the center N is long-pressed.');
+assert.match(portal, /openAskVoice|setVoiceIntent\('ask'\)[\s\S]*setCaptureMode\('voice'\)/, 'Portal must route center N long press to the voice ask surface after the guide.');
 assert.match(portal, /nesio-memory-received[\s\S]*收好了，以后可以找回来|MemoryReceipt/, 'Portal must show a calm receipt animation after the first user record.');
 assert.match(portal, /onboardingActive[\s\S]*!\s*onboardingActive[\s\S]*<TodayFeed/s, 'Portal must hide private Today surfaces while first-login onboarding is visible.');
 assert.match(onboarding, /nesio-onboarding-visibility-change/, 'Onboarding must notify Portal so the private background layer can be hidden.');
 assert.doesNotMatch(profileCard, /已整理|已使用第|daysUsed/, 'Profile summary must not foreground usage-day counters.');
 assert.match(profileCard, /api\/auth\/logout|退出登录/, 'Profile/settings surface must expose a logout action when signed in.');
+assert.match(profileCard, /clearProfileIdentity/, 'Profile logout must clear local identity so the old customer name is not shown after sign-out.');
 assert.match(loginPage, /注册|Create account|发送注册链接|sign-up/, 'Login page must expose a create-account path.');
+assert.match(loginPage, /nesio-login-logo-img/, 'Login page must use a non-inverted logo class so the logo is visible on the white card.');
+assert.match(loginPage, /provider_not_configured|supabase_otp_failed|auth_start_exception|friendlyAuthError/, 'Login page must show specific account setup/send failures instead of one vague error.');
+assert.match(authStartRoute, /auth_start_exception|try\s*\{[\s\S]*const auditId|catch \(err/, 'Auth start route must fail closed with JSON instead of returning an empty 500.');
 assert.match(shareSheet, /你分享进来的内容[\s\S]*可确认的信息/, 'Share sheet should say user-shared content is organized into confirmable information.');
 assert.match(domains, /确认，放到门口/, 'Domain actions should read as user confirmation, not AI obedience.');
 

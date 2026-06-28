@@ -27,6 +27,9 @@ function isAnalyzeAiAllowed(req: NextRequest): boolean {
   const providedStage5Secret = req.headers.get('x-nesio-stage5-secret')?.trim() || '';
   if (stage5Secret && providedStage5Secret === stage5Secret) return true;
 
+  const hasSignedInCookie = Boolean(req.cookies.get('baohe_auth_access')?.value);
+  if (hasSignedInCookie) return true;
+
   const accessMode = req.headers.get('x-baohe-access-mode')?.trim() || '';
   const labEnabled = envValue('BAOHE_PERSONAL_LAB_AI_ENABLED').toLowerCase() === 'true';
   return labEnabled && accessMode === 'personal_lab';
@@ -210,8 +213,9 @@ export async function POST(req: NextRequest) {
 
     let raw = '';
     const isImage = body.type === 'image' && Boolean(body.imageBase64);
+    const aiAllowed = isAnalyzeAiAllowed(req);
 
-    if (isAnalyzeAiAllowed(req)) {
+    if (aiAllowed) {
       try {
         raw = await analyzeWithClaude(body.content, isImage, body.imageBase64, body.mimeType);
       } catch {
@@ -221,6 +225,15 @@ export async function POST(req: NextRequest) {
           raw = analyzeFallback(body.content);
         }
       }
+    } else if (isImage) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: 'ai_auth_required',
+          summary: '登录或 Lab 模式后可自动识别图片。现在可以先保存为待确认图片线索。',
+        },
+        { status: 403 },
+      );
     } else {
       raw = analyzeFallback(body.content);
     }

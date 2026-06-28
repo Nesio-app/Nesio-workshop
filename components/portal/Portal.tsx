@@ -47,6 +47,7 @@ import { type ToolForShellState } from './tool-state';
 const DEC_METADATA_TTL_MS = 30_000;
 const FIRST_MEMORY_RECEIPT_KEY = 'nesio-first-memory-receipt-shown-v1';
 const HAPTIC_FEEDBACK_KEY = 'nesio-haptic-feedback-enabled-v1';
+const ASK_GUIDE_KEY = 'nesio-ask-guide-seen-v1';
 
 type ActiveSurface = 'today' | 'tell' | 'memory';
 type AuthSessionPayload = {
@@ -54,6 +55,38 @@ type AuthSessionPayload = {
   loggedIn?: boolean;
   status?: string;
 };
+
+function AskGuideSheet({
+  open,
+  onClose,
+  onStart,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onStart: () => void;
+}) {
+  if (!open) return null;
+  return (
+    <div className="nesio-ask-guide" role="dialog" aria-modal="true" aria-label="问宝盒">
+      <button type="button" className="nesio-ask-guide-backdrop" onClick={onClose} aria-label="关闭问宝盒引导" />
+      <div className="nesio-ask-guide-card">
+        <div className="nesio-sheet-handle" aria-hidden />
+        <p className="nesio-ask-guide-kicker">长按中间按钮</p>
+        <h2>问宝盒</h2>
+        <p>找东西、找线索，也可以问下一步。比如：钥匙在哪里？生日快到了该买什么礼物？</p>
+        <div className="nesio-ask-guide-examples" aria-label="问宝盒示例">
+          <span>钥匙在哪里</span>
+          <span>Linda 生日买什么</span>
+          <span>上次买的药还有吗</span>
+        </div>
+        <div className="nesio-ask-guide-actions">
+          <button type="button" className="nesio-ob-primary-btn" onClick={onStart}>开始问宝盒</button>
+          <button type="button" className="nesio-ask-guide-later" onClick={onClose}>稍后</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function normalizeLaunchSurfaceContext(raw: {
   viewerRole?: unknown;
@@ -162,6 +195,7 @@ export default function Portal() {
   const [authSessionLoggedIn, setAuthSessionLoggedIn] = useState(false);
   const [onboardingActive, setOnboardingActive] = useState(false);
   const [memoryReceipt, setMemoryReceipt] = useState(false);
+  const [askGuideOpen, setAskGuideOpen] = useState(false);
   const [launchSurfaceContext, setLaunchSurfaceContext] = useState({
     viewerRole: 'public' as 'public' | 'tester' | 'personal_lab',
     testerAllowlist: [] as string[],
@@ -444,6 +478,28 @@ export default function Portal() {
     [launchSurfaceContext],
   );
 
+  const openAskVoice = useCallback(() => {
+    try {
+      localStorage.setItem(ASK_GUIDE_KEY, '1');
+    } catch { /* ignore unavailable storage */ }
+    setAskGuideOpen(false);
+    setActiveSurface('today');
+    setVoiceIntent('ask');
+    setCaptureMode('voice');
+  }, []);
+
+  const handleAskFromCenterButton = useCallback(() => {
+    let seen = false;
+    try {
+      seen = localStorage.getItem(ASK_GUIDE_KEY) === '1';
+    } catch { /* ignore unavailable storage */ }
+    if (!seen) {
+      setAskGuideOpen(true);
+      return;
+    }
+    openAskVoice();
+  }, [openAskVoice]);
+
   return (
     <>
       <div className="portal-root portal-root--home">
@@ -474,11 +530,7 @@ export default function Portal() {
             locale={locale}
             onToday={() => setActiveSurface('today')}
             onTell={() => setActiveSurface(activeSurface === 'tell' ? 'today' : 'tell')}
-            onAsk={() => {
-              setActiveSurface('today');
-              setVoiceIntent('ask');
-              setCaptureMode('voice');
-            }}
+            onAsk={handleAskFromCenterButton}
             onMemory={() => setActiveSurface('memory')}
           />
         )}
@@ -486,8 +538,14 @@ export default function Portal() {
 
       {/* Capture sheets — rendered at root level, independent of TellNesioSheet state */}
       <CameraSheet open={captureMode === 'camera'} onClose={() => setCaptureMode(null)} />
-      <VoiceInputSheet open={captureMode === 'voice'} intent={voiceIntent} onClose={() => { setCaptureMode(null); setVoiceIntent('note'); }} />
+      <VoiceInputSheet
+        open={captureMode === 'voice'}
+        intent={voiceIntent}
+        canUsePrivateData={canUsePrivateRuntime}
+        onClose={() => { setCaptureMode(null); setVoiceIntent('note'); }}
+      />
       <ShareSheet open={captureMode === 'share'} onClose={() => setCaptureMode(null)} />
+      <AskGuideSheet open={askGuideOpen} onClose={() => setAskGuideOpen(false)} onStart={openAskVoice} />
 
       <NotePanelEnhanced open={noteOpen} onOpenChange={setNoteOpen} />
       {memoryReceipt && (

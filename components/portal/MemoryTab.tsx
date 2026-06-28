@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { loadProfileSettings } from '@/lib/portal/profile';
-import { getRecentNodes, searchLifeGraph, type LifeNode } from '@/lib/portal/life-graph';
+import { getRecentNodes, isPrivateExternalNode, searchLifeGraph, type LifeNode } from '@/lib/portal/life-graph';
 import MemoryNodeDetail from './MemoryNodeDetail';
 
 const TYPE_ICON: Record<string, string> = {
@@ -36,6 +36,10 @@ function cleanMemoryPreview(node: LifeNode): string {
     .slice(0, 44) || '来自你的记录';
 }
 
+function visibleMemoryNodes(nodes: LifeNode[], canUsePrivateData: boolean): LifeNode[] {
+  return canUsePrivateData ? nodes : nodes.filter((node) => !isPrivateExternalNode(node));
+}
+
 export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: boolean }) {
   const [query, setQuery] = useState('');
   const [displayName, setDisplayName] = useState('');
@@ -49,10 +53,6 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
     } else {
       setDisplayName('');
     }
-    if (!canUsePrivateData) {
-      setNodes([]);
-      return undefined;
-    }
     setNodes(getRecentNodes(30));
 
     const onUpdate = () => setNodes(getRecentNodes(30));
@@ -60,9 +60,12 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
     return () => window.removeEventListener('nesio-life-graph-updated', onUpdate);
   }, [canUsePrivateData]);
 
-  const results = canUsePrivateData && query.trim() ? searchLifeGraph(query) : nodes;
+  const visibleNodes = visibleMemoryNodes(nodes, canUsePrivateData);
+  const results = query.trim()
+    ? visibleMemoryNodes(searchLifeGraph(query), canUsePrivateData)
+    : visibleNodes;
   const initials = canUsePrivateData ? (displayName.trim().slice(0, 1) || '我') : '我';
-  const hasRealNodes = nodes.length > 0;
+  const hasRealNodes = visibleNodes.length > 0;
 
   return (
     <>
@@ -100,7 +103,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
           )}
 
           {/* Results or empty */}
-          {!canUsePrivateData ? (
+          {!query && !hasRealNodes ? (
             <div className="nesio-memory-empty">
               <p>这里会放你以后想找回的东西。</p>
               <p style={{ fontSize: '0.78rem', marginTop: '0.4rem' }}>

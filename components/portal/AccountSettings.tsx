@@ -13,6 +13,7 @@ import {
 } from '@/lib/portal/i18n';
 import {
   loadProfileSettings,
+  clearProfileIdentity,
   normalizePortalLocale,
   PORTAL_LOCALE_OPTIONS,
   portalLocaleToHtmlLang,
@@ -513,6 +514,9 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
       const client = createAppApiClient();
       const result = await client.logoutAuth();
       if (result.ok && result.signedOut) {
+        clearProfileIdentity();
+        setDisplayName(fallbackName);
+        setAvatarUrl('');
         setAuthSession({
           safePublicStatus: true,
           secretsRedacted: true,
