@@ -32,6 +32,32 @@ function signalEvidence(sig: Signal, label: string): EvidenceRef {
 function one(card: RecommendationCard | null): RecommendationCard[] {
   return card ? [card] : [];
 }
+function contentNumber(sig: Signal, key: string): number {
+  if (!sig.content || typeof sig.content !== 'object') return NaN;
+  return Number((sig.content as Record<string, unknown>)[key]);
+}
+function contentString(sig: Signal, key: string): string {
+  if (!sig.content || typeof sig.content !== 'object') return '';
+  return String((sig.content as Record<string, unknown>)[key] || '');
+}
+function isSleepOrEnergySignal(sig: Signal): boolean {
+  const type = contentString(sig, 'type').toLowerCase();
+  const tags = (sig.tags || []).join(' ').toLowerCase();
+  const title = sig.title.toLowerCase();
+  const sourceLooksHealth = sig.source === 'health' || sig.sensitivity === 'health';
+  const contentLooksEnergy = type.includes('sleep') || type.includes('energy') ||
+    tags.includes('sleep') || tags.includes('energy') || tags.includes('睡眠') || tags.includes('精力') ||
+    title.includes('sleep') || title.includes('睡眠') || title.includes('energy') || title.includes('精力');
+  return sourceLooksHealth && contentLooksEnergy;
+}
+function isCalendarEventToday(sig: Signal, nowMs = Date.now()): boolean {
+  if (sig.type !== 'event' || sig.source !== 'calendar') return false;
+  const t = new Date(sig.occurredAt).getTime();
+  return Number.isFinite(t) && t > nowMs - 3 * 3_600_000 && t < nowMs + 18 * 3_600_000;
+}
+function formatEventTime(sig: Signal): string {
+  return new Date(sig.occurredAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+}
 
 // ── Weather domain (Health + Weather sandbox) ───────────────────────────────
 
@@ -180,41 +206,56 @@ const familyDomain: DomainEngine = {
   },
 };
 
-// ── State domain (cross-signal, Health + Calendar sandbox) ──────────────────
+// ── Energy Allocation domain (true Health + Calendar sandbox) ───────────────
 
-const stateDomain: DomainEngine = {
-  domain: 'state',
+const energyCalendarDomain: DomainEngine = {
+  domain: 'energy-calendar',
   version: 1,
   crossDomain: true,
   sandboxPair: ['health', 'calendar'],
   provideInsights(ctx: DECContext): RecommendationCard[] {
-    const { lifeState } = ctx;
-    const work = lifeState.dimensions.find((d) => d.dimension === 'work');
-    const energy = lifeState.dimensions.find((d) => d.dimension === 'energy');
-    const overloaded = work?.level === 'high_load';
-    const tired = energy?.level === 'low';
-    if (!overloaded && !tired) return [];
+    const healthSignal = ctx.signals.find(isSleepOrEnergySignal);
+    const calendarEvents = ctx.signals
+      .filter((s) => isCalendarEventToday(s))
+      .sort((a, b) => new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime());
 
-    const driverIds = [...(work?.driverSignalIds || []), ...(energy?.driverSignalIds || [])];
-    const driverSignals = driverIds
-      .map((id) => ctx.signals.find((s) => s.id === id))
-      .filter((s): s is Signal => Boolean(s));
+    // Stage 3 rule: true two-domain reasoning only. If either domain is thin,
+    // stand down instead of fabricating a weaker recommendation.
+    if (!healthSignal || calendarEvents.length < 2) return [];
+
+    const sleepHours = contentNumber(healthSignal, 'hours');
+    const energyScore = contentNumber(healthSignal, 'energy');
+    const lowSleep = Number.isFinite(sleepHours) && sleepHours < 6.5;
+    const lowEnergy = Number.isFinite(energyScore) && energyScore <= 0.45;
+    const denseCalendar = calendarEvents.length >= 4;
+    if (!lowSleep && !lowEnergy && !denseCalendar) return [];
+
+    const healthReason = lowSleep
+      ? `睡眠 ${sleepHours}h 偏少`
+      : lowEnergy
+        ? '精力记录偏低'
+        : '身体状态需要轻量安排';
+    const firstEvents = calendarEvents.slice(0, 3);
+    const eventSummary = firstEvents.map((s) => `${formatEventTime(s)} ${s.title}`).join(' / ');
+    const confidence = denseCalendar && (lowSleep || lowEnergy) ? 0.9 : 0.76;
 
     return one({
-      id: 'dec-load-reduction',
+      id: 'dec-energy-calendar-allocation',
       domain: 'work',
-      domainLabel: '状态引导',
-      confidence: 0.8,
-      urgency: 4,
+      domainLabel: '精力分配',
+      confidence,
+      urgency: denseCalendar ? 5 : 4,
       icon: '🧘',
       iconBg: '#a78bfa',
-      title: tired && overloaded ? '今天给自己留点余地' : overloaded ? '安排偏满，挑重点做' : '精力偏低，别硬撑',
-      body: lifeState.explanation,
-      tags: ['跨信号', ...(overloaded ? ['工作密集'] : []), ...(tired ? ['精力偏低'] : [])],
-      evidence: driverSignals.length
-        ? driverSignals.map((s) => signalEvidence(s, '状态信号'))
-        : [{ source: 'life-state', label: '当前状态', value: lifeState.explanation }],
-      primaryAction: '好的',
+      title: '今天按精力分配会议间隙',
+      body: `${healthReason}，同时今天有 ${calendarEvents.length} 个日程。建议把高耗能事项放在第一个空档，会议间只做轻任务。`,
+      tags: ['Health × Calendar', denseCalendar ? '会议密集' : '日程可控', lowSleep || lowEnergy ? '精力需保护' : '轻量安排'],
+      evidence: [
+        signalEvidence(healthSignal, '健康/精力'),
+        ...firstEvents.map((s) => signalEvidence(s, '日历')),
+        { source: 'calendar', label: '会议密度', value: eventSummary || `${calendarEvents.length} 个日程` },
+      ],
+      primaryAction: '安排轻任务',
       secondaryAction: '查看状态',
       type: 'standard',
       expiresAt: todayEndISO(),
@@ -224,4 +265,4 @@ const stateDomain: DomainEngine = {
 
 // ── Register all domains ────────────────────────────────────────────────────
 // Adding a domain here is the ONLY change needed to extend Today (§28.7).
-[weatherDomain, workDomain, healthDomain, familyDomain, stateDomain].forEach(registerDomain);
+[weatherDomain, workDomain, healthDomain, familyDomain, energyCalendarDomain].forEach(registerDomain);

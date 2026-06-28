@@ -16,6 +16,8 @@ import { buildOfflineSyncConflictContract } from '../lib/portal/offline-sync-con
 import { buildCloudReadinessContract } from '../lib/portal/cloud-readiness-contract.mjs';
 import { buildProductionActivationContract } from '../lib/portal/production-activation-contract.mjs';
 import { buildAiProviderRouterContract } from '../lib/portal/ai-provider-router-contract.mjs';
+import { buildAgentRuntimeReportV0 } from '../lib/intelligence/agent-runtime-report.mjs';
+import { buildStage5ToolInvocationReport } from '../lib/intelligence/tool-invocation-runtime.mjs';
 import { nesioDesignSystemContract } from '../lib/portal/nesio-design-system-contract.mjs';
 import { nesioDesignSystemAssets } from '../lib/portal/nesio-design-system-assets.mjs';
 import {
@@ -2200,6 +2202,8 @@ const productionActivationProvidersById = new Map(
 const googleCalendarProductionProvider = productionActivationProvidersById.get('google_calendar');
 const flomoProductionProvider = productionActivationProvidersById.get('flomo');
 const aiProviderRouterContract = buildAiProviderRouterContract();
+const agentRuntimeReport = buildAgentRuntimeReportV0();
+const stage5ToolInvocationReport = buildStage5ToolInvocationReport();
 const nesioDesignSystemSummary = {
   canonicalName: 'Nesio',
   originalDownloadName: 'Nesio',
@@ -2433,6 +2437,19 @@ const evidenceSummary = {
     aiProviderEnabledCount: aiProviderRouterContract.summary.aiProviderEnabledCount,
     aiRealProviderCallsEnabled: aiProviderRouterContract.summary.aiRealProviderCallsEnabled,
     defaultAiProvider: aiProviderRouterContract.summary.defaultAiProvider,
+    agentRuntimeVersion: agentRuntimeReport.summary.version,
+    agentRuntimeAgentCount: agentRuntimeReport.summary.agentCount,
+    agentRuntimeActiveAgentCount: agentRuntimeReport.summary.activeAgentCount,
+    agentRuntimeBlockedAgentCount: agentRuntimeReport.summary.blockedAgentCount,
+    agentRuntimeStage5Enabled: agentRuntimeReport.boundaries.stage5Enabled,
+    stage5ToolInvocationVersion: stage5ToolInvocationReport.summary.version,
+    stage5ToolInvocationCeoApproved: stage5ToolInvocationReport.summary.ceoApproved,
+    stage5ToolInvocationExecutionEnabled: stage5ToolInvocationReport.summary.executionEnabled,
+    stage5ToolInvocationActionCount: stage5ToolInvocationReport.summary.actionCount,
+    stage5ToolInvocationExecutableActionCount: stage5ToolInvocationReport.summary.executableActionCount,
+    stage5ToolInvocationDelegatedActionCount: stage5ToolInvocationReport.summary.delegatedActionCount,
+    stage5ToolInvocationRealExternalActionCount: stage5ToolInvocationReport.summary.realExternalActionCount,
+    stage5ToolInvocationBlockedActionCount: stage5ToolInvocationReport.summary.blockedActionCount,
     nesioDesignSystemVersion: nesioDesignSystemContract.version,
     nesioRuntimeSurfaceCount: nesioDesignSystemSummary.runtimeSurfaceCount,
     nesioDesignSystemGuardrailCount: nesioDesignSystemSummary.guardrailCount,
@@ -2681,6 +2698,8 @@ const evidenceSummary = {
   offlineSyncConflict: offlineSyncConflictContract,
   cloudReadiness: cloudReadinessContract,
   aiProviderRouter: aiProviderRouterContract,
+  agentRuntime: agentRuntimeReport,
+  stage5ToolInvocation: stage5ToolInvocationReport,
   productionActivation: productionActivationContract,
   moduleDataBus: {
     implementation: moduleDataBus.implementation,
