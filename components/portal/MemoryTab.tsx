@@ -155,19 +155,10 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
     : visibleNodes;
   const hasRealNodes = visibleNodes.length > 0;
   const sourceItems = query ? results : (hasRealNodes ? results : []);
-  const visibleItems = showAll || query ? sourceItems : sourceItems.slice(0, 3);
-  const initials = canUsePrivateData ? (displayName.trim().slice(0, 1) || '我') : '我';
-
+  const visibleItems = showAll || query ? sourceItems : sourceItems.slice(0, 6);
   return (
     <>
       <div className="nesio-memory-root">
-        <header className="nesio-today-header">
-          <div className="nesio-today-brand">
-            <img src="/icons/treasurebox.svg" alt="Nesio" className="nesio-memory-brand-icon" />
-          </div>
-          <a href="/settings" className="nesio-today-avatar" aria-label="我的设置">{initials}</a>
-        </header>
-
         <div className="nesio-memory-scroll">
           {/* Search */}
           <div className="nesio-memory-search-wrap">
@@ -247,7 +238,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                   className="nesio-memory-more-btn"
                   onClick={() => setShowAll((value) => !value)}
                 >
-                  {showAll ? '收起线索' : `更多线索（${sourceItems.length - 3}）`}
+                  {showAll ? '收起线索' : `更多线索（${sourceItems.length - 6}）`}
                 </button>
               )}
             </>

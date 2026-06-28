@@ -306,7 +306,6 @@ export default function TodayFeed({
       <header className="nesio-today-header">
         <div className="nesio-today-brand">
           <img src="/icons/treasurebox.svg" alt="Nesio" className="nesio-today-brand-icon" />
-          <span className="nesio-today-brand-name">Nesio</span>
         </div>
         <a href="/settings" className="nesio-today-avatar" aria-label="我的设置">{initials}</a>
       </header>

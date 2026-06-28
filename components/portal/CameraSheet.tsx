@@ -101,7 +101,6 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
     if (open) {
       setPhase('idle'); setResult(null); setCapturedPreview('');
       setPermDenied(false); setError(''); setExtraTags('');
-      startCamera('environment');
     } else {
       stopCamera();
     }
@@ -310,11 +309,16 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
             </svg>
             <p className="nesio-camera-fallback-text">
               {phase === 'idle'
-                ? '正在准备相机。你也可以先选一张照片或文件放进 Nesio。'
+                ? '点「启动相机」后才会请求摄像头权限。你也可以先选一张照片或文件放进 Nesio。'
                 : permDenied
                 ? '相机权限被拒绝。请在浏览器设置→网站设置→摄像头中允许，然后刷新。'
                 : '此设备不支持网页相机访问。'}
             </p>
+            {phase === 'idle' && (
+              <button type="button" className="nesio-camera-gallery-btn" onClick={() => startCamera(facingMode)}>
+                启动相机
+              </button>
+            )}
             <button type="button" className="nesio-camera-gallery-btn" onClick={handleGallery}>
               从相册 / 文件中选择
             </button>
@@ -397,7 +401,7 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
       )}
 
       {/* Controls */}
-      {(phase === 'idle' || phase === 'live' || phase === 'no-camera') && (
+      {(phase === 'live' || phase === 'no-camera') && (
         <div className="nesio-camera-controls">
           <button type="button" className="nesio-camera-ctrl-btn" onClick={handleGallery} aria-label="相册">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="22" height="22">

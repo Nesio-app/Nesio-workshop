@@ -1,8 +1,8 @@
 'use client';
 
 /**
- * 分享·上传 — bottom sheet that:
- * 1. Accepts App Share (navigator.share target / paste), or file upload
+ * 上传 — bottom sheet that:
+ * 1. Accepts paste or file upload
  * 2. Extracts text from PDF/doc/email
  * 3. POSTs to /api/portal/analyze for structured extraction
  * 4. Shows parsed result (people, dates, places, commitments)
@@ -78,15 +78,6 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
     }
   }
 
-  async function handleAppShare() {
-    if (navigator.share) {
-      try { await navigator.share({ title: 'Nesio', text: '分享内容到 Nesio Memory' }); }
-      catch { /* user cancelled */ }
-    } else {
-      setTextMode(true);
-    }
-  }
-
   async function handleFile() { fileRef.current?.click(); }
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -151,14 +142,6 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
         {/* Action buttons */}
         {!parsed && !analyzing && (
           <div className="nesio-share-actions">
-            <button type="button" className="nesio-share-action-btn" onClick={handleAppShare}>
-              <span className="nesio-share-action-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="24" height="24">
-                  <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13"/>
-                </svg>
-              </span>
-              <span>从系统分享导入</span>
-            </button>
             <button type="button" className="nesio-share-action-btn" onClick={handleFile}>
               <span className="nesio-share-action-icon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="24" height="24">
@@ -167,6 +150,14 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
                 </svg>
               </span>
               <span>上传文件</span>
+            </button>
+            <button type="button" className="nesio-share-action-btn" onClick={() => setTextMode(true)}>
+              <span className="nesio-share-action-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="24" height="24">
+                  <path d="M4 5h16M4 12h16M4 19h10"/>
+                </svg>
+              </span>
+              <span>粘贴文字/链接</span>
             </button>
           </div>
         )}
@@ -193,12 +184,6 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
               </button>
             </div>
           </div>
-        )}
-
-        {!textMode && !parsed && !analyzing && (
-          <button type="button" style={{ fontSize: '0.78rem', color: 'var(--portal-blue-deep)', display: 'block', textAlign: 'center', padding: '0.5rem', marginTop: '0.25rem' }} onClick={() => setTextMode(true)}>
-            粘贴文字/链接
-          </button>
         )}
 
         {/* Analyzing */}

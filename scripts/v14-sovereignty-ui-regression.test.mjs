@@ -33,6 +33,16 @@ assert.match(
 );
 assert.match(
   cameraSheet,
+  /启动相机/,
+  'Camera must wait for the user to tap start before requesting camera permission.',
+);
+assert.doesNotMatch(
+  cameraSheet,
+  /setError\(''\); setExtraTags\(''\);\s*startCamera\('environment'\);/,
+  'Camera sheet must not auto-start the camera on open.',
+);
+assert.match(
+  cameraSheet,
   /先选一张照片|从相册 \/ 文件中选择/,
   'Camera fallback must include an upload alternative for blocked or unsupported camera access.',
 );
@@ -74,8 +84,8 @@ assert.match(
 
 assert.match(
   globals,
-  /@media \(max-width: 340px\)[\s\S]*\.nesio-memory-grid[\s\S]*grid-template-columns:\s*1fr/,
-  'Memory grid must collapse to one column at 320px.',
+  /@media \(max-width: 340px\)[\s\S]*\.nesio-memory-grid[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/,
+  'Memory grid must keep two compact columns at 320px.',
 );
 assert.match(
   globals,
@@ -106,10 +116,11 @@ assert.match(memoryTab, /这里会放你以后想找回的东西|娃娃在蓝盒
 assert.match(memoryTab, /isPrivateExternalNode|visibleMemoryNodes/, 'Memory should show local records while filtering private external calendar/email nodes when signed out.');
 assert.doesNotMatch(memoryTab, /setNodes\(\[\]\);\s*return undefined;/, 'Signed-out Memory must not hide local voice/photo/manual records.');
 assert.doesNotMatch(memoryTab, /aria-label="语音问宝盒"|nesio-memory-search-voice/, 'Memory search should stay focused on typed retrieval; voice ask belongs to the center N long press.');
-assert.match(memoryTab, /showAll|visibleItems|slice\(0,\s*3\)|更多线索/s, 'Memory should show at most three cards first and fold the rest behind a more button.');
+assert.match(memoryTab, /showAll|visibleItems|slice\(0,\s*6\)|更多线索/s, 'Memory should show at most six cards first and fold the rest behind a more button.');
 assert.match(memoryTab, /deleteLifeNode|左滑删除|长按分享|navigator\.share|clipboard/, 'Memory cards should support left-swipe delete and long-press share.');
-assert.match(memoryTab, /\/icons\/treasurebox\.svg/, 'Memory logo should use the transparent SVG asset instead of the light-background PWA icon.');
+assert.doesNotMatch(memoryTab, /nesio-today-header[\s\S]*nesio-memory-brand-icon|aria-label="我的设置"/, 'Memory page should not show the top logo/settings buttons.');
 assert.match(todayFeed, /\/icons\/treasurebox\.svg/, 'Today logo should use the transparent SVG asset instead of the light-background PWA icon.');
+assert.doesNotMatch(todayFeed, /nesio-today-brand-name">Nesio/, 'Today header should not render the Nesio word next to the logo.');
 assert.match(bottomNav, /onPointerDown=\{startLongPress\}[\s\S]*长按提问/, 'Center N button must expose long-press ask behavior.');
 assert.match(bottomNav, /draggable=\{false\}|onContextMenu=\{\(e\) => e\.preventDefault\(\)\}/, 'Center N image must suppress iOS image callout/share sheet during long press.');
 assert.match(tellSheet, /label:\s*'上传'/, 'Center N third fan action should say 上传, not 分享.');
@@ -130,10 +141,12 @@ assert.match(profileCard, /loggedIn\?:\s*boolean|Boolean\(d\?\.loggedIn\)/, 'Pro
 assert.match(loginPage, /注册|Create account|发送注册链接|sign-up/, 'Login page must expose a create-account path.');
 assert.match(loginPage, /nesio-login-logo-img/, 'Login page must use a non-inverted logo class so the logo is visible on the white card.');
 assert.match(loginPage, /\/api\/auth\/callback/, 'Login/OAuth must redirect through the auth callback route so sessions are created.');
+assert.match(loginPage, /FALLBACK_AUTH_ORIGIN|treasurebox-nu\.vercel\.app|isLocalShell/, 'Login/OAuth must not use localhost callbacks inside the iOS/local shell.');
 assert.doesNotMatch(loginPage, /redirectTo:\s*window\.location\.origin \+ '\/'/, 'Login/OAuth must not redirect straight to home and skip callback.');
 assert.match(loginPage, /provider_not_configured|supabase_otp_failed|auth_start_exception|friendlyAuthError/, 'Login page must show specific account setup/send failures instead of one vague error.');
 assert.match(authStartRoute, /auth_start_exception|try\s*\{[\s\S]*const auditId|catch \(err/, 'Auth start route must fail closed with JSON instead of returning an empty 500.');
-assert.match(shareSheet, /你分享进来的内容[\s\S]*可确认的信息/, 'Share sheet should say user-shared content is organized into confirmable information.');
+assert.match(shareSheet, /你分享进来的内容[\s\S]*可确认的信息/, 'Upload sheet should say user-shared content is organized into confirmable information.');
+assert.doesNotMatch(shareSheet, /navigator\.share|从系统分享导入|handleAppShare/, 'Upload sheet should not expose the system share action.');
 assert.match(domains, /确认，放到门口/, 'Domain actions should read as user confirmation, not AI obedience.');
 
 assert.doesNotMatch(settingsSheets, /像朋友一样|Moment|Today Feed 的卡片会按此过滤|按能力层计费|Remember|Understand|Steer|Operate|Future Steering|Mirror Profile|全自动 Life Graph|API 接入/, 'Settings sheets should use user-sovereignty copy instead of internal product or SaaS terms.');
