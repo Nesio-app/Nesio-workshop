@@ -158,6 +158,7 @@ export default function Portal() {
   const [locale, setLocale] = useState<PortalLocale>('zh');
   const [authReady, setAuthReady] = useState(false);
   const [authSessionLoggedIn, setAuthSessionLoggedIn] = useState(false);
+  const [onboardingActive, setOnboardingActive] = useState(false);
   const [launchSurfaceContext, setLaunchSurfaceContext] = useState({
     viewerRole: 'public' as 'public' | 'tester' | 'personal_lab',
     testerAllowlist: [] as string[],
@@ -192,6 +193,15 @@ export default function Portal() {
   useEffect(() => {
     setLaunchSurfaceContext(normalizeLaunchSurfaceContext(readLaunchSurfaceContextFromBrowser()));
     setLocale(loadProfileSettings().locale);
+  }, []);
+
+  useEffect(() => {
+    const onOnboardingVisibility = (event: Event) => {
+      const detail = (event as CustomEvent<{ active?: boolean }>).detail;
+      setOnboardingActive(Boolean(detail?.active));
+    };
+    window.addEventListener('nesio-onboarding-visibility-change', onOnboardingVisibility);
+    return () => window.removeEventListener('nesio-onboarding-visibility-change', onOnboardingVisibility);
   }, []);
 
   useEffect(() => {
@@ -414,12 +424,12 @@ export default function Portal() {
       <div className="portal-root portal-root--home">
         <div className="portal-grain" aria-hidden />
         <div className="nesio-shell">
-          {activeSurface === 'today' && (
+          {!onboardingActive && activeSurface === 'today' && (
             <TodayFeed canUsePrivateData={canUsePrivateRuntime} onOpenMemory={() => setActiveSurface('memory')} />
           )}
-          {activeSurface === 'memory' && <MemoryTab canUsePrivateData={canUsePrivateRuntime} />}
+          {!onboardingActive && activeSurface === 'memory' && <MemoryTab canUsePrivateData={canUsePrivateRuntime} />}
           {/* Keep legacy surfaces accessible via tools */}
-          {activeSurface === 'tell' && (
+          {!onboardingActive && activeSurface === 'tell' && (
             <TodayFeed canUsePrivateData={canUsePrivateRuntime} onOpenMemory={() => setActiveSurface('memory')} />
           )}
         </div>
@@ -433,18 +443,20 @@ export default function Portal() {
           }}
         />
 
-        <PortalBottomNav
-          activeSurface={activeSurface}
-          locale={locale}
-          onToday={() => setActiveSurface('today')}
-          onTell={() => setActiveSurface(activeSurface === 'tell' ? 'today' : 'tell')}
-          onAsk={() => {
-            setActiveSurface('today');
-            setVoiceIntent('ask');
-            setCaptureMode('voice');
-          }}
-          onMemory={() => setActiveSurface('memory')}
-        />
+        {!onboardingActive && (
+          <PortalBottomNav
+            activeSurface={activeSurface}
+            locale={locale}
+            onToday={() => setActiveSurface('today')}
+            onTell={() => setActiveSurface(activeSurface === 'tell' ? 'today' : 'tell')}
+            onAsk={() => {
+              setActiveSurface('today');
+              setVoiceIntent('ask');
+              setCaptureMode('voice');
+            }}
+            onMemory={() => setActiveSurface('memory')}
+          />
+        )}
       </div>
 
       {/* Capture sheets — rendered at root level, independent of TellNesioSheet state */}

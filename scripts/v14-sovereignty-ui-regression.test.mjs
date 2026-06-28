@@ -13,6 +13,9 @@ const shareSheet = read('components/portal/ShareSheet.tsx');
 const nodeDetail = read('components/portal/MemoryNodeDetail.tsx');
 const bottomNav = read('components/portal/PortalBottomNav.tsx');
 const portal = read('components/portal/Portal.tsx');
+const onboarding = read('components/portal/PortalOnboarding.tsx');
+const settingsSheets = read('components/portal/SettingsSheets.tsx');
+const mirrorProfile = read('components/portal/MirrorProfileCard.tsx');
 const domains = read('lib/intelligence/domains.ts');
 const globals = read('app/globals.css');
 const storageCss = read('storage-web/styles.css');
@@ -51,13 +54,21 @@ assert.doesNotMatch(lifeState, /Life State|overallScore|nesio-lifestate-ring-num
 assert.match(lifeState, /今天的负荷|事项较多|安排稳定|先看最重要的一件/, 'Life state card should describe workload facts gently.');
 assert.doesNotMatch(domains, /不用翻笔记/, 'Meeting cards should use natural assistant wording, not system-summary language.');
 assert.match(domains, /已经整理好了|关键提醒/, 'Meeting cards should explain that key reminders are ready.');
-assert.match(memoryTab, /把散落的生活线索找回来|重要的事，慢慢连起来/, 'Memory title should use sovereignty-oriented retrieval language.');
+assert.match(memoryTab, /散落的线索，回头找得到|重要的事，慢慢连起来/, 'Memory title should use sovereignty-oriented retrieval language.');
+assert.doesNotMatch(memoryTab, /你的生活，连成一张图|Life Graph|识别图中/, 'Memory copy must avoid omniscient graph or machine-task phrasing.');
 assert.doesNotMatch(memoryTab, /aria-label="语音问宝盒"|nesio-memory-search-voice/, 'Memory search should stay focused on typed retrieval; voice ask belongs to the center N long press.');
-assert.match(bottomNav, /onPointerDown=\{startLongPress\}[\s\S]*长按问宝盒/, 'Center N button must expose long-press ask-Baohe behavior.');
+assert.match(bottomNav, /onPointerDown=\{startLongPress\}[\s\S]*长按提问/, 'Center N button must expose long-press ask behavior.');
 assert.match(portal, /onAsk=\{\(\) => \{[\s\S]*setCaptureMode\('voice'\)/, 'Portal must route center N long press to the voice ask surface.');
+assert.match(portal, /onboardingActive[\s\S]*!\s*onboardingActive[\s\S]*<TodayFeed/s, 'Portal must hide private Today surfaces while first-login onboarding is visible.');
+assert.match(onboarding, /nesio-onboarding-visibility-change/, 'Onboarding must notify Portal so the private background layer can be hidden.');
 assert.match(profileCard, /你已经整理了 \{daysUsed\} 天生活线索/, 'Profile days copy should center user agency.');
 assert.match(shareSheet, /你分享进来的内容[\s\S]*可确认的信息/, 'Share sheet should say user-shared content is organized into confirmable information.');
 assert.match(domains, /确认，放到门口/, 'Domain actions should read as user confirmation, not AI obedience.');
+
+assert.doesNotMatch(settingsSheets, /像朋友一样|Moment|Today Feed 的卡片会按此过滤|按能力层计费|Remember|Understand|Steer|Operate|Future Steering|Mirror Profile|全自动 Life Graph|API 接入/, 'Settings sheets should use user-sovereignty copy instead of internal product or SaaS terms.');
+assert.match(settingsSheets, /只整理你放进来的内容|哪些内容不会被使用|主动提醒|保持安静|选中的生活空间，会优先出现在 Today|先记住|帮你理解|主动提醒|家庭与自动化/, 'Settings sheets should expose trust, quiet mode, spaces, and user-value subscription copy.');
+assert.doesNotMatch(mirrorProfile, /Nesio 学到了什么|你最在意的领域|100%|Math\.round\(weight \* 100\)|Math\.round\(g\.score \* 100\)/, 'Mirror profile must avoid surveillance-like learning titles and percentage scores.');
+assert.match(mirrorProfile, /Nesio 目前怎么理解你|经常出现|不再这样理解我|基于 \{profile\.feedbackCount\} 次反馈/, 'Mirror profile should show editable observations with evidence.');
 
 assert.match(
   storageCss,

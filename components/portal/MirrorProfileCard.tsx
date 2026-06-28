@@ -25,6 +25,18 @@ function avg(arr: number[]): number {
   return arr.reduce((s, v) => s + v, 0) / arr.length;
 }
 
+function describeWeight(weight: number): string {
+  if (weight >= 0.65) return '经常出现';
+  if (weight >= 0.35) return '偶尔出现';
+  return '刚开始出现';
+}
+
+function describeTime(score: number): string {
+  if (score >= 0.65) return '比较常见';
+  if (score >= 0.35) return '偶尔合适';
+  return '仍在观察';
+}
+
 export default function MirrorProfileCard({ embedded = false }: { embedded?: boolean }) {
   const [profile, setProfile] = useState<MirrorProfile | null>(null);
 
@@ -55,7 +67,7 @@ export default function MirrorProfileCard({ embedded = false }: { embedded?: boo
       <div className="nesio-mirror-header">
         <span className="nesio-mirror-icon">🔮</span>
         <div>
-          <p className="nesio-mirror-title">Nesio 学到了什么</p>
+          <p className="nesio-mirror-title">Nesio 目前怎么理解你</p>
           <p className="nesio-mirror-sub">基于 {profile.feedbackCount} 次反馈</p>
         </div>
         <span className="nesio-mirror-mode">{interruptLabels[profile.interruptionStyle] || '主动推送'}</span>
@@ -63,14 +75,14 @@ export default function MirrorProfileCard({ embedded = false }: { embedded?: boo
 
       {domainEntries.length > 0 && (
         <>
-          <p className="nesio-settings-section-label" style={{ marginTop: '0.75rem' }}>你最在意的领域</p>
+          <p className="nesio-settings-section-label" style={{ marginTop: '0.75rem' }}>经常出现</p>
           {domainEntries.map(([domain, weight]) => (
             <div key={domain} className="nesio-mirror-domain-row">
               <span className="nesio-mirror-domain-label">{DOMAIN_LABELS[domain] || domain}</span>
               <div className="nesio-mirror-bar-track">
-                <div className="nesio-mirror-bar-fill" style={{ width: `${Math.round(weight * 100)}%` }} />
+                <div className="nesio-mirror-bar-fill" style={{ width: `${Math.max(16, Math.round(weight * 72))}%` }} />
               </div>
-              <span className="nesio-mirror-domain-pct">{Math.round(weight * 100)}%</span>
+              <span className="nesio-mirror-domain-pct">{describeWeight(weight)}</span>
             </div>
           ))}
         </>
@@ -82,11 +94,17 @@ export default function MirrorProfileCard({ embedded = false }: { embedded?: boo
           <div className="nesio-mirror-times">
             {bestTimes.slice(0, 2).map((g) => (
               <span key={g.label} className="nesio-mirror-time-chip">
-                {g.label} · {Math.round(g.score * 100)}%
+                {g.label} · {describeTime(g.score)}
               </span>
             ))}
           </div>
         </>
+      )}
+
+      {profile.feedbackCount > 0 && (
+        <button type="button" className="nesio-settings-toggle-btn" style={{ marginTop: '0.85rem' }}>
+          不再这样理解我
+        </button>
       )}
 
       {profile.feedbackCount < 5 && embedded && (

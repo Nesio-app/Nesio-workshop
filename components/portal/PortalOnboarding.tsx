@@ -57,8 +57,8 @@ function WelcomeStep({ onNext, locale, onLocale }: {
       <p className="nesio-ob-tagline">Know Less. Live More.</p>
       <p className="nesio-ob-desc">
         {zh
-          ? 'Nesio 是你的 Life OS。关注日历、天气、记忆，在正确时机推送最小行动——不是更多工具，而是更少操心。'
-          : 'Nesio is your Life OS. It watches your calendar, weather, and memory so you can act at the right moment with minimal effort.'}
+          ? '把重要的事放进来，需要时找得到。你分享进来的内容，都会先变成可确认的线索。'
+          : 'Put important things in. Find them later. What you share becomes confirmable clues first.'}
       </p>
       <div className="nesio-ob-lang-row">
         <button type="button" className={`nesio-ob-lang-btn${zh ? ' nesio-ob-lang-btn--active' : ''}`} onClick={() => onLocale('zh')}>简体中文</button>
@@ -84,7 +84,7 @@ function NameStep({ onNext, locale }: { onNext: (name: string) => void; locale: 
     <div className="nesio-ob-step">
       <div className="nesio-ob-step-icon" aria-hidden>👋</div>
       <h2 className="nesio-ob-step-title">{zh ? 'Nesio 叫你什么？' : 'What should Nesio call you?'}</h2>
-      <p className="nesio-ob-step-sub">{zh ? '名字就好，只存在这台设备上。' : 'First name is fine. Stored only on this device.'}</p>
+      <p className="nesio-ob-step-sub">{zh ? '只用于本机显示，你可以随时改。' : 'Only used on this device. You can change it anytime.'}</p>
       <input
         ref={inputRef}
         className="nesio-ob-input"
@@ -206,19 +206,19 @@ export function FirstUseTips({ onDone }: { onDone: () => void }) {
     {
       emoji: '📋',
       title: 'Today — 今天最重要的事',
-      body: 'Nesio 每天主动推送 3-5 个 Moment。不是通知，是在正确时机出现的可执行建议。',
+      body: 'Nesio 会把今天最值得看的事放前面。你可以决定哪些提醒以后少出现。',
       zone: 'today' as const,
     },
     {
       emoji: '💎',
       title: '中间按钮 — 告诉 Nesio',
-      body: '说一句、拍一下、分享文件。Nesio 自动判断意图——记忆、提醒、规划——并存入 Memory。',
+      body: '说一句、拍一下、分享文件。先整理成草稿，重要信息由你确认。',
       zone: 'center' as const,
     },
     {
       emoji: '🗂',
-      title: 'Memory — 你的生活图谱',
-      body: '人、物、地点、承诺，彼此关联。搜索「娃娃在哪」就能找回。用得越久，越懂你。',
+      title: 'Memory — 线索回头找得到',
+      body: '人、物、地点、承诺，先由你放进来。搜索「娃娃在哪」就能找回。',
       zone: 'memory' as const,
     },
   ];
@@ -258,6 +258,17 @@ export default function PortalOnboarding() {
   const [step, setStep] = useState<Step>('welcome');
   const [displayName, setDisplayName] = useState('');
   const [locale, setLocale] = useState<PortalLocale>('zh');
+
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('nesio-onboarding-visibility-change', {
+      detail: { active: visible || showTips },
+    }));
+    return () => {
+      window.dispatchEvent(new CustomEvent('nesio-onboarding-visibility-change', {
+        detail: { active: false },
+      }));
+    };
+  }, [visible, showTips]);
 
   useEffect(() => {
     try {

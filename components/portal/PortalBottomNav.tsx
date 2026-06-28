@@ -74,7 +74,7 @@ export default function PortalBottomNav({
           }
           onTell();
         }}
-        aria-label="告诉 Nesio；长按问宝盒"
+        aria-label="告诉 Nesio；长按提问"
         aria-expanded={activeSurface === 'tell'}
       >
         <img

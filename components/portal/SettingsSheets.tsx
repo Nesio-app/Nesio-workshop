@@ -57,11 +57,11 @@ export function ToneSheet({ open, onClose }: SheetProps) {
 
   return (
     <SheetWrap open={open} onClose={onClose} title="语气与边界">
-      <p className="nesio-settings-sheet-desc">设置 Nesio 跟你说话的方式，以及什么时候不打扰你。</p>
+      <p className="nesio-settings-sheet-desc">决定 Nesio 如何提醒你、什么时候保持安静。</p>
 
       <p className="nesio-settings-section-label">Nesio 的语气</p>
       {([
-        { id: 'warm', label: '温暖', hint: '像朋友一样，多用「你」，语气轻柔' },
+        { id: 'warm', label: '温暖', hint: '温和、自然，多用「你」' },
         { id: 'direct', label: '直接', hint: '简短、清楚，不解释太多' },
         { id: 'minimal', label: '极简', hint: '只说关键，越少越好' },
       ] as Array<{ id: ToneStyle; label: string; hint: string }>).map((opt) => (
@@ -76,9 +76,9 @@ export function ToneSheet({ open, onClose }: SheetProps) {
         </button>
       ))}
 
-      <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>主动推送程度</p>
+      <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>主动提醒程度</p>
       {([
-        { id: 'proactive', label: '主动', hint: '在合适时机主动推送 Moment' },
+        { id: 'proactive', label: '主动提醒', hint: '在合适时机提醒你看一眼' },
         { id: 'minimal', label: '轻量', hint: '只推送高优先级建议' },
         { id: 'silent', label: '安静', hint: '只在你打开 App 时展示内容' },
       ] as Array<{ id: InterruptLevel; label: string; hint: string }>).map((opt) => (
@@ -126,7 +126,7 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
   }
 
   function clearAllMemory() {
-    if (!confirm('确认删除所有 Memory 记录？此操作不可撤销。')) return;
+    if (!confirm('删除后，Nesio 不再用这些记忆提醒你。确认继续？')) return;
     const nodes = getLifeGraph();
     nodes.forEach((n) => deleteLifeNode(n.id));
     setNodeCount(0);
@@ -135,13 +135,20 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
 
   return (
     <SheetWrap open={open} onClose={onClose} title="隐私与数据">
-      <p className="nesio-settings-sheet-desc">Nesio 记住了什么、存在哪、你随时可以删除。</p>
+      <p className="nesio-settings-sheet-desc">只整理你放进来的内容。你可以看见它记住了什么、存在哪、也可以随时删除。</p>
+
+      <div className="nesio-settings-info-row">
+        <div>
+          <p className="nesio-settings-option-label">哪些内容不会被使用</p>
+          <p className="nesio-settings-option-hint">未登录、未授权或未选择接入的日历、邮件、健康和文件内容不会被加载。</p>
+        </div>
+      </div>
 
       {/* Location */}
       <div className="nesio-settings-info-row">
         <div>
           <p className="nesio-settings-option-label">地理位置</p>
-          <p className="nesio-settings-option-hint">用于天气信号和本地 Moment 推荐</p>
+          <p className="nesio-settings-option-hint">只用于天气和外出提醒</p>
         </div>
         <button type="button"
           className={`nesio-settings-toggle-btn${locationGranted ? ' nesio-settings-toggle-btn--on' : ''}`}
@@ -163,7 +170,7 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
       <div className="nesio-settings-info-row">
         <div>
           <p className="nesio-settings-option-label">云端同步</p>
-          <p className="nesio-settings-option-hint">登录后自动加密同步到 Supabase</p>
+          <p className="nesio-settings-option-hint">登录后才会开启跨设备同步</p>
         </div>
         <a href="/login" className="nesio-settings-toggle-btn">登录启用</a>
       </div>
@@ -190,10 +197,10 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
 
 type SpaceId = 'home' | 'work' | 'health' | 'family';
 const SPACES: Array<{ id: SpaceId; icon: string; label: string; hint: string }> = [
-  { id: 'home', icon: '🏠', label: '家', hint: '物品、储物间、家务' },
-  { id: 'work', icon: '💼', label: '工作', hint: '会议、项目、待办' },
-  { id: 'health', icon: '🩷', label: '健康', hint: '用药、运动、感冒恢复' },
-  { id: 'family', icon: '👨‍👩‍👧', label: '家庭', hint: '礼物、生日、承诺' },
+  { id: 'home', icon: '🏠', label: '住处与物品', hint: '物品、储物间、家务' },
+  { id: 'work', icon: '💼', label: '工作与会议', hint: '会议、项目、待办' },
+  { id: 'health', icon: '🩷', label: '身体与用药', hint: '用药、运动、感冒恢复' },
+  { id: 'family', icon: '👨‍👩‍👧', label: '亲友与承诺', hint: '礼物、生日、承诺' },
 ];
 const SPACES_KEY = 'nesio-active-spaces-v1';
 
@@ -227,7 +234,7 @@ export function SpacesSheet({ open, onClose }: SheetProps) {
 
   return (
     <SheetWrap open={open} onClose={onClose} title="生活空间">
-      <p className="nesio-settings-sheet-desc">选择你希望 Nesio 关注的生活场景，Today Feed 的卡片会按此过滤。</p>
+      <p className="nesio-settings-sheet-desc">选中的生活空间，会优先出现在 Today。</p>
       {SPACES.map((sp) => (
         <button key={sp.id} type="button"
           className={`nesio-settings-option${active.has(sp.id) ? ' nesio-settings-option--active' : ''}`}
@@ -254,13 +261,13 @@ export function SpacesSheet({ open, onClose }: SheetProps) {
 export function SubscriptionSheet({ open, onClose }: SheetProps) {
   return (
     <SheetWrap open={open} onClose={onClose} title="订阅">
-      <p className="nesio-settings-sheet-desc">Nesio 按能力层计费，不按功能模块。</p>
+      <p className="nesio-settings-sheet-desc">选择你希望 Nesio 帮到哪一步。你的生活主权不会被套餐切走。</p>
 
       {[
-        { tier: 'Remember', price: '免费', color: '#6366f1', desc: '手动记忆、Today Feed、基础推荐', active: true },
-        { tier: 'Understand', price: '¥18 / 月', color: '#3b82f6', desc: '跨场景推理、Calendar + 天气信号、Mirror Profile', active: false },
-        { tier: 'Steer', price: '¥38 / 月', color: '#0ea5e9', desc: 'Future Steering、Gmail 接入、音频简报生成', active: false },
-        { tier: 'Operate', price: '¥68 / 月', color: '#14b8a6', desc: '全自动 Life Graph、家庭共享、API 接入', active: false },
+        { tier: '先记住', price: '免费', color: '#6366f1', desc: '记录重要线索，今天该看的事会出现', active: true },
+        { tier: '帮你理解', price: '¥18 / 月', color: '#3b82f6', desc: '把日程、天气和记忆整理成可确认的提醒', active: false },
+        { tier: '主动提醒', price: '¥38 / 月', color: '#0ea5e9', desc: '从邮件和语音里整理提醒，存入前可确认', active: false },
+        { tier: '家庭与自动化', price: '¥68 / 月', color: '#14b8a6', desc: '家人共享、重复事项和自动化动作都需要你确认', active: false },
       ].map((plan) => (
         <div key={plan.tier} className={`nesio-sub-plan${plan.active ? ' nesio-sub-plan--active' : ''}`}>
           <div className="nesio-sub-plan-badge" style={{ background: plan.color }}>{plan.tier}</div>

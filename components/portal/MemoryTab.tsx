@@ -19,7 +19,7 @@ const SEED_NODES = [
   { id: 's2', icon: '📅', iconBg: '#e0e7ff', title: 'Review 会议', subtitle: '昨天笔记 · 明早 9:30' },
   { id: 's3', icon: '🩷', iconBg: '#fce7f3', title: '感冒恢复', subtitle: '昨天记录 · 明天降温' },
   { id: 's4', icon: '🚗', iconBg: '#dbeafe', title: 'Tesla', subtitle: '电量与行程 · 即将接入' },
-  { id: 'sg', icon: '⬡', iconBg: '#ede9fe', title: 'Life Graph', subtitle: '娃娃 → 储物间 → Linda → 生日，背后已经连好。', wide: true },
+  { id: 'sg', icon: '⬡', iconBg: '#ede9fe', title: '线索已经连上', subtitle: '娃娃、储物间、Linda、生日，都能回头找得到。', wide: true },
 ];
 
 function cleanMemoryPreview(node: LifeNode): string {
@@ -95,7 +95,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
 
           {!query && (
             <div className="nesio-memory-hero">
-              <h2 className="nesio-memory-hero-title">把散落的生活线索找回来。</h2>
+              <h2 className="nesio-memory-hero-title">散落的线索，回头找得到。</h2>
               <p className="nesio-memory-hero-sub">人、物、地点、会议、承诺，先由你放进来，再由你确认关联。</p>
             </div>
           )}
