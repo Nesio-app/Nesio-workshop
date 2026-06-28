@@ -39,6 +39,14 @@ export default function NesioProfileCard() {
 
   const initials = displayName.trim().slice(0, 1) || 'J';
 
+  async function handleLogout() {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST', cache: 'no-store' });
+    } catch { /* ignore */ }
+    setIsSignedIn(false);
+    window.location.href = '/';
+  }
+
   const menuItems = [
     { key: 'tone' as ActiveSheet, icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="20" height="20">
@@ -92,6 +100,12 @@ export default function NesioProfileCard() {
             <span>🔐 登录以跨设备同步 Memory</span>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14"><path d="M9 18l6-6-6-6"/></svg>
           </a>
+        )}
+        {isSignedIn && (
+          <button type="button" className="nesio-profile-auth-banner" onClick={handleLogout}>
+            <span>退出登录</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14"><path d="M15 18l6-6-6-6"/><path d="M21 12H9"/></svg>
+          </button>
         )}
 
         {/* Mirror Profile card */}

@@ -15,16 +15,16 @@ const EMPTY_SIGNAL_CARDS: RecommendationCard[] = [
   {
     id: 'needs-input-public',
     domain: 'home',
-    domainLabel: '需要你的记录',
+    domainLabel: '从一件小事开始',
     confidence: 0.6,
     urgency: 1,
     icon: '✦',
     iconBg: '#8b9cf6',
-    title: '还没有足够记忆',
-    body: '告诉 Nesio 一件事，明天这里会出现带来源的建议。',
-    tags: ['来源 · 需要输入'],
+    title: '先放进来一件事就好',
+    body: '说一句、拍一下，Nesio 会帮你留到以后找得到。',
+    tags: ['本地优先 · 可确认'],
     evidence: [],
-    primaryAction: '告诉 Nesio',
+    primaryAction: '先记一件事',
     secondaryAction: '稍后',
     type: 'standard',
     expiresAt: new Date(Date.now() + 24 * 3600000).toISOString(),
@@ -43,7 +43,7 @@ function sourceStatusLabel(status: NonNullable<RecommendationCard['sourceStatus'
   if (status === 'authorized_calendar') return '来自授权日历';
   if (status === 'user_record') return '来自你的记录';
   if (status === 'demo_example') return 'Demo 示例';
-  return '需要你的输入';
+  return '从一件小事开始';
 }
 
 function confidenceText(confidence: number) {
@@ -199,8 +199,8 @@ function NightTimeline() {
     <div className="nesio-today-night">
       <div className="nesio-today-night-hero">
         <p className="nesio-today-night-kicker">此刻 · 把你带回今天</p>
-        <h2 className="nesio-today-night-title">还没有足够记忆<br />生成夜间建议</h2>
-        <p className="nesio-today-night-sub">告诉 Nesio 一件事，夜间路径会开始显示带来源的轻提醒。</p>
+        <h2 className="nesio-today-night-title">先放进来一件事<br />以后就找得到</h2>
+        <p className="nesio-today-night-sub">说一句、拍一下，Nesio 会帮你留到以后找得到。</p>
         <div className="nesio-today-night-actions">
           <span className="nesio-today-night-conf">● 建议确认</span>
           <button type="button" className="nesio-today-btn nesio-today-btn--night">好的</button>
@@ -325,7 +325,7 @@ export default function TodayFeed({
               <p className="nesio-today-greeting-sub">
                 {cards.length > 0
                   ? '我把最该看的放前面，你来决定下一步。'
-                  : '暂时没有新建议，有需要时再把事情放进来。'}
+                  : '先记一件事，以后就找得到。'}
               </p>
             </div>
 
@@ -342,19 +342,19 @@ export default function TodayFeed({
             ) : (
               <div className="nesio-today-empty">
                 <div className="nesio-today-empty-icon" aria-hidden>✦</div>
-                <h3 className="nesio-today-empty-title">今天的事都处理好了</h3>
-                <p className="nesio-today-empty-sub">Nesio 持续关注你的日历、天气和记忆。有新动态会第一时间出现在这里。</p>
+                <h3 className="nesio-today-empty-title">从一件小事开始</h3>
+                <p className="nesio-today-empty-sub">说一句、拍一下，Nesio 会帮你留到以后找得到。</p>
                 <div className="nesio-today-empty-actions">
                   <button type="button" className="nesio-today-empty-action" onClick={onOpenMemory}>
                     <span>🗂</span> 看看 Memory
                   </button>
                   <button type="button" className="nesio-today-empty-action"
                     onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-tell'))}>
-                    <span>✦</span> 告诉 Nesio 新事情
+                    <span>✦</span> 先记一件事
                   </button>
                 </div>
                 <p className="nesio-today-empty-hint">
-                  提示：说「记住 xxx」或拍一下物品，明天 Today 会基于这些记忆生成建议。
+                  登录后可以同步日历和 Memory；不登录也能先本地使用。
                 </p>
               </div>
             )}

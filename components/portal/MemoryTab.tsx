@@ -103,11 +103,20 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
           {/* Results or empty */}
           {!canUsePrivateData ? (
             <div className="nesio-memory-empty">
-              <p>登录后查看你的 Memory</p>
+              <p>这里会放你以后想找回的东西。</p>
               <p style={{ fontSize: '0.78rem', marginTop: '0.4rem' }}>
-                未登录时只显示空态或 Demo，不加载真实日历、邮件或记忆数据。
+                比如：娃娃在蓝盒子里、上次买的药、Jim 的会议提醒。
               </p>
-              <a href="/settings" className="nesio-settings-toggle-btn" style={{ marginTop: '0.75rem' }}>去登录</a>
+              <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap', marginTop: '0.75rem' }}>
+                <button
+                  type="button"
+                  className="nesio-settings-toggle-btn"
+                  onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-tell'))}
+                >
+                  放进来第一件
+                </button>
+                <a href="/login" className="nesio-settings-toggle-btn" style={{ textDecoration: 'none' }}>登录同步</a>
+              </div>
             </div>
           ) : query && results.length === 0 ? (
             <div className="nesio-memory-empty">

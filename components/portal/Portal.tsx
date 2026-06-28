@@ -45,6 +45,8 @@ import type { PortalConfig, PortalDecMetadata, PortalTool } from '@/lib/portal/t
 import { type ToolForShellState } from './tool-state';
 
 const DEC_METADATA_TTL_MS = 30_000;
+const FIRST_MEMORY_RECEIPT_KEY = 'nesio-first-memory-receipt-shown-v1';
+const HAPTIC_FEEDBACK_KEY = 'nesio-haptic-feedback-enabled-v1';
 
 type ActiveSurface = 'today' | 'tell' | 'memory';
 type AuthSessionPayload = {
@@ -159,6 +161,7 @@ export default function Portal() {
   const [authReady, setAuthReady] = useState(false);
   const [authSessionLoggedIn, setAuthSessionLoggedIn] = useState(false);
   const [onboardingActive, setOnboardingActive] = useState(false);
+  const [memoryReceipt, setMemoryReceipt] = useState(false);
   const [launchSurfaceContext, setLaunchSurfaceContext] = useState({
     viewerRole: 'public' as 'public' | 'tester' | 'personal_lab',
     testerAllowlist: [] as string[],
@@ -202,6 +205,28 @@ export default function Portal() {
     };
     window.addEventListener('nesio-onboarding-visibility-change', onOnboardingVisibility);
     return () => window.removeEventListener('nesio-onboarding-visibility-change', onOnboardingVisibility);
+  }, []);
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const onMemoryReceived = () => {
+      try {
+        if (localStorage.getItem(FIRST_MEMORY_RECEIPT_KEY) === '1') return;
+        localStorage.setItem(FIRST_MEMORY_RECEIPT_KEY, '1');
+        if (localStorage.getItem(HAPTIC_FEEDBACK_KEY) !== '0') {
+          navigator.vibrate?.(18);
+        }
+      } catch {
+        navigator.vibrate?.(18);
+      }
+      setMemoryReceipt(true);
+      timer = setTimeout(() => setMemoryReceipt(false), 1800);
+    };
+    window.addEventListener('nesio-memory-received', onMemoryReceived);
+    return () => {
+      window.removeEventListener('nesio-memory-received', onMemoryReceived);
+      if (timer) clearTimeout(timer);
+    };
   }, []);
 
   useEffect(() => {
@@ -465,6 +490,12 @@ export default function Portal() {
       <ShareSheet open={captureMode === 'share'} onClose={() => setCaptureMode(null)} />
 
       <NotePanelEnhanced open={noteOpen} onOpenChange={setNoteOpen} />
+      {memoryReceipt && (
+        <div className="nesio-memory-receipt" role="status" aria-live="polite">
+          <span className="nesio-memory-receipt-crystal" aria-hidden />
+          <span>收好了，以后可以找回来。</span>
+        </div>
+      )}
       <PortalOnboarding />
     </>
   );

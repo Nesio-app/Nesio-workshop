@@ -31,6 +31,7 @@ export interface LifeNode {
 
 const STORAGE_KEY = 'nesio-life-graph-v1';
 const PRIVATE_EXTERNAL_SOURCES = new Set<LifeNodeSource>(['calendar', 'email']);
+const RECEIPT_SOURCES = new Set<LifeNodeSource>(['manual', 'photo', 'voice']);
 
 function loadAll(): LifeNode[] {
   if (typeof window === 'undefined') return [];
@@ -84,6 +85,9 @@ export function addLifeNode(node: Omit<LifeNode, 'id' | 'createdAt'>): LifeNode 
   };
   nodes.unshift(newNode);
   saveAll(nodes);
+  if (typeof window !== 'undefined' && RECEIPT_SOURCES.has(newNode.source)) {
+    window.dispatchEvent(new CustomEvent('nesio-memory-received', { detail: { node: newNode } }));
+  }
   return newNode;
 }
 

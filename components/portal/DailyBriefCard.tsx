@@ -189,12 +189,16 @@ export default function DailyBriefCard({ canUsePrivateData }: { canUsePrivateDat
             </span>
             停止
           </button>
-        ) : (
+        ) : canUsePrivateData ? (
           <button type="button" className="nesio-brief-podcast-btn"
             onClick={() => generated ? playSegments(segments, 0) : generateBrief()}
-            disabled={playState === 'loading' || !canUsePrivateData}>
-            {playState === 'loading' ? '生成中…' : canUsePrivateData ? '听简报' : '登录后生成'}
+            disabled={playState === 'loading'}>
+            {playState === 'loading' ? '生成中…' : '听简报'}
           </button>
+        ) : (
+          <a href="/login" className="nesio-brief-podcast-btn" style={{ textDecoration: 'none' }}>
+            登录后生成
+          </a>
         )}
       </div>
 

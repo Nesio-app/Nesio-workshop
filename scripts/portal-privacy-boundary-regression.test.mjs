@@ -26,7 +26,7 @@ assert.doesNotMatch(
 
 assert.doesNotMatch(todayFeed, /Linda|嗓子|灰色外套|储物间蓝盒子/, 'public Today fallback must not imply private personal knowledge');
 assert.match(todayFeed, /sourceStatus/, 'Today cards must expose source status');
-assert.match(todayFeed, /还没有足够记忆|告诉 Nesio 一件事/, 'Today fallback must invite explicit user input');
+assert.match(todayFeed, /先放进来一件事就好|先记一件事/, 'Today fallback must invite one low-pressure first record');
 
 assert.match(lifeStateRoute, /fallbackExplanation/, 'life-state route must provide a non-error fallback explanation');
 assert.doesNotMatch(lifeStateRoute, /status: 502/, 'life-state route must not surface provider empty responses as 502 in public runtime');

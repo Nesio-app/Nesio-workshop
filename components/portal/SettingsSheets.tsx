@@ -33,10 +33,14 @@ function SheetWrap({ open, onClose, title, children }: SheetProps & { title: str
 
 type ToneStyle = 'direct' | 'warm' | 'minimal';
 type InterruptLevel = 'proactive' | 'minimal' | 'silent';
+const HAPTIC_FEEDBACK_KEY = 'nesio-haptic-feedback-enabled-v1';
+const SUBTLE_SOUND_KEY = 'nesio-subtle-sound-enabled-v1';
 
 export function ToneSheet({ open, onClose }: SheetProps) {
   const [tone, setTone] = useState<ToneStyle>('warm');
   const [interrupt, setInterrupt] = useState<InterruptLevel>('proactive');
+  const [hapticsOn, setHapticsOn] = useState(true);
+  const [soundOn, setSoundOn] = useState(false);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
@@ -45,12 +49,20 @@ export function ToneSheet({ open, onClose }: SheetProps) {
       setTone((p.coachStyle as ToneStyle) || 'warm');
       const m = getMirrorProfile();
       setInterrupt(m.interruptionStyle);
+      try {
+        setHapticsOn(localStorage.getItem(HAPTIC_FEEDBACK_KEY) !== '0');
+        setSoundOn(localStorage.getItem(SUBTLE_SOUND_KEY) === '1');
+      } catch { /* ignore */ }
       setSaved(false);
     }
   }, [open]);
 
   function save() {
     saveProfileSettings({ coachStyle: tone as 'warm' | 'minimal' | 'professional' });
+    try {
+      localStorage.setItem(HAPTIC_FEEDBACK_KEY, hapticsOn ? '1' : '0');
+      localStorage.setItem(SUBTLE_SOUND_KEY, soundOn ? '1' : '0');
+    } catch { /* ignore */ }
     setSaved(true);
     setTimeout(() => { setSaved(false); onClose(); }, 1000);
   }
@@ -90,6 +102,24 @@ export function ToneSheet({ open, onClose }: SheetProps) {
             <span className="nesio-settings-option-hint">{opt.hint}</span>
           </div>
           {interrupt === opt.id && <span className="nesio-settings-option-check">✓</span>}
+        </button>
+      ))}
+
+      <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>轻反馈</p>
+      {([
+        { id: 'haptics', label: '触感反馈', hint: '记录成功、找到结果、长按录音时轻轻震一下', checked: hapticsOn, onChange: setHapticsOn },
+        { id: 'sound', label: '细微音效', hint: '默认关闭。之后会用于纸片落下、木盒轻合一类低音量提示', checked: soundOn, onChange: setSoundOn },
+      ] as Array<{ id: string; label: string; hint: string; checked: boolean; onChange: (value: boolean) => void }>).map((opt) => (
+        <button key={opt.id} type="button"
+          className={`nesio-settings-option${opt.checked ? ' nesio-settings-option--active' : ''}`}
+          onClick={() => opt.onChange(!opt.checked)}>
+          <div>
+            <span className="nesio-settings-option-label">{opt.label}</span>
+            <span className="nesio-settings-option-hint">{opt.hint}</span>
+          </div>
+          <span className={`nesio-settings-space-check${opt.checked ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>
+            {opt.checked ? '✓' : '○'}
+          </span>
         </button>
       ))}
 

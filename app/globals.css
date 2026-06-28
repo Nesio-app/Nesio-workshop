@@ -8812,6 +8812,46 @@ html[data-portal-theme="night"] .nesio-memory-card-title { color: #e8eefa; }
   color: var(--portal-muted);
 }
 
+.nesio-memory-receipt {
+  position: fixed;
+  left: 50%;
+  bottom: calc(8.5rem + env(safe-area-inset-bottom));
+  z-index: 1100;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 44px;
+  padding: 0.55rem 0.85rem;
+  border-radius: 999px;
+  color: var(--portal-ink);
+  font-size: 0.82rem;
+  font-weight: 700;
+  background: rgba(244, 249, 255, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.74);
+  box-shadow: 0 18px 45px rgba(42, 82, 135, 0.2);
+  backdrop-filter: blur(18px) saturate(1.18);
+  animation: nesioReceiptSettle 1.8s ease both;
+}
+
+.nesio-memory-receipt-crystal {
+  width: 1.05rem;
+  height: 1.05rem;
+  border-radius: 0.35rem;
+  background:
+    linear-gradient(145deg, rgba(255,255,255,0.96), rgba(150,199,243,0.42)),
+    radial-gradient(circle at 30% 20%, rgba(255,255,255,0.9), rgba(88,140,227,0.55));
+  box-shadow: 0 0 18px rgba(88, 140, 227, 0.35);
+  transform: rotate(12deg);
+}
+
+@keyframes nesioReceiptSettle {
+  0% { opacity: 0; transform: translate(-50%, 1.25rem) scale(0.96); }
+  18% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  72% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -0.45rem) scale(0.98); }
+}
+
 /* ── Tell Nesio Sheet ── */
 .nesio-tell-overlay {
   position: fixed;
@@ -10563,6 +10603,7 @@ html[data-portal-theme="night"] .nesio-today-empty-action {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  width: 100%;
   background: rgba(88,140,227,0.08);
   border: 1px solid rgba(88,140,227,0.18);
   border-radius: 0.85rem;
@@ -10572,6 +10613,7 @@ html[data-portal-theme="night"] .nesio-today-empty-action {
   color: var(--portal-blue-deep);
   text-decoration: none;
   margin-bottom: 1rem;
+  cursor: pointer;
 }
 html[data-portal-theme="night"] .nesio-profile-auth-banner { background: rgba(88,140,227,0.12); color: #96c7f3; }
 
