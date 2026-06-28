@@ -246,7 +246,7 @@ export default function MeetingRecorder({ open, onClose }: MeetingRecorderProps)
             </div>
 
             <div className="nesio-voice-transcript" style={{ maxHeight: '12rem', overflowY: 'auto', fontSize: '0.82rem' }}>
-              {transcript || <span className="nesio-voice-transcript-placeholder">正在聆听，说话后会在这里显示…</span>}
+              {transcript || <span className="nesio-voice-transcript-placeholder">正在记录，说话后会在这里显示…</span>}
             </div>
 
             <button type="button" className="nesio-ob-primary-btn" style={{ marginTop: '1rem', background: '#ef4444', boxShadow: '0 4px 16px rgba(239,68,68,0.3)' }} onClick={stopAndProcess}>

@@ -43,6 +43,12 @@ const TYPE_LABEL: Record<string, string> = {
   commitment: '承诺', health_state: '健康', preference: '偏好',
 };
 
+function confidenceLabel(confidence: number): string {
+  if (confidence >= 0.82) return '比较确定';
+  if (confidence >= 0.58) return '可能相关';
+  return '建议确认';
+}
+
 export default function CameraSheet({ open, onClose }: CameraSheetProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -243,14 +249,16 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
         )}
 
         {/* No camera fallback */}
-        {phase === 'no-camera' && (
+        {(phase === 'idle' || phase === 'no-camera') && (
           <div className="nesio-camera-fallback">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="52" height="52" opacity="0.25">
               <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
               <circle cx="12" cy="13" r="4"/>
             </svg>
             <p className="nesio-camera-fallback-text">
-              {permDenied
+              {phase === 'idle'
+                ? '正在准备相机。你也可以先选一张照片或文件放进 Nesio。'
+                : permDenied
                 ? '相机权限被拒绝。请在浏览器设置→网站设置→摄像头中允许，然后刷新。'
                 : '此设备不支持网页相机访问。'}
             </p>
@@ -302,7 +310,7 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
                     <p key={k} className="nesio-camera-result-node-attr">{k}: {String(v)}</p>
                   ))}
                 </div>
-                <span className="nesio-camera-result-conf">{Math.round(node.confidence * 100)}%</span>
+                <span className="nesio-camera-result-conf">{confidenceLabel(node.confidence)}</span>
               </div>
             ))}
           </div>
@@ -322,7 +330,7 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
       )}
 
       {/* Controls */}
-      {(phase === 'live' || phase === 'no-camera') && (
+      {(phase === 'idle' || phase === 'live' || phase === 'no-camera') && (
         <div className="nesio-camera-controls">
           <button type="button" className="nesio-camera-ctrl-btn" onClick={handleGallery} aria-label="相册">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="22" height="22">

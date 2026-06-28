@@ -93,7 +93,7 @@ const weatherDomain: DomainEngine = {
         ...(weather.forecastNote ? [{ source: 'weather', label: '预报', value: weather.forecastNote }] : []),
         ...(activeHealth ? [signalEvidence(activeHealth, '健康记录')] : []),
       ],
-      primaryAction: '好的，放门口',
+      primaryAction: '确认，放到门口',
       secondaryAction: '稍后',
       type: 'standard',
       expiresAt: todayEndISO(),

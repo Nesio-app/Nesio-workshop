@@ -1,0 +1,160 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+const root = process.cwd();
+const read = (file) => readFileSync(join(root, file), 'utf8');
+
+const portal = read('components/portal/Portal.tsx');
+const todayFeed = read('components/portal/TodayFeed.tsx');
+const dailyBrief = read('components/portal/DailyBriefCard.tsx');
+const lifeState = read('components/portal/LifeStateCard.tsx');
+const memoryTab = read('components/portal/MemoryTab.tsx');
+const nodeDetail = read('components/portal/MemoryNodeDetail.tsx');
+const lifeGraph = read('lib/portal/life-graph.ts');
+const integrations = read('lib/portal/integrations.ts');
+const calendarRoute = read('app/api/portal/calendar/route.ts');
+const gmailRoute = read('app/api/portal/gmail/route.ts');
+const packageJson = JSON.parse(read('package.json'));
+
+function assertBefore(source, first, second, message) {
+  const firstIndex = source.indexOf(first);
+  const secondIndex = source.indexOf(second);
+  assert.ok(firstIndex >= 0, `${message} Missing marker: ${first}`);
+  assert.ok(secondIndex >= 0, `${message} Missing marker: ${second}`);
+  assert.ok(firstIndex < secondIndex, message);
+}
+
+assert.match(
+  calendarRoute,
+  /requireAuthenticatedCalendarAccess/,
+  'Calendar API must require Nesio auth or an explicit lab-mode request before returning real events.',
+);
+assert.match(
+  calendarRoute,
+  /calendar_auth_required/,
+  'Calendar API must fail closed with a safe auth-required response for anonymous callers.',
+);
+assert.match(
+  gmailRoute,
+  /requireAuthenticatedGmailAccess/,
+  'Gmail API must require Nesio auth or explicit lab-mode before returning metadata from a mailbox.',
+);
+assert.match(
+  integrations,
+  /allowCookieIntegrationFallback/,
+  'Integration cookie fallback must be explicit and disabled by default, not an anonymous data path.',
+);
+assert.match(
+  integrations,
+  /if \(allowCookieIntegrationFallback\(\)\) \{\s*return readTokensFromCookies\(provider\);/s,
+  'Integration token lookup must only fall back to OAuth cookies inside the explicit escape hatch.',
+);
+
+assert.match(
+  portal,
+  /fetch\('\/api\/auth\/session'/,
+  'Portal must check the Nesio auth session before running real connectors.',
+);
+assert.match(
+  portal,
+  /canUsePrivateRuntime/,
+  'Portal must derive one runtime gate for private data connectors and surfaces.',
+);
+assert.doesNotMatch(
+  portal,
+  /useEffect\(\(\) => \{\s*pruneDisposableSignals\(\);\s*runConnectors\(\)/,
+  'Portal must not run real connectors unconditionally on anonymous mount.',
+);
+assert.match(
+  portal,
+  /<TodayFeed[\s\S]*canUsePrivateData=\{canUsePrivateRuntime\}/,
+  'TodayFeed must receive the same private-data gate used by connectors.',
+);
+assert.match(
+  portal,
+  /sessionStorage\.removeItem\(PORTAL_CACHE_KEYS\.calendar\)/,
+  'Portal must clear stale private calendar cache while signed out.',
+);
+assert.match(
+  portal,
+  /<MemoryTab[\s\S]*canUsePrivateData=\{canUsePrivateRuntime\}/,
+  'MemoryTab must receive the same private-data gate used by connectors.',
+);
+
+for (const [name, source] of [
+  ['TodayFeed', todayFeed],
+  ['DailyBriefCard', dailyBrief],
+  ['LifeStateCard', lifeState],
+  ['MemoryTab', memoryTab],
+]) {
+  assert.match(
+    source,
+    /canUsePrivateData/,
+    `${name} must support a signed-out empty/demo state instead of reading the Life Graph unconditionally.`,
+  );
+}
+assertBefore(
+  dailyBrief,
+  'if (canUsePrivateData)',
+  'readPortalCache<{ events?: CalendarEvent[] }>(PORTAL_CACHE_KEYS.calendar)',
+  'DailyBriefCard must check the private-data gate before reading cached calendar events.',
+);
+assertBefore(
+  dailyBrief,
+  'if (!canUsePrivateData) return;',
+  'const memoryNotes = getRecentNodes(5)',
+  'DailyBriefCard must not generate a private memory brief while signed out.',
+);
+assertBefore(
+  lifeState,
+  'if (!canUsePrivateData)',
+  'const recompute = () => setState(computeLifeState());',
+  'LifeStateCard must check the private-data gate before computing cross-signal state.',
+);
+assertBefore(
+  todayFeed,
+  'if (!canUsePrivateData)',
+  'const real = generateTodayCards();',
+  'TodayFeed must check the private-data gate before reading real Life Graph cards/counts.',
+);
+assertBefore(
+  memoryTab,
+  'if (!canUsePrivateData)',
+  'setNodes(getRecentNodes(30));',
+  'MemoryTab must check the private-data gate before reading local Life Graph nodes.',
+);
+
+assert.match(
+  lifeGraph,
+  /isPrivateExternalNode/,
+  'Life Graph must classify private external nodes such as calendar/email imports.',
+);
+assert.match(
+  lifeGraph,
+  /prunePrivateExternalNodes/,
+  'Life Graph must expose a local cleanup hook for previously cached anonymous external nodes.',
+);
+assert.match(
+  nodeDetail,
+  /HIDDEN_ATTRIBUTE_KEYS/,
+  'Memory detail must hide production-sensitive debug attributes by default.',
+);
+assert.doesNotMatch(
+  nodeDetail,
+  /const attrs = Object\.entries\(n\.attributes\)\.filter\(\(\[, v\]\) => v !== null && v !== ''\);/,
+  'Memory detail must not display every raw attribute such as calendarId/start/end/calendarName.',
+);
+
+assert.equal(
+  packageJson.scripts['test:anonymous-private-data-gate'],
+  'node scripts/anonymous-private-data-gate.test.mjs',
+  'package.json must expose test:anonymous-private-data-gate.',
+);
+assert.match(
+  packageJson.scripts['test:security'],
+  /test:anonymous-private-data-gate/,
+  'test:security must include anonymous private data gate coverage.',
+);
+
+console.log('anonymous private data gate checks passed');

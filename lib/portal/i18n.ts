@@ -189,13 +189,13 @@ const STRINGS = {
     accountSettingsHomepageAriaLabel: '进入个人主页',
     accountSettingsUsageDaysTemplate: '已使用第 {days} 天',
     accountSettingsOpenSoftwareSettings: '设置',
-    accountSettingsLearnedTitle: 'Nesio 学到的',
+    accountSettingsLearnedTitle: '我整理过的线索',
     accountSettingsMemoryCountTemplate: '{count} 条记忆',
-    accountSettingsMemoryConfidenceTemplate: '置信度 {confidence}%',
+    accountSettingsMemoryConfidenceTemplate: '建议确认程度 {confidence}',
     accountSettingsMemoryStrengthTemplate: '强度 {strength}',
-    accountSettingsMemoryEmpty: '再用几天，Nesio 就会有新发现。',
+    accountSettingsMemoryEmpty: '继续记录几件事，这里会出现可确认的线索。',
     accountSettingsProgressTitle: '全部学习进展',
-    accountSettingsMemoryEvidenceTemplate: '证据 {count} 条 · 置信度 {confidence}%',
+    accountSettingsMemoryEvidenceTemplate: '证据 {count} 条 · 建议确认程度 {confidence}',
     accountSettingsPreferenceSummaryTemplate: '偏好：{pace}节奏 · 推送时间 {pushTime}',
     accountSettingsCollapseProgress: '收起学习进展 ↑',
     accountSettingsViewAllProgress: '查看全部学习进展 →',
@@ -745,13 +745,13 @@ const STRINGS = {
     accountSettingsHomepageAriaLabel: 'Open public profile',
     accountSettingsUsageDaysTemplate: 'Day {days} of use',
     accountSettingsOpenSoftwareSettings: 'Settings',
-    accountSettingsLearnedTitle: 'What Nesio learned',
+    accountSettingsLearnedTitle: 'Clues I have organized',
     accountSettingsMemoryCountTemplate: '{count} memories',
-    accountSettingsMemoryConfidenceTemplate: 'Confidence {confidence}%',
+    accountSettingsMemoryConfidenceTemplate: 'Review status {confidence}',
     accountSettingsMemoryStrengthTemplate: 'Strength {strength}',
-    accountSettingsMemoryEmpty: 'Use it a few more days and Nesio will find new patterns.',
+    accountSettingsMemoryEmpty: 'Add a few more notes and confirmable clues will appear here.',
     accountSettingsProgressTitle: 'All learning progress',
-    accountSettingsMemoryEvidenceTemplate: '{count} evidence item(s) · confidence {confidence}%',
+    accountSettingsMemoryEvidenceTemplate: '{count} evidence item(s) · review status {confidence}',
     accountSettingsPreferenceSummaryTemplate: 'Preference: {pace} pace · push time {pushTime}',
     accountSettingsCollapseProgress: 'Collapse progress ↑',
     accountSettingsViewAllProgress: 'View all progress →',
@@ -1134,7 +1134,10 @@ export function formatAccountSettingsMemoryCount(locale: PortalLocale, count: nu
 }
 
 export function formatAccountSettingsMemoryConfidence(locale: PortalLocale, confidence: number): string {
-  return t(locale, 'accountSettingsMemoryConfidenceTemplate', { confidence });
+  const label = confidence >= 82 ? (locale === 'zh' ? '比较确定' : 'fairly sure')
+    : confidence >= 58 ? (locale === 'zh' ? '可能相关' : 'possibly related')
+    : (locale === 'zh' ? '建议确认' : 'needs review');
+  return t(locale, 'accountSettingsMemoryConfidenceTemplate', { confidence: label });
 }
 
 export function formatAccountSettingsMemoryStrength(locale: PortalLocale, strength: number): string {
@@ -1142,7 +1145,10 @@ export function formatAccountSettingsMemoryStrength(locale: PortalLocale, streng
 }
 
 export function formatAccountSettingsMemoryEvidence(locale: PortalLocale, count: number, confidence: number): string {
-  return t(locale, 'accountSettingsMemoryEvidenceTemplate', { count, confidence });
+  const label = confidence >= 82 ? (locale === 'zh' ? '比较确定' : 'fairly sure')
+    : confidence >= 58 ? (locale === 'zh' ? '可能相关' : 'possibly related')
+    : (locale === 'zh' ? '建议确认' : 'needs review');
+  return t(locale, 'accountSettingsMemoryEvidenceTemplate', { count, confidence: label });
 }
 
 export function formatAccountSettingsPreferenceSummary(locale: PortalLocale, pace: string, pushTime: string): string {

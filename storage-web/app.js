@@ -59,7 +59,7 @@ const DEFAULT_STATE = {
   widgets: [
     { emoji: '🧼', name: '无菌枕巾', sub: '主卧 · 剩 9 张' },
     { emoji: '🥑', name: '纯奶酪条', sub: '冰箱 2 层 · 3 根' },
-    { emoji: '🫙', name: 'MCT 油', sub: '厨房 · 84% 置信' },
+    { emoji: '🫙', name: 'MCT 油', sub: '厨房 · 比较确定' },
     { emoji: '🐾', name: 'Maple 雨衣', sub: '玄关 · 顶层' },
   ],
   containers: [
@@ -895,6 +895,12 @@ function confClass(c) {
   return 'cf-lo';
 }
 
+function confLabel(c) {
+  if (c >= 80) return '比较确定';
+  if (c >= 60) return '可能相关';
+  return '建议确认';
+}
+
 // ── Navigation ──
 function goPage(id) {
   if (id !== 'pg-scan') stopQrScanUi();
@@ -1111,7 +1117,7 @@ function renderHome() {
         <span style="font-size:16px;font-weight:700;">${s.emoji} ${s.name}</span>
         <span style="font-size:10px;color:var(--text3);background:var(--surface3);padding:2px 8px;border-radius:10px;">${s.items}件·${s.containers}箱</span>
       </div>
-      <div style="font-size:10px;color:var(--text3);margin-bottom:4px;display:flex;justify-content:space-between;"><span>总置信度</span><span style="color:${color};">${s.confidence}%</span></div>
+      <div style="font-size:10px;color:var(--text3);margin-bottom:4px;display:flex;justify-content:space-between;"><span>确认状态</span><span style="color:${color};">${confLabel(s.confidence)}</span></div>
       <div class="cbar"><div class="cfill ${cc}" style="width:${s.confidence}%"></div></div>
     </div>`;
   }).join('');
@@ -1188,7 +1194,7 @@ function openDetail(itemId) {
       ${item.containerCode ? `<div class="code-badge">${item.containerCode}</div>` : ''}
       <div class="itags" style="justify-content:center;">${item.category ? `<span class="tag t-cat">${item.category}</span>` : ''}${expiryTag(item)}</div>
     </div>
-    ${item.confidence ? `<div style="margin-bottom:14px;"><div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-bottom:4px;"><span>视觉置信度</span><span>${item.confidence}%</span></div><div class="cbar" style="height:5px;"><div class="cfill ${confClass(item.confidence)}" style="width:${item.confidence}%"></div></div></div>` : ''}
+    ${item.confidence ? `<div style="margin-bottom:14px;"><div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-bottom:4px;"><span>视觉线索</span><span>${confLabel(item.confidence)}</span></div><div class="cbar" style="height:5px;"><div class="cfill ${confClass(item.confidence)}" style="width:${item.confidence}%"></div></div></div>` : ''}
     ${item.price ? `<div class="drow"><span class="drow-l">💰 价格</span><span class="drow-v">$${item.price.toFixed(2)}</span></div>` : ''}
     ${item.spec ? `<div class="drow"><span class="drow-l">📏 规格</span><span class="drow-v">${item.spec}</span></div>` : ''}
     ${item.purchased || purchaseMemory.purchasedAt ? `<div class="drow"><span class="drow-l">📅 购入</span><span class="drow-v">${purchaseMemory.purchasedAt || item.purchased}</span></div>` : ''}
@@ -1221,7 +1227,7 @@ function openDetail(itemId) {
 function confirmItem(id) {
   const item = state.items.find((i) => i.id === id);
   if (item) { item.confidence = 100; item.updatedAt = new Date().toISOString(); persist(); openDetail(id); }
-  showToast('✓ 置信度归位 100%');
+  showToast('✓ 已确认位置');
 }
 
 function fadeItem(id) {

@@ -30,6 +30,7 @@ export interface LifeNode {
 }
 
 const STORAGE_KEY = 'nesio-life-graph-v1';
+const PRIVATE_EXTERNAL_SOURCES = new Set<LifeNodeSource>(['calendar', 'email']);
 
 function loadAll(): LifeNode[] {
   if (typeof window === 'undefined') return [];
@@ -54,6 +55,24 @@ function saveAll(nodes: LifeNode[]): void {
 
 export function getLifeGraph(): LifeNode[] {
   return loadAll();
+}
+
+export function isPrivateExternalNode(node: LifeNode): boolean {
+  if (PRIVATE_EXTERNAL_SOURCES.has(node.source)) return true;
+  return Boolean(
+    node.attributes['calendarId'] ||
+      node.attributes['calendarName'] ||
+      node.attributes['emailId'] ||
+      node.attributes['messageId'],
+  );
+}
+
+export function prunePrivateExternalNodes(): number {
+  const nodes = loadAll();
+  const filtered = nodes.filter((node) => !isPrivateExternalNode(node));
+  const removed = nodes.length - filtered.length;
+  if (removed > 0) saveAll(filtered);
+  return removed;
 }
 
 export function addLifeNode(node: Omit<LifeNode, 'id' | 'createdAt'>): LifeNode {

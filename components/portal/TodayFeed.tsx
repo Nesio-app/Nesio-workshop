@@ -46,6 +46,12 @@ function sourceStatusLabel(status: NonNullable<RecommendationCard['sourceStatus'
   return '需要你的输入';
 }
 
+function confidenceText(confidence: number) {
+  if (confidence >= 0.82) return '比较确定';
+  if (confidence >= 0.58) return '可能相关';
+  return '建议确认';
+}
+
 function AudioCard({ card, onFeedback }: { card: RecommendationCard; onFeedback: (f: RecommendationCard['feedback']) => void }) {
   const [briefOpen, setBriefOpen] = useState(false);
   return (
@@ -54,7 +60,7 @@ function AudioCard({ card, onFeedback }: { card: RecommendationCard; onFeedback:
         <div className="nesio-today-card-header">
           <span className="nesio-today-card-domain">{card.domainLabel}</span>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <span className="nesio-today-card-duration">90 秒</span>
+            <span className="nesio-today-card-duration">文字简报</span>
             <FeedbackMenu onFeedback={onFeedback} />
           </div>
         </div>
@@ -76,7 +82,7 @@ function AudioCard({ card, onFeedback }: { card: RecommendationCard; onFeedback:
                 style={{ height: `${8 + Math.sin(i * 0.7) * 6}px` }} />
             ))}
           </div>
-          <span className="nesio-today-audio-time">~90s</span>
+          <span className="nesio-today-audio-time">文字版</span>
         </div>
         <div className="nesio-today-card-actions">
           <button type="button" className="nesio-today-btn nesio-today-btn--primary" onClick={() => { setBriefOpen(true); onFeedback('useful'); }}>{card.primaryAction}</button>
@@ -175,7 +181,7 @@ function StandardCard({ card, onFeedback }: { card: RecommendationCard; onFeedba
                   {e.label}：{e.value.length > 16 ? e.value.slice(0, 15) + '…' : e.value}
                 </span>
               ))}
-              <span className="nesio-today-evidence-conf">{Math.round(card.confidence * 100)}% 把握</span>
+              <span className="nesio-today-evidence-conf">{confidenceText(card.confidence)}</span>
             </div>
           )}
           {card.secondaryAction && (
@@ -196,7 +202,7 @@ function NightTimeline() {
         <h2 className="nesio-today-night-title">还没有足够记忆<br />生成夜间建议</h2>
         <p className="nesio-today-night-sub">告诉 Nesio 一件事，夜间路径会开始显示带来源的轻提醒。</p>
         <div className="nesio-today-night-actions">
-          <span className="nesio-today-night-conf">● 92% 把握</span>
+          <span className="nesio-today-night-conf">● 建议确认</span>
           <button type="button" className="nesio-today-btn nesio-today-btn--night">好的</button>
         </div>
       </div>
@@ -220,7 +226,13 @@ function NightTimeline() {
   );
 }
 
-export default function TodayFeed({ onOpenMemory }: { onOpenMemory?: () => void }) {
+export default function TodayFeed({
+  canUsePrivateData,
+  onOpenMemory,
+}: {
+  canUsePrivateData: boolean;
+  onOpenMemory?: () => void;
+}) {
   const [displayName, setDisplayName] = useState('Jessy');
   const [isNight, setIsNight] = useState(false);
   const [cards, setCards] = useState<RecommendationCard[]>([]);
@@ -240,6 +252,12 @@ export default function TodayFeed({ onOpenMemory }: { onOpenMemory?: () => void 
     // Load initial cards. Public fallback must not imply private knowledge.
     // Note: connector collection + pruning are driven by the platform shell
     // (Portal.tsx), not the Experience layer — Today only consumes results.
+    if (!canUsePrivateData) {
+      setCards(EMPTY_SIGNAL_CARDS);
+      setMemoryCount(0);
+      return () => observer.disconnect();
+    }
+
     const real = generateTodayCards();
     setCards(real.length > 0 ? real : EMPTY_SIGNAL_CARDS);
     setMemoryCount(getRecentNodes().length);
@@ -262,7 +280,7 @@ export default function TodayFeed({ onOpenMemory }: { onOpenMemory?: () => void 
       window.removeEventListener('nesio-weather-updated', refresh);
       window.removeEventListener('nesio-calendar-updated', refresh);
     };
-  }, []);
+  }, [canUsePrivateData]);
 
   function handleFeedback(cardId: string, feedback: RecommendationCard['feedback']) {
     const card = cards.find((c) => c.id === cardId);
@@ -293,10 +311,10 @@ export default function TodayFeed({ onOpenMemory }: { onOpenMemory?: () => void 
         ) : (
           <>
             {/* Always-present daily overview card */}
-            <DailyBriefCard />
+            <DailyBriefCard canUsePrivateData={canUsePrivateData} />
 
             {/* Cross-signal Life State (Signal → Life State pipeline output) */}
-            <LifeStateCard />
+            <LifeStateCard canUsePrivateData={canUsePrivateData} />
 
             <div className="nesio-today-greeting">
               <h1 className="nesio-today-greeting-title">{greeting}，{displayName}。</h1>

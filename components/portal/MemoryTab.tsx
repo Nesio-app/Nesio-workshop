@@ -22,7 +22,21 @@ const SEED_NODES = [
   { id: 'sg', icon: '⬡', iconBg: '#ede9fe', title: 'Life Graph', subtitle: '娃娃 → 储物间 → Linda → 生日，背后已经连好。', wide: true },
 ];
 
-export default function MemoryTab() {
+function cleanMemoryPreview(node: LifeNode): string {
+  const raw = node.rawInput || Object.values(node.attributes).join(' · ');
+  return raw
+    .replace(node.name, '')
+    .replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?/g, (value) => {
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+    })
+    .replace(/\s+/g, ' ')
+    .replace(/^[\s:：·,-]+/, '')
+    .trim()
+    .slice(0, 44) || '来自你的记录';
+}
+
+export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: boolean }) {
   const [query, setQuery] = useState('');
   const [displayName, setDisplayName] = useState('Jessy');
   const [nodes, setNodes] = useState<LifeNode[]>([]);
@@ -31,14 +45,18 @@ export default function MemoryTab() {
   useEffect(() => {
     const profile = loadProfileSettings();
     if (profile.displayName) setDisplayName(profile.displayName);
+    if (!canUsePrivateData) {
+      setNodes([]);
+      return undefined;
+    }
     setNodes(getRecentNodes(30));
 
     const onUpdate = () => setNodes(getRecentNodes(30));
     window.addEventListener('nesio-life-graph-updated', onUpdate);
     return () => window.removeEventListener('nesio-life-graph-updated', onUpdate);
-  }, []);
+  }, [canUsePrivateData]);
 
-  const results = query.trim() ? searchLifeGraph(query) : nodes;
+  const results = canUsePrivateData && query.trim() ? searchLifeGraph(query) : nodes;
   const initials = displayName.trim().slice(0, 1) || 'J';
   const hasRealNodes = nodes.length > 0;
 
@@ -61,7 +79,7 @@ export default function MemoryTab() {
             </svg>
             <input
               className="nesio-memory-search"
-              placeholder="找回娃娃、会议、药、Tesla…"
+              placeholder="问宝盒：娃娃在哪、上次买的药…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               aria-label="搜索记忆"
@@ -73,13 +91,21 @@ export default function MemoryTab() {
 
           {!query && (
             <div className="nesio-memory-hero">
-              <h2 className="nesio-memory-hero-title">你的生活，连成一张图。</h2>
-              <p className="nesio-memory-hero-sub">人、物、地点、会议、承诺，都能回头找到、彼此关联。</p>
+              <h2 className="nesio-memory-hero-title">把散落的生活线索找回来。</h2>
+              <p className="nesio-memory-hero-sub">人、物、地点、会议、承诺，先由你放进来，再由你确认关联。</p>
             </div>
           )}
 
           {/* Results or empty */}
-          {query && results.length === 0 ? (
+          {!canUsePrivateData ? (
+            <div className="nesio-memory-empty">
+              <p>登录后查看你的 Memory</p>
+              <p style={{ fontSize: '0.78rem', marginTop: '0.4rem' }}>
+                未登录时只显示空态或 Demo，不加载真实日历、邮件或记忆数据。
+              </p>
+              <a href="/settings" className="nesio-settings-toggle-btn" style={{ marginTop: '0.75rem' }}>去登录</a>
+            </div>
+          ) : query && results.length === 0 ? (
             <div className="nesio-memory-empty">
               <p>没有找到「{query}」</p>
               <p style={{ fontSize: '0.78rem', marginTop: '0.4rem' }}>用 Nesio 按钮说一句「记住…」就会出现在这里</p>
@@ -97,7 +123,7 @@ export default function MemoryTab() {
                       {TYPE_ICON[node.type] || '📌'}
                     </span>
                     <span className="nesio-memory-card-title">{node.name}</span>
-                    <span className="nesio-memory-card-sub">{node.rawInput?.slice(0, 40) || Object.values(node.attributes).join(' · ').slice(0, 40)}</span>
+                    <span className="nesio-memory-card-sub">{cleanMemoryPreview(node)}</span>
                   </button>
                 ))}
 
@@ -121,14 +147,14 @@ export default function MemoryTab() {
               <span style={{ fontSize: '1.1rem' }}>📧</span>
               <div style={{ flex: 1 }}>
                 <p style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--portal-ink)' }}>接入 Gmail</p>
-                <p style={{ fontSize: '0.72rem', color: 'var(--portal-muted)' }}>自动从邮件中抽取人、时间、承诺存入 Memory</p>
+                <p style={{ fontSize: '0.72rem', color: 'var(--portal-muted)' }}>你授权并选择后，整理出可确认的人、时间与承诺</p>
               </div>
               <a href="/settings" className="nesio-settings-toggle-btn" style={{ whiteSpace: 'nowrap' }}>设置</a>
             </div>
           </div>
 
           <div className="nesio-memory-add-wrap">
-            <p className="nesio-memory-add-hint">用 Nesio 按钮随时记录，自动归入记忆图。</p>
+            <p className="nesio-memory-add-hint">点中间按钮把东西放进来，需要时再向宝盒要回线索。</p>
           </div>
         </div>
       </div>

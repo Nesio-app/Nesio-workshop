@@ -8,6 +8,7 @@
 import { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getIntegrationToken } from '@/lib/portal/integrations';
+import { cookies } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,6 +17,40 @@ const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemi
 
 function envValue(key: string): string {
   return (process.env[key] ?? '').trim();
+}
+
+function hasStage5LabAccess(req: NextRequest): boolean {
+  const configured = envValue('NESIO_STAGE5_INVOCATION_SECRET');
+  const provided = req.headers.get('x-nesio-stage5-secret')?.trim() || '';
+  const accessMode = req.headers.get('x-baohe-access-mode')?.trim() || '';
+  return Boolean(configured && provided === configured && accessMode === 'personal_lab');
+}
+
+function requireAuthenticatedGmailAccess(req: NextRequest): NextResponse | null {
+  const cookieStore = cookies();
+  const hasNesioSession = Boolean(
+    cookieStore.get('baohe_auth_access')?.value ||
+      cookieStore.get('baohe_auth_refresh')?.value ||
+      cookieStore.get('baohe_wechat_openid')?.value,
+  );
+  if (hasNesioSession || hasStage5LabAccess(req)) return null;
+
+  return NextResponse.json(
+    {
+      ok: false,
+      error: 'gmail_auth_required',
+      metadataOnly: true,
+      includeBody: false,
+      analyze: false,
+      bodyRead: false,
+      aiAnalysisPerformed: false,
+      messages: [],
+      nodes: [],
+      emailCount: 0,
+      connectUrl: '/settings',
+    },
+    { status: 401, headers: { 'Cache-Control': 'no-store, max-age=0' } },
+  );
 }
 
 type GmailMessage = {
@@ -150,6 +185,9 @@ function metadataPreview(messages: GmailMessage[]) {
 }
 
 export async function GET(req: NextRequest) {
+  const authFailure = requireAuthenticatedGmailAccess(req);
+  if (authFailure) return authFailure;
+
   const url = new URL(req.url);
   const includeBody = url.searchParams.get('includeBody') === 'true';
   const shouldAnalyze = url.searchParams.get('analyze') === 'true';

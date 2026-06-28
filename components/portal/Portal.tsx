@@ -40,12 +40,18 @@ import { configUrl } from '@/lib/portal/paths';
 import { loadProfileSettings, PROFILE_UPDATED_EVENT, type PortalLocale } from '@/lib/portal/profile';
 import { runConnectors } from '@/lib/portal/connectors';
 import { pruneDisposableSignals } from '@/lib/life-domain';
+import { prunePrivateExternalNodes } from '@/lib/portal/life-graph';
 import type { PortalConfig, PortalDecMetadata, PortalTool } from '@/lib/portal/types';
 import { type ToolForShellState } from './tool-state';
 
 const DEC_METADATA_TTL_MS = 30_000;
 
 type ActiveSurface = 'today' | 'tell' | 'memory';
+type AuthSessionPayload = {
+  ok?: boolean;
+  loggedIn?: boolean;
+  status?: string;
+};
 
 function normalizeLaunchSurfaceContext(raw: {
   viewerRole?: unknown;
@@ -147,8 +153,11 @@ export default function Portal() {
   >(new Map());
   const [activeSurface, setActiveSurface] = useState<ActiveSurface>('today');
   const [captureMode, setCaptureMode] = useState<CaptureMode | null>(null);
+  const [voiceIntent, setVoiceIntent] = useState<'note' | 'ask'>('note');
   const [noteOpen, setNoteOpen] = useState(false);
   const [locale, setLocale] = useState<PortalLocale>('zh');
+  const [authReady, setAuthReady] = useState(false);
+  const [authSessionLoggedIn, setAuthSessionLoggedIn] = useState(false);
   const [launchSurfaceContext, setLaunchSurfaceContext] = useState({
     viewerRole: 'public' as 'public' | 'tester' | 'personal_lab',
     testerAllowlist: [] as string[],
@@ -178,18 +187,44 @@ export default function Portal() {
     () => resolveShellRuntimeTools(shellManifest.tools, launchSurfaceContext),
     [shellManifest.tools, launchSurfaceContext],
   );
+  const canUsePrivateRuntime = authReady && authSessionLoggedIn;
 
   useEffect(() => {
     setLaunchSurfaceContext(normalizeLaunchSurfaceContext(readLaunchSurfaceContextFromBrowser()));
     setLocale(loadProfileSettings().locale);
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/auth/session', { cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: AuthSessionPayload | null) => {
+        if (cancelled) return;
+        setAuthSessionLoggedIn(Boolean(data?.loggedIn));
+      })
+      .catch(() => {
+        if (!cancelled) setAuthSessionLoggedIn(false);
+      })
+      .finally(() => {
+        if (!cancelled) setAuthReady(true);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
   // Platform Runtime: the shell drives Integration collection + Pruning.
   // The Experience layer (Today) only consumes results, never calls connectors.
   useEffect(() => {
+    if (!authReady) return;
     pruneDisposableSignals();
+    if (!canUsePrivateRuntime) {
+      prunePrivateExternalNodes();
+      try {
+        sessionStorage.removeItem(PORTAL_CACHE_KEYS.calendar);
+      } catch { /* ignore unavailable storage */ }
+      return;
+    }
     runConnectors().catch(() => undefined);
-  }, []);
+  }, [authReady, canUsePrivateRuntime]);
 
   useEffect(() => {
     const syncLocale = () => setLocale(loadProfileSettings().locale);
@@ -232,6 +267,7 @@ export default function Portal() {
       calendarStatus === 'calendar_session_established';
 
     if (!connector && !calendarParam) return;
+    if (!authReady) return;
 
     // Clean URL immediately
     params.delete('connector'); params.delete('status'); params.delete('error');
@@ -248,6 +284,7 @@ export default function Portal() {
     }
 
     function triggerCalendarRefresh() {
+      if (!canUsePrivateRuntime) return;
       setTimeout(() => {
         fetch('/api/portal/calendar', { cache: 'no-store' })
           .then((r) => r.json())
@@ -265,6 +302,7 @@ export default function Portal() {
 
     // Handle Calendar OAuth callback (?calendar=google_oauth_connected)
     if (calendarConnected) {
+      if (!canUsePrivateRuntime) return;
       saveConnector('calendar');
       window.dispatchEvent(new CustomEvent('nesio-connector-connected', { detail: { connector: 'calendar' } }));
       triggerCalendarRefresh();
@@ -272,6 +310,7 @@ export default function Portal() {
     }
 
     if (status === 'connected' && connector) {
+      if (!canUsePrivateRuntime) return;
       saveConnector(connector);
       window.dispatchEvent(new CustomEvent('nesio-connector-connected', { detail: { connector } }));
 
@@ -298,7 +337,7 @@ export default function Portal() {
     } else if (oauthError) {
       console.warn(`[nesio] connector ${connector} oauth error:`, oauthError);
     }
-  }, []);
+  }, [authReady, canUsePrivateRuntime]);
 
   useEffect(() => {
     fetch(configUrl())
@@ -329,17 +368,19 @@ export default function Portal() {
         console.error('DEC modules prefetch failed:', readDecDataError(error));
       });
 
-    fetch('/api/portal/calendar', { cache: 'no-store' })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data && (data.events || data.feeds)) writePortalCache(PORTAL_CACHE_KEYS.calendar, data);
-      })
-      .catch(() => undefined);
+    if (canUsePrivateRuntime) {
+      fetch('/api/portal/calendar', { cache: 'no-store' })
+        .then((r) => r.json())
+        .then((data) => {
+          if (data && (data.events || data.feeds)) writePortalCache(PORTAL_CACHE_KEYS.calendar, data);
+        })
+        .catch(() => undefined);
+    }
 
     fetch('/api/portal/flomo?limit=48', { cache: 'no-store' }).catch(() => undefined);
 
     return () => { mounted = false; };
-  }, []);
+  }, [canUsePrivateRuntime]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -374,19 +415,22 @@ export default function Portal() {
         <div className="portal-grain" aria-hidden />
         <div className="nesio-shell">
           {activeSurface === 'today' && (
-            <TodayFeed onOpenMemory={() => setActiveSurface('memory')} />
+            <TodayFeed canUsePrivateData={canUsePrivateRuntime} onOpenMemory={() => setActiveSurface('memory')} />
           )}
-          {activeSurface === 'memory' && <MemoryTab />}
+          {activeSurface === 'memory' && <MemoryTab canUsePrivateData={canUsePrivateRuntime} />}
           {/* Keep legacy surfaces accessible via tools */}
           {activeSurface === 'tell' && (
-            <TodayFeed onOpenMemory={() => setActiveSurface('memory')} />
+            <TodayFeed canUsePrivateData={canUsePrivateRuntime} onOpenMemory={() => setActiveSurface('memory')} />
           )}
         </div>
 
         <TellNesioSheet
           open={activeSurface === 'tell'}
           onClose={() => setActiveSurface('today')}
-          onCapture={(mode) => setCaptureMode(mode)}
+          onCapture={(mode) => {
+            if (mode === 'voice') setVoiceIntent('note');
+            setCaptureMode(mode);
+          }}
         />
 
         <PortalBottomNav
@@ -394,13 +438,18 @@ export default function Portal() {
           locale={locale}
           onToday={() => setActiveSurface('today')}
           onTell={() => setActiveSurface(activeSurface === 'tell' ? 'today' : 'tell')}
+          onAsk={() => {
+            setActiveSurface('today');
+            setVoiceIntent('ask');
+            setCaptureMode('voice');
+          }}
           onMemory={() => setActiveSurface('memory')}
         />
       </div>
 
       {/* Capture sheets — rendered at root level, independent of TellNesioSheet state */}
       <CameraSheet open={captureMode === 'camera'} onClose={() => setCaptureMode(null)} />
-      <VoiceInputSheet open={captureMode === 'voice'} onClose={() => setCaptureMode(null)} />
+      <VoiceInputSheet open={captureMode === 'voice'} intent={voiceIntent} onClose={() => { setCaptureMode(null); setVoiceIntent('note'); }} />
       <ShareSheet open={captureMode === 'share'} onClose={() => setCaptureMode(null)} />
 
       <NotePanelEnhanced open={noteOpen} onOpenChange={setNoteOpen} />

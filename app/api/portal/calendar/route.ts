@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
@@ -24,6 +24,37 @@ type GoogleCalendarItem = {
 function envValue(key: string): string {
   const value = process.env[key];
   return typeof value === 'string' ? value.trim() : '';
+}
+
+function hasStage5LabAccess(req: NextRequest): boolean {
+  const configured = envValue('NESIO_STAGE5_INVOCATION_SECRET');
+  const provided = req.headers.get('x-nesio-stage5-secret')?.trim() || '';
+  const accessMode = req.headers.get('x-baohe-access-mode')?.trim() || '';
+  return Boolean(configured && provided === configured && accessMode === 'personal_lab');
+}
+
+function requireAuthenticatedCalendarAccess(req: NextRequest): NextResponse | null {
+  const cookieStore = cookies();
+  const hasNesioSession = Boolean(
+    cookieStore.get('baohe_auth_access')?.value ||
+      cookieStore.get('baohe_auth_refresh')?.value ||
+      cookieStore.get('baohe_wechat_openid')?.value,
+  );
+  if (hasNesioSession || hasStage5LabAccess(req)) return null;
+
+  return NextResponse.json(
+    {
+      ok: false,
+      configured: false,
+      enabled: false,
+      events: [],
+      feeds: [],
+      sources: [],
+      error: 'calendar_auth_required',
+      message: 'Sign in before loading private calendar data.',
+    },
+    { status: 401, headers: { 'Cache-Control': 'no-store, max-age=0' } },
+  );
 }
 
 function privateFeedAccessEnabled(): boolean {
@@ -180,7 +211,10 @@ async function fetchGoogleOAuthEvents(accessToken: string) {
   return rows.map((item: GoogleCalendarItem) => mapGoogleCalendarItem(item));
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const authFailure = requireAuthenticatedCalendarAccess(req);
+  if (authFailure) return authFailure;
+
   const accessToken = googleCalendarAccessToken();
   const refreshToken = googleCalendarRefreshToken();
   if (accessToken) {

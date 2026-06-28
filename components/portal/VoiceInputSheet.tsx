@@ -10,11 +10,15 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { addLifeNode } from '@/lib/portal/life-graph';
+import { addLifeNode, searchLifeGraph, type LifeNode } from '@/lib/portal/life-graph';
 import { routeIntent } from '@/lib/portal/intent-router';
 import MeetingRecorder from './MeetingRecorder';
 
-interface VoiceInputSheetProps { open: boolean; onClose: () => void; }
+interface VoiceInputSheetProps {
+  open: boolean;
+  intent?: 'note' | 'ask';
+  onClose: () => void;
+}
 
 const QUICK_INTENTS = [
   { label: '记住…', prefix: '记住 ' },
@@ -25,7 +29,7 @@ const QUICK_INTENTS = [
 
 type SendState = 'idle' | 'analyzing' | 'saved' | 'error';
 
-export default function VoiceInputSheet({ open, onClose }: VoiceInputSheetProps) {
+export default function VoiceInputSheet({ open, intent = 'note', onClose }: VoiceInputSheetProps) {
   const [mode, setMode] = useState<'note' | 'meeting'>('note');
   const [text, setText] = useState('');
   const [listening, setListening] = useState(false);
@@ -33,13 +37,15 @@ export default function VoiceInputSheet({ open, onClose }: VoiceInputSheetProps)
   const [intentLabel, setIntentLabel] = useState('');
   const [micError, setMicError] = useState('');
   const [savedCount, setSavedCount] = useState(0);
+  const [askResults, setAskResults] = useState<LifeNode[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const recRef = useRef<{ stop: () => void } | null>(null);
+  const isAskMode = intent === 'ask';
 
   useEffect(() => {
     if (!open) {
       setText(''); setSendState('idle'); setListening(false);
-      setIntentLabel(''); setMicError(''); setSavedCount(0);
+      setIntentLabel(''); setMicError(''); setSavedCount(0); setAskResults([]);
       recRef.current?.stop();
     } else {
       setTimeout(startListening, 300);
@@ -101,6 +107,14 @@ export default function VoiceInputSheet({ open, onClose }: VoiceInputSheetProps)
   async function handleSend() {
     const t = text.trim();
     if (!t) return;
+
+    if (isAskMode) {
+      stopListening();
+      setAskResults(searchLifeGraph(t).slice(0, 4));
+      setSendState('saved');
+      return;
+    }
+
     setSendState('analyzing');
 
     try {
@@ -141,13 +155,13 @@ export default function VoiceInputSheet({ open, onClose }: VoiceInputSheetProps)
     {/* Meeting recorder takes over when in meeting mode */}
     <MeetingRecorder open={mode === 'meeting'} onClose={() => { setMode('note'); onClose(); }} />
 
-    <div className="nesio-voice-sheet" role="dialog" aria-modal="true" aria-label="说一句" style={{ display: mode === 'meeting' ? 'none' : undefined }}>
+    <div className="nesio-voice-sheet" role="dialog" aria-modal="true" aria-label={isAskMode ? '问宝盒' : '说一句'} style={{ display: mode === 'meeting' ? 'none' : undefined }}>
       <div className="nesio-voice-sheet-backdrop" onClick={onClose} />
       <div className="nesio-voice-sheet-card">
         <div className="nesio-sheet-handle" aria-hidden />
 
         <div className="nesio-voice-sheet-header">
-          <h2 className="nesio-voice-sheet-title">说一句</h2>
+          <h2 className="nesio-voice-sheet-title">{isAskMode ? '问宝盒' : '说一句'}</h2>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
             <button type="button"
               style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--portal-blue-deep)', background: 'rgba(88,140,227,0.1)', padding: '0.2rem 0.6rem', borderRadius: '999px' }}
@@ -164,7 +178,11 @@ export default function VoiceInputSheet({ open, onClose }: VoiceInputSheetProps)
           {text
             ? <span>{text}</span>
             : <span className="nesio-voice-transcript-placeholder">
-                {listening ? '正在聆听，说话后会自动显示…' : '点下方麦克风开始，或直接打字'}
+                {listening
+                  ? '正在听这一句，说完后会显示…'
+                  : isAskMode
+                    ? '问一句：那件外套在哪、上次买的药还有吗…'
+                    : '点下方麦克风开始，或直接打字'}
               </span>}
         </div>
 
@@ -184,7 +202,7 @@ export default function VoiceInputSheet({ open, onClose }: VoiceInputSheetProps)
                   <span key={i} className="nesio-voice-wave-bar" style={{ animationDelay: `${i * 0.09}s` }} />
                 ))}
               </div>
-              <span className="nesio-voice-status-label">正在聆听…</span>
+              <span className="nesio-voice-status-label">{isAskMode ? '正在听这一句…' : '正在记录…'}</span>
               <button type="button" style={{ fontSize: '0.72rem', color: 'var(--portal-muted)', marginLeft: '0.5rem', padding: '0.2rem 0.5rem' }} onClick={stopListening}>
                 停止
               </button>
@@ -192,19 +210,21 @@ export default function VoiceInputSheet({ open, onClose }: VoiceInputSheetProps)
           ) : micError ? (
             <span style={{ fontSize: '0.73rem', color: '#ef4444', textAlign: 'center', lineHeight: 1.4 }}>{micError}</span>
           ) : text ? (
-            <span style={{ fontSize: '0.72rem', color: 'var(--portal-muted)' }}>识别完成 · 点「告诉 Nesio」保存</span>
+            <span style={{ fontSize: '0.72rem', color: 'var(--portal-muted)' }}>{isAskMode ? '识别完成 · 点「问宝盒」查找线索' : '识别完成 · 点「告诉 Nesio」保存'}</span>
           ) : null}
         </div>
 
         {/* Quick intent chips */}
-        <div className="nesio-voice-quick">
-          {QUICK_INTENTS.map((q) => (
-            <button key={q.label} type="button" className="nesio-voice-quick-btn"
-              onClick={() => { stopListening(); setText(q.prefix); setTimeout(() => inputRef.current?.focus(), 50); }}>
-              {q.label}
-            </button>
-          ))}
-        </div>
+        {!isAskMode && (
+          <div className="nesio-voice-quick">
+            {QUICK_INTENTS.map((q) => (
+              <button key={q.label} type="button" className="nesio-voice-quick-btn"
+                onClick={() => { stopListening(); setText(q.prefix); setTimeout(() => inputRef.current?.focus(), 50); }}>
+                {q.label}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Text input fallback */}
         <div className="nesio-voice-input-row">
@@ -212,7 +232,7 @@ export default function VoiceInputSheet({ open, onClose }: VoiceInputSheetProps)
           <input
             ref={inputRef}
             className="nesio-voice-input"
-            placeholder="或者打字输入…"
+            placeholder={isAskMode ? '或者打字问宝盒…' : '或者打字输入…'}
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
@@ -231,7 +251,22 @@ export default function VoiceInputSheet({ open, onClose }: VoiceInputSheetProps)
         </div>
 
         {/* Send button */}
-        {sendState === 'saved' ? (
+        {isAskMode && sendState === 'saved' ? (
+          <div className="nesio-voice-saved" style={{ textAlign: 'left', color: 'var(--portal-ink)', background: 'rgba(88,140,227,0.08)', borderRadius: '1rem' }}>
+            {askResults.length ? (
+              <>
+                <p style={{ fontWeight: 700, marginBottom: '0.45rem' }}>我找到了这些可能相关的线索</p>
+                {askResults.map((node) => (
+                  <p key={node.id} style={{ marginTop: '0.35rem', color: 'var(--portal-muted)' }}>
+                    {node.name} · 来自：{node.source === 'voice' ? '你说的一句话' : node.source}
+                  </p>
+                ))}
+              </>
+            ) : (
+              <p>还没找到相关线索。你可以先把这件事放进宝盒。</p>
+            )}
+          </div>
+        ) : sendState === 'saved' ? (
           <div className="nesio-voice-saved">✓ 已存入 Memory（{savedCount} 条）</div>
         ) : sendState === 'analyzing' ? (
           <div className="nesio-voice-send-btn" style={{ opacity: 0.6, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
@@ -239,7 +274,7 @@ export default function VoiceInputSheet({ open, onClose }: VoiceInputSheetProps)
           </div>
         ) : text.trim() ? (
           <button type="button" className="nesio-voice-send-btn" onClick={handleSend}>
-            告诉 Nesio
+            {isAskMode ? '问宝盒' : '告诉 Nesio'}
           </button>
         ) : null}
       </div>

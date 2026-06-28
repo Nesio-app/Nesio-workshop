@@ -734,7 +734,16 @@ html, body {
   margin-bottom: 16px;
   box-shadow: var(--shadow-sm);
 }
-.wrow { display: flex; gap: 9px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+.wrow {
+  display: flex;
+  gap: 9px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 0 16px 2px;
+  margin-inline: -16px;
+  scroll-padding-inline: 24px;
+  overscroll-behavior-x: contain;
+}
 .wrow::-webkit-scrollbar { display: none; }
 .wchip {
   flex-shrink: 0;
@@ -1109,7 +1118,7 @@ html, body {
 
 .toast {
   position: absolute;
-  bottom: calc(100px + var(--safe-bottom));
+  bottom: calc(112px + env(safe-area-inset-bottom));
   left: 50%;
   transform: translateX(-50%);
   background: #16243f;

@@ -12,6 +12,48 @@ const TYPE_LABELS: Record<string, string> = {
   person: '人物', object: '物品', place: '地点', event: '事件',
   commitment: '承诺', health_state: '健康状态', preference: '偏好',
 };
+const HIDDEN_ATTRIBUTE_KEYS = new Set([
+  'calendarId',
+  'calendarName',
+  'description',
+  'emailId',
+  'messageId',
+  'htmlLink',
+  'url',
+]);
+const ATTRIBUTE_LABELS: Record<string, string> = {
+  start: '开始',
+  end: '结束',
+  location: '地点',
+  date: '日期',
+  owner: '相关人',
+  detail: '说明',
+  note: '备注',
+  status: '状态',
+};
+
+function confidenceLabel(confidence: number): string {
+  if (confidence >= 0.82) return '比较确定';
+  if (confidence >= 0.58) return '可能相关';
+  return '建议确认';
+}
+
+function formatAttributeValue(key: string, value: string | number | boolean | null): string {
+  if (value === null) return '';
+  const raw = String(value);
+  if ((key === 'start' || key === 'end' || key === 'date') && raw) {
+    const date = new Date(raw);
+    if (!Number.isNaN(date.getTime())) {
+      return date.toLocaleString('zh-CN', {
+        month: 'short',
+        day: 'numeric',
+        hour: key === 'date' ? undefined : '2-digit',
+        minute: key === 'date' ? undefined : '2-digit',
+      });
+    }
+  }
+  return raw;
+}
 
 export default function MemoryNodeDetail({ node, onClose }: MemoryNodeDetailProps) {
   const [editing, setEditing] = useState(false);
@@ -40,7 +82,10 @@ export default function MemoryNodeDetail({ node, onClose }: MemoryNodeDetailProp
   }
 
   const createdDate = new Date(n.createdAt).toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', year: 'numeric' });
-  const attrs = Object.entries(n.attributes).filter(([, v]) => v !== null && v !== '');
+  const attrs = Object.entries(n.attributes).filter(
+    ([k, v]) => v !== null && v !== '' && !HIDDEN_ATTRIBUTE_KEYS.has(k),
+  );
+  const showRawInput = Boolean(n.rawInput && n.source !== 'calendar' && n.source !== 'email');
 
   return (
     <div className="nesio-node-detail-overlay" role="dialog" aria-modal="true" aria-label={n.name}>
@@ -69,11 +114,11 @@ export default function MemoryNodeDetail({ node, onClose }: MemoryNodeDetailProp
             <span className="nesio-node-source">来源：{
               ({ manual: '手动', photo: '拍照', voice: '语音', calendar: '日历', email: '邮件', system: '系统' } as Record<string, string>)[n.source] || n.source
             }</span>
-            <span className="nesio-node-confidence">{Math.round(n.confidence * 100)}% 置信</span>
+            <span className="nesio-node-confidence">{confidenceLabel(n.confidence)}</span>
           </div>
 
           {/* Raw input */}
-          {n.rawInput && (
+          {showRawInput && (
             <div className="nesio-node-raw">
               <p className="nesio-settings-section-label">原始记录</p>
               <p style={{ fontSize: '0.88rem', color: 'var(--portal-muted)', fontStyle: 'italic' }}>&ldquo;{n.rawInput}&rdquo;</p>
@@ -86,8 +131,8 @@ export default function MemoryNodeDetail({ node, onClose }: MemoryNodeDetailProp
               <p className="nesio-settings-section-label">属性</p>
               {attrs.map(([k, v]) => (
                 <div key={k} className="nesio-node-attr-row">
-                  <span className="nesio-node-attr-key">{k}</span>
-                  <span className="nesio-node-attr-val">{String(v)}</span>
+                  <span className="nesio-node-attr-key">{ATTRIBUTE_LABELS[k] || k}</span>
+                  <span className="nesio-node-attr-val">{formatAttributeValue(k, v)}</span>
                 </div>
               ))}
             </>

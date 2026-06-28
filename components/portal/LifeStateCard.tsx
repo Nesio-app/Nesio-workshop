@@ -30,12 +30,17 @@ const LEVEL_LABEL: Record<DimensionLevel, string> = {
   mild_risk: '需关注', high_load: '偏高', low: '偏低',
 };
 
-export default function LifeStateCard() {
+export default function LifeStateCard({ canUsePrivateData }: { canUsePrivateData: boolean }) {
   const [state, setState] = useState<LifeState | null>(null);
   const [aiExplanation, setAiExplanation] = useState<string>('');
   const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
+    if (!canUsePrivateData) {
+      setState(null);
+      setAiExplanation('');
+      return undefined;
+    }
     const recompute = () => setState(computeLifeState());
     recompute();
     window.addEventListener('nesio-life-graph-updated', recompute);
@@ -44,12 +49,12 @@ export default function LifeStateCard() {
       window.removeEventListener('nesio-life-graph-updated', recompute);
       window.removeEventListener('nesio-connectors-refreshed', recompute);
     };
-  }, []);
+  }, [canUsePrivateData]);
 
   // Fetch a natural-language explanation (PRD: hybrid rules + AI summary).
   // Cached per state snapshot so it does not refetch on every render.
   useEffect(() => {
-    if (!state) return;
+    if (!canUsePrivateData || !state) return;
     const known = state.dimensions.filter((d) => d.level !== 'unknown');
     if (!known.length) return;
 
@@ -81,7 +86,7 @@ export default function LifeStateCard() {
       })
       .catch(() => undefined);
     return () => controller.abort();
-  }, [state?.stateId]);
+  }, [canUsePrivateData, state?.stateId]);
 
   if (!state) return null;
 

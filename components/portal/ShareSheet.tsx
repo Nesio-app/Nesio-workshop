@@ -134,18 +134,18 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
   if (!open) return null;
 
   return (
-    <div className="nesio-share-overlay" role="dialog" aria-modal="true" aria-label="分享或上传">
+    <div className="nesio-share-overlay" role="dialog" aria-modal="true" aria-label="上传">
       <div className="nesio-share-backdrop" onClick={onClose} />
       <div className="nesio-share-card">
         <div className="nesio-sheet-handle" aria-hidden />
 
         <div className="nesio-share-header">
-          <h2 className="nesio-share-title">分享或上传</h2>
+          <h2 className="nesio-share-title">上传</h2>
           <button type="button" className="nesio-share-close" onClick={onClose} aria-label="关闭">✕</button>
         </div>
 
         <p className="nesio-share-desc">
-          从邮件 · 网页 · PDF · 笔记里，Nesio 自动抽取人、时间、承诺与地点，存入 Memory。
+          你分享进来的内容，Nesio 会先整理出可确认的信息，再由你决定是否存入 Memory。
         </p>
 
         {/* Action buttons */}
@@ -157,7 +157,7 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
                   <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13"/>
                 </svg>
               </span>
-              <span>从 App 分享</span>
+              <span>从系统分享导入</span>
             </button>
             <button type="button" className="nesio-share-action-btn" onClick={handleFile}>
               <span className="nesio-share-action-icon">
@@ -197,7 +197,7 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
 
         {!textMode && !parsed && !analyzing && (
           <button type="button" style={{ fontSize: '0.78rem', color: 'var(--portal-blue-deep)', display: 'block', textAlign: 'center', padding: '0.5rem', marginTop: '0.25rem' }} onClick={() => setTextMode(true)}>
-            ✦ 粘贴文字 / 链接
+            粘贴文字/链接
           </button>
         )}
 
@@ -205,7 +205,7 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
         {analyzing && (
           <div style={{ textAlign: 'center', padding: '1.5rem 0', color: 'var(--portal-muted)', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
             <span className="nesio-camera-recognizing-dot" style={{ background: 'var(--portal-blue-deep)', display: 'inline-block', width: '0.5rem', height: '0.5rem', borderRadius: '50%' }} />
-            Nesio 正在提取关键信息…
+            Nesio 正在整理可确认的信息…
           </div>
         )}
 

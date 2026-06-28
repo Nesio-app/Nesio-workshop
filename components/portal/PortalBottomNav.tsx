@@ -1,5 +1,6 @@
 'use client';
 
+import { useRef } from 'react';
 import type { PortalLocale } from '@/lib/portal/profile';
 
 interface PortalBottomNavProps {
@@ -7,6 +8,7 @@ interface PortalBottomNavProps {
   locale?: PortalLocale;
   onToday: () => void;
   onTell: () => void;
+  onAsk?: () => void;
   onMemory: () => void;
 }
 
@@ -14,8 +16,32 @@ export default function PortalBottomNav({
   activeSurface,
   onToday,
   onTell,
+  onAsk,
   onMemory,
 }: PortalBottomNavProps) {
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressFired = useRef(false);
+
+  function clearLongPressTimer() {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  }
+
+  function startLongPress() {
+    longPressFired.current = false;
+    clearLongPressTimer();
+    longPressTimer.current = setTimeout(() => {
+      longPressFired.current = true;
+      onAsk?.();
+    }, 520);
+  }
+
+  function finishLongPress() {
+    clearLongPressTimer();
+  }
+
   return (
     <nav className="nesio-bottom-nav" aria-label="主导航">
       {/* Today */}
@@ -37,8 +63,18 @@ export default function PortalBottomNav({
       <button
         type="button"
         className={`nesio-bottom-nav-center${activeSurface === 'tell' ? ' nesio-bottom-nav-center--active' : ''}`}
-        onClick={onTell}
-        aria-label="告诉 Nesio"
+        onPointerDown={startLongPress}
+        onPointerUp={finishLongPress}
+        onPointerCancel={finishLongPress}
+        onPointerLeave={finishLongPress}
+        onClick={() => {
+          if (longPressFired.current) {
+            longPressFired.current = false;
+            return;
+          }
+          onTell();
+        }}
+        aria-label="告诉 Nesio；长按问宝盒"
         aria-expanded={activeSurface === 'tell'}
       >
         <img

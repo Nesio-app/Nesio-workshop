@@ -1,6 +1,6 @@
 /**
  * Integration token storage — per-user OAuth tokens for Gmail, Calendar, etc.
- * Supabase-backed (cross-device) with cookie fallback (no login required).
+ * Supabase-backed (cross-device) with an explicit cookie fallback escape hatch.
  * Called by API routes; never runs client-side.
  */
 
@@ -94,6 +94,10 @@ export function readTokensFromCookies(provider: IntegrationProvider): Integratio
   return { accessToken, refreshToken, connectedAt: new Date().toISOString() };
 }
 
+export function allowCookieIntegrationFallback(): boolean {
+  return envValue('NESIO_ALLOW_COOKIE_INTEGRATION_FALLBACK').toLowerCase() === 'true';
+}
+
 export function setTokenCookiesOnResponse(
   response: { cookies: { set: (name: string, value: string, opts: object) => void } },
   provider: IntegrationProvider,
@@ -112,7 +116,8 @@ export function setTokenCookiesOnResponse(
 
 /**
  * Returns the OAuth tokens for the given provider for the currently
- * logged-in user. Checks Supabase first (cross-device), then cookies.
+ * logged-in user. Checks Supabase first (cross-device). Cookie fallback is
+ * disabled by default so OAuth cookies cannot become an anonymous data path.
  */
 export async function getIntegrationToken(
   provider: IntegrationProvider,
@@ -129,7 +134,11 @@ export async function getIntegrationToken(
     }
   }
 
-  return readTokensFromCookies(provider);
+  if (allowCookieIntegrationFallback()) {
+    return readTokensFromCookies(provider);
+  }
+
+  return null;
 }
 
 /**

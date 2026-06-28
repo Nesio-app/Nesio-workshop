@@ -13,20 +13,20 @@ const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
 
 assert.match(
   middleware,
-  /pathname === '\/secretary'[\s\S]{0,320}\/secretary\/index\.html/,
-  'V14 Secretary must have a direct page rewrite instead of showing the first-launch 403 gate.',
+  /pathname\.startsWith\('\/secretary'\)[\s\S]{0,80}isSecretaryPageRequestAllowed\(request\)[\s\S]*pathname === '\/secretary'[\s\S]{0,320}\/secretary\/index\.html/,
+  'V14 Secretary page rewrite must be protected by the personal/lab page gate.',
 );
 
 assert.match(
   middleware,
-  /pathname === '\/secretary\/chat'[\s\S]{0,220}\/secretary\/chat\.html/,
-  'V14 Secretary chat must rewrite to the static chat page.',
+  /isSecretaryPageRequestAllowed\(request\)[\s\S]*pathname === '\/secretary\/chat'[\s\S]{0,220}\/secretary\/chat\.html/,
+  'V14 Secretary chat rewrite must stay behind the personal/lab page gate.',
 );
 
-assert.ok(
-  middleware.includes("/^\\/secretary\\/[^?]+\\.(?:css|js|json|svg|png|jpg|jpeg|webp|ico)$/i.test(pathname)") &&
-    middleware.includes('return NextResponse.next();'),
-  'V14 Secretary static assets must bypass the first-launch page gate.',
+assert.doesNotMatch(
+  middleware,
+  /\/\^\\\/secretary\\\/\[\^\?\]\+\\\.\(\?:css\|js\|json\|svg\|png\|jpg\|jpeg\|webp\|ico\)\$\/i\.test\(pathname\)[\s\S]{0,140}return NextResponse\.next\(\);/,
+  'V14 Secretary static assets must not bypass the first-launch page gate for public users.',
 );
 
 assert.match(

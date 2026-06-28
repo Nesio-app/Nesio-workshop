@@ -26,7 +26,7 @@ interface ConnectorDef {
 
 const CONNECTORS: ConnectorDef[] = [
   { id: 'calendar', name: 'Google Calendar', icon: '📅', iconBg: '#dbeafe', method: 'oauth', description: '读取日程，生成会议提醒和准备 Brief' },
-  { id: 'gmail', name: 'Gmail', icon: '📧', iconBg: '#fce7f3', method: 'oauth', description: '从邮件自动抽取人物、日期、承诺' },
+  { id: 'gmail', name: 'Gmail', icon: '📧', iconBg: '#fce7f3', method: 'oauth', description: '你授权并选择后，整理可确认的人物、日期、承诺' },
   { id: 'weather', name: '地理位置 · 天气', icon: '🌤', iconBg: '#fef3c7', method: 'geo', description: '基于实时天气生成外出和健康建议' },
   { id: 'flomo', name: 'Flomo', icon: '📝', iconBg: '#e0e7ff', method: 'server', syncEndpoint: '/api/portal/flomo?limit=30', description: '同步 flomo 笔记，提取想法与记录' },
   { id: 'notion', name: 'Notion', icon: '📓', iconBg: '#f3f4f6', method: 'token', syncEndpoint: '/api/portal/notion', tokenHint: 'notion.so/my-integrations → 新建集成 → 复制 Internal Integration Secret，并把页面共享给它', description: '同步最近编辑的页面，提取项目与想法' },

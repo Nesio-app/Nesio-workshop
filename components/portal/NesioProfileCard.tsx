@@ -43,20 +43,20 @@ export default function NesioProfileCard() {
     { key: 'tone' as ActiveSheet, icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="20" height="20">
           <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8"/>
-        </svg>), iconBg: '#e0e7ff', label: '语气与边界', sublabel: 'Nesio 怎么跟你说话、什么时候不打扰' },
+        </svg>), iconBg: '#e0e7ff', label: '表达方式', sublabel: '你决定 Nesio 怎么说、什么时候少打扰' },
     { key: 'privacy' as ActiveSheet, icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="20" height="20">
           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-        </svg>), iconBg: '#d1fae5', label: '隐私与数据', sublabel: '记住了什么、存在哪、随时可删' },
+        </svg>), iconBg: '#d1fae5', label: '我的数据', sublabel: '你能查看、导出或删除 Nesio 记住的内容' },
     { key: 'spaces' as ActiveSheet, icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="20" height="20">
           <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/>
           <rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>
-        </svg>), iconBg: '#fef3c7', label: '生活空间', sublabel: '家 · 工作 · 健康 · 家庭，分区管理' },
+        </svg>), iconBg: '#fef3c7', label: '我的生活范围', sublabel: '你选择哪些场景可以被整理' },
     { key: 'subscription' as ActiveSheet, icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="20" height="20">
           <rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>
-        </svg>), iconBg: '#fef9c3', label: '订阅', sublabel: 'Nesio Plus · 管理计划' },
+        </svg>), iconBg: '#fef9c3', label: '我的计划', sublabel: '查看当前能力与未来可选升级' },
     { key: 'connectors' as ActiveSheet, icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="20" height="20">
           <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/>
@@ -76,7 +76,7 @@ export default function NesioProfileCard() {
           <div className="nesio-profile-avatar-lg">{initials}</div>
           <div style={{ flex: 1 }}>
             <p className="nesio-profile-name">{displayName}</p>
-            <p className="nesio-profile-days">Nesio 已经陪你 {daysUsed} 天</p>
+            <p className="nesio-profile-days">你已经整理了 {daysUsed} 天生活线索</p>
           </div>
           {memoryCount > 0 && (
             <div className="nesio-profile-stat">

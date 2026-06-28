@@ -38,7 +38,7 @@ function todayKey(): string {
 
 type PlayState = 'idle' | 'loading' | 'playing' | 'paused' | 'done';
 
-export default function DailyBriefCard() {
+export default function DailyBriefCard({ canUsePrivateData }: { canUsePrivateData: boolean }) {
   const [weather, setWeather] = useState<WeatherView | null>(null);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [segments, setSegments] = useState<BriefSegment[]>([]);
@@ -65,11 +65,19 @@ export default function DailyBriefCard() {
     // Load signals
     const w = readPortalCache<WeatherView>(PORTAL_CACHE_KEYS.weather);
     setWeather(w);
-    const cal = readPortalCache<{ events?: CalendarEvent[] }>(PORTAL_CACHE_KEYS.calendar);
-    setEvents(cal?.events?.filter((e) => new Date(e.start).getTime() > Date.now()).slice(0, 3) || []);
+    if (canUsePrivateData) {
+      const cal = readPortalCache<{ events?: CalendarEvent[] }>(PORTAL_CACHE_KEYS.calendar);
+      setEvents(cal?.events?.filter((e) => new Date(e.start).getTime() > Date.now()).slice(0, 3) || []);
+    } else {
+      setEvents([]);
+    }
 
     const onUpdate = () => {
       setWeather(readPortalCache<WeatherView>(PORTAL_CACHE_KEYS.weather));
+      if (!canUsePrivateData) {
+        setEvents([]);
+        return;
+      }
       const c = readPortalCache<{ events?: CalendarEvent[] }>(PORTAL_CACHE_KEYS.calendar);
       setEvents(c?.events?.filter((e) => new Date(e.start).getTime() > Date.now()).slice(0, 3) || []);
     };
@@ -81,9 +89,10 @@ export default function DailyBriefCard() {
       window.removeEventListener('nesio-weather-updated', onUpdate);
       window.removeEventListener('nesio-calendar-updated', onUpdate);
     };
-  }, []);
+  }, [canUsePrivateData]);
 
   async function generateBrief() {
+    if (!canUsePrivateData) return;
     setPlayState('loading');
     const memoryNotes = getRecentNodes(5).map((n) => n.name);
     try {
@@ -179,8 +188,8 @@ export default function DailyBriefCard() {
         ) : (
           <button type="button" className="nesio-brief-podcast-btn"
             onClick={() => generated ? playSegments(segments, 0) : generateBrief()}
-            disabled={playState === 'loading'}>
-            {playState === 'loading' ? '生成中…' : '▶ 播客'}
+            disabled={playState === 'loading' || !canUsePrivateData}>
+            {playState === 'loading' ? '生成中…' : canUsePrivateData ? '文字简报' : '登录后生成'}
           </button>
         )}
       </div>
@@ -216,8 +225,8 @@ export default function DailyBriefCard() {
               </>
             ) : (
               <>
-                <p className="nesio-brief-signal-val">今天无安排</p>
-                <p className="nesio-brief-signal-note">接入 Calendar 显示日程</p>
+                <p className="nesio-brief-signal-val">{canUsePrivateData ? '今天无安排' : '登录后显示日程'}</p>
+                <p className="nesio-brief-signal-note">{canUsePrivateData ? '接入 Calendar 显示日程' : '不会在公开状态加载日历'}</p>
               </>
             )}
           </div>
