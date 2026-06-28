@@ -11,6 +11,7 @@ const voiceSheet = read('components/portal/VoiceInputSheet.tsx');
 const dailyBrief = read('components/portal/DailyBriefCard.tsx');
 const lifeState = read('components/portal/LifeStateCard.tsx');
 const profileCard = read('components/portal/NesioProfileCard.tsx');
+const accountSettings = read('components/portal/AccountSettings.tsx');
 const loginPage = read('components/portal/LoginPageClient.tsx');
 const authStartRoute = read('app/api/auth/start/route.ts');
 const analyzeRoute = read('app/api/portal/analyze/route.ts');
@@ -133,6 +134,8 @@ assert.match(portal, /nesio-memory-received[\s\S]*收好了，以后可以找回
 assert.match(portal, /onboardingActive[\s\S]*!\s*onboardingActive[\s\S]*<TodayFeed/s, 'Portal must hide private Today surfaces while first-login onboarding is visible.');
 assert.match(onboarding, /nesio-onboarding-visibility-change/, 'Onboarding must notify Portal so the private background layer can be hidden.');
 assert.doesNotMatch(profileCard, /已整理|已使用第|daysUsed/, 'Profile summary must not foreground usage-day counters.');
+assert.doesNotMatch(profileCard, /className="nesio-profile-name"|<p className="nesio-profile-name">\{displayName\}<\/p>/, 'Profile top should not duplicate the user name next to the avatar.');
+assert.match(profileCard, /className="nesio-profile-stat"[\s\S]*aria-label="打开 Nesio 整理出的线索"[\s\S]*scrollIntoView/, 'Profile memory count should open the organized-clues section.');
 assert.match(profileCard, /api\/auth\/logout|退出登录/, 'Profile/settings surface must expose a logout action when signed in.');
 assert.match(profileCard, /clearProfileIdentity/, 'Profile logout must clear local identity so the old customer name is not shown after sign-out.');
 assert.match(profileCard, /loggedIn\?:\s*boolean|Boolean\(d\?\.loggedIn\)/, 'Profile card must use session.loggedIn, not ok, to avoid fake signed-in state.');
@@ -157,6 +160,7 @@ assert.match(mirrorProfile, /Nesio 目前怎么理解你|经常出现|不再这�
 assert.match(mirrorProfile, /resetMirrorProfile|setProfile\(getMirrorProfile\(\)\)/, 'Mirror profile clear-understanding button must perform a real local reset.');
 assert.match(lifeGraph, /nesio-memory-received/, 'Life Graph should emit a user-record receipt event for calm feedback.');
 assert.match(settingsSheets, /触感反馈|细微音效/, 'Settings should let users control haptics and subtle sounds.');
+assert.doesNotMatch(accountSettings, /portal-personal-profile-card|portal-personal-profile-main|portal-personal-settings-arrow|accountSettingsHomepage/, 'Advanced settings should not repeat the old "My/Home" identity block.');
 assert.match(voiceSheet, /parseInlineTags|stripInlineTags|mergeTags/, 'Voice input should parse inline #tags and remove them from the display text.');
 assert.doesNotMatch(voiceSheet, /setTimeout\(startListening,\s*300\)/, 'Voice input must not auto-start recording when opened.');
 assert.match(voiceSheet, /setAskResults\(matches\.slice\(0,\s*4\)\)[\s\S]*setText\(''\)/, 'Ask mode should clear the input after each question while keeping the answer visible.');

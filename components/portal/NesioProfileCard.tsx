@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { clearProfileIdentity, loadProfileSettings } from '@/lib/portal/profile';
 import { getRecentNodes } from '@/lib/portal/life-graph';
 import { ToneSheet, PrivacySheet, SpacesSheet, SubscriptionSheet } from './SettingsSheets';
@@ -15,6 +15,7 @@ export default function NesioProfileCard() {
   const [memoryCount, setMemoryCount] = useState(0);
   const [activeSheet, setActiveSheet] = useState<ActiveSheet>(null);
   const [isSignedIn, setIsSignedIn] = useState(false);
+  const mirrorRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const profile = loadProfileSettings();
@@ -79,14 +80,16 @@ export default function NesioProfileCard() {
         {/* Avatar + name + stats */}
         <div className="nesio-profile-card-top">
           <div className="nesio-profile-avatar-lg">{initials}</div>
-          <div style={{ flex: 1 }}>
-            <p className="nesio-profile-name">{displayName}</p>
-          </div>
           {memoryCount > 0 && (
-            <div className="nesio-profile-stat">
+            <button
+              type="button"
+              className="nesio-profile-stat"
+              aria-label="打开 Nesio 整理出的线索"
+              onClick={() => mirrorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+            >
               <span className="nesio-profile-stat-num">{memoryCount}</span>
               <span className="nesio-profile-stat-label">条记忆</span>
-            </div>
+            </button>
           )}
         </div>
 
@@ -105,7 +108,9 @@ export default function NesioProfileCard() {
         )}
 
         {/* Mirror Profile card */}
-        <MirrorProfileCard embedded />
+        <div ref={mirrorRef}>
+          <MirrorProfileCard embedded />
+        </div>
 
         {/* Menu */}
         <nav className="nesio-profile-menu" aria-label="设置菜单">

@@ -1,7 +1,6 @@
 'use client';
 
-import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   formatAccountSettingsMemoryConfidence,
   formatAccountSettingsMemoryCount,
@@ -17,7 +16,6 @@ import {
   normalizePortalLocale,
   PORTAL_LOCALE_OPTIONS,
   portalLocaleToHtmlLang,
-  readAvatarFile,
   saveProfileSettings,
   type PortalCoachStyle,
   type PortalLocale,
@@ -84,18 +82,12 @@ function normalizeCloudProfileSettings(
   };
 }
 
-function initials(name: string): string {
-  const t = name.trim();
-  return t.slice(0, 1);
-}
-
 interface AccountSettingsProps {
   config: PortalConfig;
 }
 
 export default function AccountSettings({ config }: AccountSettingsProps) {
   const fallbackName = config.profile?.displayName || t('zh', 'profileDefaultName');
-  const fileRef = useRef<HTMLInputElement>(null);
   const [displayName, setDisplayName] = useState(fallbackName);
   const [avatarUrl, setAvatarUrl] = useState('');
   const [locale, setLocale] = useState<PortalLocale>('zh');
@@ -237,23 +229,6 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
     } catch {
       setCloudProfileStatus('local_only');
     }
-  };
-
-  const onPickAvatar = async (file: File) => {
-    try {
-      const dataUrl = await readAvatarFile(file);
-      setAvatarUrl(dataUrl);
-      saveProfileSettings({ avatarUrl: dataUrl });
-      void syncCloudProfileSettings({
-        displayName,
-        avatarUrl: dataUrl,
-        locale,
-        displayLanguage,
-        calendarUrl,
-        observationPushEnabled,
-      });
-      showToast('settingsSaved');
-    } catch { /* ignore */ }
   };
 
   const onDisplayLanguageChange = (next: DisplayLanguage) => {
@@ -648,39 +623,6 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
           </button>
           <h1 className="portal-settings-title">{t(locale, 'accountSettingsTitle')}</h1>
         </header>
-      ) : null}
-
-      {!showAppSettings ? (
-        <section className="portal-personal-profile-card">
-          <div className="portal-personal-profile-main">
-            <button type="button" className="portal-personal-avatar-edit" onClick={() => fileRef.current?.click()} aria-label={t(locale, 'accountSettingsAvatarChange')}>
-              {avatarUrl ? (
-                <img src={avatarUrl} alt="" className="portal-settings-avatar" width={64} height={64} />
-              ) : (
-                <span className="portal-personal-profile-avatar" aria-hidden>
-                  {initials(displayName)}
-                </span>
-              )}
-            </button>
-            <span>
-              <b>{displayName}</b>
-            </span>
-            <Link href="/portfolio" className="portal-personal-settings-arrow" aria-label={t(locale, 'accountSettingsHomepageAriaLabel')}>
-              {t(locale, 'accountSettingsHomepage')}
-            </Link>
-          </div>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            className="portal-avatar-file"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) onPickAvatar(f);
-              e.target.value = '';
-            }}
-          />
-        </section>
       ) : null}
 
       {!showAppSettings ? (
