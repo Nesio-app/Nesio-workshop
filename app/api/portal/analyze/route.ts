@@ -1,7 +1,7 @@
 /**
  * /api/portal/analyze
  * Unified AI analysis endpoint for Tell Nesio captures.
- * Accepts: { type: 'image' | 'text' | 'file', content: string, mimeType?: string }
+ * Accepts: { type: 'image' | 'text' | 'file' | 'ask', content: string, mimeType?: string }
  * Returns: { nodes: LifeNodeInput[], summary: string, intent: string }
  */
 
@@ -57,7 +57,17 @@ If input is in Chinese, extract Chinese names and keep attributes in Chinese.
 For image input, only extract things that are visibly present. Do not create a person node unless a real person is clearly visible. Prefer concrete visible objects such as cups, cables, boxes, medicine, clothes, keys, documents, rooms, and locations. Never use the instruction text itself as a node name.
 `;
 
-async function analyzeWithClaude(content: string, isImage: boolean, imageBase64?: string, mimeType?: string): Promise<string> {
+const ASK_SYSTEM_PROMPT = `You are Nesio's semantic Memory search ranker.
+Given a user question and candidate memory nodes, choose only candidates that are semantically relevant.
+Do not invent new memories. Do not expose hidden fields. Return ONLY valid JSON:
+{
+  "matches": [{ "id": "candidate id", "name": "candidate name", "reason": "short user-facing reason" }],
+  "answer": "one short natural-language answer"
+}
+If nothing is relevant, return { "matches": [], "answer": "还没找到相关线索。" }.
+`;
+
+async function analyzeWithClaude(content: string, isImage: boolean, imageBase64?: string, mimeType?: string, systemPrompt = SYSTEM_PROMPT): Promise<string> {
   const key = getAnthropicKey();
   if (!key) throw new Error('no_anthropic_key');
 
@@ -87,7 +97,7 @@ async function analyzeWithClaude(content: string, isImage: boolean, imageBase64?
     },
     body: JSON.stringify({
       model: 'claude-3-5-haiku-latest',
-      system: SYSTEM_PROMPT,
+      system: systemPrompt,
       messages,
       max_tokens: 1024,
     }),
@@ -98,7 +108,7 @@ async function analyzeWithClaude(content: string, isImage: boolean, imageBase64?
   return data.content?.map((c) => c.text).join('') || '';
 }
 
-async function analyzeWithGemini(content: string, imageBase64?: string, mimeType?: string): Promise<string> {
+async function analyzeWithGemini(content: string, imageBase64?: string, mimeType?: string, systemPrompt = SYSTEM_PROMPT): Promise<string> {
   const key = getGeminiKey();
   if (!key) throw new Error('no_gemini_key');
 
@@ -106,7 +116,7 @@ async function analyzeWithGemini(content: string, imageBase64?: string, mimeType
   if (imageBase64) {
     parts.push({ inline_data: { mime_type: mimeType || 'image/jpeg', data: imageBase64 } });
   }
-  parts.push({ text: `${SYSTEM_PROMPT}\n\nUser input: ${content}` });
+  parts.push({ text: `${systemPrompt}\n\nUser input: ${content}` });
 
   const res = await fetch(`${GEMINI_URL}?key=${key}`, {
     method: 'POST',
@@ -206,7 +216,7 @@ function extractJson(raw: string): string {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json() as {
-      type: 'text' | 'image' | 'file';
+      type: 'text' | 'image' | 'file' | 'ask';
       content: string;
       imageBase64?: string;
       mimeType?: string;
@@ -216,6 +226,24 @@ export async function POST(req: NextRequest) {
     const isImage = body.type === 'image' && Boolean(body.imageBase64);
     const aiAllowed = isAnalyzeAiAllowed(req);
 
+    if (body.type === 'ask') {
+      if (!aiAllowed) {
+        return NextResponse.json({ ok: false, error: 'ai_auth_required' }, { status: 403 });
+      }
+      try {
+        raw = await analyzeWithClaude(body.content, false, undefined, undefined, ASK_SYSTEM_PROMPT);
+      } catch {
+        try {
+          raw = await analyzeWithGemini(body.content, undefined, undefined, ASK_SYSTEM_PROMPT);
+        } catch {
+          return NextResponse.json({ ok: false, error: 'ai_search_unavailable' }, { status: 503 });
+        }
+      }
+      const askJson = extractJson(raw);
+      const askResult = JSON.parse(askJson) as { matches?: object[]; answer?: string };
+      return NextResponse.json({ ok: true, matches: askResult.matches || [], answer: askResult.answer || '' });
+    }
+
     if (aiAllowed) {
       try {
         raw = await analyzeWithClaude(body.content, isImage, body.imageBase64, body.mimeType);
@@ -223,6 +251,16 @@ export async function POST(req: NextRequest) {
         try {
           raw = await analyzeWithGemini(body.content, body.imageBase64, body.mimeType);
         } catch {
+          if (isImage) {
+            return NextResponse.json(
+              {
+                ok: false,
+                error: 'ai_image_unavailable',
+                summary: '图片识别暂时不可用。可以先保存为待确认图片线索。',
+              },
+              { status: 503 },
+            );
+          }
           raw = analyzeFallback(body.content);
         }
       }

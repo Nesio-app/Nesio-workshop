@@ -66,6 +66,11 @@ assert.match(
 );
 assert.match(
   cameraSheet,
+  /capture="environment"/,
+  'Camera fallback file input should prefer the rear camera on mobile instead of a generic picker.',
+);
+assert.match(
+  cameraSheet,
   /x-baohe-access-mode['"]\s*:\s*['"]personal_lab|personal_lab/,
   'Camera image analysis should request lab AI when lab mode is enabled.',
 );
@@ -166,22 +171,27 @@ assert.match(voiceSheet, /parseInlineTags|stripInlineTags|mergeTags/, 'Voice inp
 assert.doesNotMatch(voiceSheet, /setTimeout\(startListening,\s*300\)/, 'Voice input must not auto-start recording when opened.');
 assert.match(voiceSheet, /setAskResults\(matches\.slice\(0,\s*4\)\)[\s\S]*setText\(''\)/, 'Ask mode should clear the input after each question while keeping the answer visible.');
 assert.match(voiceSheet, /searchLifeGraphFuzzy/, 'Ask mode should use fuzzy local memory search instead of only exact title search.');
+assert.match(voiceSheet, /\/api\/portal\/analyze[\s\S]*type:\s*'ask'[\s\S]*searchLifeGraphFuzzy/, 'Ask mode should try AI semantic search before falling back to local fuzzy search.');
 assert.doesNotMatch(voiceSheet, /isAskMode \? '输入完成 · 点「问宝盒」查找线索'/, 'Ask mode should not show the extra duplicate helper line above the answer.');
 assert.match(voiceSheet, /text && !isAskMode[\s\S]*识别完成 · 点「告诉 Nesio」保存/, 'Ask mode should not show the non-ask save helper line.');
 assert.match(todayFeed, /feedback === 'too_much' \|\| feedback === 'useful' \|\| feedback === 'not_now'/, 'Today not-now feedback should dismiss the card so 稍后 has a visible result.');
 assert.doesNotMatch(todayFeed, /为什么\{why \? ' ↑' : ' ↓'\}/, 'Today card 为什么 action should not append arrow glyphs.');
 assert.match(todayFeed, /onClick=\{\(\) => setMirrorOpen\(true\)\}[\s\S]*MirrorProfileCard embedded/, 'Today logo should open the organized-clues / mirror profile sheet.');
 assert.match(globals, /@keyframes tellFanIn[\s\S]*from \{ opacity: 0; \}[\s\S]*to\s+\{ opacity: 1; \}/, 'Center N fan animation must not override button transforms.');
-assert.match(globals, /nesio-tell-fan-btn--left[\s\S]*rotate\(-10deg\)[\s\S]*nesio-tell-fan-btn--right[\s\S]*rotate\(10deg\)/, 'Center N actions should be positioned as a visible fan.');
+assert.match(globals, /nesio-tell-fan-btn--left[\s\S]*translate\(-1\.45rem,\s*0\.45rem\)[\s\S]*nesio-tell-fan-btn--right[\s\S]*translate\(1\.45rem,\s*0\.45rem\)/, 'Center N actions should be positioned as a visible fan.');
+assert.doesNotMatch(globals, /nesio-tell-fan-btn--left[^{]*\{[^}]*rotate|nesio-tell-fan-btn--right[^{]*\{[^}]*rotate/, 'Center N fan icons/text should stay upright, not rotated.');
 assert.match(ingestRoute, /ingest_auth_required|isIngestAllowed|baohe_auth_access|NESIO_STAGE5_INVOCATION_SECRET/, 'Ingest endpoint must fail closed for anonymous public parsing.');
 assert.match(lifeGraph, /searchLifeGraphFuzzy[\s\S]*rawInput[\s\S]*tags[\s\S]*relations/, 'Life Graph fuzzy search should include raw input, tags, attributes, and relations.');
 assert.match(shareSheet, /buildPendingImageParsed[\s\S]*图片线索待确认[\s\S]*originalFileName/, 'Upload image fallback should show a confirmable image clue, not the photo filename as AI content.');
 assert.match(shareSheet, /analyze\('image'[\s\S]*根据这张图片里真实可见的内容/, 'Upload images should call the image analysis path.');
+assert.match(shareSheet, /x-baohe-access-mode['"]\s*:\s*['"]personal_lab/, 'Upload image analysis should request lab AI access like the camera path.');
+assert.match(shareSheet, /type === 'image' && nodes\.length === 0[\s\S]*ai_image_empty/, 'Upload image should not use the prompt or filename when AI returns no nodes.');
 assert.doesNotMatch(shareSheet, /title:\s*nodes\[0\]\?\.name \|\| content\.slice\(0,\s*30\)[\s\S]*file\.name,\s*base64/s, 'Upload image result must not fall back to the raw filename as the recognized title.');
 assert.doesNotMatch(dailyBrief, /开启位置权限获取天气|weather\.temperatureC|weather\.condition/, 'Daily overview should not display weather in the first home card.');
 assert.match(globals, /\.nesio-brief-card \{[\s\S]*background:\s*var\(--glass-bg-solid\)/, 'Daily overview card should use the shared glass card background, not a blue gradient.');
 assert.match(authStartRoute, /sanitizeRedirectTo[\s\S]*localhost[\s\S]*\/api\/auth\/callback/, 'Auth start must sanitize localhost callback URLs before sending users to Google/Supabase.');
-assert.match(authClient, /NEXT_PUBLIC_SITE_URL|www\.nesio\.app/, 'Client auth redirect fallback should use the production Nesio origin instead of localhost.');
+assert.match(authClient, /NEXT_PUBLIC_SITE_URL|treasurebox-nu\.vercel\.app/, 'Client auth redirect fallback should use a working production origin instead of localhost.');
+assert.match(authStartRoute, /treasurebox-nu\.vercel\.app\/api\/auth\/callback/, 'Server auth redirect fallback should never return localhost callbacks.');
 
 assert.match(
   storageCss,

@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { addLifeNode, isPrivateExternalNode, searchLifeGraphFuzzy, type LifeNode } from '@/lib/portal/life-graph';
+import { addLifeNode, getRecentNodes, isPrivateExternalNode, searchLifeGraphFuzzy, type LifeNode } from '@/lib/portal/life-graph';
 import { routeIntent } from '@/lib/portal/intent-router';
 import MeetingRecorder from './MeetingRecorder';
 
@@ -41,6 +41,35 @@ function stripInlineTags(value: string): string {
 
 function mergeTags(...groups: Array<string[] | undefined>): string[] {
   return Array.from(new Set(groups.flatMap((group) => group || []).filter(Boolean)));
+}
+
+async function askMemoryWithAi(query: string, candidates: LifeNode[]): Promise<LifeNode[]> {
+  if (!candidates.length) return [];
+  const res = await fetch('/api/portal/analyze', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-baohe-access-mode': 'personal_lab' },
+    body: JSON.stringify({
+      type: 'ask',
+      content: JSON.stringify({
+        query,
+        candidates: candidates.slice(0, 40).map((node) => ({
+          id: node.id,
+          type: node.type,
+          name: node.name,
+          tags: node.tags,
+          source: node.source,
+          rawInput: node.rawInput,
+          attributes: node.attributes,
+          relations: node.relations,
+        })),
+      }),
+    }),
+  });
+  if (!res.ok) return [];
+  const data = await res.json() as { ok?: boolean; matches?: Array<{ id?: string; name?: string }> };
+  if (!data.ok || !data.matches?.length) return [];
+  const wanted = new Set(data.matches.map((match) => match.id || match.name).filter(Boolean));
+  return candidates.filter((node) => wanted.has(node.id) || wanted.has(node.name));
 }
 
 export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateData = false, onClose }: VoiceInputSheetProps) {
@@ -124,7 +153,11 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
 
     if (isAskMode) {
       stopListening();
-      const matches = searchLifeGraphFuzzy(t, 8).filter((node) => canUsePrivateData || !isPrivateExternalNode(node));
+      const visibleCandidates = getRecentNodes(60).filter((node) => canUsePrivateData || !isPrivateExternalNode(node));
+      const aiMatches = await askMemoryWithAi(t, visibleCandidates).catch(() => []);
+      const matches = aiMatches.length
+        ? aiMatches
+        : searchLifeGraphFuzzy(t, 8).filter((node) => canUsePrivateData || !isPrivateExternalNode(node));
       setAskResults(matches.slice(0, 4));
       setSendState('saved');
       setText('');

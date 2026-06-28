@@ -64,15 +64,27 @@ function getProviderGate(req: NextRequest, provider: AuthProvider): {
 }
 
 function sanitizeRedirectTo(raw: string | undefined, fallback: string): string {
-  if (!raw) return fallback;
+  const safeFallback = (() => {
+    try {
+      const url = new URL(fallback);
+      const host = url.hostname.toLowerCase();
+      if (host === 'localhost' || host === '127.0.0.1' || host.endsWith('.localhost')) {
+        return 'https://treasurebox-nu.vercel.app/api/auth/callback';
+      }
+      return fallback;
+    } catch {
+      return 'https://treasurebox-nu.vercel.app/api/auth/callback';
+    }
+  })();
+  if (!raw) return safeFallback;
   try {
     const url = new URL(raw);
     const host = url.hostname.toLowerCase();
-    if (host === 'localhost' || host === '127.0.0.1' || host.endsWith('.localhost')) return fallback;
-    if (url.pathname !== '/api/auth/callback') return fallback;
+    if (host === 'localhost' || host === '127.0.0.1' || host.endsWith('.localhost')) return safeFallback;
+    if (url.pathname !== '/api/auth/callback') return safeFallback;
     return url.toString();
   } catch {
-    return fallback;
+    return safeFallback;
   }
 }
 

@@ -9025,8 +9025,8 @@ html[data-portal-theme="night"] .nesio-memory-card-title { color: #e8eefa; }
 }
 
 /* Left (camera) — drop down 20px relative to center voice */
-.nesio-tell-fan-btn--left  { transform: translate(-1.45rem, 0.45rem) rotate(-10deg); margin-right: 0.25rem; }
-.nesio-tell-fan-btn--right { transform: translate(1.45rem, 0.45rem) rotate(10deg); margin-left: 0.25rem; }
+.nesio-tell-fan-btn--left  { transform: translate(-1.45rem, 0.45rem); margin-right: 0.25rem; }
+.nesio-tell-fan-btn--right { transform: translate(1.45rem, 0.45rem); margin-left: 0.25rem; }
 .nesio-tell-fan-btn--center { transform: translateY(-1.65rem); } /* fan apex */
 
 .nesio-tell-fan-icon {

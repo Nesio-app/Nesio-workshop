@@ -66,7 +66,7 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
     try {
       const res = await fetch('/api/portal/analyze', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-baohe-access-mode': 'personal_lab' },
         body: JSON.stringify({ type, content, imageBase64, mimeType }),
       });
       const data = await res.json() as { ok?: boolean; nodes?: ParsedResult['nodes']; summary?: string; intent?: string; error?: string };
@@ -74,6 +74,7 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
       if (!data.ok) throw new Error(data.error || 'analysis_failed');
 
       const nodes = data.nodes || [];
+      if (type === 'image' && nodes.length === 0) throw new Error('ai_image_empty');
       // Extract people, dates, locations from node attributes
       const people: string[] = [];
       let date: string | undefined;
@@ -87,7 +88,7 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
       });
 
       setParsed({
-        title: nodes[0]?.name || content.slice(0, 30),
+        title: nodes[0]?.name || (type === 'image' ? '图片线索待确认' : content.slice(0, 30)),
         summary: data.summary || '提取成功',
         intent: data.intent || 'MEMORY_CAPTURE',
         people: Array.from(new Set(people)),
