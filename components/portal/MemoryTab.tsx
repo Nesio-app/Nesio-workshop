@@ -38,13 +38,17 @@ function cleanMemoryPreview(node: LifeNode): string {
 
 export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: boolean }) {
   const [query, setQuery] = useState('');
-  const [displayName, setDisplayName] = useState('Jessy');
+  const [displayName, setDisplayName] = useState('');
   const [nodes, setNodes] = useState<LifeNode[]>([]);
   const [selectedNode, setSelectedNode] = useState<LifeNode | null>(null);
 
   useEffect(() => {
-    const profile = loadProfileSettings();
-    if (profile.displayName) setDisplayName(profile.displayName);
+    if (canUsePrivateData) {
+      const profile = loadProfileSettings();
+      setDisplayName(profile.displayName || '');
+    } else {
+      setDisplayName('');
+    }
     if (!canUsePrivateData) {
       setNodes([]);
       return undefined;
@@ -57,7 +61,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
   }, [canUsePrivateData]);
 
   const results = canUsePrivateData && query.trim() ? searchLifeGraph(query) : nodes;
-  const initials = displayName.trim().slice(0, 1) || 'J';
+  const initials = canUsePrivateData ? (displayName.trim().slice(0, 1) || '我') : '我';
   const hasRealNodes = nodes.length > 0;
 
   return (
@@ -140,18 +144,6 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
               </div>
             </>
           )}
-
-          {/* Gmail connect hint */}
-          <div className="nesio-memory-connector-hint">
-            <div className="nesio-memory-connector-row">
-              <span style={{ fontSize: '1.1rem' }}>📧</span>
-              <div style={{ flex: 1 }}>
-                <p style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--portal-ink)' }}>接入 Gmail</p>
-                <p style={{ fontSize: '0.72rem', color: 'var(--portal-muted)' }}>你授权并选择后，整理出可确认的人、时间与承诺</p>
-              </div>
-              <a href="/settings" className="nesio-settings-toggle-btn" style={{ whiteSpace: 'nowrap' }}>设置</a>
-            </div>
-          </div>
 
           <div className="nesio-memory-add-wrap">
             <p className="nesio-memory-add-hint">点中间按钮把东西放进来，需要时再向宝盒要回线索。</p>

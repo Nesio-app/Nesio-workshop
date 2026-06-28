@@ -59,7 +59,7 @@ export function portalLocaleToDictionaryLocale(locale: PortalLocale): 'zh' | 'en
   return locale === 'zh' || locale === 'zh-TW' ? 'zh' : 'en';
 }
 
-export function loadProfileSettings(fallbackName = '婧'): PortalProfileSettings {
+export function loadProfileSettings(fallbackName = '我'): PortalProfileSettings {
   if (typeof window === 'undefined') {
     return { displayName: fallbackName, avatarUrl: '', locale: 'zh', coachStyle: 'warm' };
   }
@@ -84,7 +84,7 @@ export function saveProfileSettings(patch: Partial<PortalProfileSettings>) {
   if (typeof window === 'undefined') return;
   try {
     if (patch.displayName !== undefined) {
-      localStorage.setItem(KEYS.displayName, patch.displayName.trim() || '婧');
+      localStorage.setItem(KEYS.displayName, patch.displayName.trim() || '我');
     }
     if (patch.avatarUrl !== undefined) {
       if (patch.avatarUrl) localStorage.setItem(KEYS.avatar, patch.avatarUrl);

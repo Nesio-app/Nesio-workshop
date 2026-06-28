@@ -49,8 +49,12 @@ export default function DailyBriefCard({ canUsePrivateData }: { canUsePrivateDat
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    const profile = loadProfileSettings();
-    setDisplayName(profile.displayName || '');
+    if (canUsePrivateData) {
+      const profile = loadProfileSettings();
+      setDisplayName(profile.displayName || '');
+    } else {
+      setDisplayName('');
+    }
 
     // Load cached brief for today
     try {

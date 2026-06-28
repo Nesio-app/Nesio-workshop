@@ -233,14 +233,18 @@ export default function TodayFeed({
   canUsePrivateData: boolean;
   onOpenMemory?: () => void;
 }) {
-  const [displayName, setDisplayName] = useState('Jessy');
+  const [displayName, setDisplayName] = useState('');
   const [isNight, setIsNight] = useState(false);
   const [cards, setCards] = useState<RecommendationCard[]>([]);
   const [memoryCount, setMemoryCount] = useState(0);
 
   useEffect(() => {
-    const profile = loadProfileSettings();
-    if (profile.displayName) setDisplayName(profile.displayName);
+    if (canUsePrivateData) {
+      const profile = loadProfileSettings();
+      setDisplayName(profile.displayName || '');
+    } else {
+      setDisplayName('');
+    }
 
     const theme = document.documentElement.getAttribute('data-portal-theme');
     setIsNight(theme === 'night');
@@ -291,7 +295,7 @@ export default function TodayFeed({
     }
   }
 
-  const initials = displayName.trim().slice(0, 1) || 'J';
+  const initials = canUsePrivateData ? (displayName.trim().slice(0, 1) || '我') : '我';
 
   return (
     <div className="nesio-today-root">
