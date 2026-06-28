@@ -106,19 +106,22 @@ function FeedbackMenu({ onFeedback }: { onFeedback: (f: RecommendationCard['feed
     <div style={{ position: 'relative' }}>
       <button type="button" style={{ fontSize: '1rem', color: 'var(--portal-muted)', padding: '0 0.2rem' }} onClick={() => setOpen(!open)} aria-label="反馈">···</button>
       {open && (
-        <div className="nesio-today-feedback-menu" role="menu">
-          {[
-            { key: 'useful', label: '✓ 有帮助' },
-            { key: 'wrong', label: '✗ 不准确' },
-            { key: 'not_now', label: '稍后' },
-            { key: 'too_much', label: '不要再提' },
-          ].map((item) => (
-            <button key={item.key} type="button" role="menuitem"
-              onClick={() => { onFeedback(item.key as RecommendationCard['feedback']); setOpen(false); }}>
-              {item.label}
-            </button>
-          ))}
-        </div>
+        <>
+          <button type="button" className="nesio-today-feedback-scrim" aria-label="关闭反馈" onClick={() => setOpen(false)} />
+          <div className="nesio-today-feedback-menu" role="menu">
+            {[
+              { key: 'useful', label: '✓ 有帮助' },
+              { key: 'wrong', label: '✗ 不准确' },
+              { key: 'not_now', label: '稍后' },
+              { key: 'too_much', label: '不要再提' },
+            ].map((item) => (
+              <button key={item.key} type="button" role="menuitem"
+                onClick={() => { onFeedback(item.key as RecommendationCard['feedback']); setOpen(false); }}>
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );
@@ -237,6 +240,7 @@ export default function TodayFeed({
   const [isNight, setIsNight] = useState(false);
   const [cards, setCards] = useState<RecommendationCard[]>([]);
   const [memoryCount, setMemoryCount] = useState(0);
+  const [showMoreCards, setShowMoreCards] = useState(false);
 
   useEffect(() => {
     if (canUsePrivateData) {
@@ -301,7 +305,7 @@ export default function TodayFeed({
     <div className="nesio-today-root">
       <header className="nesio-today-header">
         <div className="nesio-today-brand">
-          <img src="/icons/treasurebox-pwa-192.png" alt="Nesio" className="nesio-today-brand-icon" />
+          <img src="/icons/treasurebox.svg" alt="Nesio" className="nesio-today-brand-icon" />
           <span className="nesio-today-brand-name">Nesio</span>
         </div>
         <a href="/settings" className="nesio-today-avatar" aria-label="我的设置">{initials}</a>
@@ -331,12 +335,21 @@ export default function TodayFeed({
 
             {cards.length > 0 ? (
               <div className="nesio-today-cards">
-                {cards.map((card) =>
+                {(showMoreCards ? cards : cards.slice(0, 1)).map((card) =>
                   card.type === 'audio' ? (
                     <AudioCard key={card.id} card={card} onFeedback={(f) => handleFeedback(card.id, f)} />
                   ) : (
                     <StandardCard key={card.id} card={card} onFeedback={(f) => handleFeedback(card.id, f)} />
                   )
+                )}
+                {cards.length > 1 && (
+                  <button
+                    type="button"
+                    className="nesio-today-more-btn"
+                    onClick={() => setShowMoreCards((value) => !value)}
+                  >
+                    {showMoreCards ? '收起' : `更多（${cards.length - 1}）`}
+                  </button>
                 )}
               </div>
             ) : (

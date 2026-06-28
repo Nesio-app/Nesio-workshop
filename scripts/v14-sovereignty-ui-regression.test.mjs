@@ -6,6 +6,8 @@ const read = (path) => fs.readFileSync(new URL(`../${path}`, import.meta.url), '
 const cameraSheet = read('components/portal/CameraSheet.tsx');
 const memoryTab = read('components/portal/MemoryTab.tsx');
 const todayFeed = read('components/portal/TodayFeed.tsx');
+const tellSheet = read('components/portal/TellNesioSheet.tsx');
+const voiceSheet = read('components/portal/VoiceInputSheet.tsx');
 const dailyBrief = read('components/portal/DailyBriefCard.tsx');
 const lifeState = read('components/portal/LifeStateCard.tsx');
 const profileCard = read('components/portal/NesioProfileCard.tsx');
@@ -48,6 +50,16 @@ assert.match(
   cameraSheet,
   /待确认图片线索|登录或 Lab 模式后可自动识别标签|ai_auth_required/,
   'Camera must degrade honestly when AI image analysis is not authorized.',
+);
+assert.match(
+  cameraSheet,
+  /#钥匙|#门口|extraTags|parseInlineTags/,
+  'Camera result should let users add tags before saving an image clue.',
+);
+assert.match(
+  cameraSheet,
+  /x-baohe-access-mode['"]\s*:\s*['"]personal_lab|personal_lab/,
+  'Camera image analysis should request lab AI when lab mode is enabled.',
 );
 assert.match(
   analyzeRoute,
@@ -94,7 +106,18 @@ assert.match(memoryTab, /这里会放你以后想找回的东西|娃娃在蓝盒
 assert.match(memoryTab, /isPrivateExternalNode|visibleMemoryNodes/, 'Memory should show local records while filtering private external calendar/email nodes when signed out.');
 assert.doesNotMatch(memoryTab, /setNodes\(\[\]\);\s*return undefined;/, 'Signed-out Memory must not hide local voice/photo/manual records.');
 assert.doesNotMatch(memoryTab, /aria-label="语音问宝盒"|nesio-memory-search-voice/, 'Memory search should stay focused on typed retrieval; voice ask belongs to the center N long press.');
+assert.match(memoryTab, /showAll|visibleItems|slice\(0,\s*3\)|更多线索/s, 'Memory should show at most three cards first and fold the rest behind a more button.');
+assert.match(memoryTab, /deleteLifeNode|左滑删除|长按分享|navigator\.share|clipboard/, 'Memory cards should support left-swipe delete and long-press share.');
+assert.match(memoryTab, /\/icons\/treasurebox\.svg/, 'Memory logo should use the transparent SVG asset instead of the light-background PWA icon.');
+assert.match(todayFeed, /\/icons\/treasurebox\.svg/, 'Today logo should use the transparent SVG asset instead of the light-background PWA icon.');
 assert.match(bottomNav, /onPointerDown=\{startLongPress\}[\s\S]*长按提问/, 'Center N button must expose long-press ask behavior.');
+assert.match(bottomNav, /draggable=\{false\}|onContextMenu=\{\(e\) => e\.preventDefault\(\)\}/, 'Center N image must suppress iOS image callout/share sheet during long press.');
+assert.match(tellSheet, /label:\s*'上传'/, 'Center N third fan action should say 上传, not 分享.');
+assert.doesNotMatch(tellSheet, /分享 · 上传|分享<\/span>/, 'Center N fan should not show the word 分享 under the upload action.');
+assert.doesNotMatch(tellSheet, /nesio-tell-fan-icon--voice/, 'Center N fan action colors should be consistent; voice should not use a separate blue background.');
+assert.match(voiceSheet, /isAskMode[\s\S]*inputRef\.current\?\.focus|!isAskMode[\s\S]*startListening/s, 'Ask mode should not auto-start recording; it should focus typed question input first.');
+assert.match(voiceSheet, /!\s*isAskMode[\s\S]*会议记录/s, 'Meeting recorder entry should be hidden from Ask mode.');
+assert.match(voiceSheet, /nesio-ask-answer|我找到了这些可能相关的线索|还没找到相关线索/s, 'Ask mode should show the answer below the input after asking.');
 assert.match(portal, /ASK_GUIDE_KEY|setAskGuideOpen\(true\)|问宝盒/, 'Portal must show a first-use ask guide when the center N is long-pressed.');
 assert.match(portal, /openAskVoice|setVoiceIntent\('ask'\)[\s\S]*setCaptureMode\('voice'\)/, 'Portal must route center N long press to the voice ask surface after the guide.');
 assert.match(portal, /nesio-memory-received[\s\S]*收好了，以后可以找回来|MemoryReceipt/, 'Portal must show a calm receipt animation after the first user record.');
@@ -103,8 +126,11 @@ assert.match(onboarding, /nesio-onboarding-visibility-change/, 'Onboarding must 
 assert.doesNotMatch(profileCard, /已整理|已使用第|daysUsed/, 'Profile summary must not foreground usage-day counters.');
 assert.match(profileCard, /api\/auth\/logout|退出登录/, 'Profile/settings surface must expose a logout action when signed in.');
 assert.match(profileCard, /clearProfileIdentity/, 'Profile logout must clear local identity so the old customer name is not shown after sign-out.');
+assert.match(profileCard, /loggedIn\?:\s*boolean|Boolean\(d\?\.loggedIn\)/, 'Profile card must use session.loggedIn, not ok, to avoid fake signed-in state.');
 assert.match(loginPage, /注册|Create account|发送注册链接|sign-up/, 'Login page must expose a create-account path.');
 assert.match(loginPage, /nesio-login-logo-img/, 'Login page must use a non-inverted logo class so the logo is visible on the white card.');
+assert.match(loginPage, /\/api\/auth\/callback/, 'Login/OAuth must redirect through the auth callback route so sessions are created.');
+assert.doesNotMatch(loginPage, /redirectTo:\s*window\.location\.origin \+ '\/'/, 'Login/OAuth must not redirect straight to home and skip callback.');
 assert.match(loginPage, /provider_not_configured|supabase_otp_failed|auth_start_exception|friendlyAuthError/, 'Login page must show specific account setup/send failures instead of one vague error.');
 assert.match(authStartRoute, /auth_start_exception|try\s*\{[\s\S]*const auditId|catch \(err/, 'Auth start route must fail closed with JSON instead of returning an empty 500.');
 assert.match(shareSheet, /你分享进来的内容[\s\S]*可确认的信息/, 'Share sheet should say user-shared content is organized into confirmable information.');

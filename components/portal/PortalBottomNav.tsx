@@ -82,6 +82,8 @@ export default function PortalBottomNav({
           alt=""
           className="nesio-bottom-nav-center-icon"
           aria-hidden
+          draggable={false}
+          onContextMenu={(e) => e.preventDefault()}
         />
       </button>
 

@@ -49,9 +49,13 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
       setIntentLabel(''); setMicError(''); setSavedCount(0); setAskResults([]);
       recRef.current?.stop();
     } else {
-      setTimeout(startListening, 300);
+      if (isAskMode) {
+        setTimeout(() => inputRef.current?.focus(), 120);
+      } else {
+        setTimeout(startListening, 300);
+      }
     }
-  }, [open]);
+  }, [open, isAskMode]);
 
   // Update intent label as user types/speaks
   useEffect(() => {
@@ -165,28 +169,29 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
         <div className="nesio-voice-sheet-header">
           <h2 className="nesio-voice-sheet-title">{isAskMode ? '问宝盒' : '说一句'}</h2>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <button type="button"
-              style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--portal-blue-deep)', background: 'rgba(88,140,227,0.1)', padding: '0.2rem 0.6rem', borderRadius: '999px' }}
-              onClick={() => { stopListening(); setMode('meeting'); }}
-              title="切换到会议记录模式">
-              🎙 会议记录
-            </button>
+            {!isAskMode && (
+              <button type="button"
+                style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--portal-blue-deep)', background: 'rgba(88,140,227,0.1)', padding: '0.2rem 0.6rem', borderRadius: '999px' }}
+                onClick={() => { stopListening(); setMode('meeting'); }}
+                title="切换到会议记录模式">
+                🎙 会议记录
+              </button>
+            )}
             <button type="button" className="nesio-voice-sheet-close" onClick={onClose} aria-label="关闭">✕</button>
           </div>
         </div>
 
-        {/* Transcript */}
-        <div className="nesio-voice-transcript" onClick={() => { stopListening(); inputRef.current?.focus(); }}>
-          {text
-            ? <span>{text}</span>
-            : <span className="nesio-voice-transcript-placeholder">
-                {listening
-                  ? '正在听这一句，说完后会显示…'
-                  : isAskMode
-                    ? '问一句：那件外套在哪、上次买的药还有吗…'
+        {!isAskMode && (
+          <div className="nesio-voice-transcript" onClick={() => { stopListening(); inputRef.current?.focus(); }}>
+            {text
+              ? <span>{text}</span>
+              : <span className="nesio-voice-transcript-placeholder">
+                  {listening
+                    ? '正在听这一句，说完后会显示…'
                     : '点下方麦克风开始，或直接打字'}
-              </span>}
-        </div>
+                </span>}
+          </div>
+        )}
 
         {/* Intent label */}
         {intentLabel && (
@@ -212,7 +217,7 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
           ) : micError ? (
             <span style={{ fontSize: '0.73rem', color: '#ef4444', textAlign: 'center', lineHeight: 1.4 }}>{micError}</span>
           ) : text ? (
-            <span style={{ fontSize: '0.72rem', color: 'var(--portal-muted)' }}>{isAskMode ? '识别完成 · 点「问宝盒」查找线索' : '识别完成 · 点「告诉 Nesio」保存'}</span>
+            <span style={{ fontSize: '0.72rem', color: 'var(--portal-muted)' }}>{isAskMode ? '输入完成 · 点「问宝盒」查找线索' : '识别完成 · 点「告诉 Nesio」保存'}</span>
           ) : null}
         </div>
 
@@ -254,7 +259,7 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
 
         {/* Send button */}
         {isAskMode && sendState === 'saved' ? (
-          <div className="nesio-voice-saved" style={{ textAlign: 'left', color: 'var(--portal-ink)', background: 'rgba(88,140,227,0.08)', borderRadius: '1rem' }}>
+          <div className="nesio-voice-saved nesio-ask-answer" style={{ textAlign: 'left', color: 'var(--portal-ink)', background: 'rgba(88,140,227,0.08)', borderRadius: '1rem' }}>
             {askResults.length ? (
               <>
                 <p style={{ fontWeight: 700, marginBottom: '0.45rem' }}>我找到了这些可能相关的线索</p>

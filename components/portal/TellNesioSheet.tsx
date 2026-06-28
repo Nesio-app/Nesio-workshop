@@ -19,7 +19,6 @@ const FAN_BUTTONS: Array<{
   label: string;
   pos: 'left' | 'center' | 'right';
   icon: React.ReactNode;
-  voice?: boolean;
 }> = [
   {
     mode: 'camera',
@@ -36,7 +35,6 @@ const FAN_BUTTONS: Array<{
     mode: 'voice',
     label: '说一句',
     pos: 'center',
-    voice: true,
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="28" height="28">
         <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
@@ -46,7 +44,7 @@ const FAN_BUTTONS: Array<{
   },
   {
     mode: 'share',
-    label: '分享 · 上传',
+    label: '上传',
     pos: 'right',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="26" height="26">
@@ -74,7 +72,7 @@ export default function TellNesioSheet({ open, onClose, onCapture }: TellNesioSh
             }}
             aria-label={btn.label}
           >
-            <span className={`nesio-tell-fan-icon${btn.voice ? ' nesio-tell-fan-icon--voice' : ''}`}>
+            <span className="nesio-tell-fan-icon">
               {btn.icon}
             </span>
             <span className="nesio-tell-fan-label">{btn.label}</span>

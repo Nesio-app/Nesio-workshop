@@ -7,10 +7,11 @@ type AuthState = 'idle' | 'loading' | 'email_sent' | 'error';
 
 async function startAuth(provider: string, email?: string): Promise<{ ok: boolean; url?: string; error?: string; status?: number }> {
   try {
+    const redirectTo = `${window.location.origin}/api/auth/callback`;
     const res = await fetch('/api/auth/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ provider, email, redirectTo: window.location.origin + '/' }),
+      body: JSON.stringify({ provider, email, redirectTo }),
     });
     const text = await res.text();
     const data = text ? JSON.parse(text) as { ok?: boolean; url?: string; error?: string } : {};

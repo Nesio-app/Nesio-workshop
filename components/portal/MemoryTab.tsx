@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { loadProfileSettings } from '@/lib/portal/profile';
-import { getRecentNodes, isPrivateExternalNode, searchLifeGraph, type LifeNode } from '@/lib/portal/life-graph';
+import { deleteLifeNode, getRecentNodes, isPrivateExternalNode, searchLifeGraph, type LifeNode } from '@/lib/portal/life-graph';
 import MemoryNodeDetail from './MemoryNodeDetail';
 
 const TYPE_ICON: Record<string, string> = {
@@ -40,11 +40,100 @@ function visibleMemoryNodes(nodes: LifeNode[], canUsePrivateData: boolean): Life
   return canUsePrivateData ? nodes : nodes.filter((node) => !isPrivateExternalNode(node));
 }
 
+function shareTextForNode(node: LifeNode): string {
+  const tags = node.tags?.length ? `\n标签：${node.tags.map((tag) => `#${tag}`).join(' ')}` : '';
+  const preview = cleanMemoryPreview(node);
+  return `${node.name}\n${preview}${tags}\n来自 Nesio Memory`;
+}
+
+function MemoryCard({
+  node,
+  onOpen,
+  onDeleted,
+}: {
+  node: LifeNode;
+  onOpen: () => void;
+  onDeleted: () => void;
+}) {
+  const startX = useRef(0);
+  const startY = useRef(0);
+  const swiped = useRef(false);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function clearTimer() {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  }
+
+  async function shareNode() {
+    swiped.current = true;
+    clearTimer();
+    const text = shareTextForNode(node);
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: node.name, text });
+      } else {
+        await navigator.clipboard?.writeText(text);
+      }
+    } catch {
+      /* user cancelled or clipboard unavailable */
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      className="nesio-memory-card"
+      onClick={() => {
+        if (swiped.current) {
+          swiped.current = false;
+          return;
+        }
+        onOpen();
+      }}
+      onPointerDown={(event) => {
+        swiped.current = false;
+        startX.current = event.clientX;
+        startY.current = event.clientY;
+        clearTimer();
+        longPressTimer.current = setTimeout(shareNode, 620);
+      }}
+      onPointerMove={(event) => {
+        const dx = event.clientX - startX.current;
+        const dy = event.clientY - startY.current;
+        if (Math.abs(dx) > 14 || Math.abs(dy) > 14) clearTimer();
+        if (dx < -64 && Math.abs(dy) < 32) {
+          swiped.current = true;
+          clearTimer();
+          if (deleteLifeNode(node.id)) onDeleted();
+        }
+      }}
+      onPointerUp={clearTimer}
+      onPointerCancel={clearTimer}
+      onPointerLeave={clearTimer}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        shareNode();
+      }}
+      aria-label={`${node.name}，左滑删除，长按分享`}
+    >
+      <span className="nesio-memory-card-icon" style={{ background: TYPE_BG[node.type] || '#f0f4ff' }}>
+        {TYPE_ICON[node.type] || '📌'}
+      </span>
+      <span className="nesio-memory-card-title">{node.name}</span>
+      <span className="nesio-memory-card-sub">{cleanMemoryPreview(node)}</span>
+    </button>
+  );
+}
+
 export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: boolean }) {
   const [query, setQuery] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [nodes, setNodes] = useState<LifeNode[]>([]);
   const [selectedNode, setSelectedNode] = useState<LifeNode | null>(null);
+  const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
     if (canUsePrivateData) {
@@ -64,15 +153,17 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
   const results = query.trim()
     ? visibleMemoryNodes(searchLifeGraph(query), canUsePrivateData)
     : visibleNodes;
-  const initials = canUsePrivateData ? (displayName.trim().slice(0, 1) || '我') : '我';
   const hasRealNodes = visibleNodes.length > 0;
+  const sourceItems = query ? results : (hasRealNodes ? results : []);
+  const visibleItems = showAll || query ? sourceItems : sourceItems.slice(0, 3);
+  const initials = canUsePrivateData ? (displayName.trim().slice(0, 1) || '我') : '我';
 
   return (
     <>
       <div className="nesio-memory-root">
         <header className="nesio-today-header">
           <div className="nesio-today-brand">
-            <img src="/icons/treasurebox-pwa-192.png" alt="Nesio" className="nesio-memory-brand-icon" />
+            <img src="/icons/treasurebox.svg" alt="Nesio" className="nesio-memory-brand-icon" />
           </div>
           <a href="/settings" className="nesio-today-avatar" aria-label="我的设置">{initials}</a>
         </header>
@@ -130,16 +221,13 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
               <p className="nesio-memory-section-label">{query ? `搜索结果（${results.length}）` : '最近想起'}</p>
               <div className="nesio-memory-grid">
                 {/* Real nodes */}
-                {(query ? results : (hasRealNodes ? results : [])).map((node) => (
-                  <button key={node.id} type="button"
-                    className="nesio-memory-card"
-                    onClick={() => setSelectedNode(node)}>
-                    <span className="nesio-memory-card-icon" style={{ background: TYPE_BG[node.type] || '#f0f4ff' }}>
-                      {TYPE_ICON[node.type] || '📌'}
-                    </span>
-                    <span className="nesio-memory-card-title">{node.name}</span>
-                    <span className="nesio-memory-card-sub">{cleanMemoryPreview(node)}</span>
-                  </button>
+                {visibleItems.map((node) => (
+                  <MemoryCard
+                    key={node.id}
+                    node={node}
+                    onOpen={() => setSelectedNode(node)}
+                    onDeleted={() => setNodes(getRecentNodes(30))}
+                  />
                 ))}
 
                 {/* Seed cards when no real nodes */}
@@ -153,6 +241,15 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                   </button>
                 ))}
               </div>
+              {!query && sourceItems.length > 3 && (
+                <button
+                  type="button"
+                  className="nesio-memory-more-btn"
+                  onClick={() => setShowAll((value) => !value)}
+                >
+                  {showAll ? '收起线索' : `更多线索（${sourceItems.length - 3}）`}
+                </button>
+              )}
             </>
           )}
 

@@ -22,7 +22,10 @@ export default function NesioProfileCard() {
     setMemoryCount(getRecentNodes(100).length);
 
     // Check auth session
-    fetch('/api/auth/session').then((r) => r.json()).then((d: { ok?: boolean }) => setIsSignedIn(!!d?.ok)).catch(() => {});
+    fetch('/api/auth/session')
+      .then((r) => r.json())
+      .then((d: { loggedIn?: boolean }) => setIsSignedIn(Boolean(d?.loggedIn)))
+      .catch(() => {});
 
     const onUpdate = () => setMemoryCount(getRecentNodes(100).length);
     window.addEventListener('nesio-life-graph-updated', onUpdate);

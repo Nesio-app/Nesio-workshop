@@ -32,7 +32,7 @@ async function compressImage(canvas: HTMLCanvasElement): Promise<string> {
 async function analyzeImage(base64: string): Promise<AnalysisResult> {
   const res = await fetch('/api/portal/analyze', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'x-baohe-access-mode': 'personal_lab' },
     body: JSON.stringify({ type: 'image', content: '请识别图中的物品、人物、场景，提取为结构化记忆节点。', imageBase64: base64, mimeType: 'image/jpeg' }),
   });
   const data = await res.json() as { ok?: boolean; nodes?: AnalyzedNode[]; summary?: string; error?: string };
@@ -72,6 +72,17 @@ function buildPendingImageResult(name = '图片线索'): AnalysisResult {
   };
 }
 
+function parseInlineTags(value: string): string[] {
+  return Array.from(new Set(
+    value
+      .split(/\s+/)
+      .map((part) => part.trim())
+      .filter((part) => part.startsWith('#') && part.length > 1)
+      .map((part) => part.slice(1).replace(/[，。,.!?！？:：；;]/g, '').trim())
+      .filter(Boolean),
+  ));
+}
+
 export default function CameraSheet({ open, onClose }: CameraSheetProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -84,11 +95,12 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
   const [permDenied, setPermDenied] = useState(false);
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
   const [error, setError] = useState('');
+  const [extraTags, setExtraTags] = useState('');
 
   useEffect(() => {
     if (open) {
       setPhase('idle'); setResult(null); setCapturedPreview('');
-      setPermDenied(false); setError('');
+      setPermDenied(false); setError(''); setExtraTags('');
       startCamera('environment');
     } else {
       stopCamera();
@@ -217,13 +229,22 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
 
   function saveAll() {
     if (!result) return;
-    result.nodes.forEach((n) => addLifeNode({ ...n, source: 'photo' }));
+    const userTags = parseInlineTags(extraTags);
+    result.nodes.forEach((n) => addLifeNode({
+      ...n,
+      source: 'photo',
+      tags: Array.from(new Set([...(n.tags || []), ...userTags])),
+      attributes: {
+        ...n.attributes,
+        ...(userTags.length ? { userTags: userTags.join(', ') } : {}),
+      },
+    }));
     setPhase('saved');
-    setTimeout(() => { onClose(); setPhase('idle'); setResult(null); }, 900);
+    setTimeout(() => { onClose(); setPhase('idle'); setResult(null); setExtraTags(''); }, 900);
   }
 
   function retake() {
-    setResult(null); setCapturedPreview(''); setError('');
+    setResult(null); setCapturedPreview(''); setError(''); setExtraTags('');
     setPhase('live');
   }
 
@@ -346,6 +367,20 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
               </div>
             ))}
           </div>
+          <label className="nesio-camera-tag-field">
+            <span>给这张图片加标签</span>
+            <input
+              value={extraTags}
+              onChange={(e) => setExtraTags(e.target.value)}
+              placeholder="例如 #钥匙 #门口 #Linda礼物"
+              aria-label="图片标签"
+            />
+          </label>
+          {parseInlineTags(extraTags).length > 0 && (
+            <div className="nesio-camera-tag-preview">
+              {parseInlineTags(extraTags).map((tag) => <span key={tag}>#{tag}</span>)}
+            </div>
+          )}
           <div className="nesio-camera-result-actions">
             <button type="button" className="nesio-camera-save-btn" onClick={saveAll}>
               存入 Memory ({result.nodes.length} 条)
