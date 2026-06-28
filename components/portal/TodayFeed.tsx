@@ -291,8 +291,6 @@ export default function TodayFeed({
     }
   }
 
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? '早上好' : hour < 18 ? '下午好' : '晚上好';
   const initials = displayName.trim().slice(0, 1) || 'J';
 
   return (
@@ -317,11 +315,13 @@ export default function TodayFeed({
             <LifeStateCard canUsePrivateData={canUsePrivateData} />
 
             <div className="nesio-today-greeting">
-              <h1 className="nesio-today-greeting-title">{greeting}，{displayName}。</h1>
+              <h1 className="nesio-today-greeting-title">
+                {cards.length > 0 ? '今天有点多，先看最重要的一件。' : '今天先留一点空白。'}
+              </h1>
               <p className="nesio-today-greeting-sub">
                 {cards.length > 0
-                  ? `今天，${cards.length} 件事想轻轻让你看见。`
-                  : '今天暂时没有新建议，保持稳定就是好状态。'}
+                  ? '我把最该看的放前面，你来决定下一步。'
+                  : '暂时没有新建议，有需要时再把事情放进来。'}
               </p>
             </div>
 

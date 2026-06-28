@@ -1,15 +1,13 @@
 'use client';
 
 /**
- * LifeStateCard — visible output of the Signal → Life State pipeline (PRD Ch.4.3).
- * Shows the user's current cross-signal life state: dimension scores, key
- * drivers, risks. This is the layer Today/Mirror reason from.
+ * LifeStateCard — gentle cross-signal workload view.
+ * It describes what is taking attention today without scoring the user.
  */
 
 import { useEffect, useState } from 'react';
 import {
   computeLifeState,
-  overallScore,
   dimensionLabel,
   type LifeState,
   type DimensionLevel,
@@ -25,9 +23,13 @@ const LEVEL_COLOR: Record<DimensionLevel, string> = {
   low: '#ef4444',
 };
 
-const LEVEL_LABEL: Record<DimensionLevel, string> = {
-  good: '良好', stable: '平稳', unknown: '未知',
-  mild_risk: '需关注', high_load: '偏高', low: '偏低',
+const LEVEL_FACT: Record<DimensionLevel, string> = {
+  good: '安排较轻',
+  stable: '安排稳定',
+  unknown: '线索还少',
+  mild_risk: '事项较多',
+  high_load: '事项较多',
+  low: '需要放慢',
 };
 
 export default function LifeStateCard({ canUsePrivateData }: { canUsePrivateData: boolean }) {
@@ -94,18 +96,20 @@ export default function LifeStateCard({ canUsePrivateData }: { canUsePrivateData
   // Don't show until there's at least one real signal-backed dimension
   if (known.length === 0) return null;
 
-  const score = Math.round(overallScore(state) * 100);
-  const scoreColor = score >= 70 ? '#10b981' : score >= 50 ? '#f59e0b' : '#ef4444';
+  const highLoadCount = known.filter((d) => d.level === 'high_load' || d.level === 'mild_risk' || d.level === 'low').length;
+  const loadTone = highLoadCount > 1 ? '有点满' : highLoadCount === 1 ? '有一处需要放轻' : '安排还算稳定';
+  const loadHint = highLoadCount > 0 ? '先看最重要的一件。' : '把最该看的放前面就好。';
+  const leadColor = highLoadCount > 0 ? '#f59e0b' : '#10b981';
 
   return (
     <div className="nesio-lifestate-card">
       <button type="button" className="nesio-lifestate-head" onClick={() => setExpanded(!expanded)}>
-        <div className="nesio-lifestate-ring" style={{ ['--ring-color' as string]: scoreColor, ['--ring-pct' as string]: `${score}` }}>
-          <span className="nesio-lifestate-ring-num">{score}</span>
+        <div className="nesio-lifestate-ring" style={{ ['--ring-color' as string]: leadColor, ['--ring-pct' as string]: '64' }}>
+          <span className="nesio-lifestate-ring-icon" aria-hidden>◦</span>
         </div>
         <div className="nesio-lifestate-head-text">
-          <p className="nesio-lifestate-kicker">当前状态 · Life State</p>
-          <p className="nesio-lifestate-explanation">{aiExplanation || state.explanation}</p>
+          <p className="nesio-lifestate-kicker">今天的负荷</p>
+          <p className="nesio-lifestate-explanation">{loadTone}，{aiExplanation || loadHint}</p>
         </div>
         <svg className={`nesio-lifestate-chevron${expanded ? ' nesio-lifestate-chevron--open' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
           <path d="M6 9l6 6 6-6" />
@@ -119,7 +123,7 @@ export default function LifeStateCard({ canUsePrivateData }: { canUsePrivateData
             <div className="nesio-lifestate-dim-head">
               <span className="nesio-lifestate-dim-label">{dimensionLabel(d.dimension)}</span>
               <span className="nesio-lifestate-dim-level" style={{ color: LEVEL_COLOR[d.level] }}>
-                {LEVEL_LABEL[d.level]}
+                {LEVEL_FACT[d.level]}
               </span>
             </div>
             <div className="nesio-lifestate-dim-track">

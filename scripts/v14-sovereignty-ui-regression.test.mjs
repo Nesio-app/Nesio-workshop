@@ -6,6 +6,8 @@ const read = (path) => fs.readFileSync(new URL(`../${path}`, import.meta.url), '
 const cameraSheet = read('components/portal/CameraSheet.tsx');
 const memoryTab = read('components/portal/MemoryTab.tsx');
 const todayFeed = read('components/portal/TodayFeed.tsx');
+const dailyBrief = read('components/portal/DailyBriefCard.tsx');
+const lifeState = read('components/portal/LifeStateCard.tsx');
 const profileCard = read('components/portal/NesioProfileCard.tsx');
 const shareSheet = read('components/portal/ShareSheet.tsx');
 const nodeDetail = read('components/portal/MemoryNodeDetail.tsx');
@@ -41,6 +43,14 @@ for (const source of [todayFeed, nodeDetail, profileCard, shareSheet, domains]) 
   assert.doesNotMatch(source, /[0-9]{2,3}%\s*(把握|置信|confidence)|置信度\s*[0-9{]/i, 'User-facing copy must not expose pseudo-precise confidence percentages.');
 }
 assert.doesNotMatch(todayFeed, /你的生活，连成一张图。|Nesio 已经陪你|正在聆听|自动抽取/, 'Public UI copy should avoid omniscient or over-personified phrasing.');
+assert.doesNotMatch(todayFeed, /今天，\$\{cards\.length\} 件事|<h1 className="nesio-today-greeting-title">\{greeting\}，\{displayName\}/, 'Today must not repeat the greeting/name below the daily brief.');
+assert.match(todayFeed, /先看最重要的一件|把最该看的放前面/, 'Today greeting should frame attention support instead of repeated salutation.');
+assert.doesNotMatch(dailyBrief, /播客/, 'Daily brief action copy should not say podcast on the home surface.');
+assert.match(dailyBrief, /听简报|文字简报/, 'Daily brief should use home-appropriate briefing language.');
+assert.doesNotMatch(lifeState, /Life State|overallScore|nesio-lifestate-ring-num|偏高|良好|需关注|偏低/, 'Life state card must not expose scoring or evaluative labels.');
+assert.match(lifeState, /今天的负荷|事项较多|安排稳定|先看最重要的一件/, 'Life state card should describe workload facts gently.');
+assert.doesNotMatch(domains, /不用翻笔记/, 'Meeting cards should use natural assistant wording, not system-summary language.');
+assert.match(domains, /已经整理好了|关键提醒/, 'Meeting cards should explain that key reminders are ready.');
 assert.match(memoryTab, /把散落的生活线索找回来|重要的事，慢慢连起来/, 'Memory title should use sovereignty-oriented retrieval language.');
 assert.doesNotMatch(memoryTab, /aria-label="语音问宝盒"|nesio-memory-search-voice/, 'Memory search should stay focused on typed retrieval; voice ask belongs to the center N long press.');
 assert.match(bottomNav, /onPointerDown=\{startLongPress\}[\s\S]*长按问宝盒/, 'Center N button must expose long-press ask-Baohe behavior.');

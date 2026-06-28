@@ -11071,12 +11071,12 @@ html[data-portal-theme="night"] .nesio-lifestate-ring {
     conic-gradient(var(--ring-color) calc(var(--ring-pct) * 1%), rgba(255,255,255,0.1) 0);
 }
 
-.nesio-lifestate-ring-num {
+.nesio-lifestate-ring-icon {
   font-size: 0.85rem;
   font-weight: 800;
   color: var(--portal-ink);
 }
-html[data-portal-theme="night"] .nesio-lifestate-ring-num { color: #e8eefa; }
+html[data-portal-theme="night"] .nesio-lifestate-ring-icon { color: #e8eefa; }
 
 .nesio-lifestate-head-text { flex: 1; min-width: 0; }
 

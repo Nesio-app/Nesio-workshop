@@ -3,7 +3,7 @@
 /**
  * DailyBriefCard — always-present card in Today Feed.
  * Shows weather + calendar + email highlights.
- * "播客" button launches conversational TTS briefing.
+ * "听简报" button launches conversational TTS briefing.
  */
 
 import { useEffect, useRef, useState } from 'react';
@@ -189,7 +189,7 @@ export default function DailyBriefCard({ canUsePrivateData }: { canUsePrivateDat
           <button type="button" className="nesio-brief-podcast-btn"
             onClick={() => generated ? playSegments(segments, 0) : generateBrief()}
             disabled={playState === 'loading' || !canUsePrivateData}>
-            {playState === 'loading' ? '生成中…' : canUsePrivateData ? '文字简报' : '登录后生成'}
+            {playState === 'loading' ? '生成中…' : canUsePrivateData ? '听简报' : '登录后生成'}
           </button>
         )}
       </div>
