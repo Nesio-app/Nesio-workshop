@@ -7,6 +7,7 @@ import {
   type PortalLocale,
 } from '@/lib/portal/profile';
 import { loadMirrorFromCloud } from '@/lib/portal/mirror-profile';
+import { getAuthRedirectTo } from '@/lib/portal/auth-client';
 
 const ONBOARDING_DONE_KEY = 'treasurebox-onboarding-v14-done';
 const LEGACY_ONBOARDING_DONE_KEY = 'treasurebox-onboarding-v13-done';
@@ -18,10 +19,11 @@ type Step = 'welcome' | 'name' | 'auth';
 
 async function startGoogleAuth(): Promise<string | null> {
   try {
+    const redirectTo = getAuthRedirectTo();
     const res = await fetch('/api/auth/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ provider: 'google', redirectTo: window.location.href }),
+      body: JSON.stringify({ provider: 'google', redirectTo }),
     });
     const data = await res.json() as { ok?: boolean; url?: string };
     return data.ok && data.url ? data.url : null;
@@ -30,10 +32,11 @@ async function startGoogleAuth(): Promise<string | null> {
 
 async function startEmailAuth(email: string): Promise<{ ok: boolean }> {
   try {
+    const redirectTo = getAuthRedirectTo();
     const res = await fetch('/api/auth/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ provider: 'email', email, redirectTo: window.location.href }),
+      body: JSON.stringify({ provider: 'email', email, redirectTo }),
     });
     const data = await res.json() as { ok?: boolean };
     return { ok: !!data.ok };

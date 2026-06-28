@@ -294,7 +294,7 @@ export default function TodayFeed({
     const card = cards.find((c) => c.id === cardId);
     recordCardFeedback(cardId, feedback);
     if (card) learnFromFeedback(card.domain, feedback);
-    if (feedback === 'too_much' || feedback === 'useful') {
+    if (feedback === 'too_much' || feedback === 'useful' || feedback === 'not_now') {
       setCards((prev) => prev.filter((c) => c.id !== cardId));
     }
   }
@@ -320,17 +320,6 @@ export default function TodayFeed({
 
             {/* Cross-signal Life State (Signal → Life State pipeline output) */}
             <LifeStateCard canUsePrivateData={canUsePrivateData} />
-
-            <div className="nesio-today-greeting">
-              <h1 className="nesio-today-greeting-title">
-                {cards.length > 0 ? '今天有点多，先看最重要的一件。' : '今天先留一点空白。'}
-              </h1>
-              <p className="nesio-today-greeting-sub">
-                {cards.length > 0
-                  ? '我把最该看的放前面，你来决定下一步。'
-                  : '先记一件事，以后就找得到。'}
-              </p>
-            </div>
 
             {cards.length > 0 ? (
               <div className="nesio-today-cards">

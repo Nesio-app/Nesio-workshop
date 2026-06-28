@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { addLifeNode, type LifeNode } from '@/lib/portal/life-graph';
 
 interface CameraSheetProps { open: boolean; onClose: () => void; }
@@ -102,17 +102,12 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
   const [error, setError] = useState('');
   const [extraTags, setExtraTags] = useState('');
 
-  useEffect(() => {
-    if (open) {
-      setPhase('idle'); setResult(null); setCapturedPreview('');
-      setPermDenied(false); setError(''); setExtraTags('');
-    } else {
-      stopCamera();
-    }
-    return stopCamera;
-  }, [open]);
+  const stopCamera = useCallback(() => {
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+  }, []);
 
-  async function startCamera(facing: 'environment' | 'user') {
+  const startCamera = useCallback(async (facing: 'environment' | 'user') => {
     stopCamera();
     if (!navigator.mediaDevices?.getUserMedia) { setPhase('no-camera'); return; }
     try {
@@ -140,12 +135,18 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
       }
       setPhase('no-camera');
     }
-  }
+  }, [stopCamera]);
 
-  function stopCamera() {
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    streamRef.current = null;
-  }
+  useEffect(() => {
+    if (open) {
+      setPhase('idle'); setResult(null); setCapturedPreview('');
+      setPermDenied(false); setError(''); setExtraTags('');
+      startCamera('environment');
+    } else {
+      stopCamera();
+    }
+    return stopCamera;
+  }, [open, startCamera, stopCamera]);
 
   async function capturePhoto() {
     const video = videoRef.current;
@@ -305,7 +306,7 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
           />
         )}
 
-        {/* No camera fallback */}
+        {/* Opening / no camera fallback */}
         {(phase === 'idle' || phase === 'no-camera') && (
           <div className="nesio-camera-fallback">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="52" height="52" opacity="0.25">
@@ -314,16 +315,11 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
             </svg>
             <p className="nesio-camera-fallback-text">
               {phase === 'idle'
-                ? '点「启动相机」后才会请求摄像头权限。你也可以先选一张照片或文件放进 Nesio。'
+                ? '正在打开相机。你也可以先选一张照片或文件放进 Nesio。'
                 : permDenied
                 ? '相机权限被拒绝。请在浏览器设置→网站设置→摄像头中允许，然后刷新。'
                 : '此设备不支持网页相机访问。'}
             </p>
-            {phase === 'idle' && (
-              <button type="button" className="nesio-camera-gallery-btn" onClick={() => startCamera(facingMode)}>
-                启动相机
-              </button>
-            )}
             <button type="button" className="nesio-camera-gallery-btn" onClick={handleGallery}>
               从相册 / 文件中选择
             </button>

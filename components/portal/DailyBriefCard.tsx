@@ -38,6 +38,31 @@ function todayKey(): string {
 
 type PlayState = 'idle' | 'loading' | 'playing' | 'paused' | 'done';
 
+function buildDailyOverview(canUsePrivateData: boolean, eventCount: number, memoryCount: number) {
+  if (!canUsePrivateData || memoryCount === 0) {
+    return {
+      title: '先放进来一件事就好',
+      subtitle: '说一句、拍一下，Nesio 会帮你留到以后找得到。',
+    };
+  }
+  if (eventCount >= 2) {
+    return {
+      title: '今天有点多，先看最重要的一件。',
+      subtitle: `有 ${eventCount} 个安排，我把最该看的放前面。`,
+    };
+  }
+  if (eventCount === 1) {
+    return {
+      title: '今天先看这一件事。',
+      subtitle: '还有别的线索可以晚点处理。',
+    };
+  }
+  return {
+    title: memoryCount >= 3 ? '今天适合整理一下线索。' : '今天很轻，可以补一条 Memory。',
+    subtitle: memoryCount >= 3 ? '你已经放进来一些内容，可以回头找得到。' : '从一件小事开始就够了。',
+  };
+}
+
 export default function DailyBriefCard({ canUsePrivateData }: { canUsePrivateData: boolean }) {
   const [weather, setWeather] = useState<WeatherView | null>(null);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
@@ -173,6 +198,8 @@ export default function DailyBriefCard({ canUsePrivateData }: { canUsePrivateDat
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? '早上好' : hour < 18 ? '下午好' : '晚上好';
+  const memoryCount = canUsePrivateData ? getRecentNodes().length : 0;
+  const overview = buildDailyOverview(canUsePrivateData, events.length, memoryCount);
 
   return (
     <div className="nesio-brief-card">
@@ -181,6 +208,8 @@ export default function DailyBriefCard({ canUsePrivateData }: { canUsePrivateDat
         <div>
           <p className="nesio-brief-kicker">每日概况</p>
           <h3 className="nesio-brief-title">{greeting}{displayName ? `，${displayName}` : ''}。</h3>
+          <p className="nesio-brief-overview-title">{overview.title}</p>
+          <p className="nesio-brief-overview-sub">{overview.subtitle}</p>
         </div>
         {playState === 'playing' ? (
           <button type="button" className="nesio-brief-podcast-btn nesio-brief-podcast-btn--active" onClick={stopPlay}>

@@ -2,17 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { loadProfileSettings, saveProfileSettings, type PortalLocale } from '@/lib/portal/profile';
+import { getAuthRedirectTo } from '@/lib/portal/auth-client';
 
 type AuthState = 'idle' | 'loading' | 'email_sent' | 'error';
-
-const FALLBACK_AUTH_ORIGIN = 'https://treasurebox-nu.vercel.app';
-
-function getAuthRedirectTo(): string {
-  const origin = window.location.origin;
-  const host = window.location.hostname;
-  const isLocalShell = host === 'localhost' || host === '127.0.0.1' || host.endsWith('.localhost');
-  return `${isLocalShell ? FALLBACK_AUTH_ORIGIN : origin}/api/auth/callback`;
-}
 
 async function startAuth(provider: string, email?: string): Promise<{ ok: boolean; url?: string; error?: string; status?: number }> {
   try {

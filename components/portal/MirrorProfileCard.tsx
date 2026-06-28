@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { getMirrorProfile, type MirrorProfile } from '@/lib/portal/mirror-profile';
+import { getMirrorProfile, resetMirrorProfile, type MirrorProfile } from '@/lib/portal/mirror-profile';
 
 const DOMAIN_LABELS: Record<string, string> = {
   weather: '天气 · 外出', work: '工作 · 会议', family: '家庭 · 礼物',
@@ -115,7 +115,15 @@ export default function MirrorProfileCard({ embedded = false }: { embedded?: boo
       )}
 
       {profile.feedbackCount > 0 && (
-        <button type="button" className="nesio-settings-toggle-btn" style={{ marginTop: '0.85rem' }}>
+        <button
+          type="button"
+          className="nesio-settings-toggle-btn"
+          style={{ marginTop: '0.85rem' }}
+          onClick={() => {
+            resetMirrorProfile();
+            setProfile(getMirrorProfile());
+          }}
+        >
           不再这样理解我
         </button>
       )}

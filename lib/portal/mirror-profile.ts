@@ -51,6 +51,13 @@ function saveMirrorProfile(profile: MirrorProfile): void {
   }
 }
 
+export function resetMirrorProfile(): void {
+  saveMirrorProfile(defaultMirror());
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('nesio-feedback-recorded'));
+  }
+}
+
 async function hasCloudSession(): Promise<boolean> {
   try {
     const res = await fetch('/api/auth/session', { cache: 'no-store' });

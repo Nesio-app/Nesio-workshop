@@ -9012,14 +9012,14 @@ html[data-portal-theme="night"] .nesio-memory-card-title { color: #e8eefa; }
 }
 
 @keyframes tellFanIn {
-  from { opacity: 0; transform: translateY(24px) scale(0.8); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 /* Left (camera) — drop down 20px relative to center voice */
-.nesio-tell-fan-btn--left  { transform: translateY(20px); margin-right: 1.5rem; }
-.nesio-tell-fan-btn--right { transform: translateY(20px); margin-left: 1.5rem; }
-.nesio-tell-fan-btn--center { } /* baseline */
+.nesio-tell-fan-btn--left  { transform: translate(-1.35rem, 1.25rem) rotate(-10deg); margin-right: 0.35rem; }
+.nesio-tell-fan-btn--right { transform: translate(1.35rem, 1.25rem) rotate(10deg); margin-left: 0.35rem; }
+.nesio-tell-fan-btn--center { transform: translateY(-0.65rem); } /* fan apex */
 
 .nesio-tell-fan-icon {
   width: 3.6rem;
@@ -11175,6 +11175,25 @@ html[data-portal-theme="night"] .nesio-brief-kicker { color: #96c7f3; }
 }
 
 html[data-portal-theme="night"] .nesio-brief-title { color: #e8eefa; }
+
+.nesio-brief-overview-title {
+  margin-top: 0.45rem;
+  font-size: 1.18rem;
+  font-weight: 800;
+  line-height: 1.18;
+  color: var(--portal-ink);
+  letter-spacing: 0;
+}
+
+.nesio-brief-overview-sub {
+  margin-top: 0.3rem;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--portal-muted);
+}
+
+html[data-portal-theme="night"] .nesio-brief-overview-title { color: #f7fbff; }
+html[data-portal-theme="night"] .nesio-brief-overview-sub { color: rgba(232,238,250,0.72); }
 
 .nesio-brief-podcast-btn {
   display: flex;

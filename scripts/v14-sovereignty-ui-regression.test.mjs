@@ -14,6 +14,8 @@ const profileCard = read('components/portal/NesioProfileCard.tsx');
 const loginPage = read('components/portal/LoginPageClient.tsx');
 const authStartRoute = read('app/api/auth/start/route.ts');
 const analyzeRoute = read('app/api/portal/analyze/route.ts');
+const ingestRoute = read('app/api/portal/ingest/route.ts');
+const authClient = read('lib/portal/auth-client.ts');
 const shareSheet = read('components/portal/ShareSheet.tsx');
 const nodeDetail = read('components/portal/MemoryNodeDetail.tsx');
 const bottomNav = read('components/portal/PortalBottomNav.tsx');
@@ -28,18 +30,13 @@ const storageCss = read('storage-web/styles.css');
 
 assert.match(
   cameraSheet,
-  /phase === 'idle'[\s\S]*nesio-camera-fallback/,
-  'Camera idle state must render a visible permission/upload fallback, not an empty shell.',
-);
-assert.match(
-  cameraSheet,
-  /启动相机/,
-  'Camera must wait for the user to tap start before requesting camera permission.',
+  /if \(open\)[\s\S]*startCamera\('environment'\)/,
+  'Camera should open the camera directly from the user tap on 拍一下.',
 );
 assert.doesNotMatch(
   cameraSheet,
-  /setError\(''\); setExtraTags\(''\);\s*startCamera\('environment'\);/,
-  'Camera sheet must not auto-start the camera on open.',
+  /启动相机/,
+  'Camera should not show an extra start-camera intermediate page.',
 );
 assert.match(
   cameraSheet,
@@ -100,7 +97,8 @@ assert.doesNotMatch(todayFeed, /你的生活，连成一张图。|Nesio 已经�
 assert.doesNotMatch(todayFeed, /需要你的输入|还没有足够记忆|告诉 Nesio 一件事|告诉 Nesio 新事情/, 'Today empty state should not sound like a data requirement.');
 assert.match(todayFeed, /先放进来一件事就好|从一件小事开始|先记一件事|说一句、拍一下，Nesio 会帮你留到以后找得到/, 'Today empty state should invite one low-pressure first record.');
 assert.doesNotMatch(todayFeed, /今天，\$\{cards\.length\} 件事|<h1 className="nesio-today-greeting-title">\{greeting\}，\{displayName\}/, 'Today must not repeat the greeting/name below the daily brief.');
-assert.match(todayFeed, /先看最重要的一件|把最该看的放前面/, 'Today greeting should frame attention support instead of repeated salutation.');
+assert.doesNotMatch(todayFeed, /今天有点多，先看最重要的一件。/, 'Today Feed must not hard-code the daily overview sentence outside DailyBriefCard.');
+assert.match(dailyBrief, /buildDailyOverview[\s\S]*今天有点多，先看最重要的一件|events\.length|memoryCount/, 'Daily overview should be generated from current user state in DailyBriefCard.');
 assert.doesNotMatch(dailyBrief, /播客/, 'Daily brief action copy should not say podcast on the home surface.');
 assert.match(dailyBrief, /听简报|文字简报/, 'Daily brief should use home-appropriate briefing language.');
 assert.match(dailyBrief, /href="\/login"[\s\S]*登录后生成/, 'Signed-out daily brief generation must be a real login link, not a disabled button.');
@@ -126,7 +124,7 @@ assert.match(bottomNav, /draggable=\{false\}|onContextMenu=\{\(e\) => e\.prevent
 assert.match(tellSheet, /label:\s*'上传'/, 'Center N third fan action should say 上传, not 分享.');
 assert.doesNotMatch(tellSheet, /分享 · 上传|分享<\/span>/, 'Center N fan should not show the word 分享 under the upload action.');
 assert.doesNotMatch(tellSheet, /nesio-tell-fan-icon--voice/, 'Center N fan action colors should be consistent; voice should not use a separate blue background.');
-assert.match(voiceSheet, /isAskMode[\s\S]*inputRef\.current\?\.focus|!isAskMode[\s\S]*startListening/s, 'Ask mode should not auto-start recording; it should focus typed question input first.');
+assert.match(voiceSheet, /setTimeout\(\(\) => inputRef\.current\?\.focus\(\),\s*120\)/, 'Voice and Ask sheets should focus typed input first.');
 assert.match(voiceSheet, /!\s*isAskMode[\s\S]*会议记录/s, 'Meeting recorder entry should be hidden from Ask mode.');
 assert.match(voiceSheet, /nesio-ask-answer|我找到了这些可能相关的线索|还没找到相关线索/s, 'Ask mode should show the answer below the input after asking.');
 assert.match(portal, /ASK_GUIDE_KEY|setAskGuideOpen\(true\)|问宝盒/, 'Portal must show a first-use ask guide when the center N is long-pressed.');
@@ -140,8 +138,11 @@ assert.match(profileCard, /clearProfileIdentity/, 'Profile logout must clear loc
 assert.match(profileCard, /loggedIn\?:\s*boolean|Boolean\(d\?\.loggedIn\)/, 'Profile card must use session.loggedIn, not ok, to avoid fake signed-in state.');
 assert.match(loginPage, /注册|Create account|发送注册链接|sign-up/, 'Login page must expose a create-account path.');
 assert.match(loginPage, /nesio-login-logo-img/, 'Login page must use a non-inverted logo class so the logo is visible on the white card.');
-assert.match(loginPage, /\/api\/auth\/callback/, 'Login/OAuth must redirect through the auth callback route so sessions are created.');
-assert.match(loginPage, /FALLBACK_AUTH_ORIGIN|treasurebox-nu\.vercel\.app|isLocalShell/, 'Login/OAuth must not use localhost callbacks inside the iOS/local shell.');
+assert.match(authClient, /\/api\/auth\/callback/, 'Login/OAuth helper must redirect through the auth callback route so sessions are created.');
+assert.match(authClient, /FALLBACK_AUTH_ORIGIN|treasurebox-nu\.vercel\.app|isLocalShell/, 'Login/OAuth helper must not use localhost callbacks inside the iOS/local shell.');
+assert.match(loginPage, /getAuthRedirectTo/, 'Login page should use the shared auth callback helper.');
+assert.match(onboarding, /getAuthRedirectTo/, 'First-launch onboarding should use the shared auth callback helper.');
+assert.doesNotMatch(onboarding, /redirectTo:\s*window\.location\.href/, 'First-launch onboarding must not send OAuth back to localhost/current page.');
 assert.doesNotMatch(loginPage, /redirectTo:\s*window\.location\.origin \+ '\/'/, 'Login/OAuth must not redirect straight to home and skip callback.');
 assert.match(loginPage, /provider_not_configured|supabase_otp_failed|auth_start_exception|friendlyAuthError/, 'Login page must show specific account setup/send failures instead of one vague error.');
 assert.match(authStartRoute, /auth_start_exception|try\s*\{[\s\S]*const auditId|catch \(err/, 'Auth start route must fail closed with JSON instead of returning an empty 500.');
@@ -153,8 +154,16 @@ assert.doesNotMatch(settingsSheets, /像朋友一样|Moment|Today Feed 的卡片
 assert.match(settingsSheets, /只整理你放进来的内容|哪些内容不会被使用|主动提醒|保持安静|选中的生活空间，会优先出现在 Today|先记住|帮你理解|主动提醒|家庭与自动化/, 'Settings sheets should expose trust, quiet mode, spaces, and user-value subscription copy.');
 assert.doesNotMatch(mirrorProfile, /Nesio 学到了什么|你最在意的领域|100%|Math\.round\(weight \* 100\)|Math\.round\(g\.score \* 100\)/, 'Mirror profile must avoid surveillance-like learning titles and percentage scores.');
 assert.match(mirrorProfile, /Nesio 目前怎么理解你|经常出现|不再这样理解我|基于 \{profile\.feedbackCount\} 次反馈/, 'Mirror profile should show editable observations with evidence.');
+assert.match(mirrorProfile, /resetMirrorProfile|setProfile\(getMirrorProfile\(\)\)/, 'Mirror profile clear-understanding button must perform a real local reset.');
 assert.match(lifeGraph, /nesio-memory-received/, 'Life Graph should emit a user-record receipt event for calm feedback.');
 assert.match(settingsSheets, /触感反馈|细微音效/, 'Settings should let users control haptics and subtle sounds.');
+assert.match(voiceSheet, /parseInlineTags|stripInlineTags|mergeTags/, 'Voice input should parse inline #tags and remove them from the display text.');
+assert.doesNotMatch(voiceSheet, /setTimeout\(startListening,\s*300\)/, 'Voice input must not auto-start recording when opened.');
+assert.match(voiceSheet, /setAskResults\(matches\.slice\(0,\s*4\)\)[\s\S]*setText\(''\)/, 'Ask mode should clear the input after each question while keeping the answer visible.');
+assert.match(todayFeed, /feedback === 'too_much' \|\| feedback === 'useful' \|\| feedback === 'not_now'/, 'Today not-now feedback should dismiss the card so 稍后 has a visible result.');
+assert.match(globals, /@keyframes tellFanIn[\s\S]*from \{ opacity: 0; \}[\s\S]*to\s+\{ opacity: 1; \}/, 'Center N fan animation must not override button transforms.');
+assert.match(globals, /nesio-tell-fan-btn--left[\s\S]*rotate\(-10deg\)[\s\S]*nesio-tell-fan-btn--right[\s\S]*rotate\(10deg\)/, 'Center N actions should be positioned as a visible fan.');
+assert.match(ingestRoute, /ingest_auth_required|isIngestAllowed|baohe_auth_access|NESIO_STAGE5_INVOCATION_SECRET/, 'Ingest endpoint must fail closed for anonymous public parsing.');
 
 assert.match(
   storageCss,

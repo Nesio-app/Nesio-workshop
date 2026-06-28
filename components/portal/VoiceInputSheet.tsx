@@ -30,6 +30,19 @@ const QUICK_INTENTS = [
 
 type SendState = 'idle' | 'analyzing' | 'saved' | 'error';
 
+function parseInlineTags(value: string): string[] {
+  const tags = value.match(/#[^\s#，。,.!?！？:：；;]+/g) || [];
+  return Array.from(new Set(tags.map((tag) => tag.slice(1).trim()).filter(Boolean)));
+}
+
+function stripInlineTags(value: string): string {
+  return value.replace(/#[^\s#，。,.!?！？:：；;]+/g, '').replace(/\s+/g, ' ').trim();
+}
+
+function mergeTags(...groups: Array<string[] | undefined>): string[] {
+  return Array.from(new Set(groups.flatMap((group) => group || []).filter(Boolean)));
+}
+
 export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateData = false, onClose }: VoiceInputSheetProps) {
   const [mode, setMode] = useState<'note' | 'meeting'>('note');
   const [text, setText] = useState('');
@@ -49,11 +62,7 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
       setIntentLabel(''); setMicError(''); setSavedCount(0); setAskResults([]);
       recRef.current?.stop();
     } else {
-      if (isAskMode) {
-        setTimeout(() => inputRef.current?.focus(), 120);
-      } else {
-        setTimeout(startListening, 300);
-      }
+      setTimeout(() => inputRef.current?.focus(), 120);
     }
   }, [open, isAskMode]);
 
@@ -118,10 +127,14 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
       const matches = searchLifeGraph(t).filter((node) => canUsePrivateData || !isPrivateExternalNode(node));
       setAskResults(matches.slice(0, 4));
       setSendState('saved');
+      setText('');
+      setIntentLabel('');
       return;
     }
 
     setSendState('analyzing');
+    const inlineTags = parseInlineTags(t);
+    const cleanText = stripInlineTags(t) || inlineTags.join(' ') || t;
 
     try {
       const res = await fetch('/api/portal/analyze', {
@@ -136,18 +149,25 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
       };
 
       if (data.ok && data.nodes?.length) {
-        data.nodes.forEach((node) => addLifeNode({ ...node, source: 'voice' } as Parameters<typeof addLifeNode>[0]));
+        data.nodes.forEach((node) => addLifeNode({
+          ...node,
+          name: stripInlineTags(node.name || '') || cleanText.slice(0, 30),
+          attributes: { ...(node.attributes || {}), note: stripInlineTags(String(node.attributes?.note || cleanText)) || cleanText },
+          tags: mergeTags(['说一句'], node.tags, inlineTags),
+          rawInput: t,
+          source: 'voice',
+        } as Parameters<typeof addLifeNode>[0]));
         setSavedCount(data.nodes.length);
       } else {
         // Fallback: save raw text
-        addLifeNode({ type: 'object', name: t.slice(0, 30), attributes: { note: t }, source: 'voice', confidence: 0.65, relations: [], tags: ['说一句'], rawInput: t });
+        addLifeNode({ type: 'object', name: cleanText.slice(0, 30), attributes: { note: cleanText }, source: 'voice', confidence: 0.65, relations: [], tags: mergeTags(['说一句'], inlineTags), rawInput: t });
         setSavedCount(1);
       }
       setSendState('saved');
       setTimeout(() => { onClose(); setText(''); setSendState('idle'); }, 1100);
     } catch {
       // Even on error, save locally
-      addLifeNode({ type: 'object', name: t.slice(0, 30), attributes: { note: t }, source: 'voice', confidence: 0.6, relations: [], tags: ['说一句'], rawInput: t });
+      addLifeNode({ type: 'object', name: cleanText.slice(0, 30), attributes: { note: cleanText }, source: 'voice', confidence: 0.6, relations: [], tags: mergeTags(['说一句'], inlineTags), rawInput: t });
       setSavedCount(1);
       setSendState('saved');
       setTimeout(() => { onClose(); setText(''); setSendState('idle'); }, 1100);

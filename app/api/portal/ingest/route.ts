@@ -8,9 +8,9 @@
  * Body: { source: string, content: string, secret?: string }
  * Returns: { ok, nodes, summary }
  *
- * `secret` is an optional per-user ingest token. When INGEST_SHARED_SECRET is set
- * server-side, the request must match it (for webhook security). When unset, the
- * endpoint is open (relies on the unguessable nature of the deploy URL for MVP).
+ * Production is fail-closed: callers need a signed-in session cookie, the
+ * configured ingest secret, the Stage 5 invocation secret, or explicit personal
+ * lab mode. Anonymous public parsing is not allowed.
  */
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -30,6 +30,22 @@ const SOURCE_HINTS: Record<string, string> = {
   shortcuts: '这是来自 iOS 快捷指令的数据。根据内容判断类型。',
   generic: '根据内容判断最合适的节点类型。',
 };
+
+function isIngestAllowed(req: NextRequest, bodySecret?: string): boolean {
+  const sharedSecret = envValue('INGEST_SHARED_SECRET');
+  if (sharedSecret && bodySecret === sharedSecret) return true;
+
+  const stage5Secret = envValue('NESIO_STAGE5_INVOCATION_SECRET');
+  const providedStage5Secret = req.headers.get('x-nesio-stage5-secret')?.trim() || '';
+  if (stage5Secret && providedStage5Secret === stage5Secret) return true;
+
+  const hasSignedInCookie = Boolean(req.cookies.get('baohe_auth_access')?.value);
+  if (hasSignedInCookie) return true;
+
+  const accessMode = req.headers.get('x-baohe-access-mode')?.trim() || '';
+  const labEnabled = envValue('BAOHE_PERSONAL_LAB_AI_ENABLED').toLowerCase() === 'true';
+  return labEnabled && accessMode === 'personal_lab';
+}
 
 async function extractNodes(source: string, content: string): Promise<{ nodes: object[]; summary: string }> {
   const geminiKey = envValue('GEMINI_API_KEY') || envValue('GOOGLE_GENERATIVE_AI_API_KEY');
@@ -102,9 +118,8 @@ export async function POST(req: NextRequest) {
     body = { source: 'shortcuts', content: text };
   }
 
-  const sharedSecret = envValue('INGEST_SHARED_SECRET');
-  if (sharedSecret && body.secret !== sharedSecret) {
-    return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
+  if (!isIngestAllowed(req, body.secret)) {
+    return NextResponse.json({ ok: false, error: 'ingest_auth_required' }, { status: 401 });
   }
 
   const source = (body.source || 'generic').toLowerCase();
@@ -120,8 +135,8 @@ export async function POST(req: NextRequest) {
 export async function GET() {
   return NextResponse.json({
     ok: true,
-    description: 'Universal ingest endpoint. POST { source, content } to extract Life Graph nodes.',
+    description: 'Universal ingest endpoint. Authenticated or lab/secret callers can POST { source, content } to extract Memory nodes.',
     sources: Object.keys(SOURCE_HINTS),
-    shortcutsUsage: 'In iOS Shortcuts: Get Contents of URL → POST → /api/portal/ingest with JSON { source, content }',
+    shortcutsUsage: 'In iOS Shortcuts: Get Contents of URL → POST → /api/portal/ingest with JSON { source, content, secret } when an ingest secret is configured.',
   });
 }
