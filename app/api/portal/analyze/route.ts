@@ -54,6 +54,7 @@ Also return:
 
 Respond ONLY with valid JSON: { "nodes": [...], "summary": "...", "intent": "..." }
 If input is in Chinese, extract Chinese names and keep attributes in Chinese.
+For image input, only extract things that are visibly present. Do not create a person node unless a real person is clearly visible. Prefer concrete visible objects such as cups, cables, boxes, medicine, clothes, keys, documents, rooms, and locations. Never use the instruction text itself as a node name.
 `;
 
 async function analyzeWithClaude(content: string, isImage: boolean, imageBase64?: string, mimeType?: string): Promise<string> {

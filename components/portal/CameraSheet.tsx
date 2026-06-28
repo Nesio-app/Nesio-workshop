@@ -33,7 +33,12 @@ async function analyzeImage(base64: string): Promise<AnalysisResult> {
   const res = await fetch('/api/portal/analyze', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-baohe-access-mode': 'personal_lab' },
-    body: JSON.stringify({ type: 'image', content: '请识别图中的物品、人物、场景，提取为结构化记忆节点。', imageBase64: base64, mimeType: 'image/jpeg' }),
+    body: JSON.stringify({
+      type: 'image',
+      content: '请只根据图片里真实可见的内容生成 Memory 节点。优先识别具体物品、位置、文件、场景；除非图片里清楚有人，否则不要生成“人物”节点；不要把这段指令当成节点名称。',
+      imageBase64: base64,
+      mimeType: 'image/jpeg',
+    }),
   });
   const data = await res.json() as { ok?: boolean; nodes?: AnalyzedNode[]; summary?: string; error?: string };
   if (!data.ok || !data.nodes?.length) throw new AnalyzeImageError(data.error || 'no_result');
