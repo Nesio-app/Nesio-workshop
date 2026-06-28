@@ -1,6 +1,6 @@
 'use client';
 
-const FALLBACK_AUTH_ORIGIN = 'https://treasurebox-nu.vercel.app';
+const FALLBACK_AUTH_ORIGIN = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.nesio.app';
 
 export function getAuthRedirectTo(): string {
   const origin = window.location.origin;

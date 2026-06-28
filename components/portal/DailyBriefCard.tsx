@@ -231,25 +231,8 @@ export default function DailyBriefCard({ canUsePrivateData }: { canUsePrivateDat
         )}
       </div>
 
-      {/* Signals row */}
+      {/* Signals row: calendar only. Weather stays out of the first-launch overview. */}
       <div className="nesio-brief-signals">
-        {/* Weather */}
-        {weather ? (
-          <div className="nesio-brief-signal">
-            <span className="nesio-brief-signal-icon">🌤</span>
-            <div>
-              <p className="nesio-brief-signal-val">{weather.temperatureC}° · {weather.condition}</p>
-              {weather.forecastNote && <p className="nesio-brief-signal-note">{weather.forecastNote}</p>}
-            </div>
-          </div>
-        ) : (
-          <div className="nesio-brief-signal nesio-brief-signal--empty">
-            <span className="nesio-brief-signal-icon">🌤</span>
-            <p className="nesio-brief-signal-note">开启位置权限获取天气</p>
-          </div>
-        )}
-
-        {/* Calendar */}
         <div className="nesio-brief-signal">
           <span className="nesio-brief-signal-icon">📅</span>
           <div>

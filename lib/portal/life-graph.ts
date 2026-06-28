@@ -119,6 +119,51 @@ export function searchLifeGraph(query: string): LifeNode[] {
   );
 }
 
+function nodeSearchText(node: LifeNode): string {
+  return [
+    node.name,
+    node.rawInput || '',
+    ...(node.tags || []),
+    ...Object.entries(node.attributes).flatMap(([key, value]) => [key, String(value ?? '')]),
+    ...node.relations.flatMap((relation) => [relation.targetId, relation.relation]),
+  ].join(' ').toLowerCase();
+}
+
+function queryTokens(query: string): string[] {
+  return Array.from(new Set(
+    query
+      .toLowerCase()
+      .replace(/[，。！？、,.!?;；:："'“”‘’()[\]{}]/g, ' ')
+      .split(/\s+/)
+      .map((token) => token.trim())
+      .filter(Boolean),
+  ));
+}
+
+export function searchLifeGraphFuzzy(query: string, limit = 6): LifeNode[] {
+  const q = query.toLowerCase().trim();
+  if (!q) return getRecentNodes(limit);
+  const tokens = queryTokens(q);
+  return loadAll()
+    .map((node) => {
+      const text = nodeSearchText(node);
+      let score = 0;
+      if (node.name.toLowerCase().includes(q)) score += 8;
+      if (node.rawInput?.toLowerCase().includes(q)) score += 6;
+      if (text.includes(q)) score += 5;
+      for (const token of tokens) {
+        if (node.name.toLowerCase().includes(token)) score += 4;
+        if (node.tags?.some((tag) => tag.toLowerCase().includes(token))) score += 3;
+        if (text.includes(token)) score += 1;
+      }
+      return { node, score };
+    })
+    .filter((entry) => entry.score > 0)
+    .sort((a, b) => b.score - a.score || new Date(b.node.createdAt).getTime() - new Date(a.node.createdAt).getTime())
+    .slice(0, limit)
+    .map((entry) => entry.node);
+}
+
 export function getRecentNodes(limit = 8): LifeNode[] {
   return loadAll()
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())

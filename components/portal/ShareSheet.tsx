@@ -37,7 +37,31 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
     if (!open) { setParsed(null); setSaved(false); setAnalyzing(false); setTextMode(false); setTextInput(''); setError(''); }
   }, [open]);
 
-  async function analyze(type: 'text' | 'file', content: string, imageBase64?: string, mimeType?: string) {
+  function buildPendingImageParsed(fileName: string): ParsedResult {
+    return {
+      title: '图片线索待确认',
+      summary: '已先整理为一条图片线索。登录或 Lab 模式后，Nesio 会自动识别图中物品、人物和场景。',
+      intent: 'MEMORY_CAPTURE',
+      people: [],
+      nodes: [
+        {
+          type: 'object',
+          name: '图片线索待确认',
+          attributes: {
+            status: '待确认',
+            originalFileName: fileName,
+            note: '这张图片已保存为待确认线索。',
+          },
+          relations: [],
+          tags: ['图片', '待确认'],
+          confidence: 0.45,
+          rawInput: fileName,
+        },
+      ],
+    };
+  }
+
+  async function analyze(type: 'text' | 'file' | 'image', content: string, imageBase64?: string, mimeType?: string): Promise<boolean> {
     setAnalyzing(true); setError('');
     try {
       const res = await fetch('/api/portal/analyze', {
@@ -71,8 +95,10 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
         location,
         nodes,
       });
+      return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : '分析失败，请稍后再试。');
+      return false;
     } finally {
       setAnalyzing(false);
     }
@@ -89,7 +115,11 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
       reader.onload = async () => {
         const dataUrl = reader.result as string;
         const base64 = dataUrl.split(',')[1];
-        await analyze('file', file.name, base64, file.type);
+        const ok = await analyze('image', '请根据这张图片里真实可见的内容，整理出可确认的 Memory 线索。', base64, file.type);
+        if (!ok) {
+          setError('');
+          setParsed(buildPendingImageParsed(file.name));
+        }
       };
       reader.readAsDataURL(file);
     } else {
@@ -115,7 +145,7 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
     parsed.nodes.forEach((node) => {
       addLifeNode({
         ...node,
-        source: 'email',
+        source: node.attributes?.originalFileName ? 'photo' : 'manual',
       } as Parameters<typeof addLifeNode>[0]);
     });
     setSaved(true);

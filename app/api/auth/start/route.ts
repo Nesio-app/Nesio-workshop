@@ -63,6 +63,19 @@ function getProviderGate(req: NextRequest, provider: AuthProvider): {
   };
 }
 
+function sanitizeRedirectTo(raw: string | undefined, fallback: string): string {
+  if (!raw) return fallback;
+  try {
+    const url = new URL(raw);
+    const host = url.hostname.toLowerCase();
+    if (host === 'localhost' || host === '127.0.0.1' || host.endsWith('.localhost')) return fallback;
+    if (url.pathname !== '/api/auth/callback') return fallback;
+    return url.toString();
+  } catch {
+    return fallback;
+  }
+}
+
 async function requestSupabaseOtp(payload: { email?: string; phone?: string; redirectTo: string }) {
   const supabaseUrl = normalizeSupabaseRuntimeUrl(process.env.SUPABASE_URL || '');
   const supabaseAnonKey = process.env.SUPABASE_ANON_KEY?.trim();
@@ -140,7 +153,7 @@ export async function POST(req: NextRequest) {
       return safeJson({ ok: false, error: 'unsupported_provider', supportedProviders: AUTH_PROVIDERS, auditId }, 400);
     }
 
-    const redirectTo = body.redirectTo || getAuthRedirectUrl(req.url);
+    const redirectTo = sanitizeRedirectTo(body.redirectTo, getAuthRedirectUrl(req.url));
     const email = body.email?.trim() || '';
     const phone = body.phone?.trim() || '';
 

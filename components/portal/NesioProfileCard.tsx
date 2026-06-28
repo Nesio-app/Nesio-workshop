@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { clearProfileIdentity, loadProfileSettings } from '@/lib/portal/profile';
 import { getRecentNodes } from '@/lib/portal/life-graph';
 import { ToneSheet, PrivacySheet, SpacesSheet, SubscriptionSheet } from './SettingsSheets';
@@ -8,14 +8,13 @@ import ConnectorsHub from './ConnectorsHub';
 import HealthLogger from './HealthLogger';
 import MirrorProfileCard from './MirrorProfileCard';
 
-type ActiveSheet = 'tone' | 'privacy' | 'spaces' | 'subscription' | 'connectors' | 'health' | null;
+type ActiveSheet = 'mirror' | 'tone' | 'privacy' | 'spaces' | 'subscription' | 'connectors' | 'health' | null;
 
 export default function NesioProfileCard() {
   const [displayName, setDisplayName] = useState('Jessy');
   const [memoryCount, setMemoryCount] = useState(0);
   const [activeSheet, setActiveSheet] = useState<ActiveSheet>(null);
   const [isSignedIn, setIsSignedIn] = useState(false);
-  const mirrorRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const profile = loadProfileSettings();
@@ -85,7 +84,7 @@ export default function NesioProfileCard() {
               type="button"
               className="nesio-profile-stat"
               aria-label="打开 Nesio 整理出的线索"
-              onClick={() => mirrorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+              onClick={() => setActiveSheet('mirror')}
             >
               <span className="nesio-profile-stat-num">{memoryCount}</span>
               <span className="nesio-profile-stat-label">条记忆</span>
@@ -107,11 +106,6 @@ export default function NesioProfileCard() {
           </button>
         )}
 
-        {/* Mirror Profile card */}
-        <div ref={mirrorRef}>
-          <MirrorProfileCard embedded />
-        </div>
-
         {/* Menu */}
         <nav className="nesio-profile-menu" aria-label="设置菜单">
           {menuItems.map((item) => (
@@ -128,6 +122,21 @@ export default function NesioProfileCard() {
       </div>
 
       {/* Sub-sheets */}
+      {activeSheet === 'mirror' && (
+        <div className="nesio-settings-sheet-overlay" role="dialog" aria-modal="true" aria-label="Nesio 整理出的线索">
+          <button type="button" className="nesio-settings-sheet-backdrop" onClick={() => setActiveSheet(null)} aria-label="关闭" />
+          <div className="nesio-settings-sheet-card">
+            <div className="nesio-sheet-handle" aria-hidden />
+            <div className="nesio-settings-sheet-header">
+              <h2 className="nesio-settings-sheet-title">整理出的线索</h2>
+              <button type="button" className="nesio-settings-sheet-close" onClick={() => setActiveSheet(null)} aria-label="关闭">✕</button>
+            </div>
+            <div className="nesio-settings-sheet-body">
+              <MirrorProfileCard embedded />
+            </div>
+          </div>
+        </div>
+      )}
       <ToneSheet open={activeSheet === 'tone'} onClose={() => setActiveSheet(null)} />
       <PrivacySheet open={activeSheet === 'privacy'} onClose={() => setActiveSheet(null)} />
       <SpacesSheet open={activeSheet === 'spaces'} onClose={() => setActiveSheet(null)} />

@@ -9,6 +9,7 @@ import { learnFromFeedback } from '@/lib/portal/mirror-profile';
 import VoiceBrief from './VoiceBrief';
 import DailyBriefCard from './DailyBriefCard';
 import LifeStateCard from './LifeStateCard';
+import MirrorProfileCard from './MirrorProfileCard';
 
 // Public fallback card: never implies Nesio knows private facts before consent/input.
 const EMPTY_SIGNAL_CARDS: RecommendationCard[] = [
@@ -169,7 +170,7 @@ function StandardCard({ card, onFeedback }: { card: RecommendationCard; onFeedba
           }}>{card.primaryAction}</button>
         <button type="button" className="nesio-today-why-btn"
           onClick={() => setWhy((v) => !v)} aria-expanded={why}>
-          为什么{why ? ' ↑' : ' ↓'}
+          为什么
         </button>
       </div>
 
@@ -241,6 +242,7 @@ export default function TodayFeed({
   const [cards, setCards] = useState<RecommendationCard[]>([]);
   const [memoryCount, setMemoryCount] = useState(0);
   const [showMoreCards, setShowMoreCards] = useState(false);
+  const [mirrorOpen, setMirrorOpen] = useState(false);
 
   useEffect(() => {
     if (canUsePrivateData) {
@@ -304,9 +306,14 @@ export default function TodayFeed({
   return (
     <div className="nesio-today-root">
       <header className="nesio-today-header">
-        <div className="nesio-today-brand">
+        <button
+          type="button"
+          className="nesio-today-brand"
+          aria-label="打开 Nesio 整理出的线索"
+          onClick={() => setMirrorOpen(true)}
+        >
           <img src="/icons/treasurebox.svg" alt="Nesio" className="nesio-today-brand-icon" />
-        </div>
+        </button>
         <a href="/settings" className="nesio-today-avatar" aria-label="我的设置">{initials}</a>
       </header>
 
@@ -366,6 +373,21 @@ export default function TodayFeed({
           </>
         )}
       </div>
+      {mirrorOpen && (
+        <div className="nesio-settings-sheet-overlay" role="dialog" aria-modal="true" aria-label="Nesio 整理出的线索">
+          <button type="button" className="nesio-settings-sheet-backdrop" onClick={() => setMirrorOpen(false)} aria-label="关闭" />
+          <div className="nesio-settings-sheet-card">
+            <div className="nesio-sheet-handle" aria-hidden />
+            <div className="nesio-settings-sheet-header">
+              <h2 className="nesio-settings-sheet-title">整理出的线索</h2>
+              <button type="button" className="nesio-settings-sheet-close" onClick={() => setMirrorOpen(false)} aria-label="关闭">✕</button>
+            </div>
+            <div className="nesio-settings-sheet-body">
+              <MirrorProfileCard embedded />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

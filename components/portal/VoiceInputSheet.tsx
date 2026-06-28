@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { addLifeNode, isPrivateExternalNode, searchLifeGraph, type LifeNode } from '@/lib/portal/life-graph';
+import { addLifeNode, isPrivateExternalNode, searchLifeGraphFuzzy, type LifeNode } from '@/lib/portal/life-graph';
 import { routeIntent } from '@/lib/portal/intent-router';
 import MeetingRecorder from './MeetingRecorder';
 
@@ -124,7 +124,7 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
 
     if (isAskMode) {
       stopListening();
-      const matches = searchLifeGraph(t).filter((node) => canUsePrivateData || !isPrivateExternalNode(node));
+      const matches = searchLifeGraphFuzzy(t, 8).filter((node) => canUsePrivateData || !isPrivateExternalNode(node));
       setAskResults(matches.slice(0, 4));
       setSendState('saved');
       setText('');
@@ -214,7 +214,7 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
         )}
 
         {/* Intent label */}
-        {intentLabel && (
+        {!isAskMode && intentLabel && (
           <div className="nesio-voice-intent-label">
             <span>✦</span> {intentLabel}
           </div>
@@ -236,8 +236,8 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
             </>
           ) : micError ? (
             <span style={{ fontSize: '0.73rem', color: '#ef4444', textAlign: 'center', lineHeight: 1.4 }}>{micError}</span>
-          ) : text ? (
-            <span style={{ fontSize: '0.72rem', color: 'var(--portal-muted)' }}>{isAskMode ? '输入完成 · 点「问宝盒」查找线索' : '识别完成 · 点「告诉 Nesio」保存'}</span>
+          ) : text && !isAskMode ? (
+            <span style={{ fontSize: '0.72rem', color: 'var(--portal-muted)' }}>识别完成 · 点「告诉 Nesio」保存</span>
           ) : null}
         </div>
 
