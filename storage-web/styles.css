@@ -1563,6 +1563,32 @@ body.native .portal-back-link { display: none; }
 
 .toggle input:checked + span::before { transform: translateX(20px); }
 
+/* Release hit-area guard: keep visual styling, expand mobile touch targets. */
+button,
+a,
+[role="button"],
+.tab,
+.fab,
+.shclose,
+.mini-btn,
+.retake,
+.sbar {
+  min-height: 44px;
+}
+
+button,
+.fab,
+.shclose,
+.mini-btn,
+.retake {
+  min-width: 44px;
+}
+
+.sbar input,
+.fi {
+  min-height: 44px;
+}
+
 /* breathing immersive (正念暂停) */
 .breath-scene {
   background:

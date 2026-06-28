@@ -33,6 +33,7 @@ export interface RecommendationCard {
   secondaryAction?: string;
   type: 'standard' | 'audio' | 'compact';
   expiresAt: string;
+  sourceStatus?: 'user_record' | 'authorized_calendar' | 'demo_example' | 'needs_input';
   feedback?: 'useful' | 'wrong' | 'not_now' | 'too_much';
 }
 
@@ -68,4 +69,3 @@ export function recordCardFeedback(cardId: string, feedback: RecommendationCard[
     /* ignore */
   }
 }
-

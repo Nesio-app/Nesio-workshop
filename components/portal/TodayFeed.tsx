@@ -10,58 +10,41 @@ import VoiceBrief from './VoiceBrief';
 import DailyBriefCard from './DailyBriefCard';
 import LifeStateCard from './LifeStateCard';
 
-// Fallback mock cards shown before real signals load
-const MOCK_CARDS: RecommendationCard[] = [
+// Public fallback card: never implies Nesio knows private facts before consent/input.
+const EMPTY_SIGNAL_CARDS: RecommendationCard[] = [
   {
-    id: 'coat-demo',
-    domain: 'weather',
-    domainLabel: '未来引导',
-    confidence: 0.92,
-    urgency: 3,
-    icon: '🌧',
-    iconBg: '#f59e0b',
-    title: '把灰色外套放到门口',
-    body: '明天午后会降温，你昨天记到嗓子还没全好。',
-    tags: ['天气 · 降温', '健康 · 感冒记录'],
+    id: 'needs-input-public',
+    domain: 'home',
+    domainLabel: '需要你的记录',
+    confidence: 0.6,
+    urgency: 1,
+    icon: '✦',
+    iconBg: '#8b9cf6',
+    title: '还没有足够记忆',
+    body: '告诉 Nesio 一件事，明天这里会出现带来源的建议。',
+    tags: ['来源 · 需要输入'],
     evidence: [],
-    primaryAction: '好的，放门口',
+    primaryAction: '告诉 Nesio',
     secondaryAction: '稍后',
     type: 'standard',
-    expiresAt: new Date(Date.now() + 8 * 3600000).toISOString(),
-  },
-  {
-    id: 'meeting-demo',
-    domain: 'work',
-    domainLabel: '语音简报',
-    confidence: 0.88,
-    urgency: 4,
-    icon: '🎙',
-    iconBg: '#6366f1',
-    title: '明早的会，不用翻笔记',
-    body: '昨天的会我整理成了 3 个音频重点，明早 9:10 提醒你。',
-    evidence: [],
-    primaryAction: '播放',
-    secondaryAction: '改时间',
-    type: 'audio',
-    expiresAt: new Date(Date.now() + 12 * 3600000).toISOString(),
-  },
-  {
-    id: 'gift-demo',
-    domain: 'family',
-    domainLabel: '家庭未来',
-    confidence: 0.96,
-    urgency: 3,
-    icon: '🎁',
-    iconBg: '#10b981',
-    title: 'Linda 的礼物已经有了',
-    body: '储物间蓝盒子 · 生日还有 3 天，需要包装。',
-    evidence: [],
-    primaryAction: '好的',
-    secondaryAction: '去 Memory 看',
-    type: 'standard',
-    expiresAt: new Date(Date.now() + 72 * 3600000).toISOString(),
+    expiresAt: new Date(Date.now() + 24 * 3600000).toISOString(),
+    sourceStatus: 'needs_input',
   },
 ];
+
+function inferSourceStatus(card: RecommendationCard): NonNullable<RecommendationCard['sourceStatus']> {
+  if (card.sourceStatus) return card.sourceStatus;
+  if (card.evidence.some((e) => /calendar|日历/i.test(e.source) || /calendar|日历/i.test(e.label))) return 'authorized_calendar';
+  if (card.evidence.length > 0) return 'user_record';
+  return 'needs_input';
+}
+
+function sourceStatusLabel(status: NonNullable<RecommendationCard['sourceStatus']>) {
+  if (status === 'authorized_calendar') return '来自授权日历';
+  if (status === 'user_record') return '来自你的记录';
+  if (status === 'demo_example') return 'Demo 示例';
+  return '需要你的输入';
+}
 
 function AudioCard({ card, onFeedback }: { card: RecommendationCard; onFeedback: (f: RecommendationCard['feedback']) => void }) {
   const [briefOpen, setBriefOpen] = useState(false);
@@ -150,6 +133,7 @@ function capEvidence(text: string): string {
 function StandardCard({ card, onFeedback }: { card: RecommendationCard; onFeedback: (f: RecommendationCard['feedback']) => void }) {
   const [done, setDone] = useState(false);
   const [why, setWhy] = useState(false);
+  const needsInput = inferSourceStatus(card) === 'needs_input';
   if (done) return null;
 
   return (
@@ -158,6 +142,7 @@ function StandardCard({ card, onFeedback }: { card: RecommendationCard; onFeedba
       <div className="nesio-today-card-row">
         <span className="nesio-today-card-icon-wrap" style={{ background: card.iconBg }}>{card.icon}</span>
         <div style={{ flex: 1, minWidth: 0 }}>
+          <span className="nesio-today-card-domain">{sourceStatusLabel(inferSourceStatus(card))}</span>
           <h3 className="nesio-today-card-title">{card.title}</h3>
         </div>
         <FeedbackMenu onFeedback={onFeedback} />
@@ -165,7 +150,14 @@ function StandardCard({ card, onFeedback }: { card: RecommendationCard; onFeedba
 
       <div className="nesio-today-card-actions">
         <button type="button" className="nesio-today-btn nesio-today-btn--primary"
-          onClick={() => { setDone(true); onFeedback('useful'); }}>{card.primaryAction}</button>
+          onClick={() => {
+            if (needsInput) {
+              window.dispatchEvent(new CustomEvent('nesio-open-tell'));
+              return;
+            }
+            setDone(true);
+            onFeedback('useful');
+          }}>{card.primaryAction}</button>
         <button type="button" className="nesio-today-why-btn"
           onClick={() => setWhy((v) => !v)} aria-expanded={why}>
           为什么{why ? ' ↑' : ' ↓'}
@@ -201,8 +193,8 @@ function NightTimeline() {
     <div className="nesio-today-night">
       <div className="nesio-today-night-hero">
         <p className="nesio-today-night-kicker">此刻 · 把你带回今天</p>
-        <h2 className="nesio-today-night-title">把灰色外套<br />放到门口</h2>
-        <p className="nesio-today-night-sub">明天午后降温，你的嗓子还在恢复。一个 30 秒的小动作。</p>
+        <h2 className="nesio-today-night-title">还没有足够记忆<br />生成夜间建议</h2>
+        <p className="nesio-today-night-sub">告诉 Nesio 一件事，夜间路径会开始显示带来源的轻提醒。</p>
         <div className="nesio-today-night-actions">
           <span className="nesio-today-night-conf">● 92% 把握</span>
           <button type="button" className="nesio-today-btn nesio-today-btn--night">好的</button>
@@ -212,9 +204,9 @@ function NightTimeline() {
         <p className="nesio-today-night-timeline-label">今晚的路径</p>
         <ol className="nesio-today-night-steps">
           {[
-            { time: '现在', label: '外套放门口', active: true },
-            { time: '明早 9:10', label: '会议语音简报 · 90 秒', active: false },
-            { time: '明晚', label: '包装 Linda 的礼物', active: false },
+            { time: '现在', label: '记录一件真实小事', active: true },
+            { time: '明早', label: '基于记录生成提醒', active: false },
+            { time: '之后', label: '你反馈后逐步调整', active: false },
           ].map((step, i) => (
             <li key={i} className={`nesio-today-night-step${step.active ? ' nesio-today-night-step--active' : ''}`}>
               <span className="nesio-today-night-step-dot" />
@@ -245,16 +237,16 @@ export default function TodayFeed({ onOpenMemory }: { onOpenMemory?: () => void 
     });
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-portal-theme'] });
 
-    // Load initial cards (may be mock or cached-signal cards).
+    // Load initial cards. Public fallback must not imply private knowledge.
     // Note: connector collection + pruning are driven by the platform shell
     // (Portal.tsx), not the Experience layer — Today only consumes results.
     const real = generateTodayCards();
-    setCards(real.length > 0 ? real : MOCK_CARDS);
+    setCards(real.length > 0 ? real : EMPTY_SIGNAL_CARDS);
     setMemoryCount(getRecentNodes().length);
 
     const refresh = () => {
       const updated = generateTodayCards();
-      setCards(updated.length > 0 ? updated : MOCK_CARDS);
+      setCards(updated.length > 0 ? updated : EMPTY_SIGNAL_CARDS);
       setMemoryCount(getRecentNodes().length);
     };
 

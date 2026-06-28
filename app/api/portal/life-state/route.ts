@@ -26,13 +26,27 @@ interface LifeStateRequest {
   timeWindow?: string;
 }
 
+function fallbackExplanation(body: Partial<LifeStateRequest>): string {
+  const risks = body.risks || [];
+  const opportunities = body.opportunities || [];
+  if (risks.length > 0) return `我看到今天有些负荷，先把最重要的一件事放到前面就好。`;
+  if (opportunities.length > 0) return `今天有几个状态不错的信号，可以顺势做一件轻一点的事。`;
+  return `还没有足够稳定的状态信号。告诉 Nesio 一件事，我会慢慢更懂你。`;
+}
+
 export async function POST(req: NextRequest) {
   const body = await req.json() as LifeStateRequest;
   const { displayName, dimensions, risks, opportunities } = body;
 
   const geminiKey = envValue('GEMINI_API_KEY') || envValue('GOOGLE_GENERATIVE_AI_API_KEY');
   if (!geminiKey || !dimensions?.length) {
-    return NextResponse.json({ ok: false, error: 'no_key_or_data' }, { status: geminiKey ? 400 : 503 });
+    return NextResponse.json({
+      ok: true,
+      provider: 'fallback',
+      fallback: true,
+      explanation: fallbackExplanation(body),
+      reason: geminiKey ? 'no_life_state_data' : 'provider_not_configured',
+    });
   }
 
   const dimText = dimensions
@@ -58,11 +72,34 @@ ${opportunities?.length ? '状态不错：' + opportunities.join('；') : ''}
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
     });
+    if (!res.ok) {
+      return NextResponse.json({
+        ok: true,
+        provider: 'fallback',
+        fallback: true,
+        explanation: fallbackExplanation(body),
+        reason: `provider_status_${res.status}`,
+      });
+    }
     const data = await res.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
     const explanation = (data.candidates?.[0]?.content?.parts?.map((p) => p.text).join('') || '').trim();
-    if (!explanation) return NextResponse.json({ ok: false, error: 'empty' }, { status: 502 });
-    return NextResponse.json({ ok: true, explanation });
+    if (!explanation) {
+      return NextResponse.json({
+        ok: true,
+        provider: 'fallback',
+        fallback: true,
+        explanation: fallbackExplanation(body),
+        reason: 'provider_empty_response',
+      });
+    }
+    return NextResponse.json({ ok: true, provider: 'gemini', fallback: false, explanation });
   } catch (err) {
-    return NextResponse.json({ ok: false, error: err instanceof Error ? err.message : 'failed' }, { status: 500 });
+    return NextResponse.json({
+      ok: true,
+      provider: 'fallback',
+      fallback: true,
+      explanation: fallbackExplanation(body),
+      reason: err instanceof Error ? err.message : 'provider_failed',
+    });
   }
 }

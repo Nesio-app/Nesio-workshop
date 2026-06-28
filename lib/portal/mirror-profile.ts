@@ -51,6 +51,17 @@ function saveMirrorProfile(profile: MirrorProfile): void {
   }
 }
 
+async function hasCloudSession(): Promise<boolean> {
+  try {
+    const res = await fetch('/api/auth/session', { cache: 'no-store' });
+    if (!res.ok) return false;
+    const data = await res.json() as { loggedIn?: boolean };
+    return data.loggedIn === true;
+  } catch {
+    return false;
+  }
+}
+
 /** Call this whenever user gives feedback on a card */
 export function learnFromFeedback(
   domain: string,
@@ -105,8 +116,9 @@ export function getBestInterruptionHours(): number[] {
 /** Sync mirror profile to cloud (best-effort, silent on failure) */
 async function syncToCloud(profile: MirrorProfile): Promise<void> {
   try {
+    if (!(await hasCloudSession())) return;
     const res = await fetch('/api/cloud/profile-settings', {
-      method: 'PATCH',
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ mirrorProfile: JSON.stringify(profile) }),
     });
@@ -119,6 +131,7 @@ async function syncToCloud(profile: MirrorProfile): Promise<void> {
 /** Load mirror profile from cloud on sign-in */
 export async function loadMirrorFromCloud(): Promise<void> {
   try {
+    if (!(await hasCloudSession())) return;
     const res = await fetch('/api/cloud/profile-settings');
     if (!res.ok) return;
     const data = await res.json() as { settings?: { mirrorProfile?: string } };

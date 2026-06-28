@@ -18,6 +18,20 @@ function getGeminiKey(): string | undefined {
   return (process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY)?.trim();
 }
 
+function envValue(key: string): string {
+  return (process.env[key] || '').trim();
+}
+
+function isAnalyzeAiAllowed(req: NextRequest): boolean {
+  const stage5Secret = envValue('NESIO_STAGE5_INVOCATION_SECRET');
+  const providedStage5Secret = req.headers.get('x-nesio-stage5-secret')?.trim() || '';
+  if (stage5Secret && providedStage5Secret === stage5Secret) return true;
+
+  const accessMode = req.headers.get('x-baohe-access-mode')?.trim() || '';
+  const labEnabled = envValue('BAOHE_PERSONAL_LAB_AI_ENABLED').toLowerCase() === 'true';
+  return labEnabled && accessMode === 'personal_lab';
+}
+
 const SYSTEM_PROMPT = `You are Nesio's Life Graph extractor. Given user input (text, image description, or document), extract structured life memory nodes.
 
 For each piece of information, return a JSON array of nodes. Each node:
@@ -197,14 +211,18 @@ export async function POST(req: NextRequest) {
     let raw = '';
     const isImage = body.type === 'image' && Boolean(body.imageBase64);
 
-    try {
-      raw = await analyzeWithClaude(body.content, isImage, body.imageBase64, body.mimeType);
-    } catch {
+    if (isAnalyzeAiAllowed(req)) {
       try {
-        raw = await analyzeWithGemini(body.content, body.imageBase64, body.mimeType);
+        raw = await analyzeWithClaude(body.content, isImage, body.imageBase64, body.mimeType);
       } catch {
-        raw = analyzeFallback(body.content);
+        try {
+          raw = await analyzeWithGemini(body.content, body.imageBase64, body.mimeType);
+        } catch {
+          raw = analyzeFallback(body.content);
+        }
       }
+    } else {
+      raw = analyzeFallback(body.content);
     }
 
     const json = extractJson(raw);
@@ -222,7 +240,7 @@ export async function OPTIONS() {
     headers: {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Headers': 'Content-Type, x-baohe-access-mode, x-nesio-stage5-secret',
     },
   });
 }

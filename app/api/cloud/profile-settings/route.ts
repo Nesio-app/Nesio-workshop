@@ -27,6 +27,7 @@ type ProfileSettings = {
   theme?: string;
   calendarUrl?: string;
   observationPushEnabled?: boolean;
+  mirrorProfile?: string;
 };
 
 const allowedSettingsKeys = [
@@ -37,6 +38,7 @@ const allowedSettingsKeys = [
   'coachStyle',
   'theme',
   'calendarUrl',
+  'mirrorProfile',
   'observationPushEnabled',
 ] as const;
 
@@ -48,6 +50,7 @@ const stringSettingsKeys = [
   'coachStyle',
   'theme',
   'calendarUrl',
+  'mirrorProfile',
 ] as const;
 
 function envValue(key: string): string {

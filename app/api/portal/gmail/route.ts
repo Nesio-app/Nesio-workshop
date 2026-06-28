@@ -2,8 +2,10 @@
  * GET /api/portal/gmail
  * Fetches the current user's Gmail messages using their OAuth token.
  * Token is read from Supabase (cross-device) or cookies (fallback).
- * Extracts Life Graph nodes via Gemini.
+ * Defaults to metadata-only status/preview. Body reads + Gemini extraction
+ * require explicit query opt-in: ?includeBody=true&analyze=true.
  */
+import { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getIntegrationToken } from '@/lib/portal/integrations';
 
@@ -67,7 +69,7 @@ async function refreshToken(refreshTk: string): Promise<string | null> {
   return data.access_token || null;
 }
 
-async function fetchMessages(accessToken: string, max = 10): Promise<GmailMessage[]> {
+async function fetchMessages(accessToken: string, max = 10, metadataOnly = true): Promise<GmailMessage[]> {
   const listRes = await fetch(
     `${GMAIL_API}/users/me/messages?maxResults=${max}&q=newer_than:7d`,
     { headers: { Authorization: `Bearer ${accessToken}` } },
@@ -81,7 +83,7 @@ async function fetchMessages(accessToken: string, max = 10): Promise<GmailMessag
   const messages = await Promise.all(
     ids.slice(0, max).map(async ({ id }) => {
       const res = await fetch(
-        `${GMAIL_API}/users/me/messages/${id}?format=full`,
+        `${GMAIL_API}/users/me/messages/${id}?format=${metadataOnly ? 'metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date' : 'full'}`,
         { headers: { Authorization: `Bearer ${accessToken}` } },
       );
       if (!res.ok) return null;
@@ -137,7 +139,21 @@ ${emailTexts.slice(0, 5000)}`;
   catch { return []; }
 }
 
-export async function GET() {
+function metadataPreview(messages: GmailMessage[]) {
+  return messages.map((m) => ({
+    id: m.id,
+    subject: header(m, 'subject'),
+    from: header(m, 'from'),
+    date: header(m, 'date'),
+    snippetPreview: m.snippet ? `${m.snippet.slice(0, 80)}${m.snippet.length > 80 ? '…' : ''}` : '',
+  }));
+}
+
+export async function GET(req: NextRequest) {
+  const url = new URL(req.url);
+  const includeBody = url.searchParams.get('includeBody') === 'true';
+  const shouldAnalyze = url.searchParams.get('analyze') === 'true';
+  const metadataOnly = !includeBody;
   // Get token for current user (Supabase → cookies fallback)
   let tokens = await getIntegrationToken('gmail');
 
@@ -151,7 +167,7 @@ export async function GET() {
   let messages: GmailMessage[] = [];
 
   try {
-    messages = await fetchMessages(tokens.accessToken, 10);
+    messages = await fetchMessages(tokens.accessToken, 10, metadataOnly);
   } catch (err) {
     const msg = err instanceof Error ? err.message : '';
 
@@ -165,7 +181,7 @@ export async function GET() {
         );
       }
       tokens = { ...tokens, accessToken: newToken };
-      try { messages = await fetchMessages(newToken, 10); }
+      try { messages = await fetchMessages(newToken, 10, metadataOnly); }
       catch {
         return NextResponse.json({ ok: false, error: 'gmail_fetch_failed' }, { status: 500 });
       }
@@ -174,10 +190,16 @@ export async function GET() {
     }
   }
 
-  const nodes = await extractNodes(messages);
+  const nodes = includeBody && shouldAnalyze ? await extractNodes(messages) : [];
 
   return NextResponse.json({
     ok: true,
+    metadataOnly,
+    includeBody,
+    analyze: shouldAnalyze,
+    bodyRead: includeBody,
+    aiAnalysisPerformed: includeBody && shouldAnalyze,
+    messages: metadataPreview(messages),
     nodes,
     count: nodes.length,
     emailCount: messages.length,

@@ -11224,3 +11224,28 @@ html[data-portal-theme="night"] .nesio-today-evidence-chip { color: #96c7f3; bac
   padding: 0.16rem 0.5rem;
   border-radius: 999px;
 }
+
+/* Release hit-area guard: preserve visual design while keeping mobile taps >=44px. */
+.portal-shell a,
+.portal-shell button,
+.portal-app a,
+.portal-app button,
+.nesio-today-root a,
+.nesio-today-root button,
+.settings-page a,
+.settings-page button,
+.settings-page [role="button"],
+.nesio-lifestate-head,
+.nesio-today-feedback-menu button {
+  min-width: var(--tap-min);
+  min-height: var(--tap-min);
+}
+
+.nesio-today-feedback-menu button,
+.nesio-today-why-btn,
+.nesio-today-btn,
+.nesio-today-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
