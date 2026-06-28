@@ -41,7 +41,7 @@ const enabledExecuteDecision = evaluateStage5ToolInvocationPolicy({
   actionKey: 'calendar.event.create',
   executionMode: 'execute',
   env: enabledEnv,
-  runtimeContext: { hasGoogleCalendarAccessToken: true },
+  runtimeContext: { hasInvocationSecret: true, hasGoogleCalendarAccessToken: true },
 });
 assert.equal(enabledExecuteDecision.allowed, true);
 assert.equal(enabledExecuteDecision.mode, 'execute');
@@ -52,10 +52,19 @@ const missingTokenDecision = evaluateStage5ToolInvocationPolicy({
   actionKey: 'calendar.event.create',
   executionMode: 'execute',
   env: enabledEnv,
-  runtimeContext: { hasGoogleCalendarAccessToken: false },
+  runtimeContext: { hasInvocationSecret: true, hasGoogleCalendarAccessToken: false },
 });
 assert.equal(missingTokenDecision.allowed, false);
 assert.equal(missingTokenDecision.blockedReason, 'missing_google_calendar_access_token');
+
+const missingSecretDecision = evaluateStage5ToolInvocationPolicy({
+  actionKey: 'notification.webhook.send',
+  executionMode: 'execute',
+  env: enabledEnv,
+  runtimeContext: { hasInvocationSecret: false },
+});
+assert.equal(missingSecretDecision.allowed, false);
+assert.equal(missingSecretDecision.blockedReason, 'missing_stage5_invocation_secret');
 
 const unknownDecision = evaluateStage5ToolInvocationPolicy({
   actionKey: 'calendar.event.delete_everything',

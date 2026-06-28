@@ -35,6 +35,12 @@ function googleCalendarAccessToken(): string {
   return cookies().get('nesio_google_calendar_access')?.value || '';
 }
 
+function hasInvocationSecret(request: Request): boolean {
+  const expected = envValue('NESIO_STAGE5_INVOCATION_SECRET');
+  const provided = request.headers.get('x-nesio-stage5-secret')?.trim() || '';
+  return Boolean(expected && provided && provided === expected);
+}
+
 function sanitizeCalendarPayload(raw: Record<string, unknown> | undefined) {
   const payload = (raw || {}) as CalendarEventPayload;
   const summary = String(payload.summary || '').trim();
@@ -153,6 +159,7 @@ export async function POST(request: Request) {
     executionMode,
     env: process.env,
     runtimeContext: {
+      hasInvocationSecret: hasInvocationSecret(request),
       hasGoogleCalendarAccessToken: Boolean(accessToken),
     },
   });
