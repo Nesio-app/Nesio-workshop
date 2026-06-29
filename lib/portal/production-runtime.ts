@@ -73,6 +73,13 @@ function normalizeHost(host: string): string {
   }
 }
 
+function hostVariants(host: string): string[] {
+  const normalized = normalizeHost(host);
+  if (!normalized) return [];
+  const withoutWww = normalized.startsWith('www.') ? normalized.slice(4) : normalized;
+  return Array.from(new Set([normalized, withoutWww, `www.${withoutWww}`].filter(Boolean)));
+}
+
 function hasAiProviderKey(env: EnvMap): boolean {
   return envAny(env, [
     'OPENAI_API_KEY',
@@ -202,7 +209,10 @@ export function buildProductionRuntimeStatus(
   const requestHost = normalizeHost(context.requestHost || '');
   const canonicalHost = normalizeHost(canonicalDomain);
   const allowedRuntimeHosts = envList(env, 'BAOHE_ALLOWED_RUNTIME_HOSTS');
-  const canonicalDomainAllowedHosts = Array.from(new Set([canonicalHost, ...allowedRuntimeHosts].filter(Boolean)));
+  const canonicalDomainAllowedHosts = Array.from(new Set([
+    ...hostVariants(canonicalHost),
+    ...allowedRuntimeHosts.flatMap((host) => hostVariants(host)),
+  ].filter(Boolean)));
   const canonicalDomainMatchesRequestHost = Boolean(requestHost) && canonicalDomainAllowedHosts.includes(requestHost);
   const authEnabled = envValue(env, 'BAOHE_AUTH_ENABLED').toLowerCase() === 'true';
   const cloudDbEnabled = envValue(env, 'CLOUD_DB_ENABLED').toLowerCase() === 'true';

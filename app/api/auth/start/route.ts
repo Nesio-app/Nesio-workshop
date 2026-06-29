@@ -55,7 +55,7 @@ function getProviderGate(req: NextRequest, provider: AuthProvider): {
   setupTask?: ProductionRuntimeSetupTask;
 } {
   const status = buildProductionRuntimeStatus(process.env, {
-    requestHost: req.headers.get('host'),
+    requestHost: req.headers.get('x-forwarded-host') || req.headers.get('host'),
   });
   return {
     providerStatus: status.accountAuth.providers[provider],

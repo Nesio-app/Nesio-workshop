@@ -168,7 +168,7 @@ function buildProductDataBackendMatrix({
 
 export async function GET(request: NextRequest) {
   const runtime = buildProductionRuntimeStatus(process.env, {
-    requestHost: request.headers.get('host'),
+    requestHost: request.headers.get('x-forwarded-host') || request.headers.get('host'),
   });
   const cookieStore = cookies();
   const accessCookiePresent = Boolean(cookieStore.get('baohe_auth_access')?.value);
