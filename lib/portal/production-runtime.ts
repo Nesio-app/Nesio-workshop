@@ -80,6 +80,12 @@ function hostVariants(host: string): string[] {
   return Array.from(new Set([normalized, withoutWww, `www.${withoutWww}`].filter(Boolean)));
 }
 
+const PRODUCT_RUNTIME_HOSTS = [
+  'www.nesio.app',
+  'nesio.app',
+  'treasurebox-nu.vercel.app',
+];
+
 function hasAiProviderKey(env: EnvMap): boolean {
   return envAny(env, [
     'OPENAI_API_KEY',
@@ -210,6 +216,7 @@ export function buildProductionRuntimeStatus(
   const canonicalHost = normalizeHost(canonicalDomain);
   const allowedRuntimeHosts = envList(env, 'BAOHE_ALLOWED_RUNTIME_HOSTS');
   const canonicalDomainAllowedHosts = Array.from(new Set([
+    ...PRODUCT_RUNTIME_HOSTS.flatMap((host) => hostVariants(host)),
     ...hostVariants(canonicalHost),
     ...allowedRuntimeHosts.flatMap((host) => hostVariants(host)),
   ].filter(Boolean)));
