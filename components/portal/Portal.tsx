@@ -57,6 +57,11 @@ type AuthSessionPayload = {
   status?: string;
 };
 
+async function fetchAuthSessionPayload(): Promise<AuthSessionPayload | null> {
+  const res = await fetch('/api/auth/session', { cache: 'no-store' });
+  return res.ok ? (res.json() as Promise<AuthSessionPayload>) : null;
+}
+
 function AskGuideSheet({
   open,
   onClose,
@@ -266,21 +271,36 @@ export default function Portal() {
 
   useEffect(() => {
     let cancelled = false;
+    const refreshAuthSession = () => {
+      fetchAuthSessionPayload()
+        .then((data) => {
+          if (cancelled) return;
+          setAuthSessionLoggedIn(Boolean(data?.loggedIn));
+        })
+        .catch(() => {
+          if (!cancelled) setAuthSessionLoggedIn(false);
+        })
+        .finally(() => {
+          if (!cancelled) setAuthReady(true);
+        });
+    };
     importSupabaseHashSession()
       .catch(() => ({ imported: false, ok: false }))
-      .then(() => fetch('/api/auth/session', { cache: 'no-store' }))
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: AuthSessionPayload | null) => {
-        if (cancelled) return;
-        setAuthSessionLoggedIn(Boolean(data?.loggedIn));
-      })
+      .then(() => refreshAuthSession())
       .catch(() => {
         if (!cancelled) setAuthSessionLoggedIn(false);
       })
       .finally(() => {
         if (!cancelled) setAuthReady(true);
       });
-    return () => { cancelled = true; };
+
+    window.addEventListener('nesio-auth-session-ready', refreshAuthSession);
+    window.addEventListener('nesio-auth-session-imported', refreshAuthSession);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('nesio-auth-session-ready', refreshAuthSession);
+      window.removeEventListener('nesio-auth-session-imported', refreshAuthSession);
+    };
   }, []);
 
   // Platform Runtime: the shell drives Integration collection + Pruning.

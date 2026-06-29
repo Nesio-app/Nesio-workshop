@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import AuthHashImportBridge from '@/components/portal/AuthHashImportBridge';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -44,7 +45,10 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />
       </head>
-      <body className="font-sans">{children}</body>
+      <body className="font-sans">
+        <AuthHashImportBridge />
+        {children}
+      </body>
     </html>
   );
 }
