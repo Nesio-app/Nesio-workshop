@@ -9,7 +9,9 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
+const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 const GEMINI_MODEL_FALLBACKS = ['gemini-2.0-flash', 'gemini-1.5-flash'];
+const DEFAULT_OPENAI_MODEL = 'gpt-4o-mini';
 
 function getAnthropicKey(): string | undefined {
   return (process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY)?.trim();
@@ -17,6 +19,10 @@ function getAnthropicKey(): string | undefined {
 
 function getGeminiKey(): string | undefined {
   return (process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY)?.trim();
+}
+
+function getOpenAIKey(): string | undefined {
+  return (process.env.OpenAI_KEY || process.env.OPENAI_API_KEY)?.trim();
 }
 
 function envValue(key: string): string {
@@ -155,6 +161,48 @@ async function analyzeWithGemini(content: string, imageBase64?: string, mimeType
   throw new Error(lastError);
 }
 
+async function analyzeWithOpenAI(content: string, isImage: boolean, imageBase64?: string, mimeType?: string, systemPrompt = SYSTEM_PROMPT): Promise<string> {
+  const key = getOpenAIKey();
+  if (!key) throw new Error('no_openai_key');
+
+  const prompt = `${systemPrompt}\n\nUser input: ${content}`;
+  const userContent: unknown[] = isImage && imageBase64
+    ? [
+        { type: 'text', text: prompt },
+        {
+          type: 'image_url',
+          image_url: {
+            url: `data:${mimeType || 'image/jpeg'};base64,${imageBase64}`,
+            detail: 'low',
+          },
+        },
+      ]
+    : [{ type: 'text', text: prompt }];
+
+  const res = await fetch(OPENAI_API_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${key}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: envValue('OPENAI_VISION_MODEL') || envValue('OPENAI_MODEL') || DEFAULT_OPENAI_MODEL,
+      messages: [{ role: 'user', content: userContent }],
+      temperature: 0.2,
+      max_tokens: 900,
+    }),
+  });
+
+  const data = await res.json() as {
+    choices?: Array<{ message?: { content?: string } }>;
+    error?: { message?: string; type?: string };
+  };
+  if (!res.ok) {
+    throw new Error(`OpenAI ${res.status}${data.error?.type ? ` ${data.error.type}` : ''}`);
+  }
+  return data.choices?.[0]?.message?.content || '';
+}
+
 /** Rule-based fallback when no AI key is available */
 function analyzeFallback(content: string): string {
   const lower = content.toLowerCase();
@@ -279,17 +327,22 @@ export async function POST(req: NextRequest) {
           raw = await analyzeWithGemini(body.content, body.imageBase64, body.mimeType);
         } catch (geminiError) {
           logAiProviderFailure('gemini', geminiError instanceof Error ? geminiError.message : 'unknown_error');
-          if (isImage) {
-            return NextResponse.json(
-              {
-                ok: false,
-                error: 'ai_image_unavailable',
-                summary: '图片识别暂时不可用。可以先保存为待确认图片线索。',
-              },
-              { status: 503 },
-            );
+          try {
+            raw = await analyzeWithOpenAI(body.content, isImage, body.imageBase64, body.mimeType);
+          } catch (openAiError) {
+            logAiProviderFailure('openai', openAiError instanceof Error ? openAiError.message : 'unknown_error');
+            if (isImage) {
+              return NextResponse.json(
+                {
+                  ok: false,
+                  error: 'ai_image_unavailable',
+                  summary: '图片识别暂时不可用。可以先保存为待确认图片线索。',
+                },
+                { status: 503 },
+              );
+            }
+            raw = analyzeFallback(body.content);
           }
-          raw = analyzeFallback(body.content);
         }
       }
     } else if (isImage) {
