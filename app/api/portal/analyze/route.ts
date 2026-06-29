@@ -8,7 +8,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
+const GEMINI_MODEL_FALLBACKS = ['gemini-2.0-flash', 'gemini-1.5-flash'];
 
 function getAnthropicKey(): string | undefined {
   return (process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY)?.trim();
@@ -108,6 +109,13 @@ async function analyzeWithClaude(content: string, isImage: boolean, imageBase64?
   return data.content?.map((c) => c.text).join('') || '';
 }
 
+function logAiProviderFailure(provider: string, detail: string) {
+  console.warn('[portal-analyze] provider_failed', {
+    provider,
+    detail,
+  });
+}
+
 async function analyzeWithGemini(content: string, imageBase64?: string, mimeType?: string, systemPrompt = SYSTEM_PROMPT): Promise<string> {
   const key = getGeminiKey();
   if (!key) throw new Error('no_gemini_key');
@@ -118,15 +126,33 @@ async function analyzeWithGemini(content: string, imageBase64?: string, mimeType
   }
   parts.push({ text: `${systemPrompt}\n\nUser input: ${content}` });
 
-  const res = await fetch(`${GEMINI_URL}?key=${key}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ contents: [{ parts }] }),
-  });
+  const configuredModel = envValue('GEMINI_MODEL');
+  const models = Array.from(new Set([configuredModel, ...GEMINI_MODEL_FALLBACKS].filter(Boolean)));
+  let lastError = 'Gemini unavailable';
 
-  const data = await res.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
-  if (!res.ok) throw new Error(`Gemini ${res.status}`);
-  return data.candidates?.[0]?.content?.parts?.map((p) => p.text).join('') || '';
+  for (const model of models) {
+    const res = await fetch(`${GEMINI_BASE_URL}/${model}:generateContent?key=${key}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: [{ parts }] }),
+    });
+
+    const data = await res.json() as {
+      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+      error?: { message?: string; status?: string };
+    };
+    if (res.ok) {
+      const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text).join('') || '';
+      if (text) return text;
+      lastError = `Gemini ${model} empty_response`;
+      logAiProviderFailure('gemini', lastError);
+      continue;
+    }
+    lastError = `Gemini ${model} ${res.status}${data.error?.status ? ` ${data.error.status}` : ''}`;
+    logAiProviderFailure('gemini', lastError);
+  }
+
+  throw new Error(lastError);
 }
 
 /** Rule-based fallback when no AI key is available */
@@ -247,10 +273,12 @@ export async function POST(req: NextRequest) {
     if (aiAllowed) {
       try {
         raw = await analyzeWithClaude(body.content, isImage, body.imageBase64, body.mimeType);
-      } catch {
+      } catch (claudeError) {
+        logAiProviderFailure('claude', claudeError instanceof Error ? claudeError.message : 'unknown_error');
         try {
           raw = await analyzeWithGemini(body.content, body.imageBase64, body.mimeType);
-        } catch {
+        } catch (geminiError) {
+          logAiProviderFailure('gemini', geminiError instanceof Error ? geminiError.message : 'unknown_error');
           if (isImage) {
             return NextResponse.json(
               {
