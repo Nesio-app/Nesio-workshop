@@ -121,6 +121,7 @@
     "test:account-settings-auth-i18n": "node scripts/account-settings-auth-i18n.test.mjs",
     "test:auth-wechat-runtime": "node scripts/auth-wechat-runtime.test.mjs",
     "test:auth-start-audit": "node scripts/auth-start-audit.test.mjs",
+    "test:auth-implicit-session-import": "node scripts/auth-implicit-session-import.test.mjs",
     "test:auth-linked-provider-logout": "node scripts/auth-linked-provider-logout.test.mjs",
     "test:portal-ai-friends-runtime": "node scripts/portal-ai-friends-runtime.test.mjs",
     "test:portal-ai-action-controls": "node scripts/portal-ai-action-controls.test.mjs",

@@ -37,6 +37,7 @@ import {
   writePortalCache,
 } from '@/lib/portal/prefetch-cache';
 import { configUrl } from '@/lib/portal/paths';
+import { importSupabaseHashSession } from '@/lib/portal/auth-client';
 import { loadProfileSettings, PROFILE_UPDATED_EVENT, type PortalLocale } from '@/lib/portal/profile';
 import { runConnectors } from '@/lib/portal/connectors';
 import { pruneDisposableSignals } from '@/lib/life-domain';
@@ -265,7 +266,9 @@ export default function Portal() {
 
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/auth/session', { cache: 'no-store' })
+    importSupabaseHashSession()
+      .catch(() => ({ imported: false, ok: false }))
+      .then(() => fetch('/api/auth/session', { cache: 'no-store' }))
       .then((res) => (res.ok ? res.json() : null))
       .then((data: AuthSessionPayload | null) => {
         if (cancelled) return;

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { loadProfileSettings, saveProfileSettings, type PortalLocale } from '@/lib/portal/profile';
-import { getAuthRedirectTo } from '@/lib/portal/auth-client';
+import { getAuthRedirectTo, importSupabaseHashSession } from '@/lib/portal/auth-client';
 
 type AuthState = 'idle' | 'loading' | 'email_sent' | 'error';
 
@@ -46,6 +46,16 @@ export default function LoginPageClient() {
 
   useEffect(() => {
     setLocale(loadProfileSettings().locale);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    importSupabaseHashSession().then((result) => {
+      if (!cancelled && result.imported && result.ok) {
+        window.location.href = '/';
+      }
+    });
+    return () => { cancelled = true; };
   }, []);
 
   async function handleGoogle() {
