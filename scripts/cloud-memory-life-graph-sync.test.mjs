@@ -1,0 +1,182 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+
+const root = process.cwd();
+const lifeGraphPath = path.join(root, 'lib', 'portal', 'life-graph.ts');
+const memoryTabPath = path.join(root, 'components', 'portal', 'MemoryTab.tsx');
+const packagePath = path.join(root, 'package.json');
+
+const lifeGraph = fs.readFileSync(lifeGraphPath, 'utf8');
+const memoryTab = fs.readFileSync(memoryTabPath, 'utf8');
+const pkg = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+
+for (const marker of [
+  'cloudMemorySyncEnabled',
+  'CLOUD_SYNC_STATUS_KEY',
+  'CLOUD_SYNC_OUTBOX_KEY',
+  'export type CloudSyncStatus',
+  'export function getLifeGraphCloudSyncSummary',
+  'export function getLifeGraphCloudSyncRecords',
+  'export interface LifeGraphCloudSyncOutboxItem',
+  'export async function retryLifeGraphCloudSync',
+  'queueCloudSyncOutboxItem',
+  'removeCloudSyncOutboxItem',
+  'markCloudSyncPending',
+  'markCloudSyncSynced',
+  'markCloudSyncFailed',
+  'syncLifeNodeToCloud',
+  'syncLifeGraphDeleteToCloud',
+  '/api/cloud/memory',
+  'credentials: \'include\'',
+  'void syncLifeNodeToCloud(newNode)',
+  'void syncLifeNodeToCloud(nodes[idx])',
+  'void syncLifeGraphDeleteToCloud(id)',
+  'return newNode',
+  'return true',
+]) {
+  assert.ok(lifeGraph.includes(marker), `life-graph cloud sync missing marker: ${marker}`);
+}
+
+for (const marker of [
+  'export function mergeCloudMemorySnapshot',
+  'incomingAssetsByNodeId',
+  'saveAll(mergedNodes)',
+  'nesio-life-graph-cloud-hydrated',
+]) {
+  assert.ok(lifeGraph.includes(marker), `life-graph cloud hydration missing marker: ${marker}`);
+}
+
+for (const marker of [
+  'export async function backfillLocalLifeGraphToCloud',
+  'const nodes = loadAll()',
+  'nodes.slice(0, limit)',
+  'flatMap((node) =>',
+  'node.assets',
+  'body: JSON.stringify({ nodes: backfillNodes, assets: backfillAssets, backfill: true })',
+  'attemptedNodeCount: backfillNodes.length',
+]) {
+  assert.ok(lifeGraph.includes(marker), `life-graph cloud backfill missing marker: ${marker}`);
+}
+
+for (const marker of [
+  'getLifeGraphCloudSyncRecords().filter',
+  'record.status === \'pending\' || record.status === \'failed\'',
+  'const outboxItemsByKey = loadCloudSyncOutboxMap()',
+  'removeCloudSyncOutboxItem(item.resourceId, item.operation)',
+  'retriedCount',
+  'succeededCount',
+  'failedCount',
+]) {
+  assert.ok(lifeGraph.includes(marker), `life-graph cloud sync retry missing marker: ${marker}`);
+}
+
+for (const marker of [
+  'createAppApiClient',
+  'fetchCloudMemorySnapshot',
+  'mergeCloudMemorySnapshot',
+  'retryLifeGraphCloudSync',
+  'getLifeGraphCloudSyncSummary',
+  'backfillLocalLifeGraphToCloud',
+  'cloudSyncSummary',
+  'setCloudSyncSummary',
+  'nesio-life-graph-cloud-sync-updated',
+  'nesio-memory-sync-status',
+  '同步失败',
+  '等待同步',
+  '已同步',
+  'if (!canUsePrivateData)',
+  'void retryLifeGraphCloudSync()',
+  'void backfillLocalLifeGraphToCloud',
+  'window.addEventListener(\'online\', retryCloudSync)',
+  'window.addEventListener(\'nesio-life-graph-cloud-sync-updated\', onCloudSyncUpdate)',
+  'window.removeEventListener(\'online\', retryCloudSync)',
+  'window.removeEventListener(\'nesio-life-graph-cloud-sync-updated\', onCloudSyncUpdate)',
+  'setNodes(getRecentNodes(30))',
+]) {
+  assert.ok(memoryTab.includes(marker), `MemoryTab cloud hydration missing marker: ${marker}`);
+}
+
+assert.match(
+  memoryTab,
+  /function retryCloudSync\(\)\s*\{[\s\S]*if \(!canUsePrivateData\) return;[\s\S]*void retryLifeGraphCloudSync\(\)/,
+  'MemoryTab must retry pending/failed cloud Memory sync only when private signed-in data is allowed.',
+);
+assert.match(
+  memoryTab,
+  /function onCloudSyncUpdate\(\)\s*\{[\s\S]*setCloudSyncSummary\(getLifeGraphCloudSyncSummary\(\)\)/,
+  'MemoryTab must refresh visible cloud sync summary when cloud sync status changes.',
+);
+assert.match(
+  memoryTab,
+  /cloudSyncSummary\.failedCount > 0[\s\S]*同步失败/,
+  'MemoryTab must surface failed cloud Memory sync instead of hiding backend failures.',
+);
+assert.match(
+  memoryTab,
+  /cloudSyncSummary\.pendingCount > 0[\s\S]*等待同步/,
+  'MemoryTab must surface pending local-first Memory sync while offline or retrying.',
+);
+
+assert.match(
+  lifeGraph,
+  /catch\s*\([^)]*\)\s*\{[\s\S]*markCloudSyncFailed/,
+  'cloud sync failures must be recorded so local-first Memory does not silently pretend cloud persistence succeeded.',
+);
+assert.match(
+  lifeGraph,
+  /if\s*\(!response\.ok\)[\s\S]*throw new Error\('cloud_memory_sync_failed'\)/,
+  'non-2xx cloud memory writes must be marked failed instead of counted as synced.',
+);
+assert.match(
+  lifeGraph,
+  /queueCloudSyncOutboxItem\([^)]*node[^)]*'upsert'/,
+  'upsert payloads must be queued locally before best-effort cloud sync.',
+);
+assert.match(
+  lifeGraph,
+  /queueCloudSyncOutboxItem\([^)]*id[^)]*'delete'/,
+  'delete tombstones must be queued locally before best-effort cloud sync.',
+);
+assert.match(
+  lifeGraph,
+  /body: JSON\.stringify\(\{ nodes: \[item\.node\], assets: item\.assets \|\| \[\] \}\)/,
+  'retry must replay queued upsert payloads, not just status markers.',
+);
+assert.match(
+  lifeGraph,
+  /body: JSON\.stringify\(\{ nodeId: item\.resourceId \}\)/,
+  'retry must replay queued delete tombstones.',
+);
+assert.match(
+  memoryTab,
+  /catch\s*\{[\s\S]*cloud hydration is best-effort/,
+  'cloud hydration failures must be swallowed so signed-in Memory still works offline.',
+);
+assert.doesNotMatch(
+  lifeGraph,
+  /await\s+syncLifeNodeToCloud/,
+  'local Memory writes must not block on cloud sync.',
+);
+assert.doesNotMatch(
+  memoryTab,
+  /await\s+backfillLocalLifeGraphToCloud/,
+  'signed-in local-to-cloud backfill must not block Memory hydration/rendering.',
+);
+assert.doesNotMatch(
+  lifeGraph,
+  /deleteMissing|deleteUnmatched|filter\(\(node\)\s*=>\s*incoming/,
+  'cloud hydration must not delete unmatched local Memory nodes by default.',
+);
+assert.equal(
+  pkg.scripts['test:cloud-memory-life-graph-sync'],
+  'node scripts/cloud-memory-life-graph-sync.test.mjs',
+  'package.json must expose cloud memory life-graph sync test.',
+);
+assert.match(
+  pkg.scripts['test:contracts'],
+  /test:cloud-memory-life-graph-sync/,
+  'test:contracts must include cloud memory life-graph sync test.',
+);
+
+console.log('cloud memory life-graph sync contract passed');

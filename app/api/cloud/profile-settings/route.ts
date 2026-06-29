@@ -22,6 +22,7 @@ type SupabaseTokenResponse = {
 type ProfileSettings = {
   displayName?: string;
   avatarUrl?: string;
+  avatarStoragePath?: string;
   locale?: string;
   displayLanguage?: string;
   coachStyle?: string;
@@ -34,6 +35,7 @@ type ProfileSettings = {
 const allowedSettingsKeys = [
   'displayName',
   'avatarUrl',
+  'avatarStoragePath',
   'locale',
   'displayLanguage',
   'coachStyle',
@@ -46,6 +48,7 @@ const allowedSettingsKeys = [
 const stringSettingsKeys = [
   'displayName',
   'avatarUrl',
+  'avatarStoragePath',
   'locale',
   'displayLanguage',
   'coachStyle',

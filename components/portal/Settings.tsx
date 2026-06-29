@@ -11,6 +11,7 @@ import {
   type PortalProfileSettings,
 } from '@/lib/portal/profile';
 import { readAvatarFile } from '@/lib/portal/profile';
+import { createAppApiClient } from '@/lib/portal/app-api-client';
 
 export default function Settings() {
   const [locale, setLocale] = useState<PortalLocale>('zh');
@@ -52,9 +53,30 @@ export default function Settings() {
     if (!file) return;
 
     try {
-      const dataUrl = await readAvatarFile(file);
-      setAvatarUrl(dataUrl);
-      saveProfileSettings({ avatarUrl: dataUrl });
+      const client = createAppApiClient();
+      const result = await client.uploadCloudAsset({ file, purpose: 'avatar' });
+      if (result.ok && result.storagePath) {
+        const readResult = await client.fetchCloudAssetReadUrl({ storagePath: result.storagePath });
+        const displayUrl = readResult.ok && readResult.signedUrl ? readResult.signedUrl : '';
+        await client.saveCloudProfileSettings({ avatarStoragePath: result.storagePath });
+        saveProfileSettings({
+          avatarUrl: displayUrl,
+          avatarStoragePath: result.storagePath,
+        });
+        if (displayUrl) setAvatarUrl(displayUrl);
+        setSaveMsg(t(locale, 'settingsSaved'));
+        setTimeout(() => setSaveMsg(''), 2000);
+        event.target.value = '';
+        return;
+      }
+    } catch {
+      // Cloud avatar upload is a signed-in enhancement; local avatar should keep working offline.
+    }
+
+    try {
+      const avatar = await readAvatarFile(file);
+      setAvatarUrl(avatar);
+      saveProfileSettings({ avatarUrl: avatar, avatarStoragePath: '' });
       setSaveMsg(t(locale, 'settingsSaved'));
       setTimeout(() => setSaveMsg(''), 2000);
     } catch {

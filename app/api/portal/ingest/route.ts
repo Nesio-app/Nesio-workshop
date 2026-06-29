@@ -13,6 +13,12 @@
  * lab mode. Anonymous public parsing is not allowed.
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { createSignal } from '@/lib/life-domain/create-signal';
+import {
+  normalizeHealthToSignal,
+  normalizeTaskToSignal,
+  normalizeVoiceToSignal,
+} from '@/lib/life-domain/normalizers';
 
 export const dynamic = 'force-dynamic';
 
@@ -108,6 +114,16 @@ ${content.slice(0, 5000)}`;
   }
 }
 
+function normalizeIngestToSignal(source: string, content: string) {
+  if (source === 'reminder') {
+    return normalizeTaskToSignal({ title: content.slice(0, 80) || '提醒事项', status: 'open' });
+  }
+  if (source === 'keep') {
+    return normalizeHealthToSignal({ title: content.slice(0, 80) || '健康记录', status: content });
+  }
+  return normalizeVoiceToSignal({ text: content, tags: [source] });
+}
+
 export async function POST(req: NextRequest) {
   let body: { source?: string; content?: string; secret?: string };
   try {
@@ -129,7 +145,16 @@ export async function POST(req: NextRequest) {
   }
 
   const { nodes, summary } = await extractNodes(source, content);
-  return NextResponse.json({ ok: true, source, nodes, summary, count: nodes.length });
+  const signal = createSignal(normalizeIngestToSignal(source, content));
+  return NextResponse.json({
+    ok: true,
+    source,
+    nodes,
+    summary,
+    count: nodes.length,
+    signals: [signal],
+    signalIds: [signal.id],
+  });
 }
 
 export async function GET() {

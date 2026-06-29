@@ -1,0 +1,155 @@
+/**
+ * Canonical Signal write path.
+ *
+ * All new real-world inputs must enter Nesio through createSignal(). The current
+ * app stores Memory in Life Graph, so this writes a normalized Signal projection
+ * into Life Graph while preserving a stable Signal id/type in node attributes.
+ */
+
+import { addLifeNode, type LifeNode, type LifeNodeSource, type LifeNodeType } from '../portal/life-graph';
+import { lifeNodeToSignal, type RetentionPolicy, type Signal, type SignalSensitivity, type SignalSource, type SignalType } from './signal';
+
+export const SIGNAL_SCHEMA_VERSION = 'Signal@v1';
+export type SignalWriteMode = 'local_first' | 'cloud_mirror_attempted' | 'cloud_mirror_pending';
+
+export interface CreateSignalInput {
+  source: SignalSource;
+  type: SignalType;
+  occurredAt?: string | Date;
+  capturedAt?: string | Date;
+  title: string;
+  payload?: Record<string, unknown>;
+  confidence?: number;
+  sensitivity?: SignalSensitivity;
+  retentionPolicy?: RetentionPolicy;
+  tags?: string[];
+  raw?: string;
+  externalId?: string;
+}
+
+function iso(value: string | Date | undefined): string {
+  if (!value) return new Date().toISOString();
+  return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
+}
+
+function hashText(value: string): string {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = ((hash << 5) - hash + value.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash).toString(36).slice(0, 8);
+}
+
+export function buildSignalId(input: Pick<CreateSignalInput, 'source' | 'type' | 'occurredAt' | 'payload' | 'externalId'>): string {
+  const occurredAt = iso(input.occurredAt);
+  const stamp = occurredAt.replace(/[-:.TZ]/g, '').slice(0, 14);
+  const seed = JSON.stringify({
+    source: input.source,
+    type: input.type,
+    occurredAt,
+    externalId: input.externalId || '',
+    payload: input.payload || {},
+  });
+  return `${input.source}_${stamp}_${hashText(seed)}`;
+}
+
+function clampConfidence(value: number | undefined): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return 0.6;
+  return Math.max(0, Math.min(1, value));
+}
+
+function lifeNodeSource(source: SignalSource): LifeNodeSource {
+  if (source === 'photo') return 'photo';
+  if (source === 'calendar') return 'calendar';
+  if (source === 'gmail') return 'email';
+  if (source === 'voice') return 'voice';
+  if (source === 'manual') return 'manual';
+  return 'system';
+}
+
+function lifeNodeType(input: CreateSignalInput): LifeNodeType {
+  if (input.source === 'calendar' || input.type === 'event') return 'event';
+  if (input.source === 'task' || input.type === 'commitment' || String(input.type).startsWith('task.')) return 'commitment';
+  if (input.source === 'health' || String(input.type).startsWith('health.')) return 'health_state';
+  if (String(input.type).includes('location')) return 'place';
+  if (input.source === 'photo' || String(input.type).includes('object')) return 'object';
+  return 'preference';
+}
+
+function primitivePayload(payload: Record<string, unknown> = {}): LifeNode['attributes'] {
+  const attrs: LifeNode['attributes'] = {};
+  for (const [key, value] of Object.entries(payload)) {
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' || value === null) {
+      attrs[key] = value;
+    }
+  }
+  return attrs;
+}
+
+function inferSensitivity(input: CreateSignalInput): SignalSensitivity {
+  if (input.sensitivity) return input.sensitivity;
+  if (input.source === 'health') return 'health';
+  if (String(input.type).startsWith('finance.')) return 'financial';
+  if (input.source === 'calendar' || input.source === 'gmail' || input.source === 'task') return 'work';
+  return 'normal';
+}
+
+function inferRetention(input: CreateSignalInput): RetentionPolicy {
+  if (input.retentionPolicy) return input.retentionPolicy;
+  if (input.source === 'weather' || input.source === 'hardware_pulse') return 'Disposable';
+  if (input.source === 'health' || input.source === 'gmail') return 'LongLiving';
+  return 'Normal';
+}
+
+export function signalWriteMode(): SignalWriteMode {
+  if (typeof window === 'undefined' || typeof fetch !== 'function') return 'local_first';
+  return 'cloud_mirror_pending';
+}
+
+export async function writeCloudSignal(signal: Signal): Promise<{ ok: boolean; status: string }> {
+  if (typeof window === 'undefined' || typeof fetch !== 'function') {
+    return { ok: false, status: 'server_or_no_fetch' };
+  }
+  try {
+    const response = await fetch('/api/cloud/signals', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ signal: { ...signal, schemaVersion: SIGNAL_SCHEMA_VERSION } }),
+    });
+    if (!response.ok) return { ok: false, status: `http_${response.status}` };
+    return { ok: true, status: 'cloud_mirror_attempted' };
+  } catch {
+    return { ok: false, status: 'cloud_mirror_failed' };
+  }
+}
+
+export function createSignal(input: CreateSignalInput): Signal {
+  const occurredAt = iso(input.occurredAt);
+  const capturedAt = iso(input.capturedAt);
+  const signalId = buildSignalId({ ...input, occurredAt });
+  const node = addLifeNode({
+    type: lifeNodeType(input),
+    name: input.title,
+    attributes: {
+      ...primitivePayload(input.payload),
+      signalId,
+      signalSource: input.source,
+      signalType: input.type,
+      occurredAt,
+      capturedAt,
+      externalId: input.externalId || null,
+      retentionPolicy: inferRetention(input),
+      sensitivity: inferSensitivity(input),
+    },
+    source: lifeNodeSource(input.source),
+    confidence: clampConfidence(input.confidence),
+    relations: [],
+    tags: Array.from(new Set([...(input.tags || []), input.source, String(input.type)])),
+    rawInput: input.raw,
+  });
+  const signal = lifeNodeToSignal(node);
+  if (signalWriteMode() === 'cloud_mirror_pending') {
+    void writeCloudSignal(signal);
+  }
+  return signal;
+}

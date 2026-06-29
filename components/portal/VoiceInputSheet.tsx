@@ -11,6 +11,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { addLifeNode, getRecentNodes, isPrivateExternalNode, searchLifeGraphFuzzy, type LifeNode } from '@/lib/portal/life-graph';
+import { searchSignalsSemantically } from '@/lib/life-domain/signal-search';
 import { routeIntent } from '@/lib/portal/intent-router';
 import MeetingRecorder from './MeetingRecorder';
 
@@ -29,6 +30,7 @@ const QUICK_INTENTS = [
 ];
 
 type SendState = 'idle' | 'analyzing' | 'saved' | 'error';
+type AskResult = Pick<LifeNode, 'id' | 'name'> & { source: string };
 
 function parseInlineTags(value: string): string[] {
   const tags = value.match(/#[^\s#，。,.!?！？:：；;]+/g) || [];
@@ -80,7 +82,7 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
   const [intentLabel, setIntentLabel] = useState('');
   const [micError, setMicError] = useState('');
   const [savedCount, setSavedCount] = useState(0);
-  const [askResults, setAskResults] = useState<LifeNode[]>([]);
+  const [askResults, setAskResults] = useState<AskResult[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const recRef = useRef<{ stop: () => void } | null>(null);
   const isAskMode = intent === 'ask';
@@ -155,9 +157,16 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
       stopListening();
       const visibleCandidates = getRecentNodes(60).filter((node) => canUsePrivateData || !isPrivateExternalNode(node));
       const aiMatches = await askMemoryWithAi(t, visibleCandidates).catch(() => []);
-      const matches = aiMatches.length
+      const signalMatches = searchSignalsSemantically(t, 8).map((signal) => ({
+        id: signal.id,
+        name: signal.title,
+        source: signal.source,
+      }));
+      const matches: AskResult[] = aiMatches.length
         ? aiMatches
-        : searchLifeGraphFuzzy(t, 8).filter((node) => canUsePrivateData || !isPrivateExternalNode(node));
+        : signalMatches.length
+          ? signalMatches
+          : searchLifeGraphFuzzy(t, 8).filter((node) => canUsePrivateData || !isPrivateExternalNode(node));
       setAskResults(matches.slice(0, 4));
       setSendState('saved');
       setText('');

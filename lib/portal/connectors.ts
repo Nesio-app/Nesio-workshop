@@ -5,8 +5,10 @@
 
 import { fetchWeatherAt, readGeo, reverseGeocode } from './weather';
 import { PORTAL_CACHE_KEYS, writePortalCache, readPortalCache } from './prefetch-cache';
-import { addLifeNode, getLifeGraph } from './life-graph';
+import { getLifeGraph } from './life-graph';
 import type { CalendarEvent } from './types';
+import { createSignal } from '../life-domain/create-signal';
+import { normalizeCalendarToSignal, normalizeWeatherToSignal } from '../life-domain/normalizers';
 
 // ── Weather ──────────────────────────────────────────────────────────────────
 
@@ -31,6 +33,7 @@ export async function refreshWeather(): Promise<void> {
 
           const snapshot = await fetchWeatherAt(lat, lon, timezone, placeName);
           writePortalCache(PORTAL_CACHE_KEYS.weather, snapshot);
+          createSignal(normalizeWeatherToSignal({ ...snapshot, placeName }));
           window.dispatchEvent(new CustomEvent('nesio-weather-updated', { detail: snapshot }));
         } catch { /* fetch failed */ }
         resolve();
@@ -55,7 +58,9 @@ export async function refreshCalendar(): Promise<void> {
 
     // Add upcoming events to Life Graph (deduplicate by event id)
     if (data.events?.length) {
-      const existingIds = new Set(getLifeGraph().map((n) => n.attributes['calendarId'] as string).filter(Boolean));
+      const existingIds = new Set(getLifeGraph()
+        .map((n) => (n.attributes['externalId'] || n.attributes['calendarId']) as string)
+        .filter(Boolean));
       const now = Date.now();
 
       data.events
@@ -65,23 +70,14 @@ export async function refreshCalendar(): Promise<void> {
           const calId = event.id || event.start;
           if (existingIds.has(calId)) return; // already in Life Graph
 
-          addLifeNode({
-            type: 'event',
-            name: event.title || 'Calendar Event',
-            attributes: {
-              calendarId: calId,
-              start: event.start,
-              end: event.end || '',
-              location: event.location || '',
-              description: (event.description || '').slice(0, 200),
-              calendarName: event.calendarName || '',
-            },
-            source: 'calendar',
-            confidence: 1.0,
-            relations: [],
-            tags: ['日历', event.calendarName || 'Google Calendar'],
-            rawInput: `${event.title} ${event.start}`,
-          });
+          createSignal(normalizeCalendarToSignal({
+            id: calId,
+            title: event.title || 'Calendar Event',
+            start: event.start,
+            end: event.end,
+            location: event.location,
+            calendarName: event.calendarName,
+          }));
         });
     }
   } catch { /* offline */ }

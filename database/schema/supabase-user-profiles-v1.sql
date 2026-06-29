@@ -1,0 +1,52 @@
+-- Nesio cloud user profiles v1
+-- Apply manually in Supabase SQL editor before enabling CLOUD_DB_ENABLED=true.
+-- This schema supports app/api/cloud/account/route.ts.
+-- user_profiles is the product-level account profile that mirrors Supabase Auth safely.
+
+CREATE TABLE IF NOT EXISTS public.user_profiles (
+  identity_key text PRIMARY KEY,
+  user_id uuid REFERENCES auth.users (id) ON DELETE CASCADE,
+  email text,
+  phone text,
+  provider text,
+  providers text[] NOT NULL DEFAULT '{}'::text[],
+  display_name text,
+  avatar_url text,
+  onboarding_completed boolean NOT NULL DEFAULT false,
+  profile jsonb NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(profile) = 'object'),
+  last_seen_at timestamptz,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_profiles_user_updated
+  ON public.user_profiles (user_id, updated_at DESC)
+  WHERE user_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_user_profiles_email
+  ON public.user_profiles (email)
+  WHERE email IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_user_profiles_last_seen_at
+  ON public.user_profiles (last_seen_at DESC);
+
+ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "user_profiles_select_own"
+  ON public.user_profiles
+  FOR SELECT
+  TO authenticated
+  USING (user_id IS NOT NULL AND auth.uid() = user_id);
+
+CREATE POLICY "user_profiles_insert_own"
+  ON public.user_profiles
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (user_id IS NOT NULL AND auth.uid() = user_id);
+
+CREATE POLICY "user_profiles_update_own"
+  ON public.user_profiles
+  FOR UPDATE
+  TO authenticated
+  USING (user_id IS NOT NULL AND auth.uid() = user_id)
+  WITH CHECK (user_id IS NOT NULL AND auth.uid() = user_id);

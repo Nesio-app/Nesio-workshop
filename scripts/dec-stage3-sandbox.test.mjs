@@ -5,12 +5,18 @@ import { join } from 'node:path';
 const root = process.cwd();
 const domains = readFileSync(join(root, 'lib', 'intelligence', 'domains.ts'), 'utf8');
 const dec = readFileSync(join(root, 'lib', 'intelligence', 'dec.ts'), 'utf8');
+const policy = readFileSync(join(root, 'lib', 'intelligence', 'dec-policy.ts'), 'utf8');
 const packageJson = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
 
 assert.match(
-  dec,
+  policy,
   /\['health', 'calendar'\]/,
   'DEC sandbox allowlist must keep Health + Calendar as an explicit Stage 3 pair.',
+);
+assert.match(
+  dec,
+  /canRunDomain/,
+  'DEC runtime must consume the shared evidence policy gate.',
 );
 assert.match(
   domains,

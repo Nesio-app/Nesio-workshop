@@ -14,6 +14,10 @@ export type AuthHashImportResult = {
   ok: boolean;
   loggedIn?: boolean;
   status?: string;
+  authType?: string;
+  authMode?: 'login' | 'register';
+  profileBootstrapped?: boolean;
+  profileBootstrapStatus?: string;
 };
 
 export function getAuthRedirectTo(): string {
@@ -62,12 +66,20 @@ export async function importSupabaseHashSession(): Promise<AuthHashImportResult>
       ok?: boolean;
       loggedIn?: boolean;
       status?: string;
+      authType?: string;
+      authMode?: 'login' | 'register';
+      profileBootstrapped?: boolean;
+      profileBootstrapStatus?: string;
     } | null;
     const result = {
       imported: true,
       ok: Boolean(response.ok && data?.ok),
       loggedIn: Boolean(data?.loggedIn),
       status: data?.status || (response.ok ? 'session_imported' : 'session_import_failed'),
+      authType: data?.authType,
+      authMode: data?.authMode,
+      profileBootstrapped: Boolean(data?.profileBootstrapped),
+      profileBootstrapStatus: data?.profileBootstrapStatus,
     };
     window.dispatchEvent(new CustomEvent('nesio-auth-session-imported', { detail: result }));
     return result;

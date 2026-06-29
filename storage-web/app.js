@@ -34,6 +34,10 @@ const LAUNCH_CLOUD_FLAGS = Object.freeze({
 const CLOUD_INVENTORY_ENDPOINT = '/api/cloud/inventory';
 const INVENTORY_TABLE_NAMES = ['items', 'containers', 'spaces', 'analytics', 'frozen', 'widgets'];
 
+let inventoryCloudBootstrapComplete = false;
+let inventoryCloudSyncTimer = null;
+let inventoryCloudApplyingSnapshot = false;
+
 const DEFAULT_STATE = {
   pts: 650,
   savedTotal: 284,
@@ -550,6 +554,7 @@ function persist() {
   saveRootStore(root);
   refreshPtsUI();
   refreshBinUI();
+  scheduleInventoryCloudSnapshotSync();
 }
 
 function snapshotLocalData(action) {
@@ -657,6 +662,7 @@ function switchDataMode(mode) {
   state = loadState();
   rerenderInventoryApp();
   showToast(`已切换到 ${nextMode === 'personal' ? 'Personal' : 'Demo'} 数据`);
+  if (nextMode === 'personal') void restoreSignedInInventoryCloudSnapshot();
 }
 
 function cloudInventoryStatusMessage(error) {
@@ -673,6 +679,23 @@ function cloudInventoryStatusMessage(error) {
 function setCloudSnapshotStatus(message) {
   const el = document.getElementById('settingsCloudSnapshotStatus');
   if (el) el.textContent = message;
+}
+
+function shouldUseSignedInCloudInventorySnapshotSync() {
+  if (getActiveDataMode() !== 'personal') return false;
+  if (typeof fetch !== 'function') return false;
+  if (window.location?.protocol === 'file:') return false;
+  if (navigator.onLine === false) return false;
+  return CLOUD_INVENTORY_ENDPOINT.startsWith('/api/cloud/');
+}
+
+function scheduleInventoryCloudSnapshotSync() {
+  if (!shouldUseSignedInCloudInventorySnapshotSync()) return;
+  if (!inventoryCloudBootstrapComplete || inventoryCloudApplyingSnapshot) return;
+  window.clearTimeout(inventoryCloudSyncTimer);
+  inventoryCloudSyncTimer = window.setTimeout(() => {
+    void saveInventoryCloudSnapshot({ silent: true });
+  }, 1200);
 }
 
 function buildCloudInventorySnapshotItems(root = loadRootStore()) {
@@ -702,6 +725,7 @@ function applyCloudInventorySnapshotItems(items) {
   const root = loadRootStore();
   const personal = migrateState(root.stores.personal, 'personal');
   const now = new Date().toISOString();
+  inventoryCloudApplyingSnapshot = true;
   personal.items = (Array.isArray(items) ? items : []).map((item) => versionInventoryItem({
     id: item.id,
     name: item.name,
@@ -722,50 +746,77 @@ function applyCloudInventorySnapshotItems(items) {
   setActiveDataMode('personal');
   state = loadState();
   rerenderInventoryApp();
+  inventoryCloudApplyingSnapshot = false;
 }
 
-async function saveInventoryCloudSnapshot() {
+async function saveInventoryCloudSnapshot({ silent = false } = {}) {
   if (getActiveDataMode() !== 'personal') {
-    showToast('请先切换到 Personal 数据域');
+    if (!silent) showToast('请先切换到 Personal 数据域');
     return;
   }
   const root = loadRootStore();
   const items = buildCloudInventorySnapshotItems(root);
-  setCloudSnapshotStatus('正在保存到云端...');
+  if (!silent) setCloudSnapshotStatus('正在保存到云端...');
   try {
     const response = await fetch(CLOUD_INVENTORY_ENDPOINT, {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json', accept: 'application/json' },
       body: JSON.stringify({ items, deleteMissing: true }),
     });
     const result = await response.json();
     if (!response.ok || !result.ok) throw new Error(result.error || 'cloud_write_failed');
-    setCloudSnapshotStatus(`已保存 ${result.savedCount || 0} 件到云端`);
-    showToast('Personal 库存已保存到云端');
+    if (!silent) {
+      setCloudSnapshotStatus(`已保存 ${result.savedCount || 0} 件到云端`);
+      showToast('Personal 库存已保存到云端');
+    }
   } catch (error) {
     const message = cloudInventoryStatusMessage(error?.message);
-    setCloudSnapshotStatus(message);
-    showToast(message);
+    if (silent) {
+      console.info('cloud_auto_save_failed', { reason: error?.message || message });
+    } else {
+      setCloudSnapshotStatus(message);
+      showToast(message);
+    }
   }
 }
 
-async function restoreInventoryCloudSnapshot() {
-  if (!confirm('从云端恢复会覆盖本机 Personal 库存，Demo 不受影响。继续吗？')) return;
-  setCloudSnapshotStatus('正在从云端读取...');
+async function restoreInventoryCloudSnapshot({ confirmFirst = true, silent = false } = {}) {
+  if (confirmFirst && !confirm('从云端恢复会覆盖本机 Personal 库存，Demo 不受影响。继续吗？')) return;
+  if (!silent) setCloudSnapshotStatus('正在从云端读取...');
   try {
     const response = await fetch(CLOUD_INVENTORY_ENDPOINT, {
+      credentials: 'include',
       headers: { accept: 'application/json' },
     });
     const result = await response.json();
     if (!response.ok || !result.ok) throw new Error(result.error || 'cloud_read_failed');
-    snapshotLocalData('restore-cloud-inventory-snapshot');
+    if (!silent) snapshotLocalData('restore-cloud-inventory-snapshot');
     applyCloudInventorySnapshotItems(result.items || []);
-    setCloudSnapshotStatus(`已从云端恢复 ${result.itemCount || 0} 件`);
-    showToast('已从云端恢复 Personal 库存');
+    if (!silent) {
+      setCloudSnapshotStatus(`已从云端恢复 ${result.itemCount || 0} 件`);
+      showToast('已从云端恢复 Personal 库存');
+    }
   } catch (error) {
     const message = cloudInventoryStatusMessage(error?.message);
-    setCloudSnapshotStatus(message);
-    showToast(message);
+    if (silent) {
+      console.info('cloud_auto_restore_failed', { reason: error?.message || message });
+    } else {
+      setCloudSnapshotStatus(message);
+      showToast(message);
+    }
+  }
+}
+
+async function restoreSignedInInventoryCloudSnapshot() {
+  if (!shouldUseSignedInCloudInventorySnapshotSync()) {
+    inventoryCloudBootstrapComplete = true;
+    return;
+  }
+  try {
+    await restoreInventoryCloudSnapshot({ confirmFirst: false, silent: true });
+  } finally {
+    inventoryCloudBootstrapComplete = true;
   }
 }
 
@@ -1858,3 +1909,4 @@ initNative();
 registerInventoryServiceWorker();
 bootstrapRootStoreFromIndexedDb();
 showFirstLaunchIfNeeded();
+void restoreSignedInInventoryCloudSnapshot();

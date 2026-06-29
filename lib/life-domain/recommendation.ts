@@ -57,13 +57,16 @@ const DEFAULT_ACTIONS: ActionOption[] = [
 
 /** Convert a reasoning-engine card into the canonical Recommendation schema. */
 export function cardToRecommendation(card: RecommendationCard): Recommendation {
+  const evidenceIds = Array.from(new Set([
+    ...(card.evidenceSignalIds || []),
+    ...card.evidence.map((e) => e.signalId).filter((id): id is string => Boolean(id)),
+  ]));
   return {
     id: card.id,
     category: DOMAIN_TO_CATEGORY[card.domain] ?? 'general',
     recommendation: card.title,
     reasoningSummary: card.body,
-    // Prefer traceable Signal ids; fall back to a source:value ref.
-    evidenceIds: card.evidence.map((e) => e.signalId ?? `${e.source}:${e.value}`),
+    evidenceIds,
     confidence: card.confidence,
     impact: card.evidence.find((e) => e.label.includes('影响'))?.value ?? '',
     actionOptions: [

@@ -34,12 +34,14 @@ export const PORTAL_LOCALE_OPTIONS: ReadonlyArray<readonly [PortalLocale, string
 export interface PortalProfileSettings {
   displayName: string;
   avatarUrl: string;
+  avatarStoragePath: string;
   locale: PortalLocale;
   coachStyle: PortalCoachStyle;
 }
 
 const KEYS = {
   avatar: 'treasurebox-profile-avatar',
+  avatarStoragePath: 'treasurebox-profile-avatar-storage-path',
   displayName: 'treasurebox-profile-name',
   locale: 'treasurebox-locale',
   coachStyle: 'treasurebox-coach-style',
@@ -61,7 +63,7 @@ export function portalLocaleToDictionaryLocale(locale: PortalLocale): 'zh' | 'en
 
 export function loadProfileSettings(fallbackName = '我'): PortalProfileSettings {
   if (typeof window === 'undefined') {
-    return { displayName: fallbackName, avatarUrl: '', locale: 'zh', coachStyle: 'warm' };
+    return { displayName: fallbackName, avatarUrl: '', avatarStoragePath: '', locale: 'zh', coachStyle: 'warm' };
   }
   try {
     const localeRaw = localStorage.getItem(KEYS.locale);
@@ -72,11 +74,12 @@ export function loadProfileSettings(fallbackName = '我'): PortalProfileSettings
     return {
       displayName: localStorage.getItem(KEYS.displayName) || fallbackName,
       avatarUrl: localStorage.getItem(KEYS.avatar) || '',
+      avatarStoragePath: localStorage.getItem(KEYS.avatarStoragePath) || '',
       locale,
       coachStyle,
     };
   } catch {
-    return { displayName: fallbackName, avatarUrl: '', locale: 'zh', coachStyle: 'warm' };
+    return { displayName: fallbackName, avatarUrl: '', avatarStoragePath: '', locale: 'zh', coachStyle: 'warm' };
   }
 }
 
@@ -89,6 +92,10 @@ export function saveProfileSettings(patch: Partial<PortalProfileSettings>) {
     if (patch.avatarUrl !== undefined) {
       if (patch.avatarUrl) localStorage.setItem(KEYS.avatar, patch.avatarUrl);
       else localStorage.removeItem(KEYS.avatar);
+    }
+    if (patch.avatarStoragePath !== undefined) {
+      if (patch.avatarStoragePath) localStorage.setItem(KEYS.avatarStoragePath, patch.avatarStoragePath);
+      else localStorage.removeItem(KEYS.avatarStoragePath);
     }
     if (patch.locale !== undefined) {
       localStorage.setItem(KEYS.locale, patch.locale);
@@ -106,6 +113,7 @@ export function clearProfileIdentity() {
   try {
     localStorage.removeItem(KEYS.displayName);
     localStorage.removeItem(KEYS.avatar);
+    localStorage.removeItem(KEYS.avatarStoragePath);
     window.dispatchEvent(new CustomEvent(PROFILE_UPDATED_EVENT));
   } catch { /* ignore */ }
 }

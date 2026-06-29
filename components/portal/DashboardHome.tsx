@@ -39,7 +39,7 @@ import {
   readGeo,
   reverseGeocode,
   simplifyPlaceName,
-} from '@/lib/portal/weather';
+} from '@/lib/platform/runtime/integration-runtime';
 import {
   PORTAL_CACHE_KEYS,
   readPortalCache,

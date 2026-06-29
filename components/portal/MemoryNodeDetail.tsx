@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { deleteLifeNode, updateLifeNode, type LifeNode } from '@/lib/portal/life-graph';
+import { createAppApiClient } from '@/lib/portal/app-api-client';
 
 interface MemoryNodeDetailProps {
   node: LifeNode | null;
@@ -59,6 +60,38 @@ export default function MemoryNodeDetail({ node, onClose }: MemoryNodeDetailProp
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState('');
   const [deleted, setDeleted] = useState(false);
+  const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const assets = node?.assets || [];
+    if (assets.length === 0) {
+      setAssetUrls({});
+      return;
+    }
+
+    let cancelled = false;
+    const client = createAppApiClient();
+    setAssetUrls({});
+
+    for (const asset of assets) {
+      if (!asset.storagePath) continue;
+      void client
+        .fetchCloudAssetReadUrl({ storagePath: asset.storagePath })
+        .then((result) => {
+          if (cancelled || !result.ok || !result.signedUrl) return;
+          const key = asset.id || asset.storagePath || result.storagePath || '';
+          if (!key) return;
+          setAssetUrls((current) => ({ ...current, [key]: result.signedUrl || '' }));
+        })
+        .catch(() => {
+          // Private asset reads are best-effort; Memory text should remain usable offline.
+        });
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [node?.id, node?.assets]);
 
   if (!node || deleted) return null;
 
@@ -85,6 +118,7 @@ export default function MemoryNodeDetail({ node, onClose }: MemoryNodeDetailProp
   const attrs = Object.entries(n.attributes).filter(
     ([k, v]) => v !== null && v !== '' && !HIDDEN_ATTRIBUTE_KEYS.has(k),
   );
+  const assets = n.assets || [];
   const showRawInput = Boolean(n.rawInput && n.source !== 'calendar' && n.source !== 'email');
 
   return (
@@ -156,6 +190,60 @@ export default function MemoryNodeDetail({ node, onClose }: MemoryNodeDetailProp
             <div className="nesio-today-card-tags" style={{ marginTop: '0.75rem' }}>
               {n.tags.map((t) => <span key={t} className="nesio-today-card-tag">{t}</span>)}
             </div>
+          )}
+
+          {/* Private assets */}
+          {assets.length > 0 && (
+            <>
+              <p className="nesio-settings-section-label">图片线索</p>
+              <div style={{ display: 'grid', gap: '0.6rem' }}>
+                {assets.map((asset) => {
+                  const key = asset.id || asset.storagePath || asset.label || 'asset';
+                  const previewUrl = asset.storagePath ? assetUrls[key] : undefined;
+                  const isImage = asset.kind === 'image' || asset.mimeType?.startsWith('image/');
+                  return (
+                    <div
+                      key={key}
+                      style={{
+                        border: '1px solid rgba(148, 163, 184, 0.22)',
+                        borderRadius: '1rem',
+                        padding: '0.65rem',
+                        background: 'rgba(255,255,255,0.5)',
+                      }}
+                    >
+                      {isImage && previewUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={previewUrl}
+                          alt={asset.label || n.name}
+                          draggable={false}
+                          style={{
+                            width: '100%',
+                            maxHeight: '15rem',
+                            objectFit: 'cover',
+                            borderRadius: '0.75rem',
+                            display: 'block',
+                            marginBottom: '0.55rem',
+                          }}
+                        />
+                      ) : (
+                        <p style={{ fontSize: '0.82rem', color: 'var(--portal-muted)', marginBottom: '0.35rem' }}>
+                          {asset.storagePath ? '图片线索已保存，登录后可查看原图。' : '附件线索已保存。'}
+                        </p>
+                      )}
+                      <p style={{ fontSize: '0.9rem', fontWeight: 800, marginBottom: '0.25rem' }}>
+                        {asset.label || '图片线索'}
+                      </p>
+                      {asset.analysisSummary && (
+                        <p style={{ fontSize: '0.78rem', color: 'var(--portal-muted)', margin: 0 }}>
+                          {asset.analysisSummary}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </>
           )}
 
           <p style={{ fontSize: '0.7rem', color: 'var(--portal-muted)', marginTop: '1rem' }}>记录于 {createdDate}</p>

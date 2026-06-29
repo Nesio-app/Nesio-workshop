@@ -6,6 +6,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { createSignal } from '@/lib/life-domain/create-signal';
+import { normalizePhotoToSignal, normalizeVoiceToSignal } from '@/lib/life-domain/normalizers';
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
@@ -360,8 +362,20 @@ export async function POST(req: NextRequest) {
 
     const json = extractJson(raw);
     const result = JSON.parse(json) as { nodes: object[]; summary: string; intent: string };
+    const firstNode = Array.isArray(result.nodes) ? result.nodes[0] as Record<string, unknown> | undefined : undefined;
+    const signalInput = body.type === 'image'
+      ? normalizePhotoToSignal({
+          title: typeof firstNode?.name === 'string' ? firstNode.name : result.summary || '图片线索',
+          summary: result.summary,
+          tags: ['拍一下', 'AI识别'],
+        })
+      : normalizeVoiceToSignal({
+          text: body.content || result.summary || '记录',
+          tags: [result.intent || 'MEMORY_CAPTURE'],
+        });
+    const signal = createSignal(signalInput);
 
-    return NextResponse.json({ ok: true, ...result });
+    return NextResponse.json({ ok: true, ...result, signals: [signal], signalIds: [signal.id] });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'parse_error';
     return NextResponse.json({ ok: false, error: msg }, { status: 400 });

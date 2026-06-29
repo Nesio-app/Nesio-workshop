@@ -28,6 +28,12 @@ import {
 import { checkPlatformHealth, type PlatformHealth } from './platform-health';
 import { getDomains } from './registry';
 import type { DECContext, WeatherView } from './contracts';
+import {
+  DEC_SANDBOX_PAIRS,
+  canRunDomain,
+  cardHasSignalEvidence,
+  withEvidenceSignalIds,
+} from './dec-policy';
 import './domains'; // side-effect: registers the Domain Engines
 
 // ── Governance guardrails (PRD v3.0 Stage 1) ────────────────────────────────
@@ -38,20 +44,7 @@ const CONFIDENCE_FLOOR = 0.6;
 /** Attention Budget (§2.1). Today shows at most 3 cards. */
 const TODAY_CARD_BUDGET = 3;
 
-/** Two-Domain Constraint Sandbox (§4.2). The only cross-domain pairs DEC v1
- *  allows. Each cross-domain engine declares a sandboxPair that must be in here;
- *  widening the sandbox is a deliberate, reviewable change. */
-export const DEC_SANDBOX_PAIRS = [
-  ['health', 'calendar'],
-  ['health', 'weather'],
-  ['task', 'calendar'],
-] as const;
-
-function sandboxAllows(pair: readonly [string, string]): boolean {
-  return DEC_SANDBOX_PAIRS.some(([a, b]) =>
-    (a === pair[0] && b === pair[1]) || (a === pair[1] && b === pair[0]),
-  );
-}
+export { DEC_SANDBOX_PAIRS };
 
 function toWeatherView(w: WeatherSnapshot | null): WeatherView | null {
   if (!w) return null;
@@ -81,17 +74,16 @@ export function runDEC(): DECOutput {
   };
 
   // Discover domains; gather candidates. Cross-domain engines stand down when
-  // platform health is degraded (§4.2) or their sandbox pair isn't allowed.
+  // platform health is degraded (§4.2), their sandbox pair isn't allowed, or
+  // the two domains do not both have traceable Signal evidence.
   const candidates = getDomains()
-    .filter((d) => {
-      if (!d.crossDomain) return true;
-      if (ctx.degraded) return false;
-      return d.sandboxPair ? sandboxAllows(d.sandboxPair) : true;
-    })
+    .filter((d) => canRunDomain(d, ctx))
     .flatMap((d) => d.provideInsights(ctx));
 
   const feedback = readCardFeedbackAll();
   const cards = candidates
+    .map(withEvidenceSignalIds)
+    .filter(cardHasSignalEvidence)
     // Confidence Threshold: physically degrade low-confidence guesses.
     .filter((c) => c.confidence >= CONFIDENCE_FLOOR)
     .filter((c) => {

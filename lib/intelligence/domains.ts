@@ -33,12 +33,14 @@ function one(card: RecommendationCard | null): RecommendationCard[] {
   return card ? [card] : [];
 }
 function contentNumber(sig: Signal, key: string): number {
-  if (!sig.content || typeof sig.content !== 'object') return NaN;
-  return Number((sig.content as Record<string, unknown>)[key]);
+  const content = sig.payload || sig.content;
+  if (!content || typeof content !== 'object') return NaN;
+  return Number((content as Record<string, unknown>)[key]);
 }
 function contentString(sig: Signal, key: string): string {
-  if (!sig.content || typeof sig.content !== 'object') return '';
-  return String((sig.content as Record<string, unknown>)[key] || '');
+  const content = sig.payload || sig.content;
+  if (!content || typeof content !== 'object') return '';
+  return String((content as Record<string, unknown>)[key] || '');
 }
 function isSleepOrEnergySignal(sig: Signal): boolean {
   const type = contentString(sig, 'type').toLowerCase();
@@ -67,14 +69,23 @@ const weatherDomain: DomainEngine = {
   crossDomain: true,
   sandboxPair: ['health', 'weather'],
   provideInsights(ctx: DECContext): RecommendationCard[] {
-    const { weather } = ctx;
+    const activeHealth = ctx.signals.find((s) => s.source === 'health' || s.sensitivity === 'health');
+    const weatherSignal = ctx.signals.find((s) => s.source === 'weather');
+    if (!activeHealth || !weatherSignal) return [];
+    const temperatureC = contentNumber(weatherSignal, 'temperatureC');
+    const condition = contentString(weatherSignal, 'condition');
+    const forecastNote = contentString(weatherSignal, 'forecastNote');
+    const weather = ctx.weather || {
+      temperatureC: Number.isFinite(temperatureC) ? temperatureC : 20,
+      condition: condition || '未知',
+      forecastNote,
+    };
     if (!weather) return [];
     const note = (weather.forecastNote || '').toLowerCase();
     const cold = note.includes('降温') || note.includes('cold') || note.includes('rain') ||
       note.includes('雨') || weather.temperatureC < 15;
     if (!cold) return [];
 
-    const activeHealth = ctx.signals.find((s) => s.type === 'symptom');
     return one({
       id: 'weather-coat',
       domain: 'weather',
@@ -88,9 +99,10 @@ const weatherDomain: DomainEngine = {
         ? `${weather.forecastNote || '明天降温'}，你最近${activeHealth.title}还在恢复，提前备好外套。`
         : `${weather.forecastNote ? `预计${weather.forecastNote}` : '明天气温较低'}，出门前备好外套。`,
       tags: [`天气 · ${weather.condition}`, ...(activeHealth ? ['健康 · 恢复中'] : [])],
+      evidenceSignalIds: [weatherSignal.id, activeHealth.id],
       evidence: [
-        { source: 'weather', label: '天气', value: `${weather.temperatureC}°C, ${weather.condition}` },
-        ...(weather.forecastNote ? [{ source: 'weather', label: '预报', value: weather.forecastNote }] : []),
+        { source: 'weather', label: '天气', value: `${weather.temperatureC}°C, ${weather.condition}`, signalId: weatherSignal.id },
+        ...(weather.forecastNote ? [{ source: 'weather', label: '预报', value: weather.forecastNote, signalId: weatherSignal.id }] : []),
         ...(activeHealth ? [signalEvidence(activeHealth, '健康记录')] : []),
       ],
       primaryAction: '确认，放到门口',
@@ -110,6 +122,9 @@ const workDomain: DomainEngine = {
   sandboxPair: ['task', 'calendar'],
   provideInsights(ctx: DECContext): RecommendationCard[] {
     const now = Date.now();
+    const taskSignal = ctx.signals
+      .filter((s) => s.source === 'task' || String(s.type).startsWith('task.'))
+      .sort((a, b) => new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime())[0];
     const next = ctx.signals
       .filter((s) => s.type === 'event' && s.source === 'calendar')
       .filter((s) => {
@@ -117,7 +132,7 @@ const workDomain: DomainEngine = {
         return t > now && t - now < 14 * 3_600_000;
       })
       .sort((a, b) => new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime())[0];
-    if (!next) return [];
+    if (!taskSignal || !next) return [];
 
     const startTime = new Date(next.occurredAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
     const isSoon = new Date(next.occurredAt).getTime() - now < 3_600_000;
@@ -132,8 +147,13 @@ const workDomain: DomainEngine = {
       icon: '🎙',
       iconBg: '#6366f1',
       title: `${next.title || '即将开始的会'}，已经整理好了`,
-      body: `${isSoon ? '马上' : `今天 ${startTime}`}的会，我提取了关键提醒，你可以先看一眼。${location ? ` 地点：${location}` : ''}`,
-      evidence: [signalEvidence(next, '日历'), { source: 'calendar', label: '时间', value: startTime, signalId: next.id }],
+      body: `${isSoon ? '马上' : `今天 ${startTime}`}的会和「${taskSignal.title}」有关，我把可执行事项放前面。${location ? ` 地点：${location}` : ''}`,
+      evidenceSignalIds: [taskSignal.id, next.id],
+      evidence: [
+        signalEvidence(taskSignal, '任务'),
+        signalEvidence(next, '日历'),
+        { source: 'calendar', label: '时间', value: startTime, signalId: next.id },
+      ],
       primaryAction: '查看',
       secondaryAction: '改时间',
       type: 'audio',
@@ -147,10 +167,8 @@ const workDomain: DomainEngine = {
 const healthDomain: DomainEngine = {
   domain: 'health',
   version: 1,
-  crossDomain: true,
-  sandboxPair: ['health', 'weather'],
   provideInsights(ctx: DECContext): RecommendationCard[] {
-    const health = ctx.signals.find((s) => s.type === 'symptom');
+    const health = ctx.signals.find((s) => s.source === 'health' || s.sensitivity === 'health');
     if (!health) return [];
     const cold = ctx.weather && ctx.weather.temperatureC < 15;
     return one({
@@ -167,8 +185,8 @@ const healthDomain: DomainEngine = {
         : `记录显示你最近${health.title}，注意休息。`,
       evidence: [
         signalEvidence(health, '健康记录'),
-        ...(cold ? [{ source: 'weather', label: '气温', value: `${ctx.weather!.temperatureC}°C` }] : []),
       ],
+      evidenceSignalIds: [health.id],
       primaryAction: '记录今天状态',
       secondaryAction: '稍后',
       type: 'standard',
@@ -198,6 +216,7 @@ const familyDomain: DomainEngine = {
         ? top.content
         : `来自你的 Memory 记录 · ${new Date(top.capturedAt).toLocaleDateString('zh-CN')}`,
       evidence: [signalEvidence(top, '记忆')],
+      evidenceSignalIds: [top.id],
       primaryAction: '好的',
       secondaryAction: '在 Memory 看',
       type: 'standard',
@@ -255,6 +274,7 @@ const energyCalendarDomain: DomainEngine = {
         ...firstEvents.map((s) => signalEvidence(s, '日历')),
         { source: 'calendar', label: '会议密度', value: eventSummary || `${calendarEvents.length} 个日程` },
       ],
+      evidenceSignalIds: [healthSignal.id, ...firstEvents.map((s) => s.id)],
       primaryAction: '安排轻任务',
       secondaryAction: '查看状态',
       type: 'standard',

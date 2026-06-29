@@ -3,9 +3,10 @@
 import { useEffect, useState } from 'react';
 import { loadProfileSettings } from '@/lib/portal/profile';
 import { recordCardFeedback, type RecommendationCard } from '@/lib/portal/reasoning-engine';
-import { generateTodayCards } from '@/lib/intelligence';
-import { getRecentNodes } from '@/lib/portal/life-graph';
+import { buildTodayViewModel } from '@/lib/platform/view-models/today-view-model';
 import { learnFromFeedback } from '@/lib/portal/mirror-profile';
+import { recordSignalFeedback } from '@/lib/life-domain/signal-feedback';
+import { createAppApiClient } from '@/lib/portal/app-api-client';
 import VoiceBrief from './VoiceBrief';
 import DailyBriefCard from './DailyBriefCard';
 import LifeStateCard from './LifeStateCard';
@@ -241,6 +242,7 @@ export default function TodayFeed({
   const [isNight, setIsNight] = useState(false);
   const [cards, setCards] = useState<RecommendationCard[]>([]);
   const [memoryCount, setMemoryCount] = useState(0);
+  const [memoryNotes, setMemoryNotes] = useState<readonly string[]>([]);
   const [showMoreCards, setShowMoreCards] = useState(false);
   const [mirrorOpen, setMirrorOpen] = useState(false);
 
@@ -259,23 +261,18 @@ export default function TodayFeed({
     });
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-portal-theme'] });
 
-    // Load initial cards. Public fallback must not imply private knowledge.
-    // Note: connector collection + pruning are driven by the platform shell
-    // (Portal.tsx), not the Experience layer — Today only consumes results.
-    if (!canUsePrivateData) {
-      setCards(EMPTY_SIGNAL_CARDS);
-      setMemoryCount(0);
-      return () => observer.disconnect();
-    }
-
-    const real = generateTodayCards();
-    setCards(real.length > 0 ? real : EMPTY_SIGNAL_CARDS);
-    setMemoryCount(getRecentNodes().length);
+    // Load initial cards through the Experience view-model. Connector
+    // collection + pruning are driven by the platform shell (Portal.tsx).
+    const initial = buildTodayViewModel({ canUsePrivateData, fallbackCards: EMPTY_SIGNAL_CARDS });
+    setCards(initial.cards);
+    setMemoryCount(initial.memoryCount);
+    setMemoryNotes(initial.memoryNotes);
 
     const refresh = () => {
-      const updated = generateTodayCards();
-      setCards(updated.length > 0 ? updated : EMPTY_SIGNAL_CARDS);
-      setMemoryCount(getRecentNodes().length);
+      const updated = buildTodayViewModel({ canUsePrivateData, fallbackCards: EMPTY_SIGNAL_CARDS });
+      setCards(updated.cards);
+      setMemoryCount(updated.memoryCount);
+      setMemoryNotes(updated.memoryNotes);
     };
 
     window.addEventListener('nesio-life-graph-updated', refresh);
@@ -295,7 +292,28 @@ export default function TodayFeed({
   function handleFeedback(cardId: string, feedback: RecommendationCard['feedback']) {
     const card = cards.find((c) => c.id === cardId);
     recordCardFeedback(cardId, feedback);
-    if (card) learnFromFeedback(card.domain, feedback);
+    if (card) {
+      const evidenceSignalIds = Array.from(new Set([
+        ...(card.evidenceSignalIds || []),
+        ...card.evidence.map((entry) => entry.signalId).filter((id): id is string => Boolean(id)),
+      ]));
+      recordSignalFeedback(card, feedback);
+      learnFromFeedback(card.domain, feedback);
+      if (canUsePrivateData) {
+        void createAppApiClient().recordCloudProductEvent({
+          eventType: 'today.card.feedback',
+          source: 'today-feed',
+          targetType: card.type,
+          targetId: cardId,
+          feedback,
+          payload: {
+            domain: card.domain,
+            evidenceSignalIds,
+            sourceStatus: inferSourceStatus(card),
+          },
+        }).catch(() => {});
+      }
+    }
     if (feedback === 'too_much' || feedback === 'useful' || feedback === 'not_now') {
       setCards((prev) => prev.filter((c) => c.id !== cardId));
     }
@@ -323,7 +341,7 @@ export default function TodayFeed({
         ) : (
           <>
             {/* Always-present daily overview card */}
-            <DailyBriefCard canUsePrivateData={canUsePrivateData} />
+            <DailyBriefCard canUsePrivateData={canUsePrivateData} memoryCount={memoryCount} memoryNotes={memoryNotes} />
 
             {/* Cross-signal Life State (Signal → Life State pipeline output) */}
             <LifeStateCard canUsePrivateData={canUsePrivateData} />

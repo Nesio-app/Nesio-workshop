@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { clearProfileIdentity, loadProfileSettings, readAvatarFile, saveProfileSettings } from '@/lib/portal/profile';
 import { getRecentNodes } from '@/lib/portal/life-graph';
+import { createAppApiClient } from '@/lib/portal/app-api-client';
 import { ToneSheet, PrivacySheet, SpacesSheet, SubscriptionSheet } from './SettingsSheets';
 import ConnectorsHub from './ConnectorsHub';
 import HealthLogger from './HealthLogger';
@@ -24,6 +25,22 @@ export default function NesioProfileCard() {
     if (profile.displayName) setDisplayName(profile.displayName);
     setAvatarUrl(profile.avatarUrl || '');
     setMemoryCount(getRecentNodes(100).length);
+
+    if (profile.avatarStoragePath) {
+      const client = createAppApiClient();
+      client
+        .fetchCloudAssetReadUrl({ storagePath: profile.avatarStoragePath })
+        .then((result) => {
+          if (result.ok && result.signedUrl) {
+            setAvatarUrl(result.signedUrl);
+            saveProfileSettings({
+              avatarUrl: result.signedUrl,
+              avatarStoragePath: profile.avatarStoragePath,
+            });
+          }
+        })
+        .catch(() => {});
+    }
 
     // Check auth session
     fetch('/api/auth/session')
@@ -53,8 +70,25 @@ export default function NesioProfileCard() {
     if (!file) return;
     setAvatarError('');
     try {
+      const client = createAppApiClient();
+      const result = await client.uploadCloudAsset({ file, purpose: 'avatar' });
+      if (result.ok && result.storagePath) {
+        const readResult = await client.fetchCloudAssetReadUrl({ storagePath: result.storagePath });
+        const displayUrl = readResult.ok && readResult.signedUrl ? readResult.signedUrl : '';
+        await client.saveCloudProfileSettings({ avatarStoragePath: result.storagePath });
+        saveProfileSettings({
+          avatarUrl: displayUrl,
+          avatarStoragePath: result.storagePath,
+        });
+        if (displayUrl) setAvatarUrl(displayUrl);
+        return;
+      }
+    } catch {
+      // Cloud avatar upload is a signed-in enhancement; local avatar should keep working offline.
+    }
+    try {
       const avatar = await readAvatarFile(file);
-      saveProfileSettings({ avatarUrl: avatar });
+      saveProfileSettings({ avatarUrl: avatar, avatarStoragePath: '' });
       setAvatarUrl(avatar);
     } catch {
       setAvatarError('头像没有保存，请选择一张较小的图片。');

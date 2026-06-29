@@ -48,6 +48,19 @@ for (const marker of [
   'runtimeCopyMissingEnv',
   'portal-settings-runtime-summary',
   'portal-settings-cloud-status-summary',
+  'productBackendMatrix',
+  'productBackendReadyCount',
+  'cloudStatus?.productDataBackend.matrix',
+  'portal-settings-product-backend-matrix',
+  'portal-settings-product-backend-row',
+  'cloudProductBackendTitle',
+  'cloudProductBackendReadyCount',
+  'cloudProductBackendLocalFirst',
+  'cloudProductBackendCloudRequired',
+  'cloudProductBackendRequiresAction',
+  'capability.capabilityKey',
+  'capability.backendStatus',
+  'capability.realDataBoundary',
   'cloudStatus?.summary.cloudDatabaseReady',
   'cloudStatus?.endpoints.profileSettingsEndpoint',
   'cloudStatus?.endpoints.inventoryEndpoint',
@@ -138,6 +151,7 @@ assert.ok(apiClient.includes('ProductionActivationChecklistResponse'), 'App API 
 assert.ok(apiClient.includes('fetchProductionActivationChecklist'), 'App API client must expose production activation checklist fetcher');
 assert.ok(apiClient.includes('CloudStatusResponse'), 'App API client must expose cloud status response type');
 assert.ok(apiClient.includes('fetchCloudStatus'), 'App API client must expose cloud status fetcher');
+assert.ok(apiClient.includes('productDataBackend'), 'Cloud status type must expose product data backend matrix');
 assert.ok(apiClient.includes("profileSettingsEndpoint: '/api/cloud/profile-settings'"), 'Cloud status type must expose profile settings endpoint');
 assert.ok(apiClient.includes("inventoryEndpoint: '/api/cloud/inventory'"), 'Cloud status type must expose inventory endpoint');
 

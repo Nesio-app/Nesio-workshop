@@ -2,7 +2,18 @@
 
 import { useRef, useState, useEffect } from 'react';
 import { loadProfileSettings } from '@/lib/portal/profile';
-import { deleteLifeNode, getRecentNodes, isPrivateExternalNode, searchLifeGraph, type LifeNode } from '@/lib/portal/life-graph';
+import { createAppApiClient } from '@/lib/portal/app-api-client';
+import {
+  backfillLocalLifeGraphToCloud,
+  deleteLifeNode,
+  getLifeGraphCloudSyncSummary,
+  getRecentNodes,
+  isPrivateExternalNode,
+  mergeCloudMemorySnapshot,
+  retryLifeGraphCloudSync,
+  searchLifeGraph,
+  type LifeNode,
+} from '@/lib/portal/life-graph';
 import MemoryNodeDetail from './MemoryNodeDetail';
 
 const TYPE_ICON: Record<string, string> = {
@@ -134,8 +145,12 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
   const [nodes, setNodes] = useState<LifeNode[]>([]);
   const [selectedNode, setSelectedNode] = useState<LifeNode | null>(null);
   const [showAll, setShowAll] = useState(false);
+  const [cloudSyncSummary, setCloudSyncSummary] = useState(getLifeGraphCloudSyncSummary());
+  const cloudSyncRecordCount =
+    cloudSyncSummary.pendingCount + cloudSyncSummary.syncedCount + cloudSyncSummary.failedCount;
 
   useEffect(() => {
+    let cancelled = false;
     if (canUsePrivateData) {
       const profile = loadProfileSettings();
       setDisplayName(profile.displayName || '');
@@ -144,9 +159,40 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
     }
     setNodes(getRecentNodes(30));
 
+    async function hydrateCloudMemory() {
+      if (!canUsePrivateData) return;
+      try {
+        const client = createAppApiClient();
+        const snapshot = await client.fetchCloudMemorySnapshot();
+        if (cancelled || !snapshot.ok) return;
+        mergeCloudMemorySnapshot({ nodes: snapshot.nodes || [], assets: snapshot.assets || [] });
+        void retryLifeGraphCloudSync();
+        void backfillLocalLifeGraphToCloud({ limit: 200 });
+        if (!cancelled) setNodes(getRecentNodes(30));
+      } catch {
+        // cloud hydration is best-effort; local Memory must keep working offline.
+      }
+    }
+
+    void hydrateCloudMemory();
+
     const onUpdate = () => setNodes(getRecentNodes(30));
+    function onCloudSyncUpdate() {
+      setCloudSyncSummary(getLifeGraphCloudSyncSummary());
+    }
+    function retryCloudSync() {
+      if (!canUsePrivateData) return;
+      void retryLifeGraphCloudSync();
+    }
     window.addEventListener('nesio-life-graph-updated', onUpdate);
-    return () => window.removeEventListener('nesio-life-graph-updated', onUpdate);
+    window.addEventListener('nesio-life-graph-cloud-sync-updated', onCloudSyncUpdate);
+    window.addEventListener('online', retryCloudSync);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('nesio-life-graph-updated', onUpdate);
+      window.removeEventListener('nesio-life-graph-cloud-sync-updated', onCloudSyncUpdate);
+      window.removeEventListener('online', retryCloudSync);
+    };
   }, [canUsePrivateData]);
 
   const visibleNodes = visibleMemoryNodes(nodes, canUsePrivateData);
@@ -245,6 +291,15 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
           )}
 
           <div className="nesio-memory-add-wrap">
+            {canUsePrivateData && cloudSyncRecordCount > 0 && (
+              <p className="nesio-memory-sync-status" aria-live="polite">
+                {cloudSyncSummary.failedCount > 0
+                  ? `同步失败 ${cloudSyncSummary.failedCount} 条，已保存在本机`
+                  : cloudSyncSummary.pendingCount > 0
+                    ? `等待同步 ${cloudSyncSummary.pendingCount} 条，本机已保存`
+                    : `已同步 ${cloudSyncSummary.syncedCount} 条`}
+              </p>
+            )}
             <p className="nesio-memory-add-hint">点中间按钮把东西放进来，需要时再向宝盒要回线索。</p>
           </div>
         </div>

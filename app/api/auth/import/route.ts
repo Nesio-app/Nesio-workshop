@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { bootstrapCloudAccountProfile, buildCloudAccountProfileBootstrapMeta } from '@/lib/portal/cloud-account-profile';
 import { normalizeSupabaseRuntimeUrl } from '@/lib/portal/production-runtime';
 
 type SupabaseUserResponse = {
@@ -10,6 +11,8 @@ type SupabaseUserResponse = {
     providers?: string[];
   };
 };
+
+type AuthImportMode = 'login' | 'register';
 
 function envValue(key: string): string {
   const value = process.env[key];
@@ -46,7 +49,7 @@ async function fetchSupabaseUser(accessToken: string): Promise<SupabaseUserRespo
 
 function setAuthCookies(
   response: NextResponse,
-  session: { accessToken: string; refreshToken?: string; expiresIn?: number },
+  session: { accessToken: string; refreshToken?: string; expiresIn?: number; provider?: string },
 ) {
   const secure = process.env.NODE_ENV === 'production';
   const maxAge =
@@ -71,6 +74,33 @@ function setAuthCookies(
       maxAge: 60 * 60 * 24 * 30,
     });
   }
+
+  if (session.provider) {
+    response.cookies.set('baohe_auth_provider', session.provider, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure,
+      path: '/',
+      maxAge: 60 * 60 * 24 * 30,
+    });
+  }
+}
+
+function normalizeAuthType(value: unknown): string {
+  if (typeof value !== 'string') return 'unknown';
+  const normalized = value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 40);
+  return normalized || 'unknown';
+}
+
+function deriveAuthMode(authType: string): AuthImportMode {
+  if (authType === 'signup' || authType === 'invite') return 'register';
+  if (authType === 'magiclink' || authType === 'recovery' || authType === 'unknown') return 'login';
+  return 'login';
+}
+
+function normalizeAuthProvider(value: unknown): string {
+  if (typeof value !== 'string') return '';
+  return value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 40);
 }
 
 export async function POST(req: NextRequest) {
@@ -78,6 +108,7 @@ export async function POST(req: NextRequest) {
     accessToken?: unknown;
     refreshToken?: unknown;
     expiresIn?: unknown;
+    type?: unknown;
   };
 
   try {
@@ -89,6 +120,8 @@ export async function POST(req: NextRequest) {
   const accessToken = typeof body.accessToken === 'string' ? body.accessToken.trim() : '';
   const refreshToken = typeof body.refreshToken === 'string' ? body.refreshToken.trim() : '';
   const expiresIn = typeof body.expiresIn === 'number' ? body.expiresIn : Number(body.expiresIn);
+  const authType = normalizeAuthType(body.type);
+  const authMode = deriveAuthMode(authType);
   const supabaseUrl = normalizeSupabaseRuntimeUrl(envValue('SUPABASE_URL'));
   const supabaseAnonKey = envValue('SUPABASE_ANON_KEY');
 
@@ -105,16 +138,24 @@ export async function POST(req: NextRequest) {
     return safeJson({ ok: false, loggedIn: false, status: 'invalid_access_token' }, 401);
   }
 
+  const profileBootstrap = await bootstrapCloudAccountProfile(accessToken);
+  const profileBootstrapMeta = buildCloudAccountProfileBootstrapMeta(profileBootstrap);
+  const authProvider = normalizeAuthProvider(user.app_metadata?.provider);
+
   const response = safeJson({
     ok: true,
     loggedIn: true,
     hasRefreshToken: Boolean(refreshToken),
     status: 'session_imported',
+    authType,
+    authMode,
+    profileBootstrapped: profileBootstrapMeta.profileBootstrapped,
+    profileBootstrapStatus: profileBootstrapMeta.profileBootstrapStatus,
     user: {
       id: user.id,
       email: user.email || '',
       phone: user.phone || '',
-      provider: user.app_metadata?.provider || '',
+      provider: authProvider,
       providers: user.app_metadata?.providers || [],
     },
   });
@@ -123,6 +164,7 @@ export async function POST(req: NextRequest) {
     accessToken,
     refreshToken,
     expiresIn: Number.isFinite(expiresIn) ? expiresIn : undefined,
+    provider: authProvider,
   });
 
   return response;

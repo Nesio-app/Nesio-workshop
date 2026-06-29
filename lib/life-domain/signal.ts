@@ -20,7 +20,9 @@ export type SignalSource =
   | 'calendar'
   | 'gmail'
   | 'health'
+  | 'task'
   | 'weather'
+  | 'hardware_pulse'
   | 'manual'
   | 'ai_observation'
   | 'flomo'
@@ -31,16 +33,7 @@ export type SignalSource =
   | 'wechat_reading'
   | 'device';
 
-export type SignalType =
-  | 'event'
-  | 'symptom'
-  | 'commitment'
-  | 'reminder'
-  | 'document'
-  | 'message'
-  | 'location'
-  | 'metric'
-  | 'observation';
+export type SignalType = string;
 
 export type SignalSensitivity = 'normal' | 'private' | 'health' | 'financial' | 'family' | 'work';
 
@@ -73,6 +66,9 @@ export interface Signal {
   occurredAt: string; // when the fact happened
   capturedAt: string; // when the system recorded it
   title: string;
+  /** Canonical lightweight fact payload. Prefer this for new code. */
+  payload?: Record<string, unknown>;
+  /** Backward-compatible view over payload/raw attributes for existing UI. */
   content: string | Record<string, unknown>;
   entities: EntityRef[];
   confidence: number; // 0-1
@@ -132,24 +128,38 @@ function inferRetention(node: LifeNode): RetentionPolicy {
 
 /** Convert a legacy Life Graph node into a normalized Signal */
 export function lifeNodeToSignal(node: LifeNode): Signal {
+  const signalId = typeof node.attributes['signalId'] === 'string'
+    ? node.attributes['signalId']
+    : `sig_${node.id}`;
+  const signalType = typeof node.attributes['signalType'] === 'string'
+    ? node.attributes['signalType']
+    : NODE_TYPE_TO_SIGNAL[node.type] ?? 'observation';
+  const payload = Object.fromEntries(
+    Object.entries(node.attributes).filter(([key]) => !key.startsWith('signal')),
+  );
+  const source = typeof node.attributes['signalSource'] === 'string'
+    ? node.attributes['signalSource'] as SignalSource
+    : NODE_SOURCE_TO_SIGNAL[node.source] ?? 'manual';
   const occurredAt =
     (typeof node.attributes['start'] === 'string' && node.attributes['start']) ||
     (typeof node.attributes['date'] === 'string' && node.attributes['date']) ||
+    (typeof node.attributes['occurredAt'] === 'string' && node.attributes['occurredAt']) ||
     node.createdAt;
 
   return {
-    id: `sig_${node.id}`,
-    source: NODE_SOURCE_TO_SIGNAL[node.source] ?? 'manual',
-    type: NODE_TYPE_TO_SIGNAL[node.type] ?? 'observation',
+    id: signalId,
+    source,
+    type: signalType,
     occurredAt: String(occurredAt),
     capturedAt: node.createdAt,
     title: node.name,
-    content: node.rawInput || node.attributes,
+    payload,
+    content: node.rawInput || payload,
     entities: node.relations.map((r) => ({ id: r.targetId, type: r.relation, name: r.targetId })),
     confidence: node.confidence,
     sensitivity: inferSensitivity(node),
     retentionPolicy: inferRetention(node),
-    evidence: { source: NODE_SOURCE_TO_SIGNAL[node.source] ?? 'manual', externalId: node.id, raw: node.rawInput },
+    evidence: { source, externalId: node.id, raw: node.rawInput },
     tags: node.tags,
   };
 }

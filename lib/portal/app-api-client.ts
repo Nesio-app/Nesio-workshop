@@ -76,20 +76,27 @@ export type EntitlementsResponse = AppApiEnvelope & {
 };
 
 export type UserDataExportResponse = AppApiEnvelope & {
-  exportKind: 'mock-local-export';
-  profile: LocalProfile;
-  includesRealUserData: false;
+  exportKind: 'mock-local-export' | 'cloud-memory-export' | 'cloud-product-data-export' | string;
+  cloudExportKind?: 'supabase-memory-v1' | 'supabase-product-data-v1' | string;
+  profile: LocalProfile | Record<string, unknown>;
+  includesRealUserData: boolean;
+  readsCloud?: boolean;
+  writesCloud?: boolean;
   payload: unknown;
 };
 
 export type UserDataDeleteResponse = AppApiEnvelope & {
-  deleteKind: 'mock-local-delete';
+  deleteKind: 'mock-local-delete' | 'cloud-memory-delete' | 'cloud-product-data-delete' | string;
+  cloudDeleteKind?: 'supabase-memory-v1' | 'supabase-product-data-v1' | string;
   dryRun: boolean;
-  profile: LocalProfile;
-  deletesRealUserData: false;
-  deletesCloudData: false;
+  profile?: LocalProfile | Record<string, unknown>;
+  deletesRealUserData: boolean;
+  deletesCloudData: boolean;
+  readsCloud?: boolean;
+  writesCloud?: boolean;
   deleted: string[];
   wouldDelete: string[];
+  error?: 'confirmation_required' | 'cloud_delete_failed' | string;
 };
 
 export type ProductionProviderStatus = {
@@ -250,6 +257,8 @@ export type AuthSessionResponse = {
   loggedIn: boolean;
   hasRefreshToken: boolean;
   status: 'signed_out' | 'signed_in' | 'session_unverified' | string;
+  profileBootstrapped?: boolean;
+  profileBootstrapStatus?: string;
   user?: AuthSessionUser;
 };
 
@@ -264,6 +273,7 @@ export type AuthLogoutResponse = {
 export type CloudProfileSettings = {
   displayName?: string;
   avatarUrl?: string;
+  avatarStoragePath?: string;
   locale?: string;
   displayLanguage?: string;
   coachStyle?: string;
@@ -293,12 +303,21 @@ export type CloudStatusResponse = {
   service: 'portal-cloud-status';
   version: 'cloud-status-v0';
   endpoints: {
+    cloudAccountEndpoint: '/api/cloud/account';
     profileSettingsEndpoint: '/api/cloud/profile-settings';
     inventoryEndpoint: '/api/cloud/inventory';
+    memoryEndpoint: '/api/cloud/memory';
+    assetsEndpoint: '/api/cloud/assets';
+    eventsEndpoint: '/api/cloud/events';
   };
   tables: {
+    userProfiles: 'user_profiles';
     profileSettings: 'profile_settings';
     inventoryItems: 'inventory_items';
+    memoryNodes: 'memory_nodes';
+    memoryEdges: 'memory_edges';
+    memoryAssets: 'memory_assets';
+    productEvents: 'product_events';
   };
   authSession: {
     accessCookiePresent: boolean;
@@ -307,6 +326,54 @@ export type CloudStatusResponse = {
     canAttemptCloudRead: boolean;
   };
   cloud: ProductionRuntimeHealthResponse['cloud'];
+  assetStorage: {
+    endpoint: '/api/cloud/assets';
+    signedReadEndpoint: '/api/cloud/assets?storagePath=...' | string;
+    supportsUpload: boolean;
+    supportsSignedRead: boolean;
+    requiresSignedInUser: boolean;
+    identityScopedStoragePath: boolean;
+    bucketConfigured: boolean;
+    enabled: boolean;
+    readsCloud: false;
+    writesCloud: false;
+  };
+  productDataBackend: {
+    version: 'product-data-backend-v1';
+    readModelOnly: boolean;
+    readsCloud: false;
+    writesCloud: false;
+    matrix: Array<{
+      capabilityKey:
+        | 'accountProfile'
+        | 'profileSettings'
+        | 'inventorySnapshot'
+        | 'memoryGraph'
+        | 'assetStorage'
+        | 'productEvents'
+        | 'userDataExport'
+        | 'userDataDelete'
+        | string;
+      label: string;
+      endpoint: string;
+      table: string;
+      backendStatus: 'cloud_ready' | 'cloud_optional' | string;
+      localFirst: boolean;
+      cloudOptional: boolean;
+      requiresCloudDatabase: boolean;
+      requiresCloudStorage: boolean;
+      supportsCloudRead: boolean;
+      supportsCloudWrite: boolean;
+      explicitUserActionRequired: boolean;
+      signedInCookiePresent: boolean;
+      anonymousAccess:
+        | 'fail_closed'
+        | 'local_contract_only'
+        | 'dry_run_contract_only'
+        | string;
+      realDataBoundary: string;
+    }>;
+  };
   setupTasks: {
     database?: ProductionRuntimeSetupTask;
     storage?: ProductionRuntimeSetupTask;
@@ -321,6 +388,40 @@ export type CloudStatusResponse = {
   };
 };
 
+export type CloudAccountProfile = {
+  identityKey: string;
+  userId: string | null;
+  email: string | null;
+  phone: string | null;
+  provider: string | null;
+  providers: string[];
+  displayName: string | null;
+  avatarUrl: string | null;
+  onboardingCompleted: boolean;
+  profile: Record<string, unknown>;
+  lastSeenAt: string | null;
+  updatedAt: string | null;
+  createdAt: string | null;
+};
+
+export type CloudAccountProfileResponse = {
+  safePublicStatus: true;
+  secretsRedacted: true;
+  cloudAccountProfile: true;
+  ok: boolean;
+  readsCloud: boolean;
+  writesCloud: boolean;
+  created?: boolean;
+  profile?: CloudAccountProfile | null;
+  updatedAt?: string | null;
+  error?:
+    | 'cloud_not_configured'
+    | 'not_signed_in'
+    | 'cloud_read_failed'
+    | 'cloud_write_failed'
+    | string;
+};
+
 export type CloudInventorySnapshotItem = InventoryItemRecord & {
   schemaVersion?: 'LocalInventoryItem@v1' | string;
   locationHint?: string;
@@ -329,6 +430,139 @@ export type CloudInventorySnapshotItem = InventoryItemRecord & {
   createdAt?: string;
   updatedAt?: string;
   mode?: InventoryMode;
+};
+
+export type CloudMemoryNodeRecord = {
+  id: string;
+  schemaVersion?: 'LifeNode@v1' | string;
+  type: 'person' | 'object' | 'place' | 'event' | 'commitment' | 'health_state' | 'preference' | string;
+  name: string;
+  attributes?: Record<string, string | number | boolean | null>;
+  source: 'manual' | 'photo' | 'calendar' | 'email' | 'system' | 'voice' | string;
+  confidence?: number;
+  createdAt?: string;
+  updatedAt?: string;
+  lastConfirmedAt?: string;
+  relations?: Array<{ targetId: string; relation: string }>;
+  tags?: string[];
+  rawInput?: string;
+};
+
+export type CloudMemoryAssetRecord = {
+  id: string;
+  nodeId?: string;
+  kind: 'image' | 'file' | 'audio' | 'text' | string;
+  storagePath?: string;
+  mimeType?: string;
+  label?: string;
+  analysisSummary?: string;
+  tags?: string[];
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type CloudMemorySnapshotResponse = {
+  safePublicStatus: true;
+  secretsRedacted: true;
+  ok: boolean;
+  cloudMemorySnapshot: true;
+  readsCloud: boolean;
+  writesCloud: boolean;
+  exportOnly?: boolean;
+  nodes?: CloudMemoryNodeRecord[];
+  edges?: Array<Record<string, unknown>>;
+  assets?: CloudMemoryAssetRecord[];
+  nodeCount?: number;
+  assetCount?: number;
+  savedCount?: number;
+  savedAssetCount?: number;
+  rejectedCount?: number;
+  rejectedAssetCount?: number;
+  deletedAt?: string;
+  nodeId?: string | null;
+  updatedAt?: string | null;
+  error?:
+    | 'cloud_not_configured'
+    | 'not_signed_in'
+    | 'cloud_read_failed'
+    | 'cloud_write_failed'
+    | 'invalid_json'
+    | 'confirmation_required'
+    | 'deleteAll_required'
+    | string;
+};
+
+export type CloudAssetUploadResponse = {
+  safePublicStatus: true;
+  secretsRedacted: true;
+  ok: boolean;
+  cloudAssetUpload: true;
+  readsCloud: boolean;
+  writesCloud: boolean;
+  storagePath?: string;
+  requiresSignedUrl?: boolean;
+  mimeType?: string;
+  size?: number;
+  purpose?: string;
+  error?:
+    | 'cloud_storage_not_configured'
+    | 'not_signed_in'
+    | 'invalid_form_data'
+    | 'unsupported_file_type'
+    | 'file_too_large'
+    | 'cloud_asset_upload_failed'
+    | string;
+};
+
+export type CloudAssetReadResponse = {
+  safePublicStatus: true;
+  secretsRedacted: true;
+  ok: boolean;
+  cloudAssetRead: true;
+  readsCloud: boolean;
+  writesCloud: boolean;
+  storagePath?: string;
+  signedUrl?: string;
+  expiresIn?: number;
+  error?:
+    | 'cloud_storage_not_configured'
+    | 'not_signed_in'
+    | 'missing_storage_path'
+    | 'forbidden_storage_path'
+    | 'cloud_asset_read_failed'
+    | string;
+};
+
+export type CloudProductEvent = {
+  eventId: string;
+  identityKey?: string;
+  userId?: string | null;
+  eventType: string;
+  source: string;
+  targetType?: string | null;
+  targetId?: string | null;
+  feedback?: string | null;
+  payload?: Record<string, unknown>;
+  createdAt?: string | null;
+};
+
+export type CloudProductEventsResponse = {
+  safePublicStatus: true;
+  secretsRedacted: true;
+  product_event_recorded: true;
+  ok: boolean;
+  readsCloud: boolean;
+  writesCloud: boolean;
+  events?: CloudProductEvent[];
+  event?: CloudProductEvent;
+  eventCount?: number;
+  error?:
+    | 'cloud_not_configured'
+    | 'not_signed_in'
+    | 'cloud_read_failed'
+    | 'cloud_write_failed'
+    | 'invalid_event'
+    | string;
 };
 
 export type CloudInventorySnapshotResponse = {
@@ -426,8 +660,12 @@ const APP_API_ENDPOINTS = {
   authSession: '/api/auth/session',
   authLogout: '/api/auth/logout',
   cloudStatus: '/api/cloud/status',
+  cloudAccount: '/api/cloud/account',
   cloudProfileSettings: '/api/cloud/profile-settings',
   cloudInventory: '/api/cloud/inventory',
+  cloudMemory: '/api/cloud/memory',
+  cloudAssets: '/api/cloud/assets',
+  cloudEvents: '/api/cloud/events',
   secretaryChat: '/api/secretary/chat',
   secretaryHealth: '/api/secretary/health',
 } as const;
@@ -493,9 +731,13 @@ export function createAppApiClient(options: ClientOptions = {}) {
       return readJson(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.userDataExport));
     },
 
-    deleteUserData({ dryRun = true }: { dryRun?: boolean } = {}): Promise<UserDataDeleteResponse> {
+    deleteUserData({ dryRun = true, confirmation }: { dryRun?: boolean; confirmation?: 'DELETE_CLOUD_PRODUCT_DATA' | string } = {}): Promise<UserDataDeleteResponse> {
       return readJson(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.userDataDelete, { dryRun: dryRun ? 1 : 0 }), {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ confirmation }),
       });
     },
 
@@ -546,6 +788,20 @@ export function createAppApiClient(options: ClientOptions = {}) {
       return readJsonAllowError(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.cloudStatus));
     },
 
+    fetchCloudAccountProfile(): Promise<CloudAccountProfileResponse> {
+      return readJsonAllowError(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.cloudAccount));
+    },
+
+    saveCloudAccountProfile(profile: Partial<Pick<CloudAccountProfile, 'displayName' | 'avatarUrl' | 'onboardingCompleted' | 'profile'>>): Promise<CloudAccountProfileResponse> {
+      return readJsonAllowError(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.cloudAccount), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ profile }),
+      });
+    },
+
     fetchCloudProfileSettings(): Promise<CloudProfileSettingsResponse> {
       return readJsonAllowError(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.cloudProfileSettings));
     },
@@ -577,6 +833,87 @@ export function createAppApiClient(options: ClientOptions = {}) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ items, deleteMissing }),
+      });
+    },
+
+    fetchCloudMemorySnapshot({ exportOnly = false }: { exportOnly?: boolean } = {}): Promise<CloudMemorySnapshotResponse> {
+      return readJsonAllowError(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.cloudMemory, { exportOnly: exportOnly ? 'true' : undefined }));
+    },
+
+    saveCloudMemorySnapshot({
+      nodes,
+      assets = [],
+    }: {
+      nodes: CloudMemoryNodeRecord[];
+      assets?: CloudMemoryAssetRecord[];
+    }): Promise<CloudMemorySnapshotResponse> {
+      return readJsonAllowError(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.cloudMemory), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ nodes, assets }),
+      });
+    },
+
+    deleteCloudMemorySnapshot({
+      confirmation,
+      nodeId,
+    }: {
+      confirmation?: 'DELETE_MEMORY';
+      nodeId?: string;
+    }): Promise<CloudMemorySnapshotResponse> {
+      return readJsonAllowError(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.cloudMemory), {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(nodeId ? { nodeId } : { deleteAll: true, confirmation }),
+      });
+    },
+
+    uploadCloudAsset({
+      file,
+      purpose = 'memory',
+    }: {
+      file: File;
+      purpose?: 'avatar' | 'memory' | 'attachment' | string;
+    }): Promise<CloudAssetUploadResponse> {
+      const formData = new FormData();
+      formData.set('file', file);
+      formData.set('purpose', purpose);
+      return readJsonAllowError(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.cloudAssets), {
+        method: 'POST',
+        body: formData,
+      });
+    },
+
+    fetchCloudAssetReadUrl({
+      storagePath,
+    }: {
+      storagePath: string;
+    }): Promise<CloudAssetReadResponse> {
+      return readJsonAllowError(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.cloudAssets, { storagePath }));
+    },
+
+    fetchCloudProductEvents({ limit = 50 }: { limit?: number } = {}): Promise<CloudProductEventsResponse> {
+      return readJsonAllowError(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.cloudEvents, { limit }));
+    },
+
+    recordCloudProductEvent(event: {
+      eventType: string;
+      source: string;
+      targetType?: string;
+      targetId?: string;
+      feedback?: string;
+      payload?: Record<string, string | number | boolean | null | string[]>;
+    }): Promise<CloudProductEventsResponse> {
+      return readJsonAllowError(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.cloudEvents), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(event),
       });
     },
 

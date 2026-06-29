@@ -9,7 +9,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { loadProfileSettings } from '@/lib/portal/profile';
 import { readPortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
-import { getRecentNodes } from '@/lib/portal/life-graph';
 import type { CalendarEvent } from '@/lib/portal/types';
 
 // View-model types owned by the Today surface (Platform Leak Check: Today must
@@ -63,7 +62,15 @@ function buildDailyOverview(canUsePrivateData: boolean, eventCount: number, memo
   };
 }
 
-export default function DailyBriefCard({ canUsePrivateData }: { canUsePrivateData: boolean }) {
+export default function DailyBriefCard({
+  canUsePrivateData,
+  memoryCount,
+  memoryNotes,
+}: {
+  canUsePrivateData: boolean;
+  memoryCount: number;
+  memoryNotes: readonly string[];
+}) {
   const [weather, setWeather] = useState<WeatherView | null>(null);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [segments, setSegments] = useState<BriefSegment[]>([]);
@@ -123,7 +130,6 @@ export default function DailyBriefCard({ canUsePrivateData }: { canUsePrivateDat
   async function generateBrief() {
     if (!canUsePrivateData) return;
     setPlayState('loading');
-    const memoryNotes = getRecentNodes(5).map((n) => n.name);
     try {
       const res = await fetch('/api/portal/daily-brief', {
         method: 'POST',
@@ -194,7 +200,6 @@ export default function DailyBriefCard({ canUsePrivateData }: { canUsePrivateDat
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? '早上好' : hour < 18 ? '下午好' : '晚上好';
-  const memoryCount = canUsePrivateData ? getRecentNodes().length : 0;
   const overview = buildDailyOverview(canUsePrivateData, events.length, memoryCount);
 
   return (

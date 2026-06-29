@@ -1,5 +1,10 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import {
+  BootstrapResult,
+  bootstrapCloudAccountProfile,
+  buildCloudAccountProfileBootstrapMeta,
+} from '@/lib/portal/cloud-account-profile';
 import { normalizeSupabaseRuntimeUrl } from '@/lib/portal/production-runtime';
 
 type SupabaseUserResponse = {
@@ -97,12 +102,20 @@ async function refreshSupabaseSession(refreshToken: string): Promise<SupabaseTok
   return response.json() as Promise<SupabaseTokenResponse>;
 }
 
-function signedInResponse(user: SupabaseUserResponse, hasRefreshToken: boolean, refreshedSession: SupabaseTokenResponse | null = null) {
+function signedInResponse(
+  user: SupabaseUserResponse,
+  hasRefreshToken: boolean,
+  refreshedSession: SupabaseTokenResponse | null = null,
+  profileBootstrap: BootstrapResult | null = null,
+) {
+  const profileBootstrapMeta = buildCloudAccountProfileBootstrapMeta(profileBootstrap);
   const response = safeJson({
     ok: true,
     loggedIn: true,
     hasRefreshToken,
     status: refreshedSession?.access_token ? 'session_refreshed' : 'signed_in',
+    profileBootstrapped: profileBootstrapMeta.profileBootstrapped,
+    profileBootstrapStatus: profileBootstrapMeta.profileBootstrapStatus,
     user: {
       id: user.id,
       email: user.email || '',
@@ -125,7 +138,8 @@ export async function GET() {
   if (accessCookie) {
     const user = await fetchSupabaseUser(accessCookie);
     if (user?.id) {
-      return signedInResponse(user, Boolean(refreshCookie));
+      const profileBootstrap = await bootstrapCloudAccountProfile(accessCookie);
+      return signedInResponse(user, Boolean(refreshCookie), null, profileBootstrap);
     }
   }
 
@@ -134,7 +148,8 @@ export async function GET() {
     if (refreshedSession?.access_token) {
       const refreshedUser = await fetchSupabaseUser(refreshedSession.access_token);
       if (refreshedUser?.id) {
-        return signedInResponse(refreshedUser, true, refreshedSession);
+        const profileBootstrap = await bootstrapCloudAccountProfile(refreshedSession.access_token);
+        return signedInResponse(refreshedUser, true, refreshedSession, profileBootstrap);
       }
     }
   }

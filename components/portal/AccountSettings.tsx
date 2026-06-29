@@ -327,6 +327,9 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
       inventory: cloudStatus?.endpoints.inventoryEndpoint,
     })
     : t(locale, 'cloudStatusLoading');
+  const productBackendMatrix = cloudStatus?.productDataBackend.matrix || [];
+  const productBackendReadyCount = productBackendMatrix.filter((capability) => capability.backendStatus === 'cloud_ready').length;
+  const productBackendCloudOptionalCount = productBackendMatrix.filter((capability) => capability.cloudOptional).length;
 
   const formatProviderActionStatus = (
     provider?: ProductionRuntimeProviderAction,
@@ -773,6 +776,48 @@ export default function AccountSettings({ config }: AccountSettingsProps) {
           </div>
           <span>{cloudStatus?.summary.signedInCookiePresent ? t(locale, 'cloudStatusSignedIn') : t(locale, 'cloudStatusSignedOut')}</span>
         </div>
+        {productBackendMatrix.length ? (
+          <div className="portal-settings-product-backend-matrix" data-runtime-action="portal-settings-product-backend-matrix">
+            <div>
+              <strong>{t(locale, 'cloudProductBackendTitle')}</strong>
+              <small>
+                {t(locale, 'cloudProductBackendReadyCount', {
+                  ready: String(productBackendReadyCount),
+                  total: String(productBackendMatrix.length),
+                  optional: String(productBackendCloudOptionalCount),
+                })}
+              </small>
+            </div>
+            <ul>
+              {productBackendMatrix.map((capability) => (
+                <li
+                  key={capability.capabilityKey}
+                  className="portal-settings-product-backend-row"
+                  data-backend-capability={capability.capabilityKey}
+                >
+                  <div>
+                    <strong>{capability.label}</strong>
+                    <p>{capability.endpoint}</p>
+                    <small>{capability.realDataBoundary}</small>
+                  </div>
+                  <span>
+                    {capability.backendStatus === 'cloud_ready'
+                      ? t(locale, 'cloudStatusReady')
+                      : t(locale, 'cloudStatusNeedsSetup')}
+                  </span>
+                  <em>
+                    {capability.localFirst
+                      ? t(locale, 'cloudProductBackendLocalFirst')
+                      : t(locale, 'cloudProductBackendCloudRequired')}
+                  </em>
+                  {capability.explicitUserActionRequired ? (
+                    <b>{t(locale, 'cloudProductBackendRequiresAction')}</b>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
         <ul className="portal-settings-safety-list">
           <li className="portal-settings-auth-actions">
             <div>

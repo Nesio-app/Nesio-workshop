@@ -39,7 +39,7 @@ import {
 import { configUrl } from '@/lib/portal/paths';
 import { importSupabaseHashSession } from '@/lib/portal/auth-client';
 import { loadProfileSettings, PROFILE_UPDATED_EVENT, type PortalLocale } from '@/lib/portal/profile';
-import { runConnectors } from '@/lib/portal/connectors';
+import { runConnectors } from '@/lib/platform/runtime/integration-runtime';
 import { pruneDisposableSignals } from '@/lib/life-domain';
 import { prunePrivateExternalNodes } from '@/lib/portal/life-graph';
 import type { PortalConfig, PortalDecMetadata, PortalTool } from '@/lib/portal/types';

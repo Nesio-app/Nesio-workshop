@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { bootstrapCloudAccountProfile, buildCloudAccountProfileBootstrapMeta } from '@/lib/portal/cloud-account-profile';
 import { normalizeSupabaseRuntimeUrl } from '@/lib/portal/production-runtime';
 
 type SupabaseTokenResponse = {
@@ -198,29 +199,39 @@ export async function GET(req: NextRequest) {
 
   if (code) {
     const session = await exchangeSupabaseCode(code, `${source.origin}${source.pathname}`);
+    const profileBootstrap = session?.access_token ? await bootstrapCloudAccountProfile(session?.access_token || '') : null;
+    const profileBootstrapMeta = buildCloudAccountProfileBootstrapMeta(profileBootstrap);
     const target = safeRedirectUrl(req, {
       safePublicStatus: 'true',
       secretsRedacted: 'true',
       auth: session?.access_token ? 'auth_callback_received' : 'auth_callback_failed',
       provider,
       status: session?.access_token ? 'session_established' : 'session_exchange_failed',
+      profileBootstrapStatus: session?.access_token ? profileBootstrapMeta.profileBootstrapStatus : 'profile_bootstrap_not_started',
     });
     const response = NextResponse.redirect(target);
-    if (session?.access_token) setAuthCookies(response, session);
+    if (session?.access_token) {
+      setAuthCookies(response, session);
+    }
     return response;
   }
 
   if (tokenHash && type) {
     const session = await verifySupabaseOtp(tokenHash, type);
+    const profileBootstrap = session?.access_token ? await bootstrapCloudAccountProfile(session?.access_token || '') : null;
+    const profileBootstrapMeta = buildCloudAccountProfileBootstrapMeta(profileBootstrap);
     const target = safeRedirectUrl(req, {
       safePublicStatus: 'true',
       secretsRedacted: 'true',
       auth: session?.access_token ? 'auth_callback_received' : 'auth_callback_failed',
       provider,
       status: session?.access_token ? 'session_established' : 'otp_verify_failed',
+      profileBootstrapStatus: session?.access_token ? profileBootstrapMeta.profileBootstrapStatus : 'profile_bootstrap_not_started',
     });
     const response = NextResponse.redirect(target);
-    if (session?.access_token) setAuthCookies(response, session);
+    if (session?.access_token) {
+      setAuthCookies(response, session);
+    }
     return response;
   }
 

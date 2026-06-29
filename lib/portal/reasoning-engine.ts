@@ -29,6 +29,8 @@ export interface RecommendationCard {
   body: string;
   tags?: string[];
   evidence: EvidenceRef[];
+  /** Canonical Signal ids that explain why this card exists. Required before Today publication. */
+  evidenceSignalIds?: string[];
   primaryAction: string;
   secondaryAction?: string;
   type: 'standard' | 'audio' | 'compact';

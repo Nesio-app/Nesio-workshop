@@ -6,10 +6,9 @@
  * contract; deep ones compose more. This keeps the platform from forcing a
  * god-interface onto every domain.
  *
- * Stage 2 (Implementation Thin): only InsightContract has real implementations
- * today (domains produce Today recommendations). SignalContract / ActionContract
- * / SimulationContract are deliberately NOT defined yet — they enter main only
- * when a real implementation arrives (§6.2: no empty-interface placeholders).
+ * Stage 3/4: the atomized contracts are now first-class. A domain advertises
+ * exactly the capabilities it can actually serve; runtime registries can stay
+ * thin while product/report layers stop guessing from implementation details.
  */
 
 import type { Signal } from '../life-domain/signal';
@@ -33,12 +32,58 @@ export interface DECContext {
   degraded: boolean;
 }
 
+export interface PlatformAction {
+  readonly actionKey: string;
+  readonly moduleId?: string;
+  readonly payload?: Record<string, unknown>;
+  readonly evidenceSignalIds?: readonly string[];
+}
+
+export interface ActionResult {
+  readonly ok: boolean;
+  readonly status: 'executed' | 'blocked' | 'deferred' | 'requires_approval';
+  readonly message?: string;
+  readonly evidenceSignalIds?: readonly string[];
+}
+
+export interface Scenario {
+  readonly scenarioKey: string;
+  readonly inputSignals?: readonly Signal[];
+  readonly assumptions?: Record<string, unknown>;
+}
+
+export interface SimulationResult {
+  readonly ok: boolean;
+  readonly summary: string;
+  readonly evidenceSignalIds: readonly string[];
+  readonly warnings?: readonly string[];
+}
+
+export interface DomainInsight {
+  readonly id: string;
+  readonly domain: string;
+  readonly title: string;
+  readonly body: string;
+  readonly evidenceSignalIds: readonly string[];
+}
+
+export interface SignalContract {
+  readonly contract: 'signal';
+  publishSignals(input: unknown): Promise<Signal[]> | Signal[];
+}
+
+export interface ActionContract {
+  readonly contract: 'action';
+  executeAction(action: PlatformAction): Promise<ActionResult> | ActionResult;
+}
+
 /**
  * InsightContract (§3.2) — a Domain Engine that turns context into Today
  * recommendation candidates. The DEC discovers and invokes these instead of
  * hard-coding rules, so adding a domain never touches DEC/Today logic (§28.7).
  */
-export interface DomainEngine {
+export interface InsightContract {
+  readonly contract?: 'insight';
   /** Stable domain id: 'weather' | 'work' | 'health' | 'family' | 'state' ... */
   readonly domain: string;
   /** Capability version (evolution-contract framework; multi-version mounting
@@ -51,3 +96,19 @@ export interface DomainEngine {
   /** Produce candidate cards. Pure: same context → same output. */
   provideInsights(ctx: DECContext): RecommendationCard[];
 }
+
+export interface SimulationContract {
+  readonly contract: 'simulation';
+  runSimulation(scenario: Scenario): Promise<SimulationResult> | SimulationResult;
+}
+
+export type DomainCapabilityContracts = Partial<{
+  signal: SignalContract;
+  action: ActionContract;
+  insight: InsightContract;
+  simulation: SimulationContract;
+}>;
+
+export type DomainEngine = InsightContract & {
+  readonly capabilities?: DomainCapabilityContracts;
+};
