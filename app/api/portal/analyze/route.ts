@@ -114,7 +114,7 @@ async function analyzeWithGemini(content: string, imageBase64?: string, mimeType
 
   const parts: unknown[] = [];
   if (imageBase64) {
-    parts.push({ inline_data: { mime_type: mimeType || 'image/jpeg', data: imageBase64 } });
+    parts.push({ inlineData: { mimeType: mimeType || 'image/jpeg', data: imageBase64 } });
   }
   parts.push({ text: `${systemPrompt}\n\nUser input: ${content}` });
 
