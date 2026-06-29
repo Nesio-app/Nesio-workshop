@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { clearProfileIdentity, loadProfileSettings } from '@/lib/portal/profile';
+import { useEffect, useRef, useState } from 'react';
+import { clearProfileIdentity, loadProfileSettings, readAvatarFile, saveProfileSettings } from '@/lib/portal/profile';
 import { getRecentNodes } from '@/lib/portal/life-graph';
 import { ToneSheet, PrivacySheet, SpacesSheet, SubscriptionSheet } from './SettingsSheets';
 import ConnectorsHub from './ConnectorsHub';
@@ -12,13 +12,17 @@ type ActiveSheet = 'mirror' | 'tone' | 'privacy' | 'spaces' | 'subscription' | '
 
 export default function NesioProfileCard() {
   const [displayName, setDisplayName] = useState('Jessy');
+  const [avatarUrl, setAvatarUrl] = useState('');
   const [memoryCount, setMemoryCount] = useState(0);
   const [activeSheet, setActiveSheet] = useState<ActiveSheet>(null);
   const [isSignedIn, setIsSignedIn] = useState(false);
+  const [avatarError, setAvatarError] = useState('');
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     const profile = loadProfileSettings();
     if (profile.displayName) setDisplayName(profile.displayName);
+    setAvatarUrl(profile.avatarUrl || '');
     setMemoryCount(getRecentNodes(100).length);
 
     // Check auth session
@@ -40,8 +44,21 @@ export default function NesioProfileCard() {
     } catch { /* ignore */ }
     clearProfileIdentity();
     setDisplayName('我');
+    setAvatarUrl('');
     setIsSignedIn(false);
     window.location.href = '/';
+  }
+
+  async function handleAvatarFile(file: File | undefined) {
+    if (!file) return;
+    setAvatarError('');
+    try {
+      const avatar = await readAvatarFile(file);
+      saveProfileSettings({ avatarUrl: avatar });
+      setAvatarUrl(avatar);
+    } catch {
+      setAvatarError('头像没有保存，请选择一张较小的图片。');
+    }
   }
 
   const menuItems = [
@@ -78,7 +95,21 @@ export default function NesioProfileCard() {
       <div className="nesio-profile-card">
         {/* Avatar + name + stats */}
         <div className="nesio-profile-card-top">
-          <div className="nesio-profile-avatar-lg">{initials}</div>
+          <button
+            type="button"
+            className="nesio-profile-avatar-lg"
+            aria-label="上传头像"
+            onClick={() => avatarInputRef.current?.click()}
+          >
+            {avatarUrl ? <img src={avatarUrl} alt="" draggable={false} /> : initials}
+          </button>
+          <input
+            ref={avatarInputRef}
+            type="file"
+            accept="image/*"
+            className="nesio-visually-hidden"
+            onChange={(event) => handleAvatarFile(event.currentTarget.files?.[0])}
+          />
           {memoryCount > 0 && (
             <button
               type="button"
@@ -91,6 +122,7 @@ export default function NesioProfileCard() {
             </button>
           )}
         </div>
+        {avatarError && <p className="nesio-profile-avatar-error">{avatarError}</p>}
 
         {/* Auth status */}
         {!isSignedIn && (

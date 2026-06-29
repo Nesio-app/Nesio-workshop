@@ -13,6 +13,10 @@ assert.match(route, /auth_start_request/, 'Auth start route must log redacted au
 assert.match(route, /auth_start_failure/, 'Auth start route must log redacted auth start failure events.');
 assert.match(route, /auth_start_success/, 'Auth start route must log redacted auth start success events.');
 assert.match(route, /auditId/, 'Auth start responses must include auditId for support/debug correlation.');
+assert.match(route, /type AuthMode = 'login' \| 'register'/, 'Auth start must model login and registration separately.');
+assert.match(route, /create_user:\s*shouldCreateUser/, 'Email login must not create accounts unless registration mode is selected.');
+assert.match(route, /should_create_user:\s*shouldCreateUser/, 'Auth start should pass the Supabase compatible should_create_user flag.');
+assert.match(route, /user_not_found/, 'Email login should expose a safe user_not_found error for unknown accounts.');
 assert.match(route, /provider_not_configured/, 'Auth start must preserve fail-closed provider_not_configured responses.');
 assert.match(route, /canonical_domain_mismatch/, 'Auth start must preserve canonical domain mismatch responses.');
 assert.doesNotMatch(

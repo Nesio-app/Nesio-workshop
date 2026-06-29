@@ -10,8 +10,10 @@ import {
 } from '@/lib/portal/production-runtime';
 
 type AuthProvider = 'email' | 'google' | 'wechat' | 'phone';
+type AuthMode = 'login' | 'register';
 
 const AUTH_PROVIDERS: AuthProvider[] = ['email', 'google', 'wechat', 'phone'];
+const AUTH_MODES: AuthMode[] = ['login', 'register'];
 
 function createAuthStartAuditId(): string {
   const randomId = globalThis.crypto?.randomUUID?.();
@@ -88,7 +90,7 @@ function sanitizeRedirectTo(raw: string | undefined, fallback: string): string {
   }
 }
 
-async function requestSupabaseOtp(payload: { email?: string; phone?: string; redirectTo: string }) {
+async function requestSupabaseOtp(payload: { email?: string; phone?: string; redirectTo: string; authMode: AuthMode }) {
   const supabaseUrl = normalizeSupabaseRuntimeUrl(process.env.SUPABASE_URL || '');
   const supabaseAnonKey = process.env.SUPABASE_ANON_KEY?.trim();
 
@@ -100,6 +102,7 @@ async function requestSupabaseOtp(payload: { email?: string; phone?: string; red
     };
   }
 
+  const shouldCreateUser = payload.authMode === 'register';
   const response = await fetch(`${supabaseUrl}/auth/v1/otp`, {
     method: 'POST',
     headers: {
@@ -108,8 +111,9 @@ async function requestSupabaseOtp(payload: { email?: string; phone?: string; red
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      ...payload,
-      create_user: true,
+      ...(payload.email ? { email: payload.email } : { phone: payload.phone }),
+      create_user: shouldCreateUser,
+      should_create_user: shouldCreateUser,
       options: payload.email
         ? {
             email_redirect_to: payload.redirectTo,
@@ -119,10 +123,17 @@ async function requestSupabaseOtp(payload: { email?: string; phone?: string; red
   });
 
   if (!response.ok) {
+    let error = 'supabase_otp_failed';
+    try {
+      const data = await response.json() as { msg?: string; message?: string; error?: string; error_description?: string };
+      const text = `${data.msg || ''} ${data.message || ''} ${data.error || ''} ${data.error_description || ''}`.toLowerCase();
+      if (text.includes('not found') || text.includes('not exist')) error = 'user_not_found';
+      if (text.includes('already') && text.includes('registered')) error = 'user_already_exists';
+    } catch { /* keep generic error */ }
     return {
       ok: false,
       status: response.status,
-      error: 'supabase_otp_failed',
+      error,
     };
   }
 
@@ -138,6 +149,7 @@ export async function POST(req: NextRequest) {
   try {
     let body: {
       provider?: string;
+      authMode?: string;
       email?: string;
       phone?: string;
       redirectTo?: string;
@@ -152,9 +164,11 @@ export async function POST(req: NextRequest) {
     }
 
     const provider = body.provider as AuthProvider | undefined;
+    const authMode: AuthMode = AUTH_MODES.includes(body.authMode as AuthMode) ? body.authMode as AuthMode : 'login';
     logAuthStartAudit('auth_start_request', {
       auditId,
       provider: provider || null,
+      authMode,
       dryRun: body.dryRun === true,
       hasEmail: Boolean(body.email?.trim()),
       hasPhone: Boolean(body.phone?.trim()),
@@ -177,10 +191,12 @@ export async function POST(req: NextRequest) {
         logAuthStartAudit('auth_start_failure', { auditId, provider, reason: 'missing_supabase_config' });
         return safeJson({ ok: false, error: 'provider_not_configured', provider, auditId }, 503);
       }
-      logAuthStartAudit('auth_start_success', { auditId, provider, action: 'redirect' });
+      logAuthStartAudit('auth_start_success', { auditId, provider, authMode, action: 'redirect' });
       return safeJson({
         ok: true,
         provider,
+        authMode,
+        accountMode: authMode === 'register' ? 'create_or_sign_in' : 'sign_in_or_provider_match',
         auditId,
         action: 'redirect',
         url: getSupabaseAuthorizeUrl('google', redirectTo),
@@ -226,25 +242,27 @@ export async function POST(req: NextRequest) {
         return safeJson({ ok: false, error: 'missing_email', auditId }, 400);
       }
       if (body.dryRun === true) {
-        logAuthStartAudit('auth_start_success', { auditId, provider, action: 'otp_dry_run' });
+        logAuthStartAudit('auth_start_success', { auditId, provider, authMode, action: 'otp_dry_run' });
         return safeJson({
           ok: true,
           provider,
+          authMode,
           auditId,
           action: 'otp_dry_run',
           dryRun: true,
           noExternalOtpSent: true,
         });
       }
-      const result = await requestSupabaseOtp({ email, redirectTo });
+      const result = await requestSupabaseOtp({ email, redirectTo, authMode });
       logAuthStartAudit(result.ok ? 'auth_start_success' : 'auth_start_failure', {
         auditId,
         provider,
+        authMode,
         action: result.action || null,
         reason: result.ok ? 'otp_sent' : (result.error || 'otp_failed'),
         status: result.status,
       });
-      return safeJson({ ...result, provider, auditId }, result.status);
+      return safeJson({ ...result, provider, authMode, auditId }, result.status);
     }
 
     if (!phone) {
@@ -252,25 +270,27 @@ export async function POST(req: NextRequest) {
       return safeJson({ ok: false, error: 'missing_phone', auditId }, 400);
     }
     if (body.dryRun === true) {
-      logAuthStartAudit('auth_start_success', { auditId, provider, action: 'otp_dry_run' });
+      logAuthStartAudit('auth_start_success', { auditId, provider, authMode, action: 'otp_dry_run' });
       return safeJson({
         ok: true,
         provider,
+        authMode,
         auditId,
         action: 'otp_dry_run',
         dryRun: true,
         noExternalOtpSent: true,
       });
     }
-    const result = await requestSupabaseOtp({ phone, redirectTo });
+    const result = await requestSupabaseOtp({ phone, redirectTo, authMode });
     logAuthStartAudit(result.ok ? 'auth_start_success' : 'auth_start_failure', {
       auditId,
       provider,
+      authMode,
       action: result.action || null,
       reason: result.ok ? 'otp_sent' : (result.error || 'otp_failed'),
       status: result.status,
     });
-    return safeJson({ ...result, provider, auditId }, result.status);
+    return safeJson({ ...result, provider, authMode, auditId }, result.status);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'unknown_error';
     logAuthStartAudit('auth_start_failure', { auditId, provider: null, reason: 'auth_start_exception' });

@@ -2,7 +2,6 @@
 
 /**
  * VoiceBrief — plays a meeting/event brief using OpenAI TTS (natural voice).
- * Falls back to Web Speech Synthesis if no API key.
  */
 
 import { useEffect, useRef, useState } from 'react';
@@ -50,7 +49,6 @@ export default function VoiceBrief({ open, onClose, title, body, points }: Voice
       audioRef.current = null;
     }
     clearInterval(intervalRef.current ?? undefined);
-    window.speechSynthesis?.cancel();
   }
 
   async function startPlay() {
@@ -80,39 +78,15 @@ export default function VoiceBrief({ open, onClose, title, body, points }: Voice
         };
         audio.onpause = () => { setState('paused'); clearInterval(intervalRef.current ?? undefined); };
         audio.onended = () => { setState('done'); setProgress(100); clearInterval(intervalRef.current ?? undefined); };
-        audio.onerror = () => fallbackToWebSpeech(script);
+        audio.onerror = () => setState('error');
 
         await audio.play();
       } else {
-        // No API key or error — fall back to Web Speech
-        fallbackToWebSpeech(script);
+        setState('error');
       }
     } catch {
-      fallbackToWebSpeech(buildScript(title, body, points));
+      setState('error');
     }
-  }
-
-  function fallbackToWebSpeech(script: string) {
-    if (!window.speechSynthesis) { setState('error'); return; }
-    window.speechSynthesis.cancel();
-    const utt = new SpeechSynthesisUtterance(script);
-    utt.lang = 'zh-CN';
-    utt.rate = 1.0;
-    const voices = window.speechSynthesis.getVoices();
-    const zh = voices.find((v) => v.lang.startsWith('zh') && !v.name.includes('compact')) || voices.find((v) => v.lang.startsWith('zh'));
-    if (zh) utt.voice = zh;
-    utt.onstart = () => { setState('playing'); startFakeProgress(script.length); };
-    utt.onend = () => { setState('done'); setProgress(100); clearInterval(intervalRef.current ?? undefined); };
-    utt.onerror = () => setState('error');
-    window.speechSynthesis.speak(utt);
-  }
-
-  function startFakeProgress(len: number) {
-    const ms = (len / 5) * (1000 / 1.0);
-    const start = Date.now();
-    intervalRef.current = setInterval(() => {
-      setProgress(Math.min(99, Math.round(((Date.now() - start) / ms) * 100)));
-    }, 200);
   }
 
   function togglePause() {
@@ -122,8 +96,6 @@ export default function VoiceBrief({ open, onClose, title, body, points }: Voice
       else { audio.play(); setState('playing'); }
       return;
     }
-    if (state === 'playing') { window.speechSynthesis?.pause(); setState('paused'); }
-    else { window.speechSynthesis?.resume(); setState('playing'); }
   }
 
   function restart() { stopAll(); setProgress(0); startPlay(); }
@@ -173,7 +145,7 @@ export default function VoiceBrief({ open, onClose, title, body, points }: Voice
 
         {/* Controls */}
         {state === 'error' ? (
-          <p style={{ textAlign: 'center', color: '#ef4444', fontSize: '0.82rem' }}>语音生成失败，请检查网络。</p>
+          <p style={{ textAlign: 'center', color: '#ef4444', fontSize: '0.82rem' }}>真人语音暂不可用，请检查 OpenAI TTS 配置或网络。</p>
         ) : (
           <div className="nesio-voice-brief-controls">
             <button type="button" className="nesio-voice-brief-btn" onClick={restart} aria-label="重播">

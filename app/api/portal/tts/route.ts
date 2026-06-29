@@ -2,7 +2,6 @@
  * POST /api/portal/tts
  * Text-to-speech using OpenAI TTS API.
  * Returns audio/mpeg stream.
- * Falls back to returning the script as text if no API key.
  */
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -23,8 +22,7 @@ export async function POST(req: NextRequest) {
 
   const key = getOpenAIKey();
   if (!key) {
-    // No key — return text for client-side TTS fallback
-    return NextResponse.json({ ok: false, error: 'no_api_key', fallbackText: text });
+    return NextResponse.json({ ok: false, error: 'real_voice_not_configured' }, { status: 503 });
   }
 
   try {
@@ -35,7 +33,7 @@ export async function POST(req: NextRequest) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'tts-1',
+        model: 'tts-1-hd',
         input: text.slice(0, 4096),
         voice,
         speed: Math.max(0.25, Math.min(4.0, speed)),

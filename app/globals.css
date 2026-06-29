@@ -9804,6 +9804,8 @@ html[data-portal-theme="night"] .nesio-today-feedback-menu button { color: #c5d4
 .nesio-profile-avatar-lg {
   width: 3rem;
   height: 3rem;
+  border: 0;
+  padding: 0;
   border-radius: 50%;
   background: var(--portal-blue-deep);
   color: #fff;
@@ -9813,6 +9815,33 @@ html[data-portal-theme="night"] .nesio-today-feedback-menu button { color: #c5d4
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.nesio-profile-avatar-lg img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.nesio-profile-avatar-error {
+  color: #ef4444;
+  font-size: 0.72rem;
+  margin: -0.8rem 0 0.9rem;
+}
+
+.nesio-visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
 }
 
 .nesio-profile-name {
@@ -10416,6 +10445,14 @@ html[data-portal-theme="night"] .nesio-login-tab--active {
 .nesio-login-divider::after { content: ''; flex: 1; height: 1px; background: var(--portal-line); }
 
 .nesio-login-sent { text-align: center; }
+
+.nesio-login-note {
+  margin: 0.75rem 0 0;
+  color: var(--portal-muted);
+  font-size: 0.68rem;
+  line-height: 1.45;
+  text-align: center;
+}
 
 /* ─── Settings Sheets ─── */
 .nesio-settings-sheet-overlay {

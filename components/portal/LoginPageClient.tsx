@@ -5,14 +5,15 @@ import { loadProfileSettings, saveProfileSettings, type PortalLocale } from '@/l
 import { getAuthRedirectTo, importSupabaseHashSession } from '@/lib/portal/auth-client';
 
 type AuthState = 'idle' | 'loading' | 'email_sent' | 'error';
+type AuthMode = 'login' | 'register';
 
-async function startAuth(provider: string, email?: string): Promise<{ ok: boolean; url?: string; error?: string; status?: number }> {
+async function startAuth(provider: string, authMode: AuthMode, email?: string): Promise<{ ok: boolean; url?: string; error?: string; status?: number }> {
   try {
     const redirectTo = getAuthRedirectTo();
     const res = await fetch('/api/auth/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ provider, email, redirectTo }),
+      body: JSON.stringify({ provider, authMode, email, redirectTo }),
     });
     const text = await res.text();
     const data = text ? JSON.parse(text) as { ok?: boolean; url?: string; error?: string } : {};
@@ -26,6 +27,12 @@ function friendlyAuthError(error: string | undefined, zh: boolean): string {
   }
   if (error === 'supabase_otp_failed') {
     return zh ? '登录邮件没有发出，请稍后再试，或先本地使用。' : 'The sign-in email was not sent. Try again later or use Nesio locally.';
+  }
+  if (error === 'user_not_found') {
+    return zh ? '没有找到这个邮箱，请切换到注册。' : 'No account was found for this email. Switch to create account.';
+  }
+  if (error === 'user_already_exists') {
+    return zh ? '这个邮箱已经注册过，请切换到登录。' : 'This email already has an account. Switch to sign in.';
   }
   if (error === 'auth_start_exception') {
     return zh ? '登录服务暂时不可用，请先本地使用。' : 'Sign-in is temporarily unavailable. You can use Nesio locally.';
@@ -60,7 +67,7 @@ export default function LoginPageClient() {
 
   async function handleGoogle() {
     setState('loading'); setError('');
-    const r = await startAuth('google');
+    const r = await startAuth('google', tab);
     if (r.ok && r.url) { window.location.href = r.url; }
     else { setError(friendlyAuthError(r.error, zh)); setState('error'); }
   }
@@ -68,7 +75,7 @@ export default function LoginPageClient() {
   async function handleEmail() {
     if (!email.trim()) return;
     setState('loading'); setError('');
-    const r = await startAuth('email', email.trim());
+    const r = await startAuth('email', tab, email.trim());
     if (r.ok) { setState('email_sent'); }
     else { setError(friendlyAuthError(r.error, zh)); setState('error'); }
   }
@@ -107,7 +114,7 @@ export default function LoginPageClient() {
             <p className="nesio-ob-step-sub" style={{ textAlign: 'center', marginBottom: '1.25rem' }}>
               {tab === 'login'
                 ? (zh ? '登录后，Memory 与 Today Feed 跨设备同步。' : 'Sign in to sync your Memory and Today across devices.')
-                : (zh ? '创建账号，Nesio 记住你的生活上下文。' : 'Create an account to let Nesio remember your life context.')}
+                : (zh ? '新用户创建账号。首次 Google 授权或邮件确认后，Nesio 会建立你的账户。' : 'Create a new account. Google or email confirmation creates your Nesio account.')}
             </p>
 
             {/* Google */}
@@ -138,6 +145,14 @@ export default function LoginPageClient() {
             </button>
 
             {error && <p className="nesio-ob-error">{error}</p>}
+
+            {tab === 'register' && (
+              <p className="nesio-login-note">
+                {zh
+                  ? '注册会在 Supabase Auth 中创建账户；你仍可以先选择“本地使用”。'
+                  : 'Sign-up creates an account in Supabase Auth. You can still use local mode first.'}
+              </p>
+            )}
 
             {/* Language */}
             <div className="nesio-ob-lang-row" style={{ marginTop: '1.25rem' }}>

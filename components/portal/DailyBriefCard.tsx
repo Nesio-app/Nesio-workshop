@@ -36,7 +36,7 @@ function todayKey(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-type PlayState = 'idle' | 'loading' | 'playing' | 'paused' | 'done';
+type PlayState = 'idle' | 'loading' | 'playing' | 'paused' | 'done' | 'error';
 
 function buildDailyOverview(canUsePrivateData: boolean, eventCount: number, memoryCount: number) {
   if (!canUsePrivateData || memoryCount === 0) {
@@ -150,13 +150,14 @@ export default function DailyBriefCard({ canUsePrivateData }: { canUsePrivateDat
     for (let i = startIdx; i < segs.length; i++) {
       setCurrentSeg(i);
       setPlayState('playing');
-      await playSingleSegment(segs[i]);
+      const ok = await playSingleSegment(segs[i]);
+      if (!ok) return;
       if (playState === 'idle') return; // stopped
     }
     setPlayState('done');
   }
 
-  async function playSingleSegment(seg: BriefSegment): Promise<void> {
+  async function playSingleSegment(seg: BriefSegment): Promise<boolean> {
     return new Promise((resolve) => {
       // Try OpenAI TTS
       fetch('/api/portal/tts', {
@@ -170,29 +171,24 @@ export default function DailyBriefCard({ canUsePrivateData }: { canUsePrivateDat
             const url = URL.createObjectURL(blob);
             const audio = new Audio(url);
             audioRef.current = audio;
-            audio.onended = () => resolve();
-            audio.onerror = () => { fallbackTTS(seg.text, resolve); };
-            audio.play().catch(() => fallbackTTS(seg.text, resolve));
+            audio.onended = () => resolve(true);
+            audio.onerror = () => { setPlayState('error'); resolve(false); };
+            audio.play().catch(() => { setPlayState('error'); resolve(false); });
           } else {
-            fallbackTTS(seg.text, resolve);
+            setPlayState('error');
+            resolve(false);
           }
         })
-        .catch(() => fallbackTTS(seg.text, resolve));
+        .catch(() => {
+          setPlayState('error');
+          resolve(false);
+        });
     });
-  }
-
-  function fallbackTTS(text: string, done: () => void) {
-    if (!window.speechSynthesis) { done(); return; }
-    const utt = new SpeechSynthesisUtterance(text);
-    utt.lang = 'zh-CN'; utt.rate = 1.0;
-    utt.onend = done; utt.onerror = done;
-    window.speechSynthesis.speak(utt);
   }
 
   function stopPlay() {
     audioRef.current?.pause();
     audioRef.current = null;
-    window.speechSynthesis?.cancel();
     setPlayState('idle');
   }
 
@@ -264,6 +260,11 @@ export default function DailyBriefCard({ canUsePrivateData }: { canUsePrivateDat
       {playState === 'done' && (
         <p style={{ fontSize: '0.72rem', color: '#10b981', textAlign: 'center', marginTop: '0.5rem' }}>
           播报完毕 ✓
+        </p>
+      )}
+      {playState === 'error' && (
+        <p style={{ fontSize: '0.72rem', color: '#ef4444', textAlign: 'center', marginTop: '0.5rem' }}>
+          真人语音暂不可用，请稍后再试。
         </p>
       )}
     </div>
