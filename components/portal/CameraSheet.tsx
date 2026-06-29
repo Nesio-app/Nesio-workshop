@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { addLifeNode, type LifeNode } from '@/lib/portal/life-graph';
+import { addLifeNode, updateLifeNode, type LifeNode, type LifeNodeAsset } from '@/lib/portal/life-graph';
+import { createAppApiClient } from '@/lib/portal/app-api-client';
 
 interface CameraSheetProps { open: boolean; onClose: () => void; }
 
@@ -60,13 +61,13 @@ function confidenceLabel(confidence: number): string {
   return '建议确认';
 }
 
-function buildPendingImageResult(name = '图片线索'): AnalysisResult {
+function buildPendingImageResult(): AnalysisResult {
   return {
     summary: '已先保存为待确认图片线索。登录或 Lab 模式后可自动识别标签。',
     nodes: [
       {
         type: 'object',
-        name,
+        name: '待确认图片线索',
         attributes: { status: '待确认', note: '图片已保存，标签等待你确认或登录后自动识别。' },
         relations: [],
         tags: ['图片', '待确认'],
@@ -88,6 +89,18 @@ function parseInlineTags(value: string): string[] {
   ));
 }
 
+function dataUrlToFile(dataUrl: string, fileName: string): File | null {
+  const match = dataUrl.match(/^data:([^;]+);base64,(.*)$/);
+  if (!match) return null;
+  const [, mimeType, base64] = match;
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return new File([bytes], fileName, { type: mimeType || 'image/jpeg' });
+}
+
 export default function CameraSheet({ open, onClose }: CameraSheetProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -101,6 +114,7 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
   const [error, setError] = useState('');
   const [extraTags, setExtraTags] = useState('');
+  const [sourceFile, setSourceFile] = useState<File | null>(null);
 
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -140,7 +154,7 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
   useEffect(() => {
     if (open) {
       setPhase('idle'); setResult(null); setCapturedPreview('');
-      setPermDenied(false); setError(''); setExtraTags('');
+      setPermDenied(false); setError(''); setExtraTags(''); setSourceFile(null);
       startCamera('environment');
     } else {
       stopCamera();
@@ -169,6 +183,7 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
     // Show preview thumbnail
     const preview = canvas.toDataURL('image/jpeg', 0.5);
     setCapturedPreview(preview);
+    setSourceFile(dataUrlToFile(preview, `nesio-camera-${Date.now()}.jpg`));
 
     // Compress & analyze
     setPhase('analyzing');
@@ -195,6 +210,7 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = '';
+    setSourceFile(file);
 
     setPhase('analyzing');
     const reader = new FileReader();
@@ -207,7 +223,7 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
         setResult(res);
         setPhase('result');
       } catch {
-        setResult(buildPendingImageResult(file.name.replace(/\.[^.]+$/, '') || '图片线索'));
+        setResult(buildPendingImageResult());
         setPhase('result');
       }
     };
@@ -232,10 +248,10 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
     }
   }
 
-  function saveAll() {
+  async function saveAll() {
     if (!result) return;
     const userTags = parseInlineTags(extraTags);
-    result.nodes.forEach((n) => addLifeNode({
+    const savedNodes = result.nodes.map((n) => addLifeNode({
       ...n,
       source: 'photo',
       tags: Array.from(new Set([...(n.tags || []), ...userTags])),
@@ -244,12 +260,45 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
         ...(userTags.length ? { userTags: userTags.join(', ') } : {}),
       },
     }));
+    let cloudAssets: Array<LifeNodeAsset & { nodeId?: string }> = [];
+    if (sourceFile && savedNodes.length > 0) {
+      try {
+        const client = createAppApiClient();
+        const upload = await client.uploadCloudAsset({ file: sourceFile, purpose: 'memory' });
+        if (upload.ok && upload.storagePath) {
+          const assetRecord: LifeNodeAsset = {
+            id: `asset-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            kind: sourceFile.type.startsWith('image/') ? 'image' : 'file',
+            storagePath: upload.storagePath,
+            mimeType: upload.mimeType,
+            label: result.summary || savedNodes[0].name,
+            analysisSummary: result.summary,
+            tags: Array.from(new Set([...(savedNodes[0].tags || []), ...userTags])),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          cloudAssets = [{ ...assetRecord, nodeId: savedNodes[0].id }];
+          updateLifeNode(savedNodes[0].id, { assets: [assetRecord] });
+        }
+      } catch {
+        // Cloud asset sync is best-effort; local Memory remains the source of continuity offline.
+      }
+    }
+    try {
+      const client = createAppApiClient();
+      await client.saveCloudMemorySnapshot({
+        nodes: savedNodes,
+        assets: cloudAssets,
+      });
+    } catch {
+      // Cloud Memory sync is best-effort; local Memory remains available.
+    }
     setPhase('saved');
-    setTimeout(() => { onClose(); setPhase('idle'); setResult(null); setExtraTags(''); }, 900);
+    setTimeout(() => { onClose(); setPhase('idle'); setResult(null); setExtraTags(''); setSourceFile(null); }, 900);
   }
 
   function retake() {
-    setResult(null); setCapturedPreview(''); setError(''); setExtraTags('');
+    setResult(null); setCapturedPreview(''); setError(''); setExtraTags(''); setSourceFile(null);
     setPhase('live');
   }
 

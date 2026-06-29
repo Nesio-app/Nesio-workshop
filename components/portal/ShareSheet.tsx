@@ -10,7 +10,8 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { addLifeNode } from '@/lib/portal/life-graph';
+import { addLifeNode, updateLifeNode, type LifeNodeAsset } from '@/lib/portal/life-graph';
+import { createAppApiClient } from '@/lib/portal/app-api-client';
 
 interface ShareSheetProps { open: boolean; onClose: () => void; }
 
@@ -32,12 +33,13 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
   const [textMode, setTextMode] = useState(false);
   const [textInput, setTextInput] = useState('');
   const [error, setError] = useState('');
+  const [sourceFile, setSourceFile] = useState<File | null>(null);
 
   useEffect(() => {
-    if (!open) { setParsed(null); setSaved(false); setAnalyzing(false); setTextMode(false); setTextInput(''); setError(''); }
+    if (!open) { setParsed(null); setSaved(false); setAnalyzing(false); setTextMode(false); setTextInput(''); setError(''); setSourceFile(null); }
   }, [open]);
 
-  function buildPendingImageParsed(fileName: string): ParsedResult {
+  function buildPendingImageParsed(): ParsedResult {
     return {
       title: '图片线索待确认',
       summary: '已先整理为一条图片线索。登录或 Lab 模式后，Nesio 会自动识别图中物品、人物和场景。',
@@ -49,13 +51,12 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
           name: '图片线索待确认',
           attributes: {
             status: '待确认',
-            originalFileName: fileName,
             note: '这张图片已保存为待确认线索。',
           },
           relations: [],
           tags: ['图片', '待确认'],
           confidence: 0.45,
-          rawInput: fileName,
+          rawInput: '图片待确认',
         },
       ],
     };
@@ -110,6 +111,7 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    setSourceFile(file);
 
     if (file.type.startsWith('image/')) {
       const reader = new FileReader();
@@ -119,7 +121,7 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
         const ok = await analyze('image', '请根据这张图片里真实可见的内容，整理出可确认的 Memory 线索。', base64, file.type);
         if (!ok) {
           setError('');
-          setParsed(buildPendingImageParsed(file.name));
+          setParsed(buildPendingImageParsed());
         }
       };
       reader.readAsDataURL(file);
@@ -141,16 +143,49 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
     setTextMode(false);
   }
 
-  function saveToMemory() {
+  async function saveToMemory() {
     if (!parsed) return;
-    parsed.nodes.forEach((node) => {
+    const savedNodes = parsed.nodes.map((node) => (
       addLifeNode({
         ...node,
-        source: node.attributes?.originalFileName ? 'photo' : 'manual',
-      } as Parameters<typeof addLifeNode>[0]);
-    });
+        source: sourceFile?.type.startsWith('image/') ? 'photo' : 'manual',
+      } as Parameters<typeof addLifeNode>[0])
+    ));
+    let cloudAssets: Array<LifeNodeAsset & { nodeId?: string }> = [];
+    if (sourceFile && savedNodes.length > 0) {
+      try {
+        const client = createAppApiClient();
+        const upload = await client.uploadCloudAsset({ file: sourceFile, purpose: 'memory' });
+        if (upload.ok && upload.storagePath) {
+          const assetRecord: LifeNodeAsset = {
+            id: `asset-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            kind: sourceFile.type.startsWith('image/') ? 'image' : 'file',
+            storagePath: upload.storagePath,
+            mimeType: upload.mimeType,
+            label: parsed.title,
+            analysisSummary: parsed.summary,
+            tags: savedNodes[0].tags || [],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          cloudAssets = [{ ...assetRecord, nodeId: savedNodes[0].id }];
+          updateLifeNode(savedNodes[0].id, { assets: [assetRecord] });
+        }
+      } catch {
+        // Cloud asset sync is best-effort; local Memory remains usable without sign-in or network.
+      }
+    }
+    try {
+      const client = createAppApiClient();
+      await client.saveCloudMemorySnapshot({
+        nodes: savedNodes,
+        assets: cloudAssets,
+      });
+    } catch {
+      // Cloud Memory sync is best-effort; local Memory remains usable without sign-in or network.
+    }
     setSaved(true);
-    setTimeout(() => { onClose(); setSaved(false); setParsed(null); }, 1100);
+    setTimeout(() => { onClose(); setSaved(false); setParsed(null); setSourceFile(null); }, 1100);
   }
 
   if (!open) return null;
