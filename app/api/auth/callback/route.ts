@@ -99,6 +99,100 @@ function setWechatCookies(response: NextResponse, session: WechatTokenResponse) 
   }
 }
 
+function authHashBridgeHtml(provider: string) {
+  const safeProvider = provider.replace(/[^a-zA-Z0-9_-]/g, '') || 'unknown';
+  return `<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Nesio 登录中</title>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: #eef6ff;
+        color: #17223b;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      main {
+        width: min(82vw, 360px);
+        padding: 28px;
+        border-radius: 28px;
+        background: rgba(255, 255, 255, 0.82);
+        box-shadow: 0 24px 80px rgba(70, 115, 180, 0.18);
+        text-align: center;
+      }
+      h1 {
+        margin: 0 0 12px;
+        font-size: 24px;
+      }
+      p {
+        margin: 0;
+        color: #63708a;
+        line-height: 1.6;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>正在完成登录</h1>
+      <p>请稍等一下，Nesio 正在建立你的本次会话。</p>
+    </main>
+    <script>
+      (async function () {
+        const provider = ${JSON.stringify(safeProvider)};
+        const done = (status, extra) => {
+          const params = new URLSearchParams({
+            safePublicStatus: 'true',
+            secretsRedacted: 'true',
+            auth: status === 'session_established' ? 'auth_callback_received' : 'auth_callback_failed',
+            provider,
+            status,
+            ...(extra || {})
+          });
+          window.location.replace('/?' + params.toString());
+        };
+        try {
+          const hash = window.location.hash && window.location.hash.startsWith('#')
+            ? window.location.hash.slice(1)
+            : '';
+          const params = new URLSearchParams(hash);
+          const accessToken = (params.get('access_token') || '').trim();
+          if (!accessToken) {
+            done('callback_received_without_browser_token');
+            return;
+          }
+          const response = await fetch('/api/auth/import', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              accessToken,
+              refreshToken: (params.get('refresh_token') || '').trim() || undefined,
+              expiresIn: Number(params.get('expires_in') || '') || undefined,
+              type: (params.get('type') || '').trim() || undefined
+            }),
+            cache: 'no-store'
+          });
+          const data = await response.json().catch(() => null);
+          if (!response.ok || !data || !data.ok) {
+            done('session_import_failed');
+            return;
+          }
+          done('session_established', {
+            profileBootstrapStatus: data.profileBootstrapStatus || 'profile_bootstrap_unknown'
+          });
+        } catch (error) {
+          done('session_import_failed');
+        }
+      })();
+    </script>
+  </body>
+</html>`;
+}
+
 async function exchangeSupabaseCode(code: string, redirectTo: string): Promise<SupabaseTokenResponse | null> {
   const supabaseUrl = normalizeSupabaseRuntimeUrl(envValue('SUPABASE_URL'));
   const supabaseAnonKey = envValue('SUPABASE_ANON_KEY');
@@ -235,13 +329,11 @@ export async function GET(req: NextRequest) {
     return response;
   }
 
-  const target = safeRedirectUrl(req, {
-    safePublicStatus: 'true',
-    secretsRedacted: 'true',
-    auth: 'auth_callback_received',
-    provider,
-    status: 'callback_received',
+  return new NextResponse(authHashBridgeHtml(provider), {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': 'no-store',
+    },
   });
-
-  return NextResponse.redirect(target);
 }

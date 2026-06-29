@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   loadProfileSettings,
+  portalLocaleToDictionaryLocale,
   saveProfileSettings,
   type PortalLocale,
 } from '@/lib/portal/profile';
@@ -14,6 +15,13 @@ const LEGACY_ONBOARDING_DONE_KEY = 'treasurebox-onboarding-v13-done';
 const TIPS_SHOWN_KEY = 'nesio-tips-shown-v1';
 
 type Step = 'welcome' | 'name' | 'auth';
+type AuthMode = 'login' | 'register';
+
+type AuthStartResult = {
+  ok: boolean;
+  error?: string;
+  auditId?: string;
+};
 
 // ── Auth helpers ──────────────────────────────────────
 
@@ -23,24 +31,24 @@ async function startGoogleAuth(): Promise<string | null> {
     const res = await fetch('/api/auth/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ provider: 'google', redirectTo }),
+      body: JSON.stringify({ provider: 'google', authMode: 'register', redirectTo }),
     });
     const data = await res.json() as { ok?: boolean; url?: string };
     return data.ok && data.url ? data.url : null;
   } catch { return null; }
 }
 
-async function startEmailAuth(email: string): Promise<{ ok: boolean }> {
+async function startEmailAuth(email: string, authMode: AuthMode): Promise<AuthStartResult> {
   try {
     const redirectTo = getAuthRedirectTo();
     const res = await fetch('/api/auth/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ provider: 'email', email, redirectTo }),
+      body: JSON.stringify({ provider: 'email', authMode, email, redirectTo }),
     });
-    const data = await res.json() as { ok?: boolean };
-    return { ok: !!data.ok };
-  } catch { return { ok: false }; }
+    const data = await res.json() as { ok?: boolean; error?: string; auditId?: string };
+    return { ok: !!data.ok, error: data.error, auditId: data.auditId };
+  } catch { return { ok: false, error: 'network_error' }; }
 }
 
 // ── Welcome step ──────────────────────────────────────
@@ -132,10 +140,22 @@ function AuthStep({ onDone, locale, displayName }: {
   async function handleEmail() {
     if (!email.trim()) return;
     setLoading(true); setError('');
-    const r = await startEmailAuth(email.trim());
+    let r = await startEmailAuth(email.trim(), 'register');
+    if (!r.ok && r.error === 'user_already_exists') {
+      r = await startEmailAuth(email.trim(), 'login');
+    }
     setLoading(false);
     if (r.ok) setSent(true);
-    else setError(zh ? '发送失败，请稍后再试。' : 'Could not send link. Try again.');
+    else {
+      const message = r.error === 'provider_not_configured'
+        ? (zh ? '邮件登录还没配置完成。' : 'Email sign-in is not configured yet.')
+        : r.error === 'user_not_found'
+          ? (zh ? '这个邮箱还没有账号，请先注册。' : 'No account exists for this email yet. Try registering first.')
+          : r.error === 'supabase_otp_failed'
+            ? (zh ? '邮件服务没有发出，请检查 Supabase 邮件/SMTP 设置。' : 'Email could not be sent. Check Supabase email or SMTP settings.')
+            : (zh ? '发送失败，请稍后再试。' : 'Could not send link. Try again.');
+      setError(r.auditId ? `${message} (${r.auditId})` : message);
+    }
   }
 
   if (sent) return (
@@ -203,33 +223,55 @@ function AuthStep({ onDone, locale, displayName }: {
 
 // ── Tips overlay ──────────────────────────────────────
 
-export function FirstUseTips({ onDone }: { onDone: () => void }) {
+export function FirstUseTips({ onDone, locale }: { onDone: () => void; locale: PortalLocale }) {
   const [step, setStep] = useState(0);
-  const tips = [
-    {
-      emoji: '📋',
-      title: 'Today — 今天最重要的事',
-      body: 'Nesio 会把今天最值得看的事放前面。你可以决定哪些提醒以后少出现。',
-      zone: 'today' as const,
-    },
-    {
-      emoji: '💎',
-      title: '中间按钮 — 告诉 Nesio',
-      body: '说一句、拍一下、分享文件。先整理成草稿，重要信息由你确认。',
-      zone: 'center' as const,
-    },
-    {
-      emoji: '🗂',
-      title: 'Memory — 线索回头找得到',
-      body: '人、物、地点、承诺，先由你放进来。搜索「娃娃在哪」就能找回。',
-      zone: 'memory' as const,
-    },
-  ];
+  const zh = portalLocaleToDictionaryLocale(locale) === 'zh';
+  const tips = zh
+    ? [
+        {
+          emoji: '📋',
+          title: 'Today',
+          body: '今天最值得看的事会放在这里。',
+          zone: 'today' as const,
+        },
+        {
+          emoji: '💎',
+          title: '中间按钮',
+          body: '说一句、拍一下、上传内容，先整理成草稿。',
+          zone: 'center' as const,
+        },
+        {
+          emoji: '🗂',
+          title: 'Memory',
+          body: '你放进来的线索，以后可以问回来。',
+          zone: 'memory' as const,
+        },
+      ]
+    : [
+        {
+          emoji: '📋',
+          title: 'Today',
+          body: 'The most useful thing to look at today lives here.',
+          zone: 'today' as const,
+        },
+        {
+          emoji: '💎',
+          title: 'Center button',
+          body: 'Say, snap, or upload. Nesio drafts first; you confirm.',
+          zone: 'center' as const,
+        },
+        {
+          emoji: '🗂',
+          title: 'Memory',
+          body: 'Things you put in can be found again later.',
+          zone: 'memory' as const,
+        },
+      ];
   const tip = tips[step];
   const isLast = step === tips.length - 1;
 
   return (
-    <div className="nesio-tips-overlay" role="dialog" aria-modal="true" aria-label="新手提示">
+    <div className="nesio-tips-overlay" role="dialog" aria-modal="false" aria-label={zh ? '新手提示' : 'First-use tip'}>
       <div className={`nesio-tips-hl nesio-tips-hl--${tip.zone}`} aria-hidden />
       <div className="nesio-tips-card">
         <div className="nesio-tips-dots" aria-hidden>
@@ -240,11 +282,11 @@ export function FirstUseTips({ onDone }: { onDone: () => void }) {
         <p className="nesio-tips-body">{tip.body}</p>
         <div className="nesio-tips-actions">
           {isLast ? (
-            <button type="button" className="nesio-ob-primary-btn" onClick={onDone}>开始使用 →</button>
+            <button type="button" className="nesio-ob-primary-btn" onClick={onDone}>{zh ? '知道了' : 'Got it'}</button>
           ) : (
             <>
-              <button type="button" className="nesio-ob-primary-btn" onClick={() => setStep(step + 1)}>下一步</button>
-              <button type="button" className="nesio-ob-skip-btn" onClick={onDone}>跳过</button>
+              <button type="button" className="nesio-ob-primary-btn" onClick={() => setStep(step + 1)}>{zh ? '下一步' : 'Next'}</button>
+              <button type="button" className="nesio-ob-skip-btn" onClick={onDone}>{zh ? '跳过' : 'Skip'}</button>
             </>
           )}
         </div>
@@ -264,20 +306,23 @@ export default function PortalOnboarding() {
 
   useEffect(() => {
     window.dispatchEvent(new CustomEvent('nesio-onboarding-visibility-change', {
-      detail: { active: visible || showTips },
+      detail: { active: visible },
     }));
     return () => {
       window.dispatchEvent(new CustomEvent('nesio-onboarding-visibility-change', {
         detail: { active: false },
       }));
     };
-  }, [visible, showTips]);
+  }, [visible]);
 
   useEffect(() => {
     try {
       const done = localStorage.getItem(ONBOARDING_DONE_KEY) === '1' ||
         localStorage.getItem(LEGACY_ONBOARDING_DONE_KEY) === '1';
       if (done) {
+        const profile = loadProfileSettings();
+        setDisplayName(profile.displayName || '');
+        setLocale(profile.locale || 'zh');
         if (!localStorage.getItem(TIPS_SHOWN_KEY)) setShowTips(true);
         return;
       }
@@ -315,7 +360,7 @@ export default function PortalOnboarding() {
     setShowTips(false);
   }
 
-  if (showTips) return <FirstUseTips onDone={handleTipsDone} />;
+  if (showTips) return <FirstUseTips onDone={handleTipsDone} locale={locale} />;
   if (!visible) return null;
 
   const STEPS: Step[] = ['welcome', 'name', 'auth'];

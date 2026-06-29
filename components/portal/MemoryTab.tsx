@@ -1,7 +1,12 @@
 'use client';
 
-import { useRef, useState, useEffect } from 'react';
-import { loadProfileSettings } from '@/lib/portal/profile';
+import { useCallback, useRef, useState, useEffect } from 'react';
+import {
+  PROFILE_UPDATED_EVENT,
+  loadProfileSettings,
+  portalLocaleToDictionaryLocale,
+  type PortalLocale,
+} from '@/lib/portal/profile';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
 import {
   backfillLocalLifeGraphToCloud,
@@ -32,6 +37,51 @@ const SEED_NODES = [
   { id: 's4', icon: '🚗', iconBg: '#dbeafe', title: 'Tesla', subtitle: '电量与行程 · 即将接入' },
   { id: 'sg', icon: '⬡', iconBg: '#ede9fe', title: '线索已经连上', subtitle: '娃娃、储物间、Linda、生日，都能回头找得到。', wide: true },
 ];
+
+const MEMORY_COPY = {
+  zh: {
+    searchPlaceholder: '问宝盒：娃娃在哪、上次买的药…',
+    searchAria: '搜索记忆',
+    clear: '清除',
+    heroTitle: '散落的线索，回头找得到。',
+    heroSub: '人、物、地点、会议、承诺，先由你放进来，再由你确认关联。',
+    emptyPrimary: '这里会放你以后想找回的东西。',
+    emptySecondary: '比如：娃娃在蓝盒子里、上次买的药、Jim 的会议提醒。',
+    firstThing: '放进来第一件',
+    loginSync: '登录同步',
+    noResult: (query: string) => `没有找到「${query}」`,
+    noResultHint: '用 Nesio 按钮说一句「记住…」就会出现在这里',
+    resultCount: (count: number) => `搜索结果（${count}）`,
+    recent: '最近想起',
+    collapse: '收起线索',
+    more: (count: number) => `更多线索（${count}）`,
+    syncFailed: (count: number) => `同步失败 ${count} 条，已保存在本机`,
+    syncPending: (count: number) => `等待同步 ${count} 条，本机已保存`,
+    syncDone: (count: number) => `已同步 ${count} 条`,
+    addHint: '点中间按钮把东西放进来，需要时再向宝盒要回线索。',
+  },
+  en: {
+    searchPlaceholder: 'Ask Nesio: doll, last medicine...',
+    searchAria: 'Search memory',
+    clear: 'Clear',
+    heroTitle: 'Scattered clues, easy to find later.',
+    heroSub: 'People, objects, places, meetings, and promises go in first. You confirm the links.',
+    emptyPrimary: 'Things you want to find later will live here.',
+    emptySecondary: 'For example: doll in the blue box, last medicine, Jim meeting reminder.',
+    firstThing: 'Add the first thing',
+    loginSync: 'Sign in to sync',
+    noResult: (query: string) => `No clues found for “${query}”`,
+    noResultHint: 'Use the center button to save something first.',
+    resultCount: (count: number) => `Results (${count})`,
+    recent: 'Recent clues',
+    collapse: 'Collapse',
+    more: (count: number) => `More clues (${count})`,
+    syncFailed: (count: number) => `${count} sync failed. Saved on this device.`,
+    syncPending: (count: number) => `${count} waiting to sync. Saved locally.`,
+    syncDone: (count: number) => `${count} synced`,
+    addHint: 'Use the center button to put something in, then ask Nesio for it later.',
+  },
+} as const;
 
 function cleanMemoryPreview(node: LifeNode): string {
   const raw = node.rawInput || Object.values(node.attributes).join(' · ');
@@ -142,22 +192,30 @@ function MemoryCard({
 export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: boolean }) {
   const [query, setQuery] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [locale, setLocale] = useState<PortalLocale>(() => loadProfileSettings().locale);
   const [nodes, setNodes] = useState<LifeNode[]>([]);
   const [selectedNode, setSelectedNode] = useState<LifeNode | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [cloudSyncSummary, setCloudSyncSummary] = useState(getLifeGraphCloudSyncSummary());
   const cloudSyncRecordCount =
     cloudSyncSummary.pendingCount + cloudSyncSummary.syncedCount + cloudSyncSummary.failedCount;
+  const dictionaryLocale = portalLocaleToDictionaryLocale(locale);
+  const copy = MEMORY_COPY[dictionaryLocale];
+
+  const readRecentVisibleNodes = useCallback(() => {
+    return visibleMemoryNodes(getRecentNodes(30), canUsePrivateData);
+  }, [canUsePrivateData]);
 
   useEffect(() => {
     let cancelled = false;
+    const profile = loadProfileSettings();
+    setLocale(profile.locale);
     if (canUsePrivateData) {
-      const profile = loadProfileSettings();
       setDisplayName(profile.displayName || '');
     } else {
       setDisplayName('');
     }
-    setNodes(getRecentNodes(30));
+    setNodes(readRecentVisibleNodes());
 
     async function hydrateCloudMemory() {
       if (!canUsePrivateData) return;
@@ -168,7 +226,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
         mergeCloudMemorySnapshot({ nodes: snapshot.nodes || [], assets: snapshot.assets || [] });
         void retryLifeGraphCloudSync();
         void backfillLocalLifeGraphToCloud({ limit: 200 });
-        if (!cancelled) setNodes(getRecentNodes(30));
+        if (!cancelled) setNodes(readRecentVisibleNodes());
       } catch {
         // cloud hydration is best-effort; local Memory must keep working offline.
       }
@@ -176,9 +234,14 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
 
     void hydrateCloudMemory();
 
-    const onUpdate = () => setNodes(getRecentNodes(30));
+    const onUpdate = () => setNodes(readRecentVisibleNodes());
     function onCloudSyncUpdate() {
       setCloudSyncSummary(getLifeGraphCloudSyncSummary());
+    }
+    function onProfileUpdate() {
+      const updatedProfile = loadProfileSettings();
+      setLocale(updatedProfile.locale);
+      setDisplayName(canUsePrivateData ? updatedProfile.displayName || '' : '');
     }
     function retryCloudSync() {
       if (!canUsePrivateData) return;
@@ -186,16 +249,24 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
     }
     window.addEventListener('nesio-life-graph-updated', onUpdate);
     window.addEventListener('nesio-life-graph-cloud-sync-updated', onCloudSyncUpdate);
+    window.addEventListener(PROFILE_UPDATED_EVENT, onProfileUpdate);
     window.addEventListener('online', retryCloudSync);
     return () => {
       cancelled = true;
       window.removeEventListener('nesio-life-graph-updated', onUpdate);
       window.removeEventListener('nesio-life-graph-cloud-sync-updated', onCloudSyncUpdate);
+      window.removeEventListener(PROFILE_UPDATED_EVENT, onProfileUpdate);
       window.removeEventListener('online', retryCloudSync);
     };
-  }, [canUsePrivateData]);
+  }, [canUsePrivateData, readRecentVisibleNodes]);
 
-  const visibleNodes = visibleMemoryNodes(nodes, canUsePrivateData);
+  useEffect(() => {
+    if (!canUsePrivateData && selectedNode && isPrivateExternalNode(selectedNode)) {
+      setSelectedNode(null);
+    }
+  }, [canUsePrivateData, selectedNode]);
+
+  const visibleNodes = nodes;
   const results = query.trim()
     ? visibleMemoryNodes(searchLifeGraph(query), canUsePrivateData)
     : visibleNodes;
@@ -213,29 +284,29 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
             </svg>
             <input
               className="nesio-memory-search"
-              placeholder="问宝盒：娃娃在哪、上次买的药…"
+              placeholder={copy.searchPlaceholder}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              aria-label="搜索记忆"
+              aria-label={copy.searchAria}
             />
             {query && (
-              <button type="button" onClick={() => setQuery('')} style={{ color: 'var(--portal-muted)', fontSize: '0.85rem' }} aria-label="清除">✕</button>
+              <button type="button" onClick={() => setQuery('')} style={{ color: 'var(--portal-muted)', fontSize: '0.85rem' }} aria-label={copy.clear}>✕</button>
             )}
           </div>
 
           {!query && (
             <div className="nesio-memory-hero">
-              <h2 className="nesio-memory-hero-title">散落的线索，回头找得到。</h2>
-              <p className="nesio-memory-hero-sub">人、物、地点、会议、承诺，先由你放进来，再由你确认关联。</p>
+              <h2 className="nesio-memory-hero-title">{copy.heroTitle}</h2>
+              <p className="nesio-memory-hero-sub">{copy.heroSub}</p>
             </div>
           )}
 
           {/* Results or empty */}
           {!query && !hasRealNodes ? (
             <div className="nesio-memory-empty">
-              <p>这里会放你以后想找回的东西。</p>
+              <p>{copy.emptyPrimary}</p>
               <p style={{ fontSize: '0.78rem', marginTop: '0.4rem' }}>
-                比如：娃娃在蓝盒子里、上次买的药、Jim 的会议提醒。
+                {copy.emptySecondary}
               </p>
               <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap', marginTop: '0.75rem' }}>
                 <button
@@ -243,19 +314,19 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                   className="nesio-settings-toggle-btn"
                   onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-tell'))}
                 >
-                  放进来第一件
+                  {copy.firstThing}
                 </button>
-                <a href="/login" className="nesio-settings-toggle-btn" style={{ textDecoration: 'none' }}>登录同步</a>
+                <a href="/login" className="nesio-settings-toggle-btn" style={{ textDecoration: 'none' }}>{copy.loginSync}</a>
               </div>
             </div>
           ) : query && results.length === 0 ? (
             <div className="nesio-memory-empty">
-              <p>没有找到「{query}」</p>
-              <p style={{ fontSize: '0.78rem', marginTop: '0.4rem' }}>用 Nesio 按钮说一句「记住…」就会出现在这里</p>
+              <p>{copy.noResult(query)}</p>
+              <p style={{ fontSize: '0.78rem', marginTop: '0.4rem' }}>{copy.noResultHint}</p>
             </div>
           ) : (
             <>
-              <p className="nesio-memory-section-label">{query ? `搜索结果（${results.length}）` : '最近想起'}</p>
+              <p className="nesio-memory-section-label">{query ? copy.resultCount(results.length) : copy.recent}</p>
               <div className="nesio-memory-grid">
                 {/* Real nodes */}
                 {visibleItems.map((node) => (
@@ -263,7 +334,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                     key={node.id}
                     node={node}
                     onOpen={() => setSelectedNode(node)}
-                    onDeleted={() => setNodes(getRecentNodes(30))}
+                    onDeleted={() => setNodes(readRecentVisibleNodes())}
                   />
                 ))}
 
@@ -278,13 +349,13 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                   </button>
                 ))}
               </div>
-              {!query && sourceItems.length > 3 && (
+              {!query && sourceItems.length > 6 && (
                 <button
                   type="button"
                   className="nesio-memory-more-btn"
                   onClick={() => setShowAll((value) => !value)}
                 >
-                  {showAll ? '收起线索' : `更多线索（${sourceItems.length - 6}）`}
+                  {showAll ? copy.collapse : copy.more(Math.max(0, sourceItems.length - 6))}
                 </button>
               )}
             </>
@@ -294,13 +365,13 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
             {canUsePrivateData && cloudSyncRecordCount > 0 && (
               <p className="nesio-memory-sync-status" aria-live="polite">
                 {cloudSyncSummary.failedCount > 0
-                  ? `同步失败 ${cloudSyncSummary.failedCount} 条，已保存在本机`
+                  ? copy.syncFailed(cloudSyncSummary.failedCount)
                   : cloudSyncSummary.pendingCount > 0
-                    ? `等待同步 ${cloudSyncSummary.pendingCount} 条，本机已保存`
-                    : `已同步 ${cloudSyncSummary.syncedCount} 条`}
+                    ? copy.syncPending(cloudSyncSummary.pendingCount)
+                    : copy.syncDone(cloudSyncSummary.syncedCount)}
               </p>
             )}
-            <p className="nesio-memory-add-hint">点中间按钮把东西放进来，需要时再向宝盒要回线索。</p>
+            <p className="nesio-memory-add-hint">{copy.addHint}</p>
           </div>
         </div>
       </div>

@@ -69,6 +69,22 @@ const STORAGE_KEY = 'nesio-life-graph-v1';
 const CLOUD_SYNC_STATUS_KEY = 'nesio-life-graph-cloud-sync-v1';
 const CLOUD_SYNC_OUTBOX_KEY = 'nesio-life-graph-cloud-sync-outbox-v1';
 const PRIVATE_EXTERNAL_SOURCES = new Set<LifeNodeSource>(['calendar', 'email']);
+const PRIVATE_EXTERNAL_ATTRIBUTE_KEYS = new Set([
+  'calendarId',
+  'calendarName',
+  'calendarHtmlLink',
+  'emailId',
+  'messageId',
+  'threadId',
+  'gmailId',
+  'htmlLink',
+  'eventId',
+  'externalId',
+  'icalUid',
+  'organizerEmail',
+  'attendees',
+  'attendeeEmails',
+]);
 const RECEIPT_SOURCES = new Set<LifeNodeSource>(['manual', 'photo', 'voice']);
 const CLOUD_MEMORY_ENDPOINT = '/api/cloud/memory';
 const CLOUD_SIGNALS_ENDPOINT = '/api/cloud/signals';
@@ -648,12 +664,22 @@ export function getLifeGraph(): LifeNode[] {
 
 export function isPrivateExternalNode(node: LifeNode): boolean {
   if (PRIVATE_EXTERNAL_SOURCES.has(node.source)) return true;
-  return Boolean(
-    node.attributes['calendarId'] ||
-      node.attributes['calendarName'] ||
-      node.attributes['emailId'] ||
-      node.attributes['messageId'],
+  if (Object.keys(node.attributes).some((key) => PRIVATE_EXTERNAL_ATTRIBUTE_KEYS.has(key))) return true;
+
+  const hasEventTiming = Boolean(
+    node.attributes.start ||
+      node.attributes.end ||
+      node.attributes.startTime ||
+      node.attributes.endTime,
   );
+  if (node.type === 'event' && hasEventTiming && !RECEIPT_SOURCES.has(node.source)) return true;
+
+  const text = [
+    node.rawInput || '',
+    ...(node.tags || []),
+    ...Object.keys(node.attributes),
+  ].join(' ').toLowerCase();
+  return text.includes('google calendar') || text.includes('gmail') || text.includes('calendarid');
 }
 
 export function prunePrivateExternalNodes(): number {
