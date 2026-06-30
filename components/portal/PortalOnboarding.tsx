@@ -414,11 +414,6 @@ export default function PortalOnboarding() {
           localStorage.getItem(LEGACY_ONBOARDING_DONE_KEY) === '1';
         const callbackArrived = hasAuthCallbackSuccess();
 
-        if (done && !callbackArrived) {
-          if (!localStorage.getItem(TIPS_SHOWN_KEY)) setShowTips(true);
-          return;
-        }
-
         const session = await readAuthSession();
         if (cancelled) return;
         if (session?.loggedIn) {

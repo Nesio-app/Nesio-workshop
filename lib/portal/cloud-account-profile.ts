@@ -1,22 +1,10 @@
-import { deriveCloudIdentity } from './cloud-identity';
-import { normalizeSupabaseRuntimeUrl } from './production-runtime';
-
-type SupabaseUserResponse = {
-  id?: string;
-  email?: string;
-  phone?: string;
-  app_metadata?: {
-    provider?: string;
-    providers?: string[];
-  };
-  user_metadata?: {
-    avatar_url?: string;
-    email?: string;
-    full_name?: string;
-    name?: string;
-    picture?: string;
-  };
-};
+import {
+  deriveCloudIdentity,
+  getCloudConfig,
+  serviceRoleRestHeaders,
+  type CloudRuntimeConfig,
+  type SupabaseUserResponse,
+} from './cloud-server-runtime';
 
 export type BootstrapResult = {
   ok: boolean;
@@ -57,24 +45,6 @@ export function buildCloudAccountProfileBootstrapMeta(result?: BootstrapResult |
   };
 }
 
-function envValue(key: string): string {
-  const value = process.env[key];
-  return typeof value === 'string' ? value.trim() : '';
-}
-
-function getCloudConfig() {
-  const enabled = envValue('CLOUD_DB_ENABLED').toLowerCase() === 'true';
-  const supabaseUrl = normalizeSupabaseRuntimeUrl(envValue('SUPABASE_URL'));
-  const anonKey = envValue('SUPABASE_ANON_KEY');
-  const serviceRoleKey = envValue('SUPABASE_SERVICE_ROLE_KEY');
-  return {
-    configured: enabled && Boolean(supabaseUrl && anonKey && serviceRoleKey),
-    supabaseUrl,
-    anonKey,
-    serviceRoleKey,
-  };
-}
-
 function sanitizeString(value: unknown, maxLength = 400): string | null {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
@@ -93,7 +63,7 @@ function normalizeProviders(user: SupabaseUserResponse): string[] {
   return provider ? [provider] : [];
 }
 
-async function fetchSupabaseUser(config: ReturnType<typeof getCloudConfig>, accessToken: string): Promise<SupabaseUserResponse | null> {
+async function fetchSupabaseUser(config: CloudRuntimeConfig, accessToken: string): Promise<SupabaseUserResponse | null> {
   if (!accessToken) return null;
   const response = await fetch(`${config.supabaseUrl}/auth/v1/user`, {
     headers: {
@@ -104,6 +74,19 @@ async function fetchSupabaseUser(config: ReturnType<typeof getCloudConfig>, acce
   });
   if (!response.ok) return null;
   return response.json() as Promise<SupabaseUserResponse>;
+}
+
+async function readErrorBody(response: Response): Promise<string> {
+  try {
+    return (await response.text()).slice(0, 600);
+  } catch {
+    return '';
+  }
+}
+
+function isProfileTableUnavailable(response: Response, body: string): boolean {
+  if (response.status === 404) return true;
+  return /user_profiles|PGRST205|42P01|could not find|does not exist/i.test(body);
 }
 
 function buildUserProfileRow(user: SupabaseUserResponse) {
@@ -149,18 +132,20 @@ export async function bootstrapCloudAccountProfile(accessToken?: string | null):
     url.searchParams.set('on_conflict', 'identity_key');
     const response = await fetch(url.toString(), {
       method: 'POST',
-      headers: {
-        apikey: config.serviceRoleKey,
-        Authorization: `Bearer ${config.serviceRoleKey}`,
-        'Content-Type': 'application/json',
-        accept: 'application/json',
-        Prefer: 'resolution=merge-duplicates',
-      },
+      headers: serviceRoleRestHeaders(config, {
+        Prefer: 'resolution=merge-duplicates,return=minimal',
+      }),
       body: JSON.stringify(row),
       cache: 'no-store',
     });
 
-    if (!response.ok) return { ok: false, reason: `profile_upsert_failed:${response.status}` };
+    if (!response.ok) {
+      const body = await readErrorBody(response);
+      if (isProfileTableUnavailable(response, body)) {
+        return { ok: true, skipped: true, reason: 'profile_bootstrap_deferred:user_profiles_unavailable' };
+      }
+      return { ok: false, reason: `profile_upsert_failed:${response.status}` };
+    }
     return { ok: true, identityKey: row.identity_key };
   } catch {
     return { ok: false, reason: 'profile_bootstrap_failed' };
