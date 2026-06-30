@@ -14,6 +14,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createSignal } from '@/lib/life-domain/create-signal';
+import { writeCloudSignalsForCurrentUser } from '@/lib/platform/runtime/cloud-signals-server';
 import {
   normalizeHealthToSignal,
   normalizeTaskToSignal,
@@ -146,6 +147,7 @@ export async function POST(req: NextRequest) {
 
   const { nodes, summary } = await extractNodes(source, content);
   const signal = createSignal(normalizeIngestToSignal(source, content));
+  const cloudSignalWrite = await writeCloudSignalsForCurrentUser([signal]);
   return NextResponse.json({
     ok: true,
     source,
@@ -154,6 +156,7 @@ export async function POST(req: NextRequest) {
     count: nodes.length,
     signals: [signal],
     signalIds: [signal.id],
+    cloudSignalWrite,
   });
 }
 

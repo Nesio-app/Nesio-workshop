@@ -1,20 +1,8 @@
-import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
-import { normalizeSupabaseRuntimeUrl } from '@/lib/portal/production-runtime';
 import { deriveCloudIdentity } from '@/lib/portal/cloud-identity';
+import * as cloudRuntime from '@/lib/portal/cloud-server-runtime';
+import { embedSignalText, signalEmbeddingModel, signalVectorSearchEnabled } from '@/lib/life-domain/signal-embedding';
 import type { Signal, SignalSensitivity, SignalSource, RetentionPolicy } from '@/lib/life-domain/signal';
-
-type SupabaseUserResponse = {
-  id?: string;
-  email?: string;
-  phone?: string;
-};
-
-type SupabaseTokenResponse = {
-  access_token?: string;
-  refresh_token?: string;
-  expires_in?: number;
-};
 
 const SIGNAL_SCHEMA_VERSION = 'Signal@v1';
 const ALLOWED_SOURCES = new Set<SignalSource>([
@@ -39,10 +27,6 @@ const ALLOWED_SOURCES = new Set<SignalSource>([
 const ALLOWED_RETENTION = new Set<RetentionPolicy>(['AlwaysAlive', 'LongLiving', 'Normal', 'Disposable']);
 const ALLOWED_SENSITIVITY = new Set<SignalSensitivity>(['normal', 'private', 'health', 'financial', 'family', 'work']);
 
-function envValue(key: string): string {
-  return (process.env[key] || '').trim();
-}
-
 function safeJson(body: Record<string, unknown>, status = 200) {
   return NextResponse.json(
     {
@@ -56,94 +40,21 @@ function safeJson(body: Record<string, unknown>, status = 200) {
 }
 
 function getCloudConfig() {
-  const enabled = envValue('CLOUD_DB_ENABLED').toLowerCase() === 'true';
-  const supabaseUrl = normalizeSupabaseRuntimeUrl(envValue('SUPABASE_URL'));
-  const anonKey = envValue('SUPABASE_ANON_KEY');
-  const serviceRoleKey = envValue('SUPABASE_SERVICE_ROLE_KEY');
-  return {
-    configured: enabled && Boolean(supabaseUrl && anonKey && serviceRoleKey),
-    enabled,
-    supabaseUrl,
-    anonKey,
-    serviceRoleKey,
-  };
+  return cloudRuntime.getCloudConfig();
 }
 
-async function fetchSignedInUser(config: ReturnType<typeof getCloudConfig>, accessToken: string): Promise<SupabaseUserResponse | null> {
-  if (!accessToken) return null;
-  const response = await fetch(`${config.supabaseUrl}/auth/v1/user`, {
-    headers: {
-      apikey: config.anonKey,
-      Authorization: `Bearer ${accessToken}`,
-    },
-    cache: 'no-store',
-  });
-  if (!response.ok) return null;
-  return response.json() as Promise<SupabaseUserResponse>;
+type CloudUserSession = Awaited<ReturnType<typeof cloudRuntime.getSignedInUser>>;
+
+function setRefreshedAuthCookies(response: NextResponse, session?: CloudUserSession['refreshedSession']) {
+  return cloudRuntime.setRefreshedAuthCookies(response, session);
 }
 
-async function refreshSupabaseSession(config: ReturnType<typeof getCloudConfig>, refreshToken: string): Promise<SupabaseTokenResponse | null> {
-  if (!refreshToken) return null;
-  const response = await fetch(`${config.supabaseUrl}/auth/v1/token?grant_type=refresh_token`, {
-    method: 'POST',
-    headers: {
-      apikey: config.anonKey,
-      Authorization: `Bearer ${config.anonKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ refresh_token: refreshToken }),
-    cache: 'no-store',
-  });
-  if (!response.ok) return null;
-  return response.json() as Promise<SupabaseTokenResponse>;
-}
-
-function setRefreshedAuthCookies(response: NextResponse, session?: SupabaseTokenResponse | null) {
-  if (!session?.access_token) return response;
-  const secure = process.env.NODE_ENV === 'production';
-  const maxAge = Number.isFinite(session.expires_in) && session.expires_in ? session.expires_in : 60 * 60;
-  response.cookies.set('baohe_auth_access', session.access_token, {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure,
-    path: '/',
-    maxAge,
-  });
-  if (session.refresh_token) {
-    response.cookies.set('baohe_auth_refresh', session.refresh_token, {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure,
-      path: '/',
-      maxAge: 60 * 60 * 24 * 30,
-    });
-  }
-  return response;
-}
-
-async function getSignedInUser(config: ReturnType<typeof getCloudConfig>): Promise<{
-  user: SupabaseUserResponse | null;
-  refreshedSession: SupabaseTokenResponse | null;
-}> {
-  const cookieStore = cookies();
-  const accessToken = cookieStore.get('baohe_auth_access')?.value || '';
-  const refreshToken = cookieStore.get('baohe_auth_refresh')?.value || '';
-  const user = await fetchSignedInUser(config, accessToken);
-  if (user?.id) return { user, refreshedSession: null };
-
-  const refreshedSession = await refreshSupabaseSession(config, refreshToken);
-  const refreshedUser = await fetchSignedInUser(config, refreshedSession?.access_token || '');
-  if (refreshedUser?.id) return { user: refreshedUser, refreshedSession };
-  return { user: null, refreshedSession: null };
+async function getSignedInUser(config: ReturnType<typeof getCloudConfig>) {
+  return cloudRuntime.getSignedInUser(config);
 }
 
 function restHeaders(config: ReturnType<typeof getCloudConfig>) {
-  return {
-    apikey: config.serviceRoleKey,
-    Authorization: `Bearer ${config.serviceRoleKey}`,
-    'Content-Type': 'application/json',
-    accept: 'application/json',
-  };
+  return cloudRuntime.serviceRoleRestHeaders(config);
 }
 
 function sanitizeString(value: unknown, maxLength = 4000): string | undefined {
@@ -160,6 +71,13 @@ function sanitizeJsonObject(value: unknown): Record<string, unknown> {
 
 function sanitizeJsonArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value.slice(0, 80) : [];
+}
+
+function sanitizeStringArray(value: unknown, maxLength = 240): string[] {
+  return sanitizeJsonArray(value).flatMap((entry) => {
+    const item = sanitizeString(entry, maxLength);
+    return item ? [item] : [];
+  });
 }
 
 function clampConfidence(value: unknown): number {
@@ -184,6 +102,64 @@ function buildSignalSearchText(signal: Pick<Signal, 'title' | 'source' | 'type' 
     JSON.stringify(signal.payload || {}),
     signal.evidence?.raw || '',
   ].join(' ').slice(0, 8000);
+}
+
+function tokenizeSearchQuery(value: string): string[] {
+  const normalized = value
+    .toLowerCase()
+    .replace(/[，。！？；：、,.!?;:()[\]{}"'`~@#$%^&*_+=|\\/<>-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const words = normalized.split(' ').filter(Boolean);
+  const cjk = Array.from(normalized.matchAll(/[\u4e00-\u9fff]{1,4}/g)).map((match) => match[0]);
+  return Array.from(new Set([...words, ...cjk])).filter(Boolean);
+}
+
+function stringifySearchValue(value: unknown): string {
+  if (value == null) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return '';
+  }
+}
+
+function scoreCloudSignalRow(row: Record<string, unknown>, query: string): number {
+  const tokens = tokenizeSearchQuery(query);
+  if (!tokens.length) return 0;
+  const haystack = [
+    row.title,
+    row.source,
+    row.type,
+    row.embedding_text,
+    stringifySearchValue(row.payload),
+    stringifySearchValue(row.entities),
+    stringifySearchValue(row.evidence),
+    stringifySearchValue(row.feedback),
+  ].join(' ').toLowerCase();
+  let score = 0;
+  for (const token of tokens) {
+    if (haystack.includes(token)) score += token.length >= 2 ? 2 : 1;
+  }
+  const title = typeof row.title === 'string' ? row.title.toLowerCase() : '';
+  if (title && query.toLowerCase().includes(title)) score += 4;
+  const confidence = typeof row.confidence === 'number' ? row.confidence : 0.6;
+  const capturedAt = typeof row.captured_at === 'string' ? Date.parse(row.captured_at) : NaN;
+  const ageHours = Number.isFinite(capturedAt) ? (Date.now() - capturedAt) / 3_600_000 : NaN;
+  const recencyBoost = Number.isFinite(ageHours) ? Math.max(0, 1.2 - ageHours / 168) : 0;
+  return score + confidence * 0.8 + recencyBoost;
+}
+
+function sortRowsForQuery(rows: Array<Record<string, unknown>>, query: string, limit: number): Array<Record<string, unknown>> {
+  if (!query) return rows.slice(0, limit);
+  return rows
+    .map((row) => ({ row, score: scoreCloudSignalRow(row, query) }))
+    .filter((entry) => entry.score > 0.3)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map((entry) => entry.row);
 }
 
 function sanitizeSignal(input: unknown): Signal | null {
@@ -229,7 +205,9 @@ function sanitizeSignals(input: unknown): { signals: Signal[]; rejectedCount: nu
   return { signals, rejectedCount };
 }
 
-function signalRow(identityKey: string, userId: string | null, signal: Signal) {
+async function signalRow(identityKey: string, userId: string | null, signal: Signal) {
+  const embeddingText = buildSignalSearchText(signal);
+  const embedding = await embedSignalText(embeddingText);
   return {
     identity_key: identityKey,
     user_id: userId,
@@ -246,11 +224,40 @@ function signalRow(identityKey: string, userId: string | null, signal: Signal) {
     confidence: signal.confidence,
     sensitivity: signal.sensitivity,
     retention_policy: signal.retentionPolicy,
-    embedding_text: buildSignalSearchText(signal),
+    embedding_text: embeddingText,
+    embedding_model: embedding.ok ? embedding.model : null,
+    embedding_vector: embedding.ok ? embedding.values : null,
+    embedding_updated_at: embedding.ok ? new Date().toISOString() : null,
     feedback: {},
     updated_at: new Date().toISOString(),
     deleted_at: null,
   };
+}
+
+async function searchRowsByVector(
+  config: ReturnType<typeof getCloudConfig>,
+  identityKey: string,
+  query: string,
+  limit: number,
+): Promise<{ rows: Array<Record<string, unknown>>; ok: boolean; error?: string }> {
+  if (!query || !signalVectorSearchEnabled()) return { rows: [], ok: false, error: 'vector_search_disabled' };
+  const embedding = await embedSignalText(query);
+  if (!embedding.ok || !embedding.values) return { rows: [], ok: false, error: embedding.error || 'query_embedding_failed' };
+
+  const url = new URL('/rest/v1/rpc/match_own_signals', config.supabaseUrl);
+  const response = await fetch(url.toString(), {
+    method: 'POST',
+    headers: restHeaders(config),
+    body: JSON.stringify({
+      match_identity_key: identityKey,
+      query_embedding: embedding.values,
+      match_count: limit,
+    }),
+    cache: 'no-store',
+  });
+  if (!response.ok) return { rows: [], ok: false, error: `vector_rpc_${response.status}` };
+  const rows = await response.json() as Array<Record<string, unknown>>;
+  return { rows, ok: true };
 }
 
 export async function GET(request: NextRequest) {
@@ -263,19 +270,120 @@ export async function GET(request: NextRequest) {
   const url = new URL('/rest/v1/signals', config.supabaseUrl);
   url.searchParams.set('identity_key', `eq.${cloudIdentity.identityKey}`);
   url.searchParams.set('deleted_at', 'is.null');
-  url.searchParams.set('select', 'signal_id,source,type,occurred_at,captured_at,title,payload,entities,evidence,confidence,sensitivity,retention_policy,feedback,embedding_text');
+  url.searchParams.set('select', 'signal_id,source,type,occurred_at,captured_at,title,payload,entities,evidence,confidence,sensitivity,retention_policy,feedback,embedding_text,embedding_model,embedding_updated_at');
   url.searchParams.set('order', 'captured_at.desc');
-  url.searchParams.set('limit', request.nextUrl.searchParams.get('limit') || '200');
+  const query = sanitizeString(request.nextUrl.searchParams.get('q') || request.nextUrl.searchParams.get('query'), 300) || '';
+  const requestedLimit = Number.parseInt(request.nextUrl.searchParams.get('limit') || '200', 10);
+  const resultLimit = Number.isFinite(requestedLimit) ? Math.max(1, Math.min(requestedLimit, 200)) : 200;
+  url.searchParams.set('limit', query ? String(Math.max(resultLimit, 200)) : String(resultLimit));
 
-  const response = await fetch(url.toString(), { headers: restHeaders(config), cache: 'no-store' });
-  if (!response.ok) return safeJson({ ok: false, error: 'cloud_read_failed', readsCloud: false, writesCloud: false }, 502);
-  const rows = await response.json() as Array<Record<string, unknown>>;
+  let vectorSearch: { ok: boolean; error?: string; rows: Array<Record<string, unknown>> } = {
+    ok: false,
+    error: query ? 'vector_search_not_attempted' : '',
+    rows: [],
+  };
+  if (query) {
+    vectorSearch = await searchRowsByVector(config, cloudIdentity.identityKey, query, resultLimit);
+  }
+  let signals: Array<Record<string, unknown>>;
+  if (vectorSearch.ok) {
+    signals = vectorSearch.rows;
+  } else {
+    const response = await fetch(url.toString(), { headers: restHeaders(config), cache: 'no-store' });
+    if (!response.ok) return safeJson({ ok: false, error: 'cloud_read_failed', readsCloud: false, writesCloud: false }, 502);
+    const rows = await response.json() as Array<Record<string, unknown>>;
+    signals = sortRowsForQuery(rows, query, resultLimit);
+  }
   return setRefreshedAuthCookies(safeJson({
     ok: true,
     readsCloud: true,
     writesCloud: false,
-    signals: rows,
-    signalCount: rows.length,
+    signals,
+    signalCount: signals.length,
+    search: {
+      query: query || null,
+      mode: query ? (vectorSearch.ok ? 'signal_vector_pgvector' : 'signal_text_scoring') : 'recent_signals',
+      pgvectorSchemaReady: true,
+      embeddingVectorRuntimeReady: signalVectorSearchEnabled(),
+      embeddingModel: signalEmbeddingModel(),
+      vectorFallbackReason: query && !vectorSearch.ok ? vectorSearch.error : null,
+      scope: 'own_user_signals_only',
+    },
+  }), userSession.refreshedSession);
+}
+
+export async function PATCH(request: NextRequest) {
+  const config = getCloudConfig();
+  if (!config.configured) return safeJson({ ok: false, error: 'cloud_not_configured', readsCloud: false, writesCloud: false }, 503);
+  const userSession = await getSignedInUser(config);
+  const cloudIdentity = deriveCloudIdentity(userSession.user);
+  if (!cloudIdentity) return safeJson({ ok: false, error: 'not_signed_in', readsCloud: false, writesCloud: false }, 401);
+
+  let body: Record<string, unknown>;
+  try {
+    const parsed = await request.json();
+    body = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
+  } catch {
+    return safeJson({ ok: false, error: 'invalid_json', readsCloud: false, writesCloud: false }, 400);
+  }
+
+  const directSignalId = sanitizeString(body.signalId || body.signal_id, 240);
+  const signalIds = Array.from(new Set([
+    ...(directSignalId ? [directSignalId] : []),
+    ...sanitizeStringArray(body.signalIds || body.signal_ids, 240),
+  ])).slice(0, 40);
+  if (!signalIds.length) return safeJson({ ok: false, error: 'empty_signal_ids', readsCloud: false, writesCloud: false }, 400);
+
+  const feedback = sanitizeJsonObject(body.feedback);
+  const preferencePatch = sanitizeJsonObject(body.preferencePatch || body.preference_patch);
+  const decEngineId = sanitizeString(body.decEngineId || body.dec_engine_id, 160);
+  const feedbackValue = sanitizeString(body.feedbackValue || body.feedback_value, 80);
+  const feedbackRecord = {
+    latest: {
+      value: feedbackValue || feedback.value || null,
+      decEngineId: decEngineId || feedback.decEngineId || null,
+      preferencePatch,
+      feedback,
+      recordedAt: new Date().toISOString(),
+    },
+  };
+
+  let updatedCount = 0;
+  for (const signalId of signalIds) {
+    const url = new URL('/rest/v1/signals', config.supabaseUrl);
+    url.searchParams.set('identity_key', `eq.${cloudIdentity.identityKey}`);
+    url.searchParams.set('signal_id', `eq.${signalId}`);
+    url.searchParams.set('deleted_at', 'is.null');
+    const response = await fetch(url.toString(), {
+      method: 'PATCH',
+      headers: {
+        ...restHeaders(config),
+        Prefer: 'return=minimal',
+      },
+      body: JSON.stringify({
+        feedback: feedbackRecord,
+        updated_at: new Date().toISOString(),
+      }),
+      cache: 'no-store',
+    });
+    if (!response.ok) {
+      return safeJson({
+        ok: false,
+        error: 'feedback_update_failed',
+        updatedCount,
+        readsCloud: false,
+        writesCloud: false,
+      }, 502);
+    }
+    updatedCount += 1;
+  }
+
+  return setRefreshedAuthCookies(safeJson({
+    ok: true,
+    readsCloud: false,
+    writesCloud: true,
+    feedbackUpdated: true,
+    updatedCount,
   }), userSession.refreshedSession);
 }
 
@@ -300,13 +408,14 @@ export async function POST(request: NextRequest) {
 
   const url = new URL('/rest/v1/signals', config.supabaseUrl);
   url.searchParams.set('on_conflict', 'identity_key,signal_id');
+  const rows = await Promise.all(signals.map((signal) => signalRow(cloudIdentity.identityKey, cloudIdentity.userId, signal)));
   const response = await fetch(url.toString(), {
     method: 'POST',
     headers: {
       ...restHeaders(config),
       Prefer: 'resolution=merge-duplicates,return=representation',
     },
-    body: JSON.stringify(signals.map((signal) => signalRow(cloudIdentity.identityKey, cloudIdentity.userId, signal))),
+    body: JSON.stringify(rows),
     cache: 'no-store',
   });
   if (!response.ok) return safeJson({ ok: false, error: 'cloud_write_failed', rejectedCount, readsCloud: false, writesCloud: false }, 502);

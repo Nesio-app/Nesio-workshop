@@ -1,5 +1,29 @@
 import { getSignals, type Signal } from './signal';
 
+export type CloudSignalRow = {
+  signal_id?: string;
+  source?: Signal['source'];
+  type?: string;
+  occurred_at?: string;
+  captured_at?: string;
+  title?: string;
+  payload?: Record<string, unknown>;
+  entities?: Signal['entities'];
+  evidence?: Signal['evidence'];
+  confidence?: number;
+  sensitivity?: Signal['sensitivity'];
+  retention_policy?: Signal['retentionPolicy'];
+  feedback?: Record<string, unknown>;
+  embedding_text?: string;
+};
+
+type CloudSignalSearchResponse = {
+  signals?: CloudSignalRow[];
+  search?: {
+    mode?: string;
+  };
+};
+
 function tokenize(value: string): string[] {
   const normalized = value
     .toLowerCase()
@@ -49,4 +73,83 @@ export function searchSignalsSemantically(query: string, limit = 8): Signal[] {
     .sort((a, b) => b.score - a.score)
     .slice(0, limit)
     .map((entry) => entry.signal);
+}
+
+export function cloudSignalRowToSignal(row: CloudSignalRow): Signal | null {
+  if (!row.signal_id || !row.source || !row.type) return null;
+  const now = new Date().toISOString();
+  const embeddingText = typeof row.embedding_text === 'string' ? row.embedding_text : '';
+  const payload = {
+    ...(row.payload || {}),
+    ...(embeddingText ? { embedding_text: embeddingText } : {}),
+  };
+  const evidence = row.evidence || { source: row.source, raw: embeddingText };
+  return {
+    id: row.signal_id,
+    source: row.source,
+    type: row.type,
+    occurredAt: row.occurred_at || row.captured_at || now,
+    capturedAt: row.captured_at || row.occurred_at || now,
+    title: row.title || 'Signal',
+    payload,
+    content: payload,
+    entities: Array.isArray(row.entities) ? row.entities : [],
+    confidence: typeof row.confidence === 'number' ? row.confidence : 0.7,
+    sensitivity: row.sensitivity || 'normal',
+    retentionPolicy: row.retention_policy || 'Normal',
+    evidence,
+    tags: [],
+  };
+}
+
+export function cloudSignalRowsToSignals(rows: readonly CloudSignalRow[]): Signal[] {
+  return rows.map(cloudSignalRowToSignal).filter((signal): signal is Signal => Boolean(signal));
+}
+
+function rankSignals(signals: readonly Signal[], query: string, limit: number): Signal[] {
+  return signals
+    .map((signal) => ({ signal, score: scoreSignalForQuery(signal, query) }))
+    .filter((entry) => entry.score > 0.7)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map((entry) => entry.signal);
+}
+
+function mergeRankedSignals(primary: readonly Signal[], fallback: readonly Signal[], limit: number): Signal[] {
+  const seen = new Set<string>();
+  const merged: Signal[] = [];
+  for (const signal of [...primary, ...fallback]) {
+    if (seen.has(signal.id)) continue;
+    seen.add(signal.id);
+    merged.push(signal);
+    if (merged.length >= limit) break;
+  }
+  return merged;
+}
+
+export async function searchSignalsWithCloudFallback(query: string, limit = 8): Promise<Signal[]> {
+  const trimmed = query.trim();
+  if (!trimmed) return [];
+  const localMatches = searchSignalsSemantically(trimmed, limit);
+  if (typeof window === 'undefined' || typeof fetch === 'undefined') return localMatches;
+
+  try {
+    const params = new URLSearchParams({
+      q: trimmed,
+      limit: String(Math.max(50, limit * 20)),
+    });
+    const response = await fetch(`/api/cloud/signals?${params.toString()}`, {
+      credentials: 'same-origin',
+      cache: 'no-store',
+    });
+    if (!response.ok) return localMatches;
+    const data = await response.json() as CloudSignalSearchResponse;
+    const cloudSignals = cloudSignalRowsToSignals(data.signals || []);
+    const cloudMatches = data.search?.mode === 'signal_vector_pgvector'
+      ? cloudSignals.slice(0, limit)
+      : rankSignals(cloudSignals, trimmed, limit);
+    return mergeRankedSignals(cloudMatches, localMatches, limit);
+  } catch {
+    return localMatches;
+  }
 }

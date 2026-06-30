@@ -6,6 +6,7 @@ import { recordCardFeedback, type RecommendationCard } from '@/lib/portal/reason
 import { buildTodayViewModel } from '@/lib/platform/view-models/today-view-model';
 import { learnFromFeedback } from '@/lib/portal/mirror-profile';
 import { recordSignalFeedback } from '@/lib/life-domain/signal-feedback';
+import { cloudSignalRowsToSignals, type CloudSignalRow } from '@/lib/life-domain/signal-search';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
 import VoiceBrief from './VoiceBrief';
 import DailyBriefCard from './DailyBriefCard';
@@ -52,6 +53,21 @@ function confidenceText(confidence: number) {
   if (confidence >= 0.82) return '比较确定';
   if (confidence >= 0.58) return '可能相关';
   return '建议确认';
+}
+
+async function loadCloudSignals(canUsePrivateData: boolean) {
+  if (!canUsePrivateData) return [];
+  try {
+    const response = await fetch('/api/cloud/signals?limit=80', {
+      credentials: 'same-origin',
+      cache: 'no-store',
+    });
+    if (!response.ok) return [];
+    const data = await response.json() as { signals?: CloudSignalRow[] };
+    return cloudSignalRowsToSignals(data.signals || []);
+  } catch {
+    return [];
+  }
 }
 
 function AudioCard({ card, onFeedback }: { card: RecommendationCard; onFeedback: (f: RecommendationCard['feedback']) => void }) {
@@ -261,18 +277,22 @@ export default function TodayFeed({
     });
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-portal-theme'] });
 
-    // Load initial cards through the Experience view-model. Connector
-    // collection + pruning are driven by the platform shell (Portal.tsx).
-    const initial = buildTodayViewModel({ canUsePrivateData, fallbackCards: EMPTY_SIGNAL_CARDS });
-    setCards(initial.cards);
-    setMemoryCount(initial.memoryCount);
-    setMemoryNotes(initial.memoryNotes);
+    let cancelled = false;
 
-    const refresh = () => {
-      const updated = buildTodayViewModel({ canUsePrivateData, fallbackCards: EMPTY_SIGNAL_CARDS });
+    // Load cards through the Experience view-model. Cloud Signals are preferred
+    // for signed-in users, with local projections kept as compatibility fallback.
+    const applyViewModel = async () => {
+      const cloudSignals = await loadCloudSignals(canUsePrivateData);
+      const updated = buildTodayViewModel({ canUsePrivateData, fallbackCards: EMPTY_SIGNAL_CARDS, cloudSignals });
+      if (cancelled) return;
       setCards(updated.cards);
       setMemoryCount(updated.memoryCount);
       setMemoryNotes(updated.memoryNotes);
+    };
+    void applyViewModel();
+
+    const refresh = () => {
+      void applyViewModel();
     };
 
     window.addEventListener('nesio-life-graph-updated', refresh);
@@ -281,6 +301,7 @@ export default function TodayFeed({
     window.addEventListener('nesio-calendar-updated', refresh);
 
     return () => {
+      cancelled = true;
       observer.disconnect();
       window.removeEventListener('nesio-life-graph-updated', refresh);
       window.removeEventListener('nesio-connectors-refreshed', refresh);

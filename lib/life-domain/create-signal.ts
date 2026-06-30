@@ -1,9 +1,9 @@
 /**
  * Canonical Signal write path.
  *
- * All new real-world inputs must enter Nesio through createSignal(). The current
- * app stores Memory in Life Graph, so this writes a normalized Signal projection
- * into Life Graph while preserving a stable Signal id/type in node attributes.
+ * All new real-world inputs must enter Nesio through createSignal(). Signal is
+ * becoming the main fact table; LifeGraph and Memory are compatibility
+ * projections during the local-first dual-write transition.
  */
 
 import { addLifeNode, type LifeNode, type LifeNodeSource, type LifeNodeType } from '../portal/life-graph';
@@ -113,6 +113,7 @@ export async function writeCloudSignal(signal: Signal): Promise<{ ok: boolean; s
   try {
     const response = await fetch('/api/cloud/signals', {
       method: 'POST',
+      credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ signal: { ...signal, schemaVersion: SIGNAL_SCHEMA_VERSION } }),
     });

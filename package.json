@@ -182,6 +182,7 @@
     "test:portal-ai-transient-panels": "node scripts/portal-ai-transient-panels.test.mjs",
     "test:toolbox-no-disabled-controls": "node scripts/toolbox-no-disabled-controls.test.mjs",
     "cloud:supabase:preflight": "node scripts/supabase-cloud-preflight.mjs",
+    "cloud:supabase:migrate:signals": "node scripts/apply-supabase-signals-migration.mjs",
     "report:backend-v1-readiness": "node scripts/backend-v1-live-readiness.mjs",
     "cloud:supabase:schema:bundle": "node scripts/supabase-schema-bundle.mjs",
     "test:supabase-schema-bundle": "node scripts/supabase-schema-bundle.test.mjs",

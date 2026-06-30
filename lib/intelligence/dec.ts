@@ -18,7 +18,7 @@ import {
 } from '../portal/reasoning-engine';
 import { PORTAL_CACHE_KEYS, readPortalCache } from '../portal/prefetch-cache';
 import type { WeatherSnapshot } from '../portal/weather';
-import { getRecentSignals } from '../life-domain/signal';
+import { getRecentSignals, type Signal } from '../life-domain/signal';
 import { computeLifeState, type LifeState } from '../life-domain/life-state';
 import {
   cardToRecommendation,
@@ -60,9 +60,13 @@ export interface DECOutput {
   health: PlatformHealth;
 }
 
-export function runDEC(): DECOutput {
+export interface DECInput {
+  signals?: readonly Signal[];
+}
+
+export function runDEC(input: DECInput = {}): DECOutput {
   const weather = readPortalCache<WeatherSnapshot>(PORTAL_CACHE_KEYS.weather);
-  const signals = getRecentSignals();
+  const signals = input.signals?.length ? [...input.signals] : getRecentSignals();
   const lifeState = computeLifeState();
   const health = checkPlatformHealth();
 
@@ -105,6 +109,6 @@ export function runDEC(): DECOutput {
 }
 
 /** Backward-compatible: existing Today UI consumes view-model cards. */
-export function generateTodayCards(): RecommendationCard[] {
-  return runDEC().cards;
+export function generateTodayCards(input: DECInput = {}): RecommendationCard[] {
+  return runDEC(input).cards;
 }

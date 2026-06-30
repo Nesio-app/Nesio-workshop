@@ -650,6 +650,7 @@ export async function backfillLocalLifeGraphToCloud({ limit = 200 }: { limit?: n
     for (const node of backfillNodes) {
       markCloudSyncSynced(node.id, 'backfill');
       removeCloudSyncOutboxItem(node.id, 'backfill');
+      syncLifeNodeSignalToCloud(node);
     }
   } catch (error) {
     for (const node of backfillNodes) markCloudSyncFailed(node.id, 'backfill', error);
@@ -714,6 +715,7 @@ export function updateLifeNode(id: string, patch: Partial<LifeNode>): boolean {
   nodes[idx] = { ...nodes[idx], ...patch };
   saveAll(nodes);
   void syncLifeNodeToCloud(nodes[idx]);
+  syncLifeNodeSignalToCloud(nodes[idx]);
   return true;
 }
 

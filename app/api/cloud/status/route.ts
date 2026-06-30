@@ -1,5 +1,7 @@
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
+import { buildSignalMainFactContract } from '@/lib/life-domain/signal-main-fact-contract';
+import { buildCloudSnapshotContract } from '@/lib/portal/cloud-snapshot-contract';
 import { buildProductionRuntimeStatus } from '@/lib/portal/production-runtime';
 
 function safeJson(body: Record<string, unknown>, status = 200) {
@@ -201,6 +203,7 @@ export async function GET(request: NextRequest) {
       memoryEdges: 'memory_edges',
       memoryAssets: 'memory_assets',
       productEvents: 'product_events',
+      signals: 'signals',
     },
     authSession: {
       accessCookiePresent,
@@ -235,6 +238,8 @@ export async function GET(request: NextRequest) {
         signedInCookiePresent,
       }),
     },
+    cloudSnapshot: buildCloudSnapshotContract(),
+    signalMainFactTable: buildSignalMainFactContract(),
     setupTasks: {
       database: cloudDatabaseSetupTask,
       storage: cloudStorageSetupTask,

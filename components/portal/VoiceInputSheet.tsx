@@ -11,7 +11,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { addLifeNode, getRecentNodes, isPrivateExternalNode, searchLifeGraphFuzzy, type LifeNode } from '@/lib/portal/life-graph';
-import { searchSignalsSemantically } from '@/lib/life-domain/signal-search';
+import { searchSignalsWithCloudFallback } from '@/lib/life-domain/signal-search';
 import { routeIntent } from '@/lib/portal/intent-router';
 import MeetingRecorder from './MeetingRecorder';
 
@@ -157,7 +157,7 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
       stopListening();
       const visibleCandidates = getRecentNodes(60).filter((node) => canUsePrivateData || !isPrivateExternalNode(node));
       const aiMatches = await askMemoryWithAi(t, visibleCandidates).catch(() => []);
-      const signalMatches = searchSignalsSemantically(t, 8).map((signal) => ({
+      const signalMatches = (await searchSignalsWithCloudFallback(t, 8)).map((signal) => ({
         id: signal.id,
         name: signal.title,
         source: signal.source,

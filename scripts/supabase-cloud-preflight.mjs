@@ -3,6 +3,8 @@ import path from 'node:path';
 import process from 'node:process';
 
 const VERSION = 'supabase-cloud-preflight-v1';
+const CLOUD_SNAPSHOT_CONTRACT_VERSION = 'cloud-snapshot-v1';
+const SIGNAL_MAIN_FACT_CONTRACT_VERSION = 'signal-main-fact-v1';
 const DATABASE_REQUIRED_ENV = [
   'CLOUD_DB_ENABLED',
   'SUPABASE_URL',
@@ -113,6 +115,11 @@ const TABLES = [
       'signal_id text NOT NULL',
       'payload jsonb NOT NULL',
       'retention_policy text NOT NULL',
+      'CREATE EXTENSION IF NOT EXISTS vector',
+      'embedding_vector vector(768)',
+      'idx_signals_embedding_vector',
+      'match_own_signals',
+      'match_identity_key text',
       'UNIQUE (identity_key, signal_id)',
       'ALTER TABLE public.signals ENABLE ROW LEVEL SECURITY',
       'CREATE POLICY "signals_select_own"',
@@ -287,6 +294,149 @@ function storageReport() {
   };
 }
 
+function fileContains(root, relativePath, markers) {
+  const absolutePath = path.join(root, relativePath);
+  const exists = fs.existsSync(absolutePath);
+  const source = exists ? fs.readFileSync(absolutePath, 'utf8') : '';
+  const markerList = Array.isArray(markers) ? markers : [markers];
+  return {
+    path: relativePath,
+    exists,
+    missingMarkers: markerList.filter((marker) => !source.includes(marker)),
+    ready: exists && markerList.every((marker) => source.includes(marker)),
+  };
+}
+
+function buildCoverageReport(root, schemaFiles, storage) {
+  const tableCoverage = TABLES.map((entry) => ({
+    id: entry.id,
+    table: entry.table,
+    endpoint: entry.endpoint,
+    schemaReady: Boolean(schemaFiles[entry.id]?.ready),
+    rlsMarkersPresent: Boolean(schemaFiles[entry.id]?.ready)
+      && (schemaFiles[entry.id]?.missingMarkers || [])
+        .filter((marker) => marker.includes('ROW LEVEL SECURITY') || marker.includes('CREATE POLICY'))
+        .length === 0,
+  }));
+
+  const indexSchemas = Object.fromEntries([
+    ...new Set(TABLES.map((entry) => entry.schemaPath)),
+  ].map((schemaPath) => {
+    const absolutePath = path.join(root, schemaPath);
+    const source = fs.existsSync(absolutePath) ? fs.readFileSync(absolutePath, 'utf8') : '';
+    return [schemaPath, {
+      path: schemaPath,
+      exists: Boolean(source),
+      createIndexCount: (source.match(/CREATE INDEX/gi) || []).length,
+      hasIndexes: /CREATE INDEX/i.test(source),
+    }];
+  }));
+
+  const exportDeleteCoverage = {
+    localExport: fileContains(root, 'app/api/user-data/export/route.ts', ['export']),
+    localDelete: fileContains(root, 'app/api/user-data/delete/route.ts', ['delete']),
+    cloudMemoryExport: fileContains(root, 'app/api/cloud/memory/route.ts', ['exportOnly', 'GET']),
+    cloudMemoryDelete: fileContains(root, 'app/api/cloud/memory/route.ts', ['DELETE', 'deleted_at']),
+    cloudInventorySnapshot: fileContains(root, 'app/api/cloud/inventory/route.ts', ['POST', 'deleteMissing']),
+  };
+
+  return {
+    version: 'cloud-preflight-coverage-v1',
+    tables: tableCoverage,
+    storageBucket: {
+      configured: storage.bucketConfigured,
+      schemaReady: Boolean(schemaFiles.storageAssets?.ready),
+      rlsMarkersPresent: Boolean(schemaFiles.storageAssets?.ready),
+    },
+    rls: {
+      tablePolicyReadyCount: tableCoverage.filter((entry) => entry.rlsMarkersPresent).length,
+      expectedTableCount: tableCoverage.length,
+      storagePolicyReady: Boolean(schemaFiles.storageAssets?.ready),
+    },
+    indexes: {
+      schemas: indexSchemas,
+      indexedSchemaCount: Object.values(indexSchemas).filter((entry) => entry.hasIndexes).length,
+    },
+    exportDelete: {
+      routes: exportDeleteCoverage,
+      ready: Object.values(exportDeleteCoverage).every((entry) => entry.ready),
+    },
+  };
+}
+
+function buildCloudSnapshotContractReport() {
+  return {
+    version: CLOUD_SNAPSHOT_CONTRACT_VERSION,
+    automaticSyncEnabled: false,
+    snapshotIsNotSourceOfTruth: true,
+    operations: [
+      'manual_backup',
+      'manual_restore',
+      'manual_delete_cloud_snapshot',
+      'export_local_data',
+      'export_cloud_data',
+    ],
+    boundaries: {
+      noBackgroundSync: true,
+      noCrossUserAccess: true,
+      destructiveCloudDeleteRequiresConfirmation: true,
+      productionDeletionOrMigrationRequiresCeoGate: true,
+    },
+  };
+}
+
+function buildSignalMainFactContractReport() {
+  return {
+    version: SIGNAL_MAIN_FACT_CONTRACT_VERSION,
+    currentPhase: 'signal_read_preferred',
+    targetPhase: 'signal_source_of_truth',
+    currentSourceOfTruth: {
+      signals: 'primary_cloud_fact_candidate_with_projection_fallback',
+      memoryNodes: 'compat_projection_during_dual_write',
+      lifeGraph: 'compat_projection_during_dual_write',
+      inventoryItems: 'domain_private_table_with_signal_mirror',
+    },
+    targetSourceOfTruth: {
+      signals: 'main_fact_table',
+      memoryNodes: 'projection_view',
+      lifeGraph: 'projection_view',
+      inventoryItems: 'domain_private_table_that_references_or_emits_signals',
+    },
+    readPolicy: {
+      currentPriority: ['cloud_signals', 'local_signal_cache', 'local_projection', 'memory_nodes', 'life_graph'],
+      targetPriority: ['cloud_signals', 'local_signal_cache', 'projection_fallback'],
+      todayCardsRequireEvidenceSignalIds: true,
+      askBaoheShouldSearchSignals: true,
+      decEnginesRequireEvidenceSignals: true,
+    },
+    embeddingPolicy: {
+      phase1TextScoring: true,
+      embeddingTextColumnReady: true,
+      pgvectorSchemaReady: true,
+      vectorRpcReady: true,
+      runtimeActivation: 'SIGNAL_EMBEDDINGS_ENABLED + SIGNAL_VECTOR_SEARCH_ENABLED + GEMINI_API_KEY',
+      vectorSearchScope: 'own_user_signals_only',
+      crossUserSearchAllowed: false,
+      publicCorpusSearchAllowed: false,
+    },
+    gates: {
+      schemaMigration: 'operator_action',
+      dualWriteRuntime: 'no_ceo_gate_if_no_real_migration',
+      signalReadPreferred: 'qa_required',
+      sourceOfTruthCutover: 'ceo_gate_required',
+      realDataMigration: 'ceo_gate_required',
+      projectionDecommission: 'ceo_gate_required',
+    },
+    boundaries: {
+      noAutomaticRealDataMigration: true,
+      noDestructiveProjectionCleanup: true,
+      noCrossUserInference: true,
+      noUnscopedEmbeddingSearch: true,
+      noAgentActionFromSignalWithoutApproval: true,
+    },
+  };
+}
+
 function buildIssueCounts({ requiredEnv, schemaFiles, network }) {
   const missingEnv = requiredEnv.filter((entry) => (
     !entry.present || (entry.enabled === false)
@@ -449,12 +599,16 @@ async function main() {
   const databaseNetworkReady = !network.checked || network.tables.every((entry) => entry.ok);
   const storageNetworkReady = !network.storage?.checked || network.storage.ok;
   const issueCounts = buildIssueCounts({ requiredEnv, schemaFiles, network });
+  const coverage = buildCoverageReport(root, schemaFiles, storage);
   const operatorActions = buildOperatorActions({
     databaseEnvReady,
     storageEnvReady,
     schemaFilesReady,
     storage,
     network,
+    coverage,
+    cloudSnapshot: buildCloudSnapshotContractReport(),
+    signalMainFactTable: buildSignalMainFactContractReport(),
     issueCounts,
   });
   const report = {
@@ -486,6 +640,9 @@ async function main() {
         && databaseNetworkReady
         && storage.bucketConfigured
         && storageNetworkReady,
+      coverageReady: coverage.exportDelete.ready
+        && coverage.rls.tablePolicyReadyCount === coverage.rls.expectedTableCount
+        && coverage.rls.storagePolicyReady,
     },
   };
 

@@ -1,5 +1,6 @@
 import type { RecommendationCard } from '../portal/reasoning-engine';
 import { createSignal } from './create-signal';
+import type { Signal } from './signal';
 
 const SIGNAL_FEEDBACK_KEY = 'nesio-signal-feedback-v1';
 
@@ -47,6 +48,42 @@ function writeRecords(records: SignalFeedbackRecord[]): void {
   }
 }
 
+function writeCloudSignalFeedback(record: SignalFeedbackRecord, feedbackSignal?: Signal): void {
+  if (typeof window === 'undefined' || typeof fetch === 'undefined') return;
+
+  if (feedbackSignal) {
+    fetch('/api/cloud/signals', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ signal: { ...feedbackSignal, schemaVersion: 'Signal@v1' } }),
+    }).catch(() => {
+      /* Explicit feedback Signal is best-effort during Signal dual-write. */
+    });
+  }
+
+  if (!record.feedbackSignalIds.length) return;
+  fetch('/api/cloud/signals', {
+    method: 'PATCH',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      signalIds: record.feedbackSignalIds,
+      feedbackValue: record.feedback,
+      decEngineId: record.decEngineId,
+      preferencePatch: record.preferencePatch,
+      feedback: {
+        cardId: record.cardId,
+        feedback: record.feedback,
+        source: 'today_card',
+        createdAt: record.createdAt,
+      },
+    }),
+  }).catch(() => {
+    /* Cloud feedback is best-effort during Signal dual-write. */
+  });
+}
+
 export function recordSignalFeedback(card: RecommendationCard, feedback: RecommendationCard['feedback']): SignalFeedbackRecord {
   const record: SignalFeedbackRecord = {
     cardId: card.id,
@@ -57,7 +94,7 @@ export function recordSignalFeedback(card: RecommendationCard, feedback: Recomme
     createdAt: new Date().toISOString(),
   };
   writeRecords([...readRecords(), record]);
-  createSignal({
+  const feedbackSignal = createSignal({
     source: 'ai_observation',
     type: 'feedback.today_card',
     title: `反馈：${card.title}`,
@@ -73,6 +110,7 @@ export function recordSignalFeedback(card: RecommendationCard, feedback: Recomme
     tags: ['feedback', card.domain],
     raw: `${card.title} ${feedback}`,
   });
+  writeCloudSignalFeedback(record, feedbackSignal);
   return record;
 }
 

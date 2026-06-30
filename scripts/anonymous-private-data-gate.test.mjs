@@ -100,11 +100,15 @@ assertBefore(
   'readPortalCache<{ events?: CalendarEvent[] }>(PORTAL_CACHE_KEYS.calendar)',
   'DailyBriefCard must check the private-data gate before reading cached calendar events.',
 );
-assertBefore(
+assert.match(
   dailyBrief,
-  'if (!canUsePrivateData) return;',
-  'const memoryNotes = getRecentNodes(5)',
-  'DailyBriefCard must not generate a private memory brief while signed out.',
+  /if \(canUsePrivateData\) \{[\s\S]*localStorage\.getItem\(BRIEF_CACHE_KEY\)/,
+  'DailyBriefCard must only load cached private brief scripts while signed in.',
+);
+assert.doesNotMatch(
+  dailyBrief,
+  /getRecentNodes/,
+  'DailyBriefCard must not read Life Graph directly; gated memory notes must come from TodayViewModel.',
 );
 assertBefore(
   lifeState,
@@ -112,11 +116,15 @@ assertBefore(
   'const recompute = () => setState(computeLifeState());',
   'LifeStateCard must check the private-data gate before computing cross-signal state.',
 );
-assertBefore(
+assert.match(
   todayFeed,
-  'if (!canUsePrivateData)',
-  'const real = generateTodayCards();',
-  'TodayFeed must check the private-data gate before reading real Life Graph cards/counts.',
+  /buildTodayViewModel\(\{ canUsePrivateData,[\s\S]*cloudSignals/,
+  'TodayFeed must derive Today cards and memory notes through the gated TodayViewModel.',
+);
+assert.match(
+  todayFeed,
+  /<DailyBriefCard[\s\S]*canUsePrivateData=\{canUsePrivateData\}[\s\S]*memoryNotes=\{memoryNotes\}/,
+  'DailyBriefCard must receive gated memoryNotes from TodayFeed.',
 );
 assertBefore(
   memoryTab,

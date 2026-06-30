@@ -7,6 +7,9 @@
  */
 import { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
+import { createSignal } from '@/lib/life-domain/create-signal';
+import { writeCloudSignalsForCurrentUser } from '@/lib/platform/runtime/cloud-signals-server';
+import { normalizeGmailToSignal } from '@/lib/life-domain/normalizers';
 import { getIntegrationToken } from '@/lib/portal/integrations';
 import { cookies } from 'next/headers';
 
@@ -87,6 +90,11 @@ function extractText(msg: GmailMessage): string {
 
 function header(msg: GmailMessage, name: string): string {
   return msg.payload?.headers?.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value || '';
+}
+
+function parseHeaderDate(value: string): string | undefined {
+  const time = Date.parse(value);
+  return Number.isFinite(time) ? new Date(time).toISOString() : undefined;
 }
 
 async function refreshToken(refreshTk: string): Promise<string | null> {
@@ -228,7 +236,20 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const nodes = includeBody && shouldAnalyze ? await extractNodes(messages) : [];
+  const shouldCreateSignals = includeBody && shouldAnalyze;
+  const nodes = shouldCreateSignals ? await extractNodes(messages) : [];
+  const signals = shouldCreateSignals
+    ? messages.map((message) => createSignal(normalizeGmailToSignal({
+        id: message.id,
+        subject: header(message, 'subject') || 'Gmail message',
+        from: header(message, 'from'),
+        snippet: extractText(message).slice(0, 240) || message.snippet || '',
+        occurredAt: parseHeaderDate(header(message, 'date')),
+      })))
+    : [];
+  const cloudSignalWrite = signals.length
+    ? await writeCloudSignalsForCurrentUser(signals)
+    : { ok: true, writesCloud: false, savedCount: 0 };
 
   return NextResponse.json({
     ok: true,
@@ -239,6 +260,9 @@ export async function GET(req: NextRequest) {
     aiAnalysisPerformed: includeBody && shouldAnalyze,
     messages: metadataPreview(messages),
     nodes,
+    signalIds: signals.map((signal) => signal.id),
+    signalCount: signals.length,
+    cloudSignalWrite,
     count: nodes.length,
     emailCount: messages.length,
   });

@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createSignal } from '@/lib/life-domain/create-signal';
+import { writeCloudSignalsForCurrentUser } from '@/lib/platform/runtime/cloud-signals-server';
 import { normalizePhotoToSignal, normalizeVoiceToSignal } from '@/lib/life-domain/normalizers';
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
@@ -302,10 +303,18 @@ export async function POST(req: NextRequest) {
     const isImage = body.type === 'image' && Boolean(body.imageBase64);
     const aiAllowed = isAnalyzeAiAllowed(req);
 
+    if (!aiAllowed) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: 'ai_auth_required',
+          summary: '登录或 Lab 模式后可使用 Nesio 分析。',
+        },
+        { status: 403 },
+      );
+    }
+
     if (body.type === 'ask') {
-      if (!aiAllowed) {
-        return NextResponse.json({ ok: false, error: 'ai_auth_required' }, { status: 403 });
-      }
       try {
         raw = await analyzeWithClaude(body.content, false, undefined, undefined, ASK_SYSTEM_PROMPT);
       } catch {
@@ -347,15 +356,6 @@ export async function POST(req: NextRequest) {
           }
         }
       }
-    } else if (isImage) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: 'ai_auth_required',
-          summary: '登录或 Lab 模式后可自动识别图片。现在可以先保存为待确认图片线索。',
-        },
-        { status: 403 },
-      );
     } else {
       raw = analyzeFallback(body.content);
     }
@@ -374,8 +374,9 @@ export async function POST(req: NextRequest) {
           tags: [result.intent || 'MEMORY_CAPTURE'],
         });
     const signal = createSignal(signalInput);
+    const cloudSignalWrite = await writeCloudSignalsForCurrentUser([signal]);
 
-    return NextResponse.json({ ok: true, ...result, signals: [signal], signalIds: [signal.id] });
+    return NextResponse.json({ ok: true, ...result, signals: [signal], signalIds: [signal.id], cloudSignalWrite });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'parse_error';
     return NextResponse.json({ ok: false, error: msg }, { status: 400 });

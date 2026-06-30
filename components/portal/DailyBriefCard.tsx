@@ -86,17 +86,22 @@ export default function DailyBriefCard({
       setDisplayName(profile.displayName || '');
     } else {
       setDisplayName('');
+      setEvents([]);
+      setSegments([]);
+      setGenerated(false);
     }
 
     // Load cached brief for today
-    try {
-      const cached = JSON.parse(localStorage.getItem(BRIEF_CACHE_KEY) || 'null') as BriefCache | null;
-      if (cached?.date === todayKey() && cached.segments?.length) {
-        setSegments(cached.segments);
-        setGenerated(true);
-        return;
-      }
-    } catch { /* ignore */ }
+    if (canUsePrivateData) {
+      try {
+        const cached = JSON.parse(localStorage.getItem(BRIEF_CACHE_KEY) || 'null') as BriefCache | null;
+        if (cached?.date === todayKey() && cached.segments?.length) {
+          setSegments(cached.segments);
+          setGenerated(true);
+          return;
+        }
+      } catch { /* ignore */ }
+    }
 
     // Load signals
     const w = readPortalCache<WeatherView>(PORTAL_CACHE_KEYS.weather);
