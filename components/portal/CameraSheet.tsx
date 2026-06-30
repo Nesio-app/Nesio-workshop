@@ -402,19 +402,6 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
 
       {/* Viewfinder */}
       <div className="nesio-camera-viewfinder">
-        {/* Live preview */}
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted
-          className="nesio-camera-video"
-          style={{
-            opacity: phase === 'live' ? 1 : phase === 'captured' ? 0.4 : 0,
-            pointerEvents: 'none',
-          }}
-        />
-
         {/* Captured photo preview */}
         {(phase === 'analyzing' || phase === 'result' || phase === 'saved') && capturedPreview && (
           /* eslint-disable-next-line @next/next/no-img-element */
@@ -430,20 +417,17 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
 
         {/* Capture chooser (native camera) / no-camera fallback */}
         {(phase === 'idle' || phase === 'no-camera') && (
-          <div className="nesio-camera-fallback">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="52" height="52" opacity="0.25">
-              <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
-              <circle cx="12" cy="13" r="4"/>
-            </svg>
-            <p className="nesio-camera-fallback-text">
+          <div className="nesio-camera-chooser">
+            <span className="nesio-camera-chooser-icon" aria-hidden>📷</span>
+            <p className="nesio-camera-chooser-text">
               {phase === 'idle'
-                ? '点下方按钮拍一张，Nesio 帮你识别并存入 Memory。'
-                : '此设备不支持相机，请从相册或文件选择。'}
+                ? '拍一张，Nesio 帮你识别并存入 Memory'
+                : '此设备不支持相机，请从相册选择'}
             </p>
             <button type="button" className="nesio-camera-shoot-btn" onClick={openNativeCamera}>
-              📷 拍照
+              拍照
             </button>
-            <button type="button" className="nesio-camera-gallery-btn" onClick={handleGallery}>
+            <button type="button" className="nesio-camera-chooser-alt" onClick={handleGallery}>
               从相册 / 文件中选择
             </button>
           </div>
