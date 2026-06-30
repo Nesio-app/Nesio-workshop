@@ -117,13 +117,57 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
   const [sourceFile, setSourceFile] = useState<File | null>(null);
 
   const stopCamera = useCallback(() => {
+    const video = videoRef.current;
+    if (video) {
+      video.pause();
+      video.srcObject = null;
+    }
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
   }, []);
 
+  const waitForVideoElement = useCallback(async () => {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      if (videoRef.current) return true;
+    }
+    return Boolean(videoRef.current);
+  }, []);
+
+  const attachStreamToVideo = useCallback(async (stream: MediaStream) => {
+    await waitForVideoElement();
+    const video = videoRef.current;
+    if (!video) return false;
+
+    video.muted = true;
+    video.autoplay = true;
+    video.playsInline = true;
+    video.setAttribute('playsinline', 'true');
+    video.setAttribute('webkit-playsinline', 'true');
+    if (video.srcObject !== stream) {
+      video.srcObject = stream;
+    }
+
+    if (video.readyState < 1) {
+      await new Promise<void>((resolve) => {
+        const timer = window.setTimeout(resolve, 350);
+        video.onloadedmetadata = () => {
+          window.clearTimeout(timer);
+          video.onloadedmetadata = null;
+          resolve();
+        };
+      });
+    }
+
+    await video.play().catch(() => {});
+    return video.srcObject === stream;
+  }, [waitForVideoElement]);
+
   const startCamera = useCallback(async (facing: 'environment' | 'user') => {
     stopCamera();
     if (!navigator.mediaDevices?.getUserMedia) { setPhase('no-camera'); return; }
+    setPhase('live');
+    await waitForVideoElement();
     try {
       const constraints: MediaStreamConstraints = {
         video: {
@@ -135,31 +179,55 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
       };
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       streamRef.current = stream;
-      const video = videoRef.current;
-      if (video) {
-        video.srcObject = stream;
-        video.setAttribute('playsinline', 'true'); // iOS requires this
-        await video.play().catch(() => {}); // ignore autoplay error
+      const attached = await attachStreamToVideo(stream);
+      if (!attached && streamRef.current === stream) {
+        window.setTimeout(() => {
+          if (streamRef.current === stream) {
+            void attachStreamToVideo(stream);
+          }
+        }, 120);
       }
-      setPhase('live');
     } catch (err: unknown) {
       const name = err instanceof Error ? err.name : '';
-      if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+      stopCamera();
+      if (name === 'NotAllowedError' || name === 'PermissionDeniedError' || name === 'SecurityError') {
         setPermDenied(true);
       }
       setPhase('no-camera');
     }
-  }, [stopCamera]);
+  }, [attachStreamToVideo, stopCamera, waitForVideoElement]);
 
   useEffect(() => {
-    if (open) {
-      setPhase('idle'); setResult(null); setCapturedPreview('');
-      setPermDenied(false); setError(''); setExtraTags(''); setSourceFile(null);
-      startCamera('environment');
-    } else {
+    if (phase !== 'live') return;
+    const stream = streamRef.current;
+    if (!stream) return;
+    void attachStreamToVideo(stream);
+  }, [attachStreamToVideo, phase]);
+
+  useEffect(() => {
+    if (!open) {
       stopCamera();
+      return stopCamera;
     }
-    return stopCamera;
+
+    let cancelled = false;
+    setPhase('idle');
+    setResult(null);
+    setCapturedPreview('');
+    setPermDenied(false);
+    setError('');
+    setExtraTags('');
+    setSourceFile(null);
+
+    const frame = window.requestAnimationFrame(() => {
+      if (!cancelled) void startCamera('environment');
+    });
+
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(frame);
+      stopCamera();
+    };
   }, [open, startCamera, stopCamera]);
 
   async function capturePhoto() {
@@ -333,16 +401,17 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
       {/* Viewfinder */}
       <div className="nesio-camera-viewfinder">
         {/* Live preview */}
-        {(phase === 'live' || phase === 'captured') && (
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            className="nesio-camera-video"
-            style={{ opacity: phase === 'captured' ? 0.4 : 1 }}
-          />
-        )}
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          className="nesio-camera-video"
+          style={{
+            opacity: phase === 'live' ? 1 : phase === 'captured' ? 0.4 : 0,
+            pointerEvents: 'none',
+          }}
+        />
 
         {/* Captured photo preview */}
         {(phase === 'analyzing' || phase === 'result' || phase === 'saved') && capturedPreview && (
