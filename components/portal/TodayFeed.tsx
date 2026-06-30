@@ -393,11 +393,6 @@ export default function TodayFeed({
   onOpenMemory?: () => void;
 }) {
   const [displayName, setDisplayName] = useState('');
-  // Initialise synchronously so there is no flash before useEffect runs.
-  // Portal is loaded with ssr:false so document is always available at mount.
-  const [isNight, setIsNight] = useState(() => {
-    try { return document.documentElement.getAttribute('data-portal-theme') === 'night'; } catch { return false; }
-  });
   const [cards, setCards] = useState<RecommendationCard[]>([]);
   const [memoryCount, setMemoryCount] = useState(0);
   const [memoryNotes, setMemoryNotes] = useState<readonly string[]>([]);
@@ -412,12 +407,6 @@ export default function TodayFeed({
       setDisplayName('');
     }
 
-    const theme = document.documentElement.getAttribute('data-portal-theme');
-    setIsNight(theme === 'night');
-    const observer = new MutationObserver(() => {
-      setIsNight(document.documentElement.getAttribute('data-portal-theme') === 'night');
-    });
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-portal-theme'] });
 
     let cancelled = false;
 
@@ -444,7 +433,6 @@ export default function TodayFeed({
 
     return () => {
       cancelled = true;
-      observer.disconnect();
       window.removeEventListener('nesio-life-graph-updated', refresh);
       window.removeEventListener('nesio-connectors-refreshed', refresh);
       window.removeEventListener('nesio-weather-updated', refresh);
@@ -499,10 +487,7 @@ export default function TodayFeed({
       </header>
 
       <div className="nesio-today-scroll">
-        {isNight ? (
-          <NightTimeline />
-        ) : (
-          <>
+        <>
             {/* 🔊 Slim briefing strip — just a button, not a card section */}
             <DailyBriefCard canUsePrivateData={canUsePrivateData} memoryCount={memoryCount} memoryNotes={memoryNotes} />
 
@@ -533,8 +518,7 @@ export default function TodayFeed({
                 )}
               </div>
             )}
-          </>
-        )}
+        </>
       </div>
       {mirrorOpen && (
         <div className="nesio-settings-sheet-overlay" role="dialog" aria-modal="true" aria-label="Nesio 整理出的线索">
