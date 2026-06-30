@@ -8846,6 +8846,56 @@ html[data-portal-theme="night"] .nesio-memory-hero-title { color: #e8eefa; }
   margin-bottom: 0.65rem;
 }
 
+/* Domain filter chips — front-stage scenes (生活/成长/财物/健康/能量). */
+.nesio-memory-domains {
+  display: flex;
+  gap: 0.45rem;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+  margin-bottom: 0.85rem;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.nesio-memory-domains::-webkit-scrollbar { display: none; }
+
+.nesio-memory-domain-chip {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-height: 34px;
+  padding: 0.4rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid var(--portal-line);
+  background: var(--glass-bg-solid);
+  color: var(--portal-ink);
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s, transform 0.12s;
+}
+.nesio-memory-domain-chip:active { transform: scale(0.96); }
+.nesio-memory-domain-chip.is-active {
+  background: var(--portal-blue-deep, #588ce3);
+  border-color: var(--portal-blue-deep, #588ce3);
+  color: #fff;
+}
+html[data-portal-theme="night"] .nesio-memory-domain-chip {
+  background: rgba(255,255,255,0.07);
+  border-color: rgba(255,255,255,0.12);
+  color: #e8eefa;
+}
+html[data-portal-theme="night"] .nesio-memory-domain-chip.is-active {
+  background: var(--portal-blue-deep, #588ce3);
+  border-color: var(--portal-blue-deep, #588ce3);
+  color: #fff;
+}
+.nesio-memory-domain-count {
+  font-size: 0.68rem;
+  font-weight: 700;
+  opacity: 0.7;
+}
+
 .nesio-memory-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -8902,6 +8952,22 @@ html[data-portal-theme="night"] .nesio-memory-card-title { color: #e8eefa; }
   line-height: 1.4;
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+
+.nesio-memory-card-domain {
+  align-self: flex-start;
+  margin-top: 0.1rem;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(88,140,227,0.12);
+  color: var(--portal-blue-deep, #588ce3);
+  font-size: 0.66rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+html[data-portal-theme="night"] .nesio-memory-card-domain {
+  background: rgba(88,140,227,0.22);
+  color: #bcd2f5;
 }
 
 .nesio-memory-more-btn {

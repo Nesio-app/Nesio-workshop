@@ -15,3 +15,4 @@ export * from './domain-taxonomy';
 export * from './context';
 export * from './context-extractor';
 export * from './create-signal';
+export * from './node-context';

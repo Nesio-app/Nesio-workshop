@@ -19,6 +19,7 @@ import {
   searchLifeGraph,
   type LifeNode,
 } from '@/lib/portal/life-graph';
+import { ALL_DOMAINS, DOMAINS, nodeDomain, type FrontDomain } from '@/lib/life-domain';
 import MemoryNodeDetail from './MemoryNodeDetail';
 
 const TYPE_ICON: Record<string, string> = {
@@ -185,12 +186,19 @@ function MemoryCard({
       </span>
       <span className="nesio-memory-card-title">{node.name}</span>
       <span className="nesio-memory-card-sub">{cleanMemoryPreview(node)}</span>
+      {(() => {
+        const d = nodeDomain(node);
+        return d ? (
+          <span className="nesio-memory-card-domain">{DOMAINS[d].icon} {DOMAINS[d].label}</span>
+        ) : null;
+      })()}
     </button>
   );
 }
 
 export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: boolean }) {
   const [query, setQuery] = useState('');
+  const [domain, setDomain] = useState<FrontDomain | null>(null);
   const [displayName, setDisplayName] = useState('');
   const [locale, setLocale] = useState<PortalLocale>(() => loadProfileSettings().locale);
   const [nodes, setNodes] = useState<LifeNode[]>([]);
@@ -266,13 +274,24 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
     }
   }, [canUsePrivateData, selectedNode]);
 
-  const visibleNodes = nodes;
+  const byDomain = useCallback(
+    (list: LifeNode[]) => (domain ? list.filter((node) => nodeDomain(node) === domain) : list),
+    [domain],
+  );
+  const visibleNodes = byDomain(nodes);
   const results = query.trim()
-    ? visibleMemoryNodes(searchLifeGraph(query), canUsePrivateData)
+    ? byDomain(visibleMemoryNodes(searchLifeGraph(query), canUsePrivateData))
     : visibleNodes;
   const hasRealNodes = visibleNodes.length > 0;
   const sourceItems = query ? results : (hasRealNodes ? results : []);
   const visibleItems = showAll || query ? sourceItems : sourceItems.slice(0, 6);
+
+  // Per-domain counts for the filter chips (from the full recent set).
+  const domainCounts = nodes.reduce<Record<string, number>>((acc, node) => {
+    const d = nodeDomain(node);
+    if (d) acc[d] = (acc[d] || 0) + 1;
+    return acc;
+  }, {});
   return (
     <>
       <div className="nesio-memory-root">
@@ -293,6 +312,34 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
               <button type="button" onClick={() => setQuery('')} style={{ color: 'var(--portal-muted)', fontSize: '0.85rem' }} aria-label={copy.clear}>✕</button>
             )}
           </div>
+
+          {/* Domain filter — front-stage scenes (生活/成长/财物/健康/能量). */}
+          {nodes.length > 0 && (
+            <div className="nesio-memory-domains" role="tablist" aria-label="按领域筛选">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={domain === null}
+                className={`nesio-memory-domain-chip${domain === null ? ' is-active' : ''}`}
+                onClick={() => setDomain(null)}
+              >
+                全部
+              </button>
+              {ALL_DOMAINS.filter((meta) => domainCounts[meta.id]).map((meta) => (
+                <button
+                  key={meta.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={domain === meta.id}
+                  className={`nesio-memory-domain-chip${domain === meta.id ? ' is-active' : ''}`}
+                  onClick={() => setDomain((current) => (current === meta.id ? null : meta.id))}
+                >
+                  {meta.icon} {meta.label}
+                  <span className="nesio-memory-domain-count">{domainCounts[meta.id]}</span>
+                </button>
+              ))}
+            </div>
+          )}
 
           {!query && (
             <div className="nesio-memory-hero">
