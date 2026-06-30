@@ -313,7 +313,9 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
   return (
     <div className="nesio-camera-sheet" role="dialog" aria-modal="true" aria-label="拍一下">
       <canvas ref={canvasRef} style={{ display: 'none' }} />
-      <input ref={fileRef} type="file" accept="image/*,.pdf,.txt,.eml" capture="environment" style={{ display: 'none' }} onChange={handleFileChange} />
+      {/* Gallery / file picker — no capture attr (mixed accept + capture misbehaves
+          on iOS; the live camera is handled by getUserMedia, not this input). */}
+      <input ref={fileRef} type="file" accept="image/*,.pdf,.txt,.eml" style={{ display: 'none' }} onChange={handleFileChange} />
 
       {/* Header */}
       <div className="nesio-camera-header">

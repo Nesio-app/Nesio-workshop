@@ -131,7 +131,8 @@ async function analyzeWithGemini(content: string, imageBase64?: string, mimeType
 
   const parts: unknown[] = [];
   if (imageBase64) {
-    parts.push({ inlineData: { mimeType: mimeType || 'image/jpeg', data: imageBase64 } });
+    // Gemini REST v1beta expects snake_case inline_data / mime_type for inline images.
+    parts.push({ inline_data: { mime_type: mimeType || 'image/jpeg', data: imageBase64 } });
   }
   parts.push({ text: `${systemPrompt}\n\nUser input: ${content}` });
 
@@ -330,24 +331,30 @@ export async function POST(req: NextRequest) {
     }
 
     if (aiAllowed) {
+      const providerErrors: string[] = [];
+      const errMsg = (e: unknown) => (e instanceof Error ? e.message : 'unknown_error');
       try {
         raw = await analyzeWithClaude(body.content, isImage, body.imageBase64, body.mimeType);
       } catch (claudeError) {
-        logAiProviderFailure('claude', claudeError instanceof Error ? claudeError.message : 'unknown_error');
+        providerErrors.push(`claude: ${errMsg(claudeError)}`);
+        logAiProviderFailure('claude', errMsg(claudeError));
         try {
           raw = await analyzeWithGemini(body.content, body.imageBase64, body.mimeType);
         } catch (geminiError) {
-          logAiProviderFailure('gemini', geminiError instanceof Error ? geminiError.message : 'unknown_error');
+          providerErrors.push(`gemini: ${errMsg(geminiError)}`);
+          logAiProviderFailure('gemini', errMsg(geminiError));
           try {
             raw = await analyzeWithOpenAI(body.content, isImage, body.imageBase64, body.mimeType);
           } catch (openAiError) {
-            logAiProviderFailure('openai', openAiError instanceof Error ? openAiError.message : 'unknown_error');
+            providerErrors.push(`openai: ${errMsg(openAiError)}`);
+            logAiProviderFailure('openai', errMsg(openAiError));
             if (isImage) {
               return NextResponse.json(
                 {
                   ok: false,
                   error: 'ai_image_unavailable',
                   summary: '图片识别暂时不可用。可以先保存为待确认图片线索。',
+                  providerErrors,
                 },
                 { status: 503 },
               );
