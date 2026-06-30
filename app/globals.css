@@ -11720,3 +11720,17 @@ html[data-portal-theme="night"] .nesio-today-evidence-chip { color: #96c7f3; bac
   align-items: center;
   justify-content: center;
 }
+
+/* Native-camera primary capture button (replaces getUserMedia shutter) */
+.nesio-camera-shoot-btn {
+  margin-top: 1.25rem;
+  background: var(--portal-blue-deep, #588ce3);
+  color: #fff;
+  font-size: 1.05rem;
+  font-weight: 700;
+  padding: 0.9rem 2.4rem;
+  border-radius: 999px;
+  box-shadow: 0 6px 20px rgba(88,140,227,0.4);
+  transition: transform 0.12s, box-shadow 0.12s;
+}
+.nesio-camera-shoot-btn:active { transform: scale(0.96); box-shadow: 0 3px 12px rgba(88,140,227,0.35); }

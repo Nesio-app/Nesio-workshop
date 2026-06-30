@@ -105,6 +105,7 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
   const [phase, setPhase] = useState<'idle' | 'live' | 'captured' | 'analyzing' | 'result' | 'saved' | 'no-camera'>('idle');
@@ -210,7 +211,6 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
       return stopCamera;
     }
 
-    let cancelled = false;
     setPhase('idle');
     setResult(null);
     setCapturedPreview('');
@@ -219,16 +219,15 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
     setExtraTags('');
     setSourceFile(null);
 
-    const frame = window.requestAnimationFrame(() => {
-      if (!cancelled) void startCamera('environment');
-    });
-
+    // Native camera: opened by a user tap (iOS blocks programmatic file-input
+    // clicks outside a gesture). No getUserMedia → no persistent camera
+    // indicator, no black-screen retry loop, no permission roundabout.
     return () => {
-      cancelled = true;
-      window.cancelAnimationFrame(frame);
       stopCamera();
     };
-  }, [open, startCamera, stopCamera]);
+  }, [open, stopCamera]);
+
+  function openNativeCamera() { cameraInputRef.current?.click(); }
 
   async function capturePhoto() {
     const video = videoRef.current;
@@ -367,7 +366,8 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
 
   function retake() {
     setResult(null); setCapturedPreview(''); setError(''); setExtraTags(''); setSourceFile(null);
-    setPhase('live');
+    setPhase('idle');
+    openNativeCamera();
   }
 
   function flipCamera() {
@@ -381,8 +381,10 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
   return (
     <div className="nesio-camera-sheet" role="dialog" aria-modal="true" aria-label="拍一下">
       <canvas ref={canvasRef} style={{ display: 'none' }} />
-      {/* Gallery / file picker — no capture attr (mixed accept + capture misbehaves
-          on iOS; the live camera is handled by getUserMedia, not this input). */}
+      {/* Native camera — opens the iOS system camera directly (reliable, no
+          persistent stream/indicator). Triggered by a user tap. */}
+      <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handleFileChange} />
+      {/* Gallery / file picker — no capture, so it picks from library/files. */}
       <input ref={fileRef} type="file" accept="image/*,.pdf,.txt,.eml" style={{ display: 'none' }} onChange={handleFileChange} />
 
       {/* Header */}
@@ -426,7 +428,7 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
           />
         )}
 
-        {/* Opening / no camera fallback */}
+        {/* Capture chooser (native camera) / no-camera fallback */}
         {(phase === 'idle' || phase === 'no-camera') && (
           <div className="nesio-camera-fallback">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="52" height="52" opacity="0.25">
@@ -435,11 +437,12 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
             </svg>
             <p className="nesio-camera-fallback-text">
               {phase === 'idle'
-                ? '正在打开相机。你也可以先选一张照片或文件放进 Nesio。'
-                : permDenied
-                ? '相机权限被拒绝。请在浏览器设置→网站设置→摄像头中允许，然后刷新。'
-                : '此设备不支持网页相机访问。'}
+                ? '点下方按钮拍一张，Nesio 帮你识别并存入 Memory。'
+                : '此设备不支持相机，请从相册或文件选择。'}
             </p>
+            <button type="button" className="nesio-camera-shoot-btn" onClick={openNativeCamera}>
+              📷 拍照
+            </button>
             <button type="button" className="nesio-camera-gallery-btn" onClick={handleGallery}>
               从相册 / 文件中选择
             </button>
@@ -521,31 +524,6 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
         </div>
       )}
 
-      {/* Controls */}
-      {(phase === 'live' || phase === 'no-camera') && (
-        <div className="nesio-camera-controls">
-          <button type="button" className="nesio-camera-ctrl-btn" onClick={handleGallery} aria-label="相册">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="22" height="22">
-              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
-              <rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>
-            </svg>
-          </button>
-          <button
-            type="button"
-            className="nesio-camera-shutter"
-            onClick={capturePhoto}
-            disabled={phase !== 'live'}
-            style={{ opacity: phase === 'live' ? 1 : 0.3 }}
-            aria-label="拍照"
-          />
-          <button type="button" className="nesio-camera-ctrl-btn" onClick={flipCamera} aria-label="翻转">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="22" height="22">
-              <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
-              <circle cx="12" cy="13" r="4"/>
-            </svg>
-          </button>
-        </div>
-      )}
     </div>
   );
 }
