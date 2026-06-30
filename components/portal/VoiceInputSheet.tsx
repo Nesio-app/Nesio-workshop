@@ -12,7 +12,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { getRecentNodes, isPrivateExternalNode, searchLifeGraphFuzzy, type LifeNode } from '@/lib/portal/life-graph';
 import { searchSignalsWithCloudFallback } from '@/lib/life-domain/signal-search';
-import { createSignal, extractContext } from '@/lib/life-domain';
+import {
+  createSignal,
+  extractContext,
+  hasContext,
+  ALL_DOMAINS,
+  DOMAINS,
+  type FrontDomain,
+  type SignalContext,
+} from '@/lib/life-domain';
 import { routeIntent } from '@/lib/portal/intent-router';
 import MeetingRecorder from './MeetingRecorder';
 
@@ -30,8 +38,31 @@ const QUICK_INTENTS = [
   { label: '我今天…', prefix: '我今天 ' },
 ];
 
-type SendState = 'idle' | 'analyzing' | 'saved' | 'error';
+type SendState = 'idle' | 'analyzing' | 'confirm' | 'saved' | 'error';
 type AskResult = Pick<LifeNode, 'id' | 'name'> & { source: string };
+
+/** A captured input held for user confirmation before it becomes a trusted fact (§6.2). */
+interface PendingDraft {
+  rawText: string;
+  cleanText: string;
+  inlineTags: string[];
+  title: string;
+  aiConfidence: number;
+  baseContext: SignalContext;   // labels / intent / time / secondaryDomains from extraction
+  domain: FrontDomain | null;
+  people: string[];
+  places: string[];
+  objects: string[];
+  edited: boolean;
+}
+
+function signalTypeForDomain(domain: FrontDomain | null, hasPlaceOrObject: boolean): string {
+  if (domain === 'assets') return hasPlaceOrObject ? 'object.location' : 'object';
+  if (domain === 'health') return 'health.state';
+  if (domain === 'growth') return 'task';
+  if (domain === 'energy') return 'energy.state';
+  return 'observation';
+}
 
 function parseInlineTags(value: string): string[] {
   const tags = value.match(/#[^\s#，。,.!?！？:：；;]+/g) || [];
@@ -84,6 +115,7 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
   const [micError, setMicError] = useState('');
   const [savedCount, setSavedCount] = useState(0);
   const [askResults, setAskResults] = useState<AskResult[]>([]);
+  const [draft, setDraft] = useState<PendingDraft | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const recRef = useRef<{ stop: () => void } | null>(null);
   const isAskMode = intent === 'ask';
@@ -92,6 +124,7 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
     if (!open) {
       setText(''); setSendState('idle'); setListening(false);
       setIntentLabel(''); setMicError(''); setSavedCount(0); setAskResults([]);
+      setDraft(null);
       recRef.current?.stop();
     } else {
       setTimeout(() => inputRef.current?.focus(), 120);
@@ -182,12 +215,6 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
     // Context Extraction (§6.2): structure the input before it becomes a fact.
     // Rule-based v1; AI may refine the title/confidence below.
     const context = extractContext(cleanText);
-    const signalType = context.domain === 'assets'
-      ? (context.places?.length || context.objects?.length ? 'object.location' : 'object')
-      : context.domain === 'health' ? 'health.state'
-      : context.domain === 'growth' ? 'task'
-      : context.domain === 'energy' ? 'energy.state'
-      : 'observation';
 
     let title = cleanText.slice(0, 40);
     let aiConfidence = 0.7;
@@ -208,22 +235,69 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
       /* offline — keep rule-based title/confidence */
     }
 
+    const pending: PendingDraft = {
+      rawText: t,
+      cleanText,
+      inlineTags,
+      title,
+      aiConfidence,
+      baseContext: context,
+      domain: context.domain ?? null,
+      people: context.people ?? [],
+      places: context.places ?? [],
+      objects: context.objects ?? [],
+      edited: false,
+    };
+
+    // §6.2 绝对控制优先: AI only SUGGESTS. If it found something worth confirming
+    // (a domain or any entity), show it for confirmation/edit before it becomes a
+    // trusted fact. If there's nothing to confirm, write straight through.
+    if (hasContext(context)) {
+      setDraft(pending);
+      setSendState('confirm');
+      return;
+    }
+    writeSignalFromDraft(pending, false);
+  }
+
+  function writeSignalFromDraft(d: PendingDraft, userConfirmed: boolean) {
+    const hasPlaceOrObject = d.places.length > 0 || d.objects.length > 0;
+    const context: SignalContext = {
+      ...d.baseContext,
+      domain: d.domain ?? undefined,
+      people: d.people,
+      places: d.places,
+      objects: d.objects,
+      confidence: { ai: d.aiConfidence, userConfirmed, userEdited: d.edited },
+    };
     // Canonical write path: one Signal carrying structured context. createSignal
     // mirrors to cloud for signed-in users (§Signal main-fact transition).
     createSignal({
       source: 'voice',
-      type: signalType,
-      title,
-      payload: { note: cleanText },
-      confidence: aiConfidence,
-      context: { ...context, confidence: { ai: aiConfidence, userConfirmed: false, userEdited: false } },
-      tags: mergeTags(['说一句', context.domain ? `domain:${context.domain}` : ''], inlineTags),
-      raw: t,
+      type: signalTypeForDomain(d.domain, hasPlaceOrObject),
+      title: d.title,
+      payload: { note: d.cleanText },
+      confidence: d.aiConfidence,
+      context,
+      tags: mergeTags(['说一句', d.domain ? `domain:${d.domain}` : ''], d.inlineTags),
+      raw: d.rawText,
     });
 
     setSavedCount(1);
+    setDraft(null);
     setSendState('saved');
     setTimeout(() => { onClose(); setText(''); setSendState('idle'); }, 1100);
+  }
+
+  // Confirm-panel editors — each edit flips `edited` so provenance records it (§6.2).
+  function setDraftDomain(domain: FrontDomain) {
+    setDraft((d) => (d ? { ...d, domain: d.domain === domain ? null : domain, edited: true } : d));
+  }
+  function dropChip(kind: 'people' | 'places' | 'objects', value: string) {
+    setDraft((d) => (d ? { ...d, [kind]: d[kind].filter((item) => item !== value), edited: true } : d));
+  }
+  function setDraftTitle(title: string) {
+    setDraft((d) => (d ? { ...d, title, edited: true } : d));
   }
 
   if (!open) return null;
@@ -253,7 +327,75 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
           </div>
         </div>
 
-        {!isAskMode && (
+        {/* Context confirm (§6.2 绝对控制优先) — AI suggested; you decide before it's trusted. */}
+        {sendState === 'confirm' && draft && (
+          <div className="nesio-voice-confirm">
+            <p className="nesio-voice-confirm-lead">先确认一下，再存入 Memory</p>
+
+            <label className="nesio-voice-confirm-field">
+              <span className="nesio-voice-confirm-label">这条叫什么</span>
+              <input
+                className="nesio-voice-confirm-input"
+                value={draft.title}
+                onChange={(e) => setDraftTitle(e.target.value)}
+                aria-label="标题"
+              />
+            </label>
+
+            <div className="nesio-voice-confirm-field">
+              <span className="nesio-voice-confirm-label">属于哪个领域</span>
+              <div className="nesio-voice-confirm-domains">
+                {ALL_DOMAINS.map((meta) => (
+                  <button
+                    key={meta.id}
+                    type="button"
+                    className={`nesio-voice-confirm-domain${draft.domain === meta.id ? ' is-active' : ''}`}
+                    onClick={() => setDraftDomain(meta.id)}
+                    aria-pressed={draft.domain === meta.id}
+                  >
+                    {meta.icon} {meta.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {(['people', 'places', 'objects'] as const).some((k) => draft[k].length > 0) && (
+              <div className="nesio-voice-confirm-field">
+                <span className="nesio-voice-confirm-label">识别到的线索（点 × 去掉不对的）</span>
+                <div className="nesio-voice-confirm-chips">
+                  {([
+                    ['people', '👤'],
+                    ['places', '📍'],
+                    ['objects', '📦'],
+                  ] as const).flatMap(([kind, icon]) =>
+                    draft[kind].map((value) => (
+                      <button
+                        key={`${kind}-${value}`}
+                        type="button"
+                        className="nesio-voice-confirm-chip"
+                        onClick={() => dropChip(kind, value)}
+                        aria-label={`去掉 ${value}`}
+                      >
+                        {icon} {value} <span className="nesio-voice-confirm-chip-x">✕</span>
+                      </button>
+                    )),
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="nesio-voice-confirm-actions">
+              <button type="button" className="nesio-voice-confirm-back" onClick={() => { setDraft(null); setSendState('idle'); }}>
+                返回修改
+              </button>
+              <button type="button" className="nesio-voice-send-btn nesio-voice-confirm-save" onClick={() => draft && writeSignalFromDraft(draft, true)}>
+                确认存入 Memory
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!isAskMode && sendState !== 'confirm' && (
           <div className="nesio-voice-transcript" onClick={() => { stopListening(); inputRef.current?.focus(); }}>
             {text
               ? <span>{text}</span>
@@ -266,13 +408,14 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
         )}
 
         {/* Intent label */}
-        {!isAskMode && intentLabel && (
+        {!isAskMode && intentLabel && sendState !== 'confirm' && (
           <div className="nesio-voice-intent-label">
             <span>✦</span> {intentLabel}
           </div>
         )}
 
         {/* Waveform / status */}
+        {sendState !== 'confirm' && (
         <div className="nesio-voice-status">
           {listening ? (
             <>
@@ -292,9 +435,10 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
             <span style={{ fontSize: '0.72rem', color: 'var(--portal-muted)' }}>识别完成 · 点「告诉 Nesio」保存</span>
           ) : null}
         </div>
+        )}
 
         {/* Quick intent chips */}
-        {!isAskMode && (
+        {!isAskMode && sendState !== 'confirm' && (
           <div className="nesio-voice-quick">
             {QUICK_INTENTS.map((q) => (
               <button key={q.label} type="button" className="nesio-voice-quick-btn"
@@ -306,6 +450,7 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
         )}
 
         {/* Text input fallback */}
+        {sendState !== 'confirm' && (
         <div className="nesio-voice-input-row">
           <span className="nesio-voice-input-spark">✦</span>
           <input
@@ -328,6 +473,7 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
             </svg>
           </button>
         </div>
+        )}
 
         {/* Send button */}
         {isAskMode && sendState === 'saved' ? (
@@ -351,7 +497,7 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
           <div className="nesio-voice-send-btn" style={{ opacity: 0.6, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
             <span className="nesio-camera-recognizing-dot" style={{ background: '#fff' }} />Nesio 正在分析…
           </div>
-        ) : text.trim() ? (
+        ) : text.trim() && sendState !== 'confirm' ? (
           <button type="button" className="nesio-voice-send-btn" onClick={handleSend}>
             {isAskMode ? '问宝盒' : '告诉 Nesio'}
           </button>

@@ -9428,6 +9428,120 @@ html[data-portal-theme="night"] .nesio-voice-input { color: #e8eefa; }
   padding: 0.5rem;
 }
 
+/* ─── Context confirm (§6.2 绝对控制优先) ─── */
+.nesio-voice-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 0.25rem 0 0.5rem;
+}
+.nesio-voice-confirm-lead {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--portal-ink);
+}
+html[data-portal-theme="night"] .nesio-voice-confirm-lead { color: #e8eefa; }
+
+.nesio-voice-confirm-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.nesio-voice-confirm-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--portal-muted);
+}
+.nesio-voice-confirm-input {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.7rem;
+  border: 1px solid var(--portal-line);
+  background: var(--glass-bg-solid);
+  color: var(--portal-ink);
+  font-size: 0.9rem;
+}
+html[data-portal-theme="night"] .nesio-voice-confirm-input {
+  background: rgba(255,255,255,0.07);
+  border-color: rgba(255,255,255,0.12);
+  color: #e8eefa;
+}
+
+.nesio-voice-confirm-domains {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.nesio-voice-confirm-domain {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-height: 34px;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--portal-line);
+  background: var(--glass-bg-solid);
+  color: var(--portal-ink);
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: background 0.15s, border-color 0.15s, transform 0.12s;
+}
+.nesio-voice-confirm-domain:active { transform: scale(0.96); }
+.nesio-voice-confirm-domain.is-active {
+  background: var(--portal-blue-deep, #588ce3);
+  border-color: var(--portal-blue-deep, #588ce3);
+  color: #fff;
+}
+html[data-portal-theme="night"] .nesio-voice-confirm-domain {
+  background: rgba(255,255,255,0.07);
+  border-color: rgba(255,255,255,0.12);
+  color: #e8eefa;
+}
+
+.nesio-voice-confirm-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.nesio-voice-confirm-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-height: 32px;
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid rgba(88,140,227,0.3);
+  background: rgba(88,140,227,0.1);
+  color: var(--portal-blue-deep, #588ce3);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.nesio-voice-confirm-chip-x { opacity: 0.6; font-size: 0.7rem; }
+.nesio-voice-confirm-chip:active { transform: scale(0.96); }
+html[data-portal-theme="night"] .nesio-voice-confirm-chip {
+  background: rgba(88,140,227,0.22);
+  color: #bcd2f5;
+}
+
+.nesio-voice-confirm-actions {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  margin-top: 0.25rem;
+}
+.nesio-voice-confirm-back {
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 0.6rem 1rem;
+  border-radius: 999px;
+  border: 1px solid var(--portal-line);
+  background: transparent;
+  color: var(--portal-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.nesio-voice-confirm-save { flex: 1; width: auto; }
+
 /* ─── Camera Sheet ─── */
 .nesio-camera-sheet {
   position: fixed;
