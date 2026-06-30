@@ -393,7 +393,11 @@ export default function TodayFeed({
   onOpenMemory?: () => void;
 }) {
   const [displayName, setDisplayName] = useState('');
-  const [isNight, setIsNight] = useState(false);
+  // Initialise synchronously so there is no flash before useEffect runs.
+  // Portal is loaded with ssr:false so document is always available at mount.
+  const [isNight, setIsNight] = useState(() => {
+    try { return document.documentElement.getAttribute('data-portal-theme') === 'night'; } catch { return false; }
+  });
   const [cards, setCards] = useState<RecommendationCard[]>([]);
   const [memoryCount, setMemoryCount] = useState(0);
   const [memoryNotes, setMemoryNotes] = useState<readonly string[]>([]);
