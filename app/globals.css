@@ -8818,6 +8818,39 @@ html[data-portal-theme="night"] .nesio-memory-search { color: #e8eefa; }
 
 .nesio-memory-search::placeholder { color: var(--portal-muted); }
 
+/* AI understood chips — shown below search bar when entities are extracted from the query. */
+.nesio-search-understood {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.6rem;
+  animation: nesio-fade-in 0.18s ease;
+}
+
+.nesio-search-understood-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--portal-muted);
+  letter-spacing: 0.04em;
+  margin-right: 0.1rem;
+}
+
+.nesio-search-understood-chip {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: #3b6ef0;
+  background: #e8effe;
+  border-radius: 99px;
+  padding: 0.18rem 0.6rem;
+  white-space: nowrap;
+}
+
+html[data-portal-theme="night"] .nesio-search-understood-chip {
+  color: #8faaff;
+  background: rgba(99, 138, 255, 0.15);
+}
+
 .nesio-memory-hero { margin-bottom: 1.25rem; }
 
 .nesio-memory-hero-title {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useState, useEffect } from 'react';
+import { useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import {
   PROFILE_UPDATED_EVENT,
   loadProfileSettings,
@@ -16,10 +16,10 @@ import {
   isPrivateExternalNode,
   mergeCloudMemorySnapshot,
   retryLifeGraphCloudSync,
-  searchLifeGraph,
   type LifeNode,
 } from '@/lib/portal/life-graph';
 import { ALL_DOMAINS, DOMAINS, nodeDomain, type FrontDomain } from '@/lib/life-domain';
+import { smartSearch, type SearchUnderstood } from '@/lib/portal/smart-search';
 import MemoryNodeDetail from './MemoryNodeDetail';
 
 const TYPE_ICON: Record<string, string> = {
@@ -279,9 +279,17 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
     [domain],
   );
   const visibleNodes = byDomain(nodes);
+
+  // Smart search: entity-boosted ranking. Domain filter is applied inside smartSearch.
+  const { nodes: smartNodes, understood } = useMemo(
+    () => (query.trim() ? smartSearch(query, domain) : { nodes: [], understood: { people: [], places: [], objects: [], domain: null } as SearchUnderstood }),
+    [query, domain],
+  );
   const results = query.trim()
-    ? byDomain(visibleMemoryNodes(searchLifeGraph(query), canUsePrivateData))
+    ? visibleMemoryNodes(smartNodes, canUsePrivateData)
     : visibleNodes;
+  const hasUnderstoodEntities =
+    understood.people.length + understood.places.length + understood.objects.length > 0;
   const hasRealNodes = visibleNodes.length > 0;
   const sourceItems = query ? results : (hasRealNodes ? results : []);
   const visibleItems = showAll || query ? sourceItems : sourceItems.slice(0, 6);
@@ -312,6 +320,27 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
               <button type="button" onClick={() => setQuery('')} style={{ color: 'var(--portal-muted)', fontSize: '0.85rem' }} aria-label={copy.clear}>✕</button>
             )}
           </div>
+
+          {/* AI understood — show what entities the smart search extracted from the query. */}
+          {query.trim() && hasUnderstoodEntities && (
+            <div className="nesio-search-understood" aria-live="polite">
+              <span className="nesio-search-understood-label">理解为</span>
+              {understood.people.map((p) => (
+                <span key={p} className="nesio-search-understood-chip">👤 {p}</span>
+              ))}
+              {understood.places.map((p) => (
+                <span key={p} className="nesio-search-understood-chip">📍 {p}</span>
+              ))}
+              {understood.objects.map((o) => (
+                <span key={o} className="nesio-search-understood-chip">📦 {o}</span>
+              ))}
+              {understood.domain && (
+                <span className="nesio-search-understood-chip">
+                  {DOMAINS[understood.domain].icon} {DOMAINS[understood.domain].label}
+                </span>
+              )}
+            </div>
+          )}
 
           {/* Domain filter — front-stage scenes (生活/成长/财物/健康/能量). */}
           {nodes.length > 0 && (
