@@ -8,6 +8,7 @@ import { learnFromFeedback } from '@/lib/portal/mirror-profile';
 import { recordSignalFeedback } from '@/lib/life-domain/signal-feedback';
 import { cloudSignalRowsToSignals, type CloudSignalRow } from '@/lib/life-domain/signal-search';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
+import { getLifeGraph, type LifeNode } from '@/lib/portal/life-graph';
 import VoiceBrief from './VoiceBrief';
 import DailyBriefCard from './DailyBriefCard';
 import LifeStateCard from './LifeStateCard';
@@ -215,6 +216,143 @@ function StandardCard({ card, onFeedback }: { card: RecommendationCard; onFeedba
   );
 }
 
+// --- Today Focus helpers ---
+
+const FOCUS_TIME_WORDS = ['生日', '会议', '截止', '复诊', '今天', '明天', '后天', '本周', '这周', 'deadline', 'birthday', 'meeting', '到期', '提醒'];
+
+function isFocusNode(node: LifeNode): boolean {
+  const text = [node.name, node.rawInput || ''].join(' ').toLowerCase();
+  if (FOCUS_TIME_WORDS.some((w) => text.includes(w))) return true;
+  if (node.type === 'commitment' || node.type === 'event') return true;
+  for (const v of Object.values(node.attributes)) {
+    if (typeof v === 'string') {
+      const d = new Date(v);
+      if (!Number.isNaN(d.getTime()) && d > new Date() && d < new Date(Date.now() + 30 * 86_400_000)) return true;
+    }
+  }
+  return false;
+}
+
+function focusTimeHint(node: LifeNode): string {
+  const now = new Date();
+  for (const v of Object.values(node.attributes)) {
+    if (typeof v === 'string') {
+      const d = new Date(v);
+      if (!Number.isNaN(d.getTime()) && d > now) {
+        const days = Math.round((d.getTime() - now.getTime()) / 86_400_000);
+        if (days === 0) return '今天';
+        if (days === 1) return '明天';
+        if (days <= 7) return `${days} 天后`;
+        if (days <= 30) return `约 ${Math.round(days / 7)} 周后`;
+        return `${days} 天后`;
+      }
+    }
+  }
+  const text = [node.name, node.rawInput || ''].join(' ').toLowerCase();
+  if (text.includes('今天')) return '今天';
+  if (text.includes('明天')) return '明天';
+  const hours = (now.getTime() - new Date(node.createdAt).getTime()) / 3_600_000;
+  if (hours < 24) return '刚记录';
+  return '';
+}
+
+const FOCUS_TYPE_LABEL: Record<string, string> = {
+  commitment: '承诺', event: '日程', object: '物品', person: '联系人',
+  place: '地点', health_state: '健康', preference: '偏好',
+};
+const FOCUS_TYPE_ICON: Record<string, string> = {
+  commitment: '🤝', event: '📅', object: '📦', person: '👤',
+  place: '📍', health_state: '🩷', preference: '⭐',
+};
+const FOCUS_TYPE_BG: Record<string, string> = {
+  commitment: '#ede9fe', event: '#fef3c7', object: '#dbeafe',
+  person: '#e0e7ff', place: '#d1fae5', health_state: '#fce7f3', preference: '#f0fdf4',
+};
+
+function TodayFocusSection({
+  canUsePrivateData,
+  onOpenMemory,
+}: {
+  canUsePrivateData: boolean;
+  onOpenMemory?: () => void;
+}) {
+  const [focusNodes, setFocusNodes] = useState<LifeNode[]>([]);
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!canUsePrivateData) { setFocusNodes([]); return; }
+    const refresh = () => {
+      const all = getLifeGraph();
+      const focused = all
+        .filter(isFocusNode)
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, 5);
+      setFocusNodes(focused);
+    };
+    refresh();
+    window.addEventListener('nesio-life-graph-updated', refresh);
+    return () => window.removeEventListener('nesio-life-graph-updated', refresh);
+  }, [canUsePrivateData]);
+
+  const visible = focusNodes.filter((n) => !dismissed.has(n.id));
+
+  return (
+    <div className="nesio-focus-section">
+      <div className="nesio-focus-header">
+        <h2 className="nesio-focus-title">今日焦点</h2>
+        {onOpenMemory && (
+          <button type="button" className="nesio-focus-all-btn" onClick={onOpenMemory}>全部 Memory ›</button>
+        )}
+      </div>
+
+      {visible.length === 0 ? (
+        <div className="nesio-focus-empty">
+          <p>今天暂无焦点事项</p>
+          <p className="nesio-focus-empty-hint">说一句带时间的话（比如"生日在周五"），就会出现在这里。</p>
+          <button
+            type="button"
+            className="nesio-focus-add-btn"
+            onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-tell'))}
+          >
+            ＋ 记一件事
+          </button>
+        </div>
+      ) : (
+        <div className="nesio-focus-cards">
+          {visible.map((node) => {
+            const hint = focusTimeHint(node);
+            return (
+              <div key={node.id} className="nesio-focus-card">
+                <span
+                  className="nesio-focus-card-icon"
+                  style={{ background: FOCUS_TYPE_BG[node.type] || '#f0f4ff' }}
+                >
+                  {FOCUS_TYPE_ICON[node.type] || '📌'}
+                </span>
+                <div className="nesio-focus-card-body">
+                  <p className="nesio-focus-card-title">{node.name}</p>
+                  <p className="nesio-focus-card-meta">
+                    <span className="nesio-focus-card-type">{FOCUS_TYPE_LABEL[node.type] || '记录'}</span>
+                    {hint && <span className="nesio-focus-card-hint">{hint}</span>}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="nesio-focus-card-dismiss"
+                  aria-label="暂时忽略"
+                  onClick={() => setDismissed((prev) => { const next = new Set(prev); next.add(node.id); return next; })}
+                >
+                  ✕
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function NightTimeline() {
   return (
     <div className="nesio-today-night">
@@ -361,13 +499,17 @@ export default function TodayFeed({
           <NightTimeline />
         ) : (
           <>
-            {/* Always-present daily overview card */}
+            {/* 🔊 Slim briefing strip — just a button, not a card section */}
             <DailyBriefCard canUsePrivateData={canUsePrivateData} memoryCount={memoryCount} memoryNotes={memoryNotes} />
 
-            {/* Cross-signal Life State (Signal → Life State pipeline output) */}
+            {/* 今日焦点 — time-relevant Memory nodes surfaced from LifeGraph */}
+            <TodayFocusSection canUsePrivateData={canUsePrivateData} onOpenMemory={onOpenMemory} />
+
+            {/* 今日状态 — health/energy only; hidden when no real signal data */}
             <LifeStateCard canUsePrivateData={canUsePrivateData} />
 
-            {cards.length > 0 ? (
+            {/* Secondary: AI recommendation cards (shown below fold) */}
+            {cards.length > 0 && (
               <div className="nesio-today-cards">
                 {(showMoreCards ? cards : cards.slice(0, 1)).map((card) =>
                   card.type === 'audio' ? (
@@ -386,29 +528,7 @@ export default function TodayFeed({
                   </button>
                 )}
               </div>
-            ) : (
-              <div className="nesio-today-empty">
-                <div className="nesio-today-empty-icon" aria-hidden>✦</div>
-                <h3 className="nesio-today-empty-title">从一件小事开始</h3>
-                <p className="nesio-today-empty-sub">说一句、拍一下，Nesio 会帮你留到以后找得到。</p>
-                <div className="nesio-today-empty-actions">
-                  <button type="button" className="nesio-today-empty-action" onClick={onOpenMemory}>
-                    <span>🗂</span> 看看 Memory
-                  </button>
-                  <button type="button" className="nesio-today-empty-action"
-                    onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-tell'))}>
-                    <span>✦</span> 先记一件事
-                  </button>
-                </div>
-                <p className="nesio-today-empty-hint">
-                  登录后可以同步日历和 Memory；不登录也能先本地使用。
-                </p>
-              </div>
             )}
-
-            <button type="button" className="nesio-today-memory-link" onClick={onOpenMemory}>
-              在 Memory 里看 {memoryCount > 0 ? `（${memoryCount} 条）` : ''} ›
-            </button>
           </>
         )}
       </div>

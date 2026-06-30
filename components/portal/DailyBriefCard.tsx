@@ -1,9 +1,9 @@
 'use client';
 
 /**
- * DailyBriefCard — always-present card in Today Feed.
- * Shows weather + calendar + email highlights.
- * "听简报" button launches conversational TTS briefing.
+ * DailyBriefCard — slim button strip.
+ * "听今日简报" triggers TTS generation; while playing shows an inline waveform.
+ * The briefing content (calendar + memory highlights) is audio-only — not a card section.
  */
 
 import { useEffect, useRef, useState } from 'react';
@@ -11,8 +11,6 @@ import { loadProfileSettings } from '@/lib/portal/profile';
 import { readPortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
 import type { CalendarEvent } from '@/lib/portal/types';
 
-// View-model types owned by the Today surface (Platform Leak Check: Today must
-// not import Integration DTOs — it consumes its own normalized view shapes).
 interface BriefSegment {
   id: string;
   type: 'greeting' | 'weather' | 'calendar' | 'email' | 'memory' | 'closing';
@@ -28,7 +26,6 @@ interface WeatherView {
 }
 
 const BRIEF_CACHE_KEY = 'nesio-daily-brief-cache';
-
 interface BriefCache { date: string; segments: BriefSegment[]; script: string; }
 
 function todayKey(): string {
@@ -36,31 +33,6 @@ function todayKey(): string {
 }
 
 type PlayState = 'idle' | 'loading' | 'playing' | 'paused' | 'done' | 'error';
-
-function buildDailyOverview(canUsePrivateData: boolean, eventCount: number, memoryCount: number) {
-  if (!canUsePrivateData || memoryCount === 0) {
-    return {
-      title: '先放进来一件事就好',
-      subtitle: '说一句、拍一下，Nesio 会帮你留到以后找得到。',
-    };
-  }
-  if (eventCount >= 2) {
-    return {
-      title: '今天有点多，先看最重要的一件。',
-      subtitle: `有 ${eventCount} 个安排，我把最该看的放前面。`,
-    };
-  }
-  if (eventCount === 1) {
-    return {
-      title: '今天先看这一件事。',
-      subtitle: '还有别的线索可以晚点处理。',
-    };
-  }
-  return {
-    title: memoryCount >= 3 ? '今天适合整理一下线索。' : '今天很轻，可以补一条 Memory。',
-    subtitle: memoryCount >= 3 ? '你已经放进来一些内容，可以回头找得到。' : '从一件小事开始就够了。',
-  };
-}
 
 export default function DailyBriefCard({
   canUsePrivateData,
@@ -82,8 +54,7 @@ export default function DailyBriefCard({
 
   useEffect(() => {
     if (canUsePrivateData) {
-      const profile = loadProfileSettings();
-      setDisplayName(profile.displayName || '');
+      setDisplayName(loadProfileSettings().displayName || '');
     } else {
       setDisplayName('');
       setEvents([]);
@@ -91,7 +62,6 @@ export default function DailyBriefCard({
       setGenerated(false);
     }
 
-    // Load cached brief for today
     if (canUsePrivateData) {
       try {
         const cached = JSON.parse(localStorage.getItem(BRIEF_CACHE_KEY) || 'null') as BriefCache | null;
@@ -103,22 +73,16 @@ export default function DailyBriefCard({
       } catch { /* ignore */ }
     }
 
-    // Load signals
     const w = readPortalCache<WeatherView>(PORTAL_CACHE_KEYS.weather);
     setWeather(w);
     if (canUsePrivateData) {
       const cal = readPortalCache<{ events?: CalendarEvent[] }>(PORTAL_CACHE_KEYS.calendar);
       setEvents(cal?.events?.filter((e) => new Date(e.start).getTime() > Date.now()).slice(0, 3) || []);
-    } else {
-      setEvents([]);
     }
 
     const onUpdate = () => {
       setWeather(readPortalCache<WeatherView>(PORTAL_CACHE_KEYS.weather));
-      if (!canUsePrivateData) {
-        setEvents([]);
-        return;
-      }
+      if (!canUsePrivateData) { setEvents([]); return; }
       const c = readPortalCache<{ events?: CalendarEvent[] }>(PORTAL_CACHE_KEYS.calendar);
       setEvents(c?.events?.filter((e) => new Date(e.start).getTime() > Date.now()).slice(0, 3) || []);
     };
@@ -150,7 +114,7 @@ export default function DailyBriefCard({
             date: todayKey(), segments: data.segments, script: data.segments.map((s) => s.text).join(' '),
           }));
         } catch { /* ignore */ }
-        playSegments(data.segments, 0);
+        void playSegments(data.segments, 0);
       } else {
         setPlayState('idle');
       }
@@ -163,14 +127,12 @@ export default function DailyBriefCard({
       setPlayState('playing');
       const ok = await playSingleSegment(segs[i]);
       if (!ok) return;
-      if (playState === 'idle') return; // stopped
     }
     setPlayState('done');
   }
 
   async function playSingleSegment(seg: BriefSegment): Promise<boolean> {
     return new Promise((resolve) => {
-      // Try OpenAI TTS
       fetch('/api/portal/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -190,10 +152,7 @@ export default function DailyBriefCard({
             resolve(false);
           }
         })
-        .catch(() => {
-          setPlayState('error');
-          resolve(false);
-        });
+        .catch(() => { setPlayState('error'); resolve(false); });
     });
   }
 
@@ -203,79 +162,36 @@ export default function DailyBriefCard({
     setPlayState('idle');
   }
 
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? '早上好' : hour < 18 ? '下午好' : '晚上好';
-  const overview = buildDailyOverview(canUsePrivateData, events.length, memoryCount);
+  // Slim strip — just a button row, not a full card.
+  if (!canUsePrivateData) {
+    return (
+      <div className="nesio-brief-strip">
+        <span className="nesio-brief-strip-label">🔊 每日简报</span>
+        <a href="/login" className="nesio-brief-strip-btn">登录后生成</a>
+      </div>
+    );
+  }
 
   return (
-    <div className="nesio-brief-card">
-      {/* Header */}
-      <div className="nesio-brief-card-header">
-        <div>
-          <p className="nesio-brief-kicker">每日概况</p>
-          <h3 className="nesio-brief-title">{greeting}{displayName ? `，${displayName}` : ''}。</h3>
-          <p className="nesio-brief-overview-title">{overview.title}</p>
-          <p className="nesio-brief-overview-sub">{overview.subtitle}</p>
-        </div>
-        {playState === 'playing' ? (
-          <button type="button" className="nesio-brief-podcast-btn nesio-brief-podcast-btn--active" onClick={stopPlay}>
-            <span className="nesio-brief-wave" aria-hidden>
-              {Array.from({ length: 4 }, (_, i) => <span key={i} style={{ animationDelay: `${i * 0.1}s` }} />)}
-            </span>
-            停止
-          </button>
-        ) : canUsePrivateData ? (
-          <button type="button" className="nesio-brief-podcast-btn"
-            onClick={() => generated ? playSegments(segments, 0) : generateBrief()}
-            disabled={playState === 'loading'}>
-            {playState === 'loading' ? '生成中…' : '听简报'}
-          </button>
-        ) : (
-          <a href="/login" className="nesio-brief-podcast-btn" style={{ textDecoration: 'none' }}>
-            登录后生成
-          </a>
-        )}
-      </div>
-
-      {/* Signals row: calendar only. Weather stays out of the first-launch overview. */}
-      <div className="nesio-brief-signals">
-        <div className="nesio-brief-signal">
-          <span className="nesio-brief-signal-icon">📅</span>
-          <div>
-            {events.length > 0 ? (
-              <>
-                <p className="nesio-brief-signal-val">{events.length} 个安排</p>
-                <p className="nesio-brief-signal-note">
-                  {new Date(events[0].start).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })} {events[0].title}
-                </p>
-              </>
-            ) : (
-              <>
-                <p className="nesio-brief-signal-val">{canUsePrivateData ? '今天无安排' : '登录后显示日程'}</p>
-                <p className="nesio-brief-signal-note">{canUsePrivateData ? '接入 Calendar 显示日程' : '不会在公开状态加载日历'}</p>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Playing indicator */}
-      {playState === 'playing' && segments[currentSeg] && (
-        <div className="nesio-brief-now-playing">
-          <span>{segments[currentSeg].emoji}</span>
-          <span className="nesio-brief-now-playing-text">{segments[currentSeg].text}</span>
-        </div>
-      )}
-
-      {playState === 'done' && (
-        <p style={{ fontSize: '0.72rem', color: '#10b981', textAlign: 'center', marginTop: '0.5rem' }}>
-          播报完毕 ✓
-        </p>
-      )}
-      {playState === 'error' && (
-        <p style={{ fontSize: '0.72rem', color: '#ef4444', textAlign: 'center', marginTop: '0.5rem' }}>
-          真人语音暂不可用，请稍后再试。
-        </p>
+    <div className="nesio-brief-strip">
+      <span className="nesio-brief-strip-label">
+        {playState === 'playing' && segments[currentSeg]
+          ? <><span className="nesio-brief-strip-wave" aria-hidden>{Array.from({ length: 4 }, (_, i) => <span key={i} style={{ animationDelay: `${i * 0.12}s` }} />)}</span>{segments[currentSeg].emoji} {segments[currentSeg].text.slice(0, 30)}{segments[currentSeg].text.length > 30 ? '…' : ''}</>
+          : playState === 'done' ? '✓ 简报播放完毕'
+          : playState === 'error' ? '语音暂不可用'
+          : '🔊 听今日简报'}
+      </span>
+      {playState === 'playing' ? (
+        <button type="button" className="nesio-brief-strip-btn nesio-brief-strip-btn--stop" onClick={stopPlay}>停止</button>
+      ) : (
+        <button
+          type="button"
+          className="nesio-brief-strip-btn"
+          disabled={playState === 'loading'}
+          onClick={() => (generated ? void playSegments(segments, 0) : void generateBrief())}
+        >
+          {playState === 'loading' ? '生成中…' : generated ? '重新播放' : '生成简报'}
+        </button>
       )}
     </div>
   );

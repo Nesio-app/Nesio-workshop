@@ -11523,6 +11523,218 @@ html[data-portal-theme="night"] .nesio-meeting-note-summary { color: #e8eefa; }
 .nesio-meeting-note-list--action li::before { content: '→'; color: #10b981; }
 
 /* ─── Daily Brief Card ─── */
+/* Slim brief strip — replaces the old full card */
+.nesio-brief-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  background: var(--glass-bg-solid);
+  border: 1px solid var(--portal-line);
+  border-radius: 0.9rem;
+  padding: 0.55rem 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.nesio-brief-strip-label {
+  font-size: 0.82rem;
+  color: var(--portal-ink);
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nesio-brief-strip-wave {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 14px;
+  margin-right: 0.2rem;
+}
+.nesio-brief-strip-wave span {
+  display: inline-block;
+  width: 3px;
+  border-radius: 99px;
+  background: #3b6ef0;
+  animation: nesio-brief-wave-bounce 0.7s ease-in-out infinite alternate;
+  height: 8px;
+}
+.nesio-brief-strip-wave span:nth-child(1) { height: 6px; }
+.nesio-brief-strip-wave span:nth-child(2) { height: 12px; }
+.nesio-brief-strip-wave span:nth-child(3) { height: 8px; }
+.nesio-brief-strip-wave span:nth-child(4) { height: 10px; }
+@keyframes nesio-brief-wave-bounce {
+  from { transform: scaleY(0.5); }
+  to   { transform: scaleY(1.4); }
+}
+
+.nesio-brief-strip-btn {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #3b6ef0;
+  background: #e8effe;
+  border: none;
+  border-radius: 99px;
+  padding: 0.28rem 0.75rem;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+.nesio-brief-strip-btn:hover { background: #d4e2ff; }
+.nesio-brief-strip-btn:disabled { opacity: 0.5; cursor: default; }
+.nesio-brief-strip-btn--stop { color: #ef4444; background: #fee2e2; }
+.nesio-brief-strip-btn--stop:hover { background: #fecaca; }
+
+html[data-portal-theme="night"] .nesio-brief-strip {
+  background: rgba(30,34,50,0.92);
+  border-color: rgba(255,255,255,0.08);
+}
+html[data-portal-theme="night"] .nesio-brief-strip-label { color: #d0d8f0; }
+html[data-portal-theme="night"] .nesio-brief-strip-btn { color: #8faaff; background: rgba(99,138,255,0.15); }
+
+/* Today Focus section */
+.nesio-focus-section {
+  margin-bottom: 1rem;
+}
+
+.nesio-focus-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.6rem;
+}
+
+.nesio-focus-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--portal-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.nesio-focus-all-btn {
+  font-size: 0.74rem;
+  color: var(--portal-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.nesio-focus-empty {
+  background: var(--glass-bg-solid);
+  border: 1px dashed var(--portal-line);
+  border-radius: 1rem;
+  padding: 1rem;
+  text-align: center;
+  font-size: 0.83rem;
+  color: var(--portal-muted);
+}
+.nesio-focus-empty-hint {
+  font-size: 0.75rem;
+  margin-top: 0.35rem;
+  opacity: 0.7;
+}
+.nesio-focus-add-btn {
+  margin-top: 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #3b6ef0;
+  background: #e8effe;
+  border: none;
+  border-radius: 99px;
+  padding: 0.3rem 0.9rem;
+  cursor: pointer;
+}
+
+.nesio-focus-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.nesio-focus-card {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  background: var(--glass-bg-solid);
+  border: 1px solid var(--portal-line);
+  border-radius: 0.9rem;
+  padding: 0.65rem 0.75rem;
+  animation: nesio-fade-in 0.18s ease;
+}
+
+.nesio-focus-card-icon {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.55rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.nesio-focus-card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.nesio-focus-card-title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--portal-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 0.15rem;
+}
+
+.nesio-focus-card-meta {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.nesio-focus-card-type {
+  font-size: 0.7rem;
+  color: var(--portal-muted);
+}
+
+.nesio-focus-card-hint {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #3b6ef0;
+  background: #e8effe;
+  border-radius: 99px;
+  padding: 0.1rem 0.45rem;
+}
+
+.nesio-focus-card-dismiss {
+  font-size: 0.75rem;
+  color: var(--portal-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.2rem;
+  flex-shrink: 0;
+  opacity: 0.5;
+}
+.nesio-focus-card-dismiss:hover { opacity: 1; }
+
+html[data-portal-theme="night"] .nesio-focus-card {
+  background: rgba(30,34,50,0.92);
+  border-color: rgba(255,255,255,0.08);
+}
+html[data-portal-theme="night"] .nesio-focus-card-title { color: #d0d8f0; }
+
+/* Legacy .nesio-brief-card kept for compatibility */
 .nesio-brief-card {
   background: var(--glass-bg-solid);
   border: 1px solid var(--portal-line);

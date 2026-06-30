@@ -92,14 +92,17 @@ export default function LifeStateCard({ canUsePrivateData }: { canUsePrivateData
 
   if (!state) return null;
 
-  const known = state.dimensions.filter((d) => d.level !== 'unknown');
-  // Don't show until there's at least one real signal-backed dimension
+  // Only show health/energy dimensions — schedule-based dims are unreliable without full calendar data.
+  const healthDims = ['health', 'energy', 'sleep'];
+  const known = state.dimensions.filter(
+    (d) => d.level !== 'unknown' && healthDims.includes(d.dimension),
+  );
   if (known.length === 0) return null;
 
-  const highLoadCount = known.filter((d) => d.level === 'high_load' || d.level === 'mild_risk' || d.level === 'low').length;
-  const loadTone = highLoadCount > 1 ? '有点满' : highLoadCount === 1 ? '有一处需要放轻' : '安排还算稳定';
-  const loadHint = highLoadCount > 0 ? '先看最重要的一件。' : '把最该看的放前面就好。';
-  const leadColor = highLoadCount > 0 ? '#f59e0b' : '#10b981';
+  const needsAttention = known.filter((d) => d.level === 'high_load' || d.level === 'mild_risk' || d.level === 'low').length;
+  const stateTone = needsAttention > 0 ? '有些需要留意' : '状态不错';
+  const stateHint = needsAttention > 0 ? '注意休息。' : '继续保持。';
+  const leadColor = needsAttention > 0 ? '#f59e0b' : '#10b981';
 
   return (
     <div className="nesio-lifestate-card">
@@ -108,8 +111,8 @@ export default function LifeStateCard({ canUsePrivateData }: { canUsePrivateData
           <span className="nesio-lifestate-ring-icon" aria-hidden>◦</span>
         </div>
         <div className="nesio-lifestate-head-text">
-          <p className="nesio-lifestate-kicker">今天的负荷</p>
-          <p className="nesio-lifestate-explanation">{loadTone}，{aiExplanation || loadHint}</p>
+          <p className="nesio-lifestate-kicker">今日状态</p>
+          <p className="nesio-lifestate-explanation">{stateTone}，{aiExplanation || stateHint}</p>
         </div>
         <svg className={`nesio-lifestate-chevron${expanded ? ' nesio-lifestate-chevron--open' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
           <path d="M6 9l6 6 6-6" />
