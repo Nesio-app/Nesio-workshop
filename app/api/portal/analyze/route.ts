@@ -13,7 +13,9 @@ import { normalizePhotoToSignal, normalizeVoiceToSignal } from '@/lib/life-domai
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
-const GEMINI_MODEL_FALLBACKS = ['gemini-2.0-flash', 'gemini-1.5-flash'];
+// Current vision-capable models. gemini-1.5-flash was retired (404); use
+// gemini-flash-latest as an always-current alias plus explicit current models.
+const GEMINI_MODEL_FALLBACKS = ['gemini-2.0-flash', 'gemini-flash-latest', 'gemini-2.5-flash'];
 const DEFAULT_OPENAI_MODEL = 'gpt-4o-mini';
 
 function getAnthropicKey(): string | undefined {
