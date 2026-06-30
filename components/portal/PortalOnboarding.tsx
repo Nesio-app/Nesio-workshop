@@ -23,6 +23,23 @@ type AuthStartResult = {
   auditId?: string;
 };
 
+type AuthSessionResult = {
+  ok?: boolean;
+  loggedIn?: boolean;
+  user?: {
+    email?: string;
+    name?: string;
+    displayName?: string;
+    provider?: string;
+    providers?: string[];
+  };
+};
+
+type AuthReadyEventDetail = {
+  ok?: boolean;
+  loggedIn?: boolean;
+};
+
 // ── Auth helpers ──────────────────────────────────────
 
 async function startGoogleAuth(): Promise<string | null> {
@@ -49,6 +66,42 @@ async function startEmailAuth(email: string, authMode: AuthMode): Promise<AuthSt
     const data = await res.json() as { ok?: boolean; error?: string; auditId?: string };
     return { ok: !!data.ok, error: data.error, auditId: data.auditId };
   } catch { return { ok: false, error: 'network_error' }; }
+}
+
+function hasAuthCallbackSuccess(): boolean {
+  if (typeof window === 'undefined') return false;
+  const params = new URLSearchParams(window.location.search);
+  return params.get('auth') === 'auth_callback_received' ||
+    params.get('status') === 'session_established' ||
+    params.get('status') === 'session_imported';
+}
+
+function clearAuthCallbackParams() {
+  if (typeof window === 'undefined') return;
+  const url = new URL(window.location.href);
+  let changed = false;
+  ['auth', 'provider', 'status', 'profileBootstrapStatus', 'safePublicStatus', 'secretsRedacted'].forEach((key) => {
+    if (url.searchParams.has(key)) {
+      url.searchParams.delete(key);
+      changed = true;
+    }
+  });
+  if (changed) window.history.replaceState(null, document.title, `${url.pathname}${url.search}${url.hash}`);
+}
+
+async function readAuthSession(): Promise<AuthSessionResult | null> {
+  try {
+    const res = await fetch('/api/auth/session', { cache: 'no-store' });
+    if (!res.ok) return null;
+    return await res.json() as AuthSessionResult;
+  } catch {
+    return null;
+  }
+}
+
+function deriveDisplayNameFromSession(session: AuthSessionResult): string {
+  const raw = session.user?.name || session.user?.displayName || session.user?.email?.split('@')[0] || '';
+  return raw.trim();
 }
 
 // ── Welcome step ──────────────────────────────────────
@@ -304,6 +357,38 @@ export default function PortalOnboarding() {
   const [displayName, setDisplayName] = useState('');
   const [locale, setLocale] = useState<PortalLocale>('zh');
 
+  function syncProfileFromSession(session: AuthSessionResult) {
+    const name = deriveDisplayNameFromSession(session);
+    if (!name) return;
+    try {
+      const profile = loadProfileSettings();
+      if (!profile.displayName) {
+        saveProfileSettings({ displayName: name });
+        setDisplayName(name);
+      }
+    } catch {
+      setDisplayName(name);
+    }
+  }
+
+  function markOnboardingDone() {
+    try {
+      localStorage.setItem(ONBOARDING_DONE_KEY, '1');
+      localStorage.setItem(LEGACY_ONBOARDING_DONE_KEY, '1');
+    } catch { /* ignore */ }
+  }
+
+  function completeOnboardingAfterAuth(options: { showTips?: boolean } = {}) {
+    markOnboardingDone();
+    setVisible(false);
+    try {
+      if (options.showTips !== false && !localStorage.getItem(TIPS_SHOWN_KEY)) setShowTips(true);
+    } catch {
+      if (options.showTips !== false) setShowTips(true);
+    }
+    loadMirrorFromCloud().catch(() => undefined);
+  }
+
   useEffect(() => {
     window.dispatchEvent(new CustomEvent('nesio-onboarding-visibility-change', {
       detail: { active: visible },
@@ -316,21 +401,65 @@ export default function PortalOnboarding() {
   }, [visible]);
 
   useEffect(() => {
-    try {
-      const done = localStorage.getItem(ONBOARDING_DONE_KEY) === '1' ||
-        localStorage.getItem(LEGACY_ONBOARDING_DONE_KEY) === '1';
-      if (done) {
+    let cancelled = false;
+
+    async function hydrate() {
+      try {
         const profile = loadProfileSettings();
+        if (cancelled) return;
         setDisplayName(profile.displayName || '');
         setLocale(profile.locale || 'zh');
-        if (!localStorage.getItem(TIPS_SHOWN_KEY)) setShowTips(true);
-        return;
+
+        const done = localStorage.getItem(ONBOARDING_DONE_KEY) === '1' ||
+          localStorage.getItem(LEGACY_ONBOARDING_DONE_KEY) === '1';
+        const callbackArrived = hasAuthCallbackSuccess();
+
+        if (done && !callbackArrived) {
+          if (!localStorage.getItem(TIPS_SHOWN_KEY)) setShowTips(true);
+          return;
+        }
+
+        const session = await readAuthSession();
+        if (cancelled) return;
+        if (session?.loggedIn) {
+          syncProfileFromSession(session);
+          completeOnboardingAfterAuth({ showTips: !done });
+          clearAuthCallbackParams();
+          return;
+        }
+
+        if (done) {
+          if (!localStorage.getItem(TIPS_SHOWN_KEY)) setShowTips(true);
+          return;
+        }
+
+        setVisible(true);
+      } catch {
+        if (!cancelled) setVisible(true);
       }
-      const profile = loadProfileSettings();
-      setDisplayName(profile.displayName || '');
-      setLocale(profile.locale || 'zh');
-      setVisible(true);
-    } catch { /* storage unavailable */ }
+    }
+
+    function handleAuthReady(event: Event) {
+      const detail = (event as CustomEvent<AuthReadyEventDetail>).detail;
+      if (!detail?.ok && !detail?.loggedIn) return;
+      readAuthSession().then((session) => {
+        if (cancelled) return;
+        if (session?.loggedIn) {
+          syncProfileFromSession(session);
+          completeOnboardingAfterAuth();
+          clearAuthCallbackParams();
+        }
+      }).catch(() => undefined);
+    }
+
+    hydrate();
+    window.addEventListener('nesio-auth-session-imported', handleAuthReady);
+    window.addEventListener('nesio-auth-session-ready', handleAuthReady);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('nesio-auth-session-imported', handleAuthReady);
+      window.removeEventListener('nesio-auth-session-ready', handleAuthReady);
+    };
   }, []);
 
   function handleLocale(l: PortalLocale) {
@@ -346,10 +475,7 @@ export default function PortalOnboarding() {
   }
 
   function finish() {
-    try {
-      localStorage.setItem(ONBOARDING_DONE_KEY, '1');
-      localStorage.setItem(LEGACY_ONBOARDING_DONE_KEY, '1');
-    } catch { /* ignore */ }
+    markOnboardingDone();
     setVisible(false);
     setShowTips(true);
     loadMirrorFromCloud().catch(() => undefined);

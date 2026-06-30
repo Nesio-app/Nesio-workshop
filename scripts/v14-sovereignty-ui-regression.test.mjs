@@ -190,8 +190,12 @@ assert.doesNotMatch(shareSheet, /title:\s*nodes\[0\]\?\.name \|\| content\.slice
 assert.doesNotMatch(dailyBrief, /开启位置权限获取天气|weather\.temperatureC|weather\.condition/, 'Daily overview should not display weather in the first home card.');
 assert.match(globals, /\.nesio-brief-card \{[\s\S]*background:\s*var\(--glass-bg-solid\)/, 'Daily overview card should use the shared glass card background, not a blue gradient.');
 assert.match(authStartRoute, /sanitizeRedirectTo[\s\S]*localhost[\s\S]*\/api\/auth\/callback/, 'Auth start must sanitize localhost callback URLs before sending users to Google/Supabase.');
-assert.match(authClient, /NEXT_PUBLIC_SITE_URL|treasurebox-nu\.vercel\.app/, 'Client auth redirect fallback should use a working production origin instead of localhost.');
-assert.match(authStartRoute, /treasurebox-nu\.vercel\.app\/api\/auth\/callback/, 'Server auth redirect fallback should never return localhost callbacks.');
+assert.match(authClient, /NEXT_PUBLIC_SITE_URL|www\.nesio\.app/, 'Client auth redirect fallback should use the Nesio production origin instead of localhost.');
+assert.match(authStartRoute, /www\.nesio\.app\/api\/auth\/callback/, 'Server auth redirect fallback should never return localhost callbacks.');
+assert.match(authStartRoute, /nesio\.app[\s\S]*www\.nesio\.app/, 'Server auth redirect should normalize apex nesio.app callbacks to www.nesio.app.');
+assert.match(onboarding, /\/api\/auth\/session/, 'Onboarding must read the auth session after OAuth or magic-link callbacks.');
+assert.match(onboarding, /nesio-auth-session-imported|nesio-auth-session-ready/, 'Onboarding must react to session import events.');
+assert.match(onboarding, /auth_callback_received|session_established|session_imported/, 'Onboarding must treat callback success URLs as authenticated bootstrap candidates.');
 
 assert.match(
   storageCss,

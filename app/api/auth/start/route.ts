@@ -14,6 +14,7 @@ type AuthMode = 'login' | 'register';
 
 const AUTH_PROVIDERS: AuthProvider[] = ['email', 'google', 'wechat', 'phone'];
 const AUTH_MODES: AuthMode[] = ['login', 'register'];
+const DEFAULT_AUTH_CALLBACK_URL = 'https://www.nesio.app/api/auth/callback';
 
 function createAuthStartAuditId(): string {
   const randomId = globalThis.crypto?.randomUUID?.();
@@ -65,29 +66,37 @@ function getProviderGate(req: NextRequest, provider: AuthProvider): {
   };
 }
 
-function sanitizeRedirectTo(raw: string | undefined, fallback: string): string {
-  const safeFallback = (() => {
-    try {
-      const url = new URL(fallback);
-      const host = url.hostname.toLowerCase();
-      if (host === 'localhost' || host === '127.0.0.1' || host.endsWith('.localhost')) {
-        return 'https://treasurebox-nu.vercel.app/api/auth/callback';
-      }
-      return fallback;
-    } catch {
-      return 'https://treasurebox-nu.vercel.app/api/auth/callback';
-    }
-  })();
-  if (!raw) return safeFallback;
+function isLocalAuthHost(host: string): boolean {
+  const value = host.toLowerCase();
+  return value === 'localhost' || value === '127.0.0.1' || value.endsWith('.localhost');
+}
+
+function normalizeAuthCallbackUrl(raw: string | undefined): string | null {
+  const value = raw?.trim();
+  if (!value) return null;
   try {
-    const url = new URL(raw);
-    const host = url.hostname.toLowerCase();
-    if (host === 'localhost' || host === '127.0.0.1' || host.endsWith('.localhost')) return safeFallback;
-    if (url.pathname !== '/api/auth/callback') return safeFallback;
+    const url = new URL(value.startsWith('http') ? value : `https://${value}`);
+    if (isLocalAuthHost(url.hostname)) return null;
+    if (url.hostname.toLowerCase() === 'nesio.app') url.hostname = 'www.nesio.app';
+    if (url.pathname !== '/api/auth/callback') url.pathname = '/api/auth/callback';
+    url.search = '';
+    url.hash = '';
     return url.toString();
   } catch {
-    return safeFallback;
+    return null;
   }
+}
+
+function getSafeAuthFallback(fallback: string): string {
+  return normalizeAuthCallbackUrl(process.env.BAOHE_AUTH_REDIRECT_URL)
+    || normalizeAuthCallbackUrl(fallback)
+    || DEFAULT_AUTH_CALLBACK_URL;
+}
+
+function sanitizeRedirectTo(raw: string | undefined, fallback: string): string {
+  const safeFallback = getSafeAuthFallback(fallback);
+  if (!raw) return safeFallback;
+  return normalizeAuthCallbackUrl(raw) || safeFallback;
 }
 
 async function requestSupabaseOtp(payload: { email?: string; phone?: string; redirectTo: string; authMode: AuthMode }) {
