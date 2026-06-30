@@ -424,12 +424,17 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
                 ? '拍一张，Nesio 帮你识别并存入 Memory'
                 : '此设备不支持相机，请从相册选择'}
             </p>
-            <button type="button" className="nesio-camera-shoot-btn" onClick={openNativeCamera}>
-              拍照
-            </button>
-            <button type="button" className="nesio-camera-chooser-alt" onClick={handleGallery}>
-              从相册 / 文件中选择
-            </button>
+            <div className="nesio-camera-chooser-actions">
+              {phase === 'idle' && (
+                <button type="button" className="nesio-camera-shoot-btn" onClick={openNativeCamera}>
+                  拍照
+                </button>
+              )}
+              <button type="button" className="nesio-camera-pick-btn" onClick={handleGallery}>
+                <span className="nesio-camera-pick-btn-icon" aria-hidden>🖼️</span>
+                相册
+              </button>
+            </div>
           </div>
         )}
 

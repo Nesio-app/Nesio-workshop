@@ -11721,20 +11721,6 @@ html[data-portal-theme="night"] .nesio-today-evidence-chip { color: #96c7f3; bac
   justify-content: center;
 }
 
-/* Native-camera primary capture button (replaces getUserMedia shutter) */
-.nesio-camera-shoot-btn {
-  margin-top: 1.25rem;
-  background: var(--portal-blue-deep, #588ce3);
-  color: #fff;
-  font-size: 1.05rem;
-  font-weight: 700;
-  padding: 0.9rem 2.4rem;
-  border-radius: 999px;
-  box-shadow: 0 6px 20px rgba(88,140,227,0.4);
-  transition: transform 0.12s, box-shadow 0.12s;
-}
-.nesio-camera-shoot-btn:active { transform: scale(0.96); box-shadow: 0 3px 12px rgba(88,140,227,0.35); }
-
 /* Compact capture chooser (native camera) — centered card, snug options */
 .nesio-camera-chooser {
   position: absolute;
@@ -11753,24 +11739,51 @@ html[data-portal-theme="night"] .nesio-today-evidence-chip { color: #96c7f3; bac
   font-size: 0.85rem;
   line-height: 1.5;
   max-width: 16rem;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+/* 拍照 primary + 相册 compact box, sitting snug side by side. */
+.nesio-camera-chooser-actions {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 0.6rem;
 }
 .nesio-camera-shoot-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: var(--portal-blue-deep, #588ce3);
   color: #fff;
   font-size: 1rem;
   font-weight: 700;
-  padding: 0.8rem 3rem;
+  padding: 0.8rem 2.2rem;
   border-radius: 999px;
   box-shadow: 0 6px 20px rgba(88,140,227,0.4);
   transition: transform 0.12s, box-shadow 0.12s;
 }
 .nesio-camera-shoot-btn:active { transform: scale(0.96); box-shadow: 0 3px 12px rgba(88,140,227,0.35); }
-.nesio-camera-chooser-alt {
-  color: #8fa3c0;
-  font-size: 0.82rem;
-  padding: 0.4rem 0.8rem;
-  text-decoration: underline;
-  text-underline-offset: 3px;
+
+/* Small bordered box right next to 拍照 — picks from album / files. */
+.nesio-camera-pick-btn {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1rem;
+  min-width: 4.2rem;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid rgba(143,163,192,0.4);
+  border-radius: 0.9rem;
+  background: rgba(143,163,192,0.08);
+  color: #b9c8de;
+  font-size: 0.72rem;
+  font-weight: 600;
+  transition: transform 0.12s, background 0.12s, border-color 0.12s;
 }
-.nesio-camera-chooser-alt:active { color: #b9c8de; }
+.nesio-camera-pick-btn-icon { font-size: 1.15rem; line-height: 1; }
+.nesio-camera-pick-btn:active {
+  transform: scale(0.96);
+  background: rgba(143,163,192,0.16);
+  border-color: rgba(143,163,192,0.6);
+}
