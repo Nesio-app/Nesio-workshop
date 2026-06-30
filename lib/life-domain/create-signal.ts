@@ -8,6 +8,7 @@
 
 import { addLifeNode, type LifeNode, type LifeNodeSource, type LifeNodeType } from '../portal/life-graph';
 import { lifeNodeToSignal, type RetentionPolicy, type Signal, type SignalSensitivity, type SignalSource, type SignalType } from './signal';
+import type { SignalContext } from './context';
 
 export const SIGNAL_SCHEMA_VERSION = 'Signal@v1';
 export type SignalWriteMode = 'local_first' | 'cloud_mirror_attempted' | 'cloud_mirror_pending';
@@ -25,6 +26,8 @@ export interface CreateSignalInput {
   tags?: string[];
   raw?: string;
   externalId?: string;
+  /** Structured semantics (domain / people / places / objects / intent). */
+  context?: SignalContext;
 }
 
 function iso(value: string | Date | undefined): string {
@@ -141,6 +144,7 @@ export function createSignal(input: CreateSignalInput): Signal {
       externalId: input.externalId || null,
       retentionPolicy: inferRetention(input),
       sensitivity: inferSensitivity(input),
+      ...(input.context ? { context: JSON.stringify(input.context) } : {}),
     },
     source: lifeNodeSource(input.source),
     confidence: clampConfidence(input.confidence),

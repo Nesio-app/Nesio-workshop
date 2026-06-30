@@ -10,8 +10,9 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { addLifeNode, getRecentNodes, isPrivateExternalNode, searchLifeGraphFuzzy, type LifeNode } from '@/lib/portal/life-graph';
+import { getRecentNodes, isPrivateExternalNode, searchLifeGraphFuzzy, type LifeNode } from '@/lib/portal/life-graph';
 import { searchSignalsWithCloudFallback } from '@/lib/life-domain/signal-search';
+import { createSignal, extractContext } from '@/lib/life-domain';
 import { routeIntent } from '@/lib/portal/intent-router';
 import MeetingRecorder from './MeetingRecorder';
 
@@ -178,6 +179,18 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
     const inlineTags = parseInlineTags(t);
     const cleanText = stripInlineTags(t) || inlineTags.join(' ') || t;
 
+    // Context Extraction (§6.2): structure the input before it becomes a fact.
+    // Rule-based v1; AI may refine the title/confidence below.
+    const context = extractContext(cleanText);
+    const signalType = context.domain === 'assets'
+      ? (context.places?.length || context.objects?.length ? 'object.location' : 'object')
+      : context.domain === 'health' ? 'health.state'
+      : context.domain === 'growth' ? 'task'
+      : context.domain === 'energy' ? 'energy.state'
+      : 'observation';
+
+    let title = cleanText.slice(0, 40);
+    let aiConfidence = 0.7;
     try {
       const res = await fetch('/api/portal/analyze', {
         method: 'POST',
@@ -186,34 +199,31 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
       });
       const data = await res.json() as {
         ok?: boolean;
-        nodes?: Array<{ type: string; name: string; attributes: Record<string, string>; relations: unknown[]; tags: string[]; source: string; confidence: number; rawInput?: string }>;
-        summary?: string;
+        nodes?: Array<{ name?: string; confidence?: number }>;
       };
-
-      if (data.ok && data.nodes?.length) {
-        data.nodes.forEach((node) => addLifeNode({
-          ...node,
-          name: stripInlineTags(node.name || '') || cleanText.slice(0, 30),
-          attributes: { ...(node.attributes || {}), note: stripInlineTags(String(node.attributes?.note || cleanText)) || cleanText },
-          tags: mergeTags(['说一句'], node.tags, inlineTags),
-          rawInput: t,
-          source: 'voice',
-        } as Parameters<typeof addLifeNode>[0]));
-        setSavedCount(data.nodes.length);
-      } else {
-        // Fallback: save raw text
-        addLifeNode({ type: 'object', name: cleanText.slice(0, 30), attributes: { note: cleanText }, source: 'voice', confidence: 0.65, relations: [], tags: mergeTags(['说一句'], inlineTags), rawInput: t });
-        setSavedCount(1);
-      }
-      setSendState('saved');
-      setTimeout(() => { onClose(); setText(''); setSendState('idle'); }, 1100);
+      const best = data.ok && data.nodes?.length ? data.nodes[0] : null;
+      if (best?.name) title = stripInlineTags(best.name) || title;
+      if (typeof best?.confidence === 'number') aiConfidence = best.confidence;
     } catch {
-      // Even on error, save locally
-      addLifeNode({ type: 'object', name: cleanText.slice(0, 30), attributes: { note: cleanText }, source: 'voice', confidence: 0.6, relations: [], tags: mergeTags(['说一句'], inlineTags), rawInput: t });
-      setSavedCount(1);
-      setSendState('saved');
-      setTimeout(() => { onClose(); setText(''); setSendState('idle'); }, 1100);
+      /* offline — keep rule-based title/confidence */
     }
+
+    // Canonical write path: one Signal carrying structured context. createSignal
+    // mirrors to cloud for signed-in users (§Signal main-fact transition).
+    createSignal({
+      source: 'voice',
+      type: signalType,
+      title,
+      payload: { note: cleanText },
+      confidence: aiConfidence,
+      context: { ...context, confidence: { ai: aiConfidence, userConfirmed: false, userEdited: false } },
+      tags: mergeTags(['说一句', context.domain ? `domain:${context.domain}` : ''], inlineTags),
+      raw: t,
+    });
+
+    setSavedCount(1);
+    setSendState('saved');
+    setTimeout(() => { onClose(); setText(''); setSendState('idle'); }, 1100);
   }
 
   if (!open) return null;

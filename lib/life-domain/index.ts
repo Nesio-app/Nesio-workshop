@@ -11,3 +11,7 @@
 export * from './signal';
 export * from './life-state';
 export * from './recommendation';
+export * from './domain-taxonomy';
+export * from './context';
+export * from './context-extractor';
+export * from './create-signal';

@@ -13,6 +13,7 @@
  */
 
 import { getLifeGraph, deleteLifeNode, type LifeNode, type LifeNodeType, type LifeNodeSource } from '../portal/life-graph';
+import type { SignalContext } from './context';
 
 export type SignalSource =
   | 'voice'
@@ -76,6 +77,9 @@ export interface Signal {
   retentionPolicy: RetentionPolicy;
   evidence: SignalSourceRef;
   tags?: string[];
+  /** Structured semantics on the signal (domain / people / places / objects /
+   *  intent). Suggestion until the user confirms (Domain-Capability PRD §7). */
+  context?: SignalContext;
 }
 
 // ── LifeNode → Signal adapter ────────────────────────────────────────────────
@@ -135,8 +139,13 @@ export function lifeNodeToSignal(node: LifeNode): Signal {
     ? node.attributes['signalType']
     : NODE_TYPE_TO_SIGNAL[node.type] ?? 'observation';
   const payload = Object.fromEntries(
-    Object.entries(node.attributes).filter(([key]) => !key.startsWith('signal')),
+    Object.entries(node.attributes).filter(([key]) => !key.startsWith('signal') && key !== 'context'),
   );
+  let context: SignalContext | undefined;
+  const ctxRaw = node.attributes['context'];
+  if (typeof ctxRaw === 'string' && ctxRaw) {
+    try { context = JSON.parse(ctxRaw) as SignalContext; } catch { /* ignore malformed */ }
+  }
   const source = typeof node.attributes['signalSource'] === 'string'
     ? node.attributes['signalSource'] as SignalSource
     : NODE_SOURCE_TO_SIGNAL[node.source] ?? 'manual';
@@ -161,6 +170,7 @@ export function lifeNodeToSignal(node: LifeNode): Signal {
     retentionPolicy: inferRetention(node),
     evidence: { source, externalId: node.id, raw: node.rawInput },
     tags: node.tags,
+    context,
   };
 }
 
