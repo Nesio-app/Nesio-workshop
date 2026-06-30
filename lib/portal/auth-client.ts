@@ -2,6 +2,13 @@
 
 const FALLBACK_AUTH_ORIGIN = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.nesio.app';
 
+export const NESIO_ONBOARDING_DONE_KEYS = [
+  'treasurebox-onboarding-v14-done',
+  'treasurebox-onboarding-v13-done',
+] as const;
+
+export const NESIO_ONBOARDING_COMPLETE_EVENT = 'nesio-onboarding-complete-requested';
+
 type SupabaseHashSession = {
   accessToken: string;
   refreshToken?: string;
@@ -18,14 +25,22 @@ export type AuthHashImportResult = {
   authMode?: 'login' | 'register';
   profileBootstrapped?: boolean;
   profileBootstrapStatus?: string;
+  profileBootstrapBlocking?: boolean;
+  authReady?: boolean;
 };
 
 export function getAuthRedirectTo(): string {
   const origin = window.location.origin;
   const host = window.location.hostname;
   const isLocalShell = host === 'localhost' || host === '127.0.0.1' || host.endsWith('.localhost');
-  const isNesioApex = host === 'nesio.app';
-  return `${isLocalShell || isNesioApex ? FALLBACK_AUTH_ORIGIN : origin}/api/auth/callback`;
+  return `${isLocalShell ? FALLBACK_AUTH_ORIGIN : origin}/api/auth/callback`;
+}
+
+export function markNesioOnboardingDoneForAuth() {
+  if (typeof window === 'undefined') return;
+  for (const key of NESIO_ONBOARDING_DONE_KEYS) {
+    localStorage.setItem(key, '1');
+  }
 }
 
 export function readSupabaseAuthHash(hash: string): SupabaseHashSession | null {
@@ -71,6 +86,8 @@ export async function importSupabaseHashSession(): Promise<AuthHashImportResult>
       authMode?: 'login' | 'register';
       profileBootstrapped?: boolean;
       profileBootstrapStatus?: string;
+      profileBootstrapBlocking?: boolean;
+      authReady?: boolean;
     } | null;
     const result = {
       imported: true,
@@ -81,6 +98,8 @@ export async function importSupabaseHashSession(): Promise<AuthHashImportResult>
       authMode: data?.authMode,
       profileBootstrapped: Boolean(data?.profileBootstrapped),
       profileBootstrapStatus: data?.profileBootstrapStatus,
+      profileBootstrapBlocking: Boolean(data?.profileBootstrapBlocking),
+      authReady: Boolean(data?.authReady),
     };
     window.dispatchEvent(new CustomEvent('nesio-auth-session-imported', { detail: result }));
     return result;

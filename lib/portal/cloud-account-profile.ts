@@ -16,6 +16,8 @@ export type BootstrapResult = {
 export type BootstrapStatusMeta = {
   profileBootstrapped: boolean;
   profileBootstrapStatus: string;
+  profileBootstrapBlocking: boolean;
+  authReady: boolean;
 };
 
 function normalizeBootstrapReason(reason: unknown): string {
@@ -29,6 +31,8 @@ export function buildCloudAccountProfileBootstrapMeta(result?: BootstrapResult |
     return {
       profileBootstrapped: true,
       profileBootstrapStatus: 'profile_bootstrapped',
+      profileBootstrapBlocking: false,
+      authReady: true,
     };
   }
 
@@ -36,12 +40,16 @@ export function buildCloudAccountProfileBootstrapMeta(result?: BootstrapResult |
     return {
       profileBootstrapped: false,
       profileBootstrapStatus: normalizeBootstrapReason(result.reason) || 'profile_bootstrap_skipped',
+      profileBootstrapBlocking: false,
+      authReady: true,
     };
   }
 
   return {
     profileBootstrapped: false,
     profileBootstrapStatus: normalizeBootstrapReason(result?.reason) || 'profile_bootstrap_failed',
+    profileBootstrapBlocking: false,
+    authReady: true,
   };
 }
 
@@ -89,6 +97,49 @@ function isProfileTableUnavailable(response: Response, body: string): boolean {
   return /user_profiles|PGRST205|42P01|could not find|does not exist/i.test(body);
 }
 
+async function findExistingUserProfile(config: CloudRuntimeConfig, identityKey: string): Promise<{
+  ok: boolean;
+  found: boolean;
+  tableUnavailable: boolean;
+  status?: number;
+}> {
+  const url = new URL('/rest/v1/user_profiles', config.supabaseUrl);
+  url.searchParams.set('identity_key', `eq.${identityKey}`);
+  url.searchParams.set('select', 'identity_key,user_id');
+  url.searchParams.set('limit', '1');
+
+  const response = await fetch(url.toString(), {
+    headers: serviceRoleRestHeaders(config, {
+      Prefer: 'return=representation',
+    }),
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    const body = await readErrorBody(response);
+    return {
+      ok: false,
+      found: false,
+      tableUnavailable: isProfileTableUnavailable(response, body),
+      status: response.status,
+    };
+  }
+
+  let rows: unknown = [];
+  try {
+    rows = await response.json();
+  } catch {
+    rows = [];
+  }
+
+  return {
+    ok: true,
+    found: Array.isArray(rows) && rows.length > 0,
+    tableUnavailable: false,
+    status: response.status,
+  };
+}
+
 function buildUserProfileRow(user: SupabaseUserResponse) {
   const identity = deriveCloudIdentity(user);
   if (!identity) return null;
@@ -128,6 +179,19 @@ export async function bootstrapCloudAccountProfile(accessToken?: string | null):
     const row = user ? buildUserProfileRow(user) : null;
     if (!row) return { ok: false, reason: 'invalid_user' };
 
+    const existing = await findExistingUserProfile(config, row.identity_key);
+    if (existing.tableUnavailable) {
+      return {
+        ok: true,
+        skipped: true,
+        reason: 'profile_bootstrap_deferred:user_profiles_unavailable',
+        identityKey: row.identity_key,
+      };
+    }
+    if (existing.found) {
+      return { ok: true, reason: 'profile_already_bootstrapped', identityKey: row.identity_key };
+    }
+
     const url = new URL('/rest/v1/user_profiles', config.supabaseUrl);
     url.searchParams.set('on_conflict', 'identity_key');
     const response = await fetch(url.toString(), {
@@ -142,7 +206,16 @@ export async function bootstrapCloudAccountProfile(accessToken?: string | null):
     if (!response.ok) {
       const body = await readErrorBody(response);
       if (isProfileTableUnavailable(response, body)) {
-        return { ok: true, skipped: true, reason: 'profile_bootstrap_deferred:user_profiles_unavailable' };
+        return {
+          ok: true,
+          skipped: true,
+          reason: 'profile_bootstrap_deferred:user_profiles_unavailable',
+          identityKey: row.identity_key,
+        };
+      }
+      const maybeCreated = await findExistingUserProfile(config, row.identity_key);
+      if (maybeCreated.found) {
+        return { ok: true, reason: 'profile_already_bootstrapped', identityKey: row.identity_key };
       }
       return { ok: false, reason: `profile_upsert_failed:${response.status}` };
     }

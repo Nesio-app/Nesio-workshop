@@ -77,7 +77,8 @@ function normalizeAuthCallbackUrl(raw: string | undefined): string | null {
   try {
     const url = new URL(value.startsWith('http') ? value : `https://${value}`);
     if (isLocalAuthHost(url.hostname)) return null;
-    if (url.hostname.toLowerCase() === 'nesio.app') url.hostname = 'www.nesio.app';
+    // Keep production callbacks on the caller's current host because auth
+    // cookies are host-only. Rewriting apex <-> www makes the UI look signed out.
     if (url.pathname !== '/api/auth/callback') url.pathname = '/api/auth/callback';
     url.search = '';
     url.hash = '';

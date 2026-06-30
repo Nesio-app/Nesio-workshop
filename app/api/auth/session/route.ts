@@ -116,6 +116,8 @@ function signedInResponse(
     status: refreshedSession?.access_token ? 'session_refreshed' : 'signed_in',
     profileBootstrapped: profileBootstrapMeta.profileBootstrapped,
     profileBootstrapStatus: profileBootstrapMeta.profileBootstrapStatus,
+    profileBootstrapBlocking: profileBootstrapMeta.profileBootstrapBlocking,
+    authReady: profileBootstrapMeta.authReady,
     user: {
       id: user.id,
       email: user.email || '',

@@ -35,6 +35,90 @@ export type ToolDeprecationPolicyV0 =
   | 'replace_with_module'
   | 'ceo_gate_required';
 
+export type DomainCapabilityDomainV1 = 'life' | 'growth' | 'assets' | 'health' | 'energy' | 'platform';
+export type FrontstageDomainV1 = 'life' | 'growth' | 'assets' | 'health' | 'energy';
+export type DomainCapabilityValueV1 =
+  | 'capture'
+  | 'context_extraction'
+  | 'router'
+  | 'memory_graph'
+  | 'search_retrieval'
+  | 'schedule_daily_plan'
+  | 'reminder'
+  | 'place'
+  | 'ai_assistant'
+  | 'insight'
+  | 'export_delete'
+  | 'sync'
+  | 'entitlement_subscription'
+  | 'approval_gate';
+export type ToolSalvageStatusV1 =
+  | 'core_domain_engine'
+  | 'capability_material'
+  | 'sandbox_material'
+  | 'gated_material'
+  | 'hidden_material'
+  | 'deprecated_material';
+export type ToolVisibilityV1 = 'frontstage' | 'signed_in' | 'tester_only' | 'gated' | 'hidden' | 'internal';
+export type ToolGateLevelV1 = 'none' | 'local_only' | 'signed_in' | 'approval_required' | 'lab_only' | 'ceo_gate';
+export type GovernanceResolverStageV1 =
+  | 'safety_gate'
+  | 'entitlement_gate'
+  | 'quota_gate'
+  | 'cost_gate'
+  | 'audit_log';
+export type SignalContextFieldV1 =
+  | 'domain'
+  | 'secondaryDomains'
+  | 'labels'
+  | 'people'
+  | 'places'
+  | 'objects'
+  | 'time'
+  | 'role'
+  | 'goal'
+  | 'state'
+  | 'intent'
+  | 'source'
+  | 'sensitivity'
+  | 'permission'
+  | 'confidence';
+
+export interface SignalContextSchemaV1 {
+  version: 'signal-context-v1';
+  fields: SignalContextFieldV1[];
+  writebackLoop: string[];
+  aiSuggestedAllowed: true;
+  userConfirmationRequired: true;
+  sensitiveDomainsRequireConfirmation: true;
+  writesSignalContext: true;
+}
+
+export interface DomainCapabilityDomainDefinitionV1 {
+  value: DomainCapabilityDomainV1;
+  label: string;
+  zhLabel: string;
+  enLabel: string;
+  description?: string;
+}
+
+export interface DomainCapabilityDefinitionV1 {
+  value: DomainCapabilityValueV1;
+  label: string;
+  zhLabel: string;
+  aliases: string[];
+}
+
+export interface DomainCapabilityTaxonomyRegistryV1 {
+  version: 'domain-capability-taxonomy-v1';
+  frontstageDomains: FrontstageDomainV1[];
+  allDomains: DomainCapabilityDomainDefinitionV1[];
+  capabilities: DomainCapabilityValueV1[];
+  capabilityDefinitions: DomainCapabilityDefinitionV1[];
+  contextWritebackLoop: string[];
+  governanceResolverOrder: GovernanceResolverStageV1[];
+}
+
 export interface ToolEntitlementPolicyV0 {
   required: boolean;
   entitlementKey: string;
@@ -65,6 +149,21 @@ export interface ToolManifestV0 {
   launchStatus: ToolLaunchStatusV0;
   prodExposure: ToolProdExposureV0;
   dataNamespace: ToolDataNamespaceV0;
+  domainCapabilityVersion: 'domain-capability-taxonomy-v1';
+  primaryDomain: DomainCapabilityDomainV1;
+  primaryDomainLabel: string;
+  primaryDomainZhLabel: string;
+  primaryDomainEnglishLabel: string;
+  secondaryDomains: DomainCapabilityDomainV1[];
+  providedCapabilities: DomainCapabilityValueV1[];
+  providedCapabilityDefinitions: DomainCapabilityDefinitionV1[];
+  requiredCapabilities: DomainCapabilityValueV1[];
+  contextSchema: SignalContextSchemaV1;
+  salvageStatus: ToolSalvageStatusV1;
+  visibility: ToolVisibilityV1;
+  gateLevel: ToolGateLevelV1;
+  governanceResolverOrder: GovernanceResolverStageV1[];
+  capabilitySource: string;
   routeKind: ModuleRouteKind;
   openHref: string;
   returnHref: string;
@@ -81,6 +180,95 @@ export interface ToolManifestV0 {
   changesRuntimeBehavior: false;
   requiredFieldStatus: 'complete' | 'incomplete';
   missingRequiredFields: string[];
+}
+
+export interface DomainSummaryV0 {
+  domain: DomainCapabilityDomainV1;
+  label: string;
+  zhLabel: string;
+  enLabel: string;
+  frontstage: boolean;
+  moduleIds: string[];
+  secondaryModuleIds: string[];
+  frontstageModuleIds: string[];
+  gatedModuleIds: string[];
+  capabilityMaterialModuleIds: string[];
+}
+
+export interface CapabilitySummaryV0 {
+  capability: DomainCapabilityValueV1;
+  label: string;
+  zhLabel: string;
+  aliases: string[];
+  providerModuleIds: string[];
+  requiredByModuleIds: string[];
+  gatedProviderModuleIds: string[];
+}
+
+export interface CapabilityMaterialSummaryV0 {
+  moduleId: string;
+  primaryDomain: DomainCapabilityDomainV1;
+  primaryDomainLabel: string;
+  providedCapabilities: DomainCapabilityValueV1[];
+  gateLevel: ToolGateLevelV1;
+  reason: string;
+}
+
+export interface MaterialLibraryDomainGroupingV0 {
+  domain: DomainCapabilityDomainV1;
+  zhLabel: string;
+  moduleIds: string[];
+}
+
+export interface MaterialLibrarySalvageGroupingV0 {
+  salvageStatus: ToolSalvageStatusV1;
+  moduleIds: string[];
+}
+
+export interface MaterialLibraryGateGroupingV0 {
+  gateLevel: ToolGateLevelV1;
+  moduleIds: string[];
+}
+
+export interface MaterialLibraryModuleSummaryV0 {
+  moduleId: string;
+  displayName: {
+    zh: string;
+    en?: string;
+  };
+  primaryDomain: DomainCapabilityDomainV1;
+  primaryDomainZhLabel: string;
+  providedCapabilities: DomainCapabilityValueV1[];
+  requiredCapabilities: DomainCapabilityValueV1[];
+  salvageStatus: ToolSalvageStatusV1;
+  visibility: ToolVisibilityV1;
+  gateLevel: ToolGateLevelV1;
+  launchStatus: ToolLaunchStatusV0;
+  prodExposure: ToolProdExposureV0;
+  useAs: 'capability_material_library';
+  source: 'tool-manifest-v0';
+  reason: string;
+}
+
+export interface MaterialLibrarySummaryV0 {
+  version: 'module-material-library-v1';
+  implementation: 'static-contract-report-only';
+  boundaries: {
+    readsManifestOnly: true;
+    changesRuntimeBehavior: false;
+    writesRealData: false;
+    migratesRealData: false;
+    touchesOldRepos: false;
+    touchesOldGithub: false;
+    touchesOldDeployments: false;
+    changesLaunchPromise: false;
+  };
+  moduleCount: number;
+  moduleIds: string[];
+  byDomain: MaterialLibraryDomainGroupingV0[];
+  bySalvageStatus: MaterialLibrarySalvageGroupingV0[];
+  byGateLevel: MaterialLibraryGateGroupingV0[];
+  modules: MaterialLibraryModuleSummaryV0[];
 }
 
 export interface ToolManifestRegistryV0 {
@@ -105,9 +293,19 @@ export interface ToolManifestRegistryV0 {
     testerOnlyModuleCount: number;
     hiddenModuleCount: number;
     deprecatedModuleCount: number;
+    frontstageDomainCount: number;
+    frontstageModuleCount: number;
+    capabilityMaterialModuleCount: number;
+    materialLibraryModuleCount: number;
+    ceoGateModuleCount: number;
     missingRequiredFieldCount: number;
     warningCount: number;
   };
+  domainCapabilityTaxonomy: DomainCapabilityTaxonomyRegistryV1;
+  domainSummary: DomainSummaryV0[];
+  capabilitySummary: CapabilitySummaryV0[];
+  capabilityMaterialSummary: CapabilityMaterialSummaryV0[];
+  materialLibrarySummary: MaterialLibrarySummaryV0;
   manifests: ToolManifestV0[];
   warnings: Array<Record<string, unknown>>;
 }
@@ -169,6 +367,20 @@ export interface ModuleRegistryEntry {
   launchStatus?: ToolLaunchStatusV0;
   prodExposure?: ToolProdExposureV0;
   dataNamespace?: ToolDataNamespaceV0;
+  domainCapabilityVersion?: 'domain-capability-taxonomy-v1';
+  primaryDomain?: DomainCapabilityDomainV1;
+  primaryDomainLabel?: string;
+  primaryDomainZhLabel?: string;
+  primaryDomainEnglishLabel?: string;
+  secondaryDomains?: DomainCapabilityDomainV1[];
+  providedCapabilities?: DomainCapabilityValueV1[];
+  providedCapabilityDefinitions?: DomainCapabilityDefinitionV1[];
+  requiredCapabilities?: DomainCapabilityValueV1[];
+  contextSchema?: SignalContextSchemaV1;
+  salvageStatus?: ToolSalvageStatusV1;
+  visibility?: ToolVisibilityV1;
+  gateLevel?: ToolGateLevelV1;
+  governanceResolverOrder?: GovernanceResolverStageV1[];
   entitlementPolicy?: ToolEntitlementPolicyV0;
   mobileStrategy?: string;
   deprecationPolicy?: ToolDeprecationPolicyRecordV0;
@@ -670,6 +882,11 @@ export interface ModuleRegistry {
   shellDiscoveryEntrySlice: ShellDiscoveryEntryContract;
   mobileAppIntegration: MobileAppIntegrationContract;
   toolManifest: ToolManifestRegistryV0;
+  domainCapabilityTaxonomy: DomainCapabilityTaxonomyRegistryV1;
+  domainSummary: DomainSummaryV0[];
+  capabilitySummary: CapabilitySummaryV0[];
+  capabilityMaterialSummary: CapabilityMaterialSummaryV0[];
+  materialLibrarySummary: MaterialLibrarySummaryV0;
   modules: ModuleRegistryEntry[];
 }
 

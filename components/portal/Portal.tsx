@@ -37,7 +37,11 @@ import {
   writePortalCache,
 } from '@/lib/portal/prefetch-cache';
 import { configUrl } from '@/lib/portal/paths';
-import { importSupabaseHashSession } from '@/lib/portal/auth-client';
+import {
+  importSupabaseHashSession,
+  markNesioOnboardingDoneForAuth,
+  NESIO_ONBOARDING_COMPLETE_EVENT,
+} from '@/lib/portal/auth-client';
 import { loadProfileSettings, PROFILE_UPDATED_EVENT, type PortalLocale } from '@/lib/portal/profile';
 import { runConnectors } from '@/lib/platform/runtime/integration-runtime';
 import { pruneDisposableSignals } from '@/lib/life-domain';
@@ -55,6 +59,8 @@ type AuthSessionPayload = {
   ok?: boolean;
   loggedIn?: boolean;
   status?: string;
+  authReady?: boolean;
+  profileBootstrapBlocking?: boolean;
 };
 
 async function fetchAuthSessionPayload(): Promise<AuthSessionPayload | null> {
@@ -275,7 +281,17 @@ export default function Portal() {
       fetchAuthSessionPayload()
         .then((data) => {
           if (cancelled) return;
-          setAuthSessionLoggedIn(Boolean(data?.loggedIn));
+          const loggedIn = Boolean(data?.loggedIn);
+          const sessionReady = loggedIn && data?.authReady !== false && data?.profileBootstrapBlocking !== true;
+          setAuthSessionLoggedIn(loggedIn);
+          if (sessionReady) {
+            try {
+              markNesioOnboardingDoneForAuth();
+              window.dispatchEvent(new CustomEvent(NESIO_ONBOARDING_COMPLETE_EVENT, { detail: data }));
+            } catch {
+              // Auth state is still valid; local onboarding persistence is best-effort.
+            }
+          }
         })
         .catch(() => {
           if (!cancelled) setAuthSessionLoggedIn(false);

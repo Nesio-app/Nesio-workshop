@@ -182,7 +182,9 @@ function authHashBridgeHtml(provider: string) {
             return;
           }
           done('session_established', {
-            profileBootstrapStatus: data.profileBootstrapStatus || 'profile_bootstrap_unknown'
+            profileBootstrapStatus: data.profileBootstrapStatus || 'profile_bootstrap_unknown',
+            profileBootstrapBlocking: Boolean(data.profileBootstrapBlocking),
+            authReady: Boolean(data.authReady)
           });
         } catch (error) {
           done('session_import_failed');
@@ -302,6 +304,8 @@ export async function GET(req: NextRequest) {
       provider,
       status: session?.access_token ? 'session_established' : 'session_exchange_failed',
       profileBootstrapStatus: session?.access_token ? profileBootstrapMeta.profileBootstrapStatus : 'profile_bootstrap_not_started',
+      profileBootstrapBlocking: session?.access_token ? String(profileBootstrapMeta.profileBootstrapBlocking) : 'false',
+      authReady: session?.access_token ? String(profileBootstrapMeta.authReady) : 'false',
     });
     const response = NextResponse.redirect(target);
     if (session?.access_token) {
@@ -321,6 +325,8 @@ export async function GET(req: NextRequest) {
       provider,
       status: session?.access_token ? 'session_established' : 'otp_verify_failed',
       profileBootstrapStatus: session?.access_token ? profileBootstrapMeta.profileBootstrapStatus : 'profile_bootstrap_not_started',
+      profileBootstrapBlocking: session?.access_token ? String(profileBootstrapMeta.profileBootstrapBlocking) : 'false',
+      authReady: session?.access_token ? String(profileBootstrapMeta.authReady) : 'false',
     });
     const response = NextResponse.redirect(target);
     if (session?.access_token) {

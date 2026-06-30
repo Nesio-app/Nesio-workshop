@@ -259,6 +259,8 @@ export type AuthSessionResponse = {
   status: 'signed_out' | 'signed_in' | 'session_unverified' | string;
   profileBootstrapped?: boolean;
   profileBootstrapStatus?: string;
+  profileBootstrapBlocking?: boolean;
+  authReady?: boolean;
   user?: AuthSessionUser;
 };
 

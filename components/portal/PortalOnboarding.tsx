@@ -8,10 +8,14 @@ import {
   type PortalLocale,
 } from '@/lib/portal/profile';
 import { loadMirrorFromCloud } from '@/lib/portal/mirror-profile';
-import { getAuthRedirectTo } from '@/lib/portal/auth-client';
+import {
+  getAuthRedirectTo,
+  markNesioOnboardingDoneForAuth,
+  NESIO_ONBOARDING_COMPLETE_EVENT,
+  NESIO_ONBOARDING_DONE_KEYS,
+} from '@/lib/portal/auth-client';
 
-const ONBOARDING_DONE_KEY = 'treasurebox-onboarding-v14-done';
-const LEGACY_ONBOARDING_DONE_KEY = 'treasurebox-onboarding-v13-done';
+const [ONBOARDING_DONE_KEY, LEGACY_ONBOARDING_DONE_KEY] = NESIO_ONBOARDING_DONE_KEYS;
 const TIPS_SHOWN_KEY = 'nesio-tips-shown-v1';
 
 type Step = 'welcome' | 'name' | 'auth';
@@ -26,6 +30,9 @@ type AuthStartResult = {
 type AuthSessionResult = {
   ok?: boolean;
   loggedIn?: boolean;
+  authReady?: boolean;
+  profileBootstrapBlocking?: boolean;
+  profileBootstrapStatus?: string;
   user?: {
     email?: string;
     name?: string;
@@ -38,6 +45,8 @@ type AuthSessionResult = {
 type AuthReadyEventDetail = {
   ok?: boolean;
   loggedIn?: boolean;
+  authReady?: boolean;
+  profileBootstrapBlocking?: boolean;
 };
 
 // ── Auth helpers ──────────────────────────────────────
@@ -76,11 +85,29 @@ function hasAuthCallbackSuccess(): boolean {
     params.get('status') === 'session_imported';
 }
 
+function hasAuthReadyCallbackSuccess(): boolean {
+  if (typeof window === 'undefined') return false;
+  if (!hasAuthCallbackSuccess()) return false;
+  const params = new URLSearchParams(window.location.search);
+  return params.get('authReady') !== 'false' &&
+    params.get('profileBootstrapBlocking') !== 'true';
+}
+
 function clearAuthCallbackParams() {
   if (typeof window === 'undefined') return;
   const url = new URL(window.location.href);
   let changed = false;
-  ['auth', 'provider', 'status', 'profileBootstrapStatus', 'safePublicStatus', 'secretsRedacted'].forEach((key) => {
+  [
+    'auth',
+    'provider',
+    'status',
+    'authMode',
+    'authReady',
+    'profileBootstrapStatus',
+    'profileBootstrapBlocking',
+    'safePublicStatus',
+    'secretsRedacted',
+  ].forEach((key) => {
     if (url.searchParams.has(key)) {
       url.searchParams.delete(key);
       changed = true;
@@ -102,6 +129,14 @@ async function readAuthSession(): Promise<AuthSessionResult | null> {
 function deriveDisplayNameFromSession(session: AuthSessionResult): string {
   const raw = session.user?.name || session.user?.displayName || session.user?.email?.split('@')[0] || '';
   return raw.trim();
+}
+
+function isAuthReadySession(session: AuthSessionResult | null): session is AuthSessionResult {
+  return Boolean(
+    session?.loggedIn &&
+    session.authReady !== false &&
+    session.profileBootstrapBlocking !== true,
+  );
 }
 
 // ── Welcome step ──────────────────────────────────────
@@ -373,8 +408,7 @@ export default function PortalOnboarding() {
 
   function markOnboardingDone() {
     try {
-      localStorage.setItem(ONBOARDING_DONE_KEY, '1');
-      localStorage.setItem(LEGACY_ONBOARDING_DONE_KEY, '1');
+      markNesioOnboardingDoneForAuth();
     } catch { /* ignore */ }
   }
 
@@ -413,15 +447,24 @@ export default function PortalOnboarding() {
         const done = localStorage.getItem(ONBOARDING_DONE_KEY) === '1' ||
           localStorage.getItem(LEGACY_ONBOARDING_DONE_KEY) === '1';
         const callbackArrived = hasAuthCallbackSuccess();
+        const callbackReady = hasAuthReadyCallbackSuccess();
 
         const session = await readAuthSession();
         if (cancelled) return;
-        if (session?.loggedIn) {
+        if (isAuthReadySession(session)) {
           syncProfileFromSession(session);
-          completeOnboardingAfterAuth({ showTips: !done });
+          completeOnboardingAfterAuth({ showTips: false });
           clearAuthCallbackParams();
           return;
         }
+
+        if (callbackReady) {
+          completeOnboardingAfterAuth({ showTips: false });
+          clearAuthCallbackParams();
+          return;
+        }
+
+        if (callbackArrived) clearAuthCallbackParams();
 
         if (done) {
           if (!localStorage.getItem(TIPS_SHOWN_KEY)) setShowTips(true);
@@ -436,12 +479,12 @@ export default function PortalOnboarding() {
 
     function handleAuthReady(event: Event) {
       const detail = (event as CustomEvent<AuthReadyEventDetail>).detail;
-      if (!detail?.ok && !detail?.loggedIn) return;
+      if ((!detail?.ok && !detail?.loggedIn && detail?.authReady !== true) || detail?.profileBootstrapBlocking === true) return;
       readAuthSession().then((session) => {
         if (cancelled) return;
-        if (session?.loggedIn) {
+        if (isAuthReadySession(session)) {
           syncProfileFromSession(session);
-          completeOnboardingAfterAuth();
+          completeOnboardingAfterAuth({ showTips: false });
           clearAuthCallbackParams();
         }
       }).catch(() => undefined);
@@ -450,10 +493,12 @@ export default function PortalOnboarding() {
     hydrate();
     window.addEventListener('nesio-auth-session-imported', handleAuthReady);
     window.addEventListener('nesio-auth-session-ready', handleAuthReady);
+    window.addEventListener(NESIO_ONBOARDING_COMPLETE_EVENT, handleAuthReady);
     return () => {
       cancelled = true;
       window.removeEventListener('nesio-auth-session-imported', handleAuthReady);
       window.removeEventListener('nesio-auth-session-ready', handleAuthReady);
+      window.removeEventListener(NESIO_ONBOARDING_COMPLETE_EVENT, handleAuthReady);
     };
   }, []);
 

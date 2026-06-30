@@ -151,6 +151,8 @@ export async function POST(req: NextRequest) {
     authMode,
     profileBootstrapped: profileBootstrapMeta.profileBootstrapped,
     profileBootstrapStatus: profileBootstrapMeta.profileBootstrapStatus,
+    profileBootstrapBlocking: profileBootstrapMeta.profileBootstrapBlocking,
+    authReady: profileBootstrapMeta.authReady,
     user: {
       id: user.id,
       email: user.email || '',
