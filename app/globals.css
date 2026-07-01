@@ -13010,3 +13010,479 @@ html[data-portal-theme="night"] .nesio-chat-detail-title { color: #d0d8f0; }
 .nesio-chat-identified-tags { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.35rem; }
 .nesio-chat-camera-matches { display: flex; flex-direction: column; gap: 0.4rem; }
 .nesio-hidden { display: none; }
+
+/* ═══════════════════════════════════════════════════════
+   NesioChatSheet — WeChat-style full-screen chat
+   ═══════════════════════════════════════════════════════ */
+
+/* Full-screen container */
+.nesio-wechat-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 310;
+  display: flex;
+  flex-direction: column;
+  background: #ededed;
+  overflow: hidden;
+}
+html[data-portal-theme="night"] .nesio-wechat-fullscreen { background: #1a1b25; }
+
+/* Header */
+.nesio-wechat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 1rem;
+  background: rgba(246,246,246,0.98);
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+  flex-shrink: 0;
+  padding-top: max(0.6rem, env(safe-area-inset-top));
+}
+html[data-portal-theme="night"] .nesio-wechat-header {
+  background: rgba(26,27,37,0.98);
+  border-bottom-color: rgba(255,255,255,0.07);
+}
+
+.nesio-wechat-back-btn {
+  font-size: 1.25rem;
+  color: #3b6ef0;
+  padding: 0.3rem 0.5rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+  line-height: 1;
+  min-width: 2.5rem;
+}
+
+.nesio-wechat-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--portal-ink);
+  letter-spacing: -0.01em;
+}
+
+.nesio-wechat-more-btn {
+  font-size: 0.78rem;
+  color: var(--portal-muted);
+  padding: 0.3rem 0.5rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+  min-width: 2.5rem;
+  text-align: right;
+}
+
+/* Messages list */
+.nesio-wechat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Empty state */
+.nesio-wechat-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  flex: 1;
+  padding: 2rem 1rem;
+  text-align: center;
+}
+.nesio-wechat-empty-icon { font-size: 2.2rem; opacity: 0.5; }
+.nesio-wechat-empty-title { font-size: 1rem; font-weight: 600; color: var(--portal-muted); }
+.nesio-wechat-suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  width: 100%;
+  max-width: 17rem;
+}
+.nesio-wechat-suggestion {
+  padding: 0.6rem 1rem;
+  border-radius: 1.5rem;
+  background: rgba(255,255,255,0.85);
+  border: 1px solid rgba(59,110,240,0.18);
+  color: #3b6ef0;
+  font-size: 0.85rem;
+  cursor: pointer;
+  text-align: left;
+}
+html[data-portal-theme="night"] .nesio-wechat-suggestion {
+  background: rgba(59,110,240,0.12);
+  border-color: rgba(59,110,240,0.3);
+}
+
+/* Status bubble (thinking step) */
+.nesio-wechat-status-bubble {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  color: var(--portal-muted);
+  padding: 0 0.25rem;
+}
+.nesio-wechat-status-dot {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: #3b6ef0;
+  opacity: 0.5;
+  animation: nesio-dot-pulse 1.2s infinite;
+}
+
+/* Message rows */
+.nesio-wechat-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  max-width: 100%;
+}
+.nesio-wechat-row--user { flex-direction: row-reverse; }
+
+.nesio-wechat-avatar {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.5rem;
+  background: #3b6ef0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  color: #fff;
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+.nesio-wechat-bubble-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  max-width: calc(100% - 3rem);
+}
+
+/* Bubbles */
+.nesio-wechat-bubble {
+  padding: 0.65rem 0.9rem;
+  border-radius: 0.75rem;
+  position: relative;
+  word-break: break-word;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.nesio-wechat-bubble--ai {
+  background: #fff;
+  border-radius: 0 0.75rem 0.75rem 0.75rem;
+}
+html[data-portal-theme="night"] .nesio-wechat-bubble--ai {
+  background: #2a2d3e;
+}
+
+.nesio-wechat-bubble--user {
+  background: #07c160;
+  border-radius: 0.75rem 0 0.75rem 0.75rem;
+}
+
+.nesio-wechat-bubble-text {
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: var(--portal-ink);
+  white-space: pre-wrap;
+  margin: 0;
+}
+.nesio-wechat-bubble--user .nesio-wechat-bubble-text { color: #fff; }
+
+/* Thinking dots */
+.nesio-wechat-bubble--thinking {
+  display: flex;
+  gap: 0.3rem;
+  align-items: center;
+  padding: 0.8rem 1rem;
+}
+.nesio-wechat-bubble--thinking span {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: var(--portal-muted);
+  animation: nesio-dot-pulse 1.2s ease-in-out infinite;
+}
+.nesio-wechat-bubble--thinking span:nth-child(2) { animation-delay: 0.2s; }
+.nesio-wechat-bubble--thinking span:nth-child(3) { animation-delay: 0.4s; }
+
+.nesio-wechat-saved-badge {
+  font-size: 0.68rem;
+  color: #10b981;
+  margin: 0.2rem 0 0;
+}
+
+/* Sources */
+.nesio-wechat-sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+.nesio-wechat-source-chip {
+  font-size: 0.7rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 1rem;
+  background: rgba(59,110,240,0.1);
+  color: #3b6ef0;
+  text-decoration: none;
+  border: 1px solid rgba(59,110,240,0.2);
+}
+
+/* Input bar */
+.nesio-wechat-input-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 0.75rem;
+  padding-bottom: max(0.55rem, env(safe-area-inset-bottom));
+  background: rgba(246,246,246,0.98);
+  border-top: 1px solid rgba(0,0,0,0.08);
+  flex-shrink: 0;
+}
+html[data-portal-theme="night"] .nesio-wechat-input-bar {
+  background: rgba(26,27,37,0.98);
+  border-top-color: rgba(255,255,255,0.07);
+}
+
+.nesio-wechat-mic-btn {
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 50%;
+  border: 1px solid rgba(0,0,0,0.1);
+  background: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  flex-shrink: 0;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  transition: background 0.15s;
+}
+html[data-portal-theme="night"] .nesio-wechat-mic-btn { background: #2a2d3e; border-color: rgba(255,255,255,0.1); }
+.nesio-wechat-mic-btn--active { background: #fee2e2 !important; border-color: #ef4444; }
+
+.nesio-wechat-input {
+  flex: 1;
+  min-width: 0;
+  height: 2.2rem;
+  padding: 0 0.75rem;
+  border-radius: 1.1rem;
+  border: 1px solid rgba(0,0,0,0.1);
+  background: #fff;
+  font-size: 0.9rem;
+  color: var(--portal-ink);
+  outline: none;
+}
+html[data-portal-theme="night"] .nesio-wechat-input { background: #2a2d3e; border-color: rgba(255,255,255,0.1); color: #d0d8f0; }
+.nesio-wechat-input::placeholder { color: var(--portal-muted); opacity: 0.6; }
+.nesio-wechat-input:focus { border-color: #3b6ef0; }
+
+.nesio-wechat-send-btn {
+  padding: 0 0.9rem;
+  height: 2.2rem;
+  border-radius: 1.1rem;
+  background: #07c160;
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.nesio-wechat-send-btn:disabled { opacity: 0.45; }
+
+.nesio-wechat-plus-btn {
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 50%;
+  border: 1px solid rgba(0,0,0,0.1);
+  background: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  flex-shrink: 0;
+  color: var(--portal-muted);
+  line-height: 1;
+  transition: background 0.15s, color 0.15s;
+}
+html[data-portal-theme="night"] .nesio-wechat-plus-btn { background: #2a2d3e; border-color: rgba(255,255,255,0.1); }
+.nesio-wechat-plus-btn--active { background: #3b6ef0; color: #fff; border-color: #3b6ef0; }
+
+/* Plus panel */
+.nesio-wechat-plus-panel {
+  display: flex;
+  gap: 1.5rem;
+  padding: 1rem 1.25rem;
+  background: rgba(246,246,246,0.98);
+  border-top: 1px solid rgba(0,0,0,0.06);
+  flex-shrink: 0;
+}
+html[data-portal-theme="night"] .nesio-wechat-plus-panel {
+  background: rgba(26,27,37,0.98);
+  border-top-color: rgba(255,255,255,0.07);
+}
+.nesio-wechat-plus-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 0.72rem;
+  color: var(--portal-muted);
+}
+.nesio-wechat-plus-icon {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.75rem;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  border: 1px solid rgba(0,0,0,0.06);
+}
+html[data-portal-theme="night"] .nesio-wechat-plus-icon { background: #2a2d3e; border-color: rgba(255,255,255,0.08); }
+
+/* Bubble context menu */
+.nesio-bubble-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 320;
+  background: rgba(0,0,0,0.3);
+  border: none;
+  cursor: default;
+}
+.nesio-bubble-menu {
+  position: fixed;
+  left: 1rem;
+  right: 1rem;
+  bottom: max(1.5rem, env(safe-area-inset-bottom));
+  z-index: 321;
+  background: #fff;
+  border-radius: 1rem;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+}
+html[data-portal-theme="night"] .nesio-bubble-menu { background: #2a2d3e; }
+.nesio-bubble-menu-item {
+  width: 100%;
+  padding: 0.9rem 1rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.95rem;
+  color: var(--portal-ink);
+  border-top: 1px solid rgba(0,0,0,0.06);
+  text-align: left;
+}
+.nesio-bubble-menu-item:first-child { border-top: none; }
+html[data-portal-theme="night"] .nesio-bubble-menu-item { border-top-color: rgba(255,255,255,0.06); }
+.nesio-bubble-menu-item:active { background: rgba(0,0,0,0.04); }
+.nesio-bubble-menu-item--cancel {
+  color: var(--portal-muted);
+  margin-top: 0.3rem;
+  border-top: 6px solid rgba(0,0,0,0.04) !important;
+  justify-content: center;
+}
+html[data-portal-theme="night"] .nesio-bubble-menu-item--cancel { border-top-color: rgba(255,255,255,0.06) !important; }
+.nesio-bubble-menu-icon { font-size: 1.1rem; width: 1.5rem; text-align: center; }
+
+/* Memory detail view */
+.nesio-memory-detail {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #ededed;
+}
+html[data-portal-theme="night"] .nesio-memory-detail { background: #1a1b25; }
+.nesio-memory-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 1rem;
+  padding-top: max(0.6rem, env(safe-area-inset-top));
+  background: rgba(246,246,246,0.98);
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+  flex-shrink: 0;
+}
+html[data-portal-theme="night"] .nesio-memory-detail-header { background: rgba(26,27,37,0.98); border-bottom-color: rgba(255,255,255,0.07); }
+.nesio-memory-detail-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.25rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.nesio-memory-detail-name {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--portal-ink);
+  margin: 0;
+}
+html[data-portal-theme="night"] .nesio-memory-detail-name { color: #d0d8f0; }
+.nesio-memory-detail-meta { font-size: 0.72rem; color: var(--portal-muted); }
+.nesio-memory-detail-raw {
+  font-size: 0.85rem;
+  color: var(--portal-ink);
+  line-height: 1.55;
+  background: #fff;
+  border-radius: 0.75rem;
+  padding: 0.75rem 0.9rem;
+}
+html[data-portal-theme="night"] .nesio-memory-detail-raw { background: #2a2d3e; color: #d0d8f0; }
+.nesio-memory-detail-attrs { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.35rem; }
+.nesio-memory-detail-attrs li { display: flex; gap: 0.5rem; font-size: 0.8rem; background: #fff; border-radius: 0.5rem; padding: 0.5rem 0.75rem; }
+html[data-portal-theme="night"] .nesio-memory-detail-attrs li { background: #2a2d3e; }
+.nesio-memory-detail-key { color: var(--portal-muted); flex-shrink: 0; min-width: 5rem; }
+.nesio-memory-detail-val { color: var(--portal-ink); word-break: break-all; }
+html[data-portal-theme="night"] .nesio-memory-detail-val { color: #d0d8f0; }
+.nesio-memory-detail-tags { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+
+/* Inline camera view (inside chat fullscreen) */
+.nesio-camera-live {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #000;
+}
+.nesio-camera-back {
+  position: absolute;
+  top: max(0.6rem, env(safe-area-inset-top));
+  left: 0.5rem;
+  z-index: 10;
+  color: #fff !important;
+}
+.nesio-camera-entry {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  height: 100%;
+  padding: 2rem;
+}
+.nesio-camera-entry-btns { display: flex; gap: 1.5rem; }
+.nesio-camera-status { font-size: 0.9rem; color: var(--portal-muted); }
