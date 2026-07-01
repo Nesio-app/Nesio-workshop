@@ -44,18 +44,92 @@ export function toggleSubtask(nodeId: string, subtaskId: string): void {
   if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
 }
 
-const FOCUS_TIME_WORDS = ['生日', '会议', '截止', '复诊', '今天', '明天', '后天', '本周', '这周', 'deadline', 'birthday', 'meeting', '到期', '提醒'];
+// ---- Focus node detection — "everything that deserves attention today" ----
+
+const FOCUS_TIME_WORDS = [
+  // Time references
+  '今天', '今日', '明天', '明日', '后天', '本周', '这周', '本月', '这个月',
+  // Meetings & work
+  '会议', '开会', '例会', '周会', '月会', '汇报', '演示', '演讲', 'demo',
+  '发布', '上线', '评审', '面试', '面谈', '1on1', 'standup',
+  // Deadlines & tasks
+  '截止', '到期', '提醒', '别忘', '记得', '不要忘', '最后期限', 'deadline',
+  // Appointments & health
+  '复诊', '复查', '体检', '检查', '看诊', '医院', '医生', '挂号',
+  '手术', '取药', '配药', '打针', '疫苗', '牙医', '产检',
+  // Important dates
+  '生日', '纪念日', '周年', '忌日', 'birthday', 'anniversary',
+  // Travel & logistics
+  '出发', '航班', '机票', '火车', '高铁', '出差', '登机',
+  // Finance
+  '还款', '缴费', '账单', '保险', '交税',
+  // Keywords from other languages
+  'meeting', 'appointment', 'birthday', 'reminder',
+];
+
+// All node types that are inherently action/attention items
+const FOCUS_TYPES = new Set(['commitment', 'event', 'health_state']);
+
+/** Extract nearest future or past-due date from a node's attributes */
+function extractNearestDate(node: LifeNode): Date | null {
+  let nearest: Date | null = null;
+  const DATE_KEYS = ['start', 'end', 'date', 'dueDate', 'due', 'deadline', 'datetime', 'scheduledAt', 'remindAt'];
+  // Check known date keys first (highest priority)
+  for (const key of DATE_KEYS) {
+    const v = node.attributes[key];
+    if (typeof v === 'string') {
+      const d = new Date(v);
+      if (!Number.isNaN(d.getTime())) {
+        if (!nearest || Math.abs(d.getTime() - Date.now()) < Math.abs(nearest.getTime() - Date.now())) {
+          nearest = d;
+        }
+      }
+    }
+  }
+  // Scan all attributes for any ISO date string
+  for (const v of Object.values(node.attributes)) {
+    if (typeof v === 'string' && v.length >= 10) {
+      const d = new Date(v);
+      if (!Number.isNaN(d.getTime()) && d.getFullYear() > 2020) {
+        if (!nearest || Math.abs(d.getTime() - Date.now()) < Math.abs(nearest.getTime() - Date.now())) {
+          nearest = d;
+        }
+      }
+    }
+  }
+  return nearest;
+}
+
+/** Urgency score: lower = more urgent. Used for sorting. */
+function urgencyScore(node: LifeNode): number {
+  const now = Date.now();
+  const d = extractNearestDate(node);
+  if (d) {
+    const diff = d.getTime() - now;
+    // Overdue but not done — highest priority
+    if (diff < 0) return diff; // negative = very high priority
+    // Due within 48h
+    if (diff < 2 * 86_400_000) return diff;
+    // Due within 7 days
+    if (diff < 7 * 86_400_000) return diff;
+    return diff;
+  }
+  // No date — rank by recency (recently added commitment = relevant)
+  return Date.now() - new Date(node.createdAt).getTime() + 30 * 86_400_000;
+}
 
 function isFocusNode(node: LifeNode): boolean {
   if (node.attributes.done) return false;
-  const text = [node.name, node.rawInput || ''].join(' ').toLowerCase();
+  // Always include active commitments and events
+  if (FOCUS_TYPES.has(node.type)) return true;
+  // Keyword match in name + rawInput
+  const text = [node.name, node.rawInput || '', ...(node.tags ?? [])].join(' ').toLowerCase();
   if (FOCUS_TIME_WORDS.some((w) => text.includes(w))) return true;
-  if (node.type === 'commitment' || node.type === 'event') return true;
-  for (const v of Object.values(node.attributes)) {
-    if (typeof v === 'string') {
-      const d = new Date(v);
-      if (!Number.isNaN(d.getTime()) && d > new Date() && d < new Date(Date.now() + 30 * 86_400_000)) return true;
-    }
+  // Has a relevant date within 30 days
+  const d = extractNearestDate(node);
+  if (d) {
+    const diff = d.getTime() - Date.now();
+    if (diff > -7 * 86_400_000 && diff < 30 * 86_400_000) return true; // include slightly overdue
   }
   return false;
 }
@@ -99,11 +173,16 @@ export function addCommitmentNode(name: string): FocusNode {
 
 export function focusTimeHint(node: FocusNode): string {
   const now = new Date();
-  for (const v of Object.values(node.attributes)) {
+  const DATE_KEYS = ['start', 'end', 'date', 'dueDate', 'due', 'deadline', 'datetime', 'scheduledAt', 'remindAt'];
+  // Check known date keys first for best label
+  for (const key of DATE_KEYS) {
+    const v = node.attributes[key];
     if (typeof v === 'string') {
       const d = new Date(v);
-      if (!Number.isNaN(d.getTime()) && d > now) {
-        const days = Math.round((d.getTime() - now.getTime()) / 86_400_000);
+      if (!Number.isNaN(d.getTime())) {
+        const diffMs = d.getTime() - now.getTime();
+        const days = Math.round(diffMs / 86_400_000);
+        if (diffMs < 0 && days >= -3) return '已过期';
         if (days === 0) return '今天';
         if (days === 1) return '明天';
         if (days <= 7) return `${days} 天后`;
@@ -112,9 +191,24 @@ export function focusTimeHint(node: FocusNode): string {
       }
     }
   }
+  // Scan all attributes
+  for (const v of Object.values(node.attributes)) {
+    if (typeof v === 'string' && v.length >= 10) {
+      const d = new Date(v);
+      if (!Number.isNaN(d.getTime()) && d.getFullYear() > 2020) {
+        const diffMs = d.getTime() - now.getTime();
+        const days = Math.round(diffMs / 86_400_000);
+        if (diffMs < 0 && days >= -3) return '已过期';
+        if (days === 0) return '今天';
+        if (days === 1) return '明天';
+        if (days <= 7) return `${days} 天后`;
+        if (days <= 30) return `约 ${Math.round(days / 7)} 周后`;
+      }
+    }
+  }
   const text = [node.name, node.rawInput || ''].join(' ').toLowerCase();
-  if (text.includes('今天')) return '今天';
-  if (text.includes('明天')) return '明天';
+  if (text.includes('今天') || text.includes('今日')) return '今天';
+  if (text.includes('明天') || text.includes('明日')) return '明天';
   const hours = (now.getTime() - new Date(node.createdAt).getTime()) / 3_600_000;
   if (hours < 24) return '刚记录';
   return '';
@@ -147,8 +241,8 @@ export function buildTodayViewModel(input: {
 
   const focusNodes: FocusNode[] = getLifeGraph()
     .filter(isFocusNode)
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, 5)
+    .sort((a, b) => urgencyScore(a) - urgencyScore(b))
+    .slice(0, 10)
     .map((n) => ({ id: n.id, name: n.name, type: n.type, rawInput: n.rawInput, createdAt: n.createdAt, attributes: n.attributes, subtasks: parseSubtasks(n.attributes) }));
 
   return {
