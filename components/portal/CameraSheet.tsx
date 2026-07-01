@@ -61,6 +61,54 @@ function confidenceLabel(confidence: number): string {
   return '建议确认';
 }
 
+// ── Editable node state ──────────────────────────────────────────────────────
+
+interface EditedNode {
+  name: string;
+  type: string;
+  attributes: Record<string, string | number | boolean | null>;
+  tags: string[];
+  source: string;
+  confidence: number;
+  relations: Array<{ targetId: string; relation: string }>;
+  rawInput?: string;
+  note?: string;
+  expiry?: string;
+  deleted: boolean;
+}
+
+function toEditedNodes(nodes: AnalyzedNode[]): EditedNode[] {
+  return nodes.map((n) => ({ ...n, tags: n.tags ?? [], note: '', expiry: '', deleted: false }));
+}
+
+// ── Receipt detection ────────────────────────────────────────────────────────
+
+const RECEIPT_KEYWORDS = ['小票', '收据', 'receipt', '发票', '结账', '超市', '便利店', '合计', 'total', 'subtotal', '购物清单'];
+
+function detectReceipt(result: AnalysisResult): boolean {
+  const text = [result.summary, ...result.nodes.map((n) => n.name + ' ' + JSON.stringify(n.attributes))].join(' ').toLowerCase();
+  const keywordHit = RECEIPT_KEYWORDS.some((k) => text.includes(k));
+  const manyObjects = result.nodes.length >= 3 && result.nodes.filter((n) => n.type === 'object').length >= result.nodes.length - 1;
+  return keywordHit || manyObjects;
+}
+
+// ── Location helper ──────────────────────────────────────────────────────────
+
+async function getCurrentLocation(): Promise<{ lat: number; lon: number } | null> {
+  return new Promise((resolve) => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) { resolve(null); return; }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
+      () => resolve(null),
+      { timeout: 3000, maximumAge: 60_000 },
+    );
+  });
+}
+
+// ── Node type chips ──────────────────────────────────────────────────────────
+
+const ALL_TYPES = ['object', 'person', 'place', 'event', 'commitment', 'health_state', 'preference'] as const;
+
 function buildPendingImageResult(): AnalysisResult {
   return {
     summary: '已先保存为待确认图片线索。登录或 Lab 模式后可自动识别标签。',
@@ -111,6 +159,8 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
   const [phase, setPhase] = useState<'idle' | 'live' | 'captured' | 'analyzing' | 'result' | 'saved' | 'no-camera'>('idle');
   const [capturedPreview, setCapturedPreview] = useState<string>('');
   const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [editedNodes, setEditedNodes] = useState<EditedNode[]>([]);
+  const [isReceipt, setIsReceipt] = useState(false);
   const [permDenied, setPermDenied] = useState(false);
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
   const [error, setError] = useState('');
@@ -258,10 +308,15 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
       const base64 = await compressImage(canvas);
       const res = await analyzeImage(base64);
       setResult(res);
+      setEditedNodes(toEditedNodes(res.nodes));
+      setIsReceipt(detectReceipt(res));
       setPhase('result');
     } catch (err: unknown) {
       if (err instanceof AnalyzeImageError && err.code === 'ai_auth_required') {
-        setResult(buildPendingImageResult());
+        const pending = buildPendingImageResult();
+        setResult(pending);
+        setEditedNodes(toEditedNodes(pending.nodes));
+        setIsReceipt(false);
         setPhase('result');
         return;
       }
@@ -290,7 +345,10 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
         setResult(res);
         setPhase('result');
       } catch {
-        setResult(buildPendingImageResult());
+        const pending = buildPendingImageResult();
+        setResult(pending);
+        setEditedNodes(toEditedNodes(pending.nodes));
+        setIsReceipt(false);
         setPhase('result');
       }
     };
@@ -307,7 +365,10 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
           body: JSON.stringify({ type: 'file', content: text.slice(0, 4000) }),
         });
         const data = await res2.json() as { ok?: boolean; nodes?: AnalyzedNode[]; summary?: string };
-        setResult({ nodes: data.nodes || [], summary: data.summary || '提取完成' });
+        const fileResult = { nodes: data.nodes || [], summary: data.summary || '提取完成' };
+        setResult(fileResult);
+        setEditedNodes(toEditedNodes(fileResult.nodes));
+        setIsReceipt(detectReceipt(fileResult));
         setPhase('result');
       } catch {
         setPhase('live');
@@ -316,15 +377,28 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
   }
 
   async function saveAll() {
-    if (!result) return;
+    const nodesToSave = editedNodes.filter((n) => !n.deleted);
+    if (!nodesToSave.length) return;
     const userTags = parseInlineTags(extraTags);
-    const savedNodes = result.nodes.map((n) => addLifeNode({
-      ...n,
+
+    // Best-effort location — attach if permission already granted
+    const loc = await getCurrentLocation();
+    const locAttrs = loc ? { lat: loc.lat, lon: loc.lon } : {};
+
+    const savedNodes = nodesToSave.map((n) => addLifeNode({
+      name: n.name,
+      type: n.type as LifeNode['type'],
       source: 'photo',
       tags: Array.from(new Set([...(n.tags || []), ...userTags])),
+      confidence: n.confidence,
+      relations: n.relations,
+      rawInput: n.rawInput,
       attributes: {
         ...n.attributes,
-        ...(userTags.length ? { userTags: userTags.join(', ') } : {}),
+        ...(loc ? { lat: loc.lat as number, lon: loc.lon as number } : {}),
+        ...(n.note?.trim() ? { note: n.note.trim() as string } : {}),
+        ...(n.expiry?.trim() ? { expiry: n.expiry.trim() as string } : {}),
+        ...(userTags.length ? { userTags: userTags.join(', ') as string } : {}),
       },
     }));
     let cloudAssets: Array<LifeNodeAsset & { nodeId?: string }> = [];
@@ -338,8 +412,8 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
             kind: sourceFile.type.startsWith('image/') ? 'image' : 'file',
             storagePath: upload.storagePath,
             mimeType: upload.mimeType,
-            label: result.summary || savedNodes[0].name,
-            analysisSummary: result.summary,
+            label: result?.summary || savedNodes[0].name,
+            analysisSummary: result?.summary,
             tags: Array.from(new Set([...(savedNodes[0].tags || []), ...userTags])),
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
@@ -365,7 +439,8 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
   }
 
   function retake() {
-    setResult(null); setCapturedPreview(''); setError(''); setExtraTags(''); setSourceFile(null);
+    setResult(null); setEditedNodes([]); setIsReceipt(false);
+    setCapturedPreview(''); setError(''); setExtraTags(''); setSourceFile(null);
     setPhase('idle');
     openNativeCamera();
   }
@@ -463,44 +538,101 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
         )}
       </div>
 
-      {/* Analysis result */}
+      {/* Analysis result — editable */}
       {phase === 'result' && result && (
         <div className="nesio-camera-result-panel">
+          {isReceipt && (
+            <div className="nesio-camera-receipt-banner">
+              🧾 检测到小票，已列出条目，可编辑名称或添加有效期
+            </div>
+          )}
           <p className="nesio-camera-result-summary">{result.summary}</p>
+
           <div className="nesio-camera-result-nodes">
-            {result.nodes.slice(0, 4).map((node, i) => (
-              <div key={i} className="nesio-camera-result-node">
-                <span className="nesio-camera-result-node-icon">
-                  {TYPE_ICON[node.type] || '📌'}
-                </span>
-                <div className="nesio-camera-result-node-body">
-                  <p className="nesio-camera-result-node-name">{node.name}</p>
-                  <p className="nesio-camera-result-node-type">{TYPE_LABEL[node.type] || node.type}</p>
-                  {Object.entries(node.attributes).slice(0, 2).map(([k, v]) => (
-                    <p key={k} className="nesio-camera-result-node-attr">{k}: {String(v)}</p>
+            {editedNodes.map((node, i) => node.deleted ? null : (
+              <div key={i} className="nesio-camera-result-node nesio-camera-result-node--editable">
+                {/* Type chips */}
+                <div className="nesio-camera-node-type-row">
+                  {ALL_TYPES.map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      className={`nesio-camera-type-chip${node.type === t ? ' nesio-camera-type-chip--active' : ''}`}
+                      onClick={() => setEditedNodes((prev) => prev.map((n, j) => j === i ? { ...n, type: t } : n))}
+                    >
+                      {TYPE_ICON[t]}
+                    </button>
                   ))}
+                  <button
+                    type="button"
+                    className="nesio-camera-node-delete"
+                    aria-label="删除此条"
+                    onClick={() => setEditedNodes((prev) => prev.map((n, j) => j === i ? { ...n, deleted: true } : n))}
+                  >✕</button>
                 </div>
-                <span className="nesio-camera-result-conf">{confidenceLabel(node.confidence)}</span>
+
+                {/* Editable name */}
+                <input
+                  className="nesio-camera-node-name-input"
+                  value={node.name}
+                  onChange={(e) => setEditedNodes((prev) => prev.map((n, j) => j === i ? { ...n, name: e.target.value } : n))}
+                  placeholder="名称"
+                />
+
+                {/* Note */}
+                <input
+                  className="nesio-camera-node-note-input"
+                  value={node.note || ''}
+                  onChange={(e) => setEditedNodes((prev) => prev.map((n, j) => j === i ? { ...n, note: e.target.value } : n))}
+                  placeholder="补充一句描述…（可选）"
+                />
+
+                {/* Expiry — shown for objects or receipt items */}
+                {(node.type === 'object' || isReceipt) && (
+                  <div className="nesio-camera-node-expiry-row">
+                    <span className="nesio-camera-node-expiry-label">有效期</span>
+                    <input
+                      type="date"
+                      className="nesio-camera-node-expiry-input"
+                      value={node.expiry || ''}
+                      onChange={(e) => setEditedNodes((prev) => prev.map((n, j) => j === i ? { ...n, expiry: e.target.value } : n))}
+                    />
+                  </div>
+                )}
               </div>
             ))}
           </div>
+
+          {/* Add extra item */}
+          <button
+            type="button"
+            className="nesio-camera-add-item-btn"
+            onClick={() => setEditedNodes((prev) => [...prev, {
+              name: '', type: 'object', attributes: {}, tags: [], source: 'photo',
+              confidence: 1, relations: [], deleted: false,
+            }])}
+          >
+            + 添加条目
+          </button>
+
           <label className="nesio-camera-tag-field">
-            <span>给这张图片加标签</span>
+            <span>标签</span>
             <input
               value={extraTags}
               onChange={(e) => setExtraTags(e.target.value)}
-              placeholder="例如 #钥匙 #门口 #Linda礼物"
+              placeholder="#钥匙 #门口 #Linda礼物"
               aria-label="图片标签"
             />
           </label>
-          {parseInlineTags(extraTags).length > 0 && (
-            <div className="nesio-camera-tag-preview">
-              {parseInlineTags(extraTags).map((tag) => <span key={tag}>#{tag}</span>)}
-            </div>
-          )}
+
           <div className="nesio-camera-result-actions">
-            <button type="button" className="nesio-camera-save-btn" onClick={saveAll}>
-              存入 Memory ({result.nodes.length} 条)
+            <button
+              type="button"
+              className="nesio-camera-save-btn"
+              onClick={saveAll}
+              disabled={editedNodes.filter((n) => !n.deleted && n.name.trim()).length === 0}
+            >
+              存入 Memory ({editedNodes.filter((n) => !n.deleted && n.name.trim()).length} 条)
             </button>
             <button type="button" className="nesio-camera-retake-btn" onClick={retake}>重拍</button>
           </div>

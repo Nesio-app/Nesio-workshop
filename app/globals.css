@@ -12164,6 +12164,113 @@ html[data-portal-theme="night"] .nesio-mirror-title { color: #e8eefa; }
   flex-shrink: 0;
 }
 
+/* Editable result nodes */
+.nesio-camera-receipt-banner {
+  background: rgba(255,179,71,.15);
+  border: 1px solid rgba(255,179,71,.3);
+  border-radius: 10px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.78rem;
+  color: #c87000;
+  margin-bottom: 0.5rem;
+}
+.nesio-camera-result-node--editable {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.4rem;
+  padding: 0.65rem 0.75rem;
+}
+.nesio-camera-node-type-row {
+  display: flex;
+  gap: 0.3rem;
+  align-items: center;
+  margin-bottom: 0.15rem;
+}
+.nesio-camera-type-chip {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 6px;
+  padding: 0.15rem 0.3rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  opacity: 0.5;
+  transition: opacity 0.15s, background 0.15s;
+}
+.nesio-camera-type-chip--active {
+  opacity: 1;
+  background: rgba(74,144,217,0.2);
+  border-color: rgba(74,144,217,0.5);
+}
+.nesio-camera-node-delete {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: #8fa3c0;
+  font-size: 0.8rem;
+  cursor: pointer;
+  opacity: 0.5;
+  padding: 0.1rem 0.3rem;
+}
+.nesio-camera-node-delete:hover { opacity: 1; }
+.nesio-camera-node-name-input {
+  width: 100%;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 8px;
+  color: #e8f0fe;
+  font-size: 0.92rem;
+  font-weight: 600;
+  padding: 0.4rem 0.6rem;
+  outline: none;
+  box-sizing: border-box;
+}
+.nesio-camera-node-name-input:focus { border-color: rgba(74,144,217,0.5); }
+.nesio-camera-node-note-input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  color: #a0b4cc;
+  font-size: 0.78rem;
+  padding: 0.25rem 0.1rem;
+  outline: none;
+  box-sizing: border-box;
+}
+.nesio-camera-node-note-input::placeholder { color: #607080; }
+.nesio-camera-node-expiry-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.1rem;
+}
+.nesio-camera-node-expiry-label {
+  font-size: 0.72rem;
+  color: #8fa3c0;
+  white-space: nowrap;
+}
+.nesio-camera-node-expiry-input {
+  flex: 1;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 6px;
+  color: #c8d8e8;
+  font-size: 0.75rem;
+  padding: 0.2rem 0.4rem;
+  outline: none;
+}
+.nesio-camera-add-item-btn {
+  width: 100%;
+  background: transparent;
+  border: 1px dashed rgba(255,255,255,0.2);
+  border-radius: 8px;
+  color: #8fa3c0;
+  font-size: 0.8rem;
+  padding: 0.45rem;
+  cursor: pointer;
+  margin: 0.25rem 0;
+}
+.nesio-camera-add-item-btn:hover { border-color: rgba(74,144,217,0.4); color: #a8c4e0; }
+
 .nesio-camera-fallback-text {
   color: #8fa3c0;
   font-size: 0.82rem;

@@ -349,47 +349,65 @@ export function getLifeGraphCloudSyncSummary(): {
   };
 }
 
-async function syncLifeNodeToCloud(node: LifeNode): Promise<void> {
+// Errors that mean "cloud not ready yet" — don't mark as failed, just skip silently
+const CLOUD_TRANSIENT_ERRORS = new Set(['cloud_not_configured', 'not_signed_in', 'cloud_not_available']);
+
+async function cloudFetchWithSmartError(
+  input: RequestInfo,
+  init: RequestInit,
+): Promise<{ ok: boolean; transient: boolean; error?: string }> {
+  try {
+    const response = await fetch(input, init);
+    if (response.ok) return { ok: true, transient: false };
+    // Parse the body to distinguish transient vs real failures
+    let errorCode = 'cloud_memory_sync_failed';
+    try {
+      const body = await response.clone().json() as { error?: string };
+      if (body.error) errorCode = body.error;
+    } catch { /* ignore parse error */ }
+    const transient = CLOUD_TRANSIENT_ERRORS.has(errorCode) || response.status === 503 || response.status === 401;
+    return { ok: false, transient, error: errorCode };
+  } catch {
+    return { ok: false, transient: false, error: 'cloud_memory_network_error' };
+  }
+}
+
+async function syncLifeGraphUpsertToCloud(node: LifeNode): Promise<void> {
   if (!cloudMemorySyncEnabled()) return;
   queueCloudSyncOutboxItem(node, 'upsert', { assets: [] });
   markCloudSyncPending(node.id, 'upsert');
-  try {
-    updateCloudSyncOutboxAttempt(node.id, 'upsert');
-    const response = await fetch(CLOUD_MEMORY_ENDPOINT, {
-      method: 'POST',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ nodes: [node], assets: [] }),
-    });
-    if (!response.ok) throw new Error('cloud_memory_sync_failed');
+  updateCloudSyncOutboxAttempt(node.id, 'upsert');
+  const result = await cloudFetchWithSmartError(CLOUD_MEMORY_ENDPOINT, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nodes: [node], assets: [] }),
+  });
+  if (result.ok) {
     markCloudSyncSynced(node.id, 'upsert');
     removeCloudSyncOutboxItem(node.id, 'upsert');
-  } catch (error) {
-    markCloudSyncFailed(node.id, 'upsert', error);
+  } else if (!result.transient) {
+    markCloudSyncFailed(node.id, 'upsert', new Error(result.error));
   }
+  // transient (not configured / not signed in) → leave as pending, retry later
 }
 
 async function syncLifeGraphDeleteToCloud(id: string): Promise<void> {
   if (!cloudMemorySyncEnabled()) return;
   queueCloudSyncOutboxItem(id, 'delete');
   markCloudSyncPending(id, 'delete');
-  try {
-    updateCloudSyncOutboxAttempt(id, 'delete');
-    const response = await fetch(CLOUD_MEMORY_ENDPOINT, {
-      method: 'DELETE',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ nodeId: id }),
-    });
-    if (!response.ok) throw new Error('cloud_memory_sync_failed');
+  updateCloudSyncOutboxAttempt(id, 'delete');
+  const result = await cloudFetchWithSmartError(CLOUD_MEMORY_ENDPOINT, {
+    method: 'DELETE',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nodeId: id }),
+  });
+  if (result.ok) {
     markCloudSyncSynced(id, 'delete');
     removeCloudSyncOutboxItem(id, 'delete');
-  } catch (error) {
-    markCloudSyncFailed(id, 'delete', error);
+  } else if (!result.transient) {
+    markCloudSyncFailed(id, 'delete', new Error(result.error));
   }
 }
 
@@ -700,7 +718,7 @@ export function addLifeNode(node: Omit<LifeNode, 'id' | 'createdAt'>): LifeNode 
   };
   nodes.unshift(newNode);
   saveAll(nodes);
-  void syncLifeNodeToCloud(newNode);
+  void syncLifeGraphUpsertToCloud(newNode);
   syncLifeNodeSignalToCloud(newNode);
   if (typeof window !== 'undefined' && RECEIPT_SOURCES.has(newNode.source)) {
     window.dispatchEvent(new CustomEvent('nesio-memory-received', { detail: { node: newNode } }));
@@ -714,7 +732,7 @@ export function updateLifeNode(id: string, patch: Partial<LifeNode>): boolean {
   if (idx < 0) return false;
   nodes[idx] = { ...nodes[idx], ...patch };
   saveAll(nodes);
-  void syncLifeNodeToCloud(nodes[idx]);
+  void syncLifeGraphUpsertToCloud(nodes[idx]);
   syncLifeNodeSignalToCloud(nodes[idx]);
   return true;
 }
