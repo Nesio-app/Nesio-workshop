@@ -86,8 +86,9 @@ async function callGemini(
   history: ChatMessage[],
   systemInstruction: string,
 ): Promise<{ text: string; sources: Array<{ title: string; url: string }> }> {
+  // gemini-1.5-flash has better free-tier quota on AI Studio keys
   const GEMINI_URL =
-    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
 
   const contents = [
     ...history
@@ -141,7 +142,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'empty message' }, { status: 400 });
   }
 
-  const anthropicKey = envValue('ANTHROPIC_API_KEY');
+  // Accept both ANTHROPIC_API_KEY and CLAUDE_API_KEY as aliases
+  const anthropicKey = envValue('ANTHROPIC_API_KEY') || envValue('CLAUDE_API_KEY');
   const geminiKey = envValue('GEMINI_API_KEY');
 
   if (!anthropicKey && !geminiKey) {
