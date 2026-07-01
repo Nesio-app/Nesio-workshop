@@ -1078,6 +1078,18 @@ export default function TodayFeed({
         {/* 听今日简报 */}
         <DailyBriefCard canUsePrivateData={canUsePrivateData} memoryCount={memoryCount} memoryNotes={memoryNotes} />
 
+        {/* 此刻如何 — 常驻快捷情绪记录入口 */}
+        <button
+          type="button"
+          className="nesio-mood-quick-chip"
+          onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-mood'))}
+          aria-label="记录此刻感受"
+        >
+          <span className="nesio-mood-quick-chip-icon" aria-hidden>🌡</span>
+          <span className="nesio-mood-quick-chip-text">此刻如何？</span>
+          <span className="nesio-mood-quick-chip-arrow" aria-hidden>→</span>
+        </button>
+
         {/* 未来引导卡片 — shows only when triggered */}
         {showProactive && (
           <ProactiveGuidanceCard

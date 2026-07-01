@@ -351,11 +351,14 @@ export default function Portal() {
   useEffect(() => {
     const handler = () => setActiveSurface((s) => s === 'tell' ? 'today' : 'tell');
     const voiceHandler = () => setCaptureMode('voice');
+    const moodHandler = () => setCaptureMode('mood');
     window.addEventListener('nesio-open-tell', handler);
     window.addEventListener('nesio-open-voice', voiceHandler);
+    window.addEventListener('nesio-open-mood', moodHandler);
     return () => {
       window.removeEventListener('nesio-open-tell', handler);
       window.removeEventListener('nesio-open-voice', voiceHandler);
+      window.removeEventListener('nesio-open-mood', moodHandler);
     };
   }, []);
 
@@ -586,7 +589,8 @@ export default function Portal() {
         canUsePrivateData={canUsePrivateRuntime}
         onClose={() => { setCaptureMode(null); setVoiceIntent('note'); }}
       />
-      <MoodSheet open={captureMode === 'share'} onClose={() => setCaptureMode(null)} />
+      <ShareSheet open={captureMode === 'share'} onClose={() => setCaptureMode(null)} />
+      <MoodSheet open={captureMode === 'mood'} onClose={() => setCaptureMode(null)} />
       <AskGuideSheet open={askGuideOpen} onClose={() => setAskGuideOpen(false)} onStart={openAskVoice} />
 
       <NesioChatSheet open={chatOpen} onClose={() => setChatOpen(false)} canUsePrivateData={canUsePrivateRuntime} />

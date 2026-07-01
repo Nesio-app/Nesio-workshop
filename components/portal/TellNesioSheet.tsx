@@ -6,7 +6,7 @@
  * to avoid the race condition where onClose() resets subSheet state.
  */
 
-export type CaptureMode = 'camera' | 'voice' | 'share';
+export type CaptureMode = 'camera' | 'voice' | 'share' | 'mood';
 
 interface TellNesioSheetProps {
   open: boolean;
@@ -17,13 +17,12 @@ interface TellNesioSheetProps {
 const FAN_BUTTONS: Array<{
   mode: CaptureMode;
   label: string;
-  pos: 'left' | 'center' | 'right';
   icon: React.ReactNode;
+  accent?: boolean;
 }> = [
   {
     mode: 'camera',
     label: '拍一下',
-    pos: 'left',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="26" height="26">
         <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
@@ -34,7 +33,7 @@ const FAN_BUTTONS: Array<{
   {
     mode: 'voice',
     label: '说一句',
-    pos: 'center',
+    accent: true,
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="28" height="28">
         <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
@@ -43,15 +42,27 @@ const FAN_BUTTONS: Array<{
     ),
   },
   {
-    mode: 'share',
-    label: '分享',
-    pos: 'right',
+    mode: 'mood',
+    label: '此刻',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="26" height="26">
         <circle cx="12" cy="12" r="9.5"/>
         <path d="M8.5 14.5s1 1.5 3.5 1.5 3.5-1.5 3.5-1.5"/>
         <circle cx="9.5" cy="10.5" r="1" fill="currentColor" stroke="none"/>
         <circle cx="14.5" cy="10.5" r="1" fill="currentColor" stroke="none"/>
+      </svg>
+    ),
+  },
+  {
+    mode: 'share',
+    label: '分析文件',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="26" height="26">
+        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="16" y1="13" x2="8" y2="13"/>
+        <line x1="16" y1="17" x2="8" y2="17"/>
+        <polyline points="10 9 9 9 8 9"/>
       </svg>
     ),
   },
@@ -64,18 +75,19 @@ export default function TellNesioSheet({ open, onClose, onCapture }: TellNesioSh
     <div className="nesio-tell-overlay" role="dialog" aria-modal="true" aria-label="告诉 Nesio">
       <button type="button" className="nesio-tell-backdrop" aria-label="关闭" onClick={onClose} />
       <div className="nesio-tell-fan">
-        {FAN_BUTTONS.map((btn) => (
+        {FAN_BUTTONS.map((btn, i) => (
           <button
             key={btn.mode}
             type="button"
-            className={`nesio-tell-fan-btn nesio-tell-fan-btn--${btn.pos}`}
+            className="nesio-tell-fan-btn"
+            style={{ '--delay': `${i * 0.04}s` } as React.CSSProperties}
             onClick={() => {
-              onClose();          // close fan first
-              onCapture(btn.mode); // then open sub-sheet (independent state)
+              onClose();
+              onCapture(btn.mode);
             }}
             aria-label={btn.label}
           >
-            <span className="nesio-tell-fan-icon">
+            <span className={`nesio-tell-fan-icon${btn.accent ? ' nesio-tell-fan-icon--voice' : ''}`}>
               {btn.icon}
             </span>
             <span className="nesio-tell-fan-label">{btn.label}</span>
