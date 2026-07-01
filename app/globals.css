@@ -14439,6 +14439,33 @@ html[data-portal-theme="night"] .portal-decompose-step {
   align-self: flex-start;
 }
 .nesio-proactive-card-dismiss:hover { opacity: 1; background: rgba(0,0,0,.05); }
+
+.nesio-proactive-card-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.65rem;
+  flex-wrap: wrap;
+}
+.nesio-proactive-action-btn {
+  flex: 1;
+  min-width: 0;
+  padding: 0.4rem 0.6rem;
+  border-radius: 20px;
+  border: 1.5px solid var(--portal-border, rgba(0,0,0,.1));
+  background: transparent;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--portal-text-secondary, #555);
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+.nesio-proactive-action-btn:hover { background: rgba(0,0,0,.05); }
+.nesio-proactive-action-btn--dismiss { color: var(--portal-accent, #4a90d9); border-color: var(--portal-accent, #4a90d9); }
+.nesio-proactive-action-btn--dismiss:hover { background: rgba(74,144,217,.08); }
+.nesio-proactive-action-btn--done { color: #888; }
+.nesio-proactive-action-btn--snooze { color: #888; }
+
 html[data-portal-theme="night"] .nesio-proactive-card {
   background: linear-gradient(135deg, rgba(88,140,227,.1) 0%, rgba(88,140,227,.07) 100%);
   border-color: rgba(88,140,227,.2);

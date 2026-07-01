@@ -211,6 +211,11 @@ function StandardCard({ card, onFeedback }: { card: RecommendationCard; onFeedba
 
 // ---- Proactive guidance card ----
 
+interface ProactiveAction {
+  label: string;
+  actionType: 'dismiss' | 'snooze' | 'done';
+}
+
 interface ProactiveCardData {
   id: string;
   title: string;
@@ -219,6 +224,9 @@ interface ProactiveCardData {
   sourceTags: string[];
   icon: string;
   priority: number;
+  cardType?: string;
+  nodeId?: string;
+  actions?: ProactiveAction[];
 }
 
 type ProactiveTrigger = {
@@ -326,13 +334,29 @@ function buildProactiveTriggers(
     }
   }
 
-  // ── 4. Overdue items (from context) ──
-  for (const item of context.overdueItems.slice(0, 1)) {
+  // ── 4. Overdue items — soft ADHD-friendly nudge, one at a time, snooze-aware ──
+  for (const item of context.overdueItems.slice(0, 3)) {
+    if (isOverdueSnoozed(item.nodeId)) continue;
     triggers.push({
       type: 'overdue',
-      data: { name: item.name, daysAgo: Math.abs(item.daysUntil) },
-      fallback: { title: '有件事已经过期了', body: `"${item.name}" 已过期 ${Math.abs(item.daysUntil)} 天，还要继续吗？`, confidence: 85, sourceTags: ['任务·过期'], icon: '🔔', priority: 8 },
+      data: { name: item.name, nodeId: item.nodeId, daysAgo: Math.abs(item.daysUntil) },
+      fallback: {
+        title: `"${item.name.length > 18 ? item.name.slice(0, 18) + '…' : item.name}"`,
+        body: '这件事还有机会继续吗？没关系，选一个就好。',
+        confidence: 80,
+        sourceTags: [],
+        icon: '🌱',
+        priority: 6,
+        cardType: 'overdue',
+        nodeId: item.nodeId,
+        actions: [
+          { label: '继续做', actionType: 'dismiss' },
+          { label: '不需要了', actionType: 'done' },
+          { label: '下周再说', actionType: 'snooze' },
+        ],
+      },
     });
+    break; // only one overdue at a time
   }
 
   // ── 5. Special days: birthday / anniversary (from context) ──
@@ -394,7 +418,49 @@ function buildProactiveTriggers(
     .slice(0, 3);
 }
 
-function ProactiveGuidanceCard({ card, onDismiss }: { card: ProactiveCardData; onDismiss: () => void }) {
+const SNOOZE_KEY = 'nesio-snoozed-overdue';
+
+function snoozeOverdue(nodeId: string, days: number) {
+  try {
+    const map: Record<string, string> = JSON.parse(localStorage.getItem(SNOOZE_KEY) || '{}');
+    const until = new Date();
+    until.setDate(until.getDate() + days);
+    map[nodeId] = until.toISOString();
+    localStorage.setItem(SNOOZE_KEY, JSON.stringify(map));
+  } catch { /* ignore */ }
+}
+
+function isOverdueSnoozed(nodeId: string): boolean {
+  try {
+    const map: Record<string, string> = JSON.parse(localStorage.getItem(SNOOZE_KEY) || '{}');
+    const until = map[nodeId];
+    if (!until) return false;
+    return new Date(until).getTime() > Date.now();
+  } catch { return false; }
+}
+
+function ProactiveGuidanceCard({
+  card, onDismiss, onMarkDone,
+}: {
+  card: ProactiveCardData;
+  onDismiss: () => void;
+  onMarkDone?: (nodeId: string) => void;
+}) {
+  const hasActions = card.actions && card.actions.length > 0;
+
+  function handleAction(action: ProactiveAction) {
+    if (action.actionType === 'dismiss') { onDismiss(); return; }
+    if (action.actionType === 'snooze' && card.nodeId) {
+      snoozeOverdue(card.nodeId, 7);
+      onDismiss();
+      return;
+    }
+    if (action.actionType === 'done' && card.nodeId) {
+      onMarkDone?.(card.nodeId);
+      onDismiss();
+    }
+  }
+
   return (
     <div className="nesio-proactive-card">
       <div className="nesio-proactive-card-inner">
@@ -409,8 +475,24 @@ function ProactiveGuidanceCard({ card, onDismiss }: { card: ProactiveCardData; o
               ))}
             </div>
           )}
+          {hasActions && (
+            <div className="nesio-proactive-card-actions">
+              {card.actions!.map((a) => (
+                <button
+                  key={a.actionType}
+                  type="button"
+                  className={`nesio-proactive-action-btn nesio-proactive-action-btn--${a.actionType}`}
+                  onClick={() => handleAction(a)}
+                >
+                  {a.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
-        <button type="button" className="nesio-proactive-card-dismiss" onClick={onDismiss} aria-label="忽略">✕</button>
+        {!hasActions && (
+          <button type="button" className="nesio-proactive-card-dismiss" onClick={onDismiss} aria-label="忽略">✕</button>
+        )}
       </div>
     </div>
   );
@@ -1186,6 +1268,7 @@ export default function TodayFeed({
           <ProactiveGuidanceCard
             card={proactiveCards[0]}
             onDismiss={() => setProactiveDismissedDate(new Date().toISOString().slice(0, 10))}
+            onMarkDone={(nodeId) => markFocusNodeDone(nodeId)}
           />
         )}
 

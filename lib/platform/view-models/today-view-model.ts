@@ -120,17 +120,16 @@ function urgencyScore(node: LifeNode): number {
 
 function isFocusNode(node: LifeNode): boolean {
   if (node.attributes.done) return false;
-  // Always include active commitments and events
-  if (FOCUS_TYPES.has(node.type)) return true;
-  // Keyword match in name + rawInput
-  const text = [node.name, node.rawInput || '', ...(node.tags ?? [])].join(' ').toLowerCase();
-  if (FOCUS_TIME_WORDS.some((w) => text.includes(w))) return true;
-  // Has a relevant date within 30 days
+  const now = Date.now();
   const d = extractNearestDate(node);
   if (d) {
-    const diff = d.getTime() - Date.now();
-    if (diff > -7 * 86_400_000 && diff < 30 * 86_400_000) return true; // include slightly overdue
+    const diff = d.getTime() - now;
+    // Today (0 → 48h) or tomorrow (48h window)
+    if (diff >= 0 && diff < 48 * 3_600_000) return true;
   }
+  // Explicit "今天/今日" in name or rawInput even without a date attribute
+  const text = [node.name, node.rawInput || ''].join(' ');
+  if (text.includes('今天') || text.includes('今日')) return true;
   return false;
 }
 
@@ -217,6 +216,7 @@ export function focusTimeHint(node: FocusNode): string {
 // ---- Proactive context (exposed to Today surface via view-model) ----
 
 export interface ProactiveContextItem {
+  nodeId: string;
   name: string;
   daysUntil: number;
   subtype: string;
@@ -255,11 +255,10 @@ function buildProactiveContext(allNodes: LifeNode[]): ProactiveContext {
       if (d) {
         const daysUntil = Math.round((d.getTime() - now) / 86_400_000);
         if (daysUntil >= 0 && daysUntil <= 10) {
-          upcomingSpecialDays.push({ name: n.name, daysUntil, subtype: 'special_day' });
+          upcomingSpecialDays.push({ nodeId: n.id, name: n.name, daysUntil, subtype: 'special_day' });
         }
       } else {
-        // No date attribute — might be recurring (birthday this year)
-        upcomingSpecialDays.push({ name: n.name, daysUntil: 0, subtype: 'special_day' });
+        upcomingSpecialDays.push({ nodeId: n.id, name: n.name, daysUntil: 0, subtype: 'special_day' });
       }
     }
 
@@ -268,7 +267,7 @@ function buildProactiveContext(allNodes: LifeNode[]): ProactiveContext {
     if (d) {
       const diffMs = d.getTime() - now;
       if (diffMs < 0 && diffMs > -7 * 86_400_000) {
-        overdueItems.push({ name: n.name, daysUntil: Math.round(diffMs / 86_400_000), subtype: n.type });
+        overdueItems.push({ nodeId: n.id, name: n.name, daysUntil: Math.round(diffMs / 86_400_000), subtype: n.type });
       }
     }
 
