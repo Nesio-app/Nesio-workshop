@@ -3,7 +3,7 @@
 /**
  * NesioChatSheet — 问一问
  * WeChat-style full-screen chat window.
- * Opened by long-pressing the center Nesio button.
+ * Long-press center button to open.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -27,22 +27,23 @@ function loadHistory(): UiMessage[] {
   catch { return []; }
 }
 function saveHistory(msgs: UiMessage[]) {
-  try { localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(msgs.filter((m) => m.role !== 'status').slice(-MAX_STORED))); }
-  catch { /* ignore */ }
+  try {
+    localStorage.setItem(CHAT_HISTORY_KEY,
+      JSON.stringify(msgs.filter((m) => m.role !== 'status').slice(-MAX_STORED)));
+  } catch { /* ignore */ }
 }
 
-// ─── Context Menu ─────────────────────────────────────────────────────────────
+// ─── SpeechRecognition type ────────────────────────────────────────────────────
+type SR = new () => {
+  lang: string; interimResults: boolean; continuous: boolean;
+  onresult: ((e: { results: ArrayLike<{ 0: { transcript: string } }> }) => void) | null;
+  onend: (() => void) | null; onerror: (() => void) | null;
+  start(): void; stop(): void;
+};
 
-function BubbleMenu({
-  msg,
-  onClose,
-  onSave,
-  onCopy,
-}: {
-  msg: UiMessage;
-  onClose: () => void;
-  onSave: () => void;
-  onCopy: () => void;
+// ─── Bubble context menu ───────────────────────────────────────────────────────
+function BubbleMenu({ msg, onClose, onSave, onCopy }: {
+  msg: UiMessage; onClose: () => void; onSave: () => void; onCopy: () => void;
 }) {
   return (
     <>
@@ -56,16 +57,13 @@ function BubbleMenu({
             <span className="nesio-bubble-menu-icon">＋</span>存入记忆
           </button>
         )}
-        <button type="button" className="nesio-bubble-menu-item nesio-bubble-menu-item--cancel" onClick={onClose}>
-          取消
-        </button>
+        <button type="button" className="nesio-bubble-menu-item nesio-bubble-menu-item--cancel" onClick={onClose}>取消</button>
       </div>
     </>
   );
 }
 
-// ─── Memory Node Detail ────────────────────────────────────────────────────────
-
+// ─── Memory detail ─────────────────────────────────────────────────────────────
 function MemoryDetail({ node, onClose }: { node: LifeNode; onClose: () => void }) {
   const attrs = Object.entries(node.attributes)
     .filter(([k, v]) => v !== null && !['subtasksJson', 'context', 'done', 'doneAt', 'savedFromChat', 'fullText'].includes(k));
@@ -97,21 +95,7 @@ function MemoryDetail({ node, onClose }: { node: LifeNode; onClose: () => void }
   );
 }
 
-// ─── Plus panel (camera/search expand) ────────────────────────────────────────
-
-function PlusPanel({ onCamera }: { onCamera: () => void }) {
-  return (
-    <div className="nesio-wechat-plus-panel">
-      <button type="button" className="nesio-wechat-plus-item" onClick={onCamera}>
-        <span className="nesio-wechat-plus-icon">📷</span>
-        <span>拍照识别</span>
-      </button>
-    </div>
-  );
-}
-
 // ─── Camera view ──────────────────────────────────────────────────────────────
-
 function CameraView({ onResult, onClose }: {
   onResult: (label: string, nodes: LifeNode[]) => void;
   onClose: () => void;
@@ -127,15 +111,18 @@ function CameraView({ onResult, onClose }: {
     try {
       const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       setStream(s);
-      if (videoRef.current) videoRef.current.srcObject = s;
+      if (videoRef.current) {
+        videoRef.current.srcObject = s;
+        videoRef.current.play().catch(() => undefined);
+      }
     } catch { fileRef.current?.click(); }
   }
 
   async function capture() {
     if (!videoRef.current) return;
     const canvas = document.createElement('canvas');
-    canvas.width = videoRef.current.videoWidth;
-    canvas.height = videoRef.current.videoHeight;
+    canvas.width = videoRef.current.videoWidth || 640;
+    canvas.height = videoRef.current.videoHeight || 480;
     canvas.getContext('2d')?.drawImage(videoRef.current, 0, 0);
     stream?.getTracks().forEach((t) => t.stop());
     setStream(null);
@@ -156,13 +143,13 @@ function CameraView({ onResult, onClose }: {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image: dataUrl, mode: 'identify' }),
       });
-      const data = await res.json() as { objects?: string[]; labels?: string[]; summary?: string };
+      const data = await res.json() as { objects?: string[]; labels?: string[] };
       const items = data.objects ?? data.labels ?? [];
       const found = new Map<string, LifeNode>();
       for (const item of items) {
         for (const n of searchLifeGraphFuzzy(item, 3)) found.set(n.id, n);
       }
-      onResult(items.join('、') || '（未识别到物品）', Array.from(found.values()).slice(0, 6));
+      onResult(items.join('、') || '（未识别到）', Array.from(found.values()).slice(0, 6));
     } catch { onResult('识别失败', []); }
     setAnalyzing(false);
   }
@@ -170,9 +157,12 @@ function CameraView({ onResult, onClose }: {
   if (stream) {
     return (
       <div className="nesio-camera-live">
-        <button type="button" className="nesio-wechat-back-btn nesio-camera-back" onClick={onClose}>←</button>
-        <video ref={videoRef} autoPlay playsInline className="nesio-camera-video" />
-        <button type="button" className="nesio-camera-shutter" onClick={capture} aria-label="拍照" />
+        <button type="button" className="nesio-wechat-back-btn nesio-camera-back" onClick={() => { stream.getTracks().forEach((t) => t.stop()); setStream(null); onClose(); }}>←</button>
+        {/* muted is required on iOS for autoplay */}
+        <video ref={videoRef} autoPlay muted playsInline className="nesio-camera-video" />
+        <button type="button" className="nesio-camera-shutter" onClick={capture} aria-label="拍照">
+          <span className="nesio-camera-shutter-ring" />
+        </button>
         {analyzing && <p className="nesio-camera-status">识别中…</p>}
       </div>
     );
@@ -180,7 +170,7 @@ function CameraView({ onResult, onClose }: {
 
   return (
     <div className="nesio-camera-entry">
-      <button type="button" className="nesio-wechat-back-btn" onClick={onClose}>←</button>
+      <button type="button" className="nesio-wechat-back-btn" onClick={onClose}>← 返回</button>
       {analyzing ? (
         <p className="nesio-camera-status">识别中…</p>
       ) : (
@@ -189,23 +179,16 @@ function CameraView({ onResult, onClose }: {
             <span className="nesio-wechat-plus-icon">📷</span><span>打开摄像头</span>
           </button>
           <button type="button" className="nesio-wechat-plus-item" onClick={() => fileRef.current?.click()}>
-            <span className="nesio-wechat-plus-icon">🖼</span><span>选择图片</span>
+            <span className="nesio-wechat-plus-icon">🖼</span><span>相册</span>
           </button>
-          <input ref={fileRef} type="file" accept="image/*" capture="environment" className="nesio-hidden" onChange={handleFile} />
         </div>
       )}
+      <input ref={fileRef} type="file" accept="image/*" className="nesio-hidden" onChange={handleFile} />
     </div>
   );
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
-
-type SpeechRecognitionCtor = new () => {
-  lang: string; interimResults: boolean; continuous: boolean;
-  onresult: ((e: { results: ArrayLike<{ 0: { transcript: string } }> }) => void) | null;
-  onend: (() => void) | null; onerror: (() => void) | null;
-  start(): void; stop(): void;
-};
 
 export default function NesioChatSheet({
   open,
@@ -219,7 +202,9 @@ export default function NesioChatSheet({
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
-  const [listening, setListening] = useState(false);
+  // voiceMode: false = text input, true = hold-to-talk bar
+  const [voiceMode, setVoiceMode] = useState(false);
+  const [recording, setRecording] = useState(false);
   const [showPlus, setShowPlus] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const [menuMsg, setMenuMsg] = useState<UiMessage | null>(null);
@@ -228,11 +213,12 @@ export default function NesioChatSheet({
   const inputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<{ stop(): void } | null>(null);
   const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const voiceTextRef = useRef('');
 
   useEffect(() => { if (open) setMessages(loadHistory()); }, [open]);
   useEffect(() => {
     if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
-  }, [messages]);
+  }, [messages, sending]);
 
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || sending) return;
@@ -248,24 +234,34 @@ export default function NesioChatSheet({
       .filter((m) => m.role === 'user' || m.role === 'model')
       .map((m) => ({ role: m.role as 'user' | 'model', text: m.text }));
 
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20000);
     try {
       const res = await fetch('/api/portal/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: text.trim(), history }),
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
       const data = await res.json() as { ok?: boolean; response?: string; sources?: Array<{ title: string; url: string }> };
       const aiMsg: UiMessage = {
         id: `a-${Date.now()}`,
         role: 'model',
-        text: data.response ?? '出了点问题，稍后再试。',
+        text: data.response?.trim() || '（暂时没有找到相关信息）',
         sources: data.sources ?? [],
       };
       const withAi = [...nextMsgs, aiMsg];
       setMessages(withAi);
       saveHistory(withAi);
-    } catch {
-      const errMsg: UiMessage = { id: `e-${Date.now()}`, role: 'model', text: '网络错误，请重试。' };
+    } catch (err) {
+      clearTimeout(timeout);
+      const isTimeout = err instanceof Error && err.name === 'AbortError';
+      const errMsg: UiMessage = {
+        id: `e-${Date.now()}`,
+        role: 'model',
+        text: isTimeout ? '响应超时，请重试。' : '网络错误，请重试。',
+      };
       setMessages((prev) => [...prev, errMsg]);
     }
     setSending(false);
@@ -273,10 +269,8 @@ export default function NesioChatSheet({
 
   function handleSave(msg: UiMessage) {
     addLifeNode({
-      name: msg.text.slice(0, 60),
-      type: 'event', source: 'manual', confidence: 0.9,
-      tags: ['宝盒对话'],
-      attributes: { fullText: msg.text, savedFromChat: true },
+      name: msg.text.slice(0, 60), type: 'event', source: 'manual', confidence: 0.9,
+      tags: ['宝盒对话'], attributes: { fullText: msg.text, savedFromChat: true },
       relations: [], rawInput: msg.text,
     });
     setMessages((prev) => prev.map((m) => m.id === msg.id ? { ...m, savedToMemory: true } : m));
@@ -287,34 +281,51 @@ export default function NesioChatSheet({
     navigator.clipboard.writeText(msg.text).catch(() => undefined);
   }
 
-  function startVoice() {
-    const w = window as unknown as { SpeechRecognition?: SpeechRecognitionCtor; webkitSpeechRecognition?: SpeechRecognitionCtor };
-    const SR = w.SpeechRecognition ?? w.webkitSpeechRecognition;
-    if (!SR) return;
-    const r = new SR();
+  // Voice input (tap mic → voiceMode; hold-to-talk in voiceMode)
+  function getSR(): InstanceType<SR> | null {
+    const w = window as unknown as { SpeechRecognition?: SR; webkitSpeechRecognition?: SR };
+    const Ctor = w.SpeechRecognition ?? w.webkitSpeechRecognition;
+    if (!Ctor) return null;
+    const r = new Ctor();
     r.lang = 'zh-CN'; r.interimResults = true; r.continuous = false;
-    r.onresult = (e) => setInput(Array.from(e.results).map((res) => res[0].transcript).join(''));
-    r.onend = () => setListening(false);
-    r.onerror = () => setListening(false);
-    r.start(); recognitionRef.current = r; setListening(true);
+    return r;
   }
 
-  function stopVoice() { recognitionRef.current?.stop(); setListening(false); }
+  function startRecording() {
+    voiceTextRef.current = '';
+    const r = getSR();
+    if (!r) return;
+    r.onresult = (e) => {
+      voiceTextRef.current = Array.from(e.results).map((res) => res[0].transcript).join('');
+    };
+    r.onend = () => { setRecording(false); };
+    r.onerror = () => { setRecording(false); };
+    r.start();
+    recognitionRef.current = r;
+    setRecording(true);
+  }
+
+  function stopRecordingAndSend() {
+    recognitionRef.current?.stop();
+    setRecording(false);
+    const text = voiceTextRef.current.trim();
+    voiceTextRef.current = '';
+    if (text) void sendMessage(text);
+  }
 
   function startBubbleLongPress(msg: UiMessage) {
-    longPressRef.current = setTimeout(() => { setMenuMsg(msg); }, 500);
+    longPressRef.current = setTimeout(() => setMenuMsg(msg), 500);
   }
-
   function cancelBubbleLongPress() {
     if (longPressRef.current) { clearTimeout(longPressRef.current); longPressRef.current = null; }
   }
 
   function handleCameraResult(label: string, nodes: LifeNode[]) {
     setShowCamera(false);
-    const userMsg: UiMessage = { id: `u-${Date.now()}`, role: 'user', text: `📷 识别图片` };
+    const userMsg: UiMessage = { id: `u-${Date.now()}`, role: 'user', text: '📷 识别图片' };
     const aiText = nodes.length > 0
-      ? `识别到：${label}\n\n在记忆库里找到 ${nodes.length} 条相关记录：\n${nodes.map((n) => `• ${n.name}（${n.type}）`).join('\n')}`
-      : `识别到：${label}\n\n记忆库里暂时没找到相关记录。`;
+      ? `识别到：${label}\n\n记忆库里找到 ${nodes.length} 条相关记录：\n${nodes.map((n) => `• ${n.name}（${n.type}）`).join('\n')}`
+      : `识别到：${label}\n\n记忆库里暂时没有找到相关记录。`;
     const aiMsg: UiMessage = { id: `a-${Date.now()}`, role: 'model', text: aiText };
     const next = [...messages, userMsg, aiMsg];
     setMessages(next); saveHistory(next);
@@ -338,23 +349,13 @@ export default function NesioChatSheet({
     );
   }
 
-  const TYPE_ICON: Record<string, string> = { person: '👤', place: '📍', object: '📦', event: '📅', commitment: '✓', health_state: '❤️', note: '📝' };
-
   return (
     <div className="nesio-wechat-fullscreen" role="dialog" aria-modal="true" aria-label="问一问">
       {/* Header */}
       <div className="nesio-wechat-header">
         <button type="button" className="nesio-wechat-back-btn" onClick={onClose} aria-label="关闭">←</button>
         <span className="nesio-wechat-title">问一问</span>
-        <button
-          type="button"
-          className="nesio-wechat-more-btn"
-          onClick={() => {
-            setMessages([]);
-            saveHistory([]);
-          }}
-          aria-label="清空对话"
-        >
+        <button type="button" className="nesio-wechat-more-btn" onClick={() => { setMessages([]); saveHistory([]); }}>
           新对话
         </button>
       </div>
@@ -397,7 +398,6 @@ export default function NesioChatSheet({
                   <p className="nesio-wechat-bubble-text">{msg.text}</p>
                   {msg.savedToMemory && <p className="nesio-wechat-saved-badge">✓ 已存入记忆</p>}
                 </div>
-                {/* Web sources */}
                 {msg.sources && msg.sources.length > 0 && (
                   <div className="nesio-wechat-sources">
                     {msg.sources.map((s) => (
@@ -424,50 +424,111 @@ export default function NesioChatSheet({
 
       {/* Plus panel */}
       {showPlus && (
-        <PlusPanel onCamera={() => { setShowPlus(false); setShowCamera(true); }} />
+        <div className="nesio-wechat-plus-panel">
+          <button type="button" className="nesio-wechat-plus-item" onClick={() => { setShowPlus(false); const inp = document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.onchange=(e)=>{ const f=(e.target as HTMLInputElement).files?.[0]; if(!f) return; const reader=new FileReader(); reader.onload=(ev)=>{ setShowCamera(false); const dataUrl=ev.target?.result as string; const userMsg:UiMessage={id:`u-${Date.now()}`,role:'user',text:'📷 识别图片'}; const next=[...messages,userMsg]; setMessages(next); fetch('/api/portal/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:dataUrl,mode:'identify'})}).then(r=>r.json()).then((data:{ objects?: string[]; labels?: string[] })=>{ const items=data.objects??data.labels??[]; const found=new Map<string,LifeNode>(); for(const item of items){for(const n of searchLifeGraphFuzzy(item,3))found.set(n.id,n);} const nodes=Array.from(found.values()).slice(0,6); const aiText=nodes.length>0?`识别到：${items.join('、')}\n\n找到 ${nodes.length} 条相关记录：\n${nodes.map(n=>`• ${n.name}`).join('\n')}`:`识别到：${items.join('、')||'（未识别到）'}\n\n记忆库里暂时没有相关记录。`; const aiMsg:UiMessage={id:`a-${Date.now()}`,role:'model',text:aiText}; const withAi=[...next,aiMsg]; setMessages(withAi); saveHistory(withAi);}).catch(()=>undefined);}; reader.readAsDataURL(f);}; inp.click(); }}>
+            <span className="nesio-wechat-plus-icon">🖼</span>
+            <span>相册</span>
+          </button>
+          <button type="button" className="nesio-wechat-plus-item" onClick={() => { setShowPlus(false); setShowCamera(true); }}>
+            <span className="nesio-wechat-plus-icon">📷</span>
+            <span>拍摄</span>
+          </button>
+          <button type="button" className="nesio-wechat-plus-item" onClick={() => { setShowPlus(false); setVoiceMode(true); }}>
+            <span className="nesio-wechat-plus-icon">🎙</span>
+            <span>语音输入</span>
+          </button>
+        </div>
       )}
 
       {/* Input bar */}
       <div className="nesio-wechat-input-bar">
-        <button
-          type="button"
-          className={`nesio-wechat-mic-btn${listening ? ' nesio-wechat-mic-btn--active' : ''}`}
-          onPointerDown={startVoice}
-          onPointerUp={() => { stopVoice(); if (input.trim()) void sendMessage(input); }}
-          onPointerCancel={stopVoice}
-          aria-label={listening ? '松开发送' : '按住说话'}
-        >
-          🎙
-        </button>
-        <input
-          ref={inputRef}
-          className="nesio-wechat-input"
-          type="text"
-          placeholder={listening ? '聆听中…' : '问一问…'}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void sendMessage(input); }}}
-          disabled={sending || listening}
-        />
-        {input.trim() ? (
-          <button
-            type="button"
-            className="nesio-wechat-send-btn"
-            onClick={() => void sendMessage(input)}
-            disabled={sending}
-            aria-label="发送"
-          >
-            发送
-          </button>
+        {voiceMode ? (
+          /* Voice mode: keyboard toggle | Hold to Talk | emoji | + */
+          <>
+            <button
+              type="button"
+              className="nesio-wechat-mode-btn"
+              onClick={() => setVoiceMode(false)}
+              aria-label="切换到键盘"
+            >
+              ⌨️
+            </button>
+            <button
+              type="button"
+              className={`nesio-wechat-hold-btn${recording ? ' nesio-wechat-hold-btn--active' : ''}`}
+              onPointerDown={(e) => { e.preventDefault(); startRecording(); }}
+              onPointerUp={stopRecordingAndSend}
+              onPointerLeave={() => { if (recording) { recognitionRef.current?.stop(); setRecording(false); } }}
+              onPointerCancel={() => { if (recording) { recognitionRef.current?.stop(); setRecording(false); } }}
+              aria-label="按住说话"
+            >
+              {recording ? '松开发送' : '按住 说话'}
+            </button>
+            <button
+              type="button"
+              className="nesio-wechat-emoji-btn"
+              aria-label="表情"
+            >
+              😊
+            </button>
+            <button
+              type="button"
+              className={`nesio-wechat-plus-btn${showPlus ? ' nesio-wechat-plus-btn--active' : ''}`}
+              onClick={() => setShowPlus((v) => !v)}
+              aria-label="更多"
+            >
+              ＋
+            </button>
+          </>
         ) : (
-          <button
-            type="button"
-            className={`nesio-wechat-plus-btn${showPlus ? ' nesio-wechat-plus-btn--active' : ''}`}
-            onClick={() => setShowPlus((v) => !v)}
-            aria-label="更多"
-          >
-            ＋
-          </button>
+          /* Text mode: mic toggle | input | send or + */
+          <>
+            <button
+              type="button"
+              className="nesio-wechat-mode-btn"
+              onClick={() => setVoiceMode(true)}
+              aria-label="切换到语音"
+            >
+              🎙
+            </button>
+            <input
+              ref={inputRef}
+              className="nesio-wechat-input"
+              type="text"
+              placeholder="问一问…"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void sendMessage(input); } }}
+              disabled={sending}
+            />
+            <button
+              type="button"
+              className="nesio-wechat-emoji-btn"
+              aria-label="表情"
+            >
+              😊
+            </button>
+            {input.trim() ? (
+              <button
+                type="button"
+                className="nesio-wechat-send-btn"
+                onClick={() => void sendMessage(input)}
+                disabled={sending}
+                aria-label="发送"
+              >
+                发送
+              </button>
+            ) : (
+              <button
+                type="button"
+                className={`nesio-wechat-plus-btn${showPlus ? ' nesio-wechat-plus-btn--active' : ''}`}
+                onClick={() => setShowPlus((v) => !v)}
+                aria-label="更多"
+              >
+                ＋
+              </button>
+            )}
+          </>
         )}
       </div>
 

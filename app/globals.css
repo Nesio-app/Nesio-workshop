@@ -13486,3 +13486,81 @@ html[data-portal-theme="night"] .nesio-memory-detail-val { color: #d0d8f0; }
 }
 .nesio-camera-entry-btns { display: flex; gap: 1.5rem; }
 .nesio-camera-status { font-size: 0.9rem; color: var(--portal-muted); }
+
+/* ── Voice/text mode toggle button ── */
+.nesio-wechat-mode-btn {
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 50%;
+  border: 1px solid rgba(0,0,0,0.1);
+  background: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+html[data-portal-theme="night"] .nesio-wechat-mode-btn { background: #2a2d3e; border-color: rgba(255,255,255,0.1); }
+
+/* ── Hold-to-talk button ── */
+.nesio-wechat-hold-btn {
+  flex: 1;
+  height: 2.2rem;
+  border-radius: 1.1rem;
+  border: 1px solid rgba(0,0,0,0.1);
+  background: #fff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--portal-ink);
+  cursor: pointer;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  transition: background 0.12s, color 0.12s;
+}
+html[data-portal-theme="night"] .nesio-wechat-hold-btn { background: #2a2d3e; border-color: rgba(255,255,255,0.1); }
+.nesio-wechat-hold-btn--active {
+  background: #d1fae5;
+  border-color: #10b981;
+  color: #065f46;
+}
+
+/* ── Emoji button ── */
+.nesio-wechat-emoji-btn {
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 50%;
+  border: none;
+  background: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+/* ── Camera shutter ring (inside live camera view) ── */
+.nesio-chat-camera-shutter {
+  position: absolute;
+  bottom: max(2rem, env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4rem;
+  height: 4rem;
+  border-radius: 50%;
+  border: 3px solid #fff;
+  background: rgba(255,255,255,0.85);
+  cursor: pointer;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+}
+.nesio-chat-camera-shutter:active { transform: translateX(-50%) scale(0.92); }
+.nesio-camera-shutter-ring {
+  display: block;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  border: 2px solid rgba(0,0,0,0.15);
+  margin: auto;
+}
