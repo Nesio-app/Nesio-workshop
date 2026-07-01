@@ -607,7 +607,7 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
           </svg>
         </button>
         <h2 className="nesio-camera-title">
-          {{ idle: '拍一下', live: '拍一下', captured: '处理中', analyzing: '识别中', result: '识别结果', saved: '已保存', 'no-camera': '上传图片' }[phase]}
+          {{ idle: '拍一下', live: '拍一下', captured: '处理中', preview: '选择方式', analyzing: '识别中', result: '识别结果', saved: '已保存', 'no-camera': '上传图片' }[phase]}
         </h2>
         <div style={{ width: 40 }} />
       </div>
