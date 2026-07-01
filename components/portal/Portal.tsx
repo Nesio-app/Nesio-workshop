@@ -403,12 +403,52 @@ export default function Portal() {
       setTimeout(() => {
         fetch('/api/portal/calendar', { cache: 'no-store' })
           .then((r) => r.json())
-          .then((data: { events?: unknown[]; feeds?: unknown }) => {
+          .then((data: { events?: Array<{
+            id?: string; title?: string; start?: string; end?: string;
+            description?: string; location?: string; url?: string; calendarName?: string;
+          }>; feeds?: unknown }) => {
             if (data?.events || data?.feeds) {
               import('@/lib/portal/prefetch-cache').then(({ writePortalCache, PORTAL_CACHE_KEYS }) => {
                 writePortalCache(PORTAL_CACHE_KEYS.calendar, data);
-                window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
               });
+              // Save upcoming events (next 7 days) as LifeGraph event nodes so they appear in memory/focus
+              if (Array.isArray(data.events) && data.events.length > 0) {
+                import('@/lib/portal/life-graph').then(({ addLifeNode, getLifeGraph }) => {
+                  const now = Date.now();
+                  const week = now + 7 * 86_400_000;
+                  const existing = getLifeGraph();
+                  const existingCalIds = new Set(
+                    existing.filter((n) => n.source === 'calendar').map((n) => n.attributes.calendarId as string).filter(Boolean)
+                  );
+                  data.events!.forEach((ev) => {
+                    if (!ev.start || !ev.title) return;
+                    const t = new Date(ev.start).getTime();
+                    if (t < now - 86_400_000 || t > week) return;
+                    const calId = ev.id || `${ev.title}-${ev.start}`;
+                    if (existingCalIds.has(calId)) return; // already saved
+                    addLifeNode({
+                      name: ev.title,
+                      type: 'event',
+                      source: 'calendar',
+                      confidence: 1,
+                      rawInput: ev.title,
+                      tags: [ev.calendarName || '日历'].filter(Boolean),
+                      attributes: {
+                        start: ev.start,
+                        ...(ev.end ? { end: ev.end } : {}),
+                        ...(ev.url ? { url: ev.url } : {}),
+                        ...(ev.location ? { location: ev.location } : {}),
+                        ...(ev.description ? { note: ev.description.slice(0, 300) } : {}),
+                        calendarId: calId,
+                        calendarName: ev.calendarName || '',
+                      },
+                      relations: [],
+                    });
+                  });
+                  window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
+                });
+              }
+              window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
             }
           })
           .catch(() => undefined);

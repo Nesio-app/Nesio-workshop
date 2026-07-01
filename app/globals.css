@@ -12419,22 +12419,56 @@ html[data-portal-theme="night"] .nesio-mirror-title { color: #e8eefa; }
 
 /* "再圈一个区域" button */
 .nesio-camera-select-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: 0.5rem;
+  background: transparent;
+  border: 1.5px dashed rgba(74,144,217,0.4);
+  color: #8fa3c0;
+  font-size: 0.75rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+.nesio-camera-select-btn:hover { border-color: rgba(74,144,217,0.65); color: #a8c4e0; }
+
+/* Rich edit form in memory node detail */
+.nesio-edit-form {
+  padding: 0.5rem 0;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  margin-top: 0.25rem;
+}
+.nesio-edit-row {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 0.4rem;
-  width: 100%;
-  padding: 0.55rem;
-  margin-top: 0.5rem;
-  border-radius: 0.65rem;
-  background: transparent;
-  border: 1.5px dashed rgba(74,144,217,0.35);
-  color: #8fa3c0;
-  font-size: 0.8rem;
-  cursor: pointer;
-  transition: border-color 0.15s, color 0.15s;
+  gap: 0.5rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
 }
-.nesio-camera-select-btn:hover { border-color: rgba(74,144,217,0.6); color: #a8c4e0; }
+.nesio-edit-row:last-child { border-bottom: none; }
+.nesio-edit-row > span {
+  font-size: 0.78rem;
+  color: var(--portal-muted);
+  min-width: 5rem;
+  flex-shrink: 0;
+}
+.nesio-edit-row input,
+.nesio-edit-row select {
+  flex: 1;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 0.4rem;
+  color: var(--portal-fg);
+  font-size: 0.84rem;
+  padding: 0.3rem 0.5rem;
+  outline: none;
+}
+.nesio-edit-row input:focus,
+.nesio-edit-row select:focus { border-color: rgba(99,179,237,0.5); }
+.nesio-edit-row select option { background: #1e2430; }
 
 /* Bounding-box selection overlay */
 .nesio-select-overlay {

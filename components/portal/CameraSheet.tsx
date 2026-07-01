@@ -453,10 +453,12 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
 
   // ── Bounding-box selection ──────────────────────────────────────────────
 
-  function openSelection() {
+  // Init canvas dimensions after the overlay mounts (selecting=true causes the
+  // canvas to appear in DOM; we size it here via useEffect so the ref is valid)
+  useEffect(() => {
+    if (!selecting) return;
     const canvas = selectCanvasRef.current;
     if (!canvas) return;
-    // Size the drawing canvas to match the displayed image
     const parent = canvas.parentElement;
     if (parent) {
       canvas.width = parent.clientWidth;
@@ -465,7 +467,10 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
     const ctx = canvas.getContext('2d');
     if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
     selStartRef.current = null;
-    setSelecting(true);
+  }, [selecting]);
+
+  function openSelection() {
+    setSelecting(true); // overlay mounts → useEffect sizes canvas
   }
 
   function handleSelTouchStart(e: React.TouchEvent<HTMLCanvasElement>) {
@@ -645,7 +650,16 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
               🧾 检测到小票，已列出条目，可编辑名称或添加有效期
             </div>
           )}
-          <p className="nesio-camera-result-summary">{result.summary}</p>
+
+          {/* Bounding-box selection button — top of result, next to summary */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+            <p className="nesio-camera-result-summary" style={{ margin: 0, flex: 1 }}>{result.summary}</p>
+            {capturedPreview && (
+              <button type="button" className="nesio-camera-select-btn" onClick={openSelection}>
+                🖊 圈选
+              </button>
+            )}
+          </div>
 
           <div className="nesio-camera-result-nodes">
             {editedNodes.map((node, i) => node.deleted ? null : (
@@ -736,12 +750,6 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
             <button type="button" className="nesio-camera-retake-btn" onClick={retake}>重拍</button>
           </div>
 
-          {/* Bounding-box selection — only when there's a captured image */}
-          {capturedPreview && (
-            <button type="button" className="nesio-camera-select-btn" onClick={openSelection}>
-              🖊 再圈一个区域
-            </button>
-          )}
         </div>
       )}
 

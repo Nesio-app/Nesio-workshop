@@ -24,21 +24,38 @@ function parseIcsDate(value: string): Date | null {
   return new Date(+y, +mo - 1, +d, +h, +mi, +s);
 }
 
+function icsUnescape(s: string): string {
+  return s.replace(/\\n/g, '\n').replace(/\\,/g, ',').replace(/\\;/g, ';').replace(/\\\\/g, '\\');
+}
+
+function extractZoomUrl(text: string): string {
+  const m = text.match(/https?:\/\/[a-z0-9-]+\.zoom\.us\/[^\s"<>]*/i);
+  return m ? m[0] : '';
+}
+
 function eventFromBlock(block: string, calendarName = ''): CalendarEvent | null {
   const lines = block.split('\n');
   let uid = '';
   let summary = '';
   let dtstart = '';
   let dtend = '';
+  let description = '';
+  let location = '';
+  let url = '';
 
   for (const line of lines) {
-    const [key, ...rest] = line.split(':');
-    const val = rest.join(':');
-    const base = key.split(';')[0];
-    if (base === 'UID') uid = val;
-    if (base === 'SUMMARY') summary = val;
-    if (base === 'DTSTART') dtstart = val;
-    if (base === 'DTEND') dtend = val;
+    const colonIdx = line.indexOf(':');
+    if (colonIdx < 0) continue;
+    const key = line.slice(0, colonIdx);
+    const val = line.slice(colonIdx + 1);
+    const base = key.split(';')[0].toUpperCase();
+    if (base === 'UID') uid = val.trim();
+    if (base === 'SUMMARY') summary = val.trim();
+    if (base === 'DTSTART') dtstart = val.trim();
+    if (base === 'DTEND') dtend = val.trim();
+    if (base === 'DESCRIPTION') description = icsUnescape(val.trim());
+    if (base === 'LOCATION') location = icsUnescape(val.trim());
+    if (base === 'URL') url = val.trim();
   }
 
   const start = parseIcsDate(dtstart);
@@ -47,13 +64,19 @@ function eventFromBlock(block: string, calendarName = ''): CalendarEvent | null 
   const allDay = /^\d{8}$/.test(dtstart.trim());
   const end = dtend ? parseIcsDate(dtend) : undefined;
 
+  // Prefer explicit URL, then Zoom URL from location, then Zoom URL from description
+  const resolvedUrl = url || (location && /zoom\.us/i.test(location) ? location : '') || extractZoomUrl(description) || extractZoomUrl(location);
+
   return {
     id: uid || `${summary}-${start.toISOString()}`,
-    title: summary.replace(/\\n/g, ' ').replace(/\\,/g, ','),
+    title: icsUnescape(summary),
     start: start.toISOString(),
     end: end?.toISOString(),
     allDay,
     calendarName: calendarName || undefined,
+    description: description || undefined,
+    location: (!resolvedUrl && location) ? location : undefined,
+    url: resolvedUrl || undefined,
   };
 }
 

@@ -407,11 +407,36 @@ function PreferenceSection({ node, assetUrls }: {
 
 // ── Main component ──────────────────────────────────────────────────────────
 
+interface EditFields {
+  name: string;
+  // object
+  location: string; price: string; purchaseDate: string; expiry: string;
+  // commitment
+  dueDate: string; priority: string; owner: string; recurring: string;
+  // event
+  url: string; eventLocation: string;
+  // person
+  category: string; birthday: string;
+  // shared
+  note: string;
+}
+
 export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNode }: MemoryNodeDetailProps) {
   const [editing, setEditing] = useState(false);
-  const [name, setName] = useState('');
+  const [fields, setFields] = useState<EditFields>({
+    name: '', location: '', price: '', purchaseDate: '', expiry: '',
+    dueDate: '', priority: '', owner: '', recurring: '',
+    url: '', eventLocation: '', category: '', birthday: '', note: '',
+  });
   const [deleted, setDeleted] = useState(false);
   const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
+
+  function field(k: keyof EditFields) {
+    return fields[k];
+  }
+  function setField(k: keyof EditFields, v: string) {
+    setFields((prev) => ({ ...prev, [k]: v }));
+  }
 
   useEffect(() => {
     const assets = node?.assets || [];
@@ -436,10 +461,56 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
   if (!node || deleted) return null;
   const n = node;
 
-  function startEdit() { setName(n.name); setEditing(true); }
+  function startEdit() {
+    setFields({
+      name: n.name,
+      location: attr(n, 'location', 'room'),
+      price: attr(n, 'price'),
+      purchaseDate: attr(n, 'purchaseDate'),
+      expiry: attr(n, 'expiry'),
+      dueDate: attr(n, 'dueDate', 'deadline', 'due', 'date'),
+      priority: attr(n, 'priority'),
+      owner: attr(n, 'owner'),
+      recurring: attr(n, 'recurring'),
+      url: attr(n, 'url', 'htmlLink'),
+      eventLocation: attr(n, 'location'),
+      category: attr(n, 'category'),
+      birthday: attr(n, 'birthday'),
+      note: attr(n, 'note'),
+    });
+    setEditing(true);
+  }
   function saveEdit() {
-    if (!name.trim()) return;
-    updateLifeNode(n.id, { name: name.trim() });
+    if (!fields.name.trim()) return;
+    const extra: Record<string, string | null> = {};
+    if (n.type === 'object') {
+      if (fields.location !== attr(n, 'location', 'room')) extra.location = fields.location || null;
+      if (fields.price !== attr(n, 'price')) extra.price = fields.price || null;
+      if (fields.purchaseDate !== attr(n, 'purchaseDate')) extra.purchaseDate = fields.purchaseDate || null;
+      if (fields.expiry !== attr(n, 'expiry')) extra.expiry = fields.expiry || null;
+    }
+    if (n.type === 'commitment') {
+      if (fields.dueDate !== attr(n, 'dueDate', 'deadline')) extra.dueDate = fields.dueDate || null;
+      if (fields.priority !== attr(n, 'priority')) extra.priority = fields.priority || null;
+      if (fields.owner !== attr(n, 'owner')) extra.owner = fields.owner || null;
+      if (fields.recurring !== attr(n, 'recurring')) extra.recurring = fields.recurring || null;
+    }
+    if (n.type === 'event') {
+      if (fields.url !== attr(n, 'url', 'htmlLink')) extra.url = fields.url || null;
+      if (fields.eventLocation !== attr(n, 'location')) extra.location = fields.eventLocation || null;
+    }
+    if (n.type === 'person') {
+      if (fields.category !== attr(n, 'category')) extra.category = fields.category || null;
+      if (fields.birthday !== attr(n, 'birthday')) extra.birthday = fields.birthday || null;
+    }
+    if (fields.note !== attr(n, 'note')) extra.note = fields.note || null;
+    const newAttrs = { ...n.attributes };
+    for (const [k, v] of Object.entries(extra)) {
+      if (v === null) delete newAttrs[k];
+      else newAttrs[k] = v;
+    }
+    updateLifeNode(n.id, { name: fields.name.trim(), attributes: newAttrs });
+    if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
     setEditing(false);
     onClose();
   }
@@ -487,7 +558,7 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
           {editing ? (
             <input
               className="nesio-ob-input" style={{ fontSize: '1rem', marginBottom: 0, flex: 1 }}
-              value={name} onChange={(e) => setName(e.target.value)}
+              value={field('name')} onChange={(e) => setField('name', e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(); }}
               autoFocus
             />
@@ -496,6 +567,50 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
           )}
           <button type="button" className="nesio-voice-sheet-close" onClick={onClose} aria-label="关闭">✕</button>
         </div>
+
+        {/* Expanded edit form — type-specific fields */}
+        {editing && (
+          <div className="nesio-edit-form">
+            {n.type === 'object' && (<>
+              <label className="nesio-edit-row"><span>存放位置</span><input value={field('location')} onChange={(e) => setField('location', e.target.value)} placeholder="桌上、柜子里…" /></label>
+              <label className="nesio-edit-row"><span>价格</span><input value={field('price')} onChange={(e) => setField('price', e.target.value)} placeholder="$12.99" /></label>
+              <label className="nesio-edit-row"><span>购买日期</span><input type="date" value={field('purchaseDate')} onChange={(e) => setField('purchaseDate', e.target.value)} /></label>
+              <label className="nesio-edit-row"><span>有效期</span><input type="date" value={field('expiry')} onChange={(e) => setField('expiry', e.target.value)} /></label>
+            </>)}
+            {n.type === 'commitment' && (<>
+              <label className="nesio-edit-row"><span>截止日期</span><input type="date" value={field('dueDate').slice(0, 10)} onChange={(e) => setField('dueDate', e.target.value)} /></label>
+              <label className="nesio-edit-row">
+                <span>优先级</span>
+                <select value={field('priority')} onChange={(e) => setField('priority', e.target.value)}>
+                  <option value="">未设置</option>
+                  <option value="high">⚠️ 紧急</option>
+                  <option value="medium">⬆️ 重要</option>
+                  <option value="low">↓ 普通</option>
+                </select>
+              </label>
+              <label className="nesio-edit-row"><span>对方/负责人</span><input value={field('owner')} onChange={(e) => setField('owner', e.target.value)} placeholder="负责人姓名" /></label>
+              <label className="nesio-edit-row"><span>重复</span><input value={field('recurring')} onChange={(e) => setField('recurring', e.target.value)} placeholder="每周/每月…" /></label>
+            </>)}
+            {n.type === 'event' && (<>
+              <label className="nesio-edit-row"><span>会议链接</span><input value={field('url')} onChange={(e) => setField('url', e.target.value)} placeholder="https://zoom.us/…" /></label>
+              <label className="nesio-edit-row"><span>地点</span><input value={field('eventLocation')} onChange={(e) => setField('eventLocation', e.target.value)} placeholder="地点或地址" /></label>
+            </>)}
+            {n.type === 'person' && (<>
+              <label className="nesio-edit-row">
+                <span>关系</span>
+                <select value={field('category')} onChange={(e) => setField('category', e.target.value)}>
+                  <option value="">未分类</option>
+                  <option value="family">家人</option>
+                  <option value="colleague">同事</option>
+                  <option value="friend">朋友</option>
+                  <option value="acquaintance">认识</option>
+                </select>
+              </label>
+              <label className="nesio-edit-row"><span>生日</span><input type="date" value={field('birthday').slice(0, 10)} onChange={(e) => setField('birthday', e.target.value)} /></label>
+            </>)}
+            <label className="nesio-edit-row"><span>备注</span><input value={field('note')} onChange={(e) => setField('note', e.target.value)} placeholder="补充说明…" /></label>
+          </div>
+        )}
 
         <div className="nesio-settings-sheet-body">
           {/* Source / confidence */}

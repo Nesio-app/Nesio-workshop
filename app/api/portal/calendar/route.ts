@@ -151,18 +151,26 @@ function setCalendarCookies(response: NextResponse, session: GoogleTokenResponse
   return response;
 }
 
+function extractZoomFromText(text: string): string {
+  const m = text.match(/https?:\/\/[a-z0-9-]+\.zoom\.us\/[^\s"<>]*/i);
+  return m ? m[0] : '';
+}
+
 function mapGoogleCalendarItem(item: GoogleCalendarItem) {
   const start = item.start?.dateTime || item.start?.date || '';
   const end = item.end?.dateTime || item.end?.date || start;
+  const desc = item.description || '';
+  const zoomUrl = extractZoomFromText(desc);
   return {
     id: item.id || `${item.summary || 'google-event'}-${start}`,
     title: item.summary || 'Untitled event',
-    description: item.description || '',
+    description: desc || undefined,
     start,
     end,
     calendarName: 'Google Calendar',
     source: 'Google Calendar',
-    url: item.htmlLink || '',
+    // Zoom link takes priority over generic htmlLink (Google Calendar page)
+    url: zoomUrl || item.htmlLink || '',
   };
 }
 
