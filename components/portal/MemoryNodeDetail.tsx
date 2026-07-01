@@ -4,9 +4,20 @@ import { useEffect, useState } from 'react';
 import { deleteLifeNode, updateLifeNode, type LifeNode } from '@/lib/portal/life-graph';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
 
+const TYPE_ICON_DETAIL: Record<string, string> = {
+  person: '👤', object: '📦', place: '📍', event: '📅',
+  commitment: '🤝', health_state: '🩷', preference: '⭐',
+};
+const TYPE_BG_DETAIL: Record<string, string> = {
+  person: '#e0e7ff', object: '#dbeafe', place: '#d1fae5',
+  event: '#fef3c7', commitment: '#ede9fe', health_state: '#fce7f3', preference: '#f0fdf4',
+};
+
 interface MemoryNodeDetailProps {
   node: LifeNode | null;
   onClose: () => void;
+  relatedNodes?: LifeNode[];
+  onOpenNode?: (node: LifeNode) => void;
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -56,7 +67,7 @@ function formatAttributeValue(key: string, value: string | number | boolean | nu
   return raw;
 }
 
-export default function MemoryNodeDetail({ node, onClose }: MemoryNodeDetailProps) {
+export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNode }: MemoryNodeDetailProps) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState('');
   const [deleted, setDeleted] = useState(false);
@@ -247,6 +258,31 @@ export default function MemoryNodeDetail({ node, onClose }: MemoryNodeDetailProp
           )}
 
           <p style={{ fontSize: '0.7rem', color: 'var(--portal-muted)', marginTop: '1rem' }}>记录于 {createdDate}</p>
+
+          {/* Related memories */}
+          {relatedNodes && relatedNodes.length > 0 && (
+            <div className="nesio-related-section">
+              <p className="nesio-settings-section-label">相关记忆</p>
+              <div className="nesio-related-nodes">
+                {relatedNodes.map((related) => (
+                  <button
+                    key={related.id}
+                    type="button"
+                    className="nesio-related-node-chip"
+                    onClick={() => onOpenNode?.(related)}
+                  >
+                    <span
+                      className="nesio-related-node-icon"
+                      style={{ background: TYPE_BG_DETAIL[related.type] || '#f0f4ff' }}
+                    >
+                      {TYPE_ICON_DETAIL[related.type] || '📌'}
+                    </span>
+                    <span className="nesio-related-node-name">{related.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Actions */}
           <div style={{ display: 'flex', gap: '0.6rem', marginTop: '1.25rem' }}>

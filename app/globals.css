@@ -14775,3 +14775,124 @@ html[data-portal-theme="night"] .nesio-recorder-notes-input {
 html[data-portal-theme="night"] .nesio-recorder-transcript {
   background: rgba(88,140,227,.1);
 }
+
+/* ===== 历史上的今天 STRIP ===== */
+
+.nesio-otd-wrap {
+  margin: 0 0 0.75rem;
+  padding: 0 1rem;
+}
+.nesio-otd-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.55rem;
+}
+.nesio-otd-icon {
+  font-size: 0.95rem;
+}
+.nesio-otd-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--portal-muted);
+  letter-spacing: 0.01em;
+}
+.nesio-otd-scroll {
+  display: flex;
+  gap: 0.55rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-bottom: 0.1rem;
+}
+.nesio-otd-scroll::-webkit-scrollbar { display: none; }
+.nesio-otd-card {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  background: linear-gradient(135deg, #f0f4ff 0%, #e8eeff 100%);
+  border: 1px solid rgba(88, 140, 227, 0.18);
+  border-radius: 12px;
+  padding: 0.6rem 0.85rem;
+  min-width: 110px;
+  max-width: 160px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.nesio-otd-card:hover { background: linear-gradient(135deg, #e4ecff 0%, #d8e4ff 100%); }
+.nesio-otd-card-year {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--portal-cool-accent);
+  opacity: 0.8;
+}
+.nesio-otd-card-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--portal-ink);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-height: 1.3;
+}
+html[data-portal-theme="night"] .nesio-otd-card {
+  background: linear-gradient(135deg, rgba(88,140,227,.1) 0%, rgba(88,140,227,.07) 100%);
+  border-color: rgba(88,140,227,.18);
+}
+html[data-portal-theme="night"] .nesio-otd-card-name { color: #d0d8f0; }
+
+/* ===== RELATED MEMORIES IN DETAIL SHEET ===== */
+
+.nesio-related-section {
+  margin-top: 0.75rem;
+}
+.nesio-related-nodes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
+.nesio-related-node-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--portal-cool);
+  border: 1px solid rgba(88, 140, 227, 0.18);
+  border-radius: 20px;
+  padding: 0.35rem 0.7rem 0.35rem 0.45rem;
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: var(--portal-ink);
+  font-weight: 500;
+  transition: background 0.15s;
+  max-width: 100%;
+  text-align: left;
+}
+.nesio-related-node-chip:hover { background: #dce9fc; }
+.nesio-related-node-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+.nesio-related-node-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  max-width: 160px;
+}
+html[data-portal-theme="night"] .nesio-related-node-chip {
+  background: rgba(88,140,227,.1);
+  border-color: rgba(88,140,227,.2);
+  color: #d0d8f0;
+}
+html[data-portal-theme="night"] .nesio-related-node-chip:hover {
+  background: rgba(88,140,227,.18);
+}

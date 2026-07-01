@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState, useEffect } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   PROFILE_UPDATED_EVENT,
   loadProfileSettings,
@@ -39,6 +39,106 @@ const DOMAIN_THRESHOLDS: Record<string, number> = {
   life: 20, growth: 15, assets: 15, health: 10, energy: 10,
 };
 const TYPE_ORDER = ['person', 'object', 'place', 'event', 'commitment', 'health_state', 'preference'];
+
+// ---- Smart association helpers ----
+
+function extractKeywords(text: string): string[] {
+  const matches = text.match(/[一-鿿]{2,}|[a-zA-Z0-9]{3,}/g) || [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const w of matches) { const lw = w.toLowerCase(); if (!seen.has(lw)) { seen.add(lw); out.push(lw); } }
+  return out;
+}
+
+function findRelatedNodes(target: LifeNode, allNodes: LifeNode[]): LifeNode[] {
+  const targetWords = extractKeywords(`${target.name} ${target.rawInput || ''}`);
+  const targetTags = new Set(target.tags || []);
+
+  const scored = allNodes
+    .filter((n) => n.id !== target.id)
+    .map((node) => {
+      let score = 0;
+
+      // Explicit relations (strongest signal)
+      if (target.relations.some((r) => r.targetId === node.id)) score += 10;
+      if (node.relations.some((r) => r.targetId === target.id)) score += 10;
+
+      // Shared tags
+      const sharedTags = (node.tags || []).filter((t) => targetTags.has(t));
+      score += sharedTags.length * 3;
+
+      // Shared keywords in name / rawInput
+      const nodeWords = extractKeywords(`${node.name} ${node.rawInput || ''}`);
+      const sharedWords = targetWords.filter((w) => nodeWords.includes(w));
+      score += sharedWords.length * 2;
+
+      // Same type (minor boost)
+      if (node.type === target.type) score += 1;
+
+      // Temporal proximity
+      const daysDiff = Math.abs(
+        new Date(node.createdAt).getTime() - new Date(target.createdAt).getTime()
+      ) / 86_400_000;
+      if (daysDiff <= 1) score += 2;
+      else if (daysDiff <= 7) score += 1;
+
+      return { node, score };
+    });
+
+  return scored
+    .filter((s) => s.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5)
+    .map((s) => s.node);
+}
+
+function findOnThisDayNodes(nodes: LifeNode[]): LifeNode[] {
+  const today = new Date();
+  const month = today.getMonth();
+  const day = today.getDate();
+  const year = today.getFullYear();
+  return nodes.filter((n) => {
+    const d = new Date(n.createdAt);
+    return d.getMonth() === month && d.getDate() === day && d.getFullYear() < year;
+  });
+}
+
+// ---- On This Day strip ----
+
+function OnThisDayStrip({
+  nodes,
+  onOpen,
+}: {
+  nodes: LifeNode[];
+  onOpen: (node: LifeNode) => void;
+}) {
+  const today = new Date();
+  const label = today.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' });
+  return (
+    <div className="nesio-otd-wrap">
+      <div className="nesio-otd-header">
+        <span className="nesio-otd-icon">🗓</span>
+        <span className="nesio-otd-label">历史上的今天 · {label}</span>
+      </div>
+      <div className="nesio-otd-scroll">
+        {nodes.map((n) => {
+          const year = new Date(n.createdAt).getFullYear();
+          return (
+            <button
+              key={n.id}
+              type="button"
+              className="nesio-otd-card"
+              onClick={() => onOpen(n)}
+            >
+              <span className="nesio-otd-card-year">{year} 年</span>
+              <span className="nesio-otd-card-name">{n.name}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 const SEED_NODES = [
   { id: 's1', icon: '🎁', iconBg: '#d1fae5', title: 'Linda 礼物', subtitle: '娃娃 · 储物间蓝盒子' },
@@ -285,6 +385,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
   const [locale, setLocale] = useState<PortalLocale>(() => loadProfileSettings().locale);
   const [nodes, setNodes] = useState<LifeNode[]>([]);
   const [selectedNode, setSelectedNode] = useState<LifeNode | null>(null);
+  const [relatedNodes, setRelatedNodes] = useState<LifeNode[]>([]);
   const [showAll, setShowAll] = useState(false);
   const [cloudSyncSummary, setCloudSyncSummary] = useState(getLifeGraphCloudSyncSummary());
   const cloudSyncRecordCount =
@@ -408,6 +509,14 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
 
   const isFiltered = domain !== null || typeFilter !== null;
 
+  // 历史上的今天
+  const onThisDayNodes = useMemo(() => findOnThisDayNodes(nodes), [nodes]);
+
+  function openNodeDetail(node: LifeNode) {
+    setSelectedNode(node);
+    setRelatedNodes(findRelatedNodes(node, nodes));
+  }
+
   return (
     <>
       <div className="nesio-memory-root">
@@ -480,6 +589,11 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                 </button>
               ))}
             </div>
+          )}
+
+          {/* 历史上的今天 */}
+          {!query && onThisDayNodes.length > 0 && (
+            <OnThisDayStrip nodes={onThisDayNodes} onOpen={openNodeDetail} />
           )}
 
           {/* Type filter bar */}
@@ -562,7 +676,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                   <MemoryCard
                     key={node.id}
                     node={node}
-                    onOpen={() => setSelectedNode(node)}
+                    onOpen={() => openNodeDetail(node)}
                     onDeleted={() => setNodes(readRecentVisibleNodes())}
                   />
                 ))}
@@ -605,7 +719,12 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
         </div>
       </div>
 
-      <MemoryNodeDetail node={selectedNode} onClose={() => setSelectedNode(null)} />
+      <MemoryNodeDetail
+        node={selectedNode}
+        onClose={() => setSelectedNode(null)}
+        relatedNodes={relatedNodes}
+        onOpenNode={(n) => openNodeDetail(n)}
+      />
     </>
   );
 }
