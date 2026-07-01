@@ -79,12 +79,22 @@ function isMeetingUrl(url: string): boolean {
 }
 
 const HIDDEN_ATTR_KEYS = new Set([
-  'calendarId', 'calendarName', 'description', 'emailId', 'messageId',
-  'htmlLink', 'subtasksJson', 'done', 'doneAt', 'lat', 'lon', 'userTags',
-  'note', 'price', 'purchaseDate', 'expiry', 'location', 'room', 'address',
-  'visitCount', 'category', 'lastSeen', 'birthday', 'start', 'end', 'date',
-  'dueDate', 'deadline', 'priority', 'owner', 'recurring', 'participants',
-  'url', 'healthType', 'unit', 'value', 'receiptDate', 'status',
+  // Internal / calendar
+  'calendarId', 'calendarName', 'description', 'emailId', 'messageId', 'htmlLink',
+  // System / task internals
+  'subtasksJson', 'done', 'doneAt', 'userTags', 'status',
+  // Location (shown in PlaceSection)
+  'lat', 'lon', 'address', 'location', 'room',
+  // Signal infrastructure — never user-visible
+  'signalId', 'signalSource', 'signalType', 'signalVersion',
+  'occuredAt', 'occurredAt', 'capturedAt', 'retentionPolicy', 'sensitivity',
+  'sourceNodeId', 'schemaVersion',
+  // Type-specific (handled in sections)
+  'note', 'price', 'purchaseDate', 'expiry',
+  'visitCount', 'category', 'lastSeen', 'birthday',
+  'start', 'end', 'date', 'dueDate', 'deadline',
+  'priority', 'owner', 'recurring', 'participants',
+  'url', 'healthType', 'unit', 'value', 'receiptDate',
 ]);
 
 function InfoRow({ label, value, link }: { label: string; value: string; link?: string }) {
