@@ -36,7 +36,7 @@ async function analyzeImage(base64: string): Promise<AnalysisResult> {
     headers: { 'Content-Type': 'application/json', 'x-baohe-access-mode': 'personal_lab' },
     body: JSON.stringify({
       type: 'image',
-      content: '请只根据图片里真实可见的内容生成 Memory 节点。优先识别具体物品、位置、文件、场景；除非图片里清楚有人，否则不要生成“人物”节点；不要把这段指令当成节点名称。',
+      content: '请只根据图片里真实可见的内容生成 Memory 节点。如果是小票/收据，请为每个购买条目单独生成一个 object 节点（名称用中文，如”草莓冰淇淋”），并在 attributes 里加 price 和 receiptDate；优先识别具体物品、位置、文件、场景；除非图片里清楚有人，否则不要生成”人物”节点；不要把这段指令当成节点名称。',
       imageBase64: base64,
       mimeType: 'image/jpeg',
     }),
@@ -343,6 +343,8 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
       try {
         const res = await analyzeImage(base64);
         setResult(res);
+        setEditedNodes(toEditedNodes(res.nodes));
+        setIsReceipt(detectReceipt(res));
         setPhase('result');
       } catch {
         const pending = buildPendingImageResult();
@@ -386,7 +388,7 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
     const locAttrs = loc ? { lat: loc.lat, lon: loc.lon } : {};
 
     const savedNodes = nodesToSave.map((n) => addLifeNode({
-      name: n.name,
+      name: n.name.trim() || '未命名条目',
       type: n.type as LifeNode['type'],
       source: 'photo',
       tags: Array.from(new Set([...(n.tags || []), ...userTags])),
@@ -630,9 +632,9 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
               type="button"
               className="nesio-camera-save-btn"
               onClick={saveAll}
-              disabled={editedNodes.filter((n) => !n.deleted && n.name.trim()).length === 0}
+              disabled={editedNodes.filter((n) => !n.deleted).length === 0}
             >
-              存入 Memory ({editedNodes.filter((n) => !n.deleted && n.name.trim()).length} 条)
+              存入 Memory ({editedNodes.filter((n) => !n.deleted).length} 条)
             </button>
             <button type="button" className="nesio-camera-retake-btn" onClick={retake}>重拍</button>
           </div>

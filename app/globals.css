@@ -11531,6 +11531,152 @@ html[data-portal-theme="night"] .nesio-mood-circle {
 }
 html[data-portal-theme="night"] .nesio-node-attr-val { color: #e8eefa; }
 
+.nesio-node-attr-link {
+  color: var(--portal-blue-deep);
+  text-decoration: none;
+}
+.nesio-node-attr-link:hover { text-decoration: underline; }
+
+/* ─── Type-specific detail sections ─── */
+.nesio-type-header-strip {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 1.1rem;
+  border-radius: 0.75rem 0.75rem 0 0;
+  margin: 0 -0.1rem;
+}
+.nesio-type-header-icon { font-size: 1.1rem; }
+.nesio-type-header-label { font-size: 0.72rem; font-weight: 700; color: #374151; letter-spacing: 0.03em; }
+
+.nesio-type-section { margin-bottom: 0.25rem; }
+
+.nesio-type-badge-row { display: flex; gap: 0.45rem; flex-wrap: wrap; margin-bottom: 0.6rem; }
+.nesio-type-category-pill {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.18rem 0.6rem;
+  border-radius: 999px;
+  background: rgba(88,140,227,0.12);
+  color: var(--portal-blue-deep);
+}
+.nesio-type-category-pill--health { background: rgba(236, 72, 153, 0.1); color: #be185d; }
+
+.nesio-type-event-time {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--portal-ink);
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--portal-line);
+  margin-bottom: 0.3rem;
+}
+.nesio-type-event-time-icon { font-size: 1rem; }
+
+.nesio-type-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 0.45rem 1rem;
+  border-radius: 999px;
+  background: rgba(88,140,227,0.1);
+  color: var(--portal-blue-deep);
+  text-decoration: none;
+  border: 1.5px solid rgba(88,140,227,0.2);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.nesio-type-action-btn:hover { background: rgba(88,140,227,0.18); }
+.nesio-type-action-btn--meeting {
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
+  border-color: rgba(16,185,129,0.2);
+}
+.nesio-type-action-btn--meeting:hover { background: rgba(16,185,129,0.18); }
+
+.nesio-type-thumb {
+  width: 100%;
+  max-height: 14rem;
+  object-fit: cover;
+  border-radius: 0.75rem;
+  display: block;
+  margin-bottom: 0.75rem;
+}
+
+.nesio-type-related-events { margin-top: 0.25rem; }
+
+.nesio-commitment-status-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.65rem;
+}
+.nesio-commitment-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 0.45rem 1rem;
+  border-radius: 999px;
+  background: rgba(139,92,246,0.1);
+  color: #6d28d9;
+  border: 1.5px solid rgba(139,92,246,0.2);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.nesio-commitment-toggle:hover { background: rgba(139,92,246,0.18); }
+.nesio-commitment-toggle--done {
+  background: rgba(16,185,129,0.1);
+  color: #059669;
+  border-color: rgba(16,185,129,0.2);
+}
+.nesio-type-priority-badge { font-size: 0.75rem; font-weight: 700; }
+
+.nesio-attr-overdue .nesio-node-attr-val { color: #ef4444; }
+.nesio-attr-due-soon .nesio-node-attr-val { color: #f59e0b; }
+.nesio-overdue-tag {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #ef4444;
+  background: rgba(239,68,68,0.1);
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  margin-left: 0.3rem;
+}
+.nesio-due-soon-tag {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #f59e0b;
+  background: rgba(245,158,11,0.1);
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  margin-left: 0.3rem;
+}
+
+.nesio-type-asset-card {
+  border: 1px solid rgba(148,163,184,0.22);
+  border-radius: 1rem;
+  padding: 0.65rem;
+  background: rgba(255,255,255,0.5);
+}
+.nesio-type-asset-img {
+  width: 100%;
+  max-height: 15rem;
+  object-fit: cover;
+  border-radius: 0.75rem;
+  display: block;
+  margin-bottom: 0.55rem;
+}
+
+html[data-portal-theme="night"] .nesio-type-header-label { color: #c7d4f5; }
+html[data-portal-theme="night"] .nesio-commitment-toggle { color: #a78bfa; }
+html[data-portal-theme="night"] .nesio-type-action-btn { color: #93c5fd; }
+
 /* ─── Today Empty State ─── */
 .nesio-today-empty {
   text-align: center;
