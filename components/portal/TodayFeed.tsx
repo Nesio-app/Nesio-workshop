@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { loadProfileSettings } from '@/lib/portal/profile';
 import { recordCardFeedback, type RecommendationCard } from '@/lib/portal/reasoning-engine';
-import { buildTodayViewModel, focusTimeHint, markFocusNodeDone, addCommitmentNode, type FocusNode } from '@/lib/platform/view-models/today-view-model';
+import { buildTodayViewModel, focusTimeHint, markFocusNodeDone, addCommitmentNode, saveSubtasks, toggleSubtask, type FocusNode, type SubTask } from '@/lib/platform/view-models/today-view-model';
 import { learnFromFeedback } from '@/lib/portal/mirror-profile';
 import { recordSignalFeedback } from '@/lib/life-domain/signal-feedback';
 import { cloudSignalRowsToSignals, type CloudSignalRow } from '@/lib/life-domain/signal-search';
@@ -230,6 +230,96 @@ const FOCUS_TYPE_BG: Record<string, string> = {
   person: '#e0e7ff', place: '#d1fae5', health_state: '#fce7f3', preference: '#f0fdf4',
 };
 
+function FocusCardDetail({
+  node,
+  onSubtasksChange,
+}: {
+  node: FocusNode;
+  onSubtasksChange: (nodeId: string, subtasks: SubTask[]) => void;
+}) {
+  const [subtasks, setSubtasks] = useState<SubTask[]>(node.subtasks ?? []);
+  const [decomposing, setDecomposing] = useState(false);
+
+  async function handleDecompose() {
+    setDecomposing(true);
+    try {
+      const res = await fetch('/api/portal/decompose-task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskName: node.name, context: node.rawInput }),
+      });
+      const data = await res.json() as { ok?: boolean; steps?: Array<{ name: string; emoji?: string; durationMin?: number }> };
+      if (data.ok && data.steps?.length) {
+        const newSubtasks: SubTask[] = data.steps.map((s, i) => ({
+          id: `st-${Date.now()}-${i}`,
+          name: s.name,
+          emoji: s.emoji,
+          durationMin: s.durationMin,
+          done: false,
+        }));
+        setSubtasks(newSubtasks);
+        saveSubtasks(node.id, newSubtasks);
+        onSubtasksChange(node.id, newSubtasks);
+      }
+    } catch { /* ignore */ }
+    setDecomposing(false);
+  }
+
+  function handleToggle(subtaskId: string) {
+    const next = subtasks.map((s) => s.id === subtaskId ? { ...s, done: !s.done } : s);
+    setSubtasks(next);
+    toggleSubtask(node.id, subtaskId);
+    onSubtasksChange(node.id, next);
+  }
+
+  const doneCount = subtasks.filter((s) => s.done).length;
+  const totalMin = subtasks.reduce((acc, s) => acc + (s.durationMin ?? 0), 0);
+
+  return (
+    <div className="nesio-focus-detail">
+      {subtasks.length > 0 ? (
+        <>
+          <div className="nesio-focus-detail-progress">
+            <span className="nesio-focus-detail-progress-label">{doneCount}/{subtasks.length} 步完成</span>
+            {totalMin > 0 && <span className="nesio-focus-detail-progress-time">共 {totalMin} 分钟</span>}
+            <div className="nesio-focus-detail-progress-bar">
+              <div className="nesio-focus-detail-progress-fill" style={{ width: `${subtasks.length ? (doneCount / subtasks.length) * 100 : 0}%` }} />
+            </div>
+          </div>
+          <ul className="nesio-focus-subtask-list">
+            {subtasks.map((s) => (
+              <li key={s.id} className={`nesio-focus-subtask${s.done ? ' nesio-focus-subtask--done' : ''}`}>
+                <button
+                  type="button"
+                  className={`nesio-focus-subtask-check${s.done ? ' nesio-focus-subtask-check--checked' : ''}`}
+                  onClick={() => handleToggle(s.id)}
+                  aria-label={s.done ? '取消完成' : '标记完成'}
+                >
+                  {s.done ? '✓' : '○'}
+                </button>
+                <span className="nesio-focus-subtask-emoji">{s.emoji || '▸'}</span>
+                <span className="nesio-focus-subtask-name">{s.name}</span>
+                {s.durationMin && <span className="nesio-focus-subtask-time">{s.durationMin} min.</span>}
+              </li>
+            ))}
+          </ul>
+          <button type="button" className="nesio-focus-decompose-btn nesio-focus-decompose-btn--rerun" onClick={handleDecompose} disabled={decomposing}>
+            {decomposing ? '重新拆解中…' : '↺ 重新拆解'}
+          </button>
+        </>
+      ) : (
+        <button type="button" className="nesio-focus-decompose-btn" onClick={handleDecompose} disabled={decomposing}>
+          {decomposing ? (
+            <><span className="nesio-focus-decompose-spinner" />AI 拆解中…</>
+          ) : (
+            <>✦ AI 拆解步骤</>
+          )}
+        </button>
+      )}
+    </div>
+  );
+}
+
 function TodayFocusSection({
   focusNodes,
   onOpenMemory,
@@ -239,11 +329,11 @@ function TodayFocusSection({
 }) {
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [quickAdd, setQuickAdd] = useState('');
   const [localNodes, setLocalNodes] = useState<FocusNode[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // merge props + locally added nodes; remove dismissed
   const allNodes = [...localNodes, ...focusNodes.filter((n) => !localNodes.some((l) => l.id === n.id))];
   const visible = allNodes.filter((n) => !dismissed.has(n.id));
 
@@ -252,6 +342,7 @@ function TodayFocusSection({
     setTimeout(() => {
       markFocusNodeDone(node.id);
       setDismissed((prev) => { const next = new Set(prev); next.add(node.id); return next; });
+      if (expandedId === node.id) setExpandedId(null);
     }, 600);
   }
 
@@ -262,7 +353,12 @@ function TodayFocusSection({
     const node = addCommitmentNode(name);
     setLocalNodes((prev) => [node, ...prev]);
     setQuickAdd('');
+    setExpandedId(node.id);
     inputRef.current?.blur();
+  }
+
+  function handleSubtasksChange(nodeId: string, subtasks: SubTask[]) {
+    setLocalNodes((prev) => prev.map((n) => n.id === nodeId ? { ...n, subtasks } : n));
   }
 
   const doneToday = doneIds.size;
@@ -291,38 +387,54 @@ function TodayFocusSection({
           {visible.map((node) => {
             const hint = focusTimeHint(node);
             const isDone = doneIds.has(node.id);
+            const isExpanded = expandedId === node.id;
+            const subtasks = node.subtasks ?? [];
+            const doneSubtasks = subtasks.filter((s) => s.done).length;
+
             return (
-              <div key={node.id} className={`nesio-focus-card${isDone ? ' nesio-focus-card--done' : ''}`}>
-                <button
-                  type="button"
-                  className={`nesio-focus-card-check${isDone ? ' nesio-focus-card-check--checked' : ''}`}
-                  aria-label="完成"
-                  onClick={() => handleDone(node)}
-                >
-                  {isDone ? '✓' : '○'}
-                </button>
-                <div className="nesio-focus-card-body">
-                  <p className="nesio-focus-card-title">{node.name}</p>
-                  <p className="nesio-focus-card-meta">
-                    <span className="nesio-focus-card-type">{FOCUS_TYPE_LABEL[node.type] || '记录'}</span>
-                    {hint && <span className="nesio-focus-card-hint">{hint}</span>}
-                  </p>
+              <div key={node.id} className={`nesio-focus-card${isDone ? ' nesio-focus-card--done' : ''}${isExpanded ? ' nesio-focus-card--expanded' : ''}`}>
+                <div className="nesio-focus-card-row">
+                  <button
+                    type="button"
+                    className={`nesio-focus-card-check${isDone ? ' nesio-focus-card-check--checked' : ''}`}
+                    aria-label="完成"
+                    onClick={() => handleDone(node)}
+                  >
+                    {isDone ? '✓' : '○'}
+                  </button>
+                  <button
+                    type="button"
+                    className="nesio-focus-card-body nesio-focus-card-body--tap"
+                    onClick={() => setExpandedId(isExpanded ? null : node.id)}
+                  >
+                    <p className="nesio-focus-card-title">{node.name}</p>
+                    <p className="nesio-focus-card-meta">
+                      <span className="nesio-focus-card-type">{FOCUS_TYPE_LABEL[node.type] || '记录'}</span>
+                      {hint && <span className="nesio-focus-card-hint">{hint}</span>}
+                      {subtasks.length > 0 && (
+                        <span className="nesio-focus-card-subtask-badge">{doneSubtasks}/{subtasks.length} 步</span>
+                      )}
+                    </p>
+                  </button>
+                  <button
+                    type="button"
+                    className="nesio-focus-card-dismiss"
+                    aria-label="暂时忽略"
+                    onClick={() => setDismissed((prev) => { const next = new Set(prev); next.add(node.id); return next; })}
+                  >
+                    ✕
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  className="nesio-focus-card-dismiss"
-                  aria-label="暂时忽略"
-                  onClick={() => setDismissed((prev) => { const next = new Set(prev); next.add(node.id); return next; })}
-                >
-                  ✕
-                </button>
+
+                {isExpanded && (
+                  <FocusCardDetail node={node} onSubtasksChange={handleSubtasksChange} />
+                )}
               </div>
             );
           })}
         </div>
       )}
 
-      {/* Quick-add commitment row */}
       <form className="nesio-focus-quick-add" onSubmit={handleQuickAdd}>
         <input
           ref={inputRef}

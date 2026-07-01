@@ -3,6 +3,14 @@ import type { Signal } from '../../life-domain/signal';
 import { addLifeNode, getLifeGraph, getRecentNodes, updateLifeNode, type LifeNode } from '../../portal/life-graph';
 import type { RecommendationCard } from '../../portal/reasoning-engine';
 
+export interface SubTask {
+  id: string;
+  name: string;
+  emoji?: string;
+  durationMin?: number;
+  done: boolean;
+}
+
 /** Slimmed-down shape the Today surface needs for focus cards (no raw LifeNode exposure). */
 export interface FocusNode {
   id: string;
@@ -11,6 +19,29 @@ export interface FocusNode {
   rawInput?: string;
   createdAt: string;
   attributes: Record<string, string | number | boolean | null>;
+  subtasks?: SubTask[];
+}
+
+function parseSubtasks(attrs: Record<string, string | number | boolean | null>): SubTask[] | undefined {
+  const raw = attrs.subtasksJson;
+  if (typeof raw !== 'string') return undefined;
+  try { return JSON.parse(raw) as SubTask[]; } catch { return undefined; }
+}
+
+export function saveSubtasks(nodeId: string, subtasks: SubTask[]): void {
+  const node = getLifeGraph().find((n) => n.id === nodeId);
+  if (!node) return;
+  updateLifeNode(nodeId, { attributes: { ...node.attributes, subtasksJson: JSON.stringify(subtasks) } });
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
+}
+
+export function toggleSubtask(nodeId: string, subtaskId: string): void {
+  const node = getLifeGraph().find((n) => n.id === nodeId);
+  if (!node) return;
+  const subtasks = parseSubtasks(node.attributes) ?? [];
+  const next = subtasks.map((s) => s.id === subtaskId ? { ...s, done: !s.done } : s);
+  updateLifeNode(nodeId, { attributes: { ...node.attributes, subtasksJson: JSON.stringify(next) } });
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
 }
 
 const FOCUS_TIME_WORDS = ['生日', '会议', '截止', '复诊', '今天', '明天', '后天', '本周', '这周', 'deadline', 'birthday', 'meeting', '到期', '提醒'];
@@ -98,7 +129,7 @@ export function buildTodayViewModel(input: {
     .filter(isFocusNode)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 5)
-    .map((n) => ({ id: n.id, name: n.name, type: n.type, rawInput: n.rawInput, createdAt: n.createdAt, attributes: n.attributes }));
+    .map((n) => ({ id: n.id, name: n.name, type: n.type, rawInput: n.rawInput, createdAt: n.createdAt, attributes: n.attributes, subtasks: parseSubtasks(n.attributes) }));
 
   return {
     cards: cards.length > 0 ? cards : [...input.fallbackCards],
