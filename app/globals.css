@@ -11313,6 +11313,269 @@ html[data-portal-theme="night"] .nesio-connector-name { color: #e8eefa; }
 }
 .nesio-health-mood-btn--active { background: rgba(88,140,227,0.1); border-color: var(--portal-blue-deep); color: var(--portal-blue-deep); }
 
+/* ─── Insights Sheet ─── */
+.nesio-insights-sheet-card {
+  max-height: 88vh !important;
+}
+.nesio-insights-sheet {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+.nesio-insights-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.1rem 0 0.9rem;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--portal-line);
+  margin-bottom: 0.1rem;
+}
+.nesio-insights-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 1;
+}
+.nesio-insights-icon { font-size: 1rem; color: #8b5cf6; }
+.nesio-insights-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--portal-ink);
+}
+.nesio-insights-period-tabs {
+  display: flex;
+  gap: 0.25rem;
+  background: var(--portal-line);
+  border-radius: 0.55rem;
+  padding: 0.15rem;
+}
+.nesio-insights-tab {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--portal-muted);
+  background: none;
+  border: none;
+  border-radius: 0.4rem;
+  padding: 0.22rem 0.55rem;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.nesio-insights-tab--active {
+  background: var(--glass-bg-solid);
+  color: var(--portal-ink);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+.nesio-insights-close {
+  font-size: 0.9rem;
+  color: var(--portal-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.2rem;
+  flex-shrink: 0;
+}
+.nesio-insights-body {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-top: 0.75rem;
+  padding-bottom: 1.5rem;
+}
+
+/* Narrative */
+.nesio-insights-narrative {
+  background: linear-gradient(135deg, rgba(139,92,246,0.08), rgba(59,110,240,0.06));
+  border: 1px solid rgba(139,92,246,0.18);
+  border-radius: 1rem;
+  padding: 0.85rem 1rem;
+  margin-bottom: 0.9rem;
+  min-height: 3.5rem;
+}
+.nesio-insights-narrative-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+  color: var(--portal-muted);
+}
+.nesio-insights-narrative-text {
+  font-size: 0.88rem;
+  line-height: 1.65;
+  color: var(--portal-ink);
+}
+html[data-portal-theme="night"] .nesio-insights-narrative { background: rgba(139,92,246,0.12); border-color: rgba(139,92,246,0.25); }
+html[data-portal-theme="night"] .nesio-insights-narrative-text { color: #d8dff8; }
+
+/* Stats row */
+.nesio-insights-stats-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  background: var(--glass-bg-solid);
+  border: 1px solid var(--portal-line);
+  border-radius: 1rem;
+  padding: 0.8rem 0.5rem;
+  margin-bottom: 0.9rem;
+}
+.nesio-insights-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+}
+.nesio-insights-stat-num {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--portal-ink);
+  line-height: 1;
+}
+.nesio-insights-stat-label {
+  font-size: 0.68rem;
+  color: var(--portal-muted);
+}
+.nesio-insights-stat-divider {
+  width: 1px;
+  height: 2rem;
+  background: var(--portal-line);
+}
+
+/* Sections */
+.nesio-insights-section {
+  margin-bottom: 0.9rem;
+}
+.nesio-insights-section-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--portal-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+}
+
+/* Domain bars */
+.nesio-insights-domains { display: flex; flex-direction: column; gap: 0.4rem; }
+.nesio-insights-domain-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+.nesio-insights-domain-label {
+  font-size: 0.75rem;
+  color: var(--portal-ink);
+  min-width: 3rem;
+}
+.nesio-insights-domain-track {
+  flex: 1;
+  height: 5px;
+  background: var(--portal-line);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.nesio-insights-domain-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.4s ease;
+}
+.nesio-insights-domain-count {
+  font-size: 0.7rem;
+  color: var(--portal-muted);
+  min-width: 1.5rem;
+  text-align: right;
+}
+
+/* Pattern rows (from MirrorProfile) */
+.nesio-insights-pattern-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-bottom: 0.4rem;
+}
+.nesio-insights-pattern-label {
+  font-size: 0.75rem;
+  color: var(--portal-ink);
+  min-width: 5.5rem;
+}
+.nesio-insights-pattern-track {
+  flex: 1;
+  height: 5px;
+  background: var(--portal-line);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.nesio-insights-pattern-fill {
+  height: 100%;
+  background: var(--portal-blue-deep);
+  border-radius: 99px;
+  transition: width 0.4s ease;
+}
+.nesio-insights-pattern-desc {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--portal-blue-deep);
+  min-width: 4rem;
+  text-align: right;
+}
+
+/* Active hour */
+.nesio-insights-active-hour {
+  font-size: 0.85rem;
+  color: var(--portal-ink);
+  font-weight: 500;
+}
+
+/* Progress meter */
+.nesio-insights-progress-section {
+  background: var(--glass-bg-solid);
+  border: 1px solid var(--portal-line);
+  border-radius: 1rem;
+  padding: 0.85rem 1rem;
+  margin-bottom: 0.6rem;
+}
+.nesio-insights-progress-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+.nesio-insights-progress-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--portal-ink);
+}
+.nesio-insights-progress-pct {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: #8b5cf6;
+}
+.nesio-insights-progress-track {
+  height: 6px;
+  background: var(--portal-line);
+  border-radius: 99px;
+  overflow: hidden;
+  margin-bottom: 0.45rem;
+}
+.nesio-insights-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #8b5cf6, #3b6ef0);
+  border-radius: 99px;
+  transition: width 0.5s ease;
+}
+.nesio-insights-progress-hint {
+  font-size: 0.72rem;
+  color: var(--portal-muted);
+}
+
+/* Cloud sync note */
+.nesio-insights-cloud-note {
+  font-size: 0.68rem;
+  color: var(--portal-muted);
+  opacity: 0.6;
+  text-align: center;
+  margin-top: 0.25rem;
+}
+
 /* ─── Mirror Profile Card ─── */
 .nesio-mirror-card {
   background: rgba(88,140,227,0.06); border: 1px solid rgba(88,140,227,0.14);

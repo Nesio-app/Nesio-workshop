@@ -7,7 +7,7 @@ import { createAppApiClient } from '@/lib/portal/app-api-client';
 import { ToneSheet, PrivacySheet, SpacesSheet, SubscriptionSheet } from './SettingsSheets';
 import ConnectorsHub from './ConnectorsHub';
 import HealthLogger from './HealthLogger';
-import MirrorProfileCard from './MirrorProfileCard';
+import InsightsSheet from './InsightsSheet';
 
 type ActiveSheet = 'mirror' | 'tone' | 'privacy' | 'spaces' | 'subscription' | 'connectors' | 'health' | null;
 
@@ -189,17 +189,11 @@ export default function NesioProfileCard() {
 
       {/* Sub-sheets */}
       {activeSheet === 'mirror' && (
-        <div className="nesio-settings-sheet-overlay" role="dialog" aria-modal="true" aria-label="Nesio 整理出的线索">
+        <div className="nesio-settings-sheet-overlay" role="dialog" aria-modal="true" aria-label="Nesio 的洞察">
           <button type="button" className="nesio-settings-sheet-backdrop" onClick={() => setActiveSheet(null)} aria-label="关闭" />
-          <div className="nesio-settings-sheet-card">
+          <div className="nesio-settings-sheet-card nesio-insights-sheet-card">
             <div className="nesio-sheet-handle" aria-hidden />
-            <div className="nesio-settings-sheet-header">
-              <h2 className="nesio-settings-sheet-title">整理出的线索</h2>
-              <button type="button" className="nesio-settings-sheet-close" onClick={() => setActiveSheet(null)} aria-label="关闭">✕</button>
-            </div>
-            <div className="nesio-settings-sheet-body">
-              <MirrorProfileCard embedded />
-            </div>
+            <InsightsSheet onClose={() => setActiveSheet(null)} />
           </div>
         </div>
       )}

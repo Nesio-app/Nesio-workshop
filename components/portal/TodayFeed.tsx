@@ -11,7 +11,7 @@ import { createAppApiClient } from '@/lib/portal/app-api-client';
 import VoiceBrief from './VoiceBrief';
 import DailyBriefCard from './DailyBriefCard';
 import LifeStateCard from './LifeStateCard';
-import MirrorProfileCard from './MirrorProfileCard';
+import InsightsSheet from './InsightsSheet';
 
 // Public fallback card: never implies Nesio knows private facts before consent/input.
 const EMPTY_SIGNAL_CARDS: RecommendationCard[] = [
@@ -579,7 +579,7 @@ export default function TodayFeed({
         <button
           type="button"
           className="nesio-today-brand"
-          aria-label="打开 Nesio 整理出的线索"
+          aria-label="打开 Nesio 洞察"
           onClick={() => setMirrorOpen(true)}
         >
           <img src="/icons/treasurebox.svg" alt="Nesio" className="nesio-today-brand-icon" />
@@ -622,17 +622,11 @@ export default function TodayFeed({
         </>
       </div>
       {mirrorOpen && (
-        <div className="nesio-settings-sheet-overlay" role="dialog" aria-modal="true" aria-label="Nesio 整理出的线索">
+        <div className="nesio-settings-sheet-overlay" role="dialog" aria-modal="true" aria-label="Nesio 的洞察">
           <button type="button" className="nesio-settings-sheet-backdrop" onClick={() => setMirrorOpen(false)} aria-label="关闭" />
-          <div className="nesio-settings-sheet-card">
+          <div className="nesio-settings-sheet-card nesio-insights-sheet-card">
             <div className="nesio-sheet-handle" aria-hidden />
-            <div className="nesio-settings-sheet-header">
-              <h2 className="nesio-settings-sheet-title">整理出的线索</h2>
-              <button type="button" className="nesio-settings-sheet-close" onClick={() => setMirrorOpen(false)} aria-label="关闭">✕</button>
-            </div>
-            <div className="nesio-settings-sheet-body">
-              <MirrorProfileCard embedded />
-            </div>
+            <InsightsSheet onClose={() => setMirrorOpen(false)} />
           </div>
         </div>
       )}
