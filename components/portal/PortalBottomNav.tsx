@@ -1,5 +1,6 @@
 'use client';
 
+import { useRef } from 'react';
 import type { PortalLocale } from '@/lib/portal/profile';
 
 interface PortalBottomNavProps {
@@ -12,12 +13,39 @@ interface PortalBottomNavProps {
   onChatOpen: () => void;
 }
 
+const LONG_PRESS_MS = 450;
+
 export default function PortalBottomNav({
   activeSurface,
   onToday,
+  onTell,
   onMemory,
   onChatOpen,
 }: PortalBottomNavProps) {
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const firedRef = useRef(false);
+
+  const startPress = (e: React.PointerEvent) => {
+    e.preventDefault();
+    firedRef.current = false;
+    timerRef.current = setTimeout(() => {
+      firedRef.current = true;
+      navigator.vibrate?.(12);
+      onChatOpen();
+    }, LONG_PRESS_MS);
+  };
+
+  const endPress = () => {
+    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+    if (!firedRef.current) onTell();
+    firedRef.current = false;
+  };
+
+  const cancelPress = () => {
+    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+    firedRef.current = false;
+  };
+
   return (
     <nav className="nesio-bottom-nav" aria-label="主导航">
       {/* Today */}
@@ -35,12 +63,16 @@ export default function PortalBottomNav({
         <span className="nesio-bottom-nav-label">Today</span>
       </button>
 
-      {/* Nesio center button — single tap opens chat sheet */}
+      {/* Nesio center button — tap = 输入, long-press = 问一问 */}
       <button
         type="button"
         className="nesio-bottom-nav-center"
-        onClick={onChatOpen}
-        aria-label="打开宝盒"
+        aria-label="记录 / 问一问"
+        onPointerDown={startPress}
+        onPointerUp={endPress}
+        onPointerLeave={cancelPress}
+        onPointerCancel={cancelPress}
+        onContextMenu={(e) => e.preventDefault()}
       >
         <img
           src="/icons/treasurebox-pwa-192.png"
@@ -48,7 +80,6 @@ export default function PortalBottomNav({
           className="nesio-bottom-nav-center-icon"
           aria-hidden
           draggable={false}
-          onContextMenu={(e) => e.preventDefault()}
         />
       </button>
 

@@ -8266,6 +8266,10 @@ html[data-portal-theme="night"] .nesio-bottom-nav-btn--active {
   margin: 0 0.35rem;
   transition: transform 0.2s var(--ease-soft), box-shadow 0.2s;
   position: relative;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .nesio-bottom-nav-center:active {
