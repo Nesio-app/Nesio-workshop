@@ -3,12 +3,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { loadProfileSettings } from '@/lib/portal/profile';
 import { recordCardFeedback, type RecommendationCard } from '@/lib/portal/reasoning-engine';
-import { buildTodayViewModel, focusTimeHint, markFocusNodeDone, addCommitmentNode, saveSubtasks, toggleSubtask, type FocusNode, type SubTask } from '@/lib/platform/view-models/today-view-model';
+import { buildTodayViewModel, focusTimeHint, markFocusNodeDone, addCommitmentNode, addMeetingNotes, saveSubtasks, toggleSubtask, type FocusNode, type SubTask } from '@/lib/platform/view-models/today-view-model';
 import { learnFromFeedback } from '@/lib/portal/mirror-profile';
 import { recordSignalFeedback } from '@/lib/life-domain/signal-feedback';
 import { cloudSignalRowsToSignals, type CloudSignalRow } from '@/lib/life-domain/signal-search';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
-import { addLifeNode } from '@/lib/portal/life-graph';
 import VoiceBrief from './VoiceBrief';
 import DailyBriefCard from './DailyBriefCard';
 import LifeStateCard from './LifeStateCard';
@@ -427,20 +426,7 @@ function MeetingRecorderSheet({ open, meetingNode, onClose }: {
   function saveNotes() {
     const finalText = transcript.trim() || '（无内容）';
     const nowStr = new Date().toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-    addLifeNode({
-      name: `会议记录 · ${meetingNode?.name || nowStr}`,
-      type: 'commitment',
-      tags: ['会议记录', 'meeting-notes'],
-      attributes: {
-        meetingNodeId: meetingNode?.id || '',
-        notes: finalText,
-        recordedAt: new Date().toISOString(),
-      },
-      rawInput: finalText,
-      confidence: 1,
-      source: 'voice',
-      relations: [],
-    });
+    addMeetingNotes(meetingNode?.id || '', meetingNode?.name || nowStr, finalText);
     setSaved(true);
     setTimeout(() => onClose(), 1800);
   }

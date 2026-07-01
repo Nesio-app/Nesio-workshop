@@ -69,6 +69,26 @@ export function markFocusNodeDone(id: string): void {
   }
 }
 
+export function addMeetingNotes(meetingNodeId: string, meetingName: string, notes: string): void {
+  addLifeNode({
+    name: `会议记录 · ${meetingName}`,
+    type: 'commitment',
+    tags: ['会议记录', 'meeting-notes'],
+    attributes: {
+      meetingNodeId,
+      notes,
+      recordedAt: new Date().toISOString(),
+    },
+    rawInput: notes,
+    confidence: 1,
+    source: 'voice',
+    relations: [],
+  });
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
+  }
+}
+
 export function addCommitmentNode(name: string): FocusNode {
   const node = addLifeNode({ name, type: 'commitment', source: 'manual', confidence: 1, tags: [], attributes: {}, relations: [] });
   if (typeof window !== 'undefined') {
