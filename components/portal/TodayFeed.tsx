@@ -2,8 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { loadProfileSettings } from '@/lib/portal/profile';
-import { buildTodayViewModel, focusTimeHint, markFocusNodeDone, addCommitmentNode, addMeetingNotes, saveSubtasks, toggleSubtask, type FocusNode, type SubTask } from '@/lib/platform/view-models/today-view-model';
+import { buildTodayViewModel, focusTimeHint, markFocusNodeDone, addCommitmentNode, addMeetingNotes, saveSubtasks, toggleSubtask, type FocusNode, type SubTask, type ProactiveContext } from '@/lib/platform/view-models/today-view-model';
 import { type RecommendationCard } from '@/lib/portal/reasoning-engine';
+import { readPortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
+import type { CalendarEvent } from '@/lib/portal/types';
 import { cloudSignalRowsToSignals, type CloudSignalRow } from '@/lib/life-domain/signal-search';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
 import VoiceBrief from './VoiceBrief';
@@ -219,62 +221,177 @@ interface ProactiveCardData {
   priority: number;
 }
 
-function buildProactiveTriggers(focusNodes: readonly FocusNode[]) {
-  const triggers: Array<{
-    type: string;
-    data: Record<string, string | number | boolean | null>;
-    fallback: Omit<ProactiveCardData, 'id'>;
-  }> = [];
-  const now = new Date();
+type ProactiveTrigger = {
+  type: string;
+  data: Record<string, string | number | boolean | null>;
+  fallback: Omit<ProactiveCardData, 'id'>;
+};
 
+interface WeatherCache {
+  temperatureC: number;
+  condition: string;
+  forecastNote?: string;
+  placeLabel?: string;
+}
+
+function buildProactiveTriggers(
+  focusNodes: readonly FocusNode[],
+  context: ProactiveContext,
+): ProactiveTrigger[] {
+  const triggers: ProactiveTrigger[] = [];
+  const now = new Date();
+  const hour = now.getHours();
+  const dow = now.getDay(); // 0=Sun, 1=Mon ... 5=Fri, 6=Sat
+
+  // ── 1. Weather triggers ──
+  const weather = readPortalCache<WeatherCache>(PORTAL_CACHE_KEYS.weather);
+  if (weather) {
+    const cold = weather.temperatureC < 10;
+    const veryCold = weather.temperatureC < 4;
+    const rainHint = /雨|rain|shower|drizzle/i.test(weather.condition + (weather.forecastNote || ''));
+    if (veryCold) {
+      triggers.push({
+        type: 'weather_very_cold',
+        data: { tempC: weather.temperatureC, condition: weather.condition },
+        fallback: { title: '今天很冷，多穿一件', body: `气温 ${Math.round(weather.temperatureC)}°C，出门加件厚外套。`, confidence: 90, sourceTags: ['天气·寒冷'], icon: '🧥', priority: 9 },
+      });
+    } else if (cold) {
+      triggers.push({
+        type: 'weather_cold',
+        data: { tempC: weather.temperatureC, condition: weather.condition },
+        fallback: { title: '温度偏低，注意保暖', body: `${Math.round(weather.temperatureC)}°C，适合加一层。`, confidence: 85, sourceTags: ['天气·偏凉'], icon: '🌡', priority: 7 },
+      });
+    }
+    if (rainHint) {
+      triggers.push({
+        type: 'weather_rain',
+        data: { condition: weather.condition, forecastNote: weather.forecastNote ?? '' },
+        fallback: { title: '出门记得带伞', body: `今天${weather.condition}，随手带把伞备用。`, confidence: 88, sourceTags: ['天气·降雨'], icon: '☂️', priority: 8 },
+      });
+    }
+  }
+
+  // ── 2. Calendar: tomorrow's events ──
+  const cal = readPortalCache<{ events?: CalendarEvent[] }>(PORTAL_CACHE_KEYS.calendar);
+  const calEvents: CalendarEvent[] = cal?.events ?? [];
+  const tomorrow = new Date(now); tomorrow.setDate(tomorrow.getDate() + 1); tomorrow.setHours(0,0,0,0);
+  const dayAfter  = new Date(tomorrow); dayAfter.setDate(dayAfter.getDate() + 1);
+  const tomorrowEvents = calEvents.filter((e) => {
+    const d = new Date(e.start);
+    return d >= tomorrow && d < dayAfter;
+  });
+  if (tomorrowEvents.length > 0) {
+    const names = tomorrowEvents.map((e) => e.title).slice(0, 2).join('、');
+    triggers.push({
+      type: 'event_tomorrow',
+      data: { count: tomorrowEvents.length, names },
+      fallback: { title: '明天有重要安排', body: `${names} — 今晚可以提前做点准备。`, confidence: 88, sourceTags: ['日历·明日'], icon: '📋', priority: 8 },
+    });
+  }
+
+  // ── 3. Focus node triggers ──
   for (const node of focusNodes) {
+    // Meeting within 2h
     const meetingTime = getMeetingTime(node);
     if (meetingTime) {
-      const diffMs = meetingTime.getTime() - now.getTime();
-      const diffMin = Math.round(diffMs / 60_000);
+      const diffMin = Math.round((meetingTime.getTime() - now.getTime()) / 60_000);
       if (diffMin > 0 && diffMin <= 120) {
         triggers.push({
-          type: 'upcoming_meeting',
+          type: 'meeting_soon',
           data: { name: node.name, minutesUntil: diffMin },
-          fallback: {
-            title: `${diffMin} 分钟后开始`,
-            body: `"${node.name}" 即将开始，提前准备好。`,
-            confidence: 92,
-            sourceTags: ['日历·即将开始'],
-            icon: '📅',
-            priority: 10,
-          },
+          fallback: { title: `${diffMin} 分钟后开会`, body: `"${node.name}" 即将开始，提前进入状态。`, confidence: 95, sourceTags: ['日历·即将开始'], icon: '🎙', priority: 10 },
         });
       }
     }
 
-    if (node.type === 'commitment') {
-      for (const v of Object.values(node.attributes)) {
-        if (typeof v === 'string') {
-          const d = new Date(v);
-          if (!Number.isNaN(d.getTime())) {
-            const daysUntil = Math.round((d.getTime() - now.getTime()) / 86_400_000);
-            if (daysUntil === 0) {
-              triggers.push({
-                type: 'due_today',
-                data: { name: node.name },
-                fallback: {
-                  title: '今天截止',
-                  body: `"${node.name}" 今天到期，先拆一步开始。`,
-                  confidence: 90,
-                  sourceTags: ['任务·截止'],
-                  icon: '⏰',
-                  priority: 9,
-                },
-              });
-            }
-          }
-        }
+    // Task due today or tomorrow
+    for (const v of Object.values(node.attributes)) {
+      if (typeof v !== 'string') continue;
+      const d = new Date(v);
+      if (Number.isNaN(d.getTime())) continue;
+      const daysUntil = Math.round((d.getTime() - now.getTime()) / 86_400_000);
+      if (daysUntil === 0) {
+        triggers.push({
+          type: 'due_today',
+          data: { name: node.name },
+          fallback: { title: '今天到期', body: `"${node.name}" 今天截止，先做第一步。`, confidence: 92, sourceTags: ['任务·截止'], icon: '⏰', priority: 9 },
+        });
+      } else if (daysUntil === 1) {
+        triggers.push({
+          type: 'due_tomorrow',
+          data: { name: node.name },
+          fallback: { title: '明天截止', body: `"${node.name}" 明天到期，今天可以推进一下。`, confidence: 85, sourceTags: ['任务·明日截止'], icon: '📌', priority: 7 },
+        });
       }
     }
   }
 
-  return triggers.slice(0, 3);
+  // ── 4. Overdue items (from context) ──
+  for (const item of context.overdueItems.slice(0, 1)) {
+    triggers.push({
+      type: 'overdue',
+      data: { name: item.name, daysAgo: Math.abs(item.daysUntil) },
+      fallback: { title: '有件事已经过期了', body: `"${item.name}" 已过期 ${Math.abs(item.daysUntil)} 天，还要继续吗？`, confidence: 85, sourceTags: ['任务·过期'], icon: '🔔', priority: 8 },
+    });
+  }
+
+  // ── 5. Special days: birthday / anniversary (from context) ──
+  for (const item of context.upcomingSpecialDays.slice(0, 1)) {
+    const label = item.daysUntil === 0 ? '就是今天' : item.daysUntil === 1 ? '明天' : `${item.daysUntil} 天后`;
+    triggers.push({
+      type: 'special_day',
+      data: { name: item.name, daysUntil: item.daysUntil },
+      fallback: { title: `重要日子 · ${label}`, body: `"${item.name}" ${label}，要不要提前准备点什么？`, confidence: 88, sourceTags: ['重要日子'], icon: '🎂', priority: 8 },
+    });
+  }
+
+  // ── 6. Recent signals (booking / email context) ──
+  for (const name of context.recentSignals.slice(0, 1)) {
+    triggers.push({
+      type: 'recent_signal',
+      data: { name },
+      fallback: { title: '记录到一条新信息', body: `"${name}" — 要根据这条记录做点准备吗？`, confidence: 78, sourceTags: ['记录·新信号'], icon: '📩', priority: 6 },
+    });
+  }
+
+  // ── 7. Health items nudge ──
+  if (context.healthItems.length > 0 && hour >= 7 && hour <= 10) {
+    triggers.push({
+      type: 'health_morning',
+      data: { items: context.healthItems.slice(0, 2).join('、') },
+      fallback: { title: '今天的健康打卡', body: `${context.healthItems[0]} — 今天记得执行。`, confidence: 75, sourceTags: ['健康·习惯'], icon: '💪', priority: 6 },
+    });
+  }
+
+  // ── 8. Time-based nudges (only when nothing else fires) ──
+  if (triggers.length === 0) {
+    if (dow === 1 && hour < 11) {
+      triggers.push({
+        type: 'week_start',
+        data: {},
+        fallback: { title: '新的一周从规划开始', body: '周一早上，把本周最重要的 3 件事先记下来。', confidence: 70, sourceTags: ['时间·周一'], icon: '🗓', priority: 5 },
+      });
+    } else if (dow === 5 && hour >= 15) {
+      triggers.push({
+        type: 'week_end',
+        data: {},
+        fallback: { title: '本周还有什么没收尾？', body: '周五下午，快速过一遍本周待办，周末才能真正放松。', confidence: 70, sourceTags: ['时间·周五'], icon: '✅', priority: 5 },
+      });
+    } else if (hour >= 21) {
+      triggers.push({
+        type: 'evening_recap',
+        data: {},
+        fallback: { title: '今天有什么想记下来的？', body: '睡前花 30 秒，把今天的想法或待办存进来。', confidence: 65, sourceTags: ['时间·晚间'], icon: '🌙', priority: 4 },
+      });
+    }
+  }
+
+  // Sort by priority desc, deduplicate by type, cap at 3
+  const seen = new Set<string>();
+  return triggers
+    .sort((a, b) => (b.fallback.priority ?? 0) - (a.fallback.priority ?? 0))
+    .filter((t) => { if (seen.has(t.type)) return false; seen.add(t.type); return true; })
+    .slice(0, 3);
 }
 
 function ProactiveGuidanceCard({ card, onDismiss }: { card: ProactiveCardData; onDismiss: () => void }) {
@@ -961,7 +1078,7 @@ export default function TodayFeed({
 
   // Proactive card state
   const [proactiveCards, setProactiveCards] = useState<ProactiveCardData[]>([]);
-  const [proactiveDismissed, setProactiveDismissed] = useState(false);
+  const [proactiveDismissedDate, setProactiveDismissedDate] = useState<string>('');
 
   // Meeting recorder state
   const [meetingRecorderNode, setMeetingRecorderNode] = useState<FocusNode | null>(null);
@@ -984,10 +1101,18 @@ export default function TodayFeed({
       setMemoryNotes(updated.memoryNotes);
       setFocusNodes(updated.focusNodes);
 
-      // Fire proactive card fetch if we have focus nodes with triggers
-      if (canUsePrivateData && updated.focusNodes.length > 0) {
-        const triggers = buildProactiveTriggers(updated.focusNodes);
+      // Build triggers from all data sources and fire proactive card
+      if (canUsePrivateData) {
+        const triggers = buildProactiveTriggers(updated.focusNodes, updated.proactiveContext);
         if (triggers.length > 0) {
+          // Show fallback cards immediately (no API wait)
+          const fallbackCards: ProactiveCardData[] = triggers.slice(0, 1).map((t, i) => ({
+            id: `fb${i}`,
+            ...t.fallback,
+          }));
+          if (!cancelled) setProactiveCards(fallbackCards);
+
+          // Then upgrade with Claude-polished version async
           fetch('/api/portal/proactive', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -995,12 +1120,9 @@ export default function TodayFeed({
           })
             .then((r) => r.json())
             .then((d: { cards?: ProactiveCardData[] }) => {
-              if (!cancelled && d.cards?.length) {
-                setProactiveCards(d.cards);
-                setProactiveDismissed(false);
-              }
+              if (!cancelled && d.cards?.length) setProactiveCards(d.cards);
             })
-            .catch(() => {});
+            .catch(() => {}); // keep fallback on error
         }
       }
     };
@@ -1022,7 +1144,8 @@ export default function TodayFeed({
   }, [canUsePrivateData]);
 
   const initials = canUsePrivateData ? (displayName.trim().slice(0, 1) || '我') : '我';
-  const showProactive = !proactiveDismissed && proactiveCards.length > 0;
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const showProactive = proactiveDismissedDate !== todayStr && proactiveCards.length > 0;
 
   return (
     <div className="nesio-today-root">
@@ -1062,7 +1185,7 @@ export default function TodayFeed({
         {showProactive && (
           <ProactiveGuidanceCard
             card={proactiveCards[0]}
-            onDismiss={() => setProactiveDismissed(true)}
+            onDismiss={() => setProactiveDismissedDate(new Date().toISOString().slice(0, 10))}
           />
         )}
 

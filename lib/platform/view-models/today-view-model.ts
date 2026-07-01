@@ -214,11 +214,85 @@ export function focusTimeHint(node: FocusNode): string {
   return '';
 }
 
+// ---- Proactive context (exposed to Today surface via view-model) ----
+
+export interface ProactiveContextItem {
+  name: string;
+  daysUntil: number;
+  subtype: string;
+}
+
+export interface ProactiveContext {
+  /** Birthdays / anniversaries within 10 days */
+  upcomingSpecialDays: ProactiveContextItem[];
+  /** Tasks/commitments already past due (up to 7 days ago, not marked done) */
+  overdueItems: ProactiveContextItem[];
+  /** Active health-state or health-commitment nodes */
+  healthItems: string[];
+  /** Any node created in the last 3 days that looks like an email/booking signal */
+  recentSignals: string[];
+}
+
+const BIRTHDAY_WORDS = ['生日', '纪念日', '周年', '忌日', 'birthday', 'anniversary'];
+const HEALTH_TYPES = new Set(['health_state']);
+const HEALTH_WORDS = ['健康', '健身', '运动', '睡眠', '饮食', '减肥', '体重', '跑步', '锻炼', '复诊', '体检', '用药', '打卡'];
+const SIGNAL_WORDS = ['机票', '酒店', '预订', '订单', '行程', '快递', '外卖', '邮件', 'email', 'order', 'booking', 'flight', 'hotel', 'ticket'];
+
+function buildProactiveContext(allNodes: LifeNode[]): ProactiveContext {
+  const now = Date.now();
+  const upcomingSpecialDays: ProactiveContextItem[] = [];
+  const overdueItems: ProactiveContextItem[] = [];
+  const healthItems: string[] = [];
+  const recentSignals: string[] = [];
+
+  for (const n of allNodes) {
+    if (n.attributes.done) continue;
+    const text = [n.name, n.rawInput || ''].join(' ').toLowerCase();
+
+    // Birthdays / special days
+    if (BIRTHDAY_WORDS.some((w) => text.includes(w))) {
+      const d = extractNearestDate(n);
+      if (d) {
+        const daysUntil = Math.round((d.getTime() - now) / 86_400_000);
+        if (daysUntil >= 0 && daysUntil <= 10) {
+          upcomingSpecialDays.push({ name: n.name, daysUntil, subtype: 'special_day' });
+        }
+      } else {
+        // No date attribute — might be recurring (birthday this year)
+        upcomingSpecialDays.push({ name: n.name, daysUntil: 0, subtype: 'special_day' });
+      }
+    }
+
+    // Overdue items
+    const d = extractNearestDate(n);
+    if (d) {
+      const diffMs = d.getTime() - now;
+      if (diffMs < 0 && diffMs > -7 * 86_400_000) {
+        overdueItems.push({ name: n.name, daysUntil: Math.round(diffMs / 86_400_000), subtype: n.type });
+      }
+    }
+
+    // Health items
+    if (HEALTH_TYPES.has(n.type) || HEALTH_WORDS.some((w) => text.includes(w))) {
+      healthItems.push(n.name);
+    }
+
+    // Recent signals (email-like or booking-like)
+    const ageMs = now - new Date(n.createdAt).getTime();
+    if (ageMs < 3 * 86_400_000 && SIGNAL_WORDS.some((w) => text.includes(w))) {
+      recentSignals.push(n.name);
+    }
+  }
+
+  return { upcomingSpecialDays, overdueItems, healthItems, recentSignals };
+}
+
 export interface TodayViewModel {
   readonly cards: RecommendationCard[];
   readonly memoryCount: number;
   readonly memoryNotes: readonly string[];
   readonly focusNodes: readonly FocusNode[];
+  readonly proactiveContext: ProactiveContext;
 }
 
 export function buildTodayViewModel(input: {
@@ -226,20 +300,26 @@ export function buildTodayViewModel(input: {
   fallbackCards: readonly RecommendationCard[];
   cloudSignals?: readonly Signal[];
 }): TodayViewModel {
+  const emptyContext: ProactiveContext = {
+    upcomingSpecialDays: [], overdueItems: [], healthItems: [], recentSignals: [],
+  };
+
   if (!input.canUsePrivateData) {
     return {
       cards: [...input.fallbackCards],
       memoryCount: 0,
       memoryNotes: [],
       focusNodes: [],
+      proactiveContext: emptyContext,
     };
   }
 
   const cloudSignals = input.cloudSignals?.length ? [...input.cloudSignals] : [];
   const cards = generateTodayCards(cloudSignals.length ? { signals: cloudSignals } : undefined);
   const nodes = getRecentNodes(5);
+  const allNodes = getLifeGraph();
 
-  const focusNodes: FocusNode[] = getLifeGraph()
+  const focusNodes: FocusNode[] = allNodes
     .filter(isFocusNode)
     .sort((a, b) => urgencyScore(a) - urgencyScore(b))
     .slice(0, 10)
@@ -250,5 +330,6 @@ export function buildTodayViewModel(input: {
     memoryCount: cloudSignals.length || getRecentNodes().length,
     memoryNotes: cloudSignals.length ? cloudSignals.slice(0, 5).map((s) => s.title) : nodes.map((n) => n.name),
     focusNodes,
+    proactiveContext: buildProactiveContext(allNodes),
   };
 }
