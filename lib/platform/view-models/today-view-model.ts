@@ -1,6 +1,6 @@
 import { generateTodayCards } from '../../intelligence';
 import type { Signal } from '../../life-domain/signal';
-import { getLifeGraph, getRecentNodes, type LifeNode } from '../../portal/life-graph';
+import { addLifeNode, getLifeGraph, getRecentNodes, updateLifeNode, type LifeNode } from '../../portal/life-graph';
 import type { RecommendationCard } from '../../portal/reasoning-engine';
 
 /** Slimmed-down shape the Today surface needs for focus cards (no raw LifeNode exposure). */
@@ -16,6 +16,7 @@ export interface FocusNode {
 const FOCUS_TIME_WORDS = ['生日', '会议', '截止', '复诊', '今天', '明天', '后天', '本周', '这周', 'deadline', 'birthday', 'meeting', '到期', '提醒'];
 
 function isFocusNode(node: LifeNode): boolean {
+  if (node.attributes.done) return false;
   const text = [node.name, node.rawInput || ''].join(' ').toLowerCase();
   if (FOCUS_TIME_WORDS.some((w) => text.includes(w))) return true;
   if (node.type === 'commitment' || node.type === 'event') return true;
@@ -26,6 +27,23 @@ function isFocusNode(node: LifeNode): boolean {
     }
   }
   return false;
+}
+
+export function markFocusNodeDone(id: string): void {
+  const node = getLifeGraph().find((n) => n.id === id);
+  if (!node) return;
+  updateLifeNode(id, { attributes: { ...node.attributes, done: true, doneAt: new Date().toISOString() } });
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
+  }
+}
+
+export function addCommitmentNode(name: string): FocusNode {
+  const node = addLifeNode({ name, type: 'commitment', source: 'manual', confidence: 1, tags: [], attributes: {}, relations: [] });
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
+  }
+  return { id: node.id, name: node.name, type: node.type, rawInput: node.rawInput, createdAt: node.createdAt, attributes: node.attributes };
 }
 
 export function focusTimeHint(node: FocusNode): string {

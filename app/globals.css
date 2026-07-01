@@ -11716,6 +11716,32 @@ html[data-portal-theme="night"] .nesio-brief-strip-btn { color: #8faaff; backgro
   padding: 0.1rem 0.45rem;
 }
 
+/* check button (done action) */
+.nesio-focus-card-check {
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 50%;
+  border: 1.5px solid var(--portal-line);
+  background: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  font-size: 0.8rem;
+  color: var(--portal-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+.nesio-focus-card-check:hover {
+  border-color: #10b981;
+  color: #10b981;
+}
+.nesio-focus-card-check--checked {
+  border-color: #10b981;
+  background: #10b981;
+  color: #fff;
+}
+
 .nesio-focus-card-dismiss {
   font-size: 0.75rem;
   color: var(--portal-muted);
@@ -11724,15 +11750,79 @@ html[data-portal-theme="night"] .nesio-brief-strip-btn { color: #8faaff; backgro
   cursor: pointer;
   padding: 0.2rem;
   flex-shrink: 0;
-  opacity: 0.5;
+  opacity: 0.4;
 }
 .nesio-focus-card-dismiss:hover { opacity: 1; }
+
+/* Done animation */
+.nesio-focus-card--done {
+  opacity: 0.45;
+  transition: opacity 0.5s ease;
+}
+.nesio-focus-card--done .nesio-focus-card-title {
+  text-decoration: line-through;
+  color: var(--portal-muted);
+}
+
+/* Done badge in header */
+.nesio-focus-header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.nesio-focus-done-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #10b981;
+  background: #d1fae5;
+  border-radius: 99px;
+  padding: 0.12rem 0.5rem;
+}
+
+/* Quick-add row */
+.nesio-focus-quick-add {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+.nesio-focus-quick-input {
+  flex: 1;
+  font-size: 0.83rem;
+  color: var(--portal-ink);
+  background: var(--glass-bg-solid);
+  border: 1px solid var(--portal-line);
+  border-radius: 0.7rem;
+  padding: 0.45rem 0.75rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.nesio-focus-quick-input::placeholder { color: var(--portal-muted); opacity: 0.6; }
+.nesio-focus-quick-input:focus { border-color: #3b6ef0; }
+.nesio-focus-quick-btn {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #3b6ef0;
+  background: #e8effe;
+  border: none;
+  border-radius: 0.65rem;
+  padding: 0.45rem 0.85rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.nesio-focus-quick-btn:hover { background: #d0dcfc; }
 
 html[data-portal-theme="night"] .nesio-focus-card {
   background: rgba(30,34,50,0.92);
   border-color: rgba(255,255,255,0.08);
 }
 html[data-portal-theme="night"] .nesio-focus-card-title { color: #d0d8f0; }
+html[data-portal-theme="night"] .nesio-focus-quick-input {
+  background: rgba(30,34,50,0.9);
+  border-color: rgba(255,255,255,0.1);
+  color: #d0d8f0;
+}
 
 /* Legacy .nesio-brief-card kept for compatibility */
 .nesio-brief-card {

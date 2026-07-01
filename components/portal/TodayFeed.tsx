@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { loadProfileSettings } from '@/lib/portal/profile';
 import { recordCardFeedback, type RecommendationCard } from '@/lib/portal/reasoning-engine';
-import { buildTodayViewModel, focusTimeHint, type FocusNode } from '@/lib/platform/view-models/today-view-model';
+import { buildTodayViewModel, focusTimeHint, markFocusNodeDone, addCommitmentNode, type FocusNode } from '@/lib/platform/view-models/today-view-model';
 import { learnFromFeedback } from '@/lib/portal/mirror-profile';
 import { recordSignalFeedback } from '@/lib/life-domain/signal-feedback';
 import { cloudSignalRowsToSignals, type CloudSignalRow } from '@/lib/life-domain/signal-search';
@@ -238,41 +238,69 @@ function TodayFocusSection({
   onOpenMemory?: () => void;
 }) {
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
-  const visible = focusNodes.filter((n) => !dismissed.has(n.id));
+  const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
+  const [quickAdd, setQuickAdd] = useState('');
+  const [localNodes, setLocalNodes] = useState<FocusNode[]>([]);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // merge props + locally added nodes; remove dismissed
+  const allNodes = [...localNodes, ...focusNodes.filter((n) => !localNodes.some((l) => l.id === n.id))];
+  const visible = allNodes.filter((n) => !dismissed.has(n.id));
+
+  function handleDone(node: FocusNode) {
+    setDoneIds((prev) => { const next = new Set(prev); next.add(node.id); return next; });
+    setTimeout(() => {
+      markFocusNodeDone(node.id);
+      setDismissed((prev) => { const next = new Set(prev); next.add(node.id); return next; });
+    }, 600);
+  }
+
+  function handleQuickAdd(e: React.FormEvent) {
+    e.preventDefault();
+    const name = quickAdd.trim();
+    if (!name) return;
+    const node = addCommitmentNode(name);
+    setLocalNodes((prev) => [node, ...prev]);
+    setQuickAdd('');
+    inputRef.current?.blur();
+  }
+
+  const doneToday = doneIds.size;
 
   return (
     <div className="nesio-focus-section">
       <div className="nesio-focus-header">
         <h2 className="nesio-focus-title">今日焦点</h2>
-        {onOpenMemory && (
-          <button type="button" className="nesio-focus-all-btn" onClick={onOpenMemory}>全部 Memory ›</button>
-        )}
+        <div className="nesio-focus-header-right">
+          {doneToday > 0 && (
+            <span className="nesio-focus-done-badge">✓ 今天完成了 {doneToday} 件</span>
+          )}
+          {onOpenMemory && (
+            <button type="button" className="nesio-focus-all-btn" onClick={onOpenMemory}>全部 ›</button>
+          )}
+        </div>
       </div>
 
       {visible.length === 0 ? (
         <div className="nesio-focus-empty">
           <p>今天暂无焦点事项</p>
           <p className="nesio-focus-empty-hint">{'说一句带时间的话（比如"生日在周五"），就会出现在这里。'}</p>
-          <button
-            type="button"
-            className="nesio-focus-add-btn"
-            onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-tell'))}
-          >
-            ＋ 记一件事
-          </button>
         </div>
       ) : (
         <div className="nesio-focus-cards">
           {visible.map((node) => {
             const hint = focusTimeHint(node);
+            const isDone = doneIds.has(node.id);
             return (
-              <div key={node.id} className="nesio-focus-card">
-                <span
-                  className="nesio-focus-card-icon"
-                  style={{ background: FOCUS_TYPE_BG[node.type] || '#f0f4ff' }}
+              <div key={node.id} className={`nesio-focus-card${isDone ? ' nesio-focus-card--done' : ''}`}>
+                <button
+                  type="button"
+                  className={`nesio-focus-card-check${isDone ? ' nesio-focus-card-check--checked' : ''}`}
+                  aria-label="完成"
+                  onClick={() => handleDone(node)}
                 >
-                  {FOCUS_TYPE_ICON[node.type] || '📌'}
-                </span>
+                  {isDone ? '✓' : '○'}
+                </button>
                 <div className="nesio-focus-card-body">
                   <p className="nesio-focus-card-title">{node.name}</p>
                   <p className="nesio-focus-card-meta">
@@ -293,6 +321,21 @@ function TodayFocusSection({
           })}
         </div>
       )}
+
+      {/* Quick-add commitment row */}
+      <form className="nesio-focus-quick-add" onSubmit={handleQuickAdd}>
+        <input
+          ref={inputRef}
+          className="nesio-focus-quick-input"
+          type="text"
+          placeholder="今天要做…"
+          value={quickAdd}
+          onChange={(e) => setQuickAdd(e.target.value)}
+        />
+        {quickAdd.trim() && (
+          <button type="submit" className="nesio-focus-quick-btn">记下</button>
+        )}
+      </form>
     </div>
   );
 }
