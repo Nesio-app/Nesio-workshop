@@ -3,12 +3,11 @@
 import { useEffect, useState } from 'react';
 import { loadProfileSettings } from '@/lib/portal/profile';
 import { recordCardFeedback, type RecommendationCard } from '@/lib/portal/reasoning-engine';
-import { buildTodayViewModel } from '@/lib/platform/view-models/today-view-model';
+import { buildTodayViewModel, focusTimeHint, type FocusNode } from '@/lib/platform/view-models/today-view-model';
 import { learnFromFeedback } from '@/lib/portal/mirror-profile';
 import { recordSignalFeedback } from '@/lib/life-domain/signal-feedback';
 import { cloudSignalRowsToSignals, type CloudSignalRow } from '@/lib/life-domain/signal-search';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
-import { getLifeGraph, type LifeNode } from '@/lib/portal/life-graph';
 import VoiceBrief from './VoiceBrief';
 import DailyBriefCard from './DailyBriefCard';
 import LifeStateCard from './LifeStateCard';
@@ -216,45 +215,7 @@ function StandardCard({ card, onFeedback }: { card: RecommendationCard; onFeedba
   );
 }
 
-// --- Today Focus helpers ---
-
-const FOCUS_TIME_WORDS = ['生日', '会议', '截止', '复诊', '今天', '明天', '后天', '本周', '这周', 'deadline', 'birthday', 'meeting', '到期', '提醒'];
-
-function isFocusNode(node: LifeNode): boolean {
-  const text = [node.name, node.rawInput || ''].join(' ').toLowerCase();
-  if (FOCUS_TIME_WORDS.some((w) => text.includes(w))) return true;
-  if (node.type === 'commitment' || node.type === 'event') return true;
-  for (const v of Object.values(node.attributes)) {
-    if (typeof v === 'string') {
-      const d = new Date(v);
-      if (!Number.isNaN(d.getTime()) && d > new Date() && d < new Date(Date.now() + 30 * 86_400_000)) return true;
-    }
-  }
-  return false;
-}
-
-function focusTimeHint(node: LifeNode): string {
-  const now = new Date();
-  for (const v of Object.values(node.attributes)) {
-    if (typeof v === 'string') {
-      const d = new Date(v);
-      if (!Number.isNaN(d.getTime()) && d > now) {
-        const days = Math.round((d.getTime() - now.getTime()) / 86_400_000);
-        if (days === 0) return '今天';
-        if (days === 1) return '明天';
-        if (days <= 7) return `${days} 天后`;
-        if (days <= 30) return `约 ${Math.round(days / 7)} 周后`;
-        return `${days} 天后`;
-      }
-    }
-  }
-  const text = [node.name, node.rawInput || ''].join(' ').toLowerCase();
-  if (text.includes('今天')) return '今天';
-  if (text.includes('明天')) return '明天';
-  const hours = (now.getTime() - new Date(node.createdAt).getTime()) / 3_600_000;
-  if (hours < 24) return '刚记录';
-  return '';
-}
+// --- Today Focus display constants ---
 
 const FOCUS_TYPE_LABEL: Record<string, string> = {
   commitment: '承诺', event: '日程', object: '物品', person: '联系人',
@@ -270,30 +231,13 @@ const FOCUS_TYPE_BG: Record<string, string> = {
 };
 
 function TodayFocusSection({
-  canUsePrivateData,
+  focusNodes,
   onOpenMemory,
 }: {
-  canUsePrivateData: boolean;
+  focusNodes: readonly FocusNode[];
   onOpenMemory?: () => void;
 }) {
-  const [focusNodes, setFocusNodes] = useState<LifeNode[]>([]);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
-
-  useEffect(() => {
-    if (!canUsePrivateData) { setFocusNodes([]); return; }
-    const refresh = () => {
-      const all = getLifeGraph();
-      const focused = all
-        .filter(isFocusNode)
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-        .slice(0, 5);
-      setFocusNodes(focused);
-    };
-    refresh();
-    window.addEventListener('nesio-life-graph-updated', refresh);
-    return () => window.removeEventListener('nesio-life-graph-updated', refresh);
-  }, [canUsePrivateData]);
-
   const visible = focusNodes.filter((n) => !dismissed.has(n.id));
 
   return (
@@ -308,7 +252,7 @@ function TodayFocusSection({
       {visible.length === 0 ? (
         <div className="nesio-focus-empty">
           <p>今天暂无焦点事项</p>
-          <p className="nesio-focus-empty-hint">说一句带时间的话（比如"生日在周五"），就会出现在这里。</p>
+          <p className="nesio-focus-empty-hint">{'说一句带时间的话（比如"生日在周五"），就会出现在这里。'}</p>
           <button
             type="button"
             className="nesio-focus-add-btn"
@@ -396,6 +340,7 @@ export default function TodayFeed({
   const [cards, setCards] = useState<RecommendationCard[]>([]);
   const [memoryCount, setMemoryCount] = useState(0);
   const [memoryNotes, setMemoryNotes] = useState<readonly string[]>([]);
+  const [focusNodes, setFocusNodes] = useState<readonly FocusNode[]>([]);
   const [showMoreCards, setShowMoreCards] = useState(false);
   const [mirrorOpen, setMirrorOpen] = useState(false);
 
@@ -419,6 +364,7 @@ export default function TodayFeed({
       setCards(updated.cards);
       setMemoryCount(updated.memoryCount);
       setMemoryNotes(updated.memoryNotes);
+      setFocusNodes(updated.focusNodes);
     };
     void applyViewModel();
 
@@ -491,8 +437,8 @@ export default function TodayFeed({
             {/* 🔊 Slim briefing strip — just a button, not a card section */}
             <DailyBriefCard canUsePrivateData={canUsePrivateData} memoryCount={memoryCount} memoryNotes={memoryNotes} />
 
-            {/* 今日焦点 — time-relevant Memory nodes surfaced from LifeGraph */}
-            <TodayFocusSection canUsePrivateData={canUsePrivateData} onOpenMemory={onOpenMemory} />
+            {/* 今日焦点 — time-relevant Memory nodes surfaced via TodayViewModel */}
+            <TodayFocusSection focusNodes={focusNodes} onOpenMemory={onOpenMemory} />
 
             {/* 今日状态 — health/energy only; hidden when no real signal data */}
             <LifeStateCard canUsePrivateData={canUsePrivateData} />
