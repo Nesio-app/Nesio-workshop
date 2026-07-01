@@ -23,8 +23,11 @@ const CHAT_HISTORY_KEY = 'nesio-chat-history-v1';
 const MAX_STORED = 60;
 
 function loadHistory(): UiMessage[] {
-  try { return JSON.parse(localStorage.getItem(CHAT_HISTORY_KEY) ?? '[]') as UiMessage[]; }
-  catch { return []; }
+  try {
+    const raw = JSON.parse(localStorage.getItem(CHAT_HISTORY_KEY) ?? '[]') as UiMessage[];
+    // Filter out messages with empty text (from earlier bugs)
+    return raw.filter((m) => m.text?.trim());
+  } catch { return []; }
 }
 function saveHistory(msgs: UiMessage[]) {
   try {
@@ -96,9 +99,10 @@ function MemoryDetail({ node, onClose }: { node: LifeNode; onClose: () => void }
 }
 
 // ─── Camera view ──────────────────────────────────────────────────────────────
-function CameraView({ onResult, onClose }: {
+function CameraView({ onResult, onClose, autoOpen = false }: {
   onResult: (label: string, nodes: LifeNode[]) => void;
   onClose: () => void;
+  autoOpen?: boolean;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -106,6 +110,9 @@ function CameraView({ onResult, onClose }: {
   const [analyzing, setAnalyzing] = useState(false);
 
   useEffect(() => () => { stream?.getTracks().forEach((t) => t.stop()); }, [stream]);
+
+  // Auto-open camera when launched from 拍摄 button
+  useEffect(() => { if (autoOpen) void openCamera(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function openCamera() {
     try {
@@ -207,6 +214,7 @@ export default function NesioChatSheet({
   const [recording, setRecording] = useState(false);
   const [showPlus, setShowPlus] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
+  const [cameraAutoOpen, setCameraAutoOpen] = useState(false);
   const [menuMsg, setMenuMsg] = useState<UiMessage | null>(null);
   const [detailNode, setDetailNode] = useState<LifeNode | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -298,19 +306,22 @@ export default function NesioChatSheet({
     r.onresult = (e) => {
       voiceTextRef.current = Array.from(e.results).map((res) => res[0].transcript).join('');
     };
-    r.onend = () => { setRecording(false); };
-    r.onerror = () => { setRecording(false); };
+    // onend fires after all results are delivered — safe to send here
+    r.onend = () => {
+      setRecording(false);
+      const text = voiceTextRef.current.trim();
+      voiceTextRef.current = '';
+      if (text) void sendMessage(text);
+    };
+    r.onerror = () => { setRecording(false); voiceTextRef.current = ''; };
     r.start();
     recognitionRef.current = r;
     setRecording(true);
   }
 
-  function stopRecordingAndSend() {
+  function stopRecording() {
+    // Just stop; onend will fire and handle sending
     recognitionRef.current?.stop();
-    setRecording(false);
-    const text = voiceTextRef.current.trim();
-    voiceTextRef.current = '';
-    if (text) void sendMessage(text);
   }
 
   function startBubbleLongPress(msg: UiMessage) {
@@ -336,7 +347,11 @@ export default function NesioChatSheet({
   if (showCamera) {
     return (
       <div className="nesio-wechat-fullscreen" role="dialog" aria-label="拍照识别">
-        <CameraView onResult={handleCameraResult} onClose={() => setShowCamera(false)} />
+        <CameraView
+          onResult={handleCameraResult}
+          onClose={() => { setShowCamera(false); setCameraAutoOpen(false); }}
+          autoOpen={cameraAutoOpen}
+        />
       </div>
     );
   }
@@ -429,7 +444,7 @@ export default function NesioChatSheet({
             <span className="nesio-wechat-plus-icon">🖼</span>
             <span>相册</span>
           </button>
-          <button type="button" className="nesio-wechat-plus-item" onClick={() => { setShowPlus(false); setShowCamera(true); }}>
+          <button type="button" className="nesio-wechat-plus-item" onClick={() => { setShowPlus(false); setCameraAutoOpen(true); setShowCamera(true); }}>
             <span className="nesio-wechat-plus-icon">📷</span>
             <span>拍摄</span>
           </button>
@@ -457,9 +472,9 @@ export default function NesioChatSheet({
               type="button"
               className={`nesio-wechat-hold-btn${recording ? ' nesio-wechat-hold-btn--active' : ''}`}
               onPointerDown={(e) => { e.preventDefault(); startRecording(); }}
-              onPointerUp={stopRecordingAndSend}
-              onPointerLeave={() => { if (recording) { recognitionRef.current?.stop(); setRecording(false); } }}
-              onPointerCancel={() => { if (recording) { recognitionRef.current?.stop(); setRecording(false); } }}
+              onPointerUp={stopRecording}
+              onPointerLeave={() => { if (recording) stopRecording(); }}
+              onPointerCancel={() => { if (recording) stopRecording(); }}
               aria-label="按住说话"
             >
               {recording ? '松开发送' : '按住 说话'}
