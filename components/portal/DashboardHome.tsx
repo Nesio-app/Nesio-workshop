@@ -340,8 +340,13 @@ export default function DashboardHome({
   useEffect(() => {
     syncProfile();
     const onUpdate = () => syncProfile();
+    const onVisible = () => { if (document.visibilityState === 'visible') syncProfile(); };
     window.addEventListener(PROFILE_UPDATED_EVENT, onUpdate);
-    return () => window.removeEventListener(PROFILE_UPDATED_EVENT, onUpdate);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener(PROFILE_UPDATED_EVENT, onUpdate);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [syncProfile]);
 
   useEffect(() => {

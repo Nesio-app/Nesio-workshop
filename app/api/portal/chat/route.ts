@@ -22,16 +22,26 @@ interface ChatRequest {
   message: string;
   history?: ChatMessage[];
   personalityId?: string;
+  coachStyle?: string;
   fileContext?: { name: string; content: string };
 }
 
-const SYSTEM_PERSONALITY = `你是 Nesio，用户的贴身 AI 助手，叫"小宝"。
-- 温暖真实，像老朋友说话，不过分正式
+const SYSTEM_BASE = `你是 Nesio，用户的贴身 AI 助手，叫"小宝"。
 - 回答简洁有力，用中文
 - 善用用户的个人记忆，自然地说"我记得你之前提到…"
 - 如果用户问"我的XX在哪"，先在记忆库里找
-- 不编造用户没有记录的事实，不确定就直说
-- 偶尔幽默，但不刻意卖萌`;
+- 不编造用户没有记录的事实，不确定就直说`;
+
+const TONE_STYLE: Record<string, string> = {
+  warm: '语气温暖，像老朋友聊天，不过分正式，偶尔幽默但不刻意卖萌。',
+  direct: '说话直接简短，给结论不废话，不用客套开场，直接说答案。',
+  minimal: '极简风格。回答越短越好，用最少的字说清楚，省去所有过渡语。',
+};
+
+function buildSystemPersonality(coachStyle?: string): string {
+  const tone = TONE_STYLE[coachStyle ?? 'warm'] ?? TONE_STYLE.warm;
+  return `${SYSTEM_BASE}\n- ${tone}`;
+}
 
 // ── Anthropic (Claude) ────────────────────────────────────────────────────────
 
@@ -137,7 +147,7 @@ async function callGemini(
 
 export async function POST(req: NextRequest) {
   const body = await req.json() as ChatRequest;
-  const { message, history = [], fileContext } = body;
+  const { message, history = [], coachStyle, fileContext } = body;
 
   if (!message?.trim()) {
     return NextResponse.json({ ok: false, error: 'empty message' }, { status: 400 });
@@ -157,7 +167,7 @@ export async function POST(req: NextRequest) {
   const fileSection = fileContext
     ? `\n\n---\n用户上传了文件：${fileContext.name}\n文件内容如下：\n\n${fileContext.content}\n---\n\n回答关于这个文件的问题时，直接基于以上数据回答，不要猜测或编造数据。如果用户问数量统计、最大值、总结等，请计算后给出准确答案。`
     : '';
-  const systemInstruction = `${SYSTEM_PERSONALITY}\n\n${systemContext}${fileSection}`;
+  const systemInstruction = `${buildSystemPersonality(coachStyle)}\n\n${systemContext}${fileSection}`;
 
   try {
     const result = anthropicKey

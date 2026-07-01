@@ -8,6 +8,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { addLifeNode, searchLifeGraphFuzzy, type LifeNode } from '@/lib/portal/life-graph';
+import { loadProfileSettings } from '@/lib/portal/profile';
 
 interface ChatMessage { role: 'user' | 'model'; text: string; }
 
@@ -331,6 +332,7 @@ export default function NesioChatSheet({
         body: JSON.stringify({
           message: text.trim(),
           history,
+          coachStyle: loadProfileSettings().coachStyle || 'warm',
           fileContext: fileContextRef.current
             ? { name: fileContextRef.current.name, content: fileContextRef.current.content }
             : undefined,

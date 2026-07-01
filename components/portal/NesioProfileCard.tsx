@@ -4,12 +4,12 @@ import { useEffect, useRef, useState } from 'react';
 import { clearProfileIdentity, loadProfileSettings, readAvatarFile, saveProfileSettings } from '@/lib/portal/profile';
 import { getRecentNodes } from '@/lib/portal/life-graph';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
-import { ToneSheet, PrivacySheet, SpacesSheet, SubscriptionSheet } from './SettingsSheets';
+import { ToneSheet, PrivacySheet, SubscriptionSheet } from './SettingsSheets';
 import ConnectorsHub from './ConnectorsHub';
 import HealthLogger from './HealthLogger';
 import InsightsSheet from './InsightsSheet';
 
-type ActiveSheet = 'mirror' | 'tone' | 'privacy' | 'spaces' | 'subscription' | 'connectors' | 'health' | null;
+type ActiveSheet = 'mirror' | 'tone' | 'privacy' | 'subscription' | 'connectors' | 'health' | null;
 
 export default function NesioProfileCard() {
   const [displayName, setDisplayName] = useState('Jessy');
@@ -73,14 +73,16 @@ export default function NesioProfileCard() {
       const client = createAppApiClient();
       const result = await client.uploadCloudAsset({ file, purpose: 'avatar' });
       if (result.ok && result.storagePath) {
+        await client.saveCloudProfileSettings({ avatarStoragePath: result.storagePath });
         const readResult = await client.fetchCloudAssetReadUrl({ storagePath: result.storagePath });
         const displayUrl = readResult.ok && readResult.signedUrl ? readResult.signedUrl : '';
-        await client.saveCloudProfileSettings({ avatarStoragePath: result.storagePath });
-        saveProfileSettings({
-          avatarUrl: displayUrl,
-          avatarStoragePath: result.storagePath,
-        });
-        if (displayUrl) setAvatarUrl(displayUrl);
+        if (displayUrl) {
+          saveProfileSettings({ avatarUrl: displayUrl, avatarStoragePath: result.storagePath });
+          setAvatarUrl(displayUrl);
+        } else {
+          // Signed URL unavailable now; save path only — will refresh on next open
+          saveProfileSettings({ avatarStoragePath: result.storagePath });
+        }
         return;
       }
     } catch {
@@ -104,15 +106,10 @@ export default function NesioProfileCard() {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="20" height="20">
           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
         </svg>), iconBg: '#d1fae5', label: '我的数据', sublabel: '你能查看、导出或删除 Nesio 记住的内容' },
-    { key: 'spaces' as ActiveSheet, icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="20" height="20">
-          <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/>
-          <rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>
-        </svg>), iconBg: '#fef3c7', label: '我的生活范围', sublabel: '你选择哪些场景可以被整理' },
     { key: 'subscription' as ActiveSheet, icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="20" height="20">
-          <rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>
-        </svg>), iconBg: '#fef9c3', label: '我的计划', sublabel: '查看当前能力与未来可选升级' },
+          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+        </svg>), iconBg: '#fef9c3', label: '早期体验', sublabel: '全功能免费 · 通知我开放收费版' },
     { key: 'connectors' as ActiveSheet, icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="20" height="20">
           <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/>
@@ -199,7 +196,6 @@ export default function NesioProfileCard() {
       )}
       <ToneSheet open={activeSheet === 'tone'} onClose={() => setActiveSheet(null)} />
       <PrivacySheet open={activeSheet === 'privacy'} onClose={() => setActiveSheet(null)} />
-      <SpacesSheet open={activeSheet === 'spaces'} onClose={() => setActiveSheet(null)} />
       <SubscriptionSheet open={activeSheet === 'subscription'} onClose={() => setActiveSheet(null)} />
       <ConnectorsHub open={activeSheet === 'connectors'} onClose={() => setActiveSheet(null)} />
       <HealthLogger open={activeSheet === 'health'} onClose={() => setActiveSheet(null)} />

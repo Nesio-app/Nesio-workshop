@@ -34,13 +34,11 @@ function SheetWrap({ open, onClose, title, children }: SheetProps & { title: str
 type ToneStyle = 'direct' | 'warm' | 'minimal';
 type InterruptLevel = 'proactive' | 'minimal' | 'silent';
 const HAPTIC_FEEDBACK_KEY = 'nesio-haptic-feedback-enabled-v1';
-const SUBTLE_SOUND_KEY = 'nesio-subtle-sound-enabled-v1';
 
 export function ToneSheet({ open, onClose }: SheetProps) {
   const [tone, setTone] = useState<ToneStyle>('warm');
   const [interrupt, setInterrupt] = useState<InterruptLevel>('proactive');
   const [hapticsOn, setHapticsOn] = useState(true);
-  const [soundOn, setSoundOn] = useState(false);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
@@ -51,7 +49,6 @@ export function ToneSheet({ open, onClose }: SheetProps) {
       setInterrupt(m.interruptionStyle);
       try {
         setHapticsOn(localStorage.getItem(HAPTIC_FEEDBACK_KEY) !== '0');
-        setSoundOn(localStorage.getItem(SUBTLE_SOUND_KEY) === '1');
       } catch { /* ignore */ }
       setSaved(false);
     }
@@ -61,7 +58,6 @@ export function ToneSheet({ open, onClose }: SheetProps) {
     saveProfileSettings({ coachStyle: tone as 'warm' | 'minimal' | 'professional' });
     try {
       localStorage.setItem(HAPTIC_FEEDBACK_KEY, hapticsOn ? '1' : '0');
-      localStorage.setItem(SUBTLE_SOUND_KEY, soundOn ? '1' : '0');
     } catch { /* ignore */ }
     setSaved(true);
     setTimeout(() => { setSaved(false); onClose(); }, 1000);
@@ -106,22 +102,17 @@ export function ToneSheet({ open, onClose }: SheetProps) {
       ))}
 
       <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>轻反馈</p>
-      {([
-        { id: 'haptics', label: '触感反馈', hint: '记录成功、找到结果、长按录音时轻轻震一下', checked: hapticsOn, onChange: setHapticsOn },
-        { id: 'sound', label: '细微音效', hint: '默认关闭。之后会用于纸片落下、木盒轻合一类低音量提示', checked: soundOn, onChange: setSoundOn },
-      ] as Array<{ id: string; label: string; hint: string; checked: boolean; onChange: (value: boolean) => void }>).map((opt) => (
-        <button key={opt.id} type="button"
-          className={`nesio-settings-option${opt.checked ? ' nesio-settings-option--active' : ''}`}
-          onClick={() => opt.onChange(!opt.checked)}>
-          <div>
-            <span className="nesio-settings-option-label">{opt.label}</span>
-            <span className="nesio-settings-option-hint">{opt.hint}</span>
-          </div>
-          <span className={`nesio-settings-space-check${opt.checked ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>
-            {opt.checked ? '✓' : '○'}
-          </span>
-        </button>
-      ))}
+      <button type="button"
+        className={`nesio-settings-option${hapticsOn ? ' nesio-settings-option--active' : ''}`}
+        onClick={() => setHapticsOn((v) => !v)}>
+        <div>
+          <span className="nesio-settings-option-label">触感反馈</span>
+          <span className="nesio-settings-option-hint">记录成功、找到结果、长按录音时轻轻震一下</span>
+        </div>
+        <span className={`nesio-settings-space-check${hapticsOn ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>
+          {hapticsOn ? '✓' : '○'}
+        </span>
+      </button>
 
       <button type="button" className="nesio-ob-primary-btn" style={{ marginTop: '1.5rem' }} onClick={save}>
         {saved ? '✓ 已保存' : '保存设置'}
@@ -286,33 +277,56 @@ export function SpacesSheet({ open, onClose }: SheetProps) {
   );
 }
 
-// ── 订阅 ──────────────────────────────────────────────
+// ── 早期体验 ──────────────────────────────────────────
 
 export function SubscriptionSheet({ open, onClose }: SheetProps) {
+  const [submitted, setSubmitted] = useState(false);
+  const [email, setEmail] = useState('');
+
+  function handleNotify() {
+    if (!email.trim()) return;
+    // Store locally; future: send to backend waitlist API
+    try { localStorage.setItem('nesio-notify-email', email.trim()); } catch { /* ignore */ }
+    setSubmitted(true);
+  }
+
   return (
-    <SheetWrap open={open} onClose={onClose} title="订阅">
-      <p className="nesio-settings-sheet-desc">选择你希望 Nesio 帮到哪一步。你的生活主权不会被套餐切走。</p>
+    <SheetWrap open={open} onClose={onClose} title="早期体验">
+      <div className="nesio-sub-early-card">
+        <div className="nesio-sub-early-badge">早期体验者</div>
+        <p className="nesio-sub-early-title">全功能 · 免费使用中</p>
+        <p className="nesio-sub-early-desc">
+          你是最早一批使用 Nesio 的人。现阶段所有功能对你完全开放，不需要付费。
+        </p>
+      </div>
 
-      {[
-        { tier: '先记住', price: '免费', color: '#6366f1', desc: '记录重要线索，今天该看的事会出现', active: true },
-        { tier: '帮你理解', price: '¥18 / 月', color: '#3b82f6', desc: '把日程、天气和记忆整理成可确认的提醒', active: false },
-        { tier: '主动提醒', price: '¥38 / 月', color: '#0ea5e9', desc: '从邮件和语音里整理提醒，存入前可确认', active: false },
-        { tier: '家庭与自动化', price: '¥68 / 月', color: '#14b8a6', desc: '家人共享、重复事项和自动化动作都需要你确认', active: false },
-      ].map((plan) => (
-        <div key={plan.tier} className={`nesio-sub-plan${plan.active ? ' nesio-sub-plan--active' : ''}`}>
-          <div className="nesio-sub-plan-badge" style={{ background: plan.color }}>{plan.tier}</div>
-          <div className="nesio-sub-plan-body">
-            <p className="nesio-sub-plan-price">{plan.price}</p>
-            <p className="nesio-sub-plan-desc">{plan.desc}</p>
+      <div className="nesio-sub-notify-section">
+        <p className="nesio-settings-section-label">收费版开放时通知我</p>
+        <p className="nesio-settings-option-hint" style={{ marginBottom: '0.75rem' }}>
+          未来高级功能（跨设备同步、家庭共享等）开放时，我们会第一时间告诉你。
+        </p>
+        {submitted ? (
+          <p style={{ color: 'var(--portal-accent)', fontWeight: 600, textAlign: 'center', padding: '0.75rem 0' }}>
+            ✓ 已记录，我们会通知你
+          </p>
+        ) : (
+          <div className="nesio-sub-notify-row">
+            <input
+              type="email"
+              placeholder="your@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="nesio-sub-notify-input"
+            />
+            <button type="button" className="nesio-sub-notify-btn" onClick={handleNotify}>
+              通知我
+            </button>
           </div>
-          {plan.active
-            ? <span className="nesio-sub-plan-current">当前</span>
-            : <button type="button" className="nesio-sub-plan-btn" onClick={() => alert('订阅功能即将开放，敬请期待。')}>升级</button>}
-        </div>
-      ))}
+        )}
+      </div>
 
-      <p style={{ fontSize: '0.72rem', color: 'var(--portal-muted)', textAlign: 'center', marginTop: '1rem' }}>
-        计费即将上线 · 目前全功能免费体验
+      <p style={{ fontSize: '0.7rem', color: 'var(--portal-muted)', textAlign: 'center', marginTop: '1.5rem' }}>
+        v0.1 早期内测 · 你的反馈是最好的礼物
       </p>
     </SheetWrap>
   );
