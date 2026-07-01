@@ -21,6 +21,56 @@ interface UiMessage {
 
 const CHAT_HISTORY_KEY = 'nesio-chat-history-v1';
 const MAX_STORED = 60;
+const MAX_FILE_CHARS = 60_000; // ~15k tokens, safe for Haiku context
+
+// ─── CSV / File parsing ───────────────────────────────────────────────────────
+
+function parseCSVLine(line: string): string[] {
+  const result: string[] = [];
+  let cur = '';
+  let inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') {
+      if (inQ && line[i + 1] === '"') { cur += '"'; i++; }
+      else inQ = !inQ;
+    } else if ((c === ',' || c === '\t') && !inQ) {
+      result.push(cur.trim()); cur = '';
+    } else { cur += c; }
+  }
+  result.push(cur.trim());
+  return result;
+}
+
+function csvToMarkdown(raw: string): string {
+  const lines = raw.trim().split(/\r?\n/).filter(Boolean);
+  if (lines.length === 0) return raw;
+  const headers = parseCSVLine(lines[0]);
+  const rows = lines.slice(1).map((l) => parseCSVLine(l));
+  const header = `| ${headers.join(' | ')} |`;
+  const divider = `| ${headers.map(() => '---').join(' | ')} |`;
+  const body = rows.slice(0, 200).map((r) => `| ${r.join(' | ')} |`); // cap at 200 rows in table
+  const extra = rows.length > 200 ? [`\n（共 ${rows.length} 行，显示前 200 行）`] : [];
+  return [header, divider, ...body, ...extra].join('\n');
+}
+
+function isCsvLike(name: string): boolean {
+  return /\.(csv|tsv)$/i.test(name);
+}
+
+function readFileAsText(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => resolve(e.target?.result as string ?? '');
+    reader.onerror = () => reject(new Error('read error'));
+    reader.readAsText(file, 'UTF-8');
+  });
+}
+
+function truncate(s: string, max: number): string {
+  if (s.length <= max) return s;
+  return s.slice(0, max) + `\n\n…（内容过长，已截断至 ${max} 字符）`;
+}
 
 function loadHistory(): UiMessage[] {
   try {
@@ -246,9 +296,12 @@ export default function NesioChatSheet({
   const [detailNode, setDetailNode] = useState<LifeNode | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const filePickerRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<{ stop(): void } | null>(null);
   const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const voiceTextRef = useRef('');
+  // Loaded file context — persists across messages in this session
+  const fileContextRef = useRef<{ name: string; content: string } | null>(null);
 
   useEffect(() => { if (open) setMessages(loadHistory()); }, [open]);
   useEffect(() => {
@@ -270,12 +323,18 @@ export default function NesioChatSheet({
       .map((m) => ({ role: m.role as 'user' | 'model', text: m.text }));
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 20000);
+    const timeout = setTimeout(() => controller.abort(), 30000);
     try {
       const res = await fetch('/api/portal/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text.trim(), history }),
+        body: JSON.stringify({
+          message: text.trim(),
+          history,
+          fileContext: fileContextRef.current
+            ? { name: fileContextRef.current.name, content: fileContextRef.current.content }
+            : undefined,
+        }),
         signal: controller.signal,
       });
       clearTimeout(timeout);
@@ -314,6 +373,52 @@ export default function NesioChatSheet({
 
   function handleCopy(msg: UiMessage) {
     navigator.clipboard.writeText(msg.text).catch(() => undefined);
+  }
+
+  async function handleFileUpload(file: File) {
+    setShowPlus(false);
+    const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+    const isText = ['txt', 'md', 'csv', 'tsv', 'json', 'xml', 'yaml', 'yml', 'log'].includes(ext);
+
+    if (!isText) {
+      const notice: UiMessage = {
+        id: `m-${Date.now()}`, role: 'model',
+        text: `暂时只支持文本类文件（CSV、TXT、JSON 等）。"${file.name}" 是 .${ext || '未知'} 格式，暂不支持。`,
+      };
+      setMessages((prev) => [...prev, notice]);
+      return;
+    }
+
+    try {
+      let raw = await readFileAsText(file);
+      let content = raw;
+
+      if (isCsvLike(file.name)) {
+        // Convert CSV to readable Markdown table
+        content = `文件：${file.name}\n行数：${raw.trim().split(/\r?\n/).length - 1} 条记录\n\n${csvToMarkdown(raw)}`;
+      } else {
+        content = `文件：${file.name}\n\n${raw}`;
+      }
+
+      content = truncate(content, MAX_FILE_CHARS);
+      fileContextRef.current = { name: file.name, content };
+
+      const rowCount = isCsvLike(file.name)
+        ? `${raw.trim().split(/\r?\n/).length - 1} 行数据`
+        : `${(raw.length / 1024).toFixed(1)} KB`;
+
+      const notice: UiMessage = {
+        id: `f-${Date.now()}`, role: 'model',
+        text: `📎 已加载 **${file.name}**（${rowCount}）\n\n可以问我这个文件里的任何问题，比如：\n• 这里有多少条记录？\n• 帮我总结一下\n• 谁的金额最高？`,
+      };
+      setMessages((prev) => [...prev, notice]);
+    } catch {
+      const errMsg: UiMessage = {
+        id: `e-${Date.now()}`, role: 'model',
+        text: `读取文件失败，请确认文件没有损坏。`,
+      };
+      setMessages((prev) => [...prev, errMsg]);
+    }
   }
 
   // Voice input (tap mic → voiceMode; hold-to-talk in voiceMode)
@@ -485,8 +590,25 @@ export default function NesioChatSheet({
             <span className="nesio-wechat-plus-icon">🎙</span>
             <span>语音输入</span>
           </button>
+          <button type="button" className="nesio-wechat-plus-item" onClick={() => filePickerRef.current?.click()}>
+            <span className="nesio-wechat-plus-icon">📄</span>
+            <span>文件</span>
+          </button>
         </div>
       )}
+
+      {/* Hidden file picker for document/CSV upload */}
+      <input
+        ref={filePickerRef}
+        type="file"
+        accept=".csv,.tsv,.txt,.md,.json,.xml,.yaml,.yml,.log"
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) void handleFileUpload(file);
+          e.target.value = '';
+        }}
+      />
 
       {/* Input bar */}
       <div className="nesio-wechat-input-bar">

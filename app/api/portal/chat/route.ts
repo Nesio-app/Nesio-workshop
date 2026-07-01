@@ -22,6 +22,7 @@ interface ChatRequest {
   message: string;
   history?: ChatMessage[];
   personalityId?: string;
+  fileContext?: { name: string; content: string };
 }
 
 const SYSTEM_PERSONALITY = `你是 Nesio，用户的贴身 AI 助手，叫"小宝"。
@@ -136,7 +137,7 @@ async function callGemini(
 
 export async function POST(req: NextRequest) {
   const body = await req.json() as ChatRequest;
-  const { message, history = [] } = body;
+  const { message, history = [], fileContext } = body;
 
   if (!message?.trim()) {
     return NextResponse.json({ ok: false, error: 'empty message' }, { status: 400 });
@@ -153,7 +154,10 @@ export async function POST(req: NextRequest) {
   }
 
   const { systemContext } = buildChatContext(message);
-  const systemInstruction = `${SYSTEM_PERSONALITY}\n\n${systemContext}`;
+  const fileSection = fileContext
+    ? `\n\n---\n用户上传了文件：${fileContext.name}\n文件内容如下：\n\n${fileContext.content}\n---\n\n回答关于这个文件的问题时，直接基于以上数据回答，不要猜测或编造数据。如果用户问数量统计、最大值、总结等，请计算后给出准确答案。`
+    : '';
+  const systemInstruction = `${SYSTEM_PERSONALITY}\n\n${systemContext}${fileSection}`;
 
   try {
     const result = anthropicKey
@@ -172,9 +176,7 @@ export async function POST(req: NextRequest) {
     // Try Gemini as fallback if Claude failed
     if (anthropicKey && geminiKey) {
       try {
-        const { systemContext } = buildChatContext(message);
-        const systemInstr = `${SYSTEM_PERSONALITY}\n\n${systemContext}`;
-        const result = await callGemini(geminiKey, message, history, systemInstr);
+        const result = await callGemini(geminiKey, message, history, systemInstruction);
         return NextResponse.json({
           ok: true,
           response: result.text || '我理解你的问题，但暂时没有找到确定的答案。',

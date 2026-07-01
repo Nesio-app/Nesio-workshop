@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import Link from 'next/link';
+import { getLifeGraph } from '@/lib/portal/life-graph';
 import { formatLunarLine, nextHolidayLine, nextUSHolidayLine } from '@/lib/portal/almanac';
 import { t } from '@/lib/portal/i18n';
 import {
@@ -57,6 +58,48 @@ import {
   shouldShowBaoheInsight,
 } from '@/lib/portal/personalization-insights';
 import ToolsTreasurePopup from './ToolsTreasureSheet';
+import MeetingRecorder from './MeetingRecorder';
+
+// ── Proactive guidance ─────────────────────────────────────────────────────────
+interface ProactiveCard {
+  id: string;
+  title: string;
+  body: string;
+  confidence: number;
+  sourceTags: string[];
+  icon: string;
+  priority?: number;
+}
+
+interface ProactiveTrigger {
+  type: string;
+  data: Record<string, string | number | boolean | null>;
+  fallback: Omit<ProactiveCard, 'id'> & { priority: number };
+}
+
+// ── Today focus ────────────────────────────────────────────────────────────────
+interface FocusItem {
+  id: string;
+  type: 'meeting' | 'task' | 'reminder' | 'event';
+  icon: string;
+  title: string;
+  body?: string;
+  timeLabel?: string;
+  countdown?: string;
+  urgency: number;
+  url?: string;
+  sourceTags?: string[];
+  calEvent?: CalendarEvent;
+}
+
+// ── Decompose ──────────────────────────────────────────────────────────────────
+interface DecomposeStep {
+  name: string;
+  emoji: string;
+  durationMin: number;
+  subSteps?: DecomposeStep[];
+  drillLoading?: boolean;
+}
 
 interface DashboardHomeProps {
   config: PortalConfig;
@@ -252,9 +295,18 @@ export default function DashboardHome({
     useState<ProductionRuntimeProviderAction | null>(null);
   const [fidelityHintDismissed, setFidelityHintDismissed] = useState(false);
   const [reminderDeferred, setReminderDeferred] = useState(false);
-  const [crushTaskOpen, setCrushTaskOpen] = useState(false);
-  const [crushTaskSplitLevel, setCrushTaskSplitLevel] = useState(0);
-  const [crushTaskDone, setCrushTaskDone] = useState(false);
+  // ── Proactive cards ──
+  const [proactiveCards, setProactiveCards] = useState<ProactiveCard[]>([]);
+  const [proactiveDismissed, setProactiveDismissed] = useState<Set<string>>(new Set());
+  const proactiveLoadedRef = useRef(false);
+  // ── Today focus ──
+  const [focusItems, setFocusItems] = useState<FocusItem[]>([]);
+  const [focusExpanded, setFocusExpanded] = useState(false);
+  const [focusDetailItem, setFocusDetailItem] = useState<FocusItem | null>(null);
+  // ── Decompose ──
+  const [decomposeTarget, setDecomposeTarget] = useState<{ title: string; body?: string } | null>(null);
+  const [decomposeSteps, setDecomposeSteps] = useState<DecomposeStep[]>([]);
+  const [decomposeLoading, setDecomposeLoading] = useState(false);
   const [personalization, setPersonalization] = useState(() => getBaohePersonalizationProfile());
   const [showPersonalizationInsight, setShowPersonalizationInsight] = useState(false);
   const [insightDismissed, setInsightDismissed] = useState(false);
@@ -266,6 +318,7 @@ export default function DashboardHome({
   const [scheduleSheetOpen, setScheduleSheetOpen] = useState(false);
   const [reminderDetail, setReminderDetail] = useState<'task' | 'meeting' | null>(null);
   const [meetingRecording, setMeetingRecording] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [healthGateOpen, setHealthGateOpen] = useState(false);
   const popupTools = toolboxTools ?? shellTools ?? config.tools;
   const quotePicked = useRef(false);
@@ -276,24 +329,6 @@ export default function DashboardHome({
   const lunarLine = useMemo(() => formatLunarLine(now), [now]);
   const holidayLine = useMemo(() => nextHolidayLine(now), [now]);
   const usHolidayLine = useMemo(() => nextUSHolidayLine(now), [now]);
-  const crushSteps = useMemo(() => {
-    if (crushTaskSplitLevel <= 0) {
-      return [
-        t(locale, 'dashboardCrushStepRememberGiftHints'),
-        t(locale, 'dashboardCrushStepAskAiOptions'),
-        t(locale, 'dashboardCrushStepConfirmDelivery'),
-      ];
-    }
-    const scale = crushTaskSplitLevel + 1;
-    return [
-      t(locale, 'dashboardCrushStepKeywordTemplate', { level: scale }),
-      t(locale, 'dashboardCrushStepNarrowOptionsTemplate', { count: Math.max(1, 4 - crushTaskSplitLevel) }),
-      crushTaskSplitLevel > 2
-        ? t(locale, 'dashboardCrushStepOneMinuteAction')
-        : t(locale, 'dashboardCrushStepDecideTomorrow'),
-    ];
-  }, [crushTaskSplitLevel, locale]);
-
   const syncProfile = useCallback(() => {
     const s = loadProfileSettings(profile.displayName);
     setDisplayName(s.displayName);
@@ -643,6 +678,270 @@ export default function DashboardHome({
     setQuotePreferences(next);
   };
 
+  // ── Build today focus items from calendar + LifeGraph ─────────────────────
+  const buildFocusItems = useCallback((evs: CalendarEvent[], at: Date, tz: string): FocusItem[] => {
+    const items: FocusItem[] = [];
+
+    for (const ev of evs) {
+      const start = new Date(ev.start);
+      const diffMs = start.getTime() - at.getTime();
+      if (diffMs < -2 * 3600_000 || diffMs > 36 * 3600_000) continue;
+      const isMeeting = looksLikeMeetingEvent(ev);
+      const urgency = diffMs < 0 ? 92 : diffMs < 3600_000 ? 85 : diffMs < 8 * 3600_000 ? 70 : 55;
+      items.push({
+        id: `ev-${ev.id}`,
+        type: isMeeting ? 'meeting' : 'event',
+        icon: isMeeting ? '📹' : '📅',
+        title: ev.title,
+        body: ev.description || (ev.location ? `📍 ${ev.location}` : undefined),
+        timeLabel: formatEventTime(ev, locale),
+        countdown: formatEventCountdown(ev, at, locale),
+        url: ev.url,
+        urgency,
+        sourceTags: [isMeeting ? '会议' : '日历', formatEventDayLabel(ev, at, tz)],
+        calEvent: ev,
+      });
+    }
+
+    try {
+      const nodes = getLifeGraph();
+      for (const node of nodes) {
+        if (node.type !== 'commitment') continue;
+        const dueRaw = node.attributes.dueDate ?? node.attributes.date ?? node.attributes.due;
+        if (!dueRaw || typeof dueRaw !== 'string') continue;
+        const due = new Date(dueRaw);
+        if (isNaN(due.getTime())) continue;
+        const diffDays = Math.floor((due.getTime() - at.getTime()) / 86_400_000);
+        if (diffDays < -1 || diffDays > 7) continue;
+        const urgency = diffDays < 0 ? 95 : diffDays === 0 ? 80 : Math.max(40, 70 - diffDays * 8);
+        items.push({
+          id: `lg-${node.id}`,
+          type: 'task',
+          icon: '✅',
+          title: node.name,
+          body: typeof node.attributes.description === 'string' ? node.attributes.description : node.rawInput,
+          countdown: diffDays < 0 ? '已逾期' : diffDays === 0 ? '今天截止' : `${diffDays} 天后截止`,
+          urgency,
+          sourceTags: ['记忆', '待办'],
+        });
+      }
+      const todoNodes = nodes.filter((n) =>
+        (n.tags ?? []).some((tg) => ['待办', 'todo', '任务'].includes(tg.toLowerCase())),
+      );
+      for (const node of todoNodes.slice(0, 3)) {
+        if (items.some((i) => i.id === `lg-${node.id}`)) continue;
+        items.push({
+          id: `lg-${node.id}`,
+          type: 'task',
+          icon: '📋',
+          title: node.name,
+          body: typeof node.attributes.description === 'string' ? node.attributes.description : node.rawInput,
+          urgency: 40,
+          sourceTags: ['记忆', '待办'],
+        });
+      }
+    } catch {
+      // LifeGraph unavailable in SSR
+    }
+
+    items.sort((a, b) => b.urgency - a.urgency);
+    return items;
+  }, [locale]);
+
+  // ── Load proactive cards (rule engine → Claude polish) ────────────────────
+  const loadProactiveCards = useCallback(async (
+    weatherState: WeatherState,
+    evs: CalendarEvent[],
+    at: Date,
+    name: string,
+  ) => {
+    if (proactiveLoadedRef.current) return;
+    proactiveLoadedRef.current = true;
+
+    const triggers: ProactiveTrigger[] = [];
+
+    // Rule: cold weather
+    if (!weatherState.loading && !weatherState.error && (weatherState.temperatureC ?? 99) < 15) {
+      const tc = weatherState.temperatureC ?? 0;
+      triggers.push({
+        type: 'weather_cold',
+        data: { tempC: tc, place: weatherState.placeLabel ?? '' },
+        fallback: {
+          title: '天气转凉了',
+          body: `现在 ${tc}°C，出门记得多带件外套。`,
+          confidence: 88,
+          sourceTags: ['天气·温度'],
+          icon: '🧥',
+          priority: 2,
+        },
+      });
+    }
+
+    // Rule: rain condition
+    if (!weatherState.loading && weatherState.condition) {
+      const cond = weatherState.condition.toLowerCase();
+      if (cond.includes('rain') || cond.includes('雨') || cond.includes('storm')) {
+        triggers.push({
+          type: 'weather_rain',
+          data: { condition: weatherState.condition },
+          fallback: {
+            title: '今天有雨',
+            body: '别忘了带伞，出行时留点余量。',
+            confidence: 82,
+            sourceTags: ['天气·降雨'],
+            icon: '☂️',
+            priority: 2,
+          },
+        });
+      }
+    }
+
+    // Rule: meeting within 2 hours
+    const meetingSoon = evs.find((ev) => {
+      const start = new Date(ev.start);
+      const diff = start.getTime() - at.getTime();
+      return diff > 0 && diff < 2 * 3600_000 && looksLikeMeetingEvent(ev);
+    });
+    if (meetingSoon) {
+      const mins = Math.ceil((new Date(meetingSoon.start).getTime() - at.getTime()) / 60_000);
+      triggers.push({
+        type: 'event_soon',
+        data: { title: meetingSoon.title, minsLeft: mins, hasUrl: Boolean(meetingSoon.url) },
+        fallback: {
+          title: '会议快开始了',
+          body: `"${meetingSoon.title}" 还有 ${mins} 分钟，${meetingSoon.url ? '点进去加入' : '提前做好准备'}。`,
+          confidence: 98,
+          sourceTags: ['日历·今日'],
+          icon: '📹',
+          priority: 3,
+        },
+      });
+    }
+
+    // Rule: LifeGraph health note in past 5 days
+    try {
+      const nodes = getLifeGraph();
+      const recentHealth = nodes.find((n) => {
+        if (n.type !== 'health_state') return false;
+        return at.getTime() - new Date(n.createdAt).getTime() < 5 * 86_400_000;
+      });
+      if (recentHealth) {
+        triggers.push({
+          type: 'health_followup',
+          data: { name: recentHealth.name },
+          fallback: {
+            title: '关注一下身体',
+            body: `你之前记了"${recentHealth.name}"，注意休息，好好照顾自己。`,
+            confidence: 72,
+            sourceTags: ['记忆·健康'],
+            icon: '💙',
+            priority: 1,
+          },
+        });
+      }
+
+      // Rule: birthday within 7 days
+      const birthdayNode = nodes.find((n) => {
+        if (n.type !== 'person') return false;
+        const bd = n.attributes.birthday ?? n.attributes.birthdate;
+        if (!bd || typeof bd !== 'string') return false;
+        const bdMMDD = bd.slice(5, 10);
+        for (let d = 0; d <= 7; d++) {
+          const check = new Date(at.getTime() + d * 86_400_000).toISOString().slice(5, 10);
+          if (bdMMDD === check) return true;
+        }
+        return false;
+      });
+      if (birthdayNode) {
+        triggers.push({
+          type: 'birthday',
+          data: { name: birthdayNode.name },
+          fallback: {
+            title: `${birthdayNode.name}的生日快到了`,
+            body: `还有时间提前准备，一个小惊喜就够了。`,
+            confidence: 96,
+            sourceTags: ['记忆·家人/朋友'],
+            icon: '🎂',
+            priority: 3,
+          },
+        });
+      }
+    } catch { /* LifeGraph unavailable */ }
+
+    if (triggers.length === 0) return;
+
+    try {
+      const res = await fetch('/api/portal/proactive', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ triggers, userName: name }),
+      });
+      const data = await res.json() as { ok: boolean; cards?: ProactiveCard[] };
+      if (data.ok && Array.isArray(data.cards) && data.cards.length > 0) {
+        setProactiveCards(data.cards);
+        return;
+      }
+    } catch { /* use fallback */ }
+
+    // Fallback: use rule-generated cards sorted by priority desc
+    const fallbackCards = triggers
+      .slice()
+      .sort((a, b) => (b.fallback.priority ?? 0) - (a.fallback.priority ?? 0))
+      .slice(0, 2)
+      .map((tr, i) => ({ id: `p${i}`, ...tr.fallback }));
+    setProactiveCards(fallbackCards);
+  }, []);
+
+  // ── Decompose handlers ─────────────────────────────────────────────────────
+  const openDecompose = useCallback((item: FocusItem | { title: string; body?: string }) => {
+    setDecomposeTarget({ title: 'title' in item ? item.title : (item as FocusItem).title, body: (item as FocusItem).body });
+    setDecomposeSteps([]);
+    setDecomposeLoading(true);
+    void fetch('/api/portal/decompose-task', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ taskName: (item as FocusItem).title ?? item, context: (item as FocusItem).body }),
+    })
+      .then((r) => r.json())
+      .then((data: { ok: boolean; steps?: DecomposeStep[] }) => {
+        if (data.ok && data.steps?.length) setDecomposeSteps(data.steps);
+      })
+      .catch(() => undefined)
+      .finally(() => setDecomposeLoading(false));
+  }, []);
+
+  const drillStep = useCallback((stepIdx: number, step: DecomposeStep) => {
+    setDecomposeSteps((prev) => prev.map((s, i) => i === stepIdx ? { ...s, drillLoading: true } : s));
+    void fetch('/api/portal/decompose-task', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ taskName: step.name, context: decomposeTarget?.title, drill: true }),
+    })
+      .then((r) => r.json())
+      .then((data: { ok: boolean; steps?: DecomposeStep[] }) => {
+        if (data.ok && data.steps?.length) {
+          setDecomposeSteps((prev) => prev.map((s, i) =>
+            i === stepIdx ? { ...s, subSteps: data.steps, drillLoading: false } : s,
+          ));
+        }
+      })
+      .catch(() => setDecomposeSteps((prev) => prev.map((s, i) =>
+        i === stepIdx ? { ...s, drillLoading: false } : s,
+      )));
+  }, [decomposeTarget]);
+
+  // Build focus items whenever events or time changes (after buildFocusItems is defined)
+  useEffect(() => {
+    const tz = fallbackLocation.timezone || 'Asia/Shanghai';
+    setFocusItems(buildFocusItems(events, now, tz));
+  }, [events, now, buildFocusItems, fallbackLocation.timezone]);
+
+  // Load proactive cards once after weather + events are ready
+  useEffect(() => {
+    if (weather.loading || proactiveLoadedRef.current) return;
+    void loadProactiveCards(weather, events, now, displayName);
+  }, [weather, events, now, displayName, loadProactiveCards]);
+
   const openCalendarLink = () => {
     if (!calendarLinkUrl) return;
     window.location.href = calendarLinkUrl;
@@ -765,10 +1064,49 @@ export default function DashboardHome({
       ) : null}
 
       <section className="portal-v13-coach" aria-label={t(locale, 'dashboardCoachActionAriaLabel')}>
-        <button type="button" className="portal-v13-remind-bar" onClick={() => setScheduleSheetOpen(true)}>
-          <span>{t(locale, 'dashboardCoachEventSummaryTemplate', { count: upcomingEvents.length || 3 })}</span>
-          <small>›</small>
-        </button>
+
+        {/* ── 未来引导 (Proactive AI Guidance) ── */}
+        {proactiveCards.filter((c) => !proactiveDismissed.has(c.id)).length > 0 ? (
+          <div className="portal-proactive-section" aria-label="未来引导">
+            {proactiveCards.filter((c) => !proactiveDismissed.has(c.id)).map((card) => (
+              <div key={card.id} className="portal-proactive-card">
+                <div className="portal-proactive-card-top">
+                  <span className="portal-proactive-card-icon">{card.icon}</span>
+                  <div className="portal-proactive-card-content">
+                    <div className="portal-proactive-card-head">
+                      <b className="portal-proactive-card-title">{card.title}</b>
+                      <span className="portal-proactive-card-conf">{card.confidence}% 把握</span>
+                    </div>
+                    <p className="portal-proactive-card-body">{card.body}</p>
+                    <div className="portal-proactive-card-tags">
+                      {card.sourceTags.map((tag) => (
+                        <span key={tag} className="portal-proactive-tag">{tag}</span>
+                      ))}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="portal-proactive-dismiss"
+                    aria-label="忽略"
+                    onClick={() => setProactiveDismissed((prev) => new Set(Array.from(prev).concat(card.id)))}
+                  >×</button>
+                </div>
+                <div className="portal-proactive-card-actions">
+                  <button
+                    type="button"
+                    className="portal-proactive-btn--primary"
+                    onClick={() => { setProactiveDismissed((prev) => new Set(Array.from(prev).concat(card.id))); onOpenAiFriends?.(); }}
+                  >✦ 在智友里处理</button>
+                  <button
+                    type="button"
+                    className="portal-proactive-btn--secondary"
+                    onClick={() => setProactiveDismissed((prev) => new Set(Array.from(prev).concat(card.id)))}
+                  >稍后</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
 
         <div className="portal-v13-count-hero">
             <div className="portal-v13-count-left">
@@ -828,80 +1166,80 @@ export default function DashboardHome({
           </section>
         ) : null}
 
-        <div className="portal-v13-action-card portal-v13-action-card--html">
-          <div className="portal-v13-action-content" onClick={() => setCrushTaskOpen(true)} role="presentation">
-            <p className="portal-v13-kicker">{t(locale, 'dashboardReminderKicker')}</p>
-            <p className="portal-v13-action-copy">
-              {t(locale, 'dashboardGiftReminderPrefix')}
-              <em>{t(locale, 'dashboardGiftReminderAlbum')}</em>
-              {t(locale, 'dashboardGiftReminderMiddle')}
-              <em>{t(locale, 'dashboardGiftReminderSkincare')}</em>
-              {t(locale, 'dashboardGiftReminderSuffix')}
-            </p>
-            <button
-              type="button"
-              className="portal-v13-ai-tip"
-              aria-label={t(locale, 'dashboardAskAiNextStep')}
-              onClick={(event) => {
-                event.stopPropagation();
-                onOpenAiFriends?.();
-              }}
-            >
-              ✦
-            </button>
-          </div>
-          <div className="portal-v13-action-row">
-            <button
-              type="button"
-              className="portal-v13-primary-action"
-              onClick={() => setCrushTaskOpen(true)}
-            >
-              {t(locale, 'dashboardCrushTaskButton')}
-            </button>
-            <button
-              type="button"
-              className="portal-v13-secondary-action"
-              onClick={() => setReminderDeferred(true)}
-            >
-              {reminderDeferred ? t(locale, 'dashboardReminderDeferred') : t(locale, 'dashboardReminderNext')}
-            </button>
-          </div>
-        </div>
-
-        <article className="portal-v13-inventory-card" onClick={() => inventoryTool && onOpenTool(inventoryTool)}>
-          <div className="portal-v13-inventory-head">
-            <span aria-hidden>📦</span>
-            <b>{t(locale, 'dashboardInventoryTitle')}</b>
-            <small>{t(locale, 'dashboardInventoryWeeklyList')}</small>
-          </div>
-          <h2>{t(locale, 'dashboardInventoryWeeklyRestockTitle')}</h2>
-          <div className="portal-v13-inventory-rows">
-            <p><span>{t(locale, 'dashboardInventoryMilkLine')}</span><b>{t(locale, 'dashboardInventoryRestockAction')}</b></p>
-            <p><span>{t(locale, 'dashboardInventoryVitaminLine')}</span><b>{t(locale, 'dashboardInventoryRestockAction')}</b></p>
-            <p><span>{t(locale, 'dashboardInventorySkincareLine')}</span><b>{t(locale, 'dashboardInventoryWatchAction')}</b></p>
-          </div>
-          <p className="portal-v13-inventory-ai">{t(locale, 'dashboardInventoryAiHint')}</p>
-          <div className="portal-v13-inventory-actions">
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                if (inventoryTool) onOpenTool(inventoryTool);
-              }}
-            >
-              ＋ {t(locale, 'dashboardInventoryAddItem')}
-            </button>
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                if (inventoryTool) onOpenTool(inventoryTool);
-              }}
-            >
-              {t(locale, 'dashboardInventoryViewAll')}
-            </button>
-          </div>
-        </article>
+        {/* ── 今日聚焦 (merged focus section, max 2 visible) ── */}
+        {focusItems.length > 0 ? (
+          <section className="portal-focus-section" aria-label="今日聚焦">
+            <div className="portal-focus-header">
+              <h3 className="portal-focus-title">陪你看见 · 今天可以做的事</h3>
+              {focusItems.length > 2 ? (
+                <button
+                  type="button"
+                  className="portal-focus-count"
+                  onClick={() => setFocusExpanded((v) => !v)}
+                >
+                  {focusExpanded ? '收起' : `共 ${focusItems.length} 件`}
+                </button>
+              ) : null}
+            </div>
+            {(focusExpanded ? focusItems : focusItems.slice(0, 2)).map((item) => (
+              <div key={item.id} className="portal-focus-item" onClick={() => setFocusDetailItem(item)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') setFocusDetailItem(item); }}>
+                <div className="portal-focus-item-row">
+                  <span className="portal-focus-item-type-badge portal-focus-item-type-badge--{item.type}">
+                    {item.type === 'meeting' ? '今日安排' : item.type === 'task' ? '待完成' : item.type === 'reminder' ? '提醒' : '日程'}
+                  </span>
+                </div>
+                <p className="portal-focus-item-title">{item.title}</p>
+                {item.countdown ? (
+                  <p className="portal-focus-item-countdown">{item.countdown}</p>
+                ) : null}
+                <div className="portal-focus-item-actions" onClick={(e) => e.stopPropagation()}>
+                  {item.url ? (
+                    <button
+                      type="button"
+                      className="portal-focus-btn--join"
+                      onClick={() => { window.location.href = item.url!; }}
+                    >
+                      直达 ›
+                    </button>
+                  ) : null}
+                  {item.type !== 'meeting' ? (
+                    <button
+                      type="button"
+                      className="portal-focus-btn--decompose"
+                      onClick={() => openDecompose(item)}
+                    >
+                      拆解任务
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="portal-focus-btn--record"
+                      onClick={() => { setFocusDetailItem(item); }}
+                    >
+                      🎙 会议记录
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="portal-focus-btn--ai"
+                    onClick={() => onOpenAiFriends?.()}
+                  >
+                    ✦
+                  </button>
+                </div>
+              </div>
+            ))}
+            {!focusExpanded && focusItems.length > 2 ? (
+              <button
+                type="button"
+                className="portal-focus-expand-btn"
+                onClick={() => setFocusExpanded(true)}
+              >
+                不急，有空再看 · 还有 {focusItems.length - 2} 件 ›
+              </button>
+            ) : null}
+          </section>
+        ) : null}
 
         <button
           type="button"
@@ -914,86 +1252,138 @@ export default function DashboardHome({
         </button>
       </section>
 
-      {crushTaskOpen ? (
+      {/* ── Focus item detail sheet ── */}
+      {focusDetailItem ? (
+        <div className="portal-reminder-sheet" role="presentation">
+          <button type="button" className="portal-reminder-backdrop" onClick={() => setFocusDetailItem(null)} aria-label="关闭" />
+          <section className="portal-reminder-card portal-reminder-card--detail" role="dialog" aria-modal="true">
+            <span className="portal-crush-sheet-handle" aria-hidden />
+            <p className="portal-v13-kicker">
+              {focusDetailItem.type === 'meeting' ? '会议提醒' : focusDetailItem.type === 'task' ? '待办' : '日程'}
+            </p>
+            <h2>{focusDetailItem.title}</h2>
+            {focusDetailItem.body ? <p>{focusDetailItem.body}</p> : null}
+            {focusDetailItem.timeLabel || focusDetailItem.countdown ? (
+              <p>
+                <b style={{ color: 'var(--portal-cool-accent)' }}>
+                  {[focusDetailItem.timeLabel, focusDetailItem.countdown].filter(Boolean).join(' · ')}
+                </b>
+              </p>
+            ) : null}
+            {focusDetailItem.type === 'meeting' ? (
+              <>
+                {focusDetailItem.url ? (
+                  <button
+                    type="button"
+                    className="portal-reminder-primary"
+                    onClick={() => window.location.href = focusDetailItem.url!}
+                  >
+                    📹 加入会议
+                  </button>
+                ) : null}
+                <div className="portal-focus-record-row">
+                  <span>✦ AI 会议记录</span>
+                  <small>实时整理要点，生成摘要与待办</small>
+                  <button
+                    type="button"
+                    className="portal-reminder-record"
+                    onClick={() => { setFocusDetailItem(null); setMeetingRecording(true); }}
+                  >
+                    开始录音
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="portal-reminder-primary"
+                  onClick={() => { openDecompose(focusDetailItem); setFocusDetailItem(null); }}
+                >
+                  拆解任务
+                </button>
+                <button
+                  type="button"
+                  className="portal-reminder-record"
+                  onClick={() => { setFocusDetailItem(null); onOpenAiFriends?.(); }}
+                >
+                  ✦ 在智友里处理
+                </button>
+              </>
+            )}
+            <button type="button" className="portal-reminder-close" onClick={() => setFocusDetailItem(null)}>关闭</button>
+          </section>
+        </div>
+      ) : null}
+
+      {/* ── 2-level task decompose sheet ── */}
+      {decomposeTarget ? (
         <div className="portal-crush-sheet" role="presentation">
-          <button
-            type="button"
-            className="portal-crush-sheet-backdrop"
-            aria-label={t(locale, 'dashboardCrushTaskClose')}
-            onClick={() => setCrushTaskOpen(false)}
-          />
-          <section
-            className="portal-crush-sheet-card"
-            role="dialog"
-            aria-modal="true"
-            aria-label={t(locale, 'dashboardCrushTaskButton')}
-          >
+          <button type="button" className="portal-crush-sheet-backdrop" onClick={() => setDecomposeTarget(null)} aria-label="关闭" />
+          <section className="portal-crush-sheet-card" role="dialog" aria-modal="true">
             <div className="portal-crush-sheet-handle" aria-hidden />
             <div className="portal-crush-sheet-head">
               <div>
-                <p className="portal-v13-kicker">{t(locale, 'dashboardCrushTaskButton')}</p>
-                <h2>{t(locale, 'dashboardCrushGiftTitle')}</h2>
+                <p className="portal-v13-kicker">粉碎任务</p>
+                <h2>{decomposeTarget.title}</h2>
               </div>
-              <button
-                type="button"
-                className="portal-crush-sheet-close"
-                onClick={() => setCrushTaskOpen(false)}
-              >
+              <button type="button" className="portal-crush-sheet-close" onClick={() => setDecomposeTarget(null)}>
                 <span aria-hidden>×</span>
-                <span className="sr-only">{t(locale, 'dashboardCrushTaskClose')}</span>
               </button>
             </div>
-            <p className="portal-crush-sheet-copy">
-              {crushTaskSplitLevel > 0
-                ? t(locale, 'dashboardCrushSplitStatusTemplate', { level: crushTaskSplitLevel + 1 })
-                : t(locale, 'dashboardCrushSplitIntro')}
-            </p>
-            <ol className="portal-crush-step-list" aria-label={t(locale, 'dashboardCrushStepListLabel')}>
-              <li className={crushTaskDone ? 'is-done' : ''}>
-                <span>{crushTaskDone ? t(locale, 'dashboardCrushStepDoneLabel') : t(locale, 'dashboardCrushFirstStepLabel')}</span>
-                <strong>{crushSteps[0]}</strong>
-                <button type="button" onClick={() => setCrushTaskSplitLevel((level) => level + 1)}>{t(locale, 'dashboardCrushSplitMore')}</button>
-              </li>
-              <li>
-                <span>{t(locale, 'dashboardCrushSecondStepLabel')}</span>
-                <strong>{crushSteps[1]}</strong>
-                <button type="button" onClick={() => setCrushTaskSplitLevel((level) => level + 1)}>{t(locale, 'dashboardCrushSplitMore')}</button>
-              </li>
-              <li>
-                <span>{t(locale, 'dashboardCrushThirdStepLabel')}</span>
-                <strong>{crushSteps[2]}</strong>
-                <button type="button" onClick={() => setCrushTaskSplitLevel((level) => level + 1)}>{t(locale, 'dashboardCrushSplitMore')}</button>
-              </li>
-            </ol>
+            <p className="portal-crush-sheet-copy">把这件事拆成几步，先做最小的一个。</p>
+
+            {decomposeLoading ? (
+              <p className="portal-decompose-loading">AI 正在拆解…</p>
+            ) : (
+              <ol className="portal-decompose-steps">
+                {decomposeSteps.map((step, idx) => (
+                  <li key={idx} className="portal-decompose-step">
+                    <div className="portal-decompose-step-row">
+                      <span className="portal-decompose-step-icon">{step.emoji}</span>
+                      <div className="portal-decompose-step-body">
+                        <strong>{step.name}</strong>
+                        <small>{step.durationMin} 分钟</small>
+                      </div>
+                      {!step.subSteps ? (
+                        <button
+                          type="button"
+                          className="portal-decompose-drill-btn"
+                          onClick={() => drillStep(idx, step)}
+                          disabled={step.drillLoading}
+                        >
+                          {step.drillLoading ? '…' : '再拆'}
+                        </button>
+                      ) : null}
+                    </div>
+                    {step.subSteps ? (
+                      <ul className="portal-decompose-substeps">
+                        {step.subSteps.map((sub, si) => (
+                          <li key={si}>
+                            <span>{sub.emoji}</span>
+                            <span>{sub.name}</span>
+                            <small>{sub.durationMin}min</small>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </li>
+                ))}
+              </ol>
+            )}
+
             <div className="portal-crush-sheet-actions">
               <button
                 type="button"
                 className="portal-crush-sheet-primary"
-                onClick={() => setCrushTaskDone(true)}
+                onClick={() => { setDecomposeTarget(null); onOpenAiFriends?.(); }}
               >
-                {t(locale, 'dashboardCrushFinishStep')}
+                ✦ 在智友里处理
               </button>
-              <button
-                type="button"
-                className="portal-crush-sheet-secondary"
-                onClick={() => setCrushTaskOpen(false)}
-              >
-                {t(locale, 'dashboardCrushLater')}
+              <button type="button" className="portal-crush-sheet-secondary" onClick={() => setDecomposeTarget(null)}>
+                关闭
               </button>
             </div>
-            <button
-              type="button"
-              className="portal-crush-sheet-link"
-              onClick={() => {
-                if (planTool) {
-                  onOpenTool(planTool);
-                  return;
-                }
-                setReminderDetail('task');
-              }}
-            >
-              {t(locale, 'dashboardCrushOpenTodo')}
-            </button>
           </section>
         </div>
       ) : null}
@@ -1159,6 +1549,49 @@ export default function DashboardHome({
         </div>
       ) : null}
 
+      {/* Meeting recorder (from focus detail or calendar event) */}
+      <MeetingRecorder open={meetingRecording} onClose={() => setMeetingRecording(false)} />
+
+      {/* Selected calendar event detail */}
+      {selectedEvent ? (
+        <div className="portal-reminder-sheet" role="presentation">
+          <button type="button" className="portal-reminder-backdrop" onClick={() => setSelectedEvent(null)} aria-label="关闭" />
+          <section className="portal-reminder-card portal-reminder-card--detail" role="dialog" aria-modal="true">
+            <span className="portal-crush-sheet-handle" aria-hidden />
+            <p className="portal-v13-kicker">
+              {looksLikeMeetingEvent(selectedEvent) ? '会议提醒' : formatEventDayLabel(selectedEvent, now, calendarTz)}
+            </p>
+            <h2>{selectedEvent.title}</h2>
+            {selectedEvent.description ? <p>{selectedEvent.description}</p> : null}
+            {selectedEvent.location ? <p>📍 {selectedEvent.location}</p> : null}
+            <p><b style={{ color: 'var(--portal-cool-accent)' }}>
+              {formatEventTime(selectedEvent, locale)} · {formatEventCountdown(selectedEvent, now, locale)}
+            </b></p>
+            {looksLikeMeetingEvent(selectedEvent) ? (
+              <>
+                {selectedEvent.url ? (
+                  <button type="button" className="portal-reminder-primary" onClick={() => window.location.href = selectedEvent.url!}>
+                    📹 加入会议
+                  </button>
+                ) : null}
+                <div className="portal-focus-record-row">
+                  <span>✦ AI 会议记录</span>
+                  <small>Granola 风格 · 由智友后台整理</small>
+                  <button type="button" className="portal-reminder-record" onClick={() => { setSelectedEvent(null); setMeetingRecording(true); }}>
+                    开始录音
+                  </button>
+                </div>
+              </>
+            ) : (
+              <button type="button" className="portal-reminder-primary" onClick={() => { setSelectedEvent(null); onOpenAiFriends?.(); }}>
+                ✦ 在智友里处理
+              </button>
+            )}
+            <button type="button" className="portal-reminder-close" onClick={() => setSelectedEvent(null)}>关闭</button>
+          </section>
+        </div>
+      ) : null}
+
       <section className="portal-widgets" aria-label={t(locale, 'dashboardSummaryLabel')}>
         <article className="portal-widget portal-widget--clock">
           <p className="portal-widget-clock">{formatClock(now, locale)}</p>
@@ -1264,7 +1697,15 @@ export default function DashboardHome({
         ) : (
           <ul className="portal-calendar-list">
             {visibleEvents.map((ev) => (
-              <li key={ev.id} className="portal-calendar-event">
+              <li
+                key={ev.id}
+                className="portal-calendar-event portal-calendar-event--tap"
+                onClick={() => setSelectedEvent(ev)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedEvent(ev); }}
+                aria-label={`查看详情：${ev.title}`}
+              >
                 <span className="portal-calendar-dot" aria-hidden />
                 <div className="portal-calendar-body">
                   <p className="portal-calendar-line">
@@ -1280,6 +1721,10 @@ export default function DashboardHome({
                     <span className="portal-calendar-countdown">
                       {formatEventCountdown(ev, now, locale)}
                     </span>
+                    {looksLikeMeetingEvent(ev) ? (
+                      <span className="portal-calendar-meeting-badge" aria-hidden>🎙</span>
+                    ) : null}
+                    <span className="portal-calendar-chevron" aria-hidden>›</span>
                   </p>
                 </div>
               </li>

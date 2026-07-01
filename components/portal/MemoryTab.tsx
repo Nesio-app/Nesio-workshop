@@ -30,6 +30,15 @@ const TYPE_BG: Record<string, string> = {
   person: '#e0e7ff', object: '#dbeafe', place: '#d1fae5',
   event: '#fef3c7', commitment: '#ede9fe', health_state: '#fce7f3', preference: '#f0fdf4',
 };
+const TYPE_LABEL: Record<string, string> = {
+  person: '人物', object: '物品', place: '地点',
+  event: '事件', commitment: '承诺', health_state: '健康', preference: '偏好',
+};
+// How many nodes of this domain to reach 100% understanding
+const DOMAIN_THRESHOLDS: Record<string, number> = {
+  life: 20, growth: 15, assets: 15, health: 10, energy: 10,
+};
+const TYPE_ORDER = ['person', 'object', 'place', 'event', 'commitment', 'health_state', 'preference'];
 
 const SEED_NODES = [
   { id: 's1', icon: '🎁', iconBg: '#d1fae5', title: 'Linda 礼物', subtitle: '娃娃 · 储物间蓝盒子' },
@@ -60,6 +69,9 @@ const MEMORY_COPY = {
     syncPending: (count: number) => `等待同步 ${count} 条，本机已保存`,
     syncDone: (count: number) => `已同步 ${count} 条`,
     addHint: '点中间按钮把东西放进来，需要时再向宝盒要回线索。',
+    domainOverview: 'Nesio 了解你',
+    domainUnderstand: (pct: number) => `了解 ${pct}%`,
+    allTypes: '全部',
   },
   en: {
     searchPlaceholder: 'Ask Nesio: doll, last medicine...',
@@ -71,7 +83,7 @@ const MEMORY_COPY = {
     emptySecondary: 'For example: doll in the blue box, last medicine, Jim meeting reminder.',
     firstThing: 'Add the first thing',
     loginSync: 'Sign in to sync',
-    noResult: (query: string) => `No clues found for “${query}”`,
+    noResult: (query: string) => `No clues found for "${query}"`,
     noResultHint: 'Use the center button to save something first.',
     resultCount: (count: number) => `Results (${count})`,
     recent: 'Recent clues',
@@ -81,6 +93,9 @@ const MEMORY_COPY = {
     syncPending: (count: number) => `${count} waiting to sync. Saved locally.`,
     syncDone: (count: number) => `${count} synced`,
     addHint: 'Use the center button to put something in, then ask Nesio for it later.',
+    domainOverview: 'Nesio knows you',
+    domainUnderstand: (pct: number) => `${pct}% known`,
+    allTypes: 'All',
   },
 } as const;
 
@@ -96,6 +111,45 @@ function cleanMemoryPreview(node: LifeNode): string {
     .replace(/^[\s:：·,-]+/, '')
     .trim()
     .slice(0, 44) || '来自你的记录';
+}
+
+function getNodeTypeMeta(node: LifeNode): { extra?: string; badge?: string; badgeColor?: string } {
+  const a = node.attributes;
+  const str = (v: unknown) => (typeof v === 'string' && v ? v : '');
+  switch (node.type) {
+    case 'person': {
+      const role = str(a.relation) || str(a.role) || str(a.company);
+      return { extra: role };
+    }
+    case 'health_state': {
+      const dateStr = str(a.date) || str(a.recordedAt);
+      const dateLabel = dateStr
+        ? new Date(dateStr).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
+        : '';
+      const status = str(a.status);
+      const badgeColor = status.includes('恢复') ? '#10b981' : status.includes('注意') || status.includes('发作') ? '#f59e0b' : '#8b5cf6';
+      return { extra: dateLabel, badge: status || undefined, badgeColor: status ? badgeColor : undefined };
+    }
+    case 'commitment': {
+      const dueStr = str(a.dueDate) || str(a.due) || str(a.date);
+      const dateLabel = dueStr
+        ? new Date(dueStr).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
+        : '';
+      return { extra: dateLabel ? `截止 ${dateLabel}` : '' };
+    }
+    case 'object': {
+      const loc = str(a.location) || str(a.where) || str(a.place) || str(a.storage);
+      return { extra: loc ? `📍 ${loc}` : '' };
+    }
+    default:
+      return {};
+  }
+}
+
+function getPersonInitials(name: string): { initials: string; bg: string } {
+  const char = name.slice(0, 1);
+  const bgs = ['#c7d2fe', '#bfdbfe', '#a7f3d0', '#fbcfe8', '#fde68a', '#ddd6fe'];
+  return { initials: char, bg: bgs[name.charCodeAt(0) % bgs.length] };
 }
 
 function visibleMemoryNodes(nodes: LifeNode[], canUsePrivateData: boolean): LifeNode[] {
@@ -144,6 +198,11 @@ function MemoryCard({
     }
   }
 
+  const { extra, badge, badgeColor } = getNodeTypeMeta(node);
+  const isPerson = node.type === 'person';
+  const { initials, bg: avatarBg } = isPerson ? getPersonInitials(node.name) : { initials: '', bg: '' };
+  const domain = nodeDomain(node);
+
   return (
     <button
       type="button"
@@ -181,17 +240,39 @@ function MemoryCard({
       }}
       aria-label={`${node.name}，左滑删除，长按分享`}
     >
-      <span className="nesio-memory-card-icon" style={{ background: TYPE_BG[node.type] || '#f0f4ff' }}>
-        {TYPE_ICON[node.type] || '📌'}
-      </span>
+      {/* Icon / Avatar */}
+      {isPerson ? (
+        <span className="nesio-memory-card-avatar" style={{ background: avatarBg }}>
+          {initials}
+        </span>
+      ) : (
+        <span className="nesio-memory-card-icon" style={{ background: TYPE_BG[node.type] || '#f0f4ff' }}>
+          {TYPE_ICON[node.type] || '📌'}
+        </span>
+      )}
+
+      {/* Title */}
       <span className="nesio-memory-card-title">{node.name}</span>
-      <span className="nesio-memory-card-sub">{cleanMemoryPreview(node)}</span>
-      {(() => {
-        const d = nodeDomain(node);
-        return d ? (
-          <span className="nesio-memory-card-domain">{DOMAINS[d].icon} {DOMAINS[d].label}</span>
-        ) : null;
-      })()}
+
+      {/* Type-specific extra info */}
+      {extra && <span className="nesio-memory-card-extra">{extra}</span>}
+
+      {/* Status badge */}
+      {badge && (
+        <span className="nesio-memory-card-status-badge" style={{ background: badgeColor }}>
+          {badge}
+        </span>
+      )}
+
+      {/* Default subtitle when no extra */}
+      {!extra && !badge && (
+        <span className="nesio-memory-card-sub">{cleanMemoryPreview(node)}</span>
+      )}
+
+      {/* Domain badge */}
+      {domain ? (
+        <span className="nesio-memory-card-domain">{DOMAINS[domain].icon} {DOMAINS[domain].label}</span>
+      ) : null}
     </button>
   );
 }
@@ -199,6 +280,7 @@ function MemoryCard({
 export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: boolean }) {
   const [query, setQuery] = useState('');
   const [domain, setDomain] = useState<FrontDomain | null>(null);
+  const [typeFilter, setTypeFilter] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState('');
   const [locale, setLocale] = useState<PortalLocale>(() => loadProfileSettings().locale);
   const [nodes, setNodes] = useState<LifeNode[]>([]);
@@ -278,7 +360,12 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
     (list: LifeNode[]) => (domain ? list.filter((node) => nodeDomain(node) === domain) : list),
     [domain],
   );
-  const visibleNodes = byDomain(nodes);
+
+  const visibleNodes = useMemo(() => {
+    let result = byDomain(nodes);
+    if (typeFilter) result = result.filter((n) => n.type === typeFilter);
+    return result;
+  }, [byDomain, nodes, typeFilter]);
 
   // Smart search: entity-boosted ranking. Domain filter is applied inside smartSearch.
   const { nodes: smartNodes, understood } = useMemo(
@@ -286,20 +373,41 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
     [query, domain],
   );
   const results = query.trim()
-    ? visibleMemoryNodes(smartNodes, canUsePrivateData)
+    ? visibleMemoryNodes(smartNodes, canUsePrivateData).filter((n) => !typeFilter || n.type === typeFilter)
     : visibleNodes;
   const hasUnderstoodEntities =
     understood.people.length + understood.places.length + understood.objects.length > 0;
-  const hasRealNodes = visibleNodes.length > 0;
+  const hasRealNodes = visibleNodes.length > 0 || nodes.length > 0;
   const sourceItems = query ? results : (hasRealNodes ? results : []);
   const visibleItems = showAll || query ? sourceItems : sourceItems.slice(0, 6);
 
-  // Per-domain counts for the filter chips (from the full recent set).
+  // Per-domain counts for the insight cards (from the full recent set).
   const domainCounts = nodes.reduce<Record<string, number>>((acc, node) => {
     const d = nodeDomain(node);
     if (d) acc[d] = (acc[d] || 0) + 1;
     return acc;
   }, {});
+
+  // Per-type counts for type filter chips.
+  const typeCounts = nodes.reduce<Record<string, number>>((acc, node) => {
+    acc[node.type] = (acc[node.type] || 0) + 1;
+    return acc;
+  }, {});
+  const hasTypedNodes = Object.keys(typeCounts).length > 0;
+
+  // Domain insight data for the overview cards.
+  const domainInsights = ALL_DOMAINS
+    .filter((meta) => domainCounts[meta.id])
+    .map((meta) => {
+      const count = domainCounts[meta.id] || 0;
+      const threshold = DOMAIN_THRESHOLDS[meta.id] || 15;
+      const pct = Math.min(100, Math.round((count / threshold) * 100));
+      const previews = nodes.filter((n) => nodeDomain(n) === meta.id).slice(0, 2).map((n) => n.name);
+      return { ...meta, count, pct, previews };
+    });
+
+  const isFiltered = domain !== null || typeFilter !== null;
+
   return (
     <>
       <div className="nesio-memory-root">
@@ -342,38 +450,83 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
             </div>
           )}
 
-          {/* Domain filter — front-stage scenes (生活/成长/财物/健康/能量). */}
-          {nodes.length > 0 && (
-            <div className="nesio-memory-domains" role="tablist" aria-label="按领域筛选">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={domain === null}
-                className={`nesio-memory-domain-chip${domain === null ? ' is-active' : ''}`}
-                onClick={() => setDomain(null)}
-              >
-                全部
-              </button>
-              {ALL_DOMAINS.filter((meta) => domainCounts[meta.id]).map((meta) => (
+          {/* Domain insight cards — replaces old chip row */}
+          {!query && domainInsights.length > 0 && (
+            <div className="nesio-domain-insight-grid">
+              {domainInsights.map((meta) => (
                 <button
                   key={meta.id}
                   type="button"
-                  role="tab"
-                  aria-selected={domain === meta.id}
-                  className={`nesio-memory-domain-chip${domain === meta.id ? ' is-active' : ''}`}
-                  onClick={() => setDomain((current) => (current === meta.id ? null : meta.id))}
+                  className={`nesio-domain-insight${domain === meta.id ? ' is-active' : ''}`}
+                  onClick={() => setDomain((d) => (d === meta.id ? null : meta.id))}
+                  aria-pressed={domain === meta.id}
                 >
-                  {meta.icon} {meta.label}
-                  <span className="nesio-memory-domain-count">{domainCounts[meta.id]}</span>
+                  <div className="nesio-domain-insight-head">
+                    <span className="nesio-domain-insight-icon">{meta.icon}</span>
+                    <span className="nesio-domain-insight-name">{meta.label}</span>
+                    <span className="nesio-domain-insight-count">{meta.count}</span>
+                  </div>
+                  <div className="nesio-domain-insight-bar-track" role="progressbar" aria-valuenow={meta.pct} aria-valuemin={0} aria-valuemax={100}>
+                    <div className="nesio-domain-insight-bar-fill" style={{ width: `${meta.pct}%` }} />
+                  </div>
+                  <div className="nesio-domain-insight-pct">{copy.domainUnderstand(meta.pct)}</div>
+                  {meta.previews.length > 0 && (
+                    <div className="nesio-domain-insight-previews">
+                      {meta.previews.map((name) => (
+                        <span key={name} className="nesio-domain-insight-preview-chip">{name}</span>
+                      ))}
+                    </div>
+                  )}
                 </button>
               ))}
             </div>
           )}
 
-          {!query && (
+          {/* Type filter bar */}
+          {!query && hasTypedNodes && (
+            <div className="nesio-memory-type-filter" role="group" aria-label="按类型筛选">
+              <button
+                type="button"
+                className={`nesio-type-chip${typeFilter === null ? ' is-active' : ''}`}
+                onClick={() => setTypeFilter(null)}
+              >
+                {copy.allTypes}
+                <span className="nesio-type-chip-count">{nodes.length}</span>
+              </button>
+              {TYPE_ORDER.filter((t) => typeCounts[t]).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  className={`nesio-type-chip${typeFilter === t ? ' is-active' : ''}`}
+                  onClick={() => setTypeFilter((prev) => (prev === t ? null : t))}
+                >
+                  {TYPE_ICON[t]} {TYPE_LABEL[t]}
+                  <span className="nesio-type-chip-count">{typeCounts[t]}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Hero — only when empty */}
+          {!query && !hasRealNodes && (
             <div className="nesio-memory-hero">
               <h2 className="nesio-memory-hero-title">{copy.heroTitle}</h2>
               <p className="nesio-memory-hero-sub">{copy.heroSub}</p>
+            </div>
+          )}
+
+          {/* Active filter label */}
+          {!query && isFiltered && (
+            <div className="nesio-memory-filter-label">
+              {domain && <span>{DOMAINS[domain].icon} {DOMAINS[domain].label}</span>}
+              {typeFilter && <span>{TYPE_ICON[typeFilter]} {TYPE_LABEL[typeFilter]}</span>}
+              <button
+                type="button"
+                className="nesio-memory-filter-clear"
+                onClick={() => { setDomain(null); setTypeFilter(null); }}
+              >
+                清除筛选
+              </button>
             </div>
           )}
 
