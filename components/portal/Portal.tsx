@@ -417,22 +417,25 @@ export default function Portal() {
 
     // Handle Calendar OAuth callback (?calendar=google_oauth_connected)
     if (calendarConnected) {
-      if (!canUsePrivateRuntime) return;
+      // Save connector state unconditionally — doesn't require Supabase auth
       saveConnector('calendar');
       window.dispatchEvent(new CustomEvent('nesio-connector-connected', { detail: { connector: 'calendar' } }));
-      triggerCalendarRefresh();
+      if (canUsePrivateRuntime) triggerCalendarRefresh();
       return;
     }
 
     if (status === 'connected' && connector) {
-      if (!canUsePrivateRuntime) return;
+      // Save connector state unconditionally — localStorage doesn't need auth
       saveConnector(connector);
       window.dispatchEvent(new CustomEvent('nesio-connector-connected', { detail: { connector } }));
 
-      // Auto-sync Gmail after OAuth
+      // API-level sync requires auth
+      if (!canUsePrivateRuntime) return;
+
+      // Auto-sync Gmail after OAuth (with full body analysis)
       if (connector === 'gmail') {
         setTimeout(() => {
-          fetch('/api/portal/gmail')
+          fetch('/api/portal/gmail?includeBody=true&analyze=true')
             .then((r) => r.json())
             .then((data: { ok?: boolean; nodes?: Array<Record<string, unknown>>; count?: number }) => {
               if (data.ok && data.nodes?.length) {

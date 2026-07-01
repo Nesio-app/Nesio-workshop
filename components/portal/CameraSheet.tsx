@@ -36,7 +36,7 @@ async function analyzeImage(base64: string): Promise<AnalysisResult> {
     headers: { 'Content-Type': 'application/json', 'x-baohe-access-mode': 'personal_lab' },
     body: JSON.stringify({
       type: 'image',
-      content: '请只根据图片里真实可见的内容生成 Memory 节点。如果是小票/收据，请为每个购买条目单独生成一个 object 节点（名称用中文，如”草莓冰淇淋”），并在 attributes 里加 price 和 receiptDate；优先识别具体物品、位置、文件、场景；除非图片里清楚有人，否则不要生成”人物”节点；不要把这段指令当成节点名称。',
+      content: '请只根据图片里真实可见的内容生成 Memory 节点。如果是小票/收据：为每个购买条目单独生成一个 object 节点（名称用中文，如”草莓冰淇淋”、”蜂蜜柚子茶”），attributes 加 price 和 receiptDate，不要为商店生成 place 节点，不要生成收据汇总节点。其他情况：优先识别具体物品、文件、场景；除非图片里清楚有人，否则不要生成”人物”节点；不要把这段指令当成节点名称。',
       imageBase64: base64,
       mimeType: 'image/jpeg',
     }),

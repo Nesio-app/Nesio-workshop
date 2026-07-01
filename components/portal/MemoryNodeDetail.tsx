@@ -82,7 +82,7 @@ const HIDDEN_ATTR_KEYS = new Set([
   // Internal / calendar
   'calendarId', 'calendarName', 'description', 'emailId', 'messageId', 'htmlLink',
   // System / task internals
-  'subtasksJson', 'done', 'doneAt', 'userTags', 'status',
+  'subtasksJson', 'done', 'doneAt', 'userTags', 'status', 'context', 'reminder',
   // Location (shown in PlaceSection)
   'lat', 'lon', 'address', 'location', 'room',
   // Signal infrastructure — never user-visible

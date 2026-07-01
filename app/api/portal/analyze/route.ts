@@ -47,26 +47,53 @@ function isAnalyzeAiAllowed(req: NextRequest): boolean {
   return labEnabled && accessMode === 'personal_lab';
 }
 
-const SYSTEM_PROMPT = `You are Nesio's Life Graph extractor. Given user input (text, image description, or document), extract structured life memory nodes.
+const SYSTEM_PROMPT = `You are Nesio's Life Graph extractor. Given user input (voice/text/image/file), extract structured life memory nodes.
 
-For each piece of information, return a JSON array of nodes. Each node:
+Node schema (return ONLY these fields):
 {
   "type": "person" | "object" | "place" | "event" | "commitment" | "health_state" | "preference",
-  "name": "concise name",
-  "attributes": { "key": "value" },
-  "relations": [{ "targetId": "name or id", "relation": "relation type" }],
-  "tags": ["tag1", "tag2"],
+  "name": "concise Chinese name (translate if needed)",
+  "attributes": { "key": "value" },  // only standard keys — no 'context' or internal fields
+  "relations": [{ "targetId": "name", "relation": "relation type" }],
+  "tags": ["tag1"],
   "confidence": 0.0-1.0,
-  "rawInput": "original text"
+  "rawInput": "original excerpt"
 }
 
+Standard attribute keys by type:
+- commitment: dueDate (ISO), priority (high/medium/low), owner, recurring, done
+- event: start (ISO), end (ISO), location, url, participants
+- person: category (family/colleague/friend), lastSeen, birthday (ISO), note
+- object: location, purchaseDate, price, expiry (ISO), note
+- place: address, category (work/home/shopping/school/restaurant), note
+- health_state: healthType (medication/appointment/fitness/sleep/diet), date (ISO), value, unit
+- preference: category, note
+
+CRITICAL CLASSIFICATION RULES:
+1. "明天X生日" / "X的生日是Y" → create TWO nodes:
+   a) commitment: name="X 生日", attributes={dueDate: <tomorrow ISO date>, reminder: true}, tags=["生日","提醒"]
+   b) person: name="X" (if not already known)
+   NOT a preference or object.
+
+2. "X说要/答应/需要/要记得Y" → commitment node, name=the task Y, attributes={owner: X}
+
+3. "记住/X在Y" → object node, name=X, attributes={location: Y}
+
+4. Any meeting/appointment with time → event node with start ISO date
+
+5. Health mentions (药/运动/体检/睡眠/饮食) → health_state node
+
+6. Pure opinions/likes/preferences → preference node
+
+7. Receipts/shopping: create object nodes for each purchased ITEM only. Do NOT create a place node for the store.
+
 Also return:
-- "summary": one sentence summary of what was captured
-- "intent": "MEMORY_CAPTURE" | "REMINDER" | "COMMITMENT" | "HEALTH_LOG" | "EVENT_LOG" | "PREFERENCE"
+- "summary": one Chinese sentence
+- "intent": "REMINDER" | "COMMITMENT" | "MEMORY_CAPTURE" | "HEALTH_LOG" | "EVENT_LOG" | "PREFERENCE"
 
 Respond ONLY with valid JSON: { "nodes": [...], "summary": "...", "intent": "..." }
-If input is in Chinese, extract Chinese names and keep attributes in Chinese.
-For image input, only extract things that are visibly present. Do not create a person node unless a real person is clearly visible. Prefer concrete visible objects such as cups, cables, boxes, medicine, clothes, keys, documents, rooms, and locations. Never use the instruction text itself as a node name.
+Do NOT include any field called "context". Do NOT invent information not in the input.
+For image: only extract visibly present things. Never use instruction text as node name.
 `;
 
 const ASK_SYSTEM_PROMPT = `You are Nesio's semantic Memory search ranker.
