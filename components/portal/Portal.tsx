@@ -7,6 +7,7 @@ import TellNesioSheet, { type CaptureMode } from './TellNesioSheet';
 import CameraSheet from './CameraSheet';
 import VoiceInputSheet from './VoiceInputSheet';
 import ShareSheet from './ShareSheet';
+import MoodSheet from './MoodSheet';
 import PortalBottomNav from './PortalBottomNav';
 import NesioChatSheet from './NesioChatSheet';
 import PortalAiFriendsPreview from './PortalAiFriendsPreview';
@@ -586,7 +587,7 @@ export default function Portal() {
         canUsePrivateData={canUsePrivateRuntime}
         onClose={() => { setCaptureMode(null); setVoiceIntent('note'); }}
       />
-      <ShareSheet open={captureMode === 'share'} onClose={() => setCaptureMode(null)} />
+      <MoodSheet open={captureMode === 'share'} onClose={() => setCaptureMode(null)} />
       <AskGuideSheet open={askGuideOpen} onClose={() => setAskGuideOpen(false)} onStart={openAskVoice} />
 
       <NesioChatSheet open={chatOpen} onClose={() => setChatOpen(false)} canUsePrivateData={canUsePrivateRuntime} />

@@ -44,11 +44,14 @@ const FAN_BUTTONS: Array<{
   },
   {
     mode: 'share',
-    label: '上传',
+    label: '分享',
     pos: 'right',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="26" height="26">
-        <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13"/>
+        <circle cx="12" cy="12" r="9.5"/>
+        <path d="M8.5 14.5s1 1.5 3.5 1.5 3.5-1.5 3.5-1.5"/>
+        <circle cx="9.5" cy="10.5" r="1" fill="currentColor" stroke="none"/>
+        <circle cx="14.5" cy="10.5" r="1" fill="currentColor" stroke="none"/>
       </svg>
     ),
   },

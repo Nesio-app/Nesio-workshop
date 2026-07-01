@@ -277,56 +277,129 @@ export function SpacesSheet({ open, onClose }: SheetProps) {
   );
 }
 
-// ── 早期体验 ──────────────────────────────────────────
+// ── 订阅 / 免费体验 ───────────────────────────────────
+
+const TRIAL_KEY = 'nesio-trial-start-v1';
+const TRIAL_DAYS = 7;
+
+function getTrialState(): { started: boolean; daysLeft: number; expired: boolean } {
+  if (typeof window === 'undefined') return { started: false, daysLeft: TRIAL_DAYS, expired: false };
+  try {
+    const raw = localStorage.getItem(TRIAL_KEY);
+    if (!raw) return { started: false, daysLeft: TRIAL_DAYS, expired: false };
+    const start = Number(raw);
+    const elapsed = Math.floor((Date.now() - start) / 86400000);
+    const daysLeft = Math.max(0, TRIAL_DAYS - elapsed);
+    return { started: true, daysLeft, expired: daysLeft === 0 };
+  } catch {
+    return { started: false, daysLeft: TRIAL_DAYS, expired: false };
+  }
+}
+
+function startTrial() {
+  try { localStorage.setItem(TRIAL_KEY, String(Date.now())); } catch { /* ignore */ }
+}
+
+const PLANS = [
+  {
+    id: 'pro',
+    name: 'Nesio Pro',
+    price: '¥18',
+    cycle: '/ 月',
+    desc: '跨设备同步 · 主动提醒 · AI 洞察报告',
+    highlight: false,
+  },
+  {
+    id: 'family',
+    name: '家庭版',
+    price: '¥38',
+    cycle: '/ 月',
+    desc: '最多 5 人共享 · 家人动态 · 自动化动作',
+    highlight: false,
+  },
+];
 
 export function SubscriptionSheet({ open, onClose }: SheetProps) {
-  const [submitted, setSubmitted] = useState(false);
-  const [email, setEmail] = useState('');
+  const [trial, setTrial] = useState(() => getTrialState());
+  const [upgradeTarget, setUpgradeTarget] = useState<string | null>(null);
 
-  function handleNotify() {
-    if (!email.trim()) return;
-    // Store locally; future: send to backend waitlist API
-    try { localStorage.setItem('nesio-notify-email', email.trim()); } catch { /* ignore */ }
-    setSubmitted(true);
+  useEffect(() => {
+    if (open) setTrial(getTrialState());
+  }, [open]);
+
+  function handleStartTrial() {
+    startTrial();
+    setTrial(getTrialState());
   }
 
-  return (
-    <SheetWrap open={open} onClose={onClose} title="早期体验">
-      <div className="nesio-sub-early-card">
-        <div className="nesio-sub-early-badge">早期体验者</div>
-        <p className="nesio-sub-early-title">全功能 · 免费使用中</p>
-        <p className="nesio-sub-early-desc">
-          你是最早一批使用 Nesio 的人。现阶段所有功能对你完全开放，不需要付费。
-        </p>
-      </div>
+  function handleUpgrade(planId: string) {
+    // TODO: replace with real Stripe checkout session URL or Apple IAP trigger
+    // For web (PWA): POST /api/portal/stripe/create-session → redirect to checkout
+    // For native iOS App Store: call StoreKit purchase(product) here
+    setUpgradeTarget(planId);
+    alert(`即将跳转付款 (${planId === 'pro' ? 'Nesio Pro ¥18/月' : '家庭版 ¥38/月'}).\n\n正式上线后通过 App Store 内购或网页支付完成。`);
+    setUpgradeTarget(null);
+  }
 
-      <div className="nesio-sub-notify-section">
-        <p className="nesio-settings-section-label">收费版开放时通知我</p>
-        <p className="nesio-settings-option-hint" style={{ marginBottom: '0.75rem' }}>
-          未来高级功能（跨设备同步、家庭共享等）开放时，我们会第一时间告诉你。
-        </p>
-        {submitted ? (
-          <p style={{ color: 'var(--portal-accent)', fontWeight: 600, textAlign: 'center', padding: '0.75rem 0' }}>
-            ✓ 已记录，我们会通知你
-          </p>
-        ) : (
-          <div className="nesio-sub-notify-row">
-            <input
-              type="email"
-              placeholder="your@email.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="nesio-sub-notify-input"
-            />
-            <button type="button" className="nesio-sub-notify-btn" onClick={handleNotify}>
-              通知我
+  const { started, daysLeft, expired } = trial;
+
+  return (
+    <SheetWrap open={open} onClose={onClose} title="我的计划">
+      {/* Current plan status */}
+      <div className="nesio-sub-status-card">
+        {!started && (
+          <>
+            <div className="nesio-sub-status-badge nesio-sub-status-badge--free">免费版</div>
+            <p className="nesio-sub-status-title">开始 7 天全功能体验</p>
+            <p className="nesio-sub-status-desc">无需付款，到期后回到免费功能，不会自动扣费。</p>
+            <button type="button" className="nesio-sub-start-btn" onClick={handleStartTrial}>
+              开始免费体验 →
             </button>
-          </div>
+          </>
+        )}
+        {started && !expired && (
+          <>
+            <div className="nesio-sub-status-badge nesio-sub-status-badge--trial">体验中</div>
+            <p className="nesio-sub-status-title">还剩 {daysLeft} 天全功能体验</p>
+            <div className="nesio-sub-trial-bar-track">
+              <div className="nesio-sub-trial-bar-fill" style={{ width: `${((TRIAL_DAYS - daysLeft) / TRIAL_DAYS) * 100}%` }} />
+            </div>
+            <p className="nesio-sub-status-desc">体验结束前升级，所有记忆和设置完整保留。</p>
+          </>
+        )}
+        {expired && (
+          <>
+            <div className="nesio-sub-status-badge nesio-sub-status-badge--expired">体验已结束</div>
+            <p className="nesio-sub-status-title">升级继续使用完整功能</p>
+            <p className="nesio-sub-status-desc">记忆和数据不会丢失，随时可以升级恢复。</p>
+          </>
         )}
       </div>
 
-      <p style={{ fontSize: '0.7rem', color: 'var(--portal-muted)', textAlign: 'center', marginTop: '1.5rem' }}>
-        v0.1 早期内测 · 你的反馈是最好的礼物
+      {/* Upgrade plans */}
+      <p className="nesio-settings-section-label" style={{ marginTop: '1.1rem' }}>升级计划</p>
+      {PLANS.map((plan) => (
+        <div key={plan.id} className="nesio-sub-upgrade-row">
+          <div className="nesio-sub-upgrade-info">
+            <p className="nesio-sub-upgrade-name">{plan.name}</p>
+            <p className="nesio-sub-upgrade-desc">{plan.desc}</p>
+          </div>
+          <div className="nesio-sub-upgrade-right">
+            <p className="nesio-sub-upgrade-price">{plan.price}<span>{plan.cycle}</span></p>
+            <button
+              type="button"
+              className="nesio-sub-upgrade-btn"
+              onClick={() => handleUpgrade(plan.id)}
+              disabled={upgradeTarget === plan.id}
+            >
+              升级
+            </button>
+          </div>
+        </div>
+      ))}
+
+      <p style={{ fontSize: '0.68rem', color: 'var(--portal-muted)', textAlign: 'center', marginTop: '1rem', lineHeight: 1.5 }}>
+        通过 App Store 内购完成支付 · 可随时取消 · 不自动续费
       </p>
     </SheetWrap>
   );

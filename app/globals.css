@@ -11205,69 +11205,209 @@ html[data-portal-theme="night"] .nesio-settings-option-label { color: #e8eefa; }
 }
 
 /* ─── Subscription ─── */
-/* Early access card */
-.nesio-sub-early-card {
-  background: linear-gradient(135deg, rgba(99,102,241,0.08), rgba(59,130,246,0.06));
-  border: 1.5px solid rgba(99,102,241,0.2);
+/* ── Subscription / Trial ── */
+.nesio-sub-status-card {
+  background: linear-gradient(135deg, rgba(99,102,241,0.07), rgba(59,130,246,0.05));
+  border: 1.5px solid rgba(99,102,241,0.18);
   border-radius: 1.1rem;
-  padding: 1.15rem 1rem;
-  margin-bottom: 1.25rem;
+  padding: 1.1rem 1rem;
+  margin-bottom: 1.1rem;
   text-align: center;
 }
 
-.nesio-sub-early-badge {
+.nesio-sub-status-badge {
   display: inline-block;
-  font-size: 0.65rem;
+  font-size: 0.63rem;
   font-weight: 800;
   color: #fff;
-  background: linear-gradient(90deg, #6366f1, #3b82f6);
-  padding: 0.22rem 0.7rem;
+  padding: 0.2rem 0.65rem;
   border-radius: 999px;
   letter-spacing: 0.06em;
-  margin-bottom: 0.55rem;
+  margin-bottom: 0.5rem;
 }
+.nesio-sub-status-badge--free { background: rgba(99,102,241,0.55); }
+.nesio-sub-status-badge--trial { background: linear-gradient(90deg, #6366f1, #3b82f6); }
+.nesio-sub-status-badge--expired { background: rgba(239,68,68,0.7); }
 
-.nesio-sub-early-title {
+.nesio-sub-status-title {
   font-size: 1rem;
   font-weight: 700;
   color: var(--portal-ink);
-  margin-bottom: 0.4rem;
+  margin-bottom: 0.3rem;
 }
-html[data-portal-theme="night"] .nesio-sub-early-title { color: #e8eefa; }
+html[data-portal-theme="night"] .nesio-sub-status-title { color: #e8eefa; }
 
-.nesio-sub-early-desc {
-  font-size: 0.75rem;
+.nesio-sub-status-desc {
+  font-size: 0.73rem;
   color: var(--portal-muted);
-  line-height: 1.55;
+  line-height: 1.5;
+  margin-bottom: 0.75rem;
 }
 
-.nesio-sub-notify-section { margin-top: 0.25rem; }
+.nesio-sub-trial-bar-track {
+  height: 4px;
+  background: rgba(99,102,241,0.15);
+  border-radius: 999px;
+  margin: 0.5rem 0 0.7rem;
+  overflow: hidden;
+}
+.nesio-sub-trial-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #6366f1, #3b82f6);
+  border-radius: 999px;
+  transition: width 0.6s ease;
+}
 
-.nesio-sub-notify-row {
+.nesio-sub-start-btn {
+  display: inline-block;
+  padding: 0.6rem 1.4rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #6366f1, #3b82f6);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin-top: 0.1rem;
+}
+
+.nesio-sub-upgrade-row {
   display: flex;
-  gap: 0.5rem;
-}
-
-.nesio-sub-notify-input {
-  flex: 1;
-  padding: 0.6rem 0.8rem;
-  border-radius: 0.65rem;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 0.9rem;
+  border-radius: 1rem;
   border: 1.5px solid var(--portal-line);
-  background: var(--portal-surface);
-  color: var(--portal-ink);
-  font-size: 0.82rem;
-  outline: none;
+  background: rgba(88,140,227,0.03);
+  margin-bottom: 0.55rem;
 }
-.nesio-sub-notify-input:focus { border-color: var(--portal-accent); }
-
-.nesio-sub-notify-btn {
-  padding: 0.6rem 1rem;
-  border-radius: 0.65rem;
+.nesio-sub-upgrade-info { flex: 1; }
+.nesio-sub-upgrade-name { font-size: 0.88rem; font-weight: 700; color: var(--portal-ink); margin-bottom: 0.15rem; }
+html[data-portal-theme="night"] .nesio-sub-upgrade-name { color: #e8eefa; }
+.nesio-sub-upgrade-desc { font-size: 0.68rem; color: var(--portal-muted); line-height: 1.4; }
+.nesio-sub-upgrade-right { display: flex; flex-direction: column; align-items: flex-end; gap: 0.35rem; flex-shrink: 0; }
+.nesio-sub-upgrade-price {
+  font-size: 0.95rem; font-weight: 800; color: var(--portal-ink);
+}
+html[data-portal-theme="night"] .nesio-sub-upgrade-price { color: #e8eefa; }
+.nesio-sub-upgrade-price span { font-size: 0.7rem; font-weight: 400; color: var(--portal-muted); }
+.nesio-sub-upgrade-btn {
+  padding: 0.3rem 0.85rem;
+  border-radius: 999px;
   background: var(--portal-blue-deep);
   color: #fff;
-  font-size: 0.82rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+/* ── MoodSheet ── */
+.nesio-mood-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 520;
+  display: flex;
+  align-items: flex-end;
+}
+.nesio-mood-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+}
+.nesio-mood-card {
+  position: relative;
+  width: 100%;
+  background: var(--portal-surface, #1a2236);
+  border-radius: 1.5rem 1.5rem 0 0;
+  padding: 0.5rem 1.1rem 2.2rem;
+  z-index: 1;
+  animation: nesio-slide-up 0.28s cubic-bezier(0.32,0.72,0,1) both;
+}
+html[data-portal-theme="night"] .nesio-mood-card { background: #141b2e; }
+
+.nesio-mood-card--saved {
+  padding: 2.5rem 1.1rem 3rem;
+  text-align: center;
+}
+.nesio-mood-saved-emoji { font-size: 2.8rem; margin-bottom: 0.6rem; }
+.nesio-mood-saved-text {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--portal-ink);
+  margin-bottom: 0.3rem;
+}
+html[data-portal-theme="night"] .nesio-mood-saved-text { color: #e8eefa; }
+.nesio-mood-saved-hint { font-size: 0.78rem; color: var(--portal-muted); }
+
+.nesio-mood-handle {
+  width: 2.5rem;
+  height: 4px;
+  background: rgba(120,140,180,0.3);
+  border-radius: 999px;
+  margin: 0 auto 1rem;
+}
+
+.nesio-mood-header { text-align: center; margin-bottom: 1.1rem; }
+.nesio-mood-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--portal-ink);
+  margin-bottom: 0.2rem;
+}
+html[data-portal-theme="night"] .nesio-mood-title { color: #e8eefa; }
+.nesio-mood-subtitle { font-size: 0.75rem; color: var(--portal-muted); }
+
+.nesio-mood-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.nesio-mood-token {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.22rem;
+  padding: 0.6rem 0.3rem;
+  border-radius: 0.85rem;
+  border: 1.5px solid var(--portal-line);
+  background: rgba(88,140,227,0.04);
+  transition: border-color 0.15s, background 0.15s, transform 0.1s;
+  cursor: pointer;
+}
+.nesio-mood-token--on {
+  border-color: var(--portal-accent, #4f8ef7);
+  background: rgba(99,102,241,0.14);
+  transform: scale(1.04);
+}
+.nesio-mood-token-emoji { font-size: 1.3rem; line-height: 1; }
+.nesio-mood-token-label { font-size: 0.65rem; font-weight: 600; color: var(--portal-muted); }
+.nesio-mood-token--on .nesio-mood-token-label { color: var(--portal-accent, #4f8ef7); }
+
+.nesio-mood-note {
+  width: 100%;
+  padding: 0.65rem 0.8rem;
+  border-radius: 0.75rem;
+  border: 1.5px solid var(--portal-line);
+  background: rgba(88,140,227,0.04);
+  color: var(--portal-ink);
+  font-size: 0.85rem;
+  margin-bottom: 0.85rem;
+  outline: none;
+}
+.nesio-mood-note:focus { border-color: var(--portal-accent, #4f8ef7); }
+
+.nesio-mood-save-btn {
+  width: 100%;
+  padding: 0.85rem;
+  border-radius: 1rem;
+  background: rgba(99,102,241,0.15);
+  color: var(--portal-muted);
+  font-size: 0.9rem;
   font-weight: 600;
-  flex-shrink: 0;
+  transition: background 0.2s, color 0.2s;
+}
+.nesio-mood-save-btn--ready {
+  background: linear-gradient(90deg, #6366f1, #3b82f6);
+  color: #fff;
 }
 
 /* ─── Memory Node Detail ─── */
