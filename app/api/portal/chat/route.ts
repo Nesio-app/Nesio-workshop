@@ -1,17 +1,13 @@
 /**
  * POST /api/portal/chat
- * Nesio AI chat — Gemini 2.0 Flash with:
- *   • Google Search grounding (web queries)
- *   • LifeGraph context (personal memory)
- *   • Personality system prompt
+ * Nesio AI chat.
+ * Primary backend: Anthropic Claude (claude-haiku-4-5-20251001) — fast, cheap, reliable.
+ * Fallback: Gemini 2.0 Flash (requires GEMINI_API_KEY with valid quota).
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { buildChatContext } from '@/lib/portal/chat-context';
 
 export const dynamic = 'force-dynamic';
-
-const GEMINI_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
 function envValue(key: string): string {
   return (process.env[key] ?? '').trim();
@@ -28,55 +24,71 @@ interface ChatRequest {
   personalityId?: string;
 }
 
-const PERSONALITIES: Record<string, string> = {
-  'warm-friend': `你是 Nesio，用户的贴身 AI 助手，叫"小宝"。
-性格特点：
-- 温暖真实，像老朋友说话，不过分正式不客套
-- 回答简洁有力，避免啰嗦，用中文
-- 善用用户的个人记忆来提供个性化回答，自然地说"我记得你之前提到…"
-- 可以联网查到最新信息，但优先结合用户自己的数据
-- 如果用户问"我的XX在哪/是什么"，先在记忆库里找
+const SYSTEM_PERSONALITY = `你是 Nesio，用户的贴身 AI 助手，叫"小宝"。
+- 温暖真实，像老朋友说话，不过分正式
+- 回答简洁有力，用中文
+- 善用用户的个人记忆，自然地说"我记得你之前提到…"
+- 如果用户问"我的XX在哪"，先在记忆库里找
 - 不编造用户没有记录的事实，不确定就直说
-- 偶尔有一点幽默，但不刻意卖萌`,
-};
+- 偶尔幽默，但不刻意卖萌`;
 
-interface GeminiPart { text?: string }
-interface GeminiCandidate {
-  content?: { parts?: GeminiPart[]; role?: string };
-  finishReason?: string;
-  groundingMetadata?: {
-    webSearchQueries?: string[];
-    groundingChunks?: Array<{ web?: { uri?: string; title?: string } }>;
+// ── Anthropic (Claude) ────────────────────────────────────────────────────────
+
+async function callClaude(
+  apiKey: string,
+  message: string,
+  history: ChatMessage[],
+  systemInstruction: string,
+): Promise<{ text: string; sources: Array<{ title: string; url: string }> }> {
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 1024,
+      system: systemInstruction,
+      messages: [
+        ...history
+          .filter((m) => m.text?.trim())
+          .map((m) => ({
+            role: m.role === 'model' ? 'assistant' : 'user' as 'user' | 'assistant',
+            content: m.text,
+          })),
+        { role: 'user' as const, content: message },
+      ],
+    }),
+  });
+
+  const data = await res.json() as {
+    content?: Array<{ type: string; text?: string }>;
+    error?: { type: string; message: string };
   };
+
+  if (data.error) throw new Error(`Anthropic: ${data.error.message}`);
+
+  const text = (data.content ?? [])
+    .filter((c) => c.type === 'text' && c.text)
+    .map((c) => c.text!)
+    .join('');
+
+  return { text: text.trim(), sources: [] };
 }
-interface GeminiResponse {
-  candidates?: GeminiCandidate[];
-  promptFeedback?: { blockReason?: string };
-  error?: { code?: number; message?: string; status?: string };
-}
 
-export async function POST(req: NextRequest) {
-  const body = await req.json() as ChatRequest;
-  const { message, history = [], personalityId = 'warm-friend' } = body;
+// ── Gemini ────────────────────────────────────────────────────────────────────
 
-  if (!message?.trim()) {
-    return NextResponse.json({ ok: false, error: 'empty message' }, { status: 400 });
-  }
+async function callGemini(
+  apiKey: string,
+  message: string,
+  history: ChatMessage[],
+  systemInstruction: string,
+): Promise<{ text: string; sources: Array<{ title: string; url: string }> }> {
+  const GEMINI_URL =
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
-  const apiKey = envValue('GEMINI_API_KEY');
-  if (!apiKey) {
-    return NextResponse.json({
-      ok: true,
-      response: '（AI 暂时不可用，请检查 API Key 配置）',
-      sources: [],
-    });
-  }
-
-  const { systemContext } = buildChatContext(message);
-  const personality = PERSONALITIES[personalityId] ?? PERSONALITIES['warm-friend'];
-  const systemInstruction = `${personality}\n\n${systemContext}`;
-
-  // Convert history to Gemini format — skip empty texts
   const contents = [
     ...history
       .filter((m) => m.text?.trim())
@@ -84,72 +96,93 @@ export async function POST(req: NextRequest) {
     { role: 'user' as const, parts: [{ text: message }] },
   ];
 
-  try {
-    const res = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: systemInstruction }] },
-        contents,
-        // google_search is correct tool name for Gemini 2.0 grounding
-        tools: [{ google_search: {} }],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 1024,
-        },
-      }),
+  const res = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: systemInstruction }] },
+      contents,
+      tools: [{ google_search: {} }],
+      generationConfig: { temperature: 0.7, maxOutputTokens: 1024 },
+    }),
+  });
+
+  const data = await res.json() as {
+    candidates?: Array<{
+      content?: { parts?: Array<{ text?: string }> };
+      groundingMetadata?: { groundingChunks?: Array<{ web?: { uri?: string; title?: string } }> };
+    }>;
+    error?: { code?: number; message?: string; status?: string };
+  };
+
+  if (data.error) throw new Error(`Gemini ${data.error.code}: ${data.error.message}`);
+
+  const candidate = data.candidates?.[0];
+  const text = (candidate?.content?.parts ?? [])
+    .filter((p): p is { text: string } => typeof p.text === 'string' && p.text.length > 0)
+    .map((p) => p.text)
+    .join('');
+
+  const sources = (candidate?.groundingMetadata?.groundingChunks ?? [])
+    .map((c) => ({ title: c.web?.title ?? '', url: c.web?.uri ?? '' }))
+    .filter((s) => s.url)
+    .slice(0, 3);
+
+  return { text: text.trim(), sources };
+}
+
+// ── Main handler ──────────────────────────────────────────────────────────────
+
+export async function POST(req: NextRequest) {
+  const body = await req.json() as ChatRequest;
+  const { message, history = [] } = body;
+
+  if (!message?.trim()) {
+    return NextResponse.json({ ok: false, error: 'empty message' }, { status: 400 });
+  }
+
+  const anthropicKey = envValue('ANTHROPIC_API_KEY');
+  const geminiKey = envValue('GEMINI_API_KEY');
+
+  if (!anthropicKey && !geminiKey) {
+    return NextResponse.json({
+      ok: true, response: '（AI 暂时不可用，请配置 ANTHROPIC_API_KEY 或 GEMINI_API_KEY）', sources: [],
     });
+  }
 
-    const data = await res.json() as GeminiResponse;
+  const { systemContext } = buildChatContext(message);
+  const systemInstruction = `${SYSTEM_PERSONALITY}\n\n${systemContext}`;
 
-    // Gemini API error (e.g. invalid key, quota, bad request)
-    if (data.error) {
-      console.error('[chat] Gemini API error:', data.error);
-      return NextResponse.json({
-        ok: true,
-        response: `AI 暂时无法回答（${data.error.message ?? data.error.status ?? String(data.error.code)}）`,
-        sources: [],
-      });
-    }
-
-    // Safety block
-    if (data.promptFeedback?.blockReason) {
-      console.warn('[chat] prompt blocked:', data.promptFeedback.blockReason);
-      return NextResponse.json({ ok: true, response: '这个问题暂时没办法回答。', sources: [] });
-    }
-
-    if (!res.ok) {
-      console.error('[chat] non-ok HTTP status:', res.status);
-      return NextResponse.json({ ok: true, response: '服务暂时不可用，稍后再试。', sources: [] });
-    }
-
-    const candidate = data.candidates?.[0];
-
-    // Extract text from all text parts
-    const text = (candidate?.content?.parts ?? [])
-      .filter((p): p is GeminiPart & { text: string } => typeof p.text === 'string' && p.text.length > 0)
-      .map((p) => p.text)
-      .join('');
-
-    if (!text) {
-      console.warn('[chat] empty response. finishReason:', candidate?.finishReason,
-        'parts:', JSON.stringify(candidate?.content?.parts ?? []));
-    }
-
-    // Web sources from grounding
-    const chunks = candidate?.groundingMetadata?.groundingChunks ?? [];
-    const sources = chunks
-      .map((c) => ({ title: c.web?.title ?? '', url: c.web?.uri ?? '' }))
-      .filter((s) => s.url)
-      .slice(0, 3);
+  try {
+    const result = anthropicKey
+      ? await callClaude(anthropicKey, message, history, systemInstruction)
+      : await callGemini(geminiKey, message, history, systemInstruction);
 
     return NextResponse.json({
       ok: true,
-      response: text.trim() || '我理解你的问题，但暂时没有找到确定的答案。',
-      sources,
+      response: result.text || '我理解你的问题，但暂时没有找到确定的答案。',
+      sources: result.sources,
     });
   } catch (err) {
-    console.error('[chat] fetch error:', err);
-    return NextResponse.json({ ok: true, response: '出了点问题，稍后再试。', sources: [] });
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[chat] error:', msg);
+
+    // Try Gemini as fallback if Claude failed
+    if (anthropicKey && geminiKey) {
+      try {
+        const { systemContext } = buildChatContext(message);
+        const systemInstr = `${SYSTEM_PERSONALITY}\n\n${systemContext}`;
+        const result = await callGemini(geminiKey, message, history, systemInstr);
+        return NextResponse.json({
+          ok: true,
+          response: result.text || '我理解你的问题，但暂时没有找到确定的答案。',
+          sources: result.sources,
+        });
+      } catch (fallbackErr) {
+        console.error('[chat] fallback error:', fallbackErr);
+      }
+    }
+
+    return NextResponse.json({ ok: true, response: '出了点问题，请稍后再试。', sources: [] });
   }
 }

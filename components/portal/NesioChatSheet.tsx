@@ -108,21 +108,40 @@ function CameraView({ onResult, onClose, autoOpen = false }: {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [cameraError, setCameraError] = useState('');
 
+  // Stop tracks on unmount
   useEffect(() => () => { stream?.getTracks().forEach((t) => t.stop()); }, [stream]);
+
+  // Attach stream to video element AFTER React renders it
+  useEffect(() => {
+    if (!stream || !videoRef.current) return;
+    videoRef.current.srcObject = stream;
+    videoRef.current.addEventListener('loadedmetadata', () => {
+      videoRef.current?.play().catch(() => undefined);
+    }, { once: true });
+    // Fallback play in case loadedmetadata already fired
+    videoRef.current.play().catch(() => undefined);
+  }, [stream]);
 
   // Auto-open camera when launched from 拍摄 button
   useEffect(() => { if (autoOpen) void openCamera(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function openCamera() {
+    setCameraError('');
     try {
-      const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-      setStream(s);
-      if (videoRef.current) {
-        videoRef.current.srcObject = s;
-        videoRef.current.play().catch(() => undefined);
+      // Try back camera first, fall back to any camera
+      let s: MediaStream | null = null;
+      try {
+        s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } } });
+      } catch {
+        s = await navigator.mediaDevices.getUserMedia({ video: true });
       }
-    } catch { fileRef.current?.click(); }
+      setStream(s);
+    } catch (err) {
+      console.warn('[camera] getUserMedia failed:', err);
+      setCameraError('无法访问摄像头，请检查权限或改用相册');
+    }
   }
 
   async function capture() {
@@ -161,13 +180,18 @@ function CameraView({ onResult, onClose, autoOpen = false }: {
     setAnalyzing(false);
   }
 
+  // Show camera live view once stream is ready (video srcObject set by useEffect)
   if (stream) {
     return (
       <div className="nesio-camera-live">
-        <button type="button" className="nesio-wechat-back-btn nesio-camera-back" onClick={() => { stream.getTracks().forEach((t) => t.stop()); setStream(null); onClose(); }}>←</button>
-        {/* muted is required on iOS for autoplay */}
+        <button
+          type="button"
+          className="nesio-wechat-back-btn nesio-camera-back"
+          onClick={() => { stream.getTracks().forEach((t) => t.stop()); setStream(null); onClose(); }}
+        >←</button>
+        {/* muted + playsInline required on iOS for autoplay in PWA */}
         <video ref={videoRef} autoPlay muted playsInline className="nesio-camera-video" />
-        <button type="button" className="nesio-camera-shutter" onClick={capture} aria-label="拍照">
+        <button type="button" className="nesio-chat-camera-shutter" onClick={capture} aria-label="拍照">
           <span className="nesio-camera-shutter-ring" />
         </button>
         {analyzing && <p className="nesio-camera-status">识别中…</p>}
@@ -181,14 +205,17 @@ function CameraView({ onResult, onClose, autoOpen = false }: {
       {analyzing ? (
         <p className="nesio-camera-status">识别中…</p>
       ) : (
-        <div className="nesio-camera-entry-btns">
-          <button type="button" className="nesio-wechat-plus-item" onClick={openCamera}>
-            <span className="nesio-wechat-plus-icon">📷</span><span>打开摄像头</span>
-          </button>
-          <button type="button" className="nesio-wechat-plus-item" onClick={() => fileRef.current?.click()}>
-            <span className="nesio-wechat-plus-icon">🖼</span><span>相册</span>
-          </button>
-        </div>
+        <>
+          {cameraError && <p className="nesio-camera-status" style={{ color: '#ef4444' }}>{cameraError}</p>}
+          <div className="nesio-camera-entry-btns">
+            <button type="button" className="nesio-wechat-plus-item" onClick={openCamera}>
+              <span className="nesio-wechat-plus-icon">📷</span><span>打开摄像头</span>
+            </button>
+            <button type="button" className="nesio-wechat-plus-item" onClick={() => fileRef.current?.click()}>
+              <span className="nesio-wechat-plus-icon">🖼</span><span>从相册选图</span>
+            </button>
+          </div>
+        </>
       )}
       <input ref={fileRef} type="file" accept="image/*" className="nesio-hidden" onChange={handleFile} />
     </div>
@@ -302,7 +329,13 @@ export default function NesioChatSheet({
   function startRecording() {
     voiceTextRef.current = '';
     const r = getSR();
-    if (!r) return;
+    if (!r) {
+      // SpeechRecognition not available — surface a clear message
+      const errMsg: UiMessage = { id: `e-${Date.now()}`, role: 'model', text: '当前浏览器不支持语音输入，请切换到键盘文字输入。' };
+      setMessages((prev) => [...prev, errMsg]);
+      setVoiceMode(false);
+      return;
+    }
     r.onresult = (e) => {
       voiceTextRef.current = Array.from(e.results).map((res) => res[0].transcript).join('');
     };
