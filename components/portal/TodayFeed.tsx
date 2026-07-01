@@ -1367,6 +1367,23 @@ export default function TodayFeed({
     };
     void applyViewModel();
 
+    // Background Gmail sync — at most once every 6h, non-blocking
+    if (canUsePrivateData && typeof window !== 'undefined') {
+      const GMAIL_SYNC_KEY = 'nesio-gmail-last-sync';
+      const lastSync = parseInt(localStorage.getItem(GMAIL_SYNC_KEY) || '0', 10);
+      if (Date.now() - lastSync > 6 * 3_600_000) {
+        localStorage.setItem(GMAIL_SYNC_KEY, String(Date.now()));
+        fetch('/api/portal/gmail?includeBody=true&analyze=true')
+          .then((r) => r.json())
+          .then((d: { ok?: boolean; nodes?: unknown[] }) => {
+            if (d.ok && d.nodes && d.nodes.length > 0) {
+              window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
+            }
+          })
+          .catch(() => {});
+      }
+    }
+
     const refresh = () => { void applyViewModel(); };
     window.addEventListener('nesio-life-graph-updated', refresh);
     window.addEventListener('nesio-connectors-refreshed', refresh);

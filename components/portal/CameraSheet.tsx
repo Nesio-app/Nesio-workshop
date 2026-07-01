@@ -152,6 +152,7 @@ function dataUrlToFile(dataUrl: string, fileName: string): File | null {
 export default function CameraSheet({ open, onClose }: CameraSheetProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const selectCanvasRef = useRef<HTMLCanvasElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -166,6 +167,9 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
   const [error, setError] = useState('');
   const [extraTags, setExtraTags] = useState('');
   const [sourceFile, setSourceFile] = useState<File | null>(null);
+  // Bounding-box selection state
+  const [selecting, setSelecting] = useState(false);
+  const selStartRef = useRef<{ x: number; y: number } | null>(null);
 
   const stopCamera = useCallback(() => {
     const video = videoRef.current;
@@ -447,6 +451,99 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
     openNativeCamera();
   }
 
+  // ── Bounding-box selection ──────────────────────────────────────────────
+
+  function openSelection() {
+    const canvas = selectCanvasRef.current;
+    if (!canvas) return;
+    // Size the drawing canvas to match the displayed image
+    const parent = canvas.parentElement;
+    if (parent) {
+      canvas.width = parent.clientWidth;
+      canvas.height = parent.clientHeight;
+    }
+    const ctx = canvas.getContext('2d');
+    if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+    selStartRef.current = null;
+    setSelecting(true);
+  }
+
+  function handleSelTouchStart(e: React.TouchEvent<HTMLCanvasElement>) {
+    e.preventDefault();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const t = e.touches[0];
+    selStartRef.current = { x: t.clientX - rect.left, y: t.clientY - rect.top };
+  }
+
+  function handleSelTouchMove(e: React.TouchEvent<HTMLCanvasElement>) {
+    e.preventDefault();
+    const start = selStartRef.current;
+    if (!start) return;
+    const canvas = selectCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const t = e.touches[0];
+    const cx = t.clientX - rect.left;
+    const cy = t.clientY - rect.top;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const x = Math.min(start.x, cx);
+    const y = Math.min(start.y, cy);
+    const w = Math.abs(cx - start.x);
+    const h = Math.abs(cy - start.y);
+    ctx.strokeStyle = '#3b82f6';
+    ctx.lineWidth = 2.5;
+    ctx.setLineDash([7, 4]);
+    ctx.strokeRect(x, y, w, h);
+    ctx.fillStyle = 'rgba(59,130,246,0.08)';
+    ctx.fillRect(x, y, w, h);
+  }
+
+  async function handleSelTouchEnd(e: React.TouchEvent<HTMLCanvasElement>) {
+    e.preventDefault();
+    const start = selStartRef.current;
+    if (!start || !capturedPreview) { setSelecting(false); return; }
+    const canvas = selectCanvasRef.current;
+    if (!canvas) { setSelecting(false); return; }
+    const rect = canvas.getBoundingClientRect();
+    // Get final finger position (changedTouches for touchend)
+    const t = e.changedTouches[0];
+    const cx = t.clientX - rect.left;
+    const cy = t.clientY - rect.top;
+    const selX = Math.min(start.x, cx);
+    const selY = Math.min(start.y, cy);
+    const selW = Math.abs(cx - start.x);
+    const selH = Math.abs(cy - start.y);
+    if (selW < 20 || selH < 20) { setSelecting(false); return; }
+
+    // Crop the region from the original image
+    const img = new window.Image();
+    img.onload = async () => {
+      const scaleX = img.naturalWidth / canvas.width;
+      const scaleY = img.naturalHeight / canvas.height;
+      const cropCanvas = document.createElement('canvas');
+      const cw = Math.max(1, Math.round(selW * scaleX));
+      const ch = Math.max(1, Math.round(selH * scaleY));
+      cropCanvas.width = cw;
+      cropCanvas.height = ch;
+      const ctx2 = cropCanvas.getContext('2d');
+      if (!ctx2) { setSelecting(false); return; }
+      ctx2.drawImage(img, selX * scaleX, selY * scaleY, cw, ch, 0, 0, cw, ch);
+      const base64 = cropCanvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+      setSelecting(false);
+      setPhase('analyzing');
+      try {
+        const res = await analyzeImage(base64);
+        setEditedNodes((prev) => [...prev, ...toEditedNodes(res.nodes)]);
+        setPhase('result');
+      } catch {
+        setPhase('result');
+      }
+    };
+    img.src = capturedPreview;
+  }
+
   function flipCamera() {
     const next = facingMode === 'environment' ? 'user' : 'environment';
     setFacingMode(next);
@@ -638,6 +735,30 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
             </button>
             <button type="button" className="nesio-camera-retake-btn" onClick={retake}>重拍</button>
           </div>
+
+          {/* Bounding-box selection — only when there's a captured image */}
+          {capturedPreview && (
+            <button type="button" className="nesio-camera-select-btn" onClick={openSelection}>
+              🖊 再圈一个区域
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Selection overlay — finger-draw to crop & analyze a region */}
+      {selecting && capturedPreview && (
+        <div className="nesio-select-overlay">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={capturedPreview} alt="" className="nesio-select-image" draggable={false} />
+          <canvas
+            ref={selectCanvasRef}
+            className="nesio-select-canvas"
+            onTouchStart={handleSelTouchStart}
+            onTouchMove={handleSelTouchMove}
+            onTouchEnd={handleSelTouchEnd}
+          />
+          <div className="nesio-select-hint">用手指画框，圈住要识别的区域</div>
+          <button type="button" className="nesio-select-cancel" onClick={() => setSelecting(false)}>取消</button>
         </div>
       )}
 
