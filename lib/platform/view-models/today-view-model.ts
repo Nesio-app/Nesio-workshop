@@ -173,43 +173,48 @@ export function addCommitmentNode(name: string): FocusNode {
 export function focusTimeHint(node: FocusNode): string {
   const now = new Date();
   const DATE_KEYS = ['start', 'end', 'date', 'dueDate', 'due', 'deadline', 'datetime', 'scheduledAt', 'remindAt'];
-  // Check known date keys first for best label
+
+  function formatTimeHint(d: Date): string {
+    const diffMs = d.getTime() - now.getTime();
+    const hasTime = d.getHours() !== 0 || d.getMinutes() !== 0;
+    const timeStr = hasTime
+      ? d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+      : '';
+    if (diffMs < 0) return '已过期';
+    if (hasTime && diffMs < 60 * 60_000) {
+      const mins = Math.round(diffMs / 60_000);
+      return `${timeStr} · 还有 ${mins} 分钟`;
+    }
+    if (hasTime && diffMs < 8 * 3_600_000) {
+      const hrs = Math.floor(diffMs / 3_600_000);
+      const mins = Math.round((diffMs % 3_600_000) / 60_000);
+      return `${timeStr} · 还有 ${hrs > 0 ? `${hrs}h` : ''}${mins > 0 ? `${mins}m` : ''}`;
+    }
+    const diffDays = Math.round(diffMs / 86_400_000);
+    if (diffDays === 0) return hasTime ? `今天 ${timeStr}` : '今天';
+    if (diffDays === 1) return hasTime ? `明天 ${timeStr}` : '明天';
+    if (diffDays <= 7) return `${diffDays} 天后`;
+    return `约 ${Math.round(diffDays / 7)} 周后`;
+  }
+
   for (const key of DATE_KEYS) {
     const v = node.attributes[key];
     if (typeof v === 'string') {
       const d = new Date(v);
-      if (!Number.isNaN(d.getTime())) {
-        const diffMs = d.getTime() - now.getTime();
-        const days = Math.round(diffMs / 86_400_000);
-        if (diffMs < 0 && days >= -3) return '已过期';
-        if (days === 0) return '今天';
-        if (days === 1) return '明天';
-        if (days <= 7) return `${days} 天后`;
-        if (days <= 30) return `约 ${Math.round(days / 7)} 周后`;
-        return `${days} 天后`;
-      }
+      if (!Number.isNaN(d.getTime())) return formatTimeHint(d);
     }
   }
-  // Scan all attributes
   for (const v of Object.values(node.attributes)) {
     if (typeof v === 'string' && v.length >= 10) {
       const d = new Date(v);
-      if (!Number.isNaN(d.getTime()) && d.getFullYear() > 2020) {
-        const diffMs = d.getTime() - now.getTime();
-        const days = Math.round(diffMs / 86_400_000);
-        if (diffMs < 0 && days >= -3) return '已过期';
-        if (days === 0) return '今天';
-        if (days === 1) return '明天';
-        if (days <= 7) return `${days} 天后`;
-        if (days <= 30) return `约 ${Math.round(days / 7)} 周后`;
-      }
+      if (!Number.isNaN(d.getTime()) && d.getFullYear() > 2020) return formatTimeHint(d);
     }
   }
   const text = [node.name, node.rawInput || ''].join(' ').toLowerCase();
   if (text.includes('今天') || text.includes('今日')) return '今天';
   if (text.includes('明天') || text.includes('明日')) return '明天';
-  const hours = (now.getTime() - new Date(node.createdAt).getTime()) / 3_600_000;
-  if (hours < 24) return '刚记录';
+  const ageHours = (now.getTime() - new Date(node.createdAt).getTime()) / 3_600_000;
+  if (ageHours < 24) return '刚记录';
   return '';
 }
 

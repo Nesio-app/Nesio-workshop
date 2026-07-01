@@ -554,6 +554,138 @@ function MeetingCountdown({ startTime }: { startTime: Date }) {
   return <span className="nesio-focus-meeting-badge">{timeStr} · {countdown}</span>;
 }
 
+// ---- Focus Mode Sheet ----
+
+const FOCUS_DURATIONS = [
+  { label: '25 分钟', value: 25 },
+  { label: '50 分钟', value: 50 },
+  { label: '5 分钟', value: 5 },
+];
+
+function FocusModeSheet({ node, onClose, onDone }: {
+  node: FocusNode | null;
+  onClose: () => void;
+  onDone: (node: FocusNode) => void;
+}) {
+  const [durMin, setDurMin] = useState(25);
+  const [secsLeft, setSecsLeft] = useState(25 * 60);
+  const [running, setRunning] = useState(false);
+  const [finished, setFinished] = useState(false);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (!node) { setRunning(false); setFinished(false); return; }
+    setSecsLeft(durMin * 60);
+    setRunning(false);
+    setFinished(false);
+  }, [node, durMin]);
+
+  useEffect(() => {
+    if (running) {
+      intervalRef.current = setInterval(() => {
+        setSecsLeft((s) => {
+          if (s <= 1) {
+            clearInterval(intervalRef.current!);
+            setRunning(false);
+            setFinished(true);
+            return 0;
+          }
+          return s - 1;
+        });
+      }, 1000);
+    } else {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    }
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, [running]);
+
+  if (!node) return null;
+
+  const totalSecs = durMin * 60;
+  const progress = (totalSecs - secsLeft) / totalSecs;
+  const mm = String(Math.floor(secsLeft / 60)).padStart(2, '0');
+  const ss = String(secsLeft % 60).padStart(2, '0');
+  const hint = focusTimeHint(node);
+
+  function handleDurationChange(v: number) {
+    setDurMin(v);
+    setSecsLeft(v * 60);
+    setRunning(false);
+    setFinished(false);
+  }
+
+  return (
+    <div className="nesio-focus-mode-overlay" role="dialog" aria-modal aria-label="聚焦模式">
+      <div className="nesio-focus-mode-backdrop" onClick={onClose} />
+      <div className="nesio-focus-mode-sheet">
+        <button type="button" className="nesio-focus-mode-close" onClick={onClose} aria-label="退出聚焦">✕</button>
+
+        <p className="nesio-focus-mode-label">现在专注于</p>
+        <h2 className="nesio-focus-mode-title">{node.name}</h2>
+        {hint && <p className="nesio-focus-mode-hint">{hint}</p>}
+
+        {/* Circular timer */}
+        <div className="nesio-focus-mode-timer-wrap">
+          <svg viewBox="0 0 120 120" className="nesio-focus-mode-ring">
+            <circle cx="60" cy="60" r="54" fill="none" stroke="var(--portal-border, rgba(0,0,0,.08))" strokeWidth="8" />
+            <circle
+              cx="60" cy="60" r="54"
+              fill="none"
+              stroke={finished ? '#74c69d' : 'var(--portal-accent, #4a90d9)'}
+              strokeWidth="8"
+              strokeDasharray={`${2 * Math.PI * 54}`}
+              strokeDashoffset={`${2 * Math.PI * 54 * (1 - progress)}`}
+              strokeLinecap="round"
+              transform="rotate(-90 60 60)"
+              style={{ transition: 'stroke-dashoffset 1s linear' }}
+            />
+          </svg>
+          <div className="nesio-focus-mode-time">
+            {finished ? '🎉' : `${mm}:${ss}`}
+          </div>
+        </div>
+
+        {/* Duration picker */}
+        {!running && !finished && (
+          <div className="nesio-focus-mode-durations">
+            {FOCUS_DURATIONS.map((d) => (
+              <button
+                key={d.value}
+                type="button"
+                className={`nesio-focus-mode-dur-btn${durMin === d.value ? ' nesio-focus-mode-dur-btn--active' : ''}`}
+                onClick={() => handleDurationChange(d.value)}
+              >
+                {d.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {finished ? (
+          <p className="nesio-focus-mode-done-msg">时间到！要标记完成吗？</p>
+        ) : (
+          <button
+            type="button"
+            className="nesio-focus-mode-play-btn"
+            onClick={() => setRunning((r) => !r)}
+          >
+            {running ? '⏸ 暂停' : secsLeft < totalSecs ? '▶ 继续' : '▶ 开始'}
+          </button>
+        )}
+
+        <div className="nesio-focus-mode-actions">
+          <button type="button" className="nesio-focus-mode-done-btn" onClick={() => { onDone(node); onClose(); }}>
+            ✓ 完成了
+          </button>
+          <button type="button" className="nesio-focus-mode-later-btn" onClick={onClose}>
+            稍后再说
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ---- Meeting Recorder Sheet ----
 
 type SpeechRecAPI = {
@@ -844,8 +976,19 @@ function FocusCardDetail({
   }
 
   // Task view with 2-level decompose
+  const nodeUrl = Object.values(node.attributes).find(
+    (v) => typeof v === 'string' && (v.startsWith('http://') || v.startsWith('https://'))
+  ) as string | undefined;
+
   return (
     <div className="nesio-focus-detail">
+      {nodeUrl && (
+        <div className="nesio-focus-meeting-actions">
+          <a href={nodeUrl} target="_blank" rel="noopener noreferrer" className="nesio-focus-meeting-link-btn">
+            🔗 直达链接
+          </a>
+        </div>
+      )}
       {subtasks.length > 0 ? (
         <>
           <div className="nesio-focus-detail-progress">
@@ -948,10 +1091,12 @@ function TodayFocusSection({
   focusNodes,
   onOpenMemory,
   onOpenRecorder,
+  onFocusMode,
 }: {
   focusNodes: readonly FocusNode[];
   onOpenMemory?: () => void;
   onOpenRecorder?: (node: FocusNode) => void;
+  onFocusMode?: (node: FocusNode) => void;
 }) {
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
@@ -1057,6 +1202,17 @@ function TodayFocusSection({
                         )}
                       </p>
                     </button>
+                    {onFocusMode && !isDone && (
+                      <button
+                        type="button"
+                        className="nesio-focus-card-focus-btn"
+                        aria-label="进入聚焦模式"
+                        onClick={() => onFocusMode(node)}
+                        title="聚焦此事"
+                      >
+                        ◎
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="nesio-focus-card-dismiss"
@@ -1164,6 +1320,7 @@ export default function TodayFeed({
 
   // Meeting recorder state
   const [meetingRecorderNode, setMeetingRecorderNode] = useState<FocusNode | null>(null);
+  const [focusModeNode, setFocusModeNode] = useState<FocusNode | null>(null);
 
   useEffect(() => {
     if (canUsePrivateData) {
@@ -1277,8 +1434,16 @@ export default function TodayFeed({
           focusNodes={focusNodes}
           onOpenMemory={onOpenMemory}
           onOpenRecorder={(node) => setMeetingRecorderNode(node)}
+          onFocusMode={(node) => setFocusModeNode(node)}
         />
       </div>
+
+      {/* 聚焦模式 */}
+      <FocusModeSheet
+        node={focusModeNode}
+        onClose={() => setFocusModeNode(null)}
+        onDone={(node) => { markFocusNodeDone(node.id); setFocusModeNode(null); }}
+      />
 
       {/* 会议记录 sheet */}
       <MeetingRecorderSheet
