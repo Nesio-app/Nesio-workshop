@@ -9424,25 +9424,32 @@ html[data-portal-theme="night"] .nesio-type-chip {
 .nesio-tell-fan {
   position: relative;
   z-index: 1;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1.4rem 2.8rem;
-  padding: 0 2.4rem 2.8rem;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 0;
+  padding-bottom: 2.2rem;
 }
 
 .nesio-tell-fan-btn {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: flex-start;
+  min-width: 5rem;
   gap: 0.55rem;
   animation: tellFanIn 0.22s var(--ease-out) both;
   animation-delay: var(--delay, 0s);
 }
 
 @keyframes tellFanIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
+
+.nesio-tell-fan-btn--left  { transform: translate(-1.45rem, 0.45rem); margin-right: 0.25rem; }
+.nesio-tell-fan-btn--right { transform: translate(1.45rem, 0.45rem); margin-left: 0.25rem; }
+.nesio-tell-fan-btn--center { transform: translateY(-1.65rem); }
 
 .nesio-tell-fan-icon {
   width: 3.6rem;
@@ -11333,43 +11340,16 @@ html[data-portal-theme="night"] .nesio-mood-saved-text { color: #e8eefa; }
   margin: 0 auto 1rem;
 }
 
-.nesio-mood-header { text-align: center; margin-bottom: 1.1rem; }
 .nesio-mood-title {
-  font-size: 1.05rem;
-  font-weight: 700;
-  color: var(--portal-ink);
-  margin-bottom: 0.2rem;
+  text-align: center;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--portal-muted);
+  margin: 0.2rem 0 0;
 }
-html[data-portal-theme="night"] .nesio-mood-title { color: #e8eefa; }
-.nesio-mood-subtitle { font-size: 0.75rem; color: var(--portal-muted); }
+html[data-portal-theme="night"] .nesio-mood-title { color: #8899bb; }
 
-.nesio-mood-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-}
-
-.nesio-mood-token {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.22rem;
-  padding: 0.6rem 0.3rem;
-  border-radius: 0.85rem;
-  border: 1.5px solid var(--portal-line);
-  background: rgba(88,140,227,0.04);
-  transition: border-color 0.15s, background 0.15s, transform 0.1s;
-  cursor: pointer;
-}
-.nesio-mood-token--on {
-  border-color: var(--portal-accent, #4f8ef7);
-  background: rgba(99,102,241,0.14);
-  transform: scale(1.04);
-}
-.nesio-mood-token-emoji { font-size: 1.3rem; line-height: 1; }
-.nesio-mood-token-label { font-size: 0.65rem; font-weight: 600; color: var(--portal-muted); }
-.nesio-mood-token--on .nesio-mood-token-label { color: var(--portal-accent, #4f8ef7); }
+/* (token grid removed — now using SVG wheel) */
 
 .nesio-mood-note {
   width: 100%;
@@ -11399,38 +11379,103 @@ html[data-portal-theme="night"] .nesio-mood-title { color: #e8eefa; }
   color: #fff;
 }
 
-/* ─── 此刻如何 quick chip (TodayFeed) ─── */
-.nesio-mood-quick-chip {
+/* ─── Today top row: two circular buttons ─── */
+.nesio-today-top-row {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  width: 100%;
-  padding: 0.7rem 1rem;
-  margin: 0.1rem 0 0.4rem;
-  border-radius: 1rem;
-  border: 1.5px solid rgba(99,102,241,0.2);
-  background: rgba(99,102,241,0.06);
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
-  text-align: left;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
 }
-.nesio-mood-quick-chip:active { background: rgba(99,102,241,0.14); }
-.nesio-mood-quick-chip-icon { font-size: 1.1rem; flex-shrink: 0; }
-.nesio-mood-quick-chip-text {
+
+/* Brief circular button */
+.nesio-brief-circle {
   flex: 1;
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--portal-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 1.1rem 0.5rem;
+  border-radius: 1.25rem;
+  background: rgba(255,255,255,0.88);
+  border: 1.5px solid rgba(88,140,227,0.15);
+  box-shadow: 0 2px 12px rgba(88,140,227,0.1);
+  cursor: pointer;
+  transition: background 0.15s, box-shadow 0.15s;
 }
-.nesio-mood-quick-chip-arrow {
-  font-size: 0.85rem;
-  color: rgba(99,102,241,0.6);
-  transition: transform 0.15s;
+.nesio-brief-circle:disabled { opacity: 0.6; cursor: default; }
+.nesio-brief-circle:active { background: rgba(230,240,255,0.95); }
+.nesio-brief-circle--playing { background: rgba(88,140,227,0.12); border-color: rgba(88,140,227,0.35); }
+.nesio-brief-circle-icon { font-size: 1.7rem; line-height: 1; }
+.nesio-brief-circle-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--portal-blue-deep, #2c5db9);
+  white-space: nowrap;
 }
-.nesio-mood-quick-chip:hover .nesio-mood-quick-chip-arrow { transform: translateX(3px); }
-html[data-portal-theme="night"] .nesio-mood-quick-chip {
-  border-color: rgba(99,102,241,0.25);
-  background: rgba(99,102,241,0.1);
+html[data-portal-theme="night"] .nesio-brief-circle {
+  background: rgba(30,45,80,0.9);
+  border-color: rgba(88,140,227,0.25);
+}
+html[data-portal-theme="night"] .nesio-brief-circle-label { color: #8faaff; }
+
+/* 此刻 circular button */
+.nesio-mood-circle {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 1.1rem 0.5rem;
+  border-radius: 1.25rem;
+  background: rgba(255,255,255,0.88);
+  border: 1.5px solid rgba(99,102,241,0.18);
+  box-shadow: 0 2px 12px rgba(99,102,241,0.08);
+  cursor: pointer;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+.nesio-mood-circle:active { background: rgba(240,230,255,0.95); }
+.nesio-mood-circle-icon { font-size: 1.7rem; line-height: 1; }
+.nesio-mood-circle-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #6366f1;
+  white-space: nowrap;
+}
+html[data-portal-theme="night"] .nesio-mood-circle {
+  background: rgba(30,25,70,0.9);
+  border-color: rgba(99,102,241,0.3);
+}
+
+/* Mood wheel */
+.nesio-mood-wheel-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 0.5rem 0 0.2rem;
+}
+.nesio-mood-wheel-svg {
+  width: min(280px, 88vw);
+  height: min(280px, 88vw);
+  overflow: visible;
+}
+
+/* Selected pick chips */
+.nesio-mood-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  justify-content: center;
+  margin: 0.5rem 0 0.4rem;
+}
+.nesio-mood-pick-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: rgba(20,30,60,0.85);
 }
 
 /* ─── Memory Node Detail ─── */

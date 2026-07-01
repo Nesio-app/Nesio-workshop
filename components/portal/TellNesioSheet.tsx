@@ -6,7 +6,7 @@
  * to avoid the race condition where onClose() resets subSheet state.
  */
 
-export type CaptureMode = 'camera' | 'voice' | 'share' | 'mood';
+export type CaptureMode = 'camera' | 'voice' | 'share';
 
 interface TellNesioSheetProps {
   open: boolean;
@@ -17,12 +17,14 @@ interface TellNesioSheetProps {
 const FAN_BUTTONS: Array<{
   mode: CaptureMode;
   label: string;
-  icon: React.ReactNode;
+  pos: 'left' | 'center' | 'right';
   accent?: boolean;
+  icon: React.ReactNode;
 }> = [
   {
     mode: 'camera',
     label: '拍一下',
+    pos: 'left',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="26" height="26">
         <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
@@ -33,6 +35,7 @@ const FAN_BUTTONS: Array<{
   {
     mode: 'voice',
     label: '说一句',
+    pos: 'center',
     accent: true,
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="28" height="28">
@@ -42,20 +45,9 @@ const FAN_BUTTONS: Array<{
     ),
   },
   {
-    mode: 'mood',
-    label: '此刻',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="26" height="26">
-        <circle cx="12" cy="12" r="9.5"/>
-        <path d="M8.5 14.5s1 1.5 3.5 1.5 3.5-1.5 3.5-1.5"/>
-        <circle cx="9.5" cy="10.5" r="1" fill="currentColor" stroke="none"/>
-        <circle cx="14.5" cy="10.5" r="1" fill="currentColor" stroke="none"/>
-      </svg>
-    ),
-  },
-  {
     mode: 'share',
     label: '分析文件',
+    pos: 'right',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="26" height="26">
         <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
@@ -79,8 +71,8 @@ export default function TellNesioSheet({ open, onClose, onCapture }: TellNesioSh
           <button
             key={btn.mode}
             type="button"
-            className="nesio-tell-fan-btn"
-            style={{ '--delay': `${i * 0.04}s` } as React.CSSProperties}
+            className={`nesio-tell-fan-btn nesio-tell-fan-btn--${btn.pos}`}
+            style={{ '--delay': `${i * 0.05}s` } as React.CSSProperties}
             onClick={() => {
               onClose();
               onCapture(btn.mode);

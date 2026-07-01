@@ -2,15 +2,12 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { loadProfileSettings } from '@/lib/portal/profile';
-import { recordCardFeedback, type RecommendationCard } from '@/lib/portal/reasoning-engine';
 import { buildTodayViewModel, focusTimeHint, markFocusNodeDone, addCommitmentNode, addMeetingNotes, saveSubtasks, toggleSubtask, type FocusNode, type SubTask } from '@/lib/platform/view-models/today-view-model';
-import { learnFromFeedback } from '@/lib/portal/mirror-profile';
-import { recordSignalFeedback } from '@/lib/life-domain/signal-feedback';
+import { type RecommendationCard } from '@/lib/portal/reasoning-engine';
 import { cloudSignalRowsToSignals, type CloudSignalRow } from '@/lib/life-domain/signal-search';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
 import VoiceBrief from './VoiceBrief';
 import DailyBriefCard from './DailyBriefCard';
-import LifeStateCard from './LifeStateCard';
 import InsightsSheet from './InsightsSheet';
 
 // ---- Shared empty-state card ----
@@ -957,11 +954,9 @@ export default function TodayFeed({
   onOpenMemory?: () => void;
 }) {
   const [displayName, setDisplayName] = useState('');
-  const [cards, setCards] = useState<RecommendationCard[]>([]);
   const [memoryCount, setMemoryCount] = useState(0);
   const [memoryNotes, setMemoryNotes] = useState<readonly string[]>([]);
   const [focusNodes, setFocusNodes] = useState<readonly FocusNode[]>([]);
-  const [showMoreCards, setShowMoreCards] = useState(false);
   const [mirrorOpen, setMirrorOpen] = useState(false);
 
   // Proactive card state
@@ -985,7 +980,6 @@ export default function TodayFeed({
       const cloudSignals = await loadCloudSignals(canUsePrivateData);
       const updated = buildTodayViewModel({ canUsePrivateData, fallbackCards: EMPTY_SIGNAL_CARDS, cloudSignals });
       if (cancelled) return;
-      setCards(updated.cards);
       setMemoryCount(updated.memoryCount);
       setMemoryNotes(updated.memoryNotes);
       setFocusNodes(updated.focusNodes);
@@ -1027,36 +1021,6 @@ export default function TodayFeed({
     };
   }, [canUsePrivateData]);
 
-  function handleFeedback(cardId: string, feedback: RecommendationCard['feedback']) {
-    const card = cards.find((c) => c.id === cardId);
-    recordCardFeedback(cardId, feedback);
-    if (card) {
-      const evidenceSignalIds = Array.from(new Set([
-        ...(card.evidenceSignalIds || []),
-        ...card.evidence.map((entry) => entry.signalId).filter((id): id is string => Boolean(id)),
-      ]));
-      recordSignalFeedback(card, feedback);
-      learnFromFeedback(card.domain, feedback);
-      if (canUsePrivateData) {
-        void createAppApiClient().recordCloudProductEvent({
-          eventType: 'today.card.feedback',
-          source: 'today-feed',
-          targetType: card.type,
-          targetId: cardId,
-          feedback,
-          payload: {
-            domain: card.domain,
-            evidenceSignalIds,
-            sourceStatus: inferSourceStatus(card),
-          },
-        }).catch(() => {});
-      }
-    }
-    if (feedback === 'too_much' || feedback === 'useful' || feedback === 'not_now') {
-      setCards((prev) => prev.filter((c) => c.id !== cardId));
-    }
-  }
-
   const initials = canUsePrivateData ? (displayName.trim().slice(0, 1) || '我') : '我';
   const showProactive = !proactiveDismissed && proactiveCards.length > 0;
 
@@ -1075,20 +1039,24 @@ export default function TodayFeed({
       </header>
 
       <div className="nesio-today-scroll">
-        {/* 听今日简报 */}
-        <DailyBriefCard canUsePrivateData={canUsePrivateData} memoryCount={memoryCount} memoryNotes={memoryNotes} />
-
-        {/* 此刻如何 — 常驻快捷情绪记录入口 */}
-        <button
-          type="button"
-          className="nesio-mood-quick-chip"
-          onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-mood'))}
-          aria-label="记录此刻感受"
-        >
-          <span className="nesio-mood-quick-chip-icon" aria-hidden>🌡</span>
-          <span className="nesio-mood-quick-chip-text">此刻如何？</span>
-          <span className="nesio-mood-quick-chip-arrow" aria-hidden>→</span>
-        </button>
+        {/* 顶部双圆按钮：听简报 + 此刻 */}
+        <div className="nesio-today-top-row">
+          <DailyBriefCard
+            circular
+            canUsePrivateData={canUsePrivateData}
+            memoryCount={memoryCount}
+            memoryNotes={memoryNotes}
+          />
+          <button
+            type="button"
+            className="nesio-mood-circle"
+            onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-mood'))}
+            aria-label="记录此刻感受"
+          >
+            <span className="nesio-mood-circle-icon" aria-hidden>🌡</span>
+            <span className="nesio-mood-circle-label">此刻</span>
+          </button>
+        </div>
 
         {/* 未来引导卡片 — shows only when triggered */}
         {showProactive && (
@@ -1098,37 +1066,12 @@ export default function TodayFeed({
           />
         )}
 
-        {/* 今日聚焦 — max 2 visible, meeting + task actions */}
+        {/* 今日聚焦 — 会议 + 任务，max 2 visible */}
         <TodayFocusSection
           focusNodes={focusNodes}
           onOpenMemory={onOpenMemory}
           onOpenRecorder={(node) => setMeetingRecorderNode(node)}
         />
-
-        {/* 今日状态 */}
-        <LifeStateCard canUsePrivateData={canUsePrivateData} />
-
-        {/* AI 推荐卡片 */}
-        {cards.length > 0 && (
-          <div className="nesio-today-cards">
-            {(showMoreCards ? cards : cards.slice(0, 1)).map((card) =>
-              card.type === 'audio' ? (
-                <AudioCard key={card.id} card={card} onFeedback={(f) => handleFeedback(card.id, f)} />
-              ) : (
-                <StandardCard key={card.id} card={card} onFeedback={(f) => handleFeedback(card.id, f)} />
-              )
-            )}
-            {cards.length > 1 && (
-              <button
-                type="button"
-                className="nesio-today-more-btn"
-                onClick={() => setShowMoreCards((v) => !v)}
-              >
-                {showMoreCards ? '收起' : `更多（${cards.length - 1}）`}
-              </button>
-            )}
-          </div>
-        )}
       </div>
 
       {/* 会议记录 sheet */}

@@ -211,6 +211,7 @@ export default function Portal() {
   const [memoryReceipt, setMemoryReceipt] = useState(false);
   const [askGuideOpen, setAskGuideOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [moodOpen, setMoodOpen] = useState(false);
   const [launchSurfaceContext, setLaunchSurfaceContext] = useState({
     viewerRole: 'public' as 'public' | 'tester' | 'personal_lab',
     testerAllowlist: [] as string[],
@@ -351,7 +352,7 @@ export default function Portal() {
   useEffect(() => {
     const handler = () => setActiveSurface((s) => s === 'tell' ? 'today' : 'tell');
     const voiceHandler = () => setCaptureMode('voice');
-    const moodHandler = () => setCaptureMode('mood');
+    const moodHandler = () => setMoodOpen(true);
     window.addEventListener('nesio-open-tell', handler);
     window.addEventListener('nesio-open-voice', voiceHandler);
     window.addEventListener('nesio-open-mood', moodHandler);
@@ -590,7 +591,7 @@ export default function Portal() {
         onClose={() => { setCaptureMode(null); setVoiceIntent('note'); }}
       />
       <ShareSheet open={captureMode === 'share'} onClose={() => setCaptureMode(null)} />
-      <MoodSheet open={captureMode === 'mood'} onClose={() => setCaptureMode(null)} />
+      <MoodSheet open={moodOpen} onClose={() => setMoodOpen(false)} />
       <AskGuideSheet open={askGuideOpen} onClose={() => setAskGuideOpen(false)} onStart={openAskVoice} />
 
       <NesioChatSheet open={chatOpen} onClose={() => setChatOpen(false)} canUsePrivateData={canUsePrivateRuntime} />

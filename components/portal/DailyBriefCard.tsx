@@ -38,10 +38,12 @@ export default function DailyBriefCard({
   canUsePrivateData,
   memoryCount,
   memoryNotes,
+  circular,
 }: {
   canUsePrivateData: boolean;
   memoryCount: number;
   memoryNotes: readonly string[];
+  circular?: boolean;
 }) {
   const [weather, setWeather] = useState<WeatherView | null>(null);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
@@ -162,7 +164,37 @@ export default function DailyBriefCard({
     setPlayState('idle');
   }
 
-  // Slim strip — just a button row, not a full card.
+  function handlePlay() {
+    if (!canUsePrivateData) { window.location.href = '/login'; return; }
+    if (playState === 'playing') { stopPlay(); return; }
+    if (generated) { void playSegments(segments, 0); } else { void generateBrief(); }
+  }
+
+  // ── Circular mode: single round button (used in Today top row) ──
+  if (circular) {
+    const isPlaying = playState === 'playing';
+    const isLoading = playState === 'loading';
+    return (
+      <button
+        type="button"
+        className={`nesio-brief-circle${isPlaying ? ' nesio-brief-circle--playing' : ''}`}
+        onClick={handlePlay}
+        aria-label="听今日简报"
+        disabled={isLoading}
+      >
+        <span className="nesio-brief-circle-icon" aria-hidden>
+          {isPlaying
+            ? <span className="nesio-brief-strip-wave nesio-brief-strip-wave--sm" aria-hidden>{Array.from({ length: 4 }, (_, i) => <span key={i} style={{ animationDelay: `${i * 0.12}s` }} />)}</span>
+            : isLoading ? '⏳' : '🔊'}
+        </span>
+        <span className="nesio-brief-circle-label">
+          {isPlaying ? '播放中' : isLoading ? '生成中' : playState === 'done' ? '重播' : '听简报'}
+        </span>
+      </button>
+    );
+  }
+
+  // ── Strip mode (legacy, still used if needed) ──
   if (!canUsePrivateData) {
     return (
       <div className="nesio-brief-strip">
