@@ -8,12 +8,14 @@ import { learnFromFeedback } from '@/lib/portal/mirror-profile';
 import { recordSignalFeedback } from '@/lib/life-domain/signal-feedback';
 import { cloudSignalRowsToSignals, type CloudSignalRow } from '@/lib/life-domain/signal-search';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
+import { addLifeNode } from '@/lib/portal/life-graph';
 import VoiceBrief from './VoiceBrief';
 import DailyBriefCard from './DailyBriefCard';
 import LifeStateCard from './LifeStateCard';
 import InsightsSheet from './InsightsSheet';
 
-// Public fallback card: never implies Nesio knows private facts before consent/input.
+// ---- Shared empty-state card ----
+
 const EMPTY_SIGNAL_CARDS: RecommendationCard[] = [
   {
     id: 'needs-input-public',
@@ -34,6 +36,8 @@ const EMPTY_SIGNAL_CARDS: RecommendationCard[] = [
     sourceStatus: 'needs_input',
   },
 ];
+
+// ---- Signal / card helpers ----
 
 function inferSourceStatus(card: RecommendationCard): NonNullable<RecommendationCard['sourceStatus']> {
   if (card.sourceStatus) return card.sourceStatus;
@@ -70,6 +74,8 @@ async function loadCloudSignals(canUsePrivateData: boolean) {
   }
 }
 
+// ---- Recommendation cards (unchanged) ----
+
 function AudioCard({ card, onFeedback }: { card: RecommendationCard; onFeedback: (f: RecommendationCard['feedback']) => void }) {
   const [briefOpen, setBriefOpen] = useState(false);
   return (
@@ -89,7 +95,6 @@ function AudioCard({ card, onFeedback }: { card: RecommendationCard; onFeedback:
             <p className="nesio-today-card-body">{card.body}</p>
           </div>
         </div>
-        {/* Waveform teaser */}
         <div className="nesio-today-audio-player" style={{ cursor: 'pointer' }} onClick={() => setBriefOpen(true)}>
           <span className="nesio-today-audio-play">
             <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><polygon points="5,3 19,12 5,21"/></svg>
@@ -145,18 +150,11 @@ function FeedbackMenu({ onFeedback }: { onFeedback: (f: RecommendationCard['feed
   );
 }
 
-/** 45-char physical fuse (PRD §5.1): the causal explanation in the evidence
- *  drawer is hard-capped so scan-reading never causes second-order fatigue. */
 const EVIDENCE_CHAR_CAP = 45;
 function capEvidence(text: string): string {
   return text.length > EVIDENCE_CHAR_CAP ? text.slice(0, EVIDENCE_CHAR_CAP - 1) + '…' : text;
 }
 
-/**
- * Progressive Collapse card (PRD §5.1). Default state = "0 explanation burden":
- * one high-precision line + primary action. Evidence/reasoning stay hidden
- * until the user actively asks「为什么」, then a ≤45-char drawer slides out.
- */
 function StandardCard({ card, onFeedback }: { card: RecommendationCard; onFeedback: (f: RecommendationCard['feedback']) => void }) {
   const [done, setDone] = useState(false);
   const [why, setWhy] = useState(false);
@@ -165,7 +163,6 @@ function StandardCard({ card, onFeedback }: { card: RecommendationCard; onFeedba
 
   return (
     <div className="nesio-today-card nesio-today-card--collapse">
-      {/* Always-visible: one-line suggestion + actions */}
       <div className="nesio-today-card-row">
         <span className="nesio-today-card-icon-wrap" style={{ background: card.iconBg }}>{card.icon}</span>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -191,7 +188,6 @@ function StandardCard({ card, onFeedback }: { card: RecommendationCard; onFeedba
         </button>
       </div>
 
-      {/* Evidence drawer — only on demand, ≤45 chars */}
       {why && (
         <div className="nesio-today-evidence">
           <p className="nesio-today-evidence-text">{capEvidence(card.body)}</p>
@@ -215,30 +211,361 @@ function StandardCard({ card, onFeedback }: { card: RecommendationCard; onFeedba
   );
 }
 
-// --- Today Focus display constants ---
+// ---- Proactive guidance card ----
+
+interface ProactiveCardData {
+  id: string;
+  title: string;
+  body: string;
+  confidence: number;
+  sourceTags: string[];
+  icon: string;
+  priority: number;
+}
+
+function buildProactiveTriggers(focusNodes: readonly FocusNode[]) {
+  const triggers: Array<{
+    type: string;
+    data: Record<string, string | number | boolean | null>;
+    fallback: Omit<ProactiveCardData, 'id'>;
+  }> = [];
+  const now = new Date();
+
+  for (const node of focusNodes) {
+    const meetingTime = getMeetingTime(node);
+    if (meetingTime) {
+      const diffMs = meetingTime.getTime() - now.getTime();
+      const diffMin = Math.round(diffMs / 60_000);
+      if (diffMin > 0 && diffMin <= 120) {
+        triggers.push({
+          type: 'upcoming_meeting',
+          data: { name: node.name, minutesUntil: diffMin },
+          fallback: {
+            title: `${diffMin} 分钟后开始`,
+            body: `"${node.name}" 即将开始，提前准备好。`,
+            confidence: 92,
+            sourceTags: ['日历·即将开始'],
+            icon: '📅',
+            priority: 10,
+          },
+        });
+      }
+    }
+
+    if (node.type === 'commitment') {
+      for (const v of Object.values(node.attributes)) {
+        if (typeof v === 'string') {
+          const d = new Date(v);
+          if (!Number.isNaN(d.getTime())) {
+            const daysUntil = Math.round((d.getTime() - now.getTime()) / 86_400_000);
+            if (daysUntil === 0) {
+              triggers.push({
+                type: 'due_today',
+                data: { name: node.name },
+                fallback: {
+                  title: '今天截止',
+                  body: `"${node.name}" 今天到期，先拆一步开始。`,
+                  confidence: 90,
+                  sourceTags: ['任务·截止'],
+                  icon: '⏰',
+                  priority: 9,
+                },
+              });
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return triggers.slice(0, 3);
+}
+
+function ProactiveGuidanceCard({ card, onDismiss }: { card: ProactiveCardData; onDismiss: () => void }) {
+  return (
+    <div className="nesio-proactive-card">
+      <div className="nesio-proactive-card-inner">
+        <span className="nesio-proactive-card-icon">{card.icon}</span>
+        <div className="nesio-proactive-card-text">
+          <p className="nesio-proactive-card-title">{card.title}</p>
+          <p className="nesio-proactive-card-body">{card.body}</p>
+          {card.sourceTags.length > 0 && (
+            <div className="nesio-proactive-card-tags">
+              {card.sourceTags.map((tag) => (
+                <span key={tag} className="nesio-proactive-card-tag">{tag}</span>
+              ))}
+            </div>
+          )}
+        </div>
+        <button type="button" className="nesio-proactive-card-dismiss" onClick={onDismiss} aria-label="忽略">✕</button>
+      </div>
+    </div>
+  );
+}
+
+// ---- Meeting helpers ----
+
+const MEETING_KEYWORDS = ['会议', 'meeting', '视频会', '电话会', '面试', 'standup', '周会', '月会', '汇报', '面谈', '1on1', '同步'];
+
+function isMeetingNode(node: FocusNode): boolean {
+  if (node.type === 'event') return true;
+  const text = [node.name, node.rawInput || ''].join(' ').toLowerCase();
+  return MEETING_KEYWORDS.some((kw) => text.includes(kw));
+}
+
+function getMeetingTime(node: FocusNode): Date | null {
+  for (const v of Object.values(node.attributes)) {
+    if (typeof v === 'string') {
+      const d = new Date(v);
+      if (!Number.isNaN(d.getTime())) return d;
+    }
+  }
+  return null;
+}
+
+function getMeetingUrl(node: FocusNode): string | null {
+  const urlLike = Object.values(node.attributes).find(
+    (v) => typeof v === 'string' && (v.startsWith('http') || v.startsWith('zoom') || v.includes('meet.'))
+  );
+  return typeof urlLike === 'string' ? urlLike : null;
+}
+
+// ---- Meeting countdown ----
+
+function MeetingCountdown({ startTime }: { startTime: Date }) {
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => setTick((t) => t + 1), 30_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const now = new Date();
+  const diffMs = startTime.getTime() - now.getTime();
+  const timeStr = startTime.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+
+  if (diffMs < -120 * 60_000) return null;
+
+  if (diffMs < 0) {
+    const pastMin = Math.round(-diffMs / 60_000);
+    return <span className="nesio-focus-meeting-badge nesio-focus-meeting-badge--now">{timeStr} · 进行中 +{pastMin}min</span>;
+  }
+
+  const diffMin = Math.round(diffMs / 60_000);
+  if (diffMin <= 15) return <span className="nesio-focus-meeting-badge nesio-focus-meeting-badge--soon">{timeStr} · {diffMin}分钟后</span>;
+  const hh = Math.floor(diffMin / 60);
+  const mm = diffMin % 60;
+  const countdown = hh > 0 ? `${hh}h${mm}m后` : `${mm}分钟后`;
+  return <span className="nesio-focus-meeting-badge">{timeStr} · {countdown}</span>;
+}
+
+// ---- Meeting Recorder Sheet ----
+
+type SpeechRecAPI = {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: ((e: { results: ArrayLike<{ 0: { transcript: string } }> }) => void) | null;
+  start(): void;
+  stop(): void;
+};
+
+function MeetingRecorderSheet({ open, meetingNode, onClose }: {
+  open: boolean;
+  meetingNode: FocusNode | null;
+  onClose: () => void;
+}) {
+  const [recording, setRecording] = useState(false);
+  const [transcript, setTranscript] = useState('');
+  const [saved, setSaved] = useState(false);
+  const [seconds, setSeconds] = useState(0);
+  const recognitionRef = useRef<SpeechRecAPI | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      setRecording(false);
+      setTranscript('');
+      setSaved(false);
+      setSeconds(0);
+      if (recognitionRef.current) { recognitionRef.current.stop(); recognitionRef.current = null; }
+      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    }
+  }, [open]);
+
+  function startRecording() {
+    setRecording(true);
+    setSeconds(0);
+    timerRef.current = setInterval(() => setSeconds((s) => s + 1), 1000);
+
+    try {
+      const win = window as unknown as Record<string, unknown>;
+      const SpeechRec = (win.webkitSpeechRecognition || win.SpeechRecognition) as (new () => SpeechRecAPI) | undefined;
+      if (SpeechRec) {
+        const rec = new SpeechRec();
+        rec.continuous = true;
+        rec.interimResults = true;
+        rec.lang = 'zh-CN';
+        rec.onresult = (e) => {
+          const text = Array.from(e.results).map((r) => r[0].transcript).join('');
+          setTranscript(text);
+        };
+        rec.start();
+        recognitionRef.current = rec;
+      }
+    } catch {
+      // SpeechRecognition not available — manual input still works
+    }
+  }
+
+  function stopRecording() {
+    setRecording(false);
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    if (recognitionRef.current) { recognitionRef.current.stop(); recognitionRef.current = null; }
+  }
+
+  function saveNotes() {
+    const finalText = transcript.trim() || '（无内容）';
+    const nowStr = new Date().toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    addLifeNode({
+      name: `会议记录 · ${meetingNode?.name || nowStr}`,
+      type: 'commitment',
+      tags: ['会议记录', 'meeting-notes'],
+      attributes: {
+        meetingNodeId: meetingNode?.id || '',
+        notes: finalText,
+        recordedAt: new Date().toISOString(),
+      },
+      rawInput: finalText,
+      confidence: 1,
+      source: 'voice',
+      relations: [],
+    });
+    setSaved(true);
+    setTimeout(() => onClose(), 1800);
+  }
+
+  const formatTime = (s: number) =>
+    `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;
+
+  if (!open) return null;
+
+  return (
+    <div className="nesio-recorder-overlay" role="dialog" aria-modal aria-label="会议记录">
+      <div className="nesio-recorder-backdrop" onClick={onClose} />
+      <div className="nesio-recorder-sheet">
+        <div className="nesio-sheet-handle" aria-hidden />
+
+        {saved ? (
+          <div className="nesio-recorder-saved">
+            <span className="nesio-recorder-saved-icon">📝</span>
+            <p className="nesio-recorder-saved-title">会议记录已保存</p>
+            <p className="nesio-recorder-saved-hint">已存入记忆，和会议条目关联</p>
+          </div>
+        ) : (
+          <>
+            <div className="nesio-recorder-header">
+              <p className="nesio-recorder-title">🎙 会议记录</p>
+              {meetingNode && <p className="nesio-recorder-meeting-name">{meetingNode.name}</p>}
+            </div>
+
+            <div className="nesio-recorder-body">
+              <div className="nesio-recorder-viz">
+                {recording ? (
+                  <>
+                    <div className="nesio-recorder-wave">
+                      {Array.from({ length: 20 }, (_, i) => (
+                        <span key={i} className="nesio-recorder-wave-bar" style={{ animationDelay: `${i * 0.06}s` }} />
+                      ))}
+                    </div>
+                    <span className="nesio-recorder-timer">{formatTime(seconds)}</span>
+                  </>
+                ) : (
+                  <span className="nesio-recorder-mic-icon">🎙</span>
+                )}
+              </div>
+
+              {transcript ? (
+                <div className="nesio-recorder-transcript">
+                  <p className="nesio-recorder-transcript-label">转写内容</p>
+                  <p className="nesio-recorder-transcript-text">{transcript}</p>
+                </div>
+              ) : (
+                !recording && <p className="nesio-recorder-hint">点击录音，自动转写中文语音</p>
+              )}
+            </div>
+
+            <div className="nesio-recorder-actions">
+              {!recording ? (
+                <button type="button" className="nesio-recorder-start-btn" onClick={startRecording}>开始录音</button>
+              ) : (
+                <button type="button" className="nesio-recorder-stop-btn" onClick={stopRecording}>停止录音</button>
+              )}
+
+              {!recording && (
+                <textarea
+                  className="nesio-recorder-notes-input"
+                  placeholder="或直接输入会议笔记…"
+                  value={transcript}
+                  onChange={(e) => setTranscript(e.target.value)}
+                  rows={3}
+                />
+              )}
+
+              <button
+                type="button"
+                className={`nesio-recorder-save-btn${transcript.trim() ? ' nesio-recorder-save-btn--ready' : ''}`}
+                onClick={saveNotes}
+                disabled={recording || !transcript.trim()}
+              >
+                {transcript.trim() ? '保存会议记录' : '先录音或输入笔记'}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---- Focus card constants ----
 
 const FOCUS_TYPE_LABEL: Record<string, string> = {
-  commitment: '承诺', event: '日程', object: '物品', person: '联系人',
+  commitment: '任务', event: '日程', object: '物品', person: '联系人',
   place: '地点', health_state: '健康', preference: '偏好',
 };
 const FOCUS_TYPE_ICON: Record<string, string> = {
-  commitment: '🤝', event: '📅', object: '📦', person: '👤',
+  commitment: '📋', event: '📅', object: '📦', person: '👤',
   place: '📍', health_state: '🩷', preference: '⭐',
 };
-const FOCUS_TYPE_BG: Record<string, string> = {
-  commitment: '#ede9fe', event: '#fef3c7', object: '#dbeafe',
-  person: '#e0e7ff', place: '#d1fae5', health_state: '#fce7f3', preference: '#f0fdf4',
-};
+
+// ---- Enhanced FocusCardDetail — 2-level decompose + meeting actions ----
+
+interface SubStep {
+  id: string;
+  name: string;
+  emoji: string;
+  durationMin: number;
+  done: boolean;
+}
 
 function FocusCardDetail({
   node,
   onSubtasksChange,
+  onOpenRecorder,
 }: {
   node: FocusNode;
   onSubtasksChange: (nodeId: string, subtasks: SubTask[]) => void;
+  onOpenRecorder?: () => void;
 }) {
   const [subtasks, setSubtasks] = useState<SubTask[]>(node.subtasks ?? []);
   const [decomposing, setDecomposing] = useState(false);
+  const [subStepsMap, setSubStepsMap] = useState<Map<string, SubStep[]>>(new Map());
+  const [drillingId, setDrillingId] = useState<string | null>(null);
+
+  const isMeeting = isMeetingNode(node);
+  const meetingUrl = getMeetingUrl(node);
+  const meetingTime = getMeetingTime(node);
 
   async function handleDecompose() {
     setDecomposing(true);
@@ -265,6 +592,37 @@ function FocusCardDetail({
     setDecomposing(false);
   }
 
+  async function handleDrill(subtask: SubTask) {
+    setDrillingId(subtask.id);
+    try {
+      const res = await fetch('/api/portal/decompose-task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskName: subtask.name, context: node.name, drill: true }),
+      });
+      const data = await res.json() as { ok?: boolean; steps?: Array<{ name: string; emoji: string; durationMin: number }> };
+      if (data.ok && data.steps?.length) {
+        const steps: SubStep[] = data.steps.map((s, i) => ({
+          id: `ss-${Date.now()}-${i}`,
+          name: s.name,
+          emoji: s.emoji || '▸',
+          durationMin: s.durationMin || 1,
+          done: false,
+        }));
+        setSubStepsMap((prev) => new Map(prev).set(subtask.id, steps));
+      }
+    } catch { /* ignore */ }
+    setDrillingId(null);
+  }
+
+  function toggleSubStep(subtaskId: string, stepId: string) {
+    setSubStepsMap((prev) => {
+      const steps = prev.get(subtaskId) ?? [];
+      const updated = steps.map((s) => s.id === stepId ? { ...s, done: !s.done } : s);
+      return new Map(prev).set(subtaskId, updated);
+    });
+  }
+
   function handleToggle(subtaskId: string) {
     const next = subtasks.map((s) => s.id === subtaskId ? { ...s, done: !s.done } : s);
     setSubtasks(next);
@@ -275,6 +633,35 @@ function FocusCardDetail({
   const doneCount = subtasks.filter((s) => s.done).length;
   const totalMin = subtasks.reduce((acc, s) => acc + (s.durationMin ?? 0), 0);
 
+  // Meeting view
+  if (isMeeting) {
+    return (
+      <div className="nesio-focus-detail nesio-focus-detail--meeting">
+        <div className="nesio-focus-meeting-actions">
+          {meetingUrl && (
+            <a
+              href={meetingUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="nesio-focus-meeting-link-btn"
+            >
+              🔗 进入会议
+            </a>
+          )}
+          {onOpenRecorder && (
+            <button type="button" className="nesio-focus-meeting-record-btn" onClick={onOpenRecorder}>
+              🎙 会议记录
+            </button>
+          )}
+        </div>
+        {meetingTime && (
+          <p className="nesio-focus-meeting-prep-hint">提前 5 分钟打开，检查静音和摄像头</p>
+        )}
+      </div>
+    );
+  }
+
+  // Task view with 2-level decompose
   return (
     <div className="nesio-focus-detail">
       {subtasks.length > 0 ? (
@@ -283,36 +670,89 @@ function FocusCardDetail({
             <span className="nesio-focus-detail-progress-label">{doneCount}/{subtasks.length} 步完成</span>
             {totalMin > 0 && <span className="nesio-focus-detail-progress-time">共 {totalMin} 分钟</span>}
             <div className="nesio-focus-detail-progress-bar">
-              <div className="nesio-focus-detail-progress-fill" style={{ width: `${subtasks.length ? (doneCount / subtasks.length) * 100 : 0}%` }} />
+              <div
+                className="nesio-focus-detail-progress-fill"
+                style={{ width: `${subtasks.length ? (doneCount / subtasks.length) * 100 : 0}%` }}
+              />
             </div>
           </div>
+
           <ul className="nesio-focus-subtask-list">
-            {subtasks.map((s) => (
-              <li key={s.id} className={`nesio-focus-subtask${s.done ? ' nesio-focus-subtask--done' : ''}`}>
-                <button
-                  type="button"
-                  className={`nesio-focus-subtask-check${s.done ? ' nesio-focus-subtask-check--checked' : ''}`}
-                  onClick={() => handleToggle(s.id)}
-                  aria-label={s.done ? '取消完成' : '标记完成'}
-                >
-                  {s.done ? '✓' : '○'}
-                </button>
-                <span className="nesio-focus-subtask-emoji">{s.emoji || '▸'}</span>
-                <span className="nesio-focus-subtask-name">{s.name}</span>
-                {s.durationMin && <span className="nesio-focus-subtask-time">{s.durationMin} min.</span>}
-              </li>
-            ))}
+            {subtasks.map((s) => {
+              const subSteps = subStepsMap.get(s.id);
+              const isDrilling = drillingId === s.id;
+              const subDoneCount = subSteps?.filter((ss) => ss.done).length ?? 0;
+
+              return (
+                <li key={s.id} className={`nesio-focus-subtask${s.done ? ' nesio-focus-subtask--done' : ''}`}>
+                  <div className="nesio-focus-subtask-row">
+                    <button
+                      type="button"
+                      className={`nesio-focus-subtask-check${s.done ? ' nesio-focus-subtask-check--checked' : ''}`}
+                      onClick={() => handleToggle(s.id)}
+                      aria-label={s.done ? '取消完成' : '标记完成'}
+                    >
+                      {s.done ? '✓' : '○'}
+                    </button>
+                    <span className="nesio-focus-subtask-emoji">{s.emoji || '▸'}</span>
+                    <span className="nesio-focus-subtask-name">{s.name}</span>
+                    {s.durationMin ? <span className="nesio-focus-subtask-time">{s.durationMin}m</span> : null}
+                    {!subSteps && !isDrilling && !s.done && (
+                      <button
+                        type="button"
+                        className="nesio-focus-drill-btn"
+                        onClick={() => handleDrill(s)}
+                      >
+                        再拆
+                      </button>
+                    )}
+                    {isDrilling && <span className="nesio-focus-drill-loading">…</span>}
+                    {subSteps && (
+                      <span className="nesio-focus-drill-badge">{subDoneCount}/{subSteps.length}</span>
+                    )}
+                  </div>
+
+                  {subSteps && (
+                    <ul className="nesio-focus-substep-list">
+                      {subSteps.map((ss) => (
+                        <li
+                          key={ss.id}
+                          className={`nesio-focus-substep${ss.done ? ' nesio-focus-substep--done' : ''}`}
+                        >
+                          <button
+                            type="button"
+                            className={`nesio-focus-substep-check${ss.done ? ' nesio-focus-substep-check--checked' : ''}`}
+                            onClick={() => toggleSubStep(s.id, ss.id)}
+                          >
+                            {ss.done ? '✓' : '·'}
+                          </button>
+                          <span className="nesio-focus-substep-emoji">{ss.emoji}</span>
+                          <span className="nesio-focus-substep-name">{ss.name}</span>
+                          <span className="nesio-focus-substep-time">{ss.durationMin}m</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              );
+            })}
           </ul>
-          <button type="button" className="nesio-focus-decompose-btn nesio-focus-decompose-btn--rerun" onClick={handleDecompose} disabled={decomposing}>
+
+          <button
+            type="button"
+            className="nesio-focus-decompose-btn nesio-focus-decompose-btn--rerun"
+            onClick={handleDecompose}
+            disabled={decomposing}
+          >
             {decomposing ? '重新拆解中…' : '↺ 重新拆解'}
           </button>
         </>
       ) : (
         <button type="button" className="nesio-focus-decompose-btn" onClick={handleDecompose} disabled={decomposing}>
           {decomposing ? (
-            <><span className="nesio-focus-decompose-spinner" />AI 拆解中…</>
+            <><span className="nesio-focus-decompose-spinner" />拆解中…</>
           ) : (
-            <>✦ AI 拆解步骤</>
+            <>✦ 拆解任务</>
           )}
         </button>
       )}
@@ -320,22 +760,29 @@ function FocusCardDetail({
   );
 }
 
+// ---- Enhanced TodayFocusSection — max 2 visible + collapse ----
+
 function TodayFocusSection({
   focusNodes,
   onOpenMemory,
+  onOpenRecorder,
 }: {
   focusNodes: readonly FocusNode[];
   onOpenMemory?: () => void;
+  onOpenRecorder?: (node: FocusNode) => void;
 }) {
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [quickAdd, setQuickAdd] = useState('');
   const [localNodes, setLocalNodes] = useState<FocusNode[]>([]);
+  const [showAll, setShowAll] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const allNodes = [...localNodes, ...focusNodes.filter((n) => !localNodes.some((l) => l.id === n.id))];
   const visible = allNodes.filter((n) => !dismissed.has(n.id));
+  const displayNodes = showAll ? visible : visible.slice(0, 2);
+  const hiddenCount = visible.length - displayNodes.length;
 
   function handleDone(node: FocusNode) {
     setDoneIds((prev) => { const next = new Set(prev); next.add(node.id); return next; });
@@ -366,10 +813,10 @@ function TodayFocusSection({
   return (
     <div className="nesio-focus-section">
       <div className="nesio-focus-header">
-        <h2 className="nesio-focus-title">今日焦点</h2>
+        <h2 className="nesio-focus-title">今日聚焦</h2>
         <div className="nesio-focus-header-right">
           {doneToday > 0 && (
-            <span className="nesio-focus-done-badge">✓ 今天完成了 {doneToday} 件</span>
+            <span className="nesio-focus-done-badge">✓ 完成了 {doneToday} 件</span>
           )}
           {onOpenMemory && (
             <button type="button" className="nesio-focus-all-btn" onClick={onOpenMemory}>全部 ›</button>
@@ -379,60 +826,88 @@ function TodayFocusSection({
 
       {visible.length === 0 ? (
         <div className="nesio-focus-empty">
-          <p>今天暂无焦点事项</p>
-          <p className="nesio-focus-empty-hint">{'说一句带时间的话（比如"生日在周五"），就会出现在这里。'}</p>
+          <p>今天暂无聚焦事项</p>
+          <p className="nesio-focus-empty-hint">{'说一句带时间的话（比如"周五有会议"），就会出现在这里。'}</p>
         </div>
       ) : (
-        <div className="nesio-focus-cards">
-          {visible.map((node) => {
-            const hint = focusTimeHint(node);
-            const isDone = doneIds.has(node.id);
-            const isExpanded = expandedId === node.id;
-            const subtasks = node.subtasks ?? [];
-            const doneSubtasks = subtasks.filter((s) => s.done).length;
+        <>
+          <div className="nesio-focus-cards">
+            {displayNodes.map((node) => {
+              const hint = focusTimeHint(node);
+              const isDone = doneIds.has(node.id);
+              const isExpanded = expandedId === node.id;
+              const isMeeting = isMeetingNode(node);
+              const meetingTime = isMeeting ? getMeetingTime(node) : null;
+              const subtasks = node.subtasks ?? [];
+              const doneSubtasks = subtasks.filter((s) => s.done).length;
+              const typeIcon = isMeeting ? '📅' : (FOCUS_TYPE_ICON[node.type] || '📋');
+              const typeLabel = isMeeting ? '会议' : (FOCUS_TYPE_LABEL[node.type] || '记录');
 
-            return (
-              <div key={node.id} className={`nesio-focus-card${isDone ? ' nesio-focus-card--done' : ''}${isExpanded ? ' nesio-focus-card--expanded' : ''}`}>
-                <div className="nesio-focus-card-row">
-                  <button
-                    type="button"
-                    className={`nesio-focus-card-check${isDone ? ' nesio-focus-card-check--checked' : ''}`}
-                    aria-label="完成"
-                    onClick={() => handleDone(node)}
-                  >
-                    {isDone ? '✓' : '○'}
-                  </button>
-                  <button
-                    type="button"
-                    className="nesio-focus-card-body nesio-focus-card-body--tap"
-                    onClick={() => setExpandedId(isExpanded ? null : node.id)}
-                  >
-                    <p className="nesio-focus-card-title">{node.name}</p>
-                    <p className="nesio-focus-card-meta">
-                      <span className="nesio-focus-card-type">{FOCUS_TYPE_LABEL[node.type] || '记录'}</span>
-                      {hint && <span className="nesio-focus-card-hint">{hint}</span>}
-                      {subtasks.length > 0 && (
-                        <span className="nesio-focus-card-subtask-badge">{doneSubtasks}/{subtasks.length} 步</span>
-                      )}
-                    </p>
-                  </button>
-                  <button
-                    type="button"
-                    className="nesio-focus-card-dismiss"
-                    aria-label="暂时忽略"
-                    onClick={() => setDismissed((prev) => { const next = new Set(prev); next.add(node.id); return next; })}
-                  >
-                    ✕
-                  </button>
+              return (
+                <div
+                  key={node.id}
+                  className={`nesio-focus-card${isDone ? ' nesio-focus-card--done' : ''}${isExpanded ? ' nesio-focus-card--expanded' : ''}`}
+                >
+                  <div className="nesio-focus-card-row">
+                    <button
+                      type="button"
+                      className={`nesio-focus-card-check${isDone ? ' nesio-focus-card-check--checked' : ''}`}
+                      aria-label="完成"
+                      onClick={() => handleDone(node)}
+                    >
+                      {isDone ? '✓' : '○'}
+                    </button>
+                    <button
+                      type="button"
+                      className="nesio-focus-card-body nesio-focus-card-body--tap"
+                      onClick={() => setExpandedId(isExpanded ? null : node.id)}
+                    >
+                      <p className="nesio-focus-card-title">
+                        <span className="nesio-focus-card-type-icon">{typeIcon}</span>
+                        {node.name}
+                      </p>
+                      <p className="nesio-focus-card-meta">
+                        <span className="nesio-focus-card-type">{typeLabel}</span>
+                        {meetingTime && <MeetingCountdown startTime={meetingTime} />}
+                        {!meetingTime && hint && <span className="nesio-focus-card-hint">{hint}</span>}
+                        {subtasks.length > 0 && (
+                          <span className="nesio-focus-card-subtask-badge">{doneSubtasks}/{subtasks.length} 步</span>
+                        )}
+                      </p>
+                    </button>
+                    <button
+                      type="button"
+                      className="nesio-focus-card-dismiss"
+                      aria-label="暂时忽略"
+                      onClick={() => setDismissed((prev) => { const next = new Set(prev); next.add(node.id); return next; })}
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  {isExpanded && (
+                    <FocusCardDetail
+                      node={node}
+                      onSubtasksChange={handleSubtasksChange}
+                      onOpenRecorder={isMeeting && onOpenRecorder ? () => onOpenRecorder(node) : undefined}
+                    />
+                  )}
                 </div>
+              );
+            })}
+          </div>
 
-                {isExpanded && (
-                  <FocusCardDetail node={node} onSubtasksChange={handleSubtasksChange} />
-                )}
-              </div>
-            );
-          })}
-        </div>
+          {hiddenCount > 0 && (
+            <button type="button" className="nesio-focus-show-more-btn" onClick={() => setShowAll(true)}>
+              还有 {hiddenCount} 条 ↓
+            </button>
+          )}
+          {showAll && visible.length > 2 && (
+            <button type="button" className="nesio-focus-show-less-btn" onClick={() => setShowAll(false)}>
+              收起 ↑
+            </button>
+          )}
+        </>
       )}
 
       <form className="nesio-focus-quick-add" onSubmit={handleQuickAdd}>
@@ -451,6 +926,8 @@ function TodayFocusSection({
     </div>
   );
 }
+
+// ---- Night timeline ----
 
 function NightTimeline() {
   return (
@@ -484,6 +961,8 @@ function NightTimeline() {
   );
 }
 
+// ---- Main TodayFeed component ----
+
 export default function TodayFeed({
   canUsePrivateData,
   onOpenMemory,
@@ -499,6 +978,13 @@ export default function TodayFeed({
   const [showMoreCards, setShowMoreCards] = useState(false);
   const [mirrorOpen, setMirrorOpen] = useState(false);
 
+  // Proactive card state
+  const [proactiveCards, setProactiveCards] = useState<ProactiveCardData[]>([]);
+  const [proactiveDismissed, setProactiveDismissed] = useState(false);
+
+  // Meeting recorder state
+  const [meetingRecorderNode, setMeetingRecorderNode] = useState<FocusNode | null>(null);
+
   useEffect(() => {
     if (canUsePrivateData) {
       const profile = loadProfileSettings();
@@ -507,11 +993,8 @@ export default function TodayFeed({
       setDisplayName('');
     }
 
-
     let cancelled = false;
 
-    // Load cards through the Experience view-model. Cloud Signals are preferred
-    // for signed-in users, with local projections kept as compatibility fallback.
     const applyViewModel = async () => {
       const cloudSignals = await loadCloudSignals(canUsePrivateData);
       const updated = buildTodayViewModel({ canUsePrivateData, fallbackCards: EMPTY_SIGNAL_CARDS, cloudSignals });
@@ -520,13 +1003,30 @@ export default function TodayFeed({
       setMemoryCount(updated.memoryCount);
       setMemoryNotes(updated.memoryNotes);
       setFocusNodes(updated.focusNodes);
+
+      // Fire proactive card fetch if we have focus nodes with triggers
+      if (canUsePrivateData && updated.focusNodes.length > 0) {
+        const triggers = buildProactiveTriggers(updated.focusNodes);
+        if (triggers.length > 0) {
+          fetch('/api/portal/proactive', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ triggers }),
+          })
+            .then((r) => r.json())
+            .then((d: { cards?: ProactiveCardData[] }) => {
+              if (!cancelled && d.cards?.length) {
+                setProactiveCards(d.cards);
+                setProactiveDismissed(false);
+              }
+            })
+            .catch(() => {});
+        }
+      }
     };
     void applyViewModel();
 
-    const refresh = () => {
-      void applyViewModel();
-    };
-
+    const refresh = () => { void applyViewModel(); };
     window.addEventListener('nesio-life-graph-updated', refresh);
     window.addEventListener('nesio-connectors-refreshed', refresh);
     window.addEventListener('nesio-weather-updated', refresh);
@@ -572,6 +1072,7 @@ export default function TodayFeed({
   }
 
   const initials = canUsePrivateData ? (displayName.trim().slice(0, 1) || '我') : '我';
+  const showProactive = !proactiveDismissed && proactiveCards.length > 0;
 
   return (
     <div className="nesio-today-root">
@@ -588,39 +1089,58 @@ export default function TodayFeed({
       </header>
 
       <div className="nesio-today-scroll">
-        <>
-            {/* 🔊 Slim briefing strip — just a button, not a card section */}
-            <DailyBriefCard canUsePrivateData={canUsePrivateData} memoryCount={memoryCount} memoryNotes={memoryNotes} />
+        {/* 听今日简报 */}
+        <DailyBriefCard canUsePrivateData={canUsePrivateData} memoryCount={memoryCount} memoryNotes={memoryNotes} />
 
-            {/* 今日焦点 — time-relevant Memory nodes surfaced via TodayViewModel */}
-            <TodayFocusSection focusNodes={focusNodes} onOpenMemory={onOpenMemory} />
+        {/* 未来引导卡片 — shows only when triggered */}
+        {showProactive && (
+          <ProactiveGuidanceCard
+            card={proactiveCards[0]}
+            onDismiss={() => setProactiveDismissed(true)}
+          />
+        )}
 
-            {/* 今日状态 — health/energy only; hidden when no real signal data */}
-            <LifeStateCard canUsePrivateData={canUsePrivateData} />
+        {/* 今日聚焦 — max 2 visible, meeting + task actions */}
+        <TodayFocusSection
+          focusNodes={focusNodes}
+          onOpenMemory={onOpenMemory}
+          onOpenRecorder={(node) => setMeetingRecorderNode(node)}
+        />
 
-            {/* Secondary: AI recommendation cards (shown below fold) */}
-            {cards.length > 0 && (
-              <div className="nesio-today-cards">
-                {(showMoreCards ? cards : cards.slice(0, 1)).map((card) =>
-                  card.type === 'audio' ? (
-                    <AudioCard key={card.id} card={card} onFeedback={(f) => handleFeedback(card.id, f)} />
-                  ) : (
-                    <StandardCard key={card.id} card={card} onFeedback={(f) => handleFeedback(card.id, f)} />
-                  )
-                )}
-                {cards.length > 1 && (
-                  <button
-                    type="button"
-                    className="nesio-today-more-btn"
-                    onClick={() => setShowMoreCards((value) => !value)}
-                  >
-                    {showMoreCards ? '收起' : `更多（${cards.length - 1}）`}
-                  </button>
-                )}
-              </div>
+        {/* 今日状态 */}
+        <LifeStateCard canUsePrivateData={canUsePrivateData} />
+
+        {/* AI 推荐卡片 */}
+        {cards.length > 0 && (
+          <div className="nesio-today-cards">
+            {(showMoreCards ? cards : cards.slice(0, 1)).map((card) =>
+              card.type === 'audio' ? (
+                <AudioCard key={card.id} card={card} onFeedback={(f) => handleFeedback(card.id, f)} />
+              ) : (
+                <StandardCard key={card.id} card={card} onFeedback={(f) => handleFeedback(card.id, f)} />
+              )
             )}
-        </>
+            {cards.length > 1 && (
+              <button
+                type="button"
+                className="nesio-today-more-btn"
+                onClick={() => setShowMoreCards((v) => !v)}
+              >
+                {showMoreCards ? '收起' : `更多（${cards.length - 1}）`}
+              </button>
+            )}
+          </div>
+        )}
       </div>
+
+      {/* 会议记录 sheet */}
+      <MeetingRecorderSheet
+        open={meetingRecorderNode !== null}
+        meetingNode={meetingRecorderNode}
+        onClose={() => setMeetingRecorderNode(null)}
+      />
+
+      {/* Insights mirror */}
       {mirrorOpen && (
         <div className="nesio-settings-sheet-overlay" role="dialog" aria-modal="true" aria-label="Nesio 的洞察">
           <button type="button" className="nesio-settings-sheet-backdrop" onClick={() => setMirrorOpen(false)} aria-label="关闭" />
