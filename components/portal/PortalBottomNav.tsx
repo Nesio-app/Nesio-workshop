@@ -1,6 +1,5 @@
 'use client';
 
-import { useRef } from 'react';
 import type { PortalLocale } from '@/lib/portal/profile';
 
 interface PortalBottomNavProps {
@@ -10,38 +9,15 @@ interface PortalBottomNavProps {
   onTell: () => void;
   onAsk?: () => void;
   onMemory: () => void;
+  onChatOpen: () => void;
 }
 
 export default function PortalBottomNav({
   activeSurface,
   onToday,
-  onTell,
-  onAsk,
   onMemory,
+  onChatOpen,
 }: PortalBottomNavProps) {
-  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const longPressFired = useRef(false);
-
-  function clearLongPressTimer() {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-    }
-  }
-
-  function startLongPress() {
-    longPressFired.current = false;
-    clearLongPressTimer();
-    longPressTimer.current = setTimeout(() => {
-      longPressFired.current = true;
-      onAsk?.();
-    }, 520);
-  }
-
-  function finishLongPress() {
-    clearLongPressTimer();
-  }
-
   return (
     <nav className="nesio-bottom-nav" aria-label="主导航">
       {/* Today */}
@@ -59,23 +35,12 @@ export default function PortalBottomNav({
         <span className="nesio-bottom-nav-label">Today</span>
       </button>
 
-      {/* Nesio center button */}
+      {/* Nesio center button — single tap opens chat sheet */}
       <button
         type="button"
-        className={`nesio-bottom-nav-center${activeSurface === 'tell' ? ' nesio-bottom-nav-center--active' : ''}`}
-        onPointerDown={startLongPress}
-        onPointerUp={finishLongPress}
-        onPointerCancel={finishLongPress}
-        onPointerLeave={finishLongPress}
-        onClick={() => {
-          if (longPressFired.current) {
-            longPressFired.current = false;
-            return;
-          }
-          onTell();
-        }}
-        aria-label="告诉 Nesio；长按提问"
-        aria-expanded={activeSurface === 'tell'}
+        className="nesio-bottom-nav-center"
+        onClick={onChatOpen}
+        aria-label="打开宝盒"
       >
         <img
           src="/icons/treasurebox-pwa-192.png"

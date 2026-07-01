@@ -8,6 +8,7 @@ import CameraSheet from './CameraSheet';
 import VoiceInputSheet from './VoiceInputSheet';
 import ShareSheet from './ShareSheet';
 import PortalBottomNav from './PortalBottomNav';
+import NesioChatSheet from './NesioChatSheet';
 import PortalAiFriendsPreview from './PortalAiFriendsPreview';
 import NotePanelEnhanced from './NotePanelEnhanced';
 import PortalOnboarding from './PortalOnboarding';
@@ -208,6 +209,7 @@ export default function Portal() {
   const [onboardingActive, setOnboardingActive] = useState(false);
   const [memoryReceipt, setMemoryReceipt] = useState(false);
   const [askGuideOpen, setAskGuideOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
   const [launchSurfaceContext, setLaunchSurfaceContext] = useState({
     viewerRole: 'public' as 'public' | 'tester' | 'personal_lab',
     testerAllowlist: [] as string[],
@@ -571,6 +573,7 @@ export default function Portal() {
             onTell={() => setActiveSurface(activeSurface === 'tell' ? 'today' : 'tell')}
             onAsk={handleAskFromCenterButton}
             onMemory={() => setActiveSurface('memory')}
+            onChatOpen={() => setChatOpen(true)}
           />
         )}
       </div>
@@ -586,6 +589,7 @@ export default function Portal() {
       <ShareSheet open={captureMode === 'share'} onClose={() => setCaptureMode(null)} />
       <AskGuideSheet open={askGuideOpen} onClose={() => setAskGuideOpen(false)} onStart={openAskVoice} />
 
+      <NesioChatSheet open={chatOpen} onClose={() => setChatOpen(false)} canUsePrivateData={canUsePrivateRuntime} />
       <NotePanelEnhanced open={noteOpen} onOpenChange={setNoteOpen} />
       {memoryReceipt && (
         <div className="nesio-memory-receipt" role="status" aria-live="polite">
