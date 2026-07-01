@@ -12190,6 +12190,50 @@ html[data-portal-theme="night"] .nesio-mirror-title { color: #e8eefa; }
 }
 
 /* ─── Camera result panel (AI analysis output) ─── */
+/* Preview panel — shown after capture, before analysis */
+.nesio-camera-preview-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: rgba(12,20,42,0.97);
+  border-top: 1px solid rgba(88,140,227,0.2);
+  padding: 0.75rem 1rem 1rem;
+}
+.nesio-camera-preview-img {
+  width: 100%;
+  max-height: 28vh;
+  object-fit: contain;
+  border-radius: 0.65rem;
+  margin-bottom: 0.75rem;
+}
+.nesio-camera-preview-actions {
+  display: flex;
+  gap: 0.5rem;
+  width: 100%;
+}
+.nesio-camera-preview-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.65rem 0.4rem;
+  border-radius: 0.75rem;
+  border: 1.5px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.05);
+  color: var(--portal-fg);
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.nesio-camera-preview-btn span:first-child { font-size: 1.25rem; }
+.nesio-camera-preview-btn--full { border-color: rgba(99,179,237,0.35); }
+.nesio-camera-preview-btn--full:hover { background: rgba(99,179,237,0.12); }
+.nesio-camera-preview-btn--crop { border-color: rgba(139,92,246,0.35); }
+.nesio-camera-preview-btn--crop:hover { background: rgba(139,92,246,0.12); }
+.nesio-camera-preview-btn--retake { border-color: rgba(255,255,255,0.08); }
+.nesio-camera-preview-btn--retake:hover { background: rgba(255,255,255,0.08); }
+
 .nesio-camera-result-panel {
   background: rgba(16,26,50,0.95);
   border-top: 1px solid rgba(88,140,227,0.2);

@@ -157,8 +157,10 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
-  const [phase, setPhase] = useState<'idle' | 'live' | 'captured' | 'analyzing' | 'result' | 'saved' | 'no-camera'>('idle');
+  // 'preview' = photo taken but not yet analyzed (user chooses full/crop)
+  const [phase, setPhase] = useState<'idle' | 'live' | 'captured' | 'preview' | 'analyzing' | 'result' | 'saved' | 'no-camera'>('idle');
   const [capturedPreview, setCapturedPreview] = useState<string>('');
+  const [capturedBase64, setCapturedBase64] = useState<string>(''); // raw base64 for full-image analysis
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [editedNodes, setEditedNodes] = useState<EditedNode[]>([]);
   const [isReceipt, setIsReceipt] = useState(false);
@@ -167,9 +169,10 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
   const [error, setError] = useState('');
   const [extraTags, setExtraTags] = useState('');
   const [sourceFile, setSourceFile] = useState<File | null>(null);
-  // Bounding-box selection state
+  // Freehand selection state
   const [selecting, setSelecting] = useState(false);
   const selStartRef = useRef<{ x: number; y: number } | null>(null);
+  const selPointsRef = useRef<Array<{ x: number; y: number }>>([]);
 
   const stopCamera = useCallback(() => {
     const video = videoRef.current;
@@ -268,6 +271,7 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
     setPhase('idle');
     setResult(null);
     setCapturedPreview('');
+    setCapturedBase64('');
     setPermDenied(false);
     setError('');
     setExtraTags('');
@@ -306,11 +310,19 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
     setCapturedPreview(preview);
     setSourceFile(dataUrlToFile(preview, `nesio-camera-${Date.now()}.jpg`));
 
-    // Compress & analyze
+    // Compress and store — user picks full-image or crop next
+    const base64 = await compressImage(canvas);
+    setCapturedBase64(base64);
+    setPhase('preview');
+  }
+
+  // Analyze the full captured image (called from 'preview' phase)
+  async function analyzeFullImage() {
+    if (!capturedBase64) return;
     setPhase('analyzing');
+    setError('');
     try {
-      const base64 = await compressImage(canvas);
-      const res = await analyzeImage(base64);
+      const res = await analyzeImage(capturedBase64);
       setResult(res);
       setEditedNodes(toEditedNodes(res.nodes));
       setIsReceipt(detectReceipt(res));
@@ -338,25 +350,12 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
     e.target.value = '';
     setSourceFile(file);
 
-    setPhase('analyzing');
     const reader = new FileReader();
-    reader.onload = async () => {
+    reader.onload = () => {
       const dataUrl = reader.result as string;
       setCapturedPreview(dataUrl);
-      const base64 = dataUrl.split(',')[1];
-      try {
-        const res = await analyzeImage(base64);
-        setResult(res);
-        setEditedNodes(toEditedNodes(res.nodes));
-        setIsReceipt(detectReceipt(res));
-        setPhase('result');
-      } catch {
-        const pending = buildPendingImageResult();
-        setResult(pending);
-        setEditedNodes(toEditedNodes(pending.nodes));
-        setIsReceipt(false);
-        setPhase('result');
-      }
+      setCapturedBase64(dataUrl.split(',')[1]);
+      setPhase('preview'); // user picks full-image or crop
     };
     if (file.type.startsWith('image/')) {
       reader.readAsDataURL(file);
@@ -446,7 +445,7 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
 
   function retake() {
     setResult(null); setEditedNodes([]); setIsReceipt(false);
-    setCapturedPreview(''); setError(''); setExtraTags(''); setSourceFile(null);
+    setCapturedPreview(''); setCapturedBase64(''); setError(''); setExtraTags(''); setSourceFile(null);
     setPhase('idle');
     openNativeCamera();
   }
@@ -477,72 +476,106 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
     e.preventDefault();
     const rect = e.currentTarget.getBoundingClientRect();
     const t = e.touches[0];
-    selStartRef.current = { x: t.clientX - rect.left, y: t.clientY - rect.top };
+    const pt = { x: t.clientX - rect.left, y: t.clientY - rect.top };
+    selStartRef.current = pt;
+    selPointsRef.current = [pt];
+    const canvas = selectCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.beginPath();
+    ctx.moveTo(pt.x, pt.y);
   }
 
   function handleSelTouchMove(e: React.TouchEvent<HTMLCanvasElement>) {
     e.preventDefault();
-    const start = selStartRef.current;
-    if (!start) return;
+    if (!selStartRef.current) return;
     const canvas = selectCanvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const t = e.touches[0];
-    const cx = t.clientX - rect.left;
-    const cy = t.clientY - rect.top;
+    const pt = { x: t.clientX - rect.left, y: t.clientY - rect.top };
+    selPointsRef.current.push(pt);
+    // Redraw entire freehand path each move for smoothness
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const x = Math.min(start.x, cx);
-    const y = Math.min(start.y, cy);
-    const w = Math.abs(cx - start.x);
-    const h = Math.abs(cy - start.y);
+    const pts = selPointsRef.current;
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.closePath();
     ctx.strokeStyle = '#3b82f6';
-    ctx.lineWidth = 2.5;
-    ctx.setLineDash([7, 4]);
-    ctx.strokeRect(x, y, w, h);
-    ctx.fillStyle = 'rgba(59,130,246,0.08)';
-    ctx.fillRect(x, y, w, h);
+    ctx.lineWidth = 3;
+    ctx.setLineDash([]);
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(59,130,246,0.12)';
+    ctx.fill();
   }
 
   async function handleSelTouchEnd(e: React.TouchEvent<HTMLCanvasElement>) {
     e.preventDefault();
-    const start = selStartRef.current;
-    if (!start || !capturedPreview) { setSelecting(false); return; }
+    const pts = selPointsRef.current;
+    if (pts.length < 3 || !capturedPreview) { setSelecting(false); return; }
     const canvas = selectCanvasRef.current;
     if (!canvas) { setSelecting(false); return; }
-    const rect = canvas.getBoundingClientRect();
-    // Get final finger position (changedTouches for touchend)
-    const t = e.changedTouches[0];
-    const cx = t.clientX - rect.left;
-    const cy = t.clientY - rect.top;
-    const selX = Math.min(start.x, cx);
-    const selY = Math.min(start.y, cy);
-    const selW = Math.abs(cx - start.x);
-    const selH = Math.abs(cy - start.y);
+
+    // Bounding box of all freehand points
+    const minX = Math.min(...pts.map((p) => p.x));
+    const minY = Math.min(...pts.map((p) => p.y));
+    const maxX = Math.max(...pts.map((p) => p.x));
+    const maxY = Math.max(...pts.map((p) => p.y));
+    const selW = maxX - minX;
+    const selH = maxY - minY;
     if (selW < 20 || selH < 20) { setSelecting(false); return; }
 
-    // Crop the region from the original image
+    // Map canvas coords → image pixels, accounting for object-fit:contain letterboxing
     const img = new window.Image();
     img.onload = async () => {
-      const scaleX = img.naturalWidth / canvas.width;
-      const scaleY = img.naturalHeight / canvas.height;
+      const canvasAspect = canvas.width / canvas.height;
+      const imgAspect = img.naturalWidth / img.naturalHeight;
+      let renderedW: number, renderedH: number, offsetX: number, offsetY: number;
+      if (imgAspect > canvasAspect) {
+        renderedW = canvas.width;
+        renderedH = canvas.width / imgAspect;
+        offsetX = 0;
+        offsetY = (canvas.height - renderedH) / 2;
+      } else {
+        renderedH = canvas.height;
+        renderedW = canvas.height * imgAspect;
+        offsetX = (canvas.width - renderedW) / 2;
+        offsetY = 0;
+      }
+      const imgX = Math.max(0, (minX - offsetX) / renderedW * img.naturalWidth);
+      const imgY = Math.max(0, (minY - offsetY) / renderedH * img.naturalHeight);
+      const imgW = Math.min(img.naturalWidth - imgX, selW / renderedW * img.naturalWidth);
+      const imgH = Math.min(img.naturalHeight - imgY, selH / renderedH * img.naturalHeight);
+      if (imgW < 10 || imgH < 10) { setSelecting(false); return; }
+
       const cropCanvas = document.createElement('canvas');
-      const cw = Math.max(1, Math.round(selW * scaleX));
-      const ch = Math.max(1, Math.round(selH * scaleY));
-      cropCanvas.width = cw;
-      cropCanvas.height = ch;
+      cropCanvas.width = Math.round(imgW);
+      cropCanvas.height = Math.round(imgH);
       const ctx2 = cropCanvas.getContext('2d');
       if (!ctx2) { setSelecting(false); return; }
-      ctx2.drawImage(img, selX * scaleX, selY * scaleY, cw, ch, 0, 0, cw, ch);
-      const base64 = cropCanvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+      ctx2.drawImage(img, imgX, imgY, imgW, imgH, 0, 0, imgW, imgH);
+      const base64 = cropCanvas.toDataURL('image/jpeg', 0.88).split(',')[1];
       setSelecting(false);
       setPhase('analyzing');
       try {
         const res = await analyzeImage(base64);
+        setResult((prev) => prev ? { ...prev, nodes: [...prev.nodes, ...res.nodes] } : res);
         setEditedNodes((prev) => [...prev, ...toEditedNodes(res.nodes)]);
+        setIsReceipt((prev) => prev || detectReceipt(res));
         setPhase('result');
       } catch {
+        if (!result) {
+          const pending = buildPendingImageResult();
+          setResult(pending);
+          setEditedNodes(toEditedNodes(pending.nodes));
+        }
         setPhase('result');
       }
     };
@@ -641,6 +674,28 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
           </div>
         )}
       </div>
+
+      {/* Preview phase — photo taken, user chooses full-image or crop */}
+      {phase === 'preview' && capturedPreview && (
+        <div className="nesio-camera-preview-panel">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={capturedPreview} alt="预览" className="nesio-camera-preview-img" draggable={false} />
+          <div className="nesio-camera-preview-actions">
+            <button type="button" className="nesio-camera-preview-btn nesio-camera-preview-btn--full" onClick={analyzeFullImage}>
+              <span>🔍</span>
+              <span>全图识别</span>
+            </button>
+            <button type="button" className="nesio-camera-preview-btn nesio-camera-preview-btn--crop" onClick={openSelection}>
+              <span>🖊</span>
+              <span>画圈选区</span>
+            </button>
+            <button type="button" className="nesio-camera-preview-btn nesio-camera-preview-btn--retake" onClick={retake}>
+              <span>↩</span>
+              <span>重拍</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Analysis result — editable */}
       {phase === 'result' && result && (
@@ -765,7 +820,7 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
             onTouchMove={handleSelTouchMove}
             onTouchEnd={handleSelTouchEnd}
           />
-          <div className="nesio-select-hint">用手指画框，圈住要识别的区域</div>
+          <div className="nesio-select-hint">用手指随意圈住要识别的区域</div>
           <button type="button" className="nesio-select-cancel" onClick={() => setSelecting(false)}>取消</button>
         </div>
       )}
