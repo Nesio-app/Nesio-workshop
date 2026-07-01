@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import DashboardHome from './DashboardHome';
+import TodayFeed from './TodayFeed';
 import MemoryTab from './MemoryTab';
 import TellNesioSheet, { type CaptureMode } from './TellNesioSheet';
 import CameraSheet from './CameraSheet';
@@ -211,7 +211,6 @@ export default function Portal() {
   const [memoryReceipt, setMemoryReceipt] = useState(false);
   const [askGuideOpen, setAskGuideOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
-  const [treasureOpen, setTreasureOpen] = useState(false);
   const [launchSurfaceContext, setLaunchSurfaceContext] = useState({
     viewerRole: 'public' as 'public' | 'tester' | 'personal_lab',
     testerAllowlist: [] as string[],
@@ -548,18 +547,13 @@ export default function Portal() {
       <div className="portal-root portal-root--home">
         <div className="portal-grain" aria-hidden />
         <div className="nesio-shell">
-          {!onboardingActive && (activeSurface === 'today' || activeSurface === 'tell') && (
-            <DashboardHome
-              config={configWithShellState}
-              shellTools={shellRuntime.tools}
-              treasureOpen={treasureOpen}
-              onTreasureOpenChange={setTreasureOpen}
-              onOpenNote={() => setNoteOpen(true)}
-              onOpenTool={() => setChatOpen(true)}
-              onOpenAiFriends={() => setChatOpen(true)}
-            />
+          {!onboardingActive && activeSurface === 'today' && (
+            <TodayFeed canUsePrivateData={canUsePrivateRuntime} onOpenMemory={() => setActiveSurface('memory')} />
           )}
           {!onboardingActive && activeSurface === 'memory' && <MemoryTab canUsePrivateData={canUsePrivateRuntime} />}
+          {!onboardingActive && activeSurface === 'tell' && (
+            <TodayFeed canUsePrivateData={canUsePrivateRuntime} onOpenMemory={() => setActiveSurface('memory')} />
+          )}
         </div>
 
         <TellNesioSheet
