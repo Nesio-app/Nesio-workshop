@@ -914,112 +914,117 @@ const FOCUS_TYPE_ICON: Record<string, string> = {
   place: '📍', health_state: '🩷', preference: '⭐',
 };
 
-// ---- Enhanced FocusCardDetail — 2-level decompose + meeting actions ----
+// ── Momentum Engine ── 3-action wave, auto-unlock, recursive drill ──────────
 
-interface SubStep {
+interface MomentumAction {
   id: string;
   name: string;
   emoji: string;
-  durationMin: number;
   done: boolean;
 }
 
 function FocusCardDetail({
   node,
-  onSubtasksChange,
+  onSubtasksChange: _onSubtasksChange,
   onOpenRecorder,
 }: {
   node: FocusNode;
   onSubtasksChange: (nodeId: string, subtasks: SubTask[]) => void;
   onOpenRecorder?: () => void;
 }) {
-  const [subtasks, setSubtasks] = useState<SubTask[]>(node.subtasks ?? []);
-  const [decomposing, setDecomposing] = useState(false);
-  const [subStepsMap, setSubStepsMap] = useState<Map<string, SubStep[]>>(new Map());
+  const [wave, setWave] = useState<MomentumAction[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [drillMap, setDrillMap] = useState<Map<string, MomentumAction[]>>(new Map());
   const [drillingId, setDrillingId] = useState<string | null>(null);
+  const [completedActions, setCompletedActions] = useState<string[]>([]);
+  const [waveIndex, setWaveIndex] = useState(0);
+  const [unlocking, setUnlocking] = useState(false);
 
   const isMeeting = isMeetingNode(node);
   const meetingUrl = getMeetingUrl(node);
   const meetingTime = getMeetingTime(node);
 
-  async function handleDecompose() {
-    setDecomposing(true);
+  async function fetchWave(previousAction?: string, history: string[] = []) {
+    setLoading(true);
     try {
       const res = await fetch('/api/portal/decompose-task', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskName: node.name, context: node.rawInput }),
+        body: JSON.stringify({
+          taskName: node.name,
+          context: node.rawInput,
+          previousAction,
+          completedActions: history,
+        }),
       });
-      const data = await res.json() as { ok?: boolean; steps?: Array<{ name: string; emoji?: string; durationMin?: number }> };
+      const data = await res.json() as { ok?: boolean; steps?: Array<{ name: string; emoji?: string }> };
       if (data.ok && data.steps?.length) {
-        const newSubtasks: SubTask[] = data.steps.map((s, i) => ({
-          id: `st-${Date.now()}-${i}`,
+        const actions: MomentumAction[] = data.steps.slice(0, 3).map((s, i) => ({
+          id: `m-${Date.now()}-${i}`,
           name: s.name,
-          emoji: s.emoji,
-          durationMin: s.durationMin,
+          emoji: s.emoji || '⚡',
           done: false,
         }));
-        setSubtasks(newSubtasks);
-        saveSubtasks(node.id, newSubtasks);
-        onSubtasksChange(node.id, newSubtasks);
+        setWave(actions);
+        setWaveIndex((w) => w + 1);
+        setDrillMap(new Map());
       }
     } catch { /* ignore */ }
-    setDecomposing(false);
+    setLoading(false);
   }
 
-  async function handleDrill(subtask: SubTask) {
-    setDrillingId(subtask.id);
+  async function handleDrill(action: MomentumAction) {
+    setDrillingId(action.id);
     try {
       const res = await fetch('/api/portal/decompose-task', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskName: subtask.name, context: node.name, drill: true }),
+        body: JSON.stringify({ taskName: action.name, context: node.name, drill: true }),
       });
-      const data = await res.json() as { ok?: boolean; steps?: Array<{ name: string; emoji: string; durationMin: number }> };
+      const data = await res.json() as { ok?: boolean; steps?: Array<{ name: string; emoji?: string }> };
       if (data.ok && data.steps?.length) {
-        const steps: SubStep[] = data.steps.map((s, i) => ({
-          id: `ss-${Date.now()}-${i}`,
+        const drills: MomentumAction[] = data.steps.slice(0, 3).map((s, i) => ({
+          id: `d-${Date.now()}-${i}`,
           name: s.name,
           emoji: s.emoji || '▸',
-          durationMin: s.durationMin || 1,
           done: false,
         }));
-        setSubStepsMap((prev) => new Map(prev).set(subtask.id, steps));
+        setDrillMap((prev) => new Map(prev).set(action.id, drills));
       }
     } catch { /* ignore */ }
     setDrillingId(null);
   }
 
-  function toggleSubStep(subtaskId: string, stepId: string) {
-    setSubStepsMap((prev) => {
-      const steps = prev.get(subtaskId) ?? [];
-      const updated = steps.map((s) => s.id === stepId ? { ...s, done: !s.done } : s);
-      return new Map(prev).set(subtaskId, updated);
+  function toggleAction(actionId: string) {
+    const next = wave.map((a) => a.id === actionId ? { ...a, done: !a.done } : a);
+    setWave(next);
+    if (next.every((a) => a.done)) {
+      const lastDone = next[next.length - 1].name;
+      const allHistory = [...completedActions, ...next.map((a) => a.name)];
+      setCompletedActions(allHistory);
+      setUnlocking(true);
+      setTimeout(() => {
+        setUnlocking(false);
+        setWave([]);
+        fetchWave(lastDone, allHistory);
+      }, 700);
+    }
+  }
+
+  function toggleDrill(actionId: string, drillId: string) {
+    setDrillMap((prev) => {
+      const drills = prev.get(actionId) ?? [];
+      return new Map(prev).set(actionId, drills.map((d) => d.id === drillId ? { ...d, done: !d.done } : d));
     });
   }
 
-  function handleToggle(subtaskId: string) {
-    const next = subtasks.map((s) => s.id === subtaskId ? { ...s, done: !s.done } : s);
-    setSubtasks(next);
-    toggleSubtask(node.id, subtaskId);
-    onSubtasksChange(node.id, next);
-  }
-
-  const doneCount = subtasks.filter((s) => s.done).length;
-  const totalMin = subtasks.reduce((acc, s) => acc + (s.durationMin ?? 0), 0);
-
-  // Meeting view
+  // Meeting view — unchanged
   if (isMeeting) {
     return (
       <div className="nesio-focus-detail nesio-focus-detail--meeting">
         <div className="nesio-focus-meeting-actions">
           {meetingUrl && (
-            <a
-              href={meetingUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="nesio-focus-meeting-link-btn"
-            >
+            <a href={meetingUrl} target="_blank" rel="noopener noreferrer" className="nesio-focus-meeting-link-btn">
               🔗 进入会议
             </a>
           )}
@@ -1029,119 +1034,104 @@ function FocusCardDetail({
             </button>
           )}
         </div>
-        {meetingTime && (
-          <p className="nesio-focus-meeting-prep-hint">提前 5 分钟打开，检查静音和摄像头</p>
-        )}
+        {meetingTime && <p className="nesio-focus-meeting-prep-hint">提前 5 分钟打开，检查静音和摄像头</p>}
       </div>
     );
   }
 
-  // Task view with 2-level decompose
   const nodeUrl = Object.values(node.attributes).find(
     (v) => typeof v === 'string' && (v.startsWith('http://') || v.startsWith('https://'))
   ) as string | undefined;
 
-  return (
-    <div className="nesio-focus-detail">
-      {nodeUrl && (
-        <div className="nesio-focus-meeting-actions">
+  // Not started yet
+  if (wave.length === 0 && !loading && !unlocking) {
+    return (
+      <div className="nesio-momentum-start">
+        {nodeUrl && (
           <a href={safeExternalUrl(nodeUrl)} target="_blank" rel="noopener noreferrer" className="nesio-focus-meeting-link-btn">
             🔗 直达链接
           </a>
-        </div>
+        )}
+        <button type="button" className="nesio-momentum-ignite-btn" onClick={() => fetchWave()}>
+          ⚡ 开始动量
+        </button>
+      </div>
+    );
+  }
+
+  // Loading / unlocking state
+  if (loading || unlocking || wave.length === 0) {
+    return (
+      <div className="nesio-momentum-loading">
+        <span className="nesio-momentum-loading-dot" />
+        <span className="nesio-momentum-loading-dot" />
+        <span className="nesio-momentum-loading-dot" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="nesio-momentum">
+      {waveIndex > 1 && (
+        <div className="nesio-momentum-wave-badge">第 {waveIndex} 波</div>
       )}
-      {subtasks.length > 0 ? (
-        <>
-          <div className="nesio-focus-detail-progress">
-            <span className="nesio-focus-detail-progress-label">{doneCount}/{subtasks.length} 步完成</span>
-            {totalMin > 0 && <span className="nesio-focus-detail-progress-time">共 {totalMin} 分钟</span>}
-            <div className="nesio-focus-detail-progress-bar">
-              <div
-                className="nesio-focus-detail-progress-fill"
-                style={{ width: `${subtasks.length ? (doneCount / subtasks.length) * 100 : 0}%` }}
-              />
-            </div>
-          </div>
+      <ul className="nesio-momentum-list">
+        {wave.map((a) => {
+          const drills = drillMap.get(a.id);
+          const isDrilling = drillingId === a.id;
+          const allDrillsDone = drills ? drills.every((d) => d.done) : false;
 
-          <ul className="nesio-focus-subtask-list">
-            {subtasks.map((s) => {
-              const subSteps = subStepsMap.get(s.id);
-              const isDrilling = drillingId === s.id;
-              const subDoneCount = subSteps?.filter((ss) => ss.done).length ?? 0;
+          return (
+            <li key={a.id} className={`nesio-momentum-item${a.done ? ' nesio-momentum-item--done' : ''}`}>
+              <div className="nesio-momentum-row">
+                <button
+                  type="button"
+                  className={`nesio-momentum-check${a.done ? ' nesio-momentum-check--done' : ''}`}
+                  onClick={() => toggleAction(a.id)}
+                  aria-label={a.done ? '取消' : '完成'}
+                />
+                <span className="nesio-momentum-emoji">{a.emoji}</span>
+                <span className="nesio-momentum-name">{a.name}</span>
+                {!a.done && !drills && !isDrilling && (
+                  <button
+                    type="button"
+                    className="nesio-momentum-hard-btn"
+                    onClick={() => handleDrill(a)}
+                  >
+                    太难
+                  </button>
+                )}
+                {isDrilling && <span className="nesio-momentum-drilling">⋯</span>}
+                {drills && !a.done && (
+                  <span className={`nesio-momentum-drill-badge${allDrillsDone ? ' nesio-momentum-drill-badge--done' : ''}`}>
+                    {drills.filter((d) => d.done).length}/{drills.length}
+                  </span>
+                )}
+              </div>
 
-              return (
-                <li key={s.id} className={`nesio-focus-subtask${s.done ? ' nesio-focus-subtask--done' : ''}`}>
-                  <div className="nesio-focus-subtask-row">
-                    <button
-                      type="button"
-                      className={`nesio-focus-subtask-check${s.done ? ' nesio-focus-subtask-check--checked' : ''}`}
-                      onClick={() => handleToggle(s.id)}
-                      aria-label={s.done ? '取消完成' : '标记完成'}
+              {drills && (
+                <ul className="nesio-momentum-drill-list">
+                  {drills.map((d) => (
+                    <li
+                      key={d.id}
+                      className={`nesio-momentum-drill-item${d.done ? ' nesio-momentum-drill-item--done' : ''}`}
                     >
-                      {s.done ? '✓' : '○'}
-                    </button>
-                    <span className="nesio-focus-subtask-emoji">{s.emoji || '▸'}</span>
-                    <span className="nesio-focus-subtask-name">{s.name}</span>
-                    {s.durationMin ? <span className="nesio-focus-subtask-time">{s.durationMin}m</span> : null}
-                    {!subSteps && !isDrilling && !s.done && (
                       <button
                         type="button"
-                        className="nesio-focus-drill-btn"
-                        onClick={() => handleDrill(s)}
-                      >
-                        再拆
-                      </button>
-                    )}
-                    {isDrilling && <span className="nesio-focus-drill-loading">…</span>}
-                    {subSteps && (
-                      <span className="nesio-focus-drill-badge">{subDoneCount}/{subSteps.length}</span>
-                    )}
-                  </div>
-
-                  {subSteps && (
-                    <ul className="nesio-focus-substep-list">
-                      {subSteps.map((ss) => (
-                        <li
-                          key={ss.id}
-                          className={`nesio-focus-substep${ss.done ? ' nesio-focus-substep--done' : ''}`}
-                        >
-                          <button
-                            type="button"
-                            className={`nesio-focus-substep-check${ss.done ? ' nesio-focus-substep-check--checked' : ''}`}
-                            onClick={() => toggleSubStep(s.id, ss.id)}
-                          >
-                            {ss.done ? '✓' : '·'}
-                          </button>
-                          <span className="nesio-focus-substep-emoji">{ss.emoji}</span>
-                          <span className="nesio-focus-substep-name">{ss.name}</span>
-                          <span className="nesio-focus-substep-time">{ss.durationMin}m</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-
-          <button
-            type="button"
-            className="nesio-focus-decompose-btn nesio-focus-decompose-btn--rerun"
-            onClick={handleDecompose}
-            disabled={decomposing}
-          >
-            {decomposing ? '重新拆解中…' : '↺ 重新拆解'}
-          </button>
-        </>
-      ) : (
-        <button type="button" className="nesio-focus-decompose-btn" onClick={handleDecompose} disabled={decomposing}>
-          {decomposing ? (
-            <><span className="nesio-focus-decompose-spinner" />拆解中…</>
-          ) : (
-            <>✦ 拆解任务</>
-          )}
-        </button>
-      )}
+                        className={`nesio-momentum-drill-check${d.done ? ' nesio-momentum-drill-check--done' : ''}`}
+                        onClick={() => toggleDrill(a.id, d.id)}
+                        aria-label={d.done ? '取消' : '完成'}
+                      />
+                      <span className="nesio-momentum-drill-emoji">{d.emoji}</span>
+                      <span className="nesio-momentum-drill-name">{d.name}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

@@ -16155,3 +16155,205 @@ html[data-portal-theme="night"] .nesio-related-node-chip:hover {
   transition: background 0.15s;
 }
 .nesio-focus-tomorrow-toggle:hover { background: var(--portal-line, rgba(0,0,0,.05)); }
+
+/* ── Momentum Engine ─────────────────────────────────────────── */
+.nesio-momentum-start {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.2rem 0 0.4rem;
+}
+.nesio-momentum-ignite-btn {
+  align-self: flex-start;
+  background: linear-gradient(135deg, #3b6ef0 0%, #7c3ef0 100%);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.45rem 1rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  transition: opacity 0.15s;
+}
+.nesio-momentum-ignite-btn:hover { opacity: 0.88; }
+
+.nesio-momentum-loading {
+  display: flex;
+  gap: 5px;
+  padding: 0.6rem 0.2rem;
+  align-items: center;
+}
+.nesio-momentum-loading-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--portal-muted, #999);
+  animation: nesio-bounce 0.9s ease-in-out infinite;
+}
+.nesio-momentum-loading-dot:nth-child(2) { animation-delay: 0.18s; }
+.nesio-momentum-loading-dot:nth-child(3) { animation-delay: 0.36s; }
+@keyframes nesio-bounce {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+  40% { transform: translateY(-5px); opacity: 1; }
+}
+
+.nesio-momentum-wave-badge {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #7c3ef0;
+  background: rgba(124,62,240,0.08);
+  border-radius: 4px;
+  display: inline-block;
+  padding: 0 0.4em;
+  margin-bottom: 0.5rem;
+}
+
+.nesio-momentum-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.nesio-momentum-item {
+  border-radius: 8px;
+  transition: opacity 0.2s;
+}
+.nesio-momentum-item--done { opacity: 0.45; }
+
+.nesio-momentum-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.55rem 0.6rem;
+  background: var(--portal-surface-2, rgba(0,0,0,.04));
+  border-radius: 8px;
+  cursor: default;
+}
+
+.nesio-momentum-check {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--portal-line, rgba(0,0,0,.18));
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  position: relative;
+}
+.nesio-momentum-check--done {
+  background: #3b6ef0;
+  border-color: #3b6ef0;
+}
+.nesio-momentum-check--done::after {
+  content: '';
+  position: absolute;
+  top: 4px; left: 6px;
+  width: 6px; height: 10px;
+  border: 2px solid #fff;
+  border-top: none; border-left: none;
+  transform: rotate(45deg);
+}
+
+.nesio-momentum-emoji {
+  font-size: 1rem;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.nesio-momentum-name {
+  flex: 1;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--portal-text);
+  line-height: 1.3;
+}
+.nesio-momentum-hard-btn {
+  flex-shrink: 0;
+  background: none;
+  border: 1px solid var(--portal-line, rgba(0,0,0,.18));
+  border-radius: 5px;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.72rem;
+  color: var(--portal-muted);
+  cursor: pointer;
+  transition: background 0.12s;
+  white-space: nowrap;
+}
+.nesio-momentum-hard-btn:hover { background: var(--portal-line, rgba(0,0,0,.07)); }
+
+.nesio-momentum-drilling {
+  font-size: 1rem;
+  color: var(--portal-muted);
+  animation: nesio-pulse 0.8s ease-in-out infinite;
+}
+@keyframes nesio-pulse { 0%,100% { opacity: 0.3; } 50% { opacity: 1; } }
+
+.nesio-momentum-drill-badge {
+  font-size: 0.7rem;
+  color: var(--portal-muted);
+  background: var(--portal-surface-2, rgba(0,0,0,.05));
+  border-radius: 4px;
+  padding: 0 0.35em;
+  flex-shrink: 0;
+}
+.nesio-momentum-drill-badge--done { color: #3b6ef0; background: rgba(59,110,240,0.1); }
+
+.nesio-momentum-drill-list {
+  list-style: none;
+  margin: 0.3rem 0 0 2rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.22rem;
+}
+.nesio-momentum-drill-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.5rem;
+  background: var(--portal-surface-2, rgba(0,0,0,.03));
+  border-radius: 6px;
+  border-left: 2px solid var(--portal-line, rgba(0,0,0,.1));
+  transition: opacity 0.2s;
+}
+.nesio-momentum-drill-item--done { opacity: 0.4; }
+
+.nesio-momentum-drill-check {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1.5px solid var(--portal-line, rgba(0,0,0,.2));
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.12s, border-color 0.12s;
+}
+.nesio-momentum-drill-check--done {
+  background: #5b8ff9;
+  border-color: #5b8ff9;
+}
+.nesio-momentum-drill-check--done::after {
+  content: '';
+  position: absolute;
+  top: 2px; left: 4px;
+  width: 4px; height: 7px;
+  border: 1.5px solid #fff;
+  border-top: none; border-left: none;
+  transform: rotate(45deg);
+}
+.nesio-momentum-drill-emoji {
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+.nesio-momentum-drill-name {
+  font-size: 0.8rem;
+  color: var(--portal-text);
+  flex: 1;
+}

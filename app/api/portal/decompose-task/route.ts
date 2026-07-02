@@ -55,41 +55,57 @@ function fallbackSteps(taskName: string, drill: boolean): DecomposeStep[] {
   ];
 }
 
-function buildPrompt(taskName: string, context: string | undefined, drill: boolean): string {
+function buildPrompt(
+  taskName: string,
+  context: string | undefined,
+  drill: boolean,
+  previousAction?: string,
+  completedActions?: string[],
+): string {
+  // ── Drill mode: recursively decompose one action that's still too hard ──
   if (drill) {
-    return `把以下步骤拆成2-4个更小的具体动作，每个动作30秒到3分钟内完成。
+    return `你是动量。把这个动作拆成恰好3个物理微动作，每个30秒到1分钟内完成。
 
-步骤：${taskName}
+动作：${taskName}
 ${context ? `背景任务：${context}` : ''}
 
-只输出JSON数组，不要解释：
-[{"name":"具体动作（8字内，动词开头）","emoji":"🔧","durationMin":1},...]`;
+规则：动词开头，8字以内，只有一个物理步骤，10秒内可开始。
+只输出JSON数组恰好3条，不要解释：
+[{"name":"动词动作","emoji":"⚡","durationMin":1},...]`;
   }
 
-  const cat = detectTaskHint(taskName, context);
-  const stepCount = cat?.stepCount ?? '3-5';
-  const categoryHint = cat ? `\n参考结构（可调整）：${cat.hint}` : '';
+  // ── Momentum mode: always exactly 3, never reveal beyond these 3 ──
+  const isFirstWave = !previousAction && (!completedActions || completedActions.length === 0);
+  const historyHint = completedActions?.length
+    ? `\n刚完成：${completedActions.slice(-3).join(' → ')}` : '';
+  const prevHint = previousAction ? `\n上一步：${previousAction}，接下来：` : '';
 
-  return `你是 ADHD 友好的任务教练。把任务拆成${stepCount}个清晰步骤。
-${categoryHint}
+  return `你不是规划者。你是动量。
+你的唯一职责：让用户保持移动。${historyHint}${prevHint}
 
-任务：${taskName}
+目标：${taskName}
 ${context ? `背景：${context}` : ''}
 
-规则：
-- 第1步必须是最低门槛的启动动作（1-2分钟内能立即做，减少拖延阻力）
-- 步骤名10字内，中文，动词开头
-- emoji 贴合该步内容，不要全用通用 emoji
-- durationMin 根据实际估算，不要全写5
-- 最后1步是"确认完成"或"收尾"
+生成恰好3个物理动作：
+- 每个动作不超过1分钟
+- 只有一个物理步骤（不包含"和"字连接的两个动作）
+- 动词开头，10字以内，中文
+- 10秒内可以立即开始${isFirstWave ? '\n- 第1步：最低门槛启动动作（打开/找到/拿出），5秒内能做' : ''}
+- 不解释，不计划，不透露未来步骤
 
-只输出JSON数组，不要任何解释：
-[{"name":"步骤名","emoji":"📋","durationMin":5},...]`;
+只输出JSON数组恰好3条，不要任何其他文字：
+[{"name":"动词动作","emoji":"⚡","durationMin":1},...]`;
 }
 
-async function callClaude(
-  apiKey: string, taskName: string, context: string | undefined, drill: boolean,
-): Promise<DecomposeStep[]> {
+interface MomentumParams {
+  taskName: string;
+  context: string | undefined;
+  drill: boolean;
+  previousAction?: string;
+  completedActions?: string[];
+}
+
+async function callClaude(apiKey: string, p: MomentumParams): Promise<DecomposeStep[]> {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -99,8 +115,8 @@ async function callClaude(
     },
     body: JSON.stringify({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 400,
-      messages: [{ role: 'user', content: buildPrompt(taskName, context, drill) }],
+      max_tokens: 300,
+      messages: [{ role: 'user', content: buildPrompt(p.taskName, p.context, p.drill, p.previousAction, p.completedActions) }],
     }),
   });
   const data = await res.json() as {
@@ -111,20 +127,18 @@ async function callClaude(
   const text = (data.content ?? []).find((c) => c.type === 'text')?.text ?? '';
   const match = text.match(/\[[\s\S]*?\]/);
   if (!match) throw new Error('no JSON');
-  return (JSON.parse(match[0]) as DecomposeStep[]).slice(0, 6);
+  return (JSON.parse(match[0]) as DecomposeStep[]).slice(0, 3);
 }
 
-async function callGemini(
-  apiKey: string, taskName: string, context: string | undefined, drill: boolean,
-): Promise<DecomposeStep[]> {
+async function callGemini(apiKey: string, p: MomentumParams): Promise<DecomposeStep[]> {
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: buildPrompt(taskName, context, drill) }] }],
-        generationConfig: { temperature: 0.4, maxOutputTokens: 400 },
+        contents: [{ parts: [{ text: buildPrompt(p.taskName, p.context, p.drill, p.previousAction, p.completedActions) }] }],
+        generationConfig: { temperature: 0.4, maxOutputTokens: 300 },
       }),
     },
   );
@@ -136,17 +150,31 @@ async function callGemini(
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
   const match = text.match(/\[[\s\S]*?\]/);
   if (!match) throw new Error('no JSON');
-  return (JSON.parse(match[0]) as DecomposeStep[]).slice(0, 6);
+  return (JSON.parse(match[0]) as DecomposeStep[]).slice(0, 3);
 }
 
 export async function POST(req: NextRequest) {
-  const body = await req.json() as { taskName?: string; context?: string; drill?: boolean };
+  const body = await req.json() as {
+    taskName?: string;
+    context?: string;
+    drill?: boolean;
+    previousAction?: string;
+    completedActions?: string[];
+  };
   const taskName = (body.taskName ?? '').trim();
   const drill = body.drill ?? false;
 
   if (!taskName) {
     return NextResponse.json({ ok: false, error: 'taskName required' }, { status: 400 });
   }
+
+  const p: MomentumParams = {
+    taskName,
+    context: body.context,
+    drill,
+    previousAction: body.previousAction,
+    completedActions: body.completedActions,
+  };
 
   const claudeKey = envValue('ANTHROPIC_API_KEY') || envValue('CLAUDE_API_KEY');
   const geminiKey = envValue('GEMINI_API_KEY');
@@ -157,7 +185,7 @@ export async function POST(req: NextRequest) {
 
   if (claudeKey) {
     try {
-      const steps = await callClaude(claudeKey, taskName, body.context, drill);
+      const steps = await callClaude(claudeKey, p);
       if (steps.length > 0) return NextResponse.json({ ok: true, steps });
     } catch (err) {
       console.error('[decompose] Claude error:', err instanceof Error ? err.message : err);
@@ -166,7 +194,7 @@ export async function POST(req: NextRequest) {
 
   if (geminiKey) {
     try {
-      const steps = await callGemini(geminiKey, taskName, body.context, drill);
+      const steps = await callGemini(geminiKey, p);
       if (steps.length > 0) return NextResponse.json({ ok: true, steps });
     } catch (err) {
       console.error('[decompose] Gemini error:', err instanceof Error ? err.message : err);
