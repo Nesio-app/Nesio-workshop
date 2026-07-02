@@ -6,6 +6,7 @@ import { buildTodayViewModel, focusTimeHint, markFocusNodeDone, addCommitmentNod
 import { type RecommendationCard } from '@/lib/portal/reasoning-engine';
 import { readPortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
 import type { CalendarEvent } from '@/lib/portal/types';
+import { scoreCalendarEvents, selectPinned, EVENT_TYPE_ICON, EVENT_TYPE_LABEL, type AttentionObject } from '@/lib/portal/attention-engine';
 import { cloudSignalRowsToSignals, type CloudSignalRow } from '@/lib/life-domain/signal-search';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
 import VoiceBrief from './VoiceBrief';
@@ -1300,7 +1301,162 @@ function isProactiveCardDismissed(cardId: string): boolean {
   } catch { return false; }
 }
 
-// ---- Today Focus Section — grouped: 重要安排 / 重要日子 / 重要提醒 ----
+// ── Pinned card for a single must-not-miss calendar event ────────────────────
+
+function PinnedAttentionCard({
+  obj,
+  onOpenRecorder,
+}: {
+  obj: AttentionObject;
+  onOpenRecorder: () => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const typeIcon = EVENT_TYPE_ICON[obj.eventType];
+  const typeLabel = EVENT_TYPE_LABEL[obj.eventType];
+  const timeStr = formatEventTime(obj.event.start, obj.event.allDay);
+  const countdown = calendarCountdown(new Date(obj.event.start), obj.event.allDay);
+  const isNow = countdown.startsWith('进行中');
+  const meetingUrl = obj.event.url ? safeExternalUrl(obj.event.url) : null;
+
+  return (
+    <div className={`nesio-pinned-card${isNow ? ' nesio-pinned-card--now' : ''}`}>
+      {/* ── badge row ── */}
+      <div className="nesio-pinned-badge-row">
+        <span className="nesio-pinned-badge">⭐ 绝不能错过</span>
+        <span className="nesio-pinned-type-label">{typeIcon} {typeLabel}</span>
+      </div>
+
+      {/* ── main row ── */}
+      <button
+        type="button"
+        className="nesio-pinned-main"
+        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
+      >
+        <span className="nesio-pinned-title">{obj.title}</span>
+        <span className="nesio-pinned-meta">
+          {!obj.event.allDay && <span className="nesio-pinned-time">{timeStr}</span>}
+          {countdown && (
+            <span className={`nesio-pinned-countdown${isNow ? ' nesio-pinned-countdown--now' : ''}`}>
+              {countdown}
+            </span>
+          )}
+          <span className="nesio-pinned-chevron">{expanded ? '▴' : '▾'}</span>
+        </span>
+      </button>
+
+      {/* ── expanded detail ── */}
+      {expanded && (
+        <div className="nesio-pinned-detail">
+          {obj.event.description && (
+            <p className="nesio-pinned-desc">{obj.event.description.slice(0, 120)}{obj.event.description.length > 120 ? '…' : ''}</p>
+          )}
+          {obj.event.location && (
+            <p className="nesio-pinned-location">📍 {obj.event.location}</p>
+          )}
+          <div className="nesio-pinned-actions">
+            {meetingUrl && (
+              <a href={meetingUrl} target="_blank" rel="noopener noreferrer" className="nesio-pinned-action-btn nesio-pinned-action-btn--primary">
+                🔗 进入会议
+              </a>
+            )}
+            <button type="button" className="nesio-pinned-action-btn" onClick={onOpenRecorder}>
+              🎙 记录
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Collapsed list item ───────────────────────────────────────────────────────
+
+function CollapsedCalItem({ obj, onOpenRecorder }: { obj: AttentionObject; onOpenRecorder: () => void }) {
+  const [expanded, setExpanded] = useState(false);
+  const timeStr = obj.event.allDay ? '全天' : formatEventTime(obj.event.start, false);
+  const countdown = calendarCountdown(new Date(obj.event.start), obj.event.allDay);
+  const dayTag = obj.isTomorrow ? '明天' : null;
+
+  return (
+    <li className="nesio-collapsed-item">
+      <button type="button" className="nesio-collapsed-row" onClick={() => setExpanded((v) => !v)}>
+        <span className="nesio-collapsed-icon">{EVENT_TYPE_ICON[obj.eventType]}</span>
+        <span className="nesio-collapsed-title">{obj.title}</span>
+        <span className="nesio-collapsed-meta">
+          {dayTag && <span className="nesio-collapsed-day-tag">{dayTag}</span>}
+          <span className="nesio-collapsed-time">{timeStr}</span>
+          {countdown && !obj.isTomorrow && <span className="nesio-collapsed-countdown">{countdown}</span>}
+        </span>
+      </button>
+      {expanded && (
+        <div className="nesio-collapsed-detail">
+          {obj.event.description && <p className="nesio-collapsed-desc">{obj.event.description.slice(0, 80)}{obj.event.description.length > 80 ? '…' : ''}</p>}
+          {obj.event.location && <p className="nesio-collapsed-loc">📍 {obj.event.location}</p>}
+          {obj.event.url && (
+            <a href={safeExternalUrl(obj.event.url)} target="_blank" rel="noopener noreferrer" className="nesio-collapsed-link">🔗 链接</a>
+          )}
+          <button type="button" className="nesio-collapsed-record-btn" onClick={onOpenRecorder}>🎙 记录</button>
+        </div>
+      )}
+    </li>
+  );
+}
+
+function CollapsedTaskItem({
+  node,
+  doneIds,
+  onDone,
+  onDismiss,
+  onOpenRecorder,
+  onFocusMode,
+}: {
+  node: FocusNode;
+  doneIds: Set<string>;
+  onDone: (node: FocusNode) => void;
+  onDismiss: (id: string) => void;
+  onOpenRecorder?: () => void;
+  onFocusMode?: () => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const isDone = doneIds.has(node.id);
+  const isMeeting = isMeetingNode(node);
+  const typeIcon = isMeeting ? '📅' : (FOCUS_TYPE_ICON[node.type] || '📋');
+  const hint = focusTimeHint(node);
+
+  return (
+    <li className={`nesio-collapsed-item${isDone ? ' nesio-collapsed-item--done' : ''}`}>
+      <div className="nesio-collapsed-row">
+        <button
+          type="button"
+          className={`nesio-collapsed-check${isDone ? ' nesio-collapsed-check--done' : ''}`}
+          onClick={() => onDone(node)}
+          aria-label="完成"
+        />
+        <button type="button" className="nesio-collapsed-task-body" onClick={() => setExpanded((v) => !v)}>
+          <span className="nesio-collapsed-icon">{typeIcon}</span>
+          <span className="nesio-collapsed-title">{node.name}</span>
+          {hint && <span className="nesio-collapsed-time">{hint}</span>}
+        </button>
+        <button type="button" className="nesio-collapsed-dismiss" onClick={() => onDismiss(node.id)} aria-label="忽略">✕</button>
+      </div>
+      {expanded && (
+        <div className="nesio-collapsed-detail">
+          <FocusCardDetail
+            node={node}
+            onSubtasksChange={() => {}}
+            onOpenRecorder={isMeeting && onOpenRecorder ? onOpenRecorder : undefined}
+          />
+          {onFocusMode && (
+            <button type="button" className="nesio-collapsed-focus-btn" onClick={onFocusMode}>◎ 聚焦</button>
+          )}
+        </div>
+      )}
+    </li>
+  );
+}
+
+// ── Today Focus Section — Attention Engine v1 ─────────────────────────────────
 
 function TodayFocusSection({
   focusNodes,
@@ -1321,36 +1477,38 @@ function TodayFocusSection({
 }) {
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState(true);
   const [quickAdd, setQuickAdd] = useState('');
   const [localNodes, setLocalNodes] = useState<FocusNode[]>([]);
   const [calRecorderEvent, setCalRecorderEvent] = useState<CalendarEvent | null>(null);
-  const [overdueDismissed, setOverdueDismissed] = useState<Set<string>>(new Set());
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Calendar event groups: today + tomorrow
-  const todayEvents = calendarEvents.filter((e) => isDayToday(e.start));
-  const tomorrowEvents = calendarEvents.filter((e) => isDayTomorrow(e.start));
-  const hasCalendar = todayEvents.length > 0 || tomorrowEvents.length > 0;
+  // ── Attention Engine: score calendar events ──
+  const now = new Date();
+  const scored = scoreCalendarEvents(calendarEvents, now);
+  const pinned = selectPinned(scored);
+  const rest = scored.filter((o) => o.id !== pinned?.id);
 
-  // Task nodes (non-event focus nodes)
+  // ── Task nodes ──
   const allNodes = [...localNodes, ...focusNodes.filter((n) => !localNodes.some((l) => l.id === n.id))];
-  const taskNodes = allNodes.filter((n) => !dismissed.has(n.id) && n.type !== 'event');
+  const taskNodes = allNodes.filter((n) => !dismissed.has(n.id) && n.type !== 'event' && !doneIds.has(n.id));
 
-  // Special days: only within 2 days (today + tomorrow)
+  // ── Special days (today / tomorrow) ──
   const nearSpecialDays = specialDays.filter((d) => d.daysUntil <= 1);
 
-  // Overdue items: occasional popup, show one at a time
-  const activeOverdue = overdueItems.filter((item) => !overdueDismissed.has(item.nodeId));
-  const overdueToShow = activeOverdue[0] ?? null;
+  // ── Overdue: one at a time ──
+  const overdueToShow = overdueItems[0] ?? null;
+  const [overdueDismissed, setOverdueDismissed] = useState<Set<string>>(new Set());
+  const showOverdue = overdueToShow && !overdueDismissed.has(overdueToShow.nodeId);
+
+  const collapsedCount = rest.length + taskNodes.length + nearSpecialDays.length + (showOverdue ? 1 : 0);
+  const isEmpty = !pinned && collapsedCount === 0;
+
+  const doneToday = doneIds.size;
 
   function handleDone(node: FocusNode) {
     setDoneIds((prev) => { const next = new Set(prev); next.add(node.id); return next; });
-    setTimeout(() => {
-      markFocusNodeDone(node.id);
-      setDismissed((prev) => { const next = new Set(prev); next.add(node.id); return next; });
-      if (expandedId === node.id) setExpandedId(null);
-    }, 600);
+    setTimeout(() => markFocusNodeDone(node.id), 600);
   }
 
   function handleQuickAdd(e: React.FormEvent) {
@@ -1360,25 +1518,16 @@ function TodayFocusSection({
     const node = addCommitmentNode(name);
     setLocalNodes((prev) => [node, ...prev]);
     setQuickAdd('');
-    setExpandedId(node.id);
+    setCollapsed(false);
     inputRef.current?.blur();
   }
-
-  function handleSubtasksChange(nodeId: string, subtasks: SubTask[]) {
-    setLocalNodes((prev) => prev.map((n) => n.id === nodeId ? { ...n, subtasks } : n));
-  }
-
-  const doneToday = doneIds.size;
-  const isEmpty = !hasCalendar && taskNodes.length === 0 && nearSpecialDays.length === 0;
 
   return (
     <div className="nesio-focus-section">
       <div className="nesio-focus-header">
         <h2 className="nesio-focus-title">今日焦点</h2>
         <div className="nesio-focus-header-right">
-          {doneToday > 0 && (
-            <span className="nesio-focus-done-badge">✓ 完成了 {doneToday} 件</span>
-          )}
+          {doneToday > 0 && <span className="nesio-focus-done-badge">✓ {doneToday}</span>}
           {onOpenMemory && (
             <button type="button" className="nesio-focus-all-btn" onClick={onOpenMemory}>全部 ›</button>
           )}
@@ -1391,177 +1540,83 @@ function TodayFocusSection({
           <p className="nesio-focus-empty-hint">{'说一句带时间的话（比如"周五有会议"），就会出现在这里。'}</p>
         </div>
       ) : (
-        <div className="nesio-focus-cards">
+        <div className="nesio-attention-layout">
 
-          {/* ── 重要安排 ── calendar events today + tomorrow */}
-          {hasCalendar && (
-            <div className="nesio-focus-group">
-              <p className="nesio-focus-group-label">重要安排</p>
-              {todayEvents.map((event) => (
-                <CalendarItemCard
-                  key={event.id}
-                  event={event}
-                  onOpenRecorder={() => setCalRecorderEvent(event)}
-                />
-              ))}
-              {tomorrowEvents.length > 0 && (
-                <TomorrowEventsGroup
-                  events={tomorrowEvents}
-                  onOpenRecorder={(e) => setCalRecorderEvent(e)}
-                />
+          {/* ── Slot 1: Must Not Miss ── */}
+          {pinned && (
+            <PinnedAttentionCard
+              obj={pinned}
+              onOpenRecorder={() => setCalRecorderEvent(pinned.event)}
+            />
+          )}
+
+          {/* ── Slot 2: 折叠区 ── */}
+          {collapsedCount > 0 && (
+            <div className="nesio-collapsed-section">
+              <button
+                type="button"
+                className="nesio-collapsed-toggle"
+                onClick={() => setCollapsed((v) => !v)}
+                aria-expanded={!collapsed}
+              >
+                <span className="nesio-collapsed-toggle-label">
+                  {collapsed ? `还有 ${collapsedCount} 项` : '收起'}
+                </span>
+                <span className="nesio-collapsed-toggle-chevron">{collapsed ? '▾' : '▴'}</span>
+              </button>
+
+              {!collapsed && (
+                <ul className="nesio-collapsed-list">
+                  {/* Calendar events (non-pinned) */}
+                  {rest.map((obj) => (
+                    <CollapsedCalItem
+                      key={obj.id}
+                      obj={obj}
+                      onOpenRecorder={() => setCalRecorderEvent(obj.event)}
+                    />
+                  ))}
+
+                  {/* Special days */}
+                  {nearSpecialDays.map((item) => (
+                    <li key={item.nodeId} className="nesio-collapsed-item">
+                      <div className="nesio-collapsed-row">
+                        <span className="nesio-collapsed-icon">🎂</span>
+                        <span className="nesio-collapsed-title">{item.name}</span>
+                        <span className="nesio-collapsed-day-tag">{item.daysUntil === 0 ? '今天' : '明天'}</span>
+                      </div>
+                    </li>
+                  ))}
+
+                  {/* Task nodes */}
+                  {taskNodes.map((node) => (
+                    <CollapsedTaskItem
+                      key={node.id}
+                      node={node}
+                      doneIds={doneIds}
+                      onDone={handleDone}
+                      onDismiss={(id) => setDismissed((prev) => { const next = new Set(prev); next.add(id); return next; })}
+                      onOpenRecorder={onOpenRecorder ? () => onOpenRecorder(node) : undefined}
+                      onFocusMode={onFocusMode ? () => onFocusMode(node) : undefined}
+                    />
+                  ))}
+
+                  {/* 搁置已久 */}
+                  {showOverdue && (
+                    <li className="nesio-collapsed-item">
+                      <div className="nesio-collapsed-row">
+                        <span className="nesio-collapsed-icon">🌱</span>
+                        <span className="nesio-collapsed-title">{overdueToShow.name.slice(0, 22)}{overdueToShow.name.length > 22 ? '…' : ''}</span>
+                        <span className="nesio-collapsed-time">搁置已久</span>
+                      </div>
+                      <div className="nesio-collapsed-overdue-actions">
+                        <button type="button" onClick={() => setOverdueDismissed((p) => { const n = new Set(p); n.add(overdueToShow.nodeId); return n; })}>继续做</button>
+                        <button type="button" onClick={() => { markFocusNodeDone(overdueToShow.nodeId); setOverdueDismissed((p) => { const n = new Set(p); n.add(overdueToShow.nodeId); return n; }); }}>不需要了</button>
+                        <button type="button" onClick={() => { snoozeOverdue(overdueToShow.nodeId, 7); setOverdueDismissed((p) => { const n = new Set(p); n.add(overdueToShow.nodeId); return n; }); }}>下周再说</button>
+                      </div>
+                    </li>
+                  )}
+                </ul>
               )}
-            </div>
-          )}
-
-          {/* ── 重要日子 ── birthdays / anniversaries within 2 days */}
-          {nearSpecialDays.length > 0 && (
-            <div className="nesio-focus-group">
-              <p className="nesio-focus-group-label">重要日子</p>
-              {nearSpecialDays.map((item) => (
-                <div key={item.nodeId} className="nesio-focus-card">
-                  <div className="nesio-focus-card-row">
-                    <span className="nesio-focus-card-type-icon" style={{ marginRight: '0.5rem' }}>🎂</span>
-                    <div style={{ flex: 1 }}>
-                      <p className="nesio-focus-card-title">{item.name}</p>
-                      <p className="nesio-focus-card-meta">
-                        <span className="nesio-focus-day-label">
-                          {item.daysUntil === 0 ? '就是今天' : '明天'}
-                        </span>
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* ── 重要提醒 ── task / commitment nodes */}
-          {taskNodes.length > 0 && (
-            <div className="nesio-focus-group">
-              <p className="nesio-focus-group-label">重要提醒</p>
-              {taskNodes.map((node) => {
-                const hint = focusTimeHint(node);
-                const isDone = doneIds.has(node.id);
-                const isExpanded = expandedId === node.id;
-                const isMeeting = isMeetingNode(node);
-                const meetingTime = isMeeting ? getMeetingTime(node) : null;
-                const subtasks = node.subtasks ?? [];
-                const doneSubtasks = subtasks.filter((s) => s.done).length;
-                const typeIcon = isMeeting ? '📅' : (FOCUS_TYPE_ICON[node.type] || '📋');
-                const typeLabel = isMeeting ? '会议' : (FOCUS_TYPE_LABEL[node.type] || '记录');
-
-                return (
-                  <div
-                    key={node.id}
-                    className={`nesio-focus-card${isDone ? ' nesio-focus-card--done' : ''}${isExpanded ? ' nesio-focus-card--expanded' : ''}`}
-                  >
-                    <div className="nesio-focus-card-row">
-                      <button
-                        type="button"
-                        className={`nesio-focus-card-check${isDone ? ' nesio-focus-card-check--checked' : ''}`}
-                        aria-label="完成"
-                        onClick={() => handleDone(node)}
-                      >
-                        {isDone ? '✓' : '○'}
-                      </button>
-                      <button
-                        type="button"
-                        className="nesio-focus-card-body nesio-focus-card-body--tap"
-                        onClick={() => setExpandedId(isExpanded ? null : node.id)}
-                      >
-                        <p className="nesio-focus-card-title">
-                          <span className="nesio-focus-card-type-icon">{typeIcon}</span>
-                          {node.name}
-                        </p>
-                        <p className="nesio-focus-card-meta">
-                          <span className="nesio-focus-card-type">{typeLabel}</span>
-                          {meetingTime && <MeetingCountdown startTime={meetingTime} />}
-                          {!meetingTime && hint && <span className="nesio-focus-card-hint">{hint}</span>}
-                          {subtasks.length > 0 && (
-                            <span className="nesio-focus-card-subtask-badge">{doneSubtasks}/{subtasks.length} 步</span>
-                          )}
-                        </p>
-                      </button>
-                      {onFocusMode && !isDone && (
-                        <button
-                          type="button"
-                          className="nesio-focus-card-focus-btn"
-                          aria-label="进入聚焦模式"
-                          onClick={() => onFocusMode(node)}
-                          title="聚焦此事"
-                        >
-                          ◎
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        className="nesio-focus-card-dismiss"
-                        aria-label="暂时忽略"
-                        onClick={() => setDismissed((prev) => { const next = new Set(prev); next.add(node.id); return next; })}
-                      >
-                        ✕
-                      </button>
-                    </div>
-
-                    {isExpanded && (
-                      <FocusCardDetail
-                        node={node}
-                        onSubtasksChange={handleSubtasksChange}
-                        onOpenRecorder={isMeeting && onOpenRecorder ? () => onOpenRecorder(node) : undefined}
-                      />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* ── 搁置已久 ── occasional overdue/undated task prompt */}
-          {overdueToShow && (
-            <div className="nesio-focus-group">
-              <p className="nesio-focus-group-label" style={{ color: 'var(--portal-muted, #888)' }}>搁置已久</p>
-              <div className="nesio-focus-card">
-                <div className="nesio-focus-card-row">
-                  <span style={{ fontSize: '1.1rem', margin: '0 0.5rem 0 0.2rem' }}>🌱</span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p className="nesio-focus-card-title" style={{ marginBottom: '0.15rem' }}>
-                      {overdueToShow.name.length > 24 ? overdueToShow.name.slice(0, 24) + '…' : overdueToShow.name}
-                    </p>
-                    <p className="nesio-focus-card-meta">
-                      <span className="nesio-focus-card-hint">这件事还有机会继续吗？</span>
-                    </p>
-                  </div>
-                </div>
-                <div className="nesio-proactive-card-actions" style={{ paddingTop: '0.4rem' }}>
-                  <button
-                    type="button"
-                    className="nesio-proactive-action-btn nesio-proactive-action-btn--dismiss"
-                    onClick={() => setOverdueDismissed((prev) => { const next = new Set(prev); next.add(overdueToShow.nodeId); return next; })}
-                  >
-                    继续做
-                  </button>
-                  <button
-                    type="button"
-                    className="nesio-proactive-action-btn nesio-proactive-action-btn--done"
-                    onClick={() => {
-                      markFocusNodeDone(overdueToShow.nodeId);
-                      setOverdueDismissed((prev) => { const next = new Set(prev); next.add(overdueToShow.nodeId); return next; });
-                    }}
-                  >
-                    不需要了
-                  </button>
-                  <button
-                    type="button"
-                    className="nesio-proactive-action-btn nesio-proactive-action-btn--snooze"
-                    onClick={() => {
-                      snoozeOverdue(overdueToShow.nodeId, 7);
-                      setOverdueDismissed((prev) => { const next = new Set(prev); next.add(overdueToShow.nodeId); return next; });
-                    }}
-                  >
-                    下周再说
-                  </button>
-                </div>
-              </div>
             </div>
           )}
 
