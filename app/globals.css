@@ -11378,6 +11378,72 @@ html[data-portal-theme="night"] .nesio-mood-title { color: #8899bb; }
   background: linear-gradient(90deg, #6366f1, #3b82f6);
   color: #fff;
 }
+.nesio-mood-skip-btn {
+  width: 100%;
+  padding: 0.65rem;
+  border-radius: 1rem;
+  background: none;
+  border: none;
+  color: var(--portal-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 0.35rem;
+}
+
+/* Energy phase */
+.nesio-mood-energy-row {
+  display: flex;
+  gap: 0.6rem;
+  margin: 0.5rem 0 1rem;
+}
+.nesio-mood-energy-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.8rem 0.4rem;
+  border-radius: 1rem;
+  border: 1.5px solid var(--portal-line);
+  background: var(--glass-bg-solid);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.nesio-mood-energy-btn--active {
+  border-color: #6366f1;
+  background: rgba(99,102,241,0.08);
+}
+.nesio-mood-energy-icon { font-size: 0.82rem; letter-spacing: -0.05em; }
+.nesio-mood-energy-label { font-size: 0.74rem; font-weight: 600; color: var(--portal-ink); }
+.nesio-mood-energy-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* Thought phase */
+.nesio-mood-note--large {
+  font-size: 1rem;
+  padding: 0.85rem 1rem;
+  min-height: 3.5rem;
+}
+.nesio-mood-auto-hint {
+  font-size: 0.68rem;
+  color: var(--portal-muted);
+  text-align: center;
+  margin: 0.3rem 0 0.7rem;
+  opacity: 0.6;
+}
+
+/* Wheel hint */
+.nesio-mood-hint-text {
+  font-size: 0.72rem;
+  color: var(--portal-muted);
+  text-align: center;
+  margin-top: 0.3rem;
+  opacity: 0.7;
+}
 
 /* ─── Today top row: two circular buttons ─── */
 .nesio-today-top-row {
