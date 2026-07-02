@@ -16676,3 +16676,18 @@ html[data-portal-theme="night"] .nesio-related-node-chip:hover {
 .nesio-dormant-card { border-left: 2px solid #a8c5a0; background: rgba(168,197,160,.06); }
 .nesio-dormant-content { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
 .nesio-dormant-question { font-size: 0.68rem; color: #a8c5a0; font-style: italic; }
+
+/* Overdue dated task — warmer amber tone */
+.nesio-dormant-card--overdue { border-left-color: #c9a96e; background: rgba(201,169,110,.06); }
+.nesio-dormant-card--overdue .nesio-dormant-question { color: #c9a96e; }
+
+/* Soft-archive resurface — softer, more distant tone */
+.nesio-dormant-card--soft-archive { border-left-color: #9eb5c5; background: rgba(158,181,197,.06); }
+.nesio-dormant-card--soft-archive .nesio-dormant-question { color: #9eb5c5; }
+
+/* Letting-go tier (5+ snoozes) — muted, invitation to release */
+.nesio-dormant-card--letting-go { border-left-color: #b0a0a0; background: rgba(176,160,160,.06); }
+.nesio-dormant-card--letting-go .nesio-dormant-question { color: #b0a0a0; }
+
+/* Primary action button (放下 in letting-go mode, 彻底告别 in soft-archive) */
+.nesio-dormant-btn--primary { font-weight: 600; }

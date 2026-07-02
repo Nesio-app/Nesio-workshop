@@ -1,68 +1,84 @@
 /**
  * Dormant Task Engine — platform layer
  *
- * Handles long-neglected / undated tasks that should not permanently occupy
- * attention, but should occasionally resurface for a deliberate judgment:
- * "Do this / Snooze / Let go"
+ * Handles three classes of neglected tasks:
  *
- * State machine:  Active → Dormant → (Review) → Archived | Active
+ * 1. DORMANT (undated, passively neglected ≥ 30 days)
+ *    State: active → dormant → archived → finalized
+ *    Review prompt: "这个还属于你吗？" [现在做] [以后再说] [放下]
  *
- * Decay is based on lastTouchedAt (updated on any interaction), falling back
- * to createdAt. Tasks with explicit due-date attributes are excluded entirely.
+ * 2. OVERDUE (dated tasks past their due date by ≥ 3 days)
+ *    State: active (with overdueEnteredAt set) → archived → finalized
+ *    Review prompt: "截止日期过了，还想继续吗？" [还是要做] [以后再说] [放下]
  *
- * Score decay (days since last touch):
- *   day 0  → 50   day 3  → 40   day 7  → 30
- *   day 14 → 20   day 30 → 0    (enters Dormant)
+ * 3. SOFT-ARCHIVE RESURFACE (archived ≥ 90 days ago, one final check)
+ *    State: archived → active | finalized
+ *    Review prompt: "你曾经放下了这件事，现在还这样觉得吗？" [重新拾起] [彻底告别]
  *
- * Review pop-up probability (days since dormant, before snooze penalty):
- *   7d → 8%   14d → 18%   30d → 30%   60d → 40%   (intentionally capped — "偶尔")
- *
- * Snooze penalty: each snooze × 0.75 multiplier on base probability (min 15%).
- * So a 3× snoozed task at 30d has 30% × 0.75³ ≈ 13% → floored to 15%.
- *
- * Max 1 review card shown per day.
- * Candidate selection is deterministic per day (hash-seeded), but randomly
- * distributed among all eligible dormant nodes (not always the oldest).
+ * Snooze intervals: exponential (7 → 14 → 30 → 60 → 90d cap).
+ * Review pop probability: increases with dormant days, decays with snooze count.
+ * Escalating message: snoozeCount 3+ → stronger prompt; 5+ → letting-go primary CTA.
  */
 
 import type { FocusNode } from '@/lib/platform/view-models/today-view-model';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export type DormantStatus = 'active' | 'dormant' | 'archived';
+// 'finalized' = truly gone after soft-archive confirmation. Never resurfaces.
+export type DormantStatus = 'active' | 'dormant' | 'archived' | 'finalized';
 
 export interface DormantRecord {
   status: DormantStatus;
-  dormantSince?: string;    // ISO — when entered dormant
-  lastReviewedAt?: string;  // ISO — when review card was last shown
-  lastTouchedAt?: string;   // ISO — any user interaction resets decay clock
+  dormantSince?: string;      // ISO — when undated task entered dormant
+  lastReviewedAt?: string;    // ISO — when review card was last shown
+  lastTouchedAt?: string;     // ISO — any user interaction resets decay clock
   reviewCount: number;
-  snoozedUntil?: string;    // ISO — skip review before this date
-  snoozeCount: number;      // accumulated snoozes — drives pop probability down
+  snoozedUntil?: string;      // ISO — skip review before this date
+  snoozeCount: number;
+  // P0: overdue pool for dated tasks
+  overdueEnteredAt?: string;  // set when a dated task is 3+ days past its due date
+  originalDueDate?: string;   // preserved for display ("截止日期是 XX")
+  // P2: soft archive
+  archivedAt?: string;        // set on 'archive' action; enables 90-day resurface
+}
+
+// Describes why a candidate was selected — used by UI to choose prompt/actions
+export type DormantCandidateKind =
+  | 'dormant'        // undated, passively neglected
+  | 'overdue'        // dated, past due date
+  | 'soft-archive';  // archived 90d ago, final confirmation
+
+export interface DormantCandidate {
+  node: FocusNode;
+  kind: DormantCandidateKind;
+  rec: DormantRecord;
 }
 
 export type DormantStore = Record<string, DormantRecord>;
 
 const STORE_KEY = 'nesio-dormant-store';
 
-// Date attribute keys — nodes with any of these are excluded from dormant engine
+// Attribute keys that indicate a node has an explicit due date
 const DUE_DATE_KEYS = ['start', 'end', 'date', 'dueDate', 'due', 'deadline', 'datetime', 'scheduledAt', 'remindAt'];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function hasDueDate(node: FocusNode): boolean {
+function getDueDate(node: FocusNode): Date | null {
   for (const key of DUE_DATE_KEYS) {
     const v = node.attributes[key];
-    if (typeof v === 'string' && v.length >= 10 && !Number.isNaN(new Date(v).getTime())) return true;
+    if (typeof v === 'string' && v.length >= 10) {
+      const d = new Date(v);
+      if (!Number.isNaN(d.getTime())) return d;
+    }
   }
-  return false;
+  return null;
 }
 
 function effectiveAgeRef(rec: DormantRecord, node: FocusNode): string {
   return rec.lastTouchedAt ?? node.createdAt;
 }
 
-// ── Score decay ───────────────────────────────────────────────────────────────
+// ── Score decay (undated tasks only) ─────────────────────────────────────────
 
 const DECAY_TABLE: Array<{ days: number; score: number }> = [
   { days: 30, score: 0  },
@@ -82,8 +98,6 @@ export function ageScore(ref: string, now: Date = new Date()): number {
 
 // ── Review probability ────────────────────────────────────────────────────────
 
-// Base probabilities — intentionally moderate. "偶尔" not "经常".
-// Numbers are starting points for empirical tuning, not final values.
 const PROB_TABLE: Array<{ days: number; prob: number }> = [
   { days: 60, prob: 0.40 },
   { days: 30, prob: 0.30 },
@@ -92,8 +106,8 @@ const PROB_TABLE: Array<{ days: number; prob: number }> = [
   { days: 0,  prob: 0    },
 ];
 
-const SNOOZE_PROB_MULTIPLIER = 0.75; // each snooze × this; floored at MIN_PROB
-const MIN_PROB = 0.15;               // never drop below — task shouldn't fully vanish
+const SNOOZE_PROB_MULTIPLIER = 0.75;
+const MIN_PROB = 0.15;
 
 function reviewProbability(dormantDays: number, snoozeCount: number): number {
   let base = 0;
@@ -101,12 +115,32 @@ function reviewProbability(dormantDays: number, snoozeCount: number): number {
     if (dormantDays >= days) { base = prob; break; }
   }
   if (base === 0) return 0;
-  // Each snooze multiplies probability down; floor at MIN_PROB so it never disappears
   const adjusted = base * Math.pow(SNOOZE_PROB_MULTIPLIER, snoozeCount);
   return Math.max(adjusted, MIN_PROB);
 }
 
-// ── Deterministic randomness ───────────────────────────────────────────────────
+// ── Exponential snooze intervals (P1 — FSRS-inspired) ────────────────────────
+
+// Each successive snooze waits longer — reflects increasing signal that user
+// doesn't want to think about this task right now.
+const SNOOZE_SCHEDULE_DAYS = [7, 14, 30, 60, 90] as const;
+
+export function computeSnoozeDays(currentSnoozeCount: number): number {
+  return SNOOZE_SCHEDULE_DAYS[Math.min(currentSnoozeCount, SNOOZE_SCHEDULE_DAYS.length - 1)];
+}
+
+// ── Escalating review message tier (P1 — GTD principle) ──────────────────────
+
+// Used by UI to choose prompt text and button prominence
+export type ReviewTier = 'normal' | 'gentle-nudge' | 'letting-go';
+
+export function getReviewTier(snoozeCount: number): ReviewTier {
+  if (snoozeCount >= 5) return 'letting-go';
+  if (snoozeCount >= 3) return 'gentle-nudge';
+  return 'normal';
+}
+
+// ── Deterministic randomness ──────────────────────────────────────────────────
 
 function deterministicHash(s: string): number {
   let hash = 0;
@@ -120,8 +154,6 @@ function deterministicRoll(nodeId: string, dateStr: string): number {
   return (deterministicHash(nodeId + dateStr) % 100) / 100;
 }
 
-// Among eligible candidates, pick one deterministically per day —
-// but distributed across all candidates (not always the oldest).
 function pickCandidate(candidates: FocusNode[], dateStr: string): FocusNode {
   if (candidates.length === 1) return candidates[0];
   const sorted = [...candidates].sort((a, b) => a.id.localeCompare(b.id));
@@ -148,18 +180,17 @@ function getRecord(store: DormantStore, nodeId: string): DormantRecord {
 
 // ── Touch tracking ────────────────────────────────────────────────────────────
 
-/**
- * Call this on any meaningful user interaction with a node (opening detail,
- * starting momentum, etc.) to reset its decay clock.
- */
 export function touchNode(nodeId: string): DormantStore {
   const store = loadDormantStore();
   const rec = getRecord(store, nodeId);
-  if (rec.status === 'archived') return store;
+  if (rec.status === 'archived' || rec.status === 'finalized') return store;
   store[nodeId] = { ...rec, lastTouchedAt: new Date().toISOString() };
   if (rec.status === 'dormant') {
-    // Touching a dormant node reactivates it
     store[nodeId] = { ...store[nodeId], status: 'active', dormantSince: undefined };
+  }
+  // Touching a task that was overdue clears the overdue state
+  if (rec.overdueEnteredAt) {
+    store[nodeId] = { ...store[nodeId], overdueEnteredAt: undefined, originalDueDate: undefined };
   }
   save(store);
   return store;
@@ -168,8 +199,11 @@ export function touchNode(nodeId: string): DormantStore {
 // ── State transitions ─────────────────────────────────────────────────────────
 
 /**
- * Evaluate all undone nodes and transition those that have been silent for 30+
- * days into Dormant. Skips nodes with explicit due-date attributes.
+ * Evaluate all nodes and transition into dormant / overdue states.
+ *
+ * Undated tasks: active → dormant after 30 days of no interaction.
+ * Dated tasks:   active → overdue pool after 3 days past their due date.
+ *                (They don't enter 'dormant' status — instead overdueEnteredAt is set.)
  */
 export function evaluateDormancy(
   allNodes: readonly FocusNode[],
@@ -180,17 +214,33 @@ export function evaluateDormancy(
   const next = { ...store };
 
   for (const node of allNodes) {
-    // Nodes with a due date are managed by urgency, not dormancy
-    if (hasDueDate(node)) continue;
-
     const rec = getRecord(next, node.id);
-    if (rec.status !== 'active') continue;
+    if (rec.status === 'archived' || rec.status === 'finalized') continue;
 
-    const ref = effectiveAgeRef(rec, node);
-    const ageDays = (now.getTime() - new Date(ref).getTime()) / 86_400_000;
-    if (ageDays >= 30) {
-      next[node.id] = { ...rec, status: 'dormant', dormantSince: now.toISOString() };
-      changed = true;
+    const dueDate = getDueDate(node);
+
+    if (dueDate) {
+      // Dated task: check if 3+ days past due and not yet in overdue pool
+      if (rec.status === 'active' && !rec.overdueEnteredAt) {
+        const daysPastDue = (now.getTime() - dueDate.getTime()) / 86_400_000;
+        if (daysPastDue >= 3) {
+          next[node.id] = {
+            ...rec,
+            overdueEnteredAt: now.toISOString(),
+            originalDueDate: dueDate.toISOString(),
+          };
+          changed = true;
+        }
+      }
+    } else {
+      // Undated task: active → dormant after 30 days
+      if (rec.status !== 'active') continue;
+      const ref = effectiveAgeRef(rec, node);
+      const ageDays = (now.getTime() - new Date(ref).getTime()) / 86_400_000;
+      if (ageDays >= 30) {
+        next[node.id] = { ...rec, status: 'dormant', dormantSince: now.toISOString() };
+        changed = true;
+      }
     }
   }
 
@@ -202,43 +252,82 @@ export function evaluateDormancy(
 
 /**
  * Pick at most one node to show a review card for today.
- * Each eligible dormant node rolls independently; among those that pass,
- * one is chosen deterministically per day (distributed, not always oldest).
+ *
+ * Priority order:
+ *   1. Soft-archive resurface (archived 90+ days ago — final confirmation)
+ *   2. Overdue dated tasks (past due 3+ days)
+ *   3. Dormant undated tasks (neglected 30+ days)
+ *
+ * Returns DormantCandidate (node + kind + rec) so the UI can adapt its prompt.
  */
 export function selectReviewCandidate(
   allNodes: readonly FocusNode[],
   store: DormantStore,
   now: Date = new Date(),
-): FocusNode | null {
+): DormantCandidate | null {
   const today = now.toISOString().slice(0, 10);
 
-  const eligible = allNodes.filter((node) => {
-    if (hasDueDate(node)) return false;
-
+  // Priority 1: soft-archive resurface — show after 90 days, once only
+  for (const node of allNodes) {
     const rec = getRecord(store, node.id);
-    if (rec.status !== 'dormant') return false;
-    if (rec.snoozedUntil && new Date(rec.snoozedUntil) > now) return false;
-    if (rec.lastReviewedAt?.startsWith(today)) return false;
+    if (rec.status !== 'archived' || !rec.archivedAt) continue;
+    if (rec.lastReviewedAt?.startsWith(today)) continue;
+    const daysSince = (now.getTime() - new Date(rec.archivedAt).getTime()) / 86_400_000;
+    if (daysSince >= 90) return { node, kind: 'soft-archive', rec };
+  }
 
-    const dormantDays = rec.dormantSince
-      ? (now.getTime() - new Date(rec.dormantSince).getTime()) / 86_400_000 : 0;
+  // Priority 2 + 3: overdue dated tasks and dormant undated tasks
+  const eligible: Array<{ node: FocusNode; kind: DormantCandidateKind; refDate: string }> = [];
 
-    const prob = reviewProbability(dormantDays, rec.snoozeCount);
-    return deterministicRoll(node.id, today) < prob;
-  });
+  for (const node of allNodes) {
+    const rec = getRecord(store, node.id);
+    const dueDate = getDueDate(node);
+
+    const isOverdue = !!rec.overdueEnteredAt && rec.status === 'active';
+    const isDormant = rec.status === 'dormant' && !dueDate;
+
+    if (!isOverdue && !isDormant) continue;
+    if (rec.snoozedUntil && new Date(rec.snoozedUntil) > now) continue;
+    if (rec.lastReviewedAt?.startsWith(today)) continue;
+
+    const refDate = isOverdue
+      ? rec.overdueEnteredAt!
+      : (rec.dormantSince ?? node.createdAt);
+
+    const daysSinceRef = (now.getTime() - new Date(refDate).getTime()) / 86_400_000;
+    const prob = reviewProbability(daysSinceRef, rec.snoozeCount);
+
+    if (deterministicRoll(node.id, today) < prob) {
+      eligible.push({ node, kind: isOverdue ? 'overdue' : 'dormant', refDate });
+    }
+  }
 
   if (!eligible.length) return null;
-  return pickCandidate(eligible, today);
+
+  // Overdue takes priority over dormant among eligible candidates
+  const overdueOnly = eligible.filter((e) => e.kind === 'overdue');
+  const pool = overdueOnly.length > 0 ? overdueOnly : eligible;
+  const picked = pickCandidate(pool.map((e) => e.node), today);
+  const pickedMeta = pool.find((e) => e.node.id === picked.id)!;
+
+  return { node: picked, kind: pickedMeta.kind, rec: getRecord(store, picked.id) };
 }
 
 // ── User action handlers ──────────────────────────────────────────────────────
 
-export type ReviewAction = 'do' | 'snooze' | 'archive';
+export type ReviewAction = 'do' | 'snooze' | 'archive' | 'finalize';
 
+/**
+ * Apply a review action from the user.
+ *
+ * 'do'       → reactivate (clears dormant + overdue state, resets decay clock)
+ * 'snooze'   → defer with exponential interval based on snoozeCount
+ * 'archive'  → soft archive (will resurface after 90 days for final check)
+ * 'finalize' → permanent removal after the soft-archive resurface confirmation
+ */
 export function applyReviewAction(
   nodeId: string,
   action: ReviewAction,
-  snoozeDays: 7 | 14 | 30 = 7,
 ): DormantStore {
   const store = loadDormantStore();
   const rec = getRecord(store, nodeId);
@@ -251,9 +340,13 @@ export function applyReviewAction(
       lastReviewedAt: now,
       lastTouchedAt: now,
       reviewCount: rec.reviewCount + 1,
+      dormantSince: undefined,
+      overdueEnteredAt: undefined,
+      originalDueDate: undefined,
     };
   } else if (action === 'snooze') {
-    const until = new Date(Date.now() + snoozeDays * 86_400_000).toISOString();
+    const days = computeSnoozeDays(rec.snoozeCount);
+    const until = new Date(Date.now() + days * 86_400_000).toISOString();
     store[nodeId] = {
       ...rec,
       lastReviewedAt: now,
@@ -267,6 +360,17 @@ export function applyReviewAction(
       status: 'archived',
       lastReviewedAt: now,
       reviewCount: rec.reviewCount + 1,
+      archivedAt: now,
+      overdueEnteredAt: undefined,
+      originalDueDate: undefined,
+    };
+  } else if (action === 'finalize') {
+    // After soft-archive resurface: user confirms "彻底告别"
+    store[nodeId] = {
+      ...rec,
+      status: 'finalized',
+      lastReviewedAt: now,
+      reviewCount: rec.reviewCount + 1,
     };
   }
 
@@ -274,16 +378,15 @@ export function applyReviewAction(
   return store;
 }
 
-// ── Attention score for a dormant node ───────────────────────────────────────
+// ── Attention score for active nodes ─────────────────────────────────────────
 
-/** Returns 0 for archived/dormant nodes. */
 export function dormantAttentionScore(
   node: FocusNode,
   store: DormantStore,
   now: Date = new Date(),
 ): number {
   const rec = getRecord(store, node.id);
-  if (rec.status === 'archived' || rec.status === 'dormant') return 0;
+  if (rec.status === 'archived' || rec.status === 'dormant' || rec.status === 'finalized') return 0;
   const ref = effectiveAgeRef(rec, node);
   return Math.max(0, ageScore(ref, now));
 }

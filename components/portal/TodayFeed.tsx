@@ -10,8 +10,8 @@ import { scoreCalendarEvents, selectPinned, EVENT_TYPE_ICON, EVENT_TYPE_LABEL, t
 import type { EmailSignal } from '@/lib/platform/email-signals';
 import {
   loadDormantStore, evaluateDormancy, selectReviewCandidate, applyReviewAction,
-  touchNode,
-  type DormantStore,
+  touchNode, getReviewTier,
+  type DormantStore, type DormantCandidate,
 } from '@/lib/platform/dormant-engine';
 import { runGuidancePipeline } from '@/lib/platform/guidance-engine/guidance-pipeline';
 import { loadCoolingStore, recordDismissed, saveCoolingStore } from '@/lib/platform/guidance-engine/cooling-store';
@@ -1482,29 +1482,96 @@ function CollapsedTaskItem({
 // ── Today Focus Section — Attention Engine v1 ─────────────────────────────────
 
 function DormantReviewCard({
-  node,
+  candidate,
   onDo,
   onSnooze,
   onArchive,
+  onFinalize,
 }: {
-  node: FocusNode;
+  candidate: DormantCandidate;
   onDo: () => void;
   onSnooze: () => void;
   onArchive: () => void;
+  onFinalize: () => void;
 }) {
+  const { node, kind, rec } = candidate;
+  const name = node.name.length > 22 ? node.name.slice(0, 22) + '…' : node.name;
+  const tier = getReviewTier(rec.snoozeCount);
+
+  // ── 软归档复活 ──────────────────────────────────────────────────────────────
+  if (kind === 'soft-archive') {
+    return (
+      <li className="nesio-collapsed-item nesio-dormant-card nesio-dormant-card--soft-archive">
+        <div className="nesio-collapsed-row">
+          <span className="nesio-collapsed-icon">🕊️</span>
+          <div className="nesio-dormant-content">
+            <span className="nesio-dormant-question">你曾经放下了这件事</span>
+            <span className="nesio-collapsed-title">{name}</span>
+          </div>
+        </div>
+        <div className="nesio-collapsed-overdue-actions">
+          <button type="button" onClick={onDo}>重新拾起</button>
+          <button type="button" className="nesio-dormant-btn--primary" onClick={onFinalize}>彻底告别</button>
+        </div>
+      </li>
+    );
+  }
+
+  // ── 过期有日期任务 ───────────────────────────────────────────────────────────
+  if (kind === 'overdue') {
+    const dueDateStr = rec.originalDueDate
+      ? new Date(rec.originalDueDate).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })
+      : null;
+    return (
+      <li className="nesio-collapsed-item nesio-dormant-card nesio-dormant-card--overdue">
+        <div className="nesio-collapsed-row">
+          <span className="nesio-collapsed-icon">⏰</span>
+          <div className="nesio-dormant-content">
+            <span className="nesio-dormant-question">
+              {dueDateStr ? `截止日（${dueDateStr}）已过，还想继续吗？` : '截止日期已过，还想继续吗？'}
+            </span>
+            <span className="nesio-collapsed-title">{name}</span>
+          </div>
+        </div>
+        <div className="nesio-collapsed-overdue-actions">
+          <button type="button" onClick={onDo}>还是要做</button>
+          <button type="button" onClick={onSnooze}>以后再说</button>
+          <button type="button" onClick={onArchive}>放下</button>
+        </div>
+      </li>
+    );
+  }
+
+  // ── 普通休眠任务（带升级提示） ───────────────────────────────────────────────
+  const question =
+    tier === 'letting-go'   ? `已经搁置 ${rec.snoozeCount} 次了，建议为它做个决定` :
+    tier === 'gentle-nudge' ? `已经搁置 ${rec.snoozeCount} 次了，这件事还是你的吗？` :
+                              '这个还属于你吗？';
+
   return (
-    <li className="nesio-collapsed-item nesio-dormant-card">
+    <li className={`nesio-collapsed-item nesio-dormant-card${tier === 'letting-go' ? ' nesio-dormant-card--letting-go' : ''}`}>
       <div className="nesio-collapsed-row">
         <span className="nesio-collapsed-icon">🌿</span>
         <div className="nesio-dormant-content">
-          <span className="nesio-dormant-question">这个还属于你吗？</span>
-          <span className="nesio-collapsed-title">{node.name.length > 22 ? node.name.slice(0, 22) + '…' : node.name}</span>
+          <span className="nesio-dormant-question">{question}</span>
+          <span className="nesio-collapsed-title">{name}</span>
         </div>
       </div>
       <div className="nesio-collapsed-overdue-actions">
-        <button type="button" onClick={onDo}>现在做</button>
-        <button type="button" onClick={onSnooze}>以后再说</button>
-        <button type="button" onClick={onArchive}>放下</button>
+        {tier === 'letting-go' ? (
+          // 5次以上：放下变主按钮
+          <>
+            <button type="button" className="nesio-dormant-btn--primary" onClick={onArchive}>放下</button>
+            <button type="button" onClick={onSnooze}>再等等</button>
+            <button type="button" onClick={onDo}>现在做</button>
+          </>
+        ) : (
+          <>
+            <button type="button" onClick={onDo}>现在做</button>
+            <button type="button" onClick={onSnooze}>以后再说</button>
+            <button type="button" onClick={onArchive}>放下</button>
+          </>
+        )}
       </div>
     </li>
   );
@@ -1554,10 +1621,11 @@ function TodayFocusSection({
 
   // ── Dormant: one review card per day ──
   const [dormantDismissed, setDormantDismissed] = useState<Set<string>>(new Set());
-  const dormantCandidate = selectReviewCandidate(allNodesProp, dormantStoreProp);
-  const showDormant = dormantCandidate && !dormantDismissed.has(dormantCandidate.id);
+  const dormantCandidate: DormantCandidate | null = selectReviewCandidate(allNodesProp, dormantStoreProp);
+  const showDormant = dormantCandidate && !dormantDismissed.has(dormantCandidate.node.id);
 
   const collapsedCount = rest.length + taskNodes.length + nearSpecialDays.length + (showDormant ? 1 : 0);
+  const dormantNodeId = dormantCandidate?.node.id;
   const isEmpty = !pinned && collapsedCount === 0;
 
   const doneToday = doneIds.size;
@@ -1657,25 +1725,31 @@ function TodayFocusSection({
                   ))}
 
                   {/* Dormant 任务判断卡 */}
-                  {showDormant && dormantCandidate && (
+                  {showDormant && dormantCandidate && dormantNodeId && (
                     <DormantReviewCard
-                      node={dormantCandidate}
+                      candidate={dormantCandidate}
                       onDo={() => {
-                        const next = applyReviewAction(dormantCandidate.id, 'do');
+                        const next = applyReviewAction(dormantNodeId, 'do');
                         onSetDormantStore(next);
-                        setDormantDismissed((p) => { const n = new Set(p); n.add(dormantCandidate.id); return n; });
-                        // Open momentum / focus mode immediately
-                        onFocusMode?.(dormantCandidate);
+                        setDormantDismissed((p) => { const n = new Set(p); n.add(dormantNodeId); return n; });
+                        if (dormantCandidate.kind !== 'soft-archive') {
+                          onFocusMode?.(dormantCandidate.node);
+                        }
                       }}
                       onSnooze={() => {
-                        const next = applyReviewAction(dormantCandidate.id, 'snooze', 7);
+                        const next = applyReviewAction(dormantNodeId, 'snooze');
                         onSetDormantStore(next);
-                        setDormantDismissed((p) => { const n = new Set(p); n.add(dormantCandidate.id); return n; });
+                        setDormantDismissed((p) => { const n = new Set(p); n.add(dormantNodeId); return n; });
                       }}
                       onArchive={() => {
-                        const next = applyReviewAction(dormantCandidate.id, 'archive');
+                        const next = applyReviewAction(dormantNodeId, 'archive');
                         onSetDormantStore(next);
-                        setDormantDismissed((p) => { const n = new Set(p); n.add(dormantCandidate.id); return n; });
+                        setDormantDismissed((p) => { const n = new Set(p); n.add(dormantNodeId); return n; });
+                      }}
+                      onFinalize={() => {
+                        const next = applyReviewAction(dormantNodeId, 'finalize');
+                        onSetDormantStore(next);
+                        setDormantDismissed((p) => { const n = new Set(p); n.add(dormantNodeId); return n; });
                       }}
                     />
                   )}
