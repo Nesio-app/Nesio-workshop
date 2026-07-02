@@ -10,6 +10,7 @@ import { scoreCalendarEvents, selectPinned, EVENT_TYPE_ICON, EVENT_TYPE_LABEL, t
 import type { EmailSignal } from '@/lib/platform/email-signals';
 import {
   loadDormantStore, evaluateDormancy, selectReviewCandidate, applyReviewAction,
+  touchNode,
   type DormantStore,
 } from '@/lib/platform/dormant-engine';
 import { cloudSignalRowsToSignals, type CloudSignalRow } from '@/lib/life-domain/signal-search';
@@ -1427,7 +1428,7 @@ function CollapsedTaskItem({
           onClick={() => onDone(node)}
           aria-label="完成"
         />
-        <button type="button" className="nesio-collapsed-task-body" onClick={() => setExpanded((v) => !v)}>
+        <button type="button" className="nesio-collapsed-task-body" onClick={() => { setExpanded((v) => !v); touchNode(node.id); }}>
           <span className="nesio-collapsed-icon">{typeIcon}</span>
           <span className="nesio-collapsed-title">{node.name}</span>
           {hint && <span className="nesio-collapsed-time">{hint}</span>}
@@ -1635,6 +1636,8 @@ function TodayFocusSection({
                         const next = applyReviewAction(dormantCandidate.id, 'do');
                         onSetDormantStore(next);
                         setDormantDismissed((p) => { const n = new Set(p); n.add(dormantCandidate.id); return n; });
+                        // Open momentum / focus mode immediately
+                        onFocusMode?.(dormantCandidate);
                       }}
                       onSnooze={() => {
                         const next = applyReviewAction(dormantCandidate.id, 'snooze', 7);
