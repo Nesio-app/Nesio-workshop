@@ -1903,7 +1903,7 @@ export default function TodayFeed({
         ];
 
         const guidanceCards = runGuidancePipeline({ events: guidanceEvents, scoredCalendar: scored, now });
-        const newProactiveCards: ProactiveCardData[] = guidanceCards
+        const rawProactiveCards: ProactiveCardData[] = guidanceCards
           .map((card) => ({
             id: card.id,
             title: card.title,
@@ -1919,6 +1919,36 @@ export default function TodayFeed({
           }))
           .filter((c) => !isProactiveCardDismissed(c.id))
           .filter((c) => !c.expiresAt || new Date(c.expiresAt).getTime() > now.getTime());
+
+        // AI Language Generation (Layer 7) — enhance copy if cards exist
+        // Falls back to rule-generated text if API is unavailable
+        let newProactiveCards = rawProactiveCards;
+        if (rawProactiveCards.length > 0) {
+          try {
+            const langRes = await fetch('/api/portal/guidance-language', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                cards: guidanceCards.map((c) => ({
+                  id: c.id, type: c.type, icon: c.icon,
+                  title: c.title, body: c.body, priority: c.priority,
+                  action: c.action, expiresAt: c.expiresAt?.toISOString(), nodeId: c.nodeId,
+                })),
+                userName: displayName || undefined,
+              }),
+            });
+            if (langRes.ok) {
+              const langData = await langRes.json() as { ok: boolean; cards: Array<{ id: string; title: string; body: string }> };
+              if (langData.ok && langData.cards.length === rawProactiveCards.length) {
+                newProactiveCards = rawProactiveCards.map((card, i) => ({
+                  ...card,
+                  title: langData.cards[i]?.title || card.title,
+                  body: langData.cards[i]?.body || card.body,
+                }));
+              }
+            }
+          } catch { /* fall back to rule-generated copy */ }
+        }
 
         if (!cancelled && newProactiveCards.length > 0) setProactiveCards(newProactiveCards);
 

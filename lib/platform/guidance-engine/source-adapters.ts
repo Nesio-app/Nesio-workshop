@@ -50,6 +50,7 @@ export function calendarEventsToGuidanceEvents(
       title: e.title,
       scheduledAt,
       source: 'calendar',
+      confidence: 90,  // calendar = user-confirmed, highest confidence
       payload: { calendarEventId: e.id, location: e.location ?? '' },
     });
   }
@@ -72,6 +73,7 @@ export function emailSignalsToGuidanceEvents(signals: EmailSignal[]): GuidanceEv
       type: 'email_signal',
       title: s.subject,
       source: 'email',
+      confidence: 85,  // email = confirmed external signal
       payload: {
         emailType: s.type,
         subject: s.subject,
@@ -100,6 +102,7 @@ export function specialDaysToGuidanceEvents(
       title: item.name,
       scheduledAt,
       source: 'memory',
+      confidence: 90,  // user-created explicit date in memory
       payload: { nodeId: item.nodeId, daysUntil: item.daysUntil },
     };
   });
@@ -131,6 +134,7 @@ export function focusNodesToGuidanceEvents(
         title: node.name,
         scheduledAt: d,
         source: 'memory',
+        confidence: 90,  // user-set deadline
         payload: { nodeId: node.id },
       });
       break; // one event per node
@@ -160,6 +164,7 @@ export function weatherToGuidanceEvents(weather: WeatherSnapshot | null): Guidan
       type: 'weather_cold',
       title: `今天 ${Math.round(weather.temperatureC)}°C，很冷`,
       source: 'weather',
+      confidence: 65,  // forecast = medium-high, not user-confirmed
       payload: { temperatureC: weather.temperatureC, condition: weather.condition },
     });
   }
@@ -170,6 +175,7 @@ export function weatherToGuidanceEvents(weather: WeatherSnapshot | null): Guidan
       type: 'weather_rain',
       title: '今天有雨',
       source: 'weather',
+      confidence: 65,
       payload: { condition: weather.condition },
     });
   }
@@ -187,6 +193,7 @@ export function healthNodesToGuidanceEvents(healthItems: string[]): GuidanceEven
     type: 'health_habit',
     title: healthItems[0],
     source: 'habit',
+    confidence: 60,  // habit pattern = inferred, not explicitly scheduled
     payload: { itemName: healthItems[0], allItems: healthItems },
   }];
 }

@@ -169,8 +169,9 @@ export function runGuidancePipeline(input: GuidancePipelineInput): GuidanceCard[
     // Layer 2: consequence severity
     const severity = getConsequenceSeverity(event.type);
 
-    // Layer 4: worth interrupting at all?
-    if (!worthInterrupting(severity, urgency)) continue;
+    // Layer 4: worth interrupting at all? (5-dimension priority score)
+    const confidence = typeof event.confidence === 'number' ? event.confidence : 75;
+    if (!worthInterrupting(severity, urgency, event.type, event.source, confidence)) continue;
 
     // Layer 5: attention budget gate
     if (!passesBudgetGate(budget, severity)) continue;
@@ -182,7 +183,7 @@ export function runGuidancePipeline(input: GuidancePipelineInput): GuidanceCard[
     if (seenTypes.has(event.type)) continue;
     seenTypes.add(event.type);
 
-    const priority = interruptPriority(severity, urgency);
+    const priority = interruptPriority(severity, urgency, event.type, event.source, confidence);
     const icon = event.type === 'email_signal' && typeof event.payload.icon === 'string'
       ? event.payload.icon
       : EVENT_ICON[event.type] ?? '📋';

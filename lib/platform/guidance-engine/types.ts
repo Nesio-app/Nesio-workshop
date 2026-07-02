@@ -20,6 +20,10 @@ export interface GuidanceEvent {
   scheduledAt?: Date;  // when the thing happens (flight time, birthday, meeting start, etc.)
   source: GuidanceSource;
   payload: Record<string, unknown>;  // source-specific data for action building
+  // Confidence in the data source (0-100). Drives Priority Engine Layer 4.
+  // calendar/email/user-created=90, weather=65, habit=60, AI inference=30.
+  // Events below 50 are suppressed from Future Guidance.
+  confidence?: number;
 }
 
 // How bad is it if the user does nothing?
