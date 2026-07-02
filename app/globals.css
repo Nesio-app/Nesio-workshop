@@ -16095,3 +16095,63 @@ html[data-portal-theme="night"] .nesio-related-node-chip:hover {
   margin-top: 0.1rem;
 }
 .nesio-ask-again-btn:hover { background: rgba(88,140,227,0.14); }
+
+/* ── Focus group (重要安排 / 重要提醒 / 重要日子) ── */
+.nesio-focus-group {
+  margin-bottom: 0.8rem;
+}
+.nesio-focus-group-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--portal-muted);
+  text-transform: uppercase;
+  margin: 0 0 0.35rem 0.1rem;
+}
+
+/* Today / Tomorrow day badge */
+.nesio-focus-day-label {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #3b6ef0;
+  background: rgba(59,110,240,0.1);
+  border-radius: 4px;
+  padding: 0 0.35em;
+  margin-right: 0.35rem;
+}
+
+/* Calendar item: card currently in progress */
+.nesio-focus-card--now {
+  border-left: 2.5px solid #f0a040;
+}
+
+/* Calendar detail: description + location */
+.nesio-focus-cal-desc {
+  font-size: 0.78rem;
+  color: var(--portal-muted);
+  margin: 0 0 0.4rem;
+  line-height: 1.45;
+  padding: 0 0.1rem;
+}
+.nesio-focus-cal-location {
+  font-size: 0.78rem;
+  color: var(--portal-muted);
+  margin: 0 0 0.5rem;
+}
+
+/* Tomorrow toggle */
+.nesio-focus-tomorrow-toggle {
+  width: 100%;
+  background: none;
+  border: 1px dashed var(--portal-line, rgba(0,0,0,.1));
+  border-radius: 10px;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.8rem;
+  color: var(--portal-muted);
+  cursor: pointer;
+  text-align: left;
+  margin-bottom: 0.35rem;
+  transition: background 0.15s;
+}
+.nesio-focus-tomorrow-toggle:hover { background: var(--portal-line, rgba(0,0,0,.05)); }
