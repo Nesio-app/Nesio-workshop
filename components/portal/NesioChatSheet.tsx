@@ -216,17 +216,23 @@ function CameraView({ onResult, onClose, autoOpen = false }: {
   async function analyze(dataUrl: string) {
     setAnalyzing(true);
     try {
+      const [header, base64] = dataUrl.split(',');
+      const mimeType = header.match(/:(.*?);/)?.[1] || 'image/jpeg';
       const res = await fetch('/api/portal/analyze', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: dataUrl, mode: 'identify' }),
+        body: JSON.stringify({ type: 'image', imageBase64: base64, mimeType }),
       });
-      const data = await res.json() as { objects?: string[]; labels?: string[] };
-      const items = data.objects ?? data.labels ?? [];
-      const found = new Map<string, LifeNode>();
-      for (const item of items) {
-        for (const n of searchLifeGraphFuzzy(item, 3)) found.set(n.id, n);
+      const data = await res.json() as { ok?: boolean; nodes?: Array<{ name: string; type: string }>; summary?: string };
+      if (data.ok && data.nodes?.length) {
+        const names = data.nodes.map((n) => n.name).join('、');
+        const found = new Map<string, LifeNode>();
+        for (const node of data.nodes) {
+          for (const n of searchLifeGraphFuzzy(node.name, 2)) found.set(n.id, n);
+        }
+        onResult(names || data.summary || '（未识别到）', Array.from(found.values()).slice(0, 6));
+      } else {
+        onResult(data.summary || '（未识别到）', []);
       }
-      onResult(items.join('、') || '（未识别到）', Array.from(found.values()).slice(0, 6));
     } catch { onResult('识别失败', []); }
     setAnalyzing(false);
   }
@@ -291,6 +297,7 @@ export default function NesioChatSheet({
   const [voiceMode, setVoiceMode] = useState(false);
   const [recording, setRecording] = useState(false);
   const [showPlus, setShowPlus] = useState(false);
+  const [showEmoji, setShowEmoji] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const [cameraAutoOpen, setCameraAutoOpen] = useState(false);
   const [menuMsg, setMenuMsg] = useState<UiMessage | null>(null);
@@ -353,11 +360,12 @@ export default function NesioChatSheet({
     } catch (err) {
       clearTimeout(timeout);
       const isTimeout = err instanceof Error && err.name === 'AbortError';
-      const errMsg: UiMessage = {
-        id: `e-${Date.now()}`,
-        role: 'model',
-        text: isTimeout ? '响应超时，请重试。' : '网络错误，请重试。',
-      };
+      // 兜底：从本地记忆模糊搜索
+      const localHits = searchLifeGraphFuzzy(text.trim(), 5);
+      const fallbackText = localHits.length
+        ? `AI 暂时不可用，但我在记忆库里找到了这些相关线索：\n${localHits.map((n) => `• ${n.name}`).join('\n')}`
+        : isTimeout ? '响应超时，请重试。' : 'AI 暂时不可用，记忆库里也没找到相关线索。';
+      const errMsg: UiMessage = { id: `e-${Date.now()}`, role: 'model', text: fallbackText };
       setMessages((prev) => [...prev, errMsg]);
     }
     setSending(false);
@@ -577,10 +585,26 @@ export default function NesioChatSheet({
         )}
       </div>
 
+      {/* Emoji picker panel */}
+      {showEmoji && (
+        <div className="nesio-emoji-panel">
+          {['😊','😂','🥰','😍','😭','🤔','👍','🙏','❤️','🔥','✅','⚠️','📌','💡','🎉','👏','💪','🫡','😅','🥲','🤣','😁','🙂','😏','😒','😤','🥳','🤩','😴','😇'].map((em) => (
+            <button
+              key={em}
+              type="button"
+              className="nesio-emoji-btn-item"
+              onClick={() => { setInput((v) => v + em); setShowEmoji(false); inputRef.current?.focus(); }}
+            >
+              {em}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Plus panel */}
       {showPlus && (
         <div className="nesio-wechat-plus-panel">
-          <button type="button" className="nesio-wechat-plus-item" onClick={() => { setShowPlus(false); const inp = document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.onchange=(e)=>{ const f=(e.target as HTMLInputElement).files?.[0]; if(!f) return; const reader=new FileReader(); reader.onload=(ev)=>{ setShowCamera(false); const dataUrl=ev.target?.result as string; const userMsg:UiMessage={id:`u-${Date.now()}`,role:'user',text:'📷 识别图片'}; const next=[...messages,userMsg]; setMessages(next); fetch('/api/portal/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:dataUrl,mode:'identify'})}).then(r=>r.json()).then((data:{ objects?: string[]; labels?: string[] })=>{ const items=data.objects??data.labels??[]; const found=new Map<string,LifeNode>(); for(const item of items){for(const n of searchLifeGraphFuzzy(item,3))found.set(n.id,n);} const nodes=Array.from(found.values()).slice(0,6); const aiText=nodes.length>0?`识别到：${items.join('、')}\n\n找到 ${nodes.length} 条相关记录：\n${nodes.map(n=>`• ${n.name}`).join('\n')}`:`识别到：${items.join('、')||'（未识别到）'}\n\n记忆库里暂时没有相关记录。`; const aiMsg:UiMessage={id:`a-${Date.now()}`,role:'model',text:aiText}; const withAi=[...next,aiMsg]; setMessages(withAi); saveHistory(withAi);}).catch(()=>undefined);}; reader.readAsDataURL(f);}; inp.click(); }}>
+          <button type="button" className="nesio-wechat-plus-item" onClick={() => { setShowPlus(false); const inp = document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.onchange=(e)=>{ const f=(e.target as HTMLInputElement).files?.[0]; if(!f) return; const reader=new FileReader(); reader.onload=(ev)=>{ const dataUrl=ev.target?.result as string; const [hdr,b64]=dataUrl.split(','); const mime=hdr.match(/:(.*?);/)?.[1]||'image/jpeg'; const userMsg:UiMessage={id:`u-${Date.now()}`,role:'user',text:'📷 识别图片'}; const next=[...messages,userMsg]; setMessages(next); fetch('/api/portal/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'image',imageBase64:b64,mimeType:mime})}).then(r=>r.json()).then((data:{ ok?:boolean; nodes?:Array<{name:string;type:string}>; summary?:string })=>{ if(data.ok&&data.nodes?.length){const names=data.nodes.map(n=>n.name).join('、'); const found=new Map<string,LifeNode>(); for(const node of data.nodes){for(const n of searchLifeGraphFuzzy(node.name,2))found.set(n.id,n);} const nodes=Array.from(found.values()).slice(0,6); const aiText=nodes.length>0?`识别到：${names}\n\n找到 ${nodes.length} 条相关记录：\n${nodes.map(n=>`• ${n.name}`).join('\n')}`:`识别到：${names}\n\n记忆库里暂时没有相关记录。`; const aiMsg:UiMessage={id:`a-${Date.now()}`,role:'model',text:aiText}; const withAi=[...next,aiMsg]; setMessages(withAi); saveHistory(withAi);}else{const aiMsg:UiMessage={id:`a-${Date.now()}`,role:'model',text:data.summary||'图片识别暂时不可用。'}; const withAi=[...next,aiMsg]; setMessages(withAi); saveHistory(withAi);}}).catch(()=>{const aiMsg:UiMessage={id:`a-${Date.now()}`,role:'model',text:'图片识别失败，请重试。'}; setMessages(prev=>[...prev,aiMsg]);});}; reader.readAsDataURL(f);}; inp.click(); }}>
             <span className="nesio-wechat-plus-icon">🖼</span>
             <span>相册</span>
           </button>
@@ -638,7 +662,8 @@ export default function NesioChatSheet({
             </button>
             <button
               type="button"
-              className="nesio-wechat-emoji-btn"
+              className={`nesio-wechat-emoji-btn${showEmoji ? ' nesio-wechat-emoji-btn--active' : ''}`}
+              onClick={() => { setShowEmoji((v) => !v); setShowPlus(false); }}
               aria-label="表情"
             >
               😊
@@ -675,7 +700,8 @@ export default function NesioChatSheet({
             />
             <button
               type="button"
-              className="nesio-wechat-emoji-btn"
+              className={`nesio-wechat-emoji-btn${showEmoji ? ' nesio-wechat-emoji-btn--active' : ''}`}
+              onClick={() => { setShowEmoji((v) => !v); setShowPlus(false); }}
               aria-label="表情"
             >
               😊

@@ -15956,6 +15956,33 @@ html[data-portal-theme="night"] .nesio-related-node-chip:hover {
   font-weight: 600;
 }
 
+/* ── 问一问 Emoji 选择器 ─────────────────────────────── */
+.nesio-emoji-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+  padding: 0.6rem 0.75rem;
+  background: var(--portal-card-bg, #fff);
+  border-top: 1px solid rgba(0,0,0,0.08);
+  max-height: 140px;
+  overflow-y: auto;
+}
+.nesio-emoji-btn-item {
+  font-size: 1.35rem;
+  width: 2.4rem;
+  height: 2.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  transition: background 0.12s;
+}
+.nesio-emoji-btn-item:hover { background: rgba(88,140,227,0.1); }
+.nesio-wechat-emoji-btn--active { color: #588ce3; }
+
 /* ── 问宝盒 Ask 结果样式 ─────────────────────────────── */
 .nesio-ask-result {
   padding: 0.2rem 0.1rem 0.3rem;

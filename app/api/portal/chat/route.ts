@@ -97,9 +97,9 @@ async function callGemini(
   history: ChatMessage[],
   systemInstruction: string,
 ): Promise<{ text: string; sources: Array<{ title: string; url: string }> }> {
-  // gemini-1.5-flash has better free-tier quota on AI Studio keys
+  // gemini-1.5-flash 已退役（404），使用 2.0-flash
   const GEMINI_URL =
-    'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
   const contents = [
     ...history
