@@ -19,6 +19,27 @@ export interface DecomposeStep {
   durationMin: number;
 }
 
+// Task category hints for contextually appropriate decomposition
+const TASK_CATEGORY_HINTS: Array<{ regex: RegExp; hint: string; stepCount: string }> = [
+  { regex: /会议|meeting|视频|电话会|interview|面试|1on1|周会|同步/i, stepCount: '3', hint: '提前检查设备→准备议题/问题→会议中记录要点' },
+  { regex: /学习|复习|背|读|看书|课|homework|作业|study|预习|复盘/i, stepCount: '4', hint: '明确今天目标→分段学习（番茄钟）→练习/做题→回顾确认' },
+  { regex: /买|购|超市|送|取|拿|快递|采购/i, stepCount: '3', hint: '列清单/检查存量→出发执行→确认完成' },
+  { regex: /写|报告|文章|总结|draft|文档|ppt|汇报|邮件/i, stepCount: '4', hint: '理清要点/列提纲→写初稿→检查修改→定稿发送' },
+  { regex: /代码|coding|debug|bug|fix|feature|pr|开发|测试/i, stepCount: '5', hint: '理清问题→本地搭环境/复现→实现→测试→提交' },
+  { regex: /清理|整理|打扫|归纳|收拾|断舍离/i, stepCount: '4', hint: '按区域规划→清出所有物品→分类处置→归位整洁' },
+  { regex: /健身|运动|跑步|锻炼|workout|瑜伽|游泳/i, stepCount: '3', hint: '热身5分钟→主训练→拉伸放松' },
+  { regex: /申请|填表|材料|手续|预约|注册|办理/i, stepCount: '4', hint: '确认所需材料→准备/扫描文件→填写提交→确认收到' },
+  { regex: /计划|规划|制定|思考|想清楚|决策/i, stepCount: '3', hint: '收集现有信息→梳理核心问题→做出决定/输出结论' },
+];
+
+function detectTaskHint(taskName: string, context?: string): { hint: string; stepCount: string } | null {
+  const text = `${taskName} ${context || ''}`;
+  for (const cat of TASK_CATEGORY_HINTS) {
+    if (cat.regex.test(text)) return { hint: cat.hint, stepCount: cat.stepCount };
+  }
+  return null;
+}
+
 function fallbackSteps(taskName: string, drill: boolean): DecomposeStep[] {
   if (drill) {
     return [
@@ -28,32 +49,42 @@ function fallbackSteps(taskName: string, drill: boolean): DecomposeStep[] {
     ];
   }
   return [
-    { name: `准备开始：${taskName}`, emoji: '📋', durationMin: 2 },
-    { name: '执行主要步骤', emoji: '⚡', durationMin: 10 },
-    { name: '完成收尾', emoji: '✅', durationMin: 2 },
+    { name: '打开/找到入口', emoji: '🚪', durationMin: 1 },
+    { name: `开始执行：${taskName.slice(0, 10)}`, emoji: '⚡', durationMin: 10 },
+    { name: '检查完成', emoji: '✅', durationMin: 2 },
   ];
 }
 
 function buildPrompt(taskName: string, context: string | undefined, drill: boolean): string {
   if (drill) {
-    return `把以下步骤拆成3个更小的具体动作，每个动作30秒到2分钟内完成。只输出JSON数组。
+    return `把以下步骤拆成2-4个更小的具体动作，每个动作30秒到3分钟内完成。
 
 步骤：${taskName}
-${context ? `背景：${context}` : ''}
+${context ? `背景任务：${context}` : ''}
 
-格式（只输出这个JSON，不要解释）：
-[{"name":"具体动作","emoji":"🔧","durationMin":1},...]`;
+只输出JSON数组，不要解释：
+[{"name":"具体动作（8字内，动词开头）","emoji":"🔧","durationMin":1},...]`;
   }
 
-  return `把以下任务拆解成3-5个清晰的执行步骤，每步2分钟内能开始。只输出JSON数组。
+  const cat = detectTaskHint(taskName, context);
+  const stepCount = cat?.stepCount ?? '3-5';
+  const categoryHint = cat ? `\n参考结构（可调整）：${cat.hint}` : '';
+
+  return `你是 ADHD 友好的任务教练。把任务拆成${stepCount}个清晰步骤。
+${categoryHint}
 
 任务：${taskName}
 ${context ? `背景：${context}` : ''}
 
-格式（只输出这个JSON，不要解释）：
-[{"name":"步骤名称","emoji":"🔧","durationMin":5},...]
+规则：
+- 第1步必须是最低门槛的启动动作（1-2分钟内能立即做，减少拖延阻力）
+- 步骤名10字内，中文，动词开头
+- emoji 贴合该步内容，不要全用通用 emoji
+- durationMin 根据实际估算，不要全写5
+- 最后1步是"确认完成"或"收尾"
 
-要求：步骤名称10字内，emoji贴合内容，时间合理，用中文。`;
+只输出JSON数组，不要任何解释：
+[{"name":"步骤名","emoji":"📋","durationMin":5},...]`;
 }
 
 async function callClaude(
@@ -87,7 +118,7 @@ async function callGemini(
   apiKey: string, taskName: string, context: string | undefined, drill: boolean,
 ): Promise<DecomposeStep[]> {
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

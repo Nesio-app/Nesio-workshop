@@ -242,9 +242,42 @@ interface WeatherCache {
   placeLabel?: string;
 }
 
+interface EmailSignal {
+  id: string;
+  type: string;
+  subject: string;
+  from: string;
+  date: string;
+  icon: string;
+  cardTitle: string;
+  cardBody: string;
+  priority: number;
+}
+
+const EMAIL_SIGNALS_KEY = 'nesio-email-signals-cache';
+const EMAIL_SIGNALS_TTL_MS = 20 * 60_000; // 20 minutes
+
+async function loadEmailSignals(canUsePrivateData: boolean): Promise<EmailSignal[]> {
+  if (!canUsePrivateData || typeof window === 'undefined') return [];
+  try {
+    const cached = localStorage.getItem(EMAIL_SIGNALS_KEY);
+    if (cached) {
+      const { ts, signals } = JSON.parse(cached) as { ts: number; signals: EmailSignal[] };
+      if (Date.now() - ts < EMAIL_SIGNALS_TTL_MS) return signals;
+    }
+    const res = await fetch('/api/portal/gmail-quick', { credentials: 'same-origin', cache: 'no-store' });
+    if (!res.ok) return [];
+    const data = await res.json() as { ok?: boolean; signals?: EmailSignal[] };
+    const signals = data.signals ?? [];
+    localStorage.setItem(EMAIL_SIGNALS_KEY, JSON.stringify({ ts: Date.now(), signals }));
+    return signals;
+  } catch { return []; }
+}
+
 function buildProactiveTriggers(
   focusNodes: readonly FocusNode[],
   context: ProactiveContext,
+  emailSignals: EmailSignal[] = [],
 ): ProactiveTrigger[] {
   const triggers: ProactiveTrigger[] = [];
   const now = new Date();
@@ -369,8 +402,29 @@ function buildProactiveTriggers(
     });
   }
 
-  // ── 6. Recent signals (booking / email context) ──
+  // ── 6. Email signals from quick scan (high priority, data-driven) ──
+  for (const sig of emailSignals.slice(0, 2)) {
+    triggers.push({
+      type: `email_${sig.type}`,
+      data: { subject: sig.subject.slice(0, 60), from: sig.from.slice(0, 40) },
+      fallback: {
+        title: sig.cardTitle,
+        body: sig.cardBody,
+        confidence: 90,
+        sourceTags: [`邮件·${sig.type}`],
+        icon: sig.icon,
+        priority: sig.priority,
+      },
+    });
+  }
+
+  // ── 7. LifeGraph recent signals (booking / email nodes stored in memory) ──
   for (const name of context.recentSignals.slice(0, 1)) {
+    // Skip if an email signal already covers the same type
+    const alreadyCovered = emailSignals.some((s) =>
+      name.toLowerCase().includes(s.type) || s.subject.toLowerCase().includes(name.slice(0, 6).toLowerCase()),
+    );
+    if (alreadyCovered) continue;
     triggers.push({
       type: 'recent_signal',
       data: { name },
@@ -378,7 +432,7 @@ function buildProactiveTriggers(
     });
   }
 
-  // ── 7. Health items nudge ──
+  // ── 8. Health items nudge ──
   if (context.healthItems.length > 0 && hour >= 7 && hour <= 10) {
     triggers.push({
       type: 'health_morning',
@@ -387,7 +441,7 @@ function buildProactiveTriggers(
     });
   }
 
-  // ── 8. Time-based nudges (only when nothing else fires) ──
+  // ── 9. Time-based nudges (only when nothing else fires) ──
   if (triggers.length === 0) {
     if (dow === 1 && hour < 11) {
       triggers.push({
@@ -1604,6 +1658,7 @@ export default function TodayFeed({
   const [focusNodes, setFocusNodes] = useState<readonly FocusNode[]>([]);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
   const [proactiveContext, setProactiveContext] = useState<ProactiveContext>({ upcomingSpecialDays: [], overdueItems: [], healthItems: [], recentSignals: [] });
+  const [emailSignals, setEmailSignals] = useState<EmailSignal[]>([]);
   const [mirrorOpen, setMirrorOpen] = useState(false);
 
   // Proactive cards: up to 2, each independently dismissable
@@ -1639,7 +1694,11 @@ export default function TodayFeed({
 
       // Build triggers (up to 2 proactive cards) and show independently
       if (canUsePrivateData) {
-        const triggers = buildProactiveTriggers(updated.focusNodes, updated.proactiveContext);
+        // Load email signals from quick scan (20min TTL cache)
+        const latestEmailSignals = await loadEmailSignals(canUsePrivateData);
+        if (!cancelled) setEmailSignals(latestEmailSignals);
+
+        const triggers = buildProactiveTriggers(updated.focusNodes, updated.proactiveContext, latestEmailSignals);
         if (triggers.length > 0) {
           // Show up to 2 fallback cards immediately; filter already-dismissed ones
           const fallbackCards: ProactiveCardData[] = triggers.slice(0, 2).map((t, i) => ({
@@ -1667,7 +1726,13 @@ export default function TodayFeed({
     };
     void applyViewModel();
 
-    // Background Gmail sync — at most once every 6h, non-blocking
+    // Email quick scan: re-poll every 20 minutes while the page is open.
+    // loadEmailSignals uses a localStorage TTL so it only hits the API when stale.
+    const emailPollInterval = canUsePrivateData
+      ? setInterval(() => { void loadEmailSignals(canUsePrivateData).then((sigs) => { if (sigs.length > 0) setEmailSignals(sigs); }); }, 20 * 60_000)
+      : null;
+
+    // Background Gmail full sync — at most once every 6h, non-blocking
     if (canUsePrivateData && typeof window !== 'undefined') {
       const GMAIL_SYNC_KEY = 'nesio-gmail-last-sync';
       const lastSync = parseInt(localStorage.getItem(GMAIL_SYNC_KEY) || '0', 10);
@@ -1695,6 +1760,7 @@ export default function TodayFeed({
 
     return () => {
       cancelled = true;
+      if (emailPollInterval) clearInterval(emailPollInterval);
       window.removeEventListener('nesio-life-graph-updated', refresh);
       window.removeEventListener('nesio-connectors-refreshed', refresh);
       window.removeEventListener('nesio-weather-updated', refresh);
@@ -1703,7 +1769,24 @@ export default function TodayFeed({
   }, [canUsePrivateData]);
 
   const initials = canUsePrivateData ? (displayName.trim().slice(0, 1) || '我') : '我';
-  const activeProactiveCards = proactiveCards.filter((c) => !dismissedCardIds.has(c.id)).slice(0, 2);
+
+  // Merge email signal cards into proactive cards when new signals arrive between applyViewModel calls.
+  // Email-sourced cards get priority; existing non-email cards fill remaining slots up to 2.
+  const emailProactiveCards: ProactiveCardData[] = emailSignals
+    .filter((s) => !isProactiveCardDismissed(`email_${s.type}-0`) && !isProactiveCardDismissed(`email_${s.type}-1`))
+    .slice(0, 2)
+    .map((s) => ({
+      id: `email_${s.type}-0`,
+      title: s.cardTitle,
+      body: s.cardBody,
+      confidence: 90,
+      sourceTags: [`邮件·${s.type}`],
+      icon: s.icon,
+      priority: s.priority,
+    }));
+  const nonEmailCards = proactiveCards.filter((c) => !c.id.startsWith('email_') && !dismissedCardIds.has(c.id));
+  const mergedCards = [...emailProactiveCards, ...nonEmailCards];
+  const activeProactiveCards = mergedCards.filter((c) => !dismissedCardIds.has(c.id)).slice(0, 2);
 
   return (
     <div className="nesio-today-root">
