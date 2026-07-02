@@ -1382,9 +1382,12 @@ export default function TodayFeed({
         localStorage.setItem(GMAIL_SYNC_KEY, String(Date.now()));
         fetch('/api/portal/gmail?includeBody=true&analyze=true')
           .then((r) => r.json())
-          .then((d: { ok?: boolean; nodes?: unknown[] }) => {
+          .then((d: { ok?: boolean; nodes?: Array<Record<string, unknown>> }) => {
             if (d.ok && d.nodes && d.nodes.length > 0) {
-              window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
+              import('@/lib/portal/life-graph').then(({ addLifeNode }) => {
+                d.nodes!.forEach((n) => addLifeNode(n as Parameters<typeof addLifeNode>[0]));
+                window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
+              });
             }
           })
           .catch(() => {});
