@@ -12159,6 +12159,308 @@ html[data-portal-theme="night"] .nesio-insights-narrative-text { color: #d8dff8;
   margin-top: 0.25rem;
 }
 
+/* ─── InsightsSheet: Main Tabs ─── */
+.nesio-insights-main-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--portal-line);
+  margin-bottom: 0;
+  flex-shrink: 0;
+}
+.nesio-insights-main-tab {
+  flex: 1;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--portal-muted);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 0.55rem 0;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.nesio-insights-main-tab--active {
+  color: #8b5cf6;
+  border-bottom-color: #8b5cf6;
+}
+
+/* ─── Reflection Tab ─── */
+.nesio-reflection-tab { padding-top: 0.25rem; }
+.nesio-reflection-facts { display: flex; flex-direction: column; gap: 0.7rem; }
+.nesio-reflection-fact {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  background: var(--glass-bg-solid);
+  border-radius: 0.75rem;
+  padding: 0.65rem 0.75rem;
+}
+.nesio-reflection-fact-icon { font-size: 1rem; flex-shrink: 0; }
+.nesio-reflection-fact-text {
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: var(--portal-ink);
+}
+.nesio-insights-empty {
+  font-size: 0.8rem;
+  color: var(--portal-muted);
+  text-align: center;
+  padding: 1rem 0;
+}
+
+/* ─── Analytics Tab ─── */
+.nesio-analytics-tab { padding-top: 0.25rem; }
+
+/* Donut chart */
+.nesio-donut-wrap {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.nesio-donut-svg { flex-shrink: 0; }
+.nesio-donut-legend { display: flex; flex-direction: column; gap: 0.35rem; flex: 1; }
+.nesio-donut-legend-row { display: flex; align-items: center; gap: 0.45rem; }
+.nesio-donut-dot {
+  width: 0.55rem; height: 0.55rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.nesio-donut-legend-label {
+  font-size: 0.76rem;
+  color: var(--portal-ink);
+  flex: 1;
+}
+.nesio-donut-legend-pct {
+  font-size: 0.72rem;
+  color: var(--portal-muted);
+}
+
+/* Heatmap */
+.nesio-heatmap { display: flex; flex-direction: column; gap: 0.22rem; }
+.nesio-heatmap-labels-top {
+  display: grid;
+  grid-template-columns: 2.2rem repeat(4, 1fr);
+  margin-bottom: 0.1rem;
+  padding-left: 2.2rem;
+}
+.nesio-heatmap-col-label {
+  font-size: 0.62rem;
+  color: var(--portal-muted);
+  text-align: center;
+}
+.nesio-heatmap-row {
+  display: grid;
+  grid-template-columns: 2.2rem repeat(4, 1fr);
+  gap: 0.18rem;
+  align-items: center;
+}
+.nesio-heatmap-row-label {
+  font-size: 0.66rem;
+  color: var(--portal-muted);
+  text-align: right;
+  padding-right: 0.4rem;
+}
+.nesio-heatmap-cell {
+  height: 1.4rem;
+  border-radius: 0.25rem;
+}
+
+/* ─── Living Model Tab ─── */
+.nesio-lm-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.82rem;
+  color: var(--portal-muted);
+  padding: 2rem 0;
+  justify-content: center;
+}
+.nesio-lm-tab { padding-top: 0.25rem; }
+.nesio-lm-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.9rem;
+}
+.nesio-lm-subtitle {
+  font-size: 0.75rem;
+  color: var(--portal-muted);
+  flex: 1;
+  line-height: 1.5;
+}
+.nesio-lm-refresh-btn {
+  background: none;
+  border: none;
+  color: var(--portal-muted);
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.4rem;
+  transition: background 0.12s;
+}
+.nesio-lm-refresh-btn:hover { background: var(--portal-line); }
+.nesio-lm-empty {
+  text-align: center;
+  padding: 1rem 0.5rem 1.5rem;
+}
+.nesio-lm-empty p { font-size: 0.84rem; color: var(--portal-ink); margin-bottom: 0.4rem; }
+.nesio-lm-empty-hint { font-size: 0.74rem; color: var(--portal-muted) !important; }
+
+/* Layer accordion */
+.nesio-lm-layer {
+  border: 1px solid var(--portal-line);
+  border-radius: 0.8rem;
+  margin-bottom: 0.5rem;
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+.nesio-lm-layer--expanded { border-color: rgba(139,92,246,0.3); }
+.nesio-lm-layer-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0.7rem 0.85rem;
+  cursor: pointer;
+  text-align: left;
+}
+.nesio-lm-layer-header:hover { background: var(--glass-bg-solid); }
+.nesio-lm-layer-icon { font-size: 1rem; flex-shrink: 0; }
+.nesio-lm-layer-label {
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--portal-ink);
+  flex: 1;
+}
+.nesio-lm-layer-count {
+  font-size: 0.7rem;
+  background: rgba(139,92,246,0.12);
+  color: #8b5cf6;
+  border-radius: 0.9rem;
+  padding: 0.1rem 0.45rem;
+  font-weight: 600;
+}
+.nesio-lm-layer-empty-badge {
+  font-size: 0.68rem;
+  color: var(--portal-muted);
+  background: var(--portal-line);
+  border-radius: 0.9rem;
+  padding: 0.1rem 0.4rem;
+}
+.nesio-lm-layer-chevron {
+  font-size: 0.65rem;
+  color: var(--portal-muted);
+}
+
+/* Insights inside a layer */
+.nesio-lm-layer-body {
+  padding: 0.1rem 0.85rem 0.85rem;
+  border-top: 1px solid var(--portal-line);
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+.nesio-lm-insight-empty {
+  font-size: 0.76rem;
+  color: var(--portal-muted);
+  padding: 0.5rem 0;
+  text-align: center;
+}
+.nesio-lm-insight {
+  background: var(--glass-bg-solid);
+  border-radius: 0.7rem;
+  padding: 0.7rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.nesio-lm-insight-content {
+  font-size: 0.85rem;
+  line-height: 1.55;
+  color: var(--portal-ink);
+}
+
+/* Confidence bar */
+.nesio-lm-confidence {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.nesio-lm-conf-track {
+  flex: 1;
+  height: 0.28rem;
+  background: var(--portal-line);
+  border-radius: 0.14rem;
+  overflow: hidden;
+}
+.nesio-lm-conf-fill {
+  height: 100%;
+  border-radius: 0.14rem;
+  transition: width 0.4s ease;
+}
+.nesio-lm-conf-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+/* Evidence refs */
+.nesio-lm-evidence {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+.nesio-lm-evidence-label {
+  font-size: 0.68rem;
+  color: var(--portal-muted);
+}
+.nesio-lm-evidence-tag {
+  font-size: 0.68rem;
+  background: var(--portal-line);
+  color: var(--portal-muted);
+  border-radius: 0.4rem;
+  padding: 0.1rem 0.45rem;
+}
+
+/* Insight footer: date + feedback */
+.nesio-lm-insight-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.nesio-lm-insight-date {
+  font-size: 0.65rem;
+  color: var(--portal-muted);
+}
+.nesio-lm-feedback-btns {
+  display: flex;
+  gap: 0.3rem;
+}
+.nesio-lm-fb-btn {
+  font-size: 0.7rem;
+  background: var(--portal-line);
+  border: none;
+  border-radius: 0.35rem;
+  padding: 0.15rem 0.45rem;
+  cursor: pointer;
+  color: var(--portal-muted);
+  transition: background 0.12s, color 0.12s;
+}
+.nesio-lm-fb-btn--yes { background: rgba(16,185,129,0.15); color: #10b981; }
+.nesio-lm-fb-btn--no { background: rgba(239,68,68,0.12); color: #ef4444; }
+
+/* Model gen time */
+.nesio-lm-gen-time {
+  font-size: 0.64rem;
+  color: var(--portal-muted);
+  text-align: center;
+  margin-top: 0.75rem;
+  opacity: 0.6;
+}
+
 /* ─── Mirror Profile Card ─── */
 .nesio-mirror-card {
   background: rgba(88,140,227,0.06); border: 1px solid rgba(88,140,227,0.14);
