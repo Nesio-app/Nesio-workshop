@@ -11391,50 +11391,110 @@ html[data-portal-theme="night"] .nesio-mood-title { color: #8899bb; }
   margin-top: 0.35rem;
 }
 
-/* Energy phase */
-.nesio-mood-energy-row {
+/* Energy phase — horizontal drag slider */
+.nesio-mood-slider-wrap { margin: 0.6rem 0 1rem; }
+.nesio-mood-slider-labels {
   display: flex;
-  gap: 0.6rem;
-  margin: 0.5rem 0 1rem;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  color: var(--portal-muted);
+  margin-bottom: 0.45rem;
+  opacity: 0.75;
 }
-.nesio-mood-energy-btn {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.3rem;
-  padding: 0.8rem 0.4rem;
-  border-radius: 1rem;
-  border: 1.5px solid var(--portal-line);
-  background: var(--glass-bg-solid);
+.nesio-mood-slider-track {
+  position: relative;
+  height: 10px;
+  border-radius: 99px;
+  background: var(--portal-line);
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
+  user-select: none;
+  touch-action: none;
 }
-.nesio-mood-energy-btn--active {
-  border-color: #6366f1;
-  background: rgba(99,102,241,0.08);
+.nesio-mood-slider-fill {
+  position: absolute;
+  left: 0; top: 0;
+  height: 100%;
+  border-radius: 99px;
+  pointer-events: none;
+  transition: width 0.04s, background-color 0.12s;
 }
-.nesio-mood-energy-icon { font-size: 0.82rem; letter-spacing: -0.05em; }
-.nesio-mood-energy-label { font-size: 0.74rem; font-weight: 600; color: var(--portal-ink); }
-.nesio-mood-energy-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
+.nesio-mood-slider-thumb {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  border: 2.5px solid white;
+  pointer-events: none;
+  transition: left 0.04s, background-color 0.12s, box-shadow 0.12s;
 }
+.nesio-mood-slider-label {
+  text-align: center;
+  font-size: 0.84rem;
+  font-weight: 700;
+  margin-top: 0.55rem;
+  transition: color 0.12s;
+}
+.nesio-mood-energy-actions { display: flex; flex-direction: column; gap: 0; }
 
 /* Thought phase */
-.nesio-mood-note--large {
-  font-size: 1rem;
-  padding: 0.85rem 1rem;
-  min-height: 3.5rem;
-}
+.nesio-mood-note--large { font-size: 1rem; padding: 0.85rem 1rem; min-height: 3.5rem; }
 .nesio-mood-auto-hint {
   font-size: 0.68rem;
   color: var(--portal-muted);
   text-align: center;
-  margin: 0.3rem 0 0.7rem;
+  margin: 0.3rem 0 0.5rem;
   opacity: 0.6;
 }
+.nesio-mood-thought-actions { display: flex; flex-direction: column; gap: 0.4rem; }
+.nesio-mood-journal-btn {
+  background: none;
+  border: 1.5px solid var(--portal-line);
+  border-radius: 1rem;
+  padding: 0.65rem 1.2rem;
+  font-size: 0.82rem;
+  color: var(--portal-muted);
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 0.15s, color 0.15s;
+}
+.nesio-mood-journal-btn:hover { border-color: #8b5cf6; color: #8b5cf6; }
+
+/* Journal phase */
+.nesio-mood-card--journal { max-height: 92dvh; display: flex; flex-direction: column; }
+.nesio-mood-journal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+.nesio-mood-journal-meta { font-size: 0.88rem; font-weight: 600; color: var(--portal-ink); }
+.nesio-mood-journal-date { font-size: 0.72rem; color: var(--portal-muted); opacity: 0.7; }
+.nesio-mood-journal-prompt {
+  font-size: 0.78rem;
+  color: #8b5cf6;
+  margin: 0 0 0.5rem;
+  font-style: italic;
+  opacity: 0.85;
+}
+.nesio-mood-journal-textarea {
+  flex: 1;
+  width: 100%;
+  min-height: 160px;
+  border: 1.5px solid var(--portal-line);
+  border-radius: 1rem;
+  padding: 0.9rem 1rem;
+  font-size: 0.94rem;
+  line-height: 1.6;
+  background: var(--glass-bg-solid);
+  color: var(--portal-ink);
+  resize: none;
+  outline: none;
+  font-family: inherit;
+  box-sizing: border-box;
+  margin-bottom: 0.75rem;
+}
+.nesio-mood-journal-textarea:focus { border-color: #8b5cf6; }
 
 /* Wheel hint */
 .nesio-mood-hint-text {
