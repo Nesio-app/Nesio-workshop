@@ -13204,6 +13204,76 @@ html[data-portal-theme="night"] .nesio-brief-strip-btn { color: #8faaff; backgro
   animation: nesio-spin 0.7s linear infinite;
 }
 
+/* Focus group labels */
+.nesio-focus-group { margin-bottom: 0.5rem; }
+.nesio-focus-group-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #8a96b0;
+  margin: 0.6rem 0 0.35rem;
+  display: block;
+}
+.nesio-focus-group-label--overdue {
+  color: #e07060;
+}
+.nesio-focus-group-label--toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+}
+.nesio-focus-group-count {
+  background: #e8effe;
+  color: #3b6ef0;
+  font-size: 0.65rem;
+  font-weight: 700;
+  border-radius: 99px;
+  padding: 0.05rem 0.36rem;
+}
+.nesio-focus-group-arrow {
+  margin-left: auto;
+  font-size: 0.7rem;
+  color: #b0b8cc;
+}
+.nesio-focus-group--tomorrow .nesio-focus-card {
+  opacity: 0.75;
+}
+
+/* Calendar dot (replaces checkbox for calendar items) */
+.nesio-focus-card-cal-dot {
+  font-size: 0.5rem;
+  color: #3b6ef0;
+  flex-shrink: 0;
+  padding: 0 0.15rem;
+}
+.nesio-focus-card-join-btn {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #3b6ef0;
+  background: #e8effe;
+  border: none;
+  border-radius: 6px;
+  padding: 0.2rem 0.5rem;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.nesio-focus-card-cal-detail {
+  padding: 0.4rem 0 0.2rem 1.4rem;
+}
+.nesio-focus-card-cal-row {
+  font-size: 0.73rem;
+  color: #6a778c;
+  margin: 0.1rem 0;
+}
+
 html[data-portal-theme="night"] .nesio-focus-card {
   background: rgba(30,34,50,0.92);
   border-color: rgba(255,255,255,0.08);

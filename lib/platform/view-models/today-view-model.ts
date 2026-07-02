@@ -20,6 +20,8 @@ export interface FocusNode {
   createdAt: string;
   attributes: Record<string, string | number | boolean | null>;
   subtasks?: SubTask[];
+  /** 'today' = 今天, 'tomorrow' = 明天, 'overdue' = 已过期未完成 */
+  focusGroup: 'today' | 'tomorrow' | 'overdue';
 }
 
 function parseSubtasks(attrs: Record<string, string | number | boolean | null>): SubTask[] | undefined {
@@ -118,19 +120,36 @@ function urgencyScore(node: LifeNode): number {
   return Date.now() - new Date(node.createdAt).getTime() + 30 * 86_400_000;
 }
 
-function isFocusNode(node: LifeNode): boolean {
-  if (node.attributes.done) return false;
-  const now = Date.now();
+/** Returns which focus group this node belongs to, or null if not a focus item. */
+function getFocusGroup(node: LifeNode): FocusNode['focusGroup'] | null {
+  if (node.attributes.done) return null;
+  const now = new Date();
+  const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0);
+  const todayEnd = new Date(now); todayEnd.setHours(23, 59, 59, 999);
+  const tomorrowStart = new Date(todayEnd); tomorrowStart.setDate(tomorrowStart.getDate()); tomorrowStart.setHours(0, 0, 0, 0); tomorrowStart.setTime(todayEnd.getTime() + 1);
+  const tomorrowEnd = new Date(tomorrowStart); tomorrowEnd.setHours(23, 59, 59, 999);
+
   const d = extractNearestDate(node);
   if (d) {
-    const diff = d.getTime() - now;
-    // Today (0 → 48h) or tomorrow (48h window)
-    if (diff >= 0 && diff < 48 * 3_600_000) return true;
+    if (d < todayStart) return 'overdue'; // overdue: before today
+    if (d <= todayEnd) return 'today';     // due today
+    if (d <= tomorrowEnd) return 'tomorrow'; // due tomorrow
   }
-  // Explicit "今天/今日" in name or rawInput even without a date attribute
+
+  // Text-based hints when no date
   const text = [node.name, node.rawInput || ''].join(' ');
-  if (text.includes('今天') || text.includes('今日')) return true;
-  return false;
+  if (text.includes('今天') || text.includes('今日')) return 'today';
+  if (text.includes('明天') || text.includes('明日')) return 'tomorrow';
+
+  // Commitments added in the last 24h with no due date → show in today as pending
+  const ageMs = now.getTime() - new Date(node.createdAt).getTime();
+  if ((node.type === 'commitment') && ageMs < 24 * 3_600_000 && !d) return 'today';
+
+  return null;
+}
+
+function isFocusNode(node: LifeNode): boolean {
+  return getFocusGroup(node) !== null;
 }
 
 export function markFocusNodeDone(id: string): void {
@@ -167,7 +186,7 @@ export function addCommitmentNode(name: string): FocusNode {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
   }
-  return { id: node.id, name: node.name, type: node.type, rawInput: node.rawInput, createdAt: node.createdAt, attributes: node.attributes };
+  return { id: node.id, name: node.name, type: node.type, rawInput: node.rawInput, createdAt: node.createdAt, attributes: node.attributes, focusGroup: 'today' as const };
 }
 
 export function focusTimeHint(node: FocusNode): string {
@@ -326,8 +345,13 @@ export function buildTodayViewModel(input: {
   const focusNodes: FocusNode[] = allNodes
     .filter(isFocusNode)
     .sort((a, b) => urgencyScore(a) - urgencyScore(b))
-    .slice(0, 10)
-    .map((n) => ({ id: n.id, name: n.name, type: n.type, rawInput: n.rawInput, createdAt: n.createdAt, attributes: n.attributes, subtasks: parseSubtasks(n.attributes) }));
+    .slice(0, 20)
+    .map((n) => ({
+      id: n.id, name: n.name, type: n.type, rawInput: n.rawInput,
+      createdAt: n.createdAt, attributes: n.attributes,
+      subtasks: parseSubtasks(n.attributes),
+      focusGroup: getFocusGroup(n) ?? 'today',
+    }));
 
   return {
     cards: cards.length > 0 ? cards : [...input.fallbackCards],
