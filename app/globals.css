@@ -12557,20 +12557,25 @@ html[data-portal-theme="night"] .nesio-mirror-title { color: #e8eefa; }
   white-space: nowrap;
   pointer-events: none;
 }
-.nesio-select-cancel {
+.nesio-select-overlay-actions {
   position: absolute;
   bottom: calc(2rem + env(safe-area-inset-bottom));
   left: 50%;
   transform: translateX(-50%);
+  display: flex;
+  gap: 0.75rem;
+}
+.nesio-select-action-btn {
   background: rgba(255,255,255,0.15);
   backdrop-filter: blur(6px);
   color: #fff;
   font-size: 0.9rem;
   font-weight: 600;
-  padding: 0.6rem 2rem;
+  padding: 0.6rem 1.5rem;
   border-radius: 999px;
   border: 1.5px solid rgba(255,255,255,0.25);
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .nesio-camera-fallback-text {

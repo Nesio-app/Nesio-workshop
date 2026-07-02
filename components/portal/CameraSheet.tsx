@@ -158,7 +158,7 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
   const streamRef = useRef<MediaStream | null>(null);
 
   // 'preview' = photo taken but not yet analyzed (user chooses full/crop)
-  const [phase, setPhase] = useState<'idle' | 'live' | 'captured' | 'preview' | 'analyzing' | 'result' | 'saved' | 'no-camera'>('idle');
+  const [phase, setPhase] = useState<'idle' | 'live' | 'captured' | 'analyzing' | 'result' | 'saved' | 'no-camera'>('idle');
   const [capturedPreview, setCapturedPreview] = useState<string>('');
   const [capturedBase64, setCapturedBase64] = useState<string>(''); // raw base64 for full-image analysis
   const [result, setResult] = useState<AnalysisResult | null>(null);
@@ -310,15 +310,16 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
     setCapturedPreview(preview);
     setSourceFile(dataUrlToFile(preview, `nesio-camera-${Date.now()}.jpg`));
 
-    // Compress and store — user picks full-image or crop next
+    // Compress and store, then go straight to selection/drawing
     const base64 = await compressImage(canvas);
     setCapturedBase64(base64);
-    setPhase('preview');
+    setSelecting(true);
   }
 
-  // Analyze the full captured image (called from 'preview' phase)
+  // Analyze the full captured image (called from selection overlay or result phase)
   async function analyzeFullImage() {
     if (!capturedBase64) return;
+    setSelecting(false);
     setPhase('analyzing');
     setError('');
     try {
@@ -355,7 +356,8 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
       const dataUrl = reader.result as string;
       setCapturedPreview(dataUrl);
       setCapturedBase64(dataUrl.split(',')[1]);
-      setPhase('preview'); // user picks full-image or crop
+      setPhase('captured');
+      setSelecting(true);
     };
     if (file.type.startsWith('image/')) {
       reader.readAsDataURL(file);
@@ -444,6 +446,7 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
   }
 
   function retake() {
+    setSelecting(false);
     setResult(null); setEditedNodes([]); setIsReceipt(false);
     setCapturedPreview(''); setCapturedBase64(''); setError(''); setExtraTags(''); setSourceFile(null);
     setPhase('idle');
@@ -607,7 +610,7 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
           </svg>
         </button>
         <h2 className="nesio-camera-title">
-          {{ idle: '拍一下', live: '拍一下', captured: '处理中', preview: '选择方式', analyzing: '识别中', result: '识别结果', saved: '已保存', 'no-camera': '上传图片' }[phase]}
+          {{ idle: '拍一下', live: '拍一下', captured: '处理中', analyzing: '识别中', result: '识别结果', saved: '已保存', 'no-camera': '上传图片' }[phase as 'idle' | 'live' | 'captured' | 'analyzing' | 'result' | 'saved' | 'no-camera']}
         </h2>
         <div style={{ width: 40 }} />
       </div>
@@ -674,28 +677,6 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
           </div>
         )}
       </div>
-
-      {/* Preview phase — photo taken, user chooses full-image or crop */}
-      {phase === 'preview' && capturedPreview && (
-        <div className="nesio-camera-preview-panel">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={capturedPreview} alt="预览" className="nesio-camera-preview-img" draggable={false} />
-          <div className="nesio-camera-preview-actions">
-            <button type="button" className="nesio-camera-preview-btn nesio-camera-preview-btn--full" onClick={analyzeFullImage}>
-              <span>🔍</span>
-              <span>全图识别</span>
-            </button>
-            <button type="button" className="nesio-camera-preview-btn nesio-camera-preview-btn--crop" onClick={openSelection}>
-              <span>🖊</span>
-              <span>画圈选区</span>
-            </button>
-            <button type="button" className="nesio-camera-preview-btn nesio-camera-preview-btn--retake" onClick={retake}>
-              <span>↩</span>
-              <span>重拍</span>
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Analysis result — editable */}
       {phase === 'result' && result && (
@@ -821,7 +802,10 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
             onTouchEnd={handleSelTouchEnd}
           />
           <div className="nesio-select-hint">用手指随意圈住要识别的区域</div>
-          <button type="button" className="nesio-select-cancel" onClick={() => setSelecting(false)}>取消</button>
+          <div className="nesio-select-overlay-actions">
+            <button type="button" className="nesio-select-action-btn" onClick={analyzeFullImage}>🔍 全图</button>
+            <button type="button" className="nesio-select-action-btn" onClick={retake}>↩ 重拍</button>
+          </div>
         </div>
       )}
 
