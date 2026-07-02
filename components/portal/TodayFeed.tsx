@@ -13,6 +13,16 @@ import {
   touchNode,
   type DormantStore,
 } from '@/lib/platform/dormant-engine';
+import { runGuidancePipeline } from '@/lib/platform/guidance-engine/guidance-pipeline';
+import {
+  calendarEventsToGuidanceEvents,
+  emailSignalsToGuidanceEvents,
+  specialDaysToGuidanceEvents,
+  focusNodesToGuidanceEvents,
+  weatherToGuidanceEvents,
+  healthNodesToGuidanceEvents,
+  type WeatherSnapshot,
+} from '@/lib/platform/guidance-engine/source-adapters';
 import { cloudSignalRowsToSignals, type CloudSignalRow } from '@/lib/life-domain/signal-search';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
 import VoiceBrief from './VoiceBrief';
@@ -466,6 +476,22 @@ function buildProactiveTriggers(
     .sort((a, b) => (b.fallback.priority ?? 0) - (a.fallback.priority ?? 0))
     .filter((t) => { if (seen.has(t.type)) return false; seen.add(t.type); return true; })
     .slice(0, 3);
+}
+
+// Time-based fallback nudge — only shown when the guidance pipeline produces nothing
+function buildTimeFallback(now: Date): ProactiveCardData | null {
+  const dow = now.getDay();
+  const hour = now.getHours();
+  if (dow === 1 && hour < 11) {
+    return { id: 'fallback-week-start', title: '新的一周从规划开始', body: '周一早上，把本周最重要的 3 件事先记下来。', confidence: 70, sourceTags: ['时间·周一'], icon: '🗓', priority: 5 };
+  }
+  if (dow === 5 && hour >= 15) {
+    return { id: 'fallback-week-end', title: '本周还有什么没收尾？', body: '周五下午，快速过一遍本周待办，周末才能真正放松。', confidence: 70, sourceTags: ['时间·周五'], icon: '✅', priority: 5 };
+  }
+  if (hour >= 21) {
+    return { id: 'fallback-evening', title: '今天有什么想记下来的？', body: '睡前花 30 秒，把今天的想法或待办存进来。', confidence: 65, sourceTags: ['时间·晚间'], icon: '🌙', priority: 4 };
+  }
+  return null;
 }
 
 const SNOOZE_KEY = 'nesio-snoozed-overdue';
@@ -1779,35 +1805,49 @@ export default function TodayFeed({
       const cal = readPortalCache<{ events?: CalendarEvent[] }>(PORTAL_CACHE_KEYS.calendar);
       if (!cancelled) setCalendarEvents(cal?.events ?? []);
 
-      // Build triggers (up to 2 proactive cards) and show independently
+      // Build guidance cards (up to 2) and show independently
       if (canUsePrivateData) {
+        const now = new Date();
         // Load email signals from quick scan (20min TTL cache)
         const latestEmailSignals = await loadEmailSignals(canUsePrivateData);
         if (!cancelled) setEmailSignals(latestEmailSignals);
 
-        const triggers = buildProactiveTriggers(updated.focusNodes, updated.proactiveContext, latestEmailSignals);
-        if (triggers.length > 0) {
-          // Show up to 2 fallback cards immediately; filter already-dismissed ones
-          const fallbackCards: ProactiveCardData[] = triggers.slice(0, 2).map((t, i) => ({
-            id: `${t.type}-${i}`,
-            ...t.fallback,
-          })).filter((c) => !isProactiveCardDismissed(c.id));
-          if (!cancelled && fallbackCards.length > 0) setProactiveCards(fallbackCards);
+        // ── Guidance Engine pipeline ──────────────────────────────────────
+        const calEvents = readPortalCache<{ events?: CalendarEvent[] }>(PORTAL_CACHE_KEYS.calendar)?.events ?? [];
+        const weather = readPortalCache<WeatherSnapshot>(PORTAL_CACHE_KEYS.weather);
+        const scored = scoreCalendarEvents(calEvents, now);
 
-          // Then upgrade with Claude-polished version async
-          fetch('/api/portal/proactive', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ triggers }),
-          })
-            .then((r) => r.json())
-            .then((d: { cards?: ProactiveCardData[] }) => {
-              if (!cancelled && d.cards?.length) {
-                const upgraded = d.cards.filter((c) => !isProactiveCardDismissed(c.id));
-                setProactiveCards(upgraded.slice(0, 2));
-              }
-            })
-            .catch(() => {}); // keep fallback on error
+        const guidanceEvents = [
+          ...calendarEventsToGuidanceEvents(calEvents, now),
+          ...emailSignalsToGuidanceEvents(latestEmailSignals),
+          ...specialDaysToGuidanceEvents(updated.proactiveContext.upcomingSpecialDays, now),
+          ...focusNodesToGuidanceEvents(updated.focusNodes, now),
+          ...weatherToGuidanceEvents(weather),
+          ...healthNodesToGuidanceEvents(updated.proactiveContext.healthItems),
+        ];
+
+        const guidanceCards = runGuidancePipeline({ events: guidanceEvents, scoredCalendar: scored, now });
+        const newProactiveCards: ProactiveCardData[] = guidanceCards
+          .map((card) => ({
+            id: card.id,
+            title: card.title,
+            body: card.body,
+            confidence: 90,
+            sourceTags: [],
+            icon: card.icon,
+            priority: card.priority,
+            cardType: card.type,
+            nodeId: card.nodeId,
+            actions: [{ label: card.action.cta, actionType: card.action.actionType }],
+          }))
+          .filter((c) => !isProactiveCardDismissed(c.id));
+
+        if (!cancelled && newProactiveCards.length > 0) setProactiveCards(newProactiveCards);
+
+        // Fallback time-based nudge when pipeline produces nothing
+        if (!cancelled && newProactiveCards.length === 0) {
+          const fallback = buildTimeFallback(now);
+          if (fallback && !isProactiveCardDismissed(fallback.id)) setProactiveCards([fallback]);
         }
       }
     };
