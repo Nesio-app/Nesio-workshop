@@ -200,10 +200,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 把错误原因带回来，方便排查（截短避免泄露密钥）
-    const debugHint = process.env.NODE_ENV !== 'production'
-      ? ` [claude:${msg.slice(0, 80)}] [gemini:${fallbackMsg.slice(0, 80)}]`
-      : '';
-    return NextResponse.json({ ok: true, response: `出了点问题，请稍后再试。${debugHint}`, sources: [], _claudeErr: msg.slice(0, 120), _geminiErr: fallbackMsg.slice(0, 120) });
+    return NextResponse.json({ ok: true, response: '出了点问题，请稍后再试。', sources: [] });
   }
 }

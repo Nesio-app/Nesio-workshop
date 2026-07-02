@@ -135,8 +135,7 @@ export async function getIntegrationToken(
     }
   }
 
-  // Always fall back to cookies — the OAuth callback sets them, so they're
-  // only present if the user completed a real OAuth flow in this browser.
+  if (!allowCookieIntegrationFallback()) return null;
   return readTokensFromCookies(provider);
 }
 

@@ -42,8 +42,8 @@ export async function POST(req: NextRequest) {
     });
 
     if (!res.ok) {
-      const err = await res.text();
-      return NextResponse.json({ ok: false, error: err }, { status: res.status });
+      await res.text(); // consume body; don't forward upstream error to client
+      return NextResponse.json({ ok: false, error: 'tts_unavailable' }, { status: res.status });
     }
 
     const audioBuffer = await res.arrayBuffer();
