@@ -8,8 +8,9 @@ import { ToneSheet, PrivacySheet, SubscriptionSheet } from './SettingsSheets';
 import ConnectorsHub from './ConnectorsHub';
 import HealthLogger from './HealthLogger';
 import InsightsSheet from './InsightsSheet';
+import NamedPlacesSheet from './NamedPlacesSheet';
 
-type ActiveSheet = 'mirror' | 'tone' | 'privacy' | 'subscription' | 'connectors' | 'health' | null;
+type ActiveSheet = 'mirror' | 'tone' | 'privacy' | 'subscription' | 'connectors' | 'health' | 'places' | null;
 
 export default function NesioProfileCard() {
   const [displayName, setDisplayName] = useState('Jessy');
@@ -119,6 +120,11 @@ export default function NesioProfileCard() {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="20" height="20">
           <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
         </svg>), iconBg: '#fce7f3', label: '健康记录', sublabel: '记录今日症状、睡眠、精力' },
+    { key: 'places' as ActiveSheet, icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="20" height="20">
+          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+          <circle cx="12" cy="9" r="2.5"/>
+        </svg>), iconBg: '#ecfdf5', label: '命名地点', sublabel: '家、公司、常去的地方 · 拍照自动匹配' },
   ];
 
   return (
@@ -199,6 +205,7 @@ export default function NesioProfileCard() {
       <SubscriptionSheet open={activeSheet === 'subscription'} onClose={() => setActiveSheet(null)} />
       <ConnectorsHub open={activeSheet === 'connectors'} onClose={() => setActiveSheet(null)} />
       <HealthLogger open={activeSheet === 'health'} onClose={() => setActiveSheet(null)} />
+      <NamedPlacesSheet open={activeSheet === 'places'} onClose={() => setActiveSheet(null)} />
     </>
   );
 }

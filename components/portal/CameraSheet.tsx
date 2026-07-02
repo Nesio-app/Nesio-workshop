@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { addLifeNode, updateLifeNode, type LifeNode, type LifeNodeAsset } from '@/lib/portal/life-graph';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
+import { matchNearestPlace, formatLocation, getNamedPlaces } from '@/lib/portal/named-places';
+import LocationPicker from './LocationPicker';
 
 interface CameraSheetProps { open: boolean; onClose: () => void; }
 
@@ -176,6 +178,10 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
   const [selecting, setSelecting] = useState(false);
   const selStartRef = useRef<{ x: number; y: number } | null>(null);
   const selPointsRef = useRef<Array<{ x: number; y: number }>>([]);
+  // Auto-detected place from GPS (used to pre-fill location on object nodes)
+  const [detectedPlaceId, setDetectedPlaceId] = useState<string>('');
+  // Per-node location overrides (index → formatted location string)
+  const [nodeLocations, setNodeLocations] = useState<Record<number, string>>({});
 
   const stopCamera = useCallback(() => {
     const video = videoRef.current;
@@ -319,6 +325,20 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
     setSelecting(true);
   }
 
+  // Try to match current GPS to a named place and pre-fill location fields
+  async function tryMatchGpsAndPrefill(nodes: EditedNode[]) {
+    const loc = await getCurrentLocation();
+    if (!loc) return;
+    const place = matchNearestPlace(loc.lat, loc.lon);
+    if (!place) return;
+    setDetectedPlaceId(place.id);
+    const defaults: Record<number, string> = {};
+    nodes.forEach((n, i) => {
+      if (n.type === 'object') defaults[i] = `${place.emoji} ${place.name}`;
+    });
+    if (Object.keys(defaults).length > 0) setNodeLocations(defaults);
+  }
+
   // Analyze the full captured image (called from selection overlay or result phase)
   async function analyzeFullImage() {
     if (!capturedBase64) return;
@@ -327,10 +347,12 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
     setError('');
     try {
       const res = await analyzeImage(capturedBase64);
+      const nodes = toEditedNodes(res.nodes);
       setResult(res);
-      setEditedNodes(toEditedNodes(res.nodes));
+      setEditedNodes(nodes);
       setIsReceipt(detectReceipt(res));
       setPhase('result');
+      tryMatchGpsAndPrefill(nodes);
     } catch (err: unknown) {
       if (err instanceof AnalyzeImageError && err.code === 'ai_auth_required') {
         const pending = buildPendingImageResult();
@@ -395,22 +417,27 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
     const loc = await getCurrentLocation();
     const locAttrs = loc ? { lat: loc.lat, lon: loc.lon } : {};
 
-    const savedNodes = nodesToSave.map((n) => addLifeNode({
-      name: n.name.trim() || '未命名条目',
-      type: n.type as LifeNode['type'],
-      source: 'photo',
-      tags: Array.from(new Set([...(n.tags || []), ...userTags])),
-      confidence: n.confidence,
-      relations: n.relations,
-      rawInput: n.rawInput,
-      attributes: {
-        ...n.attributes,
-        ...(loc ? { lat: loc.lat as number, lon: loc.lon as number } : {}),
-        ...(n.note?.trim() ? { note: n.note.trim() as string } : {}),
-        ...(n.expiry?.trim() ? { expiry: n.expiry.trim() as string } : {}),
-        ...(userTags.length ? { userTags: userTags.join(', ') as string } : {}),
-      },
-    }));
+    const savedNodes = nodesToSave.map((n, i) => {
+      const origIdx = editedNodes.indexOf(n);
+      const locationVal = nodeLocations[origIdx] ?? '';
+      return addLifeNode({
+        name: n.name.trim() || '未命名条目',
+        type: n.type as LifeNode['type'],
+        source: 'photo',
+        tags: Array.from(new Set([...(n.tags || []), ...userTags])),
+        confidence: n.confidence,
+        relations: n.relations,
+        rawInput: n.rawInput,
+        attributes: {
+          ...n.attributes,
+          ...(loc ? { lat: loc.lat as number, lon: loc.lon as number } : {}),
+          ...(locationVal ? { location: locationVal as string } : {}),
+          ...(n.note?.trim() ? { note: n.note.trim() as string } : {}),
+          ...(n.expiry?.trim() ? { expiry: n.expiry.trim() as string } : {}),
+          ...(userTags.length ? { userTags: userTags.join(', ') as string } : {}),
+        },
+      });
+    });
     let cloudAssets: Array<LifeNodeAsset & { nodeId?: string }> = [];
     if (sourceFile && savedNodes.length > 0) {
       try {
@@ -445,13 +472,14 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
       // Cloud Memory sync is best-effort; local Memory remains available.
     }
     setPhase('saved');
-    setTimeout(() => { onClose(); setPhase('idle'); setResult(null); setExtraTags(''); setSourceFile(null); }, 900);
+    setTimeout(() => { onClose(); setPhase('idle'); setResult(null); setExtraTags(''); setSourceFile(null); setNodeLocations({}); setDetectedPlaceId(''); }, 900);
   }
 
   function retake() {
     setSelecting(false);
     setResult(null); setEditedNodes([]); setIsReceipt(false);
     setCapturedPreview(''); setCapturedBase64(''); setError(''); setExtraTags(''); setSourceFile(null);
+    setNodeLocations({}); setDetectedPlaceId('');
     setPhase('idle');
     openNativeCamera();
   }
@@ -583,8 +611,13 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
       setPhase('analyzing');
       try {
         const res = await analyzeImage(base64, CROP_PROMPT);
+        const newNodes = toEditedNodes(res.nodes);
         setResult((prev) => prev ? { ...prev, nodes: [...prev.nodes, ...res.nodes] } : res);
-        setEditedNodes((prev) => [...prev, ...toEditedNodes(res.nodes)]);
+        setEditedNodes((prev) => {
+          const updated = [...prev, ...newNodes];
+          tryMatchGpsAndPrefill(updated);
+          return updated;
+        });
         setIsReceipt((prev) => prev || detectReceipt(res));
         setPhase('result');
       } catch {
@@ -749,6 +782,18 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
                   onChange={(e) => setEditedNodes((prev) => prev.map((n, j) => j === i ? { ...n, note: e.target.value } : n))}
                   placeholder="补充一句描述…（可选）"
                 />
+
+                {/* Location — shown for objects, hierarchical picker */}
+                {node.type === 'object' && (
+                  <div className="nesio-camera-node-loc-row">
+                    <span className="nesio-camera-node-expiry-label">存放位置</span>
+                    <LocationPicker
+                      value={nodeLocations[i] ?? ''}
+                      onChange={(v) => setNodeLocations((prev) => ({ ...prev, [i]: v }))}
+                      className="nesio-camera-loc-picker"
+                    />
+                  </div>
+                )}
 
                 {/* Expiry — shown for objects or receipt items */}
                 {(node.type === 'object' || isReceipt) && (

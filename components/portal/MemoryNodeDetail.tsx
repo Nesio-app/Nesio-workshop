@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { deleteLifeNode, updateLifeNode, type LifeNode } from '@/lib/portal/life-graph';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
+import LocationPicker from './LocationPicker';
 
 const TYPE_ICON_DETAIL: Record<string, string> = {
   person: '👤', object: '📦', place: '📍', event: '📅',
@@ -572,7 +573,10 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
         {editing && (
           <div className="nesio-edit-form">
             {n.type === 'object' && (<>
-              <label className="nesio-edit-row"><span>存放位置</span><input value={field('location')} onChange={(e) => setField('location', e.target.value)} placeholder="桌上、柜子里…" /></label>
+              <div className="nesio-edit-row">
+                <span>存放位置</span>
+                <LocationPicker value={field('location')} onChange={(v) => setField('location', v)} />
+              </div>
               <label className="nesio-edit-row"><span>价格</span><input value={field('price')} onChange={(e) => setField('price', e.target.value)} placeholder="$12.99" /></label>
               <label className="nesio-edit-row"><span>购买日期</span><input type="date" value={field('purchaseDate')} onChange={(e) => setField('purchaseDate', e.target.value)} /></label>
               <label className="nesio-edit-row"><span>有效期</span><input type="date" value={field('expiry')} onChange={(e) => setField('expiry', e.target.value)} /></label>
