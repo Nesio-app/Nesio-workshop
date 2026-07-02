@@ -30,13 +30,16 @@ async function compressImage(canvas: HTMLCanvasElement): Promise<string> {
   return dataUrl.split(',')[1]; // base64 only
 }
 
-async function analyzeImage(base64: string): Promise<AnalysisResult> {
+const FULL_IMAGE_PROMPT = '请只根据图片里真实可见的内容生成 Memory 节点。如果是小票/收据：为每个购买条目单独生成一个 object 节点（名称用中文，如”草莓冰淇淋”、”蜂蜜柚子茶”），attributes 加 price 和 receiptDate，不要为商店生成 place 节点，不要生成收据汇总节点。其他情况：优先识别具体物品、文件、场景；除非图片里清楚有人，否则不要生成”人物”节点；不要把这段指令当成节点名称。';
+const CROP_PROMPT = '用户已圈选了图片中的特定区域（圈外已遮黑）。请只识别圈内最主要的1-2个物品，生成对应 Memory 节点。不要识别背景、黑色遮罩区域或其他无关物体。';
+
+async function analyzeImage(base64: string, prompt?: string): Promise<AnalysisResult> {
   const res = await fetch('/api/portal/analyze', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-baohe-access-mode': 'personal_lab' },
     body: JSON.stringify({
       type: 'image',
-      content: '请只根据图片里真实可见的内容生成 Memory 节点。如果是小票/收据：为每个购买条目单独生成一个 object 节点（名称用中文，如”草莓冰淇淋”、”蜂蜜柚子茶”），attributes 加 price 和 receiptDate，不要为商店生成 place 节点，不要生成收据汇总节点。其他情况：优先识别具体物品、文件、场景；除非图片里清楚有人，否则不要生成”人物”节点；不要把这段指令当成节点名称。',
+      content: prompt ?? FULL_IMAGE_PROMPT,
       imageBase64: base64,
       mimeType: 'image/jpeg',
     }),
@@ -563,12 +566,23 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
       cropCanvas.height = Math.round(imgH);
       const ctx2 = cropCanvas.getContext('2d');
       if (!ctx2) { setSelecting(false); return; }
+      // Mask: fill black, clip to drawn shape, draw only the circled region
+      ctx2.fillStyle = '#000';
+      ctx2.fillRect(0, 0, cropCanvas.width, cropCanvas.height);
+      ctx2.beginPath();
+      pts.forEach((p, i) => {
+        const cx = (p.x - offsetX) / renderedW * img.naturalWidth - imgX;
+        const cy = (p.y - offsetY) / renderedH * img.naturalHeight - imgY;
+        if (i === 0) ctx2.moveTo(cx, cy); else ctx2.lineTo(cx, cy);
+      });
+      ctx2.closePath();
+      ctx2.clip();
       ctx2.drawImage(img, imgX, imgY, imgW, imgH, 0, 0, imgW, imgH);
       const base64 = cropCanvas.toDataURL('image/jpeg', 0.88).split(',')[1];
       setSelecting(false);
       setPhase('analyzing');
       try {
-        const res = await analyzeImage(base64);
+        const res = await analyzeImage(base64, CROP_PROMPT);
         setResult((prev) => prev ? { ...prev, nodes: [...prev.nodes, ...res.nodes] } : res);
         setEditedNodes((prev) => [...prev, ...toEditedNodes(res.nodes)]);
         setIsReceipt((prev) => prev || detectReceipt(res));
