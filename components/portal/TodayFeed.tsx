@@ -6,7 +6,8 @@ import { buildTodayViewModel, focusTimeHint, markFocusNodeDone, addCommitmentNod
 import { type RecommendationCard } from '@/lib/portal/reasoning-engine';
 import { readPortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
 import type { CalendarEvent } from '@/lib/portal/types';
-import { scoreCalendarEvents, selectPinned, EVENT_TYPE_ICON, EVENT_TYPE_LABEL, type AttentionObject } from '@/lib/portal/attention-engine';
+import { scoreCalendarEvents, selectPinned, EVENT_TYPE_ICON, EVENT_TYPE_LABEL, type AttentionObject } from '@/lib/platform/attention-engine';
+import type { EmailSignal } from '@/lib/platform/email-signals';
 import { cloudSignalRowsToSignals, type CloudSignalRow } from '@/lib/life-domain/signal-search';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
 import VoiceBrief from './VoiceBrief';
@@ -243,17 +244,6 @@ interface WeatherCache {
   placeLabel?: string;
 }
 
-interface EmailSignal {
-  id: string;
-  type: string;
-  subject: string;
-  from: string;
-  date: string;
-  icon: string;
-  cardTitle: string;
-  cardBody: string;
-  priority: number;
-}
 
 const EMAIL_SIGNALS_KEY = 'nesio-email-signals-cache';
 const EMAIL_SIGNALS_TTL_MS = 20 * 60_000; // 20 minutes
