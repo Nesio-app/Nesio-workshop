@@ -14,6 +14,7 @@ import {
   type DormantStore,
 } from '@/lib/platform/dormant-engine';
 import { runGuidancePipeline } from '@/lib/platform/guidance-engine/guidance-pipeline';
+import { loadCoolingStore, recordDismissed, saveCoolingStore } from '@/lib/platform/guidance-engine/cooling-store';
 import {
   calendarEventsToGuidanceEvents,
   emailSignalsToGuidanceEvents,
@@ -244,6 +245,7 @@ interface ProactiveCardData {
   cardType?: string;
   nodeId?: string;
   actions?: ProactiveAction[];
+  expiresAt?: string;  // ISO — card auto-hides after this time (Google Now lifecycle)
 }
 
 type ProactiveTrigger = {
@@ -1839,8 +1841,10 @@ export default function TodayFeed({
             cardType: card.type,
             nodeId: card.nodeId,
             actions: [{ label: card.action.cta, actionType: card.action.actionType }],
+            expiresAt: card.expiresAt?.toISOString(),
           }))
-          .filter((c) => !isProactiveCardDismissed(c.id));
+          .filter((c) => !isProactiveCardDismissed(c.id))
+          .filter((c) => !c.expiresAt || new Date(c.expiresAt).getTime() > now.getTime());
 
         if (!cancelled && newProactiveCards.length > 0) setProactiveCards(newProactiveCards);
 
@@ -1956,6 +1960,10 @@ export default function TodayFeed({
             card={card}
             onDismiss={() => {
               dismissProactiveById(card.id);
+              // Record in cooling store so adaptive cooldown can kick in after repeated ignores
+              if (card.cardType) {
+                saveCoolingStore(recordDismissed(card.cardType, loadCoolingStore()));
+              }
               setDismissedCardIds((prev) => { const next = new Set(prev); next.add(card.id); return next; });
             }}
             onMarkDone={(nodeId) => markFocusNodeDone(nodeId)}

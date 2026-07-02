@@ -44,12 +44,11 @@ export function getActionWindow(event: GuidanceEvent, now: Date): WindowUrgency 
     case 'medical':
     case 'meeting':
       if (hoursUntil < 0) return 'closed';
-      if (hoursUntil < 0.5) return 'closed';    // no time to do anything useful
-      if (hoursUntil < 1) return 'critical';
-      if (hoursUntil < 2) return 'high';
-      if (hoursUntil < 4) return 'medium';
-      if (hoursUntil < 24) return 'low';        // tomorrow's meeting: light nudge
-      return 'closed';
+      if (hoursUntil < 0.5) return 'closed';    // < 30min: no time to act
+      if (hoursUntil < 1) return 'critical';    // 30–60min: must prepare now
+      if (hoursUntil < 2) return 'high';        // 1–2h: good preparation window
+      if (hoursUntil < 4) return 'medium';      // 2–4h: still useful (prep materials, links)
+      return 'closed';                           // 4h+: user sees it on their calendar — no nudge needed
 
     case 'deadline':
       if (daysUntil < 0) return 'closed';       // past due → dormant engine's job

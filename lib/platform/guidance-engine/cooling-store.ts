@@ -27,6 +27,7 @@ const COOLDOWN_MS: Record<WindowUrgency, number> = {
 interface CooldownEntry {
   lastShownAt: string;   // ISO
   showCount: number;     // times shown (today, resets at midnight)
+  dismissCount: number;  // times user dismissed without acting (persistent — drives adaptive cooling)
 }
 
 export type CoolingStore = Record<string, CooldownEntry>;
@@ -45,8 +46,11 @@ export function isOnCooldown(
 ): boolean {
   const entry = store[eventType];
   if (!entry) return false;
-  const cooldown = COOLDOWN_MS[urgency] ?? COOLDOWN_MS.medium;
-  return now.getTime() - new Date(entry.lastShownAt).getTime() < cooldown;
+  const baseCooldown = COOLDOWN_MS[urgency] ?? COOLDOWN_MS.medium;
+  // Adaptive: if user has dismissed this type 3+ times without acting, double the cooldown.
+  // Inspired by PRISM's asymmetric cost model: persistent false-alarm patterns cost trust.
+  const multiplier = (entry.dismissCount ?? 0) >= 3 ? 2 : 1;
+  return now.getTime() - new Date(entry.lastShownAt).getTime() < baseCooldown * multiplier;
 }
 
 export function recordShown(eventType: string, store: CoolingStore): CoolingStore {
@@ -58,6 +62,21 @@ export function recordShown(eventType: string, store: CoolingStore): CoolingStor
     [eventType]: {
       lastShownAt: new Date().toISOString(),
       showCount: sameDay ? (existing!.showCount + 1) : 1,
+      dismissCount: existing?.dismissCount ?? 0,
+    },
+  };
+}
+
+// Call when user explicitly dismisses a card without acting on it.
+// Increments dismissCount which is used by isOnCooldown's adaptive multiplier.
+export function recordDismissed(eventType: string, store: CoolingStore): CoolingStore {
+  const existing = store[eventType];
+  return {
+    ...store,
+    [eventType]: {
+      lastShownAt: existing?.lastShownAt ?? new Date().toISOString(),
+      showCount: existing?.showCount ?? 0,
+      dismissCount: (existing?.dismissCount ?? 0) + 1,
     },
   };
 }

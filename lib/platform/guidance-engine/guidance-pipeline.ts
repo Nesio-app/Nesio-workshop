@@ -27,6 +27,30 @@ import { interruptPriority, worthInterrupting } from './interrupt-evaluator';
 import { computeAttentionBudget, passesBudgetGate } from './attention-budget';
 import { loadCoolingStore, isOnCooldown, recordShown, saveCoolingStore } from './cooling-store';
 
+// Compute when a card's action window closes and the card becomes irrelevant.
+// Google Now principle: a boarding-pass card disappears when the plane departs.
+function computeExpiry(event: GuidanceEvent): Date | undefined {
+  if (!event.scheduledAt) return undefined;
+  const t = event.scheduledAt.getTime();
+  switch (event.type) {
+    case 'flight':
+      return new Date(t - 2 * 3_600_000);      // card expires 2h before flight (on the way)
+    case 'medical':
+    case 'meeting':
+      return new Date(t - 0.5 * 3_600_000);    // expires 30min before (too late to prep)
+    case 'deadline':
+      return new Date(t);                        // expires at the deadline itself
+    case 'birthday':
+    case 'anniversary': {
+      const eod = new Date(event.scheduledAt);
+      eod.setHours(23, 59, 59, 0);
+      return eod;                                // expires end of that day
+    }
+    default:
+      return undefined;
+  }
+}
+
 const EVENT_ICON: Record<GuidanceEventType, string> = {
   flight:       '✈️',
   medical:      '🏥',
@@ -127,7 +151,13 @@ export function runGuidancePipeline(input: GuidancePipelineInput): GuidanceCard[
   const candidates: Array<{ card: GuidanceCard; priority: number; urgency: WindowUrgency }> = [];
   const seenTypes = new Set<string>();
 
-  for (const event of input.events) {
+  // Pre-filter: drop events whose action window has already closed (card would be stale).
+  const liveEvents = input.events.filter((e) => {
+    const expiry = computeExpiry(e);
+    return !expiry || expiry.getTime() > now.getTime();
+  });
+
+  for (const event of liveEvents) {
     // Layer 3: is the action window open right now?
     const urgency = getActionWindow(event, now);
     if (urgency === 'closed') continue;
@@ -170,6 +200,7 @@ export function runGuidancePipeline(input: GuidancePipelineInput): GuidanceCard[
         action,
         priority,
         nodeId: typeof event.payload.nodeId === 'string' ? event.payload.nodeId : undefined,
+        expiresAt: computeExpiry(event),
       },
     });
   }

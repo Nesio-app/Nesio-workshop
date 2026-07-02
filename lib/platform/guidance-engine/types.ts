@@ -49,4 +49,7 @@ export interface GuidanceCard {
   action: GuidanceAction;
   priority: number;    // 0–10, derived from consequence × urgency matrix
   nodeId?: string;
+  // When the action window closes and this card becomes irrelevant (Google Now principle).
+  // Cards past their expiry are filtered out before rendering, even if cooling hasn't expired.
+  expiresAt?: Date;
 }
