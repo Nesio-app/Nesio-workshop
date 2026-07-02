@@ -18,8 +18,8 @@ import type { AttentionObject } from '@/lib/platform/attention-engine';
 import type { AttentionBudget, ConsequenceSeverity } from './types';
 
 // Sum of attention scores for today's events
-const THRESHOLD_LIMITED   = 150; // ~2 high-importance events
-const THRESHOLD_EXHAUSTED = 280; // ~3–4 high-importance events (very busy day)
+const THRESHOLD_LIMITED   = 130; // ~2 high-importance events (e.g. flight + meeting)
+const THRESHOLD_EXHAUSTED = 230; // ~3 high-importance events (e.g. flight + medical + exam)
 
 export function computeAttentionBudget(todayObjects: AttentionObject[]): AttentionBudget {
   const total = todayObjects

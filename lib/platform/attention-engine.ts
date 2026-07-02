@@ -85,7 +85,11 @@ export function computeUrgency(start: string, allDay: boolean, now: Date): numbe
 // ── Final score ───────────────────────────────────────────────────────────────
 
 export function computeScore(importance: number, urgency: number): number {
-  return Math.round(importance * 0.55 + urgency * 0.45);
+  // Multiplicative: urgency modulates importance rather than adding to it independently.
+  // Floor at 0.35 so high-importance events that aren't urgent yet still register.
+  // Research basis: additive models let one dimension compensate the other — a
+  // far-future flight shouldn't score the same as a meeting happening in 2 hours.
+  return Math.round(importance * Math.max(0.35, urgency / 100));
 }
 
 // ── AttentionObject ───────────────────────────────────────────────────────────
