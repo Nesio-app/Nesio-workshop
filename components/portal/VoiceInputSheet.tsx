@@ -56,6 +56,7 @@ interface PendingDraft {
   edited: boolean;
   // 提醒/计划专用字段
   dueDate?: string;
+  dueTime?: string;
   recurring?: string;
   priority?: string;
 }
@@ -110,6 +111,150 @@ async function askMemoryWithAi(query: string, candidates: LifeNode[]): Promise<L
   return candidates.filter((node) => wanted.has(node.id) || wanted.has(node.name));
 }
 
+// ---- 日期时间选择器 ----
+const MONTH_NAMES = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+const WEEKDAY_LABELS = ['一','二','三','四','五','六','日'];
+
+interface DTPValue {
+  date: string;
+  time?: string;
+  recurring?: string;
+  priority?: string;
+}
+
+function DateTimePicker({ value, onChange, onClose }: {
+  value: DTPValue;
+  onChange: (v: DTPValue) => void;
+  onClose: () => void;
+}) {
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const initDate = value.date ? new Date(value.date + 'T00:00:00') : new Date();
+  const [viewYear, setViewYear] = useState(initDate.getFullYear());
+  const [viewMonth, setViewMonth] = useState(initDate.getMonth());
+
+  const todayDate = new Date(todayStr + 'T00:00:00');
+
+  function prevMonth() {
+    if (viewMonth === 0) { setViewYear(y => y - 1); setViewMonth(11); }
+    else setViewMonth(m => m - 1);
+  }
+  function nextMonth() {
+    if (viewMonth === 11) { setViewYear(y => y + 1); setViewMonth(0); }
+    else setViewMonth(m => m + 1);
+  }
+
+  const firstDow = (new Date(viewYear, viewMonth, 1).getDay() + 6) % 7;
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const cells: Array<number | null> = [];
+  for (let i = 0; i < firstDow; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+  function selectDay(day: number) {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const dateStr = `${viewYear}-${pad(viewMonth + 1)}-${pad(day)}`;
+    onChange({ ...value, date: dateStr });
+  }
+
+  return (
+    <div className="nesio-dtp-overlay" role="dialog" aria-modal>
+      <div className="nesio-dtp-backdrop" onClick={onClose} />
+      <div className="nesio-dtp-sheet">
+        {/* 月份导航 */}
+        <div className="nesio-dtp-month-nav">
+          <button type="button" className="nesio-dtp-nav-btn" onClick={prevMonth}>‹</button>
+          <span className="nesio-dtp-month-label">{viewYear}年 {MONTH_NAMES[viewMonth]}</span>
+          <button type="button" className="nesio-dtp-nav-btn" onClick={nextMonth}>›</button>
+        </div>
+
+        {/* 星期标题 */}
+        <div className="nesio-dtp-weekdays">
+          {WEEKDAY_LABELS.map(d => <span key={d}>{d}</span>)}
+        </div>
+
+        {/* 日期格子 */}
+        <div className="nesio-dtp-days">
+          {cells.map((day, i) => {
+            if (!day) return <span key={`e${i}`} />;
+            const pad = (n: number) => String(n).padStart(2, '0');
+            const dateStr = `${viewYear}-${pad(viewMonth + 1)}-${pad(day)}`;
+            const cellDate = new Date(dateStr + 'T00:00:00');
+            const isToday = cellDate.getTime() === todayDate.getTime();
+            const isSelected = value.date === dateStr;
+            return (
+              <button
+                key={day}
+                type="button"
+                className={`nesio-dtp-day${isToday ? ' nesio-dtp-day--today' : ''}${isSelected ? ' nesio-dtp-day--selected' : ''}`}
+                onClick={() => selectDay(day)}
+              >
+                {day}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="nesio-dtp-divider" />
+
+        {/* 时间 */}
+        <div className="nesio-dtp-row">
+          <span className="nesio-dtp-row-label">🕐 时间</span>
+          <input
+            type="time"
+            className="nesio-dtp-time-input"
+            value={value.time ?? ''}
+            onChange={(e) => onChange({ ...value, time: e.target.value || undefined })}
+          />
+        </div>
+
+        {/* 重复 */}
+        <div className="nesio-dtp-row nesio-dtp-row--wrap">
+          <span className="nesio-dtp-row-label">🔄 重复</span>
+          <div className="nesio-dtp-options">
+            {['不重复', '每天', '每周', '每月'].map(r => (
+              <button
+                key={r}
+                type="button"
+                className={`nesio-dtp-opt${value.recurring === r ? ' nesio-dtp-opt--on' : ''}`}
+                onClick={() => onChange({ ...value, recurring: value.recurring === r ? undefined : r })}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 优先级 */}
+        <div className="nesio-dtp-row nesio-dtp-row--wrap">
+          <span className="nesio-dtp-row-label">⚡ 优先级</span>
+          <div className="nesio-dtp-options">
+            {([['🔴','高'],['🟡','中'],['🟢','低']] as const).map(([dot, key]) => (
+              <button
+                key={key}
+                type="button"
+                className={`nesio-dtp-opt${value.priority === key ? ' nesio-dtp-opt--on' : ''}`}
+                onClick={() => onChange({ ...value, priority: value.priority === key ? undefined : key })}
+              >
+                {dot} {key}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 底部按钮 */}
+        <div className="nesio-dtp-footer">
+          <button type="button" className="nesio-dtp-clear"
+            onClick={() => { onChange({ date: todayStr }); onClose(); }}>
+            清除
+          </button>
+          <button type="button" className="nesio-dtp-confirm" onClick={onClose}>
+            确定
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateData = false, onClose }: VoiceInputSheetProps) {
   const [mode, setMode] = useState<'note' | 'meeting'>('note');
   const [text, setText] = useState('');
@@ -120,6 +265,7 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
   const [savedCount, setSavedCount] = useState(0);
   const [askResults, setAskResults] = useState<AskResult[]>([]);
   const [draft, setDraft] = useState<PendingDraft | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const recRef = useRef<{ stop: () => void } | null>(null);
   const isAskMode = intent === 'ask';
@@ -278,6 +424,7 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
     // mirrors to cloud for signed-in users (§Signal main-fact transition).
     const extraPayload: Record<string, string> = {};
     if (d.dueDate) extraPayload.dueDate = d.dueDate;
+    if (d.dueTime) extraPayload.dueTime = d.dueTime;
     if (d.recurring) extraPayload.recurring = d.recurring;
     if (d.priority) extraPayload.priority = d.priority;
 
@@ -308,14 +455,8 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
   function setDraftTitle(title: string) {
     setDraft((d) => (d ? { ...d, title, edited: true } : d));
   }
-  function setDraftDueDate(dueDate: string) {
-    setDraft((d) => (d ? { ...d, dueDate, edited: true } : d));
-  }
-  function setDraftRecurring(recurring: string) {
-    setDraft((d) => (d ? { ...d, recurring, edited: true } : d));
-  }
-  function setDraftPriority(priority: string) {
-    setDraft((d) => (d ? { ...d, priority, edited: true } : d));
+  function setDraftDTP(v: DTPValue) {
+    setDraft((d) => d ? { ...d, dueDate: v.date || undefined, dueTime: v.time, recurring: v.recurring, priority: v.priority, edited: true } : d);
   }
 
   // 判断是否是提醒/计划类型（需要显示时间相关字段）
@@ -408,45 +549,44 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
               </div>
             )}
 
-            {/* 提醒/计划专属字段 */}
-            {isCommitmentLike(draft) && (
-              <div className="nesio-voice-confirm-field">
-                <span className="nesio-voice-confirm-label">截止日期 / 提醒时间</span>
-                <input
-                  type="date"
-                  className="nesio-voice-confirm-input"
-                  value={draft.dueDate ?? new Date().toISOString().slice(0, 10)}
-                  onChange={(e) => setDraftDueDate(e.target.value)}
-                />
-                <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.4rem', flexWrap: 'wrap' }}>
-                  {['不重复', '每天', '每周', '每月'].map((r) => (
-                    <button
-                      key={r}
-                      type="button"
-                      className={`nesio-voice-confirm-domain${draft.recurring === r ? ' is-active' : ''}`}
-                      onClick={() => setDraftRecurring(draft.recurring === r ? '' : r)}
-                    >
-                      {r}
-                    </button>
-                  ))}
+            {/* 提醒/计划专属字段 — 点击日期按钮弹出日历 */}
+            {isCommitmentLike(draft) && (() => {
+              const todayStr = new Date().toISOString().slice(0, 10);
+              const dateStr = draft.dueDate ?? todayStr;
+              const dateLabel = (() => {
+                const d = new Date(dateStr + 'T00:00:00');
+                const today = new Date(todayStr + 'T00:00:00');
+                const diff = Math.round((d.getTime() - today.getTime()) / 86400000);
+                const wds = ['日','一','二','三','四','五','六'];
+                const base = `${d.getMonth()+1}月${d.getDate()}日 周${wds[d.getDay()]}`;
+                if (diff === 0) return `今天 · ${base}`;
+                if (diff === 1) return `明天 · ${base}`;
+                if (diff === -1) return `昨天 · ${base}`;
+                return base;
+              })();
+              return (
+                <div className="nesio-voice-confirm-field">
+                  <span className="nesio-voice-confirm-label">截止日期 / 提醒时间</span>
+                  <button
+                    type="button"
+                    className="nesio-dtp-trigger"
+                    onClick={() => setShowDatePicker(true)}
+                  >
+                    <span>📅 {dateLabel}</span>
+                    {draft.dueTime && <span className="nesio-dtp-trigger-time">🕐 {draft.dueTime}</span>}
+                    {draft.recurring && <span className="nesio-dtp-trigger-badge">{draft.recurring}</span>}
+                    {draft.priority && <span className="nesio-dtp-trigger-badge">{draft.priority === '高' ? '🔴' : draft.priority === '中' ? '🟡' : '🟢'} {draft.priority}</span>}
+                  </button>
+                  {showDatePicker && (
+                    <DateTimePicker
+                      value={{ date: dateStr, time: draft.dueTime, recurring: draft.recurring, priority: draft.priority }}
+                      onChange={(v) => setDraftDTP(v)}
+                      onClose={() => setShowDatePicker(false)}
+                    />
+                  )}
                 </div>
-                <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.4rem' }}>
-                  {['🔴 高', '🟡 中', '🟢 低'].map((p) => {
-                    const key = p.split(' ')[1];
-                    return (
-                      <button
-                        key={key}
-                        type="button"
-                        className={`nesio-voice-confirm-domain${draft.priority === key ? ' is-active' : ''}`}
-                        onClick={() => setDraftPriority(draft.priority === key ? '' : key)}
-                      >
-                        {p}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+              );
+            })()}
 
             <div className="nesio-voice-confirm-actions">
               <button type="button" className="nesio-voice-confirm-back" onClick={() => { setDraft(null); setSendState('idle'); }}>
