@@ -296,6 +296,8 @@ export interface TodayViewModel {
   readonly memoryCount: number;
   readonly memoryNotes: readonly string[];
   readonly focusNodes: readonly FocusNode[];
+  /** All undone nodes — for dormant engine and other platform consumers. */
+  readonly allNodes: readonly FocusNode[];
   readonly proactiveContext: ProactiveContext;
 }
 
@@ -314,6 +316,7 @@ export function buildTodayViewModel(input: {
       memoryCount: 0,
       memoryNotes: [],
       focusNodes: [],
+      allNodes: [],
       proactiveContext: emptyContext,
     };
   }
@@ -321,19 +324,30 @@ export function buildTodayViewModel(input: {
   const cloudSignals = input.cloudSignals?.length ? [...input.cloudSignals] : [];
   const cards = generateTodayCards(cloudSignals.length ? { signals: cloudSignals } : undefined);
   const nodes = getRecentNodes(5);
-  const allNodes = getLifeGraph();
+  const lifeGraphNodes = getLifeGraph();
 
-  const focusNodes: FocusNode[] = allNodes
+  const toFocusNode = (n: LifeNode): FocusNode => ({
+    id: n.id, name: n.name, type: n.type, rawInput: n.rawInput,
+    createdAt: n.createdAt, attributes: n.attributes, subtasks: parseSubtasks(n.attributes),
+  });
+
+  const focusNodes: FocusNode[] = lifeGraphNodes
     .filter(isFocusNode)
     .sort((a, b) => urgencyScore(a) - urgencyScore(b))
     .slice(0, 10)
-    .map((n) => ({ id: n.id, name: n.name, type: n.type, rawInput: n.rawInput, createdAt: n.createdAt, attributes: n.attributes, subtasks: parseSubtasks(n.attributes) }));
+    .map(toFocusNode);
+
+  // All undone nodes — for dormant engine and other platform consumers
+  const allNodes: FocusNode[] = lifeGraphNodes
+    .filter((n) => !n.attributes.done)
+    .map(toFocusNode);
 
   return {
     cards: cards.length > 0 ? cards : [...input.fallbackCards],
     memoryCount: cloudSignals.length || getRecentNodes().length,
     memoryNotes: cloudSignals.length ? cloudSignals.slice(0, 5).map((s) => s.title) : nodes.map((n) => n.name),
     focusNodes,
-    proactiveContext: buildProactiveContext(allNodes),
+    allNodes,
+    proactiveContext: buildProactiveContext(lifeGraphNodes),
   };
 }

@@ -8,6 +8,10 @@ import { readPortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache'
 import type { CalendarEvent } from '@/lib/portal/types';
 import { scoreCalendarEvents, selectPinned, EVENT_TYPE_ICON, EVENT_TYPE_LABEL, type AttentionObject } from '@/lib/platform/attention-engine';
 import type { EmailSignal } from '@/lib/platform/email-signals';
+import {
+  loadDormantStore, evaluateDormancy, selectReviewCandidate, applyReviewAction,
+  type DormantStore,
+} from '@/lib/platform/dormant-engine';
 import { cloudSignalRowsToSignals, type CloudSignalRow } from '@/lib/life-domain/signal-search';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
 import VoiceBrief from './VoiceBrief';
@@ -1448,11 +1452,42 @@ function CollapsedTaskItem({
 
 // ── Today Focus Section — Attention Engine v1 ─────────────────────────────────
 
+function DormantReviewCard({
+  node,
+  onDo,
+  onSnooze,
+  onArchive,
+}: {
+  node: FocusNode;
+  onDo: () => void;
+  onSnooze: () => void;
+  onArchive: () => void;
+}) {
+  return (
+    <li className="nesio-collapsed-item nesio-dormant-card">
+      <div className="nesio-collapsed-row">
+        <span className="nesio-collapsed-icon">🌿</span>
+        <div className="nesio-dormant-content">
+          <span className="nesio-dormant-question">这个还属于你吗？</span>
+          <span className="nesio-collapsed-title">{node.name.length > 22 ? node.name.slice(0, 22) + '…' : node.name}</span>
+        </div>
+      </div>
+      <div className="nesio-collapsed-overdue-actions">
+        <button type="button" onClick={onDo}>现在做</button>
+        <button type="button" onClick={onSnooze}>以后再说</button>
+        <button type="button" onClick={onArchive}>放下</button>
+      </div>
+    </li>
+  );
+}
+
 function TodayFocusSection({
   focusNodes,
   calendarEvents,
   specialDays,
-  overdueItems,
+  allNodes: allNodesProp,
+  dormantStore: dormantStoreProp,
+  onSetDormantStore,
   onOpenMemory,
   onOpenRecorder,
   onFocusMode,
@@ -1460,7 +1495,9 @@ function TodayFocusSection({
   focusNodes: readonly FocusNode[];
   calendarEvents: CalendarEvent[];
   specialDays: ProactiveContextItem[];
-  overdueItems: ProactiveContextItem[];
+  allNodes: readonly FocusNode[];
+  dormantStore: DormantStore;
+  onSetDormantStore: (s: DormantStore) => void;
   onOpenMemory?: () => void;
   onOpenRecorder?: (node: FocusNode) => void;
   onFocusMode?: (node: FocusNode) => void;
@@ -1486,12 +1523,12 @@ function TodayFocusSection({
   // ── Special days (today / tomorrow) ──
   const nearSpecialDays = specialDays.filter((d) => d.daysUntil <= 1);
 
-  // ── Overdue: one at a time ──
-  const overdueToShow = overdueItems[0] ?? null;
-  const [overdueDismissed, setOverdueDismissed] = useState<Set<string>>(new Set());
-  const showOverdue = overdueToShow && !overdueDismissed.has(overdueToShow.nodeId);
+  // ── Dormant: one review card per day ──
+  const [dormantDismissed, setDormantDismissed] = useState<Set<string>>(new Set());
+  const dormantCandidate = selectReviewCandidate(allNodesProp, dormantStoreProp);
+  const showDormant = dormantCandidate && !dormantDismissed.has(dormantCandidate.id);
 
-  const collapsedCount = rest.length + taskNodes.length + nearSpecialDays.length + (showOverdue ? 1 : 0);
+  const collapsedCount = rest.length + taskNodes.length + nearSpecialDays.length + (showDormant ? 1 : 0);
   const isEmpty = !pinned && collapsedCount === 0;
 
   const doneToday = doneIds.size;
@@ -1590,20 +1627,26 @@ function TodayFocusSection({
                     />
                   ))}
 
-                  {/* 搁置已久 */}
-                  {showOverdue && (
-                    <li className="nesio-collapsed-item">
-                      <div className="nesio-collapsed-row">
-                        <span className="nesio-collapsed-icon">🌱</span>
-                        <span className="nesio-collapsed-title">{overdueToShow.name.slice(0, 22)}{overdueToShow.name.length > 22 ? '…' : ''}</span>
-                        <span className="nesio-collapsed-time">搁置已久</span>
-                      </div>
-                      <div className="nesio-collapsed-overdue-actions">
-                        <button type="button" onClick={() => setOverdueDismissed((p) => { const n = new Set(p); n.add(overdueToShow.nodeId); return n; })}>继续做</button>
-                        <button type="button" onClick={() => { markFocusNodeDone(overdueToShow.nodeId); setOverdueDismissed((p) => { const n = new Set(p); n.add(overdueToShow.nodeId); return n; }); }}>不需要了</button>
-                        <button type="button" onClick={() => { snoozeOverdue(overdueToShow.nodeId, 7); setOverdueDismissed((p) => { const n = new Set(p); n.add(overdueToShow.nodeId); return n; }); }}>下周再说</button>
-                      </div>
-                    </li>
+                  {/* Dormant 任务判断卡 */}
+                  {showDormant && dormantCandidate && (
+                    <DormantReviewCard
+                      node={dormantCandidate}
+                      onDo={() => {
+                        const next = applyReviewAction(dormantCandidate.id, 'do');
+                        onSetDormantStore(next);
+                        setDormantDismissed((p) => { const n = new Set(p); n.add(dormantCandidate.id); return n; });
+                      }}
+                      onSnooze={() => {
+                        const next = applyReviewAction(dormantCandidate.id, 'snooze', 7);
+                        onSetDormantStore(next);
+                        setDormantDismissed((p) => { const n = new Set(p); n.add(dormantCandidate.id); return n; });
+                      }}
+                      onArchive={() => {
+                        const next = applyReviewAction(dormantCandidate.id, 'archive');
+                        onSetDormantStore(next);
+                        setDormantDismissed((p) => { const n = new Set(p); n.add(dormantCandidate.id); return n; });
+                      }}
+                    />
                   )}
                 </ul>
               )}
@@ -1691,6 +1734,8 @@ export default function TodayFeed({
   const [memoryCount, setMemoryCount] = useState(0);
   const [memoryNotes, setMemoryNotes] = useState<readonly string[]>([]);
   const [focusNodes, setFocusNodes] = useState<readonly FocusNode[]>([]);
+  const [allNodes, setAllNodes] = useState<readonly FocusNode[]>([]);
+  const [dormantStore, setDormantStore] = useState<DormantStore>({});
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
   const [proactiveContext, setProactiveContext] = useState<ProactiveContext>({ upcomingSpecialDays: [], overdueItems: [], healthItems: [], recentSignals: [] });
   const [emailSignals, setEmailSignals] = useState<EmailSignal[]>([]);
@@ -1721,6 +1766,10 @@ export default function TodayFeed({
       setMemoryCount(updated.memoryCount);
       setMemoryNotes(updated.memoryNotes);
       setFocusNodes(updated.focusNodes);
+      setAllNodes(updated.allNodes);
+      const store = loadDormantStore();
+      const evaluated = evaluateDormancy(updated.allNodes, store);
+      setDormantStore(evaluated);
       setProactiveContext(updated.proactiveContext);
 
       // Read calendar events from cache for the focus section
@@ -1875,7 +1924,9 @@ export default function TodayFeed({
           focusNodes={focusNodes}
           calendarEvents={calendarEvents}
           specialDays={proactiveContext.upcomingSpecialDays}
-          overdueItems={proactiveContext.overdueItems}
+          allNodes={allNodes}
+          dormantStore={dormantStore}
+          onSetDormantStore={setDormantStore}
           onOpenMemory={onOpenMemory}
           onOpenRecorder={(node) => setMeetingRecorderNode(node)}
           onFocusMode={(node) => setFocusModeNode(node)}

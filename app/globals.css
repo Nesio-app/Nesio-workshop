@@ -16671,3 +16671,8 @@ html[data-portal-theme="night"] .nesio-related-node-chip:hover {
   cursor: pointer;
 }
 .nesio-collapsed-overdue-actions button:hover { background: var(--portal-line, rgba(0,0,0,.06)); }
+
+/* Dormant review card */
+.nesio-dormant-card { border-left: 2px solid #a8c5a0; background: rgba(168,197,160,.06); }
+.nesio-dormant-content { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+.nesio-dormant-question { font-size: 0.68rem; color: #a8c5a0; font-style: italic; }
