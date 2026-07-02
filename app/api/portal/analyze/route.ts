@@ -160,7 +160,6 @@ async function analyzeWithGemini(content: string, imageBase64?: string, mimeType
 
   const parts: unknown[] = [];
   if (imageBase64) {
-    // Gemini REST v1beta expects snake_case inline_data / mime_type for inline images.
     parts.push({ inline_data: { mime_type: mimeType || 'image/jpeg', data: imageBase64 } });
   }
   parts.push({ text: `${systemPrompt}\n\nUser input: ${content}` });
@@ -170,25 +169,35 @@ async function analyzeWithGemini(content: string, imageBase64?: string, mimeType
   let lastError = 'Gemini unavailable';
 
   for (const model of models) {
-    const res = await fetch(`${GEMINI_BASE_URL}/${model}:generateContent?key=${key}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts }] }),
-    });
+    // 429 时最多重试一次（等 2 秒），避免连续打爆免费配额
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const res = await fetch(`${GEMINI_BASE_URL}/${model}:generateContent?key=${key}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts }] }),
+      });
 
-    const data = await res.json() as {
-      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-      error?: { message?: string; status?: string };
-    };
-    if (res.ok) {
-      const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text).join('') || '';
-      if (text) return text;
-      lastError = `Gemini ${model} empty_response`;
+      const data = await res.json() as {
+        candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+        error?: { message?: string; status?: string };
+      };
+      if (res.ok) {
+        const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text).join('') || '';
+        if (text) return text;
+        lastError = `Gemini ${model} empty_response`;
+        logAiProviderFailure('gemini', lastError);
+        break;
+      }
+      // 429 速率限制：等待后重试一次
+      if (res.status === 429 && attempt === 0) {
+        await new Promise((r) => setTimeout(r, 2000));
+        continue;
+      }
+      lastError = `Gemini ${model} ${res.status}${data.error?.status ? ` ${data.error.status}` : ''}`;
       logAiProviderFailure('gemini', lastError);
-      continue;
+      break;
     }
-    lastError = `Gemini ${model} ${res.status}${data.error?.status ? ` ${data.error.status}` : ''}`;
-    logAiProviderFailure('gemini', lastError);
+    // 如果这个 model 成功过（text 已 return），不会走到这里
   }
 
   throw new Error(lastError);
