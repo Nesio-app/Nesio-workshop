@@ -114,7 +114,6 @@ async function callGemini(
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: systemInstruction }] },
       contents,
-      tools: [{ google_search: {} }],
       generationConfig: { temperature: 0.7, maxOutputTokens: 1024 },
     }),
   });
@@ -186,6 +185,7 @@ export async function POST(req: NextRequest) {
     console.error('[chat] primary_error:', msg);
 
     // Claude 失败 → 尝试 Gemini 兜底
+    let fallbackMsg = '';
     if (anthropicKey && geminiKey) {
       try {
         const result = await callGemini(geminiKey, message, history, systemInstruction);
@@ -195,11 +195,15 @@ export async function POST(req: NextRequest) {
           sources: result.sources,
         });
       } catch (fallbackErr) {
-        const fbMsg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
-        console.error('[chat] gemini_fallback_error:', fbMsg);
+        fallbackMsg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
+        console.error('[chat] gemini_fallback_error:', fallbackMsg);
       }
     }
 
-    return NextResponse.json({ ok: true, response: '出了点问题，请稍后再试。', sources: [] });
+    // 把错误原因带回来，方便排查（截短避免泄露密钥）
+    const debugHint = process.env.NODE_ENV !== 'production'
+      ? ` [claude:${msg.slice(0, 80)}] [gemini:${fallbackMsg.slice(0, 80)}]`
+      : '';
+    return NextResponse.json({ ok: true, response: `出了点问题，请稍后再试。${debugHint}`, sources: [], _claudeErr: msg.slice(0, 120), _geminiErr: fallbackMsg.slice(0, 120) });
   }
 }
