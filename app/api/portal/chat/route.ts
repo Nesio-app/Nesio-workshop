@@ -155,7 +155,8 @@ export async function POST(req: NextRequest) {
 
   // Accept both ANTHROPIC_API_KEY and CLAUDE_API_KEY as aliases
   const anthropicKey = envValue('ANTHROPIC_API_KEY') || envValue('CLAUDE_API_KEY');
-  const geminiKey = envValue('GEMINI_API_KEY');
+  // 同时接受两种命名方式
+  const geminiKey = envValue('GEMINI_API_KEY') || envValue('GOOGLE_GENERATIVE_AI_API_KEY');
 
   if (!anthropicKey && !geminiKey) {
     return NextResponse.json({
@@ -169,10 +170,11 @@ export async function POST(req: NextRequest) {
     : '';
   const systemInstruction = `${buildSystemPersonality(coachStyle)}\n\n${systemContext}${fileSection}`;
 
+  console.log('[chat] keys_present:', { anthropic: !!anthropicKey, gemini: !!geminiKey });
   try {
     const result = anthropicKey
       ? await callClaude(anthropicKey, message, history, systemInstruction)
-      : await callGemini(geminiKey, message, history, systemInstruction);
+      : await callGemini(geminiKey!, message, history, systemInstruction);
 
     return NextResponse.json({
       ok: true,
@@ -181,9 +183,9 @@ export async function POST(req: NextRequest) {
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error('[chat] error:', msg);
+    console.error('[chat] primary_error:', msg);
 
-    // Try Gemini as fallback if Claude failed
+    // Claude 失败 → 尝试 Gemini 兜底
     if (anthropicKey && geminiKey) {
       try {
         const result = await callGemini(geminiKey, message, history, systemInstruction);
@@ -193,7 +195,8 @@ export async function POST(req: NextRequest) {
           sources: result.sources,
         });
       } catch (fallbackErr) {
-        console.error('[chat] fallback error:', fallbackErr);
+        const fbMsg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
+        console.error('[chat] gemini_fallback_error:', fbMsg);
       }
     }
 

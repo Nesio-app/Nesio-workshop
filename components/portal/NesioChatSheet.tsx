@@ -389,11 +389,39 @@ export default function NesioChatSheet({
     setShowPlus(false);
     const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
     const isText = ['txt', 'md', 'csv', 'tsv', 'json', 'xml', 'yaml', 'yml', 'log'].includes(ext);
+    const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif', 'bmp'].includes(ext) || file.type.startsWith('image/');
+
+    // 图片 → 走识别流程
+    if (isImage) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const dataUrl = ev.target?.result as string;
+        const [hdr, b64] = dataUrl.split(',');
+        const mime = hdr.match(/:(.*?);/)?.[1] || 'image/jpeg';
+        const userMsg: UiMessage = { id: `u-${Date.now()}`, role: 'user', text: `📷 ${file.name}` };
+        const next = [...messages, userMsg];
+        setMessages(next);
+        fetch('/api/portal/analyze', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'image', imageBase64: b64, mimeType: mime }),
+        }).then((r) => r.json()).then((data: { ok?: boolean; nodes?: Array<{ name: string; type: string }>; summary?: string }) => {
+          const names = data.nodes?.map((n) => n.name).join('、') || data.summary || '（未识别到内容）';
+          const aiMsg: UiMessage = { id: `a-${Date.now()}`, role: 'model', text: `识别到：${names}\n\n可以继续问我关于这张图片的问题。` };
+          const withAi = [...next, aiMsg];
+          setMessages(withAi); saveHistory(withAi);
+        }).catch(() => {
+          const aiMsg: UiMessage = { id: `a-${Date.now()}`, role: 'model', text: '图片识别失败，请重试。' };
+          setMessages((prev) => [...prev, aiMsg]);
+        });
+      };
+      reader.readAsDataURL(file);
+      return;
+    }
 
     if (!isText) {
       const notice: UiMessage = {
         id: `m-${Date.now()}`, role: 'model',
-        text: `暂时只支持文本类文件（CSV、TXT、JSON 等）。"${file.name}" 是 .${ext || '未知'} 格式，暂不支持。`,
+        text: `暂时只支持文本（CSV/TXT/JSON 等）和图片文件。"${file.name}" 是 .${ext || '未知'} 格式，暂不支持。`,
       };
       setMessages((prev) => [...prev, notice]);
       return;
@@ -627,7 +655,7 @@ export default function NesioChatSheet({
       <input
         ref={filePickerRef}
         type="file"
-        accept=".csv,.tsv,.txt,.md,.json,.xml,.yaml,.yml,.log"
+        accept=".csv,.tsv,.txt,.md,.json,.xml,.yaml,.yml,.log,image/*"
         style={{ display: 'none' }}
         onChange={(e) => {
           const file = e.target.files?.[0];
