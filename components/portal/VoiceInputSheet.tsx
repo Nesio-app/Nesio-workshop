@@ -415,7 +415,7 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
                 <input
                   type="date"
                   className="nesio-voice-confirm-input"
-                  value={draft.dueDate ?? ''}
+                  value={draft.dueDate ?? new Date().toISOString().slice(0, 10)}
                   onChange={(e) => setDraftDueDate(e.target.value)}
                 />
                 <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.4rem', flexWrap: 'wrap' }}>
