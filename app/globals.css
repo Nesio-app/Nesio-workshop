@@ -15955,3 +15955,116 @@ html[data-portal-theme="night"] .nesio-related-node-chip:hover {
   color: #588ce3;
   font-weight: 600;
 }
+
+/* ── 问宝盒 Ask 结果样式 ─────────────────────────────── */
+.nesio-ask-result {
+  padding: 0.2rem 0.1rem 0.3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.nesio-ask-answer-block {
+  background: rgba(88,140,227,0.07);
+  border-radius: 1rem;
+  padding: 0.9rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  position: relative;
+}
+.nesio-ask-answer-icon {
+  font-size: 0.75rem;
+  color: #588ce3;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.nesio-ask-answer-text {
+  font-size: 0.96rem;
+  line-height: 1.55;
+  color: var(--portal-ink);
+  font-weight: 500;
+  margin: 0;
+}
+.nesio-ask-web-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.7rem;
+  color: #4a9c6d;
+  background: rgba(74,156,109,0.1);
+  border-radius: 999px;
+  padding: 0.15rem 0.55rem;
+  font-weight: 600;
+  align-self: flex-start;
+}
+.nesio-ask-aggregations {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.nesio-ask-agg-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.55rem 0.85rem;
+  background: rgba(88,140,227,0.05);
+  border-radius: 0.65rem;
+  border: 1px solid rgba(88,140,227,0.15);
+}
+.nesio-ask-agg-label {
+  font-size: 0.82rem;
+  color: var(--portal-muted);
+}
+.nesio-ask-agg-value {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #588ce3;
+}
+.nesio-ask-citations {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.nesio-ask-citations-title {
+  font-size: 0.72rem;
+  color: var(--portal-muted);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  margin: 0 0 0.2rem;
+}
+.nesio-ask-citation-card {
+  padding: 0.5rem 0.75rem;
+  background: var(--portal-card-bg, #fff);
+  border: 1px solid rgba(88,140,227,0.15);
+  border-radius: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.nesio-ask-citation-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--portal-ink);
+}
+.nesio-ask-citation-reason {
+  font-size: 0.75rem;
+  color: var(--portal-muted);
+  line-height: 1.4;
+}
+.nesio-ask-again-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #588ce3;
+  background: rgba(88,140,227,0.08);
+  border: none;
+  border-radius: 999px;
+  padding: 0.5rem 1.2rem;
+  cursor: pointer;
+  align-self: flex-start;
+  margin-top: 0.1rem;
+}
+.nesio-ask-again-btn:hover { background: rgba(88,140,227,0.14); }

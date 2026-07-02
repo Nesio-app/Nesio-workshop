@@ -11,7 +11,6 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { getRecentNodes, isPrivateExternalNode, searchLifeGraphFuzzy, type LifeNode } from '@/lib/portal/life-graph';
-import { searchSignalsWithCloudFallback } from '@/lib/life-domain/signal-search';
 import {
   createSignal,
   extractContext,
@@ -39,7 +38,14 @@ const QUICK_INTENTS = [
 ];
 
 type SendState = 'idle' | 'analyzing' | 'confirm' | 'saved' | 'error';
-type AskResult = Pick<LifeNode, 'id' | 'name'> & { source: string };
+type AskResult = Pick<LifeNode, 'id' | 'name'> & { source: string; reason?: string };
+interface AskAggregation { label: string; value: string | number; }
+interface AskApiResponse {
+  nodes: AskResult[];
+  answer: string;
+  aggregations: AskAggregation[];
+  webSearchUsed: boolean;
+}
 
 /** A captured input held for user confirmation before it becomes a trusted fact (§6.2). */
 interface PendingDraft {
@@ -82,8 +88,9 @@ function mergeTags(...groups: Array<string[] | undefined>): string[] {
   return Array.from(new Set(groups.flatMap((group) => group || []).filter(Boolean)));
 }
 
-async function askMemoryWithAi(query: string, candidates: LifeNode[]): Promise<LifeNode[]> {
-  if (!candidates.length) return [];
+async function fetchAskResponse(query: string, candidates: LifeNode[]): Promise<AskApiResponse> {
+  const empty: AskApiResponse = { nodes: [], answer: '', aggregations: [], webSearchUsed: false };
+  if (!candidates.length) return empty;
   const res = await fetch('/api/portal/analyze', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-baohe-access-mode': 'personal_lab' },
@@ -91,7 +98,8 @@ async function askMemoryWithAi(query: string, candidates: LifeNode[]): Promise<L
       type: 'ask',
       content: JSON.stringify({
         query,
-        candidates: candidates.slice(0, 40).map((node) => ({
+        totalNodeCount: candidates.length,
+        candidates: candidates.slice(0, 60).map((node) => ({
           id: node.id,
           type: node.type,
           name: node.name,
@@ -104,11 +112,30 @@ async function askMemoryWithAi(query: string, candidates: LifeNode[]): Promise<L
       }),
     }),
   });
-  if (!res.ok) return [];
-  const data = await res.json() as { ok?: boolean; matches?: Array<{ id?: string; name?: string }> };
-  if (!data.ok || !data.matches?.length) return [];
-  const wanted = new Set(data.matches.map((match) => match.id || match.name).filter(Boolean));
-  return candidates.filter((node) => wanted.has(node.id) || wanted.has(node.name));
+  if (!res.ok) return empty;
+  const data = await res.json() as {
+    ok?: boolean;
+    matches?: Array<{ id?: string; name?: string; reason?: string }>;
+    answer?: string;
+    aggregations?: AskAggregation[];
+    webSearchUsed?: boolean;
+  };
+  if (!data.ok && !data.answer) return empty;
+  // Build reason lookup
+  const reasonMap = new Map<string, string>();
+  data.matches?.forEach((m) => {
+    if (m.id) reasonMap.set(m.id, m.reason || '');
+    if (m.name) reasonMap.set(m.name, m.reason || '');
+  });
+  const matchedNodes: AskResult[] = candidates
+    .filter((n) => reasonMap.has(n.id) || reasonMap.has(n.name))
+    .map((n) => ({ id: n.id, name: n.name, source: n.source || '', reason: reasonMap.get(n.id) || reasonMap.get(n.name) || '' }));
+  return {
+    nodes: matchedNodes,
+    answer: data.answer || '',
+    aggregations: data.aggregations || [],
+    webSearchUsed: data.webSearchUsed || false,
+  };
 }
 
 // ---- 日期时间选择器 ----
@@ -264,6 +291,9 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
   const [micError, setMicError] = useState('');
   const [savedCount, setSavedCount] = useState(0);
   const [askResults, setAskResults] = useState<AskResult[]>([]);
+  const [askAnswer, setAskAnswer] = useState('');
+  const [askAggregations, setAskAggregations] = useState<AskAggregation[]>([]);
+  const [webSearchUsed, setWebSearchUsed] = useState(false);
   const [draft, setDraft] = useState<PendingDraft | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -273,7 +303,8 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
   useEffect(() => {
     if (!open) {
       setText(''); setSendState('idle'); setListening(false);
-      setIntentLabel(''); setMicError(''); setSavedCount(0); setAskResults([]);
+      setIntentLabel(''); setMicError(''); setSavedCount(0);
+      setAskResults([]); setAskAnswer(''); setAskAggregations([]); setWebSearchUsed(false);
       setDraft(null);
       recRef.current?.stop();
     } else {
@@ -339,19 +370,34 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
 
     if (isAskMode) {
       stopListening();
-      const visibleCandidates = getRecentNodes(60).filter((node) => canUsePrivateData || !isPrivateExternalNode(node));
-      const aiMatches = await askMemoryWithAi(t, visibleCandidates).catch(() => []);
-      const signalMatches = (await searchSignalsWithCloudFallback(t, 8)).map((signal) => ({
-        id: signal.id,
-        name: signal.title,
-        source: signal.source,
-      }));
-      const matches: AskResult[] = aiMatches.length
-        ? aiMatches
-        : signalMatches.length
-          ? signalMatches
-          : searchLifeGraphFuzzy(t, 8).filter((node) => canUsePrivateData || !isPrivateExternalNode(node));
-      setAskResults(matches.slice(0, 4));
+      setSendState('analyzing');
+      const allCandidates = getRecentNodes(80).filter((node) => canUsePrivateData || !isPrivateExternalNode(node));
+      const fuzzyFirst = searchLifeGraphFuzzy(t, 20);
+      const seenIds = new Set<string>();
+      const merged: LifeNode[] = [];
+      for (const n of [...fuzzyFirst, ...allCandidates]) {
+        if (!seenIds.has(n.id)) { seenIds.add(n.id); merged.push(n); }
+      }
+      const candidates = merged.slice(0, 60);
+      try {
+        const result = await fetchAskResponse(t, candidates);
+        setAskAnswer(result.answer);
+        setAskAggregations(result.aggregations);
+        setWebSearchUsed(result.webSearchUsed);
+        if (result.nodes.length) {
+          setAskResults(result.nodes);
+        } else if (!result.answer) {
+          // 纯本地模糊搜索兜底
+          const fuzzyFallback = searchLifeGraphFuzzy(t, 4);
+          setAskResults(fuzzyFallback.map((n) => ({ id: n.id, name: n.name, source: n.source || '' })));
+        } else {
+          setAskResults([]);
+        }
+      } catch {
+        const fuzzyFallback = searchLifeGraphFuzzy(t, 4);
+        setAskResults(fuzzyFallback.map((n) => ({ id: n.id, name: n.name, source: n.source || '' })));
+        setAskAnswer('');
+      }
       setSendState('saved');
       setText('');
       setIntentLabel('');
@@ -679,27 +725,60 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
         </div>
         )}
 
-        {/* Send button */}
+        {/* Ask 结果展示 */}
         {isAskMode && sendState === 'saved' ? (
-          <div className="nesio-voice-saved nesio-ask-answer" style={{ textAlign: 'left', color: 'var(--portal-ink)', background: 'rgba(88,140,227,0.08)', borderRadius: '1rem' }}>
-            {askResults.length ? (
-              <>
-                <p style={{ fontWeight: 700, marginBottom: '0.45rem' }}>我找到了这些可能相关的线索</p>
-                {askResults.map((node) => (
-                  <p key={node.id} style={{ marginTop: '0.35rem', color: 'var(--portal-muted)' }}>
-                    {node.name} · 来自：{node.source === 'voice' ? '你说的一句话' : node.source}
-                  </p>
+          <div className="nesio-ask-result">
+            {/* AI 综合回答 */}
+            {askAnswer ? (
+              <div className="nesio-ask-answer-block">
+                <span className="nesio-ask-answer-icon">✦</span>
+                <p className="nesio-ask-answer-text">{askAnswer}</p>
+                {webSearchUsed && <span className="nesio-ask-web-badge">🌐 网络搜索</span>}
+              </div>
+            ) : (!askResults.length && (
+              <div className="nesio-ask-answer-block">
+                <p className="nesio-ask-answer-text" style={{ color: 'var(--portal-muted)' }}>还没找到相关线索。</p>
+              </div>
+            ))}
+
+            {/* 统计聚合 */}
+            {askAggregations.length > 0 && (
+              <div className="nesio-ask-aggregations">
+                {askAggregations.map((a, i) => (
+                  <div key={i} className="nesio-ask-agg-item">
+                    <span className="nesio-ask-agg-label">{a.label}</span>
+                    <span className="nesio-ask-agg-value">{a.value}</span>
+                  </div>
                 ))}
-              </>
-            ) : (
-              <p>还没找到相关线索。你可以先把这件事放进宝盒。</p>
+              </div>
             )}
+
+            {/* 引用来源卡片 */}
+            {askResults.length > 0 && (
+              <div className="nesio-ask-citations">
+                <p className="nesio-ask-citations-title">📍 来源线索</p>
+                {askResults.slice(0, 5).map((node) => (
+                  <div key={node.id} className="nesio-ask-citation-card">
+                    <span className="nesio-ask-citation-name">{node.name}</span>
+                    {node.reason && <span className="nesio-ask-citation-reason">{node.reason}</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <button
+              type="button"
+              className="nesio-ask-again-btn"
+              onClick={() => { setSendState('idle'); setAskAnswer(''); setAskResults([]); setAskAggregations([]); setWebSearchUsed(false); }}
+            >
+              再问一句
+            </button>
           </div>
         ) : sendState === 'saved' ? (
           <div className="nesio-voice-saved">✓ 已存入 Memory（{savedCount} 条）</div>
         ) : sendState === 'analyzing' ? (
           <div className="nesio-voice-send-btn" style={{ opacity: 0.6, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
-            <span className="nesio-camera-recognizing-dot" style={{ background: '#fff' }} />Nesio 正在分析…
+            <span className="nesio-camera-recognizing-dot" style={{ background: '#fff' }} />{isAskMode ? '正在搜索记忆…' : 'Nesio 正在分析…'}
           </div>
         ) : text.trim() && sendState !== 'confirm' ? (
           <button type="button" className="nesio-voice-send-btn" onClick={handleSend}>

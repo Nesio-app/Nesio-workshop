@@ -96,14 +96,33 @@ Do NOT include any field called "context". Do NOT invent information not in the 
 For image: only extract visibly present things. Never use instruction text as node name.
 `;
 
-const ASK_SYSTEM_PROMPT = `You are Nesio's semantic Memory search ranker.
-Given a user question and candidate memory nodes, choose only candidates that are semantically relevant.
-Do not invent new memories. Do not expose hidden fields. Return ONLY valid JSON:
+const ASK_SYSTEM_PROMPT = `You are Nesio, a personal life assistant embedded in a user's memory app.
+The user message is JSON: {"query": "...", "candidates": [...memory nodes...], "totalNodeCount": N}
+
+YOUR JOB:
+1. Answer the question directly in natural Chinese (1-4 sentences, warm and conversational)
+2. Cite which specific memory nodes support your answer
+3. For count/aggregate queries (多少/总共/所有/花了多少/哪些): compute stats from ALL provided candidates
+4. If the question requires current world info (news, weather, stocks, real-time data): set webSearchNeeded: true
+
+RETURN ONLY valid JSON, no markdown fences:
 {
-  "matches": [{ "id": "candidate id", "name": "candidate name", "reason": "short user-facing reason" }],
-  "answer": "one short natural-language answer"
+  "answer": "直接、自然的中文回答",
+  "matches": [
+    {"id": "node_id", "name": "节点名称", "reason": "一句话说明为什么引用这条"}
+  ],
+  "aggregations": [
+    {"label": "统计标签", "value": "数值或文字"}
+  ],
+  "webSearchNeeded": false
 }
-If nothing is relevant, return { "matches": [], "answer": "还没找到相关线索。" }.
+
+RULES:
+- Only use information from provided nodes. Never invent facts.
+- If nothing matches: answer = "暂时没有记录这方面的信息。" and matches = []
+- aggregations only needed for numeric count/sum questions
+- answer must be under 100 Chinese characters
+- Citations should reference the ACTUAL node id from the candidates list
 `;
 
 async function analyzeWithClaude(content: string, isImage: boolean, imageBase64?: string, mimeType?: string, systemPrompt = SYSTEM_PROMPT): Promise<string> {
@@ -245,6 +264,35 @@ async function analyzeWithOpenAI(content: string, isImage: boolean, imageBase64?
   return data.choices?.[0]?.message?.content || '';
 }
 
+/** Gemini with Google Search Grounding — for questions needing real-world info */
+async function askWithGeminiWebSearch(query: string): Promise<{ answer: string; searchUsed: boolean }> {
+  const key = getGeminiKey();
+  if (!key) throw new Error('no_gemini_key');
+
+  const res = await fetch(`${GEMINI_BASE_URL}/gemini-2.0-flash:generateContent?key=${key}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      tools: [{ google_search: {} }],
+      contents: [{ parts: [{ text: `请用中文简洁回答：${query}` }], role: 'user' }],
+    }),
+  });
+
+  const data = await res.json() as {
+    candidates?: Array<{
+      content?: { parts?: Array<{ text?: string }> };
+      groundingMetadata?: { webSearchQueries?: string[] };
+    }>;
+    error?: { message?: string };
+  };
+
+  if (!res.ok) throw new Error(`Gemini-search ${res.status}: ${data.error?.message || ''}`);
+
+  const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text).join('') || '';
+  const searchUsed = (data.candidates?.[0]?.groundingMetadata?.webSearchQueries?.length ?? 0) > 0;
+  return { answer: text, searchUsed };
+}
+
 /** Rule-based fallback when no AI key is available */
 function analyzeFallback(content: string): string {
   const lower = content.toLowerCase();
@@ -354,6 +402,12 @@ export async function POST(req: NextRequest) {
     }
 
     if (body.type === 'ask') {
+      let parsedQuery = '';
+      try {
+        const parsed = JSON.parse(body.content) as { query?: string };
+        parsedQuery = parsed.query || '';
+      } catch { /* ok */ }
+
       try {
         raw = await analyzeWithClaude(body.content, false, undefined, undefined, ASK_SYSTEM_PROMPT);
       } catch {
@@ -364,8 +418,38 @@ export async function POST(req: NextRequest) {
         }
       }
       const askJson = extractJson(raw);
-      const askResult = JSON.parse(askJson) as { matches?: object[]; answer?: string };
-      return NextResponse.json({ ok: true, matches: askResult.matches || [], answer: askResult.answer || '' });
+      const askResult = JSON.parse(askJson) as {
+        matches?: object[];
+        answer?: string;
+        aggregations?: Array<{ label: string; value: string | number }>;
+        webSearchNeeded?: boolean;
+      };
+
+      // 网络搜索（仅当 AI 判断需要且有 query 时）
+      let webAnswer = '';
+      let webSearchUsed = false;
+      if (askResult.webSearchNeeded && parsedQuery) {
+        try {
+          const ws = await askWithGeminiWebSearch(parsedQuery);
+          webAnswer = ws.answer;
+          webSearchUsed = ws.searchUsed;
+        } catch {
+          // 网络搜索失败，仍使用记忆回答
+        }
+      }
+
+      const memAnswer = askResult.answer || '';
+      const finalAnswer = webAnswer
+        ? `${memAnswer}${memAnswer ? '\n\n' : ''}🌐 来自网络：${webAnswer}`
+        : memAnswer;
+
+      return NextResponse.json({
+        ok: true,
+        matches: askResult.matches || [],
+        answer: finalAnswer,
+        aggregations: askResult.aggregations || [],
+        webSearchUsed,
+      });
     }
 
     if (aiAllowed) {
