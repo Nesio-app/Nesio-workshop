@@ -43,6 +43,10 @@ export default function LocationPicker({ value, onChange, className }: LocationP
   const [selectedSubRoom, setSelectedSubRoom] = useState('');
   const [freeText, setFreeText] = useState('');
   const [mode, setMode] = useState<'named' | 'free'>('named');
+  const [customRoom, setCustomRoom] = useState('');
+  const [customSubRoom, setCustomSubRoom] = useState('');
+  const [roomMode, setRoomMode] = useState<'select' | 'custom'>('select');
+  const [subRoomMode, setSubRoomMode] = useState<'select' | 'custom'>('select');
 
   useEffect(() => {
     const ps = getNamedPlaces();
@@ -82,12 +86,42 @@ export default function LocationPicker({ value, onChange, className }: LocationP
   }
 
   function handleRoomChange(room: string) {
+    if (room === '__custom__') {
+      setRoomMode('custom');
+      setCustomRoom('');
+      setSelectedRoom('');
+      setSelectedSubRoom('');
+      setSubRoomMode('select');
+      return;
+    }
+    setRoomMode('select');
+    setSelectedRoom(room);
+    setSelectedSubRoom('');
+    setSubRoomMode('select');
+    emitChange(selectedPlace, room, '');
+  }
+
+  function handleCustomRoomChange(room: string) {
+    setCustomRoom(room);
     setSelectedRoom(room);
     setSelectedSubRoom('');
     emitChange(selectedPlace, room, '');
   }
 
   function handleSubRoomChange(sub: string) {
+    if (sub === '__custom__') {
+      setSubRoomMode('custom');
+      setCustomSubRoom('');
+      setSelectedSubRoom('');
+      return;
+    }
+    setSubRoomMode('select');
+    setSelectedSubRoom(sub);
+    emitChange(selectedPlace, selectedRoom, sub);
+  }
+
+  function handleCustomSubRoomChange(sub: string) {
+    setCustomSubRoom(sub);
     setSelectedSubRoom(sub);
     emitChange(selectedPlace, selectedRoom, sub);
   }
@@ -127,32 +161,64 @@ export default function LocationPicker({ value, onChange, className }: LocationP
         <option value="__free__">✏️ 自定义输入</option>
       </select>
 
-      {/* Level 2 — room (only if place has rooms) */}
-      {selectedPlace && selectedPlace.rooms.length > 0 && (
-        <select
-          className="nesio-loc-select"
-          value={selectedRoom}
-          onChange={(e) => handleRoomChange(e.target.value)}
-        >
-          <option value="">区域…</option>
-          {selectedPlace.rooms.map((r) => (
-            <option key={r} value={r}>{r}</option>
-          ))}
-        </select>
+      {/* Level 2 — room */}
+      {selectedPlace && (selectedPlace.rooms.length > 0 || roomMode === 'custom') && (
+        roomMode === 'custom' ? (
+          <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+            <input
+              className="nesio-loc-free-input"
+              value={customRoom}
+              placeholder="输入区域名称…"
+              onChange={(e) => handleCustomRoomChange(e.target.value)}
+              autoFocus
+            />
+            <button type="button" className="nesio-loc-switch-btn" onClick={() => { setRoomMode('select'); setCustomRoom(''); setSelectedRoom(''); }}>
+              ×
+            </button>
+          </div>
+        ) : (
+          <select
+            className="nesio-loc-select"
+            value={selectedRoom}
+            onChange={(e) => handleRoomChange(e.target.value)}
+          >
+            <option value="">区域…</option>
+            {selectedPlace.rooms.map((r) => (
+              <option key={r} value={r}>{r}</option>
+            ))}
+            <option value="__custom__">✏️ 自定义…</option>
+          </select>
+        )
       )}
 
-      {/* Level 3 — sub-room (only if room has sub-rooms) */}
-      {selectedRoom && subRooms.length > 0 && (
-        <select
-          className="nesio-loc-select"
-          value={selectedSubRoom}
-          onChange={(e) => handleSubRoomChange(e.target.value)}
-        >
-          <option value="">具体位置…</option>
-          {subRooms.map((s) => (
-            <option key={s} value={s}>{s}</option>
-          ))}
-        </select>
+      {/* Level 3 — sub-room */}
+      {selectedRoom && (subRooms.length > 0 || subRoomMode === 'custom') && (
+        subRoomMode === 'custom' ? (
+          <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+            <input
+              className="nesio-loc-free-input"
+              value={customSubRoom}
+              placeholder="输入具体位置…"
+              onChange={(e) => handleCustomSubRoomChange(e.target.value)}
+              autoFocus
+            />
+            <button type="button" className="nesio-loc-switch-btn" onClick={() => { setSubRoomMode('select'); setCustomSubRoom(''); setSelectedSubRoom(''); }}>
+              ×
+            </button>
+          </div>
+        ) : (
+          <select
+            className="nesio-loc-select"
+            value={selectedSubRoom}
+            onChange={(e) => handleSubRoomChange(e.target.value)}
+          >
+            <option value="">具体位置…</option>
+            {subRooms.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+            <option value="__custom__">✏️ 自定义…</option>
+          </select>
+        )
       )}
     </div>
   );

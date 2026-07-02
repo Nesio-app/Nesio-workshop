@@ -518,11 +518,18 @@ function getMeetingTime(node: FocusNode): Date | null {
   return null;
 }
 
+function safeExternalUrl(url: string): string {
+  if (!url) return url;
+  if (/^https?:\/\//i.test(url)) return url;
+  if (url.startsWith('zoommtg://')) return url.replace('zoommtg://', 'https://');
+  return `https://${url}`;
+}
+
 function getMeetingUrl(node: FocusNode): string | null {
   const urlLike = Object.values(node.attributes).find(
     (v) => typeof v === 'string' && (v.startsWith('http') || v.startsWith('zoom') || v.includes('meet.'))
   );
-  return typeof urlLike === 'string' ? urlLike : null;
+  return typeof urlLike === 'string' ? safeExternalUrl(urlLike) : null;
 }
 
 // ---- Meeting countdown ----
@@ -984,7 +991,7 @@ function FocusCardDetail({
     <div className="nesio-focus-detail">
       {nodeUrl && (
         <div className="nesio-focus-meeting-actions">
-          <a href={nodeUrl} target="_blank" rel="noopener noreferrer" className="nesio-focus-meeting-link-btn">
+          <a href={safeExternalUrl(nodeUrl)} target="_blank" rel="noopener noreferrer" className="nesio-focus-meeting-link-btn">
             🔗 直达链接
           </a>
         </div>

@@ -79,6 +79,15 @@ function isMeetingUrl(url: string): boolean {
   return /zoom\.us|meet\.google|teams\.microsoft|webex\.com|whereby\.com/i.test(url);
 }
 
+// 确保外部链接有 https:// 前缀，防止缺少协议时被当成相对路径导致 404
+function safeExternalUrl(url: string): string {
+  if (!url) return url;
+  if (/^https?:\/\//i.test(url)) return url;
+  // zoommtg:// deep link → 转成 web 版，避免 iOS PWA 卡死
+  if (url.startsWith('zoommtg://')) return url.replace('zoommtg://', 'https://');
+  return `https://${url}`;
+}
+
 const HIDDEN_ATTR_KEYS = new Set([
   // Internal / calendar
   'calendarId', 'calendarName', 'description', 'emailId', 'messageId', 'htmlLink',
@@ -91,7 +100,7 @@ const HIDDEN_ATTR_KEYS = new Set([
   'occuredAt', 'occurredAt', 'capturedAt', 'retentionPolicy', 'sensitivity',
   'sourceNodeId', 'schemaVersion',
   // Type-specific (handled in sections)
-  'note', 'price', 'purchaseDate', 'expiry',
+  'note', 'price', 'purchaseDate', 'expiry', 'store', 'paymentMethod',
   'visitCount', 'category', 'lastSeen', 'birthday',
   'start', 'end', 'date', 'dueDate', 'deadline',
   'priority', 'owner', 'recurring', 'participants',
@@ -164,6 +173,8 @@ function ObjectSection({ node, assetUrls }: {
   const expiry = attr(node, 'expiry');
   const note = attr(node, 'note');
   const fileUrl = attr(node, 'url');
+  const store = attr(node, 'store');
+  const paymentMethod = attr(node, 'paymentMethod');
   const assets = node.assets || [];
   const firstImage = assets.find((a) => a.kind === 'image' || a.mimeType?.startsWith('image/'));
   const previewUrl = firstImage ? assetUrls[firstImage.id || firstImage.storagePath || ''] : '';
@@ -178,10 +189,12 @@ function ObjectSection({ node, assetUrls }: {
       <InfoRow label="购买日期" value={fmtDate(purchaseDate)} />
       <InfoRow label="价格" value={price} />
       <InfoRow label="有效期" value={fmtDate(expiry)} />
+      <InfoRow label="购买商家" value={store} />
+      <InfoRow label="支付方式" value={paymentMethod} />
       <InfoRow label="备注" value={note} />
       {fileUrl && (
         <div style={{ marginTop: '0.75rem' }}>
-          <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="nesio-type-action-btn">
+          <a href={safeExternalUrl(fileUrl)} target="_blank" rel="noopener noreferrer" className="nesio-type-action-btn">
             🔗 打开链接
           </a>
         </div>
@@ -286,7 +299,7 @@ function EventSection({ node, relatedNodes, onOpenNode }: {
       {note && <InfoRow label="会议记录" value={note} />}
       {url && (
         <div style={{ marginTop: '0.75rem' }}>
-          <a href={url} target="_blank" rel="noopener noreferrer"
+          <a href={safeExternalUrl(url)} target="_blank" rel="noopener noreferrer"
             className={`nesio-type-action-btn${isMeeting ? ' nesio-type-action-btn--meeting' : ''}`}>
             {isMeeting ? '🎥 加入会议' : '🔗 直达链接'}
           </a>

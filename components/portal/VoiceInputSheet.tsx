@@ -54,6 +54,10 @@ interface PendingDraft {
   places: string[];
   objects: string[];
   edited: boolean;
+  // 提醒/计划专用字段
+  dueDate?: string;
+  recurring?: string;
+  priority?: string;
 }
 
 function signalTypeForDomain(domain: FrontDomain | null, hasPlaceOrObject: boolean): string {
@@ -272,11 +276,16 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
     };
     // Canonical write path: one Signal carrying structured context. createSignal
     // mirrors to cloud for signed-in users (§Signal main-fact transition).
+    const extraPayload: Record<string, string> = {};
+    if (d.dueDate) extraPayload.dueDate = d.dueDate;
+    if (d.recurring) extraPayload.recurring = d.recurring;
+    if (d.priority) extraPayload.priority = d.priority;
+
     createSignal({
       source: 'voice',
       type: signalTypeForDomain(d.domain, hasPlaceOrObject),
       title: d.title,
-      payload: { note: d.cleanText },
+      payload: { note: d.cleanText, ...extraPayload },
       confidence: d.aiConfidence,
       context,
       tags: mergeTags(['说一句', d.domain ? `domain:${d.domain}` : ''], d.inlineTags),
@@ -298,6 +307,21 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
   }
   function setDraftTitle(title: string) {
     setDraft((d) => (d ? { ...d, title, edited: true } : d));
+  }
+  function setDraftDueDate(dueDate: string) {
+    setDraft((d) => (d ? { ...d, dueDate, edited: true } : d));
+  }
+  function setDraftRecurring(recurring: string) {
+    setDraft((d) => (d ? { ...d, recurring, edited: true } : d));
+  }
+  function setDraftPriority(priority: string) {
+    setDraft((d) => (d ? { ...d, priority, edited: true } : d));
+  }
+
+  // 判断是否是提醒/计划类型（需要显示时间相关字段）
+  function isCommitmentLike(d: PendingDraft): boolean {
+    return d.domain === 'growth' ||
+      /提醒|提醒我|安排|计划|任务|待办|记得|别忘|remind|todo|schedule|plan/i.test(d.rawText);
   }
 
   if (!open) return null;
@@ -380,6 +404,46 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
                       </button>
                     )),
                   )}
+                </div>
+              </div>
+            )}
+
+            {/* 提醒/计划专属字段 */}
+            {isCommitmentLike(draft) && (
+              <div className="nesio-voice-confirm-field">
+                <span className="nesio-voice-confirm-label">截止日期 / 提醒时间</span>
+                <input
+                  type="date"
+                  className="nesio-voice-confirm-input"
+                  value={draft.dueDate ?? ''}
+                  onChange={(e) => setDraftDueDate(e.target.value)}
+                />
+                <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.4rem', flexWrap: 'wrap' }}>
+                  {['不重复', '每天', '每周', '每月'].map((r) => (
+                    <button
+                      key={r}
+                      type="button"
+                      className={`nesio-voice-confirm-domain${draft.recurring === r ? ' is-active' : ''}`}
+                      onClick={() => setDraftRecurring(draft.recurring === r ? '' : r)}
+                    >
+                      {r}
+                    </button>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.4rem' }}>
+                  {['🔴 高', '🟡 中', '🟢 低'].map((p) => {
+                    const key = p.split(' ')[1];
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        className={`nesio-voice-confirm-domain${draft.priority === key ? ' is-active' : ''}`}
+                        onClick={() => setDraftPriority(draft.priority === key ? '' : key)}
+                      >
+                        {p}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}
