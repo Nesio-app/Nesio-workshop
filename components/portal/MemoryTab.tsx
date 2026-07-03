@@ -11,8 +11,8 @@ import { createAppApiClient } from '@/lib/portal/app-api-client';
 import {
   backfillLocalLifeGraphToCloud,
   deleteLifeNode,
+  getLifeGraph,
   getLifeGraphCloudSyncSummary,
-  getRecentNodes,
   isPrivateExternalNode,
   mergeCloudMemorySnapshot,
   retryLifeGraphCloudSync,
@@ -631,6 +631,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
   const [selectedNode, setSelectedNode] = useState<LifeNode | null>(null);
   const [relatedNodes, setRelatedNodes] = useState<LifeNode[]>([]);
   const [showAll, setShowAll] = useState(false);
+  const [displayLimit, setDisplayLimit] = useState(6);
   const [cloudSyncSummary, setCloudSyncSummary] = useState(getLifeGraphCloudSyncSummary());
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProject, setActiveProject] = useState<Project | null>(null);
@@ -639,7 +640,10 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
   const copy = COPY[portalLocaleToDictionaryLocale(locale)];
 
   const readNodes = useCallback(
-    () => visibleMemoryNodes(getRecentNodes(30), canUsePrivateData),
+    () => visibleMemoryNodes(
+      getLifeGraph().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+      canUsePrivateData,
+    ),
     [canUsePrivateData],
   );
 
@@ -719,7 +723,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
     ? visibleMemoryNodes(smartNodes, canUsePrivateData).filter((n) => !typeFilter || n.type === typeFilter)
     : visibleNodes;
 
-  const visibleItems = showAll || query ? results : results.slice(0, 6);
+  const visibleItems = showAll || query ? results : results.slice(0, displayLimit);
 
   const typeCounts = nodes.reduce<Record<string, number>>((acc, n) => {
     acc[n.type] = (acc[n.type] ?? 0) + 1;
@@ -930,14 +934,18 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
             </div>
           ) : null}
 
-          {/* Show more */}
-          {!showAll && results.length > 6 && (
+          {/* Show more — incremental: +20 each tap, final tap shows all */}
+          {!showAll && results.length > displayLimit && (
             <button
               type="button"
               className="nesio-memory-more-btn"
-              onClick={() => setShowAll(true)}
+              onClick={() => {
+                const next = displayLimit + 20;
+                if (next >= results.length) setShowAll(true);
+                else setDisplayLimit(next);
+              }}
             >
-              {copy.more(results.length - 6)}
+              {copy.more(results.length - displayLimit)}
             </button>
           )}
 

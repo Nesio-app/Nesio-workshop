@@ -59,7 +59,7 @@ async function callClaude(
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-3-5-haiku-latest',
+      model: envValue('CLAUDE_MODEL') || envValue('ANTHROPIC_MODEL') || 'claude-3-5-haiku-latest',
       max_tokens: 1024,
       system: systemInstruction,
       messages: [
@@ -97,9 +97,9 @@ async function callGemini(
   history: ChatMessage[],
   systemInstruction: string,
 ): Promise<{ text: string; sources: Array<{ title: string; url: string }> }> {
-  // gemini-1.5-flash 已退役（404），使用 2.0-flash
+  const geminiModel = envValue('GEMINI_MODEL') || 'gemini-2.0-flash';
   const GEMINI_URL =
-    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+    `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent`;
 
   const contents = [
     ...history
