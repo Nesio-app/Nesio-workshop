@@ -12,6 +12,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { MyExperimentWidget } from '@/components/portal/NesioExperiment';
+import LifeCivilizationMap from '@/components/portal/LifeCivilizationMap';
 import { getLifeGraph } from '@/lib/portal/life-graph';
 import type { LifeNode } from '@/lib/portal/life-graph';
 import { getMirrorProfile, type MirrorProfile } from '@/lib/portal/mirror-profile';
@@ -953,6 +954,12 @@ export default function InsightsSheet({ onClose }: { onClose: () => void }) {
               >
                 ⚙ 自定义
               </button>
+            </div>
+
+            {/* Life Civilization Map — hero visual */}
+            <div className="nesio-insights-section" style={{ marginTop: 'var(--space-3)' }}>
+              <p className="nesio-insights-section-label">生命版图</p>
+              <LifeCivilizationMap nodes={allNodes} />
             </div>
 
             {/* Dynamic widgets */}
