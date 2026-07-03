@@ -60,6 +60,8 @@ function saveToken(id: string, token: string) {
   } catch { /* ignore */ }
 }
 
+interface SyncResult { ok: boolean; msg: string; detail?: string }
+
 export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [connected, setConnected] = useState<Record<string, boolean>>({});
@@ -70,6 +72,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
   const [tokenValue, setTokenValue] = useState('');
   const [shortcutsFor, setShortcutsFor] = useState<string | null>(null);
   const [ingestUrl, setIngestUrl] = useState('');
+  const [oauthSyncResult, setOauthSyncResult] = useState<Record<string, SyncResult>>({});
 
   useEffect(() => {
     if (!open) return;
@@ -149,6 +152,69 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       setCounts((p) => ({ ...p, [c.id]: nodes.length }));
       showToast(`已同步 ${nodes.length} 条 flomo 笔记`, true);
     } catch { showToast('网络错误', false); }
+    setSyncing(null);
+  }
+
+  // ── OAuth sync (Gmail / Calendar) ──
+  async function syncOAuth(c: ConnectorDef) {
+    setSyncing(c.id);
+    setOauthSyncResult((p) => ({ ...p, [c.id]: { ok: true, msg: '同步中…' } }));
+    try {
+      if (c.id === 'gmail') {
+        const res = await fetch('/api/portal/gmail?includeBody=true&analyze=true');
+        const data = await res.json() as {
+          ok?: boolean; nodes?: NodeInput[]; error?: string;
+          emailCount?: number; count?: number; messages?: unknown[];
+        };
+        if (!data.ok) {
+          const detail = `error: ${data.error || '未知'} | HTTP ${res.status}`;
+          setOauthSyncResult((p) => ({ ...p, gmail: { ok: false, msg: `同步失败`, detail } }));
+          showToast(`Gmail 同步失败：${data.error || '未知'}`, false);
+        } else {
+          const nodeCount = data.nodes?.length ?? 0;
+          const emailCount = data.emailCount ?? data.messages?.length ?? 0;
+          if (nodeCount > 0) {
+            const { addLifeNode } = await import('@/lib/portal/life-graph');
+            data.nodes!.forEach((n) => addLifeNode({ ...n, source: 'email' } as Parameters<typeof addLifeNode>[0]));
+            localStorage.setItem('nesio-gmail-last-sync', String(Date.now()));
+            window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
+          }
+          setCounts((p) => ({ ...p, gmail: nodeCount }));
+          const detail = `读取 ${emailCount} 封邮件 · 提取 ${nodeCount} 个节点`;
+          setOauthSyncResult((p) => ({ ...p, gmail: { ok: true, msg: '同步成功', detail } }));
+          showToast(detail, true);
+        }
+      } else if (c.id === 'calendar') {
+        const res = await fetch('/api/portal/calendar', { cache: 'no-store' });
+        const data = await res.json() as {
+          ok?: boolean; events?: Array<Record<string, unknown>>; feeds?: Array<{ label: string; ok: boolean; count: number; error?: string }>;
+          error?: string; message?: string; provider?: string;
+        };
+        const feedSummary = data.feeds?.map((f) => f.label + ': ' + (f.ok ? f.count + '条' : '失败(' + (f.error || '?') + ')')).join(' · ') || '';
+        if (!data.ok || !data.events?.length) {
+          const detail = [
+            `HTTP ${res.status}`,
+            data.message || data.error || '',
+            feedSummary,
+          ].filter(Boolean).join(' | ');
+          setOauthSyncResult((p) => ({ ...p, calendar: { ok: false, msg: `无日历数据`, detail } }));
+          showToast(`日历同步失败：${data.message || data.error || '无事件'}`, false);
+        } else {
+          const count = data.events.length;
+          const { saveCalendarToLocal } = await import('@/lib/portal/calendar-local-store');
+          saveCalendarToLocal(data.events as Parameters<typeof saveCalendarToLocal>[0]);
+          setCounts((p) => ({ ...p, calendar: count }));
+          const detail = `${feedSummary || `来源: ${data.provider || '?'}`} · ${count} 条事件`;
+          setOauthSyncResult((p) => ({ ...p, calendar: { ok: true, msg: '同步成功', detail } }));
+          showToast(`日历同步成功：${count} 条事件`, true);
+          window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
+        }
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : '网络错误';
+      setOauthSyncResult((p) => ({ ...p, [c.id]: { ok: false, msg: '同步失败', detail: msg } }));
+      showToast(`同步失败：${msg}`, false);
+    }
     setSyncing(null);
   }
 
@@ -241,7 +307,13 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
                       {c.method === 'shortcuts' && !c.comingSoon && <span className="nesio-connector-soon" style={{ background: 'rgba(88,140,227,0.12)', color: 'var(--portal-blue-deep)' }}>快捷指令</span>}
                     </p>
                     <p className="nesio-connector-desc">{c.description}</p>
-                    {isConn && <p className="nesio-connector-sync">{isSync ? '同步中…' : '已连接'}{cnt ? `  ·  ${cnt} 个节点` : ''}</p>}
+                    {isConn && !oauthSyncResult[c.id] && <p className="nesio-connector-sync">{isSync ? '同步中…' : '已连接'}{cnt ? `  ·  ${cnt} 个节点` : ''}</p>}
+                    {oauthSyncResult[c.id] && (
+                      <p className="nesio-connector-sync" style={{ color: oauthSyncResult[c.id].ok ? 'var(--status-go)' : 'var(--status-risk)', fontSize: '0.68rem', lineHeight: 1.4 }}>
+                        {oauthSyncResult[c.id].msg}
+                        {oauthSyncResult[c.id].detail && <><br /><span style={{ opacity: 0.8 }}>{oauthSyncResult[c.id].detail}</span></>}
+                      </p>
+                    )}
                   </div>
 
                   {c.comingSoon ? (
@@ -253,6 +325,11 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
                   ) : isConn && (c.method === 'token' || c.method === 'server') ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', flexShrink: 0 }}>
                       <button type="button" className="nesio-connector-connect" onClick={() => c.method === 'server' ? syncFlomo(c) : syncToken(c)} disabled={isSync}>{isSync ? '…' : '同步'}</button>
+                      <button type="button" className="nesio-connector-disconnect" onClick={() => disconnect(c.id)}>断开</button>
+                    </div>
+                  ) : isConn && c.method === 'oauth' ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', flexShrink: 0 }}>
+                      <button type="button" className="nesio-connector-connect" onClick={() => syncOAuth(c)} disabled={isSync}>{isSync ? '…' : '同步'}</button>
                       <button type="button" className="nesio-connector-disconnect" onClick={() => disconnect(c.id)}>断开</button>
                     </div>
                   ) : isConn ? (

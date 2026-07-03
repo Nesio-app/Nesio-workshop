@@ -268,26 +268,8 @@ export async function GET(req: NextRequest) {
         }
       }
 
-      return NextResponse.json(
-        {
-          ok: false,
-          configured: true,
-          enabled: true,
-          provider: 'google_calendar_oauth',
-          events: [],
-          feeds: [
-            {
-              label: 'Google Calendar',
-              ok: false,
-              count: 0,
-              error: err instanceof Error ? err.message : 'fetch failed',
-            },
-          ],
-          sources: ['Google Calendar'],
-          message: 'Google Calendar OAuth token could not fetch events.',
-        },
-        { status: 502, headers: { 'Cache-Control': 'no-store, max-age=0' } },
-      );
+      // OAuth failed — fall through to iCal subscription URL fallback below.
+      // Do NOT return here; let the iCal path run so existing subscriptions still work.
     }
   }
 
