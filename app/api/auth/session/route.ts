@@ -156,10 +156,11 @@ export async function GET() {
     }
   }
 
-  // No Supabase configured → local-only mode: treat user as authenticated
-  // This covers any deployment without Supabase (personal, self-hosted, etc.)
+  // No Supabase configured → local-only mode: treat user as authenticated.
+  // Ignore stale auth cookies when there's no Supabase to validate them against;
+  // checking !accessCookie blocked users who had leftover cookies from a previous setup.
   const supabaseConfigured = Boolean(envValue('SUPABASE_URL') && envValue('SUPABASE_ANON_KEY'));
-  if (!supabaseConfigured && !accessCookie && !refreshCookie && !wechatOpenidCookie) {
+  if (!supabaseConfigured && !wechatOpenidCookie) {
     return safeJson({
       ok: true,
       loggedIn: true,

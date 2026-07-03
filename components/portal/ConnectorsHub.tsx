@@ -205,11 +205,53 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
         } else {
           const count = data.events.length;
           const { saveCalendarToLocal } = await import('@/lib/portal/calendar-local-store');
-          saveCalendarToLocal(data.events as Parameters<typeof saveCalendarToLocal>[0]);
+          const calEvents = data.events as Parameters<typeof saveCalendarToLocal>[0];
+          saveCalendarToLocal(calEvents);
+
+          // Also save upcoming events to LifeGraph so Memory tab reflects the sync
+          const { addLifeNode, getLifeGraph } = await import('@/lib/portal/life-graph');
+          const now = Date.now();
+          const windowEnd = now + 60 * 86_400_000;
+          const existingCalIds = new Set(
+            getLifeGraph().filter((n) => n.source === 'calendar')
+              .map((n) => n.attributes.calendarId as string).filter(Boolean),
+          );
+          let lifeGraphAdded = 0;
+          calEvents.forEach((ev) => {
+            const evAny = ev as Record<string, unknown>;
+            const start = evAny.start as string | undefined;
+            const title = evAny.title as string | undefined;
+            if (!start || !title) return;
+            const t = new Date(start).getTime();
+            if (t < now - 86_400_000 || t > windowEnd) return;
+            const calId = (evAny.id as string) || `${title}-${start}`;
+            if (existingCalIds.has(calId)) return;
+            addLifeNode({
+              name: title,
+              type: 'event',
+              source: 'calendar',
+              confidence: 1,
+              rawInput: title,
+              tags: [(evAny.calendarName as string) || '日历'].filter(Boolean),
+              attributes: {
+                start,
+                ...(evAny.end ? { end: evAny.end as string } : {}),
+                ...(evAny.url ? { url: evAny.url as string } : {}),
+                ...(evAny.location ? { location: evAny.location as string } : {}),
+                ...(evAny.description ? { note: (evAny.description as string).slice(0, 300) } : {}),
+                calendarId: calId,
+                calendarName: (evAny.calendarName as string) || '',
+              },
+              relations: [],
+            });
+            lifeGraphAdded++;
+          });
+
           setCounts((p) => ({ ...p, calendar: count }));
-          const detail = `${feedSummary || `来源: ${data.provider || '?'}`} · ${count} 条事件`;
+          const detail = `${feedSummary || `来源: ${data.provider || '?'}`} · ${count} 条事件${lifeGraphAdded > 0 ? ` · ${lifeGraphAdded} 条加入记忆` : ''}`;
           setOauthSyncResult((p) => ({ ...p, calendar: { ok: true, msg: '同步成功', detail } }));
           showToast(`日历同步成功：${count} 条事件`, true);
+          window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
           window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
         }
       }
