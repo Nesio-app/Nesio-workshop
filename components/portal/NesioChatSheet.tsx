@@ -44,12 +44,22 @@ function fmtEventDate(iso: string): string {
   return new Date(iso).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', weekday: 'short' });
 }
 
+const SOURCE_LABEL: Record<string, string> = {
+  email: 'Gmail',
+  calendar: '日历',
+  manual: '手动',
+  voice: '语音',
+  photo: '照片',
+  system: '系统',
+};
+
 function fmtNode(n: LifeNode): string {
   const startStr = n.attributes.start as string | undefined;
   const dateLabel = startStr
     ? fmtEventDate(startStr)
     : new Date(n.createdAt).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
-  return `• [${n.type}] ${n.name} (${dateLabel})`;
+  const src = SOURCE_LABEL[n.source] || n.source;
+  return `• [${src}] ${n.name} (${dateLabel})`;
 }
 
 function buildMemoryContext(query: string): string {

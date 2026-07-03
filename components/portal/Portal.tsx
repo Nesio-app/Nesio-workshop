@@ -478,13 +478,15 @@ export default function Portal() {
 
       // Auto-sync Gmail after OAuth (with full body analysis)
       if (connector === 'gmail') {
+        // Clear throttle so OAuth reconnect always triggers a fresh sync
+        localStorage.removeItem('nesio-gmail-last-sync');
         setTimeout(() => {
           fetch('/api/portal/gmail?includeBody=true&analyze=true')
             .then((r) => r.json())
             .then((data: { ok?: boolean; nodes?: Array<Record<string, unknown>>; count?: number }) => {
               if (data.ok && data.nodes?.length) {
                 import('@/lib/portal/life-graph').then(({ addLifeNode }) => {
-                  data.nodes!.forEach((n) => addLifeNode(n as Parameters<typeof addLifeNode>[0]));
+                  data.nodes!.forEach((n) => addLifeNode({ source: 'email', ...n } as Parameters<typeof addLifeNode>[0]));
                   window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
                 });
               }
@@ -596,7 +598,7 @@ export default function Portal() {
               if (data.ok && data.nodes?.length) {
                 localStorage.setItem('nesio-gmail-last-sync', String(Date.now()));
                 import('@/lib/portal/life-graph').then(({ addLifeNode }) => {
-                  data.nodes!.forEach((n) => addLifeNode(n as Parameters<typeof addLifeNode>[0]));
+                  data.nodes!.forEach((n) => addLifeNode({ source: 'email', ...n } as Parameters<typeof addLifeNode>[0]));
                   window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
                 });
               }

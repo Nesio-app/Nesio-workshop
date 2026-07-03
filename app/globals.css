@@ -9090,6 +9090,23 @@ html[data-portal-theme="night"] .nesio-memory-card-domain {
   color: #bcd2f5;
 }
 
+.nesio-memory-card-source-chip {
+  align-self: flex-start;
+  margin-top: 0.1rem;
+  padding: 0.1rem 0.42rem;
+  border-radius: 999px;
+  background: rgba(52,168,83,0.12);
+  color: #2d8048;
+  font-size: 0.62rem;
+  font-weight: 600;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+}
+html[data-portal-theme="night"] .nesio-memory-card-source-chip {
+  background: rgba(52,168,83,0.2);
+  color: #7ed89a;
+}
+
 .nesio-memory-more-btn {
   min-height: 44px;
   margin: 0.75rem auto 0;

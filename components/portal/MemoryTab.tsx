@@ -507,6 +507,8 @@ function MemoryCard({ node, onOpen, onDeleted, onLongPress }: { node: LifeNode; 
       {extra && <span className="nesio-memory-card-extra">{extra}</span>}
       {badge && <span className="nesio-memory-card-status-badge" style={{ background: badgeColor }}>{badge}</span>}
       {!extra && !badge && <span className="nesio-memory-card-sub">{cleanMemoryPreview(node)}</span>}
+      {node.source === 'email' && <span className="nesio-memory-card-source-chip">Gmail</span>}
+      {node.source === 'calendar' && <span className="nesio-memory-card-source-chip">日历</span>}
       {domain ? <span className="nesio-memory-card-domain">{DOMAINS[domain].icon} {DOMAINS[domain].label}</span> : null}
     </button>
   );
