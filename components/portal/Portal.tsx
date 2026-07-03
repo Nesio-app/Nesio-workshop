@@ -39,6 +39,7 @@ import {
   writePortalCache,
 } from '@/lib/portal/prefetch-cache';
 import { configUrl } from '@/lib/portal/paths';
+import { saveCalendarToLocal } from '@/lib/portal/calendar-local-store';
 import {
   importSupabaseHashSession,
   markNesioOnboardingDoneForAuth,
@@ -411,6 +412,9 @@ export default function Portal() {
               import('@/lib/portal/prefetch-cache').then(({ writePortalCache, PORTAL_CACHE_KEYS }) => {
                 writePortalCache(PORTAL_CACHE_KEYS.calendar, data);
               });
+              if (Array.isArray(data.events) && data.events.length > 0) {
+                saveCalendarToLocal(data.events);
+              }
               // Save upcoming events (next 7 days) as LifeGraph event nodes so they appear in memory/focus
               if (Array.isArray(data.events) && data.events.length > 0) {
                 import('@/lib/portal/life-graph').then(({ addLifeNode, getLifeGraph }) => {
@@ -536,6 +540,9 @@ export default function Portal() {
         }>; feeds?: unknown }) => {
           if (!data?.events && !data?.feeds) return;
           writePortalCache(PORTAL_CACHE_KEYS.calendar, data);
+          if (Array.isArray(data.events) && data.events.length > 0) {
+            saveCalendarToLocal(data.events);
+          }
           if (!Array.isArray(data.events) || data.events.length === 0) return;
           import('@/lib/portal/life-graph').then(({ addLifeNode, getLifeGraph }) => {
             const now = Date.now();

@@ -12,6 +12,7 @@ import { loadProfileSettings } from '@/lib/portal/profile';
 import { smartSearch } from '@/lib/portal/smart-search';
 import { parseTemporalQuery, isInSpan } from '@/lib/portal/temporal-query';
 import { readPortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
+import { loadCalendarFromLocal } from '@/lib/portal/calendar-local-store';
 import MemoryFlashBanner, { useMemoryFlash } from '@/components/portal/MemoryFlashBanner';
 
 interface ChatMessage { role: 'user' | 'model'; text: string; }
@@ -119,8 +120,12 @@ function buildMemoryContext(query: string): string {
 }
 
 function buildCalendarContext(query: string): string {
-  const data = readPortalCache<{ events?: CalendarEvent[] }>(PORTAL_CACHE_KEYS.calendar);
-  const events = data?.events ?? [];
+  // Primary: localStorage (24h TTL). Fallback: sessionStorage (5-min TTL, may be expired).
+  let events: CalendarEvent[] = loadCalendarFromLocal() as CalendarEvent[];
+  if (events.length === 0) {
+    const data = readPortalCache<{ events?: CalendarEvent[] }>(PORTAL_CACHE_KEYS.calendar);
+    events = data?.events ?? [];
+  }
   if (events.length === 0) return '';
 
   const temporal = parseTemporalQuery(query);
