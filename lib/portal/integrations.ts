@@ -96,7 +96,10 @@ export function readTokensFromCookies(provider: IntegrationProvider): Integratio
 }
 
 export function allowCookieIntegrationFallback(): boolean {
-  return envValue('NESIO_ALLOW_COOKIE_INTEGRATION_FALLBACK').toLowerCase() === 'true';
+  return (
+    envValue('NESIO_ALLOW_COOKIE_INTEGRATION_FALLBACK').toLowerCase() === 'true' ||
+    envValue('BAOHE_PERSONAL_LAB_AI_ENABLED').toLowerCase() === 'true'
+  );
 }
 
 export function setTokenCookiesOnResponse(

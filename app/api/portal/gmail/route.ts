@@ -36,7 +36,8 @@ function requireAuthenticatedGmailAccess(req: NextRequest): NextResponse | null 
       cookieStore.get('baohe_auth_refresh')?.value ||
       cookieStore.get('baohe_wechat_openid')?.value,
   );
-  if (hasNesioSession || hasStage5LabAccess(req)) return null;
+  const isPersonalLab = envValue('BAOHE_PERSONAL_LAB_AI_ENABLED').toLowerCase() === 'true';
+  if (hasNesioSession || hasStage5LabAccess(req) || isPersonalLab) return null;
 
   return NextResponse.json(
     {

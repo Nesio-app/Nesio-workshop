@@ -156,6 +156,25 @@ export async function GET() {
     }
   }
 
+  // Personal lab mode: no Supabase required — single-owner deployment
+  const isPersonalLab = envValue('BAOHE_PERSONAL_LAB_AI_ENABLED').toLowerCase() === 'true';
+  if (isPersonalLab && !accessCookie && !refreshCookie && !wechatOpenidCookie) {
+    return safeJson({
+      ok: true,
+      loggedIn: true,
+      hasRefreshToken: false,
+      status: 'signed_in',
+      viewerRole: 'personal_lab',
+      user: {
+        id: 'personal_lab',
+        email: '',
+        phone: '',
+        provider: 'personal_lab',
+        providers: ['personal_lab'],
+      },
+    });
+  }
+
   if (authProviderCookie === 'wechat' && wechatOpenidCookie) {
     return safeJson({
       ok: true,
