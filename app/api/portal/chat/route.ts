@@ -91,15 +91,18 @@ async function callClaude(
 
 // ── Gemini ────────────────────────────────────────────────────────────────────
 
+const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
+// Same fallback order as analyze route — 429 on one model → try next
+const GEMINI_MODEL_FALLBACKS = ['gemini-2.0-flash', 'gemini-flash-latest', 'gemini-2.5-flash'];
+
 async function callGemini(
   apiKey: string,
   message: string,
   history: ChatMessage[],
   systemInstruction: string,
 ): Promise<{ text: string; sources: Array<{ title: string; url: string }> }> {
-  const geminiModel = envValue('GEMINI_MODEL') || 'gemini-2.0-flash';
-  const GEMINI_URL =
-    `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent`;
+  const configuredModel = envValue('GEMINI_MODEL');
+  const models = Array.from(new Set([configuredModel, ...GEMINI_MODEL_FALLBACKS].filter(Boolean)));
 
   const contents = [
     ...history
@@ -108,38 +111,58 @@ async function callGemini(
     { role: 'user' as const, parts: [{ text: message }] },
   ];
 
-  const res = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: systemInstruction }] },
-      contents,
-      generationConfig: { temperature: 0.7, maxOutputTokens: 1024 },
-    }),
-  });
+  let lastError = 'Gemini unavailable';
 
-  const data = await res.json() as {
-    candidates?: Array<{
-      content?: { parts?: Array<{ text?: string }> };
-      groundingMetadata?: { groundingChunks?: Array<{ web?: { uri?: string; title?: string } }> };
-    }>;
-    error?: { code?: number; message?: string; status?: string };
-  };
+  for (const model of models) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const res = await fetch(`${GEMINI_BASE}/${model}:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: systemInstruction }] },
+          contents,
+          generationConfig: { temperature: 0.7, maxOutputTokens: 1024 },
+        }),
+      });
 
-  if (data.error) throw new Error(`Gemini ${data.error.code}: ${data.error.message}`);
+      const data = await res.json() as {
+        candidates?: Array<{
+          content?: { parts?: Array<{ text?: string }> };
+          groundingMetadata?: { groundingChunks?: Array<{ web?: { uri?: string; title?: string } }> };
+        }>;
+        error?: { code?: number; message?: string; status?: string };
+      };
 
-  const candidate = data.candidates?.[0];
-  const text = (candidate?.content?.parts ?? [])
-    .filter((p): p is { text: string } => typeof p.text === 'string' && p.text.length > 0)
-    .map((p) => p.text)
-    .join('');
+      if (res.ok) {
+        const candidate = data.candidates?.[0];
+        const text = (candidate?.content?.parts ?? [])
+          .filter((p): p is { text: string } => typeof p.text === 'string' && p.text.length > 0)
+          .map((p) => p.text)
+          .join('');
+        if (text) {
+          const sources = (candidate?.groundingMetadata?.groundingChunks ?? [])
+            .map((c) => ({ title: c.web?.title ?? '', url: c.web?.uri ?? '' }))
+            .filter((s) => s.url)
+            .slice(0, 3);
+          return { text: text.trim(), sources };
+        }
+        lastError = `Gemini ${model} empty_response`;
+        break;
+      }
 
-  const sources = (candidate?.groundingMetadata?.groundingChunks ?? [])
-    .map((c) => ({ title: c.web?.title ?? '', url: c.web?.uri ?? '' }))
-    .filter((s) => s.url)
-    .slice(0, 3);
+      // 429 rate limit: wait 2s and retry once before moving to next model
+      if (res.status === 429 && attempt === 0) {
+        await new Promise((r) => setTimeout(r, 2000));
+        continue;
+      }
 
-  return { text: text.trim(), sources };
+      lastError = `Gemini ${model} ${res.status}${data.error?.message ? `: ${data.error.message}` : ''}`;
+      console.error('[chat] gemini_model_error:', model, lastError);
+      break;
+    }
+  }
+
+  throw new Error(lastError);
 }
 
 // ── Main handler ──────────────────────────────────────────────────────────────
