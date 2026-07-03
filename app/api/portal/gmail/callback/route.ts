@@ -77,8 +77,25 @@ export async function GET(req: NextRequest) {
     req,
   );
 
-  const redirect = NextResponse.redirect(new URL('/?connector=gmail&status=connected', req.url));
+  // Consent now covers both gmail + calendar scopes — mirror tokens to the
+  // calendar cookie set so one authorization keeps both connectors alive.
+  const grantsCalendar = !token.scope || token.scope.includes('calendar');
+  const redirect = NextResponse.redirect(new URL(
+    grantsCalendar
+      ? '/?connector=gmail&status=connected&calendar=google_oauth_connected'
+      : '/?connector=gmail&status=connected',
+    req.url,
+  ));
   setTokenCookiesOnResponse(redirect, 'gmail', savedTokens);
+  if (grantsCalendar) {
+    await saveIntegrationToken('calendar', {
+      accessToken: token.access_token,
+      refreshToken: token.refresh_token,
+      expiresAt: token.expires_in ? Date.now() + token.expires_in * 1000 : undefined,
+      scope: token.scope,
+    }, req);
+    setTokenCookiesOnResponse(redirect, 'calendar', savedTokens);
+  }
   redirect.cookies.delete(STATE_COOKIE);
   return redirect;
 }

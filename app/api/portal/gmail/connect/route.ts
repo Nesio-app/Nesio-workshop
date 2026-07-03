@@ -5,7 +5,9 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 
-const GMAIL_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly';
+// Request calendar scope alongside gmail so one consent covers both connectors
+// and the resulting refresh token can serve either API.
+const GMAIL_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/calendar.readonly';
 const STATE_COOKIE = 'nesio_gmail_oauth_state';
 
 function envValue(key: string): string {

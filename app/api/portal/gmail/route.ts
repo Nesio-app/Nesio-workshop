@@ -204,6 +204,15 @@ export async function GET(req: NextRequest) {
   // Get token for current user (Supabase → cookies fallback)
   let tokens = await getIntegrationToken('gmail');
 
+  // Gmail and Calendar consent share one Google authorization; if only the
+  // calendar cookies survived, borrow its refresh token to mint a gmail one.
+  if (!tokens?.refreshToken) {
+    const calendarTokens = await getIntegrationToken('calendar');
+    if (calendarTokens?.refreshToken) {
+      tokens = { accessToken: tokens?.accessToken || '', refreshToken: calendarTokens.refreshToken };
+    }
+  }
+
   if (!tokens) {
     return NextResponse.json(
       { ok: false, error: 'not_connected', connectUrl: '/api/portal/gmail/connect' },

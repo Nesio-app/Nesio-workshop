@@ -13,6 +13,7 @@ import { smartSearch } from '@/lib/portal/smart-search';
 import { parseTemporalQuery, isInSpan } from '@/lib/portal/temporal-query';
 import { readPortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
 import { loadCalendarFromLocal } from '@/lib/portal/calendar-local-store';
+import { loadLastLocation, refreshLocation, formatLocationAge } from '@/lib/portal/location-store';
 import MemoryFlashBanner, { useMemoryFlash } from '@/components/portal/MemoryFlashBanner';
 
 interface ChatMessage { role: 'user' | 'model'; text: string; }
@@ -175,6 +176,24 @@ function buildCalendarContext(query: string): string {
   }
 
   return parts.join('\n');
+}
+
+function buildEnvironmentContext(): string {
+  const parts: string[] = [];
+
+  const loc = loadLastLocation();
+  if (loc) parts.push(`当前位置：${loc.label}（${formatLocationAge(loc.ts)}）`);
+
+  const weather = readPortalCache<{
+    temperatureC?: number; condition?: string; forecastNote?: string; placeLabel?: string;
+  }>(PORTAL_CACHE_KEYS.weather);
+  if (weather?.condition) {
+    const place = weather.placeLabel && !loc ? `${weather.placeLabel} ` : '';
+    parts.push(`当前天气：${place}${weather.temperatureC}°C ${weather.condition}${weather.forecastNote ? '，' + weather.forecastNote : ''}`);
+  }
+
+  if (parts.length === 0) return '';
+  return `【实时环境】\n${parts.join('\n')}`;
 }
 
 const CHAT_HISTORY_KEY = 'nesio-chat-history-v1';
@@ -470,6 +489,8 @@ export default function NesioChatSheet({
   const fileContextRef = useRef<{ name: string; content: string } | null>(null);
 
   useEffect(() => { if (open) setMessages(loadHistory()); }, [open]);
+  // Opportunistically refresh device location so 问一问 knows where the user is.
+  useEffect(() => { if (open) void refreshLocation(); }, [open]);
   useEffect(() => {
     if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
   }, [messages, sending]);
@@ -503,6 +524,7 @@ export default function NesioChatSheet({
             : undefined,
           memoryContext: buildMemoryContext(text.trim()),
           calendarContext: buildCalendarContext(text.trim()),
+          environmentContext: buildEnvironmentContext(),
         }),
         signal: controller.signal,
       });

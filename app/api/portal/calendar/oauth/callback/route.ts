@@ -7,6 +7,7 @@ type GoogleTokenResponse = {
   refresh_token?: string;
   expires_in?: number;
   token_type?: string;
+  scope?: string;
 };
 
 function envValue(key: string): string {
@@ -73,6 +74,21 @@ function setCalendarCookies(response: NextResponse, session: GoogleTokenResponse
       secure,
       path: '/',
       maxAge: 60 * 60 * 24 * 90,
+    });
+  }
+
+  // Consent now covers both calendar + gmail scopes — mirror tokens to the
+  // gmail cookie set so one authorization keeps both connectors alive.
+  const grantsGmail = !session.scope || session.scope.includes('gmail');
+  if (!grantsGmail) return;
+  if (session.access_token) {
+    response.cookies.set('nesio_gmail_access', session.access_token, {
+      httpOnly: true, sameSite: 'lax', secure, path: '/', maxAge,
+    });
+  }
+  if (session.refresh_token) {
+    response.cookies.set('nesio_gmail_refresh', session.refresh_token, {
+      httpOnly: true, sameSite: 'lax', secure, path: '/', maxAge: 60 * 60 * 24 * 90,
     });
   }
 }

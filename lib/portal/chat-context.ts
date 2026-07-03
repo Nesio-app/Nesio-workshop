@@ -23,6 +23,8 @@ export interface ClientBuiltContext {
   memoryContext?: string;
   /** Pre-built calendar context string from client */
   calendarContext?: string;
+  /** Real-time location + weather context from client */
+  environmentContext?: string;
 }
 
 function formatNode(n: LifeNode): string {
@@ -36,9 +38,12 @@ function formatNode(n: LifeNode): string {
 }
 
 export function buildChatContext(userQuery: string, clientContext?: ClientBuiltContext): BuiltChatContext {
-  // If client sent pre-built context (has localStorage), use it directly
-  if (clientContext?.memoryContext) {
-    const parts = [clientContext.memoryContext];
+  // If client sent pre-built context (has localStorage), use it directly.
+  // Environment (location/weather) goes first — it's short and always relevant.
+  if (clientContext?.memoryContext || clientContext?.environmentContext) {
+    const parts: string[] = [];
+    if (clientContext.environmentContext) parts.push(clientContext.environmentContext, '');
+    if (clientContext.memoryContext) parts.push(clientContext.memoryContext);
     if (clientContext.calendarContext) parts.push('', clientContext.calendarContext);
     return { systemContext: parts.join('\n'), relevantNodeIds: [] };
   }

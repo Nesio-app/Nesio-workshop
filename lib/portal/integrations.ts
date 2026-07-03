@@ -113,7 +113,8 @@ export function setTokenCookiesOnResponse(
   const expiresIn = tokens.expiresAt ? Math.round((tokens.expiresAt - Date.now()) / 1000) : 3600;
   response.cookies.set(`${prefix}_access`, tokens.accessToken, { httpOnly: true, sameSite: 'lax', secure, path: '/', maxAge: expiresIn });
   if (tokens.refreshToken) {
-    response.cookies.set(`${prefix}_refresh`, tokens.refreshToken, { httpOnly: true, sameSite: 'lax', secure, path: '/', maxAge: 60 * 60 * 24 * 30 });
+    // 90 days to match the calendar refresh cookie lifetime
+    response.cookies.set(`${prefix}_refresh`, tokens.refreshToken, { httpOnly: true, sameSite: 'lax', secure, path: '/', maxAge: 60 * 60 * 24 * 90 });
   }
 }
 

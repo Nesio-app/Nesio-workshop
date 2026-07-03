@@ -27,12 +27,14 @@ interface ChatRequest {
   /** Pre-built context strings from client (has localStorage + sessionStorage access) */
   memoryContext?: string;
   calendarContext?: string;
+  environmentContext?: string;
 }
 
 const SYSTEM_BASE = `你是 Nesio，用户的贴身 AI 助手，叫"小宝"。
 - 回答简洁有力，用中文
 - 善用用户的个人记忆，自然地说"我记得你之前提到…"
 - 如果用户问"我的XX在哪"，先在记忆库里找
+- 如果提供了【实时环境】（位置/天气），直接用它回答"我在哪""天气怎么样"这类问题，不要再反问用户
 - 不编造用户没有记录的事实，不确定就直说`;
 
 const TONE_STYLE: Record<string, string> = {
@@ -172,7 +174,7 @@ async function callGemini(
 
 export async function POST(req: NextRequest) {
   const body = await req.json() as ChatRequest;
-  const { message, history = [], coachStyle, fileContext, memoryContext, calendarContext } = body;
+  const { message, history = [], coachStyle, fileContext, memoryContext, calendarContext, environmentContext } = body;
 
   if (!message?.trim()) {
     return NextResponse.json({ ok: false, error: 'empty message' }, { status: 400 });
@@ -189,7 +191,7 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const { systemContext } = buildChatContext(message, { memoryContext, calendarContext });
+  const { systemContext } = buildChatContext(message, { memoryContext, calendarContext, environmentContext });
   const fileSection = fileContext
     ? `\n\n---\n用户上传了文件：${fileContext.name}\n文件内容如下：\n\n${fileContext.content}\n---\n\n回答关于这个文件的问题时，直接基于以上数据回答，不要猜测或编造数据。如果用户问数量统计、最大值、总结等，请计算后给出准确答案。`
     : '';
