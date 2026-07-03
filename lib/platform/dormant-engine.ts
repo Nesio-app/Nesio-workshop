@@ -21,6 +21,7 @@
  */
 
 import type { FocusNode } from '@/lib/platform/view-models/today-view-model';
+import { firstNodeDate } from '@/lib/platform/node-dates';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -58,20 +59,10 @@ export type DormantStore = Record<string, DormantRecord>;
 
 const STORE_KEY = 'nesio-dormant-store';
 
-// Attribute keys that indicate a node has an explicit due date
-const DUE_DATE_KEYS = ['start', 'end', 'date', 'dueDate', 'due', 'deadline', 'datetime', 'scheduledAt', 'remindAt'];
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function getDueDate(node: FocusNode): Date | null {
-  for (const key of DUE_DATE_KEYS) {
-    const v = node.attributes[key];
-    if (typeof v === 'string' && v.length >= 10) {
-      const d = new Date(v);
-      if (!Number.isNaN(d.getTime())) return d;
-    }
-  }
-  return null;
+  return firstNodeDate(node.attributes);
 }
 
 function effectiveAgeRef(rec: DormantRecord, node: FocusNode): string {

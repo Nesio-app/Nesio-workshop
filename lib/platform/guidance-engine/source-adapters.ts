@@ -10,6 +10,7 @@ import type { CalendarEvent } from '@/lib/portal/types';
 import type { EmailSignal } from '@/lib/platform/email-signals';
 import type { ProactiveContextItem, FocusNode } from '@/lib/platform/view-models/today-view-model';
 import { inferEventType } from '@/lib/platform/attention-engine';
+import { nearestNodeDate } from '@/lib/platform/node-dates';
 import type { LifeNode } from '@/lib/portal/life-graph';
 import type { GuidanceEvent, GuidanceEventType } from './types';
 
@@ -111,8 +112,6 @@ export function specialDaysToGuidanceEvents(
 
 // ── Focus nodes with due dates ────────────────────────────────────────────────
 
-const DATE_KEYS = ['dueDate', 'due', 'deadline', 'end', 'date', 'scheduledAt'];
-
 export function focusNodesToGuidanceEvents(
   nodes: readonly FocusNode[],
   now: Date = new Date(),
@@ -120,26 +119,23 @@ export function focusNodesToGuidanceEvents(
   const results: GuidanceEvent[] = [];
 
   for (const node of nodes) {
-    for (const key of DATE_KEYS) {
-      const v = node.attributes[key];
-      if (typeof v !== 'string') continue;
-      const d = new Date(v);
-      if (Number.isNaN(d.getTime())) continue;
+    // Unified key list (node-dates) — previously this adapter missed
+    // 'start'/'datetime'/'remindAt', so start-only nodes never got cards.
+    const d = nearestNodeDate(node.attributes, now.getTime());
+    if (!d) continue;
 
-      const daysUntil = (d.getTime() - now.getTime()) / 86_400_000;
-      if (daysUntil < 0 || daysUntil > 2) continue; // dormant engine handles past-due
+    const daysUntil = (d.getTime() - now.getTime()) / 86_400_000;
+    if (daysUntil < 0 || daysUntil > 2) continue; // dormant engine handles past-due
 
-      results.push({
-        id: `node-${node.id}`,
-        type: 'deadline',
-        title: node.name,
-        scheduledAt: d,
-        source: 'memory',
-        confidence: 90,  // user-set deadline
-        payload: { nodeId: node.id },
-      });
-      break; // one event per node
-    }
+    results.push({
+      id: `node-${node.id}`,
+      type: 'deadline',
+      title: node.name,
+      scheduledAt: d,
+      source: 'memory',
+      confidence: 90,  // user-set deadline
+      payload: { nodeId: node.id },
+    });
   }
 
   return results;

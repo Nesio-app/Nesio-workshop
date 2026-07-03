@@ -2,6 +2,8 @@ import { generateTodayCards } from '../../intelligence';
 import type { Signal } from '../../life-domain/signal';
 import { addLifeNode, getLifeGraph, getRecentNodes, updateLifeNode, type LifeNode } from '../../portal/life-graph';
 import type { RecommendationCard } from '../../portal/reasoning-engine';
+import { nearestNodeDate } from '../node-dates';
+import { scheduleHint } from '../../portal/time-labels';
 
 export interface SubTask {
   id: string;
@@ -72,32 +74,7 @@ const FOCUS_TYPES = new Set(['commitment', 'event', 'health_state']);
 
 /** Extract nearest future or past-due date from a node's attributes */
 function extractNearestDate(node: LifeNode): Date | null {
-  let nearest: Date | null = null;
-  const DATE_KEYS = ['start', 'end', 'date', 'dueDate', 'due', 'deadline', 'datetime', 'scheduledAt', 'remindAt'];
-  // Check known date keys first (highest priority)
-  for (const key of DATE_KEYS) {
-    const v = node.attributes[key];
-    if (typeof v === 'string') {
-      const d = new Date(v);
-      if (!Number.isNaN(d.getTime())) {
-        if (!nearest || Math.abs(d.getTime() - Date.now()) < Math.abs(nearest.getTime() - Date.now())) {
-          nearest = d;
-        }
-      }
-    }
-  }
-  // Scan all attributes for any ISO date string
-  for (const v of Object.values(node.attributes)) {
-    if (typeof v === 'string' && v.length >= 10) {
-      const d = new Date(v);
-      if (!Number.isNaN(d.getTime()) && d.getFullYear() > 2020) {
-        if (!nearest || Math.abs(d.getTime() - Date.now()) < Math.abs(nearest.getTime() - Date.now())) {
-          nearest = d;
-        }
-      }
-    }
-  }
-  return nearest;
+  return nearestNodeDate(node.attributes);
 }
 
 /** Urgency score: lower = more urgent. Used for sorting. */
@@ -172,44 +149,8 @@ export function addCommitmentNode(name: string): FocusNode {
 
 export function focusTimeHint(node: FocusNode): string {
   const now = new Date();
-  const DATE_KEYS = ['start', 'end', 'date', 'dueDate', 'due', 'deadline', 'datetime', 'scheduledAt', 'remindAt'];
-
-  function formatTimeHint(d: Date): string {
-    const diffMs = d.getTime() - now.getTime();
-    const hasTime = d.getHours() !== 0 || d.getMinutes() !== 0;
-    const timeStr = hasTime
-      ? d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
-      : '';
-    if (diffMs < 0) return '已过期';
-    if (hasTime && diffMs < 60 * 60_000) {
-      const mins = Math.round(diffMs / 60_000);
-      return `${timeStr} · 还有 ${mins} 分钟`;
-    }
-    if (hasTime && diffMs < 8 * 3_600_000) {
-      const hrs = Math.floor(diffMs / 3_600_000);
-      const mins = Math.round((diffMs % 3_600_000) / 60_000);
-      return `${timeStr} · 还有 ${hrs > 0 ? `${hrs}h` : ''}${mins > 0 ? `${mins}m` : ''}`;
-    }
-    const diffDays = Math.round(diffMs / 86_400_000);
-    if (diffDays === 0) return hasTime ? `今天 ${timeStr}` : '今天';
-    if (diffDays === 1) return hasTime ? `明天 ${timeStr}` : '明天';
-    if (diffDays <= 7) return `${diffDays} 天后`;
-    return `约 ${Math.round(diffDays / 7)} 周后`;
-  }
-
-  for (const key of DATE_KEYS) {
-    const v = node.attributes[key];
-    if (typeof v === 'string') {
-      const d = new Date(v);
-      if (!Number.isNaN(d.getTime())) return formatTimeHint(d);
-    }
-  }
-  for (const v of Object.values(node.attributes)) {
-    if (typeof v === 'string' && v.length >= 10) {
-      const d = new Date(v);
-      if (!Number.isNaN(d.getTime()) && d.getFullYear() > 2020) return formatTimeHint(d);
-    }
-  }
+  const d = nearestNodeDate(node.attributes, now.getTime());
+  if (d) return scheduleHint(d, now);
   const text = [node.name, node.rawInput || ''].join(' ').toLowerCase();
   if (text.includes('今天') || text.includes('今日')) return '今天';
   if (text.includes('明天') || text.includes('明日')) return '明天';

@@ -10,6 +10,7 @@
 import type { LifeNode } from './life-graph';
 import { nodeDomain } from '@/lib/life-domain';
 import { DOMAINS, type FrontDomain } from '@/lib/life-domain/domain-taxonomy';
+import { relativePastLabel, relativeFutureLabel } from './time-labels';
 
 export type NarratorCardType = 'remember' | 'commitment' | 'activity';
 
@@ -39,19 +40,11 @@ function buildRememberCard(nodes: LifeNode[]): NarratorCard | null {
   const dayIndex = Math.floor(now / (24 * 3_600_000));
   const node = candidates[dayIndex % candidates.length];
 
-  const daysAgo = Math.floor((now - new Date(node.createdAt).getTime()) / (24 * 3_600_000));
-  const timeLabel =
-    daysAgo < 30
-      ? `${daysAgo} 天前`
-      : daysAgo < 365
-        ? `${Math.floor(daysAgo / 30)} 个月前`
-        : `${Math.floor(daysAgo / 365)} 年前`;
-
   return {
     type: 'remember',
     title: '还记得这件事吗？',
     body: node.rawInput || node.name,
-    sub: `—— 你 ${timeLabel} 存的`,
+    sub: `—— 你 ${relativePastLabel(node.createdAt, now)} 存的`,
     nodes: [node],
   };
 }
@@ -73,12 +66,10 @@ function buildCommitmentCard(nodes: LifeNode[]): NarratorCard | null {
   const lines = sorted.map((n) => {
     const due = n.attributes?.dueDate as string | undefined;
     if (due) {
-      const days = Math.ceil((new Date(due).getTime() - now()) / (24 * 3_600_000));
-      const label =
-        days < 0 ? `${Math.abs(days)} 天前` :
-        days === 0 ? '今天' :
-        days === 1 ? '明天' :
-        `${days} 天后`;
+      const dueTime = new Date(due).getTime();
+      const label = dueTime < now()
+        ? relativePastLabel(dueTime)
+        : relativeFutureLabel(dueTime);
       return `${n.name} · ${label}`;
     }
     return n.name;

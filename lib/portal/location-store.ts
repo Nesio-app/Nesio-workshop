@@ -5,6 +5,7 @@
  */
 
 import { readGeo, reverseGeocode } from './weather';
+import { relativePastLabel } from './time-labels';
 
 const KEY = 'nesio-last-location-v1';
 // Re-geocode at most every 10 minutes — city-level context doesn't move faster.
@@ -49,10 +50,5 @@ export async function refreshLocation(): Promise<StoredLocation | null> {
 }
 
 export function formatLocationAge(ts: number): string {
-  const mins = Math.round((Date.now() - ts) / 60_000);
-  if (mins < 2) return '刚刚定位';
-  if (mins < 60) return `${mins}分钟前定位`;
-  const hours = Math.round(mins / 60);
-  if (hours < 24) return `${hours}小时前定位`;
-  return `${Math.round(hours / 24)}天前定位`;
+  return `${relativePastLabel(ts)}定位`;
 }
