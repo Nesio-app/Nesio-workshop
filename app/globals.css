@@ -7,8 +7,8 @@
   --beige: #E8E4DC;
   --charcoal: #2C2C2C;
   --dusty-pink: #C9A9A6;
-  --font-source-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
-  --font-portal-serif: "Songti SC", "STSong", "Noto Serif CJK SC", Georgia, "Times New Roman", serif;
+  --font-source-sans: "Noto Sans SC", "Noto Sans JP", -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans", "Microsoft YaHei", system-ui, sans-serif;
+  --font-portal-serif: "Noto Serif SC", "Songti SC", "Hiragino Mincho ProN", Georgia, serif;
 }
 
 /* Nesio Design System v0: shared tokens from design-system/nesio.
@@ -65,6 +65,59 @@
   --dur-fast: 0.2s;
   --dur: 0.3s;
   --dur-slow: 0.6s;
+  /* ── Ink & surface (day) ── */
+  --portal-bg:    #f4f8fd;
+  --portal-ink:   #1e2a3a;
+  --portal-muted: #5a6d82;
+  --portal-line:  rgba(88, 140, 227, 0.14);
+  /* ── Zone tones ── */
+  --portal-cool:           #e8f2fc;
+  --portal-cool-accent:    #588ce3;
+  --portal-warm:           #edf4fc;
+  --portal-warm-accent:    #4a7fd4;
+  --portal-neutral:        #e6eef9;
+  --portal-neutral-accent: #6b8fc9;
+  /* ── Semantic accent (aliases portal-blue-deep) ── */
+  --portal-accent:         var(--portal-blue-deep);
+  --portal-accent-soft:    rgba(88, 140, 227, 0.10);
+  --portal-accent-soft-md: rgba(88, 140, 227, 0.18);
+  --portal-accent-soft-lg: rgba(88, 140, 227, 0.28);
+  --portal-accent-border:  rgba(88, 140, 227, 0.25);
+  /* ── Status colors (warm-coach palette) ── */
+  --status-go:          #5a9e7a;
+  --status-go-soft:     #d9ece1;
+  --status-gentle:      #c9923f;
+  --status-gentle-soft: #f3e4cc;
+  --status-calm:        #6b8fc9;
+  --status-calm-soft:   #dfe8f6;
+  --status-risk:        #cf6b6b;
+  --status-risk-soft:   #f5d9d9;
+  /* ── Typography scale ── */
+  --text-display:  2.25rem;
+  --text-h1:       1.6rem;
+  --text-h2:       1.3rem;
+  --text-h3:       1.075rem;
+  --text-body:     0.95rem;
+  --text-sm:       0.85rem;
+  --text-xs:       0.75rem;
+  --text-overline: 0.68rem;
+  /* ── Font weights ── */
+  --weight-light:    300;
+  --weight-regular:  400;
+  --weight-medium:   500;
+  --weight-semibold: 600;
+  --weight-bold:     700;
+  /* ── Line heights & tracking ── */
+  --leading-tight:   1.25;
+  --leading-snug:    1.45;
+  --leading-relaxed: 1.7;
+  --tracking-tight:  -0.01em;
+  --tracking-normal: 0;
+  --tracking-label:  0.14em;
+  --tracking-wide:   0.22em;
+  /* ── Layout ── */
+  --container-max: 1000px;
+  --container-pad: 1.25rem;
 }
 
 html[data-portal-theme="night"],
@@ -84,6 +137,36 @@ html[data-portal-theme="night"] .portal-root {
   --shadow-fab: 0 8px 28px rgba(0, 0, 0, 0.5);
   --modal-backdrop-bg: rgba(13, 22, 48, 0.52);
   --modal-card-bg: rgba(22, 36, 68, 0.88);
+  /* Night blues */
+  --portal-blue-deep:  #7fb0ee;
+  --portal-blue-mid:   #5f8fd6;
+  --portal-blue-light: #2c4a78;
+  /* Night ink/surface */
+  --portal-bg:    #0e1626;
+  --portal-ink:   #e7eefb;
+  --portal-muted: rgba(200, 217, 245, 0.6);
+  --portal-line:  rgba(127, 176, 245, 0.16);
+  /* Night zones */
+  --portal-cool:           #16243c;
+  --portal-cool-accent:    #7fb0ee;
+  --portal-warm:           #181f33;
+  --portal-warm-accent:    #8fb6ef;
+  --portal-neutral:        #141d30;
+  --portal-neutral-accent: #9bb6e0;
+  /* Night accent transparencies */
+  --portal-accent-soft:    rgba(127, 176, 238, 0.12);
+  --portal-accent-soft-md: rgba(127, 176, 238, 0.20);
+  --portal-accent-soft-lg: rgba(127, 176, 238, 0.30);
+  --portal-accent-border:  rgba(127, 176, 238, 0.28);
+  /* Night status */
+  --status-go:          #6fb893;
+  --status-go-soft:     rgba(111, 184, 147, 0.18);
+  --status-gentle:      #d9ab63;
+  --status-gentle-soft: rgba(217, 171, 99, 0.18);
+  --status-calm:        #9bb6e0;
+  --status-calm-soft:   rgba(155, 182, 224, 0.16);
+  --status-risk:        #e08585;
+  --status-risk-soft:   rgba(224, 133, 133, 0.18);
 }
 
 .nesio-glass {
@@ -7650,7 +7733,7 @@ html[data-portal-theme="night"] .portal-theme-seg-btn.is-on{
     #7c8cff 120deg 150deg,
     #a855f7 150deg 180deg,
     #ec4899 180deg 210deg,
-    #ef4444 210deg 240deg,
+    var(--status-risk) 210deg 240deg,
     #f97316 240deg 270deg,
     #facc15 270deg 300deg,
     #94a3b8 300deg 330deg,
@@ -8843,8 +8926,8 @@ html[data-portal-theme="night"] .nesio-memory-search { color: #e8eefa; }
 .nesio-search-understood-chip {
   font-size: 0.72rem;
   font-weight: 500;
-  color: #3b6ef0;
-  background: #e8effe;
+  color: var(--portal-blue-deep);
+  background: var(--portal-accent-soft);
   border-radius: 99px;
   padding: 0.18rem 0.6rem;
   white-space: nowrap;
@@ -9400,13 +9483,13 @@ html[data-portal-theme="night"] .nesio-type-chip {
 }
 
 .nesio-tell-action--recording .nesio-tell-action-icon {
-  background: #ef4444;
+  background: var(--status-risk);
   animation: recordPulse 0.9s ease-in-out infinite;
 }
 
 @keyframes recordPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); }
-  50%       { box-shadow: 0 0 0 12px rgba(239,68,68,0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(207,107,107,0.4); }
+  50%       { box-shadow: 0 0 0 12px rgba(207,107,107,0); }
 }
 
 .nesio-tell-action:active .nesio-tell-action-icon {
@@ -9661,7 +9744,7 @@ html[data-portal-theme="night"] .nesio-voice-input { color: #e8eefa; }
   flex-shrink: 0;
 }
 
-.nesio-voice-mic-btn--active { background: #ef4444; animation: recordPulse 0.9s ease-in-out infinite; }
+.nesio-voice-mic-btn--active { background: var(--status-risk); animation: recordPulse 0.9s ease-in-out infinite; }
 
 .nesio-voice-send-btn {
   width: 100%;
@@ -9677,7 +9760,7 @@ html[data-portal-theme="night"] .nesio-voice-input { color: #e8eefa; }
 
 .nesio-voice-saved {
   text-align: center;
-  color: #10b981;
+  color: var(--status-go);
   font-weight: 600;
   font-size: 0.9rem;
   padding: 0.5rem;
@@ -10361,7 +10444,7 @@ html[data-portal-theme="night"] .nesio-today-feedback-menu button { color: #c5d4
 }
 
 .nesio-profile-avatar-error {
-  color: #ef4444;
+  color: var(--status-risk);
   font-size: 0.72rem;
   margin: -0.8rem 0 0.9rem;
 }
@@ -10773,7 +10856,7 @@ html[data-portal-theme="night"] .nesio-ob-auth-btn { color: #e8eefa; background:
 
 .nesio-ob-error {
   font-size: 0.78rem;
-  color: #ef4444;
+  color: var(--status-risk);
   text-align: center;
   margin: 0.25rem 0 0.5rem;
 }
@@ -11170,7 +11253,7 @@ html[data-portal-theme="night"] .nesio-settings-option-label { color: #e8eefa; }
 }
 
 .nesio-settings-toggle-btn--on {
-  background: rgba(16,185,129,0.12);
+  background: rgba(90,158,122,0.12);
   color: #059669;
 }
 
@@ -11193,18 +11276,18 @@ html[data-portal-theme="night"] .nesio-settings-option-label { color: #e8eefa; }
   padding: 0.65rem;
   font-size: 0.82rem;
   font-weight: 600;
-  color: #ef4444;
-  background: rgba(239,68,68,0.07);
+  color: var(--status-risk);
+  background: rgba(207,107,107,0.07);
   border-radius: 0.75rem;
   margin-top: 0.5rem;
-  border: 1px solid rgba(239,68,68,0.15);
+  border: 1px solid rgba(207,107,107,0.15);
 }
 
 /* ─── Subscription ─── */
 /* ── Subscription / Trial ── */
 .nesio-sub-status-card {
-  background: linear-gradient(135deg, rgba(99,102,241,0.07), rgba(59,130,246,0.05));
-  border: 1.5px solid rgba(99,102,241,0.18);
+  background: linear-gradient(135deg, rgba(88,140,227,0.07), rgba(59,130,246,0.05));
+  border: 1.5px solid rgba(88,140,227,0.18);
   border-radius: 1.1rem;
   padding: 1.1rem 1rem;
   margin-bottom: 1.1rem;
@@ -11221,9 +11304,9 @@ html[data-portal-theme="night"] .nesio-settings-option-label { color: #e8eefa; }
   letter-spacing: 0.06em;
   margin-bottom: 0.5rem;
 }
-.nesio-sub-status-badge--free { background: rgba(99,102,241,0.55); }
-.nesio-sub-status-badge--trial { background: linear-gradient(90deg, #6366f1, #3b82f6); }
-.nesio-sub-status-badge--expired { background: rgba(239,68,68,0.7); }
+.nesio-sub-status-badge--free { background: rgba(88,140,227,0.55); }
+.nesio-sub-status-badge--trial { background: linear-gradient(90deg, var(--portal-blue-deep), var(--portal-blue-deep)); }
+.nesio-sub-status-badge--expired { background: rgba(207,107,107,0.7); }
 
 .nesio-sub-status-title {
   font-size: 1rem;
@@ -11242,14 +11325,14 @@ html[data-portal-theme="night"] .nesio-sub-status-title { color: #e8eefa; }
 
 .nesio-sub-trial-bar-track {
   height: 4px;
-  background: rgba(99,102,241,0.15);
+  background: rgba(88,140,227,0.15);
   border-radius: 999px;
   margin: 0.5rem 0 0.7rem;
   overflow: hidden;
 }
 .nesio-sub-trial-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, #6366f1, #3b82f6);
+  background: linear-gradient(90deg, var(--portal-blue-deep), var(--portal-blue-deep));
   border-radius: 999px;
   transition: width 0.6s ease;
 }
@@ -11258,7 +11341,7 @@ html[data-portal-theme="night"] .nesio-sub-status-title { color: #e8eefa; }
   display: inline-block;
   padding: 0.6rem 1.4rem;
   border-radius: 999px;
-  background: linear-gradient(90deg, #6366f1, #3b82f6);
+  background: linear-gradient(90deg, var(--portal-blue-deep), var(--portal-blue-deep));
   color: #fff;
   font-size: 0.85rem;
   font-weight: 700;
@@ -11368,14 +11451,14 @@ html[data-portal-theme="night"] .nesio-mood-title { color: #8899bb; }
   width: 100%;
   padding: 0.85rem;
   border-radius: 1rem;
-  background: rgba(99,102,241,0.15);
+  background: rgba(88,140,227,0.15);
   color: var(--portal-muted);
   font-size: 0.9rem;
   font-weight: 600;
   transition: background 0.2s, color 0.2s;
 }
 .nesio-mood-save-btn--ready {
-  background: linear-gradient(90deg, #6366f1, #3b82f6);
+  background: linear-gradient(90deg, var(--portal-blue-deep), var(--portal-blue-deep));
   color: #fff;
 }
 .nesio-mood-skip-btn {
@@ -11458,7 +11541,7 @@ html[data-portal-theme="night"] .nesio-mood-title { color: #8899bb; }
   text-align: center;
   transition: border-color 0.15s, color 0.15s;
 }
-.nesio-mood-journal-btn:hover { border-color: #8b5cf6; color: #8b5cf6; }
+.nesio-mood-journal-btn:hover { border-color: var(--portal-cool-accent); color: var(--portal-cool-accent); }
 
 /* Journal phase */
 .nesio-mood-card--journal { max-height: 92dvh; display: flex; flex-direction: column; }
@@ -11472,7 +11555,7 @@ html[data-portal-theme="night"] .nesio-mood-title { color: #8899bb; }
 .nesio-mood-journal-date { font-size: 0.72rem; color: var(--portal-muted); opacity: 0.7; }
 .nesio-mood-journal-prompt {
   font-size: 0.78rem;
-  color: #8b5cf6;
+  color: var(--portal-cool-accent);
   margin: 0 0 0.5rem;
   font-style: italic;
   opacity: 0.85;
@@ -11494,7 +11577,7 @@ html[data-portal-theme="night"] .nesio-mood-title { color: #8899bb; }
   box-sizing: border-box;
   margin-bottom: 0.75rem;
 }
-.nesio-mood-journal-textarea:focus { border-color: #8b5cf6; }
+.nesio-mood-journal-textarea:focus { border-color: var(--portal-cool-accent); }
 
 /* Wheel hint */
 .nesio-mood-hint-text {
@@ -11555,8 +11638,8 @@ html[data-portal-theme="night"] .nesio-brief-circle-label { color: #8faaff; }
   padding: 1.1rem 0.5rem;
   border-radius: 1.25rem;
   background: rgba(255,255,255,0.88);
-  border: 1.5px solid rgba(99,102,241,0.18);
-  box-shadow: 0 2px 12px rgba(99,102,241,0.08);
+  border: 1.5px solid rgba(88,140,227,0.18);
+  box-shadow: 0 2px 12px rgba(88,140,227,0.08);
   cursor: pointer;
   transition: background 0.15s, box-shadow 0.15s;
 }
@@ -11565,12 +11648,12 @@ html[data-portal-theme="night"] .nesio-brief-circle-label { color: #8faaff; }
 .nesio-mood-circle-label {
   font-size: 0.72rem;
   font-weight: 700;
-  color: #6366f1;
+  color: var(--portal-blue-deep);
   white-space: nowrap;
 }
 html[data-portal-theme="night"] .nesio-mood-circle {
   background: rgba(30,25,70,0.9);
-  border-color: rgba(99,102,241,0.3);
+  border-color: rgba(88,140,227,0.3);
 }
 
 /* Mood wheel */
@@ -11720,9 +11803,9 @@ html[data-portal-theme="night"] .nesio-node-attr-val { color: #e8eefa; }
 .nesio-type-action-btn--meeting {
   background: rgba(16, 185, 129, 0.1);
   color: #059669;
-  border-color: rgba(16,185,129,0.2);
+  border-color: rgba(90,158,122,0.2);
 }
-.nesio-type-action-btn--meeting:hover { background: rgba(16,185,129,0.18); }
+.nesio-type-action-btn--meeting:hover { background: rgba(90,158,122,0.18); }
 
 .nesio-type-thumb {
   width: 100%;
@@ -11749,27 +11832,27 @@ html[data-portal-theme="night"] .nesio-node-attr-val { color: #e8eefa; }
   font-weight: 700;
   padding: 0.45rem 1rem;
   border-radius: 999px;
-  background: rgba(139,92,246,0.1);
+  background: var(--portal-accent-soft);
   color: #6d28d9;
-  border: 1.5px solid rgba(139,92,246,0.2);
+  border: 1.5px solid var(--portal-accent-soft-md);
   cursor: pointer;
   transition: background 0.15s;
 }
-.nesio-commitment-toggle:hover { background: rgba(139,92,246,0.18); }
+.nesio-commitment-toggle:hover { background: var(--portal-accent-soft-md); }
 .nesio-commitment-toggle--done {
-  background: rgba(16,185,129,0.1);
+  background: rgba(90,158,122,0.1);
   color: #059669;
-  border-color: rgba(16,185,129,0.2);
+  border-color: rgba(90,158,122,0.2);
 }
 .nesio-type-priority-badge { font-size: 0.75rem; font-weight: 700; }
 
-.nesio-attr-overdue .nesio-node-attr-val { color: #ef4444; }
-.nesio-attr-due-soon .nesio-node-attr-val { color: #f59e0b; }
+.nesio-attr-overdue .nesio-node-attr-val { color: var(--status-risk); }
+.nesio-attr-due-soon .nesio-node-attr-val { color: var(--status-gentle); }
 .nesio-overdue-tag {
   font-size: 0.68rem;
   font-weight: 700;
-  color: #ef4444;
-  background: rgba(239,68,68,0.1);
+  color: var(--status-risk);
+  background: rgba(207,107,107,0.1);
   padding: 0.1rem 0.4rem;
   border-radius: 999px;
   margin-left: 0.3rem;
@@ -11777,8 +11860,8 @@ html[data-portal-theme="night"] .nesio-node-attr-val { color: #e8eefa; }
 .nesio-due-soon-tag {
   font-size: 0.68rem;
   font-weight: 700;
-  color: #f59e0b;
-  background: rgba(245,158,11,0.1);
+  color: var(--status-gentle);
+  background: rgba(201,146,63,0.1);
   padding: 0.1rem 0.4rem;
   border-radius: 999px;
   margin-left: 0.3rem;
@@ -11983,15 +12066,15 @@ html[data-portal-theme="night"] .nesio-voice-intent-label { color: #96c7f3; }
 .nesio-connector-name { font-size: 0.88rem; font-weight: 600; color: var(--portal-ink); display: flex; align-items: center; gap: 0.4rem; }
 html[data-portal-theme="night"] .nesio-connector-name { color: #e8eefa; }
 .nesio-connector-desc { font-size: 0.71rem; color: var(--portal-muted); margin-top: 0.1rem; }
-.nesio-connector-sync { font-size: 0.68rem; color: #10b981; margin-top: 0.1rem; }
+.nesio-connector-sync { font-size: 0.68rem; color: var(--status-go); margin-top: 0.1rem; }
 .nesio-connector-soon { font-size: 0.62rem; font-weight: 600; color: var(--portal-muted); background: rgba(0,0,0,0.06); padding: 0.1rem 0.4rem; border-radius: 999px; }
 .nesio-connector-connect {
   font-size: 0.75rem; font-weight: 700; color: #fff; background: var(--portal-blue-deep);
   padding: 0.3rem 0.85rem; border-radius: 999px; flex-shrink: 0;
 }
 .nesio-connector-disconnect {
-  font-size: 0.75rem; font-weight: 600; color: #ef4444;
-  background: rgba(239,68,68,0.08); padding: 0.3rem 0.75rem; border-radius: 999px; flex-shrink: 0;
+  font-size: 0.75rem; font-weight: 600; color: var(--status-risk);
+  background: rgba(207,107,107,0.08); padding: 0.3rem 0.75rem; border-radius: 999px; flex-shrink: 0;
 }
 
 /* ─── HealthLogger ─── */
@@ -12047,7 +12130,7 @@ html[data-portal-theme="night"] .nesio-connector-name { color: #e8eefa; }
   gap: 0.4rem;
   flex: 1;
 }
-.nesio-insights-icon { font-size: 1rem; color: #8b5cf6; }
+.nesio-insights-icon { font-size: 1rem; color: var(--portal-cool-accent); }
 .nesio-insights-title {
   font-size: 1rem;
   font-weight: 700;
@@ -12095,8 +12178,8 @@ html[data-portal-theme="night"] .nesio-connector-name { color: #e8eefa; }
 
 /* Narrative */
 .nesio-insights-narrative {
-  background: linear-gradient(135deg, rgba(139,92,246,0.08), rgba(59,110,240,0.06));
-  border: 1px solid rgba(139,92,246,0.18);
+  background: linear-gradient(135deg, var(--portal-accent-soft), rgba(59,110,240,0.06));
+  border: 1px solid var(--portal-accent-soft-md);
   border-radius: 1rem;
   padding: 0.85rem 1rem;
   margin-bottom: 0.9rem;
@@ -12114,7 +12197,7 @@ html[data-portal-theme="night"] .nesio-connector-name { color: #e8eefa; }
   line-height: 1.65;
   color: var(--portal-ink);
 }
-html[data-portal-theme="night"] .nesio-insights-narrative { background: rgba(139,92,246,0.12); border-color: rgba(139,92,246,0.25); }
+html[data-portal-theme="night"] .nesio-insights-narrative { background: var(--portal-accent-soft); border-color: var(--portal-accent-border); }
 html[data-portal-theme="night"] .nesio-insights-narrative-text { color: #d8dff8; }
 
 /* Stats row */
@@ -12256,7 +12339,7 @@ html[data-portal-theme="night"] .nesio-insights-narrative-text { color: #d8dff8;
 .nesio-insights-progress-pct {
   font-size: 0.9rem;
   font-weight: 800;
-  color: #8b5cf6;
+  color: var(--portal-cool-accent);
 }
 .nesio-insights-progress-track {
   height: 6px;
@@ -12267,7 +12350,7 @@ html[data-portal-theme="night"] .nesio-insights-narrative-text { color: #d8dff8;
 }
 .nesio-insights-progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #8b5cf6, #3b6ef0);
+  background: linear-gradient(90deg, var(--portal-cool-accent), var(--portal-blue-deep));
   border-radius: 99px;
   transition: width 0.5s ease;
 }
@@ -12306,8 +12389,8 @@ html[data-portal-theme="night"] .nesio-insights-narrative-text { color: #d8dff8;
   transition: color 0.15s, border-color 0.15s;
 }
 .nesio-insights-main-tab--active {
-  color: #8b5cf6;
-  border-bottom-color: #8b5cf6;
+  color: var(--portal-cool-accent);
+  border-bottom-color: var(--portal-cool-accent);
 }
 
 /* ─── Reflection Tab ─── */
@@ -12426,8 +12509,8 @@ html[data-portal-theme="night"] .nesio-insights-narrative-text { color: #d8dff8;
 }
 .nesio-lm-refresh-btn:hover { background: var(--portal-line); }
 .nesio-lm-perspective-btn {
-  background: rgba(139,92,246,0.12);
-  border: 1px solid rgba(139,92,246,0.3);
+  background: var(--portal-accent-soft);
+  border: 1px solid var(--portal-accent-border);
   color: var(--portal-accent);
   font-size: 0.72rem;
   cursor: pointer;
@@ -12437,7 +12520,7 @@ html[data-portal-theme="night"] .nesio-insights-narrative-text { color: #d8dff8;
   white-space: nowrap;
   font-weight: 500;
 }
-.nesio-lm-perspective-btn:hover { background: rgba(139,92,246,0.2); }
+.nesio-lm-perspective-btn:hover { background: var(--portal-accent-soft-md); }
 .nesio-lm-perspective-badge {
   font-size: 0.68rem;
   color: var(--portal-accent);
@@ -12458,7 +12541,7 @@ html[data-portal-theme="night"] .nesio-insights-narrative-text { color: #d8dff8;
   overflow: hidden;
   transition: border-color 0.15s;
 }
-.nesio-lm-layer--expanded { border-color: rgba(139,92,246,0.3); }
+.nesio-lm-layer--expanded { border-color: var(--portal-accent-border); }
 .nesio-lm-layer-header {
   display: flex;
   align-items: center;
@@ -12480,8 +12563,8 @@ html[data-portal-theme="night"] .nesio-insights-narrative-text { color: #d8dff8;
 }
 .nesio-lm-layer-count {
   font-size: 0.7rem;
-  background: rgba(139,92,246,0.12);
-  color: #8b5cf6;
+  background: var(--portal-accent-soft);
+  color: var(--portal-cool-accent);
   border-radius: 0.9rem;
   padding: 0.1rem 0.45rem;
   font-weight: 600;
@@ -12593,8 +12676,8 @@ html[data-portal-theme="night"] .nesio-insights-narrative-text { color: #d8dff8;
   color: var(--portal-muted);
   transition: background 0.12s, color 0.12s;
 }
-.nesio-lm-fb-btn--yes { background: rgba(16,185,129,0.15); color: #10b981; }
-.nesio-lm-fb-btn--no { background: rgba(239,68,68,0.12); color: #ef4444; }
+.nesio-lm-fb-btn--yes { background: rgba(90,158,122,0.15); color: var(--status-go); }
+.nesio-lm-fb-btn--no { background: rgba(207,107,107,0.12); color: var(--status-risk); }
 
 /* Model gen time */
 .nesio-lm-gen-time {
@@ -12675,8 +12758,8 @@ html[data-portal-theme="night"] .nesio-mirror-title { color: #e8eefa; }
 .nesio-camera-preview-btn span:first-child { font-size: 1.25rem; }
 .nesio-camera-preview-btn--full { border-color: rgba(99,179,237,0.35); }
 .nesio-camera-preview-btn--full:hover { background: rgba(99,179,237,0.12); }
-.nesio-camera-preview-btn--crop { border-color: rgba(139,92,246,0.35); }
-.nesio-camera-preview-btn--crop:hover { background: rgba(139,92,246,0.12); }
+.nesio-camera-preview-btn--crop { border-color: var(--portal-accent-border); }
+.nesio-camera-preview-btn--crop:hover { background: var(--portal-accent-soft); }
 .nesio-camera-preview-btn--retake { border-color: rgba(255,255,255,0.08); }
 .nesio-camera-preview-btn--retake:hover { background: rgba(255,255,255,0.08); }
 
@@ -12779,7 +12862,7 @@ html[data-portal-theme="night"] .nesio-mirror-title { color: #e8eefa; }
 .nesio-camera-result-conf {
   font-size: 0.68rem;
   font-weight: 700;
-  color: #10b981;
+  color: var(--status-go);
   flex-shrink: 0;
   margin-top: 0.1rem;
 }
@@ -13080,7 +13163,7 @@ html[data-portal-theme="night"] .nesio-meeting-note-summary { color: #e8eefa; }
 
 .nesio-meeting-note-list li::before { content: '·'; position: absolute; left: 0; color: var(--portal-blue-mid); }
 
-.nesio-meeting-note-list--action li::before { content: '→'; color: #10b981; }
+.nesio-meeting-note-list--action li::before { content: '→'; color: var(--status-go); }
 
 /* ─── Daily Brief Card ─── */
 /* Slim brief strip — replaces the old full card */
@@ -13120,7 +13203,7 @@ html[data-portal-theme="night"] .nesio-meeting-note-summary { color: #e8eefa; }
   display: inline-block;
   width: 3px;
   border-radius: 99px;
-  background: #3b6ef0;
+  background: var(--portal-blue-deep);
   animation: nesio-brief-wave-bounce 0.7s ease-in-out infinite alternate;
   height: 8px;
 }
@@ -13136,8 +13219,8 @@ html[data-portal-theme="night"] .nesio-meeting-note-summary { color: #e8eefa; }
 .nesio-brief-strip-btn {
   font-size: 0.78rem;
   font-weight: 600;
-  color: #3b6ef0;
-  background: #e8effe;
+  color: var(--portal-blue-deep);
+  background: var(--portal-accent-soft);
   border: none;
   border-radius: 99px;
   padding: 0.28rem 0.75rem;
@@ -13148,7 +13231,7 @@ html[data-portal-theme="night"] .nesio-meeting-note-summary { color: #e8eefa; }
 }
 .nesio-brief-strip-btn:hover { background: #d4e2ff; }
 .nesio-brief-strip-btn:disabled { opacity: 0.5; cursor: default; }
-.nesio-brief-strip-btn--stop { color: #ef4444; background: #fee2e2; }
+.nesio-brief-strip-btn--stop { color: var(--status-risk); background: #fee2e2; }
 .nesio-brief-strip-btn--stop:hover { background: #fecaca; }
 
 html[data-portal-theme="night"] .nesio-brief-strip {
@@ -13205,8 +13288,8 @@ html[data-portal-theme="night"] .nesio-brief-strip-btn { color: #8faaff; backgro
   margin-top: 0.65rem;
   font-size: 0.78rem;
   font-weight: 600;
-  color: #3b6ef0;
-  background: #e8effe;
+  color: var(--portal-blue-deep);
+  background: var(--portal-accent-soft);
   border: none;
   border-radius: 99px;
   padding: 0.3rem 0.9rem;
@@ -13270,8 +13353,8 @@ html[data-portal-theme="night"] .nesio-brief-strip-btn { color: #8faaff; backgro
 .nesio-focus-card-hint {
   font-size: 0.7rem;
   font-weight: 600;
-  color: #3b6ef0;
-  background: #e8effe;
+  color: var(--portal-blue-deep);
+  background: var(--portal-accent-soft);
   border-radius: 99px;
   padding: 0.1rem 0.45rem;
 }
@@ -13293,12 +13376,12 @@ html[data-portal-theme="night"] .nesio-brief-strip-btn { color: #8faaff; backgro
   transition: border-color 0.15s, background 0.15s, color 0.15s;
 }
 .nesio-focus-card-check:hover {
-  border-color: #10b981;
-  color: #10b981;
+  border-color: var(--status-go);
+  color: var(--status-go);
 }
 .nesio-focus-card-check--checked {
-  border-color: #10b981;
-  background: #10b981;
+  border-color: var(--status-go);
+  background: var(--status-go);
   color: #fff;
 }
 
@@ -13440,7 +13523,7 @@ html[data-portal-theme="night"] .nesio-brief-strip-btn { color: #8faaff; backgro
 .nesio-focus-done-badge {
   font-size: 0.7rem;
   font-weight: 600;
-  color: #10b981;
+  color: var(--status-go);
   background: #d1fae5;
   border-radius: 99px;
   padding: 0.12rem 0.5rem;
@@ -13465,12 +13548,12 @@ html[data-portal-theme="night"] .nesio-brief-strip-btn { color: #8faaff; backgro
   transition: border-color 0.15s;
 }
 .nesio-focus-quick-input::placeholder { color: var(--portal-muted); opacity: 0.6; }
-.nesio-focus-quick-input:focus { border-color: #3b6ef0; }
+.nesio-focus-quick-input:focus { border-color: var(--portal-blue-deep); }
 .nesio-focus-quick-btn {
   font-size: 0.78rem;
   font-weight: 600;
-  color: #3b6ef0;
-  background: #e8effe;
+  color: var(--portal-blue-deep);
+  background: var(--portal-accent-soft);
   border: none;
   border-radius: 0.65rem;
   padding: 0.45rem 0.85rem;
@@ -13482,8 +13565,8 @@ html[data-portal-theme="night"] .nesio-brief-strip-btn { color: #8faaff; backgro
 
 /* Expanded card state */
 .nesio-focus-card--expanded {
-  border-color: #3b6ef0;
-  box-shadow: 0 0 0 1.5px #3b6ef022;
+  border-color: var(--portal-blue-deep);
+  box-shadow: 0 0 0 1.5px var(--portal-blue-deep)22;
 }
 .nesio-focus-card-row {
   display: flex;
@@ -13502,8 +13585,8 @@ html[data-portal-theme="night"] .nesio-brief-strip-btn { color: #8faaff; backgro
 .nesio-focus-card-subtask-badge {
   font-size: 0.68rem;
   font-weight: 600;
-  color: #3b6ef0;
-  background: #e8effe;
+  color: var(--portal-blue-deep);
+  background: var(--portal-accent-soft);
   border-radius: 99px;
   padding: 0.08rem 0.4rem;
 }
@@ -13545,7 +13628,7 @@ html[data-portal-theme="night"] .nesio-brief-strip-btn { color: #8faaff; backgro
 }
 .nesio-focus-detail-progress-fill {
   height: 100%;
-  background: #10b981;
+  background: var(--status-go);
   border-radius: 99px;
   transition: width 0.3s ease;
 }
@@ -13584,10 +13667,10 @@ html[data-portal-theme="night"] .nesio-brief-strip-btn { color: #8faaff; backgro
   justify-content: center;
   transition: border-color 0.12s, background 0.12s, color 0.12s;
 }
-.nesio-focus-subtask-check:hover { border-color: #10b981; color: #10b981; }
+.nesio-focus-subtask-check:hover { border-color: var(--status-go); color: var(--status-go); }
 .nesio-focus-subtask-check--checked {
-  border-color: #10b981;
-  background: #10b981;
+  border-color: var(--status-go);
+  background: var(--status-go);
   color: #fff;
 }
 .nesio-focus-subtask-emoji {
@@ -13616,8 +13699,8 @@ html[data-portal-theme="night"] .nesio-brief-strip-btn { color: #8faaff; backgro
   gap: 0.4rem;
   font-size: 0.8rem;
   font-weight: 600;
-  color: #3b6ef0;
-  background: #e8effe;
+  color: var(--portal-blue-deep);
+  background: var(--portal-accent-soft);
   border: none;
   border-radius: 0.7rem;
   padding: 0.5rem 1rem;
@@ -13644,8 +13727,8 @@ html[data-portal-theme="night"] .nesio-brief-strip-btn { color: #8faaff; backgro
   display: inline-block;
   width: 0.85rem;
   height: 0.85rem;
-  border: 2px solid #3b6ef044;
-  border-top-color: #3b6ef0;
+  border: 2px solid var(--portal-blue-deep)44;
+  border-top-color: var(--portal-blue-deep);
   border-radius: 50%;
   animation: nesio-spin 0.7s linear infinite;
 }
@@ -13665,7 +13748,7 @@ html[data-portal-theme="night"] .nesio-focus-quick-input {
   color: #d0d8f0;
 }
 html[data-portal-theme="night"] .nesio-focus-decompose-btn {
-  background: rgba(59,110,240,0.15);
+  background: var(--portal-accent-soft);
   color: #8aa8f8;
 }
 html[data-portal-theme="night"] .nesio-focus-decompose-btn:hover:not(:disabled) {
@@ -13752,8 +13835,8 @@ html[data-portal-theme="night"] .nesio-brief-overview-sub { color: rgba(232,238,
 .nesio-brief-podcast-btn:disabled { opacity: 0.55; }
 
 .nesio-brief-podcast-btn--active {
-  background: #ef4444;
-  box-shadow: 0 2px 8px rgba(239,68,68,0.35);
+  background: var(--status-risk);
+  box-shadow: 0 2px 8px rgba(207,107,107,0.35);
 }
 
 .nesio-brief-wave {
@@ -13863,7 +13946,7 @@ html[data-portal-theme="night"] .nesio-lifestate-card {
 }
 
 .nesio-lifestate-ring {
-  --ring-color: #10b981;
+  --ring-color: var(--status-go);
   --ring-pct: 70;
   width: 2.8rem;
   height: 2.8rem;
@@ -14212,7 +14295,7 @@ html[data-portal-theme="night"] .nesio-chat-sheet-card {
 .nesio-chat-empty-hint { font-size: 0.8rem; color: var(--portal-muted); }
 .nesio-chat-suggestions { display: flex; flex-direction: column; gap: 0.35rem; margin-top: 0.75rem; width: 100%; }
 .nesio-chat-suggestion {
-  font-size: 0.8rem; color: #3b6ef0; background: #e8effe;
+  font-size: 0.8rem; color: var(--portal-blue-deep); background: var(--portal-accent-soft);
   border: none; border-radius: 0.65rem; padding: 0.5rem 0.85rem;
   cursor: pointer; text-align: left; transition: background 0.12s;
 }
@@ -14223,7 +14306,7 @@ html[data-portal-theme="night"] .nesio-chat-sheet-card {
 .nesio-chat-msg--user { flex-direction: row-reverse; }
 .nesio-chat-msg-avatar {
   font-size: 0.9rem; width: 1.6rem; height: 1.6rem;
-  background: linear-gradient(135deg, #8b5cf6, #3b6ef0);
+  background: linear-gradient(135deg, var(--portal-cool-accent), var(--portal-blue-deep));
   border-radius: 50%; display: flex; align-items: center;
   justify-content: center; flex-shrink: 0; color: #fff;
 }
@@ -14233,7 +14316,7 @@ html[data-portal-theme="night"] .nesio-chat-sheet-card {
   padding: 0.55rem 0.75rem;
 }
 .nesio-chat-msg--user .nesio-chat-msg-bubble {
-  background: #3b6ef0; border-color: #3b6ef0;
+  background: var(--portal-blue-deep); border-color: var(--portal-blue-deep);
 }
 .nesio-chat-msg-text {
   font-size: 0.88rem; line-height: 1.55; color: var(--portal-ink);
@@ -14258,7 +14341,7 @@ html[data-portal-theme="night"] .nesio-chat-msg--user .nesio-chat-msg-text { col
 /* Sources */
 .nesio-chat-sources { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.4rem; }
 .nesio-chat-source-chip {
-  font-size: 0.68rem; color: #3b6ef0; background: #e8effe;
+  font-size: 0.68rem; color: var(--portal-blue-deep); background: var(--portal-accent-soft);
   border-radius: 99px; padding: 0.12rem 0.5rem; text-decoration: none;
   white-space: nowrap; max-width: 10rem; overflow: hidden; text-overflow: ellipsis;
 }
@@ -14266,11 +14349,11 @@ html[data-portal-theme="night"] .nesio-chat-msg--user .nesio-chat-msg-text { col
 /* Save button */
 .nesio-chat-save-btn {
   margin-top: 0.4rem; font-size: 0.7rem; font-weight: 600;
-  color: #3b6ef0; background: none; border: none; padding: 0; cursor: pointer;
+  color: var(--portal-blue-deep); background: none; border: none; padding: 0; cursor: pointer;
   opacity: 0.75; transition: opacity 0.12s;
 }
 .nesio-chat-save-btn:hover { opacity: 1; }
-.nesio-chat-save-btn--saved { color: #10b981; cursor: default; }
+.nesio-chat-save-btn--saved { color: var(--status-go); cursor: default; }
 
 /* Input row */
 .nesio-chat-input-row {
@@ -14285,7 +14368,7 @@ html[data-portal-theme="night"] .nesio-chat-msg--user .nesio-chat-msg-text { col
   display: flex; align-items: center; justify-content: center;
   transition: background 0.12s, border-color 0.12s; touch-action: none;
 }
-.nesio-chat-mic-btn--active { background: #fee2e2; border-color: #ef4444; }
+.nesio-chat-mic-btn--active { background: #fee2e2; border-color: var(--status-risk); }
 .nesio-chat-input {
   flex: 1; font-size: 0.88rem; color: var(--portal-ink);
   background: var(--glass-bg-solid); border: 1px solid var(--portal-line);
@@ -14293,12 +14376,12 @@ html[data-portal-theme="night"] .nesio-chat-msg--user .nesio-chat-msg-text { col
   resize: none; outline: none; max-height: 6rem; overflow-y: auto;
   font-family: inherit; transition: border-color 0.15s;
 }
-.nesio-chat-input:focus { border-color: #3b6ef0; }
+.nesio-chat-input:focus { border-color: var(--portal-blue-deep); }
 .nesio-chat-input::placeholder { color: var(--portal-muted); opacity: 0.65; }
 html[data-portal-theme="night"] .nesio-chat-input { background: rgba(20,24,40,0.9); color: #d0d8f0; }
 .nesio-chat-send-btn {
   width: 2.2rem; height: 2.2rem; border-radius: 50%;
-  background: #3b6ef0; border: none; color: #fff;
+  background: var(--portal-blue-deep); border: none; color: #fff;
   font-size: 1rem; font-weight: 700; cursor: pointer; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
   transition: opacity 0.12s, background 0.12s;
@@ -14322,7 +14405,7 @@ html[data-portal-theme="night"] .nesio-chat-input { background: rgba(20,24,40,0.
   border-radius: 0.85rem; padding: 0.55rem 2rem 0.55rem 0.85rem;
   outline: none; transition: border-color 0.15s; font-family: inherit;
 }
-.nesio-chat-search-input:focus { border-color: #3b6ef0; }
+.nesio-chat-search-input:focus { border-color: var(--portal-blue-deep); }
 .nesio-chat-search-input::placeholder { color: var(--portal-muted); opacity: 0.65; }
 html[data-portal-theme="night"] .nesio-chat-search-input { background: rgba(20,24,40,0.9); color: #d0d8f0; }
 .nesio-chat-search-clear {
@@ -14340,8 +14423,8 @@ html[data-portal-theme="night"] .nesio-chat-search-input { background: rgba(20,2
   cursor: pointer; text-align: left; width: 100%;
   transition: border-color 0.12s, background 0.12s;
 }
-.nesio-chat-result-card:hover { border-color: #3b6ef0; background: #f0f4ff; }
-html[data-portal-theme="night"] .nesio-chat-result-card:hover { background: rgba(59,110,240,0.12); }
+.nesio-chat-result-card:hover { border-color: var(--portal-blue-deep); background: var(--glass-bg-raised); }
+html[data-portal-theme="night"] .nesio-chat-result-card:hover { background: var(--portal-accent-soft); }
 .nesio-chat-result-icon { font-size: 1.1rem; flex-shrink: 0; }
 .nesio-chat-result-body { flex: 1; min-width: 0; }
 .nesio-chat-result-name {
@@ -14355,7 +14438,7 @@ html[data-portal-theme="night"] .nesio-chat-result-name { color: #d0d8f0; }
 /* Detail view */
 .nesio-chat-detail { display: flex; flex-direction: column; gap: 0.5rem; height: 100%; overflow-y: auto; }
 .nesio-chat-detail-back {
-  font-size: 0.8rem; color: #3b6ef0; background: none; border: none;
+  font-size: 0.8rem; color: var(--portal-blue-deep); background: none; border: none;
   padding: 0; cursor: pointer; text-align: left; margin-bottom: 0.25rem;
 }
 .nesio-chat-detail-title { font-size: 1.1rem; font-weight: 700; color: var(--portal-ink); }
@@ -14381,8 +14464,8 @@ html[data-portal-theme="night"] .nesio-chat-detail-title { color: #d0d8f0; }
 .nesio-chat-camera-hint { font-size: 0.85rem; color: var(--portal-muted); max-width: 18rem; line-height: 1.55; }
 .nesio-chat-camera-actions { display: flex; flex-direction: column; gap: 0.5rem; width: 100%; max-width: 16rem; }
 .nesio-chat-camera-btn {
-  font-size: 0.88rem; font-weight: 600; color: #3b6ef0;
-  background: #e8effe; border: none; border-radius: 0.85rem;
+  font-size: 0.88rem; font-weight: 600; color: var(--portal-blue-deep);
+  background: var(--portal-accent-soft); border: none; border-radius: 0.85rem;
   padding: 0.75rem 1rem; cursor: pointer; transition: background 0.12s;
 }
 .nesio-chat-camera-btn:hover { background: #d0dcfc; }
@@ -14392,11 +14475,11 @@ html[data-portal-theme="night"] .nesio-chat-detail-title { color: #d0d8f0; }
 .nesio-chat-camera-shutter {
   position: absolute; bottom: 1.25rem; left: 50%; transform: translateX(-50%);
   width: 4rem; height: 4rem; border-radius: 50%; background: #fff;
-  border: 3px solid #3b6ef0; cursor: pointer; display: flex;
+  border: 3px solid var(--portal-blue-deep); cursor: pointer; display: flex;
   align-items: center; justify-content: center;
 }
 .nesio-chat-camera-shutter-ring {
-  width: 3rem; height: 3rem; border-radius: 50%; background: #3b6ef0; display: block;
+  width: 3rem; height: 3rem; border-radius: 50%; background: var(--portal-blue-deep); display: block;
 }
 .nesio-chat-camera-result { display: flex; flex-direction: column; gap: 0.75rem; overflow-y: auto; height: 100%; }
 .nesio-chat-camera-preview-row { display: flex; align-items: flex-start; gap: 0.75rem; }
@@ -14445,7 +14528,7 @@ html[data-portal-theme="night"] .nesio-wechat-header {
 
 .nesio-wechat-back-btn {
   font-size: 1.25rem;
-  color: #3b6ef0;
+  color: var(--portal-blue-deep);
   padding: 0.3rem 0.5rem;
   border: none;
   background: none;
@@ -14509,13 +14592,13 @@ html[data-portal-theme="night"] .nesio-wechat-header {
   border-radius: 1.5rem;
   background: rgba(255,255,255,0.85);
   border: 1px solid rgba(59,110,240,0.18);
-  color: #3b6ef0;
+  color: var(--portal-blue-deep);
   font-size: 0.85rem;
   cursor: pointer;
   text-align: left;
 }
 html[data-portal-theme="night"] .nesio-wechat-suggestion {
-  background: rgba(59,110,240,0.12);
+  background: var(--portal-accent-soft);
   border-color: rgba(59,110,240,0.3);
 }
 
@@ -14532,7 +14615,7 @@ html[data-portal-theme="night"] .nesio-wechat-suggestion {
   width: 0.4rem;
   height: 0.4rem;
   border-radius: 50%;
-  background: #3b6ef0;
+  background: var(--portal-blue-deep);
   opacity: 0.5;
   animation: nesio-dot-pulse 1.2s infinite;
 }
@@ -14550,7 +14633,7 @@ html[data-portal-theme="night"] .nesio-wechat-suggestion {
   width: 2rem;
   height: 2rem;
   border-radius: 0.5rem;
-  background: #3b6ef0;
+  background: var(--portal-blue-deep);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -14618,7 +14701,7 @@ html[data-portal-theme="night"] .nesio-wechat-bubble--ai {
 
 .nesio-wechat-saved-badge {
   font-size: 0.68rem;
-  color: #10b981;
+  color: var(--status-go);
   margin: 0.2rem 0 0;
 }
 
@@ -14632,8 +14715,8 @@ html[data-portal-theme="night"] .nesio-wechat-bubble--ai {
   font-size: 0.7rem;
   padding: 0.2rem 0.5rem;
   border-radius: 1rem;
-  background: rgba(59,110,240,0.1);
-  color: #3b6ef0;
+  background: var(--portal-accent-soft);
+  color: var(--portal-blue-deep);
   text-decoration: none;
   border: 1px solid rgba(59,110,240,0.2);
 }
@@ -14672,7 +14755,7 @@ html[data-portal-theme="night"] .nesio-wechat-input-bar {
   transition: background 0.15s;
 }
 html[data-portal-theme="night"] .nesio-wechat-mic-btn { background: #2a2d3e; border-color: rgba(255,255,255,0.1); }
-.nesio-wechat-mic-btn--active { background: #fee2e2 !important; border-color: #ef4444; }
+.nesio-wechat-mic-btn--active { background: #fee2e2 !important; border-color: var(--status-risk); }
 
 .nesio-wechat-input {
   flex: 1;
@@ -14688,7 +14771,7 @@ html[data-portal-theme="night"] .nesio-wechat-mic-btn { background: #2a2d3e; bor
 }
 html[data-portal-theme="night"] .nesio-wechat-input { background: #2a2d3e; border-color: rgba(255,255,255,0.1); color: #d0d8f0; }
 .nesio-wechat-input::placeholder { color: var(--portal-muted); opacity: 0.6; }
-.nesio-wechat-input:focus { border-color: #3b6ef0; }
+.nesio-wechat-input:focus { border-color: var(--portal-blue-deep); }
 
 .nesio-wechat-send-btn {
   padding: 0 0.9rem;
@@ -14722,7 +14805,7 @@ html[data-portal-theme="night"] .nesio-wechat-input { background: #2a2d3e; borde
   transition: background 0.15s, color 0.15s;
 }
 html[data-portal-theme="night"] .nesio-wechat-plus-btn { background: #2a2d3e; border-color: rgba(255,255,255,0.1); }
-.nesio-wechat-plus-btn--active { background: #3b6ef0; color: #fff; border-color: #3b6ef0; }
+.nesio-wechat-plus-btn--active { background: var(--portal-blue-deep); color: #fff; border-color: var(--portal-blue-deep); }
 
 /* Plus panel */
 .nesio-wechat-plus-panel {
@@ -14922,7 +15005,7 @@ html[data-portal-theme="night"] .nesio-wechat-mode-btn { background: #2a2d3e; bo
 html[data-portal-theme="night"] .nesio-wechat-hold-btn { background: #2a2d3e; border-color: rgba(255,255,255,0.1); }
 .nesio-wechat-hold-btn--active {
   background: #d1fae5;
-  border-color: #10b981;
+  border-color: var(--status-go);
   color: #065f46;
 }
 
@@ -14975,8 +15058,8 @@ html[data-portal-theme="night"] .nesio-wechat-hold-btn { background: #2a2d3e; bo
   margin-bottom: 1rem;
 }
 .portal-proactive-card {
-  background: linear-gradient(135deg, rgba(99,102,241,.10) 0%, rgba(139,92,246,.08) 100%);
-  border: 1px solid rgba(99,102,241,.18);
+  background: linear-gradient(135deg, rgba(88,140,227,.10) 0%, rgba(88,140,227,.06) 100%);
+  border: 1px solid rgba(88,140,227,.18);
   border-radius: 16px;
   padding: 1rem;
   position: relative;
@@ -14990,7 +15073,7 @@ html[data-portal-theme="night"] .nesio-wechat-hold-btn { background: #2a2d3e; bo
   width: 44px;
   height: 44px;
   border-radius: 12px;
-  background: rgba(99,102,241,.15);
+  background: rgba(88,140,227,.15);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -15014,7 +15097,7 @@ html[data-portal-theme="night"] .nesio-wechat-hold-btn { background: #2a2d3e; bo
 .portal-proactive-card-conf {
   font-size: 0.7rem;
   font-weight: 600;
-  background: rgba(99,102,241,.15);
+  background: rgba(88,140,227,.15);
   color: rgb(99,102,241);
   padding: 2px 8px;
   border-radius: 20px;
@@ -15034,8 +15117,8 @@ html[data-portal-theme="night"] .nesio-wechat-hold-btn { background: #2a2d3e; bo
 }
 .portal-proactive-tag {
   font-size: 0.7rem;
-  background: rgba(99,102,241,.1);
-  color: rgba(99,102,241,.9);
+  background: rgba(88,140,227,.1);
+  color: rgba(88,140,227,.9);
   padding: 2px 8px;
   border-radius: 20px;
 }
@@ -15063,7 +15146,7 @@ html[data-portal-theme="night"] .nesio-wechat-hold-btn { background: #2a2d3e; bo
 }
 .portal-proactive-btn--primary {
   flex: 1;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  background: linear-gradient(135deg, var(--portal-blue-deep), var(--portal-cool-accent));
   color: #fff;
   border: none;
   border-radius: 10px;
@@ -15106,7 +15189,7 @@ html[data-portal-theme="night"] .nesio-wechat-hold-btn { background: #2a2d3e; bo
 }
 .portal-focus-count {
   font-size: 0.75rem;
-  color: var(--portal-cool-accent, #6366f1);
+  color: var(--portal-cool-accent, var(--portal-blue-deep));
   background: none;
   border: none;
   cursor: pointer;
@@ -15142,7 +15225,7 @@ html[data-portal-theme="night"] .nesio-wechat-hold-btn { background: #2a2d3e; bo
 .portal-focus-item-countdown {
   font-size: 0.8rem;
   font-weight: 600;
-  color: var(--portal-cool-accent, #6366f1);
+  color: var(--portal-cool-accent, var(--portal-blue-deep));
   margin: 0 0 0.6rem;
 }
 .portal-focus-item-actions {
@@ -15161,15 +15244,15 @@ html[data-portal-theme="night"] .nesio-wechat-hold-btn { background: #2a2d3e; bo
   font-weight: 600;
 }
 .portal-focus-btn--join {
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  background: linear-gradient(135deg, var(--portal-blue-deep), var(--portal-cool-accent));
   color: #fff;
 }
 .portal-focus-btn--decompose {
-  background: rgba(99,102,241,.12);
+  background: rgba(88,140,227,.12);
   color: rgb(99,102,241);
 }
 .portal-focus-btn--record {
-  background: rgba(239,68,68,.1);
+  background: rgba(207,107,107,.1);
   color: rgb(239,68,68);
 }
 .portal-focus-btn--ai {
@@ -15242,8 +15325,8 @@ html[data-portal-theme="night"] .nesio-wechat-hold-btn { background: #2a2d3e; bo
 }
 .portal-decompose-drill-btn {
   font-size: 0.75rem;
-  color: var(--portal-cool-accent, #6366f1);
-  background: rgba(99,102,241,.1);
+  color: var(--portal-cool-accent, var(--portal-blue-deep));
+  background: rgba(88,140,227,.1);
   border: none;
   border-radius: 6px;
   padding: 0.25rem 0.6rem;
@@ -15274,8 +15357,8 @@ html[data-portal-theme="night"] .nesio-wechat-hold-btn { background: #2a2d3e; bo
 
 /* Meeting record row in detail sheet */
 .portal-focus-record-row {
-  background: rgba(99,102,241,.06);
-  border: 1px solid rgba(99,102,241,.15);
+  background: rgba(88,140,227,.06);
+  border: 1px solid rgba(88,140,227,.15);
   border-radius: 12px;
   padding: 0.75rem 1rem;
   display: flex;
@@ -15295,7 +15378,7 @@ html[data-portal-theme="night"] .nesio-wechat-hold-btn { background: #2a2d3e; bo
 .portal-focus-record-row > button {
   margin-top: 0.5rem;
   align-self: flex-start;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  background: linear-gradient(135deg, var(--portal-blue-deep), var(--portal-cool-accent));
   color: #fff;
   border: none;
   border-radius: 10px;
@@ -15325,8 +15408,8 @@ html[data-portal-theme="night"] .nesio-wechat-hold-btn { background: #2a2d3e; bo
 
 /* Night theme adjustments */
 html[data-portal-theme="night"] .portal-proactive-card {
-  background: linear-gradient(135deg, rgba(99,102,241,.15) 0%, rgba(139,92,246,.12) 100%);
-  border-color: rgba(99,102,241,.25);
+  background: linear-gradient(135deg, rgba(88,140,227,.15) 0%, rgba(88,140,227,.10) 100%);
+  border-color: rgba(88,140,227,.25);
 }
 html[data-portal-theme="night"] .portal-focus-section {
   background: rgba(255,255,255,.06);
@@ -15341,7 +15424,7 @@ html[data-portal-theme="night"] .portal-decompose-step {
 .nesio-proactive-card {
   margin: 0 1rem 0.75rem;
   border-radius: 14px;
-  background: linear-gradient(135deg, #eef3ff 0%, #f0f4ff 100%);
+  background: linear-gradient(135deg, #eef3ff 0%, var(--glass-bg-raised) 100%);
   border: 1px solid rgba(88, 140, 227, 0.22);
   overflow: hidden;
   animation: nesio-proactive-in 0.3s ease;
@@ -15491,13 +15574,13 @@ html[data-portal-theme="night"] .nesio-proactive-card {
   transition: opacity 0.15s;
 }
 .nesio-focus-meeting-link-btn {
-  background: linear-gradient(135deg, #3b6ef0, #588ce3);
+  background: linear-gradient(135deg, var(--portal-blue-deep), #588ce3);
   color: #fff;
 }
 .nesio-focus-meeting-link-btn:hover { opacity: 0.88; }
 .nesio-focus-meeting-record-btn {
-  background: linear-gradient(135deg, #f0f4ff, #e8edfc);
-  color: #3b6ef0;
+  background: linear-gradient(135deg, var(--glass-bg-raised), #e8edfc);
+  color: var(--portal-blue-deep);
   border: 1px solid rgba(88,140,227,.25);
 }
 .nesio-focus-meeting-record-btn:hover { background: #e0e8ff; }
@@ -15584,8 +15667,8 @@ html[data-portal-theme="night"] .nesio-proactive-card {
   padding: 0;
 }
 .nesio-focus-substep-check--checked {
-  background: #10b981;
-  border-color: #10b981;
+  background: var(--status-go);
+  border-color: var(--status-go);
   color: #fff;
 }
 .nesio-focus-substep-emoji { font-size: 0.85rem; }
@@ -15696,7 +15779,7 @@ html[data-portal-theme="night"] .nesio-proactive-card {
   display: block;
   width: 3px;
   border-radius: 3px;
-  background: #3b6ef0;
+  background: var(--portal-blue-deep);
   animation: nesio-recorder-wave 0.8s ease-in-out infinite alternate;
   height: 10px;
 }
@@ -15742,7 +15825,7 @@ html[data-portal-theme="night"] .nesio-proactive-card {
   gap: 0.55rem;
 }
 .nesio-recorder-start-btn {
-  background: linear-gradient(135deg, #3b6ef0, #588ce3);
+  background: linear-gradient(135deg, var(--portal-blue-deep), #588ce3);
   color: #fff;
   border: none;
   border-radius: 14px;
@@ -15785,7 +15868,7 @@ html[data-portal-theme="night"] .nesio-proactive-card {
 }
 .nesio-recorder-notes-input:focus {
   outline: none;
-  border-color: #3b6ef0;
+  border-color: var(--portal-blue-deep);
 }
 .nesio-recorder-notes-input::placeholder { color: var(--portal-muted); opacity: 0.6; }
 .nesio-recorder-save-btn {
@@ -15801,7 +15884,7 @@ html[data-portal-theme="night"] .nesio-proactive-card {
   transition: all 0.2s;
 }
 .nesio-recorder-save-btn--ready {
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  background: linear-gradient(135deg, var(--portal-blue-deep), var(--portal-cool-accent));
   color: #fff;
   cursor: pointer;
 }
@@ -15873,7 +15956,7 @@ html[data-portal-theme="night"] .nesio-recorder-transcript {
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
-  background: linear-gradient(135deg, #f0f4ff 0%, #e8eeff 100%);
+  background: linear-gradient(135deg, var(--glass-bg-raised) 0%, #e8eeff 100%);
   border: 1px solid rgba(88, 140, 227, 0.18);
   border-radius: 12px;
   padding: 0.6rem 0.85rem;
@@ -16080,8 +16163,8 @@ html[data-portal-theme="night"] .nesio-related-node-chip:hover {
 .nesio-np-name-input { font-weight: 600; }
 .nesio-np-del-btn {
   color: #f87171;
-  background: rgba(239,68,68,0.1);
-  border: 1.5px solid rgba(239,68,68,0.2);
+  background: rgba(207,107,107,0.1);
+  border: 1.5px solid rgba(207,107,107,0.2);
   border-radius: 8px;
   font-size: 0.78rem;
   padding: 0.3rem 0.6rem;
@@ -16277,7 +16360,7 @@ html[data-portal-theme="night"] .nesio-related-node-chip:hover {
   color: #222;
   transition: background 0.15s;
 }
-.nesio-dtp-day:hover { background: #f0f4ff; }
+.nesio-dtp-day:hover { background: var(--glass-bg-raised); }
 .nesio-dtp-day--today {
   background: #e8efff;
   font-weight: 700;
@@ -16560,8 +16643,8 @@ html[data-portal-theme="night"] .nesio-related-node-chip:hover {
   display: inline-block;
   font-size: 0.68rem;
   font-weight: 600;
-  color: #3b6ef0;
-  background: rgba(59,110,240,0.1);
+  color: var(--portal-blue-deep);
+  background: var(--portal-accent-soft);
   border-radius: 4px;
   padding: 0 0.35em;
   margin-right: 0.35rem;
@@ -16611,7 +16694,7 @@ html[data-portal-theme="night"] .nesio-related-node-chip:hover {
 }
 .nesio-momentum-ignite-btn {
   align-self: flex-start;
-  background: linear-gradient(135deg, #3b6ef0 0%, #7c3ef0 100%);
+  background: linear-gradient(135deg, var(--portal-blue-deep) 0%, #7c3ef0 100%);
   color: #fff;
   border: none;
   border-radius: 8px;
@@ -16694,8 +16777,8 @@ html[data-portal-theme="night"] .nesio-related-node-chip:hover {
   position: relative;
 }
 .nesio-momentum-check--done {
-  background: #3b6ef0;
-  border-color: #3b6ef0;
+  background: var(--portal-blue-deep);
+  border-color: var(--portal-blue-deep);
 }
 .nesio-momentum-check--done::after {
   content: '';
@@ -16748,7 +16831,7 @@ html[data-portal-theme="night"] .nesio-related-node-chip:hover {
   padding: 0 0.35em;
   flex-shrink: 0;
 }
-.nesio-momentum-drill-badge--done { color: #3b6ef0; background: rgba(59,110,240,0.1); }
+.nesio-momentum-drill-badge--done { color: var(--portal-blue-deep); background: var(--portal-accent-soft); }
 
 .nesio-momentum-drill-list {
   list-style: none;
@@ -16816,7 +16899,7 @@ html[data-portal-theme="night"] .nesio-related-node-chip:hover {
 .nesio-pinned-card {
   background: var(--portal-surface, #fff);
   border: 1.5px solid var(--portal-line, rgba(0,0,0,.1));
-  border-left: 3px solid #3b6ef0;
+  border-left: 3px solid var(--portal-blue-deep);
   border-radius: 12px;
   padding: 0.7rem 0.85rem 0.65rem;
   box-shadow: 0 1px 4px rgba(0,0,0,.06);
@@ -16834,7 +16917,7 @@ html[data-portal-theme="night"] .nesio-related-node-chip:hover {
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: #3b6ef0;
+  color: var(--portal-blue-deep);
   background: rgba(59,110,240,0.09);
   border-radius: 4px;
   padding: 0 0.4em;
@@ -16927,9 +17010,9 @@ html[data-portal-theme="night"] .nesio-related-node-chip:hover {
 }
 .nesio-pinned-action-btn:hover { background: var(--portal-line, rgba(0,0,0,.06)); }
 .nesio-pinned-action-btn--primary {
-  background: #3b6ef0;
+  background: var(--portal-blue-deep);
   color: #fff;
-  border-color: #3b6ef0;
+  border-color: var(--portal-blue-deep);
 }
 .nesio-pinned-action-btn--primary:hover { background: #2f5fd8; }
 
@@ -17000,8 +17083,8 @@ html[data-portal-theme="night"] .nesio-related-node-chip:hover {
   transition: background 0.12s, border-color 0.12s;
 }
 .nesio-collapsed-check--done {
-  background: #3b6ef0;
-  border-color: #3b6ef0;
+  background: var(--portal-blue-deep);
+  border-color: var(--portal-blue-deep);
 }
 .nesio-collapsed-check--done::after {
   content: '';
@@ -17043,8 +17126,8 @@ html[data-portal-theme="night"] .nesio-related-node-chip:hover {
 .nesio-collapsed-day-tag {
   font-size: 0.68rem;
   font-weight: 600;
-  color: #3b6ef0;
-  background: rgba(59,110,240,0.1);
+  color: var(--portal-blue-deep);
+  background: var(--portal-accent-soft);
   border-radius: 3px;
   padding: 0 0.3em;
 }
@@ -17348,9 +17431,9 @@ html[data-portal-theme="night"] .nesio-project-detail-name { color: #e8eefa; }
   width: 100%;
   padding: 0.65rem;
   border-radius: 10px;
-  border: 1px solid rgba(239,68,68,0.3);
-  background: rgba(239,68,68,0.06);
-  color: #ef4444;
+  border: 1px solid rgba(207,107,107,0.3);
+  background: rgba(207,107,107,0.06);
+  color: var(--status-risk);
   font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
@@ -17697,12 +17780,12 @@ html[data-portal-theme="night"] .nesio-create-project-input {
 /* ── Camera similar alert (拍照发现已有) ─────────────────────────── */
 .nesio-camera-similar-alert {
   display: flex; align-items: flex-start; gap: 0.5rem;
-  background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3);
+  background: rgba(201,146,63,0.1); border: 1px solid rgba(201,146,63,0.3);
   border-radius: 10px; padding: 0.65rem 0.7rem; margin: 0.4rem 0;
 }
 .nesio-camera-similar-icon { font-size: 1rem; flex-shrink: 0; margin-top: 0.05rem; }
 .nesio-camera-similar-body { flex: 1; }
-.nesio-camera-similar-title { font-size: 0.78rem; font-weight: 600; color: #f59e0b; margin-bottom: 0.2rem; }
+.nesio-camera-similar-title { font-size: 0.78rem; font-weight: 600; color: var(--status-gentle); margin-bottom: 0.2rem; }
 .nesio-camera-similar-item { font-size: 0.74rem; color: var(--portal-ink); margin: 0.1rem 0; }
 .nesio-camera-similar-loc { color: var(--portal-muted); }
 .nesio-camera-similar-dismiss {
@@ -17733,7 +17816,7 @@ html[data-portal-theme="night"] .nesio-create-project-input {
 .nesio-freeze-tab--active { background: var(--portal-accent); color: #fff; }
 .nesio-freeze-badge {
   display: inline-flex; align-items: center; justify-content: center;
-  background: #ef4444; color: #fff; font-size: 0.65rem; border-radius: 1rem;
+  background: var(--status-risk); color: #fff; font-size: 0.65rem; border-radius: 1rem;
   padding: 0 0.35rem; min-width: 1.1rem; margin-left: 0.25rem;
 }
 .nesio-freeze-add { display: flex; flex-direction: column; gap: 0.6rem; }
@@ -17748,12 +17831,12 @@ html[data-portal-theme="night"] .nesio-create-project-input {
   border: none; cursor: pointer;
 }
 .nesio-freeze-parse-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.nesio-freeze-error { font-size: 0.74rem; color: #ef4444; }
+.nesio-freeze-error { font-size: 0.74rem; color: var(--status-risk); }
 .nesio-freeze-preview { display: flex; gap: 0.75rem; align-items: flex-start; background: var(--portal-line); padding: 0.75rem; border-radius: 10px; }
 .nesio-freeze-preview-img { width: 60px; height: 60px; object-fit: cover; border-radius: 8px; flex-shrink: 0; }
 .nesio-freeze-preview-info { flex: 1; display: flex; flex-direction: column; gap: 0.2rem; }
 .nesio-freeze-name-input { font-size: 0.84rem; font-weight: 600; background: none; border: none; color: var(--portal-ink); width: 100%; }
-.nesio-freeze-price { font-size: 0.78rem; color: #f59e0b; margin: 0; }
+.nesio-freeze-price { font-size: 0.78rem; color: var(--status-gentle); margin: 0; }
 .nesio-freeze-store { font-size: 0.72rem; color: var(--portal-muted); margin: 0; }
 .nesio-freeze-hours-row { display: flex; align-items: center; gap: 0.5rem; }
 .nesio-freeze-hours-label { font-size: 0.78rem; color: var(--portal-muted); }
@@ -17761,10 +17844,10 @@ html[data-portal-theme="night"] .nesio-create-project-input {
   padding: 0.2rem 0.65rem; border-radius: 1rem; font-size: 0.75rem;
   background: var(--portal-line); border: 1px solid transparent; cursor: pointer; color: var(--portal-muted);
 }
-.nesio-freeze-hours-chip--active { border-color: var(--portal-accent); color: var(--portal-accent); background: rgba(139,92,246,0.1); }
+.nesio-freeze-hours-chip--active { border-color: var(--portal-accent); color: var(--portal-accent); background: var(--portal-accent-soft); }
 .nesio-freeze-commit-btn {
   width: 100%; padding: 0.75rem; border-radius: 12px;
-  background: #3b82f6; color: #fff; font-size: 0.9rem; font-weight: 700; border: none; cursor: pointer;
+  background: var(--portal-blue-deep); color: #fff; font-size: 0.9rem; font-weight: 700; border: none; cursor: pointer;
 }
 .nesio-freeze-commit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .nesio-freeze-list { display: flex; flex-direction: column; gap: 0.5rem; }
@@ -17780,17 +17863,17 @@ html[data-portal-theme="night"] .nesio-create-project-input {
 .nesio-freeze-item-img { width: 48px; height: 48px; object-fit: cover; border-radius: 8px; flex-shrink: 0; }
 .nesio-freeze-item-body { flex: 1; display: flex; flex-direction: column; gap: 0.15rem; }
 .nesio-freeze-item-name { font-size: 0.84rem; font-weight: 600; color: var(--portal-ink); margin: 0; }
-.nesio-freeze-item-price { font-size: 0.76rem; color: #f59e0b; margin: 0; }
+.nesio-freeze-item-price { font-size: 0.76rem; color: var(--status-gentle); margin: 0; }
 .nesio-freeze-item-store { font-size: 0.72rem; color: var(--portal-muted); margin: 0; }
-.nesio-freeze-item-time { font-size: 0.72rem; color: #3b82f6; margin: 0; }
+.nesio-freeze-item-time { font-size: 0.72rem; color: var(--portal-blue-deep); margin: 0; }
 .nesio-freeze-item-actions { display: flex; gap: 0.4rem; margin-top: 0.4rem; flex-wrap: wrap; }
 .nesio-freeze-action-btn {
   padding: 0.25rem 0.7rem; border-radius: 1rem; font-size: 0.74rem; font-weight: 600;
   background: var(--portal-line); border: none; cursor: pointer; color: var(--portal-muted);
   transition: background 0.12s;
 }
-.nesio-freeze-action-btn--buy { background: rgba(16,185,129,0.15); color: #10b981; }
-.nesio-freeze-action-btn--skip { background: rgba(239,68,68,0.12); color: #ef4444; }
+.nesio-freeze-action-btn--buy { background: rgba(90,158,122,0.15); color: var(--status-go); }
+.nesio-freeze-action-btn--skip { background: rgba(207,107,107,0.12); color: var(--status-risk); }
 .nesio-freeze-decision-badge { font-size: 0.72rem; font-weight: 600; }
 
 /* ── My Experiment Widget (我的实验) ─────────────────────────────── */
@@ -17843,4 +17926,4 @@ html[data-portal-theme="night"] .nesio-create-project-input {
   background: var(--portal-line); border: 1px dashed var(--portal-muted); cursor: pointer;
   color: var(--portal-muted); transition: background 0.12s;
 }
-.nesio-exp-add-btn:hover { background: rgba(139,92,246,0.1); border-color: var(--portal-accent); color: var(--portal-accent); }
+.nesio-exp-add-btn:hover { background: var(--portal-accent-soft); border-color: var(--portal-accent); color: var(--portal-accent); }

@@ -56,9 +56,9 @@ export default function PortalBottomNav({
         aria-label="Today"
         aria-current={activeSurface === 'today' ? 'page' : undefined}
       >
-        <svg className="nesio-bottom-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
-          <circle cx="12" cy="12" r="9.5" />
-          <polyline points="12 6.5 12 12 15.5 15.5" />
+        <svg className="nesio-bottom-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <circle cx="12" cy="12" r="8.25" />
+          <path d="M12 7.5V12l3 2.2" />
         </svg>
         <span className="nesio-bottom-nav-label">Today</span>
       </button>
@@ -91,9 +91,8 @@ export default function PortalBottomNav({
         aria-label="Memory"
         aria-current={activeSurface === 'memory' ? 'page' : undefined}
       >
-        <svg className="nesio-bottom-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
-          <path d="M21 8.5L12 3 3 8.5v7L12 21l9-5.5z" />
-          <path d="M12 3v18M3 8.5l9 5.5 9-5.5" />
+        <svg className="nesio-bottom-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M4 8.2 12 4l8 4.2M4 8.2v9L12 21l8-3.8v-9M4 8.2 12 12.4l8-4.2M12 12.4V21" />
         </svg>
         <span className="nesio-bottom-nav-label">Memory</span>
       </button>

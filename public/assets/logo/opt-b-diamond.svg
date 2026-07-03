@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="gb1" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f0f7ff"></stop><stop offset="1" stop-color="#a9cdf7"></stop>
+    </linearGradient>
+    <linearGradient id="gb2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#96c7f3"></stop><stop offset="1" stop-color="#4a7fd4"></stop>
+    </linearGradient>
+    <linearGradient id="gb3" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#7face9"></stop><stop offset="1" stop-color="#3b66b8"></stop>
+    </linearGradient>
+    <radialGradient id="gbGlow" cx="0.5" cy="0.4" r="0.65">
+      <stop offset="0" stop-color="#bcd8fa" stop-opacity="0.85"></stop><stop offset="1" stop-color="#bcd8fa" stop-opacity="0"></stop>
+    </radialGradient>
+  </defs>
+  <circle cx="50" cy="50" r="48" fill="url(#gbGlow)"></circle>
+  
+  <polygon points="31,20 69,20 62,42 38,42" fill="url(#gb1)"></polygon>
+  <polygon points="31,20 38,42 13,42" fill="url(#gb2)"></polygon>
+  <polygon points="69,20 87,42 62,42" fill="url(#gb2)"></polygon>
+  
+  <polygon points="38,42 62,42 50,86" fill="url(#gb1)" opacity="0.95"></polygon>
+  <polygon points="13,42 38,42 50,86" fill="url(#gb3)"></polygon>
+  <polygon points="87,42 62,42 50,86" fill="url(#gb3)"></polygon>
+  <g stroke="#ffffff" stroke-opacity="0.8" stroke-width="1.1" stroke-linejoin="round" stroke-linecap="round" fill="none">
+    <polygon points="31,20 69,20 87,42 50,86 13,42"></polygon>
+    <path d="M13,42 H87 M31,20 L38,42 M69,20 L62,42 M38,42 L50,86 M62,42 L50,86"></path>
+  </g>
+  <polygon points="35,25.4 36.012,28.988 39.6,30 36.012,31.012 35,34.6 33.988,31.012 30.4,30 33.988,28.988" fill="#ffffff" fill-opacity="0.95"></polygon>
+  <polygon points="60,53 60.66,55.34 63,56 60.66,56.66 60,59 59.34,56.66 57,56 59.34,55.34" fill="#ffffff" fill-opacity="0.8"></polygon>
+</svg>
