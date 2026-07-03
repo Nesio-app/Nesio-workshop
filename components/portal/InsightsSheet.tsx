@@ -13,7 +13,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { MyExperimentWidget } from '@/components/portal/NesioExperiment';
 import LifeCivilizationMap from '@/components/portal/LifeCivilizationMap';
-import ConstellationMap from '@/components/portal/ConstellationMap';
+import RelationGraph from '@/components/portal/RelationGraph';
+import type { GNode, GEdge } from '@/lib/platform/graph-engine';
 import { getLifeGraph } from '@/lib/portal/life-graph';
 import type { LifeNode } from '@/lib/portal/life-graph';
 import { getMirrorProfile, type MirrorProfile } from '@/lib/portal/mirror-profile';
@@ -551,6 +552,88 @@ function ConfidenceBar({ value }: { value: number }) {
   );
 }
 
+// ── Model graph builders ──────────────────────────────────────────────────────
+
+const LAYER_GRAPH_COLOR: Record<string, string> = {
+  identity:    'var(--portal-accent)',
+  motivation:  'var(--status-gentle)',
+  principles:  'var(--status-go)',
+  patterns:    'var(--status-calm)',
+  blind_spots: 'var(--status-risk)',
+  evolution:   'var(--portal-cool-accent)',
+  prediction:  'var(--portal-muted)',
+};
+
+function buildModelGraphNodes(model: LivingModel | null): GNode[] {
+  if (!model) {
+    // Demo nodes for empty state
+    return [
+      { id: 'identity::0', label: '身份认同', weight: 0.7, color: LAYER_GRAPH_COLOR['identity'] },
+      { id: 'motivation::0', label: '创造渴望', weight: 0.8, color: LAYER_GRAPH_COLOR['motivation'] },
+      { id: 'patterns::0', label: '夜晚思考', weight: 0.65, color: LAYER_GRAPH_COLOR['patterns'] },
+      { id: 'blind_spots::0', label: '低估关系', weight: 0.6, color: LAYER_GRAPH_COLOR['blind_spots'] },
+      { id: 'evolution::0', label: '健康关注', weight: 0.7, color: LAYER_GRAPH_COLOR['evolution'] },
+    ];
+  }
+  const nodes: GNode[] = [];
+  for (const layer of model.layers) {
+    const visible = layer.insights.filter(ins => ins.confidence >= 50);
+    visible.forEach((insight, i) => {
+      nodes.push({
+        id: `${layer.id}::${i}`,
+        label: insight.content.slice(0, 12),
+        type: layer.id,
+        weight: insight.confidence / 100,
+        color: LAYER_GRAPH_COLOR[layer.id] ?? 'var(--portal-accent)',
+        meta: { full: insight.content, layerId: layer.id },
+      });
+    });
+  }
+  return nodes;
+}
+
+function buildModelGraphEdges(model: LivingModel | null): GEdge[] {
+  if (!model) {
+    return [
+      { source: 'identity::0', target: 'motivation::0', weight: 0.6 },
+      { source: 'motivation::0', target: 'evolution::0', weight: 0.4 },
+      { source: 'patterns::0', target: 'blind_spots::0', weight: 0.5 },
+      { source: 'identity::0', target: 'patterns::0', weight: 0.3 },
+    ];
+  }
+  const edges: GEdge[] = [];
+  const seen = new Set<string>();
+
+  // Same-layer pairs (sequential)
+  for (const layer of model.layers) {
+    const layerNodes = layer.insights
+      .filter(i => i.confidence >= 50)
+      .map((_, idx) => `${layer.id}::${idx}`);
+    for (let i = 0; i < layerNodes.length - 1; i++) {
+      const key = `${layerNodes[i]}|${layerNodes[i + 1]}`;
+      if (!seen.has(key)) { seen.add(key); edges.push({ source: layerNodes[i], target: layerNodes[i + 1], weight: 0.4 }); }
+    }
+  }
+
+  // Cross-layer: insights sharing evidenceRefs
+  const allInsights = model.layers.flatMap((l, li) =>
+    l.insights.filter(i => i.confidence >= 50).map((ins, ii) => ({ id: `${l.id}::${ii}`, refs: new Set(ins.evidenceRefs) })),
+  );
+  for (let i = 0; i < allInsights.length; i++) {
+    for (let j = i + 1; j < allInsights.length; j++) {
+      const shared = Array.from(allInsights[i].refs).filter(r => allInsights[j].refs.has(r));
+      if (shared.length > 0) {
+        const key = `${allInsights[i].id}|${allInsights[j].id}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          edges.push({ source: allInsights[i].id, target: allInsights[j].id, weight: 0.7, label: '共同证据' });
+        }
+      }
+    }
+  }
+  return edges;
+}
+
 // ── Living Model Tab ──────────────────────────────────────────────────────────
 
 function LivingModelTab({
@@ -612,12 +695,19 @@ function LivingModelTab({
         </div>
       </div>
 
-      {/* 星座 SVG 图 */}
+      {/* 认知关系图 */}
       <div className="nesio-insights-section" style={{ marginTop: 'var(--space-2)' }}>
-        <p className="nesio-insights-section-label">认知星座图</p>
-        <ConstellationMap
-          model={model}
-          onLayerClick={(id) => setExpandedLayer(id)}
+        <p className="nesio-insights-section-label">认知关系图</p>
+        <RelationGraph
+          nodes={buildModelGraphNodes(model)}
+          edges={buildModelGraphEdges(model)}
+          height={260}
+          onNodeClick={(id) => {
+            // id format: "layerId::insightIdx"
+            const layerId = id.split('::')[0] as LivingModelLayerId;
+            setExpandedLayer(layerId);
+          }}
+          emptyText="积累记录后，Nesio 将构建你的认知关系图"
         />
       </div>
 

@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { deleteLifeNode, updateLifeNode, type LifeNode } from '@/lib/portal/life-graph';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
 import LocationPicker from './LocationPicker';
+import RelationGraph from './RelationGraph';
+import type { GNode, GEdge } from '@/lib/platform/graph-engine';
 
 const TYPE_ICON_DETAIL: Record<string, string> = {
   person: '👤', object: '📦', place: '📍', event: '📅',
@@ -435,6 +437,56 @@ interface EditFields {
   note: string;
 }
 
+// ── Graph helpers ─────────────────────────────────────────────────────────────
+
+const NODE_COLOR: Record<string, string> = {
+  person:       'var(--portal-accent)',
+  object:       'var(--status-calm)',
+  place:        'var(--status-go)',
+  event:        'var(--status-gentle)',
+  commitment:   'var(--portal-cool-accent)',
+  health_state: 'var(--status-risk)',
+  preference:   'var(--portal-muted)',
+};
+
+function buildGraphNodes(focus: LifeNode, related: LifeNode[]): GNode[] {
+  const all = [focus, ...related];
+  const maxRel = Math.max(1, ...all.map(n => n.relations.length));
+  return all.map(n => ({
+    id: n.id,
+    label: n.name,
+    type: n.type,
+    weight: 0.3 + (n.relations.length / maxRel) * 0.7,
+    color: NODE_COLOR[n.type] ?? 'var(--portal-accent)',
+  }));
+}
+
+function buildGraphEdges(focus: LifeNode, related: LifeNode[]): GEdge[] {
+  const edges: GEdge[] = [];
+  const seen = new Set<string>();
+  const all = [focus, ...related];
+  const idSet = new Set(all.map(n => n.id));
+
+  for (const node of all) {
+    for (const rel of node.relations) {
+      if (!idSet.has(rel.targetId)) continue;
+      const key = [node.id, rel.targetId].sort().join('|');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      edges.push({ source: node.id, target: rel.targetId, label: rel.relation });
+    }
+  }
+  // Ensure focus node connects to at least direct neighbours
+  for (const r of related) {
+    const key = [focus.id, r.id].sort().join('|');
+    if (!seen.has(key)) {
+      seen.add(key);
+      edges.push({ source: focus.id, target: r.id, weight: 0.3 });
+    }
+  }
+  return edges;
+}
+
 export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNode }: MemoryNodeDetailProps) {
   const [editing, setEditing] = useState(false);
   const [fields, setFields] = useState<EditFields>({
@@ -724,20 +776,21 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
 
           <p style={{ fontSize: '0.7rem', color: 'var(--portal-muted)', marginTop: '1rem' }}>记录于 {createdDate}</p>
 
-          {/* Related memories (generic, for types without their own related section) */}
-          {relatedNodes && relatedNodes.length > 0 && n.type !== 'person' && n.type !== 'place' && n.type !== 'event' && (
+          {/* Related memories — 关联地图 */}
+          {relatedNodes && relatedNodes.length > 0 && (
             <div className="nesio-related-section">
-              <p className="nesio-settings-section-label">相关记忆</p>
-              <div className="nesio-related-nodes">
-                {relatedNodes.map((related) => (
-                  <button key={related.id} type="button" className="nesio-related-node-chip" onClick={() => onOpenNode?.(related)}>
-                    <span className="nesio-related-node-icon" style={{ background: TYPE_BG_DETAIL[related.type] || 'var(--portal-accent-soft)' }}>
-                      {TYPE_ICON_DETAIL[related.type] || '📌'}
-                    </span>
-                    <span className="nesio-related-node-name">{related.name}</span>
-                  </button>
-                ))}
-              </div>
+              <p className="nesio-settings-section-label">关联地图</p>
+              <RelationGraph
+                nodes={buildGraphNodes(n, relatedNodes)}
+                edges={buildGraphEdges(n, relatedNodes)}
+                focusId={n.id}
+                height={220}
+                onNodeClick={(id) => {
+                  const target = relatedNodes.find(r => r.id === id);
+                  if (target) onOpenNode?.(target);
+                }}
+                emptyText="暂无关联记忆"
+              />
             </div>
           )}
 

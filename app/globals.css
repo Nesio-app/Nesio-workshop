@@ -19013,3 +19013,39 @@ html[data-portal-theme="night"] .nesio-exp-card:hover {
   margin: 0;
   text-align: right;
 }
+
+/* ── RelationGraph ─────────────────────────────────────────────────────────── */
+
+.rg-wrap {
+  width: 100%;
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--portal-bg);
+  border: 1px solid var(--portal-line);
+}
+
+.rg-svg {
+  display: block;
+  touch-action: pan-y;
+}
+
+.rg-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  gap: 0.5rem;
+}
+
+.rg-empty-icon {
+  font-size: 1.5rem;
+  color: var(--portal-muted);
+}
+
+.rg-empty-text {
+  font-size: 0.78rem;
+  color: var(--portal-muted);
+  text-align: center;
+  margin: 0;
+}

@@ -29,6 +29,8 @@ import {
 import { buildNarratorCards, type NarratorCard } from '@/lib/portal/memory-narrator';
 import MemoryNodeDetail from './MemoryNodeDetail';
 import FreezeVaultSheet from './FreezeVaultSheet';
+import RelationGraph from './RelationGraph';
+import type { GNode, GEdge } from '@/lib/platform/graph-engine';
 
 // ── Object Map (物品地图) ────────────────────────────────────────────────────
 
@@ -575,12 +577,53 @@ function CreateProjectSheet({
   );
 }
 
+// ── Memory Relation Graph builders ───────────────────────────────────────────
+
+const MEM_NODE_COLOR: Record<string, string> = {
+  person:       'var(--portal-accent)',
+  object:       'var(--status-calm)',
+  place:        'var(--status-go)',
+  event:        'var(--status-gentle)',
+  commitment:   'var(--portal-cool-accent)',
+  health_state: 'var(--status-risk)',
+  preference:   'var(--portal-muted)',
+};
+
+function buildMemGraphNodes(nodes: LifeNode[]): GNode[] {
+  const connected = nodes.filter(n => n.relations.length > 0 || nodes.some(o => o.relations.some(r => r.targetId === n.id)));
+  if (connected.length === 0) return nodes.slice(0, 15).map(n => ({
+    id: n.id, label: n.name, type: n.type, weight: n.confidence,
+    color: MEM_NODE_COLOR[n.type] ?? 'var(--portal-accent)',
+  }));
+  const maxRel = Math.max(1, ...connected.map(n => n.relations.length));
+  return connected.slice(0, 30).map(n => ({
+    id: n.id, label: n.name, type: n.type,
+    weight: 0.3 + (n.relations.length / maxRel) * 0.7,
+    color: MEM_NODE_COLOR[n.type] ?? 'var(--portal-accent)',
+  }));
+}
+
+function buildMemGraphEdges(nodes: LifeNode[]): GEdge[] {
+  const idSet = new Set(nodes.map(n => n.id));
+  const seen = new Set<string>();
+  const edges: GEdge[] = [];
+  for (const node of nodes) {
+    for (const rel of node.relations) {
+      if (!idSet.has(rel.targetId)) continue;
+      const key = [node.id, rel.targetId].sort().join('|');
+      if (!seen.has(key)) { seen.add(key); edges.push({ source: node.id, target: rel.targetId, label: rel.relation }); }
+    }
+  }
+  return edges;
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: boolean }) {
   const [query, setQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
   const [showObjectMap, setShowObjectMap] = useState(false);
+  const [showRelationGraph, setShowRelationGraph] = useState(false);
   const [showFreezeVault, setShowFreezeVault] = useState(false);
   const [locale, setLocale] = useState<PortalLocale>(() => loadProfileSettings().locale);
   const [nodes, setNodes] = useState<LifeNode[]>([]);
@@ -816,11 +859,18 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                       <button
                         type="button"
                         className={`nesio-type-chip${showObjectMap ? ' is-active' : ''}`}
-                        onClick={() => { setShowObjectMap((prev) => !prev); setTypeFilter(null); }}
+                        onClick={() => { setShowObjectMap((prev) => !prev); setTypeFilter(null); setShowRelationGraph(false); }}
                       >
                         🗺 地图
                       </button>
                     )}
+                    <button
+                      type="button"
+                      className={`nesio-type-chip${showRelationGraph ? ' is-active' : ''}`}
+                      onClick={() => { setShowRelationGraph(prev => !prev); setShowObjectMap(false); setTypeFilter(null); }}
+                    >
+                      ◎ 关联图
+                    </button>
                   </div>
                 </>
               )}
@@ -843,6 +893,22 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
           {/* Object map view */}
           {showObjectMap && !isSearching && (
             <ObjectMap nodes={nodes} onOpenNode={openNodeDetail} />
+          )}
+
+          {/* Relation graph view */}
+          {showRelationGraph && !isSearching && (
+            <div style={{ padding: '0.5rem 0 1rem' }}>
+              <RelationGraph
+                nodes={buildMemGraphNodes(nodes)}
+                edges={buildMemGraphEdges(nodes)}
+                height={360}
+                onNodeClick={(id) => {
+                  const n = nodes.find(x => x.id === id);
+                  if (n) openNodeDetail(n);
+                }}
+                emptyText="暂无记忆节点"
+              />
+            </div>
           )}
 
           {/* Memory grid */}
