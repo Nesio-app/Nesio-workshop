@@ -24,6 +24,7 @@ import {
   getProjects,
   createProject,
   deleteProject,
+  addNodeToProject,
   type Project,
 } from '@/lib/portal/project';
 import { buildNarratorCards, type NarratorCard } from '@/lib/portal/memory-narrator';
@@ -395,7 +396,53 @@ function NarratorCardView({ card, onOpen }: { card: NarratorCard; onOpen: (n: Li
   );
 }
 
-function MemoryCard({ node, onOpen, onDeleted }: { node: LifeNode; onOpen: () => void; onDeleted: () => void }) {
+function LongPressSheet({
+  node,
+  projects,
+  onAddToProject,
+  onShare,
+  onClose,
+}: {
+  node: LifeNode;
+  projects: Project[];
+  onAddToProject: (projectId: string) => void;
+  onShare: () => void;
+  onClose: () => void;
+}) {
+  const activeProjects = projects.filter((p) => p.status === 'active');
+  return (
+    <>
+      <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label="关闭" />
+      <div className="nesio-longpress-sheet">
+        <div className="nesio-longpress-node-name">{node.name}</div>
+        {activeProjects.length > 0 && (
+          <>
+            <div className="nesio-longpress-section-label">加入项目</div>
+            {activeProjects.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                className="nesio-longpress-project-btn"
+                onClick={() => { onAddToProject(p.id); onClose(); }}
+              >
+                {p.emoji} {p.name}
+              </button>
+            ))}
+          </>
+        )}
+        {activeProjects.length === 0 && (
+          <p className="nesio-longpress-no-projects">还没有项目，先新建一个项目</p>
+        )}
+        <button type="button" className="nesio-longpress-share-btn" onClick={() => { onShare(); onClose(); }}>
+          分享 / 复制
+        </button>
+        <button type="button" className="nesio-longpress-cancel-btn" onClick={onClose}>取消</button>
+      </div>
+    </>
+  );
+}
+
+function MemoryCard({ node, onOpen, onDeleted, onLongPress }: { node: LifeNode; onOpen: () => void; onDeleted: () => void; onLongPress?: () => void }) {
   const startX = useRef(0);
   const startY = useRef(0);
   const swiped = useRef(false);
@@ -430,7 +477,12 @@ function MemoryCard({ node, onOpen, onDeleted }: { node: LifeNode; onOpen: () =>
         startX.current = e.clientX;
         startY.current = e.clientY;
         clearTimer();
-        longPressTimer.current = setTimeout(shareNode, 620);
+        longPressTimer.current = setTimeout(() => {
+          swiped.current = true;
+          clearTimer();
+          if (onLongPress) onLongPress();
+          else void shareNode();
+        }, 620);
       }}
       onPointerMove={(e) => {
         const dx = e.clientX - startX.current;
@@ -505,7 +557,7 @@ function ProjectDetailSheet({
         ) : (
           <div className="nesio-memory-grid" style={{ padding: '0 1rem 1rem' }}>
             {nodes.map((n) => (
-              <MemoryCard key={n.id} node={n} onOpen={() => onOpenNode(n)} onDeleted={() => {}} />
+              <MemoryCard key={n.id} node={n} onOpen={() => onOpenNode(n)} onDeleted={() => {}} onLongPress={undefined} />
             ))}
           </div>
         )}
@@ -636,6 +688,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProject, setActiveProject] = useState<Project | null>(null);
   const [showCreateProject, setShowCreateProject] = useState(false);
+  const [longPressNode, setLongPressNode] = useState<LifeNode | null>(null);
 
   const copy = COPY[portalLocaleToDictionaryLocale(locale)];
 
@@ -924,6 +977,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                   node={node}
                   onOpen={() => openNodeDetail(node)}
                   onDeleted={() => setNodes(readNodes())}
+                  onLongPress={() => setLongPressNode(node)}
                 />
               ))}
             </div>
@@ -1007,6 +1061,24 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
         open={showFreezeVault}
         onClose={() => setShowFreezeVault(false)}
       />
+
+      {/* Long press action sheet */}
+      {longPressNode && (
+        <LongPressSheet
+          node={longPressNode}
+          projects={projects}
+          onAddToProject={(projectId) => {
+            addNodeToProject(projectId, longPressNode.id);
+            setProjects(getProjects());
+          }}
+          onShare={() => {
+            const text = shareTextForNode(longPressNode);
+            if (navigator.share) void navigator.share({ title: longPressNode.name, text });
+            else void navigator.clipboard?.writeText(text);
+          }}
+          onClose={() => setLongPressNode(null)}
+        />
+      )}
     </>
   );
 }

@@ -53,7 +53,7 @@ function detectDomain(node: LifeNode): DomainId {
 
 function meaningScore(node: LifeNode): number {
   const base = node.confidence ?? 0.5;
-  const conn = Math.min(node.relations.length * 0.12, 0.35);
+  const conn = Math.min((node.relations?.length ?? 0) * 0.12, 0.35);
   const tags = Math.min((node.tags?.length ?? 0) * 0.08, 0.25);
   const asset = (node.assets?.length ?? 0) > 0 ? 0.15 : 0;
   return Math.min(base + conn + tags + asset, 1.0);

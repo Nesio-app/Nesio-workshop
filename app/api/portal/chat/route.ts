@@ -184,18 +184,10 @@ export async function POST(req: NextRequest) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[chat] primary_error:', msg);
 
-    // Auth error → no point trying Gemini, show clear setup message
     const isAuthError = msg.includes('invalid x-api-key') || msg.includes('authentication_error') || msg.includes('401');
-    if (isAuthError) {
-      return NextResponse.json({
-        ok: true,
-        response: '（Anthropic API Key 配置有误，请到 Vercel 环境变量重新设置 ANTHROPIC_API_KEY）',
-        sources: [],
-      });
-    }
 
-    // Claude 失败 → 尝试 Gemini 兜底
-    if (anthropicKey && geminiKey) {
+    // Claude 失败 → 尝试 Gemini 兜底（含 auth error 情况）
+    if (geminiKey) {
       try {
         const result = await callGemini(geminiKey, message, history, systemInstruction);
         return NextResponse.json({
@@ -215,6 +207,14 @@ export async function POST(req: NextRequest) {
           });
         }
       }
+    }
+
+    if (isAuthError) {
+      return NextResponse.json({
+        ok: true,
+        response: '（Anthropic API Key 配置有误，请到 Vercel 环境变量重新设置 ANTHROPIC_API_KEY）',
+        sources: [],
+      });
     }
 
     return NextResponse.json({ ok: true, response: '（AI 暂时不可用，请稍后再试）', sources: [] });
