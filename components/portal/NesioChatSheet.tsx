@@ -10,6 +10,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { addLifeNode, getLifeGraph, searchLifeGraphFuzzy, type LifeNode } from '@/lib/portal/life-graph';
 import { loadProfileSettings } from '@/lib/portal/profile';
 import { smartSearch } from '@/lib/portal/smart-search';
+import { parseTemporalQuery, isInSpan } from '@/lib/portal/temporal-query';
 import { readPortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
 import MemoryFlashBanner, { useMemoryFlash } from '@/components/portal/MemoryFlashBanner';
 
@@ -23,35 +24,142 @@ interface UiMessage {
   savedToMemory?: boolean;
 }
 
-// ─── Client-side context builder ─────────────────────────────────────────────
+// ─── Client-side context builder (3-layer hybrid retrieval) ──────────────────
+// Inspired by Chronos (2025) temporal-aware retrieval + IA-RAG interval algebra.
 // Runs in the browser where localStorage and sessionStorage are available.
+//
+// Layer 1 — Temporal/structured retrieval (highest priority):
+//   Parse date expressions ("7月9号", "下周", "今天") → filter by attributes.start
+// Layer 2 — Text + entity match (smartSearch, already includes temporal boost):
+//   BM25-style token matching + entity extraction
+// Layer 3 — Temporal baseline (always injected at top):
+//   Today + next 7 days events, so AI always has a time horizon
+//
+// Research: U-shaped context recall curve → important info at HEAD of context.
+
+type CalendarEvent = { id?: string; title?: string; start?: string; end?: string; calendarName?: string };
+
+function fmtEventDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', weekday: 'short' });
+}
+
+function fmtNode(n: LifeNode): string {
+  const startStr = n.attributes.start as string | undefined;
+  const dateLabel = startStr
+    ? fmtEventDate(startStr)
+    : new Date(n.createdAt).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+  return `• [${n.type}] ${n.name} (${dateLabel})`;
+}
 
 function buildMemoryContext(query: string): string {
   const graph = getLifeGraph();
-  const searchResults = smartSearch(query, null).nodes.slice(0, 10);
-  const recent = graph.slice(0, 12);
-  const nodeMap = new Map<string, LifeNode>();
-  for (const n of searchResults) nodeMap.set(n.id, n);
-  for (const n of recent) if (!nodeMap.has(n.id)) nodeMap.set(n.id, n);
-  const nodes = Array.from(nodeMap.values()).slice(0, 20);
-  const lines = nodes.map((n) => {
-    const date = new Date(n.createdAt).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
-    return `• [${n.type}] ${n.name} ← ${date}`;
-  });
-  return `【用户记忆库】共 ${graph.length} 条（相关条目如下）：\n${lines.join('\n') || '（暂无）'}`;
+  const temporal = parseTemporalQuery(query);
+
+  // Layer 1: date-matched nodes (attributes.start matches the parsed date)
+  const dateNodes: LifeNode[] = temporal.hasDate
+    ? graph.filter((n) => {
+        const s = n.attributes.start as string | undefined;
+        return s ? isInSpan(new Date(s), temporal) : false;
+      })
+    : [];
+
+  // Layer 2: text/entity search — smartSearch already applies temporal boost
+  const searchNodes = smartSearch(query, null).nodes.slice(0, 12);
+
+  // Layer 3: upcoming 7-day events (always in context — temporal baseline)
+  const now = Date.now();
+  const week7 = now + 7 * 86_400_000;
+  const upcomingNodes = graph
+    .filter((n) => {
+      const s = n.attributes.start as string | undefined;
+      if (!s) return false;
+      const t = new Date(s).getTime();
+      return t >= now - 86_400_000 && t <= week7;
+    })
+    .sort((a, b) =>
+      new Date(a.attributes.start as string).getTime() -
+      new Date(b.attributes.start as string).getTime(),
+    )
+    .slice(0, 8);
+
+  // Assemble: date matches HEAD → search results → upcoming → recent
+  const seen = new Set<string>();
+  const head: LifeNode[] = [];
+  const body: LifeNode[] = [];
+
+  for (const n of dateNodes) { if (!seen.has(n.id)) { seen.add(n.id); head.push(n); } }
+  for (const n of upcomingNodes) { if (!seen.has(n.id)) { seen.add(n.id); head.push(n); } }
+  for (const n of searchNodes) { if (!seen.has(n.id)) { seen.add(n.id); body.push(n); } }
+  // Fill remaining slots with recent nodes
+  for (const n of graph.slice(0, 10)) {
+    if (seen.has(n.id)) continue;
+    seen.add(n.id);
+    body.push(n);
+    if (body.length >= 12) break;
+  }
+
+  const parts: string[] = [`【用户记忆库】共 ${graph.length} 条`];
+
+  if (dateNodes.length > 0) {
+    parts.push(`\n【${temporal.label}的日程/事件】（精确命中，优先参考）`);
+    parts.push(...dateNodes.map(fmtNode));
+  }
+
+  if (upcomingNodes.length > 0 && !temporal.hasDate) {
+    parts.push('\n【今天起7天内的安排】');
+    parts.push(...upcomingNodes.map(fmtNode));
+  }
+
+  if (body.length > 0) {
+    parts.push('\n【相关记忆与近期记录】');
+    parts.push(...body.slice(0, 12).map(fmtNode));
+  }
+
+  return parts.join('\n');
 }
 
-type CalendarEvent = { title?: string; start?: string; end?: string; calendarName?: string };
-
-function buildCalendarContext(): string {
+function buildCalendarContext(query: string): string {
   const data = readPortalCache<{ events?: CalendarEvent[] }>(PORTAL_CACHE_KEYS.calendar);
   const events = data?.events ?? [];
   if (events.length === 0) return '';
-  const lines = events.slice(0, 30).map((ev) => {
-    const start = ev.start ? new Date(ev.start).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', weekday: 'short' }) : '';
-    return `• ${ev.title || '未命名'}${start ? ` (${start})` : ''}`;
-  });
-  return `【日历】未来90天共 ${events.length} 条安排：\n${lines.join('\n')}`;
+
+  const temporal = parseTemporalQuery(query);
+
+  // Split into date-specific vs general
+  const dateEvents: CalendarEvent[] = [];
+  const otherEvents: CalendarEvent[] = [];
+  for (const ev of events) {
+    if (!ev.start) continue;
+    if (temporal.hasDate && isInSpan(new Date(ev.start), temporal)) {
+      dateEvents.push(ev);
+    } else {
+      otherEvents.push(ev);
+    }
+  }
+
+  const fmtEv = (ev: CalendarEvent) => {
+    const d = ev.start ? fmtEventDate(ev.start) : '';
+    return `• ${ev.title || '未命名'}${d ? ` (${d})` : ''}`;
+  };
+
+  const parts: string[] = [`【Google日历】共 ${events.length} 条`];
+
+  if (dateEvents.length > 0) {
+    parts.push(`\n【${temporal.label}的日历事件】（精确匹配，优先参考）`);
+    parts.push(...dateEvents.map(fmtEv));
+  }
+
+  // Always include upcoming 30 events as time horizon
+  const now = Date.now();
+  const upcoming = otherEvents
+    .filter((ev) => ev.start && new Date(ev.start).getTime() >= now - 86_400_000)
+    .slice(0, 30);
+  if (upcoming.length > 0) {
+    parts.push('\n【近期日程】');
+    parts.push(...upcoming.map(fmtEv));
+  }
+
+  return parts.join('\n');
 }
 
 const CHAT_HISTORY_KEY = 'nesio-chat-history-v1';
@@ -379,7 +487,7 @@ export default function NesioChatSheet({
             ? { name: fileContextRef.current.name, content: fileContextRef.current.content }
             : undefined,
           memoryContext: buildMemoryContext(text.trim()),
-          calendarContext: buildCalendarContext(),
+          calendarContext: buildCalendarContext(text.trim()),
         }),
         signal: controller.signal,
       });

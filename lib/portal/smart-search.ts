@@ -11,6 +11,7 @@
 
 import { getLifeGraph, type LifeNode } from './life-graph';
 import { extractContext, nodeDomain, readNodeContext, type FrontDomain } from '@/lib/life-domain';
+import { parseTemporalQuery, isInSpan } from './temporal-query';
 
 export interface SearchUnderstood {
   people: string[];
@@ -126,6 +127,9 @@ export function smartSearch(query: string, domainFilter: FrontDomain | null = nu
   const ql = q.toLowerCase();
   const tokens = tokenize(q);
 
+  // Layer 1: Parse temporal expression from query (date-aware retrieval)
+  const temporal = parseTemporalQuery(q);
+
   const scored = getLifeGraph()
     .filter((node) => (domainFilter ? nodeDomain(node) === domainFilter : true))
     .map((node) => {
@@ -133,20 +137,29 @@ export function smartSearch(query: string, domainFilter: FrontDomain | null = nu
       const nodeCtx = readNodeContext(node);
       let score = 0;
 
-      // Exact / substring match on title or raw input
+      // ── Layer 1: Temporal / date match (highest priority) ────────────────
+      if (temporal.hasDate) {
+        const startStr = node.attributes.start as string | undefined;
+        if (startStr) {
+          const startDate = new Date(startStr);
+          if (isInSpan(startDate, temporal)) score += 30; // calendar event on this date
+        } else {
+          // Memory node created on this date
+          if (isInSpan(new Date(node.createdAt), temporal)) score += 10;
+        }
+      }
+
+      // ── Layer 2: Text / entity match ─────────────────────────────────────
       if (node.name.toLowerCase().includes(ql)) score += 14;
       if (node.rawInput?.toLowerCase().includes(ql)) score += 8;
       if (text.includes(ql)) score += 5;
 
-      // Entity matches (people / places / objects extracted from the query)
       score += entityMatchScore(understood.people,  nodeCtx?.people,  text);
       score += entityMatchScore(understood.places,  nodeCtx?.places,  text);
       score += entityMatchScore(understood.objects, nodeCtx?.objects, text);
 
-      // Domain hint from query (e.g., "财物", "健康")
       if (understood.domain && nodeDomain(node) === understood.domain) score += 6;
 
-      // Token-level fallback for anything not captured above
       for (const token of tokens) {
         if (node.name.toLowerCase().includes(token)) score += 3;
         if (text.includes(token)) score += 1;
