@@ -2,6 +2,9 @@
  * Chat Context Builder — assembles all available user data into a compact
  * context string for AI. Designed to be extended as new data sources arrive
  * (notes, fitness, health logs, learning records, etc.).
+ *
+ * Context can be built client-side (with full localStorage access) and passed
+ * in as a pre-built string, or built server-side from whatever data is available.
  */
 
 import { getLifeGraph, type LifeNode } from './life-graph';
@@ -15,6 +18,13 @@ export interface BuiltChatContext {
   relevantNodeIds: string[];
 }
 
+export interface ClientBuiltContext {
+  /** Pre-built memory context string from client (has localStorage access) */
+  memoryContext?: string;
+  /** Pre-built calendar context string from client */
+  calendarContext?: string;
+}
+
 function formatNode(n: LifeNode): string {
   const attrs = Object.entries(n.attributes)
     .filter(([k, v]) => v !== null && !['subtasksJson', 'done', 'doneAt', 'context'].includes(k))
@@ -25,29 +35,31 @@ function formatNode(n: LifeNode): string {
   return `• [${n.type}] ${n.name}${attrs ? ` (${attrs})` : ''} ← ${date}`;
 }
 
-export function buildChatContext(userQuery: string): BuiltChatContext {
+export function buildChatContext(userQuery: string, clientContext?: ClientBuiltContext): BuiltChatContext {
+  // If client sent pre-built context (has localStorage), use it directly
+  if (clientContext?.memoryContext) {
+    const parts = [clientContext.memoryContext];
+    if (clientContext.calendarContext) parts.push('', clientContext.calendarContext);
+    return { systemContext: parts.join('\n'), relevantNodeIds: [] };
+  }
+
+  // Server-side fallback (localStorage unavailable — returns empty graph in most cases)
   const graph = getLifeGraph();
 
-  // Relevant nodes via smart search (entity-boosted)
   const searchResults = smartSearch(userQuery, null).nodes.slice(0, 10);
-
-  // Recent nodes for general context
   const recent = graph.slice(0, 12);
 
-  // Merge, dedup, cap at 20
   const nodeMap = new Map<string, LifeNode>();
   for (const n of searchResults) nodeMap.set(n.id, n);
   for (const n of recent) if (!nodeMap.has(n.id)) nodeMap.set(n.id, n);
   const nodes = Array.from(nodeMap.values()).slice(0, 20);
 
-  // Domain preferences from MirrorProfile
   const profile = getMirrorProfile();
   const topDomains = Object.entries(profile.domainWeights)
     .sort(([, a], [, b]) => b - a)
     .slice(0, 3)
     .map(([k]) => k);
 
-  // Completed tasks today
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const doneTodayCount = graph.filter(
     (n) => n.attributes.done && n.attributes.doneAt && new Date(n.attributes.doneAt as string) >= today,

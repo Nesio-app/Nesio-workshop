@@ -24,6 +24,9 @@ interface ChatRequest {
   personalityId?: string;
   coachStyle?: string;
   fileContext?: { name: string; content: string };
+  /** Pre-built context strings from client (has localStorage + sessionStorage access) */
+  memoryContext?: string;
+  calendarContext?: string;
 }
 
 const SYSTEM_BASE = `你是 Nesio，用户的贴身 AI 助手，叫"小宝"。
@@ -169,7 +172,7 @@ async function callGemini(
 
 export async function POST(req: NextRequest) {
   const body = await req.json() as ChatRequest;
-  const { message, history = [], coachStyle, fileContext } = body;
+  const { message, history = [], coachStyle, fileContext, memoryContext, calendarContext } = body;
 
   if (!message?.trim()) {
     return NextResponse.json({ ok: false, error: 'empty message' }, { status: 400 });
@@ -186,7 +189,7 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const { systemContext } = buildChatContext(message);
+  const { systemContext } = buildChatContext(message, { memoryContext, calendarContext });
   const fileSection = fileContext
     ? `\n\n---\n用户上传了文件：${fileContext.name}\n文件内容如下：\n\n${fileContext.content}\n---\n\n回答关于这个文件的问题时，直接基于以上数据回答，不要猜测或编造数据。如果用户问数量统计、最大值、总结等，请计算后给出准确答案。`
     : '';

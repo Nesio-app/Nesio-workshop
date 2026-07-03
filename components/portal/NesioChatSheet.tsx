@@ -7,8 +7,10 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { addLifeNode, searchLifeGraphFuzzy, type LifeNode } from '@/lib/portal/life-graph';
+import { addLifeNode, getLifeGraph, searchLifeGraphFuzzy, type LifeNode } from '@/lib/portal/life-graph';
 import { loadProfileSettings } from '@/lib/portal/profile';
+import { smartSearch } from '@/lib/portal/smart-search';
+import { readPortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
 import MemoryFlashBanner, { useMemoryFlash } from '@/components/portal/MemoryFlashBanner';
 
 interface ChatMessage { role: 'user' | 'model'; text: string; }
@@ -19,6 +21,37 @@ interface UiMessage {
   text: string;
   sources?: Array<{ title: string; url: string }>;
   savedToMemory?: boolean;
+}
+
+// ─── Client-side context builder ─────────────────────────────────────────────
+// Runs in the browser where localStorage and sessionStorage are available.
+
+function buildMemoryContext(query: string): string {
+  const graph = getLifeGraph();
+  const searchResults = smartSearch(query, null).nodes.slice(0, 10);
+  const recent = graph.slice(0, 12);
+  const nodeMap = new Map<string, LifeNode>();
+  for (const n of searchResults) nodeMap.set(n.id, n);
+  for (const n of recent) if (!nodeMap.has(n.id)) nodeMap.set(n.id, n);
+  const nodes = Array.from(nodeMap.values()).slice(0, 20);
+  const lines = nodes.map((n) => {
+    const date = new Date(n.createdAt).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+    return `• [${n.type}] ${n.name} ← ${date}`;
+  });
+  return `【用户记忆库】共 ${graph.length} 条（相关条目如下）：\n${lines.join('\n') || '（暂无）'}`;
+}
+
+type CalendarEvent = { title?: string; start?: string; end?: string; calendarName?: string };
+
+function buildCalendarContext(): string {
+  const data = readPortalCache<{ events?: CalendarEvent[] }>(PORTAL_CACHE_KEYS.calendar);
+  const events = data?.events ?? [];
+  if (events.length === 0) return '';
+  const lines = events.slice(0, 30).map((ev) => {
+    const start = ev.start ? new Date(ev.start).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', weekday: 'short' }) : '';
+    return `• ${ev.title || '未命名'}${start ? ` (${start})` : ''}`;
+  });
+  return `【日历】未来90天共 ${events.length} 条安排：\n${lines.join('\n')}`;
 }
 
 const CHAT_HISTORY_KEY = 'nesio-chat-history-v1';
@@ -345,6 +378,8 @@ export default function NesioChatSheet({
           fileContext: fileContextRef.current
             ? { name: fileContextRef.current.name, content: fileContextRef.current.content }
             : undefined,
+          memoryContext: buildMemoryContext(text.trim()),
+          calendarContext: buildCalendarContext(),
         }),
         signal: controller.signal,
       });
