@@ -212,13 +212,16 @@ export async function GET(req: NextRequest) {
   }
 
   let messages: GmailMessage[] = [];
+  let refreshedAccessToken: string | null = null;
 
   try {
+    // accessToken may be '' when only refresh token cookie survives — that will 401 and trigger refresh below
+    if (!tokens.accessToken) throw new Error('gmail_list_401');
     messages = await fetchMessages(tokens.accessToken, 10, metadataOnly);
   } catch (err) {
     const msg = err instanceof Error ? err.message : '';
 
-    // Try token refresh on 401
+    // Try token refresh on 401 (including expired access token)
     if (msg.includes('401') && tokens.refreshToken) {
       const newToken = await refreshToken(tokens.refreshToken);
       if (!newToken) {
@@ -227,6 +230,7 @@ export async function GET(req: NextRequest) {
           { status: 401 },
         );
       }
+      refreshedAccessToken = newToken;
       tokens = { ...tokens, accessToken: newToken };
       try { messages = await fetchMessages(newToken, 10, metadataOnly); }
       catch {
@@ -274,7 +278,7 @@ export async function GET(req: NextRequest) {
     ? await writeCloudSignalsForCurrentUser(signals)
     : { ok: true, writesCloud: false, savedCount: 0 };
 
-  return NextResponse.json({
+  const response = NextResponse.json({
     ok: true,
     metadataOnly,
     includeBody,
@@ -289,4 +293,14 @@ export async function GET(req: NextRequest) {
     count: nodes.length,
     emailCount: messages.length,
   });
+
+  // Persist refreshed access token as cookie so the next request doesn't need to re-refresh
+  if (refreshedAccessToken) {
+    const secure = process.env.NODE_ENV === 'production';
+    response.cookies.set('nesio_gmail_access', refreshedAccessToken, {
+      httpOnly: true, sameSite: 'lax', secure, path: '/', maxAge: 3600,
+    });
+  }
+
+  return response;
 }

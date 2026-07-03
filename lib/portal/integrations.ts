@@ -91,8 +91,10 @@ export function readTokensFromCookies(provider: IntegrationProvider): Integratio
   const prefix = COOKIE_PREFIX[provider];
   const accessToken = cookieStore.get(`${prefix}_access`)?.value;
   const refreshToken = cookieStore.get(`${prefix}_refresh`)?.value;
-  if (!accessToken) return null;
-  return { accessToken, refreshToken, connectedAt: new Date().toISOString() };
+  // Return even when accessToken is missing — as long as refreshToken exists,
+  // the caller can call the provider's refresh endpoint and retry.
+  if (!accessToken && !refreshToken) return null;
+  return { accessToken: accessToken || '', refreshToken, connectedAt: new Date().toISOString() };
 }
 
 export function allowCookieIntegrationFallback(): boolean {
