@@ -60,7 +60,7 @@ async function enhanceWithClaude(
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
+      model: 'claude-3-5-haiku-latest',
       max_tokens: 400,
       system: `你是 Nesio，${userName || '用户'}的贴身 AI 助手。
 你的任务是把系统生成的引导卡片语言改写成更自然、温和、具体的中文。

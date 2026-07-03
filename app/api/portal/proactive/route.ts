@@ -65,7 +65,7 @@ async function callClaudeForCards(
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
+      model: 'claude-3-5-haiku-latest',
       max_tokens: 600,
       system: `你是 Nesio，用户 ${userName || '婧'} 的贴身 AI 助手。
 根据触发信号生成 1-2 条主动提醒卡片。规则：
