@@ -338,13 +338,22 @@ export function getLifeGraphCloudSyncSummary(): {
   pendingCount: number;
   syncedCount: number;
   failedCount: number;
+  notConfiguredCount: number;
   lastUpdatedAt: string | null;
 } {
   const records = getLifeGraphCloudSyncRecords();
+  const NOT_CONFIGURED_ERRORS = new Set(['cloud_not_configured', 'cloud_memory_sync_failed', 'cloud_memory_network_error']);
+  const notConfigured = records.filter(
+    (r) => r.status === 'failed' && NOT_CONFIGURED_ERRORS.has(r.lastError ?? ''),
+  );
+  const genuineFailed = records.filter(
+    (r) => r.status === 'failed' && !NOT_CONFIGURED_ERRORS.has(r.lastError ?? ''),
+  );
   return {
     pendingCount: records.filter((record) => record.status === 'pending').length,
     syncedCount: records.filter((record) => record.status === 'synced').length,
-    failedCount: records.filter((record) => record.status === 'failed').length,
+    failedCount: genuineFailed.length,
+    notConfiguredCount: notConfigured.length,
     lastUpdatedAt: records[0]?.updatedAt || null,
   };
 }
@@ -432,35 +441,33 @@ export async function retryLifeGraphCloudSync(): Promise<{
     retriedCount += 1;
     markCloudSyncPending(item.resourceId, item.operation);
     updateCloudSyncOutboxAttempt(item.resourceId, item.operation);
-    try {
-      if ((item.operation === 'upsert' || item.operation === 'backfill') && item.node) {
-        const response = await fetch(CLOUD_MEMORY_ENDPOINT, {
-          method: 'POST',
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ nodes: [item.node], assets: item.assets || [] }),
-        });
-        if (!response.ok) throw new Error('cloud_memory_sync_failed');
-      } else if (item.operation === 'delete') {
-        const response = await fetch(CLOUD_MEMORY_ENDPOINT, {
-          method: 'DELETE',
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ nodeId: item.resourceId }),
-        });
-        if (!response.ok) throw new Error('cloud_memory_sync_failed');
-      } else {
-        throw new Error('cloud_memory_sync_payload_missing');
-      }
+    let result: { ok: boolean; transient: boolean; error?: string };
+    if ((item.operation === 'upsert' || item.operation === 'backfill') && item.node) {
+      result = await cloudFetchWithSmartError(CLOUD_MEMORY_ENDPOINT, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nodes: [item.node], assets: item.assets || [] }),
+      });
+    } else if (item.operation === 'delete') {
+      result = await cloudFetchWithSmartError(CLOUD_MEMORY_ENDPOINT, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nodeId: item.resourceId }),
+      });
+    } else {
+      result = { ok: false, transient: false, error: 'cloud_memory_sync_payload_missing' };
+    }
+    if (result.ok) {
       markCloudSyncSynced(item.resourceId, item.operation);
       removeCloudSyncOutboxItem(item.resourceId, item.operation);
       succeededCount += 1;
-    } catch (error) {
-      markCloudSyncFailed(item.resourceId, item.operation, error);
+    } else if (result.transient) {
+      // not configured / not signed in — leave as pending, don't count as failure
+      markCloudSyncPending(item.resourceId, item.operation);
+    } else {
+      markCloudSyncFailed(item.resourceId, item.operation, new Error(result.error));
       failedCount += 1;
     }
   }

@@ -184,8 +184,17 @@ export async function POST(req: NextRequest) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[chat] primary_error:', msg);
 
+    // Auth error → no point trying Gemini, show clear setup message
+    const isAuthError = msg.includes('invalid x-api-key') || msg.includes('authentication_error') || msg.includes('401');
+    if (isAuthError) {
+      return NextResponse.json({
+        ok: true,
+        response: '（Anthropic API Key 配置有误，请到 Vercel 环境变量重新设置 ANTHROPIC_API_KEY）',
+        sources: [],
+      });
+    }
+
     // Claude 失败 → 尝试 Gemini 兜底
-    let fallbackMsg = '';
     if (anthropicKey && geminiKey) {
       try {
         const result = await callGemini(geminiKey, message, history, systemInstruction);
@@ -195,11 +204,19 @@ export async function POST(req: NextRequest) {
           sources: result.sources,
         });
       } catch (fallbackErr) {
-        fallbackMsg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
+        const fallbackMsg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
         console.error('[chat] gemini_fallback_error:', fallbackMsg);
+        const isQuotaError = fallbackMsg.includes('quota') || fallbackMsg.includes('429');
+        if (isQuotaError) {
+          return NextResponse.json({
+            ok: true,
+            response: '（AI 暂时达到免费用量上限，请为 Gemini API 开通付费，或配置 ANTHROPIC_API_KEY）',
+            sources: [],
+          });
+        }
       }
     }
 
-    return NextResponse.json({ ok: true, response: '出了点问题，请稍后再试。', sources: [] });
+    return NextResponse.json({ ok: true, response: '（AI 暂时不可用，请稍后再试）', sources: [] });
   }
 }

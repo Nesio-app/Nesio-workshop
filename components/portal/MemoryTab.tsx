@@ -726,7 +726,6 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
     return acc;
   }, {});
 
-  const cloudSyncTotal = cloudSyncSummary.pendingCount + cloudSyncSummary.syncedCount + cloudSyncSummary.failedCount;
 
   const onThisDayNodes = useMemo(() => findOnThisDayNodes(nodes), [nodes]);
 
@@ -943,13 +942,19 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
           )}
 
           {/* Cloud sync status */}
-          {cloudSyncTotal > 0 && (
+          {cloudSyncSummary.failedCount > 0 && (
             <div className="nesio-memory-sync-status">
-              {cloudSyncSummary.failedCount > 0
-                ? copy.syncFailed(cloudSyncSummary.failedCount)
-                : cloudSyncSummary.pendingCount > 0
-                  ? copy.syncPending(cloudSyncSummary.pendingCount)
-                  : copy.syncDone(cloudSyncSummary.syncedCount)}
+              {copy.syncFailed(cloudSyncSummary.failedCount)}
+            </div>
+          )}
+          {cloudSyncSummary.failedCount === 0 && cloudSyncSummary.pendingCount > 0 && (
+            <div className="nesio-memory-sync-status">
+              {copy.syncPending(cloudSyncSummary.pendingCount)}
+            </div>
+          )}
+          {cloudSyncSummary.failedCount === 0 && cloudSyncSummary.pendingCount === 0 && cloudSyncSummary.syncedCount > 0 && (
+            <div className="nesio-memory-sync-status">
+              {copy.syncDone(cloudSyncSummary.syncedCount)}
             </div>
           )}
 
