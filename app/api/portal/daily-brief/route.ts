@@ -1,9 +1,7 @@
 /**
  * POST /api/portal/daily-brief
- * Generates a conversational podcast-style daily briefing script.
- * Covers: weather, calendar events, email highlights, Life Graph context.
- * Returns: { script: string, segments: Segment[] }
- * Each segment can be TTS'd independently for a natural conversational flow.
+ * Generates a podcast-host style daily briefing script (60-90 sec).
+ * Returns: { ok: true, script: string }
  */
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -15,6 +13,16 @@ function envValue(key: string): string {
   return (process.env[key] ?? '').trim();
 }
 
+interface BriefRequest {
+  displayName: string;
+  weather?: { temperatureC?: number; condition?: string; forecastNote?: string; placeLabel?: string };
+  events?: Array<{ title: string; start: string; end?: string; location?: string; calendarName?: string }>;
+  emailHighlights?: string[];
+  memoryNotes?: string[];
+  locale?: string;
+}
+
+// Keep exporting BriefSegment for any legacy consumers
 export interface BriefSegment {
   id: string;
   type: 'greeting' | 'weather' | 'calendar' | 'email' | 'memory' | 'closing';
@@ -23,113 +31,127 @@ export interface BriefSegment {
   emoji: string;
 }
 
-interface BriefRequest {
-  displayName: string;
-  weather?: { temperatureC?: number; condition?: string; forecastNote?: string; placeLabel?: string };
-  events?: Array<{ title: string; start: string; location?: string }>;
-  emailHighlights?: string[];
-  memoryNotes?: string[];
-  locale?: string;
-}
-
 export async function POST(req: NextRequest) {
   const body = await req.json() as BriefRequest;
   const { displayName, weather, events, emailHighlights, memoryNotes } = body;
+
   const now = new Date();
   const hour = now.getHours();
-  const timeGreeting = hour < 12 ? '早上好' : hour < 18 ? '下午好' : '晚上好';
+  const timeGreeting = hour < 5 ? '凌晨好' : hour < 12 ? '早上好' : hour < 18 ? '下午好' : '晚上好';
   const dateStr = now.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' });
+  const timeStr = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
 
   const geminiKey = envValue('GEMINI_API_KEY') || envValue('GOOGLE_GENERATIVE_AI_API_KEY');
 
-  // Build context
+  // ── Build context sections ──────────────────────────────────────────────────
+
   const weatherText = weather
-    ? `当前天气：${weather.temperatureC}°C，${weather.condition}${weather.forecastNote ? '，' + weather.forecastNote : ''}，地点：${weather.placeLabel || '当前位置'}`
-    : '暂无天气数据';
+    ? `${weather.temperatureC}°C，${weather.condition}${weather.forecastNote ? '，' + weather.forecastNote : ''}${weather.placeLabel ? '（' + weather.placeLabel + '）' : ''}`
+    : null;
 
-  const eventsText = events?.length
-    ? events.slice(0, 3).map((e) => {
-        const t = new Date(e.start).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
-        return `${t} ${e.title}${e.location ? '（' + e.location + '）' : ''}`;
-      }).join('；')
-    : '今天没有日历安排';
+  const todayEvents = (events || []).filter((e) => {
+    const t = new Date(e.start).getTime();
+    const dayEnd = new Date(now).setHours(23, 59, 59, 999);
+    return t >= now.getTime() - 30 * 60_000 && t <= dayEnd;
+  });
+  const upcomingEvents = (events || []).filter((e) => {
+    const t = new Date(e.start).getTime();
+    const dayEnd = new Date(now).setHours(23, 59, 59, 999);
+    return t > dayEnd;
+  }).slice(0, 3);
 
-  const emailText = emailHighlights?.length
-    ? emailHighlights.slice(0, 3).join('；')
-    : '没有需要关注的邮件';
+  type EventItem = NonNullable<BriefRequest['events']>[0];
+  const fmtEvent = (e: EventItem) => {
+    const t = new Date(e.start).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+    return `${t} ${e.title}${e.location ? '（' + e.location + '）' : ''}`;
+  };
 
-  const memoryText = memoryNotes?.length
-    ? memoryNotes.slice(0, 2).join('；')
-    : '';
+  // ── Fallback script (no Gemini) ─────────────────────────────────────────────
 
-  if (!geminiKey) {
-    // Fallback: template-based script
-    const segments: BriefSegment[] = [
-      { id: 'greeting', type: 'greeting' as const, voice: 'nova' as const, emoji: '👋',
-        text: `${timeGreeting}，${displayName}。今天是${dateStr}。` },
-      { id: 'weather', type: 'weather' as const, voice: 'nova' as const, emoji: '🌤',
-        text: weather ? `当前气温${weather.temperatureC}度，${weather.condition}。${weather.forecastNote ? weather.forecastNote + '，注意' + (weather.temperatureC! < 15 ? '保暖' : '防晒') + '。' : ''}` : '天气数据加载中。' },
-      { id: 'calendar', type: 'calendar' as const, voice: 'nova' as const, emoji: '📅',
-        text: events?.length ? `今天你有${events.length}个安排：${eventsText}。` : '今天日历没有特别安排，可以专注深度工作。' },
-      { id: 'closing', type: 'closing' as const, voice: 'nova' as const, emoji: '✨',
-        text: '今天也是好好的一天。有任何事情，告诉我。' },
-    ];
-    return NextResponse.json({ ok: true, segments, script: segments.map((s) => s.text).join(' ') });
+  function buildFallbackScript(): string {
+    const parts: string[] = [`${timeGreeting}，${displayName || '你'}。今天是${dateStr}，现在${timeStr}。`];
+
+    if (weatherText) {
+      parts.push(`今天${weatherText}。${weather?.forecastNote ? '' : (weather?.temperatureC ?? 20) < 15 ? '记得多穿一件。' : ''}`);
+    }
+
+    if (todayEvents.length > 0) {
+      if (todayEvents.length === 1) {
+        parts.push(`今天有一个安排：${fmtEvent(todayEvents[0])}。`);
+      } else {
+        parts.push(`今天有${todayEvents.length}个安排。最近的是${fmtEvent(todayEvents[0])}，还有${todayEvents.slice(1).map((e) => e.title).join('、')}。`);
+      }
+    } else if (upcomingEvents.length > 0) {
+      parts.push(`今天日历上没有安排，下一个是${fmtEvent(upcomingEvents[0])}。`);
+    } else {
+      parts.push('今天没有特别的日历安排，可以专注深度工作。');
+    }
+
+    if (emailHighlights?.length) {
+      parts.push(`邮件方面，${emailHighlights.slice(0, 2).join('；另外，')}。`);
+    }
+
+    if (memoryNotes?.length) {
+      parts.push(`另外，${memoryNotes[0]}。`);
+    }
+
+    parts.push('今天也是好好的一天，有任何事情告诉我。');
+    return parts.join(' ');
   }
 
-  const prompt = `你是 Nesio，一个私人 AI 助理。你要生成一段温暖、自然的播客风格日报，像一个熟悉用户的私人助理在跟用户讲话。
+  if (!geminiKey) {
+    const script = buildFallbackScript();
+    return NextResponse.json({ ok: true, script });
+  }
 
-用户信息：
-- 姓名：${displayName}
-- 当前时间：${dateStr} ${now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
-- 天气：${weatherText}
-- 今日日程：${eventsText}
-- 邮件摘要：${emailText}
-${memoryText ? '- 记忆提示：' + memoryText : ''}
+  // ── Gemini: podcast-host style script ──────────────────────────────────────
 
-要求：
-1. 语气：温暖、简洁、像真人在说话，不用"您"，用"你"，不生硬
-2. 长度：每段 1-2 句，总共不超过 150 字
-3. 自然地融合信息，不要机械列举
-4. 如果天气有变化，用一句话说清楚并给出建议
-5. 如果有会议，说最重要的一个，其余带过
-6. 结尾一句暖心的话
+  const calendarSection = todayEvents.length > 0
+    ? `今日日程（${todayEvents.length}个）：\n${todayEvents.map(fmtEvent).join('\n')}`
+    : upcomingEvents.length > 0
+      ? `今天无日程，即将到来：\n${upcomingEvents.map(fmtEvent).join('\n')}`
+      : '今天没有日历安排';
 
-输出 JSON 数组，每个元素：
-{
-  "id": "greeting|weather|calendar|email|memory|closing",
-  "type": "greeting|weather|calendar|email|memory|closing",
-  "text": "这段的说话内容",
-  "voice": "nova",
-  "emoji": "对应 emoji"
-}
+  const emailSection = emailHighlights?.length
+    ? `邮件摘要：\n${emailHighlights.slice(0, 3).map((h) => `• ${h}`).join('\n')}`
+    : '';
 
-只输出 JSON 数组，不要其他文字。`;
+  const memorySection = memoryNotes?.length
+    ? `记忆提示：\n${memoryNotes.slice(0, 3).map((n) => `• ${n}`).join('\n')}`
+    : '';
+
+  const prompt = `你是 Nesio，用户的私人 AI 助理。现在用播客主持人的口吻，给用户播报今天的早/晚间简报。
+
+【用户信息】
+姓名：${displayName || '你'}
+当前时间：${dateStr} ${timeStr}
+${weatherText ? `天气：${weatherText}` : ''}
+${calendarSection}
+${emailSection}
+${memorySection}
+
+【播报要求】
+- 语气：温暖、自然、像熟悉你的朋友在说话。用"你"，不用"您"
+- 长度：纯文字 120-180 字，适合朗读 40-60 秒
+- 结构：开场问候 → 天气一句（如有）→ 最重要的 1-2 个日程细说 → 邮件/记忆亮点（如有） → 一句暖心收尾
+- 注意：如果没有日程，用积极的方式说"今天是自由时间"；不要机械列举，要自然串联
+- 输出：直接输出说话的文字，不要任何标题、括号、标注
+
+直接开始说，不要说"好的"或"以下是"。`;
 
   try {
     const res = await fetch(`${GEMINI_URL}?key=${geminiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.85, maxOutputTokens: 400 },
+      }),
     });
     const data = await res.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
-    const raw = data.candidates?.[0]?.content?.parts?.map((p) => p.text).join('') || '';
-    const jsonStr = raw.match(/```(?:json)?\s*([\s\S]*?)```/)?.[1]?.trim() || raw.trim();
-    const segments = JSON.parse(jsonStr) as BriefSegment[];
-    const script = segments.map((s) => s.text).join(' ');
-    return NextResponse.json({ ok: true, segments, script });
-  } catch {
-    // Fallback
-    const segments: BriefSegment[] = [
-      { id: 'greeting', type: 'greeting' as const, voice: 'nova' as const, emoji: '👋',
-        text: `${timeGreeting}，${displayName}。今天是${dateStr}。` },
-      { id: 'weather', type: 'weather' as const, voice: 'nova' as const, emoji: '🌤',
-        text: weather ? `气温${weather.temperatureC}度，${weather.condition}。` : '' },
-      { id: 'calendar', type: 'calendar' as const, voice: 'nova' as const, emoji: '📅',
-        text: events?.length ? `今天有${events.length}个安排，最重要的是${events[0].title}。` : '今天没有特别安排。' },
-      { id: 'closing', type: 'closing' as const, voice: 'nova' as const, emoji: '✨',
-        text: '有任何事情，告诉我。' },
-    ].filter((s) => s.text);
-    return NextResponse.json({ ok: true, segments, script: segments.map((s) => s.text).join(' ') });
-  }
+    const script = data.candidates?.[0]?.content?.parts?.map((p) => p.text).join('').trim() || '';
+    if (script) return NextResponse.json({ ok: true, script });
+  } catch { /* fall through */ }
+
+  return NextResponse.json({ ok: true, script: buildFallbackScript() });
 }
