@@ -29,6 +29,8 @@ import { createAppApiClient } from '@/lib/portal/app-api-client';
 import VoiceBrief from './VoiceBrief';
 import DailyBriefCard from './DailyBriefCard';
 import InsightsSheet from './InsightsSheet';
+import MemoryFlashBanner, { useMemoryFlash } from './MemoryFlashBanner';
+import WrappedCard, { useWrappedTrigger } from './WrappedCard';
 
 // ---- Shared empty-state card ----
 
@@ -1605,6 +1607,7 @@ function TodayFocusSection({
   const [localNodes, setLocalNodes] = useState<FocusNode[]>([]);
   const [calRecorderEvent, setCalRecorderEvent] = useState<CalendarEvent | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const { flashNodes, triggerFlash, dismiss: dismissFlash } = useMemoryFlash();
 
   // ── Attention Engine: score calendar events ──
   const now = new Date();
@@ -1644,10 +1647,13 @@ function TodayFocusSection({
     setQuickAdd('');
     setCollapsed(false);
     inputRef.current?.blur();
+    triggerFlash({ id: node.id, name: node.name });
   }
 
   return (
     <div className="nesio-focus-section">
+      <MemoryFlashBanner nodes={flashNodes} onDismiss={dismissFlash} />
+
       <div className="nesio-focus-header">
         <h2 className="nesio-focus-title">今日焦点</h2>
         <div className="nesio-focus-header-right">
@@ -2004,6 +2010,7 @@ export default function TodayFeed({
   }, [canUsePrivateData]);
 
   const initials = canUsePrivateData ? (displayName.trim().slice(0, 1) || '我') : '我';
+  const { shouldShow: showWrapped, dismiss: dismissWrapped } = useWrappedTrigger();
 
   // Merge email signal cards into proactive cards when new signals arrive between applyViewModel calls.
   // Email-sourced cards get priority; existing non-email cards fill remaining slots up to 2.
@@ -2038,6 +2045,9 @@ export default function TodayFeed({
       </header>
 
       <div className="nesio-today-scroll">
+        {/* 季度 Wrapped 卡片 */}
+        {showWrapped && <WrappedCard onDismiss={dismissWrapped} />}
+
         {/* 顶部双圆按钮：听简报 + 此刻 */}
         <div className="nesio-today-top-row">
           <DailyBriefCard

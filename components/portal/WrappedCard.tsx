@@ -1,0 +1,216 @@
+'use client';
+
+/**
+ * 季度 Wrapped 卡片 — 每 90 天自动推送生命回顾
+ * 规则引擎生成叙事，不依赖 LLM。
+ */
+
+import { useEffect, useState } from 'react';
+import { getLifeGraph, type LifeNode } from '@/lib/portal/life-graph';
+
+const STORAGE_KEY = 'nesio-wrapped-last';
+const INTERVAL_DAYS = 90;
+
+// Domain keyword mapping (mirrors LifeCivilizationMap)
+const DOMAIN_KEYWORDS: Record<string, string[]> = {
+  '关系': ['朋友','家人','父母','妻子','丈夫','孩子','恋人','同事','认识','见面','聚会','婚礼','约会'],
+  '事业': ['工作','项目','会议','客户','目标','计划','完成','上线','发布','晋升','离职','创业'],
+  '健康': ['运动','跑步','健身','睡眠','饮食','医院','体检','感冒','恢复','锻炼','冥想'],
+  '成长': ['学习','读书','课程','技能','思考','反思','写作','输出','培训','研究'],
+  '自我': ['旅行','爱好','创作','音乐','电影','游戏','休息','放松','探索','体验'],
+};
+
+const DOMAIN_EMOJI: Record<string, string> = {
+  '关系': '👥', '事业': '💼', '健康': '💚', '成长': '📚', '自我': '✨',
+};
+
+interface WrappedData {
+  quarterLabel: string;          // e.g. "2026 Q2"
+  totalNodes: number;
+  dominantDomain: string;
+  dominantEmoji: string;
+  topNodeName: string;
+  narrativeLine: string;
+  domainBreakdown: Array<{ label: string; emoji: string; count: number }>;
+}
+
+function getQuarterLabel(date: Date): string {
+  const q = Math.floor(date.getMonth() / 3) + 1;
+  return `${date.getFullYear()} Q${q}`;
+}
+
+function detectDomain(node: LifeNode): string | null {
+  const text = [node.name, ...(node.tags ?? [])].join(' ').toLowerCase();
+  for (const [domain, kws] of Object.entries(DOMAIN_KEYWORDS)) {
+    if (kws.some((k) => text.includes(k))) return domain;
+  }
+  return null;
+}
+
+function buildWrappedData(nodes: LifeNode[], quarterStart: Date, quarterEnd: Date): WrappedData {
+  const quarterNodes = nodes.filter((n) => {
+    const d = new Date(n.createdAt);
+    return d >= quarterStart && d <= quarterEnd;
+  });
+
+  const label = getQuarterLabel(quarterStart);
+  const total = quarterNodes.length;
+
+  // Count per domain
+  const domainCount: Record<string, number> = {};
+  for (const node of quarterNodes) {
+    const d = detectDomain(node) ?? '自我';
+    domainCount[d] = (domainCount[d] ?? 0) + 1;
+  }
+
+  const sorted = Object.entries(domainCount).sort((a, b) => b[1] - a[1]);
+  const dominant = sorted[0]?.[0] ?? '自我';
+  const dominantEmoji = DOMAIN_EMOJI[dominant] ?? '✨';
+
+  // Top node: most-tagged or highest confidence
+  const topNode = quarterNodes
+    .slice()
+    .sort((a, b) => (b.tags?.length ?? 0) - (a.tags?.length ?? 0) || b.confidence - a.confidence)[0];
+
+  const topNodeName = topNode?.name ?? '一段珍贵的时光';
+
+  // Generate narrative
+  const narrative = generateNarrative(label, total, dominant, topNodeName, sorted);
+
+  const breakdown = Object.entries(DOMAIN_KEYWORDS)
+    .map((e) => e[0])
+    .map((domain) => ({
+      label: domain,
+      emoji: DOMAIN_EMOJI[domain] ?? '·',
+      count: domainCount[domain] ?? 0,
+    }))
+    .filter((d) => d.count > 0)
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 4);
+
+  return {
+    quarterLabel: label,
+    totalNodes: total,
+    dominantDomain: dominant,
+    dominantEmoji,
+    topNodeName,
+    narrativeLine: narrative,
+    domainBreakdown: breakdown,
+  };
+}
+
+function generateNarrative(
+  quarter: string,
+  total: number,
+  dominant: string,
+  topNode: string,
+  sorted: [string, number][],
+): string {
+  const second = sorted[1]?.[0];
+  const shift = second ? `，同时在${second}上也有积累` : '';
+
+  if (total === 0) {
+    return `${quarter}，你开始记录自己的生命轨迹。`;
+  }
+  if (total < 5) {
+    return `${quarter}，你留下了 ${total} 条记忆，「${topNode}」是这段时间最深的印记。`;
+  }
+
+  const templates = [
+    `${quarter}，你的生命重心落在了${dominant}${shift}。「${topNode}」留下了深刻印记。`,
+    `这个季度你记录了 ${total} 件事，大多关于${dominant}。「${topNode}」是其中最鲜活的一章。`,
+    `${quarter}：${dominant}${shift}。每一条记录都是在告诉未来的自己——那段时光存在过。`,
+  ];
+
+  return templates[total % templates.length];
+}
+
+function getQuarterRange(date: Date): { start: Date; end: Date } {
+  const q = Math.floor(date.getMonth() / 3);
+  const start = new Date(date.getFullYear(), q * 3, 1);
+  const end = new Date(date.getFullYear(), q * 3 + 3, 0, 23, 59, 59);
+  return { start, end };
+}
+
+// ── Component ──────────────────────────────────────────────────────────────
+
+interface Props {
+  onDismiss: () => void;
+}
+
+export function useWrappedTrigger(): { shouldShow: boolean; dismiss: () => void } {
+  const [shouldShow, setShouldShow] = useState(false);
+
+  useEffect(() => {
+    try {
+      const lastRaw = localStorage.getItem(STORAGE_KEY);
+      if (!lastRaw) {
+        // First time — don't show immediately, just record now
+        localStorage.setItem(STORAGE_KEY, new Date().toISOString());
+        return;
+      }
+      const lastDate = new Date(lastRaw);
+      const daysSince = (Date.now() - lastDate.getTime()) / 86_400_000;
+      if (daysSince >= INTERVAL_DAYS) {
+        setShouldShow(true);
+      }
+    } catch {
+      // localStorage not available
+    }
+  }, []);
+
+  const dismiss = () => {
+    setShouldShow(false);
+    try {
+      localStorage.setItem(STORAGE_KEY, new Date().toISOString());
+    } catch { /* ignore */ }
+  };
+
+  return { shouldShow, dismiss };
+}
+
+export default function WrappedCard({ onDismiss }: Props) {
+  const [data, setData] = useState<WrappedData | null>(null);
+
+  useEffect(() => {
+    const nodes = getLifeGraph();
+    const now = new Date();
+    // Show the PREVIOUS quarter's wrap
+    const prevQuarterEnd = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 0, 23, 59, 59);
+    const { start, end } = getQuarterRange(prevQuarterEnd);
+    const built = buildWrappedData(nodes, start, end);
+    setData(built);
+  }, []);
+
+  if (!data) return null;
+
+  return (
+    <div className="wrapped-card">
+      <button type="button" className="wrapped-card-close" onClick={onDismiss} aria-label="关闭">✕</button>
+
+      <div className="wrapped-card-header">
+        <span className="wrapped-card-season">{data.dominantEmoji}</span>
+        <div>
+          <p className="wrapped-card-quarter">{data.quarterLabel} 回顾</p>
+          <p className="wrapped-card-count">{data.totalNodes} 条记忆</p>
+        </div>
+      </div>
+
+      <p className="wrapped-card-narrative">{data.narrativeLine}</p>
+
+      {data.domainBreakdown.length > 0 && (
+        <div className="wrapped-card-domains">
+          {data.domainBreakdown.map((d) => (
+            <div key={d.label} className="wrapped-card-domain">
+              <span className="wrapped-card-domain-emoji">{d.emoji}</span>
+              <span className="wrapped-card-domain-label">{d.label}</span>
+              <span className="wrapped-card-domain-count">{d.count}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <p className="wrapped-card-footer">每段时光都值得被记录 · Nesio</p>
+    </div>
+  );
+}

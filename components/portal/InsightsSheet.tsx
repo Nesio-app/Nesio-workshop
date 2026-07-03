@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { MyExperimentWidget } from '@/components/portal/NesioExperiment';
 import LifeCivilizationMap from '@/components/portal/LifeCivilizationMap';
+import ConstellationMap from '@/components/portal/ConstellationMap';
 import { getLifeGraph } from '@/lib/portal/life-graph';
 import type { LifeNode } from '@/lib/portal/life-graph';
 import { getMirrorProfile, type MirrorProfile } from '@/lib/portal/mirror-profile';
@@ -609,6 +610,15 @@ function LivingModelTab({
             ↺
           </button>
         </div>
+      </div>
+
+      {/* 星座 SVG 图 */}
+      <div className="nesio-insights-section" style={{ marginTop: 'var(--space-2)' }}>
+        <p className="nesio-insights-section-label">认知星座图</p>
+        <ConstellationMap
+          model={model}
+          onLayerClick={(id) => setExpandedLayer(id)}
+        />
       </div>
 
       {!hasAnyInsight && (

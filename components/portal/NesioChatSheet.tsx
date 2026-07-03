@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { addLifeNode, searchLifeGraphFuzzy, type LifeNode } from '@/lib/portal/life-graph';
 import { loadProfileSettings } from '@/lib/portal/profile';
+import MemoryFlashBanner, { useMemoryFlash } from '@/components/portal/MemoryFlashBanner';
 
 interface ChatMessage { role: 'user' | 'model'; text: string; }
 
@@ -293,6 +294,7 @@ export default function NesioChatSheet({
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  const { flashNodes, triggerFlash, dismiss: dismissFlash } = useMemoryFlash();
   // voiceMode: false = text input, true = hold-to-talk bar
   const [voiceMode, setVoiceMode] = useState(false);
   const [recording, setRecording] = useState(false);
@@ -372,13 +374,14 @@ export default function NesioChatSheet({
   }, [messages, sending]);
 
   function handleSave(msg: UiMessage) {
-    addLifeNode({
+    const savedNode = addLifeNode({
       name: msg.text.slice(0, 60), type: 'event', source: 'manual', confidence: 0.9,
       tags: ['宝盒对话'], attributes: { fullText: msg.text, savedFromChat: true },
       relations: [], rawInput: msg.text,
     });
     setMessages((prev) => prev.map((m) => m.id === msg.id ? { ...m, savedToMemory: true } : m));
     window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
+    triggerFlash(savedNode);
   }
 
   function handleCopy(msg: UiMessage) {
@@ -542,6 +545,9 @@ export default function NesioChatSheet({
 
   return (
     <div className="nesio-wechat-fullscreen" role="dialog" aria-modal="true" aria-label="问一问">
+      {/* 关联记忆闪现 */}
+      <MemoryFlashBanner nodes={flashNodes} onDismiss={dismissFlash} />
+
       {/* Header */}
       <div className="nesio-wechat-header">
         <button type="button" className="nesio-wechat-back-btn" onClick={onClose} aria-label="关闭">←</button>
