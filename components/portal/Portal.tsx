@@ -419,7 +419,7 @@ export default function Portal() {
               if (Array.isArray(data.events) && data.events.length > 0) {
                 import('@/lib/portal/life-graph').then(({ addLifeNode, getLifeGraph }) => {
                   const now = Date.now();
-                  const week = now + 7 * 86_400_000;
+                  const week = now + 60 * 86_400_000;
                   const existing = getLifeGraph();
                   const existingCalIds = new Set(
                     existing.filter((n) => n.source === 'calendar').map((n) => n.attributes.calendarId as string).filter(Boolean)
@@ -548,7 +548,7 @@ export default function Portal() {
           if (!Array.isArray(data.events) || data.events.length === 0) return;
           import('@/lib/portal/life-graph').then(({ addLifeNode, getLifeGraph }) => {
             const now = Date.now();
-            const week = now + 7 * 86_400_000;
+            const week = now + 60 * 86_400_000;
             const existing = getLifeGraph();
             const existingCalIds = new Set(
               existing.filter((n) => n.source === 'calendar')

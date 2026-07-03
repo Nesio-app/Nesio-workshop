@@ -60,7 +60,7 @@ function saveToken(id: string, token: string) {
   } catch { /* ignore */ }
 }
 
-interface SyncResult { ok: boolean; msg: string; detail?: string }
+interface SyncResult { ok: boolean; msg: string; detail?: string; needsReauth?: boolean }
 
 export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
   const fileRef = useRef<HTMLInputElement>(null);
@@ -167,9 +167,12 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
           emailCount?: number; count?: number; messages?: unknown[];
         };
         if (!data.ok) {
-          const detail = `error: ${data.error || '未知'} | HTTP ${res.status}`;
-          setOauthSyncResult((p) => ({ ...p, gmail: { ok: false, msg: `同步失败`, detail } }));
-          showToast(`Gmail 同步失败：${data.error || '未知'}`, false);
+          const isNotConnected = data.error === 'not_connected' || data.error === 'token_expired';
+          const detail = isNotConnected
+            ? 'OAuth token 已失效，请重新授权'
+            : `error: ${data.error || '未知'} | HTTP ${res.status}`;
+          setOauthSyncResult((p) => ({ ...p, gmail: { ok: false, msg: isNotConnected ? '需要重新授权' : '同步失败', detail, needsReauth: isNotConnected } as SyncResult }));
+          showToast(isNotConnected ? 'Gmail token 已失效，点击重新授权' : `Gmail 同步失败：${data.error || '未知'}`, false);
         } else {
           const nodeCount = data.nodes?.length ?? 0;
           const emailCount = data.emailCount ?? data.messages?.length ?? 0;
@@ -312,6 +315,9 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
                       <p className="nesio-connector-sync" style={{ color: oauthSyncResult[c.id].ok ? 'var(--status-go)' : 'var(--status-risk)', fontSize: '0.68rem', lineHeight: 1.4 }}>
                         {oauthSyncResult[c.id].msg}
                         {oauthSyncResult[c.id].detail && <><br /><span style={{ opacity: 0.8 }}>{oauthSyncResult[c.id].detail}</span></>}
+                        {oauthSyncResult[c.id].needsReauth && (
+                          <><br /><button type="button" style={{ marginTop: '0.25rem', fontSize: '0.68rem', color: 'var(--portal-blue-deep)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', padding: 0 }} onClick={() => handleConnect(c)}>点击重新授权 →</button></>
+                        )}
                       </p>
                     )}
                   </div>
