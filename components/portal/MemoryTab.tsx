@@ -271,8 +271,8 @@ function findRelatedNodes(target: LifeNode, allNodes: LifeNode[]): LifeNode[] {
     .filter((n) => n.id !== target.id)
     .map((node) => {
       let score = 0;
-      if (target.relations.some((r) => r.targetId === node.id)) score += 10;
-      if (node.relations.some((r) => r.targetId === target.id)) score += 10;
+      if (target.relations?.some((r) => r.targetId === node.id)) score += 10;
+      if (node.relations?.some((r) => r.targetId === target.id)) score += 10;
       score += (node.tags || []).filter((t) => targetTags.has(t)).length * 3;
       const nodeWords = extractKeywords(`${node.name} ${node.rawInput || ''}`);
       score += targetWords.filter((w) => nodeWords.includes(w)).length * 2;
@@ -590,15 +590,15 @@ const MEM_NODE_COLOR: Record<string, string> = {
 };
 
 function buildMemGraphNodes(nodes: LifeNode[]): GNode[] {
-  const connected = nodes.filter(n => n.relations.length > 0 || nodes.some(o => o.relations.some(r => r.targetId === n.id)));
+  const connected = nodes.filter(n => (n.relations?.length ?? 0) > 0 || nodes.some(o => o.relations?.some(r => r.targetId === n.id)));
   if (connected.length === 0) return nodes.slice(0, 15).map(n => ({
     id: n.id, label: n.name, type: n.type, weight: n.confidence,
     color: MEM_NODE_COLOR[n.type] ?? 'var(--portal-accent)',
   }));
-  const maxRel = Math.max(1, ...connected.map(n => n.relations.length));
+  const maxRel = Math.max(1, ...connected.map(n => n.relations?.length ?? 0));
   return connected.slice(0, 30).map(n => ({
     id: n.id, label: n.name, type: n.type,
-    weight: 0.3 + (n.relations.length / maxRel) * 0.7,
+    weight: 0.3 + ((n.relations?.length ?? 0) / maxRel) * 0.7,
     color: MEM_NODE_COLOR[n.type] ?? 'var(--portal-accent)',
   }));
 }
@@ -608,6 +608,7 @@ function buildMemGraphEdges(nodes: LifeNode[]): GEdge[] {
   const seen = new Set<string>();
   const edges: GEdge[] = [];
   for (const node of nodes) {
+    if (!node.relations?.length) continue;
     for (const rel of node.relations) {
       if (!idSet.has(rel.targetId)) continue;
       const key = [node.id, rel.targetId].sort().join('|');

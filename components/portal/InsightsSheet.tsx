@@ -617,7 +617,7 @@ function buildModelGraphEdges(model: LivingModel | null): GEdge[] {
 
   // Cross-layer: insights sharing evidenceRefs
   const allInsights = model.layers.flatMap((l, li) =>
-    l.insights.filter(i => i.confidence >= 50).map((ins, ii) => ({ id: `${l.id}::${ii}`, refs: new Set(ins.evidenceRefs) })),
+    l.insights.filter(i => i.confidence >= 50).map((ins, ii) => ({ id: `${l.id}::${ii}`, refs: new Set(ins.evidenceRefs ?? []) })),
   );
   for (let i = 0; i < allInsights.length; i++) {
     for (let j = i + 1; j < allInsights.length; j++) {
@@ -753,10 +753,10 @@ function LivingModelTab({
                     <div key={insight.id} className="nesio-lm-insight">
                       <p className="nesio-lm-insight-content">{insight.content}</p>
                       <ConfidenceBar value={insight.confidence} />
-                      {insight.evidenceRefs.length > 0 && (
+                      {(insight.evidenceRefs?.length ?? 0) > 0 && (
                         <div className="nesio-lm-evidence">
                           <span className="nesio-lm-evidence-label">证据：</span>
-                          {insight.evidenceRefs.map((ref, i) => (
+                          {(insight.evidenceRefs ?? []).map((ref, i) => (
                             <span key={i} className="nesio-lm-evidence-tag">{ref}</span>
                           ))}
                         </div>

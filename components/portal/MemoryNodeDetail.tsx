@@ -451,12 +451,12 @@ const NODE_COLOR: Record<string, string> = {
 
 function buildGraphNodes(focus: LifeNode, related: LifeNode[]): GNode[] {
   const all = [focus, ...related];
-  const maxRel = Math.max(1, ...all.map(n => n.relations.length));
+  const maxRel = Math.max(1, ...all.map(n => n.relations?.length ?? 0));
   return all.map(n => ({
     id: n.id,
     label: n.name,
     type: n.type,
-    weight: 0.3 + (n.relations.length / maxRel) * 0.7,
+    weight: 0.3 + ((n.relations?.length ?? 0) / maxRel) * 0.7,
     color: NODE_COLOR[n.type] ?? 'var(--portal-accent)',
   }));
 }
@@ -468,6 +468,7 @@ function buildGraphEdges(focus: LifeNode, related: LifeNode[]): GEdge[] {
   const idSet = new Set(all.map(n => n.id));
 
   for (const node of all) {
+    if (!node.relations?.length) continue;
     for (const rel of node.relations) {
       if (!idSet.has(rel.targetId)) continue;
       const key = [node.id, rel.targetId].sort().join('|');
