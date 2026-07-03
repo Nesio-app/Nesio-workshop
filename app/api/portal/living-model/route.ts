@@ -29,6 +29,9 @@ interface LivingModelRequest {
   dominantDomains: string[];
   previousInsights: Array<{ layerId: string; content: string; verified: boolean | null }>;
   userName?: string;
+  perspectiveId?: string;
+  perspectiveName?: string;
+  perspectivePrompt?: string;
 }
 
 function envValue(key: string): string {
@@ -57,7 +60,11 @@ async function generateWithClaude(apiKey: string, body: LivingModelRequest): Pro
     ? body.previousInsights.map((p) => `[${p.layerId}] ${p.content}${p.verified === false ? '（用户否定）' : p.verified === true ? '（用户确认）' : ''}`).join('\n')
     : '无历史洞察';
 
-  const prompt = `你是 Nesio，一个深度了解用户的个人 AI 助手。请基于以下行为数据，推断用户的认知模型。
+  const perspectiveSection = body.perspectivePrompt
+    ? `\n\n## 当前分析视角\n你需要从"${body.perspectiveName}"的视角进行分析：${body.perspectivePrompt}\n请用这个框架来解读下方的行为数据，生成的洞察要体现该视角的独特切入点。`
+    : '';
+
+  const prompt = `你是 Nesio，一个深度了解用户的个人 AI 助手。请基于以下行为数据，推断用户的认知模型。${perspectiveSection}
 
 ## 用户行为数据
 - 总记录数：${body.nodeCount} 条

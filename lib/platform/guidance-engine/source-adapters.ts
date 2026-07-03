@@ -10,6 +10,7 @@ import type { CalendarEvent } from '@/lib/portal/types';
 import type { EmailSignal } from '@/lib/platform/email-signals';
 import type { ProactiveContextItem, FocusNode } from '@/lib/platform/view-models/today-view-model';
 import { inferEventType } from '@/lib/platform/attention-engine';
+import type { LifeNode } from '@/lib/portal/life-graph';
 import type { GuidanceEvent, GuidanceEventType } from './types';
 
 // ── Calendar ──────────────────────────────────────────────────────────────────
@@ -196,4 +197,108 @@ export function healthNodesToGuidanceEvents(healthItems: string[]): GuidanceEven
     confidence: 60,  // habit pattern = inferred, not explicitly scheduled
     payload: { itemName: healthItems[0], allItems: healthItems },
   }];
+}
+
+// ── Object context (物品关联情境) ─────────────────────────────────────────────
+
+// Context keywords to match against object names/tags
+const CONTEXT_KEYWORD_MAP: Array<{
+  contextTypes: GuidanceEventType[];
+  keywords: string[];
+  objectKeywords: string[];
+}> = [
+  { contextTypes: ['birthday', 'anniversary'], keywords: ['生日', '纪念日', '庆祝'], objectKeywords: ['礼物', '礼品', 'gift', '包装', '卡片', '蜡烛', '蛋糕', '玩具', '香水'] },
+  { contextTypes: ['travel', 'flight'], keywords: ['旅行', '出行', '出发', '机场'], objectKeywords: ['行李', '旅行', '充电', '插头', '转换', 'adapter', '护照', '雨伞', '药品', '墨镜'] },
+  { contextTypes: ['meeting'], keywords: ['会议', '汇报', '演讲', '会面'], objectKeywords: ['投影', 'HDMI', '笔记本', '演示', '名片', '文件', '材料'] },
+  { contextTypes: ['medical'], keywords: ['看病', '医院', '体检'], objectKeywords: ['病历', '社保卡', '医保', '药', '报告', '检查单'] },
+];
+
+/**
+ * Given upcoming guidance events and the user's life graph nodes,
+ * surface owned objects that are relevant to those contexts.
+ */
+export function objectContextEvents(
+  upcomingEvents: GuidanceEvent[],
+  nodes: LifeNode[],
+  now: Date = new Date(),
+): GuidanceEvent[] {
+  const objectNodes = nodes.filter((n) => n.type === 'object');
+  const results: GuidanceEvent[] = [];
+  const seenNodeIds = new Set<string>();
+
+  // 1. Match objects to upcoming events by keyword overlap
+  for (const event of upcomingEvents) {
+    const hoursUntil = event.scheduledAt
+      ? (event.scheduledAt.getTime() - now.getTime()) / 3_600_000
+      : Infinity;
+    if (hoursUntil > 7 * 24 || hoursUntil < 0) continue; // only look 7 days ahead
+
+    const relevantObjectKeywords: string[] = [];
+    for (const mapping of CONTEXT_KEYWORD_MAP) {
+      if (mapping.contextTypes.includes(event.type)) {
+        relevantObjectKeywords.push(...mapping.objectKeywords);
+      }
+    }
+    if (relevantObjectKeywords.length === 0) continue;
+
+    const titleLower = event.title.toLowerCase();
+
+    for (const node of objectNodes) {
+      if (seenNodeIds.has(node.id)) continue;
+      const nameAndTags = [node.name, ...(node.tags ?? [])].join(' ').toLowerCase();
+      const isRelevant = relevantObjectKeywords.some((kw) => nameAndTags.includes(kw.toLowerCase()));
+      if (!isRelevant) continue;
+
+      seenNodeIds.add(node.id);
+      const loc = typeof node.attributes?.location === 'string' ? node.attributes.location : '';
+      results.push({
+        id: `obj-ctx-${node.id}-${event.id}`,
+        type: 'object_context',
+        title: node.name,
+        scheduledAt: event.scheduledAt,
+        source: 'memory',
+        confidence: 55,
+        payload: {
+          itemName: node.name,
+          location: loc,
+          contextName: event.title,
+          contextType: event.type,
+          nodeId: node.id,
+        },
+      });
+      if (results.length >= 3) return results; // cap at 3 object_context cards
+    }
+  }
+
+  // 2. Surface objects with expiry dates coming up within 7 days
+  const sevenDaysMs = 7 * 24 * 3_600_000;
+  for (const node of objectNodes) {
+    if (seenNodeIds.has(node.id)) continue;
+    const expiry = node.attributes?.expiry;
+    if (!expiry || typeof expiry !== 'string') continue;
+    const expiryDate = new Date(expiry);
+    if (Number.isNaN(expiryDate.getTime())) continue;
+    const diff = expiryDate.getTime() - now.getTime();
+    if (diff < 0 || diff > sevenDaysMs) continue;
+
+    seenNodeIds.add(node.id);
+    const loc = typeof node.attributes?.location === 'string' ? node.attributes.location : '';
+    results.push({
+      id: `obj-expiry-${node.id}`,
+      type: 'object_context',
+      title: `${node.name} 即将过期`,
+      scheduledAt: expiryDate,
+      source: 'memory',
+      confidence: 70,
+      payload: {
+        itemName: node.name,
+        location: loc,
+        expiryDate: expiry,
+        nodeId: node.id,
+      },
+    });
+    if (results.length >= 3) break;
+  }
+
+  return results;
 }

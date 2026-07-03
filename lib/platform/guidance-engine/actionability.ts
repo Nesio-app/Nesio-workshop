@@ -77,6 +77,15 @@ export function buildAction(event: GuidanceEvent, urgency: WindowUrgency): Guida
       return { label: `${item} — 现在花 1 分钟开始`, cta: '打卡', actionType: 'done' };
     }
 
+    case 'object_context': {
+      const item = String(event.payload.itemName ?? '这件东西');
+      const loc = String(event.payload.location ?? '');
+      if (event.payload.expiryDate) {
+        return { label: `处理 ${item}${loc ? `（${loc}）` : ''}`, cta: '知道了', actionType: 'dismiss' };
+      }
+      return { label: `确认 ${item} 是否需要用${loc ? `（${loc}）` : ''}`, cta: '知道了', actionType: 'dismiss' };
+    }
+
     default:
       return null;
   }

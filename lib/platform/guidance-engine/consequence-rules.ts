@@ -10,9 +10,10 @@ const CONSEQUENCE: Record<GuidanceEventType, ConsequenceSeverity> = {
   anniversary:  2,  // forget
   travel:       2,  // unprepared for departure
   email_signal: 2,  // varies — default medium
-  health_habit: 1,  // break a streak
-  weather_cold: 1,  // uncomfortable
-  weather_rain: 1,  // get wet
+  health_habit:   1,  // break a streak
+  weather_cold:   1,  // uncomfortable
+  weather_rain:   1,  // get wet
+  object_context: 1,  // miss a relevant owned item — low stakes but useful
 };
 
 export function getConsequenceSeverity(type: GuidanceEventType): ConsequenceSeverity {

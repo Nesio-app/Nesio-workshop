@@ -28,6 +28,157 @@ import {
 } from '@/lib/portal/project';
 import { buildNarratorCards, type NarratorCard } from '@/lib/portal/memory-narrator';
 import MemoryNodeDetail from './MemoryNodeDetail';
+import FreezeVaultSheet from './FreezeVaultSheet';
+
+// ── Object Map (物品地图) ────────────────────────────────────────────────────
+
+interface LocationTree {
+  place: string;
+  rooms: { room: string; subRooms: { sub: string; items: LifeNode[] }[] }[];
+  unroomed: LifeNode[];
+}
+
+function parseLocation(loc: string): { place: string; room: string; sub: string } {
+  const parts = loc.split(' · ');
+  return { place: parts[0] ?? '', room: parts[1] ?? '', sub: parts[2] ?? '' };
+}
+
+function buildLocationTree(objectNodes: LifeNode[]): { tree: LocationTree[]; unlocated: LifeNode[] } {
+  const placeMap = new Map<string, { rooms: Map<string, Map<string, LifeNode[]>>; unroomed: LifeNode[] }>();
+  const unlocated: LifeNode[] = [];
+
+  for (const n of objectNodes) {
+    const locRaw = typeof n.attributes?.location === 'string' ? n.attributes.location : '';
+    if (!locRaw) { unlocated.push(n); continue; }
+    const { place, room, sub } = parseLocation(locRaw);
+    if (!place) { unlocated.push(n); continue; }
+
+    if (!placeMap.has(place)) placeMap.set(place, { rooms: new Map(), unroomed: [] });
+    const placeEntry = placeMap.get(place)!;
+
+    if (!room) { placeEntry.unroomed.push(n); continue; }
+    if (!placeEntry.rooms.has(room)) placeEntry.rooms.set(room, new Map());
+    const roomMap = placeEntry.rooms.get(room)!;
+    const subKey = sub || '__none__';
+    if (!roomMap.has(subKey)) roomMap.set(subKey, []);
+    roomMap.get(subKey)!.push(n);
+  }
+
+  const tree: LocationTree[] = Array.from(placeMap.entries()).map(([place, { rooms, unroomed }]) => ({
+    place,
+    rooms: Array.from(rooms.entries()).map(([room, subMap]) => ({
+      room,
+      subRooms: Array.from(subMap.entries()).map(([sub, items]) => ({ sub: sub === '__none__' ? '' : sub, items })),
+    })),
+    unroomed,
+  }));
+
+  return { tree, unlocated };
+}
+
+function ObjectMap({ nodes, onOpenNode }: { nodes: LifeNode[]; onOpenNode: (n: LifeNode) => void }) {
+  const objectNodes = nodes.filter((n) => n.type === 'object');
+  const [expandedPlaces, setExpandedPlaces] = useState<Set<string>>(new Set());
+  const [expandedRooms, setExpandedRooms] = useState<Set<string>>(new Set());
+
+  const { tree, unlocated } = useMemo(() => buildLocationTree(objectNodes), [objectNodes]);
+
+  function togglePlace(p: string) {
+    setExpandedPlaces((prev) => {
+      const next = new Set(prev);
+      if (next.has(p)) next.delete(p); else next.add(p);
+      return next;
+    });
+  }
+  function toggleRoom(key: string) {
+    setExpandedRooms((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }
+
+  if (objectNodes.length === 0) {
+    return <p className="nesio-insights-empty" style={{ marginTop: '1rem' }}>暂无物品记录。拍照时选择存放位置，就能在这里看到。</p>;
+  }
+
+  const allCount = objectNodes.length;
+
+  return (
+    <div className="nesio-object-map">
+      <p className="nesio-object-map-summary">共 {allCount} 件物品</p>
+      {tree.map(({ place, rooms, unroomed }) => {
+        const total = rooms.reduce((s, r) => s + r.subRooms.reduce((a, sr) => a + sr.items.length, 0), 0) + unroomed.length;
+        const isOpen = expandedPlaces.has(place);
+        return (
+          <div key={place} className="nesio-object-map-place">
+            <button type="button" className="nesio-object-map-row nesio-object-map-row--place" onClick={() => togglePlace(place)}>
+              <span className="nesio-object-map-label">{place}</span>
+              <span className="nesio-object-map-count">{total}件</span>
+              <span className="nesio-object-map-chevron">{isOpen ? '▴' : '▾'}</span>
+            </button>
+            {isOpen && (
+              <div className="nesio-object-map-children">
+                {rooms.map(({ room, subRooms }) => {
+                  const roomKey = `${place}::${room}`;
+                  const roomCount = subRooms.reduce((a, sr) => a + sr.items.length, 0);
+                  const isRoomOpen = expandedRooms.has(roomKey);
+                  return (
+                    <div key={room} className="nesio-object-map-room">
+                      <button type="button" className="nesio-object-map-row nesio-object-map-row--room" onClick={() => toggleRoom(roomKey)}>
+                        <span className="nesio-object-map-label">📂 {room}</span>
+                        <span className="nesio-object-map-count">{roomCount}件</span>
+                        <span className="nesio-object-map-chevron">{isRoomOpen ? '▴' : '▾'}</span>
+                      </button>
+                      {isRoomOpen && (
+                        <div className="nesio-object-map-children">
+                          {subRooms.map(({ sub, items }) => (
+                            <div key={sub || 'direct'}>
+                              {sub && <p className="nesio-object-map-sub-label">· {sub}</p>}
+                              {items.map((n) => (
+                                <button key={n.id} type="button" className="nesio-object-map-item" onClick={() => onOpenNode(n)}>
+                                  <span>📦 {n.name}</span>
+                                  {n.tags?.[0] && <span className="nesio-object-map-item-tag">{n.tags[0]}</span>}
+                                </button>
+                              ))}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                {unroomed.map((n) => (
+                  <button key={n.id} type="button" className="nesio-object-map-item" onClick={() => onOpenNode(n)}>
+                    <span>📦 {n.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+      {unlocated.length > 0 && (
+        <div className="nesio-object-map-place">
+          <button type="button" className="nesio-object-map-row nesio-object-map-row--place" onClick={() => togglePlace('__unlocated__')}>
+            <span className="nesio-object-map-label" style={{ color: 'var(--portal-muted)' }}>未定位</span>
+            <span className="nesio-object-map-count">{unlocated.length}件</span>
+            <span className="nesio-object-map-chevron">{expandedPlaces.has('__unlocated__') ? '▴' : '▾'}</span>
+          </button>
+          {expandedPlaces.has('__unlocated__') && (
+            <div className="nesio-object-map-children">
+              {unlocated.map((n) => (
+                <button key={n.id} type="button" className="nesio-object-map-item" onClick={() => onOpenNode(n)}>
+                  <span>📦 {n.name}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -429,6 +580,8 @@ function CreateProjectSheet({
 export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: boolean }) {
   const [query, setQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
+  const [showObjectMap, setShowObjectMap] = useState(false);
+  const [showFreezeVault, setShowFreezeVault] = useState(false);
   const [locale, setLocale] = useState<PortalLocale>(() => loadProfileSettings().locale);
   const [nodes, setNodes] = useState<LifeNode[]>([]);
   const [selectedNode, setSelectedNode] = useState<LifeNode | null>(null);
@@ -626,19 +779,24 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                 <>
                   <div className="nesio-section-header" style={{ marginTop: '0.25rem' }}>
                     <span className="nesio-section-title">{copy.recent}</span>
-                    {typeFilter && (
-                      <button type="button" className="nesio-section-action" onClick={() => setTypeFilter(null)}>
-                        清除筛选
+                    <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                      {typeFilter && (
+                        <button type="button" className="nesio-section-action" onClick={() => setTypeFilter(null)}>
+                          清除筛选
+                        </button>
+                      )}
+                      <button type="button" className="nesio-section-action" onClick={() => setShowFreezeVault(true)} title="冷冻仓">
+                        🧊
                       </button>
-                    )}
+                    </div>
                   </div>
 
                   {/* Type filter — secondary, below header */}
                   <div className="nesio-memory-type-filter" role="group" aria-label="按类型筛选">
                     <button
                       type="button"
-                      className={`nesio-type-chip${!typeFilter ? ' is-active' : ''}`}
-                      onClick={() => setTypeFilter(null)}
+                      className={`nesio-type-chip${!typeFilter && !showObjectMap ? ' is-active' : ''}`}
+                      onClick={() => { setTypeFilter(null); setShowObjectMap(false); }}
                     >
                       {copy.allTypes}
                       <span className="nesio-type-chip-count">{nodes.length}</span>
@@ -647,13 +805,22 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                       <button
                         key={t}
                         type="button"
-                        className={`nesio-type-chip${typeFilter === t ? ' is-active' : ''}`}
-                        onClick={() => setTypeFilter((prev) => (prev === t ? null : t))}
+                        className={`nesio-type-chip${typeFilter === t && !showObjectMap ? ' is-active' : ''}`}
+                        onClick={() => { setTypeFilter((prev) => (prev === t ? null : t)); setShowObjectMap(false); }}
                       >
                         {TYPE_ICON[t]} {TYPE_LABEL[t]}
                         <span className="nesio-type-chip-count">{typeCounts[t]}</span>
                       </button>
                     ))}
+                    {(typeCounts['object'] ?? 0) > 0 && (
+                      <button
+                        type="button"
+                        className={`nesio-type-chip${showObjectMap ? ' is-active' : ''}`}
+                        onClick={() => { setShowObjectMap((prev) => !prev); setTypeFilter(null); }}
+                      >
+                        🗺 地图
+                      </button>
+                    )}
                   </div>
                 </>
               )}
@@ -673,8 +840,13 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
             <div className="nesio-memory-section-label">{copy.resultCount(results.length)}</div>
           )}
 
+          {/* Object map view */}
+          {showObjectMap && !isSearching && (
+            <ObjectMap nodes={nodes} onOpenNode={openNodeDetail} />
+          )}
+
           {/* Memory grid */}
-          {results.length > 0 ? (
+          {!showObjectMap && results.length > 0 ? (
             <div className="nesio-memory-grid">
               {visibleItems.map((node) => (
                 <MemoryCard
@@ -685,7 +857,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                 />
               ))}
             </div>
-          ) : isSearching ? (
+          ) : !showObjectMap && isSearching ? (
             <div className="nesio-memory-hero">
               <h2 className="nesio-memory-hero-title">{copy.noResult(query)}</h2>
               <p className="nesio-memory-hero-sub">{copy.noResultHint}</p>
@@ -749,6 +921,12 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
           }}
         />
       )}
+
+      {/* Freeze Vault sheet */}
+      <FreezeVaultSheet
+        open={showFreezeVault}
+        onClose={() => setShowFreezeVault(false)}
+      />
     </>
   );
 }

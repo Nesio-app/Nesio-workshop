@@ -12425,6 +12425,24 @@ html[data-portal-theme="night"] .nesio-insights-narrative-text { color: #d8dff8;
   transition: background 0.12s;
 }
 .nesio-lm-refresh-btn:hover { background: var(--portal-line); }
+.nesio-lm-perspective-btn {
+  background: rgba(139,92,246,0.12);
+  border: 1px solid rgba(139,92,246,0.3);
+  color: var(--portal-accent);
+  font-size: 0.72rem;
+  cursor: pointer;
+  padding: 0.2rem 0.55rem;
+  border-radius: 1rem;
+  transition: background 0.12s;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.nesio-lm-perspective-btn:hover { background: rgba(139,92,246,0.2); }
+.nesio-lm-perspective-badge {
+  font-size: 0.68rem;
+  color: var(--portal-accent);
+  opacity: 0.8;
+}
 .nesio-lm-empty {
   text-align: center;
   padding: 1rem 0.5rem 1.5rem;
@@ -17649,3 +17667,180 @@ html[data-portal-theme="night"] .nesio-create-project-input {
   transition: opacity 0.15s;
 }
 .nesio-widget-customizer-save:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── Object Map (物品地图) ────────────────────────────────────────── */
+.nesio-object-map { padding: 0.5rem 0; }
+.nesio-object-map-summary { font-size: 0.72rem; color: var(--portal-muted); margin-bottom: 0.6rem; }
+.nesio-object-map-place { margin-bottom: 0.25rem; }
+.nesio-object-map-row {
+  display: flex; align-items: center; gap: 0.4rem; width: 100%;
+  background: none; border: none; cursor: pointer; text-align: left;
+  padding: 0.45rem 0.5rem; border-radius: 0.5rem; transition: background 0.12s;
+}
+.nesio-object-map-row:hover { background: var(--portal-line); }
+.nesio-object-map-row--place { font-weight: 600; font-size: 0.85rem; color: var(--portal-ink); }
+.nesio-object-map-row--room { font-size: 0.8rem; color: var(--portal-ink); padding-left: 1.2rem; }
+.nesio-object-map-label { flex: 1; }
+.nesio-object-map-count { font-size: 0.7rem; color: var(--portal-muted); background: var(--portal-line); padding: 0.1rem 0.4rem; border-radius: 1rem; }
+.nesio-object-map-chevron { font-size: 0.65rem; color: var(--portal-muted); }
+.nesio-object-map-children { padding-left: 0.8rem; }
+.nesio-object-map-sub-label { font-size: 0.72rem; color: var(--portal-muted); padding: 0.15rem 0.5rem; }
+.nesio-object-map-item {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%; background: none; border: none; cursor: pointer; text-align: left;
+  font-size: 0.8rem; color: var(--portal-ink); padding: 0.3rem 0.5rem;
+  border-radius: 0.4rem; transition: background 0.12s;
+}
+.nesio-object-map-item:hover { background: var(--portal-line); }
+.nesio-object-map-item-tag { font-size: 0.68rem; color: var(--portal-muted); }
+
+/* ── Camera similar alert (拍照发现已有) ─────────────────────────── */
+.nesio-camera-similar-alert {
+  display: flex; align-items: flex-start; gap: 0.5rem;
+  background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3);
+  border-radius: 10px; padding: 0.65rem 0.7rem; margin: 0.4rem 0;
+}
+.nesio-camera-similar-icon { font-size: 1rem; flex-shrink: 0; margin-top: 0.05rem; }
+.nesio-camera-similar-body { flex: 1; }
+.nesio-camera-similar-title { font-size: 0.78rem; font-weight: 600; color: #f59e0b; margin-bottom: 0.2rem; }
+.nesio-camera-similar-item { font-size: 0.74rem; color: var(--portal-ink); margin: 0.1rem 0; }
+.nesio-camera-similar-loc { color: var(--portal-muted); }
+.nesio-camera-similar-dismiss {
+  background: none; border: none; color: var(--portal-muted); cursor: pointer;
+  font-size: 0.75rem; padding: 0.1rem; flex-shrink: 0;
+}
+
+/* ── Freeze Vault Sheet (冷冻仓) ─────────────────────────────────── */
+.nesio-freeze-overlay {
+  position: fixed; inset: 0; z-index: 1100;
+  background: rgba(0,0,0,0.55); display: flex; align-items: flex-end; justify-content: center;
+}
+.nesio-freeze-sheet {
+  background: var(--glass-bg-solid); border-radius: 20px 20px 0 0;
+  width: 100%; max-width: 480px; max-height: 80vh; overflow-y: auto;
+  padding: 1.25rem 1.1rem 2rem; box-shadow: 0 -4px 32px rgba(0,0,0,0.3);
+}
+.nesio-freeze-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.25rem; }
+.nesio-freeze-title { font-size: 1rem; font-weight: 700; color: var(--portal-ink); }
+.nesio-freeze-close { background: none; border: none; color: var(--portal-muted); cursor: pointer; font-size: 1rem; }
+.nesio-freeze-hint { font-size: 0.74rem; color: var(--portal-muted); margin-bottom: 0.75rem; }
+.nesio-freeze-tabs { display: flex; gap: 0.5rem; margin-bottom: 0.9rem; }
+.nesio-freeze-tab {
+  padding: 0.35rem 0.9rem; border-radius: 1rem; font-size: 0.78rem; font-weight: 500;
+  background: var(--portal-line); border: none; cursor: pointer; color: var(--portal-muted);
+  transition: background 0.12s, color 0.12s;
+}
+.nesio-freeze-tab--active { background: var(--portal-accent); color: #fff; }
+.nesio-freeze-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: #ef4444; color: #fff; font-size: 0.65rem; border-radius: 1rem;
+  padding: 0 0.35rem; min-width: 1.1rem; margin-left: 0.25rem;
+}
+.nesio-freeze-add { display: flex; flex-direction: column; gap: 0.6rem; }
+.nesio-freeze-url-input {
+  width: 100%; padding: 0.65rem 0.85rem; border-radius: 10px;
+  border: 1px solid var(--portal-line); background: var(--portal-surface);
+  color: var(--portal-ink); font-size: 0.84rem;
+}
+.nesio-freeze-parse-btn {
+  align-self: flex-start; padding: 0.35rem 1rem; border-radius: 1rem;
+  background: var(--portal-accent); color: #fff; font-size: 0.8rem; font-weight: 600;
+  border: none; cursor: pointer;
+}
+.nesio-freeze-parse-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.nesio-freeze-error { font-size: 0.74rem; color: #ef4444; }
+.nesio-freeze-preview { display: flex; gap: 0.75rem; align-items: flex-start; background: var(--portal-line); padding: 0.75rem; border-radius: 10px; }
+.nesio-freeze-preview-img { width: 60px; height: 60px; object-fit: cover; border-radius: 8px; flex-shrink: 0; }
+.nesio-freeze-preview-info { flex: 1; display: flex; flex-direction: column; gap: 0.2rem; }
+.nesio-freeze-name-input { font-size: 0.84rem; font-weight: 600; background: none; border: none; color: var(--portal-ink); width: 100%; }
+.nesio-freeze-price { font-size: 0.78rem; color: #f59e0b; margin: 0; }
+.nesio-freeze-store { font-size: 0.72rem; color: var(--portal-muted); margin: 0; }
+.nesio-freeze-hours-row { display: flex; align-items: center; gap: 0.5rem; }
+.nesio-freeze-hours-label { font-size: 0.78rem; color: var(--portal-muted); }
+.nesio-freeze-hours-chip {
+  padding: 0.2rem 0.65rem; border-radius: 1rem; font-size: 0.75rem;
+  background: var(--portal-line); border: 1px solid transparent; cursor: pointer; color: var(--portal-muted);
+}
+.nesio-freeze-hours-chip--active { border-color: var(--portal-accent); color: var(--portal-accent); background: rgba(139,92,246,0.1); }
+.nesio-freeze-commit-btn {
+  width: 100%; padding: 0.75rem; border-radius: 12px;
+  background: #3b82f6; color: #fff; font-size: 0.9rem; font-weight: 700; border: none; cursor: pointer;
+}
+.nesio-freeze-commit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.nesio-freeze-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.nesio-freeze-empty { font-size: 0.8rem; color: var(--portal-muted); text-align: center; padding: 1.5rem 0; }
+.nesio-freeze-section { margin-bottom: 0.75rem; }
+.nesio-freeze-section-label { font-size: 0.72rem; color: var(--portal-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.4rem; }
+.nesio-freeze-item {
+  display: flex; gap: 0.6rem; align-items: flex-start;
+  background: var(--portal-surface); border-radius: 12px; padding: 0.75rem;
+  border: 1px solid var(--portal-line);
+}
+.nesio-freeze-item--resolved { opacity: 0.5; }
+.nesio-freeze-item-img { width: 48px; height: 48px; object-fit: cover; border-radius: 8px; flex-shrink: 0; }
+.nesio-freeze-item-body { flex: 1; display: flex; flex-direction: column; gap: 0.15rem; }
+.nesio-freeze-item-name { font-size: 0.84rem; font-weight: 600; color: var(--portal-ink); margin: 0; }
+.nesio-freeze-item-price { font-size: 0.76rem; color: #f59e0b; margin: 0; }
+.nesio-freeze-item-store { font-size: 0.72rem; color: var(--portal-muted); margin: 0; }
+.nesio-freeze-item-time { font-size: 0.72rem; color: #3b82f6; margin: 0; }
+.nesio-freeze-item-actions { display: flex; gap: 0.4rem; margin-top: 0.4rem; flex-wrap: wrap; }
+.nesio-freeze-action-btn {
+  padding: 0.25rem 0.7rem; border-radius: 1rem; font-size: 0.74rem; font-weight: 600;
+  background: var(--portal-line); border: none; cursor: pointer; color: var(--portal-muted);
+  transition: background 0.12s;
+}
+.nesio-freeze-action-btn--buy { background: rgba(16,185,129,0.15); color: #10b981; }
+.nesio-freeze-action-btn--skip { background: rgba(239,68,68,0.12); color: #ef4444; }
+.nesio-freeze-decision-badge { font-size: 0.72rem; font-weight: 600; }
+
+/* ── My Experiment Widget (我的实验) ─────────────────────────────── */
+.nesio-exp-widget { display: flex; flex-direction: column; gap: 0.7rem; }
+.nesio-exp-empty { text-align: center; padding: 0.5rem 0 0.75rem; }
+.nesio-exp-empty p { font-size: 0.84rem; color: var(--portal-ink); margin-bottom: 0.3rem; }
+.nesio-exp-empty-hint { font-size: 0.73rem; color: var(--portal-muted) !important; line-height: 1.5; }
+.nesio-exp-card {
+  background: var(--portal-surface); border: 1px solid var(--portal-line);
+  border-radius: 12px; padding: 0.8rem 0.9rem; display: flex; flex-direction: column; gap: 0.4rem;
+}
+.nesio-exp-card-header { display: flex; align-items: center; justify-content: space-between; }
+.nesio-exp-name { font-size: 0.84rem; font-weight: 600; color: var(--portal-ink); }
+.nesio-exp-days { font-size: 0.7rem; color: var(--portal-muted); background: var(--portal-line); padding: 0.1rem 0.45rem; border-radius: 1rem; }
+.nesio-exp-hypo { font-size: 0.73rem; color: var(--portal-muted); margin: 0; font-style: italic; }
+.nesio-exp-stats { display: flex; gap: 0.75rem; font-size: 0.72rem; color: var(--portal-muted); flex-wrap: wrap; }
+.nesio-exp-sparkline { display: flex; gap: 2px; align-items: flex-end; height: 36px; margin: 0.2rem 0; }
+.nesio-exp-bar { width: 8px; background: var(--portal-accent); border-radius: 2px 2px 0 0; opacity: 0.7; min-height: 4px; }
+.nesio-exp-log-row { display: flex; gap: 0.4rem; margin-top: 0.25rem; }
+.nesio-exp-log-input {
+  flex: 1; padding: 0.35rem 0.6rem; border-radius: 8px; border: 1px solid var(--portal-line);
+  background: var(--portal-surface); color: var(--portal-ink); font-size: 0.8rem;
+}
+.nesio-exp-log-btn {
+  padding: 0.35rem 0.75rem; border-radius: 8px; background: var(--portal-accent);
+  color: #fff; font-size: 0.75rem; font-weight: 600; border: none; cursor: pointer;
+}
+.nesio-exp-conclude-btn {
+  padding: 0.35rem 0.65rem; border-radius: 8px; background: var(--portal-line);
+  color: var(--portal-muted); font-size: 0.73rem; border: none; cursor: pointer;
+}
+.nesio-exp-done { padding: 0.25rem 0; }
+.nesio-exp-done-label { font-size: 0.72rem; color: var(--portal-muted); }
+.nesio-exp-new-form { display: flex; flex-direction: column; gap: 0.45rem; background: var(--portal-surface); border: 1px solid var(--portal-line); border-radius: 12px; padding: 0.8rem; }
+.nesio-exp-input {
+  width: 100%; padding: 0.5rem 0.7rem; border-radius: 8px; border: 1px solid var(--portal-line);
+  background: var(--glass-bg-solid); color: var(--portal-ink); font-size: 0.8rem;
+}
+.nesio-exp-create-btn {
+  flex: 1; padding: 0.5rem; border-radius: 8px; background: var(--portal-accent);
+  color: #fff; font-size: 0.8rem; font-weight: 600; border: none; cursor: pointer;
+}
+.nesio-exp-create-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.nesio-exp-cancel-btn {
+  padding: 0.5rem 0.9rem; border-radius: 8px; background: var(--portal-line);
+  color: var(--portal-muted); font-size: 0.8rem; border: none; cursor: pointer;
+}
+.nesio-exp-add-btn {
+  align-self: flex-start; padding: 0.35rem 0.9rem; border-radius: 1rem; font-size: 0.78rem;
+  background: var(--portal-line); border: 1px dashed var(--portal-muted); cursor: pointer;
+  color: var(--portal-muted); transition: background 0.12s;
+}
+.nesio-exp-add-btn:hover { background: rgba(139,92,246,0.1); border-color: var(--portal-accent); color: var(--portal-accent); }

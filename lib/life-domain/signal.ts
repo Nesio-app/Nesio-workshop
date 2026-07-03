@@ -164,7 +164,7 @@ export function lifeNodeToSignal(node: LifeNode): Signal {
     title: node.name,
     payload,
     content: node.rawInput || payload,
-    entities: node.relations.map((r) => ({ id: r.targetId, type: r.relation, name: r.targetId })),
+    entities: (node.relations ?? []).map((r) => ({ id: r.targetId, type: r.relation, name: r.targetId })),
     confidence: node.confidence,
     sensitivity: inferSensitivity(node),
     retentionPolicy: inferRetention(node),

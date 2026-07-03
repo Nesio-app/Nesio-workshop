@@ -46,7 +46,7 @@ interface DomainStat {
 
 // ── Custom Widget Config ──────────────────────────────────────────────────────
 
-export type InsightWidgetId = 'donut' | 'heatmap' | 'week_bar' | 'tag_cloud' | 'commitment_status';
+export type InsightWidgetId = 'donut' | 'heatmap' | 'week_bar' | 'tag_cloud' | 'commitment_status' | 'my_experiment';
 
 interface WidgetMeta {
   id: InsightWidgetId;
@@ -61,6 +61,7 @@ const WIDGET_REGISTRY: WidgetMeta[] = [
   { id: 'week_bar',           label: '周趋势',     icon: '📊', description: '最近8周记录数量变化' },
   { id: 'tag_cloud',          label: '高频标签',   icon: '🏷', description: '出现最多的标签' },
   { id: 'commitment_status',  label: '承诺状态',   icon: '🤝', description: '待完成、即将到期、逾期汇总' },
+  { id: 'my_experiment',      label: '我的实验',   icon: '🧪', description: '自定义变量追踪，用数据说话' },
 ];
 
 const DEFAULT_WIDGETS: InsightWidgetId[] = ['donut', 'heatmap'];
@@ -399,6 +400,166 @@ function CommitmentStatusWidget({ nodes }: { nodes: LifeNode[] }) {
   );
 }
 
+// ── Widget: My Experiment ─────────────────────────────────────────────────────
+
+export interface Experiment {
+  id: string;
+  name: string;
+  hypothesis: string;
+  variable: string;
+  unit: string;
+  startedAt: string;
+  dataPoints: Array<{ date: string; value: number; note?: string }>;
+  concluded: boolean;
+  conclusion?: string;
+}
+
+const EXP_STORE_KEY = 'nesio-my-experiments-v1';
+
+function loadExperiments(): Experiment[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(EXP_STORE_KEY);
+    return raw ? (JSON.parse(raw) as Experiment[]) : [];
+  } catch { return []; }
+}
+
+function saveExperiments(exps: Experiment[]): void {
+  if (typeof window === 'undefined') return;
+  try { localStorage.setItem(EXP_STORE_KEY, JSON.stringify(exps)); } catch { /* ignore */ }
+}
+
+function MyExperimentWidget({ nodes }: { nodes: LifeNode[] }) {
+  const [experiments, setExperiments] = useState<Experiment[]>([]);
+  const [showNew, setShowNew] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newHypo, setNewHypo] = useState('');
+  const [newVar, setNewVar] = useState('');
+  const [newUnit, setNewUnit] = useState('');
+  const [logValue, setLogValue] = useState<Record<string, string>>({});
+
+  useEffect(() => { setExperiments(loadExperiments()); }, []);
+
+  function createExp() {
+    if (!newName.trim()) return;
+    const exp: Experiment = {
+      id: `exp_${Date.now()}`,
+      name: newName.trim(),
+      hypothesis: newHypo.trim(),
+      variable: newVar.trim() || newName.trim(),
+      unit: newUnit.trim(),
+      startedAt: new Date().toISOString(),
+      dataPoints: [],
+      concluded: false,
+    };
+    const updated = [exp, ...experiments];
+    setExperiments(updated);
+    saveExperiments(updated);
+    setShowNew(false);
+    setNewName(''); setNewHypo(''); setNewVar(''); setNewUnit('');
+  }
+
+  function logDataPoint(expId: string) {
+    const val = parseFloat(logValue[expId] ?? '');
+    if (Number.isNaN(val)) return;
+    const updated = experiments.map((e) => e.id !== expId ? e : {
+      ...e,
+      dataPoints: [...e.dataPoints, { date: new Date().toISOString().slice(0, 10), value: val }],
+    });
+    setExperiments(updated);
+    saveExperiments(updated);
+    setLogValue((prev) => ({ ...prev, [expId]: '' }));
+  }
+
+  function concludeExp(expId: string) {
+    const updated = experiments.map((e) => e.id !== expId ? e : { ...e, concluded: true });
+    setExperiments(updated);
+    saveExperiments(updated);
+  }
+
+  const active = experiments.filter((e) => !e.concluded);
+  const done = experiments.filter((e) => e.concluded);
+
+  return (
+    <div className="nesio-exp-widget">
+      {active.length === 0 && done.length === 0 ? (
+        <div className="nesio-exp-empty">
+          <p>🧪 还没有实验</p>
+          <p className="nesio-exp-empty-hint">设定一个可测量的变量，每天记录数据，用数字看趋势。<br/>例：&ldquo;每天喝水量 vs 精力状态&rdquo;</p>
+        </div>
+      ) : null}
+
+      {active.map((exp) => {
+        const pts = exp.dataPoints;
+        const lastVal = pts[pts.length - 1]?.value;
+        const daysSince = Math.floor((Date.now() - new Date(exp.startedAt).getTime()) / 86_400_000);
+        const avg = pts.length ? (pts.reduce((s, p) => s + p.value, 0) / pts.length).toFixed(1) : '—';
+        return (
+          <div key={exp.id} className="nesio-exp-card">
+            <div className="nesio-exp-card-header">
+              <span className="nesio-exp-name">🧪 {exp.name}</span>
+              <span className="nesio-exp-days">{daysSince}天</span>
+            </div>
+            {exp.hypothesis && <p className="nesio-exp-hypo">假设：{exp.hypothesis}</p>}
+            <div className="nesio-exp-stats">
+              <span>{pts.length} 次记录</span>
+              <span>均值 {avg} {exp.unit}</span>
+              {lastVal !== undefined && <span>最近 {lastVal} {exp.unit}</span>}
+            </div>
+            {pts.length >= 2 && (
+              <div className="nesio-exp-sparkline">
+                {pts.slice(-10).map((p, i) => {
+                  const min = Math.min(...pts.map((x) => x.value));
+                  const max = Math.max(...pts.map((x) => x.value));
+                  const range = max - min || 1;
+                  const h = Math.round(((p.value - min) / range) * 28) + 4;
+                  return <div key={i} className="nesio-exp-bar" style={{ height: `${h}px` }} title={`${p.date}: ${p.value}`} />;
+                })}
+              </div>
+            )}
+            <div className="nesio-exp-log-row">
+              <input
+                className="nesio-exp-log-input"
+                type="number"
+                placeholder={`记录 ${exp.variable}${exp.unit ? ` (${exp.unit})` : ''}…`}
+                value={logValue[exp.id] ?? ''}
+                onChange={(e) => setLogValue((prev) => ({ ...prev, [exp.id]: e.target.value }))}
+              />
+              <button type="button" className="nesio-exp-log-btn" onClick={() => logDataPoint(exp.id)}>记录</button>
+              {pts.length >= 5 && (
+                <button type="button" className="nesio-exp-conclude-btn" onClick={() => concludeExp(exp.id)}>结束</button>
+              )}
+            </div>
+          </div>
+        );
+      })}
+
+      {done.length > 0 && (
+        <div className="nesio-exp-done">
+          <p className="nesio-exp-done-label">已完成 {done.length} 个实验</p>
+        </div>
+      )}
+
+      {showNew ? (
+        <div className="nesio-exp-new-form">
+          <input className="nesio-exp-input" placeholder="实验名称，比如「早睡对精力的影响」" value={newName} onChange={(e) => setNewName(e.target.value)} />
+          <input className="nesio-exp-input" placeholder="假设（可选）：我猜…" value={newHypo} onChange={(e) => setNewHypo(e.target.value)} />
+          <div style={{ display: 'flex', gap: '0.4rem' }}>
+            <input className="nesio-exp-input" style={{ flex: 2 }} placeholder="追踪变量，比如「入睡时间」" value={newVar} onChange={(e) => setNewVar(e.target.value)} />
+            <input className="nesio-exp-input" style={{ flex: 1 }} placeholder="单位（小时/分/分）" value={newUnit} onChange={(e) => setNewUnit(e.target.value)} />
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button type="button" className="nesio-exp-create-btn" onClick={createExp} disabled={!newName.trim()}>创建实验</button>
+            <button type="button" className="nesio-exp-cancel-btn" onClick={() => setShowNew(false)}>取消</button>
+          </div>
+        </div>
+      ) : (
+        <button type="button" className="nesio-exp-add-btn" onClick={() => setShowNew(true)}>+ 新实验</button>
+      )}
+    </div>
+  );
+}
+
 // ── Widget Customizer Sheet ───────────────────────────────────────────────────
 
 function WidgetCustomizerSheet({
@@ -428,7 +589,7 @@ function WidgetCustomizerSheet({
           <span className="nesio-widget-customizer-title">自定义显示</span>
           <button type="button" className="nesio-widget-customizer-close" onClick={onClose}>✕</button>
         </div>
-        <p className="nesio-widget-customizer-hint">选择你想在"分析"中看到的模块</p>
+        <p className="nesio-widget-customizer-hint">选择你想在「分析」中看到的模块</p>
         <div className="nesio-widget-customizer-list">
           {WIDGET_REGISTRY.map((w) => {
             const isOn = selected.includes(w.id);
@@ -462,6 +623,77 @@ function WidgetCustomizerSheet({
   );
 }
 
+// ── Living Model: Perspectives ───────────────────────────────────────────────
+
+interface Perspective { id: string; name: string; icon: string; desc: string; prompt: string }
+
+const PERSPECTIVES: Perspective[] = [
+  { id: 'director',     name: '导演视角',    icon: '🎬', desc: '用旁观者视角看自己的剧情',         prompt: '从导演的视角分析用户：你是在拍摄用户生活的导演，观察剧情走向、角色动机、潜在的剧情转折点。' },
+  { id: 'tasha',        name: '塔莎·尤里奇', icon: '🪞', desc: '自我洞察：行为背后的深层动机',     prompt: '运用塔莎·尤里奇的自我洞察框架：聚焦于用户行为背后真实的"为什么"，区分自我感知与他人眼中的实际行为模式。' },
+  { id: 'cbt',          name: 'CBT认知行为', icon: '🧠', desc: '识别思维扭曲，建立理性解读',       prompt: '从认知行为疗法（CBT）视角：识别用户记录中可能存在的思维扭曲、认知误差，以及更理性的替代解读。' },
+  { id: 'second_order', name: '二阶思考',    icon: '🔗', desc: '行动的后果，后果的后果',           prompt: '从二阶思维视角：不只看行为本身，分析其直接后果，以及这些后果带来的次级影响和长远连锁反应。' },
+  { id: 'energy',       name: '能量视角',    icon: '⚡', desc: '什么消耗你，什么给你充电',         prompt: '从能量管理视角：分析用户的行为模式哪些在消耗生命能量，哪些在积累能量，如何优化能量分配。' },
+  { id: 'stoic',        name: '斯多葛',      icon: '🏛', desc: '区分你能控制的和不能控制的',       prompt: '从斯多葛哲学视角：区分用户生活中可以控制的事与不可控制的事，聚焦于前者，接受后者。' },
+  { id: 'pareto',       name: '帕累托20/80', icon: '📊', desc: '20% 行动带来 80% 结果',           prompt: '从帕累托原则视角：找出用户行为中最关键的 20%，这部分可能带来了 80% 的正向结果或负向问题。' },
+  { id: 'flow',         name: '心流状态',    icon: '🌊', desc: '什么时候你处于最佳状态',           prompt: '从心流（Flow）理论视角：分析用户何时处于最佳心流状态，什么条件触发或打断心流，如何创造更多心流时间。' },
+  { id: 'attachment',   name: '依恋理论',    icon: '❤️', desc: '人际关系中的模式和需求',           prompt: '从依恋理论视角：分析用户的人际关系模式、依恋风格、亲密关系中的需求与防御机制。' },
+  { id: 'somatic',      name: '身体感受',    icon: '🫀', desc: '身体信号与情绪的连接',             prompt: '从身体感受（Somatic）视角：关注用户记录中隐含的身体信号、身心连接、压力的身体化表现。' },
+  { id: 'narrative',    name: '叙事疗法',    icon: '📖', desc: '用故事视角重构自己的经历',         prompt: '从叙事疗法视角：分析用户为自己的生活构建了怎样的故事，哪些主题反复出现，可以如何重写更有力量的叙事。' },
+  { id: 'focus',        name: '专注力',      icon: '🎯', desc: '哪些事分散了注意力',               prompt: '从注意力管理视角：识别分散用户专注力的因素、注意力消耗模式，以及提升深度专注的机会。' },
+  { id: 'reverse',      name: '逆向思维',    icon: '🔄', desc: '先想最糟情况，再反推预防',         prompt: '从逆向思维（Inversion）视角：先推导用户最不想发生的结果，再分析当前行为模式是否在无意中接近这些结果。' },
+];
+
+function PerspectiveSheet({
+  current,
+  onSelect,
+  onClose,
+}: {
+  current: string;
+  onSelect: (p: Perspective | null) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="nesio-widget-customizer-overlay" onClick={onClose}>
+      <div className="nesio-widget-customizer-sheet" onClick={(e) => e.stopPropagation()}>
+        <div className="nesio-widget-customizer-header">
+          <span className="nesio-widget-customizer-title">🔭 选择分析视角</span>
+          <button type="button" className="nesio-widget-customizer-close" onClick={onClose}>✕</button>
+        </div>
+        <p className="nesio-widget-customizer-hint">选择一个视角，AI 将从该框架重新分析你的认知模型</p>
+        <div className="nesio-widget-customizer-list">
+          <button
+            type="button"
+            className={`nesio-widget-option${!current ? ' nesio-widget-option--on' : ''}`}
+            onClick={() => { onSelect(null); onClose(); }}
+          >
+            <span className="nesio-widget-option-icon">🧩</span>
+            <div className="nesio-widget-option-text">
+              <span className="nesio-widget-option-label">默认综合视角</span>
+              <span className="nesio-widget-option-desc">不限定视角，AI 自由推断</span>
+            </div>
+            {!current && <span className="nesio-widget-option-check">✓</span>}
+          </button>
+          {PERSPECTIVES.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              className={`nesio-widget-option${current === p.id ? ' nesio-widget-option--on' : ''}`}
+              onClick={() => { onSelect(p); onClose(); }}
+            >
+              <span className="nesio-widget-option-icon">{p.icon}</span>
+              <div className="nesio-widget-option-text">
+                <span className="nesio-widget-option-label">{p.name}</span>
+                <span className="nesio-widget-option-desc">{p.desc}</span>
+              </div>
+              {current === p.id && <span className="nesio-widget-option-check">✓</span>}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Living Model: Confidence Bar ──────────────────────────────────────────────
 
 function ConfidenceBar({ value }: { value: number }) {
@@ -486,10 +718,12 @@ function LivingModelTab({
 }: {
   model: LivingModel | null;
   loading: boolean;
-  onRefresh: () => void;
+  onRefresh: (perspectiveId?: string, perspectiveName?: string, perspectivePrompt?: string) => void;
   onFeedback: (insightId: string, verified: boolean) => void;
 }) {
   const [expandedLayer, setExpandedLayer] = useState<LivingModelLayerId | null>('identity');
+  const [selectedPerspective, setSelectedPerspective] = useState<Perspective | null>(null);
+  const [showPerspectiveSheet, setShowPerspectiveSheet] = useState(false);
 
   if (loading) {
     return (
@@ -515,9 +749,24 @@ function LivingModelTab({
             ? 'Nesio 对你的认知世界模型 · 每条结论均可校正'
             : '积累更多记录后，Nesio 将推断你的认知模型'}
         </p>
-        <button type="button" className="nesio-lm-refresh-btn" onClick={onRefresh} title="重新生成">
-          ↺
-        </button>
+        <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+          <button
+            type="button"
+            className="nesio-lm-perspective-btn"
+            onClick={() => setShowPerspectiveSheet(true)}
+            title="选择分析视角"
+          >
+            🔭 {selectedPerspective ? selectedPerspective.name : '视角'}
+          </button>
+          <button
+            type="button"
+            className="nesio-lm-refresh-btn"
+            onClick={() => onRefresh(selectedPerspective?.id, selectedPerspective?.name, selectedPerspective?.prompt)}
+            title="重新生成"
+          >
+            ↺
+          </button>
+        </div>
       </div>
 
       {!hasAnyInsight && (
@@ -601,7 +850,19 @@ function LivingModelTab({
       {model && (
         <p className="nesio-lm-gen-time">
           模型生成于 {new Date(model.generatedAt).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+          {selectedPerspective && <span className="nesio-lm-perspective-badge"> · {selectedPerspective.icon} {selectedPerspective.name}</span>}
         </p>
+      )}
+
+      {showPerspectiveSheet && (
+        <PerspectiveSheet
+          current={selectedPerspective?.id ?? ''}
+          onSelect={(p) => {
+            setSelectedPerspective(p);
+            onRefresh(p?.id, p?.name, p?.prompt);
+          }}
+          onClose={() => setShowPerspectiveSheet(false)}
+        />
       )}
     </div>
   );
@@ -664,12 +925,17 @@ export default function InsightsSheet({ onClose }: { onClose: () => void }) {
   }, [period, profile]);
 
   // Living Model: load cached or generate
-  const fetchLivingModel = useCallback(async (force = false) => {
+  const fetchLivingModel = useCallback(async (
+    force = false,
+    perspectiveId?: string,
+    perspectiveName?: string,
+    perspectivePrompt?: string,
+  ) => {
     const all = getLifeGraph();
     const p = getMirrorProfile();
     const cached = loadLivingModel();
 
-    if (!force && !shouldRefreshLivingModel(cached, all.length)) {
+    if (!force && !perspectiveId && !shouldRefreshLivingModel(cached, all.length)) {
       setLivingModel(cached);
       return;
     }
@@ -686,7 +952,13 @@ export default function InsightsSheet({ onClose }: { onClose: () => void }) {
       const res = await fetch('/api/portal/living-model', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...summary, userName: loadProfileSettings().displayName }),
+        body: JSON.stringify({
+          ...summary,
+          userName: loadProfileSettings().displayName,
+          perspectiveId,
+          perspectiveName,
+          perspectivePrompt,
+        }),
       });
       const data = await res.json() as { ok: boolean; layers: LivingModelLayer[] };
       if (data.ok && data.layers) {
@@ -728,9 +1000,9 @@ export default function InsightsSheet({ onClose }: { onClose: () => void }) {
     });
   }, []);
 
-  const handleRefreshLiving = useCallback(() => {
+  const handleRefreshLiving = useCallback((perspectiveId?: string, perspectiveName?: string, perspectivePrompt?: string) => {
     livingFetchedRef.current = true;
-    void fetchLivingModel(true);
+    void fetchLivingModel(true, perspectiveId, perspectiveName, perspectivePrompt);
   }, [fetchLivingModel]);
 
   return (
@@ -845,7 +1117,7 @@ export default function InsightsSheet({ onClose }: { onClose: () => void }) {
             {/* Dynamic widgets */}
             {activeWidgets.length === 0 && (
               <p className="nesio-insights-empty" style={{ marginTop: '2rem' }}>
-                还没有选择任何模块 · 点击"⚙ 自定义"来添加
+                还没有选择任何模块 · 点击「⚙ 自定义」来添加
               </p>
             )}
 
@@ -884,6 +1156,13 @@ export default function InsightsSheet({ onClose }: { onClose: () => void }) {
               <div className="nesio-insights-section">
                 <p className="nesio-insights-section-label">承诺状态</p>
                 <CommitmentStatusWidget nodes={allNodes} />
+              </div>
+            )}
+
+            {activeWidgets.includes('my_experiment') && (
+              <div className="nesio-insights-section">
+                <p className="nesio-insights-section-label">我的实验</p>
+                <MyExperimentWidget nodes={allNodes} />
               </div>
             )}
           </div>

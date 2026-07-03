@@ -1,10 +1,42 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { addLifeNode, updateLifeNode, type LifeNode, type LifeNodeAsset } from '@/lib/portal/life-graph';
+import { addLifeNode, getLifeGraph, updateLifeNode, type LifeNode, type LifeNodeAsset } from '@/lib/portal/life-graph';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
 import { matchNearestPlace, formatLocation, getNamedPlaces } from '@/lib/portal/named-places';
 import LocationPicker from './LocationPicker';
+
+// ── Similarity check (拍照发现已有) ────────────────────────────────────────
+
+interface SimilarItem { node: LifeNode; score: number }
+
+function findSimilarObjects(name: string, tags: string[]): SimilarItem[] {
+  const graph = getLifeGraph();
+  const candidates = graph.filter((n) => n.type === 'object');
+  const nameLower = name.toLowerCase().replace(/\s+/g, '');
+  const results: SimilarItem[] = [];
+
+  for (const n of candidates) {
+    const nName = n.name.toLowerCase().replace(/\s+/g, '');
+    let score = 0;
+    // Exact or near-exact name match
+    if (nName === nameLower) { score = 1.0; }
+    else if (nName.includes(nameLower) || nameLower.includes(nName)) { score = 0.8; }
+    else {
+      // Character overlap for Chinese
+      const overlapChars = Array.from(nameLower).filter((c) => nName.includes(c)).length;
+      const overlapRatio = overlapChars / Math.max(nameLower.length, nName.length, 1);
+      if (overlapRatio >= 0.5) score = overlapRatio * 0.6;
+    }
+    // Tag overlap bonus
+    if (score > 0 && tags.length > 0) {
+      const tagOverlap = (n.tags ?? []).filter((t) => tags.includes(t)).length;
+      if (tagOverlap > 0) score = Math.min(1, score + 0.1 * tagOverlap);
+    }
+    if (score >= 0.5) results.push({ node: n, score });
+  }
+  return results.sort((a, b) => b.score - a.score).slice(0, 3);
+}
 
 interface CameraSheetProps { open: boolean; onClose: () => void; }
 
@@ -182,6 +214,9 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
   const [detectedPlaceId, setDetectedPlaceId] = useState<string>('');
   // Per-node location overrides (index → formatted location string)
   const [nodeLocations, setNodeLocations] = useState<Record<number, string>>({});
+  // Similarity check result (per node index)
+  const [similarItems, setSimilarItems] = useState<Record<number, SimilarItem[]>>({});
+  const [dismissedSimilar, setDismissedSimilar] = useState<Set<number>>(new Set());
 
   const stopCamera = useCallback(() => {
     const video = videoRef.current;
@@ -353,6 +388,15 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
       setIsReceipt(detectReceipt(res));
       setPhase('result');
       tryMatchGpsAndPrefill(nodes);
+      // Check for similar existing objects
+      const similars: Record<number, SimilarItem[]> = {};
+      nodes.forEach((n, i) => {
+        if (n.type === 'object') {
+          const found = findSimilarObjects(n.name, n.tags ?? []);
+          if (found.length > 0) similars[i] = found;
+        }
+      });
+      if (Object.keys(similars).length > 0) setSimilarItems(similars);
     } catch (err: unknown) {
       if (err instanceof AnalyzeImageError && err.code === 'ai_auth_required') {
         const pending = buildPendingImageResult();
@@ -480,6 +524,7 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
     setResult(null); setEditedNodes([]); setIsReceipt(false);
     setCapturedPreview(''); setCapturedBase64(''); setError(''); setExtraTags(''); setSourceFile(null);
     setNodeLocations({}); setDetectedPlaceId('');
+    setSimilarItems({}); setDismissedSimilar(new Set());
     setPhase('idle');
     openNativeCamera();
   }
@@ -782,6 +827,28 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
                   onChange={(e) => setEditedNodes((prev) => prev.map((n, j) => j === i ? { ...n, note: e.target.value } : n))}
                   placeholder="补充一句描述…（可选）"
                 />
+
+                {/* Similarity alert */}
+                {similarItems[i] && !dismissedSimilar.has(i) && (
+                  <div className="nesio-camera-similar-alert">
+                    <span className="nesio-camera-similar-icon">🤔</span>
+                    <div className="nesio-camera-similar-body">
+                      <p className="nesio-camera-similar-title">等等，你好像已经有了</p>
+                      {similarItems[i].slice(0, 2).map((s) => (
+                        <p key={s.node.id} className="nesio-camera-similar-item">
+                          📦 {s.node.name}
+                          {s.node.attributes?.location ? <span className="nesio-camera-similar-loc"> · {String(s.node.attributes.location)}</span> : null}
+                        </p>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      className="nesio-camera-similar-dismiss"
+                      onClick={() => setDismissedSimilar((prev) => new Set(Array.from(prev).concat(i)))}
+                      aria-label="忽略"
+                    >✕</button>
+                  </div>
+                )}
 
                 {/* Location — shown for objects, hierarchical picker */}
                 {node.type === 'object' && (

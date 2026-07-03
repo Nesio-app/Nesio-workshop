@@ -52,17 +52,18 @@ function computeExpiry(event: GuidanceEvent): Date | undefined {
 }
 
 const EVENT_ICON: Record<GuidanceEventType, string> = {
-  flight:       '✈️',
-  medical:      '🏥',
-  deadline:     '⏰',
-  birthday:     '🎂',
-  anniversary:  '💝',
-  travel:       '🧳',
-  meeting:      '🎙',
-  email_signal: '📩',
-  health_habit: '💪',
-  weather_cold: '🧥',
-  weather_rain: '☂️',
+  flight:         '✈️',
+  medical:        '🏥',
+  deadline:       '⏰',
+  birthday:       '🎂',
+  anniversary:    '💝',
+  travel:         '🧳',
+  meeting:        '🎙',
+  email_signal:   '📩',
+  health_habit:   '💪',
+  weather_cold:   '🧥',
+  weather_rain:   '☂️',
+  object_context: '📦',
 };
 
 function buildTitle(event: GuidanceEvent, urgency: WindowUrgency): string {
@@ -97,6 +98,12 @@ function buildTitle(event: GuidanceEvent, urgency: WindowUrgency): string {
     case 'weather_rain': return '今天有雨，记得带伞';
     case 'email_signal': return `邮件需要关注`;
     case 'health_habit': return '今天的健康打卡';
+    case 'object_context': {
+      const itemName = String(event.payload.itemName ?? event.title);
+      const contextName = String(event.payload.contextName ?? '');
+      if (contextName) return `${itemName} 可能用得上 · ${contextName}`;
+      return `你有件东西可能用得上：${itemName}`;
+    }
     default: return n;
   }
 }
@@ -132,6 +139,16 @@ function buildBody(event: GuidanceEvent, urgency: WindowUrgency): string {
       return String(event.payload.cardBody ?? '这封邮件可能需要你做一个简单决定。');
     case 'health_habit':
       return `${String(event.payload.itemName ?? '今天的健康计划')} — 花 1 分钟开始就算赢了。`;
+    case 'object_context': {
+      const itemName = String(event.payload.itemName ?? '');
+      const loc = String(event.payload.location ?? '');
+      const contextName = String(event.payload.contextName ?? '');
+      const locStr = loc ? `（存放在 ${loc}）` : '';
+      if (contextName) return `你记录了一件 "${itemName}"${locStr}，可能和"${contextName}"有关，确认一下？`;
+      const expiry = event.payload.expiryDate ? `有效期至 ${String(event.payload.expiryDate)}` : '';
+      if (expiry) return `${itemName} · ${expiry}${locStr}，该用了还是处理了。`;
+      return `${itemName}${locStr}，回头看看是否用得上。`;
+    }
     default:
       return '';
   }

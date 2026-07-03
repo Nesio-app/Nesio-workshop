@@ -9,7 +9,8 @@ export type GuidanceEventType =
   | 'flight' | 'medical' | 'deadline' | 'birthday' | 'anniversary'
   | 'travel' | 'meeting'
   | 'email_signal' | 'health_habit'
-  | 'weather_cold' | 'weather_rain';
+  | 'weather_cold' | 'weather_rain'
+  | 'object_context';  // 物品关联情境 — owned item relevant to an upcoming context
 
 export type GuidanceSource = 'calendar' | 'email' | 'memory' | 'weather' | 'habit';
 
