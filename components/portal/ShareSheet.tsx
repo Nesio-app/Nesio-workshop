@@ -293,7 +293,7 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
                       {parsed.location}
                     </span>
                   )}
-                  <span className="nesio-share-meta-chip" style={{ background: 'rgba(16,185,129,0.1)', color: '#059669' }}>
+                  <span className="nesio-share-meta-chip" style={{ background: 'var(--status-go-soft)', color: 'var(--status-go)' }}>
                     {parsed.nodes.length} 个节点
                   </span>
                 </div>

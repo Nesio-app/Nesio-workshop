@@ -15,12 +15,12 @@ import {
 import { loadProfileSettings } from '@/lib/portal/profile';
 
 const LEVEL_COLOR: Record<DimensionLevel, string> = {
-  good: '#10b981',
+  good: 'var(--status-go)',
   stable: '#6ee7b7',
   unknown: '#cbd5e1',
-  mild_risk: '#f59e0b',
+  mild_risk: 'var(--status-gentle)',
   high_load: '#f97316',
-  low: '#ef4444',
+  low: 'var(--status-risk)',
 };
 
 const LEVEL_FACT: Record<DimensionLevel, string> = {
@@ -102,7 +102,7 @@ export default function LifeStateCard({ canUsePrivateData }: { canUsePrivateData
   const needsAttention = known.filter((d) => d.level === 'high_load' || d.level === 'mild_risk' || d.level === 'low').length;
   const stateTone = needsAttention > 0 ? '有些需要留意' : '状态不错';
   const stateHint = needsAttention > 0 ? '注意休息。' : '继续保持。';
-  const leadColor = needsAttention > 0 ? '#f59e0b' : '#10b981';
+  const leadColor = needsAttention > 0 ? 'var(--status-gentle)' : 'var(--status-go)';
 
   return (
     <div className="nesio-lifestate-card">

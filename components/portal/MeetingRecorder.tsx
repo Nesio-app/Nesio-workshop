@@ -235,12 +235,12 @@ export default function MeetingRecorder({ open, onClose }: MeetingRecorderProps)
         {recState === 'recording' && (
           <>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', margin: '0.75rem 0' }}>
-              <span style={{ color: '#ef4444', fontSize: '0.85rem', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+              <span style={{ color: 'var(--status-risk)', fontSize: '0.85rem', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
                 {formatElapsed(elapsed)}
               </span>
               <div style={{ display: 'flex', gap: 3, alignItems: 'center', height: '1.5rem' }}>
                 {Array.from({ length: 7 }, (_, i) => (
-                  <span key={i} className="nesio-voice-wave-bar" style={{ animationDelay: `${i * 0.1}s`, background: '#ef4444' }} />
+                  <span key={i} className="nesio-voice-wave-bar" style={{ animationDelay: `${i * 0.1}s`, background: 'var(--status-risk)' }} />
                 ))}
               </div>
             </div>
@@ -249,7 +249,7 @@ export default function MeetingRecorder({ open, onClose }: MeetingRecorderProps)
               {transcript || <span className="nesio-voice-transcript-placeholder">正在记录，说话后会在这里显示…</span>}
             </div>
 
-            <button type="button" className="nesio-ob-primary-btn" style={{ marginTop: '1rem', background: '#ef4444', boxShadow: '0 4px 16px rgba(239,68,68,0.3)' }} onClick={stopAndProcess}>
+            <button type="button" className="nesio-ob-primary-btn" style={{ marginTop: '1rem', background: 'var(--status-risk)', boxShadow: '0 4px 16px rgba(239,68,68,0.3)' }} onClick={stopAndProcess}>
               停止并生成笔记
             </button>
           </>
@@ -303,7 +303,7 @@ export default function MeetingRecorder({ open, onClose }: MeetingRecorderProps)
 
         {recState === 'error' && (
           <div style={{ textAlign: 'center', padding: '1.5rem 0' }}>
-            <p style={{ color: '#ef4444', fontSize: '0.85rem' }}>处理失败，请重试。</p>
+            <p style={{ color: 'var(--status-risk)', fontSize: '0.85rem' }}>处理失败，请重试。</p>
             <button type="button" className="nesio-ob-primary-btn" style={{ marginTop: '1rem' }} onClick={() => setRecState('idle')}>重试</button>
           </div>
         )}

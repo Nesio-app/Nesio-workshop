@@ -133,7 +133,7 @@ export default function VoiceBrief({ open, onClose, title, body, points }: Voice
         <div className="nesio-voice-brief-progress-track">
           <div className="nesio-voice-brief-progress-fill" style={{ width: `${progress}%`, transition: 'width 0.3s linear' }} />
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', color: '#8fa3c0', margin: '-0.4rem 0 0.5rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', color: 'var(--portal-muted)', margin: '-0.4rem 0 0.5rem' }}>
           <span>{formatTime(currentSec)}</span>
           <span>{duration ? formatTime(duration) : '—'}</span>
         </div>
@@ -145,7 +145,7 @@ export default function VoiceBrief({ open, onClose, title, body, points }: Voice
 
         {/* Controls */}
         {state === 'error' ? (
-          <p style={{ textAlign: 'center', color: '#ef4444', fontSize: '0.82rem' }}>真人语音暂不可用，请检查 OpenAI TTS 配置或网络。</p>
+          <p style={{ textAlign: 'center', color: 'var(--status-risk)', fontSize: '0.82rem' }}>真人语音暂不可用，请检查 OpenAI TTS 配置或网络。</p>
         ) : (
           <div className="nesio-voice-brief-controls">
             <button type="button" className="nesio-voice-brief-btn" onClick={restart} aria-label="重播">
@@ -169,7 +169,7 @@ export default function VoiceBrief({ open, onClose, title, body, points }: Voice
             </button>
           </div>
         )}
-        {state === 'done' && <p style={{ textAlign: 'center', color: '#10b981', fontSize: '0.82rem', marginTop: '0.5rem' }}>播放完毕 ✓</p>}
+        {state === 'done' && <p style={{ textAlign: 'center', color: 'var(--status-go)', fontSize: '0.82rem', marginTop: '0.5rem' }}>播放完毕 ✓</p>}
       </div>
     </div>
   );

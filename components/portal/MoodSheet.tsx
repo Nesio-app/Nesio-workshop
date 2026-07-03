@@ -448,14 +448,14 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
               );
             })}
             <circle cx={CX} cy={CY} r={R_IN - 3}
-              fill={longPressing ? '#f0f0ff' : 'white'}
+              fill={longPressing ? 'var(--portal-accent-soft)' : 'white'}
               style={{ cursor: 'pointer', transition: 'fill 0.3s' }} />
             <text x={CX} y={CY - 7} textAnchor="middle" fontSize="10"
-              fill={longPressing ? '#8b5cf6' : '#8899bb'} fontWeight="600"
+              fill={longPressing ? 'var(--portal-cool-accent)' : 'var(--portal-muted)'} fontWeight="600"
               style={{ userSelect: 'none', pointerEvents: 'none' }}>
               {longPressing ? '放开写 Journal' : '此刻'}
             </text>
-            <text x={CX} y={CY + 8} textAnchor="middle" fontSize="8.5" fill="#aabbcc"
+            <text x={CX} y={CY + 8} textAnchor="middle" fontSize="8.5" fill="var(--portal-muted)"
               style={{ userSelect: 'none', pointerEvents: 'none' }}>
               {longPressing ? '✍️' : '滑动选择'}
             </text>

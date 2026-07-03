@@ -263,7 +263,7 @@ function CameraView({ onResult, onClose, autoOpen = false }: {
         <p className="nesio-camera-status">识别中…</p>
       ) : (
         <>
-          {cameraError && <p className="nesio-camera-status" style={{ color: '#ef4444' }}>{cameraError}</p>}
+          {cameraError && <p className="nesio-camera-status" style={{ color: 'var(--status-risk)' }}>{cameraError}</p>}
           <div className="nesio-camera-entry-btns">
             <button type="button" className="nesio-wechat-plus-item" onClick={openCamera}>
               <span className="nesio-wechat-plus-icon">📷</span><span>打开摄像头</span>

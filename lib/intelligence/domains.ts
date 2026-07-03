@@ -93,7 +93,7 @@ const weatherDomain: DomainEngine = {
       confidence: activeHealth ? 0.93 : 0.78,
       urgency: 3,
       icon: '🌧',
-      iconBg: '#f59e0b',
+      iconBg: 'var(--status-gentle)',
       title: '把外套放到门口',
       body: activeHealth
         ? `${weather.forecastNote || '明天降温'}，你最近${activeHealth.title}还在恢复，提前备好外套。`
@@ -145,7 +145,7 @@ const workDomain: DomainEngine = {
       confidence: 0.88,
       urgency: isSoon ? 5 : 4,
       icon: '🎙',
-      iconBg: '#6366f1',
+      iconBg: 'var(--portal-blue-deep)',
       title: `${next.title || '即将开始的会'}，已经整理好了`,
       body: `${isSoon ? '马上' : `今天 ${startTime}`}的会和「${taskSignal.title}」有关，我把可执行事项放前面。${location ? ` 地点：${location}` : ''}`,
       evidenceSignalIds: [taskSignal.id, next.id],

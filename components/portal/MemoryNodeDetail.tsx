@@ -38,9 +38,9 @@ const PLACE_CATEGORIES: Record<string, string> = {
   restaurant: '🍽️ 餐厅', gym: '🏋️ 健身', hospital: '🏥 医院', other: '📍 地点',
 };
 const PRIORITY_LABELS: Record<string, { label: string; color: string }> = {
-  high: { label: '⚠️ 紧急', color: '#ef4444' },
-  medium: { label: '⬆️ 重要', color: '#f59e0b' },
-  low: { label: '↓ 普通', color: '#6b7280' },
+  high: { label: '⚠️ 紧急', color: 'var(--status-risk)' },
+  medium: { label: '⬆️ 重要', color: 'var(--status-gentle)' },
+  low: { label: '↓ 普通', color: 'var(--portal-muted)' },
 };
 
 function attr(node: LifeNode, ...keys: string[]): string {
@@ -249,7 +249,7 @@ function PlaceSection({ node, relatedNodes, onOpenNode }: {
           <p className="nesio-settings-section-label" style={{ marginTop: '0.75rem' }}>关联记忆</p>
           {related.map((r) => (
             <button key={r.id} type="button" className="nesio-related-node-chip" onClick={() => onOpenNode?.(r)}>
-              <span className="nesio-related-node-icon" style={{ background: TYPE_BG_DETAIL[r.type] || '#f0f4ff' }}>
+              <span className="nesio-related-node-icon" style={{ background: TYPE_BG_DETAIL[r.type] || 'var(--portal-accent-soft)' }}>
                 {TYPE_ICON_DETAIL[r.type] || '📌'}
               </span>
               <span className="nesio-related-node-name">{r.name}</span>
@@ -310,7 +310,7 @@ function EventSection({ node, relatedNodes, onOpenNode }: {
           <p className="nesio-settings-section-label" style={{ marginTop: '0.75rem' }}>关联备注</p>
           {related.map((r) => (
             <button key={r.id} type="button" className="nesio-related-node-chip" onClick={() => onOpenNode?.(r)}>
-              <span className="nesio-related-node-icon" style={{ background: TYPE_BG_DETAIL[r.type] || '#f0f4ff' }}>
+              <span className="nesio-related-node-icon" style={{ background: TYPE_BG_DETAIL[r.type] || 'var(--portal-accent-soft)' }}>
                 {TYPE_ICON_DETAIL[r.type] || '📌'}
               </span>
               <span className="nesio-related-node-name">{r.name}</span>
@@ -731,7 +731,7 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
               <div className="nesio-related-nodes">
                 {relatedNodes.map((related) => (
                   <button key={related.id} type="button" className="nesio-related-node-chip" onClick={() => onOpenNode?.(related)}>
-                    <span className="nesio-related-node-icon" style={{ background: TYPE_BG_DETAIL[related.type] || '#f0f4ff' }}>
+                    <span className="nesio-related-node-icon" style={{ background: TYPE_BG_DETAIL[related.type] || 'var(--portal-accent-soft)' }}>
                       {TYPE_ICON_DETAIL[related.type] || '📌'}
                     </span>
                     <span className="nesio-related-node-name">{related.name}</span>

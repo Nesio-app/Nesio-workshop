@@ -12178,7 +12178,7 @@ html[data-portal-theme="night"] .nesio-connector-name { color: #e8eefa; }
 
 /* Narrative */
 .nesio-insights-narrative {
-  background: linear-gradient(135deg, var(--portal-accent-soft), rgba(59,110,240,0.06));
+  background: linear-gradient(135deg, var(--portal-accent-soft), rgba(88,140,227,0.06));
   border: 1px solid var(--portal-accent-soft-md);
   border-radius: 1rem;
   padding: 0.85rem 1rem;
@@ -13752,7 +13752,7 @@ html[data-portal-theme="night"] .nesio-focus-decompose-btn {
   color: #8aa8f8;
 }
 html[data-portal-theme="night"] .nesio-focus-decompose-btn:hover:not(:disabled) {
-  background: rgba(59,110,240,0.25);
+  background: rgba(88,140,227,0.25);
 }
 
 /* Legacy .nesio-brief-card kept for compatibility */
@@ -14591,7 +14591,7 @@ html[data-portal-theme="night"] .nesio-wechat-header {
   padding: 0.6rem 1rem;
   border-radius: 1.5rem;
   background: rgba(255,255,255,0.85);
-  border: 1px solid rgba(59,110,240,0.18);
+  border: 1px solid var(--portal-accent-border);
   color: var(--portal-blue-deep);
   font-size: 0.85rem;
   cursor: pointer;
@@ -14599,7 +14599,7 @@ html[data-portal-theme="night"] .nesio-wechat-header {
 }
 html[data-portal-theme="night"] .nesio-wechat-suggestion {
   background: var(--portal-accent-soft);
-  border-color: rgba(59,110,240,0.3);
+  border-color: var(--portal-accent-border);
 }
 
 /* Status bubble (thinking step) */
@@ -14718,7 +14718,7 @@ html[data-portal-theme="night"] .nesio-wechat-bubble--ai {
   background: var(--portal-accent-soft);
   color: var(--portal-blue-deep);
   text-decoration: none;
-  border: 1px solid rgba(59,110,240,0.2);
+  border: 1px solid var(--portal-accent-border);
 }
 
 /* Input bar */
@@ -16918,7 +16918,7 @@ html[data-portal-theme="night"] .nesio-related-node-chip:hover {
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--portal-blue-deep);
-  background: rgba(59,110,240,0.09);
+  background: var(--portal-accent-soft);
   border-radius: 4px;
   padding: 0 0.4em;
   line-height: 1.6;

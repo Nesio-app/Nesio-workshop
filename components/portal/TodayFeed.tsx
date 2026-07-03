@@ -716,7 +716,7 @@ function FocusModeSheet({ node, onClose, onDone }: {
             <circle
               cx="60" cy="60" r="54"
               fill="none"
-              stroke={finished ? '#74c69d' : 'var(--portal-accent, #4a90d9)'}
+              stroke={finished ? 'var(--status-go)' : 'var(--portal-accent)'}
               strokeWidth="8"
               strokeDasharray={`${2 * Math.PI * 54}`}
               strokeDashoffset={`${2 * Math.PI * 54 * (1 - progress)}`}

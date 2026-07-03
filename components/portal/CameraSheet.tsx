@@ -585,7 +585,7 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
     ctx.moveTo(pts[0].x, pts[0].y);
     for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
     ctx.closePath();
-    ctx.strokeStyle = '#3b82f6';
+    ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--portal-blue-deep').trim() || '#588ce3';
     ctx.lineWidth = 3;
     ctx.setLineDash([]);
     ctx.lineJoin = 'round';
@@ -764,7 +764,7 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
         )}
 
         {error && (
-          <div className="nesio-camera-recognizing" style={{ color: '#fca5a5', borderColor: 'rgba(239,68,68,0.3)', background: 'rgba(127,29,29,0.8)' }}>
+          <div className="nesio-camera-recognizing" style={{ color: 'var(--status-risk-soft)', borderColor: 'var(--status-risk)', background: 'rgba(30,15,15,0.85)' }}>
             {error}
           </div>
         )}
@@ -937,7 +937,7 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
 
       {phase === 'saved' && (
         <div className="nesio-camera-result-panel" style={{ textAlign: 'center', padding: '1.25rem' }}>
-          <p style={{ color: '#10b981', fontSize: '1.1rem', fontWeight: 700 }}>✓ 已存入 Memory</p>
+          <p style={{ color: 'var(--status-go)', fontSize: '1.1rem', fontWeight: 700 }}>✓ 已存入 Memory</p>
         </div>
       )}
 

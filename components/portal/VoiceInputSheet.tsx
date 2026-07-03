@@ -680,7 +680,7 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
               </button>
             </>
           ) : micError ? (
-            <span style={{ fontSize: '0.73rem', color: '#ef4444', textAlign: 'center', lineHeight: 1.4 }}>{micError}</span>
+            <span style={{ fontSize: '0.73rem', color: 'var(--status-risk)', textAlign: 'center', lineHeight: 1.4 }}>{micError}</span>
           ) : text && !isAskMode ? (
             <span style={{ fontSize: '0.72rem', color: 'var(--portal-muted)' }}>识别完成 · 点「告诉 Nesio」保存</span>
           ) : null}

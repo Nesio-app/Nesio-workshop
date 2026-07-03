@@ -317,7 +317,7 @@ function getNodeTypeMeta(node: LifeNode) {
       const dateStr = str(a.date) || str(a.recordedAt);
       const dateLabel = dateStr ? new Date(dateStr).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' }) : '';
       const status = str(a.status);
-      const badgeColor = status.includes('恢复') ? '#10b981' : status.includes('注意') ? '#f59e0b' : '#8b5cf6';
+      const badgeColor = status.includes('恢复') ? 'var(--status-go)' : status.includes('注意') ? 'var(--status-gentle)' : 'var(--portal-cool-accent)';
       return { extra: dateLabel, badge: status || undefined, badgeColor: status ? badgeColor : undefined };
     }
     case 'commitment': {
@@ -371,8 +371,8 @@ function OnThisDayStrip({ nodes, onOpen }: { nodes: LifeNode[]; onOpen: (n: Life
 function NarratorCardView({ card, onOpen }: { card: NarratorCard; onOpen: (n: LifeNode) => void }) {
   const colorMap: Record<string, string> = {
     remember: 'var(--portal-accent)',
-    commitment: '#f59e0b',
-    activity: '#10b981',
+    commitment: 'var(--status-gentle)',
+    activity: 'var(--status-go)',
   };
   const accent = colorMap[card.type] ?? 'var(--portal-accent)';
   return (
@@ -445,7 +445,7 @@ function MemoryCard({ node, onOpen, onDeleted }: { node: LifeNode; onOpen: () =>
       {isPerson ? (
         <span className="nesio-memory-card-avatar" style={{ background: avatarBg }}>{initials}</span>
       ) : (
-        <span className="nesio-memory-card-icon" style={{ background: TYPE_BG[node.type] || '#f0f4ff' }}>
+        <span className="nesio-memory-card-icon" style={{ background: TYPE_BG[node.type] || 'var(--portal-accent-soft)' }}>
           {TYPE_ICON[node.type] || '📌'}
         </span>
       )}

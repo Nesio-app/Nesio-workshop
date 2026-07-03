@@ -89,10 +89,10 @@ function saveWidgetConfig(ids: InsightWidgetId[]): void {
 const PERIOD_LABELS: Record<Period, string> = { today: '今日', week: '本周', month: '本月' };
 
 const TYPE_COLOR: Record<string, string> = {
-  commitment: '#8b5cf6',
-  event:      '#8b5cf6',
-  health_state: '#10b981',
-  person:     '#f59e0b',
+  commitment: 'var(--portal-cool-accent)',
+  event:      'var(--portal-cool-accent)',
+  health_state: 'var(--status-go)',
+  person:     'var(--status-gentle)',
   place:      '#3b82f6',
   object:     '#64748b',
   preference: '#ec4899',
@@ -270,7 +270,7 @@ function ActivityHeatmap({ nodes }: { nodes: LifeNode[] }) {
               <div
                 key={si}
                 className="nesio-heatmap-cell"
-                style={{ background: alpha > 0 ? `rgba(139,92,246,${alpha.toFixed(2)})` : 'var(--portal-line)' }}
+                style={{ background: alpha > 0 ? `rgba(88,140,227,${alpha.toFixed(2)})` : 'var(--portal-line)' }}
                 title={`周${DAYS[di]} ${SLOTS[si]}: ${v} 条`}
               />
             );
@@ -373,9 +373,9 @@ function CommitmentStatusWidget({ nodes }: { nodes: LifeNode[] }) {
   }
 
   const groups = [
-    { label: '已逾期', items: overdue, accent: '#ef4444' },
-    { label: '即将到期（3天内）', items: dueSoon, accent: '#f59e0b' },
-    { label: '进行中', items: pending, accent: '#8b5cf6' },
+    { label: '已逾期', items: overdue, accent: 'var(--status-risk)' },
+    { label: '即将到期（3天内）', items: dueSoon, accent: 'var(--status-gentle)' },
+    { label: '进行中', items: pending, accent: 'var(--portal-cool-accent)' },
     { label: '无截止日', items: noDate, accent: '#94a3b8' },
   ].filter((g) => g.items.length > 0);
 
@@ -697,7 +697,7 @@ function PerspectiveSheet({
 // ── Living Model: Confidence Bar ──────────────────────────────────────────────
 
 function ConfidenceBar({ value }: { value: number }) {
-  const color = value >= 85 ? '#10b981' : value >= 70 ? '#8b5cf6' : value >= 55 ? '#f59e0b' : '#94a3b8';
+  const color = value >= 85 ? 'var(--status-go)' : value >= 70 ? 'var(--portal-cool-accent)' : value >= 55 ? 'var(--status-gentle)' : 'var(--portal-muted)';
   return (
     <div className="nesio-lm-confidence">
       <div className="nesio-lm-conf-track">
@@ -912,7 +912,7 @@ export default function InsightsSheet({ onClose }: { onClose: () => void }) {
     const domainMap: Record<string, { count: number; color: string }> = {};
     for (const n of filtered) {
       const label = TYPE_LABEL[n.type] ?? '其他';
-      const color = TYPE_COLOR[n.type] ?? '#94a3b8';
+      const color = TYPE_COLOR[n.type] ?? 'var(--portal-muted)';
       if (!domainMap[label]) domainMap[label] = { count: 0, color };
       domainMap[label].count++;
     }

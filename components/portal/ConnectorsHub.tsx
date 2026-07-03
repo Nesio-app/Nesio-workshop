@@ -220,7 +220,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
         <p className="nesio-settings-sheet-desc">连接外部信号源，让 Today Feed 出现真实数据驱动的建议。</p>
 
         {toast && (
-          <div style={{ background: toast.ok ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)', border: `1px solid ${toast.ok ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'}`, borderRadius: '0.75rem', padding: '0.65rem 0.85rem', marginBottom: '0.75rem', fontSize: '0.8rem', color: toast.ok ? '#059669' : '#ef4444' }}>
+          <div style={{ background: toast.ok ? 'var(--status-go-soft)' : 'var(--status-risk-soft)', border: `1px solid ${toast.ok ? 'var(--status-go)' : 'var(--status-risk)'}`, borderRadius: '0.75rem', padding: '0.65rem 0.85rem', marginBottom: '0.75rem', fontSize: '0.8rem', color: toast.ok ? 'var(--status-go)' : 'var(--status-risk)' }}>
             {toast.ok ? '✓ ' : ''}{toast.msg}
           </div>
         )}
