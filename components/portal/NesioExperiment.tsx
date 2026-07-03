@@ -1,0 +1,840 @@
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+export type VarType = 'number' | 'scale' | 'boolean';
+
+export interface ExpDataPoint {
+  date: string;       // YYYY-MM-DD
+  iv: number;         // independent variable value (boolean → 0/1)
+  dv: number;         // dependent variable value
+  note?: string;
+}
+
+export interface Experiment {
+  id: string;
+  name: string;
+  hypothesis: string;
+  ivName: string;
+  ivUnit: string;
+  ivType: VarType;
+  dvName: string;
+  dvUnit: string;
+  dvType: VarType;
+  targetDays: number;
+  startedAt: string;   // ISO
+  dataPoints: ExpDataPoint[];
+  concluded: boolean;
+  conclusion?: string;
+}
+
+// ── Persistence ───────────────────────────────────────────────────────────────
+
+const STORE_KEY = 'nesio-experiments-v2';
+
+export function loadExperiments(): Experiment[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    return raw ? (JSON.parse(raw) as Experiment[]) : [];
+  } catch { return []; }
+}
+
+export function saveExperiments(exps: Experiment[]): void {
+  if (typeof window === 'undefined') return;
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(exps)); } catch { /* ignore */ }
+}
+
+// ── Analysis ──────────────────────────────────────────────────────────────────
+
+function pearsonR(xs: number[], ys: number[]): number | null {
+  const n = xs.length;
+  if (n < 3) return null;
+  const mx = xs.reduce((a, b) => a + b, 0) / n;
+  const my = ys.reduce((a, b) => a + b, 0) / n;
+  let num = 0, dx2 = 0, dy2 = 0;
+  for (let i = 0; i < n; i++) {
+    const dx = xs[i] - mx, dy = ys[i] - my;
+    num += dx * dy; dx2 += dx * dx; dy2 += dy * dy;
+  }
+  const denom = Math.sqrt(dx2 * dy2);
+  return denom === 0 ? null : num / denom;
+}
+
+export interface ExpInsight {
+  r: number | null;
+  meanOn: number | null;      // mean DV when IV is high (≥ median) or boolean=1
+  meanOff: number | null;     // mean DV when IV is low or boolean=0
+  trend: 'positive' | 'negative' | 'neutral' | 'insufficient';
+  days: number;
+  text: string;
+}
+
+export function computeInsight(exp: Experiment): ExpInsight {
+  const pts = exp.dataPoints;
+  const days = pts.length;
+
+  if (days < 5) {
+    return { r: null, meanOn: null, meanOff: null, trend: 'insufficient', days,
+      text: `还需要 ${5 - days} 次记录，洞察就能出现。坚持每天打卡，数据会告诉你答案。` };
+  }
+
+  const ivs = pts.map((p) => p.iv);
+  const dvs = pts.map((p) => p.dv);
+
+  let meanOn: number | null = null;
+  let meanOff: number | null = null;
+  let r: number | null = null;
+
+  if (exp.ivType === 'boolean') {
+    const onPts = pts.filter((p) => p.iv >= 0.5).map((p) => p.dv);
+    const offPts = pts.filter((p) => p.iv < 0.5).map((p) => p.dv);
+    if (onPts.length > 0) meanOn = onPts.reduce((a, b) => a + b, 0) / onPts.length;
+    if (offPts.length > 0) meanOff = offPts.reduce((a, b) => a + b, 0) / offPts.length;
+  } else {
+    r = pearsonR(ivs, dvs);
+    const median = [...ivs].sort((a, b) => a - b)[Math.floor(ivs.length / 2)];
+    const onPts = pts.filter((p) => p.iv >= median).map((p) => p.dv);
+    const offPts = pts.filter((p) => p.iv < median).map((p) => p.dv);
+    if (onPts.length > 0) meanOn = onPts.reduce((a, b) => a + b, 0) / onPts.length;
+    if (offPts.length > 0) meanOff = offPts.reduce((a, b) => a + b, 0) / offPts.length;
+  }
+
+  const diff = meanOn !== null && meanOff !== null ? meanOn - meanOff : null;
+  const rAbs = r !== null ? Math.abs(r) : null;
+
+  let trend: ExpInsight['trend'] = 'neutral';
+  if (r !== null) {
+    trend = rAbs! > 0.3 ? (r > 0 ? 'positive' : 'negative') : 'neutral';
+  } else if (diff !== null) {
+    trend = Math.abs(diff) > 0.5 ? (diff > 0 ? 'positive' : 'negative') : 'neutral';
+  }
+
+  const dvAvg = (dvs.reduce((a, b) => a + b, 0) / dvs.length).toFixed(1);
+  const unitDV = exp.dvUnit ? ` ${exp.dvUnit}` : '';
+  const unitIV = exp.ivUnit ? ` ${exp.ivUnit}` : '';
+
+  let text = '';
+  if (exp.ivType === 'boolean') {
+    const onCount = pts.filter((p) => p.iv >= 0.5).length;
+    const offCount = pts.length - onCount;
+    if (meanOn !== null && meanOff !== null) {
+      const diffStr = Math.abs(meanOn - meanOff).toFixed(1);
+      if (trend === 'positive') {
+        text = `过去 ${days} 天里，你有 ${onCount} 天进行了「${exp.ivName}」，${exp.dvName} 均值是 ${meanOn.toFixed(1)}${unitDV}；另外 ${offCount} 天均值是 ${meanOff.toFixed(1)}${unitDV}。差距约 ${diffStr}${unitDV}，你的数据支持这个假设。`;
+      } else if (trend === 'negative') {
+        text = `过去 ${days} 天，「${exp.ivName}」的日子里 ${exp.dvName} 均值反而更低（${meanOn.toFixed(1)} vs ${meanOff.toFixed(1)}${unitDV}）。数据和假设方向相反，可能有其他因素在影响结果。`;
+      } else {
+        text = `过去 ${days} 天，做与不做「${exp.ivName}」对 ${exp.dvName} 的影响不明显（${meanOn.toFixed(1)} vs ${meanOff.toFixed(1)}${unitDV}）。可以继续观察，或者看看是否有其他变量在起作用。`;
+      }
+    }
+  } else {
+    if (r !== null) {
+      const rStr = (r > 0 ? '+' : '') + r.toFixed(2);
+      if (trend === 'positive') {
+        text = `过去 ${days} 次记录，${exp.ivName} 和 ${exp.dvName} 呈正相关（r = ${rStr}）。${exp.dvName} 整体均值 ${dvAvg}${unitDV}。增加 ${exp.ivName} 时，${exp.dvName} 有上升趋势。`;
+      } else if (trend === 'negative') {
+        text = `过去 ${days} 次记录，${exp.ivName} 越高，${exp.dvName} 有下降趋势（r = ${rStr}）。${exp.dvName} 均值 ${dvAvg}${unitDV}。可以考虑降低 ${exp.ivName} 看看效果。`;
+      } else {
+        text = `过去 ${days} 次记录，${exp.ivName} 与 ${exp.dvName} 之间目前看不出明显关联（r = ${rStr}）。${exp.dvName} 均值 ${dvAvg}${unitDV}。继续记录，或许还需要更多数据。`;
+      }
+    } else {
+      text = `已记录 ${days} 天，${exp.dvName} 均值 ${dvAvg}${unitDV}。再记录几天，相关性分析就可以开始了。`;
+    }
+  }
+
+  return { r, meanOn, meanOff, trend, days, text };
+}
+
+// ── Tiny SVG Charts ───────────────────────────────────────────────────────────
+
+function SparkDualLine({ pts, ivType }: { pts: ExpDataPoint[]; ivType: VarType }) {
+  if (pts.length < 2) return null;
+  const W = 280, H = 60, PAD = 4;
+  const last = pts.slice(-14);
+  const n = last.length;
+
+  const ivVals = last.map((p) => p.iv);
+  const dvVals = last.map((p) => p.dv);
+
+  function norm(vals: number[], v: number) {
+    const mn = Math.min(...vals), mx = Math.max(...vals);
+    const range = mx - mn || 1;
+    return PAD + ((1 - (v - mn) / range) * (H - PAD * 2));
+  }
+
+  function path(vals: number[], all: number[]) {
+    return last.map((p, i) => {
+      const x = PAD + (i / (n - 1)) * (W - PAD * 2);
+      const y = norm(all, vals[i]);
+      return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(' ');
+  }
+
+  if (ivType === 'boolean') {
+    return (
+      <svg viewBox={`0 0 ${W} ${H}`} className="nesio-exp-chart">
+        {/* boolean IV: colored background bands */}
+        {last.map((p, i) => {
+          const x = PAD + (i / (n - 1)) * (W - PAD * 2) - (W - PAD * 2) / n / 2;
+          const bw = (W - PAD * 2) / n;
+          return p.iv >= 0.5 ? (
+            <rect key={i} x={x} y={PAD} width={bw} height={H - PAD * 2}
+              fill="var(--portal-accent-soft)" rx="2" />
+          ) : null;
+        })}
+        {/* DV line */}
+        <path d={path(dvVals, dvVals)} fill="none" stroke="var(--status-go)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        {last.map((p, i) => {
+          const x = PAD + (i / (n - 1)) * (W - PAD * 2);
+          const y = norm(dvVals, p.dv);
+          return <circle key={i} cx={x} cy={y} r="2.5" fill="var(--status-go)" />;
+        })}
+      </svg>
+    );
+  }
+
+  const allIv = ivVals, allDv = dvVals;
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="nesio-exp-chart">
+      {/* IV area fill */}
+      <path
+        d={`${path(ivVals, allIv)} L${(PAD + (n - 1) / (n - 1) * (W - PAD * 2)).toFixed(1)},${H - PAD} L${PAD},${H - PAD} Z`}
+        fill="var(--portal-accent-soft)" />
+      {/* IV line */}
+      <path d={path(ivVals, allIv)} fill="none" stroke="var(--portal-blue-deep)" strokeWidth="1.5" strokeLinecap="round" />
+      {/* DV line */}
+      <path d={path(dvVals, allDv)} fill="none" stroke="var(--status-go)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="0" />
+      {last.map((p, i) => {
+        const x = PAD + (i / (n - 1)) * (W - PAD * 2);
+        return <circle key={i} cx={x} cy={norm(dvVals, p.dv)} r="2.5" fill="var(--status-go)" />;
+      })}
+    </svg>
+  );
+}
+
+function ScatterPlot({ pts, ivType }: { pts: ExpDataPoint[]; ivType: VarType }) {
+  if (pts.length < 4 || ivType === 'boolean') return null;
+  const W = 240, H = 120, PAD = 16;
+
+  const ivs = pts.map((p) => p.iv);
+  const dvs = pts.map((p) => p.dv);
+  const mnX = Math.min(...ivs), mxX = Math.max(...ivs);
+  const mnY = Math.min(...dvs), mxY = Math.max(...dvs);
+  const rx = mxX - mnX || 1, ry = mxY - mnY || 1;
+
+  function px(v: number) { return PAD + ((v - mnX) / rx) * (W - PAD * 2); }
+  function py(v: number) { return H - PAD - ((v - mnY) / ry) * (H - PAD * 2); }
+
+  // linear regression for trend line
+  const n = pts.length;
+  const mx = ivs.reduce((a, b) => a + b, 0) / n;
+  const my = dvs.reduce((a, b) => a + b, 0) / n;
+  let num = 0, den = 0;
+  for (let i = 0; i < n; i++) { num += (ivs[i] - mx) * (dvs[i] - my); den += (ivs[i] - mx) ** 2; }
+  const slope = den === 0 ? 0 : num / den;
+  const intercept = my - slope * mx;
+  const y1 = slope * mnX + intercept;
+  const y2 = slope * mxX + intercept;
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="nesio-exp-scatter">
+      {/* trend line */}
+      <line x1={px(mnX)} y1={py(y1)} x2={px(mxX)} y2={py(y2)}
+        stroke="var(--portal-blue-deep)" strokeWidth="1.2" strokeDasharray="4 3" opacity="0.6" />
+      {/* points */}
+      {pts.map((p, i) => (
+        <circle key={i} cx={px(p.iv)} cy={py(p.dv)} r="3.5"
+          fill="var(--portal-accent-soft-md)" stroke="var(--portal-blue-deep)" strokeWidth="1" />
+      ))}
+    </svg>
+  );
+}
+
+// ── Trend Badge ───────────────────────────────────────────────────────────────
+
+function TrendBadge({ trend }: { trend: ExpInsight['trend'] }) {
+  if (trend === 'insufficient') return null;
+  const map = {
+    positive: { label: '正相关', style: { background: 'var(--status-go-soft)', color: 'var(--status-go)' } },
+    negative: { label: '负相关', style: { background: 'var(--status-risk-soft)', color: 'var(--status-risk)' } },
+    neutral:  { label: '暂无关联', style: { background: 'var(--status-calm-soft)', color: 'var(--status-calm)' } },
+  } as const;
+  const { label, style } = map[trend as keyof typeof map];
+  return <span className="nesio-exp-trend-badge" style={style}>{label}</span>;
+}
+
+// ── Progress Arc ──────────────────────────────────────────────────────────────
+
+function ProgressArc({ done, total }: { done: number; total: number }) {
+  const pct = Math.min(done / total, 1);
+  const R = 18, CX = 22, CY = 22;
+  const circ = 2 * Math.PI * R;
+  const dash = pct * circ;
+  return (
+    <svg width="44" height="44" viewBox="0 0 44 44" className="nesio-exp-arc">
+      <circle cx={CX} cy={CY} r={R} fill="none" stroke="var(--portal-line)" strokeWidth="3" />
+      <circle cx={CX} cy={CY} r={R} fill="none" stroke="var(--portal-blue-deep)" strokeWidth="3"
+        strokeDasharray={`${dash.toFixed(1)} ${circ.toFixed(1)}`}
+        strokeLinecap="round" transform={`rotate(-90 ${CX} ${CY})`} />
+      <text x={CX} y={CY + 4} textAnchor="middle" fontSize="9" fill="var(--portal-ink)" fontWeight="600">{done}</text>
+    </svg>
+  );
+}
+
+// ── Create Wizard ─────────────────────────────────────────────────────────────
+
+const VAR_TYPE_OPTS: { value: VarType; label: string; hint: string }[] = [
+  { value: 'scale',   label: '评分 1–10', hint: '主观感受，如精力/心情/专注度' },
+  { value: 'number',  label: '具体数值',  hint: '客观数据，如睡眠时长/步数/咖啡量' },
+  { value: 'boolean', label: '是 / 否',   hint: '有没有做某件事' },
+];
+
+const TARGET_DAYS_OPTS = [7, 14, 21, 30];
+
+interface WizardProps {
+  onSave: (exp: Experiment) => void;
+  onCancel: () => void;
+}
+
+export function CreateExperimentWizard({ onSave, onCancel }: WizardProps) {
+  const [step, setStep] = useState(0);
+  const [name, setName] = useState('');
+  const [hypo, setHypo] = useState('');
+  const [ivName, setIvName] = useState('');
+  const [ivUnit, setIvUnit] = useState('');
+  const [ivType, setIvType] = useState<VarType>('number');
+  const [dvName, setDvName] = useState('');
+  const [dvUnit, setDvUnit] = useState('');
+  const [dvType, setDvType] = useState<VarType>('scale');
+  const [targetDays, setTargetDays] = useState(14);
+
+  function save() {
+    const exp: Experiment = {
+      id: `exp_${Date.now()}`,
+      name: name.trim(),
+      hypothesis: hypo.trim(),
+      ivName: ivName.trim() || '干预变量',
+      ivUnit: ivUnit.trim(),
+      ivType,
+      dvName: dvName.trim() || '结果变量',
+      dvUnit: dvUnit.trim(),
+      dvType,
+      targetDays,
+      startedAt: new Date().toISOString(),
+      dataPoints: [],
+      concluded: false,
+    };
+    onSave(exp);
+  }
+
+  const canStep0 = name.trim().length > 0;
+  const canStep1 = ivName.trim().length > 0;
+  const canStep2 = dvName.trim().length > 0;
+
+  return (
+    <div className="nesio-exp-wizard">
+      <div className="nesio-exp-wizard-steps">
+        {['基本信息', '干预变量', '结果 & 目标'].map((s, i) => (
+          <div key={i} className={`nesio-exp-step-dot${i === step ? ' active' : i < step ? ' done' : ''}`} />
+        ))}
+      </div>
+
+      {step === 0 && (
+        <div className="nesio-exp-wizard-body">
+          <p className="nesio-exp-wizard-label">这个实验叫什么？</p>
+          <input className="nesio-exp-input" autoFocus
+            placeholder="例：早睡对晨间精力的影响"
+            value={name} onChange={(e) => setName(e.target.value)} />
+          <p className="nesio-exp-wizard-label" style={{ marginTop: '0.9rem' }}>你的假设（可选）</p>
+          <input className="nesio-exp-input"
+            placeholder="例：如果我在 11 点前入睡，第二天精力评分会更高"
+            value={hypo} onChange={(e) => setHypo(e.target.value)} />
+          <div className="nesio-exp-wizard-actions">
+            <button type="button" className="nesio-exp-cancel-btn" onClick={onCancel}>取消</button>
+            <button type="button" className="nesio-exp-next-btn" onClick={() => setStep(1)} disabled={!canStep0}>下一步</button>
+          </div>
+        </div>
+      )}
+
+      {step === 1 && (
+        <div className="nesio-exp-wizard-body">
+          <p className="nesio-exp-wizard-label">你要改变或追踪什么？（干预 / 自变量）</p>
+          <input className="nesio-exp-input" autoFocus
+            placeholder="例：入睡时间、咖啡杯数、运动时长"
+            value={ivName} onChange={(e) => setIvName(e.target.value)} />
+          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+            <input className="nesio-exp-input" style={{ flex: 1 }} placeholder="单位（可选）"
+              value={ivUnit} onChange={(e) => setIvUnit(e.target.value)} />
+          </div>
+          <p className="nesio-exp-wizard-label" style={{ marginTop: '0.9rem' }}>记录方式</p>
+          <div className="nesio-exp-type-opts">
+            {VAR_TYPE_OPTS.map((o) => (
+              <button key={o.value} type="button"
+                className={`nesio-exp-type-btn${ivType === o.value ? ' active' : ''}`}
+                onClick={() => setIvType(o.value)}>
+                <span className="nesio-exp-type-label">{o.label}</span>
+                <span className="nesio-exp-type-hint">{o.hint}</span>
+              </button>
+            ))}
+          </div>
+          <div className="nesio-exp-wizard-actions">
+            <button type="button" className="nesio-exp-cancel-btn" onClick={() => setStep(0)}>上一步</button>
+            <button type="button" className="nesio-exp-next-btn" onClick={() => setStep(2)} disabled={!canStep1}>下一步</button>
+          </div>
+        </div>
+      )}
+
+      {step === 2 && (
+        <div className="nesio-exp-wizard-body">
+          <p className="nesio-exp-wizard-label">你期待哪个指标发生变化？（结果 / 因变量）</p>
+          <input className="nesio-exp-input" autoFocus
+            placeholder="例：晨间精力、睡眠质量、专注时长"
+            value={dvName} onChange={(e) => setDvName(e.target.value)} />
+          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+            <input className="nesio-exp-input" style={{ flex: 1 }} placeholder="单位（可选）"
+              value={dvUnit} onChange={(e) => setDvUnit(e.target.value)} />
+          </div>
+          <p className="nesio-exp-wizard-label" style={{ marginTop: '0.9rem' }}>记录方式</p>
+          <div className="nesio-exp-type-opts">
+            {VAR_TYPE_OPTS.filter((o) => o.value !== 'boolean').map((o) => (
+              <button key={o.value} type="button"
+                className={`nesio-exp-type-btn${dvType === o.value ? ' active' : ''}`}
+                onClick={() => setDvType(o.value as VarType)}>
+                <span className="nesio-exp-type-label">{o.label}</span>
+                <span className="nesio-exp-type-hint">{o.hint}</span>
+              </button>
+            ))}
+          </div>
+          <p className="nesio-exp-wizard-label" style={{ marginTop: '0.9rem' }}>实验持续天数</p>
+          <div className="nesio-exp-days-opts">
+            {TARGET_DAYS_OPTS.map((d) => (
+              <button key={d} type="button"
+                className={`nesio-exp-days-btn${targetDays === d ? ' active' : ''}`}
+                onClick={() => setTargetDays(d)}>{d} 天</button>
+            ))}
+          </div>
+          <div className="nesio-exp-wizard-actions">
+            <button type="button" className="nesio-exp-cancel-btn" onClick={() => setStep(1)}>上一步</button>
+            <button type="button" className="nesio-exp-create-btn" onClick={save} disabled={!canStep2}>开始实验</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Log Panel ─────────────────────────────────────────────────────────────────
+
+function LogPanel({ exp, onLog }: { exp: Experiment; onLog: (iv: number, dv: number, note: string) => void }) {
+  const [iv, setIv] = useState('');
+  const [dv, setDv] = useState('');
+  const [note, setNote] = useState('');
+  const [scaleIv, setScaleIv] = useState(0);
+  const [scaleDv, setScaleDv] = useState(0);
+  const [boolIv, setBoolIv] = useState<boolean | null>(null);
+
+  const today = new Date().toISOString().slice(0, 10);
+  const alreadyLogged = exp.dataPoints.some((p) => p.date === today);
+
+  function submit() {
+    let ivVal: number;
+    let dvVal: number;
+
+    if (exp.ivType === 'boolean') {
+      if (boolIv === null) return;
+      ivVal = boolIv ? 1 : 0;
+    } else if (exp.ivType === 'scale') {
+      if (!scaleIv) return;
+      ivVal = scaleIv;
+    } else {
+      ivVal = parseFloat(iv);
+      if (Number.isNaN(ivVal)) return;
+    }
+
+    if (exp.dvType === 'scale') {
+      if (!scaleDv) return;
+      dvVal = scaleDv;
+    } else {
+      dvVal = parseFloat(dv);
+      if (Number.isNaN(dvVal)) return;
+    }
+
+    onLog(ivVal, dvVal, note.trim());
+    setIv(''); setDv(''); setNote(''); setScaleIv(0); setScaleDv(0); setBoolIv(null);
+  }
+
+  if (alreadyLogged) {
+    return (
+      <div className="nesio-exp-logged-today">
+        <span>✓</span> 今天已记录
+      </div>
+    );
+  }
+
+  return (
+    <div className="nesio-exp-log-panel">
+      <p className="nesio-exp-log-title">今日记录</p>
+
+      {/* IV input */}
+      <div className="nesio-exp-log-row">
+        <span className="nesio-exp-log-label">{exp.ivName}{exp.ivUnit ? ` (${exp.ivUnit})` : ''}</span>
+        {exp.ivType === 'boolean' ? (
+          <div className="nesio-exp-bool-row">
+            <button type="button" className={`nesio-exp-bool-btn${boolIv === true ? ' active' : ''}`} onClick={() => setBoolIv(true)}>✓ 是</button>
+            <button type="button" className={`nesio-exp-bool-btn${boolIv === false ? ' active' : ''}`} onClick={() => setBoolIv(false)}>✗ 否</button>
+          </div>
+        ) : exp.ivType === 'scale' ? (
+          <div className="nesio-exp-scale-row">
+            {[1,2,3,4,5,6,7,8,9,10].map((n) => (
+              <button key={n} type="button" className={`nesio-exp-scale-btn${scaleIv === n ? ' active' : ''}`} onClick={() => setScaleIv(n)}>{n}</button>
+            ))}
+          </div>
+        ) : (
+          <input className="nesio-exp-log-input" type="number" placeholder="输入数值" value={iv} onChange={(e) => setIv(e.target.value)} />
+        )}
+      </div>
+
+      {/* DV input */}
+      <div className="nesio-exp-log-row">
+        <span className="nesio-exp-log-label">{exp.dvName}{exp.dvUnit ? ` (${exp.dvUnit})` : ''}</span>
+        {exp.dvType === 'scale' ? (
+          <div className="nesio-exp-scale-row">
+            {[1,2,3,4,5,6,7,8,9,10].map((n) => (
+              <button key={n} type="button" className={`nesio-exp-scale-btn${scaleDv === n ? ' active' : ''}`} onClick={() => setScaleDv(n)}>{n}</button>
+            ))}
+          </div>
+        ) : (
+          <input className="nesio-exp-log-input" type="number" placeholder="输入数值" value={dv} onChange={(e) => setDv(e.target.value)} />
+        )}
+      </div>
+
+      <input className="nesio-exp-log-note" placeholder="今天有什么特别的事？（可选）" value={note} onChange={(e) => setNote(e.target.value)} />
+
+      <button type="button" className="nesio-exp-log-submit" onClick={submit}>记录今天</button>
+    </div>
+  );
+}
+
+// ── Experiment Detail View ────────────────────────────────────────────────────
+
+interface DetailProps {
+  exp: Experiment;
+  onLog: (expId: string, iv: number, dv: number, note: string) => void;
+  onConclude: (expId: string, conclusion: string) => void;
+  onDelete: (expId: string) => void;
+  onBack: () => void;
+}
+
+export function ExperimentDetail({ exp, onLog, onConclude, onDelete, onBack }: DetailProps) {
+  const [showConclude, setShowConclude] = useState(false);
+  const [conclusionText, setConclusionText] = useState('');
+  const insight = computeInsight(exp);
+  const progress = exp.dataPoints.length;
+  const daysSince = Math.floor((Date.now() - new Date(exp.startedAt).getTime()) / 86_400_000);
+
+  return (
+    <div className="nesio-exp-detail">
+      <div className="nesio-exp-detail-header">
+        <button type="button" className="nesio-exp-back-btn" onClick={onBack}>← 返回</button>
+        <span className="nesio-exp-detail-title">🧪 {exp.name}</span>
+        {!exp.concluded && (
+          <button type="button" className="nesio-exp-menu-btn" onClick={() => setShowConclude(true)}>结束实验</button>
+        )}
+      </div>
+
+      {exp.hypothesis && (
+        <div className="nesio-exp-hypo-block">
+          <span className="nesio-exp-hypo-label">假设</span>
+          <p className="nesio-exp-hypo-text">{exp.hypothesis}</p>
+        </div>
+      )}
+
+      <div className="nesio-exp-meta-row">
+        <div className="nesio-exp-meta-item">
+          <ProgressArc done={progress} total={exp.targetDays} />
+          <div>
+            <p className="nesio-exp-meta-val">{progress} / {exp.targetDays} 天</p>
+            <p className="nesio-exp-meta-sub">已持续 {daysSince} 天</p>
+          </div>
+        </div>
+        <div className="nesio-exp-vars-col">
+          <span className="nesio-exp-var-chip iv">📊 {exp.ivName}</span>
+          <span className="nesio-exp-var-chip dv">📈 {exp.dvName}</span>
+        </div>
+      </div>
+
+      {/* Chart */}
+      {exp.dataPoints.length >= 2 && (
+        <div className="nesio-exp-chart-block">
+          <div className="nesio-exp-chart-legend">
+            <span className="nesio-exp-legend iv">— {exp.ivName}</span>
+            <span className="nesio-exp-legend dv">— {exp.dvName}</span>
+          </div>
+          <SparkDualLine pts={exp.dataPoints} ivType={exp.ivType} />
+        </div>
+      )}
+
+      {/* Scatter for continuous */}
+      {exp.dataPoints.length >= 4 && exp.ivType !== 'boolean' && (
+        <div className="nesio-exp-scatter-block">
+          <p className="nesio-exp-scatter-label">相关散点图</p>
+          <div className="nesio-exp-scatter-wrap">
+            <ScatterPlot pts={exp.dataPoints} ivType={exp.ivType} />
+            <div className="nesio-exp-scatter-axes">
+              <span className="nesio-exp-axis-x">{exp.ivName}</span>
+              <span className="nesio-exp-axis-y">{exp.dvName}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Insight */}
+      <div className={`nesio-exp-insight-block${insight.trend === 'insufficient' ? ' pending' : ''}`}>
+        <div className="nesio-exp-insight-head">
+          <span className="nesio-exp-insight-icon">
+            {insight.trend === 'positive' ? '📈' : insight.trend === 'negative' ? '📉' : insight.trend === 'insufficient' ? '⏳' : '〰️'}
+          </span>
+          <span className="nesio-exp-insight-title">数据说明</span>
+          <TrendBadge trend={insight.trend} />
+        </div>
+        <p className="nesio-exp-insight-text">{insight.text}</p>
+        {insight.r !== null && (
+          <p className="nesio-exp-insight-stat">
+            Pearson r = {insight.r > 0 ? '+' : ''}{insight.r.toFixed(2)}
+            {Math.abs(insight.r) > 0.5 ? '（强）' : Math.abs(insight.r) > 0.3 ? '（中）' : '（弱）'}
+          </p>
+        )}
+        {insight.meanOn !== null && insight.meanOff !== null && exp.ivType === 'boolean' && (
+          <div className="nesio-exp-compare-row">
+            <div className="nesio-exp-compare-item on">
+              <span className="nesio-exp-compare-label">有「{exp.ivName}」</span>
+              <span className="nesio-exp-compare-val">{insight.meanOn.toFixed(1)}</span>
+            </div>
+            <div className="nesio-exp-compare-item off">
+              <span className="nesio-exp-compare-label">无「{exp.ivName}」</span>
+              <span className="nesio-exp-compare-val">{insight.meanOff.toFixed(1)}</span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Log today */}
+      {!exp.concluded && (
+        <LogPanel exp={exp} onLog={(iv, dv, note) => onLog(exp.id, iv, dv, note)} />
+      )}
+
+      {/* History */}
+      {exp.dataPoints.length > 0 && (
+        <div className="nesio-exp-history">
+          <p className="nesio-exp-history-label">记录历史</p>
+          <div className="nesio-exp-history-list">
+            {[...exp.dataPoints].reverse().slice(0, 20).map((p, i) => (
+              <div key={i} className="nesio-exp-history-row">
+                <span className="nesio-exp-history-date">{p.date.slice(5)}</span>
+                <span className="nesio-exp-history-iv">
+                  {exp.ivType === 'boolean' ? (p.iv ? '✓ 是' : '✗ 否') : `${p.iv}${exp.ivUnit}`}
+                </span>
+                <span className="nesio-exp-history-dv">{p.dv}{exp.dvUnit}</span>
+                {p.note && <span className="nesio-exp-history-note">{p.note}</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Conclude modal */}
+      {showConclude && (
+        <div className="nesio-exp-conclude-overlay" onClick={() => setShowConclude(false)}>
+          <div className="nesio-exp-conclude-modal" onClick={(e) => e.stopPropagation()}>
+            <p className="nesio-exp-conclude-title">结束这个实验</p>
+            <p className="nesio-exp-conclude-sub">记录一下你的结论（可选）</p>
+            <textarea className="nesio-exp-conclude-text"
+              placeholder="根据数据，我得出……"
+              value={conclusionText} onChange={(e) => setConclusionText(e.target.value)} rows={3} />
+            <div className="nesio-exp-conclude-actions">
+              <button type="button" className="nesio-exp-cancel-btn" onClick={() => setShowConclude(false)}>继续实验</button>
+              <button type="button" className="nesio-exp-create-btn" onClick={() => { onConclude(exp.id, conclusionText); setShowConclude(false); }}>确认结束</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Conclusion (concluded) */}
+      {exp.concluded && (
+        <div className="nesio-exp-conclusion-block">
+          <p className="nesio-exp-conclusion-label">✓ 实验已完成</p>
+          {exp.conclusion && <p className="nesio-exp-conclusion-text">{exp.conclusion}</p>}
+          <button type="button" className="nesio-exp-delete-btn" onClick={() => onDelete(exp.id)}>删除实验</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Compact Card (in widget list) ─────────────────────────────────────────────
+
+interface CardProps {
+  exp: Experiment;
+  onOpen: () => void;
+  onQuickLog: (expId: string, iv: number, dv: number) => void;
+}
+
+function ExperimentCard({ exp, onOpen, onQuickLog }: CardProps) {
+  const insight = computeInsight(exp);
+  const progress = exp.dataPoints.length;
+  const today = new Date().toISOString().slice(0, 10);
+  const loggedToday = exp.dataPoints.some((p) => p.date === today);
+
+  const lastPt = exp.dataPoints[exp.dataPoints.length - 1];
+  const lastIvDisplay = lastPt
+    ? (exp.ivType === 'boolean' ? (lastPt.iv ? '是' : '否') : `${lastPt.iv}${exp.ivUnit}`)
+    : null;
+
+  return (
+    <div className={`nesio-exp-card${exp.concluded ? ' concluded' : ''}`} onClick={onOpen}>
+      <div className="nesio-exp-card-top">
+        <div className="nesio-exp-card-info">
+          <span className="nesio-exp-card-name">🧪 {exp.name}</span>
+          <div className="nesio-exp-card-vars">
+            <span className="nesio-exp-var-tag">{exp.ivName}</span>
+            <span className="nesio-exp-var-arrow">→</span>
+            <span className="nesio-exp-var-tag">{exp.dvName}</span>
+          </div>
+        </div>
+        <ProgressArc done={progress} total={exp.targetDays} />
+      </div>
+
+      {exp.dataPoints.length >= 2 && (
+        <SparkDualLine pts={exp.dataPoints} ivType={exp.ivType} />
+      )}
+
+      <div className="nesio-exp-card-footer">
+        {insight.trend !== 'insufficient' ? (
+          <TrendBadge trend={insight.trend} />
+        ) : (
+          <span className="nesio-exp-card-hint">还需 {Math.max(0, 5 - progress)} 次打卡</span>
+        )}
+        {lastIvDisplay && <span className="nesio-exp-last-val">上次：{lastIvDisplay}</span>}
+        {!exp.concluded && !loggedToday && (
+          <button type="button" className="nesio-exp-quick-log-btn"
+            onClick={(e) => { e.stopPropagation(); onOpen(); }}>
+            打卡
+          </button>
+        )}
+        {loggedToday && <span className="nesio-exp-card-done">今日 ✓</span>}
+      </div>
+    </div>
+  );
+}
+
+// ── Main Widget ───────────────────────────────────────────────────────────────
+
+export function MyExperimentWidget() {
+  const [experiments, setExperiments] = useState<Experiment[]>([]);
+  const [view, setView] = useState<'list' | 'create' | 'detail'>('list');
+  const [detailId, setDetailId] = useState<string | null>(null);
+
+  useEffect(() => { setExperiments(loadExperiments()); }, []);
+
+  function mutate(next: Experiment[]) {
+    setExperiments(next);
+    saveExperiments(next);
+  }
+
+  const handleSave = useCallback((exp: Experiment) => {
+    mutate([exp, ...experiments]);
+    setDetailId(exp.id);
+    setView('detail');
+  }, [experiments]);
+
+  const handleLog = useCallback((expId: string, iv: number, dv: number, note: string) => {
+    const today = new Date().toISOString().slice(0, 10);
+    mutate(experiments.map((e) => e.id !== expId ? e : {
+      ...e,
+      dataPoints: [...e.dataPoints.filter((p) => p.date !== today), { date: today, iv, dv, note }],
+    }));
+  }, [experiments]);
+
+  const handleQuickLog = useCallback((expId: string, iv: number, dv: number) => {
+    handleLog(expId, iv, dv, '');
+  }, [handleLog]);
+
+  const handleConclude = useCallback((expId: string, conclusion: string) => {
+    mutate(experiments.map((e) => e.id !== expId ? e : { ...e, concluded: true, conclusion }));
+    setView('list');
+  }, [experiments]);
+
+  const handleDelete = useCallback((expId: string) => {
+    mutate(experiments.filter((e) => e.id !== expId));
+    setView('list');
+  }, [experiments]);
+
+  const detailExp = detailId ? experiments.find((e) => e.id === detailId) : null;
+
+  if (view === 'create') {
+    return (
+      <div className="nesio-exp-widget">
+        <CreateExperimentWizard onSave={handleSave} onCancel={() => setView('list')} />
+      </div>
+    );
+  }
+
+  if (view === 'detail' && detailExp) {
+    return (
+      <div className="nesio-exp-widget">
+        <ExperimentDetail
+          exp={detailExp}
+          onLog={handleLog}
+          onConclude={handleConclude}
+          onDelete={handleDelete}
+          onBack={() => setView('list')}
+        />
+      </div>
+    );
+  }
+
+  const active = experiments.filter((e) => !e.concluded);
+  const done = experiments.filter((e) => e.concluded);
+
+  return (
+    <div className="nesio-exp-widget">
+      {experiments.length === 0 && (
+        <div className="nesio-exp-empty">
+          <p className="nesio-exp-empty-icon">🧪</p>
+          <p className="nesio-exp-empty-title">还没有实验</p>
+          <p className="nesio-exp-empty-hint">
+            设定一个变量，每天记录数据，用你自己的数字看趋势。<br />
+            比如：「早睡 → 晨间精力」或「运动量 → 睡眠质量」
+          </p>
+        </div>
+      )}
+
+      {active.map((exp) => (
+        <ExperimentCard key={exp.id} exp={exp}
+          onOpen={() => { setDetailId(exp.id); setView('detail'); }}
+          onQuickLog={handleQuickLog} />
+      ))}
+
+      {done.length > 0 && (
+        <div className="nesio-exp-done-section">
+          <p className="nesio-exp-done-label">已完成 {done.length} 个</p>
+          {done.map((exp) => (
+            <div key={exp.id} className="nesio-exp-done-row"
+              onClick={() => { setDetailId(exp.id); setView('detail'); }}>
+              <span>🧪 {exp.name}</span>
+              <TrendBadge trend={computeInsight(exp).trend} />
+            </div>
+          ))}
+        </div>
+      )}
+
+      <button type="button" className="nesio-exp-add-btn" onClick={() => setView('create')}>
+        + 新建实验
+      </button>
+    </div>
+  );
+}

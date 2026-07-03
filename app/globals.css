@@ -17927,3 +17927,732 @@ html[data-portal-theme="night"] .nesio-create-project-input {
   color: var(--portal-muted); transition: background 0.12s;
 }
 .nesio-exp-add-btn:hover { background: var(--portal-accent-soft); border-color: var(--portal-accent); color: var(--portal-accent); }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   NESIO EXPERIMENT — n-of-1 个人实验系统
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Widget wrapper ── */
+.nesio-exp-widget {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* ── Empty state ── */
+.nesio-exp-empty {
+  text-align: center;
+  padding: 2rem 1rem 1.5rem;
+  color: var(--portal-muted);
+}
+.nesio-exp-empty-icon { font-size: 2rem; margin-bottom: 0.4rem; }
+.nesio-exp-empty-title {
+  font-size: var(--text-body);
+  font-weight: var(--weight-semibold);
+  color: var(--portal-ink);
+  margin-bottom: 0.4rem;
+}
+.nesio-exp-empty-hint {
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+  color: var(--portal-muted);
+}
+
+/* ── Add button ── */
+.nesio-exp-add-btn {
+  width: 100%;
+  padding: 0.7rem;
+  border: 1.5px dashed var(--portal-line);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--portal-blue-deep);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-soft),
+              border-color var(--dur-fast) var(--ease-soft);
+}
+.nesio-exp-add-btn:hover {
+  background: var(--portal-accent-soft);
+  border-color: var(--portal-accent);
+  color: var(--portal-accent);
+}
+
+/* ── Experiment Card ── */
+.nesio-exp-card {
+  background: var(--glass-bg-solid);
+  border: 1px solid var(--portal-line);
+  border-radius: var(--radius-md);
+  padding: 0.85rem 1rem;
+  cursor: pointer;
+  transition: box-shadow var(--dur-fast) var(--ease-soft),
+              transform var(--dur-fast) var(--ease-soft);
+}
+.nesio-exp-card:hover {
+  box-shadow: var(--shadow-raise);
+  transform: translateY(-1px);
+}
+.nesio-exp-card.concluded {
+  opacity: 0.65;
+}
+
+.nesio-exp-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-bottom: 0.5rem;
+}
+.nesio-exp-card-info { flex: 1; min-width: 0; }
+.nesio-exp-card-name {
+  display: block;
+  font-size: var(--text-body);
+  font-weight: var(--weight-semibold);
+  color: var(--portal-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nesio-exp-card-vars {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.25rem;
+  flex-wrap: wrap;
+}
+.nesio-exp-var-tag {
+  font-size: var(--text-xs);
+  color: var(--portal-muted);
+  background: var(--portal-accent-soft);
+  border-radius: var(--radius-pill);
+  padding: 0.1rem 0.45rem;
+}
+.nesio-exp-var-arrow { font-size: var(--text-xs); color: var(--portal-muted); }
+
+.nesio-exp-card-footer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+}
+.nesio-exp-card-hint {
+  font-size: var(--text-xs);
+  color: var(--portal-muted);
+}
+.nesio-exp-last-val {
+  font-size: var(--text-xs);
+  color: var(--portal-muted);
+  margin-left: auto;
+}
+.nesio-exp-card-done {
+  font-size: var(--text-xs);
+  color: var(--status-go);
+  margin-left: auto;
+}
+.nesio-exp-quick-log-btn {
+  margin-left: auto;
+  padding: 0.25rem 0.7rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--portal-blue-deep);
+  background: var(--portal-accent-soft);
+  color: var(--portal-blue-deep);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  transition: background var(--dur-fast);
+}
+.nesio-exp-quick-log-btn:hover { background: var(--portal-accent-soft-md); }
+
+/* ── Trend badge ── */
+.nesio-exp-trend-badge {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-label);
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-pill);
+}
+
+/* ── Progress arc ── */
+.nesio-exp-arc { flex-shrink: 0; }
+
+/* ── SVG Charts ── */
+.nesio-exp-chart {
+  display: block;
+  width: 100%;
+  height: 60px;
+  margin: 0.4rem 0 0;
+  overflow: visible;
+}
+.nesio-exp-scatter {
+  display: block;
+  width: 100%;
+  max-width: 240px;
+}
+
+/* ── Done section ── */
+.nesio-exp-done-section {
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--portal-line);
+}
+.nesio-exp-done-label {
+  font-size: var(--text-xs);
+  color: var(--portal-muted);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  margin-bottom: 0.4rem;
+}
+.nesio-exp-done-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.4rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  color: var(--portal-muted);
+  cursor: pointer;
+  transition: background var(--dur-fast);
+}
+.nesio-exp-done-row:hover { background: var(--portal-accent-soft); }
+
+/* ════════════════════════════════════════════════
+   CREATE WIZARD
+   ════════════════════════════════════════════════ */
+.nesio-exp-wizard {
+  background: var(--glass-bg-solid);
+  border: 1px solid var(--portal-line);
+  border-radius: var(--radius-lg);
+  padding: 1.2rem 1rem 1rem;
+}
+.nesio-exp-wizard-steps {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 1.2rem;
+}
+.nesio-exp-step-dot {
+  width: 7px; height: 7px;
+  border-radius: 999px;
+  background: var(--portal-line);
+  transition: background var(--dur-fast), width var(--dur-fast);
+}
+.nesio-exp-step-dot.active {
+  width: 20px;
+  background: var(--portal-blue-deep);
+}
+.nesio-exp-step-dot.done { background: var(--status-go); }
+
+.nesio-exp-wizard-body { display: flex; flex-direction: column; gap: 0.4rem; }
+.nesio-exp-wizard-label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--portal-ink);
+  margin-bottom: 0.1rem;
+}
+.nesio-exp-wizard-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.8rem;
+}
+
+/* shared form inputs */
+.nesio-exp-input {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--portal-line);
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg-raised);
+  color: var(--portal-ink);
+  font-size: var(--text-sm);
+  outline: none;
+  transition: border-color var(--dur-fast);
+  box-sizing: border-box;
+}
+.nesio-exp-input:focus { border-color: var(--portal-blue-deep); }
+
+/* variable type options */
+.nesio-exp-type-opts { display: flex; flex-direction: column; gap: 0.4rem; }
+.nesio-exp-type-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 0.6rem 0.75rem;
+  border: 1.5px solid var(--portal-line);
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg);
+  cursor: pointer;
+  transition: border-color var(--dur-fast), background var(--dur-fast);
+  text-align: left;
+}
+.nesio-exp-type-btn.active {
+  border-color: var(--portal-blue-deep);
+  background: var(--portal-accent-soft);
+}
+.nesio-exp-type-label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--portal-ink);
+}
+.nesio-exp-type-hint {
+  font-size: var(--text-xs);
+  color: var(--portal-muted);
+  margin-top: 0.1rem;
+}
+
+/* duration options */
+.nesio-exp-days-opts { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.nesio-exp-days-btn {
+  padding: 0.35rem 0.8rem;
+  border: 1.5px solid var(--portal-line);
+  border-radius: var(--radius-pill);
+  background: var(--glass-bg);
+  color: var(--portal-ink);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  transition: all var(--dur-fast);
+}
+.nesio-exp-days-btn.active {
+  border-color: var(--portal-blue-deep);
+  background: var(--portal-accent-soft);
+  color: var(--portal-blue-deep);
+}
+
+/* action buttons */
+.nesio-exp-next-btn, .nesio-exp-create-btn {
+  flex: 1;
+  padding: 0.65rem 1rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--portal-blue-deep);
+  color: #fff;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  cursor: pointer;
+  transition: opacity var(--dur-fast);
+}
+.nesio-exp-next-btn:disabled, .nesio-exp-create-btn:disabled { opacity: 0.4; cursor: default; }
+.nesio-exp-cancel-btn {
+  flex: 1;
+  padding: 0.65rem 1rem;
+  border: 1px solid var(--portal-line);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--portal-muted);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+/* ════════════════════════════════════════════════
+   LOG PANEL
+   ════════════════════════════════════════════════ */
+.nesio-exp-log-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0.85rem;
+  background: var(--glass-bg-raised);
+  border: 1px solid var(--portal-line);
+  border-radius: var(--radius-md);
+  margin-top: 0.5rem;
+}
+.nesio-exp-log-title {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--portal-ink);
+}
+.nesio-exp-log-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.nesio-exp-log-label {
+  font-size: var(--text-xs);
+  color: var(--portal-muted);
+  font-weight: var(--weight-medium);
+}
+.nesio-exp-log-input {
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--portal-line);
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg);
+  color: var(--portal-ink);
+  font-size: var(--text-sm);
+  outline: none;
+}
+.nesio-exp-log-note {
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--portal-line);
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg);
+  color: var(--portal-ink);
+  font-size: var(--text-xs);
+  outline: none;
+}
+.nesio-exp-log-submit {
+  padding: 0.6rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--portal-blue-deep);
+  color: #fff;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  cursor: pointer;
+}
+.nesio-exp-logged-today {
+  text-align: center;
+  padding: 0.6rem;
+  font-size: var(--text-sm);
+  color: var(--status-go);
+  background: var(--status-go-soft);
+  border-radius: var(--radius-sm);
+}
+
+/* scale buttons */
+.nesio-exp-scale-row {
+  display: flex;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+}
+.nesio-exp-scale-btn {
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--portal-line);
+  border-radius: var(--radius-xs);
+  background: var(--glass-bg);
+  color: var(--portal-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  transition: all var(--dur-fast);
+}
+.nesio-exp-scale-btn.active {
+  border-color: var(--portal-blue-deep);
+  background: var(--portal-blue-deep);
+  color: #fff;
+}
+
+/* boolean buttons */
+.nesio-exp-bool-row { display: flex; gap: 0.5rem; }
+.nesio-exp-bool-btn {
+  flex: 1;
+  padding: 0.5rem;
+  border: 1.5px solid var(--portal-line);
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg);
+  color: var(--portal-muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  transition: all var(--dur-fast);
+}
+.nesio-exp-bool-btn.active {
+  border-color: var(--portal-blue-deep);
+  background: var(--portal-accent-soft);
+  color: var(--portal-blue-deep);
+}
+
+/* ════════════════════════════════════════════════
+   DETAIL VIEW
+   ════════════════════════════════════════════════ */
+.nesio-exp-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  animation: nesio-fade-in 0.2s var(--ease-soft);
+}
+.nesio-exp-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.nesio-exp-back-btn {
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--portal-line);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--portal-muted);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.nesio-exp-detail-title {
+  flex: 1;
+  font-size: var(--text-body);
+  font-weight: var(--weight-semibold);
+  color: var(--portal-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nesio-exp-menu-btn {
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--portal-line);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--portal-muted);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* hypothesis block */
+.nesio-exp-hypo-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.65rem 0.85rem;
+  background: var(--portal-accent-soft);
+  border-left: 3px solid var(--portal-blue-deep);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+.nesio-exp-hypo-label {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-label);
+  color: var(--portal-blue-deep);
+  text-transform: uppercase;
+}
+.nesio-exp-hypo-text {
+  font-size: var(--text-sm);
+  color: var(--portal-ink);
+  line-height: var(--leading-snug);
+}
+
+/* meta row */
+.nesio-exp-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  justify-content: space-between;
+}
+.nesio-exp-meta-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.nesio-exp-meta-val {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--portal-ink);
+}
+.nesio-exp-meta-sub {
+  font-size: var(--text-xs);
+  color: var(--portal-muted);
+}
+.nesio-exp-vars-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  align-items: flex-end;
+}
+.nesio-exp-var-chip {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  padding: 0.15rem 0.55rem;
+  border-radius: var(--radius-pill);
+}
+.nesio-exp-var-chip.iv {
+  background: var(--portal-accent-soft);
+  color: var(--portal-blue-deep);
+}
+.nesio-exp-var-chip.dv {
+  background: var(--status-go-soft);
+  color: var(--status-go);
+}
+
+/* chart block */
+.nesio-exp-chart-block {
+  background: var(--glass-bg-raised);
+  border: 1px solid var(--portal-line);
+  border-radius: var(--radius-md);
+  padding: 0.65rem 0.75rem 0.5rem;
+}
+.nesio-exp-chart-legend {
+  display: flex;
+  gap: 0.9rem;
+  margin-bottom: 0.2rem;
+}
+.nesio-exp-legend {
+  font-size: var(--text-xs);
+  color: var(--portal-muted);
+}
+.nesio-exp-legend.iv { color: var(--portal-blue-deep); }
+.nesio-exp-legend.dv { color: var(--status-go); }
+
+/* scatter */
+.nesio-exp-scatter-block {
+  background: var(--glass-bg-raised);
+  border: 1px solid var(--portal-line);
+  border-radius: var(--radius-md);
+  padding: 0.65rem 0.75rem;
+}
+.nesio-exp-scatter-label {
+  font-size: var(--text-xs);
+  color: var(--portal-muted);
+  margin-bottom: 0.4rem;
+}
+.nesio-exp-scatter-wrap { position: relative; }
+.nesio-exp-scatter-axes { display: flex; justify-content: space-between; margin-top: 0.2rem; }
+.nesio-exp-axis-x, .nesio-exp-axis-y { font-size: 10px; color: var(--portal-muted); }
+
+/* insight block */
+.nesio-exp-insight-block {
+  background: var(--glass-bg-raised);
+  border: 1px solid var(--portal-line);
+  border-radius: var(--radius-md);
+  padding: 0.85rem;
+}
+.nesio-exp-insight-block.pending {
+  background: var(--portal-accent-soft);
+  border-color: var(--portal-accent-border);
+}
+.nesio-exp-insight-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+.nesio-exp-insight-icon { font-size: 1rem; }
+.nesio-exp-insight-title {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--portal-ink);
+  flex: 1;
+}
+.nesio-exp-insight-text {
+  font-size: var(--text-sm);
+  color: var(--portal-ink);
+  line-height: var(--leading-relaxed);
+}
+.nesio-exp-insight-stat {
+  font-size: var(--text-xs);
+  color: var(--portal-muted);
+  margin-top: 0.4rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* compare row (boolean) */
+.nesio-exp-compare-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+.nesio-exp-compare-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.5rem;
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg);
+  gap: 0.2rem;
+}
+.nesio-exp-compare-item.on { background: var(--portal-accent-soft); }
+.nesio-exp-compare-item.off { background: var(--glass-bg); }
+.nesio-exp-compare-label { font-size: var(--text-xs); color: var(--portal-muted); text-align: center; }
+.nesio-exp-compare-val {
+  font-size: var(--text-h3);
+  font-weight: var(--weight-bold);
+  color: var(--portal-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* history */
+.nesio-exp-history { margin-top: 0.25rem; }
+.nesio-exp-history-label {
+  font-size: var(--text-xs);
+  color: var(--portal-muted);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  margin-bottom: 0.4rem;
+}
+.nesio-exp-history-list { display: flex; flex-direction: column; gap: 0.25rem; }
+.nesio-exp-history-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: var(--radius-xs);
+  font-size: var(--text-xs);
+}
+.nesio-exp-history-row:nth-child(odd) { background: var(--portal-accent-soft); }
+.nesio-exp-history-date { color: var(--portal-muted); width: 2.5rem; flex-shrink: 0; }
+.nesio-exp-history-iv { color: var(--portal-blue-deep); font-weight: var(--weight-medium); min-width: 3rem; }
+.nesio-exp-history-dv { color: var(--status-go); font-weight: var(--weight-medium); min-width: 3rem; }
+.nesio-exp-history-note { color: var(--portal-muted); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* conclude overlay */
+.nesio-exp-conclude-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--modal-backdrop-bg);
+  backdrop-filter: blur(var(--modal-backdrop-blur));
+  z-index: 200;
+  display: flex;
+  align-items: flex-end;
+  padding: 1rem;
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+}
+.nesio-exp-conclude-modal {
+  width: 100%;
+  background: var(--glass-bg-pop);
+  border: 1px solid var(--portal-line);
+  border-radius: var(--radius-xl);
+  padding: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  box-shadow: var(--shadow-pop);
+}
+.nesio-exp-conclude-title {
+  font-size: var(--text-h3);
+  font-weight: var(--weight-semibold);
+  color: var(--portal-ink);
+}
+.nesio-exp-conclude-sub { font-size: var(--text-sm); color: var(--portal-muted); }
+.nesio-exp-conclude-text {
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--portal-line);
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg);
+  color: var(--portal-ink);
+  font-size: var(--text-sm);
+  resize: none;
+  outline: none;
+  font-family: var(--font-sans);
+}
+.nesio-exp-conclude-actions { display: flex; gap: 0.5rem; }
+
+/* concluded conclusion block */
+.nesio-exp-conclusion-block {
+  padding: 0.85rem;
+  background: var(--status-go-soft);
+  border: 1px solid var(--status-go);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.nesio-exp-conclusion-label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--status-go);
+}
+.nesio-exp-conclusion-text { font-size: var(--text-sm); color: var(--portal-ink); }
+.nesio-exp-delete-btn {
+  align-self: flex-start;
+  margin-top: 0.3rem;
+  padding: 0.3rem 0.75rem;
+  border: 1px solid var(--status-risk);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--status-risk);
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+/* Night mode tweaks */
+html[data-portal-theme="night"] .nesio-exp-card:hover {
+  box-shadow: var(--shadow-raise);
+}

@@ -11,6 +11,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { MyExperimentWidget } from '@/components/portal/NesioExperiment';
 import { getLifeGraph } from '@/lib/portal/life-graph';
 import type { LifeNode } from '@/lib/portal/life-graph';
 import { getMirrorProfile, type MirrorProfile } from '@/lib/portal/mirror-profile';
@@ -64,7 +65,7 @@ const WIDGET_REGISTRY: WidgetMeta[] = [
   { id: 'my_experiment',      label: '我的实验',   icon: '🧪', description: '自定义变量追踪，用数据说话' },
 ];
 
-const DEFAULT_WIDGETS: InsightWidgetId[] = ['donut', 'heatmap'];
+const DEFAULT_WIDGETS: InsightWidgetId[] = ['donut', 'heatmap', 'my_experiment'];
 const STORAGE_KEY = 'nesio-insights-widget-config';
 
 function loadWidgetConfig(): InsightWidgetId[] {
@@ -396,166 +397,6 @@ function CommitmentStatusWidget({ nodes }: { nodes: LifeNode[] }) {
           )}
         </div>
       ))}
-    </div>
-  );
-}
-
-// ── Widget: My Experiment ─────────────────────────────────────────────────────
-
-export interface Experiment {
-  id: string;
-  name: string;
-  hypothesis: string;
-  variable: string;
-  unit: string;
-  startedAt: string;
-  dataPoints: Array<{ date: string; value: number; note?: string }>;
-  concluded: boolean;
-  conclusion?: string;
-}
-
-const EXP_STORE_KEY = 'nesio-my-experiments-v1';
-
-function loadExperiments(): Experiment[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = localStorage.getItem(EXP_STORE_KEY);
-    return raw ? (JSON.parse(raw) as Experiment[]) : [];
-  } catch { return []; }
-}
-
-function saveExperiments(exps: Experiment[]): void {
-  if (typeof window === 'undefined') return;
-  try { localStorage.setItem(EXP_STORE_KEY, JSON.stringify(exps)); } catch { /* ignore */ }
-}
-
-function MyExperimentWidget({ nodes }: { nodes: LifeNode[] }) {
-  const [experiments, setExperiments] = useState<Experiment[]>([]);
-  const [showNew, setShowNew] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [newHypo, setNewHypo] = useState('');
-  const [newVar, setNewVar] = useState('');
-  const [newUnit, setNewUnit] = useState('');
-  const [logValue, setLogValue] = useState<Record<string, string>>({});
-
-  useEffect(() => { setExperiments(loadExperiments()); }, []);
-
-  function createExp() {
-    if (!newName.trim()) return;
-    const exp: Experiment = {
-      id: `exp_${Date.now()}`,
-      name: newName.trim(),
-      hypothesis: newHypo.trim(),
-      variable: newVar.trim() || newName.trim(),
-      unit: newUnit.trim(),
-      startedAt: new Date().toISOString(),
-      dataPoints: [],
-      concluded: false,
-    };
-    const updated = [exp, ...experiments];
-    setExperiments(updated);
-    saveExperiments(updated);
-    setShowNew(false);
-    setNewName(''); setNewHypo(''); setNewVar(''); setNewUnit('');
-  }
-
-  function logDataPoint(expId: string) {
-    const val = parseFloat(logValue[expId] ?? '');
-    if (Number.isNaN(val)) return;
-    const updated = experiments.map((e) => e.id !== expId ? e : {
-      ...e,
-      dataPoints: [...e.dataPoints, { date: new Date().toISOString().slice(0, 10), value: val }],
-    });
-    setExperiments(updated);
-    saveExperiments(updated);
-    setLogValue((prev) => ({ ...prev, [expId]: '' }));
-  }
-
-  function concludeExp(expId: string) {
-    const updated = experiments.map((e) => e.id !== expId ? e : { ...e, concluded: true });
-    setExperiments(updated);
-    saveExperiments(updated);
-  }
-
-  const active = experiments.filter((e) => !e.concluded);
-  const done = experiments.filter((e) => e.concluded);
-
-  return (
-    <div className="nesio-exp-widget">
-      {active.length === 0 && done.length === 0 ? (
-        <div className="nesio-exp-empty">
-          <p>🧪 还没有实验</p>
-          <p className="nesio-exp-empty-hint">设定一个可测量的变量，每天记录数据，用数字看趋势。<br/>例：&ldquo;每天喝水量 vs 精力状态&rdquo;</p>
-        </div>
-      ) : null}
-
-      {active.map((exp) => {
-        const pts = exp.dataPoints;
-        const lastVal = pts[pts.length - 1]?.value;
-        const daysSince = Math.floor((Date.now() - new Date(exp.startedAt).getTime()) / 86_400_000);
-        const avg = pts.length ? (pts.reduce((s, p) => s + p.value, 0) / pts.length).toFixed(1) : '—';
-        return (
-          <div key={exp.id} className="nesio-exp-card">
-            <div className="nesio-exp-card-header">
-              <span className="nesio-exp-name">🧪 {exp.name}</span>
-              <span className="nesio-exp-days">{daysSince}天</span>
-            </div>
-            {exp.hypothesis && <p className="nesio-exp-hypo">假设：{exp.hypothesis}</p>}
-            <div className="nesio-exp-stats">
-              <span>{pts.length} 次记录</span>
-              <span>均值 {avg} {exp.unit}</span>
-              {lastVal !== undefined && <span>最近 {lastVal} {exp.unit}</span>}
-            </div>
-            {pts.length >= 2 && (
-              <div className="nesio-exp-sparkline">
-                {pts.slice(-10).map((p, i) => {
-                  const min = Math.min(...pts.map((x) => x.value));
-                  const max = Math.max(...pts.map((x) => x.value));
-                  const range = max - min || 1;
-                  const h = Math.round(((p.value - min) / range) * 28) + 4;
-                  return <div key={i} className="nesio-exp-bar" style={{ height: `${h}px` }} title={`${p.date}: ${p.value}`} />;
-                })}
-              </div>
-            )}
-            <div className="nesio-exp-log-row">
-              <input
-                className="nesio-exp-log-input"
-                type="number"
-                placeholder={`记录 ${exp.variable}${exp.unit ? ` (${exp.unit})` : ''}…`}
-                value={logValue[exp.id] ?? ''}
-                onChange={(e) => setLogValue((prev) => ({ ...prev, [exp.id]: e.target.value }))}
-              />
-              <button type="button" className="nesio-exp-log-btn" onClick={() => logDataPoint(exp.id)}>记录</button>
-              {pts.length >= 5 && (
-                <button type="button" className="nesio-exp-conclude-btn" onClick={() => concludeExp(exp.id)}>结束</button>
-              )}
-            </div>
-          </div>
-        );
-      })}
-
-      {done.length > 0 && (
-        <div className="nesio-exp-done">
-          <p className="nesio-exp-done-label">已完成 {done.length} 个实验</p>
-        </div>
-      )}
-
-      {showNew ? (
-        <div className="nesio-exp-new-form">
-          <input className="nesio-exp-input" placeholder="实验名称，比如「早睡对精力的影响」" value={newName} onChange={(e) => setNewName(e.target.value)} />
-          <input className="nesio-exp-input" placeholder="假设（可选）：我猜…" value={newHypo} onChange={(e) => setNewHypo(e.target.value)} />
-          <div style={{ display: 'flex', gap: '0.4rem' }}>
-            <input className="nesio-exp-input" style={{ flex: 2 }} placeholder="追踪变量，比如「入睡时间」" value={newVar} onChange={(e) => setNewVar(e.target.value)} />
-            <input className="nesio-exp-input" style={{ flex: 1 }} placeholder="单位（小时/分/分）" value={newUnit} onChange={(e) => setNewUnit(e.target.value)} />
-          </div>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button type="button" className="nesio-exp-create-btn" onClick={createExp} disabled={!newName.trim()}>创建实验</button>
-            <button type="button" className="nesio-exp-cancel-btn" onClick={() => setShowNew(false)}>取消</button>
-          </div>
-        </div>
-      ) : (
-        <button type="button" className="nesio-exp-add-btn" onClick={() => setShowNew(true)}>+ 新实验</button>
-      )}
     </div>
   );
 }
@@ -1162,7 +1003,7 @@ export default function InsightsSheet({ onClose }: { onClose: () => void }) {
             {activeWidgets.includes('my_experiment') && (
               <div className="nesio-insights-section">
                 <p className="nesio-insights-section-label">我的实验</p>
-                <MyExperimentWidget nodes={allNodes} />
+                <MyExperimentWidget />
               </div>
             )}
           </div>
