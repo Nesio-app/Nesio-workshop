@@ -250,20 +250,6 @@ interface ProactiveCardData {
   expiresAt?: string;  // ISO — card auto-hides after this time (Google Now lifecycle)
 }
 
-type ProactiveTrigger = {
-  type: string;
-  data: Record<string, string | number | boolean | null>;
-  fallback: Omit<ProactiveCardData, 'id'>;
-};
-
-interface WeatherCache {
-  temperatureC: number;
-  condition: string;
-  forecastNote?: string;
-  placeLabel?: string;
-}
-
-
 const EMAIL_SIGNALS_KEY = 'nesio-email-signals-cache';
 const EMAIL_SIGNALS_TTL_MS = 20 * 60_000; // 20 minutes
 
@@ -282,204 +268,6 @@ async function loadEmailSignals(canUsePrivateData: boolean): Promise<EmailSignal
     localStorage.setItem(EMAIL_SIGNALS_KEY, JSON.stringify({ ts: Date.now(), signals }));
     return signals;
   } catch { return []; }
-}
-
-function buildProactiveTriggers(
-  focusNodes: readonly FocusNode[],
-  context: ProactiveContext,
-  emailSignals: EmailSignal[] = [],
-): ProactiveTrigger[] {
-  const triggers: ProactiveTrigger[] = [];
-  const now = new Date();
-  const hour = now.getHours();
-  const dow = now.getDay(); // 0=Sun, 1=Mon ... 5=Fri, 6=Sat
-
-  // ── 1. Weather triggers ──
-  const weather = readPortalCache<WeatherCache>(PORTAL_CACHE_KEYS.weather);
-  if (weather) {
-    const cold = weather.temperatureC < 10;
-    const veryCold = weather.temperatureC < 4;
-    const rainHint = /雨|rain|shower|drizzle/i.test(weather.condition + (weather.forecastNote || ''));
-    if (veryCold) {
-      triggers.push({
-        type: 'weather_very_cold',
-        data: { tempC: weather.temperatureC, condition: weather.condition },
-        fallback: { title: '今天很冷，多穿一件', body: `气温 ${Math.round(weather.temperatureC)}°C，出门加件厚外套。`, confidence: 90, sourceTags: ['天气·寒冷'], icon: '🧥', priority: 9 },
-      });
-    } else if (cold) {
-      triggers.push({
-        type: 'weather_cold',
-        data: { tempC: weather.temperatureC, condition: weather.condition },
-        fallback: { title: '温度偏低，注意保暖', body: `${Math.round(weather.temperatureC)}°C，适合加一层。`, confidence: 85, sourceTags: ['天气·偏凉'], icon: '🌡', priority: 7 },
-      });
-    }
-    if (rainHint) {
-      triggers.push({
-        type: 'weather_rain',
-        data: { condition: weather.condition, forecastNote: weather.forecastNote ?? '' },
-        fallback: { title: '出门记得带伞', body: `今天${weather.condition}，随手带把伞备用。`, confidence: 88, sourceTags: ['天气·降雨'], icon: '☂️', priority: 8 },
-      });
-    }
-  }
-
-  // ── 2. Calendar: tomorrow's events ──
-  const cal = readPortalCache<{ events?: CalendarEvent[] }>(PORTAL_CACHE_KEYS.calendar);
-  const calEvents: CalendarEvent[] = cal?.events ?? [];
-  const tomorrow = new Date(now); tomorrow.setDate(tomorrow.getDate() + 1); tomorrow.setHours(0,0,0,0);
-  const dayAfter  = new Date(tomorrow); dayAfter.setDate(dayAfter.getDate() + 1);
-  const tomorrowEvents = calEvents.filter((e) => {
-    const d = new Date(e.start);
-    return d >= tomorrow && d < dayAfter;
-  });
-  if (tomorrowEvents.length > 0) {
-    const names = tomorrowEvents.map((e) => e.title).slice(0, 2).join('、');
-    triggers.push({
-      type: 'event_tomorrow',
-      data: { count: tomorrowEvents.length, names },
-      fallback: { title: '明天有重要安排', body: `${names} — 今晚可以提前做点准备。`, confidence: 88, sourceTags: ['日历·明日'], icon: '📋', priority: 8 },
-    });
-  }
-
-  // ── 3. Focus node triggers ──
-  for (const node of focusNodes) {
-    // Meeting within 2h
-    const meetingTime = getMeetingTime(node);
-    if (meetingTime) {
-      const diffMin = Math.round((meetingTime.getTime() - now.getTime()) / 60_000);
-      if (diffMin > 0 && diffMin <= 120) {
-        triggers.push({
-          type: 'meeting_soon',
-          data: { name: node.name, minutesUntil: diffMin },
-          fallback: { title: `${diffMin} 分钟后开会`, body: `"${node.name}" 即将开始，提前进入状态。`, confidence: 95, sourceTags: ['日历·即将开始'], icon: '🎙', priority: 10 },
-        });
-      }
-    }
-
-    // Task due today or tomorrow
-    for (const v of Object.values(node.attributes)) {
-      if (typeof v !== 'string') continue;
-      const d = new Date(v);
-      if (Number.isNaN(d.getTime())) continue;
-      const daysUntil = Math.round((d.getTime() - now.getTime()) / 86_400_000);
-      if (daysUntil === 0) {
-        triggers.push({
-          type: 'due_today',
-          data: { name: node.name },
-          fallback: { title: '今天到期', body: `"${node.name}" 今天截止，先做第一步。`, confidence: 92, sourceTags: ['任务·截止'], icon: '⏰', priority: 9 },
-        });
-      } else if (daysUntil === 1) {
-        triggers.push({
-          type: 'due_tomorrow',
-          data: { name: node.name },
-          fallback: { title: '明天截止', body: `"${node.name}" 明天到期，今天可以推进一下。`, confidence: 85, sourceTags: ['任务·明日截止'], icon: '📌', priority: 7 },
-        });
-      }
-    }
-  }
-
-  // ── 4. Overdue items — soft ADHD-friendly nudge, one at a time, snooze-aware ──
-  for (const item of context.overdueItems.slice(0, 3)) {
-    if (isOverdueSnoozed(item.nodeId)) continue;
-    triggers.push({
-      type: 'overdue',
-      data: { name: item.name, nodeId: item.nodeId, daysAgo: Math.abs(item.daysUntil) },
-      fallback: {
-        title: `"${item.name.length > 18 ? item.name.slice(0, 18) + '…' : item.name}"`,
-        body: '这件事还有机会继续吗？没关系，选一个就好。',
-        confidence: 80,
-        sourceTags: [],
-        icon: '🌱',
-        priority: 6,
-        cardType: 'overdue',
-        nodeId: item.nodeId,
-        actions: [
-          { label: '继续做', actionType: 'dismiss' },
-          { label: '不需要了', actionType: 'done' },
-          { label: '下周再说', actionType: 'snooze' },
-        ],
-      },
-    });
-    break; // only one overdue at a time
-  }
-
-  // ── 5. Special days: birthday / anniversary (from context) ──
-  for (const item of context.upcomingSpecialDays.slice(0, 1)) {
-    const label = item.daysUntil === 0 ? '就是今天' : item.daysUntil === 1 ? '明天' : `${item.daysUntil} 天后`;
-    triggers.push({
-      type: 'special_day',
-      data: { name: item.name, daysUntil: item.daysUntil },
-      fallback: { title: `重要日子 · ${label}`, body: `"${item.name}" ${label}，要不要提前准备点什么？`, confidence: 88, sourceTags: ['重要日子'], icon: '🎂', priority: 8 },
-    });
-  }
-
-  // ── 6. Email signals from quick scan (high priority, data-driven) ──
-  for (const sig of emailSignals.slice(0, 2)) {
-    triggers.push({
-      type: `email_${sig.type}`,
-      data: { subject: sig.subject.slice(0, 60), from: sig.from.slice(0, 40) },
-      fallback: {
-        title: sig.cardTitle,
-        body: sig.cardBody,
-        confidence: 90,
-        sourceTags: [`邮件·${sig.type}`],
-        icon: sig.icon,
-        priority: sig.priority,
-      },
-    });
-  }
-
-  // ── 7. LifeGraph recent signals (booking / email nodes stored in memory) ──
-  for (const name of context.recentSignals.slice(0, 1)) {
-    // Skip if an email signal already covers the same type
-    const alreadyCovered = emailSignals.some((s) =>
-      name.toLowerCase().includes(s.type) || s.subject.toLowerCase().includes(name.slice(0, 6).toLowerCase()),
-    );
-    if (alreadyCovered) continue;
-    triggers.push({
-      type: 'recent_signal',
-      data: { name },
-      fallback: { title: '记录到一条新信息', body: `"${name}" — 要根据这条记录做点准备吗？`, confidence: 78, sourceTags: ['记录·新信号'], icon: '📩', priority: 6 },
-    });
-  }
-
-  // ── 8. Health items nudge ──
-  if (context.healthItems.length > 0 && hour >= 7 && hour <= 10) {
-    triggers.push({
-      type: 'health_morning',
-      data: { items: context.healthItems.slice(0, 2).join('、') },
-      fallback: { title: '今天的健康打卡', body: `${context.healthItems[0]} — 今天记得执行。`, confidence: 75, sourceTags: ['健康·习惯'], icon: '💪', priority: 6 },
-    });
-  }
-
-  // ── 9. Time-based nudges (only when nothing else fires) ──
-  if (triggers.length === 0) {
-    if (dow === 1 && hour < 11) {
-      triggers.push({
-        type: 'week_start',
-        data: {},
-        fallback: { title: '新的一周从规划开始', body: '周一早上，把本周最重要的 3 件事先记下来。', confidence: 70, sourceTags: ['时间·周一'], icon: '🗓', priority: 5 },
-      });
-    } else if (dow === 5 && hour >= 15) {
-      triggers.push({
-        type: 'week_end',
-        data: {},
-        fallback: { title: '本周还有什么没收尾？', body: '周五下午，快速过一遍本周待办，周末才能真正放松。', confidence: 70, sourceTags: ['时间·周五'], icon: '✅', priority: 5 },
-      });
-    } else if (hour >= 21) {
-      triggers.push({
-        type: 'evening_recap',
-        data: {},
-        fallback: { title: '今天有什么想记下来的？', body: '睡前花 30 秒，把今天的想法或待办存进来。', confidence: 65, sourceTags: ['时间·晚间'], icon: '🌙', priority: 4 },
-      });
-    }
-  }
-
-  // Sort by priority desc, deduplicate by type, cap at 3
-  const seen = new Set<string>();
-  return triggers
-    .sort((a, b) => (b.fallback.priority ?? 0) - (a.fallback.priority ?? 0))
-    .filter((t) => { if (seen.has(t.type)) return false; seen.add(t.type); return true; })
-    .slice(0, 3);
 }
 
 // Time-based fallback nudge — only shown when the guidance pipeline produces nothing
@@ -508,15 +296,6 @@ function snoozeOverdue(nodeId: string, days: number) {
     map[nodeId] = until.toISOString();
     localStorage.setItem(SNOOZE_KEY, JSON.stringify(map));
   } catch { /* ignore */ }
-}
-
-function isOverdueSnoozed(nodeId: string): boolean {
-  try {
-    const map: Record<string, string> = JSON.parse(localStorage.getItem(SNOOZE_KEY) || '{}');
-    const until = map[nodeId];
-    if (!until) return false;
-    return new Date(until).getTime() > Date.now();
-  } catch { return false; }
 }
 
 function ProactiveGuidanceCard({
@@ -1848,8 +1627,7 @@ export default function TodayFeed({
   const [allNodes, setAllNodes] = useState<readonly FocusNode[]>([]);
   const [dormantStore, setDormantStore] = useState<DormantStore>({});
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
-  const [proactiveContext, setProactiveContext] = useState<ProactiveContext>({ upcomingSpecialDays: [], overdueItems: [], healthItems: [], recentSignals: [] });
-  const [emailSignals, setEmailSignals] = useState<EmailSignal[]>([]);
+  const [proactiveContext, setProactiveContext] = useState<ProactiveContext>({ upcomingSpecialDays: [], healthItems: [] });
   const [mirrorOpen, setMirrorOpen] = useState(false);
 
   // Proactive cards: up to 2, each independently dismissable
@@ -1892,7 +1670,6 @@ export default function TodayFeed({
         const now = new Date();
         // Load email signals from quick scan (20min TTL cache)
         const latestEmailSignals = await loadEmailSignals(canUsePrivateData);
-        if (!cancelled) setEmailSignals(latestEmailSignals);
 
         // ── Guidance Engine pipeline ──────────────────────────────────────
         const calEvents = readPortalCache<{ events?: CalendarEvent[] }>(PORTAL_CACHE_KEYS.calendar)?.events ?? [];
@@ -1968,9 +1745,10 @@ export default function TodayFeed({
     void applyViewModel();
 
     // Email quick scan: re-poll every 20 minutes while the page is open.
-    // loadEmailSignals uses a localStorage TTL so it only hits the API when stale.
+    // Re-runs the full guidance pipeline so new email signals pass through
+    // cooling/budget gates like everything else (no side-channel cards).
     const emailPollInterval = canUsePrivateData
-      ? setInterval(() => { void loadEmailSignals(canUsePrivateData).then((sigs) => { if (sigs.length > 0) setEmailSignals(sigs); }); }, 20 * 60_000)
+      ? setInterval(() => { void applyViewModel(); }, 20 * 60_000)
       : null;
 
     // Background Gmail full sync — at most once every 6h, non-blocking
@@ -2012,23 +1790,9 @@ export default function TodayFeed({
   const initials = canUsePrivateData ? (displayName.trim().slice(0, 1) || '我') : '我';
   const { shouldShow: showWrapped, dismiss: dismissWrapped } = useWrappedTrigger();
 
-  // Merge email signal cards into proactive cards when new signals arrive between applyViewModel calls.
-  // Email-sourced cards get priority; existing non-email cards fill remaining slots up to 2.
-  const emailProactiveCards: ProactiveCardData[] = emailSignals
-    .filter((s) => !isProactiveCardDismissed(`email_${s.type}-0`) && !isProactiveCardDismissed(`email_${s.type}-1`))
-    .slice(0, 2)
-    .map((s) => ({
-      id: `email_${s.type}-0`,
-      title: s.cardTitle,
-      body: s.cardBody,
-      confidence: 90,
-      sourceTags: [`邮件·${s.type}`],
-      icon: s.icon,
-      priority: s.priority,
-    }));
-  const nonEmailCards = proactiveCards.filter((c) => !c.id.startsWith('email_') && !dismissedCardIds.has(c.id));
-  const mergedCards = [...emailProactiveCards, ...nonEmailCards];
-  const activeProactiveCards = mergedCards.filter((c) => !dismissedCardIds.has(c.id)).slice(0, 2);
+  // All proactive cards come from the guidance pipeline (email included) —
+  // single path so cooling-store and attention-budget always apply.
+  const activeProactiveCards = proactiveCards.filter((c) => !dismissedCardIds.has(c.id)).slice(0, 2);
 
   return (
     <div className="nesio-today-root">

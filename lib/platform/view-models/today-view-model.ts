@@ -230,25 +230,18 @@ export interface ProactiveContextItem {
 export interface ProactiveContext {
   /** Birthdays / anniversaries within 10 days */
   upcomingSpecialDays: ProactiveContextItem[];
-  /** Tasks/commitments already past due (up to 7 days ago, not marked done) */
-  overdueItems: ProactiveContextItem[];
   /** Active health-state or health-commitment nodes */
   healthItems: string[];
-  /** Any node created in the last 3 days that looks like an email/booking signal */
-  recentSignals: string[];
 }
 
 const BIRTHDAY_WORDS = ['生日', '纪念日', '周年', '忌日', 'birthday', 'anniversary'];
 const HEALTH_TYPES = new Set(['health_state']);
 const HEALTH_WORDS = ['健康', '健身', '运动', '睡眠', '饮食', '减肥', '体重', '跑步', '锻炼', '复诊', '体检', '用药', '打卡'];
-const SIGNAL_WORDS = ['机票', '酒店', '预订', '订单', '行程', '快递', '外卖', '邮件', 'email', 'order', 'booking', 'flight', 'hotel', 'ticket'];
 
 function buildProactiveContext(allNodes: LifeNode[]): ProactiveContext {
   const now = Date.now();
   const upcomingSpecialDays: ProactiveContextItem[] = [];
-  const overdueItems: ProactiveContextItem[] = [];
   const healthItems: string[] = [];
-  const recentSignals: string[] = [];
 
   for (const n of allNodes) {
     if (n.attributes.done) continue;
@@ -267,28 +260,13 @@ function buildProactiveContext(allNodes: LifeNode[]): ProactiveContext {
       }
     }
 
-    // Overdue items
-    const d = extractNearestDate(n);
-    if (d) {
-      const diffMs = d.getTime() - now;
-      if (diffMs < 0 && diffMs > -7 * 86_400_000) {
-        overdueItems.push({ nodeId: n.id, name: n.name, daysUntil: Math.round(diffMs / 86_400_000), subtype: n.type });
-      }
-    }
-
     // Health items
     if (HEALTH_TYPES.has(n.type) || HEALTH_WORDS.some((w) => text.includes(w))) {
       healthItems.push(n.name);
     }
-
-    // Recent signals (email-like or booking-like)
-    const ageMs = now - new Date(n.createdAt).getTime();
-    if (ageMs < 3 * 86_400_000 && SIGNAL_WORDS.some((w) => text.includes(w))) {
-      recentSignals.push(n.name);
-    }
   }
 
-  return { upcomingSpecialDays, overdueItems, healthItems, recentSignals };
+  return { upcomingSpecialDays, healthItems };
 }
 
 export interface TodayViewModel {
@@ -306,9 +284,7 @@ export function buildTodayViewModel(input: {
   fallbackCards: readonly RecommendationCard[];
   cloudSignals?: readonly Signal[];
 }): TodayViewModel {
-  const emptyContext: ProactiveContext = {
-    upcomingSpecialDays: [], overdueItems: [], healthItems: [], recentSignals: [],
-  };
+  const emptyContext: ProactiveContext = { upcomingSpecialDays: [], healthItems: [] };
 
   if (!input.canUsePrivateData) {
     return {
