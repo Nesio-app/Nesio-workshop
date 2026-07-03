@@ -40,8 +40,8 @@ function requireAuthenticatedCalendarAccess(req: NextRequest): NextResponse | nu
       cookieStore.get('baohe_auth_refresh')?.value ||
       cookieStore.get('baohe_wechat_openid')?.value,
   );
-  const isPersonalLab = envValue('BAOHE_PERSONAL_LAB_AI_ENABLED').toLowerCase() === 'true';
-  if (hasNesioSession || hasStage5LabAccess(req) || isPersonalLab) return null;
+  const noSupabase = !envValue('SUPABASE_URL') || !envValue('SUPABASE_ANON_KEY');
+  if (hasNesioSession || hasStage5LabAccess(req) || noSupabase) return null;
 
   return NextResponse.json(
     {
@@ -59,10 +59,8 @@ function requireAuthenticatedCalendarAccess(req: NextRequest): NextResponse | nu
 }
 
 function privateFeedAccessEnabled(): boolean {
-  return (
-    envValue('CALENDAR_PRIVATE_FEEDS_ENABLED').toLowerCase() === 'true' ||
-    envValue('BAOHE_PERSONAL_LAB_AI_ENABLED').toLowerCase() === 'true'
-  );
+  const noSupabase = !envValue('SUPABASE_URL') || !envValue('SUPABASE_ANON_KEY');
+  return envValue('CALENDAR_PRIVATE_FEEDS_ENABLED').toLowerCase() === 'true' || noSupabase;
 }
 
 function normalizeIcalUrl(raw: string): string {

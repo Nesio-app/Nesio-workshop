@@ -96,10 +96,9 @@ export function readTokensFromCookies(provider: IntegrationProvider): Integratio
 }
 
 export function allowCookieIntegrationFallback(): boolean {
-  return (
-    envValue('NESIO_ALLOW_COOKIE_INTEGRATION_FALLBACK').toLowerCase() === 'true' ||
-    envValue('BAOHE_PERSONAL_LAB_AI_ENABLED').toLowerCase() === 'true'
-  );
+  if (envValue('NESIO_ALLOW_COOKIE_INTEGRATION_FALLBACK').toLowerCase() === 'true') return true;
+  // No Supabase configured → cookie fallback is the only storage available
+  return !envValue('SUPABASE_URL') || !envValue('SUPABASE_ANON_KEY');
 }
 
 export function setTokenCookiesOnResponse(

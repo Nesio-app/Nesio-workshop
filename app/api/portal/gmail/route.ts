@@ -36,8 +36,8 @@ function requireAuthenticatedGmailAccess(req: NextRequest): NextResponse | null 
       cookieStore.get('baohe_auth_refresh')?.value ||
       cookieStore.get('baohe_wechat_openid')?.value,
   );
-  const isPersonalLab = envValue('BAOHE_PERSONAL_LAB_AI_ENABLED').toLowerCase() === 'true';
-  if (hasNesioSession || hasStage5LabAccess(req) || isPersonalLab) return null;
+  const noSupabase = !envValue('SUPABASE_URL') || !envValue('SUPABASE_ANON_KEY');
+  if (hasNesioSession || hasStage5LabAccess(req) || noSupabase) return null;
 
   return NextResponse.json(
     {

@@ -527,12 +527,76 @@ export default function Portal() {
       });
 
     if (canUsePrivateRuntime) {
+      // Calendar: fetch → cache + save upcoming 7-day events to LifeGraph
       fetch('/api/portal/calendar', { cache: 'no-store' })
         .then((r) => r.json())
-        .then((data) => {
-          if (data && (data.events || data.feeds)) writePortalCache(PORTAL_CACHE_KEYS.calendar, data);
+        .then((data: { ok?: boolean; events?: Array<{
+          id?: string; title?: string; start?: string; end?: string;
+          description?: string; location?: string; url?: string; calendarName?: string;
+        }>; feeds?: unknown }) => {
+          if (!data?.events && !data?.feeds) return;
+          writePortalCache(PORTAL_CACHE_KEYS.calendar, data);
+          if (!Array.isArray(data.events) || data.events.length === 0) return;
+          import('@/lib/portal/life-graph').then(({ addLifeNode, getLifeGraph }) => {
+            const now = Date.now();
+            const week = now + 7 * 86_400_000;
+            const existing = getLifeGraph();
+            const existingCalIds = new Set(
+              existing.filter((n) => n.source === 'calendar')
+                .map((n) => n.attributes.calendarId as string).filter(Boolean),
+            );
+            let added = 0;
+            data.events!.forEach((ev) => {
+              if (!ev.start || !ev.title) return;
+              const t = new Date(ev.start).getTime();
+              if (t < now - 86_400_000 || t > week) return;
+              const calId = ev.id || `${ev.title}-${ev.start}`;
+              if (existingCalIds.has(calId)) return;
+              addLifeNode({
+                name: ev.title,
+                type: 'event',
+                source: 'calendar',
+                confidence: 1,
+                rawInput: ev.title,
+                tags: [ev.calendarName || '日历'].filter(Boolean),
+                attributes: {
+                  start: ev.start,
+                  ...(ev.end ? { end: ev.end } : {}),
+                  ...(ev.url ? { url: ev.url } : {}),
+                  ...(ev.location ? { location: ev.location } : {}),
+                  ...(ev.description ? { note: ev.description.slice(0, 300) } : {}),
+                  calendarId: calId,
+                  calendarName: ev.calendarName || '',
+                },
+                relations: [],
+              });
+              added++;
+            });
+            if (added > 0) window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
+          });
         })
         .catch(() => undefined);
+
+      // Gmail: auto-sync on app load if connected and not synced recently (6h throttle)
+      try {
+        const connectors = JSON.parse(localStorage.getItem('nesio-connectors-v1') || '{}') as Record<string, boolean>;
+        const lastSync = parseInt(localStorage.getItem('nesio-gmail-last-sync') || '0', 10);
+        const SIX_HOURS = 6 * 60 * 60 * 1000;
+        if (connectors.gmail && Date.now() - lastSync > SIX_HOURS) {
+          fetch('/api/portal/gmail?includeBody=true&analyze=true')
+            .then((r) => r.json())
+            .then((data: { ok?: boolean; nodes?: Array<Record<string, unknown>> }) => {
+              if (data.ok && data.nodes?.length) {
+                localStorage.setItem('nesio-gmail-last-sync', String(Date.now()));
+                import('@/lib/portal/life-graph').then(({ addLifeNode }) => {
+                  data.nodes!.forEach((n) => addLifeNode(n as Parameters<typeof addLifeNode>[0]));
+                  window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
+                });
+              }
+            })
+            .catch(() => undefined);
+        }
+      } catch { /* localStorage unavailable */ }
     }
 
     fetch('/api/portal/flomo?limit=48', { cache: 'no-store' }).catch(() => undefined);

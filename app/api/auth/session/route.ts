@@ -156,21 +156,22 @@ export async function GET() {
     }
   }
 
-  // Personal lab mode: no Supabase required — single-owner deployment
-  const isPersonalLab = envValue('BAOHE_PERSONAL_LAB_AI_ENABLED').toLowerCase() === 'true';
-  if (isPersonalLab && !accessCookie && !refreshCookie && !wechatOpenidCookie) {
+  // No Supabase configured → local-only mode: treat user as authenticated
+  // This covers any deployment without Supabase (personal, self-hosted, etc.)
+  const supabaseConfigured = Boolean(envValue('SUPABASE_URL') && envValue('SUPABASE_ANON_KEY'));
+  if (!supabaseConfigured && !accessCookie && !refreshCookie && !wechatOpenidCookie) {
     return safeJson({
       ok: true,
       loggedIn: true,
       hasRefreshToken: false,
       status: 'signed_in',
-      viewerRole: 'personal_lab',
+      viewerRole: 'local',
       user: {
-        id: 'personal_lab',
+        id: 'local',
         email: '',
         phone: '',
-        provider: 'personal_lab',
-        providers: ['personal_lab'],
+        provider: 'local',
+        providers: ['local'],
       },
     });
   }
