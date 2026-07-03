@@ -17119,3 +17119,313 @@ html[data-portal-theme="night"] .nesio-related-node-chip:hover {
 
 /* Primary action button (放下 in letting-go mode, 彻底告别 in soft-archive) */
 .nesio-dormant-btn--primary { font-weight: 600; }
+
+/* ── Memory Narrator cards ──────────────────────────────────────────────── */
+.nesio-narrator-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-bottom: 1.25rem;
+}
+
+.nesio-narrator-card {
+  background: var(--glass-bg-solid);
+  border: 1px solid var(--portal-line);
+  border-left: 3px solid var(--narrator-accent, var(--portal-accent));
+  border-radius: 14px;
+  padding: 0.9rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+html[data-portal-theme="night"] .nesio-narrator-card {
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.1);
+  border-left-color: var(--narrator-accent, var(--portal-accent));
+}
+
+.nesio-narrator-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--narrator-accent, var(--portal-accent));
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.nesio-narrator-body {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--portal-text);
+  line-height: 1.45;
+  white-space: pre-line;
+}
+
+html[data-portal-theme="night"] .nesio-narrator-body { color: #e8eefa; }
+
+.nesio-narrator-sub {
+  font-size: 0.75rem;
+  color: var(--portal-muted);
+  margin-top: 0.1rem;
+}
+
+.nesio-narrator-link {
+  font-size: 0.75rem;
+  color: var(--narrator-accent, var(--portal-accent));
+  font-weight: 600;
+  margin-top: 0.25rem;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+/* ── Section header ─────────────────────────────────────────────────────── */
+.nesio-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.6rem;
+}
+
+.nesio-section-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--portal-text);
+  letter-spacing: 0.01em;
+}
+
+html[data-portal-theme="night"] .nesio-section-title { color: #c8d8f0; }
+
+.nesio-section-action {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--portal-accent);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+/* ── Projects section ───────────────────────────────────────────────────── */
+.nesio-projects-section {
+  margin-bottom: 1.25rem;
+}
+
+.nesio-projects-row {
+  display: flex;
+  gap: 0.6rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-bottom: 0.25rem;
+}
+
+.nesio-projects-row::-webkit-scrollbar { display: none; }
+
+.nesio-project-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  background: var(--glass-bg-solid);
+  border: 1px solid var(--portal-line);
+  border-radius: 14px;
+  padding: 0.7rem 1rem;
+  min-width: 80px;
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.12s;
+  flex-shrink: 0;
+}
+
+.nesio-project-card:active { transform: scale(0.95); }
+
+html[data-portal-theme="night"] .nesio-project-card {
+  background: rgba(255,255,255,0.07);
+  border-color: rgba(255,255,255,0.1);
+}
+
+.nesio-project-card-emoji { font-size: 1.4rem; }
+
+.nesio-project-card-name {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--portal-text);
+  text-align: center;
+  max-width: 72px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html[data-portal-theme="night"] .nesio-project-card-name { color: #d8e8ff; }
+
+.nesio-project-card-count {
+  font-size: 0.66rem;
+  color: var(--portal-muted);
+}
+
+.nesio-projects-empty {
+  font-size: 0.78rem;
+  color: var(--portal-muted);
+  padding: 0.4rem 0;
+}
+
+/* ── Project detail sheet ───────────────────────────────────────────────── */
+.nesio-project-detail-sheet {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  max-height: 80vh;
+  background: var(--glass-bg-solid);
+  border-radius: 20px 20px 0 0;
+  z-index: 220;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  border-top: 1px solid var(--portal-line);
+}
+
+html[data-portal-theme="night"] .nesio-project-detail-sheet {
+  background: #111827;
+  border-color: rgba(255,255,255,0.1);
+}
+
+.nesio-project-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 1rem 1rem 0.5rem;
+}
+
+.nesio-project-detail-emoji { font-size: 1.5rem; }
+
+.nesio-project-detail-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--portal-text);
+  flex: 1;
+}
+
+html[data-portal-theme="night"] .nesio-project-detail-name { color: #e8eefa; }
+
+.nesio-project-detail-stats {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0 1rem 0.75rem;
+  font-size: 0.78rem;
+  color: var(--portal-muted);
+}
+
+.nesio-project-detail-empty {
+  font-size: 0.8rem;
+  color: var(--portal-muted);
+  padding: 1rem;
+  text-align: center;
+}
+
+.nesio-project-delete-btn {
+  width: 100%;
+  padding: 0.65rem;
+  border-radius: 10px;
+  border: 1px solid rgba(239,68,68,0.3);
+  background: rgba(239,68,68,0.06);
+  color: #ef4444;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ── Create project sheet ───────────────────────────────────────────────── */
+.nesio-create-project-sheet {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--glass-bg-solid);
+  border-radius: 20px 20px 0 0;
+  z-index: 220;
+  padding: 1rem;
+  border-top: 1px solid var(--portal-line);
+}
+
+html[data-portal-theme="night"] .nesio-create-project-sheet {
+  background: #111827;
+  border-color: rgba(255,255,255,0.1);
+}
+
+.nesio-create-project-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--portal-text);
+  margin-bottom: 1rem;
+}
+
+html[data-portal-theme="night"] .nesio-create-project-header { color: #e8eefa; }
+
+.nesio-create-project-emoji-row {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.9rem;
+}
+
+.nesio-create-project-emoji-btn {
+  font-size: 1.4rem;
+  padding: 0.3rem;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background: none;
+  cursor: pointer;
+  transition: border-color 0.12s;
+}
+
+.nesio-create-project-emoji-btn.is-selected {
+  border-color: var(--portal-accent);
+  background: rgba(88,140,227,0.1);
+}
+
+.nesio-create-project-input {
+  width: 100%;
+  padding: 0.75rem 0.9rem;
+  border-radius: 12px;
+  border: 1px solid var(--portal-line);
+  background: var(--glass-bg-solid);
+  color: var(--portal-text);
+  font-size: 0.9rem;
+  margin-bottom: 0.75rem;
+  box-sizing: border-box;
+}
+
+html[data-portal-theme="night"] .nesio-create-project-input {
+  background: rgba(255,255,255,0.07);
+  border-color: rgba(255,255,255,0.12);
+  color: #e8eefa;
+}
+
+.nesio-create-project-input::placeholder { color: var(--portal-muted); }
+.nesio-create-project-input:focus { outline: none; border-color: var(--portal-accent); }
+
+.nesio-create-project-confirm {
+  width: 100%;
+  padding: 0.75rem;
+  border-radius: 12px;
+  background: var(--portal-accent);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  margin-bottom: 1rem;
+}
+
+.nesio-create-project-confirm:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
