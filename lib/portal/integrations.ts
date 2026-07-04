@@ -4,7 +4,7 @@
  * Called by API routes; never runs client-side.
  */
 
-import { cookies } from 'next/headers';
+import { cookies, type UnsafeUnwrappedCookies } from 'next/headers';
 import { normalizeSupabaseRuntimeUrl } from '@/lib/portal/production-runtime';
 
 export type IntegrationProvider = 'gmail' | 'calendar';
@@ -87,7 +87,7 @@ const COOKIE_PREFIX: Record<IntegrationProvider, string> = {
 };
 
 export function readTokensFromCookies(provider: IntegrationProvider): IntegrationTokens | null {
-  const cookieStore = cookies();
+  const cookieStore = (cookies() as unknown as UnsafeUnwrappedCookies);
   const prefix = COOKIE_PREFIX[provider];
   const accessToken = cookieStore.get(`${prefix}_access`)?.value;
   const refreshToken = cookieStore.get(`${prefix}_refresh`)?.value;
@@ -128,7 +128,7 @@ export function setTokenCookiesOnResponse(
 export async function getIntegrationToken(
   provider: IntegrationProvider,
 ): Promise<{ accessToken: string; refreshToken?: string } | null> {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabaseToken = cookieStore.get('baohe_auth_access')?.value;
 
   if (supabaseToken) {

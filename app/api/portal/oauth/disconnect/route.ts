@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 });
   }
 
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   // Revoking any live token invalidates the shared grant; try refresh
   // tokens first (kills the grant), fall back to access tokens.
   const candidates = [

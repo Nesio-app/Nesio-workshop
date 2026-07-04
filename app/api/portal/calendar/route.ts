@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
+import { cookies, type UnsafeUnwrappedCookies } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
 import { mergeCalendarEvents } from '@/lib/portal/calendar-filters';
@@ -34,7 +34,7 @@ function hasStage5LabAccess(req: NextRequest): boolean {
 }
 
 function requireAuthenticatedCalendarAccess(req: NextRequest): NextResponse | null {
-  const cookieStore = cookies();
+  const cookieStore = (cookies() as unknown as UnsafeUnwrappedCookies);
   const hasNesioSession = Boolean(
     cookieStore.get('baohe_auth_access')?.value ||
       cookieStore.get('baohe_auth_refresh')?.value ||
@@ -121,11 +121,11 @@ async function fetchIcsEvents(url: string, fallbackLabel: string) {
 }
 
 function googleCalendarAccessToken(): string {
-  return cookies().get('nesio_google_calendar_access')?.value || '';
+  return (cookies() as unknown as UnsafeUnwrappedCookies).get('nesio_google_calendar_access')?.value || '';
 }
 
 function googleCalendarRefreshToken(): string {
-  return cookies().get('nesio_google_calendar_refresh')?.value || '';
+  return (cookies() as unknown as UnsafeUnwrappedCookies).get('nesio_google_calendar_refresh')?.value || '';
 }
 
 function setCalendarCookies(response: NextResponse, session: GoogleTokenResponse | null) {

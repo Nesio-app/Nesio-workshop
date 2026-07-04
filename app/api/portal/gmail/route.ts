@@ -12,7 +12,7 @@ import { writeCloudSignalsForCurrentUser } from '@/lib/platform/runtime/cloud-si
 import { normalizeGmailToSignal } from '@/lib/life-domain/normalizers';
 import { getIntegrationToken } from '@/lib/portal/integrations';
 import { buildEmailExtractionPrompt, parseJsonBlock } from '@/lib/extraction/extraction';
-import { cookies } from 'next/headers';
+import { cookies, type UnsafeUnwrappedCookies } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,7 +31,7 @@ function hasStage5LabAccess(req: NextRequest): boolean {
 }
 
 function requireAuthenticatedGmailAccess(req: NextRequest): NextResponse | null {
-  const cookieStore = cookies();
+  const cookieStore = (cookies() as unknown as UnsafeUnwrappedCookies);
   const hasNesioSession = Boolean(
     cookieStore.get('baohe_auth_access')?.value ||
       cookieStore.get('baohe_auth_refresh')?.value ||

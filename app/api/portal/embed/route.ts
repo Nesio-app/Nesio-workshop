@@ -7,7 +7,7 @@
  * Returns: { ok, vectors: (number[] | null)[] }  — null where embedding failed
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
+import { cookies, type UnsafeUnwrappedCookies } from 'next/headers';
 import { embedTextRaw } from '@/lib/life-domain/signal-embedding';
 
 export const dynamic = 'force-dynamic';
@@ -17,7 +17,7 @@ function envValue(key: string): string {
 }
 
 function isAllowed(req: NextRequest): boolean {
-  const cookieStore = cookies();
+  const cookieStore = (cookies() as unknown as UnsafeUnwrappedCookies);
   const hasSession = Boolean(
     cookieStore.get('baohe_auth_access')?.value ||
       cookieStore.get('baohe_auth_refresh')?.value ||

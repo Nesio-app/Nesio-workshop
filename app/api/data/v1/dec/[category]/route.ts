@@ -81,35 +81,36 @@ function cacheHeaders(ttlMs: number) {
   };
 }
 
-export async function GET(req: NextRequest, { params }: { params: { category: string } }) {
+export async function GET(req: NextRequest, props: { params: Promise<{ category: string }> }) {
+  const params = await props.params;
   const category = normalizeCategory(params?.category);
   const format = parseFormat(req);
   const includeFlow = readFlowView(req);
   const force = parseForce(req);
   const ttlMs = parseTTL(req);
-    const nextParams = {
-    format,
-    includeFlow,
-    force,
-    limit: parseLimit(req),
-    offset: parseOffset(req),
-    cursor: parseCursor(req),
-    kind: req.nextUrl.searchParams.get('kind') || undefined,
-    state: req.nextUrl.searchParams.get('state') || undefined,
-    owner: req.nextUrl.searchParams.get('owner') || undefined,
-    status: req.nextUrl.searchParams.get('status') || undefined,
-    needsCeo: parseNeedsCeo(req),
-    category: req.nextUrl.searchParams.get('category') || undefined,
-    signature: req.nextUrl.searchParams.get('signature') || undefined,
-    search: req.nextUrl.searchParams.get('search') || undefined,
-    artifactPath: req.nextUrl.searchParams.get('artifactPath') || undefined,
-    module: req.nextUrl.searchParams.get('module') || undefined,
-      type: req.nextUrl.searchParams.get('type') || req.nextUrl.searchParams.get('eventType') || undefined,
-      summary: req.nextUrl.searchParams.get('summary') || undefined,
-      includeZero: parseBooleanFlag(req, 'includeZero'),
-      ...(ttlMs ? { ttlMs } : {}),
-      summaryTop: req.nextUrl.searchParams.get('top') || undefined,
-    };
+  const nextParams = {
+  format,
+  includeFlow,
+  force,
+  limit: parseLimit(req),
+  offset: parseOffset(req),
+  cursor: parseCursor(req),
+  kind: req.nextUrl.searchParams.get('kind') || undefined,
+  state: req.nextUrl.searchParams.get('state') || undefined,
+  owner: req.nextUrl.searchParams.get('owner') || undefined,
+  status: req.nextUrl.searchParams.get('status') || undefined,
+  needsCeo: parseNeedsCeo(req),
+  category: req.nextUrl.searchParams.get('category') || undefined,
+  signature: req.nextUrl.searchParams.get('signature') || undefined,
+  search: req.nextUrl.searchParams.get('search') || undefined,
+  artifactPath: req.nextUrl.searchParams.get('artifactPath') || undefined,
+  module: req.nextUrl.searchParams.get('module') || undefined,
+    type: req.nextUrl.searchParams.get('type') || req.nextUrl.searchParams.get('eventType') || undefined,
+    summary: req.nextUrl.searchParams.get('summary') || undefined,
+    includeZero: parseBooleanFlag(req, 'includeZero'),
+    ...(ttlMs ? { ttlMs } : {}),
+    summaryTop: req.nextUrl.searchParams.get('top') || undefined,
+  };
 
   if (!category) {
     return NextResponse.json(

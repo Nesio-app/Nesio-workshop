@@ -124,7 +124,7 @@ async function getSignedInUser(config: ReturnType<typeof getCloudConfig>): Promi
   user: SupabaseUserResponse | null;
   refreshedSession: SupabaseTokenResponse | null;
 }> {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const accessToken = cookieStore.get('baohe_auth_access')?.value || '';
   const refreshToken = cookieStore.get('baohe_auth_refresh')?.value || '';
   const user = await fetchSignedInUser(config, accessToken);

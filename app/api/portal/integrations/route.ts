@@ -19,7 +19,7 @@ import {
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabaseToken = cookieStore.get('baohe_auth_access')?.value;
 
   let integrationMap = {} as ReturnType<typeof readIntegrations> extends Promise<infer T> ? T : never;
@@ -51,7 +51,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabaseToken = cookieStore.get('baohe_auth_access')?.value;
 
   const body = await req.json() as {
@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabaseToken = cookieStore.get('baohe_auth_access')?.value;
   const { searchParams } = new URL(req.url);
   const provider = searchParams.get('provider') as IntegrationProvider | null;

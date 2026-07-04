@@ -77,7 +77,7 @@ async function fetchMetadata(accessToken: string): Promise<GmailMeta[]> {
 // ── Handler ───────────────────────────────────────────────────────────────────
 
 export async function GET(req: NextRequest) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const hasSession = Boolean(
     cookieStore.get('baohe_auth_access')?.value ||
     cookieStore.get('baohe_auth_refresh')?.value ||

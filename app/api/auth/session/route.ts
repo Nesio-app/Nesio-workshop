@@ -131,7 +131,7 @@ function signedInResponse(
 }
 
 export async function GET() {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const accessCookie = cookieStore.get('baohe_auth_access')?.value || '';
   const refreshCookie = cookieStore.get('baohe_auth_refresh')?.value || '';
   const authProviderCookie = cookieStore.get('baohe_auth_provider')?.value || '';

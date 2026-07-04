@@ -207,7 +207,7 @@ export async function getSignedInUser(config: CloudRuntimeConfig): Promise<{
   user: SupabaseUserResponse | null;
   refreshedSession: SupabaseTokenResponse | null;
 }> {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const accessToken = cookieStore.get('baohe_auth_access')?.value || '';
   const refreshToken = cookieStore.get('baohe_auth_refresh')?.value || '';
   const authProvider = cookieStore.get('baohe_auth_provider')?.value || '';

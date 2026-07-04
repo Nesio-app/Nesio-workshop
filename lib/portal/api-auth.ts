@@ -18,7 +18,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
+import { cookies, type UnsafeUnwrappedCookies } from 'next/headers';
 
 function envValue(key: string): string {
   return (process.env[key] ?? '').trim();
@@ -27,7 +27,7 @@ function envValue(key: string): string {
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
 export function isPortalRequestAuthorized(req: NextRequest, opts?: { allowCrossOrigin?: boolean }): boolean {
-  const cookieStore = cookies();
+  const cookieStore = (cookies() as unknown as UnsafeUnwrappedCookies);
   const hasSession = Boolean(
     cookieStore.get('baohe_auth_access')?.value ||
       cookieStore.get('baohe_auth_refresh')?.value ||

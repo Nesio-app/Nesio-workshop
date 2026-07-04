@@ -40,7 +40,7 @@ function sourcePathFor(parts: string[] = []): string | null {
 
 export async function GET(
   request: NextRequest,
-  context: { params: { path?: string[] } },
+  context: { params: Promise<{ path?: string[] }> },
 ) {
   if (!isSecretaryPageRequestAllowed(request)) {
     return new NextResponse(
@@ -55,7 +55,7 @@ export async function GET(
     );
   }
 
-  const sourcePath = sourcePathFor(context.params.path);
+  const sourcePath = sourcePathFor((await context.params).path);
   if (!sourcePath) {
     return NextResponse.json({ ok: false, reason: 'invalid_secretary_path' }, { status: 404 });
   }

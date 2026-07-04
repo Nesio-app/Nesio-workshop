@@ -60,7 +60,7 @@ async function revokeSupabaseSession(accessToken: string): Promise<boolean> {
 }
 
 export async function POST() {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const accessToken = cookieStore.get('baohe_auth_access')?.value || '';
   const supabaseRevoked = await revokeSupabaseSession(accessToken);
   const response = safeJson({

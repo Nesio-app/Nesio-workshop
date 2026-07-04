@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
+import { cookies, type UnsafeUnwrappedCookies } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,7 +32,7 @@ function envValue(key: string): string {
 }
 
 function googleCalendarAccessToken(): string {
-  return cookies().get('nesio_google_calendar_access')?.value || '';
+  return (cookies() as unknown as UnsafeUnwrappedCookies).get('nesio_google_calendar_access')?.value || '';
 }
 
 function hasInvocationSecret(request: Request): boolean {
