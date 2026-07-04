@@ -21,6 +21,7 @@ import {
 import { DOMAINS, nodeDomain, type FrontDomain } from '@/lib/life-domain';
 import { smartSearch, type SearchUnderstood } from '@/lib/portal/smart-search';
 import { semanticRerank } from '@/lib/portal/semantic-rerank';
+import { DEMO_SEED_NODES, isDemoNode } from '@/lib/portal/demo-seed';
 import {
   getProjects,
   createProject,
@@ -301,7 +302,18 @@ function findOnThisDayNodes(nodes: LifeNode[]): LifeNode[] {
   });
 }
 
+/** 情绪/日记内容属于最私密层 — 列表预览默认遮罩,点开详情才见全文。 */
+function isIntimateNode(node: LifeNode): boolean {
+  const tags = node.tags || [];
+  return tags.includes('moment') || tags.includes('journal') || tags.includes('feeling');
+}
+
 function cleanMemoryPreview(node: LifeNode): string {
+  if (isIntimateNode(node)) {
+    const d = new Date(node.createdAt).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' });
+    const emoji = typeof node.attributes.emotionEmoji === 'string' ? `${node.attributes.emotionEmoji} ` : '';
+    return `${emoji}一段 ${d} 的心情记录 · 点开查看`;
+  }
   const raw = node.rawInput || Object.values(node.attributes).join(' · ');
   return raw
     .replace(node.name, '')
@@ -699,10 +711,16 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
   const copy = COPY[portalLocaleToDictionaryLocale(locale)];
 
   const readNodes = useCallback(
-    () => visibleMemoryNodes(
-      getLifeGraph().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
-      canUsePrivateData,
-    ),
+    () => {
+      const visible = visibleMemoryNodes(
+        getLifeGraph().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+        canUsePrivateData,
+      );
+      // 演示模式:未登录且没有任何本地记录 → 展示只读种子数据,
+      // 让游客 30 秒看懂「扔进来→找得到」;任何写路径拒绝 demo 节点
+      if (!canUsePrivateData && visible.length === 0) return [...DEMO_SEED_NODES];
+      return visible;
+    },
     [canUsePrivateData],
   );
 
@@ -817,6 +835,12 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
     <>
       <div className="nesio-memory-root">
         <div className="nesio-memory-scroll">
+          {nodes.some(isDemoNode) && (
+            <div style={{ background: 'var(--portal-accent-soft, rgba(88,140,227,0.1))', borderRadius: 12, padding: '0.55rem 0.9rem', margin: '0 0 0.6rem', fontSize: '0.72rem', color: 'var(--portal-blue-deep)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span aria-hidden>👀</span>
+              <span>这些是示例数据,让你看看 Nesio 记东西的样子。<a href="/login" style={{ color: 'inherit', fontWeight: 600 }}>登录</a>或直接开始记录,就会换成你自己的。</span>
+            </div>
+          )}
 
           {/* Search */}
           <div className="nesio-memory-search-wrap">

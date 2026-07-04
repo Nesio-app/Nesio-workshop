@@ -40,10 +40,16 @@ function buildRememberCard(nodes: LifeNode[]): NarratorCard | null {
   const dayIndex = Math.floor(now / (24 * 3_600_000));
   const node = candidates[dayIndex % candidates.length];
 
+  // 情绪/日记内容不在首屏裸奔 — 遮罩为日期摘要,点开才见全文
+  const intimate = (node.tags || []).some((t) => ['moment', 'journal', 'feeling'].includes(t));
+  const body = intimate
+    ? `一段 ${new Date(node.createdAt).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })} 的心情记录`
+    : (node.rawInput || node.name);
+
   return {
     type: 'remember',
     title: '还记得这件事吗？',
-    body: node.rawInput || node.name,
+    body,
     sub: `—— 你 ${relativePastLabel(node.createdAt, now)} 存的`,
     nodes: [node],
   };

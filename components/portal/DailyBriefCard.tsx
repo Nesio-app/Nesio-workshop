@@ -14,6 +14,14 @@ import { track } from '@/lib/portal/telemetry';
 import type { CalendarEvent } from '@/lib/portal/types';
 
 const BRIEF_CACHE_KEY = 'nesio-daily-brief-v2';
+
+// 未登录演示简报 — 静态样例,browser TTS 播放,不读任何私人数据
+const DEMO_BRIEF_SCRIPT =
+  '早上好。这是一段示例简报,让你听听 Nesio 每天会怎么陪你开始一天。' +
+  '今天 22 度,晴,适合把外套留在家里。上午十点有一个产品评审会,' +
+  '你昨天记过要提前整理三个重点,放在了会议笔记里。' +
+  '另外,Linda 的生日还有五天,你存过一个礼物灵感。' +
+  '登录之后,这里播的就是你自己的今天。';
 interface BriefCache { date: string; script: string; }
 
 function todayKey(): string {
@@ -240,7 +248,15 @@ export default function DailyBriefCard({
   }
 
   function handlePlay() {
-    if (!canUsePrivateData) { window.location.href = '/login'; return; }
+    if (!canUsePrivateData) {
+      // 演示模式:先让人听到价值,再谈登录(网页测试问题 #1:曾无解释跳登录)
+      track('brief_play', { state: 'demo' });
+      if (playState === 'playing' || playState === 'paused') { togglePause(); return; }
+      stopAll();
+      setProgress(0);
+      void playWithBrowserTTS(DEMO_BRIEF_SCRIPT);
+      return;
+    }
     track('brief_play', { state: playState });
     if (playState === 'playing') { togglePause(); return; }
     if (playState === 'paused') { togglePause(); return; }
@@ -327,8 +343,13 @@ export default function DailyBriefCard({
   if (!canUsePrivateData) {
     return (
       <div className="nesio-brief-strip">
-        <span className="nesio-brief-strip-label">🔊 每日简报</span>
-        <a href="/login" className="nesio-brief-strip-btn">登录后生成</a>
+        <span className="nesio-brief-strip-label">
+          {playState === 'playing' ? '▶ 示例简报播放中' : '🔊 每日简报'}
+        </span>
+        <button type="button" className="nesio-brief-strip-btn" onClick={handlePlay}>
+          {playState === 'playing' ? '暂停' : '试听示例'}
+        </button>
+        <a href="/login" className="nesio-brief-strip-btn" style={{ opacity: 0.75 }}>登录听自己的</a>
       </div>
     );
   }

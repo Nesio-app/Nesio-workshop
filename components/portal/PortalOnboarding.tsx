@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { addLifeNode } from '@/lib/portal/life-graph';
 import {
   loadProfileSettings,
   portalLocaleToDictionaryLocale,
@@ -358,6 +359,30 @@ export function FirstUseTips({ onDone, locale }: { onDone: () => void; locale: P
   const tip = tips[step];
   const isLast = step === tips.length - 1;
 
+  // 激活式最后一步:真的存进第一条记忆,并当场找回 —— 引导结束时
+  // 用户已经亲历过一次「扔进来 → 找得到」,而不是只被告知过。
+  const [firstText, setFirstText] = useState(zh ? '备用钥匙放在玄关抽屉' : 'Spare keys are in the hallway drawer');
+  const [activatePhase, setActivatePhase] = useState<'input' | 'found'>('input');
+  const [savedName, setSavedName] = useState('');
+
+  function saveFirstMemory() {
+    const text = firstText.trim();
+    if (!text) return;
+    const name = text.slice(0, 24);
+    addLifeNode({
+      name,
+      type: 'object',
+      source: 'manual',
+      confidence: 1,
+      rawInput: text,
+      tags: [zh ? '第一条记忆' : 'first-memory'],
+      attributes: {},
+      relations: [],
+    });
+    setSavedName(name);
+    setActivatePhase('found');
+  }
+
   return (
     <div className="nesio-tips-overlay" role="dialog" aria-modal="false" aria-label={zh ? '新手提示' : 'First-use tip'}>
       <div className={`nesio-tips-hl nesio-tips-hl--${tip.zone}`} aria-hidden />
@@ -365,19 +390,50 @@ export function FirstUseTips({ onDone, locale }: { onDone: () => void; locale: P
         <div className="nesio-tips-dots" aria-hidden>
           {tips.map((_, i) => <span key={i} className={`nesio-tips-dot${i === step ? ' nesio-tips-dot--active' : ''}`} />)}
         </div>
-        <div className="nesio-tips-emoji" aria-hidden>{tip.emoji}</div>
-        <h3 className="nesio-tips-title">{tip.title}</h3>
-        <p className="nesio-tips-body">{tip.body}</p>
-        <div className="nesio-tips-actions">
-          {isLast ? (
-            <button type="button" className="nesio-ob-primary-btn" onClick={onDone}>{zh ? '知道了' : 'Got it'}</button>
+        <div className="nesio-tips-emoji" aria-hidden>{isLast && activatePhase === 'found' ? '✨' : tip.emoji}</div>
+        {isLast ? (
+          activatePhase === 'input' ? (
+            <>
+              <h3 className="nesio-tips-title">{zh ? '现在就存一条试试' : 'Try saving one now'}</h3>
+              <p className="nesio-tips-body">{zh ? '随手一句话,以后随时问回来。可以直接用这句:' : 'One sentence — ask for it back anytime. Use this one:'}</p>
+              <input
+                className="nesio-ob-input"
+                value={firstText}
+                onChange={(e) => setFirstText(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') saveFirstMemory(); }}
+                style={{ marginTop: '0.5rem' }}
+              />
+              <div className="nesio-tips-actions">
+                <button type="button" className="nesio-ob-primary-btn" onClick={saveFirstMemory} disabled={!firstText.trim()}>
+                  {zh ? '存进记忆' : 'Save it'}
+                </button>
+                <button type="button" className="nesio-ob-skip-btn" onClick={onDone}>{zh ? '先跳过' : 'Skip'}</button>
+              </div>
+            </>
           ) : (
             <>
+              <h3 className="nesio-tips-title">{zh ? '存好了,试着找回来' : 'Saved — now find it'}</h3>
+              <p className="nesio-tips-body">{zh ? '以后长按中间按钮问一句,就像这样:' : 'Long-press the center button and just ask:'}</p>
+              <div style={{ background: 'var(--portal-accent-soft, rgba(88,140,227,0.1))', borderRadius: 12, padding: '0.7rem 0.9rem', margin: '0.5rem 0', textAlign: 'left' }}>
+                <p style={{ fontSize: '0.76rem', margin: 0, color: 'var(--portal-muted)' }}>{zh ? '「钥匙在哪?」' : '"Where are the keys?"'}</p>
+                <p style={{ fontSize: '0.82rem', margin: '0.35rem 0 0', fontWeight: 600 }}>📦 {savedName}</p>
+              </div>
+              <p className="nesio-tips-body">{zh ? '这就是 Nesio:你说,它记,要用的时候找得回。' : "That's Nesio: you say it, it remembers, you get it back."}</p>
+              <div className="nesio-tips-actions">
+                <button type="button" className="nesio-ob-primary-btn" onClick={onDone}>{zh ? '开始使用' : 'Start'}</button>
+              </div>
+            </>
+          )
+        ) : (
+          <>
+            <h3 className="nesio-tips-title">{tip.title}</h3>
+            <p className="nesio-tips-body">{tip.body}</p>
+            <div className="nesio-tips-actions">
               <button type="button" className="nesio-ob-primary-btn" onClick={() => setStep(step + 1)}>{zh ? '下一步' : 'Next'}</button>
               <button type="button" className="nesio-ob-skip-btn" onClick={onDone}>{zh ? '跳过' : 'Skip'}</button>
-            </>
-          )}
-        </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

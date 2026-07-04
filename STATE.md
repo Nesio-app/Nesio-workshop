@@ -45,15 +45,9 @@
 ## 已知欠账(按优先级)
 
 1. 契约迁移工程(见上)→ 迁完再删 15 个死组件
-3. Demo 模式补完:portal 级种子数据(`demo_example` 字段已预留;参考
-   lib/portal/inventory-first-launch-contract.mjs 的完整 demo 契约);
-   未登录点听简报应播 demo 而非无解释跳登录
-4. Onboarding 激活化:FirstUseTips 第三张卡改实操(存第一条记忆+当场找回)
-5. 隐私遮罩:情绪/日记节点首屏默认摘要化
-6. 情绪轮盘缺退出(违反 Always an exit);404 页缺返回链接
-7. 设计 adherence lint(设计系统 zip 内 _adherence.oxlintrc.json)未接入 eslint
-8. TodayFeed 1408 行(工程 PRD 阈值 <300);语音合规巡检;新代 i18n 补课
-9. 深水区:LifeGraph→IndexedDB、DEC/dec-data 命名分离、Next 16、lab 模式管理 UI
+3. 设计 adherence lint(设计系统 zip 内 _adherence.oxlintrc.json)未接入 eslint
+4. TodayFeed 1408 行(工程 PRD 阈值 <300);语音合规巡检;新代 i18n 补课
+5. 深水区:LifeGraph→IndexedDB、DEC/dec-data 命名分离、Next 16、lab 模式管理 UI
 
 ## 已安装的循环(L1 = 只报告)
 

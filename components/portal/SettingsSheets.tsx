@@ -188,6 +188,7 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
   const [locationGranted, setLocationGranted] = useState<boolean | null>(null);
   const [requestingLoc, setRequestingLoc] = useState(false);
   const [restoreMsg, setRestoreMsg] = useState('');
+  const [lastBackupAt, setLastBackupAt] = useState<string | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
 
   function exportFullBackup() {
@@ -199,6 +200,8 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
     a.download = `nesio-backup-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
+    try { localStorage.setItem('nesio-last-backup-at', new Date().toISOString()); } catch { /* ignore */ }
+    setLastBackupAt(new Date().toISOString());
   }
 
   async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -224,6 +227,7 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
     if (!open) return;
     setDeleted(false);
     setNodeCount(getLifeGraph().length);
+    try { setLastBackupAt(localStorage.getItem('nesio-last-backup-at')); } catch { /* ignore */ }
     navigator.permissions?.query({ name: 'geolocation' }).then((r) => {
       setLocationGranted(r.state === 'granted');
     }).catch(() => setLocationGranted(null));
@@ -248,6 +252,22 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
   return (
     <SheetWrap open={open} onClose={onClose} title="隐私与数据">
       <p className="nesio-settings-sheet-desc">只整理你放进来的内容。你可以看见它记住了什么、存在哪、也可以随时删除。</p>
+
+      {/* 数据主权面板 — local-first 从架构卖点变成可感知的安全感 */}
+      <div style={{ background: 'var(--portal-accent-soft, rgba(88,140,227,0.08))', borderRadius: 14, padding: '0.8rem 1rem', marginBottom: '0.9rem' }}>
+        <p style={{ fontSize: '0.72rem', fontWeight: 600, margin: '0 0 0.4rem', color: 'var(--portal-blue-deep)' }}>🔐 你的数据在哪里</p>
+        <div style={{ display: 'flex', gap: '1.2rem', fontSize: '0.7rem', lineHeight: 1.6 }}>
+          <div><span style={{ fontSize: '1rem', fontWeight: 700 }}>{nodeCount}</span><br />条记忆,全在本机</div>
+          <div><span style={{ fontSize: '1rem', fontWeight: 700 }}>0</span><br />条在云端(未登录)</div>
+          <div>
+            <span style={{ fontSize: '1rem', fontWeight: 700 }}>{lastBackupAt ? new Date(lastBackupAt).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' }) : '还没有'}</span><br />
+            {lastBackupAt ? '上次备份' : '备份过'}
+          </div>
+        </div>
+        {!lastBackupAt && (
+          <p style={{ fontSize: '0.66rem', color: 'var(--portal-muted)', margin: '0.4rem 0 0' }}>数据只在这台设备上。导出一份完整备份,换手机也不会丢。</p>
+        )}
+      </div>
 
       <div className="nesio-settings-info-row">
         <div>

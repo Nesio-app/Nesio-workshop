@@ -413,6 +413,12 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
       <div className="nesio-mood-backdrop" onClick={onClose} />
       <div className="nesio-mood-card">
         <div className="nesio-mood-handle" aria-hidden />
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="关闭"
+          style={{ position: 'absolute', top: 10, right: 12, width: 32, height: 32, borderRadius: 999, border: 'none', background: 'rgba(120,140,180,0.12)', color: 'var(--portal-muted)', fontSize: '0.9rem', cursor: 'pointer' }}
+        >✕</button>
         <p className="nesio-mood-title">
           {hoveredEm ? `${hoveredEm.emoji} ${hoveredEm.label}` : '此刻，是什么感觉？'}
         </p>
