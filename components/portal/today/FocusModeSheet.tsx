@@ -7,6 +7,28 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { focusTimeHint, type FocusNode } from '@/lib/platform/view-models/today-view-model';
+import { createSignal } from '@/lib/life-domain';
+import { track } from '@/lib/portal/telemetry';
+import { IconPlay } from '../icons';
+
+/**
+ * 专注时长入统计(批次 6 用户问「这个数据有进入统计范围么」——此前没有):
+ * - 遥测 focus_session(/admin Top 事件可见次数与时长分布)
+ * - focus.session 信号进事实库,供洞察/实验消费(专注分布、与精力的相关性)
+ */
+function recordFocusSession(node: FocusNode, elapsedMin: number, completed: boolean) {
+  if (elapsedMin < 1) return; // 秒开秒关不算一次专注
+  track('focus_session', { minutes: elapsedMin, completed });
+  createSignal({
+    source: 'manual',
+    type: 'focus.session',
+    title: `专注 ${elapsedMin} 分钟 · ${node.name.slice(0, 24)}`,
+    payload: { minutes: elapsedMin, completed, nodeId: node.id, nodeName: node.name.slice(0, 60) },
+    confidence: 1,
+    tags: ['聚焦模式'],
+    raw: node.name,
+  });
+}
 
 // ---- Focus Mode Sheet ----
 
@@ -26,9 +48,11 @@ export function FocusModeSheet({ node, onClose, onDone }: {
   const [running, setRunning] = useState(false);
   const [finished, setFinished] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const elapsedRef = useRef(0); // 累计专注秒数(跨暂停)
 
   useEffect(() => {
     if (!node) { setRunning(false); setFinished(false); return; }
+    elapsedRef.current = 0;
     setSecsLeft(durMin * 60);
     setRunning(false);
     setFinished(false);
@@ -38,6 +62,7 @@ export function FocusModeSheet({ node, onClose, onDone }: {
     if (running) {
       intervalRef.current = setInterval(() => {
         setSecsLeft((s) => {
+          elapsedRef.current += 1;
           if (s <= 1) {
             clearInterval(intervalRef.current!);
             setRunning(false);
@@ -95,7 +120,7 @@ export function FocusModeSheet({ node, onClose, onDone }: {
             />
           </svg>
           <div className="nesio-focus-mode-time">
-            {finished ? '🎉' : `${mm}:${ss}`}
+            {finished ? '完成' : `${mm}:${ss}`}
           </div>
         </div>
 
@@ -123,15 +148,15 @@ export function FocusModeSheet({ node, onClose, onDone }: {
             className="nesio-focus-mode-play-btn"
             onClick={() => setRunning((r) => !r)}
           >
-            {running ? '⏸ 暂停' : secsLeft < totalSecs ? '▶ 继续' : '▶ 开始'}
+            {running ? '暂停' : secsLeft < totalSecs ? <><IconPlay size={13} /> 继续</> : <><IconPlay size={13} /> 开始</>}
           </button>
         )}
 
         <div className="nesio-focus-mode-actions">
-          <button type="button" className="nesio-focus-mode-done-btn" onClick={() => { onDone(node); onClose(); }}>
+          <button type="button" className="nesio-focus-mode-done-btn" onClick={() => { recordFocusSession(node, Math.round(elapsedRef.current / 60), true); onDone(node); onClose(); }}>
             ✓ 完成了
           </button>
-          <button type="button" className="nesio-focus-mode-later-btn" onClick={onClose}>
+          <button type="button" className="nesio-focus-mode-later-btn" onClick={() => { recordFocusSession(node, Math.round(elapsedRef.current / 60), false); onClose(); }}>
             稍后再说
           </button>
         </div>

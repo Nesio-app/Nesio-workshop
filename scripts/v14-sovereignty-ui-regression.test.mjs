@@ -159,7 +159,9 @@ assert.match(portal, /onboardingActive[\s\S]*!\s*onboardingActive[\s\S]*<TodayFe
 assert.match(onboarding, /nesio-onboarding-visibility-change/, 'Onboarding must notify Portal so the private background layer can be hidden.');
 assert.doesNotMatch(profileCard, /已整理|已使用第|daysUsed/, 'Profile summary must not foreground usage-day counters.');
 assert.doesNotMatch(profileCard, /className="nesio-profile-name"|<p className="nesio-profile-name">\{displayName\}<\/p>/, 'Profile top should not duplicate the user name next to the avatar.');
-assert.match(profileCard, /className="nesio-profile-stat"[\s\S]*aria-label="打开 Nesio 整理出的线索"[\s\S]*setActiveSheet\('mirror'\)/, 'Profile memory count should open the organized-clues section.');
+// 批次 6(2026-07-04):右上角从记忆数统计改为「返回今天」——设置页最常见的下一步;
+// 洞察入口收敛到主页 logo(todayFeed 断言另行守护)。守住:是真实返回链接,不是死数字。
+assert.match(profileCard, /className="nesio-profile-stat"[\s\S]*aria-label="返回今天"/, 'Profile top-right should be a real back-to-today link.');
 assert.doesNotMatch(profileCard, /<MirrorProfileCard embedded \/>\s*<\/div>\s*\{\/\* Menu \*\//, 'Profile page should not show the organized-clues card inline before settings menu.');
 assert.match(profileCard, /api\/auth\/logout|退出登录/, 'Profile/settings surface must expose a logout action when signed in.');
 assert.match(profileCard, /clearProfileIdentity/, 'Profile logout must clear local identity so the old customer name is not shown after sign-out.');

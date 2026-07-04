@@ -55,6 +55,14 @@ export function getEnvironment(now: Date = new Date()): Environment {
  */
 export function formatEnvironmentContext(env: Environment = getEnvironment()): string {
   const parts: string[] = [];
+  // 当前本地日期时间永远在环境头部 — 没有它,模型会把白天当深夜、把日期说错
+  // (2026-07-04 用户实测:凌晨问答正常,白天被当成半夜;「今天」说成 7月3日)
+  const now = new Date();
+  const wd = ['日', '一', '二', '三', '四', '五', '六'][now.getDay()];
+  const h = now.getHours();
+  const period = h < 6 ? '凌晨' : h < 12 ? '上午' : h < 14 ? '中午' : h < 18 ? '下午' : h < 23 ? '晚上' : '深夜';
+  const mm = String(now.getMinutes()).padStart(2, '0');
+  parts.push(`当前时间：${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日 周${wd} ${period} ${h}:${mm}（用户本地时间，涉及今天/明天/白天/深夜的判断必须以此为准）`);
   if (env.location) {
     parts.push(`当前位置：${env.location.label}（${formatLocationAge(env.location.ts)}）`);
   }
@@ -65,7 +73,6 @@ export function formatEnvironmentContext(env: Environment = getEnvironment()): s
       (env.weather.forecastNote ? `，${env.weather.forecastNote}` : ''),
     );
   }
-  if (parts.length === 0) return '';
   return `【实时环境】\n${parts.join('\n')}`;
 }
 

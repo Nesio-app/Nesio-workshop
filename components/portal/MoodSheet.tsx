@@ -15,7 +15,47 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
-import { IconMoon, IconZap } from './icons';
+import { IconBook, IconMoon, IconZap } from './icons';
+import { getLifeGraph, type LifeNode } from '@/lib/portal/life-graph';
+
+// ── Journal 历史(批次 6:富文本-lite + 历史时间线 + 搜索)────────────────────
+
+/** markdown-lite 渲染:**加粗** 与「- 」列表,其余原样。Journal 自家写自家读。 */
+function renderMdLite(text: string): React.ReactNode {
+  return text.split('\n').map((line, i) => {
+    const isBullet = line.startsWith('- ');
+    const content = isBullet ? line.slice(2) : line;
+    const parts = content.split('**');
+    const rendered = parts.map((seg, j) => (j % 2 === 1 ? <strong key={j}>{seg}</strong> : <span key={j}>{seg}</span>));
+    if (isBullet) {
+      return (
+        <div key={i} style={{ display: 'flex', gap: 6 }}>
+          <span aria-hidden style={{ color: 'var(--portal-blue-deep)' }}>•</span>
+          <span style={{ flex: 1 }}>{rendered}</span>
+        </div>
+      );
+    }
+    return <div key={i} style={{ minHeight: line ? undefined : '0.5em' }}>{rendered}</div>;
+  });
+}
+
+interface JournalEntry { id: string; date: Date; text: string; emotionColor?: string; emotionLabel?: string }
+
+function loadJournalEntries(): JournalEntry[] {
+  return getLifeGraph()
+    .filter((n: LifeNode) => (n.tags ?? []).includes('journal') && typeof n.attributes.journalText === 'string' && n.attributes.journalText)
+    .map((n: LifeNode) => {
+      const em = typeof n.attributes.emotion === 'string' ? EMOTIONS.find((e) => e.id === n.attributes.emotion) : undefined;
+      return {
+        id: n.id,
+        date: new Date(n.createdAt),
+        text: String(n.attributes.journalText),
+        emotionColor: em?.color,
+        emotionLabel: em?.label,
+      };
+    })
+    .sort((a, b) => b.date.getTime() - a.date.getTime());
+}
 
 // ── 12-Emotion taxonomy (Russell Circumplex 4 quadrants × 3) ─────────────────
 const EMOTIONS = [
@@ -144,6 +184,9 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
   const [thought, setThought] = useState('');
   const [journal, setJournal] = useState('');
   const [longPressing, setLongPressing] = useState(false);
+  const [journalTab, setJournalTab] = useState<'write' | 'history'>('write');
+  const [journalQuery, setJournalQuery] = useState('');
+  const [expandedEntry, setExpandedEntry] = useState('');
 
   const svgRef = useRef<SVGSVGElement>(null);
   const thoughtRef = useRef<HTMLInputElement>(null);
@@ -327,26 +370,121 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
   const eColor = energyColor(energyVal);
 
   if (phase === 'journal') {
+    const wrapBold = () => {
+      const el = journalRef.current;
+      if (!el) return;
+      const { selectionStart: a, selectionEnd: b, value } = el;
+      const next = a === b
+        ? `${value.slice(0, a)}****${value.slice(b)}`
+        : `${value.slice(0, a)}**${value.slice(a, b)}**${value.slice(b)}`;
+      setJournal(next);
+      setTimeout(() => { el.focus(); el.setSelectionRange(a + 2, (a === b ? a : b) + 2); }, 0);
+    };
+    const insertBullet = () => {
+      const el = journalRef.current;
+      if (!el) return;
+      const { selectionStart: a, value } = el;
+      const lineStart = value.lastIndexOf('\n', a - 1) + 1;
+      const next = `${value.slice(0, lineStart)}- ${value.slice(lineStart)}`;
+      setJournal(next);
+      setTimeout(() => { el.focus(); el.setSelectionRange(a + 2, a + 2); }, 0);
+    };
+    const entries = journalTab === 'history' ? loadJournalEntries() : [];
+    const q = journalQuery.trim();
+    const filtered = q ? entries.filter((e) => e.text.includes(q)) : entries;
+    // 时间线:按天分组
+    const byDay = new Map<string, JournalEntry[]>();
+    for (const e of filtered) {
+      const key = e.date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' });
+      if (!byDay.has(key)) byDay.set(key, []);
+      byDay.get(key)!.push(e);
+    }
+
     return (
       <div className="nesio-mood-overlay" role="dialog" aria-modal aria-label="Journal">
-        <div className="nesio-mood-backdrop" onClick={() => handleSave({ isJournal: true })} />
+        <div className="nesio-mood-backdrop" onClick={() => (journalTab === 'write' && journal.trim() ? handleSave({ isJournal: true }) : onClose())} />
         <div className="nesio-mood-card nesio-mood-card--journal">
           <div className="nesio-mood-handle" aria-hidden />
           <div className="nesio-mood-journal-header">
-            <span className="nesio-mood-journal-meta" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              {selectedEm && <span aria-hidden style={{ width: 9, height: 9, borderRadius: '50%', background: selectedEm.color, display: 'inline-block' }} />}
-              {selectedEm ? selectedEm.label : 'Journal'}
-            </span>
+            <div style={{ display: 'flex', gap: '0.35rem' }}>
+              {([['write', '写一篇'], ['history', '历史']] as const).map(([id, label]) => (
+                <button key={id} type="button"
+                  onClick={() => setJournalTab(id)}
+                  style={{ fontSize: '0.78rem', fontWeight: 600, padding: '0.3rem 0.8rem', borderRadius: 999, border: 'none', cursor: 'pointer', background: journalTab === id ? 'var(--portal-blue-deep)' : 'rgba(88,140,227,0.1)', color: journalTab === id ? '#fff' : 'var(--portal-blue-deep)' }}>
+                  {label}
+                </button>
+              ))}
+            </div>
             <span className="nesio-mood-journal-date">
               {new Date().toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', weekday: 'short' })}
             </span>
           </div>
-          <p className="nesio-mood-journal-prompt">{journalPromptRef.current}</p>
-          <textarea ref={journalRef} className="nesio-mood-journal-textarea"
-            placeholder="写下此刻…" value={journal}
-            onChange={(e) => setJournal(e.target.value)} rows={7} />
-          <button type="button" className="nesio-mood-save-btn nesio-mood-save-btn--ready"
-            onClick={() => handleSave({ isJournal: true })}>保存这一刻</button>
+
+          {journalTab === 'write' ? (
+            <>
+              {selectedEm && (
+                <p style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.76rem', color: 'var(--portal-muted)', margin: '0 0 0.3rem' }}>
+                  <span aria-hidden style={{ width: 9, height: 9, borderRadius: '50%', background: selectedEm.color, display: 'inline-block' }} />
+                  {selectedEm.label}
+                </p>
+              )}
+              <p className="nesio-mood-journal-prompt">{journalPromptRef.current}</p>
+              {/* 富文本-lite 工具条:加粗 / 列表 */}
+              <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.4rem' }}>
+                <button type="button" onClick={wrapBold} aria-label="加粗"
+                  style={{ minWidth: 'var(--tap-min)', minHeight: '2.1rem', borderRadius: '0.5rem', border: '1px solid var(--portal-line)', background: 'var(--glass-bg-solid)', fontWeight: 800, color: 'var(--portal-ink)', cursor: 'pointer' }}>B</button>
+                <button type="button" onClick={insertBullet} aria-label="列表"
+                  style={{ minWidth: 'var(--tap-min)', minHeight: '2.1rem', borderRadius: '0.5rem', border: '1px solid var(--portal-line)', background: 'var(--glass-bg-solid)', color: 'var(--portal-ink)', cursor: 'pointer' }}>•—</button>
+              </div>
+              <textarea ref={journalRef} className="nesio-mood-journal-textarea"
+                placeholder="写下此刻…（支持 **加粗** 和 - 列表）" value={journal}
+                onChange={(e) => setJournal(e.target.value)} rows={7} />
+              <button type="button" className="nesio-mood-save-btn nesio-mood-save-btn--ready"
+                onClick={() => handleSave({ isJournal: true })}>保存这一刻</button>
+            </>
+          ) : (
+            <>
+              <input
+                value={journalQuery}
+                onChange={(e) => setJournalQuery(e.target.value)}
+                placeholder="搜索日记…"
+                className="nesio-mood-note"
+                style={{ marginBottom: '0.6rem' }}
+              />
+              <div style={{ maxHeight: '46vh', overflowY: 'auto', paddingRight: 2 }}>
+                {filtered.length === 0 && (
+                  <p style={{ fontSize: '0.8rem', color: 'var(--portal-muted)', textAlign: 'center', padding: '1.2rem 0' }}>
+                    {q ? `没有找到「${q}」` : '还没有日记。长按转盘中心,写下第一篇。'}
+                  </p>
+                )}
+                {[...byDay.entries()].map(([day, list]) => (
+                  <div key={day} style={{ marginBottom: '0.7rem' }}>
+                    {/* 时间线:日期节点 + 竖线 */}
+                    <p style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.72rem', fontWeight: 700, color: 'var(--portal-blue-deep)', margin: '0 0 0.35rem' }}>
+                      <IconBook size={13} /> {day}
+                    </p>
+                    <div style={{ borderLeft: '2px solid var(--portal-line)', marginLeft: 6, paddingLeft: 12, display: 'grid', gap: '0.5rem' }}>
+                      {list.map((e) => {
+                        const isOpen = expandedEntry === e.id;
+                        const preview = e.text.length > 80 && !isOpen ? `${e.text.slice(0, 80)}…` : e.text;
+                        return (
+                          <button key={e.id} type="button"
+                            onClick={() => setExpandedEntry(isOpen ? '' : e.id)}
+                            style={{ textAlign: 'left', background: 'rgba(88,140,227,0.05)', border: '1px solid var(--portal-line)', borderRadius: '0.7rem', padding: '0.55rem 0.7rem', cursor: 'pointer' }}>
+                            <p style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.68rem', color: 'var(--portal-muted)', margin: '0 0 0.25rem' }}>
+                              {e.emotionColor && <span aria-hidden style={{ width: 8, height: 8, borderRadius: '50%', background: e.emotionColor, display: 'inline-block' }} />}
+                              {e.emotionLabel || ''} {e.date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                            <div style={{ fontSize: '0.82rem', color: 'var(--portal-ink)', lineHeight: 1.6 }}>{renderMdLite(preview)}</div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
     );

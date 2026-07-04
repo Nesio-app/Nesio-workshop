@@ -557,7 +557,8 @@ export default function NesioChatSheet({
       const aiMsg: UiMessage = {
         id: `a-${Date.now()}`,
         role: 'model',
-        text: data.response?.trim() || '（暂时没有找到相关信息）',
+        // 兜底剥掉 markdown 强调记号 — 气泡是纯文本,裸 ** 很出戏
+        text: (data.response?.trim() || '（暂时没有找到相关信息）').replace(/\*\*/g, ''),
         sources: data.sources ?? [],
       };
       const withAi = [...nextMsgs, aiMsg];

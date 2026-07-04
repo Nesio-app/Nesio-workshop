@@ -165,6 +165,13 @@
   --container-pad: 1.25rem;
 }
 
+/* 批次 6:PWA 状态栏区域曾露出 body 的 cream 底(每页顶部一条白边)。
+   portal 主题下 body 直接铺 portal 渐变,任何缺口都不再露色差。 */
+html[data-portal-theme] body {
+  background: var(--portal-bg-gradient);
+  background-attachment: fixed;
+}
+
 html[data-portal-theme="night"],
 html[data-portal-theme="night"] .portal-root {
   --portal-bg-gradient:
@@ -14805,8 +14812,9 @@ html[data-portal-theme="night"] .nesio-wechat-suggestion {
 }
 
 .nesio-wechat-avatar--logo {
-  background: var(--glass-bg-solid);
-  border: 1px solid var(--portal-line);
+  /* 批次 6:纯矢量标,无底色无边框 */
+  background: transparent;
+  border: none;
 }
 .nesio-wechat-avatar--logo img { display: block; }
 

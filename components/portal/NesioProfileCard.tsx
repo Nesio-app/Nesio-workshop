@@ -2,22 +2,19 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { clearProfileIdentity, loadProfileSettings, readAvatarFile, saveProfileSettings } from '@/lib/portal/profile';
-import { getRecentNodes } from '@/lib/portal/life-graph';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
 import { GeneralSheet, DataSheet, PrivacySheet, SubscriptionSheet } from './SettingsSheets';
 import ConnectorsHub from './ConnectorsHub';
-import InsightsSheet from './InsightsSheet';
 import RoadmapSheet from './RoadmapSheet';
 import { t } from '@/lib/portal/i18n';
 import { usePortalLocale } from './use-portal-locale';
-import { IconDatabase, IconGear, IconStar as IconStarOutline } from './icons';
+import { IconDatabase, IconGear, IconStar as IconStarOutline, IconGift } from './icons';
 
 type ActiveSheet = 'mirror' | 'general' | 'data' | 'privacy' | 'subscription' | 'connectors' | 'roadmap' | null;
 
 export default function NesioProfileCard() {
   const [displayName, setDisplayName] = useState('Jessy');
   const [avatarUrl, setAvatarUrl] = useState('');
-  const [memoryCount, setMemoryCount] = useState(0);
   const locale = usePortalLocale();
   const [activeSheet, setActiveSheet] = useState<ActiveSheet>(null);
   const [isSignedIn, setIsSignedIn] = useState(false);
@@ -28,7 +25,6 @@ export default function NesioProfileCard() {
     const profile = loadProfileSettings();
     if (profile.displayName) setDisplayName(profile.displayName);
     setAvatarUrl(profile.avatarUrl || '');
-    setMemoryCount(getRecentNodes(100).length);
 
     if (profile.avatarStoragePath) {
       const client = createAppApiClient();
@@ -52,9 +48,6 @@ export default function NesioProfileCard() {
       .then((d: { loggedIn?: boolean }) => setIsSignedIn(Boolean(d?.loggedIn)))
       .catch(() => {});
 
-    const onUpdate = () => setMemoryCount(getRecentNodes(100).length);
-    window.addEventListener('nesio-life-graph-updated', onUpdate);
-    return () => window.removeEventListener('nesio-life-graph-updated', onUpdate);
   }, []);
 
   const initials = displayName.trim().slice(0, 1) || 'J';
@@ -109,7 +102,7 @@ export default function NesioProfileCard() {
       icon: <IconDatabase />,
       iconBg: 'var(--chip-green)', label: t(locale, 'menuData'), sublabel: t(locale, 'menuDataHint') },
     { key: 'subscription' as ActiveSheet,
-      icon: <IconStarOutline />,
+      icon: <IconGift />,
       iconBg: 'var(--chip-lemon)', label: t(locale, 'menuEarlyAccess'), sublabel: t(locale, 'menuEarlyAccessHint') },
     { key: 'roadmap' as ActiveSheet,
       icon: <IconStarOutline />,
@@ -136,24 +129,18 @@ export default function NesioProfileCard() {
             className="nesio-visually-hidden"
             onChange={(event) => handleAvatarFile(event.currentTarget.files?.[0])}
           />
-          {memoryCount > 0 && (
-            <button
-              type="button"
-              className="nesio-profile-stat"
-              aria-label="打开 Nesio 整理出的线索"
-              onClick={() => setActiveSheet('mirror')}
-            >
-              <span className="nesio-profile-stat-num">{memoryCount}</span>
-              <span className="nesio-profile-stat-label">条记忆</span>
-            </button>
-          )}
+          {/* 批次 6:数字统计改「返回今天」——设置页最常见的下一步;
+              洞察(原 mirror)从主页左上角 logo 进,不再从这里开 */}
+          <a href="/" className="nesio-profile-stat" aria-label="返回今天">
+            <span className="nesio-profile-stat-label" style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--portal-blue-deep)' }}>返回今天</span>
+          </a>
         </div>
         {avatarError && <p className="nesio-profile-avatar-error">{avatarError}</p>}
 
         {/* Auth status */}
         {!isSignedIn && (
           <a href="/login" className="nesio-profile-auth-banner">
-            <span>🔐 登录以跨设备同步 Memory</span>
+            <span>登录以跨设备同步 Memory</span>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14"><path d="M9 18l6-6-6-6"/></svg>
           </a>
         )}
@@ -171,7 +158,6 @@ export default function NesioProfileCard() {
               <span className="nesio-profile-menu-icon" style={{ background: item.iconBg }}>{item.icon}</span>
               <div className="nesio-profile-menu-text">
                 <span className="nesio-profile-menu-label">{item.label}</span>
-                <span className="nesio-profile-menu-sublabel">{item.sublabel}</span>
               </div>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16" className="nesio-profile-menu-chevron"><path d="M9 18l6-6-6-6"/></svg>
             </button>
@@ -180,15 +166,6 @@ export default function NesioProfileCard() {
       </div>
 
       {/* Sub-sheets */}
-      {activeSheet === 'mirror' && (
-        <div className="nesio-settings-sheet-overlay" role="dialog" aria-modal="true" aria-label="Nesio 的洞察">
-          <button type="button" className="nesio-settings-sheet-backdrop" onClick={() => setActiveSheet(null)} aria-label="关闭" />
-          <div className="nesio-settings-sheet-card nesio-insights-sheet-card">
-            <div className="nesio-sheet-handle" aria-hidden />
-            <InsightsSheet onClose={() => setActiveSheet(null)} />
-          </div>
-        </div>
-      )}
       <GeneralSheet open={activeSheet === 'general'} onClose={() => setActiveSheet(null)} />
       <DataSheet open={activeSheet === 'data'} onClose={() => setActiveSheet(null)} onOpenMine={() => setActiveSheet('privacy')} onOpenConnect={() => setActiveSheet('connectors')} />
       <PrivacySheet open={activeSheet === 'privacy'} onClose={() => setActiveSheet(null)} />
