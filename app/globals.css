@@ -11652,6 +11652,9 @@ html[data-portal-theme="night"] .nesio-mood-title { color: #8899bb; }
 /* ─── Today top row: two circular buttons ─── */
 .nesio-today-top-row {
   display: flex;
+  /* flex-start:简报列播放态会下挂进度条/重新生成,默认 stretch 会把
+     右侧此刻按钮垂直拉高(QA P3 修复 2026-07-04) */
+  align-items: flex-start;
   gap: 0.75rem;
   margin-bottom: 0.75rem;
 }

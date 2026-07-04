@@ -12,7 +12,7 @@
   但路由头注释自述设计是「anonymous per-device id」——实现与意图矛盾。
 - **需要决策**:A)放开匿名遥测(保留限流+同源检查,事件本身无内容只有计数,隐私安全);
   B)维持登录后才收集,那客户端 track() 应在未登录时不发(消 401 噪音)。
-- **状态**:open
+- **状态**:fixed(2026-07-04,方案 A:isSameOriginRequest + 限流,不要求会话;扫描器与 api-routes.md 同步)
 
 ## P2 — 匿名写入触发云镜像 401 噪音
 
@@ -22,7 +22,7 @@
   writeCloudSignal 对匿名用户注定失败却照发。
 - **修法**:writeCloudSignal 前检查 baohe_auth_access cookie 存在(document.cookie 不可读
   httpOnly——改为读 auth-client 的会话缓存状态,或 401 一次后本会话降级不再发)。
-- **状态**:open
+- **状态**:fixed(2026-07-04,writeCloudSignal 收到 401 后本会话降级不再发)
 
 ## P2 — 听简报无 watchdog,引擎哑火时 UI 无失败态
 
@@ -32,28 +32,28 @@
 - **证据**:headless Chromium 上点击听简报 100% 挂起渲染器(QA 中 3/3 复现)。
   真机概率低但存在。违反设计红线「每个异步动作必有可见失败态」。
 - **修法**:speak() 后起 8s watchdog,onstart 未触发则 cancel + setErrorMsg + error 态。
-- **状态**:open
+- **状态**:fixed(2026-07-04,speak 后 8s watchdog → cancel + 可见错误态)
 
 ## P3 — 中文语音选取时序问题
 
 - **现象**:getVoices() 在 Chrome 首次调用常返回空数组(语音列表异步加载,
   需监听 voiceschanged),cnVoice 选不上 → 可能用默认英文音读中文脚本。
 - **修法**:voices 为空时等 voiceschanged(带超时)再 speak。
-- **状态**:open
+- **状态**:fixed(2026-07-04,voicesReady 等 voiceschanged 带 1.5s 超时)
 
 ## P3 — 顶部双按钮视觉不对称
 
 - **现象**:移动端 375px 下「听简报」是圆钮,「此刻」被 flex 拉伸成通栏长条,
   与「双圆按钮」设计意图不符(nesio-mood-circle 类名 vs 实际矩形)。
 - **确认**:是否有意为之;若否,给 nesio-mood-circle 定宽或 flex:none。
-- **状态**:open(先确认设计意图)
+- **状态**:fixed(2026-07-04,简报包装 div 补 flex:1 + 按钮撑满;行 align-items:flex-start 防止播放态把此刻垂直拉高)
 
 ## P3 — manifest 路径确认
 
 - **现象**:/manifest.webmanifest 404,/manifest.json 200。
 - **确认**:HTML `<link rel=manifest>` 指向哪个;若指 manifest.json 则无事,
   PWA 安装流程真机验证一次即闭环。
-- **状态**:open(仅需确认)
+- **状态**:confirmed(HTML link 指向 /manifest.json 且 200,无需改动)
 
 ## 全绿项(不需要动)
 

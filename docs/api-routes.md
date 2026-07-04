@@ -61,7 +61,7 @@ Auth legend:
 
 | Route | Auth |
 |---|---|
-| POST /api/telemetry | guard-style (auth + 60/min) — event names/props whitelisted & truncated |
+| POST /api/telemetry | anonymous-by-design (same-origin + 60/min) — event names/props whitelisted & truncated; 匿名设备级计数,QA P1 修复 2026-07-04 |
 
 ## Known-open routes
 

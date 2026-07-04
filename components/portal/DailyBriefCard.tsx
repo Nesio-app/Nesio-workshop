@@ -103,14 +103,27 @@ export default function DailyBriefCard({
   }
 
   // ── Browser SpeechSynthesis fallback ──────────────────────────────────────
-  async function playWithBrowserTTS(script: string): Promise<void> {
+
+  // Chrome 的 getVoices() 首次调用常为空(语音表异步加载),等 voiceschanged
+  // 一小段时间再取,否则中文脚本可能落到默认英文音(QA P3 修复 2026-07-04)。
+  function voicesReady(timeoutMs = 1500): Promise<SpeechSynthesisVoice[]> {
     return new Promise((resolve) => {
-      if (typeof window === 'undefined' || !window.speechSynthesis) {
-        setErrorMsg('语音不可用，请配置 OpenAI TTS 或使用支持语音的浏览器');
-        setPlayState('error');
-        resolve();
-        return;
-      }
+      const synth = window.speechSynthesis;
+      const now = synth.getVoices();
+      if (now.length > 0) { resolve(now); return; }
+      const timer = setTimeout(() => { synth.onvoiceschanged = null; resolve(synth.getVoices()); }, timeoutMs);
+      synth.onvoiceschanged = () => { clearTimeout(timer); synth.onvoiceschanged = null; resolve(synth.getVoices()); };
+    });
+  }
+
+  async function playWithBrowserTTS(script: string): Promise<void> {
+    if (typeof window === 'undefined' || !window.speechSynthesis) {
+      setErrorMsg('语音不可用，请配置 OpenAI TTS 或使用支持语音的浏览器');
+      setPlayState('error');
+      return;
+    }
+    const voices = await voicesReady();
+    return new Promise((resolve) => {
       setTtsMode('browser');
       track('brief_tts_fallback');
       window.speechSynthesis.cancel();
@@ -120,14 +133,23 @@ export default function DailyBriefCard({
       utterance.rate = 1.0;
       utterance.pitch = 1.05;
 
-      // Pick Chinese voice if available
-      const voices = window.speechSynthesis.getVoices();
       const cnVoice = voices.find((v) => v.lang.startsWith('zh') || v.lang.includes('CN'));
       if (cnVoice) utterance.voice = cnVoice;
 
       utteranceRef.current = utterance;
 
+      // Watchdog(QA P2 修复 2026-07-04):部分 WebView/无语音包设备上
+      // speak() 后回调永不触发,UI 会停在无反馈状态——设计红线要求
+      // 每个异步动作必有可见失败态。8s 内没开播就明确报错。
+      const watchdog = setTimeout(() => {
+        window.speechSynthesis.cancel();
+        setErrorMsg('语音引擎没有响应，请稍后再试');
+        setPlayState('error');
+        resolve();
+      }, 8000);
+
       utterance.onstart = () => {
+        clearTimeout(watchdog);
         setPlayState('playing');
         // Simulate progress since SpeechSynthesis has no duration API
         let pct = 0;
@@ -142,6 +164,7 @@ export default function DailyBriefCard({
         resolve();
       };
       utterance.onerror = (e) => {
+        clearTimeout(watchdog);
         if (e.error === 'interrupted') { resolve(); return; } // intentional stop
         setErrorMsg('浏览器语音播放失败');
         setPlayState('error');
@@ -302,9 +325,11 @@ export default function DailyBriefCard({
       : '听简报';
 
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0 }}>
+      // flex:1 与右侧此刻按钮平分行宽(此前缺失导致左小右长,QA P3 修复)
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0 }}>
         <button
           type="button"
+          style={{ width: '100%' }}
           className={`nesio-brief-circle${isPlaying ? ' nesio-brief-circle--playing' : ''}${isError ? ' nesio-brief-circle--error' : ''}`}
           onClick={handlePlay}
           aria-label="听今日简报"

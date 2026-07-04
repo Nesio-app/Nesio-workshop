@@ -11,7 +11,7 @@
  * leak in even by accident.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { isPortalRequestAuthorized, isRateLimited } from '@/lib/portal/api-auth';
+import { isSameOriginRequest, isRateLimited } from '@/lib/portal/api-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -55,8 +55,11 @@ async function writeToSupabase(events: TelemetryEvent[], deviceId: string): Prom
 }
 
 export async function POST(req: NextRequest) {
-  if (!(await isPortalRequestAuthorized(req))) {
-    return NextResponse.json({ ok: false }, { status: 401 });
+  // 匿名合法(2026-07-04 QA P1 修复):本路由设计上就是匿名设备级计数
+  // (名字+粗粒度 props,内容在 sanitize 里截断),demo/onboarding 漏斗
+  // 依赖它。要求登录曾让匿名遥测全军覆没。守卫 = 同源 + 限流,不要求会话。
+  if (!isSameOriginRequest(req)) {
+    return NextResponse.json({ ok: false }, { status: 403 });
   }
   if (isRateLimited(req, 'telemetry', { limit: 60, windowMs: 60_000 })) {
     return NextResponse.json({ ok: false }, { status: 429 });

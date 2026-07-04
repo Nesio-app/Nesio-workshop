@@ -60,6 +60,23 @@ export async function isPortalRequestAuthorized(req: NextRequest, opts?: { allow
   return true;
 }
 
+/**
+ * 同源守卫(不要求登录)— 供「匿名合法」的路由使用(如 /api/telemetry:
+ * 设计上收匿名设备级计数)。浏览器带 Origin/Referer 时必须匹配本 host,
+ * 挡跨站脚本和扫描器;直连 curl 类滥用交给限流。
+ */
+export function isSameOriginRequest(req: NextRequest): boolean {
+  const host = req.headers.get('host') || '';
+  for (const header of ['origin', 'referer']) {
+    const value = req.headers.get(header);
+    if (!value) continue;
+    try {
+      if (new URL(value).host !== host) return false;
+    } catch { return false; }
+  }
+  return true;
+}
+
 // ── Rate limit (per-instance, per-IP) ─────────────────────────────────────────
 
 interface Window { count: number; resetAt: number }

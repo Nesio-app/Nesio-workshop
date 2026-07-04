@@ -1,0 +1,78 @@
+# 修复闭环:机器发现 → 机器修 → 人只审。
+#
+# 触发:① ci-failure / loop-report / prod-down / claude-fix 标签的 issue 出现
+#      ② 任何 issue/PR 评论里 @claude(直接给它派活,包括写创意)
+#
+# 激活(一步,未激活时本工作流零成本静默跳过):
+#   repo Settings → Secrets and variables → Actions → New repository secret
+#   名字 ANTHROPIC_API_KEY,值 = console.anthropic.com 的 API key(按量计费)
+#
+# 红线:只开 PR,永不直推 main;修复前必读 STATE.md;契约全绿才请求 review。
+name: Claude Autofix
+
+on:
+  issues:
+    types: [opened, labeled]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  id-token: write
+  actions: read
+
+jobs:
+  autofix:
+    if: |
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'issues' && (
+        contains(github.event.issue.labels.*.name, 'ci-failure') ||
+        contains(github.event.issue.labels.*.name, 'loop-report') ||
+        contains(github.event.issue.labels.*.name, 'prod-down') ||
+        contains(github.event.issue.labels.*.name, 'claude-fix')
+      ))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check activation (ANTHROPIC_API_KEY)
+        id: key
+        env:
+          KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -n "$KEY" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Claude Autofix 接口已就位但未激活(缺 ANTHROPIC_API_KEY secret)。激活方法见 .github/workflows/claude-autofix.yml 头注释。"
+          fi
+
+      - uses: actions/checkout@v7
+        if: steps.key.outputs.ready == 'true'
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        if: steps.key.outputs.ready == 'true'
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Claude fix
+        if: steps.key.outputs.ready == 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            ${{ github.event_name == 'issues' && format('修复这个 issue:#{0} {1}
+
+            工作规则(仓库红线,必须遵守):
+            1. 动手前先读 STATE.md(会话外记忆)和 issue 正文,理解两代产品交接背景
+            2. 契约测试是字面断言,改 integrations/TodayFeed/Portal/DailyBriefCard/
+               MemoryNodeDetail 前先读 scripts/anonymous-private-data-gate.test.mjs
+            3. 验证命令:npx tsc --noEmit、npm run test:security(25 条 passed)、
+               npm run loops(三项 TOTAL 全 0);涉及重构再跑 npm run test:contracts
+            4. 只开 PR,永不直推 main;PR 描述里写清根因、修法、验证结果
+            5. 修不动就在 issue 里评论说明卡在哪,不要硬改', github.event.issue.number, github.event.issue.title) || '' }}
+          claude_args: '--max-turns 60'

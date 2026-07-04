@@ -32,7 +32,7 @@ if (auditCounts.critical > 0 || auditCounts.high > 0) {
 
 // ── 2. Route 守卫覆盖:调 AI/读私据的 route 必须有守卫 ────────────────────────
 const AI_MARKERS = ['api.anthropic.com', 'generativelanguage', 'api.openai.com', 'GEMINI_API_KEY', 'ANTHROPIC_API_KEY', 'OPENAI_API_KEY'];
-const GUARD_MARKERS = ['guardAiRoute', 'isPortalRequestAuthorized', 'isAnalyzeAiAllowed', 'isIngestAllowed', 'isSecretaryAiRequestAllowed', 'requireAuthenticatedGmailAccess', 'requireAuthenticatedCalendarAccess', 'hasStage5LabAccess', 'INGEST_SHARED_SECRET'];
+const GUARD_MARKERS = ['guardAiRoute', 'isPortalRequestAuthorized', 'isSameOriginRequest', 'isAnalyzeAiAllowed', 'isIngestAllowed', 'isSecretaryAiRequestAllowed', 'requireAuthenticatedGmailAccess', 'requireAuthenticatedCalendarAccess', 'hasStage5LabAccess', 'INGEST_SHARED_SECRET'];
 // OAuth 预授权流程和 lib/health 内部封装:route 侧无守卫是设计使然
 const EXEMPT = ['gmail/connect', 'gmail/callback', 'calendar/connect', 'calendar/oauth'];
 

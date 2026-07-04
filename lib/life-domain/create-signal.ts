@@ -113,9 +113,16 @@ export function signalWriteMode(): SignalWriteMode {
   return 'cloud_mirror_pending';
 }
 
+// 匿名会话云镜像降噪(2026-07-04 QA P2 修复):未登录时镜像注定 401,
+// 收到一次后本会话不再发(登录流程会导航/刷新页面,标志自然复位)。
+let cloudMirrorAuthBlocked = false;
+
 export async function writeCloudSignal(signal: Signal): Promise<{ ok: boolean; status: string }> {
   if (typeof window === 'undefined' || typeof fetch !== 'function') {
     return { ok: false, status: 'server_or_no_fetch' };
+  }
+  if (cloudMirrorAuthBlocked) {
+    return { ok: false, status: 'skipped_not_signed_in' };
   }
   try {
     const response = await fetch('/api/cloud/signals', {
@@ -124,6 +131,10 @@ export async function writeCloudSignal(signal: Signal): Promise<{ ok: boolean; s
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ signal: { ...signal, schemaVersion: SIGNAL_SCHEMA_VERSION } }),
     });
+    if (response.status === 401) {
+      cloudMirrorAuthBlocked = true;
+      return { ok: false, status: 'http_401' };
+    }
     if (!response.ok) return { ok: false, status: `http_${response.status}` };
     return { ok: true, status: 'cloud_mirror_attempted' };
   } catch {
