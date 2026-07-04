@@ -20,6 +20,25 @@ import { getLifeGraph, type LifeNode } from '@/lib/portal/life-graph';
 
 // ── Journal 历史(批次 6:富文本-lite + 历史时间线 + 搜索)────────────────────
 
+/** HTML 净化:只留基础排版标签,剥所有属性(Journal 自产自读,双保险)。 */
+function sanitizeJournalHtml(html: string): string {
+  const ALLOW = new Set(['B', 'STRONG', 'I', 'EM', 'U', 'UL', 'OL', 'LI', 'BR', 'DIV', 'P', 'SPAN']);
+  const root = document.createElement('div');
+  root.innerHTML = html;
+  const walk = (el: Element) => {
+    for (const child of Array.from(el.children)) {
+      if (!ALLOW.has(child.tagName)) {
+        child.replaceWith(...Array.from(child.childNodes));
+        continue;
+      }
+      for (const attr of Array.from(child.attributes)) child.removeAttribute(attr.name);
+      walk(child);
+    }
+  };
+  walk(root);
+  return root.innerHTML;
+}
+
 /** markdown-lite 渲染:**加粗** 与「- 」列表,其余原样。Journal 自家写自家读。 */
 function renderMdLite(text: string): React.ReactNode {
   return text.split('\n').map((line, i) => {
@@ -39,7 +58,7 @@ function renderMdLite(text: string): React.ReactNode {
   });
 }
 
-interface JournalEntry { id: string; date: Date; text: string; emotionColor?: string; emotionLabel?: string }
+interface JournalEntry { id: string; date: Date; text: string; html?: string; emotionColor?: string; emotionLabel?: string }
 
 function loadJournalEntries(): JournalEntry[] {
   return getLifeGraph()
@@ -50,6 +69,7 @@ function loadJournalEntries(): JournalEntry[] {
         id: n.id,
         date: new Date(n.createdAt),
         text: String(n.attributes.journalText),
+        html: typeof n.attributes.journalHtml === 'string' ? n.attributes.journalHtml : undefined,
         emotionColor: em?.color,
         emotionLabel: em?.label,
       };
@@ -190,7 +210,8 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
 
   const svgRef = useRef<SVGSVGElement>(null);
   const thoughtRef = useRef<HTMLInputElement>(null);
-  const journalRef = useRef<HTMLTextAreaElement>(null);
+  const journalRef = useRef<HTMLDivElement>(null);
+  const journalHtmlRef = useRef('');
   const sliderRef = useRef<HTMLDivElement>(null);
   const autoCloseRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -218,6 +239,7 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
       autoCloseRef.current = setTimeout(() => handleSave(), 4000);
     }
     if (phase === 'journal') {
+      journalHtmlRef.current = '';
       setTimeout(() => journalRef.current?.focus(), 80);
     }
   }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -234,12 +256,15 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
 
     if (isJournalEntry) {
       const dateStr = new Date().toISOString().slice(0, 10);
+      const html = sanitizeJournalHtml(journalHtmlRef.current || '');
+      const plain = (journalRef.current?.textContent ?? journal).trim();
       ingestLifeNode({
         name: `Journal · ${dateStr}${em ? ` · ${em.label}` : ''}`,
         type: 'health_state',
         tags: ['moment', 'journal', ...(em ? ['feeling', em.id, em.quadrant] : []), `energy-${lvl}`],
         attributes: {
-          isJournal: true, journalText: journal.trim(),
+          isJournal: true, journalText: plain || journal.trim(),
+          ...(html ? { journalHtml: html } : {}),
           ...(em ? { emotion: em.id, emotionLabel: em.label, emotionEmoji: em.emoji, emotionQuadrant: em.quadrant } : {}),
           energyValue: energyVal, energyLevel: lvl, ...autoContext(),
         },
@@ -370,24 +395,16 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
   const eColor = energyColor(energyVal);
 
   if (phase === 'journal') {
+    // 所见即所得(批次 8):选中直接变粗/成列表,编辑区里不出现任何记号
     const wrapBold = () => {
-      const el = journalRef.current;
-      if (!el) return;
-      const { selectionStart: a, selectionEnd: b, value } = el;
-      const next = a === b
-        ? `${value.slice(0, a)}****${value.slice(b)}`
-        : `${value.slice(0, a)}**${value.slice(a, b)}**${value.slice(b)}`;
-      setJournal(next);
-      setTimeout(() => { el.focus(); el.setSelectionRange(a + 2, (a === b ? a : b) + 2); }, 0);
+      journalRef.current?.focus();
+      document.execCommand('bold');
+      journalHtmlRef.current = journalRef.current?.innerHTML ?? '';
     };
     const insertBullet = () => {
-      const el = journalRef.current;
-      if (!el) return;
-      const { selectionStart: a, value } = el;
-      const lineStart = value.lastIndexOf('\n', a - 1) + 1;
-      const next = `${value.slice(0, lineStart)}- ${value.slice(lineStart)}`;
-      setJournal(next);
-      setTimeout(() => { el.focus(); el.setSelectionRange(a + 2, a + 2); }, 0);
+      journalRef.current?.focus();
+      document.execCommand('insertUnorderedList');
+      journalHtmlRef.current = journalRef.current?.innerHTML ?? '';
     };
     const entries = journalTab === 'history' ? loadJournalEntries() : [];
     const q = journalQuery.trim();
@@ -436,9 +453,17 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
                 <button type="button" onClick={insertBullet} aria-label="列表"
                   style={{ minWidth: 'var(--tap-min)', minHeight: '2.1rem', borderRadius: '0.5rem', border: '1px solid var(--portal-line)', background: 'var(--glass-bg-solid)', color: 'var(--portal-ink)', cursor: 'pointer' }}>•—</button>
               </div>
-              <textarea ref={journalRef} className="nesio-mood-journal-textarea"
-                placeholder="写下此刻…（支持 **加粗** 和 - 列表）" value={journal}
-                onChange={(e) => setJournal(e.target.value)} rows={7} />
+              <div
+                ref={journalRef}
+                className="nesio-journal-editor"
+                contentEditable
+                suppressContentEditableWarning
+                data-placeholder="写下此刻…"
+                onInput={(e) => {
+                  journalHtmlRef.current = (e.target as HTMLDivElement).innerHTML;
+                  setJournal((e.target as HTMLDivElement).textContent ?? '');
+                }}
+              />
               <button type="button" className="nesio-mood-save-btn nesio-mood-save-btn--ready"
                 onClick={() => handleSave({ isJournal: true })}>保存这一刻</button>
             </>
@@ -475,7 +500,12 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
                               {e.emotionColor && <span aria-hidden style={{ width: 8, height: 8, borderRadius: '50%', background: e.emotionColor, display: 'inline-block' }} />}
                               {e.emotionLabel || ''} {e.date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
                             </p>
-                            <div style={{ fontSize: '0.82rem', color: 'var(--portal-ink)', lineHeight: 1.6 }}>{renderMdLite(preview)}</div>
+                            {e.html && isOpen ? (
+                              <div className="nesio-journal-history-html" style={{ fontSize: '0.82rem', color: 'var(--portal-ink)', lineHeight: 1.6 }}
+                                dangerouslySetInnerHTML={{ __html: sanitizeJournalHtml(e.html) }} />
+                            ) : (
+                              <div style={{ fontSize: '0.82rem', color: 'var(--portal-ink)', lineHeight: 1.6 }}>{renderMdLite(preview)}</div>
+                            )}
                           </button>
                         );
                       })}

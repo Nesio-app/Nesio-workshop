@@ -31,11 +31,12 @@ interface MomentumAction {
 export function FocusCardDetail({
   node,
   onSubtasksChange: _onSubtasksChange,
-  onOpenRecorder,
-}: {
+  onOpenRecorder, onFocusMode, focusModeLabel }: {
   node: FocusNode;
   onSubtasksChange: (nodeId: string, subtasks: SubTask[]) => void;
   onOpenRecorder?: () => void;
+  onFocusMode?: () => void;
+  focusModeLabel?: string;
 }) {
   const [wave, setWave] = useState<MomentumAction[]>([]);
   const [loading, setLoading] = useState(false);
@@ -154,12 +155,17 @@ export function FocusCardDetail({
       <div className="nesio-momentum-start">
         {nodeUrl && (
           <a href={safeExternalUrl(nodeUrl)} target="_blank" rel="noopener noreferrer" className="nesio-focus-meeting-link-btn">
-            🔗 直达链接
+            直达链接
           </a>
         )}
         <button type="button" className="nesio-momentum-ignite-btn" onClick={() => fetchWave()}>
-          ⚡ 开始动量
+          粉碎任务
         </button>
+        {onFocusMode && (
+          <button type="button" className="nesio-collapsed-focus-btn" onClick={onFocusMode}>
+            {focusModeLabel ?? '聚焦'}
+          </button>
+        )}
       </div>
     );
   }

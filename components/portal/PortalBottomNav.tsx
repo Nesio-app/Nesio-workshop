@@ -2,6 +2,7 @@
 
 import { useRef } from 'react';
 import type { PortalLocale } from '@/lib/portal/profile';
+import { t } from '@/lib/portal/i18n';
 
 interface PortalBottomNavProps {
   activeSurface: 'today' | 'tell' | 'memory';
@@ -17,6 +18,7 @@ const LONG_PRESS_MS = 450;
 
 export default function PortalBottomNav({
   activeSurface,
+  locale = 'zh',
   onToday,
   onTell,
   onMemory,
@@ -60,7 +62,7 @@ export default function PortalBottomNav({
           <circle cx="12" cy="12" r="8.25" />
           <path d="M12 7.5V12l3 2.2" />
         </svg>
-        <span className="nesio-bottom-nav-label">Today</span>
+        <span className="nesio-bottom-nav-label">{t(locale, 'navToday')}</span>
       </button>
 
       {/* Nesio center button — tap = 输入, long-press = 问一问 */}
@@ -94,7 +96,7 @@ export default function PortalBottomNav({
         <svg className="nesio-bottom-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <path d="M4 8.2 12 4l8 4.2M4 8.2v9L12 21l8-3.8v-9M4 8.2 12 12.4l8-4.2M12 12.4V21" />
         </svg>
-        <span className="nesio-bottom-nav-label">Memory</span>
+        <span className="nesio-bottom-nav-label">{t(locale, 'navMemory')}</span>
       </button>
     </nav>
   );

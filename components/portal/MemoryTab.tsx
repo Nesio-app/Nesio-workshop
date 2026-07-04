@@ -527,7 +527,8 @@ function MemoryCard({ node, onOpen, onDeleted, onLongPress }: { node: LifeNode; 
       {extra && <span className="nesio-memory-card-extra">{extra}</span>}
       {badge && <span className="nesio-memory-card-status-badge" style={{ background: badgeColor }}>{badge}</span>}
       {!extra && !badge && <span className="nesio-memory-card-sub">{cleanMemoryPreview(node)}</span>}
-      {/* 批次 4:类型图标缩小挪到底部,与来源/领域标签同排 */}
+      {/* 批次 8:只留符号不留文字 — 类型 chip 与领域 chip 等大;
+          来源文字 chip(日历/Gmail)与类型图标重复,移除 */}
       <span className="nesio-memory-card-meta-row">
         {isPerson ? (
           <span className="nesio-memory-card-avatar" style={{ background: avatarBg, width: '1.55rem', height: '1.55rem', fontSize: '0.7rem' }}>{initials}</span>
@@ -536,9 +537,11 @@ function MemoryCard({ node, onOpen, onDeleted, onLongPress }: { node: LifeNode; 
             <NodeTypeIcon type={node.type} size={13} />
           </span>
         )}
-        {node.source === 'email' && <span className="nesio-memory-card-source-chip">Gmail</span>}
-        {node.source === 'calendar' && <span className="nesio-memory-card-source-chip">日历</span>}
-        {domain ? <span className="nesio-memory-card-domain"><DomainIcon domain={domain} size={11} /> {DOMAINS[domain].label}</span> : null}
+        {domain ? (
+          <span className="nesio-memory-card-icon" title={DOMAINS[domain].label} style={{ background: 'var(--chip-blue)' }}>
+            <DomainIcon domain={domain} size={13} />
+          </span>
+        ) : null}
       </span>
     </button>
   );

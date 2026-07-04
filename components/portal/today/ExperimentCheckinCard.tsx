@@ -69,7 +69,7 @@ export function ExperimentCheckinCard() {
         <span className="nesio-proactive-card-icon"><IconTarget size={18} /></span>
         <div className="nesio-proactive-card-text">
           <p className="nesio-proactive-card-title">实验打卡 · {exp!.name}</p>
-          {!expanded ? (
+          {!expanded && (
             <>
               <p className="nesio-proactive-card-body">
                 第 {exp!.dataPoints.length + 1} / {exp!.targetDays} 天,今天还没记录。
@@ -84,11 +84,15 @@ export function ExperimentCheckinCard() {
                 </button>
               </div>
             </>
-          ) : (
-            <LogPanel exp={exp!} onLog={handleLog} />
           )}
         </div>
       </div>
+      {/* 批次 8:记录面板占满整卡宽,不再挤在图标右侧的窄栏里 */}
+      {expanded && (
+        <div style={{ padding: '0 0.9rem 0.9rem' }}>
+          <LogPanel exp={exp!} onLog={handleLog} />
+        </div>
+      )}
     </div>
   );
 }

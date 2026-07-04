@@ -22,7 +22,7 @@ import { MeetingRecorderSheet } from './MeetingRecorderSheet';
 import MemoryFlashBanner, { useMemoryFlash } from '../MemoryFlashBanner';
 import { t } from '@/lib/portal/i18n';
 import { usePortalLocale } from '../use-portal-locale';
-import { IconCalendar, IconNote } from '../icons';
+import { IconCalendar, IconGift, IconNote } from '../icons';
 
 function CollapsedTaskItem({
   node,
@@ -68,10 +68,9 @@ function CollapsedTaskItem({
             node={node}
             onSubtasksChange={() => {}}
             onOpenRecorder={isMeeting && onOpenRecorder ? onOpenRecorder : undefined}
+            onFocusMode={onFocusMode}
+            focusModeLabel={t(locale, 'todayFocusModeBtn')}
           />
-          {onFocusMode && (
-            <button type="button" className="nesio-collapsed-focus-btn" onClick={onFocusMode}>{t(locale, 'todayFocusModeBtn')}</button>
-          )}
         </div>
       )}
     </li>
@@ -182,22 +181,24 @@ export function TodayFocusSection({
             />
           )}
 
-          {/* ── Slot 2: 折叠区 ── */}
+          {/* ── Slot 2: 折叠区(批次 8:≤2 条直接铺开,不值得让人多点一下) ── */}
           {collapsedCount > 0 && (
             <div className="nesio-collapsed-section">
-              <button
-                type="button"
-                className="nesio-collapsed-toggle"
-                onClick={() => setCollapsed((v) => !v)}
-                aria-expanded={!collapsed}
-              >
-                <span className="nesio-collapsed-toggle-label">
-                  {collapsed ? t(locale, 'todayCollapsedMoreTemplate', { count: collapsedCount }) : t(locale, 'todayCollapse')}
-                </span>
-                <span className="nesio-collapsed-toggle-chevron">{collapsed ? '▾' : '▴'}</span>
-              </button>
+              {collapsedCount > 2 && (
+                <button
+                  type="button"
+                  className="nesio-collapsed-toggle"
+                  onClick={() => setCollapsed((v) => !v)}
+                  aria-expanded={!collapsed}
+                >
+                  <span className="nesio-collapsed-toggle-label">
+                    {collapsed ? t(locale, 'todayCollapsedMoreTemplate', { count: collapsedCount }) : t(locale, 'todayCollapse')}
+                  </span>
+                  <span className="nesio-collapsed-toggle-chevron">{collapsed ? '▾' : '▴'}</span>
+                </button>
+              )}
 
-              {!collapsed && (
+              {(!collapsed || collapsedCount <= 2) && (
                 <ul className="nesio-collapsed-list">
                   {/* Calendar events (non-pinned) */}
                   {rest.map((obj) => (
@@ -212,7 +213,7 @@ export function TodayFocusSection({
                   {nearSpecialDays.map((item) => (
                     <li key={item.nodeId} className="nesio-collapsed-item">
                       <div className="nesio-collapsed-row">
-                        <span className="nesio-collapsed-icon">🎂</span>
+                        <span className="nesio-collapsed-icon"><IconGift size={15} /></span>
                         <span className="nesio-collapsed-title">{item.name}</span>
                         <span className="nesio-collapsed-day-tag">{item.daysUntil === 0 ? t(locale, 'todayLabelToday') : t(locale, 'todayLabelTomorrow')}</span>
                       </div>

@@ -11,7 +11,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { MyExperimentWidget } from '@/components/portal/NesioExperiment';
+import { MyExperimentWidget, loadExperiments, computeInsight } from '@/components/portal/NesioExperiment';
 import LifeCivilizationMap from '@/components/portal/LifeCivilizationMap';
 import RelationGraph from '@/components/portal/RelationGraph';
 import type { GNode, GEdge } from '@/lib/platform/graph-engine';
@@ -190,6 +190,19 @@ function computeReflectionFacts(nodes: LifeNode[], all: LifeNode[], profile: Mir
   if (bestGroup && bestGroup.score > 0.5) {
     facts.push({ icon: <IconClock size={15} />, text: `你的黄金时段在${bestGroup.label}` });
   }
+
+  // 4.4 进行中实验(批次 8:打卡数据与洞察关联)
+  try {
+    for (const exp of loadExperiments().filter((e) => !e.concluded)) {
+      if (exp.dataPoints.length < 3) continue;
+      const ins = computeInsight(exp);
+      facts.push({
+        icon: <IconTarget size={15} />,
+        text: `实验「${exp.name.slice(0, 12)}」已记录 ${exp.dataPoints.length} 天:${ins.text.slice(0, 40)}`,
+      });
+      break; // 洞察区只放一条,详情在 分析→我的实验
+    }
+  } catch { /* ignore */ }
 
   // 4.5 冲动冷静账本(批次 7:劝住/没劝住都可见)
   try {

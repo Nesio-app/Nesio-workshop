@@ -722,6 +722,8 @@ const STRINGS = {
     langGroupReady: '可用',
     langGroupSoon: '翻译中 · 即将开放',
     langSoonHint: '界面翻译完成一种就开放一种,不给不生效的选项。',
+    navToday: '今天',
+    navMemory: '记忆',
   },
   en: {
     settingsTitle: 'Account',
@@ -1444,6 +1446,8 @@ const STRINGS = {
     langGroupReady: 'Available',
     langGroupSoon: 'In translation · coming soon',
     langSoonHint: 'Each language opens as its translation completes — no options that do nothing.',
+    navToday: 'Today',
+    navMemory: 'Memory',
   },
 } as const;
 

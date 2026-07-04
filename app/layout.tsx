@@ -17,7 +17,9 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    statusBarStyle: 'default',
+    // 批次 8:default 会给状态栏画白底(每页顶部白边的根因);
+    // black-translucent 让 portal 渐变延伸到状态栏下
+    statusBarStyle: 'black-translucent',
     title: 'Nesio',
   },
 };
