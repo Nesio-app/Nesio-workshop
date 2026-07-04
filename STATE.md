@@ -75,6 +75,7 @@ Signal M1-M4(读切换 + 删除传导)、REG-004/006 i18n 闭环
 | 断链巡检(modal 退出/能力入口) | `npm run report:broken-links` + loops.yml | 每周 |
 | 安全循环(audit/route 守卫/文档新鲜度) | `npm run report:security-loop` + loops.yml | 每周 |
 | 全量契约链(100+ 套) | `npm run test:contracts` + loops.yml | 每周 |
+| 生产合成监控(uptime + 安全门) | .github/workflows/uptime.yml → prod-down issue | 每 15 分钟 |
 | AI 成本(telemetry 汇总) | `npm run report:ai-cost` | 每月/手动 |
 
 ## 命名词典(易混项)

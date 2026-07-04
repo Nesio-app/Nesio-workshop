@@ -1,0 +1,81 @@
+# 生产合成监控:定时探测关键端点,失败开/更新 issue(标签 prod-down)。
+# 恢复后自动关闭 issue。设计目标:生产挂了不需要有人正好打开网站才发现。
+name: Production Uptime
+
+on:
+  schedule:
+    - cron: '*/15 * * * *' # 每 15 分钟(GitHub cron 实际粒度)
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe production
+        id: probe
+        run: |
+          FAILS=""
+          check() {
+            local label="$1" url="$2" expect="$3"
+            local code
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "$url" || echo "000")
+            echo "$label → $code (expect $expect)"
+            if [ "$code" != "$expect" ]; then FAILS="$FAILS\n- $label: got $code, expected $expect ($url)"; fi
+          }
+          check "首页" "https://www.nesio.app" "200"
+          check "登录页" "https://www.nesio.app/login" "200"
+          check "设置页" "https://www.nesio.app/settings" "200"
+          check "PWA manifest" "https://www.nesio.app/manifest.json" "200"
+          check "Service Worker" "https://www.nesio.app/sw.js" "200"
+          check "健康端点" "https://www.nesio.app/api/portal/health" "200"
+          # 安全门必须保持关闭(松了同样是事故)
+          check "secretary 公众隔离" "https://www.nesio.app/secretary" "403"
+          if [ -n "$FAILS" ]; then
+            echo "failed=true" >> "$GITHUB_OUTPUT"
+            {
+              echo 'DETAILS<<EOF_D'
+              echo -e "$FAILS"
+              echo 'EOF_D'
+            } >> "$GITHUB_OUTPUT"
+          else
+            echo "failed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Manage prod-down issue
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const failed = '${{ steps.probe.outputs.failed }}' === 'true';
+            const details = `${{ toJSON(steps.probe.outputs.DETAILS) }}`;
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner, repo: context.repo.repo,
+              state: 'open', labels: 'prod-down',
+            });
+            const now = new Date().toISOString();
+            if (failed) {
+              const body = `生产探测失败 · ${now}\n${JSON.parse(details)}\n\n> 修复入口:先看 Vercel 部署日志;回滚 = Vercel dashboard 上 promote 上一个部署。`;
+              if (issues.length > 0) {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner, repo: context.repo.repo,
+                  issue_number: issues[0].number, body,
+                });
+              } else {
+                await github.rest.issues.create({
+                  owner: context.repo.owner, repo: context.repo.repo,
+                  title: '🔴 生产站探测失败(prod-down)',
+                  body, labels: ['prod-down'],
+                });
+              }
+            } else if (issues.length > 0) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: issues[0].number, body: `✅ ${now} 探测恢复正常,自动关闭。`,
+              });
+              await github.rest.issues.update({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: issues[0].number, state: 'closed',
+              });
+            }
