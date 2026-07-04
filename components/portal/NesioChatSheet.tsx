@@ -15,6 +15,7 @@ import { readPortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache'
 import { refreshLocation } from '@/lib/portal/location-store';
 import { formatEnvironmentContext, getCachedCalendarEvents } from '@/lib/portal/environment';
 import { semanticRerank } from '@/lib/portal/semantic-rerank';
+import { track } from '@/lib/portal/telemetry';
 import MemoryFlashBanner, { useMemoryFlash } from '@/components/portal/MemoryFlashBanner';
 
 interface ChatMessage { role: 'user' | 'model'; text: string; }
@@ -490,6 +491,7 @@ export default function NesioChatSheet({
       .filter((m) => m.role === 'user' || m.role === 'model')
       .map((m) => ({ role: m.role as 'user' | 'model', text: m.text }));
 
+    track('chat_send', { has_file: Boolean(fileContextRef.current) });
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30000);
     try {

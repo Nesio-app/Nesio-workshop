@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from 'react';
 import { loadProfileSettings } from '@/lib/portal/profile';
 import { getEnvironment, getCachedCalendarEvents } from '@/lib/portal/environment';
 import { refreshLocation } from '@/lib/portal/location-store';
+import { track } from '@/lib/portal/telemetry';
 import type { CalendarEvent } from '@/lib/portal/types';
 
 const BRIEF_CACHE_KEY = 'nesio-daily-brief-v2';
@@ -97,6 +98,7 @@ export default function DailyBriefCard({
         return;
       }
       setTtsMode('browser');
+      track('brief_tts_fallback');
       window.speechSynthesis.cancel();
 
       const utterance = new SpeechSynthesisUtterance(script);
@@ -233,6 +235,7 @@ export default function DailyBriefCard({
 
   function handlePlay() {
     if (!canUsePrivateData) { window.location.href = '/login'; return; }
+    track('brief_play', { state: playState });
     if (playState === 'playing') { togglePause(); return; }
     if (playState === 'paused') { togglePause(); return; }
     if (playState === 'error' || playState === 'done') {

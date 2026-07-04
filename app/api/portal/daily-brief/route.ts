@@ -5,6 +5,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { guardAiRoute } from '@/lib/portal/api-auth';
+import { reportAiCall } from '@/lib/portal/ai-telemetry';
 
 export const dynamic = 'force-dynamic';
 
@@ -147,6 +148,7 @@ ${memorySection}
 
 直接开始说，不要说"好的"或"以下是"。`;
 
+  const startedAt = Date.now();
   try {
     const res = await fetch(`${GEMINI_URL}?key=${geminiKey}`, {
       method: 'POST',
@@ -158,8 +160,12 @@ ${memorySection}
     });
     const data = await res.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
     const script = data.candidates?.[0]?.content?.parts?.map((p) => p.text).join('').trim() || '';
-    if (script) return NextResponse.json({ ok: true, script });
+    if (script) {
+      reportAiCall('daily_brief', true, startedAt);
+      return NextResponse.json({ ok: true, script });
+    }
   } catch { /* fall through */ }
 
+  reportAiCall('daily_brief', false, startedAt, { fallback: true });
   return NextResponse.json({ ok: true, script: buildFallbackScript() });
 }

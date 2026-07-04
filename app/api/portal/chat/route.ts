@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { buildChatContext } from '@/lib/portal/chat-context';
 import { guardAiRoute } from '@/lib/portal/api-auth';
+import { reportAiCall } from '@/lib/portal/ai-telemetry';
 
 export const dynamic = 'force-dynamic';
 
@@ -201,11 +202,13 @@ export async function POST(req: NextRequest) {
     : '';
   const systemInstruction = `${buildSystemPersonality(coachStyle)}\n\n${systemContext}${fileSection}`;
 
+  const startedAt = Date.now();
   try {
     const result = anthropicKey
       ? await callClaude(anthropicKey, message, history, systemInstruction)
       : await callGemini(geminiKey!, message, history, systemInstruction);
 
+    reportAiCall('chat', true, startedAt, { provider: anthropicKey ? 'claude' : 'gemini' });
     return NextResponse.json({
       ok: true,
       response: result.text || '我理解你的问题，但暂时没有找到确定的答案。',
@@ -221,6 +224,7 @@ export async function POST(req: NextRequest) {
     if (geminiKey) {
       try {
         const result = await callGemini(geminiKey, message, history, systemInstruction);
+        reportAiCall('chat', true, startedAt, { provider: 'gemini_fallback' });
         return NextResponse.json({
           ok: true,
           response: result.text || '我理解你的问题，但暂时没有找到确定的答案。',
@@ -240,6 +244,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    reportAiCall('chat', false, startedAt, { error: isAuthError ? 'auth' : 'provider' });
     if (isAuthError) {
       return NextResponse.json({
         ok: true,

@@ -5,6 +5,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { guardAiRoute } from '@/lib/portal/api-auth';
+import { reportAiCall } from '@/lib/portal/ai-telemetry';
 
 function getOpenAIKey(): string {
   return (process.env.OpenAI_KEY || process.env.OPENAI_API_KEY || '').trim();
@@ -29,6 +30,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'real_voice_not_configured' }, { status: 503 });
   }
 
+  const startedAt = Date.now();
   try {
     const res = await fetch('https://api.openai.com/v1/audio/speech', {
       method: 'POST',
@@ -47,10 +49,12 @@ export async function POST(req: NextRequest) {
 
     if (!res.ok) {
       await res.text(); // consume body; don't forward upstream error to client
+      reportAiCall('tts', false, startedAt, { status: res.status });
       return NextResponse.json({ ok: false, error: 'tts_unavailable' }, { status: res.status });
     }
 
     const audioBuffer = await res.arrayBuffer();
+    reportAiCall('tts', true, startedAt, { chars: text.length });
     return new NextResponse(audioBuffer, {
       headers: {
         'Content-Type': 'audio/mpeg',
@@ -58,6 +62,7 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (err) {
+    reportAiCall('tts', false, startedAt);
     return NextResponse.json(
       { ok: false, error: err instanceof Error ? err.message : 'tts_failed' },
       { status: 500 },

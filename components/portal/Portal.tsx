@@ -50,6 +50,7 @@ import { runConnectors } from '@/lib/platform/runtime/integration-runtime';
 import { pruneDisposableSignals } from '@/lib/life-domain';
 import { prunePrivateExternalNodes } from '@/lib/portal/life-graph';
 import { STORAGE_FULL_EVENT, STORAGE_WARNING_EVENT } from '@/lib/portal/storage-health';
+import { track, installErrorTracking } from '@/lib/portal/telemetry';
 import type { PortalConfig, PortalDecMetadata, PortalTool } from '@/lib/portal/types';
 import { type ToolForShellState } from './tool-state';
 
@@ -351,6 +352,12 @@ export default function Portal() {
     };
   }, []);
 
+  // Telemetry: app open + global error hooks (event counts only, no content)
+  useEffect(() => {
+    installErrorTracking();
+    track('app_open');
+  }, []);
+
   // Storage quota alerts — a dropped write must never be silent
   useEffect(() => {
     const onFull = (e: Event) => {
@@ -372,8 +379,8 @@ export default function Portal() {
   // Allow TodayFeed empty state / other surfaces to open Tell Nesio or capture directly
   useEffect(() => {
     const handler = () => setActiveSurface((s) => s === 'tell' ? 'today' : 'tell');
-    const voiceHandler = () => setCaptureMode('voice');
-    const moodHandler = () => setMoodOpen(true);
+    const voiceHandler = () => { track('capture_voice_open'); setCaptureMode('voice'); };
+    const moodHandler = () => { track('mood_open'); setMoodOpen(true); };
     window.addEventListener('nesio-open-tell', handler);
     window.addEventListener('nesio-open-voice', voiceHandler);
     window.addEventListener('nesio-open-mood', moodHandler);
