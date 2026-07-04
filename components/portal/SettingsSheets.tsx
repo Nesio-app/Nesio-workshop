@@ -5,10 +5,11 @@
  * Each is a slide-up bottom sheet opened from NesioProfileCard.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { loadProfileSettings, saveProfileSettings } from '@/lib/portal/profile';
 import { getMirrorProfile } from '@/lib/portal/mirror-profile';
 import { deleteLifeNode, getLifeGraph } from '@/lib/portal/life-graph';
+import { buildFullBackup, isValidBackup, restoreFullBackup } from '@/lib/portal/full-backup';
 
 interface SheetProps { open: boolean; onClose: () => void; }
 
@@ -128,6 +129,38 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
   const [deleted, setDeleted] = useState(false);
   const [locationGranted, setLocationGranted] = useState<boolean | null>(null);
   const [requestingLoc, setRequestingLoc] = useState(false);
+  const [restoreMsg, setRestoreMsg] = useState('');
+  const importRef = useRef<HTMLInputElement>(null);
+
+  function exportFullBackup() {
+    const backup = buildFullBackup(localStorage);
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `nesio-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    let parsed: unknown;
+    try { parsed = JSON.parse(await file.text()); }
+    catch { setRestoreMsg('⚠️ 文件不是有效的 JSON'); return; }
+    if (!isValidBackup(parsed)) { setRestoreMsg('⚠️ 不是有效的 Nesio 备份文件'); return; }
+
+    const replace = confirm(
+      `备份包含 ${Object.keys(parsed.entries).length} 项数据（${parsed.exportedAt.slice(0, 10)} 导出）。\n\n` +
+      '「确定」= 覆盖恢复（备份内容覆盖本机）\n「取消」= 合并恢复（记忆按条合并，其余仅补缺）',
+    );
+    const result = restoreFullBackup(localStorage, parsed, replace ? 'replace' : 'merge');
+    setNodeCount(getLifeGraph().length);
+    setRestoreMsg(`✓ 已恢复 ${result.restoredKeys} 项${result.mergedNodes != null ? `，记忆合并后共 ${result.mergedNodes} 条` : ''}`);
+    window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -206,6 +239,16 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
       }}>
         ↓ 导出 Memory 数据（JSON）
       </button>
+
+      <button type="button" className="nesio-settings-action-btn" onClick={exportFullBackup}>
+        ⬇ 导出完整备份（含项目/情绪/设置等全部本地数据）
+      </button>
+
+      <button type="button" className="nesio-settings-action-btn" onClick={() => importRef.current?.click()}>
+        ⬆ 导入备份
+      </button>
+      <input ref={importRef} type="file" accept="application/json,.json" hidden onChange={handleImportFile} />
+      {restoreMsg && <p style={{ fontSize: '0.75rem', marginTop: 4, color: restoreMsg.startsWith('✓') ? 'var(--status-go)' : 'var(--status-risk)' }}>{restoreMsg}</p>}
 
       <button type="button" className="nesio-settings-danger-btn" onClick={clearAllMemory}>
         {deleted ? '✓ 已清除' : '清除所有 Memory'}
