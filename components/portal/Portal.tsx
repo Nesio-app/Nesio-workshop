@@ -1,19 +1,23 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import dynamic from 'next/dynamic';
 import TodayFeed from './TodayFeed';
 import MemoryTab from './MemoryTab';
 import TellNesioSheet, { type CaptureMode } from './TellNesioSheet';
-import CameraSheet from './CameraSheet';
-import VoiceInputSheet from './VoiceInputSheet';
-import ShareSheet from './ShareSheet';
-import MoodSheet from './MoodSheet';
 import PortalBottomNav from './PortalBottomNav';
-import NesioChatSheet from './NesioChatSheet';
-import PortalAiFriendsPreview from './PortalAiFriendsPreview';
-import NotePanelEnhanced from './NotePanelEnhanced';
 import PortalOnboarding from './PortalOnboarding';
-import ToolsTreasurePopup from './ToolsTreasureSheet';
+
+// Heavy sheets load on first open, not at boot — together they were ~3.5k
+// lines of first-paint JS for UI the user may never touch in a session.
+const CameraSheet = dynamic(() => import('./CameraSheet'), { ssr: false });
+const VoiceInputSheet = dynamic(() => import('./VoiceInputSheet'), { ssr: false });
+const ShareSheet = dynamic(() => import('./ShareSheet'), { ssr: false });
+const MoodSheet = dynamic(() => import('./MoodSheet'), { ssr: false });
+const NesioChatSheet = dynamic(() => import('./NesioChatSheet'), { ssr: false });
+const PortalAiFriendsPreview = dynamic(() => import('./PortalAiFriendsPreview'), { ssr: false });
+const NotePanelEnhanced = dynamic(() => import('./NotePanelEnhanced'), { ssr: false });
+const ToolsTreasurePopup = dynamic(() => import('./ToolsTreasureSheet'), { ssr: false });
 import { DEFAULT_PORTAL_CONFIG } from '@/lib/portal/defaults';
 import { openToolHref } from '@/lib/portal/open-tool';
 import {

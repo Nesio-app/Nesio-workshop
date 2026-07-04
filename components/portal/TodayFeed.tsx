@@ -30,7 +30,10 @@ import { cloudSignalRowsToSignals, type CloudSignalRow } from '@/lib/life-domain
 import { createAppApiClient } from '@/lib/portal/app-api-client';
 import VoiceBrief from './VoiceBrief';
 import DailyBriefCard from './DailyBriefCard';
-import InsightsSheet from './InsightsSheet';
+import dynamic from 'next/dynamic';
+
+// 1143-line analytics sheet — load on open, not at boot
+const InsightsSheet = dynamic(() => import('./InsightsSheet'), { ssr: false });
 import MemoryFlashBanner, { useMemoryFlash } from './MemoryFlashBanner';
 import WrappedCard, { useWrappedTrigger } from './WrappedCard';
 

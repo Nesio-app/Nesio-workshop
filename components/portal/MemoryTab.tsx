@@ -29,9 +29,12 @@ import {
   type Project,
 } from '@/lib/portal/project';
 import { buildNarratorCards, type NarratorCard } from '@/lib/portal/memory-narrator';
-import MemoryNodeDetail from './MemoryNodeDetail';
-import FreezeVaultSheet from './FreezeVaultSheet';
-import RelationGraph from './RelationGraph';
+import dynamic from 'next/dynamic';
+
+// Detail/graph views load on first open, not with the tab
+const MemoryNodeDetail = dynamic(() => import('./MemoryNodeDetail'), { ssr: false });
+const FreezeVaultSheet = dynamic(() => import('./FreezeVaultSheet'), { ssr: false });
+const RelationGraph = dynamic(() => import('./RelationGraph'), { ssr: false });
 import type { GNode, GEdge } from '@/lib/platform/graph-engine';
 
 // ── Object Map (物品地图) ────────────────────────────────────────────────────
