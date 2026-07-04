@@ -77,8 +77,8 @@ export default function TellNesioSheet({ open, onClose, onCapture }: TellNesioSh
   if (!open) return null;
 
   return (
-    <div className="nesio-tell-overlay" role="dialog" aria-modal="true" aria-label="告诉 Nesio">
-      <button type="button" className="nesio-tell-backdrop" aria-label="关闭" onClick={onClose} />
+    <div className="nesio-tell-overlay" role="dialog" aria-modal="true" aria-label={L(dict, '告诉 Nesio', 'Tell Nesio')}>
+      <button type="button" className="nesio-tell-backdrop" aria-label={L(dict, '关闭', 'Close')} onClick={onClose} />
       {/* 原生相机直达:capture 属性 → iOS 直接开相机;取消拍摄则什么都不发生 */}
       <input
         ref={cameraInputRef}

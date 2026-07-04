@@ -269,7 +269,8 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
       const html = sanitizeJournalHtml(journalHtmlRef.current || '');
       const plain = (journalRef.current?.textContent ?? journal).trim();
       ingestLifeNode({
-        name: `Journal · ${dateStr}${em ? ` · ${em.label}` : ''}`,
+        // 批次 12:节点名按保存时的界面语言生成(英文界面下不再冒出中文标题)
+        name: `Journal · ${dateStr}${em ? ` · ${L(dict, em.label, em.labelEn)}` : ''}`,
         type: 'health_state',
         tags: ['moment', 'journal', ...(em ? ['feeling', em.id, em.quadrant] : []), `energy-${lvl}`],
         attributes: {
@@ -278,12 +279,13 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
           ...(em ? { emotion: em.id, emotionLabel: em.label, emotionEmoji: em.emoji, emotionQuadrant: em.quadrant } : {}),
           energyValue: energyVal, energyLevel: lvl, ...autoContext(),
         },
-        rawInput: `Journal ${em ? em.label : ''} ${journal.slice(0, 40)}`,
+        rawInput: `Journal ${em ? L(dict, em.label, em.labelEn) : ''} ${journal.slice(0, 40)}`,
         confidence: 1, source: 'manual', relations: [],
       });
     } else if (em) {
       ingestLifeNode({
-        name: `此刻 · ${em.label}`,
+        // 批次 12:同上,「此刻 · 感激」在英文界面下生成 "This moment · Grateful"
+        name: L(dict, `此刻 · ${em.label}`, `This moment · ${em.labelEn}`),
         type: 'health_state',
         tags: ['moment', 'feeling', em.id, em.quadrant, `energy-${lvl}`],
         attributes: {
@@ -291,14 +293,16 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
           emotionQuadrant: em.quadrant, energyValue: energyVal, energyLevel: lvl,
           ...(thought.trim() ? { thought: thought.trim() } : {}), ...autoContext(),
         },
-        rawInput: `此刻 ${em.label} · 精力${lvl}${thought.trim() ? ` · ${thought.trim()}` : ''}`,
+        rawInput: L(dict,
+          `此刻 ${em.label} · 精力${lvl}${thought.trim() ? ` · ${thought.trim()}` : ''}`,
+          `This moment ${em.labelEn} · energy ${lvl}${thought.trim() ? ` · ${thought.trim()}` : ''}`),
         confidence: 1, source: 'manual', relations: [],
       });
     } else { onClose(); return; }
 
     setPhase('saved');
     setTimeout(() => onClose(), 1600);
-  }, [selected, energyVal, thought, journal, phase, onClose]);
+  }, [selected, energyVal, thought, journal, phase, onClose, dict]);
 
   function pickEmotion(idx: number) { setSelected(EMOTIONS[idx].id); setPhase('energy'); }
 
@@ -568,7 +572,7 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
 
   if (phase === 'thought') {
     return (
-      <div className="nesio-mood-overlay" role="dialog" aria-modal aria-label="记录此刻想法">
+      <div className="nesio-mood-overlay" role="dialog" aria-modal aria-label={L(dict, '记录此刻想法', 'Note this thought')}>
         <div className="nesio-mood-backdrop" onClick={() => handleSave()} />
         <div className="nesio-mood-card">
           <div className="nesio-mood-handle" aria-hidden />
@@ -590,14 +594,14 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
   }
 
   return (
-    <div className="nesio-mood-overlay" role="dialog" aria-modal aria-label="记录此刻感受">
+    <div className="nesio-mood-overlay" role="dialog" aria-modal aria-label={L(dict, '记录此刻感受', 'Log how you feel')}>
       <div className="nesio-mood-backdrop" onClick={onClose} />
       <div className="nesio-mood-card">
         <div className="nesio-mood-handle" aria-hidden />
         <button
           type="button"
           onClick={onClose}
-          aria-label="关闭"
+          aria-label={L(dict, '关闭', 'Close')}
           style={{ position: 'absolute', top: 10, right: 12, width: 32, height: 32, borderRadius: 999, border: 'none', background: 'rgba(120,140,180,0.12)', color: 'var(--portal-muted)', fontSize: '0.9rem', cursor: 'pointer' }}
         >✕</button>
         <p className="nesio-mood-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>

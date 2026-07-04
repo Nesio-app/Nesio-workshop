@@ -207,8 +207,8 @@ export default function TodayFeed({
 
       {/* Insights mirror */}
       {mirrorOpen && (
-        <div className="nesio-settings-sheet-overlay" role="dialog" aria-modal="true" aria-label="Nesio 的洞察">
-          <button type="button" className="nesio-settings-sheet-backdrop" onClick={() => setMirrorOpen(false)} aria-label="关闭" />
+        <div className="nesio-settings-sheet-overlay" role="dialog" aria-modal="true" aria-label={L(uiLocale, 'Nesio 的洞察', "Nesio's insights")}>
+          <button type="button" className="nesio-settings-sheet-backdrop" onClick={() => setMirrorOpen(false)} aria-label={L(uiLocale, '关闭', 'Close')} />
           <div className="nesio-settings-sheet-card nesio-insights-sheet-card">
             <div className="nesio-sheet-handle" aria-hidden />
             <InsightsSheet onClose={() => setMirrorOpen(false)} />

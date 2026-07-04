@@ -145,7 +145,9 @@ async function fetchAskResponse(query: string, candidates: LifeNode[]): Promise<
 
 // ---- 日期时间选择器 ----
 const MONTH_NAMES = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+const MONTH_NAMES_EN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const WEEKDAY_LABELS = ['一','二','三','四','五','六','日'];
+const WEEKDAY_LABELS_EN = ['Mo','Tu','We','Th','Fr','Sa','Su'];
 
 interface DTPValue {
   date: string;
@@ -195,13 +197,13 @@ function DateTimePicker({ value, onChange, onClose }: {
         {/* 月份导航 */}
         <div className="nesio-dtp-month-nav">
           <button type="button" className="nesio-dtp-nav-btn" onClick={prevMonth}>‹</button>
-          <span className="nesio-dtp-month-label">{viewYear}年 {MONTH_NAMES[viewMonth]}</span>
+          <span className="nesio-dtp-month-label">{L(dict, `${viewYear}年 ${MONTH_NAMES[viewMonth]}`, `${MONTH_NAMES_EN[viewMonth]} ${viewYear}`)}</span>
           <button type="button" className="nesio-dtp-nav-btn" onClick={nextMonth}>›</button>
         </div>
 
         {/* 星期标题 */}
         <div className="nesio-dtp-weekdays">
-          {WEEKDAY_LABELS.map(d => <span key={d}>{d}</span>)}
+          {(dict === 'en' ? WEEKDAY_LABELS_EN : WEEKDAY_LABELS).map(d => <span key={d}>{d}</span>)}
         </div>
 
         {/* 日期格子 */}

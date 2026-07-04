@@ -66,11 +66,11 @@ export default function FreezeVaultSheet({ open, onClose, initialUrl }: FreezeVa
       if (data.ok && data.title) {
         setParsed({ title: data.title, price: data.price, image: data.image, store: data.store, description: data.description });
       } else {
-        setParseError('无法解析该链接，请手动填写商品名称');
+        setParseError(L(dict, '无法解析该链接，请手动填写商品名称', "Couldn't parse the link — enter the item name manually"));
         setParsed({ title: url });
       }
     } catch {
-      setParseError('网络错误，可以直接填写商品名称');
+      setParseError(L(dict, '网络错误，可以直接填写商品名称', 'Network error — you can just type the item name'));
       setParsed({ title: url });
     } finally {
       setParsing(false);
@@ -106,11 +106,11 @@ export default function FreezeVaultSheet({ open, onClose, initialUrl }: FreezeVa
 
   function hoursUntilThaw(thawAt: string): string {
     const diff = new Date(thawAt).getTime() - Date.now();
-    if (diff <= 0) return '已解冻';
+    if (diff <= 0) return L(dict, '已解冻', 'Thawed');
     const h = Math.floor(diff / 3_600_000);
     const m = Math.floor((diff % 3_600_000) / 60_000);
     if (h > 0) return `${h}h ${m}m`;
-    return `${m}分钟`;
+    return L(dict, `${m}分钟`, `${m} min`);
   }
 
   if (!open) return null;

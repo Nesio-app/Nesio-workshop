@@ -144,7 +144,7 @@ export function FocusCardDetail({
             </button>
           )}
         </div>
-        {meetingTime && <p className="nesio-focus-meeting-prep-hint">提前 5 分钟打开，检查静音和摄像头</p>}
+        {meetingTime && <p className="nesio-focus-meeting-prep-hint">{L(dict, '提前 5 分钟打开，检查静音和摄像头', 'Open 5 min early — check mute and camera')}</p>}
       </div>
     );
   }
@@ -188,7 +188,7 @@ export function FocusCardDetail({
   return (
     <div className="nesio-momentum">
       {waveIndex > 1 && (
-        <div className="nesio-momentum-wave-badge">第 {waveIndex} 波</div>
+        <div className="nesio-momentum-wave-badge">{L(dict, `第 ${waveIndex} 波`, `Wave ${waveIndex}`)}</div>
       )}
       <ul className="nesio-momentum-list">
         {wave.map((a) => {

@@ -7,7 +7,8 @@ import { useProfileAvatar } from './use-profile-avatar';
 import { GeneralSheet, DataSheet, PrivacySheet, SubscriptionSheet } from './SettingsSheets';
 import ConnectorsHub from './ConnectorsHub';
 import RoadmapSheet from './RoadmapSheet';
-import { t } from '@/lib/portal/i18n';
+import { L, t } from '@/lib/portal/i18n';
+import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import { IconDatabase, IconGear, IconStar as IconStarOutline, IconGift } from './icons';
 
@@ -18,6 +19,7 @@ export default function NesioProfileCard() {
   // 头像统一走 useProfileAvatar(批次 11:与主页「我」按钮同一数据源,不再各自刷新)
   const { avatarUrl, refreshAvatar } = useProfileAvatar();
   const locale = usePortalLocale();
+  const dict = portalLocaleToDictionaryLocale(locale);
   const [activeSheet, setActiveSheet] = useState<ActiveSheet>(null);
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [avatarError, setAvatarError] = useState('');
@@ -35,14 +37,17 @@ export default function NesioProfileCard() {
 
   }, []);
 
-  const initials = displayName.trim().slice(0, 1) || 'J';
+  // 批次 12:缺省名「我」是 profile store 的 zh 回落值,英文界面显示 Me
+  const initials = displayName.trim() && displayName.trim() !== '我'
+    ? displayName.trim().slice(0, 1)
+    : L(dict, '我', 'Me');
 
   async function handleLogout() {
     try {
       await fetch('/api/auth/logout', { method: 'POST', cache: 'no-store' });
     } catch { /* ignore */ }
     clearProfileIdentity(); // 清除后 PROFILE_UPDATED_EVENT 会让头像自行清空
-    setDisplayName('我');
+    setDisplayName(L(dict, '我', 'Me'));
     setIsSignedIn(false);
     window.location.href = '/';
   }
@@ -73,7 +78,7 @@ export default function NesioProfileCard() {
       const avatar = await readAvatarFile(file);
       saveProfileSettings({ avatarUrl: avatar, avatarStoragePath: '' });
     } catch {
-      setAvatarError('头像没有保存，请选择一张较小的图片。');
+      setAvatarError(L(dict, '头像没有保存，请选择一张较小的图片。', "Avatar wasn't saved — try a smaller image."));
     }
   }
 
@@ -100,7 +105,7 @@ export default function NesioProfileCard() {
           <button
             type="button"
             className="nesio-profile-avatar-lg"
-            aria-label="上传头像"
+            aria-label={L(dict, '上传头像', 'Upload avatar')}
             onClick={() => avatarInputRef.current?.click()}
           >
             {avatarUrl ? <img src={avatarUrl} alt="" draggable={false} onError={refreshAvatar} /> : initials}
@@ -114,8 +119,8 @@ export default function NesioProfileCard() {
           />
           {/* 批次 6:数字统计改「返回今天」——设置页最常见的下一步;
               洞察(原 mirror)从主页左上角 logo 进,不再从这里开 */}
-          <a href="/" className="nesio-profile-stat" aria-label="返回今天">
-            <span className="nesio-profile-stat-label" style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--portal-blue-deep)' }}>返回今天</span>
+          <a href="/" className="nesio-profile-stat" aria-label={L(dict, '返回今天', 'Back to Today')}>
+            <span className="nesio-profile-stat-label" style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--portal-blue-deep)' }}>{L(dict, '返回今天', 'Back to Today')}</span>
           </a>
         </div>
         {avatarError && <p className="nesio-profile-avatar-error">{avatarError}</p>}
@@ -123,19 +128,19 @@ export default function NesioProfileCard() {
         {/* Auth status */}
         {!isSignedIn && (
           <a href="/login" className="nesio-profile-auth-banner">
-            <span>登录以跨设备同步 Memory</span>
+            <span>{L(dict, '登录以跨设备同步 Memory', 'Sign in to sync Memory across devices')}</span>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14"><path d="M9 18l6-6-6-6"/></svg>
           </a>
         )}
         {isSignedIn && (
           <button type="button" className="nesio-profile-auth-banner" onClick={handleLogout}>
-            <span>退出登录</span>
+            <span>{L(dict, '退出登录', 'Sign out')}</span>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14"><path d="M15 18l6-6-6-6"/><path d="M21 12H9"/></svg>
           </button>
         )}
 
         {/* Menu */}
-        <nav className="nesio-profile-menu" aria-label="设置菜单">
+        <nav className="nesio-profile-menu" aria-label={L(dict, '设置菜单', 'Settings menu')}>
           {menuItems.map((item) => (
             <button key={String(item.key)} type="button" className="nesio-profile-menu-item" onClick={() => setActiveSheet(item.key)}>
               <span className="nesio-profile-menu-icon" style={{ background: item.iconBg }}>{item.icon}</span>

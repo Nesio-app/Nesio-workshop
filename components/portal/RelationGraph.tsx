@@ -7,6 +7,9 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { L } from '@/lib/portal/i18n';
+import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
+import { usePortalLocale } from './use-portal-locale';
 import { buildLayout, type GEdge, type GNode, type GNodePos } from '@/lib/platform/graph-engine';
 
 interface Props {
@@ -37,8 +40,10 @@ export default function RelationGraph({
   height = 280,
   focusId,
   onNodeClick,
-  emptyText = '暂无关联节点',
+  emptyText,
 }: Props) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
+  const resolvedEmptyText = emptyText ?? L(dict, '暂无关联节点', 'No connections yet');
   const [hovered, setHovered] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(focusId ?? null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -60,7 +65,7 @@ export default function RelationGraph({
     return (
       <div className="rg-empty">
         <span className="rg-empty-icon">◎</span>
-        <p className="rg-empty-text">{emptyText}</p>
+        <p className="rg-empty-text">{resolvedEmptyText}</p>
       </div>
     );
   }

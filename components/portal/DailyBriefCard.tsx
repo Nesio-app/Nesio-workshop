@@ -25,6 +25,12 @@ const DEMO_BRIEF_SCRIPT =
   '你昨天记过要提前整理三个重点,放在了会议笔记里。' +
   '另外,Linda 的生日还有五天,你存过一个礼物灵感。' +
   '登录之后,这里播的就是你自己的今天。';
+const DEMO_BRIEF_SCRIPT_EN =
+  "Good morning. This is a sample brief — a taste of how Nesio starts your day with you. " +
+  "It's 22 degrees and sunny; you can leave the coat at home. Product review at ten — " +
+  "yesterday you noted three points to prepare, they're in your meeting notes. " +
+  "Also, Linda's birthday is in five days and you saved a gift idea. " +
+  "Once you sign in, this becomes your own day.";
 interface BriefCache { date: string; script: string; }
 
 function todayKey(): string {
@@ -125,7 +131,7 @@ export default function DailyBriefCard({
 
   async function playWithBrowserTTS(script: string): Promise<void> {
     if (typeof window === 'undefined' || !window.speechSynthesis) {
-      setErrorMsg('语音不可用，请配置 OpenAI TTS 或使用支持语音的浏览器');
+      setErrorMsg(L(dict, '语音不可用，请配置 OpenAI TTS 或使用支持语音的浏览器', 'Voice unavailable — configure OpenAI TTS or use a browser with speech support'));
       setPlayState('error');
       return;
     }
@@ -150,7 +156,7 @@ export default function DailyBriefCard({
       // 每个异步动作必有可见失败态。8s 内没开播就明确报错。
       const watchdog = setTimeout(() => {
         window.speechSynthesis.cancel();
-        setErrorMsg('语音引擎没有响应，请稍后再试');
+        setErrorMsg(L(dict, '语音引擎没有响应，请稍后再试', 'Speech engine not responding — try again later'));
         setPlayState('error');
         resolve();
       }, 8000);
@@ -173,7 +179,7 @@ export default function DailyBriefCard({
       utterance.onerror = (e) => {
         clearTimeout(watchdog);
         if (e.error === 'interrupted') { resolve(); return; } // intentional stop
-        setErrorMsg('浏览器语音播放失败');
+        setErrorMsg(L(dict, '浏览器语音播放失败', 'Browser speech playback failed'));
         setPlayState('error');
         if (progressRef.current) clearInterval(progressRef.current);
         resolve();
@@ -254,7 +260,7 @@ export default function DailyBriefCard({
       });
       const data = await res.json() as { ok?: boolean; script?: string };
       if (!data.ok || !data.script) {
-        setErrorMsg('简报生成失败，请重试');
+        setErrorMsg(L(dict, '简报生成失败，请重试', 'Brief generation failed — try again'));
         setPlayState('error');
         return;
       }
@@ -263,7 +269,7 @@ export default function DailyBriefCard({
       setCachedScript(script);
       await playScript(script);
     } catch {
-      setErrorMsg('网络错误，请重试');
+      setErrorMsg(L(dict, '网络错误，请重试', 'Network error — try again'));
       setPlayState('error');
     }
   }
@@ -287,7 +293,7 @@ export default function DailyBriefCard({
       if (playState === 'playing' || playState === 'paused') { togglePause(); return; }
       stopAll();
       setProgress(0);
-      void playWithBrowserTTS(DEMO_BRIEF_SCRIPT);
+      void playWithBrowserTTS(L(dict, DEMO_BRIEF_SCRIPT, DEMO_BRIEF_SCRIPT_EN));
       return;
     }
     track('brief_play', { state: playState });
@@ -404,12 +410,12 @@ export default function DailyBriefCard({
     return (
       <div className="nesio-brief-strip">
         <span className="nesio-brief-strip-label">
-          {playState === 'playing' ? '▶ 示例简报播放中' : <><IconSpeaker size={13} /> 每日简报</>}
+          {playState === 'playing' ? L(dict, '▶ 示例简报播放中', '▶ Sample brief playing') : <><IconSpeaker size={13} /> {L(dict, '每日简报', 'Daily brief')}</>}
         </span>
         <button type="button" className="nesio-brief-strip-btn" onClick={handlePlay}>
-          {playState === 'playing' ? '暂停' : '试听示例'}
+          {playState === 'playing' ? L(dict, '暂停', 'Pause') : L(dict, '试听示例', 'Play sample')}
         </button>
-        <a href="/login" className="nesio-brief-strip-btn" style={{ opacity: 0.75 }}>登录听自己的</a>
+        <a href="/login" className="nesio-brief-strip-btn" style={{ opacity: 0.75 }}>{L(dict, '登录听自己的', 'Sign in for yours')}</a>
       </div>
     );
   }

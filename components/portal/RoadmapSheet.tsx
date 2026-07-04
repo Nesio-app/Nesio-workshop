@@ -10,7 +10,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ROADMAP_ITEMS } from '@/lib/portal/roadmap';
 import { track } from '@/lib/portal/telemetry';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
-import { t } from '@/lib/portal/i18n';
+import { L, t } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 
@@ -86,12 +86,12 @@ export default function RoadmapSheet({ open, onClose }: { open: boolean; onClose
   if (!open) return null;
   return (
     <div className="nesio-settings-sheet-overlay" role="dialog" aria-modal="true" aria-label={t(locale, 'roadmapTitle')}>
-      <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label="关闭" />
+      <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
       <div className="nesio-settings-sheet-card">
         <div className="nesio-sheet-handle" aria-hidden />
         <div className="nesio-settings-sheet-header">
           <h2 className="nesio-settings-sheet-title">{t(locale, 'roadmapTitle')}</h2>
-          <button type="button" className="nesio-voice-sheet-close" onClick={onClose} aria-label="关闭">✕</button>
+          <button type="button" className="nesio-voice-sheet-close" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}>✕</button>
         </div>
         <div className="nesio-settings-sheet-body">
           <p style={{ fontSize: '0.75rem', color: 'var(--portal-muted)', margin: '0 0 0.8rem' }}>

@@ -31,7 +31,7 @@ import {
   type LivingModelLayer,
   type LivingModelLayerId,
 } from '@/lib/platform/living-model';
-import { IconBox, IconCheckCircle, IconClock, IconSnowflake, IconTarget, IconUser } from './icons';
+import { IconBox, IconCheckCircle, IconClock, IconGear, IconSnowflake, IconTarget, IconUser } from './icons';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
@@ -1145,7 +1145,7 @@ export default function InsightsSheet({ onClose }: { onClose: () => void }) {
                 onClick={() => setShowCustomizer(true)}
                 title={L(dict, '自定义显示模块', 'Customize modules')}
               >
-                {L(dict, '⚙ 自定义', '⚙ Customize')}
+                <IconGear size={13} /> {L(dict, '自定义', 'Customize')}
               </button>
             </div>
 
@@ -1158,7 +1158,7 @@ export default function InsightsSheet({ onClose }: { onClose: () => void }) {
             {/* Dynamic widgets */}
             {activeWidgets.length === 0 && (
               <p className="nesio-insights-empty" style={{ marginTop: '2rem' }}>
-                {L(dict, '还没有选择任何模块 · 点击「⚙ 自定义」来添加', 'No modules yet · tap "⚙ Customize" to add')}
+                {L(dict, '还没有选择任何模块 · 点击「自定义」来添加', 'No modules yet · tap "Customize" to add')}
               </p>
             )}
 

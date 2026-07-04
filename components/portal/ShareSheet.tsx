@@ -46,23 +46,24 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
   }, [open]);
 
   function buildPendingImageParsed(): ParsedResult {
+    // 批次 12:名称/摘要按保存时界面语言生成;tags/status 是数据层标记,维持中文
     return {
-      title: '图片线索待确认',
-      summary: '已先整理为一条图片线索。登录或 Lab 模式后，Nesio 会自动识别图中物品、人物和场景。',
+      title: L(dict, '图片线索待确认', 'Image clue to confirm'),
+      summary: L(dict, '已先整理为一条图片线索。登录或 Lab 模式后，Nesio 会自动识别图中物品、人物和场景。', 'Saved as an image clue for now. Sign in or use Lab mode and Nesio will recognize objects, people and scenes.'),
       intent: 'MEMORY_CAPTURE',
       people: [],
       nodes: [
         {
           type: 'object',
-          name: '图片线索待确认',
+          name: L(dict, '图片线索待确认', 'Image clue to confirm'),
           attributes: {
             status: '待确认',
-            note: '这张图片已保存为待确认线索。',
+            note: L(dict, '这张图片已保存为待确认线索。', 'This image is saved as a clue to confirm.'),
           },
           relations: [],
           tags: ['图片', '待确认'],
           confidence: 0.45,
-          rawInput: '图片待确认',
+          rawInput: L(dict, '图片待确认', 'Image to confirm'),
         },
       ],
     };

@@ -9,6 +9,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { searchLifeGraphFuzzy, type LifeNode } from '@/lib/portal/life-graph';
+import { L } from '@/lib/portal/i18n';
+import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
+import { usePortalLocale } from './use-portal-locale';
 
 // ── Hook ─────────────────────────────────────────────────────────────────────
 
@@ -50,14 +53,14 @@ export function useMemoryFlash() {
 
 // ── UI component ─────────────────────────────────────────────────────────────
 
-function timeAgo(iso: string): string {
+function timeAgo(iso: string, dict: string): string {
   const ms = Date.now() - new Date(iso).getTime();
   const days = Math.floor(ms / 86_400_000);
-  if (days < 1) return '今天';
-  if (days < 7) return `${days} 天前`;
-  if (days < 30) return `${Math.floor(days / 7)} 周前`;
-  if (days < 365) return `${Math.floor(days / 30)} 个月前`;
-  return `${Math.floor(days / 365)} 年前`;
+  if (days < 1) return L(dict, '今天', 'today');
+  if (days < 7) return L(dict, `${days} 天前`, `${days}d ago`);
+  if (days < 30) return L(dict, `${Math.floor(days / 7)} 周前`, `${Math.floor(days / 7)}w ago`);
+  if (days < 365) return L(dict, `${Math.floor(days / 30)} 个月前`, `${Math.floor(days / 30)}mo ago`);
+  return L(dict, `${Math.floor(days / 365)} 年前`, `${Math.floor(days / 365)}y ago`);
 }
 
 interface Props {
@@ -66,6 +69,7 @@ interface Props {
 }
 
 export default function MemoryFlashBanner({ nodes, onDismiss }: Props) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [visible, setVisible] = useState(false);
 
   // Animate in
@@ -87,12 +91,12 @@ export default function MemoryFlashBanner({ nodes, onDismiss }: Props) {
       aria-live="polite"
     >
       <div className="mem-flash-header">
-        <span className="mem-flash-label">你还记得…</span>
+        <span className="mem-flash-label">{L(dict, '你还记得…', 'Remember this…')}</span>
         <button
           type="button"
           className="mem-flash-close"
           onClick={onDismiss}
-          aria-label="关闭关联提示"
+          aria-label={L(dict, '关闭关联提示', 'Dismiss related note')}
         >
           ✕
         </button>
@@ -110,7 +114,7 @@ export default function MemoryFlashBanner({ nodes, onDismiss }: Props) {
                 </p>
               )}
             </div>
-            <span className="mem-flash-node-time">{timeAgo(node.createdAt)}</span>
+            <span className="mem-flash-node-time">{timeAgo(node.createdAt, dict)}</span>
           </div>
         ))}
       </div>

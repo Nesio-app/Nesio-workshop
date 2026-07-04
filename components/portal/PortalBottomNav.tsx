@@ -2,7 +2,8 @@
 
 import { useRef } from 'react';
 import type { PortalLocale } from '@/lib/portal/profile';
-import { t } from '@/lib/portal/i18n';
+import { L, t } from '@/lib/portal/i18n';
+import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 
 interface PortalBottomNavProps {
   activeSurface: 'today' | 'tell' | 'memory';
@@ -49,7 +50,7 @@ export default function PortalBottomNav({
   };
 
   return (
-    <nav className="nesio-bottom-nav" aria-label="主导航">
+    <nav className="nesio-bottom-nav" aria-label={L(portalLocaleToDictionaryLocale(locale), '主导航', 'Main navigation')}>
       {/* Today */}
       <button
         type="button"
@@ -69,7 +70,7 @@ export default function PortalBottomNav({
       <button
         type="button"
         className="nesio-bottom-nav-center"
-        aria-label="记录 / 问一问"
+        aria-label={L(portalLocaleToDictionaryLocale(locale), '记录 / 问一问', 'Capture / Ask')}
         onPointerDown={startPress}
         onPointerUp={endPress}
         onPointerLeave={cancelPress}

@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { getNamedPlaces, type NamedPlace } from '@/lib/portal/named-places';
+import { L } from '@/lib/portal/i18n';
+import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
+import { usePortalLocale } from './use-portal-locale';
 
 interface LocationPickerProps {
   value: string;
@@ -37,6 +40,7 @@ function parseValue(value: string, places: NamedPlace[]): { place: NamedPlace | 
 }
 
 export default function LocationPicker({ value, onChange, className }: LocationPickerProps) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [places, setPlaces] = useState<NamedPlace[]>([]);
   const [selectedPlace, setSelectedPlace] = useState<NamedPlace | null>(null);
   const [selectedRoom, setSelectedRoom] = useState('');
@@ -134,7 +138,7 @@ export default function LocationPicker({ value, onChange, className }: LocationP
         <input
           className="nesio-loc-free-input"
           value={freeText}
-          placeholder="输入位置…"
+          placeholder={L(dict, '输入位置…', 'Enter a place…')}
           onChange={(e) => { setFreeText(e.target.value); onChange(e.target.value); }}
         />
         {places.length > 0 && (
@@ -154,11 +158,11 @@ export default function LocationPicker({ value, onChange, className }: LocationP
         value={selectedPlace?.id ?? ''}
         onChange={(e) => handlePlaceChange(e.target.value)}
       >
-        <option value="">选择地点…</option>
+        <option value="">{L(dict, '选择地点…', 'Pick a place…')}</option>
         {places.map((p) => (
           <option key={p.id} value={p.id}>{p.emoji} {p.name}</option>
         ))}
-        <option value="__free__">✏️ 自定义输入</option>
+        <option value="__free__">{L(dict, '自定义输入', 'Custom entry')}</option>
       </select>
 
       {/* Level 2 — room */}
@@ -168,7 +172,7 @@ export default function LocationPicker({ value, onChange, className }: LocationP
             <input
               className="nesio-loc-free-input"
               value={customRoom}
-              placeholder="输入区域名称…"
+              placeholder={L(dict, '输入区域名称…', 'Enter an area…')}
               onChange={(e) => handleCustomRoomChange(e.target.value)}
               autoFocus
             />
@@ -182,11 +186,11 @@ export default function LocationPicker({ value, onChange, className }: LocationP
             value={selectedRoom}
             onChange={(e) => handleRoomChange(e.target.value)}
           >
-            <option value="">区域…</option>
+            <option value="">{L(dict, '区域…', 'Area…')}</option>
             {selectedPlace.rooms.map((r) => (
               <option key={r} value={r}>{r}</option>
             ))}
-            <option value="__custom__">✏️ 自定义…</option>
+            <option value="__custom__">{L(dict, '自定义…', 'Custom…')}</option>
           </select>
         )
       )}
@@ -198,7 +202,7 @@ export default function LocationPicker({ value, onChange, className }: LocationP
             <input
               className="nesio-loc-free-input"
               value={customSubRoom}
-              placeholder="输入具体位置…"
+              placeholder={L(dict, '输入具体位置…', 'Enter a spot…')}
               onChange={(e) => handleCustomSubRoomChange(e.target.value)}
               autoFocus
             />
@@ -212,11 +216,11 @@ export default function LocationPicker({ value, onChange, className }: LocationP
             value={selectedSubRoom}
             onChange={(e) => handleSubRoomChange(e.target.value)}
           >
-            <option value="">具体位置…</option>
+            <option value="">{L(dict, '具体位置…', 'Spot…')}</option>
             {subRooms.map((s) => (
               <option key={s} value={s}>{s}</option>
             ))}
-            <option value="__custom__">✏️ 自定义…</option>
+            <option value="__custom__">{L(dict, '自定义…', 'Custom…')}</option>
           </select>
         )
       )}
