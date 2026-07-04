@@ -11,13 +11,14 @@ import { getMirrorProfile } from '@/lib/portal/mirror-profile';
 import { L, t } from '@/lib/portal/i18n';
 import { usePortalLocale } from './use-portal-locale';
 import { IconChevronRight, IconHalfMoon, IconLink, IconLock, IconMoon, IconShield, IconSun } from './icons';
+import { InfoTip } from './InfoTip';
 import { PROACTIVE_LEVEL_KEY } from './today/proactive-types';
 import { deleteLifeNode, getLifeGraph } from '@/lib/portal/life-graph';
 import { buildFullBackup, isValidBackup, restoreFullBackup } from '@/lib/portal/full-backup';
 
 interface SheetProps { open: boolean; onClose: () => void; }
 
-function SheetWrap({ open, onClose, title, children }: SheetProps & { title: string; children: React.ReactNode }) {
+function SheetWrap({ open, onClose, title, tip, children }: SheetProps & { title: string; tip?: string; children: React.ReactNode }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   if (!open) return null;
   return (
@@ -26,7 +27,7 @@ function SheetWrap({ open, onClose, title, children }: SheetProps & { title: str
       <div className="nesio-settings-sheet-card">
         <div className="nesio-sheet-handle" aria-hidden />
         <div className="nesio-settings-sheet-header">
-          <h2 className="nesio-settings-sheet-title">{title}</h2>
+          <h2 className="nesio-settings-sheet-title">{title}{tip && <InfoTip text={tip} />}</h2>
           <button type="button" className="nesio-voice-sheet-close" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}>✕</button>
         </div>
         <div className="nesio-settings-sheet-body">{children}</div>
@@ -122,8 +123,7 @@ export function GeneralSheet({ open, onClose }: SheetProps) {
   ];
 
   return (
-    <SheetWrap open={open} onClose={onClose} title={t(locale, 'generalTitle')}>
-      <p className="nesio-settings-sheet-desc">{t(locale, 'generalDesc')}</p>
+    <SheetWrap open={open} onClose={onClose} title={t(locale, 'generalTitle')} tip={t(locale, 'generalDesc')}>
 
       {/* 偏好组(批次 10:语气/示例/提醒程度/触感全部折叠进偏好,头部显示当前值) */}
       <button type="button" className="nesio-settings-option" onClick={() => setPrefsOpen((v) => !v)} aria-expanded={prefsOpen}>
@@ -185,7 +185,7 @@ export function GeneralSheet({ open, onClose }: SheetProps) {
       </button>
       </>)}
 
-      <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{t(locale, 'sectionAppearance')}</p>
+      <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{t(locale, 'sectionAppearance')}<InfoTip text={t(locale, 'generalAutoHint')} /></p>
       <div style={{ display: 'flex', gap: '0.5rem' }}>
         {themeOpts.map((opt) => (
           <button key={opt.id} type="button"
@@ -197,9 +197,8 @@ export function GeneralSheet({ open, onClose }: SheetProps) {
           </button>
         ))}
       </div>
-      <p className="nesio-settings-option-hint" style={{ marginTop: 4 }}>{t(locale, 'generalAutoHint')}</p>
 
-      <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{t(locale, 'sectionLanguage')}</p>
+      <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{t(locale, 'sectionLanguage')}<InfoTip text={t(locale, 'langSoonHint')} /></p>
       {/* 批次 5:下拉选择,只开放字典已完成的语言(真实有效红线:不给不生效的选项) */}
       <select
         value={locale}
@@ -218,7 +217,6 @@ export function GeneralSheet({ open, onClose }: SheetProps) {
           ))}
         </optgroup>
       </select>
-      <p className="nesio-settings-option-hint" style={{ marginTop: 4 }}>{t(locale, 'langSoonHint')}</p>
 
     </SheetWrap>
   );

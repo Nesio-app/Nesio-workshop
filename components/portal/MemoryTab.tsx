@@ -39,6 +39,7 @@ import type { GNode, GEdge } from '@/lib/platform/graph-engine';
 import { DomainIcon, IconBox, IconCalendar, IconFolder, IconMapPin, IconUser, NodeTypeIcon, IconMap } from './icons';
 import { L, type DictLocale } from '@/lib/portal/i18n';
 import { displayNodeName } from '@/lib/portal/node-display';
+import { InfoTip } from './InfoTip';
 import { usePortalLocale } from './use-portal-locale';
 
 /** 组件内取字典语言(批次 9 全量双语的局部 hook)。 */
@@ -1093,6 +1094,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
           {cloudSyncSummary.failedCount === 0 && cloudSyncSummary.pendingCount > 0 && (
             <div className="nesio-memory-sync-status">
               {copy.syncPending(cloudSyncSummary.pendingCount)}
+              <InfoTip text={L(dict, '这些记录已安全存在本机,还没备份到云端;登录且网络正常时会自动上传,不影响使用。', "These are safely stored on this device and not yet backed up to the cloud; they upload automatically when you're signed in and online.")} />
             </div>
           )}
           {cloudSyncSummary.failedCount === 0 && cloudSyncSummary.pendingCount === 0 && cloudSyncSummary.syncedCount > 0 && (

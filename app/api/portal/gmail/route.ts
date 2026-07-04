@@ -119,7 +119,16 @@ async function fetchMessages(accessToken: string, max = 10, metadataOnly = true)
     `${GMAIL_API}/users/me/messages?maxResults=${max}&q=newer_than:7d`,
     { headers: { Authorization: `Bearer ${accessToken}` } },
   );
-  if (!listRes.ok) throw new Error(`gmail_list_${listRes.status}`);
+  if (!listRes.ok) {
+    // 403 有两种截然不同的病因,把 Google 的 reason 带出来一锤定音:
+    // accessNotConfigured = GCP 项目没启用 Gmail API;insufficientPermissions = token 缺 scope
+    let reason = '';
+    try {
+      const body = await listRes.json() as { error?: { errors?: Array<{ reason?: string }>; status?: string; message?: string } };
+      reason = body.error?.errors?.[0]?.reason || body.error?.status || '';
+    } catch { /* body 不是 JSON 就算了 */ }
+    throw new Error(`gmail_list_${listRes.status}${reason ? `:${reason}` : ''}`);
+  }
 
   const listData = await listRes.json() as { messages?: Array<{ id: string }> };
   const ids = listData.messages || [];
@@ -254,8 +263,15 @@ export async function GET(req: NextRequest) {
     // 403 = token 有效但没有 gmail scope(旧的日历授权借来的 token)——
     // 唯一出路是走 /api/portal/gmail/connect 重新同意(带双 scope + prompt=consent)
     if (lastError.includes('403')) {
+      // API 未启用是管理台问题,重新授权解决不了——分开报
+      const apiDisabled = lastError.includes('accessNotConfigured') || lastError.includes('SERVICE_DISABLED');
       return NextResponse.json(
-        { ok: false, error: 'insufficient_scope', connectUrl: '/api/portal/gmail/connect' },
+        {
+          ok: false,
+          error: apiDisabled ? 'gmail_api_disabled' : 'insufficient_scope',
+          detail: lastError,
+          connectUrl: '/api/portal/gmail/connect',
+        },
         { status: 403 },
       );
     }

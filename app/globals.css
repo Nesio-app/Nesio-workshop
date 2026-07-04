@@ -17526,6 +17526,26 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 }
 .nesio-narrator-section > .nesio-narrator-card:nth-child(3) { grid-column: 1 / -1; }
 
+/* 批次 17:InfoTip ——标题后的 ? 说明图标,长文案收纳 */
+.nesio-infotip { position: relative; display: inline-flex; vertical-align: middle; margin-left: 0.3rem; }
+.nesio-infotip-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; min-width: 22px; min-height: 22px;
+  border: none; background: none; padding: 0; cursor: pointer;
+  color: var(--portal-muted); opacity: 0.8;
+}
+.nesio-infotip-pop {
+  /* 从 ? 图标向右展开:标题类宿主都靠左,右伸不会出屏 */
+  position: absolute; top: calc(100% + 6px); left: 0;
+  width: max-content; max-width: min(270px, 78vw);
+  background: var(--sheet-opaque, #fdfeff);
+  border: 1px solid var(--portal-line);
+  border-radius: 10px; padding: 0.5rem 0.7rem;
+  font-size: 0.72rem; font-weight: 400; line-height: 1.55;
+  color: var(--portal-muted); text-align: left; white-space: normal;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.22); z-index: 60;
+}
+
 /* 批次 15:narrator 指标卡——标题小字,数量大号 */
 .nesio-narrator-card .nesio-narrator-body {
   font-size: 2rem;

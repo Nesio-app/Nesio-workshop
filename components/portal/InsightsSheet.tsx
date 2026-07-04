@@ -35,6 +35,7 @@ import { IconBox, IconCheckCircle, IconClock, IconGear, IconSnowflake, IconTarge
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
+import { InfoTip } from './InfoTip';
 import { getFreezeItems } from '@/lib/platform/impulse-guard';
 
 function loadFreezeLedger(): { total: number; skipped: number; bought: number } {
@@ -745,10 +746,9 @@ function LivingModelTab({
             {enough
               ? L(dict, '记录够了，点一下生成你的认知模型。', 'Enough notes — tap once to build your mind model.')
               : L(dict, `已记录 ${nodeCount} / 10 条，记满后 Nesio 开始推断。`, `${nodeCount} / 10 notes — Nesio starts inferring at 10.`)}
+            <InfoTip text={L(dict, '每条结论都带证据和置信度，可校正;类型分布/领域/完成率/活跃时段等行为统计交给 AI 推断,新增 8 条或 7 天后自动更新。', 'Every conclusion is evidence-backed, confidence-scored and correctable. Behavior stats (types / domains / completion / active hours) go to AI inference; refreshes after 8 new notes or 7 days.')} />
           </p>
-          <p className="nesio-lm-empty-hint">
-            {L(dict, '每条结论都带证据和置信度，可校正。', 'Every conclusion is evidence-backed, confidence-scored, correctable.')}
-          </p>
+
           {enough && (
             <button type="button" className="nesio-lm-perspective-btn" style={{ marginTop: '0.6rem' }} onClick={() => onRefresh()}>
               {L(dict, '生成模型', 'Build model')}
@@ -786,11 +786,14 @@ function LivingModelTab({
 
   return (
     <div className="nesio-lm-tab">
-      <p className="nesio-lm-subtitle">{L(dict, '来自你的记录，每条结论都可校正。', 'From your notes — every conclusion is correctable.')}</p>
+      <p className="nesio-lm-subtitle">
+        {L(dict, '来自你的记录，每条结论都可校正。', 'From your notes — every conclusion is correctable.')}
+        <InfoTip text={L(dict, '算法：类型分布 / 领域 / 完成率 / 活跃时段等行为统计交给 AI 推断；新增 8 条记录或 7 天后自动更新；你的 ✓ / ✗ 会进入下一次生成。', 'How it works: behavior stats (types / domains / completion / active hours) go to AI inference; refreshes after 8 new notes or 7 days; your ✓ / ✗ feeds the next run.')} />
+      </p>
 
       {/* 认知关系图 */}
       <div className="nesio-insights-section" style={{ marginTop: 'var(--space-2)' }}>
-        <p className="nesio-insights-section-label">{L(dict, '认知关系图', 'Cognition graph')}</p>
+        <p className="nesio-insights-section-label">{L(dict, '认知关系图', 'Cognition graph')}<InfoTip text={L(dict, '把认知模型的各层结论连成图:点任一节点展开它所属的维度详情。', 'Your mind-model conclusions as a graph — tap a node to expand its layer.')} /></p>
         <RelationGraph
           nodes={buildModelGraphNodes(model, dict)}
           edges={buildModelGraphEdges(model, dict)}
@@ -907,9 +910,6 @@ function LivingModelTab({
           ↺
         </button>
       </div>
-      <p className="nesio-lm-algo-hint">
-        {L(dict, '算法：类型分布 / 领域 / 完成率 / 活跃时段等行为统计交给 AI 推断；新增 8 条记录或 7 天后自动更新；你的 ✓ / ✗ 会进入下一次生成。', 'How it works: behavior stats (types / domains / completion / active hours) go to AI inference; refreshes after 8 new notes or 7 days; your ✓ / ✗ feeds the next run.')}
-      </p>
 
       {showPerspectiveSheet && (
         <PerspectiveSheet
@@ -1068,8 +1068,8 @@ export default function InsightsSheet({ onClose }: { onClose: () => void }) {
       {/* Header */}
       <div className="nesio-insights-header">
         <div className="nesio-insights-title-row">
-          <span className="nesio-insights-icon">✦</span>
-          <h2 className="nesio-insights-title">{L(dict, 'Nesio 的了解', 'What Nesio knows')}</h2>
+          {/* 批次 17:星星去掉,改名「洞察 / Insight」 */}
+          <h2 className="nesio-insights-title">{L(dict, '洞察', 'Insight')}</h2>
         </div>
         <button type="button" className="nesio-insights-close" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}>✕</button>
       </div>
@@ -1174,7 +1174,7 @@ export default function InsightsSheet({ onClose }: { onClose: () => void }) {
 
             {/* Life Civilization Map — hero visual */}
             <div className="nesio-insights-section" style={{ marginTop: 'var(--space-3)' }}>
-              <p className="nesio-insights-section-label">{L(dict, '生命版图', 'Life map')}</p>
+              <p className="nesio-insights-section-label">{L(dict, '生命版图', 'Life map')}<InfoTip text={L(dict, '五个领域(关系/事业/健康/成长/自我)的地形图:领土宽度由记录的意义密度决定(置信度+关联数+标签),不是数量;地形随时间演变,自动标出最大迁移。', 'A terrain of five domains (ties/work/health/growth/self). Territory width reflects meaning density (confidence + connections + tags), not count; it evolves over time and flags the biggest shift.')} /></p>
               <LifeCivilizationMap nodes={allNodes} />
             </div>
 

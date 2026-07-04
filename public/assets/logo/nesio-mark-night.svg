@@ -4,19 +4,19 @@
        此前本文件与日间版完全相同,夜间从未真正差异化。 -->
   <defs>
     <linearGradient id="gn1" x1="0.15" y1="0" x2="0.8" y2="1">
-      <stop offset="0" stop-color="#dcebff" stop-opacity="0.92"></stop>
-      <stop offset="0.45" stop-color="#8fb4e8" stop-opacity="0.82"></stop>
-      <stop offset="1" stop-color="#41669f" stop-opacity="0.85"></stop>
+      <stop offset="0" stop-color="#b9d2f0" stop-opacity="0.6"></stop>
+      <stop offset="0.45" stop-color="#6f93c6" stop-opacity="0.55"></stop>
+      <stop offset="1" stop-color="#33507e" stop-opacity="0.65"></stop>
     </linearGradient>
     <linearGradient id="gn2" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#eaf3ff" stop-opacity="0.75"></stop>
+      <stop offset="0" stop-color="#dcebff" stop-opacity="0.4"></stop>
       <stop offset="1" stop-color="#eaf3ff" stop-opacity="0.06"></stop>
     </linearGradient>
   </defs>
   <polygon points="50,10 84.6,30 84.6,70 50,90 15.4,70 15.4,30" fill="url(#gn1)"></polygon>
   <path d="M15.35898384862245,30.000000000000004 L50,10 L84.64101615137756,30.000000000000004 L50,50 Z" fill="url(#gn2)"></path>
   <path d="M15.35898384862245,70 L50,50 L84.64101615137756,70 L50,90 Z" fill="#20395f" opacity="0.55"></path>
-  <g stroke="#d5e3f8" stroke-opacity="0.9" stroke-width="1.6" stroke-linejoin="round" fill="none">
+  <g stroke="#a9c3e8" stroke-opacity="0.7" stroke-width="1.4" stroke-linejoin="round" fill="none">
     <polygon points="50,10 84.6,30 84.6,70 50,90 15.4,70 15.4,30"></polygon>
     <path d="M15.35898384862245,30.000000000000004 L50,50 L84.64101615137756,30.000000000000004 M50,50 L50,90"></path>
   </g>
