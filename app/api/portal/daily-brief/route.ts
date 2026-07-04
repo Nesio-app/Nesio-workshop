@@ -16,6 +16,8 @@ function envValue(key: string): string {
 }
 
 interface BriefRequest {
+  /** 设置→偏好→语气(warm/direct/minimal),同样作用于简报口吻 */
+  coachStyle?: string;
   displayName: string;
   weather?: { temperatureC?: number; condition?: string; forecastNote?: string; placeLabel?: string };
   /** Reverse-geocoded city label from the device, e.g. "Cary, NC" */
@@ -128,6 +130,11 @@ export async function POST(req: NextRequest) {
     ? `记忆提示：\n${memoryNotes.slice(0, 3).map((n) => `• ${n}`).join('\n')}`
     : '';
 
+  const toneLine = ({
+    warm: '温暖、自然、像熟悉你的朋友在说话。用"你"，不用"您"',
+    direct: '直接、简短、信息密度高，先说结论不绕弯，不用客套话',
+    minimal: '极简。只报关键事项，每件事一句话，不加修饰和过渡',
+  } as Record<string, string>)[body.coachStyle ?? 'warm'] ?? '温暖、自然、像熟悉你的朋友在说话。用"你"，不用"您"';
   const prompt = `你是 Nesio，用户的私人 AI 助理。现在用播客主持人的口吻，给用户播报今天的早/晚间简报。
 
 【用户信息】
@@ -140,7 +147,7 @@ ${emailSection}
 ${memorySection}
 
 【播报要求】
-- 语气：温暖、自然、像熟悉你的朋友在说话。用"你"，不用"您"
+- 语气：${toneLine}
 - 长度：纯文字 120-180 字，适合朗读 40-60 秒
 - 结构：开场问候 → 天气一句（如有）→ 最重要的 1-2 个日程细说 → 邮件/记忆亮点（如有） → 一句暖心收尾
 - 注意：如果没有日程，用积极的方式说"今天是自由时间"；不要机械列举，要自然串联

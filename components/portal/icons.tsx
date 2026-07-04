@@ -70,6 +70,7 @@ export const IconPlay = make(<path d="M7 4.5v15l12-7.5z" fill="currentColor" str
 export const IconGlobe = make(<><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a14.5 14.5 0 0 1 0 18 14.5 14.5 0 0 1 0-18z" /></>);
 export const IconHome = make(<><path d="m3 10 9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><path d="M9 22v-8h6v8" /></>);
 export const IconTrendingUp = make(<><path d="m2 17 7-7 4 4 9-9" /><path d="M15 5h7v7" /></>);
+export const IconTrendingDown = make(<><path d="m2 7 7 7 4-4 9 9" /><path d="M15 19h7v-7" /></>);
 export const IconZap = make(<path d="M13 2 3 14h7l-1 8 10-12h-7z" />);
 export const IconBalloon = make(<><ellipse cx="12" cy="9" rx="6.5" ry="7.5" /><path d="M12 16.5c-.6 1 .6 1.5 0 2.5-.5.9-1.5 1.2-1.5 3" /></>);
 export const IconCloud = make(<path d="M17.5 19a4.5 4.5 0 0 0 .4-9A7 7 0 0 0 4.3 12.4 4 4 0 0 0 6 20h11.5z" />);

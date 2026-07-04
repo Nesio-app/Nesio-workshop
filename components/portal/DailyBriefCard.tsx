@@ -244,6 +244,8 @@ export default function DailyBriefCard({
           weather: env.weather,
           location: env.location?.label || undefined,
           events, emailHighlights, memoryNotes,
+          // 设置→偏好→语气 同样作用于简报口吻(批次 5「真实有效」)
+          coachStyle: loadProfileSettings().coachStyle || 'warm',
         }),
       });
       const data = await res.json() as { ok?: boolean; script?: string };

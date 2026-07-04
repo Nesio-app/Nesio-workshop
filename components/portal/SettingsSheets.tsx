@@ -40,6 +40,8 @@ type ToneStyle = 'direct' | 'warm' | 'minimal';
 type InterruptLevel = 'proactive' | 'minimal' | 'silent';
 type ThemeChoice = 'day' | 'auto' | 'night';
 const HAPTIC_FEEDBACK_KEY = 'nesio-haptic-feedback-enabled-v1';
+// 字典真实覆盖的语言 — 翻译完成一种开放一种(下拉里其余禁用,不给假选项)
+const READY_LOCALES = new Set<string>(['zh', 'en']);
 const THEME_KEY = 'treasurebox-theme';
 
 // Mirror of the anti-flash boot script in app/layout.tsx — keep in sync.
@@ -121,6 +123,10 @@ export function GeneralSheet({ open, onClose }: SheetProps) {
     <SheetWrap open={open} onClose={onClose} title={t(locale, 'generalTitle')}>
       <p className="nesio-settings-sheet-desc">{t(locale, 'generalDesc')}</p>
 
+      {/* 偏好组:语气 + 提醒程度(批次 5:归组 + 说明真实作用面) */}
+      <p className="nesio-settings-section-label" style={{ fontSize: '0.8rem', color: 'var(--portal-ink)' }}>{t(locale, 'sectionPreferences')}</p>
+      <p className="nesio-settings-option-hint" style={{ margin: '0 0 0.6rem' }}>{t(locale, 'sectionPreferencesHint')}</p>
+
       <p className="nesio-settings-section-label">{t(locale, 'sectionTone')}</p>
       {toneOpts.map((opt) => (
         <button key={opt.id} type="button"
@@ -133,6 +139,13 @@ export function GeneralSheet({ open, onClose }: SheetProps) {
           {tone === opt.id && <span className="nesio-settings-option-check">✓</span>}
         </button>
       ))}
+      {/* 实时示例:让人一眼看出三种语气的差别 */}
+      <div style={{ background: 'rgba(88,140,227,0.06)', border: '1px solid var(--portal-line)', borderRadius: '0.75rem', padding: '0.55rem 0.75rem', marginTop: '0.35rem' }}>
+        <p style={{ fontSize: '0.66rem', color: 'var(--portal-muted)', margin: '0 0 0.2rem' }}>{t(locale, 'toneExampleLabel')}</p>
+        <p style={{ fontSize: '0.78rem', color: 'var(--portal-ink)', margin: 0, lineHeight: 1.55 }}>
+          {tone === 'warm' ? t(locale, 'toneExampleWarm') : tone === 'direct' ? t(locale, 'toneExampleDirect') : t(locale, 'toneExampleMinimal')}
+        </p>
+      </div>
 
       <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{t(locale, 'sectionReminders')}</p>
       {levelOpts.map((opt) => (
@@ -162,17 +175,25 @@ export function GeneralSheet({ open, onClose }: SheetProps) {
       <p className="nesio-settings-option-hint" style={{ marginTop: 4 }}>{t(locale, 'generalAutoHint')}</p>
 
       <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{t(locale, 'sectionLanguage')}</p>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.45rem' }}>
-        {PORTAL_LOCALE_OPTIONS.map(([code, label]) => (
-          <button key={code} type="button"
-            className={`nesio-settings-option${locale === code ? ' nesio-settings-option--active' : ''}`}
-            style={{ justifyContent: 'center', padding: '0.55rem 0.3rem' }}
-            onClick={() => pickLang(code)}>
-            <span className="nesio-settings-option-label" style={{ fontSize: '0.78rem' }}>{label}</span>
-          </button>
-        ))}
-      </div>
-      <p className="nesio-settings-option-hint" style={{ marginTop: 4 }}>{t(locale, 'languageFallbackNote')}</p>
+      {/* 批次 5:下拉选择,只开放字典已完成的语言(真实有效红线:不给不生效的选项) */}
+      <select
+        value={locale}
+        onChange={(e) => pickLang(e.target.value as PortalLocale)}
+        aria-label={t(locale, 'sectionLanguage')}
+        style={{ width: '100%', minHeight: 'var(--tap-min)', borderRadius: '0.75rem', border: '1.5px solid var(--portal-line)', background: 'var(--glass-bg-solid)', color: 'var(--portal-ink)', fontSize: '0.88rem', padding: '0.55rem 0.75rem', outline: 'none', fontFamily: 'inherit' }}
+      >
+        <optgroup label={t(locale, 'langGroupReady')}>
+          {PORTAL_LOCALE_OPTIONS.filter(([code]) => READY_LOCALES.has(code)).map(([code, label]) => (
+            <option key={code} value={code}>{label}</option>
+          ))}
+        </optgroup>
+        <optgroup label={t(locale, 'langGroupSoon')}>
+          {PORTAL_LOCALE_OPTIONS.filter(([code]) => !READY_LOCALES.has(code)).map(([code, label]) => (
+            <option key={code} value={code} disabled>{label}</option>
+          ))}
+        </optgroup>
+      </select>
+      <p className="nesio-settings-option-hint" style={{ marginTop: 4 }}>{t(locale, 'langSoonHint')}</p>
 
       <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{t(locale, 'sectionHaptics')}</p>
       <button type="button"

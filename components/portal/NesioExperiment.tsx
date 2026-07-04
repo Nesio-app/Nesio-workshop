@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { IconActivity, IconClock, IconTarget, IconTrendingDown, IconTrendingUp } from './icons';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -429,9 +430,39 @@ export function CreateExperimentWizard({ onSave, onCancel }: WizardProps) {
 
 // ── Log Panel ─────────────────────────────────────────────────────────────────
 
-function LogPanel({ exp, onLog }: { exp: Experiment; onLog: (iv: number, dv: number, note: string) => void }) {
-  const [iv, setIv] = useState('');
-  const [dv, setDv] = useState('');
+/** number 型变量的步进输入:上次值起步,+/- 点按,点数值可直改(批次 5 去手动填写)。 */
+function NumberStepper({ value, onChange, unit }: { value: string; onChange: (v: string) => void; unit?: string }) {
+  const [editing, setEditing] = useState(false);
+  const n = parseFloat(value);
+  const cur = Number.isNaN(n) ? 0 : n;
+  // 恒定步长 1:时刻/次数类数值居多,粗步长会打错(实测 23点−5=18)
+  const step = 1;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+      <button type="button" aria-label="减少"
+        style={{ width: 'var(--tap-min)', height: 'var(--tap-min)', borderRadius: '50%', border: '1.5px solid var(--portal-line)', background: 'var(--glass-bg-solid)', color: 'var(--portal-ink)', fontSize: '1.15rem', cursor: 'pointer' }}
+        onClick={() => onChange(String(Math.max(0, cur - step)))}>−</button>
+      {editing ? (
+        <input className="nesio-exp-log-input" type="number" autoFocus value={value}
+          style={{ width: '5.5rem', textAlign: 'center' }}
+          onChange={(e) => onChange(e.target.value)} onBlur={() => setEditing(false)} />
+      ) : (
+        <button type="button" onClick={() => setEditing(true)}
+          style={{ minWidth: '5.5rem', minHeight: 'var(--tap-min)', border: 'none', background: 'none', cursor: 'text', fontSize: '1.3rem', fontWeight: 700, color: value === '' ? 'var(--portal-muted)' : 'var(--portal-ink)' }}>
+          {value === '' ? '0' : value}{unit ? <span style={{ fontSize: '0.7rem', fontWeight: 500, color: 'var(--portal-muted)', marginLeft: 3 }}>{unit}</span> : null}
+        </button>
+      )}
+      <button type="button" aria-label="增加"
+        style={{ width: 'var(--tap-min)', height: 'var(--tap-min)', borderRadius: '50%', border: '1.5px solid var(--portal-line)', background: 'var(--glass-bg-solid)', color: 'var(--portal-ink)', fontSize: '1.15rem', cursor: 'pointer' }}
+        onClick={() => onChange(String(cur + step))}>＋</button>
+    </div>
+  );
+}
+
+export function LogPanel({ exp, onLog }: { exp: Experiment; onLog: (iv: number, dv: number, note: string) => void }) {
+  const last = exp.dataPoints[exp.dataPoints.length - 1];
+  const [iv, setIv] = useState(exp.ivType === 'number' && last ? String(last.iv) : '');
+  const [dv, setDv] = useState(exp.dvType === 'number' && last ? String(last.dv) : '');
   const [note, setNote] = useState('');
   const [scaleIv, setScaleIv] = useState(0);
   const [scaleDv, setScaleDv] = useState(0);
@@ -494,7 +525,7 @@ function LogPanel({ exp, onLog }: { exp: Experiment; onLog: (iv: number, dv: num
             ))}
           </div>
         ) : (
-          <input className="nesio-exp-log-input" type="number" placeholder="输入数值" value={iv} onChange={(e) => setIv(e.target.value)} />
+          <NumberStepper value={iv} onChange={setIv} unit={exp.ivUnit} />
         )}
       </div>
 
@@ -508,7 +539,7 @@ function LogPanel({ exp, onLog }: { exp: Experiment; onLog: (iv: number, dv: num
             ))}
           </div>
         ) : (
-          <input className="nesio-exp-log-input" type="number" placeholder="输入数值" value={dv} onChange={(e) => setDv(e.target.value)} />
+          <NumberStepper value={dv} onChange={setDv} unit={exp.dvUnit} />
         )}
       </div>
 
@@ -540,7 +571,7 @@ export function ExperimentDetail({ exp, onLog, onConclude, onDelete, onBack }: D
     <div className="nesio-exp-detail">
       <div className="nesio-exp-detail-header">
         <button type="button" className="nesio-exp-back-btn" onClick={onBack}>← 返回</button>
-        <span className="nesio-exp-detail-title">🧪 {exp.name}</span>
+        <span className="nesio-exp-detail-title">{exp.name}</span>
         {!exp.concluded && (
           <button type="button" className="nesio-exp-menu-btn" onClick={() => setShowConclude(true)}>结束实验</button>
         )}
@@ -562,8 +593,8 @@ export function ExperimentDetail({ exp, onLog, onConclude, onDelete, onBack }: D
           </div>
         </div>
         <div className="nesio-exp-vars-col">
-          <span className="nesio-exp-var-chip iv">📊 {exp.ivName}</span>
-          <span className="nesio-exp-var-chip dv">📈 {exp.dvName}</span>
+          <span className="nesio-exp-var-chip iv">{exp.ivName}</span>
+          <span className="nesio-exp-var-chip dv">{exp.dvName}</span>
         </div>
       </div>
 
@@ -596,7 +627,7 @@ export function ExperimentDetail({ exp, onLog, onConclude, onDelete, onBack }: D
       <div className={`nesio-exp-insight-block${insight.trend === 'insufficient' ? ' pending' : ''}`}>
         <div className="nesio-exp-insight-head">
           <span className="nesio-exp-insight-icon">
-            {insight.trend === 'positive' ? '📈' : insight.trend === 'negative' ? '📉' : insight.trend === 'insufficient' ? '⏳' : '〰️'}
+            {insight.trend === 'positive' ? <IconTrendingUp size={15} /> : insight.trend === 'negative' ? <IconTrendingDown size={15} /> : insight.trend === 'insufficient' ? <IconClock size={15} /> : <IconActivity size={15} />}
           </span>
           <span className="nesio-exp-insight-title">数据说明</span>
           <TrendBadge trend={insight.trend} />
@@ -698,7 +729,7 @@ function ExperimentCard({ exp, onOpen, onQuickLog }: CardProps) {
     <div className={`nesio-exp-card${exp.concluded ? ' concluded' : ''}`} onClick={onOpen}>
       <div className="nesio-exp-card-top">
         <div className="nesio-exp-card-info">
-          <span className="nesio-exp-card-name">🧪 {exp.name}</span>
+          <span className="nesio-exp-card-name">{exp.name}</span>
           <div className="nesio-exp-card-vars">
             <span className="nesio-exp-var-tag">{exp.ivName}</span>
             <span className="nesio-exp-var-arrow">→</span>
@@ -804,7 +835,7 @@ export function MyExperimentWidget() {
     <div className="nesio-exp-widget">
       {experiments.length === 0 && (
         <div className="nesio-exp-empty">
-          <p className="nesio-exp-empty-icon">🧪</p>
+          <p className="nesio-exp-empty-icon"><IconTarget size={30} /></p>
           <p className="nesio-exp-empty-title">还没有实验</p>
           <p className="nesio-exp-empty-hint">
             设定一个变量，每天记录数据，用你自己的数字看趋势。<br />
@@ -825,7 +856,7 @@ export function MyExperimentWidget() {
           {done.map((exp) => (
             <div key={exp.id} className="nesio-exp-done-row"
               onClick={() => { setDetailId(exp.id); setView('detail'); }}>
-              <span>🧪 {exp.name}</span>
+              <span>{exp.name}</span>
               <TrendBadge trend={computeInsight(exp).trend} />
             </div>
           ))}

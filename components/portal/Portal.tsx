@@ -529,7 +529,12 @@ export default function Portal() {
     if (calendarConnected) {
       // Save connector state unconditionally — doesn't require Supabase auth
       saveConnector('calendar');
-      window.dispatchEvent(new CustomEvent('nesio-connector-connected', { detail: { connector: 'calendar' } }));
+      // BUG FIX(批次 5):Gmail 授权回调同时带 calendar 参数,这里曾提前 return,
+      // 发起授权的 connector(gmail)标记永远没写 → UI 一直显示「接入」。
+      // Google 一次授权覆盖日历+邮件,两个标记一起写,合并入口 google 也写。
+      if (status === 'connected' && connector) saveConnector(connector);
+      saveConnector('google');
+      window.dispatchEvent(new CustomEvent('nesio-connector-connected', { detail: { connector: connector || 'calendar' } }));
       if (canUsePrivateRuntime) triggerCalendarRefresh();
       return;
     }

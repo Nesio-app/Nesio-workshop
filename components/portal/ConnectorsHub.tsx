@@ -29,8 +29,8 @@ interface ConnectorDef {
 
 // dev: true = 还在打磨的接入,收进「开发中」折叠组,不占主列表
 const CONNECTORS: ConnectorDef[] = [
-  { id: 'calendar', name: 'Google Calendar', icon: <IconCalendar />, iconBg: 'var(--chip-blue)', method: 'oauth', description: '读取日程，生成会议提醒和准备 Brief' },
-  { id: 'gmail', name: 'Gmail', icon: <IconMail />, iconBg: 'var(--chip-pink)', method: 'oauth', description: '你授权并选择后，整理可确认的人物、日期、承诺' },
+  // 日历和 Gmail 是同一次 Google 授权,合并为一个入口(批次 5 用户反馈)
+  { id: 'google', name: 'Google 日历 · Gmail', icon: <IconCalendar />, iconBg: 'var(--chip-blue)', method: 'oauth', description: '一次授权同时接入:日程生成提醒和简报,邮件提取人物、日期、承诺' },
   { id: 'weather', name: '地理位置 · 天气', icon: <IconCloudSun />, iconBg: 'var(--chip-amber)', method: 'geo', description: '基于实时天气生成外出和健康建议' },
   { id: 'flomo', name: 'Flomo', icon: <IconNote />, iconBg: 'var(--chip-indigo)', method: 'server', syncEndpoint: '/api/portal/flomo?limit=30', description: '同步 flomo 笔记，提取想法与记录' },
   { id: 'notion', name: 'Notion', icon: <IconBook />, iconBg: 'var(--chip-gray)', method: 'token', syncEndpoint: '/api/portal/notion', tokenHint: 'notion.so/my-integrations → 新建集成 → 复制 Internal Integration Secret，并把页面共享给它', description: '同步最近编辑的页面，提取项目与想法', dev: true },
@@ -176,8 +176,102 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     setSyncing(null);
   }
 
-  // ── OAuth sync (Gmail / Calendar) ──
+  // ── OAuth sync(google = 日历 + 邮件一起同步,结果分行展示)──
+  async function syncGoogle(c: ConnectorDef) {
+    setSyncing(c.id);
+    setOauthSyncResult((p) => ({ ...p, google: { ok: true, msg: '同步中…' } }));
+    const parts: string[] = [];
+    let allOk = true;
+    let reauth = false;
+
+    // 日历
+    try {
+      const res = await fetch('/api/portal/calendar', { cache: 'no-store' });
+      const data = await res.json() as { ok?: boolean; events?: Array<Record<string, unknown>>; error?: string; message?: string };
+      if (data.ok && data.events?.length) {
+        const count = data.events.length;
+        const { saveCalendarToLocal } = await import('@/lib/portal/calendar-local-store');
+        saveCalendarToLocal(data.events as Parameters<typeof saveCalendarToLocal>[0]);
+        const added = await saveCalendarEventsToMemory(data.events);
+        parts.push(`日历:${count} 条事件${added > 0 ? `,${added} 条加入记忆` : ''}`);
+        window.dispatchEvent(new CustomEvent('nesio-calendar-updated'));
+      } else {
+        allOk = false;
+        parts.push(`日历:没同步上(${data.message || data.error || '无事件'})`);
+      }
+    } catch { allOk = false; parts.push('日历:网络错误'); }
+
+    // 邮件
+    try {
+      const res = await fetch('/api/portal/gmail?includeBody=true&analyze=true');
+      const data = await res.json() as { ok?: boolean; nodes?: NodeInput[]; error?: string; emailCount?: number; messages?: unknown[] };
+      if (data.ok) {
+        const nodeCount = data.nodes?.length ?? 0;
+        if (nodeCount > 0) {
+          data.nodes!.forEach((n) => ingestLifeNode({ ...n, source: 'email' } as NodeInput));
+          localStorage.setItem('nesio-gmail-last-sync', String(Date.now()));
+        }
+        parts.push(`邮件:读取 ${data.emailCount ?? data.messages?.length ?? 0} 封,提取 ${nodeCount} 条`);
+      } else {
+        allOk = false;
+        const isNotConnected = data.error === 'not_connected' || data.error === 'token_expired';
+        if (isNotConnected) reauth = true;
+        parts.push(isNotConnected ? '邮件:授权已失效,需重新授权' : `邮件:同步失败(${data.error || '未知'})`);
+      }
+    } catch { allOk = false; parts.push('邮件:网络错误'); }
+
+    saveConnectorState('google', true);
+    setConnected((p) => ({ ...p, google: true }));
+    setOauthSyncResult((p) => ({ ...p, google: { ok: allOk, msg: allOk ? '同步成功' : '部分同步失败', detail: parts.join('\n'), needsReauth: reauth } }));
+    showToast(parts.join(' · '), allOk);
+    window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
+    window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
+    setSyncing(null);
+  }
+
+  async function saveCalendarEventsToMemory(events: Array<Record<string, unknown>>): Promise<number> {
+    const { getLifeGraph } = await import('@/lib/portal/life-graph');
+    const now = Date.now();
+    const windowEnd = now + 60 * 86_400_000;
+    const existingCalIds = new Set(
+      getLifeGraph().filter((n) => n.source === 'calendar')
+        .map((n) => n.attributes.calendarId as string).filter(Boolean),
+    );
+    let added = 0;
+    events.forEach((evAny) => {
+      const start = evAny.start as string | undefined;
+      const title = evAny.title as string | undefined;
+      if (!start || !title) return;
+      const t = new Date(start).getTime();
+      if (t < now - 86_400_000 || t > windowEnd) return;
+      const calId = (evAny.id as string) || `${title}-${start}`;
+      if (existingCalIds.has(calId)) return;
+      ingestLifeNode({
+        name: title,
+        type: 'event',
+        source: 'calendar',
+        confidence: 1,
+        rawInput: title,
+        tags: [(evAny.calendarName as string) || '日历'].filter(Boolean),
+        attributes: {
+          start,
+          ...(evAny.end ? { end: evAny.end as string } : {}),
+          ...(evAny.url ? { url: evAny.url as string } : {}),
+          ...(evAny.location ? { location: evAny.location as string } : {}),
+          ...(evAny.description ? { note: (evAny.description as string).slice(0, 300) } : {}),
+          calendarId: calId,
+          calendarName: (evAny.calendarName as string) || '',
+        },
+        relations: [],
+      });
+      added++;
+    });
+    return added;
+  }
+
+  // ── OAuth sync (Gmail / Calendar 旧入口,google 合并后仅内部保留) ──
   async function syncOAuth(c: ConnectorDef) {
+    if (c.id === 'google') { await syncGoogle(c); return; }
     setSyncing(c.id);
     setOauthSyncResult((p) => ({ ...p, [c.id]: { ok: true, msg: '同步中…' } }));
     try {
@@ -287,8 +381,8 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
   // ── OAuth / Geo / File ──
   function handleConnect(c: ConnectorDef) {
     if (c.comingSoon) return;
-    if (c.id === 'gmail') { window.location.href = '/api/portal/gmail/connect'; return; }
-    if (c.id === 'calendar') { window.location.href = '/api/portal/calendar/connect'; return; }
+    // 一次 Google 授权覆盖日历+邮件两个 scope(gmail/connect 请求全量 scope)
+    if (c.id === 'google') { window.location.href = '/api/portal/gmail/connect'; return; }
     if (c.method === 'geo') {
       setSyncing(c.id);
       navigator.geolocation.getCurrentPosition(
@@ -332,10 +426,11 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
 
     // Google connectors share one OAuth consent — really revoke it at
     // Google and clear the HTTP-only token cookies (both providers).
-    if (id === 'gmail' || id === 'calendar') {
-      const other = id === 'gmail' ? 'calendar' : 'gmail';
-      saveConnectorState(other, false);
-      setConnected((p) => ({ ...p, [other]: false }));
+    if (id === 'gmail' || id === 'calendar' || id === 'google') {
+      for (const g of ['google', 'gmail', 'calendar'].filter((x) => x !== id)) {
+        saveConnectorState(g, false);
+        setConnected((p) => ({ ...p, [g]: false }));
+      }
       void fetch('/api/portal/oauth/disconnect', { method: 'POST' })
         .then((r) => r.json() as Promise<{ ok?: boolean; revoked?: boolean }>)
         .then((d) => {
@@ -375,7 +470,9 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
 
         <div className="nesio-settings-sheet-body">
           {CONNECTORS.filter((c) => !c.dev).map((c) => {
-            const isConn = connected[c.id];
+            const isConn = c.id === 'google'
+              ? Boolean(connected.google || connected.calendar || connected.gmail)
+              : connected[c.id];
             const isSync = syncing === c.id;
             const cnt = counts[c.id];
             return (
@@ -393,7 +490,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
                     {oauthSyncResult[c.id] && (
                       <p className="nesio-connector-sync" style={{ color: oauthSyncResult[c.id].ok ? 'var(--status-go)' : 'var(--status-risk)', fontSize: '0.68rem', lineHeight: 1.4 }}>
                         {oauthSyncResult[c.id].msg}
-                        {oauthSyncResult[c.id].detail && <><br /><span style={{ opacity: 0.8 }}>{oauthSyncResult[c.id].detail}</span></>}
+                        {oauthSyncResult[c.id].detail && <><br /><span style={{ opacity: 0.8, whiteSpace: 'pre-line' }}>{oauthSyncResult[c.id].detail}</span></>}
                         {oauthSyncResult[c.id].needsReauth && (
                           <><br /><button type="button" style={{ marginTop: '0.25rem', fontSize: '0.68rem', color: 'var(--portal-blue-deep)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', padding: 0 }} onClick={() => handleConnect(c)}>点击重新授权 →</button></>
                         )}
@@ -471,7 +568,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
           </details>
 
           <div style={{ marginTop: '1rem', fontSize: '0.72rem', color: 'var(--portal-muted)', textAlign: 'center', lineHeight: 1.6 }}>
-            有 API 的（Gmail / Calendar / Notion / Toggl / Flomo）直接连接；<br />
+            有 API 的（Google 日历+Gmail / Notion / Toggl / Flomo）直接连接；<br />
             没有公开 API 的（提醒事项 / Keep / 微信读书）通过快捷指令推送。<br />
             所有数据仅在你的设备上处理和存储。
           </div>
