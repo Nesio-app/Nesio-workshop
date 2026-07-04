@@ -2,7 +2,8 @@
 
 > Loop-engineering 原则:状态必须活在对话之外。任何 AI 会话或新协作者
 > **先读这个文件**,再动手。改动仓库重大状态时,同步更新这里。
-> 最后更新:2026-07-04(第一期契约迁移完成)
+> 最后更新:2026-07-04(深水区批次完成:Signal M1+M2 / TodayFeed 拆分 /
+> lab UI / DEC 消歧 / Next 16;PRD 偏差见 docs/prd-deltas-2026-07.md)
 
 ## 当前纪元:两代产品交接中
 
@@ -18,7 +19,10 @@
 
 ## 进行中的迁移
 
-1. **Signal 主事实表**:createSignal() 是唯一合法写入口;LifeGraph/Memory 是兼容投影
+1. **Signal 主事实表**:两扇合法写入门 — `createSignal()`(Signal 形态)与
+   `ingestLifeNode()`(LifeNode 形态,lib/life-domain/ingest-node.ts)。
+   - M1 堵旁路写入 ✅ + M2 IDB 信号库(signal-store-idb.ts,只写积累)✅(2026-07-04)
+   - M3 读切换 / M4 LifeGraph 降级为投影:未排期
 2. **契约迁移(2026-07-04 完成)**:13 个契约已全部迁移/退役,15 个旧代死组件已删除。
    - 迁移到活 surface:tool-icons→ToolGridIcon、anonymous-gate→today-view-model、
      locale purchased-tools→ToolsTreasureSheet、color-tokens→MoodSheet EMOTIONS(顺手
@@ -36,7 +40,7 @@
   MemoryNodeDetail / TodayFeed / Portal 前先看 scripts/anonymous-private-data-gate.test.mjs
   对它们的字面断言(契约喜欢正形式门控 `if (canUsePrivateData) {`)。
 - **新增花钱/碰私据的 API route 必须过 `guardAiRoute`**(lib/portal/api-auth.ts)
-  并登记 docs/api-routes.md。
+  并登记 docs/api-routes.md。Next 16 起为 async:`const guard = await guardAiRoute(...)`。
 - **设计规则**:每个异步动作必有可见失败态;每个 modal 必有退出;红色只给真实风险;
   文案遵循设计系统"温暖教练"语音(禁感叹号/禁"逾期失败")。
 - 兄弟目录不是全是垃圾:adhd-flow-ios/web、health-web、storage-web、fitness/web、
@@ -44,10 +48,14 @@
 
 ## 已知欠账(按优先级)
 
-1. 契约迁移工程(见上)→ 迁完再删 15 个死组件
-3. 新代 i18n 完整包(REG-004 TodayFeed + REG-006 剩余 onboarding 步)— adherence lint 已上线(57 处存量 hex warn 待清)
-4. TodayFeed 1408 行(工程 PRD 阈值 <300)
-5. 深水区:LifeGraph→IndexedDB、DEC/dec-data 命名分离、Next 16、lab 模式管理 UI
+1. Signal M3/M4:读切换 + LifeGraph 降级为投影(M1/M2 已完成)
+2. 新代 i18n 完整包(REG-004 TodayFeed + REG-006 剩余 onboarding 步)— adherence lint 已上线(57 处存量 hex warn 待清)
+3. FocusSection 676 行进一步拆分(DormantReviewCard / NightTimeline)
+4. 组件阈值修订为:容器 ≤500 / 展示 ≤300(见 docs/prd-deltas-2026-07.md §2)
+
+已清偿(2026-07-04):TodayFeed 拆分(1408→容器 164 + today/ 7 文件)、
+lab 模式管理 UI(设置→隐私 sheet 开关)、DEC/dec-data 注释消歧、
+Next 16.2.10(async cookies 转正)、Signal M1+M2。
 
 ## 已安装的循环(L1 = 只报告)
 
