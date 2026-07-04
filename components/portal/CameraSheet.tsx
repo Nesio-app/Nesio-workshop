@@ -8,6 +8,9 @@ import { matchNearestPlace, formatLocation, getNamedPlaces } from '@/lib/portal/
 import LocationPicker from './LocationPicker';
 import { IconBox, IconCamera, IconImage } from './icons';
 import { PurchaseCoolingPanel } from './PurchaseCoolingPanel';
+import { L } from '@/lib/portal/i18n';
+import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
+import { usePortalLocale } from './use-portal-locale';
 
 // ── Similarity check (拍照发现已有) ────────────────────────────────────────
 
@@ -195,6 +198,7 @@ function dataUrlToFile(dataUrl: string, fileName: string): File | null {
 }
 
 export default function CameraSheet({ open, onClose, initialFile }: CameraSheetProps) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const selectCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -702,7 +706,7 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
   if (!open) return null;
 
   return (
-    <div className="nesio-camera-sheet" role="dialog" aria-modal="true" aria-label="拍一下">
+    <div className="nesio-camera-sheet" role="dialog" aria-modal="true" aria-label={L(dict, '拍一下', 'Snap')}>
       <canvas ref={canvasRef} style={{ display: 'none' }} />
       {/* Native camera — opens the iOS system camera directly (reliable, no
           persistent stream/indicator). Triggered by a user tap. */}
@@ -718,7 +722,7 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
           </svg>
         </button>
         <h2 className="nesio-camera-title">
-          {{ idle: '拍一下', live: '拍一下', captured: '处理中', analyzing: '识别中', result: '识别结果', saved: '已保存', 'no-camera': '上传图片' }[phase as 'idle' | 'live' | 'captured' | 'analyzing' | 'result' | 'saved' | 'no-camera']}
+          {L(dict, { idle: '拍一下', live: '拍一下', captured: '处理中', analyzing: '识别中', result: '识别结果', saved: '已保存', 'no-camera': '上传图片' }[phase as 'idle' | 'live' | 'captured' | 'analyzing' | 'result' | 'saved' | 'no-camera'], { idle: 'Snap', live: 'Snap', captured: 'Processing', analyzing: 'Recognizing', result: 'Results', saved: 'Saved', 'no-camera': 'Upload image' }[phase as 'idle' | 'live' | 'captured' | 'analyzing' | 'result' | 'saved' | 'no-camera'])}
         </h2>
         <div style={{ width: 40 }} />
       </div>
@@ -744,18 +748,18 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
             <span className="nesio-camera-chooser-icon" aria-hidden><IconCamera size={30} /></span>
             <p className="nesio-camera-chooser-text">
               {phase === 'idle'
-                ? '拍一张，Nesio 帮你识别并存入 Memory'
-                : '此设备不支持相机，请从相册选择'}
+                ? L(dict, '拍一张，Nesio 帮你识别并存入 Memory', 'Take a photo — Nesio recognizes it into Memory')
+                : L(dict, '此设备不支持相机，请从相册选择', 'No camera on this device — pick from Photos')}
             </p>
             <div className="nesio-camera-chooser-actions">
               {phase === 'idle' && (
                 <button type="button" className="nesio-camera-shoot-btn" onClick={openNativeCamera}>
-                  拍照
+                  {L(dict, '拍照', 'Take photo')}
                 </button>
               )}
               <button type="button" className="nesio-camera-pick-btn" onClick={handleGallery}>
                 <span className="nesio-camera-pick-btn-icon" aria-hidden><IconImage size={15} /></span>
-                相册
+                {L(dict, '相册', 'Photos')}
               </button>
             </div>
           </div>
@@ -775,7 +779,7 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
         {phase === 'analyzing' && (
           <div className="nesio-camera-recognizing" aria-live="polite">
             <span className="nesio-camera-recognizing-dot"/>
-            Nesio 正在识别…
+            {L(dict, 'Nesio 正在识别…', 'Nesio is recognizing…')}
           </div>
         )}
 
@@ -791,7 +795,7 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
         <div className="nesio-camera-result-panel">
           {isReceipt && (
             <div className="nesio-camera-receipt-banner">
-              检测到小票，已列出条目，可编辑名称或添加有效期
+              {L(dict, '检测到小票，已列出条目，可编辑名称或添加有效期', 'Receipt detected — items listed; edit names or add expiry')}
             </div>
           )}
 
@@ -814,7 +818,7 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
             <p className="nesio-camera-result-summary" style={{ margin: 0, flex: 1 }}>{result.summary}</p>
             {capturedPreview && (
               <button type="button" className="nesio-camera-select-btn" onClick={openSelection}>
-                圈选
+                {L(dict, '圈选', 'Circle')}
               </button>
             )}
           </div>
@@ -847,7 +851,7 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
                   className="nesio-camera-node-name-input"
                   value={node.name}
                   onChange={(e) => setEditedNodes((prev) => prev.map((n, j) => j === i ? { ...n, name: e.target.value } : n))}
-                  placeholder="名称"
+                  placeholder={L(dict, '名称', 'Name')}
                 />
 
                 {/* Note */}
@@ -855,7 +859,7 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
                   className="nesio-camera-node-note-input"
                   value={node.note || ''}
                   onChange={(e) => setEditedNodes((prev) => prev.map((n, j) => j === i ? { ...n, note: e.target.value } : n))}
-                  placeholder="补充一句描述…（可选）"
+                  placeholder={L(dict, '补充一句描述…（可选）', 'Add a line of description… (optional)')}
                 />
 
                 {/* Similarity alert */}

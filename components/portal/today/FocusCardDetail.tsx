@@ -9,6 +9,9 @@ import { useState } from 'react';
 import type { FocusNode, SubTask } from '@/lib/platform/view-models/today-view-model';
 import { isMeetingNode, getMeetingTime, getMeetingUrl, safeExternalUrl } from './meeting-node';
 import { IconBox, IconCalendar, IconFlag, IconHeartPulse, IconMapPin, IconStar, IconUser } from '../icons';
+import { L } from '@/lib/portal/i18n';
+import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
+import { usePortalLocale } from '../use-portal-locale';
 
 export const FOCUS_TYPE_LABEL: Record<string, string> = {
   commitment: '任务', event: '日程', object: '物品', person: '联系人',
@@ -38,6 +41,7 @@ export function FocusCardDetail({
   onFocusMode?: () => void;
   focusModeLabel?: string;
 }) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [wave, setWave] = useState<MomentumAction[]>([]);
   const [loading, setLoading] = useState(false);
   const [drillMap, setDrillMap] = useState<Map<string, MomentumAction[]>>(new Map());
@@ -155,15 +159,15 @@ export function FocusCardDetail({
       <div className="nesio-momentum-start">
         {nodeUrl && (
           <a href={safeExternalUrl(nodeUrl)} target="_blank" rel="noopener noreferrer" className="nesio-focus-meeting-link-btn">
-            直达链接
+            {L(dict, '直达链接', 'Open link')}
           </a>
         )}
         <button type="button" className="nesio-momentum-ignite-btn" onClick={() => fetchWave()}>
-          粉碎任务
+          {L(dict, '粉碎任务', 'Smash it')}
         </button>
         {onFocusMode && (
           <button type="button" className="nesio-collapsed-focus-btn" onClick={onFocusMode}>
-            {focusModeLabel ?? '聚焦'}
+            {focusModeLabel ?? L(dict, '聚焦', 'Focus')}
           </button>
         )}
       </div>

@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { PROFILE_UPDATED_EVENT, loadProfileSettings } from '@/lib/portal/profile';
+import { PROFILE_UPDATED_EVENT, loadProfileSettings, portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
+import { usePortalLocale } from './use-portal-locale';
+import { L } from '@/lib/portal/i18n';
 import { IconThermometer } from './icons';
 import { buildTodayViewModel, focusTimeHint, markFocusNodeDone, addCommitmentNode, addMeetingNotes, saveSubtasks, toggleSubtask, type FocusNode, type SubTask, type ProactiveContext, type ProactiveContextItem } from '@/lib/platform/view-models/today-view-model';
 import type { CalendarEvent } from '@/lib/portal/types';
@@ -66,7 +68,8 @@ export default function TodayFeed({
   const [focusModeNode, setFocusModeNode] = useState<FocusNode | null>(null);
 
 
-  const initials = canUsePrivateData ? (displayName.trim().slice(0, 1) || '我') : '我';
+  const uiLocale = portalLocaleToDictionaryLocale(usePortalLocale());
+  const initials = canUsePrivateData ? (displayName.trim().slice(0, 1) || L(uiLocale, '我', 'Me')) : L(uiLocale, '我', 'Me');
   const { shouldShow: showWrapped, dismiss: dismissWrapped } = useWrappedTrigger();
 
   // 设置页上传的头像同步到主页「我」按钮(PROFILE_UPDATED_EVENT 驱动)
@@ -95,9 +98,9 @@ export default function TodayFeed({
   // (历史上的今天/记忆回顾/时间段建议/小技巧),每次打开随机一张。
   const [fallbackTick, setFallbackTick] = useState(0);
   const fallbackCard = useMemo(
-    () => buildRotatingFallback(new Date(), allNodes),
+    () => buildRotatingFallback(new Date(), allNodes, uiLocale),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [allNodes, fallbackTick],
+    [allNodes, fallbackTick, uiLocale],
   );
   const showFallback = activeProactiveCards.length === 0 && cardBudget > 0
     && fallbackCard && !isProactiveCardDismissed(fallbackCard.id)
@@ -109,7 +112,7 @@ export default function TodayFeed({
         <button
           type="button"
           className="nesio-today-brand"
-          aria-label="打开 Nesio 洞察"
+          aria-label={L(uiLocale, '打开 Nesio 洞察', "Open Nesio insights")}
           onClick={() => setMirrorOpen(true)}
         >
           <img src="/assets/logo/nesio-mark.svg" alt="Nesio" className="nesio-today-brand-icon" />
@@ -126,12 +129,12 @@ export default function TodayFeed({
             type="button"
             className="nesio-header-mini-btn"
             onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-mood'))}
-            aria-label="记录此刻感受"
-            title="此刻"
+            aria-label={L(uiLocale, '记录此刻感受', 'Log how you feel')}
+            title={L(uiLocale, '此刻', 'This moment')}
           >
             <IconThermometer size={19} />
           </button>
-          <a href="/settings" className="nesio-today-avatar" aria-label="我的设置">
+          <a href="/settings" className="nesio-today-avatar" aria-label={L(uiLocale, '我的设置', 'My settings')}>
             {avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element -- 头像是运行时签名 URL,next/image 无法静态优化
               <img src={avatarUrl} alt="" className="nesio-today-avatar-img" draggable={false} />

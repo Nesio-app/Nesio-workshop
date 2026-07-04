@@ -7,12 +7,14 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { loadProfileSettings } from '@/lib/portal/profile';
+import { loadProfileSettings, portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { getEnvironment, getCachedCalendarEvents } from '@/lib/portal/environment';
 import { refreshLocation } from '@/lib/portal/location-store';
 import { track } from '@/lib/portal/telemetry';
 import type { CalendarEvent } from '@/lib/portal/types';
 import { IconAlertTriangle, IconClock, IconPlay, IconRefresh, IconSpeaker } from './icons';
+import { L } from '@/lib/portal/i18n';
+import { usePortalLocale } from './use-portal-locale';
 
 const BRIEF_CACHE_KEY = 'nesio-daily-brief-v2';
 
@@ -74,6 +76,7 @@ export default function DailyBriefCard({
   /** header 图标圆钮模式 — 只出状态图标,不占首屏版面。 */
   compact?: boolean;
 }) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [playState, setPlayState] = useState<PlayState>('idle');
   const [displayName, setDisplayName] = useState('');
   const [cachedScript, setCachedScript] = useState('');
@@ -246,6 +249,7 @@ export default function DailyBriefCard({
           events, emailHighlights, memoryNotes,
           // 设置→偏好→语气 同样作用于简报口吻(批次 5「真实有效」)
           coachStyle: loadProfileSettings().coachStyle || 'warm',
+          uiLocale: portalLocaleToDictionaryLocale(loadProfileSettings().locale),
         }),
       });
       const data = await res.json() as { ok?: boolean; script?: string };
@@ -323,8 +327,8 @@ export default function DailyBriefCard({
         type="button"
         className={`nesio-header-mini-btn${isPlaying ? ' nesio-header-mini-btn--active' : ''}`}
         onClick={handlePlay}
-        aria-label="听简报"
-        title="听简报"
+        aria-label={L(dict, '听简报', 'Play brief')}
+        title={L(dict, '听简报', 'Daily brief')}
         disabled={isLoading}
       >
         {icon}
@@ -348,12 +352,12 @@ export default function DailyBriefCard({
       : isDone ? <IconRefresh size={18} />
       : <IconSpeaker size={18} />;
 
-    const label = isPlaying ? '暂停'
-      : isLoading ? '生成中'
-      : isError ? '重试'
-      : isPaused ? '继续'
-      : isDone ? '重播'
-      : '听简报';
+    const label = isPlaying ? L(dict, '暂停', 'Pause')
+      : isLoading ? L(dict, '生成中', 'Making')
+      : isError ? L(dict, '重试', 'Retry')
+      : isPaused ? L(dict, '继续', 'Resume')
+      : isDone ? L(dict, '重播', 'Replay')
+      : L(dict, '听简报', 'Brief');
 
     return (
       // flex:1 与右侧此刻按钮平分行宽(此前缺失导致左小右长,QA P3 修复)
@@ -363,7 +367,7 @@ export default function DailyBriefCard({
           style={{ width: '100%' }}
           className={`nesio-brief-circle${isPlaying ? ' nesio-brief-circle--playing' : ''}${isError ? ' nesio-brief-circle--error' : ''}`}
           onClick={handlePlay}
-          aria-label="听今日简报"
+          aria-label={L(dict, '听今日简报', "Play today's brief")}
           disabled={isLoading}
         >
           <span className="nesio-brief-circle-icon" aria-hidden>{icon}</span>
@@ -384,12 +388,12 @@ export default function DailyBriefCard({
 
         {isDone && (
           <button type="button" onClick={handleRegenerate} style={{ marginTop: 2, fontSize: '0.58rem', color: 'var(--portal-muted)', background: 'none', border: 'none', cursor: 'pointer' }}>
-            重新生成
+            {L(dict, '重新生成', 'Regenerate')}
           </button>
         )}
 
         {ttsMode === 'browser' && (isPlaying || isDone) && (
-          <p style={{ fontSize: '0.58rem', color: 'var(--portal-muted)', marginTop: 2 }}>系统语音</p>
+          <p style={{ fontSize: '0.58rem', color: 'var(--portal-muted)', marginTop: 2 }}>{L(dict, '系统语音', 'System voice')}</p>
         )}
       </div>
     );

@@ -37,6 +37,13 @@ const MemoryNodeDetail = dynamic(() => import('./MemoryNodeDetail'), { ssr: fals
 const RelationGraph = dynamic(() => import('./RelationGraph'), { ssr: false });
 import type { GNode, GEdge } from '@/lib/platform/graph-engine';
 import { DomainIcon, IconBox, IconCalendar, IconFolder, IconMapPin, IconUser, NodeTypeIcon, IconMap } from './icons';
+import { L, type DictLocale } from '@/lib/portal/i18n';
+import { usePortalLocale } from './use-portal-locale';
+
+/** 组件内取字典语言(批次 9 全量双语的局部 hook)。 */
+function useDict(): DictLocale {
+  return portalLocaleToDictionaryLocale(usePortalLocale());
+}
 
 // ── Object Map (物品地图) ────────────────────────────────────────────────────
 
@@ -85,6 +92,7 @@ function buildLocationTree(objectNodes: LifeNode[]): { tree: LocationTree[]; unl
 }
 
 function ObjectMap({ nodes, onOpenNode }: { nodes: LifeNode[]; onOpenNode: (n: LifeNode) => void }) {
+  const dict = useDict();
   const objectNodes = nodes.filter((n) => n.type === 'object');
   const [expandedPlaces, setExpandedPlaces] = useState<Set<string>>(new Set());
   const [expandedRooms, setExpandedRooms] = useState<Set<string>>(new Set());
@@ -107,14 +115,14 @@ function ObjectMap({ nodes, onOpenNode }: { nodes: LifeNode[]; onOpenNode: (n: L
   }
 
   if (objectNodes.length === 0) {
-    return <p className="nesio-insights-empty" style={{ marginTop: '1rem' }}>暂无物品记录。拍照时选择存放位置，就能在这里看到。</p>;
+    return <p className="nesio-insights-empty" style={{ marginTop: '1rem' }}>{L(dict, '暂无物品记录。拍照时选择存放位置，就能在这里看到。', 'No items yet. Pick a storage spot when you snap a photo and it shows up here.')}</p>;
   }
 
   const allCount = objectNodes.length;
 
   return (
     <div className="nesio-object-map">
-      <p className="nesio-object-map-summary">共 {allCount} 件物品</p>
+      <p className="nesio-object-map-summary">{L(dict, `共 ${allCount} 件物品`, `${allCount} items in total`)}</p>
       {tree.map(({ place, rooms, unroomed }) => {
         const total = rooms.reduce((s, r) => s + r.subRooms.reduce((a, sr) => a + sr.items.length, 0), 0) + unroomed.length;
         const isOpen = expandedPlaces.has(place);
@@ -122,7 +130,7 @@ function ObjectMap({ nodes, onOpenNode }: { nodes: LifeNode[]; onOpenNode: (n: L
           <div key={place} className="nesio-object-map-place">
             <button type="button" className="nesio-object-map-row nesio-object-map-row--place" onClick={() => togglePlace(place)}>
               <span className="nesio-object-map-label">{place}</span>
-              <span className="nesio-object-map-count">{total}件</span>
+              <span className="nesio-object-map-count">{total}{L(dict, '件', '')}</span>
               <span className="nesio-object-map-chevron">{isOpen ? '▴' : '▾'}</span>
             </button>
             {isOpen && (
@@ -135,7 +143,7 @@ function ObjectMap({ nodes, onOpenNode }: { nodes: LifeNode[]; onOpenNode: (n: L
                     <div key={room} className="nesio-object-map-room">
                       <button type="button" className="nesio-object-map-row nesio-object-map-row--room" onClick={() => toggleRoom(roomKey)}>
                         <span className="nesio-object-map-label" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><IconFolder size={13} /> {room}</span>
-                        <span className="nesio-object-map-count">{roomCount}件</span>
+                        <span className="nesio-object-map-count">{roomCount}{L(dict, '件', '')}</span>
                         <span className="nesio-object-map-chevron">{isRoomOpen ? '▴' : '▾'}</span>
                       </button>
                       {isRoomOpen && (
@@ -169,8 +177,8 @@ function ObjectMap({ nodes, onOpenNode }: { nodes: LifeNode[]; onOpenNode: (n: L
       {unlocated.length > 0 && (
         <div className="nesio-object-map-place">
           <button type="button" className="nesio-object-map-row nesio-object-map-row--place" onClick={() => togglePlace('__unlocated__')}>
-            <span className="nesio-object-map-label" style={{ color: 'var(--portal-muted)' }}>未定位</span>
-            <span className="nesio-object-map-count">{unlocated.length}件</span>
+            <span className="nesio-object-map-label" style={{ color: 'var(--portal-muted)' }}>{L(dict, '未定位', 'Unplaced')}</span>
+            <span className="nesio-object-map-count">{unlocated.length}{L(dict, '件', '')}</span>
             <span className="nesio-object-map-chevron">{expandedPlaces.has('__unlocated__') ? '▴' : '▾'}</span>
           </button>
           {expandedPlaces.has('__unlocated__') && (
@@ -194,10 +202,17 @@ const TYPE_BG: Record<string, string> = {
   person: 'var(--chip-indigo)', object: 'var(--chip-blue)', place: 'var(--chip-green)',
   event: 'var(--chip-amber)', commitment: 'var(--chip-violet)', health_state: 'var(--chip-pink)', preference: 'var(--chip-mint)',
 };
-const TYPE_LABEL: Record<string, string> = {
+const TYPE_LABEL_ZH: Record<string, string> = {
   person: '人物', object: '物品', place: '地点',
   event: '事件', commitment: '承诺', health_state: '健康', preference: '偏好',
 };
+const TYPE_LABEL_EN: Record<string, string> = {
+  person: 'People', object: 'Items', place: 'Places',
+  event: 'Events', commitment: 'Promises', health_state: 'Health', preference: 'Tastes',
+};
+function typeLabel(t: string, dict: DictLocale): string {
+  return (dict === 'en' ? TYPE_LABEL_EN : TYPE_LABEL_ZH)[t] ?? t;
+}
 const TYPE_ORDER = ['person', 'object', 'place', 'event', 'commitment', 'health_state', 'preference'];
 
 const PROJECT_EMOJIS = ['📁', '🏠', '✈️', '🎯', '📚', '💪', '🎂', '🛠️', '🌱', '💡'];
@@ -304,25 +319,25 @@ function isIntimateNode(node: LifeNode): boolean {
   return tags.includes('moment') || tags.includes('journal') || tags.includes('feeling');
 }
 
-function cleanMemoryPreview(node: LifeNode): string {
+function cleanMemoryPreview(node: LifeNode, dict: DictLocale = 'zh'): string {
   if (isIntimateNode(node)) {
-    const d = new Date(node.createdAt).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' });
-    return `一段 ${d} 的心情记录 · 点开查看`;
+    const d = new Date(node.createdAt).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'numeric', day: 'numeric' });
+    return L(dict, `一段 ${d} 的心情记录 · 点开查看`, `A mood entry from ${d} · tap to view`);
   }
   const raw = node.rawInput || Object.values(node.attributes).join(' · ');
   return raw
     .replace(node.name, '')
     .replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?/g, (v) => {
       const d = new Date(v);
-      return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+      return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'short', day: 'numeric' });
     })
     .replace(/\s+/g, ' ')
     .replace(/^[\s:：·,-]+/, '')
     .trim()
-    .slice(0, 44) || '来自你的记录';
+    .slice(0, 44) || L(dict, '来自你的记录', 'From your notes');
 }
 
-function getNodeTypeMeta(node: LifeNode) {
+function getNodeTypeMeta(node: LifeNode, dict: DictLocale = 'zh') {
   const a = node.attributes;
   const str = (v: unknown) => (typeof v === 'string' && v ? v : '');
   switch (node.type) {
@@ -336,7 +351,7 @@ function getNodeTypeMeta(node: LifeNode) {
     }
     case 'commitment': {
       const dueStr = str(a.dueDate) || str(a.due) || str(a.date);
-      return { extra: dueStr ? `截止 ${new Date(dueStr).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })}` : '' };
+      return { extra: dueStr ? L(dict, `截止 ${new Date(dueStr).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })}`, `Due ${new Date(dueStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`) : '' };
     }
     case 'object': {
       const loc = str(a.location) || str(a.where) || str(a.place) || str(a.storage);
@@ -379,12 +394,13 @@ function shareTextForNode(node: LifeNode): string {
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function OnThisDayStrip({ nodes, onOpen }: { nodes: LifeNode[]; onOpen: (n: LifeNode) => void }) {
-  const label = new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' });
+  const dict = useDict();
+  const label = new Date().toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'long', day: 'numeric' });
   return (
     <div className="nesio-otd-wrap">
       <div className="nesio-otd-header">
         <span className="nesio-otd-icon"><IconCalendar size={14} /></span>
-        <span className="nesio-otd-label">历史上的今天 · {label}</span>
+        <span className="nesio-otd-label">{L(dict, '历史上的今天', 'On this day')} · {label}</span>
       </div>
       <div className="nesio-otd-scroll">
         {nodes.map((n) => (
@@ -399,6 +415,7 @@ function OnThisDayStrip({ nodes, onOpen }: { nodes: LifeNode[]; onOpen: (n: Life
 }
 
 function NarratorCardView({ card, onOpen }: { card: NarratorCard; onOpen: (n: LifeNode) => void }) {
+  const dict = useDict();
   const colorMap: Record<string, string> = {
     remember: 'var(--portal-accent)',
     commitment: 'var(--status-gentle)',
@@ -416,7 +433,7 @@ function NarratorCardView({ card, onOpen }: { card: NarratorCard; onOpen: (n: Li
           className="nesio-narrator-link"
           onClick={() => onOpen(card.nodes[0])}
         >
-          查看详情 →
+          {L(dict, '查看详情', 'Details')} →
         </button>
       )}
     </div>
@@ -436,15 +453,16 @@ function LongPressSheet({
   onShare: () => void;
   onClose: () => void;
 }) {
+  const dict = useDict();
   const activeProjects = projects.filter((p) => p.status === 'active');
   return (
     <>
-      <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label="关闭" />
+      <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
       <div className="nesio-longpress-sheet">
         <div className="nesio-longpress-node-name">{node.name}</div>
         {activeProjects.length > 0 && (
           <>
-            <div className="nesio-longpress-section-label">加入项目</div>
+            <div className="nesio-longpress-section-label">{L(dict, '加入项目', 'Add to project')}</div>
             {activeProjects.map((p) => (
               <button
                 key={p.id}
@@ -458,18 +476,19 @@ function LongPressSheet({
           </>
         )}
         {activeProjects.length === 0 && (
-          <p className="nesio-longpress-no-projects">还没有项目，先新建一个项目</p>
+          <p className="nesio-longpress-no-projects">{L(dict, '还没有项目，先新建一个项目', 'No projects yet — create one first')}</p>
         )}
         <button type="button" className="nesio-longpress-share-btn" onClick={() => { onShare(); onClose(); }}>
-          分享 / 复制
+          {L(dict, '分享 / 复制', 'Share / Copy')}
         </button>
-        <button type="button" className="nesio-longpress-cancel-btn" onClick={onClose}>取消</button>
+        <button type="button" className="nesio-longpress-cancel-btn" onClick={onClose}>{L(dict, '取消', 'Cancel')}</button>
       </div>
     </>
   );
 }
 
 function MemoryCard({ node, onOpen, onDeleted, onLongPress }: { node: LifeNode; onOpen: () => void; onDeleted: () => void; onLongPress?: () => void }) {
+  const dict = useDict();
   const startX = useRef(0);
   const startY = useRef(0);
   const swiped = useRef(false);
@@ -489,7 +508,7 @@ function MemoryCard({ node, onOpen, onDeleted, onLongPress }: { node: LifeNode; 
     } catch { /* user cancelled */ }
   }
 
-  const { extra, badge, badgeColor } = getNodeTypeMeta(node);
+  const { extra, badge, badgeColor } = getNodeTypeMeta(node, dict);
   const isPerson = node.type === 'person';
   const { initials, bg: avatarBg } = isPerson ? getPersonInitials(node.name) : { initials: '', bg: '' };
   const domain = nodeDomain(node);
@@ -521,12 +540,12 @@ function MemoryCard({ node, onOpen, onDeleted, onLongPress }: { node: LifeNode; 
       onPointerCancel={clearTimer}
       onPointerLeave={clearTimer}
       onContextMenu={(e) => { e.preventDefault(); shareNode(); }}
-      aria-label={`${node.name}，左滑删除，长按分享`}
+      aria-label={`${node.name}${L(dict, ',左滑删除,长按分享', ' — swipe left to delete, long-press to share')}`}
     >
       <span className="nesio-memory-card-title" title={node.name}>{smartCardTitle(node.name)}</span>
       {extra && <span className="nesio-memory-card-extra">{extra}</span>}
       {badge && <span className="nesio-memory-card-status-badge" style={{ background: badgeColor }}>{badge}</span>}
-      {!extra && !badge && <span className="nesio-memory-card-sub">{cleanMemoryPreview(node)}</span>}
+      {!extra && !badge && <span className="nesio-memory-card-sub">{cleanMemoryPreview(node, dict)}</span>}
       {/* 批次 8:只留符号不留文字 — 类型 chip 与领域 chip 等大;
           来源文字 chip(日历/Gmail)与类型图标重复,移除 */}
       <span className="nesio-memory-card-meta-row">
@@ -548,13 +567,14 @@ function MemoryCard({ node, onOpen, onDeleted, onLongPress }: { node: LifeNode; 
 }
 
 function ProjectCard({ project, allNodes, onClick }: { project: Project; allNodes: LifeNode[]; onClick: () => void }) {
+  const dict = useDict();
   const count = project.nodeIds.filter((id) => allNodes.some((n) => n.id === id)).length;
   return (
     <button type="button" className="nesio-project-card" onClick={onClick}>
       <span className="nesio-project-card-name">{project.name}</span>
       <span className="nesio-project-card-meta">
         <span className="nesio-project-card-emoji">{project.emoji}</span>
-        <span className="nesio-project-card-count">{count} 条</span>
+        <span className="nesio-project-card-count">{count} {L(dict, '条', 'items')}</span>
       </span>
     </button>
   );
@@ -574,6 +594,7 @@ function ProjectDetailSheet({
   onOpenNode: (n: LifeNode) => void;
 }) {
   const nodes = allNodes.filter((n) => project.nodeIds.includes(n.id));
+  const dict = useDict();
 
   return (
     <>
@@ -585,12 +606,12 @@ function ProjectDetailSheet({
           <button type="button" className="nesio-voice-sheet-close" onClick={onClose}>✕</button>
         </div>
         <div className="nesio-project-detail-stats">
-          <span>{nodes.length} 条记录</span>
+          <span>{nodes.length} {L(dict, '条记录', 'entries')}</span>
           <span>·</span>
-          <span>{nodes.filter((n) => n.type === 'commitment').length} 个承诺</span>
+          <span>{nodes.filter((n) => n.type === 'commitment').length} {L(dict, '个承诺', 'promises')}</span>
         </div>
         {nodes.length === 0 ? (
-          <p className="nesio-project-detail-empty">还没有记录。在记忆卡片里长按可以加入项目。</p>
+          <p className="nesio-project-detail-empty">{L(dict, '还没有记录。在记忆卡片里长按可以加入项目。', 'Nothing here yet. Long-press a memory card to add it.')}</p>
         ) : (
           <div className="nesio-memory-grid" style={{ padding: '0 1rem 1rem' }}>
             {nodes.map((n) => (
@@ -604,7 +625,7 @@ function ProjectDetailSheet({
             className="nesio-project-delete-btn"
             onClick={() => { onDelete(); onClose(); }}
           >
-            删除项目
+            {L(dict, '删除项目', 'Delete project')}
           </button>
         </div>
       </div>
@@ -619,6 +640,7 @@ function CreateProjectSheet({
   onClose: () => void;
   onCreate: (name: string, emoji: string) => void;
 }) {
+  const dict = useDict();
   const [name, setName] = useState('');
   const [emoji, setEmoji] = useState('📁');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -630,7 +652,7 @@ function CreateProjectSheet({
       <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label="关闭" />
       <div className="nesio-create-project-sheet">
         <div className="nesio-create-project-header">
-          <span>新建项目</span>
+          <span>{L(dict, '新建项目', 'New project')}</span>
           <button type="button" className="nesio-voice-sheet-close" onClick={onClose}>✕</button>
         </div>
         <div className="nesio-create-project-emoji-row">
@@ -648,7 +670,7 @@ function CreateProjectSheet({
         <input
           ref={inputRef}
           className="nesio-create-project-input"
-          placeholder='项目名称，比如"装修"、"妈妈生日"…'
+          placeholder={L(dict, '项目名称，比如"装修"、"妈妈生日"…', 'Project name, e.g. "Renovation", "Mom\'s birthday"…')}
           value={name}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) { onCreate(name.trim(), emoji); onClose(); } }}
@@ -659,7 +681,7 @@ function CreateProjectSheet({
           disabled={!name.trim()}
           onClick={() => { if (name.trim()) { onCreate(name.trim(), emoji); onClose(); } }}
         >
-          创建
+          {L(dict, '创建', 'Create')}
         </button>
       </div>
     </>
@@ -726,7 +748,8 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [longPressNode, setLongPressNode] = useState<LifeNode | null>(null);
 
-  const copy = COPY[portalLocaleToDictionaryLocale(locale)];
+  const dict = portalLocaleToDictionaryLocale(locale);
+  const copy = COPY[dict];
 
   const readNodes = useCallback(
     () => {
@@ -795,7 +818,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
   }, [canUsePrivateData, selectedNode]);
 
   // Narrator cards
-  const narratorCards = useMemo(() => buildNarratorCards(nodes), [nodes]);
+  const narratorCards = useMemo(() => buildNarratorCards(nodes, dict), [nodes, dict]);
 
   // Smart search (text/entity rank, synchronous)
   const { nodes: textRankedNodes, understood } = useMemo(
@@ -855,7 +878,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
         <div className="nesio-memory-scroll">
           {nodes.some(isDemoNode) && (
             <div style={{ background: 'var(--portal-accent-soft, rgba(88,140,227,0.1))', borderRadius: 12, padding: '0.55rem 0.9rem', margin: '0 0 0.6rem', fontSize: '0.72rem', color: 'var(--portal-blue-deep)', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span>这些是示例数据,让你看看 Nesio 记东西的样子。<a href="/login" style={{ color: 'inherit', fontWeight: 600 }}>登录</a>或直接开始记录,就会换成你自己的。</span>
+              <span>{L(dict, '这些是示例数据,让你看看 Nesio 记东西的样子。', 'Sample data to show how Nesio remembers. ')}<a href="/login" style={{ color: 'inherit', fontWeight: 600 }}>{L(dict, '登录', 'Sign in')}</a>{L(dict, '或直接开始记录,就会换成你自己的。', ' or just start noting — it becomes yours.')}</span>
             </div>
           )}
 
@@ -879,7 +902,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
           {/* AI understood */}
           {isSearching && hasUnderstoodEntities && (
             <div className="nesio-search-understood" aria-live="polite">
-              <span className="nesio-search-understood-label">理解为</span>
+              <span className="nesio-search-understood-label">{L(dict, '理解为', 'Understood as')}</span>
               {understood.people.map((p) => <span key={p} className="nesio-search-understood-chip"><IconUser size={11} /> {p}</span>)}
               {understood.places.map((p) => <span key={p} className="nesio-search-understood-chip"><IconMapPin size={11} /> {p}</span>)}
               {understood.objects.map((o) => <span key={o} className="nesio-search-understood-chip"><IconBox size={11} /> {o}</span>)}
@@ -930,7 +953,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                     ))}
                   </div>
                 ) : (
-                  <p className="nesio-projects-empty">创建项目，把相关记录聚在一起</p>
+                  <p className="nesio-projects-empty">{L(dict, '创建项目，把相关记录聚在一起', 'Create a project to group related notes')}</p>
                 )}
               </div>
 
@@ -942,7 +965,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                     <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
                       {typeFilter && (
                         <button type="button" className="nesio-section-action" onClick={() => setTypeFilter(null)}>
-                          清除筛选
+                          {L(dict, '清除筛选', 'Clear filter')}
                         </button>
                       )}
 
@@ -966,7 +989,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                         className={`nesio-type-chip${typeFilter === t && !showObjectMap ? ' is-active' : ''}`}
                         onClick={() => { setTypeFilter((prev) => (prev === t ? null : t)); setShowObjectMap(false); }}
                       >
-                        <NodeTypeIcon type={t} size={12} /> {TYPE_LABEL[t]}
+                        <NodeTypeIcon type={t} size={12} /> {typeLabel(t, dict)}
                         <span className="nesio-type-chip-count">{typeCounts[t]}</span>
                       </button>
                     ))}
@@ -976,7 +999,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                         className={`nesio-type-chip${showObjectMap ? ' is-active' : ''}`}
                         onClick={() => { setShowObjectMap((prev) => !prev); setTypeFilter(null); setShowRelationGraph(false); }}
                       >
-                        <IconMap size={12} /> 地图
+                        <IconMap size={12} /> {L(dict, '地图', 'Map')}
                       </button>
                     )}
                     <button
@@ -984,7 +1007,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                       className={`nesio-type-chip${showRelationGraph ? ' is-active' : ''}`}
                       onClick={() => { setShowRelationGraph(prev => !prev); setShowObjectMap(false); setTypeFilter(null); }}
                     >
-                      ◎ 关联图
+                      ◎ {L(dict, '关联图', 'Graph')}
                     </button>
                   </div>
                 </>
@@ -1021,7 +1044,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                   const n = nodes.find(x => x.id === id);
                   if (n) openNodeDetail(n);
                 }}
-                emptyText="暂无记忆节点"
+                emptyText={L(dict, '暂无记忆节点', 'No memory nodes yet')}
               />
             </div>
           )}

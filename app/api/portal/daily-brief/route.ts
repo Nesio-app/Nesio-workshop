@@ -18,6 +18,7 @@ function envValue(key: string): string {
 interface BriefRequest {
   /** 设置→偏好→语气(warm/direct/minimal),同样作用于简报口吻 */
   coachStyle?: string;
+  uiLocale?: string;
   displayName: string;
   weather?: { temperatureC?: number; condition?: string; forecastNote?: string; placeLabel?: string };
   /** Reverse-geocoded city label from the device, e.g. "Cary, NC" */
@@ -135,7 +136,10 @@ export async function POST(req: NextRequest) {
     direct: '直接、简短、信息密度高，先说结论不绕弯，不用客套话',
     minimal: '极简。只报关键事项，每件事一句话，不加修饰和过渡',
   } as Record<string, string>)[body.coachStyle ?? 'warm'] ?? '温暖、自然、像熟悉你的朋友在说话。用"你"，不用"您"';
-  const prompt = `你是 Nesio，用户的私人 AI 助理。现在用播客主持人的口吻，给用户播报今天的早/晚间简报。
+  const langLine = body.uiLocale === 'en'
+    ? '\n- Deliver the entire briefing in natural spoken English (the user\'s interface language).'
+    : '';
+  const prompt = `你是 Nesio，用户的私人 AI 助理。现在用播客主持人的口吻，给用户播报今天的早/晚间简报。${langLine}
 
 【用户信息】
 姓名：${displayName || '你'}

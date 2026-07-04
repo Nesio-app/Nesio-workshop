@@ -12,6 +12,9 @@ import dynamic from 'next/dynamic';
 import { addToFreeze } from '@/lib/platform/impulse-guard';
 import { track } from '@/lib/portal/telemetry';
 import { IconSnowflake } from './icons';
+import { L } from '@/lib/portal/i18n';
+import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
+import { usePortalLocale } from './use-portal-locale';
 
 const FreezeVaultSheet = dynamic(() => import('./FreezeVaultSheet'), { ssr: false });
 
@@ -26,6 +29,7 @@ export function PurchaseCoolingPanel({ productName, similarCount, similarExample
   similarCount: number;
   similarExample?: string;
 }) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [expanded, setExpanded] = useState(false);
   const [price, setPrice] = useState('');
   const [wage, setWage] = useState('');
@@ -45,13 +49,13 @@ export function PurchaseCoolingPanel({ productName, similarCount, similarExample
 
   // 劝说文案:规则生成,信息都来自真实数据(已有几件 + 时薪换算)
   const persuasion: string[] = [];
-  if (similarCount > 0) persuasion.push(`你已经记录过 ${similarCount} 件类似的${similarExample ? `(比如「${similarExample}」)` : ''}。`);
+  if (similarCount > 0) persuasion.push(L(dict, `你已经记录过 ${similarCount} 件类似的${similarExample ? `(比如「${similarExample}」)` : ''}。`, `You already logged ${similarCount} similar item${similarCount > 1 ? 's' : ''}${similarExample ? ` (e.g. "${similarExample}")` : ''}.`));
   if (hours > 0) {
     persuasion.push(hours >= 8
-      ? `这一件 ≈ 你 ${hours.toFixed(1)} 小时的工资——超过一整个工作日。`
-      : `这一件 ≈ 你 ${hours.toFixed(1)} 小时的工资。`);
+      ? L(dict, `这一件 ≈ 你 ${hours.toFixed(1)} 小时的工资——超过一整个工作日。`, `This ≈ ${hours.toFixed(1)} hours of your pay — more than a full workday.`)
+      : L(dict, `这一件 ≈ 你 ${hours.toFixed(1)} 小时的工资。`, `This ≈ ${hours.toFixed(1)} hours of your pay.`));
   }
-  persuasion.push('冻 24 小时,明天还想要就买,大多数冲动过一晚就凉了。');
+  persuasion.push(L(dict, '冻 24 小时,明天还想要就买,大多数冲动过一晚就凉了。', 'Freeze it 24 hours. If you still want it tomorrow, buy it — most impulses cool overnight.'));
 
   function freeze() {
     addToFreeze({ url: '', title: productName, price: price ? `¥${price}` : undefined, freezeHours: 24 });
@@ -66,8 +70,8 @@ export function PurchaseCoolingPanel({ productName, similarCount, similarExample
   if (decided === 'frozen') {
     return (
       <div className="nesio-cooling-panel">
-        <p className="nesio-cooling-done">已冻住「{productName.slice(0, 18)}」24 小时。解冻时 Today 会提醒你做决定。</p>
-        <button type="button" className="nesio-cooling-link" onClick={() => setVaultOpen(true)}>查看冷冻清单</button>
+        <p className="nesio-cooling-done">{L(dict, `已冻住「${productName.slice(0, 18)}」24 小时。解冻时 Today 会提醒你做决定。`, `"${productName.slice(0, 18)}" frozen for 24h. Today will remind you when it thaws.`)}</p>
+        <button type="button" className="nesio-cooling-link" onClick={() => setVaultOpen(true)}>{L(dict, '查看冷冻清单', 'View freeze list')}</button>
         <FreezeVaultSheet open={vaultOpen} onClose={() => setVaultOpen(false)} />
       </div>
     );
@@ -75,7 +79,7 @@ export function PurchaseCoolingPanel({ productName, similarCount, similarExample
   if (decided === 'buying') {
     return (
       <div className="nesio-cooling-panel">
-        <p className="nesio-cooling-done">好,买得开心。记得把价格记进来,月底能看到花在哪。</p>
+        <p className="nesio-cooling-done">{L(dict, '好,买得开心。记得把价格记进来,月底能看到花在哪。', 'OK, enjoy it. Log the price so month-end shows where money went.')}</p>
       </div>
     );
   }
@@ -83,17 +87,17 @@ export function PurchaseCoolingPanel({ productName, similarCount, similarExample
   if (!expanded) {
     return (
       <button type="button" className="nesio-cooling-trigger" onClick={() => setExpanded(true)}>
-        <IconSnowflake size={14} /> 想买这个?先算一笔账
+        <IconSnowflake size={14} /> {L(dict, '想买这个?先算一笔账', 'Want this? Run the numbers first')}
       </button>
     );
   }
 
   return (
     <div className="nesio-cooling-panel">
-      <p className="nesio-cooling-title"><IconSnowflake size={14} /> 买之前,三十秒冷静</p>
+      <p className="nesio-cooling-title"><IconSnowflake size={14} /> {L(dict, '买之前,三十秒冷静', '30 seconds of calm before buying')}</p>
 
       <div className="nesio-cooling-row">
-        <span className="nesio-cooling-label">价格</span>
+        <span className="nesio-cooling-label">{L(dict, '价格', 'Price')}</span>
         <input
           className="nesio-cooling-input"
           type="number"
@@ -102,12 +106,12 @@ export function PurchaseCoolingPanel({ productName, similarCount, similarExample
           value={price}
           onChange={(e) => setPrice(e.target.value)}
         />
-        <span className="nesio-cooling-label">时薪</span>
+        <span className="nesio-cooling-label">{L(dict, '时薪', 'Hourly pay')}</span>
         <input
           className="nesio-cooling-input"
           type="number"
           inputMode="decimal"
-          placeholder="¥/小时"
+          placeholder={L(dict, '¥/小时', '$/hr')}
           value={wage}
           onChange={(e) => saveWage(e.target.value)}
         />
@@ -118,10 +122,10 @@ export function PurchaseCoolingPanel({ productName, similarCount, similarExample
       </div>
 
       <div className="nesio-cooling-actions">
-        <button type="button" className="nesio-cooling-freeze-btn" onClick={freeze}>冻 24 小时</button>
-        <button type="button" className="nesio-cooling-buy-btn" onClick={buyAnyway}>还是要买</button>
+        <button type="button" className="nesio-cooling-freeze-btn" onClick={freeze}>{L(dict, '冻 24 小时', 'Freeze 24h')}</button>
+        <button type="button" className="nesio-cooling-buy-btn" onClick={buyAnyway}>{L(dict, '还是要买', 'Buying anyway')}</button>
       </div>
-      <button type="button" className="nesio-cooling-link" onClick={() => setVaultOpen(true)}>冷冻清单</button>
+      <button type="button" className="nesio-cooling-link" onClick={() => setVaultOpen(true)}>{L(dict, '冷冻清单', 'Freeze list')}</button>
       <FreezeVaultSheet open={vaultOpen} onClose={() => setVaultOpen(false)} />
     </div>
   );

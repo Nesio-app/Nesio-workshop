@@ -9,7 +9,7 @@
 
 import { useEffect, useState } from 'react';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
-import { loadProfileSettings } from '@/lib/portal/profile';
+import { loadProfileSettings, portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { buildTodayViewModel, type FocusNode, type ProactiveContext } from '@/lib/platform/view-models/today-view-model';
 import { readPortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
 import type { CalendarEvent } from '@/lib/portal/types';
@@ -153,7 +153,9 @@ export function useTodayData(canUsePrivateData: boolean) {
           ...healthNodesToGuidanceEvents(updated.proactiveContext.healthItems),
         ];
 
+        const uiLocale = portalLocaleToDictionaryLocale(loadProfileSettings().locale);
         const guidanceCards = runGuidancePipeline({
+          locale: uiLocale,
           events: guidanceEvents,
           scoredCalendar: scored,
           now,

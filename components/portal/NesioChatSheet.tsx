@@ -17,6 +17,9 @@ import { refreshLocation } from '@/lib/portal/location-store';
 import { formatEnvironmentContext, getCachedCalendarEvents } from '@/lib/portal/environment';
 import { semanticRerank } from '@/lib/portal/semantic-rerank';
 import { track } from '@/lib/portal/telemetry';
+import { L } from '@/lib/portal/i18n';
+import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
+import { usePortalLocale } from './use-portal-locale';
 import MemoryFlashBanner, { useMemoryFlash } from '@/components/portal/MemoryFlashBanner';
 import { IconCamera, IconFile, IconHistory, IconImage, IconKeyboard, IconLink, IconMic, IconSmile } from './icons';
 
@@ -296,19 +299,20 @@ type SR = new () => {
 function BubbleMenu({ msg, onClose, onSave, onCopy }: {
   msg: UiMessage; onClose: () => void; onSave: () => void; onCopy: () => void;
 }) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   return (
     <>
       <button type="button" className="nesio-bubble-menu-backdrop" onClick={onClose} aria-label="关闭" />
       <div className="nesio-bubble-menu">
         <button type="button" className="nesio-bubble-menu-item" onClick={() => { onCopy(); onClose(); }}>
-          <span className="nesio-bubble-menu-icon">⎘</span>复制
+          <span className="nesio-bubble-menu-icon">⎘</span>{L(dict, '复制', 'Copy')}
         </button>
         {!msg.savedToMemory && (
           <button type="button" className="nesio-bubble-menu-item" onClick={() => { onSave(); onClose(); }}>
-            <span className="nesio-bubble-menu-icon">＋</span>存入记忆
+            <span className="nesio-bubble-menu-icon">＋</span>{L(dict, '存入记忆', 'Save to Memory')}
           </button>
         )}
-        <button type="button" className="nesio-bubble-menu-item nesio-bubble-menu-item--cancel" onClick={onClose}>取消</button>
+        <button type="button" className="nesio-bubble-menu-item nesio-bubble-menu-item--cancel" onClick={onClose}>{L(dict, '取消', 'Cancel')}</button>
       </div>
     </>
   );
@@ -487,6 +491,7 @@ export default function NesioChatSheet({
   onClose: () => void;
   canUsePrivateData?: boolean;
 }) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
@@ -543,6 +548,7 @@ export default function NesioChatSheet({
           message: text.trim(),
           history,
           coachStyle: loadProfileSettings().coachStyle || 'warm',
+          uiLocale: dict,
           fileContext: fileContextRef.current
             ? { name: fileContextRef.current.name, content: fileContextRef.current.content }
             : undefined,
@@ -558,7 +564,7 @@ export default function NesioChatSheet({
         id: `a-${Date.now()}`,
         role: 'model',
         // 兜底剥掉 markdown 强调记号 — 气泡是纯文本,裸 ** 很出戏
-        text: (data.response?.trim() || '（暂时没有找到相关信息）').replace(/\*\*/g, ''),
+        text: (data.response?.trim() || L(dict, '（暂时没有找到相关信息）', '(Nothing relevant found)')).replace(/\*\*/g, ''),
         sources: data.sources ?? [],
       };
       const withAi = [...nextMsgs, aiMsg];
@@ -756,7 +762,7 @@ export default function NesioChatSheet({
       {/* Header */}
       <div className="nesio-wechat-header">
         <button type="button" className="nesio-wechat-back-btn" onClick={onClose} aria-label="关闭">←</button>
-        <span className="nesio-wechat-title">问一问</span>
+        <span className="nesio-wechat-title">{L(dict, '问一问', 'Ask')}</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.15rem' }}>
           <button
             type="button"
@@ -768,7 +774,7 @@ export default function NesioChatSheet({
             <IconHistory size={18} />
           </button>
           <button type="button" className="nesio-wechat-more-btn" onClick={() => { archiveSession(messages); setMessages([]); saveHistory([]); }}>
-            新对话
+            {L(dict, '新对话', 'New chat')}
           </button>
         </div>
       </div>
@@ -778,9 +784,9 @@ export default function NesioChatSheet({
         <div className="nesio-chat-history-panel">
           <button type="button" className="nesio-settings-sheet-backdrop" onClick={() => setShowHistory(false)} aria-label="关闭" />
           <div className="nesio-chat-history-card">
-            <p className="nesio-chat-history-title">历史对话</p>
+            <p className="nesio-chat-history-title">{L(dict, '历史对话', 'Past chats')}</p>
             {sessions.length === 0 && (
-              <p style={{ fontSize: '0.78rem', color: 'var(--portal-muted)', margin: '0.5rem 0' }}>还没有归档的对话。点「新对话」会把当前对话存到这里。</p>
+              <p style={{ fontSize: '0.78rem', color: 'var(--portal-muted)', margin: '0.5rem 0' }}>{L(dict, '还没有归档的对话。点「新对话」会把当前对话存到这里。', 'No archived chats yet. "New chat" stores the current one here.')}</p>
             )}
             {sessions.map((s) => (
               <button
@@ -800,7 +806,7 @@ export default function NesioChatSheet({
               >
                 <span className="nesio-chat-history-item-title">{s.title}</span>
                 <span className="nesio-chat-history-item-date">
-                  {new Date(s.at).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })} · {s.messages.length} 条
+                  {new Date(s.at).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'short', day: 'numeric' })} · {s.messages.length} {L(dict, '条', 'msgs')}
                 </span>
               </button>
             ))}
@@ -816,9 +822,9 @@ export default function NesioChatSheet({
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/assets/logo/nesio-mark.svg" alt="" width={52} height={52} draggable={false} />
             </p>
-            <p className="nesio-wechat-empty-title">问我任何事</p>
+            <p className="nesio-wechat-empty-title">{L(dict, '问我任何事', 'Ask me anything')}</p>
             <div className="nesio-wechat-suggestions">
-              {['我的护照放在哪里', '今天该吃什么', '帮我总结这周做了什么'].map((s) => (
+              {[L(dict, '我的护照放在哪里', 'Where did I put my passport?'), L(dict, '今天该吃什么', 'What should I eat today?'), L(dict, '帮我总结这周做了什么', 'Summarize my week')].map((s) => (
                 <button key={s} type="button" className="nesio-wechat-suggestion" onClick={() => void sendMessage(s)}>{s}</button>
               ))}
             </div>
@@ -847,7 +853,7 @@ export default function NesioChatSheet({
                   onContextMenu={(e) => { e.preventDefault(); if (!isUser) setMenuMsg(msg); }}
                 >
                   <p className="nesio-wechat-bubble-text">{msg.text}</p>
-                  {msg.savedToMemory && <p className="nesio-wechat-saved-badge">✓ 已存入记忆</p>}
+                  {msg.savedToMemory && <p className="nesio-wechat-saved-badge">✓ {L(dict, '已存入记忆', 'Saved to Memory')}</p>}
                 </div>
                 {msg.sources && msg.sources.length > 0 && (
                   <div className="nesio-wechat-sources">
@@ -894,19 +900,19 @@ export default function NesioChatSheet({
         <div className="nesio-wechat-plus-panel">
           <button type="button" className="nesio-wechat-plus-item" onClick={() => { setShowPlus(false); const inp = document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.onchange=(e)=>{ const f=(e.target as HTMLInputElement).files?.[0]; if(!f) return; const reader=new FileReader(); reader.onload=(ev)=>{ const dataUrl=ev.target?.result as string; const [hdr,b64]=dataUrl.split(','); const mime=hdr.match(/:(.*?);/)?.[1]||'image/jpeg'; const userMsg:UiMessage={id:`u-${Date.now()}`,role:'user',text:'[图片] 识别图片'}; const next=[...messages,userMsg]; setMessages(next); fetch('/api/portal/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'image',imageBase64:b64,mimeType:mime})}).then(r=>r.json()).then((data:{ ok?:boolean; nodes?:Array<{name:string;type:string}>; summary?:string })=>{ if(data.ok&&data.nodes?.length){const names=data.nodes.map(n=>n.name).join('、'); const found=new Map<string,LifeNode>(); for(const node of data.nodes){for(const n of searchLifeGraphFuzzy(node.name,2))found.set(n.id,n);} const nodes=Array.from(found.values()).slice(0,6); const aiText=nodes.length>0?`识别到：${names}\n\n找到 ${nodes.length} 条相关记录：\n${nodes.map(n=>`• ${n.name}`).join('\n')}`:`识别到：${names}\n\n记忆库里暂时没有相关记录。`; const aiMsg:UiMessage={id:`a-${Date.now()}`,role:'model',text:aiText}; const withAi=[...next,aiMsg]; setMessages(withAi); saveHistory(withAi);}else{const aiMsg:UiMessage={id:`a-${Date.now()}`,role:'model',text:data.summary||'图片识别暂时不可用。'}; const withAi=[...next,aiMsg]; setMessages(withAi); saveHistory(withAi);}}).catch(()=>{const aiMsg:UiMessage={id:`a-${Date.now()}`,role:'model',text:'图片识别失败，请重试。'}; setMessages(prev=>[...prev,aiMsg]);});}; reader.readAsDataURL(f);}; inp.click(); }}>
             <span className="nesio-wechat-plus-icon"><IconImage /></span>
-            <span>相册</span>
+            <span>{L(dict, '相册', 'Photos')}</span>
           </button>
           <button type="button" className="nesio-wechat-plus-item" onClick={() => { setShowPlus(false); setCameraAutoOpen(true); setShowCamera(true); }}>
             <span className="nesio-wechat-plus-icon"><IconCamera /></span>
-            <span>拍摄</span>
+            <span>{L(dict, '拍摄', 'Camera')}</span>
           </button>
           <button type="button" className="nesio-wechat-plus-item" onClick={() => { setShowPlus(false); setVoiceMode(true); }}>
             <span className="nesio-wechat-plus-icon"><IconMic /></span>
-            <span>语音输入</span>
+            <span>{L(dict, '语音输入', 'Voice')}</span>
           </button>
           <button type="button" className="nesio-wechat-plus-item" onClick={() => filePickerRef.current?.click()}>
             <span className="nesio-wechat-plus-icon"><IconFile /></span>
-            <span>文件</span>
+            <span>{L(dict, '文件', 'File')}</span>
           </button>
         </div>
       )}
@@ -946,7 +952,7 @@ export default function NesioChatSheet({
               onPointerCancel={() => { if (recording) stopRecording(); }}
               aria-label="按住说话"
             >
-              {recording ? '松开发送' : '按住 说话'}
+              {recording ? L(dict, '松开发送', 'Release to send') : L(dict, '按住 说话', 'Hold to talk')}
             </button>
             <button
               type="button"
@@ -980,7 +986,7 @@ export default function NesioChatSheet({
               ref={inputRef}
               className="nesio-wechat-input"
               type="text"
-              placeholder="问一问…"
+              placeholder={L(dict, '问一问…', 'Ask…')}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void sendMessage(input); } }}
@@ -1002,7 +1008,7 @@ export default function NesioChatSheet({
                 disabled={sending}
                 aria-label="发送"
               >
-                发送
+                {L(dict, '发送', 'Send')}
               </button>
             ) : (
               <button

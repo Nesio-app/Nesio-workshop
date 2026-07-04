@@ -10,10 +10,14 @@ import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { getThawedItems } from '@/lib/platform/impulse-guard';
 import { IconSnowflake } from '../icons';
+import { L } from '@/lib/portal/i18n';
+import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
+import { usePortalLocale } from '../use-portal-locale';
 
 const FreezeVaultSheet = dynamic(() => import('../FreezeVaultSheet'), { ssr: false });
 
 export function ThawedReminder() {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [count, setCount] = useState(0);
   const [open, setOpen] = useState(false);
 
@@ -30,8 +34,8 @@ export function ThawedReminder() {
     <>
       <button type="button" className="nesio-thawed-banner" onClick={() => setOpen(true)}>
         <IconSnowflake size={15} />
-        <span>{count} 件冷冻到期了 — 现在还想买吗？</span>
-        <span className="nesio-thawed-banner-cta">去决定</span>
+        <span>{L(dict, `${count} 件冷冻到期了 — 现在还想买吗？`, `${count} frozen item${count > 1 ? 's' : ''} thawed — still want it?`)}</span>
+        <span className="nesio-thawed-banner-cta">{L(dict, '去决定', 'Decide')}</span>
       </button>
       <FreezeVaultSheet open={open} onClose={() => setOpen(false)} />
     </>

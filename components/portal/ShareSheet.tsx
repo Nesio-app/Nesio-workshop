@@ -13,6 +13,9 @@ import { useEffect, useRef, useState } from 'react';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { updateLifeNode, type LifeNodeAsset } from '@/lib/portal/life-graph';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
+import { L } from '@/lib/portal/i18n';
+import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
+import { usePortalLocale } from './use-portal-locale';
 import { NodeTypeIcon } from './icons';
 
 interface ShareSheetProps { open: boolean; onClose: () => void; }
@@ -28,6 +31,7 @@ interface ParsedResult {
 }
 
 export default function ShareSheet({ open, onClose }: ShareSheetProps) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const fileRef = useRef<HTMLInputElement>(null);
   const [parsed, setParsed] = useState<ParsedResult | null>(null);
   const [saved, setSaved] = useState(false);
@@ -193,18 +197,18 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
   if (!open) return null;
 
   return (
-    <div className="nesio-share-overlay" role="dialog" aria-modal="true" aria-label="分享">
+    <div className="nesio-share-overlay" role="dialog" aria-modal="true" aria-label={L(dict, '分享', 'Share')}>
       <div className="nesio-share-backdrop" onClick={onClose} />
       <div className="nesio-share-card">
         <div className="nesio-sheet-handle" aria-hidden />
 
         <div className="nesio-share-header">
-          <h2 className="nesio-share-title">分享</h2>
+          <h2 className="nesio-share-title">{L(dict, '分享', 'Share')}</h2>
           <button type="button" className="nesio-share-close" onClick={onClose} aria-label="关闭">✕</button>
         </div>
 
         <p className="nesio-share-desc">
-          你分享进来的内容，Nesio 会先整理出可确认的信息，再由你决定是否存入 Memory。
+          {L(dict, '你分享进来的内容，Nesio 会先整理出可确认的信息，再由你决定是否存入 Memory。', 'Whatever you share in, Nesio first organizes into confirmable info — you decide what enters Memory.')}
         </p>
 
         {/* Action buttons */}
@@ -217,7 +221,7 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
                   <polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>
                 </svg>
               </span>
-              <span>上传文件</span>
+              <span>{L(dict, '上传文件', 'Upload file')}</span>
             </button>
             <button type="button" className="nesio-share-action-btn" onClick={() => setTextMode(true)}>
               <span className="nesio-share-action-icon">
@@ -225,7 +229,7 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
                   <path d="M4 5h16M4 12h16M4 19h10"/>
                 </svg>
               </span>
-              <span>粘贴文字/链接</span>
+              <span>{L(dict, '粘贴文字/链接', 'Paste text/link')}</span>
             </button>
           </div>
         )}
@@ -238,17 +242,17 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
             <textarea
               className="nesio-ob-input"
               style={{ resize: 'vertical', minHeight: '5rem', borderRadius: '0.85rem', width: '100%', fontFamily: 'inherit' }}
-              placeholder="粘贴邮件正文、链接、笔记内容…"
+              placeholder={L(dict, '粘贴邮件正文、链接、笔记内容…', 'Paste email text, links, notes…')}
               value={textInput}
               onChange={(e) => setTextInput(e.target.value)}
               autoFocus
             />
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               <button type="button" className="nesio-ob-primary-btn" style={{ flex: 1 }} onClick={handleTextSubmit} disabled={!textInput.trim()}>
-                提取信息
+                {L(dict, '提取信息', 'Extract')}
               </button>
               <button type="button" className="nesio-today-btn nesio-today-btn--ghost" style={{ flex: 1 }} onClick={() => { setTextMode(false); setTextInput(''); }}>
-                取消
+                {L(dict, '取消', 'Cancel')}
               </button>
             </div>
           </div>
@@ -258,7 +262,7 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
         {analyzing && (
           <div style={{ textAlign: 'center', padding: '1.5rem 0', color: 'var(--portal-muted)', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
             <span className="nesio-camera-recognizing-dot" style={{ background: 'var(--portal-blue-deep)', display: 'inline-block', width: '0.5rem', height: '0.5rem', borderRadius: '50%' }} />
-            Nesio 正在整理可确认的信息…
+            {L(dict, 'Nesio 正在整理可确认的信息…', 'Nesio is organizing confirmable info…')}
           </div>
         )}
 
@@ -268,7 +272,7 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
         {/* Parsed result */}
         {parsed && (
           <div className="nesio-share-recent">
-            <p className="nesio-share-recent-label">刚刚分享进来</p>
+            <p className="nesio-share-recent-label">{L(dict, '刚刚分享进来', 'Just shared in')}</p>
             <div className="nesio-share-parsed-card">
               <span className="nesio-share-parsed-icon">
                 <NodeTypeIcon type={{ MEMORY_CAPTURE: 'object', EVENT_LOG: 'event', COMMITMENT: 'commitment', HEALTH_LOG: 'health_state', REMINDER: 'commitment' }[parsed.intent] || 'event'} size={18} />
@@ -296,7 +300,7 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
                     </span>
                   )}
                   <span className="nesio-share-meta-chip" style={{ background: 'var(--status-go-soft)', color: 'var(--status-go)' }}>
-                    {parsed.nodes.length} 个节点
+                    {parsed.nodes.length} {L(dict, '个节点', 'nodes')}
                   </span>
                 </div>
               </div>
@@ -304,11 +308,11 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
 
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               <button type="button" className="nesio-share-save-btn" onClick={saveToMemory} style={{ flex: 1 }}>
-                {saved ? '✓ 已存入 Memory' : '存入 Memory'}
+                {saved ? L(dict, '✓ 已存入 Memory', '✓ Saved to Memory') : L(dict, '存入 Memory', 'Save to Memory')}
               </button>
               <button type="button" className="nesio-today-btn nesio-today-btn--ghost" style={{ flex: 1, borderRadius: '999px' }}
                 onClick={() => { setParsed(null); setTextMode(false); }}>
-                重新分享
+                {L(dict, '重新分享', 'Share again')}
               </button>
             </div>
           </div>

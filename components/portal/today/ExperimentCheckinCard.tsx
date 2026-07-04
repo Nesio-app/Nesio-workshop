@@ -15,8 +15,12 @@ import {
 } from '../NesioExperiment';
 import { IconTarget } from '../icons';
 import { track } from '@/lib/portal/telemetry';
+import { L } from '@/lib/portal/i18n';
+import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
+import { usePortalLocale } from '../use-portal-locale';
 
 export function ExperimentCheckinCard() {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [exp, setExp] = useState<Experiment | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [justLogged, setJustLogged] = useState(false);
@@ -42,8 +46,8 @@ export function ExperimentCheckinCard() {
         <div className="nesio-proactive-card-inner">
           <span className="nesio-proactive-card-icon"><IconTarget size={18} /></span>
           <div className="nesio-proactive-card-text">
-            <p className="nesio-proactive-card-title">今天已打卡</p>
-            <p className="nesio-proactive-card-body">数据已记入实验,坚持就会看到规律。</p>
+            <p className="nesio-proactive-card-title">{L(dict, '今天已打卡', 'Checked in for today')}</p>
+            <p className="nesio-proactive-card-body">{L(dict, '数据已记入实验,坚持就会看到规律。', 'Logged. Keep going and the pattern will show.')}</p>
           </div>
         </div>
       </div>
@@ -68,11 +72,11 @@ export function ExperimentCheckinCard() {
       <div className="nesio-proactive-card-inner">
         <span className="nesio-proactive-card-icon"><IconTarget size={18} /></span>
         <div className="nesio-proactive-card-text">
-          <p className="nesio-proactive-card-title">实验打卡 · {exp!.name}</p>
+          <p className="nesio-proactive-card-title">{L(dict, '实验打卡', 'Experiment check-in')} · {exp!.name}</p>
           {!expanded && (
             <>
               <p className="nesio-proactive-card-body">
-                第 {exp!.dataPoints.length + 1} / {exp!.targetDays} 天,今天还没记录。
+                {L(dict, `第 ${exp!.dataPoints.length + 1} / ${exp!.targetDays} 天,今天还没记录。`, `Day ${exp!.dataPoints.length + 1} / ${exp!.targetDays} — not logged yet today.`)}
               </p>
               <div className="nesio-proactive-card-actions">
                 <button
@@ -80,7 +84,7 @@ export function ExperimentCheckinCard() {
                   className="nesio-proactive-action-btn"
                   onClick={() => setExpanded(true)}
                 >
-                  30 秒打卡
+                  {L(dict, '30 秒打卡', '30-second check-in')}
                 </button>
               </div>
             </>

@@ -7,6 +7,9 @@ import LocationPicker from './LocationPicker';
 import RelationGraph from './RelationGraph';
 import type { GNode, GEdge } from '@/lib/platform/graph-engine';
 import { IconClock, IconLink, NodeTypeIcon, WeatherIcon } from './icons';
+import { L } from '@/lib/portal/i18n';
+import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
+import { usePortalLocale } from './use-portal-locale';
 const TYPE_BG_DETAIL: Record<string, string> = {
   person: 'var(--chip-indigo)', object: 'var(--chip-blue)', place: 'var(--chip-green)',
   event: 'var(--chip-amber)', commitment: 'var(--chip-violet)', health_state: 'var(--chip-pink)', preference: 'var(--chip-mint)',
@@ -19,9 +22,13 @@ interface MemoryNodeDetailProps {
   onOpenNode?: (node: LifeNode) => void;
 }
 
-const TYPE_LABELS: Record<string, string> = {
+const TYPE_LABELS_ZH: Record<string, string> = {
   person: '人物', object: '物品', place: '地点', event: '事件',
   commitment: '承诺', health_state: '健康状态', preference: '偏好',
+};
+const TYPE_LABELS_EN: Record<string, string> = {
+  person: 'Person', object: 'Item', place: 'Place', event: 'Event',
+  commitment: 'Promise', health_state: 'Health', preference: 'Taste',
 };
 
 const PERSON_CATEGORIES: Record<string, string> = {
@@ -49,6 +56,7 @@ const ATTR_KEY_LABELS: Record<string, string> = {
 
 /** 长文本(如日历事件的会议记录)默认只显示摘要,点「详情」展开 */
 function CollapsibleText({ text, limit = 110 }: { text: string; limit?: number }) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [expanded, setExpanded] = useState(false);
   if (text.length <= limit) return <span className="nesio-node-attr-val">{text}</span>;
   return (
@@ -59,7 +67,7 @@ function CollapsibleText({ text, limit = 110 }: { text: string; limit?: number }
         onClick={() => setExpanded((v) => !v)}
         style={{ marginLeft: 6, fontSize: '0.72rem', fontWeight: 600, color: 'var(--portal-blue-deep)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
       >
-        {expanded ? '收起' : '详情'}
+        {expanded ? L(dict, '收起', 'Less') : L(dict, '详情', 'More')}
       </button>
     </span>
   );
@@ -159,6 +167,7 @@ function PersonSection({ node }: {
   relatedNodes?: LifeNode[];
   onOpenNode?: (n: LifeNode) => void;
 }) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const category = attr(node, 'category');
   const lastSeen = attr(node, 'lastSeen');
   const birthday = attr(node, 'birthday');
@@ -173,9 +182,9 @@ function PersonSection({ node }: {
           </span>
         </div>
       )}
-      <InfoRow label="上次见面" value={fmtDate(lastSeen)} />
-      <InfoRow label="生日" value={fmtDate(birthday)} />
-      <InfoRow label="备注" value={note} />
+      <InfoRow label={L(dict, '上次见面', 'Last seen')} value={fmtDate(lastSeen)} />
+      <InfoRow label={L(dict, '生日', 'Birthday')} value={fmtDate(birthday)} />
+      <InfoRow label={L(dict, '备注', 'Note')} value={note} />
     </div>
   );
 }
@@ -184,6 +193,7 @@ function ObjectSection({ node, assetUrls }: {
   node: LifeNode;
   assetUrls: Record<string, string>;
 }) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const location = attr(node, 'location', 'room');
   const purchaseDate = attr(node, 'purchaseDate');
   const price = attr(node, 'price');
@@ -202,13 +212,13 @@ function ObjectSection({ node, assetUrls }: {
         // eslint-disable-next-line @next/next/no-img-element
         <img src={previewUrl} alt={node.name} className="nesio-type-thumb" draggable={false} />
       )}
-      <InfoRow label="存放位置" value={location} />
-      <InfoRow label="购买日期" value={fmtDate(purchaseDate)} />
-      <InfoRow label="价格" value={price} />
-      <InfoRow label="有效期" value={fmtDate(expiry)} />
+      <InfoRow label={L(dict, '存放位置', 'Stored at')} value={location} />
+      <InfoRow label={L(dict, '购买日期', 'Bought on')} value={fmtDate(purchaseDate)} />
+      <InfoRow label={L(dict, '价格', 'Price')} value={price} />
+      <InfoRow label={L(dict, '有效期', 'Expires')} value={fmtDate(expiry)} />
       <InfoRow label="购买商家" value={store} />
       <InfoRow label="支付方式" value={paymentMethod} />
-      <InfoRow label="备注" value={note} />
+      <InfoRow label={L(dict, '备注', 'Note')} value={note} />
       {fileUrl && (
         <div style={{ marginTop: '0.75rem' }}>
           <a href={safeExternalUrl(fileUrl)} target="_blank" rel="noopener noreferrer" className="nesio-type-action-btn">
@@ -225,6 +235,7 @@ function PlaceSection({ node }: {
   relatedNodes?: LifeNode[];
   onOpenNode?: (n: LifeNode) => void;
 }) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const address = attr(node, 'address', 'location');
   const lat = attr(node, 'lat');
   const lon = attr(node, 'lon');
@@ -244,7 +255,7 @@ function PlaceSection({ node }: {
       )}
       {address && (
         <div className="nesio-node-attr-row">
-          <span className="nesio-node-attr-key">地址</span>
+          <span className="nesio-node-attr-key">{L(dict, '地址', 'Address')}</span>
           {link
             ? <a href={link} target="_blank" rel="noopener noreferrer" className="nesio-node-attr-val nesio-node-attr-link">{address}</a>
             : <span className="nesio-node-attr-val">{address}</span>
@@ -259,7 +270,7 @@ function PlaceSection({ node }: {
         </div>
       )}
       <InfoRow label="来访次数" value={visitCount ? `${visitCount} 次` : ''} />
-      <InfoRow label="备注" value={note} />
+      <InfoRow label={L(dict, '备注', 'Note')} value={note} />
     </div>
   );
 }
@@ -269,6 +280,7 @@ function EventSection({ node }: {
   relatedNodes?: LifeNode[];
   onOpenNode?: (n: LifeNode) => void;
 }) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const start = attr(node, 'start', 'date', 'datetime');
   const end = attr(node, 'end');
   const location = attr(node, 'location');
@@ -290,17 +302,17 @@ function EventSection({ node }: {
       )}
       {location && (
         <div className="nesio-node-attr-row">
-          <span className="nesio-node-attr-key">地点</span>
+          <span className="nesio-node-attr-key">{L(dict, '地点', 'Location')}</span>
           {mapLink
             ? <a href={mapLink} target="_blank" rel="noopener noreferrer" className="nesio-node-attr-val nesio-node-attr-link">{location}</a>
             : <span className="nesio-node-attr-val">{location}</span>
           }
         </div>
       )}
-      {participants && <InfoRow label="参与者" value={participants} />}
+      {participants && <InfoRow label={L(dict, '参与者', 'People')} value={participants} />}
       {note && (
         <div className="nesio-node-attr-row">
-          <span className="nesio-node-attr-key">会议记录</span>
+          <span className="nesio-node-attr-key">{L(dict, '会议记录', 'Meeting notes')}</span>
           <CollapsibleText text={note} />
         </div>
       )}
@@ -308,7 +320,7 @@ function EventSection({ node }: {
         <div style={{ marginTop: '0.75rem' }}>
           <a href={safeExternalUrl(url)} target="_blank" rel="noopener noreferrer"
             className={`nesio-type-action-btn${isMeeting ? ' nesio-type-action-btn--meeting' : ''}`}>
-            {isMeeting ? '加入会议' : <><IconLink size={13} /> 直达链接</>}
+            {isMeeting ? L(dict, '加入会议', 'Join meeting') : <><IconLink size={13} /> {L(dict, '直达链接', 'Open link')}</>}
           </a>
         </div>
       )}
@@ -320,6 +332,7 @@ function CommitmentSection({ node, onToggleDone }: {
   node: LifeNode;
   onToggleDone: () => void;
 }) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const dueDate = attr(node, 'dueDate', 'deadline', 'due', 'date');
   const priority = attr(node, 'priority');
   const owner = attr(node, 'owner');
@@ -340,7 +353,7 @@ function CommitmentSection({ node, onToggleDone }: {
           className={`nesio-commitment-toggle${isDone ? ' nesio-commitment-toggle--done' : ''}`}
           onClick={onToggleDone}
         >
-          {isDone ? '✓ 已完成' : '○ 待完成'}
+          {isDone ? L(dict, '✓ 已完成', '✓ Done') : L(dict, '○ 待完成', '○ To do')}
         </button>
         {priorityInfo && (
           <span className="nesio-type-priority-badge" style={{ color: priorityInfo.color }}>
@@ -350,22 +363,23 @@ function CommitmentSection({ node, onToggleDone }: {
       </div>
       {dueDate && (
         <div className={`nesio-node-attr-row${isOverdue ? ' nesio-attr-overdue' : dueSoon ? ' nesio-attr-due-soon' : ''}`}>
-          <span className="nesio-node-attr-key">截止日期</span>
+          <span className="nesio-node-attr-key">{L(dict, '截止日期', 'Due')}</span>
           <span className="nesio-node-attr-val">
             {fmtDateTime(dueDate)}
-            {isOverdue && <span className="nesio-overdue-tag"> 已过期</span>}
-            {dueSoon && <span className="nesio-due-soon-tag"> 今天截止</span>}
+            {isOverdue && <span className="nesio-overdue-tag"> {L(dict, '已过期', 'overdue')}</span>}
+            {dueSoon && <span className="nesio-due-soon-tag"> {L(dict, '今天截止', 'due today')}</span>}
           </span>
         </div>
       )}
       <InfoRow label="对方/负责人" value={owner} />
       {recurring && <InfoRow label="重复" value={recurring} />}
-      <InfoRow label="备注" value={note} />
+      <InfoRow label={L(dict, '备注', 'Note')} value={note} />
     </div>
   );
 }
 
 function HealthSection({ node }: { node: LifeNode }) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const healthType = attr(node, 'healthType', 'category');
   const date = attr(node, 'date', 'start', 'datetime');
   const value = attr(node, 'value');
@@ -378,9 +392,9 @@ function HealthSection({ node }: { node: LifeNode }) {
       <div className="nesio-type-badge-row">
         <span className="nesio-type-category-pill nesio-type-category-pill--health">{typeLabel}</span>
       </div>
-      <InfoRow label="时间" value={fmtDateTime(date)} />
+      <InfoRow label={L(dict, '时间', 'Time')} value={fmtDateTime(date)} />
       {value && <InfoRow label="数值" value={unit ? `${value} ${unit}` : value} />}
-      <InfoRow label="备注" value={note} />
+      <InfoRow label={L(dict, '备注', 'Note')} value={note} />
     </div>
   );
 }
@@ -389,6 +403,7 @@ function PreferenceSection({ node, assetUrls }: {
   node: LifeNode;
   assetUrls: Record<string, string>;
 }) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const category = attr(node, 'category');
   const note = attr(node, 'note');
   const date = attr(node, 'date');
@@ -407,8 +422,8 @@ function PreferenceSection({ node, assetUrls }: {
           <span className="nesio-type-category-pill">{category}</span>
         </div>
       )}
-      <InfoRow label="记录时间" value={fmtDate(date)} />
-      <InfoRow label="备注" value={note} />
+      <InfoRow label={L(dict, '记录时间', 'Noted on')} value={fmtDate(date)} />
+      <InfoRow label={L(dict, '备注', 'Note')} value={note} />
     </div>
   );
 }
@@ -481,6 +496,7 @@ function buildGraphEdges(focus: LifeNode, related: LifeNode[]): GEdge[] {
 }
 
 export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNode }: MemoryNodeDetailProps) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [editing, setEditing] = useState(false);
   const [fields, setFields] = useState<EditFields>({
     name: '', location: '', price: '', purchaseDate: '', expiry: '',
@@ -610,7 +626,7 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
         {/* Type color strip */}
         <div className="nesio-type-header-strip" style={{ background: typeBg }}>
           <span className="nesio-type-header-icon"><NodeTypeIcon type={n.type} size={15} /></span>
-          <span className="nesio-type-header-label">{TYPE_LABELS[n.type] || n.type}</span>
+          <span className="nesio-type-header-label">{(dict === 'en' ? TYPE_LABELS_EN : TYPE_LABELS_ZH)[n.type] || n.type}</span>
         </div>
 
         <div className="nesio-settings-sheet-header">
@@ -678,10 +694,10 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
           {/* Source / confidence */}
           <div className="nesio-node-meta-row">
             <span className="nesio-node-source">
-              {({ manual: '手动', photo: '拍照', voice: '语音', calendar: '日历', email: '邮件', system: '系统' } as Record<string, string>)[n.source] || n.source}
+              {(dict === 'en' ? { manual: 'Manual', photo: 'Photo', voice: 'Voice', calendar: 'Calendar', email: 'Email', system: 'System' } : { manual: '手动', photo: '拍照', voice: '语音', calendar: '日历', email: '邮件', system: '系统' } as Record<string, string>)[n.source] || n.source}
             </span>
             <span className="nesio-node-confidence">
-              {n.confidence >= 0.82 ? '比较确定' : n.confidence >= 0.58 ? '可能相关' : '建议确认'}
+              {n.confidence >= 0.82 ? L(dict, '比较确定', 'Confident') : n.confidence >= 0.58 ? L(dict, '可能相关', 'Likely') : L(dict, '建议确认', 'Please confirm')}
             </span>
           </div>
 
@@ -711,7 +727,7 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
           {/* Raw input */}
           {showRawInput && (
             <div className="nesio-node-raw" style={{ marginTop: '0.75rem' }}>
-              <p className="nesio-settings-section-label">原始记录</p>
+              <p className="nesio-settings-section-label">{L(dict, '原始记录', 'Original note')}</p>
               <p style={{ fontSize: '0.88rem', color: 'var(--portal-muted)', fontStyle: 'italic' }}>&ldquo;{n.rawInput}&rdquo;</p>
             </div>
           )}
@@ -719,7 +735,7 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
           {/* Remaining attributes not covered above */}
           {shownAttrs.length > 0 && (
             <>
-              <p className="nesio-settings-section-label" style={{ marginTop: '0.75rem' }}>其他属性</p>
+              <p className="nesio-settings-section-label" style={{ marginTop: '0.75rem' }}>{L(dict, '其他属性', 'Other details')}</p>
               {shownAttrs.map(([k, v]) => (
                 <div key={k} className="nesio-node-attr-row">
                   <span className="nesio-node-attr-key">{ATTR_KEY_LABELS[k] ?? k}</span>
@@ -742,7 +758,7 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
           {/* Assets for non-object/preference types */}
           {n.type !== 'object' && n.type !== 'preference' && (n.assets || []).length > 0 && (
             <>
-              <p className="nesio-settings-section-label" style={{ marginTop: '0.75rem' }}>图片线索</p>
+              <p className="nesio-settings-section-label" style={{ marginTop: '0.75rem' }}>{L(dict, '图片线索', 'Image clues')}</p>
               <div style={{ display: 'grid', gap: '0.6rem' }}>
                 {(n.assets || []).map((asset) => {
                   const key = asset.id || asset.storagePath || asset.label || 'asset';
@@ -770,12 +786,12 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
             </>
           )}
 
-          <p style={{ fontSize: '0.7rem', color: 'var(--portal-muted)', marginTop: '1rem' }}>记录于 {createdDate}</p>
+          <p style={{ fontSize: '0.7rem', color: 'var(--portal-muted)', marginTop: '1rem' }}>{L(dict, '记录于', 'Noted on')} {createdDate}</p>
 
           {/* Related memories — 关联地图 */}
           {relatedNodes && relatedNodes.length > 0 && (
             <div className="nesio-related-section">
-              <p className="nesio-settings-section-label">关联地图</p>
+              <p className="nesio-settings-section-label">{L(dict, '关联地图', 'Connections')}</p>
               <RelationGraph
                 nodes={buildGraphNodes(n, relatedNodes)}
                 edges={buildGraphEdges(n, relatedNodes)}
@@ -785,7 +801,7 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
                   const target = relatedNodes.find(r => r.id === id);
                   if (target) onOpenNode?.(target);
                 }}
-                emptyText="暂无关联记忆"
+                emptyText={L(dict, '暂无关联记忆', 'No connections yet')}
               />
             </div>
           )}
@@ -794,13 +810,13 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
           <div style={{ display: 'flex', gap: '0.6rem', marginTop: '1.25rem' }}>
             {editing ? (
               <>
-                <button type="button" className="nesio-ob-primary-btn" style={{ flex: 1 }} onClick={saveEdit}>保存</button>
-                <button type="button" className="nesio-today-btn nesio-today-btn--ghost" style={{ flex: 1 }} onClick={() => setEditing(false)}>取消</button>
+                <button type="button" className="nesio-ob-primary-btn" style={{ flex: 1 }} onClick={saveEdit}>{L(dict, '保存', 'Save')}</button>
+                <button type="button" className="nesio-today-btn nesio-today-btn--ghost" style={{ flex: 1 }} onClick={() => setEditing(false)}>{L(dict, '取消', 'Cancel')}</button>
               </>
             ) : (
               <>
-                <button type="button" className="nesio-today-btn nesio-today-btn--ghost" style={{ flex: 1 }} onClick={startEdit}>编辑</button>
-                <button type="button" className="nesio-settings-danger-btn" style={{ flex: 1, marginTop: 0 }} onClick={handleDelete}>删除</button>
+                <button type="button" className="nesio-today-btn nesio-today-btn--ghost" style={{ flex: 1 }} onClick={startEdit}>{L(dict, '编辑', 'Edit')}</button>
+                <button type="button" className="nesio-settings-danger-btn" style={{ flex: 1, marginTop: 0 }} onClick={handleDelete}>{L(dict, '删除', 'Delete')}</button>
               </>
             )}
           </div>

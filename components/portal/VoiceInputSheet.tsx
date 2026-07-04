@@ -24,6 +24,9 @@ import {
 } from '@/lib/life-domain';
 import { routeIntent } from '@/lib/portal/intent-router';
 import { DomainIcon, IconBox, IconClock, IconMapPin, IconUser } from './icons';
+import { L } from '@/lib/portal/i18n';
+import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
+import { usePortalLocale } from './use-portal-locale';
 
 interface VoiceInputSheetProps {
   open: boolean;
@@ -33,10 +36,10 @@ interface VoiceInputSheetProps {
 }
 
 const QUICK_INTENTS = [
-  { label: '记住…', prefix: '记住 ' },
-  { label: '帮我安排…', prefix: '帮我安排 ' },
-  { label: '提醒我…', prefix: '提醒我 ' },
-  { label: '我今天…', prefix: '我今天 ' },
+  { zh: '记住…', en: 'Remember…', prefixZh: '记住 ', prefixEn: 'Remember ' },
+  { zh: '帮我安排…', en: 'Schedule…', prefixZh: '帮我安排 ', prefixEn: 'Schedule ' },
+  { zh: '提醒我…', en: 'Remind me…', prefixZh: '提醒我 ', prefixEn: 'Remind me ' },
+  { zh: '我今天…', en: 'Today I…', prefixZh: '我今天 ', prefixEn: 'Today I ' },
 ];
 
 type SendState = 'idle' | 'analyzing' | 'confirm' | 'saved' | 'error';
@@ -156,6 +159,7 @@ function DateTimePicker({ value, onChange, onClose }: {
   onChange: (v: DTPValue) => void;
   onClose: () => void;
 }) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const todayStr = new Date().toISOString().slice(0, 10);
   const initDate = value.date ? new Date(value.date + 'T00:00:00') : new Date();
   const [viewYear, setViewYear] = useState(initDate.getFullYear());
@@ -226,7 +230,7 @@ function DateTimePicker({ value, onChange, onClose }: {
 
         {/* 时间 */}
         <div className="nesio-dtp-row">
-          <span className="nesio-dtp-row-label">时间</span>
+          <span className="nesio-dtp-row-label">{L(dict, '时间', 'Time')}</span>
           <input
             type="time"
             className="nesio-dtp-time-input"
@@ -237,9 +241,9 @@ function DateTimePicker({ value, onChange, onClose }: {
 
         {/* 重复 */}
         <div className="nesio-dtp-row nesio-dtp-row--wrap">
-          <span className="nesio-dtp-row-label">重复</span>
+          <span className="nesio-dtp-row-label">{L(dict, '重复', 'Repeat')}</span>
           <div className="nesio-dtp-options">
-            {['不重复', '每天', '每周', '每月'].map(r => (
+            {[L(dict, '不重复', 'None'), L(dict, '每天', 'Daily'), L(dict, '每周', 'Weekly'), L(dict, '每月', 'Monthly')].map(r => (
               <button
                 key={r}
                 type="button"
@@ -254,9 +258,9 @@ function DateTimePicker({ value, onChange, onClose }: {
 
         {/* 优先级 */}
         <div className="nesio-dtp-row nesio-dtp-row--wrap">
-          <span className="nesio-dtp-row-label">优先级</span>
+          <span className="nesio-dtp-row-label">{L(dict, '优先级', 'Priority')}</span>
           <div className="nesio-dtp-options">
-            {([['var(--status-risk)','高'],['var(--status-gentle)','中'],['var(--status-go)','低']] as const).map(([dot, key]) => (
+            {([['var(--status-risk)', L(dict, '高', 'High')],['var(--status-gentle)', L(dict, '中', 'Med')],['var(--status-go)', L(dict, '低', 'Low')]] as const).map(([dot, key]) => (
               <button
                 key={key}
                 type="button"
@@ -273,10 +277,10 @@ function DateTimePicker({ value, onChange, onClose }: {
         <div className="nesio-dtp-footer">
           <button type="button" className="nesio-dtp-clear"
             onClick={() => { onChange({ date: todayStr }); onClose(); }}>
-            清除
+            {L(dict, '清除', 'Clear')}
           </button>
           <button type="button" className="nesio-dtp-confirm" onClick={onClose}>
-            确定
+            {L(dict, '确定', 'Done')}
           </button>
         </div>
       </div>
@@ -285,6 +289,7 @@ function DateTimePicker({ value, onChange, onClose }: {
 }
 
 export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateData = false, onClose }: VoiceInputSheetProps) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [text, setText] = useState('');
   const [listening, setListening] = useState(false);
   const [sendState, setSendState] = useState<SendState>('idle');
@@ -331,7 +336,7 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
       }) | undefined;
 
     if (!Ctor) {
-      setMicError('此浏览器不支持语音输入，请直接打字。');
+      setMicError(L(dict, '此浏览器不支持语音输入，请直接打字。', 'Voice input is not supported in this browser — please type.'));
       setTimeout(() => inputRef.current?.focus(), 100);
       return;
     }
@@ -355,12 +360,12 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
     rec.onend = () => setListening(false);
     rec.onerror = (e) => {
       setListening(false);
-      if (e.error === 'not-allowed') setMicError('麦克风权限被拒，请在浏览器设置中允许后重试。');
+      if (e.error === 'not-allowed') setMicError(L(dict, '麦克风权限被拒，请在浏览器设置中允许后重试。', 'Mic permission denied — allow it in browser settings and retry.'));
       else if (e.error === 'no-speech') { /* silently retry */ }
     };
 
     try { rec.start(); recRef.current = rec; setListening(true); }
-    catch { setMicError('无法启动语音识别，请直接打字。'); }
+    catch { setMicError(L(dict, '无法启动语音识别，请直接打字。', 'Could not start speech recognition — please type.')); }
   }
 
   function stopListening() { recRef.current?.stop(); setListening(false); }
@@ -520,23 +525,23 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
 
   return (
     <>
-    <div className="nesio-voice-sheet" role="dialog" aria-modal="true" aria-label={isAskMode ? '问宝盒' : '说一句'}>
+    <div className="nesio-voice-sheet" role="dialog" aria-modal="true" aria-label={isAskMode ? L(dict, '问宝盒', 'Ask Nesio') : L(dict, '说一句', 'Say it')}>
       <div className="nesio-voice-sheet-backdrop" onClick={onClose} />
       <div className="nesio-voice-sheet-card">
         <div className="nesio-sheet-handle" aria-hidden />
 
         <div className="nesio-voice-sheet-header">
-          <h2 className="nesio-voice-sheet-title">{isAskMode ? '问宝盒' : '说一句'}</h2>
+          <h2 className="nesio-voice-sheet-title">{isAskMode ? L(dict, '问宝盒', 'Ask Nesio') : L(dict, '说一句', 'Say it')}</h2>
           <button type="button" className="nesio-voice-sheet-close" onClick={onClose} aria-label="关闭">✕</button>
         </div>
 
         {/* Context confirm (§6.2 绝对控制优先) — AI suggested; you decide before it's trusted. */}
         {sendState === 'confirm' && draft && (
           <div className="nesio-voice-confirm">
-            <p className="nesio-voice-confirm-lead">先确认一下，再存入 Memory</p>
+            <p className="nesio-voice-confirm-lead">{L(dict, '先确认一下，再存入 Memory', 'Confirm first, then it enters Memory')}</p>
 
             <label className="nesio-voice-confirm-field">
-              <span className="nesio-voice-confirm-label">这条叫什么</span>
+              <span className="nesio-voice-confirm-label">{L(dict, '这条叫什么', 'Call this…')}</span>
               <input
                 className="nesio-voice-confirm-input"
                 value={draft.title}
@@ -546,7 +551,7 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
             </label>
 
             <div className="nesio-voice-confirm-field">
-              <span className="nesio-voice-confirm-label">属于哪个领域</span>
+              <span className="nesio-voice-confirm-label">{L(dict, '属于哪个领域', 'Which area of life')}</span>
               <div className="nesio-voice-confirm-domains">
                 {ALL_DOMAINS.map((meta) => (
                   <button
@@ -564,7 +569,7 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
 
             {(['people', 'places', 'objects'] as const).some((k) => draft[k].length > 0) && (
               <div className="nesio-voice-confirm-field">
-                <span className="nesio-voice-confirm-label">识别到的线索（点 × 去掉不对的）</span>
+                <span className="nesio-voice-confirm-label">{L(dict, '识别到的线索（点 × 去掉不对的）', 'Detected clues (tap × to remove wrong ones)')}</span>
                 <div className="nesio-voice-confirm-chips">
                   {([
                     ['people', <IconUser key="p" size={12} />],
@@ -604,7 +609,7 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
               })();
               return (
                 <div className="nesio-voice-confirm-field">
-                  <span className="nesio-voice-confirm-label">截止日期 / 提醒时间</span>
+                  <span className="nesio-voice-confirm-label">{L(dict, '截止日期 / 提醒时间', 'Due date / reminder')}</span>
                   <button
                     type="button"
                     className="nesio-dtp-trigger"
@@ -628,11 +633,9 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
 
             <div className="nesio-voice-confirm-actions">
               <button type="button" className="nesio-voice-confirm-back" onClick={() => { setDraft(null); setSendState('idle'); }}>
-                返回修改
+                {L(dict, '返回修改', 'Back to edit')}
               </button>
-              <button type="button" className="nesio-voice-send-btn nesio-voice-confirm-save" onClick={() => draft && writeSignalFromDraft(draft, true)}>
-                确认存入 Memory
-              </button>
+              <button type="button" className="nesio-voice-send-btn nesio-voice-confirm-save" onClick={() => draft && writeSignalFromDraft(draft, true)}>{L(dict, '确认存入 Memory', 'Confirm & save')}</button>
             </div>
           </div>
         )}
@@ -644,7 +647,7 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
           <input
             ref={inputRef}
             className="nesio-voice-input"
-            placeholder={isAskMode ? '打字问宝盒,或点麦克风说…' : '说一句,或直接打字…'}
+            placeholder={isAskMode ? L(dict, '打字问宝盒,或点麦克风说…', 'Type your question, or tap the mic…') : L(dict, '说一句,或直接打字…', 'Say it, or just type…')}
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
@@ -681,15 +684,15 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
                   <span key={i} className="nesio-voice-wave-bar" style={{ animationDelay: `${i * 0.09}s` }} />
                 ))}
               </div>
-              <span className="nesio-voice-status-label">{isAskMode ? '正在听这一句…' : '正在记录…'}</span>
+              <span className="nesio-voice-status-label">{isAskMode ? L(dict, '正在听这一句…', 'Listening…') : L(dict, '正在记录…', 'Recording…')}</span>
               <button type="button" style={{ fontSize: '0.72rem', color: 'var(--portal-muted)', marginLeft: '0.5rem', padding: '0.2rem 0.5rem' }} onClick={stopListening}>
-                停止
+                {L(dict, '停止', 'Stop')}
               </button>
             </>
           ) : micError ? (
             <span style={{ fontSize: '0.73rem', color: 'var(--status-risk)', textAlign: 'center', lineHeight: 1.4 }}>{micError}</span>
           ) : text && !isAskMode ? (
-            <span style={{ fontSize: '0.72rem', color: 'var(--portal-muted)' }}>识别完成 · 点「告诉 Nesio」保存</span>
+            <span style={{ fontSize: '0.72rem', color: 'var(--portal-muted)' }}>{L(dict, '识别完成 · 点「告诉 Nesio」保存', 'Got it · tap "Tell Nesio" to save')}</span>
           ) : null}
         </div>
         )}
@@ -698,9 +701,9 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
         {!isAskMode && sendState !== 'confirm' && (
           <div className="nesio-voice-quick">
             {QUICK_INTENTS.map((q) => (
-              <button key={q.label} type="button" className="nesio-voice-quick-btn"
-                onClick={() => { stopListening(); setText(q.prefix); setTimeout(() => inputRef.current?.focus(), 50); }}>
-                {q.label}
+              <button key={q.zh} type="button" className="nesio-voice-quick-btn"
+                onClick={() => { stopListening(); setText(L(dict, q.prefixZh, q.prefixEn)); setTimeout(() => inputRef.current?.focus(), 50); }}>
+                {L(dict, q.zh, q.en)}
               </button>
             ))}
           </div>
@@ -714,11 +717,11 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
               <div className="nesio-ask-answer-block">
                 <span className="nesio-ask-answer-icon">✦</span>
                 <p className="nesio-ask-answer-text">{askAnswer}</p>
-                {webSearchUsed && <span className="nesio-ask-web-badge">网络搜索</span>}
+                {webSearchUsed && <span className="nesio-ask-web-badge">{L(dict, '网络搜索', 'Web search')}</span>}
               </div>
             ) : (!askResults.length && (
               <div className="nesio-ask-answer-block">
-                <p className="nesio-ask-answer-text" style={{ color: 'var(--portal-muted)' }}>还没找到相关线索。</p>
+                <p className="nesio-ask-answer-text" style={{ color: 'var(--portal-muted)' }}>{L(dict, '还没找到相关线索。', 'No relevant clues found yet.')}</p>
               </div>
             ))}
 
@@ -737,7 +740,7 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
             {/* 引用来源卡片 */}
             {askResults.length > 0 && (
               <div className="nesio-ask-citations">
-                <p className="nesio-ask-citations-title">来源线索</p>
+                <p className="nesio-ask-citations-title">{L(dict, '来源线索', 'Sources')}</p>
                 {askResults.slice(0, 5).map((node) => (
                   <div key={node.id} className="nesio-ask-citation-card">
                     <span className="nesio-ask-citation-name">{node.name}</span>
@@ -752,18 +755,18 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
               className="nesio-ask-again-btn"
               onClick={() => { setSendState('idle'); setAskAnswer(''); setAskResults([]); setAskAggregations([]); setWebSearchUsed(false); }}
             >
-              再问一句
+              {L(dict, '再问一句', 'Ask another')}
             </button>
           </div>
         ) : sendState === 'saved' ? (
-          <div className="nesio-voice-saved">✓ 已存入 Memory（{savedCount} 条）</div>
+          <div className="nesio-voice-saved">✓ {L(dict, `已存入 Memory（${savedCount} 条）`, `Saved to Memory (${savedCount})`)}</div>
         ) : sendState === 'analyzing' ? (
           <div className="nesio-voice-send-btn" style={{ opacity: 0.6, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
-            <span className="nesio-camera-recognizing-dot" style={{ background: '#fff' }} />{isAskMode ? '正在搜索记忆…' : 'Nesio 正在分析…'}
+            <span className="nesio-camera-recognizing-dot" style={{ background: '#fff' }} />{isAskMode ? L(dict, '正在搜索记忆…', 'Searching memory…') : L(dict, 'Nesio 正在分析…', 'Nesio is analyzing…')}
           </div>
         ) : text.trim() && sendState !== 'confirm' ? (
           <button type="button" className="nesio-voice-send-btn" onClick={handleSend}>
-            {isAskMode ? '问宝盒' : '告诉 Nesio'}
+            {isAskMode ? L(dict, '问宝盒', 'Ask') : L(dict, '告诉 Nesio', 'Tell Nesio')}
           </button>
         ) : null}
       </div>

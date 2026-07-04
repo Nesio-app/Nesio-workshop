@@ -2,6 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { IconActivity, IconClock, IconTarget, IconTrendingDown, IconTrendingUp } from './icons';
+import { L } from '@/lib/portal/i18n';
+import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
+import { usePortalLocale } from './use-portal-locale';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -460,6 +463,7 @@ function NumberStepper({ value, onChange, unit }: { value: string; onChange: (v:
 }
 
 export function LogPanel({ exp, onLog }: { exp: Experiment; onLog: (iv: number, dv: number, note: string) => void }) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const last = exp.dataPoints[exp.dataPoints.length - 1];
   const [iv, setIv] = useState(exp.ivType === 'number' && last ? String(last.iv) : '');
   const [dv, setDv] = useState(exp.dvType === 'number' && last ? String(last.dv) : '');
@@ -501,22 +505,22 @@ export function LogPanel({ exp, onLog }: { exp: Experiment; onLog: (iv: number, 
   if (alreadyLogged) {
     return (
       <div className="nesio-exp-logged-today">
-        <span>✓</span> 今天已记录
+        <span>✓</span> {L(dict, '今天已记录', 'Logged today')}
       </div>
     );
   }
 
   return (
     <div className="nesio-exp-log-panel">
-      <p className="nesio-exp-log-title">今日记录</p>
+      <p className="nesio-exp-log-title">{L(dict, '今日记录', "Today's log")}</p>
 
       {/* IV input */}
       <div className="nesio-exp-log-row">
         <span className="nesio-exp-log-label">{exp.ivName}{exp.ivUnit ? ` (${exp.ivUnit})` : ''}</span>
         {exp.ivType === 'boolean' ? (
           <div className="nesio-exp-bool-row">
-            <button type="button" className={`nesio-exp-bool-btn${boolIv === true ? ' active' : ''}`} onClick={() => setBoolIv(true)}>✓ 是</button>
-            <button type="button" className={`nesio-exp-bool-btn${boolIv === false ? ' active' : ''}`} onClick={() => setBoolIv(false)}>✗ 否</button>
+            <button type="button" className={`nesio-exp-bool-btn${boolIv === true ? ' active' : ''}`} onClick={() => setBoolIv(true)}>✓ {L(dict, '是', 'Yes')}</button>
+            <button type="button" className={`nesio-exp-bool-btn${boolIv === false ? ' active' : ''}`} onClick={() => setBoolIv(false)}>✗ {L(dict, '否', 'No')}</button>
           </div>
         ) : exp.ivType === 'scale' ? (
           <div className="nesio-exp-scale-row">
@@ -543,9 +547,9 @@ export function LogPanel({ exp, onLog }: { exp: Experiment; onLog: (iv: number, 
         )}
       </div>
 
-      <input className="nesio-exp-log-note" placeholder="今天有什么特别的事？（可选）" value={note} onChange={(e) => setNote(e.target.value)} />
+      <input className="nesio-exp-log-note" placeholder={L(dict, '今天有什么特别的事？（可选）', 'Anything special today? (optional)')} value={note} onChange={(e) => setNote(e.target.value)} />
 
-      <button type="button" className="nesio-exp-log-submit" onClick={submit}>记录今天</button>
+      <button type="button" className="nesio-exp-log-submit" onClick={submit}>{L(dict, '记录今天', 'Log today')}</button>
     </div>
   );
 }

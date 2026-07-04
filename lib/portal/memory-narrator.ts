@@ -7,6 +7,12 @@
  * - activity:     "最近你在忙" — 近7天最活跃域的摘要
  */
 
+import { L } from './i18n';
+
+// 领域中文标签 → 英文(domain-taxonomy 的 label 是数据层中文)
+const DOMAIN_EN: Record<string, string> = {
+  '生活': 'life', '成长': 'growth', '财物': 'assets', '健康': 'health', '能量': 'energy',
+};
 import type { LifeNode } from './life-graph';
 import { nodeDomain } from '@/lib/life-domain';
 import { topDomain } from './domain-stats';
@@ -24,7 +30,7 @@ export interface NarratorCard {
 
 // ── 还记得这件事吗？ ──────────────────────────────────────────────────────────
 
-function buildRememberCard(nodes: LifeNode[]): NarratorCard | null {
+function buildRememberCard(nodes: LifeNode[], locale: string = 'zh'): NarratorCard | null {
   const now = Date.now();
   const MIN_AGE = 14 * 24 * 3_600_000;   // 14 天
   const MAX_AGE = 180 * 24 * 3_600_000;  // 6 个月
@@ -42,22 +48,23 @@ function buildRememberCard(nodes: LifeNode[]): NarratorCard | null {
 
   // 情绪/日记内容不在首屏裸奔 — 遮罩为日期摘要,点开才见全文
   const intimate = (node.tags || []).some((t) => ['moment', 'journal', 'feeling'].includes(t));
+  const dateStr = new Date(node.createdAt).toLocaleDateString(locale === 'en' ? 'en-US' : 'zh-CN', { month: 'numeric', day: 'numeric' });
   const body = intimate
-    ? `一段 ${new Date(node.createdAt).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })} 的心情记录`
+    ? L(locale, `一段 ${dateStr} 的心情记录`, `A mood entry from ${dateStr}`)
     : (node.rawInput || node.name);
 
   return {
     type: 'remember',
-    title: '还记得这件事吗？',
+    title: L(locale, '还记得这件事吗？', 'Remember this?'),
     body,
-    sub: `—— 你 ${relativePastLabel(node.createdAt, now)} 存的`,
+    sub: L(locale, `—— 你 ${relativePastLabel(node.createdAt, now)} 存的`, `— saved ${relativePastLabel(node.createdAt, now, 'en')}`),
     nodes: [node],
   };
 }
 
 // ── 承诺 ──────────────────────────────────────────────────────────────────────
 
-function buildCommitmentCard(nodes: LifeNode[]): NarratorCard | null {
+function buildCommitmentCard(nodes: LifeNode[], locale: string = 'zh'): NarratorCard | null {
   const commitments = nodes.filter((n) => n.type === 'commitment');
   if (!commitments.length) return null;
 
@@ -74,8 +81,8 @@ function buildCommitmentCard(nodes: LifeNode[]): NarratorCard | null {
     if (due) {
       const dueTime = new Date(due).getTime();
       const label = dueTime < now()
-        ? relativePastLabel(dueTime)
-        : relativeFutureLabel(dueTime);
+        ? relativePastLabel(dueTime, Date.now(), locale)
+        : relativeFutureLabel(dueTime, new Date(), locale);
       return `${n.name} · ${label}`;
     }
     return n.name;
@@ -83,7 +90,7 @@ function buildCommitmentCard(nodes: LifeNode[]): NarratorCard | null {
 
   return {
     type: 'commitment',
-    title: `有 ${commitments.length} 个承诺`,
+    title: L(locale, `有 ${commitments.length} 个承诺`, `${commitments.length} promise${commitments.length > 1 ? 's' : ''} open`),
     body: lines.join('\n'),
     nodes: sorted,
   };
@@ -91,7 +98,7 @@ function buildCommitmentCard(nodes: LifeNode[]): NarratorCard | null {
 
 // ── 最近你在忙 ────────────────────────────────────────────────────────────────
 
-function buildActivityCard(nodes: LifeNode[]): NarratorCard | null {
+function buildActivityCard(nodes: LifeNode[], locale: string = 'zh'): NarratorCard | null {
   const SEVEN_DAYS = 7 * 24 * 3_600_000;
   const recent = nodes.filter(
     (n) => now() - new Date(n.createdAt).getTime() < SEVEN_DAYS,
@@ -109,8 +116,8 @@ function buildActivityCard(nodes: LifeNode[]): NarratorCard | null {
 
   return {
     type: 'activity',
-    title: '最近你在忙',
-    body: `${top.count} 条${top.label}记录`,
+    title: L(locale, '最近你在忙', "Lately you've been on"),
+    body: L(locale, `${top.count} 条${top.label}记录`, `${top.count} ${DOMAIN_EN[top.label] ?? top.label} entries`),
     sub: preview || undefined,
     nodes: recent.slice(0, 3),
   };
@@ -118,13 +125,13 @@ function buildActivityCard(nodes: LifeNode[]): NarratorCard | null {
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-export function buildNarratorCards(nodes: LifeNode[]): NarratorCard[] {
+export function buildNarratorCards(nodes: LifeNode[], locale: string = 'zh'): NarratorCard[] {
   const cards: NarratorCard[] = [];
-  const r = buildRememberCard(nodes);
+  const r = buildRememberCard(nodes, locale);
   if (r) cards.push(r);
-  const c = buildCommitmentCard(nodes);
+  const c = buildCommitmentCard(nodes, locale);
   if (c) cards.push(c);
-  const a = buildActivityCard(nodes);
+  const a = buildActivityCard(nodes, locale);
   if (a) cards.push(a);
   return cards;
 }

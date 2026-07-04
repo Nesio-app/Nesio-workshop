@@ -16,6 +16,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { IconBook, IconMoon, IconZap } from './icons';
+import { L, type DictLocale } from '@/lib/portal/i18n';
+import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
+import { usePortalLocale } from './use-portal-locale';
 import { getLifeGraph, type LifeNode } from '@/lib/portal/life-graph';
 
 // ── Journal 历史(批次 6:富文本-lite + 历史时间线 + 搜索)────────────────────
@@ -79,19 +82,24 @@ function loadJournalEntries(): JournalEntry[] {
 
 // ── 12-Emotion taxonomy (Russell Circumplex 4 quadrants × 3) ─────────────────
 const EMOTIONS = [
-  { id: 'joy',        label: '开心', emoji: '😄', color: 'var(--emotion-joy)', quadrant: 'hv-ha' },
-  { id: 'excited',    label: '兴奋', emoji: '🤩', color: 'var(--emotion-excited)', quadrant: 'hv-ha' },
-  { id: 'moved',      label: '感动', emoji: '🥰', color: 'var(--emotion-moved)', quadrant: 'hv-ha' },
-  { id: 'calm',       label: '平静', emoji: '😌', color: 'var(--emotion-calm)', quadrant: 'hv-la' },
-  { id: 'content',    label: '满足', emoji: '😊', color: 'var(--emotion-content)', quadrant: 'hv-la' },
-  { id: 'grateful',   label: '感激', emoji: '🤗', color: 'var(--emotion-grateful)', quadrant: 'hv-la' },
-  { id: 'tired',      label: '疲惫', emoji: '😪', color: 'var(--emotion-tired)', quadrant: 'lv-la' },
-  { id: 'empty',      label: '空洞', emoji: '😶', color: 'var(--emotion-empty)', quadrant: 'lv-la' },
-  { id: 'sad',        label: '难过', emoji: '😢', color: 'var(--emotion-sad)', quadrant: 'lv-la' },
-  { id: 'anxious',    label: '焦虑', emoji: '😰', color: 'var(--emotion-anxious)', quadrant: 'lv-ha' },
-  { id: 'frustrated', label: '烦躁', emoji: '😤', color: 'var(--emotion-frustrated)', quadrant: 'lv-ha' },
-  { id: 'angry',      label: '生气', emoji: '😠', color: 'var(--emotion-angry)', quadrant: 'lv-ha' },
+  { id: 'joy',        label: '开心', labelEn: 'Joyful',    emoji: '😄', color: 'var(--emotion-joy)', quadrant: 'hv-ha' },
+  { id: 'excited',    label: '兴奋', labelEn: 'Excited',   emoji: '🤩', color: 'var(--emotion-excited)', quadrant: 'hv-ha' },
+  { id: 'moved',      label: '感动', labelEn: 'Moved',     emoji: '🥰', color: 'var(--emotion-moved)', quadrant: 'hv-ha' },
+  { id: 'calm',       label: '平静', labelEn: 'Calm',      emoji: '😌', color: 'var(--emotion-calm)', quadrant: 'hv-la' },
+  { id: 'content',    label: '满足', labelEn: 'Content',   emoji: '😊', color: 'var(--emotion-content)', quadrant: 'hv-la' },
+  { id: 'grateful',   label: '感激', labelEn: 'Grateful',  emoji: '🤗', color: 'var(--emotion-grateful)', quadrant: 'hv-la' },
+  { id: 'tired',      label: '疲惫', labelEn: 'Tired',     emoji: '😪', color: 'var(--emotion-tired)', quadrant: 'lv-la' },
+  { id: 'empty',      label: '空洞', labelEn: 'Empty',     emoji: '😶', color: 'var(--emotion-empty)', quadrant: 'lv-la' },
+  { id: 'sad',        label: '难过', labelEn: 'Sad',       emoji: '😢', color: 'var(--emotion-sad)', quadrant: 'lv-la' },
+  { id: 'anxious',    label: '焦虑', labelEn: 'Anxious',   emoji: '😰', color: 'var(--emotion-anxious)', quadrant: 'lv-ha' },
+  { id: 'frustrated', label: '烦躁', labelEn: 'Restless',  emoji: '😤', color: 'var(--emotion-frustrated)', quadrant: 'lv-ha' },
+  { id: 'angry',      label: '生气', labelEn: 'Angry',     emoji: '😠', color: 'var(--emotion-angry)', quadrant: 'lv-ha' },
 ] as const;
+
+function emLabel(em: { label: string; labelEn: string } | null | undefined, dict: DictLocale): string {
+  if (!em) return '';
+  return dict === 'en' ? em.labelEn : em.label;
+}
 
 type EmotionId = typeof EMOTIONS[number]['id'];
 type EnergyLevel = 'high' | 'mid' | 'low';
@@ -155,25 +163,26 @@ function energyColor(v: number): string {
   return `rgb(${r},${g},${b})`;
 }
 
-function energyLabel(v: number): string {
-  if (v >= 67) return '充沛';
-  if (v >= 34) return '一般';
-  return '没电';
+function energyLabel(v: number, dict: DictLocale = 'zh'): string {
+  if (v >= 67) return L(dict, '充沛', 'Charged');
+  if (v >= 34) return L(dict, '一般', 'OK');
+  return L(dict, '没电', 'Drained');
 }
 
 // ── Rotating prompts ──────────────────────────────────────────────────────────
-const THOUGHT_PROMPTS = [
-  '今天最开心的一件事？', '今天最感谢什么？', '今天什么最消耗你？',
-  '此刻你想对自己说什么？', '今天发现了什么？', '一句话描述此刻。', '今天最让你意外的是？',
+const THOUGHT_PROMPTS: Array<[string, string]> = [
+  ['今天最开心的一件事？', 'The happiest thing today?'], ['今天最感谢什么？', 'What are you most grateful for today?'], ['今天什么最消耗你？', 'What drained you most today?'],
+  ['此刻你想对自己说什么？', 'What would you tell yourself right now?'], ['今天发现了什么？', 'What did you discover today?'], ['一句话描述此刻。', 'This moment, in one line.'], ['今天最让你意外的是？', 'What surprised you today?'],
 ];
 
-const JOURNAL_PROMPTS = [
-  '今天你注意到什么？', '此刻身体感觉如何？', '最近什么让你感到充实？',
-  '现在你最需要的是什么？', '今天什么值得记住？', '如果此刻可以对未来的自己说一句话…',
+const JOURNAL_PROMPTS: Array<[string, string]> = [
+  ['今天你注意到什么？', 'What did you notice today?'], ['此刻身体感觉如何？', 'How does your body feel right now?'], ['最近什么让你感到充实？', "What's been fulfilling lately?"],
+  ['现在你最需要的是什么？', 'What do you need most right now?'], ['今天什么值得记住？', "What's worth remembering today?"], ['如果此刻可以对未来的自己说一句话…', 'One line to your future self…'],
 ];
 
-function todayPrompt(list: string[]): string {
-  return list[new Date().getDate() % list.length];
+function todayPrompt(list: Array<[string, string]>, dict: DictLocale): string {
+  const [zh, en] = list[new Date().getDate() % list.length];
+  return dict === 'en' ? en : zh;
 }
 
 // ── Context auto-fill ─────────────────────────────────────────────────────────
@@ -197,6 +206,7 @@ interface MoodSheetProps { open: boolean; onClose: () => void; }
 type Phase = 'wheel' | 'energy' | 'thought' | 'journal' | 'saved';
 
 export default function MoodSheet({ open, onClose }: MoodSheetProps) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [phase, setPhase] = useState<Phase>('wheel');
   const [selected, setSelected] = useState<EmotionId | null>(null);
   const [hovered, setHovered] = useState<number | null>(null);
@@ -216,15 +226,15 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
   const autoCloseRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isDraggingSlider = useRef(false);
-  const thoughtPromptRef = useRef(todayPrompt(THOUGHT_PROMPTS));
-  const journalPromptRef = useRef(todayPrompt(JOURNAL_PROMPTS));
+  const thoughtPromptRef = useRef(todayPrompt(THOUGHT_PROMPTS, dict));
+  const journalPromptRef = useRef(todayPrompt(JOURNAL_PROMPTS, dict));
 
   useEffect(() => {
     if (open) {
       setPhase('wheel'); setSelected(null); setHovered(null);
       setEnergyVal(50); setThought(''); setJournal(''); setLongPressing(false);
-      thoughtPromptRef.current = todayPrompt(THOUGHT_PROMPTS);
-      journalPromptRef.current = todayPrompt(JOURNAL_PROMPTS);
+      thoughtPromptRef.current = todayPrompt(THOUGHT_PROMPTS, dict);
+      journalPromptRef.current = todayPrompt(JOURNAL_PROMPTS, dict);
     }
     return () => {
       if (autoCloseRef.current) clearTimeout(autoCloseRef.current);
@@ -383,8 +393,8 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
           <div className="nesio-mood-saved-emoji" aria-hidden>
             <span style={{ display: 'inline-block', width: 30, height: 30, borderRadius: '50%', background: em?.color ?? 'var(--portal-blue-deep)', boxShadow: `0 0 0 8px color-mix(in srgb, ${em?.color ?? 'var(--portal-blue-deep)'} 22%, transparent)` }} />
           </div>
-          <p className="nesio-mood-saved-text">留住了这一刻</p>
-          <p className="nesio-mood-saved-hint">会和你其他的记忆慢慢连起来</p>
+          <p className="nesio-mood-saved-text">{L(dict, '留住了这一刻', 'Moment kept')}</p>
+          <p className="nesio-mood-saved-hint">{L(dict, '会和你其他的记忆慢慢连起来', 'It will slowly connect with your other memories')}</p>
         </div>
       </div>
     );
@@ -424,7 +434,7 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
           <div className="nesio-mood-handle" aria-hidden />
           <div className="nesio-mood-journal-header">
             <div style={{ display: 'flex', gap: '0.35rem' }}>
-              {([['write', '写一篇'], ['history', '历史']] as const).map(([id, label]) => (
+              {([['write', L(dict, '写一篇', 'Write')], ['history', L(dict, '历史', 'History')]] as const).map(([id, label]) => (
                 <button key={id} type="button"
                   onClick={() => setJournalTab(id)}
                   style={{ fontSize: '0.78rem', fontWeight: 600, padding: '0.3rem 0.8rem', borderRadius: 999, border: 'none', cursor: 'pointer', background: journalTab === id ? 'var(--portal-blue-deep)' : 'rgba(88,140,227,0.1)', color: journalTab === id ? '#fff' : 'var(--portal-blue-deep)' }}>
@@ -442,7 +452,7 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
               {selectedEm && (
                 <p style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.76rem', color: 'var(--portal-muted)', margin: '0 0 0.3rem' }}>
                   <span aria-hidden style={{ width: 9, height: 9, borderRadius: '50%', background: selectedEm.color, display: 'inline-block' }} />
-                  {selectedEm.label}
+                  {emLabel(selectedEm, dict)}
                 </p>
               )}
               <p className="nesio-mood-journal-prompt">{journalPromptRef.current}</p>
@@ -458,28 +468,28 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
                 className="nesio-journal-editor"
                 contentEditable
                 suppressContentEditableWarning
-                data-placeholder="写下此刻…"
+                data-placeholder={L(dict, '写下此刻…', 'Write this moment…')}
                 onInput={(e) => {
                   journalHtmlRef.current = (e.target as HTMLDivElement).innerHTML;
                   setJournal((e.target as HTMLDivElement).textContent ?? '');
                 }}
               />
               <button type="button" className="nesio-mood-save-btn nesio-mood-save-btn--ready"
-                onClick={() => handleSave({ isJournal: true })}>保存这一刻</button>
+                onClick={() => handleSave({ isJournal: true })}>{L(dict, '保存这一刻', 'Save this moment')}</button>
             </>
           ) : (
             <>
               <input
                 value={journalQuery}
                 onChange={(e) => setJournalQuery(e.target.value)}
-                placeholder="搜索日记…"
+                placeholder={L(dict, '搜索日记…', 'Search journal…')}
                 className="nesio-mood-note"
                 style={{ marginBottom: '0.6rem' }}
               />
               <div style={{ maxHeight: '46vh', overflowY: 'auto', paddingRight: 2 }}>
                 {filtered.length === 0 && (
                   <p style={{ fontSize: '0.8rem', color: 'var(--portal-muted)', textAlign: 'center', padding: '1.2rem 0' }}>
-                    {q ? `没有找到「${q}」` : '还没有日记。长按转盘中心,写下第一篇。'}
+                    {q ? L(dict, `没有找到「${q}」`, `Nothing found for \"${q}\"`) : L(dict, '还没有日记。长按转盘中心,写下第一篇。', 'No journal yet. Long-press the wheel center to write the first one.')}
                   </p>
                 )}
                 {[...byDay.entries()].map(([day, list]) => (
@@ -528,12 +538,12 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
           <div className="nesio-mood-handle" aria-hidden />
           <p className="nesio-mood-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
             {selectedEm && <span aria-hidden style={{ width: 9, height: 9, borderRadius: '50%', background: selectedEm.color, display: 'inline-block' }} />}
-            {selectedEm?.label} · 现在精力怎么样？
+            {emLabel(selectedEm, dict)} · {L(dict, '现在精力怎么样？', 'How is your energy?')}
           </p>
           <div className="nesio-mood-slider-wrap">
             <div className="nesio-mood-slider-labels">
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><IconMoon size={12} /> 没电</span>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><IconZap size={12} /> 充沛</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><IconMoon size={12} /> {L(dict, '没电', 'Drained')}</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><IconZap size={12} /> {L(dict, '充沛', 'Charged')}</span>
             </div>
             <div ref={sliderRef} className="nesio-mood-slider-track"
               onMouseDown={onSliderStart} onTouchStart={onSliderStart}>
@@ -543,13 +553,13 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
                 style={{ left: `${energyVal}%`, backgroundColor: eColor, boxShadow: `0 0 0 4px ${eColor}33` }}
                 role="slider" aria-valuenow={energyVal} aria-valuemin={0} aria-valuemax={100} />
             </div>
-            <p className="nesio-mood-slider-label" style={{ color: eColor }}>{energyLabel(energyVal)}</p>
+            <p className="nesio-mood-slider-label" style={{ color: eColor }}>{energyLabel(energyVal, dict)}</p>
           </div>
           <div className="nesio-mood-energy-actions">
             <button type="button" className="nesio-mood-save-btn nesio-mood-save-btn--ready"
-              onClick={() => setPhase('thought')}>再说一句 →</button>
+              onClick={() => setPhase('thought')}>{L(dict, '再说一句', 'One more line')} →</button>
             <button type="button" className="nesio-mood-skip-btn"
-              onClick={() => handleSave()}>留住这一刻</button>
+              onClick={() => handleSave()}>{L(dict, '留住这一刻', 'Keep this moment')}</button>
           </div>
         </div>
       </div>
@@ -564,15 +574,15 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
           <div className="nesio-mood-handle" aria-hidden />
           <p className="nesio-mood-title">{thoughtPromptRef.current}</p>
           <input ref={thoughtRef} type="text" className="nesio-mood-note nesio-mood-note--large"
-            placeholder="一句话也好…" value={thought}
+            placeholder={L(dict, '一句话也好…', 'Even one line…')} value={thought}
             onChange={(e) => { setThought(e.target.value); cancelAutoClose(); }}
             onKeyDown={(e) => { if (e.key === 'Enter') handleSave(); }} maxLength={80} />
-          <p className="nesio-mood-auto-hint">4 秒无输入自动保存</p>
+          <p className="nesio-mood-auto-hint">{L(dict, '4 秒无输入自动保存', 'Auto-saves after 4s of no typing')}</p>
           <div className="nesio-mood-thought-actions">
             <button type="button" className="nesio-mood-save-btn nesio-mood-save-btn--ready"
-              onClick={() => handleSave()}>留住这一刻</button>
+              onClick={() => handleSave()}>{L(dict, '留住这一刻', 'Keep this moment')}</button>
             <button type="button" className="nesio-mood-journal-btn"
-              onClick={() => { cancelAutoClose(); setPhase('journal'); }}>展开为 Journal</button>
+              onClick={() => { cancelAutoClose(); setPhase('journal'); }}>{L(dict, '展开为 Journal', 'Expand to Journal')}</button>
           </div>
         </div>
       </div>
@@ -592,7 +602,7 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
         >✕</button>
         <p className="nesio-mood-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
           {hoveredEm && <span aria-hidden style={{ width: 9, height: 9, borderRadius: '50%', background: hoveredEm.color, display: 'inline-block' }} />}
-          {hoveredEm ? hoveredEm.label : '此刻，是什么感觉？'}
+          {hoveredEm ? emLabel(hoveredEm, dict) : L(dict, '此刻，是什么感觉？', 'This moment — how does it feel?')}
         </p>
         <div className="nesio-mood-wheel-wrap">
           <svg ref={svgRef} viewBox="0 0 300 300" className="nesio-mood-wheel-svg"
@@ -618,7 +628,7 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
                   <text x={lx} y={ly} textAnchor="middle" dominantBaseline="middle"
                     fontSize={isHov ? '10.5' : '9.5'} fontWeight={isHov ? '800' : '650'}
                     fill="#fff" opacity={isHov ? 1 : 0.92}
-                    style={{ pointerEvents: 'none', userSelect: 'none', transition: 'font-size 0.12s', letterSpacing: '0.05em' }}>{em.label}</text>
+                    style={{ pointerEvents: 'none', userSelect: 'none', transition: 'font-size 0.12s', letterSpacing: '0.05em' }}>{emLabel(em, dict)}</text>
                 </g>
               );
             })}
@@ -629,15 +639,15 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
             <text x={CX} y={CY - 7} textAnchor="middle" fontSize="10"
               fill={longPressing ? 'var(--portal-cool-accent)' : 'var(--portal-muted)'} fontWeight="600"
               style={{ userSelect: 'none', pointerEvents: 'none' }}>
-              {longPressing ? '放开写 Journal' : '此刻'}
+              {longPressing ? L(dict, '放开写 Journal', 'Release to journal') : L(dict, '此刻', 'Now')}
             </text>
             <text x={CX} y={CY + 8} textAnchor="middle" fontSize="8.5" fill="var(--portal-muted)"
               style={{ userSelect: 'none', pointerEvents: 'none' }}>
-              {longPressing ? 'Journal' : '滑动选择'}
+              {longPressing ? 'Journal' : L(dict, '滑动选择', 'Slide to pick')}
             </text>
           </svg>
         </div>
-        <p className="nesio-mood-hint-text">滑过一种感觉，松手即记录 · 长按中心写 Journal</p>
+        <p className="nesio-mood-hint-text">{L(dict, '滑过一种感觉，松手即记录 · 长按中心写 Journal', 'Slide over a feeling and release to log · long-press center to journal')}</p>
       </div>
     </div>
   );

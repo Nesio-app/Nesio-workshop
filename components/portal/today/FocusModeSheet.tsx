@@ -10,6 +10,9 @@ import { focusTimeHint, type FocusNode } from '@/lib/platform/view-models/today-
 import { createSignal } from '@/lib/life-domain';
 import { track } from '@/lib/portal/telemetry';
 import { IconPlay } from '../icons';
+import { L } from '@/lib/portal/i18n';
+import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
+import { usePortalLocale } from '../use-portal-locale';
 
 /**
  * 专注时长入统计(批次 6 用户问「这个数据有进入统计范围么」——此前没有):
@@ -33,9 +36,9 @@ function recordFocusSession(node: FocusNode, elapsedMin: number, completed: bool
 // ---- Focus Mode Sheet ----
 
 const FOCUS_DURATIONS = [
-  { label: '25 分钟', value: 25 },
-  { label: '50 分钟', value: 50 },
-  { label: '5 分钟', value: 5 },
+  { zh: '25 分钟', en: '25 min', value: 25 },
+  { zh: '50 分钟', en: '50 min', value: 50 },
+  { zh: '5 分钟', en: '5 min', value: 5 },
 ];
 
 export function FocusModeSheet({ node, onClose, onDone }: {
@@ -43,6 +46,7 @@ export function FocusModeSheet({ node, onClose, onDone }: {
   onClose: () => void;
   onDone: (node: FocusNode) => void;
 }) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [durMin, setDurMin] = useState(25);
   const [secsLeft, setSecsLeft] = useState(25 * 60);
   const [running, setRunning] = useState(false);
@@ -84,7 +88,7 @@ export function FocusModeSheet({ node, onClose, onDone }: {
   const progress = (totalSecs - secsLeft) / totalSecs;
   const mm = String(Math.floor(secsLeft / 60)).padStart(2, '0');
   const ss = String(secsLeft % 60).padStart(2, '0');
-  const hint = focusTimeHint(node);
+  const hint = focusTimeHint(node, dict);
 
   function handleDurationChange(v: number) {
     setDurMin(v);
@@ -94,12 +98,12 @@ export function FocusModeSheet({ node, onClose, onDone }: {
   }
 
   return (
-    <div className="nesio-focus-mode-overlay" role="dialog" aria-modal aria-label="聚焦模式">
+    <div className="nesio-focus-mode-overlay" role="dialog" aria-modal aria-label={L(dict, '聚焦模式', 'Focus mode')}>
       <div className="nesio-focus-mode-backdrop" onClick={onClose} />
       <div className="nesio-focus-mode-sheet">
-        <button type="button" className="nesio-focus-mode-close" onClick={onClose} aria-label="退出聚焦">✕</button>
+        <button type="button" className="nesio-focus-mode-close" onClick={onClose} aria-label={L(dict, '退出聚焦', 'Exit focus')}>✕</button>
 
-        <p className="nesio-focus-mode-label">现在专注于</p>
+        <p className="nesio-focus-mode-label">{L(dict, '现在专注于', 'Focusing on')}</p>
         <h2 className="nesio-focus-mode-title">{node.name}</h2>
         {hint && <p className="nesio-focus-mode-hint">{hint}</p>}
 
@@ -120,7 +124,7 @@ export function FocusModeSheet({ node, onClose, onDone }: {
             />
           </svg>
           <div className="nesio-focus-mode-time">
-            {finished ? '完成' : `${mm}:${ss}`}
+            {finished ? L(dict, '完成', 'Done') : `${mm}:${ss}`}
           </div>
         </div>
 
@@ -134,30 +138,30 @@ export function FocusModeSheet({ node, onClose, onDone }: {
                 className={`nesio-focus-mode-dur-btn${durMin === d.value ? ' nesio-focus-mode-dur-btn--active' : ''}`}
                 onClick={() => handleDurationChange(d.value)}
               >
-                {d.label}
+                {L(dict, d.zh, d.en)}
               </button>
             ))}
           </div>
         )}
 
         {finished ? (
-          <p className="nesio-focus-mode-done-msg">时间到！要标记完成吗？</p>
+          <p className="nesio-focus-mode-done-msg">{L(dict, '时间到！要标记完成吗？', 'Time! Mark it done?')}</p>
         ) : (
           <button
             type="button"
             className="nesio-focus-mode-play-btn"
             onClick={() => setRunning((r) => !r)}
           >
-            {running ? '暂停' : secsLeft < totalSecs ? <><IconPlay size={13} /> 继续</> : <><IconPlay size={13} /> 开始</>}
+            {running ? L(dict, '暂停', 'Pause') : secsLeft < totalSecs ? <><IconPlay size={13} /> {L(dict, '继续', 'Resume')}</> : <><IconPlay size={13} /> {L(dict, '开始', 'Start')}</>}
           </button>
         )}
 
         <div className="nesio-focus-mode-actions">
           <button type="button" className="nesio-focus-mode-done-btn" onClick={() => { recordFocusSession(node, Math.round(elapsedRef.current / 60), true); onDone(node); onClose(); }}>
-            ✓ 完成了
+            ✓ {L(dict, '完成了', 'Done')}
           </button>
           <button type="button" className="nesio-focus-mode-later-btn" onClick={() => { recordFocusSession(node, Math.round(elapsedRef.current / 60), false); onClose(); }}>
-            稍后再说
+            {L(dict, '稍后再说', 'Later')}
           </button>
         </div>
       </div>

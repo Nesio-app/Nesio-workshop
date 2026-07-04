@@ -3,6 +3,7 @@
  * 从 TodayFeed 拆出(工程 PRD 组件阈值整改)。
  */
 
+import { L } from '@/lib/portal/i18n';
 import type { EvidenceRef } from '@/lib/portal/reasoning-engine';
 import type { RecommendationCard } from '@/lib/portal/reasoning-engine';
 
@@ -31,17 +32,18 @@ export interface ProactiveCardData {
 
 
 // Time-based fallback nudge — only shown when the guidance pipeline produces nothing
-export function buildTimeFallback(now: Date): ProactiveCardData | null {
+export function buildTimeFallback(now: Date, locale: string = 'zh'): ProactiveCardData | null {
+  const l = (zh: string, en: string) => L(locale, zh, en);
   const dow = now.getDay();
   const hour = now.getHours();
   if (dow === 1 && hour < 11) {
-    return { id: 'fallback-week-start', title: '新的一周从规划开始', body: '周一早上，把本周最重要的 3 件事先记下来。', confidence: 70, sourceTags: ['时间·周一'], icon: '🗓', priority: 5 };
+    return { id: 'fallback-week-start', title: l('新的一周从规划开始', 'Start the week with a plan'), body: l('周一早上，把本周最重要的 3 件事先记下来。', 'Monday morning: jot down the 3 things that matter most this week.'), confidence: 70, sourceTags: [l('时间·周一', 'Time · Monday')], icon: '🗓', priority: 5 };
   }
   if (dow === 5 && hour >= 15) {
-    return { id: 'fallback-week-end', title: '本周还有什么没收尾？', body: '周五下午，快速过一遍本周待办，周末才能真正放松。', confidence: 70, sourceTags: ['时间·周五'], icon: '✅', priority: 5 };
+    return { id: 'fallback-week-end', title: l('本周还有什么没收尾？', 'Anything left to wrap up this week?'), body: l('周五下午，快速过一遍本周待办，周末才能真正放松。', 'Friday afternoon: a quick pass over the week so the weekend is actually off.'), confidence: 70, sourceTags: [l('时间·周五', 'Time · Friday')], icon: '✅', priority: 5 };
   }
   if (hour >= 21) {
-    return { id: 'fallback-evening', title: '今天有什么想记下来的？', body: '睡前花 30 秒，把今天的想法或待办存进来。', confidence: 65, sourceTags: ['时间·晚间'], icon: '🌙', priority: 4 };
+    return { id: 'fallback-evening', title: l('今天有什么想记下来的？', 'Anything worth writing down today?'), body: l('睡前花 30 秒，把今天的想法或待办存进来。', '30 seconds before bed: capture today\'s thoughts or todos.'), confidence: 65, sourceTags: [l('时间·晚间', 'Time · Evening')], icon: '🌙', priority: 4 };
   }
   return null;
 }
@@ -54,10 +56,11 @@ export function buildTimeFallback(now: Date): ProactiveCardData | null {
  */
 export interface FallbackNodeLike { id: string; name: string; createdAt: string; type?: string }
 
-export function buildRotatingFallback(now: Date, nodes: readonly FallbackNodeLike[]): ProactiveCardData | null {
+export function buildRotatingFallback(now: Date, nodes: readonly FallbackNodeLike[], locale: string = 'zh'): ProactiveCardData | null {
+  const l = (zh: string, en: string) => L(locale, zh, en);
   const pool: ProactiveCardData[] = [];
 
-  const timeCard = buildTimeFallback(now);
+  const timeCard = buildTimeFallback(now, locale);
   if (timeCard) pool.push(timeCard);
 
   // 历史上的今天(同月同日、更早年份)
@@ -70,9 +73,9 @@ export function buildRotatingFallback(now: Date, nodes: readonly FallbackNodeLik
     const years = now.getFullYear() - new Date(pick.createdAt).getFullYear();
     pool.push({
       id: 'fallback-on-this-day',
-      title: `${years} 年前的今天`,
-      body: `你记下了「${pick.name.slice(0, 40)}」。点 Memory 可以回看。`,
-      confidence: 70, sourceTags: ['历史上的今天'], icon: '🗓', priority: 4,
+      title: l(`${years} 年前的今天`, `On this day, ${years} year${years > 1 ? 's' : ''} ago`),
+      body: l(`你记下了「${pick.name.slice(0, 40)}」。点 Memory 可以回看。`, `You noted "${pick.name.slice(0, 40)}". Tap Memory to revisit.`),
+      confidence: 70, sourceTags: [l('历史上的今天', 'On this day')], icon: '🗓', priority: 4,
     });
   }
 
@@ -83,25 +86,25 @@ export function buildRotatingFallback(now: Date, nodes: readonly FallbackNodeLik
     const d = new Date(pick.createdAt).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
     pool.push({
       id: 'fallback-resurface',
-      title: '还记得这条吗？',
-      body: `${d} 你记下了「${pick.name.slice(0, 40)}」。`,
-      confidence: 65, sourceTags: ['记忆回顾'], icon: '💡', priority: 3,
+      title: l('还记得这条吗？', 'Remember this one?'),
+      body: l(`${d} 你记下了「${pick.name.slice(0, 40)}」。`, `On ${d} you noted "${pick.name.slice(0, 40)}".`),
+      confidence: 65, sourceTags: [l('记忆回顾', 'Memory review')], icon: '💡', priority: 3,
     });
   }
 
   // 使用提示(永远可用的兜底之兜底)
   pool.push({
     id: 'fallback-tip-ask',
-    title: '找东西不用翻',
-    body: '长按中间按钮问一问:「护照放在哪」「上次买的药」,记过的都能找到。',
-    confidence: 60, sourceTags: ['小技巧'], icon: '💡', priority: 2,
+    title: l('找东西不用翻', 'Find things without digging'),
+    body: l('长按中间按钮问一问:「护照放在哪」「上次买的药」,记过的都能找到。', 'Long-press the center button and ask: "Where\'s my passport?" — anything you noted can be found.'),
+    confidence: 60, sourceTags: [l('小技巧', 'Tip')], icon: '💡', priority: 2,
   });
   if (nodes.length >= 5) {
     pool.push({
       id: 'fallback-tip-count',
-      title: `已经陪你记住 ${nodes.length} 件事`,
-      body: '点左上角 Nesio 图标,看看这段时间的洞察和分析。',
-      confidence: 60, sourceTags: ['小技巧'], icon: '📦', priority: 2,
+      title: l(`已经陪你记住 ${nodes.length} 件事`, `${nodes.length} things remembered together so far`),
+      body: l('点左上角 Nesio 图标,看看这段时间的洞察和分析。', 'Tap the Nesio mark top-left for insights and analytics on this stretch.'),
+      confidence: 60, sourceTags: [l('小技巧', 'Tip')], icon: '📦', priority: 2,
     });
   }
 

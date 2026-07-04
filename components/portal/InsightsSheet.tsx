@@ -32,6 +32,9 @@ import {
   type LivingModelLayerId,
 } from '@/lib/platform/living-model';
 import { IconBox, IconCheckCircle, IconClock, IconSnowflake, IconTarget, IconUser } from './icons';
+import { L } from '@/lib/portal/i18n';
+import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
+import { usePortalLocale } from './use-portal-locale';
 import { getFreezeItems } from '@/lib/platform/impulse-guard';
 
 function loadFreezeLedger(): { total: number; skipped: number; bought: number } {
@@ -101,7 +104,8 @@ function saveWidgetConfig(ids: InsightWidgetId[]): void {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const PERIOD_LABELS: Record<Period, string> = { today: '今日', week: '本周', month: '本月' };
+const PERIOD_LABELS_ZH: Record<Period, string> = { today: '今日', week: '本周', month: '本月' };
+const PERIOD_LABELS_EN: Record<Period, string> = { today: 'Today', week: 'Week', month: 'Month' };
 
 const TYPE_COLOR: Record<string, string> = {
   commitment: 'var(--portal-cool-accent)',
@@ -149,14 +153,14 @@ function avg(arr: number[]): number {
 
 // ── Reflection Engine (pure rules, no AI) ─────────────────────────────────────
 
-function computeReflectionFacts(nodes: LifeNode[], all: LifeNode[], profile: MirrorProfile): FactBullet[] {
+function computeReflectionFacts(nodes: LifeNode[], all: LifeNode[], profile: MirrorProfile, dict: string = 'zh'): FactBullet[] {
   const facts: FactBullet[] = [];
 
   // 1. Record count
   if (nodes.length > 0) {
-    facts.push({ icon: <IconBox size={15} />, text: `记录了 ${nodes.length} 件事` });
+    facts.push({ icon: <IconBox size={15} />, text: L(dict, `记录了 ${nodes.length} 件事`, `${nodes.length} things noted`) });
   } else {
-    facts.push({ icon: <IconBox size={15} />, text: '这段时间还没有新记录' });
+    facts.push({ icon: <IconBox size={15} />, text: L(dict, '这段时间还没有新记录', 'No new notes in this period') });
   }
 
   // 2. Completion rate
@@ -164,7 +168,7 @@ function computeReflectionFacts(nodes: LifeNode[], all: LifeNode[], profile: Mir
   const done = commitments.filter((n) => n.attributes.done === true);
   if (commitments.length > 0) {
     const rate = Math.round((done.length / commitments.length) * 100);
-    facts.push({ icon: <IconCheckCircle size={15} />, text: `承诺完成率 ${rate}%（${done.length}/${commitments.length} 件）` });
+    facts.push({ icon: <IconCheckCircle size={15} />, text: L(dict, `承诺完成率 ${rate}%（${done.length}/${commitments.length} 件）`, `Promise completion ${rate}% (${done.length}/${commitments.length})`) });
   }
 
   // 3. Top domain
@@ -180,7 +184,7 @@ function computeReflectionFacts(nodes: LifeNode[], all: LifeNode[], profile: Mir
   }
   const topDomain = Object.entries(domainMap).sort(([, a], [, b]) => b - a)[0];
   if (topDomain && nodes.length > 1) {
-    facts.push({ icon: <IconTarget size={15} />, text: `最集中在「${topDomain[0]}」（${topDomain[1]} 条，占 ${Math.round(topDomain[1] / nodes.length * 100)}%）` });
+    facts.push({ icon: <IconTarget size={15} />, text: L(dict, `最集中在「${topDomain[0]}」（${topDomain[1]} 条，占 ${Math.round(topDomain[1] / nodes.length * 100)}%）`, `Most focused on "${topDomain[0]}" (${topDomain[1]}, ${Math.round(topDomain[1] / nodes.length * 100)}%)`) });
   }
 
   // 4. Active hour
@@ -188,7 +192,7 @@ function computeReflectionFacts(nodes: LifeNode[], all: LifeNode[], profile: Mir
     .map((g) => ({ ...g, score: avg(g.hours.map((h) => profile.hourEngagement[h])) }))
     .sort((a, b) => b.score - a.score)[0];
   if (bestGroup && bestGroup.score > 0.5) {
-    facts.push({ icon: <IconClock size={15} />, text: `你的黄金时段在${bestGroup.label}` });
+    facts.push({ icon: <IconClock size={15} />, text: L(dict, `你的黄金时段在${bestGroup.label}`, `Your golden hours: ${bestGroup.label}`) });
   }
 
   // 4.4 进行中实验(批次 8:打卡数据与洞察关联)
@@ -198,7 +202,7 @@ function computeReflectionFacts(nodes: LifeNode[], all: LifeNode[], profile: Mir
       const ins = computeInsight(exp);
       facts.push({
         icon: <IconTarget size={15} />,
-        text: `实验「${exp.name.slice(0, 12)}」已记录 ${exp.dataPoints.length} 天:${ins.text.slice(0, 40)}`,
+        text: L(dict, `实验「${exp.name.slice(0, 12)}」已记录 ${exp.dataPoints.length} 天:${ins.text.slice(0, 40)}`, `Experiment "${exp.name.slice(0, 12)}": ${exp.dataPoints.length} days logged`),
       });
       break; // 洞察区只放一条,详情在 分析→我的实验
     }
@@ -210,7 +214,7 @@ function computeReflectionFacts(nodes: LifeNode[], all: LifeNode[], profile: Mir
     if (freeze.skipped + freeze.bought > 0) {
       facts.push({
         icon: <IconSnowflake size={15} />,
-        text: `冲动冷静:冻过 ${freeze.total} 次,${freeze.skipped} 次最后没买(省下了),${freeze.bought} 次还是买了`,
+        text: L(dict, `冲动冷静:冻过 ${freeze.total} 次,${freeze.skipped} 次最后没买(省下了),${freeze.bought} 次还是买了`, `Impulse cooling: ${freeze.total} frozen, ${freeze.skipped} skipped (saved), ${freeze.bought} bought anyway`),
       });
     }
   } catch { /* ignore */ }
@@ -218,7 +222,7 @@ function computeReflectionFacts(nodes: LifeNode[], all: LifeNode[], profile: Mir
   // 5. Top person
   const persons = all.filter((n) => n.type === 'person').slice(0, 3);
   if (persons.length > 0) {
-    facts.push({ icon: <IconUser size={15} />, text: `最常出现的人：${persons.map((p) => p.name).join('、')}` });
+    facts.push({ icon: <IconUser size={15} />, text: L(dict, `最常出现的人：${persons.map((p) => p.name).join('、')}`, `Most frequent people: ${persons.map((p) => p.name).join(', ')}`) });
   }
 
   return facts.slice(0, 5);
@@ -847,6 +851,7 @@ function LivingModelTab({
 // ── Main Component ─────────────────────────────────────────────────────────────
 
 export default function InsightsSheet({ onClose }: { onClose: () => void }) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [mainTab, setMainTab] = useState<MainTab>('reflection');
   const [period, setPeriod] = useState<Period>('week');
   const [profile, setProfile] = useState<MirrorProfile | null>(null);
@@ -882,7 +887,7 @@ export default function InsightsSheet({ onClose }: { onClose: () => void }) {
     setPeriodNodes(filtered);
 
     // Reflection facts
-    setFacts(computeReflectionFacts(filtered, all, profile));
+    setFacts(computeReflectionFacts(filtered, all, profile, dict));
 
     // Domain distribution
     const domainMap: Record<string, { count: number; color: string }> = {};
@@ -987,7 +992,7 @@ export default function InsightsSheet({ onClose }: { onClose: () => void }) {
       <div className="nesio-insights-header">
         <div className="nesio-insights-title-row">
           <span className="nesio-insights-icon">✦</span>
-          <h2 className="nesio-insights-title">Nesio 的了解</h2>
+          <h2 className="nesio-insights-title">{L(dict, 'Nesio 的了解', 'What Nesio knows')}</h2>
         </div>
         <button type="button" className="nesio-insights-close" onClick={onClose} aria-label="关闭">✕</button>
       </div>
@@ -1001,7 +1006,7 @@ export default function InsightsSheet({ onClose }: { onClose: () => void }) {
             className={`nesio-insights-main-tab${mainTab === t ? ' nesio-insights-main-tab--active' : ''}`}
             onClick={() => setMainTab(t)}
           >
-            {t === 'reflection' ? '洞察' : t === 'analytics' ? '分析' : '认知模型'}
+            {t === 'reflection' ? L(dict, '洞察', 'Insights') : t === 'analytics' ? L(dict, '分析', 'Analytics') : L(dict, '认知模型', 'Mind model')}
           </button>
         ))}
       </div>
@@ -1020,7 +1025,7 @@ export default function InsightsSheet({ onClose }: { onClose: () => void }) {
                   className={`nesio-insights-tab${period === p ? ' nesio-insights-tab--active' : ''}`}
                   onClick={() => setPeriod(p)}
                 >
-                  {PERIOD_LABELS[p]}
+                  {(dict === 'en' ? PERIOD_LABELS_EN : PERIOD_LABELS_ZH)[p]}
                 </button>
               ))}
             </div>
@@ -1028,7 +1033,7 @@ export default function InsightsSheet({ onClose }: { onClose: () => void }) {
             {/* Fact bullets */}
             <div className="nesio-reflection-facts">
               {facts.length === 0 ? (
-                <p className="nesio-insights-empty">暂无数据 · 多记录一些内容</p>
+                <p className="nesio-insights-empty">{L(dict, '暂无数据 · 多记录一些内容', 'No data yet · add a few notes')}</p>
               ) : (
                 facts.map((f, i) => (
                   <div key={i} className="nesio-reflection-fact">
@@ -1043,22 +1048,22 @@ export default function InsightsSheet({ onClose }: { onClose: () => void }) {
             <div className="nesio-insights-stats-row" style={{ marginTop: '1.25rem' }}>
               <div className="nesio-insights-stat">
                 <span className="nesio-insights-stat-num">{periodNodes.length}</span>
-                <span className="nesio-insights-stat-label">{PERIOD_LABELS[period]}记录</span>
+                <span className="nesio-insights-stat-label">{(dict === 'en' ? PERIOD_LABELS_EN : PERIOD_LABELS_ZH)[period]}{L(dict, '记录', ' notes')}</span>
               </div>
               <div className="nesio-insights-stat-divider" />
               <div className="nesio-insights-stat">
                 <span className="nesio-insights-stat-num">{allNodes.length}</span>
-                <span className="nesio-insights-stat-label">总记忆</span>
+                <span className="nesio-insights-stat-label">{L(dict, '总记忆', 'Total')}</span>
               </div>
               <div className="nesio-insights-stat-divider" />
               <div className="nesio-insights-stat">
                 <span className="nesio-insights-stat-num">{profile?.feedbackCount ?? 0}</span>
-                <span className="nesio-insights-stat-label">次互动</span>
+                <span className="nesio-insights-stat-label">{L(dict, '次互动', 'Interactions')}</span>
               </div>
             </div>
 
             <p className="nesio-insights-cloud-note" style={{ marginTop: '1.25rem' }}>
-              以上数据来自本地记录 · 无 AI 推断
+              {L(dict, '以上数据来自本地记录 · 无 AI 推断', 'All from local notes · no AI inference')}
             </p>
           </div>
         )}
@@ -1076,7 +1081,7 @@ export default function InsightsSheet({ onClose }: { onClose: () => void }) {
                     className={`nesio-insights-tab${period === p ? ' nesio-insights-tab--active' : ''}`}
                     onClick={() => setPeriod(p)}
                   >
-                    {PERIOD_LABELS[p]}
+                    {(dict === 'en' ? PERIOD_LABELS_EN : PERIOD_LABELS_ZH)[p]}
                   </button>
                 ))}
               </div>

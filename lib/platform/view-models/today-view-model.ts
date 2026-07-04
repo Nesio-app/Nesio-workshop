@@ -149,15 +149,16 @@ export function addCommitmentNode(name: string): FocusNode {
   return { id: node.id, name: node.name, type: node.type, rawInput: node.rawInput, createdAt: node.createdAt, attributes: node.attributes };
 }
 
-export function focusTimeHint(node: FocusNode): string {
+export function focusTimeHint(node: FocusNode, locale: string = 'zh'): string {
   const now = new Date();
+  const en = locale === 'en';
   const d = nearestNodeDate(node.attributes, now.getTime());
-  if (d) return scheduleHint(d, now);
+  if (d) return scheduleHint(d, now, locale);
   const text = [node.name, node.rawInput || ''].join(' ').toLowerCase();
-  if (text.includes('今天') || text.includes('今日')) return '今天';
-  if (text.includes('明天') || text.includes('明日')) return '明天';
+  if (text.includes('今天') || text.includes('今日')) return en ? 'today' : '今天';
+  if (text.includes('明天') || text.includes('明日')) return en ? 'tomorrow' : '明天';
   const ageHours = (now.getTime() - new Date(node.createdAt).getTime()) / 3_600_000;
-  if (ageHours < 24) return '刚记录';
+  if (ageHours < 24) return en ? 'just noted' : '刚记录';
   return '';
 }
 

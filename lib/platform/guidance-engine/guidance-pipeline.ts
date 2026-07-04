@@ -22,6 +22,7 @@ import type { AttentionObject } from '@/lib/platform/attention-engine';
 import type { GuidanceEvent, GuidanceCard, GuidanceEventType, WindowUrgency } from './types';
 import { getActionWindow } from './action-window';
 import { buildAction } from './actionability';
+import { L } from '@/lib/portal/i18n';
 import { getConsequenceSeverity } from './consequence-rules';
 import { interruptPriority, worthInterrupting } from './interrupt-evaluator';
 import { computeAttentionBudget, passesBudgetGate } from './attention-budget';
@@ -74,97 +75,99 @@ const EVENT_ICON: Record<GuidanceEventType, string> = {
   dec_insight:    '💡',
 };
 
-function buildTitle(event: GuidanceEvent, urgency: WindowUrgency): string {
+function buildTitle(event: GuidanceEvent, urgency: WindowUrgency, locale: string = 'zh'): string {
   const n = event.title.slice(0, 22);
+  const l = (zh: string, en: string) => L(locale, zh, en);
   switch (event.type) {
     case 'dec_insight': return event.title;
     case 'flight':
-      if (urgency === 'critical') return `出发时间到了 · ${n}`;
-      if (urgency === 'high')     return `值机窗口已开 · ${n}`;
-      return `航班提醒 · ${n}`;
+      if (urgency === 'critical') return l(`出发时间到了 · ${n}`, `Time to leave · ${n}`);
+      if (urgency === 'high')     return l(`值机窗口已开 · ${n}`, `Check-in is open · ${n}`);
+      return l(`航班提醒 · ${n}`, `Flight reminder · ${n}`);
     case 'travel':
-      if (urgency === 'critical') return `出发时间 · ${n}`;
-      return `旅行准备 · ${n}`;
+      if (urgency === 'critical') return l(`出发时间 · ${n}`, `Departure time · ${n}`);
+      return l(`旅行准备 · ${n}`, `Trip prep · ${n}`);
     case 'medical':
-      if (urgency === 'critical') return `预约时间到 · ${n}`;
-      return `就诊提醒 · ${n}`;
+      if (urgency === 'critical') return l(`预约时间到 · ${n}`, `Appointment now · ${n}`);
+      return l(`就诊提醒 · ${n}`, `Appointment reminder · ${n}`);
     case 'meeting':
-      if (urgency === 'critical') return `马上开始 · ${n}`;
-      if (urgency === 'high')     return `快要开会了 · ${n}`;
-      return `今天有安排 · ${n}`;
+      if (urgency === 'critical') return l(`马上开始 · ${n}`, `Starting now · ${n}`);
+      if (urgency === 'high')     return l(`快要开会了 · ${n}`, `Meeting soon · ${n}`);
+      return l(`今天有安排 · ${n}`, `On today · ${n}`);
     case 'deadline':
-      if (urgency === 'critical') return `今天截止 · ${n}`;
-      if (urgency === 'high')     return `明天截止 · ${n}`;
-      return `截止日临近 · ${n}`;
+      if (urgency === 'critical') return l(`今天截止 · ${n}`, `Due today · ${n}`);
+      if (urgency === 'high')     return l(`明天截止 · ${n}`, `Due tomorrow · ${n}`);
+      return l(`截止日临近 · ${n}`, `Deadline approaching · ${n}`);
     case 'birthday':
-      if (urgency === 'critical') return `今天是 ${n} 的生日`;
-      if (urgency === 'high')     return `明天 · ${n}`;
-      return `即将到来 · ${n}`;
+      if (urgency === 'critical') return l(`今天是 ${n} 的生日`, `Today is ${n}'s birthday`);
+      if (urgency === 'high')     return l(`明天 · ${n}`, `Tomorrow · ${n}`);
+      return l(`即将到来 · ${n}`, `Coming up · ${n}`);
     case 'anniversary':
-      if (urgency === 'critical') return `今天 · ${n}`;
-      return `纪念日临近 · ${n}`;
+      if (urgency === 'critical') return l(`今天 · ${n}`, `Today · ${n}`);
+      return l(`纪念日临近 · ${n}`, `Anniversary coming up · ${n}`);
     case 'holiday':
-      if (urgency === 'critical') return `今天是 ${n}`;
-      if (urgency === 'high')     return `明天是 ${n}`;
-      return `${n} 快到了`;
-    case 'weather_cold': return '今天很冷，记得加件衣';
-    case 'weather_rain': return '今天有雨，记得带伞';
-    case 'email_signal': return `邮件需要关注`;
-    case 'health_habit': return '今天的健康打卡';
+      if (urgency === 'critical') return l(`今天是 ${n}`, `Today is ${n}`);
+      if (urgency === 'high')     return l(`明天是 ${n}`, `Tomorrow is ${n}`);
+      return l(`${n} 快到了`, `${n} is coming up`);
+    case 'weather_cold': return l('今天很冷，记得加件衣', "It's cold today — layer up");
+    case 'weather_rain': return l('今天有雨，记得带伞', 'Rain today — bring an umbrella');
+    case 'email_signal': return l('邮件需要关注', 'An email needs attention');
+    case 'health_habit': return l('今天的健康打卡', "Today's health check-in");
     case 'object_context': {
       const itemName = String(event.payload.itemName ?? event.title);
       const contextName = String(event.payload.contextName ?? '');
-      if (contextName) return `${itemName} 可能用得上 · ${contextName}`;
-      return `你有件东西可能用得上：${itemName}`;
+      if (contextName) return l(`${itemName} 可能用得上 · ${contextName}`, `${itemName} might be useful · ${contextName}`);
+      return l(`你有件东西可能用得上：${itemName}`, `You own something useful here: ${itemName}`);
     }
     default: return n;
   }
 }
 
-function buildBody(event: GuidanceEvent, urgency: WindowUrgency): string {
+function buildBody(event: GuidanceEvent, urgency: WindowUrgency, locale: string = 'zh'): string {
+  const l = (zh: string, en: string) => L(locale, zh, en);
   switch (event.type) {
     case 'dec_insight': return typeof event.payload.body === 'string' ? event.payload.body : '';
     case 'flight':
-      if (urgency === 'critical') return '现在需要出发了，不要错过登机时间。';
-      return '值机通常 1–2 分钟，现在处理最省心，到机场就直接走。';
+      if (urgency === 'critical') return l('现在需要出发了，不要错过登机时间。', 'Time to leave now — don\'t miss boarding.');
+      return l('值机通常 1–2 分钟，现在处理最省心，到机场就直接走。', 'Check-in takes 1–2 minutes. Do it now and walk straight through at the airport.');
     case 'travel':
-      if (urgency === 'critical') return '出发时间到了，快速检查随身物品。';
-      return '行程在即，确认行李和出行信息。';
+      if (urgency === 'critical') return l('出发时间到了，快速检查随身物品。', 'Departure time — quick check of your essentials.');
+      return l('行程在即，确认行李和出行信息。', 'Trip coming up — confirm bags and travel details.');
     case 'medical':
-      if (urgency === 'critical') return '预约时间快到了，准备好就诊材料出发。';
-      return '提前确认预约信息，避免临时手忙脚乱。';
+      if (urgency === 'critical') return l('预约时间快到了，准备好就诊材料出发。', 'Appointment is close — grab your documents and go.');
+      return l('提前确认预约信息，避免临时手忙脚乱。', 'Confirm the details ahead so there\'s no last-minute scramble.');
     case 'meeting':
-      if (urgency === 'critical') return '会议即将开始，立即准备好。';
-      if (urgency === 'high')     return '还有不到一小时，趁现在准备材料和链接。';
-      return '今天有安排，提前做好准备会更从容。';
+      if (urgency === 'critical') return l('会议即将开始，立即准备好。', 'The meeting is about to start — get ready now.');
+      if (urgency === 'high')     return l('还有不到一小时，趁现在准备材料和链接。', 'Less than an hour — prep the materials and link now.');
+      return l('今天有安排，提前做好准备会更从容。', 'It\'s on today — a little prep goes a long way.');
     case 'deadline':
-      if (urgency === 'critical') return '今天最后期限，哪怕完成第一步也比拖延好。';
-      return '明天到期，今天推进一下比明天临时抱佛脚轻松得多。';
+      if (urgency === 'critical') return l('今天最后期限，哪怕完成第一步也比拖延好。', 'Final deadline today — even the first step beats stalling.');
+      return l('明天到期，今天推进一下比明天临时抱佛脚轻松得多。', 'Due tomorrow — a push today is far easier than a scramble tomorrow.');
     case 'birthday':
     case 'anniversary':
-      if (urgency === 'critical') return '今天记得发条消息，哪怕一句话也能让人感到温暖。';
-      if (urgency === 'high')     return '明天是重要日子，今晚花几分钟准备一下。';
-      return '还有几天，现在准备礼物或安排比到时候手忙脚乱好得多。';
+      if (urgency === 'critical') return l('今天记得发条消息，哪怕一句话也能让人感到温暖。', 'Send a message today — even one line means a lot.');
+      if (urgency === 'high')     return l('明天是重要日子，今晚花几分钟准备一下。', 'Big day tomorrow — take a few minutes tonight to prepare.');
+      return l('还有几天，现在准备礼物或安排比到时候手忙脚乱好得多。', 'A few days out — preparing now beats a last-minute rush.');
     case 'holiday':
-      if (urgency === 'critical') return '公司和学校一般都放假。今天有什么活动安排吗？说一句就能记下来。';
-      return '公司和学校一般都放假——想安排点什么？现在说一句，到时候 Nesio 会帮你记着。';
+      if (urgency === 'critical') return l('公司和学校一般都放假。今天有什么活动安排吗？说一句就能记下来。', 'Most offices and schools are off. Any plans today? Say it and it sticks.');
+      return l('公司和学校一般都放假——想安排点什么？现在说一句，到时候 Nesio 会帮你记着。', 'Most offices and schools are off — want to plan something? Say it now and Nesio will remember.');
     case 'weather_cold':
-      return `${Math.round(Number(event.payload.temperatureC ?? 0))}°C，真的需要多穿一件，出门前准备好。`;
+      return l(`${Math.round(Number(event.payload.temperatureC ?? 0))}°C，真的需要多穿一件，出门前准备好。`, `${Math.round(Number(event.payload.temperatureC ?? 0))}°C — you genuinely need another layer. Get it ready before heading out.`);
     case 'weather_rain':
-      return '出门前把雨伞放进包，一秒钟的事。';
+      return l('出门前把雨伞放进包，一秒钟的事。', 'Drop an umbrella in your bag before leaving — takes a second.');
     case 'email_signal':
-      return String(event.payload.cardBody ?? '这封邮件可能需要你做一个简单决定。');
+      return String(event.payload.cardBody ?? l('这封邮件可能需要你做一个简单决定。', 'This email may need a quick decision from you.'));
     case 'health_habit':
-      return `${String(event.payload.itemName ?? '今天的健康计划')} — 花 1 分钟开始就算赢了。`;
+      return l(`${String(event.payload.itemName ?? '今天的健康计划')} — 花 1 分钟开始就算赢了。`, `${String(event.payload.itemName ?? "today's health plan")} — one minute to start counts as a win.`);
     case 'object_context': {
       const itemName = String(event.payload.itemName ?? '');
       const loc = String(event.payload.location ?? '');
       const contextName = String(event.payload.contextName ?? '');
-      const locStr = loc ? `（存放在 ${loc}）` : '';
-      if (contextName) return `你记录了一件 "${itemName}"${locStr}，可能和"${contextName}"有关，确认一下？`;
-      const expiry = event.payload.expiryDate ? `有效期至 ${String(event.payload.expiryDate)}` : '';
-      if (expiry) return `${itemName} · ${expiry}${locStr}，该用了还是处理了。`;
-      return `${itemName}${locStr}，回头看看是否用得上。`;
+      const locStr = loc ? L(locale, `（存放在 ${loc}）`, ` (stored at ${loc})`) : '';
+      if (contextName) return l(`你记录了一件 "${itemName}"${locStr}，可能和"${contextName}"有关，确认一下？`, `You logged "${itemName}"${locStr} — it may relate to "${contextName}". Worth a check?`);
+      const expiry = event.payload.expiryDate ? l(`有效期至 ${String(event.payload.expiryDate)}`, `valid until ${String(event.payload.expiryDate)}`) : '';
+      if (expiry) return l(`${itemName} · ${expiry}${locStr}，该用了还是处理了。`, `${itemName} · ${expiry}${locStr} — use it or deal with it.`);
+      return l(`${itemName}${locStr}，回头看看是否用得上。`, `${itemName}${locStr} — worth checking if it\'s useful.`);
     }
     default:
       return '';
@@ -182,6 +185,8 @@ export interface GuidancePipelineInput {
   energy?: 'low' | 'normal' | 'high' | 'unknown';
   /** From mirror-profile hourEngagement: user's most receptive hours (0-23). */
   goodHours?: number[];
+  /** UI 语言(zh/en),卡片标题/正文/动作随界面语言(批次 9)。 */
+  locale?: string;
 }
 
 function tightenBudget(budget: ReturnType<typeof computeAttentionBudget>): ReturnType<typeof computeAttentionBudget> {
@@ -191,6 +196,7 @@ function tightenBudget(budget: ReturnType<typeof computeAttentionBudget>): Retur
 
 export function runGuidancePipeline(input: GuidancePipelineInput): GuidanceCard[] {
   const now = input.now ?? new Date();
+  const locale = input.locale ?? 'zh';
   const coolingStore = loadCoolingStore();
   let budget = computeAttentionBudget(input.scoredCalendar);
   // Low personal energy → fewer interruptions today (critical events still pass)
@@ -215,7 +221,7 @@ export function runGuidancePipeline(input: GuidancePipelineInput): GuidanceCard[
     if (urgency === 'closed') continue;
 
     // Actionability hard gate: must have a 1-minute first step
-    const action = buildAction(event, urgency);
+    const action = buildAction(event, urgency, locale);
     if (!action) continue;
 
     // Layer 2: consequence severity
@@ -251,8 +257,8 @@ export function runGuidancePipeline(input: GuidancePipelineInput): GuidanceCard[
         eventId: event.id,
         type: event.type,
         icon,
-        title: buildTitle(event, urgency),
-        body: buildBody(event, urgency),
+        title: buildTitle(event, urgency, locale),
+        body: buildBody(event, urgency, locale),
         action,
         priority,
         nodeId: typeof event.payload.nodeId === 'string' ? event.payload.nodeId : undefined,

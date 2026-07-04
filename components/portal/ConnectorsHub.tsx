@@ -4,6 +4,9 @@ import { useEffect, useRef, useState } from 'react';
 import { IconActivity, IconBook, IconBookOpen, IconCalendar, IconCar, IconCheckSquare, IconCloudSun, IconHeartPulse, IconMail, IconNote, IconTimer } from './icons';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { type LifeNode } from '@/lib/portal/life-graph';
+import { L } from '@/lib/portal/i18n';
+import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
+import { usePortalLocale } from './use-portal-locale';
 
 interface ConnectorsHubProps { open: boolean; onClose: () => void; }
 
@@ -13,6 +16,8 @@ type NodeInput = Omit<LifeNode, 'id' | 'createdAt'>;
 interface ConnectorDef {
   id: string;
   name: string;
+  nameEn?: string;
+  descriptionEn?: string;
   icon: React.ReactNode;
   iconBg: string;
   description: string;
@@ -30,9 +35,9 @@ interface ConnectorDef {
 // dev: true = 还在打磨的接入,收进「开发中」折叠组,不占主列表
 const CONNECTORS: ConnectorDef[] = [
   // 日历和 Gmail 是同一次 Google 授权,合并为一个入口(批次 5 用户反馈)
-  { id: 'google', name: 'Google 日历 · Gmail', icon: <IconCalendar />, iconBg: 'var(--chip-blue)', method: 'oauth', description: '一次授权同时接入:日程生成提醒和简报,邮件提取人物、日期、承诺' },
-  { id: 'weather', name: '地理位置 · 天气', icon: <IconCloudSun />, iconBg: 'var(--chip-amber)', method: 'geo', description: '基于实时天气生成外出和健康建议' },
-  { id: 'flomo', name: 'Flomo', icon: <IconNote />, iconBg: 'var(--chip-indigo)', method: 'server', syncEndpoint: '/api/portal/flomo?limit=30', description: '同步 flomo 笔记，提取想法与记录' },
+  { id: 'google', name: 'Google 日历 · Gmail', nameEn: 'Google Calendar · Gmail', icon: <IconCalendar />, iconBg: 'var(--chip-blue)', method: 'oauth', description: '一次授权同时接入:日程生成提醒和简报,邮件提取人物、日期、承诺', descriptionEn: 'One consent covers both: calendar drives reminders and briefs; email yields people, dates, promises' },
+  { id: 'weather', name: '地理位置 · 天气', nameEn: 'Location · Weather', icon: <IconCloudSun />, iconBg: 'var(--chip-amber)', method: 'geo', description: '基于实时天气生成外出和健康建议', descriptionEn: 'Live weather feeds outing and health suggestions' },
+  { id: 'flomo', name: 'Flomo', icon: <IconNote />, iconBg: 'var(--chip-indigo)', method: 'server', syncEndpoint: '/api/portal/flomo?limit=30', description: '同步 flomo 笔记，提取想法与记录', descriptionEn: 'Sync flomo notes; extract ideas and records' },
   { id: 'notion', name: 'Notion', icon: <IconBook />, iconBg: 'var(--chip-gray)', method: 'token', syncEndpoint: '/api/portal/notion', tokenHint: 'notion.so/my-integrations → 新建集成 → 复制 Internal Integration Secret，并把页面共享给它', description: '同步最近编辑的页面，提取项目与想法', dev: true },
   { id: 'toggl', name: 'Toggl Track', icon: <IconTimer />, iconBg: 'var(--chip-red)', method: 'token', syncEndpoint: '/api/portal/toggl', tokenHint: 'track.toggl.com → Profile → API Token', description: '同步时间记录，了解你的专注分布', dev: true },
   { id: 'health', name: 'Apple Health 导出', icon: <IconHeartPulse />, iconBg: 'var(--chip-pink)', method: 'file', description: '上传 export.xml，提取步数、睡眠、心率', dev: true },
@@ -67,6 +72,7 @@ function saveToken(id: string, token: string) {
 interface SyncResult { ok: boolean; msg: string; detail?: string; needsReauth?: boolean }
 
 export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const fileRef = useRef<HTMLInputElement>(null);
   const [connected, setConnected] = useState<Record<string, boolean>>({});
   const [syncing, setSyncing] = useState<string | null>(null);
@@ -97,7 +103,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
         <div className="nesio-connector-body">
           <p className="nesio-connector-name">
             {c.name}
-            <span className="nesio-connector-soon">{c.comingSoon ? '即将上线' : '开发中'}</span>
+            <span className="nesio-connector-soon">{c.comingSoon ? L(dict, '即将上线', 'Coming soon') : L(dict, '开发中', 'In dev')}</span>
           </p>
           <p className="nesio-connector-desc">{c.description}</p>
         </div>
@@ -451,16 +457,16 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
   const def = (id: string) => CONNECTORS.find((c) => c.id === id)!;
 
   return (
-    <div className="nesio-settings-sheet-overlay" role="dialog" aria-modal="true" aria-label="数据接入">
+    <div className="nesio-settings-sheet-overlay" role="dialog" aria-modal="true" aria-label={L(dict, '数据接入', 'Data sources')}>
       <input ref={fileRef} type="file" accept=".xml,.zip" style={{ display: 'none' }} onChange={handleHealthFile} />
       <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label="关闭" />
       <div className="nesio-settings-sheet-card">
         <div className="nesio-sheet-handle" aria-hidden />
         <div className="nesio-settings-sheet-header">
-          <h2 className="nesio-settings-sheet-title">数据接入</h2>
+          <h2 className="nesio-settings-sheet-title">{L(dict, '数据接入', 'Data sources')}</h2>
           <button type="button" className="nesio-voice-sheet-close" onClick={onClose}>✕</button>
         </div>
-        <p className="nesio-settings-sheet-desc">连接外部信号源，让 Today Feed 出现真实数据驱动的建议。</p>
+        <p className="nesio-settings-sheet-desc">{L(dict, '连接外部信号源，让 Today Feed 出现真实数据驱动的建议。', 'Connect outside signals so Today runs on real data.')}</p>
 
         {toast && (
           <div style={{ background: toast.ok ? 'var(--status-go-soft)' : 'var(--status-risk-soft)', border: `1px solid ${toast.ok ? 'var(--status-go)' : 'var(--status-risk)'}`, borderRadius: '0.75rem', padding: '0.65rem 0.85rem', marginBottom: '0.75rem', fontSize: '0.8rem', color: toast.ok ? 'var(--status-go)' : 'var(--status-risk)' }}>
@@ -481,12 +487,12 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
                   <span className="nesio-connector-icon" style={{ background: c.iconBg }}>{c.icon}</span>
                   <div className="nesio-connector-body">
                     <p className="nesio-connector-name">
-                      {c.name}
+                      {dict === 'en' ? (c.nameEn ?? c.name) : c.name}
                       {c.comingSoon && <span className="nesio-connector-soon">即将上线</span>}
                       {c.method === 'shortcuts' && !c.comingSoon && <span className="nesio-connector-soon" style={{ background: 'rgba(88,140,227,0.12)', color: 'var(--portal-blue-deep)' }}>快捷指令</span>}
                     </p>
-                    <p className="nesio-connector-desc">{c.description}</p>
-                    {isConn && !oauthSyncResult[c.id] && <p className="nesio-connector-sync">{isSync ? '同步中…' : '已连接'}{cnt ? `  ·  ${cnt} 个节点` : ''}</p>}
+                    <p className="nesio-connector-desc">{dict === 'en' ? (c.descriptionEn ?? c.description) : c.description}</p>
+                    {isConn && !oauthSyncResult[c.id] && <p className="nesio-connector-sync">{isSync ? L(dict, '同步中…', 'Syncing…') : L(dict, '已连接', 'Connected')}{cnt ? `  ·  ${cnt} 个节点` : ''}</p>}
                     {oauthSyncResult[c.id] && (
                       <p className="nesio-connector-sync" style={{ color: oauthSyncResult[c.id].ok ? 'var(--status-go)' : 'var(--status-risk)', fontSize: '0.68rem', lineHeight: 1.4 }}>
                         {oauthSyncResult[c.id].msg}
@@ -506,19 +512,19 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
                     </button>
                   ) : isConn && (c.method === 'token' || c.method === 'server') ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', flexShrink: 0 }}>
-                      <button type="button" className="nesio-connector-connect" onClick={() => c.method === 'server' ? syncFlomo(c) : syncToken(c)} disabled={isSync}>{isSync ? '…' : '同步'}</button>
-                      <button type="button" className="nesio-connector-disconnect" onClick={() => disconnect(c.id)}>断开</button>
+                      <button type="button" className="nesio-connector-connect" onClick={() => c.method === 'server' ? syncFlomo(c) : syncToken(c)} disabled={isSync}>{isSync ? '…' : L(dict, '同步', 'Sync')}</button>
+                      <button type="button" className="nesio-connector-disconnect" onClick={() => disconnect(c.id)}>{L(dict, '断开', 'Disconnect')}</button>
                     </div>
                   ) : isConn && c.method === 'oauth' ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', flexShrink: 0 }}>
-                      <button type="button" className="nesio-connector-connect" onClick={() => syncOAuth(c)} disabled={isSync}>{isSync ? '…' : '同步'}</button>
-                      <button type="button" className="nesio-connector-disconnect" onClick={() => disconnect(c.id)}>断开</button>
+                      <button type="button" className="nesio-connector-connect" onClick={() => syncOAuth(c)} disabled={isSync}>{isSync ? '…' : L(dict, '同步', 'Sync')}</button>
+                      <button type="button" className="nesio-connector-disconnect" onClick={() => disconnect(c.id)}>{L(dict, '断开', 'Disconnect')}</button>
                     </div>
                   ) : isConn ? (
-                    <button type="button" className="nesio-connector-disconnect" onClick={() => disconnect(c.id)} style={{ flexShrink: 0 }}>断开</button>
+                    <button type="button" className="nesio-connector-disconnect" onClick={() => disconnect(c.id)} style={{ flexShrink: 0 }}>{L(dict, '断开', 'Disconnect')}</button>
                   ) : (
                     <button type="button" className="nesio-connector-connect" onClick={() => handleConnect(c)} disabled={isSync} style={{ flexShrink: 0 }}>
-                      {isSync ? '…' : c.method === 'file' ? '上传' : c.method === 'token' || c.method === 'server' ? '接入' : '接入'}
+                      {isSync ? '…' : c.method === 'file' ? L(dict, '上传', 'Upload') : L(dict, '接入', 'Connect')}
                     </button>
                   )}
                 </div>
@@ -559,8 +565,8 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
           <details className="nesio-conn-dev-group" style={{ marginTop: '0.9rem', border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-md)', padding: '0.15rem 0.75rem' }}>
             <summary style={{ cursor: 'pointer', padding: '0.6rem 0', fontSize: '0.82rem', color: 'var(--portal-muted)', listStyle: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>
-                <span style={{ color: 'var(--portal-ink)', fontWeight: 600 }}>开发中 · 抢先看</span>
-                <span style={{ marginLeft: 8, fontSize: '0.7rem' }}>{CONNECTORS.filter((c) => c.dev).length} 项在打磨</span>
+                <span style={{ color: 'var(--portal-ink)', fontWeight: 600 }}>{L(dict, '开发中 · 抢先看', 'In development · preview')}</span>
+                <span style={{ marginLeft: 8, fontSize: '0.7rem' }}>{CONNECTORS.filter((c) => c.dev).length} {L(dict, '项在打磨', 'being polished')}</span>
               </span>
               <span aria-hidden>▾</span>
             </summary>
@@ -568,9 +574,9 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
           </details>
 
           <div style={{ marginTop: '1rem', fontSize: '0.72rem', color: 'var(--portal-muted)', textAlign: 'center', lineHeight: 1.6 }}>
-            有 API 的（Google 日历+Gmail / Notion / Toggl / Flomo）直接连接；<br />
-            没有公开 API 的（提醒事项 / Keep / 微信读书）通过快捷指令推送。<br />
-            所有数据仅在你的设备上处理和存储。
+            {L(dict, '有 API 的（Google 日历+Gmail / Notion / Toggl / Flomo）直接连接；', 'API sources (Google Calendar+Gmail / Notion / Toggl / Flomo) connect directly;')}<br />
+            {L(dict, '没有公开 API 的（提醒事项 / Keep / 微信读书）通过快捷指令推送。', 'no-API sources (Reminders / Keep / WeRead) push via Shortcuts.')}<br />
+            {L(dict, '所有数据仅在你的设备上处理和存储。', 'All data is processed and stored on your device only.')}
           </div>
         </div>
       </div>

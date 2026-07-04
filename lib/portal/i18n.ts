@@ -1,5 +1,16 @@
 import { portalLocaleToDictionaryLocale, type PortalLocale } from './profile';
 
+export type DictLocale = 'zh' | 'en';
+
+/**
+ * L — 内联双语(批次 9 硬编码清剿的主力模式)。
+ * 中文字面保留在调用处(契约的字面断言不受迁移影响),英文并排可审。
+ * 共享/菜单类文案仍走 t() 字典;L 用于组件局部文案与规则引擎生成文案。
+ */
+export function L(locale: string, zh: string, en: string): string {
+  return locale === 'en' ? en : zh;
+}
+
 const STRINGS = {
   zh: {
     settingsTitle: '账号设置',
