@@ -20,6 +20,8 @@ import { isMeetingNode } from './meeting-node';
 import { FocusCardDetail, FOCUS_TYPE_ICON } from './FocusCardDetail';
 import { MeetingRecorderSheet } from './FocusModeSheet';
 import MemoryFlashBanner, { useMemoryFlash } from '../MemoryFlashBanner';
+import { t } from '@/lib/portal/i18n';
+import { usePortalLocale } from '../use-portal-locale';
 
 function CollapsedTaskItem({
   node,
@@ -36,6 +38,7 @@ function CollapsedTaskItem({
   onOpenRecorder?: () => void;
   onFocusMode?: () => void;
 }) {
+  const locale = usePortalLocale();
   const [expanded, setExpanded] = useState(false);
   const isDone = doneIds.has(node.id);
   const isMeeting = isMeetingNode(node);
@@ -49,14 +52,14 @@ function CollapsedTaskItem({
           type="button"
           className={`nesio-collapsed-check${isDone ? ' nesio-collapsed-check--done' : ''}`}
           onClick={() => onDone(node)}
-          aria-label="完成"
+          aria-label={t(locale, 'todayDoneAria')}
         />
         <button type="button" className="nesio-collapsed-task-body" onClick={() => { setExpanded((v) => !v); touchNode(node.id); }}>
           <span className="nesio-collapsed-icon">{typeIcon}</span>
           <span className="nesio-collapsed-title">{node.name}</span>
           {hint && <span className="nesio-collapsed-time">{hint}</span>}
         </button>
-        <button type="button" className="nesio-collapsed-dismiss" onClick={() => onDismiss(node.id)} aria-label="忽略">✕</button>
+        <button type="button" className="nesio-collapsed-dismiss" onClick={() => onDismiss(node.id)} aria-label={t(locale, 'todayDismissAria')}>✕</button>
       </div>
       {expanded && (
         <div className="nesio-collapsed-detail">
@@ -66,7 +69,7 @@ function CollapsedTaskItem({
             onOpenRecorder={isMeeting && onOpenRecorder ? onOpenRecorder : undefined}
           />
           {onFocusMode && (
-            <button type="button" className="nesio-collapsed-focus-btn" onClick={onFocusMode}>◎ 聚焦</button>
+            <button type="button" className="nesio-collapsed-focus-btn" onClick={onFocusMode}>{t(locale, 'todayFocusModeBtn')}</button>
           )}
         </div>
       )}
@@ -103,6 +106,7 @@ export function TodayFocusSection({
   const [quickAdd, setQuickAdd] = useState('');
   const [localNodes, setLocalNodes] = useState<FocusNode[]>([]);
   const [calRecorderEvent, setCalRecorderEvent] = useState<CalendarEvent | null>(null);
+  const locale = usePortalLocale();
   const inputRef = useRef<HTMLInputElement>(null);
   const { flashNodes, triggerFlash, dismiss: dismissFlash } = useMemoryFlash();
 
@@ -152,19 +156,19 @@ export function TodayFocusSection({
       <MemoryFlashBanner nodes={flashNodes} onDismiss={dismissFlash} />
 
       <div className="nesio-focus-header">
-        <h2 className="nesio-focus-title">今日焦点</h2>
+        <h2 className="nesio-focus-title">{t(locale, 'todayFocusTitle')}</h2>
         <div className="nesio-focus-header-right">
           {doneToday > 0 && <span className="nesio-focus-done-badge">✓ {doneToday}</span>}
           {onOpenMemory && (
-            <button type="button" className="nesio-focus-all-btn" onClick={onOpenMemory}>全部 ›</button>
+            <button type="button" className="nesio-focus-all-btn" onClick={onOpenMemory}>{t(locale, 'todayFocusAll')}</button>
           )}
         </div>
       </div>
 
       {isEmpty ? (
         <div className="nesio-focus-empty">
-          <p>今天暂无聚焦事项</p>
-          <p className="nesio-focus-empty-hint">{'说一句带时间的话（比如"周五有会议"），就会出现在这里。'}</p>
+          <p>{t(locale, 'todayFocusEmpty')}</p>
+          <p className="nesio-focus-empty-hint">{t(locale, 'todayFocusEmptyHint')}</p>
         </div>
       ) : (
         <div className="nesio-attention-layout">
@@ -187,7 +191,7 @@ export function TodayFocusSection({
                 aria-expanded={!collapsed}
               >
                 <span className="nesio-collapsed-toggle-label">
-                  {collapsed ? `还有 ${collapsedCount} 项` : '收起'}
+                  {collapsed ? t(locale, 'todayCollapsedMoreTemplate', { count: collapsedCount }) : t(locale, 'todayCollapse')}
                 </span>
                 <span className="nesio-collapsed-toggle-chevron">{collapsed ? '▾' : '▴'}</span>
               </button>
@@ -209,7 +213,7 @@ export function TodayFocusSection({
                       <div className="nesio-collapsed-row">
                         <span className="nesio-collapsed-icon">🎂</span>
                         <span className="nesio-collapsed-title">{item.name}</span>
-                        <span className="nesio-collapsed-day-tag">{item.daysUntil === 0 ? '今天' : '明天'}</span>
+                        <span className="nesio-collapsed-day-tag">{item.daysUntil === 0 ? t(locale, 'todayLabelToday') : t(locale, 'todayLabelTomorrow')}</span>
                       </div>
                     </li>
                   ))}
@@ -269,12 +273,12 @@ export function TodayFocusSection({
           ref={inputRef}
           className="nesio-focus-quick-input"
           type="text"
-          placeholder="今天要做…"
+          placeholder={t(locale, 'todayQuickAddPlaceholder')}
           value={quickAdd}
           onChange={(e) => setQuickAdd(e.target.value)}
         />
         {quickAdd.trim() && (
-          <button type="submit" className="nesio-focus-quick-btn">记下</button>
+          <button type="submit" className="nesio-focus-quick-btn">{t(locale, 'todayQuickAddSubmit')}</button>
         )}
       </form>
 

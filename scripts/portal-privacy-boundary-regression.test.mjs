@@ -17,6 +17,8 @@ const todayFeed = [
   read('components/portal/today/CalendarCards.tsx'),
   read('components/portal/today/DormantReviewCard.tsx'),
   read('components/portal/today/NightTimeline.tsx'),
+  // Today 表面文案已入 i18n 字典(REG-004),文案断言随之覆盖字典
+  read('lib/portal/i18n.ts'),
 ].join('\n');
 const lifeStateRoute = read('app/api/portal/life-state/route.ts');
 

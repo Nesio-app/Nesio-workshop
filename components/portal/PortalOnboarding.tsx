@@ -5,7 +5,6 @@ import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { t } from '@/lib/portal/i18n';
 import {
   loadProfileSettings,
-  portalLocaleToDictionaryLocale,
   saveProfileSettings,
   type PortalLocale,
 } from '@/lib/portal/profile';
@@ -157,16 +156,14 @@ function WelcomeStep({ onNext, locale, onLocale }: {
       <h1 className="nesio-ob-brand">Nesio</h1>
       <p className="nesio-ob-tagline">Know Less. Live More.</p>
       <p className="nesio-ob-desc">
-        {zh
-          ? '把重要的事放进来，需要时找得到。你分享进来的内容，都会先变成可确认的线索。'
-          : 'Put important things in. Find them later. What you share becomes confirmable clues first.'}
+        {t(locale, 'onboardingWelcomeDesc')}
       </p>
       <div className="nesio-ob-lang-row">
         <button type="button" className={`nesio-ob-lang-btn${zh ? ' nesio-ob-lang-btn--active' : ''}`} onClick={() => onLocale('zh')}>简体中文</button>
         <button type="button" className={`nesio-ob-lang-btn${!zh ? ' nesio-ob-lang-btn--active' : ''}`} onClick={() => onLocale('en')}>English</button>
       </div>
       <button type="button" className="nesio-ob-primary-btn" onClick={onNext}>
-        {zh ? '开始使用 →' : 'Get started →'}
+        {t(locale, 'onboardingStart')}
       </button>
     </div>
   );
@@ -177,7 +174,6 @@ function WelcomeStep({ onNext, locale, onLocale }: {
 function NameStep({ onNext, locale }: { onNext: (name: string) => void; locale: PortalLocale }) {
   const [name, setName] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
-  const zh = locale === 'zh';
 
   useEffect(() => { setTimeout(() => inputRef.current?.focus(), 100); }, []);
 
@@ -197,10 +193,10 @@ function NameStep({ onNext, locale }: { onNext: (name: string) => void; locale: 
         autoComplete="given-name"
       />
       <button type="button" className="nesio-ob-primary-btn" disabled={!name.trim()} onClick={() => onNext(name.trim())}>
-        {zh ? '继续' : 'Continue'}
+        {t(locale, 'onboardingContinue')}
       </button>
-      <button type="button" className="nesio-ob-skip-btn" onClick={() => onNext(zh ? '朋友' : 'Friend')}>
-        {zh ? '跳过' : 'Skip'}
+      <button type="button" className="nesio-ob-skip-btn" onClick={() => onNext(t(locale, 'onboardingDefaultFriendName'))}>
+        {t(locale, 'onboardingSkip')}
       </button>
     </div>
   );
@@ -218,13 +214,12 @@ function AuthStep({ onDone, locale, displayName }: {
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
-  const zh = locale === 'zh';
 
   async function handleGoogle() {
     setLoading(true); setError('');
     const url = await startGoogleAuth();
     if (url) { window.location.href = url; }
-    else { setError(zh ? 'Google 登录暂未配置，请用邮件。' : 'Google sign-in not configured yet.'); setLoading(false); }
+    else { setError(t(locale, 'onboardingAuthGoogleNotConfigured')); setLoading(false); }
   }
 
   async function handleEmail() {
@@ -238,12 +233,12 @@ function AuthStep({ onDone, locale, displayName }: {
     if (r.ok) setSent(true);
     else {
       const message = r.error === 'provider_not_configured'
-        ? (zh ? '邮件登录还没配置完成。' : 'Email sign-in is not configured yet.')
+        ? t(locale, 'onboardingAuthEmailNotConfigured')
         : r.error === 'user_not_found'
-          ? (zh ? '这个邮箱还没有账号，请先注册。' : 'No account exists for this email yet. Try registering first.')
+          ? t(locale, 'onboardingAuthUserNotFound')
           : r.error === 'supabase_otp_failed'
-            ? (zh ? '邮件服务没有发出，请检查 Supabase 邮件/SMTP 设置。' : 'Email could not be sent. Check Supabase email or SMTP settings.')
-            : (zh ? '发送失败，请稍后再试。' : 'Could not send link. Try again.');
+            ? t(locale, 'onboardingAuthOtpFailed')
+            : t(locale, 'onboardingAuthSendFailed');
       setError(r.auditId ? `${message} (${r.auditId})` : message);
     }
   }
@@ -251,18 +246,18 @@ function AuthStep({ onDone, locale, displayName }: {
   if (sent) return (
     <div className="nesio-ob-step">
       <div className="nesio-ob-step-icon" aria-hidden>📬</div>
-      <h2 className="nesio-ob-step-title">{zh ? '查一下邮件' : 'Check your email'}</h2>
-      <p className="nesio-ob-step-sub">{zh ? `登录链接已发到 ${email}` : `We sent a link to ${email}`}</p>
-      <button type="button" className="nesio-ob-primary-btn" onClick={onDone}>{zh ? '继续本地使用' : 'Continue locally'}</button>
+      <h2 className="nesio-ob-step-title">{t(locale, 'onboardingAuthCheckEmailTitle')}</h2>
+      <p className="nesio-ob-step-sub">{t(locale, 'onboardingAuthLinkSentTemplate', { email })}</p>
+      <button type="button" className="nesio-ob-primary-btn" onClick={onDone}>{t(locale, 'onboardingAuthContinueLocal')}</button>
     </div>
   );
 
   return (
     <div className="nesio-ob-step">
       <div className="nesio-ob-step-icon" aria-hidden>🔐</div>
-      <h2 className="nesio-ob-step-title">{zh ? `你好，${displayName}` : `Hello, ${displayName}`}</h2>
+      <h2 className="nesio-ob-step-title">{t(locale, 'onboardingAuthHelloTemplate', { name: displayName })}</h2>
       <p className="nesio-ob-step-sub">
-        {zh ? '登录后，Memory 和 Today 可跨设备同步。可以跳过，稍后再设置。' : 'Sign in to sync across devices. You can skip for now.'}
+        {t(locale, 'onboardingAuthBenefit')}
       </p>
 
       {/* Google */}
@@ -275,7 +270,7 @@ function AuthStep({ onDone, locale, displayName }: {
           <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
         </svg>
         {/* eslint-enable no-restricted-syntax */}
-        {loading ? (zh ? '跳转中…' : 'Redirecting…') : (zh ? '用 Google 登录' : 'Continue with Google')}
+        {loading ? t(locale, 'onboardingAuthRedirecting') : t(locale, 'onboardingAuthGoogleBtn')}
       </button>
 
       {/* Email */}
@@ -284,7 +279,7 @@ function AuthStep({ onDone, locale, displayName }: {
           <input
             type="email"
             className="nesio-ob-input"
-            placeholder={zh ? '你的邮箱地址' : 'your@email.com'}
+            placeholder={t(locale, 'onboardingAuthEmailPlaceholder')}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') handleEmail(); }}
@@ -292,7 +287,7 @@ function AuthStep({ onDone, locale, displayName }: {
             autoFocus
           />
           <button type="button" className="nesio-ob-primary-btn" onClick={handleEmail} disabled={loading || !email.trim()}>
-            {loading ? (zh ? '发送中…' : 'Sending…') : (zh ? '发送登录链接' : 'Send sign-in link')}
+            {loading ? t(locale, 'onboardingAuthSending') : t(locale, 'onboardingAuthSendLink')}
           </button>
         </>
       ) : (
@@ -301,13 +296,13 @@ function AuthStep({ onDone, locale, displayName }: {
             <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
             <polyline points="22,6 12,13 2,6"/>
           </svg>
-          {zh ? '用邮件登录' : 'Continue with Email'}
+          {t(locale, 'onboardingAuthEmailBtn')}
         </button>
       )}
 
       {error && <p className="nesio-ob-error">{error}</p>}
       <button type="button" className="nesio-ob-skip-btn" onClick={onDone}>
-        {zh ? '跳过，本地使用' : 'Skip for now'}
+        {t(locale, 'onboardingAuthSkipLocal')}
       </button>
     </div>
   );
@@ -317,54 +312,17 @@ function AuthStep({ onDone, locale, displayName }: {
 
 export function FirstUseTips({ onDone, locale }: { onDone: () => void; locale: PortalLocale }) {
   const [step, setStep] = useState(0);
-  const zh = portalLocaleToDictionaryLocale(locale) === 'zh';
-  const tips = zh
-    ? [
-        {
-          emoji: '📋',
-          title: 'Today',
-          body: '今天最值得看的事会放在这里。',
-          zone: 'today' as const,
-        },
-        {
-          emoji: '💎',
-          title: '中间按钮',
-          body: '说一句、拍一下、上传内容，先整理成草稿。',
-          zone: 'center' as const,
-        },
-        {
-          emoji: '🗂',
-          title: 'Memory',
-          body: '你放进来的线索，以后可以问回来。',
-          zone: 'memory' as const,
-        },
-      ]
-    : [
-        {
-          emoji: '📋',
-          title: 'Today',
-          body: 'The most useful thing to look at today lives here.',
-          zone: 'today' as const,
-        },
-        {
-          emoji: '💎',
-          title: 'Center button',
-          body: 'Say, snap, or upload. Nesio drafts first; you confirm.',
-          zone: 'center' as const,
-        },
-        {
-          emoji: '🗂',
-          title: 'Memory',
-          body: 'Things you put in can be found again later.',
-          zone: 'memory' as const,
-        },
-      ];
+  const tips = [
+    { emoji: '📋', title: t(locale, 'onboardingTipTodayTitle'), body: t(locale, 'onboardingTipTodayBody'), zone: 'today' as const },
+    { emoji: '💎', title: t(locale, 'onboardingTipCenterTitle'), body: t(locale, 'onboardingTipCenterBody'), zone: 'center' as const },
+    { emoji: '🗂', title: t(locale, 'onboardingTipMemoryTitle'), body: t(locale, 'onboardingTipMemoryBody'), zone: 'memory' as const },
+  ];
   const tip = tips[step];
   const isLast = step === tips.length - 1;
 
   // 激活式最后一步:真的存进第一条记忆,并当场找回 —— 引导结束时
   // 用户已经亲历过一次「扔进来 → 找得到」,而不是只被告知过。
-  const [firstText, setFirstText] = useState(zh ? '备用钥匙放在玄关抽屉' : 'Spare keys are in the hallway drawer');
+  const [firstText, setFirstText] = useState(t(locale, 'onboardingActivatePlaceholderDefault'));
   const [activatePhase, setActivatePhase] = useState<'input' | 'found'>('input');
   const [savedName, setSavedName] = useState('');
 
@@ -378,7 +336,7 @@ export function FirstUseTips({ onDone, locale }: { onDone: () => void; locale: P
       source: 'manual',
       confidence: 1,
       rawInput: text,
-      tags: [zh ? '第一条记忆' : 'first-memory'],
+      tags: [t(locale, 'onboardingActivateFirstTag')],
       attributes: {},
       relations: [],
     });
@@ -387,7 +345,7 @@ export function FirstUseTips({ onDone, locale }: { onDone: () => void; locale: P
   }
 
   return (
-    <div className="nesio-tips-overlay" role="dialog" aria-modal="false" aria-label={zh ? '新手提示' : 'First-use tip'}>
+    <div className="nesio-tips-overlay" role="dialog" aria-modal="false" aria-label={t(locale, 'onboardingTipsAriaLabel')}>
       <div className={`nesio-tips-hl nesio-tips-hl--${tip.zone}`} aria-hidden />
       <div className="nesio-tips-card">
         <div className="nesio-tips-dots" aria-hidden>
@@ -397,8 +355,8 @@ export function FirstUseTips({ onDone, locale }: { onDone: () => void; locale: P
         {isLast ? (
           activatePhase === 'input' ? (
             <>
-              <h3 className="nesio-tips-title">{zh ? '现在就存一条试试' : 'Try saving one now'}</h3>
-              <p className="nesio-tips-body">{zh ? '随手一句话,以后随时问回来。可以直接用这句:' : 'One sentence — ask for it back anytime. Use this one:'}</p>
+              <h3 className="nesio-tips-title">{t(locale, 'onboardingActivateTryTitle')}</h3>
+              <p className="nesio-tips-body">{t(locale, 'onboardingActivateTryBody')}</p>
               <input
                 className="nesio-ob-input"
                 value={firstText}
@@ -408,22 +366,22 @@ export function FirstUseTips({ onDone, locale }: { onDone: () => void; locale: P
               />
               <div className="nesio-tips-actions">
                 <button type="button" className="nesio-ob-primary-btn" onClick={saveFirstMemory} disabled={!firstText.trim()}>
-                  {zh ? '存进记忆' : 'Save it'}
+                  {t(locale, 'onboardingActivateSave')}
                 </button>
-                <button type="button" className="nesio-ob-skip-btn" onClick={onDone}>{zh ? '先跳过' : 'Skip'}</button>
+                <button type="button" className="nesio-ob-skip-btn" onClick={onDone}>{t(locale, 'onboardingActivateSkip')}</button>
               </div>
             </>
           ) : (
             <>
-              <h3 className="nesio-tips-title">{zh ? '存好了,试着找回来' : 'Saved — now find it'}</h3>
-              <p className="nesio-tips-body">{zh ? '以后长按中间按钮问一句,就像这样:' : 'Long-press the center button and just ask:'}</p>
+              <h3 className="nesio-tips-title">{t(locale, 'onboardingActivateFoundTitle')}</h3>
+              <p className="nesio-tips-body">{t(locale, 'onboardingActivateFoundBody')}</p>
               <div style={{ background: 'var(--portal-accent-soft, rgba(88,140,227,0.1))', borderRadius: 12, padding: '0.7rem 0.9rem', margin: '0.5rem 0', textAlign: 'left' }}>
-                <p style={{ fontSize: '0.76rem', margin: 0, color: 'var(--portal-muted)' }}>{zh ? '「钥匙在哪?」' : '"Where are the keys?"'}</p>
+                <p style={{ fontSize: '0.76rem', margin: 0, color: 'var(--portal-muted)' }}>{t(locale, 'onboardingActivateAskExample')}</p>
                 <p style={{ fontSize: '0.82rem', margin: '0.35rem 0 0', fontWeight: 600 }}>📦 {savedName}</p>
               </div>
-              <p className="nesio-tips-body">{zh ? '这就是 Nesio:你说,它记,要用的时候找得回。' : "That's Nesio: you say it, it remembers, you get it back."}</p>
+              <p className="nesio-tips-body">{t(locale, 'onboardingActivateSummary')}</p>
               <div className="nesio-tips-actions">
-                <button type="button" className="nesio-ob-primary-btn" onClick={onDone}>{zh ? '开始使用' : 'Start'}</button>
+                <button type="button" className="nesio-ob-primary-btn" onClick={onDone}>{t(locale, 'onboardingActivateStart')}</button>
               </div>
             </>
           )
@@ -432,8 +390,8 @@ export function FirstUseTips({ onDone, locale }: { onDone: () => void; locale: P
             <h3 className="nesio-tips-title">{tip.title}</h3>
             <p className="nesio-tips-body">{tip.body}</p>
             <div className="nesio-tips-actions">
-              <button type="button" className="nesio-ob-primary-btn" onClick={() => setStep(step + 1)}>{zh ? '下一步' : 'Next'}</button>
-              <button type="button" className="nesio-ob-skip-btn" onClick={onDone}>{zh ? '跳过' : 'Skip'}</button>
+              <button type="button" className="nesio-ob-primary-btn" onClick={() => setStep(step + 1)}>{t(locale, 'onboardingTipNext')}</button>
+              <button type="button" className="nesio-ob-skip-btn" onClick={onDone}>{t(locale, 'onboardingSkip')}</button>
             </div>
           </>
         )}

@@ -28,10 +28,10 @@
     {
       "id": "REG-004",
       "from_contract": "baohe-v14-coverage + portal-locale-runtime (DashboardHome 部分)",
-      "description": "Today 表面 i18n 全丢:旧代 DashboardHome 全键覆盖(dashboardReminderKicker 等),新代 TodayFeed 硬编码中文。第四期按此清单补:提醒kicker/聚焦区标题/momentum按钮/空状态",
+      "description": "Today 表面 i18n(2026-07-04 闭环):today* 键组入字典,FocusSection/CalendarCards/DormantReviewCard/NightTimeline/ProactiveGuidanceCard 经 usePortalLocale + t() 双语;文案契约聚合已含 i18n.ts",
       "living_surface": "components/portal/TodayFeed.tsx",
       "marker": "t(locale,",
-      "status": "open"
+      "status": "closed"
     },
     {
       "id": "REG-005",
@@ -44,10 +44,10 @@
     {
       "id": "REG-006",
       "from_contract": "portal-locale-runtime (PortalOnboarding 部分)",
-      "description": "Onboarding 绕过 i18n 字典。2026-07-04 部分闭环:NameStep 已接 t()(3 处);Welcome/Auth 步和 FirstUseTips 仍为 zh/en 三元,与 TodayFeed i18n(REG-004)一起做完整包",
+      "description": "Onboarding i18n(2026-07-04 闭环):Welcome/Name/Auth/FirstUseTips 全部走 t() 字典(onboarding* 键组),zh/en 三元清零",
       "living_surface": "components/portal/PortalOnboarding.tsx",
       "marker": "t(locale, 'onboarding",
-      "status": "partial"
+      "status": "closed"
     }
   ]
 }

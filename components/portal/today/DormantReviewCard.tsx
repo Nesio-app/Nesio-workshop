@@ -7,6 +7,8 @@
  */
 
 import { getReviewTier, type DormantCandidate } from '@/lib/platform/dormant-engine';
+import { t } from '@/lib/portal/i18n';
+import { usePortalLocale } from '../use-portal-locale';
 
 export function DormantReviewCard({
   candidate,
@@ -21,6 +23,7 @@ export function DormantReviewCard({
   onArchive: () => void;
   onFinalize: () => void;
 }) {
+  const locale = usePortalLocale();
   const { node, kind, rec } = candidate;
   const name = node.name.length > 22 ? node.name.slice(0, 22) + '…' : node.name;
   const tier = getReviewTier(rec.snoozeCount);
@@ -32,13 +35,13 @@ export function DormantReviewCard({
         <div className="nesio-collapsed-row">
           <span className="nesio-collapsed-icon">🕊️</span>
           <div className="nesio-dormant-content">
-            <span className="nesio-dormant-question">你曾经放下了这件事</span>
+            <span className="nesio-dormant-question">{t(locale, 'dormantSoftArchiveQuestion')}</span>
             <span className="nesio-collapsed-title">{name}</span>
           </div>
         </div>
         <div className="nesio-collapsed-overdue-actions">
-          <button type="button" onClick={onDo}>重新拾起</button>
-          <button type="button" className="nesio-dormant-btn--primary" onClick={onFinalize}>彻底告别</button>
+          <button type="button" onClick={onDo}>{t(locale, 'dormantPickUpAgain')}</button>
+          <button type="button" className="nesio-dormant-btn--primary" onClick={onFinalize}>{t(locale, 'dormantFinalize')}</button>
         </div>
       </li>
     );
@@ -55,15 +58,15 @@ export function DormantReviewCard({
           <span className="nesio-collapsed-icon">⏰</span>
           <div className="nesio-dormant-content">
             <span className="nesio-dormant-question">
-              {dueDateStr ? `截止日（${dueDateStr}）已过，还想继续吗？` : '截止日期已过，还想继续吗？'}
+              {dueDateStr ? t(locale, 'dormantOverdueQuestionTemplate', { date: dueDateStr }) : t(locale, 'dormantOverdueQuestionNoDate')}
             </span>
             <span className="nesio-collapsed-title">{name}</span>
           </div>
         </div>
         <div className="nesio-collapsed-overdue-actions">
-          <button type="button" onClick={onDo}>还是要做</button>
-          <button type="button" onClick={onSnooze}>以后再说</button>
-          <button type="button" onClick={onArchive}>放下</button>
+          <button type="button" onClick={onDo}>{t(locale, 'dormantStillDo')}</button>
+          <button type="button" onClick={onSnooze}>{t(locale, 'dormantLater')}</button>
+          <button type="button" onClick={onArchive}>{t(locale, 'dormantLetGo')}</button>
         </div>
       </li>
     );
@@ -71,9 +74,9 @@ export function DormantReviewCard({
 
   // ── 普通休眠任务（带升级提示） ───────────────────────────────────────────────
   const question =
-    tier === 'letting-go'   ? `已经搁置 ${rec.snoozeCount} 次了，建议为它做个决定` :
-    tier === 'gentle-nudge' ? `已经搁置 ${rec.snoozeCount} 次了，这件事还是你的吗？` :
-                              '这个还属于你吗？';
+    tier === 'letting-go'   ? t(locale, 'dormantLettingGoTemplate', { count: rec.snoozeCount }) :
+    tier === 'gentle-nudge' ? t(locale, 'dormantGentleNudgeTemplate', { count: rec.snoozeCount }) :
+                              t(locale, 'dormantDefaultQuestion');
 
   return (
     <li className={`nesio-collapsed-item nesio-dormant-card${tier === 'letting-go' ? ' nesio-dormant-card--letting-go' : ''}`}>
@@ -88,15 +91,15 @@ export function DormantReviewCard({
         {tier === 'letting-go' ? (
           // 5次以上：放下变主按钮
           <>
-            <button type="button" className="nesio-dormant-btn--primary" onClick={onArchive}>放下</button>
-            <button type="button" onClick={onSnooze}>再等等</button>
-            <button type="button" onClick={onDo}>现在做</button>
+            <button type="button" className="nesio-dormant-btn--primary" onClick={onArchive}>{t(locale, 'dormantLetGo')}</button>
+            <button type="button" onClick={onSnooze}>{t(locale, 'dormantWaitMore')}</button>
+            <button type="button" onClick={onDo}>{t(locale, 'dormantDoNow')}</button>
           </>
         ) : (
           <>
-            <button type="button" onClick={onDo}>现在做</button>
-            <button type="button" onClick={onSnooze}>以后再说</button>
-            <button type="button" onClick={onArchive}>放下</button>
+            <button type="button" onClick={onDo}>{t(locale, 'dormantDoNow')}</button>
+            <button type="button" onClick={onSnooze}>{t(locale, 'dormantLater')}</button>
+            <button type="button" onClick={onArchive}>{t(locale, 'dormantLetGo')}</button>
           </>
         )}
       </div>

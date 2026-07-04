@@ -90,6 +90,6 @@
 ## 7. 遗留欠账(下版 PRD 应吸收)
 
 1. Signal M3/M4 读切换(见 §5)
-2. 新代 i18n 完整包:REG-004(TodayFeed)+ REG-006(onboarding 剩余步)
+2. ~~新代 i18n 完整包~~(✅ 2026-07-04:today*/night*/dormant*/guidance*/onboarding* 键组入字典,usePortalLocale hook 即时切换;REG-004/006 关闭)
 3. ~~57 处存量 raw hex token 化~~(✅ 2026-07-04:chip/avatar/accent 三组 token 入 globals.css;canvas 兜底与 Google 品牌色为合法保留,带说明 disable)
 4. ~~FocusSection 进一步拆分~~(✅ 2026-07-04,见 §2)

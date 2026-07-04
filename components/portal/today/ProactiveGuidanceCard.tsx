@@ -8,6 +8,8 @@
 import { useState } from 'react';
 import { recordCardFeedback } from '@/lib/portal/reasoning-engine';
 import { snoozeOverdue, type ProactiveAction, type ProactiveCardData } from './proactive-types';
+import { t } from '@/lib/portal/i18n';
+import { usePortalLocale } from '../use-portal-locale';
 
 export function ProactiveGuidanceCard({
   card, onDismiss, onMarkDone,
@@ -16,6 +18,7 @@ export function ProactiveGuidanceCard({
   onDismiss: () => void;
   onMarkDone?: (nodeId: string) => void;
 }) {
+  const locale = usePortalLocale();
   const hasActions = card.actions && card.actions.length > 0;
   const [evidenceOpen, setEvidenceOpen] = useState(false);
   const [feedbackGiven, setFeedbackGiven] = useState(false);
@@ -64,7 +67,7 @@ export function ProactiveGuidanceCard({
                 onClick={() => setEvidenceOpen((v) => !v)}
                 style={{ fontSize: '0.66rem', color: 'var(--portal-blue-deep)', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
               >
-                依据 {evidenceOpen ? '▾' : '▸'} {card.evidence.length} 条
+                {t(locale, 'guidanceEvidenceTemplate', { chevron: evidenceOpen ? '▾' : '▸', count: card.evidence.length })}
               </button>
               {evidenceOpen && (
                 <ul style={{ margin: '0.25rem 0 0', paddingLeft: '1rem', fontSize: '0.66rem', color: 'var(--portal-muted)', lineHeight: 1.5 }}>
@@ -90,13 +93,13 @@ export function ProactiveGuidanceCard({
             </div>
           )}
           {feedbackGiven ? (
-            <p style={{ fontSize: '0.66rem', color: 'var(--status-go)', margin: '0.35rem 0 0' }}>✓ 记下了，会照着调整</p>
+            <p style={{ fontSize: '0.66rem', color: 'var(--status-go)', margin: '0.35rem 0 0' }}>{t(locale, 'guidanceFeedbackAck')}</p>
           ) : (
             <div style={{ display: 'flex', gap: '0.7rem', marginTop: '0.35rem' }}>
               {([
-                ['useful', '有用'],
-                ['wrong', '不准'],
-                ['too_much', '不再提醒'],
+                ['useful', t(locale, 'guidanceFeedbackUseful')],
+                ['wrong', t(locale, 'guidanceFeedbackWrong')],
+                ['too_much', t(locale, 'guidanceFeedbackTooMuch')],
               ] as Array<['useful' | 'wrong' | 'too_much', string]>).map(([fb, label]) => (
                 <button
                   key={fb}
@@ -111,7 +114,7 @@ export function ProactiveGuidanceCard({
           )}
         </div>
         {!hasActions && (
-          <button type="button" className="nesio-proactive-card-dismiss" onClick={onDismiss} aria-label="忽略">✕</button>
+          <button type="button" className="nesio-proactive-card-dismiss" onClick={onDismiss} aria-label={t(locale, 'todayDismissAria')}>✕</button>
         )}
       </div>
     </div>

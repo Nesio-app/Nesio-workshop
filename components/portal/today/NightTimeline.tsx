@@ -3,29 +3,36 @@
 /**
  * NightTimeline — 夜间空状态时间线(此刻 · 把你带回今天)。
  * 从 FocusSection 拆出;无共享状态,纯展示。
- * 文案受 v14-sovereignty 契约约束(低压首记录邀请)。
+ * 文案在 lib/portal/i18n.ts 的 night* 键组,受 v14-sovereignty 契约约束
+ * (低压首记录邀请)。
  */
 
+import { t } from '@/lib/portal/i18n';
+import { usePortalLocale } from '../use-portal-locale';
+
 export function NightTimeline() {
+  const locale = usePortalLocale();
+  const steps = [
+    { time: t(locale, 'nightNowTime'), label: t(locale, 'nightNowLabel'), active: true },
+    { time: t(locale, 'nightMorningTime'), label: t(locale, 'nightMorningLabel'), active: false },
+    { time: t(locale, 'nightLaterTime'), label: t(locale, 'nightLaterLabel'), active: false },
+  ];
+
   return (
     <div className="nesio-today-night">
       <div className="nesio-today-night-hero">
-        <p className="nesio-today-night-kicker">此刻 · 把你带回今天</p>
-        <h2 className="nesio-today-night-title">先放进来一件事<br />以后就找得到</h2>
-        <p className="nesio-today-night-sub">说一句、拍一下，Nesio 会帮你留到以后找得到。</p>
+        <p className="nesio-today-night-kicker">{t(locale, 'nightKicker')}</p>
+        <h2 className="nesio-today-night-title">{t(locale, 'nightTitleL1')}<br />{t(locale, 'nightTitleL2')}</h2>
+        <p className="nesio-today-night-sub">{t(locale, 'nightSub')}</p>
         <div className="nesio-today-night-actions">
-          <span className="nesio-today-night-conf">● 建议确认</span>
-          <button type="button" className="nesio-today-btn nesio-today-btn--night">好的</button>
+          <span className="nesio-today-night-conf">{t(locale, 'nightConfirmHint')}</span>
+          <button type="button" className="nesio-today-btn nesio-today-btn--night">{t(locale, 'nightOk')}</button>
         </div>
       </div>
       <div className="nesio-today-night-timeline">
-        <p className="nesio-today-night-timeline-label">今晚的路径</p>
+        <p className="nesio-today-night-timeline-label">{t(locale, 'nightPathLabel')}</p>
         <ol className="nesio-today-night-steps">
-          {[
-            { time: '现在', label: '记录一件真实小事', active: true },
-            { time: '明早', label: '基于记录生成提醒', active: false },
-            { time: '之后', label: '你反馈后逐步调整', active: false },
-          ].map((step, i) => (
+          {steps.map((step, i) => (
             <li key={i} className={`nesio-today-night-step${step.active ? ' nesio-today-night-step--active' : ''}`}>
               <span className="nesio-today-night-step-dot" />
               <span className="nesio-today-night-step-time">{step.time}</span>
