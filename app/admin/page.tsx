@@ -1,14 +1,18 @@
 'use client';
 
 /**
- * /admin — 管理员数据面板(只读)。
+ * /admin — 管理员数据面板(只读,容器)。
  * 数据全部来自自己的 Supabase(经 /api/admin/metrics 服务端聚合),
  * 不依赖任何第三方分析服务。密钥存本机浏览器,随请求头发送。
+ * 图表展示层在 ./MetricsCharts.tsx。
  */
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { FeedbackDonut, FunnelSteps, TopEventsChart, TrendChart, type DailyPoint } from './MetricsCharts';
 
 const SECRET_KEY = 'nesio_admin_secret';
+const RANGES = [7, 14, 30] as const;
+type RangeDays = (typeof RANGES)[number];
 
 interface Metrics {
   ok: boolean;
@@ -18,7 +22,7 @@ interface Metrics {
   sources?: { telemetryEvents: { ok: boolean; error?: string; rows?: number }; productEvents: { ok: boolean; error?: string; rows?: number } };
   windows?: { today: { events: number; devices: number }; week: { events: number; devices: number }; month: { events: number; devices: number } };
   topEvents7d?: Array<{ name: string; count: number }>;
-  daily14d?: Array<{ date: string; events: number; devices: number }>;
+  daily30d?: DailyPoint[];
   funnel30d?: Array<{ step: string; devices: number }>;
   cardFeedback30d?: { useful: number; wrong: number; too_much: number; other: number };
   productEvents30d?: Array<{ type: string; count: number }>;
@@ -29,30 +33,24 @@ const card: React.CSSProperties = {
   borderRadius: 'var(--radius-lg)', padding: '1rem 1.1rem', boxShadow: 'var(--shadow-card)',
 };
 const label: React.CSSProperties = { fontSize: '0.7rem', color: 'var(--portal-muted)', letterSpacing: '0.08em' };
-const big: React.CSSProperties = { fontSize: '1.6rem', fontWeight: 700, color: 'var(--portal-ink)' };
-
-function Bar({ value, max, color = 'var(--portal-accent)' }: { value: number; max: number; color?: string }) {
-  const pct = max > 0 ? Math.max(2, Math.round((value / max) * 100)) : 0;
-  return (
-    <div style={{ height: 6, background: 'var(--portal-accent-soft)', borderRadius: 3 }}>
-      <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 3 }} />
-    </div>
-  );
-}
+const big: React.CSSProperties = { fontSize: '1.7rem', fontWeight: 700, color: 'var(--portal-ink)' };
+const chip = (active: boolean): React.CSSProperties => ({
+  padding: '0.3rem 0.75rem', borderRadius: 'var(--radius-pill)', fontSize: '0.75rem', cursor: 'pointer',
+  border: `1px solid ${active ? 'var(--portal-accent)' : 'var(--glass-border)'}`,
+  background: active ? 'var(--portal-accent-soft-md)' : 'var(--glass-bg-solid)',
+  color: active ? 'var(--portal-accent)' : 'var(--portal-muted)',
+});
 
 export default function AdminPage() {
   const [secret, setSecret] = useState('');
   const [saved, setSaved] = useState(false);
   const [data, setData] = useState<Metrics | null>(null);
   const [loading, setLoading] = useState(false);
+  const [range, setRange] = useState<RangeDays>(14);
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  useEffect(() => {
-    const s = localStorage.getItem(SECRET_KEY) || '';
-    setSecret(s);
-    setSaved(Boolean(s));
-  }, []);
-
-  async function load(withSecret: string) {
+  const load = useCallback(async (withSecret: string) => {
     setLoading(true);
     try {
       const res = await fetch('/api/admin/metrics', { headers: withSecret ? { 'x-nesio-admin-secret': withSecret } : {} });
@@ -63,23 +61,43 @@ export default function AdminPage() {
       setData({ ok: false, error: 'network_failed' });
     }
     setLoading(false);
-  }
+  }, []);
 
   useEffect(() => {
     const s = localStorage.getItem(SECRET_KEY) || '';
+    setSecret(s);
+    setSaved(Boolean(s));
     void load(s);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [load]);
 
-  const maxDaily = Math.max(1, ...(data?.daily14d?.map((d) => d.events) || [1]));
-  const maxTop = Math.max(1, ...(data?.topEvents7d?.map((e) => e.count) || [1]));
-  const maxFunnel = Math.max(1, ...(data?.funnel30d?.map((f) => f.devices) || [1]));
+  useEffect(() => {
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    if (autoRefresh) {
+      timerRef.current = setInterval(() => { void load(localStorage.getItem(SECRET_KEY) || ''); }, 60_000);
+    }
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [autoRefresh, load]);
+
+  const daily = (data?.daily30d || []).slice(-range);
+  const rangeEvents = daily.reduce((s, d) => s + d.events, 0);
+  const rangeDevices = Math.max(0, ...daily.map((d) => d.devices));
 
   return (
-    <main style={{ maxWidth: 760, margin: '0 auto', padding: '1.2rem 1rem 4rem', fontFamily: 'var(--font-sans)' }}>
-      <header style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '1rem' }}>
+    <main style={{ maxWidth: 880, margin: '0 auto', padding: '1.2rem 1rem 4rem', fontFamily: 'var(--font-sans)' }}>
+      <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.6rem', marginBottom: '1rem' }}>
         <h1 style={{ fontSize: 'var(--text-h2)', color: 'var(--portal-ink)', margin: 0 }}>Nesio 数据面板</h1>
-        <span style={label}>{data?.generatedAt ? `更新于 ${new Date(data.generatedAt).toLocaleTimeString('zh-CN')}` : ''}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+          {RANGES.map((r) => (
+            <button key={r} type="button" style={chip(range === r)} onClick={() => setRange(r)}>{r} 天</button>
+          ))}
+          <button type="button" style={chip(autoRefresh)} onClick={() => setAutoRefresh((v) => !v)}
+            title="每 60 秒自动拉取">
+            {autoRefresh ? '⟳ 自动中' : '⟳ 自动'}
+          </button>
+          <button type="button" style={chip(false)} onClick={() => void load(localStorage.getItem(SECRET_KEY) || '')} disabled={loading}>
+            {loading ? '…' : '刷新'}
+          </button>
+        </div>
       </header>
 
       {/* ── 密钥 / 失败态 ── */}
@@ -120,82 +138,66 @@ export default function AdminPage() {
               {!data.sources?.telemetryEvents.ok && (
                 <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--status-gentle)' }}>
                   telemetry_events 数据源不可用({data.sources?.telemetryEvents.error})
-                  {data.sources?.telemetryEvents.error === 'table_missing' && ' — 需在 Supabase SQL Editor 执行一次 database/schema/supabase-backend-v1-bundle.sql(2026-07-04 起含此表)'}
+                  {data.sources?.telemetryEvents.error === 'table_missing' && ' — 需在 Supabase SQL Editor 建表(schema bundle 的 Telemetry events 段)'}
                 </p>
               )}
               {!data.sources?.productEvents.ok && (
                 <p style={{ margin: '0.3rem 0 0', fontSize: '0.8rem', color: 'var(--status-gentle)' }}>
                   product_events 数据源不可用({data.sources?.productEvents.error})
+                  {data.sources?.productEvents.error === 'table_missing' && ' — 需在 Supabase SQL Editor 建表(schema bundle 的 Product events 段)'}
                 </p>
               )}
             </section>
           )}
 
-          {/* ── 窗口统计 ── */}
-          <section style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.7rem', marginBottom: '1rem' }}>
-            {([['今日', data.windows?.today], ['7 天', data.windows?.week], ['30 天', data.windows?.month]] as const).map(([name, w]) => (
+          {/* ── KPI 行 ── */}
+          <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.7rem', marginBottom: '0.9rem' }}>
+            {([
+              ['今日事件', data.windows?.today.events, `${data.windows?.today.devices ?? 0} 台设备`],
+              [`${range} 天事件`, rangeEvents, '所选范围'],
+              ['单日峰值设备', rangeDevices, `${range} 天内`],
+              ['30 天设备', data.windows?.month.devices, `${data.windows?.month.events ?? 0} 事件`],
+            ] as const).map(([name, value, sub]) => (
               <div key={name} style={card}>
                 <p style={{ ...label, margin: '0 0 0.3rem' }}>{name}</p>
-                <p style={{ ...big, margin: 0 }}>{w?.events ?? 0}</p>
-                <p style={{ ...label, margin: '0.2rem 0 0' }}>事件 · {w?.devices ?? 0} 台设备</p>
+                <p style={{ ...big, margin: 0 }}>{value ?? 0}</p>
+                <p style={{ ...label, margin: '0.2rem 0 0' }}>{sub}</p>
               </div>
             ))}
           </section>
 
-          {/* ── 14 天趋势 ── */}
-          <section style={{ ...card, marginBottom: '1rem' }}>
-            <p style={{ ...label, margin: '0 0 0.6rem' }}>14 天事件趋势</p>
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 72 }}>
-              {data.daily14d?.map((d) => (
-                <div key={d.date} title={`${d.date}:${d.events} 事件 / ${d.devices} 设备`}
-                  style={{ flex: 1, height: `${Math.max(3, Math.round((d.events / maxDaily) * 100))}%`, background: 'var(--portal-accent)', opacity: d.events ? 0.9 : 0.25, borderRadius: 2 }} />
-              ))}
+          {/* ── 趋势 ── */}
+          <section style={{ ...card, marginBottom: '0.9rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+              <p style={{ ...label, margin: 0 }}>{range} 天趋势 — 事件(面积)/ 独立设备(线)</p>
+              <span style={label}>{data.generatedAt ? `更新 ${new Date(data.generatedAt).toLocaleTimeString('zh-CN')}` : ''}</span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
-              <span style={label}>{data.daily14d?.[0]?.date.slice(5)}</span>
-              <span style={label}>{data.daily14d?.[data.daily14d.length - 1]?.date.slice(5)}</span>
-            </div>
+            <TrendChart data={daily} />
           </section>
 
           {/* ── Top 事件 + 漏斗 ── */}
-          <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.7rem', marginBottom: '1rem' }}>
+          <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '0.7rem', marginBottom: '0.9rem' }}>
             <div style={card}>
               <p style={{ ...label, margin: '0 0 0.6rem' }}>Top 事件(7 天)</p>
-              {(data.topEvents7d?.length ?? 0) === 0 && <p style={label}>暂无数据 — 遥测刚接通,等它累积。</p>}
-              {data.topEvents7d?.map((e) => (
-                <div key={e.name} style={{ marginBottom: '0.5rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: 'var(--portal-ink)' }}>
-                    <span>{e.name}</span><span>{e.count}</span>
-                  </div>
-                  <Bar value={e.count} max={maxTop} />
-                </div>
-              ))}
+              {(data.topEvents7d?.length ?? 0) === 0
+                ? <p style={{ ...label }}>暂无数据 — 遥测刚接通,等它累积。</p>
+                : <TopEventsChart data={data.topEvents7d!} />}
             </div>
             <div style={card}>
-              <p style={{ ...label, margin: '0 0 0.6rem' }}>使用漏斗(30 天,按设备)</p>
-              {data.funnel30d?.map((f) => (
-                <div key={f.step} style={{ marginBottom: '0.5rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: 'var(--portal-ink)' }}>
-                    <span>{f.step}</span><span>{f.devices}</span>
-                  </div>
-                  <Bar value={f.devices} max={maxFunnel} color="var(--status-go)" />
-                </div>
-              ))}
+              <p style={{ ...label, margin: '0 0 0.6rem' }}>使用漏斗(30 天,按设备 · 百分比为相对上一步)</p>
+              <FunnelSteps data={data.funnel30d || []} />
             </div>
           </section>
 
           {/* ── 反馈 + 产品事件 ── */}
-          <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.7rem' }}>
+          <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '0.7rem' }}>
             <div style={card}>
-              <p style={{ ...label, margin: '0 0 0.6rem' }}>今日卡反馈(30 天)</p>
-              <div style={{ display: 'flex', gap: '1.2rem' }}>
-                {([['有用', data.cardFeedback30d?.useful, 'var(--status-go)'], ['不准', data.cardFeedback30d?.wrong, 'var(--status-gentle)'], ['不再提醒', data.cardFeedback30d?.too_much, 'var(--portal-muted)']] as const).map(([n, v, c]) => (
-                  <div key={n}>
-                    <p style={{ ...big, margin: 0, fontSize: '1.2rem', color: c }}>{v ?? 0}</p>
-                    <p style={{ ...label, margin: 0 }}>{n}</p>
-                  </div>
-                ))}
-              </div>
+              <p style={{ ...label, margin: '0 0 0.6rem' }}>今日卡反馈(30 天)— DEC 推荐质量</p>
+              <FeedbackDonut
+                useful={data.cardFeedback30d?.useful ?? 0}
+                wrong={data.cardFeedback30d?.wrong ?? 0}
+                tooMuch={data.cardFeedback30d?.too_much ?? 0}
+              />
             </div>
             <div style={card}>
               <p style={{ ...label, margin: '0 0 0.6rem' }}>产品事件(30 天,已登录用户)</p>

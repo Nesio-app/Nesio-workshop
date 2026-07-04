@@ -90,9 +90,9 @@ export async function GET(req: NextRequest) {
     byName7.set(r.name, (byName7.get(r.name) || 0) + 1);
   }
 
-  // ── 每日趋势(14 天,事件数 + 独立设备) ──
+  // ── 每日趋势(30 天,事件数 + 独立设备;前端按 7/14/30 范围切换) ──
   const daily = new Map<string, { events: number; devices: Set<string> }>();
-  for (let i = 13; i >= 0; i -= 1) {
+  for (let i = 29; i >= 0; i -= 1) {
     daily.set(dayKey(new Date(now - i * 86_400_000).toISOString()), { events: 0, devices: new Set() });
   }
   for (const r of telemetry.rows) {
@@ -130,7 +130,7 @@ export async function GET(req: NextRequest) {
     },
     windows: { today: windowStats(1), week: windowStats(7), month: windowStats(30) },
     topEvents7d: [...byName7.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12).map(([name, count]) => ({ name, count })),
-    daily14d: [...daily.entries()].map(([date, d]) => ({ date, events: d.events, devices: d.devices.size })),
+    daily30d: [...daily.entries()].map(([date, d]) => ({ date, events: d.events, devices: d.devices.size })),
     funnel30d: funnel,
     cardFeedback30d: feedback,
     productEvents30d: [...productByType.entries()].map(([type, count]) => ({ type, count })),
