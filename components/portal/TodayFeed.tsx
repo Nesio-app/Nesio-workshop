@@ -1711,34 +1711,51 @@ export default function TodayFeed({
           .filter((c) => !isProactiveCardDismissed(c.id))
           .filter((c) => !c.expiresAt || new Date(c.expiresAt).getTime() > now.getTime());
 
-        // AI Language Generation (Layer 7) — enhance copy if cards exist
-        // Falls back to rule-generated text if API is unavailable
+        // AI Language Generation (Layer 7) — enhance copy if cards exist.
+        // Cached per card-set per day: the same cards used to trigger a fresh
+        // AI rewrite on every app open (pipeline runs on load + 4 events +
+        // 20-min poll), burning quota for identical output.
         let newProactiveCards = rawProactiveCards;
         if (rawProactiveCards.length > 0) {
+          const LANG_CACHE_KEY = 'nesio-guidance-lang-cache-v1';
+          const cacheSig = `${new Date().toISOString().slice(0, 10)}|${rawProactiveCards.map((c) => c.id + c.title).join('§')}`;
+          let cachedCopy: Array<{ id: string; title: string; body: string }> | null = null;
           try {
-            const langRes = await fetch('/api/portal/guidance-language', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                cards: guidanceCards.map((c) => ({
-                  id: c.id, type: c.type, icon: c.icon,
-                  title: c.title, body: c.body, priority: c.priority,
-                  action: c.action, expiresAt: c.expiresAt?.toISOString(), nodeId: c.nodeId,
-                })),
-                userName: displayName || undefined,
-              }),
-            });
-            if (langRes.ok) {
-              const langData = await langRes.json() as { ok: boolean; cards: Array<{ id: string; title: string; body: string }> };
-              if (langData.ok && langData.cards.length === rawProactiveCards.length) {
-                newProactiveCards = rawProactiveCards.map((card, i) => ({
-                  ...card,
-                  title: langData.cards[i]?.title || card.title,
-                  body: langData.cards[i]?.body || card.body,
-                }));
+            const raw = JSON.parse(localStorage.getItem(LANG_CACHE_KEY) || 'null') as { sig: string; cards: Array<{ id: string; title: string; body: string }> } | null;
+            if (raw?.sig === cacheSig) cachedCopy = raw.cards;
+          } catch { /* ignore */ }
+
+          if (!cachedCopy) {
+            try {
+              const langRes = await fetch('/api/portal/guidance-language', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  cards: guidanceCards.map((c) => ({
+                    id: c.id, type: c.type, icon: c.icon,
+                    title: c.title, body: c.body, priority: c.priority,
+                    action: c.action, expiresAt: c.expiresAt?.toISOString(), nodeId: c.nodeId,
+                  })),
+                  userName: displayName || undefined,
+                }),
+              });
+              if (langRes.ok) {
+                const langData = await langRes.json() as { ok: boolean; cards: Array<{ id: string; title: string; body: string }> };
+                if (langData.ok && langData.cards.length === rawProactiveCards.length) {
+                  cachedCopy = langData.cards;
+                  try { localStorage.setItem(LANG_CACHE_KEY, JSON.stringify({ sig: cacheSig, cards: cachedCopy })); } catch { /* ignore */ }
+                }
               }
-            }
-          } catch { /* fall back to rule-generated copy */ }
+            } catch { /* fall back to rule-generated copy */ }
+          }
+
+          if (cachedCopy && cachedCopy.length === rawProactiveCards.length) {
+            newProactiveCards = rawProactiveCards.map((card, i) => ({
+              ...card,
+              title: cachedCopy![i]?.title || card.title,
+              body: cachedCopy![i]?.body || card.body,
+            }));
+          }
         }
 
         if (!cancelled && newProactiveCards.length > 0) setProactiveCards(newProactiveCards);
