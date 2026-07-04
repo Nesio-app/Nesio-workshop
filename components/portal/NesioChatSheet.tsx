@@ -28,7 +28,8 @@ function NesioAvatar() {
   return (
     <span className="nesio-wechat-avatar nesio-wechat-avatar--logo">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/assets/logo/nesio-mark.svg" alt="" width={30} height={30} draggable={false} />
+      <img src="/assets/logo/nesio-mark.svg" alt="" width={30} height={30} draggable={false} className="nesio-logo-day" />
+      <img src="/assets/logo/nesio-mark-night.svg" alt="" width={30} height={30} draggable={false} className="nesio-logo-night" />
     </span>
   );
 }
@@ -820,7 +821,8 @@ export default function NesioChatSheet({
           <div className="nesio-wechat-empty">
             <p className="nesio-wechat-empty-icon">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/assets/logo/nesio-mark.svg" alt="" width={52} height={52} draggable={false} />
+              <img src="/assets/logo/nesio-mark.svg" alt="" width={52} height={52} draggable={false} className="nesio-logo-day" />
+              <img src="/assets/logo/nesio-mark-night.svg" alt="" width={52} height={52} draggable={false} className="nesio-logo-night" />
             </p>
             <p className="nesio-wechat-empty-title">{L(dict, '问我任何事', 'Ask me anything')}</p>
             <div className="nesio-wechat-suggestions">

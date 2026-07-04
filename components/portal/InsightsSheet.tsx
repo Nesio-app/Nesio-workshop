@@ -702,11 +702,13 @@ function buildModelGraphEdges(model: LivingModel | null, dict: string = 'zh'): G
 function LivingModelTab({
   model,
   loading,
+  nodeCount,
   onRefresh,
   onFeedback,
 }: {
   model: LivingModel | null;
   loading: boolean;
+  nodeCount: number;
   onRefresh: (perspectiveId?: string, perspectiveName?: string, perspectivePrompt?: string) => void;
   onFeedback: (insightId: string, verified: boolean) => void;
 }) {
@@ -731,33 +733,37 @@ function LivingModelTab({
 
   const hasAnyInsight = layers.some((l) => l.insights.length > 0);
 
-  return (
-    <div className="nesio-lm-tab">
-      <div className="nesio-lm-header-row">
-        <p className="nesio-lm-subtitle">
-          {hasAnyInsight
-            ? L(dict, 'Nesio 对你的认知世界模型 · 每条结论均可校正', "Nesio's model of your inner world · every conclusion is correctable")
-            : L(dict, '积累更多记录后，Nesio 将推断你的认知模型', 'With more notes, Nesio will infer your mind model')}
-        </p>
-        <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
-          <button
-            type="button"
-            className="nesio-lm-perspective-btn"
-            onClick={() => setShowPerspectiveSheet(true)}
-            title={L(dict, '选择分析视角', 'Choose a lens')}
-          >
-            <IconTarget size={13} /> {selectedPerspective ? L(dict, selectedPerspective.name, selectedPerspective.nameEn) : L(dict, '视角', 'Lens')}
-          </button>
-          <button
-            type="button"
-            className="nesio-lm-refresh-btn"
-            onClick={() => onRefresh(selectedPerspective?.id, selectedPerspective?.name, selectedPerspective?.prompt)}
-            title={L(dict, '重新生成', 'Regenerate')}
-          >
-            ↺
-          </button>
+  // 批次 11:空态收成一句话(此前四段文案说同一件事),给真实进度而不是空话
+  if (!hasAnyInsight) {
+    const enough = nodeCount >= 10;
+    return (
+      <div className="nesio-lm-tab">
+        <div className="nesio-lm-empty">
+          <p>
+            {enough
+              ? L(dict, '记录够了，点一下生成你的认知模型。', 'Enough notes — tap once to build your mind model.')
+              : L(dict, `已记录 ${nodeCount} / 10 条，记满后 Nesio 开始推断。`, `${nodeCount} / 10 notes — Nesio starts inferring at 10.`)}
+          </p>
+          <p className="nesio-lm-empty-hint">
+            {L(dict, '7 个维度：身份认同 · 驱动力 · 原则 · 模式 · 盲区 · 演化 · 预测。每条结论都带证据和置信度，可校正。', '7 layers: identity · drive · principles · patterns · blind spots · evolution · prediction — evidence-backed, confidence-scored, correctable.')}
+          </p>
+          {enough && (
+            <button type="button" className="nesio-lm-perspective-btn" style={{ marginTop: '0.6rem' }} onClick={() => onRefresh()}>
+              {L(dict, '生成模型', 'Build model')}
+            </button>
+          )}
         </div>
       </div>
+    );
+  }
+
+  // 有洞察的层展开可看;还没攒够的层合并成一行,不再占 7 行「积累中」
+  const withInsights = layers.filter((l) => l.insights.some((i) => i.confidence >= l.minConfidenceToShow));
+  const gathering = layers.filter((l) => !l.insights.some((i) => i.confidence >= l.minConfidenceToShow));
+
+  return (
+    <div className="nesio-lm-tab">
+      <p className="nesio-lm-subtitle">{L(dict, '来自你的记录，每条结论都可校正。', 'From your notes — every conclusion is correctable.')}</p>
 
       {/* 认知关系图 */}
       <div className="nesio-insights-section" style={{ marginTop: 'var(--space-2)' }}>
@@ -771,19 +777,12 @@ function LivingModelTab({
             const layerId = id.split('::')[0] as LivingModelLayerId;
             setExpandedLayer(layerId);
           }}
-          emptyText={L(dict, '积累记录后，Nesio 将构建你的认知关系图', 'With more notes, Nesio will build your cognition graph')}
+          emptyText={L(dict, '积累中', 'Gathering')}
         />
       </div>
 
-      {!hasAnyInsight && (
-        <div className="nesio-lm-empty">
-          <p>{L(dict, '记录更多内容，Nesio 会发现你的模式和规律。', 'Keep recording — Nesio will find your patterns.')}</p>
-          <p className="nesio-lm-empty-hint">{L(dict, '通常需要 10+ 条记录才能生成有意义的洞察。', 'Meaningful insights usually need 10+ notes.')}</p>
-        </div>
-      )}
-
       <div className="nesio-lm-layers-menu">
-      {layers.map((layer) => {
+      {withInsights.map((layer) => {
         const visibleInsights = layer.insights.filter((i) => i.confidence >= layer.minConfidenceToShow);
         const isExpanded = expandedLayer === layer.id;
 
@@ -854,12 +853,40 @@ function LivingModelTab({
       })}
       </div>
 
-      {model && (
-        <p className="nesio-lm-gen-time">
-          {L(dict, '模型生成于', 'Model generated')} {new Date(model.generatedAt).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-          {selectedPerspective && <span className="nesio-lm-perspective-badge"> · {L(dict, selectedPerspective.name, selectedPerspective.nameEn)}</span>}
+      {gathering.length > 0 && (
+        <p className="nesio-lm-gathering-row">
+          {L(dict, '积累中：', 'Gathering: ')}
+          {gathering.map((l) => L(dict, LAYER_META[l.id]?.label ?? l.label, LAYER_META[l.id]?.labelEn ?? l.label)).join(' · ')}
         </p>
       )}
+
+      <div className="nesio-lm-footer-row">
+        {model && (
+          <p className="nesio-lm-gen-time">
+            {L(dict, '模型生成于', 'Model generated')} {new Date(model.generatedAt).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+            {selectedPerspective && <span className="nesio-lm-perspective-badge"> · {L(dict, selectedPerspective.name, selectedPerspective.nameEn)}</span>}
+          </p>
+        )}
+        <button
+          type="button"
+          className="nesio-lm-perspective-btn"
+          onClick={() => setShowPerspectiveSheet(true)}
+          title={L(dict, '选择分析视角', 'Choose a lens')}
+        >
+          <IconTarget size={13} /> {selectedPerspective ? L(dict, selectedPerspective.name, selectedPerspective.nameEn) : L(dict, '视角', 'Lens')}
+        </button>
+        <button
+          type="button"
+          className="nesio-lm-refresh-btn"
+          onClick={() => onRefresh(selectedPerspective?.id, selectedPerspective?.name, selectedPerspective?.prompt)}
+          title={L(dict, '重新生成', 'Regenerate')}
+        >
+          ↺
+        </button>
+      </div>
+      <p className="nesio-lm-algo-hint">
+        {L(dict, '算法：类型分布 / 领域 / 完成率 / 活跃时段等行为统计交给 AI 推断；新增 8 条记录或 7 天后自动更新；你的 ✓ / ✗ 会进入下一次生成。', 'How it works: behavior stats (types / domains / completion / active hours) go to AI inference; refreshes after 8 new notes or 7 days; your ✓ / ✗ feeds the next run.')}
+      </p>
 
       {showPerspectiveSheet && (
         <PerspectiveSheet
@@ -1187,6 +1214,7 @@ export default function InsightsSheet({ onClose }: { onClose: () => void }) {
           <LivingModelTab
             model={livingModel}
             loading={livingLoading}
+            nodeCount={allNodes.length}
             onRefresh={handleRefreshLiving}
             onFeedback={handleFeedback}
           />

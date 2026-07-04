@@ -10,7 +10,12 @@ const profileSettingsRoutePath = path.join(root, 'app', 'api', 'cloud', 'profile
 const profileStorePath = path.join(root, 'lib', 'portal', 'profile.ts');
 const packagePath = path.join(root, 'package.json');
 
+// 批次 11:重载后换签名的逻辑上移到全站共享的 useProfileAvatar
+// (此前只有设置页会刷新,主页读到过期签名 URL 就「头像丢失」)
+const avatarHookPath = path.join(root, 'components', 'portal', 'use-profile-avatar.ts');
+
 const profileCard = fs.readFileSync(profileCardPath, 'utf8');
+const avatarHook = fs.readFileSync(avatarHookPath, 'utf8');
 const settings = fs.readFileSync(settingsPath, 'utf8');
 const profileSettingsRoute = fs.readFileSync(profileSettingsRoutePath, 'utf8');
 const profileStore = fs.readFileSync(profileStorePath, 'utf8');
@@ -32,9 +37,19 @@ assert.match(
   'Uploaded avatar must request a signed read URL from /api/cloud/assets using the returned storagePath.',
 );
 assert.match(
+  avatarHook,
+  /avatarStoragePath[\s\S]*fetchCloudAssetReadUrl\(\{\s*storagePath\s*\}\)/s,
+  'Stored avatarStoragePath must be refreshed through a signed read URL after page reload (shared hook).',
+);
+assert.match(
   profileCard,
-  /profile\.avatarStoragePath[\s\S]*fetchCloudAssetReadUrl\(\{\s*storagePath:\s*profile\.avatarStoragePath\s*\}\)/s,
-  'Stored avatarStoragePath must be refreshed through a signed read URL after page reload.',
+  /useProfileAvatar/,
+  'NesioProfileCard must consume the shared avatar hook so refresh logic stays global.',
+);
+assert.match(
+  fs.readFileSync(path.join(root, 'components', 'portal', 'TodayFeed.tsx'), 'utf8'),
+  /useProfileAvatar/,
+  'Today header avatar must consume the shared avatar hook (fixes intermittent avatar loss).',
 );
 assert.match(
   profileCard,

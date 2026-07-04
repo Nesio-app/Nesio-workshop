@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { clearProfileIdentity, loadProfileSettings, readAvatarFile, saveProfileSettings } from '@/lib/portal/profile';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
+import { useProfileAvatar } from './use-profile-avatar';
 import { GeneralSheet, DataSheet, PrivacySheet, SubscriptionSheet } from './SettingsSheets';
 import ConnectorsHub from './ConnectorsHub';
 import RoadmapSheet from './RoadmapSheet';
@@ -14,7 +15,8 @@ type ActiveSheet = 'mirror' | 'general' | 'data' | 'privacy' | 'subscription' | 
 
 export default function NesioProfileCard() {
   const [displayName, setDisplayName] = useState('Jessy');
-  const [avatarUrl, setAvatarUrl] = useState('');
+  // 头像统一走 useProfileAvatar(批次 11:与主页「我」按钮同一数据源,不再各自刷新)
+  const { avatarUrl, refreshAvatar } = useProfileAvatar();
   const locale = usePortalLocale();
   const [activeSheet, setActiveSheet] = useState<ActiveSheet>(null);
   const [isSignedIn, setIsSignedIn] = useState(false);
@@ -24,23 +26,6 @@ export default function NesioProfileCard() {
   useEffect(() => {
     const profile = loadProfileSettings();
     if (profile.displayName) setDisplayName(profile.displayName);
-    setAvatarUrl(profile.avatarUrl || '');
-
-    if (profile.avatarStoragePath) {
-      const client = createAppApiClient();
-      client
-        .fetchCloudAssetReadUrl({ storagePath: profile.avatarStoragePath })
-        .then((result) => {
-          if (result.ok && result.signedUrl) {
-            setAvatarUrl(result.signedUrl);
-            saveProfileSettings({
-              avatarUrl: result.signedUrl,
-              avatarStoragePath: profile.avatarStoragePath,
-            });
-          }
-        })
-        .catch(() => {});
-    }
 
     // Check auth session
     fetch('/api/auth/session')
@@ -56,9 +41,8 @@ export default function NesioProfileCard() {
     try {
       await fetch('/api/auth/logout', { method: 'POST', cache: 'no-store' });
     } catch { /* ignore */ }
-    clearProfileIdentity();
+    clearProfileIdentity(); // 清除后 PROFILE_UPDATED_EVENT 会让头像自行清空
     setDisplayName('我');
-    setAvatarUrl('');
     setIsSignedIn(false);
     window.location.href = '/';
   }
@@ -74,10 +58,10 @@ export default function NesioProfileCard() {
         const readResult = await client.fetchCloudAssetReadUrl({ storagePath: result.storagePath });
         const displayUrl = readResult.ok && readResult.signedUrl ? readResult.signedUrl : '';
         if (displayUrl) {
+          // saveProfileSettings 广播 PROFILE_UPDATED_EVENT,useProfileAvatar 自动更新
           saveProfileSettings({ avatarUrl: displayUrl, avatarStoragePath: result.storagePath });
-          setAvatarUrl(displayUrl);
         } else {
-          // Signed URL unavailable now; save path only — will refresh on next open
+          // Signed URL unavailable now; save path only — hook 下次挂载/刷新时换签名
           saveProfileSettings({ avatarStoragePath: result.storagePath });
         }
         return;
@@ -88,7 +72,6 @@ export default function NesioProfileCard() {
     try {
       const avatar = await readAvatarFile(file);
       saveProfileSettings({ avatarUrl: avatar, avatarStoragePath: '' });
-      setAvatarUrl(avatar);
     } catch {
       setAvatarError('头像没有保存，请选择一张较小的图片。');
     }
@@ -120,7 +103,7 @@ export default function NesioProfileCard() {
             aria-label="上传头像"
             onClick={() => avatarInputRef.current?.click()}
           >
-            {avatarUrl ? <img src={avatarUrl} alt="" draggable={false} /> : initials}
+            {avatarUrl ? <img src={avatarUrl} alt="" draggable={false} onError={refreshAvatar} /> : initials}
           </button>
           <input
             ref={avatarInputRef}

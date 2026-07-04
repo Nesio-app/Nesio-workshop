@@ -8509,6 +8509,11 @@ html[data-portal-theme="night"] .nesio-today-brand-name {
   color: #e8eefa;
 }
 
+/* 批次 11:昼夜双 logo(夜间资产 nesio-mark-night.svg 一直存在但从没接上) */
+.nesio-logo-night { display: none; }
+html[data-portal-theme="night"] .nesio-logo-day { display: none; }
+html[data-portal-theme="night"] .nesio-logo-night { display: inline-block; }
+
 .nesio-today-avatar {
   width: var(--tap-min, 44px);
   height: var(--tap-min, 44px);
@@ -9655,7 +9660,9 @@ html[data-portal-theme="night"] .nesio-type-chip {
   width: 3.6rem;
   height: 3.6rem;
   border-radius: 50%;
-  background: rgba(255,255,255,0.92);
+  /* 批次 11:三个按钮统一同一套配色,且随主题翻转(昼白夜暗),
+     不再出现「说一句蓝、其余白」的混搭 */
+  background: var(--sheet-opaque, #fdfeff);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -9663,12 +9670,13 @@ html[data-portal-theme="night"] .nesio-type-chip {
   color: var(--portal-blue-deep);
   transition: transform 0.15s;
 }
-
-.nesio-tell-fan-icon--voice {
-  background: var(--portal-blue-deep);
-  color: #fff;
-  box-shadow: 0 6px 28px rgba(88,140,227,0.5);
+html[data-portal-theme="night"] .nesio-tell-fan-icon {
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  border: 1px solid var(--portal-line);
 }
+
+/* 批次 11:--voice 特例取消,与其余按钮同款(类保留以防旧样式引用) */
+.nesio-tell-fan-icon--voice { }
 
 .nesio-tell-fan-btn:active .nesio-tell-fan-icon { transform: scale(0.88); }
 
@@ -12820,6 +12828,12 @@ html[data-portal-theme="night"] .nesio-lm-layers-menu {
 .nesio-lm-fb-btn--no { background: rgba(207,107,107,0.12); color: var(--status-risk); }
 
 /* Model gen time */
+/* 批次 11:认知模型底部行(生成时间 + 视角 + 重新生成)与合并「积累中」行 */
+.nesio-lm-footer-row { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.9rem; flex-wrap: wrap; }
+.nesio-lm-footer-row .nesio-lm-gen-time { margin: 0; flex: 1; }
+.nesio-lm-gathering-row { font-size: 0.72rem; color: var(--portal-muted); margin: 0.6rem 0 0; line-height: 1.5; }
+.nesio-lm-algo-hint { font-size: 0.66rem; color: var(--portal-muted); opacity: 0.8; margin: 0.5rem 0 0; line-height: 1.55; }
+
 .nesio-lm-gen-time {
   font-size: 0.64rem;
   color: var(--portal-muted);
@@ -14336,6 +14350,13 @@ html[data-portal-theme="night"] .nesio-today-evidence-chip { color: #96c7f3; bac
 .nesio-header-mini-btn--active {
   background: var(--portal-accent-soft, rgba(88,140,227,0.14));
   border-color: var(--portal-blue-deep);
+}
+
+
+html[data-portal-theme="night"] .nesio-today-avatar {
+  background: var(--portal-blue-light, #2c4a78);
+  color: #dce8fa;
+  border: 1px solid var(--portal-line);
 }
 
 .nesio-today-avatar-img {

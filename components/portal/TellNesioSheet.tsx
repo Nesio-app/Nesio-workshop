@@ -9,6 +9,9 @@
  */
 
 import { useRef } from 'react';
+import { L } from '@/lib/portal/i18n';
+import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
+import { usePortalLocale } from './use-portal-locale';
 
 export type CaptureMode = 'camera' | 'voice' | 'share';
 
@@ -21,6 +24,7 @@ interface TellNesioSheetProps {
 const FAN_BUTTONS: Array<{
   mode: CaptureMode;
   label: string;
+  labelEn: string;
   pos: 'left' | 'center' | 'right';
   accent?: boolean;
   icon: React.ReactNode;
@@ -28,6 +32,7 @@ const FAN_BUTTONS: Array<{
   {
     mode: 'camera',
     label: '拍一下',
+    labelEn: 'Snap',
     pos: 'left',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="26" height="26">
@@ -39,6 +44,7 @@ const FAN_BUTTONS: Array<{
   {
     mode: 'voice',
     label: '说一句',
+    labelEn: 'Say it',
     pos: 'center',
     accent: true,
     icon: (
@@ -50,7 +56,8 @@ const FAN_BUTTONS: Array<{
   },
   {
     mode: 'share',
-    label: '分析文件',
+    label: '分享',
+    labelEn: 'Share',
     pos: 'right',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="26" height="26">
@@ -65,6 +72,7 @@ const FAN_BUTTONS: Array<{
 ];
 
 export default function TellNesioSheet({ open, onClose, onCapture }: TellNesioSheetProps) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const cameraInputRef = useRef<HTMLInputElement>(null);
   if (!open) return null;
 
@@ -102,12 +110,12 @@ export default function TellNesioSheet({ open, onClose, onCapture }: TellNesioSh
               onClose();
               onCapture(btn.mode);
             }}
-            aria-label={btn.label}
+            aria-label={L(dict, btn.label, btn.labelEn)}
           >
             <span className={`nesio-tell-fan-icon${btn.accent ? ' nesio-tell-fan-icon--voice' : ''}`}>
               {btn.icon}
             </span>
-            <span className="nesio-tell-fan-label">{btn.label}</span>
+            <span className="nesio-tell-fan-label">{L(dict, btn.label, btn.labelEn)}</span>
           </button>
         ))}
       </div>

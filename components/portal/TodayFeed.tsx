@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { PROFILE_UPDATED_EVENT, loadProfileSettings, portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
+import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
+import { useProfileAvatar } from './use-profile-avatar';
 import { usePortalLocale } from './use-portal-locale';
 import { L } from '@/lib/portal/i18n';
 import { IconThermometer } from './icons';
@@ -72,14 +73,8 @@ export default function TodayFeed({
   const initials = canUsePrivateData ? (displayName.trim().slice(0, 1) || L(uiLocale, '我', 'Me')) : L(uiLocale, '我', 'Me');
   const { shouldShow: showWrapped, dismiss: dismissWrapped } = useWrappedTrigger();
 
-  // 设置页上传的头像同步到主页「我」按钮(PROFILE_UPDATED_EVENT 驱动)
-  const [avatarUrl, setAvatarUrl] = useState('');
-  useEffect(() => {
-    const readAvatar = () => setAvatarUrl(canUsePrivateData ? (loadProfileSettings().avatarUrl || '') : '');
-    readAvatar();
-    window.addEventListener(PROFILE_UPDATED_EVENT, readAvatar);
-    return () => window.removeEventListener(PROFILE_UPDATED_EVENT, readAvatar);
-  }, [canUsePrivateData]);
+  // 头像统一走 useProfileAvatar(批次 11:签名 URL 过期自动换新,修「头像丢失」)
+  const { avatarUrl, refreshAvatar } = useProfileAvatar(canUsePrivateData);
 
   // All proactive cards come from the guidance pipeline (email included) —
   // single path so cooling-store and attention-budget always apply.
@@ -115,7 +110,8 @@ export default function TodayFeed({
           aria-label={L(uiLocale, '打开 Nesio 洞察', "Open Nesio insights")}
           onClick={() => setMirrorOpen(true)}
         >
-          <img src="/assets/logo/nesio-mark.svg" alt="Nesio" className="nesio-today-brand-icon" />
+          <img src="/assets/logo/nesio-mark.svg" alt="Nesio" className="nesio-today-brand-icon nesio-logo-day" />
+          <img src="/assets/logo/nesio-mark-night.svg" alt="" aria-hidden className="nesio-today-brand-icon nesio-logo-night" />
         </button>
         <div className="nesio-today-header-tools">
           {/* 听简报/此刻 缩为图标圆钮,不再占首屏黄金位(批次 3) */}
@@ -137,7 +133,7 @@ export default function TodayFeed({
           <a href="/settings" className="nesio-today-avatar" aria-label={L(uiLocale, '我的设置', 'My settings')}>
             {avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element -- 头像是运行时签名 URL,next/image 无法静态优化
-              <img src={avatarUrl} alt="" className="nesio-today-avatar-img" draggable={false} />
+              <img src={avatarUrl} alt="" className="nesio-today-avatar-img" draggable={false} onError={refreshAvatar} />
             ) : initials}
           </a>
         </div>
