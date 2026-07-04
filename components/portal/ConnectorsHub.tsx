@@ -92,7 +92,13 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     // Check OAuth callback
     const params = new URLSearchParams(window.location.search);
     const err = params.get('error');
-    if (err) showToast(L(dict, `连接失败：${err}`, `Connection failed: ${err}`), false);
+    if (err === 'gmail_scope_not_granted') {
+      showToast(L(dict,
+        'Google 没有授出邮件权限:需在 Google Cloud 同意屏幕配置 gmail.readonly(测试模式下把自己加为测试用户)',
+        "Google didn't grant Gmail access: add gmail.readonly on the OAuth consent screen (and add yourself as a test user while in Testing)"), false);
+    } else if (err) {
+      showToast(L(dict, `连接失败：${err}`, `Connection failed: ${err}`), false);
+    }
   }, [open]);
 
 

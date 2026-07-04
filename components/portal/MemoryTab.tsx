@@ -220,7 +220,7 @@ const PROJECT_EMOJIS = ['📁', '🏠', '✈️', '🎯', '📚', '💪', '🎂'
 
 const COPY = {
   zh: {
-    searchPlaceholder: '搜记忆：护照、钥匙、上次买的药…',
+    searchPlaceholder: '搜记忆',
     searchAria: '搜索记忆',
     clear: '清除',
     heroTitle: '散落的线索，回头找得到。',
@@ -244,7 +244,7 @@ const COPY = {
     createProjectCancel: '取消',
   },
   en: {
-    searchPlaceholder: 'Search memory: passport, keys, meds…',
+    searchPlaceholder: 'Search memory',
     searchAria: 'Search memory',
     clear: 'Clear',
     heroTitle: 'Scattered clues, easy to find later.',

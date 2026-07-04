@@ -77,6 +77,16 @@ export async function GET(req: NextRequest) {
     req,
   );
 
+  // 批次 15:请求了 gmail scope 但 Google 没授出(同意屏幕未配置该 scope /
+  // 应用未过审时会被静默丢弃)——这是「重新授权后仍 403」死循环的根源,
+  // 必须显式报错而不是让用户在授权页转圈。
+  if (token.scope && !token.scope.includes('gmail')) {
+    console.error('gmail_oauth_scope_not_granted', token.scope);
+    return NextResponse.redirect(
+      new URL('/?connector=gmail&error=gmail_scope_not_granted', req.url),
+    );
+  }
+
   // Consent now covers both gmail + calendar scopes — mirror tokens to the
   // calendar cookie set so one authorization keeps both connectors alive.
   const grantsCalendar = !token.scope || token.scope.includes('calendar');

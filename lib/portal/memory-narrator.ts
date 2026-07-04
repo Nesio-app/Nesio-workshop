@@ -88,10 +88,12 @@ function buildCommitmentCard(nodes: LifeNode[], locale: string = 'zh'): Narrator
     return n.name;
   });
 
+  void lines;
   return {
     type: 'commitment',
-    title: L(locale, `有 ${commitments.length} 个承诺`, `${commitments.length} promise${commitments.length > 1 ? 's' : ''} open`),
-    body: lines.join('\n'),
+    // 批次 15:指标卡式——第一行「承诺」,第二行数字(点卡进详情看名单)
+    title: L(locale, '承诺', 'Promise'),
+    body: String(commitments.length),
     nodes: sorted,
   };
 }
@@ -108,17 +110,20 @@ function buildActivityCard(nodes: LifeNode[], locale: string = 'zh'): NarratorCa
   const top = topDomain(recent);
   if (!top) return null;
 
+  // preview 名单不再上卡(批次 15)
+  void 0;
   const preview = recent
     .filter((n) => nodeDomain(n) === top.domain)
     .slice(0, 2)
     .map((n) => n.name)
     .join('、');
+  void preview;
 
   return {
     type: 'activity',
-    title: L(locale, '最近你在忙', "Lately you've been on"),
-    body: L(locale, `${top.count} 条${top.label}记录`, `${top.count} ${DOMAIN_EN[top.label] ?? top.label} entries`),
-    sub: preview || undefined,
+    // 批次 15:指标卡式——第一行「最近」,第二行数字(点卡进详情)
+    title: L(locale, '最近', 'Recent'),
+    body: String(top.count),
     nodes: recent.slice(0, 3),
   };
 }

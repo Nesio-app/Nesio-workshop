@@ -126,7 +126,8 @@ assert.match(domains, /已经整理好了|关键提醒/, 'Meeting cards should e
 assert.match(memoryTab, /散落的线索，回头找得到|重要的事，慢慢连起来/, 'Memory title should use sovereignty-oriented retrieval language.');
 assert.doesNotMatch(memoryTab, /你的生活，连成一张图|Life Graph|识别图中/, 'Memory copy must avoid omniscient graph or machine-task phrasing.');
 assert.doesNotMatch(memoryTab, /登录后查看你的 Memory|去登录|接入 Gmail/, 'Memory empty state should not force login or early Gmail connection.');
-assert.match(memoryTab, /这里会放你以后想找回的东西|娃娃在蓝盒子里|上次买的药|Jim 的会议提醒|放进来第一件|登录同步/, 'Memory empty state should prioritize local-first value before login sync.');
+// 批次 15:搜索占位精简后,本地优先意图由 hero 文案承载(由你放进来,由你随时找回)
+assert.match(memoryTab, /这里会放你以后想找回的东西|由你放进来，由你随时找回|回头找得到|放进来第一件|登录同步/, 'Memory empty state should prioritize local-first value before login sync.');
 assert.match(memoryTab, /isPrivateExternalNode|visibleMemoryNodes/, 'Memory should show local records while filtering private external calendar/email nodes when signed out.');
 assert.doesNotMatch(memoryTab, /setNodes\(\[\]\);\s*return undefined;/, 'Signed-out Memory must not hide local voice/photo/manual records.');
 assert.doesNotMatch(memoryTab, /aria-label="语音问宝盒"|nesio-memory-search-voice/, 'Memory search should stay focused on typed retrieval; voice ask belongs to the center N long press.');
