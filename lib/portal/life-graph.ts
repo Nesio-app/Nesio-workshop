@@ -491,8 +491,14 @@ function saveAll(nodes: LifeNode[]): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(nodes));
     window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
+    // Warn proactively as the quota cliff approaches (throttled daily)
+    import('./storage-health').then(({ checkStorageWarning }) => checkStorageWarning());
   } catch {
-    /* storage full or unavailable */
+    // Quota exceeded — the write was DROPPED. Surface it; silence here
+    // previously meant users lost new memories without any signal.
+    import('./storage-health').then(({ STORAGE_FULL_EVENT, getStorageHealth }) => {
+      window.dispatchEvent(new CustomEvent(STORAGE_FULL_EVENT, { detail: getStorageHealth() }));
+    });
   }
 }
 

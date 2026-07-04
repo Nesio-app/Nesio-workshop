@@ -49,6 +49,7 @@ import { loadProfileSettings, PROFILE_UPDATED_EVENT, type PortalLocale } from '@
 import { runConnectors } from '@/lib/platform/runtime/integration-runtime';
 import { pruneDisposableSignals } from '@/lib/life-domain';
 import { prunePrivateExternalNodes } from '@/lib/portal/life-graph';
+import { STORAGE_FULL_EVENT, STORAGE_WARNING_EVENT } from '@/lib/portal/storage-health';
 import type { PortalConfig, PortalDecMetadata, PortalTool } from '@/lib/portal/types';
 import { type ToolForShellState } from './tool-state';
 
@@ -202,6 +203,7 @@ export default function Portal() {
     ReturnType<typeof parseDecShellRoutesFromModules>
   >(new Map());
   const [activeSurface, setActiveSurface] = useState<ActiveSurface>('today');
+  const [storageAlert, setStorageAlert] = useState<{ kind: 'full' | 'warning'; percent: number } | null>(null);
   const [captureMode, setCaptureMode] = useState<CaptureMode | null>(null);
   const [voiceIntent, setVoiceIntent] = useState<'note' | 'ask'>('note');
   const [noteOpen, setNoteOpen] = useState(false);
@@ -346,6 +348,24 @@ export default function Portal() {
     return () => {
       window.removeEventListener(PROFILE_UPDATED_EVENT, syncLocale);
       window.removeEventListener('storage', syncLocale);
+    };
+  }, []);
+
+  // Storage quota alerts — a dropped write must never be silent
+  useEffect(() => {
+    const onFull = (e: Event) => {
+      const detail = (e as CustomEvent<{ percent?: number }>).detail;
+      setStorageAlert({ kind: 'full', percent: detail?.percent ?? 100 });
+    };
+    const onWarning = (e: Event) => {
+      const detail = (e as CustomEvent<{ percent?: number }>).detail;
+      setStorageAlert((prev) => prev?.kind === 'full' ? prev : { kind: 'warning', percent: detail?.percent ?? 80 });
+    };
+    window.addEventListener(STORAGE_FULL_EVENT, onFull);
+    window.addEventListener(STORAGE_WARNING_EVENT, onWarning);
+    return () => {
+      window.removeEventListener(STORAGE_FULL_EVENT, onFull);
+      window.removeEventListener(STORAGE_WARNING_EVENT, onWarning);
     };
   }, []);
 
@@ -666,6 +686,29 @@ export default function Portal() {
     <>
       <div className="portal-root portal-root--home">
         <div className="portal-grain" aria-hidden />
+        {storageAlert && (
+          <div
+            role="alert"
+            style={{
+              position: 'fixed', top: 8, left: 12, right: 12, zIndex: 300,
+              background: 'var(--status-risk-soft, #fde8e8)', border: '1px solid var(--status-risk, #d33)',
+              borderRadius: 12, padding: '0.6rem 0.9rem', fontSize: '0.8rem',
+              color: 'var(--status-risk, #d33)', display: 'flex', alignItems: 'center', gap: 8,
+            }}
+          >
+            <span style={{ flex: 1 }}>
+              {storageAlert.kind === 'full'
+                ? `本地存储已满（${storageAlert.percent}%），新记忆无法保存！请在设置中导出备份并清理照片。`
+                : `本地存储已用 ${storageAlert.percent}%，接近上限。建议尽快导出备份。`}
+            </span>
+            <button
+              type="button"
+              onClick={() => setStorageAlert(null)}
+              style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: '1rem', padding: 0 }}
+              aria-label="关闭存储警告"
+            >✕</button>
+          </div>
+        )}
         <div className="nesio-shell">
           {!onboardingActive && activeSurface === 'today' && (
             <TodayFeed canUsePrivateData={canUsePrivateRuntime} onOpenMemory={() => setActiveSurface('memory')} />
