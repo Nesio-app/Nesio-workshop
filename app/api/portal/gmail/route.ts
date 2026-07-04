@@ -11,6 +11,7 @@ import { createSignal } from '@/lib/life-domain/create-signal';
 import { writeCloudSignalsForCurrentUser } from '@/lib/platform/runtime/cloud-signals-server';
 import { normalizeGmailToSignal } from '@/lib/life-domain/normalizers';
 import { getIntegrationToken } from '@/lib/portal/integrations';
+import { buildEmailExtractionPrompt, parseJsonBlock } from '@/lib/extraction/extraction';
 import { cookies } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
@@ -149,25 +150,7 @@ async function extractNodes(messages: GmailMessage[]): Promise<object[]> {
     return `主题：${subject}\n发件人：${from}\n日期：${date}\n内容：${body}`;
   }).join('\n\n───\n\n');
 
-  const prompt = `你是 Nesio 的邮件解析器。从邮件中提取有意义的生活记忆节点。
-
-只提取：预约/约会、承诺、重要日期、人名、地点。忽略广告、营销、自动通知。
-
-输出 JSON 数组（每封邮件最多 2 个节点）：
-[{
-  "type": "event"|"commitment"|"person"|"place"|"health_state",
-  "name": "简短名称",
-  "attributes": { "date": "日期", "location": "地点", "source": "发件人" },
-  "relations": [{ "targetId": "关联人名", "relation": "involves" }],
-  "tags": ["邮件", "分类"],
-  "confidence": 0.85,
-  "rawInput": "原始摘要（50字以内）"
-}]
-
-输出纯 JSON 数组，不要任何其他文字。
-
-邮件内容：
-${emailTexts.slice(0, 5000)}`;
+  const prompt = buildEmailExtractionPrompt(emailTexts);
 
   const res = await fetch(`${GEMINI_URL}?key=${geminiKey}`, {
     method: 'POST',
@@ -177,10 +160,7 @@ ${emailTexts.slice(0, 5000)}`;
 
   const data = await res.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
   const raw = data.candidates?.[0]?.content?.parts?.map((p) => p.text).join('') || '[]';
-  const jsonStr = raw.match(/```(?:json)?\s*([\s\S]*?)```/)?.[1]?.trim() || raw.trim();
-
-  try { return JSON.parse(jsonStr) as object[]; }
-  catch { return []; }
+  return parseJsonBlock<object[]>(raw) ?? [];
 }
 
 function metadataPreview(messages: GmailMessage[]) {

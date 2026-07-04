@@ -20,6 +20,7 @@ import {
   normalizeTaskToSignal,
   normalizeVoiceToSignal,
 } from '@/lib/life-domain/normalizers';
+import { buildSourceExtractionPrompt, parseJsonBlock, SOURCE_HINTS } from '@/lib/extraction/extraction';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,15 +29,6 @@ const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemi
 function envValue(key: string): string {
   return (process.env[key] ?? '').trim();
 }
-
-const SOURCE_HINTS: Record<string, string> = {
-  reminder: '这是来自 Apple 提醒事项的待办。提取为 commitment 节点，标注截止日期。',
-  keep: '这是来自 Keep 的运动健康数据。提取为 health_state 节点（运动类型、时长、卡路里）。',
-  wechat_reading: '这是来自微信读书的阅读数据。提取为 preference 节点（书名、作者、进度、笔记）。',
-  toggl: '这是来自 Toggl 的时间记录。提取为 event 节点（项目、任务、时长）。',
-  shortcuts: '这是来自 iOS 快捷指令的数据。根据内容判断类型。',
-  generic: '根据内容判断最合适的节点类型。',
-};
 
 function isIngestAllowed(req: NextRequest, bodySecret?: string): boolean {
   const sharedSecret = envValue('INGEST_SHARED_SECRET');
@@ -56,7 +48,6 @@ function isIngestAllowed(req: NextRequest, bodySecret?: string): boolean {
 
 async function extractNodes(source: string, content: string): Promise<{ nodes: object[]; summary: string }> {
   const geminiKey = envValue('GEMINI_API_KEY') || envValue('GOOGLE_GENERATIVE_AI_API_KEY');
-  const hint = SOURCE_HINTS[source] || SOURCE_HINTS.generic;
 
   if (!geminiKey) {
     // Rule-based fallback
@@ -74,27 +65,7 @@ async function extractNodes(source: string, content: string): Promise<{ nodes: o
     };
   }
 
-  const prompt = `你是 Nesio 的数据解析器。${hint}
-
-将以下数据提取为结构化生活记忆节点，输出 JSON：
-{
-  "nodes": [{
-    "type": "person|object|place|event|commitment|health_state|preference",
-    "name": "简短名称",
-    "attributes": { "key": "value", "source": "${source}" },
-    "relations": [{"targetId": "关联名", "relation": "关系"}],
-    "tags": ["${source}", "标签"],
-    "confidence": 0.85,
-    "rawInput": "原始摘要"
-  }],
-  "summary": "一句话总结"
-}
-
-只输出 JSON，不要其他文字。
-
-数据来源：${source}
-内容：
-${content.slice(0, 5000)}`;
+  const prompt = buildSourceExtractionPrompt(source, content);
 
   try {
     const res = await fetch(`${GEMINI_URL}?key=${geminiKey}`, {
@@ -104,8 +75,8 @@ ${content.slice(0, 5000)}`;
     });
     const data = await res.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
     const raw = data.candidates?.[0]?.content?.parts?.map((p) => p.text).join('') || '';
-    const jsonStr = raw.match(/```(?:json)?\s*([\s\S]*?)```/)?.[1]?.trim() || raw.trim();
-    const parsed = JSON.parse(jsonStr) as { nodes?: object[]; summary?: string };
+    const parsed = parseJsonBlock<{ nodes?: object[]; summary?: string }>(raw);
+    if (!parsed) throw new Error('unparseable');
     return { nodes: parsed.nodes || [], summary: parsed.summary || '已记录' };
   } catch {
     return {

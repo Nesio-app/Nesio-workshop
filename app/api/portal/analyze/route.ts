@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSignal } from '@/lib/life-domain/create-signal';
 import { writeCloudSignalsForCurrentUser } from '@/lib/platform/runtime/cloud-signals-server';
 import { normalizePhotoToSignal, normalizeVoiceToSignal } from '@/lib/life-domain/normalizers';
+import { EXTRACTION_SYSTEM_PROMPT, parseJsonBlock } from '@/lib/extraction/extraction';
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
@@ -47,54 +48,8 @@ function isAnalyzeAiAllowed(req: NextRequest): boolean {
   return labEnabled && accessMode === 'personal_lab';
 }
 
-const SYSTEM_PROMPT = `You are Nesio's Life Graph extractor. Given user input (voice/text/image/file), extract structured life memory nodes.
-
-Node schema (return ONLY these fields):
-{
-  "type": "person" | "object" | "place" | "event" | "commitment" | "health_state" | "preference",
-  "name": "concise Chinese name (translate if needed)",
-  "attributes": { "key": "value" },  // only standard keys — no 'context' or internal fields
-  "relations": [{ "targetId": "name", "relation": "relation type" }],
-  "tags": ["tag1"],
-  "confidence": 0.0-1.0,
-  "rawInput": "original excerpt"
-}
-
-Standard attribute keys by type:
-- commitment: dueDate (ISO), priority (high/medium/low), owner, recurring, done
-- event: start (ISO), end (ISO), location, url, participants
-- person: category (family/colleague/friend), lastSeen, birthday (ISO), note
-- object: location, purchaseDate, price, expiry (ISO), note
-- place: address, category (work/home/shopping/school/restaurant), note
-- health_state: healthType (medication/appointment/fitness/sleep/diet), date (ISO), value, unit
-- preference: category, note
-
-CRITICAL CLASSIFICATION RULES:
-1. "明天X生日" / "X的生日是Y" → create TWO nodes:
-   a) commitment: name="X 生日", attributes={dueDate: <tomorrow ISO date>, reminder: true}, tags=["生日","提醒"]
-   b) person: name="X" (if not already known)
-   NOT a preference or object.
-
-2. "X说要/答应/需要/要记得Y" → commitment node, name=the task Y, attributes={owner: X}
-
-3. "记住/X在Y" → object node, name=X, attributes={location: Y}
-
-4. Any meeting/appointment with time → event node with start ISO date
-
-5. Health mentions (药/运动/体检/睡眠/饮食) → health_state node
-
-6. Pure opinions/likes/preferences → preference node
-
-7. Receipts/shopping: create object nodes for each purchased ITEM only. Do NOT create a place node for the store.
-
-Also return:
-- "summary": one Chinese sentence
-- "intent": "REMINDER" | "COMMITMENT" | "MEMORY_CAPTURE" | "HEALTH_LOG" | "EVENT_LOG" | "PREFERENCE"
-
-Respond ONLY with valid JSON: { "nodes": [...], "summary": "...", "intent": "..." }
-Do NOT include any field called "context". Do NOT invent information not in the input.
-For image: only extract visibly present things. Never use instruction text as node name.
-`;
+// Canonical extraction prompt — shared with ingest/gmail via lib/extraction
+const SYSTEM_PROMPT = EXTRACTION_SYSTEM_PROMPT;
 
 const ASK_SYSTEM_PROMPT = `You are Nesio, a personal life assistant embedded in a user's memory app.
 The user message is JSON: {"query": "...", "candidates": [...memory nodes...], "totalNodeCount": N}
@@ -372,9 +327,10 @@ function analyzeFallback(content: string): string {
 }
 
 function extractJson(raw: string): string {
-  // Strip markdown code fences if present
-  const match = raw.match(/```(?:json)?\s*([\s\S]*?)```/) || raw.match(/(\{[\s\S]*\})/);
-  return match?.[1]?.trim() || raw.trim();
+  // Shared fence-stripping parser (lib/extraction); re-stringify to keep
+  // this function's string-based contract for downstream JSON.parse calls.
+  const parsed = parseJsonBlock<unknown>(raw);
+  return parsed !== null ? JSON.stringify(parsed) : raw.trim();
 }
 
 export async function POST(req: NextRequest) {
