@@ -38,6 +38,21 @@ jobs:
             echo 'EOF_REPORT'
           } >> "$GITHUB_OUTPUT"
 
+      # 全量契约链(100+ 套;CI 每次 push 只跑 test:security 的 18 套)。
+      # 2026-07-04 教训:重构漂移在这条链上积累了 15 处断裂,半个月无人发现。
+      - name: Full contract chain
+        id: contracts
+        run: |
+          if npm run test:contracts > contracts.log 2>&1; then
+            echo "CONTRACTS_TOTAL=0" >> "$GITHUB_OUTPUT"
+          else
+            echo "CONTRACTS_TOTAL=1" >> "$GITHUB_OUTPUT"
+            {
+              echo '## 全量契约链失败(节选)'
+              grep -B8 -E "AssertionError|^Error:" contracts.log | tail -40
+            } >> "$GITHUB_STEP_SUMMARY" || true
+          fi
+
       - name: Summary
         run: echo "${{ steps.loops.outputs.REPORT }}" >> "$GITHUB_STEP_SUMMARY"
 
@@ -47,7 +62,8 @@ jobs:
           script: |
             const report = `${{ toJSON(steps.loops.outputs.REPORT) }}`;
             const totals = [...report.matchAll(/(DRIFT|BROKEN_LINKS|SECURITY)_TOTAL=(\d+)/g)];
-            const sum = totals.reduce((s, m) => s + Number(m[2]), 0);
+            const contractsTotal = Number('${{ steps.contracts.outputs.CONTRACTS_TOTAL }}' || 0);
+            const sum = totals.reduce((s, m) => s + Number(m[2]), 0) + contractsTotal;
             const { data: issues } = await github.rest.issues.listForRepo({
               owner: context.repo.owner, repo: context.repo.repo,
               state: 'open', labels: 'loop-report',

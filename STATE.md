@@ -56,9 +56,9 @@
 
 (暂无 — 2026-07-04 批次全部清偿;新欠账请记录在此)
 
-**契约测试提示**:`test:contracts`(100+ 套,不在 CI)在 2026-07-04 全量修复过
-一轮——历史重构(cloud-server-runtime 委托化、TodayFeed 拆分、i18n 化、函数
-改名)造成的 marker 漂移已对齐。重构后请顺手跑 `npm run test:contracts`。
+**契约测试提示**:`test:contracts`(100+ 套,CI 只跑 test:security 的 18 套)
+在 2026-07-04 全量修复过一轮——历史重构造成的 15 处 marker 漂移已对齐,
+并已挂进每周 loops.yml(失败进 loop-report issue)。重构后请顺手本地跑一遍。
 
 已清偿(2026-07-04):TodayFeed 拆分、FocusSection 二次拆分(298 行)、
 FocusModeSheet 拆分(141 + MeetingRecorderSheet 163)、
@@ -74,6 +74,7 @@ Signal M1-M4(读切换 + 删除传导)、REG-004/006 i18n 闭环
 | 漂移检测(契约可达性/PRD 对账/文档过时) | `npm run report:drift` + loops.yml | 每周 |
 | 断链巡检(modal 退出/能力入口) | `npm run report:broken-links` + loops.yml | 每周 |
 | 安全循环(audit/route 守卫/文档新鲜度) | `npm run report:security-loop` + loops.yml | 每周 |
+| 全量契约链(100+ 套) | `npm run test:contracts` + loops.yml | 每周 |
 | AI 成本(telemetry 汇总) | `npm run report:ai-cost` | 每月/手动 |
 
 ## 命名词典(易混项)
