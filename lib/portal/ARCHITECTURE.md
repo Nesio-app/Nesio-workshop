@@ -4,7 +4,9 @@
 It owns the contracts and resolvers that let Shell, tools, local data, launch
 readiness, and reports share one vocabulary.
 
-Current top-level file count: 53.
+Current top-level file count: 111 (2026-07 audit; was 53 when this doc was
+first written — growth is mostly algorithm-layer extractions and contracts.
+See docs/api-routes.md for the API surface and its auth matrix).
 
 ## Responsibilities
 

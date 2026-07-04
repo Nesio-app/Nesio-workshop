@@ -131,7 +131,12 @@ function mockRequest(headers = {}) {
 }
 
 async function testConfiguredFeedFailsClosedWithoutGate() {
+  // Fail-closed applies to CLOUD deployments (Supabase configured, no
+  // session). Deployments without Supabase run in local mode by design and
+  // are covered by testLocalModeAllowsFeedsWithoutSession below.
   clearCalendarEnv();
+  process.env.SUPABASE_URL = 'https://example.supabase.co';
+  process.env.SUPABASE_ANON_KEY = 'anon-key';
   process.env.GOOGLE_CALENDAR_ICAL_URL = 'https://example.test/private.ics';
   let fetchCalled = false;
   global.fetch = async () => {
@@ -142,6 +147,9 @@ async function testConfiguredFeedFailsClosedWithoutGate() {
   const { GET } = loadRoute();
   const response = await GET(mockRequest());
 
+  delete process.env.SUPABASE_URL;
+  delete process.env.SUPABASE_ANON_KEY;
+
   assert.equal(fetchCalled, false);
   assert.equal(response.body.ok, false);
   assert.equal(response.body.error, 'calendar_auth_required');
@@ -149,6 +157,28 @@ async function testConfiguredFeedFailsClosedWithoutGate() {
   assert.equal(response.body.events.length, 0);
   assert.match(response.body.message, /Sign in/i);
   assert.doesNotMatch(JSON.stringify(response.body), /Sensitive Private Meeting/);
+}
+
+async function testLocalModeAllowsFeedsWithoutSession() {
+  // No Supabase configured → personal/local deployment: configured iCal
+  // subscriptions must keep working without a login session.
+  clearCalendarEnv();
+  delete process.env.SUPABASE_URL;
+  delete process.env.SUPABASE_ANON_KEY;
+  mockBaoheAuthCookie = '';
+  process.env.GOOGLE_CALENDAR_ICAL_URL = 'https://example.test/private.ics';
+  const mockIcs = fs.readFileSync(fixturePath, 'utf8');
+  global.fetch = async () => ({
+    ok: true,
+    async text() { return mockIcs; },
+  });
+
+  const { GET } = loadRoute();
+  const response = await GET(mockRequest());
+
+  assert.equal(response.body.ok, true);
+  assert.equal(response.body.enabled, true);
+  assert.equal(response.body.events.length > 0, true);
 }
 
 async function testConfiguredFeedUsesMockOnlyWhenGateEnabled() {
@@ -325,6 +355,7 @@ async function testOauthRefreshCookieRecoversExpiredCalendarAccess() {
 const originalFetch = global.fetch;
 try {
   await testConfiguredFeedFailsClosedWithoutGate();
+  await testLocalModeAllowsFeedsWithoutSession();
   await testConfiguredFeedUsesMockOnlyWhenGateEnabled();
   await testPrivateFeedGateAcceptsTrimmedVercelEnvValue();
   await testOauthCookieReadsGoogleCalendarApiWithoutIcsEnv();
