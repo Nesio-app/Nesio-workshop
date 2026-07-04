@@ -50,3 +50,14 @@ CREATE POLICY "user_profiles_update_own"
   TO authenticated
   USING (user_id IS NOT NULL AND auth.uid() = user_id)
   WITH CHECK (user_id IS NOT NULL AND auth.uid() = user_id);
+
+-- ── Access control(权限管理,2026-07-04)─────────────────────────────────
+-- 服务器权威的用户访问角色:管理员在 /admin 设置,用户登录后经
+-- /api/portal/access 领取。access_role: public / tester / personal_lab;
+-- feature_flags: 模块布尔开关(true = 进该用户 testerAllowlist)。
+
+ALTER TABLE public.user_profiles
+  ADD COLUMN IF NOT EXISTS access_role text NOT NULL DEFAULT 'public';
+
+ALTER TABLE public.user_profiles
+  ADD COLUMN IF NOT EXISTS feature_flags jsonb NOT NULL DEFAULT '{}'::jsonb;

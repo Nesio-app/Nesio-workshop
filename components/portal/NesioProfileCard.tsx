@@ -9,8 +9,9 @@ import ConnectorsHub from './ConnectorsHub';
 import HealthLogger from './HealthLogger';
 import InsightsSheet from './InsightsSheet';
 import NamedPlacesSheet from './NamedPlacesSheet';
+import RoadmapSheet from './RoadmapSheet';
 
-type ActiveSheet = 'mirror' | 'tone' | 'privacy' | 'subscription' | 'connectors' | 'health' | 'places' | null;
+type ActiveSheet = 'mirror' | 'tone' | 'privacy' | 'subscription' | 'connectors' | 'health' | 'places' | 'roadmap' | null;
 
 export default function NesioProfileCard() {
   const [displayName, setDisplayName] = useState('Jessy');
@@ -120,6 +121,10 @@ export default function NesioProfileCard() {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="20" height="20">
           <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
         </svg>), iconBg: 'var(--chip-pink)', label: '健康记录', sublabel: '记录今日症状、睡眠、精力' },
+    { key: 'roadmap' as ActiveSheet, icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="20" height="20">
+          <path d="M12 2l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.5-4.8 2.5.9-5.4L4.2 7.7l5.4-.8L12 2z"/>
+        </svg>), iconBg: 'var(--chip-amber)', label: '投票给未来功能', sublabel: '你的星星决定 Nesio 先做什么' },
     { key: 'places' as ActiveSheet, icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="20" height="20">
           <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
@@ -206,6 +211,7 @@ export default function NesioProfileCard() {
       <ConnectorsHub open={activeSheet === 'connectors'} onClose={() => setActiveSheet(null)} />
       <HealthLogger open={activeSheet === 'health'} onClose={() => setActiveSheet(null)} />
       <NamedPlacesSheet open={activeSheet === 'places'} onClose={() => setActiveSheet(null)} />
+      <RoadmapSheet open={activeSheet === 'roadmap'} onClose={() => setActiveSheet(null)} />
     </>
   );
 }

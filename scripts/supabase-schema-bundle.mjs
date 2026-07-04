@@ -12,12 +12,25 @@ const CANONICAL_SOURCES = [
   'database/schema/supabase-signals-v1.sql',
   'database/schema/supabase-storage-v1.sql',
   'database/schema/supabase-product-events-v1.sql',
+  'database/schema/supabase-telemetry-events-v1.sql',
+  'database/schema/supabase-feature-votes-v1.sql',
 ];
 const REQUIRED_MARKERS = {
   'database/schema/supabase-user-profiles-v1.sql': [
     'CREATE TABLE IF NOT EXISTS public.user_profiles',
     'identity_key text PRIMARY KEY',
     'ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY',
+    'ADD COLUMN IF NOT EXISTS access_role',
+    'ADD COLUMN IF NOT EXISTS feature_flags',
+  ],
+  'database/schema/supabase-telemetry-events-v1.sql': [
+    'CREATE TABLE IF NOT EXISTS public.telemetry_events',
+    'ALTER TABLE public.telemetry_events ENABLE ROW LEVEL SECURITY',
+  ],
+  'database/schema/supabase-feature-votes-v1.sql': [
+    'CREATE TABLE IF NOT EXISTS public.feature_votes',
+    'PRIMARY KEY (feature_id, device_id)',
+    'ALTER TABLE public.feature_votes ENABLE ROW LEVEL SECURITY',
   ],
   'database/schema/supabase-profile-settings-v1.sql': [
     'CREATE TABLE IF NOT EXISTS public.profile_settings',

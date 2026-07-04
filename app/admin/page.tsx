@@ -8,7 +8,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Delta, FeedbackDonut, FunnelSteps, InsightCard, TopEventsChart, TrendChart, type DailyPoint } from './MetricsCharts';
+import { Delta, FeedbackDonut, FunnelSteps, InsightCard, SmartnessRadar, TopEventsChart, TrendChart, type DailyPoint } from './MetricsCharts';
 import { UserAccess } from './UserAccess';
 
 const SECRET_KEY = 'nesio_admin_secret';
@@ -27,6 +27,10 @@ interface Metrics {
   topEvents7d?: Array<{ name: string; count: number }>;
   daily60d?: DailyPoint[];
   funnel30d?: Array<{ step: string; devices: number }>;
+  ai?: { totals: { calls: number; estCostUsd: number; okRate: number | null; avgLatencyMs: number | null }; routes: Array<{ route: string; calls: number; okRate: number; avgLatencyMs: number; estCostUsd: number }> };
+  smartness?: { score: number; dims: Array<{ dim: string; score: number; thin: boolean }> };
+  roadmapVotes?: Array<{ id: string; title: string; status: string; avg: number | null; count: number }>;
+  experiments?: Array<{ id: string; name: string; enabled: boolean; variants: Array<{ variant: string; devices: number }> }>;
   cardFeedback30d?: { useful: number; wrong: number; too_much: number; other: number };
   productEvents30d?: Array<{ type: string; count: number }>;
 }
@@ -197,6 +201,72 @@ export default function AdminPage() {
             <div style={card}>
               <p style={{ ...label, margin: '0 0 0.6rem' }}>使用漏斗(30 天,按设备 · 百分比为相对上一步)</p>
               <FunnelSteps data={data.funnel30d || []} />
+            </div>
+          </section>
+
+          {/* ── 聪明度 + AI 成本 ── */}
+          <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '0.7rem', marginBottom: '0.9rem' }}>
+            <div style={card}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                <p style={{ ...label, margin: 0 }}>聪明度(30 天,带·的维度样本不足按 50 中性)</p>
+                <span style={{ ...big, fontSize: '1.4rem', color: (data.smartness?.score ?? 0) >= 70 ? 'var(--status-go)' : (data.smartness?.score ?? 0) >= 50 ? 'var(--status-gentle)' : 'var(--status-risk)' }}>{data.smartness?.score ?? '—'}</span>
+              </div>
+              {data.smartness && <SmartnessRadar dims={data.smartness.dims} />}
+            </div>
+            <div style={card}>
+              <p style={{ ...label, margin: '0 0 0.4rem' }}>
+                AI 调用与成本(30 天,成本为量级估算)
+                {data.ai && <span style={{ marginLeft: 8, color: 'var(--portal-ink)' }}>共 {data.ai.totals.calls} 次 · ≈ ${data.ai.totals.estCostUsd}</span>}
+              </p>
+              {(data.ai?.routes.length ?? 0) === 0
+                ? <p style={label}>暂无 AI 调用记录 — 服务端落库 2026-07-04 接通,用一次听简报/问一问就有了。</p>
+                : (
+                  <div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 0.7fr 0.7fr 0.8fr 0.7fr', fontSize: '0.68rem', color: 'var(--portal-muted)', padding: '0 0 0.3rem' }}>
+                      <span>路由</span><span>次数</span><span>成功</span><span>延迟</span><span>估算</span>
+                    </div>
+                    {data.ai!.routes.map((r) => (
+                      <div key={r.route} style={{ display: 'grid', gridTemplateColumns: '1.4fr 0.7fr 0.7fr 0.8fr 0.7fr', fontSize: '0.76rem', color: 'var(--portal-ink)', padding: '0.22rem 0', borderTop: '1px solid var(--portal-line)' }}>
+                        <span>{r.route}</span>
+                        <span>{r.calls}</span>
+                        <span style={{ color: r.okRate >= 95 ? 'var(--status-go)' : r.okRate >= 85 ? 'var(--status-gentle)' : 'var(--status-risk)' }}>{r.okRate}%</span>
+                        <span>{r.avgLatencyMs}ms</span>
+                        <span>${r.estCostUsd}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+            </div>
+          </section>
+
+          {/* ── 功能许愿(Roadmap 评分)+ 实验 ── */}
+          <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '0.7rem', marginBottom: '0.9rem' }}>
+            <div style={card}>
+              <p style={{ ...label, margin: '0 0 0.6rem' }}>功能许愿榜(用户在设置 → 投票给未来功能 里打分)</p>
+              {data.roadmapVotes?.map((v) => (
+                <div key={v.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.3rem 0', borderTop: '1px solid var(--portal-line)', fontSize: '0.78rem', color: 'var(--portal-ink)' }}>
+                  <span>
+                    {v.title}
+                    <span style={{ ...label, marginLeft: 6 }}>{v.status === 'building' ? '在做' : v.status === 'planned' ? '已排期' : '探索中'}</span>
+                  </span>
+                  <span>{v.avg !== null ? `★ ${v.avg}(${v.count} 票)` : '待投票'}</span>
+                </div>
+              ))}
+            </div>
+            <div style={card}>
+              <p style={{ ...label, margin: '0 0 0.6rem' }}>A/B 实验(代码注册表 lib/portal/experiments.ts,注册即用)</p>
+              {(data.experiments?.length ?? 0) === 0 && <p style={label}>暂无注册实验</p>}
+              {data.experiments?.map((e) => (
+                <div key={e.id} style={{ padding: '0.3rem 0', borderTop: '1px solid var(--portal-line)' }}>
+                  <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--portal-ink)' }}>
+                    {e.name}
+                    <span style={{ ...label, marginLeft: 6, color: e.enabled ? 'var(--status-go)' : 'var(--portal-muted)' }}>{e.enabled ? '运行中' : '未启用'}</span>
+                  </p>
+                  <p style={{ ...label, margin: '0.15rem 0 0' }}>
+                    {e.variants.map((v) => `${v.variant}: ${v.devices} 设备`).join(' · ')}
+                  </p>
+                </div>
+              ))}
             </div>
           </section>
 

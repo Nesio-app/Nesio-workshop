@@ -65,6 +65,7 @@ Auth legend:
 | GET /api/admin/metrics | same-origin + NESIO_ADMIN_SECRET header + 30/min — 管理面板聚合只读(telemetry_events/product_events),只回统计不回原始行 |
 | GET/PATCH /api/admin/users | requireAdmin(同 metrics 门)— 用户权限管理:列用户/改 access_role/feature_flags |
 | GET /api/portal/access | same-origin + 30/min,匿名回 public — 登录用户领取服务器授予的角色;personal_lab 顺带下发 secretary lab cookie |
+| GET/POST /api/portal/feature-vote | same-origin + 限流,匿名合法(遥测 deviceId)— Roadmap 功能 1-5 星评分,feature id 白名单在 lib/portal/roadmap.ts |
 
 ## Known-open routes
 

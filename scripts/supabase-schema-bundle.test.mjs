@@ -62,6 +62,8 @@ assert.deepEqual(
     'database/schema/supabase-signals-v1.sql',
     'database/schema/supabase-storage-v1.sql',
     'database/schema/supabase-product-events-v1.sql',
+    'database/schema/supabase-telemetry-events-v1.sql',
+    'database/schema/supabase-feature-votes-v1.sql',
   ],
   'bundle must use canonical Backend v1 schema files in operator-safe order',
 );
@@ -97,6 +99,9 @@ assert.match(bundle, /public = false/, 'Storage bucket must be private by defaul
 assert.match(bundle, /CREATE POLICY "nesio_assets_select_own_prefix"/, 'bundle must include private asset select policy');
 assert.match(bundle, /CREATE POLICY "nesio_assets_insert_own_prefix"/, 'bundle must include private asset insert policy');
 assert.match(bundle, /CREATE TABLE IF NOT EXISTS public\.product_events/, 'bundle must include product_events schema');
+assert.match(bundle, /CREATE TABLE IF NOT EXISTS public\.telemetry_events/, 'bundle must include telemetry_events schema');
+assert.match(bundle, /CREATE TABLE IF NOT EXISTS public\.feature_votes/, 'bundle must include feature_votes schema');
+assert.match(bundle, /ADD COLUMN IF NOT EXISTS access_role/, 'bundle must include access control columns');
 assert.equal(
   (bundle.match(/CREATE TABLE IF NOT EXISTS public\.inventory_items/g) || []).length,
   1,

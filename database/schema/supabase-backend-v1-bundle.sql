@@ -1,5 +1,5 @@
 -- Nesio Supabase Backend v1 Bundle
--- Generated at 2026-07-04T15:49:12.738Z
+-- Generated at 2026-07-04T16:03:33.972Z
 -- Apply manually in Supabase SQL Editor after CEO-approved production data operation window.
 -- This file contains schema only. It does not contain secrets. It creates the private Storage bucket contract.
 
@@ -60,6 +60,17 @@ CREATE POLICY "user_profiles_update_own"
   TO authenticated
   USING (user_id IS NOT NULL AND auth.uid() = user_id)
   WITH CHECK (user_id IS NOT NULL AND auth.uid() = user_id);
+
+-- ── Access control(权限管理,2026-07-04)─────────────────────────────────
+-- 服务器权威的用户访问角色:管理员在 /admin 设置,用户登录后经
+-- /api/portal/access 领取。access_role: public / tester / personal_lab;
+-- feature_flags: 模块布尔开关(true = 进该用户 testerAllowlist)。
+
+ALTER TABLE public.user_profiles
+  ADD COLUMN IF NOT EXISTS access_role text NOT NULL DEFAULT 'public';
+
+ALTER TABLE public.user_profiles
+  ADD COLUMN IF NOT EXISTS feature_flags jsonb NOT NULL DEFAULT '{}'::jsonb;
 
 -- ============================================================================
 -- Source: database/schema/supabase-profile-settings-v1.sql
@@ -556,5 +567,58 @@ CREATE POLICY "product_events_insert_own"
   FOR INSERT
   TO authenticated
   WITH CHECK (user_id IS NOT NULL AND auth.uid() = user_id);
+
+-- ============================================================================
+-- Source: database/schema/supabase-telemetry-events-v1.sql
+-- ============================================================================
+-- Nesio Backend v1 — telemetry_events(匿名设备级计数,2026-07-04)
+-- This schema supports app/api/telemetry/route.ts (writes),
+-- lib/portal/ai-telemetry.ts (server ai_route writes) and
+-- app/api/admin/metrics/route.ts (aggregated reads).
+-- Anonymous product telemetry: event name + coarse props + per-device id.
+-- Never content. RLS enabled with NO policies — service role only.
+
+BEGIN;
+
+CREATE TABLE IF NOT EXISTS public.telemetry_events (
+  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  name text NOT NULL,
+  props jsonb NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(props) = 'object'),
+  device_id text NOT NULL DEFAULT 'unknown',
+  at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_telemetry_events_name_at
+  ON public.telemetry_events (name, at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_telemetry_events_at
+  ON public.telemetry_events (at DESC);
+
+ALTER TABLE public.telemetry_events ENABLE ROW LEVEL SECURITY;
+
+COMMIT;
+
+-- ============================================================================
+-- Source: database/schema/supabase-feature-votes-v1.sql
+-- ============================================================================
+-- Nesio Backend v1 — feature_votes(Roadmap 功能评分,2026-07-04)
+-- This schema supports app/api/portal/feature-vote/route.ts.
+-- Users rate backlog features 1-5; one vote per (feature, device),
+-- re-voting overwrites. Feature id whitelist lives in lib/portal/roadmap.ts.
+-- RLS enabled with NO policies — service role only.
+
+BEGIN;
+
+CREATE TABLE IF NOT EXISTS public.feature_votes (
+  feature_id text NOT NULL,
+  device_id text NOT NULL,
+  score int NOT NULL CHECK (score BETWEEN 1 AND 5),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (feature_id, device_id)
+);
+
+ALTER TABLE public.feature_votes ENABLE ROW LEVEL SECURITY;
+
+COMMIT;
 
 COMMIT;

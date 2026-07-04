@@ -12,6 +12,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isSameOriginRequest, isRateLimited } from '@/lib/portal/api-auth';
 import { normalizeSupabaseRuntimeUrl } from '@/lib/portal/production-runtime';
+import { ROADMAP_ITEMS } from '@/lib/portal/roadmap';
+import { EXPERIMENTS } from '@/lib/portal/experiments';
 
 export const dynamic = 'force-dynamic';
 
@@ -67,12 +69,15 @@ export async function GET(req: NextRequest) {
 
   const since60 = new Date(Date.now() - 60 * 86_400_000).toISOString();
   const since30 = new Date(Date.now() - 30 * 86_400_000).toISOString();
-  const [telemetry, product] = await Promise.all([
+  const [telemetry, product, votes] = await Promise.all([
     supabaseSelect<TelemetryRow>(
-      `telemetry_events?select=name,device_id,at&at=gte.${since60}&order=at.desc&limit=10000`,
+      `telemetry_events?select=name,device_id,at,props&at=gte.${since60}&order=at.desc&limit=10000`,
     ),
     supabaseSelect<ProductEventRow>(
       `product_events?select=event_type,feedback,target_type,created_at&created_at=gte.${since30}&order=created_at.desc&limit=2000`,
+    ),
+    supabaseSelect<{ feature_id: string; score: number }>(
+      'feature_votes?select=feature_id,score&limit=5000',
     ),
   ]);
 
@@ -121,6 +126,81 @@ export async function GET(req: NextRequest) {
   }
   const productByType = new Map<string, number>();
   for (const r of product.rows) productByType.set(r.event_type, (productByType.get(r.event_type) || 0) + 1);
+
+  // ── AI 调用统计与成本估算(server ai_route 事件,30 天) ──
+  // 单价是量级估算(美元/次),用于看趋势与占比,不是账单。
+  const COST_PER_CALL: Record<string, number> = {
+    chat: 0.004, daily_brief: 0.001, tts: 0.015, analyze: 0.002,
+    guidance_language: 0.001, insights: 0.002, narrative: 0.002,
+  };
+  const aiByRoute = new Map<string, { calls: number; okCalls: number; latencySum: number }>();
+  for (const r of telemetry.rows) {
+    if (r.name !== 'ai_route' || new Date(r.at).getTime() < cut(30)) continue;
+    const p = (r.props || {}) as { route?: string; ok?: boolean; latency_ms?: number };
+    const route = typeof p.route === 'string' ? p.route : 'unknown';
+    if (!aiByRoute.has(route)) aiByRoute.set(route, { calls: 0, okCalls: 0, latencySum: 0 });
+    const a = aiByRoute.get(route)!;
+    a.calls += 1;
+    if (p.ok === true) a.okCalls += 1;
+    a.latencySum += typeof p.latency_ms === 'number' ? p.latency_ms : 0;
+  }
+  const aiRoutes = [...aiByRoute.entries()].map(([route, a]) => ({
+    route,
+    calls: a.calls,
+    okRate: Math.round((a.okCalls / Math.max(1, a.calls)) * 100),
+    avgLatencyMs: Math.round(a.latencySum / Math.max(1, a.calls)),
+    estCostUsd: Math.round(a.calls * (COST_PER_CALL[route] ?? 0.002) * 1000) / 1000,
+  })).sort((x, y) => y.estCostUsd - x.estCostUsd);
+  const aiTotals = {
+    calls: aiRoutes.reduce((sum, r) => sum + r.calls, 0),
+    estCostUsd: Math.round(aiRoutes.reduce((sum, r) => sum + r.estCostUsd, 0) * 1000) / 1000,
+    okRate: aiRoutes.length ? Math.round(aiRoutes.reduce((sum, r) => sum + r.okRate * r.calls, 0) / Math.max(1, aiRoutes.reduce((sum, r) => sum + r.calls, 0))) : null,
+    avgLatencyMs: aiRoutes.length ? Math.round(aiRoutes.reduce((sum, r) => sum + r.avgLatencyMs * r.calls, 0) / Math.max(1, aiRoutes.reduce((sum, r) => sum + r.calls, 0))) : null,
+  };
+
+  // ── 聪明度(0-100 五维,样本不足的维度按 50 中性并标注) ──
+  const clamp = (v: number) => Math.max(0, Math.min(100, Math.round(v)));
+  const fbTotalForSmart = feedback.useful + feedback.wrong + feedback.too_much;
+  const funnelStart = funnel[0]?.devices || 0;
+  const funnelEnd = funnel[funnel.length - 1]?.devices || 0;
+  const smartness = {
+    dims: [
+      { dim: '推荐有用率', score: fbTotalForSmart >= 3 ? clamp((feedback.useful / fbTotalForSmart) * 100) : 50, thin: fbTotalForSmart < 3 },
+      { dim: 'AI 可用性', score: aiTotals.okRate ?? 50, thin: aiTotals.okRate === null },
+      { dim: '响应速度', score: aiTotals.avgLatencyMs === null ? 50 : clamp(100 - (aiTotals.avgLatencyMs - 800) / 40), thin: aiTotals.avgLatencyMs === null },
+      { dim: '功能走通率', score: funnelStart >= 3 ? clamp((funnelEnd / funnelStart) * 100) : 50, thin: funnelStart < 3 },
+      { dim: '反馈参与度', score: windowStats(30).devices >= 3 ? clamp((fbTotalForSmart / Math.max(1, windowStats(30).devices)) * 100) : 50, thin: windowStats(30).devices < 3 },
+    ],
+  };
+  const smartScore = Math.round(smartness.dims.reduce((sum, d) => sum + d.score, 0) / smartness.dims.length);
+
+  // ── Roadmap 评分汇总 ──
+  const voteAgg = new Map<string, { sum: number; count: number }>();
+  for (const v of votes.rows) {
+    if (!voteAgg.has(v.feature_id)) voteAgg.set(v.feature_id, { sum: 0, count: 0 });
+    const a = voteAgg.get(v.feature_id)!;
+    a.sum += v.score; a.count += 1;
+  }
+  const roadmapVotes = ROADMAP_ITEMS.map((item) => {
+    const a = voteAgg.get(item.id);
+    return { id: item.id, title: item.title, status: item.status, avg: a ? Math.round((a.sum / a.count) * 10) / 10 : null, count: a?.count || 0 };
+  }).sort((x, y) => (y.avg ?? 0) * y.count - (x.avg ?? 0) * x.count);
+
+  // ── 实验曝光(exp_exposure by exp/variant) ──
+  const expAgg = new Map<string, Map<string, Set<string>>>();
+  for (const r of telemetry.rows) {
+    if (r.name !== 'exp_exposure') continue;
+    const p = (r.props || {}) as { exp?: string; variant?: string };
+    if (!p.exp || !p.variant) continue;
+    if (!expAgg.has(p.exp)) expAgg.set(p.exp, new Map());
+    const m = expAgg.get(p.exp)!;
+    if (!m.has(p.variant)) m.set(p.variant, new Set());
+    m.get(p.variant)!.add(r.device_id);
+  }
+  const experiments = EXPERIMENTS.map((e) => ({
+    id: e.id, name: e.name, enabled: e.enabled,
+    variants: e.variants.map((v) => ({ variant: v, devices: expAgg.get(e.id)?.get(v)?.size || 0 })),
+  }));
 
   // ── 洞察引擎:面板不该让人自己找问题——规则先替你看一遍 ──
   const dayEvents = (offsetDays: number, spanDays: number) =>
@@ -182,6 +262,10 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  if (aiTotals.okRate !== null && aiTotals.okRate < 90 && aiTotals.calls >= 10) {
+    insights.push({ severity: 'gentle', title: `AI 成功率 ${aiTotals.okRate}%`, detail: `30 天 ${aiTotals.calls} 次调用有失败,看「AI 调用」表里哪条路由最差。`, advice: '成功率最低的路由优先查 key 配额/兜底链;fallback 生效时用户无感但成本翻倍。' });
+  }
+
   if (insights.length === 0) {
     insights.push({ severity: 'go', title: '一切平稳', detail: '数据在进,没有触发任何告警规则。', advice: '不用管面板,去做创意。' });
   }
@@ -191,6 +275,10 @@ export async function GET(req: NextRequest) {
     generatedAt: new Date().toISOString(),
     insights,
     deltas,
+    ai: { totals: aiTotals, routes: aiRoutes.slice(0, 8) },
+    smartness: { score: smartScore, dims: smartness.dims },
+    roadmapVotes,
+    experiments,
     sources: {
       telemetryEvents: telemetry.error ? { ok: false, error: telemetry.error } : { ok: true, rows: telemetry.rows.length },
       productEvents: product.error ? { ok: false, error: product.error } : { ok: true, rows: product.rows.length },

@@ -8,7 +8,8 @@
 
 import {
   Area, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Line,
-  Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
+  Pie, PieChart, PolarAngleAxis, PolarGrid, PolarRadiusAxis, Radar,
+  RadarChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
 
 const INK = 'var(--portal-ink)';
@@ -170,5 +171,21 @@ export function FeedbackDonut({ useful, wrong, tooMuch }: { useful: number; wron
         ))}
       </div>
     </div>
+  );
+}
+
+/** 聪明度雷达:五维 0-100;样本不足的维度在轴名上标 · */
+export function SmartnessRadar({ dims }: { dims: Array<{ dim: string; score: number; thin: boolean }> }) {
+  const data = dims.map((d) => ({ ...d, label: d.thin ? `${d.dim}·` : d.dim }));
+  return (
+    <ResponsiveContainer width="100%" height={230}>
+      <RadarChart data={data} outerRadius="72%">
+        <PolarGrid stroke={LINE} />
+        <PolarAngleAxis dataKey="label" tick={{ fontSize: 11, fill: INK }} />
+        <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
+        <Radar dataKey="score" stroke={ACCENT} fill={ACCENT} fillOpacity={0.28} strokeWidth={2} />
+        <Tooltip contentStyle={tooltipStyle} formatter={(v) => [String(v), '分']} />
+      </RadarChart>
+    </ResponsiveContainer>
   );
 }

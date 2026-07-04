@@ -100,8 +100,17 @@ Signal M1-M4(读切换 + 删除传导)、REG-004/006 i18n 闭环
   管理员在 /admin 设置 → 用户登录后经 GET /api/portal/access 领取,
   只增不减地并入浏览器侧 launchSurfaceContext;personal_lab 顺带下发
   secretary lab cookie。本机 URL/localStorage lab 开关保留(所有者工具)。
+- **v4(2026-07-04)**:聪明度雷达(推荐有用率/AI 可用性/响应速度/功能走通率/
+  反馈参与度五维)、AI 调用与成本估算表(server ai_route 经 next after()
+  落库)、功能许愿榜(用户在 设置→投票给未来功能 打星,清单单一事实源
+  lib/portal/roadmap.ts,表 feature_votes)、A/B 实验区(基建
+  lib/portal/experiments.ts:注册即用,稳定设备分桶 + exp_exposure 曝光)。
+- **schema 管道纪律**:bundle 是生成物(scripts/supabase-schema-bundle.mjs
+  拼接 canonical 源)——加表 = 新建 database/schema/supabase-*-v1.sql 源文件
+  并登记生成器与契约,**不要手改 bundle**(会被生成器覆盖,已踩过)。
 - 生产激活:① Vercel 环境变量 `NESIO_ADMIN_SECRET`;② Supabase SQL Editor
-  跑 schema bundle(2026-07-04 起含 telemetry_events 表 + Access control 列)。
+  跑 schema bundle(2026-07-04 起含 telemetry_events/feature_votes 表 +
+  Access control 列)。
 
 ## 模式速查
 
