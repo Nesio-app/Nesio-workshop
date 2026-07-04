@@ -14,7 +14,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { addLifeNode } from '@/lib/portal/life-graph';
+import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 
 // ── 12-Emotion taxonomy (Russell Circumplex 4 quadrants × 3) ─────────────────
 const EMOTIONS = [
@@ -195,7 +195,7 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
 
     if (isJournalEntry) {
       const dateStr = new Date().toISOString().slice(0, 10);
-      addLifeNode({
+      ingestLifeNode({
         name: `Journal · ${dateStr}${em ? ` · ${em.emoji}${em.label}` : ''}`,
         type: 'health_state',
         tags: ['moment', 'journal', ...(em ? ['feeling', em.id, em.quadrant] : []), `energy-${lvl}`],
@@ -208,7 +208,7 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
         confidence: 1, source: 'manual', relations: [],
       });
     } else if (em) {
-      addLifeNode({
+      ingestLifeNode({
         name: `此刻 · ${em.emoji} ${em.label}`,
         type: 'health_state',
         tags: ['moment', 'feeling', em.id, em.quadrant, `energy-${lvl}`],

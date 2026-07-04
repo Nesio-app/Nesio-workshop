@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import dynamic from 'next/dynamic';
 import TodayFeed from './TodayFeed';
 import MemoryTab from './MemoryTab';
@@ -452,7 +453,7 @@ export default function Portal() {
               }
               // Save upcoming events (next 7 days) as LifeGraph event nodes so they appear in memory/focus
               if (Array.isArray(data.events) && data.events.length > 0) {
-                import('@/lib/portal/life-graph').then(({ addLifeNode, getLifeGraph }) => {
+                import('@/lib/portal/life-graph').then(({ getLifeGraph }) => {
                   const now = Date.now();
                   const week = now + 60 * 86_400_000;
                   const existing = getLifeGraph();
@@ -465,7 +466,7 @@ export default function Portal() {
                     if (t < now - 86_400_000 || t > week) return;
                     const calId = ev.id || `${ev.title}-${ev.start}`;
                     if (existingCalIds.has(calId)) return; // already saved
-                    addLifeNode({
+                    ingestLifeNode({
                       name: ev.title,
                       type: 'event',
                       source: 'calendar',
@@ -521,7 +522,7 @@ export default function Portal() {
             .then((data: { ok?: boolean; nodes?: Array<Record<string, unknown>>; count?: number }) => {
               if (data.ok && data.nodes?.length) {
                 import('@/lib/portal/life-graph').then(({ addLifeNode }) => {
-                  data.nodes!.forEach((n) => addLifeNode({ source: 'email', ...n } as Parameters<typeof addLifeNode>[0]));
+                  data.nodes!.forEach((n) => ingestLifeNode({ source: 'email', ...n } as Parameters<typeof addLifeNode>[0]));
                   window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
                 });
               }
@@ -581,7 +582,7 @@ export default function Portal() {
             saveCalendarToLocal(data.events);
           }
           if (!Array.isArray(data.events) || data.events.length === 0) return;
-          import('@/lib/portal/life-graph').then(({ addLifeNode, getLifeGraph }) => {
+          import('@/lib/portal/life-graph').then(({ getLifeGraph }) => {
             const now = Date.now();
             const week = now + 60 * 86_400_000;
             const existing = getLifeGraph();
@@ -596,7 +597,7 @@ export default function Portal() {
               if (t < now - 86_400_000 || t > week) return;
               const calId = ev.id || `${ev.title}-${ev.start}`;
               if (existingCalIds.has(calId)) return;
-              addLifeNode({
+              ingestLifeNode({
                 name: ev.title,
                 type: 'event',
                 source: 'calendar',
@@ -633,7 +634,7 @@ export default function Portal() {
               if (data.ok && data.nodes?.length) {
                 localStorage.setItem('nesio-gmail-last-sync', String(Date.now()));
                 import('@/lib/portal/life-graph').then(({ addLifeNode }) => {
-                  data.nodes!.forEach((n) => addLifeNode({ source: 'email', ...n } as Parameters<typeof addLifeNode>[0]));
+                  data.nodes!.forEach((n) => ingestLifeNode({ source: 'email', ...n } as Parameters<typeof addLifeNode>[0]));
                   window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
                 });
               }

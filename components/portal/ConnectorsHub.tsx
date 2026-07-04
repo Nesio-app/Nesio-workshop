@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { addLifeNode, type LifeNode } from '@/lib/portal/life-graph';
+import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
+import { type LifeNode } from '@/lib/portal/life-graph';
 
 interface ConnectorsHubProps { open: boolean; onClose: () => void; }
 
@@ -90,7 +91,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
   }
 
   function saveNodes(nodes: Array<Omit<NodeInput, 'source'>>, source: LifeNode['source']) {
-    nodes.forEach((n) => addLifeNode({ ...n, source } as NodeInput));
+    nodes.forEach((n) => ingestLifeNode({ ...n, source } as NodeInput));
     window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
   }
 
@@ -178,7 +179,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
           const emailCount = data.emailCount ?? data.messages?.length ?? 0;
           if (nodeCount > 0) {
             const { addLifeNode } = await import('@/lib/portal/life-graph');
-            data.nodes!.forEach((n) => addLifeNode({ ...n, source: 'email' } as Parameters<typeof addLifeNode>[0]));
+            data.nodes!.forEach((n) => ingestLifeNode({ ...n, source: 'email' } as Parameters<typeof addLifeNode>[0]));
             localStorage.setItem('nesio-gmail-last-sync', String(Date.now()));
             window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
           }
@@ -209,7 +210,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
           saveCalendarToLocal(calEvents);
 
           // Also save upcoming events to LifeGraph so Memory tab reflects the sync
-          const { addLifeNode, getLifeGraph } = await import('@/lib/portal/life-graph');
+          const { getLifeGraph } = await import('@/lib/portal/life-graph');
           const now = Date.now();
           const windowEnd = now + 60 * 86_400_000;
           const existingCalIds = new Set(
@@ -226,7 +227,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
             if (t < now - 86_400_000 || t > windowEnd) return;
             const calId = (evAny.id as string) || `${title}-${start}`;
             if (existingCalIds.has(calId)) return;
-            addLifeNode({
+            ingestLifeNode({
               name: title,
               type: 'event',
               source: 'calendar',

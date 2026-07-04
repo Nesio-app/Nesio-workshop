@@ -7,7 +7,8 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { addLifeNode, getLifeGraph, searchLifeGraphFuzzy, type LifeNode } from '@/lib/portal/life-graph';
+import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
+import { getLifeGraph, searchLifeGraphFuzzy, type LifeNode } from '@/lib/portal/life-graph';
 import { loadProfileSettings } from '@/lib/portal/profile';
 import { smartSearch } from '@/lib/portal/smart-search';
 import { parseTemporalQuery, isInSpan } from '@/lib/portal/temporal-query';
@@ -537,7 +538,7 @@ export default function NesioChatSheet({
   }, [messages, sending]);
 
   function handleSave(msg: UiMessage) {
-    const savedNode = addLifeNode({
+    const savedNode = ingestLifeNode({
       name: msg.text.slice(0, 60), type: 'event', source: 'manual', confidence: 0.9,
       tags: ['宝盒对话'], attributes: { fullText: msg.text, savedFromChat: true },
       relations: [], rawInput: msg.text,

@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { addLifeNode, getLifeGraph, updateLifeNode, type LifeNode, type LifeNodeAsset } from '@/lib/portal/life-graph';
+import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
+import { getLifeGraph, updateLifeNode, type LifeNode, type LifeNodeAsset } from '@/lib/portal/life-graph';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
 import { matchNearestPlace, formatLocation, getNamedPlaces } from '@/lib/portal/named-places';
 import LocationPicker from './LocationPicker';
@@ -464,7 +465,7 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
     const savedNodes = nodesToSave.map((n, i) => {
       const origIdx = editedNodes.indexOf(n);
       const locationVal = nodeLocations[origIdx] ?? '';
-      return addLifeNode({
+      return ingestLifeNode({
         name: n.name.trim() || '未命名条目',
         type: n.type as LifeNode['type'],
         source: 'photo',

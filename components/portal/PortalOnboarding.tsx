@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { addLifeNode } from '@/lib/portal/life-graph';
+import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { t } from '@/lib/portal/i18n';
 import {
   loadProfileSettings,
@@ -370,7 +370,7 @@ export function FirstUseTips({ onDone, locale }: { onDone: () => void; locale: P
     const text = firstText.trim();
     if (!text) return;
     const name = text.slice(0, 24);
-    addLifeNode({
+    ingestLifeNode({
       name,
       type: 'object',
       source: 'manual',

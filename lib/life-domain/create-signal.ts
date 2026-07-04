@@ -1,14 +1,18 @@
 /**
  * Canonical Signal write path.
  *
- * All new real-world inputs must enter Nesio through createSignal(). Signal is
- * becoming the main fact table; LifeGraph and Memory are compatibility
- * projections during the local-first dual-write transition.
+ * All new real-world inputs must enter Nesio through createSignal() —
+ * or, for LifeNode-shaped inputs (connector/AI extraction outputs),
+ * through lib/life-domain/ingest-node.ingestLifeNode(). Signal is the
+ * main fact table (accumulating in IndexedDB, see signal-store-idb.ts);
+ * LifeGraph and Memory are compatibility projections until read paths
+ * switch over (migration M3).
  */
 
 import { addLifeNode, type LifeNode, type LifeNodeSource, type LifeNodeType } from '../portal/life-graph';
 import { lifeNodeToSignal, type RetentionPolicy, type Signal, type SignalSensitivity, type SignalSource, type SignalType } from './signal';
 import type { SignalContext } from './context';
+import { appendSignalIdb } from './signal-store-idb';
 
 export const SIGNAL_SCHEMA_VERSION = 'Signal@v1';
 export type SignalWriteMode = 'local_first' | 'cloud_mirror_attempted' | 'cloud_mirror_pending';
@@ -153,6 +157,7 @@ export function createSignal(input: CreateSignalInput): Signal {
     rawInput: input.raw,
   });
   const signal = lifeNodeToSignal(node);
+  void appendSignalIdb(signal); // M2:IDB 事实库双写(读路径未切,见 signal-store-idb.ts)
   if (signalWriteMode() === 'cloud_mirror_pending') {
     void writeCloudSignal(signal);
   }

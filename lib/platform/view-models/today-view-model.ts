@@ -1,6 +1,7 @@
 import { generateTodayCards } from '../../intelligence';
+import { ingestLifeNode } from '../../life-domain/ingest-node';
 import type { Signal } from '../../life-domain/signal';
-import { addLifeNode, getLifeGraph, getRecentNodes, updateLifeNode, type LifeNode } from '../../portal/life-graph';
+import { getLifeGraph, getRecentNodes, updateLifeNode, type LifeNode } from '../../portal/life-graph';
 import type { RecommendationCard } from '../../portal/reasoning-engine';
 import { nearestNodeDate } from '../node-dates';
 import { LEXICON } from '../keyword-lexicon';
@@ -121,7 +122,7 @@ export function markFocusNodeDone(id: string): void {
 }
 
 export function addMeetingNotes(meetingNodeId: string, meetingName: string, notes: string): void {
-  addLifeNode({
+  ingestLifeNode({
     name: `会议记录 · ${meetingName}`,
     type: 'commitment',
     tags: ['会议记录', 'meeting-notes'],
@@ -141,7 +142,7 @@ export function addMeetingNotes(meetingNodeId: string, meetingName: string, note
 }
 
 export function addCommitmentNode(name: string): FocusNode {
-  const node = addLifeNode({ name, type: 'commitment', source: 'manual', confidence: 1, tags: [], attributes: {}, relations: [] });
+  const node = ingestLifeNode({ name, type: 'commitment', source: 'manual', confidence: 1, tags: [], attributes: {}, relations: [] });
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
   }

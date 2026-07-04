@@ -8,6 +8,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { loadProfileSettings } from '@/lib/portal/profile';
 import { buildTodayViewModel, type FocusNode, type ProactiveContext } from '@/lib/platform/view-models/today-view-model';
 import { readPortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
@@ -253,7 +254,7 @@ export function useTodayData(canUsePrivateData: boolean) {
           .then((d: { ok?: boolean; nodes?: Array<Record<string, unknown>> }) => {
             if (d.ok && d.nodes && d.nodes.length > 0) {
               import('@/lib/portal/life-graph').then(({ addLifeNode }) => {
-                d.nodes!.forEach((n) => addLifeNode(n as Parameters<typeof addLifeNode>[0]));
+                d.nodes!.forEach((n) => ingestLifeNode(n as Parameters<typeof addLifeNode>[0]));
                 window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
               });
             }

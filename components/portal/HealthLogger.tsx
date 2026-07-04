@@ -8,7 +8,7 @@
  */
 
 import { useState } from 'react';
-import { addLifeNode } from '@/lib/portal/life-graph';
+import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 
 interface HealthLoggerProps { open: boolean; onClose: () => void; }
 
@@ -32,7 +32,7 @@ export default function HealthLogger({ open, onClose }: HealthLoggerProps) {
 
     if (selectedSymptoms.length > 0) {
       selectedSymptoms.forEach((symptom) => {
-        addLifeNode({
+        ingestLifeNode({
           type: 'health_state',
           name: symptom,
           attributes: { status: 'active', date: today, energy: String(energy), mood, note },
@@ -47,7 +47,7 @@ export default function HealthLogger({ open, onClose }: HealthLoggerProps) {
 
     // Sleep log
     if (sleep) {
-      addLifeNode({
+      ingestLifeNode({
         type: 'health_state',
         name: `睡眠 ${sleep}h`,
         attributes: { type: 'sleep', hours: sleep, date: today },
@@ -60,7 +60,7 @@ export default function HealthLogger({ open, onClose }: HealthLoggerProps) {
 
     // General energy/mood
     if (mood || energy !== 3) {
-      addLifeNode({
+      ingestLifeNode({
         type: 'health_state',
         name: `今日状态：${mood || '一般'}`,
         attributes: { energy: String(energy), mood, date: today },

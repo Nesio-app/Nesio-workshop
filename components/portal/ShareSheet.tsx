@@ -10,7 +10,8 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { addLifeNode, updateLifeNode, type LifeNodeAsset } from '@/lib/portal/life-graph';
+import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
+import { updateLifeNode, type LifeNodeAsset } from '@/lib/portal/life-graph';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
 
 interface ShareSheetProps { open: boolean; onClose: () => void; }
@@ -146,10 +147,10 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
   async function saveToMemory() {
     if (!parsed) return;
     const savedNodes = parsed.nodes.map((node) => (
-      addLifeNode({
+      ingestLifeNode({
         ...node,
         source: sourceFile?.type.startsWith('image/') ? 'photo' : 'manual',
-      } as Parameters<typeof addLifeNode>[0])
+      } as Parameters<typeof ingestLifeNode>[0])
     ));
     let cloudAssets: Array<LifeNodeAsset & { nodeId?: string }> = [];
     if (sourceFile && savedNodes.length > 0) {

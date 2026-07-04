@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { addLifeNode } from '@/lib/portal/life-graph';
+import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { readPortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
 import type { CalendarEvent } from '@/lib/portal/types';
 
@@ -161,7 +161,7 @@ export default function MeetingRecorder({ open, onClose }: MeetingRecorderProps)
 
   function saveNote() {
     if (!note) return;
-    addLifeNode({
+    ingestLifeNode({
       type: 'event',
       name: note.title,
       attributes: {
