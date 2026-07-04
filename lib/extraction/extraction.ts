@@ -11,9 +11,13 @@
 
 // ── Shared schema blocks ──────────────────────────────────────────────────────
 
+import { NODE_TYPES, renderAttributeSchemaLines } from '@/lib/portal/node-schema';
+
+// Generated from lib/portal/node-schema.ts — the typed single source of
+// truth — so prompt and code can't drift apart.
 export const NODE_SCHEMA_BLOCK = `Node schema (return ONLY these fields):
 {
-  "type": "person" | "object" | "place" | "event" | "commitment" | "health_state" | "preference",
+  "type": ${NODE_TYPES.map((t) => `"${t}"`).join(' | ')},
   "name": "concise Chinese name (translate if needed)",
   "attributes": { "key": "value" },  // only standard keys — no 'context' or internal fields
   "relations": [{ "targetId": "name", "relation": "relation type" }],
@@ -23,13 +27,7 @@ export const NODE_SCHEMA_BLOCK = `Node schema (return ONLY these fields):
 }
 
 Standard attribute keys by type:
-- commitment: dueDate (ISO), priority (high/medium/low), owner, recurring, done
-- event: start (ISO), end (ISO), location, url, participants
-- person: category (family/colleague/friend), lastSeen, birthday (ISO), note
-- object: location, purchaseDate, price, expiry (ISO), note
-- place: address, category (work/home/shopping/school/restaurant), note
-- health_state: healthType (medication/appointment/fitness/sleep/diet), date (ISO), value, unit
-- preference: category, note
+${renderAttributeSchemaLines()}
 
 Confidence rubric: 0.9+ = explicitly stated fact; 0.7 = clearly inferred;
 0.5 = plausible guess. Never fabricate — omit a node rather than invent fields.`;
