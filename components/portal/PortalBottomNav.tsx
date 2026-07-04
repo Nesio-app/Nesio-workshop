@@ -77,13 +77,9 @@ export default function PortalBottomNav({
         onPointerCancel={cancelPress}
         onContextMenu={(e) => e.preventDefault()}
       >
-        <img
-          src="/icons/treasurebox-pwa-192.png"
-          alt=""
-          className="nesio-bottom-nav-center-icon"
-          aria-hidden
-          draggable={false}
-        />
+        {/* 批次 13:白底 PWA PNG 换成无底色矢量 logo,昼夜双资产 */}
+        <img src="/assets/logo/nesio-mark.svg" alt="" className="nesio-bottom-nav-center-icon nesio-logo-day" aria-hidden draggable={false} />
+        <img src="/assets/logo/nesio-mark-night.svg" alt="" className="nesio-bottom-nav-center-icon nesio-logo-night" aria-hidden draggable={false} />
       </button>
 
       {/* Memory */}

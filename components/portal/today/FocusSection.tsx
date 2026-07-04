@@ -44,7 +44,6 @@ function CollapsedTaskItem({
   const [expanded, setExpanded] = useState(false);
   const isDone = doneIds.has(node.id);
   const isMeeting = isMeetingNode(node);
-  const typeIcon = isMeeting ? <IconCalendar size={15} /> : (FOCUS_TYPE_ICON[node.type] || <IconNote size={15} />);
   const hint = focusTimeHint(node, portalLocaleToDictionaryLocale(locale));
 
   return (
@@ -57,7 +56,7 @@ function CollapsedTaskItem({
           aria-label={t(locale, 'todayDoneAria')}
         />
         <button type="button" className="nesio-collapsed-task-body" onClick={() => { setExpanded((v) => !v); touchNode(node.id); }}>
-          <span className="nesio-collapsed-icon">{typeIcon}</span>
+          {/* 批次 13:类型小图标(旗子等)按用户要求移除,行内只留标题 */}
           <span className="nesio-collapsed-title">{node.name}</span>
           {hint && <span className="nesio-collapsed-time">{hint}</span>}
         </button>
@@ -169,7 +168,6 @@ export function TodayFocusSection({
       {isEmpty ? (
         <div className="nesio-focus-empty">
           <p>{t(locale, 'todayFocusEmpty')}</p>
-          <p className="nesio-focus-empty-hint">{t(locale, 'todayFocusEmptyHint')}</p>
         </div>
       ) : (
         <div className="nesio-attention-layout">

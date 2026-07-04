@@ -333,8 +333,8 @@ export default function DailyBriefCard({
         type="button"
         className={`nesio-header-mini-btn${isPlaying ? ' nesio-header-mini-btn--active' : ''}`}
         onClick={handlePlay}
-        aria-label={L(dict, '听简报', 'Play brief')}
-        title={L(dict, '听简报', 'Daily brief')}
+        aria-label={playState === 'error' && errorMsg ? errorMsg : L(dict, '听简报', 'Play brief')}
+        title={playState === 'error' && errorMsg ? errorMsg : L(dict, '听简报', 'Daily brief')}
         disabled={isLoading}
       >
         {icon}

@@ -70,7 +70,11 @@ export default function TodayFeed({
 
 
   const uiLocale = portalLocaleToDictionaryLocale(usePortalLocale());
-  const initials = canUsePrivateData ? (displayName.trim().slice(0, 1) || L(uiLocale, '我', 'Me')) : L(uiLocale, '我', 'Me');
+  // 批次 13:profile store 的缺省名是 zh「我」,英文界面下按语言回落 Me
+  const trimmedName = displayName.trim();
+  const initials = canUsePrivateData && trimmedName && trimmedName !== '我'
+    ? trimmedName.slice(0, 1)
+    : L(uiLocale, '我', 'Me');
   const { shouldShow: showWrapped, dismiss: dismissWrapped } = useWrappedTrigger();
 
   // 头像统一走 useProfileAvatar(批次 11:签名 URL 过期自动换新,修「头像丢失」)

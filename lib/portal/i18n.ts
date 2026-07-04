@@ -1295,7 +1295,7 @@ const STRINGS = {
     automationExternalAuthStatus: 'Off',
     automationExternalAuthDetail: 'Payment or connection does not mean safe execution; external authorization and automation still require CEO Gate.',
     /* ── Today surface (REG-004) ── */
-    todayFocusTitle: "Today's focus",
+    todayFocusTitle: 'Focus',
     todayFocusAll: 'All ›',
     todayFocusEmpty: 'Nothing in focus today',
     todayFocusEmptyHint: 'Say something with a time ("meeting on Friday") and it will show up here.',

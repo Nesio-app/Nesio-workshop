@@ -716,6 +716,8 @@ function LivingModelTab({
   const [expandedLayer, setExpandedLayer] = useState<LivingModelLayerId | null>('identity');
   const [selectedPerspective, setSelectedPerspective] = useState<Perspective | null>(null);
   const [showPerspectiveSheet, setShowPerspectiveSheet] = useState(false);
+  // 批次 13:空态下七个维度折叠可展开(用户:「是折叠不是消失,想让人知道有什么」)
+  const [dimsOpen, setDimsOpen] = useState(false);
 
   if (loading) {
     return (
@@ -745,13 +747,34 @@ function LivingModelTab({
               : L(dict, `已记录 ${nodeCount} / 10 条，记满后 Nesio 开始推断。`, `${nodeCount} / 10 notes — Nesio starts inferring at 10.`)}
           </p>
           <p className="nesio-lm-empty-hint">
-            {L(dict, '7 个维度：身份认同 · 驱动力 · 原则 · 模式 · 盲区 · 演化 · 预测。每条结论都带证据和置信度，可校正。', '7 layers: identity · drive · principles · patterns · blind spots · evolution · prediction — evidence-backed, confidence-scored, correctable.')}
+            {L(dict, '每条结论都带证据和置信度，可校正。', 'Every conclusion is evidence-backed, confidence-scored, correctable.')}
           </p>
           {enough && (
             <button type="button" className="nesio-lm-perspective-btn" style={{ marginTop: '0.6rem' }} onClick={() => onRefresh()}>
               {L(dict, '生成模型', 'Build model')}
             </button>
           )}
+        </div>
+        {/* 七个维度:折叠组,展开可看每一层是什么 */}
+        <div className="nesio-lm-layers-menu" style={{ marginTop: '0.75rem' }}>
+          <div className="nesio-lm-layer">
+            <button type="button" className="nesio-lm-layer-header" onClick={() => setDimsOpen((v) => !v)} aria-expanded={dimsOpen}>
+              <span className="nesio-lm-layer-label">{L(dict, '7 个维度', '7 layers')}</span>
+              <span className="nesio-lm-layer-empty-badge">{L(dict, '积累中', 'Gathering')}</span>
+              <span className="nesio-lm-layer-chevron">{dimsOpen ? '▴' : '▾'}</span>
+            </button>
+            {dimsOpen && (
+              <div className="nesio-lm-layer-body">
+                {layerIds.map((id) => (
+                  <div key={id} className="nesio-lm-insight" style={{ padding: '0.4rem 0' }}>
+                    <p className="nesio-lm-insight-content" style={{ margin: 0 }}>
+                      {L(dict, LAYER_META[id].label, LAYER_META[id].labelEn)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );

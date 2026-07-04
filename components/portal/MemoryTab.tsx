@@ -219,7 +219,7 @@ const PROJECT_EMOJIS = ['📁', '🏠', '✈️', '🎯', '📚', '💪', '🎂'
 
 const COPY = {
   zh: {
-    searchPlaceholder: '问宝盒：娃娃在哪、上次买的药…',
+    searchPlaceholder: '搜记忆：护照、钥匙、上次买的药…',
     searchAria: '搜索记忆',
     clear: '清除',
     heroTitle: '散落的线索，回头找得到。',
@@ -243,7 +243,7 @@ const COPY = {
     createProjectCancel: '取消',
   },
   en: {
-    searchPlaceholder: 'Ask Nesio: doll, medicine...',
+    searchPlaceholder: 'Search memory: passport, keys, meds…',
     searchAria: 'Search memory',
     clear: 'Clear',
     heroTitle: 'Scattered clues, easy to find later.',
@@ -422,21 +422,19 @@ function NarratorCardView({ card, onOpen }: { card: NarratorCard; onOpen: (n: Li
     activity: 'var(--status-go)',
   };
   const accent = colorMap[card.type] ?? 'var(--portal-accent)';
+  // 批次 13:整卡可点直接进详情,去掉「查看详情」文字,卡片做正方形
+  void dict;
   return (
-    <div className={`nesio-narrator-card nesio-narrator-card--${card.type}`} style={{ '--narrator-accent': accent } as React.CSSProperties}>
+    <button
+      type="button"
+      className={`nesio-narrator-card nesio-narrator-card--${card.type}`}
+      style={{ '--narrator-accent': accent } as React.CSSProperties}
+      onClick={() => { if (card.nodes.length > 0) onOpen(card.nodes[0]); }}
+    >
       <div className="nesio-narrator-title">{card.title}</div>
       <div className="nesio-narrator-body">{card.body.replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu, '')}</div>
       {card.sub && <div className="nesio-narrator-sub">{card.sub}</div>}
-      {card.nodes.length > 0 && (
-        <button
-          type="button"
-          className="nesio-narrator-link"
-          onClick={() => onOpen(card.nodes[0])}
-        >
-          {L(dict, '查看详情', 'Details')} →
-        </button>
-      )}
-    </div>
+    </button>
   );
 }
 
@@ -556,7 +554,8 @@ function MemoryCard({ node, onOpen, onDeleted, onLongPress }: { node: LifeNode; 
             <NodeTypeIcon type={node.type} size={13} />
           </span>
         )}
-        {domain ? (
+        {/* 批次 13:类型图标与领域图标相同(health_state/health 都是心形)时只留一个 */}
+        {domain && !(node.type === 'health_state' && domain === 'health') ? (
           <span className="nesio-memory-card-icon" title={DOMAINS[domain].label} style={{ background: 'var(--chip-blue)' }}>
             <DomainIcon domain={domain} size={13} />
           </span>

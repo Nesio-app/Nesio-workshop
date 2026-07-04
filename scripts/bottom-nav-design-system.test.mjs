@@ -19,11 +19,18 @@ function assertEqual(actual, expected, message) {
 }
 
 // 导航已重设计为三键(Today / 中央记录 / Memory):图标为内联描边 SVG
-// (design-system 线性图标语言)+ 品牌 PWA 中键;mask 图标系统随旧宫格退役。
+// (design-system 线性图标语言)+ 品牌矢量中键。
+// 批次 13:中键从带白底方块的 PWA PNG 换成无底色矢量 logo(昼夜双资产),
+// 守住:必须是品牌 mark 资产,不是临时字符或白底位图。
 assert(
   component.includes('nesio-bottom-nav-icon') &&
-    component.includes('/icons/treasurebox-pwa-192.png'),
-  'PortalBottomNav must render design-system stroke icons and the brand center icon.',
+    component.includes('/assets/logo/nesio-mark.svg') &&
+    component.includes('/assets/logo/nesio-mark-night.svg'),
+  'PortalBottomNav must render design-system stroke icons and the brand vector center marks.',
+);
+assert(
+  !component.includes('/icons/treasurebox-pwa-192.png'),
+  'Center nav icon must not regress to the white-tile PWA PNG (batch-13 decision).',
 );
 
 assert(

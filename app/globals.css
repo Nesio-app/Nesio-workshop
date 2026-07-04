@@ -15691,6 +15691,8 @@ html[data-portal-theme="night"] .portal-decompose-step {
   align-items: flex-start;
   gap: 0.75rem;
   padding: 0.85rem 1rem;
+  /* 批次 13:✕ 绝对定位后,文字列占满卡宽,右侧不再留大片空白 */
+  position: relative;
 }
 .nesio-proactive-card-icon {
   font-size: 1.5rem;
@@ -15729,7 +15731,10 @@ html[data-portal-theme="night"] .portal-decompose-step {
   font-weight: 500;
 }
 .nesio-proactive-card-dismiss {
-  flex-shrink: 0;
+  /* 批次 13:从 flex 列改为绝对定位,文字不再被挤出右侧大空白 */
+  position: absolute;
+  top: 0.55rem;
+  right: 0.6rem;
   background: none;
   border: none;
   color: var(--portal-muted);
@@ -15739,8 +15744,8 @@ html[data-portal-theme="night"] .portal-decompose-step {
   opacity: 0.6;
   border-radius: 6px;
   line-height: 1;
-  align-self: flex-start;
 }
+.nesio-proactive-card-text { padding-right: 1.4rem; }
 .nesio-proactive-card-dismiss:hover { opacity: 1; background: rgba(0,0,0,.05); }
 
 .nesio-proactive-card-actions {
@@ -17507,6 +17512,13 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
   flex-direction: column;
   gap: 0.22rem;
   min-width: 0;
+  /* 批次 13:与 Memory 记录卡一致的正方形;整卡是按钮,点击进详情 */
+  aspect-ratio: 1;
+  overflow: hidden;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
 }
 .nesio-narrator-card .nesio-narrator-body {
   display: -webkit-box;
@@ -18033,7 +18045,8 @@ html[data-portal-theme="night"] .nesio-create-project-input {
   width: 100%;
   max-width: 480px;
   max-height: 80vh;
-  background: var(--glass-bg-solid);
+  /* 批次 13:玻璃底在夜间近乎全透,视角面板文字和底层内容严重重影 → 全不透明 */
+  background: var(--sheet-opaque, #fdfeff);
   border-radius: 20px 20px 0 0;
   padding: 1.25rem 1.25rem 0;
   overflow-y: auto;
