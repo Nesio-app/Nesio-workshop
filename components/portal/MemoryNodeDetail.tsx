@@ -90,7 +90,7 @@ function safeExternalUrl(url: string): string {
   return `https://${url}`;
 }
 
-const HIDDEN_ATTR_KEYS = new Set([
+const HIDDEN_ATTRIBUTE_KEYS = new Set([
   // Internal / calendar
   'calendarId', 'calendarName', 'description', 'emailId', 'messageId', 'htmlLink',
   // System / task internals
@@ -107,6 +107,10 @@ const HIDDEN_ATTR_KEYS = new Set([
   'start', 'end', 'date', 'dueDate', 'deadline',
   'priority', 'owner', 'recurring', 'participants',
   'url', 'healthType', 'unit', 'value', 'receiptDate',
+  // Moment capture internals (emotion shown via its own section, not raw keys)
+  'emotion', 'emotionLabel', 'emotionEmoji', 'emotionQuadrant',
+  'energyValue', 'energyLevel', 'recordedAt', 'hourOfDay',
+  'isWorkHours', 'isEvening', 'isMorning', 'isJournal', 'journalText',
 ]);
 
 function InfoRow({ label, value, link }: { label: string; value: string; link?: string }) {
@@ -604,7 +608,7 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
 
   // Remaining attributes not shown in type-specific sections
   const shownAttrs = Object.entries(n.attributes).filter(
-    ([k, v]) => v !== null && v !== '' && !HIDDEN_ATTR_KEYS.has(k),
+    ([k, v]) => v !== null && v !== '' && !HIDDEN_ATTRIBUTE_KEYS.has(k),
   );
   const showRawInput = Boolean(n.rawInput && n.source !== 'calendar' && n.source !== 'email');
   const typeBg = TYPE_BG_DETAIL[n.type] || '#f0f4ff';

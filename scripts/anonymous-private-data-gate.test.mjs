@@ -94,10 +94,12 @@ for (const [name, source] of [
     `${name} must support a signed-out empty/demo state instead of reading the Life Graph unconditionally.`,
   );
 }
+// Calendar reads live behind lib/portal/environment.getCachedCalendarEvents()
+// since the environment-layer refactor; the gate must still come first.
 assertBefore(
   dailyBrief,
   'if (canUsePrivateData)',
-  'readPortalCache<{ events?: CalendarEvent[] }>(PORTAL_CACHE_KEYS.calendar)',
+  'getCachedCalendarEvents()',
   'DailyBriefCard must check the private-data gate before reading cached calendar events.',
 );
 assert.match(

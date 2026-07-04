@@ -140,8 +140,12 @@ export async function getIntegrationToken(
     }
   }
 
-  if (!allowCookieIntegrationFallback()) return null;
-  return readTokensFromCookies(provider);
+  // Positive-form gate — the anonymous-private-data-gate contract asserts
+  // cookie fallback only happens inside this explicit escape hatch.
+  if (allowCookieIntegrationFallback()) {
+    return readTokensFromCookies(provider);
+  }
+  return null;
 }
 
 /**

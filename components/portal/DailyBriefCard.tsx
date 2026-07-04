@@ -73,13 +73,19 @@ export default function DailyBriefCard({
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   useEffect(() => {
-    if (!canUsePrivateData) { setDisplayName(''); setCachedScript(''); return; }
-    setDisplayName(loadProfileSettings().displayName || '');
-    void refreshLocation(); // warm the location cache for the brief
-    try {
-      const cached = JSON.parse(localStorage.getItem(BRIEF_CACHE_KEY) || 'null') as BriefCache | null;
-      if (cached?.date === todayKey() && cached.script) setCachedScript(cached.script);
-    } catch { /* ignore */ }
+    // Positive-form gate — anonymous-private-data-gate contract requires
+    // private reads to live inside the explicit signed-in branch.
+    if (canUsePrivateData) {
+      setDisplayName(loadProfileSettings().displayName || '');
+      void refreshLocation(); // warm the location cache for the brief
+      try {
+        const cached = JSON.parse(localStorage.getItem(BRIEF_CACHE_KEY) || 'null') as BriefCache | null;
+        if (cached?.date === todayKey() && cached.script) setCachedScript(cached.script);
+      } catch { /* ignore */ }
+    } else {
+      setDisplayName('');
+      setCachedScript('');
+    }
   }, [canUsePrivateData]);
 
   function stopAll() {
