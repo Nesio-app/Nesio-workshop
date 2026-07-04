@@ -44,6 +44,7 @@ const label: React.CSSProperties = { fontSize: '0.7rem', color: 'var(--portal-mu
 const big: React.CSSProperties = { fontSize: '1.7rem', fontWeight: 700, color: 'var(--portal-ink)' };
 const chip = (active: boolean): React.CSSProperties => ({
   padding: '0.3rem 0.75rem', borderRadius: 'var(--radius-pill)', fontSize: '0.75rem', cursor: 'pointer',
+  whiteSpace: 'nowrap',
   border: `1px solid ${active ? 'var(--portal-accent)' : 'var(--glass-border)'}`,
   background: active ? 'var(--portal-accent-soft-md)' : 'var(--glass-bg-solid)',
   color: active ? 'var(--portal-accent)' : 'var(--portal-muted)',
@@ -130,7 +131,7 @@ export default function AdminPage() {
     <main style={{ maxWidth: 880, margin: '0 auto', padding: '1.2rem 1rem 4rem', fontFamily: 'var(--font-sans)' }}>
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.6rem', marginBottom: '1rem' }}>
         <h1 style={{ fontSize: 'var(--text-h2)', color: 'var(--portal-ink)', margin: 0 }}>Nesio 数据面板</h1>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
           {RANGES.map((r) => (
             <button key={r} type="button" style={chip(range === r)} onClick={() => setRange(r)}>{r} 天</button>
           ))}
@@ -259,7 +260,8 @@ export default function AdminPage() {
               {(data.ai?.routes.length ?? 0) === 0
                 ? <p style={label}>暂无 AI 调用记录 — 服务端落库 2026-07-04 接通,用一次听简报/问一问就有了。</p>
                 : (
-                  <div>
+                  <div style={{ overflowX: 'auto' }}>
+                    <div style={{ minWidth: 420 }}>
                     <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 0.7fr 0.7fr 0.8fr 0.7fr', fontSize: '0.68rem', color: 'var(--portal-muted)', padding: '0 0 0.3rem' }}>
                       <span>路由</span><span>次数</span><span>成功</span><span>延迟</span><span>估算</span>
                     </div>
@@ -272,6 +274,7 @@ export default function AdminPage() {
                         <span>${r.estCostUsd}</span>
                       </div>
                     ))}
+                    </div>
                   </div>
                 )}
             </div>

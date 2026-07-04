@@ -87,13 +87,13 @@ export default function RoadmapSheet({ open, onClose }: { open: boolean; onClose
                   )}
                 </div>
                 <p style={{ margin: '0.2rem 0 0.45rem', fontSize: '0.76rem', color: 'var(--portal-muted)', lineHeight: 1.5 }}>{item.description}</p>
-                <div style={{ display: 'flex', gap: '0.3rem' }} role="radiogroup" aria-label={`给 ${item.title} 打分`}>
+                <div style={{ display: 'flex', gap: 0, marginLeft: '-0.6rem' }} role="radiogroup" aria-label={`给 ${item.title} 打分`}>
                   {[1, 2, 3, 4, 5].map((s) => {
                     const active = (v?.mine ?? 0) >= s;
                     return (
                       <button key={s} type="button" role="radio" aria-checked={v?.mine === s}
                         onClick={() => void vote(item.id, s)} disabled={savingId === item.id}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.15rem', padding: '0.1rem', color: active ? 'var(--status-gentle)' : 'var(--portal-line)', transition: 'color 0.15s' }}>
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.35rem', minWidth: 'var(--tap-min)', minHeight: 'var(--tap-min)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: active ? 'var(--status-gentle)' : 'var(--portal-line)', transition: 'color 0.15s' }}>
                         ★
                       </button>
                     );
