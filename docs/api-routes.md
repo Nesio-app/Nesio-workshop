@@ -62,6 +62,7 @@ Auth legend:
 | Route | Auth |
 |---|---|
 | POST /api/telemetry | anonymous-by-design (same-origin + 60/min) — event names/props whitelisted & truncated; 匿名设备级计数,QA P1 修复 2026-07-04 |
+| GET /api/admin/metrics | same-origin + NESIO_ADMIN_SECRET header + 30/min — 管理面板聚合只读(telemetry_events/product_events),只回统计不回原始行 |
 
 ## Known-open routes
 

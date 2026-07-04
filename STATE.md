@@ -88,6 +88,14 @@ Signal M1-M4(读切换 + 删除传导)、REG-004/006 i18n 闭环
 - **guidance vs DEC**:guidance-engine 是渲染管线(7 层仲裁),DEC 卡
   经 decCardsToGuidanceEvents 作为一个来源汇入它。
 
+## 数据面板
+
+- `/admin` — 自有管理面板(不依赖第三方):事件趋势/独立设备/漏斗/今日卡反馈,
+  数据源 = 自己 Supabase 的 telemetry_events + product_events,服务端聚合只回统计。
+- 生产激活两步:① Vercel 环境变量加 `NESIO_ADMIN_SECRET`(自定强密码);
+  ② Supabase SQL Editor 执行一次 database/schema/supabase-backend-v1-bundle.sql
+  (2026-07-04 起含 telemetry_events 表——此前该表缺失,遥测落库一直静默失败)。
+
 ## 模式速查
 
 - Lab 模式:URL `?baohePersonal=1` 进入,`?baohePublic=1` 退出;viewerRole
