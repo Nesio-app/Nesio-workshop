@@ -201,7 +201,6 @@ export async function POST(req: NextRequest) {
     : '';
   const systemInstruction = `${buildSystemPersonality(coachStyle)}\n\n${systemContext}${fileSection}`;
 
-  console.log('[chat] keys_present:', { anthropic: !!anthropicKey, gemini: !!geminiKey });
   try {
     const result = anthropicKey
       ? await callClaude(anthropicKey, message, history, systemInstruction)
