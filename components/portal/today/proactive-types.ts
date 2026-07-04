@@ -4,6 +4,7 @@
  */
 
 import type { EvidenceRef } from '@/lib/portal/reasoning-engine';
+import type { RecommendationCard } from '@/lib/portal/reasoning-engine';
 
 export interface ProactiveAction {
   label: string;
@@ -78,3 +79,19 @@ export function isProactiveCardDismissed(cardId: string): boolean {
   } catch { return false; }
 }
 
+// ── DEC 卡登记表(反馈环回写用)─────────────────────────────────────────────
+// Today 渲染的是 GuidanceCard 投影,evidenceSignalIds 等字段不进渲染层。
+// 反馈(TODAY-004)要写回 signal 反馈环(recordSignalFeedback)需要完整
+// RecommendationCard——管线每轮登记,反馈时按 guidance 卡 id 取回,
+// evidenceSignalIds 随完整卡保全(契约 todayCardsRequireEvidenceSignalIds)。
+
+const decCardRegistry = new Map<string, RecommendationCard>();
+
+export function registerDecCards(cards: readonly RecommendationCard[]): void {
+  decCardRegistry.clear();
+  for (const card of cards) decCardRegistry.set(`guidance-dec-${card.id}`, card);
+}
+
+export function getRegisteredDecCard(guidanceCardId: string): RecommendationCard | undefined {
+  return decCardRegistry.get(guidanceCardId);
+}

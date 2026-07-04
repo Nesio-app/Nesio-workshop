@@ -1,4 +1,15 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+
+// 自供给:契约不依赖机器上未版本化的本地 sqlite。
+// dec-data-api 每次调用时解析 BAOHE_DB_PATH,先建临时库再触发读取。
+const decMetricsDbDir = mkdtempSync(path.join(tmpdir(), 'dec-metrics-'));
+process.env.BAOHE_DB_PATH = path.join(decMetricsDbDir, 'treasurebox-local.db');
+execFileSync('node', ['scripts/db-local.mjs', 'migrate'], { env: process.env, stdio: 'ignore' });
+execFileSync('node', ['scripts/db-local.mjs', 'seed-demo'], { env: process.env, stdio: 'ignore' });
 
 import {
   getDecArtifactsPayload,

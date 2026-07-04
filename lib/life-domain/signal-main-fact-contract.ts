@@ -9,14 +9,29 @@ export type SignalFactPlanePhase =
 export function buildSignalMainFactContract() {
   return {
     version: SIGNAL_MAIN_FACT_CONTRACT_VERSION,
-    currentPhase: 'signal_read_preferred' satisfies SignalFactPlanePhase,
+    currentPhase: 'signal_source_of_truth' satisfies SignalFactPlanePhase,
     targetPhase: 'signal_source_of_truth' satisfies SignalFactPlanePhase,
-    sourceOfTruth: {
-      current: {
+    // CEO Gate:sourceOfTruthCutover 于 2026-07-04 由 CEO 会话决策批准。
+    // 实现:signal-read-cache.ts(事实库独立 + 显式删除传导 + 投影重建)。
+    ceoGate: {
+      sourceOfTruthCutoverApprovedAt: '2026-07-04',
+      approvedVia: 'ceo_session_decision',
+    },
+    phaseHistory: [
+      {
+        phase: 'signal_read_preferred' satisfies SignalFactPlanePhase,
+        until: '2026-07-04',
         signals: 'primary_cloud_fact_candidate_with_projection_fallback',
         memoryNodes: 'compat_projection_during_dual_write',
         lifeGraph: 'compat_projection_during_dual_write',
-        inventoryItems: 'domain_private_table_with_signal_mirror',
+      },
+    ],
+    sourceOfTruth: {
+      current: {
+        signals: 'main_fact_table',
+        memoryNodes: 'projection_view',
+        lifeGraph: 'projection_view',
+        inventoryItems: 'domain_private_table_that_references_or_emits_signals',
       },
       target: {
         signals: 'main_fact_table',
@@ -28,12 +43,12 @@ export function buildSignalMainFactContract() {
     writePolicy: {
       requiredFlow: 'normalize -> createSignal -> projection',
       dualWriteAllowedDuringTransition: true,
-      directProjectionWriteAllowedDuringTransition: true,
+      directProjectionWriteAllowedDuringTransition: false,
       directProjectionWriteTargetState: false,
       productionMigrationRequiresCeoGate: true,
     },
     readPolicy: {
-      currentPriority: ['cloud_signals', 'local_signal_cache', 'local_projection', 'memory_nodes', 'life_graph'],
+      currentPriority: ['cloud_signals', 'local_signal_cache', 'projection_fallback'],
       targetPriority: ['cloud_signals', 'local_signal_cache', 'projection_fallback'],
       todayCardsRequireEvidenceSignalIds: true,
       askBaoheShouldSearchSignals: true,

@@ -103,6 +103,8 @@ const PRODUCT_BACKEND_SURFACE_SPECS = [
     label: 'Cloud assets',
     routeFile: 'app/api/cloud/assets/route.ts',
     clientFile: 'lib/portal/app-api-client.ts',
+    // 存储签名(/storage/v1/object/sign)在共享服务端运行时里,route 委托调用
+    runtimeFile: 'lib/portal/cloud-server-runtime.ts',
     schemaTables: ['storage.objects'],
     postgresBacked: false,
     storageBacked: true,
@@ -251,7 +253,8 @@ function productBackendSurfacesReport() {
   const surfaces = PRODUCT_BACKEND_SURFACE_SPECS.map((spec) => {
     const routeSource = readSourceFile(spec.routeFile);
     const clientSource = spec.clientFile ? readSourceFile(spec.clientFile) : '';
-    const combinedSource = `${routeSource}\n${clientSource}`;
+    const runtimeSource = spec.runtimeFile ? readSourceFile(spec.runtimeFile) : '';
+    const combinedSource = `${routeSource}\n${clientSource}\n${runtimeSource}`;
     const missingMarkers = spec.requiredMarkers.filter((marker) => !combinedSource.includes(marker));
     const routeExists = Boolean(routeSource);
     const clientExists = spec.clientFile ? Boolean(clientSource) : true;

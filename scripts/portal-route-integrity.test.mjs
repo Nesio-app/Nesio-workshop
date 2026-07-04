@@ -40,10 +40,17 @@ assert.deepEqual(
   'Secretary must not be exposed by public Vercel rewrites; middleware/lab gate owns this route.',
 );
 
+// 9099b06(2026-06-28 隐私 QA 阻断)收紧:无门的扩展名直通会把 gated 的
+// secretary 页面泄露给公众,已移除。静态资源只在 lab gate 内放行。
 assert.match(
   middleware,
+  /isSecretaryPageRequestAllowed\(request\)[\s\S]*NextResponse\.next\(\)/,
+  'Secretary static assets must only pass through inside the lab gate (isSecretaryPageRequestAllowed).',
+);
+assert.doesNotMatch(
+  middleware,
   /\?:html\|css\|js\|json\|svg\|png\|jpg\|jpeg\|webp\|ico/,
-  'Secretary middleware must allow rewritten static HTML and assets through after extensionless route rewrites.',
+  'Ungated extension-based bypass must stay removed (launch privacy QA blocker, commit 9099b06).',
 );
 
 for (const route of [

@@ -3,12 +3,10 @@ import { join } from 'node:path';
 
 const root = process.cwd();
 const aiFriendsPath = join(root, 'components', 'portal', 'PortalAiFriendsPreview.tsx');
-const accountSettingsPath = join(root, 'components', 'portal', 'AccountSettings.tsx');
 const i18nPath = join(root, 'lib', 'portal', 'i18n.ts');
 const packagePath = join(root, 'package.json');
 
 const aiFriends = readFileSync(aiFriendsPath, 'utf8');
-const accountSettings = readFileSync(accountSettingsPath, 'utf8');
 const i18n = readFileSync(i18nPath, 'utf8');
 const pkg = JSON.parse(readFileSync(packagePath, 'utf8'));
 
@@ -44,14 +42,11 @@ for (const forbidden of [
   assert(!aiFriends.includes(forbidden), `PortalAiFriendsPreview still contains hard-coded feedback: ${forbidden}`);
 }
 
+// 旧代 AccountSettings.tsx 已删(2026-07 契约迁移);provider 反馈翻译
+// 意图由活表面 PortalAiFriendsPreview 承载(上方断言),模板键在字典中钉住。
 assert(
-  !accountSettings.includes('${provider.label} 暂不可用：${reason}'),
-  'AccountSettings provider unavailable feedback must be translated.',
-);
-
-assert(
-  accountSettings.includes("t(locale, 'providerUnavailableTemplate'"),
-  'AccountSettings must use providerUnavailableTemplate for provider action feedback.',
+  aiFriends.includes("t(locale, 'providerUnavailableTemplate'"),
+  'Living provider surface must use providerUnavailableTemplate for provider action feedback.',
 );
 
 assert(

@@ -718,7 +718,13 @@ export function prunePrivateExternalNodes(): number {
   const nodes = loadAll();
   const filtered = nodes.filter((node) => !isPrivateExternalNode(node));
   const removed = nodes.length - filtered.length;
-  if (removed > 0) saveAll(filtered);
+  if (removed > 0) {
+    const pruned = nodes.filter((node) => isPrivateExternalNode(node));
+    saveAll(filtered);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('nesio-life-node-deleted', { detail: { nodes: pruned } }));
+    }
+  }
   return removed;
 }
 
@@ -750,11 +756,27 @@ export function updateLifeNode(id: string, patch: Partial<LifeNode>): boolean {
   return true;
 }
 
+/**
+ * 投影整体重建 — 仅供 Signal 事实库恢复路径调用
+ * (lib/life-domain/signal-read-cache.rebuildLifeGraphFromSignals)。
+ * Cutover(2026-07-04)后 Signal 是权威源,LifeGraph 是可重建的派生视图;
+ * 这个函数是该关系的证明。组件层禁止直接调用。
+ */
+export function replaceLifeGraphProjection(nodes: LifeNode[]): void {
+  saveAll(nodes);
+}
+
 export function deleteLifeNode(id: string): boolean {
   const nodes = loadAll();
+  const deleted = nodes.find((n) => n.id === id);
   const filtered = nodes.filter((n) => n.id !== id);
   if (filtered.length === nodes.length) return false;
   saveAll(filtered);
+  // Cutover(2026-07-04):删除意图显式广播——本地事实库(signal-read-cache)
+  // 据此删对应 Signal。事实库独立后不能再用「不在投影=删」推断。
+  if (deleted && typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('nesio-life-node-deleted', { detail: { nodes: [deleted] } }));
+  }
   void syncLifeGraphDeleteToCloud(id);
   return true;
 }

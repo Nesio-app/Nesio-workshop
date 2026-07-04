@@ -7,7 +7,9 @@
 
 import { useState } from 'react';
 import { recordCardFeedback } from '@/lib/portal/reasoning-engine';
-import { snoozeOverdue, type ProactiveAction, type ProactiveCardData } from './proactive-types';
+import { recordSignalFeedback } from '@/lib/life-domain/signal-feedback';
+import { createAppApiClient } from '@/lib/portal/app-api-client';
+import { getRegisteredDecCard, snoozeOverdue, type ProactiveAction, type ProactiveCardData } from './proactive-types';
 import { t } from '@/lib/portal/i18n';
 import { usePortalLocale } from '../use-portal-locale';
 
@@ -36,9 +38,21 @@ export function ProactiveGuidanceCard({
     }
   }
 
-  // TODAY-004 反馈闭环:写回 feedback store(DEC 下轮据此过滤),温和确认后收起
+  // TODAY-004 反馈闭环:写回 feedback store(DEC 下轮据此过滤)+ signal
+  // 反馈环(recordSignalFeedback:本地记录 + 反馈 Signal + 云回写,
+  // evidenceSignalIds 随完整卡保全),温和确认后收起
   function handleFeedback(feedback: 'useful' | 'wrong' | 'too_much') {
+    const decCard = getRegisteredDecCard(card.id);
+    if (decCard) recordSignalFeedback(decCard, feedback);
     recordCardFeedback(card.id.replace(/^guidance-dec-/, ''), feedback);
+    // 云端产品事件(best-effort):反馈进 telemetry 面,供 DEC 质量回看
+    void createAppApiClient().recordCloudProductEvent({
+      eventType: 'today.card.feedback',
+      source: 'today',
+      targetType: card.cardType || 'guidance_card',
+      targetId: card.id,
+      feedback,
+    }).catch(() => {});
     setFeedbackGiven(true);
     setTimeout(onDismiss, 600);
   }

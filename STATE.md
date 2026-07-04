@@ -14,18 +14,21 @@
 | 首页 | DashboardHome(已删) | TodayFeed + today/ | ✅ 完成:契约已迁移,i18n 已接 t() 字典(REG-004) |
 | 设置 | AccountSettings | NesioProfileCard + SettingsSheets | 已切换;主题/语言入口曾断链(已修) |
 | 推荐卡 | DEC(lib/intelligence) | guidance-engine(lib/platform) | **已接线(2026-07-04)**:DEC 卡经 decCardsToGuidanceEvents 汇入 guidance 管线,证据+反馈随卡 |
-| 数据模型 | LifeGraph(localStorage) | Signal 主事实表 | ✅ 读优先切换(signal_read_preferred):getSignals 读 IDB 水合缓存,投影兜底;cutover 需 CEO Gate |
+| 数据模型 | LifeGraph(localStorage) | Signal 主事实表 | ✅ **cutover 完成(signal_source_of_truth)**:IDB 是权威源,LifeGraph 是可重建投影 |
 | 工具入口 | 11 工具宫格 | 统一入口 + 五域 | 工具由 bundle-toolbox.mjs 构建时拷入 public/ |
 
 ## 进行中的迁移
 
 1. **Signal 主事实表**:两扇合法写入门 — `createSignal()`(Signal 形态)与
    `ingestLifeNode()`(LifeNode 形态,lib/life-domain/ingest-node.ts)。
-   - M1 堵旁路 ✅ M2 IDB 信号库 ✅ M3 读切换 ✅ M4 投影降级基础 ✅(全部 2026-07-04)
-   - M3/M4 实现:signal-read-cache.ts 启动水合(全量回填 + 删除传导),
-     getSignals() 优先读事实缓存、投影兜底;LifeGraph 变更事件同步刷新缓存
-   - **剩余(需 CEO Gate,见 signal-main-fact-contract)**:source_of_truth
-     cutover(事实库独立于投影保留数据)+ 投影退役
+   - M1-M4 ✅ + **source_of_truth cutover ✅(CEO Gate 2026-07-04 批准)**
+   - 实现:signal-read-cache.ts — IDB 事实库独立(不再镜像式对账),
+     删除是显式意图(life-graph 广播 'nesio-life-node-deleted' 携带节点,
+     缓存/IDB 删对应 Signal);投影可整体重建(rebuildLifeGraphFromSignals
+     ← signalToLifeNode 逆向适配器,payload.nodeType/nodeSource 保真字段)
+   - 契约相位:signal_source_of_truth(signal-main-fact-contract.ceoGate 记录);
+     localStorage LifeGraph 保留为兼容投影(noDestructiveProjectionCleanup)
+   - 问一问(ask)候选集接入 signal 语义搜索(searchSignalsSemantically)
 2. **契约迁移(2026-07-04 完成)**:13 个契约已全部迁移/退役,15 个旧代死组件已删除。
    - 迁移到活 surface:tool-icons→ToolGridIcon、anonymous-gate→today-view-model、
      locale purchased-tools→ToolsTreasureSheet、color-tokens→MoodSheet EMOTIONS(顺手
@@ -51,8 +54,11 @@
 
 ## 已知欠账(按优先级)
 
-1. Signal source-of-truth cutover + 投影退役(CEO Gate,契约 gates 约束)
-2. 组件阈值:容器 ≤500 / 展示 ≤300(见 docs/prd-deltas-2026-07.md §2)— 当前全部达标
+(暂无 — 2026-07-04 批次全部清偿;新欠账请记录在此)
+
+**契约测试提示**:`test:contracts`(100+ 套,不在 CI)在 2026-07-04 全量修复过
+一轮——历史重构(cloud-server-runtime 委托化、TodayFeed 拆分、i18n 化、函数
+改名)造成的 marker 漂移已对齐。重构后请顺手跑 `npm run test:contracts`。
 
 已清偿(2026-07-04):TodayFeed 拆分、FocusSection 二次拆分(298 行)、
 FocusModeSheet 拆分(141 + MeetingRecorderSheet 163)、

@@ -11,6 +11,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { getRecentNodes, isPrivateExternalNode, searchLifeGraphFuzzy, type LifeNode } from '@/lib/portal/life-graph';
+import { signalToLifeNode } from '@/lib/life-domain';
+import { searchSignalsSemantically } from '@/lib/life-domain/signal-search';
 import {
   createSignal,
   extractContext,
@@ -372,10 +374,14 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
       stopListening();
       setSendState('analyzing');
       const allCandidates = getRecentNodes(80).filter((node) => canUsePrivateData || !isPrivateExternalNode(node));
+      // Signal 事实面语义搜索优先(cutover 后读事实缓存),模糊/近期节点补位
+      const semanticFirst = searchSignalsSemantically(t, 20)
+        .map(signalToLifeNode)
+        .filter((node) => canUsePrivateData || !isPrivateExternalNode(node));
       const fuzzyFirst = searchLifeGraphFuzzy(t, 20);
       const seenIds = new Set<string>();
       const merged: LifeNode[] = [];
-      for (const n of [...fuzzyFirst, ...allCandidates]) {
+      for (const n of [...semanticFirst, ...fuzzyFirst, ...allCandidates]) {
         if (!seenIds.has(n.id)) { seenIds.add(n.id); merged.push(n); }
       }
       const candidates = merged.slice(0, 60);

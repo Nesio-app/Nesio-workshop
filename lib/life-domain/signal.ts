@@ -139,9 +139,16 @@ export function lifeNodeToSignal(node: LifeNode): Signal {
   const signalType = typeof node.attributes['signalType'] === 'string'
     ? node.attributes['signalType']
     : NODE_TYPE_TO_SIGNAL[node.type] ?? 'observation';
-  const payload = Object.fromEntries(
-    Object.entries(node.attributes).filter(([key]) => !key.startsWith('signal') && key !== 'context'),
-  );
+  const payload = {
+    ...Object.fromEntries(
+      Object.entries(node.attributes).filter(([key]) => !key.startsWith('signal') && key !== 'context'),
+    ),
+    // Cutover(2026-07-04):投影保真字段——原 NODE_TYPE_TO_SIGNAL 映射有损
+    // (object/person/preference 均折叠为 observation),signalToLifeNode
+    // 重建投影时需要原始 type/source。
+    nodeType: node.type,
+    nodeSource: node.source,
+  };
   let context: SignalContext | undefined;
   const ctxRaw = node.attributes['context'];
   if (typeof ctxRaw === 'string' && ctxRaw) {
@@ -172,6 +179,64 @@ export function lifeNodeToSignal(node: LifeNode): Signal {
     evidence: { source, externalId: node.id, raw: node.rawInput },
     tags: node.tags,
     context,
+  };
+}
+
+// ── Signal → LifeNode 逆向适配器(投影重建用)────────────────────────────────
+
+const SIGNAL_TYPE_TO_NODE: Record<string, LifeNodeType> = {
+  event: 'event',
+  commitment: 'commitment',
+  symptom: 'health_state',
+  location: 'place',
+};
+
+const SIGNAL_SOURCE_TO_NODE: Partial<Record<SignalSource, LifeNodeSource>> = {
+  manual: 'manual',
+  photo: 'photo',
+  calendar: 'calendar',
+  gmail: 'email',
+  device: 'system',
+  voice: 'voice',
+};
+
+const NODE_TYPES: ReadonlySet<string> = new Set(['event', 'commitment', 'health_state', 'object', 'person', 'place', 'preference']);
+const NODE_SOURCES: ReadonlySet<string> = new Set(['manual', 'photo', 'calendar', 'email', 'system', 'voice']);
+
+/**
+ * Signal → LifeNode 投影(cutover 恢复路径)。优先用 payload.nodeType/
+ * nodeSource 保真字段;缺失时(旧信号)按类型映射降级推断。
+ */
+export function signalToLifeNode(signal: Signal): LifeNode {
+  const payload = (signal.payload || {}) as Record<string, unknown>;
+  const { nodeType, nodeSource, ...rest } = payload;
+  const attributes: LifeNode['attributes'] = {};
+  for (const [key, value] of Object.entries(rest)) {
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' || value === null) {
+      attributes[key] = value;
+    }
+  }
+  attributes.signalId = signal.id;
+  attributes.signalSource = signal.source;
+  attributes.signalType = signal.type;
+  attributes.occurredAt = signal.occurredAt;
+  if (signal.context) attributes.context = JSON.stringify(signal.context);
+
+  return {
+    id: signal.evidence.externalId || signal.id,
+    type: (typeof nodeType === 'string' && NODE_TYPES.has(nodeType)
+      ? nodeType
+      : SIGNAL_TYPE_TO_NODE[signal.type] ?? 'preference') as LifeNodeType,
+    name: signal.title,
+    attributes,
+    source: (typeof nodeSource === 'string' && NODE_SOURCES.has(nodeSource)
+      ? nodeSource
+      : SIGNAL_SOURCE_TO_NODE[signal.source] ?? 'system') as LifeNodeSource,
+    confidence: signal.confidence,
+    createdAt: signal.capturedAt,
+    relations: signal.entities.map((e) => ({ targetId: e.id, relation: e.type })),
+    tags: signal.tags,
+    rawInput: signal.evidence.raw,
   };
 }
 

@@ -388,13 +388,22 @@ function buildCloudSnapshotContractReport() {
 function buildSignalMainFactContractReport() {
   return {
     version: SIGNAL_MAIN_FACT_CONTRACT_VERSION,
-    currentPhase: 'signal_read_preferred',
+    currentPhase: 'signal_source_of_truth',
     targetPhase: 'signal_source_of_truth',
+    ceoGate: { sourceOfTruthCutoverApprovedAt: '2026-07-04' },
+    phaseHistory: [
+      {
+        phase: 'signal_read_preferred',
+        until: '2026-07-04',
+        signals: 'primary_cloud_fact_candidate_with_projection_fallback',
+        lifeGraph: 'compat_projection_during_dual_write',
+      },
+    ],
     currentSourceOfTruth: {
-      signals: 'primary_cloud_fact_candidate_with_projection_fallback',
-      memoryNodes: 'compat_projection_during_dual_write',
-      lifeGraph: 'compat_projection_during_dual_write',
-      inventoryItems: 'domain_private_table_with_signal_mirror',
+      signals: 'main_fact_table',
+      memoryNodes: 'projection_view',
+      lifeGraph: 'projection_view',
+      inventoryItems: 'domain_private_table_that_references_or_emits_signals',
     },
     targetSourceOfTruth: {
       signals: 'main_fact_table',
@@ -403,7 +412,7 @@ function buildSignalMainFactContractReport() {
       inventoryItems: 'domain_private_table_that_references_or_emits_signals',
     },
     readPolicy: {
-      currentPriority: ['cloud_signals', 'local_signal_cache', 'local_projection', 'memory_nodes', 'life_graph'],
+      currentPriority: ['cloud_signals', 'local_signal_cache', 'projection_fallback'],
       targetPriority: ['cloud_signals', 'local_signal_cache', 'projection_fallback'],
       todayCardsRequireEvidenceSignalIds: true,
       askBaoheShouldSearchSignals: true,

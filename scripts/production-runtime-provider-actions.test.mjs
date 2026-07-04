@@ -91,8 +91,10 @@ assert.equal(
 );
 assert.deepEqual(
   allowedHostRuntime.canonicalDomainAllowedHosts,
-  ['www.nesio.app', 'treasurebox-nu.vercel.app', 'preview.nesio.app'],
-  'canonicalDomainAllowedHosts should expose normalized canonical and allowed runtime hosts.',
+  // hostVariants 同时展开 apex 与 www 变体(host-only cookie bug 修复,
+  // 见 production-runtime.hostVariants 头注释)
+  ['www.nesio.app', 'nesio.app', 'treasurebox-nu.vercel.app', 'www.treasurebox-nu.vercel.app', 'preview.nesio.app', 'www.preview.nesio.app'],
+  'canonicalDomainAllowedHosts should expose normalized canonical and allowed runtime hosts (apex + www variants).',
 );
 assert.deepEqual(
   Object.keys(allowedHostRuntime.summary.categoryReadinessSummary),

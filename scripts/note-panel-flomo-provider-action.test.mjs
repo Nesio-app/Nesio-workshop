@@ -4,7 +4,6 @@ import path from 'node:path';
 
 const root = process.cwd();
 const component = fs.readFileSync(path.join(root, 'components', 'portal', 'NotePanelEnhanced.tsx'), 'utf8');
-const basicComponent = fs.readFileSync(path.join(root, 'components', 'portal', 'NotePanel.tsx'), 'utf8');
 const runtime = fs.readFileSync(path.join(root, 'lib', 'portal', 'production-runtime.ts'), 'utf8');
 const i18n = fs.readFileSync(path.join(root, 'lib', 'portal', 'i18n.ts'), 'utf8');
 const flomoRoute = fs.readFileSync(path.join(root, 'app', 'api', 'portal', 'flomo', 'route.ts'), 'utf8');
@@ -138,9 +137,9 @@ for (const key of ['flomoCopyMemo', 'flomoMemoCopied', 'flomoMemoCopyFailed']) {
   assert.match(i18n, new RegExp(`${key}:`), `i18n dictionary must define key ${key}.`);
 }
 
+// 旧代 NotePanel.tsx 已删(2026-07 契约迁移);活表面只剩 NotePanelEnhanced
 for (const [name, source] of [
   ['NotePanelEnhanced', component],
-  ['NotePanel', basicComponent],
 ]) {
   assert.doesNotMatch(
     source,

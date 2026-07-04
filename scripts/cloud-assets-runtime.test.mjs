@@ -10,7 +10,12 @@ const statusPath = path.join(root, 'app', 'api', 'cloud', 'status', 'route.ts');
 
 assert.ok(fs.existsSync(routePath), 'expected cloud assets route at app/api/cloud/assets/route.ts');
 
-const route = fs.readFileSync(routePath, 'utf8');
+// Cloud 配置/鉴权已重构进共享服务端运行时(lib/portal/cloud-server-runtime),
+// route 委托调用;marker 对聚合源断言(能力仍必须可达)。
+const route = [
+  fs.readFileSync(routePath, 'utf8'),
+  fs.readFileSync(path.join(root, 'lib', 'portal', 'cloud-server-runtime.ts'), 'utf8'),
+].join('\n');
 const client = fs.readFileSync(clientPath, 'utf8');
 const statusRoute = fs.readFileSync(statusPath, 'utf8');
 const pkg = JSON.parse(fs.readFileSync(packagePath, 'utf8'));

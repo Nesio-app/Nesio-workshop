@@ -26,7 +26,11 @@ export function NightTimeline() {
         <p className="nesio-today-night-sub">{t(locale, 'nightSub')}</p>
         <div className="nesio-today-night-actions">
           <span className="nesio-today-night-conf">{t(locale, 'nightConfirmHint')}</span>
-          <button type="button" className="nesio-today-btn nesio-today-btn--night">{t(locale, 'nightOk')}</button>
+          <button
+            type="button"
+            className="nesio-today-btn nesio-today-btn--night"
+            onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-voice'))}
+          >{t(locale, 'nightOk')}</button>
         </div>
       </div>
       <div className="nesio-today-night-timeline">

@@ -25,12 +25,12 @@ for (const marker of [
   'markCloudSyncPending',
   'markCloudSyncSynced',
   'markCloudSyncFailed',
-  'syncLifeNodeToCloud',
+  'syncLifeGraphUpsertToCloud',
   'syncLifeGraphDeleteToCloud',
   '/api/cloud/memory',
   'credentials: \'include\'',
-  'void syncLifeNodeToCloud(newNode)',
-  'void syncLifeNodeToCloud(nodes[idx])',
+  'void syncLifeGraphUpsertToCloud(newNode)',
+  'void syncLifeGraphUpsertToCloud(nodes[idx])',
   'void syncLifeGraphDeleteToCloud(id)',
   'return newNode',
   'return true',
@@ -85,36 +85,36 @@ for (const marker of [
   '同步失败',
   '等待同步',
   '已同步',
-  'if (!canUsePrivateData)',
-  'void retryLifeGraphCloudSync()',
+    'void retryLifeGraphCloudSync()',
   'void backfillLocalLifeGraphToCloud',
-  'window.addEventListener(\'online\', retryCloudSync)',
-  'window.addEventListener(\'nesio-life-graph-cloud-sync-updated\', onCloudSyncUpdate)',
-  'window.removeEventListener(\'online\', retryCloudSync)',
-  'window.removeEventListener(\'nesio-life-graph-cloud-sync-updated\', onCloudSyncUpdate)',
-  'setNodes(getRecentNodes(30))',
+  "const retrySync = () => { if (canUsePrivateData) void retryLifeGraphCloudSync(); }",
+  'window.addEventListener(\'online\', retrySync)',
+  'window.addEventListener(\'nesio-life-graph-cloud-sync-updated\', onSyncUpdate)',
+  'window.removeEventListener(\'online\', retrySync)',
+  'window.removeEventListener(\'nesio-life-graph-cloud-sync-updated\', onSyncUpdate)',
+  'setNodes(readNodes())',
 ]) {
   assert.ok(memoryTab.includes(marker), `MemoryTab cloud hydration missing marker: ${marker}`);
 }
 
 assert.match(
   memoryTab,
-  /function retryCloudSync\(\)\s*\{[\s\S]*if \(!canUsePrivateData\) return;[\s\S]*void retryLifeGraphCloudSync\(\)/,
+  /const retrySync = \(\) => \{ if \(canUsePrivateData\) void retryLifeGraphCloudSync\(\); \}/,
   'MemoryTab must retry pending/failed cloud Memory sync only when private signed-in data is allowed.',
 );
 assert.match(
   memoryTab,
-  /function onCloudSyncUpdate\(\)\s*\{[\s\S]*setCloudSyncSummary\(getLifeGraphCloudSyncSummary\(\)\)/,
+  /const onSyncUpdate = \(\) => setCloudSyncSummary\(getLifeGraphCloudSyncSummary\(\)\)/,
   'MemoryTab must refresh visible cloud sync summary when cloud sync status changes.',
 );
 assert.match(
   memoryTab,
-  /cloudSyncSummary\.failedCount > 0[\s\S]*同步失败/,
+  /cloudSyncSummary\.failedCount > 0[\s\S]*copy\.syncFailed\(cloudSyncSummary\.failedCount\)/,
   'MemoryTab must surface failed cloud Memory sync instead of hiding backend failures.',
 );
 assert.match(
   memoryTab,
-  /cloudSyncSummary\.pendingCount > 0[\s\S]*等待同步/,
+  /cloudSyncSummary\.pendingCount > 0[\s\S]*copy\.syncPending\(cloudSyncSummary\.pendingCount\)/,
   'MemoryTab must surface pending local-first Memory sync while offline or retrying.',
 );
 
@@ -150,7 +150,7 @@ assert.match(
 );
 assert.match(
   memoryTab,
-  /catch\s*\{[\s\S]*cloud hydration is best-effort/,
+  /async function hydrateCloud\(\)[\s\S]*catch \{ \/\* best-effort \*\/ \}/,
   'cloud hydration failures must be swallowed so signed-in Memory still works offline.',
 );
 assert.doesNotMatch(

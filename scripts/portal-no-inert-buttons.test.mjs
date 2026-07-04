@@ -35,6 +35,10 @@ for (const file of walk(portalDir)) {
       const block = match[0];
       const isInteractive =
         /onClick=/.test(block) ||
+        // 按住说话/长按问一问等手势按钮走 pointer 事件,不是惰性
+        /onPointerDown=/.test(block) ||
+        /onTouchStart=/.test(block) ||
+        /onMouseDown=/.test(block) ||
         /type=["']submit["']/.test(block) ||
         /disabled=/.test(block) ||
         /aria-disabled=/.test(block);

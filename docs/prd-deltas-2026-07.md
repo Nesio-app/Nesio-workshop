@@ -66,7 +66,7 @@
 | 首页 | DashboardHome(已删) | TodayFeed + today/ | ✅ 交接完成 |
 | 设置 | AccountSettings(已删) | NesioProfileCard + SettingsSheets | ✅ 完成(主题/语言/隐私/Lab 入口齐) |
 | 推荐卡 | DEC 直渲染 | guidance-engine 7 层管线 | ✅ DEC 作为来源汇入(decCardsToGuidanceEvents) |
-| 数据模型 | LifeGraph(localStorage) | Signal 主事实表 | ✅ 读优先切换完成(signal_read_preferred 相位,见 §5) |
+| 数据模型 | LifeGraph(localStorage) | Signal 主事实表 | ✅ cutover 完成(signal_source_of_truth,见 §5) |
 | 工具入口 | 11 工具宫格 | 统一入口 + 五域 | ✅ |
 
 ## 5. Signal 主事实表迁移里程碑
@@ -80,8 +80,12 @@
   未水合回退投影;LifeGraph 变更事件同步刷新缓存(读新鲜度不降)
 - **M4(✅ 基础,2026-07-04)删除传导**:用户删除/剪枝引擎的意图传导到
   IDB 事实缓存,IDB 与投影保持一致;localStorage LifeGraph 保留为兼容投影
-- **剩余**:source_of_truth cutover(事实库独立保留)+ 投影退役,
-  契约 gates 要求 CEO Gate,不在自主工作范围
+- **cutover(✅ 2026-07-04,CEO Gate 会话批准)**:事实库独立
+  (不再镜像式对账,删除走显式事件传导)、signalToLifeNode 逆向适配器 +
+  rebuildLifeGraphFromSignals 投影重建(「Signal 是权威源」的可执行证明)、
+  契约相位翻转 signal_source_of_truth;顺带把 Today 反馈接回 signal 反馈环
+  (recordSignalFeedback,evidenceSignalIds 随完整卡回写)+ 云端产品事件,
+  ask 候选集接入 signal 语义搜索
 
 ## 6. 平台与运行时
 

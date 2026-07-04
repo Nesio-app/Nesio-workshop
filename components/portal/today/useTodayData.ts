@@ -31,7 +31,7 @@ import {
   decCardsToGuidanceEvents,
 } from '@/lib/platform/guidance-engine/source-adapters';
 import { cloudSignalRowsToSignals, type CloudSignalRow } from '@/lib/life-domain/signal-search';
-import { buildTimeFallback, isProactiveCardDismissed, type ProactiveCardData } from './proactive-types';
+import { buildTimeFallback, isProactiveCardDismissed, type ProactiveCardData, registerDecCards } from './proactive-types';
 
 const EMPTY_SIGNAL_CARDS: RecommendationCard[] = [
   {
@@ -141,6 +141,7 @@ export function useTodayData(canUsePrivateData: boolean) {
         const weather = readPortalCache<WeatherSnapshot>(PORTAL_CACHE_KEYS.weather);
         const scored = scoreCalendarEvents(calEvents, now);
 
+        registerDecCards(updated.cards); // 反馈环回写:完整卡(含 evidenceSignalIds)登记
         const guidanceEvents = [
           // DEC 域引擎卡(证据门控)— 此前 runDEC 输出被丢弃,现与其他源同台仲裁
           ...decCardsToGuidanceEvents(updated.cards),

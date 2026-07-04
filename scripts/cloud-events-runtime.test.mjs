@@ -16,10 +16,19 @@ assert.ok(fs.existsSync(schemaPath), 'Supabase product events schema must exist.
 assert.ok(fs.existsSync(routePath), 'cloud events route must exist at app/api/cloud/events/route.ts.');
 
 const schema = fs.readFileSync(schemaPath, 'utf8');
-const route = fs.readFileSync(routePath, 'utf8');
+// Cloud 配置/鉴权已重构进共享服务端运行时(lib/portal/cloud-server-runtime),
+// route 委托调用;marker 对聚合源断言(能力仍必须可达)。
+const route = [
+  fs.readFileSync(routePath, 'utf8'),
+  fs.readFileSync(path.join(root, 'lib', 'portal', 'cloud-server-runtime.ts'), 'utf8'),
+].join('\n');
 const statusRoute = fs.readFileSync(statusPath, 'utf8');
 const client = fs.readFileSync(clientPath, 'utf8');
-const todayFeed = fs.readFileSync(todayFeedPath, 'utf8');
+// Today 反馈已拆至 today/ProactiveGuidanceCard(容器+today/ 拆分)
+const todayFeed = [
+  fs.readFileSync(todayFeedPath, 'utf8'),
+  fs.readFileSync(path.join(root, 'components', 'portal', 'today', 'ProactiveGuidanceCard.tsx'), 'utf8'),
+].join('\n');
 const readme = fs.readFileSync(readmePath, 'utf8');
 const pkg = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
 
@@ -89,8 +98,8 @@ for (const marker of [
 for (const marker of [
   'recordCloudProductEvent',
   "eventType: 'today.card.feedback'",
-  'targetType: card.type',
-  'targetId: cardId',
+  'targetType: card.cardType',
+  'targetId: card.id',
   'feedback',
 ]) {
   assert.ok(todayFeed.includes(marker), `TodayFeed missing cloud feedback marker: ${marker}`);

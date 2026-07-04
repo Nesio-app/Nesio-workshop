@@ -18,13 +18,12 @@ function assertEqual(actual, expected, message) {
   if (actual !== expected) throw new Error(`${message} Expected ${expected}, got ${actual}`);
 }
 
+// 导航已重设计为三键(Today / 中央记录 / Memory):图标为内联描边 SVG
+// (design-system 线性图标语言)+ 品牌 PWA 中键;mask 图标系统随旧宫格退役。
 assert(
-  component.includes('nesioBrandAssets') &&
-    component.includes('nesioToolIcons') &&
-    component.includes('bottomNavItems') &&
-    component.includes('portal-bottom-nav-icon--mask') &&
-    component.includes('--portal-bottom-nav-icon-url'),
-  'PortalBottomNav must render icons from the Nesio design-system asset contract.',
+  component.includes('nesio-bottom-nav-icon') &&
+    component.includes('/icons/treasurebox-pwa-192.png'),
+  'PortalBottomNav must render design-system stroke icons and the brand center icon.',
 );
 
 assert(
@@ -33,13 +32,8 @@ assert(
 );
 
 assert(
-  /bottomNavItems\.map\(\(item\)[\s\S]*style=\{\{\s*'--portal-bottom-nav-icon-url': `url\("\$\{item\.iconUrl\}"\)`/.test(component),
-  'PortalBottomNav must map nav items through a single item list with mask icon URLs.',
-);
-
-assert(
-  /\.portal-bottom-nav-icon--mask[\s\S]*mask-image:\s*var\(--portal-bottom-nav-icon-url\)/.test(css),
-  'Bottom nav mask CSS must use the icon URL variable.',
+  /\.nesio-bottom-nav-icon/.test(css),
+  'Bottom nav icon class must be styled in globals.css.',
 );
 
 assertEqual(

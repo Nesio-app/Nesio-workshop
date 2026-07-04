@@ -48,6 +48,14 @@
       "living_surface": "components/portal/PortalOnboarding.tsx",
       "marker": "t(locale, 'onboarding",
       "status": "closed"
+    },
+    {
+      "id": "REG-007",
+      "from_contract": "dashboard-health-tool-runtime (DashboardHome 能量卡)",
+      "description": "旧代 DashboardHome 能量卡的健康工具运行时契约(2026-07-04 退役,组件已删)。意图:健康入口必须打开真实运行时或购买/加入 gate,且带可追踪 runtime action 标记。新代对应表面:NesioProfileCard 健康记录入口 → HealthLogger sheet;若未来 Today 恢复能量卡,按此意图重建契约",
+      "living_surface": "components/portal/NesioProfileCard.tsx",
+      "marker": "健康记录",
+      "status": "open"
     }
   ]
 }

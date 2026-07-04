@@ -154,9 +154,16 @@ for (const marker of [
   assert.ok(feedback.includes(marker), `feedback loop missing marker: ${marker}`);
 }
 
-const todayFeed = read('components/portal/TodayFeed.tsx');
+// Today 表面已按工程 PRD 拆分(容器 + today/);反馈环活在 today/ 里
+const todayFeed = [
+  read('components/portal/TodayFeed.tsx'),
+  read('components/portal/today/useTodayData.ts'),
+  read('components/portal/today/ProactiveGuidanceCard.tsx'),
+  read('components/portal/today/proactive-types.ts'),
+].join('\n');
 assert.match(todayFeed, /recordSignalFeedback/, 'Today feedback must write back to the signal feedback loop.');
 assert.match(todayFeed, /evidenceSignalIds/, 'Today feedback must preserve evidenceSignalIds.');
+assert.match(todayFeed, /registerDecCards/, 'Today pipeline must register full DEC cards so feedback can rejoin the signal loop.');
 
 const signalSearch = read('lib/life-domain/signal-search.ts');
 for (const marker of [

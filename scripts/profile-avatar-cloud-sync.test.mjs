@@ -4,7 +4,8 @@ import path from 'node:path';
 
 const root = process.cwd();
 const profileCardPath = path.join(root, 'components', 'portal', 'NesioProfileCard.tsx');
-const settingsPath = path.join(root, 'components', 'portal', 'Settings.tsx');
+// 旧代 Settings.tsx 已删;avatar 上传流程活在 NesioProfileCard(设置入口)
+const settingsPath = path.join(root, 'components', 'portal', 'NesioProfileCard.tsx');
 const profileSettingsRoutePath = path.join(root, 'app', 'api', 'cloud', 'profile-settings', 'route.ts');
 const profileStorePath = path.join(root, 'lib', 'portal', 'profile.ts');
 const packagePath = path.join(root, 'package.json');
