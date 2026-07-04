@@ -713,8 +713,8 @@ export default function Portal() {
           >
             <span style={{ flex: 1 }}>
               {storageAlert.kind === 'full'
-                ? `本地存储已满（${storageAlert.percent}%），新记忆无法保存！请在设置中导出备份并清理照片。`
-                : `本地存储已用 ${storageAlert.percent}%，接近上限。建议尽快导出备份。`}
+                ? `本机空间满了，新的记忆暂时存不进来。先在设置里导出一份备份，再清理一些照片，就能继续保存。`
+                : `本机空间已用 ${storageAlert.percent}%。方便的时候导出一份备份，之后就不用惦记这件事了。`}
             </span>
             <button
               type="button"

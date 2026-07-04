@@ -44,10 +44,10 @@
     {
       "id": "REG-006",
       "from_contract": "portal-locale-runtime (PortalOnboarding 部分)",
-      "description": "Onboarding 重写后绕过 i18n 字典(zh/en 三元硬编码,onboarding* 键在字典里成孤儿);style 选择步骤迁入 ToneSheet 且同样硬编码。第四期统一补 t() 接线",
+      "description": "Onboarding 绕过 i18n 字典。2026-07-04 部分闭环:NameStep 已接 t()(3 处);Welcome/Auth 步和 FirstUseTips 仍为 zh/en 三元,与 TodayFeed i18n(REG-004)一起做完整包",
       "living_surface": "components/portal/PortalOnboarding.tsx",
       "marker": "t(locale, 'onboarding",
-      "status": "open"
+      "status": "partial"
     }
   ]
 }

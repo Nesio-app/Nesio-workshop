@@ -45,8 +45,8 @@
 ## 已知欠账(按优先级)
 
 1. 契约迁移工程(见上)→ 迁完再删 15 个死组件
-3. 设计 adherence lint(设计系统 zip 内 _adherence.oxlintrc.json)未接入 eslint
-4. TodayFeed 1408 行(工程 PRD 阈值 <300);语音合规巡检;新代 i18n 补课
+3. 新代 i18n 完整包(REG-004 TodayFeed + REG-006 剩余 onboarding 步)— adherence lint 已上线(57 处存量 hex warn 待清)
+4. TodayFeed 1408 行(工程 PRD 阈值 <300)
 5. 深水区:LifeGraph→IndexedDB、DEC/dec-data 命名分离、Next 16、lab 模式管理 UI
 
 ## 已安装的循环(L1 = 只报告)

@@ -1,3 +1,17 @@
 {
-  "extends": "next/core-web-vitals"
+  "extends": "next/core-web-vitals",
+  "overrides": [
+    {
+      "files": ["components/portal/**/*.tsx", "components/portal/**/*.ts"],
+      "rules": {
+        "no-restricted-syntax": [
+          "warn",
+          {
+            "selector": "Literal[value=/#[0-9a-fA-F]{6}\\b/]",
+            "message": "设计系统 adherence:裸 hex 色值 — 请用 design token(var(--...)),规则源自设计系统 _adherence.oxlintrc.json。"
+          }
+        ]
+      }
+    }
+  ]
 }

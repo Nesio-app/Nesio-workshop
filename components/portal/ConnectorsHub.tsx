@@ -201,7 +201,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
             feedSummary,
           ].filter(Boolean).join(' | ');
           setOauthSyncResult((p) => ({ ...p, calendar: { ok: false, msg: `无日历数据`, detail } }));
-          showToast(`日历同步失败：${data.message || data.error || '无事件'}`, false);
+          showToast(`日历这次没同步上，稍后再试。（${data.message || data.error || '无事件'}）`, false);
         } else {
           const count = data.events.length;
           const { saveCalendarToLocal } = await import('@/lib/portal/calendar-local-store');
@@ -258,7 +258,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     } catch (e) {
       const msg = e instanceof Error ? e.message : '网络错误';
       setOauthSyncResult((p) => ({ ...p, [c.id]: { ok: false, msg: '同步失败', detail: msg } }));
-      showToast(`同步失败：${msg}`, false);
+      showToast(`这次没同步上（${msg}）。稍后再试一次就好。`, false);
     }
     setSyncing(null);
   }

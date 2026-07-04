@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { addLifeNode } from '@/lib/portal/life-graph';
+import { t } from '@/lib/portal/i18n';
 import {
   loadProfileSettings,
   portalLocaleToDictionaryLocale,
@@ -183,12 +184,12 @@ function NameStep({ onNext, locale }: { onNext: (name: string) => void; locale: 
   return (
     <div className="nesio-ob-step">
       <div className="nesio-ob-step-icon" aria-hidden>👋</div>
-      <h2 className="nesio-ob-step-title">{zh ? 'Nesio 叫你什么？' : 'What should Nesio call you?'}</h2>
-      <p className="nesio-ob-step-sub">{zh ? '只用于本机显示，你可以随时改。' : 'Only used on this device. You can change it anytime.'}</p>
+      <h2 className="nesio-ob-step-title">{t(locale, 'onboardingNameLabel')}</h2>
+      <p className="nesio-ob-step-sub">{t(locale, 'onboardingNameNote')}</p>
       <input
         ref={inputRef}
         className="nesio-ob-input"
-        placeholder={zh ? '你的名字…' : 'Your name…'}
+        placeholder={t(locale, 'onboardingNameCopy')}
         value={name}
         maxLength={24}
         onChange={(e) => setName(e.target.value)}
