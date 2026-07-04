@@ -12,8 +12,8 @@ const TYPE_ICON_DETAIL: Record<string, string> = {
   commitment: '🤝', health_state: '🩷', preference: '⭐',
 };
 const TYPE_BG_DETAIL: Record<string, string> = {
-  person: '#e0e7ff', object: '#dbeafe', place: '#d1fae5',
-  event: '#fef3c7', commitment: '#ede9fe', health_state: '#fce7f3', preference: '#f0fdf4',
+  person: 'var(--chip-indigo)', object: 'var(--chip-blue)', place: 'var(--chip-green)',
+  event: 'var(--chip-amber)', commitment: 'var(--chip-violet)', health_state: 'var(--chip-pink)', preference: 'var(--chip-mint)',
 };
 
 interface MemoryNodeDetailProps {
@@ -611,7 +611,7 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
     ([k, v]) => v !== null && v !== '' && !HIDDEN_ATTRIBUTE_KEYS.has(k),
   );
   const showRawInput = Boolean(n.rawInput && n.source !== 'calendar' && n.source !== 'email');
-  const typeBg = TYPE_BG_DETAIL[n.type] || '#f0f4ff';
+  const typeBg = TYPE_BG_DETAIL[n.type] || 'var(--chip-fog)';
 
   return (
     <div className="nesio-node-detail-overlay" role="dialog" aria-modal="true" aria-label={n.name}>

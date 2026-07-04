@@ -707,7 +707,7 @@ export default function Portal() {
             role="alert"
             style={{
               position: 'fixed', top: 8, left: 12, right: 12, zIndex: 300,
-              background: 'var(--status-risk-soft, #fde8e8)', border: '1px solid var(--status-risk, #d33)',
+              background: 'var(--status-risk-soft)', border: '1px solid var(--status-risk)',
               borderRadius: 12, padding: '0.6rem 0.9rem', fontSize: '0.8rem',
               color: 'var(--status-risk, #d33)', display: 'flex', alignItems: 'center', gap: 8,
             }}

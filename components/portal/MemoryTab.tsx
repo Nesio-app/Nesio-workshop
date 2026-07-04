@@ -195,8 +195,8 @@ const TYPE_ICON: Record<string, string> = {
   commitment: '🤝', health_state: '🩷', preference: '⭐',
 };
 const TYPE_BG: Record<string, string> = {
-  person: '#e0e7ff', object: '#dbeafe', place: '#d1fae5',
-  event: '#fef3c7', commitment: '#ede9fe', health_state: '#fce7f3', preference: '#f0fdf4',
+  person: 'var(--chip-indigo)', object: 'var(--chip-blue)', place: 'var(--chip-green)',
+  event: 'var(--chip-amber)', commitment: 'var(--chip-violet)', health_state: 'var(--chip-pink)', preference: 'var(--chip-mint)',
 };
 const TYPE_LABEL: Record<string, string> = {
   person: '人物', object: '物品', place: '地点',
@@ -352,7 +352,7 @@ function getNodeTypeMeta(node: LifeNode) {
 }
 
 function getPersonInitials(name: string) {
-  const bgs = ['#c7d2fe', '#bfdbfe', '#a7f3d0', '#fbcfe8', '#fde68a', '#ddd6fe'];
+  const bgs = ['var(--avatar-indigo)', 'var(--avatar-blue)', 'var(--avatar-mint)', 'var(--avatar-pink)', 'var(--avatar-amber)', 'var(--avatar-violet)'];
   return { initials: name.slice(0, 1), bg: bgs[name.charCodeAt(0) % bgs.length] };
 }
 

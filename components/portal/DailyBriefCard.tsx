@@ -321,7 +321,7 @@ export default function DailyBriefCard({
         {(isPlaying || isPaused || isDone) && (
           <div style={{ width: 56, marginTop: 4 }}>
             <div style={{ width: '100%', height: 3, background: 'rgba(88,140,227,0.15)', borderRadius: 2 }}>
-              <div style={{ width: `${progress}%`, height: '100%', background: 'var(--portal-blue-deep, #588ce3)', borderRadius: 2, transition: 'width 0.3s linear' }} />
+              <div style={{ width: `${progress}%`, height: '100%', background: 'var(--portal-blue-deep)', borderRadius: 2, transition: 'width 0.3s linear' }} />
             </div>
           </div>
         )}

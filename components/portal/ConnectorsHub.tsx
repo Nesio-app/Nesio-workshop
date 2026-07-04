@@ -26,17 +26,17 @@ interface ConnectorDef {
 }
 
 const CONNECTORS: ConnectorDef[] = [
-  { id: 'calendar', name: 'Google Calendar', icon: '📅', iconBg: '#dbeafe', method: 'oauth', description: '读取日程，生成会议提醒和准备 Brief' },
-  { id: 'gmail', name: 'Gmail', icon: '📧', iconBg: '#fce7f3', method: 'oauth', description: '你授权并选择后，整理可确认的人物、日期、承诺' },
-  { id: 'weather', name: '地理位置 · 天气', icon: '🌤', iconBg: '#fef3c7', method: 'geo', description: '基于实时天气生成外出和健康建议' },
-  { id: 'flomo', name: 'Flomo', icon: '📝', iconBg: '#e0e7ff', method: 'server', syncEndpoint: '/api/portal/flomo?limit=30', description: '同步 flomo 笔记，提取想法与记录' },
-  { id: 'notion', name: 'Notion', icon: '📓', iconBg: '#f3f4f6', method: 'token', syncEndpoint: '/api/portal/notion', tokenHint: 'notion.so/my-integrations → 新建集成 → 复制 Internal Integration Secret，并把页面共享给它', description: '同步最近编辑的页面，提取项目与想法' },
-  { id: 'toggl', name: 'Toggl Track', icon: '⏱', iconBg: '#fee2e2', method: 'token', syncEndpoint: '/api/portal/toggl', tokenHint: 'track.toggl.com → Profile → API Token', description: '同步时间记录，了解你的专注分布' },
-  { id: 'health', name: 'Apple Health 导出', icon: '🩷', iconBg: '#fce7f3', method: 'file', description: '上传 export.xml，提取步数、睡眠、心率' },
-  { id: 'reminder', name: 'Apple 提醒事项', icon: '✅', iconBg: '#fef3c7', method: 'shortcuts', ingestSource: 'reminder', description: '通过快捷指令推送提醒，自动转为承诺' },
-  { id: 'keep', name: 'Keep 健康', icon: '🏃', iconBg: '#d1fae5', method: 'shortcuts', ingestSource: 'keep', description: '通过快捷指令推送运动数据' },
-  { id: 'wechat_reading', name: '微信读书', icon: '📖', iconBg: '#dcfce7', method: 'shortcuts', ingestSource: 'wechat_reading', description: '通过快捷指令推送阅读进度与笔记' },
-  { id: 'tesla', name: 'Tesla', icon: '🚗', iconBg: '#d1fae5', method: 'oauth', description: '电量、行程信号，自动提醒充电', comingSoon: true },
+  { id: 'calendar', name: 'Google Calendar', icon: '📅', iconBg: 'var(--chip-blue)', method: 'oauth', description: '读取日程，生成会议提醒和准备 Brief' },
+  { id: 'gmail', name: 'Gmail', icon: '📧', iconBg: 'var(--chip-pink)', method: 'oauth', description: '你授权并选择后，整理可确认的人物、日期、承诺' },
+  { id: 'weather', name: '地理位置 · 天气', icon: '🌤', iconBg: 'var(--chip-amber)', method: 'geo', description: '基于实时天气生成外出和健康建议' },
+  { id: 'flomo', name: 'Flomo', icon: '📝', iconBg: 'var(--chip-indigo)', method: 'server', syncEndpoint: '/api/portal/flomo?limit=30', description: '同步 flomo 笔记，提取想法与记录' },
+  { id: 'notion', name: 'Notion', icon: '📓', iconBg: 'var(--chip-gray)', method: 'token', syncEndpoint: '/api/portal/notion', tokenHint: 'notion.so/my-integrations → 新建集成 → 复制 Internal Integration Secret，并把页面共享给它', description: '同步最近编辑的页面，提取项目与想法' },
+  { id: 'toggl', name: 'Toggl Track', icon: '⏱', iconBg: 'var(--chip-red)', method: 'token', syncEndpoint: '/api/portal/toggl', tokenHint: 'track.toggl.com → Profile → API Token', description: '同步时间记录，了解你的专注分布' },
+  { id: 'health', name: 'Apple Health 导出', icon: '🩷', iconBg: 'var(--chip-pink)', method: 'file', description: '上传 export.xml，提取步数、睡眠、心率' },
+  { id: 'reminder', name: 'Apple 提醒事项', icon: '✅', iconBg: 'var(--chip-amber)', method: 'shortcuts', ingestSource: 'reminder', description: '通过快捷指令推送提醒，自动转为承诺' },
+  { id: 'keep', name: 'Keep 健康', icon: '🏃', iconBg: 'var(--chip-green)', method: 'shortcuts', ingestSource: 'keep', description: '通过快捷指令推送运动数据' },
+  { id: 'wechat_reading', name: '微信读书', icon: '📖', iconBg: 'var(--chip-leaf)', method: 'shortcuts', ingestSource: 'wechat_reading', description: '通过快捷指令推送阅读进度与笔记' },
+  { id: 'tesla', name: 'Tesla', icon: '🚗', iconBg: 'var(--chip-green)', method: 'oauth', description: '电量、行程信号，自动提醒充电', comingSoon: true },
 ];
 
 const CONNECTORS_KEY = 'nesio-connectors-v1';

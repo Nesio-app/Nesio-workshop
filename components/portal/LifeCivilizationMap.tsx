@@ -213,12 +213,15 @@ export default function LifeCivilizationMap({ nodes, isDemo = false }: Props) {
   const [colors, setColors] = useState<Record<string, string>>({});
   const [containerW, setContainerW] = useState(680);
 
+  // eslint-disable-next-line no-restricted-syntax -- 运行时 getComputedStyle 兜底需真实色值,镜像 --portal-blue-deep
+  const FALLBACK_DOMAIN_COLOR = '#588ce3';
+
   // Resolve CSS variable colors at runtime (Canvas/SVG can't use var())
   useEffect(() => {
     const cs = getComputedStyle(document.documentElement);
     const resolved: Record<string, string> = {};
     for (const d of DOMAINS) {
-      resolved[d.id] = cs.getPropertyValue(d.cssVar).trim() || '#588ce3';
+      resolved[d.id] = cs.getPropertyValue(d.cssVar).trim() || FALLBACK_DOMAIN_COLOR;
     }
     setColors(resolved);
   }, []);
@@ -329,7 +332,7 @@ export default function LifeCivilizationMap({ nodes, isDemo = false }: Props) {
           <g transform={`translate(${MARGIN.left},${MARGIN.top})`}>
             {/* Territory paths */}
             {paths.map(({ domainId, d }) => {
-              const col = colors[domainId] ?? '#588ce3';
+              const col = colors[domainId] ?? FALLBACK_DOMAIN_COLOR;
               const isDimmed = hovered !== null && hovered !== domainId;
               return (
                 <path
@@ -352,7 +355,7 @@ export default function LifeCivilizationMap({ nodes, isDemo = false }: Props) {
             {paths.map(({ domainId, labelX, labelY, labelVisible }) => {
               if (!labelVisible) return null;
               const domain = DOMAINS.find(d => d.id === domainId)!;
-              const col = colors[domainId] ?? '#588ce3';
+              const col = colors[domainId] ?? FALLBACK_DOMAIN_COLOR;
               const isDimmed = hovered !== null && hovered !== domainId;
               return (
                 <text

@@ -97,9 +97,9 @@ const TYPE_COLOR: Record<string, string> = {
   event:      'var(--portal-cool-accent)',
   health_state: 'var(--status-go)',
   person:     'var(--status-gentle)',
-  place:      '#3b82f6',
-  object:     '#64748b',
-  preference: '#ec4899',
+  place:      'var(--accent-info)',
+  object:     'var(--accent-slate)',
+  preference: 'var(--accent-rose)',
 };
 
 const TYPE_LABEL: Record<string, string> = {
@@ -380,7 +380,7 @@ function CommitmentStatusWidget({ nodes }: { nodes: LifeNode[] }) {
     { label: '已逾期', items: overdue, accent: 'var(--status-risk)' },
     { label: '即将到期（3天内）', items: dueSoon, accent: 'var(--status-gentle)' },
     { label: '进行中', items: pending, accent: 'var(--portal-cool-accent)' },
-    { label: '无截止日', items: noDate, accent: '#94a3b8' },
+    { label: '无截止日', items: noDate, accent: 'var(--accent-muted)' },
   ].filter((g) => g.items.length > 0);
 
   return (

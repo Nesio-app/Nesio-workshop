@@ -102,29 +102,29 @@ export default function NesioProfileCard() {
     { key: 'tone' as ActiveSheet, icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="20" height="20">
           <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8"/>
-        </svg>), iconBg: '#e0e7ff', label: '表达方式', sublabel: '你决定 Nesio 怎么说、什么时候少打扰' },
+        </svg>), iconBg: 'var(--chip-indigo)', label: '表达方式', sublabel: '你决定 Nesio 怎么说、什么时候少打扰' },
     { key: 'privacy' as ActiveSheet, icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="20" height="20">
           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-        </svg>), iconBg: '#d1fae5', label: '我的数据', sublabel: '你能查看、导出或删除 Nesio 记住的内容' },
+        </svg>), iconBg: 'var(--chip-green)', label: '我的数据', sublabel: '你能查看、导出或删除 Nesio 记住的内容' },
     { key: 'subscription' as ActiveSheet, icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="20" height="20">
           <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-        </svg>), iconBg: '#fef9c3', label: '早期体验', sublabel: '全功能免费 · 通知我开放收费版' },
+        </svg>), iconBg: 'var(--chip-lemon)', label: '早期体验', sublabel: '全功能免费 · 通知我开放收费版' },
     { key: 'connectors' as ActiveSheet, icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="20" height="20">
           <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/>
           <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/>
-        </svg>), iconBg: '#dbeafe', label: '数据接入', sublabel: 'Gmail · Calendar · 天气 · Tesla' },
+        </svg>), iconBg: 'var(--chip-blue)', label: '数据接入', sublabel: 'Gmail · Calendar · 天气 · Tesla' },
     { key: 'health' as ActiveSheet, icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="20" height="20">
           <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
-        </svg>), iconBg: '#fce7f3', label: '健康记录', sublabel: '记录今日症状、睡眠、精力' },
+        </svg>), iconBg: 'var(--chip-pink)', label: '健康记录', sublabel: '记录今日症状、睡眠、精力' },
     { key: 'places' as ActiveSheet, icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="20" height="20">
           <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
           <circle cx="12" cy="9" r="2.5"/>
-        </svg>), iconBg: '#ecfdf5', label: '命名地点', sublabel: '家、公司、常去的地方 · 拍照自动匹配' },
+        </svg>), iconBg: 'var(--chip-frost)', label: '命名地点', sublabel: '家、公司、常去的地方 · 拍照自动匹配' },
   ];
 
   return (

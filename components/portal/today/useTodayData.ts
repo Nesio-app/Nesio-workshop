@@ -41,7 +41,7 @@ const EMPTY_SIGNAL_CARDS: RecommendationCard[] = [
     confidence: 0.6,
     urgency: 1,
     icon: '✦',
-    iconBg: '#8b9cf6',
+    iconBg: 'var(--chip-periwinkle)',
     title: '先放进来一件事就好',
     body: '说一句、拍一下，Nesio 会帮你留到以后找得到。',
     tags: ['本地优先 · 可确认'],

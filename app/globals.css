@@ -17,6 +17,36 @@
   --emotion-frustrated: #FF8A65;
   --emotion-angry: #EF5350;
 
+  /* Chip pastels(节点类型底色/连接器图标底)— data palette, theme-stable */
+  --chip-indigo: #e0e7ff;
+  --chip-blue:   #dbeafe;
+  --chip-green:  #d1fae5;
+  --chip-amber:  #fef3c7;
+  --chip-violet: #ede9fe;
+  --chip-pink:   #fce7f3;
+  --chip-mint:   #f0fdf4;
+  --chip-gray:   #f3f4f6;
+  --chip-red:    #fee2e2;
+  --chip-leaf:   #dcfce7;
+  --chip-lemon:  #fef9c3;
+  --chip-frost:  #ecfdf5;
+  --chip-fog:    #f0f4ff;
+  --chip-periwinkle: #8b9cf6;
+
+  /* Avatar pastels(人物首字头像,比 chip 深一档) */
+  --avatar-indigo: #c7d2fe;
+  --avatar-blue:   #bfdbfe;
+  --avatar-mint:   #a7f3d0;
+  --avatar-pink:   #fbcfe8;
+  --avatar-amber:  #fde68a;
+  --avatar-violet: #ddd6fe;
+
+  /* Insight accents(洞察分组/类型强调色) */
+  --accent-info:  #3b82f6;
+  --accent-slate: #64748b;
+  --accent-rose:  #ec4899;
+  --accent-muted: #94a3b8;
+
   --cream: #F7F5F0;
   --beige: #E8E4DC;
   --charcoal: #2C2C2C;
