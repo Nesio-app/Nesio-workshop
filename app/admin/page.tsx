@@ -29,6 +29,7 @@ interface Metrics {
   funnel30d?: Array<{ step: string; devices: number }>;
   ai?: { totals: { calls: number; estCostUsd: number; okRate: number | null; avgLatencyMs: number | null }; routes: Array<{ route: string; calls: number; okRate: number; avgLatencyMs: number; estCostUsd: number }> };
   smartness?: { score: number; dims: Array<{ dim: string; score: number; thin: boolean }> };
+  clientErrors?: Array<{ kind: string; message: string; count: number; devices: number; lastAt: string }>;
   roadmapVotes?: Array<{ id: string; title: string; status: string; avg: number | null; count: number }>;
   experiments?: Array<{ id: string; name: string; enabled: boolean; variants: Array<{ variant: string; devices: number }> }>;
   cardFeedback30d?: { useful: number; wrong: number; too_much: number; other: number };
@@ -85,6 +86,40 @@ export default function AdminPage() {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [autoRefresh, load]);
 
+  function exportCsv() {
+    if (!data?.ok) return;
+    const lines: string[] = [];
+    const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    lines.push('# Nesio 数据导出,' + new Date().toISOString());
+    lines.push('');
+    lines.push('## 每日趋势');
+    lines.push('date,events,devices');
+    for (const d of data.daily60d || []) lines.push(`${d.date},${d.events},${d.devices}`);
+    lines.push('');
+    lines.push('## Top 事件(7天)');
+    lines.push('event,count');
+    for (const e of data.topEvents7d || []) lines.push(`${esc(e.name)},${e.count}`);
+    lines.push('');
+    lines.push('## AI 调用(30天)');
+    lines.push('route,calls,ok_rate,avg_latency_ms,est_cost_usd');
+    for (const r of data.ai?.routes || []) lines.push(`${esc(r.route)},${r.calls},${r.okRate},${r.avgLatencyMs},${r.estCostUsd}`);
+    lines.push('');
+    lines.push('## 功能许愿榜');
+    lines.push('feature,status,avg,votes');
+    for (const v of data.roadmapVotes || []) lines.push(`${esc(v.title)},${v.status},${v.avg ?? ''},${v.count}`);
+    lines.push('');
+    lines.push('## 客户端错误(30天)');
+    lines.push('kind,message,count,devices,last_at');
+    for (const e of data.clientErrors || []) lines.push(`${esc(e.kind)},${esc(e.message)},${e.count},${e.devices},${e.lastAt}`);
+    const blob = new Blob(['\ufeff' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `nesio-metrics-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   const all = data?.daily60d || [];
   const daily = all.slice(-range);
   const prevDaily = all.slice(-range * 2, -range);
@@ -105,6 +140,9 @@ export default function AdminPage() {
           </button>
           <button type="button" style={chip(false)} onClick={() => void load(localStorage.getItem(SECRET_KEY) || '')} disabled={loading}>
             {loading ? '…' : '刷新'}
+          </button>
+          <button type="button" style={chip(false)} onClick={exportCsv} disabled={!data?.ok} title="导出全部数据为 CSV(Excel 可直接打开)">
+            ⤓ CSV
           </button>
         </div>
       </header>
@@ -268,6 +306,21 @@ export default function AdminPage() {
                 </div>
               ))}
             </div>
+          </section>
+
+          {/* ── 客户端错误(错误自己来找你) ── */}
+          <section style={{ ...card, marginBottom: '0.9rem', ...(data.clientErrors?.length ? { borderColor: 'var(--status-risk)' } : {}) }}>
+            <p style={{ ...label, margin: '0 0 0.5rem' }}>客户端错误(30 天,来自用户浏览器的自动上报)</p>
+            {(data.clientErrors?.length ?? 0) === 0
+              ? <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--status-go)' }}>✓ 没有错误上报 — 用户端一切干净。</p>
+              : data.clientErrors!.map((e) => (
+                <div key={`${e.kind}:${e.message}`} style={{ display: 'flex', justifyContent: 'space-between', gap: '0.6rem', padding: '0.35rem 0', borderTop: '1px solid var(--portal-line)', fontSize: '0.76rem' }}>
+                  <span style={{ color: 'var(--portal-ink)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <span style={{ color: 'var(--status-risk)', marginRight: 6 }}>{e.kind}</span>{e.message}
+                  </span>
+                  <span style={{ color: 'var(--portal-muted)', whiteSpace: 'nowrap' }}>×{e.count} · {e.devices} 台 · {e.lastAt.slice(5, 16).replace('T', ' ')}</span>
+                </div>
+              ))}
           </section>
 
           {/* ── 反馈 + 产品事件 ── */}

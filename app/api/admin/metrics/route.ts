@@ -202,6 +202,25 @@ export async function GET(req: NextRequest) {
     variants: e.variants.map((v) => ({ variant: v, devices: expAgg.get(e.id)?.get(v)?.size || 0 })),
   }));
 
+  // ── 客户端错误聚合(client_error 遥测,30 天)——错误自己来找你 ──
+  const errAgg = new Map<string, { count: number; devices: Set<string>; lastAt: string; kind: string; message: string }>();
+  for (const r of telemetry.rows) {
+    if (r.name !== 'client_error' || new Date(r.at).getTime() < cut(30)) continue;
+    const p = (r.props || {}) as { kind?: string; message?: string };
+    const kind = typeof p.kind === 'string' ? p.kind : 'error';
+    const message = typeof p.message === 'string' ? p.message : 'unknown';
+    const sig = `${kind}:${message}`;
+    if (!errAgg.has(sig)) errAgg.set(sig, { count: 0, devices: new Set(), lastAt: r.at, kind, message });
+    const e = errAgg.get(sig)!;
+    e.count += 1;
+    e.devices.add(r.device_id);
+    if (r.at > e.lastAt) e.lastAt = r.at;
+  }
+  const clientErrors = [...errAgg.values()]
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10)
+    .map((e) => ({ kind: e.kind, message: e.message, count: e.count, devices: e.devices.size, lastAt: e.lastAt }));
+
   // ── 洞察引擎:面板不该让人自己找问题——规则先替你看一遍 ──
   const dayEvents = (offsetDays: number, spanDays: number) =>
     telemetry.rows.filter((r) => {
@@ -262,6 +281,12 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  const errTotal = clientErrors.reduce((sum, e) => sum + e.count, 0);
+  if (errTotal >= 5) {
+    const top = clientErrors[0];
+    insights.push({ severity: 'risk', title: `客户端错误 ${errTotal} 次(30 天)`, detail: `最高频:「${top.message}」×${top.count},影响 ${top.devices} 台设备。`, advice: '看下方「客户端错误」区,把最高频那条丢给修复流程(issue 打 claude-fix 标签)。' });
+  }
+
   if (aiTotals.okRate !== null && aiTotals.okRate < 90 && aiTotals.calls >= 10) {
     insights.push({ severity: 'gentle', title: `AI 成功率 ${aiTotals.okRate}%`, detail: `30 天 ${aiTotals.calls} 次调用有失败,看「AI 调用」表里哪条路由最差。`, advice: '成功率最低的路由优先查 key 配额/兜底链;fallback 生效时用户无感但成本翻倍。' });
   }
@@ -276,6 +301,7 @@ export async function GET(req: NextRequest) {
     insights,
     deltas,
     ai: { totals: aiTotals, routes: aiRoutes.slice(0, 8) },
+    clientErrors,
     smartness: { score: smartScore, dims: smartness.dims },
     roadmapVotes,
     experiments,
