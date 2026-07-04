@@ -59,6 +59,15 @@
 | 安全循环(audit/route 守卫/文档新鲜度) | `npm run report:security-loop` + loops.yml | 每周 |
 | AI 成本(telemetry 汇总) | `npm run report:ai-cost` | 每月/手动 |
 
+## 命名词典(易混项)
+
+- **DEC(两个,互不相关)**:lib/intelligence/dec.ts = Decision Engine
+  (跨域推荐引擎,PRD Ch.36);lib/portal/dec-data-* = 运营数据目录
+  (只读 reporting API,/api/data/v1/dec)。物理改名被否决:URL 是公开
+  契约、2 个契约测试钉文件名,注释消歧成本更低。
+- **guidance vs DEC**:guidance-engine 是渲染管线(7 层仲裁),DEC 卡
+  经 decCardsToGuidanceEvents 作为一个来源汇入它。
+
 ## 模式速查
 
 - Lab 模式:URL `?baohePersonal=1` 进入,`?baohePublic=1` 退出;viewerRole

@@ -6,7 +6,14 @@ const root = process.cwd();
 const read = (file) => readFileSync(join(root, file), 'utf8');
 
 const portal = read('components/portal/Portal.tsx');
-const todayFeed = read('components/portal/TodayFeed.tsx');
+// Today 表面已按工程 PRD 拆分(容器+today/);契约约束整个表面
+const todayFeed = [
+  read('components/portal/TodayFeed.tsx'),
+  read('components/portal/today/useTodayData.ts'),
+  read('components/portal/today/ProactiveGuidanceCard.tsx'),
+  read('components/portal/today/FocusSection.tsx'),
+  read('components/portal/today/FocusCardDetail.tsx'),
+].join('\n');
 const dailyBrief = read('components/portal/DailyBriefCard.tsx');
 const todayViewModel = read('lib/platform/view-models/today-view-model.ts');
 const memoryTab = read('components/portal/MemoryTab.tsx');

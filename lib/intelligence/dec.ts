@@ -1,6 +1,9 @@
 /**
  * DEC — Decision Engine (PRD Ch.36 / v3.0).
  *
+ * ⚠️ 命名消歧:与 lib/portal/dec-data-*(运营数据目录 API)无关,
+ * 那是另一个 "DEC"。详见 STATE.md 命名词典。
+ *
  * The cross-domain reasoning center. Belongs to no single domain. It does NOT
  * hold rules anymore — it discovers Domain Engines from the registry, gathers
  * their recommendation candidates, then applies platform governance:

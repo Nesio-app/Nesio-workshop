@@ -63,6 +63,9 @@ const modalFiles = uiSources.filter((f) =>
   /components\/portal/.test(f.path) && /(Sheet|Overlay|Popup|Detail)\.tsx$/.test(f.path),
 );
 for (const f of modalFiles) {
+  // Detail 后缀但无 overlay/backdrop 的是内嵌展开视图,不是弹层
+  const isOverlay = /overlay|backdrop|aria-modal/i.test(f.src);
+  if (f.path.endsWith('Detail.tsx') && !isOverlay) continue;
   const hasExit = EXIT_MARKERS.some((m) => f.src.includes(m));
   if (!hasExit) {
     findings.push({ kind: 'modal_no_exit', detail: `${f.path} 未发现退出通路(onClose/关闭按钮)— 违反设计系统 Always an exit` });

@@ -1,3 +1,10 @@
+/**
+ * ⚠️ 命名消歧:本仓库有两个互不相关的 "DEC"。
+ * 这里(dec-data-*)是 **运营数据目录**(ops/reporting 只读 API,
+ * /api/data/v1/dec,类别: network/modules/artifacts/gates/metrics…)。
+ * 它与 lib/intelligence/dec.ts 的 **Decision Engine**(PRD Ch.36 跨域
+ * 推荐引擎)没有任何关系。详见 STATE.md 命名词典。
+ */
 export type DecCategory =
   | 'network'
   | 'modules'

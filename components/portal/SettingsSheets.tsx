@@ -189,6 +189,7 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
   const [requestingLoc, setRequestingLoc] = useState(false);
   const [restoreMsg, setRestoreMsg] = useState('');
   const [lastBackupAt, setLastBackupAt] = useState<string | null>(null);
+  const [labOn, setLabOn] = useState(false);
   const importRef = useRef<HTMLInputElement>(null);
 
   function exportFullBackup() {
@@ -227,7 +228,10 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
     if (!open) return;
     setDeleted(false);
     setNodeCount(getLifeGraph().length);
-    try { setLastBackupAt(localStorage.getItem('nesio-last-backup-at')); } catch { /* ignore */ }
+    try {
+      setLastBackupAt(localStorage.getItem('nesio-last-backup-at'));
+      setLabOn(localStorage.getItem('baohe_personal_lab') === '1' || localStorage.getItem('baohe_lab_mode') === '1');
+    } catch { /* ignore */ }
     navigator.permissions?.query({ name: 'geolocation' }).then((r) => {
       setLocationGranted(r.state === 'granted');
     }).catch(() => setLocationGranted(null));
@@ -239,6 +243,20 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
       () => { setLocationGranted(true); setRequestingLoc(false); },
       () => { setLocationGranted(false); setRequestingLoc(false); },
     );
+  }
+
+  function toggleLab() {
+    try {
+      if (labOn) {
+        localStorage.removeItem('baohe_personal_lab');
+        localStorage.removeItem('baohe_lab_mode');
+        sessionStorage.removeItem('baohe_personal_lab');
+        sessionStorage.removeItem('baohe_lab_mode');
+      } else {
+        localStorage.setItem('baohe_personal_lab', '1');
+      }
+    } catch { /* ignore */ }
+    window.location.reload(); // launch-surface resolver 在加载时读取
   }
 
   function clearAllMemory() {
@@ -330,6 +348,23 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
 
       <button type="button" className="nesio-settings-danger-btn" onClick={clearAllMemory}>
         {deleted ? '✓ 已清除' : '清除所有 Memory'}
+      </button>
+
+      <p className="nesio-settings-section-label" style={{ marginTop: '1.5rem' }}>实验功能</p>
+      <button type="button"
+        className={`nesio-settings-option${labOn ? ' nesio-settings-option--active' : ''}`}
+        onClick={toggleLab}>
+        <div>
+          <span className="nesio-settings-option-label">Lab 模式 {labOn ? '· 已开启' : ''}</span>
+          <span className="nesio-settings-option-hint">
+            {labOn
+              ? '实验工具和预览功能已解锁。关闭后回到公开版。'
+              : '解锁实验工具和预览功能。之前需要 ?baohePersonal=1 参数,现在点这里就行。'}
+          </span>
+        </div>
+        <span className={`nesio-settings-space-check${labOn ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>
+          {labOn ? '✓' : '○'}
+        </span>
       </button>
     </SheetWrap>
   );

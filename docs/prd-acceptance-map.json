@@ -6,14 +6,14 @@
       "id": "TODAY-001",
       "description": "Today 数据源统一改为 Guidance Service,不直接 import connector client",
       "marker": "runGuidancePipeline({",
-      "file": "components/portal/TodayFeed.tsx",
+      "file": "components/portal/today/useTodayData.ts",
       "status_note": "已满足:DEC 卡经 decCardsToGuidanceEvents 汇入 guidance 管线,单一服务仲裁"
     },
     {
       "id": "TODAY-002",
       "description": "每张卡必须显示 Recommendation + Reason + Evidence,可展开看证据",
       "marker": "decCardsToGuidanceEvents",
-      "file": "components/portal/TodayFeed.tsx",
+      "file": "components/portal/today/useTodayData.ts",
       "status_note": "已实现:GuidanceCard 携带 evidence(EvidenceRef[])+reason,卡片 UI 依据▸可展开"
     },
     {
@@ -27,14 +27,14 @@
       "id": "TODAY-004",
       "description": "每张卡提供 有用/不准/不再提醒 反馈并写回",
       "marker": "recordCardFeedback",
-      "file": "components/portal/TodayFeed.tsx",
+      "file": "components/portal/today/ProactiveGuidanceCard.tsx",
       "status_note": "已实现:卡片反馈行 有用/不准/不再提醒 → recordCardFeedback,DEC 下轮过滤"
     },
     {
       "id": "TODAY-005",
       "description": "卡片必须有过期策略,过期自动消失",
       "marker": "expiresAt",
-      "file": "components/portal/TodayFeed.tsx",
+      "file": "components/portal/today/useTodayData.ts",
       "status_note": "已实现(computeExpiry + 渲染层过滤)"
     }
   ]

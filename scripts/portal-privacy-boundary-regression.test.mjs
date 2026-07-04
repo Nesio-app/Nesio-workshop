@@ -7,7 +7,14 @@ const read = (file) => readFileSync(join(root, file), 'utf8');
 
 const analyzeRoute = read('app/api/portal/analyze/route.ts');
 const gmailRoute = read('app/api/portal/gmail/route.ts');
-const todayFeed = read('components/portal/TodayFeed.tsx');
+// Today 表面已按工程 PRD 拆分(容器+today/);契约约束整个表面
+const todayFeed = [
+  read('components/portal/TodayFeed.tsx'),
+  read('components/portal/today/useTodayData.ts'),
+  read('components/portal/today/ProactiveGuidanceCard.tsx'),
+  read('components/portal/today/FocusSection.tsx'),
+  read('components/portal/today/FocusCardDetail.tsx'),
+].join('\n');
 const lifeStateRoute = read('app/api/portal/life-state/route.ts');
 
 assert.match(analyzeRoute, /isAnalyzeAiAllowed/, 'analyze route must gate real AI provider calls');
