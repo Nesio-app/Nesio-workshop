@@ -14,6 +14,9 @@ const todayFeed = [
   read('components/portal/today/ProactiveGuidanceCard.tsx'),
   read('components/portal/today/FocusSection.tsx'),
   read('components/portal/today/FocusCardDetail.tsx'),
+  read('components/portal/today/CalendarCards.tsx'),
+  read('components/portal/today/DormantReviewCard.tsx'),
+  read('components/portal/today/NightTimeline.tsx'),
 ].join('\n');
 const lifeStateRoute = read('app/api/portal/life-state/route.ts');
 

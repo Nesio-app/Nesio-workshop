@@ -26,12 +26,18 @@
 
 | 文件 | 行数 | 类型 | 状态 |
 |---|---|---|---|
-| TodayFeed.tsx | 164 | 容器 | ✅ |
+| TodayFeed.tsx | 165 | 容器 | ✅ |
 | today/useTodayData.ts | 291 | 数据编排 hook | ✅ |
-| today/FocusSection.tsx | 676 | 展示 | ⚠️ 超标,文件头已注明;后续拆 DormantReviewCard/NightTimeline |
+| today/FocusSection.tsx | 298 | 编排 | ✅(2026-07-04 二次拆分) |
+| today/CalendarCards.tsx | 137 | 展示 | ✅ |
+| today/DormantReviewCard.tsx | 105 | 展示 | ✅ |
+| today/NightTimeline.tsx | 39 | 展示 | ✅ |
 | today/FocusModeSheet.tsx | 328 | 展示 | ⚠️ 轻微超标 |
 | today/FocusCardDetail.tsx | 242 | 展示 | ✅ |
 | today/ProactiveGuidanceCard.tsx | 119 | 展示 | ✅ |
+
+二次拆分时顺带删除了两个死组件(CalendarItemCard/TomorrowEventsGroup,
+被 attention-engine 折叠列表取代后无引用)。
 
 ## 3. 契约测试迁移/退役表(2026-07-04 完成)
 
@@ -86,4 +92,4 @@
 1. Signal M3/M4 读切换(见 §5)
 2. 新代 i18n 完整包:REG-004(TodayFeed)+ REG-006(onboarding 剩余步)
 3. 57 处存量 raw hex(adherence lint 已 warn,待 token 化)
-4. FocusSection 676 行进一步拆分(DormantReviewCard / NightTimeline)
+4. ~~FocusSection 进一步拆分~~(✅ 2026-07-04,见 §2)

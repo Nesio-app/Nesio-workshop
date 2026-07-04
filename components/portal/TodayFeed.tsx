@@ -26,7 +26,8 @@ import DailyBriefCard from './DailyBriefCard';
 import dynamic from 'next/dynamic';
 import { buildTimeFallback, dismissProactiveById, isProactiveCardDismissed, type ProactiveCardData } from './today/proactive-types';
 import { ProactiveGuidanceCard } from './today/ProactiveGuidanceCard';
-import { TodayFocusSection, NightTimeline } from './today/FocusSection';
+import { TodayFocusSection } from './today/FocusSection';
+import { NightTimeline } from './today/NightTimeline';
 import { useTodayData } from './today/useTodayData';
 import { FocusModeSheet, MeetingRecorderSheet } from './today/FocusModeSheet';
 

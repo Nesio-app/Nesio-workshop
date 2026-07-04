@@ -13,6 +13,9 @@ const todayFeed = [
   read('components/portal/today/ProactiveGuidanceCard.tsx'),
   read('components/portal/today/FocusSection.tsx'),
   read('components/portal/today/FocusCardDetail.tsx'),
+  read('components/portal/today/CalendarCards.tsx'),
+  read('components/portal/today/DormantReviewCard.tsx'),
+  read('components/portal/today/NightTimeline.tsx'),
 ].join('\n');
 const dailyBrief = read('components/portal/DailyBriefCard.tsx');
 const todayViewModel = read('lib/platform/view-models/today-view-model.ts');
