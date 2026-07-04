@@ -63,6 +63,8 @@ Auth legend:
 |---|---|
 | POST /api/telemetry | anonymous-by-design (same-origin + 60/min) — event names/props whitelisted & truncated; 匿名设备级计数,QA P1 修复 2026-07-04 |
 | GET /api/admin/metrics | same-origin + NESIO_ADMIN_SECRET header + 30/min — 管理面板聚合只读(telemetry_events/product_events),只回统计不回原始行 |
+| GET/PATCH /api/admin/users | requireAdmin(同 metrics 门)— 用户权限管理:列用户/改 access_role/feature_flags |
+| GET /api/portal/access | same-origin + 30/min,匿名回 public — 登录用户领取服务器授予的角色;personal_lab 顺带下发 secretary lab cookie |
 
 ## Known-open routes
 

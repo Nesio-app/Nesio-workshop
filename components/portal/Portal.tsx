@@ -258,6 +258,31 @@ export default function Portal() {
     setLocale(loadProfileSettings().locale);
   }, []);
 
+  // 服务器授予的访问角色(权限管理):登录后领取,只增不减地并入
+  // 浏览器侧上下文(personal_lab > tester > public;flags=true 的模块
+  // 进 testerAllowlist)。管理员在 /admin 改角色,用户下次加载生效。
+  useEffect(() => {
+    if (!canUsePrivateRuntime) return;
+    let cancelled = false;
+    void fetch('/api/portal/access', { credentials: 'same-origin' })
+      .then((res) => res.json() as Promise<{ ok?: boolean; role?: string; featureFlags?: Record<string, boolean> }>)
+      .then((access) => {
+        if (cancelled || !access?.ok) return;
+        const rank = { public: 0, tester: 1, personal_lab: 2 } as const;
+        const serverRole = access.role === 'personal_lab' ? 'personal_lab' : access.role === 'tester' ? 'tester' : 'public';
+        const grantedModules = Object.entries(access.featureFlags || {})
+          .filter(([, on]) => on === true)
+          .map(([id]) => id);
+        setLaunchSurfaceContext((prev) => ({
+          ...prev,
+          viewerRole: rank[serverRole] > rank[prev.viewerRole] ? serverRole : prev.viewerRole,
+          testerAllowlist: Array.from(new Set([...prev.testerAllowlist, ...grantedModules])),
+        }));
+      })
+      .catch(() => { /* 领取失败按本机上下文继续 */ });
+    return () => { cancelled = true; };
+  }, [canUsePrivateRuntime]);
+
   useEffect(() => {
     const onOnboardingVisibility = (event: Event) => {
       const detail = (event as CustomEvent<{ active?: boolean }>).detail;

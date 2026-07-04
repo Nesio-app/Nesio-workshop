@@ -8,7 +8,8 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { FeedbackDonut, FunnelSteps, TopEventsChart, TrendChart, type DailyPoint } from './MetricsCharts';
+import { Delta, FeedbackDonut, FunnelSteps, InsightCard, TopEventsChart, TrendChart, type DailyPoint } from './MetricsCharts';
+import { UserAccess } from './UserAccess';
 
 const SECRET_KEY = 'nesio_admin_secret';
 const RANGES = [7, 14, 30] as const;
@@ -21,8 +22,10 @@ interface Metrics {
   generatedAt?: string;
   sources?: { telemetryEvents: { ok: boolean; error?: string; rows?: number }; productEvents: { ok: boolean; error?: string; rows?: number } };
   windows?: { today: { events: number; devices: number }; week: { events: number; devices: number }; month: { events: number; devices: number } };
+  insights?: Array<{ severity: 'go' | 'gentle' | 'risk'; title: string; detail: string; advice: string }>;
+  deltas?: { todayVsYesterday: number | null; weekVsPrevWeek: number | null };
   topEvents7d?: Array<{ name: string; count: number }>;
-  daily30d?: DailyPoint[];
+  daily60d?: DailyPoint[];
   funnel30d?: Array<{ step: string; devices: number }>;
   cardFeedback30d?: { useful: number; wrong: number; too_much: number; other: number };
   productEvents30d?: Array<{ type: string; count: number }>;
@@ -78,7 +81,9 @@ export default function AdminPage() {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [autoRefresh, load]);
 
-  const daily = (data?.daily30d || []).slice(-range);
+  const all = data?.daily60d || [];
+  const daily = all.slice(-range);
+  const prevDaily = all.slice(-range * 2, -range);
   const rangeEvents = daily.reduce((s, d) => s + d.events, 0);
   const rangeDevices = Math.max(0, ...daily.map((d) => d.devices));
 
@@ -150,17 +155,23 @@ export default function AdminPage() {
             </section>
           )}
 
+          {/* ── 洞察与建议(规则引擎替你先看一遍) ── */}
+          <section style={{ marginBottom: '0.9rem' }}>
+            <p style={{ ...label, margin: '0 0 0.5rem' }}>洞察与建议</p>
+            {data.insights?.map((ins) => <InsightCard key={ins.title} {...ins} />)}
+          </section>
+
           {/* ── KPI 行 ── */}
           <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.7rem', marginBottom: '0.9rem' }}>
             {([
-              ['今日事件', data.windows?.today.events, `${data.windows?.today.devices ?? 0} 台设备`],
-              [`${range} 天事件`, rangeEvents, '所选范围'],
-              ['单日峰值设备', rangeDevices, `${range} 天内`],
-              ['30 天设备', data.windows?.month.devices, `${data.windows?.month.events ?? 0} 事件`],
-            ] as const).map(([name, value, sub]) => (
+              ['今日事件', data.windows?.today.events, `${data.windows?.today.devices ?? 0} 台设备`, data.deltas?.todayVsYesterday],
+              ['7 天事件', data.windows?.week.events, '对比前 7 天', data.deltas?.weekVsPrevWeek],
+              ['单日峰值设备', rangeDevices, `${range} 天内`, null],
+              ['30 天设备', data.windows?.month.devices, `${data.windows?.month.events ?? 0} 事件`, null],
+            ] as const).map(([name, value, sub, delta]) => (
               <div key={name} style={card}>
                 <p style={{ ...label, margin: '0 0 0.3rem' }}>{name}</p>
-                <p style={{ ...big, margin: 0 }}>{value ?? 0}</p>
+                <p style={{ ...big, margin: 0 }}>{value ?? 0}<Delta value={delta} /></p>
                 <p style={{ ...label, margin: '0.2rem 0 0' }}>{sub}</p>
               </div>
             ))}
@@ -169,10 +180,10 @@ export default function AdminPage() {
           {/* ── 趋势 ── */}
           <section style={{ ...card, marginBottom: '0.9rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-              <p style={{ ...label, margin: 0 }}>{range} 天趋势 — 事件(面积)/ 独立设备(线)</p>
+              <p style={{ ...label, margin: 0 }}>{range} 天趋势 — 事件(面积)/ 设备(绿线)/ 上一周期(灰虚线)</p>
               <span style={label}>{data.generatedAt ? `更新 ${new Date(data.generatedAt).toLocaleTimeString('zh-CN')}` : ''}</span>
             </div>
-            <TrendChart data={daily} />
+            <TrendChart data={daily} prev={prevDaily.length === daily.length ? prevDaily : undefined} />
           </section>
 
           {/* ── Top 事件 + 漏斗 ── */}
@@ -208,6 +219,14 @@ export default function AdminPage() {
                 </div>
               ))}
             </div>
+          </section>
+          {/* ── 用户权限管理 ── */}
+          <section style={{ ...card, marginTop: '0.9rem' }}>
+            <p style={{ ...label, margin: '0 0 0.2rem' }}>用户权限管理</p>
+            <p style={{ ...label, margin: '0 0 0.7rem' }}>
+              角色:普通=公开功能;测试员=+下方勾选模块;Lab=全部实验功能与 secretary。改动即存,用户下次打开 App 生效。
+            </p>
+            <UserAccess secret={typeof window !== 'undefined' ? localStorage.getItem(SECRET_KEY) || '' : ''} />
           </section>
         </>
       )}

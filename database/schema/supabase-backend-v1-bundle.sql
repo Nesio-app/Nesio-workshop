@@ -1,5 +1,5 @@
 -- Nesio Supabase Backend v1 Bundle
--- Generated at 2026-07-04T15:02:36.060Z
+-- Generated at 2026-07-04T15:49:12.738Z
 -- Apply manually in Supabase SQL Editor after CEO-approved production data operation window.
 -- This file contains schema only. It does not contain secrets. It creates the private Storage bucket contract.
 
@@ -556,29 +556,5 @@ CREATE POLICY "product_events_insert_own"
   FOR INSERT
   TO authenticated
   WITH CHECK (user_id IS NOT NULL AND auth.uid() = user_id);
-
--- ── Telemetry events(匿名设备级计数)──────────────────────────────────────
--- This schema supports app/api/telemetry/route.ts (writes) and
--- app/api/admin/metrics/route.ts (aggregated reads).
--- Anonymous product telemetry: event name + coarse props + per-device id.
--- Never content. Writes/reads go through the service role only — RLS is
--- enabled with NO policies so anon/authenticated clients cannot touch it.
--- (缺表曾让遥测落库静默失败,2026-07-04 补齐。)
-
-CREATE TABLE IF NOT EXISTS public.telemetry_events (
-  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  name text NOT NULL,
-  props jsonb NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(props) = 'object'),
-  device_id text NOT NULL DEFAULT 'unknown',
-  at timestamptz NOT NULL DEFAULT now()
-);
-
-CREATE INDEX IF NOT EXISTS idx_telemetry_events_name_at
-  ON public.telemetry_events (name, at DESC);
-
-CREATE INDEX IF NOT EXISTS idx_telemetry_events_at
-  ON public.telemetry_events (at DESC);
-
-ALTER TABLE public.telemetry_events ENABLE ROW LEVEL SECURITY;
 
 COMMIT;

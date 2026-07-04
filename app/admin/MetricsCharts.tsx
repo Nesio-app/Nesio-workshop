@@ -25,9 +25,13 @@ const tooltipStyle: React.CSSProperties = {
 
 export interface DailyPoint { date: string; events: number; devices: number }
 
-/** 每日事件(面积)+ 独立设备(折线)双轴趋势 */
-export function TrendChart({ data }: { data: DailyPoint[] }) {
-  const points = data.map((d) => ({ ...d, day: d.date.slice(5) }));
+/** 每日事件(面积)+ 独立设备(折线)+ 上一周期(灰虚线)趋势 */
+export function TrendChart({ data, prev }: { data: DailyPoint[]; prev?: DailyPoint[] }) {
+  const points = data.map((d, i) => ({
+    ...d,
+    day: d.date.slice(5),
+    prevEvents: prev?.[i]?.events ?? null,
+  }));
   return (
     <ResponsiveContainer width="100%" height={220}>
       <ComposedChart data={points} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
@@ -41,7 +45,8 @@ export function TrendChart({ data }: { data: DailyPoint[] }) {
         <XAxis dataKey="day" tick={{ fontSize: 10, fill: MUTED }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
         <YAxis tick={{ fontSize: 10, fill: MUTED }} tickLine={false} axisLine={false} allowDecimals={false} />
         <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: MUTED }}
-          formatter={(v, name) => [String(v), name === 'events' ? '事件' : '设备']} />
+          formatter={(v, name) => [String(v ?? 0), name === 'events' ? '事件' : name === 'devices' ? '设备' : '上一周期']} />
+        <Line type="monotone" dataKey="prevEvents" stroke={MUTED} strokeWidth={1.2} strokeDasharray="4 4" dot={false} />
         <Area type="monotone" dataKey="events" stroke={ACCENT} strokeWidth={2} fill="url(#evFill)" />
         <Line type="monotone" dataKey="devices" stroke={GO} strokeWidth={1.6} dot={false} />
       </ComposedChart>
@@ -65,32 +70,73 @@ export function TopEventsChart({ data }: { data: Array<{ name: string; count: nu
   );
 }
 
-/** 使用漏斗:逐级条 + 相对上一步的转化率 */
+/** 使用漏斗:逐级条 + 相对上一步的转化率;转化最差的一步自动高亮为瓶颈 */
 export function FunnelSteps({ data }: { data: Array<{ step: string; devices: number }> }) {
   const max = Math.max(1, ...data.map((f) => f.devices));
+  const rates = data.map((f, i) => {
+    const prev = i === 0 ? null : data[i - 1].devices;
+    return prev && prev >= 3 ? Math.round((f.devices / prev) * 100) : null;
+  });
+  const validRates = rates.filter((r): r is number => r !== null);
+  const worstRate = validRates.length ? Math.min(...validRates) : null;
   return (
     <div>
       {data.map((f, i) => {
-        const prev = i === 0 ? null : data[i - 1].devices;
-        const rate = prev ? Math.round((f.devices / Math.max(1, prev)) * 100) : null;
+        const rate = rates[i];
+        const isBottleneck = worstRate !== null && rate === worstRate && rate < 40;
         return (
           <div key={f.step} style={{ marginBottom: '0.65rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: INK, marginBottom: 3 }}>
-              <span>{f.step}</span>
+              <span>
+                {f.step}
+                {isBottleneck && (
+                  <span style={{ marginLeft: 6, fontSize: '0.62rem', color: 'var(--status-risk)', border: '1px solid var(--status-risk)', borderRadius: 'var(--radius-pill)', padding: '0 0.4rem' }}>瓶颈</span>
+                )}
+              </span>
               <span>
                 {f.devices}
                 {rate !== null && (
-                  <span style={{ color: rate >= 50 ? GO : GENTLE, marginLeft: 6, fontSize: '0.68rem' }}>{rate}% ↓</span>
+                  <span style={{ color: isBottleneck ? 'var(--status-risk)' : rate >= 50 ? GO : GENTLE, marginLeft: 6, fontSize: '0.68rem' }}>{rate}% ↓</span>
                 )}
               </span>
             </div>
             <div style={{ height: 10, background: 'var(--portal-accent-soft)', borderRadius: 5 }}>
-              <div style={{ width: `${Math.max(2, Math.round((f.devices / max) * 100))}%`, height: '100%', background: GO, borderRadius: 5, transition: 'width 0.4s var(--ease-out)' }} />
+              <div style={{ width: `${Math.max(2, Math.round((f.devices / max) * 100))}%`, height: '100%', background: isBottleneck ? 'var(--status-risk)' : GO, borderRadius: 5, transition: 'width 0.4s var(--ease-out)' }} />
             </div>
           </div>
         );
       })}
     </div>
+  );
+}
+
+/** 洞察卡:严重度着色 + 描述 + 建议 */
+export function InsightCard({ severity, title, detail, advice }: { severity: 'go' | 'gentle' | 'risk'; title: string; detail: string; advice: string }) {
+  const color = severity === 'risk' ? 'var(--status-risk)' : severity === 'gentle' ? GENTLE : GO;
+  const soft = severity === 'risk' ? 'var(--status-risk-soft)' : severity === 'gentle' ? 'var(--status-gentle-soft)' : 'var(--status-go-soft)';
+  const icon = severity === 'risk' ? '⚠' : severity === 'gentle' ? '◐' : '✓';
+  return (
+    <div style={{ display: 'flex', gap: '0.7rem', padding: '0.75rem 0.9rem', borderRadius: 'var(--radius-md)', background: soft, borderLeft: `3px solid ${color}`, marginBottom: '0.5rem' }}>
+      <span style={{ color, fontSize: '1rem', lineHeight: 1.3 }} aria-hidden>{icon}</span>
+      <div style={{ minWidth: 0 }}>
+        <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: 700, color: INK }}>{title}</p>
+        <p style={{ margin: '0.15rem 0 0', fontSize: '0.76rem', color: INK, opacity: 0.85 }}>{detail}</p>
+        <p style={{ margin: '0.25rem 0 0', fontSize: '0.76rem', color }}>建议:{advice}</p>
+      </div>
+    </div>
+  );
+}
+
+/** KPI 环比箭头 */
+export function Delta({ value }: { value: number | null | undefined }) {
+  if (value === null || value === undefined) return null;
+  const up = value > 0;
+  const flat = value === 0;
+  const color = flat ? MUTED : up ? GO : GENTLE;
+  return (
+    <span style={{ color, fontSize: '0.72rem', marginLeft: 6 }}>
+      {flat ? '持平' : `${up ? '↑' : '↓'} ${Math.abs(value)}%`}
+    </span>
   );
 }
 

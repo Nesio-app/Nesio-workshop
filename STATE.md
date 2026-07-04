@@ -88,13 +88,20 @@ Signal M1-M4(读切换 + 删除传导)、REG-004/006 i18n 闭环
 - **guidance vs DEC**:guidance-engine 是渲染管线(7 层仲裁),DEC 卡
   经 decCardsToGuidanceEvents 作为一个来源汇入它。
 
-## 数据面板
+## 数据面板与权限管理
 
-- `/admin` — 自有管理面板(不依赖第三方):事件趋势/独立设备/漏斗/今日卡反馈,
-  数据源 = 自己 Supabase 的 telemetry_events + product_events,服务端聚合只回统计。
-- 生产激活两步:① Vercel 环境变量加 `NESIO_ADMIN_SECRET`(自定强密码);
-  ② Supabase SQL Editor 执行一次 database/schema/supabase-backend-v1-bundle.sql
-  (2026-07-04 起含 telemetry_events 表——此前该表缺失,遥测落库一直静默失败)。
+- `/admin` — 自有管理面板(不依赖第三方,recharts 图表层):
+  洞察引擎(环比涨跌/数据静默告警/漏斗瓶颈/推荐质量,每条带建议)、
+  KPI 环比箭头、趋势图叠上一周期虚线、漏斗瓶颈自动高亮、反馈环形图、
+  **用户权限管理**(见下)。数据源 = 自己 Supabase 的 telemetry_events +
+  product_events,服务端聚合只回统计。
+- **权限体系(2026-07-04)**:服务器权威角色在 user_profiles.access_role
+  (public/tester/personal_lab)+ feature_flags(模块开关)。
+  管理员在 /admin 设置 → 用户登录后经 GET /api/portal/access 领取,
+  只增不减地并入浏览器侧 launchSurfaceContext;personal_lab 顺带下发
+  secretary lab cookie。本机 URL/localStorage lab 开关保留(所有者工具)。
+- 生产激活:① Vercel 环境变量 `NESIO_ADMIN_SECRET`;② Supabase SQL Editor
+  跑 schema bundle(2026-07-04 起含 telemetry_events 表 + Access control 列)。
 
 ## 模式速查
 
