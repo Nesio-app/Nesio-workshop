@@ -76,3 +76,9 @@ open. If one of these starts touching AI or private data, move it up a table.
   任一连接器会同时断开另一个(UI 已同步提示)。
 - Token 存储: HTTP-only cookies(access 1h / refresh 90d),无 Supabase
   时不落库。
+
+## 移动端走查 (2026-07)
+
+通过:viewportFit cover + 74 处 safe-area-inset + dvh/svh 全覆盖(唯一
+100vh 为渐进增强回退)。图标按钮均有 aria-label。已知缺口:无
+visualViewport 键盘监听(Capacitor 壳内实测键盘正常,暂不投机修补)。
