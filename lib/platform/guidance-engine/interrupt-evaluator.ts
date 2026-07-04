@@ -47,6 +47,7 @@ const PREPARATION_VALUE: Record<GuidanceEventType, number> = {
   travel:       75,  // earlier prep = less last-minute stress
   birthday:     65,  // ordering gift earlier is meaningfully better
   anniversary:  65,
+  holiday:      45,  // 提前一天知道放假,安排活动更从容
   medical:      60,  // appointment is fixed; prep is helpful but not critical
   meeting:      55,  // 1h prep vs 30min prep is marginally better
   email_signal: 40,  // email can be handled anytime

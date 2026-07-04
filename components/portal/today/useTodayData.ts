@@ -31,7 +31,7 @@ import {
   decCardsToGuidanceEvents,
 } from '@/lib/platform/guidance-engine/source-adapters';
 import { cloudSignalRowsToSignals, type CloudSignalRow } from '@/lib/life-domain/signal-search';
-import { buildTimeFallback, isProactiveCardDismissed, type ProactiveCardData, registerDecCards } from './proactive-types';
+import { isProactiveCardDismissed, type ProactiveCardData, registerDecCards } from './proactive-types';
 
 const EMPTY_SIGNAL_CARDS: RecommendationCard[] = [
   {
@@ -227,12 +227,8 @@ export function useTodayData(canUsePrivateData: boolean) {
         }
 
         if (!cancelled && newProactiveCards.length > 0) setProactiveCards(newProactiveCards);
-
-        // Fallback time-based nudge when pipeline produces nothing
-        if (!cancelled && newProactiveCards.length === 0) {
-          const fallback = buildTimeFallback(now);
-          if (fallback && !isProactiveCardDismissed(fallback.id)) setProactiveCards([fallback]);
-        }
+        // 管线空窗时的兜底轮播移到 TodayFeed 渲染层(buildRotatingFallback):
+        // 那里能看到「被 dismiss 后还剩几张」,保证未来预测区永远有内容。
       }
     };
     void applyViewModel();

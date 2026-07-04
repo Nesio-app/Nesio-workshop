@@ -6,6 +6,7 @@ import { getLifeGraph, updateLifeNode, type LifeNode, type LifeNodeAsset } from 
 import { createAppApiClient } from '@/lib/portal/app-api-client';
 import { matchNearestPlace, formatLocation, getNamedPlaces } from '@/lib/portal/named-places';
 import LocationPicker from './LocationPicker';
+import { IconCamera, IconImage } from './icons';
 
 // ── Similarity check (拍照发现已有) ────────────────────────────────────────
 
@@ -39,7 +40,12 @@ function findSimilarObjects(name: string, tags: string[]): SimilarItem[] {
   return results.sort((a, b) => b.score - a.score).slice(0, 3);
 }
 
-interface CameraSheetProps { open: boolean; onClose: () => void; }
+interface CameraSheetProps {
+  open: boolean;
+  onClose: () => void;
+  /** 扇形按钮同手势拍到的照片 — 有它就跳过选择页直接进识别流。 */
+  initialFile?: File | null;
+}
 
 interface AnalyzedNode extends Omit<LifeNode, 'id' | 'createdAt'> {}
 
@@ -187,7 +193,7 @@ function dataUrlToFile(dataUrl: string, fileName: string): File | null {
   return new File([bytes], fileName, { type: mimeType || 'image/jpeg' });
 }
 
-export default function CameraSheet({ open, onClose }: CameraSheetProps) {
+export default function CameraSheet({ open, onClose, initialFile }: CameraSheetProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const selectCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -325,10 +331,13 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
     // Native camera: opened by a user tap (iOS blocks programmatic file-input
     // clicks outside a gesture). No getUserMedia → no persistent camera
     // indicator, no black-screen retry loop, no permission roundabout.
+    // 扇形按钮已在同一手势里拍好照片 → 直接进识别流,不显示选择页。
+    if (initialFile) void processFile(initialFile);
     return () => {
       stopCamera();
     };
-  }, [open, stopCamera]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, stopCamera, initialFile]);
 
   function openNativeCamera() { cameraInputRef.current?.click(); }
 
@@ -419,6 +428,10 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = '';
+    await processFile(file);
+  }
+
+  async function processFile(file: File) {
     setSourceFile(file);
 
     const reader = new FileReader();
@@ -727,7 +740,7 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
         {/* Capture chooser (native camera) / no-camera fallback */}
         {(phase === 'idle' || phase === 'no-camera') && (
           <div className="nesio-camera-chooser">
-            <span className="nesio-camera-chooser-icon" aria-hidden>📷</span>
+            <span className="nesio-camera-chooser-icon" aria-hidden><IconCamera size={30} /></span>
             <p className="nesio-camera-chooser-text">
               {phase === 'idle'
                 ? '拍一张，Nesio 帮你识别并存入 Memory'
@@ -740,7 +753,7 @@ export default function CameraSheet({ open, onClose }: CameraSheetProps) {
                 </button>
               )}
               <button type="button" className="nesio-camera-pick-btn" onClick={handleGallery}>
-                <span className="nesio-camera-pick-btn-icon" aria-hidden>🖼️</span>
+                <span className="nesio-camera-pick-btn-icon" aria-hidden><IconImage size={15} /></span>
                 相册
               </button>
             </div>

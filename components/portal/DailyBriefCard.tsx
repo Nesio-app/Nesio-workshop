@@ -65,11 +65,14 @@ export default function DailyBriefCard({
   memoryCount: _memoryCount,
   memoryNotes: _memoryNotesProp,
   circular,
+  compact,
 }: {
   canUsePrivateData: boolean;
   memoryCount: number;
   memoryNotes: readonly string[];
   circular?: boolean;
+  /** header 图标圆钮模式 — 只出状态图标,不占首屏版面。 */
+  compact?: boolean;
 }) {
   const [playState, setPlayState] = useState<PlayState>('idle');
   const [displayName, setDisplayName] = useState('');
@@ -300,6 +303,31 @@ export default function DailyBriefCard({
     setErrorMsg('');
     try { localStorage.removeItem(BRIEF_CACHE_KEY); } catch { /* ignore */ }
     void generateAndPlay();
+  }
+
+  // ── Compact mode(header 图标圆钮,批次 3)─────────────────────────────
+  if (compact) {
+    const isPlaying = playState === 'playing';
+    const isLoading = playState === 'loading';
+    const icon = isPlaying
+      ? <span className="nesio-brief-strip-wave nesio-brief-strip-wave--sm" aria-hidden>{Array.from({ length: 4 }, (_, i) => <span key={i} style={{ animationDelay: `${i * 0.12}s` }} />)}</span>
+      : isLoading ? <IconClock size={19} />
+      : playState === 'error' ? <IconAlertTriangle size={19} />
+      : playState === 'paused' ? <IconPlay size={19} />
+      : playState === 'done' ? <IconRefresh size={19} />
+      : <IconSpeaker size={19} />;
+    return (
+      <button
+        type="button"
+        className={`nesio-header-mini-btn${isPlaying ? ' nesio-header-mini-btn--active' : ''}`}
+        onClick={handlePlay}
+        aria-label="听简报"
+        title="听简报"
+        disabled={isLoading}
+      >
+        {icon}
+      </button>
+    );
   }
 
   // ── Circular mode ──────────────────────────────────────────────────────────

@@ -15,6 +15,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
+import { IconMoon, IconZap } from './icons';
 
 // ── 12-Emotion taxonomy (Russell Circumplex 4 quadrants × 3) ─────────────────
 const EMOTIONS = [
@@ -38,8 +39,8 @@ type EnergyLevel = 'high' | 'mid' | 'low';
 // ── SVG geometry ──────────────────────────────────────────────────────────────
 const N = EMOTIONS.length;
 const CX = 150, CY = 150;
-const R_IN = 52, R_OUT = 120;
-const R_LABEL = 82, R_EMOJI = 132;
+const R_IN = 52, R_OUT = 130;
+const R_LABEL = 91;
 const GAP = 1.5;
 
 function rad(d: number) { return (d * Math.PI) / 180; }
@@ -63,11 +64,6 @@ function midAngle(i: number): number { return ((i + 0.5) * 360) / N - 90; }
 function labelPos(i: number): [number, number] {
   const a = rad(midAngle(i));
   return [CX + R_LABEL * Math.cos(a), CY + R_LABEL * Math.sin(a)];
-}
-
-function emojiPos(i: number): [number, number] {
-  const a = rad(midAngle(i));
-  return [CX + R_EMOJI * Math.cos(a), CY + R_EMOJI * Math.sin(a)];
 }
 
 function sectorAtPoint(svgX: number, svgY: number): number | null {
@@ -100,9 +96,9 @@ function energyColor(v: number): string {
 }
 
 function energyLabel(v: number): string {
-  if (v >= 67) return '⚡ 充沛';
-  if (v >= 34) return '~ 一般';
-  return '😴 没电';
+  if (v >= 67) return '充沛';
+  if (v >= 34) return '一般';
+  return '没电';
 }
 
 // ── Rotating prompts ──────────────────────────────────────────────────────────
@@ -196,7 +192,7 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
     if (isJournalEntry) {
       const dateStr = new Date().toISOString().slice(0, 10);
       ingestLifeNode({
-        name: `Journal · ${dateStr}${em ? ` · ${em.emoji}${em.label}` : ''}`,
+        name: `Journal · ${dateStr}${em ? ` · ${em.label}` : ''}`,
         type: 'health_state',
         tags: ['moment', 'journal', ...(em ? ['feeling', em.id, em.quadrant] : []), `energy-${lvl}`],
         attributes: {
@@ -204,12 +200,12 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
           ...(em ? { emotion: em.id, emotionLabel: em.label, emotionEmoji: em.emoji, emotionQuadrant: em.quadrant } : {}),
           energyValue: energyVal, energyLevel: lvl, ...autoContext(),
         },
-        rawInput: `Journal ${em ? em.emoji + em.label : ''} ${journal.slice(0, 40)}`,
+        rawInput: `Journal ${em ? em.label : ''} ${journal.slice(0, 40)}`,
         confidence: 1, source: 'manual', relations: [],
       });
     } else if (em) {
       ingestLifeNode({
-        name: `此刻 · ${em.emoji} ${em.label}`,
+        name: `此刻 · ${em.label}`,
         type: 'health_state',
         tags: ['moment', 'feeling', em.id, em.quadrant, `energy-${lvl}`],
         attributes: {
@@ -217,7 +213,7 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
           emotionQuadrant: em.quadrant, energyValue: energyVal, energyLevel: lvl,
           ...(thought.trim() ? { thought: thought.trim() } : {}), ...autoContext(),
         },
-        rawInput: `此刻 ${em.emoji}${em.label} ⚡${lvl}${thought.trim() ? ` · ${thought.trim()}` : ''}`,
+        rawInput: `此刻 ${em.label} · 精力${lvl}${thought.trim() ? ` · ${thought.trim()}` : ''}`,
         confidence: 1, source: 'manual', relations: [],
       });
     } else { onClose(); return; }
@@ -316,7 +312,9 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
       <div className="nesio-mood-overlay" role="dialog" aria-modal>
         <div className="nesio-mood-backdrop" onClick={onClose} />
         <div className="nesio-mood-card nesio-mood-card--saved">
-          <div className="nesio-mood-saved-emoji">{em?.emoji ?? '✍️'}</div>
+          <div className="nesio-mood-saved-emoji" aria-hidden>
+            <span style={{ display: 'inline-block', width: 30, height: 30, borderRadius: '50%', background: em?.color ?? 'var(--portal-blue-deep)', boxShadow: `0 0 0 8px color-mix(in srgb, ${em?.color ?? 'var(--portal-blue-deep)'} 22%, transparent)` }} />
+          </div>
           <p className="nesio-mood-saved-text">留住了这一刻</p>
           <p className="nesio-mood-saved-hint">会和你其他的记忆慢慢连起来</p>
         </div>
@@ -335,8 +333,9 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
         <div className="nesio-mood-card nesio-mood-card--journal">
           <div className="nesio-mood-handle" aria-hidden />
           <div className="nesio-mood-journal-header">
-            <span className="nesio-mood-journal-meta">
-              {selectedEm ? `${selectedEm.emoji} ${selectedEm.label}` : '✍️ Journal'}
+            <span className="nesio-mood-journal-meta" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              {selectedEm && <span aria-hidden style={{ width: 9, height: 9, borderRadius: '50%', background: selectedEm.color, display: 'inline-block' }} />}
+              {selectedEm ? selectedEm.label : 'Journal'}
             </span>
             <span className="nesio-mood-journal-date">
               {new Date().toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', weekday: 'short' })}
@@ -347,7 +346,7 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
             placeholder="写下此刻…" value={journal}
             onChange={(e) => setJournal(e.target.value)} rows={7} />
           <button type="button" className="nesio-mood-save-btn nesio-mood-save-btn--ready"
-            onClick={() => handleSave({ isJournal: true })}>💾 保存这一刻</button>
+            onClick={() => handleSave({ isJournal: true })}>保存这一刻</button>
         </div>
       </div>
     );
@@ -359,10 +358,14 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
         <div className="nesio-mood-backdrop" onClick={() => handleSave()} />
         <div className="nesio-mood-card">
           <div className="nesio-mood-handle" aria-hidden />
-          <p className="nesio-mood-title">{selectedEm?.emoji} {selectedEm?.label} · 现在精力怎么样？</p>
+          <p className="nesio-mood-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            {selectedEm && <span aria-hidden style={{ width: 9, height: 9, borderRadius: '50%', background: selectedEm.color, display: 'inline-block' }} />}
+            {selectedEm?.label} · 现在精力怎么样？
+          </p>
           <div className="nesio-mood-slider-wrap">
             <div className="nesio-mood-slider-labels">
-              <span>😴 没电</span><span>⚡ 充沛</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><IconMoon size={12} /> 没电</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><IconZap size={12} /> 充沛</span>
             </div>
             <div ref={sliderRef} className="nesio-mood-slider-track"
               onMouseDown={onSliderStart} onTouchStart={onSliderStart}>
@@ -391,7 +394,7 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
         <div className="nesio-mood-backdrop" onClick={() => handleSave()} />
         <div className="nesio-mood-card">
           <div className="nesio-mood-handle" aria-hidden />
-          <p className="nesio-mood-title">{selectedEm?.emoji} {thoughtPromptRef.current}</p>
+          <p className="nesio-mood-title">{thoughtPromptRef.current}</p>
           <input ref={thoughtRef} type="text" className="nesio-mood-note nesio-mood-note--large"
             placeholder="一句话也好…" value={thought}
             onChange={(e) => { setThought(e.target.value); cancelAutoClose(); }}
@@ -401,7 +404,7 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
             <button type="button" className="nesio-mood-save-btn nesio-mood-save-btn--ready"
               onClick={() => handleSave()}>留住这一刻</button>
             <button type="button" className="nesio-mood-journal-btn"
-              onClick={() => { cancelAutoClose(); setPhase('journal'); }}>✍️ 展开为 Journal</button>
+              onClick={() => { cancelAutoClose(); setPhase('journal'); }}>展开为 Journal</button>
           </div>
         </div>
       </div>
@@ -419,8 +422,9 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
           aria-label="关闭"
           style={{ position: 'absolute', top: 10, right: 12, width: 32, height: 32, borderRadius: 999, border: 'none', background: 'rgba(120,140,180,0.12)', color: 'var(--portal-muted)', fontSize: '0.9rem', cursor: 'pointer' }}
         >✕</button>
-        <p className="nesio-mood-title">
-          {hoveredEm ? `${hoveredEm.emoji} ${hoveredEm.label}` : '此刻，是什么感觉？'}
+        <p className="nesio-mood-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+          {hoveredEm && <span aria-hidden style={{ width: 9, height: 9, borderRadius: '50%', background: hoveredEm.color, display: 'inline-block' }} />}
+          {hoveredEm ? hoveredEm.label : '此刻，是什么感觉？'}
         </p>
         <div className="nesio-mood-wheel-wrap">
           <svg ref={svgRef} viewBox="0 0 300 300" className="nesio-mood-wheel-svg"
@@ -433,28 +437,26 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
             {EMOTIONS.map((em, i) => {
               const isHov = hovered === i;
               const [lx, ly] = labelPos(i);
-              const [ex, ey] = emojiPos(i);
               return (
                 <g key={em.id} role="button" aria-label={em.label} tabIndex={0}
                   onClick={() => pickEmotion(i)}
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') pickEmotion(i); }}
                   style={{ cursor: 'pointer' }}>
-                  <path d={sectorPath(i)} fill={em.color} opacity={isHov ? 1 : 0.7}
-                    stroke="white" strokeWidth="2" style={{ transition: 'opacity 0.1s' }} />
+                  <path d={sectorPath(i)} fill={em.color} opacity={isHov ? 1 : 0.88}
+                    stroke="var(--mood-card-bg, #fff)" strokeWidth="2.5" strokeLinejoin="round"
+                    style={{ transition: 'opacity 0.12s' }} />
                   {isHov && <path d={sectorPath(i)} fill="none" stroke={em.color}
-                    strokeWidth="5" opacity="0.4" style={{ filter: 'blur(4px)' }} />}
+                    strokeWidth="6" opacity="0.45" style={{ filter: 'blur(5px)' }} />}
                   <text x={lx} y={ly} textAnchor="middle" dominantBaseline="middle"
-                    fontSize="8.5" fontWeight={isHov ? '800' : '600'}
-                    fill={isHov ? '#fff' : 'rgba(20,30,60,0.72)'}
-                    style={{ pointerEvents: 'none', userSelect: 'none' }}>{em.label}</text>
-                  <text x={ex} y={ey} textAnchor="middle" dominantBaseline="middle"
-                    fontSize={isHov ? '24' : '19'}
-                    style={{ pointerEvents: 'none', userSelect: 'none', transition: 'font-size 0.1s' }}>{em.emoji}</text>
+                    fontSize={isHov ? '10.5' : '9.5'} fontWeight={isHov ? '800' : '650'}
+                    fill="#fff" opacity={isHov ? 1 : 0.92}
+                    style={{ pointerEvents: 'none', userSelect: 'none', transition: 'font-size 0.12s', letterSpacing: '0.05em' }}>{em.label}</text>
                 </g>
               );
             })}
             <circle cx={CX} cy={CY} r={R_IN - 3}
-              fill={longPressing ? 'var(--portal-accent-soft)' : 'white'}
+              fill={longPressing ? 'var(--portal-accent-soft)' : 'var(--mood-card-bg, #fff)'}
+              stroke="var(--portal-line)" strokeWidth="1"
               style={{ cursor: 'pointer', transition: 'fill 0.3s' }} />
             <text x={CX} y={CY - 7} textAnchor="middle" fontSize="10"
               fill={longPressing ? 'var(--portal-cool-accent)' : 'var(--portal-muted)'} fontWeight="600"
@@ -463,7 +465,7 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
             </text>
             <text x={CX} y={CY + 8} textAnchor="middle" fontSize="8.5" fill="var(--portal-muted)"
               style={{ userSelect: 'none', pointerEvents: 'none' }}>
-              {longPressing ? '✍️' : '滑动选择'}
+              {longPressing ? 'Journal' : '滑动选择'}
             </text>
           </svg>
         </div>

@@ -308,8 +308,7 @@ function isIntimateNode(node: LifeNode): boolean {
 function cleanMemoryPreview(node: LifeNode): string {
   if (isIntimateNode(node)) {
     const d = new Date(node.createdAt).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' });
-    const emoji = typeof node.attributes.emotionEmoji === 'string' ? `${node.attributes.emotionEmoji} ` : '';
-    return `${emoji}一段 ${d} 的心情记录 · 点开查看`;
+    return `一段 ${d} 的心情记录 · 点开查看`;
   }
   const raw = node.rawInput || Object.values(node.attributes).join(' · ');
   return raw

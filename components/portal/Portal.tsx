@@ -212,6 +212,8 @@ export default function Portal() {
   const [activeSurface, setActiveSurface] = useState<ActiveSurface>('today');
   const [storageAlert, setStorageAlert] = useState<{ kind: 'full' | 'warning'; percent: number } | null>(null);
   const [captureMode, setCaptureMode] = useState<CaptureMode | null>(null);
+  // 拍一下直达:扇形按钮同手势调起原生相机,拍完的文件直接进 CameraSheet
+  const [cameraFile, setCameraFile] = useState<File | null>(null);
   const [voiceIntent, setVoiceIntent] = useState<'note' | 'ask'>('note');
   const [noteOpen, setNoteOpen] = useState(false);
   const [locale, setLocale] = useState<PortalLocale>('zh');
@@ -766,8 +768,9 @@ export default function Portal() {
         <TellNesioSheet
           open={activeSurface === 'tell'}
           onClose={() => setActiveSurface('today')}
-          onCapture={(mode) => {
+          onCapture={(mode, file) => {
             if (mode === 'voice') setVoiceIntent('note');
+            if (mode === 'camera') setCameraFile(file ?? null);
             setCaptureMode(mode);
           }}
         />
@@ -786,7 +789,7 @@ export default function Portal() {
       </div>
 
       {/* Capture sheets — rendered at root level, independent of TellNesioSheet state */}
-      <CameraSheet open={captureMode === 'camera'} onClose={() => setCaptureMode(null)} />
+      <CameraSheet open={captureMode === 'camera'} initialFile={cameraFile} onClose={() => { setCaptureMode(null); setCameraFile(null); }} />
       <VoiceInputSheet
         open={captureMode === 'voice'}
         intent={voiceIntent}

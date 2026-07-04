@@ -7,7 +7,7 @@
 
 export type GuidanceEventType =
   | 'flight' | 'medical' | 'deadline' | 'birthday' | 'anniversary'
-  | 'travel' | 'meeting'
+  | 'travel' | 'meeting' | 'holiday'
   | 'email_signal' | 'health_habit'
   | 'weather_cold' | 'weather_rain'
   | 'object_context'   // 物品关联情境 — owned item relevant to an upcoming context

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { PROFILE_UPDATED_EVENT, loadProfileSettings } from '@/lib/portal/profile';
 import { IconThermometer } from './icons';
 import { buildTodayViewModel, focusTimeHint, markFocusNodeDone, addCommitmentNode, addMeetingNotes, saveSubtasks, toggleSubtask, type FocusNode, type SubTask, type ProactiveContext, type ProactiveContextItem } from '@/lib/platform/view-models/today-view-model';
@@ -26,7 +26,7 @@ import {
 import { createAppApiClient } from '@/lib/portal/app-api-client';
 import DailyBriefCard from './DailyBriefCard';
 import dynamic from 'next/dynamic';
-import { buildTimeFallback, dismissProactiveById, getProactiveCardBudget, isProactiveCardDismissed, type ProactiveCardData } from './today/proactive-types';
+import { buildRotatingFallback, dismissProactiveById, getProactiveCardBudget, isProactiveCardDismissed, type ProactiveCardData } from './today/proactive-types';
 import { ProactiveGuidanceCard } from './today/ProactiveGuidanceCard';
 import { TodayFocusSection } from './today/FocusSection';
 import { NightTimeline } from './today/NightTimeline';
@@ -89,6 +89,18 @@ export default function TodayFeed({
   const cardBudget = Math.min(TODAY_CARD_BUDGET, getProactiveCardBudget());
   const activeProactiveCards = proactiveCards.filter((c) => !dismissedCardIds.has(c.id)).slice(0, cardBudget);
 
+  // 未来预测区永远有内容(批次 3):管线空窗/全被划掉时,轮播兜底
+  // (历史上的今天/记忆回顾/时间段建议/小技巧),每次打开随机一张。
+  const [fallbackTick, setFallbackTick] = useState(0);
+  const fallbackCard = useMemo(
+    () => buildRotatingFallback(new Date(), allNodes),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [allNodes, fallbackTick],
+  );
+  const showFallback = activeProactiveCards.length === 0 && cardBudget > 0
+    && fallbackCard && !isProactiveCardDismissed(fallbackCard.id)
+    ? fallbackCard : null;
+
   return (
     <div className="nesio-today-root">
       <header className="nesio-today-header">
@@ -100,36 +112,35 @@ export default function TodayFeed({
         >
           <img src="/assets/logo/nesio-mark.svg" alt="Nesio" className="nesio-today-brand-icon" />
         </button>
-        <a href="/settings" className="nesio-today-avatar" aria-label="我的设置">
-          {avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element -- 头像是运行时签名 URL,next/image 无法静态优化
-            <img src={avatarUrl} alt="" className="nesio-today-avatar-img" draggable={false} />
-          ) : initials}
-        </a>
-      </header>
-
-      <div className="nesio-today-scroll">
-        {/* 季度 Wrapped 卡片 */}
-        {showWrapped && <WrappedCard onDismiss={dismissWrapped} />}
-
-        {/* 顶部双圆按钮：听简报 + 此刻 */}
-        <div className="nesio-today-top-row">
+        <div className="nesio-today-header-tools">
+          {/* 听简报/此刻 缩为图标圆钮,不再占首屏黄金位(批次 3) */}
           <DailyBriefCard
-            circular
+            compact
             canUsePrivateData={canUsePrivateData}
             memoryCount={memoryCount}
             memoryNotes={memoryNotes}
           />
           <button
             type="button"
-            className="nesio-mood-circle"
+            className="nesio-header-mini-btn"
             onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-mood'))}
             aria-label="记录此刻感受"
+            title="此刻"
           >
-            <span className="nesio-mood-circle-icon" aria-hidden><IconThermometer size={22} /></span>
-            <span className="nesio-mood-circle-label">此刻</span>
+            <IconThermometer size={19} />
           </button>
+          <a href="/settings" className="nesio-today-avatar" aria-label="我的设置">
+            {avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- 头像是运行时签名 URL,next/image 无法静态优化
+              <img src={avatarUrl} alt="" className="nesio-today-avatar-img" draggable={false} />
+            ) : initials}
+          </a>
         </div>
+      </header>
+
+      <div className="nesio-today-scroll">
+        {/* 季度 Wrapped 卡片 */}
+        {showWrapped && <WrappedCard onDismiss={dismissWrapped} />}
 
         {/* 未来引导卡 — up to 2, each independently dismissable */}
         {activeProactiveCards.map((card) => (
@@ -147,6 +158,17 @@ export default function TodayFeed({
             onMarkDone={(nodeId) => markFocusNodeDone(nodeId)}
           />
         ))}
+
+        {showFallback && (
+          <ProactiveGuidanceCard
+            key={showFallback.id}
+            card={showFallback}
+            onDismiss={() => {
+              dismissProactiveById(showFallback.id);
+              setFallbackTick((v) => v + 1);
+            }}
+          />
+        )}
 
         {/* 今日焦点 — 重要安排 / 重要日子 / 重要提醒 */}
         <TodayFocusSection

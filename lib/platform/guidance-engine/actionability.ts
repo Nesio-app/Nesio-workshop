@@ -46,6 +46,10 @@ export function buildAction(event: GuidanceEvent, urgency: WindowUrgency): Guida
       if (urgency === 'low')      return { label: '明天有会议，今晚可以提前想想', cta: '知道了', actionType: 'dismiss' };
       return null;
 
+    case 'holiday':
+      // 节日永远不是任务:轻确认即可,把「安排活动」的主动权留给用户
+      return { label: '想安排点什么，随口说一句就记下', cta: '知道了', actionType: 'dismiss' };
+
     case 'deadline':
       if (urgency === 'critical') return { label: '现在打开任务，完成第一步', cta: '开始', actionType: 'dismiss' };
       if (urgency === 'high')     return { label: '今天必须推进，先做最小的那一步', cta: '开始做', actionType: 'dismiss' };

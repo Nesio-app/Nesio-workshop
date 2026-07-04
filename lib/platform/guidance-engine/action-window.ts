@@ -66,6 +66,13 @@ export function getActionWindow(event: GuidanceEvent, now: Date): WindowUrgency 
       if (daysUntil < 7) return 'low';          // this week: early notice
       return 'closed';
 
+    case 'holiday':
+      // 节日提示只在今明两天出现:今天放假(critical 文案=今天是)或明天放假(high=明天是)
+      if (daysUntil < -0.5) return 'closed';
+      if (daysUntil < 0.5) return 'critical';
+      if (daysUntil < 1.5) return 'high';
+      return 'closed';
+
     default:
       // Generic: only if within 24h
       if (daysUntil >= 0 && daysUntil < 1) return 'medium';

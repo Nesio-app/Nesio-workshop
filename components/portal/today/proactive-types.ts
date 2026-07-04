@@ -47,6 +47,69 @@ export function buildTimeFallback(now: Date): ProactiveCardData | null {
 }
 
 
+/**
+ * 轮播兜底(批次 3 用户反馈:「希望未来预测一直有东西显示,每次打开都不一样」)。
+ * 管线没有卡可出时,从内容池随机挑一张:时间段建议 / 历史上的今天 /
+ * 记忆回顾 / 使用提示。安静模式(预算 0)下仍然不出。
+ */
+export interface FallbackNodeLike { id: string; name: string; createdAt: string; type?: string }
+
+export function buildRotatingFallback(now: Date, nodes: readonly FallbackNodeLike[]): ProactiveCardData | null {
+  const pool: ProactiveCardData[] = [];
+
+  const timeCard = buildTimeFallback(now);
+  if (timeCard) pool.push(timeCard);
+
+  // 历史上的今天(同月同日、更早年份)
+  const otd = nodes.filter((n) => {
+    const d = new Date(n.createdAt);
+    return d.getMonth() === now.getMonth() && d.getDate() === now.getDate() && d.getFullYear() < now.getFullYear();
+  });
+  if (otd.length > 0) {
+    const pick = otd[Math.floor(Math.random() * otd.length)];
+    const years = now.getFullYear() - new Date(pick.createdAt).getFullYear();
+    pool.push({
+      id: 'fallback-on-this-day',
+      title: `${years} 年前的今天`,
+      body: `你记下了「${pick.name.slice(0, 40)}」。点 Memory 可以回看。`,
+      confidence: 70, sourceTags: ['历史上的今天'], icon: '🗓', priority: 4,
+    });
+  }
+
+  // 记忆回顾(随机一条 14 天前的旧记录)
+  const old14 = nodes.filter((n) => now.getTime() - new Date(n.createdAt).getTime() > 14 * 86_400_000);
+  if (old14.length > 0) {
+    const pick = old14[Math.floor(Math.random() * old14.length)];
+    const d = new Date(pick.createdAt).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+    pool.push({
+      id: 'fallback-resurface',
+      title: '还记得这条吗？',
+      body: `${d} 你记下了「${pick.name.slice(0, 40)}」。`,
+      confidence: 65, sourceTags: ['记忆回顾'], icon: '💡', priority: 3,
+    });
+  }
+
+  // 使用提示(永远可用的兜底之兜底)
+  pool.push({
+    id: 'fallback-tip-ask',
+    title: '找东西不用翻',
+    body: '长按中间按钮问一问:「护照放在哪」「上次买的药」,记过的都能找到。',
+    confidence: 60, sourceTags: ['小技巧'], icon: '💡', priority: 2,
+  });
+  if (nodes.length >= 5) {
+    pool.push({
+      id: 'fallback-tip-count',
+      title: `已经陪你记住 ${nodes.length} 件事`,
+      body: '点左上角 Nesio 图标,看看这段时间的洞察和分析。',
+      confidence: 60, sourceTags: ['小技巧'], icon: '📦', priority: 2,
+    });
+  }
+
+  if (pool.length === 0) return null;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+
 const SNOOZE_KEY = 'nesio-snoozed-overdue';
 
 export function snoozeOverdue(nodeId: string, days: number) {

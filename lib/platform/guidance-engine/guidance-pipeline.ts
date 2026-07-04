@@ -46,7 +46,8 @@ function computeExpiry(event: GuidanceEvent): Date | undefined {
     case 'deadline':
       return new Date(t);                        // expires at the deadline itself
     case 'birthday':
-    case 'anniversary': {
+    case 'anniversary':
+    case 'holiday': {
       const eod = new Date(event.scheduledAt);
       eod.setHours(23, 59, 59, 0);
       return eod;                                // expires end of that day
@@ -62,6 +63,7 @@ const EVENT_ICON: Record<GuidanceEventType, string> = {
   deadline:       '⏰',
   birthday:       '🎂',
   anniversary:    '💝',
+  holiday:        '🎈',
   travel:         '🧳',
   meeting:        '🎙',
   email_signal:   '📩',
@@ -101,6 +103,10 @@ function buildTitle(event: GuidanceEvent, urgency: WindowUrgency): string {
     case 'anniversary':
       if (urgency === 'critical') return `今天 · ${n}`;
       return `纪念日临近 · ${n}`;
+    case 'holiday':
+      if (urgency === 'critical') return `今天是 ${n}`;
+      if (urgency === 'high')     return `明天是 ${n}`;
+      return `${n} 快到了`;
     case 'weather_cold': return '今天很冷，记得加件衣';
     case 'weather_rain': return '今天有雨，记得带伞';
     case 'email_signal': return `邮件需要关注`;
@@ -139,6 +145,9 @@ function buildBody(event: GuidanceEvent, urgency: WindowUrgency): string {
       if (urgency === 'critical') return '今天记得发条消息，哪怕一句话也能让人感到温暖。';
       if (urgency === 'high')     return '明天是重要日子，今晚花几分钟准备一下。';
       return '还有几天，现在准备礼物或安排比到时候手忙脚乱好得多。';
+    case 'holiday':
+      if (urgency === 'critical') return '公司和学校一般都放假。今天有什么活动安排吗？说一句就能记下来。';
+      return '公司和学校一般都放假——想安排点什么？现在说一句，到时候 Nesio 会帮你记着。';
     case 'weather_cold':
       return `${Math.round(Number(event.payload.temperatureC ?? 0))}°C，真的需要多穿一件，出门前准备好。`;
     case 'weather_rain':

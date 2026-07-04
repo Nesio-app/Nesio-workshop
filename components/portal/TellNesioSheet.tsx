@@ -4,14 +4,18 @@
  * TellNesioSheet — fan overlay only.
  * Sub-sheets (Camera, Voice, Share) are managed by the parent (Portal.tsx)
  * to avoid the race condition where onClose() resets subSheet state.
+ * 拍一下 = 直接调起原生相机(iOS 要求 file-input click 在用户手势内,
+ * 所以 input 就渲染在扇形按钮旁,点按钮即点 input,没有二次选择页)。
  */
+
+import { useRef } from 'react';
 
 export type CaptureMode = 'camera' | 'voice' | 'share';
 
 interface TellNesioSheetProps {
   open: boolean;
   onClose: () => void;
-  onCapture: (mode: CaptureMode) => void;
+  onCapture: (mode: CaptureMode, file?: File) => void;
 }
 
 const FAN_BUTTONS: Array<{
@@ -61,11 +65,27 @@ const FAN_BUTTONS: Array<{
 ];
 
 export default function TellNesioSheet({ open, onClose, onCapture }: TellNesioSheetProps) {
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   if (!open) return null;
 
   return (
     <div className="nesio-tell-overlay" role="dialog" aria-modal="true" aria-label="告诉 Nesio">
       <button type="button" className="nesio-tell-backdrop" aria-label="关闭" onClick={onClose} />
+      {/* 原生相机直达:capture 属性 → iOS 直接开相机;取消拍摄则什么都不发生 */}
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = '';
+          if (!file) return;
+          onClose();
+          onCapture('camera', file);
+        }}
+      />
       <div className="nesio-tell-fan">
         {FAN_BUTTONS.map((btn, i) => (
           <button
@@ -74,6 +94,11 @@ export default function TellNesioSheet({ open, onClose, onCapture }: TellNesioSh
             className={`nesio-tell-fan-btn nesio-tell-fan-btn--${btn.pos}`}
             style={{ '--delay': `${i * 0.05}s` } as React.CSSProperties}
             onClick={() => {
+              if (btn.mode === 'camera') {
+                // 同一手势内触发 input.click(),跳过第二次选择页
+                cameraInputRef.current?.click();
+                return;
+              }
               onClose();
               onCapture(btn.mode);
             }}

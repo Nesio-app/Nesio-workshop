@@ -17,6 +17,17 @@ import type { GuidanceEvent, GuidanceEventType } from './types';
 
 // ── Calendar ──────────────────────────────────────────────────────────────────
 
+/**
+ * 节日识别 — 「Independence Day」这类日历条目不是任务,不该被当成
+ * 「今天截止」的 deadline(用户实测反馈)。识别成 holiday 后走节日口吻:
+ * 提示放假 + 邀请安排活动,永远不给「开始」这种任务按钮。
+ */
+const HOLIDAY_RE = /independence day|christmas|thanksgiving|new year'?s?|easter|memorial day|labor day|veterans day|presidents'? day|mlk|halloween|holiday|day off|春节|除夕|国庆|中秋|端午|清明|元旦|劳动节|儿童节|妇女节|感恩节|圣诞|新年|放假|假期|年三十/i;
+
+export function isHolidayTitle(title: string): boolean {
+  return HOLIDAY_RE.test(title);
+}
+
 // Map attention-engine EventType → GuidanceEventType
 // 'other' is intentionally excluded: not specific enough to be actionable
 const ATTENTION_TYPE_MAP: Partial<Record<string, GuidanceEventType>> = {
@@ -40,7 +51,8 @@ export function calendarEventsToGuidanceEvents(
     if (Number.isNaN(scheduledAt.getTime())) continue;
 
     const eventType = inferEventType(e);
-    const guidanceType = ATTENTION_TYPE_MAP[eventType];
+    let guidanceType = ATTENTION_TYPE_MAP[eventType];
+    if (isHolidayTitle(e.title)) guidanceType = 'holiday';
     if (!guidanceType) continue; // 'other' — skip
 
     // Only consider events within -1h to +48h from now
@@ -130,7 +142,7 @@ export function focusNodesToGuidanceEvents(
 
     results.push({
       id: `node-${node.id}`,
-      type: 'deadline',
+      type: isHolidayTitle(node.name) ? 'holiday' : 'deadline',
       title: node.name,
       scheduledAt: d,
       source: 'memory',

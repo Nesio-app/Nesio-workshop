@@ -8,6 +8,7 @@ const CONSEQUENCE: Record<GuidanceEventType, ConsequenceSeverity> = {
   meeting:      2,  // show up unprepared or miss it
   birthday:     2,  // forget to prepare / acknowledge
   anniversary:  2,  // forget
+  holiday:      1,  // 节日提示 — 低打扰,只是提醒可以安排活动
   travel:       2,  // unprepared for departure
   email_signal: 2,  // varies — default medium
   health_habit:   1,  // break a streak

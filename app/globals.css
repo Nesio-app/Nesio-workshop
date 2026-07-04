@@ -4,18 +4,19 @@
 
 :root {
   /* Moment-capture emotion wheel (Russell quadrants) — data palette, theme-stable */
-  --emotion-joy: #FFD166;
-  --emotion-excited: #FFB347;
-  --emotion-moved: #FF8FAB;
-  --emotion-calm: #74C69D;
-  --emotion-content: #52B788;
-  --emotion-grateful: #95D5B2;
-  --emotion-tired: #90CAF9;
-  --emotion-empty: #B0C4DE;
-  --emotion-sad: #7B9CCC;
-  --emotion-anxious: #CE93D8;
-  --emotion-frustrated: #FF8A65;
-  --emotion-angry: #EF5350;
+  /* 批次 3 高级化:降饱和的莫兰迪调,白字标签可读,象限语义不变 */
+  --emotion-joy: #DBAE55;
+  --emotion-excited: #D9975B;
+  --emotion-moved: #CC8396;
+  --emotion-calm: #74A98F;
+  --emotion-content: #5F9E80;
+  --emotion-grateful: #8FB8A0;
+  --emotion-tired: #82A3C9;
+  --emotion-empty: #9AA9BD;
+  --emotion-sad: #7189B0;
+  --emotion-anxious: #A088BE;
+  --emotion-frustrated: #CC7F62;
+  --emotion-angry: #C4645B;
 
   /* Chip pastels(节点类型底色/连接器图标底)— data palette, theme-stable */
   --chip-indigo: #e0e7ff;
@@ -8323,6 +8324,12 @@ html[data-portal-theme="night"] .portal-bottom-nav {
 }
 
 /* ── Bottom Nav (Today | N | Memory) ── */
+/* 扇形菜单/此刻面板打开时隐藏模糊垫:深色遮罩下它会透出一条色差带(批次 3) */
+body:has(.nesio-tell-overlay) .nesio-bottom-nav::before,
+body:has(.nesio-mood-overlay) .nesio-bottom-nav::before {
+  display: none;
+}
+
 /* 悬浮导航下方的渐隐垫:滚动内容不再「裸露」在按钮后面(批次 2) */
 .nesio-bottom-nav::before {
   content: '';
@@ -11475,13 +11482,16 @@ html[data-portal-theme="night"] .nesio-sub-upgrade-price { color: #e8eefa; }
 .nesio-mood-card {
   position: relative;
   width: 100%;
-  background: var(--portal-surface, #1a2236);
+  /* 批次 3:白天跟随亮色主题(此前恒暗色,与全站不一致) */
+  --mood-card-bg: var(--glass-bg-solid, #fdfefe);
+  background: var(--mood-card-bg);
+  box-shadow: 0 -12px 40px rgba(23,42,84,0.14);
   border-radius: 1.5rem 1.5rem 0 0;
   padding: 0.5rem 1.1rem 2.2rem;
   z-index: 1;
   animation: nesio-slide-up 0.28s cubic-bezier(0.32,0.72,0,1) both;
 }
-html[data-portal-theme="night"] .nesio-mood-card { background: #141b2e; }
+html[data-portal-theme="night"] .nesio-mood-card { --mood-card-bg: #141b2e; background: var(--mood-card-bg); }
 
 .nesio-mood-card--saved {
   padding: 2.5rem 1.1rem 3rem;
@@ -14260,6 +14270,32 @@ html[data-portal-theme="night"] .nesio-today-evidence-chip { color: #96c7f3; bac
   color: var(--portal-blue-deep);
 }
 
+.nesio-today-header-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.nesio-header-mini-btn {
+  width: var(--tap-min, 44px);
+  height: var(--tap-min, 44px);
+  border-radius: 50%;
+  border: 1px solid var(--portal-line);
+  background: var(--glass-bg-solid);
+  color: var(--portal-blue-deep);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, transform 0.1s;
+}
+.nesio-header-mini-btn:active { transform: scale(0.94); }
+.nesio-header-mini-btn--active {
+  background: var(--portal-accent-soft, rgba(88,140,227,0.14));
+  border-color: var(--portal-blue-deep);
+}
+
 .nesio-today-avatar-img {
   width: 100%;
   height: 100%;
@@ -15647,13 +15683,15 @@ html[data-portal-theme="night"] .portal-decompose-step {
   flex-wrap: wrap;
 }
 .nesio-proactive-action-btn {
-  flex: 1;
+  /* 批次 3:不再撑满整行 — 内联小按钮,卡片高度不被动作区拉爆 */
+  flex: 0 0 auto;
   min-width: 0;
-  padding: 0.4rem 0.6rem;
+  min-height: var(--tap-min, 44px);
+  padding: 0.3rem 1rem;
   border-radius: 20px;
   border: 1.5px solid var(--portal-border, rgba(0,0,0,.1));
   background: transparent;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 600;
   cursor: pointer;
   color: var(--portal-text-secondary, #555);

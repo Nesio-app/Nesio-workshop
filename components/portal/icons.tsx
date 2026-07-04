@@ -71,6 +71,7 @@ export const IconGlobe = make(<><circle cx="12" cy="12" r="9" /><path d="M3 12h1
 export const IconHome = make(<><path d="m3 10 9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><path d="M9 22v-8h6v8" /></>);
 export const IconTrendingUp = make(<><path d="m2 17 7-7 4 4 9-9" /><path d="M15 5h7v7" /></>);
 export const IconZap = make(<path d="M13 2 3 14h7l-1 8 10-12h-7z" />);
+export const IconBalloon = make(<><ellipse cx="12" cy="9" rx="6.5" ry="7.5" /><path d="M12 16.5c-.6 1 .6 1.5 0 2.5-.5.9-1.5 1.2-1.5 3" /></>);
 export const IconCloud = make(<path d="M17.5 19a4.5 4.5 0 0 0 .4-9A7 7 0 0 0 4.3 12.4 4 4 0 0 0 6 20h11.5z" />);
 export const IconPlane = make(<path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z" />);
 export const IconGift = make(<><rect x="3" y="8" width="18" height="4" /><path d="M12 8v13M5 12v9h14v-9" /><path d="M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 0 1 0 5" /></>);
@@ -119,6 +120,7 @@ export function GuidanceIcon({ icon, size = 18 }: { icon: string; size?: number 
     '💝': IconStar, '🧳': IconMap, '🎙': IconMic, '📩': IconMail,
     '💪': IconActivity, '🧥': IconCloud, '☂️': IconRain, '📦': IconBox,
     '💡': IconBulb, '🗓': IconCalendar, '✅': IconCheckCircle, '🌙': IconMoon,
+    '🎈': IconBalloon,
   };
   const C = map[icon];
   return C ? <C size={size} /> : <IconNote size={size} />;
