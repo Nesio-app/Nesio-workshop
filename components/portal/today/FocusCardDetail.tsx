@@ -8,14 +8,15 @@
 import { useState } from 'react';
 import type { FocusNode, SubTask } from '@/lib/platform/view-models/today-view-model';
 import { isMeetingNode, getMeetingTime, getMeetingUrl, safeExternalUrl } from './meeting-node';
+import { IconBox, IconCalendar, IconFlag, IconHeartPulse, IconMapPin, IconStar, IconUser } from '../icons';
 
 export const FOCUS_TYPE_LABEL: Record<string, string> = {
   commitment: '任务', event: '日程', object: '物品', person: '联系人',
   place: '地点', health_state: '健康', preference: '偏好',
 };
-export const FOCUS_TYPE_ICON: Record<string, string> = {
-  commitment: '📋', event: '📅', object: '📦', person: '👤',
-  place: '📍', health_state: '🩷', preference: '⭐',
+export const FOCUS_TYPE_ICON: Record<string, React.ReactNode> = {
+  commitment: <IconFlag size={15} />, event: <IconCalendar size={15} />, object: <IconBox size={15} />, person: <IconUser size={15} />,
+  place: <IconMapPin size={15} />, health_state: <IconHeartPulse size={15} />, preference: <IconStar size={15} />,
 };
 
 // ── Momentum Engine ── 3-action wave, auto-unlock, recursive drill ──────────

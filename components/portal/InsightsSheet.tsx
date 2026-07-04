@@ -681,7 +681,7 @@ function LivingModelTab({
             onClick={() => setShowPerspectiveSheet(true)}
             title="选择分析视角"
           >
-            🔭 {selectedPerspective ? selectedPerspective.name : '视角'}
+            <IconTarget size={13} /> {selectedPerspective ? selectedPerspective.name : '视角'}
           </button>
           <button
             type="button"
@@ -712,11 +712,12 @@ function LivingModelTab({
 
       {!hasAnyInsight && (
         <div className="nesio-lm-empty">
-          <p>📊 记录更多内容，Nesio 会发现你的模式和规律。</p>
+          <p>记录更多内容，Nesio 会发现你的模式和规律。</p>
           <p className="nesio-lm-empty-hint">通常需要 10+ 条记录才能生成有意义的洞察。</p>
         </div>
       )}
 
+      <div className="nesio-lm-layers-menu">
       {layers.map((layer) => {
         const visibleInsights = layer.insights.filter((i) => i.confidence >= layer.minConfidenceToShow);
         const isExpanded = expandedLayer === layer.id;
@@ -786,6 +787,7 @@ function LivingModelTab({
           </div>
         );
       })}
+      </div>
 
       {model && (
         <p className="nesio-lm-gen-time">

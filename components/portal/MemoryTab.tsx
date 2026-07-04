@@ -347,6 +347,13 @@ function getNodeTypeMeta(node: LifeNode) {
   }
 }
 
+/** 卡片标题智能截断:整段原文取首个分句,一眼读完(批次 4)。 */
+function smartCardTitle(name: string): string {
+  if (name.length <= 24) return name;
+  const clause = name.split(/[。！？!?；;，,\n]/)[0];
+  return `${clause.length > 24 ? clause.slice(0, 24) : clause}…`;
+}
+
 function getPersonInitials(name: string) {
   const bgs = ['var(--avatar-indigo)', 'var(--avatar-blue)', 'var(--avatar-mint)', 'var(--avatar-pink)', 'var(--avatar-amber)', 'var(--avatar-violet)'];
   return { initials: name.slice(0, 1), bg: bgs[name.charCodeAt(0) % bgs.length] };
@@ -515,20 +522,23 @@ function MemoryCard({ node, onOpen, onDeleted, onLongPress }: { node: LifeNode; 
       onContextMenu={(e) => { e.preventDefault(); shareNode(); }}
       aria-label={`${node.name}，左滑删除，长按分享`}
     >
-      {isPerson ? (
-        <span className="nesio-memory-card-avatar" style={{ background: avatarBg }}>{initials}</span>
-      ) : (
-        <span className="nesio-memory-card-icon" style={{ background: TYPE_BG[node.type] || 'var(--portal-accent-soft)' }}>
-          <NodeTypeIcon type={node.type} size={16} />
-        </span>
-      )}
-      <span className="nesio-memory-card-title">{node.name}</span>
+      <span className="nesio-memory-card-title" title={node.name}>{smartCardTitle(node.name)}</span>
       {extra && <span className="nesio-memory-card-extra">{extra}</span>}
       {badge && <span className="nesio-memory-card-status-badge" style={{ background: badgeColor }}>{badge}</span>}
       {!extra && !badge && <span className="nesio-memory-card-sub">{cleanMemoryPreview(node)}</span>}
-      {node.source === 'email' && <span className="nesio-memory-card-source-chip">Gmail</span>}
-      {node.source === 'calendar' && <span className="nesio-memory-card-source-chip">日历</span>}
-      {domain ? <span className="nesio-memory-card-domain"><DomainIcon domain={domain} size={11} /> {DOMAINS[domain].label}</span> : null}
+      {/* 批次 4:类型图标缩小挪到底部,与来源/领域标签同排 */}
+      <span className="nesio-memory-card-meta-row">
+        {isPerson ? (
+          <span className="nesio-memory-card-avatar" style={{ background: avatarBg, width: '1.55rem', height: '1.55rem', fontSize: '0.7rem' }}>{initials}</span>
+        ) : (
+          <span className="nesio-memory-card-icon" style={{ background: TYPE_BG[node.type] || 'var(--portal-accent-soft)' }}>
+            <NodeTypeIcon type={node.type} size={13} />
+          </span>
+        )}
+        {node.source === 'email' && <span className="nesio-memory-card-source-chip">Gmail</span>}
+        {node.source === 'calendar' && <span className="nesio-memory-card-source-chip">日历</span>}
+        {domain ? <span className="nesio-memory-card-domain"><DomainIcon domain={domain} size={11} /> {DOMAINS[domain].label}</span> : null}
+      </span>
     </button>
   );
 }
@@ -537,9 +547,11 @@ function ProjectCard({ project, allNodes, onClick }: { project: Project; allNode
   const count = project.nodeIds.filter((id) => allNodes.some((n) => n.id === id)).length;
   return (
     <button type="button" className="nesio-project-card" onClick={onClick}>
-      <span className="nesio-project-card-emoji">{project.emoji}</span>
       <span className="nesio-project-card-name">{project.name}</span>
-      <span className="nesio-project-card-count">{count} 条</span>
+      <span className="nesio-project-card-meta">
+        <span className="nesio-project-card-emoji">{project.emoji}</span>
+        <span className="nesio-project-card-count">{count} 条</span>
+      </span>
     </button>
   );
 }

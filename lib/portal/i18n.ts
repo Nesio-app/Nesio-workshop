@@ -709,6 +709,10 @@ const STRINGS = {
     statusExploring: '探索中',
     roadmapError: '这一票没送到,稍后再试。',
     roadmapSaving: '记下了…',
+    wishLabel: '没有你想要的？直接告诉 Nesio',
+    wishPlaceholder: '一句话描述你希望它做什么…',
+    wishSubmit: '提交愿望',
+    wishDone: '已收到，谢谢！会进和其他候选一起的评审池。',
   },
   en: {
     settingsTitle: 'Account',
@@ -1418,6 +1422,10 @@ const STRINGS = {
     statusExploring: 'Exploring',
     roadmapError: "That vote didn't go through — try again soon.",
     roadmapSaving: 'Saved…',
+    wishLabel: "Something missing? Tell Nesio directly",
+    wishPlaceholder: 'One sentence on what you wish it could do…',
+    wishSubmit: 'Send wish',
+    wishDone: 'Got it, thanks! It joins the review pool with other candidates.',
   },
 } as const;
 

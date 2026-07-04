@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ROADMAP_ITEMS } from '@/lib/portal/roadmap';
 import { track } from '@/lib/portal/telemetry';
+import { createAppApiClient } from '@/lib/portal/app-api-client';
 import { t } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
@@ -32,6 +33,23 @@ export default function RoadmapSheet({ open, onClose }: { open: boolean; onClose
   const [votes, setVotes] = useState<Map<string, VoteState>>(new Map());
   const [savingId, setSavingId] = useState('');
   const [error, setError] = useState('');
+  const [wish, setWish] = useState('');
+  const [wishSent, setWishSent] = useState(false);
+
+  // 自由许愿(批次 4):文本进遥测(props 上限 80 字)+ 云产品事件(payload 全文),
+  // /admin Top 事件与 product_events 都能看到,和候选榜同池评审。
+  function submitWish() {
+    const text = wish.trim();
+    if (!text || wishSent) return;
+    track('feature_wish', { text: text.slice(0, 80) });
+    void createAppApiClient().recordCloudProductEvent({
+      eventType: 'feature.wish',
+      source: 'roadmap',
+      targetType: 'feature_wish',
+      payload: { text },
+    }).catch(() => {});
+    setWishSent(true);
+  }
 
   const load = useCallback(async () => {
     try {
@@ -111,6 +129,34 @@ export default function RoadmapSheet({ open, onClose }: { open: boolean; onClose
               </div>
             );
           })}
+          {/* 自由许愿输入(批次 4) */}
+          <div style={{ borderTop: '1px solid var(--portal-line)', marginTop: '0.9rem', paddingTop: '0.9rem' }}>
+            <p style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--portal-ink)', margin: '0 0 0.45rem' }}>{t(locale, 'wishLabel')}</p>
+            {wishSent ? (
+              <p style={{ fontSize: '0.78rem', color: 'var(--status-go)', margin: 0 }}>✓ {t(locale, 'wishDone')}</p>
+            ) : (
+              <>
+                <textarea
+                  value={wish}
+                  onChange={(e) => setWish(e.target.value)}
+                  placeholder={t(locale, 'wishPlaceholder')}
+                  maxLength={80}
+                  rows={2}
+                  style={{ width: '100%', resize: 'none', borderRadius: '0.75rem', border: '1.5px solid var(--portal-line)', background: 'rgba(88,140,227,0.04)', color: 'var(--portal-ink)', fontSize: '0.82rem', padding: '0.55rem 0.7rem', outline: 'none', fontFamily: 'inherit' }}
+                />
+                <button
+                  type="button"
+                  className="nesio-ob-primary-btn"
+                  style={{ marginTop: '0.5rem', opacity: wish.trim() ? 1 : 0.5 }}
+                  disabled={!wish.trim()}
+                  onClick={submitWish}
+                >
+                  {t(locale, 'wishSubmit')}
+                </button>
+              </>
+            )}
+          </div>
+
           {error && <p style={{ fontSize: '0.74rem', color: 'var(--status-risk)', margin: '0.6rem 0 0' }}>{error}</p>}
         </div>
       </div>

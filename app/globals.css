@@ -8464,8 +8464,9 @@ html[data-portal-theme="night"] .nesio-bottom-nav-btn--active {
 }
 
 .nesio-today-brand-icon {
-  width: 1.75rem;
-  height: 1.75rem;
+  /* 与右侧头像(2.2rem)同大小(批次 4) */
+  width: 2.2rem;
+  height: 2.2rem;
   border-radius: 0.35rem;
   object-fit: contain;
   background: transparent;
@@ -9113,14 +9114,23 @@ html[data-portal-theme="night"] .nesio-memory-card {
 }
 
 .nesio-memory-card-icon {
-  width: 2.2rem;
-  height: 2.2rem;
-  border-radius: 0.6rem;
-  display: flex;
+  /* 批次 4:图标缩小,挪到底部与标签同排 */
+  width: 1.55rem;
+  height: 1.55rem;
+  border-radius: 0.45rem;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.05rem;
-  margin-bottom: 0.2rem;
+  flex-shrink: 0;
+}
+
+.nesio-memory-card-meta-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: auto;
+  padding-top: 0.2rem;
 }
 
 .nesio-memory-card-title {
@@ -12632,13 +12642,28 @@ html[data-portal-theme="night"] .nesio-insights-narrative-text { color: #d8dff8;
 .nesio-lm-empty-hint { font-size: 0.74rem; color: var(--portal-muted) !important; }
 
 /* Layer accordion */
-.nesio-lm-layer {
+/* 批次 4:七层折叠进一个菜单容器,不再各自成卡 */
+.nesio-lm-layers-menu {
   border: 1px solid var(--portal-line);
-  border-radius: 0.8rem;
-  margin-bottom: 0.5rem;
+  border-radius: 0.9rem;
+  background: var(--glass-bg-solid);
+  overflow: hidden;
+  margin-bottom: 0.6rem;
+}
+html[data-portal-theme="night"] .nesio-lm-layers-menu {
+  background: rgba(255,255,255,0.05);
+  border-color: rgba(255,255,255,0.1);
+}
+
+.nesio-lm-layer {
+  border: none;
+  border-top: 1px solid var(--portal-line);
+  border-radius: 0;
+  margin-bottom: 0;
   overflow: hidden;
   transition: border-color 0.15s;
 }
+.nesio-lm-layer:first-child { border-top: none; }
 .nesio-lm-layer--expanded { border-color: var(--portal-accent-border); }
 .nesio-lm-layer-header {
   display: flex;
@@ -17422,7 +17447,6 @@ html[data-portal-theme="night"] .nesio-related-node-chip:hover {
 .nesio-narrator-card {
   background: var(--glass-bg-solid);
   border: 1px solid var(--portal-line);
-  border-left: 3px solid var(--narrator-accent, var(--portal-accent));
   border-radius: 14px;
   padding: 0.65rem 0.75rem;
   display: flex;
@@ -17440,7 +17464,6 @@ html[data-portal-theme="night"] .nesio-related-node-chip:hover {
 html[data-portal-theme="night"] .nesio-narrator-card {
   background: rgba(255,255,255,0.06);
   border-color: rgba(255,255,255,0.1);
-  border-left-color: var(--narrator-accent, var(--portal-accent));
 }
 
 .nesio-narrator-title {
@@ -17523,18 +17546,38 @@ html[data-portal-theme="night"] .nesio-section-title { color: #c8d8f0; }
 .nesio-projects-row::-webkit-scrollbar { display: none; }
 
 .nesio-project-card {
+  /* 批次 4:正方形卡,名称第一排,图标+数量第二排 */
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 0.3rem;
   background: var(--glass-bg-solid);
   border: 1px solid var(--portal-line);
   border-radius: 14px;
-  padding: 0.7rem 1rem;
-  min-width: 80px;
+  padding: 0.7rem 0.75rem;
+  width: 6rem;
+  aspect-ratio: 1 / 1;
   cursor: pointer;
   transition: border-color 0.15s, transform 0.12s;
   flex-shrink: 0;
+}
+.nesio-project-card-name {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--portal-ink);
+  text-align: left;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.nesio-project-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  color: var(--portal-muted);
 }
 
 .nesio-project-card:active { transform: scale(0.95); }

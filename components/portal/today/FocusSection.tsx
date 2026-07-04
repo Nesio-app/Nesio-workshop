@@ -22,6 +22,7 @@ import { MeetingRecorderSheet } from './MeetingRecorderSheet';
 import MemoryFlashBanner, { useMemoryFlash } from '../MemoryFlashBanner';
 import { t } from '@/lib/portal/i18n';
 import { usePortalLocale } from '../use-portal-locale';
+import { IconCalendar, IconNote } from '../icons';
 
 function CollapsedTaskItem({
   node,
@@ -42,7 +43,7 @@ function CollapsedTaskItem({
   const [expanded, setExpanded] = useState(false);
   const isDone = doneIds.has(node.id);
   const isMeeting = isMeetingNode(node);
-  const typeIcon = isMeeting ? '📅' : (FOCUS_TYPE_ICON[node.type] || '📋');
+  const typeIcon = isMeeting ? <IconCalendar size={15} /> : (FOCUS_TYPE_ICON[node.type] || <IconNote size={15} />);
   const hint = focusTimeHint(node);
 
   return (

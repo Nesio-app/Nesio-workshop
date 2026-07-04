@@ -435,7 +435,17 @@ export function SubscriptionSheet({ open, onClose }: SheetProps) {
   function optIn() {
     try { localStorage.setItem(PLAN_NOTIFY_KEY, '1'); } catch { /* ignore */ }
     setNotified(true);
+    // 双写:遥测计数(/admin Top 事件可见)+ 云产品事件(product_events 持久,
+    // 登录用户带 user 归属)。收费版开放时按这两处名单通知。
     void import('@/lib/portal/telemetry').then(({ track }) => track('plan_notify_optin'));
+    void import('@/lib/portal/app-api-client').then(({ createAppApiClient }) =>
+      createAppApiClient().recordCloudProductEvent({
+        eventType: 'plan.notify_optin',
+        source: 'settings',
+        targetType: 'plan',
+        targetId: 'paid_plans_waitlist',
+      }),
+    ).catch(() => {});
   }
 
   return (
