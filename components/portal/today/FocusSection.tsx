@@ -18,7 +18,7 @@ import { DormantReviewCard } from './DormantReviewCard';
 import { PinnedAttentionCard, CollapsedCalItem } from './CalendarCards';
 import { isMeetingNode } from './meeting-node';
 import { FocusCardDetail, FOCUS_TYPE_ICON } from './FocusCardDetail';
-import { MeetingRecorderSheet } from './FocusModeSheet';
+import { MeetingRecorderSheet } from './MeetingRecorderSheet';
 import MemoryFlashBanner, { useMemoryFlash } from '../MemoryFlashBanner';
 import { t } from '@/lib/portal/i18n';
 import { usePortalLocale } from '../use-portal-locale';

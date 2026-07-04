@@ -29,7 +29,8 @@ import { ProactiveGuidanceCard } from './today/ProactiveGuidanceCard';
 import { TodayFocusSection } from './today/FocusSection';
 import { NightTimeline } from './today/NightTimeline';
 import { useTodayData } from './today/useTodayData';
-import { FocusModeSheet, MeetingRecorderSheet } from './today/FocusModeSheet';
+import { FocusModeSheet } from './today/FocusModeSheet';
+import { MeetingRecorderSheet } from './today/MeetingRecorderSheet';
 
 // 1143-line analytics sheet — load on open, not at boot
 const InsightsSheet = dynamic(() => import('./InsightsSheet'), { ssr: false });

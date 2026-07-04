@@ -32,7 +32,8 @@
 | today/CalendarCards.tsx | 137 | 展示 | ✅ |
 | today/DormantReviewCard.tsx | 105 | 展示 | ✅ |
 | today/NightTimeline.tsx | 39 | 展示 | ✅ |
-| today/FocusModeSheet.tsx | 328 | 展示 | ⚠️ 轻微超标 |
+| today/FocusModeSheet.tsx | 141 | 展示 | ✅(2026-07-04 拆分) |
+| today/MeetingRecorderSheet.tsx | 163 | 展示 | ✅ |
 | today/FocusCardDetail.tsx | 242 | 展示 | ✅ |
 | today/ProactiveGuidanceCard.tsx | 119 | 展示 | ✅ |
 

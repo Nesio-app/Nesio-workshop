@@ -52,10 +52,10 @@
 ## 已知欠账(按优先级)
 
 1. Signal source-of-truth cutover + 投影退役(CEO Gate,契约 gates 约束)
-2. FocusModeSheet 328 行(展示阈值 300,轻微超标)
-3. 组件阈值修订为:容器 ≤500 / 展示 ≤300(见 docs/prd-deltas-2026-07.md §2)
+2. 组件阈值:容器 ≤500 / 展示 ≤300(见 docs/prd-deltas-2026-07.md §2)— 当前全部达标
 
-已清偿(2026-07-04):TodayFeed 拆分、FocusSection 二次拆分(298 行达标)、
+已清偿(2026-07-04):TodayFeed 拆分、FocusSection 二次拆分(298 行)、
+FocusModeSheet 拆分(141 + MeetingRecorderSheet 163)、
 lab 模式管理 UI、DEC/dec-data 注释消歧、Next 16.2.10(async cookies)、
 Signal M1-M4(读切换 + 删除传导)、REG-004/006 i18n 闭环
 (usePortalLocale + t() 字典)、57 处 hex token 化(chip/avatar/accent)。
