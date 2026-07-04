@@ -158,12 +158,27 @@ export interface GuidancePipelineInput {
   events: GuidanceEvent[];
   scoredCalendar: AttentionObject[]; // from attention engine — drives budget
   now?: Date;
+  /** From energy-state (此刻 EWMA baseline): 'low' tightens the budget one level. */
+  energy?: 'low' | 'normal' | 'high' | 'unknown';
+  /** From mirror-profile hourEngagement: user's most receptive hours (0-23). */
+  goodHours?: number[];
+}
+
+function tightenBudget(budget: ReturnType<typeof computeAttentionBudget>): ReturnType<typeof computeAttentionBudget> {
+  if (budget === 'ample') return 'limited';
+  return 'exhausted';
 }
 
 export function runGuidancePipeline(input: GuidancePipelineInput): GuidanceCard[] {
   const now = input.now ?? new Date();
   const coolingStore = loadCoolingStore();
-  const budget = computeAttentionBudget(input.scoredCalendar);
+  let budget = computeAttentionBudget(input.scoredCalendar);
+  // Low personal energy → fewer interruptions today (critical events still pass)
+  if (input.energy === 'low') budget = tightenBudget(budget);
+  // Outside the user's learned receptive hours, non-critical cards need a higher bar
+  const offHours = Boolean(
+    input.goodHours && input.goodHours.length > 0 && !input.goodHours.includes(now.getHours()),
+  );
 
   const candidates: Array<{ card: GuidanceCard; priority: number; urgency: WindowUrgency }> = [];
   const seenTypes = new Set<string>();
@@ -201,6 +216,9 @@ export function runGuidancePipeline(input: GuidancePipelineInput): GuidanceCard[
     seenTypes.add(event.type);
 
     const priority = interruptPriority(severity, urgency, event.type, event.source, confidence);
+
+    // Hour-fit gate: outside receptive hours, only severity-3 or high-priority cards show
+    if (offHours && severity < 3 && priority < 6) continue;
     const icon = event.type === 'email_signal' && typeof event.payload.icon === 'string'
       ? event.payload.icon
       : EVENT_ICON[event.type] ?? '📋';

@@ -14,6 +14,8 @@ import {
   type DormantStore, type DormantCandidate,
 } from '@/lib/platform/dormant-engine';
 import { runGuidancePipeline } from '@/lib/platform/guidance-engine/guidance-pipeline';
+import { getEnergyState } from '@/lib/platform/energy-state';
+import { getBestInterruptionHours } from '@/lib/portal/mirror-profile';
 import { loadCoolingStore, recordDismissed, saveCoolingStore } from '@/lib/platform/guidance-engine/cooling-store';
 import {
   calendarEventsToGuidanceEvents,
@@ -1685,7 +1687,13 @@ export default function TodayFeed({
           ...healthNodesToGuidanceEvents(updated.proactiveContext.healthItems),
         ];
 
-        const guidanceCards = runGuidancePipeline({ events: guidanceEvents, scoredCalendar: scored, now });
+        const guidanceCards = runGuidancePipeline({
+          events: guidanceEvents,
+          scoredCalendar: scored,
+          now,
+          energy: getEnergyState(now),
+          goodHours: getBestInterruptionHours(),
+        });
         const rawProactiveCards: ProactiveCardData[] = guidanceCards
           .map((card) => ({
             id: card.id,
