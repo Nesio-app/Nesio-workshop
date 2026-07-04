@@ -12,7 +12,6 @@ const i18n = readFileSync(join(root, 'lib', 'portal', 'i18n.ts'), 'utf8');
 const zhI18n = i18n.slice(i18n.indexOf('  zh: {'), i18n.indexOf('  en: {'));
 const onboarding = readFileSync(join(root, 'components', 'portal', 'PortalOnboarding.tsx'), 'utf8');
 const bottomNav = readFileSync(join(root, 'components', 'portal', 'PortalBottomNav.tsx'), 'utf8');
-const dashboardHome = readFileSync(join(root, 'components', 'portal', 'DashboardHome.tsx'), 'utf8');
 const toolsTreasureSheet = readFileSync(join(root, 'components', 'portal', 'ToolsTreasureSheet.tsx'), 'utf8');
 const personalizationInsights = readFileSync(join(root, 'lib', 'portal', 'personalization-insights.ts'), 'utf8');
 const storageSourceHome = readFileSync(join(root, 'storage-web', 'index.html'), 'utf8');
@@ -24,7 +23,6 @@ const secretaryApi = readFileSync(join(root, 'tools', 'secretary', 'api.js'), 'u
 const moduleManagerCore = readFileSync(join(root, 'lib', 'portal', 'module-manager-core.mjs'), 'utf8');
 const moduleManagerTs = readFileSync(join(root, 'lib', 'portal', 'module-manager.ts'), 'utf8');
 const secretaryChatRoute = readFileSync(join(root, 'app', 'api', 'secretary', 'chat', 'route.ts'), 'utf8');
-const portfolioPage = readFileSync(join(root, 'app', 'portfolio', 'page.tsx'), 'utf8');
 const webSurfaceContract = readFileSync(join(root, 'lib', 'portal', 'web-surface-contract-v0.mjs'), 'utf8');
 const appApiContract = readFileSync(join(root, 'lib', 'portal', 'app-api-contract-v0.mjs'), 'utf8');
 
@@ -79,7 +77,6 @@ assert.doesNotMatch(
   /你是「宝盒」|在宝盒智友中的角色/,
   'AI-facing Secretary system prompts must use Nesio naming.',
 );
-assert.doesNotMatch(portfolioPage, />宝盒</, 'Public portfolio nav must use Nesio naming.');
 assert.doesNotMatch(
   webSurfaceContract,
   /Baohe v0\.1 is a mobile-first personal toolbox/,
@@ -90,7 +87,6 @@ assert.doesNotMatch(moduleManagerCore, /config\.meta\?\.title \|\| '宝盒'/, 'S
 for (const [name, source] of [
   ['PortalOnboarding', onboarding],
   ['PortalBottomNav', bottomNav],
-  ['DashboardHome', dashboardHome],
   ['ToolsTreasureSheet', toolsTreasureSheet],
   ['personalization-insights', personalizationInsights],
   ['Secretary gated-source chat actions', secretaryListJs],
@@ -103,11 +99,6 @@ assert.match(storageHome, /Nesio Purchase Memory/, 'Inventory first-launch kicke
 assert.match(secretaryList, /Nesio/, 'Secretary gated-source list chrome should mention Nesio.');
 assert.match(secretaryListJs, /返回 Nesio/, 'Secretary gated-source dock should return to Nesio.');
 assert.match(secretaryApi, /https:\/\/www\.nesio\.app/, 'Secretary API public fallback should use www.nesio.app.');
-assert.match(
-  portfolioPage,
-  /<Link href="\/"[\s\S]*Nesio[\s\S]*<\/Link>/,
-  'Public portfolio nav should mention Nesio.',
-);
 assert.match(webSurfaceContract, /Nesio v0\.1 is a mobile-first personal toolbox/, 'Web-surface positioning should mention Nesio.');
 assert.match(appApiContract, /Nesio Local Demo/, 'Local API fixture display name should mention Nesio.');
 assert.match(

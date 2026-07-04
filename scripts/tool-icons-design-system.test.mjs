@@ -3,14 +3,12 @@ import { join } from 'node:path';
 
 const root = process.cwd();
 const assetContractPath = join(root, 'lib', 'portal', 'nesio-design-system-assets.mjs');
-const toolCardPath = join(root, 'components', 'portal', 'ToolCard.tsx');
-const toolSidebarPath = join(root, 'components', 'portal', 'ToolSidebar.tsx');
+// ToolCard/ToolSidebar retired with the v14 dashboard (2026-07 contract
+// migration); ToolGridIcon is the living icon surface.
 const toolGridIconPath = join(root, 'components', 'portal', 'ToolGridIcon.tsx');
 const packagePath = join(root, 'package.json');
 
 const assetContract = readFileSync(assetContractPath, 'utf8');
-const toolCard = readFileSync(toolCardPath, 'utf8');
-const toolSidebar = readFileSync(toolSidebarPath, 'utf8');
 const toolGridIcon = readFileSync(toolGridIconPath, 'utf8');
 const pkg = JSON.parse(readFileSync(packagePath, 'utf8'));
 
@@ -36,8 +34,6 @@ for (const [moduleId, iconKey] of [
 }
 
 for (const [name, source] of [
-  ['ToolCard', toolCard],
-  ['ToolSidebar', toolSidebar],
   ['ToolGridIcon', toolGridIcon],
 ]) {
   assert(

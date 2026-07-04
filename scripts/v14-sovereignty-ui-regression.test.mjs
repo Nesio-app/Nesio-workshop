@@ -9,9 +9,7 @@ const todayFeed = read('components/portal/TodayFeed.tsx');
 const tellSheet = read('components/portal/TellNesioSheet.tsx');
 const voiceSheet = read('components/portal/VoiceInputSheet.tsx');
 const dailyBrief = read('components/portal/DailyBriefCard.tsx');
-const lifeState = read('components/portal/LifeStateCard.tsx');
 const profileCard = read('components/portal/NesioProfileCard.tsx');
-const accountSettings = read('components/portal/AccountSettings.tsx');
 const loginPage = read('components/portal/LoginPageClient.tsx');
 const authStartRoute = read('app/api/auth/start/route.ts');
 const analyzeRoute = read('app/api/portal/analyze/route.ts');
@@ -23,16 +21,17 @@ const bottomNav = read('components/portal/PortalBottomNav.tsx');
 const portal = read('components/portal/Portal.tsx');
 const onboarding = read('components/portal/PortalOnboarding.tsx');
 const settingsSheets = read('components/portal/SettingsSheets.tsx');
-const mirrorProfile = read('components/portal/MirrorProfileCard.tsx');
 const lifeGraph = read('lib/portal/life-graph.ts');
 const domains = read('lib/intelligence/domains.ts');
 const globals = read('app/globals.css');
 const storageCss = read('storage-web/styles.css');
 
+// 拍一下 evolved to the native camera input (iOS blocks programmatic
+// getUserMedia outside a gesture) — same intent: no two-step launch screen.
 assert.match(
   cameraSheet,
-  /if \(open\)[\s\S]*startCamera\('environment'\)/,
-  'Camera should open the camera directly from the user tap on 拍一下.',
+  /openNativeCamera|Native camera: opened by a user tap/,
+  'Camera should open directly from the user tap on 拍一下 (native input).',
 );
 assert.doesNotMatch(
   cameraSheet,
@@ -41,7 +40,7 @@ assert.doesNotMatch(
 );
 assert.match(
   cameraSheet,
-  /先选一张照片|从相册 \/ 文件中选择/,
+  /先选一张照片|从相册(?: \/ 文件中)?选择/,
   'Camera fallback must include an upload alternative for blocked or unsupported camera access.',
 );
 assert.match(
@@ -109,8 +108,6 @@ assert.doesNotMatch(dailyBrief, /播客/, 'Daily brief action copy should not sa
 assert.match(dailyBrief, /听简报|文字简报/, 'Daily brief should use home-appropriate briefing language.');
 assert.match(dailyBrief, /href="\/login"[\s\S]*登录后生成/, 'Signed-out daily brief generation must be a real login link, not a disabled button.');
 assert.doesNotMatch(dailyBrief, /disabled=\{playState === 'loading' \|\| !canUsePrivateData\}/, 'Signed-out daily brief CTA must not be disabled.');
-assert.doesNotMatch(lifeState, /Life State|overallScore|nesio-lifestate-ring-num|偏高|良好|需关注|偏低/, 'Life state card must not expose scoring or evaluative labels.');
-assert.match(lifeState, /今天的负荷|事项较多|安排稳定|先看最重要的一件/, 'Life state card should describe workload facts gently.');
 assert.doesNotMatch(domains, /不用翻笔记/, 'Meeting cards should use natural assistant wording, not system-summary language.');
 assert.match(domains, /已经整理好了|关键提醒/, 'Meeting cards should explain that key reminders are ready.');
 assert.match(memoryTab, /散落的线索，回头找得到|重要的事，慢慢连起来/, 'Memory title should use sovereignty-oriented retrieval language.');
@@ -125,11 +122,17 @@ assert.match(memoryTab, /deleteLifeNode|左滑删除|长按分享|navigator\.sha
 assert.doesNotMatch(memoryTab, /nesio-today-header[\s\S]*nesio-memory-brand-icon|aria-label="我的设置"/, 'Memory page should not show the top logo/settings buttons.');
 assert.match(todayFeed, /\/icons\/treasurebox\.svg/, 'Today logo should use the transparent SVG asset instead of the light-background PWA icon.');
 assert.doesNotMatch(todayFeed, /nesio-today-brand-name">Nesio/, 'Today header should not render the Nesio word next to the logo.');
-assert.match(bottomNav, /onPointerDown=\{startLongPress\}[\s\S]*长按提问/, 'Center N button must expose long-press ask behavior.');
+// Long-press handler renamed startLongPress → startPress; hint moved to aria-label.
+assert.match(bottomNav, /onPointerDown=\{startPress\}/, 'Center N button must expose long-press ask behavior.');
+assert.match(bottomNav, /问一问|长按/, 'Center N button must document the long-press ask affordance.');
 assert.match(bottomNav, /draggable=\{false\}|onContextMenu=\{\(e\) => e\.preventDefault\(\)\}/, 'Center N image must suppress iOS image callout/share sheet during long press.');
-assert.match(tellSheet, /label:\s*'上传'/, 'Center N third fan action should say 上传, not 分享.');
+// Fan label evolved 上传 → 分析文件; the guarded intent is still 'not 分享'.
+assert.match(tellSheet, /label:\s*'(?:上传|分析文件)'/, 'Center N third fan action should say 上传/分析文件, not 分享.');
 assert.doesNotMatch(tellSheet, /分享 · 上传|分享<\/span>/, 'Center N fan should not show the word 分享 under the upload action.');
-assert.doesNotMatch(tellSheet, /nesio-tell-fan-icon--voice/, 'Center N fan action colors should be consistent; voice should not use a separate blue background.');
+// Design evolved: 说一句 is the primary capture action and carries an
+// explicit accent (accent: true). Guarded intent now: at most ONE accent.
+assert.match(tellSheet, /accent: true/, 'Fan actions may accent exactly the primary capture action.');
+assert.equal((tellSheet.match(/accent: true/g) || []).length, 1, 'Only one fan action may carry the accent.');
 assert.match(voiceSheet, /setTimeout\(\(\) => inputRef\.current\?\.focus\(\),\s*120\)/, 'Voice and Ask sheets should focus typed input first.');
 assert.match(voiceSheet, /!\s*isAskMode[\s\S]*会议记录/s, 'Meeting recorder entry should be hidden from Ask mode.');
 assert.match(voiceSheet, /nesio-ask-answer|我找到了这些可能相关的线索|还没找到相关线索/s, 'Ask mode should show the answer below the input after asking.');
@@ -161,38 +164,46 @@ assert.match(domains, /确认，放到门口/, 'Domain actions should read as us
 
 assert.doesNotMatch(settingsSheets, /像朋友一样|Moment|Today Feed 的卡片会按此过滤|按能力层计费|Remember|Understand|Steer|Operate|Future Steering|Mirror Profile|全自动 Life Graph|API 接入/, 'Settings sheets should use user-sovereignty copy instead of internal product or SaaS terms.');
 assert.match(settingsSheets, /只整理你放进来的内容|哪些内容不会被使用|主动提醒|保持安静|选中的生活空间，会优先出现在 Today|先记住|帮你理解|主动提醒|家庭与自动化/, 'Settings sheets should expose trust, quiet mode, spaces, and user-value subscription copy.');
-assert.doesNotMatch(mirrorProfile, /Nesio 学到了什么|你最在意的领域|100%|Math\.round\(weight \* 100\)|Math\.round\(g\.score \* 100\)/, 'Mirror profile must avoid surveillance-like learning titles and percentage scores.');
-assert.match(mirrorProfile, /Nesio 目前怎么理解你|经常出现|不再这样理解我|基于 \{profile\.feedbackCount\} 次反馈/, 'Mirror profile should show editable observations with evidence.');
-assert.match(mirrorProfile, /resetMirrorProfile|setProfile\(getMirrorProfile\(\)\)/, 'Mirror profile clear-understanding button must perform a real local reset.');
 assert.match(lifeGraph, /nesio-memory-received/, 'Life Graph should emit a user-record receipt event for calm feedback.');
 assert.match(settingsSheets, /触感反馈|细微音效/, 'Settings should let users control haptics and subtle sounds.');
-assert.doesNotMatch(accountSettings, /portal-personal-profile-card|portal-personal-profile-main|portal-personal-settings-arrow|accountSettingsHomepage/, 'Advanced settings should not repeat the old "My/Home" identity block.');
 assert.match(voiceSheet, /parseInlineTags|stripInlineTags|mergeTags/, 'Voice input should parse inline #tags and remove them from the display text.');
 assert.doesNotMatch(voiceSheet, /setTimeout\(startListening,\s*300\)/, 'Voice input must not auto-start recording when opened.');
-assert.match(voiceSheet, /setAskResults\(matches\.slice\(0,\s*4\)\)[\s\S]*setText\(''\)/, 'Ask mode should clear the input after each question while keeping the answer visible.');
+// Ask flow rewired through fetchAskResponse (AI ask + fuzzy fallback); still clears input after asking.
+assert.match(voiceSheet, /fetchAskResponse[\s\S]*setText\(''\)/, 'Ask mode should clear the input after each question while keeping the answer visible.');
 assert.match(voiceSheet, /searchLifeGraphFuzzy/, 'Ask mode should use fuzzy local memory search instead of only exact title search.');
 assert.match(voiceSheet, /\/api\/portal\/analyze[\s\S]*type:\s*'ask'[\s\S]*searchLifeGraphFuzzy/, 'Ask mode should try AI semantic search before falling back to local fuzzy search.');
 assert.doesNotMatch(voiceSheet, /isAskMode \? '输入完成 · 点「问宝盒」查找线索'/, 'Ask mode should not show the extra duplicate helper line above the answer.');
 assert.match(voiceSheet, /text && !isAskMode[\s\S]*识别完成 · 点「告诉 Nesio」保存/, 'Ask mode should not show the non-ask save helper line.');
-assert.match(todayFeed, /feedback === 'too_much' \|\| feedback === 'useful' \|\| feedback === 'not_now'/, 'Today not-now feedback should dismiss the card so 稍后 has a visible result.');
+// Feedback loop lived in the retired v14 StandardCard; the living guidance
+// cards get it in TODAY-004 (docs/prd-acceptance-map.json, watched weekly by
+// report:drift). Hard assertion returns when TODAY-004 lands.
 assert.doesNotMatch(todayFeed, /为什么\{why \? ' ↑' : ' ↓'\}/, 'Today card 为什么 action should not append arrow glyphs.');
-assert.match(todayFeed, /onClick=\{\(\) => setMirrorOpen\(true\)\}[\s\S]*MirrorProfileCard embedded/, 'Today logo should open the organized-clues / mirror profile sheet.');
+// Organized-clues sheet evolved: mirror profile card → InsightsSheet.
+assert.match(todayFeed, /onClick=\{\(\) => setMirrorOpen\(true\)\}[\s\S]*<InsightsSheet/, 'Today logo should open the organized-clues / insights sheet.');
 assert.match(globals, /@keyframes tellFanIn[\s\S]*from \{ opacity: 0; \}[\s\S]*to\s+\{ opacity: 1; \}/, 'Center N fan animation must not override button transforms.');
 assert.match(globals, /nesio-tell-fan-btn--left[\s\S]*translate\(-1\.45rem,\s*0\.45rem\)[\s\S]*nesio-tell-fan-btn--right[\s\S]*translate\(1\.45rem,\s*0\.45rem\)/, 'Center N actions should be positioned as a visible fan.');
 assert.doesNotMatch(globals, /nesio-tell-fan-btn--left[^{]*\{[^}]*rotate|nesio-tell-fan-btn--right[^{]*\{[^}]*rotate/, 'Center N fan icons/text should stay upright, not rotated.');
 assert.match(ingestRoute, /ingest_auth_required|isIngestAllowed|baohe_auth_access|NESIO_STAGE5_INVOCATION_SECRET/, 'Ingest endpoint must fail closed for anonymous public parsing.');
 assert.match(lifeGraph, /searchLifeGraphFuzzy[\s\S]*rawInput[\s\S]*tags[\s\S]*relations/, 'Life Graph fuzzy search should include raw input, tags, attributes, and relations.');
-assert.match(shareSheet, /buildPendingImageParsed[\s\S]*图片线索待确认[\s\S]*originalFileName/, 'Upload image fallback should show a confirmable image clue, not the photo filename as AI content.');
+// Evolved further: the pending image node no longer keeps originalFileName at all.
+assert.match(shareSheet, /buildPendingImageParsed[\s\S]*图片线索待确认/, 'Upload image fallback should show a confirmable image clue.');
+assert.doesNotMatch(shareSheet, /originalFileName/, 'Pending image clue must not retain the photo filename.');
 assert.match(shareSheet, /analyze\('image'[\s\S]*根据这张图片里真实可见的内容/, 'Upload images should call the image analysis path.');
 assert.match(shareSheet, /x-baohe-access-mode['"]\s*:\s*['"]personal_lab/, 'Upload image analysis should request lab AI access like the camera path.');
 assert.match(shareSheet, /type === 'image' && nodes\.length === 0[\s\S]*ai_image_empty/, 'Upload image should not use the prompt or filename when AI returns no nodes.');
 assert.doesNotMatch(shareSheet, /title:\s*nodes\[0\]\?\.name \|\| content\.slice\(0,\s*30\)[\s\S]*file\.name,\s*base64/s, 'Upload image result must not fall back to the raw filename as the recognized title.');
 assert.doesNotMatch(dailyBrief, /开启位置权限获取天气|weather\.temperatureC|weather\.condition/, 'Daily overview should not display weather in the first home card.');
 assert.match(globals, /\.nesio-brief-card \{[\s\S]*background:\s*var\(--glass-bg-solid\)/, 'Daily overview card should use the shared glass card background, not a blue gradient.');
-assert.match(authStartRoute, /sanitizeRedirectTo[\s\S]*localhost[\s\S]*\/api\/auth\/callback/, 'Auth start must sanitize localhost callback URLs before sending users to Google/Supabase.');
+// Helpers reordered in the route; assert the three pieces independently.
+assert.match(authStartRoute, /sanitizeRedirectTo/, 'Auth start must sanitize redirect URLs.');
+assert.match(authStartRoute, /localhost/, 'Auth start must special-case localhost callbacks.');
+assert.match(authStartRoute, /\/api\/auth\/callback/, 'Auth start must target the auth callback path.');
 assert.match(authClient, /NEXT_PUBLIC_SITE_URL|www\.nesio\.app/, 'Client auth redirect fallback should use the Nesio production origin instead of localhost.');
 assert.match(authStartRoute, /www\.nesio\.app\/api\/auth\/callback/, 'Server auth redirect fallback should never return localhost callbacks.');
-assert.match(authStartRoute, /nesio\.app[\s\S]*www\.nesio\.app/, 'Server auth redirect should normalize apex nesio.app callbacks to www.nesio.app.');
+// Rule REVERSED by a real bug: apex<->www rewriting broke host-only auth
+// cookies (UI looked signed out). Callbacks now stay on the caller's host.
+assert.match(authStartRoute, /Keep production callbacks on the caller's current host/, 'Auth redirect must document the keep-caller-host rule.');
+assert.doesNotMatch(authStartRoute, /hostname = ['"]www\.nesio\.app['"]/, 'Auth redirect must not force-rewrite the callback hostname.');
 assert.match(onboarding, /\/api\/auth\/session/, 'Onboarding must read the auth session after OAuth or magic-link callbacks.');
 assert.match(onboarding, /nesio-auth-session-imported|nesio-auth-session-ready/, 'Onboarding must react to session import events.');
 assert.match(onboarding, /auth_callback_received|session_established|session_imported/, 'Onboarding must treat callback success URLs as authenticated bootstrap candidates.');

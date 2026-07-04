@@ -41,7 +41,6 @@ export const LAYER_RULES = [
     include: [
       /^components\/portal\/TodayFeed\.tsx$/,
       /^components\/portal\/DailyBriefCard\.tsx$/,
-      /^components\/portal\/LifeStateCard\.tsx$/,
       /^components\/portal\/VoiceBrief\.tsx$/,
       /^components\/portal\/today\//,
     ],

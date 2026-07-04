@@ -5,7 +5,6 @@ import { join } from 'node:path';
 const root = process.cwd();
 const source = readFileSync(join(root, 'app/api/portal/quote/route.ts'), 'utf8');
 const catalog = readFileSync(join(root, 'lib/portal/positive-quote-catalog.mjs'), 'utf8');
-const dashboardHome = readFileSync(join(root, 'components/portal/DashboardHome.tsx'), 'utf8');
 
 assert.match(source, /positive-quote-catalog\.mjs/, 'quote route must import the shared quote catalog');
 assert.doesNotMatch(source, /const POSITIVE_TERMS = \[/, 'positive allowlist must live in the shared quote catalog');
@@ -29,15 +28,8 @@ assert.match(source, /searchParams\.get\('locale'\)/, 'quote route must read req
 assert.match(source, /source: 'local_fallback'/, 'quote route must fall back locally when upstream fails');
 assert.doesNotMatch(source, /ok: false,\s*quote: null/, 'quote route must not render an empty quote on upstream failure');
 assert.match(catalog, /并无新事/, 'previously observed neutral-cold external quote must stay blocked');
-assert.match(
-  dashboardHome,
-  /URLSearchParams\(\{ locale \}\)/,
-  'Dashboard external quote fetch must pass the current portal locale.',
-);
-assert.match(
-  dashboardHome,
-  /\/api\/portal\/quote\?\$\{quoteQuery\.toString\(\)\}/,
-  'Dashboard external quote fetch must call the locale-aware quote endpoint.',
-);
+// Quote UI retired with the v14 dashboard — no living consumer today.
+// Tracked as REG-001 in docs/regression-backlog.json (revive in Today or
+// retire the engine). Route/catalog contracts above still guard the API.
 
 console.log('portal quote positive boundary tests passed');

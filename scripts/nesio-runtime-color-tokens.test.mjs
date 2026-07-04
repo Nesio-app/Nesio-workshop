@@ -2,11 +2,9 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const root = process.cwd();
-const dashboardPath = join(root, 'components', 'portal', 'DashboardHome.tsx');
 const personalizationPath = join(root, 'lib', 'portal', 'personalization-insights.ts');
 const packagePath = join(root, 'package.json');
 
-const dashboard = readFileSync(dashboardPath, 'utf8');
 const personalization = readFileSync(personalizationPath, 'utf8');
 const pkg = JSON.parse(readFileSync(packagePath, 'utf8'));
 
@@ -20,7 +18,9 @@ function extractConstArray(source, constName) {
   return match[1];
 }
 
-const moodOptions = extractConstArray(dashboard, 'MOOD_OPTIONS');
+// v14 dashboard retired — mood colors now live in MoodSheet's EMOTIONS wheel.
+const moodSheet = readFileSync(join(root, 'components', 'portal', 'MoodSheet.tsx'), 'utf8');
+const moodOptions = extractConstArray(moodSheet, 'EMOTIONS');
 const rawHexColor = /color:\s*['"]#[0-9a-fA-F]{3,8}['"]/;
 
 assert(
@@ -28,19 +28,16 @@ assert(
   'MOOD_OPTIONS must use Nesio theme-aware color tokens instead of raw hex colors.',
 );
 
-for (const token of [
-  'var(--status-calm)',
-  'var(--status-go)',
-  'var(--status-gentle)',
-  'var(--portal-cool-accent)',
-  'var(--portal-warm-accent)',
-  'var(--portal-neutral-accent)',
-]) {
-  assert(
-    moodOptions.includes(token),
-    `MOOD_OPTIONS should include the design-system token ${token}.`,
-  );
-}
+// The v14 six-tone MOOD_OPTIONS became the Russell 12-emotion wheel;
+// colors must come from the --emotion-* design-token family (globals.css).
+assert(
+  /var\(--emotion-[a-z]+\)/.test(moodOptions),
+  'EMOTIONS must reference the --emotion-* design-token family.',
+);
+assert(
+  !/#[0-9a-fA-F]{3,8}/.test(moodOptions),
+  'EMOTIONS must not contain raw hex colors.',
+);
 
 assert(
   !/moodDotColor:\s*['"]#[0-9a-fA-F]{3,8}['"]/.test(personalization),

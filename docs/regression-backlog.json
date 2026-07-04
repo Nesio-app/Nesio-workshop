@@ -1,0 +1,53 @@
+{
+  "$comment": "两代交接的回归欠账(第一期契约迁移产出)。每条来自一个退役契约的活意图:旧代有、新代没有、且值得要回来的能力。report:drift 会周检 status=open 的条目并计入漂移。做完一条改 status=done 并在 marker 填实现证据。",
+  "items": [
+    {
+      "id": "REG-001",
+      "from_contract": "portal-quote-positive (DashboardHome 部分)",
+      "description": "「每日一句」正能量语录 UI 随 DashboardHome 退役 — quotes.ts(224行)+ positive-quote-catalog + /api/portal/quote 现为无表面引擎。产品决策:要么在 TodayFeed 复活(带 locale 传参),要么正式砍掉引擎",
+      "living_surface": "components/portal/TodayFeed.tsx",
+      "marker": "/api/portal/quote",
+      "status": "open"
+    },
+    {
+      "id": "REG-002",
+      "from_contract": "account-settings-production-runtime",
+      "description": "auth 启动的可追踪标记(data-runtime-action=\"auth-start-{provider}\")随 AccountSettings 退役,LoginPageClient 无等价物 — 生产排障时无法从 DOM 定位 auth 动作",
+      "living_surface": "components/portal/LoginPageClient.tsx",
+      "marker": "data-runtime-action",
+      "status": "open"
+    },
+    {
+      "id": "REG-003",
+      "from_contract": "dashboard-calendar-provider-action",
+      "description": "日历连接状态从 providerActionMatrix 派生(区分 OAuth 就绪/iCal 只读/未配置)随 DashboardHome 退役 — ConnectorsHub 现在只有本地 connected 标记,不感知服务端 provider 真实状态",
+      "living_surface": "components/portal/ConnectorsHub.tsx",
+      "marker": "providerActionMatrix",
+      "status": "open"
+    },
+    {
+      "id": "REG-004",
+      "from_contract": "baohe-v14-coverage + portal-locale-runtime (DashboardHome 部分)",
+      "description": "Today 表面 i18n 全丢:旧代 DashboardHome 全键覆盖(dashboardReminderKicker 等),新代 TodayFeed 硬编码中文。第四期按此清单补:提醒kicker/聚焦区标题/momentum按钮/空状态",
+      "living_surface": "components/portal/TodayFeed.tsx",
+      "marker": "t(locale,",
+      "status": "open"
+    },
+    {
+      "id": "REG-005",
+      "from_contract": "account-settings-auth-i18n",
+      "description": "auth/runtime 文案 i18n 化(禁硬编码中文错误)随 AccountSettings 退役 — LoginPageClient 部分文案硬编码",
+      "living_surface": "components/portal/LoginPageClient.tsx",
+      "marker": "authProviderLabel",
+      "status": "open"
+    },
+    {
+      "id": "REG-006",
+      "from_contract": "portal-locale-runtime (PortalOnboarding 部分)",
+      "description": "Onboarding 重写后绕过 i18n 字典(zh/en 三元硬编码,onboarding* 键在字典里成孤儿);style 选择步骤迁入 ToneSheet 且同样硬编码。第四期统一补 t() 接线",
+      "living_surface": "components/portal/PortalOnboarding.tsx",
+      "marker": "t(locale, 'onboarding",
+      "status": "open"
+    }
+  ]
+}

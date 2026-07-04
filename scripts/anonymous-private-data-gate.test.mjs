@@ -8,7 +8,7 @@ const read = (file) => readFileSync(join(root, file), 'utf8');
 const portal = read('components/portal/Portal.tsx');
 const todayFeed = read('components/portal/TodayFeed.tsx');
 const dailyBrief = read('components/portal/DailyBriefCard.tsx');
-const lifeState = read('components/portal/LifeStateCard.tsx');
+const todayViewModel = read('lib/platform/view-models/today-view-model.ts');
 const memoryTab = read('components/portal/MemoryTab.tsx');
 const nodeDetail = read('components/portal/MemoryNodeDetail.tsx');
 const lifeGraph = read('lib/portal/life-graph.ts');
@@ -85,7 +85,6 @@ assert.match(
 for (const [name, source] of [
   ['TodayFeed', todayFeed],
   ['DailyBriefCard', dailyBrief],
-  ['LifeStateCard', lifeState],
   ['MemoryTab', memoryTab],
 ]) {
   assert.match(
@@ -112,11 +111,13 @@ assert.doesNotMatch(
   /getRecentNodes/,
   'DailyBriefCard must not read Life Graph directly; gated memory notes must come from TodayViewModel.',
 );
+// LifeStateCard retired; cross-signal life state now computes inside the
+// gated TodayViewModel (runDEC → computeLifeState) — the gate must come first.
 assertBefore(
-  lifeState,
-  'if (!canUsePrivateData)',
-  'const recompute = () => setState(computeLifeState());',
-  'LifeStateCard must check the private-data gate before computing cross-signal state.',
+  todayViewModel,
+  'if (!input.canUsePrivateData)',
+  'generateTodayCards(',
+  'TodayViewModel must check the private-data gate before running DEC / computing life state.',
 );
 assert.match(
   todayFeed,

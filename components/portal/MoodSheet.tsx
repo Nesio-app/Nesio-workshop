@@ -18,18 +18,18 @@ import { addLifeNode } from '@/lib/portal/life-graph';
 
 // ── 12-Emotion taxonomy (Russell Circumplex 4 quadrants × 3) ─────────────────
 const EMOTIONS = [
-  { id: 'joy',        label: '开心', emoji: '😄', color: '#FFD166', quadrant: 'hv-ha' },
-  { id: 'excited',    label: '兴奋', emoji: '🤩', color: '#FFB347', quadrant: 'hv-ha' },
-  { id: 'moved',      label: '感动', emoji: '🥰', color: '#FF8FAB', quadrant: 'hv-ha' },
-  { id: 'calm',       label: '平静', emoji: '😌', color: '#74C69D', quadrant: 'hv-la' },
-  { id: 'content',    label: '满足', emoji: '😊', color: '#52B788', quadrant: 'hv-la' },
-  { id: 'grateful',   label: '感激', emoji: '🤗', color: '#95D5B2', quadrant: 'hv-la' },
-  { id: 'tired',      label: '疲惫', emoji: '😪', color: '#90CAF9', quadrant: 'lv-la' },
-  { id: 'empty',      label: '空洞', emoji: '😶', color: '#B0C4DE', quadrant: 'lv-la' },
-  { id: 'sad',        label: '难过', emoji: '😢', color: '#7B9CCC', quadrant: 'lv-la' },
-  { id: 'anxious',    label: '焦虑', emoji: '😰', color: '#CE93D8', quadrant: 'lv-ha' },
-  { id: 'frustrated', label: '烦躁', emoji: '😤', color: '#FF8A65', quadrant: 'lv-ha' },
-  { id: 'angry',      label: '生气', emoji: '😠', color: '#EF5350', quadrant: 'lv-ha' },
+  { id: 'joy',        label: '开心', emoji: '😄', color: 'var(--emotion-joy)', quadrant: 'hv-ha' },
+  { id: 'excited',    label: '兴奋', emoji: '🤩', color: 'var(--emotion-excited)', quadrant: 'hv-ha' },
+  { id: 'moved',      label: '感动', emoji: '🥰', color: 'var(--emotion-moved)', quadrant: 'hv-ha' },
+  { id: 'calm',       label: '平静', emoji: '😌', color: 'var(--emotion-calm)', quadrant: 'hv-la' },
+  { id: 'content',    label: '满足', emoji: '😊', color: 'var(--emotion-content)', quadrant: 'hv-la' },
+  { id: 'grateful',   label: '感激', emoji: '🤗', color: 'var(--emotion-grateful)', quadrant: 'hv-la' },
+  { id: 'tired',      label: '疲惫', emoji: '😪', color: 'var(--emotion-tired)', quadrant: 'lv-la' },
+  { id: 'empty',      label: '空洞', emoji: '😶', color: 'var(--emotion-empty)', quadrant: 'lv-la' },
+  { id: 'sad',        label: '难过', emoji: '😢', color: 'var(--emotion-sad)', quadrant: 'lv-la' },
+  { id: 'anxious',    label: '焦虑', emoji: '😰', color: 'var(--emotion-anxious)', quadrant: 'lv-ha' },
+  { id: 'frustrated', label: '烦躁', emoji: '😤', color: 'var(--emotion-frustrated)', quadrant: 'lv-ha' },
+  { id: 'angry',      label: '生气', emoji: '😠', color: 'var(--emotion-angry)', quadrant: 'lv-ha' },
 ] as const;
 
 type EmotionId = typeof EMOTIONS[number]['id'];

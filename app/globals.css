@@ -3,6 +3,20 @@
 @tailwind utilities;
 
 :root {
+  /* Moment-capture emotion wheel (Russell quadrants) — data palette, theme-stable */
+  --emotion-joy: #FFD166;
+  --emotion-excited: #FFB347;
+  --emotion-moved: #FF8FAB;
+  --emotion-calm: #74C69D;
+  --emotion-content: #52B788;
+  --emotion-grateful: #95D5B2;
+  --emotion-tired: #90CAF9;
+  --emotion-empty: #B0C4DE;
+  --emotion-sad: #7B9CCC;
+  --emotion-anxious: #CE93D8;
+  --emotion-frustrated: #FF8A65;
+  --emotion-angry: #EF5350;
+
   --cream: #F7F5F0;
   --beige: #E8E4DC;
   --charcoal: #2C2C2C;

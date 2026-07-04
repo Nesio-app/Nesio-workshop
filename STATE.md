@@ -2,7 +2,7 @@
 
 > Loop-engineering 原则:状态必须活在对话之外。任何 AI 会话或新协作者
 > **先读这个文件**,再动手。改动仓库重大状态时,同步更新这里。
-> 最后更新:2026-07-04
+> 最后更新:2026-07-04(第一期契约迁移完成)
 
 ## 当前纪元:两代产品交接中
 
@@ -19,11 +19,15 @@
 ## 进行中的迁移
 
 1. **Signal 主事实表**:createSignal() 是唯一合法写入口;LifeGraph/Memory 是兼容投影
-2. **契约迁移**(未开始):~11 个 scripts/*.test.mjs 契约测试钉在旧代组件上
-   (AccountSettings/DashboardHome/LifeStateCard/ToolCard/ToolSidebar)。
-   这些组件已从页面不可达,但**不能删**——删除会弄红 CI(2026-07-03 已发生并 revert,
-   见 commit ae05ccd)。正确顺序:先迁契约到新代 surface,再删组件。
-   迁移过程会自动产出新代回归清单(TodayFeed 缺 i18n 键、缺 providerActionMatrix 等)。
+2. **契约迁移(2026-07-04 完成)**:13 个契约已全部迁移/退役,15 个旧代死组件已删除。
+   - 迁移到活 surface:tool-icons→ToolGridIcon、anonymous-gate→today-view-model、
+     locale purchased-tools→ToolsTreasureSheet、color-tokens→MoodSheet EMOTIONS(顺手
+     把 12 个情绪色 token 化为 --emotion-*)
+   - 退役(纯死表面):baohe-v14-coverage、shell-entry-visibility、
+     dashboard-calendar-provider-action、account-settings-*(意图入 regression-backlog)
+   - 断言随实现进化更新:相机原生打开、镜像 sheet→InsightsSheet、apex↔www 规则反转
+     (代码注释记载了原因:host-only cookie bug)
+   - 产出:docs/regression-backlog.json(REG-001~006,report:drift 周检)
 
 ## 红线(动之前必读)
 

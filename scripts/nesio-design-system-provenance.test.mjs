@@ -97,10 +97,8 @@ for (const [kind, names] of [
 const runtimeFiles = [
   join(root, 'app', 'page.tsx'),
   join(root, 'app', 'globals.css'),
-  join(root, 'components', 'portal', 'DashboardHome.tsx'),
   join(root, 'components', 'portal', 'PortalAiFriendsPreview.tsx'),
   join(root, 'components', 'portal', 'ToolsTreasureSheet.tsx'),
-  join(root, 'components', 'portal', 'AccountSettings.tsx'),
   join(root, 'components', 'portal', 'PortalBottomNav.tsx'),
 ];
 

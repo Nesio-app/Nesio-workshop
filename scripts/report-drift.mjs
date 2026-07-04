@@ -22,7 +22,10 @@ const componentRefRe = /components[/'"], '([A-Z][A-Za-z]+)\.tsx'|components\/por
 const contractRefs = new Map(); // component -> Set<script>
 for (const s of scriptFiles) {
   const src = read(join('scripts', s));
+  // 跳过测试自写的临时 fixture(如 i18n-hardcode-scan 的 DemoPanel)
+  const writesFixtures = src.includes('writeFileSync');
   for (const m of src.matchAll(componentRefRe)) {
+    if (writesFixtures && !src.includes(`read('components/portal/${m[1] || m[2]}`) && !src.includes(`'${m[1] || m[2]}.tsx'), 'utf8'`)) continue;
     const comp = m[1] || m[2];
     if (!comp) continue;
     if (!contractRefs.has(comp)) contractRefs.set(comp, new Set());
