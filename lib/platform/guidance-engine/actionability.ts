@@ -12,6 +12,14 @@ import type { GuidanceEvent, WindowUrgency, GuidanceAction } from './types';
 
 export function buildAction(event: GuidanceEvent, urgency: WindowUrgency): GuidanceAction | null {
   switch (event.type) {
+    case 'dec_insight': {
+      // DEC cards ship their own one-step CTA (PRD: primaryAction).
+      const cta = typeof event.payload.primaryAction === 'string' && event.payload.primaryAction
+        ? event.payload.primaryAction
+        : '知道了';
+      return { label: cta, cta, actionType: 'dismiss' };
+    }
+
     case 'flight':
       if (urgency === 'critical') return { label: '现在需要出发前往机场', cta: '知道了', actionType: 'dismiss' };
       if (urgency === 'high')     return { label: '用航空公司 App 完成在线值机（约 1 分钟）', cta: '去值机', actionType: 'dismiss' };

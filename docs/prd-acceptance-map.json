@@ -7,28 +7,28 @@
       "description": "Today 数据源统一改为 Guidance Service,不直接 import connector client",
       "marker": "runGuidancePipeline({",
       "file": "components/portal/TodayFeed.tsx",
-      "status_note": "部分满足:guidance 管线是主路径,但 TodayFeed 仍直接读 portal cache"
+      "status_note": "已满足:DEC 卡经 decCardsToGuidanceEvents 汇入 guidance 管线,单一服务仲裁"
     },
     {
       "id": "TODAY-002",
       "description": "每张卡必须显示 Recommendation + Reason + Evidence,可展开看证据",
-      "marker": "evidenceSignalIds",
+      "marker": "decCardsToGuidanceEvents",
       "file": "components/portal/TodayFeed.tsx",
-      "status_note": "证据体系在 lib/intelligence/dec.ts 已实现但未渲染;guidance 卡缺证据展示"
+      "status_note": "已实现:GuidanceCard 携带 evidence(EvidenceRef[])+reason,卡片 UI 依据▸可展开"
     },
     {
       "id": "TODAY-003",
       "description": "Today 默认最多显示 3-5 张核心卡(统一仲裁)",
       "marker": "TODAY_CARD_BUDGET",
       "file": "components/portal/TodayFeed.tsx",
-      "status_note": "DEC 有 budget=3 但未接线;渲染层是 slice(0,2) 硬编码"
+      "status_note": "TODAY_CARD_BUDGET=3 由管线导出,渲染层同一常量"
     },
     {
       "id": "TODAY-004",
       "description": "每张卡提供 有用/不准/不再提醒 反馈并写回",
       "marker": "recordCardFeedback",
       "file": "components/portal/TodayFeed.tsx",
-      "status_note": "feedback store 存在(reasoning-engine),渲染卡片上无入口"
+      "status_note": "已实现:卡片反馈行 有用/不准/不再提醒 → recordCardFeedback,DEC 下轮过滤"
     },
     {
       "id": "TODAY-005",

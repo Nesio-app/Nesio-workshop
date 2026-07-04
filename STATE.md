@@ -12,7 +12,7 @@
 |---|---|---|---|
 | 首页 | DashboardHome | TodayFeed | UI 已切换;**i18n/契约未迁移** |
 | 设置 | AccountSettings | NesioProfileCard + SettingsSheets | 已切换;主题/语言入口曾断链(已修) |
-| 推荐卡 | DEC(lib/intelligence) | guidance-engine(lib/platform) | **DEC 每次页面加载仍在运行,输出被丢弃**;其证据门控体系是 PRD TODAY-002 的现成实现 |
+| 推荐卡 | DEC(lib/intelligence) | guidance-engine(lib/platform) | **已接线(2026-07-04)**:DEC 卡经 decCardsToGuidanceEvents 汇入 guidance 管线,证据+反馈随卡 |
 | 数据模型 | LifeGraph(localStorage) | Signal 主事实表 | **双写过渡中**(见 lib/life-domain/create-signal.ts 头注释) |
 | 工具入口 | 11 工具宫格 | 统一入口 + 五域 | 工具由 bundle-toolbox.mjs 构建时拷入 public/ |
 
@@ -45,7 +45,6 @@
 ## 已知欠账(按优先级)
 
 1. 契约迁移工程(见上)→ 迁完再删 15 个死组件
-2. DEC 接线:让 Today 卡消费 runDEC() 证据卡,或移植证据机制进 guidance(PRD TODAY-002/003/004)
 3. Demo 模式补完:portal 级种子数据(`demo_example` 字段已预留;参考
    lib/portal/inventory-first-launch-contract.mjs 的完整 demo 契约);
    未登录点听简报应播 demo 而非无解释跳登录

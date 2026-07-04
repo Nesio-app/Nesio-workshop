@@ -7,6 +7,7 @@
  */
 
 import type { CalendarEvent } from '@/lib/portal/types';
+import type { RecommendationCard } from '@/lib/portal/reasoning-engine';
 import type { EmailSignal } from '@/lib/platform/email-signals';
 import type { ProactiveContextItem, FocusNode } from '@/lib/platform/view-models/today-view-model';
 import { inferEventType } from '@/lib/platform/attention-engine';
@@ -297,4 +298,29 @@ export function objectContextEvents(
   }
 
   return results;
+}
+
+
+// ── DEC domain-engine cards (PRD TODAY-001/002) ───────────────────────────────
+// runDEC() output previously computed on every load and DISCARDED. Its cards
+// now flow through the same pipeline as every other source, carrying their
+// evidence chain so Today can render Recommendation + Reason + Evidence.
+
+export function decCardsToGuidanceEvents(cards: readonly RecommendationCard[]): GuidanceEvent[] {
+  return cards.map((card): GuidanceEvent => ({
+    id: `dec-${card.id}`,
+    type: 'dec_insight',
+    title: card.title,
+    source: 'memory',
+    confidence: Math.round((card.confidence ?? 0.6) * 100),
+    payload: {
+      body: card.body,
+      icon: card.icon,
+      primaryAction: card.primaryAction,
+      evidence: card.evidence,
+      evidenceSignalIds: card.evidenceSignalIds ?? [],
+      reason: `${card.domainLabel} · 基于你的 ${card.evidence.length} 条记录`,
+      expiresAt: card.expiresAt,
+    },
+  }));
 }

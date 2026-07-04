@@ -52,6 +52,7 @@ const PREPARATION_VALUE: Record<GuidanceEventType, number> = {
   email_signal: 40,  // email can be handled anytime
   health_habit:   35,  // can do anytime today
   object_context: 30,  // context-triggered — nice to know but not urgent
+  dec_insight:    55,  // evidence-backed recommendation — acting today beats later
 };
 
 function preparationValueScore(type: GuidanceEventType): number {

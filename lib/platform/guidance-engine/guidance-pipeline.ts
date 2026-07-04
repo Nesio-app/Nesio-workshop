@@ -30,6 +30,11 @@ import { loadCoolingStore, isOnCooldown, recordShown, saveCoolingStore } from '.
 // Compute when a card's action window closes and the card becomes irrelevant.
 // Google Now principle: a boarding-pass card disappears when the plane departs.
 function computeExpiry(event: GuidanceEvent): Date | undefined {
+  // DEC cards carry their own expiry and have no scheduledAt — check first.
+  if (event.type === 'dec_insight') {
+    const raw = event.payload?.expiresAt;
+    return typeof raw === 'string' ? new Date(raw) : undefined;
+  }
   if (!event.scheduledAt) return undefined;
   const t = event.scheduledAt.getTime();
   switch (event.type) {
@@ -64,11 +69,13 @@ const EVENT_ICON: Record<GuidanceEventType, string> = {
   weather_cold:   '🧥',
   weather_rain:   '☂️',
   object_context: '📦',
+  dec_insight:    '💡',
 };
 
 function buildTitle(event: GuidanceEvent, urgency: WindowUrgency): string {
   const n = event.title.slice(0, 22);
   switch (event.type) {
+    case 'dec_insight': return event.title;
     case 'flight':
       if (urgency === 'critical') return `出发时间到了 · ${n}`;
       if (urgency === 'high')     return `值机窗口已开 · ${n}`;
@@ -110,6 +117,7 @@ function buildTitle(event: GuidanceEvent, urgency: WindowUrgency): string {
 
 function buildBody(event: GuidanceEvent, urgency: WindowUrgency): string {
   switch (event.type) {
+    case 'dec_insight': return typeof event.payload.body === 'string' ? event.payload.body : '';
     case 'flight':
       if (urgency === 'critical') return '现在需要出发了，不要错过登机时间。';
       return '值机通常 1–2 分钟，现在处理最省心，到机场就直接走。';
@@ -153,6 +161,9 @@ function buildBody(event: GuidanceEvent, urgency: WindowUrgency): string {
       return '';
   }
 }
+
+/** Today 首屏统一预算(PRD TODAY-003):所有来源的卡经同一仲裁,最多 3 张。 */
+export const TODAY_CARD_BUDGET = 3;
 
 export interface GuidancePipelineInput {
   events: GuidanceEvent[];
@@ -237,14 +248,16 @@ export function runGuidancePipeline(input: GuidancePipelineInput): GuidanceCard[
         priority,
         nodeId: typeof event.payload.nodeId === 'string' ? event.payload.nodeId : undefined,
         expiresAt: computeExpiry(event),
+        evidence: Array.isArray(event.payload.evidence) ? event.payload.evidence as GuidanceCard['evidence'] : undefined,
+        reason: typeof event.payload.reason === 'string' ? event.payload.reason : undefined,
       },
     });
   }
 
-  // Sort by priority desc, take top 2
+  // Sort by priority desc — TODAY_CARD_BUDGET is the single arbiter (PRD TODAY-003)
   const result = candidates
     .sort((a, b) => b.priority - a.priority)
-    .slice(0, 2)
+    .slice(0, TODAY_CARD_BUDGET)
     .map((c) => c.card);
 
   // Record shown → update cooling state

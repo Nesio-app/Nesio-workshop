@@ -174,9 +174,9 @@ assert.match(voiceSheet, /searchLifeGraphFuzzy/, 'Ask mode should use fuzzy loca
 assert.match(voiceSheet, /\/api\/portal\/analyze[\s\S]*type:\s*'ask'[\s\S]*searchLifeGraphFuzzy/, 'Ask mode should try AI semantic search before falling back to local fuzzy search.');
 assert.doesNotMatch(voiceSheet, /isAskMode \? '输入完成 · 点「问宝盒」查找线索'/, 'Ask mode should not show the extra duplicate helper line above the answer.');
 assert.match(voiceSheet, /text && !isAskMode[\s\S]*识别完成 · 点「告诉 Nesio」保存/, 'Ask mode should not show the non-ask save helper line.');
-// Feedback loop lived in the retired v14 StandardCard; the living guidance
-// cards get it in TODAY-004 (docs/prd-acceptance-map.json, watched weekly by
-// report:drift). Hard assertion returns when TODAY-004 lands.
+// TODAY-004 landed: guidance cards carry the feedback row writing back to
+// the store the DEC filters on next run.
+assert.match(todayFeed, /recordCardFeedback/, 'Today cards must write feedback back so 稍后/不再提醒 has a visible result.');
 assert.doesNotMatch(todayFeed, /为什么\{why \? ' ↑' : ' ↓'\}/, 'Today card 为什么 action should not append arrow glyphs.');
 // Organized-clues sheet evolved: mirror profile card → InsightsSheet.
 assert.match(todayFeed, /onClick=\{\(\) => setMirrorOpen\(true\)\}[\s\S]*<InsightsSheet/, 'Today logo should open the organized-clues / insights sheet.');

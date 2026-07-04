@@ -13,8 +13,9 @@ import {
   touchNode, getReviewTier,
   type DormantStore, type DormantCandidate,
 } from '@/lib/platform/dormant-engine';
-import { runGuidancePipeline } from '@/lib/platform/guidance-engine/guidance-pipeline';
+import { runGuidancePipeline, TODAY_CARD_BUDGET } from '@/lib/platform/guidance-engine/guidance-pipeline';
 import { getEnergyState } from '@/lib/platform/energy-state';
+import { recordCardFeedback, type EvidenceRef } from '@/lib/portal/reasoning-engine';
 import { getBestInterruptionHours } from '@/lib/portal/mirror-profile';
 import { loadCoolingStore, recordDismissed, saveCoolingStore } from '@/lib/platform/guidance-engine/cooling-store';
 import {
@@ -25,6 +26,7 @@ import {
   weatherToGuidanceEvents,
   healthNodesToGuidanceEvents,
   type WeatherSnapshot,
+  decCardsToGuidanceEvents,
 } from '@/lib/platform/guidance-engine/source-adapters';
 import { cloudSignalRowsToSignals, type CloudSignalRow } from '@/lib/life-domain/signal-search';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
@@ -95,6 +97,10 @@ interface ProactiveCardData {
   nodeId?: string;
   actions?: ProactiveAction[];
   expiresAt?: string;  // ISO — card auto-hides after this time (Google Now lifecycle)
+  /** Traceable evidence (PRD TODAY-002) — rendered as an expandable 依据 section. */
+  evidence?: EvidenceRef[];
+  /** 为什么现在出现 one-liner. */
+  reason?: string;
 }
 
 const EMAIL_SIGNALS_KEY = 'nesio-email-signals-cache';
@@ -153,6 +159,8 @@ function ProactiveGuidanceCard({
   onMarkDone?: (nodeId: string) => void;
 }) {
   const hasActions = card.actions && card.actions.length > 0;
+  const [evidenceOpen, setEvidenceOpen] = useState(false);
+  const [feedbackGiven, setFeedbackGiven] = useState(false);
 
   function handleAction(action: ProactiveAction) {
     if (action.actionType === 'dismiss') { onDismiss(); return; }
@@ -167,6 +175,13 @@ function ProactiveGuidanceCard({
     }
   }
 
+  // TODAY-004 反馈闭环:写回 feedback store(DEC 下轮据此过滤),温和确认后收起
+  function handleFeedback(feedback: 'useful' | 'wrong' | 'too_much') {
+    recordCardFeedback(card.id.replace(/^guidance-dec-/, ''), feedback);
+    setFeedbackGiven(true);
+    setTimeout(onDismiss, 600);
+  }
+
   return (
     <div className="nesio-proactive-card">
       <div className="nesio-proactive-card-inner">
@@ -174,11 +189,32 @@ function ProactiveGuidanceCard({
         <div className="nesio-proactive-card-text">
           <p className="nesio-proactive-card-title">{card.title}</p>
           <p className="nesio-proactive-card-body">{card.body}</p>
+          {card.reason && (
+            <p style={{ fontSize: '0.66rem', color: 'var(--portal-muted)', margin: '0.2rem 0 0' }}>{card.reason}</p>
+          )}
           {card.sourceTags.length > 0 && (
             <div className="nesio-proactive-card-tags">
               {card.sourceTags.map((tag) => (
                 <span key={tag} className="nesio-proactive-card-tag">{tag}</span>
               ))}
+            </div>
+          )}
+          {card.evidence && card.evidence.length > 0 && (
+            <div style={{ marginTop: '0.3rem' }}>
+              <button
+                type="button"
+                onClick={() => setEvidenceOpen((v) => !v)}
+                style={{ fontSize: '0.66rem', color: 'var(--portal-blue-deep)', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+              >
+                依据 {evidenceOpen ? '▾' : '▸'} {card.evidence.length} 条
+              </button>
+              {evidenceOpen && (
+                <ul style={{ margin: '0.25rem 0 0', paddingLeft: '1rem', fontSize: '0.66rem', color: 'var(--portal-muted)', lineHeight: 1.5 }}>
+                  {card.evidence.map((e, i) => (
+                    <li key={i}>{e.label}：{e.value}</li>
+                  ))}
+                </ul>
+              )}
             </div>
           )}
           {hasActions && (
@@ -191,6 +227,26 @@ function ProactiveGuidanceCard({
                   onClick={() => handleAction(a)}
                 >
                   {a.label}
+                </button>
+              ))}
+            </div>
+          )}
+          {feedbackGiven ? (
+            <p style={{ fontSize: '0.66rem', color: 'var(--status-go)', margin: '0.35rem 0 0' }}>✓ 记下了，会照着调整</p>
+          ) : (
+            <div style={{ display: 'flex', gap: '0.7rem', marginTop: '0.35rem' }}>
+              {([
+                ['useful', '有用'],
+                ['wrong', '不准'],
+                ['too_much', '不再提醒'],
+              ] as Array<['useful' | 'wrong' | 'too_much', string]>).map(([fb, label]) => (
+                <button
+                  key={fb}
+                  type="button"
+                  onClick={() => handleFeedback(fb)}
+                  style={{ fontSize: '0.64rem', color: 'var(--portal-muted)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}
+                >
+                  {label}
                 </button>
               ))}
             </div>
@@ -1171,6 +1227,8 @@ export default function TodayFeed({
         const scored = scoreCalendarEvents(calEvents, now);
 
         const guidanceEvents = [
+          // DEC 域引擎卡(证据门控)— 此前 runDEC 输出被丢弃,现与其他源同台仲裁
+          ...decCardsToGuidanceEvents(updated.cards),
           ...calendarEventsToGuidanceEvents(calEvents, now),
           ...emailSignalsToGuidanceEvents(latestEmailSignals),
           ...specialDaysToGuidanceEvents(updated.proactiveContext.upcomingSpecialDays, now),
@@ -1199,6 +1257,8 @@ export default function TodayFeed({
             nodeId: card.nodeId,
             actions: [{ label: card.action.cta, actionType: card.action.actionType }],
             expiresAt: card.expiresAt?.toISOString(),
+            evidence: card.evidence,
+            reason: card.reason,
           }))
           .filter((c) => !isProactiveCardDismissed(c.id))
           .filter((c) => !c.expiresAt || new Date(c.expiresAt).getTime() > now.getTime());
@@ -1309,7 +1369,7 @@ export default function TodayFeed({
 
   // All proactive cards come from the guidance pipeline (email included) —
   // single path so cooling-store and attention-budget always apply.
-  const activeProactiveCards = proactiveCards.filter((c) => !dismissedCardIds.has(c.id)).slice(0, 2);
+  const activeProactiveCards = proactiveCards.filter((c) => !dismissedCardIds.has(c.id)).slice(0, TODAY_CARD_BUDGET);
 
   return (
     <div className="nesio-today-root">

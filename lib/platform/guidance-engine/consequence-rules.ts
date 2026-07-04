@@ -14,6 +14,7 @@ const CONSEQUENCE: Record<GuidanceEventType, ConsequenceSeverity> = {
   weather_cold:   1,  // uncomfortable
   weather_rain:   1,  // get wet
   object_context: 1,  // miss a relevant owned item — low stakes but useful
+  dec_insight:    2,  // evidence-gated cross-domain recommendation
 };
 
 export function getConsequenceSeverity(type: GuidanceEventType): ConsequenceSeverity {

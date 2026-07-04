@@ -90,6 +90,10 @@ function getUnscheduledWindow(event: GuidanceEvent, now: Date): WindowUrgency {
       // Useful during waking hours, not late night
       return (hour >= 7 && hour <= 21) ? 'low' : 'closed';
 
+    case 'dec_insight':
+      // Evidence-gated recommendation — relevant through the waking day
+      return (hour >= 7 && hour <= 22) ? 'medium' : 'closed';
+
     default:
       return 'low';
   }
