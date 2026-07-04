@@ -20,6 +20,7 @@ import {
 } from '@/lib/portal/life-graph';
 import { DOMAINS, nodeDomain, type FrontDomain } from '@/lib/life-domain';
 import { smartSearch, type SearchUnderstood } from '@/lib/portal/smart-search';
+import { semanticRerank } from '@/lib/portal/semantic-rerank';
 import {
   getProjects,
   createProject,
@@ -757,13 +758,26 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
   // Narrator cards
   const narratorCards = useMemo(() => buildNarratorCards(nodes), [nodes]);
 
-  // Smart search
-  const { nodes: smartNodes, understood } = useMemo(
+  // Smart search (text/entity rank, synchronous)
+  const { nodes: textRankedNodes, understood } = useMemo(
     () => query.trim()
       ? smartSearch(query, null)
       : { nodes: [], understood: { people: [], places: [], objects: [], domain: null } as SearchUnderstood },
     [query],
   );
+
+  // Semantic re-rank (async embedding blend): text order shows immediately,
+  // refines when vectors arrive; falls back silently if endpoint unavailable
+  const [smartNodes, setSmartNodes] = useState<LifeNode[]>([]);
+  useEffect(() => {
+    setSmartNodes(textRankedNodes);
+    if (!query.trim() || textRankedNodes.length < 3) return;
+    let cancelled = false;
+    void semanticRerank(query, textRankedNodes).then((reranked) => {
+      if (!cancelled) setSmartNodes(reranked);
+    });
+    return () => { cancelled = true; };
+  }, [query, textRankedNodes]);
 
   const hasUnderstoodEntities = understood.people.length + understood.places.length + understood.objects.length > 0;
 

@@ -29,13 +29,16 @@ export function normalizeEmbeddingText(value: string): string {
   return value.replace(/\s+/g, ' ').trim().slice(0, 8000);
 }
 
-export async function embedSignalText(text: string): Promise<SignalEmbeddingResult> {
+/**
+ * Core embedding call — no feature-flag gate, only needs the API key.
+ * Used directly by search re-ranking; cloud signal writes go through
+ * embedSignalText which additionally honors SIGNAL_EMBEDDINGS_ENABLED.
+ */
+export async function embedTextRaw(text: string): Promise<SignalEmbeddingResult> {
   const normalized = normalizeEmbeddingText(text);
   if (!normalized) return { ok: false, error: 'empty_embedding_text' };
   const apiKey = (process.env.GEMINI_API_KEY || '').trim();
-  if (!signalEmbeddingsEnabled() || !apiKey) {
-    return { ok: false, error: 'signal_embeddings_disabled' };
-  }
+  if (!apiKey) return { ok: false, error: 'embedding_key_missing' };
 
   const model = signalEmbeddingModel();
   try {
@@ -64,4 +67,12 @@ export async function embedSignalText(text: string): Promise<SignalEmbeddingResu
   } catch {
     return { ok: false, error: 'embedding_provider_unreachable' };
   }
+}
+
+/** Cloud-signal embedding — feature-flag gated (SIGNAL_EMBEDDINGS_ENABLED). */
+export async function embedSignalText(text: string): Promise<SignalEmbeddingResult> {
+  if (!signalEmbeddingsEnabled()) {
+    return { ok: false, error: 'signal_embeddings_disabled' };
+  }
+  return embedTextRaw(text);
 }

@@ -5,8 +5,9 @@
  *   Query "Linda 的礼物" → understood {people:["Linda"], objects:["礼物"]}
  *   → nodes with those entities in their context score higher.
  *
- * Phase 2 (future): vector embeddings in LifeNodeAsset.analysisSummary → semantic match.
- *   Image / PDF / Notes connector adds analysisSummary; nodeText() picks it up automatically.
+ * Phase 2 (implemented): semantic re-rank via lib/portal/semantic-rerank.ts —
+ *   callers pass smartSearch results to semanticRerank(query, nodes) to blend
+ *   embedding cosine similarity with the text rank (fails open to text order).
  */
 
 import { getLifeGraph, type LifeNode } from './life-graph';

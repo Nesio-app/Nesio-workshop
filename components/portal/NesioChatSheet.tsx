@@ -14,6 +14,7 @@ import { parseTemporalQuery, isInSpan } from '@/lib/portal/temporal-query';
 import { readPortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
 import { refreshLocation } from '@/lib/portal/location-store';
 import { formatEnvironmentContext, getCachedCalendarEvents } from '@/lib/portal/environment';
+import { semanticRerank } from '@/lib/portal/semantic-rerank';
 import MemoryFlashBanner, { useMemoryFlash } from '@/components/portal/MemoryFlashBanner';
 
 interface ChatMessage { role: 'user' | 'model'; text: string; }
@@ -63,7 +64,7 @@ function fmtNode(n: LifeNode): string {
   return `• [${src}] ${n.name} (${dateLabel})`;
 }
 
-function buildMemoryContext(query: string): string {
+async function buildMemoryContext(query: string): Promise<string> {
   const graph = getLifeGraph();
   const temporal = parseTemporalQuery(query);
 
@@ -75,8 +76,10 @@ function buildMemoryContext(query: string): string {
       })
     : [];
 
-  // Layer 2: text/entity search — smartSearch already applies temporal boost
-  const searchNodes = smartSearch(query, null).nodes.slice(0, 12);
+  // Layer 2: text/entity search + semantic re-rank (embedding cosine blend;
+  // falls back to pure text order when the embed endpoint is unavailable)
+  const textRanked = smartSearch(query, null).nodes.slice(0, 20);
+  const searchNodes = (await semanticRerank(query, textRanked)).slice(0, 12);
 
   // Layer 3: upcoming 7-day events (always in context — temporal baseline)
   const now = Date.now();
@@ -500,7 +503,7 @@ export default function NesioChatSheet({
           fileContext: fileContextRef.current
             ? { name: fileContextRef.current.name, content: fileContextRef.current.content }
             : undefined,
-          memoryContext: buildMemoryContext(text.trim()),
+          memoryContext: await buildMemoryContext(text.trim()),
           calendarContext: buildCalendarContext(text.trim()),
           environmentContext: formatEnvironmentContext(),
         }),
