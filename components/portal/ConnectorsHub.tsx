@@ -222,8 +222,14 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       } else {
         allOk = false;
         const isNotConnected = data.error === 'not_connected' || data.error === 'token_expired';
-        if (isNotConnected) reauth = true;
-        parts.push(isNotConnected ? L(dict, '邮件:授权已失效,需重新授权', 'Mail: authorization expired, reconnect needed') : L(dict, `邮件:同步失败(${data.error || '未知'})`, `Mail: sync failed (${data.error || 'unknown'})`));
+        // 403/insufficient_scope = 旧授权只有日历权限,重新授权会带上邮件读取
+        const isScopeMissing = data.error === 'insufficient_scope' || (data.error || '').includes('403');
+        if (isNotConnected || isScopeMissing) reauth = true;
+        parts.push(isScopeMissing
+          ? L(dict, '邮件:当前授权不含邮件权限,点「重新授权」补上邮件读取', 'Mail: consent lacks Gmail access — tap Reauthorize to add mail read')
+          : isNotConnected
+            ? L(dict, '邮件:授权已失效,需重新授权', 'Mail: authorization expired, reconnect needed')
+            : L(dict, `邮件:同步失败(${data.error || '未知'})`, `Mail: sync failed (${data.error || 'unknown'})`));
       }
     } catch { allOk = false; parts.push(L(dict, '邮件:网络错误', 'Mail: network error')); }
 

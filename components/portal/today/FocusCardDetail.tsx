@@ -65,6 +65,7 @@ export function FocusCardDetail({
           context: node.rawInput,
           previousAction,
           completedActions: history,
+          locale: dict,
         }),
       });
       const data = await res.json() as { ok?: boolean; steps?: Array<{ name: string; emoji?: string }> };
@@ -89,7 +90,7 @@ export function FocusCardDetail({
       const res = await fetch('/api/portal/decompose-task', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskName: action.name, context: node.name, drill: true }),
+        body: JSON.stringify({ taskName: action.name, context: node.name, drill: true, locale: dict }),
       });
       const data = await res.json() as { ok?: boolean; steps?: Array<{ name: string; emoji?: string }> };
       if (data.ok && data.steps?.length) {
@@ -205,7 +206,7 @@ export function FocusCardDetail({
                   onClick={() => toggleAction(a.id)}
                   aria-label={a.done ? '取消' : '完成'}
                 />
-                <span className="nesio-momentum-emoji">{a.emoji}</span>
+                {/* 批次 14:emoji 不进 UI(红线);动作名本身就够了 */}
                 <span className="nesio-momentum-name">{a.name}</span>
                 {!a.done && !drills && !isDrilling && (
                   <button
@@ -237,7 +238,7 @@ export function FocusCardDetail({
                         onClick={() => toggleDrill(a.id, d.id)}
                         aria-label={d.done ? '取消' : '完成'}
                       />
-                      <span className="nesio-momentum-drill-emoji">{d.emoji}</span>
+                      {/* 批次 14:同上,去 emoji */}
                       <span className="nesio-momentum-drill-name">{d.name}</span>
                     </li>
                   ))}

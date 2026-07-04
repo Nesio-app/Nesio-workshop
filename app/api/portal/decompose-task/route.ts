@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
   const geminiKey = envValue('GEMINI_API_KEY');
 
   if (!claudeKey && !geminiKey) {
-    return NextResponse.json({ ok: true, steps: fallbackMomentumSteps(taskName, p.drill ?? false) });
+    return NextResponse.json({ ok: true, steps: fallbackMomentumSteps(taskName, p.drill ?? false, p.locale) });
   }
 
   if (claudeKey) {
@@ -118,5 +118,5 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true, steps: fallbackMomentumSteps(taskName, p.drill ?? false) });
+  return NextResponse.json({ ok: true, steps: fallbackMomentumSteps(taskName, p.drill ?? false, p.locale) });
 }

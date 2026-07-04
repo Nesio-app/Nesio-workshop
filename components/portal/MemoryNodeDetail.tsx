@@ -8,6 +8,7 @@ import RelationGraph from './RelationGraph';
 import type { GNode, GEdge } from '@/lib/platform/graph-engine';
 import { IconClock, IconLink, NodeTypeIcon, WeatherIcon } from './icons';
 import { L } from '@/lib/portal/i18n';
+import { displayNodeName } from '@/lib/portal/node-display';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 const TYPE_BG_DETAIL: Record<string, string> = {
@@ -653,7 +654,7 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
               autoFocus
             />
           ) : (
-            <h2 className="nesio-settings-sheet-title" title={n.name}>{displayTitle(n.name)}</h2>
+            <h2 className="nesio-settings-sheet-title" title={n.name}>{displayTitle(displayNodeName(n.name, dict))}</h2>
           )}
           <button type="button" className="nesio-voice-sheet-close" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}>✕</button>
         </div>

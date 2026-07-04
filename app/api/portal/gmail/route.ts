@@ -251,6 +251,14 @@ export async function GET(req: NextRequest) {
   }
 
   if (!winner) {
+    // 403 = token 有效但没有 gmail scope(旧的日历授权借来的 token)——
+    // 唯一出路是走 /api/portal/gmail/connect 重新同意(带双 scope + prompt=consent)
+    if (lastError.includes('403')) {
+      return NextResponse.json(
+        { ok: false, error: 'insufficient_scope', connectUrl: '/api/portal/gmail/connect' },
+        { status: 403 },
+      );
+    }
     if (sawAuthFailure || !lastError) {
       return NextResponse.json(
         { ok: false, error: 'token_expired', connectUrl: '/api/portal/gmail/connect' },

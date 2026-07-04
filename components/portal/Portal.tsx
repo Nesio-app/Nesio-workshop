@@ -249,6 +249,12 @@ export default function Portal() {
   const [locale, setLocale] = useState<PortalLocale>('zh');
   const dict = portalLocaleToDictionaryLocale(locale);
   const [authReady, setAuthReady] = useState(false);
+  // 批次 14 数据完整性:会话接口网络失败/非 200 时不能当「未登录」——
+  // 此前任何一次瞬时失败都会触发 prunePrivateExternalNodes 硬删日历/邮件
+  // 节点(项目里引用的也跟着消失),下次重新同步 createdAt 全新 → 列表大洗牌。
+  // 三态:true=确定登录 / false=服务器明确说未登录 / null=未知(网络问题),
+  // 未知态既不跑连接器也不删数据。
+  const [authDefinitelyAnonymous, setAuthDefinitelyAnonymous] = useState(false);
   const [authSessionLoggedIn, setAuthSessionLoggedIn] = useState(false);
   const [onboardingActive, setOnboardingActive] = useState(false);
   const [memoryReceipt, setMemoryReceipt] = useState(false);
@@ -356,6 +362,8 @@ export default function Portal() {
           const loggedIn = Boolean(data?.loggedIn);
           const sessionReady = loggedIn && data?.authReady !== false && data?.profileBootstrapBlocking !== true;
           setAuthSessionLoggedIn(loggedIn);
+          // data 为 null(接口非 200)= 未知,不算「确定未登录」
+          setAuthDefinitelyAnonymous(data != null && !loggedIn);
           if (sessionReady) {
             try {
               markNesioOnboardingDoneForAuth();
@@ -366,7 +374,8 @@ export default function Portal() {
           }
         })
         .catch(() => {
-          if (!cancelled) setAuthSessionLoggedIn(false);
+          // 网络失败 = 未知,不触发数据清理
+          if (!cancelled) { setAuthSessionLoggedIn(false); setAuthDefinitelyAnonymous(false); }
         })
         .finally(() => {
           if (!cancelled) setAuthReady(true);
@@ -399,14 +408,20 @@ export default function Portal() {
     // M3 读切换:回填 + 删除传导 + 水合事实缓存(见 signal-read-cache.ts)
     void hydrateSignalFactStore();
     if (!canUsePrivateRuntime) {
-      prunePrivateExternalNodes();
+      // 只有服务器明确说「未登录」才清私有节点;未知态(网络抖动/超时)
+      // 绝不删数据——删了的节点在项目里的引用会一起消失,且重新同步后
+      // createdAt 全变导致列表重排(批次 14 用户报的三个数据问题同根)。
+      if (authDefinitelyAnonymous) {
+        const removed = prunePrivateExternalNodes();
+        if (removed > 0) track('private_prune', { removed });
+      }
       try {
         sessionStorage.removeItem(PORTAL_CACHE_KEYS.calendar);
       } catch { /* ignore unavailable storage */ }
       return;
     }
     runConnectors().catch(() => undefined);
-  }, [authReady, canUsePrivateRuntime]);
+  }, [authReady, canUsePrivateRuntime, authDefinitelyAnonymous]);
 
   useEffect(() => {
     const syncLocale = () => setLocale(loadProfileSettings().locale);

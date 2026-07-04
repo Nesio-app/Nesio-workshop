@@ -38,6 +38,7 @@ const RelationGraph = dynamic(() => import('./RelationGraph'), { ssr: false });
 import type { GNode, GEdge } from '@/lib/platform/graph-engine';
 import { DomainIcon, IconBox, IconCalendar, IconFolder, IconMapPin, IconUser, NodeTypeIcon, IconMap } from './icons';
 import { L, type DictLocale } from '@/lib/portal/i18n';
+import { displayNodeName } from '@/lib/portal/node-display';
 import { usePortalLocale } from './use-portal-locale';
 
 /** 组件内取字典语言(批次 9 全量双语的局部 hook)。 */
@@ -540,7 +541,7 @@ function MemoryCard({ node, onOpen, onDeleted, onLongPress }: { node: LifeNode; 
       onContextMenu={(e) => { e.preventDefault(); shareNode(); }}
       aria-label={`${node.name}${L(dict, ',左滑删除,长按分享', ' — swipe left to delete, long-press to share')}`}
     >
-      <span className="nesio-memory-card-title" title={node.name}>{smartCardTitle(node.name)}</span>
+      <span className="nesio-memory-card-title" title={node.name}>{smartCardTitle(displayNodeName(node.name, dict))}</span>
       {extra && <span className="nesio-memory-card-extra">{extra}</span>}
       {badge && <span className="nesio-memory-card-status-badge" style={{ background: badgeColor }}>{badge}</span>}
       {!extra && !badge && <span className="nesio-memory-card-sub">{cleanMemoryPreview(node, dict)}</span>}

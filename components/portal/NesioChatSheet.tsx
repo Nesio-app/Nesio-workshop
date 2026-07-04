@@ -613,15 +613,15 @@ export default function NesioChatSheet({
         const dataUrl = ev.target?.result as string;
         const [hdr, b64] = dataUrl.split(',');
         const mime = hdr.match(/:(.*?);/)?.[1] || 'image/jpeg';
-        const userMsg: UiMessage = { id: `u-${Date.now()}`, role: 'user', text: `[图片] ${file.name}` };
+        const userMsg: UiMessage = { id: `u-${Date.now()}`, role: 'user', text: L(dict, `［图片］这是什么？`, `[Image] What's this?`) };
         const next = [...messages, userMsg];
         setMessages(next);
         fetch('/api/portal/analyze', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ type: 'image', imageBase64: b64, mimeType: mime }),
         }).then((r) => r.json()).then((data: { ok?: boolean; nodes?: Array<{ name: string; type: string }>; summary?: string }) => {
-          const names = data.nodes?.map((n) => n.name).join('、') || data.summary || '（未识别到内容）';
-          const aiMsg: UiMessage = { id: `a-${Date.now()}`, role: 'model', text: `识别到：${names}\n\n可以继续问我关于这张图片的问题。` };
+          const names = data.nodes?.map((n) => n.name).join(L(dict, '、', ', ')) || data.summary || L(dict, '（未识别到内容）', '(nothing recognized)');
+          const aiMsg: UiMessage = { id: `a-${Date.now()}`, role: 'model', text: L(dict, `识别到：${names}\n\n可以继续问我关于这张图片的问题。`, `Recognized: ${names}\n\nAsk me anything about this image.`) };
           const withAi = [...next, aiMsg];
           setMessages(withAi); saveHistory(withAi);
         }).catch(() => {
