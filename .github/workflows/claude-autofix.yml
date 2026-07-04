@@ -3,9 +3,14 @@
 # 触发:① ci-failure / loop-report / prod-down / claude-fix 标签的 issue 出现
 #      ② 任何 issue/PR 评论里 @claude(直接给它派活,包括写创意)
 #
-# 激活(一步,未激活时本工作流零成本静默跳过):
-#   repo Settings → Secrets and variables → Actions → New repository secret
-#   名字 ANTHROPIC_API_KEY,值 = console.anthropic.com 的 API key(按量计费)
+# 激活(二选一,未激活时本工作流零成本静默跳过):
+#   方式 A(推荐,用你的 Claude 包月订阅,不按量计费):
+#     本机终端跑 `claude setup-token` → 复制生成的长效 token →
+#     repo Settings → Secrets → 新建 CLAUDE_CODE_OAUTH_TOKEN
+#     (用量计入你订阅的额度窗口;偶发修复占用很小)
+#   方式 B(API 按量计费):
+#     新建 secret ANTHROPIC_API_KEY,值 = console.anthropic.com 的 key
+#   两个都配时订阅 token 优先。
 #
 # 红线:只开 PR,永不直推 main;修复前必读 STATE.md;契约全绿才请求 review。
 name: Claude Autofix
@@ -35,16 +40,18 @@ jobs:
       ))
     runs-on: ubuntu-latest
     steps:
-      - name: Check activation (ANTHROPIC_API_KEY)
+      - name: Check activation (subscription token or API key)
         id: key
         env:
+          OAUTH: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          if [ -n "$KEY" ]; then
+          if [ -n "$OAUTH" ] || [ -n "$KEY" ]; then
             echo "ready=true" >> "$GITHUB_OUTPUT"
+            [ -n "$OAUTH" ] && echo "::notice::使用 Claude 订阅 token(不按量计费)" || echo "::notice::使用 API key(按量计费)"
           else
             echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Claude Autofix 接口已就位但未激活(缺 ANTHROPIC_API_KEY secret)。激活方法见 .github/workflows/claude-autofix.yml 头注释。"
+            echo "::notice::Claude Autofix 已就位但未激活。方式 A:本机跑 claude setup-token,把 token 存为 CLAUDE_CODE_OAUTH_TOKEN secret(用包月订阅);方式 B:存 ANTHROPIC_API_KEY(按量)。详见工作流头注释。"
           fi
 
       - uses: actions/checkout@v7
@@ -63,6 +70,7 @@ jobs:
         if: steps.key.outputs.ready == 'true'
         uses: anthropics/claude-code-action@v1
         with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           prompt: |
             ${{ github.event_name == 'issues' && format('修复这个 issue:#{0} {1}

@@ -76,7 +76,7 @@ Signal M1-M4(读切换 + 删除传导)、REG-004/006 i18n 闭环
 | 安全循环(audit/route 守卫/文档新鲜度) | `npm run report:security-loop` + loops.yml | 每周 |
 | 全量契约链(100+ 套) | `npm run test:contracts` + loops.yml | 每周 |
 | 生产合成监控(uptime + 安全门) | .github/workflows/uptime.yml → prod-down issue | 每 15 分钟 |
-| **修复闭环(待激活)** | .github/workflows/claude-autofix.yml:issue(ci-failure/loop-report/prod-down/claude-fix)或 @claude 评论 → 自动开修复 PR | 事件触发;激活 = repo secrets 加 ANTHROPIC_API_KEY |
+| **修复闭环(待激活)** | .github/workflows/claude-autofix.yml:issue(ci-failure/loop-report/prod-down/claude-fix)或 @claude 评论 → 自动开修复 PR | 事件触发;激活二选一:`claude setup-token` → CLAUDE_CODE_OAUTH_TOKEN secret(包月订阅,推荐)或 ANTHROPIC_API_KEY(按量) |
 | AI 成本(telemetry 汇总) | `npm run report:ai-cost` | 每月/手动 |
 
 ## 命名词典(易混项)
