@@ -37,6 +37,7 @@ const MemoryNodeDetail = dynamic(() => import('./MemoryNodeDetail'), { ssr: fals
 const FreezeVaultSheet = dynamic(() => import('./FreezeVaultSheet'), { ssr: false });
 const RelationGraph = dynamic(() => import('./RelationGraph'), { ssr: false });
 import type { GNode, GEdge } from '@/lib/platform/graph-engine';
+import { DomainIcon, IconBox, IconCalendar, IconFolder, IconMapPin, IconSnowflake, IconUser, NodeTypeIcon, IconMap } from './icons';
 
 // ── Object Map (物品地图) ────────────────────────────────────────────────────
 
@@ -134,7 +135,7 @@ function ObjectMap({ nodes, onOpenNode }: { nodes: LifeNode[]; onOpenNode: (n: L
                   return (
                     <div key={room} className="nesio-object-map-room">
                       <button type="button" className="nesio-object-map-row nesio-object-map-row--room" onClick={() => toggleRoom(roomKey)}>
-                        <span className="nesio-object-map-label">📂 {room}</span>
+                        <span className="nesio-object-map-label" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><IconFolder size={13} /> {room}</span>
                         <span className="nesio-object-map-count">{roomCount}件</span>
                         <span className="nesio-object-map-chevron">{isRoomOpen ? '▴' : '▾'}</span>
                       </button>
@@ -145,7 +146,7 @@ function ObjectMap({ nodes, onOpenNode }: { nodes: LifeNode[]; onOpenNode: (n: L
                               {sub && <p className="nesio-object-map-sub-label">· {sub}</p>}
                               {items.map((n) => (
                                 <button key={n.id} type="button" className="nesio-object-map-item" onClick={() => onOpenNode(n)}>
-                                  <span>📦 {n.name}</span>
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><IconBox size={13} /> {n.name}</span>
                                   {n.tags?.[0] && <span className="nesio-object-map-item-tag">{n.tags[0]}</span>}
                                 </button>
                               ))}
@@ -158,7 +159,7 @@ function ObjectMap({ nodes, onOpenNode }: { nodes: LifeNode[]; onOpenNode: (n: L
                 })}
                 {unroomed.map((n) => (
                   <button key={n.id} type="button" className="nesio-object-map-item" onClick={() => onOpenNode(n)}>
-                    <span>📦 {n.name}</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><IconBox size={13} /> {n.name}</span>
                   </button>
                 ))}
               </div>
@@ -177,7 +178,7 @@ function ObjectMap({ nodes, onOpenNode }: { nodes: LifeNode[]; onOpenNode: (n: L
             <div className="nesio-object-map-children">
               {unlocated.map((n) => (
                 <button key={n.id} type="button" className="nesio-object-map-item" onClick={() => onOpenNode(n)}>
-                  <span>📦 {n.name}</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><IconBox size={13} /> {n.name}</span>
                 </button>
               ))}
             </div>
@@ -190,10 +191,6 @@ function ObjectMap({ nodes, onOpenNode }: { nodes: LifeNode[]; onOpenNode: (n: L
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const TYPE_ICON: Record<string, string> = {
-  person: '👤', object: '📦', place: '📍', event: '📅',
-  commitment: '🤝', health_state: '🩷', preference: '⭐',
-};
 const TYPE_BG: Record<string, string> = {
   person: 'var(--chip-indigo)', object: 'var(--chip-blue)', place: 'var(--chip-green)',
   event: 'var(--chip-amber)', commitment: 'var(--chip-violet)', health_state: 'var(--chip-pink)', preference: 'var(--chip-mint)',
@@ -274,7 +271,7 @@ function findRelatedNodes(target: LifeNode, allNodes: LifeNode[]): LifeNode[] {
   const targetWords = extractKeywords(`${target.name} ${target.rawInput || ''}`);
   const targetTags = new Set(target.tags || []);
   return allNodes
-    .filter((n) => n.id !== target.id)
+    .filter((n) => n.id !== target.id && !isWeatherNode(n))
     .map((node) => {
       let score = 0;
       if (target.relations?.some((r) => r.targetId === node.id)) score += 10;
@@ -345,7 +342,7 @@ function getNodeTypeMeta(node: LifeNode) {
     }
     case 'object': {
       const loc = str(a.location) || str(a.where) || str(a.place) || str(a.storage);
-      return { extra: loc ? `📍 ${loc}` : '' };
+      return { extra: loc };
     }
     default: return {};
   }
@@ -356,8 +353,15 @@ function getPersonInitials(name: string) {
   return { initials: name.slice(0, 1), bg: bgs[name.charCodeAt(0) % bgs.length] };
 }
 
+/** 天气快照是环境信号,进 Memory 只会制造噪音(用户反馈「存在意义不明」)。 */
+function isWeatherNode(n: LifeNode): boolean {
+  const tags = n.tags || [];
+  return tags.includes('weather') || tags.includes('weather.forecast') || /天气信号$|^天气$/.test(n.name);
+}
+
 function visibleMemoryNodes(nodes: LifeNode[], canUse: boolean): LifeNode[] {
-  return canUse ? nodes : nodes.filter((n) => !isPrivateExternalNode(n));
+  const base = nodes.filter((n) => !isWeatherNode(n));
+  return canUse ? base : base.filter((n) => !isPrivateExternalNode(n));
 }
 
 function shareTextForNode(node: LifeNode): string {
@@ -372,7 +376,7 @@ function OnThisDayStrip({ nodes, onOpen }: { nodes: LifeNode[]; onOpen: (n: Life
   return (
     <div className="nesio-otd-wrap">
       <div className="nesio-otd-header">
-        <span className="nesio-otd-icon">🗓</span>
+        <span className="nesio-otd-icon"><IconCalendar size={14} /></span>
         <span className="nesio-otd-label">历史上的今天 · {label}</span>
       </div>
       <div className="nesio-otd-scroll">
@@ -516,7 +520,7 @@ function MemoryCard({ node, onOpen, onDeleted, onLongPress }: { node: LifeNode; 
         <span className="nesio-memory-card-avatar" style={{ background: avatarBg }}>{initials}</span>
       ) : (
         <span className="nesio-memory-card-icon" style={{ background: TYPE_BG[node.type] || 'var(--portal-accent-soft)' }}>
-          {TYPE_ICON[node.type] || '📌'}
+          <NodeTypeIcon type={node.type} size={16} />
         </span>
       )}
       <span className="nesio-memory-card-title">{node.name}</span>
@@ -525,7 +529,7 @@ function MemoryCard({ node, onOpen, onDeleted, onLongPress }: { node: LifeNode; 
       {!extra && !badge && <span className="nesio-memory-card-sub">{cleanMemoryPreview(node)}</span>}
       {node.source === 'email' && <span className="nesio-memory-card-source-chip">Gmail</span>}
       {node.source === 'calendar' && <span className="nesio-memory-card-source-chip">日历</span>}
-      {domain ? <span className="nesio-memory-card-domain">{DOMAINS[domain].icon} {DOMAINS[domain].label}</span> : null}
+      {domain ? <span className="nesio-memory-card-domain"><DomainIcon domain={domain} size={11} /> {DOMAINS[domain].label}</span> : null}
     </button>
   );
 }
@@ -837,7 +841,6 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
         <div className="nesio-memory-scroll">
           {nodes.some(isDemoNode) && (
             <div style={{ background: 'var(--portal-accent-soft, rgba(88,140,227,0.1))', borderRadius: 12, padding: '0.55rem 0.9rem', margin: '0 0 0.6rem', fontSize: '0.72rem', color: 'var(--portal-blue-deep)', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span aria-hidden>👀</span>
               <span>这些是示例数据,让你看看 Nesio 记东西的样子。<a href="/login" style={{ color: 'inherit', fontWeight: 600 }}>登录</a>或直接开始记录,就会换成你自己的。</span>
             </div>
           )}
@@ -863,11 +866,11 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
           {isSearching && hasUnderstoodEntities && (
             <div className="nesio-search-understood" aria-live="polite">
               <span className="nesio-search-understood-label">理解为</span>
-              {understood.people.map((p) => <span key={p} className="nesio-search-understood-chip">👤 {p}</span>)}
-              {understood.places.map((p) => <span key={p} className="nesio-search-understood-chip">📍 {p}</span>)}
-              {understood.objects.map((o) => <span key={o} className="nesio-search-understood-chip">📦 {o}</span>)}
+              {understood.people.map((p) => <span key={p} className="nesio-search-understood-chip"><IconUser size={11} /> {p}</span>)}
+              {understood.places.map((p) => <span key={p} className="nesio-search-understood-chip"><IconMapPin size={11} /> {p}</span>)}
+              {understood.objects.map((o) => <span key={o} className="nesio-search-understood-chip"><IconBox size={11} /> {o}</span>)}
               {understood.domain && (
-                <span className="nesio-search-understood-chip">{DOMAINS[understood.domain].icon} {DOMAINS[understood.domain].label}</span>
+                <span className="nesio-search-understood-chip"><DomainIcon domain={understood.domain} size={11} /> {DOMAINS[understood.domain].label}</span>
               )}
             </div>
           )}
@@ -928,8 +931,8 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                           清除筛选
                         </button>
                       )}
-                      <button type="button" className="nesio-section-action" onClick={() => setShowFreezeVault(true)} title="冷冻仓">
-                        🧊
+                      <button type="button" className="nesio-section-action" onClick={() => setShowFreezeVault(true)} title="冷冻仓" aria-label="冷冻仓">
+                        <IconSnowflake size={15} />
                       </button>
                     </div>
                   </div>
@@ -951,7 +954,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                         className={`nesio-type-chip${typeFilter === t && !showObjectMap ? ' is-active' : ''}`}
                         onClick={() => { setTypeFilter((prev) => (prev === t ? null : t)); setShowObjectMap(false); }}
                       >
-                        {TYPE_ICON[t]} {TYPE_LABEL[t]}
+                        <NodeTypeIcon type={t} size={12} /> {TYPE_LABEL[t]}
                         <span className="nesio-type-chip-count">{typeCounts[t]}</span>
                       </button>
                     ))}
@@ -961,7 +964,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                         className={`nesio-type-chip${showObjectMap ? ' is-active' : ''}`}
                         onClick={() => { setShowObjectMap((prev) => !prev); setTypeFilter(null); setShowRelationGraph(false); }}
                       >
-                        🗺 地图
+                        <IconMap size={12} /> 地图
                       </button>
                     )}
                     <button

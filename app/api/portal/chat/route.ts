@@ -32,7 +32,7 @@ interface ChatRequest {
   environmentContext?: string;
 }
 
-const SYSTEM_BASE = `你是 Nesio，用户的贴身 AI 助手，叫"小宝"。
+const SYSTEM_BASE = `你是 Nesio，用户的贴身 AI 助手，叫"小娜"。
 - 回答简洁有力，用中文
 - 善用用户的个人记忆，自然地说"我记得你之前提到…"
 - 如果用户问"我的XX在哪"，先在记忆库里找
@@ -67,7 +67,8 @@ async function callClaude(
     },
     body: JSON.stringify({
       model: envValue('CLAUDE_MODEL') || envValue('ANTHROPIC_MODEL') || 'claude-3-5-haiku-latest',
-      max_tokens: 1024,
+      // 2048:1024 时中文长答案会在句中被硬截断(用户可见「说到一半没了」)
+      max_tokens: 2048,
       system: systemInstruction,
       messages: [
         ...history
@@ -128,7 +129,8 @@ async function callGemini(
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: systemInstruction }] },
           contents,
-          generationConfig: { temperature: 0.7, maxOutputTokens: 1024 },
+          // 4096:2.5 系模型把思考 token 也计入输出预算,1024 会让可见文本被截断
+          generationConfig: { temperature: 0.7, maxOutputTokens: 4096 },
         }),
       });
 

@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { PROFILE_UPDATED_EVENT, loadProfileSettings } from '@/lib/portal/profile';
+import { IconThermometer } from './icons';
 import { buildTodayViewModel, focusTimeHint, markFocusNodeDone, addCommitmentNode, addMeetingNotes, saveSubtasks, toggleSubtask, type FocusNode, type SubTask, type ProactiveContext, type ProactiveContextItem } from '@/lib/platform/view-models/today-view-model';
 import type { CalendarEvent } from '@/lib/portal/types';
 import {
@@ -65,6 +67,15 @@ export default function TodayFeed({
   const initials = canUsePrivateData ? (displayName.trim().slice(0, 1) || '我') : '我';
   const { shouldShow: showWrapped, dismiss: dismissWrapped } = useWrappedTrigger();
 
+  // 设置页上传的头像同步到主页「我」按钮(PROFILE_UPDATED_EVENT 驱动)
+  const [avatarUrl, setAvatarUrl] = useState('');
+  useEffect(() => {
+    const readAvatar = () => setAvatarUrl(canUsePrivateData ? (loadProfileSettings().avatarUrl || '') : '');
+    readAvatar();
+    window.addEventListener(PROFILE_UPDATED_EVENT, readAvatar);
+    return () => window.removeEventListener(PROFILE_UPDATED_EVENT, readAvatar);
+  }, [canUsePrivateData]);
+
   // All proactive cards come from the guidance pipeline (email included) —
   // single path so cooling-store and attention-budget always apply.
   // 用户在 设置→通用→主动提醒程度 里可把预算降到 1 或 0(安静)。
@@ -87,9 +98,14 @@ export default function TodayFeed({
           aria-label="打开 Nesio 洞察"
           onClick={() => setMirrorOpen(true)}
         >
-          <img src="/icons/treasurebox.svg" alt="Nesio" className="nesio-today-brand-icon" />
+          <img src="/assets/logo/nesio-mark.svg" alt="Nesio" className="nesio-today-brand-icon" />
         </button>
-        <a href="/settings" className="nesio-today-avatar" aria-label="我的设置">{initials}</a>
+        <a href="/settings" className="nesio-today-avatar" aria-label="我的设置">
+          {avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- 头像是运行时签名 URL,next/image 无法静态优化
+            <img src={avatarUrl} alt="" className="nesio-today-avatar-img" draggable={false} />
+          ) : initials}
+        </a>
       </header>
 
       <div className="nesio-today-scroll">
@@ -110,7 +126,7 @@ export default function TodayFeed({
             onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-mood'))}
             aria-label="记录此刻感受"
           >
-            <span className="nesio-mood-circle-icon" aria-hidden>🌡</span>
+            <span className="nesio-mood-circle-icon" aria-hidden><IconThermometer size={22} /></span>
             <span className="nesio-mood-circle-label">此刻</span>
           </button>
         </div>

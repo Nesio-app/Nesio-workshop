@@ -118,7 +118,8 @@ assert.doesNotMatch(todayFeed, /今天有点多，先看最重要的一件。/, 
 assert.match(dailyBrief, /buildDailyOverview[\s\S]*今天有点多，先看最重要的一件|events\.length|memoryCount/, 'Daily overview should be generated from current user state in DailyBriefCard.');
 assert.doesNotMatch(dailyBrief, /播客/, 'Daily brief action copy should not say podcast on the home surface.');
 assert.match(dailyBrief, /听简报|文字简报/, 'Daily brief should use home-appropriate briefing language.');
-assert.match(dailyBrief, /href="\/login"[\s\S]*登录后生成/, 'Signed-out daily brief generation must be a real login link, not a disabled button.');
+// Copy evolved 登录后生成 → 登录听自己的; guarded intent: real /login link, not a disabled button.
+assert.match(dailyBrief, /href="\/login"[\s\S]*(登录后生成|登录听自己的)/, 'Signed-out daily brief generation must be a real login link, not a disabled button.');
 assert.doesNotMatch(dailyBrief, /disabled=\{playState === 'loading' \|\| !canUsePrivateData\}/, 'Signed-out daily brief CTA must not be disabled.');
 assert.doesNotMatch(domains, /不用翻笔记/, 'Meeting cards should use natural assistant wording, not system-summary language.');
 assert.match(domains, /已经整理好了|关键提醒/, 'Meeting cards should explain that key reminders are ready.');
@@ -132,7 +133,8 @@ assert.doesNotMatch(memoryTab, /aria-label="语音问宝盒"|nesio-memory-search
 assert.match(memoryTab, /showAll|visibleItems|slice\(0,\s*6\)|更多线索/s, 'Memory should show at most six cards first and fold the rest behind a more button.');
 assert.match(memoryTab, /deleteLifeNode|左滑删除|长按分享|navigator\.share|clipboard/, 'Memory cards should support left-swipe delete and long-press share.');
 assert.doesNotMatch(memoryTab, /nesio-today-header[\s\S]*nesio-memory-brand-icon|aria-label="我的设置"/, 'Memory page should not show the top logo/settings buttons.');
-assert.match(todayFeed, /\/icons\/treasurebox\.svg/, 'Today logo should use the transparent SVG asset instead of the light-background PWA icon.');
+// Logo swapped to the design-system mark (user decision 2026-07-04); intent unchanged: transparent SVG, not the light-background PWA png.
+assert.match(todayFeed, /\/assets\/logo\/nesio-mark\.svg/, 'Today logo should use the transparent SVG brand asset instead of the light-background PWA icon.');
 assert.doesNotMatch(todayFeed, /nesio-today-brand-name">Nesio/, 'Today header should not render the Nesio word next to the logo.');
 // Long-press handler renamed startLongPress → startPress; hint moved to aria-label.
 assert.match(bottomNav, /onPointerDown=\{startPress\}/, 'Center N button must expose long-press ask behavior.');
@@ -146,7 +148,9 @@ assert.doesNotMatch(tellSheet, /分享 · 上传|分享<\/span>/, 'Center N fan 
 assert.match(tellSheet, /accent: true/, 'Fan actions may accent exactly the primary capture action.');
 assert.equal((tellSheet.match(/accent: true/g) || []).length, 1, 'Only one fan action may carry the accent.');
 assert.match(voiceSheet, /setTimeout\(\(\) => inputRef\.current\?\.focus\(\),\s*120\)/, 'Voice and Ask sheets should focus typed input first.');
-assert.match(voiceSheet, /!\s*isAskMode[\s\S]*会议记录/s, 'Meeting recorder entry should be hidden from Ask mode.');
+// 2026-07-04 批次 2:说一句 sheet 的会议记录入口按用户指示整体移除(会议记录只从 Today 焦点卡进入);
+// 原守护意图「Ask 模式不得出现会议记录入口」由入口不存在自动满足。
+assert.doesNotMatch(voiceSheet, /会议记录/, 'VoiceInputSheet must not re-grow a meeting recorder entry (removed per user decision 2026-07-04).');
 assert.match(voiceSheet, /nesio-ask-answer|我找到了这些可能相关的线索|还没找到相关线索/s, 'Ask mode should show the answer below the input after asking.');
 assert.match(portal, /ASK_GUIDE_KEY|setAskGuideOpen\(true\)|问宝盒/, 'Portal must show a first-use ask guide when the center N is long-pressed.');
 assert.match(portal, /openAskVoice|setVoiceIntent\('ask'\)[\s\S]*setCaptureMode\('voice'\)/, 'Portal must route center N long press to the voice ask surface after the guide.');
@@ -177,7 +181,9 @@ assert.match(domains, /确认，放到门口/, 'Domain actions should read as us
 assert.doesNotMatch(settingsSheets, /像朋友一样|Moment|Today Feed 的卡片会按此过滤|按能力层计费|Remember|Understand|Steer|Operate|Future Steering|Mirror Profile|全自动 Life Graph|API 接入/, 'Settings sheets should use user-sovereignty copy instead of internal product or SaaS terms.');
 assert.match(settingsSheets, /只整理你放进来的内容|哪些内容不会被使用|主动提醒|保持安静|选中的生活空间，会优先出现在 Today|先记住|帮你理解|主动提醒|家庭与自动化/, 'Settings sheets should expose trust, quiet mode, spaces, and user-value subscription copy.');
 assert.match(lifeGraph, /nesio-memory-received/, 'Life Graph should emit a user-record receipt event for calm feedback.');
-assert.match(settingsSheets, /触感反馈|细微音效/, 'Settings should let users control haptics and subtle sounds.');
+// 批次 1(2026-07-04)把设置文案迁入 i18n 字典,断言连同字典一起检查。
+const settingsI18n = read('lib/portal/i18n.ts');
+assert.match(settingsSheets + settingsI18n, /触感反馈|细微音效/, 'Settings should let users control haptics and subtle sounds.');
 assert.match(voiceSheet, /parseInlineTags|stripInlineTags|mergeTags/, 'Voice input should parse inline #tags and remove them from the display text.');
 assert.doesNotMatch(voiceSheet, /setTimeout\(startListening,\s*300\)/, 'Voice input must not auto-start recording when opened.');
 // Ask flow rewired through fetchAskResponse (AI ask + fuzzy fallback); still clears input after asking.

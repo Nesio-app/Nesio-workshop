@@ -12,6 +12,7 @@ import { getEnvironment, getCachedCalendarEvents } from '@/lib/portal/environmen
 import { refreshLocation } from '@/lib/portal/location-store';
 import { track } from '@/lib/portal/telemetry';
 import type { CalendarEvent } from '@/lib/portal/types';
+import { IconAlertTriangle, IconClock, IconPlay, IconRefresh, IconSpeaker } from './icons';
 
 const BRIEF_CACHE_KEY = 'nesio-daily-brief-v2';
 
@@ -311,11 +312,11 @@ export default function DailyBriefCard({
 
     const icon = isPlaying
       ? <span className="nesio-brief-strip-wave nesio-brief-strip-wave--sm" aria-hidden>{Array.from({ length: 4 }, (_, i) => <span key={i} style={{ animationDelay: `${i * 0.12}s` }} />)}</span>
-      : isLoading ? <span style={{ fontSize: '1rem' }}>⏳</span>
-      : isError ? <span style={{ fontSize: '1rem' }}>⚠️</span>
-      : isPaused ? <span style={{ fontSize: '1rem' }}>▶</span>
-      : isDone ? <span style={{ fontSize: '1rem' }}>🔁</span>
-      : <span style={{ fontSize: '1rem' }}>🔊</span>;
+      : isLoading ? <IconClock size={18} />
+      : isError ? <IconAlertTriangle size={18} />
+      : isPaused ? <IconPlay size={18} />
+      : isDone ? <IconRefresh size={18} />
+      : <IconSpeaker size={18} />;
 
     const label = isPlaying ? '暂停'
       : isLoading ? '生成中'
@@ -369,7 +370,7 @@ export default function DailyBriefCard({
     return (
       <div className="nesio-brief-strip">
         <span className="nesio-brief-strip-label">
-          {playState === 'playing' ? '▶ 示例简报播放中' : '🔊 每日简报'}
+          {playState === 'playing' ? '▶ 示例简报播放中' : <><IconSpeaker size={13} /> 每日简报</>}
         </span>
         <button type="button" className="nesio-brief-strip-btn" onClick={handlePlay}>
           {playState === 'playing' ? '暂停' : '试听示例'}
@@ -384,9 +385,9 @@ export default function DailyBriefCard({
       <span className="nesio-brief-strip-label">
         {playState === 'playing' ? <><span className="nesio-brief-strip-wave" aria-hidden>{Array.from({ length: 4 }, (_, i) => <span key={i} style={{ animationDelay: `${i * 0.12}s` }} />)}</span>播放中</>
           : playState === 'done' ? '✓ 简报播放完毕'
-          : playState === 'error' ? `⚠️ ${errorMsg || '语音暂不可用'}`
-          : playState === 'paused' ? '⏸ 已暂停'
-          : '🔊 听今日简报'}
+          : playState === 'error' ? `${errorMsg || '语音暂不可用'}`
+          : playState === 'paused' ? '已暂停'
+          : <><IconSpeaker size={13} /> 听今日简报</>}
       </span>
       {playState === 'playing' ? (
         <button type="button" className="nesio-brief-strip-btn nesio-brief-strip-btn--stop" onClick={togglePause}>暂停</button>

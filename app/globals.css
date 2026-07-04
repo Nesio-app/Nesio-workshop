@@ -8323,6 +8323,22 @@ html[data-portal-theme="night"] .portal-bottom-nav {
 }
 
 /* ── Bottom Nav (Today | N | Memory) ── */
+/* 悬浮导航下方的渐隐垫:滚动内容不再「裸露」在按钮后面(批次 2) */
+.nesio-bottom-nav::before {
+  content: '';
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: calc(4.6rem + env(safe-area-inset-bottom, 0px));
+  backdrop-filter: blur(9px);
+  -webkit-backdrop-filter: blur(9px);
+  -webkit-mask-image: linear-gradient(to top, black 38%, transparent);
+  mask-image: linear-gradient(to top, black 38%, transparent);
+  pointer-events: none;
+  z-index: -1;
+}
+
 .nesio-bottom-nav {
   position: fixed;
   bottom: calc(env(safe-area-inset-bottom, 0px) + 0.5rem);
@@ -9106,6 +9122,11 @@ html[data-portal-theme="night"] .nesio-memory-card {
   color: var(--portal-ink);
   overflow-wrap: anywhere;
   word-break: break-word;
+  /* 长标题(偏好类常见=整段原文)最多 3 行,详情里看全文 */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 html[data-portal-theme="night"] .nesio-memory-card-title { color: #e8eefa; }
@@ -12208,13 +12229,16 @@ html[data-portal-theme="night"] .nesio-connector-name { color: #e8eefa; }
   padding: 0.15rem;
 }
 .nesio-insights-tab {
+  /* flex:1 让 今日/本周/本月 平分整条 bar(批次 2 用户反馈) */
+  flex: 1;
+  text-align: center;
   font-size: 0.72rem;
   font-weight: 600;
   color: var(--portal-muted);
   background: none;
   border: none;
   border-radius: 0.4rem;
-  padding: 0.22rem 0.55rem;
+  padding: 0.28rem 0.55rem;
   cursor: pointer;
   transition: background 0.12s, color 0.12s;
 }
@@ -14231,6 +14255,18 @@ html[data-portal-theme="night"] .nesio-today-evidence-chip { color: #96c7f3; bac
   justify-content: center;
 }
 
+.nesio-brief-circle-icon svg,
+.nesio-mood-circle-icon svg {
+  color: var(--portal-blue-deep);
+}
+
+.nesio-today-avatar-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
 /* Compact capture chooser (native camera) — centered card, snug options */
 .nesio-camera-chooser {
   position: absolute;
@@ -14705,6 +14741,56 @@ html[data-portal-theme="night"] .nesio-wechat-suggestion {
   color: #fff;
   flex-shrink: 0;
   margin-top: 0.1rem;
+}
+
+.nesio-wechat-avatar--logo {
+  background: var(--glass-bg-solid);
+  border: 1px solid var(--portal-line);
+}
+.nesio-wechat-avatar--logo img { display: block; }
+
+.nesio-chat-history-panel { position: fixed; inset: 0; z-index: 340; }
+.nesio-chat-history-card {
+  position: absolute;
+  top: 3.4rem;
+  right: 0.75rem;
+  left: 0.75rem;
+  max-height: 60vh;
+  overflow-y: auto;
+  background: var(--glass-bg-solid);
+  border: 1px solid var(--portal-line);
+  border-radius: 16px;
+  box-shadow: 0 16px 44px rgba(23,42,84,0.18);
+  padding: 0.8rem 0.9rem;
+}
+.nesio-chat-history-title {
+  margin: 0 0 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--portal-ink);
+}
+.nesio-chat-history-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: 0.5rem 0.55rem;
+  border: none;
+  border-top: 1px solid var(--portal-line);
+  background: none;
+  cursor: pointer;
+  text-align: left;
+}
+.nesio-chat-history-item-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--portal-ink);
+}
+.nesio-chat-history-item-date {
+  font-size: 0.68rem;
+  color: var(--portal-muted);
 }
 
 .nesio-wechat-bubble-wrap {
@@ -17287,21 +17373,30 @@ html[data-portal-theme="night"] .nesio-related-node-chip:hover {
 
 /* ── Memory Narrator cards ──────────────────────────────────────────────── */
 .nesio-narrator-section {
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-  margin-bottom: 1.25rem;
+  /* 两张摘要卡并排缩小(批次 2:「上面2个卡片缩小,并排放」) */
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.55rem;
+  margin-bottom: 1rem;
 }
+.nesio-narrator-section > .nesio-narrator-card:nth-child(3) { grid-column: 1 / -1; }
 
 .nesio-narrator-card {
   background: var(--glass-bg-solid);
   border: 1px solid var(--portal-line);
   border-left: 3px solid var(--narrator-accent, var(--portal-accent));
   border-radius: 14px;
-  padding: 0.9rem 1rem;
+  padding: 0.65rem 0.75rem;
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
+  gap: 0.22rem;
+  min-width: 0;
+}
+.nesio-narrator-card .nesio-narrator-body {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 html[data-portal-theme="night"] .nesio-narrator-card {

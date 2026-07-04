@@ -12,6 +12,7 @@ import { createAppApiClient } from '@/lib/portal/app-api-client';
 import { getRegisteredDecCard, snoozeOverdue, type ProactiveAction, type ProactiveCardData } from './proactive-types';
 import { t } from '@/lib/portal/i18n';
 import { usePortalLocale } from '../use-portal-locale';
+import { GuidanceIcon } from '../icons';
 
 export function ProactiveGuidanceCard({
   card, onDismiss, onMarkDone,
@@ -60,7 +61,7 @@ export function ProactiveGuidanceCard({
   return (
     <div className="nesio-proactive-card">
       <div className="nesio-proactive-card-inner">
-        <span className="nesio-proactive-card-icon">{card.icon}</span>
+        <span className="nesio-proactive-card-icon"><GuidanceIcon icon={card.icon} /></span>
         <div className="nesio-proactive-card-text">
           <p className="nesio-proactive-card-title">{card.title}</p>
           <p className="nesio-proactive-card-body">{card.body}</p>

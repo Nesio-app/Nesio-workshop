@@ -23,7 +23,7 @@ import {
   type SignalContext,
 } from '@/lib/life-domain';
 import { routeIntent } from '@/lib/portal/intent-router';
-import MeetingRecorder from './MeetingRecorder';
+import { DomainIcon, IconBox, IconClock, IconMapPin, IconUser } from './icons';
 
 interface VoiceInputSheetProps {
   open: boolean;
@@ -226,7 +226,7 @@ function DateTimePicker({ value, onChange, onClose }: {
 
         {/* 时间 */}
         <div className="nesio-dtp-row">
-          <span className="nesio-dtp-row-label">🕐 时间</span>
+          <span className="nesio-dtp-row-label">时间</span>
           <input
             type="time"
             className="nesio-dtp-time-input"
@@ -237,7 +237,7 @@ function DateTimePicker({ value, onChange, onClose }: {
 
         {/* 重复 */}
         <div className="nesio-dtp-row nesio-dtp-row--wrap">
-          <span className="nesio-dtp-row-label">🔄 重复</span>
+          <span className="nesio-dtp-row-label">重复</span>
           <div className="nesio-dtp-options">
             {['不重复', '每天', '每周', '每月'].map(r => (
               <button
@@ -254,16 +254,16 @@ function DateTimePicker({ value, onChange, onClose }: {
 
         {/* 优先级 */}
         <div className="nesio-dtp-row nesio-dtp-row--wrap">
-          <span className="nesio-dtp-row-label">⚡ 优先级</span>
+          <span className="nesio-dtp-row-label">优先级</span>
           <div className="nesio-dtp-options">
-            {([['🔴','高'],['🟡','中'],['🟢','低']] as const).map(([dot, key]) => (
+            {([['var(--status-risk)','高'],['var(--status-gentle)','中'],['var(--status-go)','低']] as const).map(([dot, key]) => (
               <button
                 key={key}
                 type="button"
                 className={`nesio-dtp-opt${value.priority === key ? ' nesio-dtp-opt--on' : ''}`}
                 onClick={() => onChange({ ...value, priority: value.priority === key ? undefined : key })}
               >
-                {dot} {key}
+                <span aria-hidden style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: dot, marginRight: 4 }} /> {key}
               </button>
             ))}
           </div>
@@ -285,7 +285,6 @@ function DateTimePicker({ value, onChange, onClose }: {
 }
 
 export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateData = false, onClose }: VoiceInputSheetProps) {
-  const [mode, setMode] = useState<'note' | 'meeting'>('note');
   const [text, setText] = useState('');
   const [listening, setListening] = useState(false);
   const [sendState, setSendState] = useState<SendState>('idle');
@@ -521,27 +520,14 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
 
   return (
     <>
-    {/* Meeting recorder takes over when in meeting mode */}
-    <MeetingRecorder open={mode === 'meeting'} onClose={() => { setMode('note'); onClose(); }} />
-
-    <div className="nesio-voice-sheet" role="dialog" aria-modal="true" aria-label={isAskMode ? '问宝盒' : '说一句'} style={{ display: mode === 'meeting' ? 'none' : undefined }}>
+    <div className="nesio-voice-sheet" role="dialog" aria-modal="true" aria-label={isAskMode ? '问宝盒' : '说一句'}>
       <div className="nesio-voice-sheet-backdrop" onClick={onClose} />
       <div className="nesio-voice-sheet-card">
         <div className="nesio-sheet-handle" aria-hidden />
 
         <div className="nesio-voice-sheet-header">
           <h2 className="nesio-voice-sheet-title">{isAskMode ? '问宝盒' : '说一句'}</h2>
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            {!isAskMode && (
-              <button type="button"
-                style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--portal-blue-deep)', background: 'rgba(88,140,227,0.1)', padding: '0.2rem 0.6rem', borderRadius: '999px' }}
-                onClick={() => { stopListening(); setMode('meeting'); }}
-                title="切换到会议记录模式">
-                🎙 会议记录
-              </button>
-            )}
-            <button type="button" className="nesio-voice-sheet-close" onClick={onClose} aria-label="关闭">✕</button>
-          </div>
+          <button type="button" className="nesio-voice-sheet-close" onClick={onClose} aria-label="关闭">✕</button>
         </div>
 
         {/* Context confirm (§6.2 绝对控制优先) — AI suggested; you decide before it's trusted. */}
@@ -570,7 +556,7 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
                     onClick={() => setDraftDomain(meta.id)}
                     aria-pressed={draft.domain === meta.id}
                   >
-                    {meta.icon} {meta.label}
+                    <DomainIcon domain={meta.id} size={12} /> {meta.label}
                   </button>
                 ))}
               </div>
@@ -581,9 +567,9 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
                 <span className="nesio-voice-confirm-label">识别到的线索（点 × 去掉不对的）</span>
                 <div className="nesio-voice-confirm-chips">
                   {([
-                    ['people', '👤'],
-                    ['places', '📍'],
-                    ['objects', '📦'],
+                    ['people', <IconUser key="p" size={12} />],
+                    ['places', <IconMapPin key="l" size={12} />],
+                    ['objects', <IconBox key="o" size={12} />],
                   ] as const).flatMap(([kind, icon]) =>
                     draft[kind].map((value) => (
                       <button
@@ -624,10 +610,10 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
                     className="nesio-dtp-trigger"
                     onClick={() => setShowDatePicker(true)}
                   >
-                    <span>📅 {dateLabel}</span>
-                    {draft.dueTime && <span className="nesio-dtp-trigger-time">🕐 {draft.dueTime}</span>}
+                    <span>{dateLabel}</span>
+                    {draft.dueTime && <span className="nesio-dtp-trigger-time" style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><IconClock size={12} /> {draft.dueTime}</span>}
                     {draft.recurring && <span className="nesio-dtp-trigger-badge">{draft.recurring}</span>}
-                    {draft.priority && <span className="nesio-dtp-trigger-badge">{draft.priority === '高' ? '🔴' : draft.priority === '中' ? '🟡' : '🟢'} {draft.priority}</span>}
+                    {draft.priority && <span className="nesio-dtp-trigger-badge"><span aria-hidden style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: draft.priority === '高' ? 'var(--status-risk)' : draft.priority === '中' ? 'var(--status-gentle)' : 'var(--status-go)', marginRight: 3 }} /> {draft.priority}</span>}
                   </button>
                   {showDatePicker && (
                     <DateTimePicker
@@ -651,17 +637,32 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
           </div>
         )}
 
-        {!isAskMode && sendState !== 'confirm' && (
-          <div className="nesio-voice-transcript" onClick={() => { stopListening(); inputRef.current?.focus(); }}>
-            {text
-              ? <span>{text}</span>
-              : <span className="nesio-voice-transcript-placeholder">
-                  {listening
-                    ? '正在听这一句，说完后会显示…'
-                    : '点下方麦克风开始，或直接打字'}
-                </span>}
-          </div>
+        {/* Text input fallback */}
+        {sendState !== 'confirm' && (
+        <div className="nesio-voice-input-row">
+          <span className="nesio-voice-input-spark">✦</span>
+          <input
+            ref={inputRef}
+            className="nesio-voice-input"
+            placeholder={isAskMode ? '打字问宝盒,或点麦克风说…' : '说一句,或直接打字…'}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+          />
+          <button
+            type="button"
+            className={`nesio-voice-mic-btn${listening ? ' nesio-voice-mic-btn--active' : ''}`}
+            onClick={listening ? stopListening : startListening}
+            aria-label={listening ? '停止录音' : '开始录音'}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+              <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
+              <path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8"/>
+            </svg>
+          </button>
+        </div>
         )}
+
 
         {/* Intent label */}
         {!isAskMode && intentLabel && sendState !== 'confirm' && (
@@ -705,32 +706,6 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
           </div>
         )}
 
-        {/* Text input fallback */}
-        {sendState !== 'confirm' && (
-        <div className="nesio-voice-input-row">
-          <span className="nesio-voice-input-spark">✦</span>
-          <input
-            ref={inputRef}
-            className="nesio-voice-input"
-            placeholder={isAskMode ? '或者打字问宝盒…' : '或者打字输入…'}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-          />
-          <button
-            type="button"
-            className={`nesio-voice-mic-btn${listening ? ' nesio-voice-mic-btn--active' : ''}`}
-            onClick={listening ? stopListening : startListening}
-            aria-label={listening ? '停止录音' : '开始录音'}
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
-              <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
-              <path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8"/>
-            </svg>
-          </button>
-        </div>
-        )}
-
         {/* Ask 结果展示 */}
         {isAskMode && sendState === 'saved' ? (
           <div className="nesio-ask-result">
@@ -739,7 +714,7 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
               <div className="nesio-ask-answer-block">
                 <span className="nesio-ask-answer-icon">✦</span>
                 <p className="nesio-ask-answer-text">{askAnswer}</p>
-                {webSearchUsed && <span className="nesio-ask-web-badge">🌐 网络搜索</span>}
+                {webSearchUsed && <span className="nesio-ask-web-badge">网络搜索</span>}
               </div>
             ) : (!askResults.length && (
               <div className="nesio-ask-answer-block">
@@ -762,7 +737,7 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
             {/* 引用来源卡片 */}
             {askResults.length > 0 && (
               <div className="nesio-ask-citations">
-                <p className="nesio-ask-citations-title">📍 来源线索</p>
+                <p className="nesio-ask-citations-title">来源线索</p>
                 {askResults.slice(0, 5).map((node) => (
                   <div key={node.id} className="nesio-ask-citation-card">
                     <span className="nesio-ask-citation-name">{node.name}</span>

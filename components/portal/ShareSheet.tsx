@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * 上传 — bottom sheet that:
+ * 分享 — bottom sheet that:
  * 1. Accepts paste or file upload
  * 2. Extracts text from PDF/doc/email
  * 3. POSTs to /api/portal/analyze for structured extraction
@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { updateLifeNode, type LifeNodeAsset } from '@/lib/portal/life-graph';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
+import { NodeTypeIcon } from './icons';
 
 interface ShareSheetProps { open: boolean; onClose: () => void; }
 
@@ -192,13 +193,13 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
   if (!open) return null;
 
   return (
-    <div className="nesio-share-overlay" role="dialog" aria-modal="true" aria-label="上传">
+    <div className="nesio-share-overlay" role="dialog" aria-modal="true" aria-label="分享">
       <div className="nesio-share-backdrop" onClick={onClose} />
       <div className="nesio-share-card">
         <div className="nesio-sheet-handle" aria-hidden />
 
         <div className="nesio-share-header">
-          <h2 className="nesio-share-title">上传</h2>
+          <h2 className="nesio-share-title">分享</h2>
           <button type="button" className="nesio-share-close" onClick={onClose} aria-label="关闭">✕</button>
         </div>
 
@@ -270,7 +271,7 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
             <p className="nesio-share-recent-label">刚刚分享进来</p>
             <div className="nesio-share-parsed-card">
               <span className="nesio-share-parsed-icon">
-                {{ MEMORY_CAPTURE: '📦', EVENT_LOG: '📅', COMMITMENT: '🤝', HEALTH_LOG: '🩷', REMINDER: '⏰' }[parsed.intent] || '📋'}
+                <NodeTypeIcon type={{ MEMORY_CAPTURE: 'object', EVENT_LOG: 'event', COMMITMENT: 'commitment', HEALTH_LOG: 'health_state', REMINDER: 'commitment' }[parsed.intent] || 'event'} size={18} />
               </span>
               <div className="nesio-share-parsed-body">
                 <p className="nesio-share-parsed-title">{parsed.title}</p>
@@ -307,7 +308,7 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
               </button>
               <button type="button" className="nesio-today-btn nesio-today-btn--ghost" style={{ flex: 1, borderRadius: '999px' }}
                 onClick={() => { setParsed(null); setTextMode(false); }}>
-                重新上传
+                重新分享
               </button>
             </div>
           </div>

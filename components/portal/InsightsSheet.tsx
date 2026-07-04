@@ -31,6 +31,7 @@ import {
   type LivingModelLayer,
   type LivingModelLayerId,
 } from '@/lib/platform/living-model';
+import { IconBox, IconCheckCircle, IconClock, IconTarget, IconUser } from './icons';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -38,7 +39,7 @@ type MainTab = 'reflection' | 'analytics' | 'living';
 type Period = 'today' | 'week' | 'month';
 
 interface FactBullet {
-  icon: string;
+  icon: React.ReactNode;
   text: string;
 }
 
@@ -143,9 +144,9 @@ function computeReflectionFacts(nodes: LifeNode[], all: LifeNode[], profile: Mir
 
   // 1. Record count
   if (nodes.length > 0) {
-    facts.push({ icon: '📦', text: `记录了 ${nodes.length} 件事` });
+    facts.push({ icon: <IconBox size={15} />, text: `记录了 ${nodes.length} 件事` });
   } else {
-    facts.push({ icon: '📦', text: '这段时间还没有新记录' });
+    facts.push({ icon: <IconBox size={15} />, text: '这段时间还没有新记录' });
   }
 
   // 2. Completion rate
@@ -153,7 +154,7 @@ function computeReflectionFacts(nodes: LifeNode[], all: LifeNode[], profile: Mir
   const done = commitments.filter((n) => n.attributes.done === true);
   if (commitments.length > 0) {
     const rate = Math.round((done.length / commitments.length) * 100);
-    facts.push({ icon: '✅', text: `承诺完成率 ${rate}%（${done.length}/${commitments.length} 件）` });
+    facts.push({ icon: <IconCheckCircle size={15} />, text: `承诺完成率 ${rate}%（${done.length}/${commitments.length} 件）` });
   }
 
   // 3. Top domain
@@ -169,7 +170,7 @@ function computeReflectionFacts(nodes: LifeNode[], all: LifeNode[], profile: Mir
   }
   const topDomain = Object.entries(domainMap).sort(([, a], [, b]) => b - a)[0];
   if (topDomain && nodes.length > 1) {
-    facts.push({ icon: '🎯', text: `最集中在「${topDomain[0]}」（${topDomain[1]} 条，占 ${Math.round(topDomain[1] / nodes.length * 100)}%）` });
+    facts.push({ icon: <IconTarget size={15} />, text: `最集中在「${topDomain[0]}」（${topDomain[1]} 条，占 ${Math.round(topDomain[1] / nodes.length * 100)}%）` });
   }
 
   // 4. Active hour
@@ -177,13 +178,13 @@ function computeReflectionFacts(nodes: LifeNode[], all: LifeNode[], profile: Mir
     .map((g) => ({ ...g, score: avg(g.hours.map((h) => profile.hourEngagement[h])) }))
     .sort((a, b) => b.score - a.score)[0];
   if (bestGroup && bestGroup.score > 0.5) {
-    facts.push({ icon: '⏰', text: `你的黄金时段在${bestGroup.label}` });
+    facts.push({ icon: <IconClock size={15} />, text: `你的黄金时段在${bestGroup.label}` });
   }
 
   // 5. Top person
   const persons = all.filter((n) => n.type === 'person').slice(0, 3);
   if (persons.length > 0) {
-    facts.push({ icon: '👤', text: `最常出现的人：${persons.map((p) => p.name).join('、')}` });
+    facts.push({ icon: <IconUser size={15} />, text: `最常出现的人：${persons.map((p) => p.name).join('、')}` });
   }
 
   return facts.slice(0, 5);
@@ -444,7 +445,6 @@ function WidgetCustomizerSheet({
                 className={`nesio-widget-option${isOn ? ' nesio-widget-option--on' : ''}`}
                 onClick={() => toggle(w.id)}
               >
-                <span className="nesio-widget-option-icon">{w.icon}</span>
                 <div className="nesio-widget-option-text">
                   <span className="nesio-widget-option-label">{w.label}</span>
                   <span className="nesio-widget-option-desc">{w.description}</span>
@@ -500,7 +500,7 @@ function PerspectiveSheet({
     <div className="nesio-widget-customizer-overlay" onClick={onClose}>
       <div className="nesio-widget-customizer-sheet" onClick={(e) => e.stopPropagation()}>
         <div className="nesio-widget-customizer-header">
-          <span className="nesio-widget-customizer-title">🔭 选择分析视角</span>
+          <span className="nesio-widget-customizer-title">选择分析视角</span>
           <button type="button" className="nesio-widget-customizer-close" onClick={onClose}>✕</button>
         </div>
         <p className="nesio-widget-customizer-hint">选择一个视角，AI 将从该框架重新分析你的认知模型</p>
@@ -524,7 +524,6 @@ function PerspectiveSheet({
               className={`nesio-widget-option${current === p.id ? ' nesio-widget-option--on' : ''}`}
               onClick={() => { onSelect(p); onClose(); }}
             >
-              <span className="nesio-widget-option-icon">{p.icon}</span>
               <div className="nesio-widget-option-text">
                 <span className="nesio-widget-option-label">{p.name}</span>
                 <span className="nesio-widget-option-desc">{p.desc}</span>
@@ -729,7 +728,6 @@ function LivingModelTab({
               className="nesio-lm-layer-header"
               onClick={() => setExpandedLayer(isExpanded ? null : layer.id)}
             >
-              <span className="nesio-lm-layer-icon">{layer.icon}</span>
               <span className="nesio-lm-layer-label">{layer.label}</span>
               {visibleInsights.length > 0 && (
                 <span className="nesio-lm-layer-count">{visibleInsights.length}</span>
@@ -792,7 +790,7 @@ function LivingModelTab({
       {model && (
         <p className="nesio-lm-gen-time">
           模型生成于 {new Date(model.generatedAt).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-          {selectedPerspective && <span className="nesio-lm-perspective-badge"> · {selectedPerspective.icon} {selectedPerspective.name}</span>}
+          {selectedPerspective && <span className="nesio-lm-perspective-badge"> · {selectedPerspective.name}</span>}
         </p>
       )}
 
@@ -1024,7 +1022,7 @@ export default function InsightsSheet({ onClose }: { onClose: () => void }) {
             </div>
 
             <p className="nesio-insights-cloud-note" style={{ marginTop: '1.25rem' }}>
-              ↕ 以上数据来自本地记录 · 无AI推断
+              以上数据来自本地记录 · 无 AI 推断
             </p>
           </div>
         )}

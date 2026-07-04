@@ -18,6 +18,17 @@ import { formatEnvironmentContext, getCachedCalendarEvents } from '@/lib/portal/
 import { semanticRerank } from '@/lib/portal/semantic-rerank';
 import { track } from '@/lib/portal/telemetry';
 import MemoryFlashBanner, { useMemoryFlash } from '@/components/portal/MemoryFlashBanner';
+import { IconCamera, IconFile, IconHistory, IconImage, IconKeyboard, IconLink, IconMic, IconSmile } from './icons';
+
+/** 小娜头像 — Nesio logo,替代 ✦ 占位 */
+function NesioAvatar() {
+  return (
+    <span className="nesio-wechat-avatar nesio-wechat-avatar--logo">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/assets/logo/nesio-mark.svg" alt="" width={30} height={30} draggable={false} />
+    </span>
+  );
+}
 
 interface ChatMessage { role: 'user' | 'model'; text: string; }
 
@@ -180,7 +191,34 @@ function buildCalendarContext(query: string): string {
 
 
 const CHAT_HISTORY_KEY = 'nesio-chat-history-v1';
+const CHAT_SESSIONS_KEY = 'nesio-chat-sessions-v1';
 const MAX_STORED = 60;
+const MAX_SESSIONS = 20;
+
+/** 归档的历史对话 — 「新对话」时把当前消息存档,历史记录里可回看 */
+interface ChatSession { id: string; title: string; at: string; messages: UiMessage[] }
+
+function loadSessions(): ChatSession[] {
+  try {
+    return JSON.parse(localStorage.getItem(CHAT_SESSIONS_KEY) ?? '[]') as ChatSession[];
+  } catch { return []; }
+}
+
+function archiveSession(messages: UiMessage[]): void {
+  const real = messages.filter((m) => m.role !== 'status' && m.text?.trim());
+  if (real.length === 0) return;
+  const firstUser = real.find((m) => m.role === 'user');
+  const session: ChatSession = {
+    id: `s-${Date.now()}`,
+    title: (firstUser?.text || real[0].text).slice(0, 30),
+    at: new Date().toISOString(),
+    messages: real.slice(-MAX_STORED),
+  };
+  try {
+    const next = [session, ...loadSessions()].slice(0, MAX_SESSIONS);
+    localStorage.setItem(CHAT_SESSIONS_KEY, JSON.stringify(next));
+  } catch { /* ignore */ }
+}
 const MAX_FILE_CHARS = 60_000; // ~15k tokens, safe for Haiku context
 
 // ─── CSV / File parsing ───────────────────────────────────────────────────────
@@ -425,10 +463,10 @@ function CameraView({ onResult, onClose, autoOpen = false }: {
           {cameraError && <p className="nesio-camera-status" style={{ color: 'var(--status-risk)' }}>{cameraError}</p>}
           <div className="nesio-camera-entry-btns">
             <button type="button" className="nesio-wechat-plus-item" onClick={openCamera}>
-              <span className="nesio-wechat-plus-icon">📷</span><span>打开摄像头</span>
+              <span className="nesio-wechat-plus-icon"><IconCamera /></span><span>打开摄像头</span>
             </button>
             <button type="button" className="nesio-wechat-plus-item" onClick={() => fileRef.current?.click()}>
-              <span className="nesio-wechat-plus-icon">🖼</span><span>从相册选图</span>
+              <span className="nesio-wechat-plus-icon"><IconImage /></span><span>从相册选图</span>
             </button>
           </div>
         </>
@@ -462,6 +500,8 @@ export default function NesioChatSheet({
   const [cameraAutoOpen, setCameraAutoOpen] = useState(false);
   const [menuMsg, setMenuMsg] = useState<UiMessage | null>(null);
   const [detailNode, setDetailNode] = useState<LifeNode | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const filePickerRef = useRef<HTMLInputElement>(null);
@@ -565,7 +605,7 @@ export default function NesioChatSheet({
         const dataUrl = ev.target?.result as string;
         const [hdr, b64] = dataUrl.split(',');
         const mime = hdr.match(/:(.*?);/)?.[1] || 'image/jpeg';
-        const userMsg: UiMessage = { id: `u-${Date.now()}`, role: 'user', text: `📷 ${file.name}` };
+        const userMsg: UiMessage = { id: `u-${Date.now()}`, role: 'user', text: `[图片] ${file.name}` };
         const next = [...messages, userMsg];
         setMessages(next);
         fetch('/api/portal/analyze', {
@@ -614,7 +654,7 @@ export default function NesioChatSheet({
 
       const notice: UiMessage = {
         id: `f-${Date.now()}`, role: 'model',
-        text: `📎 已加载 **${file.name}**（${rowCount}）\n\n可以问我这个文件里的任何问题，比如：\n• 这里有多少条记录？\n• 帮我总结一下\n• 谁的金额最高？`,
+        text: `已加载 **${file.name}**（${rowCount}）\n\n可以问我这个文件里的任何问题，比如：\n• 这里有多少条记录？\n• 帮我总结一下\n• 谁的金额最高？`,
       };
       setMessages((prev) => [...prev, notice]);
     } catch {
@@ -676,7 +716,7 @@ export default function NesioChatSheet({
 
   function handleCameraResult(label: string, nodes: LifeNode[]) {
     setShowCamera(false);
-    const userMsg: UiMessage = { id: `u-${Date.now()}`, role: 'user', text: '📷 识别图片' };
+    const userMsg: UiMessage = { id: `u-${Date.now()}`, role: 'user', text: '[图片] 识别图片' };
     const aiText = nodes.length > 0
       ? `识别到：${label}\n\n记忆库里找到 ${nodes.length} 条相关记录：\n${nodes.map((n) => `• ${n.name}（${n.type}）`).join('\n')}`
       : `识别到：${label}\n\n记忆库里暂时没有找到相关记录。`;
@@ -716,16 +756,65 @@ export default function NesioChatSheet({
       <div className="nesio-wechat-header">
         <button type="button" className="nesio-wechat-back-btn" onClick={onClose} aria-label="关闭">←</button>
         <span className="nesio-wechat-title">问一问</span>
-        <button type="button" className="nesio-wechat-more-btn" onClick={() => { setMessages([]); saveHistory([]); }}>
-          新对话
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.15rem' }}>
+          <button
+            type="button"
+            className="nesio-wechat-more-btn"
+            onClick={() => { setSessions(loadSessions()); setShowHistory(true); }}
+            aria-label="历史记录"
+            title="历史记录"
+          >
+            <IconHistory size={18} />
+          </button>
+          <button type="button" className="nesio-wechat-more-btn" onClick={() => { archiveSession(messages); setMessages([]); saveHistory([]); }}>
+            新对话
+          </button>
+        </div>
       </div>
+
+      {/* 历史记录面板 */}
+      {showHistory && (
+        <div className="nesio-chat-history-panel">
+          <button type="button" className="nesio-settings-sheet-backdrop" onClick={() => setShowHistory(false)} aria-label="关闭" />
+          <div className="nesio-chat-history-card">
+            <p className="nesio-chat-history-title">历史对话</p>
+            {sessions.length === 0 && (
+              <p style={{ fontSize: '0.78rem', color: 'var(--portal-muted)', margin: '0.5rem 0' }}>还没有归档的对话。点「新对话」会把当前对话存到这里。</p>
+            )}
+            {sessions.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                className="nesio-chat-history-item"
+                onClick={() => {
+                  archiveSession(messages);
+                  setMessages(s.messages);
+                  saveHistory(s.messages);
+                  try {
+                    localStorage.setItem(CHAT_SESSIONS_KEY,
+                      JSON.stringify(loadSessions().filter((x) => x.id !== s.id)));
+                  } catch { /* ignore */ }
+                  setShowHistory(false);
+                }}
+              >
+                <span className="nesio-chat-history-item-title">{s.title}</span>
+                <span className="nesio-chat-history-item-date">
+                  {new Date(s.at).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })} · {s.messages.length} 条
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Messages */}
       <div className="nesio-wechat-messages" ref={listRef}>
         {messages.length === 0 && !sending && (
           <div className="nesio-wechat-empty">
-            <p className="nesio-wechat-empty-icon">✦</p>
+            <p className="nesio-wechat-empty-icon">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/assets/logo/nesio-mark.svg" alt="" width={52} height={52} draggable={false} />
+            </p>
             <p className="nesio-wechat-empty-title">问我任何事</p>
             <div className="nesio-wechat-suggestions">
               {['我的护照放在哪里', '今天该吃什么', '帮我总结这周做了什么'].map((s) => (
@@ -746,7 +835,7 @@ export default function NesioChatSheet({
           const isUser = msg.role === 'user';
           return (
             <div key={msg.id} className={`nesio-wechat-row nesio-wechat-row--${isUser ? 'user' : 'ai'}`}>
-              {!isUser && <span className="nesio-wechat-avatar">✦</span>}
+              {!isUser && <NesioAvatar />}
               <div className="nesio-wechat-bubble-wrap">
                 <div
                   className={`nesio-wechat-bubble nesio-wechat-bubble--${isUser ? 'user' : 'ai'}`}
@@ -763,7 +852,7 @@ export default function NesioChatSheet({
                   <div className="nesio-wechat-sources">
                     {msg.sources.map((s) => (
                       <a key={s.url} href={s.url} target="_blank" rel="noopener noreferrer" className="nesio-wechat-source-chip">
-                        🔗 {s.title || s.url.replace(/^https?:\/\//, '').split('/')[0]}
+                        <IconLink size={11} /> {s.title || s.url.replace(/^https?:\/\//, '').split('/')[0]}
                       </a>
                     ))}
                   </div>
@@ -775,7 +864,7 @@ export default function NesioChatSheet({
 
         {sending && (
           <div className="nesio-wechat-row nesio-wechat-row--ai">
-            <span className="nesio-wechat-avatar">✦</span>
+            <NesioAvatar />
             <div className="nesio-wechat-bubble nesio-wechat-bubble--ai nesio-wechat-bubble--thinking">
               <span /><span /><span />
             </div>
@@ -802,20 +891,20 @@ export default function NesioChatSheet({
       {/* Plus panel */}
       {showPlus && (
         <div className="nesio-wechat-plus-panel">
-          <button type="button" className="nesio-wechat-plus-item" onClick={() => { setShowPlus(false); const inp = document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.onchange=(e)=>{ const f=(e.target as HTMLInputElement).files?.[0]; if(!f) return; const reader=new FileReader(); reader.onload=(ev)=>{ const dataUrl=ev.target?.result as string; const [hdr,b64]=dataUrl.split(','); const mime=hdr.match(/:(.*?);/)?.[1]||'image/jpeg'; const userMsg:UiMessage={id:`u-${Date.now()}`,role:'user',text:'📷 识别图片'}; const next=[...messages,userMsg]; setMessages(next); fetch('/api/portal/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'image',imageBase64:b64,mimeType:mime})}).then(r=>r.json()).then((data:{ ok?:boolean; nodes?:Array<{name:string;type:string}>; summary?:string })=>{ if(data.ok&&data.nodes?.length){const names=data.nodes.map(n=>n.name).join('、'); const found=new Map<string,LifeNode>(); for(const node of data.nodes){for(const n of searchLifeGraphFuzzy(node.name,2))found.set(n.id,n);} const nodes=Array.from(found.values()).slice(0,6); const aiText=nodes.length>0?`识别到：${names}\n\n找到 ${nodes.length} 条相关记录：\n${nodes.map(n=>`• ${n.name}`).join('\n')}`:`识别到：${names}\n\n记忆库里暂时没有相关记录。`; const aiMsg:UiMessage={id:`a-${Date.now()}`,role:'model',text:aiText}; const withAi=[...next,aiMsg]; setMessages(withAi); saveHistory(withAi);}else{const aiMsg:UiMessage={id:`a-${Date.now()}`,role:'model',text:data.summary||'图片识别暂时不可用。'}; const withAi=[...next,aiMsg]; setMessages(withAi); saveHistory(withAi);}}).catch(()=>{const aiMsg:UiMessage={id:`a-${Date.now()}`,role:'model',text:'图片识别失败，请重试。'}; setMessages(prev=>[...prev,aiMsg]);});}; reader.readAsDataURL(f);}; inp.click(); }}>
-            <span className="nesio-wechat-plus-icon">🖼</span>
+          <button type="button" className="nesio-wechat-plus-item" onClick={() => { setShowPlus(false); const inp = document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.onchange=(e)=>{ const f=(e.target as HTMLInputElement).files?.[0]; if(!f) return; const reader=new FileReader(); reader.onload=(ev)=>{ const dataUrl=ev.target?.result as string; const [hdr,b64]=dataUrl.split(','); const mime=hdr.match(/:(.*?);/)?.[1]||'image/jpeg'; const userMsg:UiMessage={id:`u-${Date.now()}`,role:'user',text:'[图片] 识别图片'}; const next=[...messages,userMsg]; setMessages(next); fetch('/api/portal/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'image',imageBase64:b64,mimeType:mime})}).then(r=>r.json()).then((data:{ ok?:boolean; nodes?:Array<{name:string;type:string}>; summary?:string })=>{ if(data.ok&&data.nodes?.length){const names=data.nodes.map(n=>n.name).join('、'); const found=new Map<string,LifeNode>(); for(const node of data.nodes){for(const n of searchLifeGraphFuzzy(node.name,2))found.set(n.id,n);} const nodes=Array.from(found.values()).slice(0,6); const aiText=nodes.length>0?`识别到：${names}\n\n找到 ${nodes.length} 条相关记录：\n${nodes.map(n=>`• ${n.name}`).join('\n')}`:`识别到：${names}\n\n记忆库里暂时没有相关记录。`; const aiMsg:UiMessage={id:`a-${Date.now()}`,role:'model',text:aiText}; const withAi=[...next,aiMsg]; setMessages(withAi); saveHistory(withAi);}else{const aiMsg:UiMessage={id:`a-${Date.now()}`,role:'model',text:data.summary||'图片识别暂时不可用。'}; const withAi=[...next,aiMsg]; setMessages(withAi); saveHistory(withAi);}}).catch(()=>{const aiMsg:UiMessage={id:`a-${Date.now()}`,role:'model',text:'图片识别失败，请重试。'}; setMessages(prev=>[...prev,aiMsg]);});}; reader.readAsDataURL(f);}; inp.click(); }}>
+            <span className="nesio-wechat-plus-icon"><IconImage /></span>
             <span>相册</span>
           </button>
           <button type="button" className="nesio-wechat-plus-item" onClick={() => { setShowPlus(false); setCameraAutoOpen(true); setShowCamera(true); }}>
-            <span className="nesio-wechat-plus-icon">📷</span>
+            <span className="nesio-wechat-plus-icon"><IconCamera /></span>
             <span>拍摄</span>
           </button>
           <button type="button" className="nesio-wechat-plus-item" onClick={() => { setShowPlus(false); setVoiceMode(true); }}>
-            <span className="nesio-wechat-plus-icon">🎙</span>
+            <span className="nesio-wechat-plus-icon"><IconMic /></span>
             <span>语音输入</span>
           </button>
           <button type="button" className="nesio-wechat-plus-item" onClick={() => filePickerRef.current?.click()}>
-            <span className="nesio-wechat-plus-icon">📄</span>
+            <span className="nesio-wechat-plus-icon"><IconFile /></span>
             <span>文件</span>
           </button>
         </div>
@@ -845,7 +934,7 @@ export default function NesioChatSheet({
               onClick={() => setVoiceMode(false)}
               aria-label="切换到键盘"
             >
-              ⌨️
+              <IconKeyboard />
             </button>
             <button
               type="button"
@@ -864,7 +953,7 @@ export default function NesioChatSheet({
               onClick={() => { setShowEmoji((v) => !v); setShowPlus(false); }}
               aria-label="表情"
             >
-              😊
+              <IconSmile />
             </button>
             <button
               type="button"
@@ -884,7 +973,7 @@ export default function NesioChatSheet({
               onClick={() => setVoiceMode(true)}
               aria-label="切换到语音"
             >
-              🎙
+              <IconMic />
             </button>
             <input
               ref={inputRef}
@@ -902,7 +991,7 @@ export default function NesioChatSheet({
               onClick={() => { setShowEmoji((v) => !v); setShowPlus(false); }}
               aria-label="表情"
             >
-              😊
+              <IconSmile />
             </button>
             {input.trim() ? (
               <button

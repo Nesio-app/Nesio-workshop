@@ -44,3 +44,82 @@ export const IconLink = make(<><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7
 export const IconChevronRight = make(<path d="m9 6 6 6-6 6" />);
 export const IconDownload = make(<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="m7 10 5 5 5-5M12 15V3" /></>);
 export const IconUpload = make(<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="m7 8 5-5 5 5M12 3v12" /></>);
+
+// ── 记忆节点类型 / 领域 / 天气(批次 2 全站去 emoji)──
+export const IconUser = make(<><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" /></>);
+export const IconBox = make(<><path d="M21 8 12 3 3 8v8l9 5 9-5z" /><path d="M3 8l9 5 9-5M12 13v8" /></>);
+export const IconMapPin = make(<><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></>);
+export const IconFlag = make(<><path d="M4 22V4a2 2 0 0 1 2-2h9l-1.5 4L15 10H6" /></>);
+export const IconTarget = make(<><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none" /></>);
+export const IconCheckCircle = make(<><circle cx="12" cy="12" r="9" /><path d="m8 12 3 3 5-6" /></>);
+export const IconClock = make(<><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3.2 2.2" /></>);
+export const IconSpeaker = make(<><path d="M11 5 6 9H2v6h4l5 4z" /><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" /></>);
+export const IconThermometer = make(<><path d="M14 14.8V4a2 2 0 0 0-4 0v10.8a4 4 0 1 0 4 0z" /><path d="M12 17.5v-6" /></>);
+export const IconSmile = make(<><circle cx="12" cy="12" r="9" /><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0M9 9.5h.01M15 9.5h.01" /></>);
+export const IconKeyboard = make(<><rect x="2" y="6" width="20" height="12" rx="2" /><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h.01M18 14h.01M9 14h6" /></>);
+export const IconCamera = make(<><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></>);
+export const IconImage = make(<><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="m21 15-5-5L5 21" /></>);
+export const IconFile = make(<><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /></>);
+export const IconHistory = make(<><path d="M3 3v6h6" /><path d="M3.5 9a9 9 0 1 1-.5 3" /><path d="M12 7v5l3.5 2" /></>);
+export const IconSnowflake = make(<><path d="M12 2v20M4 6l16 12M20 6 4 18" /><path d="m9 4 3 2 3-2M9 20l3-2 3 2" /></>);
+export const IconMap = make(<><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z" /><path d="M9 4v14M15 6v14" /></>);
+export const IconFolder = make(<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />);
+export const IconRefresh = make(<><path d="M21 12a9 9 0 1 1-2.6-6.3" /><path d="M21 3v6h-6" /></>);
+export const IconAlertTriangle = make(<><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /><path d="M12 9v4M12 17h.01" /></>);
+export const IconPlay = make(<path d="M7 4.5v15l12-7.5z" fill="currentColor" stroke="none" />);
+export const IconGlobe = make(<><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a14.5 14.5 0 0 1 0 18 14.5 14.5 0 0 1 0-18z" /></>);
+export const IconHome = make(<><path d="m3 10 9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><path d="M9 22v-8h6v8" /></>);
+export const IconTrendingUp = make(<><path d="m2 17 7-7 4 4 9-9" /><path d="M15 5h7v7" /></>);
+export const IconZap = make(<path d="M13 2 3 14h7l-1 8 10-12h-7z" />);
+export const IconCloud = make(<path d="M17.5 19a4.5 4.5 0 0 0 .4-9A7 7 0 0 0 4.3 12.4 4 4 0 0 0 6 20h11.5z" />);
+export const IconPlane = make(<path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z" />);
+export const IconGift = make(<><rect x="3" y="8" width="18" height="4" /><path d="M12 8v13M5 12v9h14v-9" /><path d="M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 0 1 0 5" /></>);
+export const IconBulb = make(<><path d="M9 18h6M10 22h4" /><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.4 1 2.3h6c0-.9.4-1.8 1-2.3A7 7 0 0 0 12 2z" /></>);
+export const IconRain = make(<><path d="M17.5 15a4.5 4.5 0 0 0 .4-9A7 7 0 0 0 4.3 8.4 4 4 0 0 0 6 16" /><path d="M8 19v2M12 18v3M16 19v2" /></>);
+
+/** 记忆节点类型 → 描边图标(替代 👤📦📍📅🤝🩷⭐ emoji 映射) */
+export function NodeTypeIcon({ type, size = 16 }: { type: string; size?: number }) {
+  switch (type) {
+    case 'person': return <IconUser size={size} />;
+    case 'object': return <IconBox size={size} />;
+    case 'place': return <IconMapPin size={size} />;
+    case 'event': return <IconCalendar size={size} />;
+    case 'commitment': return <IconFlag size={size} />;
+    case 'health_state': return <IconHeartPulse size={size} />;
+    case 'preference': return <IconStar size={size} />;
+    default: return <IconNote size={size} />;
+  }
+}
+
+/** 生活领域 → 描边图标(替代 domain-taxonomy 的 🏡📈📦🩷🧘) */
+export function DomainIcon({ domain, size = 13 }: { domain: string; size?: number }) {
+  switch (domain) {
+    case 'life': return <IconHome size={size} />;
+    case 'growth': return <IconTrendingUp size={size} />;
+    case 'assets': return <IconBox size={size} />;
+    case 'health': return <IconHeartPulse size={size} />;
+    case 'energy': return <IconZap size={size} />;
+    default: return <IconNote size={size} />;
+  }
+}
+
+/** 天气状况 → 常见天气图标 */
+export function WeatherIcon({ condition, size = 16 }: { condition: string; size?: number }) {
+  if (/晴|sunny|clear/i.test(condition)) return <IconSun size={size} />;
+  if (/雨|rain|shower|drizzle/i.test(condition)) return <IconRain size={size} />;
+  if (/雪|snow/i.test(condition)) return <IconSnowflake size={size} />;
+  if (/阴|多云|云|cloud|overcast/i.test(condition)) return <IconCloud size={size} />;
+  return <IconCloudSun size={size} />;
+}
+
+/** 引导卡 emoji 图标 → 描边图标(卡片数据/缓存里仍是 emoji 字符串,渲染层统一转换) */
+export function GuidanceIcon({ icon, size = 18 }: { icon: string; size?: number }) {
+  const map: Record<string, React.ComponentType<{ size?: number }>> = {
+    '✈️': IconPlane, '🏥': IconHeartPulse, '⏰': IconClock, '🎂': IconGift,
+    '💝': IconStar, '🧳': IconMap, '🎙': IconMic, '📩': IconMail,
+    '💪': IconActivity, '🧥': IconCloud, '☂️': IconRain, '📦': IconBox,
+    '💡': IconBulb, '🗓': IconCalendar, '✅': IconCheckCircle, '🌙': IconMoon,
+  };
+  const C = map[icon];
+  return C ? <C size={size} /> : <IconNote size={size} />;
+}

@@ -6,11 +6,7 @@ import { createAppApiClient } from '@/lib/portal/app-api-client';
 import LocationPicker from './LocationPicker';
 import RelationGraph from './RelationGraph';
 import type { GNode, GEdge } from '@/lib/platform/graph-engine';
-
-const TYPE_ICON_DETAIL: Record<string, string> = {
-  person: '👤', object: '📦', place: '📍', event: '📅',
-  commitment: '🤝', health_state: '🩷', preference: '⭐',
-};
+import { IconClock, IconLink, NodeTypeIcon, WeatherIcon } from './icons';
 const TYPE_BG_DETAIL: Record<string, string> = {
   person: 'var(--chip-indigo)', object: 'var(--chip-blue)', place: 'var(--chip-green)',
   event: 'var(--chip-amber)', commitment: 'var(--chip-violet)', health_state: 'var(--chip-pink)', preference: 'var(--chip-mint)',
@@ -32,18 +28,49 @@ const PERSON_CATEGORIES: Record<string, string> = {
   family: '家人', colleague: '同事', friend: '朋友', acquaintance: '认识', other: '其他',
 };
 const HEALTH_TYPES: Record<string, string> = {
-  medication: '💊 药物', appointment: '🩺 就诊', fitness: '🏃 运动',
-  sleep: '😴 睡眠', diet: '🥗 饮食', checkup: '🔬 检查', other: '🩷 健康',
+  medication: '药物', appointment: '就诊', fitness: '运动',
+  sleep: '睡眠', diet: '饮食', checkup: '检查', other: '健康',
 };
 const PLACE_CATEGORIES: Record<string, string> = {
-  work: '🏢 工作', school: '🎓 学校', home: '🏠 家', shopping: '🛍️ 购物',
-  restaurant: '🍽️ 餐厅', gym: '🏋️ 健身', hospital: '🏥 医院', other: '📍 地点',
+  work: '工作', school: '学校', home: '家', shopping: '购物',
+  restaurant: '餐厅', gym: '健身', hospital: '医院', other: '地点',
 };
 const PRIORITY_LABELS: Record<string, { label: string; color: string }> = {
-  high: { label: '⚠️ 紧急', color: 'var(--status-risk)' },
-  medium: { label: '⬆️ 重要', color: 'var(--status-gentle)' },
-  low: { label: '↓ 普通', color: 'var(--portal-muted)' },
+  high: { label: '紧急', color: 'var(--status-risk)' },
+  medium: { label: '重要', color: 'var(--status-gentle)' },
+  low: { label: '普通', color: 'var(--portal-muted)' },
 };
+
+/** 已知属性键 → 中文标签(天气信号等系统属性不再裸奔英文键名) */
+const ATTR_KEY_LABELS: Record<string, string> = {
+  temperatureC: '温度', condition: '天气', forecastNote: '预报',
+  placeName: '地点', humidity: '湿度', windKph: '风速',
+};
+
+/** 长文本(如日历事件的会议记录)默认只显示摘要,点「详情」展开 */
+function CollapsibleText({ text, limit = 110 }: { text: string; limit?: number }) {
+  const [expanded, setExpanded] = useState(false);
+  if (text.length <= limit) return <span className="nesio-node-attr-val">{text}</span>;
+  return (
+    <span className="nesio-node-attr-val">
+      {expanded ? text : `${text.slice(0, limit)}…`}
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        style={{ marginLeft: 6, fontSize: '0.72rem', fontWeight: 600, color: 'var(--portal-blue-deep)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+      >
+        {expanded ? '收起' : '详情'}
+      </button>
+    </span>
+  );
+}
+
+/** 标题一行化:超长标题(偏好类常见=整段原文)取第一个分句 */
+function displayTitle(name: string): string {
+  if (name.length <= 28) return name;
+  const clause = name.split(/[。！？!?；;\n]/)[0];
+  return `${clause.length > 28 ? clause.slice(0, 28) : clause}…`;
+}
 
 function attr(node: LifeNode, ...keys: string[]): string {
   for (const k of keys) {
@@ -127,7 +154,7 @@ function InfoRow({ label, value, link }: { label: string; value: string; link?: 
 
 // ── Type-specific sections ──────────────────────────────────────────────────
 
-function PersonSection({ node, relatedNodes, onOpenNode }: {
+function PersonSection({ node }: {
   node: LifeNode;
   relatedNodes?: LifeNode[];
   onOpenNode?: (n: LifeNode) => void;
@@ -136,7 +163,6 @@ function PersonSection({ node, relatedNodes, onOpenNode }: {
   const lastSeen = attr(node, 'lastSeen');
   const birthday = attr(node, 'birthday');
   const note = attr(node, 'note');
-  const events = (relatedNodes || []).filter((n) => n.type === 'event');
 
   return (
     <div className="nesio-type-section">
@@ -150,21 +176,6 @@ function PersonSection({ node, relatedNodes, onOpenNode }: {
       <InfoRow label="上次见面" value={fmtDate(lastSeen)} />
       <InfoRow label="生日" value={fmtDate(birthday)} />
       <InfoRow label="备注" value={note} />
-      {events.length > 0 && (
-        <div className="nesio-type-related-events">
-          <p className="nesio-settings-section-label" style={{ marginTop: '0.75rem' }}>相关事件</p>
-          {events.slice(0, 3).map((e) => (
-            <button
-              key={e.id} type="button"
-              className="nesio-related-node-chip"
-              onClick={() => onOpenNode?.(e)}
-            >
-              <span className="nesio-related-node-icon" style={{ background: TYPE_BG_DETAIL.event }}>📅</span>
-              <span className="nesio-related-node-name">{e.name}</span>
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
@@ -201,7 +212,7 @@ function ObjectSection({ node, assetUrls }: {
       {fileUrl && (
         <div style={{ marginTop: '0.75rem' }}>
           <a href={safeExternalUrl(fileUrl)} target="_blank" rel="noopener noreferrer" className="nesio-type-action-btn">
-            🔗 打开链接
+            <IconLink size={13} /> 打开链接
           </a>
         </div>
       )}
@@ -209,7 +220,7 @@ function ObjectSection({ node, assetUrls }: {
   );
 }
 
-function PlaceSection({ node, relatedNodes, onOpenNode }: {
+function PlaceSection({ node }: {
   node: LifeNode;
   relatedNodes?: LifeNode[];
   onOpenNode?: (n: LifeNode) => void;
@@ -221,7 +232,6 @@ function PlaceSection({ node, relatedNodes, onOpenNode }: {
   const category = attr(node, 'category');
   const note = attr(node, 'note');
   const link = mapUrl(address, lat, lon);
-  const related = (relatedNodes || []).filter((n) => n.id !== node.id).slice(0, 4);
 
   return (
     <div className="nesio-type-section">
@@ -236,7 +246,7 @@ function PlaceSection({ node, relatedNodes, onOpenNode }: {
         <div className="nesio-node-attr-row">
           <span className="nesio-node-attr-key">地址</span>
           {link
-            ? <a href={link} target="_blank" rel="noopener noreferrer" className="nesio-node-attr-val nesio-node-attr-link">{address} 🗺</a>
+            ? <a href={link} target="_blank" rel="noopener noreferrer" className="nesio-node-attr-val nesio-node-attr-link">{address}</a>
             : <span className="nesio-node-attr-val">{address}</span>
           }
         </div>
@@ -244,30 +254,17 @@ function PlaceSection({ node, relatedNodes, onOpenNode }: {
       {(lat && lon && !address) && (
         <div style={{ marginTop: '0.5rem' }}>
           <a href={mapUrl('', lat, lon)} target="_blank" rel="noopener noreferrer" className="nesio-type-action-btn">
-            🗺 在地图中查看
+            在地图中查看
           </a>
         </div>
       )}
       <InfoRow label="来访次数" value={visitCount ? `${visitCount} 次` : ''} />
       <InfoRow label="备注" value={note} />
-      {related.length > 0 && (
-        <div className="nesio-type-related-events">
-          <p className="nesio-settings-section-label" style={{ marginTop: '0.75rem' }}>关联记忆</p>
-          {related.map((r) => (
-            <button key={r.id} type="button" className="nesio-related-node-chip" onClick={() => onOpenNode?.(r)}>
-              <span className="nesio-related-node-icon" style={{ background: TYPE_BG_DETAIL[r.type] || 'var(--portal-accent-soft)' }}>
-                {TYPE_ICON_DETAIL[r.type] || '📌'}
-              </span>
-              <span className="nesio-related-node-name">{r.name}</span>
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
 
-function EventSection({ node, relatedNodes, onOpenNode }: {
+function EventSection({ node }: {
   node: LifeNode;
   relatedNodes?: LifeNode[];
   onOpenNode?: (n: LifeNode) => void;
@@ -282,13 +279,12 @@ function EventSection({ node, relatedNodes, onOpenNode }: {
   const lon = attr(node, 'lon');
   const mapLink = mapUrl(location, lat, lon);
   const isMeeting = url && isMeetingUrl(url);
-  const related = (relatedNodes || []).filter((n) => n.id !== node.id).slice(0, 4);
 
   return (
     <div className="nesio-type-section">
       {start && (
         <div className="nesio-type-event-time">
-          <span className="nesio-type-event-time-icon">🕐</span>
+          <span className="nesio-type-event-time-icon"><IconClock size={15} /></span>
           <span>{fmtDateTime(start)}{end ? ` — ${fmtDateTime(end)}` : ''}</span>
         </div>
       )}
@@ -296,32 +292,24 @@ function EventSection({ node, relatedNodes, onOpenNode }: {
         <div className="nesio-node-attr-row">
           <span className="nesio-node-attr-key">地点</span>
           {mapLink
-            ? <a href={mapLink} target="_blank" rel="noopener noreferrer" className="nesio-node-attr-val nesio-node-attr-link">{location} 🗺</a>
+            ? <a href={mapLink} target="_blank" rel="noopener noreferrer" className="nesio-node-attr-val nesio-node-attr-link">{location}</a>
             : <span className="nesio-node-attr-val">{location}</span>
           }
         </div>
       )}
       {participants && <InfoRow label="参与者" value={participants} />}
-      {note && <InfoRow label="会议记录" value={note} />}
+      {note && (
+        <div className="nesio-node-attr-row">
+          <span className="nesio-node-attr-key">会议记录</span>
+          <CollapsibleText text={note} />
+        </div>
+      )}
       {url && (
         <div style={{ marginTop: '0.75rem' }}>
           <a href={safeExternalUrl(url)} target="_blank" rel="noopener noreferrer"
             className={`nesio-type-action-btn${isMeeting ? ' nesio-type-action-btn--meeting' : ''}`}>
-            {isMeeting ? '🎥 加入会议' : '🔗 直达链接'}
+            {isMeeting ? '加入会议' : <><IconLink size={13} /> 直达链接</>}
           </a>
-        </div>
-      )}
-      {related.length > 0 && (
-        <div className="nesio-type-related-events">
-          <p className="nesio-settings-section-label" style={{ marginTop: '0.75rem' }}>关联备注</p>
-          {related.map((r) => (
-            <button key={r.id} type="button" className="nesio-related-node-chip" onClick={() => onOpenNode?.(r)}>
-              <span className="nesio-related-node-icon" style={{ background: TYPE_BG_DETAIL[r.type] || 'var(--portal-accent-soft)' }}>
-                {TYPE_ICON_DETAIL[r.type] || '📌'}
-              </span>
-              <span className="nesio-related-node-name">{r.name}</span>
-            </button>
-          ))}
         </div>
       )}
     </div>
@@ -383,7 +371,7 @@ function HealthSection({ node }: { node: LifeNode }) {
   const value = attr(node, 'value');
   const unit = attr(node, 'unit');
   const note = attr(node, 'note');
-  const typeLabel = HEALTH_TYPES[healthType] || (healthType || '🩷 健康');
+  const typeLabel = HEALTH_TYPES[healthType] || (healthType || '健康');
 
   return (
     <div className="nesio-type-section">
@@ -621,7 +609,7 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
 
         {/* Type color strip */}
         <div className="nesio-type-header-strip" style={{ background: typeBg }}>
-          <span className="nesio-type-header-icon">{TYPE_ICON_DETAIL[n.type] || '📌'}</span>
+          <span className="nesio-type-header-icon"><NodeTypeIcon type={n.type} size={15} /></span>
           <span className="nesio-type-header-label">{TYPE_LABELS[n.type] || n.type}</span>
         </div>
 
@@ -634,7 +622,7 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
               autoFocus
             />
           ) : (
-            <h2 className="nesio-settings-sheet-title">{n.name}</h2>
+            <h2 className="nesio-settings-sheet-title" title={n.name}>{displayTitle(n.name)}</h2>
           )}
           <button type="button" className="nesio-voice-sheet-close" onClick={onClose} aria-label="关闭">✕</button>
         </div>
@@ -657,9 +645,9 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
                 <span>优先级</span>
                 <select value={field('priority')} onChange={(e) => setField('priority', e.target.value)}>
                   <option value="">未设置</option>
-                  <option value="high">⚠️ 紧急</option>
-                  <option value="medium">⬆️ 重要</option>
-                  <option value="low">↓ 普通</option>
+                  <option value="high">紧急</option>
+                  <option value="medium">重要</option>
+                  <option value="low">普通</option>
                 </select>
               </label>
               <label className="nesio-edit-row"><span>对方/负责人</span><input value={field('owner')} onChange={(e) => setField('owner', e.target.value)} placeholder="负责人姓名" /></label>
@@ -734,8 +722,11 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
               <p className="nesio-settings-section-label" style={{ marginTop: '0.75rem' }}>其他属性</p>
               {shownAttrs.map(([k, v]) => (
                 <div key={k} className="nesio-node-attr-row">
-                  <span className="nesio-node-attr-key">{k}</span>
-                  <span className="nesio-node-attr-val">{String(v)}</span>
+                  <span className="nesio-node-attr-key">{ATTR_KEY_LABELS[k] ?? k}</span>
+                  <span className="nesio-node-attr-val" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                    {k === 'condition' && <WeatherIcon condition={String(v)} size={15} />}
+                    {k === 'temperatureC' ? `${String(v)} °C` : String(v)}
+                  </span>
                 </div>
               ))}
             </>
