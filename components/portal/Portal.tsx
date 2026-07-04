@@ -360,6 +360,10 @@ export default function Portal() {
   useEffect(() => {
     installErrorTracking();
     track('app_open');
+    // Offline shell: data is local, so a cached shell = readable memories offline
+    if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
+      navigator.serviceWorker.register('/sw.js').catch(() => undefined);
+    }
   }, []);
 
   // Storage quota alerts — a dropped write must never be silent
