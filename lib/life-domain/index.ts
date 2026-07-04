@@ -16,3 +16,4 @@ export * from './context';
 export * from './context-extractor';
 export * from './create-signal';
 export * from './node-context';
+export * from './signal-read-cache';

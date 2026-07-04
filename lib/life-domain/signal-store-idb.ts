@@ -1,13 +1,10 @@
 /**
- * Signal Store (IndexedDB) — Signal 主事实表迁移的里程碑 2。
+ * Signal Store (IndexedDB) — Signal 主事实表的本地库(M2 建库,M3 接读)。
  *
- * 新事实库直接建在 IndexedDB 上(GB 级配额,结构化克隆,不占
- * localStorage 的 5MB 预算)。当前为**只写累积期**:createSignal /
- * ingestLifeNode 双写至此,读路径仍走 LifeGraph 投影。
- * 里程碑 3(读切换)开始前,这里已积累完整事实流水。
- *
- * 迁移不做:历史 LifeGraph 回填(lifeNodeToSignal 可随时批量回填,
- * 留给 M3 前置步骤,避免本期引入迁移窗口问题)。
+ * 事实库建在 IndexedDB 上(GB 级配额,结构化克隆,不占 localStorage
+ * 的 5MB 预算)。写入:createSignal / ingestLifeNode 双写至此;
+ * 读取:signal-read-cache.ts 水合(backfill + reconcile)后,
+ * getSignals() 优先从缓存读(M3 读切换),LifeGraph 投影兜底。
  */
 
 import type { Signal } from './signal';
@@ -56,6 +53,43 @@ export async function getRecentSignalsIdb(limit = 100): Promise<Signal[]> {
       else resolve(out);
     };
     req.onerror = () => resolve(out);
+  });
+}
+
+/** 全量读取(水合用)。事实库为 localStorage 量级(≤5MB 投影镜像),一次读入可接受。 */
+export async function getAllSignalsIdb(): Promise<Signal[]> {
+  const db = await openDb();
+  if (!db) return [];
+  return new Promise((resolve) => {
+    const req = db.transaction(STORE, 'readonly').objectStore(STORE).getAll();
+    req.onsuccess = () => resolve((req.result as Signal[]) || []);
+    req.onerror = () => resolve([]);
+  });
+}
+
+/** 批量写入(幂等覆盖)。回填与内容漂移修复共用。 */
+export async function bulkPutSignalsIdb(signals: Signal[]): Promise<number> {
+  if (!signals.length) return 0;
+  const db = await openDb();
+  if (!db) return 0;
+  return new Promise((resolve) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    const store = tx.objectStore(STORE);
+    for (const s of signals) store.put(s);
+    tx.oncomplete = () => resolve(signals.length);
+    tx.onerror = () => resolve(0);
+  });
+}
+
+/** 删除一条(用户删除/剪枝传导到本地事实缓存;云镜像不受影响)。 */
+export async function deleteSignalIdb(id: string): Promise<boolean> {
+  const db = await openDb();
+  if (!db) return false;
+  return new Promise((resolve) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).delete(id);
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => resolve(false);
   });
 }
 

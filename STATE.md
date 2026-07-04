@@ -2,8 +2,8 @@
 
 > Loop-engineering 原则:状态必须活在对话之外。任何 AI 会话或新协作者
 > **先读这个文件**,再动手。改动仓库重大状态时,同步更新这里。
-> 最后更新:2026-07-04(深水区批次完成:Signal M1+M2 / TodayFeed 拆分 /
-> lab UI / DEC 消歧 / Next 16;PRD 偏差见 docs/prd-deltas-2026-07.md)
+> 最后更新:2026-07-04(欠账清偿批次:Signal M1-M4 / FocusSection 二次拆分 /
+> hex token 化 / REG-004/006 i18n;PRD 偏差见 docs/prd-deltas-2026-07.md)
 
 ## 当前纪元:两代产品交接中
 
@@ -11,18 +11,21 @@
 
 | 层面 | 旧代(退役中) | 新代(现役) | 交接状态 |
 |---|---|---|---|
-| 首页 | DashboardHome | TodayFeed | UI 已切换;**i18n/契约未迁移** |
+| 首页 | DashboardHome(已删) | TodayFeed + today/ | ✅ 完成:契约已迁移,i18n 已接 t() 字典(REG-004) |
 | 设置 | AccountSettings | NesioProfileCard + SettingsSheets | 已切换;主题/语言入口曾断链(已修) |
 | 推荐卡 | DEC(lib/intelligence) | guidance-engine(lib/platform) | **已接线(2026-07-04)**:DEC 卡经 decCardsToGuidanceEvents 汇入 guidance 管线,证据+反馈随卡 |
-| 数据模型 | LifeGraph(localStorage) | Signal 主事实表 | **双写过渡中**(见 lib/life-domain/create-signal.ts 头注释) |
+| 数据模型 | LifeGraph(localStorage) | Signal 主事实表 | ✅ 读优先切换(signal_read_preferred):getSignals 读 IDB 水合缓存,投影兜底;cutover 需 CEO Gate |
 | 工具入口 | 11 工具宫格 | 统一入口 + 五域 | 工具由 bundle-toolbox.mjs 构建时拷入 public/ |
 
 ## 进行中的迁移
 
 1. **Signal 主事实表**:两扇合法写入门 — `createSignal()`(Signal 形态)与
    `ingestLifeNode()`(LifeNode 形态,lib/life-domain/ingest-node.ts)。
-   - M1 堵旁路写入 ✅ + M2 IDB 信号库(signal-store-idb.ts,只写积累)✅(2026-07-04)
-   - M3 读切换 / M4 LifeGraph 降级为投影:未排期
+   - M1 堵旁路 ✅ M2 IDB 信号库 ✅ M3 读切换 ✅ M4 投影降级基础 ✅(全部 2026-07-04)
+   - M3/M4 实现:signal-read-cache.ts 启动水合(全量回填 + 删除传导),
+     getSignals() 优先读事实缓存、投影兜底;LifeGraph 变更事件同步刷新缓存
+   - **剩余(需 CEO Gate,见 signal-main-fact-contract)**:source_of_truth
+     cutover(事实库独立于投影保留数据)+ 投影退役
 2. **契约迁移(2026-07-04 完成)**:13 个契约已全部迁移/退役,15 个旧代死组件已删除。
    - 迁移到活 surface:tool-icons→ToolGridIcon、anonymous-gate→today-view-model、
      locale purchased-tools→ToolsTreasureSheet、color-tokens→MoodSheet EMOTIONS(顺手
@@ -48,14 +51,14 @@
 
 ## 已知欠账(按优先级)
 
-1. Signal M3/M4:读切换 + LifeGraph 降级为投影(M1/M2 已完成)
-2. 新代 i18n 完整包(REG-004 TodayFeed + REG-006 剩余 onboarding 步)— adherence lint 已上线(57 处存量 hex warn 待清)
-3. FocusSection 676 行进一步拆分(DormantReviewCard / NightTimeline)
-4. 组件阈值修订为:容器 ≤500 / 展示 ≤300(见 docs/prd-deltas-2026-07.md §2)
+1. Signal source-of-truth cutover + 投影退役(CEO Gate,契约 gates 约束)
+2. FocusModeSheet 328 行(展示阈值 300,轻微超标)
+3. 组件阈值修订为:容器 ≤500 / 展示 ≤300(见 docs/prd-deltas-2026-07.md §2)
 
-已清偿(2026-07-04):TodayFeed 拆分(1408→容器 164 + today/ 7 文件)、
-lab 模式管理 UI(设置→隐私 sheet 开关)、DEC/dec-data 注释消歧、
-Next 16.2.10(async cookies 转正)、Signal M1+M2。
+已清偿(2026-07-04):TodayFeed 拆分、FocusSection 二次拆分(298 行达标)、
+lab 模式管理 UI、DEC/dec-data 注释消歧、Next 16.2.10(async cookies)、
+Signal M1-M4(读切换 + 删除传导)、REG-004/006 i18n 闭环
+(usePortalLocale + t() 字典)、57 处 hex token 化(chip/avatar/accent)。
 
 ## 已安装的循环(L1 = 只报告)
 

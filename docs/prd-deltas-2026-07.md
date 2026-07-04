@@ -65,7 +65,7 @@
 | 首页 | DashboardHome(已删) | TodayFeed + today/ | ✅ 交接完成 |
 | 设置 | AccountSettings(已删) | NesioProfileCard + SettingsSheets | ✅ 完成(主题/语言/隐私/Lab 入口齐) |
 | 推荐卡 | DEC 直渲染 | guidance-engine 7 层管线 | ✅ DEC 作为来源汇入(decCardsToGuidanceEvents) |
-| 数据模型 | LifeGraph(localStorage) | Signal 主事实表 | 🔶 双写过渡(见 §5) |
+| 数据模型 | LifeGraph(localStorage) | Signal 主事实表 | ✅ 读优先切换完成(signal_read_preferred 相位,见 §5) |
 | 工具入口 | 11 工具宫格 | 统一入口 + 五域 | ✅ |
 
 ## 5. Signal 主事实表迁移里程碑
@@ -74,8 +74,13 @@
   成为 LifeNode 形态的唯一写入口,11 个直写点已切换;与 `createSignal` 并列为两扇合法门
 - **M2(✅ 2026-07-04)IDB 信号库**:lib/life-domain/signal-store-idb.ts,
   IndexedDB 'nesio-signals' 只写积累(appendSignalIdb),双写不读
-- **M3(⏸ 未排期)读切换**:Today/Memory 读路径从 LifeGraph 切到 IDB Signal
-- **M4(⏸ 未排期)LifeGraph 降级为投影**:localStorage 仅存派生视图
+- **M3(✅ 2026-07-04)读切换**:signal-read-cache.ts 启动水合
+  (LifeGraph 全量回填 IDB + 删除传导对账),getSignals() 优先读事实缓存,
+  未水合回退投影;LifeGraph 变更事件同步刷新缓存(读新鲜度不降)
+- **M4(✅ 基础,2026-07-04)删除传导**:用户删除/剪枝引擎的意图传导到
+  IDB 事实缓存,IDB 与投影保持一致;localStorage LifeGraph 保留为兼容投影
+- **剩余**:source_of_truth cutover(事实库独立保留)+ 投影退役,
+  契约 gates 要求 CEO Gate,不在自主工作范围
 
 ## 6. 平台与运行时
 
@@ -89,7 +94,7 @@
 
 ## 7. 遗留欠账(下版 PRD 应吸收)
 
-1. Signal M3/M4 读切换(见 §5)
+1. ~~Signal M3/M4 读切换~~(✅ 2026-07-04,见 §5;剩余 cutover 需 CEO Gate)
 2. ~~新代 i18n 完整包~~(✅ 2026-07-04:today*/night*/dormant*/guidance*/onboarding* 键组入字典,usePortalLocale hook 即时切换;REG-004/006 关闭)
 3. ~~57 处存量 raw hex token 化~~(✅ 2026-07-04:chip/avatar/accent 三组 token 入 globals.css;canvas 兜底与 Google 品牌色为合法保留,带说明 disable)
 4. ~~FocusSection 进一步拆分~~(✅ 2026-07-04,见 §2)

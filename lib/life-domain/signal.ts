@@ -13,6 +13,7 @@
  */
 
 import { getLifeGraph, deleteLifeNode, type LifeNode, type LifeNodeType, type LifeNodeSource } from '../portal/life-graph';
+import { getCachedSignals } from './signal-read-cache';
 import type { SignalContext } from './context';
 
 export type SignalSource =
@@ -183,10 +184,12 @@ function isExpiredDisposable(s: Signal): boolean {
     Date.now() - new Date(s.capturedAt).getTime() > DISPOSABLE_TTL_MS;
 }
 
-/** Get all signals, projected from the Life Graph (newest first).
+/** Get all signals, newest first. M3 读切换:优先读水合后的事实缓存
+ *  (signal-read-cache,来源 IDB 主事实表),未水合时回退 LifeGraph 投影。
  *  Expired Disposable signals are filtered out so they never reach reasoning. */
 export function getSignals(opts?: { since?: number; sources?: SignalSource[]; types?: SignalType[] }): Signal[] {
-  let signals = getLifeGraph().map(lifeNodeToSignal).filter((s) => !isExpiredDisposable(s));
+  const cached = getCachedSignals();
+  let signals = (cached ?? getLifeGraph().map(lifeNodeToSignal)).filter((s) => !isExpiredDisposable(s));
   if (opts?.since) {
     signals = signals.filter((s) => new Date(s.capturedAt).getTime() >= opts.since!);
   }

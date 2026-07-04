@@ -53,6 +53,7 @@ import {
 import { loadProfileSettings, PROFILE_UPDATED_EVENT, type PortalLocale } from '@/lib/portal/profile';
 import { runConnectors } from '@/lib/platform/runtime/integration-runtime';
 import { pruneDisposableSignals } from '@/lib/life-domain';
+import { hydrateSignalFactStore } from '@/lib/life-domain/signal-read-cache';
 import { prunePrivateExternalNodes } from '@/lib/portal/life-graph';
 import { STORAGE_FULL_EVENT, STORAGE_WARNING_EVENT } from '@/lib/portal/storage-health';
 import { track, installErrorTracking } from '@/lib/portal/telemetry';
@@ -337,6 +338,8 @@ export default function Portal() {
   useEffect(() => {
     if (!authReady) return;
     pruneDisposableSignals();
+    // M3 读切换:回填 + 删除传导 + 水合事实缓存(见 signal-read-cache.ts)
+    void hydrateSignalFactStore();
     if (!canUsePrivateRuntime) {
       prunePrivateExternalNodes();
       try {
