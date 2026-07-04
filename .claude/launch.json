@@ -5,9 +5,7 @@
       "name": "nesio-dev",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
-      "port": 3000,
-      "autoPort": true,
-      "cwd": "/Users/jing/web/PersonalWeb"
+      "port": 3000
     }
   ]
 }

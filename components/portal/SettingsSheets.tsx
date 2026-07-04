@@ -34,26 +34,52 @@ function SheetWrap({ open, onClose, title, children }: SheetProps & { title: str
 
 type ToneStyle = 'direct' | 'warm' | 'minimal';
 type InterruptLevel = 'proactive' | 'minimal' | 'silent';
+type ThemeChoice = 'day' | 'auto' | 'night';
 const HAPTIC_FEEDBACK_KEY = 'nesio-haptic-feedback-enabled-v1';
+const THEME_KEY = 'treasurebox-theme';
+
+// Mirror of the anti-flash boot script in app/layout.tsx — keep in sync.
+function applyTheme(choice: ThemeChoice) {
+  const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const h = new Date().getHours();
+  const resolved = choice === 'night' ? 'night' : choice === 'day' ? 'day' : (dark || h < 6 || h >= 19) ? 'night' : 'day';
+  document.documentElement.setAttribute('data-portal-theme', resolved);
+}
 
 export function ToneSheet({ open, onClose }: SheetProps) {
   const [tone, setTone] = useState<ToneStyle>('warm');
   const [interrupt, setInterrupt] = useState<InterruptLevel>('proactive');
   const [hapticsOn, setHapticsOn] = useState(true);
+  const [theme, setTheme] = useState<ThemeChoice>('auto');
+  const [lang, setLang] = useState<'zh' | 'en'>('zh');
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     if (open) {
       const p = loadProfileSettings();
       setTone((p.coachStyle as ToneStyle) || 'warm');
+      setLang(p.locale === 'en' ? 'en' : 'zh');
       const m = getMirrorProfile();
       setInterrupt(m.interruptionStyle);
       try {
         setHapticsOn(localStorage.getItem(HAPTIC_FEEDBACK_KEY) !== '0');
+        const t = localStorage.getItem(THEME_KEY);
+        setTheme(t === 'day' || t === 'night' ? t : 'auto');
       } catch { /* ignore */ }
       setSaved(false);
     }
   }, [open]);
+
+  function pickTheme(next: ThemeChoice) {
+    setTheme(next);
+    try { localStorage.setItem(THEME_KEY, next); } catch { /* ignore */ }
+    applyTheme(next); // instant preview, no save needed
+  }
+
+  function pickLang(next: 'zh' | 'en') {
+    setLang(next);
+    saveProfileSettings({ locale: next }); // dispatches PROFILE_UPDATED_EVENT — Portal re-renders
+  }
 
   function save() {
     saveProfileSettings({ coachStyle: tone as 'warm' | 'minimal' | 'professional' });
@@ -114,6 +140,38 @@ export function ToneSheet({ open, onClose }: SheetProps) {
           {hapticsOn ? '✓' : '○'}
         </span>
       </button>
+
+      <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>外观</p>
+      <div style={{ display: 'flex', gap: '0.5rem' }}>
+        {([
+          { id: 'day', label: '☀️ 日间' },
+          { id: 'auto', label: '🌗 自动' },
+          { id: 'night', label: '🌙 夜间' },
+        ] as Array<{ id: ThemeChoice; label: string }>).map((opt) => (
+          <button key={opt.id} type="button"
+            className={`nesio-settings-option${theme === opt.id ? ' nesio-settings-option--active' : ''}`}
+            style={{ flex: 1, justifyContent: 'center' }}
+            onClick={() => pickTheme(opt.id)}>
+            <span className="nesio-settings-option-label">{opt.label}</span>
+          </button>
+        ))}
+      </div>
+      <p className="nesio-settings-option-hint" style={{ marginTop: 4 }}>自动 = 跟随系统与时间（晚上 7 点后切夜间）</p>
+
+      <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>语言 / Language</p>
+      <div style={{ display: 'flex', gap: '0.5rem' }}>
+        {([
+          { id: 'zh', label: '简体中文' },
+          { id: 'en', label: 'English' },
+        ] as Array<{ id: 'zh' | 'en'; label: string }>).map((opt) => (
+          <button key={opt.id} type="button"
+            className={`nesio-settings-option${lang === opt.id ? ' nesio-settings-option--active' : ''}`}
+            style={{ flex: 1, justifyContent: 'center' }}
+            onClick={() => pickLang(opt.id)}>
+            <span className="nesio-settings-option-label">{opt.label}</span>
+          </button>
+        ))}
+      </div>
 
       <button type="button" className="nesio-ob-primary-btn" style={{ marginTop: '1.5rem' }} onClick={save}>
         {saved ? '✓ 已保存' : '保存设置'}
