@@ -6,8 +6,12 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { loadProfileSettings, saveProfileSettings } from '@/lib/portal/profile';
+import { PORTAL_LOCALE_OPTIONS, loadProfileSettings, saveProfileSettings, type PortalLocale } from '@/lib/portal/profile';
 import { getMirrorProfile } from '@/lib/portal/mirror-profile';
+import { t } from '@/lib/portal/i18n';
+import { usePortalLocale } from './use-portal-locale';
+import { IconChevronRight, IconHalfMoon, IconLink, IconLock, IconMoon, IconShield, IconSun } from './icons';
+import { PROACTIVE_LEVEL_KEY } from './today/proactive-types';
 import { deleteLifeNode, getLifeGraph } from '@/lib/portal/life-graph';
 import { buildFullBackup, isValidBackup, restoreFullBackup } from '@/lib/portal/full-backup';
 
@@ -46,63 +50,82 @@ function applyTheme(choice: ThemeChoice) {
   document.documentElement.setAttribute('data-portal-theme', resolved);
 }
 
-export function ToneSheet({ open, onClose }: SheetProps) {
+/**
+ * GeneralSheet(通用)— 语气 / 提醒程度 / 外观 / 语言 / 触感。
+ * 一切改动即点即生效(设计红线:不再有"看起来能点但没反应"的控件):
+ *   - 语气 → chat 系统提示词(buildSystemPersonality)
+ *   - 提醒程度 → Today 主动卡数量(PROACTIVE_LEVEL_KEY,useTodayFeed 消费)
+ *   - 外观/语言 → 立即应用;语言 12 种,zh/en 之外先回落英文界面
+ */
+export function GeneralSheet({ open, onClose }: SheetProps) {
+  const locale = usePortalLocale();
   const [tone, setTone] = useState<ToneStyle>('warm');
   const [interrupt, setInterrupt] = useState<InterruptLevel>('proactive');
   const [hapticsOn, setHapticsOn] = useState(true);
   const [theme, setTheme] = useState<ThemeChoice>('auto');
-  const [lang, setLang] = useState<'zh' | 'en'>('zh');
-  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    if (open) {
-      const p = loadProfileSettings();
-      setTone((p.coachStyle as ToneStyle) || 'warm');
-      setLang(p.locale === 'en' ? 'en' : 'zh');
-      const m = getMirrorProfile();
-      setInterrupt(m.interruptionStyle);
-      try {
-        setHapticsOn(localStorage.getItem(HAPTIC_FEEDBACK_KEY) !== '0');
-        const t = localStorage.getItem(THEME_KEY);
-        setTheme(t === 'day' || t === 'night' ? t : 'auto');
-      } catch { /* ignore */ }
-      setSaved(false);
-    }
+    if (!open) return;
+    const p = loadProfileSettings();
+    setTone((p.coachStyle as ToneStyle) || 'warm');
+    try {
+      const lvl = localStorage.getItem(PROACTIVE_LEVEL_KEY);
+      setInterrupt(lvl === 'minimal' || lvl === 'silent' ? lvl : getMirrorProfile().interruptionStyle);
+      setHapticsOn(localStorage.getItem(HAPTIC_FEEDBACK_KEY) !== '0');
+      const th = localStorage.getItem(THEME_KEY);
+      setTheme(th === 'day' || th === 'night' ? th : 'auto');
+    } catch { /* ignore */ }
   }, [open]);
 
+  function pickTone(next: ToneStyle) {
+    setTone(next);
+    saveProfileSettings({ coachStyle: next as 'warm' | 'minimal' | 'professional' });
+  }
+  function pickInterrupt(next: InterruptLevel) {
+    setInterrupt(next);
+    try { localStorage.setItem(PROACTIVE_LEVEL_KEY, next); } catch { /* ignore */ }
+    window.dispatchEvent(new CustomEvent('nesio-proactive-level-changed'));
+  }
   function pickTheme(next: ThemeChoice) {
     setTheme(next);
     try { localStorage.setItem(THEME_KEY, next); } catch { /* ignore */ }
-    applyTheme(next); // instant preview, no save needed
+    applyTheme(next);
+  }
+  function pickLang(next: PortalLocale) {
+    saveProfileSettings({ locale: next }); // PROFILE_UPDATED_EVENT → 全站即时切换
+  }
+  function toggleHaptics() {
+    setHapticsOn((v) => {
+      try { localStorage.setItem(HAPTIC_FEEDBACK_KEY, v ? '0' : '1'); } catch { /* ignore */ }
+      return !v;
+    });
   }
 
-  function pickLang(next: 'zh' | 'en') {
-    setLang(next);
-    saveProfileSettings({ locale: next }); // dispatches PROFILE_UPDATED_EVENT — Portal re-renders
-  }
-
-  function save() {
-    saveProfileSettings({ coachStyle: tone as 'warm' | 'minimal' | 'professional' });
-    try {
-      localStorage.setItem(HAPTIC_FEEDBACK_KEY, hapticsOn ? '1' : '0');
-    } catch { /* ignore */ }
-    setSaved(true);
-    setTimeout(() => { setSaved(false); onClose(); }, 1000);
-  }
+  const toneOpts: Array<{ id: ToneStyle; label: string; hint: string }> = [
+    { id: 'warm', label: t(locale, 'toneWarm'), hint: t(locale, 'toneWarmHint') },
+    { id: 'direct', label: t(locale, 'toneDirect'), hint: t(locale, 'toneDirectHint') },
+    { id: 'minimal', label: t(locale, 'toneMinimalist'), hint: t(locale, 'toneMinimalistHint') },
+  ];
+  const levelOpts: Array<{ id: InterruptLevel; label: string; hint: string }> = [
+    { id: 'proactive', label: t(locale, 'levelProactive'), hint: t(locale, 'levelProactiveHint') },
+    { id: 'minimal', label: t(locale, 'levelLight'), hint: t(locale, 'levelLightHint') },
+    { id: 'silent', label: t(locale, 'levelSilent'), hint: t(locale, 'levelSilentHint') },
+  ];
+  const themeOpts: Array<{ id: ThemeChoice; label: string; icon: React.ReactNode }> = [
+    { id: 'day', label: t(locale, 'themeDay'), icon: <IconSun size={16} /> },
+    { id: 'auto', label: t(locale, 'themeAuto'), icon: <IconHalfMoon size={16} /> },
+    { id: 'night', label: t(locale, 'themeNight'), icon: <IconMoon size={16} /> },
+  ];
 
   return (
-    <SheetWrap open={open} onClose={onClose} title="语气与边界">
-      <p className="nesio-settings-sheet-desc">决定 Nesio 如何提醒你、什么时候保持安静。</p>
+    <SheetWrap open={open} onClose={onClose} title={t(locale, 'generalTitle')}>
+      <p className="nesio-settings-sheet-desc">{t(locale, 'generalDesc')}</p>
 
-      <p className="nesio-settings-section-label">Nesio 的语气</p>
-      {([
-        { id: 'warm', label: '温暖', hint: '温和、自然，多用「你」' },
-        { id: 'direct', label: '直接', hint: '简短、清楚，不解释太多' },
-        { id: 'minimal', label: '极简', hint: '只说关键，越少越好' },
-      ] as Array<{ id: ToneStyle; label: string; hint: string }>).map((opt) => (
+      <p className="nesio-settings-section-label">{t(locale, 'sectionTone')}</p>
+      {toneOpts.map((opt) => (
         <button key={opt.id} type="button"
           className={`nesio-settings-option${tone === opt.id ? ' nesio-settings-option--active' : ''}`}
-          onClick={() => setTone(opt.id)}>
+          onClick={() => pickTone(opt.id)}>
           <div>
             <span className="nesio-settings-option-label">{opt.label}</span>
             <span className="nesio-settings-option-hint">{opt.hint}</span>
@@ -111,15 +134,11 @@ export function ToneSheet({ open, onClose }: SheetProps) {
         </button>
       ))}
 
-      <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>主动提醒程度</p>
-      {([
-        { id: 'proactive', label: '主动提醒', hint: '在合适时机提醒你看一眼' },
-        { id: 'minimal', label: '轻量', hint: '只推送高优先级建议' },
-        { id: 'silent', label: '安静', hint: '只在你打开 App 时展示内容' },
-      ] as Array<{ id: InterruptLevel; label: string; hint: string }>).map((opt) => (
+      <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{t(locale, 'sectionReminders')}</p>
+      {levelOpts.map((opt) => (
         <button key={opt.id} type="button"
           className={`nesio-settings-option${interrupt === opt.id ? ' nesio-settings-option--active' : ''}`}
-          onClick={() => setInterrupt(opt.id)}>
+          onClick={() => pickInterrupt(opt.id)}>
           <div>
             <span className="nesio-settings-option-label">{opt.label}</span>
             <span className="nesio-settings-option-hint">{opt.hint}</span>
@@ -128,59 +147,81 @@ export function ToneSheet({ open, onClose }: SheetProps) {
         </button>
       ))}
 
-      <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>轻反馈</p>
+      <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{t(locale, 'sectionAppearance')}</p>
+      <div style={{ display: 'flex', gap: '0.5rem' }}>
+        {themeOpts.map((opt) => (
+          <button key={opt.id} type="button"
+            className={`nesio-settings-option${theme === opt.id ? ' nesio-settings-option--active' : ''}`}
+            style={{ flex: 1, justifyContent: 'center', gap: '0.35rem' }}
+            onClick={() => pickTheme(opt.id)}>
+            {opt.icon}
+            <span className="nesio-settings-option-label">{opt.label}</span>
+          </button>
+        ))}
+      </div>
+      <p className="nesio-settings-option-hint" style={{ marginTop: 4 }}>{t(locale, 'generalAutoHint')}</p>
+
+      <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{t(locale, 'sectionLanguage')}</p>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.45rem' }}>
+        {PORTAL_LOCALE_OPTIONS.map(([code, label]) => (
+          <button key={code} type="button"
+            className={`nesio-settings-option${locale === code ? ' nesio-settings-option--active' : ''}`}
+            style={{ justifyContent: 'center', padding: '0.55rem 0.3rem' }}
+            onClick={() => pickLang(code)}>
+            <span className="nesio-settings-option-label" style={{ fontSize: '0.78rem' }}>{label}</span>
+          </button>
+        ))}
+      </div>
+      <p className="nesio-settings-option-hint" style={{ marginTop: 4 }}>{t(locale, 'languageFallbackNote')}</p>
+
+      <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{t(locale, 'sectionHaptics')}</p>
       <button type="button"
         className={`nesio-settings-option${hapticsOn ? ' nesio-settings-option--active' : ''}`}
-        onClick={() => setHapticsOn((v) => !v)}>
+        onClick={toggleHaptics}>
         <div>
-          <span className="nesio-settings-option-label">触感反馈</span>
-          <span className="nesio-settings-option-hint">记录成功、找到结果、长按录音时轻轻震一下</span>
+          <span className="nesio-settings-option-label">{t(locale, 'hapticsLabel')}</span>
+          <span className="nesio-settings-option-hint">{t(locale, 'hapticsHint')}</span>
         </div>
         <span className={`nesio-settings-space-check${hapticsOn ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>
           {hapticsOn ? '✓' : '○'}
         </span>
       </button>
+    </SheetWrap>
+  );
+}
 
-      <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>外观</p>
-      <div style={{ display: 'flex', gap: '0.5rem' }}>
-        {([
-          { id: 'day', label: '☀️ 日间' },
-          { id: 'auto', label: '🌗 自动' },
-          { id: 'night', label: '🌙 夜间' },
-        ] as Array<{ id: ThemeChoice; label: string }>).map((opt) => (
-          <button key={opt.id} type="button"
-            className={`nesio-settings-option${theme === opt.id ? ' nesio-settings-option--active' : ''}`}
-            style={{ flex: 1, justifyContent: 'center' }}
-            onClick={() => pickTheme(opt.id)}>
-            <span className="nesio-settings-option-label">{opt.label}</span>
-          </button>
-        ))}
-      </div>
-      <p className="nesio-settings-option-hint" style={{ marginTop: 4 }}>自动 = 跟随系统与时间（晚上 7 点后切夜间）</p>
+// 兼容旧引用(契约/历史调用点):ToneSheet 即 GeneralSheet
+export const ToneSheet = GeneralSheet;
 
-      <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>语言 / Language</p>
-      <div style={{ display: 'flex', gap: '0.5rem' }}>
-        {([
-          { id: 'zh', label: '简体中文' },
-          { id: 'en', label: 'English' },
-        ] as Array<{ id: 'zh' | 'en'; label: string }>).map((opt) => (
-          <button key={opt.id} type="button"
-            className={`nesio-settings-option${lang === opt.id ? ' nesio-settings-option--active' : ''}`}
-            style={{ flex: 1, justifyContent: 'center' }}
-            onClick={() => pickLang(opt.id)}>
-            <span className="nesio-settings-option-label">{opt.label}</span>
-          </button>
-        ))}
-      </div>
+// ── 数据(二级菜单:我的数据 / 数据接入)──────────────
 
-      <button type="button" className="nesio-ob-primary-btn" style={{ marginTop: '1.5rem' }} onClick={save}>
-        {saved ? '✓ 已保存' : '保存设置'}
-      </button>
+export function DataSheet({ open, onClose, onOpenMine, onOpenConnect }: SheetProps & {
+  onOpenMine: () => void;
+  onOpenConnect: () => void;
+}) {
+  const locale = usePortalLocale();
+  return (
+    <SheetWrap open={open} onClose={onClose} title={t(locale, 'dataTitle')}>
+      <p className="nesio-settings-sheet-desc">{t(locale, 'dataDesc')}</p>
+      {([
+        { icon: <IconShield />, label: t(locale, 'dataMine'), hint: t(locale, 'dataMineHint'), onClick: onOpenMine },
+        { icon: <IconLink />, label: t(locale, 'dataConnect'), hint: t(locale, 'dataConnectHint'), onClick: onOpenConnect },
+      ]).map((row) => (
+        <button key={row.label} type="button" className="nesio-settings-option" onClick={row.onClick}>
+          <span style={{ color: 'var(--portal-accent)', display: 'inline-flex' }}>{row.icon}</span>
+          <div style={{ flex: 1 }}>
+            <span className="nesio-settings-option-label">{row.label}</span>
+            <span className="nesio-settings-option-hint">{row.hint}</span>
+          </div>
+          <span style={{ color: 'var(--portal-muted)', display: 'inline-flex' }}><IconChevronRight size={16} /></span>
+        </button>
+      ))}
     </SheetWrap>
   );
 }
 
 // ── 隐私与数据 ────────────────────────────────────────
+
 
 export function PrivacySheet({ open, onClose }: SheetProps) {
   const [nodeCount, setNodeCount] = useState(0);
@@ -211,8 +252,8 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
     if (!file) return;
     let parsed: unknown;
     try { parsed = JSON.parse(await file.text()); }
-    catch { setRestoreMsg('⚠️ 文件不是有效的 JSON'); return; }
-    if (!isValidBackup(parsed)) { setRestoreMsg('⚠️ 不是有效的 Nesio 备份文件'); return; }
+    catch { setRestoreMsg('文件不是有效的 JSON'); return; }
+    if (!isValidBackup(parsed)) { setRestoreMsg('不是有效的 Nesio 备份文件'); return; }
 
     const replace = confirm(
       `备份包含 ${Object.keys(parsed.entries).length} 项数据（${parsed.exportedAt.slice(0, 10)} 导出）。\n\n` +
@@ -273,7 +314,7 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
 
       {/* 数据主权面板 — local-first 从架构卖点变成可感知的安全感 */}
       <div style={{ background: 'var(--portal-accent-soft, rgba(88,140,227,0.08))', borderRadius: 14, padding: '0.8rem 1rem', marginBottom: '0.9rem' }}>
-        <p style={{ fontSize: '0.72rem', fontWeight: 600, margin: '0 0 0.4rem', color: 'var(--portal-blue-deep)' }}>🔐 你的数据在哪里</p>
+        <p style={{ fontSize: '0.72rem', fontWeight: 600, margin: '0 0 0.4rem', color: 'var(--portal-blue-deep)', display: 'flex', alignItems: 'center', gap: 6 }}><IconLock size={14} /> 你的数据在哪里</p>
         <div style={{ display: 'flex', gap: '1.2rem', fontSize: '0.7rem', lineHeight: 1.6 }}>
           <div><span style={{ fontSize: '1rem', fontWeight: 700 }}>{nodeCount}</span><br />条记忆,全在本机</div>
           <div><span style={{ fontSize: '1rem', fontWeight: 700 }}>0</span><br />条在云端(未登录)</div>
@@ -333,15 +374,15 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
         const a = document.createElement('a');
         a.href = url; a.download = 'nesio-memory.json'; a.click();
       }}>
-        ↓ 导出 Memory 数据（JSON）
+        导出 Memory 数据（JSON）
       </button>
 
       <button type="button" className="nesio-settings-action-btn" onClick={exportFullBackup}>
-        ⬇ 导出完整备份（含项目/情绪/设置等全部本地数据）
+        导出完整备份（含项目/情绪/设置等全部本地数据）
       </button>
 
       <button type="button" className="nesio-settings-action-btn" onClick={() => importRef.current?.click()}>
-        ⬆ 导入备份
+        导入备份
       </button>
       <input ref={importRef} type="file" accept="application/json,.json" hidden onChange={handleImportFile} />
       {restoreMsg && <p style={{ fontSize: '0.75rem', marginTop: 4, color: restoreMsg.startsWith('✓') ? 'var(--status-go)' : 'var(--status-risk)' }}>{restoreMsg}</p>}
@@ -370,171 +411,43 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
   );
 }
 
-// ── 生活空间 ──────────────────────────────────────────
+// ── 早期体验(诚实版,2026-07-04)────────────────────
+// 此前的 7 天体验倒计时与「升级」按钮是没有支付系统支撑的假流程
+// (点了只弹 alert)。改为:如实说明当前全免费 + 未来计划只做预览
+// + 唯一真实动作「开放时通知我」(遥测登记意向,顺带是定价验证信号)。
 
-type SpaceId = 'home' | 'work' | 'health' | 'family';
-const SPACES: Array<{ id: SpaceId; icon: string; label: string; hint: string }> = [
-  { id: 'home', icon: '🏠', label: '住处与物品', hint: '物品、储物间、家务' },
-  { id: 'work', icon: '💼', label: '工作与会议', hint: '会议、项目、待办' },
-  { id: 'health', icon: '🩷', label: '身体与用药', hint: '用药、运动、感冒恢复' },
-  { id: 'family', icon: '👨‍👩‍👧', label: '亲友与承诺', hint: '礼物、生日、承诺' },
-];
-const SPACES_KEY = 'nesio-active-spaces-v1';
+const PLAN_NOTIFY_KEY = 'nesio-plan-notify-optin-v1';
 
-export function SpacesSheet({ open, onClose }: SheetProps) {
-  const [active, setActive] = useState<Set<SpaceId>>(new Set<SpaceId>(['home', 'work', 'health', 'family']));
-  const [saved, setSaved] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    try {
-      const raw = localStorage.getItem(SPACES_KEY);
-      if (raw) setActive(new Set<SpaceId>(JSON.parse(raw) as SpaceId[]));
-    } catch { /* ignore */ }
-    setSaved(false);
-  }, [open]);
-
-  function toggle(id: SpaceId) {
-    setActive((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) { if (next.size > 1) next.delete(id); }
-      else next.add(id);
-      return next;
-    });
-  }
-
-  function save() {
-    try { localStorage.setItem(SPACES_KEY, JSON.stringify(Array.from(active))); } catch { /* ignore */ }
-    setSaved(true);
-    setTimeout(() => { setSaved(false); onClose(); }, 900);
-  }
-
-  return (
-    <SheetWrap open={open} onClose={onClose} title="生活空间">
-      <p className="nesio-settings-sheet-desc">选中的生活空间，会优先出现在 Today。</p>
-      {SPACES.map((sp) => (
-        <button key={sp.id} type="button"
-          className={`nesio-settings-option${active.has(sp.id) ? ' nesio-settings-option--active' : ''}`}
-          onClick={() => toggle(sp.id)}>
-          <span style={{ fontSize: '1.3rem' }}>{sp.icon}</span>
-          <div style={{ flex: 1 }}>
-            <span className="nesio-settings-option-label">{sp.label}</span>
-            <span className="nesio-settings-option-hint">{sp.hint}</span>
-          </div>
-          <span className={`nesio-settings-space-check${active.has(sp.id) ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>
-            {active.has(sp.id) ? '✓' : '○'}
-          </span>
-        </button>
-      ))}
-      <button type="button" className="nesio-ob-primary-btn" style={{ marginTop: '1.5rem' }} onClick={save}>
-        {saved ? '✓ 已保存' : '保存'}
-      </button>
-    </SheetWrap>
-  );
-}
-
-// ── 订阅 / 免费体验 ───────────────────────────────────
-
-const TRIAL_KEY = 'nesio-trial-start-v1';
-const TRIAL_DAYS = 7;
-
-function getTrialState(): { started: boolean; daysLeft: number; expired: boolean } {
-  if (typeof window === 'undefined') return { started: false, daysLeft: TRIAL_DAYS, expired: false };
-  try {
-    const raw = localStorage.getItem(TRIAL_KEY);
-    if (!raw) return { started: false, daysLeft: TRIAL_DAYS, expired: false };
-    const start = Number(raw);
-    const elapsed = Math.floor((Date.now() - start) / 86400000);
-    const daysLeft = Math.max(0, TRIAL_DAYS - elapsed);
-    return { started: true, daysLeft, expired: daysLeft === 0 };
-  } catch {
-    return { started: false, daysLeft: TRIAL_DAYS, expired: false };
-  }
-}
-
-function startTrial() {
-  try { localStorage.setItem(TRIAL_KEY, String(Date.now())); } catch { /* ignore */ }
-}
-
-const PLANS = [
-  {
-    id: 'pro',
-    name: 'Nesio Pro',
-    price: '¥18',
-    cycle: '/ 月',
-    desc: '跨设备同步 · 主动提醒 · AI 洞察报告',
-    highlight: false,
-  },
-  {
-    id: 'family',
-    name: '家庭版',
-    price: '¥38',
-    cycle: '/ 月',
-    desc: '最多 5 人共享 · 家人动态 · 自动化动作',
-    highlight: false,
-  },
+const PLAN_PREVIEWS = [
+  { id: 'pro', name: 'Nesio Pro', price: '¥18', cycle: '/ 月', desc: '跨设备同步 · 主动提醒 · AI 洞察报告' },
+  { id: 'family', name: '家庭版', price: '¥38', cycle: '/ 月', desc: '最多 5 人共享 · 家人动态 · 自动化动作' },
 ];
 
 export function SubscriptionSheet({ open, onClose }: SheetProps) {
-  const [trial, setTrial] = useState(() => getTrialState());
-  const [upgradeTarget, setUpgradeTarget] = useState<string | null>(null);
+  const locale = usePortalLocale();
+  const [notified, setNotified] = useState(false);
 
   useEffect(() => {
-    if (open) setTrial(getTrialState());
+    if (!open) return;
+    try { setNotified(localStorage.getItem(PLAN_NOTIFY_KEY) === '1'); } catch { /* ignore */ }
   }, [open]);
 
-  function handleStartTrial() {
-    startTrial();
-    setTrial(getTrialState());
+  function optIn() {
+    try { localStorage.setItem(PLAN_NOTIFY_KEY, '1'); } catch { /* ignore */ }
+    setNotified(true);
+    void import('@/lib/portal/telemetry').then(({ track }) => track('plan_notify_optin'));
   }
-
-  function handleUpgrade(planId: string) {
-    // TODO: replace with real Stripe checkout session URL or Apple IAP trigger
-    // For web (PWA): POST /api/portal/stripe/create-session → redirect to checkout
-    // For native iOS App Store: call StoreKit purchase(product) here
-    setUpgradeTarget(planId);
-    alert(`即将跳转付款 (${planId === 'pro' ? 'Nesio Pro ¥18/月' : '家庭版 ¥38/月'}).\n\n正式上线后通过 App Store 内购或网页支付完成。`);
-    setUpgradeTarget(null);
-  }
-
-  const { started, daysLeft, expired } = trial;
 
   return (
-    <SheetWrap open={open} onClose={onClose} title="我的计划">
-      {/* Current plan status */}
+    <SheetWrap open={open} onClose={onClose} title={t(locale, 'subTitle')}>
       <div className="nesio-sub-status-card">
-        {!started && (
-          <>
-            <div className="nesio-sub-status-badge nesio-sub-status-badge--free">免费版</div>
-            <p className="nesio-sub-status-title">开始 7 天全功能体验</p>
-            <p className="nesio-sub-status-desc">无需付款，到期后回到免费功能，不会自动扣费。</p>
-            <button type="button" className="nesio-sub-start-btn" onClick={handleStartTrial}>
-              开始免费体验 →
-            </button>
-          </>
-        )}
-        {started && !expired && (
-          <>
-            <div className="nesio-sub-status-badge nesio-sub-status-badge--trial">体验中</div>
-            <p className="nesio-sub-status-title">还剩 {daysLeft} 天全功能体验</p>
-            <div className="nesio-sub-trial-bar-track">
-              <div className="nesio-sub-trial-bar-fill" style={{ width: `${((TRIAL_DAYS - daysLeft) / TRIAL_DAYS) * 100}%` }} />
-            </div>
-            <p className="nesio-sub-status-desc">体验结束前升级，所有记忆和设置完整保留。</p>
-          </>
-        )}
-        {expired && (
-          <>
-            <div className="nesio-sub-status-badge nesio-sub-status-badge--expired">体验已结束</div>
-            <p className="nesio-sub-status-title">升级继续使用完整功能</p>
-            <p className="nesio-sub-status-desc">记忆和数据不会丢失，随时可以升级恢复。</p>
-          </>
-        )}
+        <div className="nesio-sub-status-badge nesio-sub-status-badge--free">{t(locale, 'subBadgeFree')}</div>
+        <p className="nesio-sub-status-title">{t(locale, 'subFreeTitle')}</p>
+        <p className="nesio-sub-status-desc">{t(locale, 'subFreeDesc')}</p>
       </div>
 
-      {/* Upgrade plans */}
-      <p className="nesio-settings-section-label" style={{ marginTop: '1.1rem' }}>升级计划</p>
-      {PLANS.map((plan) => (
+      <p className="nesio-settings-section-label" style={{ marginTop: '1.1rem' }}>{t(locale, 'subFuturePlans')}</p>
+      {PLAN_PREVIEWS.map((plan) => (
         <div key={plan.id} className="nesio-sub-upgrade-row">
           <div className="nesio-sub-upgrade-info">
             <p className="nesio-sub-upgrade-name">{plan.name}</p>
@@ -542,21 +455,16 @@ export function SubscriptionSheet({ open, onClose }: SheetProps) {
           </div>
           <div className="nesio-sub-upgrade-right">
             <p className="nesio-sub-upgrade-price">{plan.price}<span>{plan.cycle}</span></p>
-            <button
-              type="button"
-              className="nesio-sub-upgrade-btn"
-              onClick={() => handleUpgrade(plan.id)}
-              disabled={upgradeTarget === plan.id}
-            >
-              升级
-            </button>
+            <span style={{ fontSize: '0.66rem', color: 'var(--portal-muted)', border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-pill)', padding: '0.15rem 0.55rem', whiteSpace: 'nowrap' }}>
+              {t(locale, 'subPlanned')}
+            </span>
           </div>
         </div>
       ))}
 
-      <p style={{ fontSize: '0.68rem', color: 'var(--portal-muted)', textAlign: 'center', marginTop: '1rem', lineHeight: 1.5 }}>
-        通过 App Store 内购完成支付 · 可随时取消 · 不自动续费
-      </p>
+      <button type="button" className="nesio-ob-primary-btn" style={{ marginTop: '1.2rem' }} onClick={optIn} disabled={notified}>
+        {notified ? `✓ ${t(locale, 'subNotifyDone')}` : t(locale, 'subNotify')}
+      </button>
     </SheetWrap>
   );
 }

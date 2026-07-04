@@ -183,7 +183,7 @@ export async function GET(req: NextRequest) {
   }
   const roadmapVotes = ROADMAP_ITEMS.map((item) => {
     const a = voteAgg.get(item.id);
-    return { id: item.id, title: item.title, status: item.status, avg: a ? Math.round((a.sum / a.count) * 10) / 10 : null, count: a?.count || 0 };
+    return { id: item.id, title: item.title.zh, status: item.status, avg: a ? Math.round((a.sum / a.count) * 10) / 10 : null, count: a?.count || 0 };
   }).sort((x, y) => (y.avg ?? 0) * y.count - (x.avg ?? 0) * x.count);
 
   // ── 实验曝光(exp_exposure by exp/variant) ──

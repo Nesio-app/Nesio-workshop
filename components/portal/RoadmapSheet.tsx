@@ -9,18 +9,26 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ROADMAP_ITEMS } from '@/lib/portal/roadmap';
 import { track } from '@/lib/portal/telemetry';
+import { t } from '@/lib/portal/i18n';
+import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
+import { usePortalLocale } from './use-portal-locale';
 
 const DEVICE_KEY = 'nesio-telemetry-device-v1';
 
 interface VoteState { avg: number; count: number; mine: number | null }
-
-const STATUS_LABEL: Record<string, string> = { building: '在做了', planned: '已排期', exploring: '探索中' };
 
 function deviceId(): string {
   try { return localStorage.getItem(DEVICE_KEY) || ''; } catch { return ''; }
 }
 
 export default function RoadmapSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const locale = usePortalLocale();
+  const dict = portalLocaleToDictionaryLocale(locale);
+  const statusLabel: Record<string, string> = {
+    building: t(locale, 'statusBuilding'),
+    planned: t(locale, 'statusPlanned'),
+    exploring: t(locale, 'statusExploring'),
+  };
   const [votes, setVotes] = useState<Map<string, VoteState>>(new Map());
   const [savingId, setSavingId] = useState('');
   const [error, setError] = useState('');
@@ -49,27 +57,27 @@ export default function RoadmapSheet({ open, onClose }: { open: boolean; onClose
         track('feature_vote', { feature: featureId, score });
         await load();
       } else {
-        setError('这一票没送到,稍后再试。');
+        setError(t(locale, 'roadmapError'));
       }
     } catch {
-      setError('这一票没送到,稍后再试。');
+      setError(t(locale, 'roadmapError'));
     }
     setSavingId('');
   }
 
   if (!open) return null;
   return (
-    <div className="nesio-settings-sheet-overlay" role="dialog" aria-modal="true" aria-label="投票给未来功能">
+    <div className="nesio-settings-sheet-overlay" role="dialog" aria-modal="true" aria-label={t(locale, 'roadmapTitle')}>
       <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label="关闭" />
       <div className="nesio-settings-sheet-card">
         <div className="nesio-sheet-handle" aria-hidden />
         <div className="nesio-settings-sheet-header">
-          <h2 className="nesio-settings-sheet-title">投票给未来功能</h2>
+          <h2 className="nesio-settings-sheet-title">{t(locale, 'roadmapTitle')}</h2>
           <button type="button" className="nesio-voice-sheet-close" onClick={onClose} aria-label="关闭">✕</button>
         </div>
         <div className="nesio-settings-sheet-body">
           <p style={{ fontSize: '0.75rem', color: 'var(--portal-muted)', margin: '0 0 0.8rem' }}>
-            你的星星决定先做什么。点星即投,可以随时改。
+            {t(locale, 'roadmapHint')}
           </p>
           {ROADMAP_ITEMS.map((item) => {
             const v = votes.get(item.id);
@@ -77,17 +85,17 @@ export default function RoadmapSheet({ open, onClose }: { open: boolean; onClose
               <div key={item.id} style={{ padding: '0.7rem 0', borderTop: '1px solid var(--portal-line)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
                   <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: 600, color: 'var(--portal-ink)' }}>
-                    {item.title}
+                    {item.title[dict]}
                     <span style={{ marginLeft: 6, fontSize: '0.62rem', color: 'var(--portal-muted)', border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-pill)', padding: '0.05rem 0.4rem' }}>
-                      {STATUS_LABEL[item.status]}
+                      {statusLabel[item.status]}
                     </span>
                   </p>
                   {v && v.count > 0 && (
-                    <span style={{ fontSize: '0.7rem', color: 'var(--portal-muted)', whiteSpace: 'nowrap' }}>★ {v.avg} · {v.count} 票</span>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--portal-muted)', whiteSpace: 'nowrap' }}>{t(locale, 'roadmapVotesTemplate', { avg: v.avg, count: v.count })}</span>
                   )}
                 </div>
-                <p style={{ margin: '0.2rem 0 0.45rem', fontSize: '0.76rem', color: 'var(--portal-muted)', lineHeight: 1.5 }}>{item.description}</p>
-                <div style={{ display: 'flex', gap: 0, marginLeft: '-0.6rem' }} role="radiogroup" aria-label={`给 ${item.title} 打分`}>
+                <p style={{ margin: '0.2rem 0 0.45rem', fontSize: '0.76rem', color: 'var(--portal-muted)', lineHeight: 1.5 }}>{item.description[dict]}</p>
+                <div style={{ display: 'flex', gap: 0, marginLeft: '-0.6rem' }} role="radiogroup" aria-label={`${item.title[dict]}`}>
                   {[1, 2, 3, 4, 5].map((s) => {
                     const active = (v?.mine ?? 0) >= s;
                     return (
@@ -98,7 +106,7 @@ export default function RoadmapSheet({ open, onClose }: { open: boolean; onClose
                       </button>
                     );
                   })}
-                  {savingId === item.id && <span style={{ fontSize: '0.68rem', color: 'var(--portal-muted)', alignSelf: 'center' }}>记下了…</span>}
+                  {savingId === item.id && <span style={{ fontSize: '0.68rem', color: 'var(--portal-muted)', alignSelf: 'center' }}>{t(locale, 'roadmapSaving')}</span>}
                 </div>
               </div>
             );

@@ -95,3 +95,19 @@ export function registerDecCards(cards: readonly RecommendationCard[]): void {
 export function getRegisteredDecCard(guidanceCardId: string): RecommendationCard | undefined {
   return decCardRegistry.get(guidanceCardId);
 }
+
+// ── 主动提醒程度(设置 → 通用):控制 Today 主动卡数量 ─────────────────────
+// proactive=3(与 TODAY_CARD_BUDGET 一致)/ minimal=1 / silent=0。
+// GeneralSheet 写入并广播 'nesio-proactive-level-changed'。
+
+export const PROACTIVE_LEVEL_KEY = 'nesio-proactive-level-v1';
+
+export function getProactiveCardBudget(): number {
+  if (typeof window === 'undefined') return 3;
+  try {
+    const level = localStorage.getItem(PROACTIVE_LEVEL_KEY);
+    if (level === 'silent') return 0;
+    if (level === 'minimal') return 1;
+  } catch { /* ignore */ }
+  return 3;
+}

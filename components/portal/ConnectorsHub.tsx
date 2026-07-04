@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { IconActivity, IconBook, IconBookOpen, IconCalendar, IconCar, IconCheckSquare, IconCloudSun, IconHeartPulse, IconMail, IconNote, IconTimer } from './icons';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { type LifeNode } from '@/lib/portal/life-graph';
 
@@ -12,7 +13,7 @@ type NodeInput = Omit<LifeNode, 'id' | 'createdAt'>;
 interface ConnectorDef {
   id: string;
   name: string;
-  icon: string;
+  icon: React.ReactNode;
   iconBg: string;
   description: string;
   method: ConnMethod;
@@ -23,20 +24,22 @@ interface ConnectorDef {
   /** shortcuts connectors: the source id for /api/portal/ingest */
   ingestSource?: string;
   comingSoon?: boolean;
+  dev?: boolean;
 }
 
+// dev: true = 还在打磨的接入,收进「开发中」折叠组,不占主列表
 const CONNECTORS: ConnectorDef[] = [
-  { id: 'calendar', name: 'Google Calendar', icon: '📅', iconBg: 'var(--chip-blue)', method: 'oauth', description: '读取日程，生成会议提醒和准备 Brief' },
-  { id: 'gmail', name: 'Gmail', icon: '📧', iconBg: 'var(--chip-pink)', method: 'oauth', description: '你授权并选择后，整理可确认的人物、日期、承诺' },
-  { id: 'weather', name: '地理位置 · 天气', icon: '🌤', iconBg: 'var(--chip-amber)', method: 'geo', description: '基于实时天气生成外出和健康建议' },
-  { id: 'flomo', name: 'Flomo', icon: '📝', iconBg: 'var(--chip-indigo)', method: 'server', syncEndpoint: '/api/portal/flomo?limit=30', description: '同步 flomo 笔记，提取想法与记录' },
-  { id: 'notion', name: 'Notion', icon: '📓', iconBg: 'var(--chip-gray)', method: 'token', syncEndpoint: '/api/portal/notion', tokenHint: 'notion.so/my-integrations → 新建集成 → 复制 Internal Integration Secret，并把页面共享给它', description: '同步最近编辑的页面，提取项目与想法' },
-  { id: 'toggl', name: 'Toggl Track', icon: '⏱', iconBg: 'var(--chip-red)', method: 'token', syncEndpoint: '/api/portal/toggl', tokenHint: 'track.toggl.com → Profile → API Token', description: '同步时间记录，了解你的专注分布' },
-  { id: 'health', name: 'Apple Health 导出', icon: '🩷', iconBg: 'var(--chip-pink)', method: 'file', description: '上传 export.xml，提取步数、睡眠、心率' },
-  { id: 'reminder', name: 'Apple 提醒事项', icon: '✅', iconBg: 'var(--chip-amber)', method: 'shortcuts', ingestSource: 'reminder', description: '通过快捷指令推送提醒，自动转为承诺' },
-  { id: 'keep', name: 'Keep 健康', icon: '🏃', iconBg: 'var(--chip-green)', method: 'shortcuts', ingestSource: 'keep', description: '通过快捷指令推送运动数据' },
-  { id: 'wechat_reading', name: '微信读书', icon: '📖', iconBg: 'var(--chip-leaf)', method: 'shortcuts', ingestSource: 'wechat_reading', description: '通过快捷指令推送阅读进度与笔记' },
-  { id: 'tesla', name: 'Tesla', icon: '🚗', iconBg: 'var(--chip-green)', method: 'oauth', description: '电量、行程信号，自动提醒充电', comingSoon: true },
+  { id: 'calendar', name: 'Google Calendar', icon: <IconCalendar />, iconBg: 'var(--chip-blue)', method: 'oauth', description: '读取日程，生成会议提醒和准备 Brief' },
+  { id: 'gmail', name: 'Gmail', icon: <IconMail />, iconBg: 'var(--chip-pink)', method: 'oauth', description: '你授权并选择后，整理可确认的人物、日期、承诺' },
+  { id: 'weather', name: '地理位置 · 天气', icon: <IconCloudSun />, iconBg: 'var(--chip-amber)', method: 'geo', description: '基于实时天气生成外出和健康建议' },
+  { id: 'flomo', name: 'Flomo', icon: <IconNote />, iconBg: 'var(--chip-indigo)', method: 'server', syncEndpoint: '/api/portal/flomo?limit=30', description: '同步 flomo 笔记，提取想法与记录' },
+  { id: 'notion', name: 'Notion', icon: <IconBook />, iconBg: 'var(--chip-gray)', method: 'token', syncEndpoint: '/api/portal/notion', tokenHint: 'notion.so/my-integrations → 新建集成 → 复制 Internal Integration Secret，并把页面共享给它', description: '同步最近编辑的页面，提取项目与想法', dev: true },
+  { id: 'toggl', name: 'Toggl Track', icon: <IconTimer />, iconBg: 'var(--chip-red)', method: 'token', syncEndpoint: '/api/portal/toggl', tokenHint: 'track.toggl.com → Profile → API Token', description: '同步时间记录，了解你的专注分布', dev: true },
+  { id: 'health', name: 'Apple Health 导出', icon: <IconHeartPulse />, iconBg: 'var(--chip-pink)', method: 'file', description: '上传 export.xml，提取步数、睡眠、心率', dev: true },
+  { id: 'reminder', name: 'Apple 提醒事项', icon: <IconCheckSquare />, iconBg: 'var(--chip-amber)', method: 'shortcuts', ingestSource: 'reminder', description: '通过快捷指令推送提醒，自动转为承诺', dev: true },
+  { id: 'keep', name: 'Keep 健康', icon: <IconActivity />, iconBg: 'var(--chip-green)', method: 'shortcuts', ingestSource: 'keep', description: '通过快捷指令推送运动数据', dev: true },
+  { id: 'wechat_reading', name: '微信读书', icon: <IconBookOpen />, iconBg: 'var(--chip-leaf)', method: 'shortcuts', ingestSource: 'wechat_reading', description: '通过快捷指令推送阅读进度与笔记', dev: true },
+  { id: 'tesla', name: 'Tesla', icon: <IconCar />, iconBg: 'var(--chip-green)', method: 'oauth', description: '电量、行程信号，自动提醒充电', comingSoon: true, dev: true },
 ];
 
 const CONNECTORS_KEY = 'nesio-connectors-v1';
@@ -84,6 +87,23 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     const err = params.get('error');
     if (err) showToast(`连接失败：${err}`, false);
   }, [open]);
+
+
+  // 开发中的接入:只展示,不给操作按钮(不做假交互)
+  function renderDevRow(c: ConnectorDef) {
+    return (
+      <div key={c.id} className="nesio-connector-row" style={{ opacity: 0.75 }}>
+        <span className="nesio-connector-icon" style={{ background: c.iconBg }}>{c.icon}</span>
+        <div className="nesio-connector-body">
+          <p className="nesio-connector-name">
+            {c.name}
+            <span className="nesio-connector-soon">{c.comingSoon ? '即将上线' : '开发中'}</span>
+          </p>
+          <p className="nesio-connector-desc">{c.description}</p>
+        </div>
+      </div>
+    );
+  }
 
   function showToast(msg: string, ok: boolean) {
     setToast({ msg, ok });
@@ -354,7 +374,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
         )}
 
         <div className="nesio-settings-sheet-body">
-          {CONNECTORS.map((c) => {
+          {CONNECTORS.filter((c) => !c.dev).map((c) => {
             const isConn = connected[c.id];
             const isSync = syncing === c.id;
             const cnt = counts[c.id];
@@ -437,6 +457,18 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
               </div>
             );
           })}
+
+          {/* ── 开发中 · 折叠二级(以后慢慢开发的接入不占主列表) ── */}
+          <details className="nesio-conn-dev-group" style={{ marginTop: '0.9rem', border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-md)', padding: '0.15rem 0.75rem' }}>
+            <summary style={{ cursor: 'pointer', padding: '0.6rem 0', fontSize: '0.82rem', color: 'var(--portal-muted)', listStyle: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>
+                <span style={{ color: 'var(--portal-ink)', fontWeight: 600 }}>开发中 · 抢先看</span>
+                <span style={{ marginLeft: 8, fontSize: '0.7rem' }}>{CONNECTORS.filter((c) => c.dev).length} 项在打磨</span>
+              </span>
+              <span aria-hidden>▾</span>
+            </summary>
+            {CONNECTORS.filter((c) => c.dev).map((c) => renderDevRow(c))}
+          </details>
 
           <div style={{ marginTop: '1rem', fontSize: '0.72rem', color: 'var(--portal-muted)', textAlign: 'center', lineHeight: 1.6 }}>
             有 API 的（Gmail / Calendar / Notion / Toggl / Flomo）直接连接；<br />

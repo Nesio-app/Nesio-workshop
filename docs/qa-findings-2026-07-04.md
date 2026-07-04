@@ -80,7 +80,8 @@
   英文用户看到中文。
 - **修法**:sheet 框架文案入 t() 字典;候选功能标题/描述在 roadmap.ts
   改为 { zh, en } 双语结构。属 REG-004 家族的新增欠账。
-- **状态**:open
+- **状态**:fixed(2026-07-04 UI 精修批次 1:roadmap.ts 双语化 +
+  RoadmapSheet 全量 t() 接线,/admin 汇总取 title.zh)
 
 ## 全绿项(生产实测)
 

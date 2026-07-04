@@ -24,7 +24,7 @@ import {
 import { createAppApiClient } from '@/lib/portal/app-api-client';
 import DailyBriefCard from './DailyBriefCard';
 import dynamic from 'next/dynamic';
-import { buildTimeFallback, dismissProactiveById, isProactiveCardDismissed, type ProactiveCardData } from './today/proactive-types';
+import { buildTimeFallback, dismissProactiveById, getProactiveCardBudget, isProactiveCardDismissed, type ProactiveCardData } from './today/proactive-types';
 import { ProactiveGuidanceCard } from './today/ProactiveGuidanceCard';
 import { TodayFocusSection } from './today/FocusSection';
 import { NightTimeline } from './today/NightTimeline';
@@ -67,7 +67,16 @@ export default function TodayFeed({
 
   // All proactive cards come from the guidance pipeline (email included) —
   // single path so cooling-store and attention-budget always apply.
-  const activeProactiveCards = proactiveCards.filter((c) => !dismissedCardIds.has(c.id)).slice(0, TODAY_CARD_BUDGET);
+  // 用户在 设置→通用→主动提醒程度 里可把预算降到 1 或 0(安静)。
+  const [levelTick, setLevelTick] = useState(0);
+  useEffect(() => {
+    const onLevel = () => setLevelTick((v) => v + 1);
+    window.addEventListener('nesio-proactive-level-changed', onLevel);
+    return () => window.removeEventListener('nesio-proactive-level-changed', onLevel);
+  }, []);
+  void levelTick;
+  const cardBudget = Math.min(TODAY_CARD_BUDGET, getProactiveCardBudget());
+  const activeProactiveCards = proactiveCards.filter((c) => !dismissedCardIds.has(c.id)).slice(0, cardBudget);
 
   return (
     <div className="nesio-today-root">
