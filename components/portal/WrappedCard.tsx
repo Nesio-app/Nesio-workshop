@@ -162,13 +162,13 @@ export default function WrappedCard({ onDismiss }: Props) {
 
   return (
     <div className="wrapped-card">
-      <button type="button" className="wrapped-card-close" onClick={onDismiss} aria-label="关闭">✕</button>
+      <button type="button" className="wrapped-card-close" onClick={onDismiss} aria-label={L(dict, '关闭', 'Close')}>✕</button>
 
       <div className="wrapped-card-header">
         <span className="wrapped-card-season">{data.dominantEmoji}</span>
         <div>
-          <p className="wrapped-card-quarter">{data.quarterLabel} 回顾</p>
-          <p className="wrapped-card-count">{data.totalNodes} 条记忆</p>
+          <p className="wrapped-card-quarter">{L(dict, `${data.quarterLabel} 回顾`, `${data.quarterLabel} wrapped`)}</p>
+          <p className="wrapped-card-count">{L(dict, `${data.totalNodes} 条记忆`, `${data.totalNodes} memories`)}</p>
         </div>
       </div>
 
@@ -186,7 +186,7 @@ export default function WrappedCard({ onDismiss }: Props) {
         </div>
       )}
 
-      <p className="wrapped-card-footer">每段时光都值得被记录 · Nesio</p>
+      <p className="wrapped-card-footer">{L(dict, '每段时光都值得被记录 · Nesio', 'Every stretch of time deserves remembering · Nesio')}</p>
     </div>
   );
 }

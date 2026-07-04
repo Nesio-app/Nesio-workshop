@@ -5,6 +5,9 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { L } from '@/lib/portal/i18n';
+import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
+import { usePortalLocale } from './use-portal-locale';
 
 export interface VoiceBriefProps {
   open: boolean;
@@ -16,15 +19,16 @@ export interface VoiceBriefProps {
 
 type PlayState = 'idle' | 'loading' | 'playing' | 'paused' | 'done' | 'error';
 
-function buildScript(title: string, body: string, points?: string[]): string {
-  const intro = title + '。';
+function buildScript(title: string, body: string, points?: string[], dict: string = 'zh'): string {
+  const intro = title + L(dict, '。', '.');
   if (points?.length) {
-    return intro + ' ' + points.map((p, i) => `第${['一','二','三','四','五'][i] || i+1}点，${p}。`).join(' ');
+    return intro + ' ' + points.map((p, i) => L(dict, `第${['一','二','三','四','五'][i] || i+1}点，${p}。`, `Point ${i + 1}: ${p}.`)).join(' ');
   }
   return intro + ' ' + body;
 }
 
 export default function VoiceBrief({ open, onClose, title, body, points }: VoiceBriefProps) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [state, setState] = useState<PlayState>('idle');
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -53,7 +57,7 @@ export default function VoiceBrief({ open, onClose, title, body, points }: Voice
 
   async function startPlay() {
     setState('loading');
-    const script = buildScript(title, body, points);
+    const script = buildScript(title, body, points, dict);
 
     try {
       // Try OpenAI TTS
@@ -106,14 +110,14 @@ export default function VoiceBrief({ open, onClose, title, body, points }: Voice
   if (!open) return null;
 
   return (
-    <div className="nesio-voice-brief-overlay" role="dialog" aria-modal="true" aria-label="语音简报">
+    <div className="nesio-voice-brief-overlay" role="dialog" aria-modal="true" aria-label={L(dict, '语音简报', 'Voice brief')}>
       <div className="nesio-voice-brief-backdrop" onClick={onClose} />
       <div className="nesio-voice-brief-card">
         <div className="nesio-sheet-handle" aria-hidden />
         <div className="nesio-voice-brief-header">
           <div>
             <p className="nesio-voice-brief-kicker">
-              {state === 'loading' ? '正在生成语音…' : '语音简报 · AI 朗读'}
+              {state === 'loading' ? L(dict, '正在生成语音…', 'Generating audio…') : L(dict, '语音简报 · AI 朗读', 'Voice brief · read by AI')}
             </p>
             <h2 className="nesio-voice-brief-title">{title}</h2>
           </div>
@@ -145,15 +149,15 @@ export default function VoiceBrief({ open, onClose, title, body, points }: Voice
 
         {/* Controls */}
         {state === 'error' ? (
-          <p style={{ textAlign: 'center', color: 'var(--status-risk)', fontSize: '0.82rem' }}>真人语音暂不可用，请检查 OpenAI TTS 配置或网络。</p>
+          <p style={{ textAlign: 'center', color: 'var(--status-risk)', fontSize: '0.82rem' }}>{L(dict, '真人语音暂不可用，请检查 OpenAI TTS 配置或网络。', 'Natural voice unavailable — check OpenAI TTS config or your network.')}</p>
         ) : (
           <div className="nesio-voice-brief-controls">
-            <button type="button" className="nesio-voice-brief-btn" onClick={restart} aria-label="重播">
+            <button type="button" className="nesio-voice-brief-btn" onClick={restart} aria-label={L(dict, '重播', 'Replay')}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
                 <path d="M1 4v6h6M3.51 15a9 9 0 102.13-9.36L1 10"/>
               </svg>
             </button>
-            <button type="button" className="nesio-voice-brief-play-btn" onClick={state === 'done' ? restart : (state === 'loading' ? () => {} : togglePause)} aria-label={state === 'playing' ? '暂停' : '播放'}>
+            <button type="button" className="nesio-voice-brief-play-btn" onClick={state === 'done' ? restart : (state === 'loading' ? () => {} : togglePause)} aria-label={state === 'playing' ? L(dict, '暂停', 'Pause') : L(dict, '播放', 'Play')}>
               {state === 'loading' ? (
                 <span style={{ width: 10, height: 10, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} />
               ) : state === 'playing' ? (
@@ -162,14 +166,14 @@ export default function VoiceBrief({ open, onClose, title, body, points }: Voice
                 <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22"><polygon points="5,3 19,12 5,21"/></svg>
               )}
             </button>
-            <button type="button" className="nesio-voice-brief-btn" onClick={() => { stopAll(); onClose(); }} aria-label="完成">
+            <button type="button" className="nesio-voice-brief-btn" onClick={() => { stopAll(); onClose(); }} aria-label={L(dict, '完成', 'Done')}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
                 <polyline points="20,6 9,17 4,12"/>
               </svg>
             </button>
           </div>
         )}
-        {state === 'done' && <p style={{ textAlign: 'center', color: 'var(--status-go)', fontSize: '0.82rem', marginTop: '0.5rem' }}>播放完毕 ✓</p>}
+        {state === 'done' && <p style={{ textAlign: 'center', color: 'var(--status-go)', fontSize: '0.82rem', marginTop: '0.5rem' }}>{L(dict, '播放完毕 ✓', 'Playback finished ✓')}</p>}
       </div>
     </div>
   );

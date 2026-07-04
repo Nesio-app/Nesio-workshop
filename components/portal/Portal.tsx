@@ -50,7 +50,9 @@ import {
   markNesioOnboardingDoneForAuth,
   NESIO_ONBOARDING_COMPLETE_EVENT,
 } from '@/lib/portal/auth-client';
-import { loadProfileSettings, PROFILE_UPDATED_EVENT, type PortalLocale } from '@/lib/portal/profile';
+import { loadProfileSettings, portalLocaleToDictionaryLocale, PROFILE_UPDATED_EVENT, type PortalLocale } from '@/lib/portal/profile';
+import { L } from '@/lib/portal/i18n';
+import { usePortalLocale } from './use-portal-locale';
 import { runConnectors } from '@/lib/platform/runtime/integration-runtime';
 import { pruneDisposableSignals } from '@/lib/life-domain';
 import { hydrateSignalFactStore } from '@/lib/life-domain/signal-read-cache';
@@ -88,23 +90,24 @@ function AskGuideSheet({
   onClose: () => void;
   onStart: () => void;
 }) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   if (!open) return null;
   return (
-    <div className="nesio-ask-guide" role="dialog" aria-modal="true" aria-label="问宝盒">
-      <button type="button" className="nesio-ask-guide-backdrop" onClick={onClose} aria-label="关闭问宝盒引导" />
+    <div className="nesio-ask-guide" role="dialog" aria-modal="true" aria-label={L(dict, '问宝盒', 'Ask Nesio')}>
+      <button type="button" className="nesio-ask-guide-backdrop" onClick={onClose} aria-label={L(dict, '关闭问宝盒引导', 'Close Ask Nesio guide')} />
       <div className="nesio-ask-guide-card">
         <div className="nesio-sheet-handle" aria-hidden />
-        <p className="nesio-ask-guide-kicker">长按中间按钮</p>
-        <h2>问宝盒</h2>
-        <p>找东西、找线索，也可以问下一步。比如：钥匙在哪里？生日快到了该买什么礼物？</p>
-        <div className="nesio-ask-guide-examples" aria-label="问宝盒示例">
-          <span>钥匙在哪里</span>
-          <span>Linda 生日买什么</span>
-          <span>上次买的药还有吗</span>
+        <p className="nesio-ask-guide-kicker">{L(dict, '长按中间按钮', 'Long-press the center button')}</p>
+        <h2>{L(dict, '问宝盒', 'Ask Nesio')}</h2>
+        <p>{L(dict, '找东西、找线索，也可以问下一步。比如：钥匙在哪里？生日快到了该买什么礼物？', "Find things, find clues, or ask what's next. Like: where are my keys? What gift before the birthday?")}</p>
+        <div className="nesio-ask-guide-examples" aria-label={L(dict, '问宝盒示例', 'Ask Nesio examples')}>
+          <span>{L(dict, '钥匙在哪里', 'Where are my keys')}</span>
+          <span>{L(dict, 'Linda 生日买什么', "What to buy for Linda's birthday")}</span>
+          <span>{L(dict, '上次买的药还有吗', 'Any of that medicine left')}</span>
         </div>
         <div className="nesio-ask-guide-actions">
-          <button type="button" className="nesio-ob-primary-btn" onClick={onStart}>开始问宝盒</button>
-          <button type="button" className="nesio-ask-guide-later" onClick={onClose}>稍后</button>
+          <button type="button" className="nesio-ob-primary-btn" onClick={onStart}>{L(dict, '开始问宝盒', 'Start asking')}</button>
+          <button type="button" className="nesio-ask-guide-later" onClick={onClose}>{L(dict, '稍后', 'Later')}</button>
         </div>
       </div>
     </div>
@@ -244,6 +247,7 @@ export default function Portal() {
   const [voiceIntent, setVoiceIntent] = useState<'note' | 'ask'>('note');
   const [noteOpen, setNoteOpen] = useState(false);
   const [locale, setLocale] = useState<PortalLocale>('zh');
+  const dict = portalLocaleToDictionaryLocale(locale);
   const [authReady, setAuthReady] = useState(false);
   const [authSessionLoggedIn, setAuthSessionLoggedIn] = useState(false);
   const [onboardingActive, setOnboardingActive] = useState(false);
@@ -776,14 +780,14 @@ export default function Portal() {
           >
             <span style={{ flex: 1 }}>
               {storageAlert.kind === 'full'
-                ? `本机空间满了，新的记忆暂时存不进来。先在设置里导出一份备份，再清理一些照片，就能继续保存。`
-                : `本机空间已用 ${storageAlert.percent}%。方便的时候导出一份备份，之后就不用惦记这件事了。`}
+                ? L(dict, `本机空间满了，新的记忆暂时存不进来。先在设置里导出一份备份，再清理一些照片，就能继续保存。`, 'Local storage is full — new memories cannot be saved. Export a backup in Settings, clear some photos, and saving resumes.')
+                : L(dict, `本机空间已用 ${storageAlert.percent}%。方便的时候导出一份备份，之后就不用惦记这件事了。`, `Local storage is ${storageAlert.percent}% used. Export a backup when convenient and stop worrying about it.`)}
             </span>
             <button
               type="button"
               onClick={() => setStorageAlert(null)}
               style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: '1rem', padding: 0 }}
-              aria-label="关闭存储警告"
+              aria-label={L(dict, '关闭存储警告', 'Dismiss storage warning')}
             >✕</button>
           </div>
         )}
@@ -837,7 +841,7 @@ export default function Portal() {
       {memoryReceipt && (
         <div className="nesio-memory-receipt" role="status" aria-live="polite">
           <span className="nesio-memory-receipt-crystal" aria-hidden />
-          <span>收好了，以后可以找回来。</span>
+          <span>{L(dict, '收好了，以后可以找回来。', 'Tucked away — you can find it again later.')}</span>
         </div>
       )}
       <PortalOnboarding />
