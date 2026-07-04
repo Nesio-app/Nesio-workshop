@@ -12,6 +12,7 @@
  */
 
 import type { CalendarEvent } from '@/lib/portal/types';
+import { LEXICON, type LexiconCategory } from './keyword-lexicon';
 
 // ── Event type ────────────────────────────────────────────────────────────────
 
@@ -40,21 +41,21 @@ const TYPE_IMPORTANCE: Record<EventType, number> = {
 // Types that are always considered "pinnable" (regardless of score threshold)
 const ALWAYS_PINNABLE: ReadonlySet<EventType> = new Set<EventType>(['flight', 'medical', 'exam', 'deadline', 'birthday', 'travel']);
 
-// Type-detection keyword rules (checked in order — first match wins)
-const TYPE_RULES: Array<{ type: EventType; re: RegExp }> = [
-  { type: 'flight',   re: /flight|航班|机票|登机|起飞|出发|乘机|飞往|飞\s*\w/i },
-  { type: 'medical',  re: /doctor|医生|医院|诊所|手术|检查|复诊|挂号|预约.*医|dental|牙科/i },
-  { type: 'exam',     re: /exam|考试|考核|测试|quiz|托福|雅思|gre|gmat/i },
-  { type: 'deadline', re: /due|deadline|截止|到期|缴费|付款|租金|房租|还款|逾期|最后一天/i },
-  { type: 'birthday', re: /birthday|生日|寿|满月/i },
-  { type: 'travel',   re: /旅行|出行|搬家|入住|check.?in|酒店.*到达|到达.*酒店/i },
-  { type: 'meeting',  re: /meeting|会议|review|面试|interview|周会|同步|1on1|standup|stand.up|sync|call/i },
+// Type-detection order (first match wins) — patterns live in the shared lexicon
+const TYPE_ORDER: Array<{ type: EventType; category: LexiconCategory }> = [
+  { type: 'flight',   category: 'flight' },
+  { type: 'medical',  category: 'medical' },
+  { type: 'exam',     category: 'exam' },
+  { type: 'deadline', category: 'deadline' },
+  { type: 'birthday', category: 'birthday' },
+  { type: 'travel',   category: 'travel' },
+  { type: 'meeting',  category: 'meeting' },
 ];
 
 export function inferEventType(event: CalendarEvent): EventType {
   const text = `${event.title} ${event.description ?? ''}`;
-  for (const rule of TYPE_RULES) {
-    if (rule.re.test(text)) return rule.type;
+  for (const rule of TYPE_ORDER) {
+    if (LEXICON[rule.category].test(text)) return rule.type;
   }
   return 'other';
 }

@@ -7,22 +7,10 @@
 
 import { useEffect, useState } from 'react';
 import { getLifeGraph, type LifeNode } from '@/lib/portal/life-graph';
+import { countByDomain } from '@/lib/portal/domain-stats';
 
 const STORAGE_KEY = 'nesio-wrapped-last';
 const INTERVAL_DAYS = 90;
-
-// Domain keyword mapping (mirrors LifeCivilizationMap)
-const DOMAIN_KEYWORDS: Record<string, string[]> = {
-  '关系': ['朋友','家人','父母','妻子','丈夫','孩子','恋人','同事','认识','见面','聚会','婚礼','约会'],
-  '事业': ['工作','项目','会议','客户','目标','计划','完成','上线','发布','晋升','离职','创业'],
-  '健康': ['运动','跑步','健身','睡眠','饮食','医院','体检','感冒','恢复','锻炼','冥想'],
-  '成长': ['学习','读书','课程','技能','思考','反思','写作','输出','培训','研究'],
-  '自我': ['旅行','爱好','创作','音乐','电影','游戏','休息','放松','探索','体验'],
-};
-
-const DOMAIN_EMOJI: Record<string, string> = {
-  '关系': '👥', '事业': '💼', '健康': '💚', '成长': '📚', '自我': '✨',
-};
 
 interface WrappedData {
   quarterLabel: string;          // e.g. "2026 Q2"
@@ -39,14 +27,6 @@ function getQuarterLabel(date: Date): string {
   return `${date.getFullYear()} Q${q}`;
 }
 
-function detectDomain(node: LifeNode): string | null {
-  const text = [node.name, ...(node.tags ?? [])].join(' ').toLowerCase();
-  for (const [domain, kws] of Object.entries(DOMAIN_KEYWORDS)) {
-    if (kws.some((k) => text.includes(k))) return domain;
-  }
-  return null;
-}
-
 function buildWrappedData(nodes: LifeNode[], quarterStart: Date, quarterEnd: Date): WrappedData {
   const quarterNodes = nodes.filter((n) => {
     const d = new Date(n.createdAt);
@@ -56,16 +36,10 @@ function buildWrappedData(nodes: LifeNode[], quarterStart: Date, quarterEnd: Dat
   const label = getQuarterLabel(quarterStart);
   const total = quarterNodes.length;
 
-  // Count per domain
-  const domainCount: Record<string, number> = {};
-  for (const node of quarterNodes) {
-    const d = detectDomain(node) ?? '自我';
-    domainCount[d] = (domainCount[d] ?? 0) + 1;
-  }
-
-  const sorted = Object.entries(domainCount).sort((a, b) => b[1] - a[1]);
-  const dominant = sorted[0]?.[0] ?? '自我';
-  const dominantEmoji = DOMAIN_EMOJI[dominant] ?? '✨';
+  // Canonical domain taxonomy (nodeDomain + DOMAINS) via shared aggregation
+  const domainCounts = countByDomain(quarterNodes);
+  const dominant = domainCounts[0]?.label ?? '生活';
+  const dominantEmoji = domainCounts[0]?.icon ?? '✨';
 
   // Top node: most-tagged or highest confidence
   const topNode = quarterNodes
@@ -75,17 +49,11 @@ function buildWrappedData(nodes: LifeNode[], quarterStart: Date, quarterEnd: Dat
   const topNodeName = topNode?.name ?? '一段珍贵的时光';
 
   // Generate narrative
+  const sorted = domainCounts.map((d): [string, number] => [d.label, d.count]);
   const narrative = generateNarrative(label, total, dominant, topNodeName, sorted);
 
-  const breakdown = Object.entries(DOMAIN_KEYWORDS)
-    .map((e) => e[0])
-    .map((domain) => ({
-      label: domain,
-      emoji: DOMAIN_EMOJI[domain] ?? '·',
-      count: domainCount[domain] ?? 0,
-    }))
-    .filter((d) => d.count > 0)
-    .sort((a, b) => b.count - a.count)
+  const breakdown = domainCounts
+    .map((d) => ({ label: d.label, emoji: d.icon, count: d.count }))
     .slice(0, 4);
 
   return {

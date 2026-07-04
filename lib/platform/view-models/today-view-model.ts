@@ -3,6 +3,7 @@ import type { Signal } from '../../life-domain/signal';
 import { addLifeNode, getLifeGraph, getRecentNodes, updateLifeNode, type LifeNode } from '../../portal/life-graph';
 import type { RecommendationCard } from '../../portal/reasoning-engine';
 import { nearestNodeDate } from '../node-dates';
+import { LEXICON } from '../keyword-lexicon';
 import { scheduleHint } from '../../portal/time-labels';
 
 export interface SubTask {
@@ -175,9 +176,7 @@ export interface ProactiveContext {
   healthItems: string[];
 }
 
-const BIRTHDAY_WORDS = ['生日', '纪念日', '周年', '忌日', 'birthday', 'anniversary'];
 const HEALTH_TYPES = new Set(['health_state']);
-const HEALTH_WORDS = ['健康', '健身', '运动', '睡眠', '饮食', '减肥', '体重', '跑步', '锻炼', '复诊', '体检', '用药', '打卡'];
 
 function buildProactiveContext(allNodes: LifeNode[]): ProactiveContext {
   const now = Date.now();
@@ -189,7 +188,7 @@ function buildProactiveContext(allNodes: LifeNode[]): ProactiveContext {
     const text = [n.name, n.rawInput || ''].join(' ').toLowerCase();
 
     // Birthdays / special days
-    if (BIRTHDAY_WORDS.some((w) => text.includes(w))) {
+    if (LEXICON.birthday.test(text) || LEXICON.anniversary.test(text)) {
       const d = extractNearestDate(n);
       if (d) {
         const daysUntil = Math.round((d.getTime() - now) / 86_400_000);
@@ -202,7 +201,7 @@ function buildProactiveContext(allNodes: LifeNode[]): ProactiveContext {
     }
 
     // Health items
-    if (HEALTH_TYPES.has(n.type) || HEALTH_WORDS.some((w) => text.includes(w))) {
+    if (HEALTH_TYPES.has(n.type) || LEXICON.health.test(text)) {
       healthItems.push(n.name);
     }
   }

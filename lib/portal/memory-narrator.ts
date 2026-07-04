@@ -9,7 +9,7 @@
 
 import type { LifeNode } from './life-graph';
 import { nodeDomain } from '@/lib/life-domain';
-import { DOMAINS, type FrontDomain } from '@/lib/life-domain/domain-taxonomy';
+import { topDomain } from './domain-stats';
 import { relativePastLabel, relativeFutureLabel } from './time-labels';
 
 export type NarratorCardType = 'remember' | 'commitment' | 'activity';
@@ -92,18 +92,11 @@ function buildActivityCard(nodes: LifeNode[]): NarratorCard | null {
   );
   if (recent.length < 2) return null;
 
-  const counts = recent.reduce<Record<string, number>>((acc, n) => {
-    const d = nodeDomain(n);
-    if (d) acc[d] = (acc[d] ?? 0) + 1;
-    return acc;
-  }, {});
+  const top = topDomain(recent);
+  if (!top) return null;
 
-  const [topId, topCount] = Object.entries(counts).sort((a, b) => b[1] - a[1])[0] ?? [];
-  if (!topId) return null;
-
-  const meta = DOMAINS[topId as FrontDomain];
   const preview = recent
-    .filter((n) => nodeDomain(n) === topId)
+    .filter((n) => nodeDomain(n) === top.domain)
     .slice(0, 2)
     .map((n) => n.name)
     .join('、');
@@ -111,7 +104,7 @@ function buildActivityCard(nodes: LifeNode[]): NarratorCard | null {
   return {
     type: 'activity',
     title: '最近你在忙',
-    body: `${topCount} 条${meta?.label ?? topId}记录`,
+    body: `${top.count} 条${top.label}记录`,
     sub: preview || undefined,
     nodes: recent.slice(0, 3),
   };
