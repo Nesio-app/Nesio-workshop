@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { cookies, type UnsafeUnwrappedCookies } from 'next/headers';
+import { cookies } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,8 +31,8 @@ function envValue(key: string): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
-function googleCalendarAccessToken(): string {
-  return (cookies() as unknown as UnsafeUnwrappedCookies).get('nesio_google_calendar_access')?.value || '';
+async function googleCalendarAccessToken(): Promise<string> {
+  return (await cookies()).get('nesio_google_calendar_access')?.value || '';
 }
 
 function hasInvocationSecret(request: Request): boolean {
@@ -153,7 +153,7 @@ export async function POST(request: Request) {
   const body = (await request.json().catch(() => ({}))) as ToolInvocationBody;
   const actionKey = String(body.actionKey || '').trim();
   const executionMode = body.executionMode === 'execute' ? 'execute' : 'dry_run';
-  const accessToken = googleCalendarAccessToken();
+  const accessToken = await googleCalendarAccessToken();
   const policyDecision = evaluateStage5ToolInvocationPolicy({
     actionKey,
     executionMode,

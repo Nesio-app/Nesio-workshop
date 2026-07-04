@@ -55,7 +55,7 @@ async function writeToSupabase(events: TelemetryEvent[], deviceId: string): Prom
 }
 
 export async function POST(req: NextRequest) {
-  if (!isPortalRequestAuthorized(req)) {
+  if (!(await isPortalRequestAuthorized(req))) {
     return NextResponse.json({ ok: false }, { status: 401 });
   }
   if (isRateLimited(req, 'telemetry', { limit: 60, windowMs: 60_000 })) {

@@ -15,7 +15,7 @@ export async function OPTIONS() {
 }
 
 export async function POST(req: NextRequest) {
-  const guard = guardAiRoute(req, 'health_chat', { limit: 20, allowCrossOrigin: true });
+  const guard = await guardAiRoute(req, 'health_chat', { limit: 20, allowCrossOrigin: true });
   if (guard) return guard;
 
   if (!getGoogleKey()) {

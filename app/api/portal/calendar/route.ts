@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies, type UnsafeUnwrappedCookies } from 'next/headers';
+import { cookies } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
 import { mergeCalendarEvents } from '@/lib/portal/calendar-filters';
@@ -33,8 +33,8 @@ function hasStage5LabAccess(req: NextRequest): boolean {
   return Boolean(configured && provided === configured && accessMode === 'personal_lab');
 }
 
-function requireAuthenticatedCalendarAccess(req: NextRequest): NextResponse | null {
-  const cookieStore = (cookies() as unknown as UnsafeUnwrappedCookies);
+async function requireAuthenticatedCalendarAccess(req: NextRequest): Promise<NextResponse | null> {
+  const cookieStore = await cookies();
   const hasNesioSession = Boolean(
     cookieStore.get('baohe_auth_access')?.value ||
       cookieStore.get('baohe_auth_refresh')?.value ||
@@ -120,12 +120,12 @@ async function fetchIcsEvents(url: string, fallbackLabel: string) {
   }));
 }
 
-function googleCalendarAccessToken(): string {
-  return (cookies() as unknown as UnsafeUnwrappedCookies).get('nesio_google_calendar_access')?.value || '';
+async function googleCalendarAccessToken(): Promise<string> {
+  return (await cookies()).get('nesio_google_calendar_access')?.value || '';
 }
 
-function googleCalendarRefreshToken(): string {
-  return (cookies() as unknown as UnsafeUnwrappedCookies).get('nesio_google_calendar_refresh')?.value || '';
+async function googleCalendarRefreshToken(): Promise<string> {
+  return (await cookies()).get('nesio_google_calendar_refresh')?.value || '';
 }
 
 function setCalendarCookies(response: NextResponse, session: GoogleTokenResponse | null) {
@@ -222,11 +222,11 @@ async function fetchGoogleOAuthEvents(accessToken: string) {
 }
 
 export async function GET(req: NextRequest) {
-  const authFailure = requireAuthenticatedCalendarAccess(req);
+  const authFailure = await requireAuthenticatedCalendarAccess(req);
   if (authFailure) return authFailure;
 
-  const accessToken = googleCalendarAccessToken();
-  const refreshToken = googleCalendarRefreshToken();
+  const accessToken = await googleCalendarAccessToken();
+  const refreshToken = await googleCalendarRefreshToken();
   if (accessToken) {
     try {
       const events = await fetchGoogleOAuthEvents(accessToken);

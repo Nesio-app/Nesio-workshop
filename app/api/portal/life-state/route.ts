@@ -36,7 +36,7 @@ function fallbackExplanation(body: Partial<LifeStateRequest>): string {
 }
 
 export async function POST(req: NextRequest) {
-  const guard = guardAiRoute(req, 'life_state', { limit: 15 });
+  const guard = await guardAiRoute(req, 'life_state', { limit: 15 });
   if (guard) return guard;
 
   const body = await req.json() as LifeStateRequest;

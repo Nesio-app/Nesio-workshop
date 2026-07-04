@@ -35,7 +35,7 @@ async function revokeAtGoogle(token: string): Promise<boolean> {
 }
 
 export async function POST(req: NextRequest) {
-  if (!isPortalRequestAuthorized(req)) {
+  if (!(await isPortalRequestAuthorized(req))) {
     return NextResponse.json({ ok: false, error: 'auth_required' }, { status: 401 });
   }
   if (isRateLimited(req, 'oauth_disconnect', { limit: 10 })) {

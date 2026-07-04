@@ -12,7 +12,7 @@ import { writeCloudSignalsForCurrentUser } from '@/lib/platform/runtime/cloud-si
 import { normalizeGmailToSignal } from '@/lib/life-domain/normalizers';
 import { getIntegrationToken } from '@/lib/portal/integrations';
 import { buildEmailExtractionPrompt, parseJsonBlock } from '@/lib/extraction/extraction';
-import { cookies, type UnsafeUnwrappedCookies } from 'next/headers';
+import { cookies } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,8 +30,8 @@ function hasStage5LabAccess(req: NextRequest): boolean {
   return Boolean(configured && provided === configured && accessMode === 'personal_lab');
 }
 
-function requireAuthenticatedGmailAccess(req: NextRequest): NextResponse | null {
-  const cookieStore = (cookies() as unknown as UnsafeUnwrappedCookies);
+async function requireAuthenticatedGmailAccess(req: NextRequest): Promise<NextResponse | null> {
+  const cookieStore = await cookies();
   const hasNesioSession = Boolean(
     cookieStore.get('baohe_auth_access')?.value ||
       cookieStore.get('baohe_auth_refresh')?.value ||
@@ -174,7 +174,7 @@ function metadataPreview(messages: GmailMessage[]) {
 }
 
 export async function GET(req: NextRequest) {
-  const authFailure = requireAuthenticatedGmailAccess(req);
+  const authFailure = await requireAuthenticatedGmailAccess(req);
   if (authFailure) return authFailure;
 
   const url = new URL(req.url);

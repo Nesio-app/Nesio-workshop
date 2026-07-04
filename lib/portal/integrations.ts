@@ -4,7 +4,7 @@
  * Called by API routes; never runs client-side.
  */
 
-import { cookies, type UnsafeUnwrappedCookies } from 'next/headers';
+import { cookies } from 'next/headers';
 import { normalizeSupabaseRuntimeUrl } from '@/lib/portal/production-runtime';
 
 export type IntegrationProvider = 'gmail' | 'calendar';
@@ -86,8 +86,8 @@ const COOKIE_PREFIX: Record<IntegrationProvider, string> = {
   calendar: 'nesio_google_calendar',
 };
 
-export function readTokensFromCookies(provider: IntegrationProvider): IntegrationTokens | null {
-  const cookieStore = (cookies() as unknown as UnsafeUnwrappedCookies);
+export async function readTokensFromCookies(provider: IntegrationProvider): Promise<IntegrationTokens | null> {
+  const cookieStore = await cookies();
   const prefix = COOKIE_PREFIX[provider];
   const accessToken = cookieStore.get(`${prefix}_access`)?.value;
   const refreshToken = cookieStore.get(`${prefix}_refresh`)?.value;

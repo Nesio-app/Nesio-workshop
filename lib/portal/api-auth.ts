@@ -18,7 +18,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies, type UnsafeUnwrappedCookies } from 'next/headers';
+import { cookies } from 'next/headers';
 
 function envValue(key: string): string {
   return (process.env[key] ?? '').trim();
@@ -26,8 +26,8 @@ function envValue(key: string): string {
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
-export function isPortalRequestAuthorized(req: NextRequest, opts?: { allowCrossOrigin?: boolean }): boolean {
-  const cookieStore = (cookies() as unknown as UnsafeUnwrappedCookies);
+export async function isPortalRequestAuthorized(req: NextRequest, opts?: { allowCrossOrigin?: boolean }): Promise<boolean> {
+  const cookieStore = await cookies();
   const hasSession = Boolean(
     cookieStore.get('baohe_auth_access')?.value ||
       cookieStore.get('baohe_auth_refresh')?.value ||
@@ -99,12 +99,12 @@ export function isRateLimited(
  *   const guard = guardAiRoute(req, 'chat');
  *   if (guard) return guard;
  */
-export function guardAiRoute(
+export async function guardAiRoute(
   req: NextRequest,
   routeId: string,
   opts?: { limit?: number; windowMs?: number; allowCrossOrigin?: boolean },
-): NextResponse | null {
-  if (!isPortalRequestAuthorized(req, opts)) {
+): Promise<NextResponse | null> {
+  if (!(await isPortalRequestAuthorized(req, opts))) {
     return NextResponse.json(
       { ok: false, error: 'auth_required' },
       { status: 401, headers: { 'Cache-Control': 'no-store, max-age=0' } },

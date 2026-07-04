@@ -20,7 +20,7 @@ const MAX_TEXTS = 24;
 const MAX_CHARS = 500;
 
 export async function POST(req: NextRequest) {
-  if (!isPortalRequestAuthorized(req)) {
+  if (!(await isPortalRequestAuthorized(req))) {
     return NextResponse.json({ ok: false, error: 'auth_required' }, { status: 401 });
   }
   if (isRateLimited(req, 'embed', { limit: 30 })) {

@@ -12,7 +12,7 @@ function getOpenAIKey(): string {
 }
 
 export async function POST(req: NextRequest) {
-  const guard = guardAiRoute(req, 'tts', { limit: 10 });
+  const guard = await guardAiRoute(req, 'tts', { limit: 10 });
   if (guard) return guard;
 
   const { text, voice = 'nova', speed = 1.0 } = await req.json() as {

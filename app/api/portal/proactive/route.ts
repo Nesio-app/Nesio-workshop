@@ -101,7 +101,7 @@ async function callClaudeForCards(
 }
 
 export async function POST(req: NextRequest) {
-  const guard = guardAiRoute(req, 'proactive', { limit: 20 });
+  const guard = await guardAiRoute(req, 'proactive', { limit: 20 });
   if (guard) return guard;
 
   const body = await req.json() as ProactiveRequest;

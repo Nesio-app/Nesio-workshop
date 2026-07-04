@@ -175,7 +175,7 @@ async function callGemini(
 // ── Main handler ──────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
-  const guard = guardAiRoute(req, 'chat', { limit: 20 });
+  const guard = await guardAiRoute(req, 'chat', { limit: 20 });
   if (guard) return guard;
 
   const body = await req.json() as ChatRequest;

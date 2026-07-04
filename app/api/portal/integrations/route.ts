@@ -33,7 +33,7 @@ export async function GET() {
   // Merge cookie tokens for providers not in Supabase
   for (const provider of ['gmail', 'calendar'] as IntegrationProvider[]) {
     if (!integrationMap[provider]) {
-      const t = readTokensFromCookies(provider);
+      const t = await readTokensFromCookies(provider);
       if (t) integrationMap[provider] = t;
     }
   }

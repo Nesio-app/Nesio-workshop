@@ -37,7 +37,7 @@ function fallbackNarrative(body: Partial<InsightsRequest>): string {
 }
 
 export async function POST(req: NextRequest) {
-  const guard = guardAiRoute(req, 'insights', { limit: 15 });
+  const guard = await guardAiRoute(req, 'insights', { limit: 15 });
   if (guard) return guard;
 
   const body = await req.json() as InsightsRequest;

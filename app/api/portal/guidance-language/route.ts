@@ -108,7 +108,7 @@ async function enhanceWithClaude(
 }
 
 export async function POST(req: NextRequest) {
-  const guard = guardAiRoute(req, 'guidance_language', { limit: 20 });
+  const guard = await guardAiRoute(req, 'guidance_language', { limit: 20 });
   if (guard) return guard;
 
   const body = await req.json() as LanguageRequest;

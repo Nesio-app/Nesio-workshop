@@ -12,7 +12,7 @@ function envValue(key: string): string {
 }
 
 export async function POST(req: NextRequest) {
-  const guard = guardAiRoute(req, 'meeting_notes', { limit: 15 });
+  const guard = await guardAiRoute(req, 'meeting_notes', { limit: 15 });
   if (guard) return guard;
 
   const { transcript, duration, calendarEvent } = await req.json() as {

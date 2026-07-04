@@ -70,7 +70,7 @@ async function callGemini(apiKey: string, p: MomentumParams): Promise<MomentumSt
 }
 
 export async function POST(req: NextRequest) {
-  const guard = guardAiRoute(req, 'decompose_task', { limit: 20 });
+  const guard = await guardAiRoute(req, 'decompose_task', { limit: 20 });
   if (guard) return guard;
 
   const body = await req.json() as {

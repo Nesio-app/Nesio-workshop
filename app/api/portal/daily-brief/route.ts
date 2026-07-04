@@ -36,7 +36,7 @@ export interface BriefSegment {
 }
 
 export async function POST(req: NextRequest) {
-  const guard = guardAiRoute(req, 'daily_brief', { limit: 15 });
+  const guard = await guardAiRoute(req, 'daily_brief', { limit: 15 });
   if (guard) return guard;
 
   const body = await req.json() as BriefRequest;
