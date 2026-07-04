@@ -58,3 +58,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Sibling projects living in this working tree (see docs/repository-boundary-cleanup.md)
+/health-ios/
+/lifeflow/
+/weaver-ios/
+/health-web/config.js

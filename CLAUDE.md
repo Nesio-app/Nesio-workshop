@@ -99,3 +99,16 @@ font-family: var(--font-serif);    /* 引用/标题：Noto Serif SC */
 ## gstack
 
 Use the `/browse` skill from gstack for all web browsing. Never use `mcp__claude-in-chrome__*` tools directly.
+
+## Design rules
+
+- **Every async action must have a visible failure state.** Buttons that
+  trigger fetch/AI/TTS must render explicit error UI (message + retry),
+  never silently return to idle. Root cause of multiple "按钮没反应" bugs
+  (听简报, Gmail sync). No optimistic UI without a failure branch.
+- **Never swallow storage write failures.** localStorage/IndexedDB writes
+  that can drop user data must dispatch a visible event on failure
+  (see lib/portal/storage-health.ts).
+- **New API routes that spend money or read private data must call
+  `guardAiRoute`** (lib/portal/api-auth.ts) and be added to
+  docs/api-routes.md.

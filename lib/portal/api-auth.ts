@@ -26,7 +26,7 @@ function envValue(key: string): string {
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
-export function isPortalRequestAuthorized(req: NextRequest): boolean {
+export function isPortalRequestAuthorized(req: NextRequest, opts?: { allowCrossOrigin?: boolean }): boolean {
   const cookieStore = cookies();
   const hasSession = Boolean(
     cookieStore.get('baohe_auth_access')?.value ||
@@ -46,6 +46,9 @@ export function isPortalRequestAuthorized(req: NextRequest): boolean {
   // rate limiting (below) handles direct curl-style abuse.
   const noSupabase = !envValue('SUPABASE_URL') || !envValue('SUPABASE_ANON_KEY');
   if (!noSupabase) return false;
+  // Routes serving the Capacitor iOS shells (CORS *) skip the origin check
+  // — capacitor:// origins never match the host; rate limiting still applies.
+  if (opts?.allowCrossOrigin) return true;
   const host = req.headers.get('host') || '';
   for (const header of ['origin', 'referer']) {
     const value = req.headers.get(header);
@@ -99,9 +102,9 @@ export function isRateLimited(
 export function guardAiRoute(
   req: NextRequest,
   routeId: string,
-  opts?: { limit?: number; windowMs?: number },
+  opts?: { limit?: number; windowMs?: number; allowCrossOrigin?: boolean },
 ): NextResponse | null {
-  if (!isPortalRequestAuthorized(req)) {
+  if (!isPortalRequestAuthorized(req, opts)) {
     return NextResponse.json(
       { ok: false, error: 'auth_required' },
       { status: 401, headers: { 'Cache-Control': 'no-store, max-age=0' } },

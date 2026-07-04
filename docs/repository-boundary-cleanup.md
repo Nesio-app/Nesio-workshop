@@ -185,3 +185,10 @@ For this cleanup phase:
 - worktree is clean after documentation changes.
 - no UI, runtime data, external auth, cloud, payment, or production behavior is
   changed.
+
+## 2026-07 执行记录
+
+- `health-ios/`、`lifeflow/`、`weaver-ios/`、`health-web/config.js` 已加入
+  .gitignore(独立项目,不再污染 git status)。
+- `lib/health/` + `app/api/health/*` 属于本应用(溯健康 API),已入库。
+- 子模块(psych-tool-ios 等)保持现状,迁出需要单独规划 remote。
