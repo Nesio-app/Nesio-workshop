@@ -68,3 +68,41 @@
   CSP/HSTS/X-Frame-Options/nosniff/Referrer-Policy 全套在
 - 移动端 375px:无横向溢出、底部导航贴底、布局正常
 - 零 JS 运行时错误(除上述两类 401 网络噪音)
+
+---
+
+# 面板功能专项 QA(2026-07-04 第二轮,SQL 全就位后)
+
+## P3 — RoadmapSheet 文案未进 i18n 字典
+
+- **现象**:「投票给未来功能」sheet 的界面文案与 6 个候选功能的标题/描述
+  均为硬编码中文(components/portal/RoadmapSheet.tsx + lib/portal/roadmap.ts),
+  英文用户看到中文。
+- **修法**:sheet 框架文案入 t() 字典;候选功能标题/描述在 roadmap.ts
+  改为 { zh, en } 双语结构。属 REG-004 家族的新增欠账。
+- **状态**:open
+
+## 全绿项(生产实测)
+
+- **门禁矩阵**:admin metrics/users 无密钥 401、错密钥 401、跨域 403;
+  /admin 页密钥态不泄露任何数据,错密钥有明确提示;noindex 生效
+- **投票全链路**:投 5 星 → 查(avg/count/mine 正确)→ 改 3 星覆盖不加票 →
+  伪造 featureId/越界分数/缺 deviceId 全部 400、跨域 403
+- **App 内 sheet**:设置入口 → sheet 打开(候选+已有均分显示)→ 点星 →
+  服务端落库确认 → 星星高亮/票数刷新,零 console 错误
+- **access 匿名** → public;事件名 exp_exposure/feature_vote 过 sanitize
+- **移动端** 375px 面板无横向溢出
+- **循环自证**:uptime 工作流已按 15 分钟节奏自跑(10s 成功),
+  CI Release Verification 近 5 次推送全绿
+
+## 留给你验证的(需要你的密钥/登录态)
+
+1. /admin 输入正确密钥 → 各区出数;点 ⤓ CSV 下载打开看格式
+2. 用户权限区:给自己设 Lab → 重新打开 App → /secretary 应直接可进
+3. 登录态用一次 听简报/问一问 → 几分钟后 AI 成本表应出现该路由行
+
+## QA 测试数据清理(可选)
+
+本轮在 feature_votes 写了 2 条测试票(week_review ★3、voice_diary ★4)。
+想清零就在 Supabase SQL Editor 跑:
+`DELETE FROM public.feature_votes;`(现在表里只有这两条 QA 票,放心清)
