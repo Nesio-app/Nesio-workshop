@@ -16,6 +16,8 @@ function envValue(key: string): string {
 interface BriefRequest {
   displayName: string;
   weather?: { temperatureC?: number; condition?: string; forecastNote?: string; placeLabel?: string };
+  /** Reverse-geocoded city label from the device, e.g. "Cary, NC" */
+  location?: string;
   events?: Array<{ title: string; start: string; end?: string; location?: string; calendarName?: string }>;
   emailHighlights?: string[];
   memoryNotes?: string[];
@@ -33,7 +35,7 @@ export interface BriefSegment {
 
 export async function POST(req: NextRequest) {
   const body = await req.json() as BriefRequest;
-  const { displayName, weather, events, emailHighlights, memoryNotes } = body;
+  const { displayName, weather, location, events, emailHighlights, memoryNotes } = body;
 
   const now = new Date();
   const hour = now.getHours();
@@ -45,8 +47,9 @@ export async function POST(req: NextRequest) {
 
   // ── Build context sections ──────────────────────────────────────────────────
 
+  const placeLabel = location || weather?.placeLabel || '';
   const weatherText = weather
-    ? `${weather.temperatureC}°C，${weather.condition}${weather.forecastNote ? '，' + weather.forecastNote : ''}${weather.placeLabel ? '（' + weather.placeLabel + '）' : ''}`
+    ? `${weather.temperatureC}°C，${weather.condition}${weather.forecastNote ? '，' + weather.forecastNote : ''}${placeLabel ? '（' + placeLabel + '）' : ''}`
     : null;
 
   const todayEvents = (events || []).filter((e) => {
@@ -125,6 +128,7 @@ export async function POST(req: NextRequest) {
 【用户信息】
 姓名：${displayName || '你'}
 当前时间：${dateStr} ${timeStr}
+${location ? `所在位置：${location}` : ''}
 ${weatherText ? `天气：${weatherText}` : ''}
 ${calendarSection}
 ${emailSection}

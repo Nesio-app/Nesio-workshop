@@ -8,16 +8,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { loadProfileSettings } from '@/lib/portal/profile';
-import { loadCalendarFromLocal } from '@/lib/portal/calendar-local-store';
-import { readPortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
+import { getEnvironment, getCachedCalendarEvents } from '@/lib/portal/environment';
+import { refreshLocation } from '@/lib/portal/location-store';
 import type { CalendarEvent } from '@/lib/portal/types';
-
-interface WeatherView {
-  temperatureC: number;
-  condition: string;
-  forecastNote?: string;
-  placeLabel?: string;
-}
 
 const BRIEF_CACHE_KEY = 'nesio-daily-brief-v2';
 interface BriefCache { date: string; script: string; }
@@ -28,13 +21,6 @@ function todayKey(): string {
 
 type PlayState = 'idle' | 'loading' | 'playing' | 'paused' | 'done' | 'error';
 type TTSMode = 'openai' | 'browser';
-
-function getCalendarEvents(): CalendarEvent[] {
-  const local = loadCalendarFromLocal() as CalendarEvent[];
-  if (local.length > 0) return local;
-  const cached = readPortalCache<{ events?: CalendarEvent[] }>(PORTAL_CACHE_KEYS.calendar);
-  return cached?.events ?? [];
-}
 
 function getEmailHighlights(): string[] {
   if (typeof window === 'undefined') return [];
@@ -88,6 +74,7 @@ export default function DailyBriefCard({
   useEffect(() => {
     if (!canUsePrivateData) { setDisplayName(''); setCachedScript(''); return; }
     setDisplayName(loadProfileSettings().displayName || '');
+    void refreshLocation(); // warm the location cache for the brief
     try {
       const cached = JSON.parse(localStorage.getItem(BRIEF_CACHE_KEY) || 'null') as BriefCache | null;
       if (cached?.date === todayKey() && cached.script) setCachedScript(cached.script);
@@ -200,8 +187,8 @@ export default function DailyBriefCard({
     setProgress(0);
     setErrorMsg('');
 
-    const weather = readPortalCache<WeatherView>(PORTAL_CACHE_KEYS.weather);
-    const events = getCalendarEvents();
+    const env = getEnvironment();
+    const events: CalendarEvent[] = getCachedCalendarEvents();
     const emailHighlights = getEmailHighlights();
     const memoryNotes = getMemoryNotes();
 
@@ -209,7 +196,12 @@ export default function DailyBriefCard({
       const res = await fetch('/api/portal/daily-brief', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ displayName, weather, events, emailHighlights, memoryNotes }),
+        body: JSON.stringify({
+          displayName,
+          weather: env.weather,
+          location: env.location?.label || undefined,
+          events, emailHighlights, memoryNotes,
+        }),
       });
       const data = await res.json() as { ok?: boolean; script?: string };
       if (!data.ok || !data.script) {

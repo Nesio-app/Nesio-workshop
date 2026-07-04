@@ -12,8 +12,8 @@ import { loadProfileSettings } from '@/lib/portal/profile';
 import { smartSearch } from '@/lib/portal/smart-search';
 import { parseTemporalQuery, isInSpan } from '@/lib/portal/temporal-query';
 import { readPortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
-import { loadCalendarFromLocal } from '@/lib/portal/calendar-local-store';
-import { loadLastLocation, refreshLocation, formatLocationAge } from '@/lib/portal/location-store';
+import { refreshLocation } from '@/lib/portal/location-store';
+import { formatEnvironmentContext, getCachedCalendarEvents } from '@/lib/portal/environment';
 import MemoryFlashBanner, { useMemoryFlash } from '@/components/portal/MemoryFlashBanner';
 
 interface ChatMessage { role: 'user' | 'model'; text: string; }
@@ -131,12 +131,7 @@ function buildMemoryContext(query: string): string {
 }
 
 function buildCalendarContext(query: string): string {
-  // Primary: localStorage (24h TTL). Fallback: sessionStorage (5-min TTL, may be expired).
-  let events: CalendarEvent[] = loadCalendarFromLocal() as CalendarEvent[];
-  if (events.length === 0) {
-    const data = readPortalCache<{ events?: CalendarEvent[] }>(PORTAL_CACHE_KEYS.calendar);
-    events = data?.events ?? [];
-  }
+  const events: CalendarEvent[] = getCachedCalendarEvents();
   if (events.length === 0) return '';
 
   const temporal = parseTemporalQuery(query);
@@ -178,23 +173,6 @@ function buildCalendarContext(query: string): string {
   return parts.join('\n');
 }
 
-function buildEnvironmentContext(): string {
-  const parts: string[] = [];
-
-  const loc = loadLastLocation();
-  if (loc) parts.push(`当前位置：${loc.label}（${formatLocationAge(loc.ts)}）`);
-
-  const weather = readPortalCache<{
-    temperatureC?: number; condition?: string; forecastNote?: string; placeLabel?: string;
-  }>(PORTAL_CACHE_KEYS.weather);
-  if (weather?.condition) {
-    const place = weather.placeLabel && !loc ? `${weather.placeLabel} ` : '';
-    parts.push(`当前天气：${place}${weather.temperatureC}°C ${weather.condition}${weather.forecastNote ? '，' + weather.forecastNote : ''}`);
-  }
-
-  if (parts.length === 0) return '';
-  return `【实时环境】\n${parts.join('\n')}`;
-}
 
 const CHAT_HISTORY_KEY = 'nesio-chat-history-v1';
 const MAX_STORED = 60;
@@ -524,7 +502,7 @@ export default function NesioChatSheet({
             : undefined,
           memoryContext: buildMemoryContext(text.trim()),
           calendarContext: buildCalendarContext(text.trim()),
-          environmentContext: buildEnvironmentContext(),
+          environmentContext: formatEnvironmentContext(),
         }),
         signal: controller.signal,
       });

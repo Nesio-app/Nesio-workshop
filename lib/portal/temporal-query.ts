@@ -117,6 +117,23 @@ export function parseTemporalQuery(query: string): TemporalSpan {
   return { hasDate: false, label: '' };
 }
 
+// ── Span factories ─────────────────────────────────────────────────────────────
+// Use these instead of hand-rolled "tomorrow 00:00 <= d < dayAfter" comparisons.
+
+export function todaySpan(now: Date = new Date()): TemporalSpan {
+  return { exact: dayStart(now), hasDate: true, label: '今天' };
+}
+
+export function tomorrowSpan(now: Date = new Date()): TemporalSpan {
+  return { exact: addDays(dayStart(now), 1), hasDate: true, label: '明天' };
+}
+
+/** [today, today+days] inclusive — e.g. nextDaysSpan(7) = the coming week. */
+export function nextDaysSpan(days: number, now: Date = new Date()): TemporalSpan {
+  const start = dayStart(now);
+  return { rangeStart: start, rangeEnd: addDays(start, days), hasDate: true, label: `未来${days}天` };
+}
+
 /** True if Date d falls on the same calendar day as target */
 export function isSameDay(d: Date, target: Date): boolean {
   return (
