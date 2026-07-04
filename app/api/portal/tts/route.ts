@@ -4,12 +4,16 @@
  * Returns audio/mpeg stream.
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { guardAiRoute } from '@/lib/portal/api-auth';
 
 function getOpenAIKey(): string {
   return (process.env.OpenAI_KEY || process.env.OPENAI_API_KEY || '').trim();
 }
 
 export async function POST(req: NextRequest) {
+  const guard = guardAiRoute(req, 'tts', { limit: 10 });
+  if (guard) return guard;
+
   const { text, voice = 'nova', speed = 1.0 } = await req.json() as {
     text: string;
     voice?: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';

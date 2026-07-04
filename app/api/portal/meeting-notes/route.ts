@@ -3,6 +3,7 @@
  * Generates structured meeting notes from transcript using Gemini.
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { guardAiRoute } from '@/lib/portal/api-auth';
 
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
@@ -11,6 +12,9 @@ function envValue(key: string): string {
 }
 
 export async function POST(req: NextRequest) {
+  const guard = guardAiRoute(req, 'meeting_notes', { limit: 15 });
+  if (guard) return guard;
+
   const { transcript, duration, calendarEvent } = await req.json() as {
     transcript: string;
     duration: string;

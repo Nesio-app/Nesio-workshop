@@ -4,6 +4,7 @@
  * Returns: { ok: true, script: string }
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { guardAiRoute } from '@/lib/portal/api-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,6 +35,9 @@ export interface BriefSegment {
 }
 
 export async function POST(req: NextRequest) {
+  const guard = guardAiRoute(req, 'daily_brief', { limit: 15 });
+  if (guard) return guard;
+
   const body = await req.json() as BriefRequest;
   const { displayName, weather, location, events, emailHighlights, memoryNotes } = body;
 

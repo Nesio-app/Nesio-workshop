@@ -15,6 +15,7 @@
  * AI only invoked after trigger fires. See docs/research/proactive-ai-systems-2025.md §4
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { guardAiRoute } from '@/lib/portal/api-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -107,6 +108,9 @@ async function enhanceWithClaude(
 }
 
 export async function POST(req: NextRequest) {
+  const guard = guardAiRoute(req, 'guidance_language', { limit: 20 });
+  if (guard) return guard;
+
   const body = await req.json() as LanguageRequest;
   const { cards = [], userName } = body;
 

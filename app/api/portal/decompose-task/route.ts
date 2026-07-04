@@ -6,6 +6,7 @@
  * Primary: Claude Haiku. Fallback: Gemini 2.0 Flash.
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { guardAiRoute } from '@/lib/portal/api-auth';
 import {
   buildMomentumPrompt,
   fallbackMomentumSteps,
@@ -69,6 +70,9 @@ async function callGemini(apiKey: string, p: MomentumParams): Promise<MomentumSt
 }
 
 export async function POST(req: NextRequest) {
+  const guard = guardAiRoute(req, 'decompose_task', { limit: 20 });
+  if (guard) return guard;
+
   const body = await req.json() as {
     taskName?: string;
     context?: string;

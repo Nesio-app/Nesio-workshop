@@ -9,6 +9,7 @@
  * to AI, not all Signals." We send dimension levels + short notes, nothing raw.
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { guardAiRoute } from '@/lib/portal/api-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,6 +36,9 @@ function fallbackExplanation(body: Partial<LifeStateRequest>): string {
 }
 
 export async function POST(req: NextRequest) {
+  const guard = guardAiRoute(req, 'life_state', { limit: 15 });
+  if (guard) return guard;
+
   const body = await req.json() as LifeStateRequest;
   const { displayName, dimensions, risks, opportunities } = body;
 

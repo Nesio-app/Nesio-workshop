@@ -11,6 +11,7 @@
  * copy the Internal Integration Secret, then share the pages/databases with it.
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { guardAiRoute } from '@/lib/portal/api-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -103,6 +104,9 @@ ${docText.slice(0, 5000)}`;
 }
 
 export async function POST(req: NextRequest) {
+  const guard = guardAiRoute(req, 'notion', { limit: 15 });
+  if (guard) return guard;
+
   const { token } = await req.json() as { token?: string };
   if (!token) {
     return NextResponse.json({ ok: false, error: 'missing_token' }, { status: 400 });

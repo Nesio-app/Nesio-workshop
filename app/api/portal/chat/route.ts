@@ -6,6 +6,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { buildChatContext } from '@/lib/portal/chat-context';
+import { guardAiRoute } from '@/lib/portal/api-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -173,6 +174,9 @@ async function callGemini(
 // ── Main handler ──────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
+  const guard = guardAiRoute(req, 'chat', { limit: 20 });
+  if (guard) return guard;
+
   const body = await req.json() as ChatRequest;
   const { message, history = [], coachStyle, fileContext, memoryContext, calendarContext, environmentContext } = body;
 

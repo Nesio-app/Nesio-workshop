@@ -8,6 +8,7 @@
  * Falls back to rule-generated text if Claude unavailable.
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { guardAiRoute } from '@/lib/portal/api-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -100,6 +101,9 @@ async function callClaudeForCards(
 }
 
 export async function POST(req: NextRequest) {
+  const guard = guardAiRoute(req, 'proactive', { limit: 20 });
+  if (guard) return guard;
+
   const body = await req.json() as ProactiveRequest;
   const { triggers = [], userName } = body;
 

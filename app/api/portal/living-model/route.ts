@@ -15,6 +15,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { LivingModelLayer, LivingModelLayerId } from '@/lib/platform/living-model';
 import { LAYER_META } from '@/lib/platform/living-model';
+import { guardAiRoute } from '@/lib/portal/api-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -163,6 +164,9 @@ ${prevStr}
 }
 
 export async function POST(req: NextRequest) {
+  const guard = guardAiRoute(req, 'living_model', { limit: 10 });
+  if (guard) return guard;
+
   const body = await req.json() as LivingModelRequest;
 
   const fallback = buildFallbackModel();

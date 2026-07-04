@@ -5,6 +5,7 @@
  * We accept the raw XML text and parse key records with Gemini.
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { guardAiRoute } from '@/lib/portal/api-auth';
 
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
@@ -112,6 +113,9 @@ function parseHealthFallback(text: string): object[] {
 }
 
 export async function POST(req: NextRequest) {
+  const guard = guardAiRoute(req, 'portal_health', { limit: 10 });
+  if (guard) return guard;
+
   try {
     const contentType = req.headers.get('content-type') || '';
 
