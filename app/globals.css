@@ -15223,6 +15223,7 @@ html[data-portal-theme="night"] .nesio-memory-detail-val { color: #d0d8f0; }
 
 /* ── Voice/text mode toggle button ── */
 .nesio-wechat-mode-btn {
+  color: var(--portal-muted);
   width: 2.2rem;
   height: 2.2rem;
   border-radius: 50%;
@@ -15273,7 +15274,11 @@ html[data-portal-theme="night"] .nesio-wechat-hold-btn { background: #2a2d3e; bo
   justify-content: center;
   font-size: 1.25rem;
   flex-shrink: 0;
+  /* 批次 14:图标显式着色,夜间不再隐形 */
+  color: var(--portal-muted);
 }
+html[data-portal-theme="night"] .nesio-wechat-emoji-btn,
+html[data-portal-theme="night"] .nesio-wechat-mode-btn { color: #b9d0f0; }
 
 /* ── Camera shutter ring (inside live camera view) ── */
 .nesio-chat-camera-shutter {
@@ -17025,16 +17030,27 @@ html[data-portal-theme="night"] .nesio-related-node-chip:hover {
   cursor: default;
 }
 
+/* 批次 16:与上一级勾选圈(collapsed-check)完全一致——
+   视觉 20px(豁免全局 44px 按钮规则,触控区由 ::before 补足),
+   边框用 --portal-muted(--portal-line 在日间几乎看不见) */
+.nesio-today-root button.nesio-momentum-check,
 .nesio-momentum-check {
   flex-shrink: 0;
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  min-height: 20px;
   border-radius: 50%;
-  border: 2px solid var(--portal-line, rgba(0,0,0,.18));
-  background: transparent;
+  border: 2px solid var(--portal-muted, rgba(0,0,0,.4));
+  background: var(--glass-bg-solid);
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
   position: relative;
+}
+.nesio-momentum-check::before {
+  content: '';
+  position: absolute;
+  inset: -12px;
 }
 .nesio-momentum-check--done {
   background: var(--portal-blue-deep);
@@ -17113,16 +17129,23 @@ html[data-portal-theme="night"] .nesio-related-node-chip:hover {
 }
 .nesio-momentum-drill-item--done { opacity: 0.4; }
 
+.nesio-today-root button.nesio-momentum-drill-check,
 .nesio-momentum-drill-check {
   flex-shrink: 0;
   width: 16px;
   height: 16px;
+  min-width: 16px;
+  min-height: 16px;
   border-radius: 50%;
-  border: 1.5px solid var(--portal-line, rgba(0,0,0,.2));
-  background: transparent;
+  border: 2px solid var(--portal-muted, rgba(0,0,0,.4));
+  background: var(--glass-bg-solid);
   cursor: pointer;
   position: relative;
-  transition: background 0.12s, border-color 0.12s;
+}
+.nesio-momentum-drill-check::before {
+  content: '';
+  position: absolute;
+  inset: -12px;
 }
 .nesio-momentum-drill-check--done {
   background: #5b8ff9;
@@ -17502,6 +17525,14 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
   margin-bottom: 1rem;
 }
 .nesio-narrator-section > .nesio-narrator-card:nth-child(3) { grid-column: 1 / -1; }
+
+/* 批次 15:narrator 指标卡——标题小字,数量大号 */
+.nesio-narrator-card .nesio-narrator-body {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--portal-ink);
+}
 
 .nesio-narrator-card {
   background: var(--glass-bg-solid);

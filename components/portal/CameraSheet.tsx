@@ -826,18 +826,9 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
           <div className="nesio-camera-result-nodes">
             {editedNodes.map((node, i) => node.deleted ? null : (
               <div key={i} className="nesio-camera-result-node nesio-camera-result-node--editable">
-                {/* Type chips */}
-                <div className="nesio-camera-node-type-row">
-                  {ALL_TYPES.map((t) => (
-                    <button
-                      key={t}
-                      type="button"
-                      className={`nesio-camera-type-chip${node.type === t ? ' nesio-camera-type-chip--active' : ''}`}
-                      onClick={() => setEditedNodes((prev) => prev.map((n, j) => j === i ? { ...n, type: t } : n))}
-                    >
-                      {TYPE_ICON[t]}
-                    </button>
-                  ))}
+                {/* 批次 16:类型选择行删除——AI 按照片内容识别(小票/物品/文档…),
+                    不再让人手挑 emoji 图标;只留删除按钮 */}
+                <div className="nesio-camera-node-type-row" style={{ justifyContent: 'flex-end' }}>
                   <button
                     type="button"
                     className="nesio-camera-node-delete"

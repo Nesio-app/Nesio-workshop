@@ -33,10 +33,16 @@ export function PurchaseCoolingPanel({ productName, similarCount, similarExample
   const [expanded, setExpanded] = useState(false);
   const [price, setPrice] = useState('');
   const [wage, setWage] = useState('');
+  // 批次 16:时薪填一次就记住(WAGE_KEY),已有值时默认收起,点「改」才展开
+  const [editingWage, setEditingWage] = useState(false);
   const [decided, setDecided] = useState<'frozen' | 'buying' | ''>('');
   const [vaultOpen, setVaultOpen] = useState(false);
 
-  useEffect(() => { setWage(loadWage()); }, []);
+  useEffect(() => {
+    const saved = loadWage();
+    setWage(saved);
+    setEditingWage(!saved); // 没填过才默认展开时薪输入
+  }, []);
 
   function saveWage(v: string) {
     setWage(v);
@@ -106,15 +112,30 @@ export function PurchaseCoolingPanel({ productName, similarCount, similarExample
           value={price}
           onChange={(e) => setPrice(e.target.value)}
         />
-        <span className="nesio-cooling-label">{L(dict, '时薪', 'Hourly pay')}</span>
-        <input
-          className="nesio-cooling-input"
-          type="number"
-          inputMode="decimal"
-          placeholder={L(dict, '¥/小时', '$/hr')}
-          value={wage}
-          onChange={(e) => saveWage(e.target.value)}
-        />
+        {editingWage ? (
+          <>
+            <span className="nesio-cooling-label">{L(dict, '时薪', 'Hourly pay')}</span>
+            <input
+              className="nesio-cooling-input"
+              type="number"
+              inputMode="decimal"
+              placeholder={L(dict, '¥/小时', '$/hr')}
+              value={wage}
+              onChange={(e) => saveWage(e.target.value)}
+              onBlur={() => { if (wage) setEditingWage(false); }}
+              autoFocus={Boolean(loadWage())}
+            />
+          </>
+        ) : (
+          <button
+            type="button"
+            className="nesio-cooling-link"
+            style={{ marginLeft: 'auto', whiteSpace: 'nowrap' }}
+            onClick={() => setEditingWage(true)}
+          >
+            {L(dict, `时薪 ¥${wage} · 改`, `Pay $${wage}/hr · edit`)}
+          </button>
+        )}
       </div>
 
       <div className="nesio-cooling-copy">
