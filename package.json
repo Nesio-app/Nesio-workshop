@@ -191,7 +191,12 @@
     "cloud:supabase:schema:bundle": "node scripts/supabase-schema-bundle.mjs",
     "test:supabase-schema-bundle": "node scripts/supabase-schema-bundle.test.mjs",
     "test:supabase-cloud-preflight": "node scripts/supabase-cloud-preflight.test.mjs",
-    "test:backend-v1-live-readiness": "node scripts/backend-v1-live-readiness.test.mjs"
+    "test:backend-v1-live-readiness": "node scripts/backend-v1-live-readiness.test.mjs",
+    "report:drift": "node scripts/report-drift.mjs",
+    "report:broken-links": "node scripts/report-broken-links.mjs",
+    "report:security-loop": "node scripts/report-security-loop.mjs",
+    "report:ai-cost": "node scripts/report-ai-cost.mjs",
+    "loops": "npm run report:drift && npm run report:broken-links && npm run report:security-loop"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

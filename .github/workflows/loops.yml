@@ -1,0 +1,81 @@
+# L-2/L-3/L-4 周循环:漂移检测 + 断链巡检 + 安全循环(全部 report-only)。
+# 有发现 → 更新固定 issue(标签 loop-report);无发现 → 静默。
+# L-1(CI 失败开 issue)在 deploy.yml;L-5(成本)因需外部数据源为手动:npm run report:ai-cost。
+name: Weekly Loops
+
+on:
+  schedule:
+    - cron: '0 13 * * 1' # 每周一 13:00 UTC(美东早上)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  loops:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run loops
+        id: loops
+        run: |
+          {
+            echo 'REPORT<<EOF_REPORT'
+            node scripts/report-drift.mjs --markdown
+            node scripts/report-broken-links.mjs --markdown
+            node scripts/report-security-loop.mjs --markdown
+            echo 'EOF_REPORT'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Summary
+        run: echo "${{ steps.loops.outputs.REPORT }}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Update loop-report issue
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const report = `${{ toJSON(steps.loops.outputs.REPORT) }}`;
+            const totals = [...report.matchAll(/(DRIFT|BROKEN_LINKS|SECURITY)_TOTAL=(\d+)/g)];
+            const sum = totals.reduce((s, m) => s + Number(m[2]), 0);
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner, repo: context.repo.repo,
+              state: 'open', labels: 'loop-report',
+            });
+            const body = `每周循环报告 · ${new Date().toISOString().slice(0, 10)}\n\n${JSON.parse(report)}`;
+            if (sum === 0) {
+              // 全绿:有旧 issue 则关闭
+              if (issues.length > 0) {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner, repo: context.repo.repo,
+                  issue_number: issues[0].number, body: '✅ 本周全绿,关闭。',
+                });
+                await github.rest.issues.update({
+                  owner: context.repo.owner, repo: context.repo.repo,
+                  issue_number: issues[0].number, state: 'closed',
+                });
+              }
+              return;
+            }
+            if (issues.length > 0) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: issues[0].number, body,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner, repo: context.repo.repo,
+                title: `循环报告:${sum} 项待关注(漂移/断链/安全)`,
+                body, labels: ['loop-report'],
+              });
+            }

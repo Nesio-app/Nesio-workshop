@@ -7,8 +7,8 @@
  * Returns: { ok, vectors: (number[] | null)[] }  — null where embedding failed
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies, type UnsafeUnwrappedCookies } from 'next/headers';
 import { embedTextRaw } from '@/lib/life-domain/signal-embedding';
+import { isPortalRequestAuthorized, isRateLimited } from '@/lib/portal/api-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,25 +16,15 @@ function envValue(key: string): string {
   return (process.env[key] ?? '').trim();
 }
 
-function isAllowed(req: NextRequest): boolean {
-  const cookieStore = (cookies() as unknown as UnsafeUnwrappedCookies);
-  const hasSession = Boolean(
-    cookieStore.get('baohe_auth_access')?.value ||
-      cookieStore.get('baohe_auth_refresh')?.value ||
-      cookieStore.get('baohe_wechat_openid')?.value,
-  );
-  const noSupabase = !envValue('SUPABASE_URL') || !envValue('SUPABASE_ANON_KEY');
-  const stage5 = envValue('NESIO_STAGE5_INVOCATION_SECRET');
-  const providedStage5 = req.headers.get('x-nesio-stage5-secret')?.trim() || '';
-  return hasSession || noSupabase || (Boolean(stage5) && providedStage5 === stage5);
-}
-
 const MAX_TEXTS = 24;
 const MAX_CHARS = 500;
 
 export async function POST(req: NextRequest) {
-  if (!isAllowed(req)) {
+  if (!isPortalRequestAuthorized(req)) {
     return NextResponse.json({ ok: false, error: 'auth_required' }, { status: 401 });
+  }
+  if (isRateLimited(req, 'embed', { limit: 30 })) {
+    return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 });
   }
   if (!envValue('GEMINI_API_KEY')) {
     return NextResponse.json({ ok: false, error: 'embeddings_unavailable' }, { status: 503 });

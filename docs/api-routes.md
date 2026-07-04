@@ -32,6 +32,8 @@ Auth legend:
 | POST /api/portal/health | guard | 10/min |
 | POST /api/health/analyze | guard | 20/min |
 | POST /api/health/chat | guard | 20/min |
+| POST /api/health/narrative | guard (allowCrossOrigin) | 15/min |
+| GET/POST /api/secretary/health, /api/secretary/chat | session / lab(route 内建) | — |
 | POST /api/portal/analyze | session (route-local) | — |
 | POST /api/portal/ingest | secret / session | — |
 | POST /api/portal/embed | session / no-Supabase | — |
