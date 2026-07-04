@@ -69,17 +69,19 @@ export type InsightWidgetId = 'donut' | 'heatmap' | 'week_bar' | 'tag_cloud' | '
 interface WidgetMeta {
   id: InsightWidgetId;
   label: string;
+  labelEn: string;
   icon: string;
   description: string;
+  descriptionEn: string;
 }
 
 const WIDGET_REGISTRY: WidgetMeta[] = [
-  { id: 'donut',              label: '记录分布',   icon: '🥧', description: '各类型记录占比（饼图）' },
-  { id: 'heatmap',            label: '活动热力图', icon: '🗓', description: '每周各时段的记录密度' },
-  { id: 'week_bar',           label: '周趋势',     icon: '📊', description: '最近8周记录数量变化' },
-  { id: 'tag_cloud',          label: '高频标签',   icon: '🏷', description: '出现最多的标签' },
-  { id: 'commitment_status',  label: '承诺状态',   icon: '🤝', description: '待完成、即将到期、逾期汇总' },
-  { id: 'my_experiment',      label: '我的实验',   icon: '🧪', description: '自定义变量追踪，用数据说话' },
+  { id: 'donut',              label: '记录分布',   labelEn: 'Distribution',      icon: '🥧', description: '各类型记录占比（饼图）', descriptionEn: 'Share of each record type (pie)' },
+  { id: 'heatmap',            label: '活动热力图', labelEn: 'Activity heatmap',  icon: '🗓', description: '每周各时段的记录密度', descriptionEn: 'Record density by weekday and time' },
+  { id: 'week_bar',           label: '周趋势',     labelEn: 'Weekly trend',      icon: '📊', description: '最近8周记录数量变化', descriptionEn: 'Record count over the last 8 weeks' },
+  { id: 'tag_cloud',          label: '高频标签',   labelEn: 'Top tags',          icon: '🏷', description: '出现最多的标签', descriptionEn: 'Most frequent tags' },
+  { id: 'commitment_status',  label: '承诺状态',   labelEn: 'Commitments',       icon: '🤝', description: '待完成、即将到期、逾期汇总', descriptionEn: 'Pending, due soon, and overdue summary' },
+  { id: 'my_experiment',      label: '我的实验',   labelEn: 'My experiment',     icon: '🧪', description: '自定义变量追踪，用数据说话', descriptionEn: 'Track your own variables — let data speak' },
 ];
 
 const DEFAULT_WIDGETS: InsightWidgetId[] = ['donut', 'heatmap', 'my_experiment'];
@@ -127,11 +129,25 @@ const TYPE_LABEL: Record<string, string> = {
   preference: '偏好',
 };
 
+const TYPE_LABEL_EN: Record<string, string> = {
+  commitment: 'Commitments',
+  event:      'Events',
+  health_state: 'Health',
+  person:     'People',
+  place:      'Places',
+  object:     'Objects',
+  preference: 'Preferences',
+};
+
+function typeLabel(dict: string, type: string): string {
+  return (dict === 'en' ? TYPE_LABEL_EN[type] : TYPE_LABEL[type]) ?? L(dict, '其他', 'Other');
+}
+
 const HOUR_GROUPS = [
-  { label: '清晨 6-9',  hours: [6, 7, 8] },
-  { label: '上午 9-12', hours: [9, 10, 11] },
-  { label: '下午 12-18', hours: [12, 13, 14, 15, 16, 17] },
-  { label: '晚上 18-23', hours: [18, 19, 20, 21, 22] },
+  { label: '清晨 6-9',  labelEn: 'early morning 6-9', hours: [6, 7, 8] },
+  { label: '上午 9-12', labelEn: 'morning 9-12', hours: [9, 10, 11] },
+  { label: '下午 12-18', labelEn: 'afternoon 12-18', hours: [12, 13, 14, 15, 16, 17] },
+  { label: '晚上 18-23', labelEn: 'evening 18-23', hours: [18, 19, 20, 21, 22] },
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -179,7 +195,7 @@ function computeReflectionFacts(nodes: LifeNode[], all: LifeNode[], profile: Mir
       try { domain = (JSON.parse(n.attributes.context) as { domain?: string }).domain ?? ''; } catch { /* ignore */ }
     }
     if (!domain && n.tags?.[0]) domain = n.tags[0];
-    if (!domain) domain = TYPE_LABEL[n.type] ?? '其他';
+    if (!domain) domain = typeLabel(dict, n.type);
     domainMap[domain] = (domainMap[domain] ?? 0) + 1;
   }
   const topDomain = Object.entries(domainMap).sort(([, a], [, b]) => b - a)[0];
@@ -192,17 +208,17 @@ function computeReflectionFacts(nodes: LifeNode[], all: LifeNode[], profile: Mir
     .map((g) => ({ ...g, score: avg(g.hours.map((h) => profile.hourEngagement[h])) }))
     .sort((a, b) => b.score - a.score)[0];
   if (bestGroup && bestGroup.score > 0.5) {
-    facts.push({ icon: <IconClock size={15} />, text: L(dict, `你的黄金时段在${bestGroup.label}`, `Your golden hours: ${bestGroup.label}`) });
+    facts.push({ icon: <IconClock size={15} />, text: L(dict, `你的黄金时段在${bestGroup.label}`, `Your golden hours: ${bestGroup.labelEn}`) });
   }
 
   // 4.4 进行中实验(批次 8:打卡数据与洞察关联)
   try {
     for (const exp of loadExperiments().filter((e) => !e.concluded)) {
       if (exp.dataPoints.length < 3) continue;
-      const ins = computeInsight(exp);
+      const ins = computeInsight(exp, dict);
       facts.push({
         icon: <IconTarget size={15} />,
-        text: L(dict, `实验「${exp.name.slice(0, 12)}」已记录 ${exp.dataPoints.length} 天:${ins.text.slice(0, 40)}`, `Experiment "${exp.name.slice(0, 12)}": ${exp.dataPoints.length} days logged`),
+        text: L(dict, `实验「${exp.name.slice(0, 12)}」已记录 ${exp.dataPoints.length} 天:${ins.text.slice(0, 40)}`, `Experiment "${exp.name.slice(0, 12)}", ${exp.dataPoints.length} days in: ${ins.text.slice(0, 60)}`),
       });
       break; // 洞察区只放一条,详情在 分析→我的实验
     }
@@ -231,7 +247,8 @@ function computeReflectionFacts(nodes: LifeNode[], all: LifeNode[], profile: Mir
 // ── Analytics: Domain Distribution (SVG donut) ────────────────────────────────
 
 function DonutChart({ data }: { data: DomainStat[] }) {
-  if (data.length === 0) return <p className="nesio-insights-empty">暂无数据</p>;
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
+  if (data.length === 0) return <p className="nesio-insights-empty">{L(dict, '暂无数据', 'No data yet')}</p>;
 
   const total = data.reduce((s, d) => s + d.count, 0);
   const R = 56; const cx = 72; const cy = 72;
@@ -264,7 +281,7 @@ function DonutChart({ data }: { data: DomainStat[] }) {
         ))}
         <circle cx={cx} cy={cy} r={34} fill="var(--glass-bg-solid)" />
         <text x={cx} y={cy - 6} textAnchor="middle" fontSize="11" fill="var(--portal-ink)" fontWeight="700">{total}</text>
-        <text x={cx} y={cy + 9} textAnchor="middle" fontSize="8" fill="var(--portal-muted)">条记录</text>
+        <text x={cx} y={cy + 9} textAnchor="middle" fontSize="8" fill="var(--portal-muted)">{L(dict, '条记录', 'records')}</text>
       </svg>
       <div className="nesio-donut-legend">
         {slices.map((s, i) => (
@@ -282,8 +299,11 @@ function DonutChart({ data }: { data: DomainStat[] }) {
 // ── Analytics: Activity Heatmap (7-day × time-of-day grid) ───────────────────
 
 function ActivityHeatmap({ nodes }: { nodes: LifeNode[] }) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   // Grid: rows = day-of-week (Mon–Sun), cols = time buckets (0–5, 6–11, 12–17, 18–23)
   const DAYS = ['一', '二', '三', '四', '五', '六', '日'];
+  const DAYS_EN = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const dayLabel = (di: number) => L(dict, `周${DAYS[di]}`, DAYS_EN[di]);
   const SLOTS = ['00-06', '06-12', '12-18', '18-24'];
   const counts: number[][] = Array.from({ length: 7 }, () => Array(4).fill(0));
   let maxVal = 0;
@@ -296,7 +316,7 @@ function ActivityHeatmap({ nodes }: { nodes: LifeNode[] }) {
     if (counts[dow][slot] > maxVal) maxVal = counts[dow][slot];
   }
 
-  if (maxVal === 0) return <p className="nesio-insights-empty">暂无活动数据</p>;
+  if (maxVal === 0) return <p className="nesio-insights-empty">{L(dict, '暂无活动数据', 'No activity yet')}</p>;
 
   return (
     <div className="nesio-heatmap">
@@ -305,7 +325,7 @@ function ActivityHeatmap({ nodes }: { nodes: LifeNode[] }) {
       </div>
       {counts.map((row, di) => (
         <div key={di} className="nesio-heatmap-row">
-          <span className="nesio-heatmap-row-label">周{DAYS[di]}</span>
+          <span className="nesio-heatmap-row-label">{dayLabel(di)}</span>
           {row.map((v, si) => {
             const intensity = maxVal > 0 ? v / maxVal : 0;
             const alpha = intensity > 0 ? 0.15 + intensity * 0.75 : 0;
@@ -314,7 +334,7 @@ function ActivityHeatmap({ nodes }: { nodes: LifeNode[] }) {
                 key={si}
                 className="nesio-heatmap-cell"
                 style={{ background: alpha > 0 ? `rgba(88,140,227,${alpha.toFixed(2)})` : 'var(--portal-line)' }}
-                title={`周${DAYS[di]} ${SLOTS[si]}: ${v} 条`}
+                title={L(dict, `周${DAYS[di]} ${SLOTS[si]}: ${v} 条`, `${DAYS_EN[di]} ${SLOTS[si]}: ${v}`)}
               />
             );
           })}
@@ -327,6 +347,7 @@ function ActivityHeatmap({ nodes }: { nodes: LifeNode[] }) {
 // ── Widget: Week Bar Chart ────────────────────────────────────────────────────
 
 function WeekBarChart({ nodes }: { nodes: LifeNode[] }) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const now = Date.now();
   const buckets: { label: string; count: number }[] = [];
 
@@ -352,7 +373,7 @@ function WeekBarChart({ nodes }: { nodes: LifeNode[] }) {
             <div
               className="nesio-week-bar-fill"
               style={{ height: `${Math.round((b.count / maxCount) * 100)}%` }}
-              title={`${b.label}: ${b.count} 条`}
+              title={L(dict, `${b.label}: ${b.count} 条`, `${b.label}: ${b.count}`)}
             />
           </div>
           <span className="nesio-week-bar-label">{b.label}</span>
@@ -365,13 +386,14 @@ function WeekBarChart({ nodes }: { nodes: LifeNode[] }) {
 // ── Widget: Tag Cloud ─────────────────────────────────────────────────────────
 
 function TagCloud({ nodes }: { nodes: LifeNode[] }) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const freq: Record<string, number> = {};
   for (const n of nodes) {
     for (const tag of n.tags ?? []) freq[tag] = (freq[tag] ?? 0) + 1;
   }
   const tags = Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 12);
 
-  if (!tags.length) return <p className="nesio-insights-empty">暂无标签数据</p>;
+  if (!tags.length) return <p className="nesio-insights-empty">{L(dict, '暂无标签数据', 'No tags yet')}</p>;
 
   const maxFreq = tags[0][1];
   return (
@@ -384,7 +406,7 @@ function TagCloud({ nodes }: { nodes: LifeNode[] }) {
             key={tag}
             className="nesio-tag-cloud-item"
             style={{ fontSize: `${size}rem`, opacity }}
-            title={`${count} 次`}
+            title={L(dict, `${count} 次`, `${count}×`)}
           >
             {tag}
           </span>
@@ -397,8 +419,9 @@ function TagCloud({ nodes }: { nodes: LifeNode[] }) {
 // ── Widget: Commitment Status ─────────────────────────────────────────────────
 
 function CommitmentStatusWidget({ nodes }: { nodes: LifeNode[] }) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const commitments = nodes.filter((n) => n.type === 'commitment');
-  if (!commitments.length) return <p className="nesio-insights-empty">没有承诺/任务记录</p>;
+  if (!commitments.length) return <p className="nesio-insights-empty">{L(dict, '没有承诺/任务记录', 'No commitments yet')}</p>;
 
   const now = Date.now();
   const overdue: LifeNode[] = [];
@@ -416,10 +439,10 @@ function CommitmentStatusWidget({ nodes }: { nodes: LifeNode[] }) {
   }
 
   const groups = [
-    { label: '已逾期', items: overdue, accent: 'var(--status-risk)' },
-    { label: '即将到期（3天内）', items: dueSoon, accent: 'var(--status-gentle)' },
-    { label: '进行中', items: pending, accent: 'var(--portal-cool-accent)' },
-    { label: '无截止日', items: noDate, accent: 'var(--accent-muted)' },
+    { label: L(dict, '已逾期', 'Overdue'), items: overdue, accent: 'var(--status-risk)' },
+    { label: L(dict, '即将到期（3天内）', 'Due soon (within 3 days)'), items: dueSoon, accent: 'var(--status-gentle)' },
+    { label: L(dict, '进行中', 'In progress'), items: pending, accent: 'var(--portal-cool-accent)' },
+    { label: L(dict, '无截止日', 'No due date'), items: noDate, accent: 'var(--accent-muted)' },
   ].filter((g) => g.items.length > 0);
 
   return (
@@ -435,7 +458,7 @@ function CommitmentStatusWidget({ nodes }: { nodes: LifeNode[] }) {
             <div key={n.id} className="nesio-commitment-item">{n.name}</div>
           ))}
           {g.items.length > 3 && (
-            <div className="nesio-commitment-more">还有 {g.items.length - 3} 项…</div>
+            <div className="nesio-commitment-more">{L(dict, `还有 ${g.items.length - 3} 项…`, `${g.items.length - 3} more…`)}</div>
           )}
         </div>
       ))}
@@ -454,6 +477,7 @@ function WidgetCustomizerSheet({
   onClose: () => void;
   onSave: (ids: InsightWidgetId[]) => void;
 }) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [selected, setSelected] = useState<InsightWidgetId[]>(active);
 
   function toggle(id: InsightWidgetId) {
@@ -469,10 +493,10 @@ function WidgetCustomizerSheet({
     <div className="nesio-widget-customizer-overlay" onClick={onClose}>
       <div className="nesio-widget-customizer-sheet" onClick={(e) => e.stopPropagation()}>
         <div className="nesio-widget-customizer-header">
-          <span className="nesio-widget-customizer-title">自定义显示</span>
+          <span className="nesio-widget-customizer-title">{L(dict, '自定义显示', 'Customize display')}</span>
           <button type="button" className="nesio-widget-customizer-close" onClick={onClose}>✕</button>
         </div>
-        <p className="nesio-widget-customizer-hint">选择你想在「分析」中看到的模块</p>
+        <p className="nesio-widget-customizer-hint">{L(dict, '选择你想在「分析」中看到的模块', 'Choose the modules to show in Analytics')}</p>
         <div className="nesio-widget-customizer-list">
           {WIDGET_REGISTRY.map((w) => {
             const isOn = selected.includes(w.id);
@@ -484,8 +508,8 @@ function WidgetCustomizerSheet({
                 onClick={() => toggle(w.id)}
               >
                 <div className="nesio-widget-option-text">
-                  <span className="nesio-widget-option-label">{w.label}</span>
-                  <span className="nesio-widget-option-desc">{w.description}</span>
+                  <span className="nesio-widget-option-label">{L(dict, w.label, w.labelEn)}</span>
+                  <span className="nesio-widget-option-desc">{L(dict, w.description, w.descriptionEn)}</span>
                 </div>
                 <span className="nesio-widget-option-check">{isOn ? '✓' : ''}</span>
               </button>
@@ -498,7 +522,7 @@ function WidgetCustomizerSheet({
           onClick={() => { onSave(ordered); onClose(); }}
           disabled={ordered.length === 0}
         >
-          保存（{ordered.length} 个模块）
+          {L(dict, `保存（${ordered.length} 个模块）`, `Save (${ordered.length} modules)`)}
         </button>
       </div>
     </div>
@@ -507,22 +531,23 @@ function WidgetCustomizerSheet({
 
 // ── Living Model: Perspectives ───────────────────────────────────────────────
 
-interface Perspective { id: string; name: string; icon: string; desc: string; prompt: string }
+interface Perspective { id: string; name: string; nameEn: string; icon: string; desc: string; descEn: string; prompt: string }
 
+// prompt 发给 AI 生成中文认知模型,保留中文(与 CameraSheet 提示词同策略)
 const PERSPECTIVES: Perspective[] = [
-  { id: 'director',     name: '导演视角',    icon: '🎬', desc: '用旁观者视角看自己的剧情',         prompt: '从导演的视角分析用户：你是在拍摄用户生活的导演，观察剧情走向、角色动机、潜在的剧情转折点。' },
-  { id: 'tasha',        name: '塔莎·尤里奇', icon: '🪞', desc: '自我洞察：行为背后的深层动机',     prompt: '运用塔莎·尤里奇的自我洞察框架：聚焦于用户行为背后真实的"为什么"，区分自我感知与他人眼中的实际行为模式。' },
-  { id: 'cbt',          name: 'CBT认知行为', icon: '🧠', desc: '识别思维扭曲，建立理性解读',       prompt: '从认知行为疗法（CBT）视角：识别用户记录中可能存在的思维扭曲、认知误差，以及更理性的替代解读。' },
-  { id: 'second_order', name: '二阶思考',    icon: '🔗', desc: '行动的后果，后果的后果',           prompt: '从二阶思维视角：不只看行为本身，分析其直接后果，以及这些后果带来的次级影响和长远连锁反应。' },
-  { id: 'energy',       name: '能量视角',    icon: '⚡', desc: '什么消耗你，什么给你充电',         prompt: '从能量管理视角：分析用户的行为模式哪些在消耗生命能量，哪些在积累能量，如何优化能量分配。' },
-  { id: 'stoic',        name: '斯多葛',      icon: '🏛', desc: '区分你能控制的和不能控制的',       prompt: '从斯多葛哲学视角：区分用户生活中可以控制的事与不可控制的事，聚焦于前者，接受后者。' },
-  { id: 'pareto',       name: '帕累托20/80', icon: '📊', desc: '20% 行动带来 80% 结果',           prompt: '从帕累托原则视角：找出用户行为中最关键的 20%，这部分可能带来了 80% 的正向结果或负向问题。' },
-  { id: 'flow',         name: '心流状态',    icon: '🌊', desc: '什么时候你处于最佳状态',           prompt: '从心流（Flow）理论视角：分析用户何时处于最佳心流状态，什么条件触发或打断心流，如何创造更多心流时间。' },
-  { id: 'attachment',   name: '依恋理论',    icon: '❤️', desc: '人际关系中的模式和需求',           prompt: '从依恋理论视角：分析用户的人际关系模式、依恋风格、亲密关系中的需求与防御机制。' },
-  { id: 'somatic',      name: '身体感受',    icon: '🫀', desc: '身体信号与情绪的连接',             prompt: '从身体感受（Somatic）视角：关注用户记录中隐含的身体信号、身心连接、压力的身体化表现。' },
-  { id: 'narrative',    name: '叙事疗法',    icon: '📖', desc: '用故事视角重构自己的经历',         prompt: '从叙事疗法视角：分析用户为自己的生活构建了怎样的故事，哪些主题反复出现，可以如何重写更有力量的叙事。' },
-  { id: 'focus',        name: '专注力',      icon: '🎯', desc: '哪些事分散了注意力',               prompt: '从注意力管理视角：识别分散用户专注力的因素、注意力消耗模式，以及提升深度专注的机会。' },
-  { id: 'reverse',      name: '逆向思维',    icon: '🔄', desc: '先想最糟情况，再反推预防',         prompt: '从逆向思维（Inversion）视角：先推导用户最不想发生的结果，再分析当前行为模式是否在无意中接近这些结果。' },
+  { id: 'director',     name: '导演视角',    nameEn: 'Director',        icon: '🎬', desc: '用旁观者视角看自己的剧情',         descEn: 'Watch your own plot as an outsider',            prompt: '从导演的视角分析用户：你是在拍摄用户生活的导演，观察剧情走向、角色动机、潜在的剧情转折点。' },
+  { id: 'tasha',        name: '塔莎·尤里奇', nameEn: 'Tasha Eurich',    icon: '🪞', desc: '自我洞察：行为背后的深层动机',     descEn: 'Self-insight: motives behind behavior',         prompt: '运用塔莎·尤里奇的自我洞察框架：聚焦于用户行为背后真实的"为什么"，区分自我感知与他人眼中的实际行为模式。' },
+  { id: 'cbt',          name: 'CBT认知行为', nameEn: 'CBT',             icon: '🧠', desc: '识别思维扭曲，建立理性解读',       descEn: 'Spot distortions, build rational reads',        prompt: '从认知行为疗法（CBT）视角：识别用户记录中可能存在的思维扭曲、认知误差，以及更理性的替代解读。' },
+  { id: 'second_order', name: '二阶思考',    nameEn: 'Second-order',    icon: '🔗', desc: '行动的后果，后果的后果',           descEn: 'Consequences of consequences',                  prompt: '从二阶思维视角：不只看行为本身，分析其直接后果，以及这些后果带来的次级影响和长远连锁反应。' },
+  { id: 'energy',       name: '能量视角',    nameEn: 'Energy',          icon: '⚡', desc: '什么消耗你，什么给你充电',         descEn: 'What drains you, what recharges you',           prompt: '从能量管理视角：分析用户的行为模式哪些在消耗生命能量，哪些在积累能量，如何优化能量分配。' },
+  { id: 'stoic',        name: '斯多葛',      nameEn: 'Stoic',           icon: '🏛', desc: '区分你能控制的和不能控制的',       descEn: 'What you control vs. what you cannot',          prompt: '从斯多葛哲学视角：区分用户生活中可以控制的事与不可控制的事，聚焦于前者，接受后者。' },
+  { id: 'pareto',       name: '帕累托20/80', nameEn: 'Pareto 20/80',    icon: '📊', desc: '20% 行动带来 80% 结果',           descEn: '20% of actions drive 80% of results',           prompt: '从帕累托原则视角：找出用户行为中最关键的 20%，这部分可能带来了 80% 的正向结果或负向问题。' },
+  { id: 'flow',         name: '心流状态',    nameEn: 'Flow',            icon: '🌊', desc: '什么时候你处于最佳状态',           descEn: 'When you are at your best',                     prompt: '从心流（Flow）理论视角：分析用户何时处于最佳心流状态，什么条件触发或打断心流，如何创造更多心流时间。' },
+  { id: 'attachment',   name: '依恋理论',    nameEn: 'Attachment',      icon: '❤️', desc: '人际关系中的模式和需求',           descEn: 'Patterns and needs in relationships',           prompt: '从依恋理论视角：分析用户的人际关系模式、依恋风格、亲密关系中的需求与防御机制。' },
+  { id: 'somatic',      name: '身体感受',    nameEn: 'Somatic',         icon: '🫀', desc: '身体信号与情绪的连接',             descEn: 'Body signals and emotion links',                prompt: '从身体感受（Somatic）视角：关注用户记录中隐含的身体信号、身心连接、压力的身体化表现。' },
+  { id: 'narrative',    name: '叙事疗法',    nameEn: 'Narrative',       icon: '📖', desc: '用故事视角重构自己的经历',         descEn: 'Rewrite your experience as a story',            prompt: '从叙事疗法视角：分析用户为自己的生活构建了怎样的故事，哪些主题反复出现，可以如何重写更有力量的叙事。' },
+  { id: 'focus',        name: '专注力',      nameEn: 'Focus',           icon: '🎯', desc: '哪些事分散了注意力',               descEn: 'What scatters your attention',                  prompt: '从注意力管理视角：识别分散用户专注力的因素、注意力消耗模式，以及提升深度专注的机会。' },
+  { id: 'reverse',      name: '逆向思维',    nameEn: 'Inversion',       icon: '🔄', desc: '先想最糟情况，再反推预防',         descEn: 'Imagine the worst, then work backwards',        prompt: '从逆向思维（Inversion）视角：先推导用户最不想发生的结果，再分析当前行为模式是否在无意中接近这些结果。' },
 ];
 
 function PerspectiveSheet({
@@ -534,14 +559,15 @@ function PerspectiveSheet({
   onSelect: (p: Perspective | null) => void;
   onClose: () => void;
 }) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   return (
     <div className="nesio-widget-customizer-overlay" onClick={onClose}>
       <div className="nesio-widget-customizer-sheet" onClick={(e) => e.stopPropagation()}>
         <div className="nesio-widget-customizer-header">
-          <span className="nesio-widget-customizer-title">选择分析视角</span>
+          <span className="nesio-widget-customizer-title">{L(dict, '选择分析视角', 'Choose a lens')}</span>
           <button type="button" className="nesio-widget-customizer-close" onClick={onClose}>✕</button>
         </div>
-        <p className="nesio-widget-customizer-hint">选择一个视角，AI 将从该框架重新分析你的认知模型</p>
+        <p className="nesio-widget-customizer-hint">{L(dict, '选择一个视角，AI 将从该框架重新分析你的认知模型', 'Pick a lens and the AI will re-analyze your mind model through it')}</p>
         <div className="nesio-widget-customizer-list">
           <button
             type="button"
@@ -550,8 +576,8 @@ function PerspectiveSheet({
           >
             <span className="nesio-widget-option-icon">🧩</span>
             <div className="nesio-widget-option-text">
-              <span className="nesio-widget-option-label">默认综合视角</span>
-              <span className="nesio-widget-option-desc">不限定视角，AI 自由推断</span>
+              <span className="nesio-widget-option-label">{L(dict, '默认综合视角', 'Default (holistic)')}</span>
+              <span className="nesio-widget-option-desc">{L(dict, '不限定视角，AI 自由推断', 'No fixed lens — AI infers freely')}</span>
             </div>
             {!current && <span className="nesio-widget-option-check">✓</span>}
           </button>
@@ -563,8 +589,8 @@ function PerspectiveSheet({
               onClick={() => { onSelect(p); onClose(); }}
             >
               <div className="nesio-widget-option-text">
-                <span className="nesio-widget-option-label">{p.name}</span>
-                <span className="nesio-widget-option-desc">{p.desc}</span>
+                <span className="nesio-widget-option-label">{L(dict, p.name, p.nameEn)}</span>
+                <span className="nesio-widget-option-desc">{L(dict, p.desc, p.descEn)}</span>
               </div>
               {current === p.id && <span className="nesio-widget-option-check">✓</span>}
             </button>
@@ -601,15 +627,15 @@ const LAYER_GRAPH_COLOR: Record<string, string> = {
   prediction:  'var(--portal-muted)',
 };
 
-function buildModelGraphNodes(model: LivingModel | null): GNode[] {
+function buildModelGraphNodes(model: LivingModel | null, dict: string = 'zh'): GNode[] {
   if (!model) {
     // Demo nodes for empty state
     return [
-      { id: 'identity::0', label: '身份认同', weight: 0.7, color: LAYER_GRAPH_COLOR['identity'] },
-      { id: 'motivation::0', label: '创造渴望', weight: 0.8, color: LAYER_GRAPH_COLOR['motivation'] },
-      { id: 'patterns::0', label: '夜晚思考', weight: 0.65, color: LAYER_GRAPH_COLOR['patterns'] },
-      { id: 'blind_spots::0', label: '低估关系', weight: 0.6, color: LAYER_GRAPH_COLOR['blind_spots'] },
-      { id: 'evolution::0', label: '健康关注', weight: 0.7, color: LAYER_GRAPH_COLOR['evolution'] },
+      { id: 'identity::0', label: L(dict, '身份认同', 'Identity'), weight: 0.7, color: LAYER_GRAPH_COLOR['identity'] },
+      { id: 'motivation::0', label: L(dict, '创造渴望', 'Urge to create'), weight: 0.8, color: LAYER_GRAPH_COLOR['motivation'] },
+      { id: 'patterns::0', label: L(dict, '夜晚思考', 'Night thinking'), weight: 0.65, color: LAYER_GRAPH_COLOR['patterns'] },
+      { id: 'blind_spots::0', label: L(dict, '低估关系', 'Undervaluing ties'), weight: 0.6, color: LAYER_GRAPH_COLOR['blind_spots'] },
+      { id: 'evolution::0', label: L(dict, '健康关注', 'Health focus'), weight: 0.7, color: LAYER_GRAPH_COLOR['evolution'] },
     ];
   }
   const nodes: GNode[] = [];
@@ -629,7 +655,7 @@ function buildModelGraphNodes(model: LivingModel | null): GNode[] {
   return nodes;
 }
 
-function buildModelGraphEdges(model: LivingModel | null): GEdge[] {
+function buildModelGraphEdges(model: LivingModel | null, dict: string = 'zh'): GEdge[] {
   if (!model) {
     return [
       { source: 'identity::0', target: 'motivation::0', weight: 0.6 },
@@ -663,7 +689,7 @@ function buildModelGraphEdges(model: LivingModel | null): GEdge[] {
         const key = `${allInsights[i].id}|${allInsights[j].id}`;
         if (!seen.has(key)) {
           seen.add(key);
-          edges.push({ source: allInsights[i].id, target: allInsights[j].id, weight: 0.7, label: '共同证据' });
+          edges.push({ source: allInsights[i].id, target: allInsights[j].id, weight: 0.7, label: L(dict, '共同证据', 'Shared evidence') });
         }
       }
     }
@@ -684,6 +710,7 @@ function LivingModelTab({
   onRefresh: (perspectiveId?: string, perspectiveName?: string, perspectivePrompt?: string) => void;
   onFeedback: (insightId: string, verified: boolean) => void;
 }) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [expandedLayer, setExpandedLayer] = useState<LivingModelLayerId | null>('identity');
   const [selectedPerspective, setSelectedPerspective] = useState<Perspective | null>(null);
   const [showPerspectiveSheet, setShowPerspectiveSheet] = useState(false);
@@ -692,7 +719,7 @@ function LivingModelTab({
     return (
       <div className="nesio-lm-loading">
         <span className="nesio-focus-decompose-spinner" />
-        <span>Nesio 正在深度思考你的认知模型…</span>
+        <span>{L(dict, 'Nesio 正在深度思考你的认知模型…', 'Nesio is thinking hard about your mind model…')}</span>
       </div>
     );
   }
@@ -709,23 +736,23 @@ function LivingModelTab({
       <div className="nesio-lm-header-row">
         <p className="nesio-lm-subtitle">
           {hasAnyInsight
-            ? 'Nesio 对你的认知世界模型 · 每条结论均可校正'
-            : '积累更多记录后，Nesio 将推断你的认知模型'}
+            ? L(dict, 'Nesio 对你的认知世界模型 · 每条结论均可校正', "Nesio's model of your inner world · every conclusion is correctable")
+            : L(dict, '积累更多记录后，Nesio 将推断你的认知模型', 'With more notes, Nesio will infer your mind model')}
         </p>
         <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
           <button
             type="button"
             className="nesio-lm-perspective-btn"
             onClick={() => setShowPerspectiveSheet(true)}
-            title="选择分析视角"
+            title={L(dict, '选择分析视角', 'Choose a lens')}
           >
-            <IconTarget size={13} /> {selectedPerspective ? selectedPerspective.name : '视角'}
+            <IconTarget size={13} /> {selectedPerspective ? L(dict, selectedPerspective.name, selectedPerspective.nameEn) : L(dict, '视角', 'Lens')}
           </button>
           <button
             type="button"
             className="nesio-lm-refresh-btn"
             onClick={() => onRefresh(selectedPerspective?.id, selectedPerspective?.name, selectedPerspective?.prompt)}
-            title="重新生成"
+            title={L(dict, '重新生成', 'Regenerate')}
           >
             ↺
           </button>
@@ -734,24 +761,24 @@ function LivingModelTab({
 
       {/* 认知关系图 */}
       <div className="nesio-insights-section" style={{ marginTop: 'var(--space-2)' }}>
-        <p className="nesio-insights-section-label">认知关系图</p>
+        <p className="nesio-insights-section-label">{L(dict, '认知关系图', 'Cognition graph')}</p>
         <RelationGraph
-          nodes={buildModelGraphNodes(model)}
-          edges={buildModelGraphEdges(model)}
+          nodes={buildModelGraphNodes(model, dict)}
+          edges={buildModelGraphEdges(model, dict)}
           height={260}
           onNodeClick={(id) => {
             // id format: "layerId::insightIdx"
             const layerId = id.split('::')[0] as LivingModelLayerId;
             setExpandedLayer(layerId);
           }}
-          emptyText="积累记录后，Nesio 将构建你的认知关系图"
+          emptyText={L(dict, '积累记录后，Nesio 将构建你的认知关系图', 'With more notes, Nesio will build your cognition graph')}
         />
       </div>
 
       {!hasAnyInsight && (
         <div className="nesio-lm-empty">
-          <p>记录更多内容，Nesio 会发现你的模式和规律。</p>
-          <p className="nesio-lm-empty-hint">通常需要 10+ 条记录才能生成有意义的洞察。</p>
+          <p>{L(dict, '记录更多内容，Nesio 会发现你的模式和规律。', 'Keep recording — Nesio will find your patterns.')}</p>
+          <p className="nesio-lm-empty-hint">{L(dict, '通常需要 10+ 条记录才能生成有意义的洞察。', 'Meaningful insights usually need 10+ notes.')}</p>
         </div>
       )}
 
@@ -767,12 +794,12 @@ function LivingModelTab({
               className="nesio-lm-layer-header"
               onClick={() => setExpandedLayer(isExpanded ? null : layer.id)}
             >
-              <span className="nesio-lm-layer-label">{layer.label}</span>
+              <span className="nesio-lm-layer-label">{L(dict, LAYER_META[layer.id]?.label ?? layer.label, LAYER_META[layer.id]?.labelEn ?? layer.label)}</span>
               {visibleInsights.length > 0 && (
                 <span className="nesio-lm-layer-count">{visibleInsights.length}</span>
               )}
               {visibleInsights.length === 0 && (
-                <span className="nesio-lm-layer-empty-badge">积累中</span>
+                <span className="nesio-lm-layer-empty-badge">{L(dict, '积累中', 'Gathering')}</span>
               )}
               <span className="nesio-lm-layer-chevron">{isExpanded ? '▴' : '▾'}</span>
             </button>
@@ -782,8 +809,8 @@ function LivingModelTab({
                 {visibleInsights.length === 0 ? (
                   <p className="nesio-lm-insight-empty">
                     {layer.id === 'blind_spots'
-                      ? '盲区需要更高的置信度（90%+）才会展示'
-                      : '这一层还在观察中，继续记录你的生活'}
+                      ? L(dict, '盲区需要更高的置信度（90%+）才会展示', 'Blind spots only show at 90%+ confidence')
+                      : L(dict, '这一层还在观察中，继续记录你的生活', 'Still observing this layer — keep recording your life')}
                   </p>
                 ) : (
                   visibleInsights.map((insight) => (
@@ -792,7 +819,7 @@ function LivingModelTab({
                       <ConfidenceBar value={insight.confidence} />
                       {(insight.evidenceRefs?.length ?? 0) > 0 && (
                         <div className="nesio-lm-evidence">
-                          <span className="nesio-lm-evidence-label">证据：</span>
+                          <span className="nesio-lm-evidence-label">{L(dict, '证据：', 'Evidence: ')}</span>
                           {(insight.evidenceRefs ?? []).map((ref, i) => (
                             <span key={i} className="nesio-lm-evidence-tag">{ref}</span>
                           ))}
@@ -800,20 +827,20 @@ function LivingModelTab({
                       )}
                       <div className="nesio-lm-insight-footer">
                         <span className="nesio-lm-insight-date">
-                          更新于 {new Date(insight.lastUpdatedAt).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })}
+                          {L(dict, '更新于', 'Updated')} {new Date(insight.lastUpdatedAt).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'short', day: 'numeric' })}
                         </span>
                         <div className="nesio-lm-feedback-btns">
                           <button
                             type="button"
                             className={`nesio-lm-fb-btn${insight.userVerified === true ? ' nesio-lm-fb-btn--yes' : ''}`}
                             onClick={() => onFeedback(insight.id, true)}
-                            title="说得对"
+                            title={L(dict, '说得对', 'Spot on')}
                           >✓</button>
                           <button
                             type="button"
                             className={`nesio-lm-fb-btn${insight.userVerified === false ? ' nesio-lm-fb-btn--no' : ''}`}
                             onClick={() => onFeedback(insight.id, false)}
-                            title="不对"
+                            title={L(dict, '不对', 'Not right')}
                           >✗</button>
                         </div>
                       </div>
@@ -829,8 +856,8 @@ function LivingModelTab({
 
       {model && (
         <p className="nesio-lm-gen-time">
-          模型生成于 {new Date(model.generatedAt).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-          {selectedPerspective && <span className="nesio-lm-perspective-badge"> · {selectedPerspective.name}</span>}
+          {L(dict, '模型生成于', 'Model generated')} {new Date(model.generatedAt).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+          {selectedPerspective && <span className="nesio-lm-perspective-badge"> · {L(dict, selectedPerspective.name, selectedPerspective.nameEn)}</span>}
         </p>
       )}
 
@@ -892,7 +919,7 @@ export default function InsightsSheet({ onClose }: { onClose: () => void }) {
     // Domain distribution
     const domainMap: Record<string, { count: number; color: string }> = {};
     for (const n of filtered) {
-      const label = TYPE_LABEL[n.type] ?? '其他';
+      const label = typeLabel(dict, n.type);
       const color = TYPE_COLOR[n.type] ?? 'var(--portal-muted)';
       if (!domainMap[label]) domainMap[label] = { count: 0, color };
       domainMap[label].count++;
@@ -903,7 +930,7 @@ export default function InsightsSheet({ onClose }: { onClose: () => void }) {
         .sort((a, b) => b.count - a.count)
         .slice(0, 7),
     );
-  }, [period, profile]);
+  }, [period, profile, dict]);
 
   // Living Model: load cached or generate
   const fetchLivingModel = useCallback(async (
@@ -994,7 +1021,7 @@ export default function InsightsSheet({ onClose }: { onClose: () => void }) {
           <span className="nesio-insights-icon">✦</span>
           <h2 className="nesio-insights-title">{L(dict, 'Nesio 的了解', 'What Nesio knows')}</h2>
         </div>
-        <button type="button" className="nesio-insights-close" onClick={onClose} aria-label="关闭">✕</button>
+        <button type="button" className="nesio-insights-close" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}>✕</button>
       </div>
 
       {/* Main tabs */}
@@ -1089,35 +1116,35 @@ export default function InsightsSheet({ onClose }: { onClose: () => void }) {
                 type="button"
                 className="nesio-analytics-customize-btn"
                 onClick={() => setShowCustomizer(true)}
-                title="自定义显示模块"
+                title={L(dict, '自定义显示模块', 'Customize modules')}
               >
-                ⚙ 自定义
+                {L(dict, '⚙ 自定义', '⚙ Customize')}
               </button>
             </div>
 
             {/* Life Civilization Map — hero visual */}
             <div className="nesio-insights-section" style={{ marginTop: 'var(--space-3)' }}>
-              <p className="nesio-insights-section-label">生命版图</p>
+              <p className="nesio-insights-section-label">{L(dict, '生命版图', 'Life map')}</p>
               <LifeCivilizationMap nodes={allNodes} />
             </div>
 
             {/* Dynamic widgets */}
             {activeWidgets.length === 0 && (
               <p className="nesio-insights-empty" style={{ marginTop: '2rem' }}>
-                还没有选择任何模块 · 点击「⚙ 自定义」来添加
+                {L(dict, '还没有选择任何模块 · 点击「⚙ 自定义」来添加', 'No modules yet · tap "⚙ Customize" to add')}
               </p>
             )}
 
             {activeWidgets.includes('donut') && (
               <div className="nesio-insights-section">
-                <p className="nesio-insights-section-label">记录分布</p>
+                <p className="nesio-insights-section-label">{L(dict, '记录分布', 'Distribution')}</p>
                 <DonutChart data={domainStats} />
               </div>
             )}
 
             {activeWidgets.includes('heatmap') && (
               <div className="nesio-insights-section">
-                <p className="nesio-insights-section-label">活动热力图（过去30天）</p>
+                <p className="nesio-insights-section-label">{L(dict, '活动热力图（过去30天）', 'Activity heatmap (last 30 days)')}</p>
                 <ActivityHeatmap nodes={allNodes.filter((n) => {
                   const d = new Date(n.createdAt);
                   return (Date.now() - d.getTime()) <= 30 * 86_400_000;
@@ -1127,28 +1154,28 @@ export default function InsightsSheet({ onClose }: { onClose: () => void }) {
 
             {activeWidgets.includes('week_bar') && (
               <div className="nesio-insights-section">
-                <p className="nesio-insights-section-label">周趋势（近8周）</p>
+                <p className="nesio-insights-section-label">{L(dict, '周趋势（近8周）', 'Weekly trend (last 8 weeks)')}</p>
                 <WeekBarChart nodes={allNodes} />
               </div>
             )}
 
             {activeWidgets.includes('tag_cloud') && (
               <div className="nesio-insights-section">
-                <p className="nesio-insights-section-label">高频标签</p>
+                <p className="nesio-insights-section-label">{L(dict, '高频标签', 'Top tags')}</p>
                 <TagCloud nodes={periodNodes} />
               </div>
             )}
 
             {activeWidgets.includes('commitment_status') && (
               <div className="nesio-insights-section">
-                <p className="nesio-insights-section-label">承诺状态</p>
+                <p className="nesio-insights-section-label">{L(dict, '承诺状态', 'Commitments')}</p>
                 <CommitmentStatusWidget nodes={allNodes} />
               </div>
             )}
 
             {activeWidgets.includes('my_experiment') && (
               <div className="nesio-insights-section">
-                <p className="nesio-insights-section-label">我的实验</p>
+                <p className="nesio-insights-section-label">{L(dict, '我的实验', 'My experiment')}</p>
                 <MyExperimentWidget />
               </div>
             )}

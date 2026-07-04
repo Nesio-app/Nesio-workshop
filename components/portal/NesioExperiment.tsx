@@ -76,13 +76,13 @@ export interface ExpInsight {
   text: string;
 }
 
-export function computeInsight(exp: Experiment): ExpInsight {
+export function computeInsight(exp: Experiment, dict: string = 'zh'): ExpInsight {
   const pts = exp.dataPoints;
   const days = pts.length;
 
   if (days < 5) {
     return { r: null, meanOn: null, meanOff: null, trend: 'insufficient', days,
-      text: `还需要 ${5 - days} 次记录，洞察就能出现。坚持每天打卡，数据会告诉你答案。` };
+      text: L(dict, `还需要 ${5 - days} 次记录，洞察就能出现。坚持每天打卡，数据会告诉你答案。`, `${5 - days} more logs and insights appear. Keep checking in daily — the data will answer.`) };
   }
 
   const ivs = pts.map((p) => p.iv);
@@ -127,25 +127,39 @@ export function computeInsight(exp: Experiment): ExpInsight {
     if (meanOn !== null && meanOff !== null) {
       const diffStr = Math.abs(meanOn - meanOff).toFixed(1);
       if (trend === 'positive') {
-        text = `过去 ${days} 天里，你有 ${onCount} 天进行了「${exp.ivName}」，${exp.dvName} 均值是 ${meanOn.toFixed(1)}${unitDV}；另外 ${offCount} 天均值是 ${meanOff.toFixed(1)}${unitDV}。差距约 ${diffStr}${unitDV}，你的数据支持这个假设。`;
+        text = L(dict,
+          `过去 ${days} 天里，你有 ${onCount} 天进行了「${exp.ivName}」，${exp.dvName} 均值是 ${meanOn.toFixed(1)}${unitDV}；另外 ${offCount} 天均值是 ${meanOff.toFixed(1)}${unitDV}。差距约 ${diffStr}${unitDV}，你的数据支持这个假设。`,
+          `Over the last ${days} days you did "${exp.ivName}" on ${onCount} of them — ${exp.dvName} averaged ${meanOn.toFixed(1)}${unitDV}, vs ${meanOff.toFixed(1)}${unitDV} on the other ${offCount}. A gap of about ${diffStr}${unitDV}: your data supports the hypothesis.`);
       } else if (trend === 'negative') {
-        text = `过去 ${days} 天，「${exp.ivName}」的日子里 ${exp.dvName} 均值反而更低（${meanOn.toFixed(1)} vs ${meanOff.toFixed(1)}${unitDV}）。数据和假设方向相反，可能有其他因素在影响结果。`;
+        text = L(dict,
+          `过去 ${days} 天，「${exp.ivName}」的日子里 ${exp.dvName} 均值反而更低（${meanOn.toFixed(1)} vs ${meanOff.toFixed(1)}${unitDV}）。数据和假设方向相反，可能有其他因素在影响结果。`,
+          `Over the last ${days} days, ${exp.dvName} was actually lower on "${exp.ivName}" days (${meanOn.toFixed(1)} vs ${meanOff.toFixed(1)}${unitDV}). The data runs against the hypothesis — something else may be at play.`);
       } else {
-        text = `过去 ${days} 天，做与不做「${exp.ivName}」对 ${exp.dvName} 的影响不明显（${meanOn.toFixed(1)} vs ${meanOff.toFixed(1)}${unitDV}）。可以继续观察，或者看看是否有其他变量在起作用。`;
+        text = L(dict,
+          `过去 ${days} 天，做与不做「${exp.ivName}」对 ${exp.dvName} 的影响不明显（${meanOn.toFixed(1)} vs ${meanOff.toFixed(1)}${unitDV}）。可以继续观察，或者看看是否有其他变量在起作用。`,
+          `Over the last ${days} days, doing "${exp.ivName}" or not made little difference to ${exp.dvName} (${meanOn.toFixed(1)} vs ${meanOff.toFixed(1)}${unitDV}). Keep observing, or check for another variable.`);
       }
     }
   } else {
     if (r !== null) {
       const rStr = (r > 0 ? '+' : '') + r.toFixed(2);
       if (trend === 'positive') {
-        text = `过去 ${days} 次记录，${exp.ivName} 和 ${exp.dvName} 呈正相关（r = ${rStr}）。${exp.dvName} 整体均值 ${dvAvg}${unitDV}。增加 ${exp.ivName} 时，${exp.dvName} 有上升趋势。`;
+        text = L(dict,
+          `过去 ${days} 次记录，${exp.ivName} 和 ${exp.dvName} 呈正相关（r = ${rStr}）。${exp.dvName} 整体均值 ${dvAvg}${unitDV}。增加 ${exp.ivName} 时，${exp.dvName} 有上升趋势。`,
+          `Across ${days} logs, ${exp.ivName} and ${exp.dvName} correlate positively (r = ${rStr}). ${exp.dvName} averages ${dvAvg}${unitDV}, and rises as ${exp.ivName} increases.`);
       } else if (trend === 'negative') {
-        text = `过去 ${days} 次记录，${exp.ivName} 越高，${exp.dvName} 有下降趋势（r = ${rStr}）。${exp.dvName} 均值 ${dvAvg}${unitDV}。可以考虑降低 ${exp.ivName} 看看效果。`;
+        text = L(dict,
+          `过去 ${days} 次记录，${exp.ivName} 越高，${exp.dvName} 有下降趋势（r = ${rStr}）。${exp.dvName} 均值 ${dvAvg}${unitDV}。可以考虑降低 ${exp.ivName} 看看效果。`,
+          `Across ${days} logs, higher ${exp.ivName} trends with lower ${exp.dvName} (r = ${rStr}). ${exp.dvName} averages ${dvAvg}${unitDV}. Try dialing ${exp.ivName} down and see.`);
       } else {
-        text = `过去 ${days} 次记录，${exp.ivName} 与 ${exp.dvName} 之间目前看不出明显关联（r = ${rStr}）。${exp.dvName} 均值 ${dvAvg}${unitDV}。继续记录，或许还需要更多数据。`;
+        text = L(dict,
+          `过去 ${days} 次记录，${exp.ivName} 与 ${exp.dvName} 之间目前看不出明显关联（r = ${rStr}）。${exp.dvName} 均值 ${dvAvg}${unitDV}。继续记录，或许还需要更多数据。`,
+          `Across ${days} logs, no clear link between ${exp.ivName} and ${exp.dvName} yet (r = ${rStr}). ${exp.dvName} averages ${dvAvg}${unitDV}. Keep logging — it may just need more data.`);
       }
     } else {
-      text = `已记录 ${days} 天，${exp.dvName} 均值 ${dvAvg}${unitDV}。再记录几天，相关性分析就可以开始了。`;
+      text = L(dict,
+        `已记录 ${days} 天，${exp.dvName} 均值 ${dvAvg}${unitDV}。再记录几天，相关性分析就可以开始了。`,
+        `${days} days logged; ${exp.dvName} averages ${dvAvg}${unitDV}. A few more days and correlation analysis can start.`);
     }
   }
 
@@ -261,11 +275,12 @@ function ScatterPlot({ pts, ivType }: { pts: ExpDataPoint[]; ivType: VarType }) 
 // ── Trend Badge ───────────────────────────────────────────────────────────────
 
 function TrendBadge({ trend }: { trend: ExpInsight['trend'] }) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   if (trend === 'insufficient') return null;
   const map = {
-    positive: { label: '正相关', style: { background: 'var(--status-go-soft)', color: 'var(--status-go)' } },
-    negative: { label: '负相关', style: { background: 'var(--status-risk-soft)', color: 'var(--status-risk)' } },
-    neutral:  { label: '暂无关联', style: { background: 'var(--status-calm-soft)', color: 'var(--status-calm)' } },
+    positive: { label: L(dict, '正相关', 'Positive'), style: { background: 'var(--status-go-soft)', color: 'var(--status-go)' } },
+    negative: { label: L(dict, '负相关', 'Negative'), style: { background: 'var(--status-risk-soft)', color: 'var(--status-risk)' } },
+    neutral:  { label: L(dict, '暂无关联', 'No link yet'), style: { background: 'var(--status-calm-soft)', color: 'var(--status-calm)' } },
   } as const;
   const { label, style } = map[trend as keyof typeof map];
   return <span className="nesio-exp-trend-badge" style={style}>{label}</span>;
@@ -291,10 +306,10 @@ function ProgressArc({ done, total }: { done: number; total: number }) {
 
 // ── Create Wizard ─────────────────────────────────────────────────────────────
 
-const VAR_TYPE_OPTS: { value: VarType; label: string; hint: string }[] = [
-  { value: 'scale',   label: '评分 1–10', hint: '主观感受，如精力/心情/专注度' },
-  { value: 'number',  label: '具体数值',  hint: '客观数据，如睡眠时长/步数/咖啡量' },
-  { value: 'boolean', label: '是 / 否',   hint: '有没有做某件事' },
+const VAR_TYPE_OPTS: { value: VarType; label: string; labelEn: string; hint: string; hintEn: string }[] = [
+  { value: 'scale',   label: '评分 1–10', labelEn: 'Score 1–10', hint: '主观感受，如精力/心情/专注度', hintEn: 'Subjective feel: energy / mood / focus' },
+  { value: 'number',  label: '具体数值',  labelEn: 'Number',     hint: '客观数据，如睡眠时长/步数/咖啡量', hintEn: 'Objective data: sleep hours / steps / coffees' },
+  { value: 'boolean', label: '是 / 否',   labelEn: 'Yes / No',   hint: '有没有做某件事', hintEn: 'Did you do the thing or not' },
 ];
 
 const TARGET_DAYS_OPTS = [7, 14, 21, 30];
@@ -305,6 +320,7 @@ interface WizardProps {
 }
 
 export function CreateExperimentWizard({ onSave, onCancel }: WizardProps) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [step, setStep] = useState(0);
   const [name, setName] = useState('');
   const [hypo, setHypo] = useState('');
@@ -321,10 +337,10 @@ export function CreateExperimentWizard({ onSave, onCancel }: WizardProps) {
       id: `exp_${Date.now()}`,
       name: name.trim(),
       hypothesis: hypo.trim(),
-      ivName: ivName.trim() || '干预变量',
+      ivName: ivName.trim() || L(dict, '干预变量', 'Intervention'),
       ivUnit: ivUnit.trim(),
       ivType,
-      dvName: dvName.trim() || '结果变量',
+      dvName: dvName.trim() || L(dict, '结果变量', 'Outcome'),
       dvUnit: dvUnit.trim(),
       dvType,
       targetDays,
@@ -342,88 +358,88 @@ export function CreateExperimentWizard({ onSave, onCancel }: WizardProps) {
   return (
     <div className="nesio-exp-wizard">
       <div className="nesio-exp-wizard-steps">
-        {['基本信息', '干预变量', '结果 & 目标'].map((s, i) => (
+        {[L(dict, '基本信息', 'Basics'), L(dict, '干预变量', 'Intervention'), L(dict, '结果 & 目标', 'Outcome & goal')].map((s, i) => (
           <div key={i} className={`nesio-exp-step-dot${i === step ? ' active' : i < step ? ' done' : ''}`} />
         ))}
       </div>
 
       {step === 0 && (
         <div className="nesio-exp-wizard-body">
-          <p className="nesio-exp-wizard-label">这个实验叫什么？</p>
+          <p className="nesio-exp-wizard-label">{L(dict, '这个实验叫什么？', 'What is this experiment called?')}</p>
           <input className="nesio-exp-input" autoFocus
-            placeholder="例：早睡对晨间精力的影响"
+            placeholder={L(dict, '例：早睡对晨间精力的影响', 'e.g. Early sleep vs. morning energy')}
             value={name} onChange={(e) => setName(e.target.value)} />
-          <p className="nesio-exp-wizard-label" style={{ marginTop: '0.9rem' }}>你的假设（可选）</p>
+          <p className="nesio-exp-wizard-label" style={{ marginTop: '0.9rem' }}>{L(dict, '你的假设（可选）', 'Your hypothesis (optional)')}</p>
           <input className="nesio-exp-input"
-            placeholder="例：如果我在 11 点前入睡，第二天精力评分会更高"
+            placeholder={L(dict, '例：如果我在 11 点前入睡，第二天精力评分会更高', 'e.g. If I sleep before 11pm, next-day energy scores higher')}
             value={hypo} onChange={(e) => setHypo(e.target.value)} />
           <div className="nesio-exp-wizard-actions">
-            <button type="button" className="nesio-exp-cancel-btn" onClick={onCancel}>取消</button>
-            <button type="button" className="nesio-exp-next-btn" onClick={() => setStep(1)} disabled={!canStep0}>下一步</button>
+            <button type="button" className="nesio-exp-cancel-btn" onClick={onCancel}>{L(dict, '取消', 'Cancel')}</button>
+            <button type="button" className="nesio-exp-next-btn" onClick={() => setStep(1)} disabled={!canStep0}>{L(dict, '下一步', 'Next')}</button>
           </div>
         </div>
       )}
 
       {step === 1 && (
         <div className="nesio-exp-wizard-body">
-          <p className="nesio-exp-wizard-label">你要改变或追踪什么？（干预 / 自变量）</p>
+          <p className="nesio-exp-wizard-label">{L(dict, '你要改变或追踪什么？（干预 / 自变量）', 'What will you change or track? (intervention / independent variable)')}</p>
           <input className="nesio-exp-input" autoFocus
-            placeholder="例：入睡时间、咖啡杯数、运动时长"
+            placeholder={L(dict, '例：入睡时间、咖啡杯数、运动时长', 'e.g. bedtime, cups of coffee, workout minutes')}
             value={ivName} onChange={(e) => setIvName(e.target.value)} />
           <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-            <input className="nesio-exp-input" style={{ flex: 1 }} placeholder="单位（可选）"
+            <input className="nesio-exp-input" style={{ flex: 1 }} placeholder={L(dict, '单位（可选）', 'Unit (optional)')}
               value={ivUnit} onChange={(e) => setIvUnit(e.target.value)} />
           </div>
-          <p className="nesio-exp-wizard-label" style={{ marginTop: '0.9rem' }}>记录方式</p>
+          <p className="nesio-exp-wizard-label" style={{ marginTop: '0.9rem' }}>{L(dict, '记录方式', 'How to record')}</p>
           <div className="nesio-exp-type-opts">
             {VAR_TYPE_OPTS.map((o) => (
               <button key={o.value} type="button"
                 className={`nesio-exp-type-btn${ivType === o.value ? ' active' : ''}`}
                 onClick={() => setIvType(o.value)}>
-                <span className="nesio-exp-type-label">{o.label}</span>
-                <span className="nesio-exp-type-hint">{o.hint}</span>
+                <span className="nesio-exp-type-label">{L(dict, o.label, o.labelEn)}</span>
+                <span className="nesio-exp-type-hint">{L(dict, o.hint, o.hintEn)}</span>
               </button>
             ))}
           </div>
           <div className="nesio-exp-wizard-actions">
-            <button type="button" className="nesio-exp-cancel-btn" onClick={() => setStep(0)}>上一步</button>
-            <button type="button" className="nesio-exp-next-btn" onClick={() => setStep(2)} disabled={!canStep1}>下一步</button>
+            <button type="button" className="nesio-exp-cancel-btn" onClick={() => setStep(0)}>{L(dict, '上一步', 'Back')}</button>
+            <button type="button" className="nesio-exp-next-btn" onClick={() => setStep(2)} disabled={!canStep1}>{L(dict, '下一步', 'Next')}</button>
           </div>
         </div>
       )}
 
       {step === 2 && (
         <div className="nesio-exp-wizard-body">
-          <p className="nesio-exp-wizard-label">你期待哪个指标发生变化？（结果 / 因变量）</p>
+          <p className="nesio-exp-wizard-label">{L(dict, '你期待哪个指标发生变化？（结果 / 因变量）', 'Which metric do you expect to change? (outcome / dependent variable)')}</p>
           <input className="nesio-exp-input" autoFocus
-            placeholder="例：晨间精力、睡眠质量、专注时长"
+            placeholder={L(dict, '例：晨间精力、睡眠质量、专注时长', 'e.g. morning energy, sleep quality, focus time')}
             value={dvName} onChange={(e) => setDvName(e.target.value)} />
           <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-            <input className="nesio-exp-input" style={{ flex: 1 }} placeholder="单位（可选）"
+            <input className="nesio-exp-input" style={{ flex: 1 }} placeholder={L(dict, '单位（可选）', 'Unit (optional)')}
               value={dvUnit} onChange={(e) => setDvUnit(e.target.value)} />
           </div>
-          <p className="nesio-exp-wizard-label" style={{ marginTop: '0.9rem' }}>记录方式</p>
+          <p className="nesio-exp-wizard-label" style={{ marginTop: '0.9rem' }}>{L(dict, '记录方式', 'How to record')}</p>
           <div className="nesio-exp-type-opts">
             {VAR_TYPE_OPTS.filter((o) => o.value !== 'boolean').map((o) => (
               <button key={o.value} type="button"
                 className={`nesio-exp-type-btn${dvType === o.value ? ' active' : ''}`}
                 onClick={() => setDvType(o.value as VarType)}>
-                <span className="nesio-exp-type-label">{o.label}</span>
-                <span className="nesio-exp-type-hint">{o.hint}</span>
+                <span className="nesio-exp-type-label">{L(dict, o.label, o.labelEn)}</span>
+                <span className="nesio-exp-type-hint">{L(dict, o.hint, o.hintEn)}</span>
               </button>
             ))}
           </div>
-          <p className="nesio-exp-wizard-label" style={{ marginTop: '0.9rem' }}>实验持续天数</p>
+          <p className="nesio-exp-wizard-label" style={{ marginTop: '0.9rem' }}>{L(dict, '实验持续天数', 'Experiment length (days)')}</p>
           <div className="nesio-exp-days-opts">
             {TARGET_DAYS_OPTS.map((d) => (
               <button key={d} type="button"
                 className={`nesio-exp-days-btn${targetDays === d ? ' active' : ''}`}
-                onClick={() => setTargetDays(d)}>{d} 天</button>
+                onClick={() => setTargetDays(d)}>{L(dict, `${d} 天`, `${d} days`)}</button>
             ))}
           </div>
           <div className="nesio-exp-wizard-actions">
-            <button type="button" className="nesio-exp-cancel-btn" onClick={() => setStep(1)}>上一步</button>
-            <button type="button" className="nesio-exp-create-btn" onClick={save} disabled={!canStep2}>开始实验</button>
+            <button type="button" className="nesio-exp-cancel-btn" onClick={() => setStep(1)}>{L(dict, '上一步', 'Back')}</button>
+            <button type="button" className="nesio-exp-create-btn" onClick={save} disabled={!canStep2}>{L(dict, '开始实验', 'Start experiment')}</button>
           </div>
         </div>
       )}
@@ -435,6 +451,7 @@ export function CreateExperimentWizard({ onSave, onCancel }: WizardProps) {
 
 /** number 型变量的步进输入:上次值起步,+/- 点按,点数值可直改(批次 5 去手动填写)。 */
 function NumberStepper({ value, onChange, unit }: { value: string; onChange: (v: string) => void; unit?: string }) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [editing, setEditing] = useState(false);
   const n = parseFloat(value);
   const cur = Number.isNaN(n) ? 0 : n;
@@ -442,7 +459,7 @@ function NumberStepper({ value, onChange, unit }: { value: string; onChange: (v:
   const step = 1;
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
-      <button type="button" aria-label="减少"
+      <button type="button" aria-label={L(dict, '减少', 'Decrease')}
         style={{ width: 'var(--tap-min)', height: 'var(--tap-min)', borderRadius: '50%', border: '1.5px solid var(--portal-line)', background: 'var(--glass-bg-solid)', color: 'var(--portal-ink)', fontSize: '1.15rem', cursor: 'pointer' }}
         onClick={() => onChange(String(Math.max(0, cur - step)))}>−</button>
       {editing ? (
@@ -455,7 +472,7 @@ function NumberStepper({ value, onChange, unit }: { value: string; onChange: (v:
           {value === '' ? '0' : value}{unit ? <span style={{ fontSize: '0.7rem', fontWeight: 500, color: 'var(--portal-muted)', marginLeft: 3 }}>{unit}</span> : null}
         </button>
       )}
-      <button type="button" aria-label="增加"
+      <button type="button" aria-label={L(dict, '增加', 'Increase')}
         style={{ width: 'var(--tap-min)', height: 'var(--tap-min)', borderRadius: '50%', border: '1.5px solid var(--portal-line)', background: 'var(--glass-bg-solid)', color: 'var(--portal-ink)', fontSize: '1.15rem', cursor: 'pointer' }}
         onClick={() => onChange(String(cur + step))}>＋</button>
     </div>
@@ -565,25 +582,26 @@ interface DetailProps {
 }
 
 export function ExperimentDetail({ exp, onLog, onConclude, onDelete, onBack }: DetailProps) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [showConclude, setShowConclude] = useState(false);
   const [conclusionText, setConclusionText] = useState('');
-  const insight = computeInsight(exp);
+  const insight = computeInsight(exp, dict);
   const progress = exp.dataPoints.length;
   const daysSince = Math.floor((Date.now() - new Date(exp.startedAt).getTime()) / 86_400_000);
 
   return (
     <div className="nesio-exp-detail">
       <div className="nesio-exp-detail-header">
-        <button type="button" className="nesio-exp-back-btn" onClick={onBack}>← 返回</button>
+        <button type="button" className="nesio-exp-back-btn" onClick={onBack}>{L(dict, '← 返回', '← Back')}</button>
         <span className="nesio-exp-detail-title">{exp.name}</span>
         {!exp.concluded && (
-          <button type="button" className="nesio-exp-menu-btn" onClick={() => setShowConclude(true)}>结束实验</button>
+          <button type="button" className="nesio-exp-menu-btn" onClick={() => setShowConclude(true)}>{L(dict, '结束实验', 'End experiment')}</button>
         )}
       </div>
 
       {exp.hypothesis && (
         <div className="nesio-exp-hypo-block">
-          <span className="nesio-exp-hypo-label">假设</span>
+          <span className="nesio-exp-hypo-label">{L(dict, '假设', 'Hypothesis')}</span>
           <p className="nesio-exp-hypo-text">{exp.hypothesis}</p>
         </div>
       )}
@@ -592,8 +610,8 @@ export function ExperimentDetail({ exp, onLog, onConclude, onDelete, onBack }: D
         <div className="nesio-exp-meta-item">
           <ProgressArc done={progress} total={exp.targetDays} />
           <div>
-            <p className="nesio-exp-meta-val">{progress} / {exp.targetDays} 天</p>
-            <p className="nesio-exp-meta-sub">已持续 {daysSince} 天</p>
+            <p className="nesio-exp-meta-val">{L(dict, `${progress} / ${exp.targetDays} 天`, `${progress} / ${exp.targetDays} days`)}</p>
+            <p className="nesio-exp-meta-sub">{L(dict, `已持续 ${daysSince} 天`, `${daysSince} days in`)}</p>
           </div>
         </div>
         <div className="nesio-exp-vars-col">
@@ -616,7 +634,7 @@ export function ExperimentDetail({ exp, onLog, onConclude, onDelete, onBack }: D
       {/* Scatter for continuous */}
       {exp.dataPoints.length >= 4 && exp.ivType !== 'boolean' && (
         <div className="nesio-exp-scatter-block">
-          <p className="nesio-exp-scatter-label">相关散点图</p>
+          <p className="nesio-exp-scatter-label">{L(dict, '相关散点图', 'Correlation scatter')}</p>
           <div className="nesio-exp-scatter-wrap">
             <ScatterPlot pts={exp.dataPoints} ivType={exp.ivType} />
             <div className="nesio-exp-scatter-axes">
@@ -633,24 +651,24 @@ export function ExperimentDetail({ exp, onLog, onConclude, onDelete, onBack }: D
           <span className="nesio-exp-insight-icon">
             {insight.trend === 'positive' ? <IconTrendingUp size={15} /> : insight.trend === 'negative' ? <IconTrendingDown size={15} /> : insight.trend === 'insufficient' ? <IconClock size={15} /> : <IconActivity size={15} />}
           </span>
-          <span className="nesio-exp-insight-title">数据说明</span>
+          <span className="nesio-exp-insight-title">{L(dict, '数据说明', 'What the data says')}</span>
           <TrendBadge trend={insight.trend} />
         </div>
         <p className="nesio-exp-insight-text">{insight.text}</p>
         {insight.r !== null && (
           <p className="nesio-exp-insight-stat">
             Pearson r = {insight.r > 0 ? '+' : ''}{insight.r.toFixed(2)}
-            {Math.abs(insight.r) > 0.5 ? '（强）' : Math.abs(insight.r) > 0.3 ? '（中）' : '（弱）'}
+            {Math.abs(insight.r) > 0.5 ? L(dict, '（强）', ' (strong)') : Math.abs(insight.r) > 0.3 ? L(dict, '（中）', ' (moderate)') : L(dict, '（弱）', ' (weak)')}
           </p>
         )}
         {insight.meanOn !== null && insight.meanOff !== null && exp.ivType === 'boolean' && (
           <div className="nesio-exp-compare-row">
             <div className="nesio-exp-compare-item on">
-              <span className="nesio-exp-compare-label">有「{exp.ivName}」</span>
+              <span className="nesio-exp-compare-label">{L(dict, `有「${exp.ivName}」`, `With "${exp.ivName}"`)}</span>
               <span className="nesio-exp-compare-val">{insight.meanOn.toFixed(1)}</span>
             </div>
             <div className="nesio-exp-compare-item off">
-              <span className="nesio-exp-compare-label">无「{exp.ivName}」</span>
+              <span className="nesio-exp-compare-label">{L(dict, `无「${exp.ivName}」`, `Without "${exp.ivName}"`)}</span>
               <span className="nesio-exp-compare-val">{insight.meanOff.toFixed(1)}</span>
             </div>
           </div>
@@ -665,13 +683,13 @@ export function ExperimentDetail({ exp, onLog, onConclude, onDelete, onBack }: D
       {/* History */}
       {exp.dataPoints.length > 0 && (
         <div className="nesio-exp-history">
-          <p className="nesio-exp-history-label">记录历史</p>
+          <p className="nesio-exp-history-label">{L(dict, '记录历史', 'History')}</p>
           <div className="nesio-exp-history-list">
             {[...exp.dataPoints].reverse().slice(0, 20).map((p, i) => (
               <div key={i} className="nesio-exp-history-row">
                 <span className="nesio-exp-history-date">{p.date.slice(5)}</span>
                 <span className="nesio-exp-history-iv">
-                  {exp.ivType === 'boolean' ? (p.iv ? '✓ 是' : '✗ 否') : `${p.iv}${exp.ivUnit}`}
+                  {exp.ivType === 'boolean' ? (p.iv ? L(dict, '✓ 是', '✓ Yes') : L(dict, '✗ 否', '✗ No')) : `${p.iv}${exp.ivUnit}`}
                 </span>
                 <span className="nesio-exp-history-dv">{p.dv}{exp.dvUnit}</span>
                 {p.note && <span className="nesio-exp-history-note">{p.note}</span>}
@@ -685,14 +703,14 @@ export function ExperimentDetail({ exp, onLog, onConclude, onDelete, onBack }: D
       {showConclude && (
         <div className="nesio-exp-conclude-overlay" onClick={() => setShowConclude(false)}>
           <div className="nesio-exp-conclude-modal" onClick={(e) => e.stopPropagation()}>
-            <p className="nesio-exp-conclude-title">结束这个实验</p>
-            <p className="nesio-exp-conclude-sub">记录一下你的结论（可选）</p>
+            <p className="nesio-exp-conclude-title">{L(dict, '结束这个实验', 'End this experiment')}</p>
+            <p className="nesio-exp-conclude-sub">{L(dict, '记录一下你的结论（可选）', 'Note your conclusion (optional)')}</p>
             <textarea className="nesio-exp-conclude-text"
-              placeholder="根据数据，我得出……"
+              placeholder={L(dict, '根据数据，我得出……', 'Based on the data, I conclude…')}
               value={conclusionText} onChange={(e) => setConclusionText(e.target.value)} rows={3} />
             <div className="nesio-exp-conclude-actions">
-              <button type="button" className="nesio-exp-cancel-btn" onClick={() => setShowConclude(false)}>继续实验</button>
-              <button type="button" className="nesio-exp-create-btn" onClick={() => { onConclude(exp.id, conclusionText); setShowConclude(false); }}>确认结束</button>
+              <button type="button" className="nesio-exp-cancel-btn" onClick={() => setShowConclude(false)}>{L(dict, '继续实验', 'Keep going')}</button>
+              <button type="button" className="nesio-exp-create-btn" onClick={() => { onConclude(exp.id, conclusionText); setShowConclude(false); }}>{L(dict, '确认结束', 'Confirm end')}</button>
             </div>
           </div>
         </div>
@@ -701,9 +719,9 @@ export function ExperimentDetail({ exp, onLog, onConclude, onDelete, onBack }: D
       {/* Conclusion (concluded) */}
       {exp.concluded && (
         <div className="nesio-exp-conclusion-block">
-          <p className="nesio-exp-conclusion-label">✓ 实验已完成</p>
+          <p className="nesio-exp-conclusion-label">{L(dict, '✓ 实验已完成', '✓ Experiment complete')}</p>
           {exp.conclusion && <p className="nesio-exp-conclusion-text">{exp.conclusion}</p>}
-          <button type="button" className="nesio-exp-delete-btn" onClick={() => onDelete(exp.id)}>删除实验</button>
+          <button type="button" className="nesio-exp-delete-btn" onClick={() => onDelete(exp.id)}>{L(dict, '删除实验', 'Delete experiment')}</button>
         </div>
       )}
     </div>
@@ -719,14 +737,15 @@ interface CardProps {
 }
 
 function ExperimentCard({ exp, onOpen, onQuickLog }: CardProps) {
-  const insight = computeInsight(exp);
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
+  const insight = computeInsight(exp, dict);
   const progress = exp.dataPoints.length;
   const today = new Date().toISOString().slice(0, 10);
   const loggedToday = exp.dataPoints.some((p) => p.date === today);
 
   const lastPt = exp.dataPoints[exp.dataPoints.length - 1];
   const lastIvDisplay = lastPt
-    ? (exp.ivType === 'boolean' ? (lastPt.iv ? '是' : '否') : `${lastPt.iv}${exp.ivUnit}`)
+    ? (exp.ivType === 'boolean' ? (lastPt.iv ? L(dict, '是', 'Yes') : L(dict, '否', 'No')) : `${lastPt.iv}${exp.ivUnit}`)
     : null;
 
   return (
@@ -751,16 +770,16 @@ function ExperimentCard({ exp, onOpen, onQuickLog }: CardProps) {
         {insight.trend !== 'insufficient' ? (
           <TrendBadge trend={insight.trend} />
         ) : (
-          <span className="nesio-exp-card-hint">还需 {Math.max(0, 5 - progress)} 次打卡</span>
+          <span className="nesio-exp-card-hint">{L(dict, `还需 ${Math.max(0, 5 - progress)} 次打卡`, `${Math.max(0, 5 - progress)} more check-ins needed`)}</span>
         )}
-        {lastIvDisplay && <span className="nesio-exp-last-val">上次：{lastIvDisplay}</span>}
+        {lastIvDisplay && <span className="nesio-exp-last-val">{L(dict, `上次：${lastIvDisplay}`, `Last: ${lastIvDisplay}`)}</span>}
         {!exp.concluded && !loggedToday && (
           <button type="button" className="nesio-exp-quick-log-btn"
             onClick={(e) => { e.stopPropagation(); onOpen(); }}>
-            打卡
+            {L(dict, '打卡', 'Check in')}
           </button>
         )}
-        {loggedToday && <span className="nesio-exp-card-done">今日 ✓</span>}
+        {loggedToday && <span className="nesio-exp-card-done">{L(dict, '今日 ✓', 'Today ✓')}</span>}
       </div>
     </div>
   );
@@ -769,6 +788,7 @@ function ExperimentCard({ exp, onOpen, onQuickLog }: CardProps) {
 // ── Main Widget ───────────────────────────────────────────────────────────────
 
 export function MyExperimentWidget() {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [experiments, setExperiments] = useState<Experiment[]>([]);
   const [view, setView] = useState<'list' | 'create' | 'detail'>('list');
   const [detailId, setDetailId] = useState<string | null>(null);
@@ -840,10 +860,10 @@ export function MyExperimentWidget() {
       {experiments.length === 0 && (
         <div className="nesio-exp-empty">
           <p className="nesio-exp-empty-icon"><IconTarget size={30} /></p>
-          <p className="nesio-exp-empty-title">还没有实验</p>
+          <p className="nesio-exp-empty-title">{L(dict, '还没有实验', 'No experiments yet')}</p>
           <p className="nesio-exp-empty-hint">
-            设定一个变量，每天记录数据，用你自己的数字看趋势。<br />
-            比如：「早睡 → 晨间精力」或「运动量 → 睡眠质量」
+            {L(dict, '设定一个变量，每天记录数据，用你自己的数字看趋势。', 'Pick a variable, log it daily, and watch the trend in your own numbers.')}<br />
+            {L(dict, '比如：「早睡 → 晨间精力」或「运动量 → 睡眠质量」', 'e.g. "early sleep → morning energy" or "exercise → sleep quality"')}
           </p>
         </div>
       )}
@@ -856,19 +876,19 @@ export function MyExperimentWidget() {
 
       {done.length > 0 && (
         <div className="nesio-exp-done-section">
-          <p className="nesio-exp-done-label">已完成 {done.length} 个</p>
+          <p className="nesio-exp-done-label">{L(dict, `已完成 ${done.length} 个`, `${done.length} completed`)}</p>
           {done.map((exp) => (
             <div key={exp.id} className="nesio-exp-done-row"
               onClick={() => { setDetailId(exp.id); setView('detail'); }}>
               <span>{exp.name}</span>
-              <TrendBadge trend={computeInsight(exp).trend} />
+              <TrendBadge trend={computeInsight(exp, dict).trend} />
             </div>
           ))}
         </div>
       )}
 
       <button type="button" className="nesio-exp-add-btn" onClick={() => setView('create')}>
-        + 新建实验
+        {L(dict, '+ 新建实验', '+ New experiment')}
       </button>
     </div>
   );

@@ -9,6 +9,9 @@ import { useEffect, useRef, useState } from 'react';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { readPortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
 import type { CalendarEvent } from '@/lib/portal/types';
+import { L } from '@/lib/portal/i18n';
+import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
+import { usePortalLocale } from './use-portal-locale';
 
 interface MeetingRecorderProps { open: boolean; onClose: () => void; }
 
@@ -26,6 +29,7 @@ interface MeetingNote {
 type RecordState = 'idle' | 'recording' | 'processing' | 'done' | 'error';
 
 export default function MeetingRecorder({ open, onClose }: MeetingRecorderProps) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [recState, setRecState] = useState<RecordState>('idle');
   const [transcript, setTranscript] = useState('');
   const [elapsed, setElapsed] = useState(0);
@@ -83,7 +87,7 @@ export default function MeetingRecorder({ open, onClose }: MeetingRecorderProps)
 
     if (SpeechRecognitionCtor) {
       const rec = new SpeechRecognitionCtor();
-      rec.lang = 'zh-CN';
+      rec.lang = dict === 'en' ? 'en-US' : 'zh-CN';
       rec.interimResults = true;
       rec.continuous = true;
       rec.maxAlternatives = 1;
@@ -113,7 +117,7 @@ export default function MeetingRecorder({ open, onClose }: MeetingRecorderProps)
     clearInterval(timerRef.current ?? undefined);
 
     const durationSec = Math.floor((Date.now() - startTimeRef.current) / 1000);
-    const durationStr = `${Math.floor(durationSec / 60)}分${durationSec % 60}秒`;
+    const durationStr = L(dict, `${Math.floor(durationSec / 60)}分${durationSec % 60}秒`, `${Math.floor(durationSec / 60)}m ${durationSec % 60}s`);
 
     try {
       const res = await fetch('/api/portal/analyze', {
@@ -141,10 +145,10 @@ export default function MeetingRecorder({ open, onClose }: MeetingRecorderProps)
       } else {
         // Fallback: parse from Life Graph nodes
         structuredNote = {
-          title: upcomingEvent?.title || `会议 ${new Date().toLocaleDateString('zh-CN')}`,
-          date: new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long', hour: '2-digit', minute: '2-digit' }),
+          title: upcomingEvent?.title || L(dict, `会议 ${new Date().toLocaleDateString('zh-CN')}`, `Meeting ${new Date().toLocaleDateString('en-US')}`),
+          date: new Date().toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'long', day: 'numeric', weekday: 'long', hour: '2-digit', minute: '2-digit' }),
           duration: durationStr,
-          summary: data.summary || transcript.slice(0, 100) || '会议记录',
+          summary: data.summary || transcript.slice(0, 100) || L(dict, '会议记录', 'Meeting notes'),
           keyPoints: transcript.split('\n').filter((l) => l.trim()).slice(0, 5),
           actions: [],
           people: [],
@@ -189,7 +193,7 @@ export default function MeetingRecorder({ open, onClose }: MeetingRecorderProps)
   if (!open) return null;
 
   return (
-    <div className="nesio-meeting-overlay" role="dialog" aria-modal="true" aria-label="会议记录">
+    <div className="nesio-meeting-overlay" role="dialog" aria-modal="true" aria-label={L(dict, '会议记录', 'Meeting notes')}>
       <div className="nesio-voice-sheet-backdrop" onClick={recState === 'idle' || recState === 'done' ? onClose : undefined} />
       <div className="nesio-meeting-card">
         <div className="nesio-sheet-handle" aria-hidden />
@@ -197,11 +201,11 @@ export default function MeetingRecorder({ open, onClose }: MeetingRecorderProps)
         <div className="nesio-voice-sheet-header">
           <div>
             <h2 className="nesio-voice-sheet-title">
-              {recState === 'idle' && '会议记录'}
-              {recState === 'recording' && '🔴 录音中'}
-              {recState === 'processing' && 'Nesio 正在整理笔记…'}
-              {recState === 'done' && '会议笔记'}
-              {recState === 'error' && '处理失败'}
+              {recState === 'idle' && L(dict, '会议记录', 'Meeting notes')}
+              {recState === 'recording' && L(dict, '🔴 录音中', '🔴 Recording')}
+              {recState === 'processing' && L(dict, 'Nesio 正在整理笔记…', 'Nesio is tidying the notes…')}
+              {recState === 'done' && L(dict, '会议笔记', 'Meeting notes')}
+              {recState === 'error' && L(dict, '处理失败', 'Processing failed')}
             </h2>
             {upcomingEvent && (
               <p style={{ fontSize: '0.72rem', color: 'var(--portal-blue-deep)', marginTop: '0.1rem' }}>
@@ -218,15 +222,15 @@ export default function MeetingRecorder({ open, onClose }: MeetingRecorderProps)
         {recState === 'idle' && (
           <div style={{ textAlign: 'center', padding: '1rem 0' }}>
             <p style={{ fontSize: '0.85rem', color: 'var(--portal-muted)', marginBottom: '1.25rem', lineHeight: 1.5 }}>
-              开始录音后，Nesio 实时转录，结束时自动生成结构化笔记，并存入 Memory。
+              {L(dict, '开始录音后，Nesio 实时转录，结束时自动生成结构化笔记，并存入 Memory。', 'Once recording starts, Nesio transcribes live, then builds structured notes into Memory.')}
             </p>
             {upcomingEvent ? (
               <div style={{ background: 'rgba(88,140,227,0.08)', borderRadius: '0.75rem', padding: '0.65rem 0.85rem', marginBottom: '1rem', fontSize: '0.8rem', color: 'var(--portal-muted)' }}>
-                将关联日历事件：<strong style={{ color: 'var(--portal-ink)' }}>{upcomingEvent.title}</strong>
+                {L(dict, '将关联日历事件：', 'Will link calendar event: ')}<strong style={{ color: 'var(--portal-ink)' }}>{upcomingEvent.title}</strong>
               </div>
             ) : null}
             <button type="button" className="nesio-ob-primary-btn" onClick={startRecording}>
-              开始录音
+              {L(dict, '开始录音', 'Start recording')}
             </button>
           </div>
         )}
@@ -246,11 +250,11 @@ export default function MeetingRecorder({ open, onClose }: MeetingRecorderProps)
             </div>
 
             <div className="nesio-voice-transcript" style={{ maxHeight: '12rem', overflowY: 'auto', fontSize: '0.82rem' }}>
-              {transcript || <span className="nesio-voice-transcript-placeholder">正在记录，说话后会在这里显示…</span>}
+              {transcript || <span className="nesio-voice-transcript-placeholder">{L(dict, '正在记录，说话后会在这里显示…', 'Recording — your words will appear here…')}</span>}
             </div>
 
             <button type="button" className="nesio-ob-primary-btn" style={{ marginTop: '1rem', background: 'var(--status-risk)', boxShadow: '0 4px 16px rgba(239,68,68,0.3)' }} onClick={stopAndProcess}>
-              停止并生成笔记
+              {L(dict, '停止并生成笔记', 'Stop and build notes')}
             </button>
           </>
         )}
@@ -259,7 +263,7 @@ export default function MeetingRecorder({ open, onClose }: MeetingRecorderProps)
         {recState === 'processing' && (
           <div style={{ textAlign: 'center', padding: '2rem 0', color: 'var(--portal-muted)' }}>
             <div style={{ width: '2.5rem', height: '2.5rem', border: '3px solid rgba(88,140,227,0.2)', borderTopColor: 'var(--portal-blue-deep)', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 1rem' }} />
-            <p style={{ fontSize: '0.85rem' }}>AI 正在提取关键信息…</p>
+            <p style={{ fontSize: '0.85rem' }}>{L(dict, 'AI 正在提取关键信息…', 'AI is extracting the key points…')}</p>
           </div>
         )}
 
@@ -272,7 +276,7 @@ export default function MeetingRecorder({ open, onClose }: MeetingRecorderProps)
 
               {note.keyPoints.length > 0 && (
                 <>
-                  <p className="nesio-settings-section-label">关键内容</p>
+                  <p className="nesio-settings-section-label">{L(dict, '关键内容', 'Key points')}</p>
                   <ul className="nesio-meeting-note-list">
                     {note.keyPoints.map((p, i) => <li key={i}>{p}</li>)}
                   </ul>
@@ -281,7 +285,7 @@ export default function MeetingRecorder({ open, onClose }: MeetingRecorderProps)
 
               {note.actions.length > 0 && (
                 <>
-                  <p className="nesio-settings-section-label">待办行动</p>
+                  <p className="nesio-settings-section-label">{L(dict, '待办行动', 'Action items')}</p>
                   <ul className="nesio-meeting-note-list nesio-meeting-note-list--action">
                     {note.actions.map((a, i) => <li key={i}>{a}</li>)}
                   </ul>
@@ -290,21 +294,21 @@ export default function MeetingRecorder({ open, onClose }: MeetingRecorderProps)
 
               {note.linkedEvent && (
                 <p style={{ fontSize: '0.7rem', color: 'var(--portal-blue-deep)', marginTop: '0.75rem' }}>
-                  📅 已关联：{note.linkedEvent}
+                  {L(dict, '📅 已关联：', '📅 Linked: ')}{note.linkedEvent}
                 </p>
               )}
             </div>
 
             <button type="button" className="nesio-ob-primary-btn" style={{ marginTop: '1rem' }} onClick={saveNote}>
-              {saved ? '✓ 已存入 Memory' : '存入 Memory'}
+              {saved ? L(dict, '✓ 已存入 Memory', '✓ Saved to Memory') : L(dict, '存入 Memory', 'Save to Memory')}
             </button>
           </>
         )}
 
         {recState === 'error' && (
           <div style={{ textAlign: 'center', padding: '1.5rem 0' }}>
-            <p style={{ color: 'var(--status-risk)', fontSize: '0.85rem' }}>处理失败，请重试。</p>
-            <button type="button" className="nesio-ob-primary-btn" style={{ marginTop: '1rem' }} onClick={() => setRecState('idle')}>重试</button>
+            <p style={{ color: 'var(--status-risk)', fontSize: '0.85rem' }}>{L(dict, '处理失败，请重试。', 'Processing failed — try again.')}</p>
+            <button type="button" className="nesio-ob-primary-btn" style={{ marginTop: '1rem' }} onClick={() => setRecState('idle')}>{L(dict, '重试', 'Retry')}</button>
           </div>
         )}
       </div>

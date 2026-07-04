@@ -7,6 +7,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { addMeetingNotes, type FocusNode } from '@/lib/platform/view-models/today-view-model';
+import { L } from '@/lib/portal/i18n';
+import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
+import { usePortalLocale } from '../use-portal-locale';
 
 type SpeechRecAPI = {
   continuous: boolean;
@@ -22,6 +25,7 @@ export function MeetingRecorderSheet({ open, meetingNode, onClose }: {
   meetingNode: FocusNode | null;
   onClose: () => void;
 }) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [recording, setRecording] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [saved, setSaved] = useState(false);
@@ -52,7 +56,7 @@ export function MeetingRecorderSheet({ open, meetingNode, onClose }: {
         const rec = new SpeechRec();
         rec.continuous = true;
         rec.interimResults = true;
-        rec.lang = 'zh-CN';
+        rec.lang = dict === 'en' ? 'en-US' : 'zh-CN';
         rec.onresult = (e) => {
           const text = Array.from(e.results).map((r) => r[0].transcript).join('');
           setTranscript(text);
@@ -72,8 +76,8 @@ export function MeetingRecorderSheet({ open, meetingNode, onClose }: {
   }
 
   function saveNotes() {
-    const finalText = transcript.trim() || '（无内容）';
-    const nowStr = new Date().toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const finalText = transcript.trim() || L(dict, '（无内容）', '(empty)');
+    const nowStr = new Date().toLocaleString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
     addMeetingNotes(meetingNode?.id || '', meetingNode?.name || nowStr, finalText);
     setSaved(true);
     setTimeout(() => onClose(), 1800);
@@ -85,7 +89,7 @@ export function MeetingRecorderSheet({ open, meetingNode, onClose }: {
   if (!open) return null;
 
   return (
-    <div className="nesio-recorder-overlay" role="dialog" aria-modal aria-label="会议记录">
+    <div className="nesio-recorder-overlay" role="dialog" aria-modal aria-label={L(dict, '会议记录', 'Meeting notes')}>
       <div className="nesio-recorder-backdrop" onClick={onClose} />
       <div className="nesio-recorder-sheet">
         <div className="nesio-sheet-handle" aria-hidden />
@@ -93,13 +97,13 @@ export function MeetingRecorderSheet({ open, meetingNode, onClose }: {
         {saved ? (
           <div className="nesio-recorder-saved">
             <span className="nesio-recorder-saved-icon">📝</span>
-            <p className="nesio-recorder-saved-title">会议记录已保存</p>
-            <p className="nesio-recorder-saved-hint">已存入记忆，和会议条目关联</p>
+            <p className="nesio-recorder-saved-title">{L(dict, '会议记录已保存', 'Meeting notes saved')}</p>
+            <p className="nesio-recorder-saved-hint">{L(dict, '已存入记忆，和会议条目关联', 'Saved to memory, linked to the meeting entry')}</p>
           </div>
         ) : (
           <>
             <div className="nesio-recorder-header">
-              <p className="nesio-recorder-title">🎙 会议记录</p>
+              <p className="nesio-recorder-title">{L(dict, '🎙 会议记录', '🎙 Meeting notes')}</p>
               {meetingNode && <p className="nesio-recorder-meeting-name">{meetingNode.name}</p>}
             </div>
 
@@ -121,25 +125,25 @@ export function MeetingRecorderSheet({ open, meetingNode, onClose }: {
 
               {transcript ? (
                 <div className="nesio-recorder-transcript">
-                  <p className="nesio-recorder-transcript-label">转写内容</p>
+                  <p className="nesio-recorder-transcript-label">{L(dict, '转写内容', 'Transcript')}</p>
                   <p className="nesio-recorder-transcript-text">{transcript}</p>
                 </div>
               ) : (
-                !recording && <p className="nesio-recorder-hint">点击录音，自动转写中文语音</p>
+                !recording && <p className="nesio-recorder-hint">{L(dict, '点击录音，自动转写中文语音', 'Tap record — speech transcribes automatically')}</p>
               )}
             </div>
 
             <div className="nesio-recorder-actions">
               {!recording ? (
-                <button type="button" className="nesio-recorder-start-btn" onClick={startRecording}>开始录音</button>
+                <button type="button" className="nesio-recorder-start-btn" onClick={startRecording}>{L(dict, '开始录音', 'Start recording')}</button>
               ) : (
-                <button type="button" className="nesio-recorder-stop-btn" onClick={stopRecording}>停止录音</button>
+                <button type="button" className="nesio-recorder-stop-btn" onClick={stopRecording}>{L(dict, '停止录音', 'Stop recording')}</button>
               )}
 
               {!recording && (
                 <textarea
                   className="nesio-recorder-notes-input"
-                  placeholder="或直接输入会议笔记…"
+                  placeholder={L(dict, '或直接输入会议笔记…', 'Or type meeting notes directly…')}
                   value={transcript}
                   onChange={(e) => setTranscript(e.target.value)}
                   rows={3}
@@ -152,7 +156,7 @@ export function MeetingRecorderSheet({ open, meetingNode, onClose }: {
                 onClick={saveNotes}
                 disabled={recording || !transcript.trim()}
               >
-                {transcript.trim() ? '保存会议记录' : '先录音或输入笔记'}
+                {transcript.trim() ? L(dict, '保存会议记录', 'Save meeting notes') : L(dict, '先录音或输入笔记', 'Record or type notes first')}
               </button>
             </div>
           </>

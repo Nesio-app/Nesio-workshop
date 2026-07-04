@@ -121,7 +121,7 @@ export function GuidanceIcon({ icon, size = 18 }: { icon: string; size?: number 
     '💝': IconStar, '🧳': IconMap, '🎙': IconMic, '📩': IconMail,
     '💪': IconActivity, '🧥': IconCloud, '☂️': IconRain, '📦': IconBox,
     '💡': IconBulb, '🗓': IconCalendar, '✅': IconCheckCircle, '🌙': IconMoon,
-    '🎈': IconBalloon,
+    '🎈': IconBalloon, '✨': IconStar,
   };
   const C = map[icon];
   return C ? <C size={size} /> : <IconNote size={size} />;

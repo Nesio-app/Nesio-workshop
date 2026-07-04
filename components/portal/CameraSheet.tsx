@@ -78,7 +78,7 @@ async function compressImage(canvas: HTMLCanvasElement): Promise<string> {
 const FULL_IMAGE_PROMPT = '请只根据图片里真实可见的内容生成 Memory 节点。如果是小票/收据：为每个购买条目单独生成一个 object 节点（名称用中文，如”草莓冰淇淋”、”蜂蜜柚子茶”），attributes 加 price 和 receiptDate；如果能识别出商家名称，将其加入每个节点的 attributes.store 字段；如果能识别出支付方式（如 AMEX、Visa、微信支付），将其加入 attributes.paymentMethod 字段；不要单独为商店生成 place 节点，不要生成收据汇总节点。其他情况：优先识别具体物品、文件、场景；除非图片里清楚有人，否则不要生成”人物”节点；不要把这段指令当成节点名称。';
 const CROP_PROMPT = '用户已圈选了图片中的特定区域（圈外已遮黑）。请只识别圈内最主要的1-2个物品，生成对应 Memory 节点。不要识别背景、黑色遮罩区域或其他无关物体。';
 
-async function analyzeImage(base64: string, prompt?: string): Promise<AnalysisResult> {
+async function analyzeImage(base64: string, prompt?: string, dict: string = 'zh'): Promise<AnalysisResult> {
   const res = await fetch('/api/portal/analyze', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-baohe-access-mode': 'personal_lab' },
@@ -91,7 +91,7 @@ async function analyzeImage(base64: string, prompt?: string): Promise<AnalysisRe
   });
   const data = await res.json() as { ok?: boolean; nodes?: AnalyzedNode[]; summary?: string; error?: string };
   if (!data.ok || !data.nodes?.length) throw new AnalyzeImageError(data.error || 'no_result');
-  return { nodes: data.nodes, summary: data.summary || '识别完成' };
+  return { nodes: data.nodes, summary: data.summary || L(dict, '识别完成', 'Recognition done') };
 }
 
 const TYPE_ICON: Record<string, string> = {
@@ -157,16 +157,16 @@ async function getCurrentLocation(): Promise<{ lat: number; lon: number } | null
 
 const ALL_TYPES = ['object', 'person', 'place', 'event', 'commitment', 'health_state', 'preference'] as const;
 
-function buildPendingImageResult(): AnalysisResult {
+function buildPendingImageResult(dict: string = 'zh'): AnalysisResult {
   return {
-    summary: '已先保存为待确认图片线索。登录或 Lab 模式后可自动识别标签。',
+    summary: L(dict, '已先保存为待确认图片线索。登录或 Lab 模式后可自动识别标签。', 'Saved as an unconfirmed image clue for now. Sign in or enable Lab mode for auto-tagging.'),
     nodes: [
       {
         type: 'object',
-        name: '待确认图片线索',
-        attributes: { status: '待确认', note: '图片已保存，标签等待你确认或登录后自动识别。' },
+        name: L(dict, '待确认图片线索', 'Unconfirmed image clue'),
+        attributes: { status: L(dict, '待确认', 'Unconfirmed'), note: L(dict, '图片已保存，标签等待你确认或登录后自动识别。', 'Image saved; tags await your confirmation or auto-recognition after sign-in.') },
         relations: [],
-        tags: ['图片', '待确认'],
+        tags: [L(dict, '图片', 'image'), L(dict, '待确认', 'unconfirmed')],
         source: 'photo',
         confidence: 0.45,
       },
@@ -350,7 +350,7 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas || video.readyState < 2) {
-      setError('相机未就绪，请稍后再试。');
+      setError(L(dict, '相机未就绪，请稍后再试。', 'Camera not ready — try again shortly.'));
       return;
     }
     setPhase('captured');
@@ -396,7 +396,7 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
     setPhase('analyzing');
     setError('');
     try {
-      const res = await analyzeImage(capturedBase64);
+      const res = await analyzeImage(capturedBase64, undefined, dict);
       const nodes = toEditedNodes(res.nodes);
       setResult(res);
       setEditedNodes(nodes);
@@ -414,15 +414,15 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
       if (Object.keys(similars).length > 0) setSimilarItems(similars);
     } catch (err: unknown) {
       if (err instanceof AnalyzeImageError && err.code === 'ai_auth_required') {
-        const pending = buildPendingImageResult();
+        const pending = buildPendingImageResult(dict);
         setResult(pending);
         setEditedNodes(toEditedNodes(pending.nodes));
         setIsReceipt(false);
         setPhase('result');
         return;
       }
-      setError('识别失败。你可以先保存为待确认图片线索。');
-      setResult(buildPendingImageResult());
+      setError(L(dict, '识别失败。你可以先保存为待确认图片线索。', 'Recognition failed. You can save it as an unconfirmed image clue for now.'));
+      setResult(buildPendingImageResult(dict));
       setPhase('result');
     }
   }
@@ -460,7 +460,7 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
           body: JSON.stringify({ type: 'file', content: text.slice(0, 4000) }),
         });
         const data = await res2.json() as { ok?: boolean; nodes?: AnalyzedNode[]; summary?: string };
-        const fileResult = { nodes: data.nodes || [], summary: data.summary || '提取完成' };
+        const fileResult = { nodes: data.nodes || [], summary: data.summary || L(dict, '提取完成', 'Extraction done') };
         setResult(fileResult);
         setEditedNodes(toEditedNodes(fileResult.nodes));
         setIsReceipt(detectReceipt(fileResult));
@@ -484,7 +484,7 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
       const origIdx = editedNodes.indexOf(n);
       const locationVal = nodeLocations[origIdx] ?? '';
       return ingestLifeNode({
-        name: n.name.trim() || '未命名条目',
+        name: n.name.trim() || L(dict, '未命名条目', 'Untitled item'),
         type: n.type as LifeNode['type'],
         source: 'photo',
         tags: Array.from(new Set([...(n.tags || []), ...userTags])),
@@ -675,7 +675,7 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
       setSelecting(false);
       setPhase('analyzing');
       try {
-        const res = await analyzeImage(base64, CROP_PROMPT);
+        const res = await analyzeImage(base64, CROP_PROMPT, dict);
         const newNodes = toEditedNodes(res.nodes);
         setResult((prev) => prev ? { ...prev, nodes: [...prev.nodes, ...res.nodes] } : res);
         setEditedNodes((prev) => {
@@ -687,7 +687,7 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
         setPhase('result');
       } catch {
         if (!result) {
-          const pending = buildPendingImageResult();
+          const pending = buildPendingImageResult(dict);
           setResult(pending);
           setEditedNodes(toEditedNodes(pending.nodes));
         }
@@ -716,7 +716,7 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
 
       {/* Header */}
       <div className="nesio-camera-header">
-        <button type="button" className="nesio-camera-close" onClick={onClose} aria-label="关闭">
+        <button type="button" className="nesio-camera-close" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" width="18" height="18">
             <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
           </svg>
@@ -734,7 +734,7 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
           /* eslint-disable-next-line @next/next/no-img-element */
           <img
             src={capturedPreview}
-            alt="拍摄的照片"
+            alt={L(dict, '拍摄的照片', 'Captured photo')}
             className="nesio-camera-video camera-callout-none"
             style={{ objectFit: 'cover' }}
             draggable={false}
@@ -806,7 +806,7 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
             const sims = similarItems[firstObjIdx] || [];
             return (
               <PurchaseCoolingPanel
-                productName={firstObj.name || '这件东西'}
+                productName={firstObj.name || L(dict, '这件东西', 'this item')}
                 similarCount={sims.length}
                 similarExample={sims[0]?.node.name}
               />
@@ -841,7 +841,7 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
                   <button
                     type="button"
                     className="nesio-camera-node-delete"
-                    aria-label="删除此条"
+                    aria-label={L(dict, '删除此条', 'Delete this item')}
                     onClick={() => setEditedNodes((prev) => prev.map((n, j) => j === i ? { ...n, deleted: true } : n))}
                   >✕</button>
                 </div>
@@ -867,7 +867,7 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
                   <div className="nesio-camera-similar-alert">
                     <span className="nesio-camera-similar-icon"><IconBox size={14} /></span>
                     <div className="nesio-camera-similar-body">
-                      <p className="nesio-camera-similar-title">等等，你好像已经有了</p>
+                      <p className="nesio-camera-similar-title">{L(dict, '等等，你好像已经有了', 'Wait — you might already have this')}</p>
                       {similarItems[i].slice(0, 2).map((s) => (
                         <p key={s.node.id} className="nesio-camera-similar-item">
                           📦 {s.node.name}
@@ -879,7 +879,7 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
                       type="button"
                       className="nesio-camera-similar-dismiss"
                       onClick={() => setDismissedSimilar((prev) => new Set(Array.from(prev).concat(i)))}
-                      aria-label="忽略"
+                      aria-label={L(dict, '忽略', 'Dismiss')}
                     >✕</button>
                   </div>
                 )}
@@ -887,7 +887,7 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
                 {/* Location — shown for objects, hierarchical picker */}
                 {node.type === 'object' && (
                   <div className="nesio-camera-node-loc-row">
-                    <span className="nesio-camera-node-expiry-label">存放位置</span>
+                    <span className="nesio-camera-node-expiry-label">{L(dict, '存放位置', 'Stored at')}</span>
                     <LocationPicker
                       value={nodeLocations[i] ?? ''}
                       onChange={(v) => setNodeLocations((prev) => ({ ...prev, [i]: v }))}
@@ -899,7 +899,7 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
                 {/* Expiry — shown for objects or receipt items */}
                 {(node.type === 'object' || isReceipt) && (
                   <div className="nesio-camera-node-expiry-row">
-                    <span className="nesio-camera-node-expiry-label">有效期</span>
+                    <span className="nesio-camera-node-expiry-label">{L(dict, '有效期', 'Expires')}</span>
                     <input
                       type="date"
                       className="nesio-camera-node-expiry-input"
@@ -921,16 +921,16 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
               confidence: 1, relations: [], deleted: false,
             }])}
           >
-            + 添加条目
+            {L(dict, '+ 添加条目', '+ Add item')}
           </button>
 
           <label className="nesio-camera-tag-field">
-            <span>标签</span>
+            <span>{L(dict, '标签', 'Tags')}</span>
             <input
               value={extraTags}
               onChange={(e) => setExtraTags(e.target.value)}
-              placeholder="#钥匙 #门口 #Linda礼物"
-              aria-label="图片标签"
+              placeholder={L(dict, '#钥匙 #门口 #Linda礼物', '#keys #entry #LindaGift')}
+              aria-label={L(dict, '图片标签', 'Image tags')}
             />
           </label>
 
@@ -941,9 +941,9 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
               onClick={saveAll}
               disabled={editedNodes.filter((n) => !n.deleted).length === 0}
             >
-              存入 Memory ({editedNodes.filter((n) => !n.deleted).length} 条)
+              {L(dict, `存入 Memory (${editedNodes.filter((n) => !n.deleted).length} 条)`, `Save to Memory (${editedNodes.filter((n) => !n.deleted).length})`)}
             </button>
-            <button type="button" className="nesio-camera-retake-btn" onClick={retake}>重拍</button>
+            <button type="button" className="nesio-camera-retake-btn" onClick={retake}>{L(dict, '重拍', 'Retake')}</button>
           </div>
 
         </div>
@@ -961,17 +961,17 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
             onTouchMove={handleSelTouchMove}
             onTouchEnd={handleSelTouchEnd}
           />
-          <div className="nesio-select-hint">用手指随意圈住要识别的区域</div>
+          <div className="nesio-select-hint">{L(dict, '用手指随意圈住要识别的区域', 'Circle the area to recognize with your finger')}</div>
           <div className="nesio-select-overlay-actions">
-            <button type="button" className="nesio-select-action-btn" onClick={analyzeFullImage}>🔍 全图</button>
-            <button type="button" className="nesio-select-action-btn" onClick={retake}>↩ 重拍</button>
+            <button type="button" className="nesio-select-action-btn" onClick={analyzeFullImage}>{L(dict, '🔍 全图', '🔍 Full image')}</button>
+            <button type="button" className="nesio-select-action-btn" onClick={retake}>{L(dict, '↩ 重拍', '↩ Retake')}</button>
           </div>
         </div>
       )}
 
       {phase === 'saved' && (
         <div className="nesio-camera-result-panel" style={{ textAlign: 'center', padding: '1.25rem' }}>
-          <p style={{ color: 'var(--status-go)', fontSize: '1.1rem', fontWeight: 700 }}>✓ 已存入 Memory</p>
+          <p style={{ color: 'var(--status-go)', fontSize: '1.1rem', fontWeight: 700 }}>{L(dict, '✓ 已存入 Memory', '✓ Saved to Memory')}</p>
         </div>
       )}
 

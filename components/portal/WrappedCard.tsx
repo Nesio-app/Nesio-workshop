@@ -8,6 +8,10 @@
 import { useEffect, useState } from 'react';
 import { getLifeGraph, type LifeNode } from '@/lib/portal/life-graph';
 import { countByDomain } from '@/lib/portal/domain-stats';
+import { DOMAINS as DOMAIN_META } from '@/lib/life-domain/domain-taxonomy';
+import { L } from '@/lib/portal/i18n';
+import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
+import { usePortalLocale } from './use-portal-locale';
 
 const STORAGE_KEY = 'nesio-wrapped-last';
 const INTERVAL_DAYS = 90;
@@ -27,7 +31,7 @@ function getQuarterLabel(date: Date): string {
   return `${date.getFullYear()} Q${q}`;
 }
 
-function buildWrappedData(nodes: LifeNode[], quarterStart: Date, quarterEnd: Date): WrappedData {
+function buildWrappedData(nodes: LifeNode[], quarterStart: Date, quarterEnd: Date, dict: string = 'zh'): WrappedData {
   const quarterNodes = nodes.filter((n) => {
     const d = new Date(n.createdAt);
     return d >= quarterStart && d <= quarterEnd;
@@ -37,8 +41,10 @@ function buildWrappedData(nodes: LifeNode[], quarterStart: Date, quarterEnd: Dat
   const total = quarterNodes.length;
 
   // Canonical domain taxonomy (nodeDomain + DOMAINS) via shared aggregation
+  const localizedDomainLabel = (d: { domain: keyof typeof DOMAIN_META; label: string }) =>
+    L(dict, d.label, DOMAIN_META[d.domain]?.labelEn ?? d.label);
   const domainCounts = countByDomain(quarterNodes);
-  const dominant = domainCounts[0]?.label ?? '生活';
+  const dominant = domainCounts[0] ? localizedDomainLabel(domainCounts[0]) : L(dict, '生活', 'Life');
   const dominantEmoji = domainCounts[0]?.icon ?? '✨';
 
   // Top node: most-tagged or highest confidence
@@ -46,14 +52,14 @@ function buildWrappedData(nodes: LifeNode[], quarterStart: Date, quarterEnd: Dat
     .slice()
     .sort((a, b) => (b.tags?.length ?? 0) - (a.tags?.length ?? 0) || b.confidence - a.confidence)[0];
 
-  const topNodeName = topNode?.name ?? '一段珍贵的时光';
+  const topNodeName = topNode?.name ?? L(dict, '一段珍贵的时光', 'a treasured stretch of time');
 
   // Generate narrative
-  const sorted = domainCounts.map((d): [string, number] => [d.label, d.count]);
-  const narrative = generateNarrative(label, total, dominant, topNodeName, sorted);
+  const sorted = domainCounts.map((d): [string, number] => [localizedDomainLabel(d), d.count]);
+  const narrative = generateNarrative(label, total, dominant, topNodeName, sorted, dict);
 
   const breakdown = domainCounts
-    .map((d) => ({ label: d.label, emoji: d.icon, count: d.count }))
+    .map((d) => ({ label: localizedDomainLabel(d), emoji: d.icon, count: d.count }))
     .slice(0, 4);
 
   return {
@@ -73,21 +79,22 @@ function generateNarrative(
   dominant: string,
   topNode: string,
   sorted: [string, number][],
+  dict: string = 'zh',
 ): string {
   const second = sorted[1]?.[0];
-  const shift = second ? `，同时在${second}上也有积累` : '';
+  const shift = second ? L(dict, `，同时在${second}上也有积累`, `, with steady gains in ${second} too`) : '';
 
   if (total === 0) {
-    return `${quarter}，你开始记录自己的生命轨迹。`;
+    return L(dict, `${quarter}，你开始记录自己的生命轨迹。`, `${quarter} — you started recording your life's trail.`);
   }
   if (total < 5) {
-    return `${quarter}，你留下了 ${total} 条记忆，「${topNode}」是这段时间最深的印记。`;
+    return L(dict, `${quarter}，你留下了 ${total} 条记忆，「${topNode}」是这段时间最深的印记。`, `${quarter} — you left ${total} memories; "${topNode}" marked this stretch the deepest.`);
   }
 
   const templates = [
-    `${quarter}，你的生命重心落在了${dominant}${shift}。「${topNode}」留下了深刻印记。`,
-    `这个季度你记录了 ${total} 件事，大多关于${dominant}。「${topNode}」是其中最鲜活的一章。`,
-    `${quarter}：${dominant}${shift}。每一条记录都是在告诉未来的自己——那段时光存在过。`,
+    L(dict, `${quarter}，你的生命重心落在了${dominant}${shift}。「${topNode}」留下了深刻印记。`, `${quarter} — your center of gravity was ${dominant}${shift}. "${topNode}" left a deep mark.`),
+    L(dict, `这个季度你记录了 ${total} 件事，大多关于${dominant}。「${topNode}」是其中最鲜活的一章。`, `You recorded ${total} things this quarter, mostly about ${dominant}. "${topNode}" was the most vivid chapter.`),
+    L(dict, `${quarter}：${dominant}${shift}。每一条记录都是在告诉未来的自己——那段时光存在过。`, `${quarter}: ${dominant}${shift}. Every record tells your future self — that time really happened.`),
   ];
 
   return templates[total % templates.length];
@@ -138,6 +145,7 @@ export function useWrappedTrigger(): { shouldShow: boolean; dismiss: () => void 
 }
 
 export default function WrappedCard({ onDismiss }: Props) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [data, setData] = useState<WrappedData | null>(null);
 
   useEffect(() => {
@@ -146,9 +154,9 @@ export default function WrappedCard({ onDismiss }: Props) {
     // Show the PREVIOUS quarter's wrap
     const prevQuarterEnd = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 0, 23, 59, 59);
     const { start, end } = getQuarterRange(prevQuarterEnd);
-    const built = buildWrappedData(nodes, start, end);
+    const built = buildWrappedData(nodes, start, end, dict);
     setData(built);
-  }, []);
+  }, [dict]);
 
   if (!data) return null;
 

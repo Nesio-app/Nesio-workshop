@@ -26,6 +26,7 @@ interface ConnectorDef {
   syncEndpoint?: string;
   /** token connectors: where to get the token */
   tokenHint?: string;
+  tokenHintEn?: string;
   /** shortcuts connectors: the source id for /api/portal/ingest */
   ingestSource?: string;
   comingSoon?: boolean;
@@ -38,13 +39,13 @@ const CONNECTORS: ConnectorDef[] = [
   { id: 'google', name: 'Google 日历 · Gmail', nameEn: 'Google Calendar · Gmail', icon: <IconCalendar />, iconBg: 'var(--chip-blue)', method: 'oauth', description: '一次授权同时接入:日程生成提醒和简报,邮件提取人物、日期、承诺', descriptionEn: 'One consent covers both: calendar drives reminders and briefs; email yields people, dates, promises' },
   { id: 'weather', name: '地理位置 · 天气', nameEn: 'Location · Weather', icon: <IconCloudSun />, iconBg: 'var(--chip-amber)', method: 'geo', description: '基于实时天气生成外出和健康建议', descriptionEn: 'Live weather feeds outing and health suggestions' },
   { id: 'flomo', name: 'Flomo', icon: <IconNote />, iconBg: 'var(--chip-indigo)', method: 'server', syncEndpoint: '/api/portal/flomo?limit=30', description: '同步 flomo 笔记，提取想法与记录', descriptionEn: 'Sync flomo notes; extract ideas and records' },
-  { id: 'notion', name: 'Notion', icon: <IconBook />, iconBg: 'var(--chip-gray)', method: 'token', syncEndpoint: '/api/portal/notion', tokenHint: 'notion.so/my-integrations → 新建集成 → 复制 Internal Integration Secret，并把页面共享给它', description: '同步最近编辑的页面，提取项目与想法', dev: true },
-  { id: 'toggl', name: 'Toggl Track', icon: <IconTimer />, iconBg: 'var(--chip-red)', method: 'token', syncEndpoint: '/api/portal/toggl', tokenHint: 'track.toggl.com → Profile → API Token', description: '同步时间记录，了解你的专注分布', dev: true },
-  { id: 'health', name: 'Apple Health 导出', icon: <IconHeartPulse />, iconBg: 'var(--chip-pink)', method: 'file', description: '上传 export.xml，提取步数、睡眠、心率', dev: true },
-  { id: 'reminder', name: 'Apple 提醒事项', icon: <IconCheckSquare />, iconBg: 'var(--chip-amber)', method: 'shortcuts', ingestSource: 'reminder', description: '通过快捷指令推送提醒，自动转为承诺', dev: true },
-  { id: 'keep', name: 'Keep 健康', icon: <IconActivity />, iconBg: 'var(--chip-green)', method: 'shortcuts', ingestSource: 'keep', description: '通过快捷指令推送运动数据', dev: true },
-  { id: 'wechat_reading', name: '微信读书', icon: <IconBookOpen />, iconBg: 'var(--chip-leaf)', method: 'shortcuts', ingestSource: 'wechat_reading', description: '通过快捷指令推送阅读进度与笔记', dev: true },
-  { id: 'tesla', name: 'Tesla', icon: <IconCar />, iconBg: 'var(--chip-green)', method: 'oauth', description: '电量、行程信号，自动提醒充电', comingSoon: true, dev: true },
+  { id: 'notion', name: 'Notion', icon: <IconBook />, iconBg: 'var(--chip-gray)', method: 'token', syncEndpoint: '/api/portal/notion', tokenHint: 'notion.so/my-integrations → 新建集成 → 复制 Internal Integration Secret，并把页面共享给它', tokenHintEn: 'notion.so/my-integrations → New integration → copy the Internal Integration Secret, then share your pages with it', description: '同步最近编辑的页面，提取项目与想法', descriptionEn: 'Sync recently edited pages; extract projects and ideas', dev: true },
+  { id: 'toggl', name: 'Toggl Track', icon: <IconTimer />, iconBg: 'var(--chip-red)', method: 'token', syncEndpoint: '/api/portal/toggl', tokenHint: 'track.toggl.com → Profile → API Token', tokenHintEn: 'track.toggl.com → Profile → API Token', description: '同步时间记录，了解你的专注分布', descriptionEn: 'Sync time entries to see where your focus goes', dev: true },
+  { id: 'health', name: 'Apple Health 导出', nameEn: 'Apple Health export', icon: <IconHeartPulse />, iconBg: 'var(--chip-pink)', method: 'file', description: '上传 export.xml，提取步数、睡眠、心率', descriptionEn: 'Upload export.xml to extract steps, sleep, heart rate', dev: true },
+  { id: 'reminder', name: 'Apple 提醒事项', nameEn: 'Apple Reminders', icon: <IconCheckSquare />, iconBg: 'var(--chip-amber)', method: 'shortcuts', ingestSource: 'reminder', description: '通过快捷指令推送提醒，自动转为承诺', descriptionEn: 'Push reminders via Shortcuts; they become commitments', dev: true },
+  { id: 'keep', name: 'Keep 健康', nameEn: 'Keep fitness', icon: <IconActivity />, iconBg: 'var(--chip-green)', method: 'shortcuts', ingestSource: 'keep', description: '通过快捷指令推送运动数据', descriptionEn: 'Push workout data via Shortcuts', dev: true },
+  { id: 'wechat_reading', name: '微信读书', nameEn: 'WeRead', icon: <IconBookOpen />, iconBg: 'var(--chip-leaf)', method: 'shortcuts', ingestSource: 'wechat_reading', description: '通过快捷指令推送阅读进度与笔记', descriptionEn: 'Push reading progress and notes via Shortcuts', dev: true },
+  { id: 'tesla', name: 'Tesla', icon: <IconCar />, iconBg: 'var(--chip-green)', method: 'oauth', description: '电量、行程信号，自动提醒充电', descriptionEn: 'Battery and trip signals; charging reminders', comingSoon: true, dev: true },
 ];
 
 const CONNECTORS_KEY = 'nesio-connectors-v1';
@@ -91,7 +92,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     // Check OAuth callback
     const params = new URLSearchParams(window.location.search);
     const err = params.get('error');
-    if (err) showToast(`连接失败：${err}`, false);
+    if (err) showToast(L(dict, `连接失败：${err}`, `Connection failed: ${err}`), false);
   }, [open]);
 
 
@@ -102,10 +103,10 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
         <span className="nesio-connector-icon" style={{ background: c.iconBg }}>{c.icon}</span>
         <div className="nesio-connector-body">
           <p className="nesio-connector-name">
-            {c.name}
+            {dict === 'en' ? (c.nameEn ?? c.name) : c.name}
             <span className="nesio-connector-soon">{c.comingSoon ? L(dict, '即将上线', 'Coming soon') : L(dict, '开发中', 'In dev')}</span>
           </p>
-          <p className="nesio-connector-desc">{c.description}</p>
+          <p className="nesio-connector-desc">{dict === 'en' ? (c.descriptionEn ?? c.description) : c.description}</p>
         </div>
       </div>
     );
@@ -134,8 +135,8 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       });
       const data = await res.json() as { ok?: boolean; nodes?: NodeInput[]; error?: string };
       if (!data.ok) {
-        if (data.error === 'invalid_token') { saveToken(c.id, ''); setTokenInputFor(c.id); setTokenValue(''); showToast('Token 无效，请重新输入', false); }
-        else showToast(`同步失败：${data.error || '未知'}`, false);
+        if (data.error === 'invalid_token') { saveToken(c.id, ''); setTokenInputFor(c.id); setTokenValue(''); showToast(L(dict, 'Token 无效，请重新输入', 'Invalid token — please re-enter'), false); }
+        else showToast(L(dict, `同步失败：${data.error || '未知'}`, `Sync failed: ${data.error || 'unknown'}`), false);
         setSyncing(null);
         return;
       }
@@ -144,8 +145,8 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       saveConnectorState(c.id, true);
       setConnected((p) => ({ ...p, [c.id]: true }));
       setCounts((p) => ({ ...p, [c.id]: n.length }));
-      showToast(`已提取 ${n.length} 个节点`, true);
-    } catch { showToast('网络错误', false); }
+      showToast(L(dict, `已提取 ${n.length} 个节点`, `Extracted ${n.length} nodes`), true);
+    } catch { showToast(L(dict, '网络错误', 'Network error'), false); }
     setSyncing(null);
   }
 
@@ -162,7 +163,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     try {
       const res = await fetch(c.syncEndpoint!);
       const data = await res.json() as { ok?: boolean; memos?: Array<{ content: string; created_at: string; tags: string[] }>; error?: string };
-      if (!data.ok) { showToast(`Flomo 未配置或同步失败`, false); setSyncing(null); return; }
+      if (!data.ok) { showToast(L(dict, `Flomo 未配置或同步失败`, 'Flomo not configured or sync failed'), false); setSyncing(null); return; }
       const memos = data.memos || [];
       const nodes: Array<Omit<NodeInput, 'source'>> = memos.slice(0, 20).map((m) => ({
         type: 'preference' as const,
@@ -177,15 +178,15 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       saveConnectorState(c.id, true);
       setConnected((p) => ({ ...p, [c.id]: true }));
       setCounts((p) => ({ ...p, [c.id]: nodes.length }));
-      showToast(`已同步 ${nodes.length} 条 flomo 笔记`, true);
-    } catch { showToast('网络错误', false); }
+      showToast(L(dict, `已同步 ${nodes.length} 条 flomo 笔记`, `Synced ${nodes.length} flomo notes`), true);
+    } catch { showToast(L(dict, '网络错误', 'Network error'), false); }
     setSyncing(null);
   }
 
   // ── OAuth sync(google = 日历 + 邮件一起同步,结果分行展示)──
   async function syncGoogle(c: ConnectorDef) {
     setSyncing(c.id);
-    setOauthSyncResult((p) => ({ ...p, google: { ok: true, msg: '同步中…' } }));
+    setOauthSyncResult((p) => ({ ...p, google: { ok: true, msg: L(dict, '同步中…', 'Syncing…') } }));
     const parts: string[] = [];
     let allOk = true;
     let reauth = false;
@@ -199,13 +200,13 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
         const { saveCalendarToLocal } = await import('@/lib/portal/calendar-local-store');
         saveCalendarToLocal(data.events as Parameters<typeof saveCalendarToLocal>[0]);
         const added = await saveCalendarEventsToMemory(data.events);
-        parts.push(`日历:${count} 条事件${added > 0 ? `,${added} 条加入记忆` : ''}`);
+        parts.push(L(dict, `日历:${count} 条事件${added > 0 ? `,${added} 条加入记忆` : ''}`, `Calendar: ${count} events${added > 0 ? `, ${added} added to memory` : ''}`));
         window.dispatchEvent(new CustomEvent('nesio-calendar-updated'));
       } else {
         allOk = false;
-        parts.push(`日历:没同步上(${data.message || data.error || '无事件'})`);
+        parts.push(L(dict, `日历:没同步上(${data.message || data.error || '无事件'})`, `Calendar: not synced (${data.message || data.error || 'no events'})`));
       }
-    } catch { allOk = false; parts.push('日历:网络错误'); }
+    } catch { allOk = false; parts.push(L(dict, '日历:网络错误', 'Calendar: network error')); }
 
     // 邮件
     try {
@@ -217,18 +218,18 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
           data.nodes!.forEach((n) => ingestLifeNode({ ...n, source: 'email' } as NodeInput));
           localStorage.setItem('nesio-gmail-last-sync', String(Date.now()));
         }
-        parts.push(`邮件:读取 ${data.emailCount ?? data.messages?.length ?? 0} 封,提取 ${nodeCount} 条`);
+        parts.push(L(dict, `邮件:读取 ${data.emailCount ?? data.messages?.length ?? 0} 封,提取 ${nodeCount} 条`, `Mail: read ${data.emailCount ?? data.messages?.length ?? 0}, extracted ${nodeCount}`));
       } else {
         allOk = false;
         const isNotConnected = data.error === 'not_connected' || data.error === 'token_expired';
         if (isNotConnected) reauth = true;
-        parts.push(isNotConnected ? '邮件:授权已失效,需重新授权' : `邮件:同步失败(${data.error || '未知'})`);
+        parts.push(isNotConnected ? L(dict, '邮件:授权已失效,需重新授权', 'Mail: authorization expired, reconnect needed') : L(dict, `邮件:同步失败(${data.error || '未知'})`, `Mail: sync failed (${data.error || 'unknown'})`));
       }
-    } catch { allOk = false; parts.push('邮件:网络错误'); }
+    } catch { allOk = false; parts.push(L(dict, '邮件:网络错误', 'Mail: network error')); }
 
     saveConnectorState('google', true);
     setConnected((p) => ({ ...p, google: true }));
-    setOauthSyncResult((p) => ({ ...p, google: { ok: allOk, msg: allOk ? '同步成功' : '部分同步失败', detail: parts.join('\n'), needsReauth: reauth } }));
+    setOauthSyncResult((p) => ({ ...p, google: { ok: allOk, msg: allOk ? L(dict, '同步成功', 'Synced') : L(dict, '部分同步失败', 'Partly failed'), detail: parts.join('\n'), needsReauth: reauth } }));
     showToast(parts.join(' · '), allOk);
     window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
     window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
@@ -279,7 +280,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
   async function syncOAuth(c: ConnectorDef) {
     if (c.id === 'google') { await syncGoogle(c); return; }
     setSyncing(c.id);
-    setOauthSyncResult((p) => ({ ...p, [c.id]: { ok: true, msg: '同步中…' } }));
+    setOauthSyncResult((p) => ({ ...p, [c.id]: { ok: true, msg: L(dict, '同步中…', 'Syncing…') } }));
     try {
       if (c.id === 'gmail') {
         const res = await fetch('/api/portal/gmail?includeBody=true&analyze=true');
@@ -290,10 +291,10 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
         if (!data.ok) {
           const isNotConnected = data.error === 'not_connected' || data.error === 'token_expired';
           const detail = isNotConnected
-            ? 'OAuth token 已失效，请重新授权'
-            : `error: ${data.error || '未知'} | HTTP ${res.status}`;
-          setOauthSyncResult((p) => ({ ...p, gmail: { ok: false, msg: isNotConnected ? '需要重新授权' : '同步失败', detail, needsReauth: isNotConnected } as SyncResult }));
-          showToast(isNotConnected ? 'Gmail token 已失效，点击重新授权' : `Gmail 同步失败：${data.error || '未知'}`, false);
+            ? L(dict, 'OAuth token 已失效，请重新授权', 'OAuth token expired — please reconnect')
+            : L(dict, `error: ${data.error || '未知'} | HTTP ${res.status}`, `error: ${data.error || 'unknown'} | HTTP ${res.status}`);
+          setOauthSyncResult((p) => ({ ...p, gmail: { ok: false, msg: isNotConnected ? L(dict, '需要重新授权', 'Reauth needed') : L(dict, '同步失败', 'Sync failed'), detail, needsReauth: isNotConnected } as SyncResult }));
+          showToast(isNotConnected ? L(dict, 'Gmail token 已失效，点击重新授权', 'Gmail token expired — tap to reconnect') : L(dict, `Gmail 同步失败：${data.error || '未知'}`, `Gmail sync failed: ${data.error || 'unknown'}`), false);
         } else {
           const nodeCount = data.nodes?.length ?? 0;
           const emailCount = data.emailCount ?? data.messages?.length ?? 0;
@@ -304,8 +305,8 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
             window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
           }
           setCounts((p) => ({ ...p, gmail: nodeCount }));
-          const detail = `读取 ${emailCount} 封邮件 · 提取 ${nodeCount} 个节点`;
-          setOauthSyncResult((p) => ({ ...p, gmail: { ok: true, msg: '同步成功', detail } }));
+          const detail = L(dict, `读取 ${emailCount} 封邮件 · 提取 ${nodeCount} 个节点`, `Read ${emailCount} emails · extracted ${nodeCount} nodes`);
+          setOauthSyncResult((p) => ({ ...p, gmail: { ok: true, msg: L(dict, '同步成功', 'Synced'), detail } }));
           showToast(detail, true);
         }
       } else if (c.id === 'calendar') {
@@ -314,15 +315,15 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
           ok?: boolean; events?: Array<Record<string, unknown>>; feeds?: Array<{ label: string; ok: boolean; count: number; error?: string }>;
           error?: string; message?: string; provider?: string;
         };
-        const feedSummary = data.feeds?.map((f) => f.label + ': ' + (f.ok ? f.count + '条' : '失败(' + (f.error || '?') + ')')).join(' · ') || '';
+        const feedSummary = data.feeds?.map((f) => f.label + ': ' + (f.ok ? L(dict, f.count + '条', String(f.count)) : L(dict, '失败(' + (f.error || '?') + ')', 'failed (' + (f.error || '?') + ')'))).join(' · ') || '';
         if (!data.ok || !data.events?.length) {
           const detail = [
             `HTTP ${res.status}`,
             data.message || data.error || '',
             feedSummary,
           ].filter(Boolean).join(' | ');
-          setOauthSyncResult((p) => ({ ...p, calendar: { ok: false, msg: `无日历数据`, detail } }));
-          showToast(`日历这次没同步上，稍后再试。（${data.message || data.error || '无事件'}）`, false);
+          setOauthSyncResult((p) => ({ ...p, calendar: { ok: false, msg: L(dict, `无日历数据`, 'No calendar data'), detail } }));
+          showToast(L(dict, `日历这次没同步上，稍后再试。（${data.message || data.error || '无事件'}）`, `Calendar didn't sync this time — try again later. (${data.message || data.error || 'no events'})`), false);
         } else {
           const count = data.events.length;
           const { saveCalendarToLocal } = await import('@/lib/portal/calendar-local-store');
@@ -369,17 +370,19 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
           });
 
           setCounts((p) => ({ ...p, calendar: count }));
-          const detail = `${feedSummary || `来源: ${data.provider || '?'}`} · ${count} 条事件${lifeGraphAdded > 0 ? ` · ${lifeGraphAdded} 条加入记忆` : ''}`;
-          setOauthSyncResult((p) => ({ ...p, calendar: { ok: true, msg: '同步成功', detail } }));
-          showToast(`日历同步成功：${count} 条事件`, true);
+          const detail = L(dict,
+            `${feedSummary || `来源: ${data.provider || '?'}`} · ${count} 条事件${lifeGraphAdded > 0 ? ` · ${lifeGraphAdded} 条加入记忆` : ''}`,
+            `${feedSummary || `source: ${data.provider || '?'}`} · ${count} events${lifeGraphAdded > 0 ? ` · ${lifeGraphAdded} added to memory` : ''}`);
+          setOauthSyncResult((p) => ({ ...p, calendar: { ok: true, msg: L(dict, '同步成功', 'Synced'), detail } }));
+          showToast(L(dict, `日历同步成功：${count} 条事件`, `Calendar synced: ${count} events`), true);
           window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
           window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
         }
       }
     } catch (e) {
-      const msg = e instanceof Error ? e.message : '网络错误';
-      setOauthSyncResult((p) => ({ ...p, [c.id]: { ok: false, msg: '同步失败', detail: msg } }));
-      showToast(`这次没同步上（${msg}）。稍后再试一次就好。`, false);
+      const msg = e instanceof Error ? e.message : L(dict, '网络错误', 'network error');
+      setOauthSyncResult((p) => ({ ...p, [c.id]: { ok: false, msg: L(dict, '同步失败', 'Sync failed'), detail: msg } }));
+      showToast(L(dict, `这次没同步上（${msg}）。稍后再试一次就好。`, `Didn't sync this time (${msg}). Try again in a bit.`), false);
     }
     setSyncing(null);
   }
@@ -392,8 +395,8 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     if (c.method === 'geo') {
       setSyncing(c.id);
       navigator.geolocation.getCurrentPosition(
-        () => { saveConnectorState('weather', true); setConnected((p) => ({ ...p, weather: true })); setSyncing(null); window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed')); showToast('位置已授权', true); },
-        () => { setSyncing(null); showToast('位置权限被拒绝', false); },
+        () => { saveConnectorState('weather', true); setConnected((p) => ({ ...p, weather: true })); setSyncing(null); window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed')); showToast(L(dict, '位置已授权', 'Location granted'), true); },
+        () => { setSyncing(null); showToast(L(dict, '位置权限被拒绝', 'Location permission denied'), false); },
         { timeout: 8000 },
       );
       return;
@@ -408,7 +411,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = '';
-    if (file.name.endsWith('.zip')) { showToast('请先解压 zip，上传里面的 export.xml', false); return; }
+    if (file.name.endsWith('.zip')) { showToast(L(dict, '请先解压 zip，上传里面的 export.xml', 'Unzip first, then upload the export.xml inside'), false); return; }
     setSyncing('health');
     try {
       const text = await file.text();
@@ -419,9 +422,9 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
         saveConnectorState('health', true);
         setConnected((p) => ({ ...p, health: true }));
         setCounts((p) => ({ ...p, health: data.count || 0 }));
-        showToast(`已提取 ${data.count} 个健康节点`, true);
-      } else showToast('未识别到健康数据', false);
-    } catch { showToast('解析失败', false); }
+        showToast(L(dict, `已提取 ${data.count} 个健康节点`, `Extracted ${data.count} health nodes`), true);
+      } else showToast(L(dict, '未识别到健康数据', 'No health data recognized'), false);
+    } catch { showToast(L(dict, '解析失败', 'Parse failed'), false); }
     setSyncing(null);
   }
 
@@ -441,15 +444,15 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
         .then((r) => r.json() as Promise<{ ok?: boolean; revoked?: boolean }>)
         .then((d) => {
           showToast(d.revoked
-            ? '已断开并撤销 Google 授权（邮件与日历共用授权，已一并断开）'
-            : '已断开并清除本地 token（邮件与日历一并断开）', true);
+            ? L(dict, '已断开并撤销 Google 授权（邮件与日历共用授权，已一并断开）', 'Disconnected and revoked Google access (mail and calendar share one consent — both disconnected)')
+            : L(dict, '已断开并清除本地 token（邮件与日历一并断开）', 'Disconnected and cleared local tokens (mail and calendar both)'), true);
         })
-        .catch(() => showToast('已断开本地连接，撤销请求失败——可在 Google 账号安全页手动移除', false));
+        .catch(() => showToast(L(dict, '已断开本地连接，撤销请求失败——可在 Google 账号安全页手动移除', 'Disconnected locally; revoke request failed — remove it manually in Google account security'), false));
     }
   }
 
   function copyIngestUrl() {
-    navigator.clipboard?.writeText(ingestUrl).then(() => showToast('接入地址已复制', true)).catch(() => {});
+    navigator.clipboard?.writeText(ingestUrl).then(() => showToast(L(dict, '接入地址已复制', 'Ingest URL copied'), true)).catch(() => {});
   }
 
   if (!open) return null;
@@ -459,7 +462,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
   return (
     <div className="nesio-settings-sheet-overlay" role="dialog" aria-modal="true" aria-label={L(dict, '数据接入', 'Data sources')}>
       <input ref={fileRef} type="file" accept=".xml,.zip" style={{ display: 'none' }} onChange={handleHealthFile} />
-      <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label="关闭" />
+      <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
       <div className="nesio-settings-sheet-card">
         <div className="nesio-sheet-handle" aria-hidden />
         <div className="nesio-settings-sheet-header">
@@ -488,27 +491,27 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
                   <div className="nesio-connector-body">
                     <p className="nesio-connector-name">
                       {dict === 'en' ? (c.nameEn ?? c.name) : c.name}
-                      {c.comingSoon && <span className="nesio-connector-soon">即将上线</span>}
-                      {c.method === 'shortcuts' && !c.comingSoon && <span className="nesio-connector-soon" style={{ background: 'rgba(88,140,227,0.12)', color: 'var(--portal-blue-deep)' }}>快捷指令</span>}
+                      {c.comingSoon && <span className="nesio-connector-soon">{L(dict, '即将上线', 'Coming soon')}</span>}
+                      {c.method === 'shortcuts' && !c.comingSoon && <span className="nesio-connector-soon" style={{ background: 'rgba(88,140,227,0.12)', color: 'var(--portal-blue-deep)' }}>{L(dict, '快捷指令', 'Shortcuts')}</span>}
                     </p>
                     <p className="nesio-connector-desc">{dict === 'en' ? (c.descriptionEn ?? c.description) : c.description}</p>
-                    {isConn && !oauthSyncResult[c.id] && <p className="nesio-connector-sync">{isSync ? L(dict, '同步中…', 'Syncing…') : L(dict, '已连接', 'Connected')}{cnt ? `  ·  ${cnt} 个节点` : ''}</p>}
+                    {isConn && !oauthSyncResult[c.id] && <p className="nesio-connector-sync">{isSync ? L(dict, '同步中…', 'Syncing…') : L(dict, '已连接', 'Connected')}{cnt ? L(dict, `  ·  ${cnt} 个节点`, `  ·  ${cnt} nodes`) : ''}</p>}
                     {oauthSyncResult[c.id] && (
                       <p className="nesio-connector-sync" style={{ color: oauthSyncResult[c.id].ok ? 'var(--status-go)' : 'var(--status-risk)', fontSize: '0.68rem', lineHeight: 1.4 }}>
                         {oauthSyncResult[c.id].msg}
                         {oauthSyncResult[c.id].detail && <><br /><span style={{ opacity: 0.8, whiteSpace: 'pre-line' }}>{oauthSyncResult[c.id].detail}</span></>}
                         {oauthSyncResult[c.id].needsReauth && (
-                          <><br /><button type="button" style={{ marginTop: '0.25rem', fontSize: '0.68rem', color: 'var(--portal-blue-deep)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', padding: 0 }} onClick={() => handleConnect(c)}>点击重新授权 →</button></>
+                          <><br /><button type="button" style={{ marginTop: '0.25rem', fontSize: '0.68rem', color: 'var(--portal-blue-deep)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', padding: 0 }} onClick={() => handleConnect(c)}>{L(dict, '点击重新授权 →', 'Tap to reconnect →')}</button></>
                         )}
                       </p>
                     )}
                   </div>
 
                   {c.comingSoon ? (
-                    <span style={{ fontSize: '0.7rem', color: 'var(--portal-muted)', flexShrink: 0 }}>敬请期待</span>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--portal-muted)', flexShrink: 0 }}>{L(dict, '敬请期待', 'Stay tuned')}</span>
                   ) : c.method === 'shortcuts' ? (
                     <button type="button" className="nesio-connector-connect" onClick={() => setShortcutsFor(shortcutsFor === c.id ? null : c.id)} style={{ flexShrink: 0 }}>
-                      {shortcutsFor === c.id ? '收起' : '设置'}
+                      {shortcutsFor === c.id ? L(dict, '收起', 'Collapse') : L(dict, '设置', 'Set up')}
                     </button>
                   ) : isConn && (c.method === 'token' || c.method === 'server') ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', flexShrink: 0 }}>
@@ -532,10 +535,10 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
                 {/* Token input */}
                 {tokenInputFor === c.id && (
                   <div className="nesio-connector-token-box">
-                    <p style={{ fontSize: '0.72rem', color: 'var(--portal-muted)', marginBottom: '0.5rem', lineHeight: 1.5 }}>{c.tokenHint}</p>
+                    <p style={{ fontSize: '0.72rem', color: 'var(--portal-muted)', marginBottom: '0.5rem', lineHeight: 1.5 }}>{dict === 'en' ? (c.tokenHintEn ?? c.tokenHint) : c.tokenHint}</p>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <input className="nesio-ob-input" style={{ marginBottom: 0, flex: 1, fontSize: '0.8rem' }} type="password" placeholder="粘贴 Token…" value={tokenValue} onChange={(e) => setTokenValue(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submitToken(c); }} autoFocus />
-                      <button type="button" className="nesio-connector-connect" onClick={() => submitToken(c)} disabled={!tokenValue.trim()}>连接</button>
+                      <input className="nesio-ob-input" style={{ marginBottom: 0, flex: 1, fontSize: '0.8rem' }} type="password" placeholder={L(dict, '粘贴 Token…', 'Paste token…')} value={tokenValue} onChange={(e) => setTokenValue(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submitToken(c); }} autoFocus />
+                      <button type="button" className="nesio-connector-connect" onClick={() => submitToken(c)} disabled={!tokenValue.trim()}>{L(dict, '连接', 'Connect')}</button>
                     </div>
                   </div>
                 )}
@@ -543,17 +546,17 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
                 {/* Shortcuts setup */}
                 {shortcutsFor === c.id && (
                   <div className="nesio-connector-token-box">
-                    <p style={{ fontSize: '0.75rem', color: 'var(--portal-ink)', fontWeight: 600, marginBottom: '0.4rem' }}>通过 iOS 快捷指令接入</p>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--portal-ink)', fontWeight: 600, marginBottom: '0.4rem' }}>{L(dict, '通过 iOS 快捷指令接入', 'Connect via iOS Shortcuts')}</p>
                     <ol style={{ fontSize: '0.72rem', color: 'var(--portal-muted)', lineHeight: 1.7, paddingLeft: '1.1rem', marginBottom: '0.6rem' }}>
-                      <li>打开「快捷指令」App，新建快捷指令</li>
-                      <li>添加动作「获取 URL 内容」</li>
-                      <li>URL 填下方地址，方法选 <strong>POST</strong></li>
-                      <li>请求体 JSON：<code style={{ fontSize: '0.68rem' }}>{`{"source":"${c.ingestSource}","content":"数据内容"}`}</code></li>
-                      <li>可设为自动化，定时推送</li>
+                      <li>{L(dict, '打开「快捷指令」App，新建快捷指令', 'Open the Shortcuts app and create a new shortcut')}</li>
+                      <li>{L(dict, '添加动作「获取 URL 内容」', 'Add the "Get Contents of URL" action')}</li>
+                      <li>{L(dict, 'URL 填下方地址，方法选 ', 'Use the URL below, method ')}<strong>POST</strong></li>
+                      <li>{L(dict, '请求体 JSON：', 'Request body JSON: ')}<code style={{ fontSize: '0.68rem' }}>{L(dict, `{"source":"${c.ingestSource}","content":"数据内容"}`, `{"source":"${c.ingestSource}","content":"your data"}`)}</code></li>
+                      <li>{L(dict, '可设为自动化，定时推送', 'Optionally automate it on a schedule')}</li>
                     </ol>
                     <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                       <code style={{ flex: 1, fontSize: '0.68rem', background: 'rgba(88,140,227,0.08)', padding: '0.4rem 0.6rem', borderRadius: '0.5rem', wordBreak: 'break-all', color: 'var(--portal-ink)' }}>{ingestUrl}</code>
-                      <button type="button" className="nesio-connector-connect" onClick={copyIngestUrl} style={{ flexShrink: 0 }}>复制</button>
+                      <button type="button" className="nesio-connector-connect" onClick={copyIngestUrl} style={{ flexShrink: 0 }}>{L(dict, '复制', 'Copy')}</button>
                     </div>
                   </div>
                 )}

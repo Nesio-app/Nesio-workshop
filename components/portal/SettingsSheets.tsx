@@ -6,9 +6,9 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { PORTAL_LOCALE_OPTIONS, loadProfileSettings, saveProfileSettings, type PortalLocale } from '@/lib/portal/profile';
+import { PORTAL_LOCALE_OPTIONS, loadProfileSettings, portalLocaleToDictionaryLocale, saveProfileSettings, type PortalLocale } from '@/lib/portal/profile';
 import { getMirrorProfile } from '@/lib/portal/mirror-profile';
-import { t } from '@/lib/portal/i18n';
+import { L, t } from '@/lib/portal/i18n';
 import { usePortalLocale } from './use-portal-locale';
 import { IconChevronRight, IconHalfMoon, IconLink, IconLock, IconMoon, IconShield, IconSun } from './icons';
 import { PROACTIVE_LEVEL_KEY } from './today/proactive-types';
@@ -18,15 +18,16 @@ import { buildFullBackup, isValidBackup, restoreFullBackup } from '@/lib/portal/
 interface SheetProps { open: boolean; onClose: () => void; }
 
 function SheetWrap({ open, onClose, title, children }: SheetProps & { title: string; children: React.ReactNode }) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   if (!open) return null;
   return (
     <div className="nesio-settings-sheet-overlay" role="dialog" aria-modal="true" aria-label={title}>
-      <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label="关闭" />
+      <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
       <div className="nesio-settings-sheet-card">
         <div className="nesio-sheet-handle" aria-hidden />
         <div className="nesio-settings-sheet-header">
           <h2 className="nesio-settings-sheet-title">{title}</h2>
-          <button type="button" className="nesio-voice-sheet-close" onClick={onClose} aria-label="关闭">✕</button>
+          <button type="button" className="nesio-voice-sheet-close" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}>✕</button>
         </div>
         <div className="nesio-settings-sheet-body">{children}</div>
       </div>
@@ -103,6 +104,7 @@ export function GeneralSheet({ open, onClose }: SheetProps) {
     });
   }
 
+  const [prefsOpen, setPrefsOpen] = useState(false);
   const toneOpts: Array<{ id: ToneStyle; label: string; hint: string }> = [
     { id: 'warm', label: t(locale, 'toneWarm'), hint: t(locale, 'toneWarmHint') },
     { id: 'direct', label: t(locale, 'toneDirect'), hint: t(locale, 'toneDirectHint') },
@@ -123,9 +125,18 @@ export function GeneralSheet({ open, onClose }: SheetProps) {
     <SheetWrap open={open} onClose={onClose} title={t(locale, 'generalTitle')}>
       <p className="nesio-settings-sheet-desc">{t(locale, 'generalDesc')}</p>
 
-      {/* 偏好组:语气 + 提醒程度(批次 5:归组 + 说明真实作用面) */}
-      <p className="nesio-settings-section-label" style={{ fontSize: '0.8rem', color: 'var(--portal-ink)' }}>{t(locale, 'sectionPreferences')}</p>
-      <p className="nesio-settings-option-hint" style={{ margin: '0 0 0.6rem' }}>{t(locale, 'sectionPreferencesHint')}</p>
+      {/* 偏好组(批次 10:语气/示例/提醒程度/触感全部折叠进偏好,头部显示当前值) */}
+      <button type="button" className="nesio-settings-option" onClick={() => setPrefsOpen((v) => !v)} aria-expanded={prefsOpen}>
+        <div>
+          <span className="nesio-settings-option-label">{t(locale, 'sectionPreferences')}</span>
+          <span className="nesio-settings-option-hint">
+            {toneOpts.find((o) => o.id === tone)?.label} · {levelOpts.find((o) => o.id === interrupt)?.label}
+          </span>
+        </div>
+        <span aria-hidden style={{ display: 'inline-flex', color: 'var(--portal-muted)', transform: prefsOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}><IconChevronRight size={16} /></span>
+      </button>
+      {prefsOpen && (<>
+      <p className="nesio-settings-option-hint" style={{ margin: '0.35rem 0 0.6rem' }}>{t(locale, 'sectionPreferencesHint')}</p>
 
       <p className="nesio-settings-section-label">{t(locale, 'sectionTone')}</p>
       {toneOpts.map((opt) => (
@@ -159,6 +170,20 @@ export function GeneralSheet({ open, onClose }: SheetProps) {
           {interrupt === opt.id && <span className="nesio-settings-option-check">✓</span>}
         </button>
       ))}
+
+      <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{t(locale, 'sectionHaptics')}</p>
+      <button type="button"
+        className={`nesio-settings-option${hapticsOn ? ' nesio-settings-option--active' : ''}`}
+        onClick={toggleHaptics}>
+        <div>
+          <span className="nesio-settings-option-label">{t(locale, 'hapticsLabel')}</span>
+          <span className="nesio-settings-option-hint">{t(locale, 'hapticsHint')}</span>
+        </div>
+        <span className={`nesio-settings-space-check${hapticsOn ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>
+          {hapticsOn ? '✓' : '○'}
+        </span>
+      </button>
+      </>)}
 
       <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{t(locale, 'sectionAppearance')}</p>
       <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -195,18 +220,6 @@ export function GeneralSheet({ open, onClose }: SheetProps) {
       </select>
       <p className="nesio-settings-option-hint" style={{ marginTop: 4 }}>{t(locale, 'langSoonHint')}</p>
 
-      <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{t(locale, 'sectionHaptics')}</p>
-      <button type="button"
-        className={`nesio-settings-option${hapticsOn ? ' nesio-settings-option--active' : ''}`}
-        onClick={toggleHaptics}>
-        <div>
-          <span className="nesio-settings-option-label">{t(locale, 'hapticsLabel')}</span>
-          <span className="nesio-settings-option-hint">{t(locale, 'hapticsHint')}</span>
-        </div>
-        <span className={`nesio-settings-space-check${hapticsOn ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>
-          {hapticsOn ? '✓' : '○'}
-        </span>
-      </button>
     </SheetWrap>
   );
 }
@@ -245,10 +258,9 @@ export function DataSheet({ open, onClose, onOpenMine, onOpenConnect }: SheetPro
 
 
 export function PrivacySheet({ open, onClose }: SheetProps) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [nodeCount, setNodeCount] = useState(0);
   const [deleted, setDeleted] = useState(false);
-  const [locationGranted, setLocationGranted] = useState<boolean | null>(null);
-  const [requestingLoc, setRequestingLoc] = useState(false);
   const [restoreMsg, setRestoreMsg] = useState('');
   const [lastBackupAt, setLastBackupAt] = useState<string | null>(null);
   const [labOn, setLabOn] = useState(false);
@@ -273,16 +285,20 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
     if (!file) return;
     let parsed: unknown;
     try { parsed = JSON.parse(await file.text()); }
-    catch { setRestoreMsg('文件不是有效的 JSON'); return; }
-    if (!isValidBackup(parsed)) { setRestoreMsg('不是有效的 Nesio 备份文件'); return; }
+    catch { setRestoreMsg(L(dict, '文件不是有效的 JSON', 'File is not valid JSON')); return; }
+    if (!isValidBackup(parsed)) { setRestoreMsg(L(dict, '不是有效的 Nesio 备份文件', 'Not a valid Nesio backup file')); return; }
 
-    const replace = confirm(
+    const replace = confirm(L(dict,
       `备份包含 ${Object.keys(parsed.entries).length} 项数据（${parsed.exportedAt.slice(0, 10)} 导出）。\n\n` +
       '「确定」= 覆盖恢复（备份内容覆盖本机）\n「取消」= 合并恢复（记忆按条合并，其余仅补缺）',
-    );
+      `Backup holds ${Object.keys(parsed.entries).length} entries (exported ${parsed.exportedAt.slice(0, 10)}).\n\n` +
+      'OK = replace (backup overwrites this device)\nCancel = merge (memories merge per item, the rest fills gaps only)',
+    ));
     const result = restoreFullBackup(localStorage, parsed, replace ? 'replace' : 'merge');
     setNodeCount(getLifeGraph().length);
-    setRestoreMsg(`✓ 已恢复 ${result.restoredKeys} 项${result.mergedNodes != null ? `，记忆合并后共 ${result.mergedNodes} 条` : ''}`);
+    setRestoreMsg(L(dict,
+      `✓ 已恢复 ${result.restoredKeys} 项${result.mergedNodes != null ? `，记忆合并后共 ${result.mergedNodes} 条` : ''}`,
+      `✓ Restored ${result.restoredKeys} entries${result.mergedNodes != null ? `, ${result.mergedNodes} memories after merge` : ''}`));
     window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
   }
 
@@ -294,18 +310,7 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
       setLastBackupAt(localStorage.getItem('nesio-last-backup-at'));
       setLabOn(localStorage.getItem('baohe_personal_lab') === '1' || localStorage.getItem('baohe_lab_mode') === '1');
     } catch { /* ignore */ }
-    navigator.permissions?.query({ name: 'geolocation' }).then((r) => {
-      setLocationGranted(r.state === 'granted');
-    }).catch(() => setLocationGranted(null));
   }, [open]);
-
-  function requestLocation() {
-    setRequestingLoc(true);
-    navigator.geolocation.getCurrentPosition(
-      () => { setLocationGranted(true); setRequestingLoc(false); },
-      () => { setLocationGranted(false); setRequestingLoc(false); },
-    );
-  }
 
   function toggleLab() {
     try {
@@ -322,7 +327,7 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
   }
 
   function clearAllMemory() {
-    if (!confirm('删除后，Nesio 不再用这些记忆提醒你。确认继续？')) return;
+    if (!confirm(L(dict, '删除后，Nesio 不再用这些记忆提醒你。确认继续？', 'After deleting, Nesio will no longer use these memories to remind you. Continue?'))) return;
     const nodes = getLifeGraph();
     nodes.forEach((n) => deleteLifeNode(n.id));
     setNodeCount(0);
@@ -330,61 +335,50 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
   }
 
   return (
-    <SheetWrap open={open} onClose={onClose} title="隐私与数据">
-      <p className="nesio-settings-sheet-desc">只整理你放进来的内容。你可以看见它记住了什么、存在哪、也可以随时删除。</p>
+    <SheetWrap open={open} onClose={onClose} title={L(dict, '隐私与数据', 'Privacy & data')}>
+      <p className="nesio-settings-sheet-desc">{L(dict, '只整理你放进来的内容。你可以看见它记住了什么、存在哪、也可以随时删除。', 'Only what you put in gets organized. You can see what it remembers, where it lives, and delete it anytime.')}</p>
 
       {/* 数据主权面板 — local-first 从架构卖点变成可感知的安全感 */}
       <div style={{ background: 'var(--portal-accent-soft, rgba(88,140,227,0.08))', borderRadius: 14, padding: '0.8rem 1rem', marginBottom: '0.9rem' }}>
-        <p style={{ fontSize: '0.72rem', fontWeight: 600, margin: '0 0 0.4rem', color: 'var(--portal-blue-deep)', display: 'flex', alignItems: 'center', gap: 6 }}><IconLock size={14} /> 你的数据在哪里</p>
+        <p style={{ fontSize: '0.72rem', fontWeight: 600, margin: '0 0 0.4rem', color: 'var(--portal-blue-deep)', display: 'flex', alignItems: 'center', gap: 6 }}><IconLock size={14} /> {L(dict, '你的数据在哪里', 'Where your data lives')}</p>
         <div style={{ display: 'flex', gap: '1.2rem', fontSize: '0.7rem', lineHeight: 1.6 }}>
-          <div><span style={{ fontSize: '1rem', fontWeight: 700 }}>{nodeCount}</span><br />条记忆,全在本机</div>
-          <div><span style={{ fontSize: '1rem', fontWeight: 700 }}>0</span><br />条在云端(未登录)</div>
+          <div><span style={{ fontSize: '1rem', fontWeight: 700 }}>{nodeCount}</span><br />{L(dict, '条记忆,全在本机', 'memories, all on this device')}</div>
+          <div><span style={{ fontSize: '1rem', fontWeight: 700 }}>0</span><br />{L(dict, '条在云端(未登录)', 'in the cloud (signed out)')}</div>
           <div>
-            <span style={{ fontSize: '1rem', fontWeight: 700 }}>{lastBackupAt ? new Date(lastBackupAt).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' }) : '还没有'}</span><br />
-            {lastBackupAt ? '上次备份' : '备份过'}
+            <span style={{ fontSize: '1rem', fontWeight: 700 }}>{lastBackupAt ? new Date(lastBackupAt).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'numeric', day: 'numeric' }) : L(dict, '还没有', 'never')}</span><br />
+            {lastBackupAt ? L(dict, '上次备份', 'last backup') : L(dict, '备份过', 'backed up')}
           </div>
         </div>
         {!lastBackupAt && (
-          <p style={{ fontSize: '0.66rem', color: 'var(--portal-muted)', margin: '0.4rem 0 0' }}>数据只在这台设备上。导出一份完整备份,换手机也不会丢。</p>
+          <p style={{ fontSize: '0.66rem', color: 'var(--portal-muted)', margin: '0.4rem 0 0' }}>{L(dict, '数据只在这台设备上。导出一份完整备份,换手机也不会丢。', 'Data lives only on this device. Export a full backup so a new phone loses nothing.')}</p>
         )}
       </div>
 
       <div className="nesio-settings-info-row">
         <div>
-          <p className="nesio-settings-option-label">哪些内容不会被使用</p>
-          <p className="nesio-settings-option-hint">未登录、未授权或未选择接入的日历、邮件、健康和文件内容不会被加载。</p>
+          <p className="nesio-settings-option-label">{L(dict, '哪些内容不会被使用', 'What is never used')}</p>
+          <p className="nesio-settings-option-hint">{L(dict, '未登录、未授权或未选择接入的日历、邮件、健康和文件内容不会被加载。', 'Calendar, mail, health, and files are never loaded unless you sign in, authorize, and connect them.')}</p>
         </div>
       </div>
 
-      {/* Location */}
-      <div className="nesio-settings-info-row">
-        <div>
-          <p className="nesio-settings-option-label">地理位置</p>
-          <p className="nesio-settings-option-hint">只用于天气和外出提醒</p>
-        </div>
-        <button type="button"
-          className={`nesio-settings-toggle-btn${locationGranted ? ' nesio-settings-toggle-btn--on' : ''}`}
-          onClick={requestLocation} disabled={requestingLoc}>
-          {requestingLoc ? '请求中…' : locationGranted ? '已授权 ✓' : '授权位置'}
-        </button>
-      </div>
+      {/* 批次 10:地理位置授权入口与「数据接入 → 地理位置·天气」重复,只留数据接入一处 */}
 
       {/* Memory stats */}
       <div className="nesio-settings-info-row">
         <div>
-          <p className="nesio-settings-option-label">Memory 记录</p>
-          <p className="nesio-settings-option-hint">存储在本设备 localStorage</p>
+          <p className="nesio-settings-option-label">{L(dict, 'Memory 记录', 'Memory records')}</p>
+          <p className="nesio-settings-option-hint">{L(dict, '存储在本设备 localStorage', 'Stored in this device’s localStorage')}</p>
         </div>
-        <span className="nesio-settings-badge">{nodeCount} 条</span>
+        <span className="nesio-settings-badge">{L(dict, `${nodeCount} 条`, String(nodeCount))}</span>
       </div>
 
       {/* Cloud sync */}
       <div className="nesio-settings-info-row">
         <div>
-          <p className="nesio-settings-option-label">云端同步</p>
-          <p className="nesio-settings-option-hint">登录后才会开启跨设备同步</p>
+          <p className="nesio-settings-option-label">{L(dict, '云端同步', 'Cloud sync')}</p>
+          <p className="nesio-settings-option-hint">{L(dict, '登录后才会开启跨设备同步', 'Cross-device sync only starts after sign-in')}</p>
         </div>
-        <a href="/login" className="nesio-settings-toggle-btn">登录启用</a>
+        <a href="/login" className="nesio-settings-toggle-btn">{L(dict, '登录启用', 'Sign in to enable')}</a>
       </div>
 
       {/* Export */}
@@ -395,33 +389,33 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
         const a = document.createElement('a');
         a.href = url; a.download = 'nesio-memory.json'; a.click();
       }}>
-        导出 Memory 数据（JSON）
+        {L(dict, '导出 Memory 数据（JSON）', 'Export Memory data (JSON)')}
       </button>
 
       <button type="button" className="nesio-settings-action-btn" onClick={exportFullBackup}>
-        导出完整备份（含项目/情绪/设置等全部本地数据）
+        {L(dict, '导出完整备份（含项目/情绪/设置等全部本地数据）', 'Export full backup (projects, moods, settings — all local data)')}
       </button>
 
       <button type="button" className="nesio-settings-action-btn" onClick={() => importRef.current?.click()}>
-        导入备份
+        {L(dict, '导入备份', 'Import backup')}
       </button>
       <input ref={importRef} type="file" accept="application/json,.json" hidden onChange={handleImportFile} />
       {restoreMsg && <p style={{ fontSize: '0.75rem', marginTop: 4, color: restoreMsg.startsWith('✓') ? 'var(--status-go)' : 'var(--status-risk)' }}>{restoreMsg}</p>}
 
       <button type="button" className="nesio-settings-danger-btn" onClick={clearAllMemory}>
-        {deleted ? '✓ 已清除' : '清除所有 Memory'}
+        {deleted ? L(dict, '✓ 已清除', '✓ Cleared') : L(dict, '清除所有 Memory', 'Clear all Memory')}
       </button>
 
-      <p className="nesio-settings-section-label" style={{ marginTop: '1.5rem' }}>实验功能</p>
+      <p className="nesio-settings-section-label" style={{ marginTop: '1.5rem' }}>{L(dict, '实验功能', 'Experimental')}</p>
       <button type="button"
         className={`nesio-settings-option${labOn ? ' nesio-settings-option--active' : ''}`}
         onClick={toggleLab}>
         <div>
-          <span className="nesio-settings-option-label">Lab 模式 {labOn ? '· 已开启' : ''}</span>
+          <span className="nesio-settings-option-label">{L(dict, `Lab 模式 ${labOn ? '· 已开启' : ''}`, `Lab mode ${labOn ? '· on' : ''}`)}</span>
           <span className="nesio-settings-option-hint">
             {labOn
-              ? '实验工具和预览功能已解锁。关闭后回到公开版。'
-              : '解锁实验工具和预览功能。之前需要 ?baohePersonal=1 参数,现在点这里就行。'}
+              ? L(dict, '实验工具和预览功能已解锁。关闭后回到公开版。', 'Experimental tools and previews unlocked. Turn off to return to the public build.')
+              : L(dict, '解锁实验工具和预览功能。之前需要 ?baohePersonal=1 参数,现在点这里就行。', 'Unlock experimental tools and previews. Used to need ?baohePersonal=1 — now just tap here.')}
           </span>
         </div>
         <span className={`nesio-settings-space-check${labOn ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>
@@ -440,12 +434,13 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
 const PLAN_NOTIFY_KEY = 'nesio-plan-notify-optin-v1';
 
 const PLAN_PREVIEWS = [
-  { id: 'pro', name: 'Nesio Pro', price: '¥18', cycle: '/ 月', desc: '跨设备同步 · 主动提醒 · AI 洞察报告' },
-  { id: 'family', name: '家庭版', price: '¥38', cycle: '/ 月', desc: '最多 5 人共享 · 家人动态 · 自动化动作' },
+  { id: 'pro', name: 'Nesio Pro', nameEn: 'Nesio Pro', price: '¥18', cycle: '/ 月', cycleEn: '/ mo', desc: '跨设备同步 · 主动提醒 · AI 洞察报告', descEn: 'Cross-device sync · proactive reminders · AI insight reports' },
+  { id: 'family', name: '家庭版', nameEn: 'Family', price: '¥38', cycle: '/ 月', cycleEn: '/ mo', desc: '最多 5 人共享 · 家人动态 · 自动化动作', descEn: 'Up to 5 people · family updates · automated actions' },
 ];
 
 export function SubscriptionSheet({ open, onClose }: SheetProps) {
   const locale = usePortalLocale();
+  const dict = portalLocaleToDictionaryLocale(locale);
   const [notified, setNotified] = useState(false);
 
   useEffect(() => {
@@ -481,11 +476,11 @@ export function SubscriptionSheet({ open, onClose }: SheetProps) {
       {PLAN_PREVIEWS.map((plan) => (
         <div key={plan.id} className="nesio-sub-upgrade-row">
           <div className="nesio-sub-upgrade-info">
-            <p className="nesio-sub-upgrade-name">{plan.name}</p>
-            <p className="nesio-sub-upgrade-desc">{plan.desc}</p>
+            <p className="nesio-sub-upgrade-name">{L(dict, plan.name, plan.nameEn)}</p>
+            <p className="nesio-sub-upgrade-desc">{L(dict, plan.desc, plan.descEn)}</p>
           </div>
           <div className="nesio-sub-upgrade-right">
-            <p className="nesio-sub-upgrade-price">{plan.price}<span>{plan.cycle}</span></p>
+            <p className="nesio-sub-upgrade-price">{plan.price}<span>{L(dict, plan.cycle, plan.cycleEn)}</span></p>
             <span style={{ fontSize: '0.66rem', color: 'var(--portal-muted)', border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-pill)', padding: '0.15rem 0.55rem', whiteSpace: 'nowrap' }}>
               {t(locale, 'subPlanned')}
             </span>

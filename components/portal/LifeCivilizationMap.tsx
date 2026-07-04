@@ -5,15 +5,18 @@ import type { LifeNode, LifeNodeType } from '@/lib/portal/life-graph';
 import { stack, stackOffsetWiggle, stackOrderInsideOut, area, curveCatmullRom } from 'd3-shape';
 import { scaleTime, scaleLinear } from 'd3-scale';
 import { extent, max } from 'd3-array';
+import { L } from '@/lib/portal/i18n';
+import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
+import { usePortalLocale } from './use-portal-locale';
 
 // ── Domain config ────────────────────────────────────────────────────────────
 
 const DOMAINS = [
-  { id: 'relations', label: '关系', cssVar: '--portal-accent' },
-  { id: 'work',      label: '事业', cssVar: '--status-gentle' },
-  { id: 'health',    label: '健康', cssVar: '--status-go' },
-  { id: 'growth',    label: '成长', cssVar: '--status-calm' },
-  { id: 'self',      label: '自我', cssVar: '--portal-cool-accent' },
+  { id: 'relations', label: '关系', labelEn: 'Ties',    cssVar: '--portal-accent' },
+  { id: 'work',      label: '事业', labelEn: 'Work',    cssVar: '--status-gentle' },
+  { id: 'health',    label: '健康', labelEn: 'Health',  cssVar: '--status-go' },
+  { id: 'growth',    label: '成长', labelEn: 'Growth',  cssVar: '--status-calm' },
+  { id: 'self',      label: '自我', labelEn: 'Self',    cssVar: '--portal-cool-accent' },
 ] as const;
 
 type DomainId = typeof DOMAINS[number]['id'];
@@ -166,7 +169,7 @@ function generateDemoData(): Bucket[] {
 
 // ── Insight generation ───────────────────────────────────────────────────────
 
-function generateInsight(data: Bucket[]): string | null {
+function generateInsight(data: Bucket[], dict: string = 'zh'): string | null {
   if (data.length < 4) return null;
 
   // Find biggest single-period domain shift
@@ -193,11 +196,15 @@ function generateInsight(data: Bucket[]): string | null {
   if (shiftIdx < 0 || maxShift < 0.06) return null;
 
   const d = data[shiftIdx].date;
-  const period = `${d.getFullYear()} 年 ${d.getMonth() + 1} 月`;
-  const gain = DOMAINS.find(x => x.id === gainDomain)?.label ?? gainDomain;
-  const loss = DOMAINS.find(x => x.id === lossDomain)?.label ?? lossDomain;
+  const gainMeta = DOMAINS.find(x => x.id === gainDomain);
+  const lossMeta = DOMAINS.find(x => x.id === lossDomain);
+  const gain = L(dict, gainMeta?.label ?? gainDomain, gainMeta?.labelEn ?? gainDomain);
+  const loss = L(dict, lossMeta?.label ?? lossDomain, lossMeta?.labelEn ?? lossDomain);
+  const period = L(dict, `${d.getFullYear()} 年 ${d.getMonth() + 1} 月`, d.toLocaleDateString('en-US', { year: 'numeric', month: 'short' }));
 
-  return `${period}前后，「${gain}」开始扩张，逐渐从「${loss}」手中接管你更多的能量`;
+  return L(dict,
+    `${period}前后，「${gain}」开始扩张，逐渐从「${loss}」手中接管你更多的能量`,
+    `Around ${period}, "${gain}" began expanding, gradually taking over more of your energy from "${loss}"`);
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -208,6 +215,7 @@ interface Props {
 }
 
 export default function LifeCivilizationMap({ nodes, isDemo = false }: Props) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const svgRef = useRef<SVGSVGElement>(null);
   const [hovered, setHovered] = useState<DomainId | null>(null);
   const [colors, setColors] = useState<Record<string, string>>({});
@@ -242,7 +250,7 @@ export default function LifeCivilizationMap({ nodes, isDemo = false }: Props) {
   const W = Math.max(containerW, 300);
 
   const streamData = useMemo(() => buildStream(nodes), [nodes]);
-  const insight    = useMemo(() => generateInsight(streamData), [streamData]);
+  const insight    = useMemo(() => generateInsight(streamData, dict), [streamData, dict]);
   const isShowingDemo = nodes.length < 6;
 
   // D3 computation (pure math, no DOM)
@@ -315,7 +323,7 @@ export default function LifeCivilizationMap({ nodes, isDemo = false }: Props) {
       {/* Demo notice */}
       {isShowingDemo && (
         <p className="life-civ-demo-note">
-          以下为示例地形 · 记录更多内容后将展示你真实的生命版图
+          {L(dict, '以下为示例地形 · 记录更多内容后将展示你真实的生命版图', 'Sample terrain — record more and your real life map appears')}
         </p>
       )}
 
@@ -327,7 +335,7 @@ export default function LifeCivilizationMap({ nodes, isDemo = false }: Props) {
           height={HEIGHT}
           className="life-civ-svg"
           role="img"
-          aria-label="生命版图：各领域随时间演变的意义分布"
+          aria-label={L(dict, '生命版图：各领域随时间演变的意义分布', 'Life map: how meaning shifts across life domains over time')}
         >
           <g transform={`translate(${MARGIN.left},${MARGIN.top})`}>
             {/* Territory paths */}
@@ -371,7 +379,7 @@ export default function LifeCivilizationMap({ nodes, isDemo = false }: Props) {
                   opacity={isDimmed ? 0.2 : 1}
                   style={{ pointerEvents: 'none', transition: 'opacity 0.25s ease' }}
                 >
-                  {domain.label}
+                  {L(dict, domain.label, domain.labelEn)}
                 </text>
               );
             })}
@@ -409,7 +417,7 @@ export default function LifeCivilizationMap({ nodes, isDemo = false }: Props) {
               className="life-civ-legend-dot"
               style={{ background: colors[d.id] ?? 'var(--portal-accent)' }}
             />
-            {d.label}
+            {L(dict, d.label, d.labelEn)}
           </button>
         ))}
       </div>

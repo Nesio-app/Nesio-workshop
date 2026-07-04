@@ -9131,6 +9131,8 @@ html[data-portal-theme="night"] .nesio-memory-card {
 
 .nesio-memory-card-icon {
   /* 批次 4:图标缩小,挪到底部与标签同排 */
+  /* 批次 10:chip 底是不随主题翻转的粉彩色,图标固定深色,夜间不再隐形 */
+  color: #2b3a5c;
   width: 1.55rem;
   height: 1.55rem;
   border-radius: 0.45rem;
@@ -11228,7 +11230,9 @@ html[data-portal-theme="night"] .nesio-login-tab--active {
   position: relative;
   z-index: 1;
   width: 100%;
-  background: var(--glass-bg-pop);
+  /* 批次 10:0.97 半透明仍会把亮字透出来(节点详情/设置系全部走这张卡),
+     统一到 --sheet-opaque 全不透明 token(昼 #fdfeff / 夜 #141b2e 自动翻转) */
+  background: var(--sheet-opaque, #fdfeff);
   border-top-left-radius: 1.5rem;
   border-top-right-radius: 1.5rem;
   padding: 0 1.25rem calc(2.5rem + env(safe-area-inset-bottom));
@@ -11236,10 +11240,6 @@ html[data-portal-theme="night"] .nesio-login-tab--active {
   max-height: 88dvh;
   overflow-y: auto;
   animation: sheetSlideUp 0.28s var(--ease-out);
-}
-
-html[data-portal-theme="night"] .nesio-settings-sheet-card {
-  background: rgba(16,26,50,0.97);
 }
 
 .nesio-settings-sheet-header {
@@ -14836,7 +14836,8 @@ html[data-portal-theme="night"] .nesio-wechat-suggestion {
   left: 0.75rem;
   max-height: 60vh;
   overflow-y: auto;
-  background: var(--glass-bg-solid);
+  /* 批次 10:玻璃底会把聊天内容透出来,历史面板改全不透明 */
+  background: var(--sheet-opaque, #fdfeff);
   border: 1px solid var(--portal-line);
   border-radius: 16px;
   box-shadow: 0 16px 44px rgba(23,42,84,0.18);
@@ -15651,10 +15652,12 @@ html[data-portal-theme="night"] .portal-decompose-step {
 /* ===== PROACTIVE GUIDANCE CARD ===== */
 
 .nesio-proactive-card {
-  margin: 0 1rem 0.75rem;
-  border-radius: 14px;
-  background: linear-gradient(135deg, #eef3ff 0%, var(--glass-bg-raised) 100%);
-  border: 1px solid rgba(88, 140, 227, 0.22);
+  /* 批次 10:与 .nesio-focus-card 统一(同底/同边/同圆角/同宽),
+     此前多出的 1rem 外边距和渐变底让这两类卡看着像另一套系统 */
+  margin: 0 0 0.75rem;
+  border-radius: 0.9rem;
+  background: var(--glass-bg-solid);
+  border: 1px solid var(--portal-line);
   overflow: hidden;
   animation: nesio-proactive-in 0.3s ease;
 }
@@ -15747,10 +15750,7 @@ html[data-portal-theme="night"] .portal-decompose-step {
 .nesio-proactive-action-btn--done { color: #888; }
 .nesio-proactive-action-btn--snooze { color: #888; }
 
-html[data-portal-theme="night"] .nesio-proactive-card {
-  background: linear-gradient(135deg, rgba(88,140,227,.1) 0%, rgba(88,140,227,.07) 100%);
-  border-color: rgba(88,140,227,.2);
-}
+/* 批次 10:proactive 卡改用主题 token,夜间无需单独覆写 */
 
 /* ===== MEETING BADGES & ACTIONS ===== */
 
@@ -17351,6 +17351,9 @@ html[data-portal-theme="night"] .nesio-related-node-chip:hover {
   min-width: 0;
 }
 .nesio-collapsed-icon { font-size: 0.95rem; flex-shrink: 0; color: var(--portal-ink); display: inline-flex; }
+/* 批次 10:夜间深底上类型图标看不清,显式提亮(勾选圈同理加亮边) */
+html[data-portal-theme="night"] .nesio-collapsed-icon { color: #cfe0f7; }
+html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check { border-color: rgba(207, 224, 247, 0.55); }
 .nesio-collapsed-title {
   flex: 1;
   font-size: 0.85rem;

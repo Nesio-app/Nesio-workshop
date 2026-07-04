@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { saveIntegrationToken } from '@/lib/portal/integrations';
 
 const GOOGLE_CALENDAR_OAUTH_STATE_COOKIE = 'nesio_google_calendar_oauth_state';
 
@@ -182,6 +183,21 @@ export async function GET(req: NextRequest) {
   );
 
   response.cookies.delete(GOOGLE_CALENDAR_OAUTH_STATE_COOKIE);
-  if (session?.access_token) setCalendarCookies(response, session);
+  if (session?.access_token) {
+    setCalendarCookies(response, session);
+    // 批次 10:此前这条回调只写 cookie,gmail route 走 Supabase 读不到,
+    // 造成「日历正常、邮件永远授权失效」。同一份授权同时落 Supabase,
+    // 登录会话有效时 gmail/calendar 两个 provider 都能跨设备读到。
+    const stored = {
+      accessToken: session.access_token,
+      refreshToken: session.refresh_token,
+      expiresAt: session.expires_in ? Date.now() + session.expires_in * 1000 : undefined,
+      scope: session.scope,
+    };
+    await saveIntegrationToken('calendar', stored, req);
+    if (!session.scope || session.scope.includes('gmail')) {
+      await saveIntegrationToken('gmail', stored, req);
+    }
+  }
   return response;
 }

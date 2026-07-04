@@ -34,24 +34,39 @@ const TYPE_LABELS_EN: Record<string, string> = {
 const PERSON_CATEGORIES: Record<string, string> = {
   family: '家人', colleague: '同事', friend: '朋友', acquaintance: '认识', other: '其他',
 };
+const PERSON_CATEGORIES_EN: Record<string, string> = {
+  family: 'Family', colleague: 'Colleague', friend: 'Friend', acquaintance: 'Acquaintance', other: 'Other',
+};
 const HEALTH_TYPES: Record<string, string> = {
   medication: '药物', appointment: '就诊', fitness: '运动',
   sleep: '睡眠', diet: '饮食', checkup: '检查', other: '健康',
+};
+const HEALTH_TYPES_EN: Record<string, string> = {
+  medication: 'Medication', appointment: 'Appointment', fitness: 'Fitness',
+  sleep: 'Sleep', diet: 'Diet', checkup: 'Checkup', other: 'Health',
 };
 const PLACE_CATEGORIES: Record<string, string> = {
   work: '工作', school: '学校', home: '家', shopping: '购物',
   restaurant: '餐厅', gym: '健身', hospital: '医院', other: '地点',
 };
-const PRIORITY_LABELS: Record<string, { label: string; color: string }> = {
-  high: { label: '紧急', color: 'var(--status-risk)' },
-  medium: { label: '重要', color: 'var(--status-gentle)' },
-  low: { label: '普通', color: 'var(--portal-muted)' },
+const PLACE_CATEGORIES_EN: Record<string, string> = {
+  work: 'Work', school: 'School', home: 'Home', shopping: 'Shopping',
+  restaurant: 'Restaurant', gym: 'Gym', hospital: 'Hospital', other: 'Place',
+};
+const PRIORITY_LABELS: Record<string, { label: string; labelEn: string; color: string }> = {
+  high: { label: '紧急', labelEn: 'Urgent', color: 'var(--status-risk)' },
+  medium: { label: '重要', labelEn: 'Important', color: 'var(--status-gentle)' },
+  low: { label: '普通', labelEn: 'Normal', color: 'var(--portal-muted)' },
 };
 
 /** 已知属性键 → 中文标签(天气信号等系统属性不再裸奔英文键名) */
 const ATTR_KEY_LABELS: Record<string, string> = {
   temperatureC: '温度', condition: '天气', forecastNote: '预报',
   placeName: '地点', humidity: '湿度', windKph: '风速',
+};
+const ATTR_KEY_LABELS_EN: Record<string, string> = {
+  temperatureC: 'Temperature', condition: 'Weather', forecastNote: 'Forecast',
+  placeName: 'Place', humidity: 'Humidity', windKph: 'Wind',
 };
 
 /** 长文本(如日历事件的会议记录)默认只显示摘要,点「详情」展开 */
@@ -88,26 +103,26 @@ function attr(node: LifeNode, ...keys: string[]): string {
   return '';
 }
 
-function fmtDate(raw: string): string {
+function fmtDate(raw: string, dict: string = 'zh'): string {
   if (!raw) return '';
   const d = new Date(raw);
   if (Number.isNaN(d.getTime())) return raw;
-  return d.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
+  return d.toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
-function fmtDateTime(raw: string): string {
+function fmtDateTime(raw: string, dict: string = 'zh'): string {
   if (!raw) return '';
   const d = new Date(raw);
   if (Number.isNaN(d.getTime())) return raw;
   const hasTime = d.getHours() !== 0 || d.getMinutes() !== 0;
-  if (!hasTime) return fmtDate(raw);
-  return d.toLocaleString('zh-CN', {
+  if (!hasTime) return fmtDate(raw, dict);
+  return d.toLocaleString(dict === 'en' ? 'en-US' : 'zh-CN', {
     month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
   });
 }
 
-function mapUrl(address: string, lat?: string, lon?: string): string {
-  if (lat && lon) return `https://maps.apple.com/?ll=${lat},${lon}&q=${encodeURIComponent(address || '位置')}`;
+function mapUrl(address: string, lat?: string, lon?: string, dict: string = 'zh'): string {
+  if (lat && lon) return `https://maps.apple.com/?ll=${lat},${lon}&q=${encodeURIComponent(address || L(dict, '位置', 'Location'))}`;
   if (address) return `https://maps.apple.com/?q=${encodeURIComponent(address)}`;
   return '';
 }
@@ -178,12 +193,12 @@ function PersonSection({ node }: {
       {category && (
         <div className="nesio-type-badge-row">
           <span className="nesio-type-category-pill">
-            {PERSON_CATEGORIES[category] || category}
+            {(dict === 'en' ? PERSON_CATEGORIES_EN : PERSON_CATEGORIES)[category] || category}
           </span>
         </div>
       )}
-      <InfoRow label={L(dict, '上次见面', 'Last seen')} value={fmtDate(lastSeen)} />
-      <InfoRow label={L(dict, '生日', 'Birthday')} value={fmtDate(birthday)} />
+      <InfoRow label={L(dict, '上次见面', 'Last seen')} value={fmtDate(lastSeen, dict)} />
+      <InfoRow label={L(dict, '生日', 'Birthday')} value={fmtDate(birthday, dict)} />
       <InfoRow label={L(dict, '备注', 'Note')} value={note} />
     </div>
   );
@@ -213,16 +228,16 @@ function ObjectSection({ node, assetUrls }: {
         <img src={previewUrl} alt={node.name} className="nesio-type-thumb" draggable={false} />
       )}
       <InfoRow label={L(dict, '存放位置', 'Stored at')} value={location} />
-      <InfoRow label={L(dict, '购买日期', 'Bought on')} value={fmtDate(purchaseDate)} />
+      <InfoRow label={L(dict, '购买日期', 'Bought on')} value={fmtDate(purchaseDate, dict)} />
       <InfoRow label={L(dict, '价格', 'Price')} value={price} />
-      <InfoRow label={L(dict, '有效期', 'Expires')} value={fmtDate(expiry)} />
-      <InfoRow label="购买商家" value={store} />
-      <InfoRow label="支付方式" value={paymentMethod} />
+      <InfoRow label={L(dict, '有效期', 'Expires')} value={fmtDate(expiry, dict)} />
+      <InfoRow label={L(dict, '购买商家', 'Store')} value={store} />
+      <InfoRow label={L(dict, '支付方式', 'Paid with')} value={paymentMethod} />
       <InfoRow label={L(dict, '备注', 'Note')} value={note} />
       {fileUrl && (
         <div style={{ marginTop: '0.75rem' }}>
           <a href={safeExternalUrl(fileUrl)} target="_blank" rel="noopener noreferrer" className="nesio-type-action-btn">
-            <IconLink size={13} /> 打开链接
+            <IconLink size={13} /> {L(dict, '打开链接', 'Open link')}
           </a>
         </div>
       )}
@@ -242,14 +257,14 @@ function PlaceSection({ node }: {
   const visitCount = attr(node, 'visitCount');
   const category = attr(node, 'category');
   const note = attr(node, 'note');
-  const link = mapUrl(address, lat, lon);
+  const link = mapUrl(address, lat, lon, dict);
 
   return (
     <div className="nesio-type-section">
       {category && (
         <div className="nesio-type-badge-row">
           <span className="nesio-type-category-pill">
-            {PLACE_CATEGORIES[category] || category}
+            {(dict === 'en' ? PLACE_CATEGORIES_EN : PLACE_CATEGORIES)[category] || category}
           </span>
         </div>
       )}
@@ -264,12 +279,12 @@ function PlaceSection({ node }: {
       )}
       {(lat && lon && !address) && (
         <div style={{ marginTop: '0.5rem' }}>
-          <a href={mapUrl('', lat, lon)} target="_blank" rel="noopener noreferrer" className="nesio-type-action-btn">
-            在地图中查看
+          <a href={mapUrl('', lat, lon, dict)} target="_blank" rel="noopener noreferrer" className="nesio-type-action-btn">
+            {L(dict, '在地图中查看', 'View on map')}
           </a>
         </div>
       )}
-      <InfoRow label="来访次数" value={visitCount ? `${visitCount} 次` : ''} />
+      <InfoRow label={L(dict, '来访次数', 'Visits')} value={visitCount ? L(dict, `${visitCount} 次`, `${visitCount}×`) : ''} />
       <InfoRow label={L(dict, '备注', 'Note')} value={note} />
     </div>
   );
@@ -289,7 +304,7 @@ function EventSection({ node }: {
   const note = attr(node, 'note');
   const lat = attr(node, 'lat');
   const lon = attr(node, 'lon');
-  const mapLink = mapUrl(location, lat, lon);
+  const mapLink = mapUrl(location, lat, lon, dict);
   const isMeeting = url && isMeetingUrl(url);
 
   return (
@@ -297,7 +312,7 @@ function EventSection({ node }: {
       {start && (
         <div className="nesio-type-event-time">
           <span className="nesio-type-event-time-icon"><IconClock size={15} /></span>
-          <span>{fmtDateTime(start)}{end ? ` — ${fmtDateTime(end)}` : ''}</span>
+          <span>{fmtDateTime(start, dict)}{end ? ` — ${fmtDateTime(end, dict)}` : ''}</span>
         </div>
       )}
       {location && (
@@ -357,7 +372,7 @@ function CommitmentSection({ node, onToggleDone }: {
         </button>
         {priorityInfo && (
           <span className="nesio-type-priority-badge" style={{ color: priorityInfo.color }}>
-            {priorityInfo.label}
+            {L(dict, priorityInfo.label, priorityInfo.labelEn)}
           </span>
         )}
       </div>
@@ -365,14 +380,14 @@ function CommitmentSection({ node, onToggleDone }: {
         <div className={`nesio-node-attr-row${isOverdue ? ' nesio-attr-overdue' : dueSoon ? ' nesio-attr-due-soon' : ''}`}>
           <span className="nesio-node-attr-key">{L(dict, '截止日期', 'Due')}</span>
           <span className="nesio-node-attr-val">
-            {fmtDateTime(dueDate)}
+            {fmtDateTime(dueDate, dict)}
             {isOverdue && <span className="nesio-overdue-tag"> {L(dict, '已过期', 'overdue')}</span>}
             {dueSoon && <span className="nesio-due-soon-tag"> {L(dict, '今天截止', 'due today')}</span>}
           </span>
         </div>
       )}
-      <InfoRow label="对方/负责人" value={owner} />
-      {recurring && <InfoRow label="重复" value={recurring} />}
+      <InfoRow label={L(dict, '对方/负责人', 'Owner')} value={owner} />
+      {recurring && <InfoRow label={L(dict, '重复', 'Repeats')} value={recurring} />}
       <InfoRow label={L(dict, '备注', 'Note')} value={note} />
     </div>
   );
@@ -385,15 +400,15 @@ function HealthSection({ node }: { node: LifeNode }) {
   const value = attr(node, 'value');
   const unit = attr(node, 'unit');
   const note = attr(node, 'note');
-  const typeLabel = HEALTH_TYPES[healthType] || (healthType || '健康');
+  const typeLabel = (dict === 'en' ? HEALTH_TYPES_EN : HEALTH_TYPES)[healthType] || (healthType || L(dict, '健康', 'Health'));
 
   return (
     <div className="nesio-type-section">
       <div className="nesio-type-badge-row">
         <span className="nesio-type-category-pill nesio-type-category-pill--health">{typeLabel}</span>
       </div>
-      <InfoRow label={L(dict, '时间', 'Time')} value={fmtDateTime(date)} />
-      {value && <InfoRow label="数值" value={unit ? `${value} ${unit}` : value} />}
+      <InfoRow label={L(dict, '时间', 'Time')} value={fmtDateTime(date, dict)} />
+      {value && <InfoRow label={L(dict, '数值', 'Value')} value={unit ? `${value} ${unit}` : value} />}
       <InfoRow label={L(dict, '备注', 'Note')} value={note} />
     </div>
   );
@@ -422,7 +437,7 @@ function PreferenceSection({ node, assetUrls }: {
           <span className="nesio-type-category-pill">{category}</span>
         </div>
       )}
-      <InfoRow label={L(dict, '记录时间', 'Noted on')} value={fmtDate(date)} />
+      <InfoRow label={L(dict, '记录时间', 'Noted on')} value={fmtDate(date, dict)} />
       <InfoRow label={L(dict, '备注', 'Note')} value={note} />
     </div>
   );
@@ -590,7 +605,7 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
     onClose();
   }
   function handleDelete() {
-    if (!confirm(`确认删除「${n.name}」？`)) return;
+    if (!confirm(L(dict, `确认删除「${n.name}」？`, `Delete "${n.name}"?`))) return;
     deleteLifeNode(n.id);
     setDeleted(true);
     onClose();
@@ -608,7 +623,7 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
     onClose();
   }
 
-  const createdDate = new Date(n.createdAt).toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', year: 'numeric' });
+  const createdDate = new Date(n.createdAt).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'long', day: 'numeric', year: 'numeric' });
 
   // Remaining attributes not shown in type-specific sections
   const shownAttrs = Object.entries(n.attributes).filter(
@@ -619,7 +634,7 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
 
   return (
     <div className="nesio-node-detail-overlay" role="dialog" aria-modal="true" aria-label={n.name}>
-      <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label="关闭" />
+      <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
       <div className="nesio-settings-sheet-card">
         <div className="nesio-sheet-handle" aria-hidden />
 
@@ -640,7 +655,7 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
           ) : (
             <h2 className="nesio-settings-sheet-title" title={n.name}>{displayTitle(n.name)}</h2>
           )}
-          <button type="button" className="nesio-voice-sheet-close" onClick={onClose} aria-label="关闭">✕</button>
+          <button type="button" className="nesio-voice-sheet-close" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}>✕</button>
         </div>
 
         {/* Expanded edit form — type-specific fields */}
@@ -648,45 +663,45 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
           <div className="nesio-edit-form">
             {n.type === 'object' && (<>
               <div className="nesio-edit-row">
-                <span>存放位置</span>
+                <span>{L(dict, '存放位置', 'Stored at')}</span>
                 <LocationPicker value={field('location')} onChange={(v) => setField('location', v)} />
               </div>
-              <label className="nesio-edit-row"><span>价格</span><input value={field('price')} onChange={(e) => setField('price', e.target.value)} placeholder="$12.99" /></label>
-              <label className="nesio-edit-row"><span>购买日期</span><input type="date" value={field('purchaseDate')} onChange={(e) => setField('purchaseDate', e.target.value)} /></label>
-              <label className="nesio-edit-row"><span>有效期</span><input type="date" value={field('expiry')} onChange={(e) => setField('expiry', e.target.value)} /></label>
+              <label className="nesio-edit-row"><span>{L(dict, '价格', 'Price')}</span><input value={field('price')} onChange={(e) => setField('price', e.target.value)} placeholder="$12.99" /></label>
+              <label className="nesio-edit-row"><span>{L(dict, '购买日期', 'Bought on')}</span><input type="date" value={field('purchaseDate')} onChange={(e) => setField('purchaseDate', e.target.value)} /></label>
+              <label className="nesio-edit-row"><span>{L(dict, '有效期', 'Expires')}</span><input type="date" value={field('expiry')} onChange={(e) => setField('expiry', e.target.value)} /></label>
             </>)}
             {n.type === 'commitment' && (<>
-              <label className="nesio-edit-row"><span>截止日期</span><input type="date" value={field('dueDate').slice(0, 10)} onChange={(e) => setField('dueDate', e.target.value)} /></label>
+              <label className="nesio-edit-row"><span>{L(dict, '截止日期', 'Due')}</span><input type="date" value={field('dueDate').slice(0, 10)} onChange={(e) => setField('dueDate', e.target.value)} /></label>
               <label className="nesio-edit-row">
-                <span>优先级</span>
+                <span>{L(dict, '优先级', 'Priority')}</span>
                 <select value={field('priority')} onChange={(e) => setField('priority', e.target.value)}>
-                  <option value="">未设置</option>
-                  <option value="high">紧急</option>
-                  <option value="medium">重要</option>
-                  <option value="low">普通</option>
+                  <option value="">{L(dict, '未设置', 'Not set')}</option>
+                  <option value="high">{L(dict, '紧急', 'Urgent')}</option>
+                  <option value="medium">{L(dict, '重要', 'Important')}</option>
+                  <option value="low">{L(dict, '普通', 'Normal')}</option>
                 </select>
               </label>
-              <label className="nesio-edit-row"><span>对方/负责人</span><input value={field('owner')} onChange={(e) => setField('owner', e.target.value)} placeholder="负责人姓名" /></label>
-              <label className="nesio-edit-row"><span>重复</span><input value={field('recurring')} onChange={(e) => setField('recurring', e.target.value)} placeholder="每周/每月…" /></label>
+              <label className="nesio-edit-row"><span>{L(dict, '对方/负责人', 'Owner')}</span><input value={field('owner')} onChange={(e) => setField('owner', e.target.value)} placeholder={L(dict, '负责人姓名', "Owner's name")} /></label>
+              <label className="nesio-edit-row"><span>{L(dict, '重复', 'Repeats')}</span><input value={field('recurring')} onChange={(e) => setField('recurring', e.target.value)} placeholder={L(dict, '每周/每月…', 'weekly / monthly…')} /></label>
             </>)}
             {n.type === 'event' && (<>
-              <label className="nesio-edit-row"><span>会议链接</span><input value={field('url')} onChange={(e) => setField('url', e.target.value)} placeholder="https://zoom.us/…" /></label>
-              <label className="nesio-edit-row"><span>地点</span><input value={field('eventLocation')} onChange={(e) => setField('eventLocation', e.target.value)} placeholder="地点或地址" /></label>
+              <label className="nesio-edit-row"><span>{L(dict, '会议链接', 'Meeting link')}</span><input value={field('url')} onChange={(e) => setField('url', e.target.value)} placeholder="https://zoom.us/…" /></label>
+              <label className="nesio-edit-row"><span>{L(dict, '地点', 'Location')}</span><input value={field('eventLocation')} onChange={(e) => setField('eventLocation', e.target.value)} placeholder={L(dict, '地点或地址', 'Place or address')} /></label>
             </>)}
             {n.type === 'person' && (<>
               <label className="nesio-edit-row">
-                <span>关系</span>
+                <span>{L(dict, '关系', 'Relationship')}</span>
                 <select value={field('category')} onChange={(e) => setField('category', e.target.value)}>
-                  <option value="">未分类</option>
-                  <option value="family">家人</option>
-                  <option value="colleague">同事</option>
-                  <option value="friend">朋友</option>
-                  <option value="acquaintance">认识</option>
+                  <option value="">{L(dict, '未分类', 'Uncategorized')}</option>
+                  <option value="family">{L(dict, '家人', 'Family')}</option>
+                  <option value="colleague">{L(dict, '同事', 'Colleague')}</option>
+                  <option value="friend">{L(dict, '朋友', 'Friend')}</option>
+                  <option value="acquaintance">{L(dict, '认识', 'Acquaintance')}</option>
                 </select>
               </label>
-              <label className="nesio-edit-row"><span>生日</span><input type="date" value={field('birthday').slice(0, 10)} onChange={(e) => setField('birthday', e.target.value)} /></label>
+              <label className="nesio-edit-row"><span>{L(dict, '生日', 'Birthday')}</span><input type="date" value={field('birthday').slice(0, 10)} onChange={(e) => setField('birthday', e.target.value)} /></label>
             </>)}
-            <label className="nesio-edit-row"><span>备注</span><input value={field('note')} onChange={(e) => setField('note', e.target.value)} placeholder="补充说明…" /></label>
+            <label className="nesio-edit-row"><span>{L(dict, '备注', 'Note')}</span><input value={field('note')} onChange={(e) => setField('note', e.target.value)} placeholder={L(dict, '补充说明…', 'Anything else…')} /></label>
           </div>
         )}
 
@@ -738,7 +753,7 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
               <p className="nesio-settings-section-label" style={{ marginTop: '0.75rem' }}>{L(dict, '其他属性', 'Other details')}</p>
               {shownAttrs.map(([k, v]) => (
                 <div key={k} className="nesio-node-attr-row">
-                  <span className="nesio-node-attr-key">{ATTR_KEY_LABELS[k] ?? k}</span>
+                  <span className="nesio-node-attr-key">{(dict === 'en' ? ATTR_KEY_LABELS_EN : ATTR_KEY_LABELS)[k] ?? k}</span>
                   <span className="nesio-node-attr-val" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
                     {k === 'condition' && <WeatherIcon condition={String(v)} size={15} />}
                     {k === 'temperatureC' ? `${String(v)} °C` : String(v)}
@@ -771,7 +786,7 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
                         <img src={previewUrl} alt={asset.label || n.name} draggable={false} className="nesio-type-asset-img" />
                       ) : (
                         <p style={{ fontSize: '0.82rem', color: 'var(--portal-muted)', marginBottom: '0.35rem' }}>
-                          {asset.storagePath ? '图片线索已保存，登录后可查看。' : '附件线索已保存。'}
+                          {asset.storagePath ? L(dict, '图片线索已保存，登录后可查看。', 'Image clue saved — sign in to view.') : L(dict, '附件线索已保存。', 'Attachment clue saved.')}
                         </p>
                       )}
                       {asset.analysisSummary && (

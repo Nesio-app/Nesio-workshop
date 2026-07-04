@@ -108,9 +108,33 @@ export function buildRotatingFallback(now: Date, nodes: readonly FallbackNodeLik
     });
   }
 
-  if (pool.length === 0) return null;
+  // 金句兜底(批次 10 用户反馈:「如果所有卡片都没有了就显示金句、quote 之类的」)。
+  // 全部取公版格言,带出处;和其他池子一样随机轮换,保证这一区永远有内容。
+  const q = FALLBACK_QUOTES[Math.floor(Math.random() * FALLBACK_QUOTES.length)];
+  pool.push({
+    id: 'fallback-quote',
+    title: l('今日一句', 'Line of the day'),
+    body: l(`「${q.zh}」— ${q.byZh}`, `"${q.en}" — ${q.byEn}`),
+    confidence: 60, sourceTags: [l('金句', 'Quote')], icon: '✨', priority: 1,
+  });
+
   return pool[Math.floor(Math.random() * pool.length)];
 }
+
+const FALLBACK_QUOTES: Array<{ zh: string; en: string; byZh: string; byEn: string }> = [
+  { zh: '千里之行,始于足下。', en: 'A journey of a thousand miles begins with a single step.', byZh: '老子', byEn: 'Laozi' },
+  { zh: '不积跬步,无以至千里。', en: 'Without small steps, there is no thousand-mile journey.', byZh: '荀子', byEn: 'Xunzi' },
+  { zh: '逝者如斯夫,不舍昼夜。', en: 'Time flows on like this river, day and night.', byZh: '孔子', byEn: 'Confucius' },
+  { zh: '知足者富。', en: 'He who knows he has enough is rich.', byZh: '老子', byEn: 'Laozi' },
+  { zh: '未经审视的生活不值得过。', en: 'The unexamined life is not worth living.', byZh: '苏格拉底', byEn: 'Socrates' },
+  { zh: '我们受的苦,多半来自想象。', en: 'We suffer more often in imagination than in reality.', byZh: '塞涅卡', byEn: 'Seneca' },
+  { zh: '每一天都是一年中最好的一天。', en: 'Every day is the best day in the year.', byZh: '爱默生', byEn: 'Emerson' },
+  { zh: '我的经验,由我选择注意什么决定。', en: 'My experience is what I agree to attend to.', byZh: '威廉·詹姆斯', byEn: 'William James' },
+  { zh: '水滴石穿,不靠力,靠恒。', en: 'Dripping water pierces stone by persistence, not force.', byZh: '谚语', byEn: 'Proverb' },
+  { zh: '种一棵树最好的时间是十年前,其次是现在。', en: 'The best time to plant a tree was ten years ago; the second best is now.', byZh: '谚语', byEn: 'Proverb' },
+  { zh: '慢慢来,比较快。', en: 'Slow is smooth, and smooth is fast.', byZh: '谚语', byEn: 'Proverb' },
+  { zh: '此心安处是吾乡。', en: 'Where the heart is at peace, there is home.', byZh: '苏轼', byEn: 'Su Shi' },
+];
 
 
 const SNOOZE_KEY = 'nesio-snoozed-overdue';

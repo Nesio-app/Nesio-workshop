@@ -10,7 +10,7 @@ import { NextResponse } from 'next/server';
 import { createSignal } from '@/lib/life-domain/create-signal';
 import { writeCloudSignalsForCurrentUser } from '@/lib/platform/runtime/cloud-signals-server';
 import { normalizeGmailToSignal } from '@/lib/life-domain/normalizers';
-import { getIntegrationToken } from '@/lib/portal/integrations';
+import { getIntegrationToken, saveIntegrationToken } from '@/lib/portal/integrations';
 import { buildEmailExtractionPrompt, parseJsonBlock } from '@/lib/extraction/extraction';
 import { cookies } from 'next/headers';
 
@@ -193,7 +193,25 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  if (!tokens) {
+  // 根因修复(批次 10):日历 route 一直是「会话门之后直接读 cookie」,而这里
+  // 只走 getIntegrationToken——生产环境(配了 Supabase)默认禁用 cookie 回退,
+  // 只读 Supabase;但 calendar/oauth 回调只写 cookie。结果就是用户看到的
+  // 「日历 19 条正常、邮件永远授权失效」。requireAuthenticatedGmailAccess
+  // 已在上面挡掉匿名请求,这里与日历 route 同构地把本设备 cookie 也列为
+  // 候选;跨设备仍靠 Supabase。
+  const cookieStore = await cookies();
+  const cookieAccess = cookieStore.get('nesio_gmail_access')?.value
+    || cookieStore.get('nesio_google_calendar_access')?.value || '';
+  const cookieRefresh = cookieStore.get('nesio_gmail_refresh')?.value
+    || cookieStore.get('nesio_google_calendar_refresh')?.value || '';
+  const candidates: Array<{ accessToken: string; refreshToken?: string }> = [];
+  if (tokens) candidates.push(tokens);
+  if ((cookieAccess || cookieRefresh)
+    && (cookieAccess !== tokens?.accessToken || cookieRefresh !== (tokens?.refreshToken || ''))) {
+    candidates.push({ accessToken: cookieAccess, refreshToken: cookieRefresh || undefined });
+  }
+
+  if (candidates.length === 0) {
     return NextResponse.json(
       { ok: false, error: 'not_connected', connectUrl: '/api/portal/gmail/connect' },
       { status: 401 },
@@ -202,33 +220,52 @@ export async function GET(req: NextRequest) {
 
   let messages: GmailMessage[] = [];
   let refreshedAccessToken: string | null = null;
+  let winner: { accessToken: string; refreshToken?: string } | null = null;
+  let sawAuthFailure = false;
+  let lastError = '';
 
-  try {
-    // accessToken may be '' when only refresh token cookie survives — that will 401 and trigger refresh below
-    if (!tokens.accessToken) throw new Error('gmail_list_401');
-    messages = await fetchMessages(tokens.accessToken, 10, metadataOnly);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : '';
-
-    // Try token refresh on 401 (including expired access token)
-    if (msg.includes('401') && tokens.refreshToken) {
-      const newToken = await refreshToken(tokens.refreshToken);
-      if (!newToken) {
-        return NextResponse.json(
-          { ok: false, error: 'token_expired', connectUrl: '/api/portal/gmail/connect' },
-          { status: 401 },
-        );
+  // Supabase 里的 token 可能是陈旧的(旧授权残留),cookie 里的是最近一次
+  // 授权写入的——逐个候选试:直接拉 → 401 就刷新再拉 → 都不行换下一个。
+  for (const cand of candidates) {
+    try {
+      // accessToken may be '' when only a refresh token survives — 401s into the refresh path
+      if (!cand.accessToken) throw new Error('gmail_list_401');
+      messages = await fetchMessages(cand.accessToken, 10, metadataOnly);
+      winner = cand;
+      break;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '';
+      if (!msg.includes('401')) { lastError = msg || 'gmail_fetch_failed'; continue; }
+      if (!cand.refreshToken) { sawAuthFailure = true; continue; }
+      const newToken = await refreshToken(cand.refreshToken);
+      if (!newToken) { sawAuthFailure = true; continue; }
+      try {
+        messages = await fetchMessages(newToken, 10, metadataOnly);
+        refreshedAccessToken = newToken;
+        winner = cand;
+        break;
+      } catch (retryErr) {
+        lastError = retryErr instanceof Error ? retryErr.message : 'gmail_fetch_failed';
       }
-      refreshedAccessToken = newToken;
-      tokens = { ...tokens, accessToken: newToken };
-      try { messages = await fetchMessages(newToken, 10, metadataOnly); }
-      catch {
-        return NextResponse.json({ ok: false, error: 'gmail_fetch_failed' }, { status: 500 });
-      }
-    } else {
-      return NextResponse.json({ ok: false, error: msg || 'gmail_fetch_failed' }, { status: 500 });
     }
   }
+
+  if (!winner) {
+    if (sawAuthFailure || !lastError) {
+      return NextResponse.json(
+        { ok: false, error: 'token_expired', connectUrl: '/api/portal/gmail/connect' },
+        { status: 401 },
+      );
+    }
+    return NextResponse.json({ ok: false, error: lastError }, { status: 500 });
+  }
+
+  // 成功后把可用 token 回写 Supabase(登录会话有效时才真正写入),
+  // 治愈「Supabase 存着旧 token、cookie 里才是新授权」的循环。
+  await saveIntegrationToken('gmail', {
+    accessToken: refreshedAccessToken || winner.accessToken,
+    refreshToken: winner.refreshToken,
+  }, req);
 
   const shouldCreateSignals = includeBody && shouldAnalyze;
   let nodes = shouldCreateSignals ? await extractNodes(messages) : [];

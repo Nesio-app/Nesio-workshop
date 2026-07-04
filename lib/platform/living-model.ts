@@ -48,14 +48,14 @@ export interface LivingModel {
 
 // ── Layer definitions ─────────────────────────────────────────────────────────
 
-export const LAYER_META: Record<LivingModelLayerId, { label: string; icon: string; minConfidence: number }> = {
-  identity:    { label: '身份认同', icon: '🪞', minConfidence: 65 },
-  motivation:  { label: '驱动力',   icon: '⚡', minConfidence: 65 },
-  principles:  { label: '原则',     icon: '⚖️', minConfidence: 70 },
-  patterns:    { label: '模式',     icon: '🔄', minConfidence: 70 },
-  blind_spots: { label: '盲区',     icon: '🫧', minConfidence: 90 },
-  evolution:   { label: '演化',     icon: '📈', minConfidence: 60 },
-  prediction:  { label: '预测',     icon: '🔮', minConfidence: 60 },
+export const LAYER_META: Record<LivingModelLayerId, { label: string; labelEn: string; icon: string; minConfidence: number }> = {
+  identity:    { label: '身份认同', labelEn: 'Identity',    icon: '🪞', minConfidence: 65 },
+  motivation:  { label: '驱动力',   labelEn: 'Drive',       icon: '⚡', minConfidence: 65 },
+  principles:  { label: '原则',     labelEn: 'Principles',  icon: '⚖️', minConfidence: 70 },
+  patterns:    { label: '模式',     labelEn: 'Patterns',    icon: '🔄', minConfidence: 70 },
+  blind_spots: { label: '盲区',     labelEn: 'Blind spots', icon: '🫧', minConfidence: 90 },
+  evolution:   { label: '演化',     labelEn: 'Evolution',   icon: '📈', minConfidence: 60 },
+  prediction:  { label: '预测',     labelEn: 'Prediction',  icon: '🔮', minConfidence: 60 },
 };
 
 // ── Storage ───────────────────────────────────────────────────────────────────
