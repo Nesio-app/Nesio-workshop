@@ -10,6 +10,7 @@ import {
   isShoppingUrl,
   type FreezeItem,
 } from '@/lib/platform/impulse-guard';
+import { IconSnowflake } from './icons';
 
 interface FreezeVaultSheetProps {
   open: boolean;
@@ -118,7 +119,7 @@ export default function FreezeVaultSheet({ open, onClose, initialUrl }: FreezeVa
     <div className="nesio-freeze-overlay" onClick={onClose}>
       <div className="nesio-freeze-sheet" onClick={(e) => e.stopPropagation()}>
         <div className="nesio-freeze-header">
-          <span className="nesio-freeze-title">🧊 冷冻仓</span>
+          <span className="nesio-freeze-title" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><IconSnowflake size={16} /> 冷冻仓</span>
           <button type="button" className="nesio-freeze-close" onClick={onClose}>✕</button>
         </div>
         <p className="nesio-freeze-hint">冲动想买？先冻 24 小时，冷静一下再决定</p>
@@ -194,7 +195,7 @@ export default function FreezeVaultSheet({ open, onClose, initialUrl }: FreezeVa
                   onClick={handleFreeze}
                   disabled={saving || !parsed.title.trim()}
                 >
-                  {saved ? '✓ 已冻住' : saving ? '冻中…' : `🧊 冻 ${freezeHours}h`}
+                  {saved ? '✓ 已冻住' : saving ? '冻中…' : `冻 ${freezeHours}h`}
                 </button>
               </>
             )}
@@ -210,7 +211,7 @@ export default function FreezeVaultSheet({ open, onClose, initialUrl }: FreezeVa
 
             {thawed.length > 0 && (
               <div className="nesio-freeze-section">
-                <p className="nesio-freeze-section-label">⏰ 已解冻，可以决定了</p>
+                <p className="nesio-freeze-section-label">已解冻，可以决定了</p>
                 {thawed.map((item) => (
                   <FreezeItemCard key={item.id} item={item} onResolve={handleResolve} hoursUntilThaw={hoursUntilThaw} />
                 ))}
@@ -219,7 +220,7 @@ export default function FreezeVaultSheet({ open, onClose, initialUrl }: FreezeVa
 
             {active.length > 0 && (
               <div className="nesio-freeze-section">
-                <p className="nesio-freeze-section-label">🧊 冷冻中</p>
+                <p className="nesio-freeze-section-label">冷冻中</p>
                 {active.map((item) => (
                   <FreezeItemCard key={item.id} item={item} onResolve={handleResolve} hoursUntilThaw={hoursUntilThaw} />
                 ))}

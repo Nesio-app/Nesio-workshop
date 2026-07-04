@@ -34,10 +34,9 @@ import dynamic from 'next/dynamic';
 
 // Detail/graph views load on first open, not with the tab
 const MemoryNodeDetail = dynamic(() => import('./MemoryNodeDetail'), { ssr: false });
-const FreezeVaultSheet = dynamic(() => import('./FreezeVaultSheet'), { ssr: false });
 const RelationGraph = dynamic(() => import('./RelationGraph'), { ssr: false });
 import type { GNode, GEdge } from '@/lib/platform/graph-engine';
-import { DomainIcon, IconBox, IconCalendar, IconFolder, IconMapPin, IconSnowflake, IconUser, NodeTypeIcon, IconMap } from './icons';
+import { DomainIcon, IconBox, IconCalendar, IconFolder, IconMapPin, IconUser, NodeTypeIcon, IconMap } from './icons';
 
 // ── Object Map (物品地图) ────────────────────────────────────────────────────
 
@@ -349,8 +348,10 @@ function getNodeTypeMeta(node: LifeNode) {
 
 /** 卡片标题智能截断:整段原文取首个分句,一眼读完(批次 4)。 */
 function smartCardTitle(name: string): string {
-  if (name.length <= 24) return name;
-  const clause = name.split(/[。！？!?；;，,\n]/)[0];
+  // 显示层剥 emoji:批次 3 前的旧记录名字里带表情(如「Journal · 😊满足」)
+  const clean = name.replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu, '').replace(/\s{2,}/g, ' ').trim();
+  if (clean.length <= 24) return clean;
+  const clause = clean.split(/[。！？!?；;，,\n]/)[0];
   return `${clause.length > 24 ? clause.slice(0, 24) : clause}…`;
 }
 
@@ -407,7 +408,7 @@ function NarratorCardView({ card, onOpen }: { card: NarratorCard; onOpen: (n: Li
   return (
     <div className={`nesio-narrator-card nesio-narrator-card--${card.type}`} style={{ '--narrator-accent': accent } as React.CSSProperties}>
       <div className="nesio-narrator-title">{card.title}</div>
-      <div className="nesio-narrator-body">{card.body}</div>
+      <div className="nesio-narrator-body">{card.body.replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu, '')}</div>
       {card.sub && <div className="nesio-narrator-sub">{card.sub}</div>}
       {card.nodes.length > 0 && (
         <button
@@ -710,7 +711,6 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
   const [showObjectMap, setShowObjectMap] = useState(false);
   const [showRelationGraph, setShowRelationGraph] = useState(false);
-  const [showFreezeVault, setShowFreezeVault] = useState(false);
   const [locale, setLocale] = useState<PortalLocale>(() => loadProfileSettings().locale);
   const [nodes, setNodes] = useState<LifeNode[]>([]);
   const [selectedNode, setSelectedNode] = useState<LifeNode | null>(null);
@@ -942,9 +942,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                           清除筛选
                         </button>
                       )}
-                      <button type="button" className="nesio-section-action" onClick={() => setShowFreezeVault(true)} title="冷冻仓" aria-label="冷冻仓">
-                        <IconSnowflake size={15} />
-                      </button>
+
                     </div>
                   </div>
 
@@ -1112,12 +1110,6 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
           }}
         />
       )}
-
-      {/* Freeze Vault sheet */}
-      <FreezeVaultSheet
-        open={showFreezeVault}
-        onClose={() => setShowFreezeVault(false)}
-      />
 
       {/* Long press action sheet */}
       {longPressNode && (

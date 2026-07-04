@@ -6,7 +6,8 @@ import { getLifeGraph, updateLifeNode, type LifeNode, type LifeNodeAsset } from 
 import { createAppApiClient } from '@/lib/portal/app-api-client';
 import { matchNearestPlace, formatLocation, getNamedPlaces } from '@/lib/portal/named-places';
 import LocationPicker from './LocationPicker';
-import { IconCamera, IconImage } from './icons';
+import { IconBox, IconCamera, IconImage } from './icons';
+import { PurchaseCoolingPanel } from './PurchaseCoolingPanel';
 
 // ── Similarity check (拍照发现已有) ────────────────────────────────────────
 
@@ -790,16 +791,30 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
         <div className="nesio-camera-result-panel">
           {isReceipt && (
             <div className="nesio-camera-receipt-banner">
-              🧾 检测到小票，已列出条目，可编辑名称或添加有效期
+              检测到小票，已列出条目，可编辑名称或添加有效期
             </div>
           )}
+
+          {/* 购买冷静(批次 7):拍到想买的东西 → 已有类似 + 时薪换算 + 冻结 */}
+          {!isReceipt && editedNodes.some((n) => !n.deleted && n.type === 'object') && (() => {
+            const firstObjIdx = editedNodes.findIndex((n) => !n.deleted && n.type === 'object');
+            const firstObj = editedNodes[firstObjIdx];
+            const sims = similarItems[firstObjIdx] || [];
+            return (
+              <PurchaseCoolingPanel
+                productName={firstObj.name || '这件东西'}
+                similarCount={sims.length}
+                similarExample={sims[0]?.node.name}
+              />
+            );
+          })()}
 
           {/* Bounding-box selection button — top of result, next to summary */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
             <p className="nesio-camera-result-summary" style={{ margin: 0, flex: 1 }}>{result.summary}</p>
             {capturedPreview && (
               <button type="button" className="nesio-camera-select-btn" onClick={openSelection}>
-                🖊 圈选
+                圈选
               </button>
             )}
           </div>
@@ -846,7 +861,7 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
                 {/* Similarity alert */}
                 {similarItems[i] && !dismissedSimilar.has(i) && (
                   <div className="nesio-camera-similar-alert">
-                    <span className="nesio-camera-similar-icon">🤔</span>
+                    <span className="nesio-camera-similar-icon"><IconBox size={14} /></span>
                     <div className="nesio-camera-similar-body">
                       <p className="nesio-camera-similar-title">等等，你好像已经有了</p>
                       {similarItems[i].slice(0, 2).map((s) => (

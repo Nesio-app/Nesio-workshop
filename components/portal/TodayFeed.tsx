@@ -29,6 +29,7 @@ import dynamic from 'next/dynamic';
 import { buildRotatingFallback, dismissProactiveById, getProactiveCardBudget, isProactiveCardDismissed, type ProactiveCardData } from './today/proactive-types';
 import { ProactiveGuidanceCard } from './today/ProactiveGuidanceCard';
 import { ExperimentCheckinCard } from './today/ExperimentCheckinCard';
+import { ThawedReminder } from './today/ThawedReminder';
 import { TodayFocusSection } from './today/FocusSection';
 import { NightTimeline } from './today/NightTimeline';
 import { useTodayData } from './today/useTodayData';
@@ -173,6 +174,9 @@ export default function TodayFeed({
 
         {/* 进行中实验的打卡卡(批次 5:入口从三层深处提到首屏) */}
         <ExperimentCheckinCard />
+
+        {/* 冷冻到期提醒(批次 7:冷冻仓入口迁到拍一下,决定回路留在首屏) */}
+        <ThawedReminder />
 
         {/* 今日焦点 — 重要安排 / 重要日子 / 重要提醒 */}
         <TodayFocusSection

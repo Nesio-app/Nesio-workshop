@@ -212,6 +212,33 @@ export default function Portal() {
   const [activeSurface, setActiveSurface] = useState<ActiveSurface>('today');
   const [storageAlert, setStorageAlert] = useState<{ kind: 'full' | 'warning'; percent: number } | null>(null);
   const [captureMode, setCaptureMode] = useState<CaptureMode | null>(null);
+
+  // 批次 7:iOS PWA 后台驻留页面从不重载,用户会停在几天前的旧 UI。
+  // 回到前台时对比部署版本,变了就整页刷新(间隔 ≥60s,不打扰输入中的表单:
+  // 仅在没有打开任何 sheet/输入焦点时刷)。
+  useEffect(() => {
+    let known = '';
+    let lastCheck = 0;
+    const check = async () => {
+      if (Date.now() - lastCheck < 60_000) return;
+      lastCheck = Date.now();
+      try {
+        const res = await fetch('/api/version', { cache: 'no-store' });
+        const data = await res.json() as { v?: string };
+        if (!data.v || data.v === 'dev') return;
+        if (!known) { known = data.v; return; }
+        if (data.v !== known) {
+          const typing = document.activeElement instanceof HTMLInputElement
+            || document.activeElement instanceof HTMLTextAreaElement;
+          if (!typing) window.location.reload();
+        }
+      } catch { /* offline 等下次 */ }
+    };
+    void check();
+    const onVisible = () => { if (document.visibilityState === 'visible') void check(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, []);
   // 拍一下直达:扇形按钮同手势调起原生相机,拍完的文件直接进 CameraSheet
   const [cameraFile, setCameraFile] = useState<File | null>(null);
   const [voiceIntent, setVoiceIntent] = useState<'note' | 'ask'>('note');

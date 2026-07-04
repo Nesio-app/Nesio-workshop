@@ -31,7 +31,17 @@ import {
   type LivingModelLayer,
   type LivingModelLayerId,
 } from '@/lib/platform/living-model';
-import { IconBox, IconCheckCircle, IconClock, IconTarget, IconUser } from './icons';
+import { IconBox, IconCheckCircle, IconClock, IconSnowflake, IconTarget, IconUser } from './icons';
+import { getFreezeItems } from '@/lib/platform/impulse-guard';
+
+function loadFreezeLedger(): { total: number; skipped: number; bought: number } {
+  const items = getFreezeItems();
+  return {
+    total: items.length,
+    skipped: items.filter((x) => x.decision === 'skipped').length,
+    bought: items.filter((x) => x.decision === 'bought').length,
+  };
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -180,6 +190,17 @@ function computeReflectionFacts(nodes: LifeNode[], all: LifeNode[], profile: Mir
   if (bestGroup && bestGroup.score > 0.5) {
     facts.push({ icon: <IconClock size={15} />, text: `你的黄金时段在${bestGroup.label}` });
   }
+
+  // 4.5 冲动冷静账本(批次 7:劝住/没劝住都可见)
+  try {
+    const freeze = loadFreezeLedger();
+    if (freeze.skipped + freeze.bought > 0) {
+      facts.push({
+        icon: <IconSnowflake size={15} />,
+        text: `冲动冷静:冻过 ${freeze.total} 次,${freeze.skipped} 次最后没买(省下了),${freeze.bought} 次还是买了`,
+      });
+    }
+  } catch { /* ignore */ }
 
   // 5. Top person
   const persons = all.filter((n) => n.type === 'person').slice(0, 3);
