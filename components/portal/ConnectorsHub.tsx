@@ -308,6 +308,22 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     saveConnectorState(id, false);
     saveToken(id, '');
     setConnected((p) => ({ ...p, [id]: false }));
+
+    // Google connectors share one OAuth consent — really revoke it at
+    // Google and clear the HTTP-only token cookies (both providers).
+    if (id === 'gmail' || id === 'calendar') {
+      const other = id === 'gmail' ? 'calendar' : 'gmail';
+      saveConnectorState(other, false);
+      setConnected((p) => ({ ...p, [other]: false }));
+      void fetch('/api/portal/oauth/disconnect', { method: 'POST' })
+        .then((r) => r.json() as Promise<{ ok?: boolean; revoked?: boolean }>)
+        .then((d) => {
+          showToast(d.revoked
+            ? '已断开并撤销 Google 授权（邮件与日历共用授权，已一并断开）'
+            : '已断开并清除本地 token（邮件与日历一并断开）', true);
+        })
+        .catch(() => showToast('已断开本地连接，撤销请求失败——可在 Google 账号安全页手动移除', false));
+    }
   }
 
   function copyIngestUrl() {

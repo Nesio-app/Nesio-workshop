@@ -66,3 +66,13 @@ Auth legend:
 `/api/portal/quote`, `/api/portal/production/health`, `/api/modules`,
 `/api/entitlements` and similar read-only/config routes are intentionally
 open. If one of these starts touching AI or private data, move it up a table.
+
+## OAuth (2026-07 审查)
+
+- **Scopes 最小化 ✓**: 仅 `gmail.readonly` + `calendar.readonly`(联合授权,
+  一次 consent 覆盖两个连接器)。无写权限、无 profile/contacts。
+- **撤销路径 ✓**: `POST /api/portal/oauth/disconnect` 调 Google revoke
+  端点作废整个 grant 并清除全部 4 个 token cookie。由于共用授权,断开
+  任一连接器会同时断开另一个(UI 已同步提示)。
+- Token 存储: HTTP-only cookies(access 1h / refresh 90d),无 Supabase
+  时不落库。
