@@ -57,6 +57,7 @@ export default function FinanceTab() {
   const [ym, setYm] = useState<string>(ymOf());
   const [sub, setSub] = useState<Sub>('overview');
   const [filter, setFilter] = useState<string>('all');
+  const [acctFilter, setAcctFilter] = useState<string>('all'); // 批次 40:按卡筛选
   const [rev, setRev] = useState(0); // 规则改动后强制重算
   const [flowEditId, setFlowEditId] = useState<string | null>(null);
 
@@ -98,7 +99,9 @@ export default function FinanceTab() {
   function removeMerchantRule(name: string) { setMerchantRule(name, ''); setRev((r) => r + 1); }
   function removeFlowRule(name: string) { setFlowRule(name, ''); setRev((r) => r + 1); }
   const filterCats = ['all', ...cats.slice(0, 6).map((c) => c.category)];
-  const shownTx = filter === 'all' ? monthTx : monthTx.filter((t) => effectiveCategory(t) === filter);
+  const shownTx = monthTx
+    .filter((t) => filter === 'all' || effectiveCategory(t) === filter)
+    .filter((t) => acctFilter === 'all' || t.accountId === acctFilter);
   // 批次 40:交易行显示卡后四位(accountId → account.mask)
   const acctMask = new Map(accounts.map((a) => [a.id, a.mask]));
 
@@ -224,7 +227,17 @@ export default function FinanceTab() {
             </>
           )}
 
-          <div className="nesio-fin-subtabs" style={{ marginTop: review.length ? '1rem' : 0 }}>
+          {/* 批次 40:按卡筛选(有多个账户时才显示) */}
+          {accounts.length > 1 && (
+            <div className="nesio-fin-subtabs" style={{ marginTop: review.length ? '1rem' : 0 }}>
+              <button type="button" className={`nesio-fin-subtab${acctFilter === 'all' ? ' is-active' : ''}`} onClick={() => setAcctFilter('all')}>{L(dict, '所有卡', 'All cards')}</button>
+              {accounts.map((a) => (
+                <button key={a.id} type="button" className={`nesio-fin-subtab${acctFilter === a.id ? ' is-active' : ''}`} onClick={() => setAcctFilter(a.id)}>{a.name}{a.mask ? ` ····${a.mask}` : ''}</button>
+              ))}
+            </div>
+          )}
+
+          <div className="nesio-fin-subtabs" style={{ marginTop: accounts.length > 1 ? '0.5rem' : (review.length ? '1rem' : 0) }}>
             {filterCats.map((c) => (
               <button key={c} type="button" className={`nesio-fin-subtab${filter === c ? ' is-active' : ''}`} onClick={() => setFilter(c)}>{c === 'all' ? L(dict, '全部', 'All') : c}</button>
             ))}
