@@ -324,7 +324,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       setCounts((p) => ({ ...p, plaid: merged.length }));
       saveConnectorState('plaid', true);
       setConnected((p) => ({ ...p, plaid: true }));
-      showToast(L(dict, `流水同步完成:新增 ${fresh.length} 笔,本机共 ${merged.length} 笔`, `Synced: ${fresh.length} new, ${merged.length} total on-device`), true);
+      showToast(L(dict, `流水同步完成:新增 ${fresh.length} 笔,共 ${merged.length} 笔。到「设置 → 支出分析」看本月净支出/分类/商户`, `Synced: ${fresh.length} new, ${merged.length} total. See Settings → Spending for this month's breakdown`), true);
     } catch {
       showToast(L(dict, '网络错误', 'Network error'), false);
     }

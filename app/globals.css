@@ -17596,6 +17596,32 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 .nesio-shelf-status--ok { color: var(--portal-accent); }
 .nesio-shelf-status--err { color: var(--status-stop, #d9534f); }
 
+/* 批次 27:支出分析 */
+.nesio-fin-monthbar { display: flex; align-items: center; justify-content: center; gap: 1rem; margin: 0.2rem 0 0.9rem; }
+.nesio-fin-monthnav { width: 2rem; height: 2rem; border-radius: 50%; border: 1px solid var(--portal-line); background: var(--glass-bg-solid); color: var(--portal-ink); font-size: 1.1rem; line-height: 1; cursor: pointer; }
+.nesio-fin-monthnav:disabled { opacity: 0.35; cursor: default; }
+.nesio-fin-month { font-size: 0.85rem; font-weight: 600; color: var(--portal-ink); min-width: 7rem; text-align: center; }
+.nesio-fin-net-card { background: var(--glass-bg-solid); border: 1px solid var(--portal-line); border-radius: 16px; padding: 1.1rem 1.15rem; margin-bottom: 1.1rem; }
+.nesio-fin-net-label { margin: 0; font-size: 0.72rem; color: var(--portal-muted); }
+.nesio-fin-net-value { margin: 0.2rem 0 0.35rem; font-size: 2rem; font-weight: 800; color: var(--portal-ink); letter-spacing: -0.01em; }
+.nesio-fin-net-sub { margin: 0; font-size: 0.78rem; color: var(--portal-muted); }
+.nesio-fin-cats { display: flex; flex-direction: column; gap: 0.9rem; margin-top: 0.5rem; }
+.nesio-fin-cat-top { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 0.4rem; }
+.nesio-fin-cat-name { font-size: 0.86rem; color: var(--portal-ink); }
+.nesio-fin-cat-amt { font-size: 0.86rem; font-weight: 600; color: var(--portal-ink); }
+.nesio-fin-delta { margin-left: 0.4rem; font-size: 0.72rem; font-weight: 600; }
+.nesio-fin-delta.up { color: var(--status-risk, #d9534f); }
+.nesio-fin-delta.down { color: var(--status-go, #3a9d6a); }
+.nesio-fin-bar { height: 7px; border-radius: 4px; background: var(--portal-accent-soft); overflow: hidden; }
+.nesio-fin-bar-fill { height: 100%; border-radius: 4px; background: var(--portal-accent); transition: width 0.4s ease; }
+.nesio-fin-merchants { display: flex; flex-direction: column; }
+.nesio-fin-merchant { display: flex; align-items: center; justify-content: space-between; padding: 0.7rem 0; border-bottom: 1px solid var(--portal-line); }
+.nesio-fin-merchant:last-child { border-bottom: none; }
+.nesio-fin-merchant-name { font-size: 0.88rem; color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nesio-fin-merchant-right { display: flex; align-items: baseline; gap: 0.6rem; flex-shrink: 0; }
+.nesio-fin-merchant-amt { font-size: 0.88rem; font-weight: 600; color: var(--portal-ink); }
+.nesio-fin-merchant-cnt { font-size: 0.72rem; color: var(--portal-muted); }
+
 /* 批次 23:全屏看图 */
 .nesio-image-viewer { position: fixed; inset: 0; z-index: 600; background: rgba(0,0,0,0.92); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; padding: 1.5rem; }
 .nesio-image-viewer-img { max-width: 100%; max-height: 78vh; object-fit: contain; border-radius: 8px; }
