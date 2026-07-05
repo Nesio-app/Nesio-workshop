@@ -15,6 +15,15 @@ export interface RoadmapItem {
 
 export const ROADMAP_ITEMS: readonly RoadmapItem[] = [
   {
+    id: 'apple_widget',
+    title: { zh: '苹果桌面 Widget', en: 'Apple home-screen widget' },
+    description: {
+      zh: '主屏一眼看到今日焦点和提醒。需要 App Store 原生版才能做(网页版做不了 Widget),原生壳是它的前置。',
+      en: "Today's focus and reminders at a glance on the home screen. Requires the native App Store build (PWAs cannot ship widgets).",
+    },
+    status: 'planned',
+  },
+  {
     id: 'week_review',
     title: { zh: '每周回顾', en: 'Weekly review' },
     description: {

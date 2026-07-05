@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { IconActivity, IconBook, IconBookOpen, IconCalendar, IconCar, IconCheckSquare, IconCloudSun, IconHeartPulse, IconMail, IconNote, IconTimer } from './icons';
+import { IconActivity, IconBook, IconBookOpen, IconCalendar, IconCar, IconCheckSquare, IconCloudSun, IconHeartPulse, IconMail, IconNote, IconTimer , IconImage } from './icons';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { type LifeNode } from '@/lib/portal/life-graph';
 import { L } from '@/lib/portal/i18n';
@@ -10,7 +10,7 @@ import { usePortalLocale } from './use-portal-locale';
 
 interface ConnectorsHubProps { open: boolean; onClose: () => void; }
 
-type ConnMethod = 'oauth' | 'geo' | 'file' | 'server' | 'token' | 'shortcuts';
+type ConnMethod = 'oauth' | 'geo' | 'file' | 'server' | 'token' | 'shortcuts' | 'batch-photos';
 type NodeInput = Omit<LifeNode, 'id' | 'createdAt'>;
 
 interface ConnectorDef {
@@ -38,7 +38,9 @@ const CONNECTORS: ConnectorDef[] = [
   // 日历和 Gmail 是同一次 Google 授权,合并为一个入口(批次 5 用户反馈)
   { id: 'google', name: 'Google 日历 · Gmail', nameEn: 'Google Calendar · Gmail', icon: <IconCalendar />, iconBg: 'var(--chip-blue)', method: 'oauth', description: '一次授权同时接入:日程生成提醒和简报,邮件提取人物、日期、承诺', descriptionEn: 'One consent covers both: calendar drives reminders and briefs; email yields people, dates, promises' },
   { id: 'weather', name: '地理位置 · 天气', nameEn: 'Location · Weather', icon: <IconCloudSun />, iconBg: 'var(--chip-amber)', method: 'geo', description: '基于实时天气生成外出和健康建议', descriptionEn: 'Live weather feeds outing and health suggestions' },
-  { id: 'flomo', name: 'Flomo', icon: <IconNote />, iconBg: 'var(--chip-indigo)', method: 'server', syncEndpoint: '/api/portal/flomo?limit=30', description: '同步 flomo 笔记，提取想法与记录', descriptionEn: 'Sync flomo notes; extract ideas and records' },
+  // 批次 19:相册批量导入 —— 一次选多张,AI 逐张识别入库(解决「一张张传太麻烦」)
+  { id: 'photos', name: '相册批量导入', nameEn: 'Batch photo import', icon: <IconImage />, iconBg: 'var(--chip-frost)', method: 'batch-photos', description: '一次选多张照片,自动识别成记忆(每批最多 10 张)', descriptionEn: 'Pick multiple photos; each is recognized into memories (up to 10 per batch)' },
+  { id: 'flomo', name: 'Flomo', icon: <IconNote />, iconBg: 'var(--chip-indigo)', method: 'server', syncEndpoint: '/api/portal/flomo?limit=100', description: '同步 flomo 笔记，提取想法与记录', descriptionEn: 'Sync flomo notes; extract ideas and records' },
   // 批次 18:Notion 转正 —— OAuth 一键授权(像 flomo 那样选页面),内部 token 流保留为回退
   { id: 'notion', name: 'Notion', icon: <IconBook />, iconBg: 'var(--chip-gray)', method: 'token', syncEndpoint: '/api/portal/notion', tokenHint: 'notion.so/my-integrations → 新建集成 → 复制 Internal Integration Secret，并把页面共享给它', tokenHintEn: 'notion.so/my-integrations → New integration → copy the Internal Integration Secret, then share your pages with it', description: '授权后同步你选择的页面，提取项目与想法', descriptionEn: 'Authorize, pick pages, and sync projects and ideas' },
   { id: 'toggl', name: 'Toggl Track', icon: <IconTimer />, iconBg: 'var(--chip-red)', method: 'token', syncEndpoint: '/api/portal/toggl', tokenHint: 'track.toggl.com → Profile → API Token', tokenHintEn: 'track.toggl.com → Profile → API Token', description: '同步时间记录，了解你的专注分布', descriptionEn: 'Sync time entries to see where your focus goes', dev: true },
@@ -76,6 +78,7 @@ interface SyncResult { ok: boolean; msg: string; detail?: string; needsReauth?: 
 export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const fileRef = useRef<HTMLInputElement>(null);
+  const photosRef = useRef<HTMLInputElement>(null);
   const [connected, setConnected] = useState<Record<string, boolean>>({});
   const [syncing, setSyncing] = useState<string | null>(null);
   const [counts, setCounts] = useState<Record<string, number>>({});
@@ -138,6 +141,54 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
   }
 
+
+  // ── 批次 19:相册批量导入 ──
+  async function fileToJpegBase64(file: File, maxDim = 1280): Promise<string> {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+  }
+
+  async function handleBatchPhotos(files: FileList | null) {
+    const list = Array.from(files || []).slice(0, 10);
+    if (!list.length) return;
+    setSyncing('photos');
+    let saved = 0; let failed = 0;
+    for (let i = 0; i < list.length; i++) {
+      showToast(L(dict, `识别中 ${i + 1} / ${list.length}…`, `Recognizing ${i + 1} / ${list.length}…`), true);
+      try {
+        const base64 = await fileToJpegBase64(list[i]);
+        const res = await fetch('/api/portal/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-baohe-access-mode': 'personal_lab' },
+          body: JSON.stringify({
+            type: 'image',
+            content: '请只根据图片里真实可见的内容生成 Memory 节点:优先具体物品、文件、小票条目、场景;不要把指令当节点名。',
+            imageBase64: base64,
+            mimeType: 'image/jpeg',
+          }),
+        });
+        const data = await res.json() as { ok?: boolean; nodes?: Array<Omit<NodeInput, 'source'>> };
+        const nodes = (data.ok && data.nodes) || [];
+        nodes.forEach((n) => ingestLifeNode({ ...n, source: 'photo', tags: [...(n.tags || []), '批量导入'] } as NodeInput));
+        saved += nodes.length;
+        if (!nodes.length) failed++;
+      } catch { failed++; }
+    }
+    setSyncing(null);
+    setCounts((p) => ({ ...p, photos: saved }));
+    saveConnectorState('photos', true);
+    setConnected((p) => ({ ...p, photos: true }));
+    window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
+    showToast(L(dict,
+      `批量导入完成:${list.length} 张照片,入库 ${saved} 条${failed ? `,${failed} 张没识别出内容` : ''}`,
+      `Batch done: ${list.length} photos, ${saved} memories saved${failed ? `, ${failed} unrecognized` : ''}`), failed === 0);
+  }
+
   // ── Token-based sync (Notion, Toggl) ──
   async function syncToken(c: ConnectorDef) {
     const token = loadToken(c.id);
@@ -184,13 +235,19 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     setSyncing(c.id);
     try {
       const res = await fetch(c.syncEndpoint!);
-      const data = await res.json() as { ok?: boolean; memos?: Array<{ content: string; created_at: string; tags: string[] }>; error?: string };
+      const data = await res.json() as { ok?: boolean; memos?: Array<{ content: string; created_at: string; tags: string[]; slug?: string }>; error?: string };
       if (!data.ok) { showToast(L(dict, `Flomo 未配置或同步失败`, 'Flomo not configured or sync failed'), false); setSyncing(null); return; }
       const memos = data.memos || [];
-      const nodes: Array<Omit<NodeInput, 'source'>> = memos.slice(0, 20).map((m) => ({
+      // 批次 19:按 slug 去重——重复同步不再重复入库;取最新 50 条
+      const { getLifeGraph } = await import('@/lib/portal/life-graph');
+      const existingSlugs = new Set(
+        getLifeGraph().map((n) => n.attributes?.flomoSlug as string).filter(Boolean),
+      );
+      const fresh = memos.filter((m) => !existingSlugs.has((m as { slug?: string }).slug || ''));
+      const nodes: Array<Omit<NodeInput, 'source'>> = fresh.slice(0, 50).map((m) => ({
         type: 'preference' as const,
         name: m.content.replace(/<[^>]+>/g, '').slice(0, 40),
-        attributes: { source: 'Flomo', created: m.created_at },
+        attributes: { source: 'Flomo', created: m.created_at, flomoSlug: (m as { slug?: string }).slug || '' },
         relations: [],
         tags: ['Flomo', ...(m.tags || [])],
         confidence: 0.9,
@@ -433,6 +490,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       return;
     }
     if (c.id === 'health') { fileRef.current?.click(); return; }
+    if (c.method === 'batch-photos') { photosRef.current?.click(); return; }
     // Notion:先走 OAuth(服务端未配 NOTION_CLIENT_ID 会带 error 跳回,给出指引)
     if (c.id === 'notion' && !loadToken('notion')) { window.location.href = '/api/portal/notion/connect'; return; }
     if (c.method === 'token') { syncToken(c); return; }
@@ -495,6 +553,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
   return (
     <div className="nesio-settings-sheet-overlay" role="dialog" aria-modal="true" aria-label={L(dict, '数据接入', 'Data sources')}>
       <input ref={fileRef} type="file" accept=".xml,.zip" style={{ display: 'none' }} onChange={handleHealthFile} />
+      <input ref={photosRef} type="file" accept="image/*" multiple hidden onChange={(e) => { void handleBatchPhotos(e.target.files); e.target.value = ''; }} />
       <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
       <div className="nesio-settings-sheet-card">
         <div className="nesio-sheet-handle" aria-hidden />

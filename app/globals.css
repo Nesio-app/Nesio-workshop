@@ -17526,6 +17526,21 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 }
 .nesio-narrator-section > .nesio-narrator-card:nth-child(3) { grid-column: 1 / -1; }
 
+/* 批次 19:例行提醒 */
+.nesio-routine-input { width: 100%; min-height: var(--tap-min); border-radius: 0.75rem; border: 1.5px solid var(--portal-line); background: var(--glass-bg-solid); color: var(--portal-ink); font-size: 0.88rem; padding: 0.55rem 0.75rem; outline: none; font-family: inherit; }
+.nesio-routine-row { display: flex; gap: 0.5rem; margin-top: 0.5rem; align-items: center; }
+.nesio-routine-time { flex: 1; min-height: var(--tap-min); border-radius: 0.75rem; border: 1.5px solid var(--portal-line); background: var(--glass-bg-solid); color: var(--portal-ink); font-size: 0.95rem; padding: 0.4rem 0.6rem; font-family: inherit; }
+.nesio-routine-day-preset { min-height: var(--tap-min); padding: 0 0.8rem; border-radius: 999px; border: 1.5px solid var(--portal-line); background: none; color: var(--portal-muted); font-size: 0.8rem; cursor: pointer; }
+.nesio-routine-day-preset.is-active { border-color: var(--portal-blue-deep); color: var(--portal-blue-deep); }
+.nesio-routine-days { display: flex; gap: 0.35rem; margin-top: 0.5rem; }
+.nesio-routine-day { flex: 1; min-height: 40px; border-radius: 0.6rem; border: 1.5px solid var(--portal-line); background: none; color: var(--portal-muted); font-size: 0.8rem; cursor: pointer; }
+.nesio-routine-day.is-active { border-color: var(--portal-blue-deep); color: var(--portal-blue-deep); background: var(--portal-accent-soft); }
+.nesio-routine-item { display: flex; align-items: center; gap: 0.6rem; padding: 0.6rem 0; border-bottom: 1px solid var(--portal-line); }
+.nesio-routine-item-main { flex: 1; min-width: 0; }
+.nesio-routine-item-text { font-size: 0.88rem; font-weight: 500; color: var(--portal-ink); margin: 0; }
+.nesio-routine-item-meta { font-size: 0.7rem; color: var(--portal-muted); margin: 0.1rem 0 0; }
+.nesio-routine-delete { border: none; background: none; color: var(--portal-muted); opacity: 0.7; cursor: pointer; font-size: 0.85rem; min-width: 32px; min-height: 32px; }
+
 /* 批次 18:/share 分享接收页 + 条码扫码 */
 .nesio-share-receive { min-height: 100dvh; padding: 2.2rem 1.4rem calc(2rem + env(safe-area-inset-bottom)); background: var(--portal-bg-gradient); display: flex; flex-direction: column; align-items: center; gap: 1rem; }
 .nesio-share-receive-title { font-size: 1.2rem; font-weight: 700; color: var(--portal-ink); }

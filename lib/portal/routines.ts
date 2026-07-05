@@ -1,0 +1,71 @@
+/**
+ * Routines — 用户自设的例行提醒(批次 19)。
+ *
+ * 模型:到点后在 Today 出卡(拉模型,打开 App 即见),完成/跳过后当天不再出。
+ * PWA 没有可靠后台推送,真·锁屏推送等原生壳或 Web Push 接入后补;
+ * 这里先把「内容 + 时间 + 重复」的闭环做实,不做假通知。
+ */
+
+export interface Routine {
+  id: string;
+  text: string;
+  /** 'HH:mm' 24 小时制 */
+  time: string;
+  /** 0=周日 … 6=周六 */
+  days: number[];
+  enabled: boolean;
+  /** 'YYYY-MM-DD' — 当天完成/跳过后写入,次日自动复活 */
+  lastDoneDate?: string;
+  createdAt: string;
+}
+
+const KEY = 'nesio-routines-v1';
+export const ROUTINES_UPDATED_EVENT = 'nesio-routines-updated';
+
+export function loadRoutines(): Routine[] {
+  if (typeof window === 'undefined') return [];
+  try { return JSON.parse(localStorage.getItem(KEY) || '[]') as Routine[]; } catch { return []; }
+}
+
+function save(routines: Routine[]): void {
+  try { localStorage.setItem(KEY, JSON.stringify(routines)); } catch { /* quota */ }
+  window.dispatchEvent(new CustomEvent(ROUTINES_UPDATED_EVENT));
+}
+
+export function addRoutine(input: { text: string; time: string; days: number[] }): Routine {
+  const r: Routine = {
+    id: `rt-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+    text: input.text.trim(),
+    time: input.time,
+    days: input.days.length ? input.days : [0, 1, 2, 3, 4, 5, 6],
+    enabled: true,
+    createdAt: new Date().toISOString(),
+  };
+  save([...loadRoutines(), r]);
+  return r;
+}
+
+export function updateRoutine(id: string, patch: Partial<Routine>): void {
+  save(loadRoutines().map((r) => (r.id === id ? { ...r, ...patch } : r)));
+}
+
+export function deleteRoutine(id: string): void {
+  save(loadRoutines().filter((r) => r.id !== id));
+}
+
+function todayStr(now: Date): string {
+  return now.toISOString().slice(0, 10);
+}
+
+/** 到点且今天还没完成/跳过的 routine。 */
+export function dueRoutines(now: Date = new Date()): Routine[] {
+  const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  const today = todayStr(now);
+  return loadRoutines().filter(
+    (r) => r.enabled && r.days.includes(now.getDay()) && r.time <= hhmm && r.lastDoneDate !== today,
+  );
+}
+
+export function markRoutineDone(id: string, now: Date = new Date()): void {
+  updateRoutine(id, { lastDoneDate: todayStr(now) });
+}

@@ -65,7 +65,7 @@ export function flomoReadAuthorization(): string | null {
   return `Bearer ${token}`;
 }
 
-function buildSignedParams(limit: number): Record<string, string> {
+function buildSignedParams(limit: number, latestUpdatedAt?: string): Record<string, string> {
   const params: Record<string, string> = {
     limit: String(Math.min(Math.max(limit, 1), 200)),
     tz: '8:0',
@@ -74,6 +74,8 @@ function buildSignedParams(limit: number): Record<string, string> {
     app_version: '5.25.64',
     platform: 'mac',
     webp: '1',
+    // 游标:updated 接口按更新时间升序分页,不带游标 = 从最旧开始
+    ...(latestUpdatedAt ? { latest_updated_at: latestUpdatedAt } : {}),
   };
 
   const paramStr = Object.keys(params)
@@ -158,66 +160,71 @@ export async function fetchFlomoMemos(limit = 50): Promise<{
     };
   }
 
-  const params = buildSignedParams(limit);
-  const query = new URLSearchParams(params).toString();
+  // 根因修复(批次 19):/memo/updated/ 是同步游标接口,升序返回——
+  // 不带 latest_updated_at 游标就永远是「最旧的一批」(用户:为什么永远
+  // 只出现最早的 20 条)。翻页取全量(封顶 25 页×200),返回最新的 limit 条。
+  const toUnix = (v: string): string => {
+    if (/^\d+$/.test(v)) return v;
+    const t = Date.parse(v.replace(' ', 'T') + '+08:00');
+    return Number.isFinite(t) ? String(Math.floor(t / 1000)) : '';
+  };
 
-  try {
-    const res = await fetch(`${FLOMO_UPDATED_URL}?${query}`, {
-      method: 'GET',
-      headers: { authorization },
-      cache: 'no-store',
-    });
+  const collected: FlomoMemo[] = [];
+  let cursor = '';
+  let pageError: { status: number; message: string; needsLogin: boolean } | null = null;
 
-    const data = await res.json().catch(() => ({}));
+  for (let page = 0; page < 25; page++) {
+    const params = buildSignedParams(200, cursor || undefined);
+    const query = new URLSearchParams(params).toString();
+    let res: Response;
+    let data: { data?: unknown[]; message?: string } = {};
+    try {
+      res = await fetch(`${FLOMO_UPDATED_URL}?${query}`, {
+        method: 'GET',
+        headers: { authorization },
+        cache: 'no-store',
+      });
+      data = await res.json().catch(() => ({})) as typeof data;
+    } catch {
+      break; // 网络断页:用已收集的部分
+    }
     if (!res.ok) {
-      return {
-        ok: false,
-        configured: true,
-        readConfigured: true,
-        writeConfigured,
-        memos: [],
-        error: data?.message || `flomo ${res.status}`,
-      };
+      const message = String((data as { message?: string }).message ?? `flomo_${res.status}`);
+      pageError = { status: res.status, message, needsLogin: res.status === 401 || /login|登录/.test(message) };
+      break;
     }
+    const rows = Array.isArray(data?.data) ? data.data as Array<Record<string, unknown>> : [];
+    const memos = rows.map((row) => parseMemo(row)).filter((memo) => memo.slug && memo.content);
+    collected.push(...memos);
+    if (rows.length < 200) break;
+    const last = rows[rows.length - 1] as { updated_at?: unknown };
+    cursor = toUnix(String(last.updated_at ?? ''));
+    if (!cursor) break;
+  }
 
-    if (data?.code !== 0 && data?.code !== undefined) {
-      const message = data?.message || 'flomo rejected request';
-      const needsLogin =
-        data?.code === -10 || /登录|login/i.test(String(message));
-      return {
-        ok: false,
-        configured: true,
-        readConfigured: true,
-        writeConfigured,
-        memos: [],
-        error: needsLogin
-          ? 'FLOMO_API_KEY 已过期，请重新从 Local Storage → me → access_token 复制'
-          : message,
-      };
-    }
-
-    const rows = Array.isArray(data?.data) ? data.data : [];
-    const memos = rows
-      .slice(0, limit)
-      .map((row: Record<string, unknown>) => parseMemo(row))
-      .filter((memo: FlomoMemo) => memo.slug && memo.content);
-
-    return {
-      ok: true,
-      configured: true,
-      readConfigured: true,
-      writeConfigured,
-      memos,
-    };
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : 'network error';
+  if (pageError && collected.length === 0) {
+    const { needsLogin, message } = pageError;
     return {
       ok: false,
       configured: true,
       readConfigured: true,
       writeConfigured,
       memos: [],
-      error: msg,
+      error: needsLogin
+        ? 'FLOMO_API_KEY 已过期，请重新从 Local Storage → me → access_token 复制'
+        : message,
     };
   }
+
+  // collected 是升序(旧→新):取最新的 limit 条,最新在前
+  const capped = Math.min(Math.max(limit, 1), 200);
+  const memos = collected.slice(-capped).reverse();
+
+  return {
+    ok: true,
+    configured: true,
+    readConfigured: true,
+    writeConfigured,
+    memos,
+  };
 }

@@ -131,7 +131,7 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         filter: { property: 'object', value: 'page' },
         sort: { direction: 'descending', timestamp: 'last_edited_time' },
-        page_size: 8,
+        page_size: 30,
       }),
     });
   } catch {

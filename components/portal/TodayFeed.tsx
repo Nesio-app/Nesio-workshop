@@ -32,6 +32,7 @@ import dynamic from 'next/dynamic';
 import { buildRotatingFallback, dismissProactiveById, getProactiveCardBudget, isProactiveCardDismissed, type ProactiveCardData } from './today/proactive-types';
 import { ProactiveGuidanceCard } from './today/ProactiveGuidanceCard';
 import { ExperimentCheckinCard } from './today/ExperimentCheckinCard';
+import { RoutineDueCards } from './today/RoutineDueCards';
 import { ThawedReminder } from './today/ThawedReminder';
 import { TodayFocusSection } from './today/FocusSection';
 import { NightTimeline } from './today/NightTimeline';
@@ -192,6 +193,7 @@ export default function TodayFeed({
         />
 
         {/* 实验打卡(批次 8:按用户要求放到最下面) */}
+        <RoutineDueCards />
         <ExperimentCheckinCard />
       </div>
 

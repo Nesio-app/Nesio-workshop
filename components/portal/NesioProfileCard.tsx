@@ -7,12 +7,14 @@ import { useProfileAvatar } from './use-profile-avatar';
 import { GeneralSheet, DataSheet, PrivacySheet, SubscriptionSheet } from './SettingsSheets';
 import ConnectorsHub from './ConnectorsHub';
 import RoadmapSheet from './RoadmapSheet';
+import RoutineSheet from './RoutineSheet';
+import { IconClock } from './icons';
 import { L, t } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import { IconDatabase, IconGear, IconStar as IconStarOutline, IconGift } from './icons';
 
-type ActiveSheet = 'mirror' | 'general' | 'data' | 'privacy' | 'subscription' | 'connectors' | 'roadmap' | null;
+type ActiveSheet = 'mirror' | 'general' | 'data' | 'privacy' | 'subscription' | 'connectors' | 'roadmap' | 'routine' | null;
 
 export default function NesioProfileCard() {
   const [displayName, setDisplayName] = useState('Jessy');
@@ -92,6 +94,9 @@ export default function NesioProfileCard() {
     { key: 'subscription' as ActiveSheet,
       icon: <IconGift />,
       iconBg: 'var(--chip-lemon)', label: t(locale, 'menuEarlyAccess'), sublabel: t(locale, 'menuEarlyAccessHint') },
+    { key: 'routine' as ActiveSheet,
+      icon: <IconClock />,
+      iconBg: 'var(--chip-blue)', label: L(dict, '例行提醒', 'Routines'), sublabel: L(dict, '到点在 Today 出卡提醒', 'Due reminders appear on Today') },
     { key: 'roadmap' as ActiveSheet,
       icon: <IconStarOutline />,
       iconBg: 'var(--chip-amber)', label: t(locale, 'menuRoadmap'), sublabel: t(locale, 'menuRoadmapHint') },
@@ -160,6 +165,7 @@ export default function NesioProfileCard() {
       <SubscriptionSheet open={activeSheet === 'subscription'} onClose={() => setActiveSheet(null)} />
       <ConnectorsHub open={activeSheet === 'connectors'} onClose={() => setActiveSheet(null)} />
       <RoadmapSheet open={activeSheet === 'roadmap'} onClose={() => setActiveSheet(null)} />
+      <RoutineSheet open={activeSheet === 'routine'} onClose={() => setActiveSheet(null)} />
     </>
   );
 }
