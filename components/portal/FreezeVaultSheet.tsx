@@ -96,7 +96,7 @@ export default function FreezeVaultSheet({ open, onClose, initialUrl }: FreezeVa
     const title = r.title || (r.upc ? L(dict, `条码 ${r.upc}`, `Barcode ${r.upc}`) : '');
     const priceLabel = r.priceLabel || (typeof r.price === 'number' && r.price > 0 ? `¥${r.price}` : undefined);
     setParsed({ title, price: priceLabel, image: r.image, store: r.store });
-    setParseError(title ? '' : L(dict, '扫到了,但没识别出商品名,手动填一下', 'Scanned, but no product name — enter it manually'));
+    setParseError(title ? '' : L(dict, '扫到码了,但商品库没这件。手动填名称,或用「拍一下」拍商品让 AI 认。', 'Scanned, but not in the product db. Type the name, or use the camera to let AI recognise it.'));
     setTab('add');
   }
 

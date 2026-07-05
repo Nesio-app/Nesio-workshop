@@ -20098,6 +20098,12 @@ html[data-portal-theme="night"] .nesio-exp-card:hover {
 }
 .nesio-cooling-copy { font-size: 0.8rem; color: var(--portal-ink); line-height: 1.6; }
 .nesio-cooling-copy p { margin: 0 0 0.25rem; }
+.nesio-cooling-scan-result {
+  display: flex; align-items: center; gap: 0.6rem;
+  background: var(--glass-bg-solid); border-radius: 0.6rem; padding: 0.5rem 0.6rem; margin: 0.4rem 0 0;
+}
+.nesio-cooling-scan-img { width: 48px; height: 48px; border-radius: 0.5rem; object-fit: contain; background: #fff; flex-shrink: 0; }
+.nesio-cooling-scan-title { font-size: 0.8rem; font-weight: 600; color: var(--portal-ink); line-height: 1.4; }
 .nesio-cooling-actions { display: flex; gap: 0.5rem; margin-top: 0.55rem; }
 .nesio-cooling-freeze-btn {
   flex: 1;

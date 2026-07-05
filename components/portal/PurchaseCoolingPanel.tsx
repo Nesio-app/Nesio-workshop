@@ -41,6 +41,8 @@ export function PurchaseCoolingPanel({ productName, similarCount, similarExample
   // 批次 18:扫条码 → UPC 库自动填价格(价格联动第一步)
   const [scanOpen, setScanOpen] = useState(false);
   const [scanNote, setScanNote] = useState('');
+  const [scanImage, setScanImage] = useState('');
+  const [scanTitle, setScanTitle] = useState('');
 
   useEffect(() => {
     const saved = loadWage();
@@ -142,9 +144,18 @@ export function PurchaseCoolingPanel({ productName, similarCount, similarExample
         )}
       </div>
 
-      <button type="button" className="nesio-cooling-link" onClick={() => { setScanNote(''); setScanOpen(true); }}>
+      <button type="button" className="nesio-cooling-link" onClick={() => { setScanNote(''); setScanImage(''); setScanTitle(''); setScanOpen(true); }}>
         {L(dict, '扫码识别商品(二维码/条码)', 'Scan a code (QR / barcode)')}
       </button>
+      {(scanImage || scanTitle) && (
+        <div className="nesio-cooling-scan-result">
+          {scanImage && (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img src={scanImage} alt="" className="nesio-cooling-scan-img" />
+          )}
+          {scanTitle && <span className="nesio-cooling-scan-title">{scanTitle}</span>}
+        </div>
+      )}
       {scanNote && <p style={{ fontSize: '0.68rem', color: 'var(--portal-muted)', margin: '0.2rem 0 0' }}>{scanNote}</p>}
 
       <div className="nesio-cooling-copy">
@@ -162,9 +173,11 @@ export function PurchaseCoolingPanel({ productName, similarCount, similarExample
         onClose={() => setScanOpen(false)}
         onResult={(r) => {
           if (r.price) setPrice(String(r.price));
+          setScanImage(r.image || '');
+          setScanTitle(r.title || '');
           setScanNote(r.title
-            ? L(dict, `识别到:${r.title}${r.price ? `(参考价 $${r.price})` : '(库里没有价格)'}`, `Found: ${r.title}${r.price ? ` (ref $${r.price})` : ' (no price on record)'}`)
-            : L(dict, `条码 ${r.upc}:商品库暂无记录,请手动填价格`, `Barcode ${r.upc}: not in the product db — enter the price manually`));
+            ? L(dict, `识别到:${r.title}${r.price ? `(参考价 ¥${r.price})` : ''}`, `Found: ${r.title}${r.price ? ` (ref ¥${r.price})` : ''}`)
+            : L(dict, `${r.upc ? `条码 ${r.upc}:` : ''}没查到商品。可换「拍一下」拍商品让 AI 认,或手动填。`, `${r.upc ? `Barcode ${r.upc}: ` : ''}not found. Try snapping a photo (AI recognises it) or enter it manually.`));
         }}
       />
     </div>
