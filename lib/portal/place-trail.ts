@@ -142,6 +142,8 @@ export interface TimelineSegment {
   end: string;
   durationMin: number;
   source: 'live' | 'import';
+  lat?: number;
+  lon?: number;
 }
 
 export interface TimelineDay {
@@ -182,8 +184,9 @@ export function buildPlaceTimeline(visits: PlaceVisit[], maxDays = 14): Timeline
     const sameDay = last && localDateKey(v.ts) === localDateKey(last.start);
     if (last && sameDay && last.label === v.label && gapMs < 3 * 3_600_000) {
       if (end > last.end) last.end = end;
+      if (last.lat == null && v.lat != null) { last.lat = v.lat; last.lon = v.lon; }
     } else {
-      segs.push({ label: v.label, category: categoryOf(v.label), start: v.ts, end, durationMin: 0, source: v.source });
+      segs.push({ label: v.label, category: categoryOf(v.label), start: v.ts, end, durationMin: 0, source: v.source, lat: v.lat, lon: v.lon });
     }
   }
 
@@ -203,6 +206,107 @@ export function buildPlaceTimeline(visits: PlaceVisit[], maxDays = 14): Timeline
     .sort((a, b) => b[0].localeCompare(a[0]))
     .slice(0, maxDays)
     .map(([dateKey, list]) => ({ dateKey, segments: list.sort((a, b) => a.start.localeCompare(b.start)) }));
+}
+
+// ── 批次 28:Google 时间线 tab 用的 —— 行程/统计/聚类 ─────────────────────────
+
+export function haversineKm(aLat: number, aLon: number, bLat: number, bLon: number): number {
+  const R = 6371;
+  const dLat = ((bLat - aLat) * Math.PI) / 180;
+  const dLon = ((bLon - aLon) * Math.PI) / 180;
+  const s =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((aLat * Math.PI) / 180) * Math.cos((bLat * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s));
+}
+
+export type TransitMode = 'walk' | 'drive' | 'move';
+
+export type JourneyItem =
+  | { kind: 'visit'; seg: TimelineSegment }
+  | { kind: 'move'; fromLabel: string; toLabel: string; start: string; end: string; durationMin: number; km: number; mode: TransitMode };
+
+/** 某一天的行程:访问段 + 段之间推断的移动(直线距离 + 时长 + 速度猜通勤方式)。 */
+export function buildDayJourney(visits: PlaceVisit[], dateKey: string): JourneyItem[] {
+  const day = buildPlaceTimeline(visits, 3650).find((d) => d.dateKey === dateKey);
+  if (!day) return [];
+  const segs = day.segments;
+  const items: JourneyItem[] = [];
+  for (let i = 0; i < segs.length; i++) {
+    items.push({ kind: 'visit', seg: segs[i] });
+    const next = segs[i + 1];
+    if (next && segs[i].lat != null && segs[i].lon != null && next.lat != null && next.lon != null) {
+      const km = haversineKm(segs[i].lat!, segs[i].lon!, next.lat!, next.lon!);
+      if (km >= 0.05) {
+        const durationMin = Math.max(0, Math.round((new Date(next.start).getTime() - new Date(segs[i].end).getTime()) / 60000));
+        const speed = durationMin > 0 ? km / (durationMin / 60) : 0; // km/h
+        const mode: TransitMode = speed === 0 ? 'move' : speed < 7 ? 'walk' : 'drive';
+        items.push({ kind: 'move', fromLabel: segs[i].label, toLabel: next.label, start: segs[i].end, end: next.start, durationMin, km: Math.round(km * 100) / 100, mode });
+      }
+    }
+  }
+  return items;
+}
+
+export interface DayStats { visits: number; dwellMin: number; moveKm: number; moveMin: number }
+
+export function dayStats(journey: JourneyItem[]): DayStats {
+  let visits = 0, dwellMin = 0, moveKm = 0, moveMin = 0;
+  for (const it of journey) {
+    if (it.kind === 'visit') { visits += 1; dwellMin += it.seg.durationMin; }
+    else { moveKm += it.km; moveMin += it.durationMin; }
+  }
+  return { visits, dwellMin, moveKm: Math.round(moveKm * 100) / 100, moveMin };
+}
+
+/** 有访问记录的日期(YYYY-MM-DD),从新到旧。 */
+export function timelineDays(visits: PlaceVisit[]): string[] {
+  return buildPlaceTimeline(visits, 3650).map((d) => d.dateKey);
+}
+
+export interface PlaceCluster { label: string; category: PlaceCategory; totalMin: number; visits: number; lastTs: string }
+
+/** 常去地点聚类:跨全部数据按地点名聚合停留时长/次数。 */
+export function clusterPlaces(visits: PlaceVisit[], topN = 8): PlaceCluster[] {
+  const segs = buildPlaceTimeline(visits, 3650).flatMap((d) => d.segments);
+  const m = new Map<string, PlaceCluster>();
+  for (const s of segs) {
+    const c = m.get(s.label) || { label: s.label, category: s.category, totalMin: 0, visits: 0, lastTs: s.start };
+    c.totalMin += s.durationMin;
+    c.visits += 1;
+    if (s.start > c.lastTs) c.lastTs = s.start;
+    m.set(s.label, c);
+  }
+  return [...m.values()].sort((a, b) => b.totalMin - a.totalMin || b.visits - a.visits).slice(0, topN);
+}
+
+export interface CategoryShare { category: PlaceCategory; totalMin: number; pct: number }
+
+export function categoryTimeShare(visits: PlaceVisit[]): CategoryShare[] {
+  const segs = buildPlaceTimeline(visits, 3650).flatMap((d) => d.segments);
+  const m = new Map<PlaceCategory, number>();
+  for (const s of segs) m.set(s.category, (m.get(s.category) || 0) + s.durationMin);
+  const grand = [...m.values()].reduce((a, b) => a + b, 0) || 1;
+  return [...m.entries()]
+    .map(([category, totalMin]) => ({ category, totalMin, pct: Math.round((totalMin / grand) * 100) }))
+    .sort((a, b) => b.totalMin - a.totalMin);
+}
+
+export type TimeBucket = 'dawn' | 'morning' | 'afternoon' | 'evening' | 'night';
+
+export interface BucketShare { bucket: TimeBucket; min: number }
+
+/** 时段分布:各访问按开始小时归入 清晨/上午/下午/傍晚/夜,累计停留分钟。 */
+export function timeOfDayBuckets(visits: PlaceVisit[]): BucketShare[] {
+  const order: TimeBucket[] = ['dawn', 'morning', 'afternoon', 'evening', 'night'];
+  const m = new Map<TimeBucket, number>(order.map((b) => [b, 0]));
+  const segs = buildPlaceTimeline(visits, 3650).flatMap((d) => d.segments);
+  for (const s of segs) {
+    const h = new Date(s.start).getHours();
+    const b: TimeBucket = h < 5 ? 'night' : h < 8 ? 'dawn' : h < 12 ? 'morning' : h < 17 ? 'afternoon' : h < 21 ? 'evening' : 'night';
+    m.set(b, (m.get(b) || 0) + s.durationMin);
+  }
+  return order.map((bucket) => ({ bucket, min: m.get(bucket) || 0 }));
 }
 
 function humanizeSemanticType(label: string): string {

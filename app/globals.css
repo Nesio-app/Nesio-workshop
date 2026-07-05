@@ -17650,6 +17650,51 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 .nesio-pt-seg-time { font-size: 0.72rem; color: var(--portal-muted); }
 .nesio-pt-src { margin-left: 0.4rem; font-size: 0.62rem; color: var(--portal-muted); background: var(--portal-accent-soft); border-radius: 5px; padding: 1px 5px; }
 
+/* 批次 28:时间线 tab(Google 风) */
+.nesio-tl { display: flex; flex-direction: column; }
+.nesio-tl-map { position: relative; border-radius: 14px; overflow: hidden; background: var(--portal-accent-soft); border: 1px solid var(--portal-line); margin-bottom: 0.9rem; }
+.nesio-tl-map svg { display: block; }
+.nesio-tl-map-note { position: absolute; right: 0.5rem; bottom: 0.4rem; font-size: 0.6rem; color: var(--portal-muted); background: var(--sheet-opaque); border-radius: 6px; padding: 1px 6px; opacity: 0.9; }
+.nesio-tl-daynav { display: flex; align-items: center; justify-content: center; gap: 1rem; margin-bottom: 0.7rem; }
+.nesio-tl-day { font-size: 0.9rem; font-weight: 700; color: var(--portal-ink); min-width: 7rem; text-align: center; }
+.nesio-tl-stats { display: flex; gap: 0.6rem; padding: 0.7rem 0.85rem; background: var(--glass-bg-solid); border: 1px solid var(--portal-line); border-radius: 14px; margin-bottom: 1rem; }
+.nesio-tl-stat { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.15rem; }
+.nesio-tl-stat-v { font-size: 1.05rem; font-weight: 700; color: var(--portal-ink); }
+.nesio-tl-stat-l { font-size: 0.66rem; color: var(--portal-muted); }
+.nesio-tl-journey { position: relative; padding-left: 1.1rem; }
+.nesio-tl-journey::before { content: ''; position: absolute; left: 4px; top: 8px; bottom: 8px; width: 2px; background: var(--portal-line); border-radius: 1px; }
+.nesio-tl-item { position: relative; display: flex; gap: 0.7rem; align-items: center; padding: 0.4rem 0; }
+.nesio-tl-item--visit .nesio-pt-dot { position: absolute; left: -1.1rem; top: 0.7rem; }
+.nesio-tl-item-body { flex: 1; min-width: 0; }
+.nesio-tl-item-top { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
+.nesio-tl-item-name { font-size: 0.9rem; font-weight: 600; color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nesio-tl-item-dur { flex-shrink: 0; font-size: 0.72rem; font-weight: 600; color: var(--portal-accent); }
+.nesio-tl-item-time { font-size: 0.72rem; color: var(--portal-muted); }
+.nesio-tl-item--move { padding-left: 0.1rem; }
+.nesio-tl-move-icon { position: absolute; left: -1.35rem; font-size: 0.85rem; }
+.nesio-tl-move-text { font-size: 0.72rem; color: var(--portal-muted); font-style: italic; }
+.nesio-tl-clusters { display: flex; flex-direction: column; gap: 0.1rem; }
+.nesio-tl-cluster { display: flex; align-items: center; gap: 0.55rem; padding: 0.55rem 0; border-bottom: 1px solid var(--portal-line); }
+.nesio-tl-cluster:last-child { border-bottom: none; }
+.nesio-tl-cluster .nesio-pt-dot { width: 9px; height: 9px; flex-shrink: 0; }
+.nesio-tl-cluster-name { flex: 1; min-width: 0; font-size: 0.86rem; color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nesio-tl-cluster-meta { flex-shrink: 0; font-size: 0.72rem; color: var(--portal-muted); }
+.nesio-tl-cats { display: flex; flex-direction: column; gap: 0.7rem; }
+.nesio-tl-cat-top { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 0.35rem; font-size: 0.82rem; color: var(--portal-ink); }
+.nesio-tl-catbar--home { background: #588ce3; }
+.nesio-tl-catbar--work { background: #7b5ea7; }
+.nesio-tl-catbar--shopping { background: #e8888f; }
+.nesio-tl-catbar--food { background: #e0954a; }
+.nesio-tl-catbar--fitness { background: #d6559e; }
+.nesio-tl-catbar--transit { background: #3aa6a0; }
+.nesio-tl-catbar--place { background: #4a7c5f; }
+.nesio-tl-catbar--unknown { background: var(--portal-muted); }
+.nesio-tl-buckets { display: flex; align-items: flex-end; gap: 0.5rem; height: 5.5rem; }
+.nesio-tl-bucket { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.3rem; height: 100%; justify-content: flex-end; }
+.nesio-tl-bucket-bar-wrap { flex: 1; width: 60%; display: flex; align-items: flex-end; }
+.nesio-tl-bucket-bar { width: 100%; min-height: 3px; background: var(--portal-accent); border-radius: 4px 4px 0 0; }
+.nesio-tl-bucket-label { font-size: 0.62rem; color: var(--portal-muted); }
+
 /* 批次 23:全屏看图 */
 .nesio-image-viewer { position: fixed; inset: 0; z-index: 600; background: rgba(0,0,0,0.92); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; padding: 1.5rem; }
 .nesio-image-viewer-img { max-width: 100%; max-height: 78vh; object-fit: contain; border-radius: 8px; }

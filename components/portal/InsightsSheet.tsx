@@ -36,8 +36,8 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import { InfoTip } from './InfoTip';
-import { loadPlaceTrail, PLACE_TRAIL_UPDATED_EVENT, buildPlaceTimeline, type PlaceVisit } from '@/lib/portal/place-trail';
 import { TimeBlocksWidget } from './today/TimeBlocksWidget';
+import TimelineTab from './insights/TimelineTab';
 import { getFreezeItems } from '@/lib/platform/impulse-guard';
 
 function loadFreezeLedger(): { total: number; skipped: number; bought: number } {
@@ -51,7 +51,7 @@ function loadFreezeLedger(): { total: number; skipped: number; bought: number } 
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type MainTab = 'reflection' | 'analytics' | 'living';
+type MainTab = 'reflection' | 'analytics' | 'timeline' | 'living';
 type Period = 'today' | 'week' | 'month';
 
 interface FactBullet {
@@ -1078,14 +1078,14 @@ export default function InsightsSheet({ onClose, canUsePrivateData = true }: { o
 
       {/* Main tabs */}
       <div className="nesio-insights-main-tabs">
-        {(['reflection', 'analytics', 'living'] as MainTab[]).map((t) => (
+        {(['reflection', 'analytics', 'timeline', 'living'] as MainTab[]).map((t) => (
           <button
             key={t}
             type="button"
             className={`nesio-insights-main-tab${mainTab === t ? ' nesio-insights-main-tab--active' : ''}`}
             onClick={() => setMainTab(t)}
           >
-            {t === 'reflection' ? L(dict, '洞察', 'Insights') : t === 'analytics' ? L(dict, '分析', 'Analytics') : L(dict, '认知模型', 'Mind model')}
+            {t === 'reflection' ? L(dict, '洞察', 'Insights') : t === 'analytics' ? L(dict, '分析', 'Analytics') : t === 'timeline' ? L(dict, '时间线', 'Timeline') : L(dict, '认知模型', 'Mind model')}
           </button>
         ))}
       </div>
@@ -1186,11 +1186,6 @@ export default function InsightsSheet({ onClose, canUsePrivateData = true }: { o
               <TimeBlocksWidget canUsePrivateData={canUsePrivateData} />
             </div>
 
-            {/* 地点足迹(批次 21) */}
-            <div className="nesio-insights-section">
-              <p className="nesio-insights-section-label">{L(dict, '地点足迹', 'Place trail')}<InfoTip text={L(dict, '来自你授权的定位(同一地点 2 小时内只记一笔,全部存本机)+ 可选的 Google 时间轴导入。', 'From your granted location (one entry per place per 2h, stored on-device) plus optional Google Timeline import.')} /></p>
-              <PlaceTrailWidget />
-            </div>
 
 
             {/* Dynamic widgets */}
@@ -1247,6 +1242,13 @@ export default function InsightsSheet({ onClose, canUsePrivateData = true }: { o
           </div>
         )}
 
+        {/* ── Tab: Timeline(批次 28,放分析后面)── */}
+        {mainTab === 'timeline' && (
+          <div className="nesio-analytics-tab">
+            <TimelineTab />
+          </div>
+        )}
+
         {/* ── Tab 3: Living Model ── */}
         {mainTab === 'living' && (
           <LivingModelTab
@@ -1275,67 +1277,3 @@ export default function InsightsSheet({ onClose, canUsePrivateData = true }: { o
 }
 
 
-// ── 地点足迹(批次 21):live 定位积累 + Google 时间轴导入 共同消费 ────────────
-function PlaceTrailWidget() {
-  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
-  const [trail, setTrail] = useState<PlaceVisit[]>([]);
-  useEffect(() => {
-    const read = () => setTrail(loadPlaceTrail());
-    read();
-    window.addEventListener(PLACE_TRAIL_UPDATED_EVENT, read);
-    return () => window.removeEventListener(PLACE_TRAIL_UPDATED_EVENT, read);
-  }, []);
-  if (trail.length === 0) {
-    return <p className="nesio-insights-empty">{L(dict, '还没有足迹。授权位置后自动积累;也可在数据接入导入 Google 时间轴。', 'No trail yet. It builds automatically once location is granted; you can also import Google Timeline under Data sources.')}</p>;
-  }
-
-  // 批次 27:原始打点聚合成 Google 时间线样式 —— 按天分组的访问段 + 停留时长 + 类别配色。
-  const days = buildPlaceTimeline(trail, 10);
-  const hhmm = (iso: string) => new Date(iso).toLocaleTimeString(dict === 'en' ? 'en-US' : 'zh-CN', { hour: '2-digit', minute: '2-digit' });
-  const fmtDur = (min: number) => {
-    if (min < 1) return L(dict, '短暂', 'brief');
-    const h = Math.floor(min / 60);
-    const m = min % 60;
-    if (h && m) return L(dict, `${h} 小时 ${m} 分`, `${h}h ${m}m`);
-    if (h) return L(dict, `${h} 小时`, `${h}h`);
-    return L(dict, `${m} 分钟`, `${m}m`);
-  };
-  const dayLabel = (key: string) => {
-    const today = new Date();
-    const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-    const y = new Date(today); y.setDate(today.getDate() - 1);
-    const yKey = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, '0')}-${String(y.getDate()).padStart(2, '0')}`;
-    if (key === todayKey) return L(dict, '今天', 'Today');
-    if (key === yKey) return L(dict, '昨天', 'Yesterday');
-    const d = new Date(key);
-    return d.toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'short', day: 'numeric', weekday: 'short' });
-  };
-
-  return (
-    <div className="nesio-pt">
-      {days.map((day) => (
-        <div key={day.dateKey} className="nesio-pt-day">
-          <p className="nesio-pt-daylabel">{dayLabel(day.dateKey)}</p>
-          <div className="nesio-pt-track">
-            {day.segments.map((s, i) => (
-              <div key={`${s.start}-${i}`} className="nesio-pt-seg">
-                <span className={`nesio-pt-dot nesio-pt-dot--${s.category}`} aria-hidden />
-                <div className="nesio-pt-seg-body">
-                  <div className="nesio-pt-seg-top">
-                    <span className="nesio-pt-seg-name">{s.label}</span>
-                    <span className="nesio-pt-seg-dur">{fmtDur(s.durationMin)}</span>
-                  </div>
-                  <span className="nesio-pt-seg-time">
-                    {hhmm(s.start)}{s.durationMin >= 1 ? ` – ${hhmm(s.end)}` : ''}
-                    {s.source === 'import' && <span className="nesio-pt-src">{L(dict, '导入', 'import')}</span>}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      ))}
-      <p className="nesio-place-trail-count">{L(dict, `共 ${trail.length} 个打点 · 聚合成 ${days.reduce((n, d) => n + d.segments.length, 0)} 段访问`, `${trail.length} points · ${days.reduce((n, d) => n + d.segments.length, 0)} visits`)}</p>
-    </div>
-  );
-}
