@@ -8516,9 +8516,11 @@ html[data-portal-theme="night"] .nesio-today-brand-name {
 }
 
 /* 批次 11:昼夜双 logo(夜间资产 nesio-mark-night.svg 一直存在但从没接上) */
-.nesio-logo-night { display: none; }
-html[data-portal-theme="night"] .nesio-logo-day { display: none; }
-html[data-portal-theme="night"] .nesio-logo-night { display: inline-block; }
+/* 批次 26:切换是工具类,必须盖过 `.x img { display: block }`(否则聊天头像
+   等处两张图都显示 → 图标重叠,用户报「图标重了」)。用 !important 保证生效。 */
+.nesio-logo-night { display: none !important; }
+html[data-portal-theme="night"] .nesio-logo-day { display: none !important; }
+html[data-portal-theme="night"] .nesio-logo-night { display: inline-block !important; }
 
 .nesio-today-avatar {
   width: var(--tap-min, 44px);

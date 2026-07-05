@@ -12,9 +12,15 @@ function envValue(key: string): string {
   return (process.env[key] ?? '').trim();
 }
 
+export function plaidEnv(): string {
+  // 批次 26:容错——去空白/小写,只认三个合法值,否则回落 sandbox。
+  // 用户设了 production 却仍进沙盒银行 = 运行时 env 没解析成 production。
+  const raw = envValue('PLAID_ENV').toLowerCase();
+  return raw === 'production' || raw === 'development' ? raw : 'sandbox';
+}
+
 export function plaidBase(): string {
-  const env = envValue('PLAID_ENV') || 'sandbox';
-  return `https://${env}.plaid.com`;
+  return `https://${plaidEnv()}.plaid.com`;
 }
 
 export async function POST(req: NextRequest) {
@@ -45,7 +51,7 @@ export async function POST(req: NextRequest) {
     if (!data.link_token) {
       return NextResponse.json({ ok: false, error: data.error_message || 'link_token_failed' }, { status: 502 });
     }
-    return NextResponse.json({ ok: true, linkToken: data.link_token });
+    return NextResponse.json({ ok: true, linkToken: data.link_token, env: plaidEnv() });
   } catch {
     return NextResponse.json({ ok: false, error: 'plaid_unreachable' }, { status: 502 });
   }

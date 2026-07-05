@@ -240,7 +240,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     setSyncing('plaid');
     try {
       const res = await fetch('/api/portal/plaid/link-token', { method: 'POST' });
-      const data = await res.json() as { ok?: boolean; linkToken?: string; error?: string };
+      const data = await res.json() as { ok?: boolean; linkToken?: string; error?: string; env?: string };
       if (!data.ok || !data.linkToken) {
         const msg = data.error === 'plaid_not_configured'
           ? L(dict, 'Plaid 还没配置:dashboard.plaid.com → Keys 拿 client_id 和 Sandbox secret,配到 Vercel(PLAID_CLIENT_ID / PLAID_SECRET / PLAID_ENV)', 'Plaid not configured: dashboard.plaid.com → Keys → set PLAID_CLIENT_ID / PLAID_SECRET / PLAID_ENV on Vercel')
@@ -260,6 +260,11 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
           sc.onerror = () => reject(new Error('link_script'));
           document.head.appendChild(sc);
         });
+      }
+      // 批次 26:环境提示——sandbox 只会出假银行(First Platypus Bank);
+      // 要真实银行需 PLAID_ENV=production/development + Vercel 生产环境重新部署
+      if (data.env === 'sandbox') {
+        showToast(L(dict, '当前是 Plaid 沙盒(只会出假银行)。要连真实银行:Vercel 生产环境设 PLAID_ENV=production 并重新部署', 'Plaid is in Sandbox (test banks only). For real banks set PLAID_ENV=production on Vercel Production and redeploy'), false);
       }
       const Plaid = (window as unknown as { Plaid?: { create: (cfg: object) => { open: () => void } } }).Plaid;
       if (!Plaid) {
