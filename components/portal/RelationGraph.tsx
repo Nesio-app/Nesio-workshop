@@ -127,6 +127,22 @@ export default function RelationGraph({
     });
   }
 
+  // 批次 39:视口夹取 —— 平移时不让图漂出视口(用户反馈「关系网络会漂移」)。
+  // 保证至少露出内容边界内的一部分,拖过头会停住而不是飞走。
+  function clampView(v: { x: number; y: number; w: number; h: number }) {
+    const xs = layout.nodes.map((n) => n.x);
+    const ys = layout.nodes.map((n) => n.y);
+    if (!xs.length) return v;
+    const minX = Math.min(...xs), maxX = Math.max(...xs);
+    const minY = Math.min(...ys), maxY = Math.max(...ys);
+    const m = NODE_R * 3;
+    return {
+      ...v,
+      x: Math.max(minX - v.w + m, Math.min(maxX - m, v.x)),
+      y: Math.max(minY - v.h + m, Math.min(maxY - m, v.y)),
+    };
+  }
+
   if (nodes.length === 0) {
     return (
       <div className="rg-empty">
@@ -194,7 +210,7 @@ export default function RelationGraph({
           } else if (g.mode === 'pan' && e.touches.length === 1) {
             const t = e.touches[0];
             const s = clientScale();
-            setView((v) => ({ ...v, x: g.viewX - (t.clientX - g.startX) * s, y: g.viewY - (t.clientY - g.startY) * s }));
+            setView((v) => clampView({ ...v, x: g.viewX - (t.clientX - g.startX) * s, y: g.viewY - (t.clientY - g.startY) * s }));
           }
         }}
         onTouchEnd={() => { gesture.current.mode = null; }}

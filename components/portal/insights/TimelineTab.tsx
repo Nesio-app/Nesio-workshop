@@ -10,8 +10,9 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   loadPlaceTrail, PLACE_TRAIL_UPDATED_EVENT,
   timelineDays, buildDayJourney, dayStats,
-  clusterPlaces, categoryTimeShare, timeOfDayBuckets, travelPlaces,
+  clusterPlaces, categoryTimeShare, timeOfDayBuckets,
   displayLabel, setPlaceAlias, isGenericPlace, loadGeocodeEnabled, setGeocodeEnabled,
+  placesByCategory, PLACE_CATEGORY_META,
   type PlaceVisit, type PlaceCategory, type TimeBucket, type JourneyItem, type PlaceCluster,
 } from '@/lib/portal/place-trail';
 import { L } from '@/lib/portal/i18n';
@@ -22,8 +23,9 @@ type Sub = 'timeline' | 'analytics' | 'travel';
 
 const CAT: Record<PlaceCategory, [string, string]> = {
   home: ['家', 'Home'], work: ['公司', 'Work'], shopping: ['购物', 'Shopping'],
-  food: ['餐饮', 'Food'], fitness: ['健身', 'Fitness'], transit: ['通勤', 'Transit'],
-  unknown: ['未知', 'Unknown'], place: ['地点', 'Place'],
+  food: ['餐饮', 'Food'], fitness: ['运动', 'Sports'], culture: ['文化', 'Culture'],
+  entertainment: ['娱乐', 'Entertainment'], health: ['医疗', 'Health'], lodging: ['住宿', 'Lodging'],
+  transit: ['交通', 'Transit'], unknown: ['未知', 'Unknown'], place: ['地点', 'Place'],
 };
 const BUCKET: Record<TimeBucket, [string, string]> = {
   dawn: ['清晨', 'Dawn'], morning: ['上午', 'Morning'], afternoon: ['下午', 'Afternoon'],
@@ -31,7 +33,8 @@ const BUCKET: Record<TimeBucket, [string, string]> = {
 };
 const DOT_COLOR: Record<PlaceCategory, string> = {
   home: '#588ce3', work: '#7b5ea7', shopping: '#e8888f', food: '#e0954a',
-  fitness: '#d6559e', transit: '#3aa6a0', place: '#4a7c5f', unknown: '#9aa7b8',
+  fitness: '#d6559e', culture: '#8a6fd0', entertainment: '#d98a4a', health: '#c25d7a',
+  lodging: '#5a8fc2', transit: '#3aa6a0', place: '#4a7c5f', unknown: '#9aa7b8',
 };
 
 export default function TimelineTab() {
@@ -44,6 +47,7 @@ export default function TimelineTab() {
   const [geoOn, setGeoOn] = useState(false);
   const [geoBusy, setGeoBusy] = useState(false);
   const [geoMsg, setGeoMsg] = useState('');
+  const [expandedCat, setExpandedCat] = useState<string | null>(null); // 批次 39:地点分类展开
 
   useEffect(() => { setGeoOn(loadGeocodeEnabled()); }, []);
 
@@ -61,7 +65,7 @@ export default function TimelineTab() {
   const clusters = useMemo(() => clusterPlaces(trail, 10), [trail]);
   const catShare = useMemo(() => categoryTimeShare(trail), [trail]);
   const buckets = useMemo(() => timeOfDayBuckets(trail), [trail]);
-  const travel = useMemo(() => travelPlaces(trail, 60), [trail]);
+  const placeCats = useMemo(() => placesByCategory(trail), [trail]); // 批次 39:Google 时间线风分类
 
   if (trail.length === 0) {
     return <p className="nesio-insights-empty">{L(dict, '还没有足迹。授权位置后自动积累;也可在数据接入导入 Google 时间轴。', 'No trail yet. It builds automatically once location is granted; you can also import Google Timeline under Data sources.')}</p>;
@@ -84,14 +88,6 @@ export default function TimelineTab() {
     return new Date(key).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'short', day: 'numeric', weekday: 'short' });
   };
   const modeLabel = (m: 'walk' | 'drive' | 'move') => m === 'walk' ? L(dict, '步行', 'Walking') : m === 'drive' ? L(dict, '驾车', 'Driving') : L(dict, '移动', 'Move');
-  const relTime = (iso: string) => {
-    const days2 = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
-    if (days2 <= 0) return L(dict, '今天', 'today');
-    if (days2 === 1) return L(dict, '昨天', 'yesterday');
-    if (days2 < 30) return L(dict, `${days2} 天前`, `${days2}d ago`);
-    const mo = Math.round(days2 / 30);
-    return L(dict, `${mo} 个月前`, `${mo}mo ago`);
-  };
 
   function saveRename() {
     if (editRaw !== null) setPlaceAlias(editRaw, editVal);
@@ -138,7 +134,7 @@ export default function TimelineTab() {
     return { W, H, d, dots: pts.map((p) => ({ x: sx(p.lon!), y: sy(p.lat!), cat: p.category })) };
   })();
 
-  const SUBS: Array<[Sub, string, string]> = [['timeline', '时间线', 'Timeline'], ['analytics', '分析', 'Analytics'], ['travel', '环游', 'Travel']];
+  const SUBS: Array<[Sub, string, string]> = [['timeline', '时间线', 'Timeline'], ['analytics', '分析', 'Analytics'], ['travel', '地点', 'Places']];
 
   return (
     <div className="nesio-tl">
@@ -244,21 +240,39 @@ export default function TimelineTab() {
         </>
       )}
 
-      {/* ── 环游:去过的地方 ── */}
+      {/* ── 地点:Google Timeline 风分类(批次 39)── */}
       {sub === 'travel' && (
-        travel.length === 0 ? (
-          <p className="nesio-insights-empty">{L(dict, '还没有「外面」的地点。多授权定位、或导入 Google 时间轴,这里会攒出你去过的地方。', 'No away-from-home places yet. Grant location or import Google Timeline and your visited places will gather here.')}</p>
+        placeCats.length === 0 ? (
+          <p className="nesio-insights-empty">{L(dict, '还没有地点。多授权定位、或导入 Google 时间轴,这里会按类别攒出你去过的地方。', 'No places yet. Grant location or import Google Timeline and your visited places gather here by category.')}</p>
         ) : (
           <>
-            <p className="nesio-settings-option-hint" style={{ marginTop: 0 }}>{L(dict, `去过 ${travel.length} 个地方`, `${travel.length} places visited`)}</p>
-            <div className="nesio-tl-travel-grid">
-              {travel.map((c) => (
-                <div key={c.label} className="nesio-tl-travel-card">
-                  <span className="nesio-tl-travel-dot" style={{ background: DOT_COLOR[c.category] }} aria-hidden />
-                  <span className="nesio-tl-travel-name">{displayLabel(c.label)}</span>
-                  <span className="nesio-tl-travel-meta">{relTime(c.lastTs)} · {L(dict, `${c.visits} 次`, `${c.visits}×`)}</span>
-                </div>
-              ))}
+            <p className="nesio-settings-option-hint" style={{ marginTop: 0 }}>{L(dict, `去过 ${placeCats.reduce((s, g) => s + g.count, 0)} 个地方 · ${placeCats.length} 类`, `${placeCats.reduce((s, g) => s + g.count, 0)} places · ${placeCats.length} categories`)}</p>
+            <div className="nesio-tl-catgrid">
+              {placeCats.map((g) => {
+                const meta = PLACE_CATEGORY_META[g.category];
+                const open = expandedCat === g.category;
+                return (
+                  <div key={g.category} className={`nesio-tl-catcard${open ? ' is-open' : ''}`}>
+                    <button type="button" className="nesio-tl-catcard-head" onClick={() => setExpandedCat(open ? null : g.category)}>
+                      <span className="nesio-tl-catcard-sym" style={{ background: DOT_COLOR[g.category] }} aria-hidden>{meta.sym}</span>
+                      <span className="nesio-tl-catcard-name">{L(dict, meta.zh, meta.en)}</span>
+                      <span className="nesio-tl-catcard-count">{L(dict, `${g.count} 个地点`, `${g.count} places`)}</span>
+                      <span className="nesio-tl-catcard-chev">{open ? '▾' : '›'}</span>
+                    </button>
+                    {open && (
+                      <div className="nesio-tl-catcard-list">
+                        {g.places.slice(0, 30).map((c) => (
+                          <div key={c.label} className="nesio-tl-catplace">
+                            <span className="nesio-tl-catplace-name">{displayLabel(c.label)}</span>
+                            <span className="nesio-tl-catplace-meta">{L(dict, `${c.visits} 次`, `${c.visits}×`)}</span>
+                          </div>
+                        ))}
+                        {g.places.length > 30 && <p className="nesio-tl-catplace-more">{L(dict, `还有 ${g.places.length - 30} 个…`, `+${g.places.length - 30} more…`)}</p>}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </>
         )

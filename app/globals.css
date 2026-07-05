@@ -17867,6 +17867,21 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 .nesio-tl-travel-dot { width: 9px; height: 9px; border-radius: 50%; }
 .nesio-tl-travel-name { font-size: 0.86rem; font-weight: 600; color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nesio-tl-travel-meta { font-size: 0.66rem; color: var(--portal-muted); }
+
+/* 批次 39:地点分类(Google Timeline 风) */
+.nesio-tl-catgrid { display: flex; flex-direction: column; gap: 0.55rem; margin-top: 0.5rem; }
+.nesio-tl-catcard { border: 1px solid var(--portal-line); border-radius: 14px; background: var(--glass-bg-solid); overflow: hidden; }
+.nesio-tl-catcard-head { width: 100%; display: flex; align-items: center; gap: 0.6rem; padding: 0.75rem 0.85rem; background: none; border: none; cursor: pointer; text-align: left; }
+.nesio-tl-catcard-sym { flex-shrink: 0; width: 2rem; height: 2rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1rem; filter: grayscale(0.1); }
+.nesio-tl-catcard-name { font-size: 0.95rem; font-weight: 700; color: var(--portal-ink); }
+.nesio-tl-catcard-count { margin-left: auto; font-size: 0.78rem; color: var(--portal-muted); }
+.nesio-tl-catcard-chev { font-size: 0.9rem; color: var(--portal-muted); width: 1rem; text-align: center; }
+.nesio-tl-catcard-list { padding: 0 0.85rem 0.6rem 3.45rem; display: flex; flex-direction: column; }
+.nesio-tl-catplace { display: flex; align-items: baseline; justify-content: space-between; gap: 0.6rem; padding: 0.4rem 0; border-top: 1px solid var(--portal-line); }
+.nesio-tl-catplace-name { font-size: 0.85rem; color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nesio-tl-catplace-meta { flex-shrink: 0; font-size: 0.7rem; color: var(--portal-muted); }
+.nesio-tl-catplace-more { font-size: 0.72rem; color: var(--portal-muted); margin: 0.35rem 0 0; }
+
 /* 批次 33:反向地理编码开关 */
 .nesio-tl-geo { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.6rem 0.7rem; margin-bottom: 0.7rem; border: 1px solid var(--portal-line); border-radius: 12px; background: var(--glass-bg-solid); }
 .nesio-tl-geo-row { display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.74rem; color: var(--portal-muted); line-height: 1.4; cursor: pointer; }

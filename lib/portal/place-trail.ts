@@ -120,19 +120,60 @@ export function parseGoogleTimeline(json: unknown): PlaceVisit[] {
 // 这里把连续同地点的点合并成「访问段」,算出停留时长,再按天分组,
 // 供 Google 时间线样式的 UI 消费。
 
-export type PlaceCategory = 'home' | 'work' | 'shopping' | 'food' | 'fitness' | 'transit' | 'unknown' | 'place';
+export type PlaceCategory = 'home' | 'work' | 'shopping' | 'food' | 'fitness' | 'culture' | 'entertainment' | 'health' | 'lodging' | 'transit' | 'unknown' | 'place';
 
-/** 从地点名推断类别(决定图标/配色)。中英文关键词都认。 */
+/** 从地点名推断类别(决定图标/配色)。中英文关键词都认。批次 39 扩了文化/娱乐/医疗/住宿。 */
 export function categoryOf(label: string): PlaceCategory {
   const s = (label || '').toLowerCase();
   if (!s || /unknown|未知/.test(s)) return 'unknown';
-  if (/home|家|住/.test(s)) return 'home';
+  if (/home|家|住宅/.test(s)) return 'home';
   if (/work|office|公司|办公/.test(s)) return 'work';
-  if (/gym|fitness|健身|运动|yoga|瑜伽/.test(s)) return 'fitness';
-  if (/restaurant|cafe|coffee|starbucks|mcdonald|餐|饭|food|dining|bakery|bar/.test(s)) return 'food';
-  if (/shop|mall|store|market|超市|商场|购物|target|walmart|costco|michaels|ulta|beauty|ikea/.test(s)) return 'shopping';
-  if (/airport|station|机场|车站|transit|地铁|subway/.test(s)) return 'transit';
+  if (/gym|fitness|健身|运动|yoga|瑜伽|sport|stadium|court|trail|park\b|公园|球场/.test(s)) return 'fitness';
+  if (/restaurant|cafe|coffee|starbucks|mcdonald|餐|饭|food|dining|bakery|bar\b|grill|pizza|kitchen|tea\b|奶茶|饮/.test(s)) return 'food';
+  if (/shop|mall|store|market|超市|商场|购物|target|walmart|costco|michaels|ulta|beauty|ikea|outlet|amazon/.test(s)) return 'shopping';
+  if (/museum|library|图书馆|博物馆|gallery|theat(er|re)|剧院|cinema|movie|电影|art\b|church|temple|寺|教堂/.test(s)) return 'culture';
+  if (/hotel|inn\b|motel|resort|airbnb|酒店|旅馆|民宿/.test(s)) return 'lodging';
+  if (/hospital|clinic|医院|诊所|pharmacy|药|dentist|doctor|clinic|urgent care/.test(s)) return 'health';
+  if (/airport|station|机场|车站|transit|地铁|subway|terminal|gas\b|加油/.test(s)) return 'transit';
+  if (/club|entertainment|游乐|amusement|zoo|aquarium|bowling|arcade|casino/.test(s)) return 'entertainment';
   return 'place';
+}
+
+export const PLACE_CATEGORY_META: Record<PlaceCategory, { zh: string; en: string; sym: string }> = {
+  shopping: { zh: '购物', en: 'Shopping', sym: '🛍' },
+  food: { zh: '餐饮', en: 'Food & drink', sym: '🍽' },
+  fitness: { zh: '运动', en: 'Sports', sym: '🏃' },
+  culture: { zh: '文化', en: 'Culture', sym: '🏛' },
+  entertainment: { zh: '娱乐', en: 'Entertainment', sym: '🎡' },
+  health: { zh: '医疗', en: 'Health', sym: '🏥' },
+  lodging: { zh: '住宿', en: 'Lodging', sym: '🏨' },
+  transit: { zh: '交通', en: 'Transit', sym: '✈' },
+  work: { zh: '工作', en: 'Work', sym: '💼' },
+  home: { zh: '家', en: 'Home', sym: '🏠' },
+  place: { zh: '其他地点', en: 'Other places', sym: '📍' },
+  unknown: { zh: '未命名', en: 'Unnamed', sym: '📍' },
+};
+
+export interface CategoryGroup { category: PlaceCategory; count: number; visits: number; places: PlaceCluster[] }
+
+/** 按类别归组所有去过的地点(Google Timeline 的 Places 分类视图)。 */
+export function placesByCategory(visits: PlaceVisit[]): CategoryGroup[] {
+  const clusters = clusterPlaces(visits, 99999);
+  const byCat = new Map<PlaceCategory, PlaceCluster[]>();
+  for (const c of clusters) {
+    const cat = c.generic ? 'unknown' : categoryOf(displayLabel(c.label));
+    const list = byCat.get(cat) || [];
+    list.push(c);
+    byCat.set(cat, list);
+  }
+  const out: CategoryGroup[] = [];
+  for (const [category, places] of byCat) {
+    places.sort((a, b) => b.visits - a.visits);
+    out.push({ category, count: places.length, visits: places.reduce((s, p) => s + p.visits, 0), places });
+  }
+  // 有意义的类别在前,未命名/其他垫底;同权按地点数
+  const rank = (c: PlaceCategory) => (c === 'unknown' ? 2 : c === 'place' ? 1 : 0);
+  return out.sort((a, b) => rank(a.category) - rank(b.category) || b.count - a.count);
 }
 
 // ── 批次 30:地点别名(手动纠正 Unknown/机器名 → 记住,以后都用对的名字)──────
