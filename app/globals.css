@@ -17627,6 +17627,19 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 .nesio-fin-merchant-right { display: flex; align-items: baseline; gap: 0.6rem; flex-shrink: 0; }
 .nesio-fin-merchant-amt { font-size: 0.88rem; font-weight: 600; color: var(--portal-ink); }
 .nesio-fin-merchant-cnt { font-size: 0.72rem; color: var(--portal-muted); }
+/* 批次 29:财务子分类 tab + 交易明细 */
+.nesio-fin-subtabs { display: flex; gap: 0.4rem; margin: 0.2rem 0 1rem; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.nesio-fin-subtab { flex-shrink: 0; border: 1px solid var(--portal-line); background: transparent; color: var(--portal-muted); border-radius: 999px; padding: 0.3rem 0.85rem; font-size: 0.8rem; cursor: pointer; }
+.nesio-fin-subtab.is-active { background: var(--portal-accent-soft); color: var(--portal-accent); border-color: var(--portal-accent-border); font-weight: 600; }
+.nesio-fin-txlist { display: flex; flex-direction: column; }
+.nesio-fin-txrow { display: flex; align-items: center; gap: 0.7rem; padding: 0.65rem 0; border-bottom: 1px solid var(--portal-line); }
+.nesio-fin-txrow:last-child { border-bottom: none; }
+.nesio-fin-txdate { flex-shrink: 0; width: 3rem; font-size: 0.72rem; color: var(--portal-muted); font-variant-numeric: tabular-nums; }
+.nesio-fin-txmid { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.1rem; }
+.nesio-fin-txname { font-size: 0.86rem; color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nesio-fin-txcat { font-size: 0.66rem; color: var(--portal-muted); }
+.nesio-fin-txamt { flex-shrink: 0; font-size: 0.88rem; font-weight: 600; color: var(--portal-ink); font-variant-numeric: tabular-nums; }
+.nesio-fin-txamt.is-refund { color: var(--status-go, #3a9d6a); }
 
 /* 批次 27:地点足迹 · Google 时间线样式 */
 .nesio-pt { display: flex; flex-direction: column; gap: 1.1rem; }

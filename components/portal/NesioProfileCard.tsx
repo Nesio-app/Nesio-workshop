@@ -8,14 +8,13 @@ import { GeneralSheet, DataSheet, PrivacySheet, SubscriptionSheet } from './Sett
 import ConnectorsHub from './ConnectorsHub';
 import RoadmapSheet from './RoadmapSheet';
 import RoutineSheet from './RoutineSheet';
-import SpendingSheet from './finance/SpendingSheet';
-import { IconClock, IconCard } from './icons';
+import { IconClock } from './icons';
 import { L, t } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import { IconDatabase, IconGear, IconStar as IconStarOutline, IconGift } from './icons';
 
-type ActiveSheet = 'mirror' | 'general' | 'data' | 'privacy' | 'subscription' | 'connectors' | 'roadmap' | 'routine' | 'spending' | null;
+type ActiveSheet = 'mirror' | 'general' | 'data' | 'privacy' | 'subscription' | 'connectors' | 'roadmap' | 'routine' | null;
 
 export default function NesioProfileCard() {
   const [displayName, setDisplayName] = useState('Jessy');
@@ -98,9 +97,6 @@ export default function NesioProfileCard() {
     { key: 'routine' as ActiveSheet,
       icon: <IconClock />,
       iconBg: 'var(--chip-blue)', label: L(dict, '例行提醒', 'Routines'), sublabel: L(dict, '到点在 Today 出卡提醒', 'Due reminders appear on Today') },
-    { key: 'spending' as ActiveSheet,
-      icon: <IconCard />,
-      iconBg: 'var(--chip-fog)', label: L(dict, '支出分析', 'Spending'), sublabel: L(dict, '银行流水 · 本月净支出/分类/商户', 'Bank feed · net spend, categories, merchants') },
     { key: 'roadmap' as ActiveSheet,
       icon: <IconStarOutline />,
       iconBg: 'var(--chip-violet)', label: t(locale, 'menuRoadmap'), sublabel: t(locale, 'menuRoadmapHint') },
@@ -170,7 +166,6 @@ export default function NesioProfileCard() {
       <ConnectorsHub open={activeSheet === 'connectors'} onClose={() => setActiveSheet(null)} />
       <RoadmapSheet open={activeSheet === 'roadmap'} onClose={() => setActiveSheet(null)} />
       <RoutineSheet open={activeSheet === 'routine'} onClose={() => setActiveSheet(null)} />
-      <SpendingSheet open={activeSheet === 'spending'} onClose={() => setActiveSheet(null)} />
     </>
   );
 }

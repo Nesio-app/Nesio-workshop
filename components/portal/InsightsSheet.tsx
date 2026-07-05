@@ -38,6 +38,7 @@ import { usePortalLocale } from './use-portal-locale';
 import { InfoTip } from './InfoTip';
 import { TimeBlocksWidget } from './today/TimeBlocksWidget';
 import TimelineTab from './insights/TimelineTab';
+import FinanceTab from './finance/FinanceTab';
 import { getFreezeItems } from '@/lib/platform/impulse-guard';
 
 function loadFreezeLedger(): { total: number; skipped: number; bought: number } {
@@ -51,7 +52,7 @@ function loadFreezeLedger(): { total: number; skipped: number; bought: number } 
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type MainTab = 'reflection' | 'analytics' | 'timeline' | 'living';
+type MainTab = 'reflection' | 'analytics' | 'timeline' | 'finance' | 'living';
 type Period = 'today' | 'week' | 'month';
 
 interface FactBullet {
@@ -1078,14 +1079,14 @@ export default function InsightsSheet({ onClose, canUsePrivateData = true }: { o
 
       {/* Main tabs */}
       <div className="nesio-insights-main-tabs">
-        {(['reflection', 'analytics', 'timeline', 'living'] as MainTab[]).map((t) => (
+        {(['reflection', 'analytics', 'timeline', 'finance', 'living'] as MainTab[]).map((t) => (
           <button
             key={t}
             type="button"
             className={`nesio-insights-main-tab${mainTab === t ? ' nesio-insights-main-tab--active' : ''}`}
             onClick={() => setMainTab(t)}
           >
-            {t === 'reflection' ? L(dict, '洞察', 'Insights') : t === 'analytics' ? L(dict, '分析', 'Analytics') : t === 'timeline' ? L(dict, '时间线', 'Timeline') : L(dict, '认知模型', 'Mind model')}
+            {t === 'reflection' ? L(dict, '洞察', 'Insights') : t === 'analytics' ? L(dict, '分析', 'Analytics') : t === 'timeline' ? L(dict, '时间线', 'Timeline') : t === 'finance' ? L(dict, '财务', 'Finance') : L(dict, '认知模型', 'Mind model')}
           </button>
         ))}
       </div>
@@ -1248,6 +1249,9 @@ export default function InsightsSheet({ onClose, canUsePrivateData = true }: { o
             <TimelineTab />
           </div>
         )}
+
+        {/* ── Tab: Finance(批次 29,放时间线后面)── */}
+        {mainTab === 'finance' && <FinanceTab />}
 
         {/* ── Tab 3: Living Model ── */}
         {mainTab === 'living' && (

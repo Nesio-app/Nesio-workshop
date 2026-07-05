@@ -28,6 +28,8 @@ export interface ProactiveCardData {
   evidence?: EvidenceRef[];
   /** 为什么现在出现 one-liner. */
   reason?: string;
+  /** 金句卡:这句所属类别(批次 29 偏好算法用:收藏→多推同类,不再提醒→换类别)。 */
+  quoteCategory?: QuoteCat;
 }
 
 
@@ -128,32 +130,67 @@ export function buildRotatingFallback(now: Date, nodes: readonly FallbackNodeLik
 
   // 金句兜底(批次 10 用户反馈:「如果所有卡片都没有了就显示金句、quote 之类的」)。
   // 全部取公版格言,带出处;和其他池子一样随机轮换,保证这一区永远有内容。
-  const q = seededPick(FALLBACK_QUOTES, seed, 3);
+  // 批次 29:按类别偏好加权 —— 收藏过的类别多出现,不再提醒的类别少出现。
+  // 每句按其类别权重重复若干次进候选池,再确定性挑选(同一小时仍稳定)。
+  const catPref = loadQuoteCatPref();
+  const weighted = FALLBACK_QUOTES.flatMap((item) => Array(Math.max(1, Math.round((catPref[item.cat] ?? 1) * 3))).fill(item) as typeof FALLBACK_QUOTES);
+  const q = seededPick(weighted, seed, 3);
   pool.push({
     id: 'fallback-quote',
     title: l('今日一句', 'Line of the day'),
     body: l(`「${q.zh}」— ${q.byZh}`, `"${q.en}" — ${q.byEn}`),
     confidence: 60, sourceTags: [l('金句', 'Quote')], icon: '✨', priority: 1,
+    quoteCategory: q.cat,
   });
 
   // 确定性挑一张:同一小时稳定,不再自己跳
   return seededPick(pool, seed, 0);
 }
 
-const FALLBACK_QUOTES: Array<{ zh: string; en: string; byZh: string; byEn: string }> = [
-  { zh: '千里之行,始于足下。', en: 'A journey of a thousand miles begins with a single step.', byZh: '老子', byEn: 'Laozi' },
-  { zh: '不积跬步,无以至千里。', en: 'Without small steps, there is no thousand-mile journey.', byZh: '荀子', byEn: 'Xunzi' },
-  { zh: '逝者如斯夫,不舍昼夜。', en: 'Time flows on like this river, day and night.', byZh: '孔子', byEn: 'Confucius' },
-  { zh: '知足者富。', en: 'He who knows he has enough is rich.', byZh: '老子', byEn: 'Laozi' },
-  { zh: '未经审视的生活不值得过。', en: 'The unexamined life is not worth living.', byZh: '苏格拉底', byEn: 'Socrates' },
-  { zh: '我们受的苦,多半来自想象。', en: 'We suffer more often in imagination than in reality.', byZh: '塞涅卡', byEn: 'Seneca' },
-  { zh: '每一天都是一年中最好的一天。', en: 'Every day is the best day in the year.', byZh: '爱默生', byEn: 'Emerson' },
-  { zh: '我的经验,由我选择注意什么决定。', en: 'My experience is what I agree to attend to.', byZh: '威廉·詹姆斯', byEn: 'William James' },
-  { zh: '水滴石穿,不靠力,靠恒。', en: 'Dripping water pierces stone by persistence, not force.', byZh: '谚语', byEn: 'Proverb' },
-  { zh: '种一棵树最好的时间是十年前,其次是现在。', en: 'The best time to plant a tree was ten years ago; the second best is now.', byZh: '谚语', byEn: 'Proverb' },
-  { zh: '慢慢来,比较快。', en: 'Slow is smooth, and smooth is fast.', byZh: '谚语', byEn: 'Proverb' },
-  { zh: '此心安处是吾乡。', en: 'Where the heart is at peace, there is home.', byZh: '苏轼', byEn: 'Su Shi' },
+/** 金句类别(批次 29):行动 / 自省 / 安定 / 知足。 */
+export type QuoteCat = 'action' | 'reflect' | 'calm' | 'content';
+
+export const QUOTE_CAT_LABELS: Record<QuoteCat, [string, string]> = {
+  action: ['行动', 'Action'], reflect: ['自省', 'Reflection'], calm: ['安定', 'Calm'], content: ['知足', 'Contentment'],
+};
+
+const FALLBACK_QUOTES: Array<{ zh: string; en: string; byZh: string; byEn: string; cat: QuoteCat }> = [
+  { zh: '千里之行,始于足下。', en: 'A journey of a thousand miles begins with a single step.', byZh: '老子', byEn: 'Laozi', cat: 'action' },
+  { zh: '不积跬步,无以至千里。', en: 'Without small steps, there is no thousand-mile journey.', byZh: '荀子', byEn: 'Xunzi', cat: 'action' },
+  { zh: '水滴石穿,不靠力,靠恒。', en: 'Dripping water pierces stone by persistence, not force.', byZh: '谚语', byEn: 'Proverb', cat: 'action' },
+  { zh: '种一棵树最好的时间是十年前,其次是现在。', en: 'The best time to plant a tree was ten years ago; the second best is now.', byZh: '谚语', byEn: 'Proverb', cat: 'action' },
+  { zh: '未经审视的生活不值得过。', en: 'The unexamined life is not worth living.', byZh: '苏格拉底', byEn: 'Socrates', cat: 'reflect' },
+  { zh: '我的经验,由我选择注意什么决定。', en: 'My experience is what I agree to attend to.', byZh: '威廉·詹姆斯', byEn: 'William James', cat: 'reflect' },
+  { zh: '我们受的苦,多半来自想象。', en: 'We suffer more often in imagination than in reality.', byZh: '塞涅卡', byEn: 'Seneca', cat: 'reflect' },
+  { zh: '逝者如斯夫,不舍昼夜。', en: 'Time flows on like this river, day and night.', byZh: '孔子', byEn: 'Confucius', cat: 'reflect' },
+  { zh: '慢慢来,比较快。', en: 'Slow is smooth, and smooth is fast.', byZh: '谚语', byEn: 'Proverb', cat: 'calm' },
+  { zh: '此心安处是吾乡。', en: 'Where the heart is at peace, there is home.', byZh: '苏轼', byEn: 'Su Shi', cat: 'calm' },
+  { zh: '每一天都是一年中最好的一天。', en: 'Every day is the best day in the year.', byZh: '爱默生', byEn: 'Emerson', cat: 'calm' },
+  { zh: '知足者富。', en: 'He who knows he has enough is rich.', byZh: '老子', byEn: 'Laozi', cat: 'content' },
 ];
+
+// ── 批次 29:金句类别偏好权重 ───────────────────────────────────────────────
+// 收藏(存到记忆)→ 该类别 +;不再提醒 → 该类别 −。挑句时按权重加权(仍每小时稳定)。
+const QUOTE_CAT_PREF_KEY = 'nesio-quote-cat-pref-v1';
+const ALL_QUOTE_CATS: QuoteCat[] = ['action', 'reflect', 'calm', 'content'];
+
+export function loadQuoteCatPref(): Record<QuoteCat, number> {
+  const base: Record<QuoteCat, number> = { action: 1, reflect: 1, calm: 1, content: 1 };
+  if (typeof window === 'undefined') return base;
+  try {
+    const raw = JSON.parse(localStorage.getItem(QUOTE_CAT_PREF_KEY) || '{}') as Partial<Record<QuoteCat, number>>;
+    for (const c of ALL_QUOTE_CATS) if (typeof raw[c] === 'number') base[c] = raw[c] as number;
+  } catch { /* ignore */ }
+  return base;
+}
+
+/** 调整某类别权重(clamp 0.15..5);收藏 +0.6,不再提醒 -0.6。 */
+export function bumpQuoteCat(cat: QuoteCat | undefined, delta: number): void {
+  if (!cat || typeof window === 'undefined') return;
+  const pref = loadQuoteCatPref();
+  pref[cat] = Math.max(0.15, Math.min(5, (pref[cat] ?? 1) + delta));
+  try { localStorage.setItem(QUOTE_CAT_PREF_KEY, JSON.stringify(pref)); } catch { /* ignore */ }
+}
 
 
 const SNOOZE_KEY = 'nesio-snoozed-overdue';

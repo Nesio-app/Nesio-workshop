@@ -9,7 +9,7 @@ import { useState } from 'react';
 import { recordCardFeedback } from '@/lib/portal/reasoning-engine';
 import { recordSignalFeedback } from '@/lib/life-domain/signal-feedback';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
-import { getRegisteredDecCard, snoozeOverdue, type ProactiveAction, type ProactiveCardData } from './proactive-types';
+import { getRegisteredDecCard, snoozeOverdue, bumpQuoteCat, QUOTE_CAT_LABELS, type ProactiveAction, type ProactiveCardData } from './proactive-types';
 import { L, t } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -53,12 +53,20 @@ export function ProactiveGuidanceCard({
       source: 'manual',
       confidence: 1,
       rawInput: card.body,
-      tags: ['金句'],
+      tags: ['金句', ...(card.quoteCategory ? [QUOTE_CAT_LABELS[card.quoteCategory][0]] : [])],
       attributes: { origin: '金句' },
       relations: [],
     });
+    // 批次 29:收藏 → 多推同类
+    bumpQuoteCat(card.quoteCategory, 0.6);
     setSavedQuote(true);
     setTimeout(onDismiss, 900);
+  }
+
+  // 批次 29:金句「不再提醒」→ 降这一类权重、换类别
+  function handleQuoteMute() {
+    bumpQuoteCat(card.quoteCategory, -0.6);
+    handleFeedback('too_much');
   }
 
   function handleAction(action: ProactiveAction) {
@@ -176,7 +184,7 @@ export function ProactiveGuidanceCard({
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleFeedback('too_much')}
+                    onClick={handleQuoteMute}
                     style={{ fontSize: '0.64rem', color: 'var(--portal-muted)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}
                   >
                     {t(locale, 'guidanceFeedbackTooMuch')}
