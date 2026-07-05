@@ -1,21 +1,20 @@
 /**
- * Guidance Pipeline — orchestrator for all seven layers
+ * Guidance Pipeline — 单一的跨来源仲裁 + 渲染管线。
  *
  * Input:  raw GuidanceEvent[] from any source + today's scored calendar objects
- * Output: up to 2 GuidanceCard[], sorted by priority, ready to render
+ * Output: up to TODAY_CARD_BUDGET (3) GuidanceCard[], sorted by priority, ready to render
  *
- * Pipeline order:
- *   Layer 3 → Action Window (is now the right time?)
- *   Hard gate → Actionability (can user act in 1 minute?)
- *   Layer 2 → Consequence (what happens if ignored?)
- *   Layer 4 → Interrupt Evaluator (worth showing at all?)
- *   Layer 5 → Attention Budget (is user's day already overloaded?)
- *   Layer 6 → Cooling Store (shown too recently?)
- *   Dedup   → one card per identity (per type, except DEC insights per id)
+ * 本函数内按序跑这几道门(务实计数就是这几道,别当成"七层"营销):
+ *   Action Window   → 现在是不是行动时机?
+ *   Actionability   → 硬门:有没有 1 分钟能做的第一步?
+ *   Consequence     → 忽略了后果多大?
+ *   Interrupt Eval  → 值不值得打扰(5 维优先分)?
+ *   Attention Budget→ 今天是不是已经太满?(全来源统一预算,DEC 不再另设)
+ *   Cooling Store   → 最近是不是刚show过?
+ *   Dedup           → 一身份一卡(按 type,DEC 洞察按 id)
  *
- * Layer 1 (event detection) and Layer 7 (learning) live outside this function:
- * Layer 1 = source-adapters.ts (call before runGuidancePipeline)
- * Layer 7 = future; interface is reserved in GuidancePipelineInput
+ * 事件检测(source-adapters.ts,调用前)与学习回写(未来,接口已在 input 预留)
+ * 在本函数之外,是两个逻辑上独立的阶段,不在上面的门计数内。
  */
 
 import type { AttentionObject } from '@/lib/platform/attention-engine';

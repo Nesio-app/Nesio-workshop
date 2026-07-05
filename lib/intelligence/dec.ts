@@ -7,8 +7,11 @@
  * The cross-domain reasoning center. Belongs to no single domain. It does NOT
  * hold rules anymore — it discovers Domain Engines from the registry, gathers
  * their recommendation candidates, then applies platform governance:
- * health-aware degrade → confidence threshold → feedback filter → attention
- * budget → evidence gate.
+ * health-aware degrade → confidence threshold → feedback filter → evidence gate.
+ *
+ * 注意力预算不在这里:DEC 输出经 decCardsToGuidanceEvents 汇入 guidance 管线,
+ * 由那里统一仲裁「首页最多 3 张」(单一预算,PRD TODAY-003)。DEC 不再自设
+ * 第二个 slice(0,3) —— 否则强候选可能在到达全局仲裁前就被上游预算截掉。
  *
  * Adding a domain never touches this file (§28.7). The rules now live with
  * their domains in ./domains.ts.
@@ -41,11 +44,12 @@ import './domains'; // side-effect: registers the Domain Engines
 
 // ── Governance guardrails (PRD v3.0 Stage 1) ────────────────────────────────
 
-/** Confidence Threshold (§2.2). Below this, a card never reaches Today. */
+/**
+ * Confidence Threshold (§2.2):DEC 侧的**硬门**,0–1 刻度,低于此的推荐物理上到不了
+ * Today。注意与 guidance 管线里的置信**软权重**(0–100,占 interrupt 分 15%)区分:
+ * 这里是"够不够格进候选",那里是"进了候选之后排多前"——两者刻度/职责不同,不是重复。
+ */
 const CONFIDENCE_FLOOR = 0.6;
-
-/** Attention Budget (§2.1). Today shows at most 3 cards. */
-const TODAY_CARD_BUDGET = 3;
 
 export { DEC_SANDBOX_PAIRS };
 
@@ -100,9 +104,8 @@ export function runDEC(input: DECInput = {}): DECOutput {
       if (fb.feedback === 'not_now') return Date.now() - new Date(fb.at).getTime() > 4 * 3_600_000;
       return true;
     })
-    .sort((a, b) => scoreCard(b) - scoreCard(a))
-    // Attention Budget:末位淘汰，首页最多 3 张。
-    .slice(0, TODAY_CARD_BUDGET);
+    // 排序给出确定性次序;不再在此截断——首页「最多 3 张」由 guidance 管线统一仲裁。
+    .sort((a, b) => scoreCard(b) - scoreCard(a));
 
   // Canonical recommendations, gated on evidence (PRD: no evidence → not Today).
   const recommendations = cards.map(cardToRecommendation).filter(hasEvidence);

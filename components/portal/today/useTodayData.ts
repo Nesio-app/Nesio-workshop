@@ -131,7 +131,7 @@ export function useTodayData(canUsePrivateData: boolean) {
       const cal = readPortalCache<{ events?: CalendarEvent[] }>(PORTAL_CACHE_KEYS.calendar);
       if (!cancelled) setCalendarEvents(cal?.events ?? []);
 
-      // Build guidance cards (up to 2) and show independently
+      // Build guidance cards (up to TODAY_CARD_BUDGET) and show independently
       if (canUsePrivateData) {
         const now = new Date();
         // Load email signals from quick scan (20min TTL cache)
