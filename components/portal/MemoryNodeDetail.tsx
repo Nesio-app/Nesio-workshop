@@ -852,12 +852,21 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
             </div>
           )}
 
-          {/* 批次 35:图片线索所有类型都显示(物品/拍照记忆也要看到照片);本机图用 IndexedDB URL */}
-          {(n.assets || []).length > 0 && (
+          {/* 批次 39:去重 —— 物品/偏好节点顶部 Object/PreferenceSection 已展示首图作 hero,
+              图片线索里跳过它,避免同一张图出现两次;只剩额外图时才显示本区。 */}
+          {(() => {
+            const allAssets = n.assets || [];
+            const heroShown = n.type === 'object' || n.type === 'preference';
+            const heroKey = heroShown
+              ? (() => { const f = allAssets.find((a) => a.kind === 'image' || a.mimeType?.startsWith('image/')); return f ? (f.id || f.storagePath || f.label || 'asset') : ''; })()
+              : '';
+            const galleryAssets = allAssets.filter((a) => (a.id || a.storagePath || a.label || 'asset') !== heroKey);
+            if (galleryAssets.length === 0) return null;
+            return (
             <>
               <p className="nesio-settings-section-label" style={{ marginTop: '0.75rem' }}>{L(dict, '图片线索', 'Image clues')}</p>
               <div style={{ display: 'grid', gap: '0.6rem' }}>
-                {(n.assets || []).map((asset) => {
+                {galleryAssets.map((asset) => {
                   const key = asset.id || asset.storagePath || asset.label || 'asset';
                   const previewUrl = assetUrls[key];
                   const isImage = asset.kind === 'image' || asset.mimeType?.startsWith('image/');
@@ -881,7 +890,8 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
                 })}
               </div>
             </>
-          )}
+            );
+          })()}
 
           <p style={{ fontSize: '0.7rem', color: 'var(--portal-muted)', marginTop: '1rem' }}>{L(dict, '记录于', 'Noted on')} {createdDate}</p>
 

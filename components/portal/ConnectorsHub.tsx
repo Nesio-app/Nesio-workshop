@@ -122,6 +122,11 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     if (loadToken('notion')) savedConn.notion = true;
     setConnected(savedConn);
     setIngestUrl(`${window.location.origin}/api/portal/ingest`);
+    // 批次 39:OAuth 连过(cookie token,没有本地 token)也要翻成已连接。
+    fetch('/api/portal/notion/status')
+      .then((r) => r.json())
+      .then((d: { connected?: boolean }) => { if (d.connected) setConnected((p) => ({ ...p, notion: true })); })
+      .catch(() => undefined);
     // Check OAuth callback
     const params = new URLSearchParams(window.location.search);
     const err = params.get('error');
