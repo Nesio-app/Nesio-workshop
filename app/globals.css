@@ -17787,6 +17787,11 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 .nesio-tl-travel-dot { width: 9px; height: 9px; border-radius: 50%; }
 .nesio-tl-travel-name { font-size: 0.86rem; font-weight: 600; color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nesio-tl-travel-meta { font-size: 0.66rem; color: var(--portal-muted); }
+/* 批次 33:反向地理编码开关 */
+.nesio-tl-geo { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.6rem 0.7rem; margin-bottom: 0.7rem; border: 1px solid var(--portal-line); border-radius: 12px; background: var(--glass-bg-solid); }
+.nesio-tl-geo-row { display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.74rem; color: var(--portal-muted); line-height: 1.4; cursor: pointer; }
+.nesio-tl-geo-row input { margin-top: 0.15rem; flex-shrink: 0; }
+.nesio-tl-geo-msg { font-size: 0.72rem; color: var(--portal-accent); }
 
 /* 批次 23:全屏看图 */
 .nesio-image-viewer { position: fixed; inset: 0; z-index: 600; background: rgba(0,0,0,0.92); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; padding: 1.5rem; }

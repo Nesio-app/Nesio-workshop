@@ -11,8 +11,8 @@ import {
   loadPlaceTrail, PLACE_TRAIL_UPDATED_EVENT,
   timelineDays, buildDayJourney, dayStats,
   clusterPlaces, categoryTimeShare, timeOfDayBuckets, travelPlaces,
-  displayLabel, setPlaceAlias,
-  type PlaceVisit, type PlaceCategory, type TimeBucket, type JourneyItem,
+  displayLabel, setPlaceAlias, isGenericPlace, loadGeocodeEnabled, setGeocodeEnabled,
+  type PlaceVisit, type PlaceCategory, type TimeBucket, type JourneyItem, type PlaceCluster,
 } from '@/lib/portal/place-trail';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -41,6 +41,11 @@ export default function TimelineTab() {
   const [sub, setSub] = useState<Sub>('timeline');
   const [editRaw, setEditRaw] = useState<string | null>(null);
   const [editVal, setEditVal] = useState('');
+  const [geoOn, setGeoOn] = useState(false);
+  const [geoBusy, setGeoBusy] = useState(false);
+  const [geoMsg, setGeoMsg] = useState('');
+
+  useEffect(() => { setGeoOn(loadGeocodeEnabled()); }, []);
 
   useEffect(() => {
     const read = () => setTrail(loadPlaceTrail());
@@ -91,6 +96,33 @@ export default function TimelineTab() {
   function saveRename() {
     if (editRaw !== null) setPlaceAlias(editRaw, editVal);
     setEditRaw(null); setEditVal('');
+  }
+
+  // 显示名:改过名→用改的;没改的无名占位→「未命名地点」;其余→原名
+  function pretty(c: PlaceCluster): string {
+    const d = displayLabel(c.label);
+    if (d !== c.label) return d;
+    if (c.generic) return L(dict, '未命名地点', 'Unnamed place');
+    return d;
+  }
+  function toggleGeo() { const next = !geoOn; setGeoOn(next); setGeocodeEnabled(next); setGeoMsg(''); }
+  async function findRealNames() {
+    const targets = clusters.filter((c) => c.generic && c.lat != null && displayLabel(c.label) === c.label);
+    if (!targets.length) { setGeoMsg(L(dict, '没有需要找名字的未命名地点', 'No unnamed places to resolve')); return; }
+    setGeoBusy(true);
+    let done = 0;
+    for (const c of targets) {
+      setGeoMsg(L(dict, `正在找真名… ${done}/${targets.length}`, `Resolving… ${done}/${targets.length}`));
+      try {
+        const res = await fetch('/api/portal/geocode', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lat: c.lat, lon: c.lon }) });
+        const data = await res.json() as { ok?: boolean; name?: string };
+        if (data.ok && data.name) setPlaceAlias(c.label, data.name);
+      } catch { /* 单个失败跳过 */ }
+      done += 1;
+      await new Promise((r) => setTimeout(r, 1100)); // Nominatim 限速 ~1/s
+    }
+    setGeoBusy(false);
+    setGeoMsg(L(dict, `完成 · 处理了 ${targets.length} 个地点`, `Done · ${targets.length} places`));
   }
 
   const pts = journey.filter((it): it is Extract<JourneyItem, { kind: 'visit' }> => it.kind === 'visit').map((it) => it.seg).filter((s) => s.lat != null && s.lon != null);
@@ -160,16 +192,25 @@ export default function TimelineTab() {
       {sub === 'analytics' && (
         <>
           <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>{L(dict, '常去地点 · 点名字可纠正', 'Frequent places · tap name to fix')}</p>
+          {/* 批次 33:无名占位地点找真名(反向地理编码,默认关,坐标会发外部地图) */}
+          <div className="nesio-tl-geo">
+            <label className="nesio-tl-geo-row">
+              <input type="checkbox" checked={geoOn} onChange={toggleGeo} />
+              <span>{L(dict, '用外部地图给「未命名地点」找真名(坐标会发给 OpenStreetMap)', 'Resolve unnamed places via external map (coords sent to OpenStreetMap)')}</span>
+            </label>
+            {geoOn && <button type="button" className="nesio-fin-review-accept" disabled={geoBusy} onClick={findRealNames}>{geoBusy ? '…' : L(dict, '找真名', 'Resolve names')}</button>}
+            {geoMsg && <span className="nesio-tl-geo-msg">{geoMsg}</span>}
+          </div>
           <div className="nesio-tl-clusters">
             {clusters.map((c) => (
               <div key={c.label} className="nesio-tl-cluster">
                 <span className={`nesio-pt-dot nesio-pt-dot--${c.category}`} aria-hidden style={{ position: 'static', boxShadow: 'none' }} />
                 {editRaw === c.label ? (
-                  <input className="nesio-tl-rename-input" value={editVal} autoFocus onChange={(e) => setEditVal(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') saveRename(); if (e.key === 'Escape') { setEditRaw(null); } }} onBlur={saveRename} placeholder={c.label} />
+                  <input className="nesio-tl-rename-input" value={editVal} autoFocus onChange={(e) => setEditVal(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') saveRename(); if (e.key === 'Escape') { setEditRaw(null); } }} onBlur={saveRename} placeholder={pretty(c)} />
                 ) : (
-                  <button type="button" className="nesio-tl-cluster-name nesio-tl-cluster-name--btn" onClick={() => { setEditRaw(c.label); setEditVal(displayLabel(c.label)); }}>
-                    {displayLabel(c.label)}
-                    {displayLabel(c.label) !== c.label && <span className="nesio-tl-alias-orig"> · {c.label}</span>}
+                  <button type="button" className="nesio-tl-cluster-name nesio-tl-cluster-name--btn" onClick={() => { setEditRaw(c.label); setEditVal(displayLabel(c.label) === c.label ? '' : displayLabel(c.label)); }}>
+                    {pretty(c)}
+                    {c.generic && displayLabel(c.label) === c.label && c.lat != null && <span className="nesio-tl-alias-orig"> · {c.lat.toFixed(2)},{c.lon!.toFixed(2)}</span>}
                   </button>
                 )}
                 <span className="nesio-tl-cluster-meta">{fmtDur(c.totalMin)} · {L(dict, `${c.visits} 次`, `${c.visits}×`)}</span>

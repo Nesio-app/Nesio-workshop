@@ -290,20 +290,43 @@ export function timelineDays(visits: PlaceVisit[]): string[] {
   return buildPlaceTimeline(visits, 3650).map((d) => d.dateKey);
 }
 
-export interface PlaceCluster { label: string; category: PlaceCategory; totalMin: number; visits: number; lastTs: string }
+export interface PlaceCluster { label: string; category: PlaceCategory; totalMin: number; visits: number; lastTs: string; lat?: number; lon?: number; generic?: boolean }
 
-/** 常去地点聚类:跨全部数据按地点名聚合停留时长/次数。 */
+// 批次 33:Google 时间轴给的无名占位标签(一个「Unknown」里其实是很多不同地点)。
+const GENERIC_RE = /^(unknown|未知|未知地点|aliased location|searched address|地址)$/i;
+export function isGenericPlace(label: string): boolean { return GENERIC_RE.test((label || '').trim()); }
+
+/** 无名占位 + 有坐标 → 按 ~1km 粗坐标分桶,让不同地点分开(可各自改名/找真名)。 */
+function bucketKey(label: string, lat?: number, lon?: number): string {
+  if (isGenericPlace(label) && lat != null && lon != null) return `${label} ·${lat.toFixed(2)},${lon.toFixed(2)}`;
+  return label;
+}
+
+/** 常去地点聚类:跨全部数据按地点名聚合;无名占位按粗坐标拆开。 */
 export function clusterPlaces(visits: PlaceVisit[], topN = 8): PlaceCluster[] {
   const segs = buildPlaceTimeline(visits, 3650).flatMap((d) => d.segments);
   const m = new Map<string, PlaceCluster>();
   for (const s of segs) {
-    const c = m.get(s.label) || { label: s.label, category: s.category, totalMin: 0, visits: 0, lastTs: s.start };
+    const key = bucketKey(s.label, s.lat, s.lon);
+    const c = m.get(key) || { label: key, category: s.category, totalMin: 0, visits: 0, lastTs: s.start, lat: s.lat, lon: s.lon, generic: isGenericPlace(s.label) };
     c.totalMin += s.durationMin;
     c.visits += 1;
     if (s.start > c.lastTs) c.lastTs = s.start;
-    m.set(s.label, c);
+    if (c.lat == null && s.lat != null) { c.lat = s.lat; c.lon = s.lon; }
+    m.set(key, c);
   }
   return [...m.values()].sort((a, b) => b.totalMin - a.totalMin || b.visits - a.visits).slice(0, topN);
+}
+
+/* ---------- 批次 33:反向地理编码开关(默认关)---------- */
+const GEOCODE_FLAG_KEY = 'nesio-place-geocode-enabled';
+export function loadGeocodeEnabled(): boolean {
+  if (typeof window === 'undefined') return false;
+  try { return localStorage.getItem(GEOCODE_FLAG_KEY) === '1'; } catch { return false; }
+}
+export function setGeocodeEnabled(on: boolean): void {
+  if (typeof window === 'undefined') return;
+  try { localStorage.setItem(GEOCODE_FLAG_KEY, on ? '1' : '0'); } catch { /* ignore */ }
 }
 
 /** 环游:去过的「外面」地点(排除家/未知),按最近去过排序 —— 给旅行/城市卡用。 */

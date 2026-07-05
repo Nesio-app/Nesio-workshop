@@ -891,7 +891,10 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
               </>
             ) : (
               <>
-                {/* 批次 31:阅读入口已移到顶部;底部只留编辑/删除 */}
+                {/* 批次 33:阅读入口顶部有(替换✕),底部也放回来一份 —— 用户反馈顶部那颗找不到 */}
+                {readableText && (
+                  <button type="button" className="nesio-ob-primary-btn" style={{ flex: 1 }} onClick={() => setReaderOpen(true)}>{L(dict, '阅读', 'Read')}</button>
+                )}
                 <button type="button" className="nesio-today-btn nesio-today-btn--ghost" style={{ flex: 1 }} onClick={startEdit}>{L(dict, '编辑', 'Edit')}</button>
                 <button type="button" className="nesio-settings-danger-btn" style={{ flex: 1, marginTop: 0 }} onClick={handleDelete}>{L(dict, '删除', 'Delete')}</button>
               </>
