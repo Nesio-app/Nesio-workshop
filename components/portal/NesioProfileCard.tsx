@@ -8,13 +8,14 @@ import { GeneralSheet, DataSheet, PrivacySheet, SubscriptionSheet } from './Sett
 import ConnectorsHub from './ConnectorsHub';
 import RoadmapSheet from './RoadmapSheet';
 import RoutineSheet from './RoutineSheet';
-import { IconClock } from './icons';
+import ReaderShelf from './reader/ReaderShelf';
+import { IconClock, IconBookOpen } from './icons';
 import { L, t } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import { IconDatabase, IconGear, IconStar as IconStarOutline, IconGift } from './icons';
 
-type ActiveSheet = 'mirror' | 'general' | 'data' | 'privacy' | 'subscription' | 'connectors' | 'roadmap' | 'routine' | null;
+type ActiveSheet = 'mirror' | 'general' | 'data' | 'privacy' | 'subscription' | 'connectors' | 'roadmap' | 'routine' | 'shelf' | null;
 
 export default function NesioProfileCard() {
   const [displayName, setDisplayName] = useState('Jessy');
@@ -97,6 +98,9 @@ export default function NesioProfileCard() {
     { key: 'routine' as ActiveSheet,
       icon: <IconClock />,
       iconBg: 'var(--chip-blue)', label: L(dict, '例行提醒', 'Routines'), sublabel: L(dict, '到点在 Today 出卡提醒', 'Due reminders appear on Today') },
+    { key: 'shelf' as ActiveSheet,
+      icon: <IconBookOpen />,
+      iconBg: 'var(--chip-green)', label: L(dict, '书架', 'Bookshelf'), sublabel: L(dict, '导入书/文章 · 神经友好瀑布流阅读', 'Import books/articles · ADHD-friendly reader') },
     { key: 'roadmap' as ActiveSheet,
       icon: <IconStarOutline />,
       iconBg: 'var(--chip-violet)', label: t(locale, 'menuRoadmap'), sublabel: t(locale, 'menuRoadmapHint') },
@@ -166,6 +170,7 @@ export default function NesioProfileCard() {
       <ConnectorsHub open={activeSheet === 'connectors'} onClose={() => setActiveSheet(null)} />
       <RoadmapSheet open={activeSheet === 'roadmap'} onClose={() => setActiveSheet(null)} />
       <RoutineSheet open={activeSheet === 'routine'} onClose={() => setActiveSheet(null)} />
+      <ReaderShelf open={activeSheet === 'shelf'} onClose={() => setActiveSheet(null)} />
     </>
   );
 }

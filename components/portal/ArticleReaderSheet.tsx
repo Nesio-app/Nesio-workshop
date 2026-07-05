@@ -1,15 +1,27 @@
 'use client';
 
 /**
- * ArticleReaderSheet — ADHD 友好的阅读器(批次 24)。
- * 设计:大字、宽行距、窄栏、段落分块;当前段高亮、其余轻度淡出,
- * 减少一眼扫到整屏的压迫感;字号可调。数据是节点里存的 article 全文。
+ * ArticleReaderSheet — 节点正文的友好阅读入口(批次 24 起,批次 26 升级)。
+ *
+ * 批次 26:内部改用移植自 reading-ios 的瀑布流阅读器(ReaderView)——
+ * 把节点里存的 article 全文经 ADHD 脱水引擎切成短行,bionic 加粗 + 卡拉OK 焦点遮罩。
+ * 对外 props 不变(title/article/onClose),MemoryNodeDetail 无需改动。
  */
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
+import { textToAdhdBook, type ReaderBook } from '@/lib/portal/adhd-reader';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
+import ReaderView from './reader/ReaderView';
+
+/** 由标题派生稳定 id,让同一篇文章重开时能恢复阅读进度。 */
+function stableId(title: string, article: string): string {
+  const s = `${title}::${article.length}`;
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h << 5) - h + s.charCodeAt(i);
+  return `article-${Math.abs(h).toString(36)}`;
+}
 
 export default function ArticleReaderSheet({ title, article, onClose }: {
   title: string;
@@ -17,55 +29,30 @@ export default function ArticleReaderSheet({ title, article, onClose }: {
   onClose: () => void;
 }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
-  const [fontStep, setFontStep] = useState(1); // 0 小 / 1 中 / 2 大
-  const [focusMode, setFocusMode] = useState(false);
-  const [activePara, setActivePara] = useState(0);
 
-  const paragraphs = useMemo(
-    () => article.split(/\n{1,}/).map((p) => p.trim()).filter((p) => p.length > 0),
-    [article],
-  );
+  const book = useMemo<ReaderBook | null>(() => {
+    if (!article.trim()) return null;
+    try {
+      return textToAdhdBook(article, { id: stableId(title, article), title: title || '阅读', author: '' });
+    } catch {
+      return null;
+    }
+  }, [title, article]);
 
-  const fontSize = [1.0, 1.15, 1.35][fontStep];
-
-  return (
-    <div className="nesio-reader-overlay" role="dialog" aria-modal="true" aria-label={title}>
-      <div className="nesio-reader-topbar">
-        <button type="button" className="nesio-reader-btn" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}>✕</button>
-        <div className="nesio-reader-tools">
-          <button type="button" className="nesio-reader-btn" onClick={() => setFontStep((v) => Math.max(0, v - 1))} aria-label={L(dict, '缩小字号', 'Smaller text')}>A−</button>
-          <button type="button" className="nesio-reader-btn" onClick={() => setFontStep((v) => Math.min(2, v + 1))} aria-label={L(dict, '放大字号', 'Bigger text')}>A+</button>
-          <button
-            type="button"
-            className={`nesio-reader-btn${focusMode ? ' is-active' : ''}`}
-            onClick={() => setFocusMode((v) => !v)}
-          >
-            {L(dict, '专注', 'Focus')}
-          </button>
+  if (!book) {
+    return (
+      <div className="nesio-rd-overlay" role="dialog" aria-modal="true" aria-label={title}>
+        <div className="nesio-rd-topbar">
+          <button type="button" className="nesio-rd-btn" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}>✕</button>
+          <div className="nesio-rd-head-mid"><p className="nesio-rd-head-title">{title}</p></div>
+          <div style={{ width: 36 }} />
+        </div>
+        <div className="nesio-rd-scroll">
+          <p className="nesio-rd-end">{L(dict, '这条没有可阅读的正文。', 'No readable text here.')}</p>
         </div>
       </div>
+    );
+  }
 
-      <div className="nesio-reader-scroll">
-        <h1 className="nesio-reader-title" style={{ fontSize: `${fontSize * 1.4}rem` }}>{title}</h1>
-        <div className="nesio-reader-body" style={{ fontSize: `${fontSize}rem` }}>
-          {paragraphs.map((p, i) => (
-            <p
-              key={i}
-              className={`nesio-reader-para${focusMode ? (i === activePara ? ' is-focus' : ' is-dim') : ''}`}
-              onClick={() => setActivePara(i)}
-            >
-              {p}
-            </p>
-          ))}
-        </div>
-        {focusMode && (
-          <div className="nesio-reader-focus-nav">
-            <button type="button" className="nesio-reader-btn" onClick={() => setActivePara((v) => Math.max(0, v - 1))}>↑</button>
-            <span>{activePara + 1} / {paragraphs.length}</span>
-            <button type="button" className="nesio-reader-btn" onClick={() => setActivePara((v) => Math.min(paragraphs.length - 1, v + 1))}>↓</button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+  return <ReaderView book={book} onClose={onClose} />;
 }
