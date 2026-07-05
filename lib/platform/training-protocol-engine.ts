@@ -10,30 +10,13 @@
  * inventory」,exerciseId 可指向那里。当前内置一份最小 seed 动作表。
  */
 
-// ── 动作库(最小内置;未来可迁到 life-domain/assets 的 skill inventory)──
-export interface Exercise {
-  id: string;
-  name: { zh: string; en: string };
-  muscle: 'legs' | 'push' | 'pull' | 'core' | 'fullbody' | 'cardio';
-  equipment?: 'barbell' | 'dumbbell' | 'machine' | 'bodyweight' | 'kettlebell' | 'cardio';
-}
+// ── 动作库:单一事实源在 life-domain/assets 的 skill-inventory(批次 40 迁出)──
+import { SKILL_INVENTORY, skillById, type Skill } from '@/lib/life-domain/assets/skill-inventory';
 
-export const EXERCISE_LIBRARY: readonly Exercise[] = [
-  { id: 'squat', name: { zh: '深蹲', en: 'Back squat' }, muscle: 'legs', equipment: 'barbell' },
-  { id: 'deadlift', name: { zh: '硬拉', en: 'Deadlift' }, muscle: 'pull', equipment: 'barbell' },
-  { id: 'bench', name: { zh: '卧推', en: 'Bench press' }, muscle: 'push', equipment: 'barbell' },
-  { id: 'ohp', name: { zh: '推举', en: 'Overhead press' }, muscle: 'push', equipment: 'barbell' },
-  { id: 'row', name: { zh: '划船', en: 'Barbell row' }, muscle: 'pull', equipment: 'barbell' },
-  { id: 'pullup', name: { zh: '引体向上', en: 'Pull-up' }, muscle: 'pull', equipment: 'bodyweight' },
-  { id: 'pushup', name: { zh: '俯卧撑', en: 'Push-up' }, muscle: 'push', equipment: 'bodyweight' },
-  { id: 'lunge', name: { zh: '箭步蹲', en: 'Lunge' }, muscle: 'legs', equipment: 'bodyweight' },
-  { id: 'plank', name: { zh: '平板支撑', en: 'Plank' }, muscle: 'core', equipment: 'bodyweight' },
-  { id: 'run', name: { zh: '跑步', en: 'Run' }, muscle: 'cardio', equipment: 'cardio' },
-  { id: 'row_erg', name: { zh: '划船机', en: 'Rowing erg' }, muscle: 'cardio', equipment: 'cardio' },
-];
-
+export type Exercise = Skill;
+export const EXERCISE_LIBRARY = SKILL_INVENTORY;
 export function exerciseById(id: string): Exercise | undefined {
-  return EXERCISE_LIBRARY.find((e) => e.id === id);
+  return skillById(id);
 }
 
 // ── 计划结构 ──
