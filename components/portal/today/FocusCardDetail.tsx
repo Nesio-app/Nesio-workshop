@@ -8,7 +8,7 @@
 import { useState } from 'react';
 import type { FocusNode, SubTask } from '@/lib/platform/view-models/today-view-model';
 import { isMeetingNode, getMeetingTime, getMeetingUrl, safeExternalUrl } from './meeting-node';
-import { IconBox, IconCalendar, IconFlag, IconHeartPulse, IconMapPin, IconStar, IconUser } from '../icons';
+import { IconBox, IconCalendar, IconFlag, IconHeartPulse, IconMapPin, IconStar, IconUser, IconLink, IconMic } from '../icons';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -136,12 +136,12 @@ export function FocusCardDetail({
         <div className="nesio-focus-meeting-actions">
           {meetingUrl && (
             <a href={meetingUrl} target="_blank" rel="noopener noreferrer" className="nesio-focus-meeting-link-btn">
-              🔗 进入会议
+              <IconLink size={15} /> {L(dict, '进入会议', 'Join')}
             </a>
           )}
           {onOpenRecorder && (
             <button type="button" className="nesio-focus-meeting-record-btn" onClick={onOpenRecorder}>
-              🎙 会议记录
+              <IconMic size={15} /> {L(dict, '会议记录', 'Record')}
             </button>
           )}
         </div>

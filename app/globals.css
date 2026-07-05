@@ -17770,6 +17770,11 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 .nesio-tl-bucket-bar-wrap { flex: 1; width: 60%; display: flex; align-items: flex-end; }
 .nesio-tl-bucket-bar { width: 100%; min-height: 3px; background: var(--portal-accent); border-radius: 4px 4px 0 0; }
 .nesio-tl-bucket-label { font-size: 0.62rem; color: var(--portal-muted); }
+/* 批次 33:焦点卡动作按钮 icon+文字居中,消除漂移 */
+.nesio-pinned-action-btn, .nesio-focus-meeting-link-btn, .nesio-focus-meeting-record-btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem; }
+.nesio-pinned-location, .nesio-collapsed-loc { display: flex; align-items: center; gap: 0.3rem; }
+.nesio-collapsed-countdown { color: var(--portal-accent); font-weight: 600; }
+
 /* 批次 31:节点详情顶部「阅读」按钮(替换 ✕,背景可关) */
 .nesio-node-read-top { flex-shrink: 0; border: none; border-radius: 999px; padding: 0.35rem 1rem; background: var(--portal-accent); color: #fff; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
 

@@ -13,6 +13,7 @@ import { safeExternalUrl } from './meeting-node';
 import { t } from '@/lib/portal/i18n';
 import type { PortalLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
+import { IconLink, IconMic, IconMapPin } from '../icons';
 
 function formatEventTime(locale: PortalLocale, dateStr: string, allDay?: boolean): string {
   if (allDay) return t(locale, 'todayAllDay');
@@ -95,16 +96,16 @@ export function PinnedAttentionCard({
             <p className="nesio-pinned-desc">{obj.event.description.slice(0, 120)}{obj.event.description.length > 120 ? '…' : ''}</p>
           )}
           {obj.event.location && (
-            <p className="nesio-pinned-location">📍 {obj.event.location}</p>
+            <p className="nesio-pinned-location"><IconMapPin size={13} /> {obj.event.location}</p>
           )}
           <div className="nesio-pinned-actions">
             {meetingUrl && (
               <a href={meetingUrl} target="_blank" rel="noopener noreferrer" className="nesio-pinned-action-btn nesio-pinned-action-btn--primary">
-                🔗 进入会议
+                <IconLink size={15} /> {t(locale, 'todayLinkLabel')}
               </a>
             )}
             <button type="button" className="nesio-pinned-action-btn" onClick={onOpenRecorder}>
-              🎙 记录
+              <IconMic size={15} /> {t(locale, 'todayRecordBtn')}
             </button>
           </div>
         </div>
@@ -130,13 +131,14 @@ export function CollapsedCalItem({ obj, onOpenRecorder }: { obj: AttentionObject
         <span className="nesio-collapsed-meta">
           {dayTag && <span className="nesio-collapsed-day-tag">{dayTag}</span>}
           <span className="nesio-collapsed-time">{timeStr}</span>
-          {countdown && !obj.isTomorrow && <span className="nesio-collapsed-countdown">{countdown}</span>}
+          {/* 批次 33:日历/提醒也显示倒计时(含明天) */}
+          {countdown && <span className="nesio-collapsed-countdown">{countdown}</span>}
         </span>
       </button>
       {expanded && (
         <div className="nesio-collapsed-detail">
           {obj.event.description && <p className="nesio-collapsed-desc">{obj.event.description.slice(0, 80)}{obj.event.description.length > 80 ? '…' : ''}</p>}
-          {obj.event.location && <p className="nesio-collapsed-loc">📍 {obj.event.location}</p>}
+          {obj.event.location && <p className="nesio-collapsed-loc"><IconMapPin size={12} /> {obj.event.location}</p>}
           {obj.event.url && (
             <a href={safeExternalUrl(obj.event.url)} target="_blank" rel="noopener noreferrer" className="nesio-collapsed-link">{t(locale, 'todayLinkLabel')}</a>
           )}
