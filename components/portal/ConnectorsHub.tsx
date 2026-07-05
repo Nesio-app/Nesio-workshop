@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { IconActivity, IconBook, IconBookOpen, IconCalendar, IconCar, IconCheckSquare, IconCloudSun, IconHeartPulse, IconMail, IconNote, IconTimer , IconImage, IconMapPin, IconCard } from './icons';
+import dynamic from 'next/dynamic';
+const WechatReadingImportSheet = dynamic(() => import('./WechatReadingImportSheet'), { ssr: false });
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { type LifeNode } from '@/lib/portal/life-graph';
 import { L } from '@/lib/portal/i18n';
@@ -51,7 +53,10 @@ const CONNECTORS: ConnectorDef[] = [
   { id: 'health', name: 'Apple Health 导出', nameEn: 'Apple Health export', icon: <IconHeartPulse />, iconBg: 'var(--chip-pink)', method: 'file', description: '上传 export.xml，提取步数、睡眠、心率', descriptionEn: 'Upload export.xml to extract steps, sleep, heart rate', dev: true },
   { id: 'reminder', name: 'Apple 提醒事项', nameEn: 'Apple Reminders', icon: <IconCheckSquare />, iconBg: 'var(--chip-amber)', method: 'shortcuts', ingestSource: 'reminder', description: '通过快捷指令推送提醒，自动转为承诺', descriptionEn: 'Push reminders via Shortcuts; they become commitments', dev: true },
   { id: 'keep', name: 'Keep 健康', nameEn: 'Keep fitness', icon: <IconActivity />, iconBg: 'var(--chip-green)', method: 'shortcuts', ingestSource: 'keep', description: '通过快捷指令推送运动数据', descriptionEn: 'Push workout data via Shortcuts', dev: true },
-  { id: 'wechat_reading', name: '微信读书', nameEn: 'WeRead', icon: <IconBookOpen />, iconBg: 'var(--chip-leaf)', method: 'shortcuts', ingestSource: 'wechat_reading', description: '通过快捷指令推送阅读进度与笔记', descriptionEn: 'Push reading progress and notes via Shortcuts', dev: true },
+  // 批次 22:微信读书无开放 API —— App 内导出笔记,粘贴文本解析入库
+  { id: 'wechat_reading', name: '微信读书', nameEn: 'WeChat Reading', icon: <IconBookOpen />, iconBg: 'var(--chip-leaf)', method: 'file', description: '微信读书 App 导出笔记,粘进来解析成划线记忆', descriptionEn: 'Export notes from WeChat Reading and paste to parse highlights' },
+  // 批次 22:微信公众号/视频收藏无 API —— 说明可用路径,不做假按钮
+  { id: 'wechat_fav', name: '微信收藏 · 公众号/视频', nameEn: 'WeChat favorites', icon: <IconBook />, iconBg: 'var(--chip-mint)', method: 'file', dev: true, description: '公众号文章 / 视频号收藏没有开放接口。可用:① 打开文章 → 分享 → 复制链接 → 用「分享给 Nesio」或冷冻仓存入;② 关注 flomo 服务号,收藏自动进 flomo,再用 Flomo 同步。', descriptionEn: 'Official-account articles and Channels favorites have no public API. Options: ① copy the article link and use Share to Nesio; ② follow flomo\'s service account so favorites flow into flomo, then use Flomo sync.' },
   { id: 'tesla', name: 'Tesla', icon: <IconCar />, iconBg: 'var(--chip-green)', method: 'oauth', description: '电量、行程信号，自动提醒充电', descriptionEn: 'Battery and trip signals; charging reminders', comingSoon: true, dev: true },
 ];
 
@@ -84,6 +89,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const photosRef = useRef<HTMLInputElement>(null);
   const timelineRef = useRef<HTMLInputElement>(null);
+  const [wechatReadingOpen, setWechatReadingOpen] = useState(false);
   const [connected, setConnected] = useState<Record<string, boolean>>({});
   const [syncing, setSyncing] = useState<string | null>(null);
   const [counts, setCounts] = useState<Record<string, number>>({});
@@ -607,6 +613,8 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     if (c.id === 'health') { fileRef.current?.click(); return; }
     if (c.method === 'batch-photos') { photosRef.current?.click(); return; }
     if (c.id === 'timeline') { timelineRef.current?.click(); return; }
+    if (c.id === 'wechat_reading') { setWechatReadingOpen(true); return; }
+    if (c.id === 'wechat_fav') { return; } // 纯说明行,无操作
     if (c.id === 'plaid') { void connectPlaid(); return; }
     // Notion:先走 OAuth(服务端未配 NOTION_CLIENT_ID 会带 error 跳回,给出指引)
     if (c.id === 'notion' && !loadToken('notion')) { window.location.href = '/api/portal/notion/connect'; return; }
@@ -793,6 +801,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
           </div>
         </div>
       </div>
+      <WechatReadingImportSheet open={wechatReadingOpen} onClose={() => setWechatReadingOpen(false)} />
     </div>
   );
 }

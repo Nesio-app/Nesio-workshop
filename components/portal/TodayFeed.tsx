@@ -98,7 +98,9 @@ export default function TodayFeed({
   // (历史上的今天/记忆回顾/时间段建议/小技巧),每次打开随机一张。
   const [fallbackTick, setFallbackTick] = useState(0);
   const fallbackCard = useMemo(
-    () => buildRotatingFallback(new Date(), allNodes, uiLocale),
+    // 批次 22:确定性选卡(hourSeed + rotation),同一小时稳定不跳;
+    // fallbackTick 作为 rotation 传入,划掉才换下一张
+    () => buildRotatingFallback(new Date(), allNodes, uiLocale, fallbackTick),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [allNodes, fallbackTick, uiLocale],
   );
@@ -217,7 +219,7 @@ export default function TodayFeed({
           <button type="button" className="nesio-settings-sheet-backdrop" onClick={() => setMirrorOpen(false)} aria-label={L(uiLocale, '关闭', 'Close')} />
           <div className="nesio-settings-sheet-card nesio-insights-sheet-card">
             <div className="nesio-sheet-handle" aria-hidden />
-            <InsightsSheet onClose={() => setMirrorOpen(false)} />
+            <InsightsSheet onClose={() => setMirrorOpen(false)} canUsePrivateData={canUsePrivateData} />
           </div>
         </div>
       )}

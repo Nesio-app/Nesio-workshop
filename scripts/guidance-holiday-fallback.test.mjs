@@ -45,7 +45,10 @@ assert.match(actionWindow, /case 'holiday':/, 'action-window must open a window 
 assert.match(proactiveTypes, /export function buildRotatingFallback/, 'proactive-types must export the rotating fallback builder.');
 assert.match(proactiveTypes, /历史上的今天/, 'Fallback pool must include on-this-day memories.');
 assert.match(proactiveTypes, /记忆回顾/, 'Fallback pool must include memory resurfacing.');
-assert.match(proactiveTypes, /Math\.random\(\)/, 'Fallback must rotate (different card per open).');
+// 批次 22:轮换由「hourSeed + rotation」确定性驱动(此前 Math.random 每次
+// re-render 重挑,视觉上「自己跳」)。同一小时稳定,划掉才换下一张。
+assert.match(proactiveTypes, /seededPick|hourSeed/, 'Fallback must rotate deterministically (stable per hour, advances on dismiss), not via Math.random.');
+assert.doesNotMatch(proactiveTypes, /Math\.random\(\)/, 'Fallback must not use Math.random (caused visual jumping on re-render).');
 assert.match(todayFeed, /buildRotatingFallback/, 'TodayFeed must render the rotating fallback when the pipeline is empty.');
 assert.match(todayFeed, /activeProactiveCards\.length === 0 && cardBudget > 0/, 'Fallback only fills真空窗,且尊重安静模式(预算 0 不出)。');
 

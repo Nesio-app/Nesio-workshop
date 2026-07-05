@@ -37,6 +37,7 @@ import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import { InfoTip } from './InfoTip';
 import { loadPlaceTrail, PLACE_TRAIL_UPDATED_EVENT, type PlaceVisit } from '@/lib/portal/place-trail';
+import { TimeBlocksWidget } from './today/TimeBlocksWidget';
 import { getFreezeItems } from '@/lib/platform/impulse-guard';
 
 function loadFreezeLedger(): { total: number; skipped: number; bought: number } {
@@ -928,7 +929,7 @@ function LivingModelTab({
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 
-export default function InsightsSheet({ onClose }: { onClose: () => void }) {
+export default function InsightsSheet({ onClose, canUsePrivateData = true }: { onClose: () => void; canUsePrivateData?: boolean }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [mainTab, setMainTab] = useState<MainTab>('reflection');
   const [period, setPeriod] = useState<Period>('week');
@@ -1177,6 +1178,12 @@ export default function InsightsSheet({ onClose }: { onClose: () => void }) {
             <div className="nesio-insights-section" style={{ marginTop: 'var(--space-3)' }}>
               <p className="nesio-insights-section-label">{L(dict, '生命版图', 'Life map')}<InfoTip text={L(dict, '五个领域(关系/事业/健康/成长/自我)的地形图:领土宽度由记录的意义密度决定(置信度+关联数+标签),不是数量;地形随时间演变,自动标出最大迁移。', 'A terrain of five domains (ties/work/health/growth/self). Territory width reflects meaning density (confidence + connections + tags), not count; it evolves over time and flags the biggest shift.')} /></p>
               <LifeCivilizationMap nodes={allNodes} />
+            </div>
+
+            {/* 今日时间块(批次 22):日历事件 + 地点足迹拼成时间线 */}
+            <div className="nesio-insights-section">
+              <p className="nesio-insights-section-label">{L(dict, '今日时间块', "Today's time blocks")}<InfoTip text={L(dict, '把今天的日历事件和到访地点拼成一条时间线(Toggl 风格),全部本机。连日历、授权位置后自动出现。', "Today's calendar events and visited places lined up into a timeline (Toggl-style), all on-device. Appears once calendar and location are connected.")} /></p>
+              <TimeBlocksWidget canUsePrivateData={canUsePrivateData} />
             </div>
 
             {/* 地点足迹(批次 21) */}

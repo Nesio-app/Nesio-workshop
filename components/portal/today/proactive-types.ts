@@ -56,8 +56,26 @@ export function buildTimeFallback(now: Date, locale: string = 'zh'): ProactiveCa
  */
 export interface FallbackNodeLike { id: string; name: string; createdAt: string; type?: string }
 
-export function buildRotatingFallback(now: Date, nodes: readonly FallbackNodeLike[], locale: string = 'zh'): ProactiveCardData | null {
+/**
+ * 确定性种子(批次 22:修「未来预测自己跳」根因)。
+ * 此前池内 5 处 Math.random,useMemo 的 allNodes 引用一抖动就重算 →
+ * 每次 re-render 都随机换卡,视觉上「自己跳」。改用「日期+小时」种子:
+ * 同一小时内选出的卡稳定;整点滚动一次;划掉才立即换下一张。
+ */
+function hourSeed(now: Date): number {
+  return now.getFullYear() * 1_000_000 + (now.getMonth() + 1) * 10_000 + now.getDate() * 100 + now.getHours();
+}
+function seededPick<T>(arr: readonly T[], seed: number, salt = 0): T {
+  // xorshift 小散列,种子稳定则结果稳定
+  let h = (seed + salt * 2_654_435_761) >>> 0;
+  h ^= h << 13; h >>>= 0; h ^= h >> 17; h ^= h << 5; h >>>= 0;
+  return arr[h % arr.length];
+}
+
+export function buildRotatingFallback(now: Date, nodes: readonly FallbackNodeLike[], locale: string = 'zh', rotation = 0): ProactiveCardData | null {
   const l = (zh: string, en: string) => L(locale, zh, en);
+  // rotation:用户每划掉一张 +1,才换下一张;否则同一小时内稳定不跳
+  const seed = hourSeed(now) + rotation * 101;
   const pool: ProactiveCardData[] = [];
 
   const timeCard = buildTimeFallback(now, locale);
@@ -69,7 +87,7 @@ export function buildRotatingFallback(now: Date, nodes: readonly FallbackNodeLik
     return d.getMonth() === now.getMonth() && d.getDate() === now.getDate() && d.getFullYear() < now.getFullYear();
   });
   if (otd.length > 0) {
-    const pick = otd[Math.floor(Math.random() * otd.length)];
+    const pick = seededPick(otd, seed, 1);
     const years = now.getFullYear() - new Date(pick.createdAt).getFullYear();
     pool.push({
       id: 'fallback-on-this-day',
@@ -82,7 +100,7 @@ export function buildRotatingFallback(now: Date, nodes: readonly FallbackNodeLik
   // 记忆回顾(随机一条 14 天前的旧记录)
   const old14 = nodes.filter((n) => now.getTime() - new Date(n.createdAt).getTime() > 14 * 86_400_000);
   if (old14.length > 0) {
-    const pick = old14[Math.floor(Math.random() * old14.length)];
+    const pick = seededPick(old14, seed, 2);
     const d = new Date(pick.createdAt).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
     pool.push({
       id: 'fallback-resurface',
@@ -110,7 +128,7 @@ export function buildRotatingFallback(now: Date, nodes: readonly FallbackNodeLik
 
   // 金句兜底(批次 10 用户反馈:「如果所有卡片都没有了就显示金句、quote 之类的」)。
   // 全部取公版格言,带出处;和其他池子一样随机轮换,保证这一区永远有内容。
-  const q = FALLBACK_QUOTES[Math.floor(Math.random() * FALLBACK_QUOTES.length)];
+  const q = seededPick(FALLBACK_QUOTES, seed, 3);
   pool.push({
     id: 'fallback-quote',
     title: l('今日一句', 'Line of the day'),
@@ -118,7 +136,8 @@ export function buildRotatingFallback(now: Date, nodes: readonly FallbackNodeLik
     confidence: 60, sourceTags: [l('金句', 'Quote')], icon: '✨', priority: 1,
   });
 
-  return pool[Math.floor(Math.random() * pool.length)];
+  // 确定性挑一张:同一小时稳定,不再自己跳
+  return seededPick(pool, seed, 0);
 }
 
 const FALLBACK_QUOTES: Array<{ zh: string; en: string; byZh: string; byEn: string }> = [

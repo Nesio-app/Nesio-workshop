@@ -17532,6 +17532,19 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 }
 .nesio-narrator-section > .nesio-narrator-card:nth-child(3) { grid-column: 1 / -1; }
 
+/* 批次 22:今日时间块(Toggl 式) */
+.nesio-timeblocks { display: flex; flex-direction: column; gap: 0.15rem; }
+.nesio-timeblock { display: flex; align-items: stretch; gap: 0.55rem; padding: 0.15rem 0; }
+.nesio-timeblock-time { display: flex; flex-direction: column; align-items: flex-end; min-width: 3.6em; flex-shrink: 0; }
+.nesio-timeblock-time > span:first-child { font-size: 0.72rem; color: var(--portal-ink); font-weight: 600; }
+.nesio-timeblock-dur { font-size: 0.6rem; color: var(--portal-muted); }
+.nesio-timeblock-bar { width: 4px; border-radius: 2px; flex-shrink: 0; }
+.nesio-timeblock--event .nesio-timeblock-bar { background: var(--portal-blue-deep); }
+.nesio-timeblock--place .nesio-timeblock-bar { background: var(--status-go); }
+.nesio-timeblock-body { flex: 1; min-width: 0; padding: 0.15rem 0 0.35rem; }
+.nesio-timeblock-label { display: block; font-size: 0.82rem; font-weight: 500; color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nesio-timeblock-sub { display: block; font-size: 0.66rem; color: var(--portal-muted); }
+
 /* 批次 21:地点足迹 */
 .nesio-place-trail-row { display: flex; align-items: baseline; gap: 0.6rem; padding: 0.35rem 0; border-bottom: 1px solid var(--portal-line); font-size: 0.8rem; }
 .nesio-place-trail-time { color: var(--portal-muted); font-size: 0.7rem; flex-shrink: 0; min-width: 6.5em; }
