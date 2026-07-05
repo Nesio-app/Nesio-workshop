@@ -310,7 +310,36 @@ function cadenceLabelFor(days: number): [string, string] | null {
   return null;
 }
 
-/** 识别定期账单:同一商户 ≥3 笔支出、间隔中位数落在某个周期档内。 */
+// 批次 39:定期 = 账单(订阅/水电/保险/房贷/会员/宽带/话费…),不是「常去的超市/咖啡」。
+// 账单关键词命中 → 强定期候选;否则要求「金额稳定」(超市/餐饮金额飘,自动排除)。
+const BILL_RE = /netflix|spotify|hulu|disney|youtube ?premium|hbo|prime video|apple\.com\/bill|icloud|adobe|dropbox|notion|chatgpt|openai|github|microsoft ?365|google ?(one|storage)|membership|会员|subscription|订阅|insurance|保险|geico|state ?farm|allstate|progressive|nationwide|premium|duke ?energy|电费|水费|燃气|gas ?(company|bill)|electric|water ?(bill|utility)|utility|comcast|xfinity|spectrum|at&t|verizon|t-?mobile|sprint|话费|宽带|internet|broadband|mortgage|房贷|月供|rent\b|房租|loan|贷款|student ?loan|gym|健身|planet ?fitness|la ?fitness|equinox|peloton|storage|自如|物业|hoa/i;
+// 明确排除:餐饮/购物/超市/咖啡(去很多次也不是账单)
+const NON_BILL_CAT_RE = /food|餐饮|shopping|购物|grocer|超市|coffee|咖啡/i;
+
+/** 变异系数(标准差/均值)—— 账单金额稳定(低),超市/餐饮飘(高)。 */
+function coeffVar(nums: number[]): number {
+  if (nums.length < 2) return 0;
+  const mean = nums.reduce((s, v) => s + v, 0) / nums.length;
+  if (mean === 0) return 1;
+  const variance = nums.reduce((s, v) => s + (v - mean) ** 2, 0) / nums.length;
+  return Math.sqrt(variance) / mean;
+}
+
+/** 把估算的下次日期滚动到今天之后(数据是历史的,别给出过去的「下次」)。 */
+function rollForward(baseMs: number, cadenceDays: number): string {
+  let t = baseMs;
+  const step = cadenceDays * 86_400_000;
+  const now = Date.now();
+  let guard = 0;
+  while (t < now && guard++ < 120) t += step;
+  return new Date(t).toISOString().slice(0, 10);
+}
+
+/**
+ * 识别定期账单(批次 39 重写):
+ * 1. 先按商户归并支出;2. 判类别 —— 账单关键词命中 OR (非餐饮/购物 且 金额稳定 CV<0.2);
+ * 3. 间隔中位数落在周期档;4. 下次日期滚动到未来。这样「超市去很多次」不会误判为定期。
+ */
 export function detectRecurring(txs: BankTx[]): RecurringCharge[] {
   const flowRules = loadFlowRules();
   const merchantRules = loadMerchantRules();
@@ -337,17 +366,27 @@ export function detectRecurring(txs: BankTx[]): RecurringCharge[] {
     const medGap = median(gaps);
     const label = cadenceLabelFor(medGap);
     if (!label) continue;
+
+    const last = sorted[sorted.length - 1];
+    const cat = merchantRules[last.name] || suggestCategory(last.name).category;
     const amts = sorted.map((t) => Math.abs(t.amount));
     const avg = amts.reduce((s, v) => s + v, 0) / amts.length;
-    const last = sorted[sorted.length - 1];
-    const nextMs = Date.parse(last.date) + medGap * 86_400_000;
+    const cv = coeffVar(amts);
+
+    // ── 账单判定 ──
+    const isBillKeyword = BILL_RE.test(last.name);
+    const isNonBill = NON_BILL_CAT_RE.test(cat) || NON_BILL_CAT_RE.test(last.name);
+    // 关键词命中 = 账单(放宽金额);否则必须「非餐饮购物 且 金额稳定」
+    const qualifies = isBillKeyword || (!isNonBill && cv < 0.2);
+    if (!qualifies) continue;
+
     out.push({
       name: last.name,
-      category: merchantRules[last.name] || suggestCategory(last.name).category,
+      category: cat,
       avgAmount: Math.round(avg * 100) / 100,
       count: sorted.length,
       lastDate: last.date,
-      nextEstimate: new Date(nextMs).toISOString().slice(0, 10),
+      nextEstimate: rollForward(Date.parse(last.date) + medGap * 86_400_000, Math.round(medGap)),
       cadenceDays: Math.round(medGap),
       cadenceLabel: label,
       currency: last.currency || 'USD',

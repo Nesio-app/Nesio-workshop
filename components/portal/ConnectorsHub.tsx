@@ -750,23 +750,18 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
 
   // 批次 38/39:直接传 zip 或 export.xml,全部在浏览器里解析(不上传大文件)。
   // export.xml 常几百 MB,只解码尾部(最近数据在末尾),正则提炼后建记忆节点 + 指标看板。
-  const HEALTH_TAIL_BYTES = 30_000_000; // 尾部 ~30MB 文本 = 最近数月的记录(含稀疏指标如血压/血糖/摄氧量)
-  async function extractExportXmlTail(file: File): Promise<string> {
+  // 批次 39:取整个 export.xml 的字节(不再只取尾部)—— Apple 导出按类型分块,
+  // 只看尾部会漏掉大多数指标(用户遇到「只出 1 项」)。全字节交给流式解析器扫全文件。
+  async function extractExportXmlBytes(file: File): Promise<Uint8Array | null> {
     if (file.name.toLowerCase().endsWith('.zip')) {
       const buf = new Uint8Array(await file.arrayBuffer());
       const { unzipSync } = await import('fflate');
-      // filter 只解压 export.xml,跳过 workout-routes/clinical-records 等一堆文件
       const isExport = (n: string) => /(^|\/)export\.xml$/i.test(n);
       const files = unzipSync(buf, { filter: (f) => isExport(f.name) });
       const entry = Object.entries(files).find(([n]) => isExport(n));
-      if (!entry) return '';
-      const bytes = entry[1];
-      const slice = bytes.length > HEALTH_TAIL_BYTES ? bytes.subarray(bytes.length - HEALTH_TAIL_BYTES) : bytes;
-      return new TextDecoder('utf-8').decode(slice);
+      return entry ? entry[1] : null;
     }
-    // 直接是 xml:大文件只读尾部,避免整个读进内存
-    const blob = file.size > HEALTH_TAIL_BYTES ? file.slice(file.size - HEALTH_TAIL_BYTES) : file;
-    return blob.text();
+    return new Uint8Array(await file.arrayBuffer());
   }
 
   async function handleHealthFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -775,30 +770,32 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     e.target.value = '';
     setSyncing('health');
     try {
-      const xml = await extractExportXmlTail(file);
-      if (!xml || !xml.includes('HKQuantityTypeIdentifier')) {
-        showToast(file.name.toLowerCase().endsWith('.zip')
-          ? L(dict, 'zip 里没找到 export.xml(别选 export_cda / 子文件夹)', "No export.xml in the zip (not export_cda / subfolders)")
-          : L(dict, '这不是 export.xml,请选主导出文件', 'Not export.xml — pick the main export file'), false);
+      const bytes = await extractExportXmlBytes(file);
+      if (!bytes || bytes.length === 0) {
+        showToast(L(dict, 'zip 里没找到 export.xml(别选 export_cda / 子文件夹)', 'No export.xml in the zip (not export_cda / subfolders)'), false);
         setSyncing(null); return;
       }
-      const { parseAppleHealthText, parseHealthMetrics } = await import('@/lib/portal/apple-health');
-      // 指标看板:全指标解析 → 存本机(健康 Dashboard 读)
-      const metrics = parseHealthMetrics(xml);
+      const { parseAppleHealthText, parseHealthMetricsFromBytes } = await import('@/lib/portal/apple-health');
+      // 指标看板:流式扫全文件 → 所有指标类型都拿到
+      const metrics = parseHealthMetricsFromBytes(bytes);
       if (metrics.metrics.length) {
         const { saveHealthMetrics } = await import('@/lib/portal/health-store');
         saveHealthMetrics(metrics);
       }
-      // 记忆节点:概况 + 锻炼(进时间线)
-      const { nodes, summary } = parseAppleHealthText(xml);
-      if (!nodes.length && !metrics.metrics.length) { showToast(L(dict, '未识别到健康数据', 'No health data recognized'), false); setSyncing(null); return; }
+      // 记忆节点:概况 + 锻炼(用尾部文本,便宜)
+      const tail = new TextDecoder('utf-8').decode(bytes.subarray(Math.max(0, bytes.length - 6_000_000)));
+      const { nodes } = parseAppleHealthText(tail);
+      if (!nodes.length && !metrics.metrics.length) {
+        showToast(L(dict, '未识别到健康数据(确认选的是 export.xml/zip,不是 export_cda)', 'No health data (make sure it is export.xml/zip, not export_cda)'), false);
+        setSyncing(null); return;
+      }
       if (nodes.length) saveNodes(nodes as Array<Omit<NodeInput, 'source'>>, 'system');
       saveConnectorState('health', true);
       setConnected((p) => ({ ...p, health: true }));
       setCounts((p) => ({ ...p, health: metrics.metrics.length || nodes.length }));
       showToast(L(dict, `已接入健康数据:${metrics.metrics.length} 项指标,到「洞察 → 健康」看看`, `Health imported: ${metrics.metrics.length} metrics — see Insights → Health`), true);
     } catch {
-      showToast(L(dict, '解析失败(文件可能太大,手机内存不够 —— 可先在电脑上解压)', 'Parse failed (file may be too large for phone memory — unzip on a computer first)'), false);
+      showToast(L(dict, '解析失败(文件可能太大,手机内存不够 —— 可先在电脑上解压后单传 export.xml)', 'Parse failed (file may be too large for phone memory — unzip on a computer and upload export.xml)'), false);
     }
     setSyncing(null);
   }

@@ -71,7 +71,7 @@ export default function FinanceTab() {
   const signed = (a: number) => (a >= 0 ? `-${formatMoney(a, summary.currency)}` : `+${formatMoney(-a, summary.currency)}`);
   const netDelta = prevSummary.net > 0 ? Math.round(((summary.net - prevSummary.net) / prevSummary.net) * 100) : null;
   const idx = months.indexOf(ym);
-  const SUBS: Array<[Sub, string, string]> = [['overview', '总览', 'Overview'], ['spending', '支出', 'Spending'], ['tx', '交易', 'Transactions'], ['recurring', '定期', 'Recurring'], ['cards', '卡片', 'Cards']];
+  const SUBS: Array<[Sub, string, string]> = [['overview', '总览', 'Overview'], ['tx', '交易', 'Transactions'], ['recurring', '定期', 'Recurring'], ['cards', '卡片', 'Cards']];
   function removeMerchantRule(name: string) { setMerchantRule(name, ''); setRev((r) => r + 1); }
   function removeFlowRule(name: string) { setFlowRule(name, ''); setRev((r) => r + 1); }
   const filterCats = ['all', ...cats.slice(0, 6).map((c) => c.category)];
@@ -138,13 +138,9 @@ export default function FinanceTab() {
               </div>
             </>
           )}
-        </>
-      )}
 
-      {/* ── 支出 ── */}
-      {sub === 'spending' && (
-        <>
-          <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>{L(dict, '全部分类', 'All categories')}</p>
+          {/* 批次 39:原「支出」tab 内容(分类聚合 + 商户 Top)并入总览 —— 它本就是聚合分析 */}
+          <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '全部分类', 'All categories')}</p>
           <div className="nesio-fin-cats">
             {cats.map((c) => (
               <div key={c.category} className="nesio-fin-cat">

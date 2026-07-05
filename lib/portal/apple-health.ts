@@ -222,61 +222,114 @@ function scaleValue(key: string, raw: number): number {
   return raw;
 }
 
-/** 提炼所有指标的最新值 + 上一次值(算变化)。在文本块(通常是尾部)上跑正则。 */
-export function parseHealthMetrics(xml: string): HealthMetrics {
-  const out: HealthMetric[] = [];
+// 批次 39:增量聚合器 —— 支持把超大 export.xml 分块喂进来。
+// 关键:Apple 导出常「按类型分块」(先全部步数、再全部心率…),所以只看尾部会漏掉大多数
+// 指标(用户遇到「只出 1 项 HRV」)。必须扫全文件,才能拿到所有类型。
+class HealthAggregator {
+  private sumDay = new Map<string, Map<string, number>>();
+  private latest = new Map<string, { d: string; v: number; pd: string; pv: number }>();
+  private sleepMs = new Map<string, number>();
+  private mindMin = new Map<string, number>();
+  workouts = 0;
 
-  for (const def of METRIC_DEFS) {
-    if (def.agg === 'sumDay') {
-      const byDay = new Map<string, number>();
-      for (const r of records(xml, def.hk)) {
-        const day = r.startDate.slice(0, 10);
-        const v = Number(r.value);
-        if (day && Number.isFinite(v)) byDay.set(day, (byDay.get(day) || 0) + scaleValue(def.key, v));
-      }
-      const days = [...byDay.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-      if (!days.length) continue;
-      const last = days[days.length - 1];
-      const prev = days.length > 1 ? days[days.length - 2][1] : null;
-      out.push({ ...toMetric(def), latest: round(last[1], def.decimals), latestDate: last[0], prev: prev == null ? null : round(prev, def.decimals) });
-    } else if (def.agg === 'latest') {
-      const recs = records(xml, def.hk).filter((r) => r.startDate && Number.isFinite(Number(r.value)));
-      if (!recs.length) continue;
-      recs.sort((a, b) => a.startDate.localeCompare(b.startDate));
-      const last = recs[recs.length - 1];
-      const prev = recs.length > 1 ? Number(recs[recs.length - 2].value) : null;
-      out.push({ ...toMetric(def), latest: round(scaleValue(def.key, Number(last.value)), def.decimals), latestDate: last.startDate.slice(0, 10), prev: prev == null ? null : round(prev, def.decimals) });
-    } else if (def.agg === 'sleep') {
-      const sleep = records(xml, def.hk).filter((r) => /Asleep/i.test(r.value));
-      if (!sleep.length) continue;
-      const byNight = new Map<string, number>();
-      for (const r of sleep) {
-        const day = r.startDate.slice(0, 10);
-        const ms = Math.max(0, parseAppleDate(r.endDate) - parseAppleDate(r.startDate));
-        byNight.set(day, (byNight.get(day) || 0) + ms);
-      }
-      const nights = [...byNight.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-      if (!nights.length) continue;
-      const last = nights[nights.length - 1];
-      const prev = nights.length > 1 ? nights[nights.length - 2][1] / 3_600_000 : null;
-      out.push({ ...toMetric(def), latest: round(last[1] / 3_600_000, 1), latestDate: last[0], prev: prev == null ? null : round(prev, 1) });
-    } else if (def.agg === 'mindful') {
-      const byDay = new Map<string, number>();
-      for (const r of records(xml, def.hk)) {
-        const day = r.startDate.slice(0, 10);
-        const min = Math.max(0, parseAppleDate(r.endDate) - parseAppleDate(r.startDate)) / 60_000;
-        if (day) byDay.set(day, (byDay.get(day) || 0) + min);
-      }
-      const days = [...byDay.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-      if (!days.length) continue;
-      const last = days[days.length - 1];
-      const prev = days.length > 1 ? days[days.length - 2][1] : null;
-      out.push({ ...toMetric(def), latest: round(last[1], 0), latestDate: last[0], prev: prev == null ? null : round(prev, 0) });
-    }
+  private pushLatest(key: string, d: string, v: number) {
+    const cur = this.latest.get(key);
+    if (!cur) { this.latest.set(key, { d, v, pd: '', pv: NaN }); return; }
+    if (d >= cur.d) { cur.pd = cur.d; cur.pv = cur.v; cur.d = d; cur.v = v; }
+    else if (d > cur.pd) { cur.pd = d; cur.pv = v; }
   }
 
-  const workouts = (xml.match(/<Workout\b/g) || []).length;
-  return { metrics: out, workouts, importedAt: new Date().toISOString() };
+  feed(text: string) {
+    for (const def of METRIC_DEFS) {
+      if (def.agg === 'sumDay') {
+        let m = this.sumDay.get(def.key);
+        for (const r of records(text, def.hk)) {
+          const day = r.startDate.slice(0, 10);
+          const v = Number(r.value);
+          if (!day || !Number.isFinite(v)) continue;
+          if (!m) { m = new Map(); this.sumDay.set(def.key, m); }
+          m.set(day, (m.get(day) || 0) + scaleValue(def.key, v));
+        }
+      } else if (def.agg === 'latest') {
+        for (const r of records(text, def.hk)) {
+          const v = Number(r.value);
+          if (!r.startDate || !Number.isFinite(v)) continue;
+          this.pushLatest(def.key, r.startDate.slice(0, 10), scaleValue(def.key, v));
+        }
+      } else if (def.agg === 'sleep') {
+        for (const r of records(text, def.hk)) {
+          if (!/Asleep/i.test(r.value)) continue;
+          const day = r.startDate.slice(0, 10);
+          const ms = Math.max(0, parseAppleDate(r.endDate) - parseAppleDate(r.startDate));
+          if (day) this.sleepMs.set(day, (this.sleepMs.get(day) || 0) + ms);
+        }
+      } else if (def.agg === 'mindful') {
+        for (const r of records(text, def.hk)) {
+          const day = r.startDate.slice(0, 10);
+          const min = Math.max(0, parseAppleDate(r.endDate) - parseAppleDate(r.startDate)) / 60_000;
+          if (day) this.mindMin.set(day, (this.mindMin.get(day) || 0) + min);
+        }
+      }
+    }
+    this.workouts += (text.match(/<Workout\b/g) || []).length;
+  }
+
+  finalize(): HealthMetrics {
+    const out: HealthMetric[] = [];
+    for (const def of METRIC_DEFS) {
+      if (def.agg === 'sumDay') {
+        const m = this.sumDay.get(def.key);
+        if (!m || !m.size) continue;
+        const days = [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+        const last = days[days.length - 1];
+        const prev = days.length > 1 ? days[days.length - 2][1] : null;
+        out.push({ ...toMetric(def), latest: round(last[1], def.decimals), latestDate: last[0], prev: prev == null ? null : round(prev, def.decimals) });
+      } else if (def.agg === 'latest') {
+        const c = this.latest.get(def.key);
+        if (!c) continue;
+        out.push({ ...toMetric(def), latest: round(c.v, def.decimals), latestDate: c.d, prev: Number.isNaN(c.pv) ? null : round(c.pv, def.decimals) });
+      } else if (def.agg === 'sleep') {
+        if (!this.sleepMs.size) continue;
+        const nights = [...this.sleepMs.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+        const last = nights[nights.length - 1];
+        const prev = nights.length > 1 ? nights[nights.length - 2][1] / 3_600_000 : null;
+        out.push({ ...toMetric(def), latest: round(last[1] / 3_600_000, 1), latestDate: last[0], prev: prev == null ? null : round(prev, 1) });
+      } else if (def.agg === 'mindful') {
+        if (!this.mindMin.size) continue;
+        const days = [...this.mindMin.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+        const last = days[days.length - 1];
+        const prev = days.length > 1 ? days[days.length - 2][1] : null;
+        out.push({ ...toMetric(def), latest: round(last[1], 0), latestDate: last[0], prev: prev == null ? null : round(prev, 0) });
+      }
+    }
+    return { metrics: out, workouts: this.workouts, importedAt: new Date().toISOString() };
+  }
+}
+
+/** 单串解析(小文件/尾部)。 */
+export function parseHealthMetrics(xml: string): HealthMetrics {
+  const agg = new HealthAggregator();
+  agg.feed(xml);
+  return agg.finalize();
+}
+
+/** 批次 39:全文件流式解析 —— 解压后的字节分块喂,扫全部记录,不漏任何指标类型。 */
+export function parseHealthMetricsFromBytes(bytes: Uint8Array): HealthMetrics {
+  const agg = new HealthAggregator();
+  const dec = new TextDecoder('utf-8');
+  const CHUNK = 8_000_000;
+  let buf = '';
+  for (let start = 0; start < bytes.length; start += CHUNK) {
+    const end = Math.min(bytes.length, start + CHUNK);
+    buf += dec.decode(bytes.subarray(start, end), { stream: end < bytes.length });
+    // 只处理到最后一个完整标签('>'),不完整的尾巴留到下一块,避免切断记录
+    const cut = buf.lastIndexOf('>');
+    if (cut < 0) continue;
+    agg.feed(buf.slice(0, cut + 1));
+    buf = buf.slice(cut + 1);
+  }
+  if (buf) agg.feed(buf);
+  return agg.finalize();
 }
 
 function toMetric(def: MetricDef): Omit<HealthMetric, 'latest' | 'latestDate' | 'prev'> {

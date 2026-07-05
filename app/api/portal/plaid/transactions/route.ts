@@ -78,6 +78,24 @@ export async function GET(req: NextRequest) {
       if (!data.has_more) break;
     }
 
+    // 批次 39:账户单独用 /accounts/get 兜底 —— transactions/sync 在增量(有 cursor、无新交易)
+    // 时可能不回 accounts,导致「卡片」永远空。这里独立拉一次,保证一定有账户/余额。
+    if (!accounts.length) {
+      try {
+        const accRes = await fetch(`${plaidBase()}/accounts/get`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            client_id: envValue('PLAID_CLIENT_ID'),
+            secret: envValue('PLAID_SECRET'),
+            access_token: accessToken,
+          }),
+        });
+        const accData = await accRes.json() as { accounts?: PlaidAccount[] };
+        if (accData.accounts?.length) accounts = accData.accounts;
+      } catch { /* 兜底失败就算了,不阻断交易 */ }
+    }
+
     const response = NextResponse.json({
       ok: true,
       accounts: accounts.map((a) => ({
