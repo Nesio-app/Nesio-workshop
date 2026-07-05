@@ -21,7 +21,15 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import MemoryFlashBanner, { useMemoryFlash } from '@/components/portal/MemoryFlashBanner';
-import { IconCamera, IconFile, IconHistory, IconImage, IconKeyboard, IconLink, IconMic, IconSmile } from './icons';
+import { IconCamera, IconFile, IconHistory, IconImage, IconKeyboard, IconLink, IconMic, IconSmile, NodeTypeIcon } from './icons';
+import EmailComposeSheet from './EmailComposeSheet';
+
+/** 从节点里取可读正文(供邮件回复的上下文参考)。 */
+function nodeReadableText(n: LifeNode): string {
+  const a = n.attributes as Record<string, unknown>;
+  return [a.article, a.summary, a.snippet, a.body, n.rawInput]
+    .find((v): v is string => typeof v === 'string' && v.trim().length > 20) || n.rawInput || n.name;
+}
 
 /** 小娜头像 — Nesio logo,替代 ✦ 占位 */
 function NesioAvatar() {
@@ -36,11 +44,14 @@ function NesioAvatar() {
 
 interface ChatMessage { role: 'user' | 'model'; text: string; }
 
+// 批次 38:聊天引用卡 —— 存紧凑引用(id+名+来源),点击时再从 life-graph 取全节点做阅读/回复。
+interface MsgRef { id: string; name: string; source: LifeNode['source'] }
 interface UiMessage {
   id: string;
   role: 'user' | 'model' | 'status';
   text: string;
   sources?: Array<{ title: string; url: string }>;
+  refs?: MsgRef[];
   savedToMemory?: boolean;
 }
 
@@ -93,7 +104,7 @@ function fmtNode(n: LifeNode): string {
   return `• [${src}] ${n.name} (${dateLabel})`;
 }
 
-async function buildMemoryContext(query: string): Promise<string> {
+async function buildMemoryContext(query: string): Promise<{ context: string; refs: LifeNode[] }> {
   const graph = getLifeGraph();
   const temporal = parseTemporalQuery(query);
 
@@ -188,7 +199,18 @@ async function buildMemoryContext(query: string): Promise<string> {
     parts.push(...body.slice(0, 12).map(fmtNode));
   }
 
-  return parts.join('\n');
+  // 批次 38:回引 —— 答案基于的记忆节点(优先邮件/日期命中/搜索命中,不含泛化近期填充),
+  // 供聊天气泡下渲染可点的引用卡(回看/阅读/回复)。
+  const refSeen = new Set<string>();
+  const refs: LifeNode[] = [];
+  for (const n of [...dateNodes, ...emailNodes, ...searchNodes]) {
+    if (refSeen.has(n.id)) continue;
+    refSeen.add(n.id);
+    refs.push(n);
+    if (refs.length >= 6) break;
+  }
+
+  return { context: parts.join('\n'), refs };
 }
 
 function buildCalendarContext(query: string): string {
@@ -547,6 +569,7 @@ export default function NesioChatSheet({
   const [cameraAutoOpen, setCameraAutoOpen] = useState(false);
   const [menuMsg, setMenuMsg] = useState<UiMessage | null>(null);
   const [detailNode, setDetailNode] = useState<LifeNode | null>(null);
+  const [replyNode, setReplyNode] = useState<LifeNode | null>(null); // 批次 38:引用卡直接回复邮件
   const [showHistory, setShowHistory] = useState(false);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const listRef = useRef<HTMLDivElement>(null);
@@ -609,6 +632,7 @@ export default function NesioChatSheet({
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30000);
     try {
+      const { context: memoryContext, refs } = await buildMemoryContext(text.trim());
       const res = await fetch('/api/portal/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -620,7 +644,7 @@ export default function NesioChatSheet({
           fileContext: fileContextRef.current
             ? { name: fileContextRef.current.name, content: fileContextRef.current.content }
             : undefined,
-          memoryContext: await buildMemoryContext(text.trim()),
+          memoryContext,
           calendarContext: buildCalendarContext(text.trim()),
           environmentContext: formatEnvironmentContext(),
         }),
@@ -634,6 +658,7 @@ export default function NesioChatSheet({
         // 兜底剥掉 markdown 强调记号 — 气泡是纯文本,裸 ** 很出戏
         text: (data.response?.trim() || L(dict, '（暂时没有找到相关信息）', '(Nothing relevant found)')).replace(/\*\*/g, ''),
         sources: data.sources ?? [],
+        refs: refs.map((n) => ({ id: n.id, name: n.name, source: n.source })),
       };
       const withAi = [...nextMsgs, aiMsg];
       setMessages(withAi);
@@ -646,7 +671,7 @@ export default function NesioChatSheet({
       const fallbackText = localHits.length
         ? `AI 暂时不可用，但我在记忆库里找到了这些相关线索：\n${localHits.map((n) => `• ${n.name}`).join('\n')}`
         : isTimeout ? '响应超时，请重试。' : 'AI 暂时不可用，记忆库里也没找到相关线索。';
-      const errMsg: UiMessage = { id: `e-${Date.now()}`, role: 'model', text: fallbackText };
+      const errMsg: UiMessage = { id: `e-${Date.now()}`, role: 'model', text: fallbackText, refs: localHits.map((n) => ({ id: n.id, name: n.name, source: n.source })) };
       setMessages((prev) => [...prev, errMsg]);
     }
     setSending(false);
@@ -827,6 +852,21 @@ export default function NesioChatSheet({
       {/* 关联记忆闪现 */}
       <MemoryFlashBanner nodes={flashNodes} onDismiss={dismissFlash} />
 
+      {/* 批次 38:从引用卡直接回复邮件(AI 帮我写 + 发送都在里面) */}
+      {replyNode && (
+        <EmailComposeSheet
+          open
+          onClose={() => setReplyNode(null)}
+          context={{
+            emailId: typeof replyNode.attributes.emailId === 'string' ? replyNode.attributes.emailId : undefined,
+            from: typeof replyNode.attributes.from === 'string' ? replyNode.attributes.from : '',
+            subject: replyNode.name,
+            snippet: typeof replyNode.attributes.snippet === 'string' ? replyNode.attributes.snippet : undefined,
+            article: nodeReadableText(replyNode),
+          }}
+        />
+      )}
+
       {/* Header */}
       <div className="nesio-wechat-header">
         <button type="button" className="nesio-wechat-back-btn" onClick={onClose} aria-label="关闭">←</button>
@@ -933,6 +973,28 @@ export default function NesioChatSheet({
                     ))}
                   </div>
                 )}
+                {/* 批次 38:引用卡 —— 答案基于的记忆,点开可回看/阅读/回复(邮件多一颗直达回复) */}
+                {!isUser && msg.refs && msg.refs.length > 0 && (() => {
+                  const g = getLifeGraph();
+                  const live = msg.refs!.map((r) => ({ ref: r, node: g.find((n) => n.id === r.id) })).filter((x) => x.node);
+                  if (!live.length) return null;
+                  return (
+                    <div className="nesio-wechat-refs">
+                      <span className="nesio-wechat-refs-label">{L(dict, '相关记忆 · 点开可回看/回复', 'Related memories · tap to view/reply')}</span>
+                      {live.map(({ ref, node }) => (
+                        <div key={ref.id} className="nesio-wechat-ref-row">
+                          <button type="button" className="nesio-wechat-ref-chip" onClick={() => setDetailNode(node!)}>
+                            <NodeTypeIcon type={node!.type} size={12} />
+                            <span className="nesio-wechat-ref-name">{ref.name}</span>
+                          </button>
+                          {ref.source === 'email' && (
+                            <button type="button" className="nesio-wechat-ref-reply" onClick={() => setReplyNode(node!)}>{L(dict, '回复', 'Reply')}</button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           );

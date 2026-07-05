@@ -14981,6 +14981,53 @@ html[data-portal-theme="night"] .nesio-wechat-bubble--ai {
   border: 1px solid var(--portal-accent-border);
 }
 
+/* 批次 38:聊天引用卡(答案基于的记忆,点开回看/回复) */
+.nesio-wechat-refs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-top: 0.35rem;
+}
+.nesio-wechat-refs-label {
+  font-size: 0.66rem;
+  color: var(--portal-muted);
+}
+.nesio-wechat-ref-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.nesio-wechat-ref-chip {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  padding: 0.3rem 0.55rem;
+  border-radius: 0.7rem;
+  background: var(--portal-surface-2, rgba(127,127,127,0.08));
+  color: var(--portal-ink);
+  border: 1px solid var(--portal-hairline, rgba(127,127,127,0.18));
+  cursor: pointer;
+  text-align: left;
+}
+.nesio-wechat-ref-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nesio-wechat-ref-reply {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 0.7rem;
+  background: var(--portal-accent-soft);
+  color: var(--portal-blue-deep);
+  border: 1px solid var(--portal-accent-border);
+  cursor: pointer;
+}
+
 /* Input bar */
 .nesio-wechat-input-bar {
   display: flex;
