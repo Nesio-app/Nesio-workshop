@@ -7,7 +7,8 @@
  */
 
 import { useEffect, useState } from 'react';
-import { addRoutine, deleteRoutine, loadRoutines, ROUTINES_UPDATED_EVENT, updateRoutine, type Routine } from '@/lib/portal/routines';
+import { addRoutine, deleteRoutine, loadRoutines, ROUTINES_UPDATED_EVENT, updateRoutine, type Routine, type RoutineCategory } from '@/lib/portal/routines';
+import { PROTOCOL_LIBRARY, startProtocol } from '@/lib/platform/training-protocol-engine';
 import { InfoTip } from './InfoTip';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -16,12 +17,24 @@ import { usePortalLocale } from './use-portal-locale';
 const WEEKDAYS = [1, 2, 3, 4, 5];
 const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
 
+const CATS: Array<{ key: RoutineCategory; zh: string; en: string }> = [
+  { key: 'general', zh: '自定义', en: 'Custom' },
+  { key: 'fitness', zh: '健身', en: 'Fitness' },
+  { key: 'chore', zh: '家务', en: 'Chores' },
+  { key: 'meds', zh: '吃药', en: 'Meds' },
+];
+const CAT_LABEL: Record<RoutineCategory, [string, string]> = {
+  general: ['自定义', 'Custom'], fitness: ['健身', 'Fitness'], chore: ['家务', 'Chores'], meds: ['吃药', 'Meds'],
+};
+
 export default function RoutineSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [text, setText] = useState('');
   const [time, setTime] = useState('09:00');
   const [days, setDays] = useState<number[]>(ALL_DAYS);
+  const [category, setCategory] = useState<RoutineCategory>('general');
+  const [protocolId, setProtocolId] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     if (!open) return;
@@ -43,8 +56,12 @@ export default function RoutineSheet({ open, onClose }: { open: boolean; onClose
 
   function submit() {
     if (!text.trim() || !time || days.length === 0) return;
-    addRoutine({ text, time, days });
+    const useProtocol = category === 'fitness' ? protocolId : undefined;
+    addRoutine({ text, time, days, category, protocolId: useProtocol });
+    // 健身计划:挂了训练计划就让它 active,Today 卡才出「开始练」
+    if (useProtocol) startProtocol(useProtocol);
     setText('');
+    setProtocolId(undefined);
   }
 
   return (
@@ -71,11 +88,49 @@ export default function RoutineSheet({ open, onClose }: { open: boolean; onClose
           >
             {L(dict, `+ 每日 AI 简报(${time} · 播报当天日程/提醒/天气)`, `+ Daily AI brief (${time} · reads your schedule/reminders/weather)`)}
           </button>
+
+          {/* 批次 45:重复计划分类 —— 自定义/健身/家务/吃药 */}
+          <div className="nesio-routine-cat-row">
+            {CATS.map((c) => (
+              <button
+                key={c.key}
+                type="button"
+                className={`nesio-routine-cat${category === c.key ? ' is-active' : ''}`}
+                onClick={() => { setCategory(c.key); if (c.key !== 'fitness') setProtocolId(undefined); }}
+              >
+                {L(dict, c.zh, c.en)}
+              </button>
+            ))}
+          </div>
+
+          {/* 健身:挂一个训练计划,Today 到点出「开始练」 */}
+          {category === 'fitness' && (
+            <div className="nesio-routine-plan-pick">
+              <p className="nesio-settings-option-hint" style={{ margin: '0 0 0.35rem' }}>{L(dict, '挂一个训练计划(到点在首页出「开始练」)', 'Attach a training plan (Today shows "Start")')}</p>
+              {PROTOCOL_LIBRARY.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  className={`nesio-routine-plan-chip${protocolId === p.id ? ' is-active' : ''}`}
+                  onClick={() => { setProtocolId(p.id); if (!text.trim()) setText(dict === 'en' ? p.name.en : p.name.zh); }}
+                >
+                  {L(dict, p.name.zh, p.name.en)}
+                </button>
+              ))}
+            </div>
+          )}
+
           <input
             className="nesio-routine-input"
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder={L(dict, '提醒内容,如:喝水、写复盘…', 'What to remind, e.g. drink water…')}
+            placeholder={category === 'fitness'
+              ? L(dict, '这个健身计划叫什么,如:下肢日', 'Name this workout, e.g. Leg day')
+              : category === 'meds'
+                ? L(dict, '吃什么药、剂量,如:维生素 D 1 粒', 'Which meds/dose, e.g. Vitamin D ×1')
+                : category === 'chore'
+                  ? L(dict, '哪件家务,如:倒垃圾、浇花', 'Which chore, e.g. take out trash')
+                  : L(dict, '提醒内容,如:喝水、写复盘…', 'What to remind, e.g. drink water…')}
             maxLength={60}
           />
           <div className="nesio-routine-row">
@@ -116,7 +171,12 @@ export default function RoutineSheet({ open, onClose }: { open: boolean; onClose
             <div key={r.id} className="nesio-routine-item">
               <div className="nesio-routine-item-main">
                 <p className="nesio-routine-item-text" style={{ opacity: r.enabled ? 1 : 0.45 }}>{r.kind === 'ai_brief' ? L(dict, '每日 AI 简报', 'Daily AI brief') : r.text}</p>
-                <p className="nesio-routine-item-meta">{r.time} · {daysSummary(r)}</p>
+                <p className="nesio-routine-item-meta">
+                  {r.category && r.category !== 'general' && (
+                    <span className="nesio-routine-cat-tag">{L(dict, CAT_LABEL[r.category][0], CAT_LABEL[r.category][1])}</span>
+                  )}
+                  {r.time} · {daysSummary(r)}
+                </p>
               </div>
               <button
                 type="button"

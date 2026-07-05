@@ -932,9 +932,9 @@ function LivingModelTab({
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 
-export default function InsightsSheet({ onClose, canUsePrivateData = true }: { onClose: () => void; canUsePrivateData?: boolean }) {
+export default function InsightsSheet({ onClose, canUsePrivateData = true, initialTab }: { onClose: () => void; canUsePrivateData?: boolean; initialTab?: MainTab }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
-  const [mainTab, setMainTab] = useState<MainTab>('reflection');
+  const [mainTab, setMainTab] = useState<MainTab>(initialTab ?? 'reflection');
   const [period, setPeriod] = useState<Period>('week');
   const [profile, setProfile] = useState<MirrorProfile | null>(null);
   const [allNodes, setAllNodes] = useState<LifeNode[]>([]);

@@ -18007,6 +18007,14 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 
 /* 批次 19:例行提醒 */
 .nesio-routine-input { width: 100%; min-height: var(--tap-min); border-radius: 0.75rem; border: 1.5px solid var(--portal-line); background: var(--glass-bg-solid); color: var(--portal-ink); font-size: 0.88rem; padding: 0.55rem 0.75rem; outline: none; font-family: inherit; }
+/* 批次 45:重复计划分类 + 健身计划选择 */
+.nesio-routine-cat-row { display: flex; gap: 0.4rem; margin-bottom: 0.6rem; flex-wrap: wrap; }
+.nesio-routine-cat { min-height: var(--tap-min); padding: 0 0.85rem; border-radius: 999px; border: 1.5px solid var(--portal-line); background: none; color: var(--portal-muted); font-size: 0.8rem; font-weight: 600; cursor: pointer; }
+.nesio-routine-cat.is-active { border-color: var(--portal-blue-deep); color: var(--portal-blue-deep); background: var(--portal-accent-soft); }
+.nesio-routine-plan-pick { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.6rem; }
+.nesio-routine-plan-chip { padding: 0.35rem 0.8rem; border-radius: 999px; border: 1.5px solid var(--portal-line); background: none; color: var(--portal-ink); font-size: 0.8rem; cursor: pointer; }
+.nesio-routine-plan-chip.is-active { border-color: var(--portal-blue-deep); color: var(--portal-blue-deep); background: var(--portal-accent-soft); }
+.nesio-routine-cat-tag { display: inline-block; padding: 0.05rem 0.4rem; margin-right: 0.4rem; border-radius: 0.4rem; background: var(--portal-accent-soft); color: var(--portal-blue-deep); font-size: 0.68rem; font-weight: 600; }
 .nesio-routine-row { display: flex; gap: 0.5rem; margin-top: 0.5rem; align-items: center; }
 .nesio-routine-time { flex: 1; min-height: var(--tap-min); border-radius: 0.75rem; border: 1.5px solid var(--portal-line); background: var(--glass-bg-solid); color: var(--portal-ink); font-size: 0.95rem; padding: 0.4rem 0.6rem; font-family: inherit; }
 .nesio-routine-day-preset { min-height: var(--tap-min); padding: 0 0.8rem; border-radius: 999px; border: 1.5px solid var(--portal-line); background: none; color: var(--portal-muted); font-size: 0.8rem; cursor: pointer; }

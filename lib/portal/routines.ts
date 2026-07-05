@@ -6,11 +6,18 @@
  * 这里先把「内容 + 时间 + 重复」的闭环做实,不做假通知。
  */
 
+/** 重复计划分类(批次 45):自定义/健身/家务/吃药。健身可挂训练计划。 */
+export type RoutineCategory = 'general' | 'fitness' | 'chore' | 'meds';
+
 export interface Routine {
   id: string;
   text: string;
   /** 'reminder'=普通提醒 / 'ai_brief'=每日 AI 简报(批次 25) */
   kind?: 'reminder' | 'ai_brief';
+  /** 计划分类,默认 general */
+  category?: RoutineCategory;
+  /** 健身分类:挂到 training-protocol-engine 的某个训练计划,Today 卡出「开始练」 */
+  protocolId?: string;
   /** 'HH:mm' 24 小时制 */
   time: string;
   /** 0=周日 … 6=周六 */
@@ -34,11 +41,13 @@ function save(routines: Routine[]): void {
   window.dispatchEvent(new CustomEvent(ROUTINES_UPDATED_EVENT));
 }
 
-export function addRoutine(input: { text: string; time: string; days: number[]; kind?: 'reminder' | 'ai_brief' }): Routine {
+export function addRoutine(input: { text: string; time: string; days: number[]; kind?: 'reminder' | 'ai_brief'; category?: RoutineCategory; protocolId?: string }): Routine {
   const r: Routine = {
     id: `rt-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
     text: input.text.trim(),
     kind: input.kind || 'reminder',
+    category: input.category || 'general',
+    protocolId: input.protocolId,
     time: input.time,
     days: input.days.length ? input.days : [0, 1, 2, 3, 4, 5, 6],
     enabled: true,

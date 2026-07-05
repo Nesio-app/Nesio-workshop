@@ -61,11 +61,24 @@ export function RoutineDueCards() {
             <span className="nesio-proactive-card-icon"><IconClock size={18} /></span>
             <div className="nesio-proactive-card-text">
               <p className="nesio-proactive-card-title">{r.text}</p>
-              <p className="nesio-proactive-card-body">{L(dict, `例行提醒 · ${r.time}`, `Routine · ${r.time}`)}</p>
+              <p className="nesio-proactive-card-body">
+                {r.category === 'fitness'
+                  ? L(dict, `健身计划 · ${r.time}`, `Workout · ${r.time}`)
+                  : L(dict, `例行提醒 · ${r.time}`, `Routine · ${r.time}`)}
+              </p>
               <div className="nesio-proactive-card-actions">
+                {r.category === 'fitness' && (
+                  <button
+                    type="button"
+                    className="nesio-proactive-action-btn"
+                    onClick={() => { window.dispatchEvent(new CustomEvent('nesio-open-training')); track('routine_train_start', {}); }}
+                  >
+                    {L(dict, '开始练', 'Start')}
+                  </button>
+                )}
                 <button
                   type="button"
-                  className="nesio-proactive-action-btn"
+                  className={`nesio-proactive-action-btn${r.category === 'fitness' ? ' nesio-proactive-action-btn--snooze' : ''}`}
                   onClick={() => { markRoutineDone(r.id); track('routine_done', {}); }}
                 >
                   {L(dict, '完成', 'Done')}

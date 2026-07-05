@@ -62,6 +62,14 @@ export default function TodayFeed({
     dismissedCardIds, setDismissedCardIds,
   } = useTodayData(canUsePrivateData);
   const [mirrorOpen, setMirrorOpen] = useState(false);
+  const [insightsTab, setInsightsTab] = useState<'reflection' | 'health'>('reflection');
+
+  // 健身 routine 卡「开始练」→ 打开洞察的健康 tab(训练计划在那)
+  useEffect(() => {
+    const openTraining = () => { setInsightsTab('health'); setMirrorOpen(true); };
+    window.addEventListener('nesio-open-training', openTraining);
+    return () => window.removeEventListener('nesio-open-training', openTraining);
+  }, []);
 
   // Proactive cards: up to 2, each independently dismissable
   const [meetingRecorderNode, setMeetingRecorderNode] = useState<FocusNode | null>(null);
@@ -113,7 +121,7 @@ export default function TodayFeed({
           type="button"
           className="nesio-today-brand"
           aria-label={L(uiLocale, '打开 Nesio 洞察', "Open Nesio insights")}
-          onClick={() => setMirrorOpen(true)}
+          onClick={() => { setInsightsTab('reflection'); setMirrorOpen(true); }}
         >
           <img src="/assets/logo/nesio-mark.svg" alt="Nesio" className="nesio-today-brand-icon nesio-logo-day" />
           <img src="/assets/logo/nesio-mark-night.svg" alt="" aria-hidden className="nesio-today-brand-icon nesio-logo-night" />
@@ -202,7 +210,7 @@ export default function TodayFeed({
           <button type="button" className="nesio-settings-sheet-backdrop" onClick={() => setMirrorOpen(false)} aria-label={L(uiLocale, '关闭', 'Close')} />
           <div className="nesio-settings-sheet-card nesio-insights-sheet-card">
             <div className="nesio-sheet-handle" aria-hidden />
-            <InsightsSheet onClose={() => setMirrorOpen(false)} canUsePrivateData={canUsePrivateData} />
+            <InsightsSheet onClose={() => setMirrorOpen(false)} canUsePrivateData={canUsePrivateData} initialTab={insightsTab} />
           </div>
         </div>
       )}
