@@ -210,6 +210,31 @@ export function placesByCategory(visits: PlaceVisit[]): CategoryGroup[] {
   return out.sort((a, b) => rank(a.category) - rank(b.category) || b.count - a.count);
 }
 
+// 批次 40:World tab —— 按国家聚合(需先跑 geocode 拿到 country/city)。国家 → 城市子分类。
+export interface CountryGroup { country: string; cities: Array<{ city: string; count: number }>; placeCount: number; visits: number }
+export function worldByCountry(visits: PlaceVisit[]): CountryGroup[] {
+  const clusters = clusterPlaces(visits, 99999);
+  const geo = loadPlaceGeo();
+  const byCountry = new Map<string, { cities: Map<string, number>; placeCount: number; visits: number }>();
+  for (const c of clusters) {
+    const g = geo[c.label];
+    if (!g?.country) continue;
+    const b = byCountry.get(g.country) || { cities: new Map<string, number>(), placeCount: 0, visits: 0 };
+    b.placeCount += 1;
+    b.visits += c.visits;
+    if (g.city) b.cities.set(g.city, (b.cities.get(g.city) || 0) + 1);
+    byCountry.set(g.country, b);
+  }
+  return [...byCountry.entries()]
+    .map(([country, b]) => ({
+      country,
+      placeCount: b.placeCount,
+      visits: b.visits,
+      cities: [...b.cities.entries()].map(([city, count]) => ({ city, count })).sort((x, y) => y.count - x.count),
+    }))
+    .sort((a, b) => b.placeCount - a.placeCount);
+}
+
 // ── 批次 30:地点别名(手动纠正 Unknown/机器名 → 记住,以后都用对的名字)──────
 const PLACE_ALIAS_KEY = 'nesio-place-alias-v1';
 

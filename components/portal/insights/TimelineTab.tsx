@@ -12,14 +12,14 @@ import {
   timelineDays, buildDayJourney, dayStats,
   clusterPlaces, categoryTimeShare, timeOfDayBuckets,
   displayLabel, setPlaceAlias, isGenericPlace, loadGeocodeEnabled, setGeocodeEnabled,
-  placesByCategory, PLACE_CATEGORY_META, setPlaceCategory,
+  placesByCategory, PLACE_CATEGORY_META, setPlaceCategory, worldByCountry,
   type PlaceVisit, type PlaceCategory, type TimeBucket, type JourneyItem, type PlaceCluster,
 } from '@/lib/portal/place-trail';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 
-type Sub = 'timeline' | 'analytics' | 'travel';
+type Sub = 'timeline' | 'analytics' | 'travel' | 'world';
 
 const CAT: Record<PlaceCategory, [string, string]> = {
   home: ['家', 'Home'], work: ['公司', 'Work'], shopping: ['购物', 'Shopping'],
@@ -67,6 +67,8 @@ export default function TimelineTab() {
   const catShare = useMemo(() => categoryTimeShare(trail), [trail]);
   const buckets = useMemo(() => timeOfDayBuckets(trail), [trail]);
   const placeCats = useMemo(() => placesByCategory(trail), [trail]); // 批次 39:Google 时间线风分类
+  const world = useMemo(() => worldByCountry(trail), [trail]); // 批次 40:World tab 国家聚合
+  const [expandedCountry, setExpandedCountry] = useState<string | null>(null);
 
   if (trail.length === 0) {
     return <p className="nesio-insights-empty">{L(dict, '还没有足迹。授权位置后自动积累;也可在数据接入导入 Google 时间轴。', 'No trail yet. It builds automatically once location is granted; you can also import Google Timeline under Data sources.')}</p>;
@@ -145,7 +147,7 @@ export default function TimelineTab() {
     return { W, H, d, dots: pts.map((p) => ({ x: sx(p.lon!), y: sy(p.lat!), cat: p.category })) };
   })();
 
-  const SUBS: Array<[Sub, string, string]> = [['timeline', '时间线', 'Timeline'], ['analytics', '分析', 'Analytics'], ['travel', '地点', 'Places']];
+  const SUBS: Array<[Sub, string, string]> = [['timeline', '时间线', 'Timeline'], ['analytics', '分析', 'Analytics'], ['travel', '地点', 'Places'], ['world', '世界', 'World']];
 
   return (
     <div className="nesio-tl">
@@ -290,6 +292,43 @@ export default function TimelineTab() {
                           </div>
                         ))}
                         {g.places.length > 30 && <p className="nesio-tl-catplace-more">{L(dict, `还有 ${g.places.length - 30} 个…`, `+${g.places.length - 30} more…`)}</p>}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )
+      )}
+
+      {/* ── 世界:按国家聚合(批次 40)── */}
+      {sub === 'world' && (
+        world.length === 0 ? (
+          <p className="nesio-insights-empty">{L(dict, '还没有国家信息。到「分析」打开 geocode 并点「找真名」,把坐标解析成城市/国家后,这里会按国家聚合(点国家看城市)。', 'No country data yet. In Analytics, enable geocode and Resolve names — once coords become city/country, countries gather here (tap for cities).')}</p>
+        ) : (
+          <>
+            <p className="nesio-settings-option-hint" style={{ marginTop: 0 }}>{L(dict, `去过 ${world.length} 个国家/地区`, `${world.length} countries/regions visited`)}</p>
+            <div className="nesio-tl-catgrid">
+              {world.map((g) => {
+                const open = expandedCountry === g.country;
+                return (
+                  <div key={g.country} className={`nesio-tl-catcard${open ? ' is-open' : ''}`}>
+                    <button type="button" className="nesio-tl-catcard-head" onClick={() => setExpandedCountry(open ? null : g.country)}>
+                      <span className="nesio-tl-catcard-sym" style={{ background: '#3d9f6e' }} aria-hidden>🌍</span>
+                      <span className="nesio-tl-catcard-name">{g.country}</span>
+                      <span className="nesio-tl-catcard-count">{L(dict, `${g.cities.length} 城 · ${g.placeCount} 地`, `${g.cities.length} cities · ${g.placeCount} places`)}</span>
+                      <span className="nesio-tl-catcard-chev">{open ? '▾' : '›'}</span>
+                    </button>
+                    {open && (
+                      <div className="nesio-tl-catcard-list">
+                        {g.cities.length === 0 && <p className="nesio-tl-catplace-more">{L(dict, '(没解析到城市)', '(no city resolved)')}</p>}
+                        {g.cities.map((c) => (
+                          <div key={c.city} className="nesio-tl-catplace" style={{ cursor: 'default' }}>
+                            <span className="nesio-tl-catplace-name">{c.city}</span>
+                            <span className="nesio-tl-catplace-meta">{L(dict, `${c.count} 个地点`, `${c.count} places`)}</span>
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
