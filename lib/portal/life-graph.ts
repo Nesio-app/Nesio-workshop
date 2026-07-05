@@ -19,6 +19,8 @@ export interface LifeNodeAsset {
   id: string;
   kind: 'image' | 'file' | 'audio' | 'text' | string;
   storagePath?: string;
+  /** 批次 23:图存 IndexedDB 本机(getLocalImage(id)),未登录/离线也能看图 */
+  local?: boolean;
   mimeType?: string;
   label?: string;
   analysisSummary?: string;

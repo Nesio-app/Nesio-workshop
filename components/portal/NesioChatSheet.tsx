@@ -518,6 +518,32 @@ export default function NesioChatSheet({
   const fileContextRef = useRef<{ name: string; content: string } | null>(null);
 
   useEffect(() => { if (open) setMessages(loadHistory()); }, [open]);
+  // 批次 23:接收节点详情传来的图片,自动跑识别问答
+  useEffect(() => {
+    if (!open) return;
+    let pending: { url?: string; name?: string } | null = null;
+    try {
+      const raw = sessionStorage.getItem('nesio-pending-ask-image');
+      if (raw) { pending = JSON.parse(raw); sessionStorage.removeItem('nesio-pending-ask-image'); }
+    } catch { /* ignore */ }
+    if (!pending?.url) return;
+    const dataUrl = pending.url;
+    const b64 = dataUrl.split(',')[1] || '';
+    const mime = dataUrl.match(/:(.*?);/)?.[1] || 'image/jpeg';
+    const userMsg: UiMessage = { id: `u-${Date.now()}`, role: 'user', text: L(dict, `［图片］${pending.name || '这张图'}`, `[Image] ${pending.name || 'this photo'}`) };
+    setMessages((prev) => { const next = [...prev, userMsg]; return next; });
+    fetch('/api/portal/analyze', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'image', imageBase64: b64, mimeType: mime }),
+    }).then((r) => r.json()).then((data: { ok?: boolean; nodes?: Array<{ name: string }>; summary?: string }) => {
+      const names = data.nodes?.map((n) => n.name).join(L(dict, '、', ', ')) || data.summary || L(dict, '（未识别到内容）', '(nothing recognized)');
+      const aiMsg: UiMessage = { id: `a-${Date.now()}`, role: 'model', text: L(dict, `识别到：${names}\n\n可以继续问我关于这张图的问题。`, `Recognized: ${names}\n\nAsk me anything about this photo.`) };
+      setMessages((prev) => { const withAi = [...prev, aiMsg]; saveHistory(withAi); return withAi; });
+    }).catch(() => {
+      setMessages((prev) => [...prev, { id: `a-${Date.now()}`, role: 'model', text: L(dict, '图片识别失败，请重试。', 'Image recognition failed — try again.') }]);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
   // Opportunistically refresh device location so 问一问 knows where the user is.
   useEffect(() => { if (open) void refreshLocation(); }, [open]);
   useEffect(() => {

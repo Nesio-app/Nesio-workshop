@@ -185,7 +185,19 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
         });
         const data = await res.json() as { ok?: boolean; nodes?: Array<Omit<NodeInput, 'source'>> };
         const nodes = (data.ok && data.nodes) || [];
-        nodes.forEach((n) => ingestLifeNode({ ...n, source: 'photo', tags: [...(n.tags || []), '批量导入'] } as NodeInput));
+        const savedForThis = nodes.map((n) => ingestLifeNode({ ...n, source: 'photo', tags: [...(n.tags || []), '批量导入'] } as NodeInput));
+        // 批次 23:每张导入的照片也存本机,挂到该照片的第一个节点上(可看图、可问一问)
+        if (savedForThis.length > 0) {
+          try {
+            const { compressToDataUrl, putLocalImage } = await import('@/lib/portal/local-image-store');
+            const { updateLifeNode } = await import('@/lib/portal/life-graph');
+            const dataUrl = await compressToDataUrl(list[i]);
+            const imgId = `img-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 6)}`;
+            await putLocalImage(imgId, dataUrl);
+            const ex = savedForThis[0].assets || [];
+            updateLifeNode(savedForThis[0].id, { assets: [...ex, { id: imgId, kind: 'image', mimeType: 'image/jpeg', local: true, createdAt: new Date().toISOString() }] });
+          } catch { /* 图存本机失败不影响文字入库 */ }
+        }
         saved += nodes.length;
         if (!nodes.length) failed++;
       } catch { failed++; }
@@ -201,6 +213,27 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
   }
 
 
+
+
+  // ── 批次 23:Notion 连接(先预检配置)──
+  async function connectNotion() {
+    setSyncing('notion');
+    try {
+      const res = await fetch('/api/portal/notion/status');
+      const data = await res.json() as { ok?: boolean; configured?: boolean };
+      if (!data.configured) {
+        showToast(L(dict,
+          'Notion 还没配置:notion.so/my-integrations 建 Public integration(选 OAuth),把 client ID/secret 配到 Vercel(NOTION_CLIENT_ID / NOTION_CLIENT_SECRET),Redirect URI 填 /api/portal/notion/callback',
+          'Notion not configured: create a Public integration (OAuth) at notion.so/my-integrations, set NOTION_CLIENT_ID / NOTION_CLIENT_SECRET on Vercel, redirect URI /api/portal/notion/callback'), false);
+        setSyncing(null);
+        return;
+      }
+      window.location.href = '/api/portal/notion/connect';
+    } catch {
+      showToast(L(dict, '网络错误,请重试', 'Network error — try again'), false);
+      setSyncing(null);
+    }
+  }
 
   // ── 批次 21:Plaid 银行流水 ──
   async function connectPlaid() {
@@ -624,8 +657,9 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     if (c.id === 'wechat_reading') { setWechatReadingOpen(true); return; }
     if (c.id === 'wechat_fav') { return; } // 纯说明行,无操作
     if (c.id === 'plaid') { void connectPlaid(); return; }
-    // Notion:先走 OAuth(服务端未配 NOTION_CLIENT_ID 会带 error 跳回,给出指引)
-    if (c.id === 'notion' && !loadToken('notion')) { window.location.href = '/api/portal/notion/connect'; return; }
+    // 批次 23:Notion 连接前预检——未配 NOTION_CLIENT_ID 时在面板内直接提示,
+    // 不做「跳转 API 又跳回、toast 丢失」的无反馈操作(用户报「按钮不管用」)
+    if (c.id === 'notion' && !loadToken('notion')) { void connectNotion(); return; }
     if (c.method === 'token') { syncToken(c); return; }
     if (c.method === 'server') { syncFlomo(c); return; }
     if (c.method === 'shortcuts') { setShortcutsFor(c.id); return; }

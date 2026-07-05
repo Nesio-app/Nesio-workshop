@@ -226,7 +226,9 @@ function ObjectSection({ node, assetUrls }: {
     <div className="nesio-type-section">
       {previewUrl && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={previewUrl} alt={node.name} className="nesio-type-thumb" draggable={false} />
+        <img src={previewUrl} alt={node.name} className="nesio-type-thumb" draggable={false}
+          role="button" tabIndex={0} style={{ cursor: 'zoom-in' }}
+          onClick={() => window.dispatchEvent(new CustomEvent('nesio-view-image', { detail: { url: previewUrl, name: node.name } }))} />
       )}
       <InfoRow label={L(dict, '存放位置', 'Stored at')} value={location} />
       <InfoRow label={L(dict, '购买日期', 'Bought on')} value={fmtDate(purchaseDate, dict)} />
@@ -431,7 +433,9 @@ function PreferenceSection({ node, assetUrls }: {
     <div className="nesio-type-section">
       {previewUrl && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={previewUrl} alt={node.name} className="nesio-type-thumb" draggable={false} />
+        <img src={previewUrl} alt={node.name} className="nesio-type-thumb" draggable={false}
+          role="button" tabIndex={0} style={{ cursor: 'zoom-in' }}
+          onClick={() => window.dispatchEvent(new CustomEvent('nesio-view-image', { detail: { url: previewUrl, name: node.name } }))} />
       )}
       {category && (
         <div className="nesio-type-badge-row">
@@ -521,6 +525,13 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
   });
   const [deleted, setDeleted] = useState(false);
   const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
+  // 批次 23:全屏看图 + 问一问这张图
+  const [viewImage, setViewImage] = useState<{ url: string; name: string } | null>(null);
+  useEffect(() => {
+    const onView = (e: Event) => setViewImage((e as CustomEvent).detail);
+    window.addEventListener('nesio-view-image', onView);
+    return () => window.removeEventListener('nesio-view-image', onView);
+  }, []);
 
   function field(k: keyof EditFields) {
     return fields[k];
@@ -536,12 +547,21 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
     const client = createAppApiClient();
     setAssetUrls({});
     for (const asset of assets) {
+      const key = asset.id || asset.storagePath || '';
+      if (!key) continue;
+      // 批次 23:本机图优先从 IndexedDB 读(未登录/离线也能看)
+      if (asset.local) {
+        void import('@/lib/portal/local-image-store').then(({ getLocalImage }) =>
+          getLocalImage(asset.id).then((dataUrl) => {
+            if (!cancelled && dataUrl) setAssetUrls((cur) => ({ ...cur, [key]: dataUrl }));
+          }),
+        ).catch(() => {});
+        continue;
+      }
       if (!asset.storagePath) continue;
       void client.fetchCloudAssetReadUrl({ storagePath: asset.storagePath })
         .then((result) => {
           if (cancelled || !result.ok || !result.signedUrl) return;
-          const key = asset.id || asset.storagePath || result.storagePath || '';
-          if (!key) return;
           setAssetUrls((cur) => ({ ...cur, [key]: result.signedUrl || '' }));
         })
         .catch(() => {});
@@ -635,6 +655,27 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
 
   return (
     <div className="nesio-node-detail-overlay" role="dialog" aria-modal="true" aria-label={n.name}>
+      {viewImage && (
+        <div className="nesio-image-viewer" role="dialog" aria-modal="true" onClick={() => setViewImage(null)}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={viewImage.url} alt={viewImage.name} className="nesio-image-viewer-img" />
+          <div className="nesio-image-viewer-actions" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className="nesio-ob-primary-btn"
+              onClick={() => {
+                // 把这张图交给问一问(chat sheet 监听此事件,带图打开)
+                window.dispatchEvent(new CustomEvent('nesio-ask-image', { detail: { url: viewImage.url, name: viewImage.name } }));
+                setViewImage(null);
+                onClose();
+              }}
+            >
+              {L(dict, '问一问这张图', 'Ask about this photo')}
+            </button>
+            <button type="button" className="nesio-image-viewer-close" onClick={() => setViewImage(null)}>{L(dict, '关闭', 'Close')}</button>
+          </div>
+        </div>
+      )}
       <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
       <div className="nesio-settings-sheet-card">
         <div className="nesio-sheet-handle" aria-hidden />

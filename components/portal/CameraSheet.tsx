@@ -501,6 +501,25 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
         },
       });
     });
+    // 批次 23:先把照片压缩存本机 IndexedDB,挂一条本地 asset——
+    // 未登录/离线也能在节点详情看图、问一问也能拿到图。云端上传照旧(并行)。
+    if (savedNodes.length > 0) {
+      try {
+        const { compressToDataUrl, putLocalImage } = await import('@/lib/portal/local-image-store');
+        const dataUrl = sourceFile
+          ? await compressToDataUrl(sourceFile)
+          : (capturedBase64 ? `data:image/jpeg;base64,${capturedBase64}` : '');
+        if (dataUrl) {
+          const localAssetId = `img-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+          await putLocalImage(localAssetId, dataUrl);
+          const existing = savedNodes[0].assets || [];
+          updateLifeNode(savedNodes[0].id, {
+            assets: [...existing, { id: localAssetId, kind: 'image', mimeType: 'image/jpeg', local: true, createdAt: new Date().toISOString() }],
+          });
+        }
+      } catch { /* 图片存本机是增强,失败不影响文字记忆 */ }
+    }
+
     let cloudAssets: Array<LifeNodeAsset & { nodeId?: string }> = [];
     if (sourceFile && savedNodes.length > 0) {
       try {

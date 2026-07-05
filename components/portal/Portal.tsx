@@ -260,6 +260,18 @@ export default function Portal() {
   const [memoryReceipt, setMemoryReceipt] = useState(false);
   const [askGuideOpen, setAskGuideOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  // 批次 23:节点详情「问一问这张图」→ 开聊天并把图交给它
+  useEffect(() => {
+    const onAskImage = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { url?: string; name?: string };
+      if (detail?.url) {
+        try { sessionStorage.setItem('nesio-pending-ask-image', JSON.stringify(detail)); } catch { /* ignore */ }
+        setChatOpen(true);
+      }
+    };
+    window.addEventListener('nesio-ask-image', onAskImage);
+    return () => window.removeEventListener('nesio-ask-image', onAskImage);
+  }, []);
   const [moodOpen, setMoodOpen] = useState(false);
   const [launchSurfaceContext, setLaunchSurfaceContext] = useState({
     viewerRole: 'public' as 'public' | 'tester' | 'personal_lab',
