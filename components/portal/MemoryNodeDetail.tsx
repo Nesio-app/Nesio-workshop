@@ -9,6 +9,8 @@ import type { GNode, GEdge } from '@/lib/platform/graph-engine';
 import { IconClock, IconLink, NodeTypeIcon, WeatherIcon } from './icons';
 import { L } from '@/lib/portal/i18n';
 import { displayNodeName } from '@/lib/portal/node-display';
+import dynamicImport from 'next/dynamic';
+const ReaderSheetLazy = dynamicImport(() => import('./ArticleReaderSheet'), { ssr: false });
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 const TYPE_BG_DETAIL: Record<string, string> = {
@@ -162,6 +164,7 @@ const HIDDEN_ATTRIBUTE_KEYS = new Set([
   'emotion', 'emotionLabel', 'emotionEmoji', 'emotionQuadrant',
   'energyValue', 'energyLevel', 'recordedAt', 'hourOfDay',
   'isWorkHours', 'isEvening', 'isMorning', 'isJournal', 'journalText',
+  'article', 'image',
 ]);
 
 function InfoRow({ label, value, link }: { label: string; value: string; link?: string }) {
@@ -527,6 +530,8 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
   const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
   // 批次 23:全屏看图 + 问一问这张图
   const [viewImage, setViewImage] = useState<{ url: string; name: string } | null>(null);
+  // 批次 24:文章阅读器(节点有 article 时)
+  const [readerOpen, setReaderOpen] = useState(false);
   useEffect(() => {
     const onView = (e: Event) => setViewImage((e as CustomEvent).detail);
     window.addEventListener('nesio-view-image', onView);
@@ -655,6 +660,9 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
 
   return (
     <div className="nesio-node-detail-overlay" role="dialog" aria-modal="true" aria-label={n.name}>
+      {readerOpen && typeof n.attributes.article === 'string' && n.attributes.article && (
+        <ReaderSheetLazy title={n.name} article={n.attributes.article} onClose={() => setReaderOpen(false)} />
+      )}
       {viewImage && (
         <div className="nesio-image-viewer" role="dialog" aria-modal="true" onClick={() => setViewImage(null)}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -872,6 +880,9 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
               </>
             ) : (
               <>
+                {typeof n.attributes.article === 'string' && n.attributes.article && (
+                  <button type="button" className="nesio-ob-primary-btn" style={{ flex: 1 }} onClick={() => setReaderOpen(true)}>{L(dict, '阅读', 'Read')}</button>
+                )}
                 <button type="button" className="nesio-today-btn nesio-today-btn--ghost" style={{ flex: 1 }} onClick={startEdit}>{L(dict, '编辑', 'Edit')}</button>
                 <button type="button" className="nesio-settings-danger-btn" style={{ flex: 1, marginTop: 0 }} onClick={handleDelete}>{L(dict, '删除', 'Delete')}</button>
               </>

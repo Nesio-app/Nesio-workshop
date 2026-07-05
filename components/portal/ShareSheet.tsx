@@ -69,7 +69,53 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
     };
   }
 
+  // 批次 24:分享进来的是纯链接时,先抓正文(微信公众号/通用文章),
+  // 生成可读的文章节点(存全文,供 ADHD 阅读器)——不再把 URL 丢给 AI 说「解析不了」。
+  async function analyzeUrl(url: string): Promise<boolean> {
+    setAnalyzing(true); setError('');
+    try {
+      const res = await fetch('/api/portal/parse-url', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+      const data = await res.json() as { ok?: boolean; title?: string; article?: string; description?: string; image?: string };
+      const title = (data.ok && data.title) || url;
+      const article = (data.ok && data.article) || '';
+      const summary = article ? article.slice(0, 80) + '…' : (data.description || url);
+      setParsed({
+        title,
+        summary,
+        intent: 'MEMORY_CAPTURE',
+        people: [],
+        nodes: [{
+          type: 'preference',
+          name: title.slice(0, 60),
+          attributes: {
+            url,
+            ...(article ? { article } : {}),
+            ...(data.image ? { image: data.image } : {}),
+          },
+          relations: [],
+          tags: ['文章', ...(/mp\.weixin\.qq\.com/.test(url) ? ['公众号'] : [])],
+          confidence: 0.9,
+          rawInput: article ? article.slice(0, 200) : title,
+        }],
+      });
+      return true;
+    } catch {
+      setError(L(dict, '抓取文章失败，可以直接粘贴正文。', 'Could not fetch the article — you can paste the text instead.'));
+      return false;
+    } finally {
+      setAnalyzing(false);
+    }
+  }
+
   async function analyze(type: 'text' | 'file' | 'image', content: string, imageBase64?: string, mimeType?: string): Promise<boolean> {
+    // 纯链接 → 走文章抓取
+    if (type === 'text') {
+      const urlMatch = content.trim().match(/^https?:\/\/\S+$/);
+      if (urlMatch) return analyzeUrl(urlMatch[0]);
+    }
     setAnalyzing(true); setError('');
     try {
       const res = await fetch('/api/portal/analyze', {

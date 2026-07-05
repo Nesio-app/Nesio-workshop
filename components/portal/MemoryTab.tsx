@@ -328,16 +328,22 @@ function cleanMemoryPreview(node: LifeNode, dict: DictLocale = 'zh'): string {
     return L(dict, `一段 ${d} 的心情记录 · 点开查看`, `A mood entry from ${d} · tap to view`);
   }
   const raw = node.rawInput || Object.values(node.attributes).join(' · ');
-  return raw
+  const cleaned = raw
     .replace(node.name, '')
+    // 批次 24:剥掉链接与裸 URL 片段(flomo/导入节点常把 memo_id、模板路径
+    // 之类当预览显示,如 m/mine/?memo_id=、s/x_xxx、ft.cn/template/xxx、d=xxx)
+    .replace(/https?:\/\/\S+/g, '')
+    .replace(/\b[\w.-]+\.(?:com|cn|org|net|io|app)\/\S*/gi, '')
+    .replace(/\b[a-z]\/[\w%?=&_-]{6,}/gi, '')
+    .replace(/\b(?:memo_id|template|d|id)=[\w%-]+/gi, '')
     .replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?/g, (v) => {
       const d = new Date(v);
       return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'short', day: 'numeric' });
     })
     .replace(/\s+/g, ' ')
-    .replace(/^[\s:：·,-]+/, '')
-    .trim()
-    .slice(0, 44) || L(dict, '来自你的记录', 'From your notes');
+    .replace(/^[\s:：·,\-—、]+/, '')
+    .trim();
+  return cleaned.slice(0, 44) || L(dict, '来自你的记录', 'From your notes');
 }
 
 function getNodeTypeMeta(node: LifeNode, dict: DictLocale = 'zh') {
@@ -367,7 +373,15 @@ function getNodeTypeMeta(node: LifeNode, dict: DictLocale = 'zh') {
 /** 卡片标题智能截断:整段原文取首个分句,一眼读完(批次 4)。 */
 function smartCardTitle(name: string): string {
   // 显示层剥 emoji:批次 3 前的旧记录名字里带表情(如「Journal · 😊满足」)
-  const clean = name.replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu, '').replace(/\s{2,}/g, ' ').trim();
+  let clean = name.replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu, '').replace(/\s{2,}/g, ' ').trim();
+  // 批次 24:标题里的裸 URL/前缀清掉(「关联自:https://v.flom…」「来自 https://…」)
+  clean = clean
+    .replace(/^(?:关联自|来自|转自|via|from)\s*[:：]?\s*/i, '')
+    .replace(/https?:\/\/\S+/g, '')
+    .replace(/\b[\w.-]+\.(?:com|cn|org|net|io|app)\/\S*/gi, '')
+    .replace(/^[\s:：·,\-—、]+/, '')
+    .trim();
+  if (!clean) return name.slice(0, 24); // 全是 URL:退回原名截断,至少不空
   if (clean.length <= 24) return clean;
   const clause = clean.split(/[。！？!?；;，,\n]/)[0];
   return `${clause.length > 24 ? clause.slice(0, 24) : clause}…`;

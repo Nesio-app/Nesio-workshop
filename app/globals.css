@@ -9165,6 +9165,7 @@ html[data-portal-theme="night"] .nesio-memory-card {
 .nesio-memory-card-title {
   font-size: 0.9rem;
   font-weight: 700;
+  line-height: 1.32;
   color: var(--portal-ink);
   overflow-wrap: anywhere;
   word-break: break-word;
@@ -17531,6 +17532,20 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
   margin-bottom: 1rem;
 }
 .nesio-narrator-section > .nesio-narrator-card:nth-child(3) { grid-column: 1 / -1; }
+
+/* 批次 24:ADHD 友好阅读器 */
+.nesio-reader-overlay { position: fixed; inset: 0; z-index: 620; background: var(--sheet-opaque, #fdfeff); display: flex; flex-direction: column; }
+.nesio-reader-topbar { display: flex; align-items: center; justify-content: space-between; padding: calc(0.6rem + env(safe-area-inset-top)) 1rem 0.6rem; border-bottom: 1px solid var(--portal-line); position: sticky; top: 0; background: var(--sheet-opaque, #fdfeff); z-index: 1; }
+.nesio-reader-tools { display: flex; gap: 0.4rem; }
+.nesio-reader-btn { min-width: 38px; min-height: 34px; border-radius: 8px; border: 1px solid var(--portal-line); background: var(--glass-bg-solid); color: var(--portal-ink); font-size: 0.82rem; cursor: pointer; padding: 0 0.5rem; }
+.nesio-reader-btn.is-active { border-color: var(--portal-blue-deep); color: var(--portal-blue-deep); }
+.nesio-reader-scroll { flex: 1; overflow-y: auto; padding: 1.2rem 1.15rem calc(2.5rem + env(safe-area-inset-bottom)); -webkit-overflow-scrolling: touch; }
+.nesio-reader-title { font-weight: 700; color: var(--portal-ink); line-height: 1.35; margin: 0 0 1.2rem; max-width: 40rem; }
+.nesio-reader-body { max-width: 40rem; margin: 0 auto; }
+.nesio-reader-para { line-height: 1.95; letter-spacing: 0.01em; color: var(--portal-ink); margin: 0 0 1.35rem; transition: opacity 0.2s; }
+.nesio-reader-para.is-dim { opacity: 0.28; }
+.nesio-reader-para.is-focus { opacity: 1; }
+.nesio-reader-focus-nav { position: sticky; bottom: 0.6rem; display: flex; align-items: center; justify-content: center; gap: 0.8rem; font-size: 0.75rem; color: var(--portal-muted); margin-top: 1rem; }
 
 /* 批次 23:全屏看图 */
 .nesio-image-viewer { position: fixed; inset: 0; z-index: 600; background: rgba(0,0,0,0.92); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; padding: 1.5rem; }

@@ -11,7 +11,7 @@
  * that's needed to read memories in airplane mode.
  */
 
-const VERSION = 'nesio-sw-v1';
+const VERSION = 'nesio-sw-v2';
 const SHELL_CACHE = `${VERSION}-shell`;
 const STATIC_CACHE = `${VERSION}-static`;
 
