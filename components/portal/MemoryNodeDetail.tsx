@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useSheetDismiss } from '@/lib/portal/use-sheet-dismiss';
 import { deleteLifeNode, updateLifeNode, type LifeNode } from '@/lib/portal/life-graph';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
 import LocationPicker from './LocationPicker';
@@ -520,6 +521,7 @@ function buildGraphEdges(focus: LifeNode, related: LifeNode[]): GEdge[] {
 }
 
 export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNode }: MemoryNodeDetailProps) {
+  useSheetDismiss(onClose);
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [editing, setEditing] = useState(false);
   const [fields, setFields] = useState<EditFields>({

@@ -8,6 +8,7 @@
  */
 
 import { useState } from 'react';
+import { useSheetDismiss } from '@/lib/portal/use-sheet-dismiss';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 
 interface HealthLoggerProps { open: boolean; onClose: () => void; }
@@ -16,6 +17,7 @@ const SYMPTOMS = ['感冒', '嗓子不舒服', '发烧', '头疼', '疲劳', '�
 const MOODS = ['😊 不错', '😐 一般', '😴 很累', '😰 焦虑', '😤 烦躁'];
 
 export default function HealthLogger({ open, onClose }: HealthLoggerProps) {
+  useSheetDismiss(onClose, { enabled: open });
   const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
   const [sleep, setSleep] = useState('');
   const [energy, setEnergy] = useState(3);

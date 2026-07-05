@@ -10,6 +10,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSheetDismiss } from '@/lib/portal/use-sheet-dismiss';
 import { flatLines, type FlatLine, type ReaderBook } from '@/lib/portal/adhd-reader';
 import { getReaderProgress, setReaderProgress } from '@/lib/portal/reader-store-idb';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
@@ -26,6 +27,7 @@ interface Bookmark { p: number; text: string }
 const HEADING_RE = /^(第[一二三四五六七八九十百千零\d]+[章篇节部回]|chapter\s|part\s|#{1,3}\s|[#＃])/i;
 
 export default function ReaderView({ book, rawText, onClose }: { book: ReaderBook; rawText?: string; onClose: () => void }) {
+  useSheetDismiss(onClose);
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const lines = useMemo<FlatLine[]>(() => flatLines(book), [book]);
 

@@ -7,6 +7,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { useSheetDismiss } from '@/lib/portal/use-sheet-dismiss';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
@@ -34,6 +35,7 @@ function extractEmail(raw: string): string {
 type Tone = 'polite' | 'concise' | 'warm' | 'decline' | 'followup';
 
 export default function EmailComposeSheet({ open, onClose, context }: EmailComposeSheetProps) {
+  useSheetDismiss(onClose, { enabled: open });
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [to, setTo] = useState('');
   const [subject, setSubject] = useState('');

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useSheetDismiss } from '@/lib/portal/use-sheet-dismiss';
 import {
   getNamedPlaces,
   upsertNamedPlace,
@@ -217,6 +218,7 @@ function PlaceCard({
 }
 
 export default function NamedPlacesSheet({ open, onClose }: Props) {
+  useSheetDismiss(onClose, { enabled: open });
   const [places, setPlaces] = useState<NamedPlace[]>([]);
 
   useEffect(() => {

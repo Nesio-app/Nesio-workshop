@@ -6,6 +6,7 @@
  */
 
 import { useState } from 'react';
+import { useSheetDismiss } from '@/lib/portal/use-sheet-dismiss';
 import { parseWechatReading } from '@/lib/portal/wechat-reading';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { InfoTip } from './InfoTip';
@@ -15,6 +16,7 @@ import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 
 export default function WechatReadingImportSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  useSheetDismiss(onClose, { enabled: open });
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [text, setText] = useState('');
   const [result, setResult] = useState('');

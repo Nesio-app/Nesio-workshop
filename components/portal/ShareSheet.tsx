@@ -10,6 +10,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { useSheetDismiss } from '@/lib/portal/use-sheet-dismiss';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { updateLifeNode, type LifeNodeAsset } from '@/lib/portal/life-graph';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
@@ -31,6 +32,7 @@ interface ParsedResult {
 }
 
 export default function ShareSheet({ open, onClose }: ShareSheetProps) {
+  useSheetDismiss(onClose, { enabled: open });
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const fileRef = useRef<HTMLInputElement>(null);
   const [parsed, setParsed] = useState<ParsedResult | null>(null);

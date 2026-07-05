@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useSheetDismiss } from '@/lib/portal/use-sheet-dismiss';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { getLifeGraph, updateLifeNode, type LifeNode, type LifeNodeAsset } from '@/lib/portal/life-graph';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
@@ -198,6 +199,7 @@ function dataUrlToFile(dataUrl: string, fileName: string): File | null {
 }
 
 export default function CameraSheet({ open, onClose, initialFile }: CameraSheetProps) {
+  useSheetDismiss(onClose, { enabled: open });
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);

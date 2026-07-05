@@ -6,6 +6,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { useSheetDismiss } from '@/lib/portal/use-sheet-dismiss';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { readPortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
 import type { CalendarEvent } from '@/lib/portal/types';
@@ -29,6 +30,7 @@ interface MeetingNote {
 type RecordState = 'idle' | 'recording' | 'processing' | 'done' | 'error';
 
 export default function MeetingRecorder({ open, onClose }: MeetingRecorderProps) {
+  useSheetDismiss(onClose, { enabled: open });
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [recState, setRecState] = useState<RecordState>('idle');
   const [transcript, setTranscript] = useState('');

@@ -14,6 +14,7 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import ReaderView from './reader/ReaderView';
+import { useSheetDismiss } from '@/lib/portal/use-sheet-dismiss';
 
 /** 由标题派生稳定 id,让同一篇文章重开时能恢复阅读进度。 */
 function stableId(title: string, article: string): string {
@@ -28,6 +29,7 @@ export default function ArticleReaderSheet({ title, article, onClose }: {
   article: string;
   onClose: () => void;
 }) {
+  useSheetDismiss(onClose);
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
 
   const book = useMemo<ReaderBook | null>(() => {

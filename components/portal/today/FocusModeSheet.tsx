@@ -13,6 +13,7 @@ import { IconPlay } from '../icons';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
+import { useSheetDismiss } from '@/lib/portal/use-sheet-dismiss';
 
 /**
  * 专注时长入统计(批次 6 用户问「这个数据有进入统计范围么」——此前没有):
@@ -46,6 +47,7 @@ export function FocusModeSheet({ node, onClose, onDone }: {
   onClose: () => void;
   onDone: (node: FocusNode) => void;
 }) {
+  useSheetDismiss(onClose, { enabled: !!node });
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [durMin, setDurMin] = useState(25);
   const [secsLeft, setSecsLeft] = useState(25 * 60);

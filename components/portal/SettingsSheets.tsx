@@ -6,6 +6,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { useSheetDismiss } from '@/lib/portal/use-sheet-dismiss';
 import { PORTAL_LOCALE_OPTIONS, loadProfileSettings, portalLocaleToDictionaryLocale, saveProfileSettings, type PortalLocale } from '@/lib/portal/profile';
 import { getMirrorProfile } from '@/lib/portal/mirror-profile';
 import { L, t } from '@/lib/portal/i18n';
@@ -19,6 +20,7 @@ import { buildFullBackup, isValidBackup, restoreFullBackup } from '@/lib/portal/
 interface SheetProps { open: boolean; onClose: () => void; }
 
 function SheetWrap({ open, onClose, title, tip, children }: SheetProps & { title: string; tip?: string; children: React.ReactNode }) {
+  useSheetDismiss(onClose, { enabled: open });
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   if (!open) return null;
   return (

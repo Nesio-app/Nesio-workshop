@@ -10,6 +10,7 @@ import { addMeetingNotes, type FocusNode } from '@/lib/platform/view-models/toda
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
+import { useSheetDismiss } from '@/lib/portal/use-sheet-dismiss';
 
 type SpeechRecAPI = {
   continuous: boolean;
@@ -25,6 +26,7 @@ export function MeetingRecorderSheet({ open, meetingNode, onClose }: {
   meetingNode: FocusNode | null;
   onClose: () => void;
 }) {
+  useSheetDismiss(onClose, { enabled: open });
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [recording, setRecording] = useState(false);
   const [transcript, setTranscript] = useState('');

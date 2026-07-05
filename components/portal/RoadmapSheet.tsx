@@ -7,6 +7,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import { useSheetDismiss } from '@/lib/portal/use-sheet-dismiss';
 import { ROADMAP_ITEMS } from '@/lib/portal/roadmap';
 import { track } from '@/lib/portal/telemetry';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
@@ -23,6 +24,7 @@ function deviceId(): string {
 }
 
 export default function RoadmapSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  useSheetDismiss(onClose, { enabled: open });
   const locale = usePortalLocale();
   const dict = portalLocaleToDictionaryLocale(locale);
   const statusLabel: Record<string, string> = {

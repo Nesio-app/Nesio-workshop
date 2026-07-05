@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useSheetDismiss } from '@/lib/portal/use-sheet-dismiss';
 import { IconActivity, IconBook, IconBookOpen, IconCalendar, IconCar, IconCheckSquare, IconCloudSun, IconHeartPulse, IconMail, IconNote, IconTimer , IconImage, IconMapPin, IconCard } from './icons';
 import dynamic from 'next/dynamic';
 const WechatReadingImportSheet = dynamic(() => import('./WechatReadingImportSheet'), { ssr: false });
@@ -94,6 +95,7 @@ function saveNotionDbs(ids: string[]) {
 interface SyncResult { ok: boolean; msg: string; detail?: string; needsReauth?: boolean }
 
 export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
+  useSheetDismiss(onClose, { enabled: open });
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const fileRef = useRef<HTMLInputElement>(null);
   const photosRef = useRef<HTMLInputElement>(null);

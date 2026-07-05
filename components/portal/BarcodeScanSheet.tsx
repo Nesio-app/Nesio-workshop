@@ -12,6 +12,7 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import { track } from '@/lib/portal/telemetry';
+import { useSheetDismiss } from '@/lib/portal/use-sheet-dismiss';
 
 export interface BarcodeResult { upc: string; title: string; image?: string; price?: number }
 
@@ -20,6 +21,7 @@ export default function BarcodeScanSheet({ open, onClose, onResult }: {
   onClose: () => void;
   onResult: (r: BarcodeResult) => void;
 }) {
+  useSheetDismiss(onClose, { enabled: open });
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const videoRef = useRef<HTMLVideoElement>(null);
   const [status, setStatus] = useState<'starting' | 'scanning' | 'looking-up' | 'error'>('starting');

@@ -5,6 +5,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { useSheetDismiss } from '@/lib/portal/use-sheet-dismiss';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
@@ -28,6 +29,7 @@ function buildScript(title: string, body: string, points?: string[], dict: strin
 }
 
 export default function VoiceBrief({ open, onClose, title, body, points }: VoiceBriefProps) {
+  useSheetDismiss(onClose, { enabled: open });
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [state, setState] = useState<PlayState>('idle');
   const [progress, setProgress] = useState(0);

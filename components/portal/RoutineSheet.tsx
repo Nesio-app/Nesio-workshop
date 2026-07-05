@@ -7,6 +7,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { useSheetDismiss } from '@/lib/portal/use-sheet-dismiss';
 import { addRoutine, deleteRoutine, loadRoutines, ROUTINES_UPDATED_EVENT, updateRoutine, type Routine } from '@/lib/portal/routines';
 import { InfoTip } from './InfoTip';
 import { L } from '@/lib/portal/i18n';
@@ -17,6 +18,7 @@ const WEEKDAYS = [1, 2, 3, 4, 5];
 const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
 
 export default function RoutineSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  useSheetDismiss(onClose, { enabled: open });
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [text, setText] = useState('');
