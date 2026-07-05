@@ -24,7 +24,7 @@ import { getActionWindow } from './action-window';
 import { buildAction } from './actionability';
 import { L } from '@/lib/portal/i18n';
 import { getConsequenceSeverity } from './consequence-rules';
-import { interruptPriority, worthInterrupting } from './interrupt-evaluator';
+import { interruptPriority, interruptPriorityRaw, worthInterrupting } from './interrupt-evaluator';
 import { computeAttentionBudget, passesBudgetGate } from './attention-budget';
 import { loadCoolingStore, isOnCooldown, recordShown, saveCoolingStore } from './cooling-store';
 import { coolingKey, makeDedupGate } from './guidance-dedup.mjs';
@@ -207,7 +207,7 @@ export function runGuidancePipeline(input: GuidancePipelineInput): GuidanceCard[
     input.goodHours && input.goodHours.length > 0 && !input.goodHours.includes(now.getHours()),
   );
 
-  const candidates: Array<{ card: GuidanceCard; priority: number; urgency: WindowUrgency }> = [];
+  const candidates: Array<{ card: GuidanceCard; priority: number; rawPriority: number; urgency: WindowUrgency }> = [];
   // Dedup gate: one card per identity. DEC insights are keyed by id (each is an
   // independent recommendation); every other type collapses to one card.
   const isDuplicate = makeDedupGate();
@@ -244,6 +244,7 @@ export function runGuidancePipeline(input: GuidancePipelineInput): GuidanceCard[
     if (isDuplicate(event.type, event.id)) continue;
 
     const priority = interruptPriority(severity, urgency, event.type, event.source, confidence);
+    const rawPriority = interruptPriorityRaw(severity, urgency, event.type, event.source, confidence);
 
     // Hour-fit gate: outside receptive hours, only severity-3 or high-priority cards show
     if (offHours && severity < 3 && priority < 6) continue;
@@ -253,6 +254,7 @@ export function runGuidancePipeline(input: GuidancePipelineInput): GuidanceCard[
 
     candidates.push({
       priority,
+      rawPriority,
       urgency,
       card: {
         id: `guidance-${event.id}`,
@@ -271,9 +273,11 @@ export function runGuidancePipeline(input: GuidancePipelineInput): GuidanceCard[
     });
   }
 
-  // Sort by priority desc — TODAY_CARD_BUDGET is the single arbiter (PRD TODAY-003)
+  // Sort by RAW priority desc (0-100, unrounded) — TODAY_CARD_BUDGET is the single
+  // arbiter (PRD TODAY-003). Sorting on the rounded 0-10 would tie most cards and
+  // degrade the top-N pick to insertion order.
   const result = candidates
-    .sort((a, b) => b.priority - a.priority)
+    .sort((a, b) => b.rawPriority - a.rawPriority)
     .slice(0, TODAY_CARD_BUDGET)
     .map((c) => c.card);
 

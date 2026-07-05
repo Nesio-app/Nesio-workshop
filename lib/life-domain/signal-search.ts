@@ -49,7 +49,8 @@ export function buildSignalSearchText(signal: Signal): string {
   ].join(' ').slice(0, 12000);
 }
 
-export function scoreSignalForQuery(signal: Signal, query: string): number {
+/** 词法相关性:query 与信号文本的 token/标题/标签重叠。这是"相关性门"的唯一依据。 */
+export function lexicalScoreForQuery(signal: Signal, query: string): number {
   const queryTokens = tokenize(query);
   if (!queryTokens.length) return 0;
   const haystack = buildSignalSearchText(signal).toLowerCase();
@@ -59,9 +60,17 @@ export function scoreSignalForQuery(signal: Signal, query: string): number {
   }
   if (signal.title && query.includes(signal.title)) score += 4;
   if ((signal.tags || []).some((tag) => query.includes(tag))) score += 3;
+  return score;
+}
+
+export function scoreSignalForQuery(signal: Signal, query: string): number {
+  // 无词法命中 → 直接判不相关。近因/置信只在"已经命中"的结果间做次序微调,
+  // 不再进相关性门(否则最新+高置信的无关信号也会被拉进结果,如查"passport"返回一堆最新记录)。
+  const lexical = lexicalScoreForQuery(signal, query);
+  if (lexical <= 0) return 0;
   const ageHours = (Date.now() - new Date(signal.capturedAt).getTime()) / 3_600_000;
   const recencyBoost = Number.isFinite(ageHours) ? Math.max(0, 1.2 - ageHours / 168) : 0;
-  return score + recencyBoost + signal.confidence * 0.8;
+  return lexical + recencyBoost + signal.confidence * 0.8;
 }
 
 export function searchSignalsSemantically(query: string, limit = 8): Signal[] {

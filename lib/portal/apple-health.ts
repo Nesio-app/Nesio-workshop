@@ -32,7 +32,7 @@ function parseAppleDate(s: string): number {
   return Number.isNaN(t) ? 0 : t;
 }
 
-interface Rec { startDate: string; endDate: string; value: string }
+interface Rec { startDate: string; endDate: string; value: string; unit: string; sourceName: string }
 
 /** 抽取某个 HK type 的所有 <Record ...>(自闭合或带子元素的开标签都能匹配到开头)。 */
 function records(xml: string, hkType: string): Rec[] {
@@ -45,6 +45,8 @@ function records(xml: string, hkType: string): Rec[] {
       startDate: tag.match(/startDate="([^"]+)"/)?.[1] || '',
       endDate: tag.match(/endDate="([^"]+)"/)?.[1] || '',
       value: tag.match(/value="([^"]+)"/)?.[1] || '',
+      unit: tag.match(/unit="([^"]+)"/)?.[1] || '',
+      sourceName: tag.match(/sourceName="([^"]+)"/)?.[1] || '',
     });
   }
   return out;
@@ -217,9 +219,16 @@ const METRIC_DEFS: MetricDef[] = [
   { key: 'mindful', hk: 'HKCategoryTypeIdentifierMindfulSession', label: ['正念', 'Mindfulness'], unit: 'min', decimals: 0, agg: 'mindful', group: 'mind' },
 ];
 
-// unit 换算:米→千米,秒→分钟(部分类型 Apple 用基础单位)
-function scaleValue(key: string, raw: number): number {
-  if (key === 'distance') return raw / 1000; // Apple 距离常以 m 记(也可能已是 km)
+// unit 换算:优先读 Record 的 unit= 属性(权威),缺失时才按 Apple 默认(米)兜底。
+// 修「导出单位是 km 时距离被 /1000 缩成 1/1000」的硬编码假设。
+function scaleValue(key: string, raw: number, unit?: string): number {
+  if (key === 'distance') {
+    const u = (unit || '').toLowerCase();
+    if (u === 'km') return raw;
+    if (u === 'mi') return raw * 1.60934;
+    if (u === 'm') return raw / 1000;
+    return raw / 1000; // 无 unit → 按 Apple 默认米
+  }
   return raw;
 }
 
@@ -241,8 +250,21 @@ function monthlySeriesAvg(daily: Map<string, number>, transform: (v: number) => 
     .map(([ym, b]) => ({ ym, v: Math.round((b.sum / b.count) * 10 ** dec) / 10 ** dec }));
 }
 
+// 多设备(iPhone + Apple Watch)会各记一份同一天的步数/距离/能量;HealthKit 只在查询时
+// 去重、XML 里不去。每天取"记得最多的那个来源"而非跨来源相加,避免总量虚高 ~1.5–2×。
+function collapseBySource(byDay: Map<string, Map<string, number>>): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const [day, bySrc] of byDay) {
+    let max = 0;
+    for (const v of bySrc.values()) if (v > max) max = v;
+    out.set(day, max);
+  }
+  return out;
+}
+
 class HealthAggregator {
-  private sumDay = new Map<string, Map<string, number>>();
+  // key → day → sourceName → 当日该来源合计(finalize 时每天取最大来源,去多设备重复)
+  private sumDay = new Map<string, Map<string, Map<string, number>>>();
   private latest = new Map<string, { d: string; v: number; pd: string; pv: number }>();
   private monthlyLatest = new Map<string, Map<string, { sum: number; count: number }>>(); // latest 类指标的按月均值
   private sleepMs = new Map<string, number>();
@@ -265,14 +287,17 @@ class HealthAggregator {
           const v = Number(r.value);
           if (!day || !Number.isFinite(v)) continue;
           if (!m) { m = new Map(); this.sumDay.set(def.key, m); }
-          m.set(day, (m.get(day) || 0) + scaleValue(def.key, v));
+          let bySrc = m.get(day);
+          if (!bySrc) { bySrc = new Map(); m.set(day, bySrc); }
+          const src = r.sourceName || '';
+          bySrc.set(src, (bySrc.get(src) || 0) + scaleValue(def.key, v, r.unit));
         }
       } else if (def.agg === 'latest') {
         let mm = this.monthlyLatest.get(def.key);
         for (const r of records(text, def.hk)) {
           const v = Number(r.value);
           if (!r.startDate || !Number.isFinite(v)) continue;
-          const sv = scaleValue(def.key, v);
+          const sv = scaleValue(def.key, v, r.unit);
           this.pushLatest(def.key, r.startDate.slice(0, 10), sv);
           if (!mm) { mm = new Map(); this.monthlyLatest.set(def.key, mm); }
           const ym = r.startDate.slice(0, 7);
@@ -301,8 +326,9 @@ class HealthAggregator {
     const out: HealthMetric[] = [];
     for (const def of METRIC_DEFS) {
       if (def.agg === 'sumDay') {
-        const m = this.sumDay.get(def.key);
-        if (!m || !m.size) continue;
+        const raw = this.sumDay.get(def.key);
+        if (!raw || !raw.size) continue;
+        const m = collapseBySource(raw); // 每天取最大来源,去多设备重复
         const days = [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]));
         const last = days[days.length - 1];
         const prev = days.length > 1 ? days[days.length - 2][1] : null;

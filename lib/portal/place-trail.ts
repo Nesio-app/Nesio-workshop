@@ -236,17 +236,52 @@ export interface TimelineDay {
   segments: TimelineSegment[];
 }
 
+const pad2 = (n: number) => String(n).padStart(2, '0');
+
+/** ISO 串自带的时区偏移(分钟);末尾 Z→0;无偏移信息→null。 */
+function isoOffsetMinutes(iso: string): number | null {
+  const m = iso.match(/([+-])(\d{2}):?(\d{2})$/);
+  if (m) return (m[1] === '-' ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3]));
+  if (/[zZ]$/.test(iso)) return 0;
+  return null;
+}
+
+/** 事件"墙上时钟"(用 ISO 自带偏移,而非浏览器本地时区)。返回 UTC 视角下的等价时刻。 */
+function wallClock(iso: string): Date | null {
+  const off = isoOffsetMinutes(iso);
+  const ms = Date.parse(iso);
+  if (off == null || Number.isNaN(ms)) return null;
+  return new Date(ms + off * 60_000); // 用 getUTC* 读出的就是事件当地的年月日时
+}
+
+/** 'YYYY-MM-DD',按事件自身时区分桶(Google Timeline 带地点偏移,别用看客机器时区)。 */
 function localDateKey(iso: string): string {
+  const w = wallClock(iso);
+  if (w) return `${w.getUTCFullYear()}-${pad2(w.getUTCMonth() + 1)}-${pad2(w.getUTCDate())}`;
   const d = new Date(iso);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
+/** 事件当地小时(0-23),用于时段分桶。 */
+function localHour(iso: string): number {
+  const w = wallClock(iso);
+  return w ? w.getUTCHours() : new Date(iso).getHours();
 }
 
 /** 段结束若跨到次日,截到当天 23:59 —— 避免「在家过夜」吞掉第二天、时长显示成 24h。 */
 function clampEndToDay(startIso: string, endIso: string): string {
   if (localDateKey(endIso) === localDateKey(startIso)) return endIso;
-  const d = new Date(startIso);
-  d.setHours(23, 59, 59, 0);
-  return d.toISOString();
+  const off = isoOffsetMinutes(startIso);
+  const ms = Date.parse(startIso);
+  if (off == null || Number.isNaN(ms)) {
+    const d = new Date(startIso);
+    d.setHours(23, 59, 59, 0);
+    return d.toISOString();
+  }
+  // 在事件自身时区把当天推到 23:59:59,再换回真实时刻
+  const w = new Date(ms + off * 60_000);
+  w.setUTCHours(23, 59, 59, 0);
+  return new Date(w.getTime() - off * 60_000).toISOString();
 }
 
 /**
@@ -420,7 +455,7 @@ export function timeOfDayBuckets(visits: PlaceVisit[]): BucketShare[] {
   const m = new Map<TimeBucket, number>(order.map((b) => [b, 0]));
   const segs = buildPlaceTimeline(visits, 3650).flatMap((d) => d.segments);
   for (const s of segs) {
-    const h = new Date(s.start).getHours();
+    const h = localHour(s.start);
     const b: TimeBucket = h < 5 ? 'night' : h < 8 ? 'dawn' : h < 12 ? 'morning' : h < 17 ? 'afternoon' : h < 21 ? 'evening' : 'night';
     m.set(b, (m.get(b) || 0) + s.durationMin);
   }

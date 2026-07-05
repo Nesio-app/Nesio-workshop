@@ -67,6 +67,11 @@ export function dominantCurrency(txs: BankTx[]): string {
   return best;
 }
 
+/** 是否属于给定币种(缺省按 USD)。聚合前先按币种分组,避免 $10 与 ¥10 直接相加成 20。 */
+function inCurrency(t: BankTx, cur: string): boolean {
+  return (t.currency || 'USD').toUpperCase() === cur;
+}
+
 /* ---------- 批次 33:交易类型分流(修「转账/收入/还款被当退款」的算错)---------- */
 // Plaid amount 约定:正=花出去,负=进账。但「进账」里混了 收入/转账/信用卡还款,
 // 这些都不该计入收支。按 personal_finance_category 自动分流,并允许用户手动纠正、记住。
@@ -112,7 +117,9 @@ export interface MonthSummary {
 }
 
 export function summarizeMonth(txs: BankTx[], ym: string): MonthSummary {
-  const monthTxs = txs.filter((t) => txYm(t) === ym);
+  // 只按主币种口径汇总(混币种时忽略非主币种交易),否则 $ 与 ¥ 会被直接相加。
+  const cur = dominantCurrency(txs);
+  const monthTxs = txs.filter((t) => txYm(t) === ym && inCurrency(t, cur));
   const flowRules = loadFlowRules();
   let gross = 0, refunds = 0, income = 0, count = 0;
   for (const t of monthTxs) {
@@ -129,7 +136,7 @@ export function summarizeMonth(txs: BankTx[], ym: string): MonthSummary {
     net: round2(gross - refunds),
     income: round2(income),
     count,
-    currency: dominantCurrency(monthTxs.length ? monthTxs : txs),
+    currency: cur,
   };
 }
 
@@ -157,8 +164,9 @@ function sumByCategory(txs: BankTx[], ym: string): Map<string, number> {
   const m = new Map<string, number>();
   const rules = loadMerchantRules();
   const flowRules = loadFlowRules();
+  const cur = dominantCurrency(txs);
   for (const t of txs) {
-    if (txYm(t) !== ym || txFlow(t, flowRules) !== 'expense') continue;
+    if (txYm(t) !== ym || !inCurrency(t, cur) || txFlow(t, flowRules) !== 'expense') continue;
     const cat = effectiveCategory(t, rules) || '未分类';
     m.set(cat, (m.get(cat) || 0) + Math.abs(t.amount));
   }
@@ -174,8 +182,9 @@ export interface MerchantAgg {
 export function topMerchants(txs: BankTx[], ym: string, n = 5): MerchantAgg[] {
   const m = new Map<string, { total: number; count: number }>();
   const flowRules = loadFlowRules();
+  const ccy = dominantCurrency(txs);
   for (const t of txs) {
-    if (txYm(t) !== ym || txFlow(t, flowRules) !== 'expense') continue;
+    if (txYm(t) !== ym || !inCurrency(t, ccy) || txFlow(t, flowRules) !== 'expense') continue;
     const name = t.name || '未知商户';
     const cur = m.get(name) || { total: 0, count: 0 };
     cur.total += Math.abs(t.amount);
@@ -218,8 +227,9 @@ export function loadBankAccounts(): BankAccount[] {
 export function accountMonth(txs: BankTx[], accountId: string, ym: string): { spend: number; refund: number; count: number } {
   let spend = 0, refund = 0, count = 0;
   const flowRules = loadFlowRules();
+  const cur = dominantCurrency(txs.filter((t) => t.accountId === accountId));
   for (const t of txs) {
-    if (t.accountId !== accountId || txYm(t) !== ym) continue;
+    if (t.accountId !== accountId || txYm(t) !== ym || !inCurrency(t, cur)) continue;
     const f = txFlow(t, flowRules);
     if (f === 'expense') { spend += Math.abs(t.amount); count += 1; }
     else if (f === 'refund') { refund += Math.abs(t.amount); count += 1; }
@@ -340,13 +350,17 @@ function rollForward(baseMs: number, cadenceDays: number): string {
  * 1. 先按商户归并支出;2. 判类别 —— 账单关键词命中 OR (非餐饮/购物 且 金额稳定 CV<0.2);
  * 3. 间隔中位数落在周期档;4. 下次日期滚动到未来。这样「超市去很多次」不会误判为定期。
  */
+// 间隔规律性上限:定期账单的相邻间隔应当稳定(CV 低)。噪声(如 1 天、59 天)会被挡下。
+const MAX_GAP_CV = 0.25;
+
 export function detectRecurring(txs: BankTx[]): RecurringCharge[] {
   const flowRules = loadFlowRules();
   const merchantRules = loadMerchantRules();
+  const cur = dominantCurrency(txs); // 同一商户不同币种不混判
   const byKey = new Map<string, BankTx[]>();
   for (const t of txs) {
     if (txFlow(t, flowRules) !== 'expense') continue;
-    if (!t.date) continue;
+    if (!t.date || !inCurrency(t, cur)) continue;
     const key = normalizeMerchant(t.name);
     if (!key) continue;
     const list = byKey.get(key) || [];
@@ -356,16 +370,22 @@ export function detectRecurring(txs: BankTx[]): RecurringCharge[] {
 
   const out: RecurringCharge[] = [];
   for (const list of byKey.values()) {
-    if (list.length < 3) continue; // 至少 3 笔才谈得上「定期」
+    const isBillKeyword = list.some((t) => BILL_RE.test(t.name));
+    // 关键词账单信号强,3 笔即可;否则要 4 笔(≥3 个间隔)才谈得上稳定周期。
+    const minCharges = isBillKeyword ? 3 : 4;
+    if (list.length < minCharges) continue;
     const sorted = list.slice().sort((a, b) => a.date.localeCompare(b.date));
     const gaps: number[] = [];
     for (let i = 1; i < sorted.length; i++) {
       const d = (Date.parse(sorted[i].date) - Date.parse(sorted[i - 1].date)) / 86_400_000;
       if (d > 0) gaps.push(d);
     }
+    if (gaps.length < 2) continue;
     const medGap = median(gaps);
     const label = cadenceLabelFor(medGap);
     if (!label) continue;
+    // 间隔必须规律:day1/day2/day60(间隔 1、59)中位数=30 会被误判「每月」,这里挡掉。
+    if (coeffVar(gaps) > MAX_GAP_CV) continue;
 
     const last = sorted[sorted.length - 1];
     const cat = merchantRules[last.name] || suggestCategory(last.name).category;
@@ -374,7 +394,6 @@ export function detectRecurring(txs: BankTx[]): RecurringCharge[] {
     const cv = coeffVar(amts);
 
     // ── 账单判定 ──
-    const isBillKeyword = BILL_RE.test(last.name);
     const isNonBill = NON_BILL_CAT_RE.test(cat) || NON_BILL_CAT_RE.test(last.name);
     // 关键词命中 = 账单(放宽金额);否则必须「非餐饮购物 且 金额稳定」
     const qualifies = isBillKeyword || (!isNonBill && cv < 0.2);
@@ -389,7 +408,7 @@ export function detectRecurring(txs: BankTx[]): RecurringCharge[] {
       nextEstimate: rollForward(Date.parse(last.date) + medGap * 86_400_000, Math.round(medGap)),
       cadenceDays: Math.round(medGap),
       cadenceLabel: label,
-      currency: last.currency || 'USD',
+      currency: last.currency || cur,
     });
   }
   return out.sort((a, b) => a.nextEstimate.localeCompare(b.nextEstimate));
@@ -419,13 +438,18 @@ export interface FinanceAlert { level: 'risk' | 'warn' | 'info'; title: string; 
 export function financeAlerts(txs: BankTx[], ym: string): FinanceAlert[] {
   const out: FinanceAlert[] = [];
   const rules = loadMerchantRules();
+  const flowRules = loadFlowRules();
+  const ccy = dominantCurrency(txs);
 
-  // 购物类超过前 6 个月均值
+  // 购物类超过前 6 个月均值(只算真支出、主币种;不再用裸 amount>0 把转账/收入算进来)
   const shoppingRe = /shopping|购物/i;
-  const monthShopping = txs.filter((t) => txYm(t) === ym && t.amount > 0 && shoppingRe.test(effectiveCategory(t, rules))).reduce((a, t) => a + t.amount, 0);
+  const shoppingSpend = (m: string) => txs
+    .filter((t) => txYm(t) === m && inCurrency(t, ccy) && txFlow(t, flowRules) === 'expense' && shoppingRe.test(effectiveCategory(t, rules)))
+    .reduce((a, t) => a + Math.abs(t.amount), 0);
+  const monthShopping = shoppingSpend(ym);
   const prevMonths = availableMonths(txs).filter((m) => m < ym).slice(0, 6);
   if (prevMonths.length >= 2) {
-    const avg = prevMonths.reduce((a, m) => a + txs.filter((t) => txYm(t) === m && t.amount > 0 && shoppingRe.test(effectiveCategory(t, rules))).reduce((s, t) => s + t.amount, 0), 0) / prevMonths.length;
+    const avg = prevMonths.reduce((a, m) => a + shoppingSpend(m), 0) / prevMonths.length;
     if (avg > 0 && monthShopping > avg * 1.3) {
       const pct = Math.round(((monthShopping - avg) / avg) * 100);
       out.push({ level: 'warn', title: '购物支出高于往月', body: `本月购物比前 ${prevMonths.length} 个月均值高 ${pct}%` });

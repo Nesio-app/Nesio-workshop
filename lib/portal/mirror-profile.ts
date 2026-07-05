@@ -110,14 +110,20 @@ export function getDomainWeight(domain: string): number {
   return getMirrorProfile().domainWeights[domain] ?? 0.5;
 }
 
-/** Best hours to interrupt user (top 8 hours by engagement) */
+/** Best hours to interrupt user — only hours that climbed ABOVE the 0.5 baseline. */
 export function getBestInterruptionHours(): number[] {
   const profile = getMirrorProfile();
-  return profile.hourEngagement
+  // 只取真正高于基线(0.5)的时段,而不是"前 8 名"。冷启动时所有桶都是 0.5,
+  // 稳定排序会返回 [0..7](凌晨)——最差的接收窗口。这里返回真正学到的时段;
+  // 数据不足(反馈 < 8 或高于基线的时段 < 3)则返回 [],让上层不加 offHours 门。
+  const engaged = profile.hourEngagement
     .map((v, h) => ({ h, v }))
+    .filter((x) => x.v > 0.5 + 1e-6)
     .sort((a, b) => b.v - a.v)
     .slice(0, 8)
     .map((x) => x.h);
+  if (profile.feedbackCount < 8 || engaged.length < 3) return [];
+  return engaged;
 }
 
 /** Sync mirror profile to cloud (best-effort, silent on failure) */

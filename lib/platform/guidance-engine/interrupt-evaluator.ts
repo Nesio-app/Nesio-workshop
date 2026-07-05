@@ -81,7 +81,13 @@ function personalRelevanceScore(source: GuidanceSource): number {
 
 const SHOW_THRESHOLD = 4; // 0-10 scale
 
-export function interruptPriority(
+/**
+ * Raw weighted priority on a 0–100 scale (unrounded).
+ * Use this for SORTING candidates — rounding to 0–10 first (interruptPriority)
+ * collapses most cards into the same integer bucket, so the top-N pick would
+ * degrade to insertion order instead of true score.
+ */
+export function interruptPriorityRaw(
   severity: ConsequenceSeverity,
   urgency: WindowUrgency,
   type: GuidanceEventType,
@@ -90,14 +96,24 @@ export function interruptPriority(
 ): number {
   if (urgency === 'closed') return 0;
 
-  const raw =
+  return (
     riskSeverityScore(severity)      * 0.30 +
     timeSensitivityScore(urgency)    * 0.25 +
     preparationValueScore(type)      * 0.20 +
     confidence                       * 0.15 +
-    personalRelevanceScore(source)   * 0.10;
+    personalRelevanceScore(source)   * 0.10
+  );
+}
 
-  return Math.round(raw / 10); // normalize to 0-10
+export function interruptPriority(
+  severity: ConsequenceSeverity,
+  urgency: WindowUrgency,
+  type: GuidanceEventType,
+  source: GuidanceSource,
+  confidence: number = 75, // 0-100, from GuidanceEvent.confidence
+): number {
+  // 0-10 rounded — for display + SHOW_THRESHOLD gating only, never for sorting.
+  return Math.round(interruptPriorityRaw(severity, urgency, type, source, confidence) / 10);
 }
 
 export function worthInterrupting(
