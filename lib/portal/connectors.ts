@@ -9,6 +9,7 @@ import { getLifeGraph } from './life-graph';
 import type { CalendarEvent } from './types';
 import { createSignal } from '../life-domain/create-signal';
 import { normalizeCalendarToSignal, normalizeWeatherToSignal } from '../life-domain/normalizers';
+import { recordLiveVisit } from './place-trail';
 
 // ── Weather ──────────────────────────────────────────────────────────────────
 
@@ -34,6 +35,8 @@ export async function refreshWeather(): Promise<void> {
           const snapshot = await fetchWeatherAt(lat, lon, timezone, placeName);
           writePortalCache(PORTAL_CACHE_KEYS.weather, snapshot);
           createSignal(normalizeWeatherToSignal({ ...snapshot, placeName }));
+          // 批次 21:地点流水——定位到手顺手记一笔(同地 2h 去重),本机积累足迹
+          if (placeName) recordLiveVisit(placeName, lat, lon);
           window.dispatchEvent(new CustomEvent('nesio-weather-updated', { detail: snapshot }));
         } catch { /* fetch failed */ }
         resolve();

@@ -36,6 +36,7 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import { InfoTip } from './InfoTip';
+import { loadPlaceTrail, PLACE_TRAIL_UPDATED_EVENT, type PlaceVisit } from '@/lib/portal/place-trail';
 import { getFreezeItems } from '@/lib/platform/impulse-guard';
 
 function loadFreezeLedger(): { total: number; skipped: number; bought: number } {
@@ -1178,6 +1179,13 @@ export default function InsightsSheet({ onClose }: { onClose: () => void }) {
               <LifeCivilizationMap nodes={allNodes} />
             </div>
 
+            {/* 地点足迹(批次 21) */}
+            <div className="nesio-insights-section">
+              <p className="nesio-insights-section-label">{L(dict, '地点足迹', 'Place trail')}<InfoTip text={L(dict, '来自你授权的定位(同一地点 2 小时内只记一笔,全部存本机)+ 可选的 Google 时间轴导入。', 'From your granted location (one entry per place per 2h, stored on-device) plus optional Google Timeline import.')} /></p>
+              <PlaceTrailWidget />
+            </div>
+
+
             {/* Dynamic widgets */}
             {activeWidgets.length === 0 && (
               <p className="nesio-insights-empty" style={{ marginTop: '2rem' }}>
@@ -1255,6 +1263,36 @@ export default function InsightsSheet({ onClose }: { onClose: () => void }) {
           }}
         />
       )}
+    </div>
+  );
+}
+
+
+// ── 地点足迹(批次 21):live 定位积累 + Google 时间轴导入 共同消费 ────────────
+function PlaceTrailWidget() {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
+  const [trail, setTrail] = useState<PlaceVisit[]>([]);
+  useEffect(() => {
+    const read = () => setTrail(loadPlaceTrail());
+    read();
+    window.addEventListener(PLACE_TRAIL_UPDATED_EVENT, read);
+    return () => window.removeEventListener(PLACE_TRAIL_UPDATED_EVENT, read);
+  }, []);
+  if (trail.length === 0) {
+    return <p className="nesio-insights-empty">{L(dict, '还没有足迹。授权位置后自动积累;也可在数据接入导入 Google 时间轴。', 'No trail yet. It builds automatically once location is granted; you can also import Google Timeline under Data sources.')}</p>;
+  }
+  return (
+    <div className="nesio-place-trail">
+      {trail.slice(0, 12).map((v, i) => (
+        <div key={`${v.ts}-${i}`} className="nesio-place-trail-row">
+          <span className="nesio-place-trail-time">
+            {new Date(v.ts).toLocaleString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+          </span>
+          <span className="nesio-place-trail-label">{v.label}</span>
+          {v.source === 'import' && <span className="nesio-place-trail-src">{L(dict, '导入', 'import')}</span>}
+        </div>
+      ))}
+      <p className="nesio-place-trail-count">{L(dict, `共 ${trail.length} 条足迹`, `${trail.length} visits total`)}</p>
     </div>
   );
 }

@@ -17532,6 +17532,13 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 }
 .nesio-narrator-section > .nesio-narrator-card:nth-child(3) { grid-column: 1 / -1; }
 
+/* 批次 21:地点足迹 */
+.nesio-place-trail-row { display: flex; align-items: baseline; gap: 0.6rem; padding: 0.35rem 0; border-bottom: 1px solid var(--portal-line); font-size: 0.8rem; }
+.nesio-place-trail-time { color: var(--portal-muted); font-size: 0.7rem; flex-shrink: 0; min-width: 6.5em; }
+.nesio-place-trail-label { color: var(--portal-ink); font-weight: 500; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nesio-place-trail-src { font-size: 0.62rem; color: var(--portal-muted); border: 1px solid var(--portal-line); border-radius: 999px; padding: 0 0.4rem; }
+.nesio-place-trail-count { font-size: 0.68rem; color: var(--portal-muted); margin: 0.4rem 0 0; }
+
 /* 批次 20:关系图星图风 */
 .rg-wrap.rg-wrap--starmap { background: #10151f; border-radius: 14px; overflow: hidden; border: 1px solid rgba(160,175,205,0.18); }
 .rg-zoom-hint { font-size: 0.64rem; color: rgba(180,195,220,0.55); text-align: center; margin: 0; padding: 0.3rem 0 0.45rem; }

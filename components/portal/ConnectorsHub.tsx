@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { IconActivity, IconBook, IconBookOpen, IconCalendar, IconCar, IconCheckSquare, IconCloudSun, IconHeartPulse, IconMail, IconNote, IconTimer , IconImage } from './icons';
+import { IconActivity, IconBook, IconBookOpen, IconCalendar, IconCar, IconCheckSquare, IconCloudSun, IconHeartPulse, IconMail, IconNote, IconTimer , IconImage, IconMapPin, IconCard } from './icons';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { type LifeNode } from '@/lib/portal/life-graph';
 import { L } from '@/lib/portal/i18n';
@@ -38,6 +38,10 @@ const CONNECTORS: ConnectorDef[] = [
   // 日历和 Gmail 是同一次 Google 授权,合并为一个入口(批次 5 用户反馈)
   { id: 'google', name: 'Google 日历 · Gmail', nameEn: 'Google Calendar · Gmail', icon: <IconCalendar />, iconBg: 'var(--chip-blue)', method: 'oauth', description: '一次授权同时接入:日程生成提醒和简报,邮件提取人物、日期、承诺', descriptionEn: 'One consent covers both: calendar drives reminders and briefs; email yields people, dates, promises' },
   { id: 'weather', name: '地理位置 · 天气', nameEn: 'Location · Weather', icon: <IconCloudSun />, iconBg: 'var(--chip-amber)', method: 'geo', description: '基于实时天气生成外出和健康建议', descriptionEn: 'Live weather feeds outing and health suggestions' },
+  // 批次 21:银行流水(Plaid)—— Link 授权后增量同步交易,明细只存本机
+  { id: 'plaid', name: '银行流水 · Plaid', nameEn: 'Bank feed · Plaid', icon: <IconCard />, iconBg: 'var(--chip-fog)', method: 'oauth', description: '连接美国银行账户,交易流水增量同步(明细只存本机)', descriptionEn: 'Link a US bank account; transactions sync incrementally (details stay on-device)' },
+  // 批次 21:Google 地图时间轴导入 —— 手机端导出的 JSON 并入地点足迹
+  { id: 'timeline', name: 'Google 时间轴导入', nameEn: 'Google Timeline import', icon: <IconMapPin />, iconBg: 'var(--chip-leaf)', method: 'file', description: '手机 Google 地图 → 设置 → 时间轴 → 导出数据,把 JSON 传进来并入地点足迹', descriptionEn: 'Google Maps app → Settings → Timeline → export, upload the JSON to merge into your place trail' },
   // 批次 19:相册批量导入 —— 一次选多张,AI 逐张识别入库(解决「一张张传太麻烦」)
   { id: 'photos', name: '相册批量导入', nameEn: 'Batch photo import', icon: <IconImage />, iconBg: 'var(--chip-frost)', method: 'batch-photos', description: '一次选多张照片,自动识别成记忆(每批最多 10 张)', descriptionEn: 'Pick multiple photos; each is recognized into memories (up to 10 per batch)' },
   { id: 'flomo', name: 'Flomo', icon: <IconNote />, iconBg: 'var(--chip-indigo)', method: 'server', syncEndpoint: '/api/portal/flomo?limit=100', description: '同步 flomo 笔记，提取想法与记录', descriptionEn: 'Sync flomo notes; extract ideas and records' },
@@ -79,6 +83,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const fileRef = useRef<HTMLInputElement>(null);
   const photosRef = useRef<HTMLInputElement>(null);
+  const timelineRef = useRef<HTMLInputElement>(null);
   const [connected, setConnected] = useState<Record<string, boolean>>({});
   const [syncing, setSyncing] = useState<string | null>(null);
   const [counts, setCounts] = useState<Record<string, number>>({});
@@ -187,6 +192,115 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     showToast(L(dict,
       `批量导入完成:${list.length} 张照片,入库 ${saved} 条${failed ? `,${failed} 张没识别出内容` : ''}`,
       `Batch done: ${list.length} photos, ${saved} memories saved${failed ? `, ${failed} unrecognized` : ''}`), failed === 0);
+  }
+
+
+
+  // ── 批次 21:Plaid 银行流水 ──
+  async function connectPlaid() {
+    setSyncing('plaid');
+    try {
+      const res = await fetch('/api/portal/plaid/link-token', { method: 'POST' });
+      const data = await res.json() as { ok?: boolean; linkToken?: string; error?: string };
+      if (!data.ok || !data.linkToken) {
+        showToast(data.error === 'plaid_not_configured'
+          ? L(dict, 'Plaid 还没配置:dashboard.plaid.com 注册 → Keys 里拿 client_id 和 Sandbox secret,配到 Vercel(PLAID_CLIENT_ID / PLAID_SECRET / PLAID_ENV)', 'Plaid not configured: sign up at dashboard.plaid.com → Keys → set PLAID_CLIENT_ID / PLAID_SECRET / PLAID_ENV on Vercel')
+          : L(dict, `Plaid 连接失败:${data.error || '未知'}`, `Plaid connect failed: ${data.error || 'unknown'}`), false);
+        setSyncing(null);
+        return;
+      }
+      // Link 前端从官方 CDN 按需加载
+      if (!(window as unknown as { Plaid?: unknown }).Plaid) {
+        await new Promise<void>((resolve, reject) => {
+          const sc = document.createElement('script');
+          sc.src = 'https://cdn.plaid.com/link/v2/stable/link-initialize.js';
+          sc.onload = () => resolve();
+          sc.onerror = () => reject(new Error('link_script'));
+          document.head.appendChild(sc);
+        });
+      }
+      const Plaid = (window as unknown as { Plaid: { create: (cfg: object) => { open: () => void } } }).Plaid;
+      const link = Plaid.create({
+        token: data.linkToken,
+        onSuccess: async (publicToken: string) => {
+          const ex = await fetch('/api/portal/plaid/exchange', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ publicToken }),
+          });
+          const exData = await ex.json() as { ok?: boolean; error?: string };
+          if (exData.ok) {
+            saveConnectorState('plaid', true);
+            setConnected((p) => ({ ...p, plaid: true }));
+            showToast(L(dict, '银行已连接,点「同步」拉取流水', 'Bank linked — tap Sync to pull transactions'), true);
+          } else {
+            showToast(L(dict, `绑定失败:${exData.error || '未知'}`, `Link failed: ${exData.error || 'unknown'}`), false);
+          }
+        },
+        onExit: () => { /* 用户取消 */ },
+      });
+      link.open();
+    } catch {
+      showToast(L(dict, 'Plaid Link 加载失败,请检查网络', 'Failed to load Plaid Link — check your network'), false);
+    }
+    setSyncing(null);
+  }
+
+  async function syncPlaid() {
+    setSyncing('plaid');
+    try {
+      const res = await fetch('/api/portal/plaid/transactions');
+      const data = await res.json() as { ok?: boolean; transactions?: Array<{ id: string; date: string; name: string; amount: number; currency: string; category: string }>; error?: string };
+      if (!data.ok) {
+        if (data.error === 'not_connected' || data.error === 'relink_required') {
+          showToast(L(dict, '需要(重新)连接银行', 'Bank needs (re)linking'), false);
+          void connectPlaid();
+        } else {
+          showToast(L(dict, `流水同步失败:${data.error || '未知'}`, `Sync failed: ${data.error || 'unknown'}`), false);
+        }
+        setSyncing(null);
+        return;
+      }
+      // 明细只存本机,按交易 id 去重,封顶 1000
+      const KEY = 'nesio-bank-tx-v1';
+      let existing: Array<{ id: string }> = [];
+      try { existing = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { /* ignore */ }
+      const seen = new Set(existing.map((t) => t.id));
+      const fresh = (data.transactions || []).filter((t) => !seen.has(t.id));
+      const merged = [...fresh, ...existing].slice(0, 1000);
+      try { localStorage.setItem(KEY, JSON.stringify(merged)); } catch { /* quota */ }
+      setCounts((p) => ({ ...p, plaid: merged.length }));
+      saveConnectorState('plaid', true);
+      setConnected((p) => ({ ...p, plaid: true }));
+      showToast(L(dict, `流水同步完成:新增 ${fresh.length} 笔,本机共 ${merged.length} 笔`, `Synced: ${fresh.length} new, ${merged.length} total on-device`), true);
+    } catch {
+      showToast(L(dict, '网络错误', 'Network error'), false);
+    }
+    setSyncing(null);
+  }
+
+  // ── 批次 21:Google 时间轴 JSON 导入 ──
+  async function handleTimelineFile(files: FileList | null) {
+    const file = files?.[0];
+    if (!file) return;
+    setSyncing('timeline');
+    try {
+      const { parseGoogleTimeline, mergeImportedVisits } = await import('@/lib/portal/place-trail');
+      const json = JSON.parse(await file.text()) as unknown;
+      const visits = parseGoogleTimeline(json);
+      if (!visits.length) {
+        showToast(L(dict, '没有解析到地点记录:请确认是 Google 地图时间轴导出的 JSON', 'No visits found — make sure this is the Google Maps Timeline export JSON'), false);
+      } else {
+        const added = mergeImportedVisits(visits);
+        saveConnectorState('timeline', true);
+        setConnected((p) => ({ ...p, timeline: true }));
+        setCounts((p) => ({ ...p, timeline: added }));
+        showToast(L(dict, `时间轴导入完成:解析 ${visits.length} 段,新增 ${added} 条足迹(洞察 → 分析 → 地点足迹)`, `Timeline imported: ${visits.length} segments parsed, ${added} new visits (Insights → Analytics → Place trail)`), true);
+      }
+    } catch {
+      showToast(L(dict, '文件不是有效的 JSON', 'Not a valid JSON file'), false);
+    }
+    setSyncing(null);
   }
 
   // ── Token-based sync (Notion, Toggl) ──
@@ -367,6 +481,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
   // ── OAuth sync (Gmail / Calendar 旧入口,google 合并后仅内部保留) ──
   async function syncOAuth(c: ConnectorDef) {
     if (c.id === 'google') { await syncGoogle(c); return; }
+    if (c.id === 'plaid') { await syncPlaid(); return; }
     setSyncing(c.id);
     setOauthSyncResult((p) => ({ ...p, [c.id]: { ok: true, msg: L(dict, '同步中…', 'Syncing…') } }));
     try {
@@ -491,6 +606,8 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     }
     if (c.id === 'health') { fileRef.current?.click(); return; }
     if (c.method === 'batch-photos') { photosRef.current?.click(); return; }
+    if (c.id === 'timeline') { timelineRef.current?.click(); return; }
+    if (c.id === 'plaid') { void connectPlaid(); return; }
     // Notion:先走 OAuth(服务端未配 NOTION_CLIENT_ID 会带 error 跳回,给出指引)
     if (c.id === 'notion' && !loadToken('notion')) { window.location.href = '/api/portal/notion/connect'; return; }
     if (c.method === 'token') { syncToken(c); return; }
@@ -554,6 +671,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     <div className="nesio-settings-sheet-overlay" role="dialog" aria-modal="true" aria-label={L(dict, '数据接入', 'Data sources')}>
       <input ref={fileRef} type="file" accept=".xml,.zip" style={{ display: 'none' }} onChange={handleHealthFile} />
       <input ref={photosRef} type="file" accept="image/*" multiple hidden onChange={(e) => { void handleBatchPhotos(e.target.files); e.target.value = ''; }} />
+      <input ref={timelineRef} type="file" accept="application/json,.json" hidden onChange={(e) => { void handleTimelineFile(e.target.files); e.target.value = ''; }} />
       <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
       <div className="nesio-settings-sheet-card">
         <div className="nesio-sheet-handle" aria-hidden />
