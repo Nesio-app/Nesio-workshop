@@ -73,6 +73,18 @@ const SOURCE_LABEL: Record<string, string> = {
 };
 
 function fmtNode(n: LifeNode): string {
+  // 批次 37:邮件节点给 AI 真实内容(发件人 + 真实收件日期 + 摘要),否则只有主题一行
+  // AI 会凭空编造邮件内容(用户遇到的「今天的邮件」被虚构成面试/物业通知)。
+  if (n.source === 'email') {
+    const from = typeof n.attributes.from === 'string' ? n.attributes.from : '';
+    const dateStr = typeof n.attributes.date === 'string' ? n.attributes.date : n.createdAt;
+    const d = new Date(dateStr);
+    const dateLabel = Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+    const body = [n.attributes.snippet, n.attributes.article, n.rawInput]
+      .find((v): v is string => typeof v === 'string' && v.trim().length > 0) || '';
+    const snippet = body.replace(/\s+/g, ' ').slice(0, 140);
+    return `• [邮件] 主题「${n.name}」${from ? ` · 来自 ${from}` : ''}${dateLabel ? ` · ${dateLabel}` : ''}${snippet ? ` · 摘要:${snippet}` : ''}`;
+  }
   const startStr = n.attributes.start as string | undefined;
   const dateLabel = startStr
     ? fmtEventDate(startStr)
@@ -114,13 +126,23 @@ async function buildMemoryContext(query: string): Promise<string> {
     )
     .slice(0, 8);
 
-  // Layer 4 (批次 37):查询提到邮件时,显式带上最近的邮件节点。否则英文主题的邮件
-  // 在中文提问("我的邮件")下文本匹配不到,永远进不了 candidates —— 用户会觉得
-  // 「同步了却问不出来」。
+  // Layer 4 (批次 37):查询提到邮件时,显式带上邮件节点。否则英文主题的邮件在中文
+  // 提问("我的邮件")下文本匹配不到,永远进不了 candidates —— 用户会觉得「同步了却问不出来」。
+  // 「今天的邮件」按邮件真实收件日期(attributes.date)过滤,而不是 attributes.start(邮件没有)。
   const wantsEmail = /邮件|邮箱|email|e-mail|\bmail\b|收件|inbox|gmail/i.test(query);
-  const emailNodes = wantsEmail
-    ? graph.filter((n) => n.source === 'email').slice(0, 10)
-    : [];
+  const emailReceived = (n: LifeNode): number => {
+    const s = typeof n.attributes.date === 'string' ? n.attributes.date : n.createdAt;
+    const t = new Date(s).getTime();
+    return Number.isNaN(t) ? new Date(n.createdAt).getTime() : t;
+  };
+  let emailNodes: LifeNode[] = [];
+  if (wantsEmail) {
+    const allEmail = graph.filter((n) => n.source === 'email');
+    emailNodes = (temporal.hasDate
+      ? allEmail.filter((n) => isInSpan(new Date(emailReceived(n)), temporal))
+      : allEmail
+    ).sort((a, b) => emailReceived(b) - emailReceived(a)).slice(0, 12);
+  }
 
   // Assemble: date matches HEAD → email (if asked) → upcoming → search → recent
   const seen = new Set<string>();
@@ -152,8 +174,13 @@ async function buildMemoryContext(query: string): Promise<string> {
   }
 
   if (emailNodes.length > 0) {
-    parts.push(`\n【最近的邮件】（共 ${graph.filter((n) => n.source === 'email').length} 封在记忆里）`);
+    const label = temporal.hasDate ? `${temporal.label}的邮件` : '最近的邮件';
+    parts.push(`\n【${label}】（下面是记忆里真实的邮件,只能根据这些回答,禁止虚构主题、发件人或内容;要总结就逐封说这几封）`);
     parts.push(...emailNodes.map(fmtNode));
+  } else if (wantsEmail) {
+    // 关键防幻觉:问到邮件但没有匹配 → 明确告诉 AI 没有,别编。
+    const label = temporal.hasDate ? temporal.label : '最近';
+    parts.push(`\n【邮件】记忆库里${label}没有邮件记录。请如实告诉用户${label}没有邮件,绝对不要编造任何邮件主题或内容。`);
   }
 
   if (body.length > 0) {

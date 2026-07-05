@@ -716,11 +716,13 @@ export default function Portal() {
         .catch(() => undefined);
 
       // Gmail: auto-sync on app load if connected and not synced recently (6h throttle)
+      // 批次 37:合并后的连接器存成 connectors.google(不是 gmail),之前只认 gmail →
+      // 自动同步对走「Google 日历·Gmail」的用户从不触发,只能手动点同步。认两者。
       try {
         const connectors = JSON.parse(localStorage.getItem('nesio-connectors-v1') || '{}') as Record<string, boolean>;
         const lastSync = parseInt(localStorage.getItem('nesio-gmail-last-sync') || '0', 10);
         const SIX_HOURS = 6 * 60 * 60 * 1000;
-        if (connectors.gmail && Date.now() - lastSync > SIX_HOURS) {
+        if ((connectors.google || connectors.gmail) && Date.now() - lastSync > SIX_HOURS) {
           fetch('/api/portal/gmail?includeBody=true&analyze=true')
             .then((r) => r.json())
             .then((data: { ok?: boolean; nodes?: Array<Record<string, unknown>> }) => {
