@@ -15,6 +15,15 @@ export interface RoadmapItem {
 
 export const ROADMAP_ITEMS: readonly RoadmapItem[] = [
   {
+    id: 'daily_brief',
+    title: { zh: '听简报', en: 'Listen to daily brief' },
+    description: {
+      zh: '每天一段语音简报:今日日程、待办、值得注意的事。真人音色 + 真实数据还在打磨,先从首屏收起。',
+      en: 'A daily audio brief: today’s schedule, to-dos and what to watch. Natural voice + real data still in progress; hidden from Today for now.',
+    },
+    status: 'building',
+  },
+  {
     id: 'apple_widget',
     title: { zh: '苹果桌面 Widget', en: 'Apple home-screen widget' },
     description: {

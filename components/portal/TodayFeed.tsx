@@ -5,7 +5,6 @@ import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { useProfileAvatar } from './use-profile-avatar';
 import { usePortalLocale } from './use-portal-locale';
 import { L } from '@/lib/portal/i18n';
-import { IconThermometer } from './icons';
 import { buildTodayViewModel, focusTimeHint, markFocusNodeDone, addCommitmentNode, addMeetingNotes, saveSubtasks, toggleSubtask, type FocusNode, type SubTask, type ProactiveContext, type ProactiveContextItem } from '@/lib/platform/view-models/today-view-model';
 import type { CalendarEvent } from '@/lib/portal/types';
 import {
@@ -27,7 +26,6 @@ import {
   decCardsToGuidanceEvents,
 } from '@/lib/platform/guidance-engine/source-adapters';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
-import DailyBriefCard from './DailyBriefCard';
 import dynamic from 'next/dynamic';
 import { buildRotatingFallback, dismissProactiveById, getProactiveCardBudget, isProactiveCardDismissed, type ProactiveCardData } from './today/proactive-types';
 import { ProactiveGuidanceCard } from './today/ProactiveGuidanceCard';
@@ -121,22 +119,7 @@ export default function TodayFeed({
           <img src="/assets/logo/nesio-mark-night.svg" alt="" aria-hidden className="nesio-today-brand-icon nesio-logo-night" />
         </button>
         <div className="nesio-today-header-tools">
-          {/* 听简报/此刻 缩为图标圆钮,不再占首屏黄金位(批次 3) */}
-          <DailyBriefCard
-            compact
-            canUsePrivateData={canUsePrivateData}
-            memoryCount={memoryCount}
-            memoryNotes={memoryNotes}
-          />
-          <button
-            type="button"
-            className="nesio-header-mini-btn"
-            onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-mood'))}
-            aria-label={L(uiLocale, '记录此刻感受', 'Log how you feel')}
-            title={L(uiLocale, '此刻', 'This moment')}
-          >
-            <IconThermometer size={19} />
-          </button>
+          {/* 批次 39:听简报暂时收进「设置 → 路线图」(还在打磨);记录心情移到中央「+」扇形菜单 */}
           <a href="/settings" className="nesio-today-avatar" aria-label={L(uiLocale, '我的设置', 'My settings')}>
             {avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element -- 头像是运行时签名 URL,next/image 无法静态优化

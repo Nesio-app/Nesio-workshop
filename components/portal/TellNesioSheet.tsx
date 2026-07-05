@@ -120,6 +120,22 @@ export default function TellNesioSheet({ open, onClose, onCapture }: TellNesioSh
           </button>
         ))}
       </div>
+
+      {/* 批次 39:记录心情从顶栏移到这里(扇形菜单下方) */}
+      <button
+        type="button"
+        className="nesio-tell-mood"
+        onClick={() => { onClose(); window.dispatchEvent(new CustomEvent('nesio-open-mood')); }}
+        aria-label={L(dict, '记录此刻心情', 'Log how you feel')}
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="18" height="18">
+          <circle cx="12" cy="12" r="10" />
+          <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+          <line x1="9" y1="9" x2="9.01" y2="9" />
+          <line x1="15" y1="9" x2="15.01" y2="9" />
+        </svg>
+        <span>{L(dict, '记录心情', 'How I feel')}</span>
+      </button>
     </div>
   );
 }

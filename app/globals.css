@@ -9697,6 +9697,26 @@ html[data-portal-theme="night"] .nesio-tell-fan-icon {
   white-space: nowrap;
 }
 
+/* 批次 39:记录心情 —— 扇形菜单下方的小胶囊 */
+.nesio-tell-mood {
+  position: relative;
+  z-index: 2;
+  margin: 1.4rem auto 0;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1.1rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.35);
+  background: rgba(255,255,255,0.16);
+  color: #eef3fc;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+}
+.nesio-tell-mood:active { transform: scale(0.96); }
+
 /* ─── Voice Input Sheet ─── */
 .nesio-voice-sheet {
   position: fixed;
