@@ -17,6 +17,7 @@ import { scoreCalendarEvents } from '@/lib/platform/attention-engine';
 import type { EmailSignal } from '@/lib/platform/email-signals';
 import { loadDormantStore, evaluateDormancy, type DormantStore } from '@/lib/platform/dormant-engine';
 import { runGuidancePipeline } from '@/lib/platform/guidance-engine/guidance-pipeline';
+import { coolingKey } from '@/lib/platform/guidance-engine/guidance-dedup.mjs';
 import { getEnergyState } from '@/lib/platform/energy-state';
 import type { RecommendationCard } from '@/lib/portal/reasoning-engine';
 import { getBestInterruptionHours } from '@/lib/portal/mirror-profile';
@@ -172,6 +173,7 @@ export function useTodayData(canUsePrivateData: boolean) {
             icon: card.icon,
             priority: card.priority,
             cardType: card.type,
+            coolingKey: coolingKey(card.type, card.eventId),
             nodeId: card.nodeId,
             actions: [{ label: card.action.cta, actionType: card.action.actionType }],
             expiresAt: card.expiresAt?.toISOString(),

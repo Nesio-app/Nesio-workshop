@@ -140,9 +140,12 @@ export default function TodayFeed({
             card={card}
             onDismiss={() => {
               dismissProactiveById(card.id);
-              // Record in cooling store so adaptive cooldown can kick in after repeated ignores
-              if (card.cardType) {
-                saveCoolingStore(recordDismissed(card.cardType, loadCoolingStore()));
+              // Record in cooling store so adaptive cooldown can kick in after repeated ignores.
+              // Use the per-card cooling identity (DEC insights cool per card, not per type),
+              // falling back to type for legacy cards.
+              const coolKey = card.coolingKey ?? card.cardType;
+              if (coolKey) {
+                saveCoolingStore(recordDismissed(coolKey, loadCoolingStore()));
               }
               setDismissedCardIds((prev) => { const next = new Set(prev); next.add(card.id); return next; });
             }}

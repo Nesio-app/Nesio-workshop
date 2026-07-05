@@ -11,7 +11,7 @@
  *   Layer 4 → Interrupt Evaluator (worth showing at all?)
  *   Layer 5 → Attention Budget (is user's day already overloaded?)
  *   Layer 6 → Cooling Store (shown too recently?)
- *   Dedup   → one card per event type
+ *   Dedup   → one card per identity (per type, except DEC insights per id)
  *
  * Layer 1 (event detection) and Layer 7 (learning) live outside this function:
  * Layer 1 = source-adapters.ts (call before runGuidancePipeline)
@@ -27,6 +27,7 @@ import { getConsequenceSeverity } from './consequence-rules';
 import { interruptPriority, worthInterrupting } from './interrupt-evaluator';
 import { computeAttentionBudget, passesBudgetGate } from './attention-budget';
 import { loadCoolingStore, isOnCooldown, recordShown, saveCoolingStore } from './cooling-store';
+import { coolingKey, makeDedupGate } from './guidance-dedup.mjs';
 
 // Compute when a card's action window closes and the card becomes irrelevant.
 // Google Now principle: a boarding-pass card disappears when the plane departs.
@@ -207,7 +208,9 @@ export function runGuidancePipeline(input: GuidancePipelineInput): GuidanceCard[
   );
 
   const candidates: Array<{ card: GuidanceCard; priority: number; urgency: WindowUrgency }> = [];
-  const seenTypes = new Set<string>();
+  // Dedup gate: one card per identity. DEC insights are keyed by id (each is an
+  // independent recommendation); every other type collapses to one card.
+  const isDuplicate = makeDedupGate();
 
   // Pre-filter: drop events whose action window has already closed (card would be stale).
   const liveEvents = input.events.filter((e) => {
@@ -234,12 +237,11 @@ export function runGuidancePipeline(input: GuidancePipelineInput): GuidanceCard[
     // Layer 5: attention budget gate
     if (!passesBudgetGate(budget, severity)) continue;
 
-    // Layer 6: cooling check
-    if (isOnCooldown(event.type, urgency, coolingStore, now)) continue;
+    // Layer 6: cooling check (by identity — DEC insights cool per card, not per type)
+    if (isOnCooldown(coolingKey(event.type, event.id), urgency, coolingStore, now)) continue;
 
-    // Dedup: one card per event type per pipeline run
-    if (seenTypes.has(event.type)) continue;
-    seenTypes.add(event.type);
+    // Dedup: one card per identity per pipeline run
+    if (isDuplicate(event.type, event.id)) continue;
 
     const priority = interruptPriority(severity, urgency, event.type, event.source, confidence);
 
@@ -281,8 +283,11 @@ export function runGuidancePipeline(input: GuidancePipelineInput): GuidanceCard[
     for (const card of result) {
       // Find urgency for this card to set correct cooldown
       const meta = candidates.find((c) => c.card.id === card.id);
-      updated = recordShown(card.type + (meta ? `_${meta.urgency}` : ''), updated);
-      updated = recordShown(card.type, updated); // also cool by type alone
+      // Cool by identity — DEC insights per card id, everything else per type —
+      // so showing one DEC insight doesn't suppress the others (PRD TODAY-002).
+      const key = coolingKey(card.type, card.eventId);
+      updated = recordShown(key + (meta ? `_${meta.urgency}` : ''), updated);
+      updated = recordShown(key, updated); // also cool by identity alone
     }
     saveCoolingStore(updated);
   }

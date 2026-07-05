@@ -21,6 +21,9 @@ export interface ProactiveCardData {
   icon: string;
   priority: number;
   cardType?: string;
+  /** Cooling/dedup identity (per-type, except DEC insights which are per-card).
+   *  Drives adaptive dismissal cooling so dismissing one DEC card doesn't cool the rest. */
+  coolingKey?: string;
   nodeId?: string;
   actions?: ProactiveAction[];
   expiresAt?: string;  // ISO — card auto-hides after this time (Google Now lifecycle)
