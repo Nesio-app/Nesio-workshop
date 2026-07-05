@@ -12,6 +12,7 @@ import type { HealthMetric, HealthMetrics } from '@/lib/portal/apple-health';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
+import TrainingPlan from './TrainingPlan';
 
 const GROUPS: Array<{ key: HealthMetric['group']; zh: string; en: string }> = [
   { key: 'activity', zh: '活动', en: 'Activity' },
@@ -80,11 +81,14 @@ export default function HealthDashboard() {
 
   if (!data || data.metrics.length === 0) {
     return (
-      <p className="nesio-insights-empty">
-        {L(dict,
-          '还没有健康数据。到「设置 → 数据接入 → Apple Health」直接上传导出的 zip(或 export.xml),就会解析出步数、心率、睡眠、血氧、体重等指标。',
-          'No health data yet. Go to Settings → Data sources → Apple Health and drop the exported zip (or export.xml) to parse steps, heart rate, sleep, SpO₂, weight and more.')}
-      </p>
+      <div className="nesio-health-dash">
+        <p className="nesio-insights-empty" style={{ marginBottom: 0 }}>
+          {L(dict,
+            '还没有健康数据。到「设置 → 数据接入 → Apple Health」直接上传导出的 zip(或 export.xml),就会解析出步数、心率、睡眠、血氧、体重等指标。',
+            'No health data yet. Go to Settings → Data sources → Apple Health and drop the exported zip (or export.xml) to parse steps, heart rate, sleep, SpO₂, weight and more.')}
+        </p>
+        <TrainingPlan />
+      </div>
     );
   }
 
@@ -93,6 +97,7 @@ export default function HealthDashboard() {
   return (
     <div className="nesio-health-dash">
       <p className="nesio-health-updated">{L(dict, `${data.metrics.length} 项指标 · 锻炼 ${data.workouts} 次 · 导入于 ${importedLabel}`, `${data.metrics.length} metrics · ${data.workouts} workouts · imported ${importedLabel}`)}</p>
+      <TrainingPlan />
       {GROUPS.map((g) => {
         const items = data.metrics.filter((m) => m.group === g.key);
         if (!items.length) return null;
