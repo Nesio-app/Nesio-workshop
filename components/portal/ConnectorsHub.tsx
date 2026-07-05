@@ -748,9 +748,9 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     if (c.method === 'shortcuts') { setShortcutsFor(c.id); return; }
   }
 
-  // 批次 38:直接传 zip 或 export.xml,全部在浏览器里解析(不上传大文件)。
-  // export.xml 常几百 MB,只解码尾部(最近数据在末尾),正则提炼后建记忆节点。
-  const HEALTH_TAIL_BYTES = 6_000_000; // 只看最后 ~6MB 文本 = 最近的记录
+  // 批次 38/39:直接传 zip 或 export.xml,全部在浏览器里解析(不上传大文件)。
+  // export.xml 常几百 MB,只解码尾部(最近数据在末尾),正则提炼后建记忆节点 + 指标看板。
+  const HEALTH_TAIL_BYTES = 30_000_000; // 尾部 ~30MB 文本 = 最近数月的记录(含稀疏指标如血压/血糖/摄氧量)
   async function extractExportXmlTail(file: File): Promise<string> {
     if (file.name.toLowerCase().endsWith('.zip')) {
       const buf = new Uint8Array(await file.arrayBuffer());
@@ -782,14 +782,21 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
           : L(dict, '这不是 export.xml,请选主导出文件', 'Not export.xml — pick the main export file'), false);
         setSyncing(null); return;
       }
-      const { parseAppleHealthText } = await import('@/lib/portal/apple-health');
+      const { parseAppleHealthText, parseHealthMetrics } = await import('@/lib/portal/apple-health');
+      // 指标看板:全指标解析 → 存本机(健康 Dashboard 读)
+      const metrics = parseHealthMetrics(xml);
+      if (metrics.metrics.length) {
+        const { saveHealthMetrics } = await import('@/lib/portal/health-store');
+        saveHealthMetrics(metrics);
+      }
+      // 记忆节点:概况 + 锻炼(进时间线)
       const { nodes, summary } = parseAppleHealthText(xml);
-      if (!nodes.length) { showToast(L(dict, '未识别到健康数据', 'No health data recognized'), false); setSyncing(null); return; }
-      saveNodes(nodes as Array<Omit<NodeInput, 'source'>>, 'system');
+      if (!nodes.length && !metrics.metrics.length) { showToast(L(dict, '未识别到健康数据', 'No health data recognized'), false); setSyncing(null); return; }
+      if (nodes.length) saveNodes(nodes as Array<Omit<NodeInput, 'source'>>, 'system');
       saveConnectorState('health', true);
       setConnected((p) => ({ ...p, health: true }));
-      setCounts((p) => ({ ...p, health: nodes.length }));
-      showToast(L(dict, `已接入健康数据:${summary}`, `Health imported: ${summary}`), true);
+      setCounts((p) => ({ ...p, health: metrics.metrics.length || nodes.length }));
+      showToast(L(dict, `已接入健康数据:${metrics.metrics.length} 项指标,到「洞察 → 健康」看看`, `Health imported: ${metrics.metrics.length} metrics — see Insights → Health`), true);
     } catch {
       showToast(L(dict, '解析失败(文件可能太大,手机内存不够 —— 可先在电脑上解压)', 'Parse failed (file may be too large for phone memory — unzip on a computer first)'), false);
     }

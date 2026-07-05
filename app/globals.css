@@ -17771,6 +17771,19 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 .nesio-fin-rule-x { flex-shrink: 0; width: 1.6rem; height: 1.6rem; border-radius: 50%; border: none; background: transparent; color: var(--portal-muted); font-size: 0.9rem; cursor: pointer; }
 .nesio-fin-rule-x:active { background: var(--portal-line); }
 
+/* 批次 39:健康 Dashboard */
+.nesio-health-dash { display: flex; flex-direction: column; }
+.nesio-health-updated { font-size: 0.72rem; color: var(--portal-muted); margin: 0 0 0.25rem; }
+.nesio-health-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin-top: 0.5rem; }
+.nesio-health-card { display: flex; flex-direction: column; gap: 0.3rem; padding: 0.85rem 0.9rem; border: 1px solid var(--portal-line); border-radius: 14px; background: var(--glass-bg-solid); }
+.nesio-health-card-label { font-size: 0.75rem; color: var(--portal-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nesio-health-card-value { font-size: 1.5rem; font-weight: 800; color: var(--portal-ink); font-variant-numeric: tabular-nums; line-height: 1.1; }
+.nesio-health-card-unit { font-size: 0.75rem; font-weight: 600; color: var(--portal-muted); margin-left: 0.25rem; }
+.nesio-health-card-delta { font-size: 0.68rem; font-weight: 600; padding: 0.12rem 0.5rem; border-radius: 999px; align-self: flex-start; background: var(--portal-line); color: var(--portal-muted); }
+.nesio-health-card-delta.up { background: rgba(88,140,227,0.14); color: var(--portal-blue-deep); }
+.nesio-health-card-delta.down { background: rgba(16,185,129,0.14); color: #047857; }
+.nesio-health-card-date { font-size: 0.66rem; color: var(--portal-muted); align-self: flex-start; }
+
 /* 批次 27:地点足迹 · Google 时间线样式 */
 .nesio-pt { display: flex; flex-direction: column; gap: 1.1rem; }
 .nesio-pt-daylabel { margin: 0 0 0.5rem; font-size: 0.72rem; font-weight: 700; color: var(--portal-muted); text-transform: uppercase; letter-spacing: 0.04em; }

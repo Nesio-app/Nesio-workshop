@@ -163,3 +163,126 @@ export function parseAppleHealthText(xml: string): HealthParseResult {
   nodes.push(...workoutNodes);
   return { nodes, summary };
 }
+
+/* ---------- 批次 39:健康 Dashboard —— 全指标提炼 ---------- */
+
+export interface HealthMetric {
+  key: string;
+  label: [string, string]; // [zh, en]
+  latest: number;
+  latestDate: string;      // YYYY-MM-DD
+  prev: number | null;     // 上一次(算 delta)
+  unit: string;
+  decimals: number;
+  group: 'activity' | 'heart' | 'body' | 'vitals' | 'mind';
+}
+
+export interface HealthMetrics {
+  metrics: HealthMetric[];
+  workouts: number;
+  importedAt: string;
+}
+
+type Agg = 'sumDay' | 'latest' | 'sleep' | 'mindful';
+interface MetricDef {
+  key: string; hk: string; label: [string, string]; unit: string; decimals: number; agg: Agg;
+  group: HealthMetric['group'];
+}
+
+// 覆盖常见 HealthKit 类型;缺的会自动跳过(不同人开的权限不一样)。
+const METRIC_DEFS: MetricDef[] = [
+  { key: 'steps', hk: 'HKQuantityTypeIdentifierStepCount', label: ['步数', 'Steps'], unit: '步', decimals: 0, agg: 'sumDay', group: 'activity' },
+  { key: 'distance', hk: 'HKQuantityTypeIdentifierDistanceWalkingRunning', label: ['步行+跑步距离', 'Walk+Run distance'], unit: 'km', decimals: 2, agg: 'sumDay', group: 'activity' },
+  { key: 'activeEnergy', hk: 'HKQuantityTypeIdentifierActiveEnergyBurned', label: ['活动能量', 'Active energy'], unit: 'kcal', decimals: 0, agg: 'sumDay', group: 'activity' },
+  { key: 'exerciseTime', hk: 'HKQuantityTypeIdentifierAppleExerciseTime', label: ['锻炼时长', 'Exercise time'], unit: 'min', decimals: 0, agg: 'sumDay', group: 'activity' },
+  { key: 'flights', hk: 'HKQuantityTypeIdentifierFlightsClimbed', label: ['爬楼', 'Flights climbed'], unit: '层', decimals: 0, agg: 'sumDay', group: 'activity' },
+  { key: 'restingHR', hk: 'HKQuantityTypeIdentifierRestingHeartRate', label: ['静息心率', 'Resting HR'], unit: 'bpm', decimals: 0, agg: 'latest', group: 'heart' },
+  { key: 'heartRate', hk: 'HKQuantityTypeIdentifierHeartRate', label: ['心率', 'Heart rate'], unit: 'bpm', decimals: 0, agg: 'latest', group: 'heart' },
+  { key: 'hrv', hk: 'HKQuantityTypeIdentifierHeartRateVariabilitySDNN', label: ['心率变异 HRV', 'HRV'], unit: 'ms', decimals: 0, agg: 'latest', group: 'heart' },
+  { key: 'vo2max', hk: 'HKQuantityTypeIdentifierVO2Max', label: ['最大摄氧量', 'VO₂ max'], unit: 'mL/kg·min', decimals: 1, agg: 'latest', group: 'heart' },
+  { key: 'walkingHR', hk: 'HKQuantityTypeIdentifierWalkingHeartRateAverage', label: ['步行平均心率', 'Walking avg HR'], unit: 'bpm', decimals: 0, agg: 'latest', group: 'heart' },
+  { key: 'spo2', hk: 'HKQuantityTypeIdentifierOxygenSaturation', label: ['血氧饱和度', 'Blood oxygen'], unit: '%', decimals: 0, agg: 'latest', group: 'vitals' },
+  { key: 'respiratory', hk: 'HKQuantityTypeIdentifierRespiratoryRate', label: ['呼吸频率', 'Respiratory rate'], unit: '次/分', decimals: 0, agg: 'latest', group: 'vitals' },
+  { key: 'bpSys', hk: 'HKQuantityTypeIdentifierBloodPressureSystolic', label: ['收缩压', 'Systolic BP'], unit: 'mmHg', decimals: 0, agg: 'latest', group: 'vitals' },
+  { key: 'bpDia', hk: 'HKQuantityTypeIdentifierBloodPressureDiastolic', label: ['舒张压', 'Diastolic BP'], unit: 'mmHg', decimals: 0, agg: 'latest', group: 'vitals' },
+  { key: 'glucose', hk: 'HKQuantityTypeIdentifierBloodGlucose', label: ['血糖', 'Blood glucose'], unit: 'mg/dL', decimals: 0, agg: 'latest', group: 'vitals' },
+  { key: 'bodyTemp', hk: 'HKQuantityTypeIdentifierBodyTemperature', label: ['体温', 'Body temp'], unit: '°C', decimals: 1, agg: 'latest', group: 'vitals' },
+  { key: 'weight', hk: 'HKQuantityTypeIdentifierBodyMass', label: ['体重', 'Weight'], unit: 'kg', decimals: 1, agg: 'latest', group: 'body' },
+  { key: 'bodyFat', hk: 'HKQuantityTypeIdentifierBodyFatPercentage', label: ['体脂率', 'Body fat'], unit: '%', decimals: 1, agg: 'latest', group: 'body' },
+  { key: 'bmi', hk: 'HKQuantityTypeIdentifierBodyMassIndex', label: ['BMI', 'BMI'], unit: '', decimals: 1, agg: 'latest', group: 'body' },
+  { key: 'leanMass', hk: 'HKQuantityTypeIdentifierLeanBodyMass', label: ['瘦体重', 'Lean mass'], unit: 'kg', decimals: 1, agg: 'latest', group: 'body' },
+  { key: 'height', hk: 'HKQuantityTypeIdentifierHeight', label: ['身高', 'Height'], unit: 'cm', decimals: 0, agg: 'latest', group: 'body' },
+  { key: 'sleep', hk: 'HKCategoryTypeIdentifierSleepAnalysis', label: ['睡眠', 'Sleep'], unit: 'h', decimals: 1, agg: 'sleep', group: 'mind' },
+  { key: 'mindful', hk: 'HKCategoryTypeIdentifierMindfulSession', label: ['正念', 'Mindfulness'], unit: 'min', decimals: 0, agg: 'mindful', group: 'mind' },
+];
+
+// unit 换算:米→千米,秒→分钟(部分类型 Apple 用基础单位)
+function scaleValue(key: string, raw: number): number {
+  if (key === 'distance') return raw / 1000; // Apple 距离常以 m 记(也可能已是 km)
+  return raw;
+}
+
+/** 提炼所有指标的最新值 + 上一次值(算变化)。在文本块(通常是尾部)上跑正则。 */
+export function parseHealthMetrics(xml: string): HealthMetrics {
+  const out: HealthMetric[] = [];
+
+  for (const def of METRIC_DEFS) {
+    if (def.agg === 'sumDay') {
+      const byDay = new Map<string, number>();
+      for (const r of records(xml, def.hk)) {
+        const day = r.startDate.slice(0, 10);
+        const v = Number(r.value);
+        if (day && Number.isFinite(v)) byDay.set(day, (byDay.get(day) || 0) + scaleValue(def.key, v));
+      }
+      const days = [...byDay.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+      if (!days.length) continue;
+      const last = days[days.length - 1];
+      const prev = days.length > 1 ? days[days.length - 2][1] : null;
+      out.push({ ...toMetric(def), latest: round(last[1], def.decimals), latestDate: last[0], prev: prev == null ? null : round(prev, def.decimals) });
+    } else if (def.agg === 'latest') {
+      const recs = records(xml, def.hk).filter((r) => r.startDate && Number.isFinite(Number(r.value)));
+      if (!recs.length) continue;
+      recs.sort((a, b) => a.startDate.localeCompare(b.startDate));
+      const last = recs[recs.length - 1];
+      const prev = recs.length > 1 ? Number(recs[recs.length - 2].value) : null;
+      out.push({ ...toMetric(def), latest: round(scaleValue(def.key, Number(last.value)), def.decimals), latestDate: last.startDate.slice(0, 10), prev: prev == null ? null : round(prev, def.decimals) });
+    } else if (def.agg === 'sleep') {
+      const sleep = records(xml, def.hk).filter((r) => /Asleep/i.test(r.value));
+      if (!sleep.length) continue;
+      const byNight = new Map<string, number>();
+      for (const r of sleep) {
+        const day = r.startDate.slice(0, 10);
+        const ms = Math.max(0, parseAppleDate(r.endDate) - parseAppleDate(r.startDate));
+        byNight.set(day, (byNight.get(day) || 0) + ms);
+      }
+      const nights = [...byNight.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+      if (!nights.length) continue;
+      const last = nights[nights.length - 1];
+      const prev = nights.length > 1 ? nights[nights.length - 2][1] / 3_600_000 : null;
+      out.push({ ...toMetric(def), latest: round(last[1] / 3_600_000, 1), latestDate: last[0], prev: prev == null ? null : round(prev, 1) });
+    } else if (def.agg === 'mindful') {
+      const byDay = new Map<string, number>();
+      for (const r of records(xml, def.hk)) {
+        const day = r.startDate.slice(0, 10);
+        const min = Math.max(0, parseAppleDate(r.endDate) - parseAppleDate(r.startDate)) / 60_000;
+        if (day) byDay.set(day, (byDay.get(day) || 0) + min);
+      }
+      const days = [...byDay.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+      if (!days.length) continue;
+      const last = days[days.length - 1];
+      const prev = days.length > 1 ? days[days.length - 2][1] : null;
+      out.push({ ...toMetric(def), latest: round(last[1], 0), latestDate: last[0], prev: prev == null ? null : round(prev, 0) });
+    }
+  }
+
+  const workouts = (xml.match(/<Workout\b/g) || []).length;
+  return { metrics: out, workouts, importedAt: new Date().toISOString() };
+}
+
+function toMetric(def: MetricDef): Omit<HealthMetric, 'latest' | 'latestDate' | 'prev'> {
+  return { key: def.key, label: def.label, unit: def.unit, decimals: def.decimals, group: def.group };
+}
+function round(v: number, d: number): number {
+  const p = Math.pow(10, d);
+  return Math.round(v * p) / p;
+}
