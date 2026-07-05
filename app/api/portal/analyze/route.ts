@@ -40,7 +40,14 @@ function isAnalyzeAiAllowed(req: NextRequest): boolean {
   const providedStage5Secret = req.headers.get('x-nesio-stage5-secret')?.trim() || '';
   if (stage5Secret && providedStage5Secret === stage5Secret) return true;
 
-  const hasSignedInCookie = Boolean(req.cookies.get('baohe_auth_access')?.value);
+  // 与 isPortalRequestAuthorized(chat 用的门)对齐 —— 认全套会话 cookie。
+  // 之前只认 baohe_auth_access:该 access cookie 短时效,过期后 refresh 还在、
+  // 文字聊天照常,但图片识别却报「登录后可用」。这就是「明明登录了图片识别失败」。
+  const hasSignedInCookie = Boolean(
+    req.cookies.get('baohe_auth_access')?.value ||
+      req.cookies.get('baohe_auth_refresh')?.value ||
+      req.cookies.get('baohe_wechat_openid')?.value,
+  );
   if (hasSignedInCookie) return true;
 
   const accessMode = req.headers.get('x-baohe-access-mode')?.trim() || '';

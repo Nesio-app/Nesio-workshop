@@ -102,7 +102,12 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
 
   useEffect(() => {
     if (!open) return;
-    setConnected(loadConnectors());
+    const savedConn = loadConnectors();
+    // 批次 37:有 Notion token 就算已连接 —— 连接(token 有效)和有没有共享页面是两回事。
+    // 之前只在「同步成功且返回了页面」才翻成已连接,导致 token 已存但没共享页面时按钮
+    // 永远停在「接入」,用户以为没连上。
+    if (loadToken('notion')) savedConn.notion = true;
+    setConnected(savedConn);
     setIngestUrl(`${window.location.origin}/api/portal/ingest`);
     // Check OAuth callback
     const params = new URLSearchParams(window.location.search);
@@ -382,7 +387,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
           showToast(L(dict, 'Token 有效,但这个集成还没被授权任何页面。到你要同步的 Notion 页面右上角「…」→ 连接 → 选中这个集成,再点同步。', 'Token works, but no pages are shared with this integration. On each Notion page: ••• → Connections → add this integration, then Sync.'), false);
           setSyncing(null); return;
         }
-        if (data.error === 'invalid_token') { saveToken(c.id, ''); setTokenInputFor(c.id); setTokenValue(''); showToast(L(dict, 'Token 无效，请重新输入', 'Invalid token — please re-enter'), false); }
+        if (data.error === 'invalid_token') { saveToken(c.id, ''); saveConnectorState(c.id, false); setConnected((p) => ({ ...p, [c.id]: false })); setTokenInputFor(c.id); setTokenValue(''); showToast(L(dict, 'Token 无效，请重新输入', 'Invalid token — please re-enter'), false); }
         else showToast(L(dict, `同步失败：${data.error || '未知'}`, `Sync failed: ${data.error || 'unknown'}`), false);
         setSyncing(null);
         return;
@@ -403,6 +408,10 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     if (!tokenValue.trim()) return;
     saveToken(c.id, tokenValue.trim());
     setTokenInputFor(null);
+    // 批次 37:存了 token 立刻标记已连接(按钮翻成 同步/断开)。
+    // 若随后 syncToken 判定 invalid_token,会把它清回未连接并重开输入框。
+    saveConnectorState(c.id, true);
+    setConnected((p) => ({ ...p, [c.id]: true }));
     syncToken(c);
   }
 
