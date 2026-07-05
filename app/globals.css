@@ -18770,6 +18770,12 @@ html[data-portal-theme="night"] .nesio-create-project-input {
   border: none; cursor: pointer;
 }
 .nesio-freeze-parse-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.nesio-freeze-add-btns { display: flex; gap: 0.5rem; align-items: center; }
+.nesio-freeze-scan-btn {
+  padding: 0.35rem 1rem; border-radius: 1rem;
+  background: none; color: var(--portal-accent); font-size: 0.8rem; font-weight: 600;
+  border: 1px solid var(--portal-accent-border); cursor: pointer; white-space: nowrap;
+}
 .nesio-freeze-error { font-size: 0.74rem; color: var(--status-risk); }
 .nesio-freeze-preview { display: flex; gap: 0.75rem; align-items: flex-start; background: var(--portal-line); padding: 0.75rem; border-radius: 10px; }
 .nesio-freeze-preview-img { width: 60px; height: 60px; object-fit: cover; border-radius: 8px; flex-shrink: 0; }

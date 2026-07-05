@@ -143,7 +143,7 @@ export function PurchaseCoolingPanel({ productName, similarCount, similarExample
       </div>
 
       <button type="button" className="nesio-cooling-link" onClick={() => { setScanNote(''); setScanOpen(true); }}>
-        {L(dict, '扫条码自动填价格', 'Scan barcode to fill the price')}
+        {L(dict, '扫码识别商品(二维码/条码)', 'Scan a code (QR / barcode)')}
       </button>
       {scanNote && <p style={{ fontSize: '0.68rem', color: 'var(--portal-muted)', margin: '0.2rem 0 0' }}>{scanNote}</p>}
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
 import {
   addToFreeze,
   getFreezeItems,
@@ -10,6 +11,9 @@ import {
   isShoppingUrl,
   type FreezeItem,
 } from '@/lib/platform/impulse-guard';
+import type { BarcodeResult } from './BarcodeScanSheet';
+
+const BarcodeScanSheet = dynamic(() => import('./BarcodeScanSheet'), { ssr: false });
 import { earnPoints, addWishFromFreeze, getPoints, DISCIPLINE_BONUS } from '@/lib/platform/rewards-engine';
 import RewardsWarehouse from './RewardsWarehouse';
 import { IconSnowflake } from './icons';
@@ -44,6 +48,7 @@ export default function FreezeVaultSheet({ open, onClose, initialUrl }: FreezeVa
   const [items, setItems] = useState<FreezeItem[]>([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [scanOpen, setScanOpen] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -85,8 +90,19 @@ export default function FreezeVaultSheet({ open, onClose, initialUrl }: FreezeVa
     }
   }
 
+  function handleScanResult(r: BarcodeResult) {
+    setScanOpen(false);
+    if (r.url) setUrlInput(r.url);
+    const title = r.title || (r.upc ? L(dict, `条码 ${r.upc}`, `Barcode ${r.upc}`) : '');
+    const priceLabel = r.priceLabel || (typeof r.price === 'number' && r.price > 0 ? `¥${r.price}` : undefined);
+    setParsed({ title, price: priceLabel, image: r.image, store: r.store });
+    setParseError(title ? '' : L(dict, '扫到了,但没识别出商品名,手动填一下', 'Scanned, but no product name — enter it manually'));
+    setTab('add');
+  }
+
   async function handleFreeze() {
-    if (!parsed || !urlInput.trim()) return;
+    // 扫码/手填可能没有 URL,只要有商品名就能冻
+    if (!parsed || !parsed.title.trim()) return;
     setSaving(true);
     addToFreeze({
       url: urlInput.trim(),
@@ -180,14 +196,19 @@ export default function FreezeVaultSheet({ open, onClose, initialUrl }: FreezeVa
               placeholder={L(dict, '粘贴购物链接（淘宝/京东/Amazon…）', 'Paste a shopping link (Amazon, Taobao…)')}
               onBlur={(e) => { if (e.target.value.trim()) void parseUrl(e.target.value.trim()); }}
             />
-            <button
-              type="button"
-              className="nesio-freeze-parse-btn"
-              onClick={() => void parseUrl(urlInput)}
-              disabled={parsing || !urlInput.trim()}
-            >
-              {parsing ? L(dict, '解析中…', 'Parsing…') : L(dict, '解析', 'Parse')}
-            </button>
+            <div className="nesio-freeze-add-btns">
+              <button
+                type="button"
+                className="nesio-freeze-parse-btn"
+                onClick={() => void parseUrl(urlInput)}
+                disabled={parsing || !urlInput.trim()}
+              >
+                {parsing ? L(dict, '解析中…', 'Parsing…') : L(dict, '解析', 'Parse')}
+              </button>
+              <button type="button" className="nesio-freeze-scan-btn" onClick={() => setScanOpen(true)}>
+                {L(dict, '扫码识别商品', 'Scan a code')}
+              </button>
+            </div>
 
             {parseError && <p className="nesio-freeze-error">{parseError}</p>}
 
@@ -279,6 +300,7 @@ export default function FreezeVaultSheet({ open, onClose, initialUrl }: FreezeVa
           </div>
         )}
       </div>
+      {scanOpen && <BarcodeScanSheet open={scanOpen} onClose={() => setScanOpen(false)} onResult={handleScanResult} />}
     </div>
   );
 }
