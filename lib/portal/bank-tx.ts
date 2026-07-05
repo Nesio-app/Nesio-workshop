@@ -6,7 +6,13 @@
  * 这里提供纯函数聚合(本月净支出 / 分类占比 / 商户 Top),给支出分析视图用。
  *
  * 金额符号约定(Plaid):正数 = 花出去(支出),负数 = 进账(退款/收入)。
+ *
+ * 纯逻辑(货币作用域 / 定期检测)抽到 ./bank-tx-core.mjs,便于 node 行为测试。
  */
+
+import { dominantCurrency, inCurrency, normalizeMerchant, evaluateRecurringGroup } from './bank-tx-core.mjs';
+
+export { dominantCurrency };
 
 export interface BankTx {
   id: string;
@@ -55,22 +61,7 @@ export function availableMonths(txs: BankTx[]): string[] {
   return [...set].sort().reverse();
 }
 
-export function dominantCurrency(txs: BankTx[]): string {
-  const counts = new Map<string, number>();
-  for (const t of txs) {
-    const c = (t.currency || 'USD').toUpperCase();
-    counts.set(c, (counts.get(c) || 0) + 1);
-  }
-  let best = 'USD';
-  let max = 0;
-  for (const [c, n] of counts) if (n > max) { max = n; best = c; }
-  return best;
-}
-
-/** 是否属于给定币种(缺省按 USD)。聚合前先按币种分组,避免 $10 与 ¥10 直接相加成 20。 */
-function inCurrency(t: BankTx, cur: string): boolean {
-  return (t.currency || 'USD').toUpperCase() === cur;
-}
+// dominantCurrency / inCurrency 见 ./bank-tx-core.mjs(纯函数,已在文件顶部 import)。
 
 /* ---------- 批次 33:交易类型分流(修「转账/收入/还款被当退款」的算错)---------- */
 // Plaid amount 约定:正=花出去,负=进账。但「进账」里混了 收入/转账/信用卡还款,
@@ -294,65 +285,11 @@ export interface RecurringCharge {
   currency: string;
 }
 
-/** 归一化商户名:去掉尾部门店号/流水号/日期,合并同一商家的多笔。 */
-function normalizeMerchant(name: string): string {
-  return (name || '')
-    .toLowerCase()
-    .replace(/[#*]?\s*\d[\d\-/.]{2,}.*$/, '') // 尾部数字串(门店号/日期)
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function median(nums: number[]): number {
-  if (!nums.length) return 0;
-  const s = [...nums].sort((a, b) => a - b);
-  const mid = Math.floor(s.length / 2);
-  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
-}
-
-function cadenceLabelFor(days: number): [string, string] | null {
-  if (days >= 6 && days <= 8) return ['每周', 'Weekly'];
-  if (days >= 12 && days <= 16) return ['每两周', 'Biweekly'];
-  if (days >= 26 && days <= 35) return ['每月', 'Monthly'];
-  if (days >= 58 && days <= 64) return ['每两月', 'Every 2 months'];
-  if (days >= 85 && days <= 95) return ['每季', 'Quarterly'];
-  if (days >= 350 && days <= 380) return ['每年', 'Yearly'];
-  return null;
-}
-
-// 批次 39:定期 = 账单(订阅/水电/保险/房贷/会员/宽带/话费…),不是「常去的超市/咖啡」。
-// 账单关键词命中 → 强定期候选;否则要求「金额稳定」(超市/餐饮金额飘,自动排除)。
-const BILL_RE = /netflix|spotify|hulu|disney|youtube ?premium|hbo|prime video|apple\.com\/bill|icloud|adobe|dropbox|notion|chatgpt|openai|github|microsoft ?365|google ?(one|storage)|membership|会员|subscription|订阅|insurance|保险|geico|state ?farm|allstate|progressive|nationwide|premium|duke ?energy|电费|水费|燃气|gas ?(company|bill)|electric|water ?(bill|utility)|utility|comcast|xfinity|spectrum|at&t|verizon|t-?mobile|sprint|话费|宽带|internet|broadband|mortgage|房贷|月供|rent\b|房租|loan|贷款|student ?loan|gym|健身|planet ?fitness|la ?fitness|equinox|peloton|storage|自如|物业|hoa/i;
-// 明确排除:餐饮/购物/超市/咖啡(去很多次也不是账单)
-const NON_BILL_CAT_RE = /food|餐饮|shopping|购物|grocer|超市|coffee|咖啡/i;
-
-/** 变异系数(标准差/均值)—— 账单金额稳定(低),超市/餐饮飘(高)。 */
-function coeffVar(nums: number[]): number {
-  if (nums.length < 2) return 0;
-  const mean = nums.reduce((s, v) => s + v, 0) / nums.length;
-  if (mean === 0) return 1;
-  const variance = nums.reduce((s, v) => s + (v - mean) ** 2, 0) / nums.length;
-  return Math.sqrt(variance) / mean;
-}
-
-/** 把估算的下次日期滚动到今天之后(数据是历史的,别给出过去的「下次」)。 */
-function rollForward(baseMs: number, cadenceDays: number): string {
-  let t = baseMs;
-  const step = cadenceDays * 86_400_000;
-  const now = Date.now();
-  let guard = 0;
-  while (t < now && guard++ < 120) t += step;
-  return new Date(t).toISOString().slice(0, 10);
-}
-
 /**
- * 识别定期账单(批次 39 重写):
- * 1. 先按商户归并支出;2. 判类别 —— 账单关键词命中 OR (非餐饮/购物 且 金额稳定 CV<0.2);
- * 3. 间隔中位数落在周期档;4. 下次日期滚动到未来。这样「超市去很多次」不会误判为定期。
+ * 识别定期账单:按商户归并本币种支出,交由 bank-tx-core.evaluateRecurringGroup 判定
+ * (最小样本 + 间隔 CV 门 + 金额稳定/关键词)。类别解析(用户规则→suggestCategory)
+ * 仍留在这里,因为它依赖 localStorage。
  */
-// 间隔规律性上限:定期账单的相邻间隔应当稳定(CV 低)。噪声(如 1 天、59 天)会被挡下。
-const MAX_GAP_CV = 0.25;
-
 export function detectRecurring(txs: BankTx[]): RecurringCharge[] {
   const flowRules = loadFlowRules();
   const merchantRules = loadMerchantRules();
@@ -368,48 +305,11 @@ export function detectRecurring(txs: BankTx[]): RecurringCharge[] {
     byKey.set(key, list);
   }
 
+  const resolveCategory = (name: string): string => merchantRules[name] || suggestCategory(name).category;
   const out: RecurringCharge[] = [];
   for (const list of byKey.values()) {
-    const isBillKeyword = list.some((t) => BILL_RE.test(t.name));
-    // 关键词账单信号强,3 笔即可;否则要 4 笔(≥3 个间隔)才谈得上稳定周期。
-    const minCharges = isBillKeyword ? 3 : 4;
-    if (list.length < minCharges) continue;
-    const sorted = list.slice().sort((a, b) => a.date.localeCompare(b.date));
-    const gaps: number[] = [];
-    for (let i = 1; i < sorted.length; i++) {
-      const d = (Date.parse(sorted[i].date) - Date.parse(sorted[i - 1].date)) / 86_400_000;
-      if (d > 0) gaps.push(d);
-    }
-    if (gaps.length < 2) continue;
-    const medGap = median(gaps);
-    const label = cadenceLabelFor(medGap);
-    if (!label) continue;
-    // 间隔必须规律:day1/day2/day60(间隔 1、59)中位数=30 会被误判「每月」,这里挡掉。
-    if (coeffVar(gaps) > MAX_GAP_CV) continue;
-
-    const last = sorted[sorted.length - 1];
-    const cat = merchantRules[last.name] || suggestCategory(last.name).category;
-    const amts = sorted.map((t) => Math.abs(t.amount));
-    const avg = amts.reduce((s, v) => s + v, 0) / amts.length;
-    const cv = coeffVar(amts);
-
-    // ── 账单判定 ──
-    const isNonBill = NON_BILL_CAT_RE.test(cat) || NON_BILL_CAT_RE.test(last.name);
-    // 关键词命中 = 账单(放宽金额);否则必须「非餐饮购物 且 金额稳定」
-    const qualifies = isBillKeyword || (!isNonBill && cv < 0.2);
-    if (!qualifies) continue;
-
-    out.push({
-      name: last.name,
-      category: cat,
-      avgAmount: Math.round(avg * 100) / 100,
-      count: sorted.length,
-      lastDate: last.date,
-      nextEstimate: rollForward(Date.parse(last.date) + medGap * 86_400_000, Math.round(medGap)),
-      cadenceDays: Math.round(medGap),
-      cadenceLabel: label,
-      currency: last.currency || cur,
-    });
+    const rec = evaluateRecurringGroup(list, { resolveCategory, fallbackCurrency: cur }) as RecurringCharge | null;
+    if (rec) out.push(rec);
   }
   return out.sort((a, b) => a.nextEstimate.localeCompare(b.nextEstimate));
 }
