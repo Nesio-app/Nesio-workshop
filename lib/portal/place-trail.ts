@@ -115,6 +115,96 @@ export function parseGoogleTimeline(json: unknown): PlaceVisit[] {
   return out;
 }
 
+// ── 批次 27:Google 时间线式聚合 ─────────────────────────────────────────────
+// 原始足迹是一条条打点(同一地方反复命中 Home/Unknown),不好看。
+// 这里把连续同地点的点合并成「访问段」,算出停留时长,再按天分组,
+// 供 Google 时间线样式的 UI 消费。
+
+export type PlaceCategory = 'home' | 'work' | 'shopping' | 'food' | 'fitness' | 'transit' | 'unknown' | 'place';
+
+/** 从地点名推断类别(决定图标/配色)。中英文关键词都认。 */
+export function categoryOf(label: string): PlaceCategory {
+  const s = (label || '').toLowerCase();
+  if (!s || /unknown|未知/.test(s)) return 'unknown';
+  if (/home|家|住/.test(s)) return 'home';
+  if (/work|office|公司|办公/.test(s)) return 'work';
+  if (/gym|fitness|健身|运动|yoga|瑜伽/.test(s)) return 'fitness';
+  if (/restaurant|cafe|coffee|starbucks|mcdonald|餐|饭|food|dining|bakery|bar/.test(s)) return 'food';
+  if (/shop|mall|store|market|超市|商场|购物|target|walmart|costco|michaels|ulta|beauty|ikea/.test(s)) return 'shopping';
+  if (/airport|station|机场|车站|transit|地铁|subway/.test(s)) return 'transit';
+  return 'place';
+}
+
+export interface TimelineSegment {
+  label: string;
+  category: PlaceCategory;
+  start: string;
+  end: string;
+  durationMin: number;
+  source: 'live' | 'import';
+}
+
+export interface TimelineDay {
+  /** 'YYYY-MM-DD'(本地) */
+  dateKey: string;
+  segments: TimelineSegment[];
+}
+
+function localDateKey(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** 段结束若跨到次日,截到当天 23:59 —— 避免「在家过夜」吞掉第二天、时长显示成 24h。 */
+function clampEndToDay(startIso: string, endIso: string): string {
+  if (localDateKey(endIso) === localDateKey(startIso)) return endIso;
+  const d = new Date(startIso);
+  d.setHours(23, 59, 59, 0);
+  return d.toISOString();
+}
+
+/**
+ * 把打点流水聚合成按天分组的访问段。
+ * - 连续同名点(间隔 < 3h)合并成一段;段结束时间取显式 end,否则取下一个点的开始。
+ * - 段停留时长 = end − start。
+ * 天从新到旧,天内按时间正序(时间线读感:早 → 晚)。
+ */
+export function buildPlaceTimeline(visits: PlaceVisit[], maxDays = 14): TimelineDay[] {
+  const sorted = [...visits].filter((v) => v.ts).sort((a, b) => a.ts.localeCompare(b.ts));
+  const segs: TimelineSegment[] = [];
+
+  for (let i = 0; i < sorted.length; i++) {
+    const v = sorted[i];
+    const next = sorted[i + 1];
+    const end = clampEndToDay(v.ts, v.end || next?.ts || v.ts);
+    const last = segs[segs.length - 1];
+    const gapMs = last ? new Date(v.ts).getTime() - new Date(last.end).getTime() : Infinity;
+    const sameDay = last && localDateKey(v.ts) === localDateKey(last.start);
+    if (last && sameDay && last.label === v.label && gapMs < 3 * 3_600_000) {
+      if (end > last.end) last.end = end;
+    } else {
+      segs.push({ label: v.label, category: categoryOf(v.label), start: v.ts, end, durationMin: 0, source: v.source });
+    }
+  }
+
+  for (const s of segs) {
+    s.durationMin = Math.max(0, Math.round((new Date(s.end).getTime() - new Date(s.start).getTime()) / 60000));
+  }
+
+  const byDay = new Map<string, TimelineSegment[]>();
+  for (const s of segs) {
+    const key = localDateKey(s.start);
+    const arr = byDay.get(key) || [];
+    arr.push(s);
+    byDay.set(key, arr);
+  }
+
+  return [...byDay.entries()]
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .slice(0, maxDays)
+    .map(([dateKey, list]) => ({ dateKey, segments: list.sort((a, b) => a.start.localeCompare(b.start)) }));
+}
+
 function humanizeSemanticType(label: string): string {
   const map: Record<string, string> = {
     INFERRED_HOME: '家', HOME: '家',

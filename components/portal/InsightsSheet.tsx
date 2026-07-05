@@ -36,7 +36,7 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import { InfoTip } from './InfoTip';
-import { loadPlaceTrail, PLACE_TRAIL_UPDATED_EVENT, type PlaceVisit } from '@/lib/portal/place-trail';
+import { loadPlaceTrail, PLACE_TRAIL_UPDATED_EVENT, buildPlaceTimeline, type PlaceVisit } from '@/lib/portal/place-trail';
 import { TimeBlocksWidget } from './today/TimeBlocksWidget';
 import { getFreezeItems } from '@/lib/platform/impulse-guard';
 
@@ -1288,18 +1288,54 @@ function PlaceTrailWidget() {
   if (trail.length === 0) {
     return <p className="nesio-insights-empty">{L(dict, '还没有足迹。授权位置后自动积累;也可在数据接入导入 Google 时间轴。', 'No trail yet. It builds automatically once location is granted; you can also import Google Timeline under Data sources.')}</p>;
   }
+
+  // 批次 27:原始打点聚合成 Google 时间线样式 —— 按天分组的访问段 + 停留时长 + 类别配色。
+  const days = buildPlaceTimeline(trail, 10);
+  const hhmm = (iso: string) => new Date(iso).toLocaleTimeString(dict === 'en' ? 'en-US' : 'zh-CN', { hour: '2-digit', minute: '2-digit' });
+  const fmtDur = (min: number) => {
+    if (min < 1) return L(dict, '短暂', 'brief');
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    if (h && m) return L(dict, `${h} 小时 ${m} 分`, `${h}h ${m}m`);
+    if (h) return L(dict, `${h} 小时`, `${h}h`);
+    return L(dict, `${m} 分钟`, `${m}m`);
+  };
+  const dayLabel = (key: string) => {
+    const today = new Date();
+    const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const y = new Date(today); y.setDate(today.getDate() - 1);
+    const yKey = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, '0')}-${String(y.getDate()).padStart(2, '0')}`;
+    if (key === todayKey) return L(dict, '今天', 'Today');
+    if (key === yKey) return L(dict, '昨天', 'Yesterday');
+    const d = new Date(key);
+    return d.toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'short', day: 'numeric', weekday: 'short' });
+  };
+
   return (
-    <div className="nesio-place-trail">
-      {trail.slice(0, 12).map((v, i) => (
-        <div key={`${v.ts}-${i}`} className="nesio-place-trail-row">
-          <span className="nesio-place-trail-time">
-            {new Date(v.ts).toLocaleString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-          </span>
-          <span className="nesio-place-trail-label">{v.label}</span>
-          {v.source === 'import' && <span className="nesio-place-trail-src">{L(dict, '导入', 'import')}</span>}
+    <div className="nesio-pt">
+      {days.map((day) => (
+        <div key={day.dateKey} className="nesio-pt-day">
+          <p className="nesio-pt-daylabel">{dayLabel(day.dateKey)}</p>
+          <div className="nesio-pt-track">
+            {day.segments.map((s, i) => (
+              <div key={`${s.start}-${i}`} className="nesio-pt-seg">
+                <span className={`nesio-pt-dot nesio-pt-dot--${s.category}`} aria-hidden />
+                <div className="nesio-pt-seg-body">
+                  <div className="nesio-pt-seg-top">
+                    <span className="nesio-pt-seg-name">{s.label}</span>
+                    <span className="nesio-pt-seg-dur">{fmtDur(s.durationMin)}</span>
+                  </div>
+                  <span className="nesio-pt-seg-time">
+                    {hhmm(s.start)}{s.durationMin >= 1 ? ` – ${hhmm(s.end)}` : ''}
+                    {s.source === 'import' && <span className="nesio-pt-src">{L(dict, '导入', 'import')}</span>}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       ))}
-      <p className="nesio-place-trail-count">{L(dict, `共 ${trail.length} 条足迹`, `${trail.length} visits total`)}</p>
+      <p className="nesio-place-trail-count">{L(dict, `共 ${trail.length} 个打点 · 聚合成 ${days.reduce((n, d) => n + d.segments.length, 0)} 段访问`, `${trail.length} points · ${days.reduce((n, d) => n + d.segments.length, 0)} visits`)}</p>
     </div>
   );
 }

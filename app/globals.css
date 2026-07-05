@@ -17622,6 +17622,28 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 .nesio-fin-merchant-amt { font-size: 0.88rem; font-weight: 600; color: var(--portal-ink); }
 .nesio-fin-merchant-cnt { font-size: 0.72rem; color: var(--portal-muted); }
 
+/* 批次 27:地点足迹 · Google 时间线样式 */
+.nesio-pt { display: flex; flex-direction: column; gap: 1.1rem; }
+.nesio-pt-daylabel { margin: 0 0 0.5rem; font-size: 0.72rem; font-weight: 700; color: var(--portal-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.nesio-pt-track { position: relative; padding-left: 1.1rem; }
+.nesio-pt-track::before { content: ''; position: absolute; left: 4px; top: 6px; bottom: 6px; width: 2px; background: var(--portal-line); border-radius: 1px; }
+.nesio-pt-seg { position: relative; display: flex; gap: 0.7rem; padding: 0.35rem 0; }
+.nesio-pt-dot { position: absolute; left: -1.1rem; top: 0.55rem; width: 10px; height: 10px; border-radius: 50%; background: var(--portal-muted); box-shadow: 0 0 0 3px var(--sheet-opaque, #fff); }
+.nesio-pt-dot--home { background: #588ce3; }
+.nesio-pt-dot--work { background: #7b5ea7; }
+.nesio-pt-dot--shopping { background: #e8888f; }
+.nesio-pt-dot--food { background: #e0954a; }
+.nesio-pt-dot--fitness { background: #d6559e; }
+.nesio-pt-dot--transit { background: #3aa6a0; }
+.nesio-pt-dot--place { background: #4a7c5f; }
+.nesio-pt-dot--unknown { background: transparent; border: 2px dashed var(--portal-muted); box-shadow: 0 0 0 3px var(--sheet-opaque, #fff); }
+.nesio-pt-seg-body { flex: 1; min-width: 0; }
+.nesio-pt-seg-top { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
+.nesio-pt-seg-name { font-size: 0.9rem; font-weight: 600; color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nesio-pt-seg-dur { flex-shrink: 0; font-size: 0.72rem; font-weight: 600; color: var(--portal-accent); }
+.nesio-pt-seg-time { font-size: 0.72rem; color: var(--portal-muted); }
+.nesio-pt-src { margin-left: 0.4rem; font-size: 0.62rem; color: var(--portal-muted); background: var(--portal-accent-soft); border-radius: 5px; padding: 1px 5px; }
+
 /* 批次 23:全屏看图 */
 .nesio-image-viewer { position: fixed; inset: 0; z-index: 600; background: rgba(0,0,0,0.92); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; padding: 1.5rem; }
 .nesio-image-viewer-img { max-width: 100%; max-height: 78vh; object-fit: contain; border-radius: 8px; }
