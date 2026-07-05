@@ -40,6 +40,7 @@ import { TimeBlocksWidget } from './today/TimeBlocksWidget';
 import TimelineTab from './insights/TimelineTab';
 import FinanceTab from './finance/FinanceTab';
 import HealthDashboard from './health/HealthDashboard';
+import RelationshipsPanel from './relationships/RelationshipsPanel';
 import { getFreezeItems } from '@/lib/platform/impulse-guard';
 
 function loadFreezeLedger(): { total: number; skipped: number; bought: number } {
@@ -53,7 +54,7 @@ function loadFreezeLedger(): { total: number; skipped: number; bought: number } 
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type MainTab = 'reflection' | 'analytics' | 'health' | 'timeline' | 'finance' | 'living';
+type MainTab = 'reflection' | 'analytics' | 'health' | 'timeline' | 'finance' | 'relationships' | 'living';
 type Period = 'today' | 'week' | 'month';
 
 interface FactBullet {
@@ -1080,14 +1081,14 @@ export default function InsightsSheet({ onClose, canUsePrivateData = true }: { o
 
       {/* Main tabs */}
       <div className="nesio-insights-main-tabs">
-        {(['reflection', 'health', 'timeline', 'finance', 'living'] as MainTab[]).map((t) => (
+        {(['reflection', 'health', 'timeline', 'finance', 'relationships', 'living'] as MainTab[]).map((t) => (
           <button
             key={t}
             type="button"
             className={`nesio-insights-main-tab${mainTab === t ? ' nesio-insights-main-tab--active' : ''}`}
             onClick={() => setMainTab(t)}
           >
-            {t === 'reflection' ? L(dict, '洞察', 'Insights') : t === 'health' ? L(dict, '健康', 'Health') : t === 'timeline' ? L(dict, '足迹', 'Footprints') : t === 'finance' ? L(dict, '财务', 'Finance') : L(dict, '认知', 'Cognition')}
+            {t === 'reflection' ? L(dict, '洞察', 'Insights') : t === 'health' ? L(dict, '健康', 'Health') : t === 'timeline' ? L(dict, '足迹', 'Footprints') : t === 'finance' ? L(dict, '财务', 'Finance') : t === 'relationships' ? L(dict, '关系', 'People') : L(dict, '认知', 'Cognition')}
           </button>
         ))}
       </div>
@@ -1256,6 +1257,9 @@ export default function InsightsSheet({ onClose, canUsePrivateData = true }: { o
 
         {/* ── Tab: 健康 Dashboard(批次 39)── */}
         {mainTab === 'health' && <HealthDashboard />}
+
+        {/* ── Tab: 关系管理(批次 41)── */}
+        {mainTab === 'relationships' && <RelationshipsPanel />}
 
         {/* ── Tab 3: Living Model ── */}
         {mainTab === 'living' && (

@@ -12528,8 +12528,9 @@ html[data-portal-theme="night"] .nesio-insights-narrative-text { color: #d8dff8;
 }
 .nesio-insights-main-tab {
   flex: 1;
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   font-weight: 600;
+  white-space: nowrap;
   color: var(--portal-muted);
   background: none;
   border: none;
@@ -17815,6 +17816,50 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 .nesio-fit-sig--neutral .nesio-fit-sig-note { color: var(--portal-muted); }
 .nesio-fit-suggest { margin: 0.7rem 0 0; font-size: 0.85rem; color: var(--portal-ink); line-height: 1.5; }
 .nesio-health-story-line { margin: 0.2rem 0 0; font-size: 0.85rem; color: var(--portal-ink); line-height: 1.55; }
+
+/* ─── 关系管理(批次 41)─── */
+.nesio-rel-due-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--portal-line);
+}
+.nesio-rel-due-row:last-of-type { border-bottom: none; }
+.nesio-rel-due-info { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.nesio-rel-name { font-size: 0.9rem; font-weight: 600; color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nesio-rel-sub { font-size: 0.75rem; color: var(--portal-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nesio-rel-touch-btn {
+  flex-shrink: 0;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--portal-cool-accent);
+  background: none;
+  border: 1px solid var(--portal-cool-accent);
+  border-radius: 999px;
+  padding: 0.28rem 0.7rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.nesio-rel-touch-btn:active { background: var(--portal-cool-accent); color: #fff; }
+.nesio-rel-touch-btn--sm { font-size: 0.72rem; padding: 0.22rem 0.55rem; margin-top: 0.35rem; align-self: flex-start; }
+.nesio-rel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+  gap: 0.6rem;
+}
+.nesio-rel-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  background: var(--glass-bg-solid);
+  border-radius: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid transparent;
+}
+.nesio-rel-card--due { border-color: color-mix(in srgb, var(--portal-cool-accent) 45%, transparent); }
+.nesio-rel-last { font-size: 0.74rem; color: var(--portal-muted); margin-top: 0.1rem; }
 
 /* 批次 27:地点足迹 · Google 时间线样式 */
 .nesio-pt { display: flex; flex-direction: column; gap: 1.1rem; }
