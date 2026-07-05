@@ -831,23 +831,23 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
             </div>
           )}
 
-          {/* Assets for non-object/preference types */}
-          {n.type !== 'object' && n.type !== 'preference' && (n.assets || []).length > 0 && (
+          {/* 批次 35:图片线索所有类型都显示(物品/拍照记忆也要看到照片);本机图用 IndexedDB URL */}
+          {(n.assets || []).length > 0 && (
             <>
               <p className="nesio-settings-section-label" style={{ marginTop: '0.75rem' }}>{L(dict, '图片线索', 'Image clues')}</p>
               <div style={{ display: 'grid', gap: '0.6rem' }}>
                 {(n.assets || []).map((asset) => {
                   const key = asset.id || asset.storagePath || asset.label || 'asset';
-                  const previewUrl = asset.storagePath ? assetUrls[key] : undefined;
+                  const previewUrl = assetUrls[key];
                   const isImage = asset.kind === 'image' || asset.mimeType?.startsWith('image/');
                   return (
                     <div key={key} className="nesio-type-asset-card">
                       {isImage && previewUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={previewUrl} alt={asset.label || n.name} draggable={false} className="nesio-type-asset-img" />
+                        <img src={previewUrl} alt={asset.label || n.name} draggable={false} className="nesio-type-asset-img" onClick={() => setViewImage({ url: previewUrl, name: asset.label || n.name })} style={{ cursor: 'zoom-in' }} />
                       ) : (
                         <p style={{ fontSize: '0.82rem', color: 'var(--portal-muted)', marginBottom: '0.35rem' }}>
-                          {asset.storagePath ? L(dict, '图片线索已保存，登录后可查看。', 'Image clue saved — sign in to view.') : L(dict, '附件线索已保存。', 'Attachment clue saved.')}
+                          {asset.local ? L(dict, '图片加载中…', 'Loading image…') : asset.storagePath ? L(dict, '图片线索已保存，登录后可查看。', 'Image clue saved — sign in to view.') : L(dict, '附件线索已保存。', 'Attachment clue saved.')}
                         </p>
                       )}
                       {asset.analysisSummary && (

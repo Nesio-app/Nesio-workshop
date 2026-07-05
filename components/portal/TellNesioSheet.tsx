@@ -79,12 +79,12 @@ export default function TellNesioSheet({ open, onClose, onCapture }: TellNesioSh
   return (
     <div className="nesio-tell-overlay" role="dialog" aria-modal="true" aria-label={L(dict, '告诉 Nesio', 'Tell Nesio')}>
       <button type="button" className="nesio-tell-backdrop" aria-label={L(dict, '关闭', 'Close')} onClick={onClose} />
-      {/* 原生相机直达:capture 属性 → iOS 直接开相机;取消拍摄则什么都不发生 */}
+      {/* 批次 35:去掉 capture —— iOS 会弹原生菜单(拍照 / 照片图库 / 选取文件),
+          既能拍也能从相册选,和原生相机一样;取消则什么都不发生 */}
       <input
         ref={cameraInputRef}
         type="file"
         accept="image/*"
-        capture="environment"
         style={{ display: 'none' }}
         onChange={(e) => {
           const file = e.target.files?.[0];

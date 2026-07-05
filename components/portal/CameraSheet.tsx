@@ -216,6 +216,7 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
   const [permDenied, setPermDenied] = useState(false);
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
   const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false); // 批次 35:存入按钮即时反馈,避免「点了没反应」
   const [extraTags, setExtraTags] = useState('');
   const [sourceFile, setSourceFile] = useState<File | null>(null);
   // Freehand selection state
@@ -473,7 +474,19 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
 
   async function saveAll() {
     const nodesToSave = editedNodes.filter((n) => !n.deleted);
-    if (!nodesToSave.length) return;
+    if (!nodesToSave.length || saving) return;
+    setSaving(true); // 立刻反馈:按钮变「保存中…」+ 禁用,避免用户以为没点上
+    try {
+      await doSave(nodesToSave);
+      setPhase('saved');
+      setTimeout(() => { onClose(); setPhase('idle'); setResult(null); setExtraTags(''); setSourceFile(null); setNodeLocations({}); setDetectedPlaceId(''); setSaving(false); }, 1200);
+    } catch {
+      setSaving(false);
+      setError(L(dict, '存入失败，请重试', 'Save failed — please try again'));
+    }
+  }
+
+  async function doSave(nodesToSave: EditedNode[]) {
     const userTags = parseInlineTags(extraTags);
 
     // Best-effort location — attach if permission already granted
@@ -553,8 +566,6 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
     } catch {
       // Cloud Memory sync is best-effort; local Memory remains available.
     }
-    setPhase('saved');
-    setTimeout(() => { onClose(); setPhase('idle'); setResult(null); setExtraTags(''); setSourceFile(null); setNodeLocations({}); setDetectedPlaceId(''); }, 900);
   }
 
   function retake() {
@@ -949,9 +960,11 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
               type="button"
               className="nesio-camera-save-btn"
               onClick={saveAll}
-              disabled={editedNodes.filter((n) => !n.deleted).length === 0}
+              disabled={saving || editedNodes.filter((n) => !n.deleted).length === 0}
             >
-              {L(dict, `存入 Memory (${editedNodes.filter((n) => !n.deleted).length} 条)`, `Save to Memory (${editedNodes.filter((n) => !n.deleted).length})`)}
+              {saving
+                ? L(dict, '保存中…', 'Saving…')
+                : L(dict, `存入 Memory (${editedNodes.filter((n) => !n.deleted).length} 条)`, `Save to Memory (${editedNodes.filter((n) => !n.deleted).length})`)}
             </button>
             <button type="button" className="nesio-camera-retake-btn" onClick={retake}>{L(dict, '重拍', 'Retake')}</button>
           </div>
@@ -980,8 +993,10 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
       )}
 
       {phase === 'saved' && (
-        <div className="nesio-camera-result-panel" style={{ textAlign: 'center', padding: '1.25rem' }}>
-          <p style={{ color: 'var(--status-go)', fontSize: '1.1rem', fontWeight: 700 }}>{L(dict, '✓ 已存入 Memory', '✓ Saved to Memory')}</p>
+        <div className="nesio-camera-result-panel" style={{ textAlign: 'center', padding: '1.5rem 1.25rem' }}>
+          <p style={{ color: 'var(--status-go)', fontSize: '2rem', margin: 0, lineHeight: 1 }}>✓</p>
+          <p style={{ color: 'var(--status-go)', fontSize: '1.1rem', fontWeight: 700, marginTop: '0.5rem' }}>{L(dict, '已存入 Memory', 'Saved to Memory')}</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '0.25rem' }}>{L(dict, '在「记忆」里查看', 'View it in Memory')}</p>
         </div>
       )}
 
