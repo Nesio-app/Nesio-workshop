@@ -114,12 +114,21 @@ async function buildMemoryContext(query: string): Promise<string> {
     )
     .slice(0, 8);
 
-  // Assemble: date matches HEAD → search results → upcoming → recent
+  // Layer 4 (批次 37):查询提到邮件时,显式带上最近的邮件节点。否则英文主题的邮件
+  // 在中文提问("我的邮件")下文本匹配不到,永远进不了 candidates —— 用户会觉得
+  // 「同步了却问不出来」。
+  const wantsEmail = /邮件|邮箱|email|e-mail|\bmail\b|收件|inbox|gmail/i.test(query);
+  const emailNodes = wantsEmail
+    ? graph.filter((n) => n.source === 'email').slice(0, 10)
+    : [];
+
+  // Assemble: date matches HEAD → email (if asked) → upcoming → search → recent
   const seen = new Set<string>();
   const head: LifeNode[] = [];
   const body: LifeNode[] = [];
 
   for (const n of dateNodes) { if (!seen.has(n.id)) { seen.add(n.id); head.push(n); } }
+  for (const n of emailNodes) { if (!seen.has(n.id)) { seen.add(n.id); head.push(n); } }
   for (const n of upcomingNodes) { if (!seen.has(n.id)) { seen.add(n.id); head.push(n); } }
   for (const n of searchNodes) { if (!seen.has(n.id)) { seen.add(n.id); body.push(n); } }
   // Fill remaining slots with recent nodes
@@ -140,6 +149,11 @@ async function buildMemoryContext(query: string): Promise<string> {
   if (upcomingNodes.length > 0 && !temporal.hasDate) {
     parts.push('\n【今天起7天内的安排】');
     parts.push(...upcomingNodes.map(fmtNode));
+  }
+
+  if (emailNodes.length > 0) {
+    parts.push(`\n【最近的邮件】（共 ${graph.filter((n) => n.source === 'email').length} 封在记忆里）`);
+    parts.push(...emailNodes.map(fmtNode));
   }
 
   if (body.length > 0) {

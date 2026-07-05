@@ -114,9 +114,10 @@ async function refreshToken(refreshTk: string): Promise<string | null> {
   return data.access_token || null;
 }
 
-async function fetchMessages(accessToken: string, max = 10, metadataOnly = true): Promise<GmailMessage[]> {
+// 批次 37:窗口从 7 天/10 封放宽到 30 天/50 封 —— 之前太窄,同步了也「问一问看不到几封」。
+async function fetchMessages(accessToken: string, max = 50, metadataOnly = true): Promise<GmailMessage[]> {
   const listRes = await fetch(
-    `${GMAIL_API}/users/me/messages?maxResults=${max}&q=newer_than:7d`,
+    `${GMAIL_API}/users/me/messages?maxResults=${max}&q=newer_than:30d`,
     { headers: { Authorization: `Bearer ${accessToken}` } },
   );
   if (!listRes.ok) {
@@ -239,7 +240,7 @@ export async function GET(req: NextRequest) {
     try {
       // accessToken may be '' when only a refresh token survives — 401s into the refresh path
       if (!cand.accessToken) throw new Error('gmail_list_401');
-      messages = await fetchMessages(cand.accessToken, 10, metadataOnly);
+      messages = await fetchMessages(cand.accessToken, 50, metadataOnly);
       winner = cand;
       break;
     } catch (err) {
@@ -249,7 +250,7 @@ export async function GET(req: NextRequest) {
       const newToken = await refreshToken(cand.refreshToken);
       if (!newToken) { sawAuthFailure = true; continue; }
       try {
-        messages = await fetchMessages(newToken, 10, metadataOnly);
+        messages = await fetchMessages(newToken, 50, metadataOnly);
         refreshedAccessToken = newToken;
         winner = cand;
         break;
