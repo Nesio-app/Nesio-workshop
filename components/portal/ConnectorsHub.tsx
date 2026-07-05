@@ -48,7 +48,7 @@ const CONNECTORS: ConnectorDef[] = [
   { id: 'photos', name: '相册批量导入', nameEn: 'Batch photo import', icon: <IconImage />, iconBg: 'var(--chip-frost)', method: 'batch-photos', description: '一次选多张照片,自动识别成记忆(每批最多 10 张)', descriptionEn: 'Pick multiple photos; each is recognized into memories (up to 10 per batch)' },
   { id: 'flomo', name: 'Flomo', icon: <IconNote />, iconBg: 'var(--chip-indigo)', method: 'server', syncEndpoint: '/api/portal/flomo?limit=100', description: '同步 flomo 笔记，提取想法与记录', descriptionEn: 'Sync flomo notes; extract ideas and records' },
   // 批次 18:Notion 转正 —— OAuth 一键授权(像 flomo 那样选页面),内部 token 流保留为回退
-  { id: 'notion', name: 'Notion', icon: <IconBook />, iconBg: 'var(--chip-gray)', method: 'token', syncEndpoint: '/api/portal/notion', tokenHint: 'notion.so/my-integrations → 新建集成 → 复制 Internal Integration Secret，并把页面共享给它', tokenHintEn: 'notion.so/my-integrations → New integration → copy the Internal Integration Secret, then share your pages with it', description: '授权后同步你选择的页面，提取项目与想法', descriptionEn: 'Authorize, pick pages, and sync projects and ideas' },
+  { id: 'notion', name: 'Notion', icon: <IconBook />, iconBg: 'var(--chip-gray)', method: 'token', syncEndpoint: '/api/portal/notion', tokenHint: 'notion.so/my-integrations → 新建集成(Internal)→ 复制 Internal Integration Secret(ntn_… 或 secret_…)→ 在要同步的 Notion 页面右上角「…」→ 连接 → 选中这个集成', tokenHintEn: 'notion.so/my-integrations → New internal integration → copy the secret (ntn_… / secret_…) → on each page: ••• → Connections → add this integration', description: '粘贴内部集成 token,同步共享给它的页面(提取项目与想法)', descriptionEn: 'Paste an internal integration token to sync the pages you shared with it' },
   { id: 'toggl', name: 'Toggl Track', icon: <IconTimer />, iconBg: 'var(--chip-red)', method: 'token', syncEndpoint: '/api/portal/toggl', tokenHint: 'track.toggl.com → Profile → API Token', tokenHintEn: 'track.toggl.com → Profile → API Token', description: '同步时间记录，了解你的专注分布', descriptionEn: 'Sync time entries to see where your focus goes', dev: true },
   { id: 'health', name: 'Apple Health 导出', nameEn: 'Apple Health export', icon: <IconHeartPulse />, iconBg: 'var(--chip-pink)', method: 'file', description: '上传 export.xml，提取步数、睡眠、心率', descriptionEn: 'Upload export.xml to extract steps, sleep, heart rate', dev: true },
   { id: 'reminder', name: 'Apple 提醒事项', nameEn: 'Apple Reminders', icon: <IconCheckSquare />, iconBg: 'var(--chip-amber)', method: 'shortcuts', ingestSource: 'reminder', description: '通过快捷指令推送提醒，自动转为承诺', descriptionEn: 'Push reminders via Shortcuts; they become commitments', dev: true },
@@ -657,9 +657,10 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     if (c.id === 'wechat_reading') { setWechatReadingOpen(true); return; }
     if (c.id === 'wechat_fav') { return; } // 纯说明行,无操作
     if (c.id === 'plaid') { void connectPlaid(); return; }
-    // 批次 23:Notion 连接前预检——未配 NOTION_CLIENT_ID 时在面板内直接提示,
-    // 不做「跳转 API 又跳回、toast 丢失」的无反馈操作(用户报「按钮不管用」)
-    if (c.id === 'notion' && !loadToken('notion')) { void connectNotion(); return; }
+    // 批次 25:Notion 直接走内部 token 粘贴——iOS 上 OAuth authorize 会被
+    // Notion App 的 universal link 劫持、进不了授权页(用户报「直接进了 Notion App」)。
+    // 内部集成 token 最可靠:notion.so/my-integrations → 新建内部集成 → 复制 secret。
+    if (c.id === 'notion' && !loadToken('notion')) { setTokenInputFor('notion'); setTokenValue(''); return; }
     if (c.method === 'token') { syncToken(c); return; }
     if (c.method === 'server') { syncFlomo(c); return; }
     if (c.method === 'shortcuts') { setShortcutsFor(c.id); return; }

@@ -63,6 +63,14 @@ export default function RoutineSheet({ open, onClose }: { open: boolean; onClose
 
           {/* 新建 */}
           <p className="nesio-settings-section-label">{L(dict, '新建提醒', 'New routine')}</p>
+          {/* 批次 25:每日 AI 简报预设(像 Gemini daily brief) */}
+          <button
+            type="button"
+            className="nesio-routine-brief-preset"
+            onClick={() => { addRoutine({ text: 'AI 简报', time, days, kind: 'ai_brief' }); }}
+          >
+            {L(dict, `+ 每日 AI 简报(${time} · 播报当天日程/提醒/天气)`, `+ Daily AI brief (${time} · reads your schedule/reminders/weather)`)}
+          </button>
           <input
             className="nesio-routine-input"
             value={text}
@@ -107,7 +115,7 @@ export default function RoutineSheet({ open, onClose }: { open: boolean; onClose
           {routines.map((r) => (
             <div key={r.id} className="nesio-routine-item">
               <div className="nesio-routine-item-main">
-                <p className="nesio-routine-item-text" style={{ opacity: r.enabled ? 1 : 0.45 }}>{r.text}</p>
+                <p className="nesio-routine-item-text" style={{ opacity: r.enabled ? 1 : 0.45 }}>{r.kind === 'ai_brief' ? L(dict, '每日 AI 简报', 'Daily AI brief') : r.text}</p>
                 <p className="nesio-routine-item-meta">{r.time} · {daysSummary(r)}</p>
               </div>
               <button

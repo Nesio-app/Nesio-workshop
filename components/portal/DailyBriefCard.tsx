@@ -286,6 +286,13 @@ export default function DailyBriefCard({
     else if (playState === 'paused') { audio.play(); setPlayState('playing'); }
   }
 
+  useEffect(() => {
+    const onPlay = () => handlePlay();
+    window.addEventListener('nesio-play-brief', onPlay);
+    return () => window.removeEventListener('nesio-play-brief', onPlay);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function handlePlay() {
     if (!canUsePrivateData) {
       // 演示模式:先让人听到价值,再谈登录(网页测试问题 #1:曾无解释跳登录)

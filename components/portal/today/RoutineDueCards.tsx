@@ -29,7 +29,33 @@ export function RoutineDueCards() {
 
   return (
     <>
-      {due.map((r) => (
+      {due.map((r) => r.kind === 'ai_brief' ? (
+        <div key={r.id} className="nesio-proactive-card">
+          <div className="nesio-proactive-card-inner">
+            <span className="nesio-proactive-card-icon"><IconClock size={18} /></span>
+            <div className="nesio-proactive-card-text">
+              <p className="nesio-proactive-card-title">{L(dict, '今日 AI 简报', "Today's AI brief")}</p>
+              <p className="nesio-proactive-card-body">{L(dict, `${r.time} · Nesio 把今天的日程、提醒、天气播给你听`, `${r.time} · Nesio reads out your day — schedule, reminders, weather`)}</p>
+              <div className="nesio-proactive-card-actions">
+                <button
+                  type="button"
+                  className="nesio-proactive-action-btn"
+                  onClick={() => { window.dispatchEvent(new CustomEvent('nesio-play-brief')); track('routine_brief_play', {}); }}
+                >
+                  {L(dict, '收听', 'Listen')}
+                </button>
+                <button
+                  type="button"
+                  className="nesio-proactive-action-btn nesio-proactive-action-btn--snooze"
+                  onClick={() => { markRoutineDone(r.id); }}
+                >
+                  {L(dict, '今天跳过', 'Skip today')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
         <div key={r.id} className="nesio-proactive-card">
           <div className="nesio-proactive-card-inner">
             <span className="nesio-proactive-card-icon"><IconClock size={18} /></span>

@@ -297,20 +297,24 @@ export async function GET(req: NextRequest) {
   // Fallback: if AI extraction returned nothing (no Gemini key or all filtered),
   // create basic nodes directly from email metadata so LifeGraph always has data.
   if (includeBody && nodes.length === 0 && messages.length > 0) {
-    nodes = messages.map((m) => ({
-      type: 'event' as const,
-      name: header(m, 'subject') || 'Gmail 邮件',
-      source: 'email' as const,
-      confidence: 0.7,
-      rawInput: `来自 ${header(m, 'from') || '未知'}: ${m.snippet?.slice(0, 120) || ''}`,
-      tags: ['邮件', 'Gmail'],
-      attributes: {
-        date: header(m, 'date'),
-        from: header(m, 'from'),
-        emailId: m.id,
-      },
-      relations: [] as Array<{ targetId: string; relation: string }>,
-    }));
+    nodes = messages.map((m) => {
+      const body = extractText(m); // 批次 25:邮件正文,供友好阅读器
+      return {
+        type: 'event' as const,
+        name: header(m, 'subject') || 'Gmail 邮件',
+        source: 'email' as const,
+        confidence: 0.7,
+        rawInput: `来自 ${header(m, 'from') || '未知'}: ${m.snippet?.slice(0, 120) || ''}`,
+        tags: ['邮件', 'Gmail'],
+        attributes: {
+          date: header(m, 'date'),
+          from: header(m, 'from'),
+          emailId: m.id,
+          ...(body ? { article: body } : {}),
+        },
+        relations: [] as Array<{ targetId: string; relation: string }>,
+      };
+    });
   }
 
   // Ensure all nodes have source: 'email' so LifeGraph can filter by source

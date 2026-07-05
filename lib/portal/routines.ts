@@ -9,6 +9,8 @@
 export interface Routine {
   id: string;
   text: string;
+  /** 'reminder'=普通提醒 / 'ai_brief'=每日 AI 简报(批次 25) */
+  kind?: 'reminder' | 'ai_brief';
   /** 'HH:mm' 24 小时制 */
   time: string;
   /** 0=周日 … 6=周六 */
@@ -32,10 +34,11 @@ function save(routines: Routine[]): void {
   window.dispatchEvent(new CustomEvent(ROUTINES_UPDATED_EVENT));
 }
 
-export function addRoutine(input: { text: string; time: string; days: number[] }): Routine {
+export function addRoutine(input: { text: string; time: string; days: number[]; kind?: 'reminder' | 'ai_brief' }): Routine {
   const r: Routine = {
     id: `rt-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
     text: input.text.trim(),
+    kind: input.kind || 'reminder',
     time: input.time,
     days: input.days.length ? input.days : [0, 1, 2, 3, 4, 5, 6],
     enabled: true,

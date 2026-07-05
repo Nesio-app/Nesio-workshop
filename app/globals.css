@@ -17533,6 +17533,8 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 }
 .nesio-narrator-section > .nesio-narrator-card:nth-child(3) { grid-column: 1 / -1; }
 
+.nesio-routine-brief-preset { width: 100%; text-align: left; padding: 0.6rem 0.8rem; margin-bottom: 0.6rem; border-radius: 0.75rem; border: 1.5px dashed var(--portal-blue-deep); background: var(--portal-accent-soft); color: var(--portal-blue-deep); font-size: 0.82rem; font-weight: 600; cursor: pointer; }
+
 /* 批次 24:ADHD 友好阅读器 */
 .nesio-reader-overlay { position: fixed; inset: 0; z-index: 620; background: var(--sheet-opaque, #fdfeff); display: flex; flex-direction: column; }
 .nesio-reader-topbar { display: flex; align-items: center; justify-content: space-between; padding: calc(0.6rem + env(safe-area-inset-top)) 1rem 0.6rem; border-bottom: 1px solid var(--portal-line); position: sticky; top: 0; background: var(--sheet-opaque, #fdfeff); z-index: 1; }

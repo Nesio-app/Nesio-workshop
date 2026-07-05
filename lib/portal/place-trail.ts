@@ -63,45 +63,53 @@ export function mergeImportedVisits(visits: PlaceVisit[]): number {
 
 export function parseGoogleTimeline(json: unknown): PlaceVisit[] {
   const out: PlaceVisit[] = [];
-  const root = json as {
-    semanticSegments?: Array<Record<string, unknown>>;
-    timelineObjects?: Array<Record<string, unknown>>;
+  const root = json as Record<string, unknown>;
+
+  // 段列表可能在:semanticSegments / timelineObjects / 顶层就是数组 /
+  // 手机新版导出 { semanticSegments: [...] } 或直接 [ {...} ](批次 25 兼容)
+  const segments: Array<Record<string, unknown>> = Array.isArray(json)
+    ? (json as Array<Record<string, unknown>>)
+    : ([
+        ...(Array.isArray(root.semanticSegments) ? root.semanticSegments : []),
+        ...(Array.isArray(root.timelineObjects) ? root.timelineObjects : []),
+        ...(Array.isArray(root.timelineEdits) ? root.timelineEdits : []),
+      ] as Array<Record<string, unknown>>);
+
+  const parseGeo = (s: unknown): { lat?: number; lon?: number } => {
+    const m = /(-?\d+\.\d+)°?,\s*(-?\d+\.\d+)°?/.exec(String(s ?? '')) || /geo:(-?[\d.]+),(-?[\d.]+)/.exec(String(s ?? ''));
+    return m ? { lat: Number(m[1]), lon: Number(m[2]) } : {};
   };
 
-  for (const seg of root.semanticSegments ?? []) {
-    const visit = seg.visit as {
-      topCandidate?: { placeLocation?: string; semanticType?: string; label?: string; placeId?: string };
-    } | undefined;
-    if (!visit?.topCandidate) continue;
-    const tc = visit.topCandidate;
-    const geo = /geo:(-?[\d.]+),(-?[\d.]+)/.exec(String(tc.placeLocation ?? ''));
-    const label = tc.label || tc.semanticType || (geo ? `${geo[1]},${geo[2]}` : '');
-    const ts = String(seg.startTime ?? '');
-    if (!label || !ts) continue;
-    out.push({
-      ts,
-      end: seg.endTime ? String(seg.endTime) : undefined,
-      label: humanizeSemanticType(label),
-      lat: geo ? Number(geo[1]) : undefined,
-      lon: geo ? Number(geo[2]) : undefined,
-      source: 'import',
-    });
-  }
+  for (const seg of segments) {
+    // 三种到访结构:visit.topCandidate(新)/ placeVisit.location(旧 Takeout)/
+    // visit.place(部分导出)
+    const startTime = String(seg.startTime ?? (seg.duration as Record<string, unknown>)?.startTimestamp ?? '');
+    const endTime = String(seg.endTime ?? (seg.duration as Record<string, unknown>)?.endTimestamp ?? '') || undefined;
 
-  for (const obj of root.timelineObjects ?? []) {
-    const pv = obj.placeVisit as {
-      location?: { name?: string; latitudeE7?: number; longitudeE7?: number };
-      duration?: { startTimestamp?: string; endTimestamp?: string };
-    } | undefined;
-    if (!pv?.location || !pv.duration?.startTimestamp) continue;
-    out.push({
-      ts: pv.duration.startTimestamp,
-      end: pv.duration.endTimestamp,
-      label: pv.location.name || `${(pv.location.latitudeE7 ?? 0) / 1e7},${(pv.location.longitudeE7 ?? 0) / 1e7}`,
-      lat: pv.location.latitudeE7 != null ? pv.location.latitudeE7 / 1e7 : undefined,
-      lon: pv.location.longitudeE7 != null ? pv.location.longitudeE7 / 1e7 : undefined,
-      source: 'import',
-    });
+    // A. 新版 visit.topCandidate
+    const visit = seg.visit as { topCandidate?: { placeLocation?: unknown; semanticType?: string; label?: string } } | undefined;
+    if (visit?.topCandidate) {
+      const tc = visit.topCandidate;
+      const geo = parseGeo(typeof tc.placeLocation === 'string' ? tc.placeLocation : (tc.placeLocation as Record<string, unknown>)?.latLng);
+      const label = tc.label || tc.semanticType || (geo.lat != null ? `${geo.lat.toFixed(4)},${geo.lon?.toFixed(4)}` : '');
+      if (label && startTime) { out.push({ ts: startTime, end: endTime, label: humanizeSemanticType(label), lat: geo.lat, lon: geo.lon, source: 'import' }); continue; }
+    }
+
+    // B. 旧 Takeout placeVisit.location
+    const pv = seg.placeVisit as { location?: { name?: string; address?: string; latitudeE7?: number; longitudeE7?: number }; duration?: { startTimestamp?: string; endTimestamp?: string } } | undefined;
+    if (pv?.location) {
+      const loc = pv.location;
+      const ts = pv.duration?.startTimestamp || startTime;
+      const label = loc.name || loc.address || (loc.latitudeE7 != null ? `${(loc.latitudeE7 / 1e7).toFixed(4)},${((loc.longitudeE7 ?? 0) / 1e7).toFixed(4)}` : '');
+      if (label && ts) { out.push({ ts, end: pv.duration?.endTimestamp || endTime, label, lat: loc.latitudeE7 != null ? loc.latitudeE7 / 1e7 : undefined, lon: loc.longitudeE7 != null ? loc.longitudeE7 / 1e7 : undefined, source: 'import' }); continue; }
+    }
+
+    // C. visit.place / 顶层 place 字段兜底
+    const place = (seg.place ?? (seg.visit as Record<string, unknown>)?.place) as { name?: string; location?: unknown } | undefined;
+    if (place?.name && startTime) {
+      const geo = parseGeo(place.location);
+      out.push({ ts: startTime, end: endTime, label: place.name, lat: geo.lat, lon: geo.lon, source: 'import' });
+    }
   }
 
   return out;
