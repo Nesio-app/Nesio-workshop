@@ -209,9 +209,12 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       const res = await fetch('/api/portal/plaid/link-token', { method: 'POST' });
       const data = await res.json() as { ok?: boolean; linkToken?: string; error?: string };
       if (!data.ok || !data.linkToken) {
-        showToast(data.error === 'plaid_not_configured'
-          ? L(dict, 'Plaid 还没配置:dashboard.plaid.com 注册 → Keys 里拿 client_id 和 Sandbox secret,配到 Vercel(PLAID_CLIENT_ID / PLAID_SECRET / PLAID_ENV)', 'Plaid not configured: sign up at dashboard.plaid.com → Keys → set PLAID_CLIENT_ID / PLAID_SECRET / PLAID_ENV on Vercel')
-          : L(dict, `Plaid 连接失败:${data.error || '未知'}`, `Plaid connect failed: ${data.error || 'unknown'}`), false);
+        const msg = data.error === 'plaid_not_configured'
+          ? L(dict, 'Plaid 还没配置:dashboard.plaid.com → Keys 拿 client_id 和 Sandbox secret,配到 Vercel(PLAID_CLIENT_ID / PLAID_SECRET / PLAID_ENV)', 'Plaid not configured: dashboard.plaid.com → Keys → set PLAID_CLIENT_ID / PLAID_SECRET / PLAID_ENV on Vercel')
+          : data.error === 'auth_required'
+          ? L(dict, '连接银行需要先登录 Nesio(数据接入的私有数据都要求登录)', 'Linking a bank requires signing in to Nesio first')
+          : L(dict, `Plaid 连接失败:${data.error || '未知'}`, `Plaid connect failed: ${data.error || 'unknown'}`);
+        showToast(msg, false);
         setSyncing(null);
         return;
       }
@@ -225,7 +228,12 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
           document.head.appendChild(sc);
         });
       }
-      const Plaid = (window as unknown as { Plaid: { create: (cfg: object) => { open: () => void } } }).Plaid;
+      const Plaid = (window as unknown as { Plaid?: { create: (cfg: object) => { open: () => void } } }).Plaid;
+      if (!Plaid) {
+        showToast(L(dict, 'Plaid Link 脚本没加载(可能被网络或拦截器挡了),请稍后重试', "Plaid Link script didn't load (network or a blocker may have stopped it) — try again"), false);
+        setSyncing(null);
+        return;
+      }
       const link = Plaid.create({
         token: data.linkToken,
         onSuccess: async (publicToken: string) => {
