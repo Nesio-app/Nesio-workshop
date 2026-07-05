@@ -50,7 +50,7 @@ const CONNECTORS: ConnectorDef[] = [
   // 批次 18:Notion 转正 —— OAuth 一键授权(像 flomo 那样选页面),内部 token 流保留为回退
   { id: 'notion', name: 'Notion', icon: <IconBook />, iconBg: 'var(--chip-gray)', method: 'token', syncEndpoint: '/api/portal/notion', tokenHint: 'notion.so/my-integrations → 新建集成(Internal)→ 复制 Internal Integration Secret(ntn_… 或 secret_…)→ 在要同步的 Notion 页面右上角「…」→ 连接 → 选中这个集成', tokenHintEn: 'notion.so/my-integrations → New internal integration → copy the secret (ntn_… / secret_…) → on each page: ••• → Connections → add this integration', description: '粘贴内部集成 token,同步共享给它的页面(提取项目与想法)', descriptionEn: 'Paste an internal integration token to sync the pages you shared with it' },
   { id: 'toggl', name: 'Toggl Track', icon: <IconTimer />, iconBg: 'var(--chip-red)', method: 'token', syncEndpoint: '/api/portal/toggl', tokenHint: 'track.toggl.com → Profile → API Token', tokenHintEn: 'track.toggl.com → Profile → API Token', description: '同步时间记录，了解你的专注分布', descriptionEn: 'Sync time entries to see where your focus goes', dev: true },
-  { id: 'health', name: 'Apple Health 导出', nameEn: 'Apple Health export', icon: <IconHeartPulse />, iconBg: 'var(--chip-pink)', method: 'file', description: '上传 export.xml，提取步数、睡眠、心率', descriptionEn: 'Upload export.xml to extract steps, sleep, heart rate' },
+  { id: 'health', name: 'Apple Health 导出', nameEn: 'Apple Health export', icon: <IconHeartPulse />, iconBg: 'var(--chip-pink)', method: 'file', description: '直接传导出的 zip 或 export.xml,提取步数、睡眠、心率、锻炼', descriptionEn: 'Drop the exported zip or export.xml — extracts steps, sleep, heart rate, workouts' },
   { id: 'reminder', name: 'Apple 提醒事项', nameEn: 'Apple Reminders', icon: <IconCheckSquare />, iconBg: 'var(--chip-amber)', method: 'shortcuts', ingestSource: 'reminder', description: '通过快捷指令推送提醒，自动转为承诺', descriptionEn: 'Push reminders via Shortcuts; they become commitments', dev: true },
   { id: 'keep', name: 'Keep 健康', nameEn: 'Keep fitness', icon: <IconActivity />, iconBg: 'var(--chip-green)', method: 'shortcuts', ingestSource: 'keep', description: '通过快捷指令推送运动数据（点设置看步骤）', descriptionEn: 'Push workout data via Shortcuts (tap Set up for steps)' },
   // 批次 22:微信读书无开放 API —— App 内导出笔记,粘贴文本解析入库
@@ -743,24 +743,51 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     if (c.method === 'shortcuts') { setShortcutsFor(c.id); return; }
   }
 
+  // 批次 38:直接传 zip 或 export.xml,全部在浏览器里解析(不上传大文件)。
+  // export.xml 常几百 MB,只解码尾部(最近数据在末尾),正则提炼后建记忆节点。
+  const HEALTH_TAIL_BYTES = 6_000_000; // 只看最后 ~6MB 文本 = 最近的记录
+  async function extractExportXmlTail(file: File): Promise<string> {
+    if (file.name.toLowerCase().endsWith('.zip')) {
+      const buf = new Uint8Array(await file.arrayBuffer());
+      const { unzipSync } = await import('fflate');
+      // filter 只解压 export.xml,跳过 workout-routes/clinical-records 等一堆文件
+      const isExport = (n: string) => /(^|\/)export\.xml$/i.test(n);
+      const files = unzipSync(buf, { filter: (f) => isExport(f.name) });
+      const entry = Object.entries(files).find(([n]) => isExport(n));
+      if (!entry) return '';
+      const bytes = entry[1];
+      const slice = bytes.length > HEALTH_TAIL_BYTES ? bytes.subarray(bytes.length - HEALTH_TAIL_BYTES) : bytes;
+      return new TextDecoder('utf-8').decode(slice);
+    }
+    // 直接是 xml:大文件只读尾部,避免整个读进内存
+    const blob = file.size > HEALTH_TAIL_BYTES ? file.slice(file.size - HEALTH_TAIL_BYTES) : file;
+    return blob.text();
+  }
+
   async function handleHealthFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = '';
-    if (file.name.endsWith('.zip')) { showToast(L(dict, '请先解压 zip，上传里面的 export.xml', 'Unzip first, then upload the export.xml inside'), false); return; }
     setSyncing('health');
     try {
-      const text = await file.text();
-      const res = await fetch('/api/portal/health', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ xml: text }) });
-      const data = await res.json() as { ok?: boolean; nodes?: NodeInput[]; count?: number };
-      if (data.ok && data.nodes?.length) {
-        saveNodes(data.nodes, 'system');
-        saveConnectorState('health', true);
-        setConnected((p) => ({ ...p, health: true }));
-        setCounts((p) => ({ ...p, health: data.count || 0 }));
-        showToast(L(dict, `已提取 ${data.count} 个健康节点`, `Extracted ${data.count} health nodes`), true);
-      } else showToast(L(dict, '未识别到健康数据', 'No health data recognized'), false);
-    } catch { showToast(L(dict, '解析失败', 'Parse failed'), false); }
+      const xml = await extractExportXmlTail(file);
+      if (!xml || !xml.includes('HKQuantityTypeIdentifier')) {
+        showToast(file.name.toLowerCase().endsWith('.zip')
+          ? L(dict, 'zip 里没找到 export.xml(别选 export_cda / 子文件夹)', "No export.xml in the zip (not export_cda / subfolders)")
+          : L(dict, '这不是 export.xml,请选主导出文件', 'Not export.xml — pick the main export file'), false);
+        setSyncing(null); return;
+      }
+      const { parseAppleHealthText } = await import('@/lib/portal/apple-health');
+      const { nodes, summary } = parseAppleHealthText(xml);
+      if (!nodes.length) { showToast(L(dict, '未识别到健康数据', 'No health data recognized'), false); setSyncing(null); return; }
+      saveNodes(nodes as Array<Omit<NodeInput, 'source'>>, 'system');
+      saveConnectorState('health', true);
+      setConnected((p) => ({ ...p, health: true }));
+      setCounts((p) => ({ ...p, health: nodes.length }));
+      showToast(L(dict, `已接入健康数据:${summary}`, `Health imported: ${summary}`), true);
+    } catch {
+      showToast(L(dict, '解析失败(文件可能太大,手机内存不够 —— 可先在电脑上解压)', 'Parse failed (file may be too large for phone memory — unzip on a computer first)'), false);
+    }
     setSyncing(null);
   }
 
