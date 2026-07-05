@@ -79,7 +79,7 @@ jobs:
             1. 动手前先读 STATE.md(会话外记忆)和 issue 正文,理解两代产品交接背景
             2. 契约测试是字面断言,改 integrations/TodayFeed/Portal/DailyBriefCard/
                MemoryNodeDetail 前先读 scripts/anonymous-private-data-gate.test.mjs
-            3. 验证命令:npx tsc --noEmit、npm run test:security(25 条 passed)、
+            3. 验证命令:npx tsc --noEmit、npm run test:security(全绿)、
                npm run loops(三项 TOTAL 全 0);涉及重构再跑 npm run test:contracts
             4. 只开 PR,永不直推 main;PR 描述里写清根因、修法、验证结果
             5. 修不动就在 issue 里评论说明卡在哪,不要硬改', github.event.issue.number, github.event.issue.title) || '' }}

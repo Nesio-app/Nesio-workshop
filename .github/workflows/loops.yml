@@ -38,7 +38,7 @@ jobs:
             echo 'EOF_REPORT'
           } >> "$GITHUB_OUTPUT"
 
-      # 全量契约链(100+ 套;CI 每次 push 只跑 test:security 的 18 套)。
+      # 全量契约链(100+ 套;CI 每次 push 只跑 test:security 的 19 套)。
       # 2026-07-04 教训:重构漂移在这条链上积累了 15 处断裂,半个月无人发现。
       - name: Full contract chain
         id: contracts

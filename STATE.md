@@ -41,7 +41,7 @@
 
 ## 红线(动之前必读)
 
-- **CI 每次 push 跑 `test:security`(18 套安全契约)**,见 .github/workflows/deploy.yml。
+- **CI 每次 push 跑 `test:security`(19 套安全契约)**,见 .github/workflows/deploy.yml。
   本地验证命令:`npm run test:security`。改动 integrations.ts / DailyBriefCard /
   MemoryNodeDetail / TodayFeed / Portal 前先看 scripts/anonymous-private-data-gate.test.mjs
   对它们的字面断言(契约喜欢正形式门控 `if (canUsePrivateData) {`)。
@@ -56,7 +56,7 @@
 
 (暂无 — 2026-07-04 批次全部清偿;新欠账请记录在此)
 
-**契约测试提示**:`test:contracts`(100+ 套,CI 只跑 test:security 的 18 套)
+**契约测试提示**:`test:contracts`(100+ 套,CI 只跑 test:security 的 19 套)
 在 2026-07-04 全量修复过一轮——历史重构造成的 15 处 marker 漂移已对齐,
 并已挂进每周 loops.yml(失败进 loop-report issue)。重构后请顺手本地跑一遍。
 

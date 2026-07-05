@@ -30,6 +30,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # 独立类型门:不再只靠 next build 兜类型;快速失败、步骤名清晰。
+      - name: Typecheck (tsc --noEmit)
+        run: npx tsc --noEmit
+
       - name: Prepare toolbox static assets
         run: npm run bundle:toolbox
 

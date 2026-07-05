@@ -113,9 +113,24 @@ export function signalWriteMode(): SignalWriteMode {
   return 'cloud_mirror_pending';
 }
 
-// 匿名会话云镜像降噪(2026-07-04 QA P2 修复):未登录时镜像注定 401,
-// 收到一次后本会话不再发(登录流程会导航/刷新页面,标志自然复位)。
+// 匿名会话云镜像降噪(2026-07-04 QA P2 修复):未登录时镜像注定 401,收到一次后本会话不再发。
+// 但 SPA 登录不刷新页面时,旧代码只靠 reload 复位 → 登录成功后本会话云镜像仍整段静默失效。
+// 改为在登录事件(会话导入/就绪)与标签重新可见(可能在别处登录)时复位。
 let cloudMirrorAuthBlocked = false;
+
+/** 复位云镜像 401 阻断(登录成功后调用,让本会话恢复镜像,无需刷新页面)。 */
+export function resetCloudMirrorAuthBlock(): void {
+  cloudMirrorAuthBlocked = false;
+}
+
+if (typeof window !== 'undefined') {
+  const reset = () => { cloudMirrorAuthBlocked = false; };
+  window.addEventListener('nesio-auth-session-imported', reset);
+  window.addEventListener('nesio-auth-session-ready', reset);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') reset();
+  });
+}
 
 export async function writeCloudSignal(signal: Signal): Promise<{ ok: boolean; status: string }> {
   if (typeof window === 'undefined' || typeof fetch !== 'function') {

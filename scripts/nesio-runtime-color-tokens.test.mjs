@@ -50,6 +50,27 @@ assert(
   'personalization-insights must map default mood dots to warm-coach status tokens.',
 );
 
+// EmailComposeSheet 曾从别的设计系统移植,内联了 --accent/--status-stop/--text-muted/
+// --surface-2/--border 这些 Nesio 里根本没定义的 token,fallback 直接渲染被拉黑的
+// #10b981/#ef4444(且 --text-muted 无 fallback → 文字无色)。守护它只用 Nesio token 家族。
+const emailCompose = readFileSync(join(root, 'components', 'portal', 'EmailComposeSheet.tsx'), 'utf8');
+for (const banned of ['#10b981', '#ef4444', '#8b5cf6', '#3b6ef0', '#f59e0b', '#f0f4ff']) {
+  assert(
+    !emailCompose.includes(banned),
+    `EmailComposeSheet must not render the deprecated hex ${banned} (CLAUDE.md blacklist).`,
+  );
+}
+for (const foreign of ['--accent', '--status-stop', '--text-muted', '--surface-2', '--border']) {
+  assert(
+    !emailCompose.includes(`var(${foreign}`),
+    `EmailComposeSheet must not reference the undefined foreign token ${foreign}; use the Nesio --portal-*/--status-* family.`,
+  );
+}
+assert(
+  /var\(--portal-blue-deep\)/.test(emailCompose) && /var\(--portal-muted\)/.test(emailCompose),
+  'EmailComposeSheet must use Nesio tokens (--portal-blue-deep / --portal-muted).',
+);
+
 assert(
   pkg.scripts['test:nesio-runtime-colors'] === 'node scripts/nesio-runtime-color-tokens.test.mjs',
   'package.json must expose test:nesio-runtime-colors.',
