@@ -27,6 +27,29 @@ function monthLabel(ym: string, dict: string): string {
     : `${y} 年 ${Number(m)} 月`;
 }
 
+// 批次 40:分类支出环形图(纯 SVG,无依赖)
+const DONUT_COLORS = ['#588ce3', '#e0954a', '#3d9f6e', '#c98a2d', '#7c6ee6', '#c25d7a', '#2f9d8f', '#9aa7b8'];
+function FinanceDonut({ slices, centerTop, centerVal }: { slices: Array<{ category: string; pct: number }>; centerTop: string; centerVal: string }) {
+  const R = 52;
+  const C = 2 * Math.PI * R;
+  let acc = 0;
+  return (
+    <svg viewBox="0 0 140 140" width="132" height="132" style={{ display: 'block', margin: '0 auto' }}>
+      <g transform="translate(70,70) rotate(-90)">
+        <circle r={R} fill="none" stroke="var(--portal-line)" strokeWidth="14" />
+        {slices.slice(0, 8).map((s, i) => {
+          const len = (s.pct / 100) * C;
+          const seg = <circle key={s.category} r={R} fill="none" stroke={DONUT_COLORS[i % DONUT_COLORS.length]} strokeWidth="14" strokeLinecap="butt" strokeDasharray={`${len} ${C - len}`} strokeDashoffset={-acc} />;
+          acc += len;
+          return seg;
+        })}
+      </g>
+      <text x="70" y="65" textAnchor="middle" fontSize="8.5" fill="var(--portal-muted)">{centerTop}</text>
+      <text x="70" y="82" textAnchor="middle" fontSize="14" fontWeight="800" fill="var(--portal-ink)">{centerVal}</text>
+    </svg>
+  );
+}
+
 export default function FinanceTab() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [txs, setTxs] = useState<BankTx[]>([]);
@@ -76,6 +99,8 @@ export default function FinanceTab() {
   function removeFlowRule(name: string) { setFlowRule(name, ''); setRev((r) => r + 1); }
   const filterCats = ['all', ...cats.slice(0, 6).map((c) => c.category)];
   const shownTx = filter === 'all' ? monthTx : monthTx.filter((t) => effectiveCategory(t) === filter);
+  // 批次 40:交易行显示卡后四位(accountId → account.mask)
+  const acctMask = new Map(accounts.map((a) => [a.id, a.mask]));
 
   function resolveReview(name: string, category: string) { setMerchantRule(name, category); setRev((r) => r + 1); }
   function applyFlow(name: string, flow: TxFlow) { setFlowRule(name, flow); setFlowEditId(null); setRev((r) => r + 1); }
@@ -105,6 +130,22 @@ export default function FinanceTab() {
             <div className="nesio-fin-kpi"><span className="nesio-fin-kpi-l">{L(dict, '收入', 'Income')}</span><span className="nesio-fin-kpi-v">{formatMoney(summary.income, summary.currency)}</span></div>
           </div>
           <p className="nesio-fin-alert-note" style={{ textAlign: 'left', marginTop: '-0.5rem', marginBottom: '0.8rem' }}>{L(dict, '收入 / 转账 / 信用卡还款 不计入收支;分错了到「交易」点类型改。', 'Income / transfers / card payments are excluded; fix any mislabels under Transactions.')}</p>
+
+          {/* 批次 40:分类支出环形图 */}
+          {cats.length > 0 && (
+            <div className="nesio-fin-donut-wrap">
+              <FinanceDonut slices={cats} centerTop={L(dict, '本月支出', 'This month')} centerVal={formatMoney(cats.reduce((s, c) => s + c.total, 0), summary.currency)} />
+              <div className="nesio-fin-donut-legend">
+                {cats.slice(0, 6).map((c, i) => (
+                  <div key={c.category} className="nesio-fin-donut-leg">
+                    <span className="nesio-fin-donut-dot" style={{ background: DONUT_COLORS[i % DONUT_COLORS.length] }} />
+                    <span className="nesio-fin-donut-cat">{c.category}</span>
+                    <span className="nesio-fin-donut-pct">{c.pct}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {alerts.length > 0 && (
             <>
@@ -197,7 +238,7 @@ export default function FinanceTab() {
                   <div className="nesio-fin-txrow">
                     <span className="nesio-fin-txdate">{(t.date || '').slice(5).replace('-', '/')}</span>
                     <div className="nesio-fin-txmid">
-                      <span className="nesio-fin-txname">{t.name || L(dict, '未知商户', 'Unknown')}</span>
+                      <span className="nesio-fin-txname">{t.name || L(dict, '未知商户', 'Unknown')}{t.accountId && acctMask.get(t.accountId) ? <span className="nesio-fin-txmask"> ····{acctMask.get(t.accountId)}</span> : null}</span>
                       <button type="button" className={`nesio-fin-txflow nesio-fin-txflow--${f}`} onClick={() => setFlowEditId((id) => (id === t.id ? null : t.id))}>
                         {L(dict, TX_FLOW_LABELS[f][0], TX_FLOW_LABELS[f][1])}
                         {f === 'expense' && <span className="nesio-fin-txcat"> · {effectiveCategory(t) || L(dict, '待归类', 'Uncategorized')}</span>}
