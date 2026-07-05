@@ -37,11 +37,19 @@ export async function POST(req: NextRequest) {
     }
     const response = NextResponse.json({ ok: true });
     const secure = process.env.NODE_ENV === 'production';
+    // 批次 40:支持连接多家银行 —— access_token 追加进数组 cookie,不再覆盖
+    // (之前单 cookie 覆盖 → 只剩最后一家,用户「10 个账户只显示 2 个」)。
+    let tokens: string[] = [];
+    try { tokens = JSON.parse(req.cookies.get('nesio_plaid_tokens')?.value || '[]'); } catch { tokens = []; }
+    if (!Array.isArray(tokens)) tokens = [];
+    if (!tokens.includes(data.access_token)) tokens.push(data.access_token);
+    response.cookies.set('nesio_plaid_tokens', JSON.stringify(tokens.slice(-20)), {
+      httpOnly: true, sameSite: 'lax', secure, path: '/', maxAge: 60 * 60 * 24 * 180,
+    });
+    // 兼容:latest 也写单 cookie
     response.cookies.set('nesio_plaid_access', data.access_token, {
       httpOnly: true, sameSite: 'lax', secure, path: '/', maxAge: 60 * 60 * 24 * 180,
     });
-    // 新连接从头同步
-    response.cookies.set('nesio_plaid_cursor', '', { httpOnly: true, sameSite: 'lax', secure, path: '/', maxAge: 0 });
     return response;
   } catch {
     return NextResponse.json({ ok: false, error: 'plaid_unreachable' }, { status: 502 });

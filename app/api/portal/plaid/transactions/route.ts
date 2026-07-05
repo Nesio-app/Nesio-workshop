@@ -39,64 +39,53 @@ export async function GET(req: NextRequest) {
   const guard = await guardAiRoute(req, 'plaid', { limit: 10 });
   if (guard) return guard;
 
-  const accessToken = req.cookies.get('nesio_plaid_access')?.value || '';
-  if (!accessToken) {
+  // 批次 40:多银行 —— 遍历所有 access_token(数组 cookie,回退旧单 cookie)。
+  let tokens: string[] = [];
+  try { tokens = JSON.parse(req.cookies.get('nesio_plaid_tokens')?.value || '[]'); } catch { tokens = []; }
+  if (!Array.isArray(tokens) || !tokens.length) {
+    const single = req.cookies.get('nesio_plaid_access')?.value || '';
+    tokens = single ? [single] : [];
+  }
+  if (!tokens.length) {
     return NextResponse.json({ ok: false, error: 'not_connected' }, { status: 401 });
   }
 
-  let cursor = req.cookies.get('nesio_plaid_cursor')?.value || '';
   const added: PlaidTx[] = [];
-  let accounts: PlaidAccount[] = [];
+  const acctById = new Map<string, PlaidAccount>();
+  let anyRelink = false;
 
   try {
-    for (let page = 0; page < 5; page++) {
-      const res = await fetch(`${plaidBase()}/transactions/sync`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          client_id: envValue('PLAID_CLIENT_ID'),
-          secret: envValue('PLAID_SECRET'),
-          access_token: accessToken,
-          cursor: cursor || undefined,
-          count: 100,
-        }),
-      });
-      const data = await res.json() as {
-        added?: PlaidTx[]; accounts?: PlaidAccount[]; next_cursor?: string; has_more?: boolean;
-        error_code?: string; error_message?: string;
-      };
-      if (data.error_code) {
-        const needsRelink = data.error_code === 'ITEM_LOGIN_REQUIRED';
-        return NextResponse.json(
-          { ok: false, error: needsRelink ? 'relink_required' : data.error_code, detail: data.error_message },
-          { status: needsRelink ? 401 : 502 },
-        );
+    for (const accessToken of tokens) {
+      // 交易:每家全量拉(客户端按 id 去重),省掉多 token 共享游标的复杂度
+      let cursor = '';
+      for (let page = 0; page < 10; page++) {
+        const res = await fetch(`${plaidBase()}/transactions/sync`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ client_id: envValue('PLAID_CLIENT_ID'), secret: envValue('PLAID_SECRET'), access_token: accessToken, cursor: cursor || undefined, count: 100 }),
+        });
+        const data = await res.json() as { added?: PlaidTx[]; accounts?: PlaidAccount[]; next_cursor?: string; has_more?: boolean; error_code?: string };
+        if (data.error_code) { if (data.error_code === 'ITEM_LOGIN_REQUIRED') anyRelink = true; break; }
+        added.push(...(data.added ?? []));
+        for (const a of data.accounts ?? []) acctById.set(a.account_id, a);
+        cursor = data.next_cursor || cursor;
+        if (!data.has_more) break;
       }
-      added.push(...(data.added ?? []));
-      if (data.accounts?.length) accounts = data.accounts; // sync 每次回全量账户,取最新
-      cursor = data.next_cursor || cursor;
-      if (!data.has_more) break;
-    }
-
-    // 批次 39:账户单独用 /accounts/get 兜底 —— transactions/sync 在增量(有 cursor、无新交易)
-    // 时可能不回 accounts,导致「卡片」永远空。这里独立拉一次,保证一定有账户/余额。
-    if (!accounts.length) {
+      // 账户:独立拉一次,保证一定有账户/余额(这家失效不阻断其他家)
       try {
         const accRes = await fetch(`${plaidBase()}/accounts/get`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            client_id: envValue('PLAID_CLIENT_ID'),
-            secret: envValue('PLAID_SECRET'),
-            access_token: accessToken,
-          }),
+          body: JSON.stringify({ client_id: envValue('PLAID_CLIENT_ID'), secret: envValue('PLAID_SECRET'), access_token: accessToken }),
         });
         const accData = await accRes.json() as { accounts?: PlaidAccount[] };
-        if (accData.accounts?.length) accounts = accData.accounts;
-      } catch { /* 兜底失败就算了,不阻断交易 */ }
+        for (const a of accData.accounts ?? []) acctById.set(a.account_id, a);
+      } catch { /* skip */ }
     }
+    const accounts = [...acctById.values()];
 
     const response = NextResponse.json({
+      relink: anyRelink || undefined,
       ok: true,
       accounts: accounts.map((a) => ({
         id: a.account_id,
@@ -116,9 +105,6 @@ export async function GET(req: NextRequest) {
         currency: t.iso_currency_code || 'USD',
         category: t.personal_finance_category?.primary || '',
       })),
-    });
-    response.cookies.set('nesio_plaid_cursor', cursor, {
-      httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', path: '/', maxAge: 60 * 60 * 24 * 180,
     });
     return response;
   } catch {

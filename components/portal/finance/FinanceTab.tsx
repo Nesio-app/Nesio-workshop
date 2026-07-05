@@ -11,7 +11,7 @@ import {
   loadBankTx, loadBankAccounts, availableMonths, summarizeMonth, categoryBreakdown, topMerchants,
   monthlyTrend, financeAlerts, needsReview, suggestCategory, setMerchantRule, effectiveCategory,
   accountMonth, formatMoney, ymOf, prevYm, txFlow, setFlowRule, TX_FLOW_LABELS,
-  detectRecurring, upcomingRecurring, loadMerchantRules, loadFlowRules,
+  detectRecurring, upcomingRecurring, loadMerchantRules, loadFlowRules, setRecurRule,
   type BankTx, type BankAccount, type TxFlow,
 } from '@/lib/portal/bank-tx';
 import { L } from '@/lib/portal/i18n';
@@ -95,7 +95,8 @@ export default function FinanceTab() {
   const signed = (a: number) => (a >= 0 ? `-${formatMoney(a, summary.currency)}` : `+${formatMoney(-a, summary.currency)}`);
   const netDelta = prevSummary.net > 0 ? Math.round(((summary.net - prevSummary.net) / prevSummary.net) * 100) : null;
   const idx = months.indexOf(ym);
-  const SUBS: Array<[Sub, string, string]> = [['overview', '总览', 'Overview'], ['tx', '交易', 'Transactions'], ['recurring', '定期', 'Recurring'], ['cards', '卡片', 'Cards']];
+  const SUBS: Array<[Sub, string, string]> = [['overview', '总览', 'Overview'], ['tx', '交易', 'Transactions'], ['recurring', '定期', 'Recurring'], ['cards', '账户', 'Accounts']];
+  function markNotRecurring(name: string) { setRecurRule(name, 'no'); setRev((r) => r + 1); }
   function removeMerchantRule(name: string) { setMerchantRule(name, ''); setRev((r) => r + 1); }
   function removeFlowRule(name: string) { setFlowRule(name, ''); setRev((r) => r + 1); }
   const filterCats = ['all', ...cats.slice(0, 6).map((c) => c.category)];
@@ -227,20 +228,22 @@ export default function FinanceTab() {
             </>
           )}
 
-          {/* 批次 40:按卡筛选(有多个账户时才显示) */}
-          {accounts.length > 1 && (
-            <div className="nesio-fin-subtabs" style={{ marginTop: review.length ? '1rem' : 0 }}>
-              <button type="button" className={`nesio-fin-subtab${acctFilter === 'all' ? ' is-active' : ''}`} onClick={() => setAcctFilter('all')}>{L(dict, '所有卡', 'All cards')}</button>
-              {accounts.map((a) => (
-                <button key={a.id} type="button" className={`nesio-fin-subtab${acctFilter === a.id ? ' is-active' : ''}`} onClick={() => setAcctFilter(a.id)}>{a.name}{a.mask ? ` ····${a.mask}` : ''}</button>
+          {/* 批次 40:筛选改成下拉菜单(账户 + 分类) */}
+          <div className="nesio-fin-filterbar" style={{ marginTop: review.length ? '1rem' : 0 }}>
+            {accounts.length > 1 && (
+              <select className="nesio-fin-select" value={acctFilter} onChange={(e) => setAcctFilter(e.target.value)} aria-label={L(dict, '按账户筛选', 'Filter by account')}>
+                <option value="all">{L(dict, '所有账户', 'All accounts')}</option>
+                {accounts.map((a) => (
+                  <option key={a.id} value={a.id}>{a.name}{a.mask ? ` ····${a.mask}` : ''}</option>
+                ))}
+              </select>
+            )}
+            <select className="nesio-fin-select" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label={L(dict, '按分类筛选', 'Filter by category')}>
+              <option value="all">{L(dict, '全部分类', 'All categories')}</option>
+              {filterCats.filter((c) => c !== 'all').map((c) => (
+                <option key={c} value={c}>{c}</option>
               ))}
-            </div>
-          )}
-
-          <div className="nesio-fin-subtabs" style={{ marginTop: accounts.length > 1 ? '0.5rem' : (review.length ? '1rem' : 0) }}>
-            {filterCats.map((c) => (
-              <button key={c} type="button" className={`nesio-fin-subtab${filter === c ? ' is-active' : ''}`} onClick={() => setFilter(c)}>{c === 'all' ? L(dict, '全部', 'All') : c}</button>
-            ))}
+            </select>
           </div>
 
           <div className="nesio-fin-txlist">
@@ -316,6 +319,7 @@ export default function FinanceTab() {
                     <span className="nesio-fin-recur-meta">{L(dict, r.cadenceLabel[0], r.cadenceLabel[1])} · {r.category} · {L(dict, `下次约 ${r.nextEstimate.slice(5).replace('-', '/')}`, `next ~${r.nextEstimate.slice(5).replace('-', '/')}`)} · {L(dict, `${r.count} 笔`, `${r.count}×`)}</span>
                   </div>
                   <span className="nesio-fin-recur-amt">{formatMoney(r.avgAmount, r.currency)}</span>
+                  <button type="button" className="nesio-fin-rule-x" onClick={() => markNotRecurring(r.name)} aria-label={L(dict, '不是定期', 'Not recurring')} title={L(dict, '标为「不是定期」', 'Mark not recurring')}>✕</button>
                 </div>
               ))}
             </div>

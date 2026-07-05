@@ -17767,6 +17767,8 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 .nesio-fin-donut-cat { color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nesio-fin-donut-pct { margin-left: auto; color: var(--portal-muted); font-variant-numeric: tabular-nums; }
 .nesio-fin-txmask { font-size: 0.7rem; color: var(--portal-muted); font-variant-numeric: tabular-nums; }
+.nesio-fin-filterbar { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.nesio-fin-select { flex: 1; min-width: 8rem; font-size: 0.82rem; padding: 0.4rem 0.6rem; border-radius: 10px; border: 1px solid var(--portal-line); background: var(--glass-bg-solid); color: var(--portal-ink); }
 
 /* 批次 39:定期账单 + 已学规则 */
 .nesio-fin-recur-hero { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; padding: 0.9rem 1rem; border-radius: 14px; background: var(--portal-accent-soft); border: 1px solid var(--portal-accent-border); }

@@ -335,14 +335,28 @@ function rollForward(baseMs: number, cadenceDays: number): string {
   return new Date(t).toISOString().slice(0, 10);
 }
 
+// 批次 40:定期手动覆盖 —— 'yes'=强制算定期,'no'=强制排除。算法判断不对时用户自己调。
+const RECUR_RULE_KEY = 'nesio-bank-recur-v1';
+export function loadRecurRules(): Record<string, 'yes' | 'no'> {
+  if (typeof window === 'undefined') return {};
+  try { return JSON.parse(localStorage.getItem(RECUR_RULE_KEY) || '{}') as Record<string, 'yes' | 'no'>; } catch { return {}; }
+}
+export function setRecurRule(name: string, v: 'yes' | 'no' | ''): void {
+  if (typeof window === 'undefined') return;
+  const all = loadRecurRules();
+  if (v) all[name] = v; else delete all[name];
+  try { localStorage.setItem(RECUR_RULE_KEY, JSON.stringify(all)); } catch { /* ignore */ }
+}
+
 /**
- * 识别定期账单(批次 39 重写):
- * 1. 先按商户归并支出;2. 判类别 —— 账单关键词命中 OR (非餐饮/购物 且 金额稳定 CV<0.2);
- * 3. 间隔中位数落在周期档;4. 下次日期滚动到未来。这样「超市去很多次」不会误判为定期。
+ * 识别定期账单(批次 39 重写,批次 40 加手动覆盖):
+ * 1. 先按商户归并支出;2. 手动覆盖优先(yes 强制/no 排除);3. 否则判类别(账单关键词 OR
+ *    非餐饮购物且金额稳定 CV<0.2);4. 间隔中位数落周期档;5. 下次日期滚动到未来。
  */
 export function detectRecurring(txs: BankTx[]): RecurringCharge[] {
   const flowRules = loadFlowRules();
   const merchantRules = loadMerchantRules();
+  const recurRules = loadRecurRules();
   const byKey = new Map<string, BankTx[]>();
   for (const t of txs) {
     if (txFlow(t, flowRules) !== 'expense') continue;
@@ -373,11 +387,13 @@ export function detectRecurring(txs: BankTx[]): RecurringCharge[] {
     const avg = amts.reduce((s, v) => s + v, 0) / amts.length;
     const cv = coeffVar(amts);
 
-    // ── 账单判定 ──
+    // ── 账单判定(手动覆盖优先)──
+    const override = recurRules[last.name];
+    if (override === 'no') continue; // 用户手动排除
     const isBillKeyword = BILL_RE.test(last.name);
     const isNonBill = NON_BILL_CAT_RE.test(cat) || NON_BILL_CAT_RE.test(last.name);
-    // 关键词命中 = 账单(放宽金额);否则必须「非餐饮购物 且 金额稳定」
-    const qualifies = isBillKeyword || (!isNonBill && cv < 0.2);
+    // 关键词命中 = 账单(放宽金额);否则必须「非餐饮购物 且 金额稳定」;'yes' 强制算定期
+    const qualifies = override === 'yes' || isBillKeyword || (!isNonBill && cv < 0.2);
     if (!qualifies) continue;
 
     out.push({
