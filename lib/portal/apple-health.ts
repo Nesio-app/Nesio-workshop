@@ -175,6 +175,7 @@ export interface HealthMetric {
   unit: string;
   decimals: number;
   group: 'activity' | 'heart' | 'body' | 'vitals' | 'mind';
+  series: Array<{ ym: string; v: number }>; // 批次 40:按月历史序列(画多年趋势曲线)
 }
 
 export interface HealthMetrics {
@@ -225,9 +226,25 @@ function scaleValue(key: string, raw: number): number {
 // 批次 39:增量聚合器 —— 支持把超大 export.xml 分块喂进来。
 // 关键:Apple 导出常「按类型分块」(先全部步数、再全部心率…),所以只看尾部会漏掉大多数
 // 指标(用户遇到「只出 1 项 HRV」)。必须扫全文件,才能拿到所有类型。
+// 从「按天」的 Map 汇成「按月平均」的历史序列(画多年曲线),末尾截近 60 个月。
+function monthlySeriesAvg(daily: Map<string, number>, transform: (v: number) => number = (v) => v, dec = 1): Array<{ ym: string; v: number }> {
+  const byMonth = new Map<string, { sum: number; count: number }>();
+  for (const [day, val] of daily) {
+    const ym = day.slice(0, 7);
+    const b = byMonth.get(ym) || { sum: 0, count: 0 };
+    b.sum += transform(val); b.count += 1;
+    byMonth.set(ym, b);
+  }
+  return [...byMonth.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .slice(-60)
+    .map(([ym, b]) => ({ ym, v: Math.round((b.sum / b.count) * 10 ** dec) / 10 ** dec }));
+}
+
 class HealthAggregator {
   private sumDay = new Map<string, Map<string, number>>();
   private latest = new Map<string, { d: string; v: number; pd: string; pv: number }>();
+  private monthlyLatest = new Map<string, Map<string, { sum: number; count: number }>>(); // latest 类指标的按月均值
   private sleepMs = new Map<string, number>();
   private mindMin = new Map<string, number>();
   workouts = 0;
@@ -251,10 +268,16 @@ class HealthAggregator {
           m.set(day, (m.get(day) || 0) + scaleValue(def.key, v));
         }
       } else if (def.agg === 'latest') {
+        let mm = this.monthlyLatest.get(def.key);
         for (const r of records(text, def.hk)) {
           const v = Number(r.value);
           if (!r.startDate || !Number.isFinite(v)) continue;
-          this.pushLatest(def.key, r.startDate.slice(0, 10), scaleValue(def.key, v));
+          const sv = scaleValue(def.key, v);
+          this.pushLatest(def.key, r.startDate.slice(0, 10), sv);
+          if (!mm) { mm = new Map(); this.monthlyLatest.set(def.key, mm); }
+          const ym = r.startDate.slice(0, 7);
+          const b = mm.get(ym) || { sum: 0, count: 0 };
+          b.sum += sv; b.count += 1; mm.set(ym, b);
         }
       } else if (def.agg === 'sleep') {
         for (const r of records(text, def.hk)) {
@@ -283,23 +306,25 @@ class HealthAggregator {
         const days = [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]));
         const last = days[days.length - 1];
         const prev = days.length > 1 ? days[days.length - 2][1] : null;
-        out.push({ ...toMetric(def), latest: round(last[1], def.decimals), latestDate: last[0], prev: prev == null ? null : round(prev, def.decimals) });
+        out.push({ ...toMetric(def), latest: round(last[1], def.decimals), latestDate: last[0], prev: prev == null ? null : round(prev, def.decimals), series: monthlySeriesAvg(m, (v) => v, def.decimals) });
       } else if (def.agg === 'latest') {
         const c = this.latest.get(def.key);
         if (!c) continue;
-        out.push({ ...toMetric(def), latest: round(c.v, def.decimals), latestDate: c.d, prev: Number.isNaN(c.pv) ? null : round(c.pv, def.decimals) });
+        const mm = this.monthlyLatest.get(def.key);
+        const series = mm ? [...mm.entries()].sort((a, b) => a[0].localeCompare(b[0])).slice(-60).map(([ym, b]) => ({ ym, v: round(b.sum / b.count, def.decimals) })) : [];
+        out.push({ ...toMetric(def), latest: round(c.v, def.decimals), latestDate: c.d, prev: Number.isNaN(c.pv) ? null : round(c.pv, def.decimals), series });
       } else if (def.agg === 'sleep') {
         if (!this.sleepMs.size) continue;
         const nights = [...this.sleepMs.entries()].sort((a, b) => a[0].localeCompare(b[0]));
         const last = nights[nights.length - 1];
         const prev = nights.length > 1 ? nights[nights.length - 2][1] / 3_600_000 : null;
-        out.push({ ...toMetric(def), latest: round(last[1] / 3_600_000, 1), latestDate: last[0], prev: prev == null ? null : round(prev, 1) });
+        out.push({ ...toMetric(def), latest: round(last[1] / 3_600_000, 1), latestDate: last[0], prev: prev == null ? null : round(prev, 1), series: monthlySeriesAvg(this.sleepMs, (ms) => ms / 3_600_000, 1) });
       } else if (def.agg === 'mindful') {
         if (!this.mindMin.size) continue;
         const days = [...this.mindMin.entries()].sort((a, b) => a[0].localeCompare(b[0]));
         const last = days[days.length - 1];
         const prev = days.length > 1 ? days[days.length - 2][1] : null;
-        out.push({ ...toMetric(def), latest: round(last[1], 0), latestDate: last[0], prev: prev == null ? null : round(prev, 0) });
+        out.push({ ...toMetric(def), latest: round(last[1], 0), latestDate: last[0], prev: prev == null ? null : round(prev, 0), series: monthlySeriesAvg(this.mindMin, (v) => v, 0) });
       }
     }
     return { metrics: out, workouts: this.workouts, importedAt: new Date().toISOString() };
@@ -332,7 +357,7 @@ export function parseHealthMetricsFromBytes(bytes: Uint8Array): HealthMetrics {
   return agg.finalize();
 }
 
-function toMetric(def: MetricDef): Omit<HealthMetric, 'latest' | 'latestDate' | 'prev'> {
+function toMetric(def: MetricDef): Omit<HealthMetric, 'latest' | 'latestDate' | 'prev' | 'series'> {
   return { key: def.key, label: def.label, unit: def.unit, decimals: def.decimals, group: def.group };
 }
 function round(v: number, d: number): number {

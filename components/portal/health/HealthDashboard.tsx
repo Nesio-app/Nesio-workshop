@@ -25,9 +25,31 @@ function fmt(v: number, decimals: number): string {
   return decimals === 0 ? Math.round(v).toLocaleString() : v.toFixed(decimals);
 }
 
+// 批次 40:按月历史趋势曲线(多年)
+function Sparkline({ series }: { series: Array<{ ym: string; v: number }> }) {
+  const vals = series.map((s) => s.v);
+  const min = Math.min(...vals);
+  const max = Math.max(...vals);
+  const range = max - min || 1;
+  const W = 100;
+  const H = 26;
+  const pts = series.map((s, i) => {
+    const x = series.length > 1 ? (i / (series.length - 1)) * W : 0;
+    const y = H - ((s.v - min) / range) * H;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="26" preserveAspectRatio="none" style={{ marginTop: '0.35rem', overflow: 'visible' }}>
+      <polyline points={pts} fill="none" stroke="var(--portal-blue-deep)" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+      <circle cx={W} cy={H - ((vals[vals.length - 1] - min) / range) * H} r="2" fill="var(--portal-blue-deep)" />
+    </svg>
+  );
+}
+
 function MetricCard({ m, dict }: { m: HealthMetric; dict: string }) {
   const delta = m.prev != null && m.prev !== 0 ? m.latest - m.prev : null;
   const deltaPct = m.prev != null && m.prev !== 0 ? Math.round(((m.latest - m.prev) / Math.abs(m.prev)) * 100) : null;
+  const hasTrend = (m.series?.length ?? 0) >= 3;
   return (
     <div className="nesio-health-card">
       <span className="nesio-health-card-label">{L(dict, m.label[0], m.label[1])}</span>
@@ -39,6 +61,8 @@ function MetricCard({ m, dict }: { m: HealthMetric; dict: string }) {
       ) : (
         <span className="nesio-health-card-date">{m.latestDate.slice(5).replace('-', '/')}</span>
       )}
+      {hasTrend && <Sparkline series={m.series} />}
+      {hasTrend && <span className="nesio-health-card-range">{L(dict, `近 ${m.series.length} 个月`, `${m.series.length}mo`)} · {fmt(Math.min(...m.series.map((s) => s.v)), m.decimals)}–{fmt(Math.max(...m.series.map((s) => s.v)), m.decimals)}</span>}
     </div>
   );
 }

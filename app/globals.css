@@ -17798,6 +17798,7 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 .nesio-health-card-delta.up { background: rgba(88,140,227,0.14); color: var(--portal-blue-deep); }
 .nesio-health-card-delta.down { background: rgba(16,185,129,0.14); color: #047857; }
 .nesio-health-card-date { font-size: 0.66rem; color: var(--portal-muted); align-self: flex-start; }
+.nesio-health-card-range { font-size: 0.62rem; color: var(--portal-muted); }
 
 /* 批次 27:地点足迹 · Google 时间线样式 */
 .nesio-pt { display: flex; flex-direction: column; gap: 1.1rem; }
