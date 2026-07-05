@@ -135,6 +135,29 @@ export function categoryOf(label: string): PlaceCategory {
   return 'place';
 }
 
+// ── 批次 30:地点别名(手动纠正 Unknown/机器名 → 记住,以后都用对的名字)──────
+const PLACE_ALIAS_KEY = 'nesio-place-alias-v1';
+
+export function loadPlaceAliases(): Record<string, string> {
+  if (typeof window === 'undefined') return {};
+  try { return JSON.parse(localStorage.getItem(PLACE_ALIAS_KEY) || '{}') as Record<string, string>; } catch { return {}; }
+}
+
+/** 原始名 → 显示名(用户纠正过就用纠正后的)。 */
+export function displayLabel(raw: string): string {
+  const a = loadPlaceAliases()[raw];
+  return a && a.trim() ? a : raw;
+}
+
+export function setPlaceAlias(raw: string, name: string): void {
+  if (typeof window === 'undefined') return;
+  const map = loadPlaceAliases();
+  const trimmed = name.trim();
+  if (trimmed && trimmed !== raw) map[raw] = trimmed; else delete map[raw];
+  try { localStorage.setItem(PLACE_ALIAS_KEY, JSON.stringify(map)); } catch { /* ignore */ }
+  window.dispatchEvent(new CustomEvent(PLACE_TRAIL_UPDATED_EVENT));
+}
+
 export interface TimelineSegment {
   label: string;
   category: PlaceCategory;
@@ -174,6 +197,9 @@ function clampEndToDay(startIso: string, endIso: string): string {
 export function buildPlaceTimeline(visits: PlaceVisit[], maxDays = 14): TimelineDay[] {
   const sorted = [...visits].filter((v) => v.ts).sort((a, b) => a.ts.localeCompare(b.ts));
   const segs: TimelineSegment[] = [];
+  // 批次 30:别名一次读入 —— 类别按纠正后的名字推断(Unknown 改成「健身房」就归 fitness)。
+  const aliases = loadPlaceAliases();
+  const disp = (raw: string) => aliases[raw]?.trim() || raw;
 
   for (let i = 0; i < sorted.length; i++) {
     const v = sorted[i];
@@ -186,7 +212,7 @@ export function buildPlaceTimeline(visits: PlaceVisit[], maxDays = 14): Timeline
       if (end > last.end) last.end = end;
       if (last.lat == null && v.lat != null) { last.lat = v.lat; last.lon = v.lon; }
     } else {
-      segs.push({ label: v.label, category: categoryOf(v.label), start: v.ts, end, durationMin: 0, source: v.source, lat: v.lat, lon: v.lon });
+      segs.push({ label: v.label, category: categoryOf(disp(v.label)), start: v.ts, end, durationMin: 0, source: v.source, lat: v.lat, lon: v.lon });
     }
   }
 
@@ -278,6 +304,14 @@ export function clusterPlaces(visits: PlaceVisit[], topN = 8): PlaceCluster[] {
     m.set(s.label, c);
   }
   return [...m.values()].sort((a, b) => b.totalMin - a.totalMin || b.visits - a.visits).slice(0, topN);
+}
+
+/** 环游:去过的「外面」地点(排除家/未知),按最近去过排序 —— 给旅行/城市卡用。 */
+export function travelPlaces(visits: PlaceVisit[], topN = 60): PlaceCluster[] {
+  return clusterPlaces(visits, 99999)
+    .filter((c) => c.category !== 'home' && c.category !== 'unknown')
+    .sort((a, b) => b.lastTs.localeCompare(a.lastTs))
+    .slice(0, topN);
 }
 
 export interface CategoryShare { category: PlaceCategory; totalMin: number; pct: number }

@@ -1086,7 +1086,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = true }: { o
             className={`nesio-insights-main-tab${mainTab === t ? ' nesio-insights-main-tab--active' : ''}`}
             onClick={() => setMainTab(t)}
           >
-            {t === 'reflection' ? L(dict, '洞察', 'Insights') : t === 'analytics' ? L(dict, '分析', 'Analytics') : t === 'timeline' ? L(dict, '时间线', 'Timeline') : t === 'finance' ? L(dict, '财务', 'Finance') : L(dict, '认知模型', 'Mind model')}
+            {t === 'reflection' ? L(dict, '洞察', 'Insights') : t === 'analytics' ? L(dict, '分析', 'Analytics') : t === 'timeline' ? L(dict, '足迹', 'Footprints') : t === 'finance' ? L(dict, '财务', 'Finance') : L(dict, '认知模型', 'Mind model')}
           </button>
         ))}
       </div>
