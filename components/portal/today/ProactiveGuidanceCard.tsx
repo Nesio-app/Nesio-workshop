@@ -16,6 +16,20 @@ import { usePortalLocale } from '../use-portal-locale';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { GuidanceIcon } from '../icons';
 
+/** 金句卡:作者(— 苏格拉底 / — Author)默认另起一行,轻一档色。 */
+function QuoteBody({ body }: { body: string }) {
+  const idx = Math.max(body.lastIndexOf('——'), body.lastIndexOf('—'), body.lastIndexOf('–'));
+  if (idx > 0) {
+    return (
+      <p className="nesio-proactive-card-body">
+        {body.slice(0, idx).trim()}
+        <span style={{ display: 'block', marginTop: '0.2rem', color: 'var(--portal-muted)' }}>{body.slice(idx).trim()}</span>
+      </p>
+    );
+  }
+  return <p className="nesio-proactive-card-body">{body}</p>;
+}
+
 export function ProactiveGuidanceCard({
   card, onDismiss, onMarkDone,
 }: {
@@ -85,7 +99,7 @@ export function ProactiveGuidanceCard({
         {!isQuote && <span className="nesio-proactive-card-icon"><GuidanceIcon icon={card.icon} /></span>}
         <div className="nesio-proactive-card-text">
           <p className="nesio-proactive-card-title">{card.title}</p>
-          <p className="nesio-proactive-card-body">{card.body}</p>
+          {isQuote ? <QuoteBody body={card.body} /> : <p className="nesio-proactive-card-body">{card.body}</p>}
           {card.reason && (
             <p style={{ fontSize: '0.66rem', color: 'var(--portal-muted)', margin: '0.2rem 0 0' }}>{card.reason}</p>
           )}

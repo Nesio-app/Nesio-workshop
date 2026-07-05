@@ -658,10 +658,16 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
   const showRawInput = Boolean(n.rawInput && n.source !== 'calendar' && n.source !== 'email');
   const typeBg = TYPE_BG_DETAIL[n.type] || 'var(--chip-fog)';
 
+  // 批次 27:阅读入口不再只认 article —— 老邮件节点没存 article,退到 summary/snippet/正文,
+  // 只要有一段够长的正文(>40 字)就给「阅读」按钮,进瀑布流阅读器。
+  const readableAttrs = n.attributes as Record<string, unknown>;
+  const readableText = [readableAttrs.article, readableAttrs.summary, readableAttrs.snippet, readableAttrs.body, n.rawInput]
+    .find((v): v is string => typeof v === 'string' && v.trim().length > 40);
+
   return (
     <div className="nesio-node-detail-overlay" role="dialog" aria-modal="true" aria-label={n.name}>
-      {readerOpen && typeof n.attributes.article === 'string' && n.attributes.article && (
-        <ReaderSheetLazy title={n.name} article={n.attributes.article} onClose={() => setReaderOpen(false)} />
+      {readerOpen && readableText && (
+        <ReaderSheetLazy title={n.name} article={readableText} onClose={() => setReaderOpen(false)} />
       )}
       {viewImage && (
         <div className="nesio-image-viewer" role="dialog" aria-modal="true" onClick={() => setViewImage(null)}>
@@ -880,7 +886,7 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
               </>
             ) : (
               <>
-                {typeof n.attributes.article === 'string' && n.attributes.article && (
+                {readableText && (
                   <button type="button" className="nesio-ob-primary-btn" style={{ flex: 1 }} onClick={() => setReaderOpen(true)}>{L(dict, '阅读', 'Read')}</button>
                 )}
                 <button type="button" className="nesio-today-btn nesio-today-btn--ghost" style={{ flex: 1 }} onClick={startEdit}>{L(dict, '编辑', 'Edit')}</button>

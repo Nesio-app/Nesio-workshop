@@ -787,6 +787,10 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
                   ) : isConn && c.method === 'oauth' ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', flexShrink: 0 }}>
                       <button type="button" className="nesio-connector-connect" onClick={() => syncOAuth(c)} disabled={isSync}>{isSync ? '…' : L(dict, '同步', 'Sync')}</button>
+                      {/* 批次 27:Plaid 连了一家还想连别家 —— 已连接也给「+银行」再开一次 Link */}
+                      {c.id === 'plaid' && (
+                        <button type="button" className="nesio-connector-connect" style={{ background: 'var(--portal-accent-soft)', color: 'var(--portal-blue-deep)' }} onClick={() => connectPlaid()} disabled={isSync}>{L(dict, '+ 银行', '+ Bank')}</button>
+                      )}
                       <button type="button" className="nesio-connector-disconnect" onClick={() => disconnect(c.id)}>{L(dict, '断开', 'Disconnect')}</button>
                     </div>
                   ) : isConn ? (
@@ -801,6 +805,18 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
                 {/* Token input */}
                 {tokenInputFor === c.id && (
                   <div className="nesio-connector-token-box">
+                    {/* 批次 27:Notion 接入是「粘贴 token」不是 OAuth 跳转(iOS 上 OAuth 会被 Notion App 劫持)。
+                        很多人不知道去哪拿 token,这里给个直达链接,新标签打开集成页。 */}
+                    {c.id === 'notion' && (
+                      <a
+                        href="https://www.notion.so/my-integrations"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ display: 'inline-block', marginBottom: '0.5rem', fontSize: '0.74rem', fontWeight: 600, color: 'var(--portal-blue-deep)', textDecoration: 'underline' }}
+                      >
+                        {L(dict, '打开 notion.so/my-integrations →', 'Open notion.so/my-integrations →')}
+                      </a>
+                    )}
                     <p style={{ fontSize: '0.72rem', color: 'var(--portal-muted)', marginBottom: '0.5rem', lineHeight: 1.5 }}>{dict === 'en' ? (c.tokenHintEn ?? c.tokenHint) : c.tokenHint}</p>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                       <input className="nesio-ob-input" style={{ marginBottom: 0, flex: 1, fontSize: '0.8rem' }} type="password" placeholder={L(dict, '粘贴 Token…', 'Paste token…')} value={tokenValue} onChange={(e) => setTokenValue(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submitToken(c); }} autoFocus />
