@@ -815,17 +815,32 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
                 {/* Token input */}
                 {tokenInputFor === c.id && (
                   <div className="nesio-connector-token-box">
-                    {/* 批次 27:Notion 接入是「粘贴 token」不是 OAuth 跳转(iOS 上 OAuth 会被 Notion App 劫持)。
-                        很多人不知道去哪拿 token,这里给个直达链接,新标签打开集成页。 */}
+                    {/* 批次 36:Notion 给两条路 —— 上面「一键授权」是 flomo 那样的 OAuth 同意页(选页面),
+                        下面「粘贴 token」是 iOS 上更稳的回退(OAuth 在 iOS 可能被 Notion App 劫持)。 */}
                     {c.id === 'notion' && (
-                      <a
-                        href="https://www.notion.so/my-integrations"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{ display: 'inline-block', marginBottom: '0.5rem', fontSize: '0.74rem', fontWeight: 600, color: 'var(--portal-blue-deep)', textDecoration: 'underline' }}
-                      >
-                        {L(dict, '打开 notion.so/my-integrations →', 'Open notion.so/my-integrations →')}
-                      </a>
+                      <>
+                        <button
+                          type="button"
+                          className="nesio-connector-connect"
+                          onClick={() => connectNotion()}
+                          disabled={isSync}
+                          style={{ width: '100%', marginBottom: '0.5rem' }}
+                        >
+                          {isSync ? '…' : L(dict, '用 Notion 授权(选择页面)→', 'Authorize with Notion (pick pages) →')}
+                        </button>
+                        <p style={{ fontSize: '0.68rem', color: 'var(--portal-muted)', margin: '0 0 0.6rem', lineHeight: 1.5 }}>
+                          {L(dict, '会跳到 Notion 同意页,像 flomo 那样勾选要同步的页面。若在 iOS 上被 Notion App 劫持打不开,改用下面的粘贴 token。', 'Opens the Notion consent page (pick pages, like flomo). If iOS hijacks it into the Notion app, use paste-token below instead.')}
+                        </p>
+                        <div style={{ borderTop: '1px solid var(--portal-hairline, rgba(127,127,127,0.18))', margin: '0 0 0.6rem' }} />
+                        <a
+                          href="https://www.notion.so/my-integrations"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ display: 'inline-block', marginBottom: '0.5rem', fontSize: '0.74rem', fontWeight: 600, color: 'var(--portal-blue-deep)', textDecoration: 'underline' }}
+                        >
+                          {L(dict, '或粘贴 token:打开 notion.so/my-integrations →', 'Or paste a token: open notion.so/my-integrations →')}
+                        </a>
+                      </>
                     )}
                     <p style={{ fontSize: '0.72rem', color: 'var(--portal-muted)', marginBottom: '0.5rem', lineHeight: 1.5 }}>{dict === 'en' ? (c.tokenHintEn ?? c.tokenHint) : c.tokenHint}</p>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
