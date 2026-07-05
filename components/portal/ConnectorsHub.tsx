@@ -82,6 +82,15 @@ function saveToken(id: string, token: string) {
   } catch { /* ignore */ }
 }
 
+// 批次 38:用户选定的 Notion 数据库 id(每行存成一条记忆)。
+const NOTION_DB_KEY = 'nesio-notion-db-v1';
+function loadNotionDbs(): string[] {
+  try { const v = JSON.parse(localStorage.getItem(NOTION_DB_KEY) || '[]'); return Array.isArray(v) ? v : []; } catch { return []; }
+}
+function saveNotionDbs(ids: string[]) {
+  try { localStorage.setItem(NOTION_DB_KEY, JSON.stringify(ids)); } catch { /* ignore */ }
+}
+
 interface SyncResult { ok: boolean; msg: string; detail?: string; needsReauth?: boolean }
 
 export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
@@ -99,6 +108,10 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
   const [shortcutsFor, setShortcutsFor] = useState<string | null>(null);
   const [ingestUrl, setIngestUrl] = useState('');
   const [oauthSyncResult, setOauthSyncResult] = useState<Record<string, SyncResult>>({});
+  // 批次 38:Notion 数据库选择器
+  const [notionDbLoading, setNotionDbLoading] = useState(false);
+  const [notionDbList, setNotionDbList] = useState<Array<{ id: string; title: string }> | null>(null);
+  const [notionDbSel, setNotionDbSel] = useState<string[]>([]);
 
   useEffect(() => {
     if (!open) return;
@@ -240,6 +253,44 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     }
   }
 
+  // ── 批次 38:Notion 数据库选择器 ──
+  async function openNotionPicker() {
+    if (notionDbList) { setNotionDbList(null); return; } // 已展开 → 收起
+    setNotionDbLoading(true);
+    try {
+      const res = await fetch('/api/portal/notion/databases', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: loadToken('notion') }),
+      });
+      const data = await res.json() as { ok?: boolean; databases?: Array<{ id: string; title: string }>; error?: string };
+      if (!data.ok) {
+        showToast(data.error === 'invalid_token'
+          ? L(dict, 'Token 无效,请重新连接', 'Invalid token — reconnect')
+          : L(dict, '取数据库列表失败', 'Failed to load databases'), false);
+        return;
+      }
+      if (!data.databases?.length) {
+        showToast(L(dict, '没找到共享给集成的数据库。到你要同步的表右上角「…」→ 连接 → 选中这个集成,再来选表。', 'No databases shared with the integration. On each table: ••• → Connections → add this integration, then pick tables.'), false);
+        return;
+      }
+      setNotionDbList(data.databases);
+      setNotionDbSel(loadNotionDbs());
+    } catch {
+      showToast(L(dict, '网络错误', 'Network error'), false);
+    } finally {
+      setNotionDbLoading(false);
+    }
+  }
+
+  function toggleNotionDb(id: string) {
+    setNotionDbSel((prev) => {
+      const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
+      saveNotionDbs(next);
+      return next;
+    });
+  }
+
   // ── 批次 21:Plaid 银行流水 ──
   async function connectPlaid() {
     setSyncing('plaid');
@@ -370,10 +421,12 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     if (!token && c.id !== 'notion') { setTokenInputFor(c.id); setTokenValue(''); return; }
     setSyncing(c.id);
     try {
+      // 批次 38:Notion 若已选定数据库,把行按结构化存进记忆(否则退回页面正文提取)。
+      const notionDbs = c.id === 'notion' ? loadNotionDbs() : [];
       const res = await fetch(c.syncEndpoint!, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token }),
+        body: JSON.stringify(notionDbs.length ? { token, databaseIds: notionDbs } : { token }),
       });
       const data = await res.json() as { ok?: boolean; nodes?: NodeInput[]; error?: string; pageCount?: number; aiUsed?: boolean };
       if (!data.ok) {
@@ -801,6 +854,10 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
                   ) : isConn && (c.method === 'token' || c.method === 'server') ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', flexShrink: 0 }}>
                       <button type="button" className="nesio-connector-connect" onClick={() => c.method === 'server' ? syncFlomo(c) : syncToken(c)} disabled={isSync}>{isSync ? '…' : L(dict, '同步', 'Sync')}</button>
+                      {/* 批次 38:Notion 选择要同步哪些数据库(表) */}
+                      {c.id === 'notion' && (
+                        <button type="button" className="nesio-connector-connect" style={{ background: 'var(--portal-accent-soft)', color: 'var(--portal-blue-deep)' }} onClick={() => openNotionPicker()} disabled={notionDbLoading}>{notionDbLoading ? '…' : L(dict, '选表', 'Pick tables')}</button>
+                      )}
                       <button type="button" className="nesio-connector-disconnect" onClick={() => disconnect(c.id)}>{L(dict, '断开', 'Disconnect')}</button>
                     </div>
                   ) : isConn && c.method === 'oauth' ? (
@@ -856,6 +913,23 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
                       <input className="nesio-ob-input" style={{ marginBottom: 0, flex: 1, fontSize: '0.8rem' }} type="password" placeholder={L(dict, '粘贴 Token…', 'Paste token…')} value={tokenValue} onChange={(e) => setTokenValue(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submitToken(c); }} autoFocus />
                       <button type="button" className="nesio-connector-connect" onClick={() => submitToken(c)} disabled={!tokenValue.trim()}>{L(dict, '连接', 'Connect')}</button>
                     </div>
+                  </div>
+                )}
+
+                {/* 批次 38:Notion 数据库选择器 —— 勾选要同步的表,每行存成一条记忆 */}
+                {c.id === 'notion' && notionDbList && (
+                  <div className="nesio-connector-token-box">
+                    <p style={{ fontSize: '0.75rem', color: 'var(--portal-ink)', fontWeight: 600, marginBottom: '0.2rem' }}>{L(dict, '选择要同步的表', 'Pick tables to sync')}</p>
+                    <p style={{ fontSize: '0.68rem', color: 'var(--portal-muted)', marginBottom: '0.5rem', lineHeight: 1.5 }}>{L(dict, '勾选的表,每一行会存成一条记忆(字段变成属性/标签/日期)。选完点上面「同步」。', 'Each row in the checked tables becomes a memory (fields → attributes/tags/dates). Then tap Sync above.')}</p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', maxHeight: 220, overflowY: 'auto' }}>
+                      {notionDbList.map((db) => (
+                        <label key={db.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', color: 'var(--portal-ink)', cursor: 'pointer' }}>
+                          <input type="checkbox" checked={notionDbSel.includes(db.id)} onChange={() => toggleNotionDb(db.id)} />
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{db.title}</span>
+                        </label>
+                      ))}
+                    </div>
+                    <p style={{ fontSize: '0.66rem', color: 'var(--portal-muted)', marginTop: '0.5rem' }}>{L(dict, `已选 ${notionDbSel.length} 个 · 每表最多 100 行`, `${notionDbSel.length} selected · up to 100 rows each`)}</p>
                   </div>
                 )}
 
