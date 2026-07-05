@@ -17802,6 +17802,19 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 .nesio-health-card-date { font-size: 0.66rem; color: var(--portal-muted); align-self: flex-start; }
 .nesio-health-card-range { font-size: 0.62rem; color: var(--portal-muted); }
 
+/* 批次 40:运动状态(cross-domain integrator) */
+.nesio-fit-panel { margin-top: 0.6rem; padding: 0.9rem 1rem; border-radius: 14px; border: 1px solid var(--portal-line); background: var(--glass-bg-solid); }
+.nesio-fit-headline { margin: 0 0 0.6rem; font-size: 1.15rem; font-weight: 800; color: var(--portal-ink); }
+.nesio-fit-signals { display: flex; flex-direction: column; gap: 0.35rem; }
+.nesio-fit-sig { display: flex; align-items: baseline; gap: 0.5rem; font-size: 0.8rem; }
+.nesio-fit-sig-label { color: var(--portal-muted); min-width: 6.5rem; }
+.nesio-fit-sig-value { font-weight: 700; color: var(--portal-ink); font-variant-numeric: tabular-nums; }
+.nesio-fit-sig-note { margin-left: auto; font-size: 0.72rem; }
+.nesio-fit-sig--good .nesio-fit-sig-note { color: #047857; }
+.nesio-fit-sig--warn .nesio-fit-sig-note { color: #b45309; }
+.nesio-fit-sig--neutral .nesio-fit-sig-note { color: var(--portal-muted); }
+.nesio-fit-suggest { margin: 0.7rem 0 0; font-size: 0.85rem; color: var(--portal-ink); line-height: 1.5; }
+
 /* 批次 27:地点足迹 · Google 时间线样式 */
 .nesio-pt { display: flex; flex-direction: column; gap: 1.1rem; }
 .nesio-pt-daylabel { margin: 0 0 0.5rem; font-size: 0.72rem; font-weight: 700; color: var(--portal-muted); text-transform: uppercase; letter-spacing: 0.04em; }

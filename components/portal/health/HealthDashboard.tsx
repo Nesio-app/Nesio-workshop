@@ -13,6 +13,31 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import TrainingPlan from './TrainingPlan';
+import { computeFitnessInsight, type FitnessInsight } from '@/lib/platform/fitness-integrator';
+import { loadTrainingState, sessionsThisWeek, protocolById } from '@/lib/platform/training-protocol-engine';
+
+const TREND_HEADLINE: Record<FitnessInsight['trend'], [string, string]> = {
+  up: ['体能上升中', 'Fitness rising'], flat: ['体能维持中', 'Holding steady'], down: ['体能下降中', 'Fitness dipping'], unknown: ['数据积累中', 'Gathering data'],
+};
+
+function FitnessPanel({ insight, dict }: { insight: FitnessInsight; dict: string }) {
+  return (
+    <div className="nesio-fit-panel">
+      <p className="nesio-fit-headline">{L(dict, TREND_HEADLINE[insight.trend][0], TREND_HEADLINE[insight.trend][1])}</p>
+      <div className="nesio-fit-signals">
+        {insight.signals.map((s) => (
+          <div key={s.key} className={`nesio-fit-sig nesio-fit-sig--${s.tone}`}>
+            <span className="nesio-fit-sig-label">{L(dict, s.label[0], s.label[1])}</span>
+            <span className="nesio-fit-sig-value">{s.value}</span>
+            <span className="nesio-fit-sig-note">{L(dict, s.note[0], s.note[1])}</span>
+          </div>
+        ))}
+      </div>
+      <p className="nesio-fit-suggest">{L(dict, insight.suggestion[0], insight.suggestion[1])}</p>
+      <p className="nesio-settings-option-hint" style={{ margin: '0.3rem 0 0' }}>{L(dict, '按规则从你的指标+训练打卡推出(非 AI)', 'Rule-based from your metrics + training log (not AI)')}</p>
+    </div>
+  );
+}
 
 const GROUPS: Array<{ key: HealthMetric['group']; zh: string; en: string }> = [
   { key: 'activity', zh: '活动', en: 'Activity' },
@@ -93,10 +118,14 @@ export default function HealthDashboard() {
   }
 
   const importedLabel = new Date(data.importedAt).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'short', day: 'numeric' });
+  const ts = loadTrainingState();
+  const activeProto = ts.activeProtocolId ? protocolById(ts.activeProtocolId) : undefined;
+  const insight = computeFitnessInsight(data.metrics, sessionsThisWeek(ts), activeProto?.sessionsPerWeek ?? null);
 
   return (
     <div className="nesio-health-dash">
       <p className="nesio-health-updated">{L(dict, `${data.metrics.length} 项指标 · 锻炼 ${data.workouts} 次 · 导入于 ${importedLabel}`, `${data.metrics.length} metrics · ${data.workouts} workouts · imported ${importedLabel}`)}</p>
+      {insight.signals.length > 0 && <FitnessPanel insight={insight} dict={dict} />}
       <TrainingPlan />
       {GROUPS.map((g) => {
         const items = data.metrics.filter((m) => m.group === g.key);
