@@ -107,7 +107,8 @@ export default function TimelineTab() {
   }
   function toggleGeo() { const next = !geoOn; setGeoOn(next); setGeocodeEnabled(next); setGeoMsg(''); }
   async function findRealNames() {
-    const targets = clusters.filter((c) => c.generic && c.lat != null && displayLabel(c.label) === c.label);
+    // 批次 34:对全部未命名地点找真名(不只显示的前 10 个)
+    const targets = clusterPlaces(trail, 99999).filter((c) => c.generic && c.lat != null && displayLabel(c.label) === c.label);
     if (!targets.length) { setGeoMsg(L(dict, '没有需要找名字的未命名地点', 'No unnamed places to resolve')); return; }
     setGeoBusy(true);
     let done = 0;

@@ -57,31 +57,25 @@ export default function NesioProfileCard() {
   async function handleAvatarFile(file: File | undefined) {
     if (!file) return;
     setAvatarError('');
+    // 批次 34:头像「时不时消失」根治 —— 先存一份永久本地 data: 头像(不会像签名 URL 那样过期),
+    // 立即显示且不再随过期消失;云端上传只用来存 storagePath 做跨设备,不覆盖本地永久头像。
+    let localSaved = false;
+    try {
+      const avatar = await readAvatarFile(file);
+      saveProfileSettings({ avatarUrl: avatar });
+      localSaved = true;
+    } catch { /* 本地存不下就退到只云端 */ }
     try {
       const client = createAppApiClient();
       const result = await client.uploadCloudAsset({ file, purpose: 'avatar' });
       if (result.ok && result.storagePath) {
         await client.saveCloudProfileSettings({ avatarStoragePath: result.storagePath });
-        const readResult = await client.fetchCloudAssetReadUrl({ storagePath: result.storagePath });
-        const displayUrl = readResult.ok && readResult.signedUrl ? readResult.signedUrl : '';
-        if (displayUrl) {
-          // saveProfileSettings 广播 PROFILE_UPDATED_EVENT,useProfileAvatar 自动更新
-          saveProfileSettings({ avatarUrl: displayUrl, avatarStoragePath: result.storagePath });
-        } else {
-          // Signed URL unavailable now; save path only — hook 下次挂载/刷新时换签名
-          saveProfileSettings({ avatarStoragePath: result.storagePath });
-        }
-        return;
+        saveProfileSettings({ avatarStoragePath: result.storagePath }); // 只补 storagePath,保留本地 data: 头像
       }
     } catch {
-      // Cloud avatar upload is a signed-in enhancement; local avatar should keep working offline.
+      // 云端是跨设备增强;本地永久头像已经能显示。
     }
-    try {
-      const avatar = await readAvatarFile(file);
-      saveProfileSettings({ avatarUrl: avatar, avatarStoragePath: '' });
-    } catch {
-      setAvatarError(L(dict, '头像没有保存，请选择一张较小的图片。', "Avatar wasn't saved — try a smaller image."));
-    }
+    if (!localSaved) setAvatarError(L(dict, '头像没有保存，请选择一张较小的图片。', "Avatar wasn't saved — try a smaller image."));
   }
 
   const menuItems = [

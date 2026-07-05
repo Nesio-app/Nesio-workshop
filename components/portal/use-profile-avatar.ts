@@ -41,7 +41,9 @@ export function useProfileAvatar(enabled: boolean = true): {
     if (!enabled) { setAvatarUrl(''); return; }
     const profile = loadProfileSettings();
     setAvatarUrl(profile.avatarUrl || '');
-    if (profile.avatarStoragePath) fetchFreshUrl(profile.avatarStoragePath);
+    // 批次 34:本地 data: 头像是永久的,不会过期 —— 别用会过期的签名 URL 覆盖它。
+    // 只有本地没有永久头像(换了新设备、只剩 storagePath)时才去换签名 URL。
+    if (profile.avatarStoragePath && !profile.avatarUrl?.startsWith('data:')) fetchFreshUrl(profile.avatarStoragePath);
 
     const onUpdate = () => setAvatarUrl(loadProfileSettings().avatarUrl || '');
     window.addEventListener(PROFILE_UPDATED_EVENT, onUpdate);
