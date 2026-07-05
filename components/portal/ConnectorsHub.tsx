@@ -369,12 +369,17 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token }),
       });
-      const data = await res.json() as { ok?: boolean; nodes?: NodeInput[]; error?: string };
+      const data = await res.json() as { ok?: boolean; nodes?: NodeInput[]; error?: string; pageCount?: number; aiUsed?: boolean };
       if (!data.ok) {
         if (data.error === 'not_connected' && c.id === 'notion') {
           setSyncing(null);
           window.location.href = '/api/portal/notion/connect';
           return;
+        }
+        // 批次 31:token 有效但集成没被授权任何页面 —— 这是 Notion 最常见的坑,给准话。
+        if (data.error === 'no_shared_pages') {
+          showToast(L(dict, 'Token 有效,但这个集成还没被授权任何页面。到你要同步的 Notion 页面右上角「…」→ 连接 → 选中这个集成,再点同步。', 'Token works, but no pages are shared with this integration. On each Notion page: ••• → Connections → add this integration, then Sync.'), false);
+          setSyncing(null); return;
         }
         if (data.error === 'invalid_token') { saveToken(c.id, ''); setTokenInputFor(c.id); setTokenValue(''); showToast(L(dict, 'Token 无效，请重新输入', 'Invalid token — please re-enter'), false); }
         else showToast(L(dict, `同步失败：${data.error || '未知'}`, `Sync failed: ${data.error || 'unknown'}`), false);
@@ -386,7 +391,9 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       saveConnectorState(c.id, true);
       setConnected((p) => ({ ...p, [c.id]: true }));
       setCounts((p) => ({ ...p, [c.id]: n.length }));
-      showToast(L(dict, `已提取 ${n.length} 个节点`, `Extracted ${n.length} nodes`), true);
+      // 批次 31:Notion 没配 Gemini 时走标题/正文兜底,提示里说清是页面数
+      const suffix = c.id === 'notion' && data.aiUsed === false ? L(dict, '(未接 AI,已按页面标题/正文存入,可直接阅读)', '(no AI — saved by page title/text, readable directly)') : '';
+      showToast(L(dict, `已提取 ${n.length} 个节点${suffix}`, `Extracted ${n.length} nodes ${suffix}`), true);
     } catch { showToast(L(dict, '网络错误', 'Network error'), false); }
     setSyncing(null);
   }

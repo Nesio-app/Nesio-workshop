@@ -149,6 +149,12 @@ export async function POST(req: NextRequest) {
   const searchData = await searchRes.json() as { results?: NotionPage[] };
   const pages = searchData.results?.slice(0, 6) || [];
 
+  // 批次 31:token 有效但搜不到页面 = 集成没被授权任何页面(最常见的坑)。
+  // 明确告诉用户去每个页面「…→ 连接 → 选中这个集成」,而不是静默返回 0。
+  if (pages.length === 0) {
+    return NextResponse.json({ ok: false, error: 'no_shared_pages' }, { status: 200 });
+  }
+
   // Fetch text for each page
   const pageContents = await Promise.all(
     pages.map(async (p) => ({
@@ -157,8 +163,27 @@ export async function POST(req: NextRequest) {
       url: p.url,
     })),
   );
+  const contentPages = pageContents.filter((p) => p.text || p.title !== 'Untitled');
 
-  const { nodes, summary } = await extractNodes(pageContents.filter((p) => p.text || p.title !== 'Untitled'));
+  const { nodes, summary } = await extractNodes(contentPages);
 
-  return NextResponse.json({ ok: true, nodes, summary, pageCount: pages.length });
+  // 批次 31:没配 Gemini(或 AI 解析空)时,别丢数据 —— 直接把每个 Notion 页面
+  // 存成可读的记忆节点(标题 + 正文),用户至少能看到、能读。
+  const finalNodes = nodes.length ? nodes : contentPages.map((p) => ({
+    type: 'preference',
+    name: (p.title || 'Notion').slice(0, 60),
+    attributes: { source: 'Notion', ...(p.url ? { url: p.url } : {}), ...(p.text ? { article: p.text } : {}) },
+    relations: [],
+    tags: ['Notion'],
+    confidence: 0.7,
+    rawInput: (p.text || p.title).slice(0, 200),
+  }));
+
+  return NextResponse.json({
+    ok: true,
+    nodes: finalNodes,
+    summary: nodes.length ? summary : `导入 ${contentPages.length} 个 Notion 页面`,
+    pageCount: pages.length,
+    aiUsed: nodes.length > 0,
+  });
 }
