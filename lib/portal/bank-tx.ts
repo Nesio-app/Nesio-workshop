@@ -15,6 +15,7 @@ export interface BankTx {
   amount: number;
   currency: string;
   category: string;
+  accountId?: string;
 }
 
 export const BANK_TX_KEY = 'nesio-bank-tx-v1';
@@ -115,9 +116,10 @@ export function categoryBreakdown(txs: BankTx[], ym: string): CategorySlice[] {
 
 function sumByCategory(txs: BankTx[], ym: string): Map<string, number> {
   const m = new Map<string, number>();
+  const rules = loadMerchantRules();
   for (const t of txs) {
     if (txYm(t) !== ym || t.amount <= 0) continue;
-    const cat = t.category || '其他';
+    const cat = effectiveCategory(t, rules) || '未分类';
     m.set(cat, (m.get(cat) || 0) + t.amount);
   }
   return m;
@@ -147,6 +149,121 @@ export function topMerchants(txs: BankTx[], ym: string, n = 5): MerchantAgg[] {
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+/* ---------- 批次 31:账户/卡片 ---------- */
+
+export interface BankAccount {
+  id: string;
+  name: string;
+  mask?: string;
+  type?: string;
+  subtype?: string;
+  balance?: number;
+  currency: string;
+}
+
+export const BANK_ACCOUNTS_KEY = 'nesio-bank-accounts-v1';
+
+export function loadBankAccounts(): BankAccount[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = JSON.parse(localStorage.getItem(BANK_ACCOUNTS_KEY) || '[]') as BankAccount[];
+    return Array.isArray(raw) ? raw.filter((a) => a && a.id) : [];
+  } catch { return []; }
+}
+
+/** 某账户某月的消费/退款/笔数。 */
+export function accountMonth(txs: BankTx[], accountId: string, ym: string): { spend: number; refund: number; count: number } {
+  let spend = 0, refund = 0, count = 0;
+  for (const t of txs) {
+    if (t.accountId !== accountId || txYm(t) !== ym) continue;
+    count += 1;
+    if (t.amount >= 0) spend += t.amount; else refund += -t.amount;
+  }
+  return { spend: round2(spend), refund: round2(refund), count };
+}
+
+/* ---------- 批次 31:商户→分类规则(交易页规则审核)---------- */
+
+const MERCHANT_RULE_KEY = 'nesio-bank-merchant-rule-v1';
+
+export function loadMerchantRules(): Record<string, string> {
+  if (typeof window === 'undefined') return {};
+  try { return JSON.parse(localStorage.getItem(MERCHANT_RULE_KEY) || '{}') as Record<string, string>; } catch { return {}; }
+}
+
+export function setMerchantRule(name: string, category: string): void {
+  if (typeof window === 'undefined') return;
+  const rules = loadMerchantRules();
+  if (category.trim()) rules[name] = category.trim(); else delete rules[name];
+  try { localStorage.setItem(MERCHANT_RULE_KEY, JSON.stringify(rules)); } catch { /* ignore */ }
+}
+
+/** 生效分类:用户规则优先,其次 Plaid 分类。 */
+export function effectiveCategory(t: BankTx, rules = loadMerchantRules()): string {
+  return rules[t.name] || t.category || '';
+}
+
+/** 需要审核的交易:本月、支出、没有生效分类的。 */
+export function needsReview(txs: BankTx[], ym: string): BankTx[] {
+  const rules = loadMerchantRules();
+  return txs.filter((t) => txYm(t) === ym && t.amount > 0 && !effectiveCategory(t, rules)).sort((a, b) => b.amount - a.amount);
+}
+
+const SUGGEST_RULES: Array<[RegExp, string]> = [
+  [/coffee|cafe|starbucks|餐|饭|restaurant|mcdonald|bakery|bar\b|dining/i, 'Food'],
+  [/shop|store|mall|market|超市|商场|target|walmart|costco|amazon|ulta|ikea/i, 'Shopping'],
+  [/uber|lyft|gas|shell|chevron|transit|parking|加油|地铁|taxi/i, 'Travel'],
+  [/netflix|spotify|hulu|subscription|membership|订阅|会员/i, 'Services'],
+  [/payment|autopay|还款|transfer|转账/i, 'Payment'],
+];
+
+/** 给未分类商户猜一个分类(简单关键词规则)。 */
+export function suggestCategory(name: string): { category: string; confidence: number } {
+  for (const [re, cat] of SUGGEST_RULES) if (re.test(name)) return { category: cat, confidence: 0.72 };
+  return { category: 'Services', confidence: 0.4 };
+}
+
+/* ---------- 批次 31:月度趋势 + 风险预警 ---------- */
+
+export function monthlyTrend(txs: BankTx[], n = 6): Array<{ ym: string; net: number }> {
+  const months = availableMonths(txs).slice(0, n).reverse();
+  return months.map((ym) => ({ ym, net: summarizeMonth(txs, ym).net }));
+}
+
+export interface FinanceAlert { level: 'risk' | 'warn' | 'info'; title: string; body: string }
+
+/** 规则预警(不是 LLM):购物超均值 / 待审交易 / 净支出环比激增。 */
+export function financeAlerts(txs: BankTx[], ym: string): FinanceAlert[] {
+  const out: FinanceAlert[] = [];
+  const rules = loadMerchantRules();
+
+  // 购物类超过前 6 个月均值
+  const shoppingRe = /shopping|购物/i;
+  const monthShopping = txs.filter((t) => txYm(t) === ym && t.amount > 0 && shoppingRe.test(effectiveCategory(t, rules))).reduce((a, t) => a + t.amount, 0);
+  const prevMonths = availableMonths(txs).filter((m) => m < ym).slice(0, 6);
+  if (prevMonths.length >= 2) {
+    const avg = prevMonths.reduce((a, m) => a + txs.filter((t) => txYm(t) === m && t.amount > 0 && shoppingRe.test(effectiveCategory(t, rules))).reduce((s, t) => s + t.amount, 0), 0) / prevMonths.length;
+    if (avg > 0 && monthShopping > avg * 1.3) {
+      const pct = Math.round(((monthShopping - avg) / avg) * 100);
+      out.push({ level: 'warn', title: '购物支出高于往月', body: `本月购物比前 ${prevMonths.length} 个月均值高 ${pct}%` });
+    }
+  }
+
+  // 待审交易
+  const review = needsReview(txs, ym).length;
+  if (review > 0) out.push({ level: 'info', title: `${review} 笔交易待归类`, body: '未匹配到分类的交易在「交易 → 规则审核」等你处理' });
+
+  // 净支出环比激增
+  const cur = summarizeMonth(txs, ym).net;
+  const prevYmS = prevYm(ym);
+  const prev = summarizeMonth(txs, prevYmS).net;
+  if (prev > 0 && cur > prev * 1.5) {
+    out.push({ level: 'risk', title: '净支出环比激增', body: `本月净支出比上月高 ${Math.round(((cur - prev) / prev) * 100)}%` });
+  }
+
+  return out;
 }
 
 export function formatMoney(amount: number, currency = 'USD'): string {

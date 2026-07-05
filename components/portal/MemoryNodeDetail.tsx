@@ -711,7 +711,12 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
           ) : (
             <h2 className="nesio-settings-sheet-title" title={n.name}>{displayTitle(displayNodeName(n.name, dict))}</h2>
           )}
-          <button type="button" className="nesio-voice-sheet-close" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}>✕</button>
+          {/* 批次 31:可阅读的节点 —— 顶部直接放「阅读」替换 ✕(背景点击仍可关闭) */}
+          {!editing && readableText ? (
+            <button type="button" className="nesio-node-read-top" onClick={() => setReaderOpen(true)}>{L(dict, '阅读', 'Read')}</button>
+          ) : (
+            <button type="button" className="nesio-voice-sheet-close" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}>✕</button>
+          )}
         </div>
 
         {/* Expanded edit form — type-specific fields */}
@@ -886,9 +891,7 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
               </>
             ) : (
               <>
-                {readableText && (
-                  <button type="button" className="nesio-ob-primary-btn" style={{ flex: 1 }} onClick={() => setReaderOpen(true)}>{L(dict, '阅读', 'Read')}</button>
-                )}
+                {/* 批次 31:阅读入口已移到顶部;底部只留编辑/删除 */}
                 <button type="button" className="nesio-today-btn nesio-today-btn--ghost" style={{ flex: 1 }} onClick={startEdit}>{L(dict, '编辑', 'Edit')}</button>
                 <button type="button" className="nesio-settings-danger-btn" style={{ flex: 1, marginTop: 0 }} onClick={handleDelete}>{L(dict, '删除', 'Delete')}</button>
               </>

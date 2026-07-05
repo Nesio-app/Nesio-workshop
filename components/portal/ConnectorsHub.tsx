@@ -302,7 +302,9 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     setSyncing('plaid');
     try {
       const res = await fetch('/api/portal/plaid/transactions');
-      const data = await res.json() as { ok?: boolean; transactions?: Array<{ id: string; date: string; name: string; amount: number; currency: string; category: string }>; error?: string };
+      const data = await res.json() as { ok?: boolean; transactions?: Array<{ id: string; accountId?: string; date: string; name: string; amount: number; currency: string; category: string }>; accounts?: unknown[]; error?: string };
+      // 批次 31:账户/卡片信息存本机,供财务「卡片」子分类分卡显示
+      if (data.accounts?.length) { try { localStorage.setItem('nesio-bank-accounts-v1', JSON.stringify(data.accounts)); } catch { /* quota */ } }
       if (!data.ok) {
         if (data.error === 'not_connected' || data.error === 'relink_required') {
           showToast(L(dict, '需要(重新)连接银行', 'Bank needs (re)linking'), false);

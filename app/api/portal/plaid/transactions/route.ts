@@ -15,6 +15,7 @@ function envValue(key: string): string {
 
 interface PlaidTx {
   transaction_id: string;
+  account_id?: string;
   date: string;
   name: string;
   merchant_name?: string | null;
@@ -22,6 +23,16 @@ interface PlaidTx {
   iso_currency_code?: string | null;
   personal_finance_category?: { primary?: string } | null;
   pending?: boolean;
+}
+
+interface PlaidAccount {
+  account_id: string;
+  name?: string;
+  official_name?: string | null;
+  mask?: string | null;
+  type?: string;
+  subtype?: string | null;
+  balances?: { current?: number | null; available?: number | null; iso_currency_code?: string | null };
 }
 
 export async function GET(req: NextRequest) {
@@ -35,6 +46,7 @@ export async function GET(req: NextRequest) {
 
   let cursor = req.cookies.get('nesio_plaid_cursor')?.value || '';
   const added: PlaidTx[] = [];
+  let accounts: PlaidAccount[] = [];
 
   try {
     for (let page = 0; page < 5; page++) {
@@ -50,7 +62,7 @@ export async function GET(req: NextRequest) {
         }),
       });
       const data = await res.json() as {
-        added?: PlaidTx[]; next_cursor?: string; has_more?: boolean;
+        added?: PlaidTx[]; accounts?: PlaidAccount[]; next_cursor?: string; has_more?: boolean;
         error_code?: string; error_message?: string;
       };
       if (data.error_code) {
@@ -61,14 +73,25 @@ export async function GET(req: NextRequest) {
         );
       }
       added.push(...(data.added ?? []));
+      if (data.accounts?.length) accounts = data.accounts; // sync 每次回全量账户,取最新
       cursor = data.next_cursor || cursor;
       if (!data.has_more) break;
     }
 
     const response = NextResponse.json({
       ok: true,
+      accounts: accounts.map((a) => ({
+        id: a.account_id,
+        name: a.name || a.official_name || '账户',
+        mask: a.mask || undefined,
+        type: a.type,
+        subtype: a.subtype || undefined,
+        balance: a.balances?.current ?? undefined,
+        currency: a.balances?.iso_currency_code || 'USD',
+      })),
       transactions: added.filter((t) => !t.pending).map((t) => ({
         id: t.transaction_id,
+        accountId: t.account_id,
         date: t.date,
         name: t.merchant_name || t.name,
         amount: t.amount,

@@ -17640,6 +17640,41 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 .nesio-fin-txcat { font-size: 0.66rem; color: var(--portal-muted); }
 .nesio-fin-txamt { flex-shrink: 0; font-size: 0.88rem; font-weight: 600; color: var(--portal-ink); font-variant-numeric: tabular-nums; }
 .nesio-fin-txamt.is-refund { color: var(--status-go, #3a9d6a); }
+/* 批次 31:总览 KPI + 预警 + 趋势;交易审核;分卡 */
+.nesio-fin-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem; margin-bottom: 1rem; }
+.nesio-fin-kpi { display: flex; flex-direction: column; gap: 0.2rem; padding: 0.7rem 0.75rem; border: 1px solid var(--portal-line); border-radius: 12px; background: var(--glass-bg-solid); }
+.nesio-fin-kpi-l { font-size: 0.66rem; color: var(--portal-muted); }
+.nesio-fin-kpi-v { font-size: 1.1rem; font-weight: 700; color: var(--portal-ink); }
+.nesio-fin-alerts { display: flex; flex-direction: column; gap: 0.5rem; }
+.nesio-fin-alert { padding: 0.65rem 0.8rem; border-radius: 12px; border: 1px solid var(--portal-line); }
+.nesio-fin-alert--risk { border-color: var(--status-risk, #d9534f); background: color-mix(in srgb, var(--status-risk, #d9534f) 8%, transparent); }
+.nesio-fin-alert--warn { border-color: #e0954a; background: color-mix(in srgb, #e0954a 9%, transparent); }
+.nesio-fin-alert--info { background: var(--glass-bg-solid); }
+.nesio-fin-alert-title { margin: 0; font-size: 0.86rem; font-weight: 700; color: var(--portal-ink); }
+.nesio-fin-alert--risk .nesio-fin-alert-title { color: var(--status-risk, #d9534f); }
+.nesio-fin-alert--warn .nesio-fin-alert-title { color: #c77b2e; }
+.nesio-fin-alert-body { margin: 0.15rem 0 0; font-size: 0.76rem; color: var(--portal-muted); }
+.nesio-fin-alert-note { font-size: 0.64rem; color: var(--portal-muted); margin: 0.4rem 0 0; text-align: right; }
+.nesio-fin-trend { display: flex; align-items: flex-end; gap: 0.4rem; height: 7rem; }
+.nesio-fin-trend-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.2rem; height: 100%; justify-content: flex-end; }
+.nesio-fin-trend-val { font-size: 0.56rem; color: var(--portal-muted); }
+.nesio-fin-trend-bar-wrap { flex: 1; width: 70%; display: flex; align-items: flex-end; }
+.nesio-fin-trend-bar { width: 100%; min-height: 4px; background: var(--portal-accent-soft-lg, var(--portal-accent-soft)); border-radius: 4px 4px 0 0; }
+.nesio-fin-trend-bar.is-cur { background: var(--portal-accent); }
+.nesio-fin-trend-lbl { font-size: 0.62rem; color: var(--portal-muted); }
+.nesio-fin-review { border: 1px solid var(--portal-accent-border); border-radius: 14px; padding: 0.8rem; background: var(--portal-accent-soft); }
+.nesio-fin-review-title { margin: 0; font-size: 0.9rem; font-weight: 700; color: var(--portal-ink); }
+.nesio-fin-review-sug { margin: 0.3rem 0 0.6rem; font-size: 0.76rem; color: var(--portal-muted); }
+.nesio-fin-review-btns { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.nesio-fin-review-accept { border: none; border-radius: 999px; padding: 0.35rem 0.9rem; background: var(--portal-accent); color: #fff; font-size: 0.78rem; font-weight: 600; cursor: pointer; }
+.nesio-fin-review-alt, .nesio-fin-review-skip { border: 1px solid var(--portal-line); border-radius: 999px; padding: 0.35rem 0.8rem; background: var(--glass-bg-solid); color: var(--portal-ink); font-size: 0.78rem; cursor: pointer; }
+.nesio-fin-review-skip { color: var(--portal-muted); margin-left: auto; }
+.nesio-fin-card { padding: 0.85rem 0.9rem; border: 1px solid var(--portal-line); border-radius: 14px; background: var(--glass-bg-solid); margin-bottom: 0.7rem; }
+.nesio-fin-card-top { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
+.nesio-fin-card-name { font-size: 0.95rem; font-weight: 700; color: var(--portal-ink); }
+.nesio-fin-card-bal { font-size: 0.95rem; font-weight: 700; color: var(--portal-ink); font-variant-numeric: tabular-nums; }
+.nesio-fin-card-sub { margin: 0.15rem 0 0.4rem; font-size: 0.68rem; color: var(--portal-muted); text-transform: capitalize; }
+.nesio-fin-card-meta { margin: 0; font-size: 0.74rem; color: var(--portal-muted); }
 
 /* 批次 27:地点足迹 · Google 时间线样式 */
 .nesio-pt { display: flex; flex-direction: column; gap: 1.1rem; }
@@ -17707,6 +17742,9 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 .nesio-tl-bucket-bar-wrap { flex: 1; width: 60%; display: flex; align-items: flex-end; }
 .nesio-tl-bucket-bar { width: 100%; min-height: 3px; background: var(--portal-accent); border-radius: 4px 4px 0 0; }
 .nesio-tl-bucket-label { font-size: 0.62rem; color: var(--portal-muted); }
+/* 批次 31:节点详情顶部「阅读」按钮(替换 ✕,背景可关) */
+.nesio-node-read-top { flex-shrink: 0; border: none; border-radius: 999px; padding: 0.35rem 1rem; background: var(--portal-accent); color: #fff; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
+
 /* 批次 30:地点纠正 + 环游 */
 .nesio-tl-cluster-name--btn { background: none; border: none; padding: 0; text-align: left; cursor: pointer; }
 .nesio-tl-alias-orig { font-size: 0.66rem; color: var(--portal-muted); }
