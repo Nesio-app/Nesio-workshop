@@ -16,6 +16,7 @@ const VoiceInputSheet = dynamic(() => import('./VoiceInputSheet'), { ssr: false 
 const ShareSheet = dynamic(() => import('./ShareSheet'), { ssr: false });
 const MoodSheet = dynamic(() => import('./MoodSheet'), { ssr: false });
 const FreezeVaultSheet = dynamic(() => import('./FreezeVaultSheet'), { ssr: false });
+const WorkoutPlayer = dynamic(() => import('./fitness/WorkoutPlayer'), { ssr: false });
 const NesioChatSheet = dynamic(() => import('./NesioChatSheet'), { ssr: false });
 const PortalAiFriendsPreview = dynamic(() => import('./PortalAiFriendsPreview'), { ssr: false });
 const NotePanelEnhanced = dynamic(() => import('./NotePanelEnhanced'), { ssr: false });
@@ -275,6 +276,7 @@ export default function Portal() {
   }, []);
   const [moodOpen, setMoodOpen] = useState(false);
   const [freezeOpen, setFreezeOpen] = useState(false);
+  const [workoutSession, setWorkoutSession] = useState<import('./fitness/WorkoutPlayer').PlayerSession | null>(null);
   const [launchSurfaceContext, setLaunchSurfaceContext] = useState({
     viewerRole: 'public' as 'public' | 'tester' | 'personal_lab',
     testerAllowlist: [] as string[],
@@ -481,15 +483,18 @@ export default function Portal() {
     const voiceHandler = () => { track('capture_voice_open'); setCaptureMode('voice'); };
     const moodHandler = () => { track('mood_open'); setMoodOpen(true); };
     const freezeHandler = () => { track('freeze_open'); setFreezeOpen(true); };
+    const workoutHandler = (e: Event) => { track('workout_start', {}); setWorkoutSession((e as CustomEvent).detail); };
     window.addEventListener('nesio-open-tell', handler);
     window.addEventListener('nesio-open-voice', voiceHandler);
     window.addEventListener('nesio-open-mood', moodHandler);
     window.addEventListener('nesio-open-freeze', freezeHandler);
+    window.addEventListener('nesio-start-workout', workoutHandler);
     return () => {
       window.removeEventListener('nesio-open-tell', handler);
       window.removeEventListener('nesio-open-voice', voiceHandler);
       window.removeEventListener('nesio-open-mood', moodHandler);
       window.removeEventListener('nesio-open-freeze', freezeHandler);
+      window.removeEventListener('nesio-start-workout', workoutHandler);
     };
   }, []);
 
@@ -869,6 +874,7 @@ export default function Portal() {
       <ShareSheet open={captureMode === 'share'} onClose={() => setCaptureMode(null)} />
       <MoodSheet open={moodOpen} onClose={() => setMoodOpen(false)} />
       <FreezeVaultSheet open={freezeOpen} onClose={() => setFreezeOpen(false)} initialTab="add" />
+      {workoutSession && <WorkoutPlayer session={workoutSession} onClose={() => setWorkoutSession(null)} />}
       <AskGuideSheet open={askGuideOpen} onClose={() => setAskGuideOpen(false)} onStart={openAskVoice} />
 
       <NesioChatSheet open={chatOpen} onClose={() => setChatOpen(false)} canUsePrivateData={canUsePrivateRuntime} />

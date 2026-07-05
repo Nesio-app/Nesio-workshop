@@ -17823,6 +17823,61 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 .nesio-fit-suggest { margin: 0.7rem 0 0; font-size: 0.85rem; color: var(--portal-ink); line-height: 1.5; }
 .nesio-health-story-line { margin: 0.2rem 0 0; font-size: 0.85rem; color: var(--portal-ink); line-height: 1.55; }
 
+/* ─── 动作库(批次 46)─── */
+.nesio-xlib-filter { display: flex; gap: 0.4rem; overflow-x: auto; padding-bottom: 0.35rem; margin-bottom: 0.3rem; -webkit-overflow-scrolling: touch; }
+.nesio-xlib-filter::-webkit-scrollbar { display: none; }
+.nesio-xlib-chip { flex-shrink: 0; padding: 0.32rem 0.75rem; border-radius: 999px; border: 1.5px solid var(--portal-line); background: none; color: var(--portal-muted); font-size: 0.78rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.nesio-xlib-chip.is-active { border-color: var(--portal-blue-deep); color: var(--portal-blue-deep); background: var(--portal-accent-soft); }
+.nesio-xlib-cards { display: flex; flex-direction: column; gap: 0.6rem; margin-top: 0.6rem; }
+.nesio-xlib-card { border: 1px solid var(--portal-line); border-radius: 0.9rem; padding: 0.7rem 0.8rem; background: var(--glass-bg-solid); }
+.nesio-xlib-card.is-picked { border-color: var(--portal-blue-deep); }
+.nesio-xlib-card-head { display: block; width: 100%; text-align: left; background: none; border: none; padding: 0; cursor: pointer; }
+.nesio-xlib-name { font-size: 0.92rem; font-weight: 700; color: var(--portal-ink); }
+.nesio-xlib-tags { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.35rem; }
+.nesio-xlib-tag { font-size: 0.68rem; font-weight: 600; padding: 0.1rem 0.45rem; border-radius: 0.4rem; }
+.nesio-xlib-tag.tm { background: var(--portal-accent-soft); color: var(--portal-blue-deep); }
+.nesio-xlib-tag.te { background: var(--chip-green, rgba(80,160,120,0.15)); color: var(--status-gentle, #3d9f6e); }
+.nesio-xlib-tag.tv { background: var(--chip-violet, rgba(140,120,200,0.15)); color: var(--portal-muted); }
+.nesio-xlib-tag[class*="td-easy"] { background: rgba(80,160,120,0.15); color: #3d9f6e; }
+.nesio-xlib-tag[class*="td-med"] { background: rgba(224,149,74,0.16); color: #e0954a; }
+.nesio-xlib-tag[class*="td-hard"] { background: rgba(194,93,122,0.16); color: #c25d7a; }
+.nesio-xlib-cue { margin: 0.5rem 0 0; font-size: 0.8rem; font-style: italic; color: var(--portal-muted); line-height: 1.5; }
+.nesio-xlib-detail { margin-top: 0.5rem; border-top: 1px solid var(--portal-line); padding-top: 0.45rem; }
+.nesio-xlib-detail-label { margin: 0.4rem 0 0.15rem; font-size: 0.72rem; font-weight: 700; color: var(--portal-blue-deep); }
+.nesio-xlib-detail ul { margin: 0; padding-left: 1.1rem; font-size: 0.78rem; color: var(--portal-ink); line-height: 1.6; }
+.nesio-xlib-add { margin-top: 0.55rem; padding: 0.32rem 0.9rem; border-radius: 999px; border: 1.5px solid var(--portal-accent-border); background: none; color: var(--portal-blue-deep); font-size: 0.78rem; font-weight: 600; cursor: pointer; }
+.nesio-xlib-add.is-picked { background: var(--portal-accent-soft); }
+.nesio-xlib-draftbar { position: sticky; bottom: 0; display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem 0.2rem; background: var(--glass-bg-solid); border-top: 1px solid var(--portal-line); }
+.nesio-xlib-draft-count { flex: 1; font-size: 0.82rem; font-weight: 600; color: var(--portal-ink); }
+.nesio-xlib-draft-save { padding: 0.4rem 0.9rem; border-radius: 999px; border: 1.5px solid var(--portal-accent-border); background: none; color: var(--portal-blue-deep); font-size: 0.8rem; font-weight: 600; cursor: pointer; }
+.nesio-xlib-draft-play { padding: 0.4rem 1rem; border-radius: 999px; border: none; background: var(--portal-blue-deep); color: #fff; font-size: 0.8rem; font-weight: 700; cursor: pointer; }
+
+/* ─── 跟练播放器(批次 46)─── */
+.nesio-wp-overlay { position: fixed; inset: 0; z-index: 600; background: var(--portal-bg, #f3f5fa); display: flex; flex-direction: column; padding: env(safe-area-inset-top) 1.1rem calc(env(safe-area-inset-bottom) + 1rem); }
+.nesio-wp-top { display: flex; align-items: center; gap: 0.6rem; padding: 0.8rem 0 0.4rem; }
+.nesio-wp-progress { font-size: 0.78rem; font-weight: 700; color: var(--portal-blue-deep); }
+.nesio-wp-session { flex: 1; font-size: 0.82rem; color: var(--portal-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nesio-wp-close { background: none; border: none; font-size: 1.1rem; color: var(--portal-muted); cursor: pointer; }
+.nesio-wp-body { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+.nesio-wp-name { font-size: 1.5rem; font-weight: 800; color: var(--portal-ink); margin: 1rem 0 0.4rem; line-height: 1.2; }
+.nesio-wp-muscles { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.nesio-wp-muscle { font-size: 0.72rem; padding: 0.12rem 0.5rem; border-radius: 0.4rem; background: var(--portal-line); color: var(--portal-muted); }
+.nesio-wp-muscle.is-p { background: var(--portal-accent-soft); color: var(--portal-blue-deep); font-weight: 600; }
+.nesio-wp-setline { display: flex; align-items: baseline; gap: 0.6rem; margin: 1rem 0 0.6rem; font-size: 0.95rem; font-weight: 700; color: var(--portal-ink); }
+.nesio-wp-target { font-size: 1.6rem; font-weight: 800; color: var(--portal-blue-deep); margin-left: auto; }
+.nesio-wp-neural { background: var(--portal-accent-soft); border-radius: 0.8rem; padding: 0.8rem 0.9rem; font-size: 0.92rem; font-style: italic; color: var(--portal-blue-deep); line-height: 1.5; margin-bottom: 0.7rem; }
+.nesio-wp-cues { margin: 0; padding-left: 1.2rem; font-size: 0.88rem; color: var(--portal-ink); line-height: 1.8; }
+.nesio-wp-rest { text-align: center; padding: 2rem 0; }
+.nesio-wp-rest-label { font-size: 0.9rem; color: var(--portal-muted); margin: 0 0 0.5rem; }
+.nesio-wp-count { font-size: 3.4rem; font-weight: 800; color: var(--portal-blue-deep); margin: 0.2rem 0; font-variant-numeric: tabular-nums; }
+.nesio-wp-count--work { text-align: center; }
+.nesio-wp-actions { display: flex; flex-direction: column; gap: 0.5rem; padding-top: 0.6rem; }
+.nesio-wp-primary { width: 100%; padding: 0.9rem; border-radius: 1rem; border: none; background: var(--portal-blue-deep); color: #fff; font-size: 1rem; font-weight: 700; cursor: pointer; }
+.nesio-wp-ghost { width: 100%; padding: 0.6rem; border-radius: 1rem; border: 1.5px solid var(--portal-line); background: none; color: var(--portal-muted); font-size: 0.86rem; font-weight: 600; cursor: pointer; }
+.nesio-wp-done { margin: auto; text-align: center; }
+.nesio-wp-done-title { font-size: 1.6rem; font-weight: 800; color: var(--portal-ink); margin: 0 0 0.4rem; }
+.nesio-wp-done-sub { font-size: 0.9rem; color: var(--portal-muted); margin: 0 0 1.5rem; }
+
 /* ─── 关系管理(批次 41)─── */
 .nesio-rel-due-row {
   display: flex;

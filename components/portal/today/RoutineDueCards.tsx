@@ -7,6 +7,7 @@
 
 import { useEffect, useState } from 'react';
 import { dueRoutines, markRoutineDone, ROUTINES_UPDATED_EVENT, type Routine } from '@/lib/portal/routines';
+import { protocolById, nextSessionOf, toRunSteps, loadTrainingState, sessionsThisWeek } from '@/lib/platform/training-protocol-engine';
 import { IconClock } from '../icons';
 import { track } from '@/lib/portal/telemetry';
 import { L } from '@/lib/portal/i18n';
@@ -24,6 +25,24 @@ export function RoutineDueCards() {
     window.addEventListener(ROUTINES_UPDATED_EVENT, read);
     return () => { clearInterval(timer); window.removeEventListener(ROUTINES_UPDATED_EVENT, read); };
   }, []);
+
+  // 健身「开始练」→ 有训练计划就直接进跟练播放器,否则打开洞察健康 tab
+  function startTraining(r: Routine) {
+    const st = loadTrainingState();
+    const p = (r.protocolId && protocolById(r.protocolId)) || (st.activeProtocolId ? protocolById(st.activeProtocolId) : undefined);
+    if (p) {
+      const sess = nextSessionOf(p, sessionsThisWeek(st));
+      if (sess) {
+        window.dispatchEvent(new CustomEvent('nesio-start-workout', {
+          detail: { name: dict === 'en' ? p.name.en : p.name.zh, steps: toRunSteps(sess.items), protocolId: p.id, sessionId: sess.id },
+        }));
+        track('routine_train_start', {});
+        return;
+      }
+    }
+    window.dispatchEvent(new CustomEvent('nesio-open-training'));
+    track('routine_train_start', {});
+  }
 
   if (due.length === 0) return null;
 
@@ -71,7 +90,7 @@ export function RoutineDueCards() {
                   <button
                     type="button"
                     className="nesio-proactive-action-btn"
-                    onClick={() => { window.dispatchEvent(new CustomEvent('nesio-open-training')); track('routine_train_start', {}); }}
+                    onClick={() => startTraining(r)}
                   >
                     {L(dict, '开始练', 'Start')}
                   </button>

@@ -10,12 +10,20 @@ import { useEffect, useState } from 'react';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
+import dynamic from 'next/dynamic';
 import {
   PROTOCOL_LIBRARY, protocolById, exerciseById, protocolWeeks,
-  loadTrainingState, startProtocol, logSession, sessionsThisWeek, saveTrainingState,
+  loadTrainingState, startProtocol, logSession, sessionsThisWeek, saveTrainingState, toRunSteps,
   type TrainingState, type TrainingProtocol, type ExercisePrescription,
 } from '@/lib/platform/training-protocol-engine';
 import { earnPoints, POINTS_PER_FITNESS_SESSION } from '@/lib/platform/rewards-engine';
+import { loadWorkouts, deleteWorkout, WORKOUTS_UPDATED, type Workout } from '@/lib/portal/workout-store';
+
+const ExerciseLibrary = dynamic(() => import('../fitness/ExerciseLibrary'), { ssr: false });
+
+function startWorkout(name: string, steps: Array<{ exerciseId: string; sets: number; reps: number; unit: 'reps' | 'sec'; restSec?: number }>, protocolId?: string, sessionId?: string) {
+  window.dispatchEvent(new CustomEvent('nesio-start-workout', { detail: { name, steps, protocolId, sessionId } }));
+}
 
 const GOAL_LABEL: Record<TrainingProtocol['goal'], [string, string]> = {
   strength: ['力量', 'Strength'], hypertrophy: ['增肌', 'Hypertrophy'], endurance: ['耐力', 'Endurance'], general: ['综合', 'General'],
@@ -40,14 +48,52 @@ export default function TrainingPlan() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [st, setSt] = useState<TrainingState | null>(null);
   const [earned, setEarned] = useState<number | null>(null);
-  useEffect(() => { setSt(loadTrainingState()); }, []);
+  const [libOpen, setLibOpen] = useState(false);
+  const [workouts, setWorkouts] = useState<Workout[]>([]);
+  useEffect(() => {
+    setSt(loadTrainingState());
+    setWorkouts(loadWorkouts());
+    const on = () => setWorkouts(loadWorkouts());
+    window.addEventListener(WORKOUTS_UPDATED, on);
+    return () => window.removeEventListener(WORKOUTS_UPDATED, on);
+  }, []);
   if (!st) return null;
 
   const active = st.activeProtocolId ? protocolById(st.activeProtocolId) : undefined;
 
+  // 动作库入口 + 我的自定义训练(两个分支都渲染)
+  const fitnessTop = (
+    <>
+      <button type="button" className="nesio-routine-brief-preset" style={{ marginTop: '1rem' }} onClick={() => setLibOpen(true)}>
+        {L(dict, '+ 动作库 · 自由组合训练(17 个动作,三维筛选)', '+ Exercise library · build your own (17 moves, 3 filters)')}
+      </button>
+      {workouts.length > 0 && (
+        <>
+          <p className="nesio-settings-section-label">{L(dict, '我的训练', 'My workouts')}</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            {workouts.map((w) => (
+              <div key={w.id} className="nesio-fin-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                <div style={{ minWidth: 0 }}>
+                  <span className="nesio-fin-card-name">{w.name}</span>
+                  <p className="nesio-fin-card-meta" style={{ marginTop: '0.15rem' }}>{L(dict, `${w.items.length} 个动作`, `${w.items.length} moves`)}</p>
+                </div>
+                <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
+                  <button type="button" className="nesio-fin-review-accept" onClick={() => startWorkout(w.name, w.items.map((it) => ({ ...it, restSec: 45 })))}>{L(dict, '开始跟练', 'Start')}</button>
+                  <button type="button" className="nesio-routine-delete" aria-label={L(dict, '删除', 'Delete')} onClick={() => { deleteWorkout(w.id); setWorkouts(loadWorkouts()); }}>✕</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+      <ExerciseLibrary open={libOpen} onClose={() => setLibOpen(false)} />
+    </>
+  );
+
   if (!active) {
     return (
       <div>
+        {fitnessTop}
         <p className="nesio-settings-section-label" style={{ marginTop: '1rem' }}>{L(dict, '训练计划', 'Training plan')}</p>
         <p className="nesio-settings-option-hint" style={{ marginTop: 0 }}>{L(dict, '选一个计划开始;每次训练打个卡,记录你的执行。', 'Pick a plan to start; check in after each session.')}</p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
@@ -75,6 +121,7 @@ export default function TrainingPlan() {
 
   return (
     <div>
+      {fitnessTop}
       <div className="nesio-fin-recur-hero" style={{ marginTop: '1rem' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', minWidth: 0 }}>
           <span className="nesio-fin-recur-hero-l">{L(dict, active.name.zh, active.name.en)}</span>
@@ -95,7 +142,10 @@ export default function TrainingPlan() {
           <div key={s.id} className="nesio-fin-card">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
               <span className="nesio-fin-card-name">{L(dict, s.name.zh, s.name.en)}</span>
-              <button type="button" className="nesio-fin-review-accept" onClick={() => logDone(s.id, L(dict, s.name.zh, s.name.en))}>{L(dict, '今天做了', 'Did it')}</button>
+              <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
+                <button type="button" className="nesio-fin-review-accept" onClick={() => startWorkout(L(dict, s.name.zh, s.name.en), toRunSteps(s.items), active.id, s.id)}>{L(dict, '开始跟练', 'Start')}</button>
+                <button type="button" className="nesio-routine-day-preset" onClick={() => logDone(s.id, L(dict, s.name.zh, s.name.en))}>{L(dict, '做过了', 'Done')}</button>
+              </div>
             </div>
             <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.1rem', fontSize: '0.8rem', color: 'var(--portal-muted)', lineHeight: 1.7 }}>
               {s.items.map((it, i) => <li key={i}>{fmtItem(it, dict)}</li>)}

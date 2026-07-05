@@ -112,6 +112,27 @@ export function protocolById(id: string): TrainingProtocol | undefined {
   return PROTOCOL_LIBRARY.find((p) => p.id === id);
 }
 
+// ── 跟练播放器接口(批次 46)──
+export interface RunStep { exerciseId: string; sets: number; reps: number; unit: 'reps' | 'sec'; restSec?: number }
+
+/** 把一个 session 的处方转成播放器步骤('min' 换算成秒)。 */
+export function toRunSteps(items: ExercisePrescription[]): RunStep[] {
+  return items.map((it) => ({
+    exerciseId: it.exerciseId,
+    sets: it.sets,
+    reps: it.unit === 'min' ? it.reps * 60 : it.reps,
+    unit: it.unit === 'min' ? 'sec' : 'reps',
+    restSec: it.restSec,
+  }));
+}
+
+/** 本周该做的下一个 session:用第一阶段的训练日按本周完成数轮换。 */
+export function nextSessionOf(p: TrainingProtocol, doneThisWeek: number): SessionTemplate | undefined {
+  const phase = p.phases[0];
+  if (!phase?.sessions.length) return undefined;
+  return phase.sessions[doneThisWeek % phase.sessions.length];
+}
+
 // ── 用户状态:选中的计划 + 执行日志 ──
 export interface TrainingState {
   activeProtocolId: string | null;
