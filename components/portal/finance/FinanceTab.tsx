@@ -10,7 +10,8 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   loadBankTx, loadBankAccounts, availableMonths, summarizeMonth, categoryBreakdown, topMerchants,
   monthlyTrend, financeAlerts, needsReview, suggestCategory, setMerchantRule, effectiveCategory,
-  accountMonth, formatMoney, ymOf, prevYm, type BankTx, type BankAccount,
+  accountMonth, formatMoney, ymOf, prevYm, txFlow, setFlowRule, TX_FLOW_LABELS,
+  type BankTx, type BankAccount, type TxFlow,
 } from '@/lib/portal/bank-tx';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -33,6 +34,7 @@ export default function FinanceTab() {
   const [sub, setSub] = useState<Sub>('overview');
   const [filter, setFilter] = useState<string>('all');
   const [rev, setRev] = useState(0); // 规则改动后强制重算
+  const [flowEditId, setFlowEditId] = useState<string | null>(null);
 
   useEffect(() => {
     const loaded = loadBankTx();
@@ -67,6 +69,7 @@ export default function FinanceTab() {
   const shownTx = filter === 'all' ? monthTx : monthTx.filter((t) => effectiveCategory(t) === filter);
 
   function resolveReview(name: string, category: string) { setMerchantRule(name, category); setRev((r) => r + 1); }
+  function applyFlow(name: string, flow: TxFlow) { setFlowRule(name, flow); setFlowEditId(null); setRev((r) => r + 1); }
 
   return (
     <div className="nesio-analytics-tab">
@@ -90,8 +93,9 @@ export default function FinanceTab() {
           <div className="nesio-fin-kpis">
             <div className="nesio-fin-kpi"><span className="nesio-fin-kpi-l">{L(dict, '净支出', 'Net spend')}</span><span className="nesio-fin-kpi-v">{formatMoney(summary.net, summary.currency)}</span>{netDelta !== null && <span className={`nesio-fin-delta${netDelta > 0 ? ' up' : ' down'}`}>{netDelta > 0 ? '+' : ''}{netDelta}%</span>}</div>
             <div className="nesio-fin-kpi"><span className="nesio-fin-kpi-l">{L(dict, '退款', 'Refunds')}</span><span className="nesio-fin-kpi-v">{formatMoney(summary.refunds, summary.currency)}</span></div>
-            <div className="nesio-fin-kpi"><span className="nesio-fin-kpi-l">{L(dict, '交易数', 'Tx count')}</span><span className="nesio-fin-kpi-v">{summary.count}</span></div>
+            <div className="nesio-fin-kpi"><span className="nesio-fin-kpi-l">{L(dict, '收入', 'Income')}</span><span className="nesio-fin-kpi-v">{formatMoney(summary.income, summary.currency)}</span></div>
           </div>
+          <p className="nesio-fin-alert-note" style={{ textAlign: 'left', marginTop: '-0.5rem', marginBottom: '0.8rem' }}>{L(dict, '收入 / 转账 / 信用卡还款 不计入收支;分错了到「交易」点类型改。', 'Income / transfers / card payments are excluded; fix any mislabels under Transactions.')}</p>
 
           {alerts.length > 0 && (
             <>
@@ -181,16 +185,31 @@ export default function FinanceTab() {
           </div>
 
           <div className="nesio-fin-txlist">
-            {shownTx.map((t) => (
-              <div key={t.id} className="nesio-fin-txrow">
-                <span className="nesio-fin-txdate">{(t.date || '').slice(5).replace('-', '/')}</span>
-                <div className="nesio-fin-txmid">
-                  <span className="nesio-fin-txname">{t.name || L(dict, '未知商户', 'Unknown')}</span>
-                  <span className="nesio-fin-txcat">{effectiveCategory(t) || L(dict, '待归类', 'Uncategorized')}</span>
+            {shownTx.map((t) => {
+              const f = txFlow(t);
+              return (
+                <div key={t.id}>
+                  <div className="nesio-fin-txrow">
+                    <span className="nesio-fin-txdate">{(t.date || '').slice(5).replace('-', '/')}</span>
+                    <div className="nesio-fin-txmid">
+                      <span className="nesio-fin-txname">{t.name || L(dict, '未知商户', 'Unknown')}</span>
+                      <button type="button" className={`nesio-fin-txflow nesio-fin-txflow--${f}`} onClick={() => setFlowEditId((id) => (id === t.id ? null : t.id))}>
+                        {L(dict, TX_FLOW_LABELS[f][0], TX_FLOW_LABELS[f][1])}
+                        {f === 'expense' && <span className="nesio-fin-txcat"> · {effectiveCategory(t) || L(dict, '待归类', 'Uncategorized')}</span>}
+                      </button>
+                    </div>
+                    <span className={`nesio-fin-txamt${t.amount < 0 ? ' is-refund' : ''}`}>{signed(t.amount)}</span>
+                  </div>
+                  {flowEditId === t.id && (
+                    <div className="nesio-fin-flowpick">
+                      {(['expense', 'refund', 'income', 'transfer'] as TxFlow[]).map((opt) => (
+                        <button key={opt} type="button" className={`nesio-fin-flowopt${f === opt ? ' is-active' : ''}`} onClick={() => applyFlow(t.name, opt)}>{L(dict, TX_FLOW_LABELS[opt][0], TX_FLOW_LABELS[opt][1])}</button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <span className={`nesio-fin-txamt${t.amount < 0 ? ' is-refund' : ''}`}>{signed(t.amount)}</span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </>
       )}

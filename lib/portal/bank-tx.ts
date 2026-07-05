@@ -67,29 +67,68 @@ export function dominantCurrency(txs: BankTx[]): string {
   return best;
 }
 
+/* ---------- 批次 33:交易类型分流(修「转账/收入/还款被当退款」的算错)---------- */
+// Plaid amount 约定:正=花出去,负=进账。但「进账」里混了 收入/转账/信用卡还款,
+// 这些都不该计入收支。按 personal_finance_category 自动分流,并允许用户手动纠正、记住。
+
+export type TxFlow = 'expense' | 'refund' | 'income' | 'transfer';
+
+export const TX_FLOW_LABELS: Record<TxFlow, [string, string]> = {
+  expense: ['支出', 'Expense'], refund: ['退款', 'Refund'], income: ['收入', 'Income'], transfer: ['转账/还款', 'Transfer'],
+};
+
+const FLOW_RULE_KEY = 'nesio-bank-flow-rule-v1';
+
+export function loadFlowRules(): Record<string, TxFlow> {
+  if (typeof window === 'undefined') return {};
+  try { return JSON.parse(localStorage.getItem(FLOW_RULE_KEY) || '{}') as Record<string, TxFlow>; } catch { return {}; }
+}
+
+export function setFlowRule(name: string, flow: TxFlow | ''): void {
+  if (typeof window === 'undefined') return;
+  const rules = loadFlowRules();
+  if (flow) rules[name] = flow; else delete rules[name];
+  try { localStorage.setItem(FLOW_RULE_KEY, JSON.stringify(rules)); } catch { /* ignore */ }
+}
+
+/** 交易类型:用户规则优先,否则按 Plaid 分类自动判(转账/还款/收入不计收支)。 */
+export function txFlow(t: BankTx, rules = loadFlowRules()): TxFlow {
+  const forced = rules[t.name];
+  if (forced) return forced;
+  const cat = (t.category || '').toUpperCase();
+  if (/INCOME/.test(cat)) return 'income';
+  if (/TRANSFER|LOAN_PAYMENT/.test(cat)) return 'transfer';
+  return t.amount >= 0 ? 'expense' : 'refund';
+}
+
 export interface MonthSummary {
   ym: string;
   net: number;
   gross: number;
   refunds: number;
+  income: number;
   count: number;
   currency: string;
 }
 
 export function summarizeMonth(txs: BankTx[], ym: string): MonthSummary {
   const monthTxs = txs.filter((t) => txYm(t) === ym);
-  let gross = 0;
-  let refunds = 0;
+  const flowRules = loadFlowRules();
+  let gross = 0, refunds = 0, income = 0, count = 0;
   for (const t of monthTxs) {
-    if (t.amount >= 0) gross += t.amount;
-    else refunds += -t.amount;
+    const f = txFlow(t, flowRules);
+    if (f === 'expense') { gross += Math.abs(t.amount); count += 1; }
+    else if (f === 'refund') { refunds += Math.abs(t.amount); count += 1; }
+    else if (f === 'income') income += Math.abs(t.amount);
+    // transfer / 还款:不计收支
   }
   return {
     ym,
     gross: round2(gross),
     refunds: round2(refunds),
     net: round2(gross - refunds),
-    count: monthTxs.length,
+    income: round2(income),
+    count,
     currency: dominantCurrency(monthTxs.length ? monthTxs : txs),
   };
 }
@@ -117,10 +156,11 @@ export function categoryBreakdown(txs: BankTx[], ym: string): CategorySlice[] {
 function sumByCategory(txs: BankTx[], ym: string): Map<string, number> {
   const m = new Map<string, number>();
   const rules = loadMerchantRules();
+  const flowRules = loadFlowRules();
   for (const t of txs) {
-    if (txYm(t) !== ym || t.amount <= 0) continue;
+    if (txYm(t) !== ym || txFlow(t, flowRules) !== 'expense') continue;
     const cat = effectiveCategory(t, rules) || '未分类';
-    m.set(cat, (m.get(cat) || 0) + t.amount);
+    m.set(cat, (m.get(cat) || 0) + Math.abs(t.amount));
   }
   return m;
 }
@@ -133,11 +173,12 @@ export interface MerchantAgg {
 
 export function topMerchants(txs: BankTx[], ym: string, n = 5): MerchantAgg[] {
   const m = new Map<string, { total: number; count: number }>();
+  const flowRules = loadFlowRules();
   for (const t of txs) {
-    if (txYm(t) !== ym || t.amount <= 0) continue;
+    if (txYm(t) !== ym || txFlow(t, flowRules) !== 'expense') continue;
     const name = t.name || '未知商户';
     const cur = m.get(name) || { total: 0, count: 0 };
-    cur.total += t.amount;
+    cur.total += Math.abs(t.amount);
     cur.count += 1;
     m.set(name, cur);
   }
@@ -176,10 +217,12 @@ export function loadBankAccounts(): BankAccount[] {
 /** 某账户某月的消费/退款/笔数。 */
 export function accountMonth(txs: BankTx[], accountId: string, ym: string): { spend: number; refund: number; count: number } {
   let spend = 0, refund = 0, count = 0;
+  const flowRules = loadFlowRules();
   for (const t of txs) {
     if (t.accountId !== accountId || txYm(t) !== ym) continue;
-    count += 1;
-    if (t.amount >= 0) spend += t.amount; else refund += -t.amount;
+    const f = txFlow(t, flowRules);
+    if (f === 'expense') { spend += Math.abs(t.amount); count += 1; }
+    else if (f === 'refund') { refund += Math.abs(t.amount); count += 1; }
   }
   return { spend: round2(spend), refund: round2(refund), count };
 }
@@ -205,10 +248,11 @@ export function effectiveCategory(t: BankTx, rules = loadMerchantRules()): strin
   return rules[t.name] || t.category || '';
 }
 
-/** 需要审核的交易:本月、支出、没有生效分类的。 */
+/** 需要审核的交易:本月、真支出、没有生效分类的。 */
 export function needsReview(txs: BankTx[], ym: string): BankTx[] {
   const rules = loadMerchantRules();
-  return txs.filter((t) => txYm(t) === ym && t.amount > 0 && !effectiveCategory(t, rules)).sort((a, b) => b.amount - a.amount);
+  const flowRules = loadFlowRules();
+  return txs.filter((t) => txYm(t) === ym && txFlow(t, flowRules) === 'expense' && !effectiveCategory(t, rules)).sort((a, b) => b.amount - a.amount);
 }
 
 const SUGGEST_RULES: Array<[RegExp, string]> = [

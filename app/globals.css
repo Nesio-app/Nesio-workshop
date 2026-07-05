@@ -17658,6 +17658,16 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 .nesio-fin-txcat { font-size: 0.66rem; color: var(--portal-muted); }
 .nesio-fin-txamt { flex-shrink: 0; font-size: 0.88rem; font-weight: 600; color: var(--portal-ink); font-variant-numeric: tabular-nums; }
 .nesio-fin-txamt.is-refund { color: var(--status-go, #3a9d6a); }
+/* 批次 33:交易类型标签 + 分流纠正 */
+.nesio-fin-txflow { display: inline-flex; align-items: center; align-self: flex-start; border: none; background: none; padding: 0; font-size: 0.66rem; color: var(--portal-muted); cursor: pointer; }
+.nesio-fin-txflow::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 4px; background: var(--portal-muted); }
+.nesio-fin-txflow--expense::before { background: #588ce3; }
+.nesio-fin-txflow--refund::before { background: #3a9d6a; }
+.nesio-fin-txflow--income::before { background: #e0954a; }
+.nesio-fin-txflow--transfer::before { background: #9aa7b8; }
+.nesio-fin-flowpick { display: flex; gap: 0.4rem; flex-wrap: wrap; padding: 0.5rem 0 0.7rem; }
+.nesio-fin-flowopt { border: 1px solid var(--portal-line); border-radius: 999px; padding: 0.3rem 0.75rem; background: var(--glass-bg-solid); color: var(--portal-ink); font-size: 0.76rem; cursor: pointer; }
+.nesio-fin-flowopt.is-active { background: var(--portal-accent-soft); color: var(--portal-accent); border-color: var(--portal-accent-border); font-weight: 600; }
 /* 批次 31:总览 KPI + 预警 + 趋势;交易审核;分卡 */
 .nesio-fin-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem; margin-bottom: 1rem; }
 .nesio-fin-kpi { display: flex; flex-direction: column; gap: 0.2rem; padding: 0.7rem 0.75rem; border: 1px solid var(--portal-line); border-radius: 12px; background: var(--glass-bg-solid); }
