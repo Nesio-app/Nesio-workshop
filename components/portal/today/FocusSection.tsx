@@ -77,6 +77,21 @@ function CollapsedTaskItem({
   );
 }
 
+// 批次 29:消除的焦点项要留得住 —— 之前 dismissed 只在内存,重新挂载/刷新就全回来了。
+// 按当天持久化;次日自然复活(焦点本就是每日的)。
+const FOCUS_DISMISS_KEY = 'nesio-focus-dismissed-v1';
+function todayStr() { return new Date().toISOString().slice(0, 10); }
+function loadDismissedToday(): Set<string> {
+  if (typeof window === 'undefined') return new Set();
+  try {
+    const d = JSON.parse(localStorage.getItem(FOCUS_DISMISS_KEY) || '{}') as { date?: string; ids?: string[] };
+    return d.date === todayStr() && Array.isArray(d.ids) ? new Set(d.ids) : new Set();
+  } catch { return new Set(); }
+}
+function persistDismissed(ids: Set<string>) {
+  try { localStorage.setItem(FOCUS_DISMISS_KEY, JSON.stringify({ date: todayStr(), ids: [...ids] })); } catch { /* ignore */ }
+}
+
 // ── Today Focus Section — Attention Engine v1 ─────────────────────────────────
 
 export function TodayFocusSection({
@@ -100,7 +115,7 @@ export function TodayFocusSection({
   onOpenRecorder?: (node: FocusNode) => void;
   onFocusMode?: (node: FocusNode) => void;
 }) {
-  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const [dismissed, setDismissed] = useState<Set<string>>(() => loadDismissedToday());
   const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
   const [collapsed, setCollapsed] = useState(true);
   const [quickAdd, setQuickAdd] = useState('');
@@ -183,7 +198,8 @@ export function TodayFocusSection({
           {/* ── Slot 2: 折叠区(批次 8:≤2 条直接铺开,不值得让人多点一下) ── */}
           {collapsedCount > 0 && (
             <div className="nesio-collapsed-section">
-              {collapsedCount > 2 && (
+              {/* 批次 29:没有置顶卡时不整段折叠 —— 焦点区至少露出内容,不只显示「还有 N 项」 */}
+              {collapsedCount > 2 && pinned && (
                 <button
                   type="button"
                   className="nesio-collapsed-toggle"
@@ -197,7 +213,7 @@ export function TodayFocusSection({
                 </button>
               )}
 
-              {(!collapsed || collapsedCount <= 2) && (
+              {(!collapsed || collapsedCount <= 2 || !pinned) && (
                 <ul className="nesio-collapsed-list">
                   {/* Calendar events (non-pinned) */}
                   {rest.map((obj) => (
@@ -226,7 +242,7 @@ export function TodayFocusSection({
                       node={node}
                       doneIds={doneIds}
                       onDone={handleDone}
-                      onDismiss={(id) => setDismissed((prev) => { const next = new Set(prev); next.add(id); return next; })}
+                      onDismiss={(id) => setDismissed((prev) => { const next = new Set(prev); next.add(id); persistDismissed(next); return next; })}
                       onOpenRecorder={onOpenRecorder ? () => onOpenRecorder(node) : undefined}
                       onFocusMode={onFocusMode ? () => onFocusMode(node) : undefined}
                     />
