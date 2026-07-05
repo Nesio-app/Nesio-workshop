@@ -18,30 +18,42 @@ function envValue(key: string): string {
 
 interface GoogleComponent { long_name?: string; types?: string[] }
 interface GoogleResult { formatted_address?: string; address_components?: GoogleComponent[]; types?: string[] }
+// 批次 40:除了地名,也返回城市/国家 —— 供足迹 World tab(去过的国家 → 城市)。
+export interface GeoResult { name: string; city: string; country: string }
 
-async function googleReverse(lat: number, lon: number, key: string): Promise<string> {
-  const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lon}&key=${key}&language=en`;
-  const res = await fetch(url);
-  if (!res.ok) return '';
-  const data = await res.json() as { status?: string; results?: GoogleResult[] };
-  if (data.status !== 'OK' || !data.results?.length) return '';
-  const POI = ['point_of_interest', 'establishment', 'premise'];
-  const best = data.results.find((r) => (r.types || []).some((t) => POI.includes(t))) || data.results[0];
-  const comp = (best.address_components || []).find((c) => (c.types || []).some((t) => [...POI, 'neighborhood'].includes(t)));
-  return (comp?.long_name || best.formatted_address?.split(',')[0] || '').slice(0, 40);
+function pickGoogleComp(comps: GoogleComponent[], types: string[]): string {
+  const c = comps.find((x) => (x.types || []).some((t) => types.includes(t)));
+  return c?.long_name || '';
 }
 
-async function osmReverse(lat: number, lon: number): Promise<string> {
+async function googleReverse(lat: number, lon: number, key: string): Promise<GeoResult | null> {
+  const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lon}&key=${key}&language=en`;
+  const res = await fetch(url);
+  if (!res.ok) return null;
+  const data = await res.json() as { status?: string; results?: GoogleResult[] };
+  if (data.status !== 'OK' || !data.results?.length) return null;
+  const POI = ['point_of_interest', 'establishment', 'premise'];
+  const best = data.results.find((r) => (r.types || []).some((t) => POI.includes(t))) || data.results[0];
+  const comps = best.address_components || [];
+  const name = (pickGoogleComp(comps, [...POI, 'neighborhood']) || best.formatted_address?.split(',')[0] || '').slice(0, 40);
+  const city = (pickGoogleComp(comps, ['locality', 'postal_town', 'sublocality', 'administrative_area_level_2'])).slice(0, 40);
+  const country = pickGoogleComp(comps, ['country']).slice(0, 40);
+  return { name, city, country };
+}
+
+async function osmReverse(lat: number, lon: number): Promise<GeoResult | null> {
   const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`;
   const res = await fetch(url, { headers: { 'User-Agent': 'Nesio/1.0 (personal life kit; on-device reverse geocode)', 'Accept-Language': 'en' } });
-  if (!res.ok) return '';
+  if (!res.ok) return null;
   const data = await res.json() as { name?: string; display_name?: string; address?: Record<string, string> };
   const a = data.address || {};
-  const name = data.name
+  const name = (data.name
     || a.shop || a.amenity || a.building || a.office || a.leisure || a.tourism
     || a.road || a.neighbourhood || a.suburb || a.city || a.town || a.village
-    || (data.display_name ? data.display_name.split(',')[0] : '');
-  return (name || '').slice(0, 40);
+    || (data.display_name ? data.display_name.split(',')[0] : '')).slice(0, 40);
+  const city = (a.city || a.town || a.village || a.municipality || a.county || '').slice(0, 40);
+  const country = (a.country || '').slice(0, 40);
+  return { name, city, country };
 }
 
 export async function POST(req: NextRequest) {
@@ -57,12 +69,13 @@ export async function POST(req: NextRequest) {
   const googleKey = envValue('GOOGLE_MAPS_API_KEY');
   try {
     if (googleKey) {
-      const name = await googleReverse(lat, lon, googleKey);
-      if (name) return NextResponse.json({ ok: true, name, source: 'google' });
+      const g = await googleReverse(lat, lon, googleKey);
+      if (g && (g.name || g.city || g.country)) return NextResponse.json({ ok: true, ...g, source: 'google' });
       // Google 没给结果就回落 OSM
     }
     const osm = await osmReverse(lat, lon);
-    return NextResponse.json({ ok: true, name: osm, source: 'osm' });
+    if (osm) return NextResponse.json({ ok: true, ...osm, source: 'osm' });
+    return NextResponse.json({ ok: false, error: 'no_result' }, { status: 200 });
   } catch {
     return NextResponse.json({ ok: false, error: 'geocode_unreachable' }, { status: 502 });
   }

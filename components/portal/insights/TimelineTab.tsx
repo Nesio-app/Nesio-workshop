@@ -104,23 +104,33 @@ export default function TimelineTab() {
   }
   function toggleGeo() { const next = !geoOn; setGeoOn(next); setGeocodeEnabled(next); setGeoMsg(''); }
   async function findRealNames() {
-    // 批次 34:对全部未命名地点找真名(不只显示的前 10 个)
-    const targets = clusterPlaces(trail, 99999).filter((c) => c.generic && c.lat != null && displayLabel(c.label) === c.label);
-    if (!targets.length) { setGeoMsg(L(dict, '没有需要找名字的未命名地点', 'No unnamed places to resolve')); return; }
+    // 批次 40:处理所有「有坐标但还没解析过」的地点(不再只限 generic-word),
+    // 同时存城市/国家(供 World tab)。已解析过(有 geo)的跳过,避免重复限速。
+    const { loadPlaceGeo, setPlaceGeo } = await import('@/lib/portal/place-trail');
+    const geoDone = loadPlaceGeo();
+    const withCoords = clusterPlaces(trail, 99999).filter((c) => c.lat != null && c.lon != null);
+    const targets = withCoords.filter((c) => !geoDone[c.label]?.country);
+    if (!withCoords.length) { setGeoMsg(L(dict, '这些地点没有坐标,无法反查(需要带经纬度的足迹/Google 时间轴)', 'These places have no coordinates to resolve (need lat/lon from live trail / Google Timeline)')); return; }
+    if (!targets.length) { setGeoMsg(L(dict, '都解析过了 ✓', 'All resolved ✓')); return; }
     setGeoBusy(true);
     let done = 0;
+    let ok = 0;
     for (const c of targets) {
-      setGeoMsg(L(dict, `正在找真名… ${done}/${targets.length}`, `Resolving… ${done}/${targets.length}`));
+      setGeoMsg(L(dict, `正在解析… ${done}/${targets.length}(约 ${Math.ceil((targets.length - done) * 1.1)} 秒)`, `Resolving… ${done}/${targets.length}`));
       try {
         const res = await fetch('/api/portal/geocode', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lat: c.lat, lon: c.lon }) });
-        const data = await res.json() as { ok?: boolean; name?: string };
-        if (data.ok && data.name) setPlaceAlias(c.label, data.name);
+        const data = await res.json() as { ok?: boolean; name?: string; city?: string; country?: string };
+        if (data.ok && (data.name || data.city || data.country)) {
+          setPlaceGeo(c.label, { name: data.name, city: data.city, country: data.country });
+          if (data.name && c.generic && displayLabel(c.label) === c.label) setPlaceAlias(c.label, data.name);
+          if (data.country) ok += 1;
+        }
       } catch { /* 单个失败跳过 */ }
       done += 1;
       await new Promise((r) => setTimeout(r, 1100)); // Nominatim 限速 ~1/s
     }
     setGeoBusy(false);
-    setGeoMsg(L(dict, `完成 · 处理了 ${targets.length} 个地点`, `Done · ${targets.length} places`));
+    setGeoMsg(L(dict, `完成 · 解析 ${targets.length} 个,拿到国家的 ${ok} 个`, `Done · ${targets.length} places, ${ok} with country`));
   }
 
   const pts = journey.filter((it): it is Extract<JourneyItem, { kind: 'visit' }> => it.kind === 'visit').map((it) => it.seg).filter((s) => s.lat != null && s.lon != null);

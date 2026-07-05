@@ -156,6 +156,20 @@ export const PLACE_CATEGORY_META: Record<PlaceCategory, { zh: string; en: string
 
 export interface CategoryGroup { category: PlaceCategory; count: number; visits: number; places: PlaceCluster[] }
 
+// 批次 40:反向地理编码结果 —— label → { name, city, country }。供 World tab(国家/城市)。
+const PLACE_GEO_KEY = 'nesio-place-geo-v1';
+export interface PlaceGeo { name?: string; city?: string; country?: string }
+export function loadPlaceGeo(): Record<string, PlaceGeo> {
+  if (typeof window === 'undefined') return {};
+  try { return JSON.parse(localStorage.getItem(PLACE_GEO_KEY) || '{}') as Record<string, PlaceGeo>; } catch { return {}; }
+}
+export function setPlaceGeo(rawLabel: string, geo: PlaceGeo): void {
+  if (typeof window === 'undefined') return;
+  const all = loadPlaceGeo();
+  all[rawLabel] = { ...all[rawLabel], ...geo };
+  try { localStorage.setItem(PLACE_GEO_KEY, JSON.stringify(all)); window.dispatchEvent(new CustomEvent(PLACE_TRAIL_UPDATED_EVENT)); } catch { /* ignore */ }
+}
+
 // 批次 40:手动类别覆盖 —— 自动识别不了(未命名)时,用户自己挑类别,记住。
 const PLACE_CAT_KEY = 'nesio-place-cat-v1';
 export function loadPlaceCategories(): Record<string, PlaceCategory> {
