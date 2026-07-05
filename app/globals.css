@@ -172,6 +172,12 @@ html[data-portal-theme] body {
   background: var(--portal-bg-gradient);
   background-attachment: fixed;
 }
+/* 批次 20:顶部 safe-area 露出的是 html 自身底色(day 白 / night 纯黑),
+   与页面渐变形成一条色带——html 直接铺同款渐变,状态栏区彻底一体 */
+html[data-portal-theme] {
+  background: var(--portal-bg-gradient);
+  background-attachment: fixed;
+}
 
 html[data-portal-theme="night"] { --sheet-opaque: #141b2e; }
 
@@ -17525,6 +17531,10 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
   margin-bottom: 1rem;
 }
 .nesio-narrator-section > .nesio-narrator-card:nth-child(3) { grid-column: 1 / -1; }
+
+/* 批次 20:关系图星图风 */
+.rg-wrap.rg-wrap--starmap { background: #10151f; border-radius: 14px; overflow: hidden; border: 1px solid rgba(160,175,205,0.18); }
+.rg-zoom-hint { font-size: 0.64rem; color: rgba(180,195,220,0.55); text-align: center; margin: 0; padding: 0.3rem 0 0.45rem; }
 
 /* 批次 19:例行提醒 */
 .nesio-routine-input { width: 100%; min-height: var(--tap-min); border-radius: 0.75rem; border: 1.5px solid var(--portal-line); background: var(--glass-bg-solid); color: var(--portal-ink); font-size: 0.88rem; padding: 0.55rem 0.75rem; outline: none; font-family: inherit; }

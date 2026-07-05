@@ -99,7 +99,7 @@ export default function NesioProfileCard() {
       iconBg: 'var(--chip-blue)', label: L(dict, '例行提醒', 'Routines'), sublabel: L(dict, '到点在 Today 出卡提醒', 'Due reminders appear on Today') },
     { key: 'roadmap' as ActiveSheet,
       icon: <IconStarOutline />,
-      iconBg: 'var(--chip-amber)', label: t(locale, 'menuRoadmap'), sublabel: t(locale, 'menuRoadmapHint') },
+      iconBg: 'var(--chip-violet)', label: t(locale, 'menuRoadmap'), sublabel: t(locale, 'menuRoadmapHint') },
   ];
 
   return (

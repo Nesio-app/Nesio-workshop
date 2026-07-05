@@ -40,6 +40,7 @@ import { DomainIcon, IconBox, IconCalendar, IconFolder, IconMapPin, IconUser, No
 import { L, type DictLocale } from '@/lib/portal/i18n';
 import { displayNodeName } from '@/lib/portal/node-display';
 import { InfoTip } from './InfoTip';
+import { isPinned, loadPins, PINS_UPDATED_EVENT, togglePin } from '@/lib/portal/pins';
 import { usePortalLocale } from './use-portal-locale';
 
 /** 组件内取字典语言(批次 9 全量双语的局部 hook)。 */
@@ -478,6 +479,13 @@ function LongPressSheet({
         {activeProjects.length === 0 && (
           <p className="nesio-longpress-no-projects">{L(dict, '还没有项目，先新建一个项目', 'No projects yet — create one first')}</p>
         )}
+        <button
+          type="button"
+          className="nesio-longpress-share-btn"
+          onClick={() => { togglePin(node.id); onClose(); }}
+        >
+          {isPinned(node.id) ? L(dict, '取消收藏', 'Unpin') : L(dict, '收藏到首页', 'Pin to home')}
+        </button>
         <button type="button" className="nesio-longpress-share-btn" onClick={() => { onShare(); onClose(); }}>
           {L(dict, '分享 / 复制', 'Share / Copy')}
         </button>
@@ -748,6 +756,17 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
   const [activeProject, setActiveProject] = useState<Project | null>(null);
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [longPressNode, setLongPressNode] = useState<LifeNode | null>(null);
+  // 收藏夹(批次 20):pin 列表,事件驱动刷新
+  const [pinIds, setPinIds] = useState<string[]>([]);
+  useEffect(() => {
+    const read = () => setPinIds(loadPins());
+    read();
+    window.addEventListener(PINS_UPDATED_EVENT, read);
+    return () => window.removeEventListener(PINS_UPDATED_EVENT, read);
+  }, []);
+  const pinnedNodes = pinIds
+    .map((id) => nodes.find((n) => n.id === id))
+    .filter((n): n is LifeNode => Boolean(n));
 
   const dict = portalLocaleToDictionaryLocale(locale);
   const copy = COPY[dict];
@@ -928,6 +947,26 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
               {/* On this day */}
               {onThisDayNodes.length > 0 && (
                 <OnThisDayStrip nodes={onThisDayNodes} onOpen={openNodeDetail} />
+              )}
+
+              {/* 收藏夹(批次 20):pin 的重要记忆,与我的项目并列 */}
+              {pinnedNodes.length > 0 && (
+                <div className="nesio-projects-section">
+                  <div className="nesio-section-header">
+                    <span className="nesio-section-title">{L(dict, '收藏夹', 'Pinned')}</span>
+                  </div>
+                  <div className="nesio-memory-grid">
+                    {pinnedNodes.map((n) => (
+                      <MemoryCard
+                        key={n.id}
+                        node={n}
+                        onOpen={() => openNodeDetail(n)}
+                        onDeleted={() => setNodes(getLifeGraph())}
+                        onLongPress={() => setLongPressNode(n)}
+                      />
+                    ))}
+                  </div>
+                </div>
               )}
 
               {/* My Projects */}
