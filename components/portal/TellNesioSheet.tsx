@@ -121,20 +121,22 @@ export default function TellNesioSheet({ open, onClose, onCapture }: TellNesioSh
         ))}
       </div>
 
-      {/* 批次 39:记录心情从顶栏移到这里(扇形菜单下方) */}
+      {/* 批次 40:记录心情 —— 与另外三个扇形按钮同款(圆圈图标 + 标签),居中放在下方 */}
       <button
         type="button"
-        className="nesio-tell-mood"
+        className="nesio-tell-fan-btn nesio-tell-fan-btn--mood"
         onClick={() => { onClose(); window.dispatchEvent(new CustomEvent('nesio-open-mood')); }}
         aria-label={L(dict, '记录此刻心情', 'Log how you feel')}
       >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="18" height="18">
-          <circle cx="12" cy="12" r="10" />
-          <path d="M8 14s1.5 2 4 2 4-2 4-2" />
-          <line x1="9" y1="9" x2="9.01" y2="9" />
-          <line x1="15" y1="9" x2="15.01" y2="9" />
-        </svg>
-        <span>{L(dict, '记录心情', 'How I feel')}</span>
+        <span className="nesio-tell-fan-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="26" height="26">
+            <circle cx="12" cy="12" r="10" />
+            <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+            <line x1="9" y1="9" x2="9.01" y2="9" />
+            <line x1="15" y1="9" x2="15.01" y2="9" />
+          </svg>
+        </span>
+        <span className="nesio-tell-fan-label">{L(dict, '记录心情', 'How I feel')}</span>
       </button>
     </div>
   );

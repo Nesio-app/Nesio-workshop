@@ -1080,14 +1080,14 @@ export default function InsightsSheet({ onClose, canUsePrivateData = true }: { o
 
       {/* Main tabs */}
       <div className="nesio-insights-main-tabs">
-        {(['reflection', 'analytics', 'health', 'timeline', 'finance', 'living'] as MainTab[]).map((t) => (
+        {(['reflection', 'health', 'timeline', 'finance', 'living'] as MainTab[]).map((t) => (
           <button
             key={t}
             type="button"
             className={`nesio-insights-main-tab${mainTab === t ? ' nesio-insights-main-tab--active' : ''}`}
             onClick={() => setMainTab(t)}
           >
-            {t === 'reflection' ? L(dict, '洞察', 'Insights') : t === 'analytics' ? L(dict, '分析', 'Analytics') : t === 'health' ? L(dict, '健康', 'Health') : t === 'timeline' ? L(dict, '足迹', 'Footprints') : t === 'finance' ? L(dict, '财务', 'Finance') : L(dict, '认知模型', 'Mind model')}
+            {t === 'reflection' ? L(dict, '洞察', 'Insights') : t === 'health' ? L(dict, '健康', 'Health') : t === 'timeline' ? L(dict, '足迹', 'Footprints') : t === 'finance' ? L(dict, '财务', 'Finance') : L(dict, '认知', 'Cognition')}
           </button>
         ))}
       </div>
@@ -1149,8 +1149,8 @@ export default function InsightsSheet({ onClose, canUsePrivateData = true }: { o
           </div>
         )}
 
-        {/* ── Tab 2: Analytics ── */}
-        {mainTab === 'analytics' && (
+        {/* ── 批次 40:分析并入洞察(同 tab 内接在洞察下方)── */}
+        {mainTab === 'reflection' && (
           <div className="nesio-analytics-tab">
             {/* Header row: period switcher + customize button */}
             <div className="nesio-analytics-header-row">
