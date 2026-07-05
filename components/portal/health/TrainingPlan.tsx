@@ -15,6 +15,7 @@ import {
   loadTrainingState, startProtocol, logSession, sessionsThisWeek, saveTrainingState,
   type TrainingState, type TrainingProtocol, type ExercisePrescription,
 } from '@/lib/platform/training-protocol-engine';
+import { earnPoints, POINTS_PER_FITNESS_SESSION } from '@/lib/platform/rewards-engine';
 
 const GOAL_LABEL: Record<TrainingProtocol['goal'], [string, string]> = {
   strength: ['力量', 'Strength'], hypertrophy: ['增肌', 'Hypertrophy'], endurance: ['耐力', 'Endurance'], general: ['综合', 'General'],
@@ -38,6 +39,7 @@ function fmtItem(it: ExercisePrescription, dict: string): string {
 export default function TrainingPlan() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [st, setSt] = useState<TrainingState | null>(null);
+  const [earned, setEarned] = useState<number | null>(null);
   useEffect(() => { setSt(loadTrainingState()); }, []);
   if (!st) return null;
 
@@ -63,7 +65,12 @@ export default function TrainingPlan() {
   const phase = currentPhase(active, st.startedAt);
   const doneThisWeek = sessionsThisWeek(st);
   const recentLog = st.log.slice(0, 3);
-  const logDone = (sid: string) => setSt(logSession(active.id, sid));
+  const logDone = (sid: string, sname: string) => {
+    setSt(logSession(active.id, sid));
+    earnPoints(POINTS_PER_FITNESS_SESSION, 'fitness', dict === 'en' ? `Training: ${sname}` : `训练完成:${sname}`);
+    setEarned(POINTS_PER_FITNESS_SESSION);
+    setTimeout(() => setEarned(null), 2400);
+  };
   const switchPlan = () => { const s = { ...st, activeProtocolId: null, startedAt: null }; saveTrainingState(s); setSt(s); };
 
   return (
@@ -76,13 +83,19 @@ export default function TrainingPlan() {
         <button type="button" onClick={switchPlan} style={{ flexShrink: 0, fontSize: '0.72rem', color: 'var(--portal-blue-deep)', background: 'none', border: '1px solid var(--portal-accent-border)', borderRadius: 999, padding: '0.25rem 0.6rem', cursor: 'pointer' }}>{L(dict, '换计划', 'Change')}</button>
       </div>
 
+      {earned != null && (
+        <div className="nesio-rewards-flash" style={{ marginTop: '0.6rem' }}>
+          {L(dict, `训练打卡 +${earned} 积分 · 到冷冻仓兑换奖励`, `Session logged +${earned} pts · redeem in the vault`)}
+        </div>
+      )}
+
       <p className="nesio-settings-section-label" style={{ marginTop: '1rem' }}>{L(dict, '本阶段的训练日', 'Sessions this phase')}</p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
         {phase.sessions.map((s) => (
           <div key={s.id} className="nesio-fin-card">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
               <span className="nesio-fin-card-name">{L(dict, s.name.zh, s.name.en)}</span>
-              <button type="button" className="nesio-fin-review-accept" onClick={() => logDone(s.id)}>{L(dict, '今天做了', 'Did it')}</button>
+              <button type="button" className="nesio-fin-review-accept" onClick={() => logDone(s.id, L(dict, s.name.zh, s.name.en))}>{L(dict, '今天做了', 'Did it')}</button>
             </div>
             <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.1rem', fontSize: '0.8rem', color: 'var(--portal-muted)', lineHeight: 1.7 }}>
               {s.items.map((it, i) => <li key={i}>{fmtItem(it, dict)}</li>)}

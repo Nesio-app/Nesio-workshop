@@ -18815,6 +18815,56 @@ html[data-portal-theme="night"] .nesio-create-project-input {
 .nesio-freeze-action-btn--skip { background: rgba(207,107,107,0.12); color: var(--status-risk); }
 .nesio-freeze-decision-badge { font-size: 0.72rem; font-weight: 600; }
 
+/* ── 积分 + 奖品仓库(批次 42)──────────────────────────────────── */
+.nesio-rewards-pts-badge {
+  font-size: 0.74rem; font-weight: 700; color: var(--portal-blue-deep);
+  background: var(--portal-accent-soft, rgba(90,130,200,0.12));
+  border: 1px solid var(--portal-accent-border); border-radius: 999px;
+  padding: 0.24rem 0.66rem; cursor: pointer; white-space: nowrap;
+}
+.nesio-rewards-flash {
+  font-size: 0.8rem; font-weight: 600; color: var(--portal-blue-deep);
+  background: var(--portal-accent-soft, rgba(90,130,200,0.12));
+  border-radius: 0.6rem; padding: 0.5rem 0.7rem; margin: 0.5rem 0; text-align: center;
+}
+.nesio-rewards { display: flex; flex-direction: column; }
+.nesio-rewards-section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.4rem; }
+.nesio-rewards-add-toggle {
+  font-size: 0.72rem; font-weight: 600; color: var(--portal-blue-deep);
+  background: none; border: none; cursor: pointer;
+}
+.nesio-rewards-add-row { display: flex; gap: 0.4rem; margin-bottom: 0.6rem; }
+.nesio-rewards-add-row .nesio-freeze-name-input { flex: 1; }
+.nesio-rewards-cost-input {
+  width: 4.2rem; flex-shrink: 0; font-size: 0.82rem; text-align: center;
+  border: 1px solid var(--portal-line); border-radius: 0.5rem; padding: 0.4rem;
+  background: var(--portal-surface); color: var(--portal-ink);
+}
+.nesio-reward-card {
+  display: flex; gap: 0.65rem; align-items: center;
+  background: var(--glass-bg-solid); border-radius: 0.75rem;
+  padding: 0.6rem 0.7rem; margin-bottom: 0.5rem;
+}
+.nesio-reward-img { width: 44px; height: 44px; border-radius: 0.5rem; object-fit: cover; flex-shrink: 0; }
+.nesio-reward-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.15rem; }
+.nesio-reward-name { font-size: 0.86rem; font-weight: 600; color: var(--portal-ink); margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nesio-reward-progress { height: 5px; border-radius: 999px; background: var(--portal-line); overflow: hidden; margin-top: 0.25rem; }
+.nesio-reward-progress-fill { height: 100%; background: var(--portal-blue-deep); border-radius: 999px; transition: width 0.3s; }
+.nesio-reward-progress-label { font-size: 0.7rem; color: var(--portal-muted); margin: 0.15rem 0 0; }
+.nesio-reward-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 0.3rem; flex-shrink: 0; }
+.nesio-reward-redeem {
+  font-size: 0.76rem; font-weight: 700; color: #fff; background: var(--portal-blue-deep);
+  border: none; border-radius: 999px; padding: 0.3rem 0.75rem; cursor: pointer; white-space: nowrap;
+}
+.nesio-reward-redeem--locked { background: var(--portal-line); color: var(--portal-muted); }
+.nesio-reward-remove { font-size: 0.78rem; color: var(--portal-muted); background: none; border: none; cursor: pointer; padding: 0 0.2rem; }
+.nesio-rewards-ledger-row { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; padding: 0.3rem 0; border-bottom: 1px solid var(--portal-line); }
+.nesio-rewards-ledger-row:last-child { border-bottom: none; }
+.nesio-rewards-ledger-label { font-size: 0.78rem; color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nesio-rewards-ledger-delta { font-size: 0.8rem; font-weight: 700; flex-shrink: 0; }
+.nesio-rewards-ledger-delta.pos { color: var(--status-gentle, #3d9f6e); }
+.nesio-rewards-ledger-delta.neg { color: var(--portal-muted); }
+
 /* ── My Experiment Widget (我的实验) ─────────────────────────────── */
 .nesio-exp-widget { display: flex; flex-direction: column; gap: 0.7rem; }
 .nesio-exp-empty { text-align: center; padding: 0.5rem 0 0.75rem; }

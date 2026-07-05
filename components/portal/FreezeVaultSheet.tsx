@@ -10,6 +10,8 @@ import {
   isShoppingUrl,
   type FreezeItem,
 } from '@/lib/platform/impulse-guard';
+import { earnPoints, addWishFromFreeze, getPoints, DISCIPLINE_BONUS } from '@/lib/platform/rewards-engine';
+import RewardsWarehouse from './RewardsWarehouse';
 import { IconSnowflake } from './icons';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -31,7 +33,9 @@ interface ParsedProduct {
 
 export default function FreezeVaultSheet({ open, onClose, initialUrl }: FreezeVaultSheetProps) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
-  const [tab, setTab] = useState<'add' | 'list'>('list');
+  const [tab, setTab] = useState<'add' | 'list' | 'rewards'>('list');
+  const [points, setPoints] = useState(0);
+  const [flash, setFlash] = useState('');
   const [urlInput, setUrlInput] = useState(initialUrl ?? '');
   const [parsing, setParsing] = useState(false);
   const [parsed, setParsed] = useState<ParsedProduct | null>(null);
@@ -44,11 +48,15 @@ export default function FreezeVaultSheet({ open, onClose, initialUrl }: FreezeVa
   useEffect(() => {
     if (!open) return;
     setItems(getFreezeItems());
+    setPoints(getPoints());
+    const onPts = () => setPoints(getPoints());
+    window.addEventListener('nesio-rewards-updated', onPts);
     if (initialUrl) {
       setTab('add');
       setUrlInput(initialUrl);
       void parseUrl(initialUrl);
     }
+    return () => window.removeEventListener('nesio-rewards-updated', onPts);
   }, [open, initialUrl]);
 
   async function parseUrl(url: string) {
@@ -100,8 +108,20 @@ export default function FreezeVaultSheet({ open, onClose, initialUrl }: FreezeVa
   }
 
   function handleResolve(id: string, decision: 'bought' | 'skipped' | 'extended') {
+    const target = items.find((x) => x.id === id);
     resolveItem(id, decision, decision === 'extended' ? 24 : undefined);
     setItems(getFreezeItems());
+    // 忍住没买 → 自律积分 + 落进奖品仓库当愿望(复用 storage-ios「不买了 +PTS」机制)
+    if (decision === 'skipped' && target) {
+      earnPoints(DISCIPLINE_BONUS, 'freeze_decline', dict === 'en' ? `Resisted: ${target.title}` : `忍住没买:${target.title}`);
+      const wish = addWishFromFreeze(target);
+      setFlash(
+        wish
+          ? L(dict, `拦截成功 +${DISCIPLINE_BONUS} 积分 · 已存进奖品仓库`, `Resisted +${DISCIPLINE_BONUS} pts · saved to rewards`)
+          : L(dict, `拦截成功 +${DISCIPLINE_BONUS} 积分`, `Resisted +${DISCIPLINE_BONUS} pts`),
+      );
+      setTimeout(() => setFlash(''), 2400);
+    }
   }
 
   function hoursUntilThaw(thawAt: string): string {
@@ -124,9 +144,16 @@ export default function FreezeVaultSheet({ open, onClose, initialUrl }: FreezeVa
       <div className="nesio-freeze-sheet" onClick={(e) => e.stopPropagation()}>
         <div className="nesio-freeze-header">
           <span className="nesio-freeze-title" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><IconSnowflake size={16} /> {L(dict, '冷冻仓', 'Freeze vault')}</span>
-          <button type="button" className="nesio-freeze-close" onClick={onClose}>✕</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <button type="button" className="nesio-rewards-pts-badge" onClick={() => setTab('rewards')} title={L(dict, '积分 · 点开奖品仓库', 'Points · open rewards')}>
+              ⬡ {points} {L(dict, '积分', 'pts')}
+            </button>
+            <button type="button" className="nesio-freeze-close" onClick={onClose}>✕</button>
+          </div>
         </div>
         <p className="nesio-freeze-hint">{L(dict, '冲动想买？先冻 24 小时，冷静一下再决定', 'Impulse buy? Freeze it 24 hours and decide with a cool head')}</p>
+
+        {flash && <div className="nesio-rewards-flash">{flash}</div>}
 
         {/* Tabs */}
         <div className="nesio-freeze-tabs">
@@ -136,7 +163,12 @@ export default function FreezeVaultSheet({ open, onClose, initialUrl }: FreezeVa
           <button type="button" className={`nesio-freeze-tab${tab === 'add' ? ' nesio-freeze-tab--active' : ''}`} onClick={() => setTab('add')}>
             + {L(dict, '冻住', 'Freeze')}
           </button>
+          <button type="button" className={`nesio-freeze-tab${tab === 'rewards' ? ' nesio-freeze-tab--active' : ''}`} onClick={() => setTab('rewards')}>
+            {L(dict, '奖品仓库', 'Rewards')}
+          </button>
         </div>
+
+        {tab === 'rewards' && <RewardsWarehouse />}
 
         {/* Add tab */}
         {tab === 'add' && (
