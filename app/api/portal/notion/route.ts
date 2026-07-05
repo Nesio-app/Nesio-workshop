@@ -107,9 +107,15 @@ export async function POST(req: NextRequest) {
   const guard = await guardAiRoute(req, 'notion', { limit: 15 });
   if (guard) return guard;
 
-  const { token } = await req.json() as { token?: string };
+  // 批次 18:优先用 OAuth 授权存下的 cookie token(像 flomo 连 Notion 那样
+  // 一键授权、选页面);body token 是老的内部集成用法,保留兼容
+  const body = await req.json().catch(() => ({})) as { token?: string };
+  const token = body.token || req.cookies.get('nesio_notion_access')?.value || '';
   if (!token) {
-    return NextResponse.json({ ok: false, error: 'missing_token' }, { status: 400 });
+    return NextResponse.json(
+      { ok: false, error: 'not_connected', connectUrl: '/api/portal/notion/connect' },
+      { status: 401 },
+    );
   }
 
   // Search recently edited pages

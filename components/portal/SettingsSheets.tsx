@@ -338,7 +338,7 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
 
       {/* 数据主权面板 — local-first 从架构卖点变成可感知的安全感 */}
       <div style={{ background: 'var(--portal-accent-soft, rgba(88,140,227,0.08))', borderRadius: 14, padding: '0.8rem 1rem', marginBottom: '0.9rem' }}>
-        <p style={{ fontSize: '0.72rem', fontWeight: 600, margin: '0 0 0.4rem', color: 'var(--portal-blue-deep)', display: 'flex', alignItems: 'center', gap: 6 }}><IconLock size={14} /> {L(dict, '你的数据在哪里', 'Where your data lives')}</p>
+        <p style={{ fontSize: '0.72rem', fontWeight: 600, margin: '0 0 0.4rem', color: 'var(--portal-blue-deep)', display: 'flex', alignItems: 'center', gap: 6 }}><IconLock size={14} /> {L(dict, '你的数据在哪里', 'Where your data lives')}<InfoTip text={L(dict, '记忆存在本设备 localStorage;未登录、未授权或未选择接入的日历、邮件、健康和文件内容永远不会被加载;登录后才开启跨设备云同步。', "Memories live in this device's localStorage. Calendar, mail, health and files are never loaded unless you sign in, authorize and connect them. Cross-device cloud sync starts only after sign-in.")} /></p>
         <div style={{ display: 'flex', gap: '1.2rem', fontSize: '0.7rem', lineHeight: 1.6 }}>
           <div><span style={{ fontSize: '1rem', fontWeight: 700 }}>{nodeCount}</span><br />{L(dict, '条记忆,全在本机', 'memories, all on this device')}</div>
           <div><span style={{ fontSize: '1rem', fontWeight: 700 }}>0</span><br />{L(dict, '条在云端(未登录)', 'in the cloud (signed out)')}</div>
@@ -352,32 +352,12 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
         )}
       </div>
 
-      <div className="nesio-settings-info-row">
-        <div>
-          <p className="nesio-settings-option-label">{L(dict, '哪些内容不会被使用', 'What is never used')}</p>
-          <p className="nesio-settings-option-hint">{L(dict, '未登录、未授权或未选择接入的日历、邮件、健康和文件内容不会被加载。', 'Calendar, mail, health, and files are never loaded unless you sign in, authorize, and connect them.')}</p>
-        </div>
-      </div>
-
-      {/* 批次 10:地理位置授权入口与「数据接入 → 地理位置·天气」重复,只留数据接入一处 */}
-
-      {/* Memory stats */}
-      <div className="nesio-settings-info-row">
-        <div>
-          <p className="nesio-settings-option-label">{L(dict, 'Memory 记录', 'Memory records')}</p>
-          <p className="nesio-settings-option-hint">{L(dict, '存储在本设备 localStorage', 'Stored in this device’s localStorage')}</p>
-        </div>
-        <span className="nesio-settings-badge">{L(dict, `${nodeCount} 条`, String(nodeCount))}</span>
-      </div>
-
-      {/* Cloud sync */}
-      <div className="nesio-settings-info-row">
-        <div>
-          <p className="nesio-settings-option-label">{L(dict, '云端同步', 'Cloud sync')}</p>
-          <p className="nesio-settings-option-hint">{L(dict, '登录后才会开启跨设备同步', 'Cross-device sync only starts after sign-in')}</p>
-        </div>
-        <a href="/login" className="nesio-settings-toggle-btn">{L(dict, '登录启用', 'Sign in to enable')}</a>
-      </div>
+      {/* 批次 18:「哪些内容不会被使用 / Memory 记录 / 云端同步」三行与顶部
+          数据主权卡重复(条数/云端/备份都在卡上),删除;说明收进卡标题 ?,
+          登录入口保留一行 */}
+      <a href="/login" className="nesio-settings-action-btn" style={{ display: 'block', textAlign: 'center', textDecoration: 'none' }}>
+        {L(dict, '登录,开启跨设备云同步', 'Sign in to sync across devices')}
+      </a>
 
       {/* Export */}
       <button type="button" className="nesio-settings-action-btn" onClick={() => {

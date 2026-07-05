@@ -17,6 +17,7 @@ import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 
 const FreezeVaultSheet = dynamic(() => import('./FreezeVaultSheet'), { ssr: false });
+const BarcodeScanSheet = dynamic(() => import('./BarcodeScanSheet'), { ssr: false });
 
 const WAGE_KEY = 'nesio-hourly-wage-v1';
 
@@ -37,6 +38,9 @@ export function PurchaseCoolingPanel({ productName, similarCount, similarExample
   const [editingWage, setEditingWage] = useState(false);
   const [decided, setDecided] = useState<'frozen' | 'buying' | ''>('');
   const [vaultOpen, setVaultOpen] = useState(false);
+  // 批次 18:扫条码 → UPC 库自动填价格(价格联动第一步)
+  const [scanOpen, setScanOpen] = useState(false);
+  const [scanNote, setScanNote] = useState('');
 
   useEffect(() => {
     const saved = loadWage();
@@ -138,6 +142,11 @@ export function PurchaseCoolingPanel({ productName, similarCount, similarExample
         )}
       </div>
 
+      <button type="button" className="nesio-cooling-link" onClick={() => { setScanNote(''); setScanOpen(true); }}>
+        {L(dict, '扫条码自动填价格', 'Scan barcode to fill the price')}
+      </button>
+      {scanNote && <p style={{ fontSize: '0.68rem', color: 'var(--portal-muted)', margin: '0.2rem 0 0' }}>{scanNote}</p>}
+
       <div className="nesio-cooling-copy">
         {persuasion.map((line, i) => <p key={i}>{line}</p>)}
       </div>
@@ -148,6 +157,16 @@ export function PurchaseCoolingPanel({ productName, similarCount, similarExample
       </div>
       <button type="button" className="nesio-cooling-link" onClick={() => setVaultOpen(true)}>{L(dict, '冷冻清单', 'Freeze list')}</button>
       <FreezeVaultSheet open={vaultOpen} onClose={() => setVaultOpen(false)} />
+      <BarcodeScanSheet
+        open={scanOpen}
+        onClose={() => setScanOpen(false)}
+        onResult={(r) => {
+          if (r.price) setPrice(String(r.price));
+          setScanNote(r.title
+            ? L(dict, `识别到:${r.title}${r.price ? `(参考价 $${r.price})` : '(库里没有价格)'}`, `Found: ${r.title}${r.price ? ` (ref $${r.price})` : ' (no price on record)'}`)
+            : L(dict, `条码 ${r.upc}:商品库暂无记录,请手动填价格`, `Barcode ${r.upc}: not in the product db — enter the price manually`));
+        }}
+      />
     </div>
   );
 }

@@ -39,7 +39,8 @@ const CONNECTORS: ConnectorDef[] = [
   { id: 'google', name: 'Google 日历 · Gmail', nameEn: 'Google Calendar · Gmail', icon: <IconCalendar />, iconBg: 'var(--chip-blue)', method: 'oauth', description: '一次授权同时接入:日程生成提醒和简报,邮件提取人物、日期、承诺', descriptionEn: 'One consent covers both: calendar drives reminders and briefs; email yields people, dates, promises' },
   { id: 'weather', name: '地理位置 · 天气', nameEn: 'Location · Weather', icon: <IconCloudSun />, iconBg: 'var(--chip-amber)', method: 'geo', description: '基于实时天气生成外出和健康建议', descriptionEn: 'Live weather feeds outing and health suggestions' },
   { id: 'flomo', name: 'Flomo', icon: <IconNote />, iconBg: 'var(--chip-indigo)', method: 'server', syncEndpoint: '/api/portal/flomo?limit=30', description: '同步 flomo 笔记，提取想法与记录', descriptionEn: 'Sync flomo notes; extract ideas and records' },
-  { id: 'notion', name: 'Notion', icon: <IconBook />, iconBg: 'var(--chip-gray)', method: 'token', syncEndpoint: '/api/portal/notion', tokenHint: 'notion.so/my-integrations → 新建集成 → 复制 Internal Integration Secret，并把页面共享给它', tokenHintEn: 'notion.so/my-integrations → New integration → copy the Internal Integration Secret, then share your pages with it', description: '同步最近编辑的页面，提取项目与想法', descriptionEn: 'Sync recently edited pages; extract projects and ideas', dev: true },
+  // 批次 18:Notion 转正 —— OAuth 一键授权(像 flomo 那样选页面),内部 token 流保留为回退
+  { id: 'notion', name: 'Notion', icon: <IconBook />, iconBg: 'var(--chip-gray)', method: 'token', syncEndpoint: '/api/portal/notion', tokenHint: 'notion.so/my-integrations → 新建集成 → 复制 Internal Integration Secret，并把页面共享给它', tokenHintEn: 'notion.so/my-integrations → New integration → copy the Internal Integration Secret, then share your pages with it', description: '授权后同步你选择的页面，提取项目与想法', descriptionEn: 'Authorize, pick pages, and sync projects and ideas' },
   { id: 'toggl', name: 'Toggl Track', icon: <IconTimer />, iconBg: 'var(--chip-red)', method: 'token', syncEndpoint: '/api/portal/toggl', tokenHint: 'track.toggl.com → Profile → API Token', tokenHintEn: 'track.toggl.com → Profile → API Token', description: '同步时间记录，了解你的专注分布', descriptionEn: 'Sync time entries to see where your focus goes', dev: true },
   { id: 'health', name: 'Apple Health 导出', nameEn: 'Apple Health export', icon: <IconHeartPulse />, iconBg: 'var(--chip-pink)', method: 'file', description: '上传 export.xml，提取步数、睡眠、心率', descriptionEn: 'Upload export.xml to extract steps, sleep, heart rate', dev: true },
   { id: 'reminder', name: 'Apple 提醒事项', nameEn: 'Apple Reminders', icon: <IconCheckSquare />, iconBg: 'var(--chip-amber)', method: 'shortcuts', ingestSource: 'reminder', description: '通过快捷指令推送提醒，自动转为承诺', descriptionEn: 'Push reminders via Shortcuts; they become commitments', dev: true },
@@ -92,7 +93,16 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     // Check OAuth callback
     const params = new URLSearchParams(window.location.search);
     const err = params.get('error');
-    if (err === 'gmail_scope_not_granted') {
+    if (params.get('connector') === 'notion' && params.get('status') === 'connected') {
+      saveConnectorState('notion', true);
+      setConnected((p) => ({ ...p, notion: true }));
+      showToast(L(dict, 'Notion 已授权,点「同步」拉取你选择的页面', 'Notion authorized — tap Sync to pull the pages you granted'), true);
+    }
+    if (err === 'notion_not_configured') {
+      showToast(L(dict,
+        'Notion 集成还没配置:去 notion.so/my-integrations 创建 Public integration,把 NOTION_CLIENT_ID / NOTION_CLIENT_SECRET 配到 Vercel,Redirect URI 填 /api/portal/notion/callback',
+        'Notion integration not configured yet: create a Public integration at notion.so/my-integrations, set NOTION_CLIENT_ID / NOTION_CLIENT_SECRET on Vercel, redirect URI /api/portal/notion/callback'), false);
+    } else if (err === 'gmail_scope_not_granted') {
       showToast(L(dict,
         'Google 没有授出邮件权限:需在 Google Cloud 同意屏幕配置 gmail.readonly(测试模式下把自己加为测试用户)',
         "Google didn't grant Gmail access: add gmail.readonly on the OAuth consent screen (and add yourself as a test user while in Testing)"), false);
@@ -131,7 +141,8 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
   // ── Token-based sync (Notion, Toggl) ──
   async function syncToken(c: ConnectorDef) {
     const token = loadToken(c.id);
-    if (!token) { setTokenInputFor(c.id); setTokenValue(''); return; }
+    // Notion OAuth:cookie 里有授权时不需要本地 token,直接空 body 同步
+    if (!token && c.id !== 'notion') { setTokenInputFor(c.id); setTokenValue(''); return; }
     setSyncing(c.id);
     try {
       const res = await fetch(c.syncEndpoint!, {
@@ -141,6 +152,11 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       });
       const data = await res.json() as { ok?: boolean; nodes?: NodeInput[]; error?: string };
       if (!data.ok) {
+        if (data.error === 'not_connected' && c.id === 'notion') {
+          setSyncing(null);
+          window.location.href = '/api/portal/notion/connect';
+          return;
+        }
         if (data.error === 'invalid_token') { saveToken(c.id, ''); setTokenInputFor(c.id); setTokenValue(''); showToast(L(dict, 'Token 无效，请重新输入', 'Invalid token — please re-enter'), false); }
         else showToast(L(dict, `同步失败：${data.error || '未知'}`, `Sync failed: ${data.error || 'unknown'}`), false);
         setSyncing(null);
@@ -417,6 +433,8 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       return;
     }
     if (c.id === 'health') { fileRef.current?.click(); return; }
+    // Notion:先走 OAuth(服务端未配 NOTION_CLIENT_ID 会带 error 跳回,给出指引)
+    if (c.id === 'notion' && !loadToken('notion')) { window.location.href = '/api/portal/notion/connect'; return; }
     if (c.method === 'token') { syncToken(c); return; }
     if (c.method === 'server') { syncFlomo(c); return; }
     if (c.method === 'shortcuts') { setShortcutsFor(c.id); return; }
