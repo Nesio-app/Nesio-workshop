@@ -17814,6 +17814,7 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 .nesio-fit-sig--warn .nesio-fit-sig-note { color: #b45309; }
 .nesio-fit-sig--neutral .nesio-fit-sig-note { color: var(--portal-muted); }
 .nesio-fit-suggest { margin: 0.7rem 0 0; font-size: 0.85rem; color: var(--portal-ink); line-height: 1.5; }
+.nesio-health-story-line { margin: 0.2rem 0 0; font-size: 0.85rem; color: var(--portal-ink); line-height: 1.55; }
 
 /* 批次 27:地点足迹 · Google 时间线样式 */
 .nesio-pt { display: flex; flex-direction: column; gap: 1.1rem; }

@@ -15,6 +15,7 @@ import { usePortalLocale } from '../use-portal-locale';
 import TrainingPlan from './TrainingPlan';
 import { computeFitnessInsight, type FitnessInsight } from '@/lib/platform/fitness-integrator';
 import { loadTrainingState, sessionsThisWeek, protocolById } from '@/lib/platform/training-protocol-engine';
+import { healthNarrative, analyzeSeries } from '@/lib/portal/health-narrative';
 
 const TREND_HEADLINE: Record<FitnessInsight['trend'], [string, string]> = {
   up: ['体能上升中', 'Fitness rising'], flat: ['体能维持中', 'Holding steady'], down: ['体能下降中', 'Fitness dipping'], unknown: ['数据积累中', 'Gathering data'],
@@ -51,7 +52,7 @@ function fmt(v: number, decimals: number): string {
   return decimals === 0 ? Math.round(v).toLocaleString() : v.toFixed(decimals);
 }
 
-// 批次 40:按月历史趋势曲线(多年)
+// 批次 40:按月历史趋势曲线(多年)+ 高峰/低谷/anomaly 标注
 function Sparkline({ series }: { series: Array<{ ym: string; v: number }> }) {
   const vals = series.map((s) => s.v);
   const min = Math.min(...vals);
@@ -59,15 +60,16 @@ function Sparkline({ series }: { series: Array<{ ym: string; v: number }> }) {
   const range = max - min || 1;
   const W = 100;
   const H = 26;
-  const pts = series.map((s, i) => {
-    const x = series.length > 1 ? (i / (series.length - 1)) * W : 0;
-    const y = H - ((s.v - min) / range) * H;
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(' ');
+  const xy = (i: number) => ({ x: series.length > 1 ? (i / (series.length - 1)) * W : 0, y: H - ((vals[i] - min) / range) * H });
+  const pts = series.map((_, i) => { const p = xy(i); return `${p.x.toFixed(1)},${p.y.toFixed(1)}`; }).join(' ');
+  const pat = analyzeSeries(series);
   return (
     <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="26" preserveAspectRatio="none" style={{ marginTop: '0.35rem', overflow: 'visible' }}>
       <polyline points={pts} fill="none" stroke="var(--portal-blue-deep)" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-      <circle cx={W} cy={H - ((vals[vals.length - 1] - min) / range) * H} r="2" fill="var(--portal-blue-deep)" />
+      {pat && (() => { const p = xy(pat.peakIdx); return <circle cx={p.x} cy={p.y} r="2.2" fill="#e0954a" />; })()}
+      {pat && (() => { const p = xy(pat.valleyIdx); return <circle cx={p.x} cy={p.y} r="2.2" fill="#3d9f6e" />; })()}
+      {pat?.anomalyIdx != null && (() => { const p = xy(pat.anomalyIdx); return <circle cx={p.x} cy={p.y} r="2.6" fill="none" stroke="#c25d7a" strokeWidth="1.4" />; })()}
+      <circle cx={W} cy={xy(series.length - 1).y} r="2" fill="var(--portal-blue-deep)" />
     </svg>
   );
 }
@@ -126,6 +128,17 @@ export default function HealthDashboard() {
     <div className="nesio-health-dash">
       <p className="nesio-health-updated">{L(dict, `${data.metrics.length} 项指标 · 锻炼 ${data.workouts} 次 · 导入于 ${importedLabel}`, `${data.metrics.length} metrics · ${data.workouts} workouts · imported ${importedLabel}`)}</p>
       {insight.signals.length > 0 && <FitnessPanel insight={insight} dict={dict} />}
+      {(() => {
+        const story = healthNarrative(data.metrics, dict);
+        if (!story.length) return null;
+        return (
+          <div className="nesio-fit-panel" style={{ marginTop: '0.6rem' }}>
+            <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>{L(dict, '这段时间的健康', 'Your health lately')}</p>
+            {story.map((s, i) => <p key={i} className="nesio-health-story-line">{s}</p>)}
+            <p className="nesio-settings-option-hint" style={{ margin: '0.3rem 0 0' }}>{L(dict, '橙点=高峰 · 绿点=低谷 · 粉圈=异常', 'orange=peak · green=valley · pink ring=anomaly')}</p>
+          </div>
+        );
+      })()}
       <TrainingPlan />
       {GROUPS.map((g) => {
         const items = data.metrics.filter((m) => m.group === g.key);
