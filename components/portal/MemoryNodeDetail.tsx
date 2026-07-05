@@ -5,6 +5,7 @@ import { deleteLifeNode, updateLifeNode, type LifeNode } from '@/lib/portal/life
 import { createAppApiClient } from '@/lib/portal/app-api-client';
 import LocationPicker from './LocationPicker';
 import RelationGraph from './RelationGraph';
+import EmailComposeSheet from './EmailComposeSheet';
 import type { GNode, GEdge } from '@/lib/platform/graph-engine';
 import { IconClock, IconLink, NodeTypeIcon, WeatherIcon } from './icons';
 import { L } from '@/lib/portal/i18n';
@@ -532,6 +533,8 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
   const [viewImage, setViewImage] = useState<{ url: string; name: string } | null>(null);
   // 批次 24:文章阅读器(节点有 article 时)
   const [readerOpen, setReaderOpen] = useState(false);
+  // 批次 36:在 Nesio 内回复邮件
+  const [composeOpen, setComposeOpen] = useState(false);
   useEffect(() => {
     const onView = (e: Event) => setViewImage((e as CustomEvent).detail);
     window.addEventListener('nesio-view-image', onView);
@@ -664,10 +667,22 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
   const readableText = [readableAttrs.article, readableAttrs.summary, readableAttrs.snippet, readableAttrs.body, n.rawInput]
     .find((v): v is string => typeof v === 'string' && v.trim().length > 40);
 
+  // 批次 36:邮件节点 → 可在 Nesio 内直接回复。识别:source=email 且带发件人。
+  const emailFrom = typeof readableAttrs.from === 'string' ? readableAttrs.from : '';
+  const emailId = typeof readableAttrs.emailId === 'string' ? readableAttrs.emailId : '';
+  const isEmailNode = n.source === 'email' && Boolean(emailFrom);
+
   return (
     <div className="nesio-node-detail-overlay" role="dialog" aria-modal="true" aria-label={n.name}>
       {readerOpen && readableText && (
         <ReaderSheetLazy title={n.name} article={readableText} onClose={() => setReaderOpen(false)} />
+      )}
+      {isEmailNode && (
+        <EmailComposeSheet
+          open={composeOpen}
+          onClose={() => setComposeOpen(false)}
+          context={{ emailId, from: emailFrom, subject: n.name, snippet: typeof readableAttrs.snippet === 'string' ? readableAttrs.snippet : undefined, article: readableText }}
+        />
       )}
       {viewImage && (
         <div className="nesio-image-viewer" role="dialog" aria-modal="true" onClick={() => setViewImage(null)}>
@@ -894,6 +909,10 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
                 {/* 批次 33:阅读入口顶部有(替换✕),底部也放回来一份 —— 用户反馈顶部那颗找不到 */}
                 {readableText && (
                   <button type="button" className="nesio-ob-primary-btn" style={{ flex: 1 }} onClick={() => setReaderOpen(true)}>{L(dict, '阅读', 'Read')}</button>
+                )}
+                {/* 批次 36:邮件节点 → 在 Nesio 内直接回复 */}
+                {isEmailNode && (
+                  <button type="button" className="nesio-ob-primary-btn" style={{ flex: 1 }} onClick={() => setComposeOpen(true)}>{L(dict, '回复', 'Reply')}</button>
                 )}
                 <button type="button" className="nesio-today-btn nesio-today-btn--ghost" style={{ flex: 1 }} onClick={startEdit}>{L(dict, '编辑', 'Edit')}</button>
                 <button type="button" className="nesio-settings-danger-btn" style={{ flex: 1, marginTop: 0 }} onClick={handleDelete}>{L(dict, '删除', 'Delete')}</button>

@@ -7,7 +7,9 @@ import { NextRequest, NextResponse } from 'next/server';
 
 // Request calendar scope alongside gmail so one consent covers both connectors
 // and the resulting refresh token can serve either API.
-const GMAIL_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/calendar.readonly';
+// 批次 36:加 gmail.send —— 支持在 Nesio 里直接回复/发送邮件(每封都由用户亲手写并点发送)。
+// 加了新 scope 后老用户会被 prompt=consent 要求重新授权一次,拿到发送权限。
+const GMAIL_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/calendar.readonly';
 const STATE_COOKIE = 'nesio_gmail_oauth_state';
 
 function envValue(key: string): string {
