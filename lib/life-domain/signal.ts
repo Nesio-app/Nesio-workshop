@@ -14,6 +14,7 @@
 
 import { getLifeGraph, deleteLifeNode, type LifeNode, type LifeNodeType, type LifeNodeSource } from '../portal/life-graph';
 import { getCachedSignals } from './signal-read-cache';
+import { resolveRetention, resolveSensitivity } from './signal-classification.mjs';
 import type { SignalContext } from './context';
 
 export type SignalSource =
@@ -104,32 +105,9 @@ const NODE_SOURCE_TO_SIGNAL: Record<LifeNodeSource, SignalSource> = {
   voice: 'voice',
 };
 
-function inferSensitivity(node: LifeNode): SignalSensitivity {
-  const tags = (node.tags || []).join(' ').toLowerCase();
-  if (node.type === 'health_state' || tags.includes('健康') || tags.includes('health')) return 'health';
-  if (tags.includes('finance') || tags.includes('财务') || tags.includes('账单')) return 'financial';
-  if (tags.includes('family') || tags.includes('家庭')) return 'family';
-  if (tags.includes('work') || tags.includes('工作') || tags.includes('会议') || node.source === 'calendar') return 'work';
-  return 'normal';
-}
-
-function inferRetention(node: LifeNode): RetentionPolicy {
-  const tags = (node.tags || []).join(' ').toLowerCase();
-  // Core family / major assets / major health → never prune
-  if (tags.includes('家庭') || tags.includes('family') || tags.includes('tesla') || node.type === 'person') {
-    return 'AlwaysAlive';
-  }
-  // Long-term knowledge / finance
-  if (tags.includes('finance') || tags.includes('财务') || tags.includes('读书') ||
-      tags.includes('learning') || tags.includes('notion') || node.type === 'preference') {
-    return 'LongLiving';
-  }
-  // Transient: weather / one-off notices / quick voice scraps with no entities
-  const transient = tags.includes('天气') || tags.includes('weather') ||
-    (node.source === 'voice' && node.relations.length === 0 && !node.rawInput);
-  if (transient) return 'Disposable';
-  return 'Normal';
-}
+// 保留期/敏感度分类见 ./signal-classification.mjs(纯函数,有行为测试)。
+// 持久化值(写入时按 source 定)优先,tag 推断只作缺失兜底 —— 消除写/读分类分歧,
+// 避免"写成 Normal、读成 Disposable 被剪枝物理删除"的数据丢失。
 
 /** Convert a legacy Life Graph node into a normalized Signal */
 export function lifeNodeToSignal(node: LifeNode): Signal {
@@ -174,8 +152,8 @@ export function lifeNodeToSignal(node: LifeNode): Signal {
     content: node.rawInput || payload,
     entities: (node.relations ?? []).map((r) => ({ id: r.targetId, type: r.relation, name: r.targetId })),
     confidence: node.confidence,
-    sensitivity: inferSensitivity(node),
-    retentionPolicy: inferRetention(node),
+    sensitivity: resolveSensitivity(node) as SignalSensitivity,
+    retentionPolicy: resolveRetention(node) as RetentionPolicy,
     evidence: { source, externalId: node.id, raw: node.rawInput },
     tags: node.tags,
     context,

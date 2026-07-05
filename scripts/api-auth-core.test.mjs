@@ -75,14 +75,28 @@ assert.equal(
   assert.equal(rl.check('tts:1.2.3.4', t0, opts), false, '不同路由独立计窗。');
 }
 
-// ── 限流:达到 key 上限时清空(粗粒度内存上限,不崩)────────────────────────
+// ── 限流:达上限时优先删过期、不清空所有人(修「刷唯一 key 重置全体限流」杠杆)──
 {
-  const rl = createRateLimiter({ maxTrackedKeys: 2 });
-  assert.equal(rl.check('a', 0, { limit: 1, windowMs: 1000 }), false);
-  assert.equal(rl.check('b', 0, { limit: 1, windowMs: 1000 }), false);
-  assert.equal(rl.size(), 2, '已跟踪 2 个 key(达上限)。');
-  rl.check('c', 0, { limit: 1, windowMs: 1000 }); // 触发 clear + 记新
-  assert.ok(rl.size() <= 2, '达上限后清空,内存有界。');
+  // 达上限时:过期条目先删,活跃条目保留 —— 攻击者刷唯一 key 不能清掉受害者的限流窗。
+  const rl = createRateLimiter({ maxTrackedKeys: 3 });
+  rl.check('expired', 0, { limit: 1, windowMs: 100 });   // resetAt=100
+  rl.check('victim-b', 0, { limit: 1, windowMs: 10_000 }); // resetAt=10000(活跃)
+  rl.check('victim-c', 0, { limit: 1, windowMs: 10_000 }); // resetAt=10000(活跃)
+  assert.equal(rl.size(), 3, '已跟踪 3 个 key(达上限)。');
+  // now=200:'expired' 已过期;新增 'attacker' 触发回收 —— 只应删过期的那个。
+  rl.check('attacker', 200, { limit: 1, windowMs: 10_000 });
+  assert.ok(rl.size() <= 3, '内存仍有界。');
+  // 受害者的限流窗必须还在(count 已达 limit)→ 仍被拦截,没被攻击者的洪泛重置。
+  assert.equal(rl.check('victim-b', 200, { limit: 1, windowMs: 10_000 }), true, '活跃受害者限流窗未被清空,仍拦截。');
+  assert.equal(rl.check('victim-c', 200, { limit: 1, windowMs: 10_000 }), true, '活跃受害者限流窗未被清空,仍拦截。');
+}
+
+// ── 限流:纯洪泛(无过期)时增量 LRU 淘汰,而非一次清空 ────────────────────────
+{
+  const rl = createRateLimiter({ maxTrackedKeys: 4 });
+  for (let i = 0; i < 10; i++) rl.check(`flood-${i}`, 0, { limit: 1, windowMs: 10_000 });
+  assert.ok(rl.size() <= 4, '洪泛下内存有界。');
+  assert.ok(rl.size() >= 1, '不是一次清空到 0 —— 增量淘汰保留部分窗口。');
 }
 
 console.log('api-auth-core: OK');

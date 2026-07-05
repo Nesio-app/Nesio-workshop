@@ -51,7 +51,8 @@ jobs:
             [ -n "$OAUTH" ] && echo "::notice::使用 Claude 订阅 token(不按量计费)" || echo "::notice::使用 API key(按量计费)"
           else
             echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Claude Autofix 已就位但未激活。方式 A:本机跑 claude setup-token,把 token 存为 CLAUDE_CODE_OAUTH_TOKEN secret(用包月订阅);方式 B:存 ANTHROPIC_API_KEY(按量)。详见工作流头注释。"
+            # warning(黄色,比 notice 醒目):此刻有个可修的 issue 触发了它却因未激活跳过 —— 别让人误以为在自动修。
+            echo "::warning::Claude Autofix 已就位但【未激活】,本次不会自动修复。方式 A:本机跑 claude setup-token,把 token 存为 CLAUDE_CODE_OAUTH_TOKEN secret(包月订阅);方式 B:存 ANTHROPIC_API_KEY(按量)。激活后需一次真实 issue 触发才算端到端验证。"
           fi
 
       - uses: actions/checkout@v7
