@@ -121,23 +121,44 @@ export default function TellNesioSheet({ open, onClose, onCapture }: TellNesioSh
         ))}
       </div>
 
-      {/* 批次 40:记录心情 —— 与另外三个扇形按钮同款(圆圈图标 + 标签),居中放在下方 */}
-      <button
-        type="button"
-        className="nesio-tell-fan-btn nesio-tell-fan-btn--mood"
-        onClick={() => { onClose(); window.dispatchEvent(new CustomEvent('nesio-open-mood')); }}
-        aria-label={L(dict, '记录此刻心情', 'Log how you feel')}
-      >
-        <span className="nesio-tell-fan-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="26" height="26">
-            <circle cx="12" cy="12" r="10" />
-            <path d="M8 14s1.5 2 4 2 4-2 4-2" />
-            <line x1="9" y1="9" x2="9.01" y2="9" />
-            <line x1="15" y1="9" x2="15.01" y2="9" />
-          </svg>
-        </span>
-        <span className="nesio-tell-fan-label">{L(dict, '记录心情', 'How I feel')}</span>
-      </button>
+      {/* 批次 40/44:记录心情 + 冻一下 —— 与扇形按钮同款,居中放在下方一行 */}
+      <div className="nesio-tell-extras">
+        <button
+          type="button"
+          className="nesio-tell-fan-btn nesio-tell-fan-btn--extra"
+          onClick={() => { onClose(); window.dispatchEvent(new CustomEvent('nesio-open-mood')); }}
+          aria-label={L(dict, '记录此刻心情', 'Log how you feel')}
+        >
+          <span className="nesio-tell-fan-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="26" height="26">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+              <line x1="9" y1="9" x2="9.01" y2="9" />
+              <line x1="15" y1="9" x2="15.01" y2="9" />
+            </svg>
+          </span>
+          <span className="nesio-tell-fan-label">{L(dict, '记录心情', 'How I feel')}</span>
+        </button>
+
+        {/* 冻一下 —— 想买点东西先冻进冷冻仓(冲动购物防护 + 奖品仓库入口) */}
+        <button
+          type="button"
+          className="nesio-tell-fan-btn nesio-tell-fan-btn--extra"
+          onClick={() => { onClose(); window.dispatchEvent(new CustomEvent('nesio-open-freeze')); }}
+          aria-label={L(dict, '想买的先冻进冷冻仓', 'Freeze something you want to buy')}
+        >
+          <span className="nesio-tell-fan-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="26" height="26">
+              <line x1="12" y1="2" x2="12" y2="22" />
+              <line x1="12" y1="6" x2="16" y2="3.5" /><line x1="12" y1="6" x2="8" y2="3.5" />
+              <line x1="12" y1="18" x2="16" y2="20.5" /><line x1="12" y1="18" x2="8" y2="20.5" />
+              <line x1="3.2" y1="7" x2="20.8" y2="17" />
+              <line x1="3.2" y1="17" x2="20.8" y2="7" />
+            </svg>
+          </span>
+          <span className="nesio-tell-fan-label">{L(dict, '冻一下', 'Freeze it')}</span>
+        </button>
+      </div>
     </div>
   );
 }

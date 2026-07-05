@@ -25,6 +25,7 @@ interface FreezeVaultSheetProps {
   open: boolean;
   onClose: () => void;
   initialUrl?: string;
+  initialTab?: 'add' | 'list' | 'rewards';
 }
 
 interface ParsedProduct {
@@ -35,7 +36,7 @@ interface ParsedProduct {
   description?: string;
 }
 
-export default function FreezeVaultSheet({ open, onClose, initialUrl }: FreezeVaultSheetProps) {
+export default function FreezeVaultSheet({ open, onClose, initialUrl, initialTab }: FreezeVaultSheetProps) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [tab, setTab] = useState<'add' | 'list' | 'rewards'>('list');
   const [points, setPoints] = useState(0);
@@ -60,9 +61,11 @@ export default function FreezeVaultSheet({ open, onClose, initialUrl }: FreezeVa
       setTab('add');
       setUrlInput(initialUrl);
       void parseUrl(initialUrl);
+    } else if (initialTab) {
+      setTab(initialTab);
     }
     return () => window.removeEventListener('nesio-rewards-updated', onPts);
-  }, [open, initialUrl]);
+  }, [open, initialUrl, initialTab]);
 
   async function parseUrl(url: string) {
     if (!url.trim()) return;

@@ -9698,9 +9698,15 @@ html[data-portal-theme="night"] .nesio-tell-fan-icon {
 }
 
 /* 批次 40:记录心情 —— 与另外三个扇形按钮同款,居中放在扇形下方 */
-.nesio-tell-fan-btn--mood {
-  margin: 1.5rem auto 0;
+.nesio-tell-extras {
+  display: flex;
+  justify-content: center;
+  gap: 2.2rem;
+  margin-top: 1.5rem;
+}
+.nesio-tell-fan-btn--extra {
   transform: none;
+  position: static;
 }
 
 /* ─── Voice Input Sheet ─── */
