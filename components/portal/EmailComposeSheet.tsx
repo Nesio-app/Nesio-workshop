@@ -87,16 +87,23 @@ export default function EmailComposeSheet({ open, onClose, context }: EmailCompo
           tone: tone || undefined,
         }),
       });
-      const data = await res.json() as { ok?: boolean; draft?: string; error?: string };
+      const data = await res.json().catch(() => ({})) as { ok?: boolean; draft?: string; error?: string; detail?: string };
       if (data.ok && data.draft) {
         setBody(data.draft);
       } else if (data.error === 'ai_not_configured') {
         setError(L(dict, 'AI 起草暂未开通,你可以直接手写', 'AI drafting is off — write it yourself'));
+      } else if (data.error === 'auth_required') {
+        setError(L(dict, '登录已过期,请重新登录 Nesio 再起草', 'Session expired — sign in to Nesio again'));
+      } else if (data.error === 'no_context') {
+        setError(L(dict, '这封邮件没有正文可参考,先手写一句吧', 'No email body to work from — write a line first'));
+      } else if (!res.ok && res.status >= 500) {
+        // 把服务端的 detail 带出来,方便定位(AI 供应商报错/限流等)
+        setError(L(dict, `AI 起草失败:${data.detail || data.error || res.status}`, `Draft failed: ${data.detail || data.error || res.status}`));
       } else {
         setError(L(dict, 'AI 起草失败,请重试或手写', 'Draft failed — retry or write it yourself'));
       }
     } catch {
-      setError(L(dict, 'AI 起草失败,请重试或手写', 'Draft failed — retry or write it yourself'));
+      setError(L(dict, '网络错误,起草失败', 'Network error — draft failed'));
     } finally {
       setDrafting(false);
     }
