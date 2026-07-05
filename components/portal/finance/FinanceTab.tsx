@@ -11,13 +11,14 @@ import {
   loadBankTx, loadBankAccounts, availableMonths, summarizeMonth, categoryBreakdown, topMerchants,
   monthlyTrend, financeAlerts, needsReview, suggestCategory, setMerchantRule, effectiveCategory,
   accountMonth, formatMoney, ymOf, prevYm, txFlow, setFlowRule, TX_FLOW_LABELS,
+  detectRecurring, upcomingRecurring, loadMerchantRules, loadFlowRules,
   type BankTx, type BankAccount, type TxFlow,
 } from '@/lib/portal/bank-tx';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 
-type Sub = 'overview' | 'spending' | 'tx' | 'cards';
+type Sub = 'overview' | 'spending' | 'tx' | 'recurring' | 'cards';
 
 function monthLabel(ym: string, dict: string): string {
   const [y, m] = ym.split('-');
@@ -56,6 +57,12 @@ export default function FinanceTab() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const review = useMemo(() => needsReview(txs, ym), [txs, ym, rev]);
   const monthTx = useMemo(() => txs.filter((t) => (t.date || '').slice(0, 7) === ym).sort((a, b) => (b.date || '').localeCompare(a.date || '')), [txs, ym]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const recurring = useMemo(() => detectRecurring(txs), [txs, rev]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const upcoming = useMemo(() => upcomingRecurring(txs, 7), [txs, rev]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const learnedRules = useMemo(() => ({ merchant: loadMerchantRules(), flow: loadFlowRules() }), [rev]);
 
   if (txs.length === 0) {
     return <p className="nesio-insights-empty">{L(dict, '还没有银行流水。到「设置 → 数据接入 → 银行流水 · Plaid」连接账户并点「同步」。', 'No bank transactions yet. Go to Settings → Data sources → Bank feed · Plaid, connect and Sync.')}</p>;
@@ -64,7 +71,9 @@ export default function FinanceTab() {
   const signed = (a: number) => (a >= 0 ? `-${formatMoney(a, summary.currency)}` : `+${formatMoney(-a, summary.currency)}`);
   const netDelta = prevSummary.net > 0 ? Math.round(((summary.net - prevSummary.net) / prevSummary.net) * 100) : null;
   const idx = months.indexOf(ym);
-  const SUBS: Array<[Sub, string, string]> = [['overview', '总览', 'Overview'], ['spending', '支出', 'Spending'], ['tx', '交易', 'Transactions'], ['cards', '卡片', 'Cards']];
+  const SUBS: Array<[Sub, string, string]> = [['overview', '总览', 'Overview'], ['spending', '支出', 'Spending'], ['tx', '交易', 'Transactions'], ['recurring', '定期', 'Recurring'], ['cards', '卡片', 'Cards']];
+  function removeMerchantRule(name: string) { setMerchantRule(name, ''); setRev((r) => r + 1); }
+  function removeFlowRule(name: string) { setFlowRule(name, ''); setRev((r) => r + 1); }
   const filterCats = ['all', ...cats.slice(0, 6).map((c) => c.category)];
   const shownTx = filter === 'all' ? monthTx : monthTx.filter((t) => effectiveCategory(t) === filter);
 
@@ -211,6 +220,57 @@ export default function FinanceTab() {
               );
             })}
           </div>
+
+          {/* 批次 39:已学规则管理页 —— 你纠正过的分类/类型都在这,可删 */}
+          {(Object.keys(learnedRules.merchant).length > 0 || Object.keys(learnedRules.flow).length > 0) && (
+            <>
+              <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, `已学规则 · ${Object.keys(learnedRules.merchant).length + Object.keys(learnedRules.flow).length} 条`, `Learned rules · ${Object.keys(learnedRules.merchant).length + Object.keys(learnedRules.flow).length}`)}</p>
+              <p className="nesio-settings-option-hint" style={{ marginTop: 0 }}>{L(dict, '你纠正过的商户分类和交易类型会记住,自动套用到同名交易。点 ✕ 删除。', 'Your category & flow corrections are remembered and auto-applied to same-name transactions. Tap ✕ to remove.')}</p>
+              <div className="nesio-fin-rules">
+                {Object.entries(learnedRules.merchant).map(([name, cat]) => (
+                  <div key={`m-${name}`} className="nesio-fin-rule">
+                    <span className="nesio-fin-rule-txt">{name} <span className="nesio-fin-rule-arrow">→</span> {cat}</span>
+                    <button type="button" className="nesio-fin-rule-x" onClick={() => removeMerchantRule(name)} aria-label={L(dict, '删除规则', 'Remove rule')}>✕</button>
+                  </div>
+                ))}
+                {Object.entries(learnedRules.flow).map(([name, flow]) => (
+                  <div key={`f-${name}`} className="nesio-fin-rule">
+                    <span className="nesio-fin-rule-txt">{name} <span className="nesio-fin-rule-arrow">→</span> {L(dict, TX_FLOW_LABELS[flow][0], TX_FLOW_LABELS[flow][1])}</span>
+                    <button type="button" className="nesio-fin-rule-x" onClick={() => removeFlowRule(name)} aria-label={L(dict, '删除规则', 'Remove rule')}>✕</button>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </>
+      )}
+
+      {/* ── 定期:账单识别(批次 39)── */}
+      {sub === 'recurring' && (
+        <>
+          {upcoming.items.length > 0 && (
+            <div className="nesio-fin-recur-hero">
+              <span className="nesio-fin-recur-hero-l">{L(dict, `未来 7 天 · ${upcoming.items.length} 笔定期扣款`, `Next 7 days · ${upcoming.items.length} recurring`)}</span>
+              <span className="nesio-fin-recur-hero-v">{formatMoney(upcoming.total, summary.currency)}</span>
+            </div>
+          )}
+          <p className="nesio-settings-section-label" style={{ marginTop: upcoming.items.length ? '1rem' : 0 }}>{L(dict, '识别到的定期账单', 'Detected recurring bills')}</p>
+          {recurring.length === 0 ? (
+            <p className="nesio-settings-option-hint" style={{ marginTop: 0 }}>{L(dict, '还没识别到定期账单 —— 需要同一商户至少 3 笔规律扣款。多同步几个月的流水会更准。', 'No recurring bills yet — needs 3+ regular charges from one merchant. Sync more months for accuracy.')}</p>
+          ) : (
+            <div className="nesio-fin-recurlist">
+              {recurring.map((r) => (
+                <div key={r.name} className="nesio-fin-recur">
+                  <div className="nesio-fin-recur-main">
+                    <span className="nesio-fin-recur-name">{r.name}</span>
+                    <span className="nesio-fin-recur-meta">{L(dict, r.cadenceLabel[0], r.cadenceLabel[1])} · {r.category} · {L(dict, `下次约 ${r.nextEstimate.slice(5).replace('-', '/')}`, `next ~${r.nextEstimate.slice(5).replace('-', '/')}`)} · {L(dict, `${r.count} 笔`, `${r.count}×`)}</span>
+                  </div>
+                  <span className="nesio-fin-recur-amt">{formatMoney(r.avgAmount, r.currency)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="nesio-fin-alert-note">{L(dict, '按流水周期规则识别(非 LLM),下次日期与金额为估算', 'Rule-based from transaction cadence (not LLM); next date & amount are estimates')}</p>
         </>
       )}
 

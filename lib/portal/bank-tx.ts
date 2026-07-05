@@ -269,6 +269,104 @@ export function suggestCategory(name: string): { category: string; confidence: n
   return { category: 'Services', confidence: 0.4 };
 }
 
+/* ---------- 批次 39:定期账单识别(Rocket Money 风)---------- */
+// 按商户归并支出,找出周期性(周/双周/月/年)重复的扣款,估算下次日期与金额。
+
+export interface RecurringCharge {
+  name: string;
+  category: string;
+  avgAmount: number;
+  count: number;
+  lastDate: string;
+  nextEstimate: string; // 'YYYY-MM-DD'
+  cadenceDays: number;
+  cadenceLabel: [string, string]; // [zh, en]
+  currency: string;
+}
+
+/** 归一化商户名:去掉尾部门店号/流水号/日期,合并同一商家的多笔。 */
+function normalizeMerchant(name: string): string {
+  return (name || '')
+    .toLowerCase()
+    .replace(/[#*]?\s*\d[\d\-/.]{2,}.*$/, '') // 尾部数字串(门店号/日期)
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function median(nums: number[]): number {
+  if (!nums.length) return 0;
+  const s = [...nums].sort((a, b) => a - b);
+  const mid = Math.floor(s.length / 2);
+  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+}
+
+function cadenceLabelFor(days: number): [string, string] | null {
+  if (days >= 6 && days <= 8) return ['每周', 'Weekly'];
+  if (days >= 12 && days <= 16) return ['每两周', 'Biweekly'];
+  if (days >= 26 && days <= 35) return ['每月', 'Monthly'];
+  if (days >= 58 && days <= 64) return ['每两月', 'Every 2 months'];
+  if (days >= 85 && days <= 95) return ['每季', 'Quarterly'];
+  if (days >= 350 && days <= 380) return ['每年', 'Yearly'];
+  return null;
+}
+
+/** 识别定期账单:同一商户 ≥3 笔支出、间隔中位数落在某个周期档内。 */
+export function detectRecurring(txs: BankTx[]): RecurringCharge[] {
+  const flowRules = loadFlowRules();
+  const merchantRules = loadMerchantRules();
+  const byKey = new Map<string, BankTx[]>();
+  for (const t of txs) {
+    if (txFlow(t, flowRules) !== 'expense') continue;
+    if (!t.date) continue;
+    const key = normalizeMerchant(t.name);
+    if (!key) continue;
+    const list = byKey.get(key) || [];
+    list.push(t);
+    byKey.set(key, list);
+  }
+
+  const out: RecurringCharge[] = [];
+  for (const list of byKey.values()) {
+    if (list.length < 3) continue; // 至少 3 笔才谈得上「定期」
+    const sorted = list.slice().sort((a, b) => a.date.localeCompare(b.date));
+    const gaps: number[] = [];
+    for (let i = 1; i < sorted.length; i++) {
+      const d = (Date.parse(sorted[i].date) - Date.parse(sorted[i - 1].date)) / 86_400_000;
+      if (d > 0) gaps.push(d);
+    }
+    const medGap = median(gaps);
+    const label = cadenceLabelFor(medGap);
+    if (!label) continue;
+    const amts = sorted.map((t) => Math.abs(t.amount));
+    const avg = amts.reduce((s, v) => s + v, 0) / amts.length;
+    const last = sorted[sorted.length - 1];
+    const nextMs = Date.parse(last.date) + medGap * 86_400_000;
+    out.push({
+      name: last.name,
+      category: merchantRules[last.name] || suggestCategory(last.name).category,
+      avgAmount: Math.round(avg * 100) / 100,
+      count: sorted.length,
+      lastDate: last.date,
+      nextEstimate: new Date(nextMs).toISOString().slice(0, 10),
+      cadenceDays: Math.round(medGap),
+      cadenceLabel: label,
+      currency: last.currency || 'USD',
+    });
+  }
+  return out.sort((a, b) => a.nextEstimate.localeCompare(b.nextEstimate));
+}
+
+/** 未来 n 天内预计的定期扣款汇总。 */
+export function upcomingRecurring(txs: BankTx[], withinDays = 7): { items: RecurringCharge[]; total: number } {
+  const now = Date.now();
+  const horizon = now + withinDays * 86_400_000;
+  const items = detectRecurring(txs).filter((r) => {
+    const t = Date.parse(r.nextEstimate);
+    return t >= now - 86_400_000 && t <= horizon;
+  });
+  return { items, total: Math.round(items.reduce((s, r) => s + r.avgAmount, 0) * 100) / 100 };
+}
+
 /* ---------- 批次 31:月度趋势 + 风险预警 ---------- */
 
 export function monthlyTrend(txs: BankTx[], n = 6): Array<{ ym: string; net: number }> {

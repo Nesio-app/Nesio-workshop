@@ -17753,6 +17753,24 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 .nesio-fin-card-sub { margin: 0.15rem 0 0.4rem; font-size: 0.68rem; color: var(--portal-muted); text-transform: capitalize; }
 .nesio-fin-card-meta { margin: 0; font-size: 0.74rem; color: var(--portal-muted); }
 
+/* 批次 39:定期账单 + 已学规则 */
+.nesio-fin-recur-hero { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; padding: 0.9rem 1rem; border-radius: 14px; background: var(--portal-accent-soft); border: 1px solid var(--portal-accent-border); }
+.nesio-fin-recur-hero-l { font-size: 0.82rem; font-weight: 600; color: var(--portal-blue-deep); }
+.nesio-fin-recur-hero-v { font-size: 1.25rem; font-weight: 800; color: var(--portal-blue-deep); font-variant-numeric: tabular-nums; }
+.nesio-fin-recurlist { display: flex; flex-direction: column; }
+.nesio-fin-recur { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; padding: 0.7rem 0; border-bottom: 1px solid var(--portal-line); }
+.nesio-fin-recur:last-child { border-bottom: none; }
+.nesio-fin-recur-main { min-width: 0; display: flex; flex-direction: column; gap: 0.15rem; }
+.nesio-fin-recur-name { font-size: 0.9rem; font-weight: 600; color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nesio-fin-recur-meta { font-size: 0.7rem; color: var(--portal-muted); }
+.nesio-fin-recur-amt { flex-shrink: 0; font-size: 0.95rem; font-weight: 700; color: var(--portal-ink); font-variant-numeric: tabular-nums; }
+.nesio-fin-rules { display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.5rem; }
+.nesio-fin-rule { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.5rem 0.7rem; border-radius: 10px; background: var(--portal-surface-2, rgba(127,127,127,0.06)); }
+.nesio-fin-rule-txt { font-size: 0.8rem; color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nesio-fin-rule-arrow { color: var(--portal-muted); }
+.nesio-fin-rule-x { flex-shrink: 0; width: 1.6rem; height: 1.6rem; border-radius: 50%; border: none; background: transparent; color: var(--portal-muted); font-size: 0.9rem; cursor: pointer; }
+.nesio-fin-rule-x:active { background: var(--portal-line); }
+
 /* 批次 27:地点足迹 · Google 时间线样式 */
 .nesio-pt { display: flex; flex-direction: column; gap: 1.1rem; }
 .nesio-pt-daylabel { margin: 0 0 0.5rem; font-size: 0.72rem; font-weight: 700; color: var(--portal-muted); text-transform: uppercase; letter-spacing: 0.04em; }
