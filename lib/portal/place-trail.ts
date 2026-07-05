@@ -156,12 +156,32 @@ export const PLACE_CATEGORY_META: Record<PlaceCategory, { zh: string; en: string
 
 export interface CategoryGroup { category: PlaceCategory; count: number; visits: number; places: PlaceCluster[] }
 
+// 批次 40:手动类别覆盖 —— 自动识别不了(未命名)时,用户自己挑类别,记住。
+const PLACE_CAT_KEY = 'nesio-place-cat-v1';
+export function loadPlaceCategories(): Record<string, PlaceCategory> {
+  if (typeof window === 'undefined') return {};
+  try { return JSON.parse(localStorage.getItem(PLACE_CAT_KEY) || '{}') as Record<string, PlaceCategory>; } catch { return {}; }
+}
+export function setPlaceCategory(raw: string, cat: PlaceCategory | ''): void {
+  if (typeof window === 'undefined') return;
+  const all = loadPlaceCategories();
+  if (cat) all[raw] = cat; else delete all[raw];
+  try { localStorage.setItem(PLACE_CAT_KEY, JSON.stringify(all)); window.dispatchEvent(new CustomEvent(PLACE_TRAIL_UPDATED_EVENT)); } catch { /* ignore */ }
+}
+
+/** 地点类别:用户手动指定优先,否则按名字自动识别(未命名 → unknown)。 */
+export function categoryOfPlace(rawLabel: string, generic?: boolean, overrides = loadPlaceCategories()): PlaceCategory {
+  if (overrides[rawLabel]) return overrides[rawLabel];
+  return generic ? 'unknown' : categoryOf(displayLabel(rawLabel));
+}
+
 /** 按类别归组所有去过的地点(Google Timeline 的 Places 分类视图)。 */
 export function placesByCategory(visits: PlaceVisit[]): CategoryGroup[] {
   const clusters = clusterPlaces(visits, 99999);
+  const overrides = loadPlaceCategories();
   const byCat = new Map<PlaceCategory, PlaceCluster[]>();
   for (const c of clusters) {
-    const cat = c.generic ? 'unknown' : categoryOf(displayLabel(c.label));
+    const cat = categoryOfPlace(c.label, c.generic, overrides);
     const list = byCat.get(cat) || [];
     list.push(c);
     byCat.set(cat, list);

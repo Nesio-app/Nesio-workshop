@@ -12,7 +12,7 @@ import {
   timelineDays, buildDayJourney, dayStats,
   clusterPlaces, categoryTimeShare, timeOfDayBuckets,
   displayLabel, setPlaceAlias, isGenericPlace, loadGeocodeEnabled, setGeocodeEnabled,
-  placesByCategory, PLACE_CATEGORY_META,
+  placesByCategory, PLACE_CATEGORY_META, setPlaceCategory,
   type PlaceVisit, type PlaceCategory, type TimeBucket, type JourneyItem, type PlaceCluster,
 } from '@/lib/portal/place-trail';
 import { L } from '@/lib/portal/i18n';
@@ -48,6 +48,7 @@ export default function TimelineTab() {
   const [geoBusy, setGeoBusy] = useState(false);
   const [geoMsg, setGeoMsg] = useState('');
   const [expandedCat, setExpandedCat] = useState<string | null>(null); // 批次 39:地点分类展开
+  const [catPickFor, setCatPickFor] = useState<string | null>(null); // 批次 40:给地点手动选类别
 
   useEffect(() => { setGeoOn(loadGeocodeEnabled()); }, []);
 
@@ -262,9 +263,20 @@ export default function TimelineTab() {
                     {open && (
                       <div className="nesio-tl-catcard-list">
                         {g.places.slice(0, 30).map((c) => (
-                          <div key={c.label} className="nesio-tl-catplace">
-                            <span className="nesio-tl-catplace-name">{displayLabel(c.label)}</span>
-                            <span className="nesio-tl-catplace-meta">{L(dict, `${c.visits} 次`, `${c.visits}×`)}</span>
+                          <div key={c.label}>
+                            <button type="button" className="nesio-tl-catplace" onClick={() => setCatPickFor(catPickFor === c.label ? null : c.label)}>
+                              <span className="nesio-tl-catplace-name">{displayLabel(c.label)}</span>
+                              <span className="nesio-tl-catplace-meta">{L(dict, `${c.visits} 次 · 改类别`, `${c.visits}× · set`)}</span>
+                            </button>
+                            {catPickFor === c.label && (
+                              <div className="nesio-tl-catpick">
+                                {(['shopping', 'food', 'fitness', 'culture', 'entertainment', 'health', 'lodging', 'transit', 'work', 'home', 'place'] as PlaceCategory[]).map((cat) => (
+                                  <button key={cat} type="button" className="nesio-tl-catpick-chip" onClick={() => { setPlaceCategory(c.label, cat); setCatPickFor(null); }}>
+                                    {PLACE_CATEGORY_META[cat].sym} {L(dict, PLACE_CATEGORY_META[cat].zh, PLACE_CATEGORY_META[cat].en)}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         ))}
                         {g.places.length > 30 && <p className="nesio-tl-catplace-more">{L(dict, `还有 ${g.places.length - 30} 个…`, `+${g.places.length - 30} more…`)}</p>}
