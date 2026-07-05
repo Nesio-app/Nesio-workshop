@@ -17,13 +17,18 @@
  * 内存 Map,LifeGraph 变更事件**同步**叠加投影(读新鲜度不降),
  * IDB 落盘去抖。未水合时 getCachedSignals() 返回 null,调用方回退投影。
  *
- * 冲突规则:同 id 时投影版本覆盖 IDB 版本(投影可被 updateLifeNode
- * 编辑,是更新鲜的内容);投影没有的 id 保留(事实库独立)。
+ * 冲突规则(与「IDB 是权威源」契约一致):
+ *   - 启动水合:同 id 时 IDB 版本胜出;投影独有的 id 回填(并写入 IDB)。
+ *     不再让陈旧投影覆盖并持久化 IDB —— 否则未来跨设备/云端拉取写进 IDB 的
+ *     编辑,会被下次 hydrate 的旧 localStorage 冲掉(数据完整性隐患)。
+ *   - 实时编辑(onGraphUpdated):本机刚经 updateLifeNode 改的投影就是最新,
+ *     那里投影同步叠加并写 IDB —— 与启动合并规则不冲突。
  */
 
 import { getLifeGraph, replaceLifeGraphProjection, type LifeNode } from '@/lib/portal/life-graph';
 import { lifeNodeToSignal, signalToLifeNode, type Signal } from './signal';
 import { bulkPutSignalsIdb, deleteSignalIdb, getAllSignalsIdb } from './signal-store-idb';
+import { mergeFactStore } from './signal-fact-merge.mjs';
 
 let byId: Map<string, Signal> | null = null;
 let listening = false;
@@ -34,7 +39,10 @@ export function getCachedSignals(): Signal[] | null {
   return byId ? Array.from(byId.values()) : null;
 }
 
-/** 投影同步叠加进缓存(同 id 投影胜出;缓存独有的 id 保留)。 */
+/**
+ * 投影同步叠加进缓存 —— 仅供实时编辑路径(onGraphUpdated)用:本机刚改的投影
+ * 是最新,同 id 投影胜出;缓存独有的 id 保留。启动水合走 hydrate 的 IDB-权威合并。
+ */
 function overlayProjection(): Signal[] {
   const graphSignals = getLifeGraph().map(lifeNodeToSignal);
   if (!byId) byId = new Map();
@@ -71,10 +79,13 @@ export async function hydrateSignalFactStore(): Promise<{ total: number } | null
   }
   try {
     const idbAll = await getAllSignalsIdb();
-    byId = new Map(idbAll.map((s) => [s.id, s]));
-    const graphSignals = overlayProjection();
-    await bulkPutSignalsIdb(graphSignals);
-    return { total: byId.size };
+    const projection = getLifeGraph().map(lifeNodeToSignal);
+    // IDB 权威:同 id 保留 IDB 版本,只回填投影独有的 id(并只把这些写进 IDB)。
+    const { merged, backfill } = mergeFactStore(idbAll, projection) as { merged: Signal[]; backfill: Signal[] };
+    const next = new Map<string, Signal>(merged.map((s) => [s.id, s] as const));
+    byId = next;
+    if (backfill.length) await bulkPutSignalsIdb(backfill);
+    return { total: next.size };
   } catch {
     byId = null; // 事实缓存是增强不是依赖:失败读路径走投影
     return null;

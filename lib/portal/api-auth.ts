@@ -19,12 +19,14 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { authorizeDecision, createRateLimiter } from './api-auth-core.mjs';
 
 function envValue(key: string): string {
   return (process.env[key] ?? '').trim();
 }
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
+// 判定逻辑见 api-auth-core.mjs(纯函数,有行为测试);这里只收集请求/cookie/env 值。
 
 export async function isPortalRequestAuthorized(req: NextRequest, opts?: { allowCrossOrigin?: boolean }): Promise<boolean> {
   const cookieStore = await cookies();
@@ -33,31 +35,22 @@ export async function isPortalRequestAuthorized(req: NextRequest, opts?: { allow
       cookieStore.get('baohe_auth_refresh')?.value ||
       cookieStore.get('baohe_wechat_openid')?.value,
   );
-  if (hasSession) return true;
-
-  const stage5 = envValue('NESIO_STAGE5_INVOCATION_SECRET');
-  const provided = req.headers.get('x-nesio-stage5-secret')?.trim() || '';
-  if (stage5 && provided === stage5) return true;
-
-  // No Supabase → personal/local deployment where the UI itself is open.
-  // The auth gate can't be stricter than the UI, but we can require the
-  // request to come from our own pages: when a browser sends Origin/Referer
-  // it must match this host. Blocks cross-site scripts and dumb scanners;
-  // rate limiting (below) handles direct curl-style abuse.
-  const noSupabase = !envValue('SUPABASE_URL') || !envValue('SUPABASE_ANON_KEY');
-  if (!noSupabase) return false;
-  // Routes serving the Capacitor iOS shells (CORS *) skip the origin check
-  // — capacitor:// origins never match the host; rate limiting still applies.
-  if (opts?.allowCrossOrigin) return true;
-  const host = req.headers.get('host') || '';
-  for (const header of ['origin', 'referer']) {
-    const value = req.headers.get(header);
-    if (!value) continue;
-    try {
-      if (new URL(value).host !== host) return false;
-    } catch { return false; }
-  }
-  return true;
+  const originValues = ['origin', 'referer']
+    .map((h) => req.headers.get(h))
+    .filter((v): v is string => Boolean(v));
+  return authorizeDecision({
+    hasSession,
+    stage5Secret: envValue('NESIO_STAGE5_INVOCATION_SECRET'),
+    providedStage5: req.headers.get('x-nesio-stage5-secret')?.trim() || '',
+    // No Supabase → personal/local deployment where the UI itself is open; the
+    // gate can't be stricter than the UI, so it falls back to a same-origin check.
+    noSupabase: !envValue('SUPABASE_URL') || !envValue('SUPABASE_ANON_KEY'),
+    // Capacitor iOS shells (CORS *) skip the origin check — capacitor:// never
+    // matches host; rate limiting still applies.
+    allowCrossOrigin: Boolean(opts?.allowCrossOrigin),
+    host: req.headers.get('host') || '',
+    originValues,
+  });
 }
 
 /**
@@ -79,9 +72,7 @@ export function isSameOriginRequest(req: NextRequest): boolean {
 
 // ── Rate limit (per-instance, per-IP) ─────────────────────────────────────────
 
-interface Window { count: number; resetAt: number }
-const windows = new Map<string, Window>();
-const MAX_TRACKED_KEYS = 5000;
+const limiter = createRateLimiter({ maxTrackedKeys: 5000 });
 
 function clientIp(req: NextRequest): string {
   return (
@@ -97,15 +88,7 @@ export function isRateLimited(
   { limit = 30, windowMs = 60_000 }: { limit?: number; windowMs?: number } = {},
 ): boolean {
   const key = `${routeId}:${clientIp(req)}`;
-  const now = Date.now();
-  const win = windows.get(key);
-  if (!win || win.resetAt <= now) {
-    if (windows.size >= MAX_TRACKED_KEYS) windows.clear(); // crude memory bound
-    windows.set(key, { count: 1, resetAt: now + windowMs });
-    return false;
-  }
-  win.count++;
-  return win.count > limit;
+  return limiter.check(key, Date.now(), { limit, windowMs });
 }
 
 // ── Combined guard for AI routes ──────────────────────────────────────────────
