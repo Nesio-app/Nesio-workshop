@@ -54,5 +54,5 @@ export default function ArticleReaderSheet({ title, article, onClose }: {
     );
   }
 
-  return <ReaderView book={book} onClose={onClose} />;
+  return <ReaderView book={book} rawText={article} onClose={onClose} />;
 }

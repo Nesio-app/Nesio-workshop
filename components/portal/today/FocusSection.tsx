@@ -166,6 +166,47 @@ export function TodayFocusSection({
     triggerFlash({ id: node.id, name: node.name });
   }
 
+  // 批次 32:今日聚焦「至多显示一个」—— 有置顶卡时它就是那一个,折叠区全收进「还有 N 项」;
+  // 没置顶卡时露出最靠前的一条(至少一个、至多一个),其余折叠。
+  const collapsedNodes: React.ReactNode[] = [
+    ...rest.map((obj) => (
+      <CollapsedCalItem key={obj.id} obj={obj} onOpenRecorder={() => setCalRecorderEvent(obj.event)} />
+    )),
+    ...nearSpecialDays.map((item) => (
+      <li key={item.nodeId} className="nesio-collapsed-item">
+        <div className="nesio-collapsed-row">
+          <span className="nesio-collapsed-icon"><IconGift size={15} /></span>
+          <span className="nesio-collapsed-title">{item.name}</span>
+          <span className="nesio-collapsed-day-tag">{item.daysUntil === 0 ? t(locale, 'todayLabelToday') : t(locale, 'todayLabelTomorrow')}</span>
+        </div>
+      </li>
+    )),
+    ...taskNodes.map((node) => (
+      <CollapsedTaskItem
+        key={node.id}
+        node={node}
+        doneIds={doneIds}
+        onDone={handleDone}
+        onDismiss={(id) => setDismissed((prev) => { const next = new Set(prev); next.add(id); persistDismissed(next); return next; })}
+        onOpenRecorder={onOpenRecorder ? () => onOpenRecorder(node) : undefined}
+        onFocusMode={onFocusMode ? () => onFocusMode(node) : undefined}
+      />
+    )),
+    ...(showDormant && dormantCandidate && dormantNodeId ? [(
+      <DormantReviewCard
+        key="dormant"
+        candidate={dormantCandidate}
+        onDo={() => { const next = applyReviewAction(dormantNodeId, 'do'); onSetDormantStore(next); setDormantDismissed((p) => { const n = new Set(p); n.add(dormantNodeId); return n; }); if (dormantCandidate.kind !== 'soft-archive') onFocusMode?.(dormantCandidate.node); }}
+        onSnooze={() => { const next = applyReviewAction(dormantNodeId, 'snooze'); onSetDormantStore(next); setDormantDismissed((p) => { const n = new Set(p); n.add(dormantNodeId); return n; }); }}
+        onArchive={() => { const next = applyReviewAction(dormantNodeId, 'archive'); onSetDormantStore(next); setDormantDismissed((p) => { const n = new Set(p); n.add(dormantNodeId); return n; }); }}
+        onFinalize={() => { const next = applyReviewAction(dormantNodeId, 'finalize'); onSetDormantStore(next); setDormantDismissed((p) => { const n = new Set(p); n.add(dormantNodeId); return n; }); }}
+      />
+    )] : []),
+  ];
+  const peekN = pinned ? 0 : 1;
+  const peeked = collapsedNodes.slice(0, peekN);
+  const hiddenNodes = collapsedNodes.slice(peekN);
+
   return (
     <div className="nesio-focus-section">
       <MemoryFlashBanner nodes={flashNodes} onDismiss={dismissFlash} />
@@ -195,89 +236,25 @@ export function TodayFocusSection({
             />
           )}
 
-          {/* ── Slot 2: 折叠区(批次 8:≤2 条直接铺开,不值得让人多点一下) ── */}
-          {collapsedCount > 0 && (
+          {/* ── Slot 2: 折叠区(批次 32:至多露一条,其余收进「还有 N 项」)── */}
+          {collapsedNodes.length > 0 && (
             <div className="nesio-collapsed-section">
-              {/* 批次 29:没有置顶卡时不整段折叠 —— 焦点区至少露出内容,不只显示「还有 N 项」 */}
-              {collapsedCount > 2 && pinned && (
-                <button
-                  type="button"
-                  className="nesio-collapsed-toggle"
-                  onClick={() => setCollapsed((v) => !v)}
-                  aria-expanded={!collapsed}
-                >
-                  <span className="nesio-collapsed-toggle-label">
-                    {collapsed ? t(locale, 'todayCollapsedMoreTemplate', { count: collapsedCount }) : t(locale, 'todayCollapse')}
-                  </span>
-                  <span className="nesio-collapsed-toggle-chevron">{collapsed ? '▾' : '▴'}</span>
-                </button>
-              )}
-
-              {(!collapsed || collapsedCount <= 2 || !pinned) && (
-                <ul className="nesio-collapsed-list">
-                  {/* Calendar events (non-pinned) */}
-                  {rest.map((obj) => (
-                    <CollapsedCalItem
-                      key={obj.id}
-                      obj={obj}
-                      onOpenRecorder={() => setCalRecorderEvent(obj.event)}
-                    />
-                  ))}
-
-                  {/* Special days */}
-                  {nearSpecialDays.map((item) => (
-                    <li key={item.nodeId} className="nesio-collapsed-item">
-                      <div className="nesio-collapsed-row">
-                        <span className="nesio-collapsed-icon"><IconGift size={15} /></span>
-                        <span className="nesio-collapsed-title">{item.name}</span>
-                        <span className="nesio-collapsed-day-tag">{item.daysUntil === 0 ? t(locale, 'todayLabelToday') : t(locale, 'todayLabelTomorrow')}</span>
-                      </div>
-                    </li>
-                  ))}
-
-                  {/* Task nodes */}
-                  {taskNodes.map((node) => (
-                    <CollapsedTaskItem
-                      key={node.id}
-                      node={node}
-                      doneIds={doneIds}
-                      onDone={handleDone}
-                      onDismiss={(id) => setDismissed((prev) => { const next = new Set(prev); next.add(id); persistDismissed(next); return next; })}
-                      onOpenRecorder={onOpenRecorder ? () => onOpenRecorder(node) : undefined}
-                      onFocusMode={onFocusMode ? () => onFocusMode(node) : undefined}
-                    />
-                  ))}
-
-                  {/* Dormant 任务判断卡 */}
-                  {showDormant && dormantCandidate && dormantNodeId && (
-                    <DormantReviewCard
-                      candidate={dormantCandidate}
-                      onDo={() => {
-                        const next = applyReviewAction(dormantNodeId, 'do');
-                        onSetDormantStore(next);
-                        setDormantDismissed((p) => { const n = new Set(p); n.add(dormantNodeId); return n; });
-                        if (dormantCandidate.kind !== 'soft-archive') {
-                          onFocusMode?.(dormantCandidate.node);
-                        }
-                      }}
-                      onSnooze={() => {
-                        const next = applyReviewAction(dormantNodeId, 'snooze');
-                        onSetDormantStore(next);
-                        setDormantDismissed((p) => { const n = new Set(p); n.add(dormantNodeId); return n; });
-                      }}
-                      onArchive={() => {
-                        const next = applyReviewAction(dormantNodeId, 'archive');
-                        onSetDormantStore(next);
-                        setDormantDismissed((p) => { const n = new Set(p); n.add(dormantNodeId); return n; });
-                      }}
-                      onFinalize={() => {
-                        const next = applyReviewAction(dormantNodeId, 'finalize');
-                        onSetDormantStore(next);
-                        setDormantDismissed((p) => { const n = new Set(p); n.add(dormantNodeId); return n; });
-                      }}
-                    />
-                  )}
-                </ul>
+              {peeked.length > 0 && <ul className="nesio-collapsed-list">{peeked}</ul>}
+              {hiddenNodes.length > 0 && (
+                <>
+                  <button
+                    type="button"
+                    className="nesio-collapsed-toggle"
+                    onClick={() => setCollapsed((v) => !v)}
+                    aria-expanded={!collapsed}
+                  >
+                    <span className="nesio-collapsed-toggle-label">
+                      {collapsed ? t(locale, 'todayCollapsedMoreTemplate', { count: hiddenNodes.length }) : t(locale, 'todayCollapse')}
+                    </span>
+                    <span className="nesio-collapsed-toggle-chevron">{collapsed ? '▾' : '▴'}</span>
+                  </button>
+                  {!collapsed && <ul className="nesio-collapsed-list">{hiddenNodes}</ul>}
+                </>
               )}
             </div>
           )}
