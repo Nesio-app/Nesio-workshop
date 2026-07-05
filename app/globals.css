@@ -17562,10 +17562,11 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 .nesio-rd-btn.is-active { border-color: var(--portal-accent); color: var(--portal-accent); background: var(--portal-accent-soft); }
 .nesio-rd-progress { height: 3px; background: var(--portal-line); }
 .nesio-rd-progress-fill { height: 100%; background: var(--portal-accent); transition: width 0.3s ease; }
-.nesio-rd-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 1rem 0.4rem calc(45vh + env(safe-area-inset-bottom)); }
-.nesio-rd-col { max-width: 40rem; margin: 0 auto; }
+.nesio-rd-scroll { flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; padding: 1rem 0.4rem calc(45vh + env(safe-area-inset-bottom)); }
+.nesio-rd-col { max-width: min(40rem, 100%); margin: 0 auto; }
 .nesio-rd-line { padding: 0.6rem 0.85rem; cursor: pointer; position: relative; transition: background 0.25s, margin 0.25s, padding 0.25s; }
-.nesio-rd-lt { font-size: calc(1.02rem * var(--nesio-rd-scale, 1)); line-height: 1.9; color: var(--portal-ink); transition: color 0.25s, font-size 0.25s, opacity 0.25s; }
+/* 批次 28:长串/无空格文本必须能换行,否则横向溢出、页面左右漂移 */
+.nesio-rd-lt { font-size: calc(1.02rem * var(--nesio-rd-scale, 1)); line-height: 1.9; color: var(--portal-ink); overflow-wrap: anywhere; word-break: break-word; transition: color 0.25s, font-size 0.25s, opacity 0.25s; }
 .nesio-rd-bb { font-weight: 800; }
 .nesio-rd-bn { font-weight: 300; }
 .nesio-rd-tag { display: inline-flex; align-items: center; gap: 3px; background: var(--portal-accent-soft); color: var(--portal-accent); border-radius: 6px; padding: 2px 7px; font-size: 0.62rem; font-weight: 700; margin-right: 5px; vertical-align: 0.06em; }
@@ -17579,6 +17580,11 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 .nesio-rd-bubble-tag { font-size: 0.6rem; color: var(--portal-accent); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
 .nesio-rd-end { text-align: center; color: var(--portal-muted); font-size: 0.72rem; padding: 1.6rem 0 0.4rem; }
 @keyframes nesio-rd-pop { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+/* 批次 28:划词存笔记条 */
+.nesio-rd-notebar { position: absolute; left: 0.6rem; right: 0.6rem; bottom: calc(0.8rem + env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 0.6rem; padding: 0.6rem 0.75rem; background: var(--portal-ink); color: var(--sheet-opaque); border-radius: 14px; box-shadow: 0 8px 30px rgba(0,0,0,0.28); animation: nesio-rd-pop 0.2s ease; z-index: 2; }
+.nesio-rd-notebar-text { flex: 1; min-width: 0; font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.9; }
+.nesio-rd-notebar-btn { flex-shrink: 0; border: none; border-radius: 999px; padding: 0.4rem 0.9rem; background: var(--portal-accent); color: #fff; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
+.nesio-rd-notebar-ok { flex: 1; text-align: center; font-size: 0.85rem; font-weight: 600; }
 
 /* 批次 26:书架 */
 .nesio-shelf-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.7rem; margin: 0.6rem 0 0.4rem; }

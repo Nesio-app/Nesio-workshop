@@ -3,46 +3,20 @@
 /**
  * ReaderView — 神经友好瀑布流阅读器(批次 26,移植自 reading-ios)。
  *
- * 渲染一本 ReaderBook:每行一个逻辑要点、bionic 首字加粗、卡拉OK 焦点遮罩
- * (当前行成卡高亮,已读行淡出),动作句打 ⚡ 标,前情提要泡泡点开,公式独立成卡。
- * 去掉了原版的积分/多巴胺商店/知识对撞等游戏化 —— Nesio 只要「友好读我的内容」。
+ * 渲染一本 ReaderBook:每行一个逻辑要点、卡拉OK 焦点遮罩(当前行成卡高亮,
+ * 已读行淡出),动作句打 ⚡ 标,前情提要泡泡点开,公式独立成卡。
+ * 批次 28:去掉 bionic 加粗(英文吃空格、加粗无意义);选中文字可「存为笔记」进记忆。
  */
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { flatLines, type FlatLine, type ReaderBook } from '@/lib/portal/adhd-reader';
 import { getReaderProgress, setReaderProgress } from '@/lib/portal/reader-store-idb';
+import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 
 const FONT_SCALES = [0.9, 1, 1.15];
-
-/** bionic 加粗:中文整字加粗,英文单词前 ~45% 加粗,数字/标点加粗。 */
-function BionicText({ text }: { text: string }) {
-  const tokens = useMemo(
-    () => text.match(/[一-鿿]|[a-zA-Z]+(?:'[a-z]+)?|\d+(?:\.\d+)?%?|[^\s]/g) || [text],
-    [text],
-  );
-  return (
-    <>
-      {tokens.map((tok, i) => {
-        if (/^[一-鿿]$/.test(tok)) {
-          return <span key={i} className="nesio-rd-bb">{tok}</span>;
-        }
-        if (/^[a-zA-Z]/.test(tok)) {
-          const cut = Math.max(1, Math.ceil(tok.length * 0.45));
-          return (
-            <Fragment key={i}>
-              <span className="nesio-rd-bb">{tok.slice(0, cut)}</span>
-              <span className="nesio-rd-bn">{tok.slice(cut)}</span>
-            </Fragment>
-          );
-        }
-        return <span key={i} className="nesio-rd-bb">{tok}</span>;
-      })}
-    </>
-  );
-}
 
 export default function ReaderView({ book, onClose }: { book: ReaderBook; onClose: () => void }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
@@ -52,10 +26,38 @@ export default function ReaderView({ book, onClose }: { book: ReaderBook; onClos
   const [fontStep, setFontStep] = useState(1);
   const [mask, setMask] = useState(true); // 卡拉OK 焦点遮罩
   const [openBubble, setOpenBubble] = useState<number | null>(null);
+  const [selText, setSelText] = useState('');
+  const [noteSaved, setNoteSaved] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number | null>(null);
   const restoredRef = useRef(false);
+
+  // 批次 28:选中正文 → 底部出「存为笔记」,存成带标签的记忆节点(挂到这篇文章)。
+  const readSelection = useCallback(() => {
+    const s = typeof window !== 'undefined' ? window.getSelection() : null;
+    const t = s && !s.isCollapsed ? s.toString().trim() : '';
+    setSelText(t.length >= 2 ? t : '');
+  }, []);
+
+  function saveNote() {
+    const text = selText.trim();
+    if (!text) return;
+    ingestLifeNode({
+      name: text.slice(0, 60),
+      type: 'preference',
+      source: 'manual',
+      confidence: 1,
+      rawInput: text,
+      tags: ['笔记', '摘录', book.title.slice(0, 24)],
+      attributes: { origin: '阅读摘录', fromArticle: book.title },
+      relations: [],
+    });
+    setNoteSaved(true);
+    window.getSelection()?.removeAllRanges();
+    setSelText('');
+    setTimeout(() => setNoteSaved(false), 1600);
+  }
 
   const commitActive = useCallback((idx: number) => {
     setActive(idx);
@@ -130,7 +132,7 @@ export default function ReaderView({ book, onClose }: { book: ReaderBook; onClos
 
       <div className="nesio-rd-progress"><div className="nesio-rd-progress-fill" style={{ width: `${percent}%` }} /></div>
 
-      <div className="nesio-rd-scroll" ref={scrollRef} onScroll={onScroll}>
+      <div className="nesio-rd-scroll" ref={scrollRef} onScroll={onScroll} onMouseUp={readSelection} onTouchEnd={readSelection}>
         <div className={`nesio-rd-col${mask ? ' has-mask' : ''}`}>
           {lines.map((line, i) => {
             const state = !mask ? '' : i < active ? ' is-dim' : i === active ? ' is-act' : '';
@@ -149,12 +151,14 @@ export default function ReaderView({ book, onClose }: { book: ReaderBook; onClos
                 <div
                   className="nesio-rd-lt"
                   onClick={() => {
+                    // 有选区时不抢焦点/滚动,避免打断划词
+                    if (window.getSelection && !window.getSelection()?.isCollapsed) return;
                     if (line.bubble) { setOpenBubble((v) => (v === i ? null : i)); return; }
                     commitActive(i);
                   }}
                 >
                   {line.tag && <span className="nesio-rd-tag">{line.tag}</span>}
-                  <BionicText text={line.text || ''} />
+                  {line.text}
                 </div>
                 {line.bubble && openBubble === i && (
                   <div className="nesio-rd-bubble">
@@ -168,6 +172,20 @@ export default function ReaderView({ book, onClose }: { book: ReaderBook; onClos
           <div className="nesio-rd-end">{L(dict, '— 读完了 —', '— End —')}</div>
         </div>
       </div>
+
+      {/* 批次 28:划词存笔记条 */}
+      {(selText || noteSaved) && (
+        <div className="nesio-rd-notebar">
+          {noteSaved ? (
+            <span className="nesio-rd-notebar-ok">{L(dict, '✓ 已存入记忆', '✓ Saved to Memory')}</span>
+          ) : (
+            <>
+              <span className="nesio-rd-notebar-text">{selText.length > 40 ? `${selText.slice(0, 40)}…` : selText}</span>
+              <button type="button" className="nesio-rd-notebar-btn" onClick={saveNote}>{L(dict, '存为笔记', 'Save note')}</button>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -129,6 +129,19 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
 
       const nodes = data.nodes || [];
       if (type === 'image' && nodes.length === 0) throw new Error('ai_image_empty');
+
+      // 批次 28:粘贴的是长正文(文章/笔记)时,保留全文到 article + 打「文章」标签,
+      // 这样存进记忆后能用瀑布流阅读器读(不需要单独书架)。
+      if (type === 'text') {
+        const full = content.trim();
+        if (full.length >= 200) {
+          if (nodes.length === 0) {
+            nodes.push({ type: 'preference', name: full.slice(0, 40), attributes: { article: full }, relations: [], tags: ['文章'], confidence: 0.8, rawInput: full.slice(0, 200) });
+          } else {
+            nodes[0] = { ...nodes[0], attributes: { ...nodes[0].attributes, article: full }, tags: Array.from(new Set([...(nodes[0].tags || []), '文章'])) };
+          }
+        }
+      }
       // Extract people, dates, locations from node attributes
       const people: string[] = [];
       let date: string | undefined;

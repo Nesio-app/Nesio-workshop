@@ -8,15 +8,14 @@ import { GeneralSheet, DataSheet, PrivacySheet, SubscriptionSheet } from './Sett
 import ConnectorsHub from './ConnectorsHub';
 import RoadmapSheet from './RoadmapSheet';
 import RoutineSheet from './RoutineSheet';
-import ReaderShelf from './reader/ReaderShelf';
 import SpendingSheet from './finance/SpendingSheet';
-import { IconClock, IconBookOpen, IconCard } from './icons';
+import { IconClock, IconCard } from './icons';
 import { L, t } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import { IconDatabase, IconGear, IconStar as IconStarOutline, IconGift } from './icons';
 
-type ActiveSheet = 'mirror' | 'general' | 'data' | 'privacy' | 'subscription' | 'connectors' | 'roadmap' | 'routine' | 'shelf' | 'spending' | null;
+type ActiveSheet = 'mirror' | 'general' | 'data' | 'privacy' | 'subscription' | 'connectors' | 'roadmap' | 'routine' | 'spending' | null;
 
 export default function NesioProfileCard() {
   const [displayName, setDisplayName] = useState('Jessy');
@@ -99,9 +98,6 @@ export default function NesioProfileCard() {
     { key: 'routine' as ActiveSheet,
       icon: <IconClock />,
       iconBg: 'var(--chip-blue)', label: L(dict, '例行提醒', 'Routines'), sublabel: L(dict, '到点在 Today 出卡提醒', 'Due reminders appear on Today') },
-    { key: 'shelf' as ActiveSheet,
-      icon: <IconBookOpen />,
-      iconBg: 'var(--chip-green)', label: L(dict, '书架', 'Bookshelf'), sublabel: L(dict, '导入书/文章 · 神经友好瀑布流阅读', 'Import books/articles · ADHD-friendly reader') },
     { key: 'spending' as ActiveSheet,
       icon: <IconCard />,
       iconBg: 'var(--chip-fog)', label: L(dict, '支出分析', 'Spending'), sublabel: L(dict, '银行流水 · 本月净支出/分类/商户', 'Bank feed · net spend, categories, merchants') },
@@ -174,7 +170,6 @@ export default function NesioProfileCard() {
       <ConnectorsHub open={activeSheet === 'connectors'} onClose={() => setActiveSheet(null)} />
       <RoadmapSheet open={activeSheet === 'roadmap'} onClose={() => setActiveSheet(null)} />
       <RoutineSheet open={activeSheet === 'routine'} onClose={() => setActiveSheet(null)} />
-      <ReaderShelf open={activeSheet === 'shelf'} onClose={() => setActiveSheet(null)} />
       <SpendingSheet open={activeSheet === 'spending'} onClose={() => setActiveSheet(null)} />
     </>
   );
