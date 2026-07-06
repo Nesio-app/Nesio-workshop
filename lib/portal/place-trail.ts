@@ -6,6 +6,14 @@
  * 可整段导入并入同一条流水。洞察 → 分析 → 「地点足迹」消费。
  */
 
+import { distributeDwell } from './temporal-bucketing.mjs';
+
+/** ISO 时间戳→ms(用 Date.parse 正确处理带偏移/Z 的时刻,避免把混合偏移字符串按字典序比较)。 */
+function tsMs(iso: string): number {
+  const t = Date.parse(iso);
+  return Number.isNaN(t) ? 0 : t;
+}
+
 export interface PlaceVisit {
   /** ISO 时间(到访开始) */
   ts: string;
@@ -27,8 +35,8 @@ export function loadPlaceTrail(): PlaceVisit[] {
 }
 
 function save(trail: PlaceVisit[]): void {
-  // 按时间倒序,封顶
-  const sorted = [...trail].sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, CAP);
+  // 按时间倒序,封顶(按真实时刻,不按字符串——混合时区偏移字典序会排错)
+  const sorted = [...trail].sort((a, b) => tsMs(b.ts) - tsMs(a.ts)).slice(0, CAP);
   try { localStorage.setItem(KEY, JSON.stringify(sorted)); } catch { /* quota */ }
   window.dispatchEvent(new CustomEvent(PLACE_TRAIL_UPDATED_EVENT));
 }
@@ -262,12 +270,6 @@ function localDateKey(iso: string): string {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 }
 
-/** 事件当地小时(0-23),用于时段分桶。 */
-function localHour(iso: string): number {
-  const w = wallClock(iso);
-  return w ? w.getUTCHours() : new Date(iso).getHours();
-}
-
 /** 段结束若跨到次日,截到当天 23:59 —— 避免「在家过夜」吞掉第二天、时长显示成 24h。 */
 function clampEndToDay(startIso: string, endIso: string): string {
   if (localDateKey(endIso) === localDateKey(startIso)) return endIso;
@@ -291,7 +293,7 @@ function clampEndToDay(startIso: string, endIso: string): string {
  * 天从新到旧,天内按时间正序(时间线读感:早 → 晚)。
  */
 export function buildPlaceTimeline(visits: PlaceVisit[], maxDays = 14): TimelineDay[] {
-  const sorted = [...visits].filter((v) => v.ts).sort((a, b) => a.ts.localeCompare(b.ts));
+  const sorted = [...visits].filter((v) => v.ts).sort((a, b) => tsMs(a.ts) - tsMs(b.ts));
   const segs: TimelineSegment[] = [];
   // 批次 30:别名一次读入 —— 类别按纠正后的名字推断(Unknown 改成「健身房」就归 fitness)。
   const aliases = loadPlaceAliases();
@@ -305,7 +307,7 @@ export function buildPlaceTimeline(visits: PlaceVisit[], maxDays = 14): Timeline
     const gapMs = last ? new Date(v.ts).getTime() - new Date(last.end).getTime() : Infinity;
     const sameDay = last && localDateKey(v.ts) === localDateKey(last.start);
     if (last && sameDay && last.label === v.label && gapMs < 3 * 3_600_000) {
-      if (end > last.end) last.end = end;
+      if (tsMs(end) > tsMs(last.end)) last.end = end;
       if (last.lat == null && v.lat != null) { last.lat = v.lat; last.lon = v.lon; }
     } else {
       segs.push({ label: v.label, category: categoryOf(disp(v.label)), start: v.ts, end, durationMin: 0, source: v.source, lat: v.lat, lon: v.lon });
@@ -327,7 +329,7 @@ export function buildPlaceTimeline(visits: PlaceVisit[], maxDays = 14): Timeline
   return [...byDay.entries()]
     .sort((a, b) => b[0].localeCompare(a[0]))
     .slice(0, maxDays)
-    .map(([dateKey, list]) => ({ dateKey, segments: list.sort((a, b) => a.start.localeCompare(b.start)) }));
+    .map(([dateKey, list]) => ({ dateKey, segments: list.sort((a, b) => tsMs(a.start) - tsMs(b.start)) }));
 }
 
 // ── 批次 28:Google 时间线 tab 用的 —— 行程/统计/聚类 ─────────────────────────
@@ -392,22 +394,31 @@ export interface PlaceCluster { label: string; category: PlaceCategory; totalMin
 const GENERIC_RE = /^(unknown|未知|未知地点|aliased location|searched address|地址)$/i;
 export function isGenericPlace(label: string): boolean { return GENERIC_RE.test((label || '').trim()); }
 
-/** 无名占位 + 有坐标 → 按 ~1km 粗坐标分桶,让不同地点分开(可各自改名/找真名)。 */
+/**
+ * 聚类分组 key:有坐标 → 名字 + ~110m 网格(3 位小数),同名同地并一起、
+ * 同名不同地分开(修「5 家不同星巴克并成一个常去地点」)。无坐标 → 退回按名字。
+ * 无名占位仍带坐标后缀以便区分/改名。
+ */
 function bucketKey(label: string, lat?: number, lon?: number): string {
-  if (isGenericPlace(label) && lat != null && lon != null) return `${label} ·${lat.toFixed(2)},${lon.toFixed(2)}`;
-  return label;
+  if (lat != null && lon != null) {
+    const cell = `${lat.toFixed(3)},${lon.toFixed(3)}`;
+    return isGenericPlace(label) ? `未名 ·${cell}` : `${label.toLowerCase()} @${cell}`;
+  }
+  return label.toLowerCase();
 }
 
-/** 常去地点聚类:跨全部数据按地点名聚合;无名占位按粗坐标拆开。 */
+/** 常去地点聚类:按「名字 + 粗坐标格」聚合,不同门店不合并;无名占位按粗坐标拆开。 */
 export function clusterPlaces(visits: PlaceVisit[], topN = 8): PlaceCluster[] {
   const segs = buildPlaceTimeline(visits, 3650).flatMap((d) => d.segments);
   const m = new Map<string, PlaceCluster>();
   for (const s of segs) {
     const key = bucketKey(s.label, s.lat, s.lon);
-    const c = m.get(key) || { label: key, category: s.category, totalMin: 0, visits: 0, lastTs: s.start, lat: s.lat, lon: s.lon, generic: isGenericPlace(s.label) };
+    // 显示名:命名地点用原名;无名占位用带坐标的 key 以便区分。
+    const displayLabel = isGenericPlace(s.label) ? `未名 ·${s.lat?.toFixed(2)},${s.lon?.toFixed(2)}` : s.label;
+    const c = m.get(key) || { label: displayLabel, category: s.category, totalMin: 0, visits: 0, lastTs: s.start, lat: s.lat, lon: s.lon, generic: isGenericPlace(s.label) };
     c.totalMin += s.durationMin;
     c.visits += 1;
-    if (s.start > c.lastTs) c.lastTs = s.start;
+    if (tsMs(s.start) > tsMs(c.lastTs)) c.lastTs = s.start;
     if (c.lat == null && s.lat != null) { c.lat = s.lat; c.lon = s.lon; }
     m.set(key, c);
   }
@@ -429,7 +440,7 @@ export function setGeocodeEnabled(on: boolean): void {
 export function travelPlaces(visits: PlaceVisit[], topN = 60): PlaceCluster[] {
   return clusterPlaces(visits, 99999)
     .filter((c) => c.category !== 'home' && c.category !== 'unknown')
-    .sort((a, b) => b.lastTs.localeCompare(a.lastTs))
+    .sort((a, b) => tsMs(b.lastTs) - tsMs(a.lastTs))
     .slice(0, topN);
 }
 
@@ -455,9 +466,13 @@ export function timeOfDayBuckets(visits: PlaceVisit[]): BucketShare[] {
   const m = new Map<TimeBucket, number>(order.map((b) => [b, 0]));
   const segs = buildPlaceTimeline(visits, 3650).flatMap((d) => d.segments);
   for (const s of segs) {
-    const h = localHour(s.start);
-    const b: TimeBucket = h < 5 ? 'night' : h < 8 ? 'dawn' : h < 12 ? 'morning' : h < 17 ? 'afternoon' : h < 21 ? 'evening' : 'night';
-    m.set(b, (m.get(b) || 0) + s.durationMin);
+    // 整段停留按跨越的小时分摊到各时段桶(4pm–10pm 晚餐分到 下午/傍晚/夜,而非全算下午)。
+    const w = wallClock(s.start);
+    const startHour = w ? w.getUTCHours() : new Date(s.start).getHours();
+    const startMin = w ? w.getUTCMinutes() : new Date(s.start).getMinutes();
+    for (const [b, min] of Object.entries(distributeDwell(startHour, startMin, s.durationMin))) {
+      m.set(b as TimeBucket, (m.get(b as TimeBucket) || 0) + min);
+    }
   }
   return order.map((bucket) => ({ bucket, min: m.get(bucket) || 0 }));
 }

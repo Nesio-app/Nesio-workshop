@@ -5,6 +5,8 @@
  * 纯函数,可单测。返回 Omit<LifeNode,'id'|'createdAt'|'source'> 形状的节点。
  */
 
+import { sleepNightKey } from './temporal-bucketing.mjs';
+
 export interface HealthNode {
   type: 'health_state' | 'event';
   name: string;
@@ -92,8 +94,9 @@ export function parseAppleHealthText(xml: string): HealthParseResult {
   // ── 睡眠:统计最近一晚的入睡时长 ──
   const sleep = records(xml, 'HKCategoryTypeIdentifierSleepAnalysis').filter((r) => /Asleep|InBed/i.test(r.value));
   if (sleep.length) {
-    const lastDay = sleep.map((r) => r.startDate.slice(0, 10)).sort().pop() || '';
-    const lastNight = sleep.filter((r) => r.startDate.slice(0, 10) === lastDay && /Asleep/i.test(r.value));
+    // 按"归属的那一晚"分组:跨午夜的一觉(23:00→07:00)并回入睡那天,不再只取后半段。
+    const lastDay = sleep.map((r) => sleepNightKey(r.startDate)).sort().pop() || '';
+    const lastNight = sleep.filter((r) => sleepNightKey(r.startDate) === lastDay && /Asleep/i.test(r.value));
     const ms = lastNight.reduce((s, r) => s + Math.max(0, parseAppleDate(r.endDate) - parseAppleDate(r.startDate)), 0);
     attrs.sleepRecords = sleep.length;
     if (ms > 0) {
@@ -307,7 +310,8 @@ class HealthAggregator {
       } else if (def.agg === 'sleep') {
         for (const r of records(text, def.hk)) {
           if (!/Asleep/i.test(r.value)) continue;
-          const day = r.startDate.slice(0, 10);
+          // 归属的那一晚:跨午夜的段并回入睡那天,避免"最近一晚"只统计到后半段。
+          const day = sleepNightKey(r.startDate);
           const ms = Math.max(0, parseAppleDate(r.endDate) - parseAppleDate(r.startDate));
           if (day) this.sleepMs.set(day, (this.sleepMs.get(day) || 0) + ms);
         }

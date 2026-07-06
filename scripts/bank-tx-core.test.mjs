@@ -108,4 +108,20 @@ const PAST_NOW = Date.parse('2000-01-01'); // 注入的 now:早于所有测试�
   );
 }
 
+// ── ② BILL_RE 裸词误判:"Premium Outlets"(商场)不再被当会员费 ──────────────
+{
+  // 规律月度、金额飘(商场消费),类别非购物 —— 唯一可能让它过的是被删掉的裸词 premium。
+  const mall = [
+    { date: '2026-01-05', amount: 45, name: 'Premium Outlets', currency: 'USD' },
+    { date: '2026-02-05', amount: 180, name: 'Premium Outlets', currency: 'USD' },
+    { date: '2026-03-05', amount: 22, name: 'Premium Outlets', currency: 'USD' },
+    { date: '2026-04-05', amount: 300, name: 'Premium Outlets', currency: 'USD' },
+  ];
+  assert.equal(
+    evaluateRecurringGroup(mall, { category: 'Services', now: PAST_NOW }),
+    null,
+    '"Premium Outlets" 金额飘 + premium 裸词已移除 → 不该被判成定期会员费。',
+  );
+}
+
 console.log('bank-tx-core: OK');
