@@ -13,6 +13,7 @@ import { normalizeGmailToSignal } from '@/lib/life-domain/normalizers';
 import { getIntegrationToken, saveIntegrationToken } from '@/lib/portal/integrations';
 import { buildEmailExtractionPrompt, parseJsonBlock } from '@/lib/extraction/extraction';
 import { cookies } from 'next/headers';
+import { resolveAiKey } from '@/lib/portal/ai-keys';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -150,7 +151,7 @@ async function fetchMessages(accessToken: string, max = 50, metadataOnly = true)
 }
 
 async function extractNodes(messages: GmailMessage[]): Promise<object[]> {
-  const geminiKey = envValue('GEMINI_API_KEY') || envValue('GOOGLE_GENERATIVE_AI_API_KEY');
+  const geminiKey = resolveAiKey('gemini');
   if (!geminiKey || !messages.length) return [];
 
   const emailTexts = messages.map((m) => {

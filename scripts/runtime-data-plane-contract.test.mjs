@@ -194,7 +194,7 @@ const signalEmbedding = read('lib/life-domain/signal-embedding.ts');
 for (const marker of [
   'SIGNAL_EMBEDDINGS_ENABLED',
   'SIGNAL_VECTOR_SEARCH_ENABLED',
-  'GEMINI_API_KEY',
+  "resolveAiKey('gemini')",
   'text-embedding-004',
   'outputDimensionality',
 ]) {

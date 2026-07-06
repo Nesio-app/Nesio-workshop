@@ -22,6 +22,7 @@ import {
 } from '@/lib/life-domain/normalizers';
 import { buildSourceExtractionPrompt, parseJsonBlock, SOURCE_HINTS } from '@/lib/extraction/extraction';
 import { isRateLimited } from '@/lib/portal/api-auth';
+import { resolveAiKey } from '@/lib/portal/ai-keys';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -49,7 +50,7 @@ function isIngestAllowed(req: NextRequest, bodySecret?: string): boolean {
 }
 
 async function extractNodes(source: string, content: string): Promise<{ nodes: object[]; summary: string }> {
-  const geminiKey = envValue('GEMINI_API_KEY') || envValue('GOOGLE_GENERATIVE_AI_API_KEY');
+  const geminiKey = resolveAiKey('gemini');
 
   if (!geminiKey) {
     // Rule-based fallback
