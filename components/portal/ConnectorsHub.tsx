@@ -784,16 +784,14 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
         showToast(L(dict, 'zip 里没找到 export.xml(别选 export_cda / 子文件夹)', 'No export.xml in the zip (not export_cda / subfolders)'), false);
         setSyncing(null); return;
       }
-      const { parseAppleHealthText, parseHealthMetricsFromBytes } = await import('@/lib/portal/apple-health');
-      // 指标看板:流式扫全文件 → 所有指标类型都拿到
-      const metrics = parseHealthMetricsFromBytes(bytes);
+      const { parseHealthFromBytes } = await import('@/lib/portal/apple-health');
+      // 看板指标 + 记忆节点(概况/锻炼)都基于全文件的同一次流式解析 —— 概况不再只看尾部 6MB,
+      // 避免 Apple 按类型分块导出时尾部缺步数/心率/睡眠而漏进概况。
+      const { metrics, nodes } = parseHealthFromBytes(bytes);
       if (metrics.metrics.length) {
         const { saveHealthMetrics } = await import('@/lib/portal/health-store');
         saveHealthMetrics(metrics);
       }
-      // 记忆节点:概况 + 锻炼(用尾部文本,便宜)
-      const tail = new TextDecoder('utf-8').decode(bytes.subarray(Math.max(0, bytes.length - 6_000_000)));
-      const { nodes } = parseAppleHealthText(tail);
       if (!nodes.length && !metrics.metrics.length) {
         showToast(L(dict, '未识别到健康数据(确认选的是 export.xml/zip,不是 export_cda)', 'No health data (make sure it is export.xml/zip, not export_cda)'), false);
         setSyncing(null); return;

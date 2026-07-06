@@ -95,6 +95,7 @@ function MetricCard({ m, dict }: { m: HealthMetric; dict: string }) {
       {delta != null && delta !== 0 ? (
         <span className={`nesio-health-card-delta${delta > 0 ? ' up' : ' down'}`}>
           {delta > 0 ? '▲' : '▼'} {gapLabel(m, dict)} {delta > 0 ? '+' : ''}{fmt(delta, m.decimals)}
+          <span className="nesio-health-card-date" style={{ marginLeft: '0.35rem', opacity: 0.7 }}>{m.latestDate.slice(5).replace('-', '/')}</span>
         </span>
       ) : (
         <span className="nesio-health-card-date">{m.latestDate.slice(5).replace('-', '/')}</span>
