@@ -16,6 +16,7 @@ import TrainingPlan from './TrainingPlan';
 import { computeFitnessInsight, type FitnessInsight } from '@/lib/platform/fitness-integrator';
 import { loadTrainingState, sessionsThisWeek, protocolById } from '@/lib/platform/training-protocol-engine';
 import { healthNarrative, analyzeSeries } from '@/lib/portal/health-narrative';
+import { mineRelationships } from '@/lib/portal/health-correlations';
 
 const TREND_HEADLINE: Record<FitnessInsight['trend'], [string, string]> = {
   up: ['体能上升中', 'Fitness rising'], flat: ['体能维持中', 'Holding steady'], down: ['体能下降中', 'Fitness dipping'], unknown: ['数据积累中', 'Gathering data'],
@@ -281,6 +282,24 @@ export default function HealthDashboard() {
             <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>{L(dict, '这段时间的健康', 'Your health lately')}</p>
             {story.map((s, i) => <p key={i} className="nesio-health-story-line">{s}</p>)}
             <p className="nesio-settings-option-hint" style={{ margin: '0.3rem 0 0' }}>{L(dict, '橙点=高峰 · 绿点=低谷 · 粉圈=异常', 'orange=peak · green=valley · pink ring=anomaly')}</p>
+          </div>
+        );
+      })()}
+      {(() => {
+        const rels = data.daily ? mineRelationships(data.daily) : [];
+        if (!rels.length) return null;
+        return (
+          <div className="nesio-fit-panel" style={{ marginTop: '0.6rem' }}>
+            <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>{L(dict, '跨板块关系', 'Cross-domain relationships')}</p>
+            {rels.map((rel) => (
+              <p key={rel.key} className="nesio-health-story-line">
+                <span style={{ display: 'inline-block', minWidth: 42, fontSize: '0.62rem', fontWeight: 600, color: rel.strength === 'strong' ? 'var(--status-go)' : 'var(--portal-muted)' }}>
+                  {rel.strength === 'strong' ? L(dict, '强', 'strong') : L(dict, '中', 'mod')} · n={rel.n}
+                </span>
+                {L(dict, rel.insight[0], rel.insight[1])}
+              </p>
+            ))}
+            <p className="nesio-settings-option-hint" style={{ margin: '0.3rem 0 0' }}>{L(dict, '统计相关,非因果 · 基于你的每日数据(非 AI)', 'Statistical correlation, not causation · from your daily data (not AI)')}</p>
           </div>
         );
       })()}

@@ -267,8 +267,10 @@ export interface DailyFact {
   date: string;                       // YYYY-MM-DD
   glucoseAvg?: number; glucoseMin?: number; glucoseMax?: number;  // mg/dL
   steps?: number; activeEnergy?: number; distance?: number;       // sumDay 类
-  restingHR?: number; hrv?: number;                               // latest 类当日值
+  restingHR?: number; hrv?: number;                               // latest 类当日均值
   sleepH?: number;                    // 当晚睡眠小时(按夜键归属)
+  daylight?: number;                  // 当日日照(分钟)
+  moodValence?: number;               // 当日情绪效价 [-1,1]
 }
 
 /** 批次 44(C):睡眠分期 —— 最近一晚的 Core/Deep/REM/清醒(iOS 16+),单位小时。 */
@@ -453,6 +455,9 @@ class HealthAggregator {
   private moodDay = new Map<string, { sum: number; count: number }>();
   private moodTotal = { sum: 0, count: 0 };
   private profile: Profile = {};
+  // E:跨域分析需要的 latest 类指标「按天均值」(restingHR/hrv)。
+  private dayLatest = new Map<string, Map<string, { sum: number; count: number }>>(); // key → date → {sum,count}
+  private static DAILY_LATEST_KEYS = new Set(['restingHR', 'hrv']);
 
   private feedGlucose(r: Rec, mgdl: number) {
     const day = r.startDate.slice(0, 10);
@@ -504,6 +509,13 @@ class HealthAggregator {
           const sv = convertUnit(def.key, v, r.unit);
           if (!plausible(def.key, sv)) continue; // 丢弃离谱脏值(换算后按规范单位判)
           if (def.key === 'glucose') this.feedGlucose(r, sv); // A:同一次扫描顺带深度采集,不重复读
+          if (HealthAggregator.DAILY_LATEST_KEYS.has(def.key)) { // E:按天均值(跨域相关用)
+            const day = r.startDate.slice(0, 10);
+            let dm = this.dayLatest.get(def.key);
+            if (!dm) { dm = new Map(); this.dayLatest.set(def.key, dm); }
+            const cell = dm.get(day) || { sum: 0, count: 0 };
+            cell.sum += sv; cell.count += 1; dm.set(day, cell);
+          }
           this.pushLatest(def.key, r.startDate.slice(0, 10), sv);
           if (!mm) { mm = new Map(); this.monthlyLatest.set(def.key, mm); }
           const ym = r.startDate.slice(0, 7);
@@ -750,6 +762,16 @@ class HealthAggregator {
       for (const [date, v] of collapseBySource(raw)) get(date)[key] = round(v, dec);
     }
     for (const [night, ms] of collapseBySource(this.sleepMs)) get(night).sleepH = round(ms / 3_600_000, 1);
+    // E:latest 类按天均值(restingHR/hrv)
+    for (const key of ['restingHR', 'hrv'] as const) {
+      const dm = this.dayLatest.get(key);
+      if (!dm) continue;
+      for (const [date, c] of dm) get(date)[key] = round(c.sum / c.count, 0);
+    }
+    // 日照(sumDay)与情绪效价(moodDay)也并入,作跨域相关的列
+    const dl = this.sumDay.get('daylight');
+    if (dl) for (const [date, v] of collapseBySource(dl)) get(date).daylight = round(v, 0);
+    for (const [date, m] of this.moodDay) get(date).moodValence = round(m.sum / m.count, 2);
     return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date)).slice(-180);
   }
 
