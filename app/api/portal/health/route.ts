@@ -6,9 +6,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { guardAiRoute } from '@/lib/portal/api-auth';
-import { resolveAiKey } from '@/lib/portal/ai-keys';
-
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+import { completeText, aiProviderAvailable } from '@/lib/portal/ai-complete';
 
 // Extract key health data from Apple Health XML
 function parseHealthXmlSummary(xml: string): string {
@@ -51,8 +49,7 @@ function parseHealthXmlSummary(xml: string): string {
 }
 
 async function extractHealthNodes(text: string): Promise<object[]> {
-  const geminiKey = resolveAiKey('gemini');
-  if (!geminiKey) {
+  if (!aiProviderAvailable()) {
     // Rule-based fallback
     return parseHealthFallback(text);
   }
@@ -75,14 +72,7 @@ async function extractHealthNodes(text: string): Promise<object[]> {
 健康数据：
 ${text.slice(0, 4000)}`;
 
-  const res = await fetch(`${GEMINI_URL}?key=${geminiKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-  });
-
-  const data = await res.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
-  const raw = data.candidates?.[0]?.content?.parts?.map((p) => p.text).join('') || '[]';
+  const raw = (await completeText({ prompt, maxTokens: 2048 })).text || '[]';
   const jsonStr = raw.match(/```(?:json)?\s*([\s\S]*?)```/)?.[1]?.trim() || raw.trim();
 
   try { return JSON.parse(jsonStr) as object[]; }

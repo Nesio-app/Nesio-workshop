@@ -22,12 +22,10 @@ import {
 } from '@/lib/life-domain/normalizers';
 import { buildSourceExtractionPrompt, parseJsonBlock, SOURCE_HINTS } from '@/lib/extraction/extraction';
 import { isRateLimited } from '@/lib/portal/api-auth';
-import { resolveAiKey } from '@/lib/portal/ai-keys';
+import { completeText, aiProviderAvailable } from '@/lib/portal/ai-complete';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
-
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
 function envValue(key: string): string {
   return (process.env[key] ?? '').trim();
@@ -50,9 +48,7 @@ function isIngestAllowed(req: NextRequest, bodySecret?: string): boolean {
 }
 
 async function extractNodes(source: string, content: string): Promise<{ nodes: object[]; summary: string }> {
-  const geminiKey = resolveAiKey('gemini');
-
-  if (!geminiKey) {
+  if (!aiProviderAvailable()) {
     // Rule-based fallback
     return {
       nodes: [{
@@ -71,14 +67,8 @@ async function extractNodes(source: string, content: string): Promise<{ nodes: o
   const prompt = buildSourceExtractionPrompt(source, content);
 
   try {
-    const res = await fetch(`${GEMINI_URL}?key=${geminiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-    });
-    const data = await res.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
-    const raw = data.candidates?.[0]?.content?.parts?.map((p) => p.text).join('') || '';
-    const parsed = parseJsonBlock<{ nodes?: object[]; summary?: string }>(raw);
+    const { text } = await completeText({ prompt, maxTokens: 2048 });
+    const parsed = parseJsonBlock<{ nodes?: object[]; summary?: string }>(text);
     if (!parsed) throw new Error('unparseable');
     return { nodes: parsed.nodes || [], summary: parsed.summary || '已记录' };
   } catch {

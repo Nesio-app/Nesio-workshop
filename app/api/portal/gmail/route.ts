@@ -13,13 +13,12 @@ import { normalizeGmailToSignal } from '@/lib/life-domain/normalizers';
 import { getIntegrationToken, saveIntegrationToken } from '@/lib/portal/integrations';
 import { buildEmailExtractionPrompt, parseJsonBlock } from '@/lib/extraction/extraction';
 import { cookies } from 'next/headers';
-import { resolveAiKey } from '@/lib/portal/ai-keys';
+import { completeText, aiProviderAvailable } from '@/lib/portal/ai-complete';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
 
 const GMAIL_API = 'https://gmail.googleapis.com/gmail/v1';
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
 function envValue(key: string): string {
   return (process.env[key] ?? '').trim();
@@ -151,8 +150,7 @@ async function fetchMessages(accessToken: string, max = 50, metadataOnly = true)
 }
 
 async function extractNodes(messages: GmailMessage[]): Promise<object[]> {
-  const geminiKey = resolveAiKey('gemini');
-  if (!geminiKey || !messages.length) return [];
+  if (!aiProviderAvailable() || !messages.length) return [];
 
   const emailTexts = messages.map((m) => {
     const subject = header(m, 'subject');
@@ -164,14 +162,7 @@ async function extractNodes(messages: GmailMessage[]): Promise<object[]> {
 
   const prompt = buildEmailExtractionPrompt(emailTexts);
 
-  const res = await fetch(`${GEMINI_URL}?key=${geminiKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-  });
-
-  const data = await res.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
-  const raw = data.candidates?.[0]?.content?.parts?.map((p) => p.text).join('') || '[]';
+  const raw = (await completeText({ prompt, maxTokens: 2048 })).text || '[]';
   return parseJsonBlock<object[]>(raw) ?? [];
 }
 
