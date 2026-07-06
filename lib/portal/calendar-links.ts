@@ -1,3 +1,5 @@
+import { reportStorageDropped } from './storage-health';
+
 export interface CalendarLinkSettings {
   googleCalendarUrl: string;
 }
@@ -38,7 +40,7 @@ export function saveCalendarLinkSettings(settings: CalendarLinkSettings): Calend
     try {
       localStorage.setItem(CALENDAR_LINK_KEY, JSON.stringify(next));
       window.dispatchEvent(new CustomEvent(CALENDAR_LINK_UPDATED_EVENT));
-    } catch { /* ignore */ }
+    } catch { reportStorageDropped(); }
   }
   return next;
 }

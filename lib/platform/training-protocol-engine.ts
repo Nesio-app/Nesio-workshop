@@ -13,6 +13,7 @@
 // ── 动作库:单一事实源在 life-domain/assets 的 skill-inventory(批次 40 迁出)──
 import { SKILL_INVENTORY, skillById, type Skill } from '@/lib/life-domain/assets/skill-inventory';
 import { localDayKey, countSessionsThisWeek } from '@/lib/platform/training-week.mjs';
+import { reportStorageDropped } from '@/lib/portal/storage-health';
 
 export type Exercise = Skill;
 export const EXERCISE_LIBRARY = SKILL_INVENTORY;
@@ -155,7 +156,7 @@ export function loadTrainingState(): TrainingState {
 
 export function saveTrainingState(s: TrainingState): void {
   if (typeof window === 'undefined') return;
-  try { localStorage.setItem(KEY, JSON.stringify(s)); } catch { /* quota */ }
+  try { localStorage.setItem(KEY, JSON.stringify(s)); } catch { reportStorageDropped(); }
 }
 
 export function startProtocol(protocolId: string): TrainingState {

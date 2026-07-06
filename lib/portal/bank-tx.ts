@@ -8,6 +8,8 @@
  * 金额符号约定(Plaid):正数 = 花出去(支出),负数 = 进账(退款/收入)。
  */
 
+import { reportStorageDropped } from './storage-health';
+
 export interface BankTx {
   id: string;
   date: string; // 'YYYY-MM-DD'
@@ -101,7 +103,7 @@ export function setFlowRule(name: string, flow: TxFlow | ''): void {
   if (typeof window === 'undefined') return;
   const rules = loadFlowRules();
   if (flow) rules[name] = flow; else delete rules[name];
-  try { localStorage.setItem(FLOW_RULE_KEY, JSON.stringify(rules)); } catch { /* ignore */ }
+  try { localStorage.setItem(FLOW_RULE_KEY, JSON.stringify(rules)); } catch { reportStorageDropped(); }
 }
 
 /** 交易类型:用户规则优先,否则按 Plaid 分类自动判(转账/还款/收入不计收支)。 */
@@ -283,7 +285,7 @@ export function setMerchantRule(name: string, category: string): void {
   if (typeof window === 'undefined') return;
   const rules = loadMerchantRules();
   if (category.trim()) rules[name] = category.trim(); else delete rules[name];
-  try { localStorage.setItem(MERCHANT_RULE_KEY, JSON.stringify(rules)); } catch { /* ignore */ }
+  try { localStorage.setItem(MERCHANT_RULE_KEY, JSON.stringify(rules)); } catch { reportStorageDropped(); }
 }
 
 /** 生效分类:用户规则优先,其次 Plaid 分类。 */
@@ -420,7 +422,7 @@ export function setRecurRule(name: string, v: 'yes' | 'no' | ''): void {
   if (typeof window === 'undefined') return;
   const all = loadRecurRules();
   if (v) all[name] = v; else delete all[name];
-  try { localStorage.setItem(RECUR_RULE_KEY, JSON.stringify(all)); } catch { /* ignore */ }
+  try { localStorage.setItem(RECUR_RULE_KEY, JSON.stringify(all)); } catch { reportStorageDropped(); }
 }
 
 /**

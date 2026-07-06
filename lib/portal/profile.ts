@@ -1,3 +1,5 @@
+import { reportStorageDropped } from './storage-health';
+
 export const SUPPORTED_PORTAL_LOCALES = [
   'zh',
   'en',
@@ -105,7 +107,7 @@ export function saveProfileSettings(patch: Partial<PortalProfileSettings>) {
       localStorage.setItem(KEYS.coachStyle, patch.coachStyle);
     }
     window.dispatchEvent(new CustomEvent(PROFILE_UPDATED_EVENT));
-  } catch { /* ignore */ }
+  } catch { reportStorageDropped(); }
 }
 
 export function clearProfileIdentity() {

@@ -6,6 +6,8 @@
  * 这里先把「内容 + 时间 + 重复」的闭环做实,不做假通知。
  */
 
+import { reportStorageDropped } from './storage-health';
+
 /** 重复计划分类(批次 45):自定义/健身/家务/吃药。健身可挂训练计划。 */
 export type RoutineCategory = 'general' | 'fitness' | 'chore' | 'meds';
 
@@ -37,7 +39,7 @@ export function loadRoutines(): Routine[] {
 }
 
 function save(routines: Routine[]): void {
-  try { localStorage.setItem(KEY, JSON.stringify(routines)); } catch { /* quota */ }
+  try { localStorage.setItem(KEY, JSON.stringify(routines)); } catch { reportStorageDropped(); }
   window.dispatchEvent(new CustomEvent(ROUTINES_UPDATED_EVENT));
 }
 
