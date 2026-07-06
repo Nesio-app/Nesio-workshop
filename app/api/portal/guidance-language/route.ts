@@ -18,6 +18,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { guardAiRoute } from '@/lib/portal/api-auth';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 30;
 
 interface CardInput {
   id: string;

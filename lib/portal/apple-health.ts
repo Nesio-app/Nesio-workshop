@@ -41,6 +41,20 @@ function parseAppleDate(s: string): number {
   return Number.isNaN(t) ? 0 : t;
 }
 
+/** 一段睡眠归属的"夜"键(按本地钟点):凌晨(<12 点)起始的段归到前一晚,
+ *  否则归当天 —— 让跨午夜的一整晚(23:30 入睡 + 次日凌晨段)聚成一条,不被拆成两天。 */
+function sleepNightKey(startDate: string): string {
+  const day = startDate.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return '';
+  const hour = Number(startDate.slice(11, 13));
+  if (Number.isFinite(hour) && hour < 12) {
+    const d = new Date(`${day}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() - 1);
+    return d.toISOString().slice(0, 10);
+  }
+  return day;
+}
+
 interface Rec { startDate: string; endDate: string; value: string }
 
 /** 抽取某个 HK type 的所有 <Record ...>(自闭合或带子元素的开标签都能匹配到开头)。 */
@@ -85,8 +99,12 @@ export function parseAppleHealthText(xml: string): HealthParseResult {
     summaryLines.push(`近 ${stepDays.length} 天日均 ${avg.toLocaleString()} 步(最近一天 ${attrs.stepsLatest.toLocaleString()} 步)`);
   }
 
-  // ── 心率:最近样本的均值/区间 ──
-  const hr = records(xml, 'HKQuantityTypeIdentifierHeartRate').map((r) => Number(r.value)).filter((v) => Number.isFinite(v) && v > 0);
+  // ── 心率:最近样本的均值/区间(按时间排序取最近 100 条,不假设文档顺序=时间顺序)──
+  const hr = records(xml, 'HKQuantityTypeIdentifierHeartRate')
+    .map((r) => ({ v: Number(r.value), t: parseAppleDate(r.startDate) }))
+    .filter((x) => Number.isFinite(x.v) && x.v > 0)
+    .sort((a, b) => a.t - b.t)
+    .map((x) => x.v);
   const hrRecent = hr.slice(-100);
   if (hrRecent.length) {
     const avg = Math.round(hrRecent.reduce((s, v) => s + v, 0) / hrRecent.length);
@@ -96,13 +114,19 @@ export function parseAppleHealthText(xml: string): HealthParseResult {
     summaryLines.push(`心率均值 ${avg} bpm(${attrs.heartRateMin}–${attrs.heartRateMax})`);
   }
 
-  // ── 睡眠:统计最近一晚的入睡时长 ──
+  // ── 睡眠:统计最近一晚的入睡时长(按"夜"聚合,跨午夜不拆成两天)──
   const sleep = records(xml, 'HKCategoryTypeIdentifierSleepAnalysis').filter((r) => /Asleep|InBed/i.test(r.value));
   if (sleep.length) {
-    const lastDay = sleep.map((r) => r.startDate.slice(0, 10)).sort().pop() || '';
-    const lastNight = sleep.filter((r) => r.startDate.slice(0, 10) === lastDay && /Asleep/i.test(r.value));
-    const ms = lastNight.reduce((s, r) => s + Math.max(0, parseAppleDate(r.endDate) - parseAppleDate(r.startDate)), 0);
+    const nightMs = new Map<string, number>();
+    for (const r of sleep) {
+      if (!/Asleep/i.test(r.value)) continue;
+      const key = sleepNightKey(r.startDate);
+      if (!key) continue;
+      nightMs.set(key, (nightMs.get(key) || 0) + Math.max(0, parseAppleDate(r.endDate) - parseAppleDate(r.startDate)));
+    }
     attrs.sleepRecords = sleep.length;
+    const lastKey = [...nightMs.keys()].sort().pop();
+    const ms = lastKey ? nightMs.get(lastKey) || 0 : 0;
     if (ms > 0) {
       const hours = (ms / 3_600_000).toFixed(1);
       attrs.sleepLastNightHours = hours;
@@ -110,10 +134,13 @@ export function parseAppleHealthText(xml: string): HealthParseResult {
     }
   }
 
-  // ── 体重:最近一条 ──
-  const weight = records(xml, 'HKQuantityTypeIdentifierBodyMass').map((r) => Number(r.value)).filter((v) => Number.isFinite(v) && v > 0);
+  // ── 体重:最近一条(按时间取,不假设文档顺序=时间顺序)──
+  const weight = records(xml, 'HKQuantityTypeIdentifierBodyMass')
+    .map((r) => ({ v: Number(r.value), t: parseAppleDate(r.startDate) }))
+    .filter((x) => Number.isFinite(x.v) && x.v > 0)
+    .sort((a, b) => a.t - b.t);
   if (weight.length) {
-    attrs.weightLatest = weight[weight.length - 1];
+    attrs.weightLatest = weight[weight.length - 1].v;
     summaryLines.push(`体重 ${attrs.weightLatest} kg`);
   }
 

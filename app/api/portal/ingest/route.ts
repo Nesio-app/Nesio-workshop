@@ -23,6 +23,7 @@ import {
 import { buildSourceExtractionPrompt, parseJsonBlock, SOURCE_HINTS } from '@/lib/extraction/extraction';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 30;
 
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 

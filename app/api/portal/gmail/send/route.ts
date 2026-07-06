@@ -10,8 +10,10 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveGmailAccessToken, hasNesioSession } from '@/lib/portal/gmail-access';
+import { isRateLimited } from '@/lib/portal/api-auth';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 20;
 
 const GMAIL_API = 'https://gmail.googleapis.com/gmail/v1';
 
@@ -57,6 +59,10 @@ async function fetchThreadingHeaders(accessToken: string, emailId: string): Prom
 export async function POST(req: NextRequest) {
   if (!(await hasNesioSession())) {
     return NextResponse.json({ ok: false, error: 'auth_required' }, { status: 401 });
+  }
+  // 已登录用户也不能无节流批量发信。
+  if (isRateLimited(req, 'gmail-send', { limit: 20 })) {
+    return NextResponse.json({ ok: false, error: 'rate_limited', retryAfterMs: 30_000 }, { status: 429 });
   }
 
   let payload: { to?: string; subject?: string; body?: string; emailId?: string };

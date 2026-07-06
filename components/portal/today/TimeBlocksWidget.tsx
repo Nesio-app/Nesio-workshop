@@ -8,7 +8,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { getCachedCalendarEvents } from '@/lib/portal/environment';
-import { loadPlaceTrail, PLACE_TRAIL_UPDATED_EVENT } from '@/lib/portal/place-trail';
+import { loadPlaceTrail, displayLabel, PLACE_TRAIL_UPDATED_EVENT } from '@/lib/portal/place-trail';
 import type { CalendarEvent } from '@/lib/portal/types';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -70,7 +70,8 @@ export function TimeBlocksWidget({ canUsePrivateData }: { canUsePrivateData: boo
       const explicitEnd = v.end ? Date.parse(v.end) : NaN;
       const nextStart = i + 1 < sorted.length ? Date.parse(sorted[i + 1].ts) : NaN;
       const end = Number.isFinite(explicitEnd) ? explicitEnd : Number.isFinite(nextStart) ? nextStart : s + 30 * 60000;
-      out.push({ start: s, end, label: v.label, kind: 'place' });
+      // 套用用户改过的地点别名(和足迹/时间线其它 UI 一致),generic 占位也兜底。
+      out.push({ start: s, end, label: displayLabel(v.label), kind: 'place' });
     });
 
     return out.sort((a, b) => a.start - b.start);

@@ -15,6 +15,7 @@ import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import { track } from '@/lib/portal/telemetry';
 import { parsePriceNumber } from '@/lib/platform/rewards-engine';
+import { useSheetDismiss } from '@/lib/portal/use-sheet-dismiss';
 
 export interface BarcodeResult {
   upc: string;
@@ -35,6 +36,8 @@ export default function BarcodeScanSheet({ open, onClose, onResult }: {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [status, setStatus] = useState<'starting' | 'scanning' | 'looking-up' | 'error'>('starting');
   const [errorMsg, setErrorMsg] = useState('');
+  // 可见失败纪律:查询失败/未命中时不静默吞成空条目关闭,显式提示 + 留"仍然添加"手动出口。
+  const [pendingResult, setPendingResult] = useState<BarcodeResult | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -64,15 +67,24 @@ export default function BarcodeScanSheet({ open, onClose, onResult }: {
                 body: JSON.stringify({ url: text }),
               });
               const data = await res.json() as { ok?: boolean; title?: string; price?: string; image?: string; store?: string };
-              onResult({
-                upc: '', url: text, title: data.title || '',
-                image: data.image, store: data.store,
-                priceLabel: data.price, price: parsePriceNumber(data.price),
-              });
+              if (data.ok !== false && data.title) {
+                onResult({
+                  upc: '', url: text, title: data.title,
+                  image: data.image, store: data.store,
+                  priceLabel: data.price, price: parsePriceNumber(data.price),
+                });
+                onClose();
+              } else {
+                // 解析没拿到商品名:提示,并留"仍然添加(仅链接)"出口。
+                setPendingResult({ upc: '', url: text, title: '' });
+                setErrorMsg(L(dict, '没查到商品信息,可仍按链接添加或重扫。', "Couldn't find product info — add by link anyway, or rescan."));
+                setStatus('error');
+              }
             } catch {
-              onResult({ upc: '', url: text, title: '' }); // 解析失败:URL 本身也有用
+              setPendingResult({ upc: '', url: text, title: '' });
+              setErrorMsg(L(dict, '查询失败(网络问题),可仍按链接添加或重扫。', 'Lookup failed (network) — add by link anyway, or rescan.'));
+              setStatus('error');
             }
-            onClose();
             return;
           }
 
@@ -86,13 +98,19 @@ export default function BarcodeScanSheet({ open, onClose, onResult }: {
             try {
               const res = await fetch(`/api/portal/barcode-lookup?upc=${code}`);
               const data = await res.json() as { ok?: boolean; title?: string; image?: string; price?: number; error?: string };
-              onResult(data.ok
-                ? { upc: code, title: data.title || '', image: data.image, price: data.price }
-                : { upc: code, title: '' });
+              if (data.ok && data.title) {
+                onResult({ upc: code, title: data.title, image: data.image, price: data.price });
+                onClose();
+              } else {
+                setPendingResult({ upc: code, title: '' });
+                setErrorMsg(L(dict, '商品库里没查到这个条码,可仍按条码添加或重扫。', "This barcode isn't in the catalog — add by code anyway, or rescan."));
+                setStatus('error');
+              }
             } catch {
-              onResult({ upc: code, title: '' });
+              setPendingResult({ upc: code, title: '' });
+              setErrorMsg(L(dict, '查询失败(网络问题),可仍按条码添加或重扫。', 'Lookup failed (network) — add by code anyway, or rescan.'));
+              setStatus('error');
             }
-            onClose();
             return;
           }
 
@@ -117,6 +135,8 @@ export default function BarcodeScanSheet({ open, onClose, onResult }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
+  useSheetDismiss(open, onClose);
+
   if (!open) return null;
 
   return (
@@ -132,6 +152,16 @@ export default function BarcodeScanSheet({ open, onClose, onResult }: {
           {status === 'looking-up' && L(dict, '查询商品信息…', 'Looking up the product…')}
           {status === 'error' && errorMsg}
         </p>
+        {status === 'error' && pendingResult && (
+          <button
+            type="button"
+            className="nesio-cooling-link"
+            style={{ fontWeight: 600 }}
+            onClick={() => { onResult(pendingResult); onClose(); }}
+          >
+            {L(dict, '仍然添加', 'Add anyway')}
+          </button>
+        )}
         <button type="button" className="nesio-cooling-link" onClick={onClose}>{L(dict, '取消', 'Cancel')}</button>
       </div>
     </div>

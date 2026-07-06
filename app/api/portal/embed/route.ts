@@ -11,6 +11,7 @@ import { embedTextRaw } from '@/lib/life-domain/signal-embedding';
 import { isPortalRequestAuthorized, isRateLimited } from '@/lib/portal/api-auth';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 30;
 
 function envValue(key: string): string {
   return (process.env[key] ?? '').trim();

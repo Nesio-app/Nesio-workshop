@@ -15,6 +15,7 @@ import { guardAiRoute } from '@/lib/portal/api-auth';
 import { notionRowToNode, notionDbTitle, type NotionRow } from '@/lib/portal/notion-map';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 30;
 
 const NOTION_API = 'https://api.notion.com/v1';
 const NOTION_VERSION = '2022-06-28';
@@ -210,6 +211,7 @@ export async function POST(req: NextRequest) {
   // Fetch text for each page
   const pageContents = await Promise.all(
     pages.map(async (p) => ({
+      id: p.id,
       title: extractTitle(p),
       text: await fetchPageText(token, p.id),
       url: p.url,
@@ -221,10 +223,13 @@ export async function POST(req: NextRequest) {
 
   // 批次 31:没配 Gemini(或 AI 解析空)时,别丢数据 —— 直接把每个 Notion 页面
   // 存成可读的记忆节点(标题 + 正文),用户至少能看到、能读。
+  // 修「重同步堆重复」:兜底节点与页面 1:1,带上 notionPageId,ingestLifeNode 按
+  //(source + notionPageId)幂等 upsert,重复点"同步"不再成倍入库。
+  // (AI 提取路径每页可能产出多个实体,无法用单个 pageId 作幂等键,故仅兜底路径去重。)
   const finalNodes = nodes.length ? nodes : contentPages.map((p) => ({
     type: 'preference',
     name: (p.title || 'Notion').slice(0, 60),
-    attributes: { source: 'Notion', ...(p.url ? { url: p.url } : {}), ...(p.text ? { article: p.text } : {}) },
+    attributes: { source: 'Notion', notionPageId: p.id, ...(p.url ? { url: p.url } : {}), ...(p.text ? { article: p.text } : {}) },
     relations: [],
     tags: ['Notion'],
     confidence: 0.7,
