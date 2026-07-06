@@ -16,6 +16,8 @@ import { getLifeGraph } from '@/lib/portal/life-graph';
 import {
   defaultEnergyBaseline,
   updateEnergyBaseline,
+  energyStd,
+  meanExcludingLatest,
   type EnergyBaseline,
 } from '@/lib/portal/moment-analytics';
 
@@ -78,8 +80,10 @@ export function getEnergyState(now: Date = new Date()): EnergyState {
   const latestDate = new Date(latest.at);
   if (latestDate.toDateString() !== now.toDateString()) return 'unknown';
 
-  const sd = Math.sqrt(Math.max(store.baseline.variance, 1));
-  const delta = latest.value - store.baseline.mean;
+  // 🟠#6 SD 下限统一走 energyStd(floor 4/std≥2),不再用本地 max(var,1);
+  // delta 拿「排除当前读数」的基线比,避免均值已折进 latest 而系统性偏向 'normal'。
+  const sd = energyStd(store.baseline);
+  const delta = latest.value - meanExcludingLatest(store.baseline, latest.value);
   if (delta < -sd) return 'low';
   if (delta > sd) return 'high';
   return 'normal';

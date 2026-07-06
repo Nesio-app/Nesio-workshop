@@ -22,10 +22,19 @@ export interface MirrorProfile {
   updatedAt: string;
 }
 
+// 🔴#4 冷启动:清醒时段的先验(0=深夜最差 → 白天最佳)。用作初始种子 + 并列时的次序,
+// 避免新用户 hourEngagement 全 0.5、稳定排序把「最佳打扰时段」判成凌晨 0-7 点(最差窗口)。
+//                   0   1   2   3   4   5    6    7    8    9   10   11   12   13   14   15   16   17   18   19   20   21   22   23
+const HOUR_PRIOR = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.2, 0.4, 0.7, 0.9, 1.0, 1.0, 0.8, 0.8, 0.9, 1.0, 1.0, 0.9, 0.8, 0.8, 0.7, 0.6, 0.4, 0.2];
+/** 把先验映射成 0.35–0.55 的软基线:有先验但很弱,几次真实反馈就能盖过。 */
+function seededHourEngagement(): number[] {
+  return HOUR_PRIOR.map((p) => 0.35 + 0.2 * p);
+}
+
 function defaultMirror(): MirrorProfile {
   return {
     domainWeights: {},
-    hourEngagement: Array(24).fill(0.5),
+    hourEngagement: seededHourEngagement(),
     feedbackCount: 0,
     interruptionStyle: 'proactive',
     updatedAt: new Date().toISOString(),
@@ -78,6 +87,13 @@ export function learnFromFeedback(
   const hour = new Date().getHours();
   const current = profile.domainWeights[domain] ?? 0.5;
 
+  // 🟠#5 抗单调饱和:每次反馈都把所有小时轻微拉回先验(均值回归),没被持续正反馈的时段
+  // 会淡出,重度用户不再所有活跃时段一起趋近 1.0、丢失区分度。
+  for (let h = 0; h < 24; h++) {
+    const prior = 0.35 + 0.2 * HOUR_PRIOR[h];
+    profile.hourEngagement[h] += 0.02 * (prior - profile.hourEngagement[h]);
+  }
+
   // Adjust domain weight
   if (feedback === 'useful') {
     profile.domainWeights[domain] = Math.min(1, current + 0.08);
@@ -115,7 +131,8 @@ export function getBestInterruptionHours(): number[] {
   const profile = getMirrorProfile();
   return profile.hourEngagement
     .map((v, h) => ({ h, v }))
-    .sort((a, b) => b.v - a.v)
+    // 🔴#4 并列时按清醒先验决胜(而非索引序),避免全 0.5 时判成凌晨最差窗口。
+    .sort((a, b) => (b.v - a.v) || (HOUR_PRIOR[b.h] - HOUR_PRIOR[a.h]))
     .slice(0, 8)
     .map((x) => x.h);
 }

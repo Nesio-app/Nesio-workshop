@@ -63,6 +63,16 @@ export function energyStd(b: EnergyBaseline): number {
 }
 
 /**
+ * 🟠#6 反解 EWMA:去掉最近一次折入的样本后的均值。
+ * 「当前读数 vs 基线」时,基线不能含当前读数本身(否则 α=0.15 把均值拉向最新值,delta
+ * 被系统性缩小、偏向 'normal')。latestVal 必须是最后一次 updateEnergyBaseline 折入的值。
+ */
+export function meanExcludingLatest(b: EnergyBaseline, latestVal: number): number {
+  if (b.sampleCount <= 1) return b.mean;
+  return (b.mean - EWMA_ALPHA * latestVal) / (1 - EWMA_ALPHA);
+}
+
+/**
  * Oura 式疲劳评分：偏离个人基线的标准差数
  * > 1.5 → 轻度疲劳预警
  * > 2.5 → 中度疲劳（触发 GuidanceCard）
