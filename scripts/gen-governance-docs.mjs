@@ -226,6 +226,30 @@ writeFileSync(join(OUT, '.gitbook.yaml'), `root: ./
 structure:
   summary: SUMMARY.md
 `);
+// ---------- 快照 JSON:给 admin 治理面板用(serverless 里不能跑 report:modules,它要读源文件)----------
+const snapshot = {
+  generatedAt: new Date().toISOString(),
+  status: sum.status ?? null,
+  summary: {
+    moduleCount: sum.moduleCount ?? null,
+    readyModuleCount: sum.readyModuleCount ?? null,
+    externalLinkCount: sum.externalLinkCount ?? null,
+    approvalGateContractCount: sum.approvalGateContractCount ?? null,
+    approvalGateKnownActionCount: sum.approvalGateKnownActionCount ?? null,
+  },
+  dataBus: {
+    dataKeyCount: bus.dataKeyCount ?? null,
+    connectedDataKeyCount: bus.connectedDataKeyCount ?? null,
+    orphanedDataKeyCount: bus.orphanedDataKeyCount ?? null,
+    edgeCount: bus.edgeCount ?? null,
+    warningCount: bus.warningCount ?? null,
+  },
+  driftGuardWarnings: R.registryDriftGuard?.summary?.warningCount ?? null,
+  statusCounts: gov.byStatus,
+};
+writeFileSync(join(ROOT, 'lib/portal/governance-snapshot.json'), JSON.stringify(snapshot, null, 2) + '\n');
+console.log('  ✓ lib/portal/governance-snapshot.json');
+
 writeFileSync(join(OUT, 'SUMMARY.md'), `# 目录
 
 ## 治理(可见 · 可信)
