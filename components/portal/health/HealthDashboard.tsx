@@ -19,6 +19,7 @@ import { healthNarrative, analyzeSeries } from '@/lib/portal/health-narrative';
 import { mineRelationships } from '@/lib/portal/health-correlations';
 import { loadClinical, type StoredClinical } from '@/lib/portal/clinical-store';
 import { readLaunchSurfaceContextFromBrowser } from '@/lib/portal/launch-surface.mjs';
+import { evaluateHealthFindings, type Severity } from '@/lib/portal/health-clinical';
 
 const TREND_HEADLINE: Record<FitnessInsight['trend'], [string, string]> = {
   up: ['体能上升中', 'Fitness rising'], flat: ['体能维持中', 'Holding steady'], down: ['体能下降中', 'Fitness dipping'], unknown: ['数据积累中', 'Gathering data'],
@@ -306,6 +307,29 @@ function ClinicalCard({ c, dict }: { c: StoredClinical; dict: string }) {
   );
 }
 
+// 批次 49:健康提示卡 —— 指南接地的确定性判定(①目标 + ②模式),依严重度着色 + 出处。
+function FindingsCard({ data, dict }: { data: HealthMetrics; dict: string }) {
+  const findings = evaluateHealthFindings({ glucose: data.glucose, sleepStages: data.sleepStages, metrics: data.metrics });
+  if (!findings.length) return null;
+  const color: Record<Severity, string> = { flag: 'var(--status-risk)', attention: 'var(--status-gentle)', info: 'var(--status-go)' };
+  const dot: Record<Severity, [string, string]> = { flag: ['需留意', 'flag'], attention: ['可关注', 'watch'], info: ['正常', 'ok'] };
+  return (
+    <div className="nesio-fit-panel" style={{ marginTop: '0.6rem' }}>
+      <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>{L(dict, '健康提示 · 依据指南', 'Health flags · guideline-based')}</p>
+      {findings.map((f) => (
+        <div key={f.id} style={{ display: 'flex', gap: '0.5rem', alignItems: 'baseline', marginBottom: '0.35rem' }}>
+          <span style={{ flexShrink: 0, minWidth: 44, fontSize: '0.62rem', fontWeight: 600, color: color[f.severity] }}>● {L(dict, dot[f.severity][0], dot[f.severity][1])}</span>
+          <span className="nesio-health-story-line" style={{ margin: 0 }}>
+            <b>{L(dict, f.title[0], f.title[1])}</b> — {L(dict, f.detail[0], f.detail[1])}
+            <span style={{ display: 'block', fontSize: '0.62rem', color: 'var(--portal-muted)' }}>{L(dict, `依据:${f.source}`, `source: ${f.source}`)}</span>
+          </span>
+        </div>
+      ))}
+      <p className="nesio-settings-option-hint" style={{ margin: '0.3rem 0 0' }}>{L(dict, '对照已发表共识/指南的规则判定,非 AI、非诊断;红旗请与医生确认', 'Rule-based against published consensus; not AI, not a diagnosis')}</p>
+    </div>
+  );
+}
+
 function MetricCard({ m, dict }: { m: HealthMetric; dict: string }) {
   // prev===0 时也算 delta(如上月 0 次锻炼 → 本月 3 次是真实增长,不该被压成"无变化");
   // 只有 deltaPct 因除零需要 prev!==0。
@@ -389,6 +413,7 @@ export default function HealthDashboard() {
           </div>
         );
       })()}
+      <FindingsCard data={data} dict={dict} />
       {(() => {
         const rels = data.daily ? mineRelationships(data.daily) : [];
         if (!rels.length) return null;

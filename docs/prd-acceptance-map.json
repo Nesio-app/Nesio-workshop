@@ -36,6 +36,48 @@
       "marker": "expiresAt",
       "file": "components/portal/today/useTodayData.ts",
       "status_note": "已实现(computeExpiry + 渲染层过滤)"
+    },
+    {
+      "id": "HEALTH-001",
+      "description": "血糖深度分析:TIR / GMI / 变异系数 CV / 每日范围带 / 0–23 点小时模式(原 PRD 未覆盖,2026-07 新增)",
+      "marker": "GlucoseAnalysis",
+      "file": "lib/portal/apple-health.ts",
+      "status_note": "已实现:按用户原始单位显示,内部 mg/dL;数据 ≥14 条才生成"
+    },
+    {
+      "id": "HEALTH-002",
+      "description": "睡眠分期(Core/Deep/REM/清醒)+ 活动三环 + 锻炼富数据(距离/消耗);睡眠总时长以分期为准不重复计",
+      "marker": "buildSleepStages",
+      "file": "lib/portal/apple-health.ts",
+      "status_note": "已实现:sleepAsleepByNight() 有分期用 Core+Deep+REM,避免与概况段重叠翻倍"
+    },
+    {
+      "id": "HEALTH-003",
+      "description": "综合分析:跨板块关系挖掘(相关 + 滞后效应),假设驱动避免虚假相关,n≥14/|r|≥0.3",
+      "marker": "export function mineRelationships",
+      "file": "lib/portal/health-correlations.ts",
+      "status_note": "已实现:确定性统计内核,人话洞察,标注统计相关非因果"
+    },
+    {
+      "id": "HEALTH-004",
+      "description": "AI 跨数据叙事:在确定性关系之上生成建议,过 guardAiRoute,数据围进 <data> 不当指令,不下诊断,有可见失败态",
+      "marker": "'health_insight'",
+      "file": "app/api/portal/health-insight/route.ts",
+      "status_note": "已实现:Claude 主/Gemini 备/确定性兜底;登记 docs/api-routes.md"
+    },
+    {
+      "id": "HEALTH-005",
+      "description": "临床记录(export_cda.xml 化验单/用药/诊断):仅 lab 模式捕获/解析/存储/渲染,本机不上云",
+      "marker": "export function parseCda",
+      "file": "lib/portal/cda-parse.ts",
+      "status_note": "已实现:CDA 防御式解析,viewerRole==='personal_lab' 门控,独立 nesio-clinical-v1 key"
+    },
+    {
+      "id": "HEALTH-006",
+      "description": "指南接地的确定性判定(医疗级 ①目标+②模式):TIR/TBR/CV 对照共识、黎明现象、深睡比例、静息心率/HRV 偏离基线;带出处、非诊断、红旗转诊",
+      "marker": "export function evaluateHealthFindings",
+      "file": "lib/portal/health-clinical.ts",
+      "status_note": "已实现:声明式 RULES(知识)+ 通用 evaluate(引擎)分离;每条带指南出处"
     }
   ]
 }

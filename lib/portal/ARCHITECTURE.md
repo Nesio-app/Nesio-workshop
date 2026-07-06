@@ -4,8 +4,10 @@
 It owns the contracts and resolvers that let Shell, tools, local data, launch
 readiness, and reports share one vocabulary.
 
-Current top-level file count: 111 (2026-07 audit; was 53 when this doc was
-first written — growth is mostly algorithm-layer extractions and contracts.
+Current top-level file count: 136 (2026-07 audit; was 53 when this doc was
+first written — growth is mostly algorithm-layer extractions and contracts,
+incl. the 2026-07 health-insight pack: apple-health / health-correlations /
+health-insight-prompt / health-clinical / cda-parse / clinical-store.
 See docs/api-routes.md for the API surface and its auth matrix).
 
 ## Responsibilities
