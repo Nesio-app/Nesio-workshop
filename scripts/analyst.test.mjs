@@ -2,7 +2,7 @@
  * 分析师规则 + 学习测试 —— 判断确定、冷启动/基线切换正确、反馈静音生效。
  */
 import assert from 'node:assert/strict';
-import { buildDailyReport, extractSignals, summarizeFeedback, renderReportText, buildAnalystPrompt } from '../lib/portal/analyst.mjs';
+import { buildDailyReport, extractSignals, summarizeFeedback, computeLearningState, renderReportText, buildAnalystPrompt } from '../lib/portal/analyst.mjs';
 
 const stableMetrics = (weekEvents) => ({
   windows: { week: { events: weekEvents, devices: 5 }, month: { events: 400 } },
@@ -77,7 +77,21 @@ const gov = (extra = {}) => ({ snapshot: { dataBus: { dataKeyCount: 34, orphaned
   assert.equal(s.ai_cost.muted, false);
 }
 
-// 8. 渲染/提示健壮
+// 8. 学习状态:冷启动标记 + 基线水位 + 静音类型
+{
+  const cold = computeLearningState([], []);
+  assert.ok(cold.baselines.every((b) => b.cold), '无历史时所有基线应为冷启动');
+
+  const history = Array.from({ length: 15 }, (_, i) => extractSignals(stableMetrics(98 + (i % 5)), gov()));
+  const feedbackRecords = Array.from({ length: 5 }, () => ({ alertType: 'gov_drift', reaction: 'dismiss' }));
+  const st = computeLearningState(history, feedbackRecords);
+  const we = st.baselines.find((b) => b.key === 'weekEvents');
+  assert.equal(we.cold, false, '攒够 15 天应脱离冷启动');
+  assert.ok(we.center >= 98 && we.center <= 102, `学到的常态应≈100,得 ${we.center}`);
+  assert.ok(st.muted.some((t) => t.type === 'gov_drift'), '被忽略的类型应出现在 muted');
+}
+
+// 9. 渲染/提示健壮
 {
   const r = buildDailyReport({}, {});
   assert.ok(renderReportText(r).includes('分析师日报'));

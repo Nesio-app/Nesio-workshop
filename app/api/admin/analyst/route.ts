@@ -16,6 +16,6 @@ function envValue(key: string): string {
 export async function GET(req: NextRequest) {
   const blocked = requireAdmin(req, 'admin-analyst');
   if (blocked) return blocked;
-  const { report } = await computeDailyReport(req.nextUrl.origin, envValue('NESIO_ADMIN_SECRET'));
-  return NextResponse.json({ ok: true, report });
+  const { report, learningState } = await computeDailyReport(req.nextUrl.origin, envValue('NESIO_ADMIN_SECRET'));
+  return NextResponse.json({ ok: true, report, learningState });
 }

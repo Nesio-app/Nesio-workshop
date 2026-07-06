@@ -56,6 +56,18 @@ export async function loadHistory(days = 45): Promise<Signals[]> {
   }
 }
 
+/** 最近 N 天的带日期快照(给周报做趋势:本周 vs 一周前)。 */
+export async function loadHistoryWithDates(days = 14): Promise<Array<{ date: string; signals: Signals }>> {
+  const res = await rest('GET', `analyst_daily?select=date,signals&order=date.desc&limit=${days}`);
+  if (!res || !res.ok) return [];
+  try {
+    const rows = await res.json() as Array<{ date?: string; signals?: Signals }>;
+    return rows.filter((r) => r.date && r.signals).map((r) => ({ date: r.date as string, signals: r.signals as Signals }));
+  } catch {
+    return [];
+  }
+}
+
 /** upsert 今日快照(按 date 去重合并)。 */
 export async function saveDaily(date: string, signals: Signals): Promise<boolean> {
   const res = await rest('POST', 'analyst_daily?on_conflict=date', { date, signals }, { Prefer: 'resolution=merge-duplicates' });

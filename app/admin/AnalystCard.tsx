@@ -12,6 +12,11 @@ type Severity = 'go' | 'gentle' | 'risk';
 interface Alert { type: string; severity: Severity; title: string; detail: string; advice: string; explain?: string; basis?: string }
 interface Learning { historyDays: number; learnedAlerts: number; mutedByFeedback: number; feedbackTypes: number }
 interface Report { date: string; status: Severity; headline: string; keyPoints: string[]; alerts: Alert[]; learning?: Learning }
+interface Baseline { key: string; label: string; n: number; center: number | null; sigma: number | null; cold: boolean }
+interface FbType { type: string; label: string; usefulRate: number | null; samples: number; muted: boolean }
+interface LearningState { historyDays: number; baselines: Baseline[]; feedbackTypes: FbType[]; muted: FbType[] }
+interface Trend { key: string; label: string; latest: number | null; weekAgo: number | null; avg: number; deltaPct: number | null }
+interface Weekly { range: { from: string | null; to: string | null }; days: number; headline: string; trends: Trend[]; notable: Trend[] }
 
 const SEV_COLOR: Record<Severity, string> = { go: '#2e9e6b', gentle: '#c98a1a', risk: '#d64545' };
 const card: React.CSSProperties = {
@@ -21,9 +26,13 @@ const card: React.CSSProperties = {
 
 export function AnalystCard({ secret }: { secret: string }) {
   const [report, setReport] = useState<Report | null>(null);
+  const [learn, setLearn] = useState<LearningState | null>(null);
+  const [showLearn, setShowLearn] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sent, setSent] = useState<string | null>(null);
   const [voted, setVoted] = useState<Record<string, string>>({});
+  const [weekly, setWeekly] = useState<Weekly | null>(null);
+  const [weeklyBusy, setWeeklyBusy] = useState(false);
 
   const headers = useCallback((): Record<string, string> => (secret ? { 'x-nesio-admin-secret': secret } : {}), [secret]);
 
@@ -33,6 +42,7 @@ export function AnalystCard({ secret }: { secret: string }) {
       const res = await fetch('/api/admin/analyst', { headers: headers() });
       const j = await res.json();
       setReport(j.ok ? j.report as Report : null);
+      setLearn(j.ok ? (j.learningState as LearningState) ?? null : null);
     } catch { setReport(null); } finally { setLoading(false); }
   }, [headers]);
 
@@ -48,6 +58,15 @@ export function AnalystCard({ secret }: { secret: string }) {
       });
     } catch { /* 已乐观标记 */ }
   }, [headers, report?.date]);
+
+  const loadWeekly = useCallback(async () => {
+    setWeeklyBusy(true);
+    try {
+      const res = await fetch('/api/admin/analyst/weekly', { method: 'POST', headers: headers() });
+      const j = await res.json();
+      setWeekly(j.ok ? j.report as Weekly : null);
+    } catch { setWeekly(null); } finally { setWeeklyBusy(false); }
+  }, [headers]);
 
   const emailNow = useCallback(async () => {
     setSent('sending');
@@ -121,14 +140,82 @@ export function AnalystCard({ secret }: { secret: string }) {
           fontSize: '0.72rem', padding: '0.35rem 0.7rem', borderRadius: 8, cursor: 'pointer',
           border: '1px solid var(--glass-border)', background: 'var(--glass-bg)', color: 'var(--portal-ink)',
         }}>发送到邮箱</button>
+        <button type="button" onClick={() => void loadWeekly()} disabled={weeklyBusy} style={{
+          fontSize: '0.72rem', padding: '0.35rem 0.7rem', borderRadius: 8, cursor: 'pointer',
+          border: '1px solid var(--glass-border)', background: 'var(--glass-bg)', color: 'var(--portal-ink)',
+        }}>{weeklyBusy ? '聚合中…' : '本周总结'}</button>
         {sent && <span style={{ fontSize: '0.68rem', color: 'var(--portal-muted)' }}>{sentMsg[sent]}</span>}
         {L && (
-          <span style={{ fontSize: '0.64rem', color: 'var(--portal-muted)', marginLeft: 'auto' }}>
-            学习:历史 {L.historyDays} 天 · 基线判定 {L.learnedAlerts} · 反馈静音 {L.mutedByFeedback}
-            {L.historyDays < 10 && '(冷启动·攒够 10 天切基线)'}
-          </span>
+          <button type="button" onClick={() => setShowLearn((v) => !v)} style={{
+            fontSize: '0.64rem', color: 'var(--portal-muted)', marginLeft: 'auto', cursor: 'pointer',
+            background: 'transparent', border: 'none', padding: 0, textDecoration: 'underline',
+          }}>
+            🧠 学到了什么 · 历史 {L.historyDays} 天 · 静音 {L.mutedByFeedback} {showLearn ? '▲' : '▼'}
+          </button>
         )}
       </div>
+
+      {showLearn && learn && (
+        <div style={{ marginTop: '0.6rem', paddingTop: '0.6rem', borderTop: '1px solid var(--glass-border)', display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+          <div>
+            <div style={{ fontSize: '0.68rem', color: 'var(--portal-muted)', marginBottom: 4 }}>学到的水位(基线)</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              {learn.baselines.map((b) => (
+                <div key={b.key} style={{ fontSize: '0.72rem', display: 'flex', gap: 8, alignItems: 'baseline', fontVariantNumeric: 'tabular-nums' }}>
+                  <span style={{ color: 'var(--portal-ink)', minWidth: 96 }}>{b.label}</span>
+                  {b.cold
+                    ? <span style={{ color: 'var(--portal-muted)' }}>冷启动 · 样本 {b.n}/10 · 用固定阈值</span>
+                    : <span style={{ color: 'var(--portal-muted)' }}>常态 ≈ {b.center == null ? '—' : Math.round(b.center * 100) / 100} ± {b.sigma == null ? '—' : Math.round(b.sigma * 100) / 100}σ · 样本 {b.n}</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+          {learn.feedbackTypes.length > 0 && (
+            <div>
+              <div style={{ fontSize: '0.68rem', color: 'var(--portal-muted)', marginBottom: 4 }}>反馈调整</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                {learn.feedbackTypes.map((t) => (
+                  <span key={t.type} style={{
+                    fontSize: '0.66rem', padding: '2px 8px', borderRadius: 999,
+                    background: t.muted ? 'color-mix(in srgb, #8a8f99 18%, transparent)' : 'color-mix(in srgb, #2e9e6b 15%, transparent)',
+                    color: t.muted ? 'var(--portal-muted)' : '#2e9e6b',
+                  }}>
+                    {t.label} {t.muted ? '· 已静音' : `· 有用 ${t.usefulRate == null ? '—' : Math.round(t.usefulRate * 100) + '%'}`}({t.samples})
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {weekly && (
+        <div style={{ marginTop: '0.6rem', paddingTop: '0.6rem', borderTop: '1px solid var(--glass-border)' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '0.4rem', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.78rem', fontWeight: 650, color: 'var(--portal-ink)' }}>本周总结 · {weekly.headline}</span>
+            <span style={{ fontSize: '0.64rem', color: 'var(--portal-muted)' }}>{weekly.range.from || '—'} → {weekly.range.to || '—'}({weekly.days} 天)</span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 6 }}>
+            {weekly.trends.map((t) => {
+              const up = t.deltaPct != null && t.deltaPct > 0;
+              const dn = t.deltaPct != null && t.deltaPct < 0;
+              return (
+                <div key={t.key} style={{ fontSize: '0.72rem', display: 'flex', gap: 8, alignItems: 'baseline', fontVariantNumeric: 'tabular-nums' }}>
+                  <span style={{ color: 'var(--portal-ink)', minWidth: 96 }}>{t.label}</span>
+                  <span style={{ color: 'var(--portal-muted)' }}>
+                    本周 {t.latest == null ? '—' : t.latest.toLocaleString()}(均 {t.avg.toLocaleString()})
+                  </span>
+                  {t.deltaPct != null && (
+                    <span style={{ color: up ? '#c98a1a' : dn ? '#2e9e6b' : 'var(--portal-muted)' }}>
+                      {up ? '↑' : dn ? '↓' : '→'} {t.deltaPct > 0 ? '+' : ''}{t.deltaPct}%
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </section>
   );
 }
