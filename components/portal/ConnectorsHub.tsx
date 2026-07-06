@@ -7,6 +7,7 @@ const WechatReadingImportSheet = dynamic(() => import('./WechatReadingImportShee
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { type LifeNode } from '@/lib/portal/life-graph';
 import type { HealthMetrics, HealthNode } from '@/lib/portal/apple-health';
+import { readLaunchSurfaceContextFromBrowser } from '@/lib/portal/launch-surface.mjs';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
@@ -769,9 +770,15 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
   async function importHealthFile(
     file: File,
     onProgress?: (pct: number) => void,
-  ): Promise<{ metrics: HealthMetrics; nodes: HealthNode[] } | null> {
+    captureCda = false,
+  ): Promise<{ metrics: HealthMetrics; nodes: HealthNode[]; cdaXml?: string } | null> {
     const { createHealthStreamParser } = await import('@/lib/portal/apple-health');
     const parser = createHealthStreamParser();
+    // D2:lab 模式下顺带缓冲 export_cda.xml(临床记录,通常很小)—— 整体缓冲有上限,防 OOM。
+    const cdaChunks: Uint8Array[] = [];
+    let cdaBytes = 0;
+    const CDA_CAP = 40_000_000; // 40MB 上限,超了就丢弃(临床文档几乎不会这么大)
+    let cdaOverflow = false;
 
     // 进度按「已读字节 / 文件总大小」上报(zip 读的是压缩字节,正好对应 file.size);
     // 按整数百分比节流,避免 ~64KB 一块的高频 setState 拖慢 UI。
@@ -814,20 +821,31 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       return any ? parser.finish() : null;
     }
 
-    // zip:流式解压,只 start export.xml(其它条目不解压),解出的每块立即喂解析器。
+    // zip:流式解压,start export.xml(+ lab 模式下 export_cda.xml),其它条目不解压。
     const { Unzip, UnzipInflate, UnzipPassThrough } = await import('fflate');
     const isExport = (n: string) => /(^|\/)export\.xml$/i.test(n);
+    const isCda = (n: string) => /(^|\/)export_cda\.xml$/i.test(n);
     let sawExport = false;
     let failed: Error | null = null;
     const unzip = new Unzip((entry) => {
-      if (!isExport(entry.name)) return;
-      sawExport = true;
-      entry.ondata = (err, chunk, final) => {
-        if (err) { failed = err instanceof Error ? err : new Error(String(err)); return; }
-        if (chunk.length) parser.push(chunk, final);
-        else if (final) parser.push(new Uint8Array(0), true);
-      };
-      entry.start();
+      if (isExport(entry.name)) {
+        sawExport = true;
+        entry.ondata = (err, chunk, final) => {
+          if (err) { failed = err instanceof Error ? err : new Error(String(err)); return; }
+          if (chunk.length) parser.push(chunk, final);
+          else if (final) parser.push(new Uint8Array(0), true);
+        };
+        entry.start();
+      } else if (captureCda && isCda(entry.name)) {
+        entry.ondata = (err, chunk) => {
+          if (err || cdaOverflow) return; // 临床解析尽力而为,出错不影响健康导入
+          if (chunk.length) {
+            if (cdaBytes + chunk.length > CDA_CAP) { cdaOverflow = true; cdaChunks.length = 0; return; }
+            cdaChunks.push(chunk.slice()); cdaBytes += chunk.length;
+          }
+        };
+        entry.start();
+      }
     });
     unzip.register(UnzipInflate);      // deflate(export.xml 常规压缩)
     unzip.register(UnzipPassThrough);  // stored(极少数未压缩存储,免 start() 抛错)
@@ -836,7 +854,13 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     unzip.push(new Uint8Array(0), true);
     if (failed) throw failed;
     if (!sawExport) return null;
-    return parser.finish();
+    const result = parser.finish();
+    let cdaXml: string | undefined;
+    if (captureCda && cdaChunks.length) {
+      const dec = new TextDecoder('utf-8');
+      cdaXml = cdaChunks.map((c, i) => dec.decode(c, { stream: i < cdaChunks.length - 1 })).join('');
+    }
+    return { ...result, cdaXml };
   }
 
   async function handleHealthFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -849,8 +873,23 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     try {
       // 看板指标 + 记忆节点(概况/锻炼)都基于全文件的同一次流式解析 —— 概况不再只看尾部 6MB,
       // 避免 Apple 按类型分块导出时尾部缺步数/心率/睡眠而漏进概况。
-      const result = await importHealthFile(file, setImportPct);
+      // D2:仅 lab 模式下顺带捕获+解析 export_cda.xml 的临床记录(化验单/用药/诊断)。
+      const labMode = readLaunchSurfaceContextFromBrowser().viewerRole === 'personal_lab';
+      const result = await importHealthFile(file, setImportPct, labMode);
       setImportPct(null); // 读取+解析完成,余下持久化很快
+      if (labMode && result?.cdaXml) {
+        try {
+          const [{ parseCda }, { saveClinical }] = await Promise.all([
+            import('@/lib/portal/cda-parse'),
+            import('@/lib/portal/clinical-store'),
+          ]);
+          const clinical = parseCda(result.cdaXml);
+          saveClinical(clinical);
+          if (clinical.labs.length || clinical.medications.length || clinical.conditions.length) {
+            showToast(L(dict, `临床记录:${clinical.labs.length} 项化验 · ${clinical.medications.length} 用药 · ${clinical.conditions.length} 诊断`, `Clinical: ${clinical.labs.length} labs · ${clinical.medications.length} meds · ${clinical.conditions.length} conditions`), true);
+          }
+        } catch { /* 临床解析尽力而为,失败不影响健康导入 */ }
+      }
       if (!result) {
         showToast(L(dict, 'zip 里没找到 export.xml(别选 export_cda / 子文件夹)', 'No export.xml in the zip (not export_cda / subfolders)'), false);
         setSyncing(null); return;
