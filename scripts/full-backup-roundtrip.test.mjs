@@ -9,17 +9,20 @@ import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 import ts from 'typescript';
 
-const libPath = new URL('../lib/portal/full-backup.ts', import.meta.url);
-
-function loadLib() {
-  const source = fs.readFileSync(libPath, 'utf8');
-  const compiled = ts.transpileModule(source, {
+function loadTs(relPath, requireImpl) {
+  const p = new URL(relPath, import.meta.url);
+  const compiled = ts.transpileModule(fs.readFileSync(p, 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
-    fileName: 'full-backup.ts',
   }).outputText;
   const mod = { exports: {} };
-  vm.runInNewContext(compiled, { module: mod, exports: mod.exports, Date, JSON }, { filename: fileURLToPath(libPath) });
+  vm.runInNewContext(compiled, { module: mod, exports: mod.exports, require: requireImpl, Date, JSON, console }, { filename: fileURLToPath(p) });
   return mod.exports;
+}
+
+function loadLib() {
+  // full-backup 现在把 key 判断收敛到 storage-manifest —— vm 加载时把它接起来。
+  const manifest = loadTs('../lib/portal/storage-manifest.ts', () => ({}));
+  return loadTs('../lib/portal/full-backup.ts', (spec) => (spec === './storage-manifest' ? manifest : {}));
 }
 
 function fakeStorage(initial = {}) {

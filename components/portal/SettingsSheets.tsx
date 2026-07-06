@@ -14,6 +14,7 @@ import { IconChevronRight, IconHalfMoon, IconLink, IconLock, IconMoon, IconShiel
 import { InfoTip } from './InfoTip';
 import { PROACTIVE_LEVEL_KEY } from './today/proactive-types';
 import { deleteLifeNode, getLifeGraph } from '@/lib/portal/life-graph';
+import { purgeLocalData } from '@/lib/portal/storage-manifest';
 import { buildFullBackup, isValidBackup, restoreFullBackup } from '@/lib/portal/full-backup';
 
 interface SheetProps { open: boolean; onClose: () => void; }
@@ -332,6 +333,19 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
     setDeleted(true);
   }
 
+  // 删除收口:清本机「全部」数据(记忆 + 健康/财务/地点/心情/学习偏好…),经 storage-manifest 遍历,
+  // 保留登录票据(不登出)。此前「清除 Memory」只删记忆节点,其余域数据全留在本机 = 隐私漏洞。
+  function clearAllLocalData() {
+    if (!confirm(L(dict, '这会删除本机全部数据(记忆、健康、财务、地点、心情、学习偏好…),仅保留登录状态,不可撤销。建议先导出备份。确认继续？', 'This deletes ALL local data (memories, health, finance, places, mood, learned preferences), keeping only your sign-in. It cannot be undone — export a backup first. Continue?'))) return;
+    try {
+      getLifeGraph().forEach((n) => deleteLifeNode(n.id)); // 记忆节点走正规删除(传导事实库/云)
+      purgeLocalData(localStorage);                         // 其余全部本机 key 收口清除(保留 auth)
+    } catch { /* ignore */ }
+    setNodeCount(0);
+    setDeleted(true);
+    window.location.reload();
+  }
+
   return (
     <SheetWrap open={open} onClose={onClose} title={L(dict, '隐私与数据', 'Privacy & data')}>
       <p className="nesio-settings-sheet-desc">{L(dict, '只整理你放进来的内容。你可以看见它记住了什么、存在哪、也可以随时删除。', 'Only what you put in gets organized. You can see what it remembers, where it lives, and delete it anytime.')}</p>
@@ -382,6 +396,9 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
 
       <button type="button" className="nesio-settings-danger-btn" onClick={clearAllMemory}>
         {deleted ? L(dict, '✓ 已清除', '✓ Cleared') : L(dict, '清除所有 Memory', 'Clear all Memory')}
+      </button>
+      <button type="button" className="nesio-settings-danger-btn" style={{ marginTop: '0.4rem', opacity: 0.85 }} onClick={clearAllLocalData}>
+        {L(dict, '彻底删除本机全部数据', 'Delete all local data')}
       </button>
 
       <p className="nesio-settings-section-label" style={{ marginTop: '1.5rem' }}>{L(dict, '实验功能', 'Experimental')}</p>
