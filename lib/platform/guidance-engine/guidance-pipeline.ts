@@ -32,6 +32,18 @@ import { getMirrorProfile, getDomainWeight } from '@/lib/portal/mirror-profile';
 
 // Compute when a card's action window closes and the card becomes irrelevant.
 // Google Now principle: a boarding-pass card disappears when the plane departs.
+// dec_insight(跨域推荐)与 object_context(多个物品)天生有多个不同实例,不能按裸
+// event.type 去重/冷却 —— 否则第一张之后全被当"同类"丢弃,旗舰跨域推荐只剩 1 张。
+// 这两类按 event.id(退化用 nodeId)区分,其余事件仍按 type(一类只出一张)。
+const MULTI_INSTANCE_EVENT_TYPES = new Set<GuidanceEventType>(['dec_insight', 'object_context']);
+function dedupKey(event: GuidanceEvent): string {
+  if (MULTI_INSTANCE_EVENT_TYPES.has(event.type)) {
+    const nodeId = typeof event.payload?.nodeId === 'string' ? event.payload.nodeId : '';
+    return `${event.type}:${event.id || nodeId}`;
+  }
+  return event.type;
+}
+
 function computeExpiry(event: GuidanceEvent): Date | undefined {
   // DEC cards carry their own expiry and have no scheduledAt — check first.
   if (event.type === 'dec_insight') {
@@ -212,7 +224,7 @@ export function runGuidancePipeline(input: GuidancePipelineInput): GuidanceCard[
   const mirror = getMirrorProfile();
   const hourFit = mirror.hourEngagement[now.getHours()] ?? 0.5;
 
-  const candidates: Array<{ card: GuidanceCard; priority: number; rScore: number; feats: GuidanceFeatures; urgency: WindowUrgency }> = [];
+  const candidates: Array<{ card: GuidanceCard; priority: number; rScore: number; feats: GuidanceFeatures; urgency: WindowUrgency; coolKey: string }> = [];
   const seenTypes = new Set<string>();
 
   // Pre-filter: drop events whose action window has already closed (card would be stale).
@@ -240,12 +252,13 @@ export function runGuidancePipeline(input: GuidancePipelineInput): GuidanceCard[
     // Layer 5: attention budget gate
     if (!passesBudgetGate(budget, severity)) continue;
 
-    // Layer 6: cooling check
-    if (isOnCooldown(event.type, urgency, coolingStore, now)) continue;
+    // Layer 6: cooling check(按 dedupKey —— dec_insight/object_context 逐实例冷却)
+    const dk = dedupKey(event);
+    if (isOnCooldown(dk, urgency, coolingStore, now)) continue;
 
-    // Dedup: one card per event type per pipeline run
-    if (seenTypes.has(event.type)) continue;
-    seenTypes.add(event.type);
+    // Dedup: 同一 dedupKey 一次 pipeline 只出一张(多实例类型按 id 区分,不再塌缩)
+    if (seenTypes.has(dk)) continue;
+    seenTypes.add(dk);
 
     // 0-10 band 仍用于时段门与卡片展示;排序改用在线学习器的分。
     const priority = interruptPriority(severity, urgency, event.type, event.source, confidence);
@@ -269,6 +282,7 @@ export function runGuidancePipeline(input: GuidancePipelineInput): GuidanceCard[
       rScore,
       feats,
       urgency,
+      coolKey: dk,
       card: {
         id: `guidance-${event.id}`,
         eventId: event.id,
@@ -307,10 +321,9 @@ export function runGuidancePipeline(input: GuidancePipelineInput): GuidanceCard[
   if (result.length > 0) {
     let updated = coolingStore;
     for (const card of result) {
-      // Find urgency for this card to set correct cooldown
+      // 冷却键与 isOnCooldown 的读取键一致(dedupKey);多实例类型逐实例冷却。
       const meta = candidates.find((c) => c.card.id === card.id);
-      updated = recordShown(card.type + (meta ? `_${meta.urgency}` : ''), updated);
-      updated = recordShown(card.type, updated); // also cool by type alone
+      updated = recordShown(meta?.coolKey ?? card.type, updated);
     }
     saveCoolingStore(updated);
   }
