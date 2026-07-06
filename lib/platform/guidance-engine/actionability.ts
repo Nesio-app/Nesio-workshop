@@ -33,6 +33,11 @@ export function buildAction(event: GuidanceEvent, urgency: WindowUrgency, locale
       return { label: l('了解这条来自你健康数据的观察。', 'A gentle observation from your own health data.'), cta: l('知道了', 'Got it'), actionType: 'dismiss' };
     }
 
+    case 'finance_insight': {
+      // warm-coach:不制造焦虑,给「去财务页看看」的轻提示。始终可跳过。
+      return { label: l('来自你的账户数据,想看细节可以打开财务页。', 'From your own account data — open Finance for details.'), cta: l('知道了', 'Got it'), actionType: 'dismiss' };
+    }
+
     case 'flight':
       if (urgency === 'critical') return { label: l('现在需要出发前往机场', 'Time to leave for the airport'), cta: l('知道了', 'Got it'), actionType: 'dismiss' };
       if (urgency === 'high')     return { label: l('用航空公司 App 完成在线值机（约 1 分钟）', 'Check in online with the airline app (about 1 min)'), cta: l('去值机', 'Check in'), actionType: 'dismiss' };

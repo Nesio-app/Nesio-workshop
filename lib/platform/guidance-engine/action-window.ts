@@ -106,6 +106,11 @@ function getUnscheduledWindow(event: GuidanceEvent, now: Date): WindowUrgency {
       if (hour < 7 || hour > 22) return 'closed';
       return event.payload.severity === 'flag' ? 'medium' : 'low';
 
+    case 'finance_insight':
+      // 财务信号:清醒时段出;flag(现金流/大涨价)窗口更高一点
+      if (hour < 7 || hour > 22) return 'closed';
+      return event.payload.severity === 'flag' ? 'medium' : 'low';
+
     default:
       return 'low';
   }

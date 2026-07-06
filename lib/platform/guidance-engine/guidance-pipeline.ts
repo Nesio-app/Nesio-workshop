@@ -35,7 +35,7 @@ import { getMirrorProfile, getDomainWeight } from '@/lib/portal/mirror-profile';
 // dec_insight(跨域推荐)与 object_context(多个物品)天生有多个不同实例,不能按裸
 // event.type 去重/冷却 —— 否则第一张之后全被当"同类"丢弃,旗舰跨域推荐只剩 1 张。
 // 这两类按 event.id(退化用 nodeId)区分,其余事件仍按 type(一类只出一张)。
-const MULTI_INSTANCE_EVENT_TYPES = new Set<GuidanceEventType>(['dec_insight', 'object_context', 'health_insight']);
+const MULTI_INSTANCE_EVENT_TYPES = new Set<GuidanceEventType>(['dec_insight', 'object_context', 'health_insight', 'finance_insight']);
 function dedupKey(event: GuidanceEvent): string {
   if (MULTI_INSTANCE_EVENT_TYPES.has(event.type)) {
     const nodeId = typeof event.payload?.nodeId === 'string' ? event.payload.nodeId : '';
@@ -50,8 +50,8 @@ function computeExpiry(event: GuidanceEvent): Date | undefined {
     const raw = event.payload?.expiresAt;
     return typeof raw === 'string' ? new Date(raw) : undefined;
   }
-  // 健康判定按天刷新:今晚过期,明天带新数据重新评估(不长期挂着一条旧信号)。
-  if (event.type === 'health_insight') {
+  // 健康/财务判定按天刷新:今晚过期,明天带新数据重新评估(不长期挂着一条旧信号)。
+  if (event.type === 'health_insight' || event.type === 'finance_insight') {
     const eod = event.scheduledAt ? new Date(event.scheduledAt) : new Date();
     eod.setHours(23, 59, 59, 0);
     return eod;
@@ -90,6 +90,7 @@ const EVENT_ICON: Record<GuidanceEventType, string> = {
   email_signal:   '📩',
   health_habit:   '💪',
   health_insight: '🩺',
+  finance_insight: '💳',
   weather_cold:   '🧥',
   weather_rain:   '☂️',
   object_context: '📦',
@@ -102,6 +103,7 @@ function buildTitle(event: GuidanceEvent, urgency: WindowUrgency, locale: string
   switch (event.type) {
     case 'dec_insight': return event.title;
     case 'health_insight':
+    case 'finance_insight':
       return l(String(event.payload.titleZh ?? event.title), String(event.payload.titleEn ?? event.title));
     case 'flight':
       if (urgency === 'critical') return l(`出发时间到了 · ${n}`, `Time to leave · ${n}`);
@@ -151,6 +153,7 @@ function buildBody(event: GuidanceEvent, urgency: WindowUrgency, locale: string 
   switch (event.type) {
     case 'dec_insight': return typeof event.payload.body === 'string' ? event.payload.body : '';
     case 'health_insight':
+    case 'finance_insight':
       return l(String(event.payload.bodyZh ?? ''), String(event.payload.bodyEn ?? ''));
     case 'flight':
       if (urgency === 'critical') return l('现在需要出发了，不要错过登机时间。', 'Time to leave now — don\'t miss boarding.');

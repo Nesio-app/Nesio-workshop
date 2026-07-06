@@ -15,6 +15,7 @@ import { nearestNodeDate } from '@/lib/platform/node-dates';
 import type { LifeNode } from '@/lib/portal/life-graph';
 import type { ClinicalFinding } from '@/lib/portal/health-clinical';
 import type { RiskScore } from '@/lib/portal/health-risk';
+import type { FinanceFinding } from '@/lib/portal/finance-insight';
 import type { GuidanceEvent, GuidanceEventType } from './types';
 
 // ── Calendar ──────────────────────────────────────────────────────────────────
@@ -265,6 +266,33 @@ export function healthFindingsToGuidanceEvents(
   }
 
   // 最多 3 条(红旗优先),避免 Today 变成体检报告;完整清单仍在健康页。
+  return events.sort((a, b) => (a.payload.severity === 'flag' ? 0 : 1) - (b.payload.severity === 'flag' ? 0 : 1)).slice(0, 3);
+}
+
+// ── Finance findings → guidance(财务判定接入主循环,仿健康桥)──────────────────
+// financeFindings(异常支出/订阅涨价/现金流/未来账单)此前只在财务页消费,从不进 Today。
+// 这个适配器把它们转成 GuidanceEvent,与其余来源同台仲裁 —— 完整明细仍在财务页。
+// warm-coach:文案不制造焦虑、给「去财务页看看」的软提示、始终可跳过(见 actionability)。
+
+export function financeFindingsToGuidanceEvents(
+  findings: readonly FinanceFinding[],
+): GuidanceEvent[] {
+  const events: GuidanceEvent[] = findings.map((f): GuidanceEvent => ({
+    id: `finance-${f.id}`,
+    type: 'finance_insight',
+    title: f.title[0],
+    source: 'habit',
+    confidence: f.severity === 'flag' ? 82 : 68,
+    payload: {
+      findingId: f.id,
+      kind: f.kind,
+      severity: f.severity,
+      titleZh: f.title[0], titleEn: f.title[1],
+      bodyZh: f.detail[0], bodyEn: f.detail[1],
+      reason: '财务 · 来自你的账户数据',
+    },
+  }));
+  // 最多 3 条(红旗优先),避免 Today 变成对账单;完整明细仍在财务页。
   return events.sort((a, b) => (a.payload.severity === 'flag' ? 0 : 1) - (b.payload.severity === 'flag' ? 0 : 1)).slice(0, 3);
 }
 

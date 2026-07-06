@@ -61,6 +61,7 @@ const PREPARATION_VALUE: Record<GuidanceEventType, number> = {
   email_signal: 40,  // email can be handled anytime
   health_habit:   35,  // can do anytime today
   health_insight: 50,  // 早点关注一条来自你数据的健康信号,总比拖着好
+  finance_insight: 55,  // 涨价/异常支出/账单越早看越能省 —— 行动价值随时间衰减
   object_context: 30,  // context-triggered — nice to know but not urgent
   dec_insight:    55,  // evidence-backed recommendation — acting today beats later
 };
