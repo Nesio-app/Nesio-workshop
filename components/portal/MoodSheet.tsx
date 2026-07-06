@@ -14,6 +14,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useSheetDismiss } from '@/lib/portal/use-sheet-dismiss';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { IconBook, IconMoon, IconZap } from './icons';
 import { L, type DictLocale } from '@/lib/portal/i18n';
@@ -206,6 +207,7 @@ interface MoodSheetProps { open: boolean; onClose: () => void; }
 type Phase = 'wheel' | 'energy' | 'thought' | 'journal' | 'saved';
 
 export default function MoodSheet({ open, onClose }: MoodSheetProps) {
+  useSheetDismiss(onClose, { enabled: open });
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [phase, setPhase] = useState<Phase>('wheel');
   const [selected, setSelected] = useState<EmotionId | null>(null);

@@ -40,17 +40,23 @@ const ADOPTED = [
   'components/portal/reader/ReaderView.tsx',
   'components/portal/today/MeetingRecorderSheet.tsx',
   'components/portal/today/FocusModeSheet.tsx',
+  // 第二批(多模态/容器):MoodSheet 5 个 phase overlay 由同一 onClose 关闭,顶层一个 hook 覆盖全部。
+  'components/portal/TellNesioSheet.tsx',
+  'components/portal/MoodSheet.tsx',
+  'components/portal/VoiceInputSheet.tsx',
+  'components/portal/NesioChatSheet.tsx',
+  'components/portal/Portal.tsx',
+  'components/portal/TodayFeed.tsx',
 ];
 for (const file of ADOPTED) {
   const src = read(file);
   assert.match(src, /from '@\/lib\/portal\/use-sheet-dismiss'/, `${file} 必须 import useSheetDismiss。`);
-  assert.match(src, /useSheetDismiss\(onClose/, `${file} 必须调用 useSheetDismiss(onClose ...)。`);
+  assert.match(src, /useSheetDismiss\(/, `${file} 必须调用 useSheetDismiss(...)。`);
 }
 
 // ── 3. 采用不倒退:aria-modal 的 sheet 数不应低于已知基线;未采用的记为待办 ──
-// 复杂/多模态的(MoodSheet 5×、PortalAiFriendsPreview 4×、VoiceInputSheet 嵌套、
-// NesioChatSheet BubbleMenu、TellNesioSheet、Portal/TodayFeed 容器、PortalOnboarding 流程)
-// 需逐个处理,留作后续;此契约保证已采用的不回退,并随采用面扩大追加到 ADOPTED。
-assert.ok(ADOPTED.length >= 18, '已采用的 sheet 不应少于 18(采用面只增不减)。');
+// 剩余待跟进:PortalAiFriendsPreview(4 个状态驱动子表,各自 close 到不同状态,需逐个接);
+// PortalOnboarding(引导流程,有意不做 Escape 关闭——避免误触退出 onboarding)。
+assert.ok(ADOPTED.length >= 24, '已采用的 sheet 不应少于 24(采用面只增不减)。');
 
 console.log('sheet-a11y-dismiss: OK');

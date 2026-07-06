@@ -9,6 +9,7 @@
  */
 
 import { useRef } from 'react';
+import { useSheetDismiss } from '@/lib/portal/use-sheet-dismiss';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
@@ -72,6 +73,7 @@ const FAN_BUTTONS: Array<{
 ];
 
 export default function TellNesioSheet({ open, onClose, onCapture }: TellNesioSheetProps) {
+  useSheetDismiss(onClose, { enabled: open });
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const cameraInputRef = useRef<HTMLInputElement>(null);
   if (!open) return null;

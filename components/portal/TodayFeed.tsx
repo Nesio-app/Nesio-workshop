@@ -32,6 +32,7 @@ import { ProactiveGuidanceCard } from './today/ProactiveGuidanceCard';
 import { ExperimentCheckinCard } from './today/ExperimentCheckinCard';
 import { RoutineDueCards } from './today/RoutineDueCards';
 import DailyBriefCard from './DailyBriefCard';
+import { useSheetDismiss } from '@/lib/portal/use-sheet-dismiss';
 import { ThawedReminder } from './today/ThawedReminder';
 import { TodayFocusSection } from './today/FocusSection';
 import { NightTimeline } from './today/NightTimeline';
@@ -63,6 +64,8 @@ export default function TodayFeed({
     dismissedCardIds, setDismissedCardIds,
   } = useTodayData(canUsePrivateData);
   const [mirrorOpen, setMirrorOpen] = useState(false);
+  // 洞察 overlay 的 Escape/滚动锁/归还焦点(FocusModeSheet/MeetingRecorderSheet 各自已采用)。
+  useSheetDismiss(() => setMirrorOpen(false), { enabled: mirrorOpen });
 
   // Proactive cards: up to 2, each independently dismissable
   const [meetingRecorderNode, setMeetingRecorderNode] = useState<FocusNode | null>(null);

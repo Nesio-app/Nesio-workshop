@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSheetDismiss } from '@/lib/portal/use-sheet-dismiss';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import dynamic from 'next/dynamic';
 import TodayFeed from './TodayFeed';
@@ -91,6 +92,7 @@ function AskGuideSheet({
   onStart: () => void;
 }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
+  useSheetDismiss(onClose, { enabled: open });
   if (!open) return null;
   return (
     <div className="nesio-ask-guide" role="dialog" aria-modal="true" aria-label={L(dict, '问宝盒', 'Ask Nesio')}>

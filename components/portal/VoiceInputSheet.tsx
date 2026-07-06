@@ -10,6 +10,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { useSheetDismiss } from '@/lib/portal/use-sheet-dismiss';
 import { getRecentNodes, isPrivateExternalNode, searchLifeGraphFuzzy, type LifeNode } from '@/lib/portal/life-graph';
 import { signalToLifeNode } from '@/lib/life-domain';
 import { searchSignalsLexical } from '@/lib/life-domain/signal-search';
@@ -161,6 +162,7 @@ function DateTimePicker({ value, onChange, onClose }: {
   onChange: (v: DTPValue) => void;
   onClose: () => void;
 }) {
+  useSheetDismiss(onClose);
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const todayStr = new Date().toISOString().slice(0, 10);
   const initDate = value.date ? new Date(value.date + 'T00:00:00') : new Date();
@@ -291,6 +293,7 @@ function DateTimePicker({ value, onChange, onClose }: {
 }
 
 export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateData = false, onClose }: VoiceInputSheetProps) {
+  useSheetDismiss(onClose, { enabled: open });
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [text, setText] = useState('');
   const [listening, setListening] = useState(false);
