@@ -45,6 +45,7 @@ const GROUPS: Array<{ key: HealthMetric['group']; zh: string; en: string }> = [
   { key: 'heart', zh: '心脏与体能', en: 'Heart & fitness' },
   { key: 'vitals', zh: '生命体征', en: 'Vitals' },
   { key: 'body', zh: '身体成分', en: 'Body' },
+  { key: 'nutrition', zh: '营养', en: 'Nutrition' },
   { key: 'mind', zh: '身心', en: 'Mind & body' },
 ];
 
