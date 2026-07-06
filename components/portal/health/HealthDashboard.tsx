@@ -8,7 +8,7 @@
 
 import { useEffect, useState } from 'react';
 import { loadHealthMetrics } from '@/lib/portal/health-store';
-import type { HealthMetric, HealthMetrics } from '@/lib/portal/apple-health';
+import type { HealthMetric, HealthMetrics, GlucoseAnalysis } from '@/lib/portal/apple-health';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -83,6 +83,54 @@ function gapLabel(m: HealthMetric, dict: string): string {
   return L(dict, `较 ${months} 个月前`, `vs ${months}mo ago`);
 }
 
+// 批次 42(A):血糖深度卡 —— 密集(CGM/指尖血)数据不再只显示「最新一个读数」。
+// TIR(时间在目标范围)+ 变异系数 + GMI + 每日 min–max 范围带 + 目标区间带。
+function GlucoseCard({ g, dict }: { g: GlucoseAnalysis; dict: string }) {
+  const dec = g.unit === 'mmol/L' ? 1 : 0;
+  const f = (v: number) => (dec === 0 ? Math.round(v).toString() : v.toFixed(1));
+  const daily = g.daily;
+  const lo = Math.min(g.targetLow, ...daily.map((d) => d.min));
+  const hi = Math.max(g.targetHigh, ...daily.map((d) => d.max));
+  const range = hi - lo || 1;
+  const W = 100, H = 44;
+  const y = (v: number) => H - ((v - lo) / range) * H;
+  const x = (i: number) => (daily.length > 1 ? (i / (daily.length - 1)) * W : W / 2);
+  return (
+    <div className="nesio-health-card" style={{ gridColumn: '1 / -1' }}>
+      <span className="nesio-health-card-label">{L(dict, '血糖 · 深度', 'Glucose · deep')}</span>
+      <span className="nesio-health-card-value">{f(g.avg)}<span className="nesio-health-card-unit">{g.unit} {L(dict, '平均', 'avg')}</span></span>
+
+      {/* TIR 三段条:低于 / 在范围 / 高于目标 */}
+      <div style={{ display: 'flex', height: 10, borderRadius: 5, overflow: 'hidden', margin: '0.5rem 0 0.35rem', background: 'var(--portal-line)' }}>
+        {g.belowPct > 0 && <div style={{ width: `${g.belowPct}%`, background: 'var(--status-risk)' }} />}
+        <div style={{ width: `${g.tirPct}%`, background: 'var(--status-go)' }} />
+        {g.abovePct > 0 && <div style={{ width: `${g.abovePct}%`, background: 'var(--status-gentle)' }} />}
+      </div>
+      <div style={{ display: 'flex', gap: '0.75rem', fontSize: '0.7rem', color: 'var(--portal-muted)', flexWrap: 'wrap' }}>
+        <span><b style={{ color: 'var(--status-go)' }}>{g.tirPct}%</b> {L(dict, '达标', 'in range')}</span>
+        {g.belowPct > 0 && <span><b style={{ color: 'var(--status-risk)' }}>{g.belowPct}%</b> {L(dict, '偏低', 'low')}</span>}
+        {g.abovePct > 0 && <span><b style={{ color: 'var(--status-gentle)' }}>{g.abovePct}%</b> {L(dict, '偏高', 'high')}</span>}
+        <span>GMI <b>{g.gmi}%</b></span>
+        <span>{L(dict, '波动', 'CV')} <b>{g.cv}%</b></span>
+      </div>
+
+      {/* 每日 min–max 范围带 + 平均点,叠目标区间带 */}
+      {daily.length >= 2 && (
+        <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="44" preserveAspectRatio="none" style={{ marginTop: '0.5rem', overflow: 'visible' }}>
+          <rect x="0" y={y(g.targetHigh)} width={W} height={Math.max(0, y(g.targetLow) - y(g.targetHigh))} fill="var(--status-go-soft)" />
+          {daily.map((d, i) => (
+            <line key={d.date} x1={x(i)} x2={x(i)} y1={y(d.min)} y2={y(d.max)} stroke="var(--portal-accent-soft-md)" strokeWidth="2.4" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+          ))}
+          <polyline points={daily.map((d, i) => `${x(i).toFixed(1)},${y(d.avg).toFixed(1)}`).join(' ')} fill="none" stroke="var(--portal-blue-deep)" strokeWidth="1.6" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+        </svg>
+      )}
+      <span className="nesio-health-card-range">
+        {L(dict, `近 ${daily.length} 天 · ${g.count.toLocaleString()} 条读数 · 目标 ${f(g.targetLow)}–${f(g.targetHigh)}`, `${daily.length}d · ${g.count.toLocaleString()} readings · target ${f(g.targetLow)}–${f(g.targetHigh)}`)}
+      </span>
+    </div>
+  );
+}
+
 function MetricCard({ m, dict }: { m: HealthMetric; dict: string }) {
   // prev===0 时也算 delta(如上月 0 次锻炼 → 本月 3 次是真实增长,不该被压成"无变化");
   // 只有 deltaPct 因除零需要 prev!==0。
@@ -150,6 +198,14 @@ export default function HealthDashboard() {
           </div>
         );
       })()}
+      {data.glucose && (
+        <div>
+          <p className="nesio-settings-section-label" style={{ marginTop: '1rem' }}>{L(dict, '血糖', 'Glucose')}</p>
+          <div className="nesio-health-grid">
+            <GlucoseCard g={data.glucose} dict={dict} />
+          </div>
+        </div>
+      )}
       <TrainingPlan />
       {GROUPS.map((g) => {
         const items = data.metrics.filter((m) => m.group === g.key);
