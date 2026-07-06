@@ -363,7 +363,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     setSyncing('plaid');
     try {
       const res = await fetch('/api/portal/plaid/transactions');
-      const data = await res.json() as { ok?: boolean; transactions?: Array<{ id: string; accountId?: string; date: string; name: string; amount: number; currency: string; category: string }>; accounts?: unknown[]; error?: string };
+      const data = await res.json() as { ok?: boolean; transactions?: Array<{ id: string; accountId?: string; date: string; name: string; amount: number; currency: string; category: string }>; removedIds?: string[]; accounts?: unknown[]; error?: string };
       // 批次 31:账户/卡片信息存本机,供财务「卡片」子分类分卡显示
       if (data.accounts?.length) { try { localStorage.setItem('nesio-bank-accounts-v1', JSON.stringify(data.accounts)); } catch { /* quota */ } }
       if (!data.ok) {
@@ -376,13 +376,21 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
         setSyncing(null);
         return;
       }
-      // 明细只存本机,按交易 id 去重,封顶 1000
+      // 明细只存本机。增量同步:按 id upsert(added/modified 覆盖旧的)、删掉 removed,
+      // 再按日期降序保留最近 1000 笔(不是按到达顺序 —— 否则永远留着最旧那批)。
       const KEY = 'nesio-bank-tx-v1';
-      let existing: Array<{ id: string }> = [];
+      type Tx = { id: string; accountId?: string; date: string; name: string; amount: number; currency: string; category: string };
+      let existing: Tx[] = [];
       try { existing = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { /* ignore */ }
-      const seen = new Set(existing.map((t) => t.id));
-      const fresh = (data.transactions || []).filter((t) => !seen.has(t.id));
-      const merged = [...fresh, ...existing].slice(0, 1000);
+      const removed = new Set(data.removedIds || []);
+      const byId = new Map<string, Tx>();
+      for (const t of existing) if (!removed.has(t.id)) byId.set(t.id, t);
+      let freshCount = 0;
+      for (const t of (data.transactions || [])) { if (!byId.has(t.id)) freshCount++; byId.set(t.id, t); }
+      const merged = [...byId.values()]
+        .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)) // 日期降序
+        .slice(0, 1000);
+      const fresh = { length: freshCount };
       try { localStorage.setItem(KEY, JSON.stringify(merged)); } catch { /* quota */ }
       setCounts((p) => ({ ...p, plaid: merged.length }));
       saveConnectorState('plaid', true);

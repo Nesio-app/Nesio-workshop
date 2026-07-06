@@ -211,11 +211,12 @@ function computeReflectionFacts(nodes: LifeNode[], all: LifeNode[], profile: Mir
     facts.push({ icon: <IconTarget size={15} />, text: L(dict, `最集中在「${topDomain[0]}」（${topDomain[1]} 条，占 ${Math.round(topDomain[1] / nodes.length * 100)}%）`, `Most focused on "${topDomain[0]}" (${topDomain[1]}, ${Math.round(topDomain[1] / nodes.length * 100)}%)`) });
   }
 
-  // 4. Active hour
+  // 4. Active hour —— hourEngagement 对新用户是"清醒先验"种子(0.35–0.55),不是从记录得来的。
+  // 只有累积了足够真实反馈(feedbackCount 够大)才把"黄金时段"当观测呈现,否则那是先验冒充数据。
   const bestGroup = HOUR_GROUPS
     .map((g) => ({ ...g, score: avg(g.hours.map((h) => profile.hourEngagement[h])) }))
     .sort((a, b) => b.score - a.score)[0];
-  if (bestGroup && bestGroup.score > 0.5) {
+  if (bestGroup && bestGroup.score > 0.5 && profile.feedbackCount >= 8) {
     facts.push({ icon: <IconClock size={15} />, text: L(dict, `你的黄金时段在${bestGroup.label}`, `Your golden hours: ${bestGroup.labelEn}`) });
   }
 
@@ -1050,9 +1051,15 @@ export default function InsightsSheet({ onClose, canUsePrivateData = true, initi
           perspectivePrompt,
         }),
       });
-      const data = await res.json() as { ok: boolean; layers: LivingModelLayer[] };
+      const data = await res.json() as { ok: boolean; layers: LivingModelLayer[]; reason?: string };
       if (mySeq !== livingSeqRef.current) return; // 已被更晚的视角请求取代 → 丢弃,避免错标/错存
-      if (data.ok && data.layers) {
+      // 后端在 no_api_key / api_error 时返回 ok:true + 空层 + reason;只看 ok && layers 会把失败
+      // 伪装成"没数据,点一下就好"。按 reason 区分真实失败态,不再静默当成功保存空模型。
+      if (data.reason === 'no_api_key' || data.reason === 'api_error') {
+        setLivingError('ai');
+        if (cached) setLivingModel(cached);
+      } else if (data.ok && data.layers) {
+        // insufficient_data 也会带 fallback 空层,交给空态的"数据不够"文案(不算错误)。
         const model: LivingModel = {
           layers: data.layers,
           generatedAt: new Date().toISOString(),
@@ -1061,7 +1068,6 @@ export default function InsightsSheet({ onClose, canUsePrivateData = true, initi
         saveLivingModel(model);
         setLivingModel(model);
       } else {
-        // AI 生成失败(未配置 key / 上游报错)—— 不是没数据。留住旧结果,显式标失败。
         setLivingError('ai');
         if (cached) setLivingModel(cached);
       }
