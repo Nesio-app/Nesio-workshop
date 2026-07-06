@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 30;
 import { mergeCalendarEvents } from '@/lib/portal/calendar-filters';
 import { parseIcsEvents, parseCalendarName } from '@/lib/portal/ics';
+import { getIntegrationToken, saveIntegrationToken } from '@/lib/portal/integrations';
+import { pickCalendarTokens, shouldUseOAuth } from '@/lib/portal/calendar-token.mjs';
 
 type Feed = { url: string; label: string };
 type FeedResult = { label: string; ok: boolean; count: number; error?: string };
@@ -120,12 +123,23 @@ async function fetchIcsEvents(url: string, fallbackLabel: string) {
   }));
 }
 
-async function googleCalendarAccessToken(): Promise<string> {
-  return (await cookies()).get('nesio_google_calendar_access')?.value || '';
-}
-
-async function googleCalendarRefreshToken(): Promise<string> {
-  return (await cookies()).get('nesio_google_calendar_refresh')?.value || '';
+/**
+ * Resolve the calendar OAuth tokens Supabase-first (cross-device), then cookie.
+ * 修「Token 存储精神分裂」—— 此前只读 nesio_google_calendar_* cookie:换一台
+ * 设备(Supabase 会话、本机无 cookie)日历就静默退回 iCal,显示"没连日历",
+ * 即便账号明明连着(用户:「日历今天仍没修好」)。改走和 gmail-access 同一条
+ * 解析链:getIntegrationToken('calendar') 先查 Supabase,再回落 cookie。
+ */
+async function resolveCalendarTokens(): Promise<{ accessToken: string; refreshToken: string }> {
+  // getIntegrationToken 已 Supabase 优先、再按显式开关回落 cookie。这里再显式认一次
+  // 本机的 nesio_google_calendar_* cookie,覆盖旧授权只写这对 cookie 的历史数据。
+  const supabase = await getIntegrationToken('calendar');
+  const store = await cookies();
+  const cookieTokens = {
+    accessToken: store.get('nesio_google_calendar_access')?.value || '',
+    refreshToken: store.get('nesio_google_calendar_refresh')?.value || '',
+  };
+  return pickCalendarTokens(supabase, cookieTokens);
 }
 
 function setCalendarCookies(response: NextResponse, session: GoogleTokenResponse | null) {
@@ -225,9 +239,9 @@ export async function GET(req: NextRequest) {
   const authFailure = await requireAuthenticatedCalendarAccess(req);
   if (authFailure) return authFailure;
 
-  const accessToken = await googleCalendarAccessToken();
-  const refreshToken = await googleCalendarRefreshToken();
-  if (accessToken) {
+  const { accessToken, refreshToken } = await resolveCalendarTokens();
+  // access 可能过期但 refresh 仍在 → 只要有任一,就走 OAuth 路径(而非直接掉进 iCal)。
+  if (shouldUseOAuth({ accessToken, refreshToken })) {
     try {
       const events = await fetchGoogleOAuthEvents(accessToken);
       return NextResponse.json(
@@ -248,6 +262,12 @@ export async function GET(req: NextRequest) {
       if (refreshedSession?.access_token) {
         try {
           const events = await fetchGoogleOAuthEvents(refreshedSession.access_token);
+          // 刷新成功后同时写回 Supabase(不只 cookie),否则换设备下次又拿到旧 token。
+          await saveIntegrationToken('calendar', {
+            accessToken: refreshedSession.access_token,
+            refreshToken: refreshedSession.refresh_token || refreshToken || undefined,
+            expiresAt: refreshedSession.expires_in ? Date.now() + refreshedSession.expires_in * 1000 : undefined,
+          }, req).catch(() => { /* Supabase heal best-effort */ });
           const response = NextResponse.json(
             {
               ok: true,
