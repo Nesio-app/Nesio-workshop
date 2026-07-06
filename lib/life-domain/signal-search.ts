@@ -73,7 +73,12 @@ export function scoreSignalForQuery(signal: Signal, query: string): number {
   return lexical + recencyBoost + signal.confidence * 0.8;
 }
 
-export function searchSignalsSemantically(query: string, limit = 8): Signal[] {
+/**
+ * 本地信号搜索 —— 词法/实体/标签重叠打分(**非真语义**;真正的向量检索只在服务端
+ * pgvector 路径,见 searchSignalsWithCloudFallback 的 mode==='signal_vector_pgvector')。
+ * 相关性门只认词法命中(scoreSignalForQuery:无命中即 0),近因/置信仅作次序微调。
+ */
+export function searchSignalsLexical(query: string, limit = 8): Signal[] {
   const trimmed = query.trim();
   if (!trimmed) return [];
   return getSignals()
@@ -83,6 +88,9 @@ export function searchSignalsSemantically(query: string, limit = 8): Signal[] {
     .slice(0, limit)
     .map((entry) => entry.signal);
 }
+
+/** @deprecated 名不副实:本地是词法匹配、不是语义。请用 searchSignalsLexical;保留兼容。 */
+export const searchSignalsSemantically = searchSignalsLexical;
 
 export function cloudSignalRowToSignal(row: CloudSignalRow): Signal | null {
   if (!row.signal_id || !row.source || !row.type) return null;
@@ -139,7 +147,7 @@ function mergeRankedSignals(primary: readonly Signal[], fallback: readonly Signa
 export async function searchSignalsWithCloudFallback(query: string, limit = 8): Promise<Signal[]> {
   const trimmed = query.trim();
   if (!trimmed) return [];
-  const localMatches = searchSignalsSemantically(trimmed, limit);
+  const localMatches = searchSignalsLexical(trimmed, limit);
   if (typeof window === 'undefined' || typeof fetch === 'undefined') return localMatches;
 
   try {

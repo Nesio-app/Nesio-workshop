@@ -12,7 +12,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { getRecentNodes, isPrivateExternalNode, searchLifeGraphFuzzy, type LifeNode } from '@/lib/portal/life-graph';
 import { signalToLifeNode } from '@/lib/life-domain';
-import { searchSignalsSemantically } from '@/lib/life-domain/signal-search';
+import { searchSignalsLexical } from '@/lib/life-domain/signal-search';
 import {
   createSignal,
   extractContext,
@@ -380,8 +380,8 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
       stopListening();
       setSendState('analyzing');
       const allCandidates = getRecentNodes(80).filter((node) => canUsePrivateData || !isPrivateExternalNode(node));
-      // Signal 事实面语义搜索优先(cutover 后读事实缓存),模糊/近期节点补位
-      const semanticFirst = searchSignalsSemantically(t, 20)
+      // Signal 事实面词法搜索优先(cutover 后读事实缓存),模糊/近期节点补位
+      const semanticFirst = searchSignalsLexical(t, 20)
         .map(signalToLifeNode)
         .filter((node) => canUsePrivateData || !isPrivateExternalNode(node));
       const fuzzyFirst = searchLifeGraphFuzzy(t, 20);

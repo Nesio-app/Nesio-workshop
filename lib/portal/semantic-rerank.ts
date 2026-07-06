@@ -14,6 +14,7 @@
  */
 
 import type { LifeNode } from './life-graph';
+import { blendRankSim } from './semantic-blend.mjs';
 
 const LEGACY_LS_KEY = 'nesio-node-embeddings-v1';
 const DB_NAME = 'nesio-vectors';
@@ -94,7 +95,9 @@ async function fetchVectors(texts: string[]): Promise<Array<number[] | null> | n
 
 /**
  * Re-rank `nodes` (already text-ranked by smartSearch) by blending text rank
- * with embedding similarity: final = 0.5·rankScore + 0.5·cosine.
+ * with embedding similarity. cosine 相关文本聚在 0.7–0.9 窄带,直接和占满 [0,1] 的
+ * rankScore 等权混合会被淹没,所以先对有向量的 sim 做 min-max 归一化再混合
+ * (见 semantic-blend.mjs),让语义真正参与排序。
  * Returns the input unchanged when embeddings are unavailable.
  */
 export async function semanticRerank(query: string, nodes: LifeNode[], topK = 12): Promise<LifeNode[]> {
@@ -132,11 +135,13 @@ export async function semanticRerank(query: string, nodes: LifeNode[], topK = 12
   });
   if (db && toStore.length > 0) await idbPutMany(db, toStore);
 
-  const scored = pool.map((node, i) => {
-    const rankScore = 1 - i / pool.length; // preserve text-ranking signal
-    const sim = nodeVecs[i] ? cosine(queryVec, nodeVecs[i]!) : 0;
-    return { node, score: 0.5 * rankScore + 0.5 * sim };
-  });
+  const items = pool.map((_, i) => ({
+    rank: 1 - i / pool.length,                                  // preserve text-ranking signal
+    sim: nodeVecs[i] ? cosine(queryVec, nodeVecs[i]!) : 0,
+    hasVec: Boolean(nodeVecs[i]),
+  }));
+  const blended = blendRankSim(items);                          // min-max 归一化 sim 后再等权混合
+  const scored = pool.map((node, i) => ({ node, score: blended[i] }));
 
   const reranked = scored.sort((a, b) => b.score - a.score).map((s) => s.node);
   return [...reranked, ...nodes.slice(pool.length)].slice(0, Math.max(topK, reranked.length));

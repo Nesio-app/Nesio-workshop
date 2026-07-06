@@ -216,8 +216,8 @@ for (const marker of [
 const voiceSheet = read('components/portal/VoiceInputSheet.tsx');
 assert.match(
   voiceSheet,
-  /searchSignalsWithCloudFallback|searchSignalsSemantically/,
-  'Ask mode must use signal-aware semantic/fuzzy search.',
+  /searchSignalsWithCloudFallback|searchSignalsSemantically|searchSignalsLexical/,
+  'Ask mode must use signal-aware search (lexical local + optional pgvector cloud).',
 );
 
 const policy = read('lib/intelligence/dec-policy.ts');
