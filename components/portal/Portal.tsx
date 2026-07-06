@@ -63,6 +63,7 @@ import { STORAGE_FULL_EVENT, STORAGE_WARNING_EVENT } from '@/lib/portal/storage-
 import { track, installErrorTracking } from '@/lib/portal/telemetry';
 import type { PortalConfig, PortalDecMetadata, PortalTool } from '@/lib/portal/types';
 import { type ToolForShellState } from './tool-state';
+import { isBusy } from '@/lib/portal/app-busy';
 
 const DEC_METADATA_TTL_MS = 30_000;
 const FIRST_MEMORY_RECEIPT_KEY = 'nesio-first-memory-receipt-shown-v1';
@@ -235,7 +236,8 @@ export default function Portal() {
         if (data.v !== known) {
           const typing = document.activeElement instanceof HTMLInputElement
             || document.activeElement instanceof HTMLTextAreaElement;
-          if (!typing) window.location.reload();
+          // busy 期间(文件选择器往返 / 正在同步)不刷新,否则会把进行中的上传冲掉、跳回主页。
+          if (!typing && !isBusy()) window.location.reload();
         }
       } catch { /* offline 等下次 */ }
     };

@@ -9,6 +9,7 @@ import { type LifeNode } from '@/lib/portal/life-graph';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
+import { markBusy } from '@/lib/portal/app-busy';
 
 interface ConnectorsHubProps { open: boolean; onClose: () => void; }
 
@@ -742,9 +743,10 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       );
       return;
     }
-    if (c.id === 'health') { fileRef.current?.click(); return; }
-    if (c.method === 'batch-photos') { photosRef.current?.click(); return; }
-    if (c.id === 'timeline') { timelineRef.current?.click(); return; }
+    // 打开文件选择器前标记 busy —— 选完文件回到前台时,别被"新部署自动整页刷新"冲掉上传。
+    if (c.id === 'health') { markBusy(); fileRef.current?.click(); return; }
+    if (c.method === 'batch-photos') { markBusy(); photosRef.current?.click(); return; }
+    if (c.id === 'timeline') { markBusy(); timelineRef.current?.click(); return; }
     if (c.id === 'wechat_reading') { setWechatReadingOpen(true); return; }
     if (c.id === 'wechat_fav') { return; } // 纯说明行,无操作
     if (c.id === 'plaid') { void connectPlaid(); return; }
@@ -777,6 +779,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = '';
+    markBusy(); // 解析期间也保持 busy,别被自动刷新打断
     setSyncing('health');
     try {
       const bytes = await extractExportXmlBytes(file);
