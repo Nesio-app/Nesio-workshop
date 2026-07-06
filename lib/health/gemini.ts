@@ -1,12 +1,10 @@
+import { resolveAiKey } from '@/lib/portal/ai-keys';
+
 const DEFAULT_MODELS = 'gemini-2.5-flash-lite,gemini-2.5-flash,gemini-1.5-flash-8b';
 
 export function getGoogleKey(): string | undefined {
-  const raw =
-    process.env.GEMINI_API_KEY ||
-    process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
-    process.env.GOOGLE_AI_API_KEY ||
-    process.env.GOOGLE_API_KEY;
-  return raw?.trim() || undefined;
+  // 统一别名解析(与 ai-keys 一处收敛),不再各处手列别名。
+  return resolveAiKey('gemini') || undefined;
 }
 
 export function getModelList(): string[] {

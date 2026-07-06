@@ -5,6 +5,8 @@
  * this deployment, instead of hard-coding one Gemini model. Server-only.
  */
 
+import { resolveAiKey } from '@/lib/portal/ai-keys';
+
 function envValue(key: string): string {
   return (process.env[key] ?? '').trim();
 }
@@ -14,11 +16,9 @@ const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 const GEMINI_MODEL_FALLBACKS = ['gemini-2.0-flash', 'gemini-flash-latest', 'gemini-2.5-flash'];
 
 export function aiProviderAvailable(): boolean {
-  return Boolean(
-    envValue('ANTHROPIC_API_KEY') ||
-      envValue('GEMINI_API_KEY') ||
-      envValue('GOOGLE_GENERATIVE_AI_API_KEY'),
-  );
+  // 统一别名解析:此前只认 GEMINI_API_KEY/GOOGLE_GENERATIVE_AI_API_KEY,漏了
+  // GOOGLE_AI_API_KEY / GOOGLE_API_KEY —— 共享客户端也曾中招同一个窄读 bug。
+  return Boolean(resolveAiKey('anthropic') || resolveAiKey('gemini'));
 }
 
 async function callClaude(apiKey: string, prompt: string, system: string, maxTokens: number): Promise<string> {
@@ -90,8 +90,8 @@ async function callGemini(apiKey: string, prompt: string, system: string, maxTok
 export async function completeText(
   { prompt, system = '', maxTokens = 1024 }: { prompt: string; system?: string; maxTokens?: number },
 ): Promise<{ text: string; provider: 'claude' | 'gemini' }> {
-  const anthropicKey = envValue('ANTHROPIC_API_KEY');
-  const geminiKey = envValue('GEMINI_API_KEY') || envValue('GOOGLE_GENERATIVE_AI_API_KEY');
+  const anthropicKey = resolveAiKey('anthropic');
+  const geminiKey = resolveAiKey('gemini');
 
   if (anthropicKey) {
     try {
