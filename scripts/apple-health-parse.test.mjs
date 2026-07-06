@@ -53,6 +53,10 @@ const xml = `
 <Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="Watch" value="HKCategoryValueSleepAnalysisAsleepREM" startDate="${iso(d2, 5)}" endDate="${iso(d2, 6)}"/>
 <Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="Watch" value="HKCategoryValueSleepAnalysisAwake" startDate="${iso(d2, 6)}" endDate="${iso(d2, 6)}"/>
 <ActivitySummary dateComponents="${iso(d2).slice(0, 10)}" activeEnergyBurned="450" activeEnergyBurnedGoal="500" activeEnergyBurnedUnit="kcal" appleExerciseTime="35" appleExerciseTimeGoal="30" appleStandHours="11" appleStandHoursGoal="12"/>
+<StateOfMind startDate="${iso(d2)}" endDate="${iso(d2)}" kind="momentaryEmotion" valence="0.6"><Label value="Happy"/></StateOfMind>
+<StateOfMind startDate="${iso(d3)}" endDate="${iso(d3)}" kind="momentaryEmotion" valence="0.4"/>
+<StateOfMind startDate="${iso(d3, 14)}" endDate="${iso(d3, 14)}" kind="momentaryEmotion" valence="0.8"/>
+<Me HKCharacteristicTypeIdentifierDateOfBirth="1990-05-01" HKCharacteristicTypeIdentifierBiologicalSex="HKBiologicalSexMale" HKCharacteristicTypeIdentifierBloodType="HKBloodTypeOPositive"/>
 <Workout workoutActivityType="HKWorkoutActivityTypeRunning" duration="30" totalDistance="5.2" totalDistanceUnit="km" totalEnergyBurned="1339" totalEnergyBurnedUnit="kJ" startDate="${iso(d2)}" endDate="${iso(d2)}"/>
 `;
 const { metrics, nodes } = AH.parseHealthFromBytes(new TextEncoder().encode(xml));
@@ -87,6 +91,16 @@ assert.equal(metrics.activityRings.stand, 11, 'C:Stand 11 h');
 const runNode = nodes.find((n) => n.type === 'event' && /跑步/.test(n.name));
 assert.ok(runNode && /5\.2 公里/.test(runNode.rawInput), 'C:锻炼节点含距离 5.2 公里');
 assert.ok(runNode && Math.abs(Number(runNode.attributes.energyKcal) - 320) < 2, `C:锻炼消耗 kJ→kcal(1339→320),实得 ${runNode?.attributes.energyKcal}`);
+
+// ── 批次 45(D1):State of Mind 情绪 + Me 档案。
+assert.ok(metrics.mood, 'D1:情绪分析生成');
+assert.equal(metrics.mood.count, 3, 'D1:计入 3 条情绪记录');
+assert.ok(Math.abs(metrics.mood.avgValence - 0.6) < 0.01, `D1:平均效价 (0.6+0.4+0.8)/3=0.6,实得 ${metrics.mood?.avgValence}`);
+assert.equal(metrics.mood.tone, 'pleasant', 'D1:基调偏积极');
+assert.ok(metrics.profile, 'D1:档案生成');
+assert.equal(metrics.profile.sex, 'male', 'D1:性别');
+assert.equal(metrics.profile.bloodType, 'O+', 'D1:血型 O+(Positive→+)');
+assert.ok(metrics.profile.age >= 30 && metrics.profile.age <= 100, `D1:年龄由生日推算,实得 ${metrics.profile?.age}`);
 
 const summary = nodes.find((n) => n.type === 'health_state');
 assert.ok(summary && /步/.test(summary.rawInput) && /体重/.test(summary.rawInput), '概况节点全文件包含步数+体重');
