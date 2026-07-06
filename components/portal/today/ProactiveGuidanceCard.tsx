@@ -70,16 +70,10 @@ export function ProactiveGuidanceCard({
   }
 
   function handleAction(action: ProactiveAction) {
-    if (action.actionType === 'dismiss') { onDismiss(); return; }
-    if (action.actionType === 'snooze' && card.nodeId) {
-      snoozeOverdue(card.nodeId, 7);
-      onDismiss();
-      return;
-    }
-    if (action.actionType === 'done' && card.nodeId) {
-      onMarkDone?.(card.nodeId);
-      onDismiss();
-    }
+    if (action.actionType === 'snooze' && card.nodeId) snoozeOverdue(card.nodeId, 7);
+    else if (action.actionType === 'done' && card.nodeId) onMarkDone?.(card.nodeId);
+    // 无论 dismiss / 缺 nodeId / 未知 actionType,都至少收起这张卡 —— 不留"点了没反应"的死按钮。
+    onDismiss();
   }
 
   // TODAY-004 反馈闭环:写回 feedback store(DEC 下轮据此过滤)+ signal

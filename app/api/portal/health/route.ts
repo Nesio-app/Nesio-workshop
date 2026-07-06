@@ -112,6 +112,7 @@ function parseHealthFallback(text: string): object[] {
   return nodes;
 }
 
+export const maxDuration = 30;
 export async function POST(req: NextRequest) {
   const guard = await guardAiRoute(req, 'portal_health', { limit: 10 });
   if (guard) return guard;

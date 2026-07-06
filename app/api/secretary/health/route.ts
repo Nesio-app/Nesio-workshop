@@ -82,6 +82,7 @@ function buildProviderMatrix(configured: {
   ];
 }
 
+export const maxDuration = 30;
 export async function GET(req: NextRequest) {
   const gemini = Boolean(getGoogleKey());
   const doubao = Boolean(getDoubaoKey());

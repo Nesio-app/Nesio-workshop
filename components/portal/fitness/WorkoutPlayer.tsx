@@ -15,6 +15,7 @@ import { earnPoints, POINTS_PER_FITNESS_SESSION } from '@/lib/platform/rewards-e
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
+import { useSheetDismiss } from '@/lib/portal/use-sheet-dismiss';
 
 export interface PlayerStep {
   exerciseId: string;
@@ -45,6 +46,8 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
   const [phase, setPhase] = useState<'work' | 'rest' | 'done'>('work');
   const [countdown, setCountdown] = useState<number | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useSheetDismiss(true, onClose); // 挂载即打开;Escape 关闭 + 焦点回收
 
   const steps = session.steps;
   const step = steps[idx];
@@ -111,7 +114,7 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
   if (!step || !ex) return null;
 
   return (
-    <div className="nesio-wp-overlay">
+    <div className="nesio-wp-overlay" role="dialog" aria-modal aria-label={session.name || L(dict, '跟练', 'Workout')}>
       <div className="nesio-wp-top">
         <span className="nesio-wp-progress">{L(dict, `动作 ${idx + 1}/${steps.length}`, `${idx + 1}/${steps.length}`)}</span>
         <span className="nesio-wp-session">{session.name}</span>

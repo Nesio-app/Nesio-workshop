@@ -11,6 +11,7 @@ function getOpenAIKey(): string {
   return (process.env.OpenAI_KEY || process.env.OPENAI_API_KEY || '').trim();
 }
 
+export const maxDuration = 30;
 export async function POST(req: NextRequest) {
   const guard = await guardAiRoute(req, 'tts', { limit: 10 });
   if (guard) return guard;

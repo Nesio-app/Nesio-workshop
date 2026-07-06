@@ -128,13 +128,14 @@ export function categoryOf(label: string): PlaceCategory {
   if (!s || /unknown|未知/.test(s)) return 'unknown';
   if (/home|家|住宅/.test(s)) return 'home';
   if (/work|office|公司|办公/.test(s)) return 'work';
-  if (/gym|fitness|健身|运动|yoga|瑜伽|sport|stadium|court|trail|park\b|公园|球场/.test(s)) return 'fitness';
-  if (/restaurant|cafe|coffee|starbucks|mcdonald|餐|饭|food|dining|bakery|bar\b|grill|pizza|kitchen|tea\b|奶茶|饮/.test(s)) return 'food';
+  // 短英文词一律加前后 \b 边界(否则 "Las Vegas" 含 gas、"Kmart"/"Stuttgart" 含 art 会误命中)。
+  if (/gym|fitness|健身|运动|yoga|瑜伽|sport|stadium|court|\btrail\b|\bpark\b|公园|球场/.test(s)) return 'fitness';
+  if (/restaurant|cafe|coffee|starbucks|mcdonald|餐|饭|\bfood\b|dining|bakery|\bbar\b|grill|pizza|kitchen|\btea\b|奶茶|饮/.test(s)) return 'food';
   if (/shop|mall|store|market|超市|商场|购物|target|walmart|costco|michaels|ulta|beauty|ikea|outlet|amazon/.test(s)) return 'shopping';
-  if (/museum|library|图书馆|博物馆|gallery|theat(er|re)|剧院|cinema|movie|电影|art\b|church|temple|寺|教堂/.test(s)) return 'culture';
-  if (/hotel|inn\b|motel|resort|airbnb|酒店|旅馆|民宿/.test(s)) return 'lodging';
-  if (/hospital|clinic|医院|诊所|pharmacy|药|dentist|doctor|clinic|urgent care/.test(s)) return 'health';
-  if (/airport|station|机场|车站|transit|地铁|subway|terminal|gas\b|加油/.test(s)) return 'transit';
+  if (/museum|library|图书馆|博物馆|gallery|theat(er|re)|剧院|cinema|movie|电影|\bart\b|church|temple|寺|教堂/.test(s)) return 'culture';
+  if (/hotel|\binn\b|motel|resort|airbnb|酒店|旅馆|民宿/.test(s)) return 'lodging';
+  if (/hospital|clinic|医院|诊所|pharmacy|药|dentist|doctor|urgent care/.test(s)) return 'health';
+  if (/airport|station|机场|车站|transit|地铁|subway|terminal|\bgas\b|加油/.test(s)) return 'transit';
   if (/club|entertainment|游乐|amusement|zoo|aquarium|bowling|arcade|casino/.test(s)) return 'entertainment';
   return 'place';
 }

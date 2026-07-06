@@ -11,6 +11,7 @@ function envValue(key: string): string {
   return (process.env[key] ?? '').trim();
 }
 
+export const maxDuration = 30;
 export async function POST(req: NextRequest) {
   const guard = await guardAiRoute(req, 'meeting_notes', { limit: 15 });
   if (guard) return guard;

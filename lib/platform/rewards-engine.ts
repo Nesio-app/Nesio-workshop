@@ -86,11 +86,16 @@ export function getPoints(): number {
   return loadRewards().points;
 }
 
-/** 从价格串里抠出数字:支持 "$1,299.00" / "¥399" / "US $50" / "50"。 */
+/** 从价格串里抠出数字:支持 "$1,299.00" / "¥399" / "US $50" / "50" / "2 for $50"。
+ *  优先取货币符号后的数字 —— 否则 "2 for $50" 会被抠成数量 2 而非价格 50。
+ *  没有货币符号时取串里最大的数字(数量词通常小于价格)。 */
 export function parsePriceNumber(price?: string): number {
   if (!price) return 0;
-  const m = price.replace(/,/g, '').match(/\d+(\.\d+)?/);
-  return m ? Math.round(parseFloat(m[0])) : 0;
+  const s = price.replace(/,/g, '');
+  const cur = s.match(/[$¥€£]\s*(\d+(?:\.\d+)?)/);
+  if (cur) return Math.round(parseFloat(cur[1]));
+  const nums = s.match(/\d+(?:\.\d+)?/g);
+  return nums ? Math.round(Math.max(...nums.map(parseFloat))) : 0;
 }
 
 function newId(prefix: string): string {

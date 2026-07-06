@@ -339,6 +339,7 @@ function extractJson(raw: string): string {
   return parsed !== null ? JSON.stringify(parsed) : raw.trim();
 }
 
+export const maxDuration = 30;
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json() as {

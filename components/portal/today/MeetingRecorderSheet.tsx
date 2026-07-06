@@ -10,12 +10,15 @@ import { addMeetingNotes, type FocusNode } from '@/lib/platform/view-models/toda
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
+import { useSheetDismiss } from '@/lib/portal/use-sheet-dismiss';
 
 type SpeechRecAPI = {
   continuous: boolean;
   interimResults: boolean;
   lang: string;
   onresult: ((e: { results: ArrayLike<{ 0: { transcript: string } }> }) => void) | null;
+  onerror: ((e: { error?: string }) => void) | null;
+  onend: (() => void) | null;
   start(): void;
   stop(): void;
 };
@@ -30,8 +33,16 @@ export function MeetingRecorderSheet({ open, meetingNode, onClose }: {
   const [transcript, setTranscript] = useState('');
   const [saved, setSaved] = useState(false);
   const [seconds, setSeconds] = useState(0);
+  // 可见失败纪律:不支持语音转写的浏览器不显示假录音波形,如实提示改用手动输入。
+  const [speechSupported, setSpeechSupported] = useState(true);
+  const [speechError, setSpeechError] = useState<string | null>(null);
   const recognitionRef = useRef<SpeechRecAPI | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    const win = window as unknown as Record<string, unknown>;
+    setSpeechSupported(Boolean(win.webkitSpeechRecognition || win.SpeechRecognition));
+  }, []);
 
   useEffect(() => {
     if (!open) {
@@ -45,27 +56,43 @@ export function MeetingRecorderSheet({ open, meetingNode, onClose }: {
   }, [open]);
 
   function startRecording() {
+    const win = window as unknown as Record<string, unknown>;
+    const SpeechRec = (win.webkitSpeechRecognition || win.SpeechRecognition) as (new () => SpeechRecAPI) | undefined;
+    // 不支持就不假装在录 —— 明确提示、只留手动输入,不显示会动的假波形。
+    if (!SpeechRec) {
+      setSpeechSupported(false);
+      setSpeechError(L(dict, '这个浏览器不支持语音转写,请在下方直接输入会议笔记。', "This browser can't transcribe speech — type your notes below instead."));
+      return;
+    }
+    setSpeechError(null);
     setRecording(true);
     setSeconds(0);
     timerRef.current = setInterval(() => setSeconds((s) => s + 1), 1000);
 
     try {
-      const win = window as unknown as Record<string, unknown>;
-      const SpeechRec = (win.webkitSpeechRecognition || win.SpeechRecognition) as (new () => SpeechRecAPI) | undefined;
-      if (SpeechRec) {
-        const rec = new SpeechRec();
-        rec.continuous = true;
-        rec.interimResults = true;
-        rec.lang = dict === 'en' ? 'en-US' : 'zh-CN';
-        rec.onresult = (e) => {
-          const text = Array.from(e.results).map((r) => r[0].transcript).join('');
-          setTranscript(text);
-        };
-        rec.start();
-        recognitionRef.current = rec;
-      }
+      const rec = new SpeechRec();
+      rec.continuous = true;
+      rec.interimResults = true;
+      rec.lang = dict === 'en' ? 'en-US' : 'zh-CN';
+      rec.onresult = (e) => {
+        const text = Array.from(e.results).map((r) => r[0].transcript).join('');
+        setTranscript(text);
+      };
+      rec.onerror = (e) => {
+        // 麦克风被拒/识别报错:显式告知,别让用户对着空转写说半天。
+        setSpeechError(
+          e?.error === 'not-allowed'
+            ? L(dict, '麦克风权限被拒,请在浏览器允许后重试,或直接输入。', 'Microphone blocked — allow it and retry, or type instead.')
+            : L(dict, '语音转写出错,请重试或直接输入。', 'Speech transcription error — retry or type instead.'),
+        );
+        stopRecording();
+      };
+      rec.onend = () => { if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; } };
+      rec.start();
+      recognitionRef.current = rec;
     } catch {
-      // SpeechRecognition not available — manual input still works
+      setSpeechError(L(dict, '无法启动语音转写,请直接输入会议笔记。', "Couldn't start transcription — type your notes instead."));
+      stopRecording();
     }
   }
 
@@ -85,6 +112,8 @@ export function MeetingRecorderSheet({ open, meetingNode, onClose }: {
 
   const formatTime = (s: number) =>
     `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;
+
+  useSheetDismiss(open, onClose);
 
   if (!open) return null;
 
@@ -129,16 +158,23 @@ export function MeetingRecorderSheet({ open, meetingNode, onClose }: {
                   <p className="nesio-recorder-transcript-text">{transcript}</p>
                 </div>
               ) : (
-                !recording && <p className="nesio-recorder-hint">{L(dict, '点击录音，自动转写中文语音', 'Tap record — speech transcribes automatically')}</p>
+                !recording && (
+                  <p className="nesio-recorder-hint">
+                    {speechSupported
+                      ? L(dict, '点击录音，自动转写中文语音', 'Tap record — speech transcribes automatically')
+                      : L(dict, '这个浏览器不支持语音转写,请直接输入笔记', "This browser can't transcribe — type notes below")}
+                  </p>
+                )
               )}
+              {speechError && <p className="nesio-recorder-hint" style={{ color: 'var(--status-risk)' }}>{speechError}</p>}
             </div>
 
             <div className="nesio-recorder-actions">
-              {!recording ? (
-                <button type="button" className="nesio-recorder-start-btn" onClick={startRecording}>{L(dict, '开始录音', 'Start recording')}</button>
-              ) : (
+              {recording ? (
                 <button type="button" className="nesio-recorder-stop-btn" onClick={stopRecording}>{L(dict, '停止录音', 'Stop recording')}</button>
-              )}
+              ) : speechSupported ? (
+                <button type="button" className="nesio-recorder-start-btn" onClick={startRecording}>{L(dict, '开始录音', 'Start recording')}</button>
+              ) : null}
 
               {!recording && (
                 <textarea
