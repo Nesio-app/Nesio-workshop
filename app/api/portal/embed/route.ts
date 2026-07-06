@@ -9,13 +9,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { embedTextRaw } from '@/lib/life-domain/signal-embedding';
 import { isPortalRequestAuthorized, isRateLimited } from '@/lib/portal/api-auth';
+import { resolveAiKey } from '@/lib/portal/ai-keys';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
-
-function envValue(key: string): string {
-  return (process.env[key] ?? '').trim();
-}
 
 const MAX_TEXTS = 24;
 const MAX_CHARS = 500;
@@ -27,7 +24,7 @@ export async function POST(req: NextRequest) {
   if (isRateLimited(req, 'embed', { limit: 30 })) {
     return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 });
   }
-  if (!envValue('GEMINI_API_KEY')) {
+  if (!resolveAiKey('gemini')) {
     return NextResponse.json({ ok: false, error: 'embeddings_unavailable' }, { status: 503 });
   }
 

@@ -9,6 +9,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { guardAiRoute } from '@/lib/portal/api-auth';
+import { resolveAiKeys } from '@/lib/portal/ai-keys';
 import {
   buildHealthInsightPrompt,
   fallbackHealthInsight,
@@ -17,10 +18,6 @@ import {
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
-
-function envValue(key: string): string {
-  return (process.env[key] ?? '').trim();
-}
 
 async function callClaude(apiKey: string, prompt: string): Promise<string> {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -68,8 +65,8 @@ export async function POST(req: NextRequest) {
   };
 
   const prompt = buildHealthInsightPrompt(input);
-  const claudeKey = envValue('ANTHROPIC_API_KEY') || envValue('CLAUDE_API_KEY');
-  const geminiKey = envValue('GEMINI_API_KEY');
+  // 统一别名解析:读全套 env 别名(修此前只读 GEMINI_API_KEY、漏 GOOGLE_GENERATIVE_AI_API_KEY 而误走兜底)。
+  const { anthropic: claudeKey, gemini: geminiKey } = resolveAiKeys();
 
   if (claudeKey) {
     try { return NextResponse.json({ ok: true, text: await callClaude(claudeKey, prompt), source: 'ai' }); }

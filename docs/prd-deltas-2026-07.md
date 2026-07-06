@@ -96,6 +96,13 @@
   (localStorage baohe_personal_lab),与 URL `?baohePersonal=1` 等价
 - **命名消歧**:两个 DEC(lib/intelligence/dec.ts 决策引擎 vs lib/portal/dec-data-*
   运营数据目录)物理改名被否决(公开 URL + 契约钉文件名),以头注释 + STATE.md 词典消歧
+- **AI key 统一解析(2026-07 新增)**:同一把 Gemini key 全仓有 4 个 env 别名
+  (GEMINI_API_KEY / GOOGLE_GENERATIVE_AI_API_KEY / GOOGLE_AI_API_KEY / GOOGLE_API_KEY),
+  各路由手读自己的子集 → 读窄了的路由即使 key 已配也静默走兜底(health-insight 中招)。
+  新增 `lib/portal/ai-keys.ts`(resolveAiKeys/resolveAiKey,别名组与 ai-provider-router-contract
+  一致,有测试钉住两处一致),health-insight/decompose-task/insights/embed 改用它。
+  **欠账**:signal-embedding(life-domain 层)仍窄读 —— 它 import portal 会违反分层熔断,
+  待 ai-keys 下沉到共享低层后再收(embeddings 受 SIGNAL_EMBEDDINGS_ENABLED flag 门控,低优先)。
 
 ## 8. 健康洞察系统(原 PRD 未覆盖,2026-07 新增 —— 下版 PRD 应吸收)
 
