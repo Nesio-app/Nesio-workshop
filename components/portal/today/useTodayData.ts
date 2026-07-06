@@ -7,7 +7,7 @@
  * TodayFeed 容器只消费返回值,不再直接触碰任何数据源。
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { loadProfileSettings, portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { buildTodayViewModel, type FocusNode, type ProactiveContext } from '@/lib/platform/view-models/today-view-model';
@@ -102,6 +102,10 @@ export function useTodayData(canUsePrivateData: boolean) {
   const [proactiveCards, setProactiveCards] = useState<ProactiveCardData[]>([]);
   const [dismissedCardIds, setDismissedCardIds] = useState<Set<string>>(new Set());
 
+  // 并发运行序号:初始加载 + 20 分轮询 + 多个 window 事件都会触发 applyViewModel,
+  // 每次有多段 await。只有最新一次运行允许写 state,否则慢的旧运行会覆盖新结果。
+  const runSeqRef = useRef(0);
+
   // Meeting recorder state
 
   useEffect(() => {
@@ -115,9 +119,11 @@ export function useTodayData(canUsePrivateData: boolean) {
     let cancelled = false;
 
     const applyViewModel = async () => {
+      const myRun = ++runSeqRef.current; // 本次运行序号;被更新的运行取代后不再写 state
+      const stale = () => cancelled || myRun !== runSeqRef.current;
       const cloudSignals = await loadCloudSignals(canUsePrivateData);
       const updated = buildTodayViewModel({ canUsePrivateData, fallbackCards: EMPTY_SIGNAL_CARDS, cloudSignals });
-      if (cancelled) return;
+      if (stale()) return;
       setMemoryCount(updated.memoryCount);
       setMemoryNotes(updated.memoryNotes);
       setFocusNodes(updated.focusNodes);
@@ -129,7 +135,7 @@ export function useTodayData(canUsePrivateData: boolean) {
 
       // Read calendar events from cache for the focus section
       const cal = readPortalCache<{ events?: CalendarEvent[] }>(PORTAL_CACHE_KEYS.calendar);
-      if (!cancelled) setCalendarEvents(cal?.events ?? []);
+      if (!stale()) setCalendarEvents(cal?.events ?? []);
 
       // Build guidance cards (up to 2) and show independently
       if (canUsePrivateData) {
@@ -229,7 +235,7 @@ export function useTodayData(canUsePrivateData: boolean) {
           }
         }
 
-        if (!cancelled && newProactiveCards.length > 0) setProactiveCards(newProactiveCards);
+        if (!stale() && newProactiveCards.length > 0) setProactiveCards(newProactiveCards);
         // 管线空窗时的兜底轮播移到 TodayFeed 渲染层(buildRotatingFallback):
         // 那里能看到「被 dismiss 后还剩几张」,保证未来预测区永远有内容。
       }

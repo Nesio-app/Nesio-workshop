@@ -318,6 +318,8 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
     } else {
       setTimeout(() => inputRef.current?.focus(), 120);
     }
+    // 卸载时(录音中被父组件直接移除,没先置 open=false)也要释放麦克风。
+    return () => { recRef.current?.stop(); recRef.current = null; };
   }, [open, isAskMode]);
 
   // Update intent label as user types/speaks
