@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { guardAiRoute } from '@/lib/portal/api-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,6 +17,9 @@ function safeJson(body: Record<string, unknown>, status = 200) {
 }
 
 export async function POST(req: NextRequest) {
+  const guard = await guardAiRoute(req, 'flomo-upload', { limit: 20 });
+  if (guard) return guard;
+
   let form: FormData;
   try {
     form = await req.formData();

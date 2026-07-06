@@ -5,8 +5,66 @@
  * Used by the 冷冻仓 flow to identify what the user wants to buy.
  */
 import { NextRequest, NextResponse } from 'next/server';
+import dns from 'node:dns/promises';
+import { guardAiRoute } from '@/lib/portal/api-auth';
 
 export const dynamic = 'force-dynamic';
+
+// ── SSRF 防护:阻止服务端被诱导去 fetch 内网/云元数据端点 ──
+function ipv4Private(ip: string): boolean {
+  const p = ip.split('.').map((n) => Number(n));
+  if (p.length !== 4 || p.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) return true; // 畸形当不安全
+  const [a, b] = p;
+  if (a === 0 || a === 10 || a === 127) return true;         // 本机/私网
+  if (a === 169 && b === 254) return true;                    // 链路本地 + 云元数据 169.254.169.254
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && (b === 168 || b === 0)) return true;
+  if (a === 100 && b >= 64 && b <= 127) return true;          // CGNAT
+  if (a >= 224) return true;                                  // 组播/保留
+  return false;
+}
+function ipPrivate(ip: string): boolean {
+  const low = ip.toLowerCase();
+  if (low === '::1' || low === '::') return true;
+  const mapped = low.match(/::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+  if (mapped) return ipv4Private(mapped[1]);
+  if (low.startsWith('fe80') || low.startsWith('fc') || low.startsWith('fd')) return true; // 链路本地 / ULA
+  if (low.includes(':')) return false;                        // 其它 IPv6 全局单播放行
+  return ipv4Private(low);
+}
+/** 校验 URL 指向公网可解析主机;不安全则抛错。 */
+async function assertSafeUrl(raw: string): Promise<void> {
+  const u = new URL(raw);
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') throw new Error('blocked_scheme');
+  const host = u.hostname.toLowerCase();
+  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || host.endsWith('.internal')) throw new Error('blocked_host');
+  if (/^[\d.]+$/.test(host) || host.includes(':')) {
+    if (ipPrivate(host)) throw new Error('blocked_ip');
+    return;
+  }
+  const addrs = await dns.lookup(host, { all: true });
+  if (!addrs.length || addrs.some((a) => ipPrivate(a.address))) throw new Error('blocked_dns');
+}
+/** 逐跳校验的安全 fetch(手动跟随重定向,防重定向绕过 SSRF)。 */
+async function safeFetch(raw: string, maxHops = 3): Promise<Response> {
+  let current = raw;
+  for (let hop = 0; hop <= maxHops; hop++) {
+    await assertSafeUrl(current);
+    const res = await fetch(current, {
+      redirect: 'manual',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; NesioBot/1.0)',
+        'Accept': 'text/html,application/xhtml+xml',
+        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+      },
+      signal: AbortSignal.timeout(8000),
+    });
+    const loc = res.status >= 300 && res.status < 400 ? res.headers.get('location') : null;
+    if (loc) { current = new URL(loc, current).toString(); continue; }
+    return res;
+  }
+  throw new Error('too_many_redirects');
+}
 
 interface ParseResult {
   ok: boolean;
@@ -98,6 +156,9 @@ function extractArticleText(html: string): string {
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse<ParseResult>> {
+  const guard = await guardAiRoute(req, 'parse-url', { limit: 30 });
+  if (guard) return guard as NextResponse<ParseResult>;
+
   let url: string;
   try {
     const body = await req.json() as { url?: string };
@@ -110,14 +171,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<ParseResult>>
   }
 
   try {
-    const res = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; NesioBot/1.0)',
-        'Accept': 'text/html,application/xhtml+xml',
-        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-      },
-      signal: AbortSignal.timeout(8000),
-    });
+    const res = await safeFetch(url); // 逐跳 SSRF 校验 + 重定向再校验
 
     if (!res.ok) {
       return NextResponse.json({ ok: false, error: `fetch_error_${res.status}` });

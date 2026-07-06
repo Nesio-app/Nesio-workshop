@@ -5,6 +5,7 @@ import {
   isFlomoReadConfigured,
   isFlomoWriteConfigured,
 } from '@/lib/portal/flomo-api';
+import { guardAiRoute } from '@/lib/portal/api-auth';
 import { providerActionCopy } from '@/lib/portal/provider-action-copy-catalog.mjs';
 
 export const dynamic = 'force-dynamic';
@@ -28,6 +29,9 @@ function webhookUrl(): string | null {
 }
 
 export async function GET(req: NextRequest) {
+  const guard = await guardAiRoute(req, 'flomo-read', { limit: 60 });
+  if (guard) return guard;
+
   const limitParam = req.nextUrl.searchParams.get('limit');
   const limit = limitParam ? Number.parseInt(limitParam, 10) : 48;
 
@@ -54,6 +58,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const guard = await guardAiRoute(req, 'flomo-write', { limit: 30 });
+  if (guard) return guard;
+
   let body: { content?: string };
   try {
     body = await req.json();
