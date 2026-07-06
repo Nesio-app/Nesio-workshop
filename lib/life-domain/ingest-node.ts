@@ -22,11 +22,13 @@ import { appendSignalIdb } from './signal-store-idb';
 
 export type IngestNodeInput = Omit<LifeNode, 'id' | 'createdAt'>;
 
-/** ⑦ 外部稳定 id:邮件 messageId / Notion pageId。用于跨同步去重(同一封邮件/同一页只一条)。 */
+/** ⑦ 外部稳定 id:邮件 messageId / Notion pageId / 通用 externalId(如健康锻炼 startISO+活动)。
+ *  用于跨同步/重导入去重(同一封邮件、同一页、同一场锻炼只一条)。 */
 function externalKey(attrs: IngestNodeInput['attributes'] | undefined): string | null {
   if (!attrs) return null;
   if (typeof attrs.emailId === 'string' && attrs.emailId) return `email:${attrs.emailId}`;
   if (typeof attrs.notionPageId === 'string' && attrs.notionPageId) return `notion:${attrs.notionPageId}`;
+  if (typeof attrs.externalId === 'string' && attrs.externalId) return `ext:${attrs.externalId}`;
   return null;
 }
 
