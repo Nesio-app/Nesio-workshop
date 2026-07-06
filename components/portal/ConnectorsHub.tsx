@@ -760,19 +760,62 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
   }
 
   // 批次 38/39:直接传 zip 或 export.xml,全部在浏览器里解析(不上传大文件)。
-  // export.xml 常几百 MB,只解码尾部(最近数据在末尾),正则提炼后建记忆节点 + 指标看板。
-  // 批次 39:取整个 export.xml 的字节(不再只取尾部)—— Apple 导出按类型分块,
-  // 只看尾部会漏掉大多数指标(用户遇到「只出 1 项」)。全字节交给流式解析器扫全文件。
-  async function extractExportXmlBytes(file: File): Promise<Uint8Array | null> {
-    if (file.name.toLowerCase().endsWith('.zip')) {
-      const buf = new Uint8Array(await file.arrayBuffer());
-      const { unzipSync } = await import('fflate');
-      const isExport = (n: string) => /(^|\/)export\.xml$/i.test(n);
-      const files = unzipSync(buf, { filter: (f) => isExport(f.name) });
-      const entry = Object.entries(files).find(([n]) => isExport(n));
-      return entry ? entry[1] : null;
+  // 批次 40:1GB+ 的 zip 流式解压 + 流式解析 —— 绝不把整份 zip、或(解压后可达十几 GB 的)
+  // export.xml 一次性读进内存。file.stream() 分块读 → fflate 流式 Unzip → 解压块直接喂给
+  // createHealthParser(内存只留很小的尾缓冲 + 按天聚合的 Map)。之前 file.arrayBuffer() +
+  // unzipSync 会把整份解压进内存,在手机上 OOM:标签页被系统杀掉 → 触发自动刷新 → 跳回主页、
+  // 连接器显示未连接(用户报告的「上传坏了」根因)。全文件扫描,概况不再只看尾部 6MB。
+  async function streamParseHealth(file: File) {
+    const { createHealthParser } = await import('@/lib/portal/apple-health');
+    const parser = createHealthParser();
+    const isExport = (n: string) => /(^|\/)export\.xml$/i.test(n);
+
+    // 裸 export.xml:直接分块流式喂,不 arrayBuffer() 整份。
+    if (!file.name.toLowerCase().endsWith('.zip')) {
+      const reader = file.stream().getReader();
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (value && value.length) parser.pushBytes(value, false);
+      }
+      parser.pushBytes(new Uint8Array(0), true); // flush 尾缓冲
+      return { found: true, ...parser.finish() };
     }
-    return new Uint8Array(await file.arrayBuffer());
+
+    // zip:流式解压。export.xml 的 local header 在 zip 靠前处,拿到即可边解压边喂解析器;
+    // 其它文件(export_cda / 心电图 / 路线)不 start(),压缩流过即弃,不占内存。
+    const { Unzip, UnzipInflate, UnzipPassThrough } = await import('fflate');
+    const unzip = new Unzip();
+    unzip.register(UnzipInflate);    // 处理 deflate(Apple 用这个)
+    unzip.register(UnzipPassThrough); // 兜底:store(无压缩)
+    let sawExport = false;
+    let exportDone = false;
+    let failed: unknown = null;
+    unzip.onfile = (entry) => {
+      if (!isExport(entry.name)) return;
+      sawExport = true;
+      entry.ondata = (err, chunk, final) => {
+        if (err) { failed = err; return; }
+        if (chunk && chunk.length) parser.pushBytes(chunk, false);
+        if (final) exportDone = true;
+      };
+      entry.start();
+    };
+    const reader = file.stream().getReader();
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) { unzip.push(new Uint8Array(0), true); break; }
+        unzip.push(value, false);
+        if (failed) throw failed;
+        if (exportDone) break; // export.xml 读完即止,无需读完整个 1GB zip 的其余部分
+      }
+    } finally {
+      try { await reader.cancel(); } catch { /* 已读完 export.xml,取消余下读取 */ }
+    }
+    if (!sawExport) return { found: false, metrics: null, nodes: null };
+    parser.pushBytes(new Uint8Array(0), true); // flush 尾缓冲
+    return { found: true, ...parser.finish() };
   }
 
   async function handleHealthFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -782,15 +825,14 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     markBusy(); // 解析期间也保持 busy,别被自动刷新打断
     setSyncing('health');
     try {
-      const bytes = await extractExportXmlBytes(file);
-      if (!bytes || bytes.length === 0) {
+      // 看板指标 + 记忆节点(概况/锻炼)都基于全文件的同一次流式解析 —— 概况不再只看尾部 6MB,
+      // 避免 Apple 按类型分块导出时尾部缺步数/心率/睡眠而漏进概况。
+      const result = await streamParseHealth(file);
+      if (!result.found || !result.metrics) {
         showToast(L(dict, 'zip 里没找到 export.xml(别选 export_cda / 子文件夹)', 'No export.xml in the zip (not export_cda / subfolders)'), false);
         setSyncing(null); return;
       }
-      const { parseHealthFromBytes } = await import('@/lib/portal/apple-health');
-      // 看板指标 + 记忆节点(概况/锻炼)都基于全文件的同一次流式解析 —— 概况不再只看尾部 6MB,
-      // 避免 Apple 按类型分块导出时尾部缺步数/心率/睡眠而漏进概况。
-      const { metrics, nodes } = parseHealthFromBytes(bytes);
+      const { metrics, nodes } = result;
       if (metrics.metrics.length) {
         const { saveHealthMetrics } = await import('@/lib/portal/health-store');
         saveHealthMetrics(metrics);
@@ -805,7 +847,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       setCounts((p) => ({ ...p, health: metrics.metrics.length || nodes.length }));
       showToast(L(dict, `已接入健康数据:${metrics.metrics.length} 项指标,到「洞察 → 健康」看看`, `Health imported: ${metrics.metrics.length} metrics — see Insights → Health`), true);
     } catch {
-      showToast(L(dict, '解析失败(文件可能太大,手机内存不够 —— 可先在电脑上解压后单传 export.xml)', 'Parse failed (file may be too large for phone memory — unzip on a computer and upload export.xml)'), false);
+      showToast(L(dict, '解析失败(文件可能损坏或不是 Apple 健康导出 —— 可先在电脑上解压后单传 export.xml)', 'Parse failed (file may be corrupt or not an Apple Health export — unzip on a computer and upload export.xml)'), false);
     }
     setSyncing(null);
   }

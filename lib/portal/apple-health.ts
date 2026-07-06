@@ -576,6 +576,28 @@ export function parseHealthFromBytes(bytes: Uint8Array): { metrics: HealthMetric
   return { metrics, nodes: agg.buildNodes(metrics.metrics) };
 }
 
+/** 流式解析器 —— 给超大文件(1GB+ zip / 多 GB export.xml)用:调用方把解压后的字节分块
+ *  喂进来(pushBytes),内存只保留很小的尾缓冲 + 按天聚合的 Map,不materialize 整个 XML。
+ *  之前 file.arrayBuffer() + unzipSync 会把整份(解压后可达十几 GB)一次读进内存 → 手机 OOM。 */
+export function createHealthParser() {
+  const agg = new HealthAggregator();
+  const dec = new TextDecoder('utf-8');
+  let buf = '';
+  return {
+    /** 喂一块解压后的字节;final=true 表示最后一块。只在完整标签('>')处切,不切断记录。 */
+    pushBytes(chunk: Uint8Array, final = false): void {
+      if (chunk.length) buf += dec.decode(chunk, { stream: !final });
+      const cut = buf.lastIndexOf('>');
+      if (cut >= 0) { agg.feed(buf.slice(0, cut + 1)); buf = buf.slice(cut + 1); }
+      if (final && buf) { agg.feed(buf); buf = ''; }
+    },
+    finish(): { metrics: HealthMetrics; nodes: HealthNode[] } {
+      const metrics = agg.finalize();
+      return { metrics, nodes: agg.buildNodes(metrics.metrics) };
+    },
+  };
+}
+
 function toMetric(def: MetricDef): Omit<HealthMetric, 'latest' | 'latestDate' | 'prev' | 'series'> {
   return { key: def.key, label: def.label, unit: def.unit, decimals: def.decimals, group: def.group };
 }
