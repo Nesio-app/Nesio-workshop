@@ -114,11 +114,19 @@ export interface MonthSummary {
   currency: string;
 }
 
+/** 一笔交易的币种(缺省 USD,大写归一)。 */
+function ccyOf(t: BankTx): string {
+  return (t.currency || 'USD').toUpperCase();
+}
+
 export function summarizeMonth(txs: BankTx[], ym: string): MonthSummary {
   const monthTxs = txs.filter((t) => txYm(t) === ym);
+  // 只汇总主币种的交易 —— 跨币种裸加($100 + ¥700 = 800)会给出任何币种下都不存在的数字。
+  const ccy = dominantCurrency(monthTxs.length ? monthTxs : txs);
   const flowRules = loadFlowRules();
   let gross = 0, refunds = 0, income = 0, count = 0;
   for (const t of monthTxs) {
+    if (ccyOf(t) !== ccy) continue;
     const f = txFlow(t, flowRules);
     if (f === 'expense') { gross += Math.abs(t.amount); count += 1; }
     else if (f === 'refund') { refunds += Math.abs(t.amount); count += 1; }
@@ -132,7 +140,7 @@ export function summarizeMonth(txs: BankTx[], ym: string): MonthSummary {
     net: round2(gross - refunds),
     income: round2(income),
     count,
-    currency: dominantCurrency(monthTxs.length ? monthTxs : txs),
+    currency: ccy,
   };
 }
 
@@ -160,8 +168,9 @@ function sumByCategory(txs: BankTx[], ym: string): Map<string, number> {
   const m = new Map<string, number>();
   const rules = loadMerchantRules();
   const flowRules = loadFlowRules();
+  const ccy = dominantCurrency(txs); // 只统计主币种,避免跨币种裸加
   for (const t of txs) {
-    if (txYm(t) !== ym || txFlow(t, flowRules) !== 'expense') continue;
+    if (txYm(t) !== ym || ccyOf(t) !== ccy || txFlow(t, flowRules) !== 'expense') continue;
     const cat = effectiveCategory(t, rules) || '未分类';
     m.set(cat, (m.get(cat) || 0) + Math.abs(t.amount));
   }
@@ -177,8 +186,9 @@ export interface MerchantAgg {
 export function topMerchants(txs: BankTx[], ym: string, n = 5): MerchantAgg[] {
   const m = new Map<string, { total: number; count: number }>();
   const flowRules = loadFlowRules();
+  const ccy = dominantCurrency(txs); // 只统计主币种,避免跨币种裸加
   for (const t of txs) {
-    if (txYm(t) !== ym || txFlow(t, flowRules) !== 'expense') continue;
+    if (txYm(t) !== ym || ccyOf(t) !== ccy || txFlow(t, flowRules) !== 'expense') continue;
     const name = t.name || '未知商户';
     const cur = m.get(name) || { total: 0, count: 0 };
     cur.total += Math.abs(t.amount);
@@ -221,8 +231,10 @@ export function loadBankAccounts(): BankAccount[] {
 export function accountMonth(txs: BankTx[], accountId: string, ym: string): { spend: number; refund: number; count: number } {
   let spend = 0, refund = 0, count = 0;
   const flowRules = loadFlowRules();
+  const acctTxs = txs.filter((t) => t.accountId === accountId);
+  const ccy = dominantCurrency(acctTxs.length ? acctTxs : txs); // 单账户按其主币种,避免跨币种裸加
   for (const t of txs) {
-    if (t.accountId !== accountId || txYm(t) !== ym) continue;
+    if (t.accountId !== accountId || txYm(t) !== ym || ccyOf(t) !== ccy) continue;
     const f = txFlow(t, flowRules);
     if (f === 'expense') { spend += Math.abs(t.amount); count += 1; }
     else if (f === 'refund') { refund += Math.abs(t.amount); count += 1; }
