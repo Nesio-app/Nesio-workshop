@@ -20,6 +20,7 @@ import { mineRelationships } from '@/lib/portal/health-correlations';
 import { loadClinical, type StoredClinical } from '@/lib/portal/clinical-store';
 import { readLaunchSurfaceContextFromBrowser } from '@/lib/portal/launch-surface.mjs';
 import { evaluateHealthFindings, type Severity } from '@/lib/portal/health-clinical';
+import { computeRiskScores, type RiskCategory } from '@/lib/portal/health-risk';
 
 const TREND_HEADLINE: Record<FitnessInsight['trend'], [string, string]> = {
   up: ['体能上升中', 'Fitness rising'], flat: ['体能维持中', 'Holding steady'], down: ['体能下降中', 'Fitness dipping'], unknown: ['数据积累中', 'Gathering data'],
@@ -330,6 +331,28 @@ function FindingsCard({ data, dict }: { data: HealthMetrics; dict: string }) {
   );
 }
 
+// 批次 50(③层):风险分层卡 —— 已验证评分(VO₂max 体适能/BMI/GMI→eA1c),数据齐才出,带出处。
+function RiskCard({ data, dict }: { data: HealthMetrics; dict: string }) {
+  const scores = computeRiskScores({ metrics: data.metrics, glucose: data.glucose, profile: data.profile });
+  if (!scores.length) return null;
+  const color: Record<RiskCategory, string> = { high: 'var(--status-risk)', moderate: 'var(--status-gentle)', low: 'var(--status-go)', info: 'var(--portal-muted)' };
+  return (
+    <div className="nesio-fit-panel" style={{ marginTop: '0.6rem' }}>
+      <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>{L(dict, '风险分层 · 已验证评分', 'Risk stratification · validated scores')}</p>
+      {scores.map((s) => (
+        <div key={s.id} style={{ marginBottom: '0.35rem' }}>
+          <p className="nesio-health-story-line" style={{ margin: 0 }}>
+            <span style={{ color: color[s.category], fontWeight: 600 }}>● </span>
+            <b>{L(dict, s.label[0], s.label[1])}</b> — <span style={{ color: color[s.category] }}>{s.value}</span>
+            <span style={{ display: 'block', fontSize: '0.62rem', color: 'var(--portal-muted)' }}>{L(dict, s.detail[0], s.detail[1])} · {L(dict, `依据:${s.source}`, `source: ${s.source}`)}</span>
+          </p>
+        </div>
+      ))}
+      <p className="nesio-settings-option-hint" style={{ margin: '0.3rem 0 0' }}>{L(dict, '对照已发表评分/常模,数据齐才计算;非诊断', 'Against published scores/norms; computed only when inputs are present; not a diagnosis')}</p>
+    </div>
+  );
+}
+
 function MetricCard({ m, dict }: { m: HealthMetric; dict: string }) {
   // prev===0 时也算 delta(如上月 0 次锻炼 → 本月 3 次是真实增长,不该被压成"无变化");
   // 只有 deltaPct 因除零需要 prev!==0。
@@ -414,6 +437,7 @@ export default function HealthDashboard() {
         );
       })()}
       <FindingsCard data={data} dict={dict} />
+      <RiskCard data={data} dict={dict} />
       {(() => {
         const rels = data.daily ? mineRelationships(data.daily) : [];
         if (!rels.length) return null;
