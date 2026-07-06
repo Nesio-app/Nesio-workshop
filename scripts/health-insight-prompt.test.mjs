@@ -10,7 +10,11 @@ import assert from 'node:assert/strict';
 const src = fs.readFileSync(new URL('../lib/portal/health-insight-prompt.ts', import.meta.url), 'utf8');
 const js = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 const mod = { exports: {} };
-vm.runInNewContext(js, { module: mod, exports: mod.exports, require: () => ({}), Math, Number, Array, String, Object, console });
+// ④:health-insight-prompt 现在 import health-guidelines,stub retrieveGuidelines(按 id 返回要点)。
+const require2 = (s) => s.includes('health-guidelines')
+  ? { retrieveGuidelines: (ids) => (ids || []).includes('glucose-tir') ? [{ topic: 'glucose-tir', text: ['TIR ≥70% 为目标', 'TIR ≥70%'], source: '国际共识 TIR', url: '' }] : [] }
+  : {};
+vm.runInNewContext(js, { module: mod, exports: mod.exports, require: require2, Math, Number, Array, String, Object, console });
 const { buildHealthInsightPrompt, fallbackHealthInsight } = mod.exports;
 
 const input = {
@@ -28,6 +32,19 @@ assert.ok(/不要发明新的相关性|不要发明/.test(prompt), 'E2:禁止 AI
 assert.ok(/6\.5mmol\/L/.test(prompt) && /78%/.test(prompt), 'E2:概况数字进入 prompt');
 assert.ok(/次日血糖越低/.test(prompt), 'E2:确定性关系进入 prompt');
 assert.ok(/诊断/.test(prompt), 'E2:禁医学诊断指令在');
+
+// ④:传入 findings(带 id)→ prompt 应注入 <guidelines> 块 + 检索到的指南要点 + 引用出处指令
+const withFindings = buildHealthInsightPrompt({
+  ...input,
+  findings: [{ id: 'glucose-tir', title: ['血糖达标率良好', 'TIR ok'], detail: ['达标 78%', '78%'], source: '国际共识 TIR' }],
+});
+assert.ok(/<guidelines>[\s\S]*<\/guidelines>/.test(withFindings), '④:指南要点围进 <guidelines>');
+assert.ok(/TIR ≥70% 为目标/.test(withFindings), '④:检索到的指南要点进入 prompt');
+assert.ok(/注明对应指南来源|cite the guideline source/.test(withFindings), '④:指令要求引用指南来源');
+assert.ok(/血糖达标率良好/.test(withFindings), '④:确定性判定进入 <data>');
+// 兜底也带上判定 + 出处
+const fb2 = fallbackHealthInsight({ ...input, findings: [{ id: 'glucose-tir', title: ['血糖达标率良好', 'ok'], detail: ['达标 78%', '78%'], source: '国际共识 TIR' }] });
+assert.ok(/血糖达标率良好/.test(fb2) && /国际共识 TIR/.test(fb2), '④:兜底含判定 + 出处');
 
 // 英文
 const en = buildHealthInsightPrompt({ ...input, locale: 'en' });

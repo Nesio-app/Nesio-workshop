@@ -64,6 +64,7 @@ export async function POST(req: NextRequest) {
     locale: body.locale === 'en' ? 'en' : 'zh',
     relationships: Array.isArray(body.relationships) ? body.relationships.slice(0, 12) : [],
     summary: body.summary && typeof body.summary === 'object' ? body.summary : {},
+    findings: Array.isArray(body.findings) ? body.findings.slice(0, 16) : [],
   };
 
   const prompt = buildHealthInsightPrompt(input);

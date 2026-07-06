@@ -85,6 +85,13 @@
       "marker": "export function computeRiskScores",
       "file": "lib/portal/health-risk.ts",
       "status_note": "已实现:纯函数,输入不全不硬算;ASCVD/FINDRISC 待完整血脂+血压+吸烟史后补"
+    },
+    {
+      "id": "HEALTH-008",
+      "description": "医疗级 ④层 指南接地:按 ②③ 判定的 id 检索策展指南语料,注入 AI prompt 的 <guidelines> 块,要求引用出处、不得超出指南编造医学声明",
+      "marker": "export function retrieveGuidelines",
+      "file": "lib/portal/health-guidelines.ts",
+      "status_note": "已实现:策展语料 + 主题键检索(非向量库 RAG,结论已结构化故更准可审计);buildHealthInsightPrompt 注入 <guidelines>。向量 embedding 库为后续"
     }
   ]
 }
