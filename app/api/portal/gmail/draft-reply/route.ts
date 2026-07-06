@@ -16,6 +16,7 @@ import { hasNesioSession } from '@/lib/portal/gmail-access';
 import { completeText, aiProviderAvailable } from '@/lib/portal/ai-complete';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 30;
 
 const TONE_HINT: Record<string, string> = {
   polite: '礼貌、得体、尊重对方。',

@@ -12,6 +12,8 @@ import { writeCloudSignalsForCurrentUser } from '@/lib/platform/runtime/cloud-si
 import { normalizePhotoToSignal, normalizeVoiceToSignal } from '@/lib/life-domain/normalizers';
 import { EXTRACTION_SYSTEM_PROMPT, parseJsonBlock } from '@/lib/extraction/extraction';
 
+export const maxDuration = 60;
+
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';

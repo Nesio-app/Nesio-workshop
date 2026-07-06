@@ -7,6 +7,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { guardAiRoute } from '@/lib/portal/api-auth';
 import { reportAiCall } from '@/lib/portal/ai-telemetry';
 
+export const maxDuration = 30;
+
 function getOpenAIKey(): string {
   return (process.env.OpenAI_KEY || process.env.OPENAI_API_KEY || '').trim();
 }

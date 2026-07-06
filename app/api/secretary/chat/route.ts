@@ -9,6 +9,8 @@ import {
   buildSecretarySystemPrompt,
 } from '@/lib/portal/secretary-ai-prompt-catalog.mjs';
 
+export const maxDuration = 60;
+
 const DEFAULT_MODELS = 'gemini-2.5-flash,gemini-2.5-flash-lite,gemini-flash-latest,gemini-3.5-flash';
 const DOUBAO_API_URL = 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';

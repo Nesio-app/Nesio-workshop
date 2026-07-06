@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { resolveGmailAccessToken, hasNesioSession } from '@/lib/portal/gmail-access';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 30;
 
 const GMAIL_API = 'https://gmail.googleapis.com/gmail/v1';
 

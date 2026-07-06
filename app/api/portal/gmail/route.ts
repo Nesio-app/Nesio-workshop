@@ -15,6 +15,7 @@ import { buildEmailExtractionPrompt, parseJsonBlock } from '@/lib/extraction/ext
 import { cookies } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 const GMAIL_API = 'https://gmail.googleapis.com/gmail/v1';
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';

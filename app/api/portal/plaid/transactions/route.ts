@@ -8,6 +8,7 @@ import { guardAiRoute } from '@/lib/portal/api-auth';
 import { plaidBase } from '../link-token/route';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 function envValue(key: string): string {
   return (process.env[key] ?? '').trim();

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { deriveCloudIdentity } from '@/lib/portal/cloud-identity';
 import * as cloudRuntime from '@/lib/portal/cloud-server-runtime';
 
+export const maxDuration = 30;
+
 type CloudMemoryNode = {
   id: string;
   schemaVersion: 'LifeNode@v1';

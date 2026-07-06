@@ -16,6 +16,7 @@ import {
 } from '@/lib/platform/momentum-engine';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 30;
 
 function envValue(key: string): string {
   return (process.env[key] ?? '').trim();

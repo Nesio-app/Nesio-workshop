@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 30;
 import { mergeCalendarEvents } from '@/lib/portal/calendar-filters';
 import { parseIcsEvents, parseCalendarName } from '@/lib/portal/ics';
 
