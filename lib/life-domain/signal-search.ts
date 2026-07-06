@@ -49,7 +49,9 @@ export function buildSignalSearchText(signal: Signal): string {
   ].join(' ').slice(0, 12000);
 }
 
-export function scoreSignalForQuery(signal: Signal, query: string): number {
+/** 纯查询相关性(词法/实体命中),不含近因/置信 —— 决定"够不够格进结果"的门。
+ *  近因和置信与查询无关,不能用它们把无关记录顶进结果(否则查任何词都返回最近几条)。 */
+export function relevanceScore(signal: Signal, query: string): number {
   const queryTokens = tokenize(query);
   if (!queryTokens.length) return 0;
   const haystack = buildSignalSearchText(signal).toLowerCase();
@@ -59,17 +61,23 @@ export function scoreSignalForQuery(signal: Signal, query: string): number {
   }
   if (signal.title && query.includes(signal.title)) score += 4;
   if ((signal.tags || []).some((tag) => query.includes(tag))) score += 3;
+  return score;
+}
+
+export function scoreSignalForQuery(signal: Signal, query: string): number {
+  const rel = relevanceScore(signal, query);
   const ageHours = (Date.now() - new Date(signal.capturedAt).getTime()) / 3_600_000;
   const recencyBoost = Number.isFinite(ageHours) ? Math.max(0, 1.2 - ageHours / 168) : 0;
-  return score + recencyBoost + signal.confidence * 0.8;
+  return rel + recencyBoost + signal.confidence * 0.8;
 }
 
 export function searchSignalsSemantically(query: string, limit = 8): Signal[] {
   const trimmed = query.trim();
   if (!trimmed) return [];
   return getSignals()
-    .map((signal) => ({ signal, score: scoreSignalForQuery(signal, trimmed) }))
-    .filter((entry) => entry.score > 0.7)
+    .map((signal) => ({ signal, rel: relevanceScore(signal, trimmed), score: scoreSignalForQuery(signal, trimmed) }))
+    // 门只认查询相关性:必须真的命中查询词/实体才够格,近因/置信只用来排序。
+    .filter((entry) => entry.rel > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, limit)
     .map((entry) => entry.signal);
