@@ -12,6 +12,10 @@ import { IconBox, IconCalendar, IconFlag, IconHeartPulse, IconMapPin, IconStar, 
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
+import { rememberAI, recallAI, sig } from '@/lib/portal/ai-cache';
+import { decomposeLocally } from '@/lib/portal/local-decompose';
+
+type Step = { name: string; emoji?: string };
 
 export const FOCUS_TYPE_LABEL: Record<string, string> = {
   commitment: '任务', event: '日程', object: '物品', person: '联系人',
@@ -51,14 +55,37 @@ export function FocusCardDetail({
   const [unlocking, setUnlocking] = useState(false);
   // 可见失败纪律:AI 分解失败/为空时显式提示 + 重试,不静默退回起始态。
   const [error, setError] = useState<string | null>(null);
+  // 批次 56:这波步骤来自哪里 —— AI / 复用上次AI(缓存) / 本地兜底。null=AI(不显)
+  const [waveSource, setWaveSource] = useState<'cache' | 'local' | null>(null);
 
   const isMeeting = isMeetingNode(node);
   const meetingUrl = getMeetingUrl(node);
   const meetingTime = getMeetingTime(node);
 
+  // 应用一波步骤到 UI(来源:ai=记住并复用 / cache=复用上次AI / local=本地兜底)
+  function applyWave(steps: Step[], source: 'ai' | 'cache' | 'local', cacheKey: string) {
+    const actions: MomentumAction[] = steps.slice(0, 3).map((s, i) => ({
+      id: `m-${Date.now()}-${i}`, name: s.name, emoji: s.emoji || '⚡', done: false,
+    }));
+    setWave(actions);
+    setWaveIndex((w) => w + 1);
+    setDrillMap(new Map());
+    setError(null);
+    setWaveSource(source === 'ai' ? null : source);
+    if (source === 'ai') rememberAI('decompose', cacheKey, steps); // 从 AI 学:记住这次拆解
+  }
+
+  // AI 不在线时的兜底:先复用上次 AI 给过的(缓存),再退到纯本地拆解 —— 永远给得出步骤。
+  function fallbackWave(cacheKey: string) {
+    const cached = recallAI<Step[]>('decompose', cacheKey);
+    if (cached?.length) { applyWave(cached, 'cache', cacheKey); return; }
+    applyWave(decomposeLocally(node.name, dict), 'local', cacheKey);
+  }
+
   async function fetchWave(previousAction?: string, history: string[] = []) {
     setLoading(true);
     setError(null);
+    const cacheKey = sig(node.name + (previousAction ? `|next:${previousAction}` : ''));
     try {
       const res = await fetch('/api/portal/decompose-task', {
         method: 'POST',
@@ -71,46 +98,37 @@ export function FocusCardDetail({
           locale: dict,
         }),
       });
-      const data = await res.json() as { ok?: boolean; steps?: Array<{ name: string; emoji?: string }> };
-      if (data.ok && data.steps?.length) {
-        const actions: MomentumAction[] = data.steps.slice(0, 3).map((s, i) => ({
-          id: `m-${Date.now()}-${i}`,
-          name: s.name,
-          emoji: s.emoji || '⚡',
-          done: false,
-        }));
-        setWave(actions);
-        setWaveIndex((w) => w + 1);
-        setDrillMap(new Map());
-      } else {
-        // 明确区分失败:不是"没点上",是这次没生成成功。
-        setError(L(dict, '这次没能拆解成功,点重试再来一次。', "Couldn't break it down this time — tap retry."));
-      }
+      const data = await res.json() as { ok?: boolean; steps?: Step[] };
+      if (data.ok && data.steps?.length) applyWave(data.steps, 'ai', cacheKey);
+      else fallbackWave(cacheKey); // AI 没成功 → 缓存/本地兜底,不再整个失败
     } catch {
-      setError(L(dict, '网络异常,拆解没成功,请重试。', 'Network error — breakdown failed, please retry.'));
+      fallbackWave(cacheKey); // 离线/网络异常 → 同上,不掉线
     }
     setLoading(false);
   }
 
   async function handleDrill(action: MomentumAction) {
     setDrillingId(action.id);
+    const cacheKey = sig(`drill:${action.name}`);
+    const applyDrills = (steps: Step[], fromAI: boolean) => {
+      const drills: MomentumAction[] = steps.slice(0, 3).map((s, i) => ({
+        id: `d-${Date.now()}-${i}`, name: s.name, emoji: s.emoji || '▸', done: false,
+      }));
+      setDrillMap((prev) => new Map(prev).set(action.id, drills));
+      if (fromAI) rememberAI('decompose', cacheKey, steps);
+    };
     try {
       const res = await fetch('/api/portal/decompose-task', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ taskName: action.name, context: node.name, drill: true, locale: dict }),
       });
-      const data = await res.json() as { ok?: boolean; steps?: Array<{ name: string; emoji?: string }> };
-      if (data.ok && data.steps?.length) {
-        const drills: MomentumAction[] = data.steps.slice(0, 3).map((s, i) => ({
-          id: `d-${Date.now()}-${i}`,
-          name: s.name,
-          emoji: s.emoji || '▸',
-          done: false,
-        }));
-        setDrillMap((prev) => new Map(prev).set(action.id, drills));
-      }
-    } catch { /* ignore */ }
+      const data = await res.json() as { ok?: boolean; steps?: Step[] };
+      if (data.ok && data.steps?.length) applyDrills(data.steps, true);
+      else applyDrills(recallAI<Step[]>('decompose', cacheKey) ?? decomposeLocally(action.name, dict), false);
+    } catch {
+      applyDrills(recallAI<Step[]>('decompose', cacheKey) ?? decomposeLocally(action.name, dict), false);
+    }
     setDrillingId(null);
   }
 
@@ -199,6 +217,13 @@ export function FocusCardDetail({
     <div className="nesio-momentum">
       {waveIndex > 1 && (
         <div className="nesio-momentum-wave-badge">{L(dict, `第 ${waveIndex} 波`, `Wave ${waveIndex}`)}</div>
+      )}
+      {waveSource && (
+        <p className="nesio-settings-option-hint" style={{ margin: '0 0 0.4rem' }}>
+          {waveSource === 'cache'
+            ? L(dict, 'AI 暂时离线 · 复用了上次给你的拆解', 'AI offline · reused its last breakdown for you')
+            : L(dict, 'AI 暂时离线 · 这是本地拆的,够你先动起来', 'AI offline · a local breakdown to get you moving')}
+        </p>
       )}
       <ul className="nesio-momentum-list">
         {wave.map((a) => {
