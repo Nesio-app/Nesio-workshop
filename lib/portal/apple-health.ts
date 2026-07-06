@@ -67,7 +67,7 @@ function collapseBySource(byDaySource: Map<string, Map<string, number>>): Map<st
   return out;
 }
 
-interface Rec { startDate: string; endDate: string; value: string; sourceName: string }
+interface Rec { startDate: string; endDate: string; value: string; sourceName: string; unit: string }
 
 /** 抽取某个 HK type 的所有 <Record ...>(自闭合或带子元素的开标签都能匹配到开头)。 */
 function records(xml: string, hkType: string): Rec[] {
@@ -81,6 +81,7 @@ function records(xml: string, hkType: string): Rec[] {
       endDate: tag.match(/endDate="([^"]+)"/)?.[1] || '',
       value: tag.match(/value="([^"]+)"/)?.[1] || '',
       sourceName: tag.match(/sourceName="([^"]+)"/)?.[1] || '',
+      unit: tag.match(/unit="([^"]+)"/)?.[1] || '',
     });
   }
   return out;
@@ -247,6 +248,18 @@ export interface HealthMetrics {
   importedAt: string;
 }
 
+// latest 类指标的合理范围(规范单位),超出即当脏值丢弃,不让离谱读数直接上卡片。
+const PLAUSIBLE_RANGE: Record<string, [number, number]> = {
+  restingHR: [25, 250], walkingHR: [40, 250], hrv: [1, 500], vo2max: [5, 90],
+  spo2: [50, 100], respiratory: [3, 60], bpSys: [50, 270], bpDia: [25, 200],
+  glucose: [20, 700], bodyTemp: [30, 45], weight: [2, 500], bodyFat: [1, 70],
+  bmi: [8, 90], leanMass: [2, 200], height: [30, 260],
+};
+function plausible(key: string, v: number): boolean {
+  const r = PLAUSIBLE_RANGE[key];
+  return !r || (v >= r[0] && v <= r[1]);
+}
+
 type Agg = 'sumDay' | 'latest' | 'sleep' | 'mindful';
 interface MetricDef {
   key: string; hk: string; label: [string, string]; unit: string; decimals: number; agg: Agg;
@@ -261,7 +274,8 @@ const METRIC_DEFS: MetricDef[] = [
   { key: 'exerciseTime', hk: 'HKQuantityTypeIdentifierAppleExerciseTime', label: ['锻炼时长', 'Exercise time'], unit: 'min', decimals: 0, agg: 'sumDay', group: 'activity' },
   { key: 'flights', hk: 'HKQuantityTypeIdentifierFlightsClimbed', label: ['爬楼', 'Flights climbed'], unit: '层', decimals: 0, agg: 'sumDay', group: 'activity' },
   { key: 'restingHR', hk: 'HKQuantityTypeIdentifierRestingHeartRate', label: ['静息心率', 'Resting HR'], unit: 'bpm', decimals: 0, agg: 'latest', group: 'heart' },
-  { key: 'heartRate', hk: 'HKQuantityTypeIdentifierHeartRate', label: ['心率', 'Heart rate'], unit: 'bpm', decimals: 0, agg: 'latest', group: 'heart' },
+  // 瞬时心率(HKQuantityTypeIdentifierHeartRate)不作为看板指标:latest 只取单条样本,运动后
+  // 一条 130bpm 会显示成"心率 130",误导。有意义的是静息心率/步行心率(下方保留)。
   { key: 'hrv', hk: 'HKQuantityTypeIdentifierHeartRateVariabilitySDNN', label: ['心率变异 HRV', 'HRV'], unit: 'ms', decimals: 0, agg: 'latest', group: 'heart' },
   { key: 'vo2max', hk: 'HKQuantityTypeIdentifierVO2Max', label: ['最大摄氧量', 'VO₂ max'], unit: 'mL/kg·min', decimals: 1, agg: 'latest', group: 'heart' },
   { key: 'walkingHR', hk: 'HKQuantityTypeIdentifierWalkingHeartRateAverage', label: ['步行平均心率', 'Walking avg HR'], unit: 'bpm', decimals: 0, agg: 'latest', group: 'heart' },
@@ -280,10 +294,38 @@ const METRIC_DEFS: MetricDef[] = [
   { key: 'mindful', hk: 'HKCategoryTypeIdentifierMindfulSession', label: ['正念', 'Mindfulness'], unit: 'min', decimals: 0, agg: 'mindful', group: 'mind' },
 ];
 
-// unit 换算:米→千米,秒→分钟(部分类型 Apple 用基础单位)
-function scaleValue(key: string, raw: number): number {
-  if (key === 'distance') return raw / 1000; // Apple 距离常以 m 记(也可能已是 km)
-  return raw;
+// 按 XML 里明写的 unit 把值换算到该指标的规范单位(METRIC_DEFS.unit)。
+// 之前只对 distance 无条件 /1000、其余不换算 → 美制用户(lb/mi/in/°F/mmol)数字与标签系统性错配。
+function convertUnit(key: string, v: number, unit: string): number {
+  const u = (unit || '').toLowerCase().trim();
+  switch (key) {
+    case 'distance': // → km
+      if (u === 'mi') return v * 1.609344;
+      if (u === 'm') return v / 1000;
+      return v; // km(或缺失:按已是 km,不再无条件 /1000 变近零)
+    case 'weight':
+    case 'leanMass': // → kg
+      if (u === 'lb') return v * 0.45359237;
+      if (u === 'st') return v * 6.35029;
+      if (u === 'g') return v / 1000;
+      return v; // kg
+    case 'height': // → cm
+      if (u === 'in') return v * 2.54;
+      if (u === 'ft') return v * 30.48;
+      if (u === 'm') return v * 100;
+      return v; // cm
+    case 'bodyTemp': // → °C
+      if (u === 'degf' || u === '°f' || u === 'f') return (v - 32) * 5 / 9;
+      return v; // degC
+    case 'glucose': // → mg/dL
+      if (u.includes('mmol')) return v * 18.0182;
+      return v; // mg/dL
+    case 'activeEnergy': // → kcal
+      if (u === 'kj') return v / 4.184;
+      return v; // kcal/Cal
+    default:
+      return v; // 计数/百分比/bpm/mmHg 等单位无关,原样
+  }
 }
 
 // 批次 39:增量聚合器 —— 支持把超大 export.xml 分块喂进来。
@@ -310,6 +352,7 @@ class HealthAggregator {
   private monthlyLatest = new Map<string, Map<string, { sum: number; count: number }>>(); // latest 类指标的按月均值
   private sleepMs = new Map<string, Map<string, number>>(); // night → source → ms(finalize 时每夜取最大源)
   private mindMin = new Map<string, number>();
+  private workoutList: Array<{ type: string; label: string; duration: string; start: string }> = [];
   workouts = 0;
 
   private pushLatest(key: string, d: string, v: number) {
@@ -332,14 +375,15 @@ class HealthAggregator {
           // 按天+来源分别累加,finalize 时每天取最大来源,去多设备(iPhone+Watch)重复。
           let s = m.get(day);
           if (!s) { s = new Map(); m.set(day, s); }
-          s.set(r.sourceName, (s.get(r.sourceName) || 0) + scaleValue(def.key, v));
+          s.set(r.sourceName, (s.get(r.sourceName) || 0) + convertUnit(def.key, v, r.unit));
         }
       } else if (def.agg === 'latest') {
         let mm = this.monthlyLatest.get(def.key);
         for (const r of records(text, def.hk)) {
           const v = Number(r.value);
           if (!r.startDate || !Number.isFinite(v)) continue;
-          const sv = scaleValue(def.key, v);
+          const sv = convertUnit(def.key, v, r.unit);
+          if (!plausible(def.key, sv)) continue; // 丢弃离谱脏值(换算后按规范单位判)
           this.pushLatest(def.key, r.startDate.slice(0, 10), sv);
           if (!mm) { mm = new Map(); this.monthlyLatest.set(def.key, mm); }
           const ym = r.startDate.slice(0, 7);
@@ -367,7 +411,20 @@ class HealthAggregator {
         }
       }
     }
-    this.workouts += (text.match(/<Workout\b/g) || []).length;
+    // 锻炼:全文件流式收集明细(不只计数),供 buildNodes 建事件节点 —— 不再只看尾部 6MB。
+    const workoutRe = /<Workout\b[^>]*>/g;
+    let wm: RegExpExecArray | null;
+    while ((wm = workoutRe.exec(text))) {
+      const tag = wm[0];
+      const rawType = (tag.match(/workoutActivityType="HKWorkoutActivityType([^"]+)"/)?.[1]) || 'Workout';
+      this.workoutList.push({
+        type: rawType,
+        label: WORKOUT_LABEL[rawType] || rawType,
+        duration: tag.match(/duration="([^"]+)"/)?.[1] || '',
+        start: tag.match(/startDate="([^"]+)"/)?.[1] || '',
+      });
+    }
+    this.workouts = this.workoutList.length;
   }
 
   finalize(): HealthMetrics {
@@ -383,7 +440,9 @@ class HealthAggregator {
         const picked = pickLatestCompleteDay(days, todayLocal());
         if (!picked) continue;
         const { last, prev } = picked;
-        out.push({ ...toMetric(def), latest: round(last[1], def.decimals), latestDate: last[0], prev: prev == null ? null : round(prev, def.decimals), series: monthlySeriesAvg(m, (v) => v, def.decimals) });
+        // 月度序列也排除今天残缺日,免得当月均值被半日数据轻微拉低。
+        const forSeries = new Map(days.filter(([d]) => d !== todayLocal()));
+        out.push({ ...toMetric(def), latest: round(last[1], def.decimals), latestDate: last[0], prev: prev == null ? null : round(prev, def.decimals), series: monthlySeriesAvg(forSeries, (v) => v, def.decimals) });
       } else if (def.agg === 'latest') {
         const c = this.latest.get(def.key);
         if (!c) continue;
@@ -406,6 +465,68 @@ class HealthAggregator {
       }
     }
     return { metrics: out, workouts: this.workouts, importedAt: new Date().toISOString() };
+  }
+
+  /** 从全文件聚合结果建记忆节点(概况 + 锻炼)—— 取代此前只解析尾部 6MB 的做法,
+   *  避免 Apple 按类型分块导出时尾部恰好缺步数/心率/睡眠而漏进概况。需在 finalize 之后调用。 */
+  buildNodes(metrics: HealthMetric[]): HealthNode[] {
+    const summaryLines: string[] = [];
+    const attrs: Record<string, string | number> = { source: 'Apple Health', importedAt: new Date().toISOString() };
+    const find = (k: string) => metrics.find((m) => m.key === k);
+
+    // 步数:近 7 天日均 + 最新完整日(全文件、去多设备重复、排除今天残缺日)
+    const rawSteps = this.sumDay.get('steps');
+    if (rawSteps && rawSteps.size) {
+      let days = [...collapseBySource(rawSteps).entries()].sort((a, b) => a[0].localeCompare(b[0]));
+      if (days.length > 1 && days[days.length - 1][0] === todayLocal()) days = days.slice(0, -1);
+      const last7 = days.slice(-7);
+      if (last7.length) {
+        const avg = Math.round(last7.reduce((s, [, v]) => s + v, 0) / last7.length);
+        attrs.stepsAvg7d = avg;
+        attrs.stepsLatest = Math.round(last7[last7.length - 1][1]);
+        summaryLines.push(`近 ${last7.length} 天日均 ${avg.toLocaleString()} 步(最近一天 ${attrs.stepsLatest.toLocaleString()} 步)`);
+      }
+    }
+    const rhr = find('restingHR');
+    if (rhr) { attrs.restingHR = rhr.latest; summaryLines.push(`静息心率 ${rhr.latest} bpm`); }
+    const sl = find('sleep');
+    if (sl) { attrs.sleepLastNightHours = sl.latest; summaryLines.push(`最近一晚睡眠约 ${sl.latest} 小时`); }
+    const w = find('weight');
+    if (w) { attrs.weightLatest = w.latest; summaryLines.push(`体重 ${w.latest} kg`); }
+
+    const recent = [...this.workoutList].sort((a, b) => a.start.localeCompare(b.start)).slice(-10);
+    if (this.workoutList.length) {
+      attrs.workoutCount = this.workoutList.length;
+      summaryLines.push(`锻炼 ${this.workoutList.length} 次(最近 ${recent[recent.length - 1].label})`);
+    }
+
+    const nodes: HealthNode[] = [];
+    if (summaryLines.length) {
+      nodes.push({
+        type: 'health_state', name: 'Apple Health · 健康概况',
+        attributes: { ...attrs, externalId: 'health:summary' },
+        relations: [], tags: ['健康', 'Apple Health'], confidence: 0.85,
+        rawInput: summaryLines.join(' · '),
+      });
+    }
+    for (const wk of recent) {
+      const startMs = parseAppleDate(wk.start);
+      const durMin = wk.duration ? Math.round(Number(wk.duration)) : 0;
+      const startIso = startMs ? new Date(startMs).toISOString() : '';
+      nodes.push({
+        type: 'event', name: `${wk.label}${durMin ? ` ${durMin} 分钟` : ''}`,
+        attributes: {
+          source: 'Apple Health',
+          ...(startMs ? { start: startIso } : {}),
+          ...(durMin ? { durationMin: durMin } : {}),
+          activity: wk.label,
+          ...(startIso ? { externalId: `health:workout:${startIso}:${wk.type}` } : {}),
+        },
+        relations: [], tags: ['健康', 'Apple Health', '锻炼', wk.label], confidence: 0.85,
+        rawInput: `${wk.label}${durMin ? `,时长 ${durMin} 分钟` : ''}${wk.start ? `,${wk.start.slice(0, 10)}` : ''}`,
+      });
+    }
+    return nodes;
   }
 }
 
@@ -433,6 +554,26 @@ export function parseHealthMetricsFromBytes(bytes: Uint8Array): HealthMetrics {
   }
   if (buf) agg.feed(buf);
   return agg.finalize();
+}
+
+/** 全文件流式解析,一次拿到看板指标 + 记忆节点(概况/锻炼)—— 概况节点也基于全文件,
+ *  不再单独 tail 解析。取代 ConnectorsHub 里"看板扫全文件、概况只看尾部 6MB"的分裂做法。 */
+export function parseHealthFromBytes(bytes: Uint8Array): { metrics: HealthMetrics; nodes: HealthNode[] } {
+  const agg = new HealthAggregator();
+  const dec = new TextDecoder('utf-8');
+  const CHUNK = 8_000_000;
+  let buf = '';
+  for (let start = 0; start < bytes.length; start += CHUNK) {
+    const end = Math.min(bytes.length, start + CHUNK);
+    buf += dec.decode(bytes.subarray(start, end), { stream: end < bytes.length });
+    const cut = buf.lastIndexOf('>');
+    if (cut < 0) continue;
+    agg.feed(buf.slice(0, cut + 1));
+    buf = buf.slice(cut + 1);
+  }
+  if (buf) agg.feed(buf);
+  const metrics = agg.finalize();
+  return { metrics, nodes: agg.buildNodes(metrics.metrics) };
 }
 
 function toMetric(def: MetricDef): Omit<HealthMetric, 'latest' | 'latestDate' | 'prev' | 'series'> {
