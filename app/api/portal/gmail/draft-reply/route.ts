@@ -11,6 +11,7 @@
  * on whatever provider this deployment has — not a single hard-coded Gemini model.
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { isRateLimited } from '@/lib/portal/api-auth';
 import { hasNesioSession } from '@/lib/portal/gmail-access';
 import { completeText, aiProviderAvailable } from '@/lib/portal/ai-complete';
 
@@ -35,6 +36,9 @@ const SYSTEM = [
 export async function POST(req: NextRequest) {
   if (!(await hasNesioSession())) {
     return NextResponse.json({ ok: false, error: 'auth_required' }, { status: 401 });
+  }
+  if (isRateLimited(req, 'gmail-draft-reply', { limit: 15 })) {
+    return NextResponse.json({ ok: false, error: 'rate_limited', retryAfterMs: 30_000 }, { status: 429 });
   }
 
   if (!aiProviderAvailable()) {

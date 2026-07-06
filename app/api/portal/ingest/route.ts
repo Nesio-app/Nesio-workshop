@@ -13,6 +13,7 @@
  * lab mode. Anonymous public parsing is not allowed.
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { isRateLimited } from '@/lib/portal/api-auth';
 import { createSignal } from '@/lib/life-domain/create-signal';
 import { writeCloudSignalsForCurrentUser } from '@/lib/platform/runtime/cloud-signals-server';
 import {
@@ -108,6 +109,9 @@ export async function POST(req: NextRequest) {
 
   if (!isIngestAllowed(req, body.secret)) {
     return NextResponse.json({ ok: false, error: 'ingest_auth_required' }, { status: 401 });
+  }
+  if (isRateLimited(req, 'ingest', { limit: 30 })) {
+    return NextResponse.json({ ok: false, error: 'rate_limited', retryAfterMs: 30_000 }, { status: 429 });
   }
 
   const source = (body.source || 'generic').toLowerCase();

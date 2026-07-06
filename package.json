@@ -153,7 +153,7 @@
     "test:anonymous-private-data-gate": "node scripts/anonymous-private-data-gate.test.mjs",
     "test:platform-boundaries": "node scripts/platform-boundary-contracts.test.mjs",
     "test:runtime-data-plane": "node scripts/runtime-data-plane-contract.test.mjs",
-    "test:security": "npm run test:release-contracts && npm run precheck:no-real-data && npm run test:first-launch-risk-isolation && npm run test:security-incident && npm run test:hardcode-remediation && npm run test:ai-proxy-boundary && npm run test:portal-privacy-boundary && npm run test:anonymous-private-data-gate && npm run test:secretary-personal-lab-ai && npm run test:secretary-production-activation-ai && npm run test:production-runtime-surface && npm run test:production-runtime-canary && npm run test:github-pages-node-runtime && npm run test:calendar-fail-closed && npm run test:calendar-oauth-state-audit && npm run test:auth-start-audit && npm run test:cloud-runtime-audit && npm run test:quote-positive && npm run test:api-auth-core",
+    "test:security": "npm run test:release-contracts && npm run precheck:no-real-data && npm run test:first-launch-risk-isolation && npm run test:security-incident && npm run test:hardcode-remediation && npm run test:ai-proxy-boundary && npm run test:portal-privacy-boundary && npm run test:anonymous-private-data-gate && npm run test:secretary-personal-lab-ai && npm run test:secretary-production-activation-ai && npm run test:production-runtime-surface && npm run test:production-runtime-canary && npm run test:github-pages-node-runtime && npm run test:calendar-fail-closed && npm run test:calendar-oauth-state-audit && npm run test:auth-start-audit && npm run test:cloud-runtime-audit && npm run test:quote-positive && npm run test:api-auth-core && npm run test:ssrf-guard",
     "test:db:readonly": "npm run report:external-bridge",
     "test:precheck": "npm run precheck:no-real-data && npm run precheck:inventory-offline && npm run precheck:local-data-launch && npm run precheck:module-data-network && npm run precheck:mobile-app && npm run precheck:public-bundle-exposure",
     "test:qa:static": "npm run report:modules && npm run test:security && npm run test:precheck",
@@ -200,7 +200,8 @@
     "test:signal-classification": "node scripts/signal-classification.test.mjs",
     "test:autofix-activation": "node scripts/autofix-activation-contract.test.mjs",
     "test:temporal-bucketing": "node scripts/temporal-bucketing.test.mjs",
-    "test:semantic-blend": "node scripts/semantic-blend.test.mjs"
+    "test:semantic-blend": "node scripts/semantic-blend.test.mjs",
+    "test:ssrf-guard": "node scripts/ssrf-guard.test.mjs"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

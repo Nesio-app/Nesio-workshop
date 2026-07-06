@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { guardAiRoute } from '@/lib/portal/api-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,6 +17,10 @@ function safeJson(body: Record<string, unknown>, status = 200) {
 }
 
 export async function POST(req: NextRequest) {
+  // 私据路由:此前无鉴权 → 任何人都能通过它把图片转存到公开主机(0x0.st)。
+  const guard = await guardAiRoute(req, 'flomo-upload');
+  if (guard) return guard;
+
   let form: FormData;
   try {
     form = await req.formData();

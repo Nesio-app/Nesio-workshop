@@ -6,6 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { isRateLimited } from '@/lib/portal/api-auth';
 import { createSignal } from '@/lib/life-domain/create-signal';
 import { writeCloudSignalsForCurrentUser } from '@/lib/platform/runtime/cloud-signals-server';
 import { normalizePhotoToSignal, normalizeVoiceToSignal } from '@/lib/life-domain/normalizers';
@@ -352,6 +353,11 @@ export async function POST(req: NextRequest) {
     let raw = '';
     const isImage = body.type === 'image' && Boolean(body.imageBase64);
     const aiAllowed = isAnalyzeAiAllowed(req);
+
+    // 花钱路由限流(denial-of-wallet):已授权的高频调用也要封顶。
+    if (aiAllowed && isRateLimited(req, 'analyze', { limit: 20 })) {
+      return NextResponse.json({ ok: false, error: 'rate_limited', retryAfterMs: 30_000 }, { status: 429 });
+    }
 
     if (!aiAllowed) {
       return NextResponse.json(

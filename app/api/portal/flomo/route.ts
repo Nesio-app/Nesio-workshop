@@ -6,6 +6,7 @@ import {
   isFlomoWriteConfigured,
 } from '@/lib/portal/flomo-api';
 import { providerActionCopy } from '@/lib/portal/provider-action-copy-catalog.mjs';
+import { guardAiRoute } from '@/lib/portal/api-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,6 +29,10 @@ function webhookUrl(): string | null {
 }
 
 export async function GET(req: NextRequest) {
+  // 私据路由:此前无鉴权 → 任何访问部署 URL 的人都能读你的 flomo memo。
+  const guard = await guardAiRoute(req, 'flomo-read');
+  if (guard) return guard;
+
   const limitParam = req.nextUrl.searchParams.get('limit');
   const limit = limitParam ? Number.parseInt(limitParam, 10) : 48;
 
@@ -54,6 +59,10 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  // 私据路由:此前无鉴权 → 任何人都能以你的身份往你的 flomo webhook 发帖。
+  const guard = await guardAiRoute(req, 'flomo-write');
+  if (guard) return guard;
+
   let body: { content?: string };
   try {
     body = await req.json();

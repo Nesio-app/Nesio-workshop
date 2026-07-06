@@ -5,8 +5,14 @@
  * Used by the 冷冻仓 flow to identify what the user wants to buy.
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { lookup } from 'node:dns/promises';
+import { guardAiRoute } from '@/lib/portal/api-auth';
+import { isBlockedUrl, isPrivateOrReservedIp } from '@/lib/portal/ssrf-guard.mjs';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 15;
+
+const MAX_FETCH_BYTES = 6_000_000; // 抓取正文上限,避免无界读取
 
 interface ParseResult {
   ok: boolean;
@@ -98,6 +104,10 @@ function extractArticleText(html: string): string {
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse<ParseResult>> {
+  // 鉴权 + 限流(此前无任何鉴权 → 未登录者可让服务器代抓任意 URL)。
+  const guard = await guardAiRoute(req, 'parse-url');
+  if (guard) return guard as NextResponse<ParseResult>;
+
   let url: string;
   try {
     const body = await req.json() as { url?: string };
@@ -109,6 +119,21 @@ export async function POST(req: NextRequest): Promise<NextResponse<ParseResult>>
     return NextResponse.json({ ok: false, error: 'invalid_url' });
   }
 
+  // SSRF 防护:挡内网/环回/链路本地/云元数据(169.254.169.254)。
+  // ① 主机名同步检查;② DNS 解析复查(主机名指向私有 IP 也挡)。
+  if (isBlockedUrl(url)) {
+    return NextResponse.json({ ok: false, error: 'blocked_host' });
+  }
+  try {
+    const host = new URL(url).hostname;
+    const addrs = await lookup(host, { all: true });
+    if (addrs.some((a) => isPrivateOrReservedIp(a.address))) {
+      return NextResponse.json({ ok: false, error: 'blocked_host' });
+    }
+  } catch {
+    return NextResponse.json({ ok: false, error: 'dns_error' });
+  }
+
   try {
     const res = await fetch(url, {
       headers: {
@@ -116,14 +141,22 @@ export async function POST(req: NextRequest): Promise<NextResponse<ParseResult>>
         'Accept': 'text/html,application/xhtml+xml',
         'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
       },
+      redirect: 'manual', // 不自动跟随跳转,避免绕过 SSRF 检查跳到内网
       signal: AbortSignal.timeout(8000),
     });
 
+    if (res.status >= 300 && res.status < 400) {
+      return NextResponse.json({ ok: false, error: 'redirect_blocked' });
+    }
     if (!res.ok) {
       return NextResponse.json({ ok: false, error: `fetch_error_${res.status}` });
     }
+    const contentLength = Number(res.headers.get('content-length') || 0);
+    if (contentLength > MAX_FETCH_BYTES) {
+      return NextResponse.json({ ok: false, error: 'too_large' });
+    }
 
-    const html = await res.text();
+    const html = (await res.text()).slice(0, MAX_FETCH_BYTES);
 
     const title = extractTitle(html) || url;
     const image = extractMeta(html, 'og:image') || extractMeta(html, 'twitter:image');
