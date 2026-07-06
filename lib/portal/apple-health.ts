@@ -646,7 +646,7 @@ class HealthAggregator {
         out.push({ ...toMetric(def), latest: round(c.v, def.decimals), latestDate: c.d, prev: Number.isNaN(c.pv) ? null : round(c.pv, def.decimals), prevDate: c.pd || undefined, series });
       } else if (def.agg === 'sleep') {
         if (!this.sleepMs.size) continue;
-        const collapsed = collapseBySource(this.sleepMs); // 每夜取最大来源,去跨源重复
+        const collapsed = this.sleepAsleepByNight(); // 有分期就用 Core+Deep+REM(不重复计),每夜取最大源
         const nights = [...collapsed.entries()].sort((a, b) => a[0].localeCompare(b[0]));
         const last = nights[nights.length - 1];
         const prev = nights.length > 1 ? nights[nights.length - 2][1] / 3_600_000 : null;
@@ -682,6 +682,27 @@ class HealthAggregator {
       tone: avg > 0.3 ? 'pleasant' : avg < -0.3 ? 'unpleasant' : 'neutral',
       daily,
     };
+  }
+
+  /** 每夜「实际睡着」毫秒(每夜取最大源)。修睡眠总时长虚高:一个来源常同时记录
+   *  概况 Asleep 段 + 细分 Core/Deep/REM 段(时间重叠),把它们全 /Asleep/ 求和会 2–3× 翻倍
+   *  (用户见「21.5h」)。有分期就用 Core+Deep+REM(彼此不重叠),否则用通用 Asleep 求和。 */
+  private sleepAsleepByNight(): Map<string, number> {
+    const byNight = new Map<string, Map<string, number>>();
+    const nights = new Set<string>([...this.sleepMs.keys(), ...this.sleepStage.keys()]);
+    for (const night of nights) {
+      const stageSrc = this.sleepStage.get(night);
+      const genSrc = this.sleepMs.get(night);
+      const srcNames = new Set<string>([...(stageSrc ? stageSrc.keys() : []), ...(genSrc ? genSrc.keys() : [])]);
+      const sources = new Map<string, number>();
+      for (const s of srcNames) {
+        const st = stageSrc?.get(s);
+        const staged = st ? st.core + st.deep + st.rem : 0;
+        sources.set(s, staged > 0 ? staged : (genSrc?.get(s) ?? 0));
+      }
+      byNight.set(night, sources);
+    }
+    return collapseBySource(byNight);
   }
 
   /** C:最近一晚睡眠分期 —— 取最后一夜、该夜睡着最多的来源(避免多设备重叠重复)的各期时长。 */
@@ -761,7 +782,7 @@ class HealthAggregator {
       const dec = key === 'distance' ? 2 : 0;
       for (const [date, v] of collapseBySource(raw)) get(date)[key] = round(v, dec);
     }
-    for (const [night, ms] of collapseBySource(this.sleepMs)) get(night).sleepH = round(ms / 3_600_000, 1);
+    for (const [night, ms] of this.sleepAsleepByNight()) get(night).sleepH = round(ms / 3_600_000, 1);
     // E:latest 类按天均值(restingHR/hrv)
     for (const key of ['restingHR', 'hrv'] as const) {
       const dm = this.dayLatest.get(key);
