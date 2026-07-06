@@ -213,6 +213,60 @@ function MoodCard({ mood, dict }: { mood: MoodAnalysis; dict: string }) {
   );
 }
 
+// 批次 47(E2):AI 跨数据叙事 —— 在 E 的确定性关系之上生成人话建议(走 guardAiRoute)。
+// 每个异步动作必有可见失败态 + 重试(设计红线)。
+function AiInsightPanel({ data, dict }: { data: HealthMetrics; dict: string }) {
+  const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
+  const [text, setText] = useState('');
+
+  async function run() {
+    setStatus('loading');
+    try {
+      const rels = data.daily ? mineRelationships(data.daily) : [];
+      const g = data.glucose;
+      const sleepDays = (data.daily || []).map((f) => f.sleepH).filter((v): v is number => v != null);
+      const summary = {
+        ...(g ? { glucose: { avg: g.avg, unit: g.unit, tirPct: g.tirPct, gmi: g.gmi, cv: g.cv } } : {}),
+        ...(sleepDays.length ? { sleepAvgH: Math.round((sleepDays.reduce((s, v) => s + v, 0) / sleepDays.length) * 10) / 10 } : {}),
+        ...(data.mood ? { moodTone: data.mood.tone } : {}),
+        ...(() => { const r = data.metrics.find((m) => m.key === 'restingHR'); return r ? { restingHR: r.latest } : {}; })(),
+      };
+      const res = await fetch('/api/portal/health-insight', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ locale: dict === 'en' ? 'en' : 'zh', relationships: rels, summary }),
+      });
+      if (!res.ok) throw new Error(String(res.status));
+      const j = await res.json() as { ok?: boolean; text?: string };
+      if (!j.ok || !j.text) throw new Error('empty');
+      setText(j.text); setStatus('done');
+    } catch {
+      setStatus('error');
+    }
+  }
+
+  return (
+    <div className="nesio-fit-panel" style={{ marginTop: '0.6rem' }}>
+      <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>{L(dict, 'AI 综合解读', 'AI synthesis')}</p>
+      {status === 'done' ? (
+        <>
+          {text.split('\n').filter(Boolean).map((line, i) => <p key={i} className="nesio-health-story-line">{line}</p>)}
+          <button type="button" className="nesio-connector-connect" style={{ marginTop: '0.4rem', background: 'var(--portal-accent-soft)', color: 'var(--portal-blue-deep)' }} onClick={() => void run()}>{L(dict, '重新生成', 'Regenerate')}</button>
+        </>
+      ) : status === 'error' ? (
+        <>
+          <p className="nesio-health-story-line" style={{ color: 'var(--status-risk)' }}>{L(dict, '生成失败,请重试。', 'Failed to generate. Please retry.')}</p>
+          <button type="button" className="nesio-connector-connect" style={{ marginTop: '0.2rem' }} onClick={() => void run()}>{L(dict, '重试', 'Retry')}</button>
+        </>
+      ) : (
+        <button type="button" className="nesio-connector-connect" disabled={status === 'loading'} onClick={() => void run()}>
+          {status === 'loading' ? L(dict, '生成中…', 'Generating…') : L(dict, '让 AI 解读我的健康数据', 'Let AI interpret my health data')}
+        </button>
+      )}
+      <p className="nesio-settings-option-hint" style={{ margin: '0.3rem 0 0' }}>{L(dict, '基于上面已算出的关系,数据只发给模型生成建议,不下诊断', 'Built on the relationships above; not a diagnosis')}</p>
+    </div>
+  );
+}
+
 function MetricCard({ m, dict }: { m: HealthMetric; dict: string }) {
   // prev===0 时也算 delta(如上月 0 次锻炼 → 本月 3 次是真实增长,不该被压成"无变化");
   // 只有 deltaPct 因除零需要 prev!==0。
@@ -303,6 +357,7 @@ export default function HealthDashboard() {
           </div>
         );
       })()}
+      {(data.glucose || (data.daily && data.daily.length >= 7)) && <AiInsightPanel data={data} dict={dict} />}
       {(data.activityRings || data.sleepStages || data.mood) && (
         <div className="nesio-health-grid" style={{ marginTop: '0.6rem' }}>
           {data.activityRings && <ActivityRingsCard a={data.activityRings} dict={dict} />}
