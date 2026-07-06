@@ -58,7 +58,8 @@ export function availableMonths(txs: BankTx[]): string[] {
 export function dominantCurrency(txs: BankTx[]): string {
   const counts = new Map<string, number>();
   for (const t of txs) {
-    const c = (t.currency || 'USD').toUpperCase();
+    const c = (t.currency || '').toUpperCase();
+    if (!c) continue; // 币种缺失的交易不参与主币种投票(也不进金额统计)
     counts.set(c, (counts.get(c) || 0) + 1);
   }
   let best = 'USD';
@@ -101,6 +102,11 @@ export function txFlow(t: BankTx, rules = loadFlowRules()): TxFlow {
   const cat = (t.category || '').toUpperCase();
   if (/INCOME/.test(cat)) return 'income';
   if (/TRANSFER|LOAN_PAYMENT/.test(cat)) return 'transfer';
+  if (!cat) {
+    // 分类缺失(Plaid 老账户/未增强常见):正数=花出去仍是可靠支出;负数=进账时无法区分
+    // 退款/收入/转账,一律当 transfer 不计收支 —— 避免把工资/转账当退款倒扣净支出。
+    return t.amount >= 0 ? 'expense' : 'transfer';
+  }
   return t.amount >= 0 ? 'expense' : 'refund';
 }
 
@@ -114,9 +120,16 @@ export interface MonthSummary {
   currency: string;
 }
 
-/** 一笔交易的币种(缺省 USD,大写归一)。 */
+/** 一笔交易的币种(大写归一;缺失返回 '' —— 不默认 USD,避免外币混入 USD 汇总)。 */
 function ccyOf(t: BankTx): string {
-  return (t.currency || 'USD').toUpperCase();
+  return (t.currency || '').toUpperCase();
+}
+
+/** 某月的主币种(与 summarizeMonth 同源:该月为空则退回全量),供分类/商户统一口径,
+ *  修「分类·商户用全量主币种、KPI 用当月主币种 → 两套口径 + 贴错货币符号」。 */
+function monthCurrency(txs: BankTx[], ym: string): string {
+  const monthTxs = txs.filter((t) => txYm(t) === ym);
+  return dominantCurrency(monthTxs.length ? monthTxs : txs);
 }
 
 export function summarizeMonth(txs: BankTx[], ym: string): MonthSummary {
@@ -168,7 +181,7 @@ function sumByCategory(txs: BankTx[], ym: string): Map<string, number> {
   const m = new Map<string, number>();
   const rules = loadMerchantRules();
   const flowRules = loadFlowRules();
-  const ccy = dominantCurrency(txs); // 只统计主币种,避免跨币种裸加
+  const ccy = monthCurrency(txs, ym); // 当月主币种,与 summarizeMonth/KPI 同口径
   for (const t of txs) {
     if (txYm(t) !== ym || ccyOf(t) !== ccy || txFlow(t, flowRules) !== 'expense') continue;
     const cat = effectiveCategory(t, rules) || '未分类';
@@ -186,7 +199,7 @@ export interface MerchantAgg {
 export function topMerchants(txs: BankTx[], ym: string, n = 5): MerchantAgg[] {
   const m = new Map<string, { total: number; count: number }>();
   const flowRules = loadFlowRules();
-  const ccy = dominantCurrency(txs); // 只统计主币种,避免跨币种裸加
+  const ccy = monthCurrency(txs, ym); // 当月主币种,与 KPI 同口径
   for (const t of txs) {
     if (txYm(t) !== ym || ccyOf(t) !== ccy || txFlow(t, flowRules) !== 'expense') continue;
     const name = t.name || '未知商户';

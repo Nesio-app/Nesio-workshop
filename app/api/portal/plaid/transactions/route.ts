@@ -21,6 +21,7 @@ interface PlaidTx {
   merchant_name?: string | null;
   amount: number;
   iso_currency_code?: string | null;
+  unofficial_currency_code?: string | null;
   personal_finance_category?: { primary?: string } | null;
   pending?: boolean;
 }
@@ -50,27 +51,40 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'not_connected' }, { status: 401 });
   }
 
+  // 每个 token 的增量游标:持久化在 cookie(与 tokens 数组同序),否则每次都从 cursor=''
+  // 从"最旧"重拉,配 10 页硬顶 → 交易超 1000 笔的用户永远同步不到近几月。
+  let cursors: string[] = [];
+  try { cursors = JSON.parse(req.cookies.get('nesio_plaid_cursors')?.value || '[]'); } catch { cursors = []; }
+  if (!Array.isArray(cursors)) cursors = [];
+
   const added: PlaidTx[] = [];
+  const removedIds: string[] = [];
   const acctById = new Map<string, PlaidAccount>();
   let anyRelink = false;
+  const nextCursors: string[] = [];
 
   try {
-    for (const accessToken of tokens) {
-      // 交易:每家全量拉(客户端按 id 去重),省掉多 token 共享游标的复杂度
-      let cursor = '';
-      for (let page = 0; page < 10; page++) {
+    for (let i = 0; i < tokens.length; i++) {
+      const accessToken = tokens[i];
+      // 从上次存的游标续拉;首次(无游标)全量回填,页数上限抬到 50(=5000 笔)防极端,
+      // 但只要 has_more 为真就继续,不再在 10 页处硬停。
+      let cursor = typeof cursors[i] === 'string' ? cursors[i] : '';
+      for (let page = 0; page < 50; page++) {
         const res = await fetch(`${plaidBase()}/transactions/sync`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ client_id: envValue('PLAID_CLIENT_ID'), secret: envValue('PLAID_SECRET'), access_token: accessToken, cursor: cursor || undefined, count: 100 }),
         });
-        const data = await res.json() as { added?: PlaidTx[]; accounts?: PlaidAccount[]; next_cursor?: string; has_more?: boolean; error_code?: string };
+        const data = await res.json() as { added?: PlaidTx[]; modified?: PlaidTx[]; removed?: Array<{ transaction_id: string }>; accounts?: PlaidAccount[]; next_cursor?: string; has_more?: boolean; error_code?: string };
         if (data.error_code) { if (data.error_code === 'ITEM_LOGIN_REQUIRED') anyRelink = true; break; }
-        added.push(...(data.added ?? []));
+        // added + modified 都送客户端按 id upsert;removed 让客户端删掉。
+        added.push(...(data.added ?? []), ...(data.modified ?? []));
+        for (const r of data.removed ?? []) removedIds.push(r.transaction_id);
         for (const a of data.accounts ?? []) acctById.set(a.account_id, a);
         cursor = data.next_cursor || cursor;
         if (!data.has_more) break;
       }
+      nextCursors[i] = cursor;
       // 账户:独立拉一次,保证一定有账户/余额(这家失效不阻断其他家)
       try {
         const accRes = await fetch(`${plaidBase()}/accounts/get`, {
@@ -102,9 +116,17 @@ export async function GET(req: NextRequest) {
         date: t.date,
         name: t.merchant_name || t.name,
         amount: t.amount,
-        currency: t.iso_currency_code || 'USD',
+        // 币种缺失时不默认 USD(会把外币混进 USD 汇总);留空,下游据此排除出金额统计。
+        currency: t.iso_currency_code || t.unofficial_currency_code || '',
+        // 分类缺失时留空;下游 txFlow 不再用金额符号猜 income/refund(会把工资当退款倒扣)。
         category: t.personal_finance_category?.primary || '',
       })),
+      removedIds,
+    });
+    // 存回增量游标,下次从这里续拉(真增量,不再每次从最旧重来)。
+    const secure = process.env.NODE_ENV === 'production';
+    response.cookies.set('nesio_plaid_cursors', JSON.stringify(nextCursors), {
+      httpOnly: true, sameSite: 'lax', secure, path: '/', maxAge: 60 * 60 * 24 * 90,
     });
     return response;
   } catch {
