@@ -28,8 +28,8 @@ import type { ConsequenceSeverity, WindowUrgency, GuidanceEventType, GuidanceSou
 // ── Dimension: Risk Severity (30%) ────────────────────────────────────────────
 
 function riskSeverityScore(severity: ConsequenceSeverity): number {
-  // 0→0, 1→33, 2→66, 3→100
-  return severity * 33.3;
+  // 0→0, 1→33.3, 2→66.7, 3→100(用 /3 精确到 100,不再 severity*33.3 峰值只到 99.9)
+  return (severity / 3) * 100;
 }
 
 // ── Dimension: Time Sensitivity (25%) ────────────────────────────────────────

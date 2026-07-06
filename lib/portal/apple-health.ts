@@ -134,13 +134,18 @@ export function parseAppleHealthText(xml: string): HealthParseResult {
   // ── 睡眠:统计最近一晚的入睡时长(按"夜"聚合,跨午夜不拆成两天)──
   const sleep = records(xml, 'HKCategoryTypeIdentifierSleepAnalysis').filter((r) => /Asleep|InBed/i.test(r.value));
   if (sleep.length) {
-    const nightMs = new Map<string, number>();
+    // 每夜按来源分别累加,取最大来源 —— 若同时装了 Watch 和第三方睡眠 app 且时段重叠,
+    // 裸加会把一晚算两遍;取最大源避免跨源重复(同源内的分期不重叠,照常求和)。
+    const nightBySource = new Map<string, Map<string, number>>();
     for (const r of sleep) {
       if (!/Asleep/i.test(r.value)) continue;
       const key = sleepNightKey(r.startDate);
       if (!key) continue;
-      nightMs.set(key, (nightMs.get(key) || 0) + Math.max(0, parseAppleDate(r.endDate) - parseAppleDate(r.startDate)));
+      let s = nightBySource.get(key);
+      if (!s) { s = new Map(); nightBySource.set(key, s); }
+      s.set(r.sourceName, (s.get(r.sourceName) || 0) + Math.max(0, parseAppleDate(r.endDate) - parseAppleDate(r.startDate)));
     }
+    const nightMs = collapseBySource(nightBySource);
     attrs.sleepRecords = sleep.length;
     const lastKey = [...nightMs.keys()].sort().pop();
     const ms = lastKey ? nightMs.get(lastKey) || 0 : 0;
@@ -303,7 +308,7 @@ class HealthAggregator {
   private sumDay = new Map<string, Map<string, Map<string, number>>>(); // key → day → source → sum
   private latest = new Map<string, { d: string; v: number; pd: string; pv: number }>();
   private monthlyLatest = new Map<string, Map<string, { sum: number; count: number }>>(); // latest 类指标的按月均值
-  private sleepMs = new Map<string, number>();
+  private sleepMs = new Map<string, Map<string, number>>(); // night → source → ms(finalize 时每夜取最大源)
   private mindMin = new Map<string, number>();
   workouts = 0;
 
@@ -348,7 +353,11 @@ class HealthAggregator {
           // latest/prev 变成同一晚两段相比(如 6.0h ▲ 较上次 +5.3)。
           const key = sleepNightKey(r.startDate);
           const ms = Math.max(0, parseAppleDate(r.endDate) - parseAppleDate(r.startDate));
-          if (key) this.sleepMs.set(key, (this.sleepMs.get(key) || 0) + ms);
+          if (key) {
+            let s = this.sleepMs.get(key);
+            if (!s) { s = new Map(); this.sleepMs.set(key, s); }
+            s.set(r.sourceName, (s.get(r.sourceName) || 0) + ms); // 按来源分开,finalize 取最大源
+          }
         }
       } else if (def.agg === 'mindful') {
         for (const r of records(text, def.hk)) {
@@ -383,10 +392,11 @@ class HealthAggregator {
         out.push({ ...toMetric(def), latest: round(c.v, def.decimals), latestDate: c.d, prev: Number.isNaN(c.pv) ? null : round(c.pv, def.decimals), prevDate: c.pd || undefined, series });
       } else if (def.agg === 'sleep') {
         if (!this.sleepMs.size) continue;
-        const nights = [...this.sleepMs.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+        const collapsed = collapseBySource(this.sleepMs); // 每夜取最大来源,去跨源重复
+        const nights = [...collapsed.entries()].sort((a, b) => a[0].localeCompare(b[0]));
         const last = nights[nights.length - 1];
         const prev = nights.length > 1 ? nights[nights.length - 2][1] / 3_600_000 : null;
-        out.push({ ...toMetric(def), latest: round(last[1] / 3_600_000, 1), latestDate: last[0], prev: prev == null ? null : round(prev, 1), series: monthlySeriesAvg(this.sleepMs, (ms) => ms / 3_600_000, 1) });
+        out.push({ ...toMetric(def), latest: round(last[1] / 3_600_000, 1), latestDate: last[0], prev: prev == null ? null : round(prev, 1), series: monthlySeriesAvg(collapsed, (ms) => ms / 3_600_000, 1) });
       } else if (def.agg === 'mindful') {
         if (!this.mindMin.size) continue;
         const days = [...this.mindMin.entries()].sort((a, b) => a[0].localeCompare(b[0]));
