@@ -392,6 +392,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
         .slice(0, 1000);
       const fresh = { length: freshCount };
       try { localStorage.setItem(KEY, JSON.stringify(merged)); } catch { /* quota */ }
+      try { localStorage.setItem('nesio-bank-synced-at', new Date().toISOString()); } catch { /* quota */ } // 供财务卡显示"数据截至何时"
       setCounts((p) => ({ ...p, plaid: merged.length }));
       saveConnectorState('plaid', true);
       setConnected((p) => ({ ...p, plaid: true }));

@@ -19,15 +19,24 @@ export interface BankTx {
 }
 
 export const BANK_TX_KEY = 'nesio-bank-tx-v1';
+export const BANK_SYNCED_AT_KEY = 'nesio-bank-synced-at';
 
 export function loadBankTx(): BankTx[] {
   if (typeof window === 'undefined') return [];
   try {
     const raw = JSON.parse(localStorage.getItem(BANK_TX_KEY) || '[]') as BankTx[];
-    return Array.isArray(raw) ? raw.filter((t) => t && typeof t.amount === 'number' && typeof t.date === 'string') : [];
+    // Number.isFinite 挡掉 NaN(typeof NaN === 'number' 会漏过去,污染整月汇总)。
+    return Array.isArray(raw) ? raw.filter((t) => t && Number.isFinite(t.amount) && typeof t.date === 'string') : [];
   } catch {
     return [];
   }
+}
+
+/** 上次 Plaid 同步时间(ISO);无则 null。供财务卡显示"数据截至何时"。 */
+export function loadBankSyncedAt(): string | null {
+  if (typeof window === 'undefined') return null;
+  const v = localStorage.getItem(BANK_SYNCED_AT_KEY);
+  return v || null;
 }
 
 /** 'YYYY-MM' */
@@ -130,6 +139,12 @@ function ccyOf(t: BankTx): string {
 function monthCurrency(txs: BankTx[], ym: string): string {
   const monthTxs = txs.filter((t) => txYm(t) === ym);
   return dominantCurrency(monthTxs.length ? monthTxs : txs);
+}
+
+/** 本月被排除出金额统计的"其他币种/缺币种"交易笔数 —— 财务卡据此如实提示"另有 N 笔未计入"。 */
+export function excludedTxCount(txs: BankTx[], ym: string): number {
+  const ccy = monthCurrency(txs, ym);
+  return txs.filter((t) => txYm(t) === ym && ccyOf(t) !== ccy).length;
 }
 
 export function summarizeMonth(txs: BankTx[], ym: string): MonthSummary {
