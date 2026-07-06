@@ -75,16 +75,17 @@ function Sparkline({ series }: { series: Array<{ ym: string; v: number }> }) {
 }
 
 function MetricCard({ m, dict }: { m: HealthMetric; dict: string }) {
-  const delta = m.prev != null && m.prev !== 0 ? m.latest - m.prev : null;
-  const deltaPct = m.prev != null && m.prev !== 0 ? Math.round(((m.latest - m.prev) / Math.abs(m.prev)) * 100) : null;
+  // prev===0 时也算 delta(如上月 0 次锻炼 → 本月 3 次是真实增长,不该被压成"无变化");
+  // 只有 deltaPct 因除零需要 prev!==0。
+  const delta = m.prev != null ? m.latest - m.prev : null;
   const hasTrend = (m.series?.length ?? 0) >= 3;
   return (
     <div className="nesio-health-card">
       <span className="nesio-health-card-label">{L(dict, m.label[0], m.label[1])}</span>
       <span className="nesio-health-card-value">{fmt(m.latest, m.decimals)}<span className="nesio-health-card-unit">{m.unit}</span></span>
-      {delta != null && deltaPct != null ? (
-        <span className={`nesio-health-card-delta${delta > 0 ? ' up' : delta < 0 ? ' down' : ''}`}>
-          {delta > 0 ? '▲' : delta < 0 ? '▼' : '—'} {L(dict, '较上次', 'vs last')} {delta > 0 ? '+' : ''}{fmt(delta, m.decimals)}
+      {delta != null && delta !== 0 ? (
+        <span className={`nesio-health-card-delta${delta > 0 ? ' up' : ' down'}`}>
+          {delta > 0 ? '▲' : '▼'} {L(dict, '较上次', 'vs last')} {delta > 0 ? '+' : ''}{fmt(delta, m.decimals)}
         </span>
       ) : (
         <span className="nesio-health-card-date">{m.latestDate.slice(5).replace('-', '/')}</span>

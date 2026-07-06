@@ -12,6 +12,7 @@
 
 // ── 动作库:单一事实源在 life-domain/assets 的 skill-inventory(批次 40 迁出)──
 import { SKILL_INVENTORY, skillById, type Skill } from '@/lib/life-domain/assets/skill-inventory';
+import { localDayKey, countSessionsThisWeek } from '@/lib/platform/training-week.mjs';
 
 export type Exercise = Skill;
 export const EXERCISE_LIBRARY = SKILL_INVENTORY;
@@ -163,18 +164,14 @@ export function startProtocol(protocolId: string): TrainingState {
   return s;
 }
 
-export function logSession(protocolId: string, sessionId: string, date = new Date().toISOString().slice(0, 10)): TrainingState {
+export function logSession(protocolId: string, sessionId: string, date = localDayKey(new Date())): TrainingState {
   const s = loadTrainingState();
   s.log = [{ date, protocolId, sessionId }, ...s.log].slice(0, 500);
   saveTrainingState(s);
   return s;
 }
 
-/** 本周已完成的训练次数(周一为周初)。 */
+/** 本周已完成的训练次数(周一为周初,按本地日键 —— 不经 UTC,避免东八区多算上周日)。 */
 export function sessionsThisWeek(s = loadTrainingState()): number {
-  const now = new Date();
-  const day = (now.getDay() + 6) % 7; // 周一=0
-  const monday = new Date(now); monday.setDate(now.getDate() - day); monday.setHours(0, 0, 0, 0);
-  const mondayKey = monday.toISOString().slice(0, 10);
-  return s.log.filter((e) => e.date >= mondayKey).length;
+  return countSessionsThisWeek(s.log, new Date());
 }

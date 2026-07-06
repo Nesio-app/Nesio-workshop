@@ -79,6 +79,9 @@ export const TX_FLOW_LABELS: Record<TxFlow, [string, string]> = {
 
 const FLOW_RULE_KEY = 'nesio-bank-flow-rule-v1';
 
+// 环比"激增"类预警的绝对额下限:低于此额的基数,百分比无统计意义(不报噪音预警)。
+const MIN_ALERT_BASE = 50;
+
 export function loadFlowRules(): Record<string, TxFlow> {
   if (typeof window === 'undefined') return {};
   try { return JSON.parse(localStorage.getItem(FLOW_RULE_KEY) || '{}') as Record<string, TxFlow>; } catch { return {}; }
@@ -442,7 +445,7 @@ export function financeAlerts(txs: BankTx[], ym: string): FinanceAlert[] {
   const prevMonths = availableMonths(txs).filter((m) => m < ym).slice(0, 6);
   if (prevMonths.length >= 2) {
     const avg = prevMonths.reduce((a, m) => a + txs.filter((t) => txYm(t) === m && t.amount > 0 && shoppingRe.test(effectiveCategory(t, rules))).reduce((s, t) => s + t.amount, 0), 0) / prevMonths.length;
-    if (avg > 0 && monthShopping > avg * 1.3) {
+    if (avg >= MIN_ALERT_BASE && monthShopping >= MIN_ALERT_BASE && monthShopping > avg * 1.3) {
       const pct = Math.round(((monthShopping - avg) / avg) * 100);
       out.push({ level: 'warn', title: '购物支出高于往月', body: `本月购物比前 ${prevMonths.length} 个月均值高 ${pct}%` });
     }
@@ -452,11 +455,12 @@ export function financeAlerts(txs: BankTx[], ym: string): FinanceAlert[] {
   const review = needsReview(txs, ym).length;
   if (review > 0) out.push({ level: 'info', title: `${review} 笔交易待归类`, body: '未匹配到分类的交易在「交易 → 规则审核」等你处理' });
 
-  // 净支出环比激增
+  // 净支出环比激增。加绝对额下限:上月/本月净额太小(如上月 net $2)时百分比无统计意义,
+  // 否则 $2 → $150 会报"激增 7400%"这种吓人却无意义的 risk 预警。
   const cur = summarizeMonth(txs, ym).net;
   const prevYmS = prevYm(ym);
   const prev = summarizeMonth(txs, prevYmS).net;
-  if (prev > 0 && cur > prev * 1.5) {
+  if (prev >= MIN_ALERT_BASE && cur >= MIN_ALERT_BASE && cur > prev * 1.5) {
     out.push({ level: 'risk', title: '净支出环比激增', body: `本月净支出比上月高 ${Math.round(((cur - prev) / prev) * 100)}%` });
   }
 

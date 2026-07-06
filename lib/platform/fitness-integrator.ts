@@ -21,12 +21,14 @@ export interface FitnessInsight {
 function byKey(metrics: HealthMetric[], key: string): HealthMetric | undefined {
   return metrics.find((m) => m.key === key);
 }
-/** 序列基线:近 N 月均值(排除最新点),用于判断「相对自己的基线」高低。 */
+/** 序列基线:近 N 月均值(排除最新点),用于判断「相对自己的基线」高低。
+ *  只有 1 个点(=最新点自己)时返回 null —— 没有历史就没有基线,不能拿最新点跟自己比、
+ *  恒判"接近基线/恢复良好"(冷启动噪声)。 */
 function baseline(m?: HealthMetric): number | null {
   if (!m?.series?.length) return null;
   const s = m.series.slice(0, -1);
-  const arr = s.length ? s : m.series;
-  return arr.reduce((a, b) => a + b.v, 0) / arr.length;
+  if (!s.length) return null;
+  return s.reduce((a, b) => a + b.v, 0) / s.length;
 }
 
 export function computeFitnessInsight(
@@ -59,7 +61,13 @@ export function computeFitnessInsight(
   if (hrv) {
     const base = baseline(hrv);
     if (base != null) { recFactors.push(hrv.latest >= base ? 1 : hrv.latest < base * 0.85 ? -1 : 0); }
-    signals.push({ key: 'hrv', label: ['心率变异 HRV', 'HRV'], value: `${hrv.latest} ms`, note: base != null && hrv.latest < base * 0.85 ? ['低于你的基线', 'below your baseline'] : ['接近基线', 'near baseline'], tone: base != null && hrv.latest < base * 0.85 ? 'warn' : 'good' });
+    // 无基线(只有一次数据)时不参与恢复度打分,也不谎称"接近基线"。
+    const below = base != null && hrv.latest < base * 0.85;
+    signals.push({
+      key: 'hrv', label: ['心率变异 HRV', 'HRV'], value: `${hrv.latest} ms`,
+      note: base == null ? ['暂无基线(数据不足)', 'no baseline yet'] : below ? ['低于你的基线', 'below your baseline'] : ['接近基线', 'near baseline'],
+      tone: base == null ? 'neutral' : below ? 'warn' : 'good',
+    });
   }
   if (sleep) {
     recFactors.push(sleep.latest >= 7 ? 1 : sleep.latest < 6 ? -1 : 0);
