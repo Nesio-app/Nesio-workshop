@@ -61,4 +61,21 @@ assert.ok(summary && /步/.test(summary.rawInput) && /体重/.test(summary.rawIn
 assert.equal(summary.attributes.externalId, 'health:summary', '概况节点固定 externalId(幂等)');
 assert.equal(nodes.filter((n) => n.type === 'event').length, 1, '锻炼事件节点');
 
+// ── 批次 41:流式解析器 —— 逐字节喂(把 <Record> 切在任意边界),结果必须与整体解析一致。
+// 这是 1GB zip 手机闪退修复的核心:边解压边解析,任何时刻不 materialize 完整 export.xml。
+const bytes = new TextEncoder().encode(xml);
+const parser = AH.createHealthStreamParser();
+for (let i = 0; i < bytes.length; i++) parser.push(bytes.subarray(i, i + 1), i === bytes.length - 1);
+const streamed = parser.finish();
+const sGet = (k) => streamed.metrics.metrics.find((m) => m.key === k);
+assert.ok(Math.abs(sGet('weight').latest - 72.57) < 0.1, '流式:lb→kg 与整体一致');
+assert.equal(sGet('steps').latest, 8000, '流式:多设备取最大源,跨块边界不丢记录');
+assert.equal(sGet('spo2'), undefined, '流式:脏值仍丢弃');
+assert.equal(streamed.metrics.metrics.length, metrics.metrics.length, '流式指标数与整体一致');
+assert.equal(
+  streamed.nodes.filter((n) => n.type === 'event').length,
+  nodes.filter((n) => n.type === 'event').length,
+  '流式锻炼事件数与整体一致',
+);
+
 console.log('apple-health-parse: OK');

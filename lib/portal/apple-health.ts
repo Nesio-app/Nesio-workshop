@@ -537,43 +537,69 @@ export function parseHealthMetrics(xml: string): HealthMetrics {
   return agg.finalize();
 }
 
-/** 批次 39:全文件流式解析 —— 解压后的字节分块喂,扫全部记录,不漏任何指标类型。 */
-export function parseHealthMetricsFromBytes(bytes: Uint8Array): HealthMetrics {
+export interface HealthStreamParser {
+  /** 喂一段解压出的字节;final=true 表示这是最后一块(冲刷 TextDecoder 与残尾缓冲)。 */
+  push: (bytes: Uint8Array, final?: boolean) => void;
+  /** 只要看板指标。 */
+  finishMetrics: () => HealthMetrics;
+  /** 看板指标 + 记忆节点(概况/锻炼)。 */
+  finish: () => { metrics: HealthMetrics; nodes: HealthNode[] };
+}
+
+/**
+ * 批次 41:增量流式解析器 —— 调用方边解压边 push,任何时刻只持有一小块文本,
+ * 不再把整份 export.xml materialize 成一个巨大的 Uint8Array/字符串。
+ * 修 1GB zip 在手机上闪退(export.xml 解压后常达 10GB+,一次性装载即 OOM)。
+ * 内部沿用「只处理到最后一个完整标签 '>'」的边界逻辑,跨 push 的半个 <Record> 不会被切断。
+ */
+export function createHealthStreamParser(): HealthStreamParser {
   const agg = new HealthAggregator();
   const dec = new TextDecoder('utf-8');
-  const CHUNK = 8_000_000;
   let buf = '';
+  const flush = () => { if (buf) { agg.feed(buf); buf = ''; } };
+  return {
+    push(bytes: Uint8Array, final = false) {
+      if (bytes.length) buf += dec.decode(bytes, { stream: !final });
+      else if (final) buf += dec.decode(); // 冲刷多字节字符残留
+      const cut = buf.lastIndexOf('>');
+      if (cut >= 0) { agg.feed(buf.slice(0, cut + 1)); buf = buf.slice(cut + 1); }
+      if (final) flush();
+    },
+    finishMetrics(): HealthMetrics {
+      flush();
+      return agg.finalize();
+    },
+    finish(): { metrics: HealthMetrics; nodes: HealthNode[] } {
+      flush();
+      const metrics = agg.finalize();
+      return { metrics, nodes: agg.buildNodes(metrics.metrics) };
+    },
+  };
+}
+
+/** 把一整块字节按 8MB 切片喂进流式解析器(内存已在手里的场景:小文件/裸 export.xml)。 */
+function feedBytes(parser: HealthStreamParser, bytes: Uint8Array): void {
+  const CHUNK = 8_000_000;
+  if (bytes.length === 0) { parser.push(bytes, true); return; }
   for (let start = 0; start < bytes.length; start += CHUNK) {
     const end = Math.min(bytes.length, start + CHUNK);
-    buf += dec.decode(bytes.subarray(start, end), { stream: end < bytes.length });
-    // 只处理到最后一个完整标签('>'),不完整的尾巴留到下一块,避免切断记录
-    const cut = buf.lastIndexOf('>');
-    if (cut < 0) continue;
-    agg.feed(buf.slice(0, cut + 1));
-    buf = buf.slice(cut + 1);
+    parser.push(bytes.subarray(start, end), end >= bytes.length);
   }
-  if (buf) agg.feed(buf);
-  return agg.finalize();
+}
+
+/** 批次 39:全文件流式解析 —— 解压后的字节分块喂,扫全部记录,不漏任何指标类型。 */
+export function parseHealthMetricsFromBytes(bytes: Uint8Array): HealthMetrics {
+  const parser = createHealthStreamParser();
+  feedBytes(parser, bytes);
+  return parser.finishMetrics();
 }
 
 /** 全文件流式解析,一次拿到看板指标 + 记忆节点(概况/锻炼)—— 概况节点也基于全文件,
  *  不再单独 tail 解析。取代 ConnectorsHub 里"看板扫全文件、概况只看尾部 6MB"的分裂做法。 */
 export function parseHealthFromBytes(bytes: Uint8Array): { metrics: HealthMetrics; nodes: HealthNode[] } {
-  const agg = new HealthAggregator();
-  const dec = new TextDecoder('utf-8');
-  const CHUNK = 8_000_000;
-  let buf = '';
-  for (let start = 0; start < bytes.length; start += CHUNK) {
-    const end = Math.min(bytes.length, start + CHUNK);
-    buf += dec.decode(bytes.subarray(start, end), { stream: end < bytes.length });
-    const cut = buf.lastIndexOf('>');
-    if (cut < 0) continue;
-    agg.feed(buf.slice(0, cut + 1));
-    buf = buf.slice(cut + 1);
-  }
-  if (buf) agg.feed(buf);
-  const metrics = agg.finalize();
-  return { metrics, nodes: agg.buildNodes(metrics.metrics) };
+  const parser = createHealthStreamParser();
+  feedBytes(parser, bytes);
+  return parser.finish();
 }
 
 function toMetric(def: MetricDef): Omit<HealthMetric, 'latest' | 'latestDate' | 'prev' | 'series'> {

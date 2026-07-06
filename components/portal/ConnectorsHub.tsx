@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic';
 const WechatReadingImportSheet = dynamic(() => import('./WechatReadingImportSheet'), { ssr: false });
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { type LifeNode } from '@/lib/portal/life-graph';
+import type { HealthMetrics, HealthNode } from '@/lib/portal/apple-health';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
@@ -759,20 +760,67 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     if (c.method === 'shortcuts') { setShortcutsFor(c.id); return; }
   }
 
-  // 批次 38/39:直接传 zip 或 export.xml,全部在浏览器里解析(不上传大文件)。
-  // export.xml 常几百 MB,只解码尾部(最近数据在末尾),正则提炼后建记忆节点 + 指标看板。
-  // 批次 39:取整个 export.xml 的字节(不再只取尾部)—— Apple 导出按类型分块,
-  // 只看尾部会漏掉大多数指标(用户遇到「只出 1 项」)。全字节交给流式解析器扫全文件。
-  async function extractExportXmlBytes(file: File): Promise<Uint8Array | null> {
-    if (file.name.toLowerCase().endsWith('.zip')) {
-      const buf = new Uint8Array(await file.arrayBuffer());
-      const { unzipSync } = await import('fflate');
-      const isExport = (n: string) => /(^|\/)export\.xml$/i.test(n);
-      const files = unzipSync(buf, { filter: (f) => isExport(f.name) });
-      const entry = Object.entries(files).find(([n]) => isExport(n));
-      return entry ? entry[1] : null;
+  // 批次 38/39/41:直接传 zip 或 export.xml,全部在浏览器里流式解析(不上传大文件)。
+  // 批次 41:改为「边解压边解析」—— 1GB zip 解压后 export.xml 常达 10GB+,旧写法
+  // (file.arrayBuffer() 整包读入 + unzipSync 整体解压成一个 Uint8Array)会把手机标签页
+  // 内存打爆 → 闪退。现用 File.stream() 逐块喂 fflate 流式 Unzip,再把解出的每块喂给
+  // 增量解析器后立即丢弃,任何时刻只持有一小块;Apple 按类型分块导出仍扫全文件不漏指标。
+  async function importHealthFile(
+    file: File,
+  ): Promise<{ metrics: HealthMetrics; nodes: HealthNode[] } | null> {
+    const { createHealthStreamParser } = await import('@/lib/portal/apple-health');
+    const parser = createHealthStreamParser();
+
+    // 文件字节按块产出:优先 File.stream()(不把整包读进内存),不支持则回退分片 arrayBuffer。
+    async function forEachChunk(onChunk: (c: Uint8Array) => void): Promise<void> {
+      if (typeof file.stream === 'function') {
+        const reader = file.stream().getReader();
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (value) onChunk(value);
+        }
+        return;
+      }
+      const whole = new Uint8Array(await file.arrayBuffer());
+      const STEP = 4_000_000;
+      for (let i = 0; i < whole.length; i += STEP) {
+        onChunk(whole.subarray(i, Math.min(whole.length, i + STEP)));
+        await Promise.resolve(); // 让出主线程,大文件下避免长任务卡死 UI
+      }
     }
-    return new Uint8Array(await file.arrayBuffer());
+
+    // 裸 export.xml:直接分块喂解析器。
+    if (!file.name.toLowerCase().endsWith('.zip')) {
+      let any = false;
+      await forEachChunk((c) => { parser.push(c); any = true; });
+      parser.push(new Uint8Array(0), true);
+      return any ? parser.finish() : null;
+    }
+
+    // zip:流式解压,只 start export.xml(其它条目不解压),解出的每块立即喂解析器。
+    const { Unzip, UnzipInflate, UnzipPassThrough } = await import('fflate');
+    const isExport = (n: string) => /(^|\/)export\.xml$/i.test(n);
+    let sawExport = false;
+    let failed: Error | null = null;
+    const unzip = new Unzip((entry) => {
+      if (!isExport(entry.name)) return;
+      sawExport = true;
+      entry.ondata = (err, chunk, final) => {
+        if (err) { failed = err instanceof Error ? err : new Error(String(err)); return; }
+        if (chunk.length) parser.push(chunk, final);
+        else if (final) parser.push(new Uint8Array(0), true);
+      };
+      entry.start();
+    });
+    unzip.register(UnzipInflate);      // deflate(export.xml 常规压缩)
+    unzip.register(UnzipPassThrough);  // stored(极少数未压缩存储,免 start() 抛错)
+
+    await forEachChunk((c) => { unzip.push(c, false); if (failed) throw failed; });
+    unzip.push(new Uint8Array(0), true);
+    if (failed) throw failed;
+    if (!sawExport) return null;
+    return parser.finish();
   }
 
   async function handleHealthFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -782,15 +830,14 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     markBusy(); // 解析期间也保持 busy,别被自动刷新打断
     setSyncing('health');
     try {
-      const bytes = await extractExportXmlBytes(file);
-      if (!bytes || bytes.length === 0) {
+      // 看板指标 + 记忆节点(概况/锻炼)都基于全文件的同一次流式解析 —— 概况不再只看尾部 6MB,
+      // 避免 Apple 按类型分块导出时尾部缺步数/心率/睡眠而漏进概况。
+      const result = await importHealthFile(file);
+      if (!result) {
         showToast(L(dict, 'zip 里没找到 export.xml(别选 export_cda / 子文件夹)', 'No export.xml in the zip (not export_cda / subfolders)'), false);
         setSyncing(null); return;
       }
-      const { parseHealthFromBytes } = await import('@/lib/portal/apple-health');
-      // 看板指标 + 记忆节点(概况/锻炼)都基于全文件的同一次流式解析 —— 概况不再只看尾部 6MB,
-      // 避免 Apple 按类型分块导出时尾部缺步数/心率/睡眠而漏进概况。
-      const { metrics, nodes } = parseHealthFromBytes(bytes);
+      const { metrics, nodes } = result;
       if (metrics.metrics.length) {
         const { saveHealthMetrics } = await import('@/lib/portal/health-store');
         saveHealthMetrics(metrics);
