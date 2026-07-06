@@ -1,11 +1,7 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { normalizeSupabaseRuntimeUrl } from '@/lib/portal/production-runtime';
-
-function envValue(key: string): string {
-  const value = process.env[key];
-  return typeof value === 'string' ? value.trim() : '';
-}
+import { envValue } from '@/lib/portal/env';
 
 function safeJson(body: Record<string, unknown>, status = 200) {
   return NextResponse.json(

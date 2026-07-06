@@ -3,16 +3,12 @@ import {
   buildProductionRuntimeStatus,
   type ProductionRuntimeSetupTask,
 } from '@/lib/portal/production-runtime';
+import { envValue } from '@/lib/portal/env';
 
 // Request gmail scope alongside calendar so one consent covers both connectors
 // and the resulting refresh token can serve either API.
 const GOOGLE_CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/gmail.readonly';
 const GOOGLE_CALENDAR_OAUTH_STATE_COOKIE = 'nesio_google_calendar_oauth_state';
-
-function envValue(key: string): string {
-  const value = process.env[key];
-  return typeof value === 'string' ? value.trim() : '';
-}
 
 function safeJson(body: Record<string, unknown>, status = 200) {
   return NextResponse.json(

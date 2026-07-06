@@ -20,10 +20,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { timingSafeEqual } from 'node:crypto';
-
-function envValue(key: string): string {
-  return (process.env[key] ?? '').trim();
-}
+import { envValue } from '@/lib/portal/env';
 
 /** 常量时间比较两个密钥(避免用 === 短路比较带来的计时侧信道)。空/不等长直接判否。 */
 export function safeEqual(a: string, b: string): boolean {

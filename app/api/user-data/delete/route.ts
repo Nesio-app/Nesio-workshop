@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { buildUserDataDeleteResponse } from '@/lib/portal/app-api-contract-v0.mjs';
 import { deriveCloudIdentity } from '@/lib/portal/cloud-identity';
 import { normalizeSupabaseRuntimeUrl } from '@/lib/portal/production-runtime';
+import { envValue } from '@/lib/portal/env';
 
 type SupabaseUserResponse = {
   id?: string;
@@ -49,11 +50,6 @@ function logCloudRuntimeAudit(event: CloudRuntimeAuditEvent, details: Record<str
     return;
   }
   console.info('[cloud-runtime]', payload);
-}
-
-function envValue(key: string): string {
-  const value = process.env[key];
-  return typeof value === 'string' ? value.trim() : '';
 }
 
 function getCloudConfig() {

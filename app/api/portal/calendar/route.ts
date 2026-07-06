@@ -7,6 +7,7 @@ import { mergeCalendarEvents } from '@/lib/portal/calendar-filters';
 import { parseIcsEvents, parseCalendarName } from '@/lib/portal/ics';
 import { getIntegrationToken, saveIntegrationToken } from '@/lib/portal/integrations';
 import { pickCalendarTokens, shouldUseOAuth } from '@/lib/portal/calendar-token.mjs';
+import { envValue } from '@/lib/portal/env';
 
 type Feed = { url: string; label: string };
 type FeedResult = { label: string; ok: boolean; count: number; error?: string };
@@ -23,11 +24,6 @@ type GoogleCalendarItem = {
   start?: { dateTime?: string; date?: string };
   end?: { dateTime?: string; date?: string };
 };
-
-function envValue(key: string): string {
-  const value = process.env[key];
-  return typeof value === 'string' ? value.trim() : '';
-}
 
 function hasStage5LabAccess(req: NextRequest): boolean {
   const configured = envValue('NESIO_STAGE5_INVOCATION_SECRET');

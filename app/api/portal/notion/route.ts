@@ -13,7 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { guardAiRoute } from '@/lib/portal/api-auth';
 import { notionRowToNode, notionDbTitle, type NotionRow } from '@/lib/portal/notion-map';
-import { resolveAiKey } from '@/lib/portal/ai-keys';
+import { completeText, aiProviderAvailable } from '@/lib/portal/ai-complete';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -23,7 +23,6 @@ const NOTION_VERSION = '2022-06-28';
 const MAX_DATABASES = 8;       // 一次最多同步几个表
 const MAX_ROWS_PER_DB = 100;   // 每个表最多取多少行(Notion 单页上限)
 const MAX_TOTAL_ROWS = 400;    // 总行数上限,防止灌爆记忆
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
 interface NotionPage {
   id: string;
@@ -65,8 +64,7 @@ async function fetchPageText(token: string, pageId: string): Promise<string> {
 }
 
 async function extractNodes(pages: Array<{ title: string; text: string; url?: string }>): Promise<{ nodes: object[]; summary: string }> {
-  const geminiKey = resolveAiKey('gemini');
-  if (!geminiKey || !pages.length) return { nodes: [], summary: '无内容' };
+  if (!aiProviderAvailable() || !pages.length) return { nodes: [], summary: '无内容' };
 
   const docText = pages.map((p) => `页面：${p.title}\n内容：${p.text}`).join('\n\n───\n\n');
 
@@ -92,13 +90,7 @@ Notion 内容：
 ${docText.slice(0, 5000)}`;
 
   try {
-    const res = await fetch(`${GEMINI_URL}?key=${geminiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-    });
-    const data = await res.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
-    const raw = data.candidates?.[0]?.content?.parts?.map((p) => p.text).join('') || '';
+    const { text: raw } = await completeText({ prompt, maxTokens: 2048 });
     const jsonStr = raw.match(/```(?:json)?\s*([\s\S]*?)```/)?.[1]?.trim() || raw.trim();
     const parsed = JSON.parse(jsonStr) as { nodes?: object[]; summary?: string };
     return { nodes: parsed.nodes || [], summary: parsed.summary || '提取完成' };

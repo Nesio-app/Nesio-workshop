@@ -9,15 +9,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getIntegrationToken } from '@/lib/portal/integrations';
 import { cookies } from 'next/headers';
 import { buildEmailSignal, type EmailSignal } from '@/lib/platform/email-signals';
+import { envValue } from '@/lib/portal/env';
 
 export const dynamic = 'force-dynamic';
 
 // Re-export so TodayFeed.tsx can import EmailSignal from one place
 export type { EmailSignal };
-
-function envValue(key: string): string {
-  return (process.env[key] ?? '').trim();
-}
 
 function hasLabAccess(req: NextRequest): boolean {
   const configured = envValue('NESIO_STAGE5_INVOCATION_SECRET');

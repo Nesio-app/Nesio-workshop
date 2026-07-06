@@ -12,6 +12,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { isSameOriginRequest, isRateLimited } from '@/lib/portal/api-auth';
+import { envValue } from '@/lib/portal/env';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,10 +24,6 @@ interface TelemetryEvent {
 
 const MAX_EVENTS_PER_BATCH = 20;
 const MAX_PROP_CHARS = 80;
-
-function envValue(key: string): string {
-  return (process.env[key] ?? '').trim();
-}
 
 function sanitize(e: TelemetryEvent): TelemetryEvent | null {
   if (typeof e?.name !== 'string' || !/^[a-z0-9_.]{1,48}$/.test(e.name)) return null;

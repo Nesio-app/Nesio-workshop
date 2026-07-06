@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 export const dynamic = 'force-dynamic';
 
 import * as stage5ToolInvocation from '@/lib/intelligence/tool-invocation-runtime.mjs';
+import { envValue } from '@/lib/portal/env';
 
 type ToolInvocationBody = {
   actionKey?: string;
@@ -25,11 +26,6 @@ type Stage5PolicyDecision = Record<string, any>;
 const buildStage5InvocationEnvelope = stage5ToolInvocation.buildStage5InvocationEnvelope as (options: Record<string, any>) => Record<string, any>;
 const createStage5AuditId = stage5ToolInvocation.createStage5AuditId as () => string;
 const evaluateStage5ToolInvocationPolicy = stage5ToolInvocation.evaluateStage5ToolInvocationPolicy as (options: Record<string, any>) => Stage5PolicyDecision;
-
-function envValue(key: string): string {
-  const value = process.env[key];
-  return typeof value === 'string' ? value.trim() : '';
-}
 
 async function googleCalendarAccessToken(): Promise<string> {
   return (await cookies()).get('nesio_google_calendar_access')?.value || '';

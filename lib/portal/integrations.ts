@@ -6,6 +6,7 @@
 
 import { cookies } from 'next/headers';
 import { normalizeSupabaseRuntimeUrl } from '@/lib/portal/production-runtime';
+import { envValue } from '@/lib/portal/env';
 
 export type IntegrationProvider = 'gmail' | 'calendar';
 
@@ -20,10 +21,6 @@ export interface IntegrationTokens {
 export type IntegrationMap = Partial<Record<IntegrationProvider, IntegrationTokens>>;
 
 // ── Env ──────────────────────────────────────────────────────────────────────
-
-function envValue(key: string): string {
-  return (process.env[key] ?? '').trim();
-}
 
 // ── Supabase ─────────────────────────────────────────────────────────────────
 

@@ -4,12 +4,9 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { saveIntegrationToken, setTokenCookiesOnResponse } from '@/lib/portal/integrations';
+import { envValue } from '@/lib/portal/env';
 
 const STATE_COOKIE = 'nesio_gmail_oauth_state';
-
-function envValue(key: string): string {
-  return (process.env[key] ?? '').trim();
-}
 
 function callbackUrl(req: NextRequest): string {
   const configured = envValue('GMAIL_REDIRECT_URI');

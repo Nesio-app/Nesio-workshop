@@ -6,10 +6,7 @@
  */
 
 import { resolveAiKey } from '@/lib/portal/ai-keys';
-
-function envValue(key: string): string {
-  return (process.env[key] ?? '').trim();
-}
+import { envValue } from '@/lib/portal/env';
 
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 // Same fallback order as chat/analyze routes — 429/unavailable on one → try next.
