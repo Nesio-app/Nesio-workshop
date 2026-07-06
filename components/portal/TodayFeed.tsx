@@ -31,6 +31,7 @@ import { buildRotatingFallback, dismissProactiveById, getProactiveCardBudget, is
 import { ProactiveGuidanceCard } from './today/ProactiveGuidanceCard';
 import { ExperimentCheckinCard } from './today/ExperimentCheckinCard';
 import { RoutineDueCards } from './today/RoutineDueCards';
+import DailyBriefCard from './DailyBriefCard';
 import { ThawedReminder } from './today/ThawedReminder';
 import { TodayFocusSection } from './today/FocusSection';
 import { NightTimeline } from './today/NightTimeline';
@@ -179,6 +180,11 @@ export default function TodayFeed({
           onOpenRecorder={(node) => setMeetingRecorderNode(node)}
           onFocusMode={(node) => setFocusModeNode(node)}
         />
+
+        {/* 每日简报 strip:批次 39 从顶栏移除圆钮后,监听器随之丢失,RoutineDueCards 的
+            「播放简报」dispatch('nesio-play-brief') 无人接收 → 功能死掉。挂回纤细 strip
+            恢复监听器(不占顶栏),与 RoutineDueCards 的简报卡是一对。 */}
+        <DailyBriefCard canUsePrivateData={canUsePrivateData} memoryCount={memoryCount} memoryNotes={memoryNotes} />
 
         {/* 实验打卡(批次 8:按用户要求放到最下面) */}
         <RoutineDueCards />
