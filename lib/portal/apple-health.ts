@@ -55,7 +55,19 @@ function sleepNightKey(startDate: string): string {
   return day;
 }
 
-interface Rec { startDate: string; endDate: string; value: string }
+/** 多设备(iPhone + Apple Watch + 第三方 app)同一天各记一份步数/距离/能量;HealthKit 只在
+ *  查询时去重、XML 里不去。每天取"记得最多的那个来源"而非跨来源裸加,避免总量虚高 ~1.5–2×。 */
+function collapseBySource(byDaySource: Map<string, Map<string, number>>): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const [day, sources] of byDaySource) {
+    let max = 0;
+    for (const v of sources.values()) if (v > max) max = v;
+    out.set(day, max);
+  }
+  return out;
+}
+
+interface Rec { startDate: string; endDate: string; value: string; sourceName: string }
 
 /** 抽取某个 HK type 的所有 <Record ...>(自闭合或带子元素的开标签都能匹配到开头)。 */
 function records(xml: string, hkType: string): Rec[] {
@@ -68,6 +80,7 @@ function records(xml: string, hkType: string): Rec[] {
       startDate: tag.match(/startDate="([^"]+)"/)?.[1] || '',
       endDate: tag.match(/endDate="([^"]+)"/)?.[1] || '',
       value: tag.match(/value="([^"]+)"/)?.[1] || '',
+      sourceName: tag.match(/sourceName="([^"]+)"/)?.[1] || '',
     });
   }
   return out;
@@ -84,13 +97,17 @@ export function parseAppleHealthText(xml: string): HealthParseResult {
   const summaryLines: string[] = [];
   const attrs: Record<string, string | number> = { source: 'Apple Health', importedAt: new Date().toISOString() };
 
-  // ── 步数:按天聚合,取最近 7 天 ──
-  const stepDay = new Map<string, number>();
+  // ── 步数:按天聚合(每天取最大来源,去多设备重复),取最近 7 天 ──
+  const stepBySource = new Map<string, Map<string, number>>(); // day → source → sum
   for (const r of records(xml, 'HKQuantityTypeIdentifierStepCount')) {
     const day = r.startDate.slice(0, 10);
     const v = Number(r.value);
-    if (day && Number.isFinite(v)) stepDay.set(day, (stepDay.get(day) || 0) + v);
+    if (!day || !Number.isFinite(v)) continue;
+    let s = stepBySource.get(day);
+    if (!s) { s = new Map(); stepBySource.set(day, s); }
+    s.set(r.sourceName, (s.get(r.sourceName) || 0) + v);
   }
+  const stepDay = collapseBySource(stepBySource);
   const stepDays = [...stepDay.entries()].sort((a, b) => a[0].localeCompare(b[0])).slice(-7);
   if (stepDays.length) {
     const avg = Math.round(stepDays.reduce((s, [, v]) => s + v, 0) / stepDays.length);
@@ -278,7 +295,7 @@ function monthlySeriesAvg(daily: Map<string, number>, transform: (v: number) => 
 }
 
 class HealthAggregator {
-  private sumDay = new Map<string, Map<string, number>>();
+  private sumDay = new Map<string, Map<string, Map<string, number>>>(); // key → day → source → sum
   private latest = new Map<string, { d: string; v: number; pd: string; pv: number }>();
   private monthlyLatest = new Map<string, Map<string, { sum: number; count: number }>>(); // latest 类指标的按月均值
   private sleepMs = new Map<string, number>();
@@ -301,7 +318,10 @@ class HealthAggregator {
           const v = Number(r.value);
           if (!day || !Number.isFinite(v)) continue;
           if (!m) { m = new Map(); this.sumDay.set(def.key, m); }
-          m.set(day, (m.get(day) || 0) + scaleValue(def.key, v));
+          // 按天+来源分别累加,finalize 时每天取最大来源,去多设备(iPhone+Watch)重复。
+          let s = m.get(day);
+          if (!s) { s = new Map(); m.set(day, s); }
+          s.set(r.sourceName, (s.get(r.sourceName) || 0) + scaleValue(def.key, v));
         }
       } else if (def.agg === 'latest') {
         let mm = this.monthlyLatest.get(def.key);
@@ -337,8 +357,9 @@ class HealthAggregator {
     const out: HealthMetric[] = [];
     for (const def of METRIC_DEFS) {
       if (def.agg === 'sumDay') {
-        const m = this.sumDay.get(def.key);
-        if (!m || !m.size) continue;
+        const raw = this.sumDay.get(def.key);
+        if (!raw || !raw.size) continue;
+        const m = collapseBySource(raw); // 每天取最大来源,去多设备重复(iPhone+Watch 不再裸加)
         const days = [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]));
         // Apple 导出常在半天时导出 → 最后一天(=今天,导入日)是残缺的,当"最新"会显示偏低
         // + 吓人的负 delta(如"步数 3200 ▼ −6800")。有更早的完整日时,用最后一个完整日。
