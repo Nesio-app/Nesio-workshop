@@ -13,8 +13,10 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/portal/admin-gate';
-import { buildDailyReport, renderReportText, buildAnalystPrompt } from '@/lib/portal/analyst.mjs';
+import { renderReportText, buildAnalystPrompt } from '@/lib/portal/analyst.mjs';
 import { aiProviderAvailable, completeText } from '@/lib/portal/ai-complete';
+import { computeDailyReport } from '@/lib/portal/analyst-runtime';
+import { saveDaily } from '@/lib/portal/analyst-store';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,16 +31,10 @@ function isCronAuthorized(req: NextRequest): boolean {
 }
 
 async function runAnalyst(req: NextRequest) {
-  const origin = req.nextUrl.origin;
-  const adminSecret = envValue('NESIO_ADMIN_SECRET');
-  const h: Record<string, string> = adminSecret ? { 'x-nesio-admin-secret': adminSecret } : {};
+  const { report, signals } = await computeDailyReport(req.nextUrl.origin, envValue('NESIO_ADMIN_SECRET'));
 
-  const [metrics, gov] = await Promise.all([
-    fetch(new URL('/api/admin/metrics', origin), { headers: h }).then((r) => r.json()).catch(() => ({})),
-    fetch(new URL('/api/admin/governance', origin), { headers: h }).then((r) => r.json()).catch(() => ({})),
-  ]);
-
-  const report = buildDailyReport(metrics, gov);
+  // 存今日快照 —— 明天起就有历史给基线学习。
+  const saved = await saveDaily(report.date, signals);
 
   // 可选 AI 润色:只改文风,不改数字/结论;失败或未配置 → 确定性文本兜底。
   let narrative = '';
@@ -71,7 +67,7 @@ async function runAnalyst(req: NextRequest) {
     emailError = 'email_not_configured';
   }
 
-  return NextResponse.json({ ok: true, emailed, emailError, report, narrative: narrative || null });
+  return NextResponse.json({ ok: true, emailed, emailError, saved, report, narrative: narrative || null });
 }
 
 export async function GET(req: NextRequest) {
