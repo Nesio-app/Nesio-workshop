@@ -183,14 +183,17 @@ export function parseAppleHealthText(xml: string): HealthParseResult {
     for (const w of recentWorkouts) {
       const startMs = parseAppleDate(w.start);
       const durMin = w.duration ? Math.round(Number(w.duration)) : 0;
+      const startIso = startMs ? new Date(startMs).toISOString() : '';
       workoutNodes.push({
         type: 'event',
         name: `${w.label}${durMin ? ` ${durMin} 分钟` : ''}`,
         attributes: {
           source: 'Apple Health',
-          ...(startMs ? { start: new Date(startMs).toISOString() } : {}),
+          ...(startMs ? { start: startIso } : {}),
           ...(durMin ? { durationMin: durMin } : {}),
           activity: w.label,
+          // 稳定外部 id:同一场锻炼(起始时刻+活动)重导入时幂等,不再每周重传就多一条。
+          ...(startIso ? { externalId: `health:workout:${startIso}:${w.type}` } : {}),
         },
         relations: [],
         tags: ['健康', 'Apple Health', '锻炼', w.label],
@@ -206,7 +209,8 @@ export function parseAppleHealthText(xml: string): HealthParseResult {
     nodes.push({
       type: 'health_state',
       name: 'Apple Health · 健康概况',
-      attributes: attrs,
+      // 固定外部 id:重导入时更新同一张概况节点,而不是每次新增一条。
+      attributes: { ...attrs, externalId: 'health:summary' },
       relations: [],
       tags: ['健康', 'Apple Health'],
       confidence: 0.85,
@@ -225,6 +229,7 @@ export interface HealthMetric {
   latest: number;
   latestDate: string;      // YYYY-MM-DD
   prev: number | null;     // 上一次(算 delta)
+  prevDate?: string;       // 上一次的日期(用于提示"较 X 前",避免拿一年前读数当"较上次")
   unit: string;
   decimals: number;
   group: 'activity' | 'heart' | 'body' | 'vitals' | 'mind';
@@ -305,8 +310,9 @@ class HealthAggregator {
   private pushLatest(key: string, d: string, v: number) {
     const cur = this.latest.get(key);
     if (!cur) { this.latest.set(key, { d, v, pd: '', pv: NaN }); return; }
-    if (d >= cur.d) { cur.pd = cur.d; cur.pv = cur.v; cur.d = d; cur.v = v; }
-    else if (d > cur.pd) { cur.pd = d; cur.pv = v; }
+    if (d > cur.d) { cur.pd = cur.d; cur.pv = cur.v; cur.d = d; cur.v = v; }        // 更新的一天 → 推进,旧的当 prev
+    else if (d === cur.d) { cur.v = v; }                                            // 同一天另一样本 → 只更新当日值,不把 prev 设成同一天
+    else if (d > cur.pd) { cur.pd = d; cur.pv = v; }                                // 更早但比现有 prev 新 → 当 prev(始终是不同的更早一天)
   }
 
   feed(text: string) {
@@ -338,9 +344,11 @@ class HealthAggregator {
       } else if (def.agg === 'sleep') {
         for (const r of records(text, def.hk)) {
           if (!/Asleep/i.test(r.value)) continue;
-          const day = r.startDate.slice(0, 10);
+          // 用"夜"键(凌晨段归前一晚),与摘要路径一致 —— 否则跨午夜整晚被拆成两天,
+          // latest/prev 变成同一晚两段相比(如 6.0h ▲ 较上次 +5.3)。
+          const key = sleepNightKey(r.startDate);
           const ms = Math.max(0, parseAppleDate(r.endDate) - parseAppleDate(r.startDate));
-          if (day) this.sleepMs.set(day, (this.sleepMs.get(day) || 0) + ms);
+          if (key) this.sleepMs.set(key, (this.sleepMs.get(key) || 0) + ms);
         }
       } else if (def.agg === 'mindful') {
         for (const r of records(text, def.hk)) {
@@ -372,7 +380,7 @@ class HealthAggregator {
         if (!c) continue;
         const mm = this.monthlyLatest.get(def.key);
         const series = mm ? [...mm.entries()].sort((a, b) => a[0].localeCompare(b[0])).slice(-60).map(([ym, b]) => ({ ym, v: round(b.sum / b.count, def.decimals) })) : [];
-        out.push({ ...toMetric(def), latest: round(c.v, def.decimals), latestDate: c.d, prev: Number.isNaN(c.pv) ? null : round(c.pv, def.decimals), series });
+        out.push({ ...toMetric(def), latest: round(c.v, def.decimals), latestDate: c.d, prev: Number.isNaN(c.pv) ? null : round(c.pv, def.decimals), prevDate: c.pd || undefined, series });
       } else if (def.agg === 'sleep') {
         if (!this.sleepMs.size) continue;
         const nights = [...this.sleepMs.entries()].sort((a, b) => a[0].localeCompare(b[0]));

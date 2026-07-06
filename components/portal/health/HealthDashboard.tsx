@@ -74,6 +74,15 @@ function Sparkline({ series }: { series: Array<{ ym: string; v: number }> }) {
   );
 }
 
+// "较上次"在两次读数间隔较大时改说"较 N 月前",避免拿一年前的读数冒充"较上次"。
+function gapLabel(m: HealthMetric, dict: string): string {
+  if (!m.prevDate) return L(dict, '较上次', 'vs last');
+  const days = Math.round((Date.parse(m.latestDate) - Date.parse(m.prevDate)) / 86_400_000);
+  if (!Number.isFinite(days) || days <= 45) return L(dict, '较上次', 'vs last');
+  const months = Math.max(2, Math.round(days / 30));
+  return L(dict, `较 ${months} 个月前`, `vs ${months}mo ago`);
+}
+
 function MetricCard({ m, dict }: { m: HealthMetric; dict: string }) {
   // prev===0 时也算 delta(如上月 0 次锻炼 → 本月 3 次是真实增长,不该被压成"无变化");
   // 只有 deltaPct 因除零需要 prev!==0。
@@ -85,7 +94,7 @@ function MetricCard({ m, dict }: { m: HealthMetric; dict: string }) {
       <span className="nesio-health-card-value">{fmt(m.latest, m.decimals)}<span className="nesio-health-card-unit">{m.unit}</span></span>
       {delta != null && delta !== 0 ? (
         <span className={`nesio-health-card-delta${delta > 0 ? ' up' : ' down'}`}>
-          {delta > 0 ? '▲' : '▼'} {L(dict, '较上次', 'vs last')} {delta > 0 ? '+' : ''}{fmt(delta, m.decimals)}
+          {delta > 0 ? '▲' : '▼'} {gapLabel(m, dict)} {delta > 0 ? '+' : ''}{fmt(delta, m.decimals)}
         </span>
       ) : (
         <span className="nesio-health-card-date">{m.latestDate.slice(5).replace('-', '/')}</span>

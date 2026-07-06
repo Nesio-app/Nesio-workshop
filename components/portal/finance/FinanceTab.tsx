@@ -12,6 +12,7 @@ import {
   monthlyTrend, financeAlerts, needsReview, suggestCategory, setMerchantRule, effectiveCategory,
   accountMonth, formatMoney, ymOf, prevYm, txFlow, setFlowRule, TX_FLOW_LABELS,
   detectRecurring, upcomingRecurring, loadMerchantRules, loadFlowRules, setRecurRule,
+  loadBankSyncedAt, excludedTxCount,
   type BankTx, type BankAccount, type TxFlow,
 } from '@/lib/portal/bank-tx';
 import { L } from '@/lib/portal/i18n';
@@ -128,6 +129,19 @@ export default function FinanceTab() {
       {/* ── 总览 ── */}
       {sub === 'overview' && (
         <>
+          {/* 数据新鲜度 + 被排除的其他币种笔数(如实告知,不假装是最新完整月/全部交易) */}
+          {(() => {
+            const syncedAt = loadBankSyncedAt();
+            const excluded = excludedTxCount(txs, ym);
+            if (!syncedAt && !excluded) return null;
+            const dateStr = syncedAt ? new Date(syncedAt).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'short', day: 'numeric' }) : '';
+            return (
+              <p className="nesio-fin-datanote" style={{ fontSize: '0.7rem', color: 'var(--portal-muted)', margin: '0 0 0.5rem' }}>
+                {syncedAt && L(dict, `数据截至 ${dateStr}`, `As of ${dateStr}`)}
+                {excluded > 0 && `${syncedAt ? ' · ' : ''}${L(dict, `另有 ${excluded} 笔其他币种未计入`, `${excluded} txn(s) in other currencies excluded`)}`}
+              </p>
+            );
+          })()}
           <div className="nesio-fin-kpis">
             <div className="nesio-fin-kpi"><span className="nesio-fin-kpi-l">{L(dict, '净支出', 'Net spend')}</span><span className="nesio-fin-kpi-v">{formatMoney(summary.net, summary.currency)}</span>{netDelta !== null && <span className={`nesio-fin-delta${netDelta > 0 ? ' up' : ' down'}`}>{netDelta > 0 ? '+' : ''}{netDelta}%</span>}</div>
             <div className="nesio-fin-kpi"><span className="nesio-fin-kpi-l">{L(dict, '退款', 'Refunds')}</span><span className="nesio-fin-kpi-v">{formatMoney(summary.refunds, summary.currency)}</span></div>
@@ -214,7 +228,8 @@ export default function FinanceTab() {
                 return (
                   <div key={t.id} className="nesio-fin-review">
                     <p className="nesio-fin-review-title">{t.name} · {formatMoney(t.amount, summary.currency)}</p>
-                    <p className="nesio-fin-review-sug">{L(dict, `建议分类:${sug.category} · 置信度 ${Math.round(sug.confidence * 100)}%`, `Suggested: ${sug.category} · ${Math.round(sug.confidence * 100)}%`)}</p>
+                    {/* 规则命中的置信度是写死的常数(0.72/0.4),与证据量无关,不该以百分比精度冒充"可信度";改定性措辞。 */}
+                    <p className="nesio-fin-review-sug">{L(dict, `建议分类:${sug.category}${sug.confidence >= 0.6 ? '(关键词匹配)' : '(默认猜测)'}`, `Suggested: ${sug.category}${sug.confidence >= 0.6 ? ' (keyword match)' : ' (default guess)'}`)}</p>
                     <div className="nesio-fin-review-btns">
                       <button type="button" className="nesio-fin-review-accept" onClick={() => resolveReview(t.name, sug.category)}>{L(dict, '接受', 'Accept')}</button>
                       {['Food', 'Shopping', 'Travel', 'Services'].filter((c) => c !== sug.category).slice(0, 2).map((c) => (

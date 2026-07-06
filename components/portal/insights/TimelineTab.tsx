@@ -82,7 +82,11 @@ export default function TimelineTab() {
     if (h) return L(dict, `${h}小时`, `${h}h`);
     return L(dict, `${m}分钟`, `${m}m`);
   };
-  const fmtDist = (km: number) => { const mi = km * 0.621371; return mi < 0.19 ? `${Math.round(mi * 5280)} ft` : `${mi.toFixed(mi < 10 ? 1 : 0)} mi`; };
+  // 距离按 locale 切公制/英制 —— 中文语境用 km/m,不再一律 mi/ft(时间/日期都本地化了,唯独距离没有)。
+  const fmtDist = (km: number) => {
+    if (dict === 'en') { const mi = km * 0.621371; return mi < 0.19 ? `${Math.round(mi * 5280)} ft` : `${mi.toFixed(mi < 10 ? 1 : 0)} mi`; }
+    return km < 1 ? `${Math.round(km * 1000)} 米` : `${km.toFixed(km < 10 ? 1 : 0)} km`;
+  };
   const dayLabel = (key: string) => {
     const t = new Date(); const tk = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
     const y = new Date(t); y.setDate(t.getDate() - 1); const yk = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, '0')}-${String(y.getDate()).padStart(2, '0')}`;

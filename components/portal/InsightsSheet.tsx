@@ -187,8 +187,8 @@ function computeReflectionFacts(nodes: LifeNode[], all: LifeNode[], profile: Mir
     facts.push({ icon: <IconBox size={15} />, text: L(dict, '这段时间还没有新记录', 'No new notes in this period') });
   }
 
-  // 2. Completion rate
-  const commitments = nodes.filter((n) => n.type === 'commitment' || n.type === 'event');
+  // 2. Completion rate —— 只算承诺 + 带 done 语义的 event(否则无 done 的日历/健康 event 被当未完成拉低)
+  const commitments = nodes.filter((n) => n.type === 'commitment' || (n.type === 'event' && n.attributes.done !== undefined));
   const done = commitments.filter((n) => n.attributes.done === true);
   if (commitments.length > 0) {
     const rate = Math.round((done.length / commitments.length) * 100);
@@ -626,7 +626,7 @@ function ConfidenceBar({ value }: { value: number }) {
       <div className="nesio-lm-conf-track">
         <div className="nesio-lm-conf-fill" style={{ width: `${value}%`, background: color }} />
       </div>
-      <span className="nesio-lm-conf-label" style={{ color }}>{value}%</span>
+      <span className="nesio-lm-conf-label" style={{ color }} title="AI 自评置信度(非精确度量)">{value}%</span>
     </div>
   );
 }
@@ -773,7 +773,7 @@ function LivingModelTab({
             {enough
               ? L(dict, '记录够了，点一下生成你的认知模型。', 'Enough notes — tap once to build your mind model.')
               : L(dict, `已记录 ${nodeCount} / 10 条，记满后 Nesio 开始推断。`, `${nodeCount} / 10 notes — Nesio starts inferring at 10.`)}
-            <InfoTip text={L(dict, '每条结论都带证据和置信度，可校正;类型分布/领域/完成率/活跃时段等行为统计交给 AI 推断,新增 8 条或 7 天后自动更新。', 'Every conclusion is evidence-backed, confidence-scored and correctable. Behavior stats (types / domains / completion / active hours) go to AI inference; refreshes after 8 new notes or 7 days.')} />
+            <InfoTip text={L(dict, '每条结论是 AI 基于你的记录推断的,置信度为 AI 自评(非精确度量),可校正;类型分布/领域/完成率/活跃时段等行为统计交给 AI 推断,新增 8 条或 7 天后自动更新。', 'Each conclusion is AI-inferred from your notes; the confidence is the AI’s own estimate (not a measured metric) and is correctable. Behavior stats go to AI inference; refreshes after 8 new notes or 7 days.')} />
           </p>
 
           {enough && (

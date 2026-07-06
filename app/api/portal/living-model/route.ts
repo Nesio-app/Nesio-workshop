@@ -172,8 +172,9 @@ export async function POST(req: NextRequest) {
 
   const fallback = buildFallbackModel();
 
-  // Need at least a few nodes to generate meaningful insights
-  if (body.nodeCount < 3) {
+  // 至少 10 条记录才生成认知模型 —— 与客户端空态"已记录 N/10 条,记满后开始推断"一致;
+  // 此前 <3 就生成 7 层带置信度画像,3-4 条杂项的新用户会拿到一份看似笃定却是编造的模型。
+  if (body.nodeCount < 10) {
     return NextResponse.json({ ok: true, layers: fallback, reason: 'insufficient_data' });
   }
 

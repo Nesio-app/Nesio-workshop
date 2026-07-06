@@ -312,8 +312,9 @@ export default function LifeCivilizationMap({ nodes, isDemo = false }: Props) {
 
   return (
     <div className="life-civ-wrap">
-      {/* Insight banner */}
-      {insight && (
+      {/* Insight banner —— demo 数据时不显示"重心迁移"这类确定断言(否则新用户看到
+          "2024年5月你的重心从事业迁移到关系"这种其实来自种子常量的假个人洞察)。 */}
+      {insight && !isShowingDemo && (
         <div className="life-civ-insight">
           <span className="life-civ-insight-icon">◉</span>
           <span>{insight}</span>

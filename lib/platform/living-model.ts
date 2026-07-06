@@ -169,7 +169,9 @@ export function summarizeForLivingModel(input: LivingModelApiInput): {
 
   for (const n of nodes) {
     typeBreakdown[n.type] = (typeBreakdown[n.type] ?? 0) + 1;
-    if (n.type === 'commitment' || n.type === 'event') {
+    // 只把承诺、以及真正带 done 语义的 event 计入完成率分母 —— 健康/日历等无 done 的 event
+    // 一律算"未完成"会系统性拉低完成率(10 条锻炼 event + 2 条已完成承诺 → 显示 17%)。
+    if (n.type === 'commitment' || (n.type === 'event' && n.attributes.done !== undefined)) {
       totalCommitments++;
       if (n.attributes.done === true) completedCount++;
     }
