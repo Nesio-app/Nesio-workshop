@@ -286,6 +286,21 @@ export interface ActivityRings {
   stand: number; standGoal: number;       // 小时
 }
 
+/** 批次 45(D1):State of Mind 情绪(iOS 17+)—— 效价 valence 在 [-1,1]。 */
+export interface MoodAnalysis {
+  count: number;
+  avgValence: number;                 // 近期平均效价 [-1,1]
+  tone: 'pleasant' | 'neutral' | 'unpleasant';
+  daily: Array<{ date: string; valence: number }>;  // 近 90 天日均效价
+}
+
+/** 批次 45(D1):基础档案 <Me> —— 生理性别/血型/生日(→ 年龄)。 */
+export interface Profile {
+  age?: number;
+  sex?: string;                       // male / female / other
+  bloodType?: string;                 // O+ / A- / …
+}
+
 export interface HealthMetrics {
   metrics: HealthMetric[];
   workouts: number;
@@ -294,6 +309,8 @@ export interface HealthMetrics {
   daily?: DailyFact[];                // A:每日事实表(跨域分析地基)
   sleepStages?: SleepStages;          // C:最近一晚睡眠分期
   activityRings?: ActivityRings;      // C:最近一天活动三环
+  mood?: MoodAnalysis;                // D1:State of Mind 情绪
+  profile?: Profile;                  // D1:基础档案
 }
 
 // latest 类指标的合理范围(规范单位),超出即当脏值丢弃,不让离谱读数直接上卡片。
@@ -432,6 +449,10 @@ class HealthAggregator {
   // C:睡眠分期(夜 → 来源 → 各期毫秒)与活动三环(日期 → 三环值+目标)。
   private sleepStage = new Map<string, Map<string, { core: number; deep: number; rem: number; awake: number }>>();
   private activityByDate = new Map<string, { move: number; moveGoal: number; exercise: number; exerciseGoal: number; stand: number; standGoal: number }>();
+  // D1:情绪效价(日 → {sum,count})与基础档案。
+  private moodDay = new Map<string, { sum: number; count: number }>();
+  private moodTotal = { sum: 0, count: 0 };
+  private profile: Profile = {};
 
   private feedGlucose(r: Rec, mgdl: number) {
     const day = r.startDate.slice(0, 10);
@@ -563,6 +584,30 @@ class HealthAggregator {
         standGoal: num('appleStandHoursGoal'),
       });
     }
+
+    // D1:State of Mind 情绪(iOS 17+)—— 效价 valence ∈ [-1,1],按天聚合。
+    const somRe = /<StateOfMind\b(?:"[^"]*"|[^>"])*>/g;
+    let sm: RegExpExecArray | null;
+    while ((sm = somRe.exec(text))) {
+      const tag = sm[0];
+      const day = (tag.match(/startDate="([^"]+)"/)?.[1] || '').slice(0, 10);
+      const val = Number(tag.match(/valence="([^"]+)"/)?.[1] || '');
+      if (!day || !Number.isFinite(val)) continue;
+      const d = this.moodDay.get(day) || { sum: 0, count: 0 };
+      d.sum += val; d.count += 1; this.moodDay.set(day, d);
+      this.moodTotal.sum += val; this.moodTotal.count += 1;
+    }
+
+    // D1:基础档案 <Me>(生理性别/血型/生日)。
+    const me = text.match(/<Me\b(?:"[^"]*"|[^>"])*>/)?.[0];
+    if (me) {
+      const dob = me.match(/HKCharacteristicTypeIdentifierDateOfBirth="([^"]+)"/)?.[1];
+      const sex = me.match(/HKCharacteristicTypeIdentifierBiologicalSex="HKBiologicalSex([^"]+)"/)?.[1];
+      const blood = me.match(/HKCharacteristicTypeIdentifierBloodType="HKBloodType([^"]+)"/)?.[1];
+      if (dob) { const y = Number(dob.slice(0, 4)); if (y > 1900) this.profile.age = new Date().getFullYear() - y; }
+      if (sex && sex !== 'NotSet') this.profile.sex = sex.toLowerCase();
+      if (blood && blood !== 'NotSet') this.profile.bloodType = blood.replace('Positive', '+').replace('Negative', '−');
+    }
   }
 
   finalize(): HealthMetrics {
@@ -606,7 +651,25 @@ class HealthAggregator {
     const daily = this.buildDailyFacts();
     const sleepStages = this.buildSleepStages();
     const activityRings = this.buildActivityRings();
-    return { metrics: out, workouts: this.workouts, importedAt: new Date().toISOString(), glucose, daily, sleepStages, activityRings };
+    const mood = this.buildMood();
+    const profile = (this.profile.age || this.profile.sex || this.profile.bloodType) ? this.profile : undefined;
+    return { metrics: out, workouts: this.workouts, importedAt: new Date().toISOString(), glucose, daily, sleepStages, activityRings, mood, profile };
+  }
+
+  /** D1:State of Mind 情绪分析 —— 平均效价 + 基调 + 近 90 天日均序列。 */
+  private buildMood(): MoodAnalysis | undefined {
+    if (this.moodTotal.count < 3) return undefined;
+    const avg = this.moodTotal.sum / this.moodTotal.count;
+    const daily = [...this.moodDay.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .slice(-90)
+      .map(([date, d]) => ({ date, valence: Math.round((d.sum / d.count) * 100) / 100 }));
+    return {
+      count: this.moodTotal.count,
+      avgValence: Math.round(avg * 100) / 100,
+      tone: avg > 0.3 ? 'pleasant' : avg < -0.3 ? 'unpleasant' : 'neutral',
+      daily,
+    };
   }
 
   /** C:最近一晚睡眠分期 —— 取最后一夜、该夜睡着最多的来源(避免多设备重叠重复)的各期时长。 */

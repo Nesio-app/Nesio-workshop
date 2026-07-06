@@ -8,7 +8,7 @@
 
 import { useEffect, useState } from 'react';
 import { loadHealthMetrics } from '@/lib/portal/health-store';
-import type { HealthMetric, HealthMetrics, GlucoseAnalysis, SleepStages, ActivityRings } from '@/lib/portal/apple-health';
+import type { HealthMetric, HealthMetrics, GlucoseAnalysis, SleepStages, ActivityRings, MoodAnalysis } from '@/lib/portal/apple-health';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -187,6 +187,31 @@ function SleepStagesCard({ s, dict }: { s: SleepStages; dict: string }) {
   );
 }
 
+// 批次 45(D1):情绪(State of Mind)—— 平均效价 + 基调 + 近 90 天日均序列。
+function MoodCard({ mood, dict }: { mood: MoodAnalysis; dict: string }) {
+  const toneColor = mood.tone === 'pleasant' ? 'var(--status-go)' : mood.tone === 'unpleasant' ? 'var(--status-gentle)' : 'var(--status-calm)';
+  const toneLabel: Record<MoodAnalysis['tone'], [string, string]> = {
+    pleasant: ['偏积极', 'Pleasant'], neutral: ['中性', 'Neutral'], unpleasant: ['偏低落', 'Low'],
+  };
+  const d = mood.daily;
+  const W = 100, H = 26, mid = H / 2;
+  const yv = (v: number) => mid - (v * mid); // valence -1..1 → 底/顶
+  const pts = d.map((p, i) => `${(d.length > 1 ? (i / (d.length - 1)) * W : 0).toFixed(1)},${yv(p.valence).toFixed(1)}`).join(' ');
+  return (
+    <div className="nesio-health-card" style={{ gridColumn: '1 / -1' }}>
+      <span className="nesio-health-card-label">{L(dict, '情绪 · State of Mind', 'Mood · State of Mind')}</span>
+      <span className="nesio-health-card-value" style={{ color: toneColor }}>{L(dict, toneLabel[mood.tone][0], toneLabel[mood.tone][1])}<span className="nesio-health-card-unit">{L(dict, `效价 ${mood.avgValence > 0 ? '+' : ''}${mood.avgValence}`, `valence ${mood.avgValence > 0 ? '+' : ''}${mood.avgValence}`)}</span></span>
+      {d.length >= 2 && (
+        <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="26" preserveAspectRatio="none" style={{ marginTop: '0.4rem', overflow: 'visible' }}>
+          <line x1="0" x2={W} y1={mid} y2={mid} stroke="var(--portal-line)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+          <polyline points={pts} fill="none" stroke={toneColor} strokeWidth="1.6" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+        </svg>
+      )}
+      <span className="nesio-health-card-range">{L(dict, `近 ${d.length} 天 · ${mood.count} 次记录`, `${d.length}d · ${mood.count} logs`)}</span>
+    </div>
+  );
+}
+
 function MetricCard({ m, dict }: { m: HealthMetric; dict: string }) {
   // prev===0 时也算 delta(如上月 0 次锻炼 → 本月 3 次是真实增长,不该被压成"无变化");
   // 只有 deltaPct 因除零需要 prev!==0。
@@ -242,6 +267,11 @@ export default function HealthDashboard() {
   return (
     <div className="nesio-health-dash">
       <p className="nesio-health-updated">{L(dict, `${data.metrics.length} 项指标 · 锻炼 ${data.workouts} 次 · 导入于 ${importedLabel}`, `${data.metrics.length} metrics · ${data.workouts} workouts · imported ${importedLabel}`)}</p>
+      {data.profile && (data.profile.age || data.profile.sex || data.profile.bloodType) && (
+        <p className="nesio-settings-option-hint" style={{ margin: '0.1rem 0 0' }}>
+          {[data.profile.age ? L(dict, `${data.profile.age} 岁`, `${data.profile.age}y`) : '', data.profile.sex ? L(dict, ({ male: '男', female: '女' } as Record<string, string>)[data.profile.sex] || data.profile.sex, data.profile.sex) : '', data.profile.bloodType ? L(dict, `${data.profile.bloodType} 型`, data.profile.bloodType) : ''].filter(Boolean).join(' · ')}
+        </p>
+      )}
       {insight.signals.length > 0 && <FitnessPanel insight={insight} dict={dict} />}
       {(() => {
         const story = healthNarrative(data.metrics, dict);
@@ -254,10 +284,11 @@ export default function HealthDashboard() {
           </div>
         );
       })()}
-      {(data.activityRings || data.sleepStages) && (
+      {(data.activityRings || data.sleepStages || data.mood) && (
         <div className="nesio-health-grid" style={{ marginTop: '0.6rem' }}>
           {data.activityRings && <ActivityRingsCard a={data.activityRings} dict={dict} />}
           {data.sleepStages && <SleepStagesCard s={data.sleepStages} dict={dict} />}
+          {data.mood && <MoodCard mood={data.mood} dict={dict} />}
         </div>
       )}
       {data.glucose && (
