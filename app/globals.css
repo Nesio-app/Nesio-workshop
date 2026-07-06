@@ -15000,6 +15000,16 @@ html[data-portal-theme="night"] .nesio-wechat-bubble--ai {
   font-size: 0.66rem;
   color: var(--portal-muted);
 }
+/* 可见失败纪律:跨语言召回退化的诚实提示 —— 克制的一行灰字,不抢答案 */
+.nesio-wechat-recall-notice {
+  margin: 0.3rem 0 0;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.66rem;
+  line-height: 1.45;
+  color: var(--portal-muted);
+  border-left: 2px solid var(--portal-border, rgba(120, 120, 120, 0.3));
+  opacity: 0.9;
+}
 .nesio-wechat-ref-row {
   display: flex;
   align-items: center;

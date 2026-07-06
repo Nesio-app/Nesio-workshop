@@ -16,7 +16,8 @@ import { parseTemporalQuery, isInSpan } from '@/lib/portal/temporal-query';
 import { readPortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
 import { refreshLocation } from '@/lib/portal/location-store';
 import { formatEnvironmentContext, getCachedCalendarEvents } from '@/lib/portal/environment';
-import { semanticRerank } from '@/lib/portal/semantic-rerank';
+import { semanticRerankWithMeta } from '@/lib/portal/semantic-rerank';
+import { detectCrossLingualGap } from '@/lib/portal/cross-lingual-gap.mjs';
 import { track } from '@/lib/portal/telemetry';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -54,6 +55,7 @@ interface UiMessage {
   sources?: Array<{ title: string; url: string }>;
   refs?: MsgRef[];
   savedToMemory?: boolean;
+  recallNotice?: string; // 可见失败纪律:跨语言召回退化时的诚实提示
 }
 
 // ─── Client-side context builder (3-layer hybrid retrieval) ──────────────────
@@ -105,7 +107,7 @@ function fmtNode(n: LifeNode): string {
   return `• [${src}] ${n.name} (${dateLabel})`;
 }
 
-async function buildMemoryContext(query: string): Promise<{ context: string; refs: LifeNode[] }> {
+async function buildMemoryContext(query: string): Promise<{ context: string; refs: LifeNode[]; recallNotice?: string }> {
   const graph = getLifeGraph();
   const temporal = parseTemporalQuery(query);
 
@@ -120,7 +122,8 @@ async function buildMemoryContext(query: string): Promise<{ context: string; ref
   // Layer 2: text/entity search + semantic re-rank (embedding cosine blend;
   // falls back to pure text order when the embed endpoint is unavailable)
   const textRanked = smartSearch(query, null).nodes.slice(0, 20);
-  const searchNodes = (await semanticRerank(query, textRanked)).slice(0, 12);
+  const reranked = await semanticRerankWithMeta(query, textRanked);
+  const searchNodes = reranked.nodes.slice(0, 12);
 
   // Layer 3: upcoming 7-day events (always in context — temporal baseline)
   const now = Date.now();
@@ -211,7 +214,19 @@ async function buildMemoryContext(query: string): Promise<{ context: string; ref
     if (refs.length >= 6) break;
   }
 
-  return { context: parts.join('\n'), refs };
+  // 可见失败纪律:没有向量重排时,文本召回够不到另一种语言的记忆。若库里确有一批
+  // 跨语言笔记,诚实提示一句,而不是假装"全都搜过了"。
+  let recallNotice: string | undefined;
+  const { gap } = detectCrossLingualGap({
+    query,
+    corpusTexts: graph.slice(0, 200).map((n) => `${n.name} ${n.rawInput || ''}`),
+    embeddingsApplied: reranked.embeddingsApplied,
+  });
+  if (gap) {
+    recallNotice = '语义检索未启用,另一种语言的记忆这次可能没被找到 —— 换用记忆里的原词再问一次会更准。';
+  }
+
+  return { context: parts.join('\n'), refs, recallNotice };
 }
 
 function buildCalendarContext(query: string): string {
@@ -634,7 +649,7 @@ export default function NesioChatSheet({
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30000);
     try {
-      const { context: memoryContext, refs } = await buildMemoryContext(text.trim());
+      const { context: memoryContext, refs, recallNotice } = await buildMemoryContext(text.trim());
       const res = await fetch('/api/portal/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -661,6 +676,7 @@ export default function NesioChatSheet({
         text: (data.response?.trim() || L(dict, '（暂时没有找到相关信息）', '(Nothing relevant found)')).replace(/\*\*/g, ''),
         sources: data.sources ?? [],
         refs: refs.map((n) => ({ id: n.id, name: n.name, source: n.source })),
+        recallNotice,
       };
       const withAi = [...nextMsgs, aiMsg];
       setMessages(withAi);
@@ -966,6 +982,12 @@ export default function NesioChatSheet({
                   <p className="nesio-wechat-bubble-text">{msg.text}</p>
                   {msg.savedToMemory && <p className="nesio-wechat-saved-badge">✓ {L(dict, '已存入记忆', 'Saved to Memory')}</p>}
                 </div>
+                {/* 可见失败纪律:跨语言召回退化时诚实提示,不假装全都搜过了 */}
+                {!isUser && msg.recallNotice && (
+                  <p className="nesio-wechat-recall-notice">
+                    {L(dict, msg.recallNotice, 'Semantic search is off — memories in another language may not have been found. Try again using the original wording from your notes.')}
+                  </p>
+                )}
                 {msg.sources && msg.sources.length > 0 && (
                   <div className="nesio-wechat-sources">
                     {msg.sources.map((s) => (

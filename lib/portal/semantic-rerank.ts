@@ -101,8 +101,23 @@ async function fetchVectors(texts: string[]): Promise<Array<number[] | null> | n
  * Returns the input unchanged when embeddings are unavailable.
  */
 export async function semanticRerank(query: string, nodes: LifeNode[], topK = 12): Promise<LifeNode[]> {
+  return (await semanticRerankWithMeta(query, nodes, topK)).nodes;
+}
+
+/**
+ * Same reranking as {@link semanticRerank}, but also reports whether embedding
+ * vectors were actually applied. `embeddingsApplied=false` means retrieval fell
+ * back to pure text order (embed endpoint down / no GEMINI_API_KEY) — callers
+ * can honestly surface that cross-lingual recall is degraded (see
+ * cross-lingual-gap.mjs). 修「AI 界面缺可见失败纪律」。
+ */
+export async function semanticRerankWithMeta(
+  query: string,
+  nodes: LifeNode[],
+  topK = 12,
+): Promise<{ nodes: LifeNode[]; embeddingsApplied: boolean }> {
   const q = query.trim();
-  if (!q || nodes.length < 3) return nodes;
+  if (!q || nodes.length < 3) return { nodes, embeddingsApplied: false };
 
   const pool = nodes.slice(0, Math.min(nodes.length, 20));
   const db = await openDb();
@@ -121,7 +136,7 @@ export async function semanticRerank(query: string, nodes: LifeNode[], topK = 12
 
   const texts = [q, ...missing.map((m) => m.text)];
   const fetched = await fetchVectors(texts);
-  if (!fetched || !fetched[0]) return nodes; // endpoint unavailable — keep text order
+  if (!fetched || !fetched[0]) return { nodes, embeddingsApplied: false }; // endpoint unavailable — keep text order
 
   const queryVec = fetched[0];
   const toStore: Array<[string, CacheEntry]> = [];
@@ -144,5 +159,8 @@ export async function semanticRerank(query: string, nodes: LifeNode[], topK = 12
   const scored = pool.map((node, i) => ({ node, score: blended[i] }));
 
   const reranked = scored.sort((a, b) => b.score - a.score).map((s) => s.node);
-  return [...reranked, ...nodes.slice(pool.length)].slice(0, Math.max(topK, reranked.length));
+  return {
+    nodes: [...reranked, ...nodes.slice(pool.length)].slice(0, Math.max(topK, reranked.length)),
+    embeddingsApplied: true,
+  };
 }
