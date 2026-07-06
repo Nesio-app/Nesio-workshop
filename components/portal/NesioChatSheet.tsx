@@ -16,6 +16,7 @@ import { readPortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache'
 import { refreshLocation } from '@/lib/portal/location-store';
 import { formatEnvironmentContext, getCachedCalendarEvents } from '@/lib/portal/environment';
 import { semanticRerankMeta } from '@/lib/portal/semantic-rerank';
+import { detectCrossLingualGap } from '@/lib/portal/cross-lingual-gap.mjs';
 import { track } from '@/lib/portal/telemetry';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -135,9 +136,14 @@ async function buildMemoryContext(query: string, convoHint = ''): Promise<{ cont
   const textRanked = smartSearch(query, null).nodes.slice(0, 20);
   const reranked = await semanticRerankMeta(query, textRanked);
   const searchNodes = reranked.nodes.slice(0, 12);
-  // 🔴#2:语义检索本该重排却没用上 embedding(缺 AI key / 端点挂了)= 静默降级。
-  // 有候选可重排(≥3)却没走语义 → 标记降级,让聊天区显式提示(区分"没数据"vs"AI 未配置")。
-  const semanticDegraded = textRanked.length >= 3 && !reranked.semantic;
+  // 🔴#2:语义检索没用上 embedding(缺 AI key / 端点挂了)= 静默降级,跨语言记录会被漏。
+  // 但只在库里真的有"另一种语言"的记录时提示才有意义 —— 纯中文用户查纯中文库不该被
+  // 无端提示"英文邮件可能没找全"。用 detectCrossLingualGap 精确判定,消除误报噪音。
+  const semanticDegraded = detectCrossLingualGap({
+    query,
+    corpusTexts: graph.slice(0, 200).map((n) => `${n.name} ${n.rawInput || ''}`),
+    embeddingsApplied: reranked.semantic,
+  }).gap;
 
   // Layer 3: upcoming 7-day events (always in context — temporal baseline)
   const now = Date.now();

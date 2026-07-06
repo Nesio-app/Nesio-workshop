@@ -241,8 +241,15 @@ function computeReflectionFacts(nodes: LifeNode[], all: LifeNode[], profile: Mir
     }
   } catch { /* ignore */ }
 
-  // 5. Top person
-  const persons = all.filter((n) => n.type === 'person').slice(0, 3);
+  // 5. Top person —— 按真实频次排序(被多少条记录的关系指到 + 自身关系数),不是插入顺序。
+  const personMentions = (p: LifeNode) =>
+    all.reduce((c, n) => c + ((n.relations || []).some((r) => r.targetId === p.id) ? 1 : 0), 0) + (p.relations?.length || 0);
+  const persons = all
+    .filter((n) => n.type === 'person')
+    .map((p) => ({ p, c: personMentions(p) }))
+    .sort((a, b) => b.c - a.c)
+    .slice(0, 3)
+    .map((x) => x.p);
   if (persons.length > 0) {
     facts.push({ icon: <IconUser size={15} />, text: L(dict, `最常出现的人：${persons.map((p) => p.name).join('、')}`, `Most frequent people: ${persons.map((p) => p.name).join(', ')}`) });
   }
