@@ -6,12 +6,10 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { guardAiRoute } from '@/lib/portal/api-auth';
-import { resolveAiKey } from '@/lib/portal/ai-keys';
+import { completeText } from '@/lib/portal/ai-complete';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
-
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
 interface InsightsRequest {
   period: 'week' | 'month' | 'all';
@@ -39,12 +37,6 @@ export async function POST(req: NextRequest) {
   if (guard) return guard;
 
   const body = await req.json() as InsightsRequest;
-  const apiKey = resolveAiKey('gemini');
-
-  if (!apiKey) {
-    return NextResponse.json({ ok: true, narrative: fallbackNarrative(body) });
-  }
-
   const { period, stats, recentNames, feedbackCount, displayName } = body;
   const periodLabel = period === 'week' ? '这周' : period === 'month' ? '这个月' : '到目前为止';
   const nameStr = displayName ? `用户叫 ${displayName}，` : '';
@@ -67,17 +59,9 @@ export async function POST(req: NextRequest) {
 - 50字以内
 - 只输出这段话，不加引号`;
 
+  // 共享单发客户端(Claude→Gemini 兜底 + 统一别名);无 key/失败 → 温暖兜底叙事。
   try {
-    const res = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.7, maxOutputTokens: 200 },
-      }),
-    });
-    const data = await res.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
-    const text = (data.candidates?.[0]?.content?.parts?.[0]?.text || '').trim();
+    const { text } = await completeText({ prompt, maxTokens: 200 });
     if (text) return NextResponse.json({ ok: true, narrative: text });
   } catch { /* fall through */ }
 
