@@ -359,6 +359,8 @@ export interface RecurringCharge {
   cadenceDays: number;
   cadenceLabel: [string, string]; // [zh, en]
   currency: string;
+  latestAmount: number;   // 最近一笔金额(供「订阅涨价」比对)
+  baselineAmount: number; // 此前各笔的中位数(无历史时 = latestAmount)
 }
 
 /** 归一化商户名:去掉尾部门店号/流水号/日期,合并同一商家的多笔。 */
@@ -463,6 +465,9 @@ export function detectRecurring(txs: BankTx[]): RecurringCharge[] {
     const amts = sorted.map((t) => Math.abs(t.amount));
     const avg = amts.reduce((s, v) => s + v, 0) / amts.length;
     const cv = coeffVar(amts);
+    const latestAmount = round2(amts[amts.length - 1]);
+    const priorAmts = amts.slice(0, -1);
+    const baselineAmount = priorAmts.length ? round2(median(priorAmts)) : latestAmount;
 
     // ── 账单判定(手动覆盖优先)──
     const override = recurRules[last.name];
@@ -483,6 +488,8 @@ export function detectRecurring(txs: BankTx[]): RecurringCharge[] {
       cadenceDays: Math.round(medGap),
       cadenceLabel: label,
       currency: last.currency || 'USD',
+      latestAmount,
+      baselineAmount,
     });
   }
   return out.sort((a, b) => a.nextEstimate.localeCompare(b.nextEstimate));
