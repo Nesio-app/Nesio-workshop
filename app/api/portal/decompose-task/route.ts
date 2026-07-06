@@ -7,6 +7,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { guardAiRoute } from '@/lib/portal/api-auth';
+import { resolveAiKeys } from '@/lib/portal/ai-keys';
 import {
   buildMomentumPrompt,
   fallbackMomentumSteps,
@@ -17,10 +18,6 @@ import {
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
-
-function envValue(key: string): string {
-  return (process.env[key] ?? '').trim();
-}
 
 async function callClaude(apiKey: string, p: MomentumParams): Promise<MomentumStep[]> {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -94,8 +91,7 @@ export async function POST(req: NextRequest) {
     completedActions: body.completedActions,
   };
 
-  const claudeKey = envValue('ANTHROPIC_API_KEY') || envValue('CLAUDE_API_KEY');
-  const geminiKey = envValue('GEMINI_API_KEY');
+  const { anthropic: claudeKey, gemini: geminiKey } = resolveAiKeys();
 
   if (!claudeKey && !geminiKey) {
     return NextResponse.json({ ok: true, steps: fallbackMomentumSteps(taskName, p.drill ?? false, p.locale) });
