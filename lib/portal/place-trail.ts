@@ -159,7 +159,7 @@ export interface CategoryGroup { category: PlaceCategory; count: number; visits:
 
 // 批次 40:反向地理编码结果 —— label → { name, city, country }。供 World tab(国家/城市)。
 const PLACE_GEO_KEY = 'nesio-place-geo-v1';
-export interface PlaceGeo { name?: string; city?: string; country?: string }
+export interface PlaceGeo { name?: string; city?: string; country?: string; resolved?: boolean }
 export function loadPlaceGeo(): Record<string, PlaceGeo> {
   if (typeof window === 'undefined') return {};
   try { return JSON.parse(localStorage.getItem(PLACE_GEO_KEY) || '{}') as Record<string, PlaceGeo>; } catch { return {}; }
