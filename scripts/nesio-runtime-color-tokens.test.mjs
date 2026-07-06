@@ -44,9 +44,12 @@ assert(
   'personalization-insights moodDotColor must use Nesio theme-aware color tokens instead of raw hex colors.',
 );
 
+// 意图:情绪点颜色映射到 warm-coach 状态 token(gentle/calm),而非裸 hex。
+// (批次 55 去剧本后 profile 改为真实数据计算,mood dot 走 MOOD_DOT token 映射,
+//  故放宽为"两个 status token 都被引用",不再要求 `moodDotColor:` 字面前缀。)
 assert(
-  personalization.includes("moodDotColor: 'var(--status-gentle)'") &&
-    personalization.includes("moodDotColor: 'var(--status-calm)'"),
+  /var\(--status-gentle\)/.test(personalization) &&
+    /var\(--status-calm\)/.test(personalization),
   'personalization-insights must map default mood dots to warm-coach status tokens.',
 );
 

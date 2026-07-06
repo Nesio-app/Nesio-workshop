@@ -1,3 +1,5 @@
+import { getLifeGraph } from './life-graph';
+
 export type BaohePersonalizationStage = 'first_use' | 'day_34';
 
 export interface BaoheDataDepthItem {
@@ -99,61 +101,56 @@ const FIRST_USE_PROFILE: BaohePersonalizationProfile = {
   },
 };
 
-const DAY_34_PROFILE: BaohePersonalizationProfile = {
-  stage: 'day_34',
-  daysSinceStart: 34,
-  summary: '持续增长中',
-  memoryCount: 23,
-  memoryProgress: 68,
-  memoryProgressLabel: '已了解 23 件事 · 持续成长中',
-  insightVisible: true,
-  insightBody: '你好像每周五下午特别高效，我会把重要提醒调到那时候',
-  insightSource: '基于过去 4 周任务完成时段分析',
-  pendingInsight: {
-    id: 'insight-friday-productivity',
-    type: 'pattern',
-    content: '你好像每周五下午特别高效，我会把重要提醒调到那时候',
-    source: '基于过去 4 周任务完成时段分析',
-    confidence: 82,
-    priority: 'normal',
-    relatedMemoryId: 'memory-weekly-output',
-  },
-  slots: {
-    greeting: '下午好，婧',
-    quote: '允许自己不确定，答案会在路上长出来。',
-    remindBarText: '妈妈生日还有几天，要不要现在花两分钟挑个礼物？',
-    energyNote: '昨晚睡得好，身体在慢慢回升',
-    actionCardText: '妈妈生日还有几天，要不要现在花两分钟挑个礼物？定制相册或护肤套装都很贴心，做不完也没关系。',
-    moodDotColor: 'var(--status-calm)',
-    dayBadge: '第 34 天 · 越来越了解你',
-  },
-  dayBadge: '第 34 天 · 越来越了解你',
-  dataDepth: [
-    { id: 'home_items', name: '家居物品', value: '32 件物品', progress: 80, tone: 'blue', icon: '⌂' },
-    { id: 'contacts', name: '联系人', value: '8 人', progress: 20, tone: 'purple', icon: '○' },
-    { id: 'tasks', name: '任务清单', value: '今日 3 件', progress: 68, tone: 'green', icon: '≡' },
-    { id: 'spending', name: '消费记录', value: '本月 ¥2,340', progress: 60, tone: 'amber', icon: '▣' },
-    { id: 'habits', name: '习惯追踪', value: '5 个习惯', progress: 50, tone: 'blue', icon: '◔' },
-    { id: 'health', name: '健康数据', value: '未接入', progress: 0, tone: 'red', icon: '+', unlockHint: '接入后可推算最佳状态时段' },
-  ],
-  memories: [
-    { id: 'memory-active-night', category: '节律', text: '晚上 10-11 点最活跃', confidence: 88, evidenceCount: 8, strength: 2, userVerified: null },
-    { id: 'memory-mood-recovering', category: '情绪', text: '近两周情绪偏蓝，在慢慢回暖', confidence: 75, evidenceCount: 4, strength: 1, userVerified: null },
-    { id: 'memory-weekly-output', category: '习惯', text: '周一低效，周五产出高', confidence: 82, evidenceCount: 7, strength: 2, userVerified: null },
-    { id: 'memory-pace-preference', category: '偏好', text: '喜欢从容节奏，不喜欢被催', confidence: 91, evidenceCount: 12, strength: 3, userVerified: null },
-    { id: 'memory-close-relations', category: '关系', text: '最在意妈妈和几个老朋友', confidence: 79, evidenceCount: 5, strength: 1, userVerified: null },
-  ],
-  preferences: {
-    pace: '从容',
-    pushTime: '22:00',
-    observationPushEnabled: true,
-  },
-};
+// ── 批次 55:去剧本 —— dataDepth 从真实数据算,不再用两套写死的 profile ──
+// 冷启动原理:第一天就是真实的(多为 0/未接入,诚实),数据长起来自动变丰富。
+function safeGraph(): Array<{ type: string; createdAt: string }> {
+  try { return getLifeGraph() as Array<{ type: string; createdAt: string }>; } catch { return []; }
+}
+function lsHasData(key: string): boolean {
+  if (typeof window === 'undefined') return false;
+  try { const v = localStorage.getItem(key); return Boolean(v) && v !== '[]' && v !== '{}'; } catch { return false; }
+}
+// 情绪点颜色用 warm-coach 状态 token:数据攒起来偏平稳(calm),初期温和(gentle)。
+const MOOD_DOT = { gentle: 'var(--status-gentle)', calm: 'var(--status-calm)' } as const;
+
+function computeDataDepth(g: Array<{ type: string }>): BaoheDataDepthItem[] {
+  const c = (t: string) => g.filter((x) => x.type === t).length;
+  const pct = (n: number, cap: number) => Math.min(100, Math.round((n / cap) * 100));
+  const objectN = c('object'), personN = c('person'), taskN = c('commitment');
+  const habitN = c('health_habit') + c('preference');
+  const spend = lsHasData('nesio-bank-tx-v1'), health = lsHasData('nesio-health-v1');
+  return [
+    { id: 'home_items', name: '家居物品', value: `${objectN} 件物品`, progress: pct(objectN, 40), tone: 'blue', icon: '⌂', ...(objectN ? {} : { unlockHint: '拍一下记录物品' }) },
+    { id: 'contacts', name: '联系人', value: `${personN} 人`, progress: pct(personN, 20), tone: 'purple', icon: '○', ...(personN ? {} : { unlockHint: '记录重要的人' }) },
+    { id: 'tasks', name: '任务清单', value: `${taskN} 件`, progress: pct(taskN, 15), tone: 'green', icon: '≡', ...(taskN ? {} : { unlockHint: '创建待办' }) },
+    { id: 'spending', name: '消费记录', value: spend ? '已接入' : '未接入', progress: spend ? 100 : 0, tone: 'amber', icon: '▣', ...(spend ? {} : { unlockHint: '接入支出记录' }) },
+    { id: 'habits', name: '习惯追踪', value: `${habitN} 个习惯`, progress: pct(habitN, 8), tone: 'blue', icon: '◔', ...(habitN ? {} : { unlockHint: '记录习惯' }) },
+    { id: 'health', name: '健康数据', value: health ? '已接入' : '未接入', progress: health ? 100 : 0, tone: 'red', icon: '+', ...(health ? {} : { unlockHint: '接入健康数据' }) },
+  ];
+}
 
 export function getBaohePersonalizationProfile(
-  stage: BaohePersonalizationStage = 'day_34',
+  _stage: BaohePersonalizationStage = 'day_34',
 ): BaohePersonalizationProfile {
-  return stage === 'first_use' ? FIRST_USE_PROFILE : DAY_34_PROFILE;
+  const g = safeGraph();
+  const memoryCount = g.length;
+  const earliest = g.reduce((min, x) => { const t = Date.parse(x.createdAt); return Number.isNaN(t) ? min : Math.min(min, t); }, Date.now());
+  const days = Math.max(1, Math.round((Date.now() - earliest) / 86_400_000));
+  return {
+    ...FIRST_USE_PROFILE,                    // 形状 + 诚实占位;ToolsTreasureSheet 只渲染 dataDepth
+    slots: { ...FIRST_USE_PROFILE.slots, moodDotColor: memoryCount >= 10 ? MOOD_DOT.calm : MOOD_DOT.gentle },
+    stage: memoryCount >= 10 ? 'day_34' : 'first_use',
+    daysSinceStart: days,
+    memoryCount,
+    memoryProgress: Math.min(100, Math.round((memoryCount / 30) * 100)),
+    memoryProgressLabel: memoryCount === 0
+      ? 'Nesio 正在了解你 · 记一点东西就会有发现'
+      : `已记住 ${memoryCount} 件事 · 越用越懂你`,
+    insightVisible: false,                   // 不再造假洞察:真洞察走 认知模型 / 学习面板
+    pendingInsight: undefined,
+    memories: [],                            // 不再预录记忆:真记忆走 Memory
+    dataDepth: computeDataDepth(g),
+  };
 }
 
 export function readBaohePersonalizationStage(): BaohePersonalizationStage {

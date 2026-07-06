@@ -41,6 +41,7 @@ import TimelineTab from './insights/TimelineTab';
 import FinanceTab from './finance/FinanceTab';
 import HealthDashboard from './health/HealthDashboard';
 import RelationshipsPanel from './relationships/RelationshipsPanel';
+import LearningStatusPanel from './LearningStatusPanel';
 import { getFreezeItems } from '@/lib/platform/impulse-guard';
 
 function loadFreezeLedger(): { total: number; skipped: number; bought: number } {
@@ -1290,14 +1291,17 @@ export default function InsightsSheet({ onClose, canUsePrivateData = true, initi
 
         {/* ── Tab 3: Living Model ── */}
         {mainTab === 'living' && (
-          <LivingModelTab
-            model={livingModel}
-            loading={livingLoading}
-            error={livingError}
-            nodeCount={allNodes.length}
-            onRefresh={handleRefreshLiving}
-            onFeedback={handleFeedback}
-          />
+          <>
+            <LearningStatusPanel />
+            <LivingModelTab
+              model={livingModel}
+              loading={livingLoading}
+              error={livingError}
+              nodeCount={allNodes.length}
+              onRefresh={handleRefreshLiving}
+              onFeedback={handleFeedback}
+            />
+          </>
         )}
 
       </div>
