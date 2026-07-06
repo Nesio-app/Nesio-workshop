@@ -367,6 +367,7 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: corsHeaders });
 }
 
+export const maxDuration = 30;
 export async function POST(req: NextRequest) {
   const auditId = createSecretaryAiAuditId();
 

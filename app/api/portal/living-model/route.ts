@@ -18,6 +18,7 @@ import { LAYER_META } from '@/lib/platform/living-model';
 import { guardAiRoute } from '@/lib/portal/api-auth';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 30;
 
 interface LivingModelRequest {
   nodeCount: number;

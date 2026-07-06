@@ -10,6 +10,7 @@ import { guardAiRoute } from '@/lib/portal/api-auth';
 import { reportAiCall } from '@/lib/portal/ai-telemetry';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 30;
 
 function envValue(key: string): string {
   return (process.env[key] ?? '').trim();

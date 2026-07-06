@@ -19,6 +19,7 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: cors });
 }
 
+export const maxDuration = 30;
 export async function POST(req: NextRequest) {
   const guard = await guardAiRoute(req, 'health_analyze', { limit: 20, allowCrossOrigin: true });
   if (guard) return guard;

@@ -12,9 +12,11 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { hasNesioSession } from '@/lib/portal/gmail-access';
+import { isRateLimited } from '@/lib/portal/api-auth';
 import { completeText, aiProviderAvailable } from '@/lib/portal/ai-complete';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 30;
 
 const TONE_HINT: Record<string, string> = {
   polite: '礼貌、得体、尊重对方。',
@@ -35,6 +37,10 @@ const SYSTEM = [
 export async function POST(req: NextRequest) {
   if (!(await hasNesioSession())) {
     return NextResponse.json({ ok: false, error: 'auth_required' }, { status: 401 });
+  }
+  // 已登录用户也不能无节流刷 AI 起草成本。
+  if (isRateLimited(req, 'gmail-draft-reply', { limit: 15 })) {
+    return NextResponse.json({ ok: false, error: 'rate_limited', retryAfterMs: 30_000 }, { status: 429 });
   }
 
   if (!aiProviderAvailable()) {

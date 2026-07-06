@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { guardAiRoute } from '@/lib/portal/api-auth';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 30;
 
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
