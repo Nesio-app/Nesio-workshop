@@ -15,7 +15,7 @@ import { parseTemporalQuery, isInSpan } from '@/lib/portal/temporal-query';
 import { readPortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
 import { refreshLocation } from '@/lib/portal/location-store';
 import { formatEnvironmentContext, getCachedCalendarEvents } from '@/lib/portal/environment';
-import { semanticRerank } from '@/lib/portal/semantic-rerank';
+import { semanticRerankMeta } from '@/lib/portal/semantic-rerank';
 import { track } from '@/lib/portal/telemetry';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -53,6 +53,18 @@ interface UiMessage {
   sources?: Array<{ title: string; url: string }>;
   refs?: MsgRef[];
   savedToMemory?: boolean;
+  /** 🔴#2:这条回答时语义检索降级了(缺 AI 配置,只用了关键词匹配)。 */
+  semanticDegraded?: boolean;
+}
+
+/** 🔴#1:从模型回答里抽出它自报的【依据:#1,#3】,并把这行从展示文本里剥掉。
+ *  ids===null = 模型没写(不合规,回退);ids=[] = 明确"无"(不出引用卡);ids=[...] = 只引这些。 */
+function extractCitations(raw: string): { text: string; ids: number[] | null } {
+  const m = raw.match(/【依据[:：]?\s*([^】]*)】\s*$/) || raw.match(/【依据[:：]?\s*([^】]*)】/);
+  if (!m) return { text: raw, ids: null };
+  const inner = m[1] || '';
+  const ids = /无|none/i.test(inner) ? [] : Array.from(inner.matchAll(/#?(\d+)/g)).map((x) => Number(x[1]));
+  return { text: raw.replace(m[0], '').trim(), ids };
 }
 
 // ─── Client-side context builder (3-layer hybrid retrieval) ──────────────────
@@ -104,7 +116,9 @@ function fmtNode(n: LifeNode): string {
   return `• [${src}] ${n.name} (${dateLabel})`;
 }
 
-async function buildMemoryContext(query: string): Promise<{ context: string; refs: LifeNode[] }> {
+interface RefCandidate { shortId: number; node: LifeNode }
+
+async function buildMemoryContext(query: string, convoHint = ''): Promise<{ context: string; refCandidates: RefCandidate[]; semanticDegraded: boolean }> {
   const graph = getLifeGraph();
   const temporal = parseTemporalQuery(query);
 
@@ -119,7 +133,11 @@ async function buildMemoryContext(query: string): Promise<{ context: string; ref
   // Layer 2: text/entity search + semantic re-rank (embedding cosine blend;
   // falls back to pure text order when the embed endpoint is unavailable)
   const textRanked = smartSearch(query, null).nodes.slice(0, 20);
-  const searchNodes = (await semanticRerank(query, textRanked)).slice(0, 12);
+  const reranked = await semanticRerankMeta(query, textRanked);
+  const searchNodes = reranked.nodes.slice(0, 12);
+  // 🔴#2:语义检索本该重排却没用上 embedding(缺 AI key / 端点挂了)= 静默降级。
+  // 有候选可重排(≥3)却没走语义 → 标记降级,让聊天区显式提示(区分"没数据"vs"AI 未配置")。
+  const semanticDegraded = textRanked.length >= 3 && !reranked.semantic;
 
   // Layer 3: upcoming 7-day events (always in context — temporal baseline)
   const now = Date.now();
@@ -140,7 +158,10 @@ async function buildMemoryContext(query: string): Promise<{ context: string; ref
   // Layer 4 (批次 37):查询提到邮件时,显式带上邮件节点。否则英文主题的邮件在中文
   // 提问("我的邮件")下文本匹配不到,永远进不了 candidates —— 用户会觉得「同步了却问不出来」。
   // 「今天的邮件」按邮件真实收件日期(attributes.date)过滤,而不是 attributes.start(邮件没有)。
-  const wantsEmail = /邮件|邮箱|email|e-mail|\bmail\b|收件|inbox|gmail/i.test(query);
+  // 🔴#3:多轮承接 —— 追问"第二封讲啥"本身没有"邮件"关键词,但上一轮问的是邮件。
+  // 用最近对话作为线索,让后续追问仍能重新召回邮件节点(否则邮件掉出上下文,模型只能编)。
+  const EMAIL_RE = /邮件|邮箱|email|e-mail|\bmail\b|收件|inbox|gmail/i;
+  const wantsEmail = EMAIL_RE.test(query) || EMAIL_RE.test(convoHint);
   const emailReceived = (n: LifeNode): number => {
     const s = typeof n.attributes.date === 'string' ? n.attributes.date : n.createdAt;
     const t = new Date(s).getTime();
@@ -172,11 +193,24 @@ async function buildMemoryContext(query: string): Promise<{ context: string; ref
     if (body.length >= 12) break;
   }
 
+  // 🔴#1:给"可被引用"的候选(日期命中/邮件/搜索命中)编号,让模型只引用真正用到的,
+  // 而不是无条件把前 6 条当"依据"渲染(模型说"没这方面记录"时也不该出引用卡)。
+  const refCandidates: RefCandidate[] = [];
+  const refSeen = new Set<string>();
+  for (const n of [...dateNodes, ...emailNodes, ...searchNodes]) {
+    if (refSeen.has(n.id)) continue;
+    refSeen.add(n.id);
+    refCandidates.push({ shortId: refCandidates.length + 1, node: n });
+    if (refCandidates.length >= 8) break;
+  }
+  const idOf = new Map(refCandidates.map((r) => [r.node.id, r.shortId]));
+  const fmtCite = (n: LifeNode): string => (idOf.has(n.id) ? `[#${idOf.get(n.id)}] ` : '') + fmtNode(n);
+
   const parts: string[] = [`【用户记忆库】共 ${graph.length} 条`];
 
   if (dateNodes.length > 0) {
     parts.push(`\n【${temporal.label}的日程/事件】（精确命中，优先参考）`);
-    parts.push(...dateNodes.map(fmtNode));
+    parts.push(...dateNodes.map(fmtCite));
   }
 
   if (upcomingNodes.length > 0 && !temporal.hasDate) {
@@ -187,7 +221,7 @@ async function buildMemoryContext(query: string): Promise<{ context: string; ref
   if (emailNodes.length > 0) {
     const label = temporal.hasDate ? `${temporal.label}的邮件` : '最近的邮件';
     parts.push(`\n【${label}】（下面是记忆里真实的邮件,只能根据这些回答,禁止虚构主题、发件人或内容;要总结就逐封说这几封）`);
-    parts.push(...emailNodes.map(fmtNode));
+    parts.push(...emailNodes.map(fmtCite));
   } else if (wantsEmail) {
     // 关键防幻觉:问到邮件但没有匹配 → 明确告诉 AI 没有,别编。
     const label = temporal.hasDate ? temporal.label : '最近';
@@ -196,21 +230,17 @@ async function buildMemoryContext(query: string): Promise<{ context: string; ref
 
   if (body.length > 0) {
     parts.push('\n【相关记忆与近期记录】');
-    parts.push(...body.slice(0, 12).map(fmtNode));
+    parts.push(...body.slice(0, 12).map(fmtCite));
   }
 
-  // 批次 38:回引 —— 答案基于的记忆节点(优先邮件/日期命中/搜索命中,不含泛化近期填充),
-  // 供聊天气泡下渲染可点的引用卡(回看/阅读/回复)。
-  const refSeen = new Set<string>();
-  const refs: LifeNode[] = [];
-  for (const n of [...dateNodes, ...emailNodes, ...searchNodes]) {
-    if (refSeen.has(n.id)) continue;
-    refSeen.add(n.id);
-    refs.push(n);
-    if (refs.length >= 6) break;
+  // 🔴#1:让模型自报"依据了哪几条"。回答末尾另起一行写【依据:#1,#3】(只列真正用到的编号);
+  // 没用到任何记忆(比如你答"没有相关记录")就写【依据:无】。前端据此只渲染被真正引用的
+  // 记忆卡,避免"伪造接地证明"。
+  if (refCandidates.length > 0) {
+    parts.push('\n【回答规则】上面标了 [#编号] 的记忆是可引用来源。回答完后在最后单独一行注明依据:用到了哪几条就写「【依据:#编号,#编号】」,一条都没用到就写「【依据:无】」。这一行只放编号,不要写别的。');
   }
 
-  return { context: parts.join('\n'), refs };
+  return { context: parts.join('\n'), refCandidates, semanticDegraded };
 }
 
 function buildCalendarContext(query: string): string {
@@ -632,7 +662,9 @@ export default function NesioChatSheet({
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30000);
     try {
-      const { context: memoryContext, refs } = await buildMemoryContext(text.trim());
+      // 🔴#3:把最近几条用户提问作为召回线索,让"第二封讲啥"这类追问仍能重新召回邮件。
+      const convoHint = messages.filter((m) => m.role === 'user').slice(-2).map((m) => m.text).join(' ');
+      const { context: memoryContext, refCandidates, semanticDegraded } = await buildMemoryContext(text.trim(), convoHint);
       const res = await fetch('/api/portal/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -652,13 +684,21 @@ export default function NesioChatSheet({
       });
       clearTimeout(timeout);
       const data = await res.json() as { ok?: boolean; response?: string; sources?: Array<{ title: string; url: string }> };
+      const rawResp = data.response?.trim() || L(dict, '（暂时没有找到相关信息）', '(Nothing relevant found)');
+      // 🔴#1:只保留模型真正引用的记忆节点。ids===null(没自报)→ 回退到前 3 候选作"相关记忆";
+      // ids=[](明确"无")→ 不出引用卡(修"模型说没记录、下面还渲染 6 张伪造依据卡")。
+      const { text: cleanResp, ids } = extractCitations(rawResp);
+      const citedNodes: LifeNode[] = ids === null
+        ? refCandidates.slice(0, 3).map((r) => r.node)
+        : ids.map((id) => refCandidates.find((r) => r.shortId === id)?.node).filter((n): n is LifeNode => Boolean(n));
       const aiMsg: UiMessage = {
         id: `a-${Date.now()}`,
         role: 'model',
         // 兜底剥掉 markdown 强调记号 — 气泡是纯文本,裸 ** 很出戏
-        text: (data.response?.trim() || L(dict, '（暂时没有找到相关信息）', '(Nothing relevant found)')).replace(/\*\*/g, ''),
+        text: cleanResp.replace(/\*\*/g, ''),
         sources: data.sources ?? [],
-        refs: refs.map((n) => ({ id: n.id, name: n.name, source: n.source })),
+        refs: citedNodes.map((n) => ({ id: n.id, name: n.name, source: n.source })),
+        semanticDegraded,
       };
       const withAi = [...nextMsgs, aiMsg];
       setMessages(withAi);
@@ -973,7 +1013,13 @@ export default function NesioChatSheet({
                     ))}
                   </div>
                 )}
-                {/* 批次 38:引用卡 —— 答案基于的记忆,点开可回看/阅读/回复(邮件多一颗直达回复) */}
+                {/* 🔴#2:语义检索降级的可见失败态 —— 明确区分"AI 未配置只用了关键词"与"真没数据" */}
+                {!isUser && msg.semanticDegraded && (
+                  <p className="nesio-chat-degraded-hint">
+                    {L(dict, '语义检索未启用(缺 AI 配置),这次只用了关键词匹配 —— 跨语言的记录(如英文邮件)可能没找全。', 'Semantic search is off (AI not configured); only keyword matching was used — cross-language records (e.g. English email) may be missed.')}
+                  </p>
+                )}
+                {/* 批次 38:引用卡 —— 模型自报引用的记忆,点开可回看/阅读/回复(邮件多一颗直达回复) */}
                 {!isUser && msg.refs && msg.refs.length > 0 && (() => {
                   const g = getLifeGraph();
                   const live = msg.refs!.map((r) => ({ ref: r, node: g.find((n) => n.id === r.id) })).filter((x) => x.node);

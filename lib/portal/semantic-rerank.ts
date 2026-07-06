@@ -92,14 +92,26 @@ async function fetchVectors(texts: string[]): Promise<Array<number[] | null> | n
   } catch { return null; }
 }
 
+export interface RerankResult {
+  nodes: LifeNode[];
+  /** true only when embeddings were actually fetched + applied; false = degraded to text order. */
+  semantic: boolean;
+}
+
 /**
  * Re-rank `nodes` (already text-ranked by smartSearch) by blending text rank
  * with embedding similarity: final = 0.5·rankScore + 0.5·cosine.
  * Returns the input unchanged when embeddings are unavailable.
  */
 export async function semanticRerank(query: string, nodes: LifeNode[], topK = 12): Promise<LifeNode[]> {
+  return (await semanticRerankMeta(query, nodes, topK)).nodes;
+}
+
+/** Same as semanticRerank but also reports whether embeddings were actually used,
+ *  so callers can distinguish "semantic search off (AI not configured)" from "no data". */
+export async function semanticRerankMeta(query: string, nodes: LifeNode[], topK = 12): Promise<RerankResult> {
   const q = query.trim();
-  if (!q || nodes.length < 3) return nodes;
+  if (!q || nodes.length < 3) return { nodes, semantic: false };
 
   const pool = nodes.slice(0, Math.min(nodes.length, 20));
   const db = await openDb();
@@ -118,7 +130,7 @@ export async function semanticRerank(query: string, nodes: LifeNode[], topK = 12
 
   const texts = [q, ...missing.map((m) => m.text)];
   const fetched = await fetchVectors(texts);
-  if (!fetched || !fetched[0]) return nodes; // endpoint unavailable — keep text order
+  if (!fetched || !fetched[0]) return { nodes, semantic: false }; // endpoint unavailable — keep text order
 
   const queryVec = fetched[0];
   const toStore: Array<[string, CacheEntry]> = [];
@@ -139,5 +151,8 @@ export async function semanticRerank(query: string, nodes: LifeNode[], topK = 12
   });
 
   const reranked = scored.sort((a, b) => b.score - a.score).map((s) => s.node);
-  return [...reranked, ...nodes.slice(pool.length)].slice(0, Math.max(topK, reranked.length));
+  return {
+    nodes: [...reranked, ...nodes.slice(pool.length)].slice(0, Math.max(topK, reranked.length)),
+    semantic: true,
+  };
 }
