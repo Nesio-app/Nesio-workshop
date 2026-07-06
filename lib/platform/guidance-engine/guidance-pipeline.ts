@@ -24,7 +24,7 @@ import { getActionWindow } from './action-window';
 import { buildAction } from './actionability';
 import { L } from '@/lib/portal/i18n';
 import { getConsequenceSeverity } from './consequence-rules';
-import { interruptPriority, worthInterrupting } from './interrupt-evaluator';
+import { interruptPriority, interruptPriorityRaw, worthInterrupting } from './interrupt-evaluator';
 import { computeAttentionBudget, passesBudgetGate } from './attention-budget';
 import { loadCoolingStore, isOnCooldown, recordShown, saveCoolingStore } from './cooling-store';
 
@@ -206,7 +206,7 @@ export function runGuidancePipeline(input: GuidancePipelineInput): GuidanceCard[
     input.goodHours && input.goodHours.length > 0 && !input.goodHours.includes(now.getHours()),
   );
 
-  const candidates: Array<{ card: GuidanceCard; priority: number; urgency: WindowUrgency }> = [];
+  const candidates: Array<{ card: GuidanceCard; priority: number; priorityRaw: number; urgency: WindowUrgency }> = [];
   const seenTypes = new Set<string>();
 
   // Pre-filter: drop events whose action window has already closed (card would be stale).
@@ -241,6 +241,9 @@ export function runGuidancePipeline(input: GuidancePipelineInput): GuidanceCard[
     if (seenTypes.has(event.type)) continue;
     seenTypes.add(event.type);
 
+    // Rank by the raw 0-100 score (full precision); band to 0-10 only for the
+    // hour-fit gate and for display on the card.
+    const priorityRaw = interruptPriorityRaw(severity, urgency, event.type, event.source, confidence);
     const priority = interruptPriority(severity, urgency, event.type, event.source, confidence);
 
     // Hour-fit gate: outside receptive hours, only severity-3 or high-priority cards show
@@ -251,6 +254,7 @@ export function runGuidancePipeline(input: GuidancePipelineInput): GuidanceCard[
 
     candidates.push({
       priority,
+      priorityRaw,
       urgency,
       card: {
         id: `guidance-${event.id}`,
@@ -269,9 +273,18 @@ export function runGuidancePipeline(input: GuidancePipelineInput): GuidanceCard[
     });
   }
 
-  // Sort by priority desc — TODAY_CARD_BUDGET is the single arbiter (PRD TODAY-003)
+  // Sort by RAW priority desc (full precision — never the 0-10 band, which ties);
+  // tie-break by urgency, then soonest-expiring first. TODAY_CARD_BUDGET is the
+  // single arbiter of how many survive (PRD TODAY-003).
+  const URGENCY_RANK: Record<WindowUrgency, number> = { critical: 4, high: 3, medium: 2, low: 1, closed: 0 };
   const result = candidates
-    .sort((a, b) => b.priority - a.priority)
+    .sort((a, b) => {
+      if (b.priorityRaw !== a.priorityRaw) return b.priorityRaw - a.priorityRaw;
+      if (URGENCY_RANK[b.urgency] !== URGENCY_RANK[a.urgency]) return URGENCY_RANK[b.urgency] - URGENCY_RANK[a.urgency];
+      const ax = a.card.expiresAt ? new Date(a.card.expiresAt).getTime() : Infinity;
+      const bx = b.card.expiresAt ? new Date(b.card.expiresAt).getTime() : Infinity;
+      return ax - bx; // sooner expiry wins the last tie
+    })
     .slice(0, TODAY_CARD_BUDGET)
     .map((c) => c.card);
 

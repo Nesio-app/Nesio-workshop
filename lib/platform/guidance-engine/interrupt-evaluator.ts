@@ -1,16 +1,24 @@
 /**
  * Interrupt Evaluator — Layer 4
  *
- * 5-dimension priority scoring (based on Future Guidance Engine spec, 2026-07):
+ * Weighted priority scoring (based on Future Guidance Engine spec, 2026-07):
  *
- *   Risk Severity    30% — how bad is it if the user does nothing?
- *   Time Sensitivity 25% — how urgent is the action window right now?
- *   Preparation Value 20% — how much better is acting now vs later?
- *   Confidence       15% — how reliable is the underlying data source?
- *   Personal Relevance 10% — how relevant to this specific user?
+ *   Risk Severity    30% — how bad is it if the user does nothing?   [dynamic: severity]
+ *   Time Sensitivity 25% — how urgent is the action window right now? [dynamic: urgency]
+ *   Preparation Value 20% — how much better is acting now vs later?   [static: type table]
+ *   Confidence       15% — how reliable is the underlying data?       [per-event]
+ *   Personal Relevance 10% — relevance to this user                   [static: source proxy]
  *
- * Final score = weighted sum (0-100) / 10 → 0-10.
- * SHOW_THRESHOLD = 4. Cards below this threshold are suppressed.
+ * Honest scope: of the "5 dimensions", risk + time are situation-dynamic and
+ * confidence is per-event (≈70% responds to the situation); preparation-value
+ * and personal-relevance are constant type/source lookup tables (relevance is a
+ * source proxy, pending learned per-user signals — Layer 7). So it's ~3 dynamic
+ * inputs + 2 constant tables, not 5 independent situational axes.
+ *
+ * Precision (2026-07): rank by the RAW 0-100 score (interruptPriorityRaw); band to
+ * 0-10 (interruptPriority) ONLY for the show-threshold and for display. Rounding to
+ * 0-10 before ranking collapsed most cards into ties → order degraded to insertion
+ * order, exactly where differentiation matters most.
  *
  * Research basis: design spec docs/design/future-guidance-engine.md §12
  */
@@ -79,9 +87,13 @@ function personalRelevanceScore(source: GuidanceSource): number {
 
 // ── Final score ───────────────────────────────────────────────────────────────
 
-const SHOW_THRESHOLD = 4; // 0-10 scale
+const SHOW_THRESHOLD = 4; // 0-10 band
 
-export function interruptPriority(
+/**
+ * Raw weighted priority, 0-100, full precision. This is the ranking key —
+ * sort candidates by this, never by the 0-10 band (see precision note above).
+ */
+export function interruptPriorityRaw(
   severity: ConsequenceSeverity,
   urgency: WindowUrgency,
   type: GuidanceEventType,
@@ -90,14 +102,27 @@ export function interruptPriority(
 ): number {
   if (urgency === 'closed') return 0;
 
-  const raw =
+  return (
     riskSeverityScore(severity)      * 0.30 +
     timeSensitivityScore(urgency)    * 0.25 +
     preparationValueScore(type)      * 0.20 +
     confidence                       * 0.15 +
-    personalRelevanceScore(source)   * 0.10;
+    personalRelevanceScore(source)   * 0.10
+  );
+}
 
-  return Math.round(raw / 10); // normalize to 0-10
+/**
+ * Display/threshold band, 0-10 (raw rounded). Use for the show-threshold and for
+ * showing a priority tier — do NOT rank by this (it collapses cards into ties).
+ */
+export function interruptPriority(
+  severity: ConsequenceSeverity,
+  urgency: WindowUrgency,
+  type: GuidanceEventType,
+  source: GuidanceSource,
+  confidence: number = 75,
+): number {
+  return Math.round(interruptPriorityRaw(severity, urgency, type, source, confidence) / 10);
 }
 
 export function worthInterrupting(

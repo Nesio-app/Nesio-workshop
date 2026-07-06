@@ -134,11 +134,16 @@ assert.match(
   /buildTodayViewModel\(\{ canUsePrivateData,[\s\S]*cloudSignals/,
   'TodayFeed must derive Today cards and memory notes through the gated TodayViewModel.',
 );
-assert.match(
-  todayFeed,
-  /<DailyBriefCard[\s\S]*canUsePrivateData=\{canUsePrivateData\}[\s\S]*memoryNotes=\{memoryNotes\}/,
-  'DailyBriefCard must receive gated memoryNotes from TodayFeed.',
-);
+// 听简报卡在批次 40 从 Today 下架,停在路线图(待开发)。若它回归 Today,
+// 隐私门不能绕过:必须仍然只收 gated 的 canUsePrivateData + memoryNotes。
+// DailyBriefCard.tsx 自身的门(上面 97-122 行)始终强制,故停用期间也不漏。
+if (/<DailyBriefCard/.test(todayFeed)) {
+  assert.match(
+    todayFeed,
+    /<DailyBriefCard[\s\S]*canUsePrivateData=\{canUsePrivateData\}[\s\S]*memoryNotes=\{memoryNotes\}/,
+    'DailyBriefCard, when rendered in TodayFeed, must receive gated memoryNotes.',
+  );
+}
 assertBefore(
   memoryTab,
   'visibleMemoryNodes',
