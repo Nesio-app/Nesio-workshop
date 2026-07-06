@@ -24,9 +24,11 @@ import { getActionWindow } from './action-window';
 import { buildAction } from './actionability';
 import { L } from '@/lib/portal/i18n';
 import { getConsequenceSeverity } from './consequence-rules';
-import { interruptPriority, interruptPriorityRaw, worthInterrupting } from './interrupt-evaluator';
+import { interruptPriority, worthInterrupting, featureDims } from './interrupt-evaluator';
 import { computeAttentionBudget, passesBudgetGate } from './attention-budget';
 import { loadCoolingStore, isOnCooldown, recordShown, saveCoolingStore } from './cooling-store';
+import { rankerScore, recordShownFeatures, type GuidanceFeatures } from './guidance-ranker';
+import { getMirrorProfile, getDomainWeight } from '@/lib/portal/mirror-profile';
 
 // Compute when a card's action window closes and the card becomes irrelevant.
 // Google Now principle: a boarding-pass card disappears when the plane departs.
@@ -206,7 +208,11 @@ export function runGuidancePipeline(input: GuidancePipelineInput): GuidanceCard[
     input.goodHours && input.goodHours.length > 0 && !input.goodHours.includes(now.getHours()),
   );
 
-  const candidates: Array<{ card: GuidanceCard; priority: number; priorityRaw: number; urgency: WindowUrgency }> = [];
+  // 批次 52:在线学习排序器要用的两个自适应特征,一次算好(该时段互动度 / 该类卡采纳度)。
+  const mirror = getMirrorProfile();
+  const hourFit = mirror.hourEngagement[now.getHours()] ?? 0.5;
+
+  const candidates: Array<{ card: GuidanceCard; priority: number; rScore: number; feats: GuidanceFeatures; urgency: WindowUrgency }> = [];
   const seenTypes = new Set<string>();
 
   // Pre-filter: drop events whose action window has already closed (card would be stale).
@@ -241,20 +247,27 @@ export function runGuidancePipeline(input: GuidancePipelineInput): GuidanceCard[
     if (seenTypes.has(event.type)) continue;
     seenTypes.add(event.type);
 
-    // Rank by the raw 0-100 score (full precision); band to 0-10 only for the
-    // hour-fit gate and for display on the card.
-    const priorityRaw = interruptPriorityRaw(severity, urgency, event.type, event.source, confidence);
+    // 0-10 band 仍用于时段门与卡片展示;排序改用在线学习器的分。
     const priority = interruptPriority(severity, urgency, event.type, event.source, confidence);
 
     // Hour-fit gate: outside receptive hours, only severity-3 or high-priority cards show
     if (offHours && severity < 3 && priority < 6) continue;
+
+    // 批次 52:特征 = 5 维(归一)+ hourFit + domainFit;排序分由学习器给(冷启动=旧公式)。
+    const feats: GuidanceFeatures = {
+      ...featureDims(severity, urgency, event.type, event.source, confidence),
+      hourFit,
+      domainFit: getDomainWeight(event.type),
+    };
+    const rScore = rankerScore(feats);
     const icon = event.type === 'email_signal' && typeof event.payload.icon === 'string'
       ? event.payload.icon
       : EVENT_ICON[event.type] ?? '📋';
 
     candidates.push({
       priority,
-      priorityRaw,
+      rScore,
+      feats,
       urgency,
       card: {
         id: `guidance-${event.id}`,
@@ -273,20 +286,22 @@ export function runGuidancePipeline(input: GuidancePipelineInput): GuidanceCard[
     });
   }
 
-  // Sort by RAW priority desc (full precision — never the 0-10 band, which ties);
-  // tie-break by urgency, then soonest-expiring first. TODAY_CARD_BUDGET is the
-  // single arbiter of how many survive (PRD TODAY-003).
+  // 批次 52:按在线学习器的分排序(冷启动=旧公式,之后从反馈里偏移);
+  // 并列再按 urgency → 最近到期。TODAY_CARD_BUDGET 仍是唯一"出几张"的裁决者(PRD TODAY-003)。
   const URGENCY_RANK: Record<WindowUrgency, number> = { critical: 4, high: 3, medium: 2, low: 1, closed: 0 };
-  const result = candidates
+  const ranked = candidates
     .sort((a, b) => {
-      if (b.priorityRaw !== a.priorityRaw) return b.priorityRaw - a.priorityRaw;
+      if (b.rScore !== a.rScore) return b.rScore - a.rScore;
       if (URGENCY_RANK[b.urgency] !== URGENCY_RANK[a.urgency]) return URGENCY_RANK[b.urgency] - URGENCY_RANK[a.urgency];
       const ax = a.card.expiresAt ? new Date(a.card.expiresAt).getTime() : Infinity;
       const bx = b.card.expiresAt ? new Date(b.card.expiresAt).getTime() : Infinity;
       return ax - bx; // sooner expiry wins the last tie
     })
-    .slice(0, TODAY_CARD_BUDGET)
-    .map((c) => c.card);
+    .slice(0, TODAY_CARD_BUDGET);
+  const result = ranked.map((c) => c.card);
+
+  // 批次 52:出卡时暂存特征 —— 用户反馈到达时(recordCardFeedback)据此做一次在线更新。
+  for (const c of ranked) recordShownFeatures(c.card.id, c.feats, c.card.type);
 
   // Record shown → update cooling state
   if (result.length > 0) {

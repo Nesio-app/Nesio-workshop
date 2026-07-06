@@ -17,6 +17,7 @@ import { scoreCalendarEvents } from '@/lib/platform/attention-engine';
 import type { EmailSignal } from '@/lib/platform/email-signals';
 import { loadDormantStore, evaluateDormancy, type DormantStore } from '@/lib/platform/dormant-engine';
 import { runGuidancePipeline } from '@/lib/platform/guidance-engine/guidance-pipeline';
+import { applyGuidanceFeedback, type GuidanceFeedback } from '@/lib/platform/guidance-engine/guidance-ranker';
 import { getEnergyState } from '@/lib/platform/energy-state';
 import type { RecommendationCard } from '@/lib/portal/reasoning-engine';
 import { getBestInterruptionHours } from '@/lib/portal/mirror-profile';
@@ -263,10 +264,18 @@ export function useTodayData(canUsePrivateData: boolean) {
     }
 
     const refresh = () => { void applyViewModel(); };
+    // 批次 52:卡片反馈 → 在线学习排序器做一次更新(reasoning-engine 保持无依赖叶子,
+    // 走它派发的 nesio-feedback-recorded 事件,不反向 import)。
+    const onFeedback = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { cardId?: string; feedback?: string } | undefined;
+      if (detail?.cardId) applyGuidanceFeedback(detail.cardId, detail.feedback as GuidanceFeedback);
+      refresh();
+    };
     window.addEventListener('nesio-life-graph-updated', refresh);
     window.addEventListener('nesio-connectors-refreshed', refresh);
     window.addEventListener('nesio-weather-updated', refresh);
     window.addEventListener('nesio-calendar-updated', refresh);
+    window.addEventListener('nesio-feedback-recorded', onFeedback);
 
     return () => {
       cancelled = true;
@@ -275,6 +284,7 @@ export function useTodayData(canUsePrivateData: boolean) {
       window.removeEventListener('nesio-connectors-refreshed', refresh);
       window.removeEventListener('nesio-weather-updated', refresh);
       window.removeEventListener('nesio-calendar-updated', refresh);
+      window.removeEventListener('nesio-feedback-recorded', onFeedback);
     };
   }, [canUsePrivateData]);
 

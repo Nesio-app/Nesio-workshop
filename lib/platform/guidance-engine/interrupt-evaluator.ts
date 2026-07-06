@@ -134,3 +134,24 @@ export function worthInterrupting(
 ): boolean {
   return interruptPriority(severity, urgency, type, source, confidence) >= SHOW_THRESHOLD;
 }
+
+/**
+ * 批次 52:把 5 个维度归一到 [0,1],作为在线学习排序器(guidance-ranker)的特征。
+ * 这样 dot([.30,.25,.20,.15,.10], dims) === interruptPriorityRaw/100(同序),
+ * 学习器冷启动即复刻现公式。
+ */
+export function featureDims(
+  severity: ConsequenceSeverity,
+  urgency: WindowUrgency,
+  type: GuidanceEventType,
+  source: GuidanceSource,
+  confidence: number = 75,
+): { risk: number; time: number; prep: number; confidence: number; relevance: number } {
+  return {
+    risk: riskSeverityScore(severity) / 100,
+    time: timeSensitivityScore(urgency) / 100,
+    prep: preparationValueScore(type) / 100,
+    confidence: confidence / 100,
+    relevance: personalRelevanceScore(source) / 100,
+  };
+}
