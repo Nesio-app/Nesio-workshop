@@ -4,6 +4,8 @@
  * This is the foundation for Reasoning Engine and Today Feed.
  */
 
+import { findByExternalId } from './external-id.mjs';
+
 export type LifeNodeType =
   | 'person'
   | 'object'
@@ -728,6 +730,14 @@ export function prunePrivateExternalNodes(): number {
     }
   }
   return removed;
+}
+
+// 稳定外部 id 逻辑见 ./external-id.mjs(纯函数,有行为测试)。
+export { externalIdOf } from './external-id.mjs';
+
+/** 按 (source + 外部 id) 找已存在的节点;用于重同步幂等。 */
+export function findNodeByExternalId(source: LifeNodeSource, extId: string): LifeNode | null {
+  return findByExternalId(loadAll(), source, extId) as LifeNode | null;
 }
 
 export function addLifeNode(node: Omit<LifeNode, 'id' | 'createdAt'>): LifeNode {

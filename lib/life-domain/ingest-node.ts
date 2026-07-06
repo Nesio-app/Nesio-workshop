@@ -15,15 +15,40 @@
  * 规则:组件层今后禁止直调 addLifeNode——用本函数或 createSignal。
  */
 
-import { addLifeNode, type LifeNode } from '@/lib/portal/life-graph';
+import { addLifeNode, updateLifeNode, externalIdOf, findNodeByExternalId, type LifeNode } from '@/lib/portal/life-graph';
 import { lifeNodeToSignal } from './signal';
 import { signalWriteMode, writeCloudSignal } from './create-signal';
 import { appendSignalIdb } from './signal-store-idb';
 
 export type IngestNodeInput = Omit<LifeNode, 'id' | 'createdAt'>;
 
+/**
+ * 统一写入门(带幂等):带稳定外部 id 的条目(Gmail message / Notion 页 / 日历事件…)
+ * 重同步时**更新已存在的节点而非新建**,把去重下沉到这里 —— 修「同步 100 行 Notion
+ * 三次 = 300 个节点」。无外部 id 的(手动/语音等)照常新建。
+ */
 export function ingestLifeNode(input: IngestNodeInput): LifeNode {
-  const node = addLifeNode(input);
+  const extId = externalIdOf(input.attributes as Record<string, unknown> | undefined);
+  const existing = extId ? findNodeByExternalId(input.source, extId) : null;
+
+  let node: LifeNode;
+  if (existing) {
+    // 就地更新(保留 id/createdAt),合并 attributes、刷新名字/类型/标签/正文/关系。
+    const attributes = { ...existing.attributes, ...input.attributes };
+    updateLifeNode(existing.id, {
+      name: input.name,
+      type: input.type,
+      attributes,
+      tags: input.tags,
+      relations: input.relations,
+      rawInput: input.rawInput,
+      confidence: input.confidence,
+    });
+    node = { ...existing, ...input, id: existing.id, createdAt: existing.createdAt, attributes };
+  } else {
+    node = addLifeNode(input);
+  }
+
   const signal = lifeNodeToSignal(node);
   void appendSignalIdb(signal);
   if (signalWriteMode() === 'cloud_mirror_pending') {
