@@ -49,6 +49,8 @@ export function FocusCardDetail({
   const [completedActions, setCompletedActions] = useState<string[]>([]);
   const [waveIndex, setWaveIndex] = useState(0);
   const [unlocking, setUnlocking] = useState(false);
+  // 可见失败纪律:AI 分解失败/为空时显式提示 + 重试,不静默退回起始态。
+  const [error, setError] = useState<string | null>(null);
 
   const isMeeting = isMeetingNode(node);
   const meetingUrl = getMeetingUrl(node);
@@ -56,6 +58,7 @@ export function FocusCardDetail({
 
   async function fetchWave(previousAction?: string, history: string[] = []) {
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch('/api/portal/decompose-task', {
         method: 'POST',
@@ -79,8 +82,13 @@ export function FocusCardDetail({
         setWave(actions);
         setWaveIndex((w) => w + 1);
         setDrillMap(new Map());
+      } else {
+        // 明确区分失败:不是"没点上",是这次没生成成功。
+        setError(L(dict, '这次没能拆解成功,点重试再来一次。', "Couldn't break it down this time — tap retry."));
       }
-    } catch { /* ignore */ }
+    } catch {
+      setError(L(dict, '网络异常,拆解没成功,请重试。', 'Network error — breakdown failed, please retry.'));
+    }
     setLoading(false);
   }
 
@@ -163,8 +171,9 @@ export function FocusCardDetail({
             {L(dict, '直达链接', 'Open link')}
           </a>
         )}
+        {error && <p className="nesio-momentum-error" style={{ color: 'var(--status-risk)', fontSize: '0.8rem', margin: '0 0 0.5rem' }}>{error}</p>}
         <button type="button" className="nesio-momentum-ignite-btn" onClick={() => fetchWave()}>
-          {L(dict, '粉碎任务', 'Smash it')}
+          {error ? L(dict, '重试', 'Retry') : L(dict, '粉碎任务', 'Smash it')}
         </button>
         {onFocusMode && (
           <button type="button" className="nesio-collapsed-focus-btn" onClick={onFocusMode}>

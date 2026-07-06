@@ -117,6 +117,7 @@ export default function TimelineTab() {
     setGeoBusy(true);
     let done = 0;
     let ok = 0;
+    let failed = 0; // 请求彻底失败(网络/服务)的次数,用于区分"解析成功但没国家"和"根本没请求成功"
     for (const c of targets) {
       setGeoMsg(L(dict, `正在解析… ${done}/${targets.length}(约 ${Math.ceil((targets.length - done) * 1.1)} 秒)`, `Resolving… ${done}/${targets.length}`));
       try {
@@ -126,13 +127,20 @@ export default function TimelineTab() {
           setPlaceGeo(c.label, { name: data.name, city: data.city, country: data.country });
           if (data.name && c.generic && displayLabel(c.label) === c.label) setPlaceAlias(c.label, data.name);
           if (data.country) ok += 1;
+        } else if (data.ok === false) {
+          failed += 1;
         }
-      } catch { /* 单个失败跳过 */ }
+      } catch { failed += 1; }
       done += 1;
       await new Promise((r) => setTimeout(r, 1100)); // Nominatim 限速 ~1/s
     }
     setGeoBusy(false);
-    setGeoMsg(L(dict, `完成 · 解析 ${targets.length} 个,拿到国家的 ${ok} 个`, `Done · ${targets.length} places, ${ok} with country`));
+    // 可见失败纪律:全失败时明确说是服务/网络异常,而不是含糊的"完成 · 0 个"。
+    if (failed === targets.length) {
+      setGeoMsg(L(dict, '解析服务暂时不可用(网络或限流),请稍后重试', 'Geocoding service unavailable (network or rate limit) — please retry later'));
+    } else {
+      setGeoMsg(L(dict, `完成 · 解析 ${targets.length} 个,拿到国家的 ${ok} 个${failed ? `,${failed} 个失败` : ''}`, `Done · ${targets.length} places, ${ok} with country${failed ? `, ${failed} failed` : ''}`));
+    }
   }
 
   const pts = journey.filter((it): it is Extract<JourneyItem, { kind: 'visit' }> => it.kind === 'visit').map((it) => it.seg).filter((s) => s.lat != null && s.lon != null);

@@ -46,7 +46,12 @@ export default function RewardsWarehouse() {
       setFlash(L(dict, `🎁 兑换成功:${r.title}`, `🎁 Redeemed: ${r.title}`));
       setTimeout(() => setFlash(''), 2200);
       refresh();
+      return;
     }
+    // 其它失败(奖励已被删/未找到等):别让"兑换"点了没反应,给通用提示并刷新。
+    setFlash(L(dict, '兑换没成功,请刷新后重试', "Redemption failed — refresh and try again"));
+    setTimeout(() => setFlash(''), 2200);
+    refresh();
   }
 
   function onAddManual() {

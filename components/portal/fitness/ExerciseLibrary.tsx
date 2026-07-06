@@ -16,6 +16,7 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import type { PlayerStep } from './WorkoutPlayer';
+import { useSheetDismiss } from '@/lib/portal/use-sheet-dismiss';
 
 const HOLD_IDS = new Set(['side-plank', 'deadbug', 'prone-swimmer', 'cat-cow', '9090']);
 function defaultItem(ex: Exercise): WorkoutItem {
@@ -35,6 +36,8 @@ export default function ExerciseLibrary({ open, onClose }: { open: boolean; onCl
   const [draft, setDraft] = useState<WorkoutItem[]>([]);
   const [flash, setFlash] = useState('');
 
+  useSheetDismiss(open, onClose);
+
   if (!open) return null;
 
   const list = filterExercises({ muscle, equip, move });
@@ -48,6 +51,9 @@ export default function ExerciseLibrary({ open, onClose }: { open: boolean; onCl
     if (!draft.length) return;
     const steps: PlayerStep[] = draft.map((d) => ({ ...d, restSec: 45 }));
     window.dispatchEvent(new CustomEvent('nesio-start-workout', { detail: { name: L(dict, '自由组合', 'Custom set'), steps } }));
+    // 开练后收起动作库、清草稿(和 save 一致),否则 WorkoutPlayer 关掉后动作库还开着、草稿还在。
+    setDraft([]);
+    onClose();
   };
 
   const save = () => {
