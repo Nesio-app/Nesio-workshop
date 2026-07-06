@@ -11,6 +11,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Delta, FeedbackDonut, FunnelSteps, InsightCard, SmartnessRadar, TopEventsChart, TrendChart, type DailyPoint } from './MetricsCharts';
 import { UserAccess } from './UserAccess';
 import { GovernancePanel } from './GovernancePanel';
+import { AnalystCard } from './AnalystCard';
 
 const SECRET_KEY = 'nesio_admin_secret';
 const RANGES = [7, 14, 30] as const;
@@ -198,6 +199,9 @@ export default function AdminPage() {
               )}
             </section>
           )}
+
+          {/* ── 分析师日报(替你读整个面板:精简要点 + 重要预警) ── */}
+          <AnalystCard secret={typeof window !== 'undefined' ? localStorage.getItem(SECRET_KEY) || '' : ''} />
 
           {/* ── 洞察与建议(规则引擎替你先看一遍) ── */}
           <section style={{ marginBottom: '0.9rem' }}>
