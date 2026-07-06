@@ -177,10 +177,19 @@ export function getRecentMoments(nodes: LifeNode[], n = 30): LifeNode[] {
 export function buildMomentSummary(
   moments: LifeNode[],
 ): Array<{ e: string; v: number; h: number; d: number }> {
-  return moments.map((nd) => ({
-    e: (nd.attributes?.emotion as string) ?? 'unknown',
-    v: (nd.attributes?.energyValue as number) ?? 50,
-    h: (nd.attributes?.hourOfDay as number) ?? 12,
-    d: (nd.attributes?.dayOfWeek as number) ?? 0,
-  }));
+  return moments
+    // 只保留至少标了情绪或精力的 moment —— 纯文字、没标情绪/精力的不该被当成"中性/精力50"
+    // 的真实样本,否则会拉平情绪趋势、稀释疲劳信号。
+    .filter((nd) => nd.attributes?.emotion !== undefined || nd.attributes?.energyValue !== undefined)
+    .map((nd) => {
+      // 时段/星期缺失时从真实时间戳推,而不是魔法值 12点/周日。
+      const created = new Date(nd.createdAt);
+      const validTs = !Number.isNaN(created.getTime());
+      return {
+        e: (nd.attributes?.emotion as string) ?? 'unknown',
+        v: typeof nd.attributes?.energyValue === 'number' ? nd.attributes.energyValue : 50,
+        h: typeof nd.attributes?.hourOfDay === 'number' ? nd.attributes.hourOfDay : (validTs ? created.getHours() : 12),
+        d: typeof nd.attributes?.dayOfWeek === 'number' ? nd.attributes.dayOfWeek : (validTs ? created.getDay() : 0),
+      };
+    });
 }
