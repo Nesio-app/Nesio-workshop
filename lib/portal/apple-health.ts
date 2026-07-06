@@ -242,7 +242,7 @@ export interface HealthMetric {
   prevDate?: string;       // 上一次的日期(用于提示"较 X 前",避免拿一年前读数当"较上次")
   unit: string;
   decimals: number;
-  group: 'activity' | 'heart' | 'body' | 'vitals' | 'mind';
+  group: 'activity' | 'heart' | 'body' | 'vitals' | 'mind' | 'nutrition';
   series: Array<{ ym: string; v: number }>; // 批次 40:按月历史序列(画多年趋势曲线)
 }
 
@@ -285,6 +285,7 @@ const PLAUSIBLE_RANGE: Record<string, [number, number]> = {
   spo2: [50, 100], respiratory: [3, 60], bpSys: [50, 270], bpDia: [25, 200],
   glucose: [20, 700], bodyTemp: [30, 45], weight: [2, 500], bodyFat: [1, 70],
   bmi: [8, 90], leanMass: [2, 200], height: [30, 260],
+  wristTemp: [30, 45], walkingSteadiness: [0, 100], walkingSpeed: [0, 20], // B
 };
 function plausible(key: string, v: number): boolean {
   const r = PLAUSIBLE_RANGE[key];
@@ -323,6 +324,18 @@ const METRIC_DEFS: MetricDef[] = [
   { key: 'height', hk: 'HKQuantityTypeIdentifierHeight', label: ['身高', 'Height'], unit: 'cm', decimals: 0, agg: 'latest', group: 'body' },
   { key: 'sleep', hk: 'HKCategoryTypeIdentifierSleepAnalysis', label: ['睡眠', 'Sleep'], unit: 'h', decimals: 1, agg: 'sleep', group: 'mind' },
   { key: 'mindful', hk: 'HKCategoryTypeIdentifierMindfulSession', label: ['正念', 'Mindfulness'], unit: 'min', decimals: 0, agg: 'mindful', group: 'mind' },
+  // ── 批次 43(B):现成便宜指标 —— 加 def 即出卡,不新增解析结构 ──
+  { key: 'standTime', hk: 'HKQuantityTypeIdentifierAppleStandTime', label: ['站立时长', 'Stand time'], unit: 'min', decimals: 0, agg: 'sumDay', group: 'activity' },
+  { key: 'walkingSpeed', hk: 'HKQuantityTypeIdentifierWalkingSpeed', label: ['步行速度', 'Walking speed'], unit: 'km/h', decimals: 1, agg: 'latest', group: 'activity' },
+  { key: 'walkingSteadiness', hk: 'HKQuantityTypeIdentifierAppleWalkingSteadiness', label: ['步行稳定性', 'Walking steadiness'], unit: '%', decimals: 0, agg: 'latest', group: 'activity' },
+  { key: 'daylight', hk: 'HKQuantityTypeIdentifierTimeInDaylight', label: ['日照时长', 'Time in daylight'], unit: 'min', decimals: 0, agg: 'sumDay', group: 'mind' },
+  { key: 'wristTemp', hk: 'HKQuantityTypeIdentifierAppleSleepingWristTemperature', label: ['睡眠腕温', 'Sleeping wrist temp'], unit: '°C', decimals: 1, agg: 'latest', group: 'vitals' },
+  { key: 'dietEnergy', hk: 'HKQuantityTypeIdentifierDietaryEnergyConsumed', label: ['摄入热量', 'Dietary energy'], unit: 'kcal', decimals: 0, agg: 'sumDay', group: 'nutrition' },
+  { key: 'dietProtein', hk: 'HKQuantityTypeIdentifierDietaryProtein', label: ['蛋白质', 'Protein'], unit: 'g', decimals: 0, agg: 'sumDay', group: 'nutrition' },
+  { key: 'dietCarbs', hk: 'HKQuantityTypeIdentifierDietaryCarbohydrates', label: ['碳水', 'Carbs'], unit: 'g', decimals: 0, agg: 'sumDay', group: 'nutrition' },
+  { key: 'dietFat', hk: 'HKQuantityTypeIdentifierDietaryFatTotal', label: ['脂肪', 'Fat'], unit: 'g', decimals: 0, agg: 'sumDay', group: 'nutrition' },
+  { key: 'dietCaffeine', hk: 'HKQuantityTypeIdentifierDietaryCaffeine', label: ['咖啡因', 'Caffeine'], unit: 'mg', decimals: 0, agg: 'sumDay', group: 'nutrition' },
+  { key: 'dietWater', hk: 'HKQuantityTypeIdentifierDietaryWater', label: ['饮水', 'Water'], unit: 'L', decimals: 1, agg: 'sumDay', group: 'nutrition' },
 ];
 
 // 按 XML 里明写的 unit 把值换算到该指标的规范单位(METRIC_DEFS.unit)。
@@ -346,14 +359,24 @@ function convertUnit(key: string, v: number, unit: string): number {
       if (u === 'm') return v * 100;
       return v; // cm
     case 'bodyTemp': // → °C
+    case 'wristTemp': // B:睡眠腕温同样 degF→°C
       if (u === 'degf' || u === '°f' || u === 'f') return (v - 32) * 5 / 9;
       return v; // degC
     case 'glucose': // → mg/dL
       if (u.includes('mmol')) return v * 18.0182;
       return v; // mg/dL
     case 'activeEnergy': // → kcal
+    case 'dietEnergy': // B:摄入热量同样 kJ→kcal
       if (u === 'kj') return v / 4.184;
       return v; // kcal/Cal
+    case 'walkingSpeed': // B → km/h
+      if (u === 'mi/hr' || u === 'mph') return v * 1.609344;
+      if (u === 'm/s') return v * 3.6;
+      return v; // km/hr
+    case 'dietWater': // B → L
+      if (u === 'ml') return v / 1000;
+      if (u === 'fl_oz_us' || u === 'floz' || u === 'fl oz') return v * 0.0295735;
+      return v; // L
     default:
       return v; // 计数/百分比/bpm/mmHg 等单位无关,原样
   }

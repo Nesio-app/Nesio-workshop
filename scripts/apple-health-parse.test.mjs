@@ -44,6 +44,10 @@ const xml = `
 <Record type="HKQuantityTypeIdentifierRestingHeartRate" sourceName="Watch" unit="bpm" value="58" startDate="${iso(d2)}" endDate="${iso(d2)}"/>
 <Record type="HKQuantityTypeIdentifierOxygenSaturation" sourceName="Watch" unit="%" value="9999" startDate="${iso(d2)}" endDate="${iso(d2)}"/>
 <Record type="HKQuantityTypeIdentifierBloodGlucose" sourceName="Dexcom" unit="mmol<180.15588000005408>/L" creationDate="${iso(d2)}" startDate="${iso(d2)}" endDate="${iso(d2)}" value="5.5"/>
+<Record type="HKQuantityTypeIdentifierAppleStandTime" sourceName="Watch" unit="min" value="120" startDate="${iso(d2)}" endDate="${iso(d2)}"/>
+<Record type="HKQuantityTypeIdentifierDietaryEnergyConsumed" sourceName="App" unit="kJ" value="8368" startDate="${iso(d2)}" endDate="${iso(d2)}"/>
+<Record type="HKQuantityTypeIdentifierWalkingSpeed" sourceName="Watch" unit="mi/hr" value="3" startDate="${iso(d2)}" endDate="${iso(d2)}"/>
+<Record type="HKQuantityTypeIdentifierAppleSleepingWristTemperature" sourceName="Watch" unit="degF" value="96.8" startDate="${iso(d2)}" endDate="${iso(d2)}"/>
 <Workout workoutActivityType="HKWorkoutActivityTypeRunning" duration="30" startDate="${iso(d2)}" endDate="${iso(d2)}"/>
 `;
 const { metrics, nodes } = AH.parseHealthFromBytes(new TextEncoder().encode(xml));
@@ -60,6 +64,12 @@ assert.ok(get('restingHR').latest === 58, '静息心率保留');
 // 截断整条记录、丢掉其后的 startDate/value → 血糖被当脏值全丢。修复后应正确抽取并换算 mmol→mg/dL。
 assert.ok(get('glucose'), '血糖被提取(摩尔单位不再截断记录)');
 assert.ok(Math.abs(get('glucose').latest - 99) < 1.5, `mmol→mg/dL(5.5mmol/L≈99mg/dL),实得 ${get('glucose')?.latest}`);
+
+// ── 批次 43(B):现成便宜指标 —— 单位换算正确、按天/最新聚合正确。
+assert.equal(get('standTime').latest, 120, 'B:站立时长 sumDay');
+assert.ok(Math.abs(get('dietEnergy').latest - 2000) < 1, `B:摄入热量 kJ→kcal(8368kJ≈2000kcal),实得 ${get('dietEnergy')?.latest}`);
+assert.ok(Math.abs(get('walkingSpeed').latest - 4.828) < 0.05, `B:步速 mi/hr→km/h(3→4.83),实得 ${get('walkingSpeed')?.latest}`);
+assert.ok(Math.abs(get('wristTemp').latest - 36.0) < 0.2, `B:腕温 degF→°C(96.8°F≈36°C),实得 ${get('wristTemp')?.latest}`);
 
 const summary = nodes.find((n) => n.type === 'health_state');
 assert.ok(summary && /步/.test(summary.rawInput) && /体重/.test(summary.rawInput), '概况节点全文件包含步数+体重');
