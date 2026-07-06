@@ -96,6 +96,34 @@
   (localStorage baohe_personal_lab),与 URL `?baohePersonal=1` 等价
 - **命名消歧**:两个 DEC(lib/intelligence/dec.ts 决策引擎 vs lib/portal/dec-data-*
   运营数据目录)物理改名被否决(公开 URL + 契约钉文件名),以头注释 + STATE.md 词典消歧
+- **AI key 统一解析(2026-07 新增)**:同一把 Gemini key 全仓有 4 个 env 别名
+  (GEMINI_API_KEY / GOOGLE_GENERATIVE_AI_API_KEY / GOOGLE_AI_API_KEY / GOOGLE_API_KEY),
+  各路由手读自己的子集 → 读窄了的路由即使 key 已配也静默走兜底(health-insight 中招)。
+  新增 `lib/portal/ai-keys.ts`(resolveAiKeys/resolveAiKey,别名组与 ai-provider-router-contract
+  一致,有测试钉住两处一致),health-insight/decompose-task/insights/embed 改用它。
+  **欠账**:signal-embedding(life-domain 层)仍窄读 —— 它 import portal 会违反分层熔断,
+  待 ai-keys 下沉到共享低层后再收(embeddings 受 SIGNAL_EMBEDDINGS_ENABLED flag 门控,低优先)。
+
+## 8. 健康洞察系统(原 PRD 未覆盖,2026-07 新增 —— 下版 PRD 应吸收)
+
+原 PRD 只有健康数据的浅层展示。2026-07 把「洞察 → 健康」升级为完整的挖掘 + 分析系统,
+验收项 HEALTH-001~006(见 prd-acceptance-map.json)。走「医疗级」四层路线:
+**已发表共识/指南编码成确定性规则,大模型只做沟通**(不训练自有模型、不靠通用大模型的记忆)。
+
+| 层 | 做什么 | 实现 |
+|---|---|---|
+| ① 标准指标 | 用领域已定的指标+阈值 | 血糖 TIR/GMI/CV(GlucoseAnalysis)、睡眠分期(AASM 参考) |
+| ② 模式识别 | 专科医生一眼看出来的模式(确定性算法,非 ML) | health-clinical.ts:黎明现象、TBR 低血糖红旗、深睡偏低、静息心率/HRV 偏离基线 |
+| ③ 风险分层 | 已验证的临床评分 | health-risk.ts:VO₂max 体适能常模(ACSM/Cooper)、BMI(WHO)、GMI→eA1c(ADA);数据齐才算。ASCVD/FINDRISC 待完整血脂+血压+吸烟史 |
+| ④ 指南接地叙事 | LLM 只沟通,数据围栏、引用、不诊断 | health-insight 路由 + health-guidelines.ts:按 ②③ 判定 id 检索策展指南语料,注入 <guidelines> 让 AI 引用出处。当前是「策展语料+主题键检索」(非向量库);向量 embedding RAG 为后续 |
+
+- **每日事实表**(DailyFact)是跨板块分析地基;跨域相关(mineRelationships)+ AI 叙事在其上。
+- **引擎/知识分离**:health-clinical.ts 用声明式 RULES(知识)+ 通用 evaluate(引擎)。
+  换板块(财务等)只换 RULES;公共引擎抽取等有第二个板块再做(避免过早抽象)。
+- **边界**:达到「指南级/专家共识级」(有出处、确定性、不诊断、红旗转诊),
+  非监管意义的「医疗级(SaMD)」——后者需临床验证+认证,单独决策。
+- **交接踩坑修复**:睡眠总时长虚高(分期段与概况段重叠被重复求和)、
+  mmol/L 血糖被摩尔单位 `mmol<...>/L` 里字面 `>` 截断而整类丢失 —— 均已修+回归测试。
 
 ## 7. 遗留欠账(下版 PRD 应吸收)
 

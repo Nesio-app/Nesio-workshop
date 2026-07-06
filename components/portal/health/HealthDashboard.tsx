@@ -8,7 +8,7 @@
 
 import { useEffect, useState } from 'react';
 import { loadHealthMetrics } from '@/lib/portal/health-store';
-import type { HealthMetric, HealthMetrics } from '@/lib/portal/apple-health';
+import type { HealthMetric, HealthMetrics, GlucoseAnalysis, SleepStages, ActivityRings, MoodAnalysis } from '@/lib/portal/apple-health';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -16,6 +16,11 @@ import TrainingPlan from './TrainingPlan';
 import { computeFitnessInsight, type FitnessInsight } from '@/lib/platform/fitness-integrator';
 import { loadTrainingState, sessionsThisWeek, protocolById } from '@/lib/platform/training-protocol-engine';
 import { healthNarrative, analyzeSeries } from '@/lib/portal/health-narrative';
+import { mineRelationships } from '@/lib/portal/health-correlations';
+import { loadClinical, type StoredClinical } from '@/lib/portal/clinical-store';
+import { readLaunchSurfaceContextFromBrowser } from '@/lib/portal/launch-surface.mjs';
+import { evaluateHealthFindings, type Severity } from '@/lib/portal/health-clinical';
+import { computeRiskScores, type RiskCategory } from '@/lib/portal/health-risk';
 
 const TREND_HEADLINE: Record<FitnessInsight['trend'], [string, string]> = {
   up: ['体能上升中', 'Fitness rising'], flat: ['体能维持中', 'Holding steady'], down: ['体能下降中', 'Fitness dipping'], unknown: ['数据积累中', 'Gathering data'],
@@ -45,6 +50,7 @@ const GROUPS: Array<{ key: HealthMetric['group']; zh: string; en: string }> = [
   { key: 'heart', zh: '心脏与体能', en: 'Heart & fitness' },
   { key: 'vitals', zh: '生命体征', en: 'Vitals' },
   { key: 'body', zh: '身体成分', en: 'Body' },
+  { key: 'nutrition', zh: '营养', en: 'Nutrition' },
   { key: 'mind', zh: '身心', en: 'Mind & body' },
 ];
 
@@ -83,6 +89,277 @@ function gapLabel(m: HealthMetric, dict: string): string {
   return L(dict, `较 ${months} 个月前`, `vs ${months}mo ago`);
 }
 
+// 批次 42(A):血糖深度卡 —— 密集(CGM/指尖血)数据不再只显示「最新一个读数」。
+// TIR(时间在目标范围)+ 变异系数 + GMI + 每日 min–max 范围带 + 目标区间带。
+function GlucoseCard({ g, dict }: { g: GlucoseAnalysis; dict: string }) {
+  const dec = g.unit === 'mmol/L' ? 1 : 0;
+  const f = (v: number) => (dec === 0 ? Math.round(v).toString() : v.toFixed(1));
+  const daily = g.daily;
+  const lo = Math.min(g.targetLow, ...daily.map((d) => d.min));
+  const hi = Math.max(g.targetHigh, ...daily.map((d) => d.max));
+  const range = hi - lo || 1;
+  const W = 100, H = 44;
+  const y = (v: number) => H - ((v - lo) / range) * H;
+  const x = (i: number) => (daily.length > 1 ? (i / (daily.length - 1)) * W : W / 2);
+  return (
+    <div className="nesio-health-card" style={{ gridColumn: '1 / -1' }}>
+      <span className="nesio-health-card-label">{L(dict, '血糖 · 深度', 'Glucose · deep')}</span>
+      <span className="nesio-health-card-value">{f(g.avg)}<span className="nesio-health-card-unit">{g.unit} {L(dict, '平均', 'avg')}</span></span>
+
+      {/* TIR 三段条:低于 / 在范围 / 高于目标 */}
+      <div style={{ display: 'flex', height: 10, borderRadius: 5, overflow: 'hidden', margin: '0.5rem 0 0.35rem', background: 'var(--portal-line)' }}>
+        {g.belowPct > 0 && <div style={{ width: `${g.belowPct}%`, background: 'var(--status-risk)' }} />}
+        <div style={{ width: `${g.tirPct}%`, background: 'var(--status-go)' }} />
+        {g.abovePct > 0 && <div style={{ width: `${g.abovePct}%`, background: 'var(--status-gentle)' }} />}
+      </div>
+      <div style={{ display: 'flex', gap: '0.75rem', fontSize: '0.7rem', color: 'var(--portal-muted)', flexWrap: 'wrap' }}>
+        <span><b style={{ color: 'var(--status-go)' }}>{g.tirPct}%</b> {L(dict, '达标', 'in range')}</span>
+        {g.belowPct > 0 && <span><b style={{ color: 'var(--status-risk)' }}>{g.belowPct}%</b> {L(dict, '偏低', 'low')}</span>}
+        {g.abovePct > 0 && <span><b style={{ color: 'var(--status-gentle)' }}>{g.abovePct}%</b> {L(dict, '偏高', 'high')}</span>}
+        <span>GMI <b>{g.gmi}%</b></span>
+        <span>{L(dict, '波动', 'CV')} <b>{g.cv}%</b></span>
+      </div>
+
+      {/* 每日 min–max 范围带 + 平均点,叠目标区间带 */}
+      {daily.length >= 2 && (
+        <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="44" preserveAspectRatio="none" style={{ marginTop: '0.5rem', overflow: 'visible' }}>
+          <rect x="0" y={y(g.targetHigh)} width={W} height={Math.max(0, y(g.targetLow) - y(g.targetHigh))} fill="var(--status-go-soft)" />
+          {daily.map((d, i) => (
+            <line key={d.date} x1={x(i)} x2={x(i)} y1={y(d.min)} y2={y(d.max)} stroke="var(--portal-accent-soft-md)" strokeWidth="2.4" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+          ))}
+          <polyline points={daily.map((d, i) => `${x(i).toFixed(1)},${y(d.avg).toFixed(1)}`).join(' ')} fill="none" stroke="var(--portal-blue-deep)" strokeWidth="1.6" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+        </svg>
+      )}
+      <span className="nesio-health-card-range">
+        {L(dict, `近 ${daily.length} 天 · ${g.count.toLocaleString()} 条读数 · 目标 ${f(g.targetLow)}–${f(g.targetHigh)}`, `${daily.length}d · ${g.count.toLocaleString()} readings · target ${f(g.targetLow)}–${f(g.targetHigh)}`)}
+      </span>
+    </div>
+  );
+}
+
+// 批次 44(C):活动三环 —— Move/Exercise/Stand vs 目标(横向进度条,清爽且色彩在设计系统内)。
+function ActivityRingsCard({ a, dict }: { a: ActivityRings; dict: string }) {
+  const rings: Array<{ label: [string, string]; v: number; goal: number; unit: string; color: string }> = [
+    { label: ['活动', 'Move'], v: a.move, goal: a.moveGoal, unit: 'kcal', color: 'var(--status-gentle)' },
+    { label: ['锻炼', 'Exercise'], v: a.exercise, goal: a.exerciseGoal, unit: 'min', color: 'var(--status-go)' },
+    { label: ['站立', 'Stand'], v: a.stand, goal: a.standGoal, unit: 'h', color: 'var(--status-calm)' },
+  ];
+  return (
+    <div className="nesio-health-card" style={{ gridColumn: '1 / -1' }}>
+      <span className="nesio-health-card-label">{L(dict, '活动三环', 'Activity rings')} · {a.date.slice(5).replace('-', '/')}</span>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+        {rings.map((r) => {
+          const pct = r.goal > 0 ? Math.min(100, Math.round((r.v / r.goal) * 100)) : 0;
+          return (
+            <div key={r.label[0]}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--portal-muted)', marginBottom: 2 }}>
+                <span>{L(dict, r.label[0], r.label[1])}</span>
+                <span><b style={{ color: r.color }}>{r.v}</b>{r.goal > 0 ? ` / ${r.goal} ${r.unit}` : ` ${r.unit}`}{r.goal > 0 ? ` · ${pct}%` : ''}</span>
+              </div>
+              <div style={{ height: 8, borderRadius: 4, background: 'var(--portal-line)', overflow: 'hidden' }}>
+                <div style={{ width: `${pct}%`, height: '100%', background: r.color }} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// 批次 44(C):睡眠分期 —— 最近一晚 Deep/Core/REM/清醒 堆叠条 + 图例。
+function SleepStagesCard({ s, dict }: { s: SleepStages; dict: string }) {
+  const segs: Array<{ label: [string, string]; v: number; color: string }> = [
+    { label: ['深睡', 'Deep'], v: s.deep, color: 'var(--portal-blue-deep)' },
+    { label: ['核心', 'Core'], v: s.core, color: 'var(--portal-cool-accent)' },
+    { label: ['REM', 'REM'], v: s.rem, color: 'var(--status-calm)' },
+    { label: ['清醒', 'Awake'], v: s.awake, color: 'var(--portal-muted)' },
+  ];
+  const denom = s.total + s.awake || 1;
+  return (
+    <div className="nesio-health-card" style={{ gridColumn: '1 / -1' }}>
+      <span className="nesio-health-card-label">{L(dict, '睡眠分期', 'Sleep stages')} · {s.night.slice(5).replace('-', '/')}</span>
+      <span className="nesio-health-card-value">{s.total.toFixed(1)}<span className="nesio-health-card-unit">h {L(dict, '实际睡着', 'asleep')}</span></span>
+      <div style={{ display: 'flex', height: 10, borderRadius: 5, overflow: 'hidden', margin: '0.5rem 0 0.4rem', background: 'var(--portal-line)' }}>
+        {segs.filter((g) => g.v > 0).map((g) => <div key={g.label[0]} style={{ width: `${(g.v / denom) * 100}%`, background: g.color }} />)}
+      </div>
+      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', fontSize: '0.7rem', color: 'var(--portal-muted)' }}>
+        {segs.map((g) => (
+          <span key={g.label[0]}><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: g.color, marginRight: 4, verticalAlign: 'middle' }} />{L(dict, g.label[0], g.label[1])} {g.v.toFixed(1)}h</span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// 批次 45(D1):情绪(State of Mind)—— 平均效价 + 基调 + 近 90 天日均序列。
+function MoodCard({ mood, dict }: { mood: MoodAnalysis; dict: string }) {
+  const toneColor = mood.tone === 'pleasant' ? 'var(--status-go)' : mood.tone === 'unpleasant' ? 'var(--status-gentle)' : 'var(--status-calm)';
+  const toneLabel: Record<MoodAnalysis['tone'], [string, string]> = {
+    pleasant: ['偏积极', 'Pleasant'], neutral: ['中性', 'Neutral'], unpleasant: ['偏低落', 'Low'],
+  };
+  const d = mood.daily;
+  const W = 100, H = 26, mid = H / 2;
+  const yv = (v: number) => mid - (v * mid); // valence -1..1 → 底/顶
+  const pts = d.map((p, i) => `${(d.length > 1 ? (i / (d.length - 1)) * W : 0).toFixed(1)},${yv(p.valence).toFixed(1)}`).join(' ');
+  return (
+    <div className="nesio-health-card" style={{ gridColumn: '1 / -1' }}>
+      <span className="nesio-health-card-label">{L(dict, '情绪 · State of Mind', 'Mood · State of Mind')}</span>
+      <span className="nesio-health-card-value" style={{ color: toneColor }}>{L(dict, toneLabel[mood.tone][0], toneLabel[mood.tone][1])}<span className="nesio-health-card-unit">{L(dict, `效价 ${mood.avgValence > 0 ? '+' : ''}${mood.avgValence}`, `valence ${mood.avgValence > 0 ? '+' : ''}${mood.avgValence}`)}</span></span>
+      {d.length >= 2 && (
+        <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="26" preserveAspectRatio="none" style={{ marginTop: '0.4rem', overflow: 'visible' }}>
+          <line x1="0" x2={W} y1={mid} y2={mid} stroke="var(--portal-line)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+          <polyline points={pts} fill="none" stroke={toneColor} strokeWidth="1.6" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+        </svg>
+      )}
+      <span className="nesio-health-card-range">{L(dict, `近 ${d.length} 天 · ${mood.count} 次记录`, `${d.length}d · ${mood.count} logs`)}</span>
+    </div>
+  );
+}
+
+// 批次 47(E2):AI 跨数据叙事 —— 在 E 的确定性关系之上生成人话建议(走 guardAiRoute)。
+// 每个异步动作必有可见失败态 + 重试(设计红线)。
+function AiInsightPanel({ data, dict }: { data: HealthMetrics; dict: string }) {
+  const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
+  const [text, setText] = useState('');
+
+  async function run() {
+    setStatus('loading');
+    try {
+      const rels = data.daily ? mineRelationships(data.daily) : [];
+      const g = data.glucose;
+      const sleepDays = (data.daily || []).map((f) => f.sleepH).filter((v): v is number => v != null);
+      const summary = {
+        ...(g ? { glucose: { avg: g.avg, unit: g.unit, tirPct: g.tirPct, gmi: g.gmi, cv: g.cv } } : {}),
+        ...(sleepDays.length ? { sleepAvgH: Math.round((sleepDays.reduce((s, v) => s + v, 0) / sleepDays.length) * 10) / 10 } : {}),
+        ...(data.mood ? { moodTone: data.mood.tone } : {}),
+        ...(() => { const r = data.metrics.find((m) => m.key === 'restingHR'); return r ? { restingHR: r.latest } : {}; })(),
+      };
+      // ④:把 ②指南判定 + ③风险评分(带 id)一起送,路由据 id 检索指南要点接地。
+      const findings = [
+        ...evaluateHealthFindings({ glucose: data.glucose, sleepStages: data.sleepStages, metrics: data.metrics })
+          .map((f) => ({ id: f.id, title: f.title, detail: f.detail, source: f.source })),
+        ...computeRiskScores({ metrics: data.metrics, glucose: data.glucose, profile: data.profile })
+          .map((s) => ({ id: s.id, title: s.label, detail: [`${s.value} · ${s.detail[0]}`, `${s.value} · ${s.detail[1]}`] as [string, string], source: s.source })),
+      ];
+      const res = await fetch('/api/portal/health-insight', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ locale: dict === 'en' ? 'en' : 'zh', relationships: rels, summary, findings }),
+      });
+      if (!res.ok) throw new Error(String(res.status));
+      const j = await res.json() as { ok?: boolean; text?: string };
+      if (!j.ok || !j.text) throw new Error('empty');
+      setText(j.text); setStatus('done');
+    } catch {
+      setStatus('error');
+    }
+  }
+
+  return (
+    <div className="nesio-fit-panel" style={{ marginTop: '0.6rem' }}>
+      <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>{L(dict, 'AI 综合解读', 'AI synthesis')}</p>
+      {status === 'done' ? (
+        <>
+          {text.split('\n').filter(Boolean).map((line, i) => <p key={i} className="nesio-health-story-line">{line}</p>)}
+          <button type="button" className="nesio-connector-connect" style={{ marginTop: '0.4rem', background: 'var(--portal-accent-soft)', color: 'var(--portal-blue-deep)' }} onClick={() => void run()}>{L(dict, '重新生成', 'Regenerate')}</button>
+        </>
+      ) : status === 'error' ? (
+        <>
+          <p className="nesio-health-story-line" style={{ color: 'var(--status-risk)' }}>{L(dict, '生成失败,请重试。', 'Failed to generate. Please retry.')}</p>
+          <button type="button" className="nesio-connector-connect" style={{ marginTop: '0.2rem' }} onClick={() => void run()}>{L(dict, '重试', 'Retry')}</button>
+        </>
+      ) : (
+        <button type="button" className="nesio-connector-connect" disabled={status === 'loading'} onClick={() => void run()}>
+          {status === 'loading' ? L(dict, '生成中…', 'Generating…') : L(dict, '让 AI 解读我的健康数据', 'Let AI interpret my health data')}
+        </button>
+      )}
+      <p className="nesio-settings-option-hint" style={{ margin: '0.3rem 0 0' }}>{L(dict, '基于上面已算出的关系,数据只发给模型生成建议,不下诊断', 'Built on the relationships above; not a diagnosis')}</p>
+    </div>
+  );
+}
+
+// 批次 48(D2):临床记录卡(化验单/用药/诊断)—— 仅 lab 模式渲染,本机存储的敏感数据。
+function ClinicalCard({ c, dict }: { c: StoredClinical; dict: string }) {
+  const flagColor = (f?: string) => (f === 'high' ? 'var(--status-gentle)' : f === 'low' ? 'var(--status-calm)' : 'var(--portal-ink)');
+  return (
+    <div>
+      <p className="nesio-settings-section-label" style={{ marginTop: '1rem' }}>
+        {L(dict, '临床记录', 'Clinical records')} <span className="nesio-connector-soon" style={{ background: 'var(--portal-accent-soft)', color: 'var(--portal-blue-deep)' }}>Lab</span>
+      </p>
+      {c.labs.length > 0 && (
+        <div className="nesio-health-card" style={{ gridColumn: '1 / -1' }}>
+          <span className="nesio-health-card-label">{L(dict, `化验单 · ${c.labs.length} 项`, `Labs · ${c.labs.length}`)}</span>
+          <div style={{ marginTop: '0.4rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+            {c.labs.slice(0, 20).map((lab, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', fontSize: '0.74rem' }}>
+                <span style={{ color: 'var(--portal-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lab.name}</span>
+                <span style={{ flexShrink: 0 }}>
+                  <b style={{ color: flagColor(lab.flag) }}>{lab.value}{lab.unit ? ` ${lab.unit}` : ''}</b>
+                  {(lab.low != null || lab.high != null) && <span style={{ color: 'var(--portal-muted)', fontSize: '0.66rem' }}> ({lab.low ?? ''}–{lab.high ?? ''})</span>}
+                  {lab.date && <span style={{ color: 'var(--portal-muted)', fontSize: '0.66rem', marginLeft: 4 }}>{lab.date.slice(2)}</span>}
+                </span>
+              </div>
+            ))}
+          </div>
+          {c.labs.length > 20 && <span className="nesio-health-card-range">{L(dict, `另有 ${c.labs.length - 20} 项`, `+${c.labs.length - 20} more`)}</span>}
+        </div>
+      )}
+      {(c.medications.length > 0 || c.conditions.length > 0) && (
+        <div className="nesio-health-card" style={{ gridColumn: '1 / -1', marginTop: '0.5rem' }}>
+          {c.conditions.length > 0 && <p style={{ margin: '0 0 0.3rem', fontSize: '0.74rem' }}><span style={{ color: 'var(--portal-muted)' }}>{L(dict, '诊断:', 'Conditions: ')}</span>{c.conditions.slice(0, 12).join(' · ')}</p>}
+          {c.medications.length > 0 && <p style={{ margin: 0, fontSize: '0.74rem' }}><span style={{ color: 'var(--portal-muted)' }}>{L(dict, '用药:', 'Meds: ')}</span>{c.medications.slice(0, 12).join(' · ')}</p>}
+        </div>
+      )}
+      <p className="nesio-settings-option-hint" style={{ marginTop: '0.4rem' }}>{L(dict, '来自 Apple 健康记录(export_cda)· 仅本机 · 仅 Lab 模式可见', 'From Apple Health Records (export_cda) · on-device · Lab only')}</p>
+    </div>
+  );
+}
+
+// 批次 49:健康提示卡 —— 指南接地的确定性判定(①目标 + ②模式),依严重度着色 + 出处。
+function FindingsCard({ data, dict }: { data: HealthMetrics; dict: string }) {
+  const findings = evaluateHealthFindings({ glucose: data.glucose, sleepStages: data.sleepStages, metrics: data.metrics });
+  if (!findings.length) return null;
+  const color: Record<Severity, string> = { flag: 'var(--status-risk)', attention: 'var(--status-gentle)', info: 'var(--status-go)' };
+  const dot: Record<Severity, [string, string]> = { flag: ['需留意', 'flag'], attention: ['可关注', 'watch'], info: ['正常', 'ok'] };
+  return (
+    <div className="nesio-fit-panel" style={{ marginTop: '0.6rem' }}>
+      <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>{L(dict, '健康提示 · 依据指南', 'Health flags · guideline-based')}</p>
+      {findings.map((f) => (
+        <div key={f.id} style={{ display: 'flex', gap: '0.5rem', alignItems: 'baseline', marginBottom: '0.35rem' }}>
+          <span style={{ flexShrink: 0, minWidth: 44, fontSize: '0.62rem', fontWeight: 600, color: color[f.severity] }}>● {L(dict, dot[f.severity][0], dot[f.severity][1])}</span>
+          <span className="nesio-health-story-line" style={{ margin: 0 }}>
+            <b>{L(dict, f.title[0], f.title[1])}</b> — {L(dict, f.detail[0], f.detail[1])}
+            <span style={{ display: 'block', fontSize: '0.62rem', color: 'var(--portal-muted)' }}>{L(dict, `依据:${f.source}`, `source: ${f.source}`)}</span>
+          </span>
+        </div>
+      ))}
+      <p className="nesio-settings-option-hint" style={{ margin: '0.3rem 0 0' }}>{L(dict, '对照已发表共识/指南的规则判定,非 AI、非诊断;红旗请与医生确认', 'Rule-based against published consensus; not AI, not a diagnosis')}</p>
+    </div>
+  );
+}
+
+// 批次 50(③层):风险分层卡 —— 已验证评分(VO₂max 体适能/BMI/GMI→eA1c),数据齐才出,带出处。
+function RiskCard({ data, dict }: { data: HealthMetrics; dict: string }) {
+  const scores = computeRiskScores({ metrics: data.metrics, glucose: data.glucose, profile: data.profile });
+  if (!scores.length) return null;
+  const color: Record<RiskCategory, string> = { high: 'var(--status-risk)', moderate: 'var(--status-gentle)', low: 'var(--status-go)', info: 'var(--portal-muted)' };
+  return (
+    <div className="nesio-fit-panel" style={{ marginTop: '0.6rem' }}>
+      <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>{L(dict, '风险分层 · 已验证评分', 'Risk stratification · validated scores')}</p>
+      {scores.map((s) => (
+        <div key={s.id} style={{ marginBottom: '0.35rem' }}>
+          <p className="nesio-health-story-line" style={{ margin: 0 }}>
+            <span style={{ color: color[s.category], fontWeight: 600 }}>● </span>
+            <b>{L(dict, s.label[0], s.label[1])}</b> — <span style={{ color: color[s.category] }}>{s.value}</span>
+            <span style={{ display: 'block', fontSize: '0.62rem', color: 'var(--portal-muted)' }}>{L(dict, s.detail[0], s.detail[1])} · {L(dict, `依据:${s.source}`, `source: ${s.source}`)}</span>
+          </p>
+        </div>
+      ))}
+      <p className="nesio-settings-option-hint" style={{ margin: '0.3rem 0 0' }}>{L(dict, '对照已发表评分/常模,数据齐才计算;非诊断', 'Against published scores/norms; computed only when inputs are present; not a diagnosis')}</p>
+    </div>
+  );
+}
+
 function MetricCard({ m, dict }: { m: HealthMetric; dict: string }) {
   // prev===0 时也算 delta(如上月 0 次锻炼 → 本月 3 次是真实增长,不该被压成"无变化");
   // 只有 deltaPct 因除零需要 prev!==0。
@@ -109,11 +386,22 @@ function MetricCard({ m, dict }: { m: HealthMetric; dict: string }) {
 export default function HealthDashboard() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [data, setData] = useState<HealthMetrics | null>(null);
+  const [clinical, setClinical] = useState<StoredClinical | null>(null);
+  const [labMode, setLabMode] = useState(false);
 
   useEffect(() => {
     setData(loadHealthMetrics());
     const onUpdate = () => setData(loadHealthMetrics());
     window.addEventListener('nesio-health-updated', onUpdate);
+    // D2:临床记录仅 lab 模式加载渲染。
+    const isLab = readLaunchSurfaceContextFromBrowser().viewerRole === 'personal_lab';
+    setLabMode(isLab);
+    if (isLab) {
+      setClinical(loadClinical());
+      const onClinical = () => setClinical(loadClinical());
+      window.addEventListener('nesio-clinical-updated', onClinical);
+      return () => { window.removeEventListener('nesio-health-updated', onUpdate); window.removeEventListener('nesio-clinical-updated', onClinical); };
+    }
     return () => window.removeEventListener('nesio-health-updated', onUpdate);
   }, []);
 
@@ -138,6 +426,11 @@ export default function HealthDashboard() {
   return (
     <div className="nesio-health-dash">
       <p className="nesio-health-updated">{L(dict, `${data.metrics.length} 项指标 · 锻炼 ${data.workouts} 次 · 导入于 ${importedLabel}`, `${data.metrics.length} metrics · ${data.workouts} workouts · imported ${importedLabel}`)}</p>
+      {data.profile && (data.profile.age || data.profile.sex || data.profile.bloodType) && (
+        <p className="nesio-settings-option-hint" style={{ margin: '0.1rem 0 0' }}>
+          {[data.profile.age ? L(dict, `${data.profile.age} 岁`, `${data.profile.age}y`) : '', data.profile.sex ? L(dict, ({ male: '男', female: '女' } as Record<string, string>)[data.profile.sex] || data.profile.sex, data.profile.sex) : '', data.profile.bloodType ? L(dict, `${data.profile.bloodType} 型`, data.profile.bloodType) : ''].filter(Boolean).join(' · ')}
+        </p>
+      )}
       {insight.signals.length > 0 && <FitnessPanel insight={insight} dict={dict} />}
       {(() => {
         const story = healthNarrative(data.metrics, dict);
@@ -150,6 +443,43 @@ export default function HealthDashboard() {
           </div>
         );
       })()}
+      <FindingsCard data={data} dict={dict} />
+      <RiskCard data={data} dict={dict} />
+      {(() => {
+        const rels = data.daily ? mineRelationships(data.daily) : [];
+        if (!rels.length) return null;
+        return (
+          <div className="nesio-fit-panel" style={{ marginTop: '0.6rem' }}>
+            <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>{L(dict, '跨板块关系', 'Cross-domain relationships')}</p>
+            {rels.map((rel) => (
+              <p key={rel.key} className="nesio-health-story-line">
+                <span style={{ display: 'inline-block', minWidth: 42, fontSize: '0.62rem', fontWeight: 600, color: rel.strength === 'strong' ? 'var(--status-go)' : 'var(--portal-muted)' }}>
+                  {rel.strength === 'strong' ? L(dict, '强', 'strong') : L(dict, '中', 'mod')} · n={rel.n}
+                </span>
+                {L(dict, rel.insight[0], rel.insight[1])}
+              </p>
+            ))}
+            <p className="nesio-settings-option-hint" style={{ margin: '0.3rem 0 0' }}>{L(dict, '统计相关,非因果 · 基于你的每日数据(非 AI)', 'Statistical correlation, not causation · from your daily data (not AI)')}</p>
+          </div>
+        );
+      })()}
+      {(data.glucose || (data.daily && data.daily.length >= 7)) && <AiInsightPanel data={data} dict={dict} />}
+      {(data.activityRings || data.sleepStages || data.mood) && (
+        <div className="nesio-health-grid" style={{ marginTop: '0.6rem' }}>
+          {data.activityRings && <ActivityRingsCard a={data.activityRings} dict={dict} />}
+          {data.sleepStages && <SleepStagesCard s={data.sleepStages} dict={dict} />}
+          {data.mood && <MoodCard mood={data.mood} dict={dict} />}
+        </div>
+      )}
+      {data.glucose && (
+        <div>
+          <p className="nesio-settings-section-label" style={{ marginTop: '1rem' }}>{L(dict, '血糖', 'Glucose')}</p>
+          <div className="nesio-health-grid">
+            <GlucoseCard g={data.glucose} dict={dict} />
+          </div>
+        </div>
+      )}
+      {labMode && clinical && <ClinicalCard c={clinical} dict={dict} />}
       <TrainingPlan />
       {GROUPS.map((g) => {
         const items = data.metrics.filter((m) => m.group === g.key);
