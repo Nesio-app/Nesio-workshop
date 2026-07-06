@@ -108,6 +108,19 @@
   `ai-complete.ts`(共享客户端也曾漏 GOOGLE_AI_API_KEY/GOOGLE_API_KEY)、
   `lib/life-domain/signal-embedding.ts`、`lib/health/gemini.ts`。全仓 Gemini/Claude key
   解析现单点收敛;别名单一真源由 ai-keys.test 钉住(与 .mjs 契约一致)。
+  **第三批(2026-07-06,跨板块扫尾)**:审计发现另有 9 个路由仍窄读 Gemini key
+  (daily-brief / meeting-notes / life-state / ingest / health / notion / gmail /
+  chat / analyze)—— 全部改用 `resolveAiKey('gemini')`,至此「配了 key 却静默兜底」
+  的 bug 全仓清零。living-model(需 Sonnet,completeText 暂无 model 参数)、tts、
+  secretary(key 已全 + 契约钉响应)按判断保留。
+
+- **存储止血扩展到全部用户数据 store(2026-07-06)**:继健康 store 之后,把
+  「写失败会丢用户数据」的 13 个 store(bank-tx 财务规则、profile、routines、
+  workout、relationships、pins、place-trail、quotes、calendar-links、impulse-guard
+  冷冻仓、living-model 反馈、rewards 积分、training 进度)全部接 storage-health
+  的 `reportStorageDropped()`(设计红线:Never swallow storage write failures)。
+  可再生缓存/派生态(ai-cache、guidance cooling/ranker、energy、dormant、
+  living-model 本体、place geo、quote 轮换)按判断保留静默,不误伤。
 
 ## 8. 健康洞察系统(原 PRD 未覆盖,2026-07 新增 —— 下版 PRD 应吸收)
 
