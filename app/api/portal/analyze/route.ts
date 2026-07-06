@@ -7,7 +7,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createSignal } from '@/lib/life-domain/create-signal';
-import { writeCloudSignalsForCurrentUser } from '@/lib/platform/runtime/cloud-signals-server';
 import { normalizePhotoToSignal, normalizeVoiceToSignal } from '@/lib/life-domain/normalizers';
 import { EXTRACTION_SYSTEM_PROMPT, parseJsonBlock } from '@/lib/extraction/extraction';
 
@@ -466,9 +465,9 @@ export async function POST(req: NextRequest) {
           tags: [result.intent || 'MEMORY_CAPTURE'],
         });
     const signal = createSignal(signalInput);
-    const cloudSignalWrite = await writeCloudSignalsForCurrentUser([signal]);
-
-    return NextResponse.json({ ok: true, ...result, signals: [signal], signalIds: [signal.id], cloudSignalWrite });
+    // ⑧ 云写入统一由客户端 ingestLifeNode 负责(与 Gmail/Notion 等所有入口一致)。
+    //   此前这里服务端再写一次云信号 → 同一次捕获在云端产生两条,已去掉双写。
+    return NextResponse.json({ ok: true, ...result, signals: [signal], signalIds: [signal.id] });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'parse_error';
     return NextResponse.json({ ok: false, error: msg }, { status: 400 });

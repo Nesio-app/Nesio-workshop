@@ -708,12 +708,14 @@ function buildModelGraphEdges(model: LivingModel | null, dict: string = 'zh'): G
 function LivingModelTab({
   model,
   loading,
+  error,
   nodeCount,
   onRefresh,
   onFeedback,
 }: {
   model: LivingModel | null;
   loading: boolean;
+  error: 'ai' | 'network' | null;
   nodeCount: number;
   onRefresh: (perspectiveId?: string, perspectiveName?: string, perspectivePrompt?: string) => void;
   onFeedback: (insightId: string, verified: boolean) => void;
@@ -734,6 +736,15 @@ function LivingModelTab({
     );
   }
 
+  // ⑨ 生成失败的可见态(区分 AI 未配置/失败 vs 网络 vs 没数据);复用降级提示样式
+  const errorBanner = error ? (
+    <p className="nesio-chat-degraded-hint" style={{ margin: '0 0 0.75rem' }}>
+      {error === 'ai'
+        ? L(dict, '认知模型这次没生成成功(AI 未配置或暂时不可用)——不是没有数据。下面是上次的结果,稍后可重试。', "Mind model didn't generate (AI not configured or temporarily unavailable) — not a lack of data. Showing your last result; retry later.")
+        : L(dict, '网络异常,认知模型没刷新出来——不是没有数据。下面是上次的结果。', "Network issue — the mind model didn't refresh. Not a lack of data; showing your last result.")}
+    </p>
+  ) : null;
+
   const layerIds: LivingModelLayerId[] = ['identity', 'motivation', 'principles', 'patterns', 'blind_spots', 'evolution', 'prediction'];
   const layers = model
     ? model.layers
@@ -746,6 +757,7 @@ function LivingModelTab({
     const enough = nodeCount >= 10;
     return (
       <div className="nesio-lm-tab">
+        {errorBanner}
         <div className="nesio-lm-empty">
           <p>
             {enough
@@ -791,6 +803,7 @@ function LivingModelTab({
 
   return (
     <div className="nesio-lm-tab">
+      {errorBanner}
       <p className="nesio-lm-subtitle">
         {L(dict, '来自你的记录，每条结论都可校正。', 'From your notes — every conclusion is correctable.')}
         <InfoTip text={L(dict, '算法：类型分布 / 领域 / 完成率 / 活跃时段等行为统计交给 AI 推断；新增 8 条记录或 7 天后自动更新；你的 ✓ / ✗ 会进入下一次生成。', 'How it works: behavior stats (types / domains / completion / active hours) go to AI inference; refreshes after 8 new notes or 7 days; your ✓ / ✗ feeds the next run.')} />
@@ -949,6 +962,8 @@ export default function InsightsSheet({ onClose, canUsePrivateData = true, initi
   // Living Model
   const [livingModel, setLivingModel] = useState<LivingModel | null>(null);
   const [livingLoading, setLivingLoading] = useState(false);
+  // ⑨ 认知模型生成失败的可见态:区分「AI 未配置/失败」与「数据不够」(后者由 nodeCount 判)
+  const [livingError, setLivingError] = useState<'ai' | 'network' | null>(null);
   const livingFetchedRef = useRef(false);
 
   // Load base data
@@ -1004,6 +1019,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = true, initi
     }
 
     setLivingLoading(true);
+    setLivingError(null);
     try {
       const feedbacks = loadLivingModelFeedbacks();
       const previousInsights = cached?.layers.flatMap((l) =>
@@ -1032,9 +1048,13 @@ export default function InsightsSheet({ onClose, canUsePrivateData = true, initi
         };
         saveLivingModel(model);
         setLivingModel(model);
+      } else {
+        // AI 生成失败(未配置 key / 上游报错)—— 不是没数据。留住旧结果,显式标失败。
+        setLivingError('ai');
+        if (cached) setLivingModel(cached);
       }
     } catch {
-      /* show cached or empty */
+      setLivingError('network');
       if (cached) setLivingModel(cached);
     } finally {
       setLivingLoading(false);
@@ -1266,6 +1286,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = true, initi
           <LivingModelTab
             model={livingModel}
             loading={livingLoading}
+            error={livingError}
             nodeCount={allNodes.length}
             onRefresh={handleRefreshLiving}
             onFeedback={handleFeedback}

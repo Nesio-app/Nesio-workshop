@@ -15,15 +15,37 @@
  * 规则:组件层今后禁止直调 addLifeNode——用本函数或 createSignal。
  */
 
-import { addLifeNode, type LifeNode } from '@/lib/portal/life-graph';
+import { addLifeNode, getLifeGraph, updateLifeNode, type LifeNode } from '@/lib/portal/life-graph';
 import { lifeNodeToSignal } from './signal';
 import { signalWriteMode, writeCloudSignal } from './create-signal';
 import { appendSignalIdb } from './signal-store-idb';
 
 export type IngestNodeInput = Omit<LifeNode, 'id' | 'createdAt'>;
 
+/** ⑦ 外部稳定 id:邮件 messageId / Notion pageId。用于跨同步去重(同一封邮件/同一页只一条)。 */
+function externalKey(attrs: IngestNodeInput['attributes'] | undefined): string | null {
+  if (!attrs) return null;
+  if (typeof attrs.emailId === 'string' && attrs.emailId) return `email:${attrs.emailId}`;
+  if (typeof attrs.notionPageId === 'string' && attrs.notionPageId) return `notion:${attrs.notionPageId}`;
+  return null;
+}
+
 export function ingestLifeNode(input: IngestNodeInput): LifeNode {
-  const node = addLifeNode(input);
+  // ⑦ 去重下沉到唯一写入口:带外部 id 的输入(Gmail/Notion 重复同步)幂等 —— 命中就原地更新,
+  //   不再生成重复节点。一处修掉此前 Gmail/Notion 各自没做去重的问题。
+  const key = externalKey(input.attributes);
+  let node: LifeNode;
+  if (key) {
+    const existing = getLifeGraph().find((n) => externalKey(n.attributes) === key);
+    if (existing) {
+      updateLifeNode(existing.id, input);           // 覆盖内容(id/createdAt 保留)
+      node = { ...existing, ...input };             // input 无 id/createdAt → 沿用旧的
+    } else {
+      node = addLifeNode(input);
+    }
+  } else {
+    node = addLifeNode(input);
+  }
   const signal = lifeNodeToSignal(node);
   void appendSignalIdb(signal);
   if (signalWriteMode() === 'cloud_mirror_pending') {
