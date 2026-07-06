@@ -10,6 +10,7 @@
  *   4. 本机「联系过了」打卡(nesio-rel-contact-v1)—— 不依赖任何同步也能维护
  */
 import type { LifeNode } from './life-graph';
+import { reportStorageDropped } from './storage-health';
 
 export type Closeness = 'core' | 'close' | 'acquaintance';
 
@@ -103,7 +104,7 @@ export function markContacted(key: string, dateIso = new Date().toISOString()): 
   if (typeof window === 'undefined') return {};
   const log = loadContactLog();
   log[key] = dateIso;
-  try { localStorage.setItem(CONTACT_LOG_KEY, JSON.stringify(log)); } catch { /* quota */ }
+  try { localStorage.setItem(CONTACT_LOG_KEY, JSON.stringify(log)); } catch { reportStorageDropped(); }
   return log;
 }
 

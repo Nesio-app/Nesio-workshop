@@ -3,6 +3,8 @@
  * 从动作库自由组合出的训练存本机 `nesio-workouts-v1`。跟练播放器和健康页读它。
  */
 
+import { reportStorageDropped } from './storage-health';
+
 export interface WorkoutItem {
   exerciseId: string;
   sets: number;
@@ -30,7 +32,7 @@ export function loadWorkouts(): Workout[] {
 
 function persist(list: Workout[]): void {
   if (typeof window === 'undefined') return;
-  try { localStorage.setItem(KEY, JSON.stringify(list)); } catch { /* quota */ }
+  try { localStorage.setItem(KEY, JSON.stringify(list)); } catch { reportStorageDropped(); }
   window.dispatchEvent(new CustomEvent(WORKOUTS_UPDATED));
 }
 

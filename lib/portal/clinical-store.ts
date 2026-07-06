@@ -18,7 +18,13 @@ export function saveClinical(rec: ClinicalRecords): void {
     const payload: StoredClinical = { ...rec, importedAt: new Date().toISOString() };
     localStorage.setItem(CLINICAL_KEY, JSON.stringify(payload));
     window.dispatchEvent(new CustomEvent('nesio-clinical-updated'));
-  } catch { /* quota — ignore */ }
+    import('./storage-health').then(({ checkStorageWarning }) => checkStorageWarning());
+  } catch {
+    // 配额超限 → 写入被丢弃。绝不静默吞(设计红线:存储写失败必须可见)。
+    import('./storage-health').then(({ STORAGE_FULL_EVENT, getStorageHealth }) => {
+      window.dispatchEvent(new CustomEvent(STORAGE_FULL_EVENT, { detail: getStorageHealth() }));
+    });
+  }
 }
 
 export function loadClinical(): StoredClinical | null {

@@ -6,15 +6,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { guardAiRoute } from '@/lib/portal/api-auth';
 import { reportAiCall } from '@/lib/portal/ai-telemetry';
+import { resolveAiKey } from '@/lib/portal/ai-keys';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
 
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
-
-function envValue(key: string): string {
-  return (process.env[key] ?? '').trim();
-}
 
 interface BriefRequest {
   /** 设置→偏好→语气(warm/direct/minimal),同样作用于简报口吻 */
@@ -52,7 +49,7 @@ export async function POST(req: NextRequest) {
   const dateStr = now.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' });
   const timeStr = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
 
-  const geminiKey = envValue('GEMINI_API_KEY') || envValue('GOOGLE_GENERATIVE_AI_API_KEY');
+  const geminiKey = resolveAiKey('gemini');
 
   // ── Build context sections ──────────────────────────────────────────────────
 

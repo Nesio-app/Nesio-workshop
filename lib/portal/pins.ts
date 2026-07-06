@@ -4,6 +4,8 @@
  * 独立 store(不污染节点数据层);随完整备份的 nesio- 前缀自动纳入。
  */
 
+import { reportStorageDropped } from './storage-health';
+
 const KEY = 'nesio-pins-v1';
 export const PINS_UPDATED_EVENT = 'nesio-pins-updated';
 
@@ -19,7 +21,7 @@ export function isPinned(nodeId: string): boolean {
 export function togglePin(nodeId: string): boolean {
   const pins = loadPins();
   const next = pins.includes(nodeId) ? pins.filter((id) => id !== nodeId) : [nodeId, ...pins];
-  try { localStorage.setItem(KEY, JSON.stringify(next.slice(0, 100))); } catch { /* quota */ }
+  try { localStorage.setItem(KEY, JSON.stringify(next.slice(0, 100))); } catch { reportStorageDropped(); }
   window.dispatchEvent(new CustomEvent(PINS_UPDATED_EVENT));
   return next.includes(nodeId);
 }

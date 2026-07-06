@@ -1,4 +1,5 @@
 import type { PortalConfig } from './types';
+import { reportStorageDropped } from './storage-health';
 
 const SHOWN_KEY = 'treasurebox-quote-shown';
 const POOL_KEY = 'treasurebox-quote-pool-id';
@@ -137,7 +138,7 @@ export function saveQuotePreferences(preferences: QuotePreferences): QuotePrefer
   if (typeof window !== 'undefined') {
     try {
       localStorage.setItem(PREF_KEY, JSON.stringify(next));
-    } catch { /* ignore */ }
+    } catch { reportStorageDropped(); }
   }
   return next;
 }

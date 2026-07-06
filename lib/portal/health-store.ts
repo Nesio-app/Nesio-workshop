@@ -11,7 +11,13 @@ export function saveHealthMetrics(m: HealthMetrics): void {
   try {
     localStorage.setItem(HEALTH_KEY, JSON.stringify(m));
     window.dispatchEvent(new CustomEvent('nesio-health-updated'));
-  } catch { /* quota — ignore */ }
+    import('./storage-health').then(({ checkStorageWarning }) => checkStorageWarning());
+  } catch {
+    // 配额超限 → 写入被丢弃。健康导入体量最大、最容易撞;必须让用户可见,不静默吞(设计红线)。
+    import('./storage-health').then(({ STORAGE_FULL_EVENT, getStorageHealth }) => {
+      window.dispatchEvent(new CustomEvent(STORAGE_FULL_EVENT, { detail: getStorageHealth() }));
+    });
+  }
 }
 
 export function loadHealthMetrics(): HealthMetrics | null {

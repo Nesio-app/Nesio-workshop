@@ -4,12 +4,9 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { guardAiRoute } from '@/lib/portal/api-auth';
+import { resolveAiKey } from '@/lib/portal/ai-keys';
 
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
-
-function envValue(key: string): string {
-  return (process.env[key] ?? '').trim();
-}
 
 export const maxDuration = 30;
 export async function POST(req: NextRequest) {
@@ -22,7 +19,7 @@ export async function POST(req: NextRequest) {
     calendarEvent?: string;
   };
 
-  const geminiKey = envValue('GEMINI_API_KEY') || envValue('GOOGLE_GENERATIVE_AI_API_KEY');
+  const geminiKey = resolveAiKey('gemini');
   if (!geminiKey) {
     return NextResponse.json({ ok: false, error: 'no_gemini_key' }, { status: 503 });
   }

@@ -10,15 +10,12 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { guardAiRoute } from '@/lib/portal/api-auth';
+import { resolveAiKey } from '@/lib/portal/ai-keys';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
 
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
-
-function envValue(key: string): string {
-  return (process.env[key] ?? '').trim();
-}
 
 interface LifeStateRequest {
   displayName?: string;
@@ -43,7 +40,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json() as LifeStateRequest;
   const { displayName, dimensions, risks, opportunities } = body;
 
-  const geminiKey = envValue('GEMINI_API_KEY') || envValue('GOOGLE_GENERATIVE_AI_API_KEY');
+  const geminiKey = resolveAiKey('gemini');
   if (!geminiKey || !dimensions?.length) {
     return NextResponse.json({
       ok: true,

@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { guardAiRoute } from '@/lib/portal/api-auth';
 import { notionRowToNode, notionDbTitle, type NotionRow } from '@/lib/portal/notion-map';
+import { resolveAiKey } from '@/lib/portal/ai-keys';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -23,10 +24,6 @@ const MAX_DATABASES = 8;       // 一次最多同步几个表
 const MAX_ROWS_PER_DB = 100;   // 每个表最多取多少行(Notion 单页上限)
 const MAX_TOTAL_ROWS = 400;    // 总行数上限,防止灌爆记忆
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
-
-function envValue(key: string): string {
-  return (process.env[key] ?? '').trim();
-}
 
 interface NotionPage {
   id: string;
@@ -68,7 +65,7 @@ async function fetchPageText(token: string, pageId: string): Promise<string> {
 }
 
 async function extractNodes(pages: Array<{ title: string; text: string; url?: string }>): Promise<{ nodes: object[]; summary: string }> {
-  const geminiKey = envValue('GEMINI_API_KEY') || envValue('GOOGLE_GENERATIVE_AI_API_KEY');
+  const geminiKey = resolveAiKey('gemini');
   if (!geminiKey || !pages.length) return { nodes: [], summary: '无内容' };
 
   const docText = pages.map((p) => `页面：${p.title}\n内容：${p.text}`).join('\n\n───\n\n');

@@ -25,6 +25,14 @@ export function buildAction(event: GuidanceEvent, urgency: WindowUrgency, locale
       return { label: cta, cta, actionType: 'dismiss' };
     }
 
+    case 'health_insight': {
+      // warm-coach:不制造焦虑、不给任务式按钮。红旗给「和医生聊聊」的软提示,其余轻确认。
+      if (event.payload.severity === 'flag') {
+        return { label: l('这条来自你的健康数据,方便时可以和医生聊聊。', 'This comes from your own health data — worth a chat with a clinician when you can.'), cta: l('知道了', 'Got it'), actionType: 'dismiss' };
+      }
+      return { label: l('了解这条来自你健康数据的观察。', 'A gentle observation from your own health data.'), cta: l('知道了', 'Got it'), actionType: 'dismiss' };
+    }
+
     case 'flight':
       if (urgency === 'critical') return { label: l('现在需要出发前往机场', 'Time to leave for the airport'), cta: l('知道了', 'Got it'), actionType: 'dismiss' };
       if (urgency === 'high')     return { label: l('用航空公司 App 完成在线值机（约 1 分钟）', 'Check in online with the airline app (about 1 min)'), cta: l('去值机', 'Check in'), actionType: 'dismiss' };

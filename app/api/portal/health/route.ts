@@ -6,12 +6,9 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { guardAiRoute } from '@/lib/portal/api-auth';
+import { resolveAiKey } from '@/lib/portal/ai-keys';
 
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
-
-function envValue(key: string): string {
-  return (process.env[key] ?? '').trim();
-}
 
 // Extract key health data from Apple Health XML
 function parseHealthXmlSummary(xml: string): string {
@@ -54,7 +51,7 @@ function parseHealthXmlSummary(xml: string): string {
 }
 
 async function extractHealthNodes(text: string): Promise<object[]> {
-  const geminiKey = envValue('GEMINI_API_KEY') || envValue('GOOGLE_GENERATIVE_AI_API_KEY');
+  const geminiKey = resolveAiKey('gemini');
   if (!geminiKey) {
     // Rule-based fallback
     return parseHealthFallback(text);
