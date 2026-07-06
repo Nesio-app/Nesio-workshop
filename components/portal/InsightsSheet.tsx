@@ -240,8 +240,15 @@ function computeReflectionFacts(nodes: LifeNode[], all: LifeNode[], profile: Mir
     }
   } catch { /* ignore */ }
 
-  // 5. Top person
-  const persons = all.filter((n) => n.type === 'person').slice(0, 3);
+  // 5. Top person —— 按真实频次排序(被多少条记录的关系指到 + 自身关系数),不是插入顺序。
+  const personMentions = (p: LifeNode) =>
+    all.reduce((c, n) => c + ((n.relations || []).some((r) => r.targetId === p.id) ? 1 : 0), 0) + (p.relations?.length || 0);
+  const persons = all
+    .filter((n) => n.type === 'person')
+    .map((p) => ({ p, c: personMentions(p) }))
+    .sort((a, b) => b.c - a.c)
+    .slice(0, 3)
+    .map((x) => x.p);
   if (persons.length > 0) {
     facts.push({ icon: <IconUser size={15} />, text: L(dict, `最常出现的人：${persons.map((p) => p.name).join('、')}`, `Most frequent people: ${persons.map((p) => p.name).join(', ')}`) });
   }
@@ -258,7 +265,7 @@ function DonutChart({ data }: { data: DomainStat[] }) {
   const total = data.reduce((s, d) => s + d.count, 0);
   const R = 56; const cx = 72; const cy = 72;
   let angle = -Math.PI / 2;
-  const slices: Array<{ d: string; color: string; label: string; count: number; pct: number }> = [];
+  const slices: Array<{ d: string; color: string; label: string; count: number; pct: number; full: boolean }> = [];
 
   for (const seg of data) {
     const pct = seg.count / total;
@@ -274,6 +281,7 @@ function DonutChart({ data }: { data: DomainStat[] }) {
       label: seg.label,
       count: seg.count,
       pct: Math.round(pct * 100),
+      full: pct >= 0.999, // 单一类型占满 → 弧线起点=终点会被 SVG 忽略,改画整圆
     });
     angle += sweep;
   }
@@ -282,7 +290,9 @@ function DonutChart({ data }: { data: DomainStat[] }) {
     <div className="nesio-donut-wrap">
       <svg viewBox="0 0 144 144" width="144" height="144" className="nesio-donut-svg">
         {slices.map((s, i) => (
-          <path key={i} d={s.d} fill={s.color} opacity={0.85} />
+          s.full
+            ? <circle key={i} cx={cx} cy={cy} r={R} fill={s.color} opacity={0.85} />
+            : <path key={i} d={s.d} fill={s.color} opacity={0.85} />
         ))}
         <circle cx={cx} cy={cy} r={34} fill="var(--glass-bg-solid)" />
         <text x={cx} y={cy - 6} textAnchor="middle" fontSize="11" fill="var(--portal-ink)" fontWeight="700">{total}</text>
@@ -707,12 +717,14 @@ function buildModelGraphEdges(model: LivingModel | null, dict: string = 'zh'): G
 function LivingModelTab({
   model,
   loading,
+  error,
   nodeCount,
   onRefresh,
   onFeedback,
 }: {
   model: LivingModel | null;
   loading: boolean;
+  error?: string;
   nodeCount: number;
   onRefresh: (perspectiveId?: string, perspectiveName?: string, perspectivePrompt?: string) => void;
   onFeedback: (insightId: string, verified: boolean) => void;
@@ -746,17 +758,29 @@ function LivingModelTab({
     return (
       <div className="nesio-lm-tab">
         <div className="nesio-lm-empty">
-          <p>
-            {enough
-              ? L(dict, '记录够了，点一下生成你的认知模型。', 'Enough notes — tap once to build your mind model.')
-              : L(dict, `已记录 ${nodeCount} / 10 条，记满后 Nesio 开始推断。`, `${nodeCount} / 10 notes — Nesio starts inferring at 10.`)}
-            <InfoTip text={L(dict, '每条结论都带证据和置信度，可校正;类型分布/领域/完成率/活跃时段等行为统计交给 AI 推断,新增 8 条或 7 天后自动更新。', 'Every conclusion is evidence-backed, confidence-scored and correctable. Behavior stats (types / domains / completion / active hours) go to AI inference; refreshes after 8 new notes or 7 days.')} />
-          </p>
+          {error ? (
+            // 可见失败态:AI 未配置/生成失败,和"数据不够"明确区分(不再静默退回空态)。
+            <>
+              <p style={{ color: 'var(--status-risk)' }}>{error}</p>
+              <button type="button" className="nesio-lm-perspective-btn" style={{ marginTop: '0.6rem' }} onClick={() => onRefresh()}>
+                {L(dict, '重试', 'Retry')}
+              </button>
+            </>
+          ) : (
+            <>
+              <p>
+                {enough
+                  ? L(dict, '记录够了，点一下生成你的认知模型。', 'Enough notes — tap once to build your mind model.')
+                  : L(dict, `已记录 ${nodeCount} / 10 条，记满后 Nesio 开始推断。`, `${nodeCount} / 10 notes — Nesio starts inferring at 10.`)}
+                <InfoTip text={L(dict, '每条结论都带证据和置信度，可校正;类型分布/领域/完成率/活跃时段等行为统计交给 AI 推断,新增 8 条或 7 天后自动更新。', 'Every conclusion is evidence-backed, confidence-scored and correctable. Behavior stats (types / domains / completion / active hours) go to AI inference; refreshes after 8 new notes or 7 days.')} />
+              </p>
 
-          {enough && (
-            <button type="button" className="nesio-lm-perspective-btn" style={{ marginTop: '0.6rem' }} onClick={() => onRefresh()}>
-              {L(dict, '生成模型', 'Build model')}
-            </button>
+              {enough && (
+                <button type="button" className="nesio-lm-perspective-btn" style={{ marginTop: '0.6rem' }} onClick={() => onRefresh()}>
+                  {L(dict, '生成模型', 'Build model')}
+                </button>
+              )}
+            </>
           )}
         </div>
         {/* 七个维度:折叠组,展开可看每一层是什么 */}
@@ -948,6 +972,8 @@ export default function InsightsSheet({ onClose, canUsePrivateData = true }: { o
   // Living Model
   const [livingModel, setLivingModel] = useState<LivingModel | null>(null);
   const [livingLoading, setLivingLoading] = useState(false);
+  // 批次 14:可见失败态 —— no_api_key / api_error / 网络错误不再静默退回空态。
+  const [livingError, setLivingError] = useState<string | null>(null);
   const livingFetchedRef = useRef(false);
 
   // Load base data
@@ -1003,6 +1029,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = true }: { o
     }
 
     setLivingLoading(true);
+    setLivingError(null);
     try {
       const feedbacks = loadLivingModelFeedbacks();
       const previousInsights = cached?.layers.flatMap((l) =>
@@ -1022,8 +1049,15 @@ export default function InsightsSheet({ onClose, canUsePrivateData = true }: { o
           perspectivePrompt,
         }),
       });
-      const data = await res.json() as { ok: boolean; layers: LivingModelLayer[] };
-      if (data.ok && data.layers) {
+      const data = await res.json() as { ok: boolean; layers: LivingModelLayer[]; reason?: string };
+      // 后端在 no_api_key / api_error 时返回 ok:true + 空 layers + reason;
+      // 只看 ok && layers 会把失败伪装成"没数据"。按 reason 区分真实失败态。
+      if (data.reason === 'no_api_key') {
+        setLivingError(L(dict, 'AI 未配置，暂时无法生成认知模型。', 'AI is not configured — mind model unavailable for now.'));
+      } else if (data.reason === 'api_error') {
+        setLivingError(L(dict, '生成认知模型失败，请稍后重试。', 'Failed to build mind model — please retry later.'));
+      } else if (data.ok && data.layers) {
+        // insufficient_data 会带 fallback 空 layers,交给空态的"数据不够"文案,不算错误。
         const model: LivingModel = {
           layers: data.layers,
           generatedAt: new Date().toISOString(),
@@ -1033,12 +1067,13 @@ export default function InsightsSheet({ onClose, canUsePrivateData = true }: { o
         setLivingModel(model);
       }
     } catch {
-      /* show cached or empty */
+      // 网络错误也是可见失败,而非静默退回空态。
+      setLivingError(L(dict, '网络异常，无法连接 Nesio，请检查网络后重试。', 'Network error — could not reach Nesio. Check your connection and retry.'));
       if (cached) setLivingModel(cached);
     } finally {
       setLivingLoading(false);
     }
-  }, []);
+  }, [dict]);
 
   // Fetch living model when tab is first opened
   useEffect(() => {
@@ -1262,6 +1297,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = true }: { o
           <LivingModelTab
             model={livingModel}
             loading={livingLoading}
+            error={livingError ?? undefined}
             nodeCount={allNodes.length}
             onRefresh={handleRefreshLiving}
             onFeedback={handleFeedback}

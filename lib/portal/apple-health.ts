@@ -6,6 +6,7 @@
  */
 
 import { sleepNightKey } from './temporal-bucketing.mjs';
+import { pickLatestCompleteDay } from './health-latest.mjs';
 
 export interface HealthNode {
   type: 'health_state' | 'event';
@@ -253,6 +254,13 @@ function monthlySeriesAvg(daily: Map<string, number>, transform: (v: number) => 
     .map(([ym, b]) => ({ ym, v: Math.round((b.sum / b.count) * 10 ** dec) / 10 ** dec }));
 }
 
+/** 本机今天的 YYYY-MM-DD(本地时区)—— 用于识别残缺的导入当日。 */
+function todayLocal(): string {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
 // 多设备(iPhone + Apple Watch)会各记一份同一天的步数/距离/能量;HealthKit 只在查询时
 // 去重、XML 里不去。每天取"记得最多的那个来源"而非跨来源相加,避免总量虚高 ~1.5–2×。
 function collapseBySource(byDay: Map<string, Map<string, number>>): Map<string, number> {
@@ -334,8 +342,11 @@ class HealthAggregator {
         if (!raw || !raw.size) continue;
         const m = collapseBySource(raw); // 每天取最大来源,去多设备重复
         const days = [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-        const last = days[days.length - 1];
-        const prev = days.length > 1 ? days[days.length - 2][1] : null;
+        // Apple 导出常在半天时导出 → 最后一天(=今天,导入日)是残缺的,当"最新"会显示偏低
+        // + 吓人的负 delta(如"步数 3200 ▼ −6800")。有更早的完整日时,用最后一个完整日。
+        const picked = pickLatestCompleteDay(days, todayLocal());
+        if (!picked) continue;
+        const { last, prev } = picked;
         out.push({ ...toMetric(def), latest: round(last[1], def.decimals), latestDate: last[0], prev: prev == null ? null : round(prev, def.decimals), series: monthlySeriesAvg(m, (v) => v, def.decimals) });
       } else if (def.agg === 'latest') {
         const c = this.latest.get(def.key);
