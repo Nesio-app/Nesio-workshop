@@ -52,6 +52,7 @@ const xml = `
 <Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="Watch" value="HKCategoryValueSleepAnalysisAsleepCore" startDate="${iso(d2, 2)}" endDate="${iso(d2, 5)}"/>
 <Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="Watch" value="HKCategoryValueSleepAnalysisAsleepREM" startDate="${iso(d2, 5)}" endDate="${iso(d2, 6)}"/>
 <Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="Watch" value="HKCategoryValueSleepAnalysisAwake" startDate="${iso(d2, 6)}" endDate="${iso(d2, 6)}"/>
+<Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="Watch" value="HKCategoryValueSleepAnalysisAsleepUnspecified" startDate="${iso(d2, 1)}" endDate="${iso(d2, 6)}"/>
 <ActivitySummary dateComponents="${iso(d2).slice(0, 10)}" activeEnergyBurned="450" activeEnergyBurnedGoal="500" activeEnergyBurnedUnit="kcal" appleExerciseTime="35" appleExerciseTimeGoal="30" appleStandHours="11" appleStandHoursGoal="12"/>
 <StateOfMind startDate="${iso(d2)}" endDate="${iso(d2)}" kind="momentaryEmotion" valence="0.6"><Label value="Happy"/></StateOfMind>
 <StateOfMind startDate="${iso(d3)}" endDate="${iso(d3)}" kind="momentaryEmotion" valence="0.4"/>
@@ -84,6 +85,8 @@ assert.ok(Math.abs(get('wristTemp').latest - 36.0) < 0.2, `B:腕温 degF→°C(9
 assert.ok(metrics.sleepStages, 'C:睡眠分期生成');
 assert.ok(Math.abs(metrics.sleepStages.total - 5.0) < 0.2, `C:实际睡着≈5h(深1+核心3+REM1),实得 ${metrics.sleepStages?.total}`);
 assert.ok(Math.abs(metrics.sleepStages.deep - 1.0) < 0.2, `C:深睡 1h,实得 ${metrics.sleepStages?.deep}`);
+// 修:同一夜同一来源既有分期(5h)又有重叠通用 Asleep 段(5h)—— 睡眠总时长应=分期和 5h,不翻倍成 10h。
+assert.ok(Math.abs(get('sleep').latest - 5.0) < 0.2, `C修:睡眠总时长用分期不翻倍(应 5h,非 10h),实得 ${get('sleep')?.latest}`);
 assert.ok(metrics.activityRings, 'C:活动三环生成');
 assert.equal(metrics.activityRings.move, 450, 'C:Move 450 kcal');
 assert.equal(metrics.activityRings.exerciseGoal, 30, 'C:Exercise 目标 30 min');
