@@ -21,6 +21,7 @@ import {
   normalizeVoiceToSignal,
 } from '@/lib/life-domain/normalizers';
 import { buildSourceExtractionPrompt, parseJsonBlock, SOURCE_HINTS } from '@/lib/extraction/extraction';
+import { isRateLimited } from '@/lib/portal/api-auth';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -109,6 +110,10 @@ export async function POST(req: NextRequest) {
 
   if (!isIngestAllowed(req, body.secret)) {
     return NextResponse.json({ ok: false, error: 'ingest_auth_required' }, { status: 401 });
+  }
+  // 有鉴权但之前无限流:登录/持 secret 后可无节流打 Gemini 抽取。
+  if (isRateLimited(req, 'ingest', { limit: 30 })) {
+    return NextResponse.json({ ok: false, error: 'rate_limited', retryAfterMs: 30_000 }, { status: 429 });
   }
 
   const source = (body.source || 'generic').toLowerCase();

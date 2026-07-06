@@ -108,7 +108,8 @@ function loadWidgetConfig(): InsightWidgetId[] {
 }
 
 function saveWidgetConfig(ids: InsightWidgetId[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(ids));
+  // 兜底:配额满 / Safari 隐私模式会抛 QuotaExceededError,别让它从保存处理里冒出去。
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(ids)); } catch { /* ignore */ }
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -973,6 +974,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = true, initi
   // ⑨ 认知模型生成失败的可见态:区分「AI 未配置/失败」与「数据不够」(后者由 nodeCount 判)
   const [livingError, setLivingError] = useState<'ai' | 'network' | null>(null);
   const livingFetchedRef = useRef(false);
+  const livingSeqRef = useRef(0); // 视角切换会并发发多次请求;只认最新一次的结果,防止旧视角内容错标
 
   // Load base data
   useEffect(() => {
@@ -1026,6 +1028,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = true, initi
       return;
     }
 
+    const mySeq = ++livingSeqRef.current; // 本次请求序号
     setLivingLoading(true);
     setLivingError(null);
     try {
@@ -1048,6 +1051,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = true, initi
         }),
       });
       const data = await res.json() as { ok: boolean; layers: LivingModelLayer[] };
+      if (mySeq !== livingSeqRef.current) return; // 已被更晚的视角请求取代 → 丢弃,避免错标/错存
       if (data.ok && data.layers) {
         const model: LivingModel = {
           layers: data.layers,
@@ -1062,10 +1066,11 @@ export default function InsightsSheet({ onClose, canUsePrivateData = true, initi
         if (cached) setLivingModel(cached);
       }
     } catch {
+      if (mySeq !== livingSeqRef.current) return;
       setLivingError('network');
       if (cached) setLivingModel(cached);
     } finally {
-      setLivingLoading(false);
+      if (mySeq === livingSeqRef.current) setLivingLoading(false);
     }
   }, []);
 

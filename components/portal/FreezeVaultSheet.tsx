@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import {
   addToFreeze,
@@ -43,6 +43,7 @@ export default function FreezeVaultSheet({ open, onClose, initialUrl, initialTab
   const [flash, setFlash] = useState('');
   const [urlInput, setUrlInput] = useState(initialUrl ?? '');
   const [parsing, setParsing] = useState(false);
+  const parseSeqRef = useRef(0); // 解析序号:onBlur + 「解析」按钮可并发,只认最新一次的结果
   const [parsed, setParsed] = useState<ParsedProduct | null>(null);
   const [parseError, setParseError] = useState('');
   const [freezeHours, setFreezeHours] = useState(24);
@@ -69,6 +70,7 @@ export default function FreezeVaultSheet({ open, onClose, initialUrl, initialTab
 
   async function parseUrl(url: string) {
     if (!url.trim()) return;
+    const mySeq = ++parseSeqRef.current; // 只有最新一次解析能写结果,避免旧 URL 的响应覆盖新的
     setParsing(true);
     setParsed(null);
     setParseError('');
@@ -79,6 +81,7 @@ export default function FreezeVaultSheet({ open, onClose, initialUrl, initialTab
         body: JSON.stringify({ url }),
       });
       const data = await res.json() as { ok: boolean; title?: string; price?: string; image?: string; store?: string; description?: string; error?: string };
+      if (mySeq !== parseSeqRef.current) return; // 已被更新的解析取代 → 丢弃这个旧结果
       if (data.ok && data.title) {
         setParsed({ title: data.title, price: data.price, image: data.image, store: data.store, description: data.description });
       } else {
@@ -86,10 +89,11 @@ export default function FreezeVaultSheet({ open, onClose, initialUrl, initialTab
         setParsed({ title: url });
       }
     } catch {
+      if (mySeq !== parseSeqRef.current) return;
       setParseError(L(dict, '网络错误，可以直接填写商品名称', 'Network error — you can just type the item name'));
       setParsed({ title: url });
     } finally {
-      setParsing(false);
+      if (mySeq === parseSeqRef.current) setParsing(false);
     }
   }
 

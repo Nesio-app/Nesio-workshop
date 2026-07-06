@@ -429,20 +429,11 @@ export async function POST(req: NextRequest) {
     if (modelId === 'doubao') {
       const key = getDoubaoKey();
       if (!key) {
-        const fallbackKey = getGoogleKey();
-        if (!fallbackKey) {
-          return NextResponse.json(
-            {
-              error: 'AI not configured',
-              hint: 'Set DOUBAO_KEY or GEMINI_API_KEY in Vercel Environment Variables',
-              auditId,
-            },
-            { status: 503, headers: corsHeaders }
-          );
-        }
-        const text = await chatWithGeminiFallback(history, message, maxTokens, fallbackKey, modelId, locale);
-        logSecretaryAiAudit('secretary_ai_success', { auditId, requestedModel: modelId, provider: 'gemini', fallback: true });
-        return NextResponse.json({ text, model: 'gemini', requestedModel: modelId, fallback: true, auditId, runtime: { provider: 'gemini', requestedModel: modelId, fallback: true } }, { headers: corsHeaders });
+        // Fail-closed:显式选了豆包但没配 key → 不静默把(含个人/健康上下文的)消息发去 Google。
+        return NextResponse.json(
+          { error: 'provider_not_configured', requestedModel: modelId, hint: 'Set DOUBAO_KEY, or switch the model to Gemini.', auditId },
+          { status: 503, headers: corsHeaders },
+        );
       }
       const text = await chatWithDoubao(history, message, maxTokens, key, systemPrompt);
       logSecretaryAiAudit('secretary_ai_success', { auditId, requestedModel: modelId, provider: 'doubao', fallback: false });
@@ -452,20 +443,11 @@ export async function POST(req: NextRequest) {
     if (modelId === 'chatgpt' || modelId === 'openai') {
       const key = getOpenAIKey();
       if (!key) {
-        const fallbackKey = getGoogleKey();
-        if (!fallbackKey) {
-          return NextResponse.json(
-            {
-              error: 'AI not configured',
-              hint: 'Set OpenAI_KEY or GEMINI_API_KEY in Vercel Environment Variables',
-              auditId,
-            },
-            { status: 503, headers: corsHeaders }
-          );
-        }
-        const text = await chatWithGeminiFallback(history, message, maxTokens, fallbackKey, modelId, locale);
-        logSecretaryAiAudit('secretary_ai_success', { auditId, requestedModel: modelId, provider: 'gemini', fallback: true });
-        return NextResponse.json({ text, model: 'gemini', requestedModel: modelId, fallback: true, auditId, runtime: { provider: 'gemini', requestedModel: modelId, fallback: true } }, { headers: corsHeaders });
+        // Fail-closed:显式选了 OpenAI 但没配 key → 不静默改发 Google。
+        return NextResponse.json(
+          { error: 'provider_not_configured', requestedModel: modelId, hint: 'Set OPENAI_KEY, or switch the model to Gemini.', auditId },
+          { status: 503, headers: corsHeaders },
+        );
       }
       const text = await chatWithOpenAI(history, message, maxTokens, key, systemPrompt);
       logSecretaryAiAudit('secretary_ai_success', { auditId, requestedModel: modelId, provider: 'chatgpt', fallback: false });
@@ -475,20 +457,11 @@ export async function POST(req: NextRequest) {
     if (modelId === 'claude' || modelId === 'anthropic') {
       const key = getAnthropicKey();
       if (!key) {
-        const fallbackKey = getGoogleKey();
-        if (!fallbackKey) {
-          return NextResponse.json(
-            {
-              error: 'AI not configured',
-              hint: 'Set ANTHROPIC_API_KEY or GEMINI_API_KEY in Vercel Environment Variables',
-              auditId,
-            },
-            { status: 503, headers: corsHeaders }
-          );
-        }
-        const text = await chatWithGeminiFallback(history, message, maxTokens, fallbackKey, modelId, locale);
-        logSecretaryAiAudit('secretary_ai_success', { auditId, requestedModel: modelId, provider: 'gemini', fallback: true });
-        return NextResponse.json({ text, model: 'gemini', requestedModel: modelId, fallback: true, auditId, runtime: { provider: 'gemini', requestedModel: modelId, fallback: true } }, { headers: corsHeaders });
+        // Fail-closed:显式选了 Claude 但没配 key → 不静默改发 Google。
+        return NextResponse.json(
+          { error: 'provider_not_configured', requestedModel: modelId, hint: 'Set ANTHROPIC_API_KEY, or switch the model to Gemini.', auditId },
+          { status: 503, headers: corsHeaders },
+        );
       }
       const text = await chatWithClaude(history, message, maxTokens, key, systemPrompt);
       logSecretaryAiAudit('secretary_ai_success', { auditId, requestedModel: modelId, provider: 'claude', fallback: false });

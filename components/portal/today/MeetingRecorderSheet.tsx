@@ -53,6 +53,11 @@ export function MeetingRecorderSheet({ open, meetingNode, onClose }: {
       if (recognitionRef.current) { recognitionRef.current.stop(); recognitionRef.current = null; }
       if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
     }
+    // 卸载时(未先置 open=false 就被父组件移除)也要停麦克风和计时器,否则麦克风一直亮着。
+    return () => {
+      if (recognitionRef.current) { recognitionRef.current.stop(); recognitionRef.current = null; }
+      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    };
   }, [open]);
 
   function startRecording() {

@@ -131,7 +131,14 @@ export default function BarcodeScanSheet({ open, onClose, onResult }: {
       }
     })();
 
-    return () => { stopped = true; controls?.stop(); };
+    return () => {
+      stopped = true;
+      controls?.stop();
+      // controls 可能在 await 未完成时就卸载 → 直接停掉 video 上的媒体流轨道,否则相机灯不灭。
+      const stream = videoRef.current?.srcObject as MediaStream | null;
+      stream?.getTracks().forEach((t) => t.stop());
+      if (videoRef.current) videoRef.current.srcObject = null;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
