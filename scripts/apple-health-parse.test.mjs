@@ -43,6 +43,7 @@ const xml = `
 <Record type="HKQuantityTypeIdentifierBodyTemperature" sourceName="Therm" unit="degF" value="98.6" startDate="${iso(d3)}" endDate="${iso(d3)}"/>
 <Record type="HKQuantityTypeIdentifierRestingHeartRate" sourceName="Watch" unit="bpm" value="58" startDate="${iso(d2)}" endDate="${iso(d2)}"/>
 <Record type="HKQuantityTypeIdentifierOxygenSaturation" sourceName="Watch" unit="%" value="9999" startDate="${iso(d2)}" endDate="${iso(d2)}"/>
+<Record type="HKQuantityTypeIdentifierBloodGlucose" sourceName="Dexcom" unit="mmol<180.15588000005408>/L" creationDate="${iso(d2)}" startDate="${iso(d2)}" endDate="${iso(d2)}" value="5.5"/>
 <Workout workoutActivityType="HKWorkoutActivityTypeRunning" duration="30" startDate="${iso(d2)}" endDate="${iso(d2)}"/>
 `;
 const { metrics, nodes } = AH.parseHealthFromBytes(new TextEncoder().encode(xml));
@@ -55,6 +56,10 @@ assert.equal(get('steps').latest, 8000, '多设备取最大源(8000,非 15500)')
 assert.equal(get('spo2'), undefined, '脏值 9999 丢弃');
 assert.equal(get('heartRate'), undefined, '瞬时心率移除');
 assert.ok(get('restingHR').latest === 58, '静息心率保留');
+// 血糖 mmol/L 的单位写作 mmol<180.156>/L(字面 '<>')—— 旧正则 [^>]* 会在单位里的 '>' 处
+// 截断整条记录、丢掉其后的 startDate/value → 血糖被当脏值全丢。修复后应正确抽取并换算 mmol→mg/dL。
+assert.ok(get('glucose'), '血糖被提取(摩尔单位不再截断记录)');
+assert.ok(Math.abs(get('glucose').latest - 99) < 1.5, `mmol→mg/dL(5.5mmol/L≈99mg/dL),实得 ${get('glucose')?.latest}`);
 
 const summary = nodes.find((n) => n.type === 'health_state');
 assert.ok(summary && /步/.test(summary.rawInput) && /体重/.test(summary.rawInput), '概况节点全文件包含步数+体重');
@@ -71,6 +76,8 @@ const sGet = (k) => streamed.metrics.metrics.find((m) => m.key === k);
 assert.ok(Math.abs(sGet('weight').latest - 72.57) < 0.1, '流式:lb→kg 与整体一致');
 assert.equal(sGet('steps').latest, 8000, '流式:多设备取最大源,跨块边界不丢记录');
 assert.equal(sGet('spo2'), undefined, '流式:脏值仍丢弃');
+// 逐字节喂时,分块边界会落在 mmol<180.156>/L 里的字面 '>' 处 —— 引号感知的切分必须不把血糖切碎。
+assert.ok(sGet('glucose') && Math.abs(sGet('glucose').latest - 99) < 1.5, '流式:摩尔单位血糖跨字节边界不丢失');
 assert.equal(streamed.metrics.metrics.length, metrics.metrics.length, '流式指标数与整体一致');
 assert.equal(
   streamed.nodes.filter((n) => n.type === 'event').length,

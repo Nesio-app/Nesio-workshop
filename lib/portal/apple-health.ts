@@ -69,9 +69,13 @@ function collapseBySource(byDaySource: Map<string, Map<string, number>>): Map<st
 
 interface Rec { startDate: string; endDate: string; value: string; sourceName: string; unit: string }
 
-/** 抽取某个 HK type 的所有 <Record ...>(自闭合或带子元素的开标签都能匹配到开头)。 */
+/** 抽取某个 HK type 的所有 <Record ...>(自闭合或带子元素的开标签都能匹配到开头)。
+ *  ⚠️ 属性值可能含 '>':Apple 对摩尔浓度的单位写作 `mmol<180.15588…>/L`(血糖/部分血脂)。
+ *  故不能用 `[^>]*` 匹配整段标签 —— 会在单位里的 '>' 处截断,把其后的 startDate/value 丢掉
+ *  (value 变空→按 0 落在合理范围外被当脏值弃、startDate 变空→latest 分支跳过),
+ *  结果整类血糖一条都进不来。用「完整引号串 | 非引号非'>' 字符」重复,正确跨过引号内的 '>'。 */
 function records(xml: string, hkType: string): Rec[] {
-  const re = new RegExp(`<Record\\b[^>]*type="${hkType}"[^>]*>`, 'g');
+  const re = new RegExp(`<Record\\b(?:"[^"]*"|[^>"])*?type="${hkType}"(?:"[^"]*"|[^>"])*>`, 'g');
   const out: Rec[] = [];
   let m: RegExpExecArray | null;
   while ((m = re.exec(xml))) {
@@ -552,6 +556,20 @@ export interface HealthStreamParser {
  * 修 1GB zip 在手机上闪退(export.xml 解压后常达 10GB+,一次性装载即 OOM)。
  * 内部沿用「只处理到最后一个完整标签 '>'」的边界逻辑,跨 push 的半个 <Record> 不会被切断。
  */
+/** 找最后一个「引号外」的 '>'(真正的标签结束),跳过 Apple 摩尔单位 `mmol<180.156>/L`
+ *  里字面的 '<'/'>'。用它切分块边界,才不会把血糖等记录从单位中间切碎。
+ *  buf 始终从一个完整标签之后开始(引号外),故从头扫描的引号状态可信。 */
+function lastTagClose(s: string): number {
+  let inQuote = false;
+  let last = -1;
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    if (c === 34 /* " */) inQuote = !inQuote;
+    else if (c === 62 /* > */ && !inQuote) last = i;
+  }
+  return last;
+}
+
 export function createHealthStreamParser(): HealthStreamParser {
   const agg = new HealthAggregator();
   const dec = new TextDecoder('utf-8');
@@ -561,7 +579,9 @@ export function createHealthStreamParser(): HealthStreamParser {
     push(bytes: Uint8Array, final = false) {
       if (bytes.length) buf += dec.decode(bytes, { stream: !final });
       else if (final) buf += dec.decode(); // 冲刷多字节字符残留
-      const cut = buf.lastIndexOf('>');
+      // 只切到「引号外」的最后一个 '>':血糖单位 mmol<180.156>/L 里的字面 '>' 不算标签结束,
+      // 否则边界会把该记录切碎(startDate/value 落到下一块的孤儿尾巴里 → 整条丢失)。
+      const cut = lastTagClose(buf);
       if (cut >= 0) { agg.feed(buf.slice(0, cut + 1)); buf = buf.slice(cut + 1); }
       if (final) flush();
     },
