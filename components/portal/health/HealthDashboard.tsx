@@ -235,9 +235,16 @@ function AiInsightPanel({ data, dict }: { data: HealthMetrics; dict: string }) {
         ...(data.mood ? { moodTone: data.mood.tone } : {}),
         ...(() => { const r = data.metrics.find((m) => m.key === 'restingHR'); return r ? { restingHR: r.latest } : {}; })(),
       };
+      // ④:把 ②指南判定 + ③风险评分(带 id)一起送,路由据 id 检索指南要点接地。
+      const findings = [
+        ...evaluateHealthFindings({ glucose: data.glucose, sleepStages: data.sleepStages, metrics: data.metrics })
+          .map((f) => ({ id: f.id, title: f.title, detail: f.detail, source: f.source })),
+        ...computeRiskScores({ metrics: data.metrics, glucose: data.glucose, profile: data.profile })
+          .map((s) => ({ id: s.id, title: s.label, detail: [`${s.value} · ${s.detail[0]}`, `${s.value} · ${s.detail[1]}`] as [string, string], source: s.source })),
+      ];
       const res = await fetch('/api/portal/health-insight', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ locale: dict === 'en' ? 'en' : 'zh', relationships: rels, summary }),
+        body: JSON.stringify({ locale: dict === 'en' ? 'en' : 'zh', relationships: rels, summary, findings }),
       });
       if (!res.ok) throw new Error(String(res.status));
       const j = await res.json() as { ok?: boolean; text?: string };

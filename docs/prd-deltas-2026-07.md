@@ -108,7 +108,7 @@
 | ① 标准指标 | 用领域已定的指标+阈值 | 血糖 TIR/GMI/CV(GlucoseAnalysis)、睡眠分期(AASM 参考) |
 | ② 模式识别 | 专科医生一眼看出来的模式(确定性算法,非 ML) | health-clinical.ts:黎明现象、TBR 低血糖红旗、深睡偏低、静息心率/HRV 偏离基线 |
 | ③ 风险分层 | 已验证的临床评分 | health-risk.ts:VO₂max 体适能常模(ACSM/Cooper)、BMI(WHO)、GMI→eA1c(ADA);数据齐才算。ASCVD/FINDRISC 待完整血脂+血压+吸烟史 |
-| ④ 指南接地叙事 | LLM 只沟通,数据围栏、引用、不诊断 | health-insight 路由(guardAiRoute);RAG 语料库待做 |
+| ④ 指南接地叙事 | LLM 只沟通,数据围栏、引用、不诊断 | health-insight 路由 + health-guidelines.ts:按 ②③ 判定 id 检索策展指南语料,注入 <guidelines> 让 AI 引用出处。当前是「策展语料+主题键检索」(非向量库);向量 embedding RAG 为后续 |
 
 - **每日事实表**(DailyFact)是跨板块分析地基;跨域相关(mineRelationships)+ AI 叙事在其上。
 - **引擎/知识分离**:health-clinical.ts 用声明式 RULES(知识)+ 通用 evaluate(引擎)。
