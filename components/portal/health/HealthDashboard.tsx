@@ -17,6 +17,8 @@ import { computeFitnessInsight, type FitnessInsight } from '@/lib/platform/fitne
 import { loadTrainingState, sessionsThisWeek, protocolById } from '@/lib/platform/training-protocol-engine';
 import { healthNarrative, analyzeSeries } from '@/lib/portal/health-narrative';
 import { mineRelationships } from '@/lib/portal/health-correlations';
+import { loadClinical, type StoredClinical } from '@/lib/portal/clinical-store';
+import { readLaunchSurfaceContextFromBrowser } from '@/lib/portal/launch-surface.mjs';
 
 const TREND_HEADLINE: Record<FitnessInsight['trend'], [string, string]> = {
   up: ['体能上升中', 'Fitness rising'], flat: ['体能维持中', 'Holding steady'], down: ['体能下降中', 'Fitness dipping'], unknown: ['数据积累中', 'Gathering data'],
@@ -267,6 +269,43 @@ function AiInsightPanel({ data, dict }: { data: HealthMetrics; dict: string }) {
   );
 }
 
+// 批次 48(D2):临床记录卡(化验单/用药/诊断)—— 仅 lab 模式渲染,本机存储的敏感数据。
+function ClinicalCard({ c, dict }: { c: StoredClinical; dict: string }) {
+  const flagColor = (f?: string) => (f === 'high' ? 'var(--status-gentle)' : f === 'low' ? 'var(--status-calm)' : 'var(--portal-ink)');
+  return (
+    <div>
+      <p className="nesio-settings-section-label" style={{ marginTop: '1rem' }}>
+        {L(dict, '临床记录', 'Clinical records')} <span className="nesio-connector-soon" style={{ background: 'var(--portal-accent-soft)', color: 'var(--portal-blue-deep)' }}>Lab</span>
+      </p>
+      {c.labs.length > 0 && (
+        <div className="nesio-health-card" style={{ gridColumn: '1 / -1' }}>
+          <span className="nesio-health-card-label">{L(dict, `化验单 · ${c.labs.length} 项`, `Labs · ${c.labs.length}`)}</span>
+          <div style={{ marginTop: '0.4rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+            {c.labs.slice(0, 20).map((lab, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', fontSize: '0.74rem' }}>
+                <span style={{ color: 'var(--portal-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lab.name}</span>
+                <span style={{ flexShrink: 0 }}>
+                  <b style={{ color: flagColor(lab.flag) }}>{lab.value}{lab.unit ? ` ${lab.unit}` : ''}</b>
+                  {(lab.low != null || lab.high != null) && <span style={{ color: 'var(--portal-muted)', fontSize: '0.66rem' }}> ({lab.low ?? ''}–{lab.high ?? ''})</span>}
+                  {lab.date && <span style={{ color: 'var(--portal-muted)', fontSize: '0.66rem', marginLeft: 4 }}>{lab.date.slice(2)}</span>}
+                </span>
+              </div>
+            ))}
+          </div>
+          {c.labs.length > 20 && <span className="nesio-health-card-range">{L(dict, `另有 ${c.labs.length - 20} 项`, `+${c.labs.length - 20} more`)}</span>}
+        </div>
+      )}
+      {(c.medications.length > 0 || c.conditions.length > 0) && (
+        <div className="nesio-health-card" style={{ gridColumn: '1 / -1', marginTop: '0.5rem' }}>
+          {c.conditions.length > 0 && <p style={{ margin: '0 0 0.3rem', fontSize: '0.74rem' }}><span style={{ color: 'var(--portal-muted)' }}>{L(dict, '诊断:', 'Conditions: ')}</span>{c.conditions.slice(0, 12).join(' · ')}</p>}
+          {c.medications.length > 0 && <p style={{ margin: 0, fontSize: '0.74rem' }}><span style={{ color: 'var(--portal-muted)' }}>{L(dict, '用药:', 'Meds: ')}</span>{c.medications.slice(0, 12).join(' · ')}</p>}
+        </div>
+      )}
+      <p className="nesio-settings-option-hint" style={{ marginTop: '0.4rem' }}>{L(dict, '来自 Apple 健康记录(export_cda)· 仅本机 · 仅 Lab 模式可见', 'From Apple Health Records (export_cda) · on-device · Lab only')}</p>
+    </div>
+  );
+}
+
 function MetricCard({ m, dict }: { m: HealthMetric; dict: string }) {
   // prev===0 时也算 delta(如上月 0 次锻炼 → 本月 3 次是真实增长,不该被压成"无变化");
   // 只有 deltaPct 因除零需要 prev!==0。
@@ -293,11 +332,22 @@ function MetricCard({ m, dict }: { m: HealthMetric; dict: string }) {
 export default function HealthDashboard() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [data, setData] = useState<HealthMetrics | null>(null);
+  const [clinical, setClinical] = useState<StoredClinical | null>(null);
+  const [labMode, setLabMode] = useState(false);
 
   useEffect(() => {
     setData(loadHealthMetrics());
     const onUpdate = () => setData(loadHealthMetrics());
     window.addEventListener('nesio-health-updated', onUpdate);
+    // D2:临床记录仅 lab 模式加载渲染。
+    const isLab = readLaunchSurfaceContextFromBrowser().viewerRole === 'personal_lab';
+    setLabMode(isLab);
+    if (isLab) {
+      setClinical(loadClinical());
+      const onClinical = () => setClinical(loadClinical());
+      window.addEventListener('nesio-clinical-updated', onClinical);
+      return () => { window.removeEventListener('nesio-health-updated', onUpdate); window.removeEventListener('nesio-clinical-updated', onClinical); };
+    }
     return () => window.removeEventListener('nesio-health-updated', onUpdate);
   }, []);
 
@@ -373,6 +423,7 @@ export default function HealthDashboard() {
           </div>
         </div>
       )}
+      {labMode && clinical && <ClinicalCard c={clinical} dict={dict} />}
       <TrainingPlan />
       {GROUPS.map((g) => {
         const items = data.metrics.filter((m) => m.group === g.key);
