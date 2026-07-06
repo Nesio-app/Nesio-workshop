@@ -271,12 +271,29 @@ export interface DailyFact {
   sleepH?: number;                    // 当晚睡眠小时(按夜键归属)
 }
 
+/** 批次 44(C):睡眠分期 —— 最近一晚的 Core/Deep/REM/清醒(iOS 16+),单位小时。 */
+export interface SleepStages {
+  night: string;                      // 夜键 YYYY-MM-DD
+  core: number; deep: number; rem: number; awake: number;
+  total: number;                      // core+deep+rem(实际睡着)
+}
+
+/** 批次 44(C):活动三环 —— 最近一天的 Move/Exercise/Stand + 目标(<ActivitySummary>)。 */
+export interface ActivityRings {
+  date: string;
+  move: number; moveGoal: number;         // kcal
+  exercise: number; exerciseGoal: number; // min
+  stand: number; standGoal: number;       // 小时
+}
+
 export interface HealthMetrics {
   metrics: HealthMetric[];
   workouts: number;
   importedAt: string;
   glucose?: GlucoseAnalysis;          // A:血糖深度分析(数据足够时才有)
   daily?: DailyFact[];                // A:每日事实表(跨域分析地基)
+  sleepStages?: SleepStages;          // C:最近一晚睡眠分期
+  activityRings?: ActivityRings;      // C:最近一天活动三环
 }
 
 // latest 类指标的合理范围(规范单位),超出即当脏值丢弃,不让离谱读数直接上卡片。
@@ -406,12 +423,15 @@ class HealthAggregator {
   private monthlyLatest = new Map<string, Map<string, { sum: number; count: number }>>(); // latest 类指标的按月均值
   private sleepMs = new Map<string, Map<string, number>>(); // night → source → ms(finalize 时每夜取最大源)
   private mindMin = new Map<string, number>();
-  private workoutList: Array<{ type: string; label: string; duration: string; start: string }> = [];
+  private workoutList: Array<{ type: string; label: string; duration: string; start: string; distKm: number; kcal: number }> = [];
   workouts = 0;
   // A:血糖深度采集(全部按 mg/dL 规范单位累计;显示时再按用户单位换算)。
   private gluDay = new Map<string, { sum: number; count: number; min: number; max: number }>();
   private gluHour = new Map<number, { sum: number; count: number }>();
   private glu = { count: 0, sum: 0, sumSq: 0, inRange: 0, below: 0, above: 0, mmol: false };
+  // C:睡眠分期(夜 → 来源 → 各期毫秒)与活动三环(日期 → 三环值+目标)。
+  private sleepStage = new Map<string, Map<string, { core: number; deep: number; rem: number; awake: number }>>();
+  private activityByDate = new Map<string, { move: number; moveGoal: number; exercise: number; exerciseGoal: number; stand: number; standGoal: number }>();
 
   private feedGlucose(r: Rec, mgdl: number) {
     const day = r.startDate.slice(0, 10);
@@ -471,16 +491,28 @@ class HealthAggregator {
         }
       } else if (def.agg === 'sleep') {
         for (const r of records(text, def.hk)) {
-          if (!/Asleep/i.test(r.value)) continue;
+          const asleep = /Asleep/i.test(r.value);
+          const awake = /Awake/i.test(r.value);
+          if (!asleep && !awake) continue; // InBed 不算睡着也不算清醒段
           // 用"夜"键(凌晨段归前一晚),与摘要路径一致 —— 否则跨午夜整晚被拆成两天,
           // latest/prev 变成同一晚两段相比(如 6.0h ▲ 较上次 +5.3)。
           const key = sleepNightKey(r.startDate);
+          if (!key) continue;
           const ms = Math.max(0, parseAppleDate(r.endDate) - parseAppleDate(r.startDate));
-          if (key) {
+          if (asleep) {
             let s = this.sleepMs.get(key);
             if (!s) { s = new Map(); this.sleepMs.set(key, s); }
             s.set(r.sourceName, (s.get(r.sourceName) || 0) + ms); // 按来源分开,finalize 取最大源
           }
+          // C:分期(iOS 16+ 才有 Core/Deep/REM;旧版只有 Asleep → 计入 total 但无分期)。
+          let st = this.sleepStage.get(key);
+          if (!st) { st = new Map(); this.sleepStage.set(key, st); }
+          let src = st.get(r.sourceName);
+          if (!src) { src = { core: 0, deep: 0, rem: 0, awake: 0 }; st.set(r.sourceName, src); }
+          if (/Core/i.test(r.value)) src.core += ms;
+          else if (/Deep/i.test(r.value)) src.deep += ms;
+          else if (/REM/i.test(r.value)) src.rem += ms;
+          else if (awake) src.awake += ms;
         }
       } else if (def.agg === 'mindful') {
         for (const r of records(text, def.hk)) {
@@ -491,19 +523,46 @@ class HealthAggregator {
       }
     }
     // 锻炼:全文件流式收集明细(不只计数),供 buildNodes 建事件节点 —— 不再只看尾部 6MB。
-    const workoutRe = /<Workout\b[^>]*>/g;
+    // C:顺带读 totalDistance / totalEnergyBurned(在 Workout 开标签上时),换算到 km / kcal。
+    const workoutRe = /<Workout\b(?:"[^"]*"|[^>"])*>/g;
     let wm: RegExpExecArray | null;
     while ((wm = workoutRe.exec(text))) {
       const tag = wm[0];
       const rawType = (tag.match(/workoutActivityType="HKWorkoutActivityType([^"]+)"/)?.[1]) || 'Workout';
+      const dist = Number(tag.match(/totalDistance="([^"]+)"/)?.[1] || '');
+      const distU = (tag.match(/totalDistanceUnit="([^"]+)"/)?.[1] || '').toLowerCase();
+      const en = Number(tag.match(/totalEnergyBurned="([^"]+)"/)?.[1] || '');
+      const enU = (tag.match(/totalEnergyBurnedUnit="([^"]+)"/)?.[1] || '').toLowerCase();
       this.workoutList.push({
         type: rawType,
         label: WORKOUT_LABEL[rawType] || rawType,
         duration: tag.match(/duration="([^"]+)"/)?.[1] || '',
         start: tag.match(/startDate="([^"]+)"/)?.[1] || '',
+        distKm: Number.isFinite(dist) ? (distU === 'mi' ? dist * 1.609344 : distU === 'm' ? dist / 1000 : dist) : 0,
+        kcal: Number.isFinite(en) ? (enU === 'kj' ? en / 4.184 : en) : 0,
       });
     }
     this.workouts = this.workoutList.length;
+
+    // C:活动三环 —— <ActivitySummary> 每日一条,含三环值与目标(属性可能含 '>',用引号感知匹配)。
+    const asRe = /<ActivitySummary\b(?:"[^"]*"|[^>"])*>/g;
+    let am: RegExpExecArray | null;
+    while ((am = asRe.exec(text))) {
+      const tag = am[0];
+      const date = tag.match(/dateComponents="([^"]+)"/)?.[1] || '';
+      if (!date) continue;
+      const num = (attr: string) => Number(tag.match(new RegExp(`${attr}="([^"]+)"`))?.[1] || '0') || 0;
+      const enU = (tag.match(/activeEnergyBurnedUnit="([^"]+)"/)?.[1] || '').toLowerCase();
+      const move = num('activeEnergyBurned');
+      this.activityByDate.set(date, {
+        move: enU === 'kj' ? move / 4.184 : move,
+        moveGoal: (() => { const g = num('activeEnergyBurnedGoal'); return enU === 'kj' ? g / 4.184 : g; })(),
+        exercise: num('appleExerciseTime'),
+        exerciseGoal: num('appleExerciseTimeGoal'),
+        stand: num('appleStandHours'),
+        standGoal: num('appleStandHoursGoal'),
+      });
+    }
   }
 
   finalize(): HealthMetrics {
@@ -545,7 +604,41 @@ class HealthAggregator {
     }
     const glucose = this.buildGlucose();
     const daily = this.buildDailyFacts();
-    return { metrics: out, workouts: this.workouts, importedAt: new Date().toISOString(), glucose, daily };
+    const sleepStages = this.buildSleepStages();
+    const activityRings = this.buildActivityRings();
+    return { metrics: out, workouts: this.workouts, importedAt: new Date().toISOString(), glucose, daily, sleepStages, activityRings };
+  }
+
+  /** C:最近一晚睡眠分期 —— 取最后一夜、该夜睡着最多的来源(避免多设备重叠重复)的各期时长。 */
+  private buildSleepStages(): SleepStages | undefined {
+    if (!this.sleepStage.size) return undefined;
+    const night = [...this.sleepStage.keys()].sort().pop()!;
+    const bySource = this.sleepStage.get(night)!;
+    let best: { core: number; deep: number; rem: number; awake: number } | undefined;
+    let bestAsleep = -1;
+    for (const s of bySource.values()) {
+      const asleep = s.core + s.deep + s.rem;
+      if (asleep > bestAsleep) { bestAsleep = asleep; best = s; }
+    }
+    if (!best) return undefined;
+    const h = (ms: number) => Math.round((ms / 3_600_000) * 10) / 10;
+    const total = best.core + best.deep + best.rem;
+    if (total <= 0) return undefined; // 旧版只有 Asleep 无分期 → 不给空分期卡
+    return { night, core: h(best.core), deep: h(best.deep), rem: h(best.rem), awake: h(best.awake), total: h(total) };
+  }
+
+  /** C:最近一天活动三环 + 目标。 */
+  private buildActivityRings(): ActivityRings | undefined {
+    if (!this.activityByDate.size) return undefined;
+    const date = [...this.activityByDate.keys()].sort().pop()!;
+    const a = this.activityByDate.get(date)!;
+    if (a.moveGoal <= 0 && a.exerciseGoal <= 0 && a.standGoal <= 0) return undefined; // 无目标=无有效三环
+    return {
+      date,
+      move: Math.round(a.move), moveGoal: Math.round(a.moveGoal),
+      exercise: Math.round(a.exercise), exerciseGoal: Math.round(a.exerciseGoal),
+      stand: Math.round(a.stand), standGoal: Math.round(a.standGoal),
+    };
   }
 
   /** A:血糖深度分析 —— 日序列 + TIR + 变异系数 + GMI + 小时模式。内部 mg/dL,按用户单位显示。 */
@@ -643,17 +736,22 @@ class HealthAggregator {
       const startMs = parseAppleDate(wk.start);
       const durMin = wk.duration ? Math.round(Number(wk.duration)) : 0;
       const startIso = startMs ? new Date(startMs).toISOString() : '';
+      // C:富数据 —— 距离 km / 消耗 kcal(有则进属性与文案,锻炼节点从「跑步 30 分钟」升级)。
+      const distKm = wk.distKm > 0 ? Math.round(wk.distKm * 100) / 100 : 0;
+      const kcal = wk.kcal > 0 ? Math.round(wk.kcal) : 0;
       nodes.push({
         type: 'event', name: `${wk.label}${durMin ? ` ${durMin} 分钟` : ''}`,
         attributes: {
           source: 'Apple Health',
           ...(startMs ? { start: startIso } : {}),
           ...(durMin ? { durationMin: durMin } : {}),
+          ...(distKm ? { distanceKm: distKm } : {}),
+          ...(kcal ? { energyKcal: kcal } : {}),
           activity: wk.label,
           ...(startIso ? { externalId: `health:workout:${startIso}:${wk.type}` } : {}),
         },
         relations: [], tags: ['健康', 'Apple Health', '锻炼', wk.label], confidence: 0.85,
-        rawInput: `${wk.label}${durMin ? `,时长 ${durMin} 分钟` : ''}${wk.start ? `,${wk.start.slice(0, 10)}` : ''}`,
+        rawInput: `${wk.label}${durMin ? `,时长 ${durMin} 分钟` : ''}${distKm ? `,${distKm} 公里` : ''}${kcal ? `,${kcal} 千卡` : ''}${wk.start ? `,${wk.start.slice(0, 10)}` : ''}`,
       });
     }
     return nodes;
