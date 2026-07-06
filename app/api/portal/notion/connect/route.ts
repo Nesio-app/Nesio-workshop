@@ -6,14 +6,11 @@
  * 未配置时诚实报错,不做假跳转。
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { envValue } from '@/lib/portal/env';
 
 export const dynamic = 'force-dynamic';
 
 const STATE_COOKIE = 'nesio_notion_oauth_state';
-
-function envValue(key: string): string {
-  return (process.env[key] ?? '').trim();
-}
 
 export function GET(req: NextRequest) {
   const clientId = envValue('NOTION_CLIENT_ID');

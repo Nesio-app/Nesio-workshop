@@ -4,10 +4,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { isSameOriginRequest, isRateLimited, safeEqual } from '@/lib/portal/api-auth';
-
-function envValue(key: string): string {
-  return (process.env[key] ?? '').trim();
-}
+import { envValue } from '@/lib/portal/env';
 
 /** 返回错误响应用于短路,或 null 放行。 */
 export function requireAdmin(req: NextRequest, routeId: string): NextResponse | null {

@@ -123,6 +123,10 @@ function loadRoute() {
           },
         };
       }
+      if (specifier === '@/lib/portal/env') {
+        // 共享 env 助手(取代各路由本地 envValue);纯函数,忠实复制。
+        return { envValue: (key) => (process.env[key] ?? '').trim() };
+      }
       throw new Error(`Unexpected import in calendar route test: ${specifier}`);
     },
   };

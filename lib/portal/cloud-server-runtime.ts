@@ -9,6 +9,7 @@ import {
   deriveCloudIdentity,
   type CloudIdentity,
 } from '@/lib/portal/cloud-identity';
+import { envValue } from '@/lib/portal/env';
 
 export { deriveCloudIdentity };
 export type { CloudIdentity };
@@ -55,11 +56,6 @@ export type SupabaseTokenResponse = {
   expires_in?: number;
   token_type?: string;
 };
-
-function envValue(key: string): string {
-  const value = process.env[key];
-  return typeof value === 'string' ? value.trim() : '';
-}
 
 export function getCloudConfig(options: { storage?: boolean } = {}): CloudRuntimeConfig {
   const databaseEnabled = envValue('CLOUD_DB_ENABLED').toLowerCase() === 'true';

@@ -6,12 +6,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/portal/admin-gate';
 import { computeDailyReport } from '@/lib/portal/analyst-runtime';
+import { envValue } from '@/lib/portal/env';
 
 export const dynamic = 'force-dynamic';
-
-function envValue(key: string): string {
-  return (process.env[key] ?? '').trim();
-}
 
 export async function GET(req: NextRequest) {
   const blocked = requireAdmin(req, 'admin-analyst');

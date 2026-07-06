@@ -8,10 +8,7 @@
 import type { NextRequest } from 'next/server';
 import { cookies } from 'next/headers';
 import { getIntegrationToken, saveIntegrationToken } from '@/lib/portal/integrations';
-
-function envValue(key: string): string {
-  return (process.env[key] ?? '').trim();
-}
+import { envValue } from '@/lib/portal/env';
 
 /** Anonymous requests must not reach a send path. Returns true when a Nesio session exists. */
 export async function hasNesioSession(): Promise<boolean> {

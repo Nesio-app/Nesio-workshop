@@ -23,13 +23,10 @@ import {
 import { buildSourceExtractionPrompt, parseJsonBlock, SOURCE_HINTS } from '@/lib/extraction/extraction';
 import { isRateLimited } from '@/lib/portal/api-auth';
 import { completeText, aiProviderAvailable } from '@/lib/portal/ai-complete';
+import { envValue } from '@/lib/portal/env';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
-
-function envValue(key: string): string {
-  return (process.env[key] ?? '').trim();
-}
 
 function isIngestAllowed(req: NextRequest, bodySecret?: string): boolean {
   const sharedSecret = envValue('INGEST_SHARED_SECRET');

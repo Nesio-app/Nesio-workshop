@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { bootstrapCloudAccountProfile, buildCloudAccountProfileBootstrapMeta } from '@/lib/portal/cloud-account-profile';
 import { normalizeSupabaseRuntimeUrl } from '@/lib/portal/production-runtime';
+import { envValue } from '@/lib/portal/env';
 
 type SupabaseTokenResponse = {
   access_token?: string;
@@ -21,11 +22,6 @@ type WechatTokenResponse = {
 };
 
 const SUPABASE_OTP_TYPES = new Set(['signup', 'magiclink', 'recovery', 'invite', 'email_change', 'email', 'sms', 'phone']);
-
-function envValue(key: string): string {
-  const value = process.env[key];
-  return typeof value === 'string' ? value.trim() : '';
-}
 
 function safeRedirectUrl(req: NextRequest, params: Record<string, string>) {
   const target = new URL('/', req.url);

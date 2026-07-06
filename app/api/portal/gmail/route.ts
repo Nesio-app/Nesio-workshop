@@ -14,15 +14,12 @@ import { getIntegrationToken, saveIntegrationToken } from '@/lib/portal/integrat
 import { buildEmailExtractionPrompt, parseJsonBlock } from '@/lib/extraction/extraction';
 import { cookies } from 'next/headers';
 import { completeText, aiProviderAvailable } from '@/lib/portal/ai-complete';
+import { envValue } from '@/lib/portal/env';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
 
 const GMAIL_API = 'https://gmail.googleapis.com/gmail/v1';
-
-function envValue(key: string): string {
-  return (process.env[key] ?? '').trim();
-}
 
 function hasStage5LabAccess(req: NextRequest): boolean {
   const configured = envValue('NESIO_STAGE5_INVOCATION_SECRET');

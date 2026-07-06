@@ -9,13 +9,10 @@ import { buildChatContext } from '@/lib/portal/chat-context';
 import { guardAiRoute } from '@/lib/portal/api-auth';
 import { reportAiCall } from '@/lib/portal/ai-telemetry';
 import { resolveAiKey } from '@/lib/portal/ai-keys';
+import { envValue } from '@/lib/portal/env';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
-
-function envValue(key: string): string {
-  return (process.env[key] ?? '').trim();
-}
 
 export interface ChatMessage {
   role: 'user' | 'model';

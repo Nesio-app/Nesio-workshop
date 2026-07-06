@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { saveIntegrationToken } from '@/lib/portal/integrations';
+import { envValue } from '@/lib/portal/env';
 
 const GOOGLE_CALENDAR_OAUTH_STATE_COOKIE = 'nesio_google_calendar_oauth_state';
 
@@ -10,11 +11,6 @@ type GoogleTokenResponse = {
   token_type?: string;
   scope?: string;
 };
-
-function envValue(key: string): string {
-  const value = process.env[key];
-  return typeof value === 'string' ? value.trim() : '';
-}
 
 function safeRedirectUrl(req: NextRequest, params: Record<string, string>) {
   const target = new URL('/', req.url);

@@ -10,10 +10,7 @@
 
 import { after } from 'next/server';
 import { normalizeSupabaseRuntimeUrl } from '@/lib/portal/production-runtime';
-
-function envValue(key: string): string {
-  return (process.env[key] ?? '').trim();
-}
+import { envValue } from '@/lib/portal/env';
 
 async function persistAiEvent(props: Record<string, string | number | boolean>, ts: number): Promise<void> {
   const url = normalizeSupabaseRuntimeUrl(envValue('SUPABASE_URL'));

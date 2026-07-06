@@ -10,12 +10,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { isRateLimited, isSameOriginRequest } from '@/lib/portal/api-auth';
 import { normalizeSupabaseRuntimeUrl } from '@/lib/portal/production-runtime';
 import { ROADMAP_ITEMS } from '@/lib/portal/roadmap';
+import { envValue } from '@/lib/portal/env';
 
 export const dynamic = 'force-dynamic';
-
-function envValue(key: string): string {
-  return (process.env[key] ?? '').trim();
-}
 
 function rest(): { url: string; headers: Record<string, string> } | null {
   const base = normalizeSupabaseRuntimeUrl(envValue('SUPABASE_URL'));
