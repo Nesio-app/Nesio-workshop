@@ -10,6 +10,8 @@ const fixturePath = new URL('./__fixtures__/mock-private.ics', import.meta.url);
 let mockCalendarAccessCookie = '';
 let mockCalendarRefreshCookie = '';
 let mockBaoheAuthCookie = '';
+// Supabase-stored calendar token (cross-device). null → fall back to cookie.
+let mockSupabaseCalendarToken = null;
 
 function parseMockIcsEvents(text, limit, calendarName) {
   const summary = text.match(/^SUMMARY:(.+)$/m)?.[1]?.trim();
@@ -92,6 +94,32 @@ function loadRoute() {
         return {
           mergeCalendarEvents(lists, limit) {
             return lists.flat().slice(0, limit);
+          },
+        };
+      }
+      if (specifier === '@/lib/portal/integrations') {
+        return {
+          async getIntegrationToken(provider) {
+            if (provider === 'calendar') return mockSupabaseCalendarToken;
+            return null;
+          },
+          async saveIntegrationToken() { /* heal is best-effort; no-op in test */ },
+        };
+      }
+      if (specifier === '@/lib/portal/calendar-token.mjs') {
+        // Faithful copies of the pure helpers (covered by calendar-token.test.mjs).
+        return {
+          pickCalendarTokens(supabase, cookie) {
+            const s = supabase || {};
+            if (s.accessToken || s.refreshToken) {
+              return { accessToken: s.accessToken || '', refreshToken: s.refreshToken || '' };
+            }
+            const c = cookie || {};
+            return { accessToken: c.accessToken || '', refreshToken: c.refreshToken || '' };
+          },
+          shouldUseOAuth(tokens) {
+            const t = tokens || {};
+            return Boolean(t.accessToken || t.refreshToken);
           },
         };
       }
@@ -271,6 +299,48 @@ async function testOauthCookieReadsGoogleCalendarApiWithoutIcsEnv() {
   assert.equal(response.body.events[0].source, 'Google Calendar');
 }
 
+// 修「Token 存储精神分裂」:换设备只有 Supabase token、本机无 cookie 时,
+// 日历以前只读 cookie → 静默退回 iCal("没连日历")。现在应走 OAuth。
+async function testSupabaseTokenReadsCalendarCrossDeviceWithoutCookie() {
+  clearCalendarEnv();
+  mockBaoheAuthCookie = 'baohe-session';
+  mockCalendarAccessCookie = ''; // 新设备:没有本机 cookie
+  mockCalendarRefreshCookie = '';
+  mockSupabaseCalendarToken = { accessToken: 'supabase-access-token', refreshToken: 'supabase-refresh-token' };
+  const fetchedUrls = [];
+  global.fetch = async (url, init = {}) => {
+    fetchedUrls.push({ url: String(url), authorization: init.headers?.Authorization || init.headers?.authorization || '' });
+    return {
+      ok: true,
+      async json() {
+        return {
+          items: [
+            {
+              id: 'google-event-xdev',
+              summary: 'Cross-device Google Event',
+              start: { dateTime: '2099-05-01T10:00:00-05:00' },
+              end: { dateTime: '2099-05-01T10:30:00-05:00' },
+            },
+          ],
+        };
+      },
+    };
+  };
+
+  try {
+    const { GET } = loadRoute();
+    const response = await GET(mockRequest());
+
+    assert.equal(fetchedUrls.length, 1, '应直接用 Supabase token 打 Google,而不是掉进 iCal 兜底。');
+    assert.equal(fetchedUrls[0].authorization, 'Bearer supabase-access-token', '用的是 Supabase 里的 token,不是 cookie。');
+    assert.equal(response.body.ok, true);
+    assert.equal(response.body.provider, 'google_calendar_oauth');
+    assert.equal(response.body.events[0].title, 'Cross-device Google Event');
+  } finally {
+    mockSupabaseCalendarToken = null;
+  }
+}
+
 async function testOauthRefreshCookieRecoversExpiredCalendarAccess() {
   clearCalendarEnv();
   mockBaoheAuthCookie = 'baohe-session';
@@ -359,6 +429,7 @@ try {
   await testConfiguredFeedUsesMockOnlyWhenGateEnabled();
   await testPrivateFeedGateAcceptsTrimmedVercelEnvValue();
   await testOauthCookieReadsGoogleCalendarApiWithoutIcsEnv();
+  await testSupabaseTokenReadsCalendarCrossDeviceWithoutCookie();
   await testOauthRefreshCookieRecoversExpiredCalendarAccess();
   console.log('calendar fail-closed route tests passed');
 } finally {
@@ -366,5 +437,6 @@ try {
   mockCalendarAccessCookie = '';
   mockCalendarRefreshCookie = '';
   mockBaoheAuthCookie = '';
+  mockSupabaseCalendarToken = null;
   clearCalendarEnv();
 }
