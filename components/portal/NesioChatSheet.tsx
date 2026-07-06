@@ -11,6 +11,7 @@ import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { getLifeGraph, searchLifeGraphFuzzy, type LifeNode } from '@/lib/portal/life-graph';
 import { loadProfileSettings } from '@/lib/portal/profile';
 import { smartSearch } from '@/lib/portal/smart-search';
+import { domainInsightsContextBlock } from '@/lib/portal/domain-insights';
 import { parseTemporalQuery, isInSpan } from '@/lib/portal/temporal-query';
 import { readPortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
 import { refreshLocation } from '@/lib/portal/location-store';
@@ -213,6 +214,11 @@ async function buildMemoryContext(query: string, convoHint = ''): Promise<{ cont
   const fmtCite = (n: LifeNode): string => (idOf.has(n.id) ? `[#${idOf.get(n.id)}] ` : '') + fmtNode(n);
 
   const parts: string[] = [`【用户记忆库】共 ${graph.length} 条`];
+
+  // 统一域洞察读出口(Cross-Insight Reader v0):把即时算的健康/财务判定接进「问一问」的
+  // 回答上下文 —— 此前它只读记忆图,看不到 findings,问"血糖达标吗/有没有订阅涨价"只能说没记录。
+  const insightBlock = domainInsightsContextBlock();
+  if (insightBlock) parts.push(insightBlock);
 
   if (dateNodes.length > 0) {
     parts.push(`\n【${temporal.label}的日程/事件】（精确命中，优先参考）`);
