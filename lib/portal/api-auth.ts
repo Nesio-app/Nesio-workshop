@@ -19,9 +19,19 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { timingSafeEqual } from 'node:crypto';
 
 function envValue(key: string): string {
   return (process.env[key] ?? '').trim();
+}
+
+/** 常量时间比较两个密钥(避免用 === 短路比较带来的计时侧信道)。空/不等长直接判否。 */
+export function safeEqual(a: string, b: string): boolean {
+  if (!a || !b) return false;
+  const ba = Buffer.from(a);
+  const bb = Buffer.from(b);
+  if (ba.length !== bb.length) return false;
+  return timingSafeEqual(ba, bb);
 }
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
@@ -37,7 +47,7 @@ export async function isPortalRequestAuthorized(req: NextRequest, opts?: { allow
 
   const stage5 = envValue('NESIO_STAGE5_INVOCATION_SECRET');
   const provided = req.headers.get('x-nesio-stage5-secret')?.trim() || '';
-  if (stage5 && provided === stage5) return true;
+  if (stage5 && safeEqual(provided, stage5)) return true;
 
   // No Supabase → personal/local deployment where the UI itself is open.
   // The auth gate can't be stricter than the UI, but we can require the
@@ -84,11 +94,16 @@ const windows = new Map<string, Window>();
 const MAX_TRACKED_KEYS = 5000;
 
 function clientIp(req: NextRequest): string {
-  return (
-    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    req.headers.get('x-real-ip') ||
-    'unknown'
-  );
+  // 平台设置的头(不可被客户端伪造)优先;x-forwarded-for 最左值是客户端可控的,取了它
+  // 攻击者轮换该 header 就能让每个请求落到不同 key、绕过 per-IP 限流。故:
+  //   x-real-ip / x-vercel-forwarded-for(平台真实客户端 IP)→ 否则取 XFF 最右一跳(最接近服务器)。
+  const realIp = req.headers.get('x-real-ip')?.trim();
+  if (realIp) return realIp;
+  const vercel = req.headers.get('x-vercel-forwarded-for')?.trim();
+  if (vercel) return vercel.split(',').pop()!.trim();
+  const xff = req.headers.get('x-forwarded-for');
+  if (xff) return xff.split(',').pop()!.trim();
+  return 'unknown';
 }
 
 export function isRateLimited(
@@ -100,7 +115,17 @@ export function isRateLimited(
   const now = Date.now();
   const win = windows.get(key);
   if (!win || win.resetAt <= now) {
-    if (windows.size >= MAX_TRACKED_KEYS) windows.clear(); // crude memory bound
+    if (windows.size >= MAX_TRACKED_KEYS) {
+      // 不要 windows.clear() 清空所有人(否则喷满 5000 key 即可把全体限流计数清零、放大滥用)。
+      // 先驱逐已过期项;仍满则删最早到期的一个,给新 key 腾位。
+      for (const [k, w] of windows) if (w.resetAt <= now) windows.delete(k);
+      if (windows.size >= MAX_TRACKED_KEYS) {
+        let oldestKey: string | undefined;
+        let oldest = Infinity;
+        for (const [k, w] of windows) if (w.resetAt < oldest) { oldest = w.resetAt; oldestKey = k; }
+        if (oldestKey) windows.delete(oldestKey);
+      }
+    }
     windows.set(key, { count: 1, resetAt: now + windowMs });
     return false;
   }

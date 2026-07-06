@@ -6,6 +6,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import dns from 'node:dns/promises';
+import { Agent } from 'undici';
 import { guardAiRoute } from '@/lib/portal/api-auth';
 
 export const dynamic = 'force-dynamic';
@@ -32,25 +33,40 @@ function ipPrivate(ip: string): boolean {
   if (low.includes(':')) return false;                        // 其它 IPv6 全局单播放行
   return ipv4Private(low);
 }
-/** 校验 URL 指向公网可解析主机;不安全则抛错。 */
-async function assertSafeUrl(raw: string): Promise<void> {
+/** 校验 URL 指向公网可解析主机;返回"校验通过的 IP 列表"(IP 字面量主机返回空 = 无需 pin)。
+ *  不安全则抛错。 */
+async function assertSafeUrl(raw: string): Promise<string[]> {
   const u = new URL(raw);
   if (u.protocol !== 'http:' && u.protocol !== 'https:') throw new Error('blocked_scheme');
   const host = u.hostname.toLowerCase();
   if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || host.endsWith('.internal')) throw new Error('blocked_host');
   if (/^[\d.]+$/.test(host) || host.includes(':')) {
     if (ipPrivate(host)) throw new Error('blocked_ip');
-    return;
+    return []; // IP 字面量:无 DNS,fetch 直连该 IP,不存在重绑定
   }
   const addrs = await dns.lookup(host, { all: true });
   if (!addrs.length || addrs.some((a) => ipPrivate(a.address))) throw new Error('blocked_dns');
+  return addrs.map((a) => a.address);
 }
-/** 逐跳校验的安全 fetch(手动跟随重定向,防重定向绕过 SSRF)。 */
+/** 逐跳校验的安全 fetch(手动跟随重定向,防重定向绕过 SSRF)。
+ *  防 DNS 重绑定 TOCTOU:把连接 pin 到刚校验过的 IP(而不是让 fetch 再独立解析一次同名主机,
+ *  否则校验解析到公网 IP、fetch 解析到 169.254.169.254 就读到了云元数据)。 */
 async function safeFetch(raw: string, maxHops = 3): Promise<Response> {
   let current = raw;
   for (let hop = 0; hop <= maxHops; hop++) {
-    await assertSafeUrl(current);
-    const res = await fetch(current, {
+    const safeIps = await assertSafeUrl(current);
+    const dispatcher = safeIps.length
+      ? new Agent({
+          connect: {
+            // 只连校验通过的那个 IP;主机名仍用于 TLS SNI / Host 头,证书照常校验。
+            lookup: (_hostname, _opts, cb: (err: Error | null, address: string, family: number) => void) => {
+              const ip = safeIps[0];
+              cb(null, ip, ip.includes(':') ? 6 : 4);
+            },
+          },
+        })
+      : undefined;
+    const opts: RequestInit & { dispatcher?: Agent } = {
       redirect: 'manual',
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; NesioBot/1.0)',
@@ -58,10 +74,21 @@ async function safeFetch(raw: string, maxHops = 3): Promise<Response> {
         'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
       },
       signal: AbortSignal.timeout(8000),
-    });
-    const loc = res.status >= 300 && res.status < 400 ? res.headers.get('location') : null;
-    if (loc) { current = new URL(loc, current).toString(); continue; }
-    return res;
+    };
+    if (dispatcher) opts.dispatcher = dispatcher;
+    try {
+      const res = await fetch(current, opts as RequestInit);
+      const loc = res.status >= 300 && res.status < 400 ? res.headers.get('location') : null;
+      if (loc) {
+        current = new URL(loc, current).toString();
+        await dispatcher?.close().catch(() => {}); // 该跳只读了头,可安全关闭
+        continue;
+      }
+      return res; // 成功返回:body 还要被读,dispatcher 随请求结束回收
+    } catch (err) {
+      await dispatcher?.close().catch(() => {});
+      throw err;
+    }
   }
   throw new Error('too_many_redirects');
 }

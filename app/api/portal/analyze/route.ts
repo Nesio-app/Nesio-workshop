@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSignal } from '@/lib/life-domain/create-signal';
 import { normalizePhotoToSignal, normalizeVoiceToSignal } from '@/lib/life-domain/normalizers';
 import { EXTRACTION_SYSTEM_PROMPT, parseJsonBlock } from '@/lib/extraction/extraction';
+import { isRateLimited } from '@/lib/portal/api-auth';
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
@@ -352,6 +353,11 @@ export async function POST(req: NextRequest) {
     let raw = '';
     const isImage = body.type === 'image' && Boolean(body.imageBase64);
     const aiAllowed = isAnalyzeAiAllowed(req);
+
+    // 有鉴权但之前无限流:单个会话可无节流刷最贵的视觉/grounding 调用(每请求最多 4 次外部 AI)。
+    if (aiAllowed && isRateLimited(req, 'analyze', { limit: 20 })) {
+      return NextResponse.json({ ok: false, error: 'rate_limited', retryAfterMs: 30_000 }, { status: 429 });
+    }
 
     if (!aiAllowed) {
       return NextResponse.json(

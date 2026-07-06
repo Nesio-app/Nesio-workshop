@@ -3,7 +3,7 @@
  * 无 Supabase 的本地部署放行(与 UI 同宽)。
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { isSameOriginRequest, isRateLimited } from '@/lib/portal/api-auth';
+import { isSameOriginRequest, isRateLimited, safeEqual } from '@/lib/portal/api-auth';
 
 function envValue(key: string): string {
   return (process.env[key] ?? '').trim();
@@ -27,7 +27,7 @@ export function requireAdmin(req: NextRequest, routeId: string): NextResponse | 
     );
   }
   const provided = req.headers.get('x-nesio-admin-secret')?.trim() || '';
-  if (provided !== secret) {
+  if (!safeEqual(provided, secret)) {
     return NextResponse.json({ ok: false, error: 'admin_secret_required' }, { status: 401 });
   }
   return null;

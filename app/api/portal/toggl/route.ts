@@ -9,8 +9,10 @@
  * Token never persisted server-side. Toggl uses HTTP Basic auth: token:api_token
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { guardAiRoute } from '@/lib/portal/api-auth';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 20;
 
 const TOGGL_API = 'https://api.track.toggl.com/api/v9';
 
@@ -34,6 +36,10 @@ function formatDuration(sec: number): string {
 }
 
 export async function POST(req: NextRequest) {
+  // 之前完全无鉴权/无限流:匿名可用本端点当 Toggl token 有效性预言机 + 隐藏源 IP 的中继。
+  const guard = await guardAiRoute(req, 'toggl', { limit: 10 });
+  if (guard) return guard;
+
   const { token } = await req.json() as { token?: string };
   if (!token) {
     return NextResponse.json({ ok: false, error: 'missing_token' }, { status: 400 });
