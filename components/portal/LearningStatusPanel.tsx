@@ -9,6 +9,7 @@
 import { useEffect, useState } from 'react';
 import { getRankerStats } from '@/lib/platform/guidance-engine/guidance-ranker';
 import { getBestInterruptionHours } from '@/lib/portal/mirror-profile';
+import { aiCacheCount } from '@/lib/portal/ai-cache';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
@@ -29,10 +30,13 @@ export default function LearningStatusPanel() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [stats, setStats] = useState<ReturnType<typeof getRankerStats> | null>(null);
   const [hours, setHours] = useState<number[]>([]);
+  const [aiLearned, setAiLearned] = useState(0);
 
   useEffect(() => {
     setStats(getRankerStats());
     setHours(getBestInterruptionHours().slice(0, 3).sort((a, b) => a - b));
+    // 从 AI 的回复里存下多少条(拆任务/起草/文案)——AI 离线时能直接复用的"外脑记忆"
+    setAiLearned(aiCacheCount('decompose') + aiCacheCount('draft-reply') + aiCacheCount('guidance-lang'));
   }, []);
 
   if (!stats) return null;
@@ -73,6 +77,14 @@ export default function LearningStatusPanel() {
       {hourLabel && (
         <p className="nesio-health-story-line">
           {L(dict, `它觉得你最愿意被提醒的时段:${hourLabel}。`, `It thinks you're most receptive around: ${hourLabel}.`)}
+        </p>
+      )}
+
+      {aiLearned > 0 && (
+        <p className="nesio-health-story-line">
+          {L(dict,
+            `已从 AI 的回复里存下 ${aiLearned} 条(拆任务 / 起草 / 文案)。AI 离线时,同样的请求直接复用它给过的答案,不掉线。`,
+            `Kept ${aiLearned} answer${aiLearned > 1 ? 's' : ''} from the AI (task-splitting / drafting / phrasing). When the AI is offline, the same request reuses what it gave before — no downtime.`)}
         </p>
       )}
 

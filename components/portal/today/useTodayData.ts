@@ -21,6 +21,7 @@ import { applyGuidanceFeedback, type GuidanceFeedback } from '@/lib/platform/gui
 import { getEnergyState } from '@/lib/platform/energy-state';
 import type { RecommendationCard } from '@/lib/portal/reasoning-engine';
 import { getBestInterruptionHours } from '@/lib/portal/mirror-profile';
+import { rememberAI, recallAI, sig } from '@/lib/portal/ai-cache';
 import {
   calendarEventsToGuidanceEvents,
   emailSignalsToGuidanceEvents,
@@ -218,6 +219,20 @@ export function useTodayData(canUsePrivateData: boolean) {
                 }
               }
             } catch { /* fall back to rule-generated copy */ }
+
+            if (cachedCopy) {
+              // 从 AI 的改写里学:逐卡记住(以卡片内容为键,跨天可复用),离线也能给出 AI 级文案
+              for (let i = 0; i < rawProactiveCards.length; i++) {
+                const c = cachedCopy[i];
+                if (c) rememberAI('guidance-lang', sig(rawProactiveCards[i].id + '|' + rawProactiveCards[i].title), { title: c.title, body: c.body });
+              }
+            } else {
+              // AI 离线 + 今日缓存未命中 → 复用过去 AI 给过的同款改写;凑不齐就退回原文(下方按长度判定)
+              const recalled = rawProactiveCards.map((card) => recallAI<{ title: string; body: string }>('guidance-lang', sig(card.id + '|' + card.title)));
+              if (recalled.every(Boolean)) {
+                cachedCopy = rawProactiveCards.map((card, i) => ({ id: card.id, title: recalled[i]!.title, body: recalled[i]!.body }));
+              }
+            }
           }
 
           if (cachedCopy && cachedCopy.length === rawProactiveCards.length) {

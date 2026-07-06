@@ -10,6 +10,8 @@ import { useEffect, useState } from 'react';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
+import { rememberAI, recallAI, sig } from '@/lib/portal/ai-cache';
+import { draftLocally } from '@/lib/portal/local-draft';
 
 export interface EmailComposeContext {
   emailId?: string;
@@ -44,6 +46,8 @@ export default function EmailComposeSheet({ open, onClose, context }: EmailCompo
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
+  // AI 离线时初稿的来源:'cache'=复用上次 AI 给的,'local'=本地骨架。null=AI 现写的。
+  const [draftSource, setDraftSource] = useState<'cache' | 'local' | null>(null);
 
   // 每次打开都用原邮件重置字段
   useEffect(() => {
@@ -58,6 +62,7 @@ export default function EmailComposeSheet({ open, onClose, context }: EmailCompo
     setSending(false);
     setSent(false);
     setError('');
+    setDraftSource(null);
   }, [open, context.from, context.subject]);
 
   if (!open) return null;
@@ -70,8 +75,26 @@ export default function EmailComposeSheet({ open, onClose, context }: EmailCompo
     { key: 'followup', zh: '跟进', en: 'Follow up' },
   ];
 
+  // 起草用的缓存签名:同样的意图+语气+这封邮件,离线时能复用上次 AI 给过的初稿。
+  const draftKey = () => sig(`${intent}|${tone || ''}|${context.subject || ''}|${(context.snippet || '').slice(0, 80)}`);
+
+  // AI 不在线时的兜底:先找上次 AI 给过的同类初稿,没有就本地拼一个能改的骨架。永不空手。
+  function fallbackDraft() {
+    const cached = recallAI<string>('draft-reply', draftKey());
+    if (cached) {
+      setBody(cached);
+      setDraftSource('cache');
+      setError('');
+      return;
+    }
+    setBody(draftLocally({ from: context.from, intent, tone: tone || '', locale: dict === 'zh' ? 'zh' : 'en' }));
+    setDraftSource('local');
+    setError('');
+  }
+
   async function aiDraft() {
     setError('');
+    setDraftSource(null);
     setDrafting(true);
     try {
       const res = await fetch('/api/portal/gmail/draft-reply', {
@@ -90,20 +113,20 @@ export default function EmailComposeSheet({ open, onClose, context }: EmailCompo
       const data = await res.json().catch(() => ({})) as { ok?: boolean; draft?: string; error?: string; detail?: string };
       if (data.ok && data.draft) {
         setBody(data.draft);
-      } else if (data.error === 'ai_not_configured') {
-        setError(L(dict, 'AI 起草暂未开通,你可以直接手写', 'AI drafting is off — write it yourself'));
+        setDraftSource(null);
+        rememberAI('draft-reply', draftKey(), data.draft); // 从 AI 的初稿里学:记住,离线可复用
       } else if (data.error === 'auth_required') {
+        // 登录问题不是"AI 离线",老实报，让用户重新登录
         setError(L(dict, '登录已过期,请重新登录 Nesio 再起草', 'Session expired — sign in to Nesio again'));
-      } else if (data.error === 'no_context') {
-        setError(L(dict, '这封邮件没有正文可参考,先手写一句吧', 'No email body to work from — write a line first'));
-      } else if (!res.ok && res.status >= 500) {
-        // 把服务端的 detail 带出来,方便定位(AI 供应商报错/限流等)
-        setError(L(dict, `AI 起草失败:${data.detail || data.error || res.status}`, `Draft failed: ${data.detail || data.error || res.status}`));
+      } else if (data.error === 'no_context' && !intent.trim()) {
+        // 既没原文又没写意图 —— 本地也拼不出有意义的东西,提示先写一句
+        setError(L(dict, '这封邮件没有正文可参考,先写一句你想说的', 'No email body to work from — write a line first'));
       } else {
-        setError(L(dict, 'AI 起草失败,请重试或手写', 'Draft failed — retry or write it yourself'));
+        // ai_not_configured / 5xx / 限流 / 空返回 —— 都算"AI 暂时离线",走本地兜底,不再把用户挡在空白框前
+        fallbackDraft();
       }
     } catch {
-      setError(L(dict, '网络错误,起草失败', 'Network error — draft failed'));
+      fallbackDraft(); // 网络错误也兜底
     } finally {
       setDrafting(false);
     }
@@ -210,11 +233,19 @@ export default function EmailComposeSheet({ open, onClose, context }: EmailCompo
             <textarea
               className="nesio-ob-input"
               value={body}
-              onChange={(e) => setBody(e.target.value)}
+              onChange={(e) => { setBody(e.target.value); if (draftSource) setDraftSource(null); }}
               rows={9}
               placeholder={L(dict, '在这里写你的回复,或点上面「AI 帮我写」', 'Write your reply, or tap “Draft with AI” above')}
               style={{ resize: 'vertical', minHeight: 160, lineHeight: 1.6 }}
             />
+
+            {draftSource && (
+              <p style={{ color: 'var(--text-tertiary, #9ca3af)', fontSize: '0.75rem', marginTop: '0.5rem', lineHeight: 1.5 }}>
+                {draftSource === 'cache'
+                  ? L(dict, 'AI 暂时离线 · 复用了上次给你的初稿,改一改就能发', 'AI is offline · reused a past draft — tweak and send')
+                  : L(dict, 'AI 暂时离线 · 这是本地起的骨架,把你的话补进去', 'AI is offline · a local skeleton — fill in your words')}
+              </p>
+            )}
 
             {error && <p style={{ color: 'var(--status-stop, #ef4444)', fontSize: '0.8rem', marginTop: '0.5rem' }}>{error}</p>}
 
