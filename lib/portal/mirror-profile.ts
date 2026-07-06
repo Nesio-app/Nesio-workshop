@@ -94,17 +94,21 @@ export function learnFromFeedback(
     profile.hourEngagement[h] += 0.02 * (prior - profile.hourEngagement[h]);
   }
 
-  // Adjust domain weight
+  // 更新律:EWMA-toward-target —— 每次反馈把权重按固定比例拉向该反馈对应的目标值,
+  // 取代此前 +0.08/-0.06/-0.12/+0.05/-0.03 那堆手调的不对称常数。目标∈[0,1] 故权重恒在
+  // [0,1](自然有界,无需手动 clamp),移动量随距离自适应(离目标远挪得多、近了挪得少)。
+  const toward = (cur: number, target: number, alpha: number) => cur + alpha * (target - cur);
+  const DW = 0.15, HR = 0.12;
   if (feedback === 'useful') {
-    profile.domainWeights[domain] = Math.min(1, current + 0.08);
-    profile.hourEngagement[hour] = Math.min(1, profile.hourEngagement[hour] + 0.05);
+    profile.domainWeights[domain] = toward(current, 1, DW);
+    profile.hourEngagement[hour] = toward(profile.hourEngagement[hour], 1, HR);
   } else if (feedback === 'wrong') {
-    profile.domainWeights[domain] = Math.max(0.1, current - 0.06);
+    profile.domainWeights[domain] = toward(current, 0.2, DW);
   } else if (feedback === 'too_much') {
-    profile.domainWeights[domain] = Math.max(0.05, current - 0.12);
+    profile.domainWeights[domain] = toward(current, 0, DW * 1.4); // 强负向,拉得快一点
   } else if (feedback === 'not_now') {
-    // Just note timing, don't penalize domain heavily
-    profile.hourEngagement[hour] = Math.max(0.1, profile.hourEngagement[hour] - 0.03);
+    // 只是时机不对,不重罚领域,只把该时段拉低
+    profile.hourEngagement[hour] = toward(profile.hourEngagement[hour], 0.15, HR);
   }
 
   profile.feedbackCount += 1;

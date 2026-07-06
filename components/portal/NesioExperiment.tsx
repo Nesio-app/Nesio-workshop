@@ -5,6 +5,7 @@ import { IconActivity, IconClock, IconTarget, IconTrendingDown, IconTrendingUp }
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
+import { welchTTest } from '@/lib/portal/moment-analytics';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -132,13 +133,11 @@ export function computeInsight(exp: Experiment, dict: string = 'zh'): ExpInsight
     const significant = rAbs! >= criticalR(days);
     trend = significant ? (r > 0 ? 'positive' : 'negative') : 'neutral';
   } else if (diff !== null) {
-    // 布尔 IV:两组都要有足够样本,且差异要盖过合并标准差(粗略效应量)才算数。
+    // 布尔 IV:on 组 vs off 组用 Welch 两样本 t 检验判显著(方差不等),显著才下结论。
     const onArr = pts.filter((p) => p.iv >= 0.5).map((p) => p.dv);
     const offArr = pts.filter((p) => p.iv < 0.5).map((p) => p.dv);
-    const sd = (arr: number[]) => { if (arr.length < 2) return 0; const m = arr.reduce((a, b) => a + b, 0) / arr.length; return Math.sqrt(arr.reduce((a, b) => a + (b - m) ** 2, 0) / (arr.length - 1)); };
-    const pooledSd = Math.max(0.5, (sd(onArr) + sd(offArr)) / 2);
-    const enoughGroups = onArr.length >= 3 && offArr.length >= 3;
-    trend = enoughGroups && Math.abs(diff) >= 0.6 * pooledSd ? (diff > 0 ? 'positive' : 'negative') : 'neutral';
+    const { significant } = welchTTest(onArr, offArr);
+    trend = significant ? (diff > 0 ? 'positive' : 'negative') : 'neutral';
   }
 
   const dvAvg = (dvs.reduce((a, b) => a + b, 0) / dvs.length).toFixed(1);

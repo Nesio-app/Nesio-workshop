@@ -133,7 +133,10 @@ export function buildRotatingFallback(now: Date, nodes: readonly FallbackNodeLik
   // 批次 29:按类别偏好加权 —— 收藏过的类别多出现,不再提醒的类别少出现。
   // 每句按其类别权重重复若干次进候选池,再确定性挑选(同一小时仍稳定)。
   const catPref = loadQuoteCatPref();
-  const weighted = FALLBACK_QUOTES.flatMap((item) => Array(Math.max(1, Math.round((catPref[item.cat] ?? 1) * 3))).fill(item) as typeof FALLBACK_QUOTES);
+  // 有界加权:pref(0.15..5)映射成 1..5 份 —— 偏好类多出现,但每类至少 1 份、最多 5×,
+  // 保证探索(冷门类仍有机会露出),口味变了也能被重新学到(不像 pref×3 那样近乎垄断)。
+  const copies = (p: number) => 1 + Math.round(4 * (Math.max(0.15, Math.min(5, p)) - 0.15) / (5 - 0.15));
+  const weighted = FALLBACK_QUOTES.flatMap((item) => Array(copies(catPref[item.cat] ?? 1)).fill(item) as typeof FALLBACK_QUOTES);
   const q = seededPick(weighted, seed, 3);
   pool.push({
     id: 'fallback-quote',
@@ -184,11 +187,14 @@ export function loadQuoteCatPref(): Record<QuoteCat, number> {
   return base;
 }
 
-/** 调整某类别权重(clamp 0.15..5);收藏 +0.6,不再提醒 -0.6。 */
+/** 调整某类别权重(clamp 0.15..5);收藏 +0.6,不再提醒 -0.6。
+ *  每次调整先把所有类别向中性 1 轻微回归(λ=0.06),没被持续强化的偏好会慢慢淡忘 ——
+ *  口味变了不会被旧偏好锁死(和 mirror hourEngagement 的抗饱和同思路)。 */
 export function bumpQuoteCat(cat: QuoteCat | undefined, delta: number): void {
   if (!cat || typeof window === 'undefined') return;
   const pref = loadQuoteCatPref();
-  pref[cat] = Math.max(0.15, Math.min(5, (pref[cat] ?? 1) + delta));
+  for (const c of ALL_QUOTE_CATS) pref[c] = (pref[c] ?? 1) + 0.06 * (1 - (pref[c] ?? 1));
+  pref[cat] = Math.max(0.15, Math.min(5, pref[cat] + delta));
   try { localStorage.setItem(QUOTE_CAT_PREF_KEY, JSON.stringify(pref)); } catch { /* ignore */ }
 }
 

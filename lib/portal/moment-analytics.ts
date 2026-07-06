@@ -72,6 +72,40 @@ export function meanExcludingLatest(b: EnergyBaseline, latestVal: number): numbe
   return (b.mean - EWMA_ALPHA * latestVal) / (1 - EWMA_ALPHA);
 }
 
+// ── 两样本显著性:Welch t 检验(方差不等)────────────────────────────────────
+// 判"布尔干预 on 组 vs off 组"的均值差异是否真实(取代粗略的效应量阈值)。
+
+/** t 分布 α=0.05 双尾临界值近似(判显著性够用)。 */
+function tCritical95(df: number): number {
+  const table: Array<[number, number]> = [
+    [1, 12.71], [2, 4.30], [3, 3.18], [4, 2.78], [5, 2.57], [6, 2.45], [8, 2.31],
+    [10, 2.23], [15, 2.13], [20, 2.09], [30, 2.04], [50, 2.01], [100, 1.984],
+  ];
+  if (df <= 1) return 12.71;
+  if (df >= 100) return 1.984;
+  for (let i = 1; i < table.length; i++) {
+    const [d1, t1] = table[i - 1];
+    const [d2, t2] = table[i];
+    if (df <= d2) return t1 + (t2 - t1) * (df - d1) / (d2 - d1);
+  }
+  return 1.984;
+}
+
+/** Welch 两样本 t 检验:返回 t、Welch–Satterthwaite 自由度、是否 α=0.05 双尾显著。 */
+export function welchTTest(a: number[], b: number[]): { t: number; df: number; significant: boolean } {
+  if (a.length < 2 || b.length < 2) return { t: 0, df: 0, significant: false };
+  const mean = (x: number[]) => x.reduce((s, v) => s + v, 0) / x.length;
+  const varc = (x: number[], m: number) => x.reduce((s, v) => s + (v - m) ** 2, 0) / (x.length - 1);
+  const m1 = mean(a), m2 = mean(b);
+  const v1 = varc(a, m1), v2 = varc(b, m2);
+  const se = Math.sqrt(v1 / a.length + v2 / b.length);
+  if (se === 0) return { t: 0, df: 0, significant: false };
+  const t = (m1 - m2) / se;
+  const df = (v1 / a.length + v2 / b.length) ** 2 /
+    ((v1 / a.length) ** 2 / (a.length - 1) + (v2 / b.length) ** 2 / (b.length - 1));
+  return { t, df, significant: Math.abs(t) >= tCritical95(df) };
+}
+
 /**
  * Oura 式疲劳评分：偏离个人基线的标准差数
  * > 1.5 → 轻度疲劳预警
