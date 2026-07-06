@@ -3,6 +3,7 @@ import {
   isSecretaryAiRequestAllowed,
   launchUnavailablePayload,
 } from '@/lib/portal/launch-safety';
+import { isPortalRequestAuthorized, isRateLimited } from '@/lib/portal/api-auth';
 import { normalizePortalLocale, type PortalLocale } from '@/lib/portal/profile';
 import {
   buildSecretaryPersonaPrompt,
@@ -379,6 +380,16 @@ export async function POST(req: NextRequest) {
       { ...launchUnavailablePayload('api:secretary:chat', 'secretary'), auditId },
       { status: 403, headers: corsHeaders },
     );
+  }
+
+  // Denial-of-Wallet 防护:isSecretaryAiRequestAllowed 只是功能开关、不校验身份 ——
+  // 之前生产开 AI 后任何人 curl 即可循环烧配额。云部署(配了 Supabase)要求会话身份;
+  // 所有部署都按 IP 限流。iOS 壳 capacitor:// 跨源放行(allowCrossOrigin),仍受限流约束。
+  if (!(await isPortalRequestAuthorized(req, { allowCrossOrigin: true }))) {
+    return NextResponse.json({ error: 'auth_required', auditId }, { status: 401, headers: corsHeaders });
+  }
+  if (isRateLimited(req, 'secretary-chat', { limit: 30 })) {
+    return NextResponse.json({ error: 'rate_limited', retryAfterMs: 30_000, auditId }, { status: 429, headers: corsHeaders });
   }
 
   let body: {

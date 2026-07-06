@@ -113,6 +113,23 @@ function inferSensitivity(node: LifeNode): SignalSensitivity {
   return 'normal';
 }
 
+const RETENTION_VALUES: RetentionPolicy[] = ['AlwaysAlive', 'LongLiving', 'Normal', 'Disposable'];
+const SENSITIVITY_VALUES: SignalSensitivity[] = ['normal', 'private', 'health', 'financial', 'family', 'work'];
+
+/** 读回写入时固化的保留期(create-signal 存进 attributes.retentionPolicy);缺失才降级推断。
+ *  修「写成 Normal、读时重算成 Disposable → pruneDisposableSignals 启动即物理删语音记忆」。 */
+function retentionOf(node: LifeNode): RetentionPolicy {
+  const stored = node.attributes['retentionPolicy'];
+  if (typeof stored === 'string' && (RETENTION_VALUES as string[]).includes(stored)) return stored as RetentionPolicy;
+  return inferRetention(node);
+}
+
+function sensitivityOf(node: LifeNode): SignalSensitivity {
+  const stored = node.attributes['sensitivity'];
+  if (typeof stored === 'string' && (SENSITIVITY_VALUES as string[]).includes(stored)) return stored as SignalSensitivity;
+  return inferSensitivity(node);
+}
+
 function inferRetention(node: LifeNode): RetentionPolicy {
   const tags = (node.tags || []).join(' ').toLowerCase();
   // Core family / major assets / major health → never prune
@@ -174,8 +191,8 @@ export function lifeNodeToSignal(node: LifeNode): Signal {
     content: node.rawInput || payload,
     entities: (node.relations ?? []).map((r) => ({ id: r.targetId, type: r.relation, name: r.targetId })),
     confidence: node.confidence,
-    sensitivity: inferSensitivity(node),
-    retentionPolicy: inferRetention(node),
+    sensitivity: sensitivityOf(node),
+    retentionPolicy: retentionOf(node),
     evidence: { source, externalId: node.id, raw: node.rawInput },
     tags: node.tags,
     context,
