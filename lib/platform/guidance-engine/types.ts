@@ -9,8 +9,7 @@ export type GuidanceEventType =
   | 'flight' | 'medical' | 'deadline' | 'birthday' | 'anniversary'
   | 'travel' | 'meeting' | 'holiday'
   | 'email_signal' | 'health_habit'
-  | 'health_insight'   // 健康四层判定(②模式/③风险)接地成的主动卡 — 载于 payload,类似 dec_insight
-  | 'finance_insight'  // 财务判定(异常支出/订阅涨价/现金流/未来账单)接地成的主动卡 — 同 payload 驱动
+  | 'domain_insight'   // 各域判定(健康/财务/…)接地成的主动卡 — 全部 payload 驱动(domain/icon/severity/双语文案),新增域零管线改动
   | 'weather_cold' | 'weather_rain'
   | 'object_context'   // 物品关联情境 — owned item relevant to an upcoming context
   | 'dec_insight';     // DEC 域引擎推荐卡(证据门控,PRD TODAY-002)

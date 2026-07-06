@@ -26,9 +26,11 @@ assert.equal(healthFindingsToGuidanceEvents([], [score('c', 'info')]).length, 0,
 // flag / attention / high / moderate 出卡,类型正确
 const one = healthFindingsToGuidanceEvents([finding('tbr', 'flag')], []);
 assert.equal(one.length, 1);
-assert.equal(one[0].type, 'health_insight', '类型必须是 health_insight');
+assert.equal(one[0].type, 'domain_insight', '类型:通用 domain_insight');
+assert.equal(one[0].payload.domain, 'health', 'payload 标注 health 域');
+assert.equal(one[0].payload.icon, '🩺', '域图标随 payload');
 assert.equal(one[0].payload.severity, 'flag');
-assert.equal(one[0].confidence, 85, 'flag 置信 85');
+assert.equal(one[0].confidence, 84, 'flag 置信 84');
 assert.equal(one[0].payload.titleZh, 'tbr-zh'); assert.equal(one[0].payload.titleEn, 'tbr-en');
 assert.match(String(one[0].payload.bodyZh), /依据 共识X/, 'body 带出处');
 assert.match(String(one[0].payload.reason), /健康/, 'reason 供「为什么现在出现」');
@@ -41,7 +43,7 @@ assert.equal(hi[0].id, 'health-risk-bmi');
 // 中风险归一成 attention
 const mod2 = healthFindingsToGuidanceEvents([], [score('gmi', 'moderate')]);
 assert.equal(mod2[0].payload.severity, 'attention', 'moderate 风险归一为 attention');
-assert.equal(mod2[0].confidence, 66);
+assert.equal(mod2[0].confidence, 68);
 
 // 红旗排前
 const mixed = healthFindingsToGuidanceEvents([finding('att', 'attention'), finding('flag', 'flag')], []);

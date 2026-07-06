@@ -101,13 +101,8 @@ function getUnscheduledWindow(event: GuidanceEvent, now: Date): WindowUrgency {
       // Evidence-gated recommendation — relevant through the waking day
       return (hour >= 7 && hour <= 22) ? 'medium' : 'closed';
 
-    case 'health_insight':
-      // 健康信号温和提示,清醒时段出;红旗(payload.severity)白天窗口更高一点
-      if (hour < 7 || hour > 22) return 'closed';
-      return event.payload.severity === 'flag' ? 'medium' : 'low';
-
-    case 'finance_insight':
-      // 财务信号:清醒时段出;flag(现金流/大涨价)窗口更高一点
+    case 'domain_insight':
+      // 域信号(健康/财务)温和提示,清醒时段出;红旗(payload.severity)白天窗口更高一点
       if (hour < 7 || hour > 22) return 'closed';
       return event.payload.severity === 'flag' ? 'medium' : 'low';
 

@@ -12,8 +12,7 @@ const CONSEQUENCE: Record<GuidanceEventType, ConsequenceSeverity> = {
   travel:       2,  // unprepared for departure
   email_signal: 2,  // varies — default medium
   health_habit:   1,  // break a streak
-  health_insight: 2,  // 指南级健康判定(红旗/风险带)— 值得温和提示,但由后续多层门控降噪
-  finance_insight: 2,  // 财务判定(异常支出/涨价/现金流)— 涉钱,值得提示,后续多层门控降噪
+  domain_insight: 2,  // 各域指南级判定(健康红旗/财务异常…)— 值得温和提示,后续多层门控降噪
   weather_cold:   1,  // uncomfortable
   weather_rain:   1,  // get wet
   object_context: 1,  // miss a relevant owned item — low stakes but useful
