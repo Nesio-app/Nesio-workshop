@@ -18,6 +18,7 @@ import {
   availableMonths,
   formatMoney,
   dominantCurrency,
+  median,
   type BankTx,
   type BankAccount,
 } from './bank-tx';
@@ -35,13 +36,6 @@ export interface FinanceFinding {
 
 // 绝对额下限:低于此额的基数,百分比无统计意义(与 bank-tx MIN_ALERT_BASE 同精神)。
 const MIN_BASE = 50;
-
-function median(nums: number[]): number {
-  if (!nums.length) return 0;
-  const s = [...nums].sort((a, b) => a - b);
-  const mid = Math.floor(s.length / 2);
-  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
-}
 
 // ── ② 异常支出:净支出环比激增 + 单类支出激增(复用 summarizeMonth / categoryBreakdown)──
 function anomalyFindings(txs: BankTx[], ym: string): FinanceFinding[] {

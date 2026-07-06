@@ -25,17 +25,10 @@ export function buildAction(event: GuidanceEvent, urgency: WindowUrgency, locale
       return { label: cta, cta, actionType: 'dismiss' };
     }
 
-    case 'health_insight': {
-      // warm-coach:不制造焦虑、不给任务式按钮。红旗给「和医生聊聊」的软提示,其余轻确认。
-      if (event.payload.severity === 'flag') {
-        return { label: l('这条来自你的健康数据,方便时可以和医生聊聊。', 'This comes from your own health data — worth a chat with a clinician when you can.'), cta: l('知道了', 'Got it'), actionType: 'dismiss' };
-      }
-      return { label: l('了解这条来自你健康数据的观察。', 'A gentle observation from your own health data.'), cta: l('知道了', 'Got it'), actionType: 'dismiss' };
-    }
-
-    case 'finance_insight': {
-      // warm-coach:不制造焦虑,给「去财务页看看」的轻提示。始终可跳过。
-      return { label: l('来自你的账户数据,想看细节可以打开财务页。', 'From your own account data — open Finance for details.'), cta: l('知道了', 'Got it'), actionType: 'dismiss' };
+    case 'domain_insight': {
+      // warm-coach:不制造焦虑、不给任务式按钮、始终可跳过。域相关软提示文案由适配器写在 payload(知识随域走)。
+      const label = l(String(event.payload.ctaLabelZh ?? '了解这条来自你数据的观察。'), String(event.payload.ctaLabelEn ?? 'A gentle observation from your own data.'));
+      return { label, cta: l('知道了', 'Got it'), actionType: 'dismiss' };
     }
 
     case 'flight':

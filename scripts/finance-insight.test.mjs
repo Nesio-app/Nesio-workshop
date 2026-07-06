@@ -72,7 +72,8 @@ const { financeFindingsToGuidanceEvents } = aMod.exports;
 
 const evts = financeFindingsToGuidanceEvents(findings);
 assert.ok(evts.length >= 1 && evts.length <= 3, 'bridge 封顶 3 条');
-assert.ok(evts.every((e) => e.type === 'finance_insight'), '类型 finance_insight');
+assert.ok(evts.every((e) => e.type === 'domain_insight'), '类型:通用 domain_insight');
+assert.ok(evts.every((e) => e.payload.domain === 'finance'), 'payload 标注 finance 域');
 assert.equal(evts[0].payload.severity, 'flag', 'bridge 红旗优先');
 assert.ok(evts[0].payload.titleZh && evts[0].payload.bodyZh && evts[0].payload.reason, 'payload 带双语 + reason');
 assert.match(String(evts[0].payload.reason), /财务/, 'reason 标注财务来源');
