@@ -68,6 +68,24 @@ interface Acc {
   mentions: number;
   last: string | null;
   relationHit: Closeness | null;
+  times: number[]; // 所有联系时间戳(ms),用来学这个人真实的联系节奏
+}
+
+const CADENCE_MIN = 3;   // 学到的节奏夹紧下限(天)
+const CADENCE_MAX = 180;
+
+/** 从一个人的真实联系时间戳学出他的联系节奏:相邻两次间隔的中位数(天)。
+ *  <3 次没法学 → 回退到按亲疏的固定桶。这把"写死的 14/30/90"换成"你和这个人实际多久联系一次"。 */
+function learnedCadence(times: number[], fallbackDays: number): number {
+  if (times.length < 3) return fallbackDays;
+  const sorted = [...times].sort((a, b) => a - b);
+  const gaps: number[] = [];
+  for (let i = 1; i < sorted.length; i++) gaps.push((sorted[i] - sorted[i - 1]) / 86400000);
+  const valid = gaps.filter((g) => g > 0.2); // 同批导入的同秒重复不算一次间隔
+  if (valid.length < 2) return fallbackDays;
+  valid.sort((a, b) => a - b);
+  const mid = valid.length % 2 ? valid[(valid.length - 1) / 2] : (valid[valid.length / 2 - 1] + valid[valid.length / 2]) / 2;
+  return Math.max(CADENCE_MIN, Math.min(CADENCE_MAX, Math.round(mid)));
 }
 
 // ── 本机「联系过了」打卡:key → ISO ──
@@ -105,9 +123,10 @@ export function buildRelationships(nodes: LifeNode[], now = Date.now(), contactL
     if (!key || key.length < 2) return;
     // 过滤明显不是人的 key(纯数字/系统标记)
     if (/^\d+$/.test(key)) return;
-    const cur = acc.get(key) || { key, name, relation: null, mentions: 0, last: null, relationHit: null };
+    const cur = acc.get(key) || { key, name, relation: null, mentions: 0, last: null, relationHit: null, times: [] };
     cur.mentions += 1;
     cur.last = newer(cur.last, date);
+    if (date) { const t = Date.parse(date); if (!Number.isNaN(t)) cur.times.push(t); }
     if (!cur.relation && relation) cur.relation = relation;
     if (relation) {
       if (CORE_RE.test(relation)) cur.relationHit = 'core';
@@ -146,7 +165,8 @@ export function buildRelationships(nodes: LifeNode[], now = Date.now(), contactL
     const logged = contactLog[a.key] || null;
     const last = newer(a.last, logged);
     const closeness = closenessOf(a);
-    const cadenceDays = CADENCE[closeness];
+    // 学到的真实节奏优先;学不出(联系次数<3)才用按亲疏的固定桶。
+    const cadenceDays = learnedCadence(a.times, CADENCE[closeness]);
     const daysSince = last ? Math.floor((now - Date.parse(last)) / 86400000) : null;
     const overdueRatio = daysSince == null ? 1.5 : daysSince / cadenceDays; // 无记录 → 略微提示
     const reachOut = daysSince == null ? false : daysSince > cadenceDays;

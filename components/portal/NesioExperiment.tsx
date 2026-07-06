@@ -67,6 +67,23 @@ function pearsonR(xs: number[], ys: number[]): number | null {
   return denom === 0 ? null : num / denom;
 }
 
+// α=0.05 双尾 Pearson 显著性临界 |r|(按样本量 n)。小样本下 r 必须很高才算真关联 ——
+// 否则 n=5 的噪声也会被说成"正相关"。这是把"参数阈值"换成"统计显著"。
+const CRIT_R: Array<[number, number]> = [
+  [5, 0.878], [6, 0.811], [7, 0.754], [8, 0.707], [10, 0.632], [12, 0.576],
+  [15, 0.514], [20, 0.444], [25, 0.396], [30, 0.361], [40, 0.312], [50, 0.279], [80, 0.220], [120, 0.179],
+];
+function criticalR(n: number): number {
+  if (n <= 5) return 0.878;
+  if (n >= 120) return 1.96 / Math.sqrt(n); // 大样本近似
+  for (let i = 1; i < CRIT_R.length; i++) {
+    const [n1, r1] = CRIT_R[i - 1];
+    const [n2, r2] = CRIT_R[i];
+    if (n <= n2) return r1 + (r2 - r1) * (n - n1) / (n2 - n1);
+  }
+  return 0.179;
+}
+
 export interface ExpInsight {
   r: number | null;
   meanOn: number | null;      // mean DV when IV is high (≥ median) or boolean=1
@@ -111,9 +128,17 @@ export function computeInsight(exp: Experiment, dict: string = 'zh'): ExpInsight
 
   let trend: ExpInsight['trend'] = 'neutral';
   if (r !== null) {
-    trend = rAbs! > 0.3 ? (r > 0 ? 'positive' : 'negative') : 'neutral';
+    // 只有统计显著才敢下"正/负相关"的结论;否则保持中性(文案会请用户继续记录)。
+    const significant = rAbs! >= criticalR(days);
+    trend = significant ? (r > 0 ? 'positive' : 'negative') : 'neutral';
   } else if (diff !== null) {
-    trend = Math.abs(diff) > 0.5 ? (diff > 0 ? 'positive' : 'negative') : 'neutral';
+    // 布尔 IV:两组都要有足够样本,且差异要盖过合并标准差(粗略效应量)才算数。
+    const onArr = pts.filter((p) => p.iv >= 0.5).map((p) => p.dv);
+    const offArr = pts.filter((p) => p.iv < 0.5).map((p) => p.dv);
+    const sd = (arr: number[]) => { if (arr.length < 2) return 0; const m = arr.reduce((a, b) => a + b, 0) / arr.length; return Math.sqrt(arr.reduce((a, b) => a + (b - m) ** 2, 0) / (arr.length - 1)); };
+    const pooledSd = Math.max(0.5, (sd(onArr) + sd(offArr)) / 2);
+    const enoughGroups = onArr.length >= 3 && offArr.length >= 3;
+    trend = enoughGroups && Math.abs(diff) >= 0.6 * pooledSd ? (diff > 0 ? 'positive' : 'negative') : 'neutral';
   }
 
   const dvAvg = (dvs.reduce((a, b) => a + b, 0) / dvs.length).toFixed(1);

@@ -263,8 +263,40 @@ const SUGGEST_RULES: Array<[RegExp, string]> = [
   [/payment|autopay|还款|transfer|转账/i, 'Payment'],
 ];
 
-/** 给未分类商户猜一个分类(简单关键词规则)。 */
-export function suggestCategory(name: string): { category: string; confidence: number } {
+/** 商户名分词(英文单词 + 中文串,长度≥2)。 */
+function merchantTokens(name: string): string[] {
+  return normalizeMerchant(name).split(/[^a-z0-9一-龥]+/).filter((t) => t.length >= 2);
+}
+
+/** 从用户已设的商户规则里学一个 token→分类 频次表(你的历史纠正就是训练数据)。 */
+function learnTokenCategory(rules: Record<string, string>): Record<string, Record<string, number>> {
+  const map: Record<string, Record<string, number>> = {};
+  for (const [name, cat] of Object.entries(rules)) {
+    for (const tok of merchantTokens(name)) {
+      (map[tok] ||= {})[cat] = (map[tok][cat] || 0) + 1;
+    }
+  }
+  return map;
+}
+
+/**
+ * 给未分类商户猜分类:先用"你自己纠正过的同类词"投票(从数据学),没学到再退回关键词规则。
+ * 例:你把 Wegmans / Trader Joe's 都归过 Food,新的 "Joe's Market" 命中 joe/market → Food。
+ */
+export function suggestCategory(name: string, rules: Record<string, string> = loadMerchantRules()): { category: string; confidence: number } {
+  const learned = learnTokenCategory(rules);
+  const votes: Record<string, number> = {};
+  let total = 0;
+  for (const tok of merchantTokens(name)) {
+    const m = learned[tok];
+    if (m) for (const [cat, c] of Object.entries(m)) { votes[cat] = (votes[cat] || 0) + c; total += c; }
+  }
+  if (total > 0) {
+    const [cat, best] = Object.entries(votes).sort((a, b) => b[1] - a[1])[0];
+    // 置信 = 该分类占比 × 证据量因子(1 个样本别太自信,4+ 个才接近上限)
+    const confidence = Math.min(0.9, (best / total) * (0.6 + 0.3 * Math.min(1, total / 4)));
+    return { category: cat, confidence: Math.round(confidence * 100) / 100 };
+  }
   for (const [re, cat] of SUGGEST_RULES) if (re.test(name)) return { category: cat, confidence: 0.72 };
   return { category: 'Services', confidence: 0.4 };
 }
