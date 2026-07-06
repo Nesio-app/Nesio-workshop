@@ -10,6 +10,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Delta, FeedbackDonut, FunnelSteps, InsightCard, SmartnessRadar, TopEventsChart, TrendChart, type DailyPoint } from './MetricsCharts';
 import { UserAccess } from './UserAccess';
+import { GovernancePanel } from './GovernancePanel';
+import { AnalystCard } from './AnalystCard';
 
 const SECRET_KEY = 'nesio_admin_secret';
 const RANGES = [7, 14, 30] as const;
@@ -198,6 +200,9 @@ export default function AdminPage() {
             </section>
           )}
 
+          {/* ── 分析师日报(替你读整个面板:精简要点 + 重要预警) ── */}
+          <AnalystCard secret={typeof window !== 'undefined' ? localStorage.getItem(SECRET_KEY) || '' : ''} />
+
           {/* ── 洞察与建议(规则引擎替你先看一遍) ── */}
           <section style={{ marginBottom: '0.9rem' }}>
             <p style={{ ...label, margin: '0 0 0.5rem' }}>洞察与建议</p>
@@ -353,6 +358,14 @@ export default function AdminPage() {
               角色:普通=公开功能;测试员=+下方勾选模块;Lab=全部实验功能与 secretary。改动即存,用户下次打开 App 生效。
             </p>
             <UserAccess secret={typeof window !== 'undefined' ? localStorage.getItem(SECRET_KEY) || '' : ''} />
+          </section>
+          {/* ── 软件治理地图 ── */}
+          <section style={{ marginTop: '0.9rem' }}>
+            <p style={{ ...label, margin: '0 0 0.2rem' }}>软件治理</p>
+            <p style={{ ...label, margin: '0 0 0.4rem' }}>
+              契约/就绪层的运行状态:哪些真在跑、哪些算了没人看、哪个已漂移。数据来自 governance-map + 构建期快照。
+            </p>
+            <GovernancePanel secret={typeof window !== 'undefined' ? localStorage.getItem(SECRET_KEY) || '' : ''} />
           </section>
         </>
       )}

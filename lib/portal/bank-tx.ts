@@ -19,15 +19,24 @@ export interface BankTx {
 }
 
 export const BANK_TX_KEY = 'nesio-bank-tx-v1';
+export const BANK_SYNCED_AT_KEY = 'nesio-bank-synced-at';
 
 export function loadBankTx(): BankTx[] {
   if (typeof window === 'undefined') return [];
   try {
     const raw = JSON.parse(localStorage.getItem(BANK_TX_KEY) || '[]') as BankTx[];
-    return Array.isArray(raw) ? raw.filter((t) => t && typeof t.amount === 'number' && typeof t.date === 'string') : [];
+    // Number.isFinite 挡掉 NaN(typeof NaN === 'number' 会漏过去,污染整月汇总)。
+    return Array.isArray(raw) ? raw.filter((t) => t && Number.isFinite(t.amount) && typeof t.date === 'string') : [];
   } catch {
     return [];
   }
+}
+
+/** 上次 Plaid 同步时间(ISO);无则 null。供财务卡显示"数据截至何时"。 */
+export function loadBankSyncedAt(): string | null {
+  if (typeof window === 'undefined') return null;
+  const v = localStorage.getItem(BANK_SYNCED_AT_KEY);
+  return v || null;
 }
 
 /** 'YYYY-MM' */
@@ -58,7 +67,8 @@ export function availableMonths(txs: BankTx[]): string[] {
 export function dominantCurrency(txs: BankTx[]): string {
   const counts = new Map<string, number>();
   for (const t of txs) {
-    const c = (t.currency || 'USD').toUpperCase();
+    const c = (t.currency || '').toUpperCase();
+    if (!c) continue; // 币种缺失的交易不参与主币种投票(也不进金额统计)
     counts.set(c, (counts.get(c) || 0) + 1);
   }
   let best = 'USD';
@@ -101,6 +111,11 @@ export function txFlow(t: BankTx, rules = loadFlowRules()): TxFlow {
   const cat = (t.category || '').toUpperCase();
   if (/INCOME/.test(cat)) return 'income';
   if (/TRANSFER|LOAN_PAYMENT/.test(cat)) return 'transfer';
+  if (!cat) {
+    // 分类缺失(Plaid 老账户/未增强常见):正数=花出去仍是可靠支出;负数=进账时无法区分
+    // 退款/收入/转账,一律当 transfer 不计收支 —— 避免把工资/转账当退款倒扣净支出。
+    return t.amount >= 0 ? 'expense' : 'transfer';
+  }
   return t.amount >= 0 ? 'expense' : 'refund';
 }
 
@@ -114,9 +129,22 @@ export interface MonthSummary {
   currency: string;
 }
 
-/** 一笔交易的币种(缺省 USD,大写归一)。 */
+/** 一笔交易的币种(大写归一;缺失返回 '' —— 不默认 USD,避免外币混入 USD 汇总)。 */
 function ccyOf(t: BankTx): string {
-  return (t.currency || 'USD').toUpperCase();
+  return (t.currency || '').toUpperCase();
+}
+
+/** 某月的主币种(与 summarizeMonth 同源:该月为空则退回全量),供分类/商户统一口径,
+ *  修「分类·商户用全量主币种、KPI 用当月主币种 → 两套口径 + 贴错货币符号」。 */
+function monthCurrency(txs: BankTx[], ym: string): string {
+  const monthTxs = txs.filter((t) => txYm(t) === ym);
+  return dominantCurrency(monthTxs.length ? monthTxs : txs);
+}
+
+/** 本月被排除出金额统计的"其他币种/缺币种"交易笔数 —— 财务卡据此如实提示"另有 N 笔未计入"。 */
+export function excludedTxCount(txs: BankTx[], ym: string): number {
+  const ccy = monthCurrency(txs, ym);
+  return txs.filter((t) => txYm(t) === ym && ccyOf(t) !== ccy).length;
 }
 
 export function summarizeMonth(txs: BankTx[], ym: string): MonthSummary {
@@ -168,7 +196,7 @@ function sumByCategory(txs: BankTx[], ym: string): Map<string, number> {
   const m = new Map<string, number>();
   const rules = loadMerchantRules();
   const flowRules = loadFlowRules();
-  const ccy = dominantCurrency(txs); // 只统计主币种,避免跨币种裸加
+  const ccy = monthCurrency(txs, ym); // 当月主币种,与 summarizeMonth/KPI 同口径
   for (const t of txs) {
     if (txYm(t) !== ym || ccyOf(t) !== ccy || txFlow(t, flowRules) !== 'expense') continue;
     const cat = effectiveCategory(t, rules) || '未分类';
@@ -186,7 +214,7 @@ export interface MerchantAgg {
 export function topMerchants(txs: BankTx[], ym: string, n = 5): MerchantAgg[] {
   const m = new Map<string, { total: number; count: number }>();
   const flowRules = loadFlowRules();
-  const ccy = dominantCurrency(txs); // 只统计主币种,避免跨币种裸加
+  const ccy = monthCurrency(txs, ym); // 当月主币种,与 KPI 同口径
   for (const t of txs) {
     if (txYm(t) !== ym || ccyOf(t) !== ccy || txFlow(t, flowRules) !== 'expense') continue;
     const name = t.name || '未知商户';

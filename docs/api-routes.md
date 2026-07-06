@@ -28,6 +28,7 @@ Auth legend:
 | POST /api/portal/decompose-task | guard | 20/min |
 | POST /api/portal/meeting-notes | guard | 15/min |
 | POST /api/portal/life-state | guard | 15/min |
+| POST /api/portal/health-insight | guard | 10/min |
 | POST /api/portal/notion | guard | 15/min |
 | GET /api/version | 公开只读(构建号,无数据) | — |
 | POST /api/portal/health | guard | 10/min |

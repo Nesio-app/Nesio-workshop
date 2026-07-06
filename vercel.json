@@ -3,6 +3,10 @@
   "framework": "nextjs",
   "buildCommand": "npm run build",
   "installCommand": "npm ci",
+  "crons": [
+    { "path": "/api/admin/analyst/run", "schedule": "3 8 * * *" },
+    { "path": "/api/admin/analyst/weekly", "schedule": "7 8 * * 1" }
+  ],
   "headers": [
     {
       "source": "/fitness/(.*)",

@@ -28,8 +28,21 @@ function readLaunchReadiness() {
   }
 }
 
+// 分支名:CI 里 actions/checkout 是 detached HEAD,`git branch --show-current`
+// 会返回空串(exit 0,兜底没触发)→ release-status 契约的 branch.length>0 断言在 PR 构建里挂。
+// 回退顺序:当前分支 → PR 源分支/推送分支(CI env)→ detached 时的 abbrev-ref('HEAD')→ unknown。
+function resolveBranch() {
+  return (
+    execText('git', ['branch', '--show-current']) ||
+    (process.env.GITHUB_HEAD_REF || '').trim() ||
+    (process.env.GITHUB_REF_NAME || '').trim() ||
+    execText('git', ['rev-parse', '--abbrev-ref', 'HEAD']) ||
+    'unknown'
+  );
+}
+
 function buildReleaseStatus(readiness = readLaunchReadiness()) {
-  const branch = execText('git', ['branch', '--show-current'], 'unknown');
+  const branch = resolveBranch();
   const commit = execText('git', ['rev-parse', '--short', 'HEAD'], 'unknown');
   const dirty = execText('git', ['status', '--short'], '').length > 0;
 

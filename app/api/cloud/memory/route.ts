@@ -497,6 +497,11 @@ export async function DELETE(request: NextRequest) {
   if (deleteAll === true && confirmation !== 'DELETE_MEMORY') {
     return safeJson({ ok: false, error: 'confirmation_required', auditId, readsCloud: false, writesCloud: false }, 400);
   }
+  // nodeId 会拼进 PostgREST 的 or= 过滤值,限制字符集,防 )/,/. 扰乱过滤树语法
+  // (即便被 identity_key 约束只影响自己数据,也不该让其破坏查询)。
+  if (deleteAll !== true && nodeId && !/^[A-Za-z0-9_:-]+$/.test(nodeId)) {
+    return safeJson({ ok: false, error: 'invalid_node_id', auditId, readsCloud: false, writesCloud: false }, 400);
+  }
   if (deleteAll !== true && !nodeId) {
     return safeJson({ ok: false, error: 'nodeId_or_deleteAll_required', auditId, readsCloud: false, writesCloud: false }, 400);
   }

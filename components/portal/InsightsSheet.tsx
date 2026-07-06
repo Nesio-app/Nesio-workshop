@@ -18,6 +18,7 @@ import type { GNode, GEdge } from '@/lib/platform/graph-engine';
 import { getLifeGraph } from '@/lib/portal/life-graph';
 import type { LifeNode } from '@/lib/portal/life-graph';
 import { getMirrorProfile, type MirrorProfile } from '@/lib/portal/mirror-profile';
+import { countByDomain } from '@/lib/portal/domain-stats';
 import { loadProfileSettings } from '@/lib/portal/profile';
 import {
   loadLivingModel,
@@ -108,7 +109,8 @@ function loadWidgetConfig(): InsightWidgetId[] {
 }
 
 function saveWidgetConfig(ids: InsightWidgetId[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(ids));
+  // 兜底:配额满 / Safari 隐私模式会抛 QuotaExceededError,别让它从保存处理里冒出去。
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(ids)); } catch { /* ignore */ }
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -186,35 +188,27 @@ function computeReflectionFacts(nodes: LifeNode[], all: LifeNode[], profile: Mir
     facts.push({ icon: <IconBox size={15} />, text: L(dict, '这段时间还没有新记录', 'No new notes in this period') });
   }
 
-  // 2. Completion rate
-  const commitments = nodes.filter((n) => n.type === 'commitment' || n.type === 'event');
+  // 2. Completion rate —— 只算承诺 + 带 done 语义的 event(否则无 done 的日历/健康 event 被当未完成拉低)
+  const commitments = nodes.filter((n) => n.type === 'commitment' || (n.type === 'event' && n.attributes.done !== undefined));
   const done = commitments.filter((n) => n.attributes.done === true);
   if (commitments.length > 0) {
     const rate = Math.round((done.length / commitments.length) * 100);
     facts.push({ icon: <IconCheckCircle size={15} />, text: L(dict, `承诺完成率 ${rate}%（${done.length}/${commitments.length} 件）`, `Promise completion ${rate}% (${done.length}/${commitments.length})`) });
   }
 
-  // 3. Top domain
-  const domainMap: Record<string, number> = {};
-  for (const n of nodes) {
-    let domain = '';
-    if (typeof n.attributes.context === 'string') {
-      try { domain = (JSON.parse(n.attributes.context) as { domain?: string }).domain ?? ''; } catch { /* ignore */ }
-    }
-    if (!domain && n.tags?.[0]) domain = n.tags[0];
-    if (!domain) domain = typeLabel(dict, n.type);
-    domainMap[domain] = (domainMap[domain] ?? 0) + 1;
-  }
-  const topDomain = Object.entries(domainMap).sort(([, a], [, b]) => b - a)[0];
-  if (topDomain && nodes.length > 1) {
-    facts.push({ icon: <IconTarget size={15} />, text: L(dict, `最集中在「${topDomain[0]}」（${topDomain[1]} 条，占 ${Math.round(topDomain[1] / nodes.length * 100)}%）`, `Most focused on "${topDomain[0]}" (${topDomain[1]}, ${Math.round(topDomain[1] / nodes.length * 100)}%)`) });
+  // 3. Top domain —— 用 canonical countByDomain(与其它卡统一口径),不再自造
+  // "context.domain ?? tags[0] ?? typeLabel" 的第三套定义(会和饼图/生命版图打架)。
+  const topDom = countByDomain(nodes)[0];
+  if (topDom && nodes.length > 1) {
+    facts.push({ icon: <IconTarget size={15} />, text: L(dict, `最集中在「${topDom.label}」（${topDom.count} 条，占 ${Math.round(topDom.count / nodes.length * 100)}%）`, `Most focused on "${topDom.label}" (${topDom.count}, ${Math.round(topDom.count / nodes.length * 100)}%)`) });
   }
 
-  // 4. Active hour
+  // 4. Active hour —— hourEngagement 对新用户是"清醒先验"种子(0.35–0.55),不是从记录得来的。
+  // 只有累积了足够真实反馈(feedbackCount 够大)才把"黄金时段"当观测呈现,否则那是先验冒充数据。
   const bestGroup = HOUR_GROUPS
     .map((g) => ({ ...g, score: avg(g.hours.map((h) => profile.hourEngagement[h])) }))
     .sort((a, b) => b.score - a.score)[0];
-  if (bestGroup && bestGroup.score > 0.5) {
+  if (bestGroup && bestGroup.score > 0.5 && profile.feedbackCount >= 8) {
     facts.push({ icon: <IconClock size={15} />, text: L(dict, `你的黄金时段在${bestGroup.label}`, `Your golden hours: ${bestGroup.labelEn}`) });
   }
 
@@ -242,9 +236,19 @@ function computeReflectionFacts(nodes: LifeNode[], all: LifeNode[], profile: Mir
     }
   } catch { /* ignore */ }
 
-  // 5. Top person —— 按真实频次排序(被多少条记录的关系指到 + 自身关系数),不是插入顺序。
-  const personMentions = (p: LifeNode) =>
-    all.reduce((c, n) => c + ((n.relations || []).some((r) => r.targetId === p.id) ? 1 : 0), 0) + (p.relations?.length || 0);
+  // 5. Top person —— 按真实频次排序:关系边 + 正文提及(你在自由文本里天天写"和 Linda"
+  // 却没建 person 关系边时,Linda 也该进"最常出现的人");不是插入顺序。
+  const personMentions = (p: LifeNode) => {
+    const name = (p.name || '').trim();
+    const relCount = all.reduce((c, n) => c + ((n.relations || []).some((r) => r.targetId === p.id) ? 1 : 0), 0) + (p.relations?.length || 0);
+    if (name.length < 2) return relCount;
+    const textCount = all.reduce((c, n) => {
+      if (n.id === p.id) return c;
+      const hay = `${n.name || ''} ${typeof n.rawInput === 'string' ? n.rawInput : ''}`;
+      return c + (hay.includes(name) ? 1 : 0);
+    }, 0);
+    return relCount + textCount;
+  };
   const persons = all
     .filter((n) => n.type === 'person')
     .map((p) => ({ p, c: personMentions(p) }))
@@ -624,7 +628,7 @@ function ConfidenceBar({ value }: { value: number }) {
       <div className="nesio-lm-conf-track">
         <div className="nesio-lm-conf-fill" style={{ width: `${value}%`, background: color }} />
       </div>
-      <span className="nesio-lm-conf-label" style={{ color }}>{value}%</span>
+      <span className="nesio-lm-conf-label" style={{ color }} title="AI 自评置信度(非精确度量)">{value}%</span>
     </div>
   );
 }
@@ -771,7 +775,7 @@ function LivingModelTab({
             {enough
               ? L(dict, '记录够了，点一下生成你的认知模型。', 'Enough notes — tap once to build your mind model.')
               : L(dict, `已记录 ${nodeCount} / 10 条，记满后 Nesio 开始推断。`, `${nodeCount} / 10 notes — Nesio starts inferring at 10.`)}
-            <InfoTip text={L(dict, '每条结论都带证据和置信度，可校正;类型分布/领域/完成率/活跃时段等行为统计交给 AI 推断,新增 8 条或 7 天后自动更新。', 'Every conclusion is evidence-backed, confidence-scored and correctable. Behavior stats (types / domains / completion / active hours) go to AI inference; refreshes after 8 new notes or 7 days.')} />
+            <InfoTip text={L(dict, '每条结论是 AI 基于你的记录推断的,置信度为 AI 自评(非精确度量),可校正;类型分布/领域/完成率/活跃时段等行为统计交给 AI 推断,新增 8 条或 7 天后自动更新。', 'Each conclusion is AI-inferred from your notes; the confidence is the AI’s own estimate (not a measured metric) and is correctable. Behavior stats go to AI inference; refreshes after 8 new notes or 7 days.')} />
           </p>
 
           {enough && (
@@ -973,6 +977,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = true, initi
   // ⑨ 认知模型生成失败的可见态:区分「AI 未配置/失败」与「数据不够」(后者由 nodeCount 判)
   const [livingError, setLivingError] = useState<'ai' | 'network' | null>(null);
   const livingFetchedRef = useRef(false);
+  const livingSeqRef = useRef(0); // 视角切换会并发发多次请求;只认最新一次的结果,防止旧视角内容错标
 
   // Load base data
   useEffect(() => {
@@ -1002,12 +1007,16 @@ export default function InsightsSheet({ onClose, canUsePrivateData = true, initi
       if (!domainMap[label]) domainMap[label] = { count: 0, color };
       domainMap[label].count++;
     }
-    setDomainStats(
-      Object.entries(domainMap)
-        .map(([label, { count, color }]) => ({ label, count, color }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 7),
-    );
+    // 取前 6 类,其余并成"其他"而不是 slice 丢弃 —— 否则中心"总记录数"与占比分母都会少计被丢那类。
+    const sorted = Object.entries(domainMap)
+      .map(([label, { count, color }]) => ({ label, count, color }))
+      .sort((a, b) => b.count - a.count);
+    const top = sorted.slice(0, 6);
+    const rest = sorted.slice(6);
+    if (rest.length) {
+      top.push({ label: L(dict, '其他', 'Other'), count: rest.reduce((s, e) => s + e.count, 0), color: 'var(--portal-muted)' });
+    }
+    setDomainStats(top);
   }, [period, profile, dict]);
 
   // Living Model: load cached or generate
@@ -1026,6 +1035,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = true, initi
       return;
     }
 
+    const mySeq = ++livingSeqRef.current; // 本次请求序号
     setLivingLoading(true);
     setLivingError(null);
     try {
@@ -1047,8 +1057,15 @@ export default function InsightsSheet({ onClose, canUsePrivateData = true, initi
           perspectivePrompt,
         }),
       });
-      const data = await res.json() as { ok: boolean; layers: LivingModelLayer[] };
-      if (data.ok && data.layers) {
+      const data = await res.json() as { ok: boolean; layers: LivingModelLayer[]; reason?: string };
+      if (mySeq !== livingSeqRef.current) return; // 已被更晚的视角请求取代 → 丢弃,避免错标/错存
+      // 后端在 no_api_key / api_error 时返回 ok:true + 空层 + reason;只看 ok && layers 会把失败
+      // 伪装成"没数据,点一下就好"。按 reason 区分真实失败态,不再静默当成功保存空模型。
+      if (data.reason === 'no_api_key' || data.reason === 'api_error') {
+        setLivingError('ai');
+        if (cached) setLivingModel(cached);
+      } else if (data.ok && data.layers) {
+        // insufficient_data 也会带 fallback 空层,交给空态的"数据不够"文案(不算错误)。
         const model: LivingModel = {
           layers: data.layers,
           generatedAt: new Date().toISOString(),
@@ -1057,15 +1074,15 @@ export default function InsightsSheet({ onClose, canUsePrivateData = true, initi
         saveLivingModel(model);
         setLivingModel(model);
       } else {
-        // AI 生成失败(未配置 key / 上游报错)—— 不是没数据。留住旧结果,显式标失败。
         setLivingError('ai');
         if (cached) setLivingModel(cached);
       }
     } catch {
+      if (mySeq !== livingSeqRef.current) return;
       setLivingError('network');
       if (cached) setLivingModel(cached);
     } finally {
-      setLivingLoading(false);
+      if (mySeq === livingSeqRef.current) setLivingLoading(false);
     }
   }, []);
 

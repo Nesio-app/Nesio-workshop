@@ -82,7 +82,11 @@ export default function TimelineTab() {
     if (h) return L(dict, `${h}小时`, `${h}h`);
     return L(dict, `${m}分钟`, `${m}m`);
   };
-  const fmtDist = (km: number) => { const mi = km * 0.621371; return mi < 0.19 ? `${Math.round(mi * 5280)} ft` : `${mi.toFixed(mi < 10 ? 1 : 0)} mi`; };
+  // 距离按 locale 切公制/英制 —— 中文语境用 km/m,不再一律 mi/ft(时间/日期都本地化了,唯独距离没有)。
+  const fmtDist = (km: number) => {
+    if (dict === 'en') { const mi = km * 0.621371; return mi < 0.19 ? `${Math.round(mi * 5280)} ft` : `${mi.toFixed(mi < 10 ? 1 : 0)} mi`; }
+    return km < 1 ? `${Math.round(km * 1000)} 米` : `${km.toFixed(km < 10 ? 1 : 0)} km`;
+  };
   const dayLabel = (key: string) => {
     const t = new Date(); const tk = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
     const y = new Date(t); y.setDate(t.getDate() - 1); const yk = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, '0')}-${String(y.getDate()).padStart(2, '0')}`;
@@ -111,7 +115,9 @@ export default function TimelineTab() {
     const { loadPlaceGeo, setPlaceGeo } = await import('@/lib/portal/place-trail');
     const geoDone = loadPlaceGeo();
     const withCoords = clusterPlaces(trail, 99999).filter((c) => c.lat != null && c.lon != null);
-    const targets = withCoords.filter((c) => !geoDone[c.label]?.country);
+    // 按"是否解析过"判重,而非"有无国家" —— 否则解析成功但没拿到国家的地点每次都被当未解析
+    // 反复重查,白白耗 Nominatim 限速额度。
+    const targets = withCoords.filter((c) => !geoDone[c.label]?.resolved);
     if (!withCoords.length) { setGeoMsg(L(dict, '这些地点没有坐标,无法反查(需要带经纬度的足迹/Google 时间轴)', 'These places have no coordinates to resolve (need lat/lon from live trail / Google Timeline)')); return; }
     if (!targets.length) { setGeoMsg(L(dict, '都解析过了 ✓', 'All resolved ✓')); return; }
     setGeoBusy(true);
@@ -124,7 +130,7 @@ export default function TimelineTab() {
         const res = await fetch('/api/portal/geocode', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lat: c.lat, lon: c.lon }) });
         const data = await res.json() as { ok?: boolean; name?: string; city?: string; country?: string };
         if (data.ok && (data.name || data.city || data.country)) {
-          setPlaceGeo(c.label, { name: data.name, city: data.city, country: data.country });
+          setPlaceGeo(c.label, { name: data.name, city: data.city, country: data.country, resolved: true });
           if (data.name && c.generic && displayLabel(c.label) === c.label) setPlaceAlias(c.label, data.name);
           if (data.country) ok += 1;
         } else if (data.ok === false) {

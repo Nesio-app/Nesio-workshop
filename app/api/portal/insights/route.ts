@@ -6,15 +6,12 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { guardAiRoute } from '@/lib/portal/api-auth';
+import { resolveAiKey } from '@/lib/portal/ai-keys';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
 
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
-
-function envValue(key: string): string {
-  return (process.env[key] ?? '').trim();
-}
 
 interface InsightsRequest {
   period: 'week' | 'month' | 'all';
@@ -42,7 +39,7 @@ export async function POST(req: NextRequest) {
   if (guard) return guard;
 
   const body = await req.json() as InsightsRequest;
-  const apiKey = envValue('GEMINI_API_KEY');
+  const apiKey = resolveAiKey('gemini');
 
   if (!apiKey) {
     return NextResponse.json({ ok: true, narrative: fallbackNarrative(body) });

@@ -12,6 +12,7 @@
 
 import type { LifeNode } from '@/lib/portal/life-graph';
 import type { MirrorProfile } from '@/lib/portal/mirror-profile';
+import { countByDomain } from '@/lib/portal/domain-stats';
 
 export type LivingModelLayerId =
   | 'identity'     // 身份认同 — 价值观、方向感、决策风格（慢变，6-12个月）
@@ -163,32 +164,24 @@ export function summarizeForLivingModel(input: LivingModelApiInput): {
   const { nodes, mirrorProfile, previousInsights = [] } = input;
 
   const typeBreakdown: Record<string, number> = {};
-  const domainMap: Record<string, number> = {};
   let completedCount = 0;
   let totalCommitments = 0;
 
   for (const n of nodes) {
     typeBreakdown[n.type] = (typeBreakdown[n.type] ?? 0) + 1;
-    if (n.type === 'commitment' || n.type === 'event') {
+    // 只把承诺、以及真正带 done 语义的 event 计入完成率分母 —— 健康/日历等无 done 的 event
+    // 一律算"未完成"会系统性拉低完成率(10 条锻炼 event + 2 条已完成承诺 → 显示 17%)。
+    if (n.type === 'commitment' || (n.type === 'event' && n.attributes.done !== undefined)) {
       totalCommitments++;
       if (n.attributes.done === true) completedCount++;
     }
-    // Extract domain from context attribute
-    if (typeof n.attributes.context === 'string') {
-      try {
-        const ctx = JSON.parse(n.attributes.context) as { domain?: string };
-        if (ctx.domain) domainMap[ctx.domain] = (domainMap[ctx.domain] ?? 0) + 1;
-      } catch { /* ignore */ }
-    }
-    for (const tag of n.tags ?? []) {
-      domainMap[tag] = (domainMap[tag] ?? 0) + 1;
-    }
   }
 
-  const topDomains = Object.entries(domainMap)
-    .sort(([, a], [, b]) => b - a)
+  // 最活跃领域用 canonical countByDomain(按节点计数)—— 此前把 domain 与每个 tag 塞进
+  // 同一张表各 +1,一个带 3 tag 的节点被计 4 次,N 不是节点数、领域与标签同池竞争。
+  const topDomains = countByDomain(nodes)
     .slice(0, 8)
-    .map(([domain, count]) => ({ domain, count }));
+    .map((d) => ({ domain: d.label, count: d.count }));
 
   const recentSample = nodes
     .slice(-30)

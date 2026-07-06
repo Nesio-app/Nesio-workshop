@@ -6,9 +6,12 @@ import dynamic from 'next/dynamic';
 const WechatReadingImportSheet = dynamic(() => import('./WechatReadingImportSheet'), { ssr: false });
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { type LifeNode } from '@/lib/portal/life-graph';
+import type { HealthMetrics, HealthNode } from '@/lib/portal/apple-health';
+import { readLaunchSurfaceContextFromBrowser } from '@/lib/portal/launch-surface.mjs';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
+import { markBusy } from '@/lib/portal/app-busy';
 
 interface ConnectorsHubProps { open: boolean; onClose: () => void; }
 
@@ -101,6 +104,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
   const [wechatReadingOpen, setWechatReadingOpen] = useState(false);
   const [connected, setConnected] = useState<Record<string, boolean>>({});
   const [syncing, setSyncing] = useState<string | null>(null);
+  const [importPct, setImportPct] = useState<number | null>(null); // 健康大文件导入进度(0–100)
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const [tokenInputFor, setTokenInputFor] = useState<string | null>(null);
@@ -363,7 +367,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     setSyncing('plaid');
     try {
       const res = await fetch('/api/portal/plaid/transactions');
-      const data = await res.json() as { ok?: boolean; transactions?: Array<{ id: string; accountId?: string; date: string; name: string; amount: number; currency: string; category: string }>; accounts?: unknown[]; error?: string };
+      const data = await res.json() as { ok?: boolean; transactions?: Array<{ id: string; accountId?: string; date: string; name: string; amount: number; currency: string; category: string }>; removedIds?: string[]; accounts?: unknown[]; error?: string };
       // 批次 31:账户/卡片信息存本机,供财务「卡片」子分类分卡显示
       if (data.accounts?.length) { try { localStorage.setItem('nesio-bank-accounts-v1', JSON.stringify(data.accounts)); } catch { /* quota */ } }
       if (!data.ok) {
@@ -376,14 +380,23 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
         setSyncing(null);
         return;
       }
-      // 明细只存本机,按交易 id 去重,封顶 1000
+      // 明细只存本机。增量同步:按 id upsert(added/modified 覆盖旧的)、删掉 removed,
+      // 再按日期降序保留最近 1000 笔(不是按到达顺序 —— 否则永远留着最旧那批)。
       const KEY = 'nesio-bank-tx-v1';
-      let existing: Array<{ id: string }> = [];
+      type Tx = { id: string; accountId?: string; date: string; name: string; amount: number; currency: string; category: string };
+      let existing: Tx[] = [];
       try { existing = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { /* ignore */ }
-      const seen = new Set(existing.map((t) => t.id));
-      const fresh = (data.transactions || []).filter((t) => !seen.has(t.id));
-      const merged = [...fresh, ...existing].slice(0, 1000);
+      const removed = new Set(data.removedIds || []);
+      const byId = new Map<string, Tx>();
+      for (const t of existing) if (!removed.has(t.id)) byId.set(t.id, t);
+      let freshCount = 0;
+      for (const t of (data.transactions || [])) { if (!byId.has(t.id)) freshCount++; byId.set(t.id, t); }
+      const merged = [...byId.values()]
+        .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)) // 日期降序
+        .slice(0, 1000);
+      const fresh = { length: freshCount };
       try { localStorage.setItem(KEY, JSON.stringify(merged)); } catch { /* quota */ }
+      try { localStorage.setItem('nesio-bank-synced-at', new Date().toISOString()); } catch { /* quota */ } // 供财务卡显示"数据截至何时"
       setCounts((p) => ({ ...p, plaid: merged.length }));
       saveConnectorState('plaid', true);
       setConnected((p) => ({ ...p, plaid: true }));
@@ -733,9 +746,10 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       );
       return;
     }
-    if (c.id === 'health') { fileRef.current?.click(); return; }
-    if (c.method === 'batch-photos') { photosRef.current?.click(); return; }
-    if (c.id === 'timeline') { timelineRef.current?.click(); return; }
+    // 打开文件选择器前标记 busy —— 选完文件回到前台时,别被"新部署自动整页刷新"冲掉上传。
+    if (c.id === 'health') { markBusy(); fileRef.current?.click(); return; }
+    if (c.method === 'batch-photos') { markBusy(); photosRef.current?.click(); return; }
+    if (c.id === 'timeline') { markBusy(); timelineRef.current?.click(); return; }
     if (c.id === 'wechat_reading') { setWechatReadingOpen(true); return; }
     if (c.id === 'wechat_fav') { return; } // 纯说明行,无操作
     if (c.id === 'plaid') { void connectPlaid(); return; }
@@ -748,43 +762,143 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     if (c.method === 'shortcuts') { setShortcutsFor(c.id); return; }
   }
 
-  // 批次 38/39:直接传 zip 或 export.xml,全部在浏览器里解析(不上传大文件)。
-  // export.xml 常几百 MB,只解码尾部(最近数据在末尾),正则提炼后建记忆节点 + 指标看板。
-  // 批次 39:取整个 export.xml 的字节(不再只取尾部)—— Apple 导出按类型分块,
-  // 只看尾部会漏掉大多数指标(用户遇到「只出 1 项」)。全字节交给流式解析器扫全文件。
-  async function extractExportXmlBytes(file: File): Promise<Uint8Array | null> {
-    if (file.name.toLowerCase().endsWith('.zip')) {
-      const buf = new Uint8Array(await file.arrayBuffer());
-      const { unzipSync } = await import('fflate');
-      const isExport = (n: string) => /(^|\/)export\.xml$/i.test(n);
-      const files = unzipSync(buf, { filter: (f) => isExport(f.name) });
-      const entry = Object.entries(files).find(([n]) => isExport(n));
-      return entry ? entry[1] : null;
+  // 批次 38/39/41:直接传 zip 或 export.xml,全部在浏览器里流式解析(不上传大文件)。
+  // 批次 41:改为「边解压边解析」—— 1GB zip 解压后 export.xml 常达 10GB+,旧写法
+  // (file.arrayBuffer() 整包读入 + unzipSync 整体解压成一个 Uint8Array)会把手机标签页
+  // 内存打爆 → 闪退。现用 File.stream() 逐块喂 fflate 流式 Unzip,再把解出的每块喂给
+  // 增量解析器后立即丢弃,任何时刻只持有一小块;Apple 按类型分块导出仍扫全文件不漏指标。
+  async function importHealthFile(
+    file: File,
+    onProgress?: (pct: number) => void,
+    captureCda = false,
+  ): Promise<{ metrics: HealthMetrics; nodes: HealthNode[]; cdaXml?: string } | null> {
+    const { createHealthStreamParser } = await import('@/lib/portal/apple-health');
+    const parser = createHealthStreamParser();
+    // D2:lab 模式下顺带缓冲 export_cda.xml(临床记录,通常很小)—— 整体缓冲有上限,防 OOM。
+    const cdaChunks: Uint8Array[] = [];
+    let cdaBytes = 0;
+    const CDA_CAP = 40_000_000; // 40MB 上限,超了就丢弃(临床文档几乎不会这么大)
+    let cdaOverflow = false;
+
+    // 进度按「已读字节 / 文件总大小」上报(zip 读的是压缩字节,正好对应 file.size);
+    // 按整数百分比节流,避免 ~64KB 一块的高频 setState 拖慢 UI。
+    const total = file.size || 0;
+    let read = 0;
+    let lastPct = -1;
+    const report = () => {
+      if (!total || !onProgress) return;
+      const pct = Math.min(99, Math.floor((read / total) * 100)); // 收尾 finalize 还有一点,留到 100
+      if (pct !== lastPct) { lastPct = pct; onProgress(pct); }
+    };
+
+    // 文件字节按块产出:优先 File.stream()(不把整包读进内存),不支持则回退分片 arrayBuffer。
+    async function forEachChunk(onChunk: (c: Uint8Array) => void): Promise<void> {
+      if (typeof file.stream === 'function') {
+        const reader = file.stream().getReader();
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (value) { read += value.length; onChunk(value); report(); }
+        }
+        return;
+      }
+      const whole = new Uint8Array(await file.arrayBuffer());
+      const STEP = 4_000_000;
+      for (let i = 0; i < whole.length; i += STEP) {
+        const slice = whole.subarray(i, Math.min(whole.length, i + STEP));
+        read += slice.length;
+        onChunk(slice);
+        report();
+        await Promise.resolve(); // 让出主线程,大文件下避免长任务卡死 UI
+      }
     }
-    return new Uint8Array(await file.arrayBuffer());
+
+    // 裸 export.xml:直接分块喂解析器。
+    if (!file.name.toLowerCase().endsWith('.zip')) {
+      let any = false;
+      await forEachChunk((c) => { parser.push(c); any = true; });
+      parser.push(new Uint8Array(0), true);
+      return any ? parser.finish() : null;
+    }
+
+    // zip:流式解压,start export.xml(+ lab 模式下 export_cda.xml),其它条目不解压。
+    const { Unzip, UnzipInflate, UnzipPassThrough } = await import('fflate');
+    const isExport = (n: string) => /(^|\/)export\.xml$/i.test(n);
+    const isCda = (n: string) => /(^|\/)export_cda\.xml$/i.test(n);
+    let sawExport = false;
+    let failed: Error | null = null;
+    const unzip = new Unzip((entry) => {
+      if (isExport(entry.name)) {
+        sawExport = true;
+        entry.ondata = (err, chunk, final) => {
+          if (err) { failed = err instanceof Error ? err : new Error(String(err)); return; }
+          if (chunk.length) parser.push(chunk, final);
+          else if (final) parser.push(new Uint8Array(0), true);
+        };
+        entry.start();
+      } else if (captureCda && isCda(entry.name)) {
+        entry.ondata = (err, chunk) => {
+          if (err || cdaOverflow) return; // 临床解析尽力而为,出错不影响健康导入
+          if (chunk.length) {
+            if (cdaBytes + chunk.length > CDA_CAP) { cdaOverflow = true; cdaChunks.length = 0; return; }
+            cdaChunks.push(chunk.slice()); cdaBytes += chunk.length;
+          }
+        };
+        entry.start();
+      }
+    });
+    unzip.register(UnzipInflate);      // deflate(export.xml 常规压缩)
+    unzip.register(UnzipPassThrough);  // stored(极少数未压缩存储,免 start() 抛错)
+
+    await forEachChunk((c) => { unzip.push(c, false); if (failed) throw failed; });
+    unzip.push(new Uint8Array(0), true);
+    if (failed) throw failed;
+    if (!sawExport) return null;
+    const result = parser.finish();
+    let cdaXml: string | undefined;
+    if (captureCda && cdaChunks.length) {
+      const dec = new TextDecoder('utf-8');
+      cdaXml = cdaChunks.map((c, i) => dec.decode(c, { stream: i < cdaChunks.length - 1 })).join('');
+    }
+    return { ...result, cdaXml };
   }
 
   async function handleHealthFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = '';
+    markBusy(); // 解析期间也保持 busy,别被自动刷新打断
     setSyncing('health');
+    setImportPct(0);
     try {
-      const bytes = await extractExportXmlBytes(file);
-      if (!bytes || bytes.length === 0) {
+      // 看板指标 + 记忆节点(概况/锻炼)都基于全文件的同一次流式解析 —— 概况不再只看尾部 6MB,
+      // 避免 Apple 按类型分块导出时尾部缺步数/心率/睡眠而漏进概况。
+      // D2:仅 lab 模式下顺带捕获+解析 export_cda.xml 的临床记录(化验单/用药/诊断)。
+      const labMode = readLaunchSurfaceContextFromBrowser().viewerRole === 'personal_lab';
+      const result = await importHealthFile(file, setImportPct, labMode);
+      setImportPct(null); // 读取+解析完成,余下持久化很快
+      if (labMode && result?.cdaXml) {
+        try {
+          const [{ parseCda }, { saveClinical }] = await Promise.all([
+            import('@/lib/portal/cda-parse'),
+            import('@/lib/portal/clinical-store'),
+          ]);
+          const clinical = parseCda(result.cdaXml);
+          saveClinical(clinical);
+          if (clinical.labs.length || clinical.medications.length || clinical.conditions.length) {
+            showToast(L(dict, `临床记录:${clinical.labs.length} 项化验 · ${clinical.medications.length} 用药 · ${clinical.conditions.length} 诊断`, `Clinical: ${clinical.labs.length} labs · ${clinical.medications.length} meds · ${clinical.conditions.length} conditions`), true);
+          }
+        } catch { /* 临床解析尽力而为,失败不影响健康导入 */ }
+      }
+      if (!result) {
         showToast(L(dict, 'zip 里没找到 export.xml(别选 export_cda / 子文件夹)', 'No export.xml in the zip (not export_cda / subfolders)'), false);
         setSyncing(null); return;
       }
-      const { parseAppleHealthText, parseHealthMetricsFromBytes } = await import('@/lib/portal/apple-health');
-      // 指标看板:流式扫全文件 → 所有指标类型都拿到
-      const metrics = parseHealthMetricsFromBytes(bytes);
+      const { metrics, nodes } = result;
       if (metrics.metrics.length) {
         const { saveHealthMetrics } = await import('@/lib/portal/health-store');
         saveHealthMetrics(metrics);
       }
-      // 记忆节点:概况 + 锻炼(用尾部文本,便宜)
-      const tail = new TextDecoder('utf-8').decode(bytes.subarray(Math.max(0, bytes.length - 6_000_000)));
-      const { nodes } = parseAppleHealthText(tail);
       if (!nodes.length && !metrics.metrics.length) {
         showToast(L(dict, '未识别到健康数据(确认选的是 export.xml/zip,不是 export_cda)', 'No health data (make sure it is export.xml/zip, not export_cda)'), false);
         setSyncing(null); return;
@@ -795,8 +909,9 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       setCounts((p) => ({ ...p, health: metrics.metrics.length || nodes.length }));
       showToast(L(dict, `已接入健康数据:${metrics.metrics.length} 项指标,到「洞察 → 健康」看看`, `Health imported: ${metrics.metrics.length} metrics — see Insights → Health`), true);
     } catch {
-      showToast(L(dict, '解析失败(文件可能太大,手机内存不够 —— 可先在电脑上解压后单传 export.xml)', 'Parse failed (file may be too large for phone memory — unzip on a computer and upload export.xml)'), false);
+      showToast(L(dict, '解析失败(文件可能损坏或不是 Apple 健康导出 —— 可先在电脑上解压后单传 export.xml)', 'Parse failed (file may be corrupt or not an Apple Health export — unzip on a computer and upload export.xml)'), false);
     }
+    setImportPct(null);
     setSyncing(null);
   }
 
@@ -869,7 +984,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
                       {c.method === 'shortcuts' && !c.comingSoon && <span className="nesio-connector-soon" style={{ background: 'rgba(88,140,227,0.12)', color: 'var(--portal-blue-deep)' }}>{L(dict, '快捷指令', 'Shortcuts')}</span>}
                     </p>
                     <p className="nesio-connector-desc">{dict === 'en' ? (c.descriptionEn ?? c.description) : c.description}</p>
-                    {isConn && !oauthSyncResult[c.id] && <p className="nesio-connector-sync">{isSync ? L(dict, '同步中…', 'Syncing…') : L(dict, '已连接', 'Connected')}{cnt ? L(dict, `  ·  ${cnt} 个节点`, `  ·  ${cnt} nodes`) : ''}</p>}
+                    {isConn && !oauthSyncResult[c.id] && <p className="nesio-connector-sync">{isSync ? (importPct != null ? L(dict, `导入中 ${importPct}%`, `Importing ${importPct}%`) : L(dict, '同步中…', 'Syncing…')) : L(dict, '已连接', 'Connected')}{cnt ? L(dict, `  ·  ${cnt} 个节点`, `  ·  ${cnt} nodes`) : ''}</p>}
                     {oauthSyncResult[c.id] && (
                       <p className="nesio-connector-sync" style={{ color: oauthSyncResult[c.id].ok ? 'var(--status-go)' : 'var(--status-risk)', fontSize: '0.68rem', lineHeight: 1.4 }}>
                         {oauthSyncResult[c.id].msg}
@@ -909,7 +1024,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
                     <button type="button" className="nesio-connector-disconnect" onClick={() => disconnect(c.id)} style={{ flexShrink: 0 }}>{L(dict, '断开', 'Disconnect')}</button>
                   ) : (
                     <button type="button" className="nesio-connector-connect" onClick={() => handleConnect(c)} disabled={isSync} style={{ flexShrink: 0 }}>
-                      {isSync ? '…' : c.method === 'file' ? L(dict, '上传', 'Upload') : L(dict, '接入', 'Connect')}
+                      {isSync ? (importPct != null ? `${importPct}%` : '…') : c.method === 'file' ? L(dict, '上传', 'Upload') : L(dict, '接入', 'Connect')}
                     </button>
                   )}
                 </div>
