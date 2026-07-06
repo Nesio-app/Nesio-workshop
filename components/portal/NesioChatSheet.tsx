@@ -595,6 +595,11 @@ export default function NesioChatSheet({
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  // 同步的发送闭锁:setSending 是异步的,快速两次 Enter 两个闭包都读到 sending===false → 双发。
+  const sendingRef = useRef(false);
+  // 单调消息 id:此前用 Date.now(),同毫秒(双发/图片+文本并发)会撞 React key。
+  const msgSeqRef = useRef(0);
+  const nextMsgId = (p: string) => `${p}-${Date.now().toString(36)}-${msgSeqRef.current++}`;
   const { flashNodes, triggerFlash, dismiss: dismissFlash } = useMemoryFlash();
   // voiceMode: false = text input, true = hold-to-talk bar
   const [voiceMode, setVoiceMode] = useState(false);
@@ -651,10 +656,11 @@ export default function NesioChatSheet({
   }, [messages, sending]);
 
   const sendMessage = useCallback(async (text: string) => {
-    if (!text.trim() || sending) return;
-    const userMsg: UiMessage = { id: `u-${Date.now()}`, role: 'user', text: text.trim() };
+    if (!text.trim() || sendingRef.current) return;
+    sendingRef.current = true; // 同步闭锁,挡住同一 tick 的第二次触发
+    const userMsg: UiMessage = { id: nextMsgId('u'), role: 'user', text: text.trim() };
     const nextMsgs = [...messages, userMsg];
-    setMessages(nextMsgs);
+    setMessages((prev) => [...prev, userMsg]); // 函数式追加,别覆盖并发(图片分析)刚追加的消息
     setInput('');
     setSending(true);
     setShowPlus(false);
@@ -698,7 +704,7 @@ export default function NesioChatSheet({
         ? refCandidates.slice(0, 3).map((r) => r.node)
         : ids.map((id) => refCandidates.find((r) => r.shortId === id)?.node).filter((n): n is LifeNode => Boolean(n));
       const aiMsg: UiMessage = {
-        id: `a-${Date.now()}`,
+        id: nextMsgId('a'),
         role: 'model',
         // 兜底剥掉 markdown 强调记号 — 气泡是纯文本,裸 ** 很出戏
         text: cleanResp.replace(/\*\*/g, ''),
@@ -706,9 +712,8 @@ export default function NesioChatSheet({
         refs: citedNodes.map((n) => ({ id: n.id, name: n.name, source: n.source })),
         semanticDegraded,
       };
-      const withAi = [...nextMsgs, aiMsg];
-      setMessages(withAi);
-      saveHistory(withAi);
+      // 函数式追加 + 用最终列表存档,别用可能已过期的 nextMsgs 快照覆盖并发消息。
+      setMessages((prev) => { const next = [...prev, aiMsg]; saveHistory(next); return next; });
     } catch (err) {
       clearTimeout(timeout);
       const isTimeout = err instanceof Error && err.name === 'AbortError';
@@ -717,11 +722,12 @@ export default function NesioChatSheet({
       const fallbackText = localHits.length
         ? `AI 暂时不可用，但我在记忆库里找到了这些相关线索：\n${localHits.map((n) => `• ${n.name}`).join('\n')}`
         : isTimeout ? '响应超时，请重试。' : 'AI 暂时不可用，记忆库里也没找到相关线索。';
-      const errMsg: UiMessage = { id: `e-${Date.now()}`, role: 'model', text: fallbackText, refs: localHits.map((n) => ({ id: n.id, name: n.name, source: n.source })) };
+      const errMsg: UiMessage = { id: nextMsgId('e'), role: 'model', text: fallbackText, refs: localHits.map((n) => ({ id: n.id, name: n.name, source: n.source })) };
       setMessages((prev) => [...prev, errMsg]);
     }
     setSending(false);
-  }, [messages, sending]);
+    sendingRef.current = false;
+  }, [messages]);
 
   function handleSave(msg: UiMessage) {
     const savedNode = ingestLifeNode({
@@ -751,19 +757,17 @@ export default function NesioChatSheet({
         const dataUrl = ev.target?.result as string;
         const [hdr, b64] = dataUrl.split(',');
         const mime = hdr.match(/:(.*?);/)?.[1] || 'image/jpeg';
-        const userMsg: UiMessage = { id: `u-${Date.now()}`, role: 'user', text: L(dict, `［图片］这是什么？`, `[Image] What's this?`) };
-        const next = [...messages, userMsg];
-        setMessages(next);
+        const userMsg: UiMessage = { id: nextMsgId('u'), role: 'user', text: L(dict, `［图片］这是什么？`, `[Image] What's this?`) };
+        setMessages((prev) => [...prev, userMsg]); // 函数式追加,别覆盖并发发送的消息
         fetch('/api/portal/analyze', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ type: 'image', imageBase64: b64, mimeType: mime }),
         }).then((r) => r.json()).then((data: { ok?: boolean; nodes?: Array<{ name: string; type: string }>; summary?: string }) => {
           const names = data.nodes?.map((n) => n.name).join(L(dict, '、', ', ')) || data.summary || L(dict, '（未识别到内容）', '(nothing recognized)');
-          const aiMsg: UiMessage = { id: `a-${Date.now()}`, role: 'model', text: L(dict, `识别到：${names}\n\n可以继续问我关于这张图片的问题。`, `Recognized: ${names}\n\nAsk me anything about this image.`) };
-          const withAi = [...next, aiMsg];
-          setMessages(withAi); saveHistory(withAi);
+          const aiMsg: UiMessage = { id: nextMsgId('a'), role: 'model', text: L(dict, `识别到：${names}\n\n可以继续问我关于这张图片的问题。`, `Recognized: ${names}\n\nAsk me anything about this image.`) };
+          setMessages((prev) => { const withAi = [...prev, aiMsg]; saveHistory(withAi); return withAi; });
         }).catch(() => {
-          const aiMsg: UiMessage = { id: `a-${Date.now()}`, role: 'model', text: '图片识别失败，请重试。' };
+          const aiMsg: UiMessage = { id: nextMsgId('a'), role: 'model', text: L(dict, '图片识别失败，请重试。', 'Image recognition failed — try again.') };
           setMessages((prev) => [...prev, aiMsg]);
         });
       };
@@ -1012,7 +1016,8 @@ export default function NesioChatSheet({
                 </div>
                 {msg.sources && msg.sources.length > 0 && (
                   <div className="nesio-wechat-sources">
-                    {msg.sources.map((s) => (
+                    {/* 只渲染 http(s) 链接 —— 模型返回的 URL 未必可信,挡 javascript:/data: 等伪协议 */}
+                    {msg.sources.filter((s) => /^https?:\/\//i.test(s.url)).map((s) => (
                       <a key={s.url} href={s.url} target="_blank" rel="noopener noreferrer" className="nesio-wechat-source-chip">
                         <IconLink size={11} /> {s.title || s.url.replace(/^https?:\/\//, '').split('/')[0]}
                       </a>
@@ -1081,7 +1086,7 @@ export default function NesioChatSheet({
       {/* Plus panel */}
       {showPlus && (
         <div className="nesio-wechat-plus-panel">
-          <button type="button" className="nesio-wechat-plus-item" onClick={() => { setShowPlus(false); const inp = document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.onchange=(e)=>{ const f=(e.target as HTMLInputElement).files?.[0]; if(!f) return; const reader=new FileReader(); reader.onload=(ev)=>{ const dataUrl=ev.target?.result as string; const [hdr,b64]=dataUrl.split(','); const mime=hdr.match(/:(.*?);/)?.[1]||'image/jpeg'; const userMsg:UiMessage={id:`u-${Date.now()}`,role:'user',text:'[图片] 识别图片'}; const next=[...messages,userMsg]; setMessages(next); fetch('/api/portal/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'image',imageBase64:b64,mimeType:mime})}).then(r=>r.json()).then((data:{ ok?:boolean; nodes?:Array<{name:string;type:string}>; summary?:string })=>{ if(data.ok&&data.nodes?.length){const names=data.nodes.map(n=>n.name).join('、'); const found=new Map<string,LifeNode>(); for(const node of data.nodes){for(const n of searchLifeGraphFuzzy(node.name,2))found.set(n.id,n);} const nodes=Array.from(found.values()).slice(0,6); const aiText=nodes.length>0?`识别到：${names}\n\n找到 ${nodes.length} 条相关记录：\n${nodes.map(n=>`• ${n.name}`).join('\n')}`:`识别到：${names}\n\n记忆库里暂时没有相关记录。`; const aiMsg:UiMessage={id:`a-${Date.now()}`,role:'model',text:aiText}; const withAi=[...next,aiMsg]; setMessages(withAi); saveHistory(withAi);}else{const aiMsg:UiMessage={id:`a-${Date.now()}`,role:'model',text:data.summary||'图片识别暂时不可用。'}; const withAi=[...next,aiMsg]; setMessages(withAi); saveHistory(withAi);}}).catch(()=>{const aiMsg:UiMessage={id:`a-${Date.now()}`,role:'model',text:'图片识别失败，请重试。'}; setMessages(prev=>[...prev,aiMsg]);});}; reader.readAsDataURL(f);}; inp.click(); }}>
+          <button type="button" className="nesio-wechat-plus-item" onClick={() => { setShowPlus(false); const inp = document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.onchange=(e)=>{ const f=(e.target as HTMLInputElement).files?.[0]; if(!f) return; const reader=new FileReader(); reader.onload=(ev)=>{ const dataUrl=ev.target?.result as string; const [hdr,b64]=dataUrl.split(','); const mime=hdr.match(/:(.*?);/)?.[1]||'image/jpeg'; const userMsg:UiMessage={id:nextMsgId('u'),role:'user',text:'[图片] 识别图片'}; setMessages(prev=>[...prev,userMsg]); fetch('/api/portal/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'image',imageBase64:b64,mimeType:mime})}).then(r=>r.json()).then((data:{ ok?:boolean; nodes?:Array<{name:string;type:string}>; summary?:string })=>{ if(data.ok&&data.nodes?.length){const names=data.nodes.map(n=>n.name).join('、'); const found=new Map<string,LifeNode>(); for(const node of data.nodes){for(const n of searchLifeGraphFuzzy(node.name,2))found.set(n.id,n);} const nodes=Array.from(found.values()).slice(0,6); const aiText=nodes.length>0?`识别到：${names}\n\n找到 ${nodes.length} 条相关记录：\n${nodes.map(n=>`• ${n.name}`).join('\n')}`:`识别到：${names}\n\n记忆库里暂时没有相关记录。`; const aiMsg:UiMessage={id:nextMsgId('a'),role:'model',text:aiText}; setMessages(prev=>{const withAi=[...prev,aiMsg]; saveHistory(withAi); return withAi;});}else{const aiMsg:UiMessage={id:nextMsgId('a'),role:'model',text:data.summary||'图片识别暂时不可用。'}; setMessages(prev=>{const withAi=[...prev,aiMsg]; saveHistory(withAi); return withAi;});}}).catch(()=>{const aiMsg:UiMessage={id:nextMsgId('a'),role:'model',text:'图片识别失败，请重试。'}; setMessages(prev=>[...prev,aiMsg]);});}; reader.readAsDataURL(f);}; inp.click(); }}>
             <span className="nesio-wechat-plus-icon"><IconImage /></span>
             <span>{L(dict, '相册', 'Photos')}</span>
           </button>
