@@ -246,10 +246,37 @@ export interface HealthMetric {
   series: Array<{ ym: string; v: number }>; // 批次 40:按月历史序列(画多年趋势曲线)
 }
 
+/** 批次 42(A):血糖深度分析 —— CGM/指尖血级密集数据,不再只留「最新一个读数」。
+ *  内部一律按 mg/dL 计算(规范单位),按用户原始单位(mmol/L 或 mg/dL)显示。 */
+export interface GlucoseAnalysis {
+  unit: 'mmol/L' | 'mg/dL';    // 显示单位(按用户数据里的原始单位)
+  count: number;               // 有效读数条数
+  avg: number; min: number; max: number;   // 显示单位
+  cv: number;                  // 变异系数 %(std/mean,血糖稳定性的金标准指标)
+  gmi: number;                 // 血糖管理指标 %(≈糖化血红蛋白 A1c),GMI=3.31+0.02392×平均mg/dL
+  tirPct: number;              // 时间在目标范围内 %(3.9–10.0 mmol/L = 70–180 mg/dL)
+  belowPct: number; abovePct: number;       // 低于/高于目标 %
+  targetLow: number; targetHigh: number;    // 显示单位的目标区间(画范围带用)
+  daily: Array<{ date: string; avg: number; min: number; max: number }>;  // 近 90 天日序列(显示单位)
+  hourly: Array<{ hour: number; avg: number }>;   // 0–23 点平均(看黎明现象/餐后峰值,显示单位)
+}
+
+/** 批次 42(A):每日事实表 —— 把各领域指标对齐到「天」,作为跨板块关系挖掘(综合层)的地基。
+ *  值一律用规范单位(与 METRIC_DEFS 一致);后续 B/C 往这张表加列。 */
+export interface DailyFact {
+  date: string;                       // YYYY-MM-DD
+  glucoseAvg?: number; glucoseMin?: number; glucoseMax?: number;  // mg/dL
+  steps?: number; activeEnergy?: number; distance?: number;       // sumDay 类
+  restingHR?: number; hrv?: number;                               // latest 类当日值
+  sleepH?: number;                    // 当晚睡眠小时(按夜键归属)
+}
+
 export interface HealthMetrics {
   metrics: HealthMetric[];
   workouts: number;
   importedAt: string;
+  glucose?: GlucoseAnalysis;          // A:血糖深度分析(数据足够时才有)
+  daily?: DailyFact[];                // A:每日事实表(跨域分析地基)
 }
 
 // latest 类指标的合理范围(规范单位),超出即当脏值丢弃,不让离谱读数直接上卡片。
@@ -358,6 +385,30 @@ class HealthAggregator {
   private mindMin = new Map<string, number>();
   private workoutList: Array<{ type: string; label: string; duration: string; start: string }> = [];
   workouts = 0;
+  // A:血糖深度采集(全部按 mg/dL 规范单位累计;显示时再按用户单位换算)。
+  private gluDay = new Map<string, { sum: number; count: number; min: number; max: number }>();
+  private gluHour = new Map<number, { sum: number; count: number }>();
+  private glu = { count: 0, sum: 0, sumSq: 0, inRange: 0, below: 0, above: 0, mmol: false };
+
+  private feedGlucose(r: Rec, mgdl: number) {
+    const day = r.startDate.slice(0, 10);
+    if (!day) return;
+    const g = this.gluDay.get(day) || { sum: 0, count: 0, min: Infinity, max: -Infinity };
+    g.sum += mgdl; g.count += 1;
+    if (mgdl < g.min) g.min = mgdl;
+    if (mgdl > g.max) g.max = mgdl;
+    this.gluDay.set(day, g);
+    const hour = Number(r.startDate.slice(11, 13));
+    if (Number.isFinite(hour)) {
+      const h = this.gluHour.get(hour) || { sum: 0, count: 0 };
+      h.sum += mgdl; h.count += 1; this.gluHour.set(hour, h);
+    }
+    this.glu.count += 1; this.glu.sum += mgdl; this.glu.sumSq += mgdl * mgdl;
+    if (mgdl < 70) this.glu.below += 1;
+    else if (mgdl > 180) this.glu.above += 1;
+    else this.glu.inRange += 1;
+    if ((r.unit || '').toLowerCase().includes('mmol')) this.glu.mmol = true;
+  }
 
   private pushLatest(key: string, d: string, v: number) {
     const cur = this.latest.get(key);
@@ -388,6 +439,7 @@ class HealthAggregator {
           if (!r.startDate || !Number.isFinite(v)) continue;
           const sv = convertUnit(def.key, v, r.unit);
           if (!plausible(def.key, sv)) continue; // 丢弃离谱脏值(换算后按规范单位判)
+          if (def.key === 'glucose') this.feedGlucose(r, sv); // A:同一次扫描顺带深度采集,不重复读
           this.pushLatest(def.key, r.startDate.slice(0, 10), sv);
           if (!mm) { mm = new Map(); this.monthlyLatest.set(def.key, mm); }
           const ym = r.startDate.slice(0, 7);
@@ -468,7 +520,58 @@ class HealthAggregator {
         out.push({ ...toMetric(def), latest: round(last[1], 0), latestDate: last[0], prev: prev == null ? null : round(prev, 0), series: monthlySeriesAvg(this.mindMin, (v) => v, 0) });
       }
     }
-    return { metrics: out, workouts: this.workouts, importedAt: new Date().toISOString() };
+    const glucose = this.buildGlucose();
+    const daily = this.buildDailyFacts();
+    return { metrics: out, workouts: this.workouts, importedAt: new Date().toISOString(), glucose, daily };
+  }
+
+  /** A:血糖深度分析 —— 日序列 + TIR + 变异系数 + GMI + 小时模式。内部 mg/dL,按用户单位显示。 */
+  private buildGlucose(): GlucoseAnalysis | undefined {
+    if (this.glu.count < 14) return undefined; // 太少不做深度分析(避免几条读数就给结论)
+    const mmol = this.glu.mmol;
+    const dv = (mgdl: number) => (mmol ? Math.round((mgdl / 18.0182) * 10) / 10 : Math.round(mgdl));
+    const n = this.glu.count;
+    const meanMgdl = this.glu.sum / n;
+    const variance = Math.max(0, this.glu.sumSq / n - meanMgdl * meanMgdl);
+    const cv = meanMgdl > 0 ? (Math.sqrt(variance) / meanMgdl) * 100 : 0;
+    const daily = [...this.gluDay.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .slice(-90)
+      .map(([date, g]) => ({ date, avg: dv(g.sum / g.count), min: dv(g.min), max: dv(g.max) }));
+    const hourly = [...this.gluHour.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([hour, h]) => ({ hour, avg: dv(h.sum / h.count) }));
+    return {
+      unit: mmol ? 'mmol/L' : 'mg/dL',
+      count: n,
+      avg: dv(meanMgdl),
+      min: dv(Math.min(...[...this.gluDay.values()].map((g) => g.min))),
+      max: dv(Math.max(...[...this.gluDay.values()].map((g) => g.max))),
+      cv: Math.round(cv * 10) / 10,
+      gmi: Math.round((3.31 + 0.02392 * meanMgdl) * 10) / 10,
+      tirPct: Math.round((this.glu.inRange / n) * 1000) / 10,
+      belowPct: Math.round((this.glu.below / n) * 1000) / 10,
+      abovePct: Math.round((this.glu.above / n) * 1000) / 10,
+      targetLow: mmol ? 3.9 : 70,
+      targetHigh: mmol ? 10 : 180,
+      daily,
+      hourly,
+    };
+  }
+
+  /** A:每日事实表 —— 把各领域已聚合到「天」的指标并到一张表,作跨板块关系挖掘的地基。 */
+  private buildDailyFacts(): DailyFact[] {
+    const byDate = new Map<string, DailyFact>();
+    const get = (d: string) => { let f = byDate.get(d); if (!f) { f = { date: d }; byDate.set(d, f); } return f; };
+    for (const [date, g] of this.gluDay) { const f = get(date); f.glucoseAvg = round(g.sum / g.count, 0); f.glucoseMin = round(g.min, 0); f.glucoseMax = round(g.max, 0); }
+    for (const key of ['steps', 'activeEnergy', 'distance'] as const) {
+      const raw = this.sumDay.get(key);
+      if (!raw) continue;
+      const dec = key === 'distance' ? 2 : 0;
+      for (const [date, v] of collapseBySource(raw)) get(date)[key] = round(v, dec);
+    }
+    for (const [night, ms] of collapseBySource(this.sleepMs)) get(night).sleepH = round(ms / 3_600_000, 1);
+    return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date)).slice(-180);
   }
 
   /** 从全文件聚合结果建记忆节点(概况 + 锻炼)—— 取代此前只解析尾部 6MB 的做法,

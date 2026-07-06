@@ -85,4 +85,22 @@ assert.equal(
   '流式锻炼事件数与整体一致',
 );
 
+// ── 批次 42(A):血糖深度分析 —— 构造 20 条 mmol/L 读数,验 TIR/GMI/单位/每日事实表。
+const gluDate = (off) => { const dt = new Date(Date.now() - off * 86_400_000); return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`; };
+const mkGlu = (day, hh, mmolVal) => `<Record type="HKQuantityTypeIdentifierBloodGlucose" sourceName="Dexcom" unit="mmol<180.15588000005408>/L" startDate="${day} ${String(hh).padStart(2, '0')}:00:00 -0800" endDate="${day} ${String(hh).padStart(2, '0')}:05:00 -0800" value="${mmolVal}"/>`;
+const gluVals = [...Array(10).fill(5.5), ...Array(5).fill(12.0), ...Array(5).fill(3.0)]; // 10 在范围 / 5 偏高 / 5 偏低
+let gluXml = '';
+gluVals.forEach((v, i) => { gluXml += mkGlu(gluDate((i % 5) + 1), (i * 3) % 24, v) + '\n'; });
+const gres = AH.parseHealthFromBytes(new TextEncoder().encode(gluXml));
+assert.ok(gres.metrics.glucose, 'A:血糖深度分析生成');
+assert.equal(gres.metrics.glucose.unit, 'mmol/L', 'A:按用户原始单位 mmol/L 显示');
+assert.equal(gres.metrics.glucose.count, 20, 'A:计入全部读数(摩尔单位不丢)');
+assert.ok(Math.abs(gres.metrics.glucose.tirPct - 50) < 0.1, `A:TIR=50%,实得 ${gres.metrics.glucose.tirPct}`);
+assert.ok(Math.abs(gres.metrics.glucose.belowPct - 25) < 0.1, `A:低于目标 25%,实得 ${gres.metrics.glucose.belowPct}`);
+assert.ok(gres.metrics.glucose.gmi > 5.5 && gres.metrics.glucose.gmi < 7, `A:GMI 合理(5.5–7),实得 ${gres.metrics.glucose.gmi}`);
+assert.equal(gres.metrics.glucose.targetLow, 3.9, 'A:mmol 用户目标下限 3.9');
+assert.ok(gres.metrics.glucose.daily.length >= 1 && gres.metrics.glucose.daily.length <= 5, `A:日序列 1–5 天,实得 ${gres.metrics.glucose.daily.length}`);
+assert.ok(gres.metrics.glucose.hourly.length >= 1, 'A:小时模式(黎明/餐后)');
+assert.ok(Array.isArray(gres.metrics.daily) && gres.metrics.daily.some((f) => f.glucoseAvg != null), 'A:每日事实表含血糖列');
+
 console.log('apple-health-parse: OK');
