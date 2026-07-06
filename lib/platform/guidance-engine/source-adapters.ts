@@ -13,6 +13,8 @@ import type { ProactiveContextItem, FocusNode } from '@/lib/platform/view-models
 import { inferEventType } from '@/lib/platform/attention-engine';
 import { nearestNodeDate } from '@/lib/platform/node-dates';
 import type { LifeNode } from '@/lib/portal/life-graph';
+import type { ClinicalFinding } from '@/lib/portal/health-clinical';
+import type { RiskScore } from '@/lib/portal/health-risk';
 import type { GuidanceEvent, GuidanceEventType } from './types';
 
 // ── Calendar ──────────────────────────────────────────────────────────────────
@@ -206,6 +208,64 @@ export function healthNodesToGuidanceEvents(healthItems: string[]): GuidanceEven
     confidence: 60,  // habit pattern = inferred, not explicitly scheduled
     payload: { itemName: healthItems[0], allItems: healthItems },
   }];
+}
+
+// ── Health four-layer findings → guidance (医疗级 ②③ 接入主循环)────────────────
+// 此前 evaluateHealthFindings(②模式)/computeRiskScores(③风险)只在健康页被消费,
+// 从不进 Today。这个适配器把「值得温和提示」的判定(红旗/可关注、高/中风险带)转成
+// GuidanceEvent,与其余来源同台经七层仲裁 —— 达标/正常项留在健康页,不打扰。
+// warm-coach:文案不制造焦虑、红旗只软性建议「和医生聊聊」、始终可跳过(见 actionability)。
+
+/** severity 归一到 payload 里的词汇(flag/attention),供 action-window / actionability 统一取用。 */
+type HealthSeverity = 'flag' | 'attention';
+
+function findingToEvent(
+  id: string, sev: HealthSeverity, confidence: number,
+  titleZh: string, titleEn: string, detailZh: string, detailEn: string,
+  source: string, reasonZh: string,
+): GuidanceEvent {
+  return {
+    id,
+    type: 'health_insight',
+    title: titleZh,
+    source: 'habit',
+    confidence,
+    payload: {
+      findingId: id, severity: sev,
+      titleZh, titleEn,
+      bodyZh: `${detailZh} · 依据 ${source}`,
+      bodyEn: `${detailEn} · per ${source}`,
+      reason: reasonZh,
+    },
+  };
+}
+
+export function healthFindingsToGuidanceEvents(
+  findings: readonly ClinicalFinding[],
+  scores: readonly RiskScore[],
+): GuidanceEvent[] {
+  const events: GuidanceEvent[] = [];
+
+  for (const f of findings) {
+    if (f.severity !== 'flag' && f.severity !== 'attention') continue; // info(正常/达标)不打扰
+    events.push(findingToEvent(
+      `health-${f.id}`, f.severity, f.severity === 'flag' ? 85 : 68,
+      f.title[0], f.title[1], f.detail[0], f.detail[1], f.source, `健康 · ${f.source}`,
+    ));
+  }
+
+  for (const s of scores) {
+    if (s.category !== 'high' && s.category !== 'moderate') continue; // info/low 不打扰
+    const sev: HealthSeverity = s.category === 'high' ? 'flag' : 'attention';
+    events.push(findingToEvent(
+      `health-risk-${s.id}`, sev, s.category === 'high' ? 80 : 66,
+      `${s.label[0]} · ${s.value}`, `${s.label[1]} · ${s.value}`,
+      s.detail[0], s.detail[1], s.source, `健康风险 · ${s.source}`,
+    ));
+  }
+
+  // 最多 3 条(红旗优先),避免 Today 变成体检报告;完整清单仍在健康页。
+  return events.sort((a, b) => (a.payload.severity === 'flag' ? 0 : 1) - (b.payload.severity === 'flag' ? 0 : 1)).slice(0, 3);
 }
 
 // ── Object context (物品关联情境) ─────────────────────────────────────────────
