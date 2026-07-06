@@ -103,6 +103,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
   const [wechatReadingOpen, setWechatReadingOpen] = useState(false);
   const [connected, setConnected] = useState<Record<string, boolean>>({});
   const [syncing, setSyncing] = useState<string | null>(null);
+  const [importPct, setImportPct] = useState<number | null>(null); // 健康大文件导入进度(0–100)
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const [tokenInputFor, setTokenInputFor] = useState<string | null>(null);
@@ -767,9 +768,21 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
   // 增量解析器后立即丢弃,任何时刻只持有一小块;Apple 按类型分块导出仍扫全文件不漏指标。
   async function importHealthFile(
     file: File,
+    onProgress?: (pct: number) => void,
   ): Promise<{ metrics: HealthMetrics; nodes: HealthNode[] } | null> {
     const { createHealthStreamParser } = await import('@/lib/portal/apple-health');
     const parser = createHealthStreamParser();
+
+    // 进度按「已读字节 / 文件总大小」上报(zip 读的是压缩字节,正好对应 file.size);
+    // 按整数百分比节流,避免 ~64KB 一块的高频 setState 拖慢 UI。
+    const total = file.size || 0;
+    let read = 0;
+    let lastPct = -1;
+    const report = () => {
+      if (!total || !onProgress) return;
+      const pct = Math.min(99, Math.floor((read / total) * 100)); // 收尾 finalize 还有一点,留到 100
+      if (pct !== lastPct) { lastPct = pct; onProgress(pct); }
+    };
 
     // 文件字节按块产出:优先 File.stream()(不把整包读进内存),不支持则回退分片 arrayBuffer。
     async function forEachChunk(onChunk: (c: Uint8Array) => void): Promise<void> {
@@ -778,14 +791,17 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
         for (;;) {
           const { done, value } = await reader.read();
           if (done) break;
-          if (value) onChunk(value);
+          if (value) { read += value.length; onChunk(value); report(); }
         }
         return;
       }
       const whole = new Uint8Array(await file.arrayBuffer());
       const STEP = 4_000_000;
       for (let i = 0; i < whole.length; i += STEP) {
-        onChunk(whole.subarray(i, Math.min(whole.length, i + STEP)));
+        const slice = whole.subarray(i, Math.min(whole.length, i + STEP));
+        read += slice.length;
+        onChunk(slice);
+        report();
         await Promise.resolve(); // 让出主线程,大文件下避免长任务卡死 UI
       }
     }
@@ -829,10 +845,12 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     e.target.value = '';
     markBusy(); // 解析期间也保持 busy,别被自动刷新打断
     setSyncing('health');
+    setImportPct(0);
     try {
       // 看板指标 + 记忆节点(概况/锻炼)都基于全文件的同一次流式解析 —— 概况不再只看尾部 6MB,
       // 避免 Apple 按类型分块导出时尾部缺步数/心率/睡眠而漏进概况。
-      const result = await importHealthFile(file);
+      const result = await importHealthFile(file, setImportPct);
+      setImportPct(null); // 读取+解析完成,余下持久化很快
       if (!result) {
         showToast(L(dict, 'zip 里没找到 export.xml(别选 export_cda / 子文件夹)', 'No export.xml in the zip (not export_cda / subfolders)'), false);
         setSyncing(null); return;
@@ -854,6 +872,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     } catch {
       showToast(L(dict, '解析失败(文件可能太大,手机内存不够 —— 可先在电脑上解压后单传 export.xml)', 'Parse failed (file may be too large for phone memory — unzip on a computer and upload export.xml)'), false);
     }
+    setImportPct(null);
     setSyncing(null);
   }
 
@@ -926,7 +945,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
                       {c.method === 'shortcuts' && !c.comingSoon && <span className="nesio-connector-soon" style={{ background: 'rgba(88,140,227,0.12)', color: 'var(--portal-blue-deep)' }}>{L(dict, '快捷指令', 'Shortcuts')}</span>}
                     </p>
                     <p className="nesio-connector-desc">{dict === 'en' ? (c.descriptionEn ?? c.description) : c.description}</p>
-                    {isConn && !oauthSyncResult[c.id] && <p className="nesio-connector-sync">{isSync ? L(dict, '同步中…', 'Syncing…') : L(dict, '已连接', 'Connected')}{cnt ? L(dict, `  ·  ${cnt} 个节点`, `  ·  ${cnt} nodes`) : ''}</p>}
+                    {isConn && !oauthSyncResult[c.id] && <p className="nesio-connector-sync">{isSync ? (importPct != null ? L(dict, `导入中 ${importPct}%`, `Importing ${importPct}%`) : L(dict, '同步中…', 'Syncing…')) : L(dict, '已连接', 'Connected')}{cnt ? L(dict, `  ·  ${cnt} 个节点`, `  ·  ${cnt} nodes`) : ''}</p>}
                     {oauthSyncResult[c.id] && (
                       <p className="nesio-connector-sync" style={{ color: oauthSyncResult[c.id].ok ? 'var(--status-go)' : 'var(--status-risk)', fontSize: '0.68rem', lineHeight: 1.4 }}>
                         {oauthSyncResult[c.id].msg}
@@ -966,7 +985,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
                     <button type="button" className="nesio-connector-disconnect" onClick={() => disconnect(c.id)} style={{ flexShrink: 0 }}>{L(dict, '断开', 'Disconnect')}</button>
                   ) : (
                     <button type="button" className="nesio-connector-connect" onClick={() => handleConnect(c)} disabled={isSync} style={{ flexShrink: 0 }}>
-                      {isSync ? '…' : c.method === 'file' ? L(dict, '上传', 'Upload') : L(dict, '接入', 'Connect')}
+                      {isSync ? (importPct != null ? `${importPct}%` : '…') : c.method === 'file' ? L(dict, '上传', 'Upload') : L(dict, '接入', 'Connect')}
                     </button>
                   )}
                 </div>
