@@ -78,6 +78,13 @@
       "marker": "export function evaluateHealthFindings",
       "file": "lib/portal/health-clinical.ts",
       "status_note": "已实现:声明式 RULES(知识)+ 通用 evaluate(引擎)分离;每条带指南出处"
+    },
+    {
+      "id": "HEALTH-007",
+      "description": "医疗级 ③层 风险分层:已验证评分(VO₂max 体适能常模 / BMI-WHO / GMI→eA1c-ADA),数据齐才算,带出处,非诊断",
+      "marker": "export function computeRiskScores",
+      "file": "lib/portal/health-risk.ts",
+      "status_note": "已实现:纯函数,输入不全不硬算;ASCVD/FINDRISC 待完整血脂+血压+吸烟史后补"
     }
   ]
 }
