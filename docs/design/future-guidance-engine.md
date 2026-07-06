@@ -298,7 +298,10 @@ Memory 日期窗口变化后重新评估
 用户明确删除的类型 → 停止出现
 ```
 
-**当前实现状态：** 已实现 dismiss 计数 → 冷却倍增；完成率追踪待实现。
+**当前实现状态：** 已实现 dismiss 计数 → 冷却倍增（`cooling-store.ts`）；点击/完成学习已由批次 52 的
+在线逻辑回归排序器 `guidance-ranker.ts` 实现（冷启动=旧公式，之后从反馈里偏移）。
+注意：当前学习知识存 localStorage 权重、原始反馈用完即弃——尚未做 event-sourcing（反馈作为事实持久化、
+权重降级为可回放投影）。详见 `docs/design/system-layers.md` Layer 2。
 
 ---
 
@@ -388,4 +391,4 @@ User Preference Allows  = true
 | Layer 5 | Attention Budget | `attention-budget.ts` | ✅ |
 | Layer 6 | Cooling + Dismiss Learning | `cooling-store.ts` | ✅ |
 | Layer 7 | AI Language Generation | `guidance-language/route.ts` | ✅（本次升级） |
-| Layer 7 | Completion/Click Learning | — | ⏳ 待实现 |
+| Layer 7 | Completion/Click Learning | `guidance-ranker.ts` | ✅（批次 52，在线逻辑回归；反馈 event-sourcing 待做，见 system-layers.md）|
