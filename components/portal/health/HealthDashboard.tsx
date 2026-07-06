@@ -8,7 +8,7 @@
 
 import { useEffect, useState } from 'react';
 import { loadHealthMetrics } from '@/lib/portal/health-store';
-import type { HealthMetric, HealthMetrics, GlucoseAnalysis } from '@/lib/portal/apple-health';
+import type { HealthMetric, HealthMetrics, GlucoseAnalysis, SleepStages, ActivityRings } from '@/lib/portal/apple-health';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -132,6 +132,61 @@ function GlucoseCard({ g, dict }: { g: GlucoseAnalysis; dict: string }) {
   );
 }
 
+// 批次 44(C):活动三环 —— Move/Exercise/Stand vs 目标(横向进度条,清爽且色彩在设计系统内)。
+function ActivityRingsCard({ a, dict }: { a: ActivityRings; dict: string }) {
+  const rings: Array<{ label: [string, string]; v: number; goal: number; unit: string; color: string }> = [
+    { label: ['活动', 'Move'], v: a.move, goal: a.moveGoal, unit: 'kcal', color: 'var(--status-gentle)' },
+    { label: ['锻炼', 'Exercise'], v: a.exercise, goal: a.exerciseGoal, unit: 'min', color: 'var(--status-go)' },
+    { label: ['站立', 'Stand'], v: a.stand, goal: a.standGoal, unit: 'h', color: 'var(--status-calm)' },
+  ];
+  return (
+    <div className="nesio-health-card" style={{ gridColumn: '1 / -1' }}>
+      <span className="nesio-health-card-label">{L(dict, '活动三环', 'Activity rings')} · {a.date.slice(5).replace('-', '/')}</span>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+        {rings.map((r) => {
+          const pct = r.goal > 0 ? Math.min(100, Math.round((r.v / r.goal) * 100)) : 0;
+          return (
+            <div key={r.label[0]}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--portal-muted)', marginBottom: 2 }}>
+                <span>{L(dict, r.label[0], r.label[1])}</span>
+                <span><b style={{ color: r.color }}>{r.v}</b>{r.goal > 0 ? ` / ${r.goal} ${r.unit}` : ` ${r.unit}`}{r.goal > 0 ? ` · ${pct}%` : ''}</span>
+              </div>
+              <div style={{ height: 8, borderRadius: 4, background: 'var(--portal-line)', overflow: 'hidden' }}>
+                <div style={{ width: `${pct}%`, height: '100%', background: r.color }} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// 批次 44(C):睡眠分期 —— 最近一晚 Deep/Core/REM/清醒 堆叠条 + 图例。
+function SleepStagesCard({ s, dict }: { s: SleepStages; dict: string }) {
+  const segs: Array<{ label: [string, string]; v: number; color: string }> = [
+    { label: ['深睡', 'Deep'], v: s.deep, color: 'var(--portal-blue-deep)' },
+    { label: ['核心', 'Core'], v: s.core, color: 'var(--portal-cool-accent)' },
+    { label: ['REM', 'REM'], v: s.rem, color: 'var(--status-calm)' },
+    { label: ['清醒', 'Awake'], v: s.awake, color: 'var(--portal-muted)' },
+  ];
+  const denom = s.total + s.awake || 1;
+  return (
+    <div className="nesio-health-card" style={{ gridColumn: '1 / -1' }}>
+      <span className="nesio-health-card-label">{L(dict, '睡眠分期', 'Sleep stages')} · {s.night.slice(5).replace('-', '/')}</span>
+      <span className="nesio-health-card-value">{s.total.toFixed(1)}<span className="nesio-health-card-unit">h {L(dict, '实际睡着', 'asleep')}</span></span>
+      <div style={{ display: 'flex', height: 10, borderRadius: 5, overflow: 'hidden', margin: '0.5rem 0 0.4rem', background: 'var(--portal-line)' }}>
+        {segs.filter((g) => g.v > 0).map((g) => <div key={g.label[0]} style={{ width: `${(g.v / denom) * 100}%`, background: g.color }} />)}
+      </div>
+      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', fontSize: '0.7rem', color: 'var(--portal-muted)' }}>
+        {segs.map((g) => (
+          <span key={g.label[0]}><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: g.color, marginRight: 4, verticalAlign: 'middle' }} />{L(dict, g.label[0], g.label[1])} {g.v.toFixed(1)}h</span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function MetricCard({ m, dict }: { m: HealthMetric; dict: string }) {
   // prev===0 时也算 delta(如上月 0 次锻炼 → 本月 3 次是真实增长,不该被压成"无变化");
   // 只有 deltaPct 因除零需要 prev!==0。
@@ -199,6 +254,12 @@ export default function HealthDashboard() {
           </div>
         );
       })()}
+      {(data.activityRings || data.sleepStages) && (
+        <div className="nesio-health-grid" style={{ marginTop: '0.6rem' }}>
+          {data.activityRings && <ActivityRingsCard a={data.activityRings} dict={dict} />}
+          {data.sleepStages && <SleepStagesCard s={data.sleepStages} dict={dict} />}
+        </div>
+      )}
       {data.glucose && (
         <div>
           <p className="nesio-settings-section-label" style={{ marginTop: '1rem' }}>{L(dict, '血糖', 'Glucose')}</p>

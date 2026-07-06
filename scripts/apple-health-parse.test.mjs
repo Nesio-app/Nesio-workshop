@@ -48,7 +48,12 @@ const xml = `
 <Record type="HKQuantityTypeIdentifierDietaryEnergyConsumed" sourceName="App" unit="kJ" value="8368" startDate="${iso(d2)}" endDate="${iso(d2)}"/>
 <Record type="HKQuantityTypeIdentifierWalkingSpeed" sourceName="Watch" unit="mi/hr" value="3" startDate="${iso(d2)}" endDate="${iso(d2)}"/>
 <Record type="HKQuantityTypeIdentifierAppleSleepingWristTemperature" sourceName="Watch" unit="degF" value="96.8" startDate="${iso(d2)}" endDate="${iso(d2)}"/>
-<Workout workoutActivityType="HKWorkoutActivityTypeRunning" duration="30" startDate="${iso(d2)}" endDate="${iso(d2)}"/>
+<Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="Watch" value="HKCategoryValueSleepAnalysisAsleepDeep" startDate="${iso(d2, 1)}" endDate="${iso(d2, 2)}"/>
+<Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="Watch" value="HKCategoryValueSleepAnalysisAsleepCore" startDate="${iso(d2, 2)}" endDate="${iso(d2, 5)}"/>
+<Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="Watch" value="HKCategoryValueSleepAnalysisAsleepREM" startDate="${iso(d2, 5)}" endDate="${iso(d2, 6)}"/>
+<Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="Watch" value="HKCategoryValueSleepAnalysisAwake" startDate="${iso(d2, 6)}" endDate="${iso(d2, 6)}"/>
+<ActivitySummary dateComponents="${iso(d2).slice(0, 10)}" activeEnergyBurned="450" activeEnergyBurnedGoal="500" activeEnergyBurnedUnit="kcal" appleExerciseTime="35" appleExerciseTimeGoal="30" appleStandHours="11" appleStandHoursGoal="12"/>
+<Workout workoutActivityType="HKWorkoutActivityTypeRunning" duration="30" totalDistance="5.2" totalDistanceUnit="km" totalEnergyBurned="1339" totalEnergyBurnedUnit="kJ" startDate="${iso(d2)}" endDate="${iso(d2)}"/>
 `;
 const { metrics, nodes } = AH.parseHealthFromBytes(new TextEncoder().encode(xml));
 const get = (k) => metrics.metrics.find((m) => m.key === k);
@@ -70,6 +75,18 @@ assert.equal(get('standTime').latest, 120, 'B:站立时长 sumDay');
 assert.ok(Math.abs(get('dietEnergy').latest - 2000) < 1, `B:摄入热量 kJ→kcal(8368kJ≈2000kcal),实得 ${get('dietEnergy')?.latest}`);
 assert.ok(Math.abs(get('walkingSpeed').latest - 4.828) < 0.05, `B:步速 mi/hr→km/h(3→4.83),实得 ${get('walkingSpeed')?.latest}`);
 assert.ok(Math.abs(get('wristTemp').latest - 36.0) < 0.2, `B:腕温 degF→°C(96.8°F≈36°C),实得 ${get('wristTemp')?.latest}`);
+
+// ── 批次 44(C):睡眠分期 / 活动三环 / 锻炼富数据。
+assert.ok(metrics.sleepStages, 'C:睡眠分期生成');
+assert.ok(Math.abs(metrics.sleepStages.total - 5.0) < 0.2, `C:实际睡着≈5h(深1+核心3+REM1),实得 ${metrics.sleepStages?.total}`);
+assert.ok(Math.abs(metrics.sleepStages.deep - 1.0) < 0.2, `C:深睡 1h,实得 ${metrics.sleepStages?.deep}`);
+assert.ok(metrics.activityRings, 'C:活动三环生成');
+assert.equal(metrics.activityRings.move, 450, 'C:Move 450 kcal');
+assert.equal(metrics.activityRings.exerciseGoal, 30, 'C:Exercise 目标 30 min');
+assert.equal(metrics.activityRings.stand, 11, 'C:Stand 11 h');
+const runNode = nodes.find((n) => n.type === 'event' && /跑步/.test(n.name));
+assert.ok(runNode && /5\.2 公里/.test(runNode.rawInput), 'C:锻炼节点含距离 5.2 公里');
+assert.ok(runNode && Math.abs(Number(runNode.attributes.energyKcal) - 320) < 2, `C:锻炼消耗 kJ→kcal(1339→320),实得 ${runNode?.attributes.energyKcal}`);
 
 const summary = nodes.find((n) => n.type === 'health_state');
 assert.ok(summary && /步/.test(summary.rawInput) && /体重/.test(summary.rawInput), '概况节点全文件包含步数+体重');
