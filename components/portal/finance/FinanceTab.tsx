@@ -21,12 +21,13 @@ import { financeFindings } from '@/lib/portal/finance-insight';
 import { computeFinanceScores } from '@/lib/portal/finance-risk';
 import { incomeBreakdown } from '@/lib/portal/finance-features';
 import { removeBankAccount } from '@/lib/portal/bank-tx';
+import { loadBudget, saveBudget, hasBudget, suggestBudget, budgetProgress, type BudgetConfig } from '@/lib/portal/finance-budget';
 import { categoryLabel, categoryDetailLabel, COMMON_EXPENSE_CATEGORIES } from '@/lib/portal/tx-category';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 
-type Sub = 'overview' | 'spending' | 'tx' | 'recurring' | 'cards';
+type Sub = 'overview' | 'spending' | 'budget' | 'tx' | 'recurring' | 'cards';
 
 function monthLabel(ym: string, dict: string): string {
   const [y, m] = ym.split('-');
@@ -132,6 +133,11 @@ export default function FinanceTab() {
   // 财务⑮:L3 财务体检(应急金/储蓄率/订阅负担,分项带出处;数据不齐的项不出)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const scores = useMemo(() => computeFinanceScores(txs, accounts), [txs, accounts, rev]);
+  // 财务㉒:预算(总额 + 分类;「按习惯生成」用近 6 月基线起草)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const budget = useMemo(() => loadBudget(), [rev]);
+  const bp = useMemo(() => budgetProgress(txs, ym, budget), [txs, ym, budget]);
+  const [budgetNote, setBudgetNote] = useState('');
 
   if (txs.length === 0) {
     return <p className="nesio-insights-empty">{L(dict, '还没有银行流水。到「设置 → 数据接入 → 银行流水 · Plaid」连接账户并点「同步」。', 'No bank transactions yet. Go to Settings → Data sources → Bank feed · Plaid, connect and Sync.')}</p>;
@@ -141,7 +147,7 @@ export default function FinanceTab() {
   // 财务④:上月净支出不足 $50 时环比是小基数噪音(+786% 之类),不出百分比
   const netDelta = prevSummary.net >= 50 ? Math.round(((summary.net - prevSummary.net) / prevSummary.net) * 100) : null;
   const idx = months.indexOf(ym);
-  const SUBS: Array<[Sub, string, string]> = [['overview', '总览', 'Overview'], ['tx', '交易', 'Transactions'], ['recurring', '定期', 'Recurring'], ['cards', '账户', 'Accounts']];
+  const SUBS: Array<[Sub, string, string]> = [['overview', '总览', 'Overview'], ['budget', '预算', 'Budget'], ['tx', '交易', 'Transactions'], ['recurring', '定期', 'Recurring'], ['cards', '账户', 'Accounts']];
   function markNotRecurring(name: string) { setRecurRule(name, 'no'); setRev((r) => r + 1); }
   function removeMerchantRule(name: string) { setMerchantRule(name, ''); setRev((r) => r + 1); }
   function removeFlowRule(name: string) { setFlowRule(name, ''); setRev((r) => r + 1); }
@@ -460,6 +466,79 @@ export default function FinanceTab() {
           <p className="nesio-fin-alert-note">{L(dict, '按流水周期规则识别(非 LLM),下次日期与金额为估算', 'Rule-based from transaction cadence (not LLM); next date & amount are estimates')}</p>
         </>
       )}
+
+      {/* ── 财务㉒:预算 ── */}
+      {sub === 'budget' && (() => {
+        const patchBudget = (next: BudgetConfig) => { saveBudget(next); setRev((r) => r + 1); };
+        if (!hasBudget(budget)) {
+          return (
+            <>
+              <p className="nesio-settings-option-hint" style={{ marginTop: 0 }}>{L(dict, '预算把「这个月还能花多少」变成一个数。可以按你近 6 个月的真实习惯一键起草,再逐类微调。', 'A budget turns "how much is left this month" into one number. Draft it from your last 6 months, then fine-tune per category.')}</p>
+              <button type="button" className="nesio-fin-review-accept" onClick={() => {
+                const s = suggestBudget(txs);
+                if (s) { patchBudget(s); setBudgetNote(''); }
+                else setBudgetNote(L(dict, '历史还不足 3 个完整月,基线起草不了——先从下面手动加一个分类预算。', 'Less than 3 full months of history — add a category budget manually below.'));
+              }}>{L(dict, '按我的习惯生成预算', 'Draft from my habits')}</button>
+              {budgetNote && <p className="nesio-settings-option-hint">{budgetNote}</p>}
+              <div className="nesio-fin-budget-add">
+                <select className="nesio-fin-select" value="" aria-label={L(dict, '添加分类预算', 'Add category budget')} onChange={(e) => { if (e.target.value) patchBudget({ ...budget, categories: { ...budget.categories, [e.target.value]: 100 } }); }}>
+                  <option value="">{L(dict, '+ 手动添加分类预算', '+ Add category budget')}</option>
+                  {COMMON_EXPENSE_CATEGORIES.filter((c) => !budget.categories[c]).map((c) => (
+                    <option key={c} value={c}>{categoryLabel(c, dict)}</option>
+                  ))}
+                </select>
+              </div>
+            </>
+          );
+        }
+        const { total, perCategory } = bp;
+        return (
+          <>
+            {total && (
+              <div className="nesio-fin-budget-hero">
+                <span className="nesio-fin-budget-hero-l">{L(dict, `${monthLabel(ym, dict)} · 还可以花`, `${monthLabel(ym, dict)} · left for spending`)}</span>
+                <span className={`nesio-fin-budget-left${total.left < 0 ? ' is-over' : ''}`}>{total.left < 0 ? `-${formatMoney(-total.left)}` : formatMoney(total.left)}</span>
+                <div className="nesio-fin-bar"><div className={`nesio-fin-bar-fill${total.ratio > 1 ? ' is-over' : ''}`} style={{ width: `${Math.min(100, Math.round(total.ratio * 100))}%` }} /></div>
+                <span className="nesio-fin-budget-hero-sub">{L(dict, `已用 ${formatMoney(total.spent)} / 预算 ${formatMoney(total.budget)}`, `${formatMoney(total.spent)} of ${formatMoney(total.budget)}`)}{total.left < 0 ? L(dict, ' · 超一点没关系,月中调整来得及', ' · a little over is okay — adjust mid-month') : ''}</span>
+                <label className="nesio-fin-budget-rowedit">
+                  {L(dict, '月总预算', 'Monthly total')}
+                  <input type="number" inputMode="decimal" min={0} className="nesio-fin-budget-input" value={budget.total ?? total.budget} onChange={(e) => patchBudget({ ...budget, total: Math.max(0, Number(e.target.value) || 0) })} />
+                </label>
+              </div>
+            )}
+            <p className="nesio-settings-section-label" style={{ marginTop: '1rem' }}>{L(dict, '分类预算', 'Category budgets')}</p>
+            <div className="nesio-fin-cats">
+              {perCategory.map((c) => (
+                <div key={c.category} className="nesio-fin-cat">
+                  <div className="nesio-fin-cat-top">
+                    <span className="nesio-fin-cat-name">{categoryLabel(c.category, dict)}</span>
+                    <span className="nesio-fin-cat-amt">
+                      {formatMoney(c.spent)} <span style={{ color: 'var(--portal-muted)', fontWeight: 400 }}>/</span>{' '}
+                      <input type="number" inputMode="decimal" min={0} className="nesio-fin-budget-input" value={c.budget} onChange={(e) => patchBudget({ ...budget, categories: { ...budget.categories, [c.category]: Math.max(0, Number(e.target.value) || 0) } })} />
+                      <button type="button" className="nesio-fin-rule-x" onClick={() => { const next = { ...budget.categories }; delete next[c.category]; patchBudget({ ...budget, categories: next }); }} aria-label={L(dict, '移除此分类预算', 'Remove this category budget')}>✕</button>
+                    </span>
+                  </div>
+                  <div className="nesio-fin-bar"><div className={`nesio-fin-bar-fill${c.ratio > 1 ? ' is-over' : ''}`} style={{ width: `${Math.min(100, Math.round(c.ratio * 100))}%` }} /></div>
+                </div>
+              ))}
+            </div>
+            <div className="nesio-fin-budget-add">
+              <select className="nesio-fin-select" value="" aria-label={L(dict, '添加分类预算', 'Add category budget')} onChange={(e) => { if (e.target.value) patchBudget({ ...budget, categories: { ...budget.categories, [e.target.value]: 100 } }); }}>
+                <option value="">{L(dict, '+ 添加分类预算', '+ Add category budget')}</option>
+                {COMMON_EXPENSE_CATEGORIES.filter((c) => !budget.categories[c]).map((c) => (
+                  <option key={c} value={c}>{categoryLabel(c, dict)}</option>
+                ))}
+              </select>
+              <button type="button" className="nesio-fin-flowopt" onClick={() => {
+                const s = suggestBudget(txs);
+                if (s) { patchBudget(s); setBudgetNote(''); } else setBudgetNote(L(dict, '历史不足 3 个完整月,暂无法按基线重置。', 'Less than 3 full months of history.'));
+              }}>{L(dict, '按习惯重置', 'Reset from habits')}</button>
+            </div>
+            {budgetNote && <p className="nesio-settings-option-hint">{budgetNote}</p>}
+            <p className="nesio-fin-alert-note">{L(dict, '预算只存本机;总口径 = 本月净支出(与总览一致),分类口径 = 该类支出合计。', 'Budgets stay on-device; total = monthly net spend (matches Overview), categories = category spend.')}</p>
+          </>
+        );
+      })()}
 
       {/* ── 卡片:分卡 ── */}
       {sub === 'cards' && (

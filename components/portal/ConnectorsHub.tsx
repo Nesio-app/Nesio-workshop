@@ -418,7 +418,9 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       } else if (pending > 0) {
         showToast(L(dict, `还有 ${pending} 家机构的流水仍在准备中,先保存已同步的,几分钟后再点「同步」即可`, `${pending} institution(s) still preparing — synced data saved; tap Sync again in a few minutes`), false);
       } else {
-        showToast(L(dict, `流水同步完成:新增 ${fresh.length} 笔,共 ${merged.length} 笔,${acctCount} 个账户。到「洞察 → 财务」看总览/支出/交易/卡片`, `Synced: ${fresh.length} new, ${merged.length} total, ${acctCount} accounts. See Insights → Finance`), true);
+        // 财务㉒:富化覆盖诊断 —— 一眼分辨「数据没来」还是「UI 没显示」
+        const withLogo = merged.filter((t) => (t as { merchantLogo?: string }).merchantLogo).length;
+        showToast(L(dict, `流水同步完成:新增 ${fresh.length} 笔,共 ${merged.length} 笔,${acctCount} 个账户(商户 logo 覆盖 ${withLogo} 笔)。到「洞察 → 财务」看总览/预算/交易`, `Synced: ${fresh.length} new, ${merged.length} total, ${acctCount} accounts (${withLogo} tx with merchant logos). See Insights → Finance`), true);
       }
     } catch {
       showToast(L(dict, '网络错误', 'Network error'), false);
