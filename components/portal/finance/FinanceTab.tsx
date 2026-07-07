@@ -9,12 +9,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   loadBankTx, loadBankAccounts, availableMonths, summarizeMonth, categoryBreakdown, topMerchants,
-  monthlyTrend, financeAlerts, needsReview, suggestCategory, setMerchantRule, effectiveCategory,
+  monthlyTrend, needsReview, suggestCategory, setMerchantRule, effectiveCategory,
   accountMonth, formatMoney, ymOf, prevYm, txFlow, setFlowRule, TX_FLOW_LABELS,
   detectRecurring, upcomingRecurring, loadMerchantRules, loadFlowRules, setRecurRule,
   loadBankSyncedAt, excludedTxCount,
   type BankTx, type BankAccount, type TxFlow,
 } from '@/lib/portal/bank-tx';
+// 风险预警与 Today/问一问 同读一份判定(financeFindings,Layer1 漂移收口)——此前 bank-tx 里
+// 另有一套 alerts 判定(函数级双实现),两个输出面据同一份流水各说各话,已删并由契约钉死不回潮。
+import { financeFindings } from '@/lib/portal/finance-insight';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -84,7 +87,7 @@ export default function FinanceTab() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const merchants = useMemo(() => topMerchants(txs, ym, 6), [txs, ym, rev]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const alerts = useMemo(() => financeAlerts(txs, ym), [txs, ym, rev]);
+  const findings = useMemo(() => financeFindings(txs, accounts, ym), [txs, accounts, ym, rev]);
   const trend = useMemo(() => monthlyTrend(txs, 6), [txs]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const review = useMemo(() => needsReview(txs, ym), [txs, ym, rev]);
@@ -172,18 +175,26 @@ export default function FinanceTab() {
             </div>
           )}
 
-          {alerts.length > 0 && (
+          {(findings.length > 0 || review.length > 0) && (
             <>
               <p className="nesio-settings-section-label">{L(dict, '风险预警', 'Risk alerts')}</p>
               <div className="nesio-fin-alerts">
-                {alerts.map((a, i) => (
-                  <div key={i} className={`nesio-fin-alert nesio-fin-alert--${a.level}`}>
-                    <p className="nesio-fin-alert-title">{a.title}</p>
-                    <p className="nesio-fin-alert-body">{a.body}</p>
+                {/* 统一判定(financeFindings):flag=真实风险 → risk 红;attention=可关注 → warn 琥珀 */}
+                {findings.map((f) => (
+                  <div key={f.id} className={`nesio-fin-alert nesio-fin-alert--${f.severity === 'flag' ? 'risk' : 'warn'}`}>
+                    <p className="nesio-fin-alert-title">{L(dict, f.title[0], f.title[1])}</p>
+                    <p className="nesio-fin-alert-body">{L(dict, f.detail[0], f.detail[1])}</p>
                   </div>
                 ))}
+                {/* 待归类是页面工作流提示(不是域判定),不进统一层,单独保留 */}
+                {review.length > 0 && (
+                  <div className="nesio-fin-alert nesio-fin-alert--info">
+                    <p className="nesio-fin-alert-title">{L(dict, `${review.length} 笔交易待归类`, `${review.length} transaction(s) to categorize`)}</p>
+                    <p className="nesio-fin-alert-body">{L(dict, '未匹配到分类的交易在「交易 → 规则审核」等你处理', 'Uncategorized transactions are waiting under Transactions → Review')}</p>
+                  </div>
+                )}
               </div>
-              <p className="nesio-fin-alert-note">{L(dict, '预警按规则算(非 LLM):基于你的流水趋势', 'Rule-based (not LLM), from your transaction trends')}</p>
+              <p className="nesio-fin-alert-note">{L(dict, '预警按规则算(非 LLM):与 Today / 问一问 同一套判定', 'Rule-based (not LLM) — the same findings Today and Ask read')}</p>
             </>
           )}
 

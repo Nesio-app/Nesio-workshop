@@ -89,4 +89,13 @@ assert.equal(evts[0].payload.severity, 'flag', 'bridge 红旗优先');
 assert.ok(evts[0].payload.titleZh && evts[0].payload.bodyZh && evts[0].payload.reason, 'payload 带双语 + reason');
 assert.match(String(evts[0].payload.reason), /财务/, 'reason 标注财务来源');
 
+// ── Layer1 漂移收口契约:全仓只有一套财务判定 ──
+// 财务页与 Today/问一问 必须同读 financeFindings;bank-tx 里那套 financeAlerts(函数级双实现)已删,
+// 不许回潮(回潮 = 两个输出面据同一份流水各说各话)。
+const bankSrc = fs.readFileSync(new URL('../lib/portal/bank-tx.ts', import.meta.url), 'utf8');
+assert.ok(!bankSrc.includes('export function financeAlerts'), 'bank-tx 不得再有第二套 financeAlerts 判定');
+const financeTabSrc = fs.readFileSync(new URL('../components/portal/finance/FinanceTab.tsx', import.meta.url), 'utf8');
+assert.ok(financeTabSrc.includes('financeFindings('), '财务页风险预警必须消费统一层 financeFindings');
+assert.ok(!financeTabSrc.includes('financeAlerts'), '财务页不得引用已删的 financeAlerts');
+
 console.log('finance-insight: OK');
