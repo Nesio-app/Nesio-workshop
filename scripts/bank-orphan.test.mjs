@@ -74,4 +74,31 @@ caches.tx = [tx('a1', 'real-acc'), tx('b1', 'bank-b'), tx('s1', 'sandbox-acc')];
 const v3 = bank.loadBankTx();
 assert.equal(v3.length, 2, '两家活银行交易都在、sandbox 滤掉');
 
+// ── 财务③:内部调整对识别(同日同账户同额一正一负、双方名字都带调整词) ──
+const adj = (id, name, amount, accountId = 'real-acc', date = '2026-06-19') =>
+  ({ id, accountId, date, name, amount, currency: 'USD', category: '' });
+
+// 6. 典型对:ADJ REDIST ±150 → 两条都进折叠集
+const pair = [adj('p1', 'KC0P ADJ REDIST FR 2892', 150), adj('p2', 'KC0P ADJ REDIST TO 2892', -150)];
+const ids1 = bank.internalAdjustmentIds(pair);
+assert.equal(ids1.size, 2, '±同额调整对整对识别');
+assert.ok(ids1.has('p1') && ids1.has('p2'));
+
+// 7. 配不上的单条保留:三条里只配一对,落单的 +150 不折叠
+const trio = [...pair, adj('p3', 'KC0P ADJ REDIST FR 2892', 150)];
+const ids2 = bank.internalAdjustmentIds(trio);
+assert.equal(ids2.size, 2, '贪心一对一,落单调整条不折叠');
+
+// 8. 金额巧合不误杀:名字不带调整词的同日同额正负真交易不配对
+const coincidence = [adj('c1', 'Refund Store', -88), adj('c2', 'Grocery Store', 88)];
+assert.equal(bank.internalAdjustmentIds(coincidence).size, 0, '非调整名的巧合金额不折叠');
+
+// 9. 跨账户不配对:同日同额正负但账户不同
+const crossAcct = [adj('x1', 'ADJ REDIST FR', 150, 'real-acc'), adj('x2', 'ADJ REDIST TO', -150, 'bank-b')];
+assert.equal(bank.internalAdjustmentIds(crossAcct).size, 0, '跨账户不视为内部调整对');
+
+// 10. 单边命中不配对:只有一方名字带调整词
+const oneSided = [adj('o1', 'ADJ REDIST FR', 150), adj('o2', 'Coffee Shop', -150)];
+assert.equal(bank.internalAdjustmentIds(oneSided).size, 0, '双方名字都须命中关键词');
+
 console.log('bank-orphan: OK');

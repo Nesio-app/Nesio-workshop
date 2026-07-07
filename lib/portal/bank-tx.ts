@@ -147,6 +147,30 @@ export function txFlow(t: BankTx, rules = loadFlowRules()): TxFlow {
   return t.amount >= 0 ? 'expense' : 'refund';
 }
 
+/* ---------- 财务③:内部调整对识别 ---------- */
+// 银行内部重分配(cash advance 调整等)常成对出现:同日、同账户、同额一正一负、名字带调整词。
+// 净效果为零、对用户零信息量,但以两条噪音行出现在交易列表。这里保守配对(双方名字都须命中
+// 关键词,不凭金额巧合杀真交易),供显示层折叠;它们本就是 transfer 流,统计不受影响。
+const ADJUSTMENT_NAME_RE = /\bADJ\b|REDIST|ADJUSTMENT|REVERSAL|OFFSET|冲正|调整/i;
+
+/** 返回可折叠的内部调整对的交易 id 集合(一对一贪心配对,配不上的单条保留)。 */
+export function internalAdjustmentIds(txs: BankTx[]): Set<string> {
+  const out = new Set<string>();
+  const buckets = new Map<string, BankTx[]>(); // date|accountId|abs(amount) → 候选
+  for (const t of txs) {
+    if (!ADJUSTMENT_NAME_RE.test(t.name || '')) continue;
+    const key = `${t.date}|${t.accountId || ''}|${Math.abs(t.amount)}`;
+    (buckets.get(key) ?? buckets.set(key, []).get(key)!).push(t);
+  }
+  for (const group of buckets.values()) {
+    const pos = group.filter((t) => t.amount > 0);
+    const neg = group.filter((t) => t.amount < 0);
+    const pairs = Math.min(pos.length, neg.length);
+    for (let i = 0; i < pairs; i++) { out.add(pos[i].id); out.add(neg[i].id); }
+  }
+  return out;
+}
+
 export interface MonthSummary {
   ym: string;
   net: number;
