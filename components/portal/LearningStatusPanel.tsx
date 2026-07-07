@@ -1,14 +1,15 @@
 'use client';
 
 /**
- * LearningStatusPanel — 学习透明面板(批次 55)。
- * 把本地学习过程摊开给用户看:引导排序学习器学了多少次、现在最看重哪个信号、
- * 以及 mirror 学到你最爱理提醒的时段。符合 Nesio 一贯的诚实风格 —— 不假装,可见。
+ * LearningStatusPanel — 学习透明面板(批次 55;A 计划收尾扩成全局「app 学到了什么」)。
+ * 把本地学习过程摊开给用户看:排序学习器/题材口味(Preference)/精力基线(Baseline)/
+ * 反馈事实日志(可回放可删)/情境分化证据。符合 Nesio 一贯的诚实风格 —— 不假装,可见。
  */
 
 import { useEffect, useState } from 'react';
-import { getRankerStats } from '@/lib/platform/guidance-engine/guidance-ranker';
+import { getRankerStats, rankerContextEvidence, type ContextEvidence } from '@/lib/platform/guidance-engine/guidance-ranker';
 import { getBestInterruptionHours } from '@/lib/portal/mirror-profile';
+import { getWeights, baseline, readFeedbackLog } from '@/lib/platform/personalization';
 import { aiCacheCount } from '@/lib/portal/ai-cache';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -26,17 +27,37 @@ const FEATURE_LABEL: Record<string, [string, string]> = {
 // 冷启动先验(和 ranker 一致):偏移=当前权重-先验,用来说"它学到了什么"
 const PRIOR: Record<string, number> = { risk: 0.30, time: 0.25, prep: 0.20, confidence: 0.15, relevance: 0.10, hourFit: 0, domainFit: 0 };
 
+// 域标签(与 domain-insights 的口径一致)
+const DOMAIN_LABEL: Record<string, [string, string]> = {
+  health: ['健康', 'Health'], finance: ['财务', 'Finance'], location: ['活动', 'Places'],
+  inventory: ['收纳', 'Inventory'], mood: ['心情', 'Mood'],
+};
+
 export default function LearningStatusPanel() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [stats, setStats] = useState<ReturnType<typeof getRankerStats> | null>(null);
   const [hours, setHours] = useState<number[]>([]);
   const [aiLearned, setAiLearned] = useState(0);
+  const [topDomain, setTopDomain] = useState<{ key: string; w: number } | null>(null);
+  const [energyBase, setEnergyBase] = useState<number | null>(null);
+  const [feedbackFacts, setFeedbackFacts] = useState(0);
+  const [ctxDiverged, setCtxDiverged] = useState<ContextEvidence | null>(null);
 
   useEffect(() => {
     setStats(getRankerStats());
     setHours(getBestInterruptionHours().slice(0, 3).sort((a, b) => a - b));
     // 从 AI 的回复里存下多少条(拆任务/起草/文案)——AI 离线时能直接复用的"外脑记忆"
     setAiLearned(aiCacheCount('decompose') + aiCacheCount('draft-reply') + aiCacheCount('guidance-lang'));
+    // Preference:学到的题材口味里,明显高于中性(0.5)的最强一项
+    const dw = Object.entries(getWeights('domain')).sort((a, b) => b[1] - a[1])[0];
+    setTopDomain(dw && dw[1] >= 0.62 ? { key: dw[0], w: Math.round(dw[1] * 100) / 100 } : null);
+    // Baseline:精力个人基线(冷启动不展示 —— 不凭几条记录报数)
+    const eb = baseline('energy');
+    setEnergyBase(!eb.cold && eb.center != null ? Math.round(eb.center) : null);
+    // 反馈事实日志(可回放/可导出/可删除)
+    setFeedbackFacts(readFeedbackLog().length);
+    // 情境分化证据:有类型亮灯才展示(证据不够不制造"它在分析你"的错觉)
+    setCtxDiverged(rankerContextEvidence().find((e) => e.diverges) ?? null);
   }, []);
 
   if (!stats) return null;
@@ -80,6 +101,28 @@ export default function LearningStatusPanel() {
         </p>
       )}
 
+      {topDomain && (
+        <p className="nesio-health-story-line">
+          {L(dict,
+            `最合你口味的题材:「${DOMAIN_LABEL[topDomain.key]?.[0] ?? topDomain.key}」(采纳度 ${topDomain.w})。`,
+            `Your most-engaged topic: "${DOMAIN_LABEL[topDomain.key]?.[1] ?? topDomain.key}" (engagement ${topDomain.w}).`)}
+        </p>
+      )}
+
+      {energyBase != null && (
+        <p className="nesio-health-story-line">
+          {L(dict, `你的精力基线 ≈ ${energyBase}(跟自己比,不跟别人比)。`, `Your energy baseline ≈ ${energyBase} (compared to yourself, not others).`)}
+        </p>
+      )}
+
+      {ctxDiverged && (
+        <p className="nesio-health-story-line">
+          {L(dict,
+            `发现「${DOMAIN_LABEL[ctxDiverged.type]?.[0] ?? ctxDiverged.type}」类提醒你在工作日和周末的反应明显不同(证据已够)—— 之后可以按情境分开学。`,
+            `"${DOMAIN_LABEL[ctxDiverged.type]?.[1] ?? ctxDiverged.type}" cards get clearly different reactions on weekdays vs weekends (enough evidence) — context-aware learning can come next.`)}
+        </p>
+      )}
+
       {aiLearned > 0 && (
         <p className="nesio-health-story-line">
           {L(dict,
@@ -89,8 +132,9 @@ export default function LearningStatusPanel() {
       )}
 
       <p className="nesio-settings-option-hint" style={{ margin: '0.35rem 0 0' }}>
-        {L(dict, '全部在本机学习 · 不上传 · 冷启动就等于通用规则,只会越用越贴合你',
-          'Learns on-device · never uploaded · starts equal to the default rules, only gets more fitted to you')}
+        {L(dict,
+          `全部在本机学习 · 不上传${feedbackFacts > 0 ? ` · 你的 ${feedbackFacts} 条反馈已记成可回放的事实(随备份可导出,「彻底删除」一并清)` : ''} · 冷启动就等于通用规则,只会越用越贴合你`,
+          `Learns on-device · never uploaded${feedbackFacts > 0 ? ` · your ${feedbackFacts} feedback facts are replayable (exported with backups, wiped by Delete all)` : ''} · starts equal to the default rules, only gets more fitted to you`)}
       </p>
     </div>
   );

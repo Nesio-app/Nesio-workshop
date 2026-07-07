@@ -249,10 +249,10 @@ export function rankerContextEvidence(log: TrainExample[] | null = trainLog.load
   });
 }
 
-/** 供调试/透明展示:学了多少、当前权重(相对先验偏移多少)。 */
-export function getRankerStats(): { n: number; weights: Record<string, number>; bias: number } {
+/** 供调试/透明展示:学了多少、当前权重(相对先验偏移多少)、存档的训练样本数(可回放)。 */
+export function getRankerStats(): { n: number; weights: Record<string, number>; bias: number; trainExamples: number } {
   const s = load();
   const weights: Record<string, number> = {};
   FEATURE_KEYS.forEach((k, i) => { weights[k] = Math.round(s.w[i] * 1000) / 1000; });
-  return { n: s.n, weights, bias: Math.round(s.b * 1000) / 1000 };
+  return { n: s.n, weights, bias: Math.round(s.b * 1000) / 1000, trainExamples: trainLog.load()?.length ?? 0 };
 }
