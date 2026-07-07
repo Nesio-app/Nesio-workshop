@@ -342,21 +342,62 @@ function learnTokenCategory(rules: Record<string, string>): Record<string, Recor
   return map;
 }
 
+// ── 2b②:近似 token 匹配(纯本地模糊,不上 embedding)────────────────────────────
+// 真实失败模式是"变体":MCDONALD'S #123 → mcdonald,你纠正过的 McDonalds → mcdonalds,
+// 精确匹配挂掉(复数/所有格/缩写同理)。模糊门槛保守:token ≥4 字符才敢模糊;
+// 前缀包含(长度差 ≤2)或编辑距离 ≤1;模糊票权重 0.5(不如精确票自信)。
+// 不上 embedding:本函数是同步渲染路径 + 变体匹配不需要语义;结论记录于 algorithm-layer-plan。
+function editDistanceAtMost1(a: string, b: string): boolean {
+  if (Math.abs(a.length - b.length) > 1) return false;
+  if (a.length === b.length) {
+    let diff = 0;
+    for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) { if (++diff > 1) return false; }
+    return true;
+  }
+  const [s, l] = a.length < b.length ? [a, b] : [b, a]; // s 比 l 短 1:允许一次插入
+  let i = 0, j = 0, skipped = false;
+  while (i < s.length) {
+    if (s[i] === l[j]) { i++; j++; continue; }
+    if (skipped) return false;
+    skipped = true; j++;
+  }
+  return true;
+}
+
+function tokenSimilar(a: string, b: string): boolean {
+  if (a.length < 4 || b.length < 4) return false; // 短 token 模糊太危险(uber≈ubon 之类)
+  if ((a.startsWith(b) || b.startsWith(a)) && Math.abs(a.length - b.length) <= 2) return true; // mcdonald~mcdonalds
+  return editDistanceAtMost1(a, b);
+}
+
+const FUZZY_WEIGHT = 0.5;
+
 /**
- * 给未分类商户猜分类:先用"你自己纠正过的同类词"投票(从数据学),没学到再退回关键词规则。
- * 例:你把 Wegmans / Trader Joe's 都归过 Food,新的 "Joe's Market" 命中 joe/market → Food。
+ * 给未分类商户猜分类:先用"你自己纠正过的同类词"投票(从数据学),精确 token 没命中的
+ * 再做保守模糊匹配(半票);都没学到再退回关键词规则。
+ * 例:你把 Wegmans / Trader Joe's 都归过 Food,新的 "Joe's Market" 命中 joe/market → Food;
+ * 你把 McDonalds 归过 Food,"MCDONALD'S #123" 经 mcdonald~mcdonalds 模糊命中 → Food(置信略低)。
  */
 export function suggestCategory(name: string, rules: Record<string, string> = loadMerchantRules()): { category: string; confidence: number } {
   const learned = learnTokenCategory(rules);
+  const learnedTokens = Object.keys(learned);
   const votes: Record<string, number> = {};
   let total = 0;
   for (const tok of merchantTokens(name)) {
-    const m = learned[tok];
-    if (m) for (const [cat, c] of Object.entries(m)) { votes[cat] = (votes[cat] || 0) + c; total += c; }
+    const exact = learned[tok];
+    if (exact) {
+      for (const [cat, c] of Object.entries(exact)) { votes[cat] = (votes[cat] || 0) + c; total += c; }
+      continue;
+    }
+    // 精确未命中 → 保守模糊(半票)
+    for (const lt of learnedTokens) {
+      if (!tokenSimilar(tok, lt)) continue;
+      for (const [cat, c] of Object.entries(learned[lt])) { votes[cat] = (votes[cat] || 0) + c * FUZZY_WEIGHT; total += c * FUZZY_WEIGHT; }
+    }
   }
   if (total > 0) {
     const [cat, best] = Object.entries(votes).sort((a, b) => b[1] - a[1])[0];
-    // 置信 = 该分类占比 × 证据量因子(1 个样本别太自信,4+ 个才接近上限)
+    // 置信 = 该分类占比 × 证据量因子(1 个样本别太自信,4+ 个才接近上限);模糊半票天然压低置信
     const confidence = Math.min(0.9, (best / total) * (0.6 + 0.3 * Math.min(1, total / 4)));
     return { category: cat, confidence: Math.round(confidence * 100) / 100 };
   }
