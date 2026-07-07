@@ -111,4 +111,27 @@ assert.equal(bank.detectRecurring(boutique).length, 0, '词界:diffeRENT 不再�
 const rent = [rtx('r1', '2026-04-01', 'Apartment Rent', 1500, 'RENT_AND_UTILITIES'), rtx('r2', '2026-05-01', 'Apartment Rent', 1500, 'RENT_AND_UTILITIES'), rtx('r3', '2026-06-01', 'Apartment Rent', 1580, 'RENT_AND_UTILITIES')];
 assert.ok(bank.detectRecurring(rent).some((r) => /rent/i.test(r.name)), '整词 rent 照常识别');
 
+// ── 财务⑩:账户类型友好名 + 资产小结口径 ──
+assert.equal(bank.accountTypeLabel({ type: 'depository', subtype: 'checking' })[0], '支票', 'subtype 优先');
+assert.equal(bank.accountTypeLabel({ type: 'credit', subtype: 'credit card' })[1], 'Credit card');
+assert.equal(bank.accountTypeLabel({ type: 'investment' })[0], '投资', 'type 兜底');
+assert.equal(bank.accountTypeLabel({ type: 'brokerage' })[0], '投资', 'brokerage 归投资');
+assert.equal(bank.accountTypeLabel({ type: 'weird-new', subtype: 'weird-sub' })[0], 'weird-sub', '未知类型原样不吞');
+assert.equal(bank.accountTypeLabel({})[0], '账户', '全缺兜底');
+
+const accts = [
+  { id: 'c1', name: 'Chk', type: 'depository', subtype: 'checking', balance: 5000, currency: 'USD' },
+  { id: 's1', name: 'Sav', type: 'depository', subtype: 'savings', balance: 3000, currency: 'USD' },
+  { id: 'i1', name: 'Brk', type: 'investment', balance: 10000, currency: 'USD' },
+  { id: 'cc', name: 'Card', type: 'credit', subtype: 'credit card', balance: 2000, currency: 'USD' },
+  { id: 'eu', name: 'Euro', type: 'depository', balance: 999, currency: 'EUR' },   // 外币不进 USD 口径
+  { id: 'nb', name: 'NoBal', type: 'depository', currency: 'USD' },                // 无余额跳过
+];
+const assets = bank.assetSummary(accts);
+assert.equal(assets.deposits, 8000, '存款合计(checking+savings)');
+assert.equal(assets.investments, 10000, '投资合计');
+assert.equal(assets.creditOwed, 2000, '信用卡欠款');
+assert.equal(assets.net, 16000, '净资产 = 存款 + 投资 − 欠款');
+assert.equal(bank.assetSummary([]).net, 0, '空账户表 → 全零');
+
 console.log('fin-display: OK');

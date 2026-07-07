@@ -12,7 +12,7 @@ import {
   monthlyTrend, needsReview, suggestCategory, setMerchantRule, effectiveCategory,
   accountMonth, formatMoney, ymOf, prevYm, txFlow, setFlowRule, TX_FLOW_LABELS,
   detectRecurring, upcomingRecurring, loadMerchantRules, loadFlowRules, setRecurRule,
-  loadBankSyncedAt, excludedTxCount, internalAdjustmentIds,
+  loadBankSyncedAt, excludedTxCount, internalAdjustmentIds, accountTypeLabel, assetSummary,
   type BankTx, type BankAccount, type TxFlow,
 } from '@/lib/portal/bank-tx';
 // 风险预警与 Today/问一问 同读一份判定(financeFindings,Layer1 漂移收口)——此前 bank-tx 里
@@ -52,6 +52,23 @@ function FinanceDonut({ slices, centerTop, centerVal }: { slices: Array<{ catego
       <text x="70" y="65" textAnchor="middle" fontSize="8.5" fill="var(--portal-muted)">{centerTop}</text>
       <text x="70" y="82" textAnchor="middle" fontSize="14" fontWeight="800" fill="var(--portal-ink)">{centerVal}</text>
     </svg>
+  );
+}
+
+/** 财务⑩:机构 logo(Plaid base64;缺失用机构/账户名首字母色块,底色用机构主色)。 */
+function AcctLogo({ a, size = 22 }: { a: BankAccount; size?: number }) {
+  if (a.logo) {
+    const src = a.logo.startsWith('data:') ? a.logo : `data:image/png;base64,${a.logo}`;
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img className="nesio-fin-acct-logo" src={src} alt="" width={size} height={size} />;
+  }
+  const ch = (a.institution || a.name || '?').trim().charAt(0).toUpperCase();
+  return (
+    <span
+      className="nesio-fin-acct-badge"
+      style={{ width: size, height: size, fontSize: size * 0.55, background: a.color || 'var(--portal-accent-soft)', color: a.color ? '#fff' : 'var(--portal-accent)' }}
+      aria-hidden
+    >{ch}</span>
   );
 }
 
@@ -119,8 +136,8 @@ export default function FinanceTab() {
     .filter((t) => !adjIds.has(t.id))
     .filter((t) => filter === 'all' || effectiveCategory(t) === filter)
     .filter((t) => acctFilter === 'all' || t.accountId === acctFilter);
-  // 批次 40:交易行显示卡后四位(accountId → account.mask)
-  const acctMask = new Map(accounts.map((a) => [a.id, a.mask]));
+  // 批次 40 → 财务⑩:交易行显示账户归属(accountId → 完整账户,logo/类型/后四位)
+  const acctById = new Map(accounts.map((a) => [a.id, a]));
 
   function resolveReview(name: string, category: string) { setMerchantRule(name, category); setRev((r) => r + 1); }
   function applyFlow(name: string, flow: TxFlow) { setFlowRule(name, flow); setFlowEditId(null); setRev((r) => r + 1); }
@@ -292,7 +309,7 @@ export default function FinanceTab() {
                   <div className="nesio-fin-txrow">
                     <span className="nesio-fin-txdate">{(t.date || '').slice(5).replace('-', '/')}</span>
                     <div className="nesio-fin-txmid">
-                      <span className="nesio-fin-txname">{t.name || L(dict, '未知商户', 'Unknown')}{t.accountId && acctMask.get(t.accountId) ? <span className="nesio-fin-txmask"> ····{acctMask.get(t.accountId)}</span> : null}</span>
+                      <span className="nesio-fin-txname">{t.name || L(dict, '未知商户', 'Unknown')}</span>
                       <button type="button" className={`nesio-fin-txflow nesio-fin-txflow--${f}`} onClick={() => setFlowEditId((id) => (id === t.id ? null : t.id))}>
                         <span className="nesio-fin-txflow-l">{L(dict, TX_FLOW_LABELS[f][0], TX_FLOW_LABELS[f][1])}</span>
                         {f === 'expense' && (() => {
@@ -302,6 +319,18 @@ export default function FinanceTab() {
                           return <span className="nesio-fin-txcat"> · {primary}{detail && detail !== primary ? ` · ${detail}` : ''}</span>;
                         })()}
                       </button>
+                      {/* 财务⑩:账户归属行 —— 机构 logo + 机构名 + 账户类型 + 卡后4位 */}
+                      {(() => {
+                        const a = t.accountId ? acctById.get(t.accountId) : undefined;
+                        if (!a) return null;
+                        const tl = accountTypeLabel(a);
+                        return (
+                          <span className="nesio-fin-txacct">
+                            <AcctLogo a={a} size={13} />
+                            {a.institution || a.name} · {L(dict, tl[0], tl[1])}{a.mask ? ` ····${a.mask}` : ''}
+                          </span>
+                        );
+                      })()}
                     </div>
                     <span className={`nesio-fin-txamt${t.amount < 0 ? ' is-refund' : ''}`}>{signed(t.amount)}</span>
                   </div>
@@ -381,21 +410,37 @@ export default function FinanceTab() {
         accounts.length === 0 ? (
           <p className="nesio-insights-option-hint nesio-settings-option-hint" style={{ marginTop: 0 }}>{L(dict, '还没有账户信息。到「设置 → 数据接入」点银行「同步」一次,就会拉到你的卡/账户(余额、消费、退款分卡显示)。', 'No account info yet. Tap Sync on the bank connector once (Settings → Data sources) to pull your cards/accounts (per-card balance, spend, refunds).')}</p>
         ) : (
-          accounts.map((a) => {
-            const m = accountMonth(txs, a.id, ym);
-            return (
-              <div key={a.id} className="nesio-fin-card">
-                <div className="nesio-fin-card-top">
-                  <span className="nesio-fin-card-name">{a.name}{a.mask ? ` ····${a.mask}` : ''}</span>
-                  {a.balance != null && <span className="nesio-fin-card-bal">{(a.type || '').toLowerCase() === 'credit' ? L(dict, `欠款 ${formatMoney(a.balance, a.currency)}`, `owes ${formatMoney(a.balance, a.currency)}`) : formatMoney(a.balance, a.currency)}</span>}
+          <>
+            {/* 财务⑩:资产小结 —— 存款 + 投资 − 信用卡欠款 = 净资产(USD 口径) */}
+            {(() => {
+              const s = assetSummary(accounts);
+              if (s.deposits === 0 && s.investments === 0 && s.creditOwed === 0) return null;
+              return (
+                <div className="nesio-fin-assets">
+                  <span className="nesio-fin-asset"><span className="nesio-fin-asset-l">{L(dict, '存款', 'Cash')}</span>{formatMoney(s.deposits)}</span>
+                  {s.investments > 0 && <span className="nesio-fin-asset"><span className="nesio-fin-asset-l">{L(dict, '投资', 'Investments')}</span>{formatMoney(s.investments)}</span>}
+                  <span className="nesio-fin-asset"><span className="nesio-fin-asset-l">{L(dict, '信用卡欠款', 'Card debt')}</span>{formatMoney(s.creditOwed)}</span>
+                  <span className="nesio-fin-asset"><span className="nesio-fin-asset-l">{L(dict, '净资产', 'Net worth')}</span>{s.net < 0 ? `-${formatMoney(-s.net)}` : formatMoney(s.net)}</span>
                 </div>
-                <p className="nesio-fin-card-sub">{[a.type, a.subtype].filter(Boolean).join(' · ') || L(dict, '账户', 'Account')}</p>
-                <p className="nesio-fin-card-meta">{m.count === 0
-                  ? L(dict, '该月此账户暂无交易', 'No transactions this month for this account')
-                  : L(dict, `本月 消费 ${formatMoney(m.spend, a.currency)} · 退款/返还 ${formatMoney(m.refund, a.currency)} · ${m.count} 笔`, `This month · spend ${formatMoney(m.spend, a.currency)} · refunds/credits ${formatMoney(m.refund, a.currency)} · ${m.count} tx`)}</p>
-              </div>
-            );
-          })
+              );
+            })()}
+            {accounts.map((a) => {
+              const m = accountMonth(txs, a.id, ym);
+              const tl = accountTypeLabel(a);
+              return (
+                <div key={a.id} className="nesio-fin-card">
+                  <div className="nesio-fin-card-top">
+                    <span className="nesio-fin-card-name"><AcctLogo a={a} /> {a.name}{a.mask ? ` ····${a.mask}` : ''}</span>
+                    {a.balance != null && <span className="nesio-fin-card-bal">{(a.type || '').toLowerCase() === 'credit' ? L(dict, `欠款 ${formatMoney(a.balance, a.currency)}`, `owes ${formatMoney(a.balance, a.currency)}`) : formatMoney(a.balance, a.currency)}</span>}
+                  </div>
+                  <p className="nesio-fin-card-sub">{[a.institution, L(dict, tl[0], tl[1]), a.mask ? `····${a.mask}` : ''].filter(Boolean).join(' · ')}</p>
+                  <p className="nesio-fin-card-meta">{m.count === 0
+                    ? L(dict, '该月此账户暂无交易', 'No transactions this month for this account')
+                    : L(dict, `本月 消费 ${formatMoney(m.spend, a.currency)} · 退款/返还 ${formatMoney(m.refund, a.currency)} · ${m.count} 笔`, `This month · spend ${formatMoney(m.spend, a.currency)} · refunds/credits ${formatMoney(m.refund, a.currency)} · ${m.count} tx`)}</p>
+                </div>
+              );
+            })}
+          </>
         )
       )}
 

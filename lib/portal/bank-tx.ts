@@ -346,6 +346,43 @@ export function saveBankAccounts(accounts: BankAccount[], opts?: { replace?: boo
   accountsStore.save([...byId.values()]);
 }
 
+/* ---------- 财务⑩:账户类型友好名 + 资产小结 ---------- */
+
+const SUBTYPE_LABELS: Record<string, [string, string]> = {
+  checking: ['支票', 'Checking'], savings: ['储蓄', 'Savings'], 'money market': ['货币市场', 'Money market'],
+  cd: ['定期存单', 'CD'], 'credit card': ['信用卡', 'Credit card'], paypal: ['PayPal', 'PayPal'],
+  brokerage: ['投资', 'Brokerage'], ira: ['退休 IRA', 'IRA'], '401k': ['退休 401k', '401k'],
+  hsa: ['医保储蓄 HSA', 'HSA'], mortgage: ['房贷', 'Mortgage'], student: ['学贷', 'Student loan'], auto: ['车贷', 'Auto loan'],
+};
+const TYPE_LABELS: Record<string, [string, string]> = {
+  depository: ['存款', 'Deposit'], credit: ['信用卡', 'Credit'], investment: ['投资', 'Investment'],
+  brokerage: ['投资', 'Investment'], loan: ['贷款', 'Loan'], other: ['账户', 'Account'],
+};
+
+/** 账户类型友好名 [zh, en](subtype 优先,type 兜底;都不认识时原样)。 */
+export function accountTypeLabel(a: { type?: string; subtype?: string }): [string, string] {
+  const sub = (a.subtype || '').toLowerCase();
+  if (SUBTYPE_LABELS[sub]) return SUBTYPE_LABELS[sub];
+  const type = (a.type || '').toLowerCase();
+  if (TYPE_LABELS[type]) return TYPE_LABELS[type];
+  const raw = a.subtype || a.type || '';
+  return raw ? [raw, raw] : ['账户', 'Account'];
+}
+
+/** 资产小结(单币种口径):存款 + 投资 − 信用卡欠款 = 净资产。无余额的账户跳过。 */
+export function assetSummary(accounts: BankAccount[], currency = 'USD'): { deposits: number; investments: number; creditOwed: number; net: number } {
+  let deposits = 0, investments = 0, creditOwed = 0;
+  for (const a of accounts) {
+    if ((a.currency || 'USD').toUpperCase() !== currency.toUpperCase()) continue;
+    if (typeof a.balance !== 'number') continue;
+    const t = (a.type || '').toLowerCase();
+    if (t === 'depository') deposits += a.balance;
+    else if (t === 'investment' || t === 'brokerage') investments += a.balance;
+    else if (t === 'credit') creditOwed += a.balance;
+  }
+  return { deposits: round2(deposits), investments: round2(investments), creditOwed: round2(creditOwed), net: round2(deposits + investments - creditOwed) };
+}
+
 /** 某账户某月的消费/退款/笔数。 */
 export function accountMonth(txs: BankTx[], accountId: string, ym: string): { spend: number; refund: number; count: number } {
   let spend = 0, refund = 0, count = 0;
