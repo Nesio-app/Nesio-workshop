@@ -80,7 +80,7 @@
 | **guidance-ranker** | 7 维在线逻辑回归 | 加特征(位置/天气/近期连拒)、分情境子模型;**event-sourcing 反馈后可回放重训** | ⭐ 最该升;先要 event-sourced 反馈垫底 |
 | **bank 商户** | token 计数投票 | 语义/模糊商户匹配(接已有 embedding 路径),泛化更准 | ⭐ 值得,接现成嵌入 |
 | **mirror-profile** | EWMA 逼近目标 | 情境化偏好(按时段/精力/星期条件化) | ⭐ 值得,升级面较小 |
-| **card-feedback** | 覆盖 + 类型过滤 | —— | ⚠️ **疑似冗余**:静音/延后已被 ranker(学采纳)+ cooling(dismiss→冷却)覆盖大半。2a 应评估**并掉**,而非给它建 store |
+| **card-feedback** | 覆盖 + 类型过滤 | —— | ✅ **已评估(2026-07-07):不并**。`dec.ts:96-102` 的 `useful/too_much→永久压制` 是**卡片生命周期业务态**,ranker(只排序)/cooling(只时间冷却)都无此语义;且 `recordCardFeedback` 是反馈流事件源头。可迁的只有 `not_now→4h` 时间窗 → 归 Recency(2a续② 与 cooling 一起收) |
 | **living-model** | 存 userVerified,学在 LLM 端 | LLM-bound,非本地算法 | 不算本地 learner 升级 |
 | **analyst** | 中位数/MAD robust + 计数静音 | 季节性/突变检测 | 运维異类,独立轨 |
 
