@@ -16,6 +16,7 @@ import type { LifeNode } from '@/lib/portal/life-graph';
 import type { ClinicalFinding } from '@/lib/portal/health-clinical';
 import type { RiskScore } from '@/lib/portal/health-risk';
 import type { FinanceFinding } from '@/lib/portal/finance-insight';
+import type { PlaceFinding } from '@/lib/portal/place-insight';
 import type { GuidanceEvent, GuidanceEventType } from './types';
 
 // ── Calendar ──────────────────────────────────────────────────────────────────
@@ -289,6 +290,18 @@ export function financeFindingsToGuidanceEvents(
     id: f.id, severity: f.severity, title: f.title, body: f.detail, cta: FINANCE_CTA,
   }));
   return insightsToGuidanceEvents('finance', '💳', '财务', items);
+}
+
+// 地图:placeFindings(活动范围/习惯断档,只出 attention 轻观察)→ 域洞察。
+const PLACE_CTA: [string, string] = ['来自你的足迹数据,想看细节可以打开时间线。', 'From your own places data — open Timeline for details.'];
+
+export function placeFindingsToGuidanceEvents(
+  findings: readonly PlaceFinding[],
+): GuidanceEvent[] {
+  const items: DomainInsightItem[] = findings
+    .filter((f) => f.severity === 'flag' || f.severity === 'attention')
+    .map((f) => ({ id: f.id, severity: f.severity as 'flag' | 'attention', title: f.title, body: f.detail, cta: PLACE_CTA }));
+  return insightsToGuidanceEvents('location', '📍', '活动', items);
 }
 
 // ── Object context (物品关联情境) ─────────────────────────────────────────────

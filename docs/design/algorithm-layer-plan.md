@@ -59,9 +59,14 @@
 
 **范式** = `health-clinical.ts` 的**引擎 + 知识分离**:声明式 `RULES`(知识,按域)插进通用 `evaluate`(引擎),出 finding → `computeDomainFindings`(Cross-Insight Reader)统一判定 → 输出。
 
-铺开顺序:**财务 → 地图 → 认知**(每域 = 写一套 RULES,复用引擎)。
+铺开顺序与状态(2026-07-07):
+- **通用引擎已抽出**:`lib/portal/domain-rules.ts`(evaluateRules:try/catch 隔离 + 严重度排序)。health-clinical 兑现它"有第二个板块再抽"的注,行为逐字不变(契约装真引擎验证)。
+- **财务 ✅**:判定层早已存在(finance-insight,引擎/知识分离精神一致);真漂移已收口(Layer1①,financeAlerts 删除)。**不做 RULES 化翻写**——刚收口且被三面消费,声明式改写是纯搅动。
+- **地图 ✅**:新建 `place-insight.ts`(声明式 RULES + 通用引擎):活动范围收窄 / 健身习惯断档。
+  **数据诚实红线**:没有足迹 ≠ 没出门(可能没开定位)——每条规则带「追踪存活」门,历史不够冷启动沉默;只出 attention(范围/习惯不是安全风险,红色只给真实风险)。已进 Reader(location 域)+ Today 桥 + 问一问投影。
+- **认知 ⏳ 下一块**:先做底料评估——候选:情绪漂移 CUSUM(moment-analytics 已有算法,缺判定层接线)、实验显著性结论(welchTTest)。warm-coach 对情绪域尤其严,评估后再动。
 
-**先修一处真漂移**:FinanceTab 用 `bank-tx.financeAlerts`,统一层用 `finance-insight.financeFindings` —— 两套不同实现,是唯一"函数级都不一致"的旁路。收口到 `financeFindings` 一套,并把 `computeDomainFindings` 扩到覆盖 location/cognition 域(现仅 health+finance)。
+**HealthDashboard 判定(census 建议的纠正)**:它是**明细面,故意渲染全谱**(含 info 达标项绿点,`HealthDashboard.tsx FindingsCard`)——统一层只筛 flag/attention,切过去会丢达标项;且它调的就是 Reader 包裹的同批引擎函数,不可能漂移。**不是旁路,保留**。至此"已建统一层域内的真漂移" 全部收口(Today/问一问/FinanceTab 同读,HealthDashboard=合法明细面)。
 
 ---
 

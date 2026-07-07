@@ -7,11 +7,17 @@ import vm from 'node:vm';
 import ts from 'typescript';
 import assert from 'node:assert/strict';
 
-const src = fs.readFileSync(new URL('../lib/portal/health-clinical.ts', import.meta.url), 'utf8');
-const js = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
-const mod = { exports: {} };
-vm.runInNewContext(js, { module: mod, exports: mod.exports, require: () => ({}), Math, Number, Array, console });
-const { evaluateHealthFindings } = mod.exports;
+function loadTs(rel, requireImpl) {
+  const src = fs.readFileSync(new URL(rel, import.meta.url), 'utf8');
+  const js = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const mod = { exports: {} };
+  vm.runInNewContext(js, { module: mod, exports: mod.exports, require: requireImpl, Math, Number, Array, console });
+  return mod.exports;
+}
+// 引擎已抽到 domain-rules(Layer1 通用运行时)—— 装真引擎,契约顺带钉住"替换后行为不变"。
+const domainRules = loadTs('../lib/portal/domain-rules.ts', () => ({}));
+const { evaluateHealthFindings } = loadTs('../lib/portal/health-clinical.ts', (p) =>
+  p === './domain-rules' ? domainRules : ({}));
 
 const find = (arr, id) => arr.find((f) => f.id === id);
 

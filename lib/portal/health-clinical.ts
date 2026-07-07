@@ -7,10 +7,11 @@
  *   ② 模式识别:专科医生一眼看出来的模式(黎明现象、静息心率/HRV 偏离你的基线)。
  * 全部确定性、可单测、带出处、不下诊断;红旗(如低血糖偏多)提示"与医生确认"。
  *
- * 结构上示范「引擎/知识分离」:RULES 是声明式知识,evaluate() 是通用运行时。
- * 换一个板块(财务等)只需换一份 RULES,不改运行时 —— 但引擎抽公共层等有第二个板块再做(避免过早抽象)。
+ * 结构上示范「引擎/知识分离」:RULES 是声明式知识,运行时已抽到 domain-rules.evaluateRules
+ * (第二个板块 place-insight 到位后兑现"有第二个板块再抽"的注)。换板块只写一份 RULES。
  */
 import type { GlucoseAnalysis, SleepStages, HealthMetric } from './apple-health';
+import { evaluateRules } from './domain-rules';
 
 export type Severity = 'info' | 'attention' | 'flag'; // info=正常/达标, attention=可关注, flag=建议就医
 
@@ -120,15 +121,13 @@ const RULES: Rule[] = [
   },
 ];
 
-// ── 引擎层:通用运行时(换板块只换 RULES)────────────────────────────────────
+// ── 引擎层:走通用运行时 domain-rules.evaluateRules(source 是本域的静态知识,包一层带上)──
 export function evaluateHealthFindings(input: HealthFindingsInput): ClinicalFinding[] {
-  const out: ClinicalFinding[] = [];
-  for (const rule of RULES) {
-    let res: ReturnType<Rule['run']> = null;
-    try { res = rule.run(input); } catch { res = null; } // 单条规则出错不影响其余
-    if (res) out.push({ id: rule.id, source: rule.source, ...res });
-  }
-  // 排序:红旗 > 可关注 > 正常
-  const rank: Record<Severity, number> = { flag: 0, attention: 1, info: 2 };
-  return out.sort((a, b) => rank[a.severity] - rank[b.severity]);
+  return evaluateRules<HealthFindingsInput, ClinicalFinding>(
+    RULES.map((r) => ({
+      id: r.id,
+      run: (i) => { const res = r.run(i); return res ? { ...res, source: r.source } : null; },
+    })),
+    input,
+  );
 }
