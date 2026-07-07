@@ -22,6 +22,7 @@ import { computeFinanceScores } from '@/lib/portal/finance-risk';
 import { incomeBreakdown } from '@/lib/portal/finance-features';
 import { removeBankAccount } from '@/lib/portal/bank-tx';
 import { loadBudget, saveBudget, hasBudget, suggestBudget, budgetProgress, type BudgetConfig } from '@/lib/portal/finance-budget';
+import { buildMonthlyReport, persistReportToMemory, autoPersistLastMonthReport, reportHtml } from '@/lib/portal/finance-report';
 import { categoryLabel, categoryDetailLabel, COMMON_EXPENSE_CATEGORIES } from '@/lib/portal/tx-category';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -138,6 +139,16 @@ export default function FinanceTab() {
   const budget = useMemo(() => loadBudget(), [rev]);
   const bp = useMemo(() => budgetProgress(txs, ym, budget), [txs, ym, budget]);
   const [budgetNote, setBudgetNote] = useState('');
+  const [reportMsg, setReportMsg] = useState(''); // 财务㉓:月报动作反馈(可见状态,不静默)
+  // 财务㉔:月初自动补生成上月月报并存记忆(每设备每月一次,幂等,localStorage 标记)
+  useEffect(() => {
+    if (!txs.length) return;
+    try {
+      const outcome = autoPersistLastMonthReport(txs, accounts, new Date(), dict);
+      if (outcome === 'created') setReportMsg(L(dict, `已自动生成 ${prevYm(ymOf())} 月报并存入记忆`, `Auto-saved the ${prevYm(ymOf())} report to memory`));
+    } catch { /* 自动补失败静默,手动入口仍在 */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [txs, accounts]);
 
   if (txs.length === 0) {
     return <p className="nesio-insights-empty">{L(dict, '还没有银行流水。到「设置 → 数据接入 → 银行流水 · Plaid」连接账户并点「同步」。', 'No bank transactions yet. Go to Settings → Data sources → Bank feed · Plaid, connect and Sync.')}</p>;
@@ -225,7 +236,7 @@ export default function FinanceTab() {
             <div className="nesio-fin-donut-wrap">
               <FinanceDonut slices={cats} centerTop={L(dict, '本月支出', 'This month')} centerVal={formatMoney(cats.reduce((s, c) => s + c.total, 0), summary.currency)} />
               <div className="nesio-fin-donut-legend">
-                {cats.slice(0, 6).map((c, i) => (
+                {cats.filter((c) => c.pct >= 1).slice(0, 6).map((c, i) => (
                   <div key={c.category} className="nesio-fin-donut-leg">
                     <span className="nesio-fin-donut-dot" style={{ background: DONUT_COLORS[i % DONUT_COLORS.length] }} />
                     <span className="nesio-fin-donut-cat">{categoryLabel(c.category, dict)}</span>
@@ -305,6 +316,43 @@ export default function FinanceTab() {
               </div>
             ))}
           </div>
+          {/* 财务㉓:月报 —— 报告级 Markdown,可下载 / 存入记忆(问一问可检索) */}
+          <div className="nesio-fin-budget-add" style={{ marginTop: '1.25rem' }}>
+            <button type="button" className="nesio-fin-flowopt" onClick={() => {
+              try {
+                const r = buildMonthlyReport(txs, accounts, ym, dict);
+                const blob = new Blob([r.markdown], { type: 'text/markdown;charset=utf-8' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = `finance-report-${r.ym}.md`;
+                document.body.appendChild(a); a.click(); a.remove();
+                setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+                setReportMsg(L(dict, `已生成 ${r.ym} 月报并下载(.md)`, `Report for ${r.ym} downloaded (.md)`));
+              } catch { setReportMsg(L(dict, '月报生成失败,请重试', 'Report failed — try again')); }
+            }}>{L(dict, '下载本月财务月报', 'Download monthly report')}</button>
+            <button type="button" className="nesio-fin-flowopt" onClick={() => {
+              try {
+                const r = buildMonthlyReport(txs, accounts, ym, dict);
+                const outcome = persistReportToMemory(r);
+                setReportMsg(outcome === 'created'
+                  ? L(dict, `已把 ${r.ym} 月报存入记忆,「问一问」可检索`, `Report ${r.ym} saved to memory — Ask can cite it`)
+                  : L(dict, `已更新记忆里的 ${r.ym} 月报`, `Updated the ${r.ym} report in memory`));
+              } catch { setReportMsg(L(dict, '存入记忆失败,请重试', 'Save to memory failed — try again')); }
+            }}>{L(dict, '存入记忆', 'Save to memory')}</button>
+            <button type="button" className="nesio-fin-flowopt" onClick={() => {
+              try {
+                const r = buildMonthlyReport(txs, accounts, ym, dict);
+                const w = window.open('', '_blank');
+                if (!w) { setReportMsg(L(dict, '弹窗被拦截,请允许弹窗后重试', 'Popup blocked — allow popups and retry')); return; }
+                w.document.write(reportHtml(r));
+                w.document.close();
+                setTimeout(() => { try { w.focus(); w.print(); } catch { /* 用户手动打印 */ } }, 350);
+                setReportMsg(L(dict, '已打开打印视图(打印 → 存为 PDF)', 'Print view opened (Print → Save as PDF)'));
+              } catch { setReportMsg(L(dict, '打印视图打开失败,请重试', 'Print view failed — try again')); }
+            }}>{L(dict, '打印 / 存 PDF', 'Print / PDF')}</button>
+          </div>
+          {reportMsg && <p className="nesio-settings-option-hint">{reportMsg}</p>}
+
           <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '商户 Top', 'Top merchants')}</p>
           <div className="nesio-fin-merchants">
             {merchants.map((m) => (
@@ -389,7 +437,7 @@ export default function FinanceTab() {
                         return (
                           <span className="nesio-fin-txacct">
                             <AcctLogo a={a} size={13} />
-                            {a.institution || a.name} · {L(dict, tl[0], tl[1])}{a.mask ? ` ····${a.mask}` : ''}
+                            {a.institution || a.name}{a.mask ? ` ····${a.mask}` : ''} · {L(dict, tl[0], tl[1])}
                           </span>
                         );
                       })()}
@@ -565,7 +613,7 @@ export default function FinanceTab() {
               return (
                 <div key={a.id} className="nesio-fin-card">
                   <div className="nesio-fin-card-top">
-                    <span className="nesio-fin-card-name"><AcctLogo a={a} /> {a.name}{a.mask ? ` ····${a.mask}` : ''}</span>
+                    <span className="nesio-fin-card-name"><AcctLogo a={a} /><span className="nesio-fin-card-name-t">{a.name}{a.mask ? ` ····${a.mask}` : ''}</span></span>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
                       {a.balance != null && <span className="nesio-fin-card-bal">{(a.type || '').toLowerCase() === 'credit' ? L(dict, `欠款 ${formatMoney(a.balance, a.currency)}`, `owes ${formatMoney(a.balance, a.currency)}`) : formatMoney(a.balance, a.currency)}</span>}
                       {/* 财务⑯:重复/失效副本手动移除兜底(仍在连接中的账户下次同步会回来) */}

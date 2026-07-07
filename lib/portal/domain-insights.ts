@@ -12,7 +12,7 @@
 import { loadHealthMetrics } from './health-store';
 import { evaluateHealthFindings, type ClinicalFinding } from './health-clinical';
 import { computeRiskScores, type RiskScore } from './health-risk';
-import { loadBankTx, loadBankAccounts } from './bank-tx';
+import { loadBankTx, loadBankAccounts, prevYm, ymOf, formatMoney } from './bank-tx';
 import { financeFindings, type FinanceFinding } from './finance-insight';
 import { computeFinanceScores } from './finance-risk';
 import { findFinanceGuidelines } from './finance-guidelines';
@@ -106,6 +106,24 @@ export function gatherDomainInsights(): DomainInsight[] {
   for (const f of finance) {
     out.push({ domain: 'finance', severity: f.severity, title: f.title[0], detail: f.detail[0] });
   }
+  // 财务㉔:月初一周内提示上月月报已就绪(已存入记忆的才提;简报/问一问同源)
+  try {
+    const now = new Date();
+    if (now.getDate() <= 7) {
+      const lastYm = prevYm(ymOf(now));
+      const node = getLifeGraph().find((n) => n.attributes?.kind === 'finance-monthly-report' && n.attributes?.ym === lastYm);
+      if (node) {
+        const net = typeof node.attributes?.net === 'number' ? formatMoney(node.attributes.net as number) : '';
+        const saved = typeof node.attributes?.saved === 'number' ? node.attributes.saved as number : null;
+        out.push({
+          domain: 'finance', severity: 'attention',
+          title: `${lastYm} 财务月报已就绪`,
+          detail: `${net ? `净支出 ${net}` : ''}${saved != null ? ` · 结余 ${saved < 0 ? '-' : ''}${formatMoney(Math.abs(saved))}` : ''} · 财务页可下载,问一问可检索全文`,
+        });
+      }
+    }
+  } catch { /* ignore */ }
+
   // 财务⑮:L3 体检分项(与健康 risks 同法,只有 moderate/high 值得提示;info/low 留在财务页)
   try {
     for (const s of computeFinanceScores(loadBankTx(), loadBankAccounts())) {
