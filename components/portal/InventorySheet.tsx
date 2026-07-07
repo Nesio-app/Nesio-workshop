@@ -4,26 +4,23 @@
  * InventorySheet — 原生收纳面板(收纳重建 · 片 2)。
  *
  * 取代静态 /storage/ app 的收纳半边(冲动守卫半边早已原生:冷冻仓/购买冷静流)。
- * 数据 = life-graph object 节点(见 lib/portal/inventory.ts),这里只是「按位置浏览」的视图:
- * 空间 chips → 物品卡 + 搜索 + 加物品 + 详情(改位置/数量/效期/备注)+ 临期警示。
- * 复用 nesio-freeze-* sheet 骨架样式,保持全 app 一致的面板观感。
+ * 数据 = life-graph object 节点(见 lib/portal/inventory.ts);位置词汇 = named-places
+ * (与拍一下识别归位共用同一个 LocationPicker,一套真相,不自建第二套位置表)。
+ * 浏览分组从物品 location 首段动态聚合;复用 nesio-freeze-* sheet 骨架样式。
  */
 
 import { useEffect, useMemo, useState } from 'react';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
+import LocationPicker from './LocationPicker';
 import {
-  addContainer,
   addInventoryItem,
-  addSpace,
   expiryStatus,
   listInventoryItems,
-  loadSpaces,
   removeInventoryItem,
   updateInventoryItem,
   type InventoryItem,
-  type InventorySpace,
 } from '@/lib/portal/inventory';
 
 interface InventorySheetProps {
@@ -37,37 +34,42 @@ const UNPLACED = '__unplaced__';
 export default function InventorySheet({ open, onClose }: InventorySheetProps) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [items, setItems] = useState<InventoryItem[]>([]);
-  const [spaces, setSpaces] = useState<InventorySpace[]>([]);
-  const [spaceFilter, setSpaceFilter] = useState<string>(ALL);
+  const [groupFilter, setGroupFilter] = useState<string>(ALL);
   const [query, setQuery] = useState('');
   const [view, setView] = useState<'list' | 'add' | 'detail'>('list');
   const [detailId, setDetailId] = useState<string | null>(null);
 
   // 加物品表单
   const [fName, setFName] = useState('');
-  const [fSpace, setFSpace] = useState('');
-  const [fContainer, setFContainer] = useState('');
+  const [fLocation, setFLocation] = useState('');
   const [fQty, setFQty] = useState('');
   const [fExpiry, setFExpiry] = useState('');
   const [fNote, setFNote] = useState('');
 
-  const refresh = () => {
-    setItems(listInventoryItems());
-    setSpaces(loadSpaces());
-  };
+  const refresh = () => setItems(listInventoryItems());
 
   useEffect(() => {
     if (!open) return;
     refresh();
     setView('list');
     setQuery('');
-    setSpaceFilter(ALL);
+    setGroupFilter(ALL);
   }, [open]);
+
+  // 浏览分组:物品 location 首段(场所或自由文本首段)动态聚合
+  const groups = useMemo(() => {
+    const seen = new Map<string, number>();
+    for (const i of items) {
+      if (!i.space) continue;
+      seen.set(i.space, (seen.get(i.space) || 0) + 1);
+    }
+    return [...seen.entries()].sort((a, b) => b[1] - a[1]);
+  }, [items]);
 
   const visible = useMemo(() => {
     let list = items;
-    if (spaceFilter === UNPLACED) list = list.filter((i) => !i.space);
-    else if (spaceFilter !== ALL) list = list.filter((i) => i.space === spaceFilter);
+    if (groupFilter === UNPLACED) list = list.filter((i) => !i.space);
+    else if (groupFilter !== ALL) list = list.filter((i) => i.space === groupFilter);
     const q = query.trim().toLowerCase();
     if (q) {
       list = list.filter((i) =>
@@ -76,37 +78,27 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
         i.note.toLowerCase().includes(q));
     }
     return list;
-  }, [items, spaceFilter, query]);
+  }, [items, groupFilter, query]);
 
   const unplacedCount = useMemo(() => items.filter((i) => !i.space).length, [items]);
   const detail = detailId ? items.find((i) => i.id === detailId) ?? null : null;
 
   if (!open) return null;
 
-  const resetForm = () => { setFName(''); setFSpace(''); setFContainer(''); setFQty(''); setFExpiry(''); setFNote(''); };
+  const resetForm = () => { setFName(''); setFLocation(''); setFQty(''); setFExpiry(''); setFNote(''); };
 
   const submitAdd = () => {
     if (!fName.trim()) return;
     addInventoryItem({
       name: fName,
-      space: fSpace || undefined,
-      container: fContainer || undefined,
+      location: fLocation || undefined,
       quantity: fQty ? parseInt(fQty, 10) : undefined,
       expiry: fExpiry || undefined,
       note: fNote || undefined,
     });
-    if (fSpace && fContainer.trim()) {
-      const sp = spaces.find((s) => s.name === fSpace);
-      if (sp && !sp.containers.includes(fContainer.trim())) setSpaces(addContainer(sp.id, fContainer));
-    }
     resetForm();
     refresh();
     setView('list');
-  };
-
-  const promptNewSpace = () => {
-    const name = window.prompt(L(dict, '新空间名称(如:玄关、储物间)', 'New space name (e.g. hallway, closet)'));
-    if (name?.trim()) setSpaces(addSpace(name));
   };
 
   const label: React.CSSProperties = { display: 'block', fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '0.7rem 0 0.3rem' };
@@ -138,21 +130,17 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
               style={{ margin: '0.5rem 0' }}
             />
             <div style={{ display: 'flex', gap: 6, overflowX: 'auto', padding: '0.2rem 0 0.5rem' }}>
-              <button type="button" style={chip(spaceFilter === ALL)} onClick={() => setSpaceFilter(ALL)}>{L(dict, '全部', 'All')} {items.length}</button>
-              {spaces.map((s) => {
-                const n = items.filter((i) => i.space === s.name).length;
-                return (
-                  <button key={s.id} type="button" style={chip(spaceFilter === s.name)} onClick={() => setSpaceFilter(s.name)}>
-                    {s.emoji} {s.name}{n > 0 ? ` ${n}` : ''}
-                  </button>
-                );
-              })}
+              <button type="button" style={chip(groupFilter === ALL)} onClick={() => setGroupFilter(ALL)}>{L(dict, '全部', 'All')} {items.length}</button>
+              {groups.map(([name, n]) => (
+                <button key={name} type="button" style={chip(groupFilter === name)} onClick={() => setGroupFilter(name)}>
+                  {name} {n}
+                </button>
+              ))}
               {unplacedCount > 0 && (
-                <button type="button" style={chip(spaceFilter === UNPLACED)} onClick={() => setSpaceFilter(UNPLACED)}>
+                <button type="button" style={chip(groupFilter === UNPLACED)} onClick={() => setGroupFilter(UNPLACED)}>
                   {L(dict, '未归位', 'Unplaced')} {unplacedCount}
                 </button>
               )}
-              <button type="button" style={chip(false)} onClick={promptNewSpace}>＋{L(dict, '空间', 'space')}</button>
             </div>
 
             {visible.length === 0 ? (
@@ -207,18 +195,8 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
           <div style={{ maxHeight: '58vh', overflowY: 'auto' }}>
             <label style={label}>{L(dict, '物品名', 'Item name')}</label>
             <input className="nesio-ob-input" value={fName} onChange={(e) => setFName(e.target.value)} placeholder={L(dict, '例:护照、备用钥匙、维生素 D3', 'e.g. passport, spare keys, vitamin D3')} />
-            <label style={label}>{L(dict, '空间', 'Space')}</label>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {spaces.map((s) => (
-                <button key={s.id} type="button" style={chip(fSpace === s.name)} onClick={() => setFSpace(fSpace === s.name ? '' : s.name)}>{s.emoji} {s.name}</button>
-              ))}
-              <button type="button" style={chip(false)} onClick={promptNewSpace}>＋</button>
-            </div>
-            <label style={label}>{L(dict, '具体位置(可选,如:镜柜后层)', 'Container (optional, e.g. mirror cabinet)')}</label>
-            <input className="nesio-ob-input" value={fContainer} onChange={(e) => setFContainer(e.target.value)} list="nesio-inv-containers" />
-            <datalist id="nesio-inv-containers">
-              {(spaces.find((s) => s.name === fSpace)?.containers || []).map((c) => <option key={c} value={c} />)}
-            </datalist>
+            <label style={label}>{L(dict, '放哪了?(和拍一下识别同一套位置)', 'Where does it live? (same places as Snap)')}</label>
+            <LocationPicker value={fLocation} onChange={setFLocation} />
             <div style={{ display: 'flex', gap: 10 }}>
               <div style={{ flex: 1 }}>
                 <label style={label}>{L(dict, '数量(可选)', 'Qty (optional)')}</label>
@@ -240,9 +218,7 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
         {view === 'detail' && detail && (
           <ItemDetail
             item={detail}
-            spaces={spaces}
             dict={dict}
-            chip={chip}
             label={label}
             onChanged={refresh}
             onDeleted={() => { refresh(); setView('list'); setDetailId(null); }}
@@ -253,17 +229,14 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
   );
 }
 
-function ItemDetail({ item, spaces, dict, chip, label, onChanged, onDeleted }: {
+function ItemDetail({ item, dict, label, onChanged, onDeleted }: {
   item: InventoryItem;
-  spaces: InventorySpace[];
   dict: ReturnType<typeof portalLocaleToDictionaryLocale>;
-  chip: (active: boolean) => React.CSSProperties;
   label: React.CSSProperties;
   onChanged: () => void;
   onDeleted: () => void;
 }) {
-  const [space, setSpace] = useState(item.space);
-  const [container, setContainer] = useState(item.container);
+  const [location, setLocation] = useState(item.location);
   const [qty, setQty] = useState(item.quantity != null ? String(item.quantity) : '');
   const [expiry, setExpiry] = useState(item.expiry ?? '');
   const [note, setNote] = useState(item.note);
@@ -271,8 +244,7 @@ function ItemDetail({ item, spaces, dict, chip, label, onChanged, onDeleted }: {
 
   const save = () => {
     updateInventoryItem(item.id, {
-      space,
-      container,
+      location,
       quantity: qty ? parseInt(qty, 10) : null as unknown as number | undefined,
       expiry,
       note,
@@ -290,14 +262,8 @@ function ItemDetail({ item, spaces, dict, chip, label, onChanged, onDeleted }: {
           </span>
         )}
       </p>
-      <label style={label}>{L(dict, '空间', 'Space')}</label>
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-        {spaces.map((s) => (
-          <button key={s.id} type="button" style={chip(space === s.name)} onClick={() => setSpace(space === s.name ? '' : s.name)}>{s.emoji} {s.name}</button>
-        ))}
-      </div>
-      <label style={label}>{L(dict, '具体位置', 'Container')}</label>
-      <input className="nesio-ob-input" value={container} onChange={(e) => setContainer(e.target.value)} />
+      <label style={label}>{L(dict, '放哪了?', 'Where does it live?')}</label>
+      <LocationPicker value={location} onChange={setLocation} />
       <div style={{ display: 'flex', gap: 10 }}>
         <div style={{ flex: 1 }}>
           <label style={label}>{L(dict, '数量', 'Qty')}</label>

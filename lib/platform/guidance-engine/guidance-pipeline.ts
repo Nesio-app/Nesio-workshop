@@ -219,7 +219,10 @@ function tightenBudget(budget: ReturnType<typeof computeAttentionBudget>): Retur
   return 'exhausted';
 }
 
-export function runGuidancePipeline(input: GuidancePipelineInput): GuidanceCard[] {
+/** 出卡但延迟「已展示」副作用 —— 调用方确认结果会上屏后调 commitShown()(见函数尾注释)。 */
+export function runGuidancePipelineDeferred(
+  input: GuidancePipelineInput,
+): { cards: GuidanceCard[]; commitShown: () => void } {
   const now = input.now ?? new Date();
   const locale = input.locale ?? 'zh';
   const coolingStore = loadCoolingStore();
@@ -326,19 +329,32 @@ export function runGuidancePipeline(input: GuidancePipelineInput): GuidanceCard[
     .slice(0, TODAY_CARD_BUDGET);
   const result = ranked.map((c) => c.card);
 
-  // 批次 52:出卡时暂存特征 —— 用户反馈到达时(recordCardFeedback)据此做一次在线更新。
-  for (const c of ranked) recordShownFeatures(c.card.id, c.feats, c.card.type);
+  // 「已展示」副作用(冷却 + ranker 特征暂存)拆成显式提交:调用方确认这轮结果
+  // **真的会上屏**后才调用。此前副作用在返回前就写,而 useTodayData 的并发守卫
+  // (runSeqRef)可能丢弃慢轮的 UI 输出 —— 卡被记成已展示却从未出现,下一轮全被
+  // 冷却拦掉,Today 只剩兜底金句(收纳临期卡首发时踩中)。
+  const commitShown = () => {
+    // 批次 52:出卡时暂存特征 —— 用户反馈到达时(recordCardFeedback)据此做一次在线更新。
+    for (const c of ranked) recordShownFeatures(c.card.id, c.feats, c.card.type);
 
-  // Record shown → update cooling state
-  if (result.length > 0) {
-    let updated = coolingStore;
-    for (const card of result) {
-      // 冷却键与 isOnCooldown 的读取键一致(dedupKey);多实例类型逐实例冷却。
-      const meta = candidates.find((c) => c.card.id === card.id);
-      updated = recordShown(meta?.coolKey ?? card.type, updated);
+    // Record shown → update cooling state
+    if (result.length > 0) {
+      let updated = coolingStore;
+      for (const card of result) {
+        // 冷却键与 isOnCooldown 的读取键一致(dedupKey);多实例类型逐实例冷却。
+        const meta = candidates.find((c) => c.card.id === card.id);
+        updated = recordShown(meta?.coolKey ?? card.type, updated);
+      }
+      saveCoolingStore(updated);
     }
-    saveCoolingStore(updated);
-  }
+  };
 
-  return result;
+  return { cards: result, commitShown };
+}
+
+/** 兼容入口:出卡并立即提交「已展示」(单次同步调用场景 / 既有测试)。 */
+export function runGuidancePipeline(input: GuidancePipelineInput): GuidanceCard[] {
+  const { cards, commitShown } = runGuidancePipelineDeferred(input);
+  commitShown();
+  return cards;
 }

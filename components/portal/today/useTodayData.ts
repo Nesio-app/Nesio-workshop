@@ -16,7 +16,7 @@ import type { CalendarEvent } from '@/lib/portal/types';
 import { scoreCalendarEvents } from '@/lib/platform/attention-engine';
 import type { EmailSignal } from '@/lib/platform/email-signals';
 import { loadDormantStore, evaluateDormancy, type DormantStore } from '@/lib/platform/dormant-engine';
-import { runGuidancePipeline } from '@/lib/platform/guidance-engine/guidance-pipeline';
+import { runGuidancePipelineDeferred } from '@/lib/platform/guidance-engine/guidance-pipeline';
 import { emitFeedback, type Reaction } from '@/lib/platform/personalization';
 import { getEnergyState } from '@/lib/platform/energy-state';
 import type { RecommendationCard } from '@/lib/portal/reasoning-engine';
@@ -32,6 +32,7 @@ import {
   healthFindingsToGuidanceEvents,
   financeFindingsToGuidanceEvents,
   placeFindingsToGuidanceEvents,
+  inventoryFindingsToGuidanceEvents,
   type WeatherSnapshot,
   decCardsToGuidanceEvents,
 } from '@/lib/platform/guidance-engine/source-adapters';
@@ -171,12 +172,15 @@ export function useTodayData(canUsePrivateData: boolean) {
               ...healthFindingsToGuidanceEvents(df.health.findings, df.health.risks),
               ...financeFindingsToGuidanceEvents(df.finance),
               ...placeFindingsToGuidanceEvents(df.location),
+              ...inventoryFindingsToGuidanceEvents(df.inventory),
             ];
           })(),
         ];
 
         const uiLocale = portalLocaleToDictionaryLocale(loadProfileSettings().locale);
-        const guidanceCards = runGuidancePipeline({
+        // deferred:出卡但先不写「已展示」(冷却/ranker),等确认这轮结果真的上屏再 commit
+        // —— 否则慢轮被 runSeqRef 丢弃时,卡被记成已展示却从未出现,下一轮全被冷却拦掉。
+        const { cards: guidanceCards, commitShown } = runGuidancePipelineDeferred({
           locale: uiLocale,
           events: guidanceEvents,
           scoredCalendar: scored,
@@ -264,7 +268,10 @@ export function useTodayData(canUsePrivateData: boolean) {
           }
         }
 
-        if (!stale() && newProactiveCards.length > 0) setProactiveCards(newProactiveCards);
+        if (!stale()) {
+          if (newProactiveCards.length > 0) setProactiveCards(newProactiveCards);
+          commitShown(); // 这轮结果确认上屏,才记「已展示」(冷却 + ranker 特征)
+        }
         // 管线空窗时的兜底轮播移到 TodayFeed 渲染层(buildRotatingFallback):
         // 那里能看到「被 dismiss 后还剩几张」,保证未来预测区永远有内容。
       }

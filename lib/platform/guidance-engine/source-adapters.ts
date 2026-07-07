@@ -17,6 +17,7 @@ import type { ClinicalFinding } from '@/lib/portal/health-clinical';
 import type { RiskScore } from '@/lib/portal/health-risk';
 import type { FinanceFinding } from '@/lib/portal/finance-insight';
 import type { PlaceFinding } from '@/lib/portal/place-insight';
+import type { InventoryFinding } from '@/lib/portal/inventory';
 import type { GuidanceEvent, GuidanceEventType } from './types';
 
 // ── Calendar ──────────────────────────────────────────────────────────────────
@@ -290,6 +291,18 @@ export function financeFindingsToGuidanceEvents(
     id: f.id, severity: f.severity, title: f.title, body: f.detail, cta: FINANCE_CTA,
   }));
   return insightsToGuidanceEvents('finance', '💳', '财务', items);
+}
+
+// 收纳:效期判定(已过期=flag,30 天内=attention;物品即 life-graph object 节点)→ 域洞察。
+const INVENTORY_CTA: [string, string] = ['来自你的收纳记录,点开收纳可以处理或改效期。', 'From your storage notes — open Storage to handle it.'];
+
+export function inventoryFindingsToGuidanceEvents(
+  findings: readonly InventoryFinding[],
+): GuidanceEvent[] {
+  const items: DomainInsightItem[] = findings.map((f) => ({
+    id: f.id, severity: f.severity, title: f.title, body: f.detail, cta: INVENTORY_CTA,
+  }));
+  return insightsToGuidanceEvents('inventory', '📦', '收纳', items);
 }
 
 // 地图:placeFindings(活动范围/习惯断档,只出 attention 轻观察)→ 域洞察。

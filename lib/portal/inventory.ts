@@ -19,68 +19,14 @@ import {
   type LifeNode,
 } from './life-graph';
 
-/* ---------- 位置表(空间/容器) ---------- */
-
-export interface InventorySpace {
-  id: string;
-  emoji: string;
-  name: string;
-  containers: string[]; // 容器名列表(轻量,不单独建实体)
-}
-
-const PLACES_KEY = 'nesio-inventory-places-v1';
-
-const DEFAULT_SPACES: InventorySpace[] = [
-  { id: 'sp-bedroom', emoji: '🛏️', name: '卧室', containers: [] },
-  { id: 'sp-kitchen', emoji: '🍳', name: '厨房', containers: [] },
-  { id: 'sp-desk', emoji: '📚', name: '书桌', containers: [] },
-];
-
-export function loadSpaces(): InventorySpace[] {
-  if (typeof window === 'undefined') return DEFAULT_SPACES;
-  try {
-    const raw = JSON.parse(localStorage.getItem(PLACES_KEY) || 'null') as InventorySpace[] | null;
-    if (Array.isArray(raw) && raw.length > 0) return raw.filter((s) => s && s.id && s.name);
-  } catch { /* ignore */ }
-  return DEFAULT_SPACES;
-}
-
-export function saveSpaces(spaces: InventorySpace[]): void {
-  if (typeof window === 'undefined') return;
-  try { localStorage.setItem(PLACES_KEY, JSON.stringify(spaces)); } catch { /* quota */ }
-}
-
-export function addSpace(name: string, emoji = '📦'): InventorySpace[] {
-  const spaces = loadSpaces();
-  const trimmed = name.trim();
-  if (!trimmed || spaces.some((s) => s.name === trimmed)) return spaces;
-  const next = [...spaces, { id: `sp-${Date.now().toString(36)}`, emoji, name: trimmed, containers: [] }];
-  saveSpaces(next);
-  return next;
-}
-
-export function addContainer(spaceId: string, containerName: string): InventorySpace[] {
-  const spaces = loadSpaces();
-  const trimmed = containerName.trim();
-  if (!trimmed) return spaces;
-  const next = spaces.map((s) =>
-    s.id === spaceId && !s.containers.includes(trimmed)
-      ? { ...s, containers: [...s.containers, trimmed] }
-      : s,
-  );
-  saveSpaces(next);
-  return next;
-}
-
-/* ---------- location 规范:「空间 · 容器」 ---------- */
+/* ---------- location 规范 ---------- */
+// 位置词汇的唯一真相是 named-places(场所→房间→子位置,LocationPicker 输出
+// 「emoji 场所 · 房间 · 子位置」或自由文本)。收纳不再自建第二套位置表 ——
+// 相机识别归位与收纳手记用同一个 LocationPicker、写同一个 location 属性。
 
 const LOC_SEP = ' · ';
 
-export function joinLocation(space: string, container?: string): string {
-  return container?.trim() ? `${space}${LOC_SEP}${container.trim()}` : space;
-}
-
-/** 解析 location 为 {space, container}。容忍旧数据的任意自由文本(全落到 space)。 */
+/** 解析 location 为 {space(首段,浏览分组用), container(其余)}。自由文本整段落到 space。 */
 export function splitLocation(location: string): { space: string; container: string } {
   const idx = location.indexOf(LOC_SEP);
   if (idx === -1) return { space: location.trim(), container: '' };
@@ -143,8 +89,7 @@ export function listInventoryItems(): InventoryItem[] {
 
 export interface NewInventoryItem {
   name: string;
-  space?: string;
-  container?: string;
+  location?: string; // LocationPicker 输出(「emoji 场所 · 房间 · 子位置」或自由文本)
   quantity?: number;
   expiry?: string; // 'YYYY-MM-DD'
   note?: string;
@@ -152,7 +97,7 @@ export interface NewInventoryItem {
 
 export function addInventoryItem(input: NewInventoryItem): LifeNode {
   const attributes: Record<string, string | number | boolean | null> = {};
-  if (input.space?.trim()) attributes.location = joinLocation(input.space, input.container);
+  if (input.location?.trim()) attributes.location = input.location.trim();
   if (input.quantity != null && Number.isFinite(input.quantity)) attributes.quantity = input.quantity;
   if (input.expiry?.trim()) attributes.expiry = input.expiry.trim();
   if (input.note?.trim()) attributes.note = input.note.trim();
@@ -170,17 +115,14 @@ export function addInventoryItem(input: NewInventoryItem): LifeNode {
 /** 更新物品属性(位置/数量/效期/备注)。 */
 export function updateInventoryItem(
   id: string,
-  patch: Partial<Pick<NewInventoryItem, 'space' | 'container' | 'quantity' | 'expiry' | 'note'>> & { name?: string },
+  patch: Partial<Pick<NewInventoryItem, 'location' | 'quantity' | 'expiry' | 'note'>> & { name?: string },
 ): boolean {
   const node = getLifeGraph().find((n) => n.id === id);
   if (!node) return false;
   const attributes = { ...node.attributes };
-  if (patch.space !== undefined) {
-    if (patch.space.trim()) attributes.location = joinLocation(patch.space, patch.container);
+  if (patch.location !== undefined) {
+    if (patch.location.trim()) attributes.location = patch.location.trim();
     else delete attributes.location;
-  } else if (patch.container !== undefined) {
-    const cur = splitLocation(str(attributes.location));
-    if (cur.space) attributes.location = joinLocation(cur.space, patch.container);
   }
   if (patch.quantity !== undefined) {
     if (patch.quantity != null && Number.isFinite(patch.quantity)) attributes.quantity = patch.quantity;
@@ -221,4 +163,47 @@ export function expiryStatus(item: InventoryItem, now = new Date()): 'expired' |
   if (t < now.getTime()) return 'expired';
   if (t <= now.getTime() + 30 * 86_400_000) return 'soon';
   return null;
+}
+
+/* ---------- 域判定(接 Cross-Insight Reader / guidance)---------- */
+
+/** 收纳域「值得提示」判定 —— 与健康/财务 finding 同形,经 domain-insights 汇聚。 */
+export interface InventoryFinding {
+  id: string;
+  severity: 'flag' | 'attention';
+  title: [string, string];  // [zh, en]
+  detail: [string, string];
+}
+
+/**
+ * 效期判定:已过期 = flag,30 天内到期 = attention。已过期在前、其余按到期日近→远。
+ * 纯函数(items/now 可注入,可单测);数量上限交给 guidance 通用脊柱(每域封顶 3)。
+ */
+export function inventoryFindings(items: InventoryItem[] = listInventoryItems(), now = new Date()): InventoryFinding[] {
+  const out: InventoryFinding[] = [];
+  for (const item of expiringSoon(items, 30, now)) {
+    const status = expiryStatus(item, now);
+    if (!status) continue;
+    const where: [string, string] = item.location
+      ? [`放在 ${item.location}`, `at ${item.location}`]
+      : ['还没记位置', 'location not noted'];
+    if (status === 'expired') {
+      out.push({
+        id: `expiry-${item.id}`,
+        severity: 'flag',
+        title: [`「${item.name}」已过期`, `"${item.name}" has expired`],
+        detail: [`效期 ${item.expiry} · ${where[0]}`, `Expiry ${item.expiry} · ${where[1]}`],
+      });
+    } else {
+      const daysLeft = Math.max(0, Math.ceil((Date.parse(`${item.expiry}T00:00:00`) - now.getTime()) / 86_400_000));
+      out.push({
+        id: `expiry-${item.id}`,
+        severity: 'attention',
+        title: [`「${item.name}」快到效期了`, `"${item.name}" expires soon`],
+        detail: [`${item.expiry} 到期(还有 ${daysLeft} 天)· ${where[0]}`, `Expires ${item.expiry} (${daysLeft}d left) · ${where[1]}`],
+      });
+    }
+  }
+  // 红旗(已过期)在前;expiringSoon 已按到期日排好,稳定分区即可
+  return [...out.filter((f) => f.severity === 'flag'), ...out.filter((f) => f.severity === 'attention')];
 }
