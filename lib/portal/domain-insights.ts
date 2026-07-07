@@ -10,10 +10,10 @@
  * 纯读、确定性、local-first;不落库(findings 是即时派生)。
  */
 import { loadHealthMetrics } from './health-store';
-import { evaluateHealthFindings } from './health-clinical';
-import { computeRiskScores } from './health-risk';
+import { evaluateHealthFindings, type ClinicalFinding } from './health-clinical';
+import { computeRiskScores, type RiskScore } from './health-risk';
 import { loadBankTx, loadBankAccounts } from './bank-tx';
-import { financeFindings } from './finance-insight';
+import { financeFindings, type FinanceFinding } from './finance-insight';
 
 export type InsightDomain = 'health' | 'finance';
 export type InsightSeverity = 'flag' | 'attention';
@@ -25,36 +25,58 @@ export interface DomainInsight {
   detail: string;  // zh(带出处)
 }
 
-/** 汇聚当前所有域的「值得提示」判定(红旗/可关注),红旗优先。达标/正常项不收。 */
-export function gatherDomainInsights(): DomainInsight[] {
-  const out: DomainInsight[] = [];
+/**
+ * 单一判定源(Cross-Insight Reader 的核心)—— 跑各域确定性引擎一次,筛出「值得提示」的原始
+ * finding:健康 = flag/attention 的 findings + high/moderate 的 risks;财务引擎本身只出 flag/attention。
+ * Today(经 guidance 适配器 → 七层仲裁)与 问一问/简报(经 gatherDomainInsights 文本投影)都从这里取。
+ * 呈现口径可不同,但**判定与筛选只有这一处**——阈值改一次两边一起动,不再各写一遍导致漂移。
+ */
+export interface DomainFindingSet {
+  health: { findings: ClinicalFinding[]; risks: RiskScore[] };
+  finance: FinanceFinding[];
+}
 
-  // 健康:②模式 + ③风险
+const isSurfaceableFinding = (f: ClinicalFinding) => f.severity === 'flag' || f.severity === 'attention';
+const isSurfaceableRisk = (s: RiskScore) => s.category === 'high' || s.category === 'moderate';
+
+export function computeDomainFindings(): DomainFindingSet {
+  let health: DomainFindingSet['health'] = { findings: [], risks: [] };
+  let finance: FinanceFinding[] = [];
+
+  // 健康:②模式(evaluateHealthFindings)+ ③风险(computeRiskScores),各自筛「值得提示」
   try {
     const hm = loadHealthMetrics();
     if (hm) {
-      for (const f of evaluateHealthFindings({ glucose: hm.glucose, sleepStages: hm.sleepStages, metrics: hm.metrics })) {
-        if (f.severity === 'flag' || f.severity === 'attention') {
-          out.push({ domain: 'health', severity: f.severity, title: f.title[0], detail: `${f.detail[0]} · 依据 ${f.source}` });
-        }
-      }
-      for (const s of computeRiskScores({ metrics: hm.metrics, glucose: hm.glucose, profile: hm.profile })) {
-        if (s.category === 'high' || s.category === 'moderate') {
-          out.push({ domain: 'health', severity: s.category === 'high' ? 'flag' : 'attention', title: `${s.label[0]} · ${s.value}`, detail: `${s.detail[0]} · 依据 ${s.source}` });
-        }
-      }
+      health = {
+        findings: evaluateHealthFindings({ glucose: hm.glucose, sleepStages: hm.sleepStages, metrics: hm.metrics }).filter(isSurfaceableFinding),
+        risks: computeRiskScores({ metrics: hm.metrics, glucose: hm.glucose, profile: hm.profile }).filter(isSurfaceableRisk),
+      };
     }
   } catch { /* 域数据缺失/解析失败不影响其余域 */ }
 
-  // 财务:异常/涨价/现金流/账单
+  // 财务:异常/涨价/现金流/账单(引擎已只出值得提示的)
   try {
     const txs = loadBankTx();
-    if (txs.length) {
-      for (const f of financeFindings(txs, loadBankAccounts())) {
-        out.push({ domain: 'finance', severity: f.severity, title: f.title[0], detail: f.detail[0] });
-      }
-    }
+    if (txs.length) finance = financeFindings(txs, loadBankAccounts());
   } catch { /* ignore */ }
+
+  return { health, finance };
+}
+
+/** 汇聚当前所有域的「值得提示」判定(红旗/可关注),红旗优先。是 computeDomainFindings 的文本投影。 */
+export function gatherDomainInsights(): DomainInsight[] {
+  const { health, finance } = computeDomainFindings();
+  const out: DomainInsight[] = [];
+
+  for (const f of health.findings) {
+    out.push({ domain: 'health', severity: f.severity as InsightSeverity, title: f.title[0], detail: `${f.detail[0]} · 依据 ${f.source}` });
+  }
+  for (const s of health.risks) {
+    out.push({ domain: 'health', severity: s.category === 'high' ? 'flag' : 'attention', title: `${s.label[0]} · ${s.value}`, detail: `${s.detail[0]} · 依据 ${s.source}` });
+  }
+  for (const f of finance) {
+    out.push({ domain: 'finance', severity: f.severity, title: f.title[0], detail: f.detail[0] });
+  }
 
   const rank = (s: InsightSeverity) => (s === 'flag' ? 0 : 1);
   return out.sort((a, b) => rank(a.severity) - rank(b.severity));
