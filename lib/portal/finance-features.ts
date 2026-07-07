@@ -8,7 +8,7 @@
 import {
   summarizeMonth, availableMonths, detectRecurring, effectiveCategory, txFlow, loadFlowRules,
   expenseMerchants, median, ymOf, merchantKey,
-  type BankTx, type BankAccount, type RecurringCharge,
+  type BankTx, type BankAccount, type RecurringCharge, type Holding,
 } from './bank-tx';
 
 const AVG_MONTH_DAYS = 30.44; // 公历平均月长,用于任意周期 → 月化
@@ -208,4 +208,89 @@ export function balanceProjection(
     if (bal < 0 && !negativeDate) negativeDate = new Date(e.t).toISOString().slice(0, 10);
   }
   return { start: Math.round(start * 100) / 100, min: Math.round(min * 100) / 100, minDate, negativeDate, days };
+}
+
+/* ---------- 投资组合(财务㉗:持仓聚合 / 结构占比 / 集中度) ---------- */
+
+/** Plaid security.type → 展示标签(中文;未知类型原样透传)。 */
+const SECURITY_TYPE_LABELS: Record<string, string> = {
+  'equity': '股票',
+  'etf': 'ETF',
+  'mutual fund': '基金',
+  'fixed income': '债券',
+  'cash': '现金',
+  'derivative': '衍生品',
+  'cryptocurrency': '加密资产',
+  'loan': '贷款类',
+  'other': '其他',
+};
+
+export interface PortfolioPosition {
+  name: string;
+  ticker?: string;
+  typeLabel: string;
+  quantity: number;
+  value: number;
+  costBasis: number | null; // 该持仓总成本(机构缺数据 → null,不硬算盈亏)
+  gain: number | null;      // value − costBasis
+  pct: number;              // 占组合市值 %
+}
+
+export interface PortfolioSlice { label: string; value: number; pct: number }
+
+export interface PortfolioSummary {
+  totalValue: number;
+  gain: number | null;     // 仅统计有成本数据的持仓;全缺 → null
+  gainPct: number | null;
+  positions: PortfolioPosition[]; // 按市值降序;同一证券跨账户合并
+  byType: PortfolioSlice[];       // 结构占比,按市值降序
+  concentrated: PortfolioPosition | null; // 单一持仓 >30%(多于一只时才提示)
+}
+
+/** 持仓聚合:同 ticker(无 ticker 用名称)跨账户合并;无持仓返回 null。 */
+export function portfolioSummary(holdings: Holding[]): PortfolioSummary | null {
+  const valid = holdings.filter((h) => h && typeof h.value === 'number' && h.value > 0);
+  if (!valid.length) return null;
+  const byKey = new Map<string, { name: string; ticker?: string; type: string; quantity: number; value: number; cost: number; hasCost: boolean; missingCost: boolean }>();
+  for (const h of valid) {
+    const key = (h.ticker || h.name).toUpperCase();
+    const cur = byKey.get(key) ?? { name: h.name, ticker: h.ticker, type: (h.type || 'other').toLowerCase(), quantity: 0, value: 0, cost: 0, hasCost: false, missingCost: false };
+    cur.quantity += h.quantity || 0;
+    cur.value += h.value;
+    if (typeof h.costBasis === 'number' && h.costBasis > 0) { cur.cost += h.costBasis; cur.hasCost = true; } else { cur.missingCost = true; }
+    byKey.set(key, cur);
+  }
+  const totalValue = [...byKey.values()].reduce((s, p) => s + p.value, 0);
+  const r2 = (v: number) => Math.round(v * 100) / 100;
+  const positions: PortfolioPosition[] = [...byKey.values()]
+    .map((p) => {
+      // 成本残缺(部分账户没给)时不报盈亏,宁缺毋错
+      const costOk = p.hasCost && !p.missingCost;
+      return {
+        name: p.name, ticker: p.ticker,
+        typeLabel: SECURITY_TYPE_LABELS[p.type] ?? p.type,
+        quantity: r2(p.quantity), value: r2(p.value),
+        costBasis: costOk ? r2(p.cost) : null,
+        gain: costOk ? r2(p.value - p.cost) : null,
+        pct: totalValue > 0 ? Math.round((p.value / totalValue) * 1000) / 10 : 0,
+      };
+    })
+    .sort((a, b) => b.value - a.value);
+
+  const typeMap = new Map<string, number>();
+  for (const p of positions) typeMap.set(p.typeLabel, (typeMap.get(p.typeLabel) || 0) + p.value);
+  const byType: PortfolioSlice[] = [...typeMap.entries()]
+    .map(([label, value]) => ({ label, value: r2(value), pct: totalValue > 0 ? Math.round((value / totalValue) * 1000) / 10 : 0 }))
+    .sort((a, b) => b.value - a.value);
+
+  const withCost = positions.filter((p) => p.gain !== null);
+  const costSum = withCost.reduce((s, p) => s + (p.costBasis || 0), 0);
+  const gain = withCost.length ? r2(withCost.reduce((s, p) => s + (p.gain || 0), 0)) : null;
+  const gainPct = gain !== null && costSum > 0 ? Math.round((gain / costSum) * 1000) / 10 : null;
+
+  // 集中度:只有一只时提示是噪音;现金类不算集中风险
+  const top = positions.find((p) => p.typeLabel !== '现金');
+  const concentrated = positions.length > 1 && top && top.pct > 30 ? top : null;
+
+  return { totalValue: r2(totalValue), gain, gainPct, positions, byType, concentrated };
 }

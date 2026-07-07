@@ -8,10 +8,10 @@ import vm from 'node:vm';
 import ts from 'typescript';
 import assert from 'node:assert/strict';
 
-const caches = { tx: null, accounts: null };
+const caches = { tx: null, accounts: null, holdings: null };
 let storeIdx = 0;
 const fakeCreateBlobStore = () => {
-  const key = storeIdx++ === 0 ? 'tx' : 'accounts';
+  const key = ['tx', 'accounts', 'holdings'][storeIdx++] ?? 'holdings'; // bank-tx 内建 store 顺序:tx → accounts → holdings
   return { load: () => caches[key], save: (v) => { caches[key] = v; }, ready: async () => {} };
 };
 function loadTs(path, requireImpl) {
@@ -103,5 +103,46 @@ assert.deepEqual([...mix].map((s) => s.detail), ['INCOME_WAGES', 'INCOME_DIVIDEN
 assert.equal(mix[0].total, 4000);
 assert.equal(mix[2].total, 30, '缺细分归 INCOME_OTHER');
 assert.equal(feat.incomeBreakdown(incomeTxs, '2020-01').length, 0, '无该月收入返回空');
+
+// ── 财务㉗:portfolioSummary(跨账户合并 / 结构占比 / 集中度 / 成本残缺不硬算) ──
+const hd = (accountId, name, ticker, type, quantity, value, costBasis) =>
+  ({ accountId, name, ticker, type, quantity, value, costBasis, currency: 'USD' });
+const port = feat.portfolioSummary([
+  hd('inv1', 'Apple Inc', 'AAPL', 'equity', 10, 2000, 1500),
+  hd('inv2', 'Apple Inc', 'AAPL', 'equity', 5, 1000, 800),   // 同证券另一账户 → 合并
+  hd('inv1', 'Vanguard S&P 500', 'VOO', 'etf', 2, 900, 1000), // 亏损持仓
+  hd('inv1', 'Cash', undefined, 'cash', 100, 100, undefined), // 现金无成本
+]);
+assert.equal(port.positions.length, 3, '同 ticker 跨账户合并');
+const aapl = port.positions[0];
+assert.equal(aapl.ticker, 'AAPL', '按市值降序,最大在前');
+assert.equal(aapl.quantity, 15);
+assert.equal(aapl.value, 3000);
+assert.equal(aapl.gain, 700, '盈亏 = 市值 − 合并成本');
+assert.equal(aapl.pct, 75, '占组合 75%');
+assert.equal(port.positions[1].gain, -100, '亏损为负,不为 0');
+assert.equal(port.positions[2].gain, null, '无成本数据 → null 不硬算');
+assert.equal(port.totalValue, 4000);
+assert.equal(port.gain, 600, '总盈亏只统计有成本的持仓');
+const eq = [...port.byType].find((s) => s.label === '股票');
+assert.equal(eq.pct, 75, '结构占比:equity → 股票');
+assert.ok([...port.byType].some((s) => s.label === '现金'), 'cash → 现金');
+assert.equal(port.concentrated.ticker, 'AAPL', '单一持仓 >30% → 集中度提示');
+// 分散组合不提示;单一持仓组合不提示(噪音);无持仓 → null
+const spread = feat.portfolioSummary([
+  hd('i', 'A', 'A', 'equity', 1, 100, 90), hd('i', 'B', 'B', 'equity', 1, 100, 90),
+  hd('i', 'C', 'C', 'equity', 1, 100, 90), hd('i', 'D', 'D', 'equity', 1, 100, 90),
+]);
+assert.equal(spread.concentrated, null, '25% 均布不提示');
+assert.equal(feat.portfolioSummary([hd('i', 'Only', 'ONLY', 'equity', 1, 500, 400)]).concentrated, null, '只有一只不提示');
+assert.equal(feat.portfolioSummary([]), null, '无持仓 → null');
+// 成本部分残缺(两账户仅一个给了 cost_basis)→ 该持仓盈亏为 null
+const partial = feat.portfolioSummary([
+  hd('i1', 'Tesla', 'TSLA', 'equity', 1, 300, 250),
+  hd('i2', 'Tesla', 'TSLA', 'equity', 1, 300, undefined),
+  hd('i1', 'Bond Fund', 'BND', 'fixed income', 1, 300, 280),
+]);
+assert.equal(partial.positions.find((p) => p.ticker === 'TSLA').gain, null, '成本残缺宁缺毋错');
+assert.equal(partial.positions.find((p) => p.ticker === 'BND').typeLabel, '债券');
 
 console.log('finance-features: OK');

@@ -5,10 +5,10 @@
  */
 import {
   summarizeMonth, prevYm, ymOf, categoryBreakdown, topMerchants, detectRecurring, upcomingRecurring,
-  formatMoney, assetSummary, accountTypeLabel, internalAdjustmentIds,
+  formatMoney, assetSummary, accountTypeLabel, internalAdjustmentIds, loadHoldings,
   type BankTx, type BankAccount,
 } from './bank-tx';
-import { incomeBreakdown, categoryBaseline, subscriptionLoad, detectIncome } from './finance-features';
+import { incomeBreakdown, categoryBaseline, subscriptionLoad, detectIncome, portfolioSummary } from './finance-features';
 import { financeFindings } from './finance-insight';
 import { computeFinanceScores } from './finance-risk';
 import { loadBudget, hasBudget, budgetProgress } from './finance-budget';
@@ -134,6 +134,26 @@ export function buildMonthlyReport(
       const tl = accountTypeLabel(a);
       const bal = a.balance != null ? formatMoney(a.balance, a.currency) : L('余额未知', 'balance n/a');
       lines.push(`- ${[a.institution, a.name].filter(Boolean).join(' · ')}(${zh ? tl[0] : tl[1]}${a.mask ? ` ····${a.mask}` : ''}):${(a.type || '').toLowerCase() === 'credit' ? L(`欠款 ${bal}`, `owes ${bal}`) : bal}`);
+    }
+  }
+
+  // ── 投资持仓(财务㉗;与预算同法,模块内自读本机 store,无持仓不出分节)──
+  const portfolio = portfolioSummary(loadHoldings());
+  if (portfolio) {
+    lines.push('', `## ${L('投资持仓', 'Investments')}`, '');
+    const g = portfolio.gain;
+    lines.push(L(
+      `总市值 ${formatMoney(portfolio.totalValue)}${g !== null ? ` · 浮动盈亏 ${g >= 0 ? '+' : '-'}${formatMoney(Math.abs(g))}${portfolio.gainPct !== null ? `(${portfolio.gainPct >= 0 ? '+' : ''}${portfolio.gainPct}%)` : ''}` : ''} · ${portfolio.positions.length} 只持仓`,
+      `Market value ${formatMoney(portfolio.totalValue)}${g !== null ? ` · unrealized ${g >= 0 ? '+' : '-'}${formatMoney(Math.abs(g))}${portfolio.gainPct !== null ? ` (${portfolio.gainPct >= 0 ? '+' : ''}${portfolio.gainPct}%)` : ''}` : ''} · ${portfolio.positions.length} positions`));
+    lines.push(L(`组合结构:${portfolio.byType.map((t) => `${t.label} ${t.pct}%`).join(' · ')}`, `Allocation: ${portfolio.byType.map((t) => `${t.label} ${t.pct}%`).join(' · ')}`));
+    for (const p of portfolio.positions.slice(0, 15)) {
+      const pg = p.gain !== null ? `${p.gain >= 0 ? '+' : '-'}${formatMoney(Math.abs(p.gain))}` : L('成本未知', 'cost n/a');
+      lines.push(`- ${p.ticker ? `${p.ticker} · ` : ''}${p.name}:${formatMoney(p.value)}(${p.pct}%)· ${pg}`);
+    }
+    if (portfolio.concentrated) {
+      lines.push(L(
+        `${portfolio.concentrated.ticker || portfolio.concentrated.name} 占组合 ${portfolio.concentrated.pct}%,波动会更贴着这一只走,有空可以想想要不要分散一点。`,
+        `${portfolio.concentrated.ticker || portfolio.concentrated.name} is ${portfolio.concentrated.pct}% of the portfolio; volatility will track it closely — worth a think.`));
     }
   }
 

@@ -13,13 +13,14 @@ import {
   accountMonth, formatMoney, ymOf, prevYm, txFlow, setFlowRule, TX_FLOW_LABELS,
   detectRecurring, upcomingRecurring, loadMerchantRules, loadFlowRules, setRecurRule,
   loadBankSyncedAt, excludedTxCount, internalAdjustmentIds, accountTypeLabel, assetSummary, expenseMerchants,
-  type BankTx, type BankAccount, type TxFlow,
+  loadHoldings,
+  type BankTx, type BankAccount, type TxFlow, type Holding,
 } from '@/lib/portal/bank-tx';
 // 风险预警与 Today/问一问 同读一份判定(financeFindings,Layer1 漂移收口)——此前 bank-tx 里
 // 另有一套 alerts 判定(函数级双实现),两个输出面据同一份流水各说各话,已删并由契约钉死不回潮。
 import { financeFindings } from '@/lib/portal/finance-insight';
 import { computeFinanceScores } from '@/lib/portal/finance-risk';
-import { incomeBreakdown, detectIncome } from '@/lib/portal/finance-features';
+import { incomeBreakdown, detectIncome, portfolioSummary } from '@/lib/portal/finance-features';
 import { removeBankAccount } from '@/lib/portal/bank-tx';
 import { loadBudget, saveBudget, hasBudget, suggestBudget, budgetProgress, type BudgetConfig } from '@/lib/portal/finance-budget';
 import { buildMonthlyReport, persistReportToMemory, autoPersistLastMonthReport, reportHtml } from '@/lib/portal/finance-report';
@@ -28,7 +29,7 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 
-type Sub = 'overview' | 'spending' | 'budget' | 'tx' | 'recurring' | 'cards';
+type Sub = 'overview' | 'spending' | 'budget' | 'tx' | 'recurring' | 'invest' | 'cards';
 
 function monthLabel(ym: string, dict: string): string {
   const [y, m] = ym.split('-');
@@ -87,6 +88,7 @@ export default function FinanceTab() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [txs, setTxs] = useState<BankTx[]>([]);
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
+  const [holdings, setHoldings] = useState<Holding[]>([]);
   const [ym, setYm] = useState<string>(ymOf());
   const [sub, setSub] = useState<Sub>('overview');
   const [filter, setFilter] = useState<string>('all');
@@ -99,6 +101,7 @@ export default function FinanceTab() {
       const loaded = loadBankTx();
       setTxs(loaded);
       setAccounts(loadBankAccounts());
+      setHoldings(loadHoldings());
       const av = availableMonths(loaded);
       if (av.length) setYm((cur) => (av.includes(cur) ? cur : av[0])); // 不覆盖用户已选月份
     };
@@ -138,6 +141,8 @@ export default function FinanceTab() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const budget = useMemo(() => loadBudget(), [rev]);
   const bp = useMemo(() => budgetProgress(txs, ym, budget), [txs, ym, budget]);
+  // 财务㉗:投资组合(持仓聚合;⚠️ 同样必须在空态早退之前)
+  const portfolio = useMemo(() => portfolioSummary(holdings), [holdings]);
   const [budgetNote, setBudgetNote] = useState('');
   const [reportMsg, setReportMsg] = useState(''); // 财务㉓:月报动作反馈(可见状态,不静默)
   // 财务㉔:月初自动补生成上月月报并存记忆(每设备每月一次,幂等,localStorage 标记)
@@ -158,7 +163,7 @@ export default function FinanceTab() {
   // 财务④:上月净支出不足 $50 时环比是小基数噪音(+786% 之类),不出百分比
   const netDelta = prevSummary.net >= 50 ? Math.round(((summary.net - prevSummary.net) / prevSummary.net) * 100) : null;
   const idx = months.indexOf(ym);
-  const SUBS: Array<[Sub, string, string]> = [['overview', '总览', 'Overview'], ['budget', '预算', 'Budget'], ['tx', '交易', 'Transactions'], ['recurring', '定期', 'Recurring'], ['cards', '账户', 'Accounts']];
+  const SUBS: Array<[Sub, string, string]> = [['overview', '总览', 'Overview'], ['budget', '预算', 'Budget'], ['tx', '交易', 'Transactions'], ['recurring', '定期', 'Recurring'], ['invest', '投资', 'Investing'], ['cards', '账户', 'Accounts']];
   function markNotRecurring(name: string) { setRecurRule(name, 'no'); setRev((r) => r + 1); }
   function removeMerchantRule(name: string) { setMerchantRule(name, ''); setRev((r) => r + 1); }
   function removeFlowRule(name: string) { setFlowRule(name, ''); setRev((r) => r + 1); }
@@ -614,6 +619,72 @@ export default function FinanceTab() {
             </div>
             {budgetNote && <p className="nesio-settings-option-hint">{budgetNote}</p>}
             <p className="nesio-fin-alert-note">{L(dict, '预算只存本机;总口径 = 本月净支出(与总览一致),分类口径 = 该类支出合计。', 'Budgets stay on-device; total = monthly net spend (matches Overview), categories = category spend.')}</p>
+          </>
+        );
+      })()}
+
+      {/* ── 财务㉗:投资(持仓明细 + 组合结构 + 集中度) ── */}
+      {sub === 'invest' && (() => {
+        const hasInvestAcct = accounts.some((a) => (a.type || '').toLowerCase() === 'investment');
+        if (!portfolio) {
+          return (
+            <p className="nesio-settings-option-hint" style={{ marginTop: 0 }}>{hasInvestAcct
+              ? L(dict, '已看到投资账户,但还没拉到持仓明细 —— 到「设置 → 数据接入」再点一次「同步」,持仓(股票/基金/现金仓位)会跟着回来。', 'Investment accounts found, but no holdings yet — tap Sync once more (Settings → Data sources) to pull positions (stocks/funds/cash).')
+              : L(dict, '还没有投资账户。连接券商/退休金账户(Fidelity、Robinhood 等)后,这里会展示持仓明细、组合结构和浮动盈亏。', 'No investment accounts yet. Connect a brokerage/retirement account (Fidelity, Robinhood, …) to see positions, allocation and unrealized gains here.')}</p>
+          );
+        }
+        const fmtGain = (g: number) => (g >= 0 ? `+${formatMoney(g)}` : `-${formatMoney(-g)}`);
+        const gainColor = (g: number) => (g >= 0 ? 'var(--status-go)' : 'var(--status-gentle)');
+        // 本月投资收益(分红/利息)——与收入细分同一口径
+        const invIncome = incomeBreakdown(txs, ym).filter((s) => s.detail === 'INCOME_DIVIDENDS' || s.detail === 'INCOME_INTEREST_EARNED');
+        const invIncomeTotal = invIncome.reduce((s, x) => s + x.total, 0);
+        return (
+          <>
+            <div className="nesio-fin-assets">
+              <span className="nesio-fin-asset"><span className="nesio-fin-asset-l">{L(dict, '总市值', 'Market value')}</span>{formatMoney(portfolio.totalValue)}</span>
+              {portfolio.gain !== null && (
+                <span className="nesio-fin-asset"><span className="nesio-fin-asset-l">{L(dict, '浮动盈亏', 'Unrealized')}</span><span style={{ color: gainColor(portfolio.gain) }}>{fmtGain(portfolio.gain)}{portfolio.gainPct !== null ? ` (${portfolio.gainPct >= 0 ? '+' : ''}${portfolio.gainPct}%)` : ''}</span></span>
+              )}
+              <span className="nesio-fin-asset"><span className="nesio-fin-asset-l">{L(dict, '持仓', 'Positions')}</span>{portfolio.positions.length}</span>
+            </div>
+            {portfolio.concentrated && (
+              <p className="nesio-fin-score-hint" style={{ marginTop: '0.6rem' }}>{L(dict,
+                `${portfolio.concentrated.ticker || portfolio.concentrated.name} 占了组合的 ${portfolio.concentrated.pct}% —— 集中不是错,只是波动会更贴着这一只走;有空可以想想要不要分散一点。`,
+                `${portfolio.concentrated.ticker || portfolio.concentrated.name} is ${portfolio.concentrated.pct}% of the portfolio — concentration isn't wrong, but volatility will track this one closely; worth a think when you have a moment.`)}</p>
+            )}
+            <p className="nesio-settings-section-label" style={{ marginTop: '1rem' }}>{L(dict, '组合结构', 'Allocation')}</p>
+            <div className="nesio-fin-cats">
+              {portfolio.byType.map((s) => (
+                <div key={s.label} className="nesio-fin-cat">
+                  <div className="nesio-fin-cat-top">
+                    <span className="nesio-fin-cat-name">{s.label}</span>
+                    <span className="nesio-fin-cat-amt">{formatMoney(s.value)} · {s.pct}%</span>
+                  </div>
+                  <div className="nesio-fin-bar"><div className="nesio-fin-bar-fill" style={{ width: `${Math.min(100, s.pct)}%` }} /></div>
+                </div>
+              ))}
+            </div>
+            <p className="nesio-settings-section-label" style={{ marginTop: '1rem' }}>{L(dict, '持仓明细', 'Positions')}</p>
+            <div className="nesio-fin-recurlist">
+              {portfolio.positions.map((p) => (
+                <div key={`${p.ticker || p.name}`} className="nesio-fin-recur">
+                  <div className="nesio-fin-recur-main">
+                    <span className="nesio-fin-recur-name">{p.ticker ? `${p.ticker} · ` : ''}{p.name}</span>
+                    <span className="nesio-fin-recur-meta">{p.typeLabel} · {L(dict, `${p.quantity} 份`, `${p.quantity} sh`)} · {p.pct}%</span>
+                  </div>
+                  <span className="nesio-fin-recur-amt" style={{ textAlign: 'right' }}>
+                    {formatMoney(p.value)}
+                    {p.gain !== null && <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: gainColor(p.gain) }}>{fmtGain(p.gain)}</span>}
+                  </span>
+                </div>
+              ))}
+            </div>
+            {invIncomeTotal > 0 && (
+              <p className="nesio-fin-score-hint" style={{ marginTop: '0.8rem' }}>{L(dict,
+                `${monthLabel(ym, dict)} 投资收益 ${formatMoney(invIncomeTotal)}(${invIncome.map((s) => `${categoryDetailLabel(s.detail, dict)} ${formatMoney(s.total)}`).join(' · ')})`,
+                `${monthLabel(ym, dict)} investment income ${formatMoney(invIncomeTotal)} (${invIncome.map((s) => `${categoryDetailLabel(s.detail, dict)} ${formatMoney(s.total)}`).join(' · ')})`)}</p>
+            )}
+            <p className="nesio-fin-alert-note">{L(dict, '持仓与成本来自券商快照,盈亏为未实现浮动值;缺成本数据的持仓不显示盈亏。以上不构成投资建议。', 'Positions & cost basis come from broker snapshots; gains are unrealized. Positions missing cost basis show no gain. Not investment advice.')}</p>
           </>
         );
       })()}
