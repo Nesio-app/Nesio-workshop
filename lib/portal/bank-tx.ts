@@ -112,10 +112,10 @@ export function dominantCurrency(txs: BankTx[]): string {
 // Plaid amount 约定:正=花出去,负=进账。但「进账」里混了 收入/转账/信用卡还款,
 // 这些都不该计入收支。按 personal_finance_category 自动分流,并允许用户手动纠正、记住。
 
-export type TxFlow = 'expense' | 'refund' | 'income' | 'transfer';
+export type TxFlow = 'expense' | 'refund' | 'rebate' | 'income' | 'transfer';
 
 export const TX_FLOW_LABELS: Record<TxFlow, [string, string]> = {
-  expense: ['支出', 'Expense'], refund: ['退款', 'Refund'], income: ['收入', 'Income'], transfer: ['转账/还款', 'Transfer'],
+  expense: ['支出', 'Expense'], refund: ['退款', 'Refund'], rebate: ['返还/报销', 'Credit'], income: ['收入', 'Income'], transfer: ['转账/还款', 'Transfer'],
 };
 
 const FLOW_RULE_KEY = 'nesio-bank-flow-rule-v1';
@@ -132,6 +132,11 @@ export function setFlowRule(name: string, flow: TxFlow | ''): void {
   try { localStorage.setItem(FLOW_RULE_KEY, JSON.stringify(rules)); } catch { reportStorageDropped(); }
 }
 
+// 财务⑤:statement credit(卡权益返还/报销,AMEX Global Entry credit、rebate、cashback 等)
+// 不是商户退款——没有对应的「退货」动作,叫「退款」误导。只在本会判成 refund 的分支上按
+// 名字保守识别(CREDIT UNION 是机构名,排除);金额口径与退款相同(冲抵支出),纯语义分流。
+const REBATE_NAME_RE = /STATEMENT CREDIT|\bREBATE\b|REIMBURSE|CASH ?BACK|\bCREDIT\b(?!\s+UNION)|返还|报销/i;
+
 /** 交易类型:用户规则优先,否则按 Plaid 分类自动判(转账/还款/收入不计收支)。 */
 export function txFlow(t: BankTx, rules = loadFlowRules()): TxFlow {
   const forced = rules[t.name];
@@ -144,7 +149,8 @@ export function txFlow(t: BankTx, rules = loadFlowRules()): TxFlow {
     // 退款/收入/转账,一律当 transfer 不计收支 —— 避免把工资/转账当退款倒扣净支出。
     return t.amount >= 0 ? 'expense' : 'transfer';
   }
-  return t.amount >= 0 ? 'expense' : 'refund';
+  if (t.amount >= 0) return 'expense';
+  return REBATE_NAME_RE.test(t.name || '') ? 'rebate' : 'refund';
 }
 
 /* ---------- 财务③:内部调整对识别 ---------- */
@@ -209,7 +215,7 @@ export function summarizeMonth(txs: BankTx[], ym: string): MonthSummary {
     if (ccyOf(t) !== ccy) continue;
     const f = txFlow(t, flowRules);
     if (f === 'expense') { gross += Math.abs(t.amount); count += 1; }
-    else if (f === 'refund') { refunds += Math.abs(t.amount); count += 1; }
+    else if (f === 'refund' || f === 'rebate') { refunds += Math.abs(t.amount); count += 1; } // 返还与退款同口径冲抵支出
     else if (f === 'income') income += Math.abs(t.amount);
     // transfer / 还款:不计收支
   }
@@ -338,7 +344,7 @@ export function accountMonth(txs: BankTx[], accountId: string, ym: string): { sp
     if (t.accountId !== accountId || txYm(t) !== ym || ccyOf(t) !== ccy) continue;
     const f = txFlow(t, flowRules);
     if (f === 'expense') { spend += Math.abs(t.amount); count += 1; }
-    else if (f === 'refund') { refund += Math.abs(t.amount); count += 1; }
+    else if (f === 'refund' || f === 'rebate') { refund += Math.abs(t.amount); count += 1; }
   }
   return { spend: round2(spend), refund: round2(refund), count };
 }
