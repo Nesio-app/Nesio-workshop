@@ -111,6 +111,22 @@ assert.equal(bank.detectRecurring(boutique).length, 0, '词界:diffeRENT 不再�
 const rent = [rtx('r1', '2026-04-01', 'Apartment Rent', 1500, 'RENT_AND_UTILITIES'), rtx('r2', '2026-05-01', 'Apartment Rent', 1500, 'RENT_AND_UTILITIES'), rtx('r3', '2026-06-01', 'Apartment Rent', 1580, 'RENT_AND_UTILITIES')];
 assert.ok(bank.detectRecurring(rent).some((r) => /rent/i.test(r.name)), '整词 rent 照常识别');
 
+// ── 财务⑪:退款证据门 —— 没买过的商户进账不是退款 ──
+const evTxs = [
+  ftx('Amazon.com', 60, 'GENERAL_MERCHANDISE'),                  // 买过 Amazon
+  ftx('Amazon.com Refund', -25, 'GENERAL_MERCHANDISE'),          // 有证据(归一同名)→ 退款…见下
+  { ...ftx('Friend Payment', -55, 'GENERAL_SERVICES'), id: 'fp', date: '2026-06-21' }, // 没买过 → 转账
+];
+const ev = bank.expenseMerchants(evTxs);
+assert.equal(bank.txFlow(evTxs[2], {}, ev), 'transfer', '无购买证据的进账 → 转账不计收支');
+assert.equal(bank.txFlow({ ...ftx('Amazon.com', -25), category: 'GENERAL_MERCHANDISE' }, {}, ev), 'refund', '买过的商户进账 → 退款');
+assert.equal(bank.txFlow(ftx('AMEX GLOBAL ENTRY CREDIT', -120), {}, ev), 'rebate', '返还不需要购买证据');
+assert.equal(bank.txFlow(evTxs[2], { 'Friend Payment': 'refund' }, ev), 'refund', '用户手动规则仍最高优先');
+// summarizeMonth 内建证据:PayPal 式无证据进账不再倒扣净支出
+const evSum = bank.summarizeMonth([ftx('Coffee Shop', 100, 'FOOD_AND_DRINK'), { ...ftx('Friend Payment', -55, 'GENERAL_SERVICES'), id: 'fp2' }], '2026-06');
+assert.equal(evSum.refunds, 0, '无证据进账不进退款桶');
+assert.equal(evSum.net, 100, '净支出不被虚减');
+
 // ── 财务⑩:账户类型友好名 + 资产小结口径 ──
 assert.equal(bank.accountTypeLabel({ type: 'depository', subtype: 'checking' })[0], '支票', 'subtype 优先');
 assert.equal(bank.accountTypeLabel({ type: 'credit', subtype: 'credit card' })[1], 'Credit card');

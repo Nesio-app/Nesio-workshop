@@ -91,11 +91,11 @@ assert.ok(/void syncPlaid\(\)/.test(hub), '连接成功后自动同步');
 
 // ══ 财务⑦/⑧:transactions 路由 —— NOT_READY 不静默 + 重复 item 摘除 + 机构元数据 ══
 // 台账:TOKENS[at] = { inst, accounts:[{id,mask,subtype}], sync 响应 }
-function makeTxWorld(world) {
+function makeTxWorld(world, opts = {}) {
   const cookies = {};
   const removedItems = [];
-  async function fakeFetch(url, opts) {
-    const body = JSON.parse(opts?.body || '{}');
+  async function fakeFetch(url, fetchOpts) {
+    const body = JSON.parse(fetchOpts?.body || '{}');
     const tok = world[body.access_token];
     if (url.includes('/transactions/sync')) return { json: async () => tok.sync };
     if (url.includes('/accounts/get')) {
@@ -103,6 +103,7 @@ function makeTxWorld(world) {
     }
     if (url.includes('/item/get')) return { json: async () => ({ item: { institution_id: tok.inst } }) };
     if (url.includes('/institutions/get_by_id')) {
+      if (opts.failInstMeta) throw new Error('inst meta down');
       return { json: async () => ({ institution: { name: `Bank ${body.institution_id}`, logo: 'bG9nbw==', primary_color: '#123456' } }) };
     }
     if (url.includes('/item/remove')) { removedItems.push(body.access_token); return { json: async () => ({}) }; }
@@ -157,6 +158,19 @@ const syncTx = (id, acc) => ({ added: [{ transaction_id: id, account_id: acc, da
   assert.deepEqual(JSON.parse(w.cookies['nesio_plaid_tokens']), ['at-dup'], '旧 token 从 cookie 摘除');
   assert.equal(JSON.parse(w.cookies['nesio_plaid_cursors']).length, 1, '游标数组与 token 同步瘦身');
   assert.equal(res.__json.authoritative, true, '全部存活 token 账户拉齐 → 权威快照');
+}
+
+// 场景 D(财务⑪):机构元数据接口挂了 → logo/名称缺,但机构 id 已保住,重复 item 照样摘除
+{
+  const w = makeTxWorld({
+    'at-old': { inst: 'ins-chase', accounts: [{ id: 'acc-old', mask: '7937', subtype: 'checking' }], sync: syncTx('t-old', 'acc-old') },
+    'at-dup': { inst: 'ins-chase', accounts: [{ id: 'acc-dup', mask: '7937', subtype: 'checking' }], sync: syncTx('t-dup', 'acc-dup') },
+  }, { failInstMeta: true });
+  const res = await w.route.GET(reqWithTokens(['at-old', 'at-dup']));
+  assert.equal(res.__json.accounts.length, 1, '元数据失败不击穿去重');
+  assert.equal(res.__json.accounts[0].id, 'acc-dup');
+  assert.equal(res.__json.accounts[0].logo, undefined, 'logo 缺失是预期(UI 有首字母兜底)');
+  assert.deepEqual([...w.removedItems], ['at-old'], '旧 item 仍被摘除');
 }
 
 // 场景 C:staleTokenIndexes 纯函数边界(保守不误杀)

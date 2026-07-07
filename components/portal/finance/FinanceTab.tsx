@@ -12,7 +12,7 @@ import {
   monthlyTrend, needsReview, suggestCategory, setMerchantRule, effectiveCategory,
   accountMonth, formatMoney, ymOf, prevYm, txFlow, setFlowRule, TX_FLOW_LABELS,
   detectRecurring, upcomingRecurring, loadMerchantRules, loadFlowRules, setRecurRule,
-  loadBankSyncedAt, excludedTxCount, internalAdjustmentIds, accountTypeLabel, assetSummary,
+  loadBankSyncedAt, excludedTxCount, internalAdjustmentIds, accountTypeLabel, assetSummary, expenseMerchants,
   type BankTx, type BankAccount, type TxFlow,
 } from '@/lib/portal/bank-tx';
 // 风险预警与 Today/问一问 同读一份判定(financeFindings,Layer1 漂移收口)——此前 bank-tx 里
@@ -129,7 +129,19 @@ export default function FinanceTab() {
   function markNotRecurring(name: string) { setRecurRule(name, 'no'); setRev((r) => r + 1); }
   function removeMerchantRule(name: string) { setMerchantRule(name, ''); setRev((r) => r + 1); }
   function removeFlowRule(name: string) { setFlowRule(name, ''); setRev((r) => r + 1); }
-  const filterCats = ['all', ...cats.slice(0, 6).map((c) => c.category)];
+  // 财务⑪:筛选全集 —— 本月分类按金额靠前,其余全量数据里出现过的分类跟在后面
+  // (此前只给本月 Top6,想筛「银行费用」但本月没有就选不了)。
+  const filterCats = (() => {
+    const monthOrder = cats.map((c) => c.category);
+    const rest = new Set<string>();
+    for (const t of txs) {
+      const c = effectiveCategory(t);
+      if (c && !monthOrder.includes(c)) rest.add(c);
+    }
+    return ['all', ...monthOrder, ...[...rest].sort()];
+  })();
+  // 财务⑪:退款证据 —— 交易行的类型标签与月度统计同口径(没买过的商户进账不是退款)
+  const refundEvidence = useMemo(() => expenseMerchants(txs), [txs]);
   // 财务③:同日同额正负、名字带调整词的内部调整对(净额为零)折叠出列表,带可见说明
   const adjIds = internalAdjustmentIds(monthTx);
   const shownTx = monthTx
@@ -303,7 +315,7 @@ export default function FinanceTab() {
 
           <div className="nesio-fin-txlist">
             {shownTx.map((t) => {
-              const f = txFlow(t);
+              const f = txFlow(t, undefined, refundEvidence);
               return (
                 <div key={t.id}>
                   <div className="nesio-fin-txrow">
