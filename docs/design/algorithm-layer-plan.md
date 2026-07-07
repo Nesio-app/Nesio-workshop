@@ -64,7 +64,13 @@
 - **财务 ✅**:判定层早已存在(finance-insight,引擎/知识分离精神一致);真漂移已收口(Layer1①,financeAlerts 删除)。**不做 RULES 化翻写**——刚收口且被三面消费,声明式改写是纯搅动。
 - **地图 ✅**:新建 `place-insight.ts`(声明式 RULES + 通用引擎):活动范围收窄 / 健身习惯断档。
   **数据诚实红线**:没有足迹 ≠ 没出门(可能没开定位)——每条规则带「追踪存活」门,历史不够冷启动沉默;只出 attention(范围/习惯不是安全风险,红色只给真实风险)。已进 Reader(location 域)+ Today 桥 + 问一问投影。
-- **认知 ⏳ 下一块**:先做底料评估——候选:情绪漂移 CUSUM(moment-analytics 已有算法,缺判定层接线)、实验显著性结论(welchTTest)。warm-coach 对情绪域尤其严,评估后再动。
+- **认知 → 心情 ✅(2026-07-07 底料评估落定)**:评估发现"认知(living-model)"的判定在 LLM 端,
+  确定性底料成熟的是**情绪**——`cusumUpdate`/`isMoodJump`/`fatigueScore` 此前**全仓零消费**(算法躺在库里,
+  心情数据活着)。新建 `mood-insight.ts`(域名诚实定为 mood):CUSUM 情绪持续偏低判定,无持久态
+  (确定性回放),门槛保守(≥5 条 + 跨 ≥3 天 + 警报须落在最近 3 天,陈年不翻旧账),
+  **情绪域从严:只 attention、文案不评判不下诊断**。CUSUM 常数(threshold 4/slack 0.5)按发表口径不动。
+  两笔记账:实验显著性 finding 需先把 `computeInsight/loadExperiments` 从组件抽到 lib(层次问题,推迟);
+  `fatigueScore` 不接(energy-state 已向管线供 low/high,再出疲劳 finding 是双报)。
 
 **HealthDashboard 判定(census 建议的纠正)**:它是**明细面,故意渲染全谱**(含 info 达标项绿点,`HealthDashboard.tsx FindingsCard`)——统一层只筛 flag/attention,切过去会丢达标项;且它调的就是 Reader 包裹的同批引擎函数,不可能漂移。**不是旁路,保留**。至此"已建统一层域内的真漂移" 全部收口(Today/问一问/FinanceTab 同读,HealthDashboard=合法明细面)。
 

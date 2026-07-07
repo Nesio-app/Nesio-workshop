@@ -24,6 +24,8 @@ function makeCtx(opts) {
       if (p === './finance-insight') return { financeFindings: () => opts.finance };
       if (p === './place-trail') return { loadPlaceTrail: () => opts.visits ?? [] };
       if (p === './place-insight') return { placeFindings: () => opts.place ?? [] };
+      if (p === './life-graph') return { getLifeGraph: () => opts.nodes ?? [] };
+      if (p === './mood-insight') return { moodFindings: () => opts.mood ?? [] };
       return {};
     },
   };
@@ -51,24 +53,30 @@ const PLACE = [
   { id: 'place-range-narrow', severity: 'attention', title: ['这周的活动范围比平时小', 'Range smaller'], detail: ['本周 1 个(平时 5 个)', '1 vs ~5'] },
 ];
 
+const MOOD = [
+  { id: 'mood-drift-cusum', severity: 'attention', title: ['最近的心情记录连着偏低了一阵', 'Mood low stretch'], detail: ['CUSUM 累积过线', 'CUSUM'] },
+];
+
 // 1. computeDomainFindings 只保留值得提示的(info finding / low risk 被筛掉)
 {
-  const mod = makeCtx({ hm: { glucose: [], sleepStages: [], metrics: [], profile: {} }, findings: FINDINGS, risks: RISKS, txs: [{ amount: 1 }], finance: FINANCE, visits: [{ ts: 'x', label: 'a', source: 'live' }], place: PLACE });
+  const mod = makeCtx({ hm: { glucose: [], sleepStages: [], metrics: [], profile: {} }, findings: FINDINGS, risks: RISKS, txs: [{ amount: 1 }], finance: FINANCE, visits: [{ ts: 'x', label: 'a', source: 'live' }], place: PLACE, mood: MOOD });
   const df = mod.computeDomainFindings();
   assert.equal(df.health.findings.length, 2, 'info finding 被筛掉');
   assert.equal(df.health.risks.length, 2, 'low risk 被筛掉');
   assert.equal(df.finance.length, 2, '财务两条');
   assert.equal(df.location.length, 1, '地图一条(Layer1② 扩域)');
+  assert.equal(df.mood.length, 1, '心情一条(Layer1② 扩域)');
 
   // 2. gatherDomainInsights 是 computeDomainFindings 的投影 —— 条数完全一致(不漂移)
   const insights = mod.gatherDomainInsights();
-  assert.equal(insights.length, 7, '2 findings + 2 risks + 2 finance + 1 location');
+  assert.equal(insights.length, 8, '2 findings + 2 risks + 2 finance + 1 location + 1 mood');
   const healthCount = insights.filter((i) => i.domain === 'health').length;
   const financeCount = insights.filter((i) => i.domain === 'finance').length;
   const locationCount = insights.filter((i) => i.domain === 'location').length;
   assert.equal(healthCount, df.health.findings.length + df.health.risks.length, 'health 投影条数 == 判定源');
   assert.equal(financeCount, df.finance.length, 'finance 投影条数 == 判定源');
   assert.equal(locationCount, df.location.length, 'location 投影条数 == 判定源');
+  assert.equal(insights.filter((i) => i.domain === 'mood').length, df.mood.length, 'mood 投影条数 == 判定源');
 
   // 3. 红旗优先:所有 flag 排在 attention 之前
   assert.equal(insights[0].severity, 'flag', 'flag 排最前');
