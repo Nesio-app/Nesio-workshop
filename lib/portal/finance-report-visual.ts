@@ -269,6 +269,8 @@ ${portfolio.concentrated ? `<p class="muted small">${esc(L(`${portfolio.concentr
 </ul></section>`);
 
   return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>
+/* 打印默认剥掉背景色 → KPI 卡/进度条/色点全变黑白;exact 强制按屏幕配色出 PDF */
+*{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 body{font:14px/1.6 -apple-system,"Noto Sans SC",sans-serif;color:${INK};max-width:760px;margin:0 auto;padding:28px;background:#fff}
 h1{font-size:22px;margin:0}
 .sub{color:${MUTED};font-size:11.5px;margin:2px 0 18px}
