@@ -326,16 +326,16 @@ export default function FinanceTab() {
           <div className="nesio-fin-budget-add" style={{ marginTop: '1.25rem' }}>
             <button type="button" className="nesio-fin-flowopt" onClick={() => {
               try {
-                const r = buildMonthlyReport(txs, accounts, ym, dict);
-                const blob = new Blob([r.markdown], { type: 'text/markdown;charset=utf-8' });
+                // 财务㉜:下载=彩色图文 HTML(自包含,双击即看,浏览器里还能打印成 PDF)
+                const blob = new Blob([reportRichHtml(txs, accounts, ym, dict)], { type: 'text/html;charset=utf-8' });
                 const a = document.createElement('a');
                 a.href = URL.createObjectURL(blob);
-                a.download = `finance-report-${r.ym}.md`;
+                a.download = `finance-report-${ym}.html`;
                 document.body.appendChild(a); a.click(); a.remove();
                 setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-                setReportMsg(L(dict, `已生成 ${r.ym} 月报并下载(.md)`, `Report for ${r.ym} downloaded (.md)`));
+                setReportMsg(L(dict, `已下载 ${ym} 彩色月报(.html,双击打开)`, `Colorful report for ${ym} downloaded (.html)`));
               } catch { setReportMsg(L(dict, '月报生成失败,请重试', 'Report failed — try again')); }
-            }}>{L(dict, '下载本月财务月报', 'Download monthly report')}</button>
+            }}>{L(dict, '下载彩色月报', 'Download report')}</button>
             <button type="button" className="nesio-fin-flowopt" onClick={() => {
               try {
                 const r = buildMonthlyReport(txs, accounts, ym, dict);
