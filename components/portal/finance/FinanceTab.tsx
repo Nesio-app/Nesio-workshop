@@ -12,7 +12,7 @@ import {
   monthlyTrend, needsReview, suggestCategory, setMerchantRule, effectiveCategory,
   accountMonth, formatMoney, ymOf, prevYm, txFlow, setFlowRule, TX_FLOW_LABELS,
   detectRecurring, upcomingRecurring, loadMerchantRules, loadFlowRules, setRecurRule,
-  loadBankSyncedAt, excludedTxCount,
+  loadBankSyncedAt, excludedTxCount, internalAdjustmentIds,
   type BankTx, type BankAccount, type TxFlow,
 } from '@/lib/portal/bank-tx';
 // 风险预警与 Today/问一问 同读一份判定(financeFindings,Layer1 漂移收口)——此前 bank-tx 里
@@ -112,7 +112,10 @@ export default function FinanceTab() {
   function removeMerchantRule(name: string) { setMerchantRule(name, ''); setRev((r) => r + 1); }
   function removeFlowRule(name: string) { setFlowRule(name, ''); setRev((r) => r + 1); }
   const filterCats = ['all', ...cats.slice(0, 6).map((c) => c.category)];
+  // 财务③:同日同额正负、名字带调整词的内部调整对(净额为零)折叠出列表,带可见说明
+  const adjIds = internalAdjustmentIds(monthTx);
   const shownTx = monthTx
+    .filter((t) => !adjIds.has(t.id))
     .filter((t) => filter === 'all' || effectiveCategory(t) === filter)
     .filter((t) => acctFilter === 'all' || t.accountId === acctFilter);
   // 批次 40:交易行显示卡后四位(accountId → account.mask)
@@ -307,6 +310,11 @@ export default function FinanceTab() {
               );
             })}
           </div>
+          {adjIds.size > 0 && (
+            <p className="nesio-settings-option-hint" style={{ marginTop: '0.35rem' }}>
+              {L(dict, `已折叠 ${adjIds.size / 2} 组银行内部调整(同日同额一正一负,净额为零)`, `${adjIds.size / 2} internal bank adjustment pair(s) collapsed (same-day offsetting, net zero)`)}
+            </p>
+          )}
 
           {/* 批次 39:已学规则管理页 —— 你纠正过的分类/类型都在这,可删 */}
           {(Object.keys(learnedRules.merchant).length > 0 || Object.keys(learnedRules.flow).length > 0) && (
@@ -373,10 +381,12 @@ export default function FinanceTab() {
               <div key={a.id} className="nesio-fin-card">
                 <div className="nesio-fin-card-top">
                   <span className="nesio-fin-card-name">{a.name}{a.mask ? ` ····${a.mask}` : ''}</span>
-                  {a.balance != null && <span className="nesio-fin-card-bal">{formatMoney(a.balance, a.currency)}</span>}
+                  {a.balance != null && <span className="nesio-fin-card-bal">{(a.type || '').toLowerCase() === 'credit' ? L(dict, `欠款 ${formatMoney(a.balance, a.currency)}`, `owes ${formatMoney(a.balance, a.currency)}`) : formatMoney(a.balance, a.currency)}</span>}
                 </div>
                 <p className="nesio-fin-card-sub">{[a.type, a.subtype].filter(Boolean).join(' · ') || L(dict, '账户', 'Account')}</p>
-                <p className="nesio-fin-card-meta">{L(dict, `本月 消费 ${formatMoney(m.spend, a.currency)} · 退款 ${formatMoney(m.refund, a.currency)} · ${m.count} 笔`, `This month · spend ${formatMoney(m.spend, a.currency)} · refunds ${formatMoney(m.refund, a.currency)} · ${m.count} tx`)}</p>
+                <p className="nesio-fin-card-meta">{m.count === 0
+                  ? L(dict, '该月此账户暂无交易', 'No transactions this month for this account')
+                  : L(dict, `本月 消费 ${formatMoney(m.spend, a.currency)} · 退款 ${formatMoney(m.refund, a.currency)} · ${m.count} 笔`, `This month · spend ${formatMoney(m.spend, a.currency)} · refunds ${formatMoney(m.refund, a.currency)} · ${m.count} tx`)}</p>
               </div>
             );
           })
