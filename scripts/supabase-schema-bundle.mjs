@@ -21,6 +21,7 @@ const REQUIRED_MARKERS = {
     'ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY',
     'ADD COLUMN IF NOT EXISTS access_role',
     'ADD COLUMN IF NOT EXISTS feature_flags',
+    'ADD COLUMN IF NOT EXISTS integrations',
   ],
   'database/schema/supabase-telemetry-events-v1.sql': [
     'CREATE TABLE IF NOT EXISTS public.telemetry_events',

@@ -61,3 +61,11 @@ ALTER TABLE public.user_profiles
 
 ALTER TABLE public.user_profiles
   ADD COLUMN IF NOT EXISTS feature_flags jsonb NOT NULL DEFAULT '{}'::jsonb;
+
+-- ── Integration tokens(Notion 修,2026-07-07)──────────────────────────
+-- 每用户的 OAuth 集成 token(gmail/calendar/notion),跨设备/跨浏览器上下文。
+-- lib/portal/integrations.ts 一直在读写这个列,但列此前从未建过 ——
+-- 写入 400 被静默吞掉,是"跨设备 token 层从来没生效"的根因。
+
+ALTER TABLE public.user_profiles
+  ADD COLUMN IF NOT EXISTS integrations jsonb;

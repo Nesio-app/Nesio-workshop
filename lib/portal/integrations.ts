@@ -41,7 +41,7 @@ export async function getSupabaseUserId(accessToken: string): Promise<string | n
   } catch { return null; }
 }
 
-async function supabaseRequest(method: string, path: string, userToken: string, body?: unknown): Promise<Response> {
+async function supabaseRequest(method: string, path: string, userToken: string, body?: unknown, prefer?: string): Promise<Response> {
   const url = normalizeSupabaseRuntimeUrl(envValue('SUPABASE_URL'));
   const key = envValue('SUPABASE_SERVICE_ROLE_KEY') || envValue('SUPABASE_ANON_KEY');
   return fetch(`${url}/rest/v1/${path}`, {
@@ -50,7 +50,7 @@ async function supabaseRequest(method: string, path: string, userToken: string, 
       apikey: key,
       Authorization: `Bearer ${userToken}`,
       'Content-Type': 'application/json',
-      Prefer: 'resolution=merge-duplicates',
+      Prefer: prefer ?? 'resolution=merge-duplicates',
     },
     body: body ? JSON.stringify(body) : undefined,
   });
@@ -60,21 +60,47 @@ export async function readIntegrations(userId: string, userToken: string): Promi
   if (!userId) return {};
   try {
     const res = await supabaseRequest('GET', `user_profiles?user_id=eq.${userId}&select=integrations&limit=1`, userToken);
-    if (!res.ok) return {};
-    const rows = await res.json() as Array<{ integrations?: string }>;
+    if (!res.ok) {
+      console.error('integrations_read_failed', res.status);
+      return {};
+    }
+    const rows = await res.json() as Array<{ integrations?: IntegrationMap | string | null }>;
     const raw = rows[0]?.integrations;
-    return raw ? (JSON.parse(raw) as IntegrationMap) : {};
+    if (!raw) return {};
+    // jsonb 列返回对象;历史 JSON.stringify 双编码写入返回字符串,两者都吃
+    return typeof raw === 'string' ? (JSON.parse(raw) as IntegrationMap) : raw;
   } catch { return {}; }
 }
 
 export async function writeIntegrations(userId: string, userToken: string, data: IntegrationMap): Promise<void> {
   if (!userId) return;
   try {
-    await supabaseRequest('POST', 'user_profiles', userToken, {
+    // 行由登录时的 profile bootstrap 创建,按 user_id PATCH 定位。
+    // 老写法 POST upsert 不带主键 identity_key → 插入 400 被静默吞掉,
+    // 是"跨设备 token 层从来没生效"的写入侧断点。
+    const patch = await supabaseRequest(
+      'PATCH',
+      `user_profiles?user_id=eq.${userId}`,
+      userToken,
+      { integrations: data },
+      'return=representation',
+    );
+    if (patch.ok) {
+      const rows = await patch.json().catch(() => []) as unknown[];
+      if (Array.isArray(rows) && rows.length > 0) return;
+    } else {
+      console.error('integrations_write_patch_failed', patch.status);
+    }
+    // 行还不存在(bootstrap 前的极端时序)→ 带主键的 upsert 兜底
+    const insert = await supabaseRequest('POST', 'user_profiles', userToken, {
+      identity_key: `supabase:${userId}`,
       user_id: userId,
-      integrations: JSON.stringify(data),
+      integrations: data,
     });
-  } catch { /* silent */ }
+    if (!insert.ok) console.error('integrations_write_insert_failed', insert.status);
+  } catch (e) {
+    console.error('integrations_write_failed', e instanceof Error ? e.message : 'unknown');
+  }
 }
 
 // ── Cookies (fallback) ────────────────────────────────────────────────────────
