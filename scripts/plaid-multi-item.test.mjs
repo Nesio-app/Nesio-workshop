@@ -125,7 +125,7 @@ function makeTxWorld(world, opts = {}) {
   return { route: mod.exports, cookies, removedItems };
 }
 const reqWithTokens = (toks) => ({ cookies: { get: (n) => n === 'nesio_plaid_tokens' ? { value: JSON.stringify(toks) } : undefined } });
-const syncTx = (id, acc) => ({ added: [{ transaction_id: id, account_id: acc, date: '2026-07-01', name: id, amount: 5, iso_currency_code: 'USD', personal_finance_category: { primary: 'FOOD_AND_DRINK' } }], has_more: false, next_cursor: `c-${id}`, transactions_update_status: 'HISTORICAL_UPDATE_COMPLETE' });
+const syncTx = (id, acc) => ({ added: [{ transaction_id: id, account_id: acc, date: '2026-07-01', name: id, amount: 5, iso_currency_code: 'USD', personal_finance_category: { primary: 'FOOD_AND_DRINK' }, merchant_entity_id: `ent-${id}`, logo_url: `https://logo/${id}.png` }], has_more: false, next_cursor: `c-${id}`, transactions_update_status: 'HISTORICAL_UPDATE_COMPLETE' });
 
 // 场景 A(财务⑦):一家就绪、一家 NOT_READY
 {
@@ -140,6 +140,9 @@ const syncTx = (id, acc) => ({ added: [{ transaction_id: id, account_id: acc, da
   assert.equal(res.__json.accounts.length, 2, '两家账户都在(未就绪只影响流水)');
   assert.equal(res.__json.accounts[0].institution, 'Bank ins-a', '账户带机构名');
   assert.equal(res.__json.accounts[0].logo, 'bG9nbw==', '账户带机构 logo');
+  // 财务⑲:商户实体 id 与 logo 透传(响应自带的富化,不再丢弃)
+  assert.equal(res.__json.transactions[0].merchantId, 'ent-t1', '透传 merchant_entity_id');
+  assert.equal(res.__json.transactions[0].merchantLogo, 'https://logo/t1.png', '透传商户 logo');
   const savedCursors = JSON.parse(w.cookies['nesio_plaid_cursors']);
   assert.equal(savedCursors[0], 'c-t1', '就绪机构游标推进');
   assert.equal(savedCursors[1], '', 'NOT_READY 机构游标不动(下次从头拉)');

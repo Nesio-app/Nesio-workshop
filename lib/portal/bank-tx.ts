@@ -21,6 +21,14 @@ export interface BankTx {
   category: string;
   categoryDetail?: string; // 财务⑨:Plaid PFC detailed(FOOD_AND_DRINK_COFFEE…),只作展示细化
   accountId?: string;
+  merchantId?: string;   // 财务⑲:Plaid merchant_entity_id —— 官方商户实体,归并同商户不同描述符
+  merchantLogo?: string; // 商户 logo URL(Plaid 提供;可缺)
+}
+
+/** 财务⑲:商户归并键 —— Plaid 官方实体 id 优先("NETFLIX.COM 866-…"/"Netflix Inc" 同 id),
+ * 缺失(老数据/无富化的机构)回退字符串归一。定期识别/退款证据/商户 Top 统一用它。 */
+export function merchantKey(t: Pick<BankTx, 'name' | 'merchantId'>): string {
+  return t.merchantId || normalizeMerchant(t.name);
 }
 
 export const BANK_TX_KEY = 'nesio-bank-tx-v1';
@@ -142,13 +150,16 @@ export function setFlowRule(name: string, flow: TxFlow | ''): void {
 // 名字保守识别(CREDIT UNION 是机构名,排除);金额口径与退款相同(冲抵支出),纯语义分流。
 const REBATE_NAME_RE = /STATEMENT CREDIT|\bREBATE\b|REIMBURSE|CASH ?BACK|\bCREDIT\b(?!\s+UNION)|返还|报销/i;
 
-/** 财务⑪:退款证据集 —— 数据集中出现过支出的商户(归一名)。退款必须有对应的"买过"。 */
+/** 财务⑪:退款证据集 —— 数据集中出现过支出的商户(⑲:entity id 优先归并)。退款必须有对应的"买过"。 */
 export function expenseMerchants(txs: BankTx[]): Set<string> {
   const out = new Set<string>();
   for (const t of txs) {
     if (t.amount > 0) {
-      const k = normalizeMerchant(t.name);
+      const k = merchantKey(t);
       if (k) out.add(k);
+      // 兼容:老支出无 merchantId、新退款有 —— 归一名同样入证据集,两把钥匙都能开
+      const nk = normalizeMerchant(t.name);
+      if (nk) out.add(nk);
     }
   }
   return out;
@@ -172,7 +183,7 @@ export function txFlow(t: BankTx, rules = loadFlowRules(), evidence?: Set<string
   }
   if (t.amount >= 0) return 'expense';
   if (REBATE_NAME_RE.test(t.name || '')) return 'rebate';
-  if (evidence && !evidence.has(normalizeMerchant(t.name))) return 'transfer';
+  if (evidence && !evidence.has(merchantKey(t)) && !evidence.has(normalizeMerchant(t.name))) return 'transfer';
   return 'refund';
 }
 
@@ -296,22 +307,26 @@ export interface MerchantAgg {
   name: string;
   total: number;
   count: number;
+  logo?: string; // 财务⑲:商户 logo URL(Plaid 富化;可缺)
 }
 
 export function topMerchants(txs: BankTx[], ym: string, n = 5): MerchantAgg[] {
   const m = new Map<string, { total: number; count: number }>();
   const flowRules = loadFlowRules();
   const ccy = monthCurrency(txs, ym); // 当月主币种,与 KPI 同口径
+  // 财务⑲:按商户实体归并(entity id 优先)——"NETFLIX.COM 866-…"/"Netflix Inc" 合成一行
+  const meta = new Map<string, { name: string; logo?: string }>();
   for (const t of txs) {
     if (txYm(t) !== ym || ccyOf(t) !== ccy || txFlow(t, flowRules) !== 'expense') continue;
-    const name = t.name || '未知商户';
-    const cur = m.get(name) || { total: 0, count: 0 };
+    const key = merchantKey(t) || '未知商户';
+    const cur = m.get(key) || { total: 0, count: 0 };
     cur.total += Math.abs(t.amount);
     cur.count += 1;
-    m.set(name, cur);
+    m.set(key, cur);
+    meta.set(key, { name: t.name || '未知商户', logo: t.merchantLogo || meta.get(key)?.logo });
   }
   return [...m.entries()]
-    .map(([name, v]) => ({ name, total: round2(v.total), count: v.count }))
+    .map(([key, v]) => ({ name: meta.get(key)?.name || key, logo: meta.get(key)?.logo, total: round2(v.total), count: v.count }))
     .sort((a, b) => b.total - a.total)
     .slice(0, n);
 }
@@ -582,6 +597,7 @@ export interface RecurringCharge {
   // 财务⑰:mature = ≥3 笔成熟(Plaid 同口径);predicted = 早识别(2 笔规律,或知名订阅
   // 品牌 1 笔按月假设)。predicted 只作展示提示,不进订阅负担/余额投影等统计。
   status: 'mature' | 'predicted';
+  logo?: string; // 财务⑲:商户 logo URL(Plaid 富化;可缺)
 }
 
 /** 归一化商户名:去掉尾部门店号/流水号/日期,合并同一商家的多笔。 */
@@ -749,7 +765,7 @@ export function detectRecurring(txs: BankTx[], opts?: { includePredicted?: boole
   for (const t of txs) {
     if (txFlow(t, flowRules) !== 'expense') continue;
     if (!t.date) continue;
-    const key = normalizeMerchant(t.name);
+    const key = merchantKey(t); // 财务⑲:entity id 优先,同商户不同描述符不再裂成两条流
     if (!key) continue;
     const list = byKey.get(key) || [];
     list.push(t);
@@ -804,6 +820,7 @@ export function detectRecurring(txs: BankTx[], opts?: { includePredicted?: boole
         latestAmount: round2(amts2[amts2.length - 1]),
         baselineAmount: round2(amts2[0]),
         status: 'predicted',
+        logo: [...sorted2].reverse().find((t) => t.merchantLogo)?.merchantLogo,
       });
       continue;
     }
@@ -855,6 +872,7 @@ export function detectRecurring(txs: BankTx[], opts?: { includePredicted?: boole
       latestAmount,
       baselineAmount,
       status: 'mature',
+      logo: [...sorted].reverse().find((t) => t.merchantLogo)?.merchantLogo,
     });
   }
   return out.sort((a, b) => a.nextEstimate.localeCompare(b.nextEstimate));

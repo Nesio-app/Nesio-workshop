@@ -7,7 +7,7 @@
  */
 import {
   summarizeMonth, availableMonths, detectRecurring, effectiveCategory, txFlow, loadFlowRules,
-  expenseMerchants, median, ymOf, normalizeMerchant,
+  expenseMerchants, median, ymOf, merchantKey,
   type BankTx, type BankAccount, type RecurringCharge,
 } from './bank-tx';
 
@@ -74,7 +74,7 @@ export function detectIncome(txs: BankTx[]): IncomeDetection | null {
     if (t.amount >= 0 || !t.date) continue;
     const isIncome = txFlow(t, rules) === 'income' || PAYROLL_RE.test(t.name || '');
     if (!isIncome) continue;
-    const key = normalizeMerchant(t.name);
+    const key = merchantKey(t); // 财务⑲:entity id 优先归并发薪流
     if (!key) continue;
     (byKey.get(key) ?? byKey.set(key, []).get(key)!).push(t);
   }

@@ -29,6 +29,8 @@ interface PlaidTx {
   unofficial_currency_code?: string | null;
   personal_finance_category?: { primary?: string; detailed?: string } | null;
   pending?: boolean;
+  merchant_entity_id?: string | null; // 财务⑲:Plaid 官方商户实体 id(归并同商户不同描述符)
+  logo_url?: string | null;           // 商户 logo(Plaid 富化)
 }
 
 interface PlaidAccount {
@@ -265,6 +267,9 @@ export async function GET(req: NextRequest) {
           category: t.personal_finance_category?.primary || '',
           // 财务⑨:detailed 细分类(咖啡/加油/房租…)透传,只作展示细化,统计仍按 primary
           categoryDetail: t.personal_finance_category?.detailed || undefined,
+          // 财务⑲:商户实体 id + logo(响应自带的富化,此前一直丢弃)
+          merchantId: t.merchant_entity_id || undefined,
+          merchantLogo: t.logo_url || undefined,
         })),
         // 财务⑯:投资流水(分红/利息=收入细分;费用=银行费用;缴存/买卖=转账不计收支)
         ...invAdded.filter((t) => !(t.account_id && staleAccountIds.has(t.account_id))).map((t) => {

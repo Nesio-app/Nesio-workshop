@@ -75,6 +75,12 @@ function AcctLogo({ a, size = 22 }: { a: BankAccount; size?: number }) {
   );
 }
 
+/** 财务⑲:商户 logo(Plaid 富化 URL;缺失由调用方不渲染,不占位)。 */
+function MLogo({ src }: { src: string }) {
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img className="nesio-fin-mlogo" src={src} alt="" width={16} height={16} loading="lazy" />;
+}
+
 export default function FinanceTab() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [txs, setTxs] = useState<BankTx[]>([]);
@@ -296,7 +302,7 @@ export default function FinanceTab() {
           <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '商户 Top', 'Top merchants')}</p>
           <div className="nesio-fin-merchants">
             {merchants.map((m) => (
-              <div key={m.name} className="nesio-fin-merchant"><span className="nesio-fin-merchant-name">{m.name}</span><span className="nesio-fin-merchant-right"><span className="nesio-fin-merchant-amt">{formatMoney(m.total, summary.currency)}</span><span className="nesio-fin-merchant-cnt">{L(dict, `${m.count} 笔`, `${m.count}×`)}</span></span></div>
+              <div key={m.name} className="nesio-fin-merchant"><span className="nesio-fin-merchant-name">{m.logo && <MLogo src={m.logo} />}{m.name}</span><span className="nesio-fin-merchant-right"><span className="nesio-fin-merchant-amt">{formatMoney(m.total, summary.currency)}</span><span className="nesio-fin-merchant-cnt">{L(dict, `${m.count} 笔`, `${m.count}×`)}</span></span></div>
             ))}
           </div>
         </>
@@ -354,7 +360,7 @@ export default function FinanceTab() {
                   <div className="nesio-fin-txrow">
                     <span className="nesio-fin-txdate">{(t.date || '').slice(5).replace('-', '/')}</span>
                     <div className="nesio-fin-txmid">
-                      <span className="nesio-fin-txname">{t.name || L(dict, '未知商户', 'Unknown')}</span>
+                      <span className="nesio-fin-txname">{t.merchantLogo && <MLogo src={t.merchantLogo} />}{t.name || L(dict, '未知商户', 'Unknown')}</span>
                       <button type="button" className={`nesio-fin-txflow nesio-fin-txflow--${f}`} onClick={() => setFlowEditId((id) => (id === t.id ? null : t.id))}>
                         <span className="nesio-fin-txflow-l">{L(dict, TX_FLOW_LABELS[f][0], TX_FLOW_LABELS[f][1])}</span>
                         {f === 'expense' && (() => {
@@ -442,7 +448,7 @@ export default function FinanceTab() {
               {recurring.map((r) => (
                 <div key={r.name} className="nesio-fin-recur">
                   <div className="nesio-fin-recur-main">
-                    <span className="nesio-fin-recur-name">{r.name}{r.status === 'predicted' && <span className="nesio-fin-recur-badge">{L(dict, '待确认', 'unconfirmed')}</span>}</span>
+                    <span className="nesio-fin-recur-name">{r.logo && <MLogo src={r.logo} />}{r.name}{r.status === 'predicted' && <span className="nesio-fin-recur-badge">{L(dict, '待确认', 'unconfirmed')}</span>}</span>
                     <span className="nesio-fin-recur-meta">{L(dict, r.cadenceLabel[0], r.cadenceLabel[1])} · {categoryLabel(r.category, dict)} · {L(dict, `下次约 ${r.nextEstimate.slice(5).replace('-', '/')}`, `next ~${r.nextEstimate.slice(5).replace('-', '/')}`)} · {L(dict, `${r.count} 笔`, `${r.count}×`)}{r.status === 'predicted' ? L(dict, ' · 再出现 1 期自动转正', ' · confirms after next cycle') : ''}</span>
                   </div>
                   <span className="nesio-fin-recur-amt">{formatMoney(r.avgAmount, r.currency)}</span>
