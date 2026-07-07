@@ -17,10 +17,18 @@
  *
  * 顺带:反馈时也回喂 mirror-profile 的 learnFromFeedback —— 该函数此前全仓零调用(死回路),
  * 于是 hourFit/domainFit 一直停在种子默认;接上后这两个特征也真正随反馈变化。
+ *
+ * 2b·回放重训(A 计划):此前 learnInto 折进权重后 delete pending —— 原始训练样本用完即弃,
+ * 权重"不可重训/易碎/不可迁移/不可审计"(system-layers L2 审计原话)。现在每次学习把
+ * (特征, 标签) 追加进**训练样本日志**(IDB,自动进备份/删除收口):权重降级为日志的
+ * 可回放投影 —— localStorage 蒸发时 load() 自愈重建;SGD 确定性,同一日志必得同一权重。
+ * 注:反馈动词日志(personalization/feedback-log)不含特征向量,重训必须靠这份样本日志。
  */
 
 import { learnFromFeedback } from '@/lib/portal/mirror-profile';
 import { onFeedback, type FeedbackEvent, type Reaction } from '@/lib/platform/personalization';
+import { createBlobStore } from '@/lib/portal/idb-blob-store';
+import { reportStorageDropped } from '@/lib/portal/storage-health';
 
 export interface GuidanceFeatures {
   risk: number;       // 风险严重度 severity/3      [0,1]
@@ -43,6 +51,7 @@ const PENDING_CAP = 60;
 const PENDING_TTL_MS = 14 * 86_400_000;
 
 const KEY = 'nesio-guidance-ranker-v1';
+const TRAIN_LOG_CAP = 500; // 训练样本日志上限(500 × 7 维,回放毫秒级;超出弃最旧)
 
 interface PendingExample { f: number[]; type: string; at: string }
 interface RankerState {
@@ -52,12 +61,32 @@ interface RankerState {
   pending: Record<string, PendingExample>;
 }
 
+/** 一条训练样本(特征 + 标签 + 时间):权重的事实来源,可回放/可审计。 */
+export interface TrainExample { f: number[]; type: string; y: 0 | 1; at: string }
+
+// 训练样本日志:IDB blob(createBlobStore 登记 → 自动进云备份/彻底删除收口)。
+// 丢了它 = 丢可重训性(用户反馈的蒸馏),写失败必须可见(设计红线)。
+const trainLog = createBlobStore<TrainExample[]>({
+  key: 'nesio-ranker-trainlog-v1',
+  updateEvent: 'nesio-ranker-trainlog-updated',
+  validate: (v) => Array.isArray(v),
+  onWriteError: reportStorageDropped,
+});
+
+function appendTrainExample(ex: TrainExample): void {
+  const cur = trainLog.load();
+  const arr = Array.isArray(cur) ? cur.slice() : [];
+  arr.push(ex);
+  if (arr.length > TRAIN_LOG_CAP) arr.splice(0, arr.length - TRAIN_LOG_CAP);
+  trainLog.save(arr);
+}
+
 function fresh(): RankerState {
   return { w: PRIOR_WEIGHTS.slice(), b: 0, n: 0, pending: {} };
 }
 
 // ranker 权重自存(proposal §3:ranker 是特征组合器,无需迁数据,只把接线改走统一反馈总线)。
-function load(): RankerState {
+function rawLoad(): RankerState {
   if (typeof window === 'undefined') return fresh();
   try {
     const raw = JSON.parse(localStorage.getItem(KEY) || 'null') as RankerState | null;
@@ -66,6 +95,35 @@ function load(): RankerState {
     }
   } catch { /* ignore */ }
   return fresh();
+}
+
+function load(): RankerState {
+  const s = rawLoad();
+  // 自愈:权重态是空白(localStorage 蒸发/换机恢复)而训练日志有样本 → 回放重建。
+  // SGD 确定性 + 日志保序 → 重建权重与蒸发前逐位一致(截断日志则为最近 500 条的投影)。
+  if (s.n === 0 && (trainLog.load()?.length ?? 0) > 0) {
+    const healed = retrainRankerFromLog();
+    if (healed) return rawLoad();
+  }
+  return s;
+}
+
+/**
+ * 从训练样本日志回放重建权重(2b:权重=可回放投影)。
+ * 用途:localStorage 蒸发自愈 / 云备份恢复到新机 / 审计验证。保留现有 pending(出卡暂存与权重独立)。
+ */
+export function retrainRankerFromLog(): { replayed: number } | null {
+  const log = trainLog.load();
+  if (!Array.isArray(log) || !log.length) return null;
+  const s = fresh();
+  for (const ex of log) {
+    if (Array.isArray(ex.f) && ex.f.length === FEATURE_KEYS.length && (ex.y === 0 || ex.y === 1)) {
+      learnInto(s, ex.f, ex.y);
+    }
+  }
+  s.pending = rawLoad().pending;
+  save(s);
+  return { replayed: s.n };
 }
 function save(s: RankerState): void {
   if (typeof window === 'undefined') return;
@@ -127,6 +185,8 @@ export function applyGuidanceFeedback(cardId: string, feedback: GuidanceFeedback
   learnInto(s, rec.f, y);
   delete s.pending[key];
   save(s);
+  // 训练样本落日志(collect first):权重从此是它的可回放投影,不再"折进即弃"。
+  appendTrainExample({ f: rec.f, type: rec.type, y, at: new Date().toISOString() });
   // 同步回喂 mirror(按卡类型当 domain 键),让 hourFit/domainFit 这两个特征也持续更新。
   try { learnFromFeedback(rec.type, feedback); } catch { /* best-effort */ }
   return true;

@@ -64,7 +64,13 @@
 - **财务 ✅**:判定层早已存在(finance-insight,引擎/知识分离精神一致);真漂移已收口(Layer1①,financeAlerts 删除)。**不做 RULES 化翻写**——刚收口且被三面消费,声明式改写是纯搅动。
 - **地图 ✅**:新建 `place-insight.ts`(声明式 RULES + 通用引擎):活动范围收窄 / 健身习惯断档。
   **数据诚实红线**:没有足迹 ≠ 没出门(可能没开定位)——每条规则带「追踪存活」门,历史不够冷启动沉默;只出 attention(范围/习惯不是安全风险,红色只给真实风险)。已进 Reader(location 域)+ Today 桥 + 问一问投影。
-- **认知 ⏳ 下一块**:先做底料评估——候选:情绪漂移 CUSUM(moment-analytics 已有算法,缺判定层接线)、实验显著性结论(welchTTest)。warm-coach 对情绪域尤其严,评估后再动。
+- **认知 → 心情 ✅(2026-07-07 底料评估落定)**:评估发现"认知(living-model)"的判定在 LLM 端,
+  确定性底料成熟的是**情绪**——`cusumUpdate`/`isMoodJump`/`fatigueScore` 此前**全仓零消费**(算法躺在库里,
+  心情数据活着)。新建 `mood-insight.ts`(域名诚实定为 mood):CUSUM 情绪持续偏低判定,无持久态
+  (确定性回放),门槛保守(≥5 条 + 跨 ≥3 天 + 警报须落在最近 3 天,陈年不翻旧账),
+  **情绪域从严:只 attention、文案不评判不下诊断**。CUSUM 常数(threshold 4/slack 0.5)按发表口径不动。
+  两笔记账:实验显著性 finding 需先把 `computeInsight/loadExperiments` 从组件抽到 lib(层次问题,推迟);
+  `fatigueScore` 不接(energy-state 已向管线供 low/high,再出疲劳 finding 是双报)。
 
 **HealthDashboard 判定(census 建议的纠正)**:它是**明细面,故意渲染全谱**(含 info 达标项绿点,`HealthDashboard.tsx FindingsCard`)——统一层只筛 flag/attention,切过去会丢达标项;且它调的就是 Reader 包裹的同批引擎函数,不可能漂移。**不是旁路,保留**。至此"已建统一层域内的真漂移" 全部收口(Today/问一问/FinanceTab 同读,HealthDashboard=合法明细面)。
 
@@ -88,7 +94,7 @@
 
 | learner | 现算法 | 更聪明 | 判断 |
 |---|---|---|---|
-| **guidance-ranker** | 7 维在线逻辑回归 | 加特征(位置/天气/近期连拒)、分情境子模型;**event-sourcing 反馈后可回放重训** | ⭐ 最该升;先要 event-sourced 反馈垫底 |
+| **guidance-ranker** | 7 维在线逻辑回归 | 加特征(位置/天气/近期连拒)、分情境子模型;**event-sourcing 反馈后可回放重训** | ⭐ **回放重训 ✅(2026-07-07)**:训练样本 (特征,标签) 落 IDB 日志(反馈动词日志不含特征,重训靠样本日志),权重=可回放投影;localStorage 蒸发时 load() 自愈、SGD 确定性逐位一致;日志自动进云备份/删除收口。加特征/分情境子模型仍待做 |
 | **bank 商户** | token 计数投票 | 语义/模糊商户匹配(接已有 embedding 路径),泛化更准 | ⭐ 值得,接现成嵌入 |
 | **mirror-profile** | EWMA 逼近目标 | 情境化偏好(按时段/精力/星期条件化) | ⭐ 值得,升级面较小 |
 | **card-feedback** | 覆盖 + 类型过滤 | —— | ✅ **已评估(2026-07-07):不并**。`dec.ts:96-102` 的 `useful/too_much→永久压制` 是**卡片生命周期业务态**,ranker(只排序)/cooling(只时间冷却)都无此语义;且 `recordCardFeedback` 是反馈流事件源头。可迁的只有 `not_now→4h` 时间窗 → 归 Recency(2a续② 与 cooling 一起收) |

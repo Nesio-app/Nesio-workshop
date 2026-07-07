@@ -33,6 +33,7 @@ import {
   financeFindingsToGuidanceEvents,
   placeFindingsToGuidanceEvents,
   inventoryFindingsToGuidanceEvents,
+  moodFindingsToGuidanceEvents,
   type WeatherSnapshot,
   decCardsToGuidanceEvents,
 } from '@/lib/platform/guidance-engine/source-adapters';
@@ -173,6 +174,7 @@ export function useTodayData(canUsePrivateData: boolean) {
               ...financeFindingsToGuidanceEvents(df.finance),
               ...placeFindingsToGuidanceEvents(df.location),
               ...inventoryFindingsToGuidanceEvents(df.inventory),
+              ...moodFindingsToGuidanceEvents(df.mood),
             ];
           })(),
         ];
