@@ -14,8 +14,8 @@
  * 支付基建接上后,把这个桩换成真权益读取即可,推送机制本身不用动。
  */
 
-import { buildFullBackup, type FullBackup } from './full-backup';
-import { collectIdbBlobs } from './idb-blob-store';
+import { buildFullBackup, restoreFullBackup, isValidBackup, type FullBackup } from './full-backup';
+import { collectIdbBlobs, isIdbBlobKey, idbBackend } from './idb-blob-store';
 
 /** 上次云备份记录(小,留 localStorage)。 */
 const LAST_CLOUD_BACKUP_KEY = 'nesio-cloud-backup-last-v1';
@@ -131,5 +131,86 @@ export async function pushBackupToCloud(): Promise<CloudBackupResult> {
     return { ok: true, storagePath: data.storagePath, at, bytes, entryCount };
   } catch {
     return { ok: false, error: 'network', bytes, entryCount };
+  }
+}
+
+// ── 恢复(pull)────────────────────────────────────────────────────────────────
+
+export type RestoreMode = 'merge' | 'replace';
+
+export interface CombinedRestoreResult {
+  restoredKeys: number;   // localStorage 侧恢复条数
+  idbRestored: number;    // IDB 侧恢复条数
+  mergedNodes?: number;   // 生命图合并后节点数(merge 模式)
+  skippedKeys: string[];
+}
+
+/**
+ * 恢复合并备份:按 IDB key 登记把条目分流 —— IDB blob 直接落 idbBackend(replace 覆盖 /
+ * merge 缺才补),其余走 restoreFullBackup 落 localStorage。
+ *
+ * 修复 #43 迁 IDB 留下的隐患:此前 restore 全写 localStorage,而 blob store 仅在「IDB 为空」时
+ * 才迁移 localStorage→IDB,于是 replace 模式下、设备已有 IDB 数据时,恢复的值被静默忽略。
+ * 现在 IDB key 直接落 IDB,replace 真覆盖。调用方成功后应 reload 让各 store 重新水合
+ * (缓存是加载时读的,不会自更新)。
+ */
+export async function restoreCombinedBackup(backup: FullBackup, mode: RestoreMode): Promise<CombinedRestoreResult> {
+  const lsEntries: Record<string, string> = {};
+  const idbEntries: Record<string, string> = {};
+  for (const [k, v] of Object.entries(backup.entries)) {
+    if (isIdbBlobKey(k)) idbEntries[k] = v; else lsEntries[k] = v;
+  }
+
+  const ls = restoreFullBackup(localStorage, { ...backup, entries: lsEntries }, mode);
+
+  let idbRestored = 0;
+  for (const [k, v] of Object.entries(idbEntries)) {
+    try {
+      if (mode === 'merge' && (await idbBackend.get(k)) != null) continue; // merge:已有不覆盖
+      await idbBackend.set(k, v);
+      idbRestored++;
+    } catch { /* 单 key 落库失败不影响其余 */ }
+  }
+
+  return { restoredKeys: ls.restoredKeys, idbRestored, mergedNodes: ls.mergedNodes, skippedKeys: ls.skippedKeys };
+}
+
+export type CloudRestoreError = CloudBackupError | 'no_backup' | 'invalid_backup';
+
+export interface CloudRestoreResult {
+  ok: boolean;
+  error?: CloudRestoreError;
+  restoredKeys?: number;
+  idbRestored?: number;
+}
+
+/**
+ * 从云拉回最近一次备份并恢复。GET assets 签名 URL → fetch blob → 校验 → restoreCombinedBackup。
+ * 门禁/失败态与 push 对齐。成功后调用方应 reload。
+ */
+export async function pullBackupFromCloud(mode: RestoreMode = 'merge'): Promise<CloudRestoreResult> {
+  if (!hasCloudEntitlement()) return { ok: false, error: 'entitlement_required' };
+  if (typeof window === 'undefined') return { ok: false, error: 'network' };
+  const last = lastCloudBackup();
+  if (!last?.storagePath) return { ok: false, error: 'no_backup' };
+
+  try {
+    // 1. 取签名读 URL(assets GET 校验身份 + 归属)
+    const metaRes = await fetch(`/api/cloud/assets?storagePath=${encodeURIComponent(last.storagePath)}`, { cache: 'no-store' });
+    const meta = (await metaRes.json().catch(() => ({}))) as { ok?: boolean; signedUrl?: string };
+    if (!metaRes.ok || !meta.ok || !meta.signedUrl) return { ok: false, error: mapHttpError(metaRes.status) };
+
+    // 2. 拉 blob
+    const blobRes = await fetch(meta.signedUrl, { cache: 'no-store' });
+    if (!blobRes.ok) return { ok: false, error: 'network' };
+    let parsed: unknown;
+    try { parsed = JSON.parse(await blobRes.text()); } catch { return { ok: false, error: 'invalid_backup' }; }
+    if (!isValidBackup(parsed)) return { ok: false, error: 'invalid_backup' };
+
+    // 3. 恢复(IDB/localStorage 分流)
+    const res = await restoreCombinedBackup(parsed, mode);
+    return { ok: true, restoredKeys: res.restoredKeys, idbRestored: res.idbRestored };
+  } catch {
+    return { ok: false, error: 'network' };
   }
 }
