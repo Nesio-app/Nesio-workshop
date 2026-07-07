@@ -18,6 +18,7 @@ import {
 // 风险预警与 Today/问一问 同读一份判定(financeFindings,Layer1 漂移收口)——此前 bank-tx 里
 // 另有一套 alerts 判定(函数级双实现),两个输出面据同一份流水各说各话,已删并由契约钉死不回潮。
 import { financeFindings } from '@/lib/portal/finance-insight';
+import { computeFinanceScores } from '@/lib/portal/finance-risk';
 import { categoryLabel, categoryDetailLabel, COMMON_EXPENSE_CATEGORIES } from '@/lib/portal/tx-category';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -119,6 +120,9 @@ export default function FinanceTab() {
   // 财务⑪:退款证据 —— 交易行的类型标签与月度统计同口径(没买过的商户进账不是退款)。
   // ⚠️ hooks 必须全部在下面的空态早退**之前**(hook 数量随渲染变化会让 React 整页抛错)。
   const refundEvidence = useMemo(() => expenseMerchants(txs), [txs]);
+  // 财务⑮:L3 财务体检(应急金/储蓄率/订阅负担,分项带出处;数据不齐的项不出)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const scores = useMemo(() => computeFinanceScores(txs, accounts), [txs, accounts, rev]);
 
   if (txs.length === 0) {
     return <p className="nesio-insights-empty">{L(dict, '还没有银行流水。到「设置 → 数据接入 → 银行流水 · Plaid」连接账户并点「同步」。', 'No bank transactions yet. Go to Settings → Data sources → Bank feed · Plaid, connect and Sync.')}</p>;
@@ -252,6 +256,24 @@ export default function FinanceTab() {
           )}
 
           {/* 批次 39:原「支出」tab 内容(分类聚合 + 商户 Top)并入总览 —— 它本就是聚合分析 */}
+          {/* 财务⑮:财务体检 —— L3 分项评分,每项带通行标准出处;红只给真实风险 */}
+          {scores.length > 0 && (
+            <>
+              <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '财务体检', 'Financial checkup')}</p>
+              <div className="nesio-fin-scores">
+                {scores.map((s) => (
+                  <div key={s.id} className="nesio-fin-score">
+                    <div className="nesio-fin-score-top">
+                      <span>{L(dict, s.label[0], s.label[1])}</span>
+                      <span className={`nesio-fin-score-val is-${s.category}`}>{s.value}</span>
+                    </div>
+                    <p className="nesio-fin-score-hint">{L(dict, s.detail[0], s.detail[1])} · {L(dict, `依据 ${s.source}`, `per ${s.source}`)}</p>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
           <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '全部分类', 'All categories')}</p>
           <div className="nesio-fin-cats">
             {cats.map((c) => (
