@@ -80,6 +80,14 @@ const empty = budget.budgetProgress(curTxs, '2026-07', { categories: {} });
 assert.equal(empty.total, null);
 assert.equal(empty.perCategory.length, 0);
 
+// ── 财务㉖:Everything Else(未设预算分类合计) ──
+const withOther = [...curTxs, tx('o1', '2026-07-08', 'Cinema', 55, 'ENTERTAINMENT')];
+const bp2 = budget.budgetProgress(withOther, '2026-07', draft);
+assert.equal(bp2.otherSpent, 55, '未设预算的分类进 Everything Else');
+assert.ok(!bp2.perCategory.some((c) => c.category === 'ENTERTAINMENT'), '不混进已设预算列表');
+assert.equal(budget.budgetProgress(curTxs, '2026-07', draft).otherSpent, 0, '全部已设预算 → 0');
+assert.equal(empty.otherSpent, 280, '空预算时全部支出都算未设预算');
+
 // ── store roundtrip + 容错 ──
 budget.saveBudget({ total: 3000, categories: { FOOD_AND_DRINK: 500 } });
 assert.equal(budget.loadBudget().total, 3000, 'roundtrip');
