@@ -40,7 +40,7 @@ interface PlaidAccount {
   mask?: string | null;
   type?: string;
   subtype?: string | null;
-  balances?: { current?: number | null; available?: number | null; iso_currency_code?: string | null };
+  balances?: { current?: number | null; available?: number | null; limit?: number | null; iso_currency_code?: string | null };
 }
 
 interface Institution { id: string; name?: string; logo?: string | null; color?: string | null }
@@ -292,6 +292,8 @@ export async function GET(req: NextRequest) {
         type: a.type,
         subtype: a.subtype || undefined,
         balance: a.balances?.current ?? undefined,
+        // 财务㉙:信用卡额度(利用率 = balance/limit;非信用账户 Plaid 给 null)
+        limit: a.balances?.limit ?? undefined,
         currency: a.balances?.iso_currency_code || 'USD',
         institution: acctInst.get(a.account_id)?.name || undefined,
         logo: acctInst.get(a.account_id)?.logo || undefined,
