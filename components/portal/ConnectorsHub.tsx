@@ -127,10 +127,17 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     setConnected(savedConn);
     setIngestUrl(`${window.location.origin}/api/portal/ingest`);
     // 批次 39:OAuth 连过(cookie token,没有本地 token)也要翻成已连接。
-    fetch('/api/portal/notion/status')
-      .then((r) => r.json())
-      .then((d: { connected?: boolean }) => { if (d.connected) setConnected((p) => ({ ...p, notion: true })); })
-      .catch(() => undefined);
+    // Notion 修:授权可能在另一个浏览器完成(token 落 Supabase),回到本 App
+    // 前台时重查一次,按钮自动翻,不用重启。
+    const checkNotionStatus = () => {
+      fetch('/api/portal/notion/status')
+        .then((r) => r.json())
+        .then((d: { connected?: boolean }) => { if (d.connected) setConnected((p) => ({ ...p, notion: true })); })
+        .catch(() => undefined);
+    };
+    checkNotionStatus();
+    const onVisible = () => { if (document.visibilityState === 'visible') checkNotionStatus(); };
+    document.addEventListener('visibilitychange', onVisible);
     // Check OAuth callback
     const params = new URLSearchParams(window.location.search);
     const err = params.get('error');
@@ -143,6 +150,14 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       showToast(L(dict,
         'Notion 集成还没配置:去 notion.so/my-integrations 创建 Public integration,把 NOTION_CLIENT_ID / NOTION_CLIENT_SECRET 配到 Vercel,Redirect URI 填 /api/portal/notion/callback',
         'Notion integration not configured yet: create a Public integration at notion.so/my-integrations, set NOTION_CLIENT_ID / NOTION_CLIENT_SECRET on Vercel, redirect URI /api/portal/notion/callback'), false);
+    } else if (err === 'state_mismatch' || err === 'state_expired') {
+      showToast(L(dict,
+        'Notion 授权返回校验未通过(常见于超时或在别的浏览器打开)。请回到 Nesio 再点一次「连接」;若反复失败,改用粘贴 token 最稳。',
+        'Notion authorization check failed (timeout or opened in a different browser). Tap Connect again from Nesio; if it keeps failing, paste a token instead.'), false);
+    } else if (err === 'token_failed') {
+      showToast(L(dict,
+        'Notion 换取令牌失败,请重试;若反复失败,改用粘贴 token。',
+        'Notion token exchange failed — try again, or paste a token instead.'), false);
     } else if (err === 'gmail_scope_not_granted') {
       showToast(L(dict,
         'Google 没有授出邮件权限:需在 Google Cloud 同意屏幕配置 gmail.readonly(测试模式下把自己加为测试用户)',
@@ -150,6 +165,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     } else if (err) {
       showToast(L(dict, `连接失败：${err}`, `Connection failed: ${err}`), false);
     }
+    return () => document.removeEventListener('visibilitychange', onVisible);
   }, [open]);
 
 

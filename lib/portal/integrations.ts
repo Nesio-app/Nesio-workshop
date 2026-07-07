@@ -8,7 +8,7 @@ import { cookies } from 'next/headers';
 import { normalizeSupabaseRuntimeUrl } from '@/lib/portal/production-runtime';
 import { envValue } from '@/lib/portal/env';
 
-export type IntegrationProvider = 'gmail' | 'calendar';
+export type IntegrationProvider = 'gmail' | 'calendar' | 'notion';
 
 export interface IntegrationTokens {
   accessToken: string;
@@ -81,6 +81,7 @@ export async function writeIntegrations(userId: string, userToken: string, data:
 const COOKIE_PREFIX: Record<IntegrationProvider, string> = {
   gmail: 'nesio_gmail',
   calendar: 'nesio_google_calendar',
+  notion: 'nesio_notion',
 };
 
 export async function readTokensFromCookies(provider: IntegrationProvider): Promise<IntegrationTokens | null> {
@@ -143,6 +144,26 @@ export async function getIntegrationToken(
     return readTokensFromCookies(provider);
   }
   return null;
+}
+
+/**
+ * Save tokens for a KNOWN userId using the service role key — for OAuth
+ * callbacks that land in a different browser context than the one that
+ * started the flow (iOS PWA → 授权被 Notion App 劫持 → 回调落在 Safari,
+ * 那里没有 Nesio 会话 cookie)。userId 由签名 state 携带,不来自请求 cookie。
+ */
+export async function saveIntegrationTokenByUserId(
+  userId: string,
+  provider: IntegrationProvider,
+  tokens: Omit<IntegrationTokens, 'connectedAt'>,
+): Promise<boolean> {
+  const serviceKey = envValue('SUPABASE_SERVICE_ROLE_KEY');
+  if (!userId || !serviceKey) return false;
+  const full: IntegrationTokens = { ...tokens, connectedAt: new Date().toISOString() };
+  const existing = await readIntegrations(userId, serviceKey);
+  existing[provider] = full;
+  await writeIntegrations(userId, serviceKey, existing);
+  return true;
 }
 
 /**

@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { guardAiRoute } from '@/lib/portal/api-auth';
 import { notionRowToNode, notionDbTitle, type NotionRow } from '@/lib/portal/notion-map';
 import { completeText, aiProviderAvailable } from '@/lib/portal/ai-complete';
+import { getIntegrationToken } from '@/lib/portal/integrations';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -129,10 +130,15 @@ export async function POST(req: NextRequest) {
   const guard = await guardAiRoute(req, 'notion', { limit: 15 });
   if (guard) return guard;
 
-  // 批次 18:优先用 OAuth 授权存下的 cookie token(像 flomo 连 Notion 那样
-  // 一键授权、选页面);body token 是老的内部集成用法,保留兼容
+  // 批次 18:优先用 OAuth 授权存下的 token;body token 是老的内部集成用法,保留兼容。
+  // Notion 修:再回落 Supabase integrations(iOS 授权在别的浏览器完成时,
+  // token 只在云端,本机 cookie 没有)。
   const body = await req.json().catch(() => ({})) as { token?: string; databaseIds?: string[] };
-  const token = body.token || req.cookies.get('nesio_notion_access')?.value || '';
+  let token = body.token || req.cookies.get('nesio_notion_access')?.value || '';
+  if (!token) {
+    const cloud = await getIntegrationToken('notion');
+    token = cloud?.accessToken || '';
+  }
   if (!token) {
     return NextResponse.json(
       { ok: false, error: 'not_connected', connectUrl: '/api/portal/notion/connect' },
