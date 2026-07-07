@@ -66,7 +66,7 @@ for (const warning of report.boundaries.boundaryWarnings) {
   assert.notEqual(warning.reason, 'Static route validation requires public/index for local static modules.');
 }
 
-assert.deepEqual(report.boundaries.publicLaunchEmbeddedModules, ['plan', 'inventory']);
+assert.deepEqual(report.boundaries.publicLaunchEmbeddedModules, ['inventory']);
 assert.equal(report.boundaries.syncedEmbeddedModules.includes('reading'), false);
 
 console.log('report-module-registry launch exposure semantics tests passed');

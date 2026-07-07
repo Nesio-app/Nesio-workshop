@@ -102,7 +102,6 @@ assert.match(
 
 const requiredToolIcons = [
   "storage",
-  "plan",
   "reading",
   "fitness",
   "quiz",

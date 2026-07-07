@@ -30,12 +30,6 @@ assert.doesNotMatch(
 );
 
 assert.match(
-  middleware,
-  /pathname === '\/adhd-flow'[\s\S]{0,320}\/adhd-flow\/index\.html/,
-  'V14 ADHD Flow must have a direct static app rewrite so extensionless URLs keep assets scoped.',
-);
-
-assert.match(
   bundler,
   /moduleId === 'secretary'[\s\S]{0,180}return true/,
   'V14 toolbox bundle must include the Secretary static app because 智友 is an active runtime route.',
@@ -83,11 +77,8 @@ try {
     cwd: root,
     stdio: 'pipe',
   });
-  const adhdHtml = readFileSync(join(tempRoot, 'adhd-flow', 'index.html'), 'utf8');
   const secretaryHtml = readFileSync(join(tempRoot, 'secretary', 'index.html'), 'utf8');
-  assert.match(adhdHtml, /<base href="\/adhd-flow\/">/, 'ADHD Flow bundle must include scoped base href.');
-  assert.doesNotMatch(adhdHtml, /(href|src)="\/(app\.js|config\.js|styles\.css|portal-back\.css|manifest\.json|icon\.svg)"/, 'ADHD Flow bundle must not request local assets from the site root.');
-  assert.match(adhdHtml, /href="\/adhd-flow\/styles\.css"/, 'ADHD Flow styles must load from /adhd-flow/styles.css.');
+  assert.doesNotMatch(secretaryHtml, /(href|src)="\/(app\.js|config\.js|styles\.css|portal-back\.css|manifest\.json|icon\.svg)"/, 'Static bundle must not request local assets from the site root.');
   assert.match(secretaryHtml, /<base href="\/secretary\/">/, 'Secretary bundle must include scoped base href.');
 } finally {
   rmSync(tempRoot, { recursive: true, force: true });

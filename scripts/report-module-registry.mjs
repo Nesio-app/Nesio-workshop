@@ -1964,7 +1964,7 @@ const launchSkuWarnings = [
     : [{
         warningKind: 'launchable_module_count_mismatch',
         issue: 'First-launch SKU must have exactly Shell + Inventory + Todo as launchable.',
-        reason: 'Avoid making all 11 modules look App Store launchable.',
+        reason: 'Avoid making all 10 modules look App Store launchable.',
         owner: 'Qiao',
         evidenceFields: ['launchSku.modules'],
       }]),

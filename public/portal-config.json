@@ -99,32 +99,6 @@
       }
     },
     {
-      "id": "plan",
-      "name": "待办",
-      "nameEn": "Flow",
-      "description": "任务总控 · ADHD 友好",
-      "url": "/adhd-flow/",
-      "zone": "kinetic",
-      "hotkey": "p",
-      "command": "/plan",
-      "featured": true,
-      "icon": "✅",
-      "iconUrl": "/icons/tools/plan.svg",
-      "ready": true,
-      "owner": "CEO",
-      "maintainer": "Qiao",
-      "responsibleAgent": "Qiao",
-      "evidenceOwner": "Sina",
-      "gateOwner": "CEO",
-      "dataContract": {
-        "schemaVersion": "PlanTask@v0",
-        "dataVersion": "plan-local-data-v0",
-        "demoDataVersion": "plan-demo-seed-v0",
-        "migrationRequired": false,
-        "migrationStatus": "not_required"
-      }
-    },
-    {
       "id": "quiz",
       "name": "刷题",
       "nameEn": "Quiz",

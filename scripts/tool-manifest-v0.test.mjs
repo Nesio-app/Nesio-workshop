@@ -93,12 +93,6 @@ assert.equal(inventory.launchStatus, 'launchable');
 assert.equal(inventory.prodExposure, 'public');
 assert.equal(inventory.dataNamespace, 'personal');
 
-const plan = manifestById.get('plan');
-assert.equal(plan.toolLifecycle, 'launchable');
-assert.equal(plan.launchStatus, 'launchable');
-assert.equal(plan.prodExposure, 'public');
-assert.equal(plan.dataNamespace, 'personal');
-
 for (const moduleId of ['finance', 'health', 'psychoanalysis', 'secretary']) {
   const manifest = manifestById.get(moduleId);
   assert.notEqual(manifest.launchStatus, 'launchable', `${moduleId} must not be launchable`);
@@ -131,10 +125,10 @@ const report = JSON.parse(execFileSync('node', [join(scriptDir, 'report-module-r
   maxBuffer: 1024 * 1024 * 20,
 }));
 assert.equal(report.toolManifest.version, 'tool-manifest-v0');
-assert.equal(report.toolManifest.summary.moduleCount, 11);
+assert.equal(report.toolManifest.summary.moduleCount, 10);
 assert.equal(report.toolManifest.summary.missingRequiredFieldCount, 0);
-assert.equal(report.toolManifest.summary.publicModuleCount, 2);
-assert.equal(report.toolManifest.manifests.length, 11);
+assert.equal(report.toolManifest.summary.publicModuleCount, 1);
+assert.equal(report.toolManifest.manifests.length, 10);
 assert.ok(report.toolManifest.manifests.every((manifest) => manifest.version === 'tool-manifest-v0'));
 
 console.log('tool manifest v0 tests passed');

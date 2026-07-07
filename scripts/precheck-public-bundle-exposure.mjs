@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 const repoRoot = fileURLToPath(new URL('..', import.meta.url));
 const publicRoot = join(repoRoot, 'public');
 
-const allowedPublicToolDirs = new Set(['adhd-flow', 'storage']);
+const allowedPublicToolDirs = new Set(['storage']);
 const knownNonLaunchToolDirs = new Set([
   'fitness',
   'health',

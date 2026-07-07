@@ -21,11 +21,6 @@ const PACKAGE_SOURCES = Object.freeze({
     sourceDir: 'tools/secretary',
     publicPath: 'secretary',
   },
-  plan: {
-    sourceDir: 'adhd-flow-ios/web',
-    publicPath: 'adhd-flow',
-    generatedConfig: "window.ADHD_FLOW_API = window.ADHD_FLOW_API || '';\n",
-  },
   inventory: {
     sourceDir: 'storage-web',
     publicPath: 'storage',

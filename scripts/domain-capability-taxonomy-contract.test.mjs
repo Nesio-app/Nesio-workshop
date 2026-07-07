@@ -144,7 +144,7 @@ assert.ok(
 );
 
 const manifestsById = new Map(registry.manifests.map((manifest) => [manifest.moduleId, manifest]));
-assert.equal(manifestsById.size, 11, "current 11 modules should all be represented");
+assert.equal(manifestsById.size, 10, "current 10 modules should all be represented");
 
 for (const manifest of manifestsById.values()) {
   assert.equal(manifest.domainCapabilityVersion, "domain-capability-taxonomy-v1");
@@ -206,11 +206,6 @@ assert.equal(inventory.primaryDomain, "assets");
 assert.ok(inventory.providedCapabilities.includes("memory_graph"));
 assert.ok(inventory.providedCapabilities.includes("search_retrieval"));
 assert.equal(inventory.visibility, "frontstage");
-
-const plan = manifestsById.get("plan");
-assert.equal(plan.primaryDomain, "growth");
-assert.ok(plan.providedCapabilities.includes("schedule_daily_plan"));
-assert.ok(plan.providedCapabilities.includes("reminder"));
 
 assert.equal(manifestsById.get("reading").primaryDomain, "growth");
 assert.equal(manifestsById.get("quiz").primaryDomain, "growth");

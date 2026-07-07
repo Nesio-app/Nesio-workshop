@@ -126,8 +126,8 @@ const report = JSON.parse(reportOutput);
 
 assert.equal(report.launchSurface.version, 'launch-surface-v0');
 assert.equal(report.launchSurface.summary.firstLaunchPromise, 'Shell + Inventory / purchase-memory + Todo');
-assert.deepEqual(report.launchSurface.summary.publicVisibleModuleIds, ['plan', 'inventory']);
-assert.equal(report.launchSurface.summary.publicVisibleModuleCount, 2);
+assert.deepEqual(report.launchSurface.summary.publicVisibleModuleIds, ['inventory']);
+assert.equal(report.launchSurface.summary.publicVisibleModuleCount, 1);
 assert.equal(report.launchSurface.summary.personalLabVisibleModuleCount, report.summary.moduleCount);
 assert.equal(report.launchSurface.summary.personalLabRealRuntimeEnabled, false);
 assert.ok(report.launchSurface.summary.testerVisibleSandboxModuleCount > 0, 'tester allowlist should expose sandbox tools in report');
@@ -139,16 +139,13 @@ assert.equal(report.launchSurface.summary.approvalGateOverridesPaywallGate, true
 assert.equal(report.launchSurface.summary.realPurchaseEnabled, false);
 assert.equal(report.launchSurface.summary.storeKitEnabled, false);
 assert.equal(report.launchSurface.summary.launchReadinessStatus, 'candidate_not_release_ready');
-assert.equal(report.summary.launchSurfacePublicVisibleModuleCount, 2);
+assert.equal(report.summary.launchSurfacePublicVisibleModuleCount, 1);
 assert.equal(report.summary.launchSurfaceAppStoreReady, false);
 
 const reportInventory = report.launchSurface.entries.find((entry) => entry.moduleId === 'inventory');
-const reportPlan = report.launchSurface.entries.find((entry) => entry.moduleId === 'plan');
 const reportFinance = report.launchSurface.entries.find((entry) => entry.moduleId === 'finance');
 assert.equal(reportInventory.visibleForPublic, true);
 assert.equal(reportInventory.shellAction, 'open');
-assert.equal(reportPlan.visibleForPublic, true);
-assert.equal(reportPlan.shellAction, 'open');
 assert.equal(reportFinance.visibleForPublic, false);
 assert.equal(reportFinance.visibleForPersonalLab, true);
 assert.equal(reportFinance.personalLabShellAction, 'open_lab_preview');

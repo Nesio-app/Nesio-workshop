@@ -29,7 +29,7 @@ assert.equal(report.nesioDesignSystem.summary.wholesaleUiReplacementAllowed, fal
 assert.equal(report.nesioDesignSystem.summary.shellKitReferenceOnly, true);
 
 assert.ok(report.nesioDesignSystem.assets.brand.crystal.endsWith('/icons/treasurebox.svg'));
-assert.equal(Object.keys(report.nesioDesignSystem.assets.tools).length, 11);
+assert.equal(Object.keys(report.nesioDesignSystem.assets.tools).length, 10);
 assert.equal(Object.keys(report.nesioDesignSystem.assets.ai).length >= 6, true);
 
 assert.equal(report.summary.nesioDesignSystemVersion, 'nesio-design-system-v0');
