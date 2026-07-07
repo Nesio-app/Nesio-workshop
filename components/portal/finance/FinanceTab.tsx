@@ -18,6 +18,7 @@ import {
 // 风险预警与 Today/问一问 同读一份判定(financeFindings,Layer1 漂移收口)——此前 bank-tx 里
 // 另有一套 alerts 判定(函数级双实现),两个输出面据同一份流水各说各话,已删并由契约钉死不回潮。
 import { financeFindings } from '@/lib/portal/finance-insight';
+import { categoryLabel, COMMON_EXPENSE_CATEGORIES } from '@/lib/portal/tx-category';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -167,7 +168,7 @@ export default function FinanceTab() {
                 {cats.slice(0, 6).map((c, i) => (
                   <div key={c.category} className="nesio-fin-donut-leg">
                     <span className="nesio-fin-donut-dot" style={{ background: DONUT_COLORS[i % DONUT_COLORS.length] }} />
-                    <span className="nesio-fin-donut-cat">{c.category}</span>
+                    <span className="nesio-fin-donut-cat">{categoryLabel(c.category, dict)}</span>
                     <span className="nesio-fin-donut-pct">{c.pct}%</span>
                   </div>
                 ))}
@@ -221,7 +222,7 @@ export default function FinanceTab() {
           <div className="nesio-fin-cats">
             {cats.map((c) => (
               <div key={c.category} className="nesio-fin-cat">
-                <div className="nesio-fin-cat-top"><span className="nesio-fin-cat-name">{c.category}</span><span className="nesio-fin-cat-amt">{formatMoney(c.total, summary.currency)} <span style={{ color: 'var(--portal-muted)', fontWeight: 400 }}>{c.pct}%</span>{c.deltaPct !== null && <span className={`nesio-fin-delta${c.deltaPct > 0 ? ' up' : ' down'}`}>{c.deltaPct > 0 ? '+' : ''}{c.deltaPct}%</span>}</span></div>
+                <div className="nesio-fin-cat-top"><span className="nesio-fin-cat-name">{categoryLabel(c.category, dict)}</span><span className="nesio-fin-cat-amt">{formatMoney(c.total, summary.currency)} <span style={{ color: 'var(--portal-muted)', fontWeight: 400 }}>{c.pct}%</span>{c.deltaPct !== null && <span className={`nesio-fin-delta${c.deltaPct > 0 ? ' up' : ' down'}`}>{c.deltaPct > 0 ? '+' : ''}{c.deltaPct}%</span>}</span></div>
                 <div className="nesio-fin-bar"><div className="nesio-fin-bar-fill" style={{ width: `${Math.max(3, c.pct)}%` }} /></div>
               </div>
             ))}
@@ -247,13 +248,13 @@ export default function FinanceTab() {
                   <div key={t.id} className="nesio-fin-review">
                     <p className="nesio-fin-review-title">{t.name} · {formatMoney(t.amount, summary.currency)}</p>
                     {/* 规则命中的置信度是写死的常数(0.72/0.4),与证据量无关,不该以百分比精度冒充"可信度";改定性措辞。 */}
-                    <p className="nesio-fin-review-sug">{L(dict, `建议分类:${sug.category}${sug.confidence >= 0.6 ? '(关键词匹配)' : '(默认猜测)'}`, `Suggested: ${sug.category}${sug.confidence >= 0.6 ? ' (keyword match)' : ' (default guess)'}`)}</p>
+                    <p className="nesio-fin-review-sug">{L(dict, `建议分类:${categoryLabel(sug.category, 'zh')}${sug.confidence >= 0.6 ? '(关键词匹配)' : '(默认猜测)'}`, `Suggested: ${categoryLabel(sug.category, 'en')}${sug.confidence >= 0.6 ? ' (keyword match)' : ' (default guess)'}`)}</p>
                     <div className="nesio-fin-review-btns">
                       <button type="button" className="nesio-fin-review-accept" onClick={() => resolveReview(t.name, sug.category)}>{L(dict, '接受', 'Accept')}</button>
-                      {['Food', 'Shopping', 'Travel', 'Services'].filter((c) => c !== sug.category).slice(0, 2).map((c) => (
-                        <button key={c} type="button" className="nesio-fin-review-alt" onClick={() => resolveReview(t.name, c)}>{c}</button>
+                      {COMMON_EXPENSE_CATEGORIES.filter((c) => c !== sug.category).slice(0, 2).map((c) => (
+                        <button key={c} type="button" className="nesio-fin-review-alt" onClick={() => resolveReview(t.name, c)}>{categoryLabel(c, dict)}</button>
                       ))}
-                      <button type="button" className="nesio-fin-review-skip" onClick={() => resolveReview(t.name, L(dict, '其他', 'Other'))}>{L(dict, '排除', 'Exclude')}</button>
+                      <button type="button" className="nesio-fin-review-skip" onClick={() => resolveReview(t.name, 'OTHER')}>{L(dict, '排除', 'Exclude')}</button>
                     </div>
                   </div>
                 );
@@ -274,7 +275,7 @@ export default function FinanceTab() {
             <select className="nesio-fin-select" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label={L(dict, '按分类筛选', 'Filter by category')}>
               <option value="all">{L(dict, '全部分类', 'All categories')}</option>
               {filterCats.filter((c) => c !== 'all').map((c) => (
-                <option key={c} value={c}>{c}</option>
+                <option key={c} value={c}>{categoryLabel(c, dict)}</option>
               ))}
             </select>
           </div>
@@ -290,7 +291,7 @@ export default function FinanceTab() {
                       <span className="nesio-fin-txname">{t.name || L(dict, '未知商户', 'Unknown')}{t.accountId && acctMask.get(t.accountId) ? <span className="nesio-fin-txmask"> ····{acctMask.get(t.accountId)}</span> : null}</span>
                       <button type="button" className={`nesio-fin-txflow nesio-fin-txflow--${f}`} onClick={() => setFlowEditId((id) => (id === t.id ? null : t.id))}>
                         {L(dict, TX_FLOW_LABELS[f][0], TX_FLOW_LABELS[f][1])}
-                        {f === 'expense' && <span className="nesio-fin-txcat"> · {effectiveCategory(t) || L(dict, '待归类', 'Uncategorized')}</span>}
+                        {f === 'expense' && <span className="nesio-fin-txcat"> · {categoryLabel(effectiveCategory(t), dict) || L(dict, '待归类', 'Uncategorized')}</span>}
                       </button>
                     </div>
                     <span className={`nesio-fin-txamt${t.amount < 0 ? ' is-refund' : ''}`}>{signed(t.amount)}</span>
@@ -315,7 +316,7 @@ export default function FinanceTab() {
               <div className="nesio-fin-rules">
                 {Object.entries(learnedRules.merchant).map(([name, cat]) => (
                   <div key={`m-${name}`} className="nesio-fin-rule">
-                    <span className="nesio-fin-rule-txt">{name} <span className="nesio-fin-rule-arrow">→</span> {cat}</span>
+                    <span className="nesio-fin-rule-txt">{name} <span className="nesio-fin-rule-arrow">→</span> {categoryLabel(cat, dict)}</span>
                     <button type="button" className="nesio-fin-rule-x" onClick={() => removeMerchantRule(name)} aria-label={L(dict, '删除规则', 'Remove rule')}>✕</button>
                   </div>
                 ))}
@@ -349,7 +350,7 @@ export default function FinanceTab() {
                 <div key={r.name} className="nesio-fin-recur">
                   <div className="nesio-fin-recur-main">
                     <span className="nesio-fin-recur-name">{r.name}</span>
-                    <span className="nesio-fin-recur-meta">{L(dict, r.cadenceLabel[0], r.cadenceLabel[1])} · {r.category} · {L(dict, `下次约 ${r.nextEstimate.slice(5).replace('-', '/')}`, `next ~${r.nextEstimate.slice(5).replace('-', '/')}`)} · {L(dict, `${r.count} 笔`, `${r.count}×`)}</span>
+                    <span className="nesio-fin-recur-meta">{L(dict, r.cadenceLabel[0], r.cadenceLabel[1])} · {categoryLabel(r.category, dict)} · {L(dict, `下次约 ${r.nextEstimate.slice(5).replace('-', '/')}`, `next ~${r.nextEstimate.slice(5).replace('-', '/')}`)} · {L(dict, `${r.count} 笔`, `${r.count}×`)}</span>
                   </div>
                   <span className="nesio-fin-recur-amt">{formatMoney(r.avgAmount, r.currency)}</span>
                   <button type="button" className="nesio-fin-rule-x" onClick={() => markNotRecurring(r.name)} aria-label={L(dict, '不是定期', 'Not recurring')} title={L(dict, '标为「不是定期」', 'Mark not recurring')}>✕</button>
