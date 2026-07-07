@@ -98,4 +98,20 @@ const r3 = report.buildMonthlyReport(txs, accounts, '2026-05', 'zh', NOW);
 assert.equal(report.persistReportToMemory(r3), 'created');
 assert.equal(nodes.length, 2);
 
+// ── 财务㉔:月初自动存记忆(幂等)──
+const NOW_JULY = new Date('2026-07-03T10:00:00Z'); // 上月 = 2026-06,有数据
+assert.equal(report.autoPersistLastMonthReport(txs, accounts, NOW_JULY), 'updated', '上月已有节点 → 更新');
+assert.equal(report.autoPersistLastMonthReport(txs, accounts, NOW_JULY), 'skipped', '同月第二次 → 幂等跳过');
+lsData.delete('nesio-fin-report-auto-v1');
+assert.equal(report.autoPersistLastMonthReport([], accounts, NOW_JULY), 'skipped', '无数据 → 跳过');
+assert.equal(report.autoPersistLastMonthReport(txs.filter((t) => !t.date.startsWith('2026-06')), accounts, new Date('2026-07-03')), 'skipped', '上月无交易 → 跳过');
+
+// ── 财务㉔:打印 HTML(Markdown 子集转换 + 转义)──
+const html = report.reportHtml(r);
+assert.ok(html.includes('<h1>2026-06 财务月报</h1>'), 'h1');
+assert.ok(html.includes('<h2>') && html.includes('<table>') && html.includes('<li>'), '分节/表格/列表都转换');
+assert.ok(!html.includes('| ---'), '表格分隔行不残留');
+const evil = { ...r, markdown: '# t\n- <script>alert(1)</script>' };
+assert.ok(!report.reportHtml(evil).includes('<script>alert'), '内容转义,不注入');
+
 console.log('finance-report: OK');

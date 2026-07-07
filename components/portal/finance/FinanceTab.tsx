@@ -22,7 +22,7 @@ import { computeFinanceScores } from '@/lib/portal/finance-risk';
 import { incomeBreakdown } from '@/lib/portal/finance-features';
 import { removeBankAccount } from '@/lib/portal/bank-tx';
 import { loadBudget, saveBudget, hasBudget, suggestBudget, budgetProgress, type BudgetConfig } from '@/lib/portal/finance-budget';
-import { buildMonthlyReport, persistReportToMemory } from '@/lib/portal/finance-report';
+import { buildMonthlyReport, persistReportToMemory, autoPersistLastMonthReport, reportHtml } from '@/lib/portal/finance-report';
 import { categoryLabel, categoryDetailLabel, COMMON_EXPENSE_CATEGORIES } from '@/lib/portal/tx-category';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -140,6 +140,15 @@ export default function FinanceTab() {
   const bp = useMemo(() => budgetProgress(txs, ym, budget), [txs, ym, budget]);
   const [budgetNote, setBudgetNote] = useState('');
   const [reportMsg, setReportMsg] = useState(''); // 财务㉓:月报动作反馈(可见状态,不静默)
+  // 财务㉔:月初自动补生成上月月报并存记忆(每设备每月一次,幂等,localStorage 标记)
+  useEffect(() => {
+    if (!txs.length) return;
+    try {
+      const outcome = autoPersistLastMonthReport(txs, accounts, new Date(), dict);
+      if (outcome === 'created') setReportMsg(L(dict, `已自动生成 ${prevYm(ymOf())} 月报并存入记忆`, `Auto-saved the ${prevYm(ymOf())} report to memory`));
+    } catch { /* 自动补失败静默,手动入口仍在 */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [txs, accounts]);
 
   if (txs.length === 0) {
     return <p className="nesio-insights-empty">{L(dict, '还没有银行流水。到「设置 → 数据接入 → 银行流水 · Plaid」连接账户并点「同步」。', 'No bank transactions yet. Go to Settings → Data sources → Bank feed · Plaid, connect and Sync.')}</p>;
@@ -330,6 +339,17 @@ export default function FinanceTab() {
                   : L(dict, `已更新记忆里的 ${r.ym} 月报`, `Updated the ${r.ym} report in memory`));
               } catch { setReportMsg(L(dict, '存入记忆失败,请重试', 'Save to memory failed — try again')); }
             }}>{L(dict, '存入记忆', 'Save to memory')}</button>
+            <button type="button" className="nesio-fin-flowopt" onClick={() => {
+              try {
+                const r = buildMonthlyReport(txs, accounts, ym, dict);
+                const w = window.open('', '_blank');
+                if (!w) { setReportMsg(L(dict, '弹窗被拦截,请允许弹窗后重试', 'Popup blocked — allow popups and retry')); return; }
+                w.document.write(reportHtml(r));
+                w.document.close();
+                setTimeout(() => { try { w.focus(); w.print(); } catch { /* 用户手动打印 */ } }, 350);
+                setReportMsg(L(dict, '已打开打印视图(打印 → 存为 PDF)', 'Print view opened (Print → Save as PDF)'));
+              } catch { setReportMsg(L(dict, '打印视图打开失败,请重试', 'Print view failed — try again')); }
+            }}>{L(dict, '打印 / 存 PDF', 'Print / PDF')}</button>
           </div>
           {reportMsg && <p className="nesio-settings-option-hint">{reportMsg}</p>}
 

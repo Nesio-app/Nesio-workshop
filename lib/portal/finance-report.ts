@@ -4,7 +4,7 @@
  * 数字与页面各处同口径;口径说明随报告落款,非投资建议。
  */
 import {
-  summarizeMonth, prevYm, categoryBreakdown, topMerchants, detectRecurring, upcomingRecurring,
+  summarizeMonth, prevYm, ymOf, categoryBreakdown, topMerchants, detectRecurring, upcomingRecurring,
   formatMoney, assetSummary, accountTypeLabel, internalAdjustmentIds,
   type BankTx, type BankAccount,
 } from './bank-tx';
@@ -191,3 +191,68 @@ export function persistReportToMemory(r: MonthlyReport): 'created' | 'updated' {
 }
 
 const zhTags = ['财务', '月报'];
+
+/* ---------- 财务㉔:月初自动存记忆 + 打印导出 ---------- */
+
+const AUTO_KEY = 'nesio-fin-report-auto-v1';
+
+/**
+ * 月初自动补生成**上月**月报并存入记忆:每设备每月一次(localStorage 标记幂等),
+ * 上月没有交易则跳过。由财务页挂载时调用——不开财务页就等下次打开时补,无损。
+ */
+export function autoPersistLastMonthReport(
+  txs: BankTx[], accounts: BankAccount[], now: Date = new Date(), dict: string = 'zh',
+): 'created' | 'updated' | 'skipped' {
+  if (typeof window === 'undefined' || !txs.length) return 'skipped';
+  const lastYm = prevYm(ymOf(now));
+  try { if (localStorage.getItem(AUTO_KEY) === lastYm) return 'skipped'; } catch { /* ignore */ }
+  if (!txs.some((t) => (t.date || '').slice(0, 7) === lastYm)) return 'skipped';
+  const outcome = persistReportToMemory(buildMonthlyReport(txs, accounts, lastYm, dict, now));
+  try { localStorage.setItem(AUTO_KEY, lastYm); } catch { /* ignore */ }
+  return outcome;
+}
+
+/**
+ * 打印友好 HTML(浏览器「打印 → 存为 PDF」即得 PDF,零依赖)。
+ * 只转换报告自产的 Markdown 子集:h1/h2、列表、表格、粗体、段落;内容全程转义。
+ */
+export function reportHtml(r: MonthlyReport): string {
+  const esc = (x: string) => x.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const inline = (x: string) => esc(x).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  const out: string[] = [];
+  let inList = false;
+  let inTable = false;
+  const closeBlocks = () => {
+    if (inList) { out.push('</ul>'); inList = false; }
+    if (inTable) { out.push('</table>'); inTable = false; }
+  };
+  for (const raw of r.markdown.split('\n')) {
+    const line = raw.trimEnd();
+    if (line.startsWith('| ')) {
+      if (/^\|[\s\-|]+\|$/.test(line.replace(/ /g, ''))) continue; // 分隔行
+      if (!inTable) { closeBlocks(); out.push('<table>'); inTable = true; }
+      const cells = line.split('|').slice(1, -1).map((c) => inline(c.trim()));
+      out.push(`<tr>${cells.map((c) => `<td>${c}</td>`).join('')}</tr>`);
+      continue;
+    }
+    if (inTable) { out.push('</table>'); inTable = false; }
+    if (line.startsWith('## ')) { closeBlocks(); out.push(`<h2>${inline(line.slice(3))}</h2>`); continue; }
+    if (line.startsWith('# ')) { closeBlocks(); out.push(`<h1>${inline(line.slice(2))}</h1>`); continue; }
+    if (line.startsWith('- ')) {
+      if (!inList) { out.push('<ul>'); inList = true; }
+      out.push(`<li>${inline(line.slice(2))}</li>`);
+      continue;
+    }
+    closeBlocks();
+    if (line) out.push(`<p>${inline(line)}</p>`);
+  }
+  closeBlocks();
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(r.title)}</title><style>
+body{font:14px/1.65 -apple-system,"Noto Sans SC",sans-serif;color:#1e2a3a;max-width:720px;margin:0 auto;padding:28px}
+h1{font-size:20px;margin:0 0 4px}h2{font-size:15px;margin:20px 0 6px;border-bottom:1px solid #dfe6ef;padding-bottom:3px}
+ul{margin:4px 0;padding-left:18px}li{margin:2px 0}p{margin:4px 0;color:#5a6d82;font-size:12.5px}
+table{border-collapse:collapse;width:100%;font-size:12px;margin:6px 0}td{border:1px solid #d8e0ea;padding:4px 8px}
+tr:first-child td{font-weight:600;background:#f4f8fd}
+@media print{body{padding:0}}
+</style></head><body>${out.join('\n')}</body></html>`;
+}
