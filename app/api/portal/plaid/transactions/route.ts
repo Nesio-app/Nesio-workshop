@@ -9,6 +9,8 @@ import { plaidBase } from '../link-token/route';
 import { envValue } from '@/lib/portal/env';
 
 export const dynamic = 'force-dynamic';
+// 财务⑦:多家机构首次回填一次要拉几十页,默认 10s 函数时限会拦腰截断
+export const maxDuration = 60;
 
 interface PlaidTx {
   transaction_id: string;
@@ -58,6 +60,9 @@ export async function GET(req: NextRequest) {
   const removedIds: string[] = [];
   const acctById = new Map<string, PlaidAccount>();
   let anyRelink = false;
+  // 财务⑦:刚连上的机构,accounts/get 立即可用,但流水初始拉取要在 Plaid 侧准备几分钟——
+  // /transactions/sync 此时返回 NOT_READY/空。不识别它就是静默空同步(账户出现了、数字全不动)。
+  let pendingItems = 0;
   const nextCursors: string[] = [];
 
   try {
@@ -72,7 +77,11 @@ export async function GET(req: NextRequest) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ client_id: envValue('PLAID_CLIENT_ID'), secret: envValue('PLAID_SECRET'), access_token: accessToken, cursor: cursor || undefined, count: 100 }),
         });
-        const data = await res.json() as { added?: PlaidTx[]; modified?: PlaidTx[]; removed?: Array<{ transaction_id: string }>; accounts?: PlaidAccount[]; next_cursor?: string; has_more?: boolean; error_code?: string };
+        const data = await res.json() as { added?: PlaidTx[]; modified?: PlaidTx[]; removed?: Array<{ transaction_id: string }>; accounts?: PlaidAccount[]; next_cursor?: string; has_more?: boolean; error_code?: string; transactions_update_status?: string };
+        if (data.error_code === 'PRODUCT_NOT_READY' || data.transactions_update_status === 'NOT_READY') {
+          pendingItems += 1; // 游标不动,下次同步从头再拉这家
+          break;
+        }
         if (data.error_code) { if (data.error_code === 'ITEM_LOGIN_REQUIRED') anyRelink = true; break; }
         // added + modified 都送客户端按 id upsert;removed 让客户端删掉。
         added.push(...(data.added ?? []), ...(data.modified ?? []));
@@ -97,6 +106,7 @@ export async function GET(req: NextRequest) {
 
     const response = NextResponse.json({
       relink: anyRelink || undefined,
+      pendingItems: pendingItems || undefined,
       ok: true,
       accounts: accounts.map((a) => ({
         id: a.account_id,

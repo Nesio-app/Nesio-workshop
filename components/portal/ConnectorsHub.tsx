@@ -367,11 +367,11 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     setSyncing(null);
   }
 
-  async function syncPlaid() {
+  async function syncPlaid(retry = 0) {
     setSyncing('plaid');
     try {
       const res = await fetch('/api/portal/plaid/transactions');
-      const data = await res.json() as { ok?: boolean; transactions?: Array<{ id: string; accountId?: string; date: string; name: string; amount: number; currency: string; category: string }>; removedIds?: string[]; accounts?: unknown[]; error?: string };
+      const data = await res.json() as { ok?: boolean; transactions?: Array<{ id: string; accountId?: string; date: string; name: string; amount: number; currency: string; category: string }>; removedIds?: string[]; accounts?: unknown[]; error?: string; pendingItems?: number };
       // 批次 31:账户/卡片信息存本机,供财务「卡片」子分类分卡显示
       if (data.accounts?.length) { const { saveBankAccounts } = await import('@/lib/portal/bank-tx'); saveBankAccounts(data.accounts as Array<{ id: string; name: string; currency: string }>); }
       if (!data.ok) {
@@ -396,7 +396,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       for (const t of (data.transactions || [])) { if (!byId.has(t.id)) freshCount++; byId.set(t.id, t); }
       const merged = [...byId.values()]
         .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)) // 日期降序
-        .slice(0, 1000);
+        .slice(0, 5000); // 财务⑦:多家机构的历史会撑爆 1000,IDB 放得下,上限提到 5000
       const fresh = { length: freshCount };
       saveBankTx(merged); // 落 IndexedDB(批次 57)
       try { localStorage.setItem('nesio-bank-synced-at', new Date().toISOString()); } catch { /* quota */ } // 时间戳小,仍留 localStorage
@@ -404,7 +404,16 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       saveConnectorState('plaid', true);
       setConnected((p) => ({ ...p, plaid: true }));
       const acctCount = data.accounts?.length || 0;
-      showToast(L(dict, `流水同步完成:新增 ${fresh.length} 笔,共 ${merged.length} 笔,${acctCount} 个账户。到「洞察 → 财务」看总览/支出/交易/卡片`, `Synced: ${fresh.length} new, ${merged.length} total, ${acctCount} accounts. See Insights → Finance`), true);
+      // 财务⑦:新连接的机构流水在 Plaid 侧要准备几分钟——明示状态并自动再试,不静默空同步
+      const pending = data.pendingItems || 0;
+      if (pending > 0 && retry < 3) {
+        showToast(L(dict, `已同步 ${fresh.length} 笔;还有 ${pending} 家机构的流水在准备中(新连接约需几分钟),1 分钟后自动再试`, `Synced ${fresh.length}; ${pending} institution(s) still preparing transactions (takes a few minutes) — retrying in 1 min`), true);
+        setTimeout(() => { void syncPlaid(retry + 1); }, 60_000);
+      } else if (pending > 0) {
+        showToast(L(dict, `还有 ${pending} 家机构的流水仍在准备中,先保存已同步的,几分钟后再点「同步」即可`, `${pending} institution(s) still preparing — synced data saved; tap Sync again in a few minutes`), false);
+      } else {
+        showToast(L(dict, `流水同步完成:新增 ${fresh.length} 笔,共 ${merged.length} 笔,${acctCount} 个账户。到「洞察 → 财务」看总览/支出/交易/卡片`, `Synced: ${fresh.length} new, ${merged.length} total, ${acctCount} accounts. See Insights → Finance`), true);
+      }
     } catch {
       showToast(L(dict, '网络错误', 'Network error'), false);
     }

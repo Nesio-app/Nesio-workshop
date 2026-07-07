@@ -89,4 +89,52 @@ const hub = fs.readFileSync(new URL('../components/portal/ConnectorsHub.tsx', im
 assert.ok(/linkToken:\s*data\.linkToken/.test(hub), 'ConnectorsHub exchange 请求带 linkToken');
 assert.ok(/void syncPlaid\(\)/.test(hub), '连接成功后自动同步');
 
+// ══ 财务⑦:新机构流水未就绪(NOT_READY)不静默空同步 ══
+// 刚连上的机构 accounts/get 立即可用,但 /transactions/sync 要等 Plaid 初始拉取(几分钟)。
+// 锁死:NOT_READY 的机构计入 pendingItems 上报、游标不动;就绪机构的流水/账户照常返回。
+const txCookies = {};
+async function txFakeFetch(url, opts) {
+  const body = JSON.parse(opts?.body || '{}');
+  if (url.includes('/transactions/sync')) {
+    if (body.access_token === 'at-new') {
+      return { json: async () => ({ added: [], transactions_update_status: 'NOT_READY', next_cursor: 'should-not-be-saved' }) };
+    }
+    return { json: async () => ({ added: [{ transaction_id: 't1', account_id: 'acc-ready', date: '2026-07-01', name: 'Coffee', amount: 5, iso_currency_code: 'USD', personal_finance_category: { primary: 'FOOD_AND_DRINK' } }], has_more: false, next_cursor: 'c-ready', transactions_update_status: 'HISTORICAL_UPDATE_COMPLETE' }) };
+  }
+  if (url.includes('/accounts/get')) {
+    const id = body.access_token === 'at-new' ? 'acc-new' : 'acc-ready';
+    return { json: async () => ({ accounts: [{ account_id: id, name: id, balances: { current: 10, iso_currency_code: 'USD' } }] }) };
+  }
+  throw new Error(`unexpected fetch ${url}`);
+}
+function loadTxRoute() {
+  const src = fs.readFileSync(new URL('../app/api/portal/plaid/transactions/route.ts', import.meta.url), 'utf8');
+  const js = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const mod = { exports: {} };
+  vm.runInNewContext(js, {
+    module: mod, exports: mod.exports, console, JSON, Array, Object, Map, Set, fetch: txFakeFetch, process: { env: {} },
+    require: (p) => p === 'next/server' ? { NextRequest: class {}, NextResponse: { json: (b, init) => ({ __json: b, __status: init?.status ?? 200, cookies: { set: (n, v) => { txCookies[n] = v; } } }) } }
+      : p === '@/lib/portal/api-auth' ? { guardAiRoute: async () => null }
+      : p === '../link-token/route' ? { plaidBase: () => 'https://sandbox.plaid.com' }
+      : p === '@/lib/portal/env' ? { envValue: () => 'k' } : ({}),
+  });
+  return mod.exports;
+}
+const txRoute = loadTxRoute();
+const txRes = await txRoute.GET({
+  cookies: { get: (n) => n === 'nesio_plaid_tokens' ? { value: JSON.stringify(['at-ready', 'at-new']) } : undefined },
+});
+assert.equal(txRes.__json.ok, true);
+assert.equal(txRes.__json.pendingItems, 1, '未就绪机构计入 pendingItems');
+assert.equal(txRes.__json.transactions.length, 1, '就绪机构的流水照常返回');
+assert.equal(txRes.__json.accounts.length, 2, '两家账户都在(未就绪只影响流水)');
+const savedCursors = JSON.parse(txCookies['nesio_plaid_cursors']);
+assert.equal(savedCursors[0], 'c-ready', '就绪机构游标推进');
+assert.equal(savedCursors[1], '', 'NOT_READY 机构游标不动(下次从头拉)');
+
+// 客户端:pendingItems 必须有可见状态 + 自动重试;上限 5000
+assert.ok(/pendingItems/.test(hub), 'syncPlaid 处理 pendingItems');
+assert.ok(/syncPlaid\(retry \+ 1\)/.test(hub), 'pending 时自动重试');
+assert.ok(/slice\(0, 5000\)/.test(hub), '本机保留上限 5000');
+
 console.log('plaid-multi-item: OK');
