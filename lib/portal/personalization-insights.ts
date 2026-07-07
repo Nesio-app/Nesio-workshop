@@ -1,4 +1,6 @@
 import { getLifeGraph } from './life-graph';
+import { hasHealthData } from './health-store';
+import { hasBankTxData } from './bank-tx';
 
 export type BaohePersonalizationStage = 'first_use' | 'day_34';
 
@@ -106,10 +108,6 @@ const FIRST_USE_PROFILE: BaohePersonalizationProfile = {
 function safeGraph(): Array<{ type: string; createdAt: string }> {
   try { return getLifeGraph() as Array<{ type: string; createdAt: string }>; } catch { return []; }
 }
-function lsHasData(key: string): boolean {
-  if (typeof window === 'undefined') return false;
-  try { const v = localStorage.getItem(key); return Boolean(v) && v !== '[]' && v !== '{}'; } catch { return false; }
-}
 // 情绪点颜色用 warm-coach 状态 token:数据攒起来偏平稳(calm),初期温和(gentle)。
 const MOOD_DOT = { gentle: 'var(--status-gentle)', calm: 'var(--status-calm)' } as const;
 
@@ -118,7 +116,8 @@ function computeDataDepth(g: Array<{ type: string }>): BaoheDataDepthItem[] {
   const pct = (n: number, cap: number) => Math.min(100, Math.round((n / cap) * 100));
   const objectN = c('object'), personN = c('person'), taskN = c('commitment');
   const habitN = c('health_habit') + c('preference');
-  const spend = lsHasData('nesio-bank-tx-v1'), health = lsHasData('nesio-health-v1');
+  // health/bank 已迁 IDB → 用 store 的 has-data(不再直读已迁走的 localStorage key)。
+  const spend = hasBankTxData(), health = hasHealthData();
   return [
     { id: 'home_items', name: '家居物品', value: `${objectN} 件物品`, progress: pct(objectN, 40), tone: 'blue', icon: '⌂', ...(objectN ? {} : { unlockHint: '拍一下记录物品' }) },
     { id: 'contacts', name: '联系人', value: `${personN} 人`, progress: pct(personN, 20), tone: 'purple', icon: '○', ...(personN ? {} : { unlockHint: '记录重要的人' }) },
