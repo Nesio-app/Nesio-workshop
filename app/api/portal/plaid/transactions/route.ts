@@ -27,7 +27,7 @@ interface PlaidTx {
   amount: number;
   iso_currency_code?: string | null;
   unofficial_currency_code?: string | null;
-  personal_finance_category?: { primary?: string } | null;
+  personal_finance_category?: { primary?: string; detailed?: string } | null;
   pending?: boolean;
 }
 
@@ -214,6 +214,8 @@ export async function GET(req: NextRequest) {
         currency: t.iso_currency_code || t.unofficial_currency_code || '',
         // 分类缺失时留空;下游 txFlow 不再用金额符号猜 income/refund(会把工资当退款倒扣)。
         category: t.personal_finance_category?.primary || '',
+        // 财务⑨:detailed 细分类(咖啡/加油/房租…)透传,只作展示细化,统计仍按 primary
+        categoryDetail: t.personal_finance_category?.detailed || undefined,
       })),
       removedIds,
     });

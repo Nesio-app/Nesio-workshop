@@ -91,4 +91,24 @@ assert.ok(bank.TX_FLOW_LABELS.rebate, 'TX_FLOW_LABELS 有 rebate');
 const tab2 = fs.readFileSync(new URL('../components/portal/finance/FinanceTab.tsx', import.meta.url), 'utf8');
 assert.ok(tab2.includes("'rebate'"), '分流纠正选项含「返还/报销」');
 
+// ── 财务⑨:定期识别 —— 间隔规律性门 + 账单词整词匹配 ──
+const rtx = (id, date, name, amount, category = 'GENERAL_SERVICES') =>
+  ({ id, date, name, amount, currency: 'USD', category, accountId: 'a1' });
+
+// 真月度账单:间隔规整 → 识别
+const netflix = [rtx('n1', '2026-04-05', 'Netflix', 15.99), rtx('n2', '2026-05-05', 'Netflix', 15.99), rtx('n3', '2026-06-05', 'Netflix', 15.99)];
+assert.ok(bank.detectRecurring(netflix).some((r) => r.name === 'Netflix'), '规整月度订阅识别');
+
+// 3 笔碰巧散落(gap 20/39,中位 29.5 落月档但极不规整)→ 不算周期
+const scattered = [rtx('s1', '2026-04-01', 'Some Vendor', 50), rtx('s2', '2026-04-21', 'Some Vendor', 50), rtx('s3', '2026-05-30', 'Some Vendor', 50)];
+assert.equal(bank.detectRecurring(scattered).length, 0, '间隔散乱不算定期(金额再稳也不行)');
+
+// "diffeRENT" 不该命中账单词 rent:购物类 + 金额飘 → 不算账单
+const boutique = [rtx('b1', '2026-04-10', 'Different Boutique', 100, 'GENERAL_MERCHANDISE'), rtx('b2', '2026-05-10', 'Different Boutique', 180, 'GENERAL_MERCHANDISE'), rtx('b3', '2026-06-10', 'Different Boutique', 60, 'GENERAL_MERCHANDISE')];
+assert.equal(bank.detectRecurring(boutique).length, 0, '词界:diffeRENT 不再误当账单词');
+
+// 整词 rent 照常命中(金额小幅波动的房租仍是账单)
+const rent = [rtx('r1', '2026-04-01', 'Apartment Rent', 1500, 'RENT_AND_UTILITIES'), rtx('r2', '2026-05-01', 'Apartment Rent', 1500, 'RENT_AND_UTILITIES'), rtx('r3', '2026-06-01', 'Apartment Rent', 1580, 'RENT_AND_UTILITIES')];
+assert.ok(bank.detectRecurring(rent).some((r) => /rent/i.test(r.name)), '整词 rent 照常识别');
+
 console.log('fin-display: OK');
