@@ -78,7 +78,7 @@ for (const moduleId of ['reading', 'sanctuary']) {
   assert.equal(entry.shellDisplay.stateLabel, '建设中');
 }
 
-for (const moduleId of ['finance', 'health', 'psychoanalysis', 'secretary', 'lifesim']) {
+for (const moduleId of ['finance', 'health', 'psychoanalysis', 'lifesim']) {
   const entry = byModule.get(moduleId);
   assert.notEqual(entry.launchCohort, 'first_launch', `${moduleId} must not be first launch`);
   assert.equal(entry.appStore.publicVisible, false, `${moduleId} must not be public visible`);

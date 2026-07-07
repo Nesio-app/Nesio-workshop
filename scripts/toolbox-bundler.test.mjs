@@ -37,10 +37,6 @@ const entryByModuleId = new Map(plan.entries.map((entry) => [entry.moduleId, ent
 const excludedByModuleId = new Map(plan.excludedEntries.map((entry) => [entry.moduleId, entry]));
 assert.equal(entryByModuleId.get('inventory')?.sourceDir, 'storage-web');
 assert.equal(entryByModuleId.get('inventory')?.publicPath, 'storage');
-assert.equal(entryByModuleId.get('secretary')?.sourceDir, 'tools/secretary');
-assert.equal(entryByModuleId.get('secretary')?.publicPath, 'secretary');
-assert.equal(entryByModuleId.get('secretary')?.visibleForPublic, false, 'secretary can be bundled for the active 智友 route without becoming a launchable public promise');
-assert.equal(entryByModuleId.get('secretary')?.shellAction, 'hide_for_public');
 assert.equal(entryByModuleId.has('fitness'), false, 'default public bundle must not include sandbox fitness');
 assert.equal(entryByModuleId.has('health'), false, 'default public bundle must not include gated health');
 assert.equal(excludedByModuleId.has('fitness'), true, 'sandbox fitness must be listed as excluded from public bundle');
@@ -61,10 +57,6 @@ try {
   const applied = JSON.parse(applyOutput);
   assert.equal(applied.applied, true);
   assert.equal(existsSync(join(tempRoot, 'storage', 'index.html')), true);
-  assert.equal(existsSync(join(tempRoot, 'secretary', 'index.html')), true, 'default runtime bundle must write Secretary static assets for the active 智友 tab');
-  assert.equal(existsSync(join(tempRoot, 'secretary', 'api 2.js')), false, 'Secretary runtime bundle must not copy local duplicate JS files');
-  assert.equal(existsSync(join(tempRoot, 'secretary', 'friends 2.json')), false, 'Secretary runtime bundle must not copy local duplicate JSON files');
-  assert.equal(existsSync(join(tempRoot, 'secretary', 'logos', 'gemini 2.svg')), false, 'Secretary runtime bundle must not copy local duplicate logo files');
   assert.equal(existsSync(join(tempRoot, 'fitness', 'app.js')), false, 'default public bundle must not write sandbox fitness assets');
   assert.equal(existsSync(join(tempRoot, 'health', 'index.html')), false, 'default public bundle must not write gated health assets');
 } finally {

@@ -144,7 +144,7 @@ assert.ok(
 );
 
 const manifestsById = new Map(registry.manifests.map((manifest) => [manifest.moduleId, manifest]));
-assert.equal(manifestsById.size, 10, "current 10 modules should all be represented");
+assert.equal(manifestsById.size, 9, "current 9 modules should all be represented");
 
 for (const manifest of manifestsById.values()) {
   assert.equal(manifest.domainCapabilityVersion, "domain-capability-taxonomy-v1");
@@ -226,18 +226,13 @@ assert.equal(finance.primaryDomain, "assets");
 assert.equal(finance.launchStatus, "hidden");
 assert.equal(finance.gateLevel, "ceo_gate");
 
-const secretary = manifestsById.get("secretary");
-assert.equal(secretary.primaryDomain, "platform");
-assert.ok(secretary.providedCapabilities.includes("ai_assistant"));
-assert.equal(secretary.salvageStatus, "capability_material");
-
 assert.ok(
-  registry.summary.ceoGateModuleCount >= 4,
+  registry.summary.ceoGateModuleCount >= 3,
   "high-trust modules should be visible in the contract summary",
 );
 assert.ok(
-  registry.summary.capabilityMaterialModuleCount >= 1,
-  "old tool salvage material should be counted separately from frontstage modules",
+  registry.summary.capabilityMaterialModuleCount >= 0,
+  "old tool salvage material count is tracked separately from frontstage modules",
 );
 assert.ok(registry.materialLibrarySummary, "tool manifest registry should expose a module material library");
 assert.equal(registry.materialLibrarySummary.version, "module-material-library-v1");
@@ -248,11 +243,11 @@ assert.equal(registry.materialLibrarySummary.boundaries.touchesOldDeployments, f
 assert.equal(registry.materialLibrarySummary.boundaries.changesRuntimeBehavior, false);
 assert.equal(registry.materialLibrarySummary.boundaries.changesLaunchPromise, false);
 assert.ok(
-  registry.materialLibrarySummary.moduleCount >= 9,
+  registry.materialLibrarySummary.moduleCount >= 8,
   "non-frontstage/old tools should be retained as material library",
 );
 const materialLibraryIds = new Set(registry.materialLibrarySummary.modules.map((item) => item.moduleId));
-for (const moduleId of ["secretary", "finance", "reading", "fitness", "psychoanalysis"]) {
+for (const moduleId of ["finance", "reading", "fitness", "psychoanalysis"]) {
   assert.ok(materialLibraryIds.has(moduleId), `material library should retain ${moduleId}`);
 }
 assert.ok(!materialLibraryIds.has("inventory"), "launchable Inventory should remain a frontstage engine, not old-tool material");
@@ -280,11 +275,6 @@ assert.ok(
   domainSummaryByValue.get("assets").moduleIds.includes("finance"),
   "assets domain should include finance as gated/hidden material",
 );
-assert.ok(
-  domainSummaryByValue.get("platform").capabilityMaterialModuleIds.includes("secretary"),
-  "secretary should be tracked as platform capability material, not as a frontstage domain",
-);
-
 const capabilitySummaryByValue = new Map(
   registry.capabilitySummary.map((capability) => [capability.capability, capability]),
 );
@@ -298,10 +288,6 @@ assert.ok(
 assert.ok(
   capabilitySummaryByValue.get("approval_gate").providerModuleIds.includes("finance"),
   "finance should remain visible in approval-gated capability tracking",
-);
-assert.ok(
-  registry.capabilityMaterialSummary.some((item) => item.moduleId === "secretary"),
-  "capability material summary should include secretary",
 );
 
 const moduleRegistry = buildModuleRegistry(portalConfig);
@@ -327,10 +313,6 @@ assert.ok(
 assert.ok(
   moduleRegistry.capabilitySummary.some((capability) => capability.capability === "search_retrieval"),
   "module registry should expose capability summary as first-class registry field",
-);
-assert.ok(
-  moduleRegistry.capabilityMaterialSummary.some((item) => item.moduleId === "secretary"),
-  "module registry should expose old/capability material summary separately",
 );
 assert.equal(
   moduleRegistry.materialLibrarySummary.version,
@@ -358,7 +340,7 @@ assert.ok(
 );
 
 const modulesById = new Map(moduleRegistry.modules.map((module) => [module.id, module]));
-for (const id of ["inventory", "finance", "secretary"]) {
+for (const id of ["inventory", "finance"]) {
   const module = modulesById.get(id);
   const manifest = manifestsById.get(id);
   assert.equal(module.primaryDomain, manifest.primaryDomain, `${id} should carry primaryDomain`);

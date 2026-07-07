@@ -3,7 +3,6 @@ import type { PortalTool } from './types';
 export const FIRST_LAUNCH_GATE_KEY = 'first_launch_high_risk_isolation_v0';
 
 export const FIRST_LAUNCH_GATED_MODULE_IDS = new Set([
-  'secretary',
   'quiz',
   'psychoanalysis',
   'sanctuary',
@@ -13,12 +12,9 @@ export const FIRST_LAUNCH_GATED_MODULE_IDS = new Set([
 ]);
 
 export const FIRST_LAUNCH_BLOCKED_PATH_PREFIXES = [
-  '/secretary',
   '/inner-shelter',
   '/health',
-  '/api/secretary',
   '/api/inner-shelter',
-  '/api/adhd-flow',
   '/api/fitness',
   '/api/identify',
   '/api/payments',
@@ -29,8 +25,6 @@ export const FIRST_LAUNCH_BLOCKED_PATH_PREFIXES = [
 export const LOCAL_FEATURE_CONTROL_VERSION = 'feature-control-contract-v0';
 
 export const LOCAL_KILL_SWITCH_STATE: Record<string, boolean> = {
-  'kill.module.secretary': false,
-  'kill.module.plan': false,
   'kill.module.quiz': false,
   'kill.module.inventory': false,
   'kill.module.psychoanalysis': false,
@@ -126,22 +120,6 @@ export function isProductionActivationAiRuntimeEnabled(): boolean {
 
 export function isLiveRuntimeAiEnabled(): boolean {
   return isLaunchIsolationDisabled() && hasProductionAiProviderKey();
-}
-
-export function isSecretaryAiRequestAllowed(request: {
-  headers: Headers;
-  nextUrl?: { searchParams?: URLSearchParams };
-}): boolean {
-  return isPersonalLabAiRequestAllowed(request) ||
-    isProductionActivationAiRuntimeEnabled() ||
-    isLiveRuntimeAiEnabled();
-}
-
-export function isSecretaryPageRequestAllowed(request: {
-  headers: Headers;
-  nextUrl?: { searchParams?: URLSearchParams };
-}): boolean {
-  return isPersonalLabAiRequestAllowed(request);
 }
 
 export function launchUnavailablePayload(kind: string, id?: string) {

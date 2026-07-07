@@ -50,7 +50,7 @@ assert.equal(contract.summary.warningCount, 0);
 const byModule = new Map(contract.modules.map((entry) => [entry.moduleId, entry]));
 assert.equal(byModule.get('inventory').mobileWebEntry, 'supported');
 assert.equal(byModule.get('inventory').desktopWebEntry, 'preview_frame');
-for (const moduleId of ['finance', 'health', 'psychoanalysis', 'secretary', 'lifesim']) {
+for (const moduleId of ['finance', 'health', 'psychoanalysis', 'lifesim']) {
   assert.equal(byModule.get(moduleId).mobileWebEntry, 'gated_or_hidden', `${moduleId} must remain gated/hidden on mobile web`);
   assert.equal(byModule.get(moduleId).desktopWebEntry, 'not_promised', `${moduleId} must not become a desktop promise`);
 }

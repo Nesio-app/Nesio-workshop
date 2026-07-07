@@ -1,6 +1,6 @@
 /**
  * Intent Router — classifies Tell Nesio input into actionable intents.
- * Rule-based MVP. LLM fallback can be added later via /api/secretary/chat.
+ * Rule-based MVP. LLM fallback can be added later via /api/portal/chat.
  */
 
 export type IntentType =

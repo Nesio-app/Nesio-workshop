@@ -54,7 +54,7 @@ assert.equal(inventory.extractabilityStatus, 'eligible_later');
 assert.equal(inventory.eligibleForFutureExtraction, true);
 assert.equal(inventory.reason, 'Launchable first-party module can be evaluated later; keep embedded for v0.1.');
 
-for (const moduleId of ['finance', 'health', 'psychoanalysis', 'secretary']) {
+for (const moduleId of ['finance', 'health', 'psychoanalysis']) {
   const entry = adapterByModule.get(moduleId);
   assert.equal(entry.extractableNow, false, `${moduleId} must not be extractable now`);
   assert.equal(entry.eligibleForFutureExtraction, false, `${moduleId} must not be future-extraction eligible now`);

@@ -17,10 +17,6 @@ const publicRoot = outDirArgIndex >= 0
   : join(repoRoot, 'public');
 
 const PACKAGE_SOURCES = Object.freeze({
-  secretary: {
-    sourceDir: 'tools/secretary',
-    publicPath: 'secretary',
-  },
   inventory: {
     sourceDir: 'storage-web',
     publicPath: 'storage',

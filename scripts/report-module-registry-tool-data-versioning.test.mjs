@@ -58,7 +58,7 @@ assert.deepEqual(inventory.backwardCompatibility.reads, ['rearbase_v2', 'rearbas
 assert.deepEqual(inventory.backwardCompatibility.writes, ['baohe_inventory_v01']);
 assert.equal(inventory.rollbackMetadata.snapshotBeforeMigration, true);
 
-for (const moduleId of ['finance', 'health', 'psychoanalysis', 'secretary']) {
+for (const moduleId of ['finance', 'health', 'psychoanalysis']) {
   const entry = versionByModule.get(moduleId);
   assert.equal(entry.migrationStatus, 'future_migration_needed', `${moduleId} must park future migration`);
   assert.equal(entry.needsCeoGateForRealMigration, true, `${moduleId} must require CEO gate for real migration`);

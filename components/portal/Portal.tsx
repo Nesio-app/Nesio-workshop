@@ -18,7 +18,6 @@ const MoodSheet = dynamic(() => import('./MoodSheet'), { ssr: false });
 const FreezeVaultSheet = dynamic(() => import('./FreezeVaultSheet'), { ssr: false });
 const WorkoutPlayer = dynamic(() => import('./fitness/WorkoutPlayer'), { ssr: false });
 const NesioChatSheet = dynamic(() => import('./NesioChatSheet'), { ssr: false });
-const PortalAiFriendsPreview = dynamic(() => import('./PortalAiFriendsPreview'), { ssr: false });
 const NotePanelEnhanced = dynamic(() => import('./NotePanelEnhanced'), { ssr: false });
 const ToolsTreasurePopup = dynamic(() => import('./ToolsTreasureSheet'), { ssr: false });
 import { DEFAULT_PORTAL_CONFIG } from '@/lib/portal/defaults';

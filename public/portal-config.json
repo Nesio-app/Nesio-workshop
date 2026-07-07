@@ -71,34 +71,6 @@
   },
   "tools": [
     {
-      "id": "secretary",
-      "name": "智友",
-      "nameEn": "AI Friends",
-      "description": "微信式 AI 对话",
-      "url": "/secretary",
-      "zone": "kinetic",
-      "hotkey": "a",
-      "command": "/ai",
-      "featured": false,
-      "icon": "💬",
-      "iconUrl": "/icons/tools/secretary.svg",
-      "ready": false,
-      "status": "gated",
-      "integrationMode": "contract-only",
-      "owner": "CEO",
-      "maintainer": "Qiao",
-      "responsibleAgent": "Qiao",
-      "evidenceOwner": "Sina",
-      "gateOwner": "CEO",
-      "dataContract": {
-        "schemaVersion": "SecretaryConversation@v0",
-        "dataVersion": "secretary-contract-data-v0",
-        "demoDataVersion": "secretary-demo-seed-v0",
-        "migrationRequired": false,
-        "migrationStatus": "future_migration_needed"
-      }
-    },
-    {
       "id": "quiz",
       "name": "刷题",
       "nameEn": "Quiz",

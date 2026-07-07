@@ -110,7 +110,6 @@ const requiredToolIcons = [
   "health",
   "finance",
   "lifesim",
-  "secretary",
 ];
 
 const requiredAiIcons = ["claude", "chatgpt", "gemini", "doubao", "deepseek", "grok"];

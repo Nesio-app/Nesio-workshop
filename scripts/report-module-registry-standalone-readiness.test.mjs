@@ -59,7 +59,7 @@ for (const [moduleId, entry] of byModule) {
   assert.ok(['not_now', 'possible_later'].includes(entry.standaloneEligible));
 }
 
-for (const moduleId of ['finance', 'health', 'psychoanalysis', 'secretary']) {
+for (const moduleId of ['finance', 'health', 'psychoanalysis']) {
   const entry = byModule.get(moduleId);
   assert.equal(entry.standaloneEligible, 'not_now', `${moduleId} must not be standalone eligible now`);
   assert.equal(entry.extractionReadinessScore, 0, `${moduleId} readiness score should be 0`);

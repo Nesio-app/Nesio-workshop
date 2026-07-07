@@ -77,9 +77,8 @@ try {
     cwd: root,
     stdio: 'pipe',
   });
-  const secretaryHtml = readFileSync(join(tempRoot, 'secretary', 'index.html'), 'utf8');
-  assert.doesNotMatch(secretaryHtml, /(href|src)="\/(app\.js|config\.js|styles\.css|portal-back\.css|manifest\.json|icon\.svg)"/, 'Static bundle must not request local assets from the site root.');
-  assert.match(secretaryHtml, /<base href="\/secretary\/">/, 'Secretary bundle must include scoped base href.');
+  const storageHtml = readFileSync(join(tempRoot, 'storage', 'index.html'), 'utf8');
+  assert.doesNotMatch(storageHtml, /(href|src)="\/(app\.js|config\.js|styles\.css|portal-back\.css|manifest\.json|icon\.svg)"/, 'Static bundle must not request local assets from the site root.');
 } finally {
   rmSync(tempRoot, { recursive: true, force: true });
 }

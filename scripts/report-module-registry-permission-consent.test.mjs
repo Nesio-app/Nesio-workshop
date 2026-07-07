@@ -45,7 +45,7 @@ assert.equal(photo.purposeString, '选择本机照片用于本机收纳记录；
 assert.equal(photo.consentRequired, true);
 assert.equal(photo.runtimeEnabled, true);
 
-for (const moduleId of ['secretary', 'health', 'finance', 'psychoanalysis']) {
+for (const moduleId of ['health', 'finance', 'psychoanalysis']) {
   const boundary = report.permissionConsent.tools.find((entry) => entry.moduleId === moduleId);
   assert.ok(boundary, `${moduleId} consent boundary must be reported`);
   assert.equal(boundary.consentRequired, true, `${moduleId} must require consent`);
@@ -56,7 +56,7 @@ for (const moduleId of ['secretary', 'health', 'finance', 'psychoanalysis']) {
 }
 
 assert.equal(report.summary.permissionConsentToolCount, report.summary.moduleCount);
-assert.equal(report.summary.permissionConsentSensitiveDisabledCount >= 4, true);
+assert.equal(report.summary.permissionConsentSensitiveDisabledCount >= 3, true);
 assert.equal(report.summary.privacyPolicyVersion, 'privacy-policy-draft-v0');
 
 console.log('report-module-registry permission/consent tests passed');

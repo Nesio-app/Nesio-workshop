@@ -380,26 +380,6 @@ export function buildProductionRuntimeStatus(
       safeUserAction: 'server_file_store_only',
       serverOnly: true,
     }),
-    action(ai.providers.gemini, {
-      category: 'ai',
-      startEndpoint: '/api/secretary/chat',
-      safeUserAction: 'send_secretary_message_to_gemini',
-    }),
-    action(ai.providers.chatgpt, {
-      category: 'ai',
-      startEndpoint: '/api/secretary/chat',
-      safeUserAction: 'send_secretary_message_to_chatgpt',
-    }),
-    action(ai.providers.doubao, {
-      category: 'ai',
-      startEndpoint: '/api/secretary/chat',
-      safeUserAction: 'send_secretary_message_to_doubao',
-    }),
-    action(ai.providers.claude, {
-      category: 'ai',
-      startEndpoint: '/api/secretary/chat',
-      safeUserAction: 'send_secretary_message_to_claude',
-    }),
     action(thirdParty.googleCalendarIcalReadonly, {
       category: 'third_party',
       startEndpoint: '/api/portal/calendar',

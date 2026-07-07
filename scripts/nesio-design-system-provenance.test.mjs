@@ -79,7 +79,7 @@ for (const relativePath of requiredTokenFiles) {
 }
 
 for (const [kind, names] of [
-  ['tools', ['storage', 'reading', 'fitness', 'quiz', 'sanctuary', 'psych', 'health', 'finance', 'lifesim', 'secretary']],
+  ['tools', ['storage', 'reading', 'fitness', 'quiz', 'sanctuary', 'psych', 'health', 'finance', 'lifesim']],
   ['ai', ['claude', 'chatgpt', 'gemini', 'doubao', 'deepseek', 'grok']],
 ]) {
   for (const name of names) {
@@ -97,7 +97,6 @@ for (const [kind, names] of [
 const runtimeFiles = [
   join(root, 'app', 'page.tsx'),
   join(root, 'app', 'globals.css'),
-  join(root, 'components', 'portal', 'PortalAiFriendsPreview.tsx'),
   join(root, 'components', 'portal', 'ToolsTreasureSheet.tsx'),
   join(root, 'components', 'portal', 'PortalBottomNav.tsx'),
 ];

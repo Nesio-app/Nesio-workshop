@@ -34,19 +34,6 @@ for (const [source, destination] of [
   assertRewrite(source, destination);
 }
 
-assert.deepEqual(
-  (vercelJson.rewrites || []).filter((rewrite) => String(rewrite.source || '').startsWith('/secretary')),
-  [],
-  'Secretary must not be exposed by public Vercel rewrites; middleware/lab gate owns this route.',
-);
-
-// 9099b06(2026-06-28 隐私 QA 阻断)收紧:无门的扩展名直通会把 gated 的
-// secretary 页面泄露给公众,已移除。静态资源只在 lab gate 内放行。
-assert.match(
-  middleware,
-  /isSecretaryPageRequestAllowed\(request\)[\s\S]*NextResponse\.next\(\)/,
-  'Secretary static assets must only pass through inside the lab gate (isSecretaryPageRequestAllowed).',
-);
 assert.doesNotMatch(
   middleware,
   /\?:html\|css\|js\|json\|svg\|png\|jpg\|jpeg\|webp\|ico/,
@@ -55,52 +42,14 @@ assert.doesNotMatch(
 
 for (const route of [
   '/storage',
-  '/secretary',
-  '/secretary/chat',
-  '/secretary/group',
-  '/secretary/:path*',
-  '/api/secretary/:path*',
 ]) {
   assertMiddlewareMatcher(route);
 }
 
-const secretaryIndex = read('tools/secretary/index.html');
-const secretaryList = read('tools/secretary/list.js');
-const secretaryChat = read('tools/secretary/chat.js');
-const secretaryGroup = read('tools/secretary/group.js');
 const storageIndex = read('public/storage/index.html');
 
-for (const [name, source] of [
-  ['tools/secretary/index.html', secretaryIndex],
-  ['tools/secretary/list.js', secretaryList],
-  ['tools/secretary/chat.js', secretaryChat],
-  ['tools/secretary/group.js', secretaryGroup],
-  ['public/storage/index.html', storageIndex],
-]) {
-  assert.doesNotMatch(source, /\/index\.html\b/, `${name} must not navigate to /index.html`);
-  assert.doesNotMatch(source, /href=["']#|javascript:void|about:blank/, `${name} must not expose fake navigation links`);
-}
-
-assert.doesNotMatch(
-  secretaryIndex,
-  /wx-tabbar|aria-label="底部导航"|href="\/secretary\/chat\?friend=gemini"/,
-  'Secretary list page must not keep the removed bottom navigation or fixed Gemini tab link.',
-);
-assert.match(
-  secretaryList,
-  /href = `\/secretary\/chat\?friend=\$\{encodeURIComponent\(f\.id\)\}`/,
-  'Secretary list should build friend chat links through /secretary/chat.',
-);
-assert.match(
-  secretaryList,
-  /href = `\/secretary\/group\?group=\$\{encodeURIComponent\(g\.id\)\}`/,
-  'Secretary list should build group links through /secretary/group.',
-);
-assert.doesNotMatch(
-  secretaryChat,
-  /location\.(?:href|replace)\s*=\s*['"]\/secretary\/chat\?friend=gemini/,
-  'Secretary chat must not force visible AI entries back to Gemini.',
-);
+assert.doesNotMatch(storageIndex, /\/index\.html\b/, 'public/storage/index.html must not navigate to /index.html');
+assert.doesNotMatch(storageIndex, /href=["']#|javascript:void|about:blank/, 'public/storage/index.html must not expose fake navigation links');
 
 assert.match(storageIndex, /href="\/"/, 'Storage must expose a root return link back to Baohe shell.');
 assert.match(

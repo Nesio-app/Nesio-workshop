@@ -24,7 +24,6 @@ assert(
 for (const [moduleId, iconKey] of [
   ['inventory', 'storage'],
   ['psychoanalysis', 'psych'],
-  ['secretary', 'secretary'],
   ['finance', 'finance'],
 ]) {
   assert(

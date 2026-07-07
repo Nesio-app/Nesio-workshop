@@ -41,12 +41,10 @@ assert.equal(
   "domain capability report should mark Signal as the write boundary for confirmed context",
 );
 assert.equal(report.domainCapabilityRegistry.moduleIndex.inventory.visibility, "frontstage");
-assert.equal(report.domainCapabilityRegistry.moduleIndex.secretary.primaryDomain, "platform");
-assert.equal(report.domainCapabilityRegistry.moduleIndex.secretary.salvageStatus, "capability_material");
 assert.equal(report.domainCapabilityRegistry.moduleIndex.finance.gateLevel, "ceo_gate");
 assert.equal(report.summary.domainCapabilityTaxonomyVersion, "domain-capability-taxonomy-v1");
-assert.ok(report.summary.platformCapabilityMaterialCount >= 1);
-assert.ok(report.summary.materialLibraryModuleCount >= 9);
+assert.ok(report.summary.platformCapabilityMaterialCount >= 0);
+assert.ok(report.summary.materialLibraryModuleCount >= 8);
 assert.equal(report.domainCapabilityRegistry.materialLibrarySummary.version, "module-material-library-v1");
 assert.equal(report.domainCapabilityRegistry.materialLibrarySummary.boundaries.touchesOldRepos, false);
 assert.equal(report.domainCapabilityRegistry.materialLibrarySummary.boundaries.touchesOldGithub, false);
@@ -54,14 +52,8 @@ assert.equal(report.domainCapabilityRegistry.materialLibrarySummary.boundaries.t
 const reportMaterialLibraryIds = new Set(
   report.domainCapabilityRegistry.materialLibrarySummary.modules.map((item) => item.moduleId),
 );
-assert.ok(reportMaterialLibraryIds.has("secretary"));
 assert.ok(reportMaterialLibraryIds.has("finance"));
 assert.ok(!reportMaterialLibraryIds.has("inventory"));
 assert.ok(!reportMaterialLibraryIds.has("plan"));
-assert.equal(
-  report.domainCapabilityRegistry.moduleIndex.secretary.visibility,
-  "gated",
-  "secretary should remain gated capability material, not frontstage product",
-);
 
 console.log("domain capability registry report passed");

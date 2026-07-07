@@ -1,8 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import {
   isFirstLaunchBlockedPath,
-  isSecretaryAiRequestAllowed,
-  isSecretaryPageRequestAllowed,
   launchUnavailablePayload,
 } from './lib/portal/launch-safety';
 
@@ -15,59 +13,8 @@ export function middleware(request: NextRequest) {
     return NextResponse.rewrite(url);
   }
 
-  if (pathname === '/adhd-flow' || pathname === '/adhd-flow/') {
-    const url = request.nextUrl.clone();
-    url.pathname = '/adhd-flow/index.html';
-    return NextResponse.rewrite(url);
-  }
-
-  if (pathname === '/api/secretary/health') {
-    return NextResponse.next();
-  }
-
   if (!isFirstLaunchBlockedPath(pathname)) {
     return NextResponse.next();
-  }
-
-  if (
-    pathname.startsWith('/api/secretary') &&
-    isSecretaryAiRequestAllowed(request)
-  ) {
-    return NextResponse.next();
-  }
-
-  if (
-    pathname.startsWith('/secretary') &&
-    isSecretaryPageRequestAllowed(request)
-  ) {
-    const url = request.nextUrl.clone();
-    if (pathname === '/secretary' || pathname === '/secretary/') {
-      url.pathname = '/secretary/index.html';
-    } else if (pathname === '/secretary/chat') {
-      url.pathname = '/secretary/chat.html';
-    } else if (pathname === '/secretary/group') {
-      url.pathname = '/secretary/group.html';
-    }
-    const response = pathname === '/secretary' ||
-      pathname === '/secretary/' ||
-      pathname === '/secretary/chat' ||
-      pathname === '/secretary/group'
-      ? NextResponse.rewrite(url)
-      : NextResponse.next();
-    const queryMode = request.nextUrl.searchParams.get('baohePersonal') ||
-      request.nextUrl.searchParams.get('baohePersonalLab') ||
-      request.nextUrl.searchParams.get('baohe_personal_lab') ||
-      '';
-    if (queryMode === '1' || queryMode === 'personal_lab') {
-      response.cookies.set('baohe_personal_lab', '1', {
-        httpOnly: true,
-        sameSite: 'lax',
-        secure: request.nextUrl.protocol === 'https:',
-        path: '/secretary',
-        maxAge: 60 * 60 * 24 * 7,
-      });
-    }
-    return response;
   }
 
   const payload = launchUnavailablePayload(pathname.startsWith('/api/') ? 'api' : 'page', pathname);
@@ -96,16 +43,9 @@ export function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     '/storage',
-    '/adhd-flow',
-    '/secretary',
-    '/secretary/chat',
-    '/secretary/group',
-    '/secretary/:path*',
     '/inner-shelter/:path*',
     '/health/:path*',
-    '/api/secretary/:path*',
     '/api/inner-shelter/:path*',
-    '/api/adhd-flow/:path*',
     '/api/fitness/:path*',
     '/api/identify/:path*',
     '/api/payments/:path*',

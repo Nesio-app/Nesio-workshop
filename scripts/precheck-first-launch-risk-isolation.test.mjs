@@ -17,7 +17,7 @@ const launchSafety = read('lib/portal/launch-safety.ts');
 const middleware = read('middleware.ts');
 const portalConfig = JSON.parse(read('public/portal-config.json'));
 
-for (const id of ['secretary', 'quiz', 'psychoanalysis', 'sanctuary', 'health', 'finance', 'lifesim']) {
+for (const id of ['quiz', 'psychoanalysis', 'sanctuary', 'health', 'finance', 'lifesim']) {
   assert.match(launchSafety, new RegExp(`['"]${id}['"]`), `${id} must be launch-gated`);
   const tool = portalConfig.tools.find((item) => item.id === id);
   assert.equal(tool?.ready, false, `${id} must not be ready in first-launch config`);
@@ -27,9 +27,7 @@ for (const id of ['secretary', 'quiz', 'psychoanalysis', 'sanctuary', 'health', 
 for (const path of [
   '/inner-shelter',
   '/health',
-  '/api/secretary',
   '/api/inner-shelter',
-  '/api/adhd-flow',
   '/api/fitness',
   '/api/identify',
   '/api/payments',
@@ -41,9 +39,6 @@ for (const path of [
 
 assert.match(middleware, /isFirstLaunchBlockedPath/, 'middleware must use launch path gate');
 assert.match(middleware, /launchUnavailablePayload/, 'middleware must emit launch-gated payload');
-
-const secretaryRoute = read('app/api/secretary/chat/route.ts');
-assert.match(secretaryRoute, /launchUnavailablePayload\('api:secretary:chat'/, 'secretary chat must fail closed before provider calls');
 
 const innerShelterRoute = readIfExists('app/api/inner-shelter/chat/route.ts');
 if (innerShelterRoute) {

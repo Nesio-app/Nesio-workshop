@@ -35,11 +35,6 @@ for (const provider of ['email', 'google', 'wechat', 'phone']) {
   );
 }
 
-assert.match(runtime, /gemini[\s\S]*?\/api\/secretary\/chat/, 'Gemini should route through secretary chat endpoint');
-assert.match(runtime, /chatgpt[\s\S]*?\/api\/secretary\/chat/, 'ChatGPT should route through secretary chat endpoint');
-assert.match(runtime, /doubao[\s\S]*?\/api\/secretary\/chat/, 'Doubao should route through secretary chat endpoint');
-assert.match(runtime, /claude[\s\S]*?\/api\/secretary\/chat/, 'Claude should route through secretary chat endpoint');
-
 assert.match(runtime, /cloud_database[\s\S]*serverOnly:\s*true/, 'cloud database must be server-only');
 assert.match(runtime, /cloud_storage[\s\S]*serverOnly:\s*true/, 'cloud storage must be server-only');
 assert.match(runtime, /google_calendar[\s\S]*\/api\/portal\/calendar\/connect/, 'Google Calendar should route through the OAuth connect endpoint');

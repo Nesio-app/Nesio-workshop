@@ -50,7 +50,7 @@ for (const [moduleId, entry] of byModule) {
   assert.equal(entry.realActionsEnabled, false);
 }
 
-for (const moduleId of ['finance', 'health', 'psychoanalysis', 'secretary']) {
+for (const moduleId of ['finance', 'health', 'psychoanalysis']) {
   const entry = byModule.get(moduleId);
   assert.ok(entry.incidentOwner, `${moduleId} must have incident owner`);
   assert.equal(entry.defaultSeverity, 'sev1', `${moduleId} must default high-risk incidents to sev1`);

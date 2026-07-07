@@ -33,34 +33,6 @@ for (const moduleId of ['reading', 'fitness']) {
   assert.equal(entry.evidenceFields.includes('launchSurface.public.shellAction'), true);
 }
 
-const secretary = report.tools.find((entry) => entry.id === 'secretary');
-assert.equal(secretary?.publicIndex, true, 'secretary must ship its static runtime bundle so 智友 can open.');
-assert.equal(
-  existsSync(join(repoRoot, 'tools', 'secretary', 'index.html')),
-  true,
-  'secretary source page must be preserved for the runtime bundle source of truth',
-);
-assert.equal(
-  existsSync(join(repoRoot, 'public', 'secretary', 'index.html')),
-  true,
-  'secretary runtime bundle must exist under public/secretary for the active 智友 route',
-);
-assert.equal(
-  existsSync(join(repoRoot, 'app', 'secretary', '[[...path]]', 'route.ts')),
-  true,
-  'secretary must keep the explicit server fallback route for non-static paths',
-);
-assert.equal(
-  report.boundaries.publicLaunchEmbeddedModules.includes('secretary'),
-  false,
-  'secretary must not be part of the public launch embedded module surface',
-);
-assert.equal(
-  report.boundaries.syncedEmbeddedModules.includes('secretary'),
-  false,
-  'secretary must not be treated as a public synced embedded tool',
-);
-assert.equal(secretary?.shellEntitlement?.blockedByApprovalGate, true, 'secretary remains gated at module contract level');
 
 for (const warning of report.boundaries.boundaryWarnings) {
   assert.notEqual(warning.reason, 'Static route validation requires public/index for local static modules.');

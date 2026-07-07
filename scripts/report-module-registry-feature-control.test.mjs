@@ -27,7 +27,7 @@ for (const entry of report.featureControl.modules) {
   assert.equal(entry.entryActionEnabled, entry.canOpenAtRuntime);
 }
 
-for (const moduleId of ['finance', 'secretary', 'health', 'psychoanalysis']) {
+for (const moduleId of ['finance', 'health', 'psychoanalysis']) {
   const entry = report.featureControl.modules.find((item) => item.moduleId === moduleId);
   assert.ok(entry, `${moduleId} feature-control entry must exist`);
   assert.equal(entry.canBeKilled, true, `${moduleId} must be killable`);

@@ -589,62 +589,6 @@ export type CloudInventorySnapshotResponse = {
     | string;
 };
 
-export type SecretaryChatProvider = 'gemini' | 'chatgpt' | 'openai' | 'doubao' | 'claude' | 'anthropic';
-
-export type SecretaryChatTurn = {
-  role: 'user' | 'assistant';
-  content: string;
-};
-
-export type SecretaryChatResponse = {
-  text?: string;
-  model?: SecretaryChatProvider | string;
-  error?: string;
-  detail?: string;
-  hint?: string;
-};
-
-export type SecretaryHealthResponse = {
-  ok: boolean;
-  service: 'secretary';
-  status?: 'ready' | string;
-  behaviorEnabled?: boolean;
-  gemini: boolean;
-  doubao: boolean;
-  chatgpt: boolean;
-  claude: boolean;
-  model?: string | null;
-  doubaoModel?: string | null;
-  openaiModel?: string | null;
-  claudeModel?: string | null;
-  defaultProvider?: 'gemini' | 'chatgpt' | 'claude' | 'doubao' | null;
-  chatEndpoint?: '/api/secretary/chat' | string;
-  providerMatrix?: Array<{
-    provider: 'gemini' | 'chatgpt' | 'claude' | 'doubao' | string;
-    label: string;
-    nativeConfigured: boolean;
-    fallbackProvider: 'gemini' | string | null;
-    runtimeAvailable: boolean;
-    chatEndpoint: '/api/secretary/chat' | string;
-    model: string | null;
-  }>;
-  productionActivation?: {
-    aiProviderMode: string;
-    aiRuntimeEnabled: boolean;
-    defaultProvider?: 'gemini' | 'chatgpt' | 'claude' | 'doubao' | null;
-    chatEndpoint?: '/api/secretary/chat' | string;
-    configuredProviders: {
-      gemini: boolean;
-      doubao: boolean;
-      chatgpt: boolean;
-      claude: boolean;
-    };
-  };
-  reason?: string;
-  statusCode?: number;
-  message?: string;
-};
-
 type ClientOptions = {
   fetcher?: AppApiFetch;
   baseUrl?: string;
@@ -668,8 +612,6 @@ const APP_API_ENDPOINTS = {
   cloudMemory: '/api/cloud/memory',
   cloudAssets: '/api/cloud/assets',
   cloudEvents: '/api/cloud/events',
-  secretaryChat: '/api/secretary/chat',
-  secretaryHealth: '/api/secretary/health',
 } as const;
 
 function buildUrl(baseUrl: string, path: string, params?: Record<string, string | number | boolean | undefined>) {
@@ -919,44 +861,6 @@ export function createAppApiClient(options: ClientOptions = {}) {
       });
     },
 
-    fetchSecretaryHealth({ personalLab = true }: { personalLab?: boolean } = {}): Promise<SecretaryHealthResponse> {
-      return readJsonAllowError(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.secretaryHealth), {
-        headers: {
-          ...(personalLab ? { 'x-baohe-access-mode': 'personal_lab' } : {}),
-        },
-      });
-    },
-
-    sendSecretaryMessage({
-      provider,
-      message,
-      history = [],
-      maxTokens = 1200,
-      personalLab = true,
-      locale,
-    }: {
-      provider: SecretaryChatProvider;
-      message: string;
-      history?: SecretaryChatTurn[];
-      maxTokens?: number;
-      personalLab?: boolean;
-      locale?: string;
-    }): Promise<SecretaryChatResponse> {
-      return readJsonAllowError(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.secretaryChat), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(personalLab ? { 'x-baohe-access-mode': 'personal_lab' } : {}),
-        },
-        body: JSON.stringify({
-          model: provider,
-          message,
-          history,
-          maxTokens,
-          locale,
-        }),
-      });
-    },
   };
 }
 

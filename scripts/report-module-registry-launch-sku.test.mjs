@@ -19,12 +19,12 @@ assert.deepEqual(report.launchSku.includedModuleIds, ['shell', 'inventory', 'pla
 assert.deepEqual(report.launchSku.launchableBusinessModuleIds, ['inventory', 'plan']);
 assert.equal(report.summary.launchSkuAppStoreReady, false);
 assert.equal(report.summary.launchableModuleCount, 2);
-assert.equal(report.summary.excludedFromLaunchCount, 9);
+assert.equal(report.summary.excludedFromLaunchCount, 8);
 assert.equal(report.summary.futurePaidModuleCount, 5);
 assert.equal(report.summary.toolLifecycleVersion, 'tool-lifecycle-v0');
 assert.equal(report.summary.toolLifecycleLaunchableCount, 1);
-assert.equal(report.summary.toolLifecycleSandboxCount, 9);
-assert.equal(report.summary.toolLifecycleReadyForCandidateReviewCount, 9);
+assert.equal(report.summary.toolLifecycleSandboxCount, 8);
+assert.equal(report.summary.toolLifecycleReadyForCandidateReviewCount, 8);
 
 const statusByModule = new Map(report.launchSku.modules.map((entry) => [entry.moduleId, entry]));
 assert.equal(statusByModule.get('shell').launchStatus, 'launchable');
@@ -41,7 +41,7 @@ assert.equal(
   '10 modules must not all be launchable',
 );
 
-for (const moduleId of ['finance', 'health', 'psychoanalysis', 'secretary']) {
+for (const moduleId of ['finance', 'health', 'psychoanalysis']) {
   const entry = statusByModule.get(moduleId);
   assert.notEqual(entry.launchStatus, 'launchable', `${moduleId} must not be launchable`);
   assert.equal(entry.excludedFromLaunch, true, `${moduleId} must be excluded from launch`);

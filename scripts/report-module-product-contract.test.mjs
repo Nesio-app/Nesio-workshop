@@ -37,7 +37,7 @@ assert.deepEqual(appStoreMentionable, ['inventory']);
 assert.equal(report.summary.moduleProductAppStoreMentionAllowedCount, 1);
 assert.equal(report.summary.moduleProductPublicVisibleCount, 1);
 
-for (const moduleId of ['finance', 'health', 'psychoanalysis', 'secretary', 'lifesim']) {
+for (const moduleId of ['finance', 'health', 'psychoanalysis', 'lifesim']) {
   const entry = byModule.get(moduleId);
   assert.equal(entry.appStore.publicVisible, false, `${moduleId} must not be public visible`);
   assert.equal(entry.appStore.appStoreMentionAllowed, false, `${moduleId} must not be App Store mentionable`);

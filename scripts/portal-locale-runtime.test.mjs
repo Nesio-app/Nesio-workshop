@@ -5,7 +5,6 @@ const root = process.cwd();
 const profilePath = join(root, 'lib', 'portal', 'profile.ts');
 const portalPath = join(root, 'components', 'portal', 'Portal.tsx');
 const toolsTreasureSheetPath = join(root, 'components', 'portal', 'ToolsTreasureSheet.tsx');
-const portalAiFriendsPreviewPath = join(root, 'components', 'portal', 'PortalAiFriendsPreview.tsx');
 const portalOnboardingPath = join(root, 'components', 'portal', 'PortalOnboarding.tsx');
 const i18nPath = join(root, 'lib', 'portal', 'i18n.ts');
 const packagePath = join(root, 'package.json');
@@ -13,7 +12,6 @@ const packagePath = join(root, 'package.json');
 const profile = readFileSync(profilePath, 'utf8');
 const portal = readFileSync(portalPath, 'utf8');
 const toolsTreasureSheet = readFileSync(toolsTreasureSheetPath, 'utf8');
-const portalAiFriendsPreview = readFileSync(portalAiFriendsPreviewPath, 'utf8');
 const portalOnboarding = readFileSync(portalOnboardingPath, 'utf8');
 const i18n = readFileSync(i18nPath, 'utf8');
 const pkg = JSON.parse(readFileSync(packagePath, 'utf8'));
@@ -259,14 +257,6 @@ for (const key of [
     `ToolsTreasureSheet must render ${key} through the shared i18n dictionary.`,
   );
 }
-assert(
-  portalAiFriendsPreview.includes("t(locale, 'aiFriendsProviderDoubaoLabel'"),
-  'PortalAiFriendsPreview must use the shared i18n dictionary for the Doubao provider label.',
-);
-assert(
-  !portalAiFriendsPreview.includes('豆包'),
-  'PortalAiFriendsPreview must not hard-code the Doubao provider label.',
-);
 // Onboarding rewrite bypassed the shared dictionary (zh/en ternaries) and
 // the style step moved into Settings ToneSheet — tracked as REG-006 in
 // docs/regression-backlog.json. Dictionary keys above stay defined; the
