@@ -3,6 +3,8 @@
  * 单独的 key(与 nesio-health-v1 隔离),仅 lab 模式读取渲染;属敏感数据,不上云。
  */
 import type { ClinicalRecords } from './cda-parse';
+import { createBlobStore } from './idb-blob-store';
+import { reportStorageDropped } from './storage-health';
 
 export const CLINICAL_KEY = 'nesio-clinical-v1';
 
@@ -10,29 +12,20 @@ export interface StoredClinical extends ClinicalRecords {
   importedAt: string;
 }
 
+// 批次 57:挪 IndexedDB(与健康同策略,腾 localStorage 配额;老数据水合时迁移)。
+const store = createBlobStore<StoredClinical>({
+  key: CLINICAL_KEY,
+  updateEvent: 'nesio-clinical-updated',
+  validate: (v) => !!v && Array.isArray((v as StoredClinical).labs),
+  onWriteError: reportStorageDropped,
+});
+
 export function saveClinical(rec: ClinicalRecords): void {
-  if (typeof window === 'undefined') return;
   // 全空不写(避免用户没有临床数据时留个空壳)。
   if (!rec.labs.length && !rec.medications.length && !rec.conditions.length) return;
-  try {
-    const payload: StoredClinical = { ...rec, importedAt: new Date().toISOString() };
-    localStorage.setItem(CLINICAL_KEY, JSON.stringify(payload));
-    window.dispatchEvent(new CustomEvent('nesio-clinical-updated'));
-    import('./storage-health').then(({ checkStorageWarning }) => checkStorageWarning());
-  } catch {
-    // 配额超限 → 写入被丢弃。绝不静默吞(设计红线:存储写失败必须可见)。
-    import('./storage-health').then(({ STORAGE_FULL_EVENT, getStorageHealth }) => {
-      window.dispatchEvent(new CustomEvent(STORAGE_FULL_EVENT, { detail: getStorageHealth() }));
-    });
-  }
+  store.save({ ...rec, importedAt: new Date().toISOString() });
 }
 
 export function loadClinical(): StoredClinical | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = localStorage.getItem(CLINICAL_KEY);
-    if (!raw) return null;
-    const c = JSON.parse(raw) as StoredClinical;
-    return Array.isArray(c.labs) ? c : null;
-  } catch { return null; }
+  return store.load();
 }

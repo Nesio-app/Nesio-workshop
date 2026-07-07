@@ -1,4 +1,5 @@
 import { getLifeGraph } from './life-graph';
+import { hasHealthData } from './health-store';
 
 export type BaohePersonalizationStage = 'first_use' | 'day_34';
 
@@ -118,7 +119,8 @@ function computeDataDepth(g: Array<{ type: string }>): BaoheDataDepthItem[] {
   const pct = (n: number, cap: number) => Math.min(100, Math.round((n / cap) * 100));
   const objectN = c('object'), personN = c('person'), taskN = c('commitment');
   const habitN = c('health_habit') + c('preference');
-  const spend = lsHasData('nesio-bank-tx-v1'), health = lsHasData('nesio-health-v1');
+  // health 已迁 IDB → 用 store 的 has-data(不再直读 localStorage);bank 仍在 localStorage。
+  const spend = lsHasData('nesio-bank-tx-v1'), health = hasHealthData();
   return [
     { id: 'home_items', name: '家居物品', value: `${objectN} 件物品`, progress: pct(objectN, 40), tone: 'blue', icon: '⌂', ...(objectN ? {} : { unlockHint: '拍一下记录物品' }) },
     { id: 'contacts', name: '联系人', value: `${personN} 人`, progress: pct(personN, 20), tone: 'purple', icon: '○', ...(personN ? {} : { unlockHint: '记录重要的人' }) },

@@ -7,6 +7,7 @@
  */
 
 import { reportStorageDropped } from './storage-health';
+import { createBlobStore } from './idb-blob-store';
 
 export interface PlaceVisit {
   /** ISO 时间(到访开始) */
@@ -23,16 +24,22 @@ const KEY = 'nesio-place-trail-v1';
 const CAP = 800;
 export const PLACE_TRAIL_UPDATED_EVENT = 'nesio-place-trail-updated';
 
+// 批次 57:地点轨迹(自动采集、会无限长)挪 IndexedDB —— 腾 localStorage 配额;
+// 别名/分类/地理编码(小)仍留 localStorage。读取同步(缓存),写落 IDB。
+const store = createBlobStore<PlaceVisit[]>({
+  key: KEY, updateEvent: PLACE_TRAIL_UPDATED_EVENT,
+  validate: (v) => Array.isArray(v), onWriteError: reportStorageDropped,
+});
+
 export function loadPlaceTrail(): PlaceVisit[] {
-  if (typeof window === 'undefined') return [];
-  try { return JSON.parse(localStorage.getItem(KEY) || '[]') as PlaceVisit[]; } catch { return []; }
+  const raw = store.load();
+  return Array.isArray(raw) ? raw : [];
 }
 
 function save(trail: PlaceVisit[]): void {
   // 按时间倒序,封顶
   const sorted = [...trail].sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, CAP);
-  try { localStorage.setItem(KEY, JSON.stringify(sorted)); } catch { reportStorageDropped(); }
-  window.dispatchEvent(new CustomEvent(PLACE_TRAIL_UPDATED_EVENT));
+  store.save(sorted);
 }
 
 /** 实时记录:同一地点 2 小时内不重复记(定位轮询会反复命中同一地方)。 */
