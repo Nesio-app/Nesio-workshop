@@ -14,8 +14,10 @@ import { evaluateHealthFindings, type ClinicalFinding } from './health-clinical'
 import { computeRiskScores, type RiskScore } from './health-risk';
 import { loadBankTx, loadBankAccounts } from './bank-tx';
 import { financeFindings, type FinanceFinding } from './finance-insight';
+import { loadPlaceTrail } from './place-trail';
+import { placeFindings, type PlaceFinding } from './place-insight';
 
-export type InsightDomain = 'health' | 'finance';
+export type InsightDomain = 'health' | 'finance' | 'location';
 export type InsightSeverity = 'flag' | 'attention';
 
 export interface DomainInsight {
@@ -34,6 +36,7 @@ export interface DomainInsight {
 export interface DomainFindingSet {
   health: { findings: ClinicalFinding[]; risks: RiskScore[] };
   finance: FinanceFinding[];
+  location: PlaceFinding[];
 }
 
 const isSurfaceableFinding = (f: ClinicalFinding) => f.severity === 'flag' || f.severity === 'attention';
@@ -42,6 +45,7 @@ const isSurfaceableRisk = (s: RiskScore) => s.category === 'high' || s.category 
 export function computeDomainFindings(): DomainFindingSet {
   let health: DomainFindingSet['health'] = { findings: [], risks: [] };
   let finance: FinanceFinding[] = [];
+  let location: PlaceFinding[] = [];
 
   // 健康:②模式(evaluateHealthFindings)+ ③风险(computeRiskScores),各自筛「值得提示」
   try {
@@ -60,12 +64,18 @@ export function computeDomainFindings(): DomainFindingSet {
     if (txs.length) finance = financeFindings(txs, loadBankAccounts());
   } catch { /* ignore */ }
 
-  return { health, finance };
+  // 地图:活动范围/习惯断档(引擎自带追踪存活门 + 冷启动沉默,只出 attention)
+  try {
+    const visits = loadPlaceTrail();
+    if (visits.length) location = placeFindings({ visits, now: new Date() });
+  } catch { /* ignore */ }
+
+  return { health, finance, location };
 }
 
 /** 汇聚当前所有域的「值得提示」判定(红旗/可关注),红旗优先。是 computeDomainFindings 的文本投影。 */
 export function gatherDomainInsights(): DomainInsight[] {
-  const { health, finance } = computeDomainFindings();
+  const { health, finance, location } = computeDomainFindings();
   const out: DomainInsight[] = [];
 
   for (const f of health.findings) {
@@ -76,6 +86,9 @@ export function gatherDomainInsights(): DomainInsight[] {
   }
   for (const f of finance) {
     out.push({ domain: 'finance', severity: f.severity, title: f.title[0], detail: f.detail[0] });
+  }
+  for (const f of location) {
+    out.push({ domain: 'location', severity: f.severity as InsightSeverity, title: f.title[0], detail: f.detail[0] });
   }
 
   const rank = (s: InsightSeverity) => (s === 'flag' ? 0 : 1);
@@ -90,7 +103,7 @@ export function gatherDomainInsights(): DomainInsight[] {
 export function domainInsightsContextBlock(max = 8): string {
   const insights = gatherDomainInsights().slice(0, max);
   if (!insights.length) return '';
-  const label: Record<InsightDomain, string> = { health: '健康', finance: '财务' };
+  const label: Record<InsightDomain, string> = { health: '健康', finance: '财务', location: '活动' };
   const lines = insights.map((i) => `• [${label[i.domain]}] ${i.title} —— ${i.detail}`);
   return `\n【当前健康/财务洞察】(来自你的数据,由确定性引擎算出;可据此回答与健康指标/支出/订阅/现金流有关的问题,禁止在此之外虚构数字)\n${lines.join('\n')}`;
 }

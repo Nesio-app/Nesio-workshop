@@ -31,6 +31,7 @@ import {
   healthNodesToGuidanceEvents,
   healthFindingsToGuidanceEvents,
   financeFindingsToGuidanceEvents,
+  placeFindingsToGuidanceEvents,
   type WeatherSnapshot,
   decCardsToGuidanceEvents,
 } from '@/lib/platform/guidance-engine/source-adapters';
@@ -162,13 +163,14 @@ export function useTodayData(canUsePrivateData: boolean) {
           ...focusNodesToGuidanceEvents(updated.focusNodes, now),
           ...weatherToGuidanceEvents(weather),
           ...healthNodesToGuidanceEvents(updated.proactiveContext.healthItems),
-          // 健康/财务判定接入主循环 —— 与 问一问/简报同读一份判定源(computeDomainFindings),
-          // 消除两个输出面口径漂移。呈现仍各走各的(这里经七层仲裁、达标项不打扰;问一问走文本投影)。
+          // 健康/财务/地图判定接入主循环 —— 与 问一问/简报同读一份判定源(computeDomainFindings),
+          // 消除输出面口径漂移。呈现仍各走各的(这里经七层仲裁、达标项不打扰;问一问走文本投影)。
           ...(() => {
             const df = computeDomainFindings();
             return [
               ...healthFindingsToGuidanceEvents(df.health.findings, df.health.risks),
               ...financeFindingsToGuidanceEvents(df.finance),
+              ...placeFindingsToGuidanceEvents(df.location),
             ];
           })(),
         ];
