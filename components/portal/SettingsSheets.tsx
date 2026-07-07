@@ -15,6 +15,7 @@ import { InfoTip } from './InfoTip';
 import { PROACTIVE_LEVEL_KEY } from './today/proactive-types';
 import { deleteLifeNode, getLifeGraph } from '@/lib/portal/life-graph';
 import { purgeLocalData } from '@/lib/portal/storage-manifest';
+import { collectIdbBlobs, purgeIdbBlobs } from '@/lib/portal/idb-blob-store';
 import { buildFullBackup, isValidBackup, restoreFullBackup } from '@/lib/portal/full-backup';
 
 interface SheetProps { open: boolean; onClose: () => void; }
@@ -265,8 +266,10 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
   const [labOn, setLabOn] = useState(false);
   const importRef = useRef<HTMLInputElement>(null);
 
-  function exportFullBackup() {
+  async function exportFullBackup() {
     const backup = buildFullBackup(localStorage);
+    // 收口:健康/临床/地点已迁 IDB —— 备份要合并 IDB blob,否则设备迁移丢这些数据。
+    backup.entries = { ...backup.entries, ...(await collectIdbBlobs()) };
     const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -339,7 +342,8 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
     if (!confirm(L(dict, '这会删除本机全部数据(记忆、健康、财务、地点、心情、学习偏好…),仅保留登录状态,不可撤销。建议先导出备份。确认继续？', 'This deletes ALL local data (memories, health, finance, places, mood, learned preferences), keeping only your sign-in. It cannot be undone — export a backup first. Continue?'))) return;
     try {
       getLifeGraph().forEach((n) => deleteLifeNode(n.id)); // 记忆节点走正规删除(传导事实库/云)
-      purgeLocalData(localStorage);                         // 其余全部本机 key 收口清除(保留 auth)
+      purgeLocalData(localStorage);                         // localStorage 全部本机 key 收口清除(保留 auth)
+      void purgeIdbBlobs();                                 // IDB blob(健康/临床/地点)一并清 —— 别漏
     } catch { /* ignore */ }
     setNodeCount(0);
     setDeleted(true);

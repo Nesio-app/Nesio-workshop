@@ -1,31 +1,30 @@
 /**
- * Health metrics store — Apple Health 导入的指标存本机(nesio-health-v1),供健康 Dashboard 读。
- * 批次 39:健康数据不再只塞一条记忆节点,单独存一份结构化的最新指标 + 导入时间。
+ * Health metrics store — Apple Health 导入的指标存本机,供健康 Dashboard 读。
+ * 批次 57:从 localStorage 挪到 IndexedDB(体量最大,腾出 5MB localStorage 配额;
+ * 老用户数据水合时透明迁移)。读取仍同步(内存缓存),写落 IDB。
  */
 import type { HealthMetrics } from './apple-health';
+import { createBlobStore } from './idb-blob-store';
+import { reportStorageDropped } from './storage-health';
 
 export const HEALTH_KEY = 'nesio-health-v1';
 
+const store = createBlobStore<HealthMetrics>({
+  key: HEALTH_KEY,
+  updateEvent: 'nesio-health-updated',
+  validate: (v) => !!v && Array.isArray((v as HealthMetrics).metrics),
+  onWriteError: reportStorageDropped,
+});
+
 export function saveHealthMetrics(m: HealthMetrics): void {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(HEALTH_KEY, JSON.stringify(m));
-    window.dispatchEvent(new CustomEvent('nesio-health-updated'));
-    import('./storage-health').then(({ checkStorageWarning }) => checkStorageWarning());
-  } catch {
-    // 配额超限 → 写入被丢弃。健康导入体量最大、最容易撞;必须让用户可见,不静默吞(设计红线)。
-    import('./storage-health').then(({ STORAGE_FULL_EVENT, getStorageHealth }) => {
-      window.dispatchEvent(new CustomEvent(STORAGE_FULL_EVENT, { detail: getStorageHealth() }));
-    });
-  }
+  store.save(m);
 }
 
 export function loadHealthMetrics(): HealthMetrics | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = localStorage.getItem(HEALTH_KEY);
-    if (!raw) return null;
-    const m = JSON.parse(raw) as HealthMetrics;
-    return Array.isArray(m.metrics) ? m : null;
-  } catch { return null; }
+  return store.load();
+}
+
+/** 是否已有健康数据(供 personalization 的 has-data 门,避免直读已迁走的 localStorage key)。 */
+export function hasHealthData(): boolean {
+  return store.load() != null;
 }
