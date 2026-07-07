@@ -23,7 +23,8 @@ import { computeFinanceScores } from '@/lib/portal/finance-risk';
 import { incomeBreakdown, detectIncome, portfolioSummary } from '@/lib/portal/finance-features';
 import { removeBankAccount } from '@/lib/portal/bank-tx';
 import { loadBudget, saveBudget, hasBudget, suggestBudget, budgetProgress, type BudgetConfig } from '@/lib/portal/finance-budget';
-import { buildMonthlyReport, persistReportToMemory, autoPersistLastMonthReport, reportHtml } from '@/lib/portal/finance-report';
+import { buildMonthlyReport, persistReportToMemory, autoPersistLastMonthReport } from '@/lib/portal/finance-report';
+import { reportRichHtml } from '@/lib/portal/finance-report-visual';
 import { categoryLabel, categoryDetailLabel, COMMON_EXPENSE_CATEGORIES } from '@/lib/portal/tx-category';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -346,10 +347,10 @@ export default function FinanceTab() {
             }}>{L(dict, '存入记忆', 'Save to memory')}</button>
             <button type="button" className="nesio-fin-flowopt" onClick={() => {
               try {
-                const r = buildMonthlyReport(txs, accounts, ym, dict);
                 const w = window.open('', '_blank');
                 if (!w) { setReportMsg(L(dict, '弹窗被拦截,请允许弹窗后重试', 'Popup blocked — allow popups and retry')); return; }
-                w.document.write(reportHtml(r));
+                // 财务㉘:彩色图文版(KPI/环形图/趋势图/进度条,自包含 HTML)
+                w.document.write(reportRichHtml(txs, accounts, ym, dict));
                 w.document.close();
                 setTimeout(() => { try { w.focus(); w.print(); } catch { /* 用户手动打印 */ } }, 350);
                 setReportMsg(L(dict, '已打开打印视图(打印 → 存为 PDF)', 'Print view opened (Print → Save as PDF)'));
