@@ -17,6 +17,7 @@ import type { ClinicalFinding } from '@/lib/portal/health-clinical';
 import type { RiskScore } from '@/lib/portal/health-risk';
 import type { FinanceFinding } from '@/lib/portal/finance-insight';
 import type { PlaceFinding } from '@/lib/portal/place-insight';
+import type { MoodFinding } from '@/lib/portal/mood-insight';
 import type { GuidanceEvent, GuidanceEventType } from './types';
 
 // ── Calendar ──────────────────────────────────────────────────────────────────
@@ -302,6 +303,19 @@ export function placeFindingsToGuidanceEvents(
     .filter((f) => f.severity === 'flag' || f.severity === 'attention')
     .map((f) => ({ id: f.id, severity: f.severity as 'flag' | 'attention', title: f.title, body: f.detail, cta: PLACE_CTA }));
   return insightsToGuidanceEvents('location', '📍', '活动', items);
+}
+
+// 心情:moodFindings(情绪持续偏低 CUSUM,情绪域从严只出 attention)→ 域洞察。
+// warm-coach:出口给足(跳过/稍后由卡片机制自带),文案不评判。
+const MOOD_CTA: [string, string] = ['来自你的「此刻」记录;想歇歇或找人聊聊,都算照顾自己。', 'From your own check-ins — a break or a chat both count as taking care.'];
+
+export function moodFindingsToGuidanceEvents(
+  findings: readonly MoodFinding[],
+): GuidanceEvent[] {
+  const items: DomainInsightItem[] = findings
+    .filter((f) => f.severity === 'flag' || f.severity === 'attention')
+    .map((f) => ({ id: f.id, severity: f.severity as 'flag' | 'attention', title: f.title, body: f.detail, cta: MOOD_CTA }));
+  return insightsToGuidanceEvents('mood', '🌤', '心情', items);
 }
 
 // ── Object context (物品关联情境) ─────────────────────────────────────────────
