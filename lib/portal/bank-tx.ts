@@ -618,9 +618,88 @@ const BILL_RE = /netflix|spotify|hulu|disney|youtube ?premium|hbo|prime video|ap
 // 明确排除:餐饮/购物/超市/咖啡(去很多次也不是账单)
 const NON_BILL_CAT_RE = /food|餐饮|shopping|merchandise|购物|grocer|超市|coffee|咖啡/i;
 
-// 财务⑰:知名订阅品牌(强先验)—— 业界做法:已知订阅商户 1-2 笔即可提前标记(Plaid early
-// detection / 银行 COF 商户表同理)。比 BILL_RE 更窄:只放"看到名字就知道是订阅"的品牌。
-const KNOWN_SUB_RE = /netflix|spotify|hulu|disney\+|hbo ?max|youtube ?premium|apple\.com\/bill|icloud|apple ?(music|tv|one)|prime ?video|audible|chatgpt|openai|claude\.ai|adobe|dropbox|notion|github|microsoft ?365|office ?365|google ?one|nytimes|patreon|peloton|strava|duolingo/i;
+// 财务⑰→⑱:已知订阅商户先验库(核心信号,业界 COF/MCC 商户表同理)——命中先验的商户
+// 1 笔即标记、2 笔不需要周期证据。条目:匹配模式 + 默认周期 + 默认分类。歧义词(calm/
+// medium/zoom…)锚定域名形式,避免误伤同名实体店;条目只增,误报由「不是定期」✕ 兜底。
+export interface KnownSubscription { re: RegExp; cadenceDays: 30 | 365; category: string }
+
+export const KNOWN_SUBSCRIPTIONS: KnownSubscription[] = [
+  // 流媒体/视频
+  { re: /netflix/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  { re: /hulu/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  { re: /disney ?\+|disneyplus/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  { re: /hbo ?max|\bmax\.com/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  { re: /paramount ?\+/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  { re: /peacock ?(tv|premium)?/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  { re: /apple ?tv/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  { re: /prime ?video/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  { re: /youtube ?(premium|tv)/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  { re: /crunchyroll/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  { re: /fubo ?tv|sling ?tv/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  // 音乐/音频
+  { re: /spotify/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  { re: /apple ?music/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  { re: /pandora\b/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  { re: /tidal/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  { re: /audible/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  { re: /sirius ?xm/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  // 软件/云/AI
+  { re: /apple\.com\/bill|icloud|apple ?one/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /google ?(one|storage)/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /dropbox/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /adobe/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /microsoft ?365|office ?365/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /\bnotion\b/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /\bcanva\b/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /github/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /openai|chatgpt/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /claude\.ai|anthropic/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /midjourney/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /grammarly/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /1password|lastpass/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /nord ?vpn|express ?vpn|surfshark/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /zoom\.us|zoom ?video/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /evernote|todoist/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  // 新闻/阅读/创作者
+  { re: /nytimes|ny ?times/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /wall ?st(reet)? ?journal|\bwsj\b/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /washington ?post/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /economist/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /medium\.com/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /substack/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /kindle ?unlimited/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  { re: /patreon/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  // 健身/健康
+  { re: /peloton/i, cadenceDays: 30, category: 'PERSONAL_CARE' },
+  { re: /planet ?fitness|la ?fitness|24 ?hour ?fitness|crunch ?fitness|equinox|orangetheory|classpass/i, cadenceDays: 30, category: 'PERSONAL_CARE' },
+  { re: /strava|whoop\b/i, cadenceDays: 30, category: 'PERSONAL_CARE' },
+  { re: /calm\.com|headspace/i, cadenceDays: 30, category: 'PERSONAL_CARE' },
+  { re: /myfitnesspal|noom\b/i, cadenceDays: 30, category: 'PERSONAL_CARE' },
+  // 游戏
+  { re: /playstation ?(network|plus)?|sony ?interactive/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  { re: /xbox ?(game ?pass)?/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  { re: /nintendo/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  { re: /steampowered|steam ?(games|purchase)/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  { re: /twitch/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  // 会员/配送(年付常见的标年付)
+  { re: /amazon ?prime(?! ?video)/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /walmart ?\+/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /instacart ?\+|dashpass|door ?dash ?pass|uber ?one/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /costco.*member|member.*costco/i, cadenceDays: 365, category: 'GENERAL_SERVICES' },
+  { re: /sam'?s ?club.*member|member.*sam'?s/i, cadenceDays: 365, category: 'GENERAL_SERVICES' },
+  // 学习/其他
+  { re: /duolingo/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /coursera|skillshare|masterclass|chegg/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /tinder|bumble/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /ring\.com|simplisafe|\badt\b/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+];
+
+/** 名字命中已知订阅商户先验 → 返回条目(默认周期/分类),否则 null。 */
+export function matchKnownSubscription(name: string): KnownSubscription | null {
+  const n = name || '';
+  for (const k of KNOWN_SUBSCRIPTIONS) if (k.re.test(n)) return k;
+  return null;
+}
 
 /** 变异系数(标准差/均值)—— 账单金额稳定(低),超市/餐饮飘(高)。 */
 function coeffVar(nums: number[]): number {
@@ -686,26 +765,35 @@ export function detectRecurring(txs: BankTx[], opts?: { includePredicted?: boole
       const last = sorted2[sorted2.length - 1];
       if (recurRules[last.name] === 'no') continue;
       const isNonBill = NON_BILL_CAT_RE.test(last.name);
+      // 财务⑱:先验优先 —— 命中已知订阅商户库的,1 笔即标、2 笔不需要周期证据。
+      const known = matchKnownSubscription(last.name);
+      const assumedLabel = (d: number): [string, string] => (d >= 300 ? ['每年(推测)', 'Yearly (assumed)'] : ['每月(推测)', 'Monthly (assumed)']);
       let cadence = 0; let label: [string, string] | null = null;
       if (sorted2.length === 2) {
         const gap = (Date.parse(sorted2[1].date) - Date.parse(sorted2[0].date)) / 86_400_000;
         label = cadenceLabelFor(gap);
         cadence = Math.round(gap);
         const amtClose = Math.abs(sorted2[1].amount - sorted2[0].amount) <= Math.max(1, Math.abs(sorted2[0].amount) * 0.02);
-        const qualifies = recurRules[last.name] === 'yes' || (!isNonBill && !!label && (BILL_RE.test(last.name) || amtClose));
-        if (!qualifies || !label) continue;
+        const qualifies = recurRules[last.name] === 'yes' || !!known || (!isNonBill && !!label && (BILL_RE.test(last.name) || amtClose));
+        if (!qualifies) continue;
+        if (!label) {
+          // 间隔不成周期(重订阅/年付中断等):有先验才继续,用先验默认周期
+          if (!known) continue;
+          cadence = known.cadenceDays;
+          label = assumedLabel(cadence);
+        }
       } else {
-        // 1 笔:仅知名订阅品牌,按月假设(业界 known-merchant 先验)
-        if (!KNOWN_SUB_RE.test(last.name) || Math.abs(last.amount) > 200) continue;
-        cadence = 30;
-        label = ['每月(推测)', 'Monthly (assumed)'];
+        // 1 笔:仅已知订阅商户(先验),周期用库里默认值并明示推测
+        if (!known || Math.abs(last.amount) > 500) continue;
+        cadence = known.cadenceDays;
+        label = assumedLabel(cadence);
       }
       const amts2 = sorted2.map((t) => Math.abs(t.amount));
       const avg2 = amts2.reduce((s, v) => s + v, 0) / amts2.length;
       const plaidCat2 = [...sorted2].reverse().find((t) => (t.category || '').trim())?.category || '';
       out.push({
         name: last.name,
-        category: normalizeCategory(merchantRules[last.name] || plaidCat2) || suggestCategory(last.name).category,
+        category: normalizeCategory(merchantRules[last.name] || plaidCat2) || known?.category || suggestCategory(last.name).category,
         avgAmount: Math.round(avg2 * 100) / 100,
         count: sorted2.length,
         lastDate: last.date,

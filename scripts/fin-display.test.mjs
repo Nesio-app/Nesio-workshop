@@ -122,9 +122,9 @@ assert.equal(pred[0].count, 2);
 // 2 笔金额差大且非账单词 → 不出(巧合不算)
 const twoLoose = [rtx('l1', '2026-05-05', 'Corner Store', 12), rtx('l2', '2026-06-05', 'Corner Store', 55)];
 assert.equal(bank.detectRecurring(twoLoose, { includePredicted: true }).length, 0, '金额不一致且非账单词不预测');
-// 2 笔间隔不落周期档 → 不出
-const twoOdd = [rtx('o1', '2026-05-05', 'Hulu', 12.99), rtx('o2', '2026-05-25', 'Hulu', 12.99)];
-assert.equal(bank.detectRecurring(twoOdd, { includePredicted: true }).length, 0, '间隔不成周期不预测');
+// 2 笔间隔不落周期档、非先验商户 → 不出(金额一致的巧合不算)
+const twoOdd = [rtx('o1', '2026-05-05', 'Acme Widgets Co', 12.99), rtx('o2', '2026-05-25', 'Acme Widgets Co', 12.99)];
+assert.equal(bank.detectRecurring(twoOdd, { includePredicted: true }).length, 0, '非先验商户间隔不成周期不预测');
 // 知名订阅品牌 1 笔 → 按月假设的待确认;非知名品牌 1 笔不出
 const one = [rtx('k1', '2026-06-20', 'Spotify USA', 11.99)];
 const onePred = bank.detectRecurring(one, { includePredicted: true });
@@ -134,6 +134,21 @@ assert.match(onePred[0].cadenceLabel[1], /assumed/i, '按月假设有明示');
 assert.equal(bank.detectRecurring([rtx('u1', '2026-06-20', 'Random Shop LLC', 11.99, 'GENERAL_SERVICES')], { includePredicted: true }).length, 0, '非知名品牌 1 笔不预测');
 // 3 笔仍是 mature
 assert.equal(bank.detectRecurring(rent)[0].status, 'mature', '≥3 笔标 mature');
+
+// ── 财务⑱:已知订阅商户先验库(核心信号) ──
+assert.ok(bank.KNOWN_SUBSCRIPTIONS.length >= 55, '先验库要够广(≥55 条)');
+assert.ok(bank.matchKnownSubscription('Netflix.com 866-579-7172'), '带尾巴的真实描述符也命中');
+assert.ok(bank.matchKnownSubscription('CHATGPT SUBSCRIPTION OPENAI'), 'AI 订阅命中');
+assert.equal(bank.matchKnownSubscription('Calm Springs Hotel'), null, '歧义词锚定域名,不误伤同名实体店');
+assert.equal(bank.matchKnownSubscription('Costco Annual Membership')?.cadenceDays, 365, '会员制先验带年付周期');
+// 先验免周期证据:知名品牌 2 笔间隔怪(重订阅)→ 仍预识别,周期用先验默认并明示推测
+const huluOdd = [rtx('h1', '2026-05-05', 'Hulu', 12.99), rtx('h2', '2026-05-25', 'Hulu', 12.99)];
+const huluPred = bank.detectRecurring(huluOdd, { includePredicted: true });
+assert.equal(huluPred.length, 1, '先验商户 2 笔不需要周期证据');
+assert.match(huluPred[0].cadenceLabel[1], /assumed/i, '间隔不成周期时用先验默认并明示');
+// 先验分类兜底:无 Plaid 分类时用库里默认分类
+const spotifyNoCat = [{ ...rtx('s0', '2026-06-20', 'Spotify USA', 11.99), category: '' }];
+assert.equal(bank.detectRecurring(spotifyNoCat, { includePredicted: true })[0]?.category, 'ENTERTAINMENT', '先验默认分类兜底');
 
 // ── 财务⑪:退款证据门 —— 没买过的商户进账不是退款 ──
 const evTxs = [
