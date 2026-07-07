@@ -20,7 +20,6 @@ const todayFeed = [
 ].join('\n');
 const tellSheet = read('components/portal/TellNesioSheet.tsx');
 const voiceSheet = read('components/portal/VoiceInputSheet.tsx');
-const dailyBrief = read('components/portal/DailyBriefCard.tsx');
 const profileCard = read('components/portal/NesioProfileCard.tsx');
 const loginPage = read('components/portal/LoginPageClient.tsx');
 const authStartRoute = read('app/api/auth/start/route.ts');
@@ -114,13 +113,8 @@ assert.doesNotMatch(todayFeed, /你的生活，连成一张图。|Nesio 已经�
 assert.doesNotMatch(todayFeed, /需要你的输入|还没有足够记忆|告诉 Nesio 一件事|告诉 Nesio 新事情/, 'Today empty state should not sound like a data requirement.');
 assert.match(todayFeed, /先放进来一件事就好|从一件小事开始|先记一件事|说一句、拍一下，Nesio 会帮你留到以后找得到/, 'Today empty state should invite one low-pressure first record.');
 assert.doesNotMatch(todayFeed, /今天，\$\{cards\.length\} 件事|<h1 className="nesio-today-greeting-title">\{greeting\}，\{displayName\}/, 'Today must not repeat the greeting/name below the daily brief.');
-assert.doesNotMatch(todayFeed, /今天有点多，先看最重要的一件。/, 'Today Feed must not hard-code the daily overview sentence outside DailyBriefCard.');
-assert.match(dailyBrief, /buildDailyOverview[\s\S]*今天有点多，先看最重要的一件|events\.length|memoryCount/, 'Daily overview should be generated from current user state in DailyBriefCard.');
-assert.doesNotMatch(dailyBrief, /播客/, 'Daily brief action copy should not say podcast on the home surface.');
-assert.match(dailyBrief, /听简报|文字简报/, 'Daily brief should use home-appropriate briefing language.');
-// Copy evolved 登录后生成 → 登录听自己的; guarded intent: real /login link, not a disabled button.
-assert.match(dailyBrief, /href="\/login"[\s\S]*(登录后生成|登录听自己的)/, 'Signed-out daily brief generation must be a real login link, not a disabled button.');
-assert.doesNotMatch(dailyBrief, /disabled=\{playState === 'loading' \|\| !canUsePrivateData\}/, 'Signed-out daily brief CTA must not be disabled.');
+// DailyBriefCard(听简报卡)批次 40 下架后未回归,已作为死组件删除;Today 表面不得再硬编码那句总览。
+assert.doesNotMatch(todayFeed, /今天有点多，先看最重要的一件。/, 'Today Feed must not hard-code the daily overview sentence.');
 assert.doesNotMatch(domains, /不用翻笔记/, 'Meeting cards should use natural assistant wording, not system-summary language.');
 assert.match(domains, /已经整理好了|关键提醒/, 'Meeting cards should explain that key reminders are ready.');
 assert.match(memoryTab, /散落的线索，回头找得到|重要的事，慢慢连起来/, 'Memory title should use sovereignty-oriented retrieval language.');
@@ -214,7 +208,6 @@ assert.match(shareSheet, /analyze\('image'[\s\S]*根据这张图片里真实可�
 assert.match(shareSheet, /x-baohe-access-mode['"]\s*:\s*['"]personal_lab/, 'Upload image analysis should request lab AI access like the camera path.');
 assert.match(shareSheet, /type === 'image' && nodes\.length === 0[\s\S]*ai_image_empty/, 'Upload image should not use the prompt or filename when AI returns no nodes.');
 assert.doesNotMatch(shareSheet, /title:\s*nodes\[0\]\?\.name \|\| content\.slice\(0,\s*30\)[\s\S]*file\.name,\s*base64/s, 'Upload image result must not fall back to the raw filename as the recognized title.');
-assert.doesNotMatch(dailyBrief, /开启位置权限获取天气|weather\.temperatureC|weather\.condition/, 'Daily overview should not display weather in the first home card.');
 assert.match(globals, /\.nesio-brief-card \{[\s\S]*background:\s*var\(--glass-bg-solid\)/, 'Daily overview card should use the shared glass card background, not a blue gradient.');
 // Helpers reordered in the route; assert the three pieces independently.
 assert.match(authStartRoute, /sanitizeRedirectTo/, 'Auth start must sanitize redirect URLs.');

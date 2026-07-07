@@ -17,7 +17,6 @@ const todayFeed = [
   read('components/portal/today/DormantReviewCard.tsx'),
   read('components/portal/today/NightTimeline.tsx'),
 ].join('\n');
-const dailyBrief = read('components/portal/DailyBriefCard.tsx');
 const todayViewModel = read('lib/platform/view-models/today-view-model.ts');
 const memoryTab = read('components/portal/MemoryTab.tsx');
 const nodeDetail = read('components/portal/MemoryNodeDetail.tsx');
@@ -94,7 +93,6 @@ assert.match(
 
 for (const [name, source] of [
   ['TodayFeed', todayFeed],
-  ['DailyBriefCard', dailyBrief],
   ['MemoryTab', memoryTab],
 ]) {
   assert.match(
@@ -103,24 +101,6 @@ for (const [name, source] of [
     `${name} must support a signed-out empty/demo state instead of reading the Life Graph unconditionally.`,
   );
 }
-// Calendar reads live behind lib/portal/environment.getCachedCalendarEvents()
-// since the environment-layer refactor; the gate must still come first.
-assertBefore(
-  dailyBrief,
-  'if (canUsePrivateData)',
-  'getCachedCalendarEvents()',
-  'DailyBriefCard must check the private-data gate before reading cached calendar events.',
-);
-assert.match(
-  dailyBrief,
-  /if \(canUsePrivateData\) \{[\s\S]*localStorage\.getItem\(BRIEF_CACHE_KEY\)/,
-  'DailyBriefCard must only load cached private brief scripts while signed in.',
-);
-assert.doesNotMatch(
-  dailyBrief,
-  /getRecentNodes/,
-  'DailyBriefCard must not read Life Graph directly; gated memory notes must come from TodayViewModel.',
-);
 // LifeStateCard retired; cross-signal life state now computes inside the
 // gated TodayViewModel (runDEC → computeLifeState) — the gate must come first.
 assertBefore(
@@ -134,16 +114,8 @@ assert.match(
   /buildTodayViewModel\(\{ canUsePrivateData,[\s\S]*cloudSignals/,
   'TodayFeed must derive Today cards and memory notes through the gated TodayViewModel.',
 );
-// 听简报卡在批次 40 从 Today 下架,停在路线图(待开发)。若它回归 Today,
-// 隐私门不能绕过:必须仍然只收 gated 的 canUsePrivateData + memoryNotes。
-// DailyBriefCard.tsx 自身的门(上面 97-122 行)始终强制,故停用期间也不漏。
-if (/<DailyBriefCard/.test(todayFeed)) {
-  assert.match(
-    todayFeed,
-    /<DailyBriefCard[\s\S]*canUsePrivateData=\{canUsePrivateData\}[\s\S]*memoryNotes=\{memoryNotes\}/,
-    'DailyBriefCard, when rendered in TodayFeed, must receive gated memoryNotes.',
-  );
-}
+// 听简报卡(DailyBriefCard)批次 40 从 Today 下架后一直未回归,已作为死组件删除。
+// 其隐私保障已上移:Today 表面统一走 gated TodayViewModel(下面的 buildTodayViewModel 断言兜住)。
 assertBefore(
   memoryTab,
   'visibleMemoryNodes',

@@ -2,8 +2,8 @@
  * Environment — single source for "where is the user right now and what's
  * around them": weather, location, time-of-day, and cached calendar events.
  *
- * Replaces per-consumer duplicates: TodayFeed / DailyBriefCard / NesioChatSheet /
- * daily-brief route each declared their own Weather interface and their own
+ * Replaces per-consumer duplicates: TodayFeed / NesioChatSheet / daily-brief
+ * route each declared their own Weather interface and their own
  * "localStorage first, portal cache fallback" calendar read. Client-side only.
  */
 

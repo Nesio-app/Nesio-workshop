@@ -40,8 +40,6 @@ export const LAYER_RULES = [
     name: 'components/portal Today surface must consume TodayViewModel',
     include: [
       /^components\/portal\/TodayFeed\.tsx$/,
-      /^components\/portal\/DailyBriefCard\.tsx$/,
-      /^components\/portal\/VoiceBrief\.tsx$/,
       /^components\/portal\/today\//,
     ],
     forbidden: [

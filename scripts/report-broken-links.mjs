@@ -46,7 +46,6 @@ const CAPABILITY_ENTRIES = [
   { name: '卡片反馈写回', evidence: ['recordCardFeedback('], note: 'PRD TODAY-004' },
   { name: 'DEC 证据卡渲染', evidence: ['card.evidence', 'decCardsToGuidanceEvents'], note: 'PRD TODAY-002' },
   { name: '此刻情绪记录', evidence: ['nesio-open-mood'], note: '' },
-  { name: '听简报', evidence: ['<DailyBriefCard'], note: '' },
   { name: '存储满警告', evidence: ['STORAGE_FULL_EVENT'], note: '' },
 ];
 
