@@ -18,7 +18,7 @@ import {
 // 风险预警与 Today/问一问 同读一份判定(financeFindings,Layer1 漂移收口)——此前 bank-tx 里
 // 另有一套 alerts 判定(函数级双实现),两个输出面据同一份流水各说各话,已删并由契约钉死不回潮。
 import { financeFindings } from '@/lib/portal/finance-insight';
-import { categoryLabel, COMMON_EXPENSE_CATEGORIES } from '@/lib/portal/tx-category';
+import { categoryLabel, categoryDetailLabel, COMMON_EXPENSE_CATEGORIES } from '@/lib/portal/tx-category';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -295,7 +295,12 @@ export default function FinanceTab() {
                       <span className="nesio-fin-txname">{t.name || L(dict, '未知商户', 'Unknown')}{t.accountId && acctMask.get(t.accountId) ? <span className="nesio-fin-txmask"> ····{acctMask.get(t.accountId)}</span> : null}</span>
                       <button type="button" className={`nesio-fin-txflow nesio-fin-txflow--${f}`} onClick={() => setFlowEditId((id) => (id === t.id ? null : t.id))}>
                         <span className="nesio-fin-txflow-l">{L(dict, TX_FLOW_LABELS[f][0], TX_FLOW_LABELS[f][1])}</span>
-                        {f === 'expense' && <span className="nesio-fin-txcat"> · {categoryLabel(effectiveCategory(t), dict) || L(dict, '待归类', 'Uncategorized')}</span>}
+                        {f === 'expense' && (() => {
+                          // 财务⑨:primary 友好名后接 detailed 细分类(咖啡/加油…);*_OTHER_* 无增量不显示
+                          const primary = categoryLabel(effectiveCategory(t), dict) || L(dict, '待归类', 'Uncategorized');
+                          const detail = categoryDetailLabel(t.categoryDetail || '', dict);
+                          return <span className="nesio-fin-txcat"> · {primary}{detail && detail !== primary ? ` · ${detail}` : ''}</span>;
+                        })()}
                       </button>
                     </div>
                     <span className={`nesio-fin-txamt${t.amount < 0 ? ' is-refund' : ''}`}>{signed(t.amount)}</span>

@@ -19,6 +19,7 @@ export interface BankTx {
   amount: number;
   currency: string;
   category: string;
+  categoryDetail?: string; // 财务⑨:Plaid PFC detailed(FOOD_AND_DRINK_COFFEE…),只作展示细化
   accountId?: string;
 }
 
@@ -523,7 +524,9 @@ function cadenceLabelFor(days: number): [string, string] | null {
 
 // 批次 39:定期 = 账单(订阅/水电/保险/房贷/会员/宽带/话费…),不是「常去的超市/咖啡」。
 // 账单关键词命中 → 强定期候选;否则要求「金额稳定」(超市/餐饮金额飘,自动排除)。
-const BILL_RE = /netflix|spotify|hulu|disney|youtube ?premium|hbo|prime video|apple\.com\/bill|icloud|adobe|dropbox|notion|chatgpt|openai|github|microsoft ?365|google ?(one|storage)|membership|会员|subscription|订阅|insurance|保险|geico|state ?farm|allstate|progressive|nationwide|premium|duke ?energy|电费|水费|燃气|gas ?(company|bill)|electric|water ?(bill|utility)|utility|comcast|xfinity|spectrum|at&t|verizon|t-?mobile|sprint|话费|宽带|internet|broadband|mortgage|房贷|月供|rent\b|房租|loan|贷款|student ?loan|gym|健身|planet ?fitness|la ?fitness|equinox|peloton|storage|自如|物业|hoa/i;
+// 财务⑨:高频误伤词加词界 —— rent\b 会命中 "diffeRENT"/"paRENT",loan 命中 "sLOANe",
+// gym 命中 "GYMboree",hoa 命中 "HOAgie"。账单词必须整词出现。
+const BILL_RE = /netflix|spotify|hulu|disney|youtube ?premium|hbo|prime video|apple\.com\/bill|icloud|adobe|dropbox|notion|chatgpt|openai|github|microsoft ?365|google ?(one|storage)|membership|会员|subscription|订阅|insurance|保险|geico|state ?farm|allstate|progressive|nationwide|premium|duke ?energy|电费|水费|燃气|gas ?(company|bill)|electric|water ?(bill|utility)|utility|comcast|xfinity|spectrum|at&t|verizon|t-?mobile|sprint|话费|宽带|internet|broadband|mortgage|房贷|月供|\brent\b|房租|\bloans?\b|贷款|student ?loan|\bgym\b|健身|planet ?fitness|la ?fitness|equinox|peloton|storage|自如|物业|\bhoa\b/i;
 // 明确排除:餐饮/购物/超市/咖啡(去很多次也不是账单)
 const NON_BILL_CAT_RE = /food|餐饮|shopping|merchandise|购物|grocer|超市|coffee|咖啡/i;
 
@@ -591,6 +594,10 @@ export function detectRecurring(txs: BankTx[]): RecurringCharge[] {
     const medGap = median(gaps);
     const label = cadenceLabelFor(medGap);
     if (!label) continue;
+    // 财务⑨:间隔要围着中位数聚 —— 3 笔碰巧散落的消费也能凑出一个「中位间隔」落进周期档,
+    // 但那不是周期。各间隔对中位数偏差的中位数(MAD)超过中位间隔的 30% → 不算定期。
+    const madGap = median(gaps.map((g) => Math.abs(g - medGap)));
+    if (!medGap || madGap / medGap > 0.3) continue;
 
     const last = sorted[sorted.length - 1];
     // 财务②:分类优先级 用户规则 > 交易自带 Plaid 分类(最新一笔非空)> 关键词建议。

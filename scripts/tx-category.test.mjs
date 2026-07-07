@@ -12,7 +12,7 @@ const src = fs.readFileSync(new URL('../lib/portal/tx-category.ts', import.meta.
 const js = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 const mod = { exports: {} };
 vm.runInNewContext(js, { module: mod, exports: mod.exports, require: () => ({}), console });
-const { normalizeCategory, categoryLabel, COMMON_EXPENSE_CATEGORIES } = mod.exports;
+const { normalizeCategory, categoryLabel, categoryDetailLabel, COMMON_EXPENSE_CATEGORIES } = mod.exports;
 
 // 归一:旧词汇 → PFC(大小写不敏感);PFC 原样;未知/空
 assert.equal(normalizeCategory('Food'), 'FOOD_AND_DRINK', '旧 Food → PFC');
@@ -38,6 +38,19 @@ assert.equal(categoryLabel('我的自定义类', 'zh'), '我的自定义类', '�
 for (const c of COMMON_EXPENSE_CATEGORIES) {
   assert.equal(normalizeCategory(c), c, `${c} 是规范 PFC`);
   assert.notEqual(categoryLabel(c, 'zh'), c, `${c} 有中文友好名`);
+}
+
+// ── 财务⑨:detailed 细分类展示 ──
+assert.equal(categoryDetailLabel('FOOD_AND_DRINK_COFFEE', 'zh'), '咖啡', '常用 detailed 有中文名');
+assert.equal(categoryDetailLabel('FOOD_AND_DRINK_COFFEE', 'en'), 'Coffee');
+assert.equal(categoryDetailLabel('TRANSPORTATION_GAS', 'zh'), '加油');
+assert.equal(categoryDetailLabel('TRAVEL_SOME_NEW_THING', 'zh'), 'Some New Thing', '未收录 detailed 去前缀 prettify');
+assert.equal(categoryDetailLabel('FOOD_AND_DRINK_OTHER_FOOD_AND_DRINK', 'zh'), '', '*_OTHER_* 零增量不展示');
+assert.equal(categoryDetailLabel('', 'zh'), '', '空 → 空');
+
+// 纠正全集:补进的支出类都在备选里(COMMON 循环在上面已断言有友好名)
+for (const c of ['RENT_AND_UTILITIES', 'HOME_IMPROVEMENT', 'BANK_FEES', 'LOAN_PAYMENTS', 'GOVERNMENT_AND_NON_PROFIT', 'OTHER']) {
+  assert.ok(COMMON_EXPENSE_CATEGORIES.includes(c), `${c} 进纠正/筛选备选`);
 }
 
 console.log('tx-category: OK');
