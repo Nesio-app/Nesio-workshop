@@ -38,6 +38,28 @@ export function foldSample(signal: string, value: number, estimator: Estimator =
   saveJson(KEY, st);
 }
 
+/** ewma 内部态读取(域层特殊读法用,如 energy 的"排除最近样本的均值"反解)。无/非 ewma → null。 */
+export function ewmaState(signal: string): { mean: number; varq: number; n: number } | null {
+  const s = loadJson<BaselineState>(KEY, {})[signal];
+  return s && s.kind === 'ewma' ? { mean: s.mean, varq: s.varq, n: s.n } : null;
+}
+
+/**
+ * 迁移/先验种子入口:装一个 ewma 初始态(旧 store 收编,或域先验如 energy 的 {mean:50,varq:100})。
+ * 默认只在该 signal 尚无状态时生效(不盖已学的)。
+ */
+export function seedEwma(
+  signal: string,
+  state: { mean: number; varq: number; n: number },
+  { overwrite = false }: { overwrite?: boolean } = {},
+): void {
+  if (!Number.isFinite(state.mean) || !Number.isFinite(state.varq)) return;
+  const st = loadJson<BaselineState>(KEY, {});
+  if (!overwrite && st[signal]) return;
+  st[signal] = { kind: 'ewma', mean: state.mean, varq: state.varq, n: state.n };
+  saveJson(KEY, st);
+}
+
 function median(xs: number[]): number {
   const s = [...xs].sort((a, b) => a - b);
   const m = Math.floor(s.length / 2);
