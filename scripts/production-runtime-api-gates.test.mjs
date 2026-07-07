@@ -7,7 +7,6 @@ const read = (file) => readFileSync(join(root, file), 'utf8');
 
 const authStartRoute = read('app/api/auth/start/route.ts');
 const calendarConnectRoute = read('app/api/portal/calendar/connect/route.ts');
-const cloudInventoryRoute = read('app/api/cloud/inventory/route.ts');
 const cloudProfileSettingsRoute = read('app/api/cloud/profile-settings/route.ts');
 const packageJson = JSON.parse(read('package.json'));
 
@@ -43,7 +42,6 @@ for (const [name, source] of [
 // 契约随实现迁移:断言 route 的委托关系 + 共享运行时的真实实现。
 const cloudServerRuntime = read('lib/portal/cloud-server-runtime.ts');
 for (const [name, source] of [
-  ['cloud inventory', cloudInventoryRoute],
   ['cloud profile settings', cloudProfileSettingsRoute],
 ]) {
   assert.match(

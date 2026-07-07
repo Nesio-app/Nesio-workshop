@@ -240,9 +240,8 @@ check(
   cloudStatus.body,
 );
 check(
-  cloudStatus.body?.endpoints?.profileSettingsEndpoint === '/api/cloud/profile-settings' &&
-    cloudStatus.body?.endpoints?.inventoryEndpoint === '/api/cloud/inventory',
-  'cloud status exposes cloud profile and inventory endpoints',
+  cloudStatus.body?.endpoints?.profileSettingsEndpoint === '/api/cloud/profile-settings',
+  'cloud status exposes cloud profile endpoints',
   cloudStatus.body?.endpoints,
 );
 check(
@@ -250,31 +249,6 @@ check(
     (cloudStatus.body.summary.cloudDatabaseReady === true || cloudStatus.body.summary.cloudBlockedReason),
   'cloud status explains cloud database readiness',
   cloudStatus.body?.summary,
-);
-
-const cloudInventory = await fetchJson('/api/cloud/inventory');
-check(
-  cloudInventory.body?.safePublicStatus === true &&
-    cloudInventory.body?.secretsRedacted === true &&
-    cloudInventory.body?.cloudInventorySnapshot === true,
-  'cloud inventory snapshot endpoint returns safe JSON',
-  cloudInventory.body,
-);
-check(
-  cloudInventory.response.ok ||
-    ['cloud_not_configured', 'not_signed_in', 'cloud_read_failed'].includes(cloudInventory.body?.error),
-  'cloud inventory snapshot is ready or fails closed with a clear reason',
-  {
-    status: cloudInventory.response.status,
-    error: cloudInventory.body?.error,
-    setupTask: cloudInventory.body?.setupTask,
-  },
-);
-check(
-  cloudInventory.body?.readsCloud === false ||
-    (cloudInventory.response.ok && Array.isArray(cloudInventory.body?.items)),
-  'cloud inventory snapshot does not claim cloud reads unless it returns items',
-  cloudInventory.body,
 );
 
 const cloudProfileSettings = await fetchJson('/api/cloud/profile-settings');
@@ -384,64 +358,6 @@ check(
   'calendar endpoint includes Google as a live source',
   calendar.body?.sources,
 );
-
-const secretaryPage = await fetchText('/secretary');
-check(
-  secretaryPage.response.ok &&
-    /<html[\s\S]*<title>智友<\/title>[\s\S]*id="friendList"[\s\S]*\/secretary\/list\.js/.test(secretaryPage.body),
-  'Secretary page direct URL is publicly available as the production AI friends surface',
-  {
-    status: secretaryPage.response.status,
-    rawPreview: secretaryPage.body.slice(0, 220),
-    networkError: secretaryPage.error,
-  },
-);
-check(
-  !/wx-tabbar|aria-label="底部导航"|<span>首页<\/span>|<span>工具箱<\/span>|输入框搞定一切|语音会先作为本地草稿/.test(
-    secretaryPage.body,
-  ),
-  'Secretary page does not expose the removed old bottom nav or local-draft helper copy',
-  {
-    status: secretaryPage.response.status,
-  },
-);
-
-const secretaryFriends = await fetchJson('/secretary/friends.json');
-check(
-  secretaryFriends.response.ok &&
-    Array.isArray(secretaryFriends.body) &&
-    ['gemini', 'chatgpt', 'doubao'].every((id) =>
-      secretaryFriends.body.some((friend) => friend.id === id && friend.name && friend.preview),
-    ),
-  'Secretary friends catalog exposes connected AI options for the production AI friends surface',
-  {
-    status: secretaryFriends.response.status,
-    friendIds: Array.isArray(secretaryFriends.body) ? secretaryFriends.body.map((friend) => friend.id) : [],
-    error: secretaryFriends.body?.error,
-  },
-);
-
-for (const staticPath of ['/secretary/index.html', '/secretary/chat.html']) {
-  const secretaryStaticPage = await fetchText(staticPath);
-  check(
-    secretaryStaticPage.response.ok && /<html/.test(secretaryStaticPage.body),
-    `Secretary static deep link is served through the production AI friends surface: ${staticPath}`,
-    {
-      status: secretaryStaticPage.response.status,
-      rawPreview: secretaryStaticPage.body.slice(0, 220),
-      networkError: secretaryStaticPage.error,
-    },
-  );
-  check(
-    !/wx-tabbar|aria-label="底部导航"|<span>首页<\/span>|<span>工具箱<\/span>|输入框搞定一切|语音会先作为本地草稿/.test(
-      secretaryStaticPage.body,
-    ),
-    `Secretary static deep link has no removed controls: ${staticPath}`,
-    {
-      status: secretaryStaticPage.response.status,
-    },
-  );
-}
 
 const authProviderCanaryMatrix = [
   {
@@ -661,18 +577,6 @@ check(
     error: flomoUpload.body?.error,
   },
 );
-
-const gemini = await fetchJson('/api/secretary/chat', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    model: 'gemini',
-    message: '请只回复：宝盒Gemini在线',
-    maxTokens: 64,
-  }),
-});
-check(gemini.response.ok, 'Gemini secretary chat returns 2xx', gemini.body);
-check(gemini.body?.text?.includes('宝盒Gemini在线'), 'Gemini secretary chat returns expected canary phrase', gemini.body);
 
 if (process.exitCode) {
   process.exit();

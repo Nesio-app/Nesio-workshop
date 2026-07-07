@@ -42,14 +42,6 @@ const TABLES = [
     requiredMarkers: ['identity_key text PRIMARY KEY', 'user_id uuid REFERENCES auth.users', 'settings jsonb'],
   },
   {
-    id: 'inventoryItems',
-    table: 'inventory_items',
-    endpoint: '/rest/v1/inventory_items',
-    schemaPath: 'database/schema/supabase-inventory-items-v1.sql',
-    selectColumn: 'identity_key',
-    requiredMarkers: ['identity_key text NOT NULL', 'UNIQUE (identity_key, local_id)', 'item jsonb'],
-  },
-  {
     id: 'memoryNodes',
     table: 'memory_nodes',
     endpoint: '/rest/v1/memory_nodes',
@@ -337,7 +329,6 @@ function buildCoverageReport(root, schemaFiles, storage) {
     localDelete: fileContains(root, 'app/api/user-data/delete/route.ts', ['delete']),
     cloudMemoryExport: fileContains(root, 'app/api/cloud/memory/route.ts', ['exportOnly', 'GET']),
     cloudMemoryDelete: fileContains(root, 'app/api/cloud/memory/route.ts', ['DELETE', 'deleted_at']),
-    cloudInventorySnapshot: fileContains(root, 'app/api/cloud/inventory/route.ts', ['POST', 'deleteMissing']),
   };
 
   return {
@@ -403,13 +394,11 @@ function buildSignalMainFactContractReport() {
       signals: 'main_fact_table',
       memoryNodes: 'projection_view',
       lifeGraph: 'projection_view',
-      inventoryItems: 'domain_private_table_that_references_or_emits_signals',
     },
     targetSourceOfTruth: {
       signals: 'main_fact_table',
       memoryNodes: 'projection_view',
       lifeGraph: 'projection_view',
-      inventoryItems: 'domain_private_table_that_references_or_emits_signals',
     },
     readPolicy: {
       currentPriority: ['cloud_signals', 'local_signal_cache', 'projection_fallback'],

@@ -307,7 +307,6 @@ export type CloudStatusResponse = {
   endpoints: {
     cloudAccountEndpoint: '/api/cloud/account';
     profileSettingsEndpoint: '/api/cloud/profile-settings';
-    inventoryEndpoint: '/api/cloud/inventory';
     memoryEndpoint: '/api/cloud/memory';
     assetsEndpoint: '/api/cloud/assets';
     eventsEndpoint: '/api/cloud/events';
@@ -315,7 +314,6 @@ export type CloudStatusResponse = {
   tables: {
     userProfiles: 'user_profiles';
     profileSettings: 'profile_settings';
-    inventoryItems: 'inventory_items';
     memoryNodes: 'memory_nodes';
     memoryEdges: 'memory_edges';
     memoryAssets: 'memory_assets';
@@ -349,7 +347,6 @@ export type CloudStatusResponse = {
       capabilityKey:
         | 'accountProfile'
         | 'profileSettings'
-        | 'inventorySnapshot'
         | 'memoryGraph'
         | 'assetStorage'
         | 'productEvents'
@@ -422,16 +419,6 @@ export type CloudAccountProfileResponse = {
     | 'cloud_read_failed'
     | 'cloud_write_failed'
     | string;
-};
-
-export type CloudInventorySnapshotItem = InventoryItemRecord & {
-  schemaVersion?: 'LocalInventoryItem@v1' | string;
-  locationHint?: string;
-  notes?: string;
-  purchaseMemory?: Record<string, unknown>;
-  createdAt?: string;
-  updatedAt?: string;
-  mode?: InventoryMode;
 };
 
 export type CloudMemoryNodeRecord = {
@@ -567,28 +554,6 @@ export type CloudProductEventsResponse = {
     | string;
 };
 
-export type CloudInventorySnapshotResponse = {
-  safePublicStatus: true;
-  secretsRedacted: true;
-  ok: boolean;
-  cloudInventorySnapshot: true;
-  readsCloud: boolean;
-  writesCloud: boolean;
-  items?: CloudInventorySnapshotItem[];
-  itemCount?: number;
-  savedCount?: number;
-  rejectedCount?: number;
-  deletedMissingCount?: number;
-  updatedAt?: string | null;
-  error?:
-    | 'cloud_not_configured'
-    | 'not_signed_in'
-    | 'cloud_read_failed'
-    | 'cloud_write_failed'
-    | 'invalid_json'
-    | string;
-};
-
 type ClientOptions = {
   fetcher?: AppApiFetch;
   baseUrl?: string;
@@ -608,7 +573,6 @@ const APP_API_ENDPOINTS = {
   cloudStatus: '/api/cloud/status',
   cloudAccount: '/api/cloud/account',
   cloudProfileSettings: '/api/cloud/profile-settings',
-  cloudInventory: '/api/cloud/inventory',
   cloudMemory: '/api/cloud/memory',
   cloudAssets: '/api/cloud/assets',
   cloudEvents: '/api/cloud/events',
@@ -757,26 +721,6 @@ export function createAppApiClient(options: ClientOptions = {}) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ settings }),
-      });
-    },
-
-    fetchCloudInventorySnapshot(): Promise<CloudInventorySnapshotResponse> {
-      return readJsonAllowError(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.cloudInventory));
-    },
-
-    saveCloudInventorySnapshot({
-      items,
-      deleteMissing = false,
-    }: {
-      items: CloudInventorySnapshotItem[];
-      deleteMissing?: boolean;
-    }): Promise<CloudInventorySnapshotResponse> {
-      return readJsonAllowError(fetcher, buildUrl(baseUrl, APP_API_ENDPOINTS.cloudInventory), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ items, deleteMissing }),
       });
     },
 

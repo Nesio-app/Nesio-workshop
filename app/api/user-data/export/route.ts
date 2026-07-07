@@ -21,7 +21,6 @@ const CLOUD_PRODUCT_DATA_REST_PATHS = {
   memory_nodes: '/rest/v1/memory_nodes',
   memory_edges: '/rest/v1/memory_edges',
   memory_assets: '/rest/v1/memory_assets',
-  inventory_items: '/rest/v1/inventory_items',
   product_events: '/rest/v1/product_events',
 } as const;
 
@@ -225,13 +224,12 @@ async function buildCloudUserDataExportResponse(auditId: string) {
     return null;
   }
 
-  const [accountProfiles, profileSettings, nodes, edges, assets, inventoryItems, productEvents] = await Promise.all([
+  const [accountProfiles, profileSettings, nodes, edges, assets, productEvents] = await Promise.all([
     readCloudRows(config, 'user_profiles', cloudIdentity.identityKey),
     readCloudRows(config, 'profile_settings', cloudIdentity.identityKey),
     readCloudRows(config, 'memory_nodes', cloudIdentity.identityKey),
     readCloudRows(config, 'memory_edges', cloudIdentity.identityKey),
     readCloudRows(config, 'memory_assets', cloudIdentity.identityKey),
-    readCloudRows(config, 'inventory_items', cloudIdentity.identityKey),
     readCloudRows(config, 'product_events', cloudIdentity.identityKey),
   ]);
   const storageObjects = collectStorageObjects({
@@ -244,7 +242,7 @@ async function buildCloudUserDataExportResponse(auditId: string) {
     profileKind: 'cloud_profile',
     readsCloud: true,
     writesCloud: false,
-    tableCount: 7,
+    tableCount: 6,
     storageObjectCount: storageObjects.length,
   });
 
@@ -284,7 +282,6 @@ async function buildCloudUserDataExportResponse(auditId: string) {
         memoryNodes: nodes,
         memoryEdges: edges,
         memoryAssets: assets,
-        inventoryItems,
         productEvents,
         storageObjects,
       },

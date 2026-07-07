@@ -32,7 +32,6 @@ for (const marker of [
   '/rest/v1/memory_nodes',
   '/rest/v1/memory_edges',
   '/rest/v1/memory_assets',
-  '/rest/v1/inventory_items',
   '/rest/v1/product_events',
   '/rest/v1/profile_settings',
   'cloud-product-data-export',
@@ -43,7 +42,6 @@ for (const marker of [
   'buildUserDataExportResponse',
   'accountProfiles',
   'profileSettings',
-  'inventoryItems',
   'productEvents',
   'storageObjects',
   'avatarStoragePath',
@@ -70,7 +68,6 @@ for (const marker of [
   '/rest/v1/memory_nodes',
   '/rest/v1/memory_edges',
   '/rest/v1/memory_assets',
-  '/rest/v1/inventory_items',
   '/rest/v1/product_events',
   'cloud-product-data-delete',
   'supabase-product-data-v1',
@@ -90,7 +87,6 @@ for (const marker of [
   'avatarStoragePath',
   'buildUserDataDeleteResponse',
   'user_profiles',
-  'inventory_items',
   'product_events',
 ]) {
   assert.ok(deleteRoute.includes(marker), `user data delete route missing marker: ${marker}`);
@@ -131,7 +127,6 @@ assert.doesNotMatch(
 
 assert.match(readme, /\/api\/user-data\/export/, 'database README must document user-data export backend behavior.');
 assert.match(readme, /\/api\/user-data\/delete/, 'database README must document user-data delete backend behavior.');
-assert.match(readme, /inventory_items/, 'database README must document inventory_items export/delete coverage.');
 assert.match(readme, /product_events/, 'database README must document product_events export/delete coverage.');
 assert.match(readme, /Storage object/i, 'database README must document Storage object delete coverage.');
 assert.match(readme, /SUPABASE_STORAGE_BUCKET/, 'database README must document the Storage bucket requirement for user-data delete.');

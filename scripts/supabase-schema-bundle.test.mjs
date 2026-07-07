@@ -57,7 +57,6 @@ assert.deepEqual(
   [
     'database/schema/supabase-user-profiles-v1.sql',
     'database/schema/supabase-profile-settings-v1.sql',
-    'database/schema/supabase-inventory-items-v1.sql',
     'database/schema/supabase-memory-v1.sql',
     'database/schema/supabase-signals-v1.sql',
     'database/schema/supabase-storage-v1.sql',
@@ -88,7 +87,7 @@ assert.match(bundle, /BEGIN;/, 'bundle must wrap schema application in an explic
 assert.match(bundle, /COMMIT;/, 'bundle must wrap schema application in an explicit transaction');
 assert.match(bundle, /CREATE TABLE IF NOT EXISTS public\.user_profiles/, 'bundle must include user_profiles schema');
 assert.match(bundle, /CREATE TABLE IF NOT EXISTS public\.profile_settings/, 'bundle must include profile_settings schema');
-assert.match(bundle, /CREATE TABLE IF NOT EXISTS public\.inventory_items/, 'bundle must include inventory_items schema');
+assert.doesNotMatch(bundle, /public\.inventory_items/, 'inventory_items 云快照表已随收纳原生化移除,不得回归 bundle');
 assert.match(bundle, /CREATE TABLE IF NOT EXISTS public\.memory_nodes/, 'bundle must include memory_nodes schema');
 assert.match(bundle, /CREATE TABLE IF NOT EXISTS public\.memory_edges/, 'bundle must include memory_edges schema');
 assert.match(bundle, /CREATE TABLE IF NOT EXISTS public\.memory_assets/, 'bundle must include memory_assets schema');
@@ -102,11 +101,6 @@ assert.match(bundle, /CREATE TABLE IF NOT EXISTS public\.product_events/, 'bundl
 assert.match(bundle, /CREATE TABLE IF NOT EXISTS public\.telemetry_events/, 'bundle must include telemetry_events schema');
 assert.match(bundle, /CREATE TABLE IF NOT EXISTS public\.feature_votes/, 'bundle must include feature_votes schema');
 assert.match(bundle, /ADD COLUMN IF NOT EXISTS access_role/, 'bundle must include access control columns');
-assert.equal(
-  (bundle.match(/CREATE TABLE IF NOT EXISTS public\.inventory_items/g) || []).length,
-  1,
-  'bundle must not include duplicate stale inventory schema copies',
-);
 assert.doesNotMatch(bundle, /supabase-inventory-items-v1 2\.sql/, 'bundle must not include stale Finder-copy schema paths');
 assert.doesNotMatch(bundle, /SUPABASE_SERVICE_ROLE_KEY|SUPABASE_ANON_KEY/, 'bundle must not contain runtime secrets');
 

@@ -72,7 +72,6 @@ assert.deepEqual(
 );
 assert.ok(report.schemaFiles.userProfiles.path.endsWith('database/schema/supabase-user-profiles-v1.sql'));
 assert.ok(report.schemaFiles.profileSettings.path.endsWith('database/schema/supabase-profile-settings-v1.sql'));
-assert.ok(report.schemaFiles.inventoryItems.path.endsWith('database/schema/supabase-inventory-items-v1.sql'));
 assert.ok(report.schemaFiles.memoryNodes.path.endsWith('database/schema/supabase-memory-v1.sql'));
 assert.ok(report.schemaFiles.memoryEdges.path.endsWith('database/schema/supabase-memory-v1.sql'));
 assert.ok(report.schemaFiles.memoryAssets.path.endsWith('database/schema/supabase-memory-v1.sql'));
@@ -81,7 +80,6 @@ assert.ok(report.schemaFiles.productEvents.path.endsWith('database/schema/supaba
 assert.ok(report.schemaFiles.signals.path.endsWith('database/schema/supabase-signals-v1.sql'));
 assert.ok(report.schemaFiles.userProfiles.hasIdentityKey);
 assert.ok(report.schemaFiles.profileSettings.hasIdentityKey);
-assert.ok(report.schemaFiles.inventoryItems.hasIdentityKey);
 assert.ok(report.schemaFiles.memoryNodes.hasIdentityKey);
 assert.ok(report.schemaFiles.memoryEdges.hasIdentityKey);
 assert.ok(report.schemaFiles.memoryAssets.hasIdentityKey);
@@ -131,7 +129,6 @@ assert.ok(
 const source = fs.readFileSync(scriptPath, 'utf8');
 assert.match(source, /\/rest\/v1\/user_profiles/, 'preflight must know how to check user_profiles table.');
 assert.match(source, /\/rest\/v1\/profile_settings/, 'preflight must know how to check profile_settings table.');
-assert.match(source, /\/rest\/v1\/inventory_items/, 'preflight must know how to check inventory_items table.');
 assert.match(source, /\/rest\/v1\/memory_nodes/, 'preflight must know how to check memory_nodes table.');
 assert.match(source, /\/rest\/v1\/memory_edges/, 'preflight must know how to check memory_edges table.');
 assert.match(source, /\/rest\/v1\/memory_assets/, 'preflight must know how to check memory_assets table.');

@@ -59,13 +59,12 @@ for (const section of [
 }
 
 assert.equal(report.productBackendSurfaces.ready, true, 'source-level product backend surfaces must be wired');
-assert.equal(report.productBackendSurfaces.surfaceCount, 9, 'Backend v1 should track the full product backend surface set');
-assert.equal(report.productBackendSurfaces.readySurfaceCount, 9, 'All source-level Backend v1 product surfaces should be ready');
+assert.equal(report.productBackendSurfaces.surfaceCount, 8, 'Backend v1 should track the full product backend surface set');
+assert.equal(report.productBackendSurfaces.readySurfaceCount, 8, 'All source-level Backend v1 product surfaces should be ready');
 for (const surfaceId of [
   'auth_session',
   'account_profile',
   'profile_settings',
-  'inventory_items',
   'memory_graph',
   'cloud_assets',
   'product_events',

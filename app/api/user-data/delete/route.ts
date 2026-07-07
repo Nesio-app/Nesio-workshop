@@ -15,14 +15,13 @@ type SupabaseTokenResponse = {
   expires_in?: number;
 };
 
-const CLOUD_PRODUCT_DATA_TABLES = ['user_profiles', 'profile_settings', 'memory_nodes', 'memory_edges', 'memory_assets', 'inventory_items', 'product_events'] as const;
+const CLOUD_PRODUCT_DATA_TABLES = ['user_profiles', 'profile_settings', 'memory_nodes', 'memory_edges', 'memory_assets', 'product_events'] as const;
 const CLOUD_PRODUCT_DATA_REST_PATHS = {
   user_profiles: '/rest/v1/user_profiles',
   profile_settings: '/rest/v1/profile_settings',
   memory_nodes: '/rest/v1/memory_nodes',
   memory_edges: '/rest/v1/memory_edges',
   memory_assets: '/rest/v1/memory_assets',
-  inventory_items: '/rest/v1/inventory_items',
   product_events: '/rest/v1/product_events',
 } as const;
 

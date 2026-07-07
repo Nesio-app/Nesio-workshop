@@ -7,7 +7,6 @@ const OUTPUT_PATH = 'database/schema/supabase-backend-v1-bundle.sql';
 const CANONICAL_SOURCES = [
   'database/schema/supabase-user-profiles-v1.sql',
   'database/schema/supabase-profile-settings-v1.sql',
-  'database/schema/supabase-inventory-items-v1.sql',
   'database/schema/supabase-memory-v1.sql',
   'database/schema/supabase-signals-v1.sql',
   'database/schema/supabase-storage-v1.sql',
@@ -36,12 +35,6 @@ const REQUIRED_MARKERS = {
     'CREATE TABLE IF NOT EXISTS public.profile_settings',
     'identity_key text PRIMARY KEY',
     'ALTER TABLE public.profile_settings ENABLE ROW LEVEL SECURITY',
-  ],
-  'database/schema/supabase-inventory-items-v1.sql': [
-    'CREATE TABLE IF NOT EXISTS public.inventory_items',
-    'identity_key text NOT NULL',
-    'UNIQUE (identity_key, local_id)',
-    'ALTER TABLE public.inventory_items ENABLE ROW LEVEL SECURITY',
   ],
   'database/schema/supabase-memory-v1.sql': [
     'CREATE TABLE IF NOT EXISTS public.memory_nodes',
