@@ -70,7 +70,13 @@
 `personalization-capacity-proposal.md §6` 硬约束:统一时**不统一数学、不推翻现有模型**——只收存储/总线/冷启动。所以拆两 phase:
 
 ### Phase 2a —— 统一(不动算法)
-统一反馈总线(schema 见 proposal §2)+ 三原语(Preference/Baseline/Recency);**mirror = 规范 Preference Store**;guidance-ranker 权重自存、特征改读规范 store。**评估并掉 card-feedback**(见下)。
+统一反馈总线(schema 见 proposal §2)+ 三原语(Preference/Baseline/Recency);**mirror = 规范 Preference Store**(✅ 2026-07-07);**energy = Baseline 原语**(✅ 2026-07-07,轨迹逐字等价、先验 {50,100} 起步);guidance-ranker 权重自存、特征改读规范 store。**评估并掉 card-feedback**(见下)。
+
+**⚠️ 原子记录原则(2a续② 评估产出,修订 proposal §3 的两行)**:cooling 与 dormant **不拆存储**。
+- cooling(`nesio-guidance-cooling`):`showCount 当日重置`派生自 `lastShownAt`(cooling-store.ts:57-59),时间戳与计数是一条原子记录,拆进 Recency = 再造双源(本轮已连修三处双源:FinanceTab/restore/mirror,不再新造)。
+- dormant(`nesio-dormant-store`):`snoozedUntil`×`snoozeCount` 配对、`archivedAt` 驱动 90 天复活,时钟即生命周期业务态,同理不拆。
+- card-feedback 的 `not_now→4h` 同判:`fb.at` 是反馈事实自带的时间戳,拆出去两库存一实。
+- **Recency 原语的定位据此收窄**:服务**新增**的时效需求 + 简单独立时钟;既有原子生命周期记录保留原状。
 
 ### Phase 2b —— 变聪明(轮到改算法)
 证据驱动、逐个上。**重评发现真够格升级的只有 3 个**:

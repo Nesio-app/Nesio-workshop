@@ -9,7 +9,7 @@
 export { emitFeedback, onFeedback, type FeedbackEvent, type Reaction } from './feedback-bus';
 export { readFeedbackLog, replayFeedback } from './feedback-log';
 export { recordPreference, getWeight, getWeights, seedPreferenceWeights, resetPreferenceDimension } from './preference-store';
-export { foldSample, baseline, zScore, type Estimator } from './baseline-store';
+export { foldSample, baseline, zScore, ewmaState, seedEwma, type Estimator } from './baseline-store';
 export { markSeen, sinceSeen, cooldownRemaining, type CooldownPolicy } from './recency-store';
 
 // 副作用引入:确保 feedback-log / preference-store 的 onFeedback 订阅在首次 emit 前已注册。
