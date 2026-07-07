@@ -5448,8 +5448,11 @@ html[data-portal-theme="night"] .nesio-type-chip {
   inset: 0;
   z-index: 300;
   display: flex;
-  align-items: flex-end;
-  justify-content: center;
+  /* 扇形行(拍/说/享)在上、extras 行(心情/冻/收纳)在下 —— 纵向堆叠、水平居中。
+     此前漏了 column,两行被排成一横排,窄屏上按钮互相叠压、两端出屏 */
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
   padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
 }
 
@@ -5561,12 +5564,14 @@ html[data-portal-theme="night"] .nesio-tell-fan-icon {
   white-space: nowrap;
 }
 
-/* 批次 40:记录心情 —— 与另外三个扇形按钮同款,居中放在扇形下方 */
+/* 批次 40:记录心情/冻一下/收纳 —— 与扇形按钮同款,居中放在扇形下方一行 */
 .nesio-tell-extras {
   display: flex;
   justify-content: center;
-  gap: 2.2rem;
-  margin-top: 1.5rem;
+  gap: 1.6rem;
+  margin-top: 0;
+  max-width: 100vw;
+  padding: 0 0.75rem;
 }
 .nesio-tell-fan-btn--extra {
   transform: none;
