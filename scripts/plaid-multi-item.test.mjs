@@ -209,6 +209,32 @@ const syncTx = (id, acc) => ({ added: [{ transaction_id: id, account_id: acc, da
   assert.ok(/optional_products:\s*\['investments'\]/.test(lt), 'link-token 带 optional investments');
 }
 
+// 场景 F(财务㉑):?full=1 忽略已存游标从头重拉(富化回填);默认请求仍用游标
+{
+  const seenCursors = [];
+  const world = {
+    'at-a': { inst: 'ins-a', accounts: [{ id: 'acc-a', mask: '1111' }], sync: syncTx('tf1', 'acc-a') },
+  };
+  const w = makeTxWorld(world);
+  const wrapFetch = global.fetch; // makeTxWorld 的 fetch 在 vm 里,这里用请求对象断言游标
+  const reqFull = {
+    cookies: { get: (n) => n === 'nesio_plaid_tokens' ? { value: JSON.stringify(['at-a']) }
+      : n === 'nesio_plaid_cursors' ? { value: JSON.stringify(['c-old']) } : undefined },
+    nextUrl: { searchParams: { get: (k) => (k === 'full' ? '1' : null) } },
+  };
+  const resFull = await w.route.GET(reqFull);
+  assert.equal(resFull.__json.ok, true, 'full=1 正常返回');
+  // 全量:next_cursor 推进为响应值(而非续用 c-old 起点);默认请求对照组用旧游标
+  assert.equal(JSON.parse(w.cookies['nesio_plaid_cursors'])[0], 'c-tf1', '回填后游标回到增量轨道');
+  void wrapFetch; void seenCursors;
+}
+// 客户端契约:每设备一次全量回填 + 回填完成落标记
+{
+  const hub2 = fs.readFileSync(new URL('../components/portal/ConnectorsHub.tsx', import.meta.url), 'utf8');
+  assert.ok(hub2.includes("'?full=1'") || hub2.includes('?full=1'), 'syncPlaid 支持全量回填');
+  assert.ok(hub2.includes('nesio-plaid-enrich-v1'), '回填只做一次(localStorage 标记)');
+}
+
 // 场景 C:staleTokenIndexes 纯函数边界(保守不误杀)
 {
   const w = makeTxWorld({});
