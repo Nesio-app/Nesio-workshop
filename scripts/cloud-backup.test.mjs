@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 const src = fs.readFileSync(new URL('../lib/portal/cloud-backup.ts', import.meta.url), 'utf8');
 const js = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 
-function makeCtx({ lsInit = {}, fbEntries = {}, idbBlobs = {}, fetchImpl } = {}) {
+function makeCtx({ lsInit = {}, fbEntries = {}, idbBlobs = {}, fetchImpl, idbKeys = [], idbInit = {} } = {}) {
   const lsMap = new Map(Object.entries(lsInit));
   const localStorage = {
     getItem: (k) => (lsMap.has(k) ? lsMap.get(k) : null),
@@ -21,6 +21,14 @@ function makeCtx({ lsInit = {}, fbEntries = {}, idbBlobs = {}, fetchImpl } = {})
     removeItem: (k) => lsMap.delete(k),
   };
   let lastFetch = null;
+  let lastRestore = null;
+  const idbStore = new Map(Object.entries(idbInit));
+  const idbBackend = {
+    get: async (k) => (idbStore.has(k) ? idbStore.get(k) : null),
+    set: async (k, v) => { idbStore.set(k, v); },
+    delete: async (k) => { idbStore.delete(k); },
+    keys: async () => [...idbStore.keys()],
+  };
   const ctx = {
     module: { exports: {} }, exports: {}, console, Date,
     window: {},
@@ -30,11 +38,22 @@ function makeCtx({ lsInit = {}, fbEntries = {}, idbBlobs = {}, fetchImpl } = {})
     FormData: class { constructor() { this._d = new Map(); } append(k, v) { this._d.set(k, v); } get(k) { return this._d.get(k); } },
     fetch: async (url, init) => { lastFetch = { url, init }; return fetchImpl(url, init); },
     require: (p) => {
-      if (p === './full-backup') return { buildFullBackup: () => ({ format: 'nesio-full-backup', version: 1, exportedAt: '2026-01-01T00:00:00.000Z', entries: { ...fbEntries } }) };
-      if (p === './idb-blob-store') return { collectIdbBlobs: async () => ({ ...idbBlobs }) };
+      if (p === './full-backup') return {
+        buildFullBackup: () => ({ format: 'nesio-full-backup', version: 1, exportedAt: '2026-01-01T00:00:00.000Z', entries: { ...fbEntries } }),
+        // 捕获 localStorage 侧收到的 entries(验证路由);返回条数
+        restoreFullBackup: (_storage, backup, mode) => { lastRestore = { entries: backup.entries, mode }; return { restoredKeys: Object.keys(backup.entries).length, skippedKeys: [], mergedNodes: undefined }; },
+        isValidBackup: (v) => !!(v && typeof v === 'object' && v.entries && v.format === 'nesio-full-backup'),
+      };
+      if (p === './idb-blob-store') return {
+        collectIdbBlobs: async () => ({ ...idbBlobs }),
+        isIdbBlobKey: (k) => idbKeys.includes(k),
+        idbBackend,
+      };
       return {};
     },
     _lastFetch: () => lastFetch,
+    _lastRestore: () => lastRestore,
+    _idbStore: () => idbStore,
     _lsMap: lsMap,
   };
   ctx.module.exports = ctx.exports;
@@ -113,6 +132,71 @@ const ok200 = () => ({ ok: true, status: 200, json: async () => ({ ok: true, sto
   assert.equal(r.ok, false);
   assert.equal(r.error, 'too_large', '超 8MB → too_large');
   assert.equal(ctx._lastFetch(), null, '超限不发网络');
+}
+
+// ── 恢复(pull / restoreCombinedBackup)──
+
+const backupDoc = (entries) => ({ format: 'nesio-full-backup', version: 1, exportedAt: 'x', entries });
+
+// 6. restoreCombinedBackup 路由:IDB key 落 idbBackend、其余走 restoreFullBackup(localStorage)
+{
+  const { mod, ctx } = makeCtx({ idbKeys: ['nesio-health-v1'] });
+  const res = await mod.restoreCombinedBackup(backupDoc({ 'nesio-life-graph-v1': '[]', 'nesio-health-v1': '{"metrics":[1]}' }), 'replace');
+  assert.equal(JSON.stringify(ctx._lastRestore().entries), JSON.stringify({ 'nesio-life-graph-v1': '[]' }), 'localStorage 侧只含非 IDB key');
+  assert.equal(ctx._idbStore().get('nesio-health-v1'), '{"metrics":[1]}', 'IDB key 落 idbBackend');
+  assert.equal(res.idbRestored, 1);
+  assert.equal(res.restoredKeys, 1, 'localStorage 侧恢复 1 条');
+}
+
+// 7. merge 不覆盖已有 IDB;replace 覆盖(= 修复的坑)
+{
+  const { mod, ctx } = makeCtx({ idbKeys: ['nesio-health-v1'], idbInit: { 'nesio-health-v1': 'OLD' } });
+  await mod.restoreCombinedBackup(backupDoc({ 'nesio-health-v1': 'NEW' }), 'merge');
+  assert.equal(ctx._idbStore().get('nesio-health-v1'), 'OLD', 'merge 保留已有 IDB(仅补缺)');
+
+  const { mod: m2, ctx: c2 } = makeCtx({ idbKeys: ['nesio-health-v1'], idbInit: { 'nesio-health-v1': 'OLD' } });
+  await m2.restoreCombinedBackup(backupDoc({ 'nesio-health-v1': 'NEW' }), 'replace');
+  assert.equal(c2._idbStore().get('nesio-health-v1'), 'NEW', 'replace 覆盖 IDB(修 #43 迁移留下的 replace 静默失效)');
+}
+
+// 8. pullBackupFromCloud:付费门 + 无备份
+{
+  const off = makeCtx({});
+  assert.equal((await off.mod.pullBackupFromCloud()).error, 'entitlement_required', '未解锁不恢复');
+
+  const noBk = makeCtx({ lsInit: { 'nesio-cloud-entitlement-v1': 'on' } });
+  assert.equal((await noBk.mod.pullBackupFromCloud()).error, 'no_backup', '无上次备份记录 → no_backup');
+}
+
+// 9. pullBackupFromCloud happy path:签名 URL → 拉 blob → 校验 → 分流恢复
+{
+  const fetchImpl = (url) => {
+    if (String(url).startsWith('/api/cloud/assets?')) return { ok: true, status: 200, json: async () => ({ ok: true, signedUrl: 'https://signed/x' }) };
+    if (url === 'https://signed/x') return { ok: true, status: 200, text: async () => JSON.stringify(backupDoc({ 'nesio-life-graph-v1': '[]', 'nesio-health-v1': '{"metrics":[]}' })) };
+    return { ok: false, status: 404, json: async () => ({}) };
+  };
+  const { mod, ctx } = makeCtx({
+    lsInit: { 'nesio-cloud-entitlement-v1': 'on', 'nesio-cloud-backup-last-v1': JSON.stringify({ at: 'x', storagePath: 'id/backup/x.txt', bytes: 1, entryCount: 2 }) },
+    idbKeys: ['nesio-health-v1'], fetchImpl,
+  });
+  const res = await mod.pullBackupFromCloud('merge');
+  assert.equal(res.ok, true, '恢复成功');
+  assert.equal(res.idbRestored, 1, '健康 blob 落 IDB');
+  assert.equal(ctx._idbStore().get('nesio-health-v1'), '{"metrics":[]}', 'IDB 里有了');
+  assert.equal(JSON.stringify(ctx._lastRestore().entries), JSON.stringify({ 'nesio-life-graph-v1': '[]' }), '非 IDB key 走 localStorage 恢复');
+}
+
+// 10. 云端 blob 不是有效备份 → invalid_backup,不动本机
+{
+  const fetchImpl = (url) => {
+    if (String(url).startsWith('/api/cloud/assets?')) return { ok: true, status: 200, json: async () => ({ ok: true, signedUrl: 'https://signed/x' }) };
+    return { ok: true, status: 200, text: async () => 'not json at all' };
+  };
+  const { mod } = makeCtx({
+    lsInit: { 'nesio-cloud-entitlement-v1': 'on', 'nesio-cloud-backup-last-v1': JSON.stringify({ at: 'x', storagePath: 'p', bytes: 1, entryCount: 1 }) },
+    fetchImpl,
+  });
+  assert.equal((await mod.pullBackupFromCloud()).error, 'invalid_backup', '坏 blob → invalid_backup');
 }
 
 console.log('cloud-backup: OK');
