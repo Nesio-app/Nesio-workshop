@@ -31,6 +31,12 @@ export function merchantKey(t: Pick<BankTx, 'name' | 'merchantId'>): string {
   return t.merchantId || normalizeMerchant(t.name);
 }
 
+/** 财务㉚:学习规则三级读取 —— entity 键(商户改名不变)→ 归一名(描述符噪音)→
+ * 原始名(老规则原位兼容,不做数据迁移)。 */
+function ruleFor<T>(rules: Record<string, T>, t: Pick<BankTx, 'name' | 'merchantId'>): T | undefined {
+  return rules[merchantKey(t)] ?? rules[normalizeMerchant(t.name)] ?? rules[t.name];
+}
+
 export const BANK_TX_KEY = 'nesio-bank-tx-v1';
 export const BANK_SYNCED_AT_KEY = 'nesio-bank-synced-at';
 
@@ -145,6 +151,13 @@ export function setFlowRule(name: string, flow: TxFlow | ''): void {
   try { localStorage.setItem(FLOW_RULE_KEY, JSON.stringify(rules)); } catch { reportStorageDropped(); }
 }
 
+/** 财务㉚:按 merchantKey 写类型规则(entity id 优先)——商户改描述符/改名后规则仍生效。 */
+export function setFlowRuleFor(t: Pick<BankTx, 'name' | 'merchantId'>, flow: TxFlow | ''): void {
+  const key = merchantKey(t);
+  setFlowRule(key, flow);
+  if (flow) rememberRuleLabel(key, t.name);
+}
+
 // 财务⑤:statement credit(卡权益返还/报销,AMEX Global Entry credit、rebate、cashback 等)
 // 不是商户退款——没有对应的「退货」动作,叫「退款」误导。只在本会判成 refund 的分支上按
 // 名字保守识别(CREDIT UNION 是机构名,排除);金额口径与退款相同(冲抵支出),纯语义分流。
@@ -171,7 +184,7 @@ export function expenseMerchants(txs: BankTx[]): Set<string> {
  * 否则归 transfer —— PayPal 收款/亲友转入此前被记成「退款」倒扣净支出。不传保持旧行为。
  */
 export function txFlow(t: BankTx, rules = loadFlowRules(), evidence?: Set<string>): TxFlow {
-  const forced = rules[t.name];
+  const forced = ruleFor(rules, t);
   if (forced) return forced;
   const cat = (t.category || '').toUpperCase();
   if (/INCOME/.test(cat)) return 'income';
@@ -509,10 +522,33 @@ export function setMerchantRule(name: string, category: string): void {
   try { localStorage.setItem(MERCHANT_RULE_KEY, JSON.stringify(rules)); } catch { reportStorageDropped(); }
 }
 
+/** 财务㉚:按 merchantKey 写分类规则(entity id 优先)。 */
+export function setMerchantRuleFor(t: Pick<BankTx, 'name' | 'merchantId'>, category: string): void {
+  const key = merchantKey(t);
+  setMerchantRule(key, category);
+  if (category.trim()) rememberRuleLabel(key, t.name);
+}
+
+// 财务㉚:entity id 作规则键不可读,「已学规则」面板展示时用 label 映射还原商户名。
+const RULE_LABEL_KEY = 'nesio-bank-rule-label-v1';
+
+export function loadRuleLabels(): Record<string, string> {
+  if (typeof window === 'undefined') return {};
+  try { return JSON.parse(localStorage.getItem(RULE_LABEL_KEY) || '{}') as Record<string, string>; } catch { return {}; }
+}
+
+function rememberRuleLabel(key: string, name: string): void {
+  if (typeof window === 'undefined' || !key || key === name) return;
+  const all = loadRuleLabels();
+  if (all[key] === name) return;
+  all[key] = name;
+  try { localStorage.setItem(RULE_LABEL_KEY, JSON.stringify(all)); } catch { reportStorageDropped(); }
+}
+
 /** 生效分类:用户规则优先,其次 Plaid 分类;经 normalizeCategory 归一(财务②:旧自家词汇
  * 与 PFC 枚举合流,统计里同类不再被拆成两组)。 */
 export function effectiveCategory(t: BankTx, rules = loadMerchantRules()): string {
-  return normalizeCategory(rules[t.name] || t.category || '');
+  return normalizeCategory(ruleFor(rules, t) || t.category || '');
 }
 
 /** 需要审核的交易:本月、真支出、没有生效分类的。 */
@@ -616,6 +652,7 @@ export function suggestCategory(name: string, rules: Record<string, string> = lo
 
 export interface RecurringCharge {
   name: string;
+  key: string; // 财务㉚:商户归并键(merchantKey)——手动覆盖(不是定期)写这个键,改名不丢
   category: string;
   avgAmount: number;
   count: number;
@@ -831,14 +868,14 @@ export function detectRecurring(txs: BankTx[], opts?: { includePredicted?: boole
       if (!opts?.includePredicted || !list.length) continue;
       const sorted2 = list.slice().sort((a, b) => a.date.localeCompare(b.date));
       const last = sorted2[sorted2.length - 1];
-      if (recurRules[last.name] === 'no') continue;
+      if (ruleFor(recurRules, last) === 'no') continue;
       const isNonBill = NON_BILL_CAT_RE.test(last.name);
       // 财务⑱:先验优先 —— 命中已知订阅商户库的,1 笔即标、2 笔不需要周期证据。
       // 财务⑳:RENT_AND_UTILITIES 分类同为强先验(市政公司穷举不了,但 Plaid 分类会给;
       // 水电账单金额天然浮动,先验路径不要求金额一致)。
       const known = matchKnownSubscription(last.name);
       const plaidCat2 = [...sorted2].reverse().find((t) => (t.category || '').trim())?.category || '';
-      const catPred = normalizeCategory(merchantRules[last.name] || plaidCat2) || known?.category || suggestCategory(last.name).category;
+      const catPred = normalizeCategory(ruleFor(merchantRules, last) || plaidCat2) || known?.category || suggestCategory(last.name).category;
       const strongPrior = !!known || catPred === 'RENT_AND_UTILITIES';
       const assumedLabel = (d: number): [string, string] => (d >= 300 ? ['每年(推测)', 'Yearly (assumed)'] : ['每月(推测)', 'Monthly (assumed)']);
       let cadence = 0; let label: [string, string] | null = null;
@@ -847,7 +884,7 @@ export function detectRecurring(txs: BankTx[], opts?: { includePredicted?: boole
         label = cadenceLabelFor(gap);
         cadence = Math.round(gap);
         const amtClose = Math.abs(sorted2[1].amount - sorted2[0].amount) <= Math.max(1, Math.abs(sorted2[0].amount) * 0.02);
-        const qualifies = recurRules[last.name] === 'yes' || strongPrior || (!isNonBill && !!label && (BILL_RE.test(last.name) || amtClose));
+        const qualifies = ruleFor(recurRules, last) === 'yes' || strongPrior || (!isNonBill && !!label && (BILL_RE.test(last.name) || amtClose));
         if (!qualifies) continue;
         if (!label) {
           // 间隔不成周期(重订阅/补缴等):有强先验才继续,用先验默认周期
@@ -865,6 +902,7 @@ export function detectRecurring(txs: BankTx[], opts?: { includePredicted?: boole
       const avg2 = amts2.reduce((s, v) => s + v, 0) / amts2.length;
       out.push({
         name: last.name,
+        key: merchantKey(last),
         category: catPred,
         avgAmount: Math.round(avg2 * 100) / 100,
         count: sorted2.length,
@@ -898,7 +936,7 @@ export function detectRecurring(txs: BankTx[], opts?: { includePredicted?: boole
     // 财务②:分类优先级 用户规则 > 交易自带 Plaid 分类(最新一笔非空)> 关键词建议。
     // 此前无视 Plaid 分类直接猜 → YouTube/健身房全兜底成 Services。
     const plaidCat = [...sorted].reverse().find((t) => (t.category || '').trim())?.category || '';
-    const cat = normalizeCategory(merchantRules[last.name] || plaidCat) || suggestCategory(last.name).category;
+    const cat = normalizeCategory(ruleFor(merchantRules, last) || plaidCat) || suggestCategory(last.name).category;
     const amts = sorted.map((t) => Math.abs(t.amount));
     const avg = amts.reduce((s, v) => s + v, 0) / amts.length;
     const cv = coeffVar(amts);
@@ -907,7 +945,7 @@ export function detectRecurring(txs: BankTx[], opts?: { includePredicted?: boole
     const baselineAmount = priorAmts.length ? round2(median(priorAmts)) : latestAmount;
 
     // ── 账单判定(手动覆盖优先)──
-    const override = recurRules[last.name];
+    const override = ruleFor(recurRules, last);
     if (override === 'no') continue; // 用户手动排除
     // 财务⑳:账单判定 = 关键词 OR 水电气网类(金额天然浮动,CV 不设限)OR 已知商户先验
     const isBill = BILL_RE.test(last.name) || cat === 'RENT_AND_UTILITIES' || !!matchKnownSubscription(last.name);
@@ -918,6 +956,7 @@ export function detectRecurring(txs: BankTx[], opts?: { includePredicted?: boole
 
     out.push({
       name: last.name,
+      key: merchantKey(last),
       category: cat,
       avgAmount: Math.round(avg * 100) / 100,
       count: sorted.length,

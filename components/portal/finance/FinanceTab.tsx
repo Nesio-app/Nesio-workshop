@@ -13,7 +13,7 @@ import {
   accountMonth, formatMoney, ymOf, prevYm, txFlow, setFlowRule, TX_FLOW_LABELS,
   detectRecurring, upcomingRecurring, loadMerchantRules, loadFlowRules, setRecurRule,
   loadBankSyncedAt, excludedTxCount, internalAdjustmentIds, accountTypeLabel, assetSummary, expenseMerchants,
-  loadHoldings,
+  loadHoldings, setMerchantRuleFor, setFlowRuleFor, loadRuleLabels,
   type BankTx, type BankAccount, type TxFlow, type Holding,
 } from '@/lib/portal/bank-tx';
 // 风险预警与 Today/问一问 同读一份判定(financeFindings,Layer1 漂移收口)——此前 bank-tx 里
@@ -131,7 +131,7 @@ export default function FinanceTab() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const upcoming = useMemo(() => upcomingRecurring(txs, 7), [txs, rev]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const learnedRules = useMemo(() => ({ merchant: loadMerchantRules(), flow: loadFlowRules() }), [rev]);
+  const learnedRules = useMemo(() => ({ merchant: loadMerchantRules(), flow: loadFlowRules(), labels: loadRuleLabels() }), [rev]);
   // 财务⑪:退款证据 —— 交易行的类型标签与月度统计同口径(没买过的商户进账不是退款)。
   // ⚠️ hooks 必须全部在下面的空态早退**之前**(hook 数量随渲染变化会让 React 整页抛错)。
   const refundEvidence = useMemo(() => expenseMerchants(txs), [txs]);
@@ -165,7 +165,7 @@ export default function FinanceTab() {
   const netDelta = prevSummary.net >= 50 ? Math.round(((summary.net - prevSummary.net) / prevSummary.net) * 100) : null;
   const idx = months.indexOf(ym);
   const SUBS: Array<[Sub, string, string]> = [['overview', '总览', 'Overview'], ['budget', '预算', 'Budget'], ['tx', '交易', 'Transactions'], ['recurring', '定期', 'Recurring'], ['invest', '投资', 'Investing'], ['cards', '账户', 'Accounts']];
-  function markNotRecurring(name: string) { setRecurRule(name, 'no'); setRev((r) => r + 1); }
+  function markNotRecurring(key: string) { setRecurRule(key, 'no'); setRev((r) => r + 1); } // 财务㉚:传流的 merchantKey,改名不丢
   function removeMerchantRule(name: string) { setMerchantRule(name, ''); setRev((r) => r + 1); }
   function removeFlowRule(name: string) { setFlowRule(name, ''); setRev((r) => r + 1); }
   // 财务⑪:筛选全集 —— 本月分类按金额靠前,其余全量数据里出现过的分类跟在后面
@@ -188,8 +188,8 @@ export default function FinanceTab() {
   // 批次 40 → 财务⑩:交易行显示账户归属(accountId → 完整账户,logo/类型/后四位)
   const acctById = new Map(accounts.map((a) => [a.id, a]));
 
-  function resolveReview(name: string, category: string) { setMerchantRule(name, category); setRev((r) => r + 1); }
-  function applyFlow(name: string, flow: TxFlow) { setFlowRule(name, flow); setFlowEditId(null); setRev((r) => r + 1); }
+  function resolveReview(t: BankTx, category: string) { setMerchantRuleFor(t, category); setRev((r) => r + 1); } // 财务㉚:写 merchantKey
+  function applyFlow(t: BankTx, flow: TxFlow) { setFlowRuleFor(t, flow); setFlowEditId(null); setRev((r) => r + 1); } // 财务㉚:写 merchantKey
 
   return (
     <div className="nesio-analytics-tab">
@@ -382,11 +382,11 @@ export default function FinanceTab() {
                     {/* 规则命中的置信度是写死的常数(0.72/0.4),与证据量无关,不该以百分比精度冒充"可信度";改定性措辞。 */}
                     <p className="nesio-fin-review-sug">{L(dict, `建议分类:${categoryLabel(sug.category, 'zh')}${sug.confidence >= 0.6 ? '(关键词匹配)' : '(默认猜测)'}`, `Suggested: ${categoryLabel(sug.category, 'en')}${sug.confidence >= 0.6 ? ' (keyword match)' : ' (default guess)'}`)}</p>
                     <div className="nesio-fin-review-btns">
-                      <button type="button" className="nesio-fin-review-accept" onClick={() => resolveReview(t.name, sug.category)}>{L(dict, '接受', 'Accept')}</button>
+                      <button type="button" className="nesio-fin-review-accept" onClick={() => resolveReview(t, sug.category)}>{L(dict, '接受', 'Accept')}</button>
                       {COMMON_EXPENSE_CATEGORIES.filter((c) => c !== sug.category).slice(0, 2).map((c) => (
-                        <button key={c} type="button" className="nesio-fin-review-alt" onClick={() => resolveReview(t.name, c)}>{categoryLabel(c, dict)}</button>
+                        <button key={c} type="button" className="nesio-fin-review-alt" onClick={() => resolveReview(t, c)}>{categoryLabel(c, dict)}</button>
                       ))}
-                      <button type="button" className="nesio-fin-review-skip" onClick={() => resolveReview(t.name, 'OTHER')}>{L(dict, '排除', 'Exclude')}</button>
+                      <button type="button" className="nesio-fin-review-skip" onClick={() => resolveReview(t, 'OTHER')}>{L(dict, '排除', 'Exclude')}</button>
                     </div>
                   </div>
                 );
@@ -453,7 +453,7 @@ export default function FinanceTab() {
                   {flowEditId === t.id && (
                     <div className="nesio-fin-flowpick">
                       {(['expense', 'refund', 'rebate', 'income', 'transfer'] as TxFlow[]).map((opt) => (
-                        <button key={opt} type="button" className={`nesio-fin-flowopt${f === opt ? ' is-active' : ''}`} onClick={() => applyFlow(t.name, opt)}>{L(dict, TX_FLOW_LABELS[opt][0], TX_FLOW_LABELS[opt][1])}</button>
+                        <button key={opt} type="button" className={`nesio-fin-flowopt${f === opt ? ' is-active' : ''}`} onClick={() => applyFlow(t, opt)}>{L(dict, TX_FLOW_LABELS[opt][0], TX_FLOW_LABELS[opt][1])}</button>
                       ))}
                     </div>
                   )}
@@ -512,7 +512,7 @@ export default function FinanceTab() {
                     <span className="nesio-fin-recur-meta">{L(dict, r.cadenceLabel[0], r.cadenceLabel[1])} · {categoryLabel(r.category, dict)} · {L(dict, `下次约 ${r.nextEstimate.slice(5).replace('-', '/')}`, `next ~${r.nextEstimate.slice(5).replace('-', '/')}`)} · {L(dict, `${r.count} 笔`, `${r.count}×`)}{r.status === 'predicted' ? L(dict, ' · 再出现 1 期自动转正', ' · confirms after next cycle') : ''}</span>
                   </div>
                   <span className="nesio-fin-recur-amt">{formatMoney(r.avgAmount, r.currency)}</span>
-                  <button type="button" className="nesio-fin-rule-x" onClick={() => markNotRecurring(r.name)} aria-label={L(dict, '不是定期', 'Not recurring')} title={L(dict, '标为「不是定期」', 'Mark not recurring')}>✕</button>
+                  <button type="button" className="nesio-fin-rule-x" onClick={() => markNotRecurring(r.key)} aria-label={L(dict, '不是定期', 'Not recurring')} title={L(dict, '标为「不是定期」', 'Mark not recurring')}>✕</button>
                 </div>
               ))}
             </div>
