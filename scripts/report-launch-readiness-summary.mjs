@@ -22,7 +22,6 @@ function unique(values) {
 function buildLaunchReadinessSummary(report) {
   const launchSurface = report.launchSurface?.summary || {};
   const launchSku = report.launchSku || {};
-  const inventory = report.inventoryFirstLaunch?.summary || {};
   const webSurface = report.webSurfaceContract || {};
   const summary = report.summary || {};
   const modules = Array.isArray(report.launchSku?.modules) ? report.launchSku.modules : [];
@@ -70,14 +69,6 @@ function buildLaunchReadinessSummary(report) {
     ceoGatedModules,
     launchableModulesWithDeferredApproval,
     sandboxTesterModules: unique(launchSurface.testerVisibleSandboxModuleIds || []),
-    inventoryLocalFlow: {
-      demoItemCount: summary.inventoryFirstLaunchDemoItemCount ?? inventory.demoItemCount ?? null,
-      readsRealData: summary.inventoryFirstLaunchReadsRealData,
-      writesRealData: summary.inventoryFirstLaunchWritesRealData,
-      cloudSyncEnabled: summary.inventoryFirstLaunchCloudSyncEnabled,
-      externalAuthEnabled: summary.inventoryFirstLaunchExternalAuthEnabled,
-      paymentIntegrationEnabled: summary.inventoryFirstLaunchPaymentIntegrationEnabled,
-    },
     webSurface: {
       mobileWebSupported: summary.mobileWebSupported ?? webSurface.mobileWebSupported,
       pwaSupported: summary.pwaSupported ?? webSurface.pwaSupported,
@@ -139,14 +130,6 @@ function renderMarkdown(summary) {
     `CEO-gated modules: ${summary.ceoGatedModules.join(', ') || 'none'}`,
     `Launchable modules with deferred approval-sensitive actions: ${summary.launchableModulesWithDeferredApproval.join(', ') || 'none'}`,
     `Tester sandbox modules: ${summary.sandboxTesterModules.join(', ') || 'none'}`,
-    '',
-    '## Inventory Local Flow',
-    '',
-    `Reads real data: ${summary.inventoryLocalFlow.readsRealData}`,
-    `Writes real data: ${summary.inventoryLocalFlow.writesRealData}`,
-    `Cloud sync enabled: ${summary.inventoryLocalFlow.cloudSyncEnabled}`,
-    `External auth enabled: ${summary.inventoryLocalFlow.externalAuthEnabled}`,
-    `Payment integration enabled: ${summary.inventoryLocalFlow.paymentIntegrationEnabled}`,
     '',
     '## Web Surface',
     '',

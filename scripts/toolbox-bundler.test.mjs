@@ -29,14 +29,13 @@ assert.equal(plan.boundaries.noRuntimePluginLoading, true);
 assert.equal(plan.exposureMode, 'public_launch_only');
 assert.deepEqual(
   plan.entries.filter((entry) => entry.visibleForPublic).map((entry) => entry.moduleId),
-  ['inventory'],
-  'default public-visible launch surface must expose Inventory while runtime-owned Secretary may still bundle for the active 智友 tab',
+  [],
+  'no static tool is publicly launchable; inventory went native and its static app was unbound',
 );
 
 const entryByModuleId = new Map(plan.entries.map((entry) => [entry.moduleId, entry]));
 const excludedByModuleId = new Map(plan.excludedEntries.map((entry) => [entry.moduleId, entry]));
-assert.equal(entryByModuleId.get('inventory')?.sourceDir, 'storage-web');
-assert.equal(entryByModuleId.get('inventory')?.publicPath, 'storage');
+assert.equal(entryByModuleId.has('inventory'), false, 'inventory static app was unbound');
 assert.equal(entryByModuleId.has('fitness'), false, 'default public bundle must not include sandbox fitness');
 assert.equal(entryByModuleId.has('health'), false, 'default public bundle must not include gated health');
 assert.equal(excludedByModuleId.has('fitness'), true, 'sandbox fitness must be listed as excluded from public bundle');
@@ -56,7 +55,7 @@ try {
   });
   const applied = JSON.parse(applyOutput);
   assert.equal(applied.applied, true);
-  assert.equal(existsSync(join(tempRoot, 'storage', 'index.html')), true);
+  assert.equal(existsSync(join(tempRoot, 'storage')), false, 'unbound storage app must not be written');
   assert.equal(existsSync(join(tempRoot, 'fitness', 'app.js')), false, 'default public bundle must not write sandbox fitness assets');
   assert.equal(existsSync(join(tempRoot, 'health', 'index.html')), false, 'default public bundle must not write gated health assets');
 } finally {

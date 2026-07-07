@@ -7,8 +7,9 @@ import { fileURLToPath } from 'node:url';
 const repoRoot = fileURLToPath(new URL('..', import.meta.url));
 const publicRoot = join(repoRoot, 'public');
 
-const allowedPublicToolDirs = new Set(['storage']);
+const allowedPublicToolDirs = new Set([]);
 const knownNonLaunchToolDirs = new Set([
+  'storage',
   'fitness',
   'health',
   'reading',
@@ -23,13 +24,19 @@ const bundlePlan = JSON.parse(execFileSync('node', [join(repoRoot, 'scripts', 'b
 assert.equal(bundlePlan.exposureMode, 'public_launch_only');
 assert.deepEqual(
   bundlePlan.entries.filter((entry) => entry.visibleForPublic).map((entry) => entry.moduleId),
-  ['inventory'],
+  [],
 );
 
 assert.equal(
   existsSync(join(publicRoot, 'secretary')),
   false,
   'public/secretary must not be present in production public assets (secretary module was removed).',
+);
+
+assert.equal(
+  existsSync(join(publicRoot, 'storage')),
+  false,
+  'public/storage must not be present in production public assets (inventory module went native).',
 );
 
 const publicDirs = existsSync(publicRoot)

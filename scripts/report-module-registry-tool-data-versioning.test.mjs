@@ -47,16 +47,8 @@ for (const tool of report.tools) {
   assert.equal(entry.rollbackMetadata.rollbackSupported, true, `${tool.id} must support local rollback metadata`);
 }
 
-const inventory = versionByModule.get('inventory');
-assert.equal(inventory.primaryEntity, 'LocalInventoryItem@v1');
-assert.equal(inventory.schemaVersion, 'LocalInventoryItem@v1');
-assert.equal(inventory.dataVersion, 'inventory-local-data-v1');
-assert.equal(inventory.demoDataVersion, 'inventory-demo-seed-v1');
-assert.equal(inventory.migrationRequired, false);
-assert.equal(inventory.migrationRegistryKey, 'inventory.local.v1');
-assert.deepEqual(inventory.backwardCompatibility.reads, ['rearbase_v2', 'rearbase_v1']);
-assert.deepEqual(inventory.backwardCompatibility.writes, ['baohe_inventory_v01']);
-assert.equal(inventory.rollbackMetadata.snapshotBeforeMigration, true);
+// inventory 已原生化(life-graph object 节点),数据版本契约随静态 app 解绑移除
+assert.equal(versionByModule.has('inventory'), false);
 
 for (const moduleId of ['finance', 'health', 'psychoanalysis']) {
   const entry = versionByModule.get(moduleId);

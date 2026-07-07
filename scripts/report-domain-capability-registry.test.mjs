@@ -40,7 +40,8 @@ assert.equal(
   true,
   "domain capability report should mark Signal as the write boundary for confirmed context",
 );
-assert.equal(report.domainCapabilityRegistry.moduleIndex.inventory.visibility, "frontstage");
+// inventory 已原生化,不再出现在 moduleIndex
+assert.equal("inventory" in report.domainCapabilityRegistry.moduleIndex, false);
 assert.equal(report.domainCapabilityRegistry.moduleIndex.finance.gateLevel, "ceo_gate");
 assert.equal(report.summary.domainCapabilityTaxonomyVersion, "domain-capability-taxonomy-v1");
 assert.ok(report.summary.platformCapabilityMaterialCount >= 0);

@@ -48,8 +48,8 @@ assert.equal(contract.summary.desktopDashboardEnabled, false);
 assert.equal(contract.summary.warningCount, 0);
 
 const byModule = new Map(contract.modules.map((entry) => [entry.moduleId, entry]));
-assert.equal(byModule.get('inventory').mobileWebEntry, 'supported');
-assert.equal(byModule.get('inventory').desktopWebEntry, 'preview_frame');
+// inventory 已原生化;launchScope.publicModuleIds 的业务定义仍包含它
+assert.equal(byModule.has('inventory'), false);
 for (const moduleId of ['finance', 'health', 'psychoanalysis', 'lifesim']) {
   assert.equal(byModule.get(moduleId).mobileWebEntry, 'gated_or_hidden', `${moduleId} must remain gated/hidden on mobile web`);
   assert.equal(byModule.get(moduleId).desktopWebEntry, 'not_promised', `${moduleId} must not become a desktop promise`);

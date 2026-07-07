@@ -35,10 +35,9 @@ for (const moduleId of ['finance', 'health', 'psychoanalysis']) {
   assert.equal(entry.entryActionEnabled, false, `${moduleId} must not be executable at first launch`);
 }
 
-const inventory = report.featureControl.modules.find((entry) => entry.moduleId === 'inventory');
-assert.equal(inventory.canBeKilled, true);
-assert.equal(inventory.entryActionEnabled, true);
-assert.deepEqual(report.featureControl.readyToCandidateModuleIds, ['inventory']);
+// inventory 已原生化,不再有 feature-control 条目
+assert.equal(report.featureControl.modules.some((entry) => entry.moduleId === 'inventory'), false);
+assert.deepEqual(report.featureControl.readyToCandidateModuleIds, []);
 
 const launchSafety = readFileSync(join(repoRoot, 'lib/portal/launch-safety.ts'), 'utf8');
 assert.match(launchSafety, /isLocalKillSwitchActive/, 'launch-safety must expose local kill switch check');

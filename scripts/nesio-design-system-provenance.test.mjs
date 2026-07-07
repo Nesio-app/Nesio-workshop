@@ -79,7 +79,7 @@ for (const relativePath of requiredTokenFiles) {
 }
 
 for (const [kind, names] of [
-  ['tools', ['storage', 'reading', 'fitness', 'quiz', 'sanctuary', 'psych', 'health', 'finance', 'lifesim']],
+  ['tools', ['reading', 'fitness', 'quiz', 'sanctuary', 'psych', 'health', 'finance', 'lifesim']],
   ['ai', ['claude', 'chatgpt', 'gemini', 'doubao', 'deepseek', 'grok']],
 ]) {
   for (const name of names) {

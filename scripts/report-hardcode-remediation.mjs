@@ -15,7 +15,6 @@ const DEFAULT_SCAN_ROOTS = Object.freeze([
   'adhd-flow-ios',
   'fitness',
   'inner-shelter-ios',
-  'storage-web',
   'storage-ios',
   'questionbank-ios',
   'treasurebox-ios',

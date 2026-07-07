@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -8,31 +8,14 @@ const root = process.cwd();
 const middleware = readFileSync(join(root, 'middleware.ts'), 'utf8');
 const bundler = readFileSync(join(root, 'scripts', 'bundle-toolbox.mjs'), 'utf8');
 const css = readFileSync(join(root, 'app', 'globals.css'), 'utf8');
-const aiFriends = readFileSync(join(root, 'components', 'portal', 'PortalAiFriendsPreview.tsx'), 'utf8');
+// AI 好友(secretary)模块已解绑,相关回归断言随组件一并移除
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
 
-assert.match(
-  middleware,
-  /pathname\.startsWith\('\/secretary'\)[\s\S]{0,80}isSecretaryPageRequestAllowed\(request\)[\s\S]*pathname === '\/secretary'[\s\S]{0,320}\/secretary\/index\.html/,
-  'V14 Secretary page rewrite must be protected by the personal/lab page gate.',
-);
-
-assert.match(
-  middleware,
-  /isSecretaryPageRequestAllowed\(request\)[\s\S]*pathname === '\/secretary\/chat'[\s\S]{0,220}\/secretary\/chat\.html/,
-  'V14 Secretary chat rewrite must stay behind the personal/lab page gate.',
-);
-
+// secretary(智友)模块已解绑:middleware 不得再出现 secretary 网关
 assert.doesNotMatch(
   middleware,
-  /\/\^\\\/secretary\\\/\[\^\?\]\+\\\.\(\?:css\|js\|json\|svg\|png\|jpg\|jpeg\|webp\|ico\)\$\/i\.test\(pathname\)[\s\S]{0,140}return NextResponse\.next\(\);/,
-  'V14 Secretary static assets must not bypass the first-launch page gate for public users.',
-);
-
-assert.match(
-  bundler,
-  /moduleId === 'secretary'[\s\S]{0,180}return true/,
-  'V14 toolbox bundle must include the Secretary static app because 智友 is an active runtime route.',
+  /secretary/i,
+  'Middleware must not reference the unbound secretary module.',
 );
 
 assert.match(
@@ -53,18 +36,6 @@ assert.match(
   'V14 must hide the legacy bottom nav on home, toolbox, and AI Friends.',
 );
 
-assert.match(
-  aiFriends,
-  /setCallSheetOpen\(true\);[\s\S]{0,220}if \(!readiness\.ready\)/,
-  'AI Friends video/live call button must open a visible surface even when provider readiness is degraded.',
-);
-
-assert.match(
-  aiFriends,
-  /setAudioCallOpen\(true\);[\s\S]{0,220}if \(!readiness\.ready\)/,
-  'AI Friends audio call button must open a visible surface even when provider readiness is degraded.',
-);
-
 assert.equal(
   pkg.scripts['test:v14-release-blockers'],
   'node scripts/v14-release-blockers.test.mjs',
@@ -77,8 +48,8 @@ try {
     cwd: root,
     stdio: 'pipe',
   });
-  const storageHtml = readFileSync(join(tempRoot, 'storage', 'index.html'), 'utf8');
-  assert.doesNotMatch(storageHtml, /(href|src)="\/(app\.js|config\.js|styles\.css|portal-back\.css|manifest\.json|icon\.svg)"/, 'Static bundle must not request local assets from the site root.');
+  // 静态 /storage/ 已解绑:公共 bundle 不得再产出它
+  assert.equal(existsSync(join(tempRoot, 'storage')), false, 'Unbound storage app must not be emitted by the public bundle.');
 } finally {
   rmSync(tempRoot, { recursive: true, force: true });
 }

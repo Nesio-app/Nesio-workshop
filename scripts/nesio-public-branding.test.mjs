@@ -14,8 +14,6 @@ const onboarding = readFileSync(join(root, 'components', 'portal', 'PortalOnboar
 const bottomNav = readFileSync(join(root, 'components', 'portal', 'PortalBottomNav.tsx'), 'utf8');
 const toolsTreasureSheet = readFileSync(join(root, 'components', 'portal', 'ToolsTreasureSheet.tsx'), 'utf8');
 const personalizationInsights = readFileSync(join(root, 'lib', 'portal', 'personalization-insights.ts'), 'utf8');
-const storageSourceHome = readFileSync(join(root, 'storage-web', 'index.html'), 'utf8');
-const storageHome = readFileSync(join(root, 'public', 'storage', 'index.html'), 'utf8');
 const calendarRoute = readFileSync(join(root, 'app', 'api', 'portal', 'calendar', 'route.ts'), 'utf8');
 const moduleManagerCore = readFileSync(join(root, 'lib', 'portal', 'module-manager-core.mjs'), 'utf8');
 const moduleManagerTs = readFileSync(join(root, 'lib', 'portal', 'module-manager.ts'), 'utf8');
@@ -52,8 +50,6 @@ assert.doesNotMatch(
   'PWA manifest must not expose old product names.',
 );
 assert.doesNotMatch(onboarding, /Baohe|Treasure Box|TreasureBox|Nosio/, 'Public onboarding copy must use Nesio naming.');
-assert.doesNotMatch(storageSourceHome, /Baohe|Treasure Box|TreasureBox|Nosio/, 'Inventory source first-launch copy must use Nesio naming.');
-assert.doesNotMatch(storageHome, /Baohe|Treasure Box|TreasureBox|Nosio/, 'Public Inventory first-launch copy must use Nesio naming.');
 assert.doesNotMatch(calendarRoute, /TreasureBox|Treasure Box|Nosio/, 'External-facing calendar User-Agent must use Nesio naming.');
 assert.doesNotMatch(
   moduleManagerCore,
@@ -81,8 +77,6 @@ for (const [name, source] of [
   assert.doesNotMatch(source, /宝盒/, `${name} public-facing copy must use Nesio instead of 宝盒.`);
 }
 assert.match(onboarding, /Nesio/, 'Public onboarding copy should mention Nesio.');
-assert.match(storageSourceHome, /Nesio Purchase Memory/, 'Inventory source first-launch kicker should mention Nesio.');
-assert.match(storageHome, /Nesio Purchase Memory/, 'Inventory first-launch kicker should mention Nesio.');
 assert.match(webSurfaceContract, /Nesio v0\.1 is a mobile-first personal toolbox/, 'Web-surface positioning should mention Nesio.');
 assert.match(appApiContract, /Nesio Local Demo/, 'Local API fixture display name should mention Nesio.');
 assert.match(

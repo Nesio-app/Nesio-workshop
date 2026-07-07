@@ -18,27 +18,25 @@ assert.equal(report.launchSku.launchSkuAppStoreReady, false);
 assert.deepEqual(report.launchSku.includedModuleIds, ['shell', 'inventory', 'plan']);
 assert.deepEqual(report.launchSku.launchableBusinessModuleIds, ['inventory', 'plan']);
 assert.equal(report.summary.launchSkuAppStoreReady, false);
-assert.equal(report.summary.launchableModuleCount, 2);
+assert.equal(report.summary.launchableModuleCount, 1);
 assert.equal(report.summary.excludedFromLaunchCount, 8);
 assert.equal(report.summary.futurePaidModuleCount, 5);
 assert.equal(report.summary.toolLifecycleVersion, 'tool-lifecycle-v0');
-assert.equal(report.summary.toolLifecycleLaunchableCount, 1);
+assert.equal(report.summary.toolLifecycleLaunchableCount, 0);
 assert.equal(report.summary.toolLifecycleSandboxCount, 8);
 assert.equal(report.summary.toolLifecycleReadyForCandidateReviewCount, 8);
 
 const statusByModule = new Map(report.launchSku.modules.map((entry) => [entry.moduleId, entry]));
 assert.equal(statusByModule.get('shell').launchStatus, 'launchable');
-assert.equal(statusByModule.get('inventory').launchStatus, 'launchable');
-assert.equal(statusByModule.get('inventory').toolLifecycle, 'launchable');
-assert.equal(statusByModule.get('inventory').toolLifecycleStage, 5);
-assert.equal(statusByModule.get('inventory').nextLifecycleTarget, 'monetized');
+// inventory 已原生化,不再是注册表模块(launch SKU 业务定义仍包含它)
+assert.equal(statusByModule.has('inventory'), false);
 
 const launchableModules = report.launchSku.modules.filter((entry) => entry.launchStatus === 'launchable');
-assert.deepEqual(launchableModules.map((entry) => entry.moduleId).sort(), ['inventory', 'shell']);
+assert.deepEqual(launchableModules.map((entry) => entry.moduleId).sort(), ['shell']);
 assert.equal(
   report.launchSku.modules.every((entry) => entry.launchStatus === 'launchable'),
   false,
-  '10 modules must not all be launchable',
+  'modules must not all be launchable',
 );
 
 for (const moduleId of ['finance', 'health', 'psychoanalysis']) {
@@ -49,15 +47,9 @@ for (const moduleId of ['finance', 'health', 'psychoanalysis']) {
 
 const lifecycleByModule = new Map(report.toolLifecycle.modules.map((entry) => [entry.moduleId, entry]));
 assert.equal(report.toolLifecycle.version, 'tool-lifecycle-v0');
-assert.deepEqual(report.toolLifecycle.summary.launchableModuleIds.sort(), ['inventory']);
-assert.equal(report.toolLifecycle.summary.nextCandidateModuleIds.length, report.summary.moduleCount - 1);
+assert.deepEqual(report.toolLifecycle.summary.launchableModuleIds, []);
+assert.equal(report.toolLifecycle.summary.nextCandidateModuleIds.length, report.summary.moduleCount);
 for (const [moduleId, entry] of lifecycleByModule) {
-  if (moduleId === 'inventory') {
-    assert.equal(entry.lifecycle, 'launchable');
-    assert.equal(entry.lifecycleStage, 5);
-    assert.equal(entry.readyForCandidateReview, false);
-    continue;
-  }
   assert.equal(entry.lifecycle, 'sandbox', `${moduleId} should remain sandbox`);
   assert.equal(entry.lifecycleStage, 3, `${moduleId} should be stage 3`);
   assert.equal(entry.nextLifecycleTarget, 'candidate', `${moduleId} should be preparing for candidate`);
@@ -70,11 +62,6 @@ assert.equal(finance.launchStatus, 'hidden');
 assert.equal(finance.mobileStrategy, 'native_bridge_deferred');
 assert.equal(finance.needsCeoGate, true);
 
-const inventory = statusByModule.get('inventory');
-assert.equal(inventory.isLaunchBusinessModule, true);
-assert.equal(inventory.entitlementKey != null, true);
-assert.equal(inventory.entitlementChangesLaunchStatus, false);
-assert.equal(inventory.approvalGateOverridesPaywallGate, true);
 
 for (const entry of report.launchSku.modules) {
   assert.equal(entry.entitlementChangesLaunchStatus, false);

@@ -144,7 +144,7 @@ assert.ok(
 );
 
 const manifestsById = new Map(registry.manifests.map((manifest) => [manifest.moduleId, manifest]));
-assert.equal(manifestsById.size, 9, "current 9 modules should all be represented");
+assert.equal(manifestsById.size, 8, "current 8 modules should all be represented");
 
 for (const manifest of manifestsById.values()) {
   assert.equal(manifest.domainCapabilityVersion, "domain-capability-taxonomy-v1");
@@ -201,11 +201,8 @@ for (const manifest of manifestsById.values()) {
   );
 }
 
-const inventory = manifestsById.get("inventory");
-assert.equal(inventory.primaryDomain, "assets");
-assert.ok(inventory.providedCapabilities.includes("memory_graph"));
-assert.ok(inventory.providedCapabilities.includes("search_retrieval"));
-assert.equal(inventory.visibility, "frontstage");
+// inventory 已原生化,不再是注册表模块
+assert.equal(manifestsById.has("inventory"), false);
 
 assert.equal(manifestsById.get("reading").primaryDomain, "growth");
 assert.equal(manifestsById.get("quiz").primaryDomain, "growth");
@@ -268,8 +265,8 @@ for (const domain of expectedFrontstageDomains) {
   );
 }
 assert.ok(
-  domainSummaryByValue.get("assets").moduleIds.includes("inventory"),
-  "assets domain should include inventory",
+  domainSummaryByValue.get("assets").moduleIds.includes("finance"),
+  "assets domain should include finance",
 );
 assert.ok(
   domainSummaryByValue.get("assets").moduleIds.includes("finance"),
@@ -282,8 +279,8 @@ for (const capability of ["capture", "search_retrieval", "approval_gate", "entit
   assert.ok(capabilitySummaryByValue.has(capability), `capability summary should include ${capability}`);
 }
 assert.ok(
-  capabilitySummaryByValue.get("search_retrieval").providerModuleIds.includes("inventory"),
-  "inventory should provide the Search capability",
+  capabilitySummaryByValue.get("search_retrieval").providerModuleIds.includes("reading"),
+  "reading should provide the Search capability",
 );
 assert.ok(
   capabilitySummaryByValue.get("approval_gate").providerModuleIds.includes("finance"),
@@ -340,7 +337,7 @@ assert.ok(
 );
 
 const modulesById = new Map(moduleRegistry.modules.map((module) => [module.id, module]));
-for (const id of ["inventory", "finance"]) {
+for (const id of ["finance"]) {
   const module = modulesById.get(id);
   const manifest = manifestsById.get(id);
   assert.equal(module.primaryDomain, manifest.primaryDomain, `${id} should carry primaryDomain`);

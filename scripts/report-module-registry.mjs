@@ -4,7 +4,6 @@ import { fileURLToPath } from 'node:url';
 import { buildModuleRegistry } from '../lib/portal/module-manager-core.mjs';
 import { buildLocalDataRecordsV0 } from '../lib/portal/local-data-records.mjs';
 import { buildModuleDataBus } from '../lib/portal/module-data-bus.mjs';
-import { buildInventoryFirstLaunchContract } from '../lib/portal/inventory-first-launch-contract.mjs';
 import { buildModuleAdapterContract } from '../lib/portal/module-adapter-contract.mjs';
 import { buildStandaloneAppReadinessContract } from '../lib/portal/standalone-app-readiness-contract.mjs';
 import { buildSecurityIncidentReadinessContract } from '../lib/portal/security-incident-readiness-contract.mjs';
@@ -50,7 +49,6 @@ function publicIndexExists(path) {
 }
 
 const registry = buildModuleRegistry(config);
-const inventoryFirstLaunchContract = buildInventoryFirstLaunchContract();
 const experienceReservedKeys = registry.experienceServices.reservedKeys;
 const dataAggregationContract = registry.dataAggregation;
 const approvalGateContract = registry.approvalGate;
@@ -893,25 +891,6 @@ const entitlementSummary = {
     state,
     shellEntitlementViews.filter((view) => view.paywallState === state).length,
   ])),
-};
-const inventoryFirstLaunchSummary = {
-  version: inventoryFirstLaunchContract.version,
-  moduleId: inventoryFirstLaunchContract.moduleId,
-  launchFlow: inventoryFirstLaunchContract.launchFlow,
-  implementation: inventoryFirstLaunchContract.implementation,
-  schemaName: inventoryFirstLaunchContract.schema.name,
-  schemaFieldCount: inventoryFirstLaunchContract.schema.fields.length,
-  demoFixtureItemCount: inventoryFirstLaunchContract.demo.itemCount,
-  demoIsolatedFromPersonal: inventoryFirstLaunchContract.demo.isolatedFromPersonal,
-  readsRealData: inventoryFirstLaunchContract.reporting.readsRealData,
-  writesRealData: inventoryFirstLaunchContract.reporting.writesRealData,
-  cloudSyncEnabled: inventoryFirstLaunchContract.reporting.cloudSyncEnabled,
-  externalAuthEnabled: inventoryFirstLaunchContract.reporting.externalAuthEnabled,
-  paymentIntegrationEnabled: inventoryFirstLaunchContract.reporting.paymentIntegrationEnabled,
-  localExportContractOnly: inventoryFirstLaunchContract.localContracts.export.externalSideEffects === false,
-  localDeleteContractOnly: inventoryFirstLaunchContract.localContracts.delete.externalSideEffects === false,
-  demoResetContractOnly: inventoryFirstLaunchContract.localContracts.demoReset.readsPersonalData === false &&
-    inventoryFirstLaunchContract.localContracts.demoReset.writesPersonalData === false,
 };
 
 const readyModules = tools.filter((tool) => tool.ready);
@@ -2379,12 +2358,6 @@ const evidenceSummary = {
     toolLifecycleSandboxCount: toolLifecycleSummary.sandboxToolCount,
     toolLifecycleReadyForCandidateReviewCount: toolLifecycleSummary.readyForCandidateReviewCount,
     toolLifecycleRapidChangeAllowedCount: toolLifecycleSummary.rapidChangeAllowedCount,
-    inventoryFirstLaunchDemoItemCount: inventoryFirstLaunchSummary.demoFixtureItemCount,
-    inventoryFirstLaunchReadsRealData: inventoryFirstLaunchSummary.readsRealData,
-    inventoryFirstLaunchWritesRealData: inventoryFirstLaunchSummary.writesRealData,
-    inventoryFirstLaunchCloudSyncEnabled: inventoryFirstLaunchSummary.cloudSyncEnabled,
-    inventoryFirstLaunchExternalAuthEnabled: inventoryFirstLaunchSummary.externalAuthEnabled,
-    inventoryFirstLaunchPaymentIntegrationEnabled: inventoryFirstLaunchSummary.paymentIntegrationEnabled,
     toolManifestVersion: registry.toolManifest.version,
     toolManifestModuleCount: registry.toolManifest.summary.moduleCount,
     toolManifestMissingRequiredFieldCount: registry.toolManifest.summary.missingRequiredFieldCount,
@@ -2701,10 +2674,6 @@ const evidenceSummary = {
       monetizedRequiresLaunchable: true,
       realDataExternalAiPaymentRequiresCeoGate: true,
     },
-  },
-  inventoryFirstLaunch: {
-    contract: inventoryFirstLaunchContract,
-    summary: inventoryFirstLaunchSummary,
   },
   toolManifest: registry.toolManifest,
   materialLibrarySummary: registry.materialLibrarySummary,

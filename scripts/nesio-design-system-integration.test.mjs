@@ -101,7 +101,6 @@ assert.match(
 );
 
 const requiredToolIcons = [
-  "storage",
   "reading",
   "fitness",
   "quiz",

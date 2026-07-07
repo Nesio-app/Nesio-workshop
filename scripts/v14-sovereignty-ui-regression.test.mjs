@@ -35,7 +35,6 @@ const settingsSheets = read('components/portal/SettingsSheets.tsx');
 const lifeGraph = read('lib/portal/life-graph.ts');
 const domains = read('lib/intelligence/domains.ts');
 const globals = read('app/globals.css');
-const storageCss = read('storage-web/styles.css');
 
 // 拍一下 evolved to the native camera input (iOS blocks programmatic
 // getUserMedia outside a gesture) — same intent: no two-step launch screen.
@@ -222,16 +221,5 @@ assert.doesNotMatch(authStartRoute, /hostname = ['"]www\.nesio\.app['"]/, 'Auth 
 assert.match(onboarding, /\/api\/auth\/session/, 'Onboarding must read the auth session after OAuth or magic-link callbacks.');
 assert.match(onboarding, /nesio-auth-session-imported|nesio-auth-session-ready/, 'Onboarding must react to session import events.');
 assert.match(onboarding, /auth_callback_received|session_established|session_imported/, 'Onboarding must treat callback success URLs as authenticated bootstrap candidates.');
-
-assert.match(
-  storageCss,
-  /\.wrow[\s\S]*scroll-padding-inline:[\s\S]*24px/,
-  'Storage horizontal rows should reserve edge scroll padding so chips/cards are not clipped.',
-);
-assert.match(
-  storageCss,
-  /\.toast[\s\S]*bottom:\s*calc\(112px \+ env\(safe-area-inset-bottom\)\)/,
-  'Storage toast should sit above bottom navigation.',
-);
 
 console.log('v14 sovereignty/ui regression checks passed');

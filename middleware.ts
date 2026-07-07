@@ -7,12 +7,6 @@ import {
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (pathname === '/storage') {
-    const url = request.nextUrl.clone();
-    url.pathname = '/storage/index.html';
-    return NextResponse.rewrite(url);
-  }
-
   if (!isFirstLaunchBlockedPath(pathname)) {
     return NextResponse.next();
   }
@@ -42,7 +36,6 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/storage',
     '/inner-shelter/:path*',
     '/health/:path*',
     '/api/inner-shelter/:path*',

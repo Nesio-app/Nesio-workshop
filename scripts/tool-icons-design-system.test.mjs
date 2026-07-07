@@ -22,7 +22,6 @@ assert(
 );
 
 for (const [moduleId, iconKey] of [
-  ['inventory', 'storage'],
   ['psychoanalysis', 'psych'],
   ['finance', 'finance'],
 ]) {

@@ -34,7 +34,7 @@ assert.equal(report.summary.syncEnabledModuleCount, 0);
 assert.equal(report.summary.cloudSyncEnabled, false);
 assert.equal(report.summary.offlineQueueEnabledNow, false);
 assert.equal(report.summary.syncConflictModelReadable, true);
-assert.equal(report.summary.inventorySyncReadiness, 'sync_candidate_later');
+assert.equal(report.summary.inventorySyncReadiness, 'not_found'); // inventory 已原生化,不再是注册表模块
 
 const syncByModule = new Map(report.offlineSyncConflict.modules.map((entry) => [entry.moduleId, entry]));
 assert.equal(syncByModule.size, report.summary.moduleCount);
@@ -50,11 +50,6 @@ for (const tool of report.tools) {
   assert.ok(report.offlineSyncConflict.conflictStates.includes(entry.defaultConflictState));
 }
 
-const inventory = syncByModule.get('inventory');
-assert.equal(inventory.syncMode, 'local_only_now');
-assert.equal(inventory.syncReadiness, 'sync_candidate_later');
-assert.equal(inventory.localQueueModel, 'future_offline_queue_contract_only');
-assert.equal(inventory.defaultConflictState, 'none');
-assert.equal(inventory.mergePolicy, 'manual_merge_for_future_multi_device');
+assert.equal(syncByModule.has('inventory'), false);
 
 console.log('report-module-registry offline sync conflict tests passed');

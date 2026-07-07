@@ -27,11 +27,12 @@ function assertMiddlewareMatcher(route) {
   );
 }
 
-for (const [source, destination] of [
-  ['/storage', '/storage/index.html'],
-  ['/storage/', '/storage/index.html'],
-]) {
-  assertRewrite(source, destination);
+// 静态 /storage/(收纳)与 /adhd-flow/ 已解绑为原生功能:不允许残留 rewrite
+for (const gone of ['/storage', '/storage/', '/adhd-flow', '/adhd-flow/']) {
+  assert.ok(
+    !vercelJson.rewrites?.some((rewrite) => rewrite.source === gone),
+    `Unbound static app rewrite must stay removed: ${gone}`,
+  );
 }
 
 assert.doesNotMatch(
@@ -40,22 +41,15 @@ assert.doesNotMatch(
   'Ungated extension-based bypass must stay removed (launch privacy QA blocker, commit 9099b06).',
 );
 
-for (const route of [
-  '/storage',
-]) {
-  assertMiddlewareMatcher(route);
-}
-
-const storageIndex = read('public/storage/index.html');
-
-assert.doesNotMatch(storageIndex, /\/index\.html\b/, 'public/storage/index.html must not navigate to /index.html');
-assert.doesNotMatch(storageIndex, /href=["']#|javascript:void|about:blank/, 'public/storage/index.html must not expose fake navigation links');
-
-assert.match(storageIndex, /href="\/"/, 'Storage must expose a root return link back to Baohe shell.');
-assert.match(
-  storageIndex,
-  /class="[^"]*portal-back-link[^"]*"/,
-  'Storage must keep its portal-back affordance for returning to Baohe shell.',
+assert.doesNotMatch(
+  middleware,
+  /['"]\/storage['"]/,
+  'Middleware must not keep a matcher for the unbound /storage static app.',
+);
+assert.equal(
+  fs.existsSync(path.join(root, 'public/storage')),
+  false,
+  'public/storage must stay removed (inventory went native).',
 );
 
 assert.equal(

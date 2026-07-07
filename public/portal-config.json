@@ -99,32 +99,6 @@
       }
     },
     {
-      "id": "inventory",
-      "name": "收纳",
-      "nameEn": "Storage",
-      "description": "大后方 · 物品收纳",
-      "url": "/storage/",
-      "zone": "kinetic",
-      "hotkey": "i",
-      "command": "/storage",
-      "featured": false,
-      "icon": "📦",
-      "iconUrl": "/icons/tools/storage.svg",
-      "ready": true,
-      "owner": "CEO",
-      "maintainer": "Qiao",
-      "responsibleAgent": "Qiao",
-      "evidenceOwner": "Sina",
-      "gateOwner": "CEO",
-      "dataContract": {
-        "schemaVersion": "LocalInventoryItem@v1",
-        "dataVersion": "inventory-local-data-v1",
-        "demoDataVersion": "inventory-demo-seed-v1",
-        "migrationRequired": false,
-        "migrationStatus": "not_required"
-      }
-    },
-    {
       "id": "psychoanalysis",
       "name": "咨询",
       "nameEn": "Psych",

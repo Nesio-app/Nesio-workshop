@@ -35,21 +35,15 @@ assert.deepEqual(report.standaloneAppReadiness.extractionConditions, [
 assert.equal(report.standaloneAppReadiness.modules.length, report.summary.moduleCount);
 assert.equal(report.standaloneAppReadiness.summary.moduleCount, report.summary.moduleCount);
 assert.equal(report.standaloneAppReadiness.summary.readyNowCount, 0);
-assert.equal(report.standaloneAppReadiness.summary.possibleLaterCount, 1);
-assert.equal(report.standaloneAppReadiness.summary.notNowCount, report.summary.moduleCount - 1);
+assert.equal(report.standaloneAppReadiness.summary.possibleLaterCount, 0);
+assert.equal(report.standaloneAppReadiness.summary.notNowCount, report.summary.moduleCount);
 assert.equal(report.standaloneAppReadiness.summary.warningCount, 0);
 assert.equal(report.summary.standaloneReadinessReadyNowCount, 0);
-assert.equal(report.summary.standaloneReadinessPossibleLaterCount, 1);
+assert.equal(report.summary.standaloneReadinessPossibleLaterCount, 0);
 
 const byModule = new Map(report.standaloneAppReadiness.modules.map((entry) => [entry.moduleId, entry]));
-const inventory = byModule.get('inventory');
-assert.equal(inventory.standaloneEligible, 'possible_later');
-assert.equal(inventory.extractionReadinessScore > 0, true);
-assert.equal(inventory.createsStandaloneAppNow, false);
-assert.equal(inventory.requiresCeoReviewBeforeAction, true);
-assert.equal(inventory.separateAppStoreMetadata.status, 'draft_only');
-assert.equal(inventory.separatePrivacyLabel.status, 'draft_only');
-assert.equal(inventory.standaloneEntitlement.status, 'draft_only');
+// inventory 已原生化,不再是可拆分评估对象
+assert.equal(byModule.has('inventory'), false);
 
 for (const [moduleId, entry] of byModule) {
   assert.equal(entry.createsStandaloneAppNow, false, `${moduleId} must not create standalone app now`);

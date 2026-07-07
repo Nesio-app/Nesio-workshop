@@ -1,9 +1,0 @@
-{
-  "name": "大后方 · Storage",
-  "short_name": "大后方",
-  "start_url": ".",
-  "display": "standalone",
-  "background_color": "#e7eefb",
-  "theme_color": "#e7eefb",
-  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }]
-}

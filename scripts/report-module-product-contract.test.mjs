@@ -33,9 +33,9 @@ const appStoreMentionable = report.moduleProductContract.modules
   .filter((entry) => entry.appStore.appStoreMentionAllowed)
   .map((entry) => entry.moduleId)
   .sort();
-assert.deepEqual(appStoreMentionable, ['inventory']);
-assert.equal(report.summary.moduleProductAppStoreMentionAllowedCount, 1);
-assert.equal(report.summary.moduleProductPublicVisibleCount, 1);
+assert.deepEqual(appStoreMentionable, []);
+assert.equal(report.summary.moduleProductAppStoreMentionAllowedCount, 0);
+assert.equal(report.summary.moduleProductPublicVisibleCount, 0);
 
 for (const moduleId of ['finance', 'health', 'psychoanalysis', 'lifesim']) {
   const entry = byModule.get(moduleId);
@@ -49,8 +49,8 @@ const launchCohorts = report.moduleProductContract.modules.reduce((counts, entry
   counts[entry.launchCohort] = (counts[entry.launchCohort] || 0) + 1;
   return counts;
 }, {});
-assert.equal(launchCohorts.first_launch, 1);
-assert.equal(byModule.get('inventory').launchCohort, 'first_launch');
-assert.equal(byModule.get('inventory').appStore.marketingClaim.includes('购买记忆'), true);
+assert.equal(launchCohorts.first_launch ?? 0, 0);
+// inventory 已原生化,不再出现在模块产品契约中
+assert.equal(byModule.has('inventory'), false);
 
 console.log('report module product contract tests passed');

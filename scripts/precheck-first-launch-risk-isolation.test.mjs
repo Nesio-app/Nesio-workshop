@@ -53,25 +53,8 @@ for (const path of ['public/fitness/app.js', 'fitness/web/app.js']) {
   assert.doesNotMatch(source, /fetch\(apiBase\+'\/api\/fitness\/chat'/, `${path} must not call fitness chat API`);
 }
 
-const storageConfig = read('public/storage/config.js');
-assert.doesNotMatch(storageConfig, /storage-kohl\.vercel\.app/, 'storage default external API must be disconnected');
-const storageSourceConfig = read('storage-web/config.js');
-assert.doesNotMatch(storageSourceConfig, /storage-kohl\.vercel\.app/, 'storage source default external API must be disconnected');
-
-const storageApp = read('public/storage/app.js');
-assert.match(storageApp, /FIRST_LAUNCH_IMAGE_AI_ENABLED\s*=\s*false/, 'storage image AI must be disabled');
-assert.match(storageApp, /if \(!FIRST_LAUNCH_IMAGE_AI_ENABLED\) \{[\s\S]*?return;[\s\S]*?\}/, 'storage image AI must return before external identify API');
-
-const storageSourceApp = read('storage-web/app.js');
-assert.match(storageSourceApp, /FIRST_LAUNCH_IMAGE_AI_ENABLED\s*=\s*false/, 'storage source image AI must be disabled');
-assert.match(storageSourceApp, /if \(!FIRST_LAUNCH_IMAGE_AI_ENABLED\) \{[\s\S]*?return;[\s\S]*?\}/, 'storage source image AI must return before external identify API');
-
-const storageGuard = read('public/storage/guard.js');
-assert.match(storageGuard, /FIRST_LAUNCH_NOTIFICATIONS_ENABLED\s*=\s*false/, 'runtime notifications must be disabled');
-assert.match(storageGuard, /if \(!FIRST_LAUNCH_NOTIFICATIONS_ENABLED\) return;/, 'notification permission prompt must be gated before request');
-
-const storageSourceGuard = read('storage-web/guard.js');
-assert.match(storageSourceGuard, /FIRST_LAUNCH_NOTIFICATIONS_ENABLED\s*=\s*false/, 'runtime source notifications must be disabled');
-assert.match(storageSourceGuard, /if \(!FIRST_LAUNCH_NOTIFICATIONS_ENABLED\) return;/, 'source notification permission prompt must be gated before request');
+// 静态 /storage/ 收纳 app 已解绑(原生收纳走 life-graph,无独立外部 API/图像 AI/通知运行时)
+assert.equal(existsSync(join(repoRoot, 'public', 'storage')), false, 'public/storage must stay removed');
+assert.equal(existsSync(join(repoRoot, 'storage-web')), false, 'storage-web must stay removed');
 
 console.log('PASS first launch high-risk runtime isolation precheck');

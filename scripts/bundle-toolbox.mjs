@@ -17,10 +17,6 @@ const publicRoot = outDirArgIndex >= 0
   : join(repoRoot, 'public');
 
 const PACKAGE_SOURCES = Object.freeze({
-  inventory: {
-    sourceDir: 'storage-web',
-    publicPath: 'storage',
-  },
   fitness: {
     sourceDir: 'fitness/web',
     publicPath: 'fitness',
@@ -75,7 +71,6 @@ function buildBundlePlan() {
     };
   });
   const entries = allEntries.filter((entry) => {
-    if (entry.moduleId === 'secretary') return true;
     if (includeSandbox) return entry.launchStatus !== 'hidden' && entry.launchStatus !== 'gated';
     return entry.launchStatus === 'launchable' && entry.prodExposure === 'public' && entry.shellAction === 'open';
   });

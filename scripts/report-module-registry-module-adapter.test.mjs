@@ -49,10 +49,8 @@ for (const moduleId of report.tools.map((tool) => tool.id)) {
   assert.equal(entry.adapterCompleteness, 'complete');
 }
 
-const inventory = adapterByModule.get('inventory');
-assert.equal(inventory.extractabilityStatus, 'eligible_later');
-assert.equal(inventory.eligibleForFutureExtraction, true);
-assert.equal(inventory.reason, 'Launchable first-party module can be evaluated later; keep embedded for v0.1.');
+// inventory 已原生化(life-graph object 节点),不再是注册表模块
+assert.equal(adapterByModule.has('inventory'), false);
 
 for (const moduleId of ['finance', 'health', 'psychoanalysis']) {
   const entry = adapterByModule.get(moduleId);

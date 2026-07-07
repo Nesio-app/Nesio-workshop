@@ -58,17 +58,8 @@ for (const entry of contract.modules) {
   assert.equal(typeof entry.trustBoundary.requiresCEOApproval, 'boolean');
 }
 
-const inventory = byModule.get('inventory');
-assert.equal(inventory.launchCohort, 'first_launch');
-assert.equal(inventory.riskTier, 'low');
-assert.equal(inventory.appStore.publicVisible, true);
-assert.equal(inventory.appStore.appStoreMentionAllowed, true);
-assert.equal(inventory.trustBoundary.canStoreLocalData, true);
-assert.equal(inventory.trustBoundary.canUseCamera, true);
-assert.equal(inventory.trustBoundary.requiresCEOApproval, false);
-assert.equal(inventory.shellDisplay.stateLabel, '可进入');
-assert.ok(inventory.primaryAction.includes('购买记忆'));
-assert.ok(inventory.doNotPromise.some((text) => text.includes('自动识别所有物品')));
+// inventory 已原生化,不再出现在模块产品契约中(coreObjectModels.storage 业务定义仍保留)
+assert.equal(byModule.has('inventory'), false);
 
 for (const moduleId of ['reading', 'sanctuary']) {
   const entry = byModule.get(moduleId);
@@ -124,7 +115,6 @@ assert.equal(contract.moduleTrustBoundary.modules.find((entry) => entry.moduleId
 assert.equal(contract.moduleTrustBoundary.modules.find((entry) => entry.moduleId === 'health').canMentionHealth, true);
 assert.equal(contract.moduleTrustBoundary.modules.find((entry) => entry.moduleId === 'psychoanalysis').canMentionMentalHealth, true);
 
-assert.equal(resolveShellDisplayState(inventory).stateLabel, '可进入');
 assert.equal(resolveShellDisplayState(byModule.get('finance')).stateLabel, '需要确认');
 assert.equal(resolveShellDisplayState(byModule.get('quiz')).stateLabel, '会离开宝盒');
 assert.equal(resolveShellDisplayState(byModule.get('reading')).stateLabel, '建设中');

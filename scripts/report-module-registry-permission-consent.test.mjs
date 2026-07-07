@@ -32,18 +32,8 @@ assert.deepEqual(
   ],
 );
 
-const inventory = report.permissionConsent.tools.find((entry) => entry.moduleId === 'inventory');
-assert.ok(inventory, 'Inventory consent boundary must be reported');
-const camera = inventory.permissions.find((entry) => entry.permissionKey === 'camera');
-const photo = inventory.permissions.find((entry) => entry.permissionKey === 'photo_library');
-assert.equal(camera.purposeVersion, 'inventory.camera.capture-v0');
-assert.equal(camera.purposeString, '拍摄物品照片用于本机收纳记录；首发版本不上传、不做外部 AI 识别。');
-assert.equal(camera.consentRequired, true);
-assert.equal(camera.runtimeEnabled, true);
-assert.equal(photo.purposeVersion, 'inventory.photo.import-v0');
-assert.equal(photo.purposeString, '选择本机照片用于本机收纳记录；首发版本不上传、不做外部 AI 识别。');
-assert.equal(photo.consentRequired, true);
-assert.equal(photo.runtimeEnabled, true);
+// inventory 已原生化,权限同意边界随注册表条目移除
+assert.equal(report.permissionConsent.tools.some((entry) => entry.moduleId === 'inventory'), false);
 
 for (const moduleId of ['health', 'finance', 'psychoanalysis']) {
   const boundary = report.permissionConsent.tools.find((entry) => entry.moduleId === moduleId);

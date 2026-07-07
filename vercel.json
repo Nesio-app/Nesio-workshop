@@ -16,12 +16,8 @@
     }
   ],
   "rewrites": [
-    { "source": "/adhd-flow", "destination": "/adhd-flow/index.html" },
-    { "source": "/adhd-flow/", "destination": "/adhd-flow/index.html" },
     { "source": "/fitness", "destination": "/fitness/index.html" },
     { "source": "/fitness/", "destination": "/fitness/index.html" },
-    { "source": "/storage", "destination": "/storage/index.html" },
-    { "source": "/storage/", "destination": "/storage/index.html" },
     { "source": "/health", "destination": "/health/index.html" },
     { "source": "/health/", "destination": "/health/index.html" }
   ]

@@ -87,11 +87,8 @@ for (const manifest of manifestRegistry.manifests) {
 }
 
 const manifestById = new Map(manifestRegistry.manifests.map((manifest) => [manifest.moduleId, manifest]));
-const inventory = manifestById.get('inventory');
-assert.equal(inventory.toolLifecycle, 'launchable');
-assert.equal(inventory.launchStatus, 'launchable');
-assert.equal(inventory.prodExposure, 'public');
-assert.equal(inventory.dataNamespace, 'personal');
+// inventory 已原生化,不再有工具清单
+assert.equal(manifestById.has('inventory'), false);
 
 for (const moduleId of ['finance', 'health', 'psychoanalysis']) {
   const manifest = manifestById.get(moduleId);
@@ -125,10 +122,10 @@ const report = JSON.parse(execFileSync('node', [join(scriptDir, 'report-module-r
   maxBuffer: 1024 * 1024 * 20,
 }));
 assert.equal(report.toolManifest.version, 'tool-manifest-v0');
-assert.equal(report.toolManifest.summary.moduleCount, 9);
+assert.equal(report.toolManifest.summary.moduleCount, 8);
 assert.equal(report.toolManifest.summary.missingRequiredFieldCount, 0);
-assert.equal(report.toolManifest.summary.publicModuleCount, 1);
-assert.equal(report.toolManifest.manifests.length, 9);
+assert.equal(report.toolManifest.summary.publicModuleCount, 0);
+assert.equal(report.toolManifest.manifests.length, 8);
 assert.ok(report.toolManifest.manifests.every((manifest) => manifest.version === 'tool-manifest-v0'));
 
 console.log('tool manifest v0 tests passed');
