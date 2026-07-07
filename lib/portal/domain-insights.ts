@@ -14,6 +14,8 @@ import { evaluateHealthFindings, type ClinicalFinding } from './health-clinical'
 import { computeRiskScores, type RiskScore } from './health-risk';
 import { loadBankTx, loadBankAccounts } from './bank-tx';
 import { financeFindings, type FinanceFinding } from './finance-insight';
+import { computeFinanceScores } from './finance-risk';
+import { findFinanceGuidelines } from './finance-guidelines';
 import { loadPlaceTrail } from './place-trail';
 import { placeFindings, type PlaceFinding } from './place-insight';
 import { inventoryFindings, type InventoryFinding } from './inventory';
@@ -104,6 +106,13 @@ export function gatherDomainInsights(): DomainInsight[] {
   for (const f of finance) {
     out.push({ domain: 'finance', severity: f.severity, title: f.title[0], detail: f.detail[0] });
   }
+  // 财务⑮:L3 体检分项(与健康 risks 同法,只有 moderate/high 值得提示;info/low 留在财务页)
+  try {
+    for (const s of computeFinanceScores(loadBankTx(), loadBankAccounts())) {
+      if (s.category !== 'high' && s.category !== 'moderate') continue;
+      out.push({ domain: 'finance', severity: s.category === 'high' ? 'flag' : 'attention', title: `${s.label[0]} · ${s.value}`, detail: `${s.detail[0]} · 依据 ${s.source}` });
+    }
+  } catch { /* ignore */ }
   for (const f of location) {
     out.push({ domain: 'location', severity: f.severity as InsightSeverity, title: f.title[0], detail: f.detail[0] });
   }
@@ -128,5 +137,13 @@ export function domainInsightsContextBlock(max = 8): string {
   if (!insights.length) return '';
   const label: Record<InsightDomain, string> = { health: '健康', finance: '财务', location: '活动', inventory: '收纳', mood: '心情' };
   const lines = insights.map((i) => `• [${label[i.domain]}] ${i.title} —— ${i.detail}`);
+  // 财务⑮:按当前财务判定的主题检索策展标准要点(带出处),让 AI 引用真标准而非编造
+  try {
+    const { finance } = computeDomainFindings();
+    const topics = [...finance.map((f) => f.id), ...computeFinanceScores(loadBankTx(), loadBankAccounts()).map((s) => s.id)];
+    for (const g of findFinanceGuidelines(topics).slice(0, 3)) {
+      lines.push(`• [标准] ${g.text[0]}(出处:${g.source})`);
+    }
+  } catch { /* ignore */ }
   return `\n【当前健康/财务洞察】(来自你的数据,由确定性引擎算出;可据此回答与健康指标/支出/订阅/现金流有关的问题,禁止在此之外虚构数字)\n${lines.join('\n')}`;
 }

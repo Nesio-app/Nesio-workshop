@@ -11540,6 +11540,16 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 .nesio-fin-flowpick { display: flex; gap: 0.4rem; flex-wrap: wrap; padding: 0.5rem 0 0.7rem; }
 .nesio-fin-flowopt { border: 1px solid var(--portal-line); border-radius: 999px; padding: 0.3rem 0.75rem; background: var(--glass-bg-solid); color: var(--portal-ink); font-size: 0.76rem; cursor: pointer; }
 .nesio-fin-flowopt.is-active { background: var(--portal-accent-soft); color: var(--portal-accent); border-color: var(--portal-accent-border); font-weight: 600; }
+/* 财务⑮:财务体检分项(L3 评分,红只给真实风险) */
+.nesio-fin-scores { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.4rem; }
+.nesio-fin-score { border: 1px solid var(--portal-line); border-radius: var(--radius-md, 16px); padding: 0.6rem 0.85rem; background: var(--glass-bg-solid); }
+.nesio-fin-score-top { display: flex; justify-content: space-between; align-items: baseline; font-size: 0.88rem; font-weight: 600; color: var(--portal-ink); }
+.nesio-fin-score-val { font-variant-numeric: tabular-nums; }
+.nesio-fin-score-val.is-info { color: var(--status-go); }
+.nesio-fin-score-val.is-low { color: var(--status-calm); }
+.nesio-fin-score-val.is-moderate { color: var(--status-gentle); }
+.nesio-fin-score-val.is-high { color: var(--status-risk); }
+.nesio-fin-score-hint { font-size: 0.7rem; color: var(--portal-muted); margin-top: 0.2rem; }
 /* 财务⑩:机构 logo / 首字母色块;交易行账户归属;资产小结 */
 .nesio-fin-acct-logo { border-radius: 50%; object-fit: contain; background: var(--glass-bg-solid); vertical-align: -0.3em; flex-shrink: 0; }
 .nesio-fin-acct-badge { display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; font-weight: 600; vertical-align: -0.3em; flex-shrink: 0; }
