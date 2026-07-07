@@ -6,7 +6,14 @@
  * - Which card domains the user acts on vs. dismisses
  * - Best time-of-day for interruptions (from interaction timestamps)
  * - Language/tone preferences
+ *
+ * 2a 收编(A 计划):domainWeights 的**真源移到 Preference 原语**(personalization/preference-store,
+ * dimension='domain',更新律=本文件原 EWMA-toward-target 逐字搬过去)。本文件保留时段/打扰风格/云同步,
+ * 对外 API(getMirrorProfile/getDomainWeight/learnFromFeedback)不变;旧 blob 里的 domainWeights
+ * 首次访问时一次性灌进 Preference(保留现 key,云回灌时同样回填)。
  */
+
+import { getWeights, recordPreference, seedPreferenceWeights, resetPreferenceDimension, type Reaction } from '@/lib/platform/personalization';
 
 const MIRROR_KEY = 'nesio-mirror-profile-v1';
 
@@ -41,14 +48,32 @@ function defaultMirror(): MirrorProfile {
   };
 }
 
-export function getMirrorProfile(): MirrorProfile {
-  if (typeof window === 'undefined') return defaultMirror();
+// 一次性迁移:旧 blob 里的 domainWeights 灌进 Preference(只补缺,不盖已学的)。模块生命周期内跑一次。
+let domainWeightsMigrated = false;
+function ensureDomainWeightsMigrated(stored: MirrorProfile | null): void {
+  if (domainWeightsMigrated) return;
+  domainWeightsMigrated = true;
+  if (stored?.domainWeights && Object.keys(stored.domainWeights).length) {
+    seedPreferenceWeights('domain', stored.domainWeights);
+  }
+}
+
+function readStored(): MirrorProfile | null {
+  if (typeof window === 'undefined') return null;
   try {
     const raw = localStorage.getItem(MIRROR_KEY);
-    return raw ? (JSON.parse(raw) as MirrorProfile) : defaultMirror();
+    return raw ? (JSON.parse(raw) as MirrorProfile) : null;
   } catch {
-    return defaultMirror();
+    return null;
   }
+}
+
+export function getMirrorProfile(): MirrorProfile {
+  const stored = readStored();
+  ensureDomainWeightsMigrated(stored);
+  const base = stored ?? defaultMirror();
+  // domainWeights 从规范 Preference 装配(真源);blob 里的副本仅供云往返/旧数据迁移。
+  return { ...base, domainWeights: getWeights('domain') };
 }
 
 function saveMirrorProfile(profile: MirrorProfile): void {
@@ -62,6 +87,8 @@ function saveMirrorProfile(profile: MirrorProfile): void {
 
 export function resetMirrorProfile(): void {
   saveMirrorProfile(defaultMirror());
+  resetPreferenceDimension('domain'); // 真源在 Preference,重置必须一起清,否则"重置"是假的
+  domainWeightsMigrated = true;       // 防止随后又从(已清空的)旧 blob 重新灌种
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('nesio-feedback-recorded'));
   }
@@ -78,14 +105,19 @@ async function hasCloudSession(): Promise<boolean> {
   }
 }
 
+// 旧四元反馈 → 统一 Reaction(not_now 在 domain 策略里=跳过,与原"时机不对不罚领域"等价)。
+const FEEDBACK_TO_REACTION: Record<string, Reaction> = {
+  useful: 'useful', wrong: 'wrong', too_much: 'too_much', not_now: 'snooze',
+};
+
 /** Call this whenever user gives feedback on a card */
 export function learnFromFeedback(
   domain: string,
   feedback: 'useful' | 'wrong' | 'not_now' | 'too_much' | undefined,
 ): void {
+  if (!feedback) return;
   const profile = getMirrorProfile();
   const hour = new Date().getHours();
-  const current = profile.domainWeights[domain] ?? 0.5;
 
   // 🟠#5 抗单调饱和:每次反馈都把所有小时轻微拉回先验(均值回归),没被持续正反馈的时段
   // 会淡出,重度用户不再所有活跃时段一起趋近 1.0、丢失区分度。
@@ -94,25 +126,23 @@ export function learnFromFeedback(
     profile.hourEngagement[h] += 0.02 * (prior - profile.hourEngagement[h]);
   }
 
-  // 更新律:EWMA-toward-target —— 每次反馈把权重按固定比例拉向该反馈对应的目标值,
-  // 取代此前 +0.08/-0.06/-0.12/+0.05/-0.03 那堆手调的不对称常数。目标∈[0,1] 故权重恒在
-  // [0,1](自然有界,无需手动 clamp),移动量随距离自适应(离目标远挪得多、近了挪得少)。
+  // 领域权重:走规范 Preference 原语(dimension='domain';更新律=原 EWMA-toward-target,
+  // useful→1 / wrong→0.2 留底 / too_much→0 加速 / not_now 跳过,策略表在 preference-store)。
+  recordPreference('domain', domain, FEEDBACK_TO_REACTION[feedback]);
+
+  // 时段互动:留在本文件(带清醒先验 + 均值回归的 24 桶结构,是 mirror 特有形态)。
   const toward = (cur: number, target: number, alpha: number) => cur + alpha * (target - cur);
-  const DW = 0.15, HR = 0.12;
+  const HR = 0.12;
   if (feedback === 'useful') {
-    profile.domainWeights[domain] = toward(current, 1, DW);
     profile.hourEngagement[hour] = toward(profile.hourEngagement[hour], 1, HR);
-  } else if (feedback === 'wrong') {
-    profile.domainWeights[domain] = toward(current, 0.2, DW);
-  } else if (feedback === 'too_much') {
-    profile.domainWeights[domain] = toward(current, 0, DW * 1.4); // 强负向,拉得快一点
   } else if (feedback === 'not_now') {
-    // 只是时机不对,不重罚领域,只把该时段拉低
+    // 只是时机不对,把该时段拉低
     profile.hourEngagement[hour] = toward(profile.hourEngagement[hour], 0.15, HR);
   }
 
   profile.feedbackCount += 1;
   profile.updatedAt = new Date().toISOString();
+  profile.domainWeights = getWeights('domain'); // blob 携带最新副本(云往返用),真源在 Preference
 
   // Adjust interruption style after enough data
   if (profile.feedbackCount > 20) {
@@ -127,7 +157,7 @@ export function learnFromFeedback(
 
 /** Get domain weight for ranking (higher = show more of this domain) */
 export function getDomainWeight(domain: string): number {
-  return getMirrorProfile().domainWeights[domain] ?? 0.5;
+  return getMirrorProfile().domainWeights[domain] ?? 0.5; // getMirrorProfile 内已做旧数据迁移
 }
 
 /** Best hours to interrupt user (top 8 hours by engagement) */
@@ -170,6 +200,8 @@ export async function loadMirrorFromCloud(): Promise<void> {
     // Merge: prefer cloud if it has more data
     if (cloud.feedbackCount > local.feedbackCount) {
       saveMirrorProfile(cloud);
+      // 采纳云侧 → 云 blob 里的 domainWeights 副本回灌规范 Preference(真源),否则只换了壳
+      if (cloud.domainWeights) seedPreferenceWeights('domain', cloud.domainWeights, { overwrite: true });
     }
   } catch {
     /* offline */

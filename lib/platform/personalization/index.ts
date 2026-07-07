@@ -8,7 +8,7 @@
 
 export { emitFeedback, onFeedback, type FeedbackEvent, type Reaction } from './feedback-bus';
 export { readFeedbackLog, replayFeedback } from './feedback-log';
-export { recordPreference, getWeight, getWeights } from './preference-store';
+export { recordPreference, getWeight, getWeights, seedPreferenceWeights, resetPreferenceDimension } from './preference-store';
 export { foldSample, baseline, zScore, type Estimator } from './baseline-store';
 export { markSeen, sinceSeen, cooldownRemaining, type CooldownPolicy } from './recency-store';
 
