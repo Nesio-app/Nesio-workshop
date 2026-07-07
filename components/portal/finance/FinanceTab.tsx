@@ -63,10 +63,17 @@ export default function FinanceTab() {
   const [flowEditId, setFlowEditId] = useState<string | null>(null);
 
   useEffect(() => {
-    const loaded = loadBankTx();
-    setTxs(loaded);
-    setAccounts(loadBankAccounts());
-    setYm(availableMonths(loaded)[0] || ymOf());
+    const reload = () => {
+      const loaded = loadBankTx();
+      setTxs(loaded);
+      setAccounts(loadBankAccounts());
+      const av = availableMonths(loaded);
+      if (av.length) setYm((cur) => (av.includes(cur) ? cur : av[0])); // 不覆盖用户已选月份
+    };
+    reload();
+    // 数据搬 IDB 后:水合完成/同步后派发 nesio-bank-updated → 重读(冷启动空窗自愈)。
+    window.addEventListener('nesio-bank-updated', reload);
+    return () => window.removeEventListener('nesio-bank-updated', reload);
   }, []);
 
   const months = useMemo(() => availableMonths(txs), [txs]);

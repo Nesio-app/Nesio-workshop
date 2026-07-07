@@ -17,7 +17,18 @@ function loadTs(path, requireImpl) {
   return mod.exports;
 }
 
-const bank = loadTs('../lib/portal/bank-tx.ts', (p) => (p === './storage-health' ? { reportStorageDropped() {} } : {}));
+// bank-tx 现从 idb-blob-store 取 createBlobStore(流水/账户已迁 IDB)。
+// 本契约只测纯聚合函数(financeFindings 直接吃传入的 txs),不走存储 → 给个内存桩即可。
+function fakeBlobStore() {
+  let cache = null;
+  return { load: () => cache, save: (v) => { cache = v; }, ready: async () => {} };
+}
+const bankRequire = (p) => {
+  if (p === './storage-health') return { reportStorageDropped() {} };
+  if (p === './idb-blob-store') return { createBlobStore: fakeBlobStore };
+  return {};
+};
+const bank = loadTs('../lib/portal/bank-tx.ts', bankRequire);
 const fin = loadTs('../lib/portal/finance-insight.ts', (p) => (p === './bank-tx' ? bank : {}));
 const { financeFindings } = fin;
 
