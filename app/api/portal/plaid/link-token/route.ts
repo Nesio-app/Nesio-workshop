@@ -40,6 +40,8 @@ export async function POST(req: NextRequest) {
         client_name: 'Nesio',
         user: { client_user_id: 'nesio-user' },
         products: ['transactions'],
+        // 财务⑯:机构支持时顺带启用 investments(投资账户流水);不支持不影响连接
+        optional_products: ['investments'],
         country_codes: ['US'],
         language: 'en',
       }),

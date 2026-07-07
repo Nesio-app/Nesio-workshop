@@ -11501,8 +11501,10 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 .nesio-fin-cat-name { font-size: 0.86rem; color: var(--portal-ink); }
 .nesio-fin-cat-amt { font-size: 0.86rem; font-weight: 600; color: var(--portal-ink); }
 .nesio-fin-delta { margin-left: 0.4rem; font-size: 0.72rem; font-weight: 600; }
-.nesio-fin-delta.up { color: var(--status-risk, #d9534f); }
+/* 财务④:支出上涨是提醒不是风险,红色仅留给真实安全/到期风险(warm-coach)→ 琥珀 */
+.nesio-fin-delta.up { color: var(--status-gentle, #c9923f); }
 .nesio-fin-delta.down { color: var(--status-go, #3a9d6a); }
+.nesio-fin-delta.is-new { color: var(--portal-muted); font-weight: 500; }
 .nesio-fin-bar { height: 7px; border-radius: 4px; background: var(--portal-accent-soft); overflow: hidden; }
 .nesio-fin-bar-fill { height: 100%; border-radius: 4px; background: var(--portal-accent); transition: width 0.4s ease; }
 .nesio-fin-merchants { display: flex; flex-direction: column; }
@@ -11522,19 +11524,43 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 .nesio-fin-txdate { flex-shrink: 0; width: 3rem; font-size: 0.72rem; color: var(--portal-muted); font-variant-numeric: tabular-nums; }
 .nesio-fin-txmid { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.1rem; }
 .nesio-fin-txname { font-size: 0.86rem; color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nesio-fin-txcat { font-size: 0.66rem; color: var(--portal-muted); }
+.nesio-fin-txcat { font-size: 0.66rem; color: var(--portal-muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nesio-fin-txamt { flex-shrink: 0; font-size: 0.88rem; font-weight: 600; color: var(--portal-ink); font-variant-numeric: tabular-nums; }
 .nesio-fin-txamt.is-refund { color: var(--status-go, #3a9d6a); }
 /* 批次 33:交易类型标签 + 分流纠正 */
-.nesio-fin-txflow { display: inline-flex; align-items: center; align-self: flex-start; border: none; background: none; padding: 0; font-size: 0.66rem; color: var(--portal-muted); cursor: pointer; }
-.nesio-fin-txflow::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 4px; background: var(--portal-muted); }
+.nesio-fin-txflow { display: inline-flex; align-items: center; align-self: flex-start; max-width: 100%; min-width: 0; border: none; background: none; padding: 0; font-size: 0.66rem; color: var(--portal-muted); cursor: pointer; }
+.nesio-fin-txflow::before { content: ''; display: inline-block; flex-shrink: 0; width: 6px; height: 6px; border-radius: 50%; margin-right: 4px; background: var(--portal-muted); }
+/* 财务④:「支出」两字不许被 CJK 断行拆开;分类名过长时单行省略号,不再折行错位 */
+.nesio-fin-txflow-l { white-space: nowrap; flex-shrink: 0; }
 .nesio-fin-txflow--expense::before { background: #588ce3; }
 .nesio-fin-txflow--refund::before { background: #3a9d6a; }
+.nesio-fin-txflow--rebate::before { background: var(--status-calm, #6b8fc9); } /* 财务⑤:返还/报销(卡权益 credit),信息蓝区别于退款绿 */
 .nesio-fin-txflow--income::before { background: #e0954a; }
 .nesio-fin-txflow--transfer::before { background: #9aa7b8; }
 .nesio-fin-flowpick { display: flex; gap: 0.4rem; flex-wrap: wrap; padding: 0.5rem 0 0.7rem; }
 .nesio-fin-flowopt { border: 1px solid var(--portal-line); border-radius: 999px; padding: 0.3rem 0.75rem; background: var(--glass-bg-solid); color: var(--portal-ink); font-size: 0.76rem; cursor: pointer; }
 .nesio-fin-flowopt.is-active { background: var(--portal-accent-soft); color: var(--portal-accent); border-color: var(--portal-accent-border); font-weight: 600; }
+/* 财务⑲:商户 logo(Plaid 富化,缺失不占位) */
+.nesio-fin-mlogo { border-radius: 4px; object-fit: contain; vertical-align: -0.2em; margin-right: 5px; background: var(--glass-bg-solid); flex-shrink: 0; }
+/* 财务⑰:定期「待确认」早识别标(中性,不焦虑) */
+.nesio-fin-recur-badge { margin-left: 0.4rem; font-size: 0.62rem; font-weight: 500; color: var(--status-calm, #6b8fc9); border: 1px solid var(--portal-line); border-radius: 999px; padding: 0.05rem 0.45rem; vertical-align: 0.1em; }
+/* 财务⑮:财务体检分项(L3 评分,红只给真实风险) */
+.nesio-fin-scores { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.4rem; }
+.nesio-fin-score { border: 1px solid var(--portal-line); border-radius: var(--radius-md, 16px); padding: 0.6rem 0.85rem; background: var(--glass-bg-solid); }
+.nesio-fin-score-top { display: flex; justify-content: space-between; align-items: baseline; font-size: 0.88rem; font-weight: 600; color: var(--portal-ink); }
+.nesio-fin-score-val { font-variant-numeric: tabular-nums; }
+.nesio-fin-score-val.is-info { color: var(--status-go); }
+.nesio-fin-score-val.is-low { color: var(--status-calm); }
+.nesio-fin-score-val.is-moderate { color: var(--status-gentle); }
+.nesio-fin-score-val.is-high { color: var(--status-risk); }
+.nesio-fin-score-hint { font-size: 0.7rem; color: var(--portal-muted); margin-top: 0.2rem; }
+/* 财务⑩:机构 logo / 首字母色块;交易行账户归属;资产小结 */
+.nesio-fin-acct-logo { border-radius: 50%; object-fit: contain; background: var(--glass-bg-solid); vertical-align: -0.3em; flex-shrink: 0; }
+.nesio-fin-acct-badge { display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; font-weight: 600; vertical-align: -0.3em; flex-shrink: 0; }
+.nesio-fin-txacct { display: inline-flex; align-items: center; gap: 5px; font-size: 0.66rem; color: var(--portal-muted); margin-top: 0.1rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nesio-fin-assets { display: flex; flex-wrap: wrap; gap: 0.5rem 1.2rem; padding: 0.8rem 1rem; margin-bottom: 0.9rem; border: 1px solid var(--portal-line); border-radius: var(--radius-md, 16px); background: var(--portal-accent-soft); }
+.nesio-fin-asset { display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.9rem; font-weight: 600; color: var(--portal-ink); font-variant-numeric: tabular-nums; }
+.nesio-fin-asset-l { font-size: 0.68rem; font-weight: 400; color: var(--portal-muted); }
 /* 批次 31:总览 KPI + 预警 + 趋势;交易审核;分卡 */
 .nesio-fin-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem; margin-bottom: 1rem; }
 .nesio-fin-kpi { display: flex; flex-direction: column; gap: 0.2rem; padding: 0.7rem 0.75rem; border: 1px solid var(--portal-line); border-radius: 12px; background: var(--glass-bg-solid); }
@@ -11565,8 +11591,8 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 .nesio-fin-review-alt, .nesio-fin-review-skip { border: 1px solid var(--portal-line); border-radius: 999px; padding: 0.35rem 0.8rem; background: var(--glass-bg-solid); color: var(--portal-ink); font-size: 0.78rem; cursor: pointer; }
 .nesio-fin-review-skip { color: var(--portal-muted); margin-left: auto; }
 .nesio-fin-card { padding: 0.85rem 0.9rem; border: 1px solid var(--portal-line); border-radius: 14px; background: var(--glass-bg-solid); margin-bottom: 0.7rem; }
-.nesio-fin-card-top { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
-.nesio-fin-card-name { font-size: 0.95rem; font-weight: 700; color: var(--portal-ink); }
+.nesio-fin-card-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.nesio-fin-card-name { display: inline-flex; align-items: center; gap: 6px; min-width: 0; font-size: 0.95rem; font-weight: 700; color: var(--portal-ink); }
 .nesio-fin-card-bal { font-size: 0.95rem; font-weight: 700; color: var(--portal-ink); font-variant-numeric: tabular-nums; }
 .nesio-fin-card-sub { margin: 0.15rem 0 0.4rem; font-size: 0.68rem; color: var(--portal-muted); text-transform: capitalize; }
 .nesio-fin-card-meta { margin: 0; font-size: 0.74rem; color: var(--portal-muted); }

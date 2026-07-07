@@ -18,13 +18,20 @@ import {
   availableMonths,
   formatMoney,
   dominantCurrency,
+  effectiveCategory,
+  ymOf,
   median,
   type BankTx,
   type BankAccount,
 } from './bank-tx';
+import { categoryBaseline, baselineZ, balanceProjection, detectIncome, monthlyCashflow } from './finance-features';
+import { categoryLabel } from './tx-category';
 
 export type FinanceSeverity = 'flag' | 'attention'; // flag=值得尽快看, attention=可关注
-export type FinanceFindingKind = 'anomaly' | 'subscription_hike' | 'cash_runway' | 'upcoming_bill';
+export type FinanceFindingKind =
+  | 'anomaly' | 'subscription_hike' | 'cash_runway' | 'upcoming_bill'
+  // 财务⑭(L2,docs/design/finance-expert-layers.md):
+  | 'fee_audit' | 'new_recurring' | 'balance_risk' | 'savings_rate';
 
 export interface FinanceFinding {
   id: string;
@@ -58,33 +65,143 @@ function anomalyFindings(txs: BankTx[], ym: string): FinanceFinding[] {
     });
   }
 
-  // 单类支出激增(最大的一个,deltaPct≥60% 且该类金额够大)。
-  const top = categoryBreakdown(txs, ym)
-    .filter((c) => c.total >= MIN_BASE && c.deltaPct != null && c.deltaPct >= 60)
+  // 财务⑭:单类漂移 —— 对**个人基线**(近 6 完整月 median/MAD)的 modified z-score >3.5
+  // 才报,替代「环比 >60%」的一刀切;基线可用的分类由 drift 负责,粗环比只兜底基线
+  // 不足的分类(历史 <3 月 / MAD=0),避免同类双报。
+  const cats = categoryBreakdown(txs, ym);
+  const monthMid = new Date(`${ym}-15T00:00:00`);
+  const driftOwned = new Set<string>();
+  for (const c of cats) {
+    if (c.total < MIN_BASE) continue;
+    const b = categoryBaseline(txs, c.category, monthMid);
+    if (!b) continue;
+    const z = baselineZ(c.total, b);
+    if (z == null) continue; // MAD=0(常数月)稳健口径无法分辨 → 留给环比兜底
+    driftOwned.add(c.category);
+    if (z > 3.5) {
+      const zh = categoryLabel(c.category, 'zh');
+      const en = categoryLabel(c.category, 'en');
+      out.push({
+        id: `finance-cat-drift-${c.category}`,
+        kind: 'anomaly',
+        severity: 'attention',
+        title: [`「${zh}」支出高于你的习惯`, `${en} spending is above your usual`],
+        detail: [
+          `本月「${zh}」${formatMoney(c.total, cur.currency)},你近 ${b.months} 个月通常约 ${formatMoney(b.median, cur.currency)}`,
+          `${en} ${formatMoney(c.total, cur.currency)} this month vs your usual ~${formatMoney(b.median, cur.currency)} (${b.months} mo)`,
+        ],
+      });
+    }
+  }
+
+  // 单类支出激增(环比兜底:仅基线不可用的分类;deltaPct≥60% 且该类金额够大)。
+  const top = cats
+    .filter((c) => c.total >= MIN_BASE && c.deltaPct != null && c.deltaPct >= 60 && !driftOwned.has(c.category))
     .sort((a, b) => (b.deltaPct ?? 0) - (a.deltaPct ?? 0))[0];
   if (top) {
+    // 财务②:分类已是 PFC 枚举,用户可见文案经 categoryLabel 出友好名(id 保持枚举,稳定)。
+    const zh = categoryLabel(top.category, 'zh');
+    const en = categoryLabel(top.category, 'en');
     out.push({
       id: `finance-cat-surge-${top.category}`,
       kind: 'anomaly',
       severity: 'attention',
-      title: [`「${top.category}」支出比往月高`, `${top.category} spending is up`],
+      title: [`「${zh}」支出比往月高`, `${en} spending is up`],
       detail: [
-        `本月「${top.category}」${formatMoney(top.total, cur.currency)},环比高 ${top.deltaPct}%`,
-        `${top.category} ${formatMoney(top.total, cur.currency)} this month, +${top.deltaPct}% vs last`,
+        `本月「${zh}」${formatMoney(top.total, cur.currency)},环比高 ${top.deltaPct}%`,
+        `${en} ${formatMoney(top.total, cur.currency)} this month, +${top.deltaPct}% vs last`,
       ],
     });
   }
   return out;
 }
 
+// ── 财务⑭:费用体检 —— 本月银行费用(ATM/透支/外币/利息)合计(BillGuard:灰色费用年均 ~$350)──
+function feeAuditFindings(txs: BankTx[], ym: string): FinanceFinding[] {
+  const fees = txs.filter((t) => (t.date || '').slice(0, 7) === ym && t.amount > 0 && effectiveCategory(t) === 'BANK_FEES');
+  if (!fees.length) return [];
+  const total = fees.reduce((s, t) => s + Math.abs(t.amount), 0);
+  const ccy = fees[0].currency || dominantCurrency(txs);
+  return [{
+    id: 'finance-fee-audit',
+    kind: 'fee_audit',
+    severity: 'attention',
+    title: ['本月有银行费用产生', 'Bank fees this month'],
+    detail: [
+      `${fees.length} 笔共 ${formatMoney(total, ccy)}(如 ${fees[0].name});多数费用可申请减免或调整习惯避开`,
+      `${fees.length} fee(s), ${formatMoney(total, ccy)} (e.g. ${fees[0].name}) — many are waivable`,
+    ],
+  }];
+}
+
+// ── 财务⑭:新订阅知情 —— 刚成熟(恰好 3 笔)且首笔在近 90 天内的定期扣款(试用转付费是最常见灰色扣费)──
+function newRecurringFindings(txs: BankTx[]): FinanceFinding[] {
+  const out: FinanceFinding[] = [];
+  for (const r of detectRecurring(txs)) {
+    if (r.count !== 3) continue;
+    const firstMs = Date.parse(r.lastDate) - r.cadenceDays * (r.count - 1) * 86_400_000;
+    if (Date.now() - firstMs > 90 * 86_400_000) continue;
+    out.push({
+      id: `finance-new-recur-${r.name}`,
+      kind: 'new_recurring',
+      severity: 'attention',
+      title: [`新识别到定期扣款:${r.name}`, `New recurring charge: ${r.name}`],
+      detail: [
+        `${r.cadenceLabel[0]} ${formatMoney(r.avgAmount, r.currency)},近 3 期首次成型 —— 如不知情,值得看一眼(可能是试用转付费)`,
+        `${r.cadenceLabel[1]}, ${formatMoney(r.avgAmount, r.currency)} — just matured; worth a look if unexpected (free trials often convert)`,
+      ],
+    });
+  }
+  return out;
+}
+
+// ── 财务⑭:余额风险 —— 30 天投影内存款转负(唯一配用 flag/红色的真实风险)──
+function balanceRiskFindings(txs: BankTx[], accounts: BankAccount[]): FinanceFinding[] {
+  const proj = balanceProjection(txs, accounts, 30);
+  if (!proj || !proj.negativeDate) return [];
+  const ccy = dominantCurrency(txs);
+  return [{
+    id: 'finance-balance-risk',
+    kind: 'balance_risk',
+    severity: 'flag',
+    title: ['未来 30 天存款可能不够账单', 'Balance may not cover upcoming bills'],
+    detail: [
+      `按定期账单与发薪推算,约 ${proj.negativeDate.slice(5).replace('-', '/')} 前后余额见底(最低约 ${formatMoney(proj.min, ccy)});提前挪一笔或调整账单日即可`,
+      `Projection dips below zero ~${proj.negativeDate} (low ~${formatMoney(proj.min, ccy)}) — moving funds or shifting a due date covers it`,
+    ],
+  }];
+}
+
+// ── 财务⑭:储蓄率 —— 有收入数据且最近 2 个完整月结余为负(50/30/20:20% 储蓄向)──
+function savingsRateFindings(txs: BankTx[]): FinanceFinding[] {
+  if (!detectIncome(txs)) return []; // 没有可靠收入流,不硬算
+  const curYm = ymOf(new Date());
+  const completed = monthlyCashflow(txs, 8).filter((m) => m.ym < curYm && m.income > 0);
+  const last2 = completed.slice(-2);
+  if (last2.length < 2 || !last2.every((m) => m.saved < 0)) return [];
+  const ccy = dominantCurrency(txs);
+  const gap = Math.abs(last2[last2.length - 1].saved);
+  return [{
+    id: 'finance-savings-rate',
+    kind: 'savings_rate',
+    severity: 'attention',
+    title: ['最近两个月支出略高于收入', 'Spending has edged above income lately'],
+    detail: [
+      `上月支出比收入多约 ${formatMoney(gap, ccy)};不用一次补齐,先从一类支出轻轻收一点即可`,
+      `Last month spent ~${formatMoney(gap, ccy)} over income — a gentle trim in one category is enough to start`,
+    ],
+  }];
+}
+
 // ── ② 订阅涨价:定期扣款里最近一笔明显高于此前基线(bank-tx 没有,这里新增)──
 function subscriptionHikeFindings(txs: BankTx[]): FinanceFinding[] {
   const out: FinanceFinding[] = [];
   for (const r of detectRecurring(txs)) {
-    // 需有历史基线(至少 3 笔),且涨幅 >10% 且绝对涨 ≥ $1(挡掉四舍五入噪音)。
+    // 需有历史基线(至少 3 笔),且涨幅 ≥5% 且绝对涨 ≥ $1(挡掉四舍五入噪音)。
+    // 财务⑭:阈值从 10% 放宽到 5% —— 订阅价格爬升(BillGuard "cost creep")常是小步慢涨。
     if (r.count < 3 || r.baselineAmount <= 0) continue;
     const rise = r.latestAmount - r.baselineAmount;
-    if (r.latestAmount <= r.baselineAmount * 1.1 || rise < 1) continue;
+    if (r.latestAmount < r.baselineAmount * 1.05 || rise < 1) continue;
     const pct = Math.round((rise / r.baselineAmount) * 100);
     out.push({
       id: `finance-hike-${r.name}`,
@@ -168,6 +285,10 @@ export function financeFindings(
     ...subscriptionHikeFindings(txs),
     ...cashRunwayFindings(txs, accounts),
     ...upcomingBillFindings(txs),
+    ...feeAuditFindings(txs, ym),
+    ...newRecurringFindings(txs),
+    ...balanceRiskFindings(txs, accounts),
+    ...savingsRateFindings(txs),
   ];
   const rank: Record<FinanceSeverity, number> = { flag: 0, attention: 1 };
   return all.sort((a, b) => rank[a.severity] - rank[b.severity]);

@@ -10,6 +10,7 @@
 
 import { reportStorageDropped } from './storage-health';
 import { createBlobStore } from './idb-blob-store';
+import { normalizeCategory } from './tx-category';
 
 export interface BankTx {
   id: string;
@@ -18,7 +19,16 @@ export interface BankTx {
   amount: number;
   currency: string;
   category: string;
+  categoryDetail?: string; // 财务⑨:Plaid PFC detailed(FOOD_AND_DRINK_COFFEE…),只作展示细化
   accountId?: string;
+  merchantId?: string;   // 财务⑲:Plaid merchant_entity_id —— 官方商户实体,归并同商户不同描述符
+  merchantLogo?: string; // 商户 logo URL(Plaid 提供;可缺)
+}
+
+/** 财务⑲:商户归并键 —— Plaid 官方实体 id 优先("NETFLIX.COM 866-…"/"Netflix Inc" 同 id),
+ * 缺失(老数据/无富化的机构)回退字符串归一。定期识别/退款证据/商户 Top 统一用它。 */
+export function merchantKey(t: Pick<BankTx, 'name' | 'merchantId'>): string {
+  return t.merchantId || normalizeMerchant(t.name);
 }
 
 export const BANK_TX_KEY = 'nesio-bank-tx-v1';
@@ -31,10 +41,28 @@ const txStore = createBlobStore<BankTx[]>({
   validate: (v) => Array.isArray(v), onWriteError: reportStorageDropped,
 });
 
+/**
+ * 孤儿交易过滤(财务①:sandbox 混库清洗)—— 交易的 accountId 不属于任何已知账户 = 旧环境残留
+ * (换 Plaid item/环境后,旧交易永远不在新 item 的 removedIds 里,靠这里识别)。
+ * fail-safe:账户表为空(没同步过账户/水合未完成)不过滤;无 accountId 的老数据保守保留。
+ * 账户表是按 id 只增合并的(见 saveBankAccounts),临时失败的银行不丢账户 → 不会误杀活银行交易。
+ */
+export function filterToKnownAccounts(txs: BankTx[], accounts: BankAccount[]): BankTx[] {
+  if (!accounts.length) return txs;
+  const known = new Set(accounts.map((a) => a.id));
+  // 财务⑪:早期同步代码不存 accountId,那批(sandbox 时代)残留曾靠"保守保留"永远清不掉
+  // (Madison/Tectra $500 假商户一直赖在定期页)。只要数据集里已有带 accountId 的现代交易,
+  // 无 accountId 的就是旧环境残留 → 隐藏;整库都没有 accountId(纯老用户)才整体保留。
+  const hasModern = txs.some((t) => t.accountId);
+  return txs.filter((t) => (t.accountId ? known.has(t.accountId) : !hasModern));
+}
+
 export function loadBankTx(): BankTx[] {
   const raw = txStore.load();
   // Number.isFinite 挡掉 NaN(typeof NaN === 'number' 会漏过去,污染整月汇总)。
-  return Array.isArray(raw) ? raw.filter((t) => t && Number.isFinite(t.amount) && typeof t.date === 'string') : [];
+  const base = Array.isArray(raw) ? raw.filter((t) => t && Number.isFinite(t.amount) && typeof t.date === 'string') : [];
+  // 读时过滤孤儿:显示立即治愈;下次同步 merge 经由本函数 → 储存自然清掉。备份读原始 IDB,可逆。
+  return filterToKnownAccounts(base, loadBankAccounts());
 }
 
 /** 写入流水(供 ConnectorsHub.syncPlaid)。 */
@@ -97,10 +125,10 @@ export function dominantCurrency(txs: BankTx[]): string {
 // Plaid amount 约定:正=花出去,负=进账。但「进账」里混了 收入/转账/信用卡还款,
 // 这些都不该计入收支。按 personal_finance_category 自动分流,并允许用户手动纠正、记住。
 
-export type TxFlow = 'expense' | 'refund' | 'income' | 'transfer';
+export type TxFlow = 'expense' | 'refund' | 'rebate' | 'income' | 'transfer';
 
 export const TX_FLOW_LABELS: Record<TxFlow, [string, string]> = {
-  expense: ['支出', 'Expense'], refund: ['退款', 'Refund'], income: ['收入', 'Income'], transfer: ['转账/还款', 'Transfer'],
+  expense: ['支出', 'Expense'], refund: ['退款', 'Refund'], rebate: ['返还/报销', 'Credit'], income: ['收入', 'Income'], transfer: ['转账/还款', 'Transfer'],
 };
 
 const FLOW_RULE_KEY = 'nesio-bank-flow-rule-v1';
@@ -117,8 +145,32 @@ export function setFlowRule(name: string, flow: TxFlow | ''): void {
   try { localStorage.setItem(FLOW_RULE_KEY, JSON.stringify(rules)); } catch { reportStorageDropped(); }
 }
 
-/** 交易类型:用户规则优先,否则按 Plaid 分类自动判(转账/还款/收入不计收支)。 */
-export function txFlow(t: BankTx, rules = loadFlowRules()): TxFlow {
+// 财务⑤:statement credit(卡权益返还/报销,AMEX Global Entry credit、rebate、cashback 等)
+// 不是商户退款——没有对应的「退货」动作,叫「退款」误导。只在本会判成 refund 的分支上按
+// 名字保守识别(CREDIT UNION 是机构名,排除);金额口径与退款相同(冲抵支出),纯语义分流。
+const REBATE_NAME_RE = /STATEMENT CREDIT|\bREBATE\b|REIMBURSE|CASH ?BACK|\bCREDIT\b(?!\s+UNION)|返还|报销/i;
+
+/** 财务⑪:退款证据集 —— 数据集中出现过支出的商户(⑲:entity id 优先归并)。退款必须有对应的"买过"。 */
+export function expenseMerchants(txs: BankTx[]): Set<string> {
+  const out = new Set<string>();
+  for (const t of txs) {
+    if (t.amount > 0) {
+      const k = merchantKey(t);
+      if (k) out.add(k);
+      // 兼容:老支出无 merchantId、新退款有 —— 归一名同样入证据集,两把钥匙都能开
+      const nk = normalizeMerchant(t.name);
+      if (nk) out.add(nk);
+    }
+  }
+  return out;
+}
+
+/**
+ * 交易类型:用户规则优先,否则按 Plaid 分类自动判(转账/还款/收入不计收支)。
+ * 财务⑪:传入 evidence(expenseMerchants)时,负数交易只有该商户买过才算 refund,
+ * 否则归 transfer —— PayPal 收款/亲友转入此前被记成「退款」倒扣净支出。不传保持旧行为。
+ */
+export function txFlow(t: BankTx, rules = loadFlowRules(), evidence?: Set<string>): TxFlow {
   const forced = rules[t.name];
   if (forced) return forced;
   const cat = (t.category || '').toUpperCase();
@@ -129,7 +181,34 @@ export function txFlow(t: BankTx, rules = loadFlowRules()): TxFlow {
     // 退款/收入/转账,一律当 transfer 不计收支 —— 避免把工资/转账当退款倒扣净支出。
     return t.amount >= 0 ? 'expense' : 'transfer';
   }
-  return t.amount >= 0 ? 'expense' : 'refund';
+  if (t.amount >= 0) return 'expense';
+  if (REBATE_NAME_RE.test(t.name || '')) return 'rebate';
+  if (evidence && !evidence.has(merchantKey(t)) && !evidence.has(normalizeMerchant(t.name))) return 'transfer';
+  return 'refund';
+}
+
+/* ---------- 财务③:内部调整对识别 ---------- */
+// 银行内部重分配(cash advance 调整等)常成对出现:同日、同账户、同额一正一负、名字带调整词。
+// 净效果为零、对用户零信息量,但以两条噪音行出现在交易列表。这里保守配对(双方名字都须命中
+// 关键词,不凭金额巧合杀真交易),供显示层折叠;它们本就是 transfer 流,统计不受影响。
+const ADJUSTMENT_NAME_RE = /\bADJ\b|REDIST|ADJUSTMENT|REVERSAL|OFFSET|冲正|调整/i;
+
+/** 返回可折叠的内部调整对的交易 id 集合(一对一贪心配对,配不上的单条保留)。 */
+export function internalAdjustmentIds(txs: BankTx[]): Set<string> {
+  const out = new Set<string>();
+  const buckets = new Map<string, BankTx[]>(); // date|accountId|abs(amount) → 候选
+  for (const t of txs) {
+    if (!ADJUSTMENT_NAME_RE.test(t.name || '')) continue;
+    const key = `${t.date}|${t.accountId || ''}|${Math.abs(t.amount)}`;
+    (buckets.get(key) ?? buckets.set(key, []).get(key)!).push(t);
+  }
+  for (const group of buckets.values()) {
+    const pos = group.filter((t) => t.amount > 0);
+    const neg = group.filter((t) => t.amount < 0);
+    const pairs = Math.min(pos.length, neg.length);
+    for (let i = 0; i < pairs; i++) { out.add(pos[i].id); out.add(neg[i].id); }
+  }
+  return out;
 }
 
 export interface MonthSummary {
@@ -165,12 +244,13 @@ export function summarizeMonth(txs: BankTx[], ym: string): MonthSummary {
   // 只汇总主币种的交易 —— 跨币种裸加($100 + ¥700 = 800)会给出任何币种下都不存在的数字。
   const ccy = dominantCurrency(monthTxs.length ? monthTxs : txs);
   const flowRules = loadFlowRules();
+  const evidence = expenseMerchants(txs); // 财务⑪:退款要有"买过"的证据,否则按转账不计收支
   let gross = 0, refunds = 0, income = 0, count = 0;
   for (const t of monthTxs) {
     if (ccyOf(t) !== ccy) continue;
-    const f = txFlow(t, flowRules);
+    const f = txFlow(t, flowRules, evidence);
     if (f === 'expense') { gross += Math.abs(t.amount); count += 1; }
-    else if (f === 'refund') { refunds += Math.abs(t.amount); count += 1; }
+    else if (f === 'refund' || f === 'rebate') { refunds += Math.abs(t.amount); count += 1; } // 返还与退款同口径冲抵支出
     else if (f === 'income') income += Math.abs(t.amount);
     // transfer / 还款:不计收支
   }
@@ -189,8 +269,13 @@ export interface CategorySlice {
   category: string;
   total: number;
   pct: number; // 占本月总支出比例 0..100
-  deltaPct: number | null; // 环比上月,null=上月无数据
+  deltaPct: number | null; // 环比上月;null=上月无数据或基数太小(百分比无意义)
+  isNew: boolean; // 上月完全没有此类支出
 }
+
+// 财务④:环比基数下限。上月不足 $50 的类别,百分比全是小基数噪音(¥30→¥314 就是
+// +946%),读者得到的是惊吓不是信息;这类只标「新增」或干脆不标。
+const DELTA_MIN_BASE = 50;
 
 export function categoryBreakdown(txs: BankTx[], ym: string): CategorySlice[] {
   const cur = sumByCategory(txs, ym);
@@ -198,9 +283,9 @@ export function categoryBreakdown(txs: BankTx[], ym: string): CategorySlice[] {
   const grand = [...cur.values()].reduce((a, b) => a + b, 0) || 1;
   return [...cur.entries()]
     .map(([category, total]) => {
-      const before = prev.get(category);
-      const deltaPct = before && before > 0 ? Math.round(((total - before) / before) * 100) : null;
-      return { category, total: round2(total), pct: Math.round((total / grand) * 100), deltaPct };
+      const before = prev.get(category) || 0;
+      const deltaPct = before >= DELTA_MIN_BASE ? Math.round(((total - before) / before) * 100) : null;
+      return { category, total: round2(total), pct: Math.round((total / grand) * 100), deltaPct, isNew: before <= 0 };
     })
     .sort((a, b) => b.total - a.total);
 }
@@ -222,22 +307,26 @@ export interface MerchantAgg {
   name: string;
   total: number;
   count: number;
+  logo?: string; // 财务⑲:商户 logo URL(Plaid 富化;可缺)
 }
 
 export function topMerchants(txs: BankTx[], ym: string, n = 5): MerchantAgg[] {
   const m = new Map<string, { total: number; count: number }>();
   const flowRules = loadFlowRules();
   const ccy = monthCurrency(txs, ym); // 当月主币种,与 KPI 同口径
+  // 财务⑲:按商户实体归并(entity id 优先)——"NETFLIX.COM 866-…"/"Netflix Inc" 合成一行
+  const meta = new Map<string, { name: string; logo?: string }>();
   for (const t of txs) {
     if (txYm(t) !== ym || ccyOf(t) !== ccy || txFlow(t, flowRules) !== 'expense') continue;
-    const name = t.name || '未知商户';
-    const cur = m.get(name) || { total: 0, count: 0 };
+    const key = merchantKey(t) || '未知商户';
+    const cur = m.get(key) || { total: 0, count: 0 };
     cur.total += Math.abs(t.amount);
     cur.count += 1;
-    m.set(name, cur);
+    m.set(key, cur);
+    meta.set(key, { name: t.name || '未知商户', logo: t.merchantLogo || meta.get(key)?.logo });
   }
   return [...m.entries()]
-    .map(([name, v]) => ({ name, total: round2(v.total), count: v.count }))
+    .map(([key, v]) => ({ name: meta.get(key)?.name || key, logo: meta.get(key)?.logo, total: round2(v.total), count: v.count }))
     .sort((a, b) => b.total - a.total)
     .slice(0, n);
 }
@@ -256,6 +345,9 @@ export interface BankAccount {
   subtype?: string;
   balance?: number;
   currency: string;
+  institution?: string; // 财务⑧:机构名(Chase / American Express…)
+  logo?: string;        // 机构 logo(base64 PNG,Plaid 提供;可缺)
+  color?: string;       // 机构主色(#rrggbb;可缺)
 }
 
 export const BANK_ACCOUNTS_KEY = 'nesio-bank-accounts-v1';
@@ -270,22 +362,101 @@ export function loadBankAccounts(): BankAccount[] {
   return Array.isArray(raw) ? raw.filter((a) => a && a.id) : [];
 }
 
-/** 写入账户(供 ConnectorsHub.syncPlaid)。 */
-export function saveBankAccounts(accounts: BankAccount[]): void {
-  accountsStore.save(accounts);
+/**
+ * 写入账户(供 ConnectorsHub.syncPlaid)。财务①:默认按 id **只增合并**,不整体替换 ——
+ * 多银行时某家临时失败(API 报错/重连中)当次返回不含它的账户,整体替换会把它从账户表里
+ * 抹掉,进而让孤儿过滤误杀它的交易。合并语义:同 id 用最新字段(余额/名称会更新),
+ * 未出现的旧账户保留(历史数据仍可归属;「彻底删除」仍全清)。
+ *
+ * 财务⑧:路由确认「本次每个存活 token 的账户都拉全了」(authoritative)时用 replace 整体
+ * 替换 —— 只增合并永不退场,重复授权留下的旧 item 账户会一直重复显示、其交易双份计数;
+ * 权威快照替换后,旧 item 的本地交易被孤儿过滤自动隐藏。
+ */
+// 财务⑪→⑯:同一实体账户判定。⑪要求名字完全相同,但新旧 item 对同一账户可能给出
+// 不同写法的名字(官方名 vs 显示名),重复副本因此漏杀(用户「7937 还是 2 个」)。
+// 加固:mask + 类型(subtype/type)相同,且 ① 双方机构相同,或 ② 旧条目没有机构元数据
+// (⑧ 之前的存量,恰是重复来源),或 ③ 归一化名字相同。缺 mask 一律不判(保守)。
+const acctTypeKey = (a: BankAccount) => (a.subtype || a.type || '').toLowerCase();
+function isSameUnderlyingAccount(incoming: BankAccount, stored: BankAccount): boolean {
+  if (!incoming?.mask || !stored?.mask || incoming.mask !== stored.mask) return false;
+  if (acctTypeKey(incoming) !== acctTypeKey(stored)) return false;
+  if (stored.institution && incoming.institution) return stored.institution === incoming.institution;
+  if (!stored.institution) return true;
+  return (stored.name || '').trim().toLowerCase() === (incoming.name || '').trim().toLowerCase();
+}
+
+/** 财务⑯:手动移除账户(重复/失效副本兜底)。若该账户仍在连接中,下次同步会重新拉回。 */
+export function removeBankAccount(id: string): void {
+  accountsStore.save(loadBankAccounts().filter((a) => a.id !== id));
+}
+
+export function saveBankAccounts(accounts: BankAccount[], opts?: { replace?: boolean }): void {
+  if (opts?.replace && accounts.length > 0) {
+    accountsStore.save(accounts.filter((a) => a?.id));
+    return;
+  }
+  const cur = accountsStore.load();
+  const byId = new Map<string, BankAccount>();
+  for (const a of Array.isArray(cur) ? cur : []) if (a?.id) byId.set(a.id, a);
+  // 指纹去重:本次同步的账户与既存账户是同一实体账户但不同 id → 旧 id 是重复授权残留,
+  // 退场(其交易随之被孤儿过滤隐藏)。同 id 正常合并更新。
+  const incoming = accounts.filter((a) => a?.id);
+  for (const [id, b] of [...byId]) {
+    if (incoming.some((a) => a.id !== id && isSameUnderlyingAccount(a, b))) byId.delete(id);
+  }
+  for (const a of accounts) if (a?.id) byId.set(a.id, { ...byId.get(a.id), ...a });
+  accountsStore.save([...byId.values()]);
+}
+
+/* ---------- 财务⑩:账户类型友好名 + 资产小结 ---------- */
+
+const SUBTYPE_LABELS: Record<string, [string, string]> = {
+  checking: ['支票', 'Checking'], savings: ['储蓄', 'Savings'], 'money market': ['货币市场', 'Money market'],
+  cd: ['定期存单', 'CD'], 'credit card': ['信用卡', 'Credit card'], paypal: ['PayPal', 'PayPal'],
+  brokerage: ['投资', 'Brokerage'], ira: ['退休 IRA', 'IRA'], '401k': ['退休 401k', '401k'],
+  hsa: ['医保储蓄 HSA', 'HSA'], mortgage: ['房贷', 'Mortgage'], student: ['学贷', 'Student loan'], auto: ['车贷', 'Auto loan'],
+};
+const TYPE_LABELS: Record<string, [string, string]> = {
+  depository: ['存款', 'Deposit'], credit: ['信用卡', 'Credit'], investment: ['投资', 'Investment'],
+  brokerage: ['投资', 'Investment'], loan: ['贷款', 'Loan'], other: ['账户', 'Account'],
+};
+
+/** 账户类型友好名 [zh, en](subtype 优先,type 兜底;都不认识时原样)。 */
+export function accountTypeLabel(a: { type?: string; subtype?: string }): [string, string] {
+  const sub = (a.subtype || '').toLowerCase();
+  if (SUBTYPE_LABELS[sub]) return SUBTYPE_LABELS[sub];
+  const type = (a.type || '').toLowerCase();
+  if (TYPE_LABELS[type]) return TYPE_LABELS[type];
+  const raw = a.subtype || a.type || '';
+  return raw ? [raw, raw] : ['账户', 'Account'];
+}
+
+/** 资产小结(单币种口径):存款 + 投资 − 信用卡欠款 = 净资产。无余额的账户跳过。 */
+export function assetSummary(accounts: BankAccount[], currency = 'USD'): { deposits: number; investments: number; creditOwed: number; net: number } {
+  let deposits = 0, investments = 0, creditOwed = 0;
+  for (const a of accounts) {
+    if ((a.currency || 'USD').toUpperCase() !== currency.toUpperCase()) continue;
+    if (typeof a.balance !== 'number') continue;
+    const t = (a.type || '').toLowerCase();
+    if (t === 'depository') deposits += a.balance;
+    else if (t === 'investment' || t === 'brokerage') investments += a.balance;
+    else if (t === 'credit') creditOwed += a.balance;
+  }
+  return { deposits: round2(deposits), investments: round2(investments), creditOwed: round2(creditOwed), net: round2(deposits + investments - creditOwed) };
 }
 
 /** 某账户某月的消费/退款/笔数。 */
 export function accountMonth(txs: BankTx[], accountId: string, ym: string): { spend: number; refund: number; count: number } {
   let spend = 0, refund = 0, count = 0;
   const flowRules = loadFlowRules();
+  const evidence = expenseMerchants(txs);
   const acctTxs = txs.filter((t) => t.accountId === accountId);
   const ccy = dominantCurrency(acctTxs.length ? acctTxs : txs); // 单账户按其主币种,避免跨币种裸加
   for (const t of txs) {
     if (t.accountId !== accountId || txYm(t) !== ym || ccyOf(t) !== ccy) continue;
-    const f = txFlow(t, flowRules);
+    const f = txFlow(t, flowRules, evidence);
     if (f === 'expense') { spend += Math.abs(t.amount); count += 1; }
-    else if (f === 'refund') { refund += Math.abs(t.amount); count += 1; }
+    else if (f === 'refund' || f === 'rebate') { refund += Math.abs(t.amount); count += 1; }
   }
   return { spend: round2(spend), refund: round2(refund), count };
 }
@@ -306,9 +477,10 @@ export function setMerchantRule(name: string, category: string): void {
   try { localStorage.setItem(MERCHANT_RULE_KEY, JSON.stringify(rules)); } catch { reportStorageDropped(); }
 }
 
-/** 生效分类:用户规则优先,其次 Plaid 分类。 */
+/** 生效分类:用户规则优先,其次 Plaid 分类;经 normalizeCategory 归一(财务②:旧自家词汇
+ * 与 PFC 枚举合流,统计里同类不再被拆成两组)。 */
 export function effectiveCategory(t: BankTx, rules = loadMerchantRules()): string {
-  return rules[t.name] || t.category || '';
+  return normalizeCategory(rules[t.name] || t.category || '');
 }
 
 /** 需要审核的交易:本月、真支出、没有生效分类的。 */
@@ -318,12 +490,13 @@ export function needsReview(txs: BankTx[], ym: string): BankTx[] {
   return txs.filter((t) => txYm(t) === ym && txFlow(t, flowRules) === 'expense' && !effectiveCategory(t, rules)).sort((a, b) => b.amount - a.amount);
 }
 
+// 财务②:建议值统一为 PFC 枚举(uber/gas 语义上是交通;流媒体订阅归娱乐)。
 const SUGGEST_RULES: Array<[RegExp, string]> = [
-  [/coffee|cafe|starbucks|餐|饭|restaurant|mcdonald|bakery|bar\b|dining/i, 'Food'],
-  [/shop|store|mall|market|超市|商场|target|walmart|costco|amazon|ulta|ikea/i, 'Shopping'],
-  [/uber|lyft|gas|shell|chevron|transit|parking|加油|地铁|taxi/i, 'Travel'],
-  [/netflix|spotify|hulu|subscription|membership|订阅|会员/i, 'Services'],
-  [/payment|autopay|还款|transfer|转账/i, 'Payment'],
+  [/coffee|cafe|starbucks|餐|饭|restaurant|mcdonald|bakery|bar\b|dining/i, 'FOOD_AND_DRINK'],
+  [/shop|store|mall|market|超市|商场|target|walmart|costco|amazon|ulta|ikea/i, 'GENERAL_MERCHANDISE'],
+  [/uber|lyft|gas|shell|chevron|transit|parking|加油|地铁|taxi/i, 'TRANSPORTATION'],
+  [/netflix|spotify|hulu|subscription|membership|订阅|会员/i, 'ENTERTAINMENT'],
+  [/payment|autopay|还款|transfer|转账/i, 'LOAN_PAYMENTS'],
 ];
 
 /** 商户名分词(英文单词 + 中文串,长度≥2)。 */
@@ -335,8 +508,9 @@ function merchantTokens(name: string): string[] {
 function learnTokenCategory(rules: Record<string, string>): Record<string, Record<string, number>> {
   const map: Record<string, Record<string, number>> = {};
   for (const [name, cat] of Object.entries(rules)) {
+    const norm = normalizeCategory(cat);
     for (const tok of merchantTokens(name)) {
-      (map[tok] ||= {})[cat] = (map[tok][cat] || 0) + 1;
+      (map[tok] ||= {})[norm] = (map[tok][norm] || 0) + 1;
     }
   }
   return map;
@@ -402,7 +576,7 @@ export function suggestCategory(name: string, rules: Record<string, string> = lo
     return { category: cat, confidence: Math.round(confidence * 100) / 100 };
   }
   for (const [re, cat] of SUGGEST_RULES) if (re.test(name)) return { category: cat, confidence: 0.72 };
-  return { category: 'Services', confidence: 0.4 };
+  return { category: 'GENERAL_SERVICES', confidence: 0.4 };
 }
 
 /* ---------- 批次 39:定期账单识别(Rocket Money 风)---------- */
@@ -420,10 +594,14 @@ export interface RecurringCharge {
   currency: string;
   latestAmount: number;   // 最近一笔金额(供「订阅涨价」比对)
   baselineAmount: number; // 此前各笔的中位数(无历史时 = latestAmount)
+  // 财务⑰:mature = ≥3 笔成熟(Plaid 同口径);predicted = 早识别(2 笔规律,或知名订阅
+  // 品牌 1 笔按月假设)。predicted 只作展示提示,不进订阅负担/余额投影等统计。
+  status: 'mature' | 'predicted';
+  logo?: string; // 财务⑲:商户 logo URL(Plaid 富化;可缺)
 }
 
 /** 归一化商户名:去掉尾部门店号/流水号/日期,合并同一商家的多笔。 */
-function normalizeMerchant(name: string): string {
+export function normalizeMerchant(name: string): string {
   return (name || '')
     .toLowerCase()
     .replace(/[#*]?\s*\d[\d\-/.]{2,}.*$/, '') // 尾部数字串(门店号/日期)
@@ -450,9 +628,94 @@ function cadenceLabelFor(days: number): [string, string] | null {
 
 // 批次 39:定期 = 账单(订阅/水电/保险/房贷/会员/宽带/话费…),不是「常去的超市/咖啡」。
 // 账单关键词命中 → 强定期候选;否则要求「金额稳定」(超市/餐饮金额飘,自动排除)。
-const BILL_RE = /netflix|spotify|hulu|disney|youtube ?premium|hbo|prime video|apple\.com\/bill|icloud|adobe|dropbox|notion|chatgpt|openai|github|microsoft ?365|google ?(one|storage)|membership|会员|subscription|订阅|insurance|保险|geico|state ?farm|allstate|progressive|nationwide|premium|duke ?energy|电费|水费|燃气|gas ?(company|bill)|electric|water ?(bill|utility)|utility|comcast|xfinity|spectrum|at&t|verizon|t-?mobile|sprint|话费|宽带|internet|broadband|mortgage|房贷|月供|rent\b|房租|loan|贷款|student ?loan|gym|健身|planet ?fitness|la ?fitness|equinox|peloton|storage|自如|物业|hoa/i;
+// 财务⑨:高频误伤词加词界 —— rent\b 会命中 "diffeRENT"/"paRENT",loan 命中 "sLOANe",
+// gym 命中 "GYMboree",hoa 命中 "HOAgie"。账单词必须整词出现。
+const BILL_RE = /netflix|spotify|hulu|disney|youtube ?premium|hbo|prime video|apple\.com\/bill|icloud|adobe|dropbox|notion|chatgpt|openai|github|microsoft ?365|google ?(one|storage)|membership|会员|subscription|订阅|insurance|保险|geico|state ?farm|allstate|progressive|nationwide|premium|duke ?energy|电费|水费|燃气|gas ?(company|bill)|electric|water ?(bill|utility)|utility|comcast|xfinity|spectrum|at&t|verizon|t-?mobile|sprint|话费|宽带|internet|broadband|mortgage|房贷|月供|\brent\b|房租|\bloans?\b|贷款|student ?loan|\bgym\b|健身|planet ?fitness|la ?fitness|equinox|peloton|storage|自如|物业|\bhoa\b/i;
 // 明确排除:餐饮/购物/超市/咖啡(去很多次也不是账单)
-const NON_BILL_CAT_RE = /food|餐饮|shopping|购物|grocer|超市|coffee|咖啡/i;
+const NON_BILL_CAT_RE = /food|餐饮|shopping|merchandise|购物|grocer|超市|coffee|咖啡/i;
+
+// 财务⑰→⑱:已知订阅商户先验库(核心信号,业界 COF/MCC 商户表同理)——命中先验的商户
+// 1 笔即标记、2 笔不需要周期证据。条目:匹配模式 + 默认周期 + 默认分类。歧义词(calm/
+// medium/zoom…)锚定域名形式,避免误伤同名实体店;条目只增,误报由「不是定期」✕ 兜底。
+export interface KnownSubscription { re: RegExp; cadenceDays: 30 | 365; category: string }
+
+export const KNOWN_SUBSCRIPTIONS: KnownSubscription[] = [
+  // 流媒体/视频
+  { re: /netflix/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  { re: /hulu/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  { re: /disney ?\+|disneyplus/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  { re: /hbo ?max|\bmax\.com/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  { re: /paramount ?\+/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  { re: /peacock ?(tv|premium)?/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  { re: /apple ?tv/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  { re: /prime ?video/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  { re: /youtube ?(premium|tv)/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  { re: /crunchyroll/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  { re: /fubo ?tv|sling ?tv/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  // 音乐/音频
+  { re: /spotify/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  { re: /apple ?music/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  { re: /pandora\b/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  { re: /tidal/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  { re: /audible/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  { re: /sirius ?xm/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  // 软件/云/AI
+  { re: /apple\.com\/bill|icloud|apple ?one/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /google ?(one|storage)/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /dropbox/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /adobe/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /microsoft ?365|office ?365/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /\bnotion\b/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /\bcanva\b/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /github/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /openai|chatgpt/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /claude\.ai|anthropic/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /midjourney/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /grammarly/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /1password|lastpass/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /nord ?vpn|express ?vpn|surfshark/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /zoom\.us|zoom ?video/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /evernote|todoist/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  // 新闻/阅读/创作者
+  { re: /nytimes|ny ?times/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /wall ?st(reet)? ?journal|\bwsj\b/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /washington ?post/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /economist/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /medium\.com/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /substack/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /kindle ?unlimited/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  { re: /patreon/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  // 健身/健康
+  { re: /peloton/i, cadenceDays: 30, category: 'PERSONAL_CARE' },
+  { re: /planet ?fitness|la ?fitness|24 ?hour ?fitness|crunch ?fitness|equinox|orangetheory|classpass/i, cadenceDays: 30, category: 'PERSONAL_CARE' },
+  { re: /strava|whoop\b/i, cadenceDays: 30, category: 'PERSONAL_CARE' },
+  { re: /calm\.com|headspace/i, cadenceDays: 30, category: 'PERSONAL_CARE' },
+  { re: /myfitnesspal|noom\b/i, cadenceDays: 30, category: 'PERSONAL_CARE' },
+  // 游戏
+  { re: /playstation ?(network|plus)?|sony ?interactive/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  { re: /xbox ?(game ?pass)?/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  { re: /nintendo/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  { re: /steampowered|steam ?(games|purchase)/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  { re: /twitch/i, cadenceDays: 30, category: 'ENTERTAINMENT' },
+  // 会员/配送(年付常见的标年付)
+  { re: /amazon ?prime(?! ?video)/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /walmart ?\+/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /instacart ?\+|dashpass|door ?dash ?pass|uber ?one/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /costco.*member|member.*costco/i, cadenceDays: 365, category: 'GENERAL_SERVICES' },
+  { re: /sam'?s ?club.*member|member.*sam'?s/i, cadenceDays: 365, category: 'GENERAL_SERVICES' },
+  // 学习/其他
+  { re: /duolingo/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /coursera|skillshare|masterclass|chegg/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /tinder|bumble/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  { re: /ring\.com|simplisafe|\badt\b/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+];
+
+/** 名字命中已知订阅商户先验 → 返回条目(默认周期/分类),否则 null。 */
+export function matchKnownSubscription(name: string): KnownSubscription | null {
+  const n = name || '';
+  for (const k of KNOWN_SUBSCRIPTIONS) if (k.re.test(n)) return k;
+  return null;
+}
 
 /** 变异系数(标准差/均值)—— 账单金额稳定(低),超市/餐饮飘(高)。 */
 function coeffVar(nums: number[]): number {
@@ -487,11 +750,14 @@ export function setRecurRule(name: string, v: 'yes' | 'no' | ''): void {
 }
 
 /**
- * 识别定期账单(批次 39 重写,批次 40 加手动覆盖):
+ * 识别定期账单(批次 39 重写,批次 40 加手动覆盖,财务⑰加早识别):
  * 1. 先按商户归并支出;2. 手动覆盖优先(yes 强制/no 排除);3. 否则判类别(账单关键词 OR
  *    非餐饮购物且金额稳定 CV<0.2);4. 间隔中位数落周期档;5. 下次日期滚动到未来。
+ * 财务⑰(对齐 Plaid mature=3 笔 + early detection):默认只回成熟流(≥3 笔,统计消费面
+ * 不受预测污染);includePredicted 时另回「待确认」——2 笔且(账单词命中或两笔金额几乎
+ * 一致)且间隔落周期档;或知名订阅品牌 1 笔(按月假设)。
  */
-export function detectRecurring(txs: BankTx[]): RecurringCharge[] {
+export function detectRecurring(txs: BankTx[], opts?: { includePredicted?: boolean }): RecurringCharge[] {
   const flowRules = loadFlowRules();
   const merchantRules = loadMerchantRules();
   const recurRules = loadRecurRules();
@@ -499,7 +765,7 @@ export function detectRecurring(txs: BankTx[]): RecurringCharge[] {
   for (const t of txs) {
     if (txFlow(t, flowRules) !== 'expense') continue;
     if (!t.date) continue;
-    const key = normalizeMerchant(t.name);
+    const key = merchantKey(t); // 财务⑲:entity id 优先,同商户不同描述符不再裂成两条流
     if (!key) continue;
     const list = byKey.get(key) || [];
     list.push(t);
@@ -508,7 +774,56 @@ export function detectRecurring(txs: BankTx[]): RecurringCharge[] {
 
   const out: RecurringCharge[] = [];
   for (const list of byKey.values()) {
-    if (list.length < 3) continue; // 至少 3 笔才谈得上「定期」
+    // ── 财务⑰:早识别(仅 includePredicted;手动 no 依然排除)──
+    if (list.length < 3) {
+      if (!opts?.includePredicted || !list.length) continue;
+      const sorted2 = list.slice().sort((a, b) => a.date.localeCompare(b.date));
+      const last = sorted2[sorted2.length - 1];
+      if (recurRules[last.name] === 'no') continue;
+      const isNonBill = NON_BILL_CAT_RE.test(last.name);
+      // 财务⑱:先验优先 —— 命中已知订阅商户库的,1 笔即标、2 笔不需要周期证据。
+      const known = matchKnownSubscription(last.name);
+      const assumedLabel = (d: number): [string, string] => (d >= 300 ? ['每年(推测)', 'Yearly (assumed)'] : ['每月(推测)', 'Monthly (assumed)']);
+      let cadence = 0; let label: [string, string] | null = null;
+      if (sorted2.length === 2) {
+        const gap = (Date.parse(sorted2[1].date) - Date.parse(sorted2[0].date)) / 86_400_000;
+        label = cadenceLabelFor(gap);
+        cadence = Math.round(gap);
+        const amtClose = Math.abs(sorted2[1].amount - sorted2[0].amount) <= Math.max(1, Math.abs(sorted2[0].amount) * 0.02);
+        const qualifies = recurRules[last.name] === 'yes' || !!known || (!isNonBill && !!label && (BILL_RE.test(last.name) || amtClose));
+        if (!qualifies) continue;
+        if (!label) {
+          // 间隔不成周期(重订阅/年付中断等):有先验才继续,用先验默认周期
+          if (!known) continue;
+          cadence = known.cadenceDays;
+          label = assumedLabel(cadence);
+        }
+      } else {
+        // 1 笔:仅已知订阅商户(先验),周期用库里默认值并明示推测
+        if (!known || Math.abs(last.amount) > 500) continue;
+        cadence = known.cadenceDays;
+        label = assumedLabel(cadence);
+      }
+      const amts2 = sorted2.map((t) => Math.abs(t.amount));
+      const avg2 = amts2.reduce((s, v) => s + v, 0) / amts2.length;
+      const plaidCat2 = [...sorted2].reverse().find((t) => (t.category || '').trim())?.category || '';
+      out.push({
+        name: last.name,
+        category: normalizeCategory(merchantRules[last.name] || plaidCat2) || known?.category || suggestCategory(last.name).category,
+        avgAmount: Math.round(avg2 * 100) / 100,
+        count: sorted2.length,
+        lastDate: last.date,
+        nextEstimate: rollForward(Date.parse(last.date) + cadence * 86_400_000, cadence),
+        cadenceDays: cadence,
+        cadenceLabel: label,
+        currency: last.currency || 'USD',
+        latestAmount: round2(amts2[amts2.length - 1]),
+        baselineAmount: round2(amts2[0]),
+        status: 'predicted',
+        logo: [...sorted2].reverse().find((t) => t.merchantLogo)?.merchantLogo,
+      });
+      continue;
+    }
     const sorted = list.slice().sort((a, b) => a.date.localeCompare(b.date));
     const gaps: number[] = [];
     for (let i = 1; i < sorted.length; i++) {
@@ -518,9 +833,16 @@ export function detectRecurring(txs: BankTx[]): RecurringCharge[] {
     const medGap = median(gaps);
     const label = cadenceLabelFor(medGap);
     if (!label) continue;
+    // 财务⑨:间隔要围着中位数聚 —— 3 笔碰巧散落的消费也能凑出一个「中位间隔」落进周期档,
+    // 但那不是周期。各间隔对中位数偏差的中位数(MAD)超过中位间隔的 30% → 不算定期。
+    const madGap = median(gaps.map((g) => Math.abs(g - medGap)));
+    if (!medGap || madGap / medGap > 0.3) continue;
 
     const last = sorted[sorted.length - 1];
-    const cat = merchantRules[last.name] || suggestCategory(last.name).category;
+    // 财务②:分类优先级 用户规则 > 交易自带 Plaid 分类(最新一笔非空)> 关键词建议。
+    // 此前无视 Plaid 分类直接猜 → YouTube/健身房全兜底成 Services。
+    const plaidCat = [...sorted].reverse().find((t) => (t.category || '').trim())?.category || '';
+    const cat = normalizeCategory(merchantRules[last.name] || plaidCat) || suggestCategory(last.name).category;
     const amts = sorted.map((t) => Math.abs(t.amount));
     const avg = amts.reduce((s, v) => s + v, 0) / amts.length;
     const cv = coeffVar(amts);
@@ -549,6 +871,8 @@ export function detectRecurring(txs: BankTx[]): RecurringCharge[] {
       currency: last.currency || 'USD',
       latestAmount,
       baselineAmount,
+      status: 'mature',
+      logo: [...sorted].reverse().find((t) => t.merchantLogo)?.merchantLogo,
     });
   }
   return out.sort((a, b) => a.nextEstimate.localeCompare(b.nextEstimate));
@@ -577,6 +901,8 @@ export function monthlyTrend(txs: BankTx[], n = 6): Array<{ ym: string; net: num
 
 export function formatMoney(amount: number, currency = 'USD'): string {
   const sym = currency === 'USD' ? '$' : currency === 'CNY' || currency === 'RMB' ? '¥' : currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : '';
-  const body = Math.abs(amount).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: amount % 1 === 0 ? 0 : 2 });
+  // 财务④:小数位统一——整数金额不带小数($500),带分的恒两位($100.80,不再 $100.8)。
+  const hasCents = Math.round(Math.abs(amount) * 100) % 100 !== 0;
+  const body = Math.abs(amount).toLocaleString('en-US', { minimumFractionDigits: hasCents ? 2 : 0, maximumFractionDigits: hasCents ? 2 : 0 });
   return sym ? `${sym}${body}` : `${body} ${currency}`;
 }

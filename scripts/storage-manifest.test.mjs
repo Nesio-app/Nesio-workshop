@@ -43,6 +43,12 @@ assert.equal(keyKind('nesio-health-v1'), 'durable', '健康数据 = durable');
 assert.equal(keyKind('nesio-bank-tx-v1'), 'durable');
 assert.equal(keyKind('analyst_feedback'), 'durable', '学习态 = durable(进备份)');
 assert.equal(keyKind('nesio-mirror-profile-v1'), 'durable', 'mirror-profile 不该被误判成 auth');
+// A 计划学习态(localStorage 侧)全部 durable —— 进备份、「彻底删除」要清。
+// (IDB 侧 feedback-log/ranker-trainlog 由 collectIdbBlobs/purgeIdbBlobs 按后端枚举自动覆盖。)
+for (const k of ['nesio-preference-v1', 'nesio-baseline-v1', 'nesio-recency-v1', 'nesio-guidance-ranker-v1']) {
+  assert.equal(keyKind(k), 'durable', `${k} 学习态必须 durable(导出/删除收口)`);
+  assert.equal(isBackupKey(k), true, `${k} 必须进备份`);
+}
 
 // 备份:durable 进、auth/cache 不进;覆盖 baohe_/analyst_(修此前漏)
 assert.equal(isBackupKey('nesio-bank-tx-v1'), true);

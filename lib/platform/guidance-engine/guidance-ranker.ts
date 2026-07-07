@@ -210,10 +210,49 @@ onFeedback((e: FeedbackEvent) => {
   if (e.dimension === 'card' && e.key) applyGuidanceFeedback(e.key, reactionToGuidanceFeedback(e.reaction));
 });
 
-/** 供调试/透明展示:学了多少、当前权重(相对先验偏移多少)。 */
-export function getRankerStats(): { n: number; weights: Record<string, number>; bias: number } {
+// ── 2b③:情境分化测量仪(mirror 情境化的前置证据门)────────────────────────────
+// 评估结论:反馈是全 app 最稀缺的数据,现在按 (domain×时段) 分桶会把稀缺样本劈碎、让所有
+// 估计变差(proposal §5:证据驱动的后期可选进化)。先造测量仪不造模型:回放训练日志,
+// 按 (卡类型 × 工作日/周末) 统计采纳率;两桶各 ≥5 样本且采纳率差 ≥0.25 才算"分化成立"。
+// 灯亮了(diverges)才轮到真正的情境化分桶;透明面板(收尾块)将展示这份证据。
+
+const CTX_MIN_N = 5;        // 每桶最少样本(少于这个不敢下结论)
+const CTX_DIVERGE_GAP = 0.25; // 采纳率差阈值
+
+export interface ContextEvidence {
+  type: string;
+  weekday: { n: number; acceptRate: number };
+  weekend: { n: number; acceptRate: number };
+  ready: boolean;    // 两桶证据都够
+  diverges: boolean; // 证据够且分化明显 → 该类型值得情境化
+}
+
+/** 回放训练日志,产出每个卡类型的「工作日 vs 周末」采纳分化证据。 */
+export function rankerContextEvidence(log: TrainExample[] | null = trainLog.load()): ContextEvidence[] {
+  if (!Array.isArray(log) || !log.length) return [];
+  const buckets = new Map<string, { wd: [number, number]; we: [number, number] }>(); // [n, accepted]
+  for (const ex of log) {
+    const t = Date.parse(ex.at);
+    if (Number.isNaN(t) || (ex.y !== 0 && ex.y !== 1)) continue;
+    const day = new Date(t).getDay();
+    const b = buckets.get(ex.type) ?? { wd: [0, 0], we: [0, 0] };
+    const slot = day === 0 || day === 6 ? b.we : b.wd;
+    slot[0] += 1;
+    slot[1] += ex.y;
+    buckets.set(ex.type, b);
+  }
+  return [...buckets.entries()].map(([type, b]) => {
+    const weekday = { n: b.wd[0], acceptRate: b.wd[0] ? Math.round((b.wd[1] / b.wd[0]) * 100) / 100 : 0 };
+    const weekend = { n: b.we[0], acceptRate: b.we[0] ? Math.round((b.we[1] / b.we[0]) * 100) / 100 : 0 };
+    const ready = weekday.n >= CTX_MIN_N && weekend.n >= CTX_MIN_N;
+    return { type, weekday, weekend, ready, diverges: ready && Math.abs(weekday.acceptRate - weekend.acceptRate) >= CTX_DIVERGE_GAP };
+  });
+}
+
+/** 供调试/透明展示:学了多少、当前权重(相对先验偏移多少)、存档的训练样本数(可回放)。 */
+export function getRankerStats(): { n: number; weights: Record<string, number>; bias: number; trainExamples: number } {
   const s = load();
   const weights: Record<string, number> = {};
   FEATURE_KEYS.forEach((k, i) => { weights[k] = Math.round(s.w[i] * 1000) / 1000; });
-  return { n: s.n, weights, bias: Math.round(s.b * 1000) / 1000 };
+  return { n: s.n, weights, bias: Math.round(s.b * 1000) / 1000, trainExamples: trainLog.load()?.length ?? 0 };
 }
