@@ -43,6 +43,29 @@ interface PlaidAccount {
 
 interface Institution { id: string; name?: string; logo?: string | null; color?: string | null }
 
+interface PlaidInvTx {
+  investment_transaction_id: string;
+  account_id?: string;
+  date: string;
+  name?: string | null;
+  amount: number;
+  iso_currency_code?: string | null;
+  type?: string;
+  subtype?: string;
+}
+
+// 财务⑯:投资账户的交易走 investments 产品(transactions 产品不覆盖 → 此前 Fidelity 全空)。
+// 分红/利息 → 收入(带细分,喂「收入构成」);费用 → 银行费用;缴存/取出与买卖 → 转账不计收支。
+export function invTxCategory(t: { type?: string; subtype?: string; amount: number }): { category: string; detail?: string } {
+  const st = `${t.subtype || ''} ${t.type || ''}`.toLowerCase();
+  if (st.includes('dividend')) return { category: 'INCOME', detail: 'INCOME_DIVIDENDS' };
+  if (st.includes('interest')) return { category: 'INCOME', detail: 'INCOME_INTEREST_EARNED' };
+  if (st.includes('fee') || st.includes('tax')) return { category: 'BANK_FEES' };
+  if (st.includes('deposit') || st.includes('contribution')) return { category: 'TRANSFER_IN' };
+  if (st.includes('withdrawal') || st.includes('distribution')) return { category: 'TRANSFER_OUT' };
+  return { category: t.amount >= 0 ? 'TRANSFER_OUT' : 'TRANSFER_IN' }; // buy/sell 等内部流转
+}
+
 /**
  * 重复 item 判定(纯函数,契约钉死):token i 的账户集合非空、每个账户都有 mask,
  * 且每个指纹(机构|mask|subtype)都被**更靠后**(=更新授权)的 token 覆盖 → i 是重复授权。
@@ -100,6 +123,7 @@ export async function GET(req: NextRequest) {
   if (!Array.isArray(cursors)) cursors = [];
 
   const added: PlaidTx[] = [];
+  const invAdded: PlaidInvTx[] = []; // 财务⑯:投资账户流水(独立产品拉取)
   const removedIds: string[] = [];
   const acctById = new Map<string, PlaidAccount>();
   let anyRelink = false;
@@ -149,6 +173,26 @@ export async function GET(req: NextRequest) {
         }
       } catch { /* skip */ }
       accountsOk[i] = ok;
+      // 财务⑯:投资账户流水 —— transactions 产品不覆盖投资账户(Fidelity 此前全空),
+      // 走 /investments/transactions/get(近 24 个月,按 id upsert 天然去重;失败不阻断)。
+      const invAccounts = tokenAccounts.filter((a) => ['investment', 'brokerage'].includes((a.type || '').toLowerCase()));
+      if (invAccounts.length) {
+        try {
+          const endDate = new Date().toISOString().slice(0, 10);
+          const startDate = new Date(Date.now() - 730 * 86_400_000).toISOString().slice(0, 10);
+          let offset = 0;
+          for (let page = 0; page < 4; page++) {
+            const inv = await plaidPost('/investments/transactions/get', {
+              access_token: accessToken, start_date: startDate, end_date: endDate,
+              options: { count: 500, offset, account_ids: invAccounts.map((a) => a.account_id) },
+            }) as { investment_transactions?: PlaidInvTx[]; total_investment_transactions?: number; error_code?: string };
+            if (inv.error_code || !Array.isArray(inv.investment_transactions)) break;
+            invAdded.push(...inv.investment_transactions);
+            offset += inv.investment_transactions.length;
+            if (!inv.investment_transactions.length || offset >= (inv.total_investment_transactions ?? 0)) break;
+          }
+        } catch { /* investments 产品不可用(机构不支持/未授权)→ 只有余额没有流水,保持现状 */ }
+      }
       // 财务⑧:机构元数据(item/get → institutions/get_by_id,按机构缓存;失败不阻断)。
       // 财务⑪:机构 id 与元数据解耦 —— 此前 get_by_id 一失败连 id 都丢,重复 item 判定
       // (靠机构 id 指纹)被击穿,旧账户清不掉。现在 id 先落袋,logo/名称可缺。
@@ -208,19 +252,35 @@ export async function GET(req: NextRequest) {
         logo: acctInst.get(a.account_id)?.logo || undefined,
         color: acctInst.get(a.account_id)?.color || undefined,
       })),
-      transactions: added.filter((t) => !t.pending && !(t.account_id && staleAccountIds.has(t.account_id))).map((t) => ({
-        id: t.transaction_id,
-        accountId: t.account_id,
-        date: t.date,
-        name: t.merchant_name || t.name,
-        amount: t.amount,
-        // 币种缺失时不默认 USD(会把外币混进 USD 汇总);留空,下游据此排除出金额统计。
-        currency: t.iso_currency_code || t.unofficial_currency_code || '',
-        // 分类缺失时留空;下游 txFlow 不再用金额符号猜 income/refund(会把工资当退款倒扣)。
-        category: t.personal_finance_category?.primary || '',
-        // 财务⑨:detailed 细分类(咖啡/加油/房租…)透传,只作展示细化,统计仍按 primary
-        categoryDetail: t.personal_finance_category?.detailed || undefined,
-      })),
+      transactions: [
+        ...added.filter((t) => !t.pending && !(t.account_id && staleAccountIds.has(t.account_id))).map((t) => ({
+          id: t.transaction_id,
+          accountId: t.account_id,
+          date: t.date,
+          name: t.merchant_name || t.name,
+          amount: t.amount,
+          // 币种缺失时不默认 USD(会把外币混进 USD 汇总);留空,下游据此排除出金额统计。
+          currency: t.iso_currency_code || t.unofficial_currency_code || '',
+          // 分类缺失时留空;下游 txFlow 不再用金额符号猜 income/refund(会把工资当退款倒扣)。
+          category: t.personal_finance_category?.primary || '',
+          // 财务⑨:detailed 细分类(咖啡/加油/房租…)透传,只作展示细化,统计仍按 primary
+          categoryDetail: t.personal_finance_category?.detailed || undefined,
+        })),
+        // 财务⑯:投资流水(分红/利息=收入细分;费用=银行费用;缴存/买卖=转账不计收支)
+        ...invAdded.filter((t) => !(t.account_id && staleAccountIds.has(t.account_id))).map((t) => {
+          const c = invTxCategory(t);
+          return {
+            id: t.investment_transaction_id,
+            accountId: t.account_id,
+            date: t.date,
+            name: t.name || t.subtype || t.type || 'Investment',
+            amount: t.amount,
+            currency: t.iso_currency_code || '',
+            category: c.category,
+            categoryDetail: c.detail,
+          };
+        }),
+      ],
       removedIds,
     });
     // 存回增量游标,下次从这里续拉(真增量,不再每次从最旧重来)。

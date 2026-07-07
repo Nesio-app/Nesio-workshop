@@ -95,6 +95,24 @@ caches.accounts = [{ id: 'no-mask-old', name: 'Card', type: 'credit', currency: 
 bank.saveBankAccounts([{ id: 'no-mask-new', name: 'Card', type: 'credit', currency: 'USD' }]);
 assert.equal(bank.loadBankAccounts().length, 2, '缺 mask 不敢按指纹杀');
 
+// ── 财务⑯:同实体判定加固 —— 名字写法不同也能认出(旧条目无机构元数据 = ⑧前存量) ──
+caches.accounts = [{ id: 'legacy-7937', name: 'BUS COMPLETE CHK', mask: '7937', type: 'depository', subtype: 'checking', currency: 'USD' }];
+bank.saveBankAccounts([{ id: 'fresh-7937', name: 'Chase Business Complete Checking', mask: '7937', type: 'depository', subtype: 'checking', currency: 'USD', institution: 'Chase' }]);
+{
+  const ids = bank.loadBankAccounts().map((a) => a.id);
+  assert.ok(ids.includes('fresh-7937') && !ids.includes('legacy-7937'), '名字不同但 mask+类型同、旧条目无机构 → 退场');
+}
+// 双方都有机构且不同 → 不杀(两家银行可能同尾号)
+caches.accounts = [{ id: 'boa-1111', name: 'Chk', mask: '1111', type: 'depository', subtype: 'checking', currency: 'USD', institution: 'BoA' }];
+bank.saveBankAccounts([{ id: 'chase-1111', name: 'Chk', mask: '1111', type: 'depository', subtype: 'checking', currency: 'USD', institution: 'Chase' }]);
+assert.equal(bank.loadBankAccounts().length, 2, '不同机构同尾号不误杀');
+// 手动移除:removeBankAccount 后账户消失、其交易被孤儿过滤隐藏
+caches.accounts = [{ id: 'zombie', name: 'Old', mask: '9', type: 'credit', currency: 'USD' }, { id: 'live', name: 'New', mask: '8', type: 'credit', currency: 'USD' }];
+caches.tx = [tx('zt', 'zombie'), tx('lt', 'live')];
+bank.removeBankAccount('zombie');
+assert.equal(bank.loadBankAccounts().length, 1, '手动移除生效');
+assert.equal(bank.loadBankTx().length, 1, '被移除账户的交易随之隐藏');
+
 // ── 财务⑧:权威快照 replace —— 重复授权的旧账户要能退场 ──
 // 路由确认全部存活 token 账户拉齐时整体替换;旧 item 账户消失 → 其交易被孤儿过滤隐藏。
 caches.tx = [tx('n1', 'new-acc'), tx('o1', 'old-dup-acc')];

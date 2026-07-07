@@ -107,6 +107,9 @@ function makeTxWorld(world, opts = {}) {
       return { json: async () => ({ institution: { name: `Bank ${body.institution_id}`, logo: 'bG9nbw==', primary_color: '#123456' } }) };
     }
     if (url.includes('/item/remove')) { removedItems.push(body.access_token); return { json: async () => ({}) }; }
+    if (url.includes('/investments/transactions/get')) {
+      return { json: async () => ({ investment_transactions: tok.invTxs || [], total_investment_transactions: (tok.invTxs || []).length }) };
+    }
     throw new Error(`unexpected fetch ${url}`);
   }
   const src = fs.readFileSync(new URL('../app/api/portal/plaid/transactions/route.ts', import.meta.url), 'utf8');
@@ -171,6 +174,36 @@ const syncTx = (id, acc) => ({ added: [{ transaction_id: id, account_id: acc, da
   assert.equal(res.__json.accounts[0].id, 'acc-dup');
   assert.equal(res.__json.accounts[0].logo, undefined, 'logo 缺失是预期(UI 有首字母兜底)');
   assert.deepEqual([...w.removedItems], ['at-old'], '旧 item 仍被摘除');
+}
+
+// 场景 E(财务⑯):投资账户走 investments 产品 —— 分红=收入细分、买入=转账,Fidelity 不再全空
+{
+  const w = makeTxWorld({
+    'at-fid': {
+      inst: 'ins-fid',
+      accounts: [{ id: 'acc-ira', mask: '0921', subtype: 'ira', type: 'investment' }],
+      sync: { added: [], has_more: false, next_cursor: 'c0', transactions_update_status: 'HISTORICAL_UPDATE_COMPLETE' },
+      invTxs: [
+        { investment_transaction_id: 'inv-div', account_id: 'acc-ira', date: '2026-07-01', name: 'FIDELITY DIVIDEND', amount: -50, iso_currency_code: 'USD', type: 'cash', subtype: 'dividend' },
+        { investment_transaction_id: 'inv-buy', account_id: 'acc-ira', date: '2026-07-02', name: 'BUY FXAIX', amount: 100, iso_currency_code: 'USD', type: 'buy', subtype: 'buy' },
+      ],
+    },
+  });
+  const res = await w.route.GET(reqWithTokens(['at-fid']));
+  const byId = new Map([...res.__json.transactions].map((t) => [t.id, t]));
+  assert.ok(byId.has('inv-div') && byId.has('inv-buy'), '投资流水进响应');
+  assert.equal(byId.get('inv-div').category, 'INCOME', '分红 → 收入');
+  assert.equal(byId.get('inv-div').categoryDetail, 'INCOME_DIVIDENDS', '分红细分,喂收入构成');
+  assert.equal(byId.get('inv-buy').category, 'TRANSFER_OUT', '买入是内部流转,不计收支');
+  // invTxCategory 纯函数边界
+  assert.equal(w.route.invTxCategory({ subtype: 'interest', amount: -3 }).detail, 'INCOME_INTEREST_EARNED');
+  assert.equal(w.route.invTxCategory({ subtype: 'management fee', amount: 10 }).category, 'BANK_FEES');
+  assert.equal(w.route.invTxCategory({ subtype: 'contribution', amount: -500 }).category, 'TRANSFER_IN', '缴存是转入');
+}
+// link-token 源码级:investments 作为 optional_products(不支持的机构不受影响)
+{
+  const lt = fs.readFileSync(new URL('../app/api/portal/plaid/link-token/route.ts', import.meta.url), 'utf8');
+  assert.ok(/optional_products:\s*\['investments'\]/.test(lt), 'link-token 带 optional investments');
 }
 
 // 场景 C:staleTokenIndexes 纯函数边界(保守不误杀)

@@ -108,6 +108,25 @@ export function detectIncome(txs: BankTx[]): IncomeDetection | null {
   return { monthlyIncome, streams };
 }
 
+/* ---------- 收入构成(财务⑯:工资/利息/分红/退税…按细分类分桶) ---------- */
+
+export interface IncomeSlice { detail: string; total: number }
+
+/** 某月收入按 PFC 细分类分桶(缺细分归 INCOME_OTHER),金额降序。 */
+export function incomeBreakdown(txs: BankTx[], ym: string): IncomeSlice[] {
+  const rules = loadFlowRules();
+  const m = new Map<string, number>();
+  for (const t of txs) {
+    if ((t.date || '').slice(0, 7) !== ym) continue;
+    if (txFlow(t, rules) !== 'income') continue;
+    const d = t.categoryDetail || 'INCOME_OTHER';
+    m.set(d, (m.get(d) || 0) + Math.abs(t.amount));
+  }
+  return [...m.entries()]
+    .map(([detail, total]) => ({ detail, total: Math.round(total * 100) / 100 }))
+    .sort((a, b) => b.total - a.total);
+}
+
 /* ---------- 月度收支序列 ---------- */
 
 export interface MonthCashflow { ym: string; income: number; net: number; saved: number }
