@@ -708,6 +708,26 @@ export const KNOWN_SUBSCRIPTIONS: KnownSubscription[] = [
   { re: /coursera|skillshare|masterclass|chegg/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
   { re: /tinder|bumble/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
   { re: /ring\.com|simplisafe|\badt\b/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
+  // 财务⑳:水电气(市政/大型公用事业)
+  { re: /duke ?energy/i, cadenceDays: 30, category: 'RENT_AND_UTILITIES' },
+  { re: /pg&e|pacific ?gas/i, cadenceDays: 30, category: 'RENT_AND_UTILITIES' },
+  { re: /con ?ed(ison)?/i, cadenceDays: 30, category: 'RENT_AND_UTILITIES' },
+  { re: /national ?grid/i, cadenceDays: 30, category: 'RENT_AND_UTILITIES' },
+  { re: /dominion ?energy/i, cadenceDays: 30, category: 'RENT_AND_UTILITIES' },
+  { re: /georgia ?power|florida ?power|\bfpl\b/i, cadenceDays: 30, category: 'RENT_AND_UTILITIES' },
+  { re: /socal ?(edison|gas)|\bsce\b|sdg&e/i, cadenceDays: 30, category: 'RENT_AND_UTILITIES' },
+  { re: /xcel ?energy|ameren|dte ?energy|pse&g|centerpoint|nv ?energy|\baps\b|\bsrp\b/i, cadenceDays: 30, category: 'RENT_AND_UTILITIES' },
+  { re: /peoples ?gas|nicor|columbia ?gas/i, cadenceDays: 30, category: 'RENT_AND_UTILITIES' },
+  { re: /american ?water|waste ?management|republic ?services/i, cadenceDays: 30, category: 'RENT_AND_UTILITIES' },
+  // 网络/有线/手机
+  { re: /comcast|xfinity/i, cadenceDays: 30, category: 'RENT_AND_UTILITIES' },
+  { re: /spectrum|charter ?comm/i, cadenceDays: 30, category: 'RENT_AND_UTILITIES' },
+  { re: /\bcox ?comm|cox ?cable/i, cadenceDays: 30, category: 'RENT_AND_UTILITIES' },
+  { re: /centurylink|lumen|frontier ?comm|optimum|altice/i, cadenceDays: 30, category: 'RENT_AND_UTILITIES' },
+  { re: /google ?fiber|verizon ?fios/i, cadenceDays: 30, category: 'RENT_AND_UTILITIES' },
+  { re: /verizon ?(wireless)?|at&t|t-?mobile|mint ?mobile|visible\b|cricket ?wireless|boost ?mobile|google ?fi\b|us ?cellular/i, cadenceDays: 30, category: 'RENT_AND_UTILITIES' },
+  // 保险
+  { re: /geico|state ?farm|progressive ?(ins|casualty)?|allstate|nationwide ?(ins)?|usaa|liberty ?mutual|farmers ?ins/i, cadenceDays: 30, category: 'GENERAL_SERVICES' },
 ];
 
 /** 名字命中已知订阅商户先验 → 返回条目(默认周期/分类),否则 null。 */
@@ -782,7 +802,12 @@ export function detectRecurring(txs: BankTx[], opts?: { includePredicted?: boole
       if (recurRules[last.name] === 'no') continue;
       const isNonBill = NON_BILL_CAT_RE.test(last.name);
       // 财务⑱:先验优先 —— 命中已知订阅商户库的,1 笔即标、2 笔不需要周期证据。
+      // 财务⑳:RENT_AND_UTILITIES 分类同为强先验(市政公司穷举不了,但 Plaid 分类会给;
+      // 水电账单金额天然浮动,先验路径不要求金额一致)。
       const known = matchKnownSubscription(last.name);
+      const plaidCat2 = [...sorted2].reverse().find((t) => (t.category || '').trim())?.category || '';
+      const catPred = normalizeCategory(merchantRules[last.name] || plaidCat2) || known?.category || suggestCategory(last.name).category;
+      const strongPrior = !!known || catPred === 'RENT_AND_UTILITIES';
       const assumedLabel = (d: number): [string, string] => (d >= 300 ? ['每年(推测)', 'Yearly (assumed)'] : ['每月(推测)', 'Monthly (assumed)']);
       let cadence = 0; let label: [string, string] | null = null;
       if (sorted2.length === 2) {
@@ -790,26 +815,25 @@ export function detectRecurring(txs: BankTx[], opts?: { includePredicted?: boole
         label = cadenceLabelFor(gap);
         cadence = Math.round(gap);
         const amtClose = Math.abs(sorted2[1].amount - sorted2[0].amount) <= Math.max(1, Math.abs(sorted2[0].amount) * 0.02);
-        const qualifies = recurRules[last.name] === 'yes' || !!known || (!isNonBill && !!label && (BILL_RE.test(last.name) || amtClose));
+        const qualifies = recurRules[last.name] === 'yes' || strongPrior || (!isNonBill && !!label && (BILL_RE.test(last.name) || amtClose));
         if (!qualifies) continue;
         if (!label) {
-          // 间隔不成周期(重订阅/年付中断等):有先验才继续,用先验默认周期
-          if (!known) continue;
-          cadence = known.cadenceDays;
+          // 间隔不成周期(重订阅/补缴等):有强先验才继续,用先验默认周期
+          if (!strongPrior) continue;
+          cadence = known?.cadenceDays ?? 30;
           label = assumedLabel(cadence);
         }
       } else {
-        // 1 笔:仅已知订阅商户(先验),周期用库里默认值并明示推测
-        if (!known || Math.abs(last.amount) > 500) continue;
-        cadence = known.cadenceDays;
+        // 1 笔:强先验(已知商户 或 水电气网类)即标,周期用先验默认并明示推测
+        if (!strongPrior || Math.abs(last.amount) > 3000) continue;
+        cadence = known?.cadenceDays ?? 30;
         label = assumedLabel(cadence);
       }
       const amts2 = sorted2.map((t) => Math.abs(t.amount));
       const avg2 = amts2.reduce((s, v) => s + v, 0) / amts2.length;
-      const plaidCat2 = [...sorted2].reverse().find((t) => (t.category || '').trim())?.category || '';
       out.push({
         name: last.name,
-        category: normalizeCategory(merchantRules[last.name] || plaidCat2) || known?.category || suggestCategory(last.name).category,
+        category: catPred,
         avgAmount: Math.round(avg2 * 100) / 100,
         count: sorted2.length,
         lastDate: last.date,
@@ -853,10 +877,11 @@ export function detectRecurring(txs: BankTx[], opts?: { includePredicted?: boole
     // ── 账单判定(手动覆盖优先)──
     const override = recurRules[last.name];
     if (override === 'no') continue; // 用户手动排除
-    const isBillKeyword = BILL_RE.test(last.name);
+    // 财务⑳:账单判定 = 关键词 OR 水电气网类(金额天然浮动,CV 不设限)OR 已知商户先验
+    const isBill = BILL_RE.test(last.name) || cat === 'RENT_AND_UTILITIES' || !!matchKnownSubscription(last.name);
     const isNonBill = NON_BILL_CAT_RE.test(cat) || NON_BILL_CAT_RE.test(last.name);
-    // 关键词命中 = 账单(放宽金额);否则必须「非餐饮购物 且 金额稳定」;'yes' 强制算定期
-    const qualifies = override === 'yes' || isBillKeyword || (!isNonBill && cv < 0.2);
+    // 账单(放宽金额);否则必须「非餐饮购物 且 金额稳定」;'yes' 强制算定期
+    const qualifies = override === 'yes' || isBill || (!isNonBill && cv < 0.2);
     if (!qualifies) continue;
 
     out.push({

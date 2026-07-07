@@ -370,7 +370,11 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
   async function syncPlaid(retry = 0) {
     setSyncing('plaid');
     try {
-      const res = await fetch('/api/portal/plaid/transactions');
+      // 财务㉑:富化回填 —— 老交易是增量游标同步的,不会自己带上商户 logo/实体id/细分类;
+      // 每设备做一次全量重拉,按 id 覆盖补齐,之后回到增量。
+      let full = false;
+      try { full = !localStorage.getItem('nesio-plaid-enrich-v1'); } catch { /* ignore */ }
+      const res = await fetch(`/api/portal/plaid/transactions${full ? '?full=1' : ''}`);
       const data = await res.json() as { ok?: boolean; transactions?: Array<{ id: string; accountId?: string; date: string; name: string; amount: number; currency: string; category: string }>; removedIds?: string[]; accounts?: unknown[]; error?: string; pendingItems?: number; authoritative?: boolean };
       // 批次 31:账户/卡片信息存本机,供财务「卡片」子分类分卡显示。
       // 财务⑧:路由确认账户全量拉齐(authoritative)时整体替换,让重复授权的旧账户退场。
@@ -401,6 +405,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       const fresh = { length: freshCount };
       saveBankTx(merged); // 落 IndexedDB(批次 57)
       try { localStorage.setItem('nesio-bank-synced-at', new Date().toISOString()); } catch { /* quota */ } // 时间戳小,仍留 localStorage
+      if (full) { try { localStorage.setItem('nesio-plaid-enrich-v1', '1'); } catch { /* quota */ } } // 回填只做一次
       setCounts((p) => ({ ...p, plaid: merged.length }));
       saveConnectorState('plaid', true);
       setConnected((p) => ({ ...p, plaid: true }));
@@ -413,7 +418,9 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       } else if (pending > 0) {
         showToast(L(dict, `还有 ${pending} 家机构的流水仍在准备中,先保存已同步的,几分钟后再点「同步」即可`, `${pending} institution(s) still preparing — synced data saved; tap Sync again in a few minutes`), false);
       } else {
-        showToast(L(dict, `流水同步完成:新增 ${fresh.length} 笔,共 ${merged.length} 笔,${acctCount} 个账户。到「洞察 → 财务」看总览/支出/交易/卡片`, `Synced: ${fresh.length} new, ${merged.length} total, ${acctCount} accounts. See Insights → Finance`), true);
+        // 财务㉒:富化覆盖诊断 —— 一眼分辨「数据没来」还是「UI 没显示」
+        const withLogo = merged.filter((t) => (t as { merchantLogo?: string }).merchantLogo).length;
+        showToast(L(dict, `流水同步完成:新增 ${fresh.length} 笔,共 ${merged.length} 笔,${acctCount} 个账户(商户 logo 覆盖 ${withLogo} 笔)。到「洞察 → 财务」看总览/预算/交易`, `Synced: ${fresh.length} new, ${merged.length} total, ${acctCount} accounts (${withLogo} tx with merchant logos). See Insights → Finance`), true);
       }
     } catch {
       showToast(L(dict, '网络错误', 'Network error'), false);

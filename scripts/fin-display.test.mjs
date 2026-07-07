@@ -150,6 +150,27 @@ assert.match(huluPred[0].cadenceLabel[1], /assumed/i, '间隔不成周期时用�
 const spotifyNoCat = [{ ...rtx('s0', '2026-06-20', 'Spotify USA', 11.99), category: '' }];
 assert.equal(bank.detectRecurring(spotifyNoCat, { includePredicted: true })[0]?.category, 'ENTERTAINMENT', '先验默认分类兜底');
 
+// ── 财务⑳:utility 账单先验(分类先验 + 服务商品牌) ──
+// 3 笔市政电费,金额浮动大(CV>0.2)、名字无关键词 → 类别先验兜住,仍是账单
+const cityPower = [
+  rtx('cp1', '2026-04-03', 'City of Springfield Util', 80, 'RENT_AND_UTILITIES'),
+  rtx('cp2', '2026-05-03', 'City of Springfield Util', 145, 'RENT_AND_UTILITIES'),
+  rtx('cp3', '2026-06-03', 'City of Springfield Util', 60, 'RENT_AND_UTILITIES'),
+];
+assert.equal(bank.detectRecurring(cityPower).length, 1, '水电类金额浮动也算账单(CV 不设限)');
+// 2 笔电费金额差 30% → 类别先验免金额一致性
+const twoUtil = [rtx('tu1', '2026-05-10', 'Metro Water Dept', 70, 'RENT_AND_UTILITIES'), rtx('tu2', '2026-06-10', 'Metro Water Dept', 95, 'RENT_AND_UTILITIES')];
+assert.equal(bank.detectRecurring(twoUtil, { includePredicted: true }).length, 1, '水电 2 笔金额浮动 → 待确认');
+// 1 笔水电类 → 按月假设的待确认
+const oneUtil = [rtx('ou1', '2026-06-15', 'Township Sewer', 42, 'RENT_AND_UTILITIES')];
+const ouPred = bank.detectRecurring(oneUtil, { includePredicted: true });
+assert.equal(ouPred.length, 1, '水电类 1 笔即预识别');
+assert.match(ouPred[0].cadenceLabel[1], /assumed/i);
+// 服务商品牌先验:Duke Energy 1 笔、Geico 2 笔
+assert.ok(bank.matchKnownSubscription('DUKE ENERGY PAYMENT'), '公用事业品牌入先验库');
+assert.ok(bank.matchKnownSubscription('GEICO INS PREM'), '保险品牌入先验库');
+assert.equal(bank.detectRecurring([rtx('de1', '2026-06-12', 'DUKE ENERGY', 132, '')], { includePredicted: true }).length, 1, '品牌 1 笔即预识别(无分类也行)');
+
 // ── 财务⑲:Plaid 商户实体 id 归并(先验数据 > 字符串归一) ──
 assert.equal(bank.merchantKey({ name: 'NETFLIX.COM 866-579-7172', merchantId: 'ent-1' }), 'ent-1', 'entity id 优先');
 assert.equal(bank.merchantKey({ name: 'Netflix Inc' }), bank.merchantKey({ name: 'Netflix Inc  ' }), '无 id 回退字符串归一');
