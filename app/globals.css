@@ -11534,6 +11534,7 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 .nesio-fin-txflow-l { white-space: nowrap; flex-shrink: 0; }
 .nesio-fin-txflow--expense::before { background: #588ce3; }
 .nesio-fin-txflow--refund::before { background: #3a9d6a; }
+.nesio-fin-txflow--rebate::before { background: var(--status-calm, #6b8fc9); } /* 财务⑤:返还/报销(卡权益 credit),信息蓝区别于退款绿 */
 .nesio-fin-txflow--income::before { background: #e0954a; }
 .nesio-fin-txflow--transfer::before { background: #9aa7b8; }
 .nesio-fin-flowpick { display: flex; gap: 0.4rem; flex-wrap: wrap; padding: 0.5rem 0 0.7rem; }

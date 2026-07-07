@@ -159,7 +159,7 @@ export default function FinanceTab() {
           })()}
           <div className="nesio-fin-kpis">
             <div className="nesio-fin-kpi"><span className="nesio-fin-kpi-l">{L(dict, '净支出', 'Net spend')}</span><span className="nesio-fin-kpi-v">{formatMoney(summary.net, summary.currency)}</span>{netDelta !== null && <span className={`nesio-fin-delta${netDelta > 0 ? ' up' : ' down'}`}>{netDelta > 0 ? '+' : ''}{netDelta}%</span>}</div>
-            <div className="nesio-fin-kpi"><span className="nesio-fin-kpi-l">{L(dict, '退款', 'Refunds')}</span><span className="nesio-fin-kpi-v">{formatMoney(summary.refunds, summary.currency)}</span></div>
+            <div className="nesio-fin-kpi"><span className="nesio-fin-kpi-l">{L(dict, '退款/返还', 'Refunds & credits')}</span><span className="nesio-fin-kpi-v">{formatMoney(summary.refunds, summary.currency)}</span></div>
             <div className="nesio-fin-kpi"><span className="nesio-fin-kpi-l">{L(dict, '收入', 'Income')}</span><span className="nesio-fin-kpi-v">{formatMoney(summary.income, summary.currency)}</span></div>
           </div>
           <p className="nesio-fin-alert-note" style={{ textAlign: 'left', marginTop: '-0.5rem', marginBottom: '0.8rem' }}>{L(dict, '收入 / 转账 / 信用卡还款 不计入收支;分错了到「交易」点类型改。', 'Income / transfers / card payments are excluded; fix any mislabels under Transactions.')}</p>
@@ -302,7 +302,7 @@ export default function FinanceTab() {
                   </div>
                   {flowEditId === t.id && (
                     <div className="nesio-fin-flowpick">
-                      {(['expense', 'refund', 'income', 'transfer'] as TxFlow[]).map((opt) => (
+                      {(['expense', 'refund', 'rebate', 'income', 'transfer'] as TxFlow[]).map((opt) => (
                         <button key={opt} type="button" className={`nesio-fin-flowopt${f === opt ? ' is-active' : ''}`} onClick={() => applyFlow(t.name, opt)}>{L(dict, TX_FLOW_LABELS[opt][0], TX_FLOW_LABELS[opt][1])}</button>
                       ))}
                     </div>
@@ -387,7 +387,7 @@ export default function FinanceTab() {
                 <p className="nesio-fin-card-sub">{[a.type, a.subtype].filter(Boolean).join(' · ') || L(dict, '账户', 'Account')}</p>
                 <p className="nesio-fin-card-meta">{m.count === 0
                   ? L(dict, '该月此账户暂无交易', 'No transactions this month for this account')
-                  : L(dict, `本月 消费 ${formatMoney(m.spend, a.currency)} · 退款 ${formatMoney(m.refund, a.currency)} · ${m.count} 笔`, `This month · spend ${formatMoney(m.spend, a.currency)} · refunds ${formatMoney(m.refund, a.currency)} · ${m.count} tx`)}</p>
+                  : L(dict, `本月 消费 ${formatMoney(m.spend, a.currency)} · 退款/返还 ${formatMoney(m.refund, a.currency)} · ${m.count} 笔`, `This month · spend ${formatMoney(m.spend, a.currency)} · refunds/credits ${formatMoney(m.refund, a.currency)} · ${m.count} tx`)}</p>
               </div>
             );
           })
