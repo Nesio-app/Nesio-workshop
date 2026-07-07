@@ -111,6 +111,30 @@ assert.equal(bank.detectRecurring(boutique).length, 0, '词界:diffeRENT 不再�
 const rent = [rtx('r1', '2026-04-01', 'Apartment Rent', 1500, 'RENT_AND_UTILITIES'), rtx('r2', '2026-05-01', 'Apartment Rent', 1500, 'RENT_AND_UTILITIES'), rtx('r3', '2026-06-01', 'Apartment Rent', 1580, 'RENT_AND_UTILITIES')];
 assert.ok(bank.detectRecurring(rent).some((r) => /rent/i.test(r.name)), '整词 rent 照常识别');
 
+// ── 财务⑰:早识别(对齐 Plaid early detection;默认调用不含,统计不受污染) ──
+// 2 笔同额月间隔 → predicted;默认(mature-only)不出
+const two = [rtx('t1', '2026-05-05', 'Hulu', 12.99), rtx('t2', '2026-06-05', 'Hulu', 12.99)];
+assert.equal(bank.detectRecurring(two).length, 0, '默认只回成熟流(≥3 笔)');
+const pred = bank.detectRecurring(two, { includePredicted: true });
+assert.equal(pred.length, 1, '2 笔规律 → 待确认');
+assert.equal(pred[0].status, 'predicted');
+assert.equal(pred[0].count, 2);
+// 2 笔金额差大且非账单词 → 不出(巧合不算)
+const twoLoose = [rtx('l1', '2026-05-05', 'Corner Store', 12), rtx('l2', '2026-06-05', 'Corner Store', 55)];
+assert.equal(bank.detectRecurring(twoLoose, { includePredicted: true }).length, 0, '金额不一致且非账单词不预测');
+// 2 笔间隔不落周期档 → 不出
+const twoOdd = [rtx('o1', '2026-05-05', 'Hulu', 12.99), rtx('o2', '2026-05-25', 'Hulu', 12.99)];
+assert.equal(bank.detectRecurring(twoOdd, { includePredicted: true }).length, 0, '间隔不成周期不预测');
+// 知名订阅品牌 1 笔 → 按月假设的待确认;非知名品牌 1 笔不出
+const one = [rtx('k1', '2026-06-20', 'Spotify USA', 11.99)];
+const onePred = bank.detectRecurring(one, { includePredicted: true });
+assert.equal(onePred.length, 1, '知名品牌 1 笔即预识别');
+assert.equal(onePred[0].status, 'predicted');
+assert.match(onePred[0].cadenceLabel[1], /assumed/i, '按月假设有明示');
+assert.equal(bank.detectRecurring([rtx('u1', '2026-06-20', 'Random Shop LLC', 11.99, 'GENERAL_SERVICES')], { includePredicted: true }).length, 0, '非知名品牌 1 笔不预测');
+// 3 笔仍是 mature
+assert.equal(bank.detectRecurring(rent)[0].status, 'mature', '≥3 笔标 mature');
+
 // ── 财务⑪:退款证据门 —— 没买过的商户进账不是退款 ──
 const evTxs = [
   ftx('Amazon.com', 60, 'GENERAL_MERCHANDISE'),                  // 买过 Amazon

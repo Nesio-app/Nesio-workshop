@@ -579,6 +579,9 @@ export interface RecurringCharge {
   currency: string;
   latestAmount: number;   // 最近一笔金额(供「订阅涨价」比对)
   baselineAmount: number; // 此前各笔的中位数(无历史时 = latestAmount)
+  // 财务⑰:mature = ≥3 笔成熟(Plaid 同口径);predicted = 早识别(2 笔规律,或知名订阅
+  // 品牌 1 笔按月假设)。predicted 只作展示提示,不进订阅负担/余额投影等统计。
+  status: 'mature' | 'predicted';
 }
 
 /** 归一化商户名:去掉尾部门店号/流水号/日期,合并同一商家的多笔。 */
@@ -615,6 +618,10 @@ const BILL_RE = /netflix|spotify|hulu|disney|youtube ?premium|hbo|prime video|ap
 // 明确排除:餐饮/购物/超市/咖啡(去很多次也不是账单)
 const NON_BILL_CAT_RE = /food|餐饮|shopping|merchandise|购物|grocer|超市|coffee|咖啡/i;
 
+// 财务⑰:知名订阅品牌(强先验)—— 业界做法:已知订阅商户 1-2 笔即可提前标记(Plaid early
+// detection / 银行 COF 商户表同理)。比 BILL_RE 更窄:只放"看到名字就知道是订阅"的品牌。
+const KNOWN_SUB_RE = /netflix|spotify|hulu|disney\+|hbo ?max|youtube ?premium|apple\.com\/bill|icloud|apple ?(music|tv|one)|prime ?video|audible|chatgpt|openai|claude\.ai|adobe|dropbox|notion|github|microsoft ?365|office ?365|google ?one|nytimes|patreon|peloton|strava|duolingo/i;
+
 /** 变异系数(标准差/均值)—— 账单金额稳定(低),超市/餐饮飘(高)。 */
 function coeffVar(nums: number[]): number {
   if (nums.length < 2) return 0;
@@ -648,11 +655,14 @@ export function setRecurRule(name: string, v: 'yes' | 'no' | ''): void {
 }
 
 /**
- * 识别定期账单(批次 39 重写,批次 40 加手动覆盖):
+ * 识别定期账单(批次 39 重写,批次 40 加手动覆盖,财务⑰加早识别):
  * 1. 先按商户归并支出;2. 手动覆盖优先(yes 强制/no 排除);3. 否则判类别(账单关键词 OR
  *    非餐饮购物且金额稳定 CV<0.2);4. 间隔中位数落周期档;5. 下次日期滚动到未来。
+ * 财务⑰(对齐 Plaid mature=3 笔 + early detection):默认只回成熟流(≥3 笔,统计消费面
+ * 不受预测污染);includePredicted 时另回「待确认」——2 笔且(账单词命中或两笔金额几乎
+ * 一致)且间隔落周期档;或知名订阅品牌 1 笔(按月假设)。
  */
-export function detectRecurring(txs: BankTx[]): RecurringCharge[] {
+export function detectRecurring(txs: BankTx[], opts?: { includePredicted?: boolean }): RecurringCharge[] {
   const flowRules = loadFlowRules();
   const merchantRules = loadMerchantRules();
   const recurRules = loadRecurRules();
@@ -669,7 +679,46 @@ export function detectRecurring(txs: BankTx[]): RecurringCharge[] {
 
   const out: RecurringCharge[] = [];
   for (const list of byKey.values()) {
-    if (list.length < 3) continue; // 至少 3 笔才谈得上「定期」
+    // ── 财务⑰:早识别(仅 includePredicted;手动 no 依然排除)──
+    if (list.length < 3) {
+      if (!opts?.includePredicted || !list.length) continue;
+      const sorted2 = list.slice().sort((a, b) => a.date.localeCompare(b.date));
+      const last = sorted2[sorted2.length - 1];
+      if (recurRules[last.name] === 'no') continue;
+      const isNonBill = NON_BILL_CAT_RE.test(last.name);
+      let cadence = 0; let label: [string, string] | null = null;
+      if (sorted2.length === 2) {
+        const gap = (Date.parse(sorted2[1].date) - Date.parse(sorted2[0].date)) / 86_400_000;
+        label = cadenceLabelFor(gap);
+        cadence = Math.round(gap);
+        const amtClose = Math.abs(sorted2[1].amount - sorted2[0].amount) <= Math.max(1, Math.abs(sorted2[0].amount) * 0.02);
+        const qualifies = recurRules[last.name] === 'yes' || (!isNonBill && !!label && (BILL_RE.test(last.name) || amtClose));
+        if (!qualifies || !label) continue;
+      } else {
+        // 1 笔:仅知名订阅品牌,按月假设(业界 known-merchant 先验)
+        if (!KNOWN_SUB_RE.test(last.name) || Math.abs(last.amount) > 200) continue;
+        cadence = 30;
+        label = ['每月(推测)', 'Monthly (assumed)'];
+      }
+      const amts2 = sorted2.map((t) => Math.abs(t.amount));
+      const avg2 = amts2.reduce((s, v) => s + v, 0) / amts2.length;
+      const plaidCat2 = [...sorted2].reverse().find((t) => (t.category || '').trim())?.category || '';
+      out.push({
+        name: last.name,
+        category: normalizeCategory(merchantRules[last.name] || plaidCat2) || suggestCategory(last.name).category,
+        avgAmount: Math.round(avg2 * 100) / 100,
+        count: sorted2.length,
+        lastDate: last.date,
+        nextEstimate: rollForward(Date.parse(last.date) + cadence * 86_400_000, cadence),
+        cadenceDays: cadence,
+        cadenceLabel: label,
+        currency: last.currency || 'USD',
+        latestAmount: round2(amts2[amts2.length - 1]),
+        baselineAmount: round2(amts2[0]),
+        status: 'predicted',
+      });
+      continue;
+    }
     const sorted = list.slice().sort((a, b) => a.date.localeCompare(b.date));
     const gaps: number[] = [];
     for (let i = 1; i < sorted.length; i++) {
@@ -717,6 +766,7 @@ export function detectRecurring(txs: BankTx[]): RecurringCharge[] {
       currency: last.currency || 'USD',
       latestAmount,
       baselineAmount,
+      status: 'mature',
     });
   }
   return out.sort((a, b) => a.nextEstimate.localeCompare(b.nextEstimate));

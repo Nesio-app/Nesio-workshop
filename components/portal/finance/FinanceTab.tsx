@@ -113,8 +113,9 @@ export default function FinanceTab() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const review = useMemo(() => needsReview(txs, ym), [txs, ym, rev]);
   const monthTx = useMemo(() => txs.filter((t) => (t.date || '').slice(0, 7) === ym).sort((a, b) => (b.date || '').localeCompare(a.date || '')), [txs, ym]);
+  // 财务⑰:定期页含「待确认」早识别(2 笔规律 / 知名品牌 1 笔);统计消费面仍只用成熟流
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const recurring = useMemo(() => detectRecurring(txs), [txs, rev]);
+  const recurring = useMemo(() => detectRecurring(txs, { includePredicted: true }), [txs, rev]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const upcoming = useMemo(() => upcomingRecurring(txs, 7), [txs, rev]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -435,14 +436,14 @@ export default function FinanceTab() {
           )}
           <p className="nesio-settings-section-label" style={{ marginTop: upcoming.items.length ? '1rem' : 0 }}>{L(dict, '识别到的定期账单', 'Detected recurring bills')}</p>
           {recurring.length === 0 ? (
-            <p className="nesio-settings-option-hint" style={{ marginTop: 0 }}>{L(dict, '还没识别到定期账单 —— 需要同一商户至少 3 笔规律扣款。新连接的银行,完整历史会在几天内陆续回填,期间隔天点一次「同步」即可。', 'No recurring bills yet — needs 3+ regular charges per merchant. Newly linked banks backfill full history over a few days; just sync again occasionally.')}</p>
+            <p className="nesio-settings-option-hint" style={{ marginTop: 0 }}>{L(dict, '还没识别到定期账单 —— 同一商户 2 笔规律扣款(或知名订阅品牌 1 笔)就会以「待确认」出现,3 笔转正。新连接的银行,完整历史会在几天内陆续回填,期间隔天点一次「同步」即可。', 'No recurring bills yet — 2 regular charges per merchant (or 1 from a known subscription brand) show as "unconfirmed", confirming at 3. Newly linked banks backfill history over a few days; sync again occasionally.')}</p>
           ) : (
             <div className="nesio-fin-recurlist">
               {recurring.map((r) => (
                 <div key={r.name} className="nesio-fin-recur">
                   <div className="nesio-fin-recur-main">
-                    <span className="nesio-fin-recur-name">{r.name}</span>
-                    <span className="nesio-fin-recur-meta">{L(dict, r.cadenceLabel[0], r.cadenceLabel[1])} · {categoryLabel(r.category, dict)} · {L(dict, `下次约 ${r.nextEstimate.slice(5).replace('-', '/')}`, `next ~${r.nextEstimate.slice(5).replace('-', '/')}`)} · {L(dict, `${r.count} 笔`, `${r.count}×`)}</span>
+                    <span className="nesio-fin-recur-name">{r.name}{r.status === 'predicted' && <span className="nesio-fin-recur-badge">{L(dict, '待确认', 'unconfirmed')}</span>}</span>
+                    <span className="nesio-fin-recur-meta">{L(dict, r.cadenceLabel[0], r.cadenceLabel[1])} · {categoryLabel(r.category, dict)} · {L(dict, `下次约 ${r.nextEstimate.slice(5).replace('-', '/')}`, `next ~${r.nextEstimate.slice(5).replace('-', '/')}`)} · {L(dict, `${r.count} 笔`, `${r.count}×`)}{r.status === 'predicted' ? L(dict, ' · 再出现 1 期自动转正', ' · confirms after next cycle') : ''}</span>
                   </div>
                   <span className="nesio-fin-recur-amt">{formatMoney(r.avgAmount, r.currency)}</span>
                   <button type="button" className="nesio-fin-rule-x" onClick={() => markNotRecurring(r.name)} aria-label={L(dict, '不是定期', 'Not recurring')} title={L(dict, '标为「不是定期」', 'Mark not recurring')}>✕</button>
