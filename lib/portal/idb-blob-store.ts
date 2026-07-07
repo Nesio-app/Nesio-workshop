@@ -94,6 +94,21 @@ export async function purgeIdbBlobs(backend: BlobBackend = idbBackend): Promise<
   } catch { return 0; }
 }
 
+// ── IDB key 登记(单一真源)──────────────────────────────────────────────────
+// 各 blob store createBlobStore 时把自己的 key 登记进来。restore/路由据此判断某 key 该落
+// IDB 还是 localStorage —— 备份是扁平的、分辨不出,登记表就是那把标尺。
+const registeredBlobKeys = new Set<string>();
+
+/** 该 key 是否是 IDB blob(已登记)。 */
+export function isIdbBlobKey(key: string): boolean {
+  return registeredBlobKeys.has(key);
+}
+
+/** 全部已登记的 IDB blob key。 */
+export function idbBlobKeys(): string[] {
+  return [...registeredBlobKeys];
+}
+
 export interface BlobStore<T> {
   load(): T | null;
   save(value: T): void;
@@ -110,6 +125,7 @@ export interface BlobStoreOptions<T> {
 }
 
 export function createBlobStore<T>(opts: BlobStoreOptions<T>): BlobStore<T> {
+  registeredBlobKeys.add(opts.key); // 登记:restore 据此把这个 key 落 IDB 而非 localStorage
   const backend = opts.backend ?? idbBackend;
   const hasWindow = typeof window !== 'undefined';
   let cache: T | null = null;

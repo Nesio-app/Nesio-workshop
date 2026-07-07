@@ -20,6 +20,7 @@
  */
 
 import { learnFromFeedback } from '@/lib/portal/mirror-profile';
+import { createLearnerStore, registerLearner, type FeedbackEvent } from '@/lib/portal/learning/learner';
 
 export interface GuidanceFeatures {
   risk: number;       // 风险严重度 severity/3      [0,1]
@@ -55,21 +56,19 @@ function fresh(): RankerState {
   return { w: PRIOR_WEIGHTS.slice(), b: 0, n: 0, pending: {} };
 }
 
-function load(): RankerState {
-  if (typeof window === 'undefined') return fresh();
-  try {
-    const raw = JSON.parse(localStorage.getItem(KEY) || 'null') as RankerState | null;
-    if (raw && Array.isArray(raw.w) && raw.w.length === FEATURE_KEYS.length) {
-      return { w: raw.w, b: raw.b ?? 0, n: raw.n ?? 0, pending: raw.pending ?? {} };
-    }
-  } catch { /* ignore */ }
-  return fresh();
-}
-
-function save(s: RankerState): void {
-  if (typeof window === 'undefined') return;
-  try { localStorage.setItem(KEY, JSON.stringify(s)); } catch { /* quota */ }
-}
+// 存取走 learner 底座的共享模板(替代此前自写的 load→JSON→save 样板)。更新律仍是本文件的 SGD。
+const store = createLearnerStore<RankerState>({
+  key: KEY,
+  fresh,
+  revive: (raw) => {
+    const r = raw as RankerState;
+    return r && Array.isArray(r.w) && r.w.length === FEATURE_KEYS.length
+      ? { w: r.w, b: r.b ?? 0, n: r.n ?? 0, pending: r.pending ?? {} }
+      : null;
+  },
+});
+function load(): RankerState { return store.load(); }
+function save(s: RankerState): void { store.save(s); }
 
 const clamp = (x: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, x));
 const vec = (f: GuidanceFeatures): number[] => FEATURE_KEYS.map((k) => f[k]);
@@ -135,6 +134,12 @@ export function applyGuidanceFeedback(cardId: string, feedback: GuidanceFeedback
 export function normKey(id: string): string {
   return id.replace(/^guidance-dec-/, '').replace(/^guidance-/, '');
 }
+
+// 注册到反馈总线(learner 底座 pilot):一次 emitFeedback 直达这里,替代 useTodayData 手工直调
+// applyGuidanceFeedback。cardId 反馈才作用于 ranker;更新律不变。
+registerLearner((e: FeedbackEvent) => {
+  if (e.cardId) applyGuidanceFeedback(e.cardId, e.verdict);
+});
 
 /** 供调试/透明展示:学了多少、当前权重(相对先验偏移多少)。 */
 export function getRankerStats(): { n: number; weights: Record<string, number>; bias: number } {

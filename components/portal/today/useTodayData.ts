@@ -17,7 +17,7 @@ import { scoreCalendarEvents } from '@/lib/platform/attention-engine';
 import type { EmailSignal } from '@/lib/platform/email-signals';
 import { loadDormantStore, evaluateDormancy, type DormantStore } from '@/lib/platform/dormant-engine';
 import { runGuidancePipeline } from '@/lib/platform/guidance-engine/guidance-pipeline';
-import { applyGuidanceFeedback, type GuidanceFeedback } from '@/lib/platform/guidance-engine/guidance-ranker';
+import { emitFeedback, type FeedbackVerdict } from '@/lib/portal/learning/learner';
 import { getEnergyState } from '@/lib/platform/energy-state';
 import type { RecommendationCard } from '@/lib/portal/reasoning-engine';
 import { getBestInterruptionHours } from '@/lib/portal/mirror-profile';
@@ -34,11 +34,7 @@ import {
   type WeatherSnapshot,
   decCardsToGuidanceEvents,
 } from '@/lib/platform/guidance-engine/source-adapters';
-import { loadHealthMetrics } from '@/lib/portal/health-store';
-import { evaluateHealthFindings } from '@/lib/portal/health-clinical';
-import { computeRiskScores } from '@/lib/portal/health-risk';
-import { loadBankTx, loadBankAccounts } from '@/lib/portal/bank-tx';
-import { financeFindings } from '@/lib/portal/finance-insight';
+import { computeDomainFindings } from '@/lib/portal/domain-insights';
 import { cloudSignalRowsToSignals, type CloudSignalRow } from '@/lib/life-domain/signal-search';
 import { isProactiveCardDismissed, type ProactiveCardData, registerDecCards } from './proactive-types';
 
@@ -166,19 +162,14 @@ export function useTodayData(canUsePrivateData: boolean) {
           ...focusNodesToGuidanceEvents(updated.focusNodes, now),
           ...weatherToGuidanceEvents(weather),
           ...healthNodesToGuidanceEvents(updated.proactiveContext.healthItems),
-          // 健康四层(②模式/③风险)接入主循环 —— 红旗/可关注升成 Today 卡,达标项不打扰。
+          // 健康/财务判定接入主循环 —— 与 问一问/简报同读一份判定源(computeDomainFindings),
+          // 消除两个输出面口径漂移。呈现仍各走各的(这里经七层仲裁、达标项不打扰;问一问走文本投影)。
           ...(() => {
-            const hm = loadHealthMetrics();
-            if (!hm) return [];
-            const findings = evaluateHealthFindings({ glucose: hm.glucose, sleepStages: hm.sleepStages, metrics: hm.metrics });
-            const scores = computeRiskScores({ metrics: hm.metrics, glucose: hm.glucose, profile: hm.profile });
-            return healthFindingsToGuidanceEvents(findings, scores);
-          })(),
-          // 财务判定(异常支出/订阅涨价/现金流/未来账单)接入主循环 —— 完整明细仍在财务页。
-          ...(() => {
-            const txs = loadBankTx();
-            if (!txs.length) return [];
-            return financeFindingsToGuidanceEvents(financeFindings(txs, loadBankAccounts()));
+            const df = computeDomainFindings();
+            return [
+              ...healthFindingsToGuidanceEvents(df.health.findings, df.health.risks),
+              ...financeFindingsToGuidanceEvents(df.finance),
+            ];
           })(),
         ];
 
@@ -306,11 +297,14 @@ export function useTodayData(canUsePrivateData: boolean) {
     }
 
     const refresh = () => { void applyViewModel(); };
-    // 批次 52:卡片反馈 → 在线学习排序器做一次更新(reasoning-engine 保持无依赖叶子,
-    // 走它派发的 nesio-feedback-recorded 事件,不反向 import)。
+    // 卡片反馈 → 反馈总线扇出到所有已注册 learner(guidance-ranker 等)。
+    // reasoning-engine 保持无依赖叶子,走它派发的 nesio-feedback-recorded 事件;
+    // 这里只把事件转成统一 FeedbackEvent 投进总线,不再手工直调各 learner(learner 底座 pilot)。
     const onFeedback = (e: Event) => {
-      const detail = (e as CustomEvent).detail as { cardId?: string; feedback?: string } | undefined;
-      if (detail?.cardId) applyGuidanceFeedback(detail.cardId, detail.feedback as GuidanceFeedback);
+      const detail = (e as CustomEvent).detail as { cardId?: string; feedback?: FeedbackVerdict } | undefined;
+      if (detail?.cardId && detail.feedback) {
+        emitFeedback({ verdict: detail.feedback, cardId: detail.cardId, at: new Date().toISOString() });
+      }
       refresh();
     };
     window.addEventListener('nesio-life-graph-updated', refresh);

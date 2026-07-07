@@ -16,8 +16,8 @@ import { PROACTIVE_LEVEL_KEY } from './today/proactive-types';
 import { deleteLifeNode, getLifeGraph } from '@/lib/portal/life-graph';
 import { purgeLocalData } from '@/lib/portal/storage-manifest';
 import { purgeIdbBlobs } from '@/lib/portal/idb-blob-store';
-import { isValidBackup, restoreFullBackup } from '@/lib/portal/full-backup';
-import { buildCombinedBackup, pushBackupToCloud, hasCloudEntitlement, lastCloudBackup, type CloudBackupError } from '@/lib/portal/cloud-backup';
+import { isValidBackup } from '@/lib/portal/full-backup';
+import { buildCombinedBackup, pushBackupToCloud, pullBackupFromCloud, restoreCombinedBackup, hasCloudEntitlement, lastCloudBackup, type CloudBackupError, type CloudRestoreError } from '@/lib/portal/cloud-backup';
 
 interface SheetProps { open: boolean; onClose: () => void; }
 
@@ -271,6 +271,8 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
   const [cloudError, setCloudError] = useState<CloudBackupError | null>(null);
   const [cloudBackupAt, setCloudBackupAt] = useState<string | null>(null);
   const [cloudEntitled, setCloudEntitled] = useState(false);
+  const [cloudRestoreState, setCloudRestoreState] = useState<'idle' | 'pulling' | 'error'>('idle');
+  const [cloudRestoreError, setCloudRestoreError] = useState<CloudRestoreError | null>(null);
 
   async function exportFullBackup() {
     // 与云备份用同一份枚举(localStorage durable + IDB blob),避免两处漂移。
@@ -309,6 +311,26 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
     }
   }
 
+  function cloudRestoreErrorText(err: CloudRestoreError): string {
+    if (err === 'no_backup') return L(dict, '还没有云备份可恢复,先点上面「备份到云」。', 'No cloud backup yet — tap "Back up to cloud" above first.');
+    if (err === 'invalid_backup') return L(dict, '云端备份读出来不是有效文件,本机没有改动。', "The cloud backup didn't read as a valid file — nothing changed locally.");
+    return cloudErrorText(err as CloudBackupError);
+  }
+
+  async function handleCloudRestore() {
+    if (!confirm(L(dict, '从云恢复:把云端备份合并回本机(仅补缺,不覆盖已有数据)。完成后会自动刷新。确认继续？', 'Restore from cloud: merges your cloud backup into this device (fills gaps, keeps existing). It will refresh when done. Continue?'))) return;
+    setCloudRestoreState('pulling');
+    setCloudRestoreError(null);
+    const result = await pullBackupFromCloud('merge');
+    if (result.ok) {
+      setCloudRestoreState('idle');
+      setTimeout(() => window.location.reload(), 700); // reload 让各 store 重新水合
+    } else {
+      setCloudRestoreState('error');
+      setCloudRestoreError(result.error || 'network');
+    }
+  }
+
   async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = '';
@@ -324,12 +346,15 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
       `Backup holds ${Object.keys(parsed.entries).length} entries (exported ${parsed.exportedAt.slice(0, 10)}).\n\n` +
       'OK = replace (backup overwrites this device)\nCancel = merge (memories merge per item, the rest fills gaps only)',
     ));
-    const result = restoreFullBackup(localStorage, parsed, replace ? 'replace' : 'merge');
-    setNodeCount(getLifeGraph().length);
+    // restoreCombinedBackup 按 IDB 登记分流(健康/财务/地点落 IDB、其余落 localStorage);
+    // 修了旧 restoreFullBackup 全写 localStorage 在 replace 模式对已迁 IDB 数据静默失效的坑。
+    const result = await restoreCombinedBackup(parsed, replace ? 'replace' : 'merge');
+    const total = result.restoredKeys + result.idbRestored;
     setRestoreMsg(L(dict,
-      `✓ 已恢复 ${result.restoredKeys} 项${result.mergedNodes != null ? `，记忆合并后共 ${result.mergedNodes} 条` : ''}`,
-      `✓ Restored ${result.restoredKeys} entries${result.mergedNodes != null ? `, ${result.mergedNodes} memories after merge` : ''}`));
-    window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
+      `✓ 已恢复 ${total} 项${result.mergedNodes != null ? `，记忆合并后共 ${result.mergedNodes} 条` : ''} · 正在刷新…`,
+      `✓ Restored ${total} entries${result.mergedNodes != null ? `, ${result.mergedNodes} memories after merge` : ''} · refreshing…`));
+    // 恢复含 IDB blob —— reload 让各 blob store 重新水合(缓存是加载时读的)
+    setTimeout(() => window.location.reload(), 900);
   }
 
   useEffect(() => {
@@ -444,6 +469,16 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
       {cloudState === 'idle' && cloudBackupAt && (
         <p style={{ fontSize: '0.7rem', marginTop: 4, color: 'var(--portal-muted)' }}>
           {L(dict, '上次云备份', 'Last cloud backup')} · {new Date(cloudBackupAt).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'numeric', day: 'numeric' })}
+        </p>
+      )}
+
+      {/* 从云恢复:拉回最近一次云备份并合并回本机(IDB/localStorage 分流恢复,完成后 reload) */}
+      <button type="button" className="nesio-settings-action-btn" onClick={handleCloudRestore} disabled={cloudRestoreState === 'pulling'}>
+        {cloudRestoreState === 'pulling' ? L(dict, '正在从云恢复…', 'Restoring from cloud…') : L(dict, '从云恢复', 'Restore from cloud')}
+      </button>
+      {cloudRestoreState === 'error' && cloudRestoreError && (
+        <p style={{ fontSize: '0.75rem', marginTop: 4, color: cloudRestoreError === 'entitlement_required' || cloudRestoreError === 'no_backup' ? 'var(--portal-muted)' : 'var(--status-risk)' }}>
+          {cloudRestoreErrorText(cloudRestoreError)}
         </p>
       )}
 

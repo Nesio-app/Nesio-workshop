@@ -44,6 +44,11 @@
    复用 `/api/cloud/assets`(purpose=backup,text/plain ≤8MB,身份隔离,签名回读)——
    零服务端改动。付费门是**桩**(hasCloudEntitlement 读本地 flag `nesio-cloud-entitlement-v1`,
    默认关);真权益强制层未落地(见权益契约 report-only)。gate 仍在 CLOUD_DB_ENABLED + 已登录。
+   **恢复(pull)已补全(2026-07-07):** `restoreCombinedBackup` 按 IDB key 登记
+   (`idb-blob-store.isIdbBlobKey`,createBlobStore 时登记)分流——IDB blob 落 idbBackend
+   (replace 覆盖 / merge 缺才补)、其余走 restoreFullBackup 落 localStorage;`pullBackupFromCloud`
+   走 assets 签名 URL 回读。**顺带修了 #43 迁 IDB 的坑**:旧 restore 全写 localStorage,而 blob store
+   仅在「IDB 空」才迁移,故 replace 模式对已有 IDB 数据静默失效——本地「导入备份」也受此影响,已一并改走 restoreCombinedBackup。
 
 ## 红线(动之前必读)
 
@@ -60,9 +65,7 @@
 
 ## 已知欠账(按优先级)
 
-- **restore-from-cloud(云备份的下半场)**:当前只做了推送(push)。从云拉回恢复
-  需 assets GET 签名 URL → fetch → restoreFullBackup + IDB 重水合,是云备份功能闭环的
-  下一增量。(2026-07-07 记)
+- ~~restore-from-cloud~~ **已做**(2026-07-07):见上「进行中的迁移 ③」——推 + 拉都通了,云备份端到端闭环。
 - **云备份付费桩转真**:hasCloudEntitlement 现读本地 flag;支付/StoreKit/账户 plan 字段
   接上后换成真权益读取(推送机制本身不用动)。(2026-07-07 记)
 
