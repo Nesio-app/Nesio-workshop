@@ -8,6 +8,8 @@
  * 金额符号约定(Plaid):正数 = 花出去(支出),负数 = 进账(退款/收入)。
  */
 
+import { reportStorageDropped } from './storage-health';
+
 export interface BankTx {
   id: string;
   date: string; // 'YYYY-MM-DD'
@@ -101,7 +103,7 @@ export function setFlowRule(name: string, flow: TxFlow | ''): void {
   if (typeof window === 'undefined') return;
   const rules = loadFlowRules();
   if (flow) rules[name] = flow; else delete rules[name];
-  try { localStorage.setItem(FLOW_RULE_KEY, JSON.stringify(rules)); } catch { /* ignore */ }
+  try { localStorage.setItem(FLOW_RULE_KEY, JSON.stringify(rules)); } catch { reportStorageDropped(); }
 }
 
 /** 交易类型:用户规则优先,否则按 Plaid 分类自动判(转账/还款/收入不计收支)。 */
@@ -283,7 +285,7 @@ export function setMerchantRule(name: string, category: string): void {
   if (typeof window === 'undefined') return;
   const rules = loadMerchantRules();
   if (category.trim()) rules[name] = category.trim(); else delete rules[name];
-  try { localStorage.setItem(MERCHANT_RULE_KEY, JSON.stringify(rules)); } catch { /* ignore */ }
+  try { localStorage.setItem(MERCHANT_RULE_KEY, JSON.stringify(rules)); } catch { reportStorageDropped(); }
 }
 
 /** 生效分类:用户规则优先,其次 Plaid 分类。 */
@@ -357,6 +359,8 @@ export interface RecurringCharge {
   cadenceDays: number;
   cadenceLabel: [string, string]; // [zh, en]
   currency: string;
+  latestAmount: number;   // 最近一笔金额(供「订阅涨价」比对)
+  baselineAmount: number; // 此前各笔的中位数(无历史时 = latestAmount)
 }
 
 /** 归一化商户名:去掉尾部门店号/流水号/日期,合并同一商家的多笔。 */
@@ -368,7 +372,7 @@ function normalizeMerchant(name: string): string {
     .trim();
 }
 
-function median(nums: number[]): number {
+export function median(nums: number[]): number {
   if (!nums.length) return 0;
   const s = [...nums].sort((a, b) => a - b);
   const mid = Math.floor(s.length / 2);
@@ -420,7 +424,7 @@ export function setRecurRule(name: string, v: 'yes' | 'no' | ''): void {
   if (typeof window === 'undefined') return;
   const all = loadRecurRules();
   if (v) all[name] = v; else delete all[name];
-  try { localStorage.setItem(RECUR_RULE_KEY, JSON.stringify(all)); } catch { /* ignore */ }
+  try { localStorage.setItem(RECUR_RULE_KEY, JSON.stringify(all)); } catch { reportStorageDropped(); }
 }
 
 /**
@@ -461,6 +465,9 @@ export function detectRecurring(txs: BankTx[]): RecurringCharge[] {
     const amts = sorted.map((t) => Math.abs(t.amount));
     const avg = amts.reduce((s, v) => s + v, 0) / amts.length;
     const cv = coeffVar(amts);
+    const latestAmount = round2(amts[amts.length - 1]);
+    const priorAmts = amts.slice(0, -1);
+    const baselineAmount = priorAmts.length ? round2(median(priorAmts)) : latestAmount;
 
     // ── 账单判定(手动覆盖优先)──
     const override = recurRules[last.name];
@@ -481,6 +488,8 @@ export function detectRecurring(txs: BankTx[]): RecurringCharge[] {
       cadenceDays: Math.round(medGap),
       cadenceLabel: label,
       currency: last.currency || 'USD',
+      latestAmount,
+      baselineAmount,
     });
   }
   return out.sort((a, b) => a.nextEstimate.localeCompare(b.nextEstimate));

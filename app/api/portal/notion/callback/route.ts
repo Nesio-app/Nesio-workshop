@@ -4,14 +4,11 @@
  * 存 httpOnly cookie nesio_notion_access(180 天),同步走 /api/portal/notion。
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { envValue } from '@/lib/portal/env';
 
 export const dynamic = 'force-dynamic';
 
 const STATE_COOKIE = 'nesio_notion_oauth_state';
-
-function envValue(key: string): string {
-  return (process.env[key] ?? '').trim();
-}
 
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);

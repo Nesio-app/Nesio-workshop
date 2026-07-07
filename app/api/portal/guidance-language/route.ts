@@ -16,6 +16,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { guardAiRoute } from '@/lib/portal/api-auth';
+import { envValue } from '@/lib/portal/env';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -39,10 +40,6 @@ interface CardOutput extends CardInput {
 interface LanguageRequest {
   cards: CardInput[];
   userName?: string;
-}
-
-function envValue(key: string): string {
-  return (process.env[key] ?? '').trim();
 }
 
 async function enhanceWithClaude(

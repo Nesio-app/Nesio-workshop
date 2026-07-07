@@ -11,39 +11,17 @@
  * (scripts/full-backup-roundtrip.test.mjs) can run against a fake store.
  */
 
-export interface StorageLike {
-  length: number;
-  key(index: number): string | null;
-  getItem(key: string): string | null;
-  setItem(key: string, value: string): void;
-  removeItem(key: string): void;
-}
+// 备份的「哪些 key 该进」判断收敛到 storage-manifest(单一真源):现在也覆盖
+// baohe_/analyst_ 前缀(此前漏),并统一排除 auth 票据(安全)+ cache(减 bloat)。
+import { isBackupKey, type StorageLike } from './storage-manifest';
+
+export type { StorageLike };
 
 export interface FullBackup {
   format: 'nesio-full-backup';
   version: 1;
   exportedAt: string;
   entries: Record<string, string>;
-}
-
-/** App key prefixes that belong in a backup. */
-const INCLUDE_PREFIXES = ['nesio-', 'treasurebox-'];
-
-/** Transient caches / throttles — excluded: they regenerate and add bloat. */
-const EXCLUDE_KEYS = new Set([
-  'nesio-email-signals-cache',
-  'nesio-guidance-lang-cache-v1',
-  'nesio-daily-brief-v2',
-  'nesio-calendar-local-v1',
-  'nesio-last-location-v1',
-  'nesio-telemetry-device-v1',
-  'nesio-storage-warned-at',
-  'nesio-gmail-last-sync',
-  'nesio-node-embeddings-v1', // legacy vector cache (now IndexedDB)
-]);
-
-function isBackupKey(key: string): boolean {
-  return INCLUDE_PREFIXES.some((p) => key.startsWith(p)) && !EXCLUDE_KEYS.has(key);
 }
 
 export function buildFullBackup(storage: StorageLike): FullBackup {

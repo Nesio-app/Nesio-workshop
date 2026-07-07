@@ -13,6 +13,7 @@
 import type { LifeNode } from '@/lib/portal/life-graph';
 import type { MirrorProfile } from '@/lib/portal/mirror-profile';
 import { countByDomain } from '@/lib/portal/domain-stats';
+import { reportStorageDropped } from '@/lib/portal/storage-health';
 
 export type LivingModelLayerId =
   | 'identity'     // 身份认同 — 价值观、方向感、决策风格（慢变，6-12个月）
@@ -119,7 +120,7 @@ export function saveLivingModelFeedback(insightId: string, verified: boolean): v
     }
     saveLivingModel(model);
   } catch {
-    /* ignore */
+    reportStorageDropped();
   }
 }
 

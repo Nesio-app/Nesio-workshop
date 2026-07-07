@@ -4,12 +4,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { guardAiRoute } from '@/lib/portal/api-auth';
-
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
-
-function envValue(key: string): string {
-  return (process.env[key] ?? '').trim();
-}
+import { completeText, aiProviderAvailable } from '@/lib/portal/ai-complete';
 
 export const maxDuration = 30;
 export async function POST(req: NextRequest) {
@@ -22,9 +17,8 @@ export async function POST(req: NextRequest) {
     calendarEvent?: string;
   };
 
-  const geminiKey = envValue('GEMINI_API_KEY') || envValue('GOOGLE_GENERATIVE_AI_API_KEY');
-  if (!geminiKey) {
-    return NextResponse.json({ ok: false, error: 'no_gemini_key' }, { status: 503 });
+  if (!aiProviderAvailable()) {
+    return NextResponse.json({ ok: false, error: 'no_ai_provider' }, { status: 503 });
   }
 
   const prompt = `你是一个专业的会议助理。根据以下会议转录内容，生成结构化会议笔记。
@@ -50,14 +44,8 @@ ${transcript || '（无转录内容）'}
 如果转录内容为空，根据日历事件名生成一个基础模板。
 只输出 JSON，不要其他文字。`;
 
-  const res = await fetch(`${GEMINI_URL}?key=${geminiKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-  });
-
-  const data = await res.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
-  const raw = data.candidates?.[0]?.content?.parts?.map((p) => p.text).join('') || '';
+  // 会议纪要 JSON 可能较长,给足 token(此前 Gemini 无显式上限,避免收编后被 1024 默认截断)。
+  const { text: raw } = await completeText({ prompt, maxTokens: 2048 });
   const jsonStr = raw.match(/```(?:json)?\s*([\s\S]*?)```/)?.[1]?.trim() || raw.trim();
 
   try {

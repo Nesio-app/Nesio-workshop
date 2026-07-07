@@ -211,7 +211,8 @@ export function rememberBaoheInsightShown(now = new Date()) {
 export function rememberBaoheInsightFeedback(profile: BaohePersonalizationProfile, positive: boolean, now = new Date()) {
   const insight = profile.pendingInsight;
   if (!insight) return;
-  safeSetStorage(`treasurebox-personalization-insight-feedback:${insight.id}`, positive ? 'positive' : 'negative');
+  // 死写清除:此前把 positive/negative 存进 personalization-insight-feedback:<id>,全仓从无读点。
+  // 抑制逻辑(下方 suppressed-until,有读点)才是实际生效的部分。
   if (!positive) {
     const suppressedUntil = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
     safeSetStorage(`${INSIGHT_SUPPRESSED_PREFIX}${insight.id}`, suppressedUntil);

@@ -101,8 +101,26 @@
   各路由手读自己的子集 → 读窄了的路由即使 key 已配也静默走兜底(health-insight 中招)。
   新增 `lib/portal/ai-keys.ts`(resolveAiKeys/resolveAiKey,别名组与 ai-provider-router-contract
   一致,有测试钉住两处一致),health-insight/decompose-task/insights/embed 改用它。
-  **欠账**:signal-embedding(life-domain 层)仍窄读 —— 它 import portal 会违反分层熔断,
-  待 ai-keys 下沉到共享低层后再收(embeddings 受 SIGNAL_EMBEDDINGS_ENABLED flag 门控,低优先)。
+  **第二批收编(2026-07-06)**:核查发现 check:leak 的 life-domain 熔断只禁
+  react/next/components/integrations/app-api,**不禁 `@/lib/portal/`**(且 ingest-node /
+  signal-read-cache 早已 import portal/life-graph 为先例)—— 原「signal-embedding 不能
+  import portal」的欠账判断有误。据此把三处窄读一并收进 resolveAiKey:
+  `ai-complete.ts`(共享客户端也曾漏 GOOGLE_AI_API_KEY/GOOGLE_API_KEY)、
+  `lib/life-domain/signal-embedding.ts`、`lib/health/gemini.ts`。全仓 Gemini/Claude key
+  解析现单点收敛;别名单一真源由 ai-keys.test 钉住(与 .mjs 契约一致)。
+  **第三批(2026-07-06,跨板块扫尾)**:审计发现另有 9 个路由仍窄读 Gemini key
+  (daily-brief / meeting-notes / life-state / ingest / health / notion / gmail /
+  chat / analyze)—— 全部改用 `resolveAiKey('gemini')`,至此「配了 key 却静默兜底」
+  的 bug 全仓清零。living-model(需 Sonnet,completeText 暂无 model 参数)、tts、
+  secretary(key 已全 + 契约钉响应)按判断保留。
+
+- **存储止血扩展到全部用户数据 store(2026-07-06)**:继健康 store 之后,把
+  「写失败会丢用户数据」的 13 个 store(bank-tx 财务规则、profile、routines、
+  workout、relationships、pins、place-trail、quotes、calendar-links、impulse-guard
+  冷冻仓、living-model 反馈、rewards 积分、training 进度)全部接 storage-health
+  的 `reportStorageDropped()`(设计红线:Never swallow storage write failures)。
+  可再生缓存/派生态(ai-cache、guidance cooling/ranker、energy、dormant、
+  living-model 本体、place geo、quote 轮换)按判断保留静默,不误伤。
 
 ## 8. 健康洞察系统(原 PRD 未覆盖,2026-07 新增 —— 下版 PRD 应吸收)
 

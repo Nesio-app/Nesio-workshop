@@ -1,3 +1,5 @@
+import { resolveAiKey } from '@/lib/portal/ai-keys';
+
 const DEFAULT_EMBEDDING_MODEL = 'text-embedding-004';
 const DEFAULT_DIMENSIONS = 768;
 
@@ -14,7 +16,7 @@ function envFlag(name: string): boolean {
 }
 
 export function signalEmbeddingsEnabled(): boolean {
-  return envFlag('SIGNAL_EMBEDDINGS_ENABLED') && Boolean((process.env.GEMINI_API_KEY || '').trim());
+  return envFlag('SIGNAL_EMBEDDINGS_ENABLED') && Boolean(resolveAiKey('gemini'));
 }
 
 export function signalVectorSearchEnabled(): boolean {
@@ -37,7 +39,7 @@ export function normalizeEmbeddingText(value: string): string {
 export async function embedTextRaw(text: string): Promise<SignalEmbeddingResult> {
   const normalized = normalizeEmbeddingText(text);
   if (!normalized) return { ok: false, error: 'empty_embedding_text' };
-  const apiKey = (process.env.GEMINI_API_KEY || '').trim();
+  const apiKey = resolveAiKey('gemini');
   if (!apiKey) return { ok: false, error: 'embedding_key_missing' };
 
   const model = signalEmbeddingModel();

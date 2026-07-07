@@ -35,7 +35,7 @@ import { getMirrorProfile, getDomainWeight } from '@/lib/portal/mirror-profile';
 // dec_insight(跨域推荐)与 object_context(多个物品)天生有多个不同实例,不能按裸
 // event.type 去重/冷却 —— 否则第一张之后全被当"同类"丢弃,旗舰跨域推荐只剩 1 张。
 // 这两类按 event.id(退化用 nodeId)区分,其余事件仍按 type(一类只出一张)。
-const MULTI_INSTANCE_EVENT_TYPES = new Set<GuidanceEventType>(['dec_insight', 'object_context']);
+const MULTI_INSTANCE_EVENT_TYPES = new Set<GuidanceEventType>(['dec_insight', 'object_context', 'domain_insight']);
 function dedupKey(event: GuidanceEvent): string {
   if (MULTI_INSTANCE_EVENT_TYPES.has(event.type)) {
     const nodeId = typeof event.payload?.nodeId === 'string' ? event.payload.nodeId : '';
@@ -49,6 +49,12 @@ function computeExpiry(event: GuidanceEvent): Date | undefined {
   if (event.type === 'dec_insight') {
     const raw = event.payload?.expiresAt;
     return typeof raw === 'string' ? new Date(raw) : undefined;
+  }
+  // 域判定按天刷新:今晚过期,明天带新数据重新评估(不长期挂着一条旧信号)。
+  if (event.type === 'domain_insight') {
+    const eod = event.scheduledAt ? new Date(event.scheduledAt) : new Date();
+    eod.setHours(23, 59, 59, 0);
+    return eod;
   }
   if (!event.scheduledAt) return undefined;
   const t = event.scheduledAt.getTime();
@@ -83,6 +89,7 @@ const EVENT_ICON: Record<GuidanceEventType, string> = {
   meeting:        '🎙',
   email_signal:   '📩',
   health_habit:   '💪',
+  domain_insight: '📊',  // 兜底;实际图标由 payload.icon 提供(健康🩺/财务💳/…)
   weather_cold:   '🧥',
   weather_rain:   '☂️',
   object_context: '📦',
@@ -94,6 +101,8 @@ function buildTitle(event: GuidanceEvent, urgency: WindowUrgency, locale: string
   const l = (zh: string, en: string) => L(locale, zh, en);
   switch (event.type) {
     case 'dec_insight': return event.title;
+    case 'domain_insight':
+      return l(String(event.payload.titleZh ?? event.title), String(event.payload.titleEn ?? event.title));
     case 'flight':
       if (urgency === 'critical') return l(`出发时间到了 · ${n}`, `Time to leave · ${n}`);
       if (urgency === 'high')     return l(`值机窗口已开 · ${n}`, `Check-in is open · ${n}`);
@@ -141,6 +150,8 @@ function buildBody(event: GuidanceEvent, urgency: WindowUrgency, locale: string 
   const l = (zh: string, en: string) => L(locale, zh, en);
   switch (event.type) {
     case 'dec_insight': return typeof event.payload.body === 'string' ? event.payload.body : '';
+    case 'domain_insight':
+      return l(String(event.payload.bodyZh ?? ''), String(event.payload.bodyEn ?? ''));
     case 'flight':
       if (urgency === 'critical') return l('现在需要出发了，不要错过登机时间。', 'Time to leave now — don\'t miss boarding.');
       return l('值机通常 1–2 分钟，现在处理最省心，到机场就直接走。', 'Check-in takes 1–2 minutes. Do it now and walk straight through at the airport.');
@@ -273,7 +284,8 @@ export function runGuidancePipeline(input: GuidancePipelineInput): GuidanceCard[
       domainFit: getDomainWeight(event.type),
     };
     const rScore = rankerScore(feats);
-    const icon = event.type === 'email_signal' && typeof event.payload.icon === 'string'
+    // email_signal 与 domain_insight 自带图标(邮件 provider 图标 / 域图标),其余用类型固定图标。
+    const icon = (event.type === 'email_signal' || event.type === 'domain_insight') && typeof event.payload.icon === 'string'
       ? event.payload.icon
       : EVENT_ICON[event.type] ?? '📋';
 

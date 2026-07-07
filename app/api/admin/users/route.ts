@@ -11,15 +11,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/portal/admin-gate';
 import { normalizeSupabaseRuntimeUrl } from '@/lib/portal/production-runtime';
+import { envValue } from '@/lib/portal/env';
 
 export const dynamic = 'force-dynamic';
 
 const ROLES = ['public', 'tester', 'personal_lab'] as const;
 type AccessRole = (typeof ROLES)[number];
-
-function envValue(key: string): string {
-  return (process.env[key] ?? '').trim();
-}
 
 function restHeaders() {
   const key = envValue('SUPABASE_SERVICE_ROLE_KEY') || envValue('SUPABASE_ANON_KEY');

@@ -13,6 +13,8 @@
  * 纯本地(localStorage `nesio-rewards-v1`),不调 AI、不上传。
  */
 
+import { reportStorageDropped } from '@/lib/portal/storage-health';
+
 export type PointsSource = 'freeze_decline' | 'fitness' | 'project' | 'breath' | 'manual' | 'redeem';
 
 export interface PointsEntry {
@@ -77,7 +79,7 @@ export function loadRewards(): RewardsState {
 
 function save(state: RewardsState): RewardsState {
   if (typeof window === 'undefined') return state;
-  try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch { /* quota */ }
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch { reportStorageDropped(); }
   window.dispatchEvent(new CustomEvent(EVENT));
   return state;
 }

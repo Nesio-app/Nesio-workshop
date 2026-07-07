@@ -5,12 +5,9 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { guardAiRoute } from '@/lib/portal/api-auth';
+import { envValue } from '@/lib/portal/env';
 
 export const dynamic = 'force-dynamic';
-
-function envValue(key: string): string {
-  return (process.env[key] ?? '').trim();
-}
 
 export function plaidEnv(): string {
   // 批次 26:容错——去空白/小写,只认三个合法值,否则回落 sandbox。

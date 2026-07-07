@@ -60,6 +60,7 @@ const PREPARATION_VALUE: Record<GuidanceEventType, number> = {
   meeting:      55,  // 1h prep vs 30min prep is marginally better
   email_signal: 40,  // email can be handled anytime
   health_habit:   35,  // can do anytime today
+  domain_insight: 52,  // 早点关注来自你数据的域信号(健康/财务)总比拖着好 —— 行动价值随时间衰减
   object_context: 30,  // context-triggered — nice to know but not urgent
   dec_insight:    55,  // evidence-backed recommendation — acting today beats later
 };

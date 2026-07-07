@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { bootstrapCloudAccountProfile, buildCloudAccountProfileBootstrapMeta } from '@/lib/portal/cloud-account-profile';
 import { normalizeSupabaseRuntimeUrl } from '@/lib/portal/production-runtime';
+import { envValue } from '@/lib/portal/env';
 
 type SupabaseUserResponse = {
   id?: string;
@@ -13,11 +14,6 @@ type SupabaseUserResponse = {
 };
 
 type AuthImportMode = 'login' | 'register';
-
-function envValue(key: string): string {
-  const value = process.env[key];
-  return typeof value === 'string' ? value.trim() : '';
-}
 
 function safeJson(body: Record<string, unknown>, status = 200) {
   return NextResponse.json(

@@ -8,6 +8,8 @@
  * 4. 冷冻期结束后，用户决定：买 / 放弃 / 继续冷冻
  */
 
+import { reportStorageDropped } from '@/lib/portal/storage-health';
+
 export type FreezeDecision = 'pending' | 'bought' | 'skipped' | 'extended';
 
 export interface FreezeItem {
@@ -42,7 +44,7 @@ function saveFreezeItems(items: FreezeItem[]): void {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(STORE_KEY, JSON.stringify(items));
-  } catch { /* ignore */ }
+  } catch { reportStorageDropped(); }
 }
 
 export function addToFreeze(item: Omit<FreezeItem, 'id' | 'frozenAt' | 'thawAt' | 'decision' | 'checkCount'> & { freezeHours?: number }): FreezeItem {

@@ -6,6 +6,8 @@
  * 可整段导入并入同一条流水。洞察 → 分析 → 「地点足迹」消费。
  */
 
+import { reportStorageDropped } from './storage-health';
+
 export interface PlaceVisit {
   /** ISO 时间(到访开始) */
   ts: string;
@@ -29,7 +31,7 @@ export function loadPlaceTrail(): PlaceVisit[] {
 function save(trail: PlaceVisit[]): void {
   // 按时间倒序,封顶
   const sorted = [...trail].sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, CAP);
-  try { localStorage.setItem(KEY, JSON.stringify(sorted)); } catch { /* quota */ }
+  try { localStorage.setItem(KEY, JSON.stringify(sorted)); } catch { reportStorageDropped(); }
   window.dispatchEvent(new CustomEvent(PLACE_TRAIL_UPDATED_EVENT));
 }
 
@@ -181,7 +183,7 @@ export function setPlaceCategory(raw: string, cat: PlaceCategory | ''): void {
   if (typeof window === 'undefined') return;
   const all = loadPlaceCategories();
   if (cat) all[raw] = cat; else delete all[raw];
-  try { localStorage.setItem(PLACE_CAT_KEY, JSON.stringify(all)); window.dispatchEvent(new CustomEvent(PLACE_TRAIL_UPDATED_EVENT)); } catch { /* ignore */ }
+  try { localStorage.setItem(PLACE_CAT_KEY, JSON.stringify(all)); window.dispatchEvent(new CustomEvent(PLACE_TRAIL_UPDATED_EVENT)); } catch { reportStorageDropped(); }
 }
 
 /** 地点类别:用户手动指定优先,否则按名字自动识别(未命名 → unknown)。 */
@@ -255,7 +257,7 @@ export function setPlaceAlias(raw: string, name: string): void {
   const map = loadPlaceAliases();
   const trimmed = name.trim();
   if (trimmed && trimmed !== raw) map[raw] = trimmed; else delete map[raw];
-  try { localStorage.setItem(PLACE_ALIAS_KEY, JSON.stringify(map)); } catch { /* ignore */ }
+  try { localStorage.setItem(PLACE_ALIAS_KEY, JSON.stringify(map)); } catch { reportStorageDropped(); }
   window.dispatchEvent(new CustomEvent(PLACE_TRAIL_UPDATED_EVENT));
 }
 

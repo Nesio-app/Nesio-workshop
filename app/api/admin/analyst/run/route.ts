@@ -17,12 +17,9 @@ import { renderReportText, buildAnalystPrompt } from '@/lib/portal/analyst.mjs';
 import { aiProviderAvailable, completeText } from '@/lib/portal/ai-complete';
 import { computeDailyReport } from '@/lib/portal/analyst-runtime';
 import { saveDaily } from '@/lib/portal/analyst-store';
+import { envValue } from '@/lib/portal/env';
 
 export const dynamic = 'force-dynamic';
-
-function envValue(key: string): string {
-  return (process.env[key] ?? '').trim();
-}
 
 function isCronAuthorized(req: NextRequest): boolean {
   const cron = envValue('CRON_SECRET');

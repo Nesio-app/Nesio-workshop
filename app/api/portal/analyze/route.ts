@@ -10,6 +10,8 @@ import { createSignal } from '@/lib/life-domain/create-signal';
 import { normalizePhotoToSignal, normalizeVoiceToSignal } from '@/lib/life-domain/normalizers';
 import { EXTRACTION_SYSTEM_PROMPT, parseJsonBlock } from '@/lib/extraction/extraction';
 import { isRateLimited } from '@/lib/portal/api-auth';
+import { resolveAiKey } from '@/lib/portal/ai-keys';
+import { envValue } from '@/lib/portal/env';
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
@@ -24,15 +26,11 @@ function getAnthropicKey(): string | undefined {
 }
 
 function getGeminiKey(): string | undefined {
-  return (process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY)?.trim();
+  return resolveAiKey('gemini') || undefined;
 }
 
 function getOpenAIKey(): string | undefined {
   return (process.env.OpenAI_KEY || process.env.OPENAI_API_KEY)?.trim();
-}
-
-function envValue(key: string): string {
-  return (process.env[key] || '').trim();
 }
 
 function isAnalyzeAiAllowed(req: NextRequest): boolean {

@@ -15,12 +15,9 @@ import { cookies } from 'next/headers';
 import { isRateLimited, isSameOriginRequest } from '@/lib/portal/api-auth';
 import { getSupabaseUserId } from '@/lib/portal/integrations';
 import { normalizeSupabaseRuntimeUrl } from '@/lib/portal/production-runtime';
+import { envValue } from '@/lib/portal/env';
 
 export const dynamic = 'force-dynamic';
-
-function envValue(key: string): string {
-  return (process.env[key] ?? '').trim();
-}
 
 export async function GET(req: NextRequest) {
   if (!isSameOriginRequest(req)) {

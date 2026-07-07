@@ -10,15 +10,10 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { guardAiRoute } from '@/lib/portal/api-auth';
+import { completeText, aiProviderAvailable } from '@/lib/portal/ai-complete';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
-
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
-
-function envValue(key: string): string {
-  return (process.env[key] ?? '').trim();
-}
 
 interface LifeStateRequest {
   displayName?: string;
@@ -43,14 +38,13 @@ export async function POST(req: NextRequest) {
   const body = await req.json() as LifeStateRequest;
   const { displayName, dimensions, risks, opportunities } = body;
 
-  const geminiKey = envValue('GEMINI_API_KEY') || envValue('GOOGLE_GENERATIVE_AI_API_KEY');
-  if (!geminiKey || !dimensions?.length) {
+  if (!aiProviderAvailable() || !dimensions?.length) {
     return NextResponse.json({
       ok: true,
       provider: 'fallback',
       fallback: true,
       explanation: fallbackExplanation(body),
-      reason: geminiKey ? 'no_life_state_data' : 'provider_not_configured',
+      reason: aiProviderAvailable() ? 'no_life_state_data' : 'provider_not_configured',
     });
   }
 
@@ -72,22 +66,7 @@ ${opportunities?.length ? '状态不错：' + opportunities.join('；') : ''}
 - 只输出这一两句话，不要任何前缀或解释`;
 
   try {
-    const res = await fetch(`${GEMINI_URL}?key=${geminiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-    });
-    if (!res.ok) {
-      return NextResponse.json({
-        ok: true,
-        provider: 'fallback',
-        fallback: true,
-        explanation: fallbackExplanation(body),
-        reason: `provider_status_${res.status}`,
-      });
-    }
-    const data = await res.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
-    const explanation = (data.candidates?.[0]?.content?.parts?.map((p) => p.text).join('') || '').trim();
+    const { text: explanation, provider } = await completeText({ prompt });
     if (!explanation) {
       return NextResponse.json({
         ok: true,
@@ -97,14 +76,14 @@ ${opportunities?.length ? '状态不错：' + opportunities.join('；') : ''}
         reason: 'provider_empty_response',
       });
     }
-    return NextResponse.json({ ok: true, provider: 'gemini', fallback: false, explanation });
-  } catch (err) {
+    return NextResponse.json({ ok: true, provider, fallback: false, explanation });
+  } catch {
     return NextResponse.json({
       ok: true,
       provider: 'fallback',
       fallback: true,
       explanation: fallbackExplanation(body),
-      reason: err instanceof Error ? err.message : 'provider_failed',
+      reason: 'provider_error',
     });
   }
 }

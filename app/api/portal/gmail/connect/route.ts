@@ -4,6 +4,7 @@
  * Redirects user to Google consent screen.
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { envValue } from '@/lib/portal/env';
 
 // Request calendar scope alongside gmail so one consent covers both connectors
 // and the resulting refresh token can serve either API.
@@ -11,10 +12,6 @@ import { NextRequest, NextResponse } from 'next/server';
 // 加了新 scope 后老用户会被 prompt=consent 要求重新授权一次,拿到发送权限。
 const GMAIL_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/calendar.readonly';
 const STATE_COOKIE = 'nesio_gmail_oauth_state';
-
-function envValue(key: string): string {
-  return (process.env[key] ?? '').trim();
-}
 
 function callbackUrl(req: NextRequest): string {
   const configured = envValue('GMAIL_REDIRECT_URI');

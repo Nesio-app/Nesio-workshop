@@ -25,6 +25,12 @@ export function buildAction(event: GuidanceEvent, urgency: WindowUrgency, locale
       return { label: cta, cta, actionType: 'dismiss' };
     }
 
+    case 'domain_insight': {
+      // warm-coach:不制造焦虑、不给任务式按钮、始终可跳过。域相关软提示文案由适配器写在 payload(知识随域走)。
+      const label = l(String(event.payload.ctaLabelZh ?? '了解这条来自你数据的观察。'), String(event.payload.ctaLabelEn ?? 'A gentle observation from your own data.'));
+      return { label, cta: l('知道了', 'Got it'), actionType: 'dismiss' };
+    }
+
     case 'flight':
       if (urgency === 'critical') return { label: l('现在需要出发前往机场', 'Time to leave for the airport'), cta: l('知道了', 'Got it'), actionType: 'dismiss' };
       if (urgency === 'high')     return { label: l('用航空公司 App 完成在线值机（约 1 分钟）', 'Check in online with the airline app (about 1 min)'), cta: l('去值机', 'Check in'), actionType: 'dismiss' };

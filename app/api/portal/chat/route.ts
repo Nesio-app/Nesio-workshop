@@ -8,13 +8,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { buildChatContext } from '@/lib/portal/chat-context';
 import { guardAiRoute } from '@/lib/portal/api-auth';
 import { reportAiCall } from '@/lib/portal/ai-telemetry';
+import { resolveAiKey } from '@/lib/portal/ai-keys';
+import { envValue } from '@/lib/portal/env';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
-
-function envValue(key: string): string {
-  return (process.env[key] ?? '').trim();
-}
 
 export interface ChatMessage {
   role: 'user' | 'model';
@@ -200,7 +198,7 @@ export async function POST(req: NextRequest) {
   // Accept both ANTHROPIC_API_KEY and CLAUDE_API_KEY as aliases
   const anthropicKey = envValue('ANTHROPIC_API_KEY') || envValue('CLAUDE_API_KEY');
   // 同时接受两种命名方式
-  const geminiKey = envValue('GEMINI_API_KEY') || envValue('GOOGLE_GENERATIVE_AI_API_KEY');
+  const geminiKey = resolveAiKey('gemini');
 
   if (!anthropicKey && !geminiKey) {
     return NextResponse.json({

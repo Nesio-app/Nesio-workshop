@@ -29,9 +29,16 @@ import {
   focusNodesToGuidanceEvents,
   weatherToGuidanceEvents,
   healthNodesToGuidanceEvents,
+  healthFindingsToGuidanceEvents,
+  financeFindingsToGuidanceEvents,
   type WeatherSnapshot,
   decCardsToGuidanceEvents,
 } from '@/lib/platform/guidance-engine/source-adapters';
+import { loadHealthMetrics } from '@/lib/portal/health-store';
+import { evaluateHealthFindings } from '@/lib/portal/health-clinical';
+import { computeRiskScores } from '@/lib/portal/health-risk';
+import { loadBankTx, loadBankAccounts } from '@/lib/portal/bank-tx';
+import { financeFindings } from '@/lib/portal/finance-insight';
 import { cloudSignalRowsToSignals, type CloudSignalRow } from '@/lib/life-domain/signal-search';
 import { isProactiveCardDismissed, type ProactiveCardData, registerDecCards } from './proactive-types';
 
@@ -159,6 +166,20 @@ export function useTodayData(canUsePrivateData: boolean) {
           ...focusNodesToGuidanceEvents(updated.focusNodes, now),
           ...weatherToGuidanceEvents(weather),
           ...healthNodesToGuidanceEvents(updated.proactiveContext.healthItems),
+          // 健康四层(②模式/③风险)接入主循环 —— 红旗/可关注升成 Today 卡,达标项不打扰。
+          ...(() => {
+            const hm = loadHealthMetrics();
+            if (!hm) return [];
+            const findings = evaluateHealthFindings({ glucose: hm.glucose, sleepStages: hm.sleepStages, metrics: hm.metrics });
+            const scores = computeRiskScores({ metrics: hm.metrics, glucose: hm.glucose, profile: hm.profile });
+            return healthFindingsToGuidanceEvents(findings, scores);
+          })(),
+          // 财务判定(异常支出/订阅涨价/现金流/未来账单)接入主循环 —— 完整明细仍在财务页。
+          ...(() => {
+            const txs = loadBankTx();
+            if (!txs.length) return [];
+            return financeFindingsToGuidanceEvents(financeFindings(txs, loadBankAccounts()));
+          })(),
         ];
 
         const uiLocale = portalLocaleToDictionaryLocale(loadProfileSettings().locale);

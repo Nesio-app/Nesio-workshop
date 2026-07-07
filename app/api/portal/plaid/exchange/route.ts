@@ -5,12 +5,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { guardAiRoute } from '@/lib/portal/api-auth';
 import { plaidBase } from '../link-token/route';
+import { envValue } from '@/lib/portal/env';
 
 export const dynamic = 'force-dynamic';
-
-function envValue(key: string): string {
-  return (process.env[key] ?? '').trim();
-}
 
 export async function POST(req: NextRequest) {
   const guard = await guardAiRoute(req, 'plaid', { limit: 10 });

@@ -50,6 +50,15 @@ export function getStorageHealth(): StorageHealth {
   }
 }
 
+/**
+ * 写入被配额丢弃时调用:派发可见事件让壳层提示用户(替代静默 catch)。
+ * 设计红线:localStorage 写失败若会丢用户数据,必须可见,不能静默吞。
+ */
+export function reportStorageDropped(): void {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent(STORAGE_FULL_EVENT, { detail: getStorageHealth() }));
+}
+
 /** Call after significant writes; fires the warning event at most once a day. */
 export function checkStorageWarning(): void {
   if (typeof window === 'undefined') return;

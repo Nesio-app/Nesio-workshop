@@ -5,23 +5,20 @@
  * this deployment, instead of hard-coding one Gemini model. Server-only.
  */
 
-function envValue(key: string): string {
-  return (process.env[key] ?? '').trim();
-}
+import { resolveAiKey } from '@/lib/portal/ai-keys';
+import { envValue } from '@/lib/portal/env';
 
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 // Same fallback order as chat/analyze routes — 429/unavailable on one → try next.
 const GEMINI_MODEL_FALLBACKS = ['gemini-2.0-flash', 'gemini-flash-latest', 'gemini-2.5-flash'];
 
 export function aiProviderAvailable(): boolean {
-  return Boolean(
-    envValue('ANTHROPIC_API_KEY') ||
-      envValue('GEMINI_API_KEY') ||
-      envValue('GOOGLE_GENERATIVE_AI_API_KEY'),
-  );
+  // 统一别名解析:此前只认 GEMINI_API_KEY/GOOGLE_GENERATIVE_AI_API_KEY,漏了
+  // GOOGLE_AI_API_KEY / GOOGLE_API_KEY —— 共享客户端也曾中招同一个窄读 bug。
+  return Boolean(resolveAiKey('anthropic') || resolveAiKey('gemini'));
 }
 
-async function callClaude(apiKey: string, prompt: string, system: string, maxTokens: number): Promise<string> {
+async function callClaude(apiKey: string, prompt: string, system: string, maxTokens: number, model?: string, temperature?: number): Promise<string> {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -30,8 +27,9 @@ async function callClaude(apiKey: string, prompt: string, system: string, maxTok
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: envValue('CLAUDE_MODEL') || envValue('ANTHROPIC_MODEL') || 'claude-3-5-haiku-latest',
+      model: model || envValue('CLAUDE_MODEL') || envValue('ANTHROPIC_MODEL') || 'claude-3-5-haiku-latest',
       max_tokens: maxTokens,
+      ...(typeof temperature === 'number' ? { temperature } : {}),
       system,
       messages: [{ role: 'user', content: prompt }],
     }),
@@ -41,7 +39,7 @@ async function callClaude(apiKey: string, prompt: string, system: string, maxTok
   return (data.content ?? []).filter((c) => c.type === 'text' && c.text).map((c) => c.text!).join('').trim();
 }
 
-async function callGemini(apiKey: string, prompt: string, system: string, maxTokens: number): Promise<string> {
+async function callGemini(apiKey: string, prompt: string, system: string, maxTokens: number, temperature?: number): Promise<string> {
   const configuredModel = envValue('GEMINI_MODEL');
   const models = Array.from(new Set([configuredModel, ...GEMINI_MODEL_FALLBACKS].filter(Boolean)));
   let lastError = 'Gemini unavailable';
@@ -54,7 +52,7 @@ async function callGemini(apiKey: string, prompt: string, system: string, maxTok
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: system }] },
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.6, maxOutputTokens: maxTokens },
+          generationConfig: { temperature: temperature ?? 0.6, maxOutputTokens: maxTokens },
         }),
       });
       const data = await res.json() as {
@@ -86,16 +84,21 @@ async function callGemini(apiKey: string, prompt: string, system: string, maxTok
  * Complete a single prompt to text. Tries Claude first (if ANTHROPIC_API_KEY),
  * then Gemini (multi-model). Throws with a descriptive message if all fail.
  * Returns { text, provider } so callers can log which channel served it.
+ *
+ * opts.model      — override the Claude model (e.g. sonnet for deep-reasoning callers);
+ *                   Gemini keeps its own fallback chain.
+ * opts.temperature — applied to both providers (e.g. 0.85 for creative briefing copy).
  */
 export async function completeText(
-  { prompt, system = '', maxTokens = 1024 }: { prompt: string; system?: string; maxTokens?: number },
+  { prompt, system = '', maxTokens = 1024, model, temperature }:
+  { prompt: string; system?: string; maxTokens?: number; model?: string; temperature?: number },
 ): Promise<{ text: string; provider: 'claude' | 'gemini' }> {
-  const anthropicKey = envValue('ANTHROPIC_API_KEY');
-  const geminiKey = envValue('GEMINI_API_KEY') || envValue('GOOGLE_GENERATIVE_AI_API_KEY');
+  const anthropicKey = resolveAiKey('anthropic');
+  const geminiKey = resolveAiKey('gemini');
 
   if (anthropicKey) {
     try {
-      const text = await callClaude(anthropicKey, prompt, system, maxTokens);
+      const text = await callClaude(anthropicKey, prompt, system, maxTokens, model, temperature);
       if (text) return { text, provider: 'claude' };
     } catch (err) {
       // Fall through to Gemini when Claude errors (auth/quota/etc.).
@@ -103,7 +106,7 @@ export async function completeText(
     }
   }
   if (geminiKey) {
-    const text = await callGemini(geminiKey, prompt, system, maxTokens);
+    const text = await callGemini(geminiKey, prompt, system, maxTokens, temperature);
     return { text, provider: 'gemini' };
   }
   throw new Error('no_ai_provider');

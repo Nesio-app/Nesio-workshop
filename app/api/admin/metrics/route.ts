@@ -14,12 +14,9 @@ import { isSameOriginRequest, isRateLimited } from '@/lib/portal/api-auth';
 import { normalizeSupabaseRuntimeUrl } from '@/lib/portal/production-runtime';
 import { ROADMAP_ITEMS } from '@/lib/portal/roadmap';
 import { EXPERIMENTS } from '@/lib/portal/experiments';
+import { envValue } from '@/lib/portal/env';
 
 export const dynamic = 'force-dynamic';
-
-function envValue(key: string): string {
-  return (process.env[key] ?? '').trim();
-}
 
 interface TelemetryRow { name: string; device_id: string; at: string; props?: Record<string, unknown> }
 interface ProductEventRow { event_type: string; feedback: string | null; target_type: string | null; created_at: string }
