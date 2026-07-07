@@ -34,11 +34,14 @@ function run(js, requireImpl) {
   return ctx.module.exports;
 }
 
-// 真反馈总线 + 真 ranker(共享同一 window/localStorage)
+// 真反馈总线 + 真 ranker(共享同一 window/localStorage);训练日志用内存 blob 桩(同步缓存语义)
 const busMod = run(transpile('../lib/platform/personalization/feedback-bus.ts'), () => ({}));
 const mirrorCalls = [];
+const fakeBlob = (() => { let cache = null; return { load: () => cache, save: (v) => { cache = v; }, ready: async () => {} }; })();
 const rankerMod = run(transpile('../lib/platform/guidance-engine/guidance-ranker.ts'), (p) =>
   p === '@/lib/platform/personalization' ? busMod
+    : p === '@/lib/portal/idb-blob-store' ? { createBlobStore: () => fakeBlob }
+    : p === '@/lib/portal/storage-health' ? { reportStorageDropped() {} }
     : { learnFromFeedback: (type, fb) => mirrorCalls.push(`${type}:${fb}`) },
 );
 
@@ -61,5 +64,27 @@ assert.equal(JSON.stringify(mirrorCalls), JSON.stringify(['health:useful']), '�
 // 3. 无暂存特征的卡不学
 busMod.emitFeedback({ surface: 'today', dimension: 'card', key: 'ghost', reaction: 'useful', at: '2026-01-01T00:00:01.000Z' });
 assert.equal(rankerMod.getRankerStats().n, 1, '无 pending 的卡不学(n 不变)');
+
+// ── 2b:回放重训(权重=训练日志的可回放投影)──
+// 4. 学习同时把 (特征,标签) 落进训练日志
+assert.equal(fakeBlob.load().length, 1, '训练样本落日志(不再折进即弃)');
+assert.equal(fakeBlob.load()[0].y, 1, 'useful → 标签 1');
+assert.equal(JSON.stringify(fakeBlob.load()[0].f), JSON.stringify([1, 1, 1, 1, 1, 0, 0]), '特征原样保留(可审计)');
+
+// 5. 再学一条负样本,记下权重;抹掉 localStorage 权重态 → load 自愈,权重逐位一致
+rankerMod.recordShownFeatures('card2', { risk: 0.2, time: 0.9, prep: 0.1, confidence: 0.8, relevance: 0.5, hourFit: 0, domainFit: 0 }, 'finance');
+busMod.emitFeedback({ surface: 'today', dimension: 'card', key: 'card2', reaction: 'too_much', at: '2026-01-01T00:00:02.000Z' });
+const before = rankerMod.getRankerStats();
+assert.equal(before.n, 2, '两条样本已学');
+lsMap.delete('nesio-guidance-ranker-v1'); // 模拟 localStorage 蒸发/换机
+const healed = rankerMod.getRankerStats(); // load() 触发自愈回放
+assert.equal(healed.n, 2, '自愈:从日志回放重建(n 恢复)');
+assert.equal(JSON.stringify(healed.weights), JSON.stringify(before.weights), '自愈权重与蒸发前逐位一致(SGD 确定性)');
+assert.equal(healed.bias, before.bias, 'bias 一致');
+
+// 6. 显式重训入口
+const res = rankerMod.retrainRankerFromLog();
+assert.equal(res.replayed, 2, 'retrainRankerFromLog 回放 2 条');
+assert.equal(JSON.stringify(rankerMod.getRankerStats().weights), JSON.stringify(before.weights), '显式重训同样逐位一致');
 
 console.log('guidance-ranker: OK');
