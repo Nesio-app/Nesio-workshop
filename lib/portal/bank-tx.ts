@@ -228,8 +228,13 @@ export interface CategorySlice {
   category: string;
   total: number;
   pct: number; // 占本月总支出比例 0..100
-  deltaPct: number | null; // 环比上月,null=上月无数据
+  deltaPct: number | null; // 环比上月;null=上月无数据或基数太小(百分比无意义)
+  isNew: boolean; // 上月完全没有此类支出
 }
+
+// 财务④:环比基数下限。上月不足 $50 的类别,百分比全是小基数噪音(¥30→¥314 就是
+// +946%),读者得到的是惊吓不是信息;这类只标「新增」或干脆不标。
+const DELTA_MIN_BASE = 50;
 
 export function categoryBreakdown(txs: BankTx[], ym: string): CategorySlice[] {
   const cur = sumByCategory(txs, ym);
@@ -237,9 +242,9 @@ export function categoryBreakdown(txs: BankTx[], ym: string): CategorySlice[] {
   const grand = [...cur.values()].reduce((a, b) => a + b, 0) || 1;
   return [...cur.entries()]
     .map(([category, total]) => {
-      const before = prev.get(category);
-      const deltaPct = before && before > 0 ? Math.round(((total - before) / before) * 100) : null;
-      return { category, total: round2(total), pct: Math.round((total / grand) * 100), deltaPct };
+      const before = prev.get(category) || 0;
+      const deltaPct = before >= DELTA_MIN_BASE ? Math.round(((total - before) / before) * 100) : null;
+      return { category, total: round2(total), pct: Math.round((total / grand) * 100), deltaPct, isNew: before <= 0 };
     })
     .sort((a, b) => b.total - a.total);
 }
@@ -631,6 +636,8 @@ export function monthlyTrend(txs: BankTx[], n = 6): Array<{ ym: string; net: num
 
 export function formatMoney(amount: number, currency = 'USD'): string {
   const sym = currency === 'USD' ? '$' : currency === 'CNY' || currency === 'RMB' ? '¥' : currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : '';
-  const body = Math.abs(amount).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: amount % 1 === 0 ? 0 : 2 });
+  // 财务④:小数位统一——整数金额不带小数($500),带分的恒两位($100.80,不再 $100.8)。
+  const hasCents = Math.round(Math.abs(amount) * 100) % 100 !== 0;
+  const body = Math.abs(amount).toLocaleString('en-US', { minimumFractionDigits: hasCents ? 2 : 0, maximumFractionDigits: hasCents ? 2 : 0 });
   return sym ? `${sym}${body}` : `${body} ${currency}`;
 }
