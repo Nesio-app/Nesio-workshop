@@ -53,6 +53,13 @@ const report = loadTs('../lib/portal/finance-report.ts', (p) =>
   : p === './finance-budget' ? budget
   : p === './tx-category' ? txCategory
   : p === './life-graph' ? lifeGraphStub : ({}));
+const visual = loadTs('../lib/portal/finance-report-visual.ts', (p) =>
+  p === './bank-tx' ? bank
+  : p === './finance-features' ? features
+  : p === './finance-insight' ? insight
+  : p === './finance-risk' ? risk
+  : p === './finance-budget' ? budget
+  : p === './tx-category' ? txCategory : ({}));
 
 const NOW = new Date('2026-07-02T12:00:00Z');
 const tx = (id, date, name, amount, category) => ({ id, date, name, amount, currency: 'USD', category, accountId: 'a1' });
@@ -127,5 +134,33 @@ assert.ok(html.includes('<h2>') && html.includes('<table>') && html.includes('<l
 assert.ok(!html.includes('| ---'), '表格分隔行不残留');
 const evil = { ...r, markdown: '# t\n- <script>alert(1)</script>' };
 assert.ok(!report.reportHtml(evil).includes('<script>alert'), '内容转义,不注入');
+
+// ── 财务㉘:彩色图文版(自包含 HTML;图表 SVG;转义;无外部资源) ──
+const rich = visual.reportRichHtml(txs, accounts, '2026-06', 'zh', NOW);
+assert.ok(rich.includes('<h1>2026-06 财务月报</h1>'), '富版标题');
+assert.ok((rich.match(/<svg/g) || []).length >= 2, '至少环形图 + 趋势图两个 SVG');
+assert.ok(rich.includes('净支出') && rich.includes(bank.formatMoney(s.net, 'USD')), 'KPI 数字与 summarizeMonth 同口径');
+assert.ok(rich.includes('class="hbar"'), '现金流/占比条在');
+assert.ok(rich.includes('Netflix'), '定期分节在');
+assert.ok(rich.includes('不构成投资建议'), '免责落款恒在');
+assert.ok(!/src=["']?https?:/.test(rich) && !/url\(/.test(rich) && !rich.includes('<link'), '自包含:无外部资源引用');
+assert.ok(!rich.includes('## '), '不是 markdown 透传,是排版后的 HTML');
+// 转义:恶意商户名不注入
+const evilTxs = [...txs, tx('ev1', '2026-06-09', '<script>alert(1)</script>', 42, 'ENTERTAINMENT')];
+assert.ok(!visual.reportRichHtml(evilTxs, accounts, '2026-06', 'zh', NOW).includes('<script>alert'), '商户名转义,不注入');
+// 持仓分节:无持仓不出,有持仓出组合结构条
+assert.ok(!rich.includes('投资持仓'), '无持仓 → 不出投资分节');
+caches.holdings = [
+  { accountId: 'inv1', name: 'Apple Inc', ticker: 'AAPL', type: 'equity', quantity: 10, value: 3000, costBasis: 2400, currency: 'USD' },
+  { accountId: 'inv1', name: 'Cash', type: 'cash', quantity: 500, value: 500, currency: 'USD' },
+];
+const richInv = visual.reportRichHtml(txs, accounts, '2026-06', 'zh', NOW);
+assert.ok(richInv.includes('投资持仓') && richInv.includes('AAPL') && richInv.includes('股票'), '有持仓 → 组合结构 + 持仓表');
+caches.holdings = null;
+// 英文版
+assert.ok(visual.reportRichHtml(txs, accounts, '2026-06', 'en', NOW).includes('Finance monthly report'), '英文标题');
+// 客户端接线:打印/存 PDF 走富版
+const finTab = fs.readFileSync(new URL('../components/portal/finance/FinanceTab.tsx', import.meta.url), 'utf8');
+assert.ok(finTab.includes('reportRichHtml(txs, accounts, ym, dict)'), 'FinanceTab 打印入口用彩色图文版');
 
 console.log('finance-report: OK');
