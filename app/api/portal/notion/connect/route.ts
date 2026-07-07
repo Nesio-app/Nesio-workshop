@@ -13,7 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { envValue } from '@/lib/portal/env';
 import { buildSignedState } from '@/lib/portal/notion-oauth-state.mjs';
-import { getSupabaseUserId } from '@/lib/portal/integrations';
+import { getRefreshedUserId } from '@/lib/portal/integrations';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,8 +30,9 @@ export async function GET(req: NextRequest) {
 
   // 发起上下文里通常有 Nesio 会话:把 userId 编进签名 state,
   // 回调无论落在哪个浏览器都知道 token 属于谁。
-  const supaAccess = req.cookies.get('baohe_auth_access')?.value || '';
-  const userId = supaAccess ? await getSupabaseUserId(supaAccess) : null;
+  // 走刷新链解析 —— access cookie 过期(手机常态)时旧写法拿不到 userId,
+  // state 带空身份,又退化回"只认本机 cookie"的断路。
+  const userId = await getRefreshedUserId();
   const stateSecret = envValue('NOTION_CLIENT_SECRET') || clientId;
   const state = buildSignedState({ userId: userId || '', secret: stateSecret });
 

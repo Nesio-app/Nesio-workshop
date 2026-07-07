@@ -14,7 +14,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { guardAiRoute } from '@/lib/portal/api-auth';
 import { notionRowToNode, notionDbTitle, type NotionRow } from '@/lib/portal/notion-map';
 import { completeText, aiProviderAvailable } from '@/lib/portal/ai-complete';
-import { getIntegrationToken } from '@/lib/portal/integrations';
+import { getIntegrationTokenRefreshed } from '@/lib/portal/integrations';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -136,7 +136,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({})) as { token?: string; databaseIds?: string[] };
   let token = body.token || req.cookies.get('nesio_notion_access')?.value || '';
   if (!token) {
-    const cloud = await getIntegrationToken('notion');
+    const cloud = await getIntegrationTokenRefreshed('notion');
     token = cloud?.accessToken || '';
   }
   if (!token) {

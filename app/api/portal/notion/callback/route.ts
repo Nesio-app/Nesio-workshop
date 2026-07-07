@@ -13,7 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { envValue } from '@/lib/portal/env';
 import { verifySignedState } from '@/lib/portal/notion-oauth-state.mjs';
-import { saveIntegrationToken, saveIntegrationTokenByUserId } from '@/lib/portal/integrations';
+import { saveIntegrationToken, saveIntegrationTokenByUserId, getRefreshedUserId } from '@/lib/portal/integrations';
 
 export const dynamic = 'force-dynamic';
 
@@ -68,11 +68,18 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL(`/?connector=notion&error=${encodeURIComponent(token.error || 'token_failed')}`, req.url));
   }
 
-  // 跨上下文持久化:优先用 state 里的 userId(service role 直写),
-  // 再尝试本请求的会话(同上下文时也写一份,双保险)。
+  // 跨上下文持久化:优先用 state 里的 userId(service role 直写);
+  // 没有就用本请求的会话走刷新链解析(同上下文但 access cookie 过期的情况);
+  // 最后才退到老的"仅当场 access 有效"写法。
   let savedToCloud = false;
   if (stateUserId) {
     savedToCloud = await saveIntegrationTokenByUserId(stateUserId, 'notion', { accessToken: token.access_token });
+  }
+  if (!savedToCloud) {
+    const sessionUserId = await getRefreshedUserId();
+    if (sessionUserId) {
+      savedToCloud = await saveIntegrationTokenByUserId(sessionUserId, 'notion', { accessToken: token.access_token });
+    }
   }
   if (!savedToCloud) {
     await saveIntegrationToken('notion', { accessToken: token.access_token }, req);

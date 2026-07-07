@@ -6,7 +6,7 @@
  *   PWA 用自己的会话就能看到已连接,按钮不再永远停在「接入」)。
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { getIntegrationToken } from '@/lib/portal/integrations';
+import { getIntegrationTokenRefreshed } from '@/lib/portal/integrations';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   const configured = Boolean((process.env.NOTION_CLIENT_ID ?? '').trim());
   let connected = Boolean(req.cookies.get('nesio_notion_access')?.value);
   if (!connected) {
-    const cloud = await getIntegrationToken('notion');
+    const cloud = await getIntegrationTokenRefreshed('notion');
     connected = Boolean(cloud?.accessToken);
   }
   return NextResponse.json({ ok: true, configured, connected });

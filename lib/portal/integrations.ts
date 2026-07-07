@@ -7,6 +7,7 @@
 import { cookies } from 'next/headers';
 import { normalizeSupabaseRuntimeUrl } from '@/lib/portal/production-runtime';
 import { envValue } from '@/lib/portal/env';
+import { getCloudConfig, getSignedInUser } from '@/lib/portal/cloud-server-runtime';
 
 export type IntegrationProvider = 'gmail' | 'calendar' | 'notion';
 
@@ -144,6 +145,41 @@ export async function getIntegrationToken(
     return readTokensFromCookies(provider);
   }
   return null;
+}
+
+/**
+ * 刷新链解析当前用户的真实 Supabase userId。access cookie 过期(手机上很
+ * 常见,只剩 refresh cookie)时 getSupabaseUserId 会失败,这里走
+ * getSignedInUser 的 access→refresh 完整链。wechat 伪 id 返回 null
+ * (user_profiles.user_id 是 auth.users 外键,写不进去)。
+ */
+export async function getRefreshedUserId(): Promise<string | null> {
+  try {
+    const config = getCloudConfig();
+    if (!config.supabaseUrl || !config.anonKey) return null;
+    const { user } = await getSignedInUser(config);
+    const id = user?.id || '';
+    if (!id || id.startsWith('wechat_openid:')) return null;
+    return id;
+  } catch { return null; }
+}
+
+/**
+ * getIntegrationToken 的会话刷新版:access cookie 过期时先刷新会话再读
+ * integrations。OAuth 连接器的 status/同步路径用这个 —— 否则手机上
+ * access 过期后云端 token 读不到,按钮又退回「接入」。
+ */
+export async function getIntegrationTokenRefreshed(
+  provider: IntegrationProvider,
+): Promise<{ accessToken: string; refreshToken?: string } | null> {
+  const direct = await getIntegrationToken(provider);
+  if (direct?.accessToken) return direct;
+  const userId = await getRefreshedUserId();
+  const serviceKey = envValue('SUPABASE_SERVICE_ROLE_KEY');
+  if (!userId || !serviceKey) return null;
+  const map = await readIntegrations(userId, serviceKey);
+  const t = map[provider];
+  return t?.accessToken ? { accessToken: t.accessToken, refreshToken: t.refreshToken } : null;
 }
 
 /**

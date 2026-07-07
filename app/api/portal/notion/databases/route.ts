@@ -9,7 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { guardAiRoute } from '@/lib/portal/api-auth';
 import { notionDbTitle } from '@/lib/portal/notion-map';
-import { getIntegrationToken } from '@/lib/portal/integrations';
+import { getIntegrationTokenRefreshed } from '@/lib/portal/integrations';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
   let token = body.token || req.cookies.get('nesio_notion_access')?.value || '';
   if (!token) {
     // Notion 修:iOS 授权在别的浏览器完成时 token 只在 Supabase,回落云端读
-    const cloud = await getIntegrationToken('notion');
+    const cloud = await getIntegrationTokenRefreshed('notion');
     token = cloud?.accessToken || '';
   }
   if (!token) {
