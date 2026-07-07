@@ -52,11 +52,15 @@ const visible = bank.loadBankTx();
 assert.equal(visible.length, 1, 'sandbox 孤儿交易被滤掉');
 assert.equal(visible[0].id, 't2', '留下的是真账户交易');
 
-// 3. 无 accountId 的老数据保守保留
+// 3. 无 accountId 残留(财务⑪收紧):已有带 accountId 的现代交易 → 无 accountId 的是
+//    旧环境残留(sandbox 时代早期同步不存 accountId),隐藏;纯老数据(整库无 accountId)保留。
 caches.tx = [tx('t3', undefined), tx('t4', 'ghost-acc')];
 const v2 = bank.loadBankTx();
-assert.equal(v2.length, 1, '孤儿滤掉、无 accountId 保留');
-assert.equal(v2[0].id, 't3');
+assert.equal(v2.length, 0, '有现代交易时,无 accountId 残留 + 孤儿都滤掉');
+caches.tx = [tx('t3', undefined)];
+assert.equal(bank.loadBankTx().length, 1, '整库都无 accountId(纯老用户)整体保留');
+caches.tx = [tx('t4', 'ghost-acc'), tx('t5', 'real-acc')];
+assert.equal(bank.loadBankTx().length, 1, '孤儿滤掉、活账户交易保留');
 
 // 4. 账户只增合并:另一家银行同步(当次不含 real-acc)不抹掉已有账户
 bank.saveBankAccounts([{ id: 'bank-b', name: 'BoA', currency: 'USD' }]);
@@ -73,6 +77,23 @@ assert.equal(bank.loadBankAccounts().length, 2, '仍是 2 个账户(无重复)')
 caches.tx = [tx('a1', 'real-acc'), tx('b1', 'bank-b'), tx('s1', 'sandbox-acc')];
 const v3 = bank.loadBankTx();
 assert.equal(v3.length, 2, '两家活银行交易都在、sandbox 滤掉');
+
+// ── 财务⑪:指纹去重(union 路径)—— 不依赖 authoritative 也能让重复授权的旧账户退场 ──
+caches.tx = null;
+caches.accounts = [
+  { id: 'old-item-chk', name: 'BUS COMPLETE CHK', mask: '7937', type: 'depository', subtype: 'checking', currency: 'USD' },
+  { id: 'keep-other', name: 'Savings', mask: '1234', type: 'depository', subtype: 'savings', currency: 'USD' },
+];
+bank.saveBankAccounts([{ id: 'new-item-chk', name: 'BUS COMPLETE CHK', mask: '7937', type: 'depository', subtype: 'checking', currency: 'USD' }]);
+{
+  const ids = bank.loadBankAccounts().map((a) => a.id);
+  assert.ok(ids.includes('new-item-chk') && !ids.includes('old-item-chk'), '同指纹不同 id → 旧 id 退场');
+  assert.ok(ids.includes('keep-other'), '不同指纹的账户不受影响');
+}
+// 缺 mask 不参与指纹去重(保守)
+caches.accounts = [{ id: 'no-mask-old', name: 'Card', type: 'credit', currency: 'USD' }];
+bank.saveBankAccounts([{ id: 'no-mask-new', name: 'Card', type: 'credit', currency: 'USD' }]);
+assert.equal(bank.loadBankAccounts().length, 2, '缺 mask 不敢按指纹杀');
 
 // ── 财务⑧:权威快照 replace —— 重复授权的旧账户要能退场 ──
 // 路由确认全部存活 token 账户拉齐时整体替换;旧 item 账户消失 → 其交易被孤儿过滤隐藏。

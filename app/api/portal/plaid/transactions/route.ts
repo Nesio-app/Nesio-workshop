@@ -149,24 +149,28 @@ export async function GET(req: NextRequest) {
         }
       } catch { /* skip */ }
       accountsOk[i] = ok;
-      // 财务⑧:机构元数据(item/get → institutions/get_by_id,按机构缓存;失败不阻断)
+      // 财务⑧:机构元数据(item/get → institutions/get_by_id,按机构缓存;失败不阻断)。
+      // 财务⑪:机构 id 与元数据解耦 —— 此前 get_by_id 一失败连 id 都丢,重复 item 判定
+      // (靠机构 id 指纹)被击穿,旧账户清不掉。现在 id 先落袋,logo/名称可缺。
       let inst: Institution = { id: '' };
       try {
         const itemData = await plaidPost('/item/get', { access_token: accessToken }) as { item?: { institution_id?: string | null } };
-        const instId = itemData.item?.institution_id || '';
-        if (instId) {
-          const cached = instCache.get(instId);
-          if (cached) {
-            inst = cached;
-          } else {
+        inst = { id: itemData.item?.institution_id || '' };
+      } catch { /* item/get 失败:无机构 id,该 token 不参与去重(保守) */ }
+      if (inst.id) {
+        const cached = instCache.get(inst.id);
+        if (cached) {
+          inst = cached;
+        } else {
+          try {
             const instData = await plaidPost('/institutions/get_by_id', {
-              institution_id: instId, country_codes: ['US'], options: { include_optional_metadata: true },
+              institution_id: inst.id, country_codes: ['US'], options: { include_optional_metadata: true },
             }) as { institution?: { name?: string; logo?: string | null; primary_color?: string | null } };
-            inst = { id: instId, name: instData.institution?.name, logo: instData.institution?.logo, color: instData.institution?.primary_color };
-            instCache.set(instId, inst);
-          }
+            inst = { id: inst.id, name: instData.institution?.name, logo: instData.institution?.logo, color: instData.institution?.primary_color };
+          } catch { /* 元数据可缺,id 已保住 */ }
+          instCache.set(inst.id, inst);
         }
-      } catch { /* 机构元数据可缺 */ }
+      }
       perToken[i] = { institutionId: inst.id, accounts: tokenAccounts };
       for (const a of tokenAccounts) acctInst.set(a.account_id, inst);
     }

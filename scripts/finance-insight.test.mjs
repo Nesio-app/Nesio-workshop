@@ -13,7 +13,7 @@ function loadTs(path, requireImpl) {
   const src = fs.readFileSync(new URL(path, import.meta.url), 'utf8');
   const js = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const mod = { exports: {} };
-  vm.runInNewContext(js, { module: mod, exports: mod.exports, require: requireImpl, process: { env: {} }, console, Date, Math });
+  vm.runInNewContext(js, { module: mod, exports: mod.exports, require: requireImpl, process: { env: {} }, console, Date, Math, Set, Map });
   return mod.exports;
 }
 

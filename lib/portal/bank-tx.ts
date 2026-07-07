@@ -42,7 +42,11 @@ const txStore = createBlobStore<BankTx[]>({
 export function filterToKnownAccounts(txs: BankTx[], accounts: BankAccount[]): BankTx[] {
   if (!accounts.length) return txs;
   const known = new Set(accounts.map((a) => a.id));
-  return txs.filter((t) => !t.accountId || known.has(t.accountId));
+  // 财务⑪:早期同步代码不存 accountId,那批(sandbox 时代)残留曾靠"保守保留"永远清不掉
+  // (Madison/Tectra $500 假商户一直赖在定期页)。只要数据集里已有带 accountId 的现代交易,
+  // 无 accountId 的就是旧环境残留 → 隐藏;整库都没有 accountId(纯老用户)才整体保留。
+  const hasModern = txs.some((t) => t.accountId);
+  return txs.filter((t) => (t.accountId ? known.has(t.accountId) : !hasModern));
 }
 
 export function loadBankTx(): BankTx[] {
@@ -138,8 +142,24 @@ export function setFlowRule(name: string, flow: TxFlow | ''): void {
 // 名字保守识别(CREDIT UNION 是机构名,排除);金额口径与退款相同(冲抵支出),纯语义分流。
 const REBATE_NAME_RE = /STATEMENT CREDIT|\bREBATE\b|REIMBURSE|CASH ?BACK|\bCREDIT\b(?!\s+UNION)|返还|报销/i;
 
-/** 交易类型:用户规则优先,否则按 Plaid 分类自动判(转账/还款/收入不计收支)。 */
-export function txFlow(t: BankTx, rules = loadFlowRules()): TxFlow {
+/** 财务⑪:退款证据集 —— 数据集中出现过支出的商户(归一名)。退款必须有对应的"买过"。 */
+export function expenseMerchants(txs: BankTx[]): Set<string> {
+  const out = new Set<string>();
+  for (const t of txs) {
+    if (t.amount > 0) {
+      const k = normalizeMerchant(t.name);
+      if (k) out.add(k);
+    }
+  }
+  return out;
+}
+
+/**
+ * 交易类型:用户规则优先,否则按 Plaid 分类自动判(转账/还款/收入不计收支)。
+ * 财务⑪:传入 evidence(expenseMerchants)时,负数交易只有该商户买过才算 refund,
+ * 否则归 transfer —— PayPal 收款/亲友转入此前被记成「退款」倒扣净支出。不传保持旧行为。
+ */
+export function txFlow(t: BankTx, rules = loadFlowRules(), evidence?: Set<string>): TxFlow {
   const forced = rules[t.name];
   if (forced) return forced;
   const cat = (t.category || '').toUpperCase();
@@ -151,7 +171,9 @@ export function txFlow(t: BankTx, rules = loadFlowRules()): TxFlow {
     return t.amount >= 0 ? 'expense' : 'transfer';
   }
   if (t.amount >= 0) return 'expense';
-  return REBATE_NAME_RE.test(t.name || '') ? 'rebate' : 'refund';
+  if (REBATE_NAME_RE.test(t.name || '')) return 'rebate';
+  if (evidence && !evidence.has(normalizeMerchant(t.name))) return 'transfer';
+  return 'refund';
 }
 
 /* ---------- 财务③:内部调整对识别 ---------- */
@@ -211,10 +233,11 @@ export function summarizeMonth(txs: BankTx[], ym: string): MonthSummary {
   // 只汇总主币种的交易 —— 跨币种裸加($100 + ¥700 = 800)会给出任何币种下都不存在的数字。
   const ccy = dominantCurrency(monthTxs.length ? monthTxs : txs);
   const flowRules = loadFlowRules();
+  const evidence = expenseMerchants(txs); // 财务⑪:退款要有"买过"的证据,否则按转账不计收支
   let gross = 0, refunds = 0, income = 0, count = 0;
   for (const t of monthTxs) {
     if (ccyOf(t) !== ccy) continue;
-    const f = txFlow(t, flowRules);
+    const f = txFlow(t, flowRules, evidence);
     if (f === 'expense') { gross += Math.abs(t.amount); count += 1; }
     else if (f === 'refund' || f === 'rebate') { refunds += Math.abs(t.amount); count += 1; } // 返还与退款同口径冲抵支出
     else if (f === 'income') income += Math.abs(t.amount);
@@ -334,6 +357,14 @@ export function loadBankAccounts(): BankAccount[] {
  * 替换 —— 只增合并永不退场,重复授权留下的旧 item 账户会一直重复显示、其交易双份计数;
  * 权威快照替换后,旧 item 的本地交易被孤儿过滤自动隐藏。
  */
+// 财务⑪:账户指纹(名 + 后4位 + 类型)。重复授权产生的新 item 里,同一张实体卡换了 id
+// 但指纹不变 —— 据此在客户端就能让旧 id 退场,不再依赖服务端「全部 token 拉齐」的时机。
+// 缺 mask 的账户指纹为空,不参与去重(保守)。
+function acctFingerprint(a: BankAccount): string {
+  if (!a?.mask) return '';
+  return `${(a.name || '').trim().toLowerCase()}|${a.mask}|${(a.subtype || a.type || '').toLowerCase()}`;
+}
+
 export function saveBankAccounts(accounts: BankAccount[], opts?: { replace?: boolean }): void {
   if (opts?.replace && accounts.length > 0) {
     accountsStore.save(accounts.filter((a) => a?.id));
@@ -342,6 +373,17 @@ export function saveBankAccounts(accounts: BankAccount[], opts?: { replace?: boo
   const cur = accountsStore.load();
   const byId = new Map<string, BankAccount>();
   for (const a of Array.isArray(cur) ? cur : []) if (a?.id) byId.set(a.id, a);
+  // 指纹去重:本次同步的账户与既存账户同指纹但不同 id → 旧 id 是重复授权残留,退场
+  // (其交易随之被孤儿过滤隐藏)。同 id 正常合并更新。
+  const incoming = new Map<string, string>();
+  for (const a of accounts) {
+    const f = acctFingerprint(a);
+    if (a?.id && f) incoming.set(f, a.id);
+  }
+  for (const [id, b] of [...byId]) {
+    const f = acctFingerprint(b);
+    if (f && incoming.has(f) && incoming.get(f) !== id) byId.delete(id);
+  }
   for (const a of accounts) if (a?.id) byId.set(a.id, { ...byId.get(a.id), ...a });
   accountsStore.save([...byId.values()]);
 }
@@ -387,11 +429,12 @@ export function assetSummary(accounts: BankAccount[], currency = 'USD'): { depos
 export function accountMonth(txs: BankTx[], accountId: string, ym: string): { spend: number; refund: number; count: number } {
   let spend = 0, refund = 0, count = 0;
   const flowRules = loadFlowRules();
+  const evidence = expenseMerchants(txs);
   const acctTxs = txs.filter((t) => t.accountId === accountId);
   const ccy = dominantCurrency(acctTxs.length ? acctTxs : txs); // 单账户按其主币种,避免跨币种裸加
   for (const t of txs) {
     if (t.accountId !== accountId || txYm(t) !== ym || ccyOf(t) !== ccy) continue;
-    const f = txFlow(t, flowRules);
+    const f = txFlow(t, flowRules, evidence);
     if (f === 'expense') { spend += Math.abs(t.amount); count += 1; }
     else if (f === 'refund' || f === 'rebate') { refund += Math.abs(t.amount); count += 1; }
   }
