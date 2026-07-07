@@ -3,6 +3,14 @@
 > 状态:**提案 / 蓝图**(未实现)。给在修的 Agent 当改造地图。
 > 目标:把散落全仓的 ~11 处「学习/自适应」收敛到一个共享底座,让**一个反馈训练所有面**、
 > 冷启动共享、并有一个统一的「app 学到了关于我什么」出口(隐私/导出/删除也随之收成一处)。
+>
+> **进度注(2026-07-07,见 `design/algorithm-layer-plan.md`):**
+> - 本蓝图 = A 计划的 **Layer 2**。拆两 phase:**2a 统一**(不动数学,本文档正文)/ **2b 变聪明**(重评发现真够格升级的只有
+>   ranker/bank/mirror 3 个;card-feedback 疑似与 ranker+cooling 冗余、2a 应评估**并掉**而非建 store)。
+> - **B pilot(PR #48)已落但偏离本蓝图**:落位 `lib/portal/learning/`(应 `lib/platform/personalization/`)、
+>   反馈 schema 用了 `{verdict,cardId}`(应本文 §2 的 `{surface,dimension,key,reaction}`)、建了泛型
+>   `createLearnerStore`(应三原语 Preference/Baseline/Recency)、且迁了 guidance-ranker 存储(§3 说 ranker
+>   "无需迁数据")。2a 开工先返工对齐,别在偏离的架子上继续搭。
 
 ---
 
