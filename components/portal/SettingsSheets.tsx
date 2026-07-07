@@ -15,8 +15,9 @@ import { InfoTip } from './InfoTip';
 import { PROACTIVE_LEVEL_KEY } from './today/proactive-types';
 import { deleteLifeNode, getLifeGraph } from '@/lib/portal/life-graph';
 import { purgeLocalData } from '@/lib/portal/storage-manifest';
-import { collectIdbBlobs, purgeIdbBlobs } from '@/lib/portal/idb-blob-store';
-import { buildFullBackup, isValidBackup, restoreFullBackup } from '@/lib/portal/full-backup';
+import { purgeIdbBlobs } from '@/lib/portal/idb-blob-store';
+import { isValidBackup, restoreFullBackup } from '@/lib/portal/full-backup';
+import { buildCombinedBackup, pushBackupToCloud, hasCloudEntitlement, lastCloudBackup, type CloudBackupError } from '@/lib/portal/cloud-backup';
 
 interface SheetProps { open: boolean; onClose: () => void; }
 
@@ -265,11 +266,15 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
   const [lastBackupAt, setLastBackupAt] = useState<string | null>(null);
   const [labOn, setLabOn] = useState(false);
   const importRef = useRef<HTMLInputElement>(null);
+  // 云备份(付费,规划中):状态机 idle→pushing→done/error,失败必可见(设计红线)。
+  const [cloudState, setCloudState] = useState<'idle' | 'pushing' | 'done' | 'error'>('idle');
+  const [cloudError, setCloudError] = useState<CloudBackupError | null>(null);
+  const [cloudBackupAt, setCloudBackupAt] = useState<string | null>(null);
+  const [cloudEntitled, setCloudEntitled] = useState(false);
 
   async function exportFullBackup() {
-    const backup = buildFullBackup(localStorage);
-    // 收口:健康/临床/地点已迁 IDB —— 备份要合并 IDB blob,否则设备迁移丢这些数据。
-    backup.entries = { ...backup.entries, ...(await collectIdbBlobs()) };
+    // 与云备份用同一份枚举(localStorage durable + IDB blob),避免两处漂移。
+    const backup = await buildCombinedBackup();
     const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -279,6 +284,29 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
     URL.revokeObjectURL(url);
     try { localStorage.setItem('nesio-last-backup-at', new Date().toISOString()); } catch { /* ignore */ }
     setLastBackupAt(new Date().toISOString());
+  }
+
+  function cloudErrorText(err: CloudBackupError): string {
+    switch (err) {
+      case 'entitlement_required': return L(dict, '云备份即将开放 —— 到下方「订阅」留个位,开放时第一时间通知你。', "Cloud backup is coming soon — join the waitlist under Subscription and we'll ping you first.");
+      case 'not_signed_in': return L(dict, '先登录(上方入口),才能同步到你的云账户。', 'Sign in first (link above) to sync to your cloud account.');
+      case 'cloud_not_configured': return L(dict, '云同步暂未开启,稍后再试。', "Cloud sync isn't enabled yet — try later.");
+      case 'too_large': return L(dict, '数据超过 8MB 单次上限,先导出到本地留一份。', 'Data is over the 8MB limit — export a local copy for now.');
+      default: return L(dict, '这次没传上去。检查网络后可以再试一次。', "Didn't go through. Check your connection and try again.");
+    }
+  }
+
+  async function handleCloudBackup() {
+    setCloudState('pushing');
+    setCloudError(null);
+    const result = await pushBackupToCloud();
+    if (result.ok) {
+      setCloudState('done');
+      setCloudBackupAt(result.at || new Date().toISOString());
+    } else {
+      setCloudState('error');
+      setCloudError(result.error || 'network');
+    }
   }
 
   async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -308,6 +336,10 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
     if (!open) return;
     setDeleted(false);
     setNodeCount(getLifeGraph().length);
+    setCloudState('idle');
+    setCloudError(null);
+    setCloudEntitled(hasCloudEntitlement());
+    setCloudBackupAt(lastCloudBackup()?.at ?? null);
     try {
       setLastBackupAt(localStorage.getItem('nesio-last-backup-at'));
       setLabOn(localStorage.getItem('baohe_personal_lab') === '1' || localStorage.getItem('baohe_lab_mode') === '1');
@@ -391,6 +423,29 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
       <button type="button" className="nesio-settings-action-btn" onClick={exportFullBackup}>
         {L(dict, '导出完整备份（含项目/情绪/设置等全部本地数据）', 'Export full backup (projects, moods, settings — all local data)')}
       </button>
+
+      {/* 云备份(付费,规划中):一键把本机全部 durable 数据推到你的云账户,换机不丢。
+          未解锁/未登录/超限都渲染明确失败态(设计红线:每个异步动作都要可见失败)。 */}
+      <button type="button" className="nesio-settings-action-btn" onClick={handleCloudBackup} disabled={cloudState === 'pushing'}>
+        {cloudState === 'pushing'
+          ? L(dict, '正在备份到云…', 'Backing up to cloud…')
+          : `${L(dict, '备份到云 · 换手机不丢', 'Back up to cloud · survive a new phone')}${cloudEntitled ? '' : L(dict, ' · 付费', ' · Paid')}`}
+      </button>
+      {cloudState === 'done' && (
+        <p style={{ fontSize: '0.75rem', marginTop: 4, color: 'var(--status-go)' }}>
+          {L(dict, '✓ 已备份到云', '✓ Backed up to cloud')}{cloudBackupAt ? ` · ${new Date(cloudBackupAt).toLocaleString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}` : ''}
+        </p>
+      )}
+      {cloudState === 'error' && cloudError && (
+        <p style={{ fontSize: '0.75rem', marginTop: 4, color: cloudError === 'entitlement_required' ? 'var(--portal-muted)' : 'var(--status-risk)' }}>
+          {cloudErrorText(cloudError)}
+        </p>
+      )}
+      {cloudState === 'idle' && cloudBackupAt && (
+        <p style={{ fontSize: '0.7rem', marginTop: 4, color: 'var(--portal-muted)' }}>
+          {L(dict, '上次云备份', 'Last cloud backup')} · {new Date(cloudBackupAt).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'numeric', day: 'numeric' })}
+        </p>
+      )}
 
       <button type="button" className="nesio-settings-action-btn" onClick={() => importRef.current?.click()}>
         {L(dict, '导入备份', 'Import backup')}

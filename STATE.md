@@ -38,6 +38,12 @@
    - 断言随实现进化更新:相机原生打开、镜像 sheet→InsightsSheet、apex↔www 规则反转
      (代码注释记载了原因:host-only cookie bug)
    - 产出:docs/regression-backlog.json(REG-001~006,report:drift 周检)
+3. **云备份推送机制(2026-07-07,输出侧统一在存储上的落点)**:
+   `lib/portal/cloud-backup.ts` — 一键把本机全部 durable 数据(localStorage manifest 归类
+   + 已迁 IDB 的 blob)推到用户云账户。与本地导出用**同一份枚举**(buildCombinedBackup),
+   复用 `/api/cloud/assets`(purpose=backup,text/plain ≤8MB,身份隔离,签名回读)——
+   零服务端改动。付费门是**桩**(hasCloudEntitlement 读本地 flag `nesio-cloud-entitlement-v1`,
+   默认关);真权益强制层未落地(见权益契约 report-only)。gate 仍在 CLOUD_DB_ENABLED + 已登录。
 
 ## 红线(动之前必读)
 
@@ -54,7 +60,11 @@
 
 ## 已知欠账(按优先级)
 
-(暂无 — 2026-07-04 批次全部清偿;新欠账请记录在此)
+- **restore-from-cloud(云备份的下半场)**:当前只做了推送(push)。从云拉回恢复
+  需 assets GET 签名 URL → fetch → restoreFullBackup + IDB 重水合,是云备份功能闭环的
+  下一增量。(2026-07-07 记)
+- **云备份付费桩转真**:hasCloudEntitlement 现读本地 flag;支付/StoreKit/账户 plan 字段
+  接上后换成真权益读取(推送机制本身不用动)。(2026-07-07 记)
 
 **契约测试提示**:`test:contracts`(100+ 套,CI 只跑 test:security 的 18 套)
 在 2026-07-04 全量修复过一轮——历史重构造成的 15 处 marker 漂移已对齐,
