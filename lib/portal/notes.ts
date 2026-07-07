@@ -18,7 +18,6 @@ export interface TreasureNote {
 }
 
 const NOTES_KEY = 'treasurebox-notes';
-const FAV_QUOTES_KEY = 'treasurebox-favorite-quotes';
 
 export const NOTE_KIND_LABELS: Record<NoteKind, string> = {
   quote: '语录',
@@ -49,27 +48,13 @@ export function saveStoredNotes(notes: TreasureNote[]): void {
   localStorage.setItem(NOTES_KEY, JSON.stringify(notes.slice(0, 200)));
 }
 
-export function loadFavoriteQuotes(): string[] {
-  const list = readJson<string[]>(FAV_QUOTES_KEY, []);
-  return Array.isArray(list) ? list.filter(Boolean) : [];
-}
-
 export function loadAllNotes(): TreasureNote[] {
   const stored = loadStoredNotes();
-  const favQuotes = loadFavoriteQuotes();
-  const favNotes: TreasureNote[] = favQuotes.map((content, index) => ({
-    id: `fav-quote-${index}`,
-    kind: 'quote',
-    title: '首页收藏',
-    content,
-    createdAt: '',
-    readonly: true,
-  }));
 
   const seen = new Set<string>();
   const merged: TreasureNote[] = [];
 
-  for (const note of [...favNotes, ...stored]) {
+  for (const note of stored) {
     const key = `${note.kind}|${note.content}|${note.attachments?.[0]?.url || ''}`;
     if (seen.has(key)) continue;
     seen.add(key);
