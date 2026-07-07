@@ -127,6 +127,19 @@ const evSum = bank.summarizeMonth([ftx('Coffee Shop', 100, 'FOOD_AND_DRINK'), { 
 assert.equal(evSum.refunds, 0, '无证据进账不进退款桶');
 assert.equal(evSum.net, 100, '净支出不被虚减');
 
+// ── hooks 纪律(财务⑪回归教训):空态早退之后不得再出现任何 hook ──
+// refundEvidence 的 useMemo 曾写在 `if (txs.length === 0) return` 之后:首渲染空态早退
+// hook 没执行,数据水合后 hook 数量变多 → React 整页抛错(用户「整个财务页面挂了」)。
+{
+  const src = fs.readFileSync(new URL('../components/portal/finance/FinanceTab.tsx', import.meta.url), 'utf8');
+  const earlyReturn = src.indexOf('if (txs.length === 0)');
+  assert.ok(earlyReturn > 0, '空态早退存在');
+  const after = src.slice(earlyReturn);
+  for (const h of ['useMemo(', 'useState(', 'useEffect(', 'useCallback(', 'useRef(']) {
+    assert.ok(!after.includes(h), `空态早退之后不得出现 ${h}(hooks 顺序会随渲染变化,整页崩)`);
+  }
+}
+
 // ── 财务⑩:账户类型友好名 + 资产小结口径 ──
 assert.equal(bank.accountTypeLabel({ type: 'depository', subtype: 'checking' })[0], '支票', 'subtype 优先');
 assert.equal(bank.accountTypeLabel({ type: 'credit', subtype: 'credit card' })[1], 'Credit card');
