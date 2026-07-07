@@ -22,6 +22,7 @@ import { computeFinanceScores } from '@/lib/portal/finance-risk';
 import { incomeBreakdown } from '@/lib/portal/finance-features';
 import { removeBankAccount } from '@/lib/portal/bank-tx';
 import { loadBudget, saveBudget, hasBudget, suggestBudget, budgetProgress, type BudgetConfig } from '@/lib/portal/finance-budget';
+import { buildMonthlyReport, persistReportToMemory } from '@/lib/portal/finance-report';
 import { categoryLabel, categoryDetailLabel, COMMON_EXPENSE_CATEGORIES } from '@/lib/portal/tx-category';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -138,6 +139,7 @@ export default function FinanceTab() {
   const budget = useMemo(() => loadBudget(), [rev]);
   const bp = useMemo(() => budgetProgress(txs, ym, budget), [txs, ym, budget]);
   const [budgetNote, setBudgetNote] = useState('');
+  const [reportMsg, setReportMsg] = useState(''); // 财务㉓:月报动作反馈(可见状态,不静默)
 
   if (txs.length === 0) {
     return <p className="nesio-insights-empty">{L(dict, '还没有银行流水。到「设置 → 数据接入 → 银行流水 · Plaid」连接账户并点「同步」。', 'No bank transactions yet. Go to Settings → Data sources → Bank feed · Plaid, connect and Sync.')}</p>;
@@ -305,6 +307,32 @@ export default function FinanceTab() {
               </div>
             ))}
           </div>
+          {/* 财务㉓:月报 —— 报告级 Markdown,可下载 / 存入记忆(问一问可检索) */}
+          <div className="nesio-fin-budget-add" style={{ marginTop: '1.25rem' }}>
+            <button type="button" className="nesio-fin-flowopt" onClick={() => {
+              try {
+                const r = buildMonthlyReport(txs, accounts, ym, dict);
+                const blob = new Blob([r.markdown], { type: 'text/markdown;charset=utf-8' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = `finance-report-${r.ym}.md`;
+                document.body.appendChild(a); a.click(); a.remove();
+                setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+                setReportMsg(L(dict, `已生成 ${r.ym} 月报并下载(.md)`, `Report for ${r.ym} downloaded (.md)`));
+              } catch { setReportMsg(L(dict, '月报生成失败,请重试', 'Report failed — try again')); }
+            }}>{L(dict, '下载本月财务月报', 'Download monthly report')}</button>
+            <button type="button" className="nesio-fin-flowopt" onClick={() => {
+              try {
+                const r = buildMonthlyReport(txs, accounts, ym, dict);
+                const outcome = persistReportToMemory(r);
+                setReportMsg(outcome === 'created'
+                  ? L(dict, `已把 ${r.ym} 月报存入记忆,「问一问」可检索`, `Report ${r.ym} saved to memory — Ask can cite it`)
+                  : L(dict, `已更新记忆里的 ${r.ym} 月报`, `Updated the ${r.ym} report in memory`));
+              } catch { setReportMsg(L(dict, '存入记忆失败,请重试', 'Save to memory failed — try again')); }
+            }}>{L(dict, '存入记忆', 'Save to memory')}</button>
+          </div>
+          {reportMsg && <p className="nesio-settings-option-hint">{reportMsg}</p>}
+
           <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '商户 Top', 'Top merchants')}</p>
           <div className="nesio-fin-merchants">
             {merchants.map((m) => (
