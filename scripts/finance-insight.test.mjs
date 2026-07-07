@@ -23,13 +23,15 @@ function fakeBlobStore() {
   let cache = null;
   return { load: () => cache, save: (v) => { cache = v; }, ready: async () => {} };
 }
+const txCategory = loadTs('../lib/portal/tx-category.ts', () => ({}));
 const bankRequire = (p) => {
   if (p === './storage-health') return { reportStorageDropped() {} };
   if (p === './idb-blob-store') return { createBlobStore: fakeBlobStore };
+  if (p === './tx-category') return txCategory;
   return {};
 };
 const bank = loadTs('../lib/portal/bank-tx.ts', bankRequire);
-const fin = loadTs('../lib/portal/finance-insight.ts', (p) => (p === './bank-tx' ? bank : {}));
+const fin = loadTs('../lib/portal/finance-insight.ts', (p) => (p === './bank-tx' ? bank : p === './tx-category' ? txCategory : {}));
 const { financeFindings } = fin;
 
 const tx = (id, date, name, amount, category, currency = 'USD') => ({ id, date, name, amount, currency, category });

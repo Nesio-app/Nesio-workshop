@@ -22,6 +22,7 @@ import {
   type BankTx,
   type BankAccount,
 } from './bank-tx';
+import { categoryLabel } from './tx-category';
 
 export type FinanceSeverity = 'flag' | 'attention'; // flag=值得尽快看, attention=可关注
 export type FinanceFindingKind = 'anomaly' | 'subscription_hike' | 'cash_runway' | 'upcoming_bill';
@@ -63,14 +64,17 @@ function anomalyFindings(txs: BankTx[], ym: string): FinanceFinding[] {
     .filter((c) => c.total >= MIN_BASE && c.deltaPct != null && c.deltaPct >= 60)
     .sort((a, b) => (b.deltaPct ?? 0) - (a.deltaPct ?? 0))[0];
   if (top) {
+    // 财务②:分类已是 PFC 枚举,用户可见文案经 categoryLabel 出友好名(id 保持枚举,稳定)。
+    const zh = categoryLabel(top.category, 'zh');
+    const en = categoryLabel(top.category, 'en');
     out.push({
       id: `finance-cat-surge-${top.category}`,
       kind: 'anomaly',
       severity: 'attention',
-      title: [`「${top.category}」支出比往月高`, `${top.category} spending is up`],
+      title: [`「${zh}」支出比往月高`, `${en} spending is up`],
       detail: [
-        `本月「${top.category}」${formatMoney(top.total, cur.currency)},环比高 ${top.deltaPct}%`,
-        `${top.category} ${formatMoney(top.total, cur.currency)} this month, +${top.deltaPct}% vs last`,
+        `本月「${zh}」${formatMoney(top.total, cur.currency)},环比高 ${top.deltaPct}%`,
+        `${en} ${formatMoney(top.total, cur.currency)} this month, +${top.deltaPct}% vs last`,
       ],
     });
   }

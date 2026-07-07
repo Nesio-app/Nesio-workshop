@@ -10,6 +10,7 @@
 
 import { reportStorageDropped } from './storage-health';
 import { createBlobStore } from './idb-blob-store';
+import { normalizeCategory } from './tx-category';
 
 export interface BankTx {
   id: string;
@@ -329,9 +330,10 @@ export function setMerchantRule(name: string, category: string): void {
   try { localStorage.setItem(MERCHANT_RULE_KEY, JSON.stringify(rules)); } catch { reportStorageDropped(); }
 }
 
-/** 生效分类:用户规则优先,其次 Plaid 分类。 */
+/** 生效分类:用户规则优先,其次 Plaid 分类;经 normalizeCategory 归一(财务②:旧自家词汇
+ * 与 PFC 枚举合流,统计里同类不再被拆成两组)。 */
 export function effectiveCategory(t: BankTx, rules = loadMerchantRules()): string {
-  return rules[t.name] || t.category || '';
+  return normalizeCategory(rules[t.name] || t.category || '');
 }
 
 /** 需要审核的交易:本月、真支出、没有生效分类的。 */
@@ -341,12 +343,13 @@ export function needsReview(txs: BankTx[], ym: string): BankTx[] {
   return txs.filter((t) => txYm(t) === ym && txFlow(t, flowRules) === 'expense' && !effectiveCategory(t, rules)).sort((a, b) => b.amount - a.amount);
 }
 
+// 财务②:建议值统一为 PFC 枚举(uber/gas 语义上是交通;流媒体订阅归娱乐)。
 const SUGGEST_RULES: Array<[RegExp, string]> = [
-  [/coffee|cafe|starbucks|餐|饭|restaurant|mcdonald|bakery|bar\b|dining/i, 'Food'],
-  [/shop|store|mall|market|超市|商场|target|walmart|costco|amazon|ulta|ikea/i, 'Shopping'],
-  [/uber|lyft|gas|shell|chevron|transit|parking|加油|地铁|taxi/i, 'Travel'],
-  [/netflix|spotify|hulu|subscription|membership|订阅|会员/i, 'Services'],
-  [/payment|autopay|还款|transfer|转账/i, 'Payment'],
+  [/coffee|cafe|starbucks|餐|饭|restaurant|mcdonald|bakery|bar\b|dining/i, 'FOOD_AND_DRINK'],
+  [/shop|store|mall|market|超市|商场|target|walmart|costco|amazon|ulta|ikea/i, 'GENERAL_MERCHANDISE'],
+  [/uber|lyft|gas|shell|chevron|transit|parking|加油|地铁|taxi/i, 'TRANSPORTATION'],
+  [/netflix|spotify|hulu|subscription|membership|订阅|会员/i, 'ENTERTAINMENT'],
+  [/payment|autopay|还款|transfer|转账/i, 'LOAN_PAYMENTS'],
 ];
 
 /** 商户名分词(英文单词 + 中文串,长度≥2)。 */
@@ -358,8 +361,9 @@ function merchantTokens(name: string): string[] {
 function learnTokenCategory(rules: Record<string, string>): Record<string, Record<string, number>> {
   const map: Record<string, Record<string, number>> = {};
   for (const [name, cat] of Object.entries(rules)) {
+    const norm = normalizeCategory(cat);
     for (const tok of merchantTokens(name)) {
-      (map[tok] ||= {})[cat] = (map[tok][cat] || 0) + 1;
+      (map[tok] ||= {})[norm] = (map[tok][norm] || 0) + 1;
     }
   }
   return map;
@@ -425,7 +429,7 @@ export function suggestCategory(name: string, rules: Record<string, string> = lo
     return { category: cat, confidence: Math.round(confidence * 100) / 100 };
   }
   for (const [re, cat] of SUGGEST_RULES) if (re.test(name)) return { category: cat, confidence: 0.72 };
-  return { category: 'Services', confidence: 0.4 };
+  return { category: 'GENERAL_SERVICES', confidence: 0.4 };
 }
 
 /* ---------- 批次 39:定期账单识别(Rocket Money 风)---------- */
@@ -475,7 +479,7 @@ function cadenceLabelFor(days: number): [string, string] | null {
 // 账单关键词命中 → 强定期候选;否则要求「金额稳定」(超市/餐饮金额飘,自动排除)。
 const BILL_RE = /netflix|spotify|hulu|disney|youtube ?premium|hbo|prime video|apple\.com\/bill|icloud|adobe|dropbox|notion|chatgpt|openai|github|microsoft ?365|google ?(one|storage)|membership|会员|subscription|订阅|insurance|保险|geico|state ?farm|allstate|progressive|nationwide|premium|duke ?energy|电费|水费|燃气|gas ?(company|bill)|electric|water ?(bill|utility)|utility|comcast|xfinity|spectrum|at&t|verizon|t-?mobile|sprint|话费|宽带|internet|broadband|mortgage|房贷|月供|rent\b|房租|loan|贷款|student ?loan|gym|健身|planet ?fitness|la ?fitness|equinox|peloton|storage|自如|物业|hoa/i;
 // 明确排除:餐饮/购物/超市/咖啡(去很多次也不是账单)
-const NON_BILL_CAT_RE = /food|餐饮|shopping|购物|grocer|超市|coffee|咖啡/i;
+const NON_BILL_CAT_RE = /food|餐饮|shopping|merchandise|购物|grocer|超市|coffee|咖啡/i;
 
 /** 变异系数(标准差/均值)—— 账单金额稳定(低),超市/餐饮飘(高)。 */
 function coeffVar(nums: number[]): number {
@@ -543,7 +547,10 @@ export function detectRecurring(txs: BankTx[]): RecurringCharge[] {
     if (!label) continue;
 
     const last = sorted[sorted.length - 1];
-    const cat = merchantRules[last.name] || suggestCategory(last.name).category;
+    // 财务②:分类优先级 用户规则 > 交易自带 Plaid 分类(最新一笔非空)> 关键词建议。
+    // 此前无视 Plaid 分类直接猜 → YouTube/健身房全兜底成 Services。
+    const plaidCat = [...sorted].reverse().find((t) => (t.category || '').trim())?.category || '';
+    const cat = normalizeCategory(merchantRules[last.name] || plaidCat) || suggestCategory(last.name).category;
     const amts = sorted.map((t) => Math.abs(t.amount));
     const avg = amts.reduce((s, v) => s + v, 0) / amts.length;
     const cv = coeffVar(amts);
