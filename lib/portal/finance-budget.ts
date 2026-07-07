@@ -76,6 +76,7 @@ export interface CategoryBudgetProgress {
 export interface BudgetProgress {
   total: { budget: number; spent: number; left: number; ratio: number } | null;
   perCategory: CategoryBudgetProgress[];
+  otherSpent: number; // 财务㉖:未设预算的分类本月支出合计(Everything Else)
 }
 
 /** 某月预算进度。总口径 = 净支出(与 KPI 一致);分类口径 = 该类支出合计。 */
@@ -104,7 +105,11 @@ export function budgetProgress(txs: BankTx[], ym: string, budget: BudgetConfig):
         return { budget: totalBudget, spent, left: Math.round((totalBudget - spent) * 100) / 100, ratio: Math.round((spent / totalBudget) * 100) / 100 };
       })()
     : null;
-  return { total, perCategory };
+  // 财务㉖:Everything Else —— 没设预算的分类合计,超支往往藏在这里
+  const budgeted = new Set(Object.keys(budget.categories).filter((c) => budget.categories[c] > 0));
+  let otherSpent = 0;
+  for (const [c, v] of spentByCat) if (!budgeted.has(c)) otherSpent += v;
+  return { total, perCategory, otherSpent: Math.round(otherSpent * 100) / 100 };
 }
 
 /** 当前月(数据里最新月优先落在当前日历月时)——预算页默认锚点。 */

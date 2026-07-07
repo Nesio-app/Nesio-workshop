@@ -110,6 +110,10 @@ function makeTxWorld(world, opts = {}) {
     if (url.includes('/investments/transactions/get')) {
       return { json: async () => ({ investment_transactions: tok.invTxs || [], total_investment_transactions: (tok.invTxs || []).length }) };
     }
+    if (url.includes('/investments/holdings/get')) {
+      if (!tok.holdings) throw new Error('holdings down'); // 未配持仓的场景 = 接口失败,验证不阻断
+      return { json: async () => tok.holdings };
+    }
     throw new Error(`unexpected fetch ${url}`);
   }
   const src = fs.readFileSync(new URL('../app/api/portal/plaid/transactions/route.ts', import.meta.url), 'utf8');
@@ -202,6 +206,33 @@ const syncTx = (id, acc) => ({ added: [{ transaction_id: id, account_id: acc, da
   assert.equal(w.route.invTxCategory({ subtype: 'interest', amount: -3 }).detail, 'INCOME_INTEREST_EARNED');
   assert.equal(w.route.invTxCategory({ subtype: 'management fee', amount: 10 }).category, 'BANK_FEES');
   assert.equal(w.route.invTxCategory({ subtype: 'contribution', amount: -500 }).category, 'TRANSFER_IN', '缴存是转入');
+  // 财务㉗:holdings 接口失败(此场景未配持仓 → fake 抛错)不阻断,响应仍带空持仓
+  assert.deepEqual([...res.__json.holdings], [], 'holdings 失败不阻断同步');
+}
+
+// 场景 E2(财务㉗):持仓快照 —— holdings × securities join(名称/代码/数量/市值/成本)
+{
+  const w = makeTxWorld({
+    'at-fid': {
+      inst: 'ins-fid',
+      accounts: [{ id: 'acc-ira', mask: '0921', subtype: 'ira', type: 'investment' }],
+      sync: { added: [], has_more: false, next_cursor: 'c0', transactions_update_status: 'HISTORICAL_UPDATE_COMPLETE' },
+      invTxs: [],
+      holdings: {
+        holdings: [
+          { account_id: 'acc-ira', security_id: 'sec-1', quantity: 10, institution_value: 3000, cost_basis: 2400, iso_currency_code: 'USD' },
+          { account_id: 'acc-ira', security_id: 'sec-missing', quantity: 1, institution_value: 50, iso_currency_code: 'USD' },
+        ],
+        securities: [{ security_id: 'sec-1', name: 'Apple Inc', ticker_symbol: 'AAPL', type: 'equity' }],
+      },
+    },
+  });
+  const res = await w.route.GET(reqWithTokens(['at-fid']));
+  const hs = [...res.__json.holdings].map((h) => ({ ...h }));
+  assert.equal(hs.length, 2, '持仓全量进响应');
+  assert.deepEqual(hs[0], { accountId: 'acc-ira', name: 'Apple Inc', ticker: 'AAPL', type: 'equity', quantity: 10, value: 3000, costBasis: 2400, currency: 'USD' }, 'securities join 出名称/代码/类型');
+  assert.equal(hs[1].name, 'Security', 'security 缺失 → 兜底名,不丢持仓');
+  assert.equal(hs[1].costBasis, undefined, '缺成本透传 undefined(下游不硬算盈亏)');
 }
 // link-token 源码级:investments 作为 optional_products(不支持的机构不受影响)
 {
@@ -271,5 +302,6 @@ const syncTx = (id, acc) => ({ added: [{ transaction_id: id, account_id: acc, da
 assert.ok(/pendingItems/.test(hub), 'syncPlaid 处理 pendingItems');
 assert.ok(/syncPlaid\(retry \+ 1\)/.test(hub), 'pending 时自动重试');
 assert.ok(/slice\(0, 5000\)/.test(hub), '本机保留上限 5000');
+assert.ok(/saveHoldings/.test(hub), '财务㉗:同步回包的持仓落本机 store');
 
 console.log('plaid-multi-item: OK');

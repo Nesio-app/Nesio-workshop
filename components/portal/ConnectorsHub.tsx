@@ -395,6 +395,11 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       // 批次 31:账户/卡片信息存本机,供财务「卡片」子分类分卡显示。
       // 财务⑧:路由确认账户全量拉齐(authoritative)时整体替换,让重复授权的旧账户退场。
       if (data.accounts?.length) { const { saveBankAccounts } = await import('@/lib/portal/bank-tx'); saveBankAccounts(data.accounts as Array<{ id: string; name: string; currency: string }>, { replace: data.authoritative === true }); }
+      // 财务㉗:持仓快照(非空才替换)
+      {
+        const h = (data as { holdings?: unknown[] }).holdings;
+        if (Array.isArray(h) && h.length) { const { saveHoldings } = await import('@/lib/portal/bank-tx'); saveHoldings(h as never); }
+      }
       if (!data.ok) {
         if (data.error === 'not_connected' || data.error === 'relink_required') {
           showToast(L(dict, '需要(重新)连接银行', 'Bank needs (re)linking'), false);

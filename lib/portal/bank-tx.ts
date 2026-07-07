@@ -385,6 +385,37 @@ function isSameUnderlyingAccount(incoming: BankAccount, stored: BankAccount): bo
   return (stored.name || '').trim().toLowerCase() === (incoming.name || '').trim().toLowerCase();
 }
 
+/* ---------- 财务㉗:投资持仓(点时快照,同步时整体替换) ---------- */
+
+export interface Holding {
+  accountId: string;
+  name: string;
+  ticker?: string;
+  type?: string;    // equity / etf / mutual fund / cash / fixed income / …(Plaid security type)
+  quantity: number;
+  value: number;    // 市值(机构口径)
+  costBasis?: number;
+  currency: string;
+}
+
+export const BANK_HOLDINGS_KEY = 'nesio-fin-holdings-v1';
+
+const holdingsStore = createBlobStore<Holding[]>({
+  key: BANK_HOLDINGS_KEY, updateEvent: 'nesio-bank-updated',
+  validate: (v) => Array.isArray(v), onWriteError: reportStorageDropped,
+});
+
+export function loadHoldings(): Holding[] {
+  const raw = holdingsStore.load();
+  return Array.isArray(raw) ? raw : [];
+}
+
+/** 持仓是点时快照 → 整体替换(空列表不写,防同步半途清空)。 */
+export function saveHoldings(holdings: Holding[]): void {
+  if (!holdings.length) return;
+  holdingsStore.save(holdings.filter((h) => h && h.accountId));
+}
+
 /** 财务⑯:手动移除账户(重复/失效副本兜底)。若该账户仍在连接中,下次同步会重新拉回。 */
 export function removeBankAccount(id: string): void {
   accountsStore.save(loadBankAccounts().filter((a) => a.id !== id));

@@ -10,10 +10,10 @@ import vm from 'node:vm';
 import ts from 'typescript';
 import assert from 'node:assert/strict';
 
-const caches = { tx: null, accounts: null };
+const caches = { tx: null, accounts: null, holdings: null };
 let storeIdx = 0;
 const fakeCreateBlobStore = () => {
-  const key = storeIdx++ === 0 ? 'tx' : 'accounts';
+  const key = ['tx', 'accounts', 'holdings'][storeIdx++] ?? 'holdings'; // bank-tx 内建 store 顺序:tx → accounts → holdings
   return { load: () => caches[key], save: (v) => { caches[key] = v; }, ready: async () => {} };
 };
 

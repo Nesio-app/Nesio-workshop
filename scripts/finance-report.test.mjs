@@ -8,10 +8,10 @@ import vm from 'node:vm';
 import ts from 'typescript';
 import assert from 'node:assert/strict';
 
-const caches = { tx: null, accounts: null };
+const caches = { tx: null, accounts: null, holdings: null };
 let storeIdx = 0;
 const fakeCreateBlobStore = () => {
-  const key = storeIdx++ === 0 ? 'tx' : 'accounts';
+  const key = ['tx', 'accounts', 'holdings'][storeIdx++] ?? 'holdings'; // bank-tx 内建 store 顺序:tx → accounts → holdings
   return { load: () => caches[key], save: (v) => { caches[key] = v; }, ready: async () => {} };
 };
 const lsData = new Map();
@@ -84,6 +84,20 @@ assert.ok(r.markdown.includes('Netflix'), '定期项在列');
 assert.ok(r.markdown.includes('不构成投资建议') || r.markdown.includes('not investment advice'), '免责落款恒在');
 // 英文标题
 assert.match(report.buildMonthlyReport(txs, accounts, '2026-06', 'en', NOW).title, /Finance monthly report/);
+
+// ── 财务㉗:投资持仓分节(有持仓才出;无持仓不出) ──
+assert.ok(!r.markdown.includes('## 投资持仓'), '无持仓 → 不出分节');
+caches.holdings = [
+  { accountId: 'inv1', name: 'Apple Inc', ticker: 'AAPL', type: 'equity', quantity: 10, value: 3000, costBasis: 2400, currency: 'USD' },
+  { accountId: 'inv1', name: 'Cash', type: 'cash', quantity: 500, value: 500, currency: 'USD' },
+];
+const rInv = report.buildMonthlyReport(txs, accounts, '2026-06', 'zh', NOW);
+assert.ok(rInv.markdown.includes('## 投资持仓'), '有持仓 → 出分节');
+assert.ok(rInv.markdown.includes('AAPL'), '持仓明细在列');
+assert.ok(rInv.markdown.includes('+$600'), '浮动盈亏 = 市值 − 成本');
+assert.ok(rInv.markdown.includes('股票'), '组合结构中文标签');
+assert.ok(rInv.markdown.includes('占组合'), '单一持仓 >30% → 集中度提示');
+caches.holdings = null; // 复位,不影响后续存记忆断言
 
 // ── 存入记忆:同月更新不重复 ──
 assert.equal(report.persistReportToMemory(r), 'created');
