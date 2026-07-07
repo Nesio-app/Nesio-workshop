@@ -150,6 +150,25 @@ assert.match(huluPred[0].cadenceLabel[1], /assumed/i, '间隔不成周期时用�
 const spotifyNoCat = [{ ...rtx('s0', '2026-06-20', 'Spotify USA', 11.99), category: '' }];
 assert.equal(bank.detectRecurring(spotifyNoCat, { includePredicted: true })[0]?.category, 'ENTERTAINMENT', '先验默认分类兜底');
 
+// ── 财务⑲:Plaid 商户实体 id 归并(先验数据 > 字符串归一) ──
+assert.equal(bank.merchantKey({ name: 'NETFLIX.COM 866-579-7172', merchantId: 'ent-1' }), 'ent-1', 'entity id 优先');
+assert.equal(bank.merchantKey({ name: 'Netflix Inc' }), bank.merchantKey({ name: 'Netflix Inc  ' }), '无 id 回退字符串归一');
+// 同 entity 不同描述符 → 归并成同一条定期流(3 笔即 mature)
+const entTxs = [
+  { ...rtx('e1', '2026-04-05', 'NETFLIX.COM 866-579', 15.99, 'ENTERTAINMENT'), merchantId: 'ent-nfx' },
+  { ...rtx('e2', '2026-05-05', 'Netflix Inc', 15.99, 'ENTERTAINMENT'), merchantId: 'ent-nfx' },
+  { ...rtx('e3', '2026-06-05', 'NETFLIX', 15.99, 'ENTERTAINMENT'), merchantId: 'ent-nfx', merchantLogo: 'https://logo/nfx.png' },
+];
+const entRec = bank.detectRecurring(entTxs);
+assert.equal(entRec.length, 1, '同 entity 不同描述符归并为一条流');
+assert.equal(entRec[0].status, 'mature');
+assert.equal(entRec[0].logo, 'https://logo/nfx.png', '定期流带商户 logo');
+// 退款证据跨描述符:支出与退款描述符不同但同 entity → 仍认作退款
+const evEnt = bank.expenseMerchants([{ ...rtx('p1', '2026-06-01', 'AMZN Mktp US*1X2', 60, 'GENERAL_MERCHANDISE'), merchantId: 'ent-amzn' }]);
+assert.equal(bank.txFlow({ ...rtx('p2', '2026-06-10', 'Amazon.com Refund', -25, 'GENERAL_MERCHANDISE'), merchantId: 'ent-amzn' }, {}, evEnt), 'refund', '同 entity 跨描述符退款证据成立');
+// 商户 Top 按 entity 归并
+assert.equal(bank.topMerchants([...entTxs, { ...rtx('e4', '2026-06-20', 'Netflix LLC', 10, 'ENTERTAINMENT'), merchantId: 'ent-nfx' }], '2026-06', 5).length, 1, '商户 Top 同 entity 合一行');
+
 // ── 财务⑪:退款证据门 —— 没买过的商户进账不是退款 ──
 const evTxs = [
   ftx('Amazon.com', 60, 'GENERAL_MERCHANDISE'),                  // 买过 Amazon

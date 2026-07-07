@@ -11540,6 +11540,8 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 .nesio-fin-flowpick { display: flex; gap: 0.4rem; flex-wrap: wrap; padding: 0.5rem 0 0.7rem; }
 .nesio-fin-flowopt { border: 1px solid var(--portal-line); border-radius: 999px; padding: 0.3rem 0.75rem; background: var(--glass-bg-solid); color: var(--portal-ink); font-size: 0.76rem; cursor: pointer; }
 .nesio-fin-flowopt.is-active { background: var(--portal-accent-soft); color: var(--portal-accent); border-color: var(--portal-accent-border); font-weight: 600; }
+/* 财务⑲:商户 logo(Plaid 富化,缺失不占位) */
+.nesio-fin-mlogo { border-radius: 4px; object-fit: contain; vertical-align: -0.2em; margin-right: 5px; background: var(--glass-bg-solid); flex-shrink: 0; }
 /* 财务⑰:定期「待确认」早识别标(中性,不焦虑) */
 .nesio-fin-recur-badge { margin-left: 0.4rem; font-size: 0.62rem; font-weight: 500; color: var(--status-calm, #6b8fc9); border: 1px solid var(--portal-line); border-radius: 999px; padding: 0.05rem 0.45rem; vertical-align: 0.1em; }
 /* 财务⑮:财务体检分项(L3 评分,红只给真实风险) */
