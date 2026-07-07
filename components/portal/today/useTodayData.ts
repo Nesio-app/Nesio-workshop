@@ -17,7 +17,7 @@ import { scoreCalendarEvents } from '@/lib/platform/attention-engine';
 import type { EmailSignal } from '@/lib/platform/email-signals';
 import { loadDormantStore, evaluateDormancy, type DormantStore } from '@/lib/platform/dormant-engine';
 import { runGuidancePipeline } from '@/lib/platform/guidance-engine/guidance-pipeline';
-import { emitFeedback, type FeedbackVerdict } from '@/lib/portal/learning/learner';
+import { emitFeedback, type Reaction } from '@/lib/platform/personalization';
 import { getEnergyState } from '@/lib/platform/energy-state';
 import type { RecommendationCard } from '@/lib/portal/reasoning-engine';
 import { getBestInterruptionHours } from '@/lib/portal/mirror-profile';
@@ -297,13 +297,15 @@ export function useTodayData(canUsePrivateData: boolean) {
     }
 
     const refresh = () => { void applyViewModel(); };
-    // 卡片反馈 → 反馈总线扇出到所有已注册 learner(guidance-ranker 等)。
+    // 卡片反馈 → 统一反馈总线扇出到所有订阅者(事实日志 + guidance-ranker + 三原语)。
     // reasoning-engine 保持无依赖叶子,走它派发的 nesio-feedback-recorded 事件;
-    // 这里只把事件转成统一 FeedbackEvent 投进总线,不再手工直调各 learner(learner 底座 pilot)。
+    // 这里把旧动词翻成统一 FeedbackEvent schema(not_now→snooze)投进总线,不再手工直调各 learner。
+    const toReaction = (v: string): Reaction =>
+      v === 'useful' ? 'useful' : v === 'wrong' ? 'wrong' : v === 'too_much' ? 'too_much' : 'snooze';
     const onFeedback = (e: Event) => {
-      const detail = (e as CustomEvent).detail as { cardId?: string; feedback?: FeedbackVerdict } | undefined;
+      const detail = (e as CustomEvent).detail as { cardId?: string; feedback?: string } | undefined;
       if (detail?.cardId && detail.feedback) {
-        emitFeedback({ verdict: detail.feedback, cardId: detail.cardId, at: new Date().toISOString() });
+        emitFeedback({ surface: 'today', dimension: 'card', key: detail.cardId, reaction: toReaction(detail.feedback), at: new Date().toISOString() });
       }
       refresh();
     };
