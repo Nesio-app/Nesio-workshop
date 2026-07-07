@@ -9,6 +9,7 @@
  */
 
 import { reportStorageDropped } from './storage-health';
+import { createBlobStore } from './idb-blob-store';
 
 export interface BankTx {
   id: string;
@@ -23,15 +24,28 @@ export interface BankTx {
 export const BANK_TX_KEY = 'nesio-bank-tx-v1';
 export const BANK_SYNCED_AT_KEY = 'nesio-bank-synced-at';
 
+// 批次 57:流水/账户(体量大)挪 IndexedDB —— 腾 localStorage 配额;老数据水合时迁移。
+// 规则(flow/merchant/recur)+ 同步时间戳(小)仍留 localStorage。
+const txStore = createBlobStore<BankTx[]>({
+  key: BANK_TX_KEY, updateEvent: 'nesio-bank-updated',
+  validate: (v) => Array.isArray(v), onWriteError: reportStorageDropped,
+});
+
 export function loadBankTx(): BankTx[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = JSON.parse(localStorage.getItem(BANK_TX_KEY) || '[]') as BankTx[];
-    // Number.isFinite 挡掉 NaN(typeof NaN === 'number' 会漏过去,污染整月汇总)。
-    return Array.isArray(raw) ? raw.filter((t) => t && Number.isFinite(t.amount) && typeof t.date === 'string') : [];
-  } catch {
-    return [];
-  }
+  const raw = txStore.load();
+  // Number.isFinite 挡掉 NaN(typeof NaN === 'number' 会漏过去,污染整月汇总)。
+  return Array.isArray(raw) ? raw.filter((t) => t && Number.isFinite(t.amount) && typeof t.date === 'string') : [];
+}
+
+/** 写入流水(供 ConnectorsHub.syncPlaid)。 */
+export function saveBankTx(txs: BankTx[]): void {
+  txStore.save(txs);
+}
+
+/** 是否已有流水数据(供 personalization has-data 门,避免直读已迁走的 localStorage)。 */
+export function hasBankTxData(): boolean {
+  const raw = txStore.load();
+  return Array.isArray(raw) && raw.length > 0;
 }
 
 /** 上次 Plaid 同步时间(ISO);无则 null。供财务卡显示"数据截至何时"。 */
@@ -249,12 +263,19 @@ export interface BankAccount {
 
 export const BANK_ACCOUNTS_KEY = 'nesio-bank-accounts-v1';
 
+const accountsStore = createBlobStore<BankAccount[]>({
+  key: BANK_ACCOUNTS_KEY, updateEvent: 'nesio-bank-updated',
+  validate: (v) => Array.isArray(v), onWriteError: reportStorageDropped,
+});
+
 export function loadBankAccounts(): BankAccount[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = JSON.parse(localStorage.getItem(BANK_ACCOUNTS_KEY) || '[]') as BankAccount[];
-    return Array.isArray(raw) ? raw.filter((a) => a && a.id) : [];
-  } catch { return []; }
+  const raw = accountsStore.load();
+  return Array.isArray(raw) ? raw.filter((a) => a && a.id) : [];
+}
+
+/** 写入账户(供 ConnectorsHub.syncPlaid)。 */
+export function saveBankAccounts(accounts: BankAccount[]): void {
+  accountsStore.save(accounts);
 }
 
 /** 某账户某月的消费/退款/笔数。 */

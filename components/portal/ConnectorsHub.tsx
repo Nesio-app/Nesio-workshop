@@ -369,7 +369,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       const res = await fetch('/api/portal/plaid/transactions');
       const data = await res.json() as { ok?: boolean; transactions?: Array<{ id: string; accountId?: string; date: string; name: string; amount: number; currency: string; category: string }>; removedIds?: string[]; accounts?: unknown[]; error?: string };
       // 批次 31:账户/卡片信息存本机,供财务「卡片」子分类分卡显示
-      if (data.accounts?.length) { try { localStorage.setItem('nesio-bank-accounts-v1', JSON.stringify(data.accounts)); } catch { /* quota */ } }
+      if (data.accounts?.length) { const { saveBankAccounts } = await import('@/lib/portal/bank-tx'); saveBankAccounts(data.accounts as Array<{ id: string; name: string; currency: string }>); }
       if (!data.ok) {
         if (data.error === 'not_connected' || data.error === 'relink_required') {
           showToast(L(dict, '需要(重新)连接银行', 'Bank needs (re)linking'), false);
@@ -382,10 +382,9 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       }
       // 明细只存本机。增量同步:按 id upsert(added/modified 覆盖旧的)、删掉 removed,
       // 再按日期降序保留最近 1000 笔(不是按到达顺序 —— 否则永远留着最旧那批)。
-      const KEY = 'nesio-bank-tx-v1';
+      const { loadBankTx, saveBankTx } = await import('@/lib/portal/bank-tx');
       type Tx = { id: string; accountId?: string; date: string; name: string; amount: number; currency: string; category: string };
-      let existing: Tx[] = [];
-      try { existing = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { /* ignore */ }
+      const existing: Tx[] = loadBankTx();
       const removed = new Set(data.removedIds || []);
       const byId = new Map<string, Tx>();
       for (const t of existing) if (!removed.has(t.id)) byId.set(t.id, t);
@@ -395,8 +394,8 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
         .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)) // 日期降序
         .slice(0, 1000);
       const fresh = { length: freshCount };
-      try { localStorage.setItem(KEY, JSON.stringify(merged)); } catch { /* quota */ }
-      try { localStorage.setItem('nesio-bank-synced-at', new Date().toISOString()); } catch { /* quota */ } // 供财务卡显示"数据截至何时"
+      saveBankTx(merged); // 落 IndexedDB(批次 57)
+      try { localStorage.setItem('nesio-bank-synced-at', new Date().toISOString()); } catch { /* quota */ } // 时间戳小,仍留 localStorage
       setCounts((p) => ({ ...p, plaid: merged.length }));
       saveConnectorState('plaid', true);
       setConnected((p) => ({ ...p, plaid: true }));
