@@ -17,7 +17,7 @@ import { scoreCalendarEvents } from '@/lib/platform/attention-engine';
 import type { EmailSignal } from '@/lib/platform/email-signals';
 import { loadDormantStore, evaluateDormancy, type DormantStore } from '@/lib/platform/dormant-engine';
 import { runGuidancePipeline } from '@/lib/platform/guidance-engine/guidance-pipeline';
-import { applyGuidanceFeedback, type GuidanceFeedback } from '@/lib/platform/guidance-engine/guidance-ranker';
+import { emitFeedback, type FeedbackVerdict } from '@/lib/portal/learning/learner';
 import { getEnergyState } from '@/lib/platform/energy-state';
 import type { RecommendationCard } from '@/lib/portal/reasoning-engine';
 import { getBestInterruptionHours } from '@/lib/portal/mirror-profile';
@@ -297,11 +297,14 @@ export function useTodayData(canUsePrivateData: boolean) {
     }
 
     const refresh = () => { void applyViewModel(); };
-    // 批次 52:卡片反馈 → 在线学习排序器做一次更新(reasoning-engine 保持无依赖叶子,
-    // 走它派发的 nesio-feedback-recorded 事件,不反向 import)。
+    // 卡片反馈 → 反馈总线扇出到所有已注册 learner(guidance-ranker 等)。
+    // reasoning-engine 保持无依赖叶子,走它派发的 nesio-feedback-recorded 事件;
+    // 这里只把事件转成统一 FeedbackEvent 投进总线,不再手工直调各 learner(learner 底座 pilot)。
     const onFeedback = (e: Event) => {
-      const detail = (e as CustomEvent).detail as { cardId?: string; feedback?: string } | undefined;
-      if (detail?.cardId) applyGuidanceFeedback(detail.cardId, detail.feedback as GuidanceFeedback);
+      const detail = (e as CustomEvent).detail as { cardId?: string; feedback?: FeedbackVerdict } | undefined;
+      if (detail?.cardId && detail.feedback) {
+        emitFeedback({ verdict: detail.feedback, cardId: detail.cardId, at: new Date().toISOString() });
+      }
       refresh();
     };
     window.addEventListener('nesio-life-graph-updated', refresh);
