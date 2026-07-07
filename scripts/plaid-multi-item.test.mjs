@@ -99,7 +99,7 @@ function makeTxWorld(world, opts = {}) {
     const tok = world[body.access_token];
     if (url.includes('/transactions/sync')) return { json: async () => tok.sync };
     if (url.includes('/accounts/get')) {
-      return { json: async () => ({ accounts: tok.accounts.map((a) => ({ account_id: a.id, name: a.id, mask: a.mask, type: a.type || 'depository', subtype: a.subtype, balances: { current: 10, iso_currency_code: 'USD' } })) }) };
+      return { json: async () => ({ accounts: tok.accounts.map((a) => ({ account_id: a.id, name: a.id, mask: a.mask, type: a.type || 'depository', subtype: a.subtype, balances: { current: 10, limit: a.limit ?? null, iso_currency_code: 'USD' } })) }) };
     }
     if (url.includes('/item/get')) return { json: async () => ({ item: { institution_id: tok.inst } }) };
     if (url.includes('/institutions/get_by_id')) {
@@ -134,7 +134,7 @@ const syncTx = (id, acc) => ({ added: [{ transaction_id: id, account_id: acc, da
 // 场景 A(财务⑦):一家就绪、一家 NOT_READY
 {
   const w = makeTxWorld({
-    'at-ready': { inst: 'ins-a', accounts: [{ id: 'acc-ready', mask: '1111' }], sync: syncTx('t1', 'acc-ready') },
+    'at-ready': { inst: 'ins-a', accounts: [{ id: 'acc-ready', mask: '1111', type: 'credit', limit: 5000 }], sync: syncTx('t1', 'acc-ready') },
     'at-new': { inst: 'ins-b', accounts: [{ id: 'acc-new', mask: '2222' }], sync: { added: [], transactions_update_status: 'NOT_READY', next_cursor: 'should-not-be-saved' } },
   });
   const res = await w.route.GET(reqWithTokens(['at-ready', 'at-new']));
@@ -144,6 +144,9 @@ const syncTx = (id, acc) => ({ added: [{ transaction_id: id, account_id: acc, da
   assert.equal(res.__json.accounts.length, 2, '两家账户都在(未就绪只影响流水)');
   assert.equal(res.__json.accounts[0].institution, 'Bank ins-a', '账户带机构名');
   assert.equal(res.__json.accounts[0].logo, 'bG9nbw==', '账户带机构 logo');
+  // 财务㉙:信用卡额度透传;无额度数据的账户为 undefined 不硬编
+  assert.equal(res.__json.accounts[0].limit, 5000, '信用卡 balances.limit 透传');
+  assert.equal(res.__json.accounts[1].limit, undefined, '无 limit → undefined');
   // 财务⑲:商户实体 id 与 logo 透传(响应自带的富化,不再丢弃)
   assert.equal(res.__json.transactions[0].merchantId, 'ent-t1', '透传 merchant_entity_id');
   assert.equal(res.__json.transactions[0].merchantLogo, 'https://logo/t1.png', '透传商户 logo');

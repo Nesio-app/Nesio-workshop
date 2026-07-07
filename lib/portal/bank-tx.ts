@@ -344,6 +344,7 @@ export interface BankAccount {
   type?: string;
   subtype?: string;
   balance?: number;
+  limit?: number;       // 财务㉙:信用卡额度(利用率 = balance/limit)
   currency: string;
   institution?: string; // 财务⑧:机构名(Chase / American Express…)
   logo?: string;        // 机构 logo(base64 PNG,Plaid 提供;可缺)

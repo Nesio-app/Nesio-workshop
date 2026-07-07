@@ -106,6 +106,28 @@ export function computeFinanceScores(txs: BankTx[], accounts: BankAccount[] = []
     }
   }
 
+  // ── 信用卡额度利用率 = 欠款合计 ÷ 额度合计(FICO:<30% 好;不用红——不是安全风险)──
+  const cards = accounts.filter((a) =>
+    (a.type || '').toLowerCase() === 'credit' && typeof a.balance === 'number' && typeof a.limit === 'number' && (a.limit || 0) > 0);
+  if (cards.length) {
+    const owed = cards.reduce((s, a) => s + Math.max(0, a.balance || 0), 0);
+    const limit = cards.reduce((s, a) => s + (a.limit || 0), 0);
+    const ratio = owed / limit;
+    const pct = Math.round(ratio * 100);
+    const category: FinanceRiskCategory = ratio < 0.3 ? 'info' : ratio <= 0.5 ? 'low' : 'moderate';
+    out.push({
+      id: 'finance-score-credit-utilization',
+      label: ['额度利用率', 'Credit utilization'],
+      value: `${pct}%`,
+      category,
+      detail: [
+        `${cards.length} 张信用卡共欠 ${formatMoney(owed, ccy)},额度 ${formatMoney(limit, ccy)},利用率 ${pct}%;信用评分口径 30% 以内最友好${ratio > 0.5 ? ',有空可以想想先还哪张' : ''}`,
+        `${cards.length} card(s) owe ${formatMoney(owed, ccy)} of ${formatMoney(limit, ccy)} (${pct}%); under 30% is friendliest to credit scores${ratio > 0.5 ? ' — worth planning which to pay down first' : ''}`,
+      ],
+      source: 'FICO(利用率占评分约 30%,<30% 通行参考)',
+    });
+  }
+
   const rank: Record<FinanceRiskCategory, number> = { high: 0, moderate: 1, low: 2, info: 3 };
   return out.sort((a, b) => rank[a.category] - rank[b.category]);
 }

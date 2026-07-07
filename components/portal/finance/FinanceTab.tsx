@@ -712,6 +712,13 @@ export default function FinanceTab() {
             {accounts.map((a) => {
               const m = accountMonth(txs, a.id, ym);
               const tl = accountTypeLabel(a);
+              // 财务㉙:信用卡额度利用率(FICO 口径 <30% 最友好;不用红,只陈述)
+              const isCredit = (a.type || '').toLowerCase() === 'credit';
+              const util = isCredit && a.balance != null && (a.limit ?? 0) > 0
+                ? L(dict,
+                    `已用 ${formatMoney(a.balance, a.currency)} / 额度 ${formatMoney(a.limit as number, a.currency)}(${Math.round((Math.max(0, a.balance) / (a.limit as number)) * 100)}%)`,
+                    `${formatMoney(a.balance, a.currency)} of ${formatMoney(a.limit as number, a.currency)} limit (${Math.round((Math.max(0, a.balance) / (a.limit as number)) * 100)}%)`)
+                : '';
               return (
                 <div key={a.id} className="nesio-fin-card">
                   <div className="nesio-fin-card-top">
@@ -722,7 +729,7 @@ export default function FinanceTab() {
                       <button type="button" className="nesio-fin-rule-x" onClick={() => { removeBankAccount(a.id); setRev((r) => r + 1); }} aria-label={L(dict, '移除此账户(重复或失效副本;仍连接的账户同步时会回来)', 'Remove this account (duplicates/stale; still-linked accounts return on sync)')} title={L(dict, '移除(重复/失效副本用;仍连接的账户同步会回来)', 'Remove (for duplicates; returns on sync if still linked)')}>✕</button>
                     </span>
                   </div>
-                  <p className="nesio-fin-card-sub">{[a.institution, L(dict, tl[0], tl[1]), a.mask ? `····${a.mask}` : ''].filter(Boolean).join(' · ')}</p>
+                  <p className="nesio-fin-card-sub">{[a.institution, L(dict, tl[0], tl[1]), a.mask ? `····${a.mask}` : '', util].filter(Boolean).join(' · ')}</p>
                   <p className="nesio-fin-card-meta">{m.count === 0
                     ? L(dict, '该月此账户暂无交易', 'No transactions this month for this account')
                     : L(dict, `本月 消费 ${formatMoney(m.spend, a.currency)} · 退款/返还 ${formatMoney(m.refund, a.currency)} · ${m.count} 笔`, `This month · spend ${formatMoney(m.spend, a.currency)} · refunds/credits ${formatMoney(m.refund, a.currency)} · ${m.count} tx`)}</p>

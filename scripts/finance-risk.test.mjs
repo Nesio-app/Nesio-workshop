@@ -71,6 +71,25 @@ const sub = scores1.find((s) => s.id === 'finance-score-subscription-load');
 assert.ok(sub, '订阅负担分项存在');
 assert.equal(sub.category, 'info', '~2% → info');
 
+// ── 财务㉙:额度利用率(FICO 口径;多卡合并;warm-coach 不用红档) ──
+const cardsAcct = (owe1, limit1, owe2, limit2) => [
+  ...acct(10000),
+  { id: 'c1', name: 'Card A', type: 'credit', balance: owe1, limit: limit1, currency: 'USD' },
+  { id: 'c2', name: 'Card B', type: 'credit', balance: owe2, limit: limit2, currency: 'USD' },
+];
+const utilOf = (accounts) => risk.computeFinanceScores(world, accounts).find((s) => s.id === 'finance-score-credit-utilization');
+const u1 = utilOf(cardsAcct(500, 5000, 400, 5000)); // 900/10000 = 9%
+assert.ok(u1, '额度利用率分项存在');
+assert.equal(u1.value, '9%', '多卡合并:欠款合计 ÷ 额度合计');
+assert.equal(u1.category, 'info', '<30% → info');
+assert.equal(utilOf(cardsAcct(2000, 5000, 2000, 5000)).category, 'low', '30–50% → low(温和)');
+const u3 = utilOf(cardsAcct(4000, 5000, 3000, 5000));
+assert.equal(u3.category, 'moderate', '>50% → moderate(attention,不用 high/红)');
+assert.ok(u3.source.includes('FICO'), '出处标 FICO');
+// 数据不齐不硬算:没有 limit 的卡不出该项;负余额(溢缴)按 0 欠款
+assert.ok(!utilOf([...acct(10000), { id: 'c1', name: 'Card', type: 'credit', balance: 900, currency: 'USD' }]), '无额度数据不出');
+assert.equal(utilOf(cardsAcct(-50, 5000, 0, 5000)).value, '0%', '溢缴不算负利用率');
+
 // 排序:更差的分级排前面
 const spendyScores = risk.computeFinanceScores(spendy, acct(1500));
 const rank = { high: 0, moderate: 1, low: 2, info: 3 };
