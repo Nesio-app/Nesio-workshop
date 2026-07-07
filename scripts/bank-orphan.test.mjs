@@ -74,6 +74,21 @@ caches.tx = [tx('a1', 'real-acc'), tx('b1', 'bank-b'), tx('s1', 'sandbox-acc')];
 const v3 = bank.loadBankTx();
 assert.equal(v3.length, 2, '两家活银行交易都在、sandbox 滤掉');
 
+// ── 财务⑧:权威快照 replace —— 重复授权的旧账户要能退场 ──
+// 路由确认全部存活 token 账户拉齐时整体替换;旧 item 账户消失 → 其交易被孤儿过滤隐藏。
+caches.tx = [tx('n1', 'new-acc'), tx('o1', 'old-dup-acc')];
+caches.accounts = [{ id: 'old-dup-acc', name: 'Chase(旧授权)', currency: 'USD' }, { id: 'new-acc', name: 'Chase', currency: 'USD' }];
+bank.saveBankAccounts([{ id: 'new-acc', name: 'Chase', currency: 'USD' }], { replace: true });
+assert.equal(bank.loadBankAccounts().length, 1, 'replace:旧重复账户退场');
+assert.equal(bank.loadBankTx().length, 1, '旧账户的交易随之被孤儿过滤隐藏');
+assert.equal(bank.loadBankTx()[0].id, 'n1');
+// replace 空列表不生效(防把账户表清空误杀全部交易)
+bank.saveBankAccounts([], { replace: true });
+assert.equal(bank.loadBankAccounts().length, 1, 'replace 空列表不清空账户表');
+// 默认仍是只增合并
+bank.saveBankAccounts([{ id: 'another', name: 'BoA', currency: 'USD' }]);
+assert.equal(bank.loadBankAccounts().length, 2, '默认 union 语义不变');
+
 // ── 财务③:内部调整对识别(同日同账户同额一正一负、双方名字都带调整词) ──
 const adj = (id, name, amount, accountId = 'real-acc', date = '2026-06-19') =>
   ({ id, accountId, date, name, amount, currency: 'USD', category: '' });
