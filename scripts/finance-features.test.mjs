@@ -90,4 +90,18 @@ assert.equal(proj3.negativeDate, null, '发薪流入后不透支');
 // 无存款余额 → null
 assert.equal(feat.balanceProjection(rentTxs, [{ id: 'c1', name: 'Card', type: 'credit', balance: 100, currency: 'USD' }]), null);
 
+// ── 财务⑯:收入构成按细分类分桶 ──
+const ymNow = new Date().toISOString().slice(0, 7);
+const incomeTxs = [
+  { ...tx('w1', `${ymNow}-03`, 'ACME PAYROLL', -4000, 'INCOME'), categoryDetail: 'INCOME_WAGES' },
+  { ...tx('d1', `${ymNow}-05`, 'Fidelity', -120, 'INCOME'), categoryDetail: 'INCOME_DIVIDENDS' },
+  { ...tx('i1', `${ymNow}-06`, 'Adjusted Interest', -30, 'INCOME') }, // 无细分 → INCOME_OTHER
+  tx('e9', `${ymNow}-07`, 'Grocer', 80), // 支出不进
+];
+const mix = feat.incomeBreakdown(incomeTxs, ymNow);
+assert.deepEqual([...mix].map((s) => s.detail), ['INCOME_WAGES', 'INCOME_DIVIDENDS', 'INCOME_OTHER'], '按细分类分桶且金额降序');
+assert.equal(mix[0].total, 4000);
+assert.equal(mix[2].total, 30, '缺细分归 INCOME_OTHER');
+assert.equal(feat.incomeBreakdown(incomeTxs, '2020-01').length, 0, '无该月收入返回空');
+
 console.log('finance-features: OK');

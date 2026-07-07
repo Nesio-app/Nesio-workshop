@@ -19,6 +19,8 @@ import {
 // 另有一套 alerts 判定(函数级双实现),两个输出面据同一份流水各说各话,已删并由契约钉死不回潮。
 import { financeFindings } from '@/lib/portal/finance-insight';
 import { computeFinanceScores } from '@/lib/portal/finance-risk';
+import { incomeBreakdown } from '@/lib/portal/finance-features';
+import { removeBankAccount } from '@/lib/portal/bank-tx';
 import { categoryLabel, categoryDetailLabel, COMMON_EXPENSE_CATEGORIES } from '@/lib/portal/tx-category';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -196,6 +198,13 @@ export default function FinanceTab() {
             <div className="nesio-fin-kpi"><span className="nesio-fin-kpi-l">{L(dict, '退款/返还', 'Refunds & credits')}</span><span className="nesio-fin-kpi-v">{formatMoney(summary.refunds, summary.currency)}</span></div>
             <div className="nesio-fin-kpi"><span className="nesio-fin-kpi-l">{L(dict, '收入', 'Income')}</span><span className="nesio-fin-kpi-v">{formatMoney(summary.income, summary.currency)}</span></div>
           </div>
+          {/* 财务⑯:收入构成(工资/利息/分红/退税…按 Plaid 细分类分桶) */}
+          {summary.income > 0 && (() => {
+            const ib = incomeBreakdown(txs, ym);
+            if (!ib.length) return null;
+            const parts = ib.slice(0, 4).map((s) => `${categoryDetailLabel(s.detail, dict) || L(dict, '其他收入', 'Other income')} ${formatMoney(s.total, summary.currency)}`);
+            return <p className="nesio-fin-alert-note" style={{ textAlign: 'left', marginTop: '-0.5rem', marginBottom: '0.5rem' }}>{L(dict, `收入构成:${parts.join(' · ')}`, `Income mix: ${parts.join(' · ')}`)}</p>;
+          })()}
           <p className="nesio-fin-alert-note" style={{ textAlign: 'left', marginTop: '-0.5rem', marginBottom: '0.8rem' }}>{L(dict, '收入 / 转账 / 信用卡还款 不计入收支;分错了到「交易」点类型改。', 'Income / transfers / card payments are excluded; fix any mislabels under Transactions.')}</p>
 
           {/* 批次 40:分类支出环形图 */}
@@ -353,6 +362,11 @@ export default function FinanceTab() {
                           const detail = categoryDetailLabel(t.categoryDetail || '', dict);
                           return <span className="nesio-fin-txcat"> · {primary}{detail && detail !== primary ? ` · ${detail}` : ''}</span>;
                         })()}
+                        {f === 'income' && (() => {
+                          // 财务⑯:收入也显示细分(工资/利息收入/分红/退税)
+                          const detail = categoryDetailLabel(t.categoryDetail || '', dict);
+                          return detail ? <span className="nesio-fin-txcat"> · {detail}</span> : null;
+                        })()}
                       </button>
                       {/* 财务⑩:账户归属行 —— 机构 logo + 机构名 + 账户类型 + 卡后4位 */}
                       {(() => {
@@ -421,7 +435,7 @@ export default function FinanceTab() {
           )}
           <p className="nesio-settings-section-label" style={{ marginTop: upcoming.items.length ? '1rem' : 0 }}>{L(dict, '识别到的定期账单', 'Detected recurring bills')}</p>
           {recurring.length === 0 ? (
-            <p className="nesio-settings-option-hint" style={{ marginTop: 0 }}>{L(dict, '还没识别到定期账单 —— 需要同一商户至少 3 笔规律扣款。多同步几个月的流水会更准。', 'No recurring bills yet — needs 3+ regular charges from one merchant. Sync more months for accuracy.')}</p>
+            <p className="nesio-settings-option-hint" style={{ marginTop: 0 }}>{L(dict, '还没识别到定期账单 —— 需要同一商户至少 3 笔规律扣款。新连接的银行,完整历史会在几天内陆续回填,期间隔天点一次「同步」即可。', 'No recurring bills yet — needs 3+ regular charges per merchant. Newly linked banks backfill full history over a few days; just sync again occasionally.')}</p>
           ) : (
             <div className="nesio-fin-recurlist">
               {recurring.map((r) => (
@@ -466,7 +480,11 @@ export default function FinanceTab() {
                 <div key={a.id} className="nesio-fin-card">
                   <div className="nesio-fin-card-top">
                     <span className="nesio-fin-card-name"><AcctLogo a={a} /> {a.name}{a.mask ? ` ····${a.mask}` : ''}</span>
-                    {a.balance != null && <span className="nesio-fin-card-bal">{(a.type || '').toLowerCase() === 'credit' ? L(dict, `欠款 ${formatMoney(a.balance, a.currency)}`, `owes ${formatMoney(a.balance, a.currency)}`) : formatMoney(a.balance, a.currency)}</span>}
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
+                      {a.balance != null && <span className="nesio-fin-card-bal">{(a.type || '').toLowerCase() === 'credit' ? L(dict, `欠款 ${formatMoney(a.balance, a.currency)}`, `owes ${formatMoney(a.balance, a.currency)}`) : formatMoney(a.balance, a.currency)}</span>}
+                      {/* 财务⑯:重复/失效副本手动移除兜底(仍在连接中的账户下次同步会回来) */}
+                      <button type="button" className="nesio-fin-rule-x" onClick={() => { removeBankAccount(a.id); setRev((r) => r + 1); }} aria-label={L(dict, '移除此账户(重复或失效副本;仍连接的账户同步时会回来)', 'Remove this account (duplicates/stale; still-linked accounts return on sync)')} title={L(dict, '移除(重复/失效副本用;仍连接的账户同步会回来)', 'Remove (for duplicates; returns on sync if still linked)')}>✕</button>
+                    </span>
                   </div>
                   <p className="nesio-fin-card-sub">{[a.institution, L(dict, tl[0], tl[1]), a.mask ? `····${a.mask}` : ''].filter(Boolean).join(' · ')}</p>
                   <p className="nesio-fin-card-meta">{m.count === 0

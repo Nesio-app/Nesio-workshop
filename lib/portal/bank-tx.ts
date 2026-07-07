@@ -357,12 +357,22 @@ export function loadBankAccounts(): BankAccount[] {
  * 替换 —— 只增合并永不退场,重复授权留下的旧 item 账户会一直重复显示、其交易双份计数;
  * 权威快照替换后,旧 item 的本地交易被孤儿过滤自动隐藏。
  */
-// 财务⑪:账户指纹(名 + 后4位 + 类型)。重复授权产生的新 item 里,同一张实体卡换了 id
-// 但指纹不变 —— 据此在客户端就能让旧 id 退场,不再依赖服务端「全部 token 拉齐」的时机。
-// 缺 mask 的账户指纹为空,不参与去重(保守)。
-function acctFingerprint(a: BankAccount): string {
-  if (!a?.mask) return '';
-  return `${(a.name || '').trim().toLowerCase()}|${a.mask}|${(a.subtype || a.type || '').toLowerCase()}`;
+// 财务⑪→⑯:同一实体账户判定。⑪要求名字完全相同,但新旧 item 对同一账户可能给出
+// 不同写法的名字(官方名 vs 显示名),重复副本因此漏杀(用户「7937 还是 2 个」)。
+// 加固:mask + 类型(subtype/type)相同,且 ① 双方机构相同,或 ② 旧条目没有机构元数据
+// (⑧ 之前的存量,恰是重复来源),或 ③ 归一化名字相同。缺 mask 一律不判(保守)。
+const acctTypeKey = (a: BankAccount) => (a.subtype || a.type || '').toLowerCase();
+function isSameUnderlyingAccount(incoming: BankAccount, stored: BankAccount): boolean {
+  if (!incoming?.mask || !stored?.mask || incoming.mask !== stored.mask) return false;
+  if (acctTypeKey(incoming) !== acctTypeKey(stored)) return false;
+  if (stored.institution && incoming.institution) return stored.institution === incoming.institution;
+  if (!stored.institution) return true;
+  return (stored.name || '').trim().toLowerCase() === (incoming.name || '').trim().toLowerCase();
+}
+
+/** 财务⑯:手动移除账户(重复/失效副本兜底)。若该账户仍在连接中,下次同步会重新拉回。 */
+export function removeBankAccount(id: string): void {
+  accountsStore.save(loadBankAccounts().filter((a) => a.id !== id));
 }
 
 export function saveBankAccounts(accounts: BankAccount[], opts?: { replace?: boolean }): void {
@@ -373,16 +383,11 @@ export function saveBankAccounts(accounts: BankAccount[], opts?: { replace?: boo
   const cur = accountsStore.load();
   const byId = new Map<string, BankAccount>();
   for (const a of Array.isArray(cur) ? cur : []) if (a?.id) byId.set(a.id, a);
-  // 指纹去重:本次同步的账户与既存账户同指纹但不同 id → 旧 id 是重复授权残留,退场
-  // (其交易随之被孤儿过滤隐藏)。同 id 正常合并更新。
-  const incoming = new Map<string, string>();
-  for (const a of accounts) {
-    const f = acctFingerprint(a);
-    if (a?.id && f) incoming.set(f, a.id);
-  }
+  // 指纹去重:本次同步的账户与既存账户是同一实体账户但不同 id → 旧 id 是重复授权残留,
+  // 退场(其交易随之被孤儿过滤隐藏)。同 id 正常合并更新。
+  const incoming = accounts.filter((a) => a?.id);
   for (const [id, b] of [...byId]) {
-    const f = acctFingerprint(b);
-    if (f && incoming.has(f) && incoming.get(f) !== id) byId.delete(id);
+    if (incoming.some((a) => a.id !== id && isSameUnderlyingAccount(a, b))) byId.delete(id);
   }
   for (const a of accounts) if (a?.id) byId.set(a.id, { ...byId.get(a.id), ...a });
   accountsStore.save([...byId.values()]);
