@@ -577,7 +577,7 @@ export interface RecurringCharge {
 }
 
 /** 归一化商户名:去掉尾部门店号/流水号/日期,合并同一商家的多笔。 */
-function normalizeMerchant(name: string): string {
+export function normalizeMerchant(name: string): string {
   return (name || '')
     .toLowerCase()
     .replace(/[#*]?\s*\d[\d\-/.]{2,}.*$/, '') // 尾部数字串(门店号/日期)
