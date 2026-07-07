@@ -211,13 +211,9 @@
     "test:ai-keys": "node scripts/ai-keys.test.mjs"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
     "@zxing/browser": "^0.2.0",
     "fflate": "^0.8.3",
-    "framer-motion": "^11.3.8",
-    "lucide-react": "^0.575.0",
     "next": "^16.2.10",
-    "openai": "^6.22.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "recharts": "^3.9.2"
