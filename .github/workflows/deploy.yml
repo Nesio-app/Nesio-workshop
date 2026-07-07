@@ -11,8 +11,11 @@ permissions:
   contents: read
   issues: write
 
+# 按 ref 分组:main 的 push run 与各 PR 的 run 互不取消。
+# 之前用写死的全局组 + cancel-in-progress,导致 main 一有 push 就把正在跑的 PR verify 掐掉,
+# 表现为「CI 莫名不注册/被取消」。每个分支/PR 各占一把锁,组内新推仍取消旧的(省算力)。
 concurrency:
-  group: 'release-verification'
+  group: release-verification-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
