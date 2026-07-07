@@ -116,6 +116,9 @@ export default function FinanceTab() {
   const upcoming = useMemo(() => upcomingRecurring(txs, 7), [txs, rev]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const learnedRules = useMemo(() => ({ merchant: loadMerchantRules(), flow: loadFlowRules() }), [rev]);
+  // 财务⑪:退款证据 —— 交易行的类型标签与月度统计同口径(没买过的商户进账不是退款)。
+  // ⚠️ hooks 必须全部在下面的空态早退**之前**(hook 数量随渲染变化会让 React 整页抛错)。
+  const refundEvidence = useMemo(() => expenseMerchants(txs), [txs]);
 
   if (txs.length === 0) {
     return <p className="nesio-insights-empty">{L(dict, '还没有银行流水。到「设置 → 数据接入 → 银行流水 · Plaid」连接账户并点「同步」。', 'No bank transactions yet. Go to Settings → Data sources → Bank feed · Plaid, connect and Sync.')}</p>;
@@ -140,8 +143,6 @@ export default function FinanceTab() {
     }
     return ['all', ...monthOrder, ...[...rest].sort()];
   })();
-  // 财务⑪:退款证据 —— 交易行的类型标签与月度统计同口径(没买过的商户进账不是退款)
-  const refundEvidence = useMemo(() => expenseMerchants(txs), [txs]);
   // 财务③:同日同额正负、名字带调整词的内部调整对(净额为零)折叠出列表,带可见说明
   const adjIds = internalAdjustmentIds(monthTx);
   const shownTx = monthTx
