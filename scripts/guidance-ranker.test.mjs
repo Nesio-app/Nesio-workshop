@@ -87,4 +87,29 @@ const res = rankerMod.retrainRankerFromLog();
 assert.equal(res.replayed, 2, 'retrainRankerFromLog 回放 2 条');
 assert.equal(JSON.stringify(rankerMod.getRankerStats().weights), JSON.stringify(before.weights), '显式重训同样逐位一致');
 
+// ── 2b③:情境分化测量仪(证据门,不是模型)──
+{
+  const wd = (i) => `2026-06-0${(i % 5) + 1}T10:00:00.000Z`; // 6/1(周一)~6/5(周五)
+  const we = (i) => (i % 2 === 0 ? '2026-06-06T10:00:00.000Z' : '2026-06-07T10:00:00.000Z'); // 周六/日
+  const f7 = [1, 1, 1, 1, 1, 0, 0];
+  const log = [];
+  // health:工作日 6 条全采纳,周末 6 条全拒 → 分化成立
+  for (let i = 0; i < 6; i++) log.push({ f: f7, type: 'health', y: 1, at: wd(i) });
+  for (let i = 0; i < 6; i++) log.push({ f: f7, type: 'health', y: 0, at: we(i) });
+  // finance:两桶都 6 条、采纳率一样 → 不分化
+  for (let i = 0; i < 6; i++) log.push({ f: f7, type: 'finance', y: i % 2, at: wd(i) });
+  for (let i = 0; i < 6; i++) log.push({ f: f7, type: 'finance', y: i % 2, at: we(i) });
+  // travel:周末只 2 条 → 证据不够,不敢下结论
+  for (let i = 0; i < 6; i++) log.push({ f: f7, type: 'travel', y: 1, at: wd(i) });
+  for (let i = 0; i < 2; i++) log.push({ f: f7, type: 'travel', y: 0, at: we(i) });
+
+  const ev = rankerMod.rankerContextEvidence(log);
+  const by = (t) => ev.find((x) => x.type === t);
+  assert.equal(by('health').diverges, true, '证据够 + 采纳率差大 → 分化成立(灯亮)');
+  assert.equal(by('finance').diverges, false, '两桶一致 → 不分化');
+  assert.equal(by('travel').ready, false, '周末样本不足 → 不敢下结论');
+  assert.equal(by('travel').diverges, false, '证据不够绝不亮灯');
+  assert.equal(rankerMod.rankerContextEvidence([]).length, 0, '空日志返回空');
+}
+
 console.log('guidance-ranker: OK');

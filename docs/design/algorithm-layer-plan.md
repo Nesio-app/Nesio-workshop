@@ -96,7 +96,7 @@
 |---|---|---|---|
 | **guidance-ranker** | 7 维在线逻辑回归 | 加特征(位置/天气/近期连拒)、分情境子模型;**event-sourcing 反馈后可回放重训** | ⭐ **回放重训 ✅(2026-07-07)**:训练样本 (特征,标签) 落 IDB 日志(反馈动词日志不含特征,重训靠样本日志),权重=可回放投影;localStorage 蒸发时 load() 自愈、SGD 确定性逐位一致;日志自动进云备份/删除收口。加特征/分情境子模型仍待做 |
 | **bank 商户** | token 计数投票 | 语义/模糊商户匹配,泛化更准 | ⭐ **✅(2026-07-07,纯本地模糊,不上 embedding)**:真实失败模式是变体(mcdonald~mcdonalds/所有格/缩写)而非语义;suggestCategory 是同步渲染路径,embedding=同步变异步+花钱。落地:前缀包含(差≤2)+ 编辑距离≤1、token≥4 字符才模糊、半票压置信 |
-| **mirror-profile** | EWMA 逼近目标 | 情境化偏好(按时段/精力/星期条件化) | ⭐ 值得,升级面较小 |
+| **mirror-profile** | EWMA 逼近目标 | 情境化偏好(按时段/精力/星期条件化) | ⭐ **评估后改走证据门(2026-07-07)**:反馈是全 app 最稀缺数据,现在分桶会把样本劈碎、让所有估计变差(proposal §5 证据驱动准则)。已落**测量仪** `rankerContextEvidence`(回放训练日志,按 类型×工作日/周末 统计采纳分化;两桶各 ≥5 且差 ≥0.25 才亮灯)——灯亮的类型才做真情境化分桶;透明面板展示证据 |
 | **card-feedback** | 覆盖 + 类型过滤 | —— | ✅ **已评估(2026-07-07):不并**。`dec.ts:96-102` 的 `useful/too_much→永久压制` 是**卡片生命周期业务态**,ranker(只排序)/cooling(只时间冷却)都无此语义;且 `recordCardFeedback` 是反馈流事件源头。可迁的只有 `not_now→4h` 时间窗 → 归 Recency(2a续② 与 cooling 一起收) |
 | **living-model** | 存 userVerified,学在 LLM 端 | LLM-bound,非本地算法 | 不算本地 learner 升级 |
 | **analyst** | 中位数/MAD robust + 计数静音 | 季节性/突变检测 | 运维異类,独立轨 |
