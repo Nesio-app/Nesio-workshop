@@ -11523,7 +11523,8 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 .nesio-fin-txrow:last-child { border-bottom: none; }
 .nesio-fin-txdate { flex-shrink: 0; width: 3rem; font-size: 0.72rem; color: var(--portal-muted); font-variant-numeric: tabular-nums; }
 .nesio-fin-txmid { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.1rem; }
-.nesio-fin-txname { font-size: 0.86rem; color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 财务㉕:长商户名允许两行(单行省略把 AUTOPAY PAYME… 裁得没信息) */
+.nesio-fin-txname { font-size: 0.86rem; color: var(--portal-ink); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.3; }
 .nesio-fin-txcat { font-size: 0.66rem; color: var(--portal-muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nesio-fin-txamt { flex-shrink: 0; font-size: 0.88rem; font-weight: 600; color: var(--portal-ink); font-variant-numeric: tabular-nums; }
 .nesio-fin-txamt.is-refund { color: var(--status-go, #3a9d6a); }
@@ -11572,10 +11573,11 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 .nesio-fin-asset { display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.9rem; font-weight: 600; color: var(--portal-ink); font-variant-numeric: tabular-nums; }
 .nesio-fin-asset-l { font-size: 0.68rem; font-weight: 400; color: var(--portal-muted); }
 /* 批次 31:总览 KPI + 预警 + 趋势;交易审核;分卡 */
-.nesio-fin-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem; margin-bottom: 1rem; }
-.nesio-fin-kpi { display: flex; flex-direction: column; gap: 0.2rem; padding: 0.7rem 0.75rem; border: 1px solid var(--portal-line); border-radius: 12px; background: var(--glass-bg-solid); }
-.nesio-fin-kpi-l { font-size: 0.66rem; color: var(--portal-muted); }
-.nesio-fin-kpi-v { font-size: 1.1rem; font-weight: 700; color: var(--portal-ink); }
+/* 财务㉕:三列窄卡防截断 —— 标签不折行、金额可断行不裁切、字号收敛 */
+.nesio-fin-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.45rem; margin-bottom: 1rem; }
+.nesio-fin-kpi { display: flex; flex-direction: column; gap: 0.2rem; padding: 0.65rem 0.6rem; border: 1px solid var(--portal-line); border-radius: 12px; background: var(--glass-bg-solid); min-width: 0; }
+.nesio-fin-kpi-l { font-size: 0.64rem; color: var(--portal-muted); white-space: nowrap; }
+.nesio-fin-kpi-v { font-size: 0.98rem; font-weight: 700; color: var(--portal-ink); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; line-height: 1.25; }
 .nesio-fin-alerts { display: flex; flex-direction: column; gap: 0.5rem; }
 .nesio-fin-alert { padding: 0.65rem 0.8rem; border-radius: 12px; border: 1px solid var(--portal-line); }
 .nesio-fin-alert--risk { border-color: var(--status-risk, #d9534f); background: color-mix(in srgb, var(--status-risk, #d9534f) 8%, transparent); }
@@ -11602,7 +11604,10 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 .nesio-fin-review-skip { color: var(--portal-muted); margin-left: auto; }
 .nesio-fin-card { padding: 0.85rem 0.9rem; border: 1px solid var(--portal-line); border-radius: 14px; background: var(--glass-bg-solid); margin-bottom: 0.7rem; }
 .nesio-fin-card-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
-.nesio-fin-card-name { display: inline-flex; align-items: center; gap: 6px; min-width: 0; font-size: 0.95rem; font-weight: 700; color: var(--portal-ink); }
+.nesio-fin-card-name { display: inline-flex; align-items: center; gap: 6px; min-width: 0; flex: 1; font-size: 0.92rem; font-weight: 700; color: var(--portal-ink); }
+/* 财务㉕:长账户名最多两行省略,不再被右侧余额挤成一词一行的竖排 */
+.nesio-fin-card-name-t { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-width: 0; line-height: 1.3; }
+.nesio-fin-card-bal { flex-shrink: 0; text-align: right; max-width: 46%; overflow-wrap: anywhere; }
 .nesio-fin-card-bal { font-size: 0.95rem; font-weight: 700; color: var(--portal-ink); font-variant-numeric: tabular-nums; }
 .nesio-fin-card-sub { margin: 0.15rem 0 0.4rem; font-size: 0.68rem; color: var(--portal-muted); text-transform: capitalize; }
 .nesio-fin-card-meta { margin: 0; font-size: 0.74rem; color: var(--portal-muted); }

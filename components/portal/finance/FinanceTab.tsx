@@ -236,7 +236,7 @@ export default function FinanceTab() {
             <div className="nesio-fin-donut-wrap">
               <FinanceDonut slices={cats} centerTop={L(dict, '本月支出', 'This month')} centerVal={formatMoney(cats.reduce((s, c) => s + c.total, 0), summary.currency)} />
               <div className="nesio-fin-donut-legend">
-                {cats.slice(0, 6).map((c, i) => (
+                {cats.filter((c) => c.pct >= 1).slice(0, 6).map((c, i) => (
                   <div key={c.category} className="nesio-fin-donut-leg">
                     <span className="nesio-fin-donut-dot" style={{ background: DONUT_COLORS[i % DONUT_COLORS.length] }} />
                     <span className="nesio-fin-donut-cat">{categoryLabel(c.category, dict)}</span>
@@ -437,7 +437,7 @@ export default function FinanceTab() {
                         return (
                           <span className="nesio-fin-txacct">
                             <AcctLogo a={a} size={13} />
-                            {a.institution || a.name} · {L(dict, tl[0], tl[1])}{a.mask ? ` ····${a.mask}` : ''}
+                            {a.institution || a.name}{a.mask ? ` ····${a.mask}` : ''} · {L(dict, tl[0], tl[1])}
                           </span>
                         );
                       })()}
@@ -613,7 +613,7 @@ export default function FinanceTab() {
               return (
                 <div key={a.id} className="nesio-fin-card">
                   <div className="nesio-fin-card-top">
-                    <span className="nesio-fin-card-name"><AcctLogo a={a} /> {a.name}{a.mask ? ` ····${a.mask}` : ''}</span>
+                    <span className="nesio-fin-card-name"><AcctLogo a={a} /><span className="nesio-fin-card-name-t">{a.name}{a.mask ? ` ····${a.mask}` : ''}</span></span>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
                       {a.balance != null && <span className="nesio-fin-card-bal">{(a.type || '').toLowerCase() === 'credit' ? L(dict, `欠款 ${formatMoney(a.balance, a.currency)}`, `owes ${formatMoney(a.balance, a.currency)}`) : formatMoney(a.balance, a.currency)}</span>}
                       {/* 财务⑯:重复/失效副本手动移除兜底(仍在连接中的账户下次同步会回来) */}
