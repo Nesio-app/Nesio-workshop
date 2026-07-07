@@ -58,6 +58,12 @@
 三家族:**反馈→权重**(guidance-ranker / mirror / analyst / signal-feedback / cooling)、
 **个人基线**(energy-EWMA / analyst-MAD / fitness-HRV)、**时效衰减**(cooling / dormant)。
 
+> **口径注(2026-07-07)**:"11" 是含基线+衰减的宽口径;若按"反馈→更新持久态→有读出口"严格闭环,
+> 是 **6** 个(ranker / mirror / bank 商户 / card-feedback / living-model / analyst)。重评发现真够格
+> "变聪明"的只有 3 个(ranker / bank / mirror);card-feedback 疑似与 ranker+cooling 冗余;
+> living-model 是 LLM-bound;analyst 是运维異类。详见 `algorithm-layer-plan.md §4`。
+> **B pilot(#48)已落但偏离本蓝图**(落位/schema/原语/多迁了 ranker 存储),返工点见 plan §6。
+
 **关键问题(本轮审计):变聪明的知识大多没被采集。**
 guidance-ranker `learnInto` 折进权重后 `delete pending`;cooling 只留计数;energy 只留 EWMA 均值/方差——
 **原始反馈用完即弃,只剩压缩权重,且几乎全在会蒸发的 localStorage。** 唯一可回放的是 `signal-feedback`(有界+云)
@@ -125,5 +131,11 @@ guidance-ranker `learnInto` 折进权重后 `delete pending`;cooling 只留计�
 | 统一 Capacity / 三原语 | ⏳ 提议 | `personalization-capacity-proposal.md` |
 | Cross-Insight Reader(三层 JOIN) | ⏳ 提议 | 本文档 |
 
-_关联:`personalization-capacity-proposal.md`(迁移蓝图)· `future-guidance-engine.md`(guidance 七层)·
+_关联:`algorithm-layer-plan.md`(A 施工图:输入→层映射 / health 范式铺开 / learner 重评 / 落地顺序)·
+`personalization-capacity-proposal.md`(学习底座迁移蓝图)· `future-guidance-engine.md`(guidance 七层)·
 `algorithms-explained.md`(普通人版)· `governance/`(可见性同思路)。_
+
+## 当前盘子(2026-07-07 重算)
+
+21 输入 · 14 输出(仅 2 走统一读出口)· 10 中间层(≈8 算法 + 1 ML + 1 底座)· 82 API · learner 6 严格 / 11 宽口径。
+详见 `algorithm-layer-plan.md §0-§1`(含 21 输入按事件流/状态提供者/绕过 三类的逐条归层)。
