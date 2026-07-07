@@ -31,10 +31,24 @@ const txStore = createBlobStore<BankTx[]>({
   validate: (v) => Array.isArray(v), onWriteError: reportStorageDropped,
 });
 
+/**
+ * 孤儿交易过滤(财务①:sandbox 混库清洗)—— 交易的 accountId 不属于任何已知账户 = 旧环境残留
+ * (换 Plaid item/环境后,旧交易永远不在新 item 的 removedIds 里,靠这里识别)。
+ * fail-safe:账户表为空(没同步过账户/水合未完成)不过滤;无 accountId 的老数据保守保留。
+ * 账户表是按 id 只增合并的(见 saveBankAccounts),临时失败的银行不丢账户 → 不会误杀活银行交易。
+ */
+export function filterToKnownAccounts(txs: BankTx[], accounts: BankAccount[]): BankTx[] {
+  if (!accounts.length) return txs;
+  const known = new Set(accounts.map((a) => a.id));
+  return txs.filter((t) => !t.accountId || known.has(t.accountId));
+}
+
 export function loadBankTx(): BankTx[] {
   const raw = txStore.load();
   // Number.isFinite 挡掉 NaN(typeof NaN === 'number' 会漏过去,污染整月汇总)。
-  return Array.isArray(raw) ? raw.filter((t) => t && Number.isFinite(t.amount) && typeof t.date === 'string') : [];
+  const base = Array.isArray(raw) ? raw.filter((t) => t && Number.isFinite(t.amount) && typeof t.date === 'string') : [];
+  // 读时过滤孤儿:显示立即治愈;下次同步 merge 经由本函数 → 储存自然清掉。备份读原始 IDB,可逆。
+  return filterToKnownAccounts(base, loadBankAccounts());
 }
 
 /** 写入流水(供 ConnectorsHub.syncPlaid)。 */
@@ -270,9 +284,18 @@ export function loadBankAccounts(): BankAccount[] {
   return Array.isArray(raw) ? raw.filter((a) => a && a.id) : [];
 }
 
-/** 写入账户(供 ConnectorsHub.syncPlaid)。 */
+/**
+ * 写入账户(供 ConnectorsHub.syncPlaid)。财务①:按 id **只增合并**,不整体替换 ——
+ * 多银行时某家临时失败(API 报错/重连中)当次返回不含它的账户,整体替换会把它从账户表里
+ * 抹掉,进而让孤儿过滤误杀它的交易。合并语义:同 id 用最新字段(余额/名称会更新),
+ * 未出现的旧账户保留(历史数据仍可归属;「彻底删除」仍全清)。
+ */
 export function saveBankAccounts(accounts: BankAccount[]): void {
-  accountsStore.save(accounts);
+  const cur = accountsStore.load();
+  const byId = new Map<string, BankAccount>();
+  for (const a of Array.isArray(cur) ? cur : []) if (a?.id) byId.set(a.id, a);
+  for (const a of accounts) if (a?.id) byId.set(a.id, { ...byId.get(a.id), ...a });
+  accountsStore.save([...byId.values()]);
 }
 
 /** 某账户某月的消费/退款/笔数。 */
