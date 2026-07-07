@@ -45,6 +45,21 @@ interface PlaidAccount {
 
 interface Institution { id: string; name?: string; logo?: string | null; color?: string | null }
 
+interface PlaidHolding {
+  account_id: string;
+  security_id: string;
+  quantity?: number | null;
+  institution_value?: number | null;
+  cost_basis?: number | null;
+  iso_currency_code?: string | null;
+}
+interface PlaidSecurity {
+  security_id: string;
+  name?: string | null;
+  ticker_symbol?: string | null;
+  type?: string | null;
+}
+
 interface PlaidInvTx {
   investment_transaction_id: string;
   account_id?: string;
@@ -130,6 +145,8 @@ export async function GET(req: NextRequest) {
 
   const added: PlaidTx[] = [];
   const invAdded: PlaidInvTx[] = []; // 财务⑯:投资账户流水(独立产品拉取)
+  // 财务㉗:持仓快照(holdings + securities join;失败不阻断,客户端仅在非空时替换)
+  const holdingsOut: Array<{ accountId: string; name: string; ticker?: string; type?: string; quantity: number; value: number; costBasis?: number; currency: string }> = [];
   const removedIds: string[] = [];
   const acctById = new Map<string, PlaidAccount>();
   let anyRelink = false;
@@ -198,6 +215,28 @@ export async function GET(req: NextRequest) {
             if (!inv.investment_transactions.length || offset >= (inv.total_investment_transactions ?? 0)) break;
           }
         } catch { /* investments 产品不可用(机构不支持/未授权)→ 只有余额没有流水,保持现状 */ }
+        // 财务㉗:持仓明细(每只股票/基金:名称/代码/数量/市值/成本)
+        try {
+          const h = await plaidPost('/investments/holdings/get', {
+            access_token: accessToken, options: { account_ids: invAccounts.map((a) => a.account_id) },
+          }) as { holdings?: PlaidHolding[]; securities?: PlaidSecurity[]; error_code?: string };
+          if (!h.error_code && Array.isArray(h.holdings)) {
+            const secById = new Map((h.securities ?? []).map((sec) => [sec.security_id, sec]));
+            for (const hd of h.holdings) {
+              const sec = secById.get(hd.security_id);
+              holdingsOut.push({
+                accountId: hd.account_id,
+                name: sec?.name || sec?.ticker_symbol || 'Security',
+                ticker: sec?.ticker_symbol || undefined,
+                type: sec?.type || undefined,
+                quantity: hd.quantity ?? 0,
+                value: hd.institution_value ?? 0,
+                costBasis: hd.cost_basis ?? undefined,
+                currency: hd.iso_currency_code || 'USD',
+              });
+            }
+          }
+        } catch { /* 持仓可缺,不阻断 */ }
       }
       // 财务⑧:机构元数据(item/get → institutions/get_by_id,按机构缓存;失败不阻断)。
       // 财务⑪:机构 id 与元数据解耦 —— 此前 get_by_id 一失败连 id 都丢,重复 item 判定
@@ -291,6 +330,8 @@ export async function GET(req: NextRequest) {
         }),
       ],
       removedIds,
+      // 财务㉗:持仓快照(点时值;客户端整体替换,仅在非空时)
+      holdings: holdingsOut.filter((h) => !staleAccountIds.has(h.accountId)),
     });
     // 存回增量游标,下次从这里续拉(真增量,不再每次从最旧重来)。
     const secure = process.env.NODE_ENV === 'production';

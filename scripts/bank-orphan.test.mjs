@@ -10,10 +10,10 @@ import ts from 'typescript';
 import assert from 'node:assert/strict';
 
 // 两个可注入的内存 blob 桩(tx / accounts 各一),模拟 IDB 同步缓存语义
-const caches = { tx: null, accounts: null };
+const caches = { tx: null, accounts: null, holdings: null };
 let storeIdx = 0;
 const fakeCreateBlobStore = () => {
-  const key = storeIdx++ === 0 ? 'tx' : 'accounts'; // bank-tx 模块内先建 txStore 再建 accountsStore
+  const key = ['tx', 'accounts', 'holdings'][storeIdx++] ?? 'holdings'; // bank-tx 内建 store 顺序:tx → accounts → holdings
   return { load: () => caches[key], save: (v) => { caches[key] = v; }, ready: async () => {} };
 };
 
