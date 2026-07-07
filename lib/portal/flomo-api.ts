@@ -217,7 +217,7 @@ export async function fetchFlomoMemos(limit = 50): Promise<{
   }
 
   // collected 是升序(旧→新):取最新的 limit 条,最新在前
-  const capped = Math.min(Math.max(limit, 1), 200);
+  const capped = Math.min(Math.max(limit, 1), 5000); // 连接器全量导入用大 limit;面板仍传 48
   const memos = collected.slice(-capped).reverse();
 
   return {
