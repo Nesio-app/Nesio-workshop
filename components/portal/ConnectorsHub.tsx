@@ -340,16 +340,20 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       const link = Plaid.create({
         token: data.linkToken,
         onSuccess: async (publicToken: string) => {
+          // 财务⑥:带上 linkToken —— 多机构一次授权时服务端据此捞出 session 里
+          // 全部 item 的 public_token 逐个交换,不再只连上第一家。
           const ex = await fetch('/api/portal/plaid/exchange', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ publicToken }),
+            body: JSON.stringify({ publicToken, linkToken: data.linkToken }),
           });
-          const exData = await ex.json() as { ok?: boolean; error?: string };
+          const exData = await ex.json() as { ok?: boolean; error?: string; items?: number };
           if (exData.ok) {
             saveConnectorState('plaid', true);
             setConnected((p) => ({ ...p, plaid: true }));
-            showToast(L(dict, '银行已连接,点「同步」拉取流水', 'Bank linked — tap Sync to pull transactions'), true);
+            const n = exData.items || 1;
+            showToast(n > 1 ? L(dict, `已连接 ${n} 家机构,正在同步流水…`, `${n} institutions linked — syncing…`) : L(dict, '银行已连接,正在同步流水…', 'Bank linked — syncing…'), true);
+            void syncPlaid(); // 连上就同步,账户/流水立即可见,不再等用户手点
           } else {
             showToast(L(dict, `绑定失败:${exData.error || '未知'}`, `Link failed: ${exData.error || 'unknown'}`), false);
           }
