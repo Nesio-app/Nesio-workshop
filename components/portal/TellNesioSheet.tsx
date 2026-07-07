@@ -158,6 +158,23 @@ export default function TellNesioSheet({ open, onClose, onCapture }: TellNesioSh
           </span>
           <span className="nesio-tell-fan-label">{L(dict, '冻一下', 'Freeze it')}</span>
         </button>
+
+        {/* 收纳 —— 东西放哪了记一笔(原生 InventorySheet,life-graph object 节点视图) */}
+        <button
+          type="button"
+          className="nesio-tell-fan-btn nesio-tell-fan-btn--extra"
+          onClick={() => { onClose(); window.dispatchEvent(new CustomEvent('nesio-open-inventory')); }}
+          aria-label={L(dict, '东西放哪了,记一笔', 'Note where something lives')}
+        >
+          <span className="nesio-tell-fan-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="26" height="26">
+              <path d="M21 8l-9-5-9 5v8l9 5 9-5V8z" />
+              <path d="M3 8l9 5 9-5" />
+              <line x1="12" y1="13" x2="12" y2="21" />
+            </svg>
+          </span>
+          <span className="nesio-tell-fan-label">{L(dict, '收纳', 'Storage')}</span>
+        </button>
       </div>
     </div>
   );

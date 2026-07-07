@@ -20,6 +20,7 @@ const WorkoutPlayer = dynamic(() => import('./fitness/WorkoutPlayer'), { ssr: fa
 const NesioChatSheet = dynamic(() => import('./NesioChatSheet'), { ssr: false });
 const NotePanelEnhanced = dynamic(() => import('./NotePanelEnhanced'), { ssr: false });
 const ToolsTreasurePopup = dynamic(() => import('./ToolsTreasureSheet'), { ssr: false });
+const InventorySheet = dynamic(() => import('./InventorySheet'), { ssr: false });
 import { DEFAULT_PORTAL_CONFIG } from '@/lib/portal/defaults';
 import { openToolHref } from '@/lib/portal/open-tool';
 import {
@@ -277,6 +278,7 @@ export default function Portal() {
   }, []);
   const [moodOpen, setMoodOpen] = useState(false);
   const [freezeOpen, setFreezeOpen] = useState(false);
+  const [inventoryOpen, setInventoryOpen] = useState(false);
   const [workoutSession, setWorkoutSession] = useState<import('./fitness/WorkoutPlayer').PlayerSession | null>(null);
   const [launchSurfaceContext, setLaunchSurfaceContext] = useState({
     viewerRole: 'public' as 'public' | 'tester' | 'personal_lab',
@@ -484,17 +486,20 @@ export default function Portal() {
     const voiceHandler = () => { track('capture_voice_open'); setCaptureMode('voice'); };
     const moodHandler = () => { track('mood_open'); setMoodOpen(true); };
     const freezeHandler = () => { track('freeze_open'); setFreezeOpen(true); };
+    const inventoryHandler = () => { track('inventory_open'); setInventoryOpen(true); };
     const workoutHandler = (e: Event) => { track('workout_start', {}); setWorkoutSession((e as CustomEvent).detail); };
     window.addEventListener('nesio-open-tell', handler);
     window.addEventListener('nesio-open-voice', voiceHandler);
     window.addEventListener('nesio-open-mood', moodHandler);
     window.addEventListener('nesio-open-freeze', freezeHandler);
+    window.addEventListener('nesio-open-inventory', inventoryHandler);
     window.addEventListener('nesio-start-workout', workoutHandler);
     return () => {
       window.removeEventListener('nesio-open-tell', handler);
       window.removeEventListener('nesio-open-voice', voiceHandler);
       window.removeEventListener('nesio-open-mood', moodHandler);
       window.removeEventListener('nesio-open-freeze', freezeHandler);
+      window.removeEventListener('nesio-open-inventory', inventoryHandler);
       window.removeEventListener('nesio-start-workout', workoutHandler);
     };
   }, []);
@@ -775,6 +780,11 @@ export default function Portal() {
       const runtimeTool = resolveShellRuntimeTools([tool], launchSurfaceContext).tools[0];
       if (!shouldShellOpenTool(runtimeTool?.shellRuntime)) return;
       if (isToolKilledByLocalFeatureControl(tool)) return;
+      // 收纳已原生重建(InventorySheet · life-graph object 节点视图),不再跳静态 /storage/
+      if (tool.id === 'inventory') {
+        setInventoryOpen(true);
+        return;
+      }
       const href = openToolHref(tool, launchSurfaceContext);
       if (!href) return;
       window.location.assign(href);
@@ -875,6 +885,7 @@ export default function Portal() {
       <ShareSheet open={captureMode === 'share'} onClose={() => setCaptureMode(null)} />
       <MoodSheet open={moodOpen} onClose={() => setMoodOpen(false)} />
       <FreezeVaultSheet open={freezeOpen} onClose={() => setFreezeOpen(false)} initialTab="add" />
+      <InventorySheet open={inventoryOpen} onClose={() => setInventoryOpen(false)} />
       {workoutSession && <WorkoutPlayer session={workoutSession} onClose={() => setWorkoutSession(null)} />}
       <AskGuideSheet open={askGuideOpen} onClose={() => setAskGuideOpen(false)} onStart={openAskVoice} />
 
