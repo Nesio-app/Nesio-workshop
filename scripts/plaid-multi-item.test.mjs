@@ -89,48 +89,107 @@ const hub = fs.readFileSync(new URL('../components/portal/ConnectorsHub.tsx', im
 assert.ok(/linkToken:\s*data\.linkToken/.test(hub), 'ConnectorsHub exchange 请求带 linkToken');
 assert.ok(/void syncPlaid\(\)/.test(hub), '连接成功后自动同步');
 
-// ══ 财务⑦:新机构流水未就绪(NOT_READY)不静默空同步 ══
-// 刚连上的机构 accounts/get 立即可用,但 /transactions/sync 要等 Plaid 初始拉取(几分钟)。
-// 锁死:NOT_READY 的机构计入 pendingItems 上报、游标不动;就绪机构的流水/账户照常返回。
-const txCookies = {};
-async function txFakeFetch(url, opts) {
-  const body = JSON.parse(opts?.body || '{}');
-  if (url.includes('/transactions/sync')) {
-    if (body.access_token === 'at-new') {
-      return { json: async () => ({ added: [], transactions_update_status: 'NOT_READY', next_cursor: 'should-not-be-saved' }) };
+// ══ 财务⑦/⑧:transactions 路由 —— NOT_READY 不静默 + 重复 item 摘除 + 机构元数据 ══
+// 台账:TOKENS[at] = { inst, accounts:[{id,mask,subtype}], sync 响应 }
+function makeTxWorld(world) {
+  const cookies = {};
+  const removedItems = [];
+  async function fakeFetch(url, opts) {
+    const body = JSON.parse(opts?.body || '{}');
+    const tok = world[body.access_token];
+    if (url.includes('/transactions/sync')) return { json: async () => tok.sync };
+    if (url.includes('/accounts/get')) {
+      return { json: async () => ({ accounts: tok.accounts.map((a) => ({ account_id: a.id, name: a.id, mask: a.mask, type: a.type || 'depository', subtype: a.subtype, balances: { current: 10, iso_currency_code: 'USD' } })) }) };
     }
-    return { json: async () => ({ added: [{ transaction_id: 't1', account_id: 'acc-ready', date: '2026-07-01', name: 'Coffee', amount: 5, iso_currency_code: 'USD', personal_finance_category: { primary: 'FOOD_AND_DRINK' } }], has_more: false, next_cursor: 'c-ready', transactions_update_status: 'HISTORICAL_UPDATE_COMPLETE' }) };
+    if (url.includes('/item/get')) return { json: async () => ({ item: { institution_id: tok.inst } }) };
+    if (url.includes('/institutions/get_by_id')) {
+      return { json: async () => ({ institution: { name: `Bank ${body.institution_id}`, logo: 'bG9nbw==', primary_color: '#123456' } }) };
+    }
+    if (url.includes('/item/remove')) { removedItems.push(body.access_token); return { json: async () => ({}) }; }
+    throw new Error(`unexpected fetch ${url}`);
   }
-  if (url.includes('/accounts/get')) {
-    const id = body.access_token === 'at-new' ? 'acc-new' : 'acc-ready';
-    return { json: async () => ({ accounts: [{ account_id: id, name: id, balances: { current: 10, iso_currency_code: 'USD' } }] }) };
-  }
-  throw new Error(`unexpected fetch ${url}`);
-}
-function loadTxRoute() {
   const src = fs.readFileSync(new URL('../app/api/portal/plaid/transactions/route.ts', import.meta.url), 'utf8');
   const js = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const mod = { exports: {} };
   vm.runInNewContext(js, {
-    module: mod, exports: mod.exports, console, JSON, Array, Object, Map, Set, fetch: txFakeFetch, process: { env: {} },
-    require: (p) => p === 'next/server' ? { NextRequest: class {}, NextResponse: { json: (b, init) => ({ __json: b, __status: init?.status ?? 200, cookies: { set: (n, v) => { txCookies[n] = v; } } }) } }
+    module: mod, exports: mod.exports, console, JSON, Array, Object, Map, Set, fetch: fakeFetch, process: { env: {} },
+    require: (p) => p === 'next/server' ? { NextRequest: class {}, NextResponse: { json: (b, init) => ({ __json: b, __status: init?.status ?? 200, cookies: { set: (n, v) => { cookies[n] = v; } } }) } }
       : p === '@/lib/portal/api-auth' ? { guardAiRoute: async () => null }
       : p === '../link-token/route' ? { plaidBase: () => 'https://sandbox.plaid.com' }
       : p === '@/lib/portal/env' ? { envValue: () => 'k' } : ({}),
   });
-  return mod.exports;
+  return { route: mod.exports, cookies, removedItems };
 }
-const txRoute = loadTxRoute();
-const txRes = await txRoute.GET({
-  cookies: { get: (n) => n === 'nesio_plaid_tokens' ? { value: JSON.stringify(['at-ready', 'at-new']) } : undefined },
-});
-assert.equal(txRes.__json.ok, true);
-assert.equal(txRes.__json.pendingItems, 1, '未就绪机构计入 pendingItems');
-assert.equal(txRes.__json.transactions.length, 1, '就绪机构的流水照常返回');
-assert.equal(txRes.__json.accounts.length, 2, '两家账户都在(未就绪只影响流水)');
-const savedCursors = JSON.parse(txCookies['nesio_plaid_cursors']);
-assert.equal(savedCursors[0], 'c-ready', '就绪机构游标推进');
-assert.equal(savedCursors[1], '', 'NOT_READY 机构游标不动(下次从头拉)');
+const reqWithTokens = (toks) => ({ cookies: { get: (n) => n === 'nesio_plaid_tokens' ? { value: JSON.stringify(toks) } : undefined } });
+const syncTx = (id, acc) => ({ added: [{ transaction_id: id, account_id: acc, date: '2026-07-01', name: id, amount: 5, iso_currency_code: 'USD', personal_finance_category: { primary: 'FOOD_AND_DRINK' } }], has_more: false, next_cursor: `c-${id}`, transactions_update_status: 'HISTORICAL_UPDATE_COMPLETE' });
+
+// 场景 A(财务⑦):一家就绪、一家 NOT_READY
+{
+  const w = makeTxWorld({
+    'at-ready': { inst: 'ins-a', accounts: [{ id: 'acc-ready', mask: '1111' }], sync: syncTx('t1', 'acc-ready') },
+    'at-new': { inst: 'ins-b', accounts: [{ id: 'acc-new', mask: '2222' }], sync: { added: [], transactions_update_status: 'NOT_READY', next_cursor: 'should-not-be-saved' } },
+  });
+  const res = await w.route.GET(reqWithTokens(['at-ready', 'at-new']));
+  assert.equal(res.__json.ok, true);
+  assert.equal(res.__json.pendingItems, 1, '未就绪机构计入 pendingItems');
+  assert.equal(res.__json.transactions.length, 1, '就绪机构的流水照常返回');
+  assert.equal(res.__json.accounts.length, 2, '两家账户都在(未就绪只影响流水)');
+  assert.equal(res.__json.accounts[0].institution, 'Bank ins-a', '账户带机构名');
+  assert.equal(res.__json.accounts[0].logo, 'bG9nbw==', '账户带机构 logo');
+  const savedCursors = JSON.parse(w.cookies['nesio_plaid_cursors']);
+  assert.equal(savedCursors[0], 'c-t1', '就绪机构游标推进');
+  assert.equal(savedCursors[1], '', 'NOT_READY 机构游标不动(下次从头拉)');
+  assert.equal(w.removedItems.length, 0, '不同机构不摘除');
+}
+
+// 场景 B(财务⑧):重复授权同一银行 → 旧 item 摘除,账户/交易不再双份
+{
+  const w = makeTxWorld({
+    'at-old': { inst: 'ins-chase', accounts: [{ id: 'acc-old', mask: '7937', subtype: 'checking' }], sync: syncTx('t-old', 'acc-old') },
+    'at-dup': { inst: 'ins-chase', accounts: [{ id: 'acc-dup', mask: '7937', subtype: 'checking' }], sync: syncTx('t-dup', 'acc-dup') },
+  });
+  const res = await w.route.GET(reqWithTokens(['at-old', 'at-dup']));
+  assert.equal(res.__json.ok, true);
+  assert.equal(res.__json.accounts.length, 1, '同实体卡只留一个账户');
+  assert.equal(res.__json.accounts[0].id, 'acc-dup', '留的是更新授权的那个');
+  assert.deepEqual([...res.__json.transactions].map((t) => t.id), ['t-dup'], '旧 item 的交易不返回(不再双份计数)');
+  assert.deepEqual([...w.removedItems], ['at-old'], '旧 item best-effort /item/remove');
+  assert.deepEqual(JSON.parse(w.cookies['nesio_plaid_tokens']), ['at-dup'], '旧 token 从 cookie 摘除');
+  assert.equal(JSON.parse(w.cookies['nesio_plaid_cursors']).length, 1, '游标数组与 token 同步瘦身');
+  assert.equal(res.__json.authoritative, true, '全部存活 token 账户拉齐 → 权威快照');
+}
+
+// 场景 C:staleTokenIndexes 纯函数边界(保守不误杀)
+{
+  const w = makeTxWorld({});
+  const S = w.route.staleTokenIndexes;
+  const acc = (mask, subtype = 'checking') => ({ mask, subtype });
+  assert.deepEqual([...S([
+    { institutionId: 'i1', accounts: [acc('1'), acc('2')] },
+    { institutionId: 'i1', accounts: [acc('1'), acc('2')] },
+  ])], [0], '完全覆盖 → 旧的摘除');
+  assert.deepEqual([...S([
+    { institutionId: 'i1', accounts: [acc('1'), acc('9')] },
+    { institutionId: 'i1', accounts: [acc('1')] },
+  ])], [], '部分覆盖(旧 item 有独有账户)不摘');
+  assert.deepEqual([...S([
+    { institutionId: 'i1', accounts: [{ subtype: 'checking' }] },
+    { institutionId: 'i1', accounts: [{ subtype: 'checking' }] },
+  ])], [], '缺 mask 不敢下结论');
+  assert.deepEqual([...S([
+    { institutionId: '', accounts: [acc('1')] },
+    { institutionId: '', accounts: [acc('1')] },
+  ])], [], '缺机构不敢下结论');
+  assert.deepEqual([...S([
+    { institutionId: 'i1', accounts: [acc('1')] },
+    { institutionId: 'i2', accounts: [acc('1')] },
+  ])], [], '不同机构同 mask 不摘(两家银行都可能有 ····1234)');
+  assert.deepEqual([...S([
+    { institutionId: 'i1', accounts: [acc('1')] },
+    { institutionId: 'i1', accounts: [acc('1')] },
+    { institutionId: 'i1', accounts: [acc('1')] },
+  ])], [0, 1], '三重授权只留最新');
+}
 
 // 客户端:pendingItems 必须有可见状态 + 自动重试;上限 5000
 assert.ok(/pendingItems/.test(hub), 'syncPlaid 处理 pendingItems');

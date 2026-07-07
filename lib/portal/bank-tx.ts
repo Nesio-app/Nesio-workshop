@@ -306,6 +306,9 @@ export interface BankAccount {
   subtype?: string;
   balance?: number;
   currency: string;
+  institution?: string; // 财务⑧:机构名(Chase / American Express…)
+  logo?: string;        // 机构 logo(base64 PNG,Plaid 提供;可缺)
+  color?: string;       // 机构主色(#rrggbb;可缺)
 }
 
 export const BANK_ACCOUNTS_KEY = 'nesio-bank-accounts-v1';
@@ -321,12 +324,20 @@ export function loadBankAccounts(): BankAccount[] {
 }
 
 /**
- * 写入账户(供 ConnectorsHub.syncPlaid)。财务①:按 id **只增合并**,不整体替换 ——
+ * 写入账户(供 ConnectorsHub.syncPlaid)。财务①:默认按 id **只增合并**,不整体替换 ——
  * 多银行时某家临时失败(API 报错/重连中)当次返回不含它的账户,整体替换会把它从账户表里
  * 抹掉,进而让孤儿过滤误杀它的交易。合并语义:同 id 用最新字段(余额/名称会更新),
  * 未出现的旧账户保留(历史数据仍可归属;「彻底删除」仍全清)。
+ *
+ * 财务⑧:路由确认「本次每个存活 token 的账户都拉全了」(authoritative)时用 replace 整体
+ * 替换 —— 只增合并永不退场,重复授权留下的旧 item 账户会一直重复显示、其交易双份计数;
+ * 权威快照替换后,旧 item 的本地交易被孤儿过滤自动隐藏。
  */
-export function saveBankAccounts(accounts: BankAccount[]): void {
+export function saveBankAccounts(accounts: BankAccount[], opts?: { replace?: boolean }): void {
+  if (opts?.replace && accounts.length > 0) {
+    accountsStore.save(accounts.filter((a) => a?.id));
+    return;
+  }
   const cur = accountsStore.load();
   const byId = new Map<string, BankAccount>();
   for (const a of Array.isArray(cur) ? cur : []) if (a?.id) byId.set(a.id, a);
