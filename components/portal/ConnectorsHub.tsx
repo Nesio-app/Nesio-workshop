@@ -370,7 +370,11 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
   async function syncPlaid(retry = 0) {
     setSyncing('plaid');
     try {
-      const res = await fetch('/api/portal/plaid/transactions');
+      // 财务㉑:富化回填 —— 老交易是增量游标同步的,不会自己带上商户 logo/实体id/细分类;
+      // 每设备做一次全量重拉,按 id 覆盖补齐,之后回到增量。
+      let full = false;
+      try { full = !localStorage.getItem('nesio-plaid-enrich-v1'); } catch { /* ignore */ }
+      const res = await fetch(`/api/portal/plaid/transactions${full ? '?full=1' : ''}`);
       const data = await res.json() as { ok?: boolean; transactions?: Array<{ id: string; accountId?: string; date: string; name: string; amount: number; currency: string; category: string }>; removedIds?: string[]; accounts?: unknown[]; error?: string; pendingItems?: number; authoritative?: boolean };
       // 批次 31:账户/卡片信息存本机,供财务「卡片」子分类分卡显示。
       // 财务⑧:路由确认账户全量拉齐(authoritative)时整体替换,让重复授权的旧账户退场。
@@ -401,6 +405,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       const fresh = { length: freshCount };
       saveBankTx(merged); // 落 IndexedDB(批次 57)
       try { localStorage.setItem('nesio-bank-synced-at', new Date().toISOString()); } catch { /* quota */ } // 时间戳小,仍留 localStorage
+      if (full) { try { localStorage.setItem('nesio-plaid-enrich-v1', '1'); } catch { /* quota */ } } // 回填只做一次
       setCounts((p) => ({ ...p, plaid: merged.length }));
       saveConnectorState('plaid', true);
       setConnected((p) => ({ ...p, plaid: true }));

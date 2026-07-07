@@ -123,6 +123,10 @@ export async function GET(req: NextRequest) {
   let cursors: string[] = [];
   try { cursors = JSON.parse(req.cookies.get('nesio_plaid_cursors')?.value || '[]'); } catch { cursors = []; }
   if (!Array.isArray(cursors)) cursors = [];
+  // 财务㉑:全量回填 —— 增量游标下老交易不会重推,富化字段(logo/实体id/细分类)只会出现
+  // 在新交易上;?full=1 忽略游标从头重拉,客户端按 id 覆盖补齐(每设备一次)。
+  const fullResync = req.nextUrl?.searchParams?.get('full') === '1';
+  if (fullResync) cursors = [];
 
   const added: PlaidTx[] = [];
   const invAdded: PlaidInvTx[] = []; // 财务⑯:投资账户流水(独立产品拉取)
