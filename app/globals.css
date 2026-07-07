@@ -11550,7 +11550,7 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 .nesio-fin-budget-hero-sub { font-size: 0.72rem; color: var(--portal-muted); }
 .nesio-fin-budget-rowedit { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; font-size: 0.78rem; color: var(--portal-muted); margin-top: 0.2rem; }
 .nesio-fin-budget-input { width: 6.5rem; border: 1px solid var(--portal-line); border-radius: var(--radius-sm, 12px); padding: 0.25rem 0.5rem; font-size: 0.82rem; color: var(--portal-ink); background: var(--glass-bg-solid); font-variant-numeric: tabular-nums; }
-.nesio-fin-budget-add { display: flex; gap: 0.5rem; align-items: center; margin-top: 0.9rem; }
+.nesio-fin-budget-add { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-top: 0.9rem; } /* 财务㉜:窄屏换行,月报按钮不再被挤出屏外 */
 /* 财务⑲:商户 logo(Plaid 富化,缺失不占位) */
 .nesio-fin-mlogo { border-radius: 4px; object-fit: contain; vertical-align: -0.2em; margin-right: 5px; background: var(--glass-bg-solid); flex-shrink: 0; }
 /* 财务⑰:定期「待确认」早识别标(中性,不焦虑) */

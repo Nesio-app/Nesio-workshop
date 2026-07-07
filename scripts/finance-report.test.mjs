@@ -159,8 +159,10 @@ assert.ok(richInv.includes('投资持仓') && richInv.includes('AAPL') && richIn
 caches.holdings = null;
 // 英文版
 assert.ok(visual.reportRichHtml(txs, accounts, '2026-06', 'en', NOW).includes('Finance monthly report'), '英文标题');
-// 客户端接线:打印/存 PDF 走富版
+// 客户端接线:打印/存 PDF 走富版;下载=彩色 HTML 文件(财务㉜,.md 只留给存记忆)
 const finTab = fs.readFileSync(new URL('../components/portal/finance/FinanceTab.tsx', import.meta.url), 'utf8');
 assert.ok(finTab.includes('reportRichHtml(txs, accounts, ym, dict)'), 'FinanceTab 打印入口用彩色图文版');
+assert.ok(finTab.includes('finance-report-${ym}.html'), '下载按钮产出彩色 .html');
+assert.ok(!finTab.includes('.md`'), '不再下载纯文本 .md');
 
 console.log('finance-report: OK');
