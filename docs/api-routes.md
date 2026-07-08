@@ -32,6 +32,7 @@ Auth legend:
 | POST /api/portal/life-state | guard | 15/min |
 | POST /api/portal/health-insight | guard | 10/min |
 | POST /api/portal/notion | guard | 15/min |
+| POST /api/portal/notion/classify | guard | 20/min |
 | GET /api/version | 公开只读(构建号,无数据) | — |
 | POST /api/portal/health | guard | 10/min |
 | POST /api/health/analyze | guard | 20/min |
