@@ -32,6 +32,8 @@ const CADENCE: Record<Closeness, number> = { core: 14, close: 30, acquaintance: 
 // 关系词 → 亲疏。中英混合匹配。
 const CORE_RE = /家人|亲人|配偶|伴侣|老婆|老公|妻|夫|父|母|爸|妈|儿|女|兄|弟|姐|妹|family|spouse|partner|wife|husband|mother|father|mom|dad|son|daughter|brother|sister|parent/i;
 const CLOSE_RE = /朋友|挚友|好友|闺蜜|哥们|死党|friend|bestie|buddy/i;
+// 结构性/非人关系:这些 relation 的 targetId 不是人(品牌架构/文档/物品归属),不进联系人。
+const NON_PERSON_REL = /架构|品牌|文档|包含|定义|属于|归属|拥有|收纳|容器|owned_by|contains|part_of|belongs|includes|defines|architecture|brand|document|category|object/i;
 
 /** 从 "Linda Smith <linda@x.com>" 或裸邮箱里取显示名 + 归一 key。 */
 export function parseContactFrom(from: string): { name: string; key: string } | null {
@@ -152,12 +154,14 @@ export function buildRelationships(nodes: LifeNode[], now = Date.now(), contactL
       bump(n.name, n.name, nodeIso, null);
     }
 
-    // relations:targetId 常是人名,relation 是关系词
+    // relations:targetId 常是人名,relation 是关系词。但结构性关系(品牌架构/文档/
+    // 包含/定义/物品归属)的 targetId 不是人 —— 跳过,否则 demo 种子(Nesio 系统/
+    // TreasureBox/Nesio 指南)会漏成假联系人。
     for (const r of n.relations || []) {
       if (!r.targetId) continue;
-      // 只收指向人的关系(排除 owned_by 之类物品关系时,仍把人名收进来但不加亲疏)
       const rel = r.relation || '';
-      bump(r.targetId, r.targetId, nodeIso, rel && rel !== 'owned_by' ? rel : null);
+      if (NON_PERSON_REL.test(rel)) continue;
+      bump(r.targetId, r.targetId, nodeIso, rel ? rel : null);
     }
   }
 
