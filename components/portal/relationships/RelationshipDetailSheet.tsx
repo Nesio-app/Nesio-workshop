@@ -15,6 +15,7 @@ import {
   loadPersonRecords, addPersonRecord, deletePersonRecord,
   RECORD_CATEGORIES, RECORD_CATEGORY_MAP, type PersonRecord, type PersonRecordCategory,
 } from '@/lib/portal/person-records';
+import { imageToDataUrl } from '@/lib/portal/image-util';
 import RelationGraph from '../RelationGraph';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -46,31 +47,6 @@ function downscaleToDataUrl(file: File, size = 200): Promise<string> {
         if (!ctx) return reject(new Error('no_ctx'));
         ctx.drawImage(img, sx, sy, side, side, 0, 0, size, size);
         resolve(canvas.toDataURL('image/jpeg', 0.82));
-      };
-      img.src = reader.result as string;
-    };
-    reader.readAsDataURL(file);
-  });
-}
-
-/** 把照片缩到长边 ≤maxSide 的 JPEG data URL(保比例,便于 OCR 又不过大)。 */
-function imageToDataUrl(file: File, maxSide = 1400): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error('read_failed'));
-    reader.onload = () => {
-      const img = new Image();
-      img.onerror = () => reject(new Error('decode_failed'));
-      img.onload = () => {
-        const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
-        const w = Math.round(img.width * scale);
-        const h = Math.round(img.height * scale);
-        const canvas = document.createElement('canvas');
-        canvas.width = w; canvas.height = h;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return reject(new Error('no_ctx'));
-        ctx.drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL('image/jpeg', 0.85));
       };
       img.src = reader.result as string;
     };

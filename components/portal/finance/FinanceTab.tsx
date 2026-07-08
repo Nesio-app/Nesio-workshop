@@ -7,6 +7,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
+import FamilyDataCard from '../relationships/FamilyDataCard';
 import {
   loadBankTx, loadBankAccounts, availableMonths, summarizeMonth, categoryBreakdown, topMerchants,
   monthlyTrend, needsReview, suggestCategory, setMerchantRule, effectiveCategory,
@@ -159,7 +160,12 @@ export default function FinanceTab() {
   }, [txs, accounts]);
 
   if (txs.length === 0) {
-    return <p className="nesio-insights-empty">{L(dict, '还没有银行流水。到「设置 → 数据接入 → 银行流水 · Plaid」连接账户并点「同步」。', 'No bank transactions yet. Go to Settings → Data sources → Bank feed · Plaid, connect and Sync.')}</p>;
+    return (
+      <div className="nesio-analytics-tab">
+        <p className="nesio-insights-empty">{L(dict, '还没有银行流水。到「设置 → 数据接入 → 银行流水 · Plaid」连接账户并点「同步」。', 'No bank transactions yet. Go to Settings → Data sources → Bank feed · Plaid, connect and Sync.')}</p>
+        <FamilyDataCard kind="spend" />
+      </div>
+    );
   }
 
   const signed = (a: number) => (a >= 0 ? `-${formatMoney(a, summary.currency)}` : `+${formatMoney(-a, summary.currency)}`);
@@ -212,6 +218,7 @@ export default function FinanceTab() {
       {/* ── 总览 ── */}
       {sub === 'overview' && (
         <>
+          <FamilyDataCard kind="spend" />
           {/* 数据新鲜度 + 被排除的其他币种笔数(如实告知,不假装是最新完整月/全部交易) */}
           {(() => {
             const syncedAt = loadBankSyncedAt();
