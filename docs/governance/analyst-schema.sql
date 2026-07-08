@@ -18,3 +18,11 @@ create table if not exists analyst_feedback (
 );
 
 create index if not exists analyst_feedback_type_idx on analyst_feedback (alert_type, created_at desc);
+
+-- ⚠️ 安全(必须):启用 RLS。这两张表只由服务端(SUPABASE_SERVICE_ROLE_KEY,绕过 RLS)读写;
+-- 而 NEXT_PUBLIC_SUPABASE_ANON_KEY 是公开的,任何人都能拿它直连 /rest/v1。
+-- 不启用 RLS = anon 可任意读写这两张表(读产品指标、污染学习基线)。
+-- 启用 RLS 且不建 anon 策略 = 默认拒绝 anon,service role 照常工作。
+alter table analyst_daily    enable row level security;
+alter table analyst_feedback enable row level security;
+-- (刻意不为 anon/authenticated 建 policy → 客户端直连一律拒绝;仅服务端 service role 可访问。)
