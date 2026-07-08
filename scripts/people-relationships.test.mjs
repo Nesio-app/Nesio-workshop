@@ -57,4 +57,11 @@ assert.ok(cs.includes('c.photo') && cs.includes('c.birthday'), '头像/生日落
 assert.ok(/runPeopleSync\(\)/.test(cs) && cs.includes("id: 'people'"), 'runPeopleSync 并入 syncAllConnectors');
 assert.ok(/'calendar' \| 'gmail' \| 'flomo' \| 'plaid' \| 'people'/.test(cs), 'SyncAllOutcome 含 people');
 
+// ── ConnectorsHub 的 Google「同步」按钮也拉通讯录(用户从数据接入点同步的路径) ──
+const hub = fs.readFileSync(new URL('../components/portal/ConnectorsHub.tsx', import.meta.url), 'utf8');
+const syncGoogle = hub.slice(hub.indexOf('async function syncGoogle'), hub.indexOf('async function syncGoogle') + 6000);
+assert.ok(syncGoogle.includes('runPeopleSync'), 'syncGoogle 调 runPeopleSync(数据接入同步含通讯录)');
+assert.ok(syncGoogle.includes('通讯录'), 'syncGoogle 通讯录结果可见');
+assert.ok(syncGoogle.includes('not_connected') && syncGoogle.includes('重新授权'), '通讯录缺权限提示重授权');
+
 console.log('people-relationships: OK');
