@@ -14019,3 +14019,23 @@ html[data-portal-theme="night"] .nesio-exp-card:hover {
 .nesio-journal-editor ul { margin: 0.2em 0; padding-left: 1.2em; }
 .nesio-journal-history-html strong, .nesio-journal-history-html b { font-weight: 750; }
 .nesio-journal-history-html ul { margin: 0.2em 0; padding-left: 1.2em; }
+
+/* ── 足迹·分析页升级(月度概览 + 真实地图 + 生活节奏)────────────────── */
+.nesio-tl-month-vs { font-weight: 400; opacity: 0.6; font-size: 0.68rem; }
+.nesio-tl-month-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; margin-top: 0.4rem; }
+.nesio-tl-month-grid .nesio-tl-stat { background: rgba(127, 127, 127, 0.14); border-radius: 12px; padding: 0.55rem 0.3rem; text-align: center; }
+.nesio-tl-delta { font-size: 0.58rem; font-weight: 600; margin-left: 0.2rem; vertical-align: 0.15em; }
+.nesio-tl-delta.is-up { color: var(--portal-green, #3d9a6b); }
+.nesio-tl-delta.is-down { color: var(--portal-muted); }
+
+.nesio-tl-realmap { position: relative; overflow: hidden; border-radius: 14px; margin-top: 0.85rem; background: var(--portal-hairline); }
+.nesio-tl-realmap img { max-width: none; user-select: none; pointer-events: none; }
+.nesio-tl-map-attr { position: absolute; right: 6px; bottom: 4px; font-size: 0.56rem; color: #333; background: rgba(255,255,255,0.72); padding: 0 4px; border-radius: 4px; text-decoration: none; }
+
+.nesio-tl-rhythm { display: flex; gap: 3px; margin-top: 0.4rem; }
+.nesio-tl-rhythm-col { display: flex; flex-direction: column; gap: 3px; flex: 1; align-items: stretch; }
+.nesio-tl-rhythm-col--labels { flex: 0 0 auto; align-items: flex-end; padding-right: 2px; }
+.nesio-tl-rhythm-collabel { font-size: 0.58rem; color: var(--portal-muted); text-align: center; height: 14px; }
+.nesio-tl-rhythm-rowlabel { font-size: 0.56rem; color: var(--portal-muted); height: 16px; display: flex; align-items: center; }
+.nesio-tl-rhythm-col--labels span:first-child { height: 14px; }
+.nesio-tl-rhythm-cell { height: 16px; border-radius: 4px; }

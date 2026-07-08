@@ -16,6 +16,8 @@ import {
   type PlaceVisit, type PlaceCategory, type TimeBucket, type JourneyItem, type PlaceCluster,
 } from '@/lib/portal/place-trail';
 import { wallHHMM, dateKeyToLocalDate } from '@/lib/portal/place-time.mjs';
+import { monthlyPlaceComparison, weekRhythm } from '@/lib/portal/place-stats';
+import PlaceMap from './PlaceMap';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -66,6 +68,11 @@ export default function TimelineTab() {
   const stats = useMemo(() => dayStats(journey), [journey]);
   const clusters = useMemo(() => clusterPlaces(trail, 10), [trail]);
   const catShare = useMemo(() => categoryTimeShare(trail), [trail]);
+  const monthly = useMemo(() => monthlyPlaceComparison(trail), [trail]);
+  const rhythm = useMemo(() => weekRhythm(trail), [trail]);
+  const mapPoints = useMemo(() => clusterPlaces(trail, 14)
+    .filter((c) => c.lat != null && c.lon != null)
+    .map((c) => ({ lat: c.lat!, lon: c.lon!, label: displayLabel(c.label), weightMin: c.totalMin, color: DOT_COLOR[c.category] })), [trail]);
   const buckets = useMemo(() => timeOfDayBuckets(trail), [trail]);
   const placeCats = useMemo(() => placesByCategory(trail), [trail]); // 批次 39:Google 时间线风分类
   const world = useMemo(() => worldByCountry(trail), [trail]); // 批次 40:World tab 国家聚合
@@ -217,7 +224,62 @@ export default function TimelineTab() {
       {/* ── 分析:聚类 + 地点纠正 ── */}
       {sub === 'analytics' && (
         <>
-          <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>{L(dict, '常去地点 · 点名字可纠正', 'Frequent places · tap name to fix')}</p>
+          {/* ── 月度概览(Google Timeline Insights 形态):数字 + 环比 ── */}
+          {monthly && (
+            <div className="nesio-tl-month">
+              <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>
+                {L(dict, `${Number(monthly.current.monthKey.slice(5, 7))} 月足迹`, `${monthly.current.monthKey} footprint`)}
+                {monthly.prevHasData && <span className="nesio-tl-month-vs">{L(dict, ' · 对比上月', ' · vs last month')}</span>}
+              </p>
+              <div className="nesio-tl-month-grid">
+                {([
+                  [monthly.current.places, monthly.prev.places, L(dict, '个地点', 'places')],
+                  [monthly.current.visits, monthly.prev.visits, L(dict, '次到访', 'visits')],
+                  [Math.round(monthly.current.moveKm), Math.round(monthly.prev.moveKm), L(dict, 'km 移动', 'km moved')],
+                  [monthly.current.newPlaces, monthly.prev.newPlaces, L(dict, '个新地点', 'new places')],
+                ] as Array<[number, number, string]>).map(([cur, prv, label], i) => (
+                  <div key={i} className="nesio-tl-stat">
+                    <span className="nesio-tl-stat-v">
+                      {cur}
+                      {monthly.prevHasData && cur !== prv && (
+                        <span className={`nesio-tl-delta ${cur > prv ? 'is-up' : 'is-down'}`}>{cur > prv ? '▲' : '▼'}{Math.abs(cur - prv)}</span>
+                      )}
+                    </span>
+                    <span className="nesio-tl-stat-l">{label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── 真实地图概览:常去地点打点(大小=停留时长)── */}
+          {mapPoints.length > 0 && <PlaceMap points={mapPoints} height={200} />}
+
+          {/* ── 生活节奏:星期 × 时段外出热力 ── */}
+          {rhythm.max > 1 && (
+            <>
+              <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '生活节奏 · 外出时间', 'Weekly rhythm · time out')}</p>
+              <div className="nesio-tl-rhythm">
+                <div className="nesio-tl-rhythm-col nesio-tl-rhythm-col--labels">
+                  <span />
+                  {(['清晨', '上午', '下午', '傍晚', '夜'] as const).map((zh, i) => (
+                    <span key={i} className="nesio-tl-rhythm-rowlabel">{L(dict, zh, ['Dawn', 'AM', 'PM', 'Eve', 'Night'][i])}</span>
+                  ))}
+                </div>
+                {rhythm.grid.map((col, wd) => (
+                  <div key={wd} className="nesio-tl-rhythm-col">
+                    <span className="nesio-tl-rhythm-collabel">{L(dict, ['一', '二', '三', '四', '五', '六', '日'][wd], ['M', 'T', 'W', 'T', 'F', 'S', 'S'][wd])}</span>
+                    {col.map((min, b) => (
+                      <span key={b} className="nesio-tl-rhythm-cell" style={{ opacity: min ? 0.25 + (min / rhythm.max) * 0.75 : 1, background: min ? 'var(--portal-accent)' : 'var(--portal-hairline)' }}
+                        title={`${Math.round(min / 60)}h`} />
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '常去地点 · 点名字可纠正', 'Frequent places · tap name to fix')}</p>
           {/* 批次 33:无名占位地点找真名(反向地理编码,默认关,坐标会发外部地图) */}
           <div className="nesio-tl-geo">
             <label className="nesio-tl-geo-row">
@@ -239,7 +301,7 @@ export default function TimelineTab() {
                     {c.generic && displayLabel(c.label) === c.label && c.lat != null && <span className="nesio-tl-alias-orig"> · {c.lat.toFixed(2)},{c.lon!.toFixed(2)}</span>}
                   </button>
                 )}
-                <span className="nesio-tl-cluster-meta">{fmtDur(c.totalMin)} · {L(dict, `${c.visits} 次`, `${c.visits}×`)}</span>
+                <span className="nesio-tl-cluster-meta">{fmtDur(c.totalMin)} · {L(dict, `${c.visits} 次`, `${c.visits}×`)}{c.visits > 1 ? L(dict, ` · 均 ${fmtDur(Math.round(c.totalMin / c.visits))}`, ` · avg ${fmtDur(Math.round(c.totalMin / c.visits))}`) : ''}</span>
               </div>
             ))}
           </div>

@@ -424,6 +424,9 @@ const GENERIC_RE = /^(unknown|未知|未知地点|aliased location|searched addr
 export function isGenericPlace(label: string): boolean { return GENERIC_RE.test((label || '').trim()); }
 
 /** 无名占位 + 有坐标 → 按 ~1km 粗坐标分桶,让不同地点分开(可各自改名/找真名)。 */
+export function placeKey(label: string, lat?: number, lon?: number): string {
+  return bucketKey(label, lat, lon);
+}
 function bucketKey(label: string, lat?: number, lon?: number): string {
   if (isGenericPlace(label) && lat != null && lon != null) return `${label} ·${lat.toFixed(2)},${lon.toFixed(2)}`;
   return label;
