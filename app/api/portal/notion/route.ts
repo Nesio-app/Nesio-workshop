@@ -12,8 +12,9 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { guardAiRoute } from '@/lib/portal/api-auth';
-import { notionRowToNode } from '@/lib/portal/notion-map';
-import { NOTION_API, NOTION_VERSION, notionHeaders, queryDataSourceRows, getSourceTitle } from '@/lib/portal/notion-api';
+import { NOTION_API, NOTION_VERSION, notionHeaders, queryDataSourceRows, getDataSourceSchema } from '@/lib/portal/notion-api';
+import { foldSourcesToMemories, type NotionPageRow } from '@/lib/portal/notion-fold';
+import type { NotionSourceSchema } from '@/lib/portal/notion-classify';
 import { completeText, aiProviderAvailable } from '@/lib/portal/ai-complete';
 import { getIntegrationTokenRefreshed } from '@/lib/portal/integrations';
 
@@ -97,12 +98,14 @@ ${docText.slice(0, 5000)}`;
   } catch { return { nodes: [], summary: '解析失败' }; }
 }
 
-/** N-1:查询一个数据源的行,每行 → 一个记忆节点。走 data source 端点(老库自动回落)。 */
-async function queryOneSource(token: string, sourceId: string, title: string): Promise<object[]> {
+/** N-3:拉一个数据源的 schema + 行(rowCount 用实际行数,供 classify 判父子)。失败返回 null。 */
+async function loadSource(token: string, sourceId: string): Promise<{ schema: NotionSourceSchema; rows: NotionPageRow[] } | null> {
   try {
+    const schema = await getDataSourceSchema(token, sourceId);
+    if (!schema) return null;
     const rows = await queryDataSourceRows(token, sourceId, MAX_ROWS_PER_DB);
-    return rows.map((row) => notionRowToNode(row, title));
-  } catch { return []; }
+    return { schema: { ...schema, rowCount: rows.length }, rows };
+  } catch { return null; }
 }
 
 export async function POST(req: NextRequest) {
@@ -125,21 +128,25 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 用户选定了数据源(N-1:databaseIds 现在承载 data_source_id,老库回落 database_id)→ 每行一条记忆。
+  // 用户选定了数据源(databaseIds 承载 data_source_id)→ N-3:结构折叠。
+  // 拉每个源的 schema + 行 → classifyDatabase 认结构角色 → foldSourcesToMemories
+  // 把子表(划线/笔记)折进父表(书),一本书 = 一条记忆;日历/维度表和技术列丢。
   const databaseIds = Array.isArray(body.databaseIds) ? body.databaseIds.filter(Boolean) : [];
   if (databaseIds.length) {
-    const nodes: object[] = [];
+    const schemas: NotionSourceSchema[] = [];
+    const rowsBySource: Record<string, NotionPageRow[]> = {};
     for (const sourceId of databaseIds.slice(0, MAX_DATABASES)) {
-      const title = await getSourceTitle(token, sourceId);
-      const rows = await queryOneSource(token, sourceId, title);
-      nodes.push(...rows);
-      if (nodes.length >= MAX_TOTAL_ROWS) break;
+      const loaded = await loadSource(token, sourceId);
+      if (!loaded) continue;
+      schemas.push(loaded.schema);
+      rowsBySource[loaded.schema.id] = loaded.rows;
     }
-    const capped = nodes.slice(0, MAX_TOTAL_ROWS);
+    const memories = foldSourcesToMemories(schemas, rowsBySource);
+    const capped = memories.slice(0, MAX_TOTAL_ROWS);
     return NextResponse.json({
       ok: true,
       nodes: capped,
-      summary: `从 ${Math.min(databaseIds.length, MAX_DATABASES)} 个表导入 ${capped.length} 行`,
+      summary: `按结构折叠导入 ${capped.length} 条记忆(子表已折进父条目)`,
       pageCount: capped.length,
       aiUsed: false,
     });
