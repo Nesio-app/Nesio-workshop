@@ -1,7 +1,9 @@
 /**
- * 行为契约:物品①——分类/标签/估值字段 + 库存统计(对标 Inventory Stats 页)。
+ * 行为契约:物品①③④⑥——分类/标签/估值字段 + 库存统计 + 卖闲置堆 + 容器 + 转卖文案。
  * 锁死:字段写读回路(add/update/清空);标签与域标「收纳」隔离;统计口径
- * (数量计入件数与估值、容器按空间+容器去重、未分类归桶、分类降序、Top 标签封顶)。
+ * (数量计入件数与估值、容器按空间+容器去重、未分类归桶、分类降序、Top 标签封顶);
+ * 物品变容器回路(containedCount 跨物品计数、解除容器不动已放进去的物品);
+ * 转卖文案模板(名称/价格/数量齐全、无 undefined 漏字)。
  */
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -74,6 +76,34 @@ pile = inv.sellPile(inv.listInventoryItems());
 assert.equal(pile.items.length, 2, '取消出售即移出卖堆');
 assert.equal(pile.totalValue, 130);
 
+// ── 物品④:变容器回路 + containedCount + 解绑不动内容物 ──
+nodes.length = 0; seq = 0;
+const box = inv.addInventoryItem({ name: '宜家收纳箱', location: '家 · 车库' });
+inv.addInventoryItem({ name: '滑雪手套', location: '家 · 宜家收纳箱' });
+inv.addInventoryItem({ name: '头盔', location: '车库 · 宜家收纳箱' });
+inv.addInventoryItem({ name: '无关物品', location: '家 · 抽屉' });
+let boxItem = inv.listInventoryItems().find((i) => i.id === box.id);
+assert.equal(boxItem.isContainer, false, '默认不是容器');
+inv.updateInventoryItem(box.id, { isContainer: true });
+boxItem = inv.listInventoryItems().find((i) => i.id === box.id);
+assert.equal(boxItem.isContainer, true, '变成容器');
+assert.equal(boxItem.containedCount, 2, '装了几件 = 其他物品容器段命中该物品名(跨空间也算)');
+inv.updateInventoryItem(box.id, { isContainer: false });
+const after = inv.listInventoryItems();
+assert.equal(after.find((i) => i.id === box.id).isContainer, false, '解除容器');
+assert.equal(after.find((i) => i.name === '滑雪手套').location, '家 · 宜家收纳箱', '解绑不动已放进去的物品');
+
+// ── 物品⑥:转卖文案模板 ──
+{
+  const t = inv.buildListingText({ name: '旧相机', quantity: 2, price: 130, category: '电子', tags: ['胶片', '复古'], note: '快门正常', location: '', space: '', container: '', hasPhoto: false, forSale: true, isContainer: false, containedCount: 0, id: 'x' });
+  assert.ok(t.includes('旧相机') && t.includes('×2') && t.includes('130'), '名称/数量/价格齐全');
+  assert.ok(t.includes('电子') && t.includes('#胶片') && t.includes('快门正常'), '分类/标签/备注带上');
+  assert.ok(!t.includes('undefined') && !t.includes('null'), '无漏字');
+  const noPrice = inv.buildListingText({ name: '闲置包', tags: [], location: '', space: '', container: '', hasPhoto: false, forSale: true, isContainer: false, containedCount: 0, id: 'y' });
+  assert.ok(noPrice.includes('价格私聊'), '无价降级为面议');
+  assert.ok(!noPrice.includes('×'), '数量 1 不显示');
+}
+
 // ── 客户端接线(源码级):统计视图 + 表单三字段 ──
 const sheet = fs.readFileSync(new URL('../components/portal/InventorySheet.tsx', import.meta.url), 'utf8');
 assert.ok(sheet.includes("view === 'stats'"), '统计视图存在');
@@ -81,5 +111,13 @@ assert.ok(sheet.includes('inventoryStats(items)'), '统计走纯函数');
 assert.ok(sheet.includes('fCategory') && sheet.includes('fTags') && sheet.includes('fPrice'), '添加表单三字段');
 assert.ok(sheet.includes("view === 'sell'") && sheet.includes('sellPile(items)'), '物品③:卖闲置视图走纯函数');
 assert.ok(sheet.includes('forSale: !item.forSale'), '详情页标记/取消出售');
+// 物品④⑤⑥ 接线
+assert.ok(sheet.includes('isContainer: !item.isContainer'), '物品④:详情页变成/解除容器');
+assert.ok(sheet.includes('🗃'), '物品④:容器图标区分');
+assert.ok(sheet.includes('containedCount'), '物品④:装了几件可见');
+assert.ok(sheet.includes('/api/portal/inventory-extract') && sheet.includes('clipboard.readText'), '物品⑤:粘贴商品信息走提取路由');
+assert.ok(sheet.includes('pasteMsg'), '物品⑤:识别失败可见(不静默)');
+assert.ok(sheet.includes('buildListingText') && sheet.includes('clipboard.writeText'), '物品⑥:复制转卖文案接线');
+assert.ok(sheet.includes('copiedId'), '物品⑥:复制成功有反馈');
 
 console.log('inventory-stats: OK');

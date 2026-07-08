@@ -18,6 +18,7 @@ import { importInventoryCsv } from '@/lib/portal/inventory-import';
 import { useRef } from 'react';
 import {
   addInventoryItem,
+  buildListingText,
   expiryStatus,
   inventoryStats,
   listInventoryItems,
@@ -44,6 +45,9 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [importMsg, setImportMsg] = useState(''); // 物品②:导入结果可见展示(不静默)
   const fileRef = useRef<HTMLInputElement>(null);
+  const [pasteBusy, setPasteBusy] = useState(false); // 物品⑤:粘贴商品信息识别
+  const [pasteMsg, setPasteMsg] = useState('');
+  const [copiedId, setCopiedId] = useState<string | null>(null); // 物品⑥:复制转卖文案反馈
 
   // 加物品表单
   const [fName, setFName] = useState('');
@@ -94,7 +98,55 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
 
   if (!open) return null;
 
-  const resetForm = () => { setFName(''); setFLocation(''); setFQty(''); setFExpiry(''); setFNote(''); setFCategory(''); setFTags(''); setFPrice(''); };
+  const resetForm = () => { setFName(''); setFLocation(''); setFQty(''); setFExpiry(''); setFNote(''); setFCategory(''); setFTags(''); setFPrice(''); setPasteMsg(''); };
+
+  // 物品⑤:粘贴商品信息(商品页标题/描述/链接文本)→ AI 识别预填表单;失败可见,不静默
+  const pasteRecognize = async () => {
+    setPasteMsg('');
+    let text = '';
+    try { text = (await navigator.clipboard.readText()).trim(); }
+    catch { setPasteMsg(L(dict, '读不到剪贴板 —— 请允许粘贴权限,或直接手动填写', 'Clipboard unavailable — allow paste permission or fill in manually')); return; }
+    if (!text) { setPasteMsg(L(dict, '剪贴板是空的 —— 先去商品页复制标题或描述', 'Clipboard is empty — copy a product title or description first')); return; }
+    setPasteBusy(true);
+    try {
+      const res = await fetch('/api/portal/inventory-extract', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) });
+      const data = await res.json().catch(() => null) as { items?: Array<{ name?: string; quantity?: number; location?: string; category?: string; tags?: string[]; price?: number; note?: string }> } | null;
+      const list = res.ok && Array.isArray(data?.items) ? data!.items! : [];
+      if (!list.length || !list[0]?.name) {
+        setPasteMsg(L(dict, '没识别出物品 —— 手动填一下吧', "Couldn't recognize an item — fill it in manually"));
+        return;
+      }
+      if (list.length > 1) {
+        // 多件直接入库(和问一问同语义),不让第 2 件之后静默丢失
+        for (const it of list) { if (it.name) addInventoryItem(it as { name: string }); }
+        refresh();
+        setView('list');
+        setImportMsg(L(dict, `已识别并存入 ${list.length} 件`, `Recognized and saved ${list.length} items`));
+        return;
+      }
+      const first = list[0];
+      setFName(first.name || '');
+      if (first.location) setFLocation(first.location);
+      if (first.quantity != null) setFQty(String(first.quantity));
+      if (first.category) setFCategory(first.category);
+      if (first.tags?.length) setFTags(first.tags.join(', '));
+      if (first.price != null) setFPrice(String(first.price));
+      if (first.note) setFNote(first.note);
+      setPasteMsg(L(dict, '已识别,确认或补几笔再保存', 'Recognized — review and save'));
+    } catch {
+      setPasteMsg(L(dict, '识别服务暂时不可用 —— 稍后再试,或手动填写', 'Recognition unavailable — try again later or fill in manually'));
+    } finally { setPasteBusy(false); }
+  };
+
+  // 物品⑥:复制转卖文案(纯模板,不花钱);复制失败降级为可手动复制的弹窗
+  const copyListing = async (i: InventoryItem) => {
+    const text = buildListingText(i, dict);
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedId(i.id);
+      window.setTimeout(() => setCopiedId((cur) => (cur === i.id ? null : cur)), 2000);
+    } catch { window.prompt(L(dict, '复制失败,长按手动复制:', 'Copy failed — copy manually:'), text); }
+  };
 
   const submitAdd = () => {
     if (!fName.trim()) return;
@@ -183,13 +235,14 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
                         background: 'var(--glass-bg, rgba(255,255,255,0.04))', color: 'var(--text-primary)',
                       }}
                     >
-                      <span style={{ fontSize: '1.15rem' }}>{i.hasPhoto ? '🖼️' : '📦'}</span>
+                      <span style={{ fontSize: '1.15rem' }}>{i.isContainer ? '🗃' : i.hasPhoto ? '🖼️' : '📦'}</span>
                       <span style={{ flex: 1, minWidth: 0 }}>
                         <span style={{ display: 'block', fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {i.name}{i.quantity != null ? ` ×${i.quantity}` : ''}
                         </span>
                         <span style={{ display: 'block', fontSize: '0.74rem', color: 'var(--text-tertiary)' }}>
                           {i.location || L(dict, '未归位 · 点开设置位置', 'Unplaced · tap to set')}
+                          {i.isContainer ? ` · ${L(dict, `装了 ${i.containedCount} 件`, `holds ${i.containedCount}`)}` : ''}
                         </span>
                       </span>
                       {exp && (
@@ -241,6 +294,16 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
 
         {view === 'add' && (
           <div style={{ maxHeight: '58vh', overflowY: 'auto' }}>
+            {/* 物品⑤:从商品页复制标题/描述,一键识别预填 */}
+            <button
+              type="button"
+              disabled={pasteBusy}
+              style={{ width: '100%', padding: '0.55rem', borderRadius: 10, border: '1px dashed var(--border-subtle, rgba(255,255,255,0.2))', background: 'transparent', color: 'var(--text-secondary)', fontSize: '0.82rem', opacity: pasteBusy ? 0.6 : 1 }}
+              onClick={pasteRecognize}
+            >
+              📋 {pasteBusy ? L(dict, '识别中…', 'Recognizing…') : L(dict, '粘贴商品信息识别(商品标题/描述都行)', 'Paste product info to auto-fill')}
+            </button>
+            {pasteMsg && <p style={{ margin: '0.4rem 0 0', fontSize: '0.75rem', color: 'var(--text-tertiary)', textAlign: 'center' }}>{pasteMsg}</p>}
             <label style={label}>{L(dict, '物品名', 'Item name')}</label>
             <input className="nesio-ob-input" value={fName} onChange={(e) => setFName(e.target.value)} placeholder={L(dict, '例:护照、备用钥匙、维生素 D3', 'e.g. passport, spare keys, vitamin D3')} />
             <label style={label}>{L(dict, '放哪了?(和拍一下识别同一套位置)', 'Where does it live? (same places as Snap)')}</label>
@@ -353,15 +416,22 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: '0.7rem' }}>
                   {sp.items.map((i) => (
-                    <button key={i.id} type="button" onClick={() => { setDetailId(i.id); setView('detail'); }}
-                      style={{ display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', width: '100%', padding: '0.6rem 0.7rem', borderRadius: 12, border: '1px solid var(--border-subtle, rgba(255,255,255,0.1))', background: 'var(--glass-bg, rgba(255,255,255,0.04))', color: 'var(--text-primary)' }}>
-                      <span style={{ fontSize: '1.05rem' }}>💰</span>
-                      <span style={{ flex: 1, minWidth: 0 }}>
-                        <span style={{ display: 'block', fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{i.name}{i.quantity != null ? ` ×${i.quantity}` : ''}</span>
-                        <span style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>{i.location || L(dict, '未归位', 'Unplaced')}</span>
-                      </span>
-                      <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{i.price != null ? `$${(i.price * (i.quantity && i.quantity > 0 ? i.quantity : 1)).toLocaleString('en-US')}` : L(dict, '未估值', 'no est.')}</span>
-                    </button>
+                    <div key={i.id} style={{ display: 'flex', gap: 6, alignItems: 'stretch' }}>
+                      <button type="button" onClick={() => { setDetailId(i.id); setView('detail'); }}
+                        style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', padding: '0.6rem 0.7rem', borderRadius: 12, border: '1px solid var(--border-subtle, rgba(255,255,255,0.1))', background: 'var(--glass-bg, rgba(255,255,255,0.04))', color: 'var(--text-primary)' }}>
+                        <span style={{ fontSize: '1.05rem' }}>💰</span>
+                        <span style={{ flex: 1, minWidth: 0 }}>
+                          <span style={{ display: 'block', fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{i.name}{i.quantity != null ? ` ×${i.quantity}` : ''}</span>
+                          <span style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>{i.location || L(dict, '未归位', 'Unplaced')}</span>
+                        </span>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{i.price != null ? `$${(i.price * (i.quantity && i.quantity > 0 ? i.quantity : 1)).toLocaleString('en-US')}` : L(dict, '未估值', 'no est.')}</span>
+                      </button>
+                      {/* 物品⑥:一键复制转卖文案(纯模板),贴去闲鱼/FB Marketplace */}
+                      <button type="button" onClick={() => copyListing(i)}
+                        style={{ flexShrink: 0, padding: '0 0.6rem', borderRadius: 12, border: '1px solid var(--border-subtle, rgba(255,255,255,0.12))', background: copiedId === i.id ? 'var(--accent-primary-dim, rgba(91,140,255,0.18))' : 'transparent', color: copiedId === i.id ? 'var(--text-primary)' : 'var(--text-secondary)', fontSize: '0.76rem', whiteSpace: 'nowrap' }}>
+                        {copiedId === i.id ? `✓ ${L(dict, '已复制', 'Copied')}` : L(dict, '复制文案', 'Copy ad')}
+                      </button>
+                    </div>
                   ))}
                 </div>
               )}
@@ -454,6 +524,16 @@ function ItemDetail({ item, dict, label, onChanged, onDeleted }: {
         onClick={() => { updateInventoryItem(item.id, { forSale: !item.forSale }); onChanged(); }}
       >
         💰 {item.forSale ? L(dict, '已在卖闲置堆 · 点击取消', 'In sell pile · tap to remove') : L(dict, '标记出售(进卖闲置堆)', 'Mark for sale')}
+      </button>
+      {/* 物品④:物品本身变容器(收纳箱等);解除只摘 flag,不动已放进去的物品 */}
+      <button
+        type="button"
+        style={{ width: '100%', marginTop: '0.5rem', padding: '0.55rem', borderRadius: 10, border: '1px solid var(--border-subtle, rgba(255,255,255,0.12))', background: item.isContainer ? 'var(--accent-primary-dim, rgba(91,140,255,0.18))' : 'transparent', color: 'var(--text-primary)', fontSize: '0.85rem' }}
+        onClick={() => { updateInventoryItem(item.id, { isContainer: !item.isContainer }); onChanged(); }}
+      >
+        🗃 {item.isContainer
+          ? L(dict, `已是容器,装了 ${item.containedCount} 件 · 点击解除(不影响里面的物品)`, `It's a bin holding ${item.containedCount} · tap to unmark (contents stay)`)
+          : L(dict, '变成容器(其他物品的位置就能写它)', 'Make it a bin (other items can live in it)')}
       </button>
       <button type="button" className="nesio-freeze-primary-btn" style={{ width: '100%', marginTop: '0.6rem' }} onClick={save}>
         {L(dict, '保存', 'Save')}
