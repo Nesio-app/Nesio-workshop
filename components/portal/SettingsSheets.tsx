@@ -16,6 +16,7 @@ import { PROACTIVE_LEVEL_KEY } from './today/proactive-types';
 import { deleteLifeNode, getLifeGraph } from '@/lib/portal/life-graph';
 import { purgeLocalData } from '@/lib/portal/storage-manifest';
 import { purgeIdbBlobs } from '@/lib/portal/idb-blob-store';
+import { purgeLocalImages } from '@/lib/portal/local-image-store';
 import { isValidBackup } from '@/lib/portal/full-backup';
 import { buildCombinedBackup, pushBackupToCloud, pullBackupFromCloud, restoreCombinedBackup, hasCloudEntitlement, lastCloudBackup, type CloudBackupError, type CloudRestoreError } from '@/lib/portal/cloud-backup';
 
@@ -321,7 +322,8 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
 
   async function exportFullBackup() {
     // 与云备份用同一份枚举(localStorage durable + IDB blob),避免两处漂移。
-    const backup = await buildCombinedBackup();
+    // 本机导出带上照片(includeImages):这是「拿走你的全部数据」的完整出口。
+    const backup = await buildCombinedBackup({ includeImages: true });
     const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -396,15 +398,19 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
     const result = await restoreCombinedBackup(parsed, replace ? 'replace' : 'merge');
     const total = result.restoredKeys + result.idbRestored;
     const corrupt = result.corruptKeys.length;
+    const photos = result.imagesRestored || 0;
+    // 记忆照片存独立 IDB(nesio-images),恢复要单独如实计数 —— 否则用户不知道图回来没
+    const photoZh = photos > 0 ? `，含 ${photos} 张照片` : '';
+    const photoEn = photos > 0 ? `, ${photos} photos` : '';
     if (corrupt > 0) {
       // 静默失败审计:备份里有损坏条目未能恢复 —— 不谎称完全成功,如实告知(本机原串已保留)
       setRestoreMsg(L(dict,
-        `已恢复 ${total} 项，但有 ${corrupt} 项备份数据损坏未能恢复（本机原数据已保留，未被覆盖）· 正在刷新…`,
-        `Restored ${total} entries, but ${corrupt} were corrupt in the backup and could not be restored (your local data was kept, not overwritten) · refreshing…`));
+        `已恢复 ${total} 项${photoZh}，但有 ${corrupt} 项备份数据损坏未能恢复（本机原数据已保留，未被覆盖）· 正在刷新…`,
+        `Restored ${total} entries${photoEn}, but ${corrupt} were corrupt in the backup and could not be restored (your local data was kept, not overwritten) · refreshing…`));
     } else {
       setRestoreMsg(L(dict,
-        `✓ 已恢复 ${total} 项${result.mergedNodes != null ? `，记忆合并后共 ${result.mergedNodes} 条` : ''} · 正在刷新…`,
-        `✓ Restored ${total} entries${result.mergedNodes != null ? `, ${result.mergedNodes} memories after merge` : ''} · refreshing…`));
+        `✓ 已恢复 ${total} 项${photoZh}${result.mergedNodes != null ? `，记忆合并后共 ${result.mergedNodes} 条` : ''} · 正在刷新…`,
+        `✓ Restored ${total} entries${photoEn}${result.mergedNodes != null ? `, ${result.mergedNodes} memories after merge` : ''} · refreshing…`));
     }
     // 恢复含 IDB blob —— reload 让各 blob store 重新水合(缓存是加载时读的)
     setTimeout(() => window.location.reload(), corrupt > 0 ? 2600 : 900);
@@ -454,6 +460,7 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
       getLifeGraph().forEach((n) => deleteLifeNode(n.id)); // 记忆节点走正规删除(传导事实库/云)
       purgeLocalData(localStorage);                         // localStorage 全部本机 key 收口清除(保留 auth)
       void purgeIdbBlobs();                                 // IDB blob(健康/临床/地点)一并清 —— 别漏
+      void purgeLocalImages();                              // 隐私审计:记忆照片在独立 IDB(nesio-images),必须一并清,否则「删除」留图在本机
     } catch { /* ignore */ }
     setNodeCount(0);
     setDeleted(true);

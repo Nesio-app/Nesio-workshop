@@ -16,6 +16,10 @@
 
 import { buildFullBackup, restoreFullBackup, isValidBackup, type FullBackup } from './full-backup';
 import { collectIdbBlobs, isIdbBlobKey, idbBackend, registerIdbBlobKey } from './idb-blob-store';
+import { collectLocalImages, restoreLocalImages } from './local-image-store';
+
+/** 备份里照片条目的键前缀(隐私审计:让导出/恢复覆盖记忆照片)。 */
+const LOCAL_IMAGE_PREFIX = 'local-image:';
 
 /** 记忆图谱现主存 IDB(localStorage 5MB 太小)。登记后备份/恢复/清理把它当 IDB blob。 */
 const LIFE_GRAPH_KEY = 'nesio-life-graph-v1';
@@ -94,10 +98,16 @@ export function hasCloudEntitlement(): boolean {
  * 组装完整备份 payload:localStorage durable(manifest 归类)+ IDB blob(已迁走的大数据)。
  * 与设置页「导出完整备份」用同一份枚举,避免两处漂移。
  */
-export async function buildCombinedBackup(): Promise<FullBackup> {
+export async function buildCombinedBackup(opts: { includeImages?: boolean } = {}): Promise<FullBackup> {
   const backup = buildFullBackup(localStorage);
   // 收口:健康/临床/地点/银行已迁 IDB —— 合并 IDB blob,否则云备份漏这些大数据。
   backup.entries = { ...backup.entries, ...(await collectIdbBlobs()) };
+  // 隐私审计:记忆照片在独立 IDB(nesio-images),默认不入(云推送已单独同步为 cloud asset、控体积);
+  // 本机导出 / Drive 全量备份传 includeImages 带上,否则「导出你的全部数据」漏图片。
+  if (opts.includeImages) {
+    const images = await collectLocalImages();
+    for (const [id, url] of Object.entries(images)) backup.entries[`${LOCAL_IMAGE_PREFIX}${id}`] = url;
+  }
   return backup;
 }
 
@@ -169,6 +179,7 @@ export type RestoreMode = 'merge' | 'replace';
 export interface CombinedRestoreResult {
   restoredKeys: number;   // localStorage 侧恢复条数
   idbRestored: number;    // IDB 侧恢复条数
+  imagesRestored?: number; // 恢复的记忆照片数(nesio-images IDB)
   mergedNodes?: number;   // 生命图合并后节点数(merge 模式)
   skippedKeys: string[];
   /** 未能恢复的键:备份数据损坏(LS 侧)或 IDB 写入失败 —— 恢复不谎称成功。 */
@@ -187,8 +198,15 @@ export interface CombinedRestoreResult {
 export async function restoreCombinedBackup(backup: FullBackup, mode: RestoreMode): Promise<CombinedRestoreResult> {
   const lsEntries: Record<string, string> = {};
   const idbEntries: Record<string, string> = {};
+  const imageEntries: Record<string, string> = {};
   for (const [k, v] of Object.entries(backup.entries)) {
-    if (isIdbBlobKey(k)) idbEntries[k] = v; else lsEntries[k] = v;
+    if (k.startsWith(LOCAL_IMAGE_PREFIX)) imageEntries[k.slice(LOCAL_IMAGE_PREFIX.length)] = v;
+    else if (isIdbBlobKey(k)) idbEntries[k] = v; else lsEntries[k] = v;
+  }
+  // 照片写回独立 IDB(nesio-images);替换/合并都直接写(图不可合并,按 assetId 覆盖)
+  let imagesRestored = 0;
+  if (Object.keys(imageEntries).length > 0) {
+    try { imagesRestored = await restoreLocalImages(imageEntries); } catch { /* 图恢复失败不阻塞其余 */ }
   }
 
   const ls = restoreFullBackup(localStorage, { ...backup, entries: lsEntries }, mode);
@@ -219,6 +237,7 @@ export async function restoreCombinedBackup(backup: FullBackup, mode: RestoreMod
   return {
     restoredKeys: ls.restoredKeys,
     idbRestored,
+    imagesRestored,
     mergedNodes: ls.mergedNodes,
     skippedKeys: ls.skippedKeys,
     corruptKeys: [...ls.corruptKeys, ...idbFailedKeys, ...idbCorruptKeys],

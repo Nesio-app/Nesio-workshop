@@ -15,7 +15,8 @@ export interface DriveBackupResult { ok: boolean; at?: string; error?: DriveBack
 /** 把本机全部 durable 数据打包推到用户 Google Drive 的 appDataFolder。 */
 export async function pushBackupToDrive(): Promise<DriveBackupResult> {
   let backup;
-  try { backup = await buildCombinedBackup(); } catch { return { ok: false, error: 'network' }; }
+  // Drive 是全量离机备份,带上照片(Drive 容量大;隐私:备份要完整)。
+  try { backup = await buildCombinedBackup({ includeImages: true }); } catch { return { ok: false, error: 'network' }; }
   try {
     const res = await fetch('/api/portal/drive', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ backup }),

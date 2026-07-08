@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 const src = fs.readFileSync(new URL('../lib/portal/cloud-backup.ts', import.meta.url), 'utf8');
 const js = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 
-function makeCtx({ lsInit = {}, fbEntries = {}, idbBlobs = {}, fetchImpl, idbKeys = [], idbInit = {} } = {}) {
+function makeCtx({ lsInit = {}, fbEntries = {}, idbBlobs = {}, fetchImpl, idbKeys = [], idbInit = {}, localImages = {} } = {}) {
   const lsMap = new Map(Object.entries(lsInit));
   const localStorage = {
     getItem: (k) => (lsMap.has(k) ? lsMap.get(k) : null),
@@ -22,6 +22,7 @@ function makeCtx({ lsInit = {}, fbEntries = {}, idbBlobs = {}, fetchImpl, idbKey
   };
   let lastFetch = null;
   let lastRestore = null;
+  let restoredImages = null;
   const idbStore = new Map(Object.entries(idbInit));
   const idbBackend = {
     get: async (k) => (idbStore.has(k) ? idbStore.get(k) : null),
@@ -50,10 +51,15 @@ function makeCtx({ lsInit = {}, fbEntries = {}, idbBlobs = {}, fetchImpl, idbKey
         registerIdbBlobKey: (k) => { if (!idbKeys.includes(k)) idbKeys.push(k); },
         idbBackend,
       };
+      if (p === './local-image-store') return {
+        collectLocalImages: async () => ({ ...localImages }),
+        restoreLocalImages: async (m) => { restoredImages = { ...m }; return Object.keys(m).length; },
+      };
       return {};
     },
     _lastFetch: () => lastFetch,
     _lastRestore: () => lastRestore,
+    _restoredImages: () => restoredImages,
     _idbStore: () => idbStore,
     _lsMap: lsMap,
   };
@@ -201,6 +207,34 @@ const backupDoc = (entries) => ({ format: 'nesio-full-backup', version: 1, expor
     fetchImpl,
   });
   assert.equal((await mod.pullBackupFromCloud()).error, 'invalid_backup', '坏 blob → invalid_backup');
+}
+
+// 11. 记忆照片导出:includeImages 才带图(默认导出不含图,避免云备份塞满);
+//     图以 local-image: 前缀落 entries(隐私审计:导出要全覆盖,否则删/换机丢照片)
+{
+  const withImg = makeCtx({ localImages: { a1: 'data:jpg;A', a2: 'data:jpg;B' } });
+  const full = await withImg.mod.buildCombinedBackup({ includeImages: true });
+  assert.equal(full.entries['local-image:a1'], 'data:jpg;A', 'includeImages 把照片 a1 打进备份');
+  assert.equal(full.entries['local-image:a2'], 'data:jpg;B', 'includeImages 把照片 a2 打进备份');
+
+  const noImg = makeCtx({ localImages: { a1: 'data:jpg;A' } });
+  const lean = await noImg.mod.buildCombinedBackup();
+  assert.equal(Object.keys(lean.entries).some((k) => k.startsWith('local-image:')), false, '默认不带图(云备份体积门)');
+}
+
+// 12. 记忆照片恢复:local-image: 前缀路由到 restoreLocalImages(nesio-images IDB),
+//     不落 localStorage、不落 blob IDB;imagesRestored 如实计数
+{
+  const { mod, ctx } = makeCtx({ idbKeys: ['nesio-health-v1'] });
+  const res = await mod.restoreCombinedBackup(
+    backupDoc({ 'local-image:a1': 'data:jpg;A', 'local-image:a2': 'data:jpg;B', 'nesio-health-v1': 'H' }),
+    'replace',
+  );
+  assert.equal(res.imagesRestored, 2, '两张照片恢复计数');
+  assert.equal(JSON.stringify(ctx._restoredImages()), JSON.stringify({ a1: 'data:jpg;A', a2: 'data:jpg;B' }), '照片按 assetId 路由到 nesio-images');
+  assert.equal(ctx._idbStore().has('local-image:a1'), false, '照片不落 blob IDB');
+  assert.equal(JSON.stringify(ctx._lastRestore().entries), JSON.stringify({}), '照片不落 localStorage');
+  assert.equal(ctx._idbStore().get('nesio-health-v1'), 'H', '同批非图数据照常恢复');
 }
 
 console.log('cloud-backup: OK');

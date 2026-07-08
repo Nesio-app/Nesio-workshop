@@ -68,3 +68,56 @@ export async function deleteLocalImage(assetId: string): Promise<void> {
     tx.onerror = () => resolve();
   });
 }
+
+/**
+ * 清空所有本机照片。隐私审计:图片存在独立 IDB(nesio-images),不在 nesio-blobs 里,
+ * 「清空本地数据」若只清 blob store 会把照片留在设备上(用户要求删除却没删)。收口用。
+ */
+export async function purgeLocalImages(): Promise<number> {
+  const db = await openDB();
+  if (!db) return 0;
+  return new Promise((resolve) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    const os = tx.objectStore(STORE);
+    const countReq = os.count();
+    os.clear();
+    tx.oncomplete = () => resolve((countReq.result as number) || 0);
+    tx.onerror = () => resolve(0);
+  });
+}
+
+/** 导出用:收集所有本机照片(assetId → dataUrl),让备份能带走图片(否则导出不完整)。 */
+export async function collectLocalImages(): Promise<Record<string, string>> {
+  const db = await openDB();
+  if (!db) return {};
+  return new Promise((resolve) => {
+    const out: Record<string, string> = {};
+    const tx = db.transaction(STORE, 'readonly');
+    const os = tx.objectStore(STORE);
+    const keysReq = os.getAllKeys();
+    const valsReq = os.getAll();
+    tx.oncomplete = () => {
+      const keys = (keysReq.result || []) as IDBValidKey[];
+      const vals = (valsReq.result || []) as string[];
+      keys.forEach((k, i) => { if (typeof vals[i] === 'string') out[String(k)] = vals[i]; });
+      resolve(out);
+    };
+    tx.onerror = () => resolve(out);
+  });
+}
+
+/** 恢复用:把备份里的照片写回本机 IDB。 */
+export async function restoreLocalImages(map: Record<string, string>): Promise<number> {
+  const db = await openDB();
+  if (!db || !map) return 0;
+  return new Promise((resolve) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    const os = tx.objectStore(STORE);
+    let n = 0;
+    for (const [id, dataUrl] of Object.entries(map)) {
+      if (typeof dataUrl === 'string') { os.put(dataUrl, id); n++; }
+    }
+    tx.oncomplete = () => resolve(n);
+    tx.onerror = () => resolve(0);
+  });
+}
