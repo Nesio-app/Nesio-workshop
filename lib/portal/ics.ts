@@ -4,7 +4,27 @@ function unfoldIcs(text: string): string {
   return text.replace(/\r\n/g, '\n').replace(/\n[ \t]/g, '');
 }
 
-function parseIcsDate(value: string): Date | null {
+/**
+ * 时区两段式换算:把「某 IANA 时区的墙上时间」换成正确的 UTC 时刻(零依赖,用 Intl)。
+ * 修复:服务器(UTC)此前把 DTSTART;TZID=America/New_York:...T090000 当服务器本地时间,
+ * 纽约上午 9 点被存成 09:00Z,客户端(纽约)显示成 05:00 —— 正好差一个时区偏移。
+ */
+function zonedWallTimeToUtc(y: number, mo: number, d: number, h: number, mi: number, sec: number, timeZone: string): Date | null {
+  try {
+    const guess = Date.UTC(y, mo - 1, d, h, mi, sec);
+    const dtf = new Intl.DateTimeFormat('en-US', {
+      timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+    });
+    const parts = dtf.formatToParts(new Date(guess));
+    const get = (t: string) => Number(parts.find((x) => x.type === t)?.value ?? NaN);
+    const asWall = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour') % 24, get('minute'), get('second'));
+    if (!Number.isFinite(asWall)) return null;
+    return new Date(guess - (asWall - guess));
+  } catch { return null; } // 未知时区名 → 交回调用方按无 TZID 处理
+}
+
+export function parseIcsDate(value: string, tzid = ''): Date | null { // export: 时区契约直测
   const raw = value.trim();
   if (!raw) return null;
 
@@ -23,6 +43,11 @@ function parseIcsDate(value: string): Date | null {
   if (raw.endsWith('Z')) {
     return new Date(Date.UTC(+y, +mo - 1, +d, +h, +mi, +s));
   }
+  // 带 TZID 的墙上时间:按该时区换算成 UTC 时刻(此前被错当服务器本地时间)
+  if (tzid) {
+    const z = zonedWallTimeToUtc(+y, +mo, +d, +h, +mi, +s, tzid);
+    if (z) return z;
+  }
   return new Date(+y, +mo - 1, +d, +h, +mi, +s);
 }
 
@@ -40,7 +65,9 @@ function eventFromBlock(block: string, calendarName = ''): CalendarEvent | null 
   let uid = '';
   let summary = '';
   let dtstart = '';
+  let dtstartTz = '';
   let dtend = '';
+  let dtendTz = '';
   let description = '';
   let location = '';
   let url = '';
@@ -53,18 +80,18 @@ function eventFromBlock(block: string, calendarName = ''): CalendarEvent | null 
     const base = key.split(';')[0].toUpperCase();
     if (base === 'UID') uid = val.trim();
     if (base === 'SUMMARY') summary = val.trim();
-    if (base === 'DTSTART') dtstart = val.trim();
-    if (base === 'DTEND') dtend = val.trim();
+    if (base === 'DTSTART') { dtstart = val.trim(); dtstartTz = /;TZID=([^;:]+)/i.exec(key)?.[1]?.trim() || ''; }
+    if (base === 'DTEND') { dtend = val.trim(); dtendTz = /;TZID=([^;:]+)/i.exec(key)?.[1]?.trim() || ''; }
     if (base === 'DESCRIPTION') description = icsUnescape(val.trim());
     if (base === 'LOCATION') location = icsUnescape(val.trim());
     if (base === 'URL') url = val.trim();
   }
 
-  const start = parseIcsDate(dtstart);
+  const start = parseIcsDate(dtstart, dtstartTz);
   if (!start || !summary) return null;
 
   const allDay = /^\d{8}$/.test(dtstart.trim());
-  const end = dtend ? parseIcsDate(dtend) : undefined;
+  const end = dtend ? parseIcsDate(dtend, dtendTz || dtstartTz) : undefined;
 
   // Prefer explicit URL, then Zoom URL from location, then Zoom URL from description
   const resolvedUrl = url || (location && /zoom\.us/i.test(location) ? location : '') || extractZoomUrl(description) || extractZoomUrl(location);

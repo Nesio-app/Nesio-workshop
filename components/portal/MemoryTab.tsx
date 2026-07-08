@@ -770,6 +770,35 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
   const [activeProject, setActiveProject] = useState<Project | null>(null);
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [longPressNode, setLongPressNode] = useState<LifeNode | null>(null);
+  // 下拉刷新 = 全源同步(日历/邮件/Flomo/银行,核心在 connector-sync,与设置页各同步按钮同一实现)
+  const [pullSync, setPullSync] = useState<'idle' | 'syncing' | 'done'>('idle');
+  const [pullSummary, setPullSummary] = useState('');
+  const pullStartY = useRef<number | null>(null);
+  const runPullSync = useCallback(async () => {
+    if (pullSync === 'syncing') return;
+    setPullSync('syncing');
+    setPullSummary('');
+    try {
+      const { syncAllConnectors } = await import('@/lib/portal/connector-sync');
+      const outcomes = await syncAllConnectors();
+      const en = locale === 'en';
+      setPullSummary(outcomes.map((o) => (en ? o.detail[1] : o.detail[0])).join(' · '));
+      setNodes(getLifeGraph());
+    } catch {
+      setPullSummary(locale === 'en' ? 'Sync failed — check network and retry' : '同步失败,检查网络后重试');
+    }
+    setPullSync('done');
+    setTimeout(() => setPullSync('idle'), 6000);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pullSync, locale]);
+  const onPullStart = useCallback((e: React.TouchEvent) => {
+    const el = e.currentTarget as HTMLElement;
+    pullStartY.current = el.scrollTop <= 0 ? e.touches[0].clientY : null;
+  }, []);
+  const onPullEnd = useCallback((e: React.TouchEvent) => {
+    if (pullStartY.current !== null && e.changedTouches[0].clientY - pullStartY.current > 70) void runPullSync();
+    pullStartY.current = null;
+  }, [runPullSync]);
   // 收藏夹(批次 20):pin 列表,事件驱动刷新
   const [pinIds, setPinIds] = useState<string[]>([]);
   useEffect(() => {
@@ -909,7 +938,14 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
   return (
     <>
       <div className="nesio-memory-root">
-        <div className="nesio-memory-scroll">
+        <div className="nesio-memory-scroll" onTouchStart={onPullStart} onTouchEnd={onPullEnd}>
+          {pullSync !== 'idle' && (
+            <p className="nesio-settings-option-hint" style={{ textAlign: 'center', margin: '0 0 0.5rem' }}>
+              {pullSync === 'syncing'
+                ? L(dict, '正在同步日历 / 邮件 / Flomo / 银行…', 'Syncing calendar / mail / flomo / bank…')
+                : pullSummary}
+            </p>
+          )}
           {nodes.some(isDemoNode) && (
             <div style={{ background: 'var(--portal-accent-soft, rgba(88,140,227,0.1))', borderRadius: 12, padding: '0.55rem 0.9rem', margin: '0 0 0.6rem', fontSize: '0.72rem', color: 'var(--portal-blue-deep)', display: 'flex', alignItems: 'center', gap: 6 }}>
               <span>{L(dict, '这些是示例数据,让你看看 Nesio 记东西的样子。', 'Sample data to show how Nesio remembers. ')}<a href="/login" style={{ color: 'inherit', fontWeight: 600 }}>{L(dict, '登录', 'Sign in')}</a>{L(dict, '或直接开始记录,就会换成你自己的。', ' or just start noting — it becomes yours.')}</span>

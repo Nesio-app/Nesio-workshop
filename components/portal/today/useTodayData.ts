@@ -287,33 +287,14 @@ export function useTodayData(canUsePrivateData: boolean) {
       ? setInterval(() => { void applyViewModel(); }, 20 * 60_000)
       : null;
 
-    // 连接器批②:Gmail 准实时 —— 首次全量(30 天窗口),之后带 afterTs 增量(Gmail after: 查询,
-    // 只拉/只分析新邮件,AI 成本不随轮询频率线性涨;emailId 去重兜底 5 分钟重叠窗)。
-    // 触发面:进入 Today + 前台每 5 分钟 + 从后台切回即刻;节流 5 分钟。
+    // 连接器批②:Gmail 准实时 —— 核心在 connector-sync(runGmailSync,自带 5 分钟节流 +
+    // 增量 after: 游标,只拉/只分析新邮件);触发面:进入 Today + 前台每 5 分钟 + 从后台切回。
     let gmailCleanup: (() => void) | null = null;
     if (canUsePrivateData && typeof window !== 'undefined') {
-      const GMAIL_SYNC_KEY = 'nesio-gmail-last-sync';
-      const syncGmailIfDue = () => {
-        const lastSync = parseInt(localStorage.getItem(GMAIL_SYNC_KEY) || '0', 10);
-        if (Date.now() - lastSync < 5 * 60_000) return;
-        localStorage.setItem(GMAIL_SYNC_KEY, String(Date.now()));
-        // 增量游标回退 5 分钟,避免边界漏件(重复由 emailId upsert 吸收)
-        const afterTs = lastSync > 0 ? Math.floor(lastSync / 1000) - 300 : 0;
-        fetch(`/api/portal/gmail?includeBody=true&analyze=true${afterTs ? `&afterTs=${afterTs}` : ''}`)
-          .then((r) => r.json())
-          .then((d: { ok?: boolean; nodes?: Array<Record<string, unknown>> }) => {
-            if (d.ok && d.nodes && d.nodes.length > 0) {
-              import('@/lib/portal/life-graph').then(({ addLifeNode }) => {
-                d.nodes!.forEach((n) => ingestLifeNode(n as Parameters<typeof addLifeNode>[0]));
-                window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
-              });
-            }
-          })
-          .catch(() => {});
-      };
-      syncGmailIfDue();
-      const gmailTimer = window.setInterval(syncGmailIfDue, 5 * 60_000);
-      const onVisible = () => { if (document.visibilityState === 'visible') syncGmailIfDue(); };
+      const syncGmail = () => { import('@/lib/portal/connector-sync').then(({ runGmailSync }) => runGmailSync()).catch(() => {}); };
+      syncGmail();
+      const gmailTimer = window.setInterval(syncGmail, 5 * 60_000);
+      const onVisible = () => { if (document.visibilityState === 'visible') syncGmail(); };
       document.addEventListener('visibilitychange', onVisible);
       gmailCleanup = () => { window.clearInterval(gmailTimer); document.removeEventListener('visibilitychange', onVisible); };
     }
