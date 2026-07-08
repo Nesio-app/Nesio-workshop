@@ -835,6 +835,38 @@ export function prunePrivateExternalNodes(): number {
   return removed;
 }
 
+/**
+ * Notion 连接器逐行导入的节点识别(N-0 清理用)。
+ * 判据只认 Notion 连接器写入的痕迹:attributes.source==='Notion' / notionPageId / database。
+ * 刻意不碰「微信读书」手动粘贴导入(那是 source:'manual' + tag「微信读书」,是用户主动录入的高价值数据)。
+ */
+export function isNotionImportedNode(node: LifeNode): boolean {
+  const a = node.attributes || {};
+  return (
+    a.source === 'Notion' ||
+    (typeof a.notionPageId === 'string' && a.notionPageId !== '') ||
+    (typeof a.database === 'string' && a.database !== '')
+  );
+}
+
+/**
+ * 清除所有 Notion 连接器逐行倒进来的记忆(N-0:止血)。
+ * 旧的「勾表→每行一条记忆」灌进大量日期/技术 ID 噪声,收录模型重做前先清干净。
+ * 与 prunePrivateExternalNodes 同构:saveAll 过滤 + 广播删除意图(本地事实库据此清对应 Signal)。
+ * 返回清除条数。
+ */
+export function pruneNotionNodes(): number {
+  const nodes = loadAll();
+  const pruned = nodes.filter(isNotionImportedNode);
+  if (pruned.length === 0) return 0;
+  const filtered = nodes.filter((node) => !isNotionImportedNode(node));
+  saveAll(filtered);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('nesio-life-node-deleted', { detail: { nodes: pruned } }));
+  }
+  return pruned.length;
+}
+
 
 // ── 节点事实 sink(架构审查 #1 残留修复,2026-07-08)────────────────────────
 // updateLifeNode 此前只写投影(localStorage)+云,不写本地 IDB 事实库 ——
