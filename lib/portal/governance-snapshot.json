@@ -1,26 +1,25 @@
 {
-  "generatedAt": "2026-07-06T16:57:23.825Z",
+  "generatedAt": "2026-07-08T03:28:34.843Z",
   "status": "warn",
   "summary": {
-    "moduleCount": 11,
-    "readyModuleCount": 4,
+    "moduleCount": 8,
+    "readyModuleCount": 2,
     "externalLinkCount": 6,
-    "approvalGateContractCount": 8,
-    "approvalGateKnownActionCount": 17
+    "approvalGateContractCount": 6,
+    "approvalGateKnownActionCount": 14
   },
   "dataBus": {
-    "dataKeyCount": 34,
-    "connectedDataKeyCount": 7,
-    "orphanedDataKeyCount": 27,
-    "edgeCount": 23,
+    "dataKeyCount": 24,
+    "connectedDataKeyCount": 0,
+    "orphanedDataKeyCount": 18,
+    "edgeCount": 0,
     "warningCount": 0
   },
   "driftGuardWarnings": 0,
   "statusCounts": {
     "enforced": 7,
-    "report-only": 17,
+    "report-only": 10,
     "dead": 1,
-    "dormant": 3,
-    "drifted": 1
+    "dormant": 3
   }
 }

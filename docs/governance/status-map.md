@@ -15,7 +15,7 @@ _真正在保护你/驱动 UI 的治理,现在就在跑。_
 | **DEC 访问边界**<br/><sub>`lib/portal/dec-access-boundary.ts`</sub> | 🟢 已强制执行 | 洞察卡 DEC 数据的分类访问边界 | 2 个 app 路由 |
 | **App API 契约 v0**<br/><sub>`lib/portal/app-api-contract-v0.mjs`</sub> | 🟢 已强制执行 | app 与本地数据的 API 面 | 5 个 app 路由 |
 | **DEC 数据 API**<br/><sub>`lib/portal/dec-data-api.mjs`</sub> | 🟢 已强制执行 | 洞察卡按领域取数 | dec/[category] 路由(真数据) |
-| **AI 供应商路由契约**<br/><sub>`lib/portal/ai-provider-router-contract.mjs`</sub> | 🔴 契约漂移 | AI provider 选择/降级策略<br/><sub>⚠ 漂移:真 AI 运行时 ai-complete.ts 完全不按此契约;契约说一套、代码做一套</sub> | report:modules + 测试(运行时 ai-complete.ts 不 import) |
+| **AI 供应商路由契约**<br/><sub>`lib/portal/ai-provider-router-contract.mjs`</sub> | 🟡 仅报告聚合 | AI provider 选择/降级策略<br/><sub>漂移已消除(架构审查 #8):契约与 ai-complete.ts 共读 ai-provider-chain.mjs 单一回退链源</sub> | report:modules + 测试(运行时 ai-complete.ts 不 import) |
 
 ## Shell 与模块注册
 
@@ -54,10 +54,6 @@ _安全事件、云就绪、生产激活、独立上架的就绪度报告。_
 
 | 治理面 | 状态 | 治理什么 | 消费方 |
 |---|---|---|---|
-| **安全事件就绪**<br/><sub>`lib/portal/security-incident-readiness-contract.mjs`</sub> | 🟡 仅报告聚合 | 事件类型/严重度/各模块就绪 | report:modules |
-| **云就绪**<br/><sub>`lib/portal/cloud-readiness-contract.mjs`</sub> | 🟡 仅报告聚合 | 云 provider/同步冲突/导出删除语义 | report:modules |
-| **生产激活**<br/><sub>`lib/portal/production-activation-contract.mjs`</sub> | 🟡 仅报告聚合 | 生产开关的激活门 | report:modules |
-| **独立上架就绪**<br/><sub>`lib/portal/standalone-app-readiness-contract.mjs`</sub> | 🟡 仅报告聚合 | 独立 app 上架就绪 | report:modules |
 | **注册表漂移守卫**<br/><sub>`lib/portal/(registry drift guard)`</sub> | 🟡 仅报告聚合 | 模块元数据缺失/漂移告警 | report:modules + report-drift.mjs |
 
 ## 生命周期与合规
@@ -67,9 +63,6 @@ _权限同意、数据版本、身份升级、离线冲突等契约。_
 | 治理面 | 状态 | 治理什么 | 消费方 |
 |---|---|---|---|
 | **权限同意**<br/><sub>`lib/portal/(permission-consent)`</sub> | 🟡 仅报告聚合 | 权限/同意矩阵 | report:modules |
-| **工具数据版本**<br/><sub>`lib/portal/tool-data-versioning-contract.mjs`</sub> | 🟡 仅报告聚合 | 工具数据的版本迁移 | report:modules |
-| **身份升级**<br/><sub>`lib/portal/user-identity-upgrade-contract.mjs`</sub> | 🟡 仅报告聚合 | 匿名→账号 的身份升级 | report:modules |
-| **离线同步冲突**<br/><sub>`lib/portal/offline-sync-conflict-contract.mjs`</sub> | 🟡 仅报告聚合 | 离线/冲突解决策略 | report:modules |
 | **Web 表面契约**<br/><sub>`lib/portal/web-surface-contract-v0.mjs`</sub> | 🟡 仅报告聚合 | Web 暴露面 | report:modules |
 | **设计系统契约**<br/><sub>`lib/portal/nesio-design-system-contract.mjs`</sub> | 🟡 仅报告聚合 | 设计 token 契约 | report:modules |
 
@@ -80,5 +73,4 @@ _第三方/独立模块的接入契约 —— 若走 ADE/interop 方向,种子�
 | 治理面 | 状态 | 治理什么 | 消费方 |
 |---|---|---|---|
 | **外部模块桥接**<br/><sub>`lib/portal/external-bridge-contract.mjs`</sub> | 🟡 休眠种子 | 第三方模块(quiz/reading/health…)接入语义<br/><sub>当前=链接占位,notes 均「需 CEO Gate 后再接 API」;走 interop 方向的种子</sub> | dec-data-api |
-| **模块适配契约**<br/><sub>`lib/portal/module-adapter-contract.mjs`</sub> | 🟡 仅报告聚合 | 模块适配版本 | scripts/report-module-registry.mjs |
 

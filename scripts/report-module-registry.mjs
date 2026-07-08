@@ -4,16 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { buildModuleRegistry } from '../lib/portal/module-manager-core.mjs';
 import { buildLocalDataRecordsV0 } from '../lib/portal/local-data-records.mjs';
 import { buildModuleDataBus } from '../lib/portal/module-data-bus.mjs';
-import { buildModuleAdapterContract } from '../lib/portal/module-adapter-contract.mjs';
-import { buildStandaloneAppReadinessContract } from '../lib/portal/standalone-app-readiness-contract.mjs';
-import { buildSecurityIncidentReadinessContract } from '../lib/portal/security-incident-readiness-contract.mjs';
 import { buildModuleProductContractV0 } from '../lib/portal/module-product-contract-v0.mjs';
 import { buildWebSurfaceContractV0 } from '../lib/portal/web-surface-contract-v0.mjs';
-import { buildToolDataVersioningContract } from '../lib/portal/tool-data-versioning-contract.mjs';
-import { buildUserIdentityUpgradeContract } from '../lib/portal/user-identity-upgrade-contract.mjs';
-import { buildOfflineSyncConflictContract } from '../lib/portal/offline-sync-conflict-contract.mjs';
-import { buildCloudReadinessContract } from '../lib/portal/cloud-readiness-contract.mjs';
-import { buildProductionActivationContract } from '../lib/portal/production-activation-contract.mjs';
 import { buildAiProviderRouterContract } from '../lib/portal/ai-provider-router-contract.mjs';
 import { buildAgentRuntimeReportV0 } from '../lib/intelligence/agent-runtime-report.mjs';
 import { buildStage5ToolInvocationReport } from '../lib/intelligence/tool-invocation-runtime.mjs';
@@ -2146,38 +2138,13 @@ const reportToolsWithLaunchState = tools.map((tool) => ({
   toolLifecycle: lifecycleForTool(tool).lifecycle,
   prodExposure: tool.prodExposure || tool.toolManifest?.prodExposure,
 }));
-const standaloneAppReadinessContract = buildStandaloneAppReadinessContract(reportToolsWithLaunchState);
-const securityIncidentReadinessContract = buildSecurityIncidentReadinessContract(
-  reportToolsWithLaunchState,
-  featureControlModules,
-);
 const moduleProductContract = buildModuleProductContractV0(reportToolsWithLaunchState);
 const webSurfaceContract = buildWebSurfaceContractV0({
   modules: reportToolsWithLaunchState,
   moduleProductContract,
   mobileAppIntegration: mobileAppIntegrationContract,
 });
-const moduleAdapterContract = buildModuleAdapterContract(launchSkuModules.filter((entry) => entry.moduleId !== 'shell').map((entry) => {
-  const tool = tools.find((candidate) => candidate.id === entry.moduleId);
-  return {
-    ...tool,
-    launchStatus: entry.launchStatus,
-    toolLifecycle: entry.toolLifecycle,
-  };
-}));
-const toolDataVersioningContract = buildToolDataVersioningContract(tools.map((tool) => ({
-  ...tool,
-  launchStatus: launchStatusForTool(tool),
-})));
-const userIdentityUpgradeContract = buildUserIdentityUpgradeContract(config);
-const offlineSyncConflictContract = buildOfflineSyncConflictContract(reportToolsWithLaunchState);
-const cloudReadinessContract = buildCloudReadinessContract({
-  userIdentityUpgrade: userIdentityUpgradeContract,
-  offlineSyncConflict: offlineSyncConflictContract,
-});
-const productionActivationContract = buildProductionActivationContract();
 const productionActivationProvidersById = new Map(
-  productionActivationContract.providers.map((provider) => [provider.id, provider]),
 );
 const googleCalendarProductionProvider = productionActivationProvidersById.get('google_calendar');
 const flomoProductionProvider = productionActivationProvidersById.get('flomo');
@@ -2332,14 +2299,6 @@ const evidenceSummary = {
     killedModuleCount: featureControlSummary.killedModuleCount,
     featureControlEntryActionEnabledCount: featureControlSummary.entryActionEnabledCount,
     remoteFeatureControlEnabled: featureControlSummary.remoteFeatureControlEnabled,
-    standaloneReadinessVersion: standaloneAppReadinessContract.version,
-    standaloneReadinessReadyNowCount: standaloneAppReadinessContract.summary.readyNowCount,
-    standaloneReadinessPossibleLaterCount: standaloneAppReadinessContract.summary.possibleLaterCount,
-    standaloneReadinessWarningCount: standaloneAppReadinessContract.summary.warningCount,
-    securityIncidentReadinessVersion: securityIncidentReadinessContract.version,
-    securityIncidentHighRiskModuleCount: securityIncidentReadinessContract.summary.highRiskModuleCount,
-    securityIncidentRealActionEnabledCount: securityIncidentReadinessContract.summary.realActionEnabledCount,
-    securityIncidentWarningCount: securityIncidentReadinessContract.summary.warningCount,
     moduleProductContractVersion: moduleProductContract.version,
     moduleProductContractModuleCount: moduleProductContract.summary.moduleCount,
     moduleProductPublicVisibleCount: moduleProductContract.summary.publicVisibleCount,
@@ -2378,40 +2337,6 @@ const evidenceSummary = {
     materialLibraryModuleCount: registry.materialLibrarySummary?.moduleCount || 0,
     governanceResolverVersion: GOVERNANCE_RESOLVER_VERSION_V1,
     governanceResolverStageCount: registry.domainCapabilityTaxonomy.governanceResolverOrder.length,
-    moduleAdapterContractVersion: moduleAdapterContract.version,
-    modularMonolithArchitecture: moduleAdapterContract.architecture,
-    standaloneAppModuleCount: moduleAdapterContract.summary.standaloneAppCount,
-    extractableNowCount: moduleAdapterContract.summary.extractableNowCount,
-    adapterContractWarningCount: moduleAdapterContract.summary.warningCount,
-    toolDataVersioningContractVersion: toolDataVersioningContract.version,
-    toolDataMigrationPlanCoverageCount: toolDataVersioningContract.summary.migrationPlanCoverageCount,
-    toolDataRealMigrationEnabledCount: toolDataVersioningContract.summary.realMigrationEnabledCount,
-    toolDataCeoGateRequiredForRealMigration: toolDataVersioningContract.boundaries.realDataMigrationRequiresCeoGate,
-    toolDataVersioningWarningCount: toolDataVersioningContract.summary.warningCount,
-    accountSystemEnabled: userIdentityUpgradeContract.summary.accountSystemEnabled,
-    supportedAuthProviderCount: userIdentityUpgradeContract.summary.supportedAuthProviderCount,
-    currentProfileKind: userIdentityUpgradeContract.summary.currentProfileKind,
-    serverUserIdEnabled: userIdentityUpgradeContract.summary.serverUserIdEnabled,
-    identityUpgradePathReadable: userIdentityUpgradeContract.summary.identityUpgradePathReadable,
-    syncEnabledModuleCount: offlineSyncConflictContract.summary.syncEnabledModuleCount,
-    cloudSyncEnabled: offlineSyncConflictContract.summary.cloudSyncEnabled,
-    offlineQueueEnabledNow: offlineSyncConflictContract.summary.offlineQueueEnabledNow,
-    syncConflictModelReadable: offlineSyncConflictContract.summary.syncConflictModelReadable,
-    inventorySyncReadiness: offlineSyncConflictContract.summary.inventorySyncReadiness,
-    cloudReadinessVersion: cloudReadinessContract.summary.cloudReadinessVersion,
-    cloudEnabled: cloudReadinessContract.summary.cloudEnabled,
-    realCloudProviderConnected: cloudReadinessContract.summary.realCloudProviderConnected,
-    cloudProviderCandidateCount: cloudReadinessContract.summary.cloudProviderCandidateCount,
-    configuredCloudProviderCount: cloudReadinessContract.summary.configuredCloudProviderCount,
-    enabledCloudProviderCount: cloudReadinessContract.summary.enabledCloudProviderCount,
-    inventoryCloudSchemaDraftReady: cloudReadinessContract.summary.inventoryCloudSchemaDraftReady,
-    futureCloudEligibleTableCount: cloudReadinessContract.summary.futureCloudEligibleTableCount,
-    productionActivationVersion: productionActivationContract.version,
-    productionActivationCeoApproved: productionActivationContract.summary.ceoApproved,
-    productionActivationProviderCount: productionActivationContract.summary.providerCount,
-    productionActivationConfiguredProviderCount: productionActivationContract.summary.configuredProviderCount,
-    productionActivationMissingEnvProviderCount: productionActivationContract.summary.missingEnvProviderCount,
-    productionActivationReady: productionActivationContract.summary.productionReady,
     googleCalendarProviderStatus: googleCalendarProductionProvider?.status || 'unknown',
     googleCalendarConfigured: googleCalendarProductionProvider?.configured === true,
     googleCalendarRuntimeEnabled: googleCalendarProductionProvider?.runtimeEnabled === true,
@@ -2632,8 +2557,6 @@ const evidenceSummary = {
   },
   permissionConsent: permissionConsentContract,
   featureControl: featureControlContract,
-  standaloneAppReadiness: standaloneAppReadinessContract,
-  securityIncidentReadiness: securityIncidentReadinessContract,
   moduleProductContract,
   moduleTrustBoundary: moduleProductContract.moduleTrustBoundary,
   coreObjectModels: moduleProductContract.coreObjectModels,
@@ -2721,15 +2644,9 @@ const evidenceSummary = {
       evidenceLinks: module.toolManifest?.evidenceLinks || [],
     }])),
   },
-  moduleAdapterContract,
-  toolDataVersioning: toolDataVersioningContract,
-  userIdentityUpgrade: userIdentityUpgradeContract,
-  offlineSyncConflict: offlineSyncConflictContract,
-  cloudReadiness: cloudReadinessContract,
   aiProviderRouter: aiProviderRouterContract,
   agentRuntime: agentRuntimeReport,
   stage5ToolInvocation: stage5ToolInvocationReport,
-  productionActivation: productionActivationContract,
   moduleDataBus: {
     implementation: moduleDataBus.implementation,
     summary: moduleDataBus.summary,

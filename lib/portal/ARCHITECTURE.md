@@ -58,9 +58,6 @@ scattered component-level checks for launch/gate/paywall state.
 - `module-manifest.ts`
 - `tool-manifest-v0.mjs`
 - `module-product-contract-v0.mjs`
-- `module-adapter-contract.mjs`
-- `tool-data-versioning-contract.mjs`
-- `standalone-app-readiness-contract.mjs`
 
 Rule: new module-level fields should start in the manifest/product contract layer
 and then be consumed by reports and Shell. Do not create a second status schema
@@ -73,9 +70,6 @@ inside components or scripts.
 - `module-data-network-db.mjs`
 - `local-data-records.mjs`
 - `local-data-records.d.ts`
-- `inventory-first-launch-contract.mjs`
-- `offline-sync-conflict-contract.mjs`
-- `cloud-readiness-contract.mjs`
 - `external-bridge-contract.mjs`
 - `app-api-contract-v0.mjs`
 - `app-api-client.ts`
@@ -89,7 +83,10 @@ real external behavior.
 
 ### Risk, Governance, And Reports
 
-- `security-incident-readiness-contract.mjs`
+> 架构审查 #7(2026-07):8 份空转 report-only 就绪契约已删除
+>(安全事件/云就绪/生产激活/独立上架/身份升级/离线冲突/工具数据版本/模块适配)。
+> 活的对应物是 production-runtime 契约(activation-checklist API)与 test:security 门禁链。
+
 - `hardcode-remediation-classifier.mjs`
 - `ai-provider-router-contract.mjs`
 - `web-surface-contract-v0.mjs`
