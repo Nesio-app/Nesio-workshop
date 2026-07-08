@@ -23,6 +23,11 @@ type GoogleCalendarItem = {
   htmlLink?: string;
   start?: { dateTime?: string; date?: string };
   end?: { dateTime?: string; date?: string };
+  // 免费最大化·Calendar:响应自带、此前全丢弃的字段(同 calendar.readonly scope,免费)
+  location?: string;
+  organizer?: { email?: string; displayName?: string; self?: boolean };
+  attendees?: Array<{ email?: string; displayName?: string; responseStatus?: string; self?: boolean; organizer?: boolean }>;
+  conferenceData?: { entryPoints?: Array<{ entryPointType?: string; uri?: string; label?: string }> };
 };
 
 function hasStage5LabAccess(req: NextRequest): boolean {
@@ -168,11 +173,27 @@ function extractZoomFromText(text: string): string {
   return m ? m[0] : '';
 }
 
+// 免费最大化·Calendar:conferenceData 的视频入会链接优先(video/其它),比正则从
+// description 里抠 zoom 链接更可靠(Google Meet/Zoom 都在 entryPoints 里)。
+function conferenceUrl(item: GoogleCalendarItem): string {
+  const eps = item.conferenceData?.entryPoints || [];
+  const video = eps.find((e) => e.entryPointType === 'video' && e.uri);
+  if (video?.uri) return video.uri;
+  const any = eps.find((e) => e.uri);
+  return any?.uri || '';
+}
+
 function mapGoogleCalendarItem(item: GoogleCalendarItem) {
   const start = item.start?.dateTime || item.start?.date || '';
   const end = item.end?.dateTime || item.end?.date || start;
   const desc = item.description || '';
-  const zoomUrl = extractZoomFromText(desc);
+  // 一键入会链接:conferenceData 优先 → description 里的 zoom → htmlLink 兜底
+  const meetingUrl = conferenceUrl(item) || extractZoomFromText(desc);
+  // 与会人名单(去掉自己),供会前简报「和 X、Y 开会」
+  const attendees = (item.attendees || [])
+    .filter((a) => !a.self && (a.displayName || a.email))
+    .map((a) => a.displayName || a.email || '')
+    .filter(Boolean);
   return {
     id: item.id || `${item.summary || 'google-event'}-${start}`,
     title: item.summary || 'Untitled event',
@@ -181,8 +202,12 @@ function mapGoogleCalendarItem(item: GoogleCalendarItem) {
     end,
     calendarName: 'Google Calendar',
     source: 'Google Calendar',
-    // Zoom link takes priority over generic htmlLink (Google Calendar page)
-    url: zoomUrl || item.htmlLink || '',
+    // Meeting/Zoom link takes priority over generic htmlLink (Google Calendar page)
+    url: meetingUrl || item.htmlLink || '',
+    location: item.location || undefined,
+    organizer: item.organizer?.displayName || item.organizer?.email || undefined,
+    attendees: attendees.length ? attendees : undefined,
+    meetingUrl: meetingUrl || undefined,
   };
 }
 
