@@ -280,7 +280,9 @@ async function buildCloudUserDataDeleteResponse({
       writesCloud: false,
       dryRun,
     });
-    return null;
+    // 云已配置但会话过期/未登录:真删除绝不能落进本地 mock 假成功
+    //(合规级「以为删了其实云端一条没删」)。dryRun 预览可降级为本地。
+    return dryRun ? null : { authRequired: true as const };
   }
   const withRefreshedSession = <T extends Record<string, unknown>>(body: T) => ({
     body,
@@ -472,6 +474,13 @@ export async function POST(request: NextRequest) {
   try {
     const cloudResponse = await buildCloudUserDataDeleteResponse({ dryRun, confirmation, auditId });
     if (cloudResponse) {
+      if ('authRequired' in cloudResponse) {
+        // 云已配置但未登录:真删除返回 401 auth_required,绝不谎称删除成功
+        return NextResponse.json(
+          { auditId, ok: false, error: 'auth_required', requiresSignIn: true, dryRun: false },
+          { status: 401 },
+        );
+      }
       return setRefreshedAuthCookies(NextResponse.json(cloudResponse.body, { status: cloudResponse.body.ok ? 200 : 400 }), cloudResponse.refreshedSession);
     }
   } catch (error) {

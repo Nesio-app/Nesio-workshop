@@ -41,7 +41,7 @@ function makeCtx({ lsInit = {}, fbEntries = {}, idbBlobs = {}, fetchImpl, idbKey
       if (p === './full-backup') return {
         buildFullBackup: () => ({ format: 'nesio-full-backup', version: 1, exportedAt: '2026-01-01T00:00:00.000Z', entries: { ...fbEntries } }),
         // 捕获 localStorage 侧收到的 entries(验证路由);返回条数
-        restoreFullBackup: (_storage, backup, mode) => { lastRestore = { entries: backup.entries, mode }; return { restoredKeys: Object.keys(backup.entries).length, skippedKeys: [], mergedNodes: undefined }; },
+        restoreFullBackup: (_storage, backup, mode) => { lastRestore = { entries: backup.entries, mode }; return { restoredKeys: Object.keys(backup.entries).length, skippedKeys: [], corruptKeys: [], mergedNodes: undefined }; },
         isValidBackup: (v) => !!(v && typeof v === 'object' && v.entries && v.format === 'nesio-full-backup'),
       };
       if (p === './idb-blob-store') return {

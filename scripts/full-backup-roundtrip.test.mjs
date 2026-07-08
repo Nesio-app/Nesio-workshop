@@ -97,6 +97,23 @@ const { buildFullBackup, isValidBackup, restoreFullBackup } = loadLib();
   assert.equal(device.getItem('nesio-projects-v1'), '[{"id":"local"}]', 'merge never clobbers existing keys');
 }
 
+// ── Drill 2b: 备份里 life-graph 损坏 —— 不静默当空覆盖本机(静默失败审计 #3)──
+{
+  const localGraph = JSON.stringify([{ id: 'keep', name: '本机记忆', createdAt: '2026-07-01' }]);
+  const backup = {
+    format: 'nesio-full-backup', version: 1, exportedAt: '2026-07-01',
+    entries: { 'nesio-life-graph-v1': '{半截损坏的 JSON', 'nesio-projects-v1': '[{"id":"p1"}]' },
+  };
+  const device = fakeStorage({ 'nesio-life-graph-v1': localGraph });
+  const result = restoreFullBackup(device, backup, 'merge');
+  // corruptKeys 是 vm 子 realm 的数组,跨 realm deepStrictEqual 会因原型不同判不等 → 逐元素比
+  assert.equal(result.corruptKeys.length, 1, '损坏备份条目记入 corruptKeys(1 项)');
+  assert.equal(result.corruptKeys[0], 'nesio-life-graph-v1', 'corruptKeys 含 life-graph 键');
+  assert.equal(device.getItem('nesio-life-graph-v1'), localGraph, '本机原串保留、未被空覆盖(抢救机会不失)');
+  assert.equal(result.mergedNodes, undefined, '损坏则不计合并节点数');
+  assert.equal(device.getItem('nesio-projects-v1'), '[{"id":"p1"}]', '其余有效键正常恢复');
+}
+
 // ── Drill 3: invalid files rejected ──────────────────────────────────────────
 {
   assert.equal(isValidBackup(null), false);

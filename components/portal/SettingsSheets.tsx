@@ -350,11 +350,19 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
     // 修了旧 restoreFullBackup 全写 localStorage 在 replace 模式对已迁 IDB 数据静默失效的坑。
     const result = await restoreCombinedBackup(parsed, replace ? 'replace' : 'merge');
     const total = result.restoredKeys + result.idbRestored;
-    setRestoreMsg(L(dict,
-      `✓ 已恢复 ${total} 项${result.mergedNodes != null ? `，记忆合并后共 ${result.mergedNodes} 条` : ''} · 正在刷新…`,
-      `✓ Restored ${total} entries${result.mergedNodes != null ? `, ${result.mergedNodes} memories after merge` : ''} · refreshing…`));
+    const corrupt = result.corruptKeys.length;
+    if (corrupt > 0) {
+      // 静默失败审计:备份里有损坏条目未能恢复 —— 不谎称完全成功,如实告知(本机原串已保留)
+      setRestoreMsg(L(dict,
+        `已恢复 ${total} 项，但有 ${corrupt} 项备份数据损坏未能恢复（本机原数据已保留，未被覆盖）· 正在刷新…`,
+        `Restored ${total} entries, but ${corrupt} were corrupt in the backup and could not be restored (your local data was kept, not overwritten) · refreshing…`));
+    } else {
+      setRestoreMsg(L(dict,
+        `✓ 已恢复 ${total} 项${result.mergedNodes != null ? `，记忆合并后共 ${result.mergedNodes} 条` : ''} · 正在刷新…`,
+        `✓ Restored ${total} entries${result.mergedNodes != null ? `, ${result.mergedNodes} memories after merge` : ''} · refreshing…`));
+    }
     // 恢复含 IDB blob —— reload 让各 blob store 重新水合(缓存是加载时读的)
-    setTimeout(() => window.location.reload(), 900);
+    setTimeout(() => window.location.reload(), corrupt > 0 ? 2600 : 900);
   }
 
   useEffect(() => {

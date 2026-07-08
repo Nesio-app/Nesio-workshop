@@ -52,25 +52,33 @@ export interface RestoreResult {
   restoredKeys: number;
   mergedNodes?: number;
   skippedKeys: string[];
+  /** 备份里损坏/不可解析、无法恢复的键(不覆盖本机原串,返回给 UI 提示)。 */
+  corruptKeys: string[];
 }
 
 interface GraphNodeLike { id?: string; createdAt?: string }
 
-/** Union two life-graph arrays by node id, keeping the newer copy. */
-function mergeLifeGraphs(currentRaw: string | null, incomingRaw: string): string {
-  const parse = (s: string | null): GraphNodeLike[] => {
-    try { const v = JSON.parse(s || '[]'); return Array.isArray(v) ? v : []; }
-    catch { return []; }
+/**
+ * Union two life-graph arrays by node id, keeping the newer copy.
+ * 关键:区分「备份该条损坏」与「空」。备份(incoming)解析失败/非数组 →
+ * corrupt=true、merged=null,调用方据此**不写回**(否则静默当空覆盖本机 =
+ * 假成功)。本机(current)损坏时当空并入(备份有效即视为一次有效恢复)。
+ */
+function mergeLifeGraphs(currentRaw: string | null, incomingRaw: string): { merged: string | null; corrupt: boolean } {
+  const parse = (s: string | null): GraphNodeLike[] | null => {
+    try { const v = JSON.parse(s || '[]'); return Array.isArray(v) ? v : null; }
+    catch { return null; }
   };
-  const current = parse(currentRaw);
   const incoming = parse(incomingRaw);
+  if (incoming === null) return { merged: null, corrupt: true };
+  const current = parse(currentRaw) ?? [];
   const byId = new Map<string, GraphNodeLike>();
   for (const n of [...current, ...incoming]) {
     if (!n?.id) continue;
     const prev = byId.get(n.id);
     if (!prev || String(n.createdAt || '') > String(prev.createdAt || '')) byId.set(n.id, n);
   }
-  return JSON.stringify(Array.from(byId.values()));
+  return { merged: JSON.stringify(Array.from(byId.values())), corrupt: false };
 }
 
 /**
@@ -85,6 +93,7 @@ export function restoreFullBackup(
   mode: 'merge' | 'replace',
 ): RestoreResult {
   const skippedKeys: string[] = [];
+  const corruptKeys: string[] = [];
   let restoredKeys = 0;
   let mergedNodes: number | undefined;
 
@@ -92,7 +101,12 @@ export function restoreFullBackup(
     if (!isBackupKey(key)) { skippedKeys.push(key); continue; }
 
     if (mode === 'merge' && key === 'nesio-life-graph-v1') {
-      const merged = mergeLifeGraphs(storage.getItem(key), value);
+      const { merged, corrupt } = mergeLifeGraphs(storage.getItem(key), value);
+      if (corrupt || merged === null) {
+        // 备份该条损坏:不能静默当空覆盖本机 → 记为损坏,保留本机原串抢救机会
+        corruptKeys.push(key);
+        continue;
+      }
       storage.setItem(key, merged);
       try { mergedNodes = (JSON.parse(merged) as unknown[]).length; } catch { /* count unavailable */ }
       restoredKeys++;
@@ -108,5 +122,5 @@ export function restoreFullBackup(
     restoredKeys++;
   }
 
-  return { restoredKeys, mergedNodes, skippedKeys };
+  return { restoredKeys, mergedNodes, skippedKeys, corruptKeys };
 }

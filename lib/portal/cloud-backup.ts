@@ -143,6 +143,8 @@ export interface CombinedRestoreResult {
   idbRestored: number;    // IDB 侧恢复条数
   mergedNodes?: number;   // 生命图合并后节点数(merge 模式)
   skippedKeys: string[];
+  /** 未能恢复的键:备份数据损坏(LS 侧)或 IDB 写入失败 —— 恢复不谎称成功。 */
+  corruptKeys: string[];
 }
 
 /**
@@ -164,15 +166,25 @@ export async function restoreCombinedBackup(backup: FullBackup, mode: RestoreMod
   const ls = restoreFullBackup(localStorage, { ...backup, entries: lsEntries }, mode);
 
   let idbRestored = 0;
+  const idbFailedKeys: string[] = [];
   for (const [k, v] of Object.entries(idbEntries)) {
     try {
       if (mode === 'merge' && (await idbBackend.get(k)) != null) continue; // merge:已有不覆盖
       await idbBackend.set(k, v);
       idbRestored++;
-    } catch { /* 单 key 落库失败不影响其余 */ }
+    } catch {
+      // 单 key 落库失败:不影响其余,但记账 —— 恢复不能对这条谎称成功
+      idbFailedKeys.push(k);
+    }
   }
 
-  return { restoredKeys: ls.restoredKeys, idbRestored, mergedNodes: ls.mergedNodes, skippedKeys: ls.skippedKeys };
+  return {
+    restoredKeys: ls.restoredKeys,
+    idbRestored,
+    mergedNodes: ls.mergedNodes,
+    skippedKeys: ls.skippedKeys,
+    corruptKeys: [...ls.corruptKeys, ...idbFailedKeys],
+  };
 }
 
 export type CloudRestoreError = CloudBackupError | 'no_backup' | 'invalid_backup';

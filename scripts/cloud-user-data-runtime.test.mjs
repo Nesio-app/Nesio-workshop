@@ -95,6 +95,13 @@ for (const marker of [
 assert.doesNotMatch(exportRoute, /SUPABASE_SERVICE_ROLE_KEY[\s\S]{0,160}NextResponse\.json/, 'export route must not serialize service role secrets.');
 assert.doesNotMatch(deleteRoute, /SUPABASE_SERVICE_ROLE_KEY[\s\S]{0,160}NextResponse\.json/, 'delete route must not serialize service role secrets.');
 
+// 静默失败审计 #2:云已配置但未登录时,真删除必须返回 401 auth_required,
+// 绝不能落进本地 mock 返回 ok:true(合规级「以为删了其实云端一条没删」)。
+for (const marker of ['authRequired', 'auth_required', 'requiresSignIn']) {
+  assert.ok(deleteRoute.includes(marker), `delete route missing not-signed-in guard marker: ${marker}`);
+}
+assert.match(deleteRoute, /'authRequired' in cloudResponse[\s\S]{0,400}status:\s*401/, 'delete route must return 401 when cloud is configured but session is not signed in for a real delete.');
+
 for (const marker of [
   'cloudExportKind',
   'cloudDeleteKind',
