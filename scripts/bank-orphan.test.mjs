@@ -26,14 +26,14 @@ const txCategory = (() => {
 })();
 
 function loadBank() {
-  const src = fs.readFileSync(new URL('../lib/portal/bank-tx.ts', import.meta.url), 'utf8');
+  const src = fs.readFileSync(new URL('../lib/portal/providers/bank-tx.ts', import.meta.url), 'utf8');
   const js = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const mod = { exports: {} };
   vm.runInNewContext(js, {
     module: mod, exports: mod.exports, console, Math, Number, Array, Date, Set, Map, Object, JSON,
-    require: (p) => p === './storage-health' ? { reportStorageDropped() {} }
-      : p === './tx-category' ? txCategory
-      : p === './idb-blob-store' ? { createBlobStore: fakeCreateBlobStore } : ({}),
+    require: (p) => p === '../storage-health' ? { reportStorageDropped() {} }
+      : p === '../tx-category' ? txCategory
+      : p === '../idb-blob-store' ? { createBlobStore: fakeCreateBlobStore } : ({}),
   });
   return mod.exports;
 }

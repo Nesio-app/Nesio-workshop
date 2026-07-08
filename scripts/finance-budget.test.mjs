@@ -34,16 +34,16 @@ function loadTs(path, requireImpl) {
   return mod.exports;
 }
 const txCategory = loadTs('../lib/portal/tx-category.ts', () => ({}));
-const bank = loadTs('../lib/portal/bank-tx.ts', (p) =>
-  p === './storage-health' ? { reportStorageDropped() {} }
-  : p === './tx-category' ? txCategory
-  : p === './idb-blob-store' ? { createBlobStore: fakeCreateBlobStore } : ({}));
+const bank = loadTs('../lib/portal/providers/bank-tx.ts', (p) =>
+  p === '../storage-health' ? { reportStorageDropped() {} }
+  : p === '../tx-category' ? txCategory
+  : p === '../idb-blob-store' ? { createBlobStore: fakeCreateBlobStore } : ({}));
 const features = loadTs('../lib/portal/finance-features.ts', (p) => (p === './bank-tx' ? bank : ({})));
 const budget = loadTs('../lib/portal/finance-budget.ts', (p) =>
   p === './bank-tx' ? bank
   : p === './finance-features' ? features
-  : p === './tx-category' ? txCategory
-  : p === './storage-health' ? { reportStorageDropped() {} } : ({}));
+  : p === '../tx-category' ? txCategory
+  : p === '../storage-health' ? { reportStorageDropped() {} } : ({}));
 
 const NOW = new Date('2026-07-15T12:00:00Z');
 const tx = (id, date, name, amount, category) => ({ id, date, name, amount, currency: 'USD', category, accountId: 'a1' });

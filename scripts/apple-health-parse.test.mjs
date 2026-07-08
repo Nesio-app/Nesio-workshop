@@ -13,11 +13,11 @@ import vm from 'node:vm';
 import ts from 'typescript';
 import assert from 'node:assert/strict';
 
-const src = fs.readFileSync(new URL('../lib/portal/apple-health.ts', import.meta.url), 'utf8');
+const src = fs.readFileSync(new URL('../lib/portal/providers/apple-health.ts', import.meta.url), 'utf8');
 const js = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 const mod = { exports: {} };
 const require2 = (s) => {
-  if (s === './health-latest.mjs') {
+  if (s === '../health-latest.mjs') {
     return {
       pickLatestCompleteDay: (days, today) => {
         if (!days.length) return null;

@@ -17,10 +17,10 @@ function loadTs(rel, requireImpl) {
 }
 const fakeStore = () => ({ load: () => null, save: () => {}, ready: async () => {} });
 const txCategory = loadTs('../lib/portal/tx-category.ts', () => ({}));
-const bank = loadTs('../lib/portal/bank-tx.ts', (p) =>
-  p === './storage-health' ? { reportStorageDropped() {} }
-    : p === './tx-category' ? txCategory
-    : p === './idb-blob-store' ? { createBlobStore: fakeStore } : ({}));
+const bank = loadTs('../lib/portal/providers/bank-tx.ts', (p) =>
+  p === '../storage-health' ? { reportStorageDropped() {} }
+    : p === '../tx-category' ? txCategory
+    : p === '../idb-blob-store' ? { createBlobStore: fakeStore } : ({}));
 
 const { suggestCategory } = bank;
 

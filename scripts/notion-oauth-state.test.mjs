@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { buildSignedState, verifySignedState } from '../lib/portal/notion-oauth-state.mjs';
+import { buildSignedState, verifySignedState } from '../lib/portal/providers/notion-oauth-state.mjs';
 
 const SECRET = 'test-secret';
 const NOW = 1_800_000_000_000;

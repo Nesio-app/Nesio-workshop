@@ -264,7 +264,7 @@ const syncTx = (id, acc) => ({ added: [{ transaction_id: id, account_id: acc, da
 }
 // 客户端契约:每设备一次全量回填 + 回填完成落标记(数据核心已收编到 connector-sync)
 {
-  const syncCore = fs.readFileSync(new URL('../lib/portal/connector-sync.ts', import.meta.url), 'utf8');
+  const syncCore = fs.readFileSync(new URL('../lib/portal/providers/connector-sync.ts', import.meta.url), 'utf8');
   assert.ok(syncCore.includes('?full=1'), 'runPlaidSync 支持全量回填');
   assert.ok(syncCore.includes('nesio-plaid-enrich-v1'), '回填只做一次(localStorage 标记)');
 }
@@ -302,7 +302,7 @@ const syncTx = (id, acc) => ({ added: [{ transaction_id: id, account_id: acc, da
 }
 
 // 客户端:pendingItems 必须有可见状态 + 自动重试(UI 留在 Hub);数据口径在 connector-sync
-const syncCore2 = fs.readFileSync(new URL('../lib/portal/connector-sync.ts', import.meta.url), 'utf8');
+const syncCore2 = fs.readFileSync(new URL('../lib/portal/providers/connector-sync.ts', import.meta.url), 'utf8');
 assert.ok(/r\.pending/.test(hub), 'syncPlaid 处理 pending 可见状态');
 assert.ok(/syncPlaid\(retry \+ 1\)/.test(hub), 'pending 时自动重试');
 assert.ok(/slice\(0, 5000\)/.test(syncCore2), '本机保留上限 5000');

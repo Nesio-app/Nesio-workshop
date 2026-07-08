@@ -122,7 +122,7 @@ assert.match(gmail, /normalizeGmailToSignal/, 'Gmail explicit analysis path must
 assert.match(gmail, /createSignal/, 'Gmail explicit analysis path must write through createSignal.');
 assert.match(gmail, /signalIds/, 'Gmail response must expose signal evidence ids for analyzed mail.');
 
-const connectors = read('lib/portal/connectors.ts');
+const connectors = read('lib/portal/providers/connectors.ts');
 assert.match(connectors, /normalizeWeatherToSignal/, 'Weather connector must normalize refresh output into Signal input.');
 assert.match(connectors, /normalizeCalendarToSignal/, 'Calendar connector must normalize refresh output into Signal input.');
 assert.match(connectors, /createSignal/, 'Connector refresh paths must write through createSignal.');

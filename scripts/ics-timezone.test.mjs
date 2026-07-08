@@ -15,7 +15,7 @@ function loadTs(path, requireImpl) {
   vm.runInNewContext(js, { module: mod, exports: mod.exports, require: requireImpl, process: { env: {} }, console, Date, Math, JSON, Number, Array, Object, String, Intl });
   return mod.exports;
 }
-const ics = loadTs('../lib/portal/ics.ts', () => ({}));
+const ics = loadTs('../lib/portal/providers/ics.ts', () => ({}));
 
 // ── parseIcsDate 直测:核心修复 —— 纽约夏令时(EDT,UTC-4)9:00 → 13:00Z
 // (此前 UTC 服务器把墙上时间当服务器本地,存成 09:00Z,客户端显示 05:00)──

@@ -36,10 +36,10 @@ function loadTs(path, requireImpl) {
   return mod.exports;
 }
 const txCategory = loadTs('../lib/portal/tx-category.ts', () => ({}));
-const bank = loadTs('../lib/portal/bank-tx.ts', (p) =>
-  p === './storage-health' ? { reportStorageDropped() {} }
-  : p === './tx-category' ? txCategory
-  : p === './idb-blob-store' ? { createBlobStore: fakeCreateBlobStore } : ({}));
+const bank = loadTs('../lib/portal/providers/bank-tx.ts', (p) =>
+  p === '../storage-health' ? { reportStorageDropped() {} }
+  : p === '../tx-category' ? txCategory
+  : p === '../idb-blob-store' ? { createBlobStore: fakeCreateBlobStore } : ({}));
 const features = loadTs('../lib/portal/finance-features.ts', (p) => (p === './bank-tx' ? bank : ({})));
 const insight = loadTs('../lib/portal/finance-insight.ts', (p) => (p === './bank-tx' ? bank : p === './tx-category' ? txCategory : p === './finance-features' ? features : ({})));
 const risk = loadTs('../lib/portal/finance-risk.ts', (p) => (p === './bank-tx' ? bank : p === './finance-features' ? features : ({})));

@@ -29,10 +29,10 @@ function loadTs(path, requireImpl) {
   return mod.exports;
 }
 const txCategory = loadTs('../lib/portal/tx-category.ts', () => ({}));
-const bank = loadTs('../lib/portal/bank-tx.ts', (p) =>
-  p === './storage-health' ? { reportStorageDropped() {} }
-  : p === './tx-category' ? txCategory
-  : p === './idb-blob-store' ? { createBlobStore: fakeCreateBlobStore } : ({}));
+const bank = loadTs('../lib/portal/providers/bank-tx.ts', (p) =>
+  p === '../storage-health' ? { reportStorageDropped() {} }
+  : p === '../tx-category' ? txCategory
+  : p === '../idb-blob-store' ? { createBlobStore: fakeCreateBlobStore } : ({}));
 
 const tx = (id, name, extra = {}) =>
   ({ id, date: '2026-06-10', name, amount: 20, currency: 'USD', category: '', accountId: 'a1', ...extra });

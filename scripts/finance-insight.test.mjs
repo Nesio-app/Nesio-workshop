@@ -25,12 +25,12 @@ function fakeBlobStore() {
 }
 const txCategory = loadTs('../lib/portal/tx-category.ts', () => ({}));
 const bankRequire = (p) => {
-  if (p === './storage-health') return { reportStorageDropped() {} };
-  if (p === './idb-blob-store') return { createBlobStore: fakeBlobStore };
-  if (p === './tx-category') return txCategory;
+  if (p === '../storage-health') return { reportStorageDropped() {} };
+  if (p === '../idb-blob-store') return { createBlobStore: fakeBlobStore };
+  if (p === '../tx-category') return txCategory;
   return {};
 };
-const bank = loadTs('../lib/portal/bank-tx.ts', bankRequire);
+const bank = loadTs('../lib/portal/providers/bank-tx.ts', bankRequire);
 const features = loadTs('../lib/portal/finance-features.ts', (p) => (p === './bank-tx' ? bank : {}));
 const fin = loadTs('../lib/portal/finance-insight.ts', (p) => (p === './bank-tx' ? bank : p === './tx-category' ? txCategory : p === './finance-features' ? features : {}));
 const { financeFindings } = fin;
@@ -166,7 +166,7 @@ const atx = (id, date, name, amount, category, accountId = 'a1') => ({ id, date,
 // ── Layer1 漂移收口契约:全仓只有一套财务判定 ──
 // 财务页与 Today/问一问 必须同读 financeFindings;bank-tx 里那套 financeAlerts(函数级双实现)已删,
 // 不许回潮(回潮 = 两个输出面据同一份流水各说各话)。
-const bankSrc = fs.readFileSync(new URL('../lib/portal/bank-tx.ts', import.meta.url), 'utf8');
+const bankSrc = fs.readFileSync(new URL('../lib/portal/providers/bank-tx.ts', import.meta.url), 'utf8');
 assert.ok(!bankSrc.includes('export function financeAlerts'), 'bank-tx 不得再有第二套 financeAlerts 判定');
 const financeTabSrc = fs.readFileSync(new URL('../components/portal/finance/FinanceTab.tsx', import.meta.url), 'utf8');
 assert.ok(financeTabSrc.includes('financeFindings('), '财务页风险预警必须消费统一层 financeFindings');

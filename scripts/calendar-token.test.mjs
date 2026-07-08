@@ -5,7 +5,7 @@
  * 无 cookie)就静默退回 iCal,显示没连日历,即便账号明明连着」。
  */
 import assert from 'node:assert/strict';
-import { pickCalendarTokens, shouldUseOAuth } from '../lib/portal/calendar-token.mjs';
+import { pickCalendarTokens, shouldUseOAuth } from '../lib/portal/providers/calendar-token.mjs';
 
 // ── Supabase 优先:换设备只有 Supabase token、本机无 cookie → 仍拿到 token ──────
 {
