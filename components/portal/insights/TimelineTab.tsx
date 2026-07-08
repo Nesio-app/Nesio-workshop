@@ -15,6 +15,7 @@ import {
   placesByCategory, PLACE_CATEGORY_META, setPlaceCategory, worldByCountry,
   type PlaceVisit, type PlaceCategory, type TimeBucket, type JourneyItem, type PlaceCluster,
 } from '@/lib/portal/place-trail';
+import { wallHHMM, dateKeyToLocalDate } from '@/lib/portal/place-time.mjs';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -74,7 +75,8 @@ export default function TimelineTab() {
     return <p className="nesio-insights-empty">{L(dict, '还没有足迹。授权位置后自动积累;也可在数据接入导入 Google 时间轴。', 'No trail yet. It builds automatically once location is granted; you can also import Google Timeline under Data sources.')}</p>;
   }
 
-  const hhmm = (iso: string) => new Date(iso).toLocaleTimeString(dict === 'en' ? 'en-US' : 'zh-CN', { hour: '2-digit', minute: '2-digit' });
+  // 按事发地钟点显示(带原时区偏移的导入段不再被设备时区改写成半夜)
+  const hhmm = (iso: string) => wallHHMM(iso);
   const fmtDur = (min: number) => {
     if (min < 1) return L(dict, '短暂', 'brief');
     const h = Math.floor(min / 60), m = min % 60;
@@ -92,7 +94,7 @@ export default function TimelineTab() {
     const y = new Date(t); y.setDate(t.getDate() - 1); const yk = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, '0')}-${String(y.getDate()).padStart(2, '0')}`;
     if (key === tk) return L(dict, '今天', 'Today');
     if (key === yk) return L(dict, '昨天', 'Yesterday');
-    return new Date(key).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'short', day: 'numeric', weekday: 'short' });
+    return dateKeyToLocalDate(key).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'short', day: 'numeric', weekday: 'short' });
   };
   const modeLabel = (m: 'walk' | 'drive' | 'move') => m === 'walk' ? L(dict, '步行', 'Walking') : m === 'drive' ? L(dict, '驾车', 'Driving') : L(dict, '移动', 'Move');
 

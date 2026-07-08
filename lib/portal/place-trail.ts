@@ -8,6 +8,7 @@
 
 import { reportStorageDropped } from './storage-health';
 import { createBlobStore } from './idb-blob-store';
+import { wallDateKey, wallHour, clampEndToWallDay } from './place-time.mjs';
 
 export interface PlaceVisit {
   /** ISO 时间(到访开始) */
@@ -21,7 +22,9 @@ export interface PlaceVisit {
 }
 
 const KEY = 'nesio-place-trail-v1';
-const CAP = 800;
+// 批次 57 迁 IndexedDB 后不再受 localStorage 配额约束;800 会把整段
+// Google 时间轴历史静默砍掉(只剩最近 800 条),是「导入了却看不到历史」的根因。
+const CAP = 20000;
 export const PLACE_TRAIL_UPDATED_EVENT = 'nesio-place-trail-updated';
 
 // 批次 57:地点轨迹(自动采集、会无限长)挪 IndexedDB —— 腾 localStorage 配额;
@@ -285,18 +288,10 @@ export interface TimelineDay {
   segments: TimelineSegment[];
 }
 
-function localDateKey(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
-/** 段结束若跨到次日,截到当天 23:59 —— 避免「在家过夜」吞掉第二天、时长显示成 24h。 */
-function clampEndToDay(startIso: string, endIso: string): string {
-  if (localDateKey(endIso) === localDateKey(startIso)) return endIso;
-  const d = new Date(startIso);
-  d.setHours(23, 59, 59, 0);
-  return d.toISOString();
-}
+// 时区还原:导入时间戳带原时区偏移(旅行数据)按事发地钟点取日/时,
+// 否则按设备本地 —— 修「国外行程时间/日期全错」。纯逻辑在 place-time.mjs(有单测)。
+const localDateKey = wallDateKey;
+const clampEndToDay = clampEndToWallDay;
 
 /**
  * 把打点流水聚合成按天分组的访问段。
@@ -305,7 +300,13 @@ function clampEndToDay(startIso: string, endIso: string): string {
  * 天从新到旧,天内按时间正序(时间线读感:早 → 晚)。
  */
 export function buildPlaceTimeline(visits: PlaceVisit[], maxDays = 14): TimelineDay[] {
-  const sorted = [...visits].filter((v) => v.ts).sort((a, b) => a.ts.localeCompare(b.ts));
+  let sorted = [...visits].filter((v) => v.ts).sort((a, b) => a.ts.localeCompare(b.ts));
+
+  // 数据分辨率:实时打点是城市级(天气反查只到「Cary, NC」),导入是地点级。
+  // 同一天两种混排会出现互相矛盾的重叠段 —— 有导入段的那天,粗粒度城市打点让位。
+  const importDays = new Set(sorted.filter((v) => v.source === 'import').map((v) => localDateKey(v.ts)));
+  if (importDays.size) sorted = sorted.filter((v) => v.source === 'import' || !importDays.has(localDateKey(v.ts)));
+
   const segs: TimelineSegment[] = [];
   // 批次 30:别名一次读入 —— 类别按纠正后的名字推断(Unknown 改成「健身房」就归 fitness)。
   const aliases = loadPlaceAliases();
@@ -314,11 +315,22 @@ export function buildPlaceTimeline(visits: PlaceVisit[], maxDays = 14): Timeline
   for (let i = 0; i < sorted.length; i++) {
     const v = sorted[i];
     const next = sorted[i + 1];
-    const end = clampEndToDay(v.ts, v.end || next?.ts || v.ts);
+    // 无显式 end 的实时打点:旧逻辑「到下一个点为止」会把中间几小时的空档
+    // 全记成停留(咖啡店一 ping、5 小时后到家一 ping → "咖啡店停留 5h")。
+    // 封顶 2h(与同地去重窗一致:真待更久会有下一个同地 ping 来续段)。
+    let rawEnd = v.end || next?.ts || v.ts;
+    if (!v.end && v.source === 'live') {
+      const cap = new Date(new Date(v.ts).getTime() + 2 * 3_600_000).toISOString();
+      if (rawEnd > cap) rawEnd = cap;
+    }
+    const end = clampEndToDay(v.ts, rawEnd);
     const last = segs[segs.length - 1];
     const gapMs = last ? new Date(v.ts).getTime() - new Date(last.end).getTime() : Infinity;
     const sameDay = last && localDateKey(v.ts) === localDateKey(last.start);
-    if (last && sameDay && last.label === v.label && gapMs < 3 * 3_600_000) {
+    // 同名还要同地:两家同名店(都叫 Starbucks)相邻到访不能并成一段
+    const nearSame = last && last.label === v.label
+      && (last.lat == null || v.lat == null || haversineKm(last.lat, last.lon ?? 0, v.lat, v.lon ?? 0) < 0.5);
+    if (last && sameDay && nearSame && gapMs < 3 * 3_600_000) {
       if (end > last.end) last.end = end;
       if (last.lat == null && v.lat != null) { last.lat = v.lat; last.lon = v.lon; }
     } else {
@@ -376,7 +388,12 @@ export function buildDayJourney(visits: PlaceVisit[], dateKey: string): JourneyI
       if (km >= 0.05) {
         const durationMin = Math.max(0, Math.round((new Date(next.start).getTime() - new Date(segs[i].end).getTime()) / 60000));
         const speed = durationMin > 0 ? km / (durationMin / 60) : 0; // km/h
-        const mode: TransitMode = speed === 0 ? 'move' : speed < 7 ? 'walk' : 'drive';
+        // 通勤方式只在速度"像那么回事"时才叫出口:步行 2-7km/h 且起点段有真实
+        // 结束时间(导入);<2km/h 是大段未记录的空档、>150 是数据毛刺,都只说"移动"。
+        const fromReliable = segs[i].source === 'import';
+        const mode: TransitMode = speed >= 7 && speed <= 150 ? 'drive'
+          : speed >= 2 && speed < 7 && fromReliable ? 'walk'
+          : 'move';
         items.push({ kind: 'move', fromLabel: segs[i].label, toLabel: next.label, start: segs[i].end, end: next.start, durationMin, km: Math.round(km * 100) / 100, mode });
       }
     }
@@ -469,7 +486,7 @@ export function timeOfDayBuckets(visits: PlaceVisit[]): BucketShare[] {
   const m = new Map<TimeBucket, number>(order.map((b) => [b, 0]));
   const segs = buildPlaceTimeline(visits, 3650).flatMap((d) => d.segments);
   for (const s of segs) {
-    const h = new Date(s.start).getHours();
+    const h = wallHour(s.start);
     const b: TimeBucket = h < 5 ? 'night' : h < 8 ? 'dawn' : h < 12 ? 'morning' : h < 17 ? 'afternoon' : h < 21 ? 'evening' : 'night';
     m.set(b, (m.get(b) || 0) + s.durationMin);
   }
