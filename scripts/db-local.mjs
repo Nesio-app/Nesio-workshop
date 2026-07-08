@@ -5,7 +5,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { spawnSync } from 'node:child_process';
 import { buildModuleRegistry } from '../lib/portal/module-manager-core.mjs';
 import { MODULE_DATA_KEY_OWNERSHIP_V1 } from '../lib/portal/module-manager-core.mjs';
-import { loadExternalBridgeContract } from '../lib/portal/external-bridge-contract.mjs';
+import { loadExternalBridgeContract } from '../lib/portal/contracts/external-bridge-contract.mjs';
 
 const dbPath = process.env.BAOHE_DB_PATH || join(process.cwd(), 'database', 'treasurebox-local.db');
 const migrationsRoot = join(process.cwd(), 'database', 'migrations');

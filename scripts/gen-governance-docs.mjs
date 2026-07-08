@@ -1,5 +1,5 @@
 /**
- * 生成治理 GitBook —— 从 lib/portal/governance-map.mjs(单一来源)+ 实时 `report:modules`
+ * 生成治理 GitBook —— 从 lib/portal/contracts/governance-map.mjs(单一来源)+ 实时 `report:modules`
  * 数字,输出 docs/governance/*.md + docs/SUMMARY.md + docs/.gitbook.yaml。
  *
  * 用法:node scripts/gen-governance-docs.mjs   (幂等,可反复重跑;数字始终来自当下代码)
@@ -11,7 +11,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   GOVERNANCE_MAP, GOV_STATUS_META, GOV_GROUP_META, summarizeGovernance,
-} from '../lib/portal/governance-map.mjs';
+} from '../lib/portal/contracts/governance-map.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = join(ROOT, 'docs');
@@ -45,7 +45,7 @@ const statusRows = Object.entries(GOV_STATUS_META)
 w('README.md', `
 # 治理总览
 
-> 本书由 \`lib/portal/governance-map.mjs\` + \`report:modules\` 自动生成(\`node scripts/gen-governance-docs.mjs\`)。
+> 本书由 \`lib/portal/contracts/governance-map.mjs\` + \`report:modules\` 自动生成(\`node scripts/gen-governance-docs.mjs\`)。
 > 数字来自当下代码,不是手写快照。后台 \`/admin\` 治理面板读同一份来源。
 
 这一层回答一个问题:**软件里那些「治理/契约/就绪」文件,哪些真的在跑、哪些只是算了没人看、哪个已经和代码对不上了。**
@@ -233,8 +233,8 @@ const snapshot = {
   driftGuardWarnings: R.registryDriftGuard?.summary?.warningCount ?? null,
   statusCounts: gov.byStatus,
 };
-writeFileSync(join(ROOT, 'lib/portal/governance-snapshot.json'), JSON.stringify(snapshot, null, 2) + '\n');
-console.log('  ✓ lib/portal/governance-snapshot.json');
+writeFileSync(join(ROOT, 'lib/portal/contracts/governance-snapshot.json'), JSON.stringify(snapshot, null, 2) + '\n');
+console.log('  ✓ lib/portal/contracts/governance-snapshot.json');
 
 writeFileSync(join(OUT, 'SUMMARY.md'), `# 目录
 

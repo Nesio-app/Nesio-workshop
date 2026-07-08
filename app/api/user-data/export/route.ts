@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { buildUserDataExportResponse } from '@/lib/portal/app-api-contract-v0.mjs';
+import { buildUserDataExportResponse } from '@/lib/portal/contracts/app-api-contract-v0.mjs';
 import { deriveCloudIdentity } from '@/lib/portal/cloud-identity';
 import { normalizeSupabaseRuntimeUrl } from '@/lib/portal/production-runtime';
 import { envValue } from '@/lib/portal/env';

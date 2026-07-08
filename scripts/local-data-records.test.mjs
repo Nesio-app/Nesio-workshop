@@ -5,7 +5,7 @@ import {
   inferGateCategory,
   LOCAL_DATA_RECORD_STATE_PRIORITY,
   normalizeHandoffTo,
-} from '../lib/portal/local-data-records.mjs';
+} from '../lib/portal/contracts/local-data-records.mjs';
 
 const sampleRecords = [
   {

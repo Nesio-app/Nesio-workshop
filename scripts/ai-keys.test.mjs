@@ -31,7 +31,7 @@ const all = resolveAiKeys({ GOOGLE_GENERATIVE_AI_API_KEY: 'g', ANTHROPIC_API_KEY
 assert.equal(all.gemini, 'g'); assert.equal(all.anthropic, 'a'); assert.equal(all.openai, ''); assert.equal(all.doubao, '');
 
 // 与契约的 alternateGroups 保持一致(防两处漂移)
-const contract = fs.readFileSync(new URL('../lib/portal/ai-provider-router-contract.mjs', import.meta.url), 'utf8');
+const contract = fs.readFileSync(new URL('../lib/portal/contracts/ai-provider-router-contract.mjs', import.meta.url), 'utf8');
 for (const name of AI_KEY_ALIASES.gemini) assert.ok(contract.includes(`'${name}'`), `契约应含 gemini 别名 ${name}`);
 for (const name of AI_KEY_ALIASES.anthropic) assert.ok(contract.includes(`'${name}'`), `契约应含 anthropic 别名 ${name}`);
 

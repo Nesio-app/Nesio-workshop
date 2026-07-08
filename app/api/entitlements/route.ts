@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { buildEntitlementsResponse } from '@/lib/portal/app-api-contract-v0.mjs';
+import { buildEntitlementsResponse } from '@/lib/portal/contracts/app-api-contract-v0.mjs';
 
 export async function GET() {
   return NextResponse.json(buildEntitlementsResponse());

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { buildAiProviderRouterContract } from '../lib/portal/ai-provider-router-contract.mjs';
+import { buildAiProviderRouterContract } from '../lib/portal/contracts/ai-provider-router-contract.mjs';
 
 const emptyContract = buildAiProviderRouterContract({ env: {} });
 

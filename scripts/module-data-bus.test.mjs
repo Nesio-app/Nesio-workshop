@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-import { buildModuleDataBus } from '../lib/portal/module-data-bus.mjs';
+import { buildModuleDataBus } from '../lib/portal/contracts/module-data-bus.mjs';
 
 const bus = buildModuleDataBus([
   {

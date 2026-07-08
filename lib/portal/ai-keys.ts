@@ -10,7 +10,7 @@
  * 纯函数、可注入 env(可单测)。
  */
 
-// 与 lib/portal/ai-provider-router-contract.mjs 的 alternateGroups 同步(改一处两处都要改)。
+// 与 lib/portal/contracts/ai-provider-router-contract.mjs 的 alternateGroups 同步(改一处两处都要改)。
 export const AI_KEY_ALIASES = {
   anthropic: ['ANTHROPIC_API_KEY', 'CLAUDE_API_KEY'],
   gemini: ['GEMINI_API_KEY', 'GOOGLE_GENERATIVE_AI_API_KEY', 'GOOGLE_AI_API_KEY', 'GOOGLE_API_KEY'],

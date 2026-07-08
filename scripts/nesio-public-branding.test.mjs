@@ -17,8 +17,8 @@ const personalizationInsights = readFileSync(join(root, 'lib', 'portal', 'person
 const calendarRoute = readFileSync(join(root, 'app', 'api', 'portal', 'calendar', 'route.ts'), 'utf8');
 const moduleManagerCore = readFileSync(join(root, 'lib', 'portal', 'module-manager-core.mjs'), 'utf8');
 const moduleManagerTs = readFileSync(join(root, 'lib', 'portal', 'module-manager.ts'), 'utf8');
-const webSurfaceContract = readFileSync(join(root, 'lib', 'portal', 'web-surface-contract-v0.mjs'), 'utf8');
-const appApiContract = readFileSync(join(root, 'lib', 'portal', 'app-api-contract-v0.mjs'), 'utf8');
+const webSurfaceContract = readFileSync(join(root, 'lib', 'portal', 'contracts', 'web-surface-contract-v0.mjs'), 'utf8');
+const appApiContract = readFileSync(join(root, 'lib', 'portal', 'contracts', 'app-api-contract-v0.mjs'), 'utf8');
 
 assert.match(layout, /title:\s*'Nesio\b/, 'App metadata title must use the public product name Nesio.');
 assert.match(layout, /appleWebApp:[\s\S]*title:\s*'Nesio'/, 'Apple Web App title must use Nesio.');

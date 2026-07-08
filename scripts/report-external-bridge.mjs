@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { loadExternalBridgeContract } from '../lib/portal/external-bridge-contract.mjs';
+import { loadExternalBridgeContract } from '../lib/portal/contracts/external-bridge-contract.mjs';
 
 const DB_PATH = process.env.BAOHE_DB_PATH
   || join(process.cwd(), 'database', 'treasurebox-local.db');

@@ -10,8 +10,8 @@ import {
   buildModulesResponse,
   buildUserDataDeleteResponse,
   buildUserDataExportResponse,
-} from '../lib/portal/app-api-contract-v0.mjs';
-import { buildAiProviderRouterContract } from '../lib/portal/ai-provider-router-contract.mjs';
+} from '../lib/portal/contracts/app-api-contract-v0.mjs';
+import { buildAiProviderRouterContract } from '../lib/portal/contracts/ai-provider-router-contract.mjs';
 
 const repoRoot = fileURLToPath(new URL('..', import.meta.url));
 

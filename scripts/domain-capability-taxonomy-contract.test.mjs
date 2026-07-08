@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { buildModuleRegistry } from "../lib/portal/module-manager-core.mjs";
-import { buildToolManifestRegistryV0 } from "../lib/portal/tool-manifest-v0.mjs";
+import { buildToolManifestRegistryV0 } from "../lib/portal/contracts/tool-manifest-v0.mjs";
 
 const repoRoot = process.cwd();
 const portalConfigPath = path.join(repoRoot, "public", "portal-config.json");

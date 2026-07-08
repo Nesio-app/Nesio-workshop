@@ -4,7 +4,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { buildModuleRegistry } from '../lib/portal/module-manager-core.mjs';
-import { buildToolManifestRegistryV0 } from '../lib/portal/tool-manifest-v0.mjs';
+import { buildToolManifestRegistryV0 } from '../lib/portal/contracts/tool-manifest-v0.mjs';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(scriptDir, '..');

@@ -1,6 +1,6 @@
 # 治理总览
 
-> 本书由 `lib/portal/governance-map.mjs` + `report:modules` 自动生成(`node scripts/gen-governance-docs.mjs`)。
+> 本书由 `lib/portal/contracts/governance-map.mjs` + `report:modules` 自动生成(`node scripts/gen-governance-docs.mjs`)。
 > 数字来自当下代码,不是手写快照。后台 `/admin` 治理面板读同一份来源。
 
 这一层回答一个问题:**软件里那些「治理/契约/就绪」文件,哪些真的在跑、哪些只是算了没人看、哪个已经和代码对不上了。**

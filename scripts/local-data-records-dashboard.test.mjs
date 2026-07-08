@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   buildLocalDataRecordsDashboardPack,
   buildLocalDataRecordsV0,
-} from '../lib/portal/local-data-records.mjs';
+} from '../lib/portal/contracts/local-data-records.mjs';
 
 const source = buildLocalDataRecordsV0([
   {

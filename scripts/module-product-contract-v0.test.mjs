@@ -9,7 +9,7 @@ import {
   resolveEntitlementApprovalState,
   resolveShellDisplayState,
   validateModuleProductContractV0,
-} from '../lib/portal/module-product-contract-v0.mjs';
+} from '../lib/portal/contracts/module-product-contract-v0.mjs';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(scriptDir, '..');

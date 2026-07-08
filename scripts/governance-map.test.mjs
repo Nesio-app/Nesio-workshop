@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { GOVERNANCE_MAP, GOV_STATUS_META, GOV_GROUP_META } from '../lib/portal/governance-map.mjs';
+import { GOVERNANCE_MAP, GOV_STATUS_META, GOV_GROUP_META } from '../lib/portal/contracts/governance-map.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 

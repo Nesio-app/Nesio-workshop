@@ -6,7 +6,7 @@ import { join } from 'node:path';
 const root = process.cwd();
 const designSystemRoot = join(root, 'design-system', 'nesio');
 const packagePath = join(root, 'package.json');
-const contractPath = join(root, 'lib', 'portal', 'nesio-design-system-contract.mjs');
+const contractPath = join(root, 'lib', 'portal', 'contracts', 'nesio-design-system-contract.mjs');
 
 const pkg = JSON.parse(readFileSync(packagePath, 'utf8'));
 const contract = await import(`file://${contractPath}`);

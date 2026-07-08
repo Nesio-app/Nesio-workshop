@@ -2,14 +2,14 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildModuleRegistry } from '../lib/portal/module-manager-core.mjs';
-import { buildLocalDataRecordsV0 } from '../lib/portal/local-data-records.mjs';
-import { buildModuleDataBus } from '../lib/portal/module-data-bus.mjs';
-import { buildModuleProductContractV0 } from '../lib/portal/module-product-contract-v0.mjs';
-import { buildWebSurfaceContractV0 } from '../lib/portal/web-surface-contract-v0.mjs';
-import { buildAiProviderRouterContract } from '../lib/portal/ai-provider-router-contract.mjs';
+import { buildLocalDataRecordsV0 } from '../lib/portal/contracts/local-data-records.mjs';
+import { buildModuleDataBus } from '../lib/portal/contracts/module-data-bus.mjs';
+import { buildModuleProductContractV0 } from '../lib/portal/contracts/module-product-contract-v0.mjs';
+import { buildWebSurfaceContractV0 } from '../lib/portal/contracts/web-surface-contract-v0.mjs';
+import { buildAiProviderRouterContract } from '../lib/portal/contracts/ai-provider-router-contract.mjs';
 import { buildAgentRuntimeReportV0 } from '../lib/intelligence/agent-runtime-report.mjs';
 import { buildStage5ToolInvocationReport } from '../lib/intelligence/tool-invocation-runtime.mjs';
-import { nesioDesignSystemContract } from '../lib/portal/nesio-design-system-contract.mjs';
+import { nesioDesignSystemContract } from '../lib/portal/contracts/nesio-design-system-contract.mjs';
 import { nesioDesignSystemAssets } from '../lib/portal/nesio-design-system-assets.mjs';
 import { GOVERNANCE_RESOLVER_VERSION_V1 } from '../lib/platform/governance-resolver.mjs';
 import {
@@ -2189,7 +2189,7 @@ const evidenceSummary = {
     'lib/portal/module-manager-core.mjs',
     'lib/portal/module-manager-core.d.ts',
     'scripts/report-module-registry.mjs',
-    'lib/portal/local-data-records.mjs',
+    'lib/portal/contracts/local-data-records.mjs',
   ],
   reportStatus: aggregationReportStatus,
   checks: [

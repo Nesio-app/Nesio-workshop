@@ -3,8 +3,8 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildModuleRegistry } from '../lib/portal/module-manager-core.mjs';
-import { buildModuleProductContractV0 } from '../lib/portal/module-product-contract-v0.mjs';
-import { buildWebSurfaceContractV0 } from '../lib/portal/web-surface-contract-v0.mjs';
+import { buildModuleProductContractV0 } from '../lib/portal/contracts/module-product-contract-v0.mjs';
+import { buildWebSurfaceContractV0 } from '../lib/portal/contracts/web-surface-contract-v0.mjs';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(scriptDir, '..');
