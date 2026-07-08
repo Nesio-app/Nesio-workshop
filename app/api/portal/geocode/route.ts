@@ -1,11 +1,15 @@
 /**
  * POST /api/portal/geocode — 反向地理编码(批次 33,默认关,用户在足迹里手动开)。
  *
- * 把「未命名地点」的经纬度换成真实地名。双后端:
- *  · 配了 GOOGLE_MAPS_API_KEY(在 Cloud Console Enable「Geocoding API」并配到 Vercel)→ 用 Google,
- *    名字质量更好(常给店名/POI)。
+ * 把「未命名地点」的经纬度换成真实地名。双后端(地图批:Google→Foursquare):
+ *  · 配了 FOURSQUARE_SERVICE_TOKEN → 用 Foursquare Places(全球 1 亿 POI,认店最准,
+ *    「这个坐标是哪家店」比 Google 更强;每月有免费额度)。
  *  · 没配 → 回落 OpenStreetMap Nominatim(免费、无需 key)。
  * 隐私提示:坐标会经 Nesio 服务器发给外部地图 —— 所以这是用户显式开启的可选功能,不默认。
+ *
+ * Foursquare 现行 API(2025 改版):base=places-api.foursquare.com、
+ * Authorization: Bearer <service token>、X-Places-Api-Version 日期头。字段解析防御式
+ * (fsq_place_id/fsq_id、location.locality/dma 都兼容),契约测试锁死映射。
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { guardAiRoute } from '@/lib/portal/api-auth';
@@ -13,10 +17,8 @@ import { envValue } from '@/lib/portal/env';
 
 export const dynamic = 'force-dynamic';
 
-interface GoogleComponent { long_name?: string; types?: string[] }
-interface GoogleResult { formatted_address?: string; address_components?: GoogleComponent[]; types?: string[] }
 // 批次 40:除了地名,也返回城市/国家 —— 供足迹 World tab(去过的国家 → 城市)。
-// 真分类批:再返回地点本来的类别 kind(OSM category/type、Google types 映射)——
+// 真分类批:再返回地点本来的类别 kind(OSM category/type、Foursquare 分类名映射)——
 // 沃尔玛就是超市,不再靠名字猜。
 export interface GeoResult { name: string; city: string; country: string; kind?: string }
 
@@ -53,42 +55,63 @@ function kindFromOsm(category?: string, type?: string): string | undefined {
   return undefined;
 }
 
-/** Google result.types → 足迹类别。 */
-function kindFromGoogle(types: string[]): string | undefined {
-  const has = (...ts: string[]) => ts.some((x) => types.includes(x));
-  if (has('supermarket', 'grocery_or_supermarket', 'convenience_store')) return 'grocery';
-  if (has('cafe', 'bakery')) return 'cafe';
-  if (has('restaurant', 'meal_takeaway', 'meal_delivery', 'bar', 'food')) return 'food';
-  if (has('park', 'campground')) return 'park';
-  if (has('school', 'university', 'primary_school', 'secondary_school', 'library')) return 'education';
-  if (has('gym', 'stadium')) return 'fitness';
-  if (has('hospital', 'doctor', 'dentist', 'pharmacy', 'drugstore', 'physiotherapist', 'veterinary_care')) return 'health';
-  if (has('lodging')) return 'lodging';
-  if (has('museum', 'art_gallery', 'movie_theater', 'church', 'place_of_worship', 'hindu_temple', 'mosque', 'synagogue')) return 'culture';
-  if (has('airport', 'train_station', 'transit_station', 'bus_station', 'subway_station', 'gas_station', 'parking')) return 'transit';
-  if (has('amusement_park', 'zoo', 'aquarium', 'casino', 'night_club', 'bowling_alley')) return 'entertainment';
-  if (has('shopping_mall', 'department_store', 'clothing_store', 'store', 'furniture_store', 'electronics_store', 'home_goods_store')) return 'shopping';
+/** Foursquare 分类名(如 "Grocery Store" / "Café" / "Pharmacy")→ 足迹类别。按关键词匹配。 */
+function kindFromFoursquare(categoryNames: string[]): string | undefined {
+  const s = categoryNames.join(' | ').toLowerCase();
+  if (/grocery|supermarket|convenience|market\b|deli/.test(s)) return 'grocery';
+  if (/café|cafe|coffee|tea room|bubble tea|bakery|dessert|ice cream/.test(s)) return 'cafe';
+  if (/restaurant|food|diner|steakhouse|pizzeria|bar\b|pub|brewery|bbq|noodle|sushi|taco|burger/.test(s)) return 'food';
+  if (/park|garden|playground|trail|campground/.test(s)) return 'park';
+  if (/school|university|college|library|education/.test(s)) return 'education';
+  if (/gym|fitness|yoga|pilates|studio|stadium|sports/.test(s)) return 'fitness';
+  if (/hospital|clinic|pharmacy|drugstore|dentist|doctor|medical|health|veterinar/.test(s)) return 'health';
+  if (/hotel|motel|hostel|lodging|inn\b|resort|bed & breakfast/.test(s)) return 'lodging';
+  if (/museum|gallery|theater|theatre|cinema|movie|church|temple|mosque|synagogue|worship|art/.test(s)) return 'culture';
+  if (/airport|train|transit|bus station|subway|metro|gas station|fuel|parking|ferry/.test(s)) return 'transit';
+  if (/amusement|zoo|aquarium|casino|night club|nightclub|bowling|arcade/.test(s)) return 'entertainment';
+  if (/mall|department store|clothing|store|shop|boutique|electronics|furniture|hardware/.test(s)) return 'shopping';
+  if (/office|coworking|corporate/.test(s)) return 'work';
   return undefined;
 }
 
-function pickGoogleComp(comps: GoogleComponent[], types: string[]): string {
-  const c = comps.find((x) => (x.types || []).some((t) => types.includes(t)));
-  return c?.long_name || '';
+interface FsqCategory { name?: string; short_name?: string }
+interface FsqLocation {
+  formatted_address?: string; address?: string;
+  locality?: string; dma?: string; region?: string; country?: string; admin_region?: string;
+}
+interface FsqPlace { fsq_place_id?: string; fsq_id?: string; name?: string; categories?: FsqCategory[]; location?: FsqLocation }
+
+// Foursquare location.country 有时是 ISO-2 代码(如 "US")。补一张常见国家小表,
+// 让足迹 World tab 显示全名而非代码;查不到就原样透传(仍能按值分组)。
+const ISO2_COUNTRY: Record<string, string> = {
+  US: 'United States', CA: 'Canada', GB: 'United Kingdom', CN: 'China', JP: 'Japan',
+  KR: 'South Korea', AU: 'Australia', DE: 'Germany', FR: 'France', IT: 'Italy',
+  ES: 'Spain', NL: 'Netherlands', SG: 'Singapore', HK: 'Hong Kong', TW: 'Taiwan',
+  MX: 'Mexico', BR: 'Brazil', IN: 'India', TH: 'Thailand', MY: 'Malaysia',
+};
+function countryName(raw: string): string {
+  const v = (raw || '').trim();
+  if (/^[A-Za-z]{2}$/.test(v)) return ISO2_COUNTRY[v.toUpperCase()] || v.toUpperCase();
+  return v.slice(0, 40);
 }
 
-async function googleReverse(lat: number, lon: number, key: string): Promise<GeoResult | null> {
-  const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lon}&key=${key}&language=en`;
-  const res = await fetch(url);
+async function foursquareReverse(lat: number, lon: number, token: string): Promise<GeoResult | null> {
+  // 取最近一个 POI:sort=DISTANCE + limit=1。radius 收窄防抓到几百米外的店。
+  const url = `https://places-api.foursquare.com/places/search?ll=${lat},${lon}&sort=DISTANCE&radius=120&limit=1`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}`, 'X-Places-Api-Version': '2025-02-05', Accept: 'application/json' },
+  });
   if (!res.ok) return null;
-  const data = await res.json() as { status?: string; results?: GoogleResult[] };
-  if (data.status !== 'OK' || !data.results?.length) return null;
-  const POI = ['point_of_interest', 'establishment', 'premise'];
-  const best = data.results.find((r) => (r.types || []).some((t) => POI.includes(t))) || data.results[0];
-  const comps = best.address_components || [];
-  const name = (pickGoogleComp(comps, [...POI, 'neighborhood']) || best.formatted_address?.split(',')[0] || '').slice(0, 40);
-  const city = (pickGoogleComp(comps, ['locality', 'postal_town', 'sublocality', 'administrative_area_level_2'])).slice(0, 40);
-  const country = pickGoogleComp(comps, ['country']).slice(0, 40);
-  return { name, city, country, kind: kindFromGoogle(best.types || []) };
+  const data = await res.json() as { results?: FsqPlace[] };
+  const p = data.results?.[0];
+  if (!p) return null;
+  const loc = p.location || {};
+  const cats = (p.categories || []).map((c) => c.name || c.short_name || '').filter(Boolean);
+  const name = (p.name || loc.formatted_address?.split(',')[0] || loc.address || '').slice(0, 40);
+  const city = (loc.locality || loc.dma || loc.region || loc.admin_region || '').slice(0, 40);
+  const country = countryName(loc.country || '');
+  if (!name && !city && !country) return null;
+  return { name, city, country, kind: kindFromFoursquare(cats) };
 }
 
 async function osmReverse(lat: number, lon: number): Promise<GeoResult | null> {
@@ -116,12 +139,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'bad_coords' }, { status: 400 });
   }
 
-  const googleKey = envValue('GOOGLE_MAPS_API_KEY');
+  const fsqToken = envValue('FOURSQUARE_SERVICE_TOKEN');
   try {
-    if (googleKey) {
-      const g = await googleReverse(lat, lon, googleKey);
-      if (g && (g.name || g.city || g.country)) return NextResponse.json({ ok: true, ...g, source: 'google' });
-      // Google 没给结果就回落 OSM
+    if (fsqToken) {
+      const f = await foursquareReverse(lat, lon, fsqToken);
+      if (f && (f.name || f.city || f.country)) return NextResponse.json({ ok: true, ...f, source: 'foursquare' });
+      // Foursquare 没给结果(如纯住宅坐标附近无 POI)就回落 OSM 取地址/区域名
     }
     const osm = await osmReverse(lat, lon);
     if (osm) return NextResponse.json({ ok: true, ...osm, source: 'osm' });
