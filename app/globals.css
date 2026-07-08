@@ -11785,6 +11785,21 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 }
 .nesio-rel-chip--on { background: var(--portal-accent-soft-md); color: var(--portal-blue-deep); border-color: var(--portal-accent-border); }
 
+/* ─── 按人分类的数据(人缘㊄)─── */
+.nesio-rel-rec-head { display: flex; align-items: center; justify-content: space-between; }
+.nesio-rel-rec-add { font-size: 0.78rem; font-weight: 600; color: var(--portal-blue-deep); background: none; border: none; cursor: pointer; padding: 0.2rem 0; }
+.nesio-rel-rec-form { display: flex; flex-direction: column; gap: 0.45rem; background: var(--glass-bg-solid); border: 1px solid var(--portal-line); border-radius: 0.75rem; padding: 0.7rem; margin: 0.5rem 0; }
+.nesio-rel-rec-input { font: inherit; font-size: 0.85rem; padding: 0.5rem 0.6rem; border: 1px solid var(--portal-line); border-radius: 0.55rem; background: var(--sheet-opaque, #fff); color: var(--portal-ink); width: 100%; }
+.nesio-rel-rec-sensitive { font-size: 0.74rem; color: var(--status-gentle); background: var(--status-gentle-soft); border-radius: 0.5rem; padding: 0.4rem 0.55rem; margin: 0; }
+.nesio-rel-rec-list { display: flex; flex-direction: column; margin-top: 0.5rem; }
+.nesio-rel-rec-row { display: flex; align-items: flex-start; gap: 0.55rem; padding: 0.45rem 0; border-bottom: 1px solid var(--portal-line); }
+.nesio-rel-rec-row:last-child { border-bottom: none; }
+.nesio-rel-rec-ic { font-size: 1.05rem; flex: none; line-height: 1.4; }
+.nesio-rel-rec-main { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.nesio-rel-rec-title { font-size: 0.88rem; font-weight: 600; color: var(--portal-ink); }
+.nesio-rel-rec-sub { font-size: 0.76rem; color: var(--portal-muted); }
+.nesio-rel-rec-del { font-size: 0.85rem; color: var(--faint, var(--portal-muted)); background: none; border: none; cursor: pointer; flex: none; padding: 0 0.2rem; }
+
 /* ─── 人物详情页(人缘㊁)─── */
 .nesio-rel-open { cursor: pointer; text-align: left; }
 button.nesio-rel-due-info { background: none; border: none; padding: 0; font: inherit; }
