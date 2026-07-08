@@ -2,7 +2,7 @@
  * 基线学习测试 —— 鲁棒统计 + z-score 异常判定。
  */
 import assert from 'node:assert/strict';
-import { robustStats, anomaly } from '../lib/portal/analyst-baseline.mjs';
+import { robustStats, anomaly } from '../lib/portal/learning/analyst-baseline.mjs';
 
 // 中位数/MAD 对离群点稳健:一个尖峰不该带偏中心
 {

@@ -51,7 +51,7 @@ const idbMocks = (p) => (
     : null);
 const persist = load('../lib/platform/personalization/persist.ts', (p) => idbMocks(p) ?? ({}));
 const baseline = load('../lib/platform/personalization/baseline-store.ts', (p) => (p === './persist' ? persist : ({})));
-const moment = load('../lib/portal/moment-analytics.ts', () => ({}));
+const moment = load('../lib/portal/learning/moment-analytics.ts', () => ({}));
 const energy = load('../lib/platform/energy-state.ts', (p) =>
   p === '@/lib/portal/life-graph' ? { getLifeGraph: () => graphNodes }
     : p === '@/lib/portal/moment-analytics' ? moment

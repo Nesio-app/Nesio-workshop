@@ -2,7 +2,7 @@
  * 周报测试 —— 趋势聚合(本周 vs 一周前、均值、变化幅度)、notable 排序、数据不足提示。
  */
 import assert from 'node:assert/strict';
-import { buildWeeklyReport, renderWeeklyText, buildWeeklyPrompt } from '../lib/portal/analyst-weekly.mjs';
+import { buildWeeklyReport, renderWeeklyText, buildWeeklyPrompt } from '../lib/portal/learning/analyst-weekly.mjs';
 
 const row = (date, weekEvents, aiCost) => ({ date, signals: { weekEvents, aiCost, aiOkRate: 0.98, errTotal: 0, orphanedKeys: 27 } });
 

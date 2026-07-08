@@ -64,7 +64,7 @@ lsMap.set('nesio-mirror-profile-v1', JSON.stringify({
   updatedAt: '2026-01-01T00:00:00Z',
 }));
 
-const mirror = load('../lib/portal/mirror-profile.ts', (p) =>
+const mirror = load('../lib/portal/learning/mirror-profile.ts', (p) =>
   p === '@/lib/platform/personalization' ? pref : (idbMocks(p) ?? ({})));
 
 // 1. 旧 blob 迁移:首次读把 domainWeights 灌进 Preference(真源)

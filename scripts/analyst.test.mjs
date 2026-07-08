@@ -2,7 +2,7 @@
  * 分析师规则 + 学习测试 —— 判断确定、冷启动/基线切换正确、反馈静音生效。
  */
 import assert from 'node:assert/strict';
-import { buildDailyReport, extractSignals, summarizeFeedback, computeLearningState, renderReportText, buildAnalystPrompt } from '../lib/portal/analyst.mjs';
+import { buildDailyReport, extractSignals, summarizeFeedback, computeLearningState, renderReportText, buildAnalystPrompt } from '../lib/portal/learning/analyst.mjs';
 
 const stableMetrics = (weekEvents) => ({
   windows: { week: { events: weekEvents, devices: 5 }, month: { events: 400 } },

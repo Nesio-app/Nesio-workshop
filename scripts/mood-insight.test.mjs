@@ -17,7 +17,7 @@ function loadTs(rel, requireImpl) {
   return mod.exports;
 }
 const domainRules = loadTs('../lib/portal/domain-rules.ts', () => ({}));
-const moment = loadTs('../lib/portal/moment-analytics.ts', () => ({}));
+const moment = loadTs('../lib/portal/learning/moment-analytics.ts', () => ({}));
 const mood = loadTs('../lib/portal/mood-insight.ts', (p) =>
   p === './domain-rules' ? domainRules : p === './moment-analytics' ? moment : ({}));
 
