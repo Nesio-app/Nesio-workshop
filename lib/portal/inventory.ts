@@ -50,6 +50,8 @@ export interface InventoryItem {
   category: string;      // 物品①:分类('' = 未分类)
   tags: string[];        // 物品①:物品标签(node.tags 去掉域标「收纳」)
   forSale: boolean;      // 物品③:标记出售(进卖闲置堆)
+  isContainer: boolean;  // 物品④:这件物品本身是容器(收纳箱等),其他物品位置可写它
+  containedCount: number;// 物品④:装了几件(其他物品 location 的容器段命中该物品名;列表时计算)
 }
 
 function str(v: unknown): string {
@@ -81,14 +83,28 @@ export function toInventoryItem(node: LifeNode): InventoryItem {
     category: str(a.category).trim(),
     tags: (node.tags || []).filter((t) => t && t !== '收纳'),
     forSale: a.forSale === true,
+    isContainer: a.isContainer === true,
+    containedCount: 0, // listInventoryItems 里跨物品计算
   };
 }
 
-/** 全部物品(object 节点),新→旧。 */
+/** 全部物品(object 节点),新→旧。容器物品的 containedCount 在此跨物品计算。 */
 export function listInventoryItems(): InventoryItem[] {
-  return getLifeGraph()
+  const items = getLifeGraph()
     .filter((n) => n.type === 'object')
     .map(toInventoryItem);
+  // 物品④:location 任一非空间段命中容器物品名 → 算「装在里面」
+  const counts = new Map<string, number>();
+  for (const i of items) {
+    for (const seg of i.location.split(LOC_SEP).slice(1)) {
+      const key = seg.trim();
+      if (key) counts.set(key, (counts.get(key) || 0) + 1);
+    }
+  }
+  for (const i of items) {
+    if (i.isContainer) i.containedCount = counts.get(i.name) || 0;
+  }
+  return items;
 }
 
 /* ---------- 写入 ---------- */
@@ -103,6 +119,7 @@ export interface NewInventoryItem {
   tags?: string[];   // 物品①:标签
   price?: number;    // 物品①:估值(单件)
   forSale?: boolean; // 物品③:标记出售
+  isContainer?: boolean; // 物品④:变成容器
 }
 
 export function addInventoryItem(input: NewInventoryItem): LifeNode {
@@ -129,7 +146,7 @@ export function addInventoryItem(input: NewInventoryItem): LifeNode {
 /** 更新物品属性(位置/数量/效期/备注)。 */
 export function updateInventoryItem(
   id: string,
-  patch: Partial<Pick<NewInventoryItem, 'location' | 'quantity' | 'expiry' | 'note' | 'category' | 'tags' | 'price' | 'forSale'>> & { name?: string },
+  patch: Partial<Pick<NewInventoryItem, 'location' | 'quantity' | 'expiry' | 'note' | 'category' | 'tags' | 'price' | 'forSale' | 'isContainer'>> & { name?: string },
 ): boolean {
   const node = getLifeGraph().find((n) => n.id === id);
   if (!node) return false;
@@ -161,6 +178,11 @@ export function updateInventoryItem(
   if (patch.forSale !== undefined) {
     if (patch.forSale) attributes.forSale = true;
     else delete attributes.forSale;
+  }
+  if (patch.isContainer !== undefined) {
+    // 物品④:解除容器只摘 flag,不动已放进去的物品(它们的 location 原样保留)
+    if (patch.isContainer) attributes.isContainer = true;
+    else delete attributes.isContainer;
   }
   const nodePatch: Partial<LifeNode> = { attributes, lastConfirmedAt: new Date().toISOString() };
   if (patch.tags !== undefined) {
@@ -246,6 +268,22 @@ export function sellPile(items: InventoryItem[]): SellPile {
   picked.sort((a, b) => worth(b) - worth(a));
   const totalValue = picked.reduce((s, i) => s + Math.max(0, worth(i)), 0);
   return { items: picked, totalValue: Math.round(totalValue * 100) / 100 };
+}
+
+/** 物品⑥:转卖文案(Marketplace/eBay 可直接粘贴的纯模板,不动 AI)。 */
+export function buildListingText(item: InventoryItem, dict: string = 'zh'): string {
+  const zh = dict !== 'en';
+  const qty = item.quantity != null && item.quantity > 1 ? (zh ? ` ×${item.quantity}` : ` (x${item.quantity})`) : '';
+  const price = item.price != null ? `$${item.price}` : (zh ? '价格私聊' : 'Price: DM me');
+  const lines = [
+    `${item.name}${qty} — ${price}`,
+    zh ? '自用闲置,状态良好。' : 'Pre-owned, in good condition.',
+  ];
+  if (item.category) lines.push(zh ? `类别:${item.category}` : `Category: ${item.category}`);
+  if (item.tags.length) lines.push(`#${item.tags.join(' #')}`);
+  if (item.note) lines.push(item.note);
+  lines.push(zh ? '自取优先,诚心可小刀。' : 'Pickup preferred. Reasonable offers welcome.');
+  return lines.join('\n');
 }
 
 /* ---------- 域判定(接 Cross-Insight Reader / guidance)---------- */
