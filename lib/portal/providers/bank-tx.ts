@@ -23,6 +23,15 @@ export interface BankTx {
   accountId?: string;
   merchantId?: string;   // 财务⑲:Plaid merchant_entity_id —— 官方商户实体,归并同商户不同描述符
   merchantLogo?: string; // 商户 logo URL(Plaid 提供;可缺)
+  // 免费最大化·Plaid B:响应自带的富化字段(全部可选,老数据无值不影响)
+  authorizedDate?: string;  // 真实刷卡日(date 是入账日)
+  paymentChannel?: string;  // online / in store / other —— 线上线下拆分
+  origDesc?: string;        // 原始银行描述符 —— 救 Plaid 未富化的商户识别
+  website?: string;         // 商户官网
+  city?: string;            // 消费城市(线下)
+  lat?: number;             // 消费坐标(线下,可接足迹)
+  lon?: number;
+  lowConfidence?: boolean;  // Plaid 分类置信度低 —— 可主动请用户纠正
 }
 
 /** 财务⑲:商户归并键 —— Plaid 官方实体 id 优先("NETFLIX.COM 866-…"/"Netflix Inc" 同 id),

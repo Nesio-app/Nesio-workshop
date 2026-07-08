@@ -27,10 +27,17 @@ interface PlaidTx {
   amount: number;
   iso_currency_code?: string | null;
   unofficial_currency_code?: string | null;
-  personal_finance_category?: { primary?: string; detailed?: string } | null;
+  personal_finance_category?: { primary?: string; detailed?: string; confidence_level?: string } | null;
   pending?: boolean;
   merchant_entity_id?: string | null; // 财务⑲:Plaid 官方商户实体 id(归并同商户不同描述符)
   logo_url?: string | null;           // 商户 logo(Plaid 富化)
+  // 免费最大化·Plaid B:响应自带、此前全丢弃的富化字段(全部免费)
+  authorized_date?: string | null;    // 真实刷卡日(date 是入账日;记账更准)
+  payment_channel?: string | null;    // online / in store / other
+  original_description?: string | null; // 原始银行描述符(需 include_original_description)
+  website?: string | null;            // 商户官网
+  location?: { address?: string | null; city?: string | null; region?: string | null; country?: string | null; lat?: number | null; lon?: number | null } | null;
+  counterparties?: Array<{ name?: string; type?: string; logo_url?: string | null }> | null;
 }
 
 interface PlaidAccount {
@@ -167,7 +174,12 @@ export async function GET(req: NextRequest) {
       // 但只要 has_more 为真就继续,不再在 10 页处硬停。
       let cursor = typeof cursors[i] === 'string' ? cursors[i] : '';
       for (let page = 0; page < 50; page++) {
-        const data = await plaidPost('/transactions/sync', { access_token: accessToken, cursor: cursor || undefined, count: 100 }) as {
+        const data = await plaidPost('/transactions/sync', {
+          access_token: accessToken, cursor: cursor || undefined, count: 100,
+          // 免费最大化·Plaid B:开原始描述(默认关)+ 用 PFCv2 分类体系(都免费)
+          options: { include_original_description: true },
+          personal_finance_category_version: '2',
+        }) as {
           added?: PlaidTx[]; modified?: PlaidTx[]; removed?: Array<{ transaction_id: string }>; accounts?: PlaidAccount[];
           next_cursor?: string; has_more?: boolean; error_code?: string; transactions_update_status?: string;
         };
@@ -315,6 +327,16 @@ export async function GET(req: NextRequest) {
           // 财务⑲:商户实体 id + logo(响应自带的富化,此前一直丢弃)
           merchantId: t.merchant_entity_id || undefined,
           merchantLogo: t.logo_url || undefined,
+          // 免费最大化·Plaid B:富化字段透传(此前全丢)
+          authorizedDate: t.authorized_date || undefined, // 真实刷卡日
+          paymentChannel: t.payment_channel || undefined, // online/in store/other
+          origDesc: t.original_description || undefined,   // 原始描述符(救 Plaid 没富化的商户)
+          website: t.website || undefined,
+          city: t.location?.city || undefined,
+          lat: typeof t.location?.lat === 'number' ? t.location.lat : undefined,
+          lon: typeof t.location?.lon === 'number' ? t.location.lon : undefined,
+          // 低置信度分类留标记,供后续「主动请你纠正」
+          lowConfidence: t.personal_finance_category?.confidence_level === 'LOW' || t.personal_finance_category?.confidence_level === 'UNKNOWN' || undefined,
         })),
         // 财务⑯:投资流水(分红/利息=收入细分;费用=银行费用;缴存/买卖=转账不计收支)
         ...invAdded.filter((t) => !(t.account_id && staleAccountIds.has(t.account_id))).map((t) => {
