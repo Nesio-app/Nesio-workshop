@@ -10,10 +10,10 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   loadPlaceTrail, PLACE_TRAIL_UPDATED_EVENT,
   timelineDays, buildDayJourney, dayStats,
-  clusterPlaces, categoryTimeShare, timeOfDayBuckets,
+  clusterPlaces, categoryTimeShare,
   displayLabel, setPlaceAlias, isGenericPlace, loadGeocodeEnabled, setGeocodeEnabled,
   placesByCategory, PLACE_CATEGORY_META, setPlaceCategory, worldByCountry,
-  type PlaceVisit, type PlaceCategory, type TimeBucket, type JourneyItem, type PlaceCluster,
+  type PlaceVisit, type PlaceCategory, type JourneyItem, type PlaceCluster,
 } from '@/lib/portal/place-trail';
 import { wallHHMM, dateKeyToLocalDate } from '@/lib/portal/place-time.mjs';
 import { monthlyPlaceComparison, weekRhythm, footprintHighlights } from '@/lib/portal/place-stats';
@@ -22,21 +22,19 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 
-type Sub = 'timeline' | 'analytics' | 'travel' | 'world' | 'recap';
+type Sub = 'timeline' | 'analytics' | 'travel' | 'world';
 
 const CAT: Record<PlaceCategory, [string, string]> = {
-  home: ['家', 'Home'], work: ['公司', 'Work'], shopping: ['购物', 'Shopping'],
-  food: ['餐饮', 'Food'], fitness: ['运动', 'Sports'], culture: ['文化', 'Culture'],
+  home: ['家', 'Home'], work: ['公司', 'Work'], grocery: ['超市', 'Grocery'], shopping: ['购物', 'Shopping'],
+  food: ['餐饮', 'Food'], cafe: ['咖啡', 'Café'], fitness: ['运动', 'Sports'], park: ['公园', 'Park'],
+  culture: ['文化', 'Culture'], education: ['学校', 'School'],
   entertainment: ['娱乐', 'Entertainment'], health: ['医疗', 'Health'], lodging: ['住宿', 'Lodging'],
   transit: ['交通', 'Transit'], unknown: ['未知', 'Unknown'], place: ['地点', 'Place'],
 };
-const BUCKET: Record<TimeBucket, [string, string]> = {
-  dawn: ['清晨', 'Dawn'], morning: ['上午', 'Morning'], afternoon: ['下午', 'Afternoon'],
-  evening: ['傍晚', 'Evening'], night: ['夜间', 'Night'],
-};
 const DOT_COLOR: Record<PlaceCategory, string> = {
-  home: '#588ce3', work: '#7b5ea7', shopping: '#e8888f', food: '#e0954a',
-  fitness: '#d6559e', culture: '#8a6fd0', entertainment: '#d98a4a', health: '#c25d7a',
+  home: '#588ce3', work: '#7b5ea7', grocery: '#4f9e57', shopping: '#e8888f', food: '#e0954a',
+  cafe: '#a5713f', fitness: '#d6559e', park: '#3e9e7e', culture: '#8a6fd0', education: '#5a7bd0',
+  entertainment: '#d98a4a', health: '#c25d7a',
   lodging: '#5a8fc2', transit: '#3aa6a0', place: '#4a7c5f', unknown: '#9aa7b8',
 };
 
@@ -74,7 +72,6 @@ export default function TimelineTab() {
   const mapPoints = useMemo(() => clusterPlaces(trail, 14)
     .filter((c) => c.lat != null && c.lon != null)
     .map((c) => ({ lat: c.lat!, lon: c.lon!, label: displayLabel(c.label), weightMin: c.totalMin, color: DOT_COLOR[c.category] })), [trail]);
-  const buckets = useMemo(() => timeOfDayBuckets(trail), [trail]);
   const placeCats = useMemo(() => placesByCategory(trail), [trail]); // 批次 39:Google 时间线风分类
   const world = useMemo(() => worldByCountry(trail), [trail]); // 批次 40:World tab 国家聚合
   const [expandedCountry, setExpandedCountry] = useState<string | null>(null);
@@ -138,9 +135,9 @@ export default function TimelineTab() {
       setGeoMsg(L(dict, `正在解析… ${done}/${targets.length}(约 ${Math.ceil((targets.length - done) * 1.1)} 秒)`, `Resolving… ${done}/${targets.length}`));
       try {
         const res = await fetch('/api/portal/geocode', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lat: c.lat, lon: c.lon }) });
-        const data = await res.json() as { ok?: boolean; name?: string; city?: string; country?: string };
-        if (data.ok && (data.name || data.city || data.country)) {
-          setPlaceGeo(c.label, { name: data.name, city: data.city, country: data.country, resolved: true });
+        const data = await res.json() as { ok?: boolean; name?: string; city?: string; country?: string; kind?: string };
+        if (data.ok && (data.name || data.city || data.country || data.kind)) {
+          setPlaceGeo(c.label, { name: data.name, city: data.city, country: data.country, resolved: true, kind: data.kind as PlaceCategory | undefined });
           if (data.name && c.generic && displayLabel(c.label) === c.label) setPlaceAlias(c.label, data.name);
           if (data.country) ok += 1;
         } else if (data.ok === false) {
@@ -164,7 +161,7 @@ export default function TimelineTab() {
   const dayMapPoints = dayPts.map((s) => ({ lat: s.lat!, lon: s.lon!, label: displayLabel(s.label), weightMin: Math.max(10, s.durationMin), color: DOT_COLOR[s.category] }));
   const dayPath = dayPts.map((s) => ({ lat: s.lat!, lon: s.lon! }));
 
-  const SUBS: Array<[Sub, string, string]> = [['timeline', '时间线', 'Timeline'], ['analytics', '分析', 'Analytics'], ['travel', '地点', 'Places'], ['world', '世界', 'World'], ['recap', '回顾', 'Recap']];
+  const SUBS: Array<[Sub, string, string]> = [['timeline', '时间线', 'Timeline'], ['analytics', '分析', 'Analytics'], ['travel', '地点', 'Places'], ['world', '世界', 'World']];
 
   return (
     <div className="nesio-tl">
@@ -238,6 +235,14 @@ export default function TimelineTab() {
             </div>
           )}
 
+          {highlights && (
+            <p className="nesio-settings-option-hint" style={{ marginTop: '0.4rem' }}>
+              {L(dict,
+                `累计:${highlights.totalPlaces} 个地点 · ${highlights.activeDays} 天 · ${highlights.totalKm} km · 最长连续外出 ${highlights.maxStreak} 天${highlights.countries ? ` · ${highlights.countries} 国 ${highlights.cities} 城` : ''}`,
+                `All-time: ${highlights.totalPlaces} places · ${highlights.activeDays} days · ${highlights.totalKm} km · ${highlights.maxStreak}-day streak${highlights.countries ? ` · ${highlights.countries} countries` : ''}`)}
+            </p>
+          )}
+
           {/* ── 真实地图概览:常去地点打点(大小=停留时长)── */}
           {mapPoints.length > 0 && <PlaceMap points={mapPoints} height={200} />}
 
@@ -261,6 +266,40 @@ export default function TimelineTab() {
                     ))}
                   </div>
                 ))}
+              </div>
+            </>
+          )}
+
+          {highlights && (highlights.longestStay || highlights.busiestDay || highlights.farthestDay) && (
+            <>
+              <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '纪录', 'Records')}</p>
+              <div className="nesio-tl-records">
+                {highlights.longestStay && (
+                  <div className="nesio-tl-record"><span className="nesio-tl-record-name">{L(dict, '最长停留', 'Longest stay')}</span><span className="nesio-tl-record-val">{displayLabel(highlights.longestStay.label)} · {fmtDur(highlights.longestStay.min)}</span><span className="nesio-tl-record-date">{dayLabel(highlights.longestStay.dateKey)}</span></div>
+                )}
+                {highlights.busiestDay && (
+                  <div className="nesio-tl-record"><span className="nesio-tl-record-name">{L(dict, '最忙一天', 'Busiest day')}</span><span className="nesio-tl-record-val">{L(dict, `${highlights.busiestDay.visits} 个到访`, `${highlights.busiestDay.visits} visits`)}</span><span className="nesio-tl-record-date">{dayLabel(highlights.busiestDay.dateKey)}</span></div>
+                )}
+                {highlights.farthestDay && (
+                  <div className="nesio-tl-record"><span className="nesio-tl-record-name">{L(dict, '最远一天', 'Farthest day')}</span><span className="nesio-tl-record-val">{fmtDist(highlights.farthestDay.km)}</span><span className="nesio-tl-record-date">{dayLabel(highlights.farthestDay.dateKey)}</span></div>
+                )}
+              </div>
+            </>
+          )}
+
+          {highlights && highlights.monthly.length > 1 && (
+            <>
+              <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '每月去过的地点', 'Places per month')}</p>
+              <div className="nesio-tl-months">
+                {highlights.monthly.map((m) => {
+                  const max = Math.max(...highlights.monthly.map((x) => x.places), 1);
+                  return (
+                    <div key={m.monthKey} className="nesio-tl-bucket">
+                      <div className="nesio-tl-bucket-bar-wrap"><div className="nesio-tl-bucket-bar" style={{ height: `${Math.round((m.places / max) * 100)}%` }} title={`${m.places}`} /></div>
+                      <span className="nesio-tl-bucket-label">{Number(m.monthKey.slice(5, 7))}{L(dict, '月', '')}</span>
+                    </div>
+                  );
+                })}
               </div>
             </>
           )}
@@ -302,18 +341,6 @@ export default function TimelineTab() {
             ))}
           </div>
 
-          <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '时段分布', 'By time of day')}</p>
-          <div className="nesio-tl-buckets">
-            {buckets.map((b) => {
-              const max = Math.max(...buckets.map((x) => x.min), 1);
-              return (
-                <div key={b.bucket} className="nesio-tl-bucket">
-                  <div className="nesio-tl-bucket-bar-wrap"><div className="nesio-tl-bucket-bar" style={{ height: `${Math.round((b.min / max) * 100)}%` }} /></div>
-                  <span className="nesio-tl-bucket-label">{L(dict, BUCKET[b.bucket][0], BUCKET[b.bucket][1])}</span>
-                </div>
-              );
-            })}
-          </div>
         </>
       )}
 
@@ -346,7 +373,7 @@ export default function TimelineTab() {
                             </button>
                             {catPickFor === c.label && (
                               <div className="nesio-tl-catpick">
-                                {(['shopping', 'food', 'fitness', 'culture', 'entertainment', 'health', 'lodging', 'transit', 'work', 'home', 'place'] as PlaceCategory[]).map((cat) => (
+                                {(['grocery', 'shopping', 'food', 'cafe', 'fitness', 'park', 'culture', 'education', 'entertainment', 'health', 'lodging', 'transit', 'work', 'home', 'place'] as PlaceCategory[]).map((cat) => (
                                   <button key={cat} type="button" className="nesio-tl-catpick-chip" onClick={() => { setPlaceCategory(c.label, cat); setCatPickFor(null); }}>
                                     {PLACE_CATEGORY_META[cat].sym} {L(dict, PLACE_CATEGORY_META[cat].zh, PLACE_CATEGORY_META[cat].en)}
                                   </button>
@@ -400,56 +427,6 @@ export default function TimelineTab() {
                 );
               })}
             </div>
-          </>
-        )
-      )}
-
-      {/* ── 回顾:全历史纪录与趋势(Wrapped 形态)── */}
-      {sub === 'recap' && (
-        !highlights ? (
-          <p className="nesio-insights-empty">{L(dict, '还没有足迹可回顾。', 'Nothing to recap yet.')}</p>
-        ) : (
-          <>
-            <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>{L(dict, '足迹总账', 'All-time footprint')}</p>
-            <div className="nesio-tl-month-grid">
-              <div className="nesio-tl-stat"><span className="nesio-tl-stat-v">{highlights.totalPlaces}</span><span className="nesio-tl-stat-l">{L(dict, '个地点', 'places')}</span></div>
-              <div className="nesio-tl-stat"><span className="nesio-tl-stat-v">{highlights.activeDays}</span><span className="nesio-tl-stat-l">{L(dict, '天足迹', 'days')}</span></div>
-              <div className="nesio-tl-stat"><span className="nesio-tl-stat-v">{highlights.totalKm}</span><span className="nesio-tl-stat-l">{L(dict, 'km 移动', 'km moved')}</span></div>
-              <div className="nesio-tl-stat"><span className="nesio-tl-stat-v">{highlights.maxStreak}</span><span className="nesio-tl-stat-l">{L(dict, '天连续外出', 'day streak')}</span></div>
-            </div>
-            {(highlights.countries > 0 || highlights.cities > 0) && (
-              <p className="nesio-settings-option-hint">{L(dict, `已解析:${highlights.countries} 个国家 · ${highlights.cities} 个城市`, `Resolved: ${highlights.countries} countries · ${highlights.cities} cities`)}</p>
-            )}
-
-            <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '纪录', 'Records')}</p>
-            <div className="nesio-tl-records">
-              {highlights.longestStay && (
-                <div className="nesio-tl-record"><span className="nesio-tl-record-name">{L(dict, '最长停留', 'Longest stay')}</span><span className="nesio-tl-record-val">{displayLabel(highlights.longestStay.label)} · {fmtDur(highlights.longestStay.min)}</span><span className="nesio-tl-record-date">{dayLabel(highlights.longestStay.dateKey)}</span></div>
-              )}
-              {highlights.busiestDay && (
-                <div className="nesio-tl-record"><span className="nesio-tl-record-name">{L(dict, '最忙一天', 'Busiest day')}</span><span className="nesio-tl-record-val">{L(dict, `${highlights.busiestDay.visits} 个到访`, `${highlights.busiestDay.visits} visits`)}</span><span className="nesio-tl-record-date">{dayLabel(highlights.busiestDay.dateKey)}</span></div>
-              )}
-              {highlights.farthestDay && (
-                <div className="nesio-tl-record"><span className="nesio-tl-record-name">{L(dict, '最远一天', 'Farthest day')}</span><span className="nesio-tl-record-val">{fmtDist(highlights.farthestDay.km)}</span><span className="nesio-tl-record-date">{dayLabel(highlights.farthestDay.dateKey)}</span></div>
-              )}
-            </div>
-
-            {highlights.monthly.length > 1 && (
-              <>
-                <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '每月去过的地点', 'Places per month')}</p>
-                <div className="nesio-tl-months">
-                  {highlights.monthly.map((m) => {
-                    const max = Math.max(...highlights.monthly.map((x) => x.places), 1);
-                    return (
-                      <div key={m.monthKey} className="nesio-tl-bucket">
-                        <div className="nesio-tl-bucket-bar-wrap"><div className="nesio-tl-bucket-bar" style={{ height: `${Math.round((m.places / max) * 100)}%` }} title={`${m.places}`} /></div>
-                        <span className="nesio-tl-bucket-label">{Number(m.monthKey.slice(5, 7))}{L(dict, '月', '')}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
-            )}
           </>
         )
       )}

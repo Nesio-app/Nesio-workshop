@@ -132,18 +132,24 @@ export function parseGoogleTimeline(json: unknown): PlaceVisit[] {
 // 这里把连续同地点的点合并成「访问段」,算出停留时长,再按天分组,
 // 供 Google 时间线样式的 UI 消费。
 
-export type PlaceCategory = 'home' | 'work' | 'shopping' | 'food' | 'fitness' | 'culture' | 'entertainment' | 'health' | 'lodging' | 'transit' | 'unknown' | 'place';
+export type PlaceCategory = 'home' | 'work' | 'grocery' | 'shopping' | 'food' | 'cafe' | 'fitness' | 'park' | 'culture' | 'education' | 'entertainment' | 'health' | 'lodging' | 'transit' | 'unknown' | 'place';
 
-/** 从地点名推断类别(决定图标/配色)。中英文关键词都认。批次 39 扩了文化/娱乐/医疗/住宿。 */
+/** 从地点名推断类别(决定图标/配色)。中英文关键词都认。
+ *  分类尽量贴"地点本来的类":沃尔玛是超市、星巴克是咖啡、公园是公园,
+ *  不再一股脑归"购物/餐饮/运动"。顺序敏感:细类在前(超市先于购物,咖啡先于餐饮,公园先于运动)。 */
 export function categoryOf(label: string): PlaceCategory {
   const s = (label || '').toLowerCase();
   if (!s || /unknown|未知/.test(s)) return 'unknown';
   if (/home|家|住宅/.test(s)) return 'home';
   if (/work|office|公司|办公/.test(s)) return 'work';
+  if (/walmart|costco|kroger|\baldi\b|harris teeter|wegmans|trader joe|whole foods|\blidl\b|publix|food lion|supermarket|grocer|超市|菜市场|生鲜|便利店|7-eleven/.test(s)) return 'grocery';
+  if (/cafe|caf\u00e9|coffee|starbucks|dunkin|咖啡|奶茶|boba|\btea\b|茶饮/.test(s)) return 'cafe';
+  if (/\bpark\b|公园|\btrail\b|greenway|botanical|植物园|湖畔|绿道/.test(s)) return 'park';
+  if (/school|university|college|campus|kindergarten|学校|大学|中学|小学|幼儿园/.test(s)) return 'education';
   // 短英文词一律加前后 \b 边界(否则 "Las Vegas" 含 gas、"Kmart"/"Stuttgart" 含 art 会误命中)。
-  if (/gym|fitness|健身|运动|yoga|瑜伽|sport|stadium|court|\btrail\b|\bpark\b|公园|球场/.test(s)) return 'fitness';
-  if (/restaurant|cafe|coffee|starbucks|mcdonald|餐|饭|\bfood\b|dining|bakery|\bbar\b|grill|pizza|kitchen|\btea\b|奶茶|饮/.test(s)) return 'food';
-  if (/shop|mall|store|market|超市|商场|购物|target|walmart|costco|michaels|ulta|beauty|ikea|outlet|amazon/.test(s)) return 'shopping';
+  if (/gym|fitness|健身|运动|yoga|瑜伽|sport|stadium|court|球场/.test(s)) return 'fitness';
+  if (/restaurant|mcdonald|餐|饭|\bfood\b|dining|bakery|\bbar\b|grill|pizza|kitchen|饮/.test(s)) return 'food';
+  if (/shop|mall|store|market|商场|购物|target|michaels|ulta|beauty|ikea|outlet|amazon/.test(s)) return 'shopping';
   if (/museum|library|图书馆|博物馆|gallery|theat(er|re)|剧院|cinema|movie|电影|\bart\b|church|temple|寺|教堂/.test(s)) return 'culture';
   if (/hotel|\binn\b|motel|resort|airbnb|酒店|旅馆|民宿/.test(s)) return 'lodging';
   if (/hospital|clinic|医院|诊所|pharmacy|药|dentist|doctor|urgent care/.test(s)) return 'health';
@@ -153,6 +159,10 @@ export function categoryOf(label: string): PlaceCategory {
 }
 
 export const PLACE_CATEGORY_META: Record<PlaceCategory, { zh: string; en: string; sym: string }> = {
+  grocery: { zh: '超市', en: 'Grocery', sym: '🛒' },
+  cafe: { zh: '咖啡', en: 'Café', sym: '☕' },
+  park: { zh: '公园', en: 'Park', sym: '🌳' },
+  education: { zh: '学校', en: 'School', sym: '🎓' },
   shopping: { zh: '购物', en: 'Shopping', sym: '🛍' },
   food: { zh: '餐饮', en: 'Food & drink', sym: '🍽' },
   fitness: { zh: '运动', en: 'Sports', sym: '🏃' },
@@ -171,7 +181,7 @@ export interface CategoryGroup { category: PlaceCategory; count: number; visits:
 
 // 批次 40:反向地理编码结果 —— label → { name, city, country }。供 World tab(国家/城市)。
 const PLACE_GEO_KEY = 'nesio-place-geo-v1';
-export interface PlaceGeo { name?: string; city?: string; country?: string; resolved?: boolean }
+export interface PlaceGeo { name?: string; city?: string; country?: string; resolved?: boolean; kind?: PlaceCategory }
 export function loadPlaceGeo(): Record<string, PlaceGeo> {
   if (typeof window === 'undefined') return {};
   try { return JSON.parse(localStorage.getItem(PLACE_GEO_KEY) || '{}') as Record<string, PlaceGeo>; } catch { return {}; }
@@ -196,9 +206,11 @@ export function setPlaceCategory(raw: string, cat: PlaceCategory | ''): void {
   try { localStorage.setItem(PLACE_CAT_KEY, JSON.stringify(all)); window.dispatchEvent(new CustomEvent(PLACE_TRAIL_UPDATED_EVENT)); } catch { reportStorageDropped(); }
 }
 
-/** 地点类别:用户手动指定优先,否则按名字自动识别(未命名 → unknown)。 */
-export function categoryOfPlace(rawLabel: string, generic?: boolean, overrides = loadPlaceCategories()): PlaceCategory {
+/** 地点类别:手动指定 > geocode 拿到的地点本来的类(沃尔玛=超市)> 名字推断(未命名 → unknown)。 */
+export function categoryOfPlace(rawLabel: string, generic?: boolean, overrides = loadPlaceCategories(), geo = loadPlaceGeo()): PlaceCategory {
   if (overrides[rawLabel]) return overrides[rawLabel];
+  const kind = geo[rawLabel]?.kind;
+  if (kind) return kind;
   return generic ? 'unknown' : categoryOf(displayLabel(rawLabel));
 }
 
@@ -309,8 +321,12 @@ export function buildPlaceTimeline(visits: PlaceVisit[], maxDays = 14): Timeline
 
   const segs: TimelineSegment[] = [];
   // 批次 30:别名一次读入 —— 类别按纠正后的名字推断(Unknown 改成「健身房」就归 fitness)。
+  // 类别优先级与 categoryOfPlace 一致:手动 > geocode 真类 > 名字推断(一次读入,避免每段查 localStorage)。
   const aliases = loadPlaceAliases();
+  const catOverrides = loadPlaceCategories();
+  const geoKinds = loadPlaceGeo();
   const disp = (raw: string) => aliases[raw]?.trim() || raw;
+  const catFor = (raw: string) => catOverrides[raw] || geoKinds[raw]?.kind || categoryOf(disp(raw));
 
   for (let i = 0; i < sorted.length; i++) {
     const v = sorted[i];
@@ -334,7 +350,7 @@ export function buildPlaceTimeline(visits: PlaceVisit[], maxDays = 14): Timeline
       if (end > last.end) last.end = end;
       if (last.lat == null && v.lat != null) { last.lat = v.lat; last.lon = v.lon; }
     } else {
-      segs.push({ label: v.label, category: categoryOf(disp(v.label)), start: v.ts, end, durationMin: 0, source: v.source, lat: v.lat, lon: v.lon });
+      segs.push({ label: v.label, category: catFor(v.label), start: v.ts, end, durationMin: 0, source: v.source, lat: v.lat, lon: v.lon });
     }
   }
 
