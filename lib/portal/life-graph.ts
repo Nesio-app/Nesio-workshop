@@ -60,11 +60,13 @@ export interface LifeGraphCloudSyncRecord {
 export interface LifeGraphCloudSyncOutboxItem {
   resourceId: string;
   operation: CloudSyncOperation;
-  node?: LifeNode;
-  assets?: Array<LifeNodeAsset & { nodeId?: string }>;
   queuedAt: string;
   updatedAt: string;
   attempts: number;
+  // 注意:不再持久化整条 node/assets —— 图谱(loadAll)才是权威源。
+  // 旧版每条 pending 都存一份完整节点副本,未登录时永不同步 → outbox 在
+  // localStorage 里堆成第二份完整图谱,直接顶爆 ~5MB 配额。retry 时按 id 从
+  // 图谱取回即可(与 backfill 一致)。
 }
 
 const STORAGE_KEY = 'nesio-life-graph-v1';
@@ -189,15 +191,43 @@ function loadCloudSyncOutboxMap(): Map<string, LifeGraphCloudSyncOutboxItem> {
   try {
     const raw = localStorage.getItem(CLOUD_SYNC_OUTBOX_KEY);
     if (!raw) return new Map();
-    const items = JSON.parse(raw) as LifeGraphCloudSyncOutboxItem[];
+    const items = JSON.parse(raw) as Array<LifeGraphCloudSyncOutboxItem & { node?: unknown; assets?: unknown }>;
     if (!Array.isArray(items)) return new Map();
     return new Map(
       items
         .filter((item) => item?.resourceId && item?.operation)
-        .map((item) => [cloudSyncRecordKey(item.resourceId, item.operation), item]),
+        // 只保留瘦身字段;旧版遗留的 node/assets 在此丢弃(下次 save 落盘即瘦身)
+        .map((item) => [
+          cloudSyncRecordKey(item.resourceId, item.operation),
+          {
+            resourceId: item.resourceId,
+            operation: item.operation,
+            queuedAt: item.queuedAt || item.updatedAt || new Date().toISOString(),
+            updatedAt: item.updatedAt || new Date().toISOString(),
+            attempts: typeof item.attempts === 'number' ? item.attempts : 0,
+          } satisfies LifeGraphCloudSyncOutboxItem,
+        ]),
     );
   } catch {
     return new Map();
+  }
+}
+
+/**
+ * 一次性把旧版「胖 outbox」(每条含整节点副本)重写成瘦身版,立刻回收 localStorage。
+ * 未登录设备上这份重复图谱是配额顶爆的主因;开机即压缩,给存储解压。
+ */
+let outboxCompacted = false;
+function compactCloudSyncOutboxOnce(): void {
+  if (outboxCompacted || typeof window === 'undefined') return;
+  outboxCompacted = true;
+  try {
+    const raw = localStorage.getItem(CLOUD_SYNC_OUTBOX_KEY);
+    if (raw && (raw.includes('"node"') || raw.includes('"assets"'))) {
+      saveCloudSyncOutboxMap(loadCloudSyncOutboxMap());
+    }
+  } catch {
+    /* best-effort */
   }
 }
 
@@ -213,18 +243,16 @@ function saveCloudSyncOutboxMap(items: Map<string, LifeGraphCloudSyncOutboxItem>
 function queueCloudSyncOutboxItem(
   resource: LifeNode | string,
   operation: CloudSyncOperation,
-  payload: Pick<LifeGraphCloudSyncOutboxItem, 'assets'> = {},
 ): void {
   const resourceId = typeof resource === 'string' ? resource : resource.id;
   const items = loadCloudSyncOutboxMap();
   const key = cloudSyncRecordKey(resourceId, operation);
   const current = items.get(key);
   const now = new Date().toISOString();
+  // 只记 id/operation/计数 —— 待发的节点内容 retry 时从权威图谱按 id 取回。
   items.set(key, {
     resourceId,
     operation,
-    node: typeof resource === 'string' ? current?.node : resource,
-    assets: payload.assets || current?.assets,
     queuedAt: current?.queuedAt || now,
     updatedAt: now,
     attempts: current?.attempts || 0,
@@ -343,6 +371,7 @@ export function getLifeGraphCloudSyncSummary(): {
   notConfiguredCount: number;
   lastUpdatedAt: string | null;
 } {
+  compactCloudSyncOutboxOnce(); // Memory 页挂载即回收旧胖 outbox 的 localStorage
   const records = getLifeGraphCloudSyncRecords();
   const NOT_CONFIGURED_ERRORS = new Set(['cloud_not_configured', 'cloud_memory_sync_failed', 'cloud_memory_network_error']);
   const notConfigured = records.filter(
@@ -385,7 +414,7 @@ async function cloudFetchWithSmartError(
 
 async function syncLifeGraphUpsertToCloud(node: LifeNode): Promise<void> {
   if (!cloudMemorySyncEnabled()) return;
-  queueCloudSyncOutboxItem(node, 'upsert', { assets: [] });
+  queueCloudSyncOutboxItem(node, 'upsert');
   markCloudSyncPending(node.id, 'upsert');
   updateCloudSyncOutboxAttempt(node.id, 'upsert');
   const result = await cloudFetchWithSmartError(CLOUD_MEMORY_ENDPOINT, {
@@ -433,6 +462,8 @@ export async function retryLifeGraphCloudSync(): Promise<{
     (record) => record.status === 'pending' || record.status === 'failed',
   );
   const outboxItemsByKey = loadCloudSyncOutboxMap();
+  // 权威源:待发的节点内容从图谱按 id 取回(outbox 只留 id,不再存副本)
+  const graphById = new Map(loadAll().map((n) => [n.id, n]));
   let retriedCount = 0;
   let succeededCount = 0;
   let failedCount = 0;
@@ -444,12 +475,21 @@ export async function retryLifeGraphCloudSync(): Promise<{
     markCloudSyncPending(item.resourceId, item.operation);
     updateCloudSyncOutboxAttempt(item.resourceId, item.operation);
     let result: { ok: boolean; transient: boolean; error?: string };
-    if ((item.operation === 'upsert' || item.operation === 'backfill') && item.node) {
+    if (item.operation === 'upsert' || item.operation === 'backfill') {
+      const node = graphById.get(item.resourceId);
+      if (!node) {
+        // 节点已被删除 —— 无内容可发,清出 outbox,不算失败
+        removeCloudSyncOutboxItem(item.resourceId, item.operation);
+        markCloudSyncSynced(item.resourceId, item.operation);
+        retriedCount -= 1;
+        continue;
+      }
+      const assets = (node.assets || []).map((asset) => ({ ...asset, nodeId: node.id }));
       result = await cloudFetchWithSmartError(CLOUD_MEMORY_ENDPOINT, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nodes: [item.node], assets: item.assets || [] }),
+        body: JSON.stringify({ nodes: [node], assets }),
       });
     } else if (item.operation === 'delete') {
       result = await cloudFetchWithSmartError(CLOUD_MEMORY_ENDPOINT, {
@@ -490,17 +530,28 @@ function loadAll(): LifeNode[] {
 
 function saveAll(nodes: LifeNode[]): void {
   if (typeof window === 'undefined') return;
+  // 首写前先把旧版胖 outbox 压缩掉,回收 localStorage(未登录设备的配额主凶)
+  compactCloudSyncOutboxOnce();
+  const serialized = JSON.stringify(nodes);
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(nodes));
+    localStorage.setItem(STORAGE_KEY, serialized);
     window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
     // Warn proactively as the quota cliff approaches (throttled daily)
     import('./storage-health').then(({ checkStorageWarning }) => checkStorageWarning());
   } catch {
-    // Quota exceeded — the write was DROPPED. Surface it; silence here
-    // previously meant users lost new memories without any signal.
-    import('./storage-health').then(({ STORAGE_FULL_EVENT, getStorageHealth }) => {
-      window.dispatchEvent(new CustomEvent(STORAGE_FULL_EVENT, { detail: getStorageHealth() }));
-    });
+    // 配额溢出:先腾出同步 outbox 占的空间(它与图谱重复),再重试一次写入
+    try {
+      localStorage.removeItem(CLOUD_SYNC_OUTBOX_KEY);
+      outboxCompacted = true;
+      localStorage.setItem(STORAGE_KEY, serialized);
+      window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
+      return;
+    } catch {
+      // 仍写不进 —— 写被丢弃,如实上报(此前静默 = 用户丢新记忆无感知)
+      import('./storage-health').then(({ STORAGE_FULL_EVENT, getStorageHealth }) => {
+        window.dispatchEvent(new CustomEvent(STORAGE_FULL_EVENT, { detail: getStorageHealth() }));
+      });
+    }
   }
 }
 
@@ -664,9 +715,7 @@ export async function backfillLocalLifeGraphToCloud({ limit = 200 }: { limit?: n
   }
 
   for (const node of backfillNodes) {
-    queueCloudSyncOutboxItem(node, 'backfill', {
-      assets: (node.assets || []).map((asset) => ({ ...asset, nodeId: node.id })),
-    });
+    queueCloudSyncOutboxItem(node, 'backfill');
     markCloudSyncPending(node.id, 'backfill');
   }
   try {

@@ -71,6 +71,19 @@ for (const marker of [
   assert.ok(lifeGraph.includes(marker), `life-graph cloud sync retry missing marker: ${marker}`);
 }
 
+// 存储修复:同步 outbox 不再持久化整条节点 —— 否则未登录设备上它在 localStorage
+// 里堆成第二份完整图谱,顶爆 ~5MB 配额(用户实测 761 条待同步 + 空间满)。
+// retry 时从权威图谱按 id 取回;首写/Memory 挂载时压缩旧胖 outbox 回收空间。
+for (const marker of [
+  'compactCloudSyncOutboxOnce',
+  'const graphById = new Map(loadAll().map',
+]) {
+  assert.ok(lifeGraph.includes(marker), `life-graph slim-outbox missing marker: ${marker}`);
+}
+const outboxIface = lifeGraph.match(/export interface LifeGraphCloudSyncOutboxItem \{[\s\S]*?\n\}/)?.[0] || '';
+assert.ok(outboxIface, 'LifeGraphCloudSyncOutboxItem interface must exist');
+assert.ok(!/node\?:\s*LifeNode/.test(outboxIface), 'cloud-sync outbox must not persist a full node copy (localStorage bloat / quota exhaustion).');
+
 for (const marker of [
   'createAppApiClient',
   'fetchCloudMemorySnapshot',
@@ -140,8 +153,8 @@ assert.match(
 );
 assert.match(
   lifeGraph,
-  /body: JSON\.stringify\(\{ nodes: \[item\.node\], assets: item\.assets \|\| \[\] \}\)/,
-  'retry must replay queued upsert payloads, not just status markers.',
+  /body: JSON\.stringify\(\{ nodes: \[node\], assets \}\)/,
+  'retry must replay upsert payloads reconstructed from the authoritative graph (outbox stores id only, not a node copy).',
 );
 assert.match(
   lifeGraph,

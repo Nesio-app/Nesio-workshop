@@ -837,7 +837,7 @@ export default function Portal() {
           >
             <span style={{ flex: 1 }}>
               {storageAlert.kind === 'full'
-                ? L(dict, `本机空间满了，新的记忆暂时存不进来。先在设置里导出一份备份，再清理一些照片，就能继续保存。`, 'Local storage is full — new memories cannot be saved. Export a backup in Settings, clear some photos, and saving resumes.')
+                ? L(dict, `本机空间紧张，新的记忆可能存不进来。先在设置里导出一份备份保底；登录后记忆会自动备份到云端并腾出本机空间。`, 'Local storage is tight — new memories may not save. Export a backup in Settings first; signing in backs memories up to the cloud and frees local space.')
                 : L(dict, `本机空间已用 ${storageAlert.percent}%。方便的时候导出一份备份，之后就不用惦记这件事了。`, `Local storage is ${storageAlert.percent}% used. Export a backup when convenient and stop worrying about it.`)}
             </span>
             <button
