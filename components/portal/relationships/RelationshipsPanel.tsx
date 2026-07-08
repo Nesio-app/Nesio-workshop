@@ -17,12 +17,14 @@ import {
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
+import RelationshipDetailSheet from './RelationshipDetailSheet';
 
 const GROUPS: Closeness[] = ['core', 'close', 'acquaintance'];
 
 export default function RelationshipsPanel() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [openKey, setOpenKey] = useState<string | null>(null);
 
   const rebuild = () => setContacts(buildRelationships(getLifeGraph()));
 
@@ -63,12 +65,12 @@ export default function RelationshipsPanel() {
           <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>{L(dict, '该联系了', 'Time to reach out')}</p>
           {dueList.slice(0, 6).map((c) => (
             <div key={c.key} className="nesio-rel-due-row">
-              <div className="nesio-rel-due-info">
+              <button type="button" className="nesio-rel-due-info nesio-rel-open" onClick={() => setOpenKey(c.key)}>
                 <span className="nesio-rel-name">{c.name}</span>
                 <span className="nesio-rel-sub">
                   {c.relation ? `${c.relation} · ` : ''}{lastContactLabel(c, dict)}
                 </span>
-              </div>
+              </button>
               <button type="button" className="nesio-rel-touch-btn" onClick={() => onContacted(c.key)}>
                 {L(dict, '联系过了', 'Reached out')}
               </button>
@@ -90,11 +92,22 @@ export default function RelationshipsPanel() {
             </p>
             <div className="nesio-rel-grid">
               {items.map((c) => (
-                <div key={c.key} className={`nesio-rel-card${c.reachOut ? ' nesio-rel-card--due' : ''}`}>
+                <div
+                  key={c.key}
+                  role="button"
+                  tabIndex={0}
+                  className={`nesio-rel-card nesio-rel-open${c.reachOut ? ' nesio-rel-card--due' : ''}`}
+                  onClick={() => setOpenKey(c.key)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpenKey(c.key); } }}
+                >
                   <span className="nesio-rel-name">{c.name}</span>
                   <span className="nesio-rel-sub">{c.relation || (dict === 'en' ? `mentioned ${c.mentions}×` : `提到 ${c.mentions} 次`)}</span>
                   <span className="nesio-rel-last">{lastContactLabel(c, dict)}</span>
-                  <button type="button" className="nesio-rel-touch-btn nesio-rel-touch-btn--sm" onClick={() => onContacted(c.key)}>
+                  <button
+                    type="button"
+                    className="nesio-rel-touch-btn nesio-rel-touch-btn--sm"
+                    onClick={(e) => { e.stopPropagation(); onContacted(c.key); }}
+                  >
                     {L(dict, '联系过了', 'Reached out')}
                   </button>
                 </div>
@@ -107,6 +120,8 @@ export default function RelationshipsPanel() {
       <p className="nesio-settings-option-hint" style={{ marginTop: '1rem', textAlign: 'center' }}>
         {L(dict, '只存本机 · 从你的记忆和邮件推出,非 AI', 'On-device only · derived from your notes and email, not AI')}
       </p>
+
+      {openKey && <RelationshipDetailSheet contactKey={openKey} onClose={() => setOpenKey(null)} />}
     </div>
   );
 }
