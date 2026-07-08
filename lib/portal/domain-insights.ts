@@ -22,8 +22,9 @@ import { inventoryFindings, type InventoryFinding } from './inventory';
 import { getLifeGraph } from './life-graph';
 import { moodFindings, type MoodFinding } from './mood-insight';
 import { relationshipFindings, type RelationshipFinding } from './relationship-insight';
+import { readingFindings, type ReadingFinding } from './reading-domain';
 
-export type InsightDomain = 'health' | 'finance' | 'location' | 'inventory' | 'mood' | 'relationship';
+export type InsightDomain = 'health' | 'finance' | 'location' | 'inventory' | 'mood' | 'relationship' | 'reading';
 export type InsightSeverity = 'flag' | 'attention';
 
 export interface DomainInsight {
@@ -46,6 +47,7 @@ export interface DomainFindingSet {
   inventory: InventoryFinding[];
   mood: MoodFinding[];
   relationship: RelationshipFinding[];
+  reading: ReadingFinding[];
 }
 
 const isSurfaceableFinding = (f: ClinicalFinding) => f.severity === 'flag' || f.severity === 'attention';
@@ -97,12 +99,18 @@ export function computeDomainFindings(): DomainFindingSet {
     relationship = relationshipFindings({ nodes: getLifeGraph(), now: new Date() });
   } catch { /* ignore */ }
 
-  return { health, finance, location, inventory, mood, relationship };
+  // 阅读:在读的书 + 最近划线(N-4 阅读域;好数据,只 attention);书即 Notion 折叠/微信读书导入的记忆
+  let reading: ReadingFinding[] = [];
+  try {
+    reading = readingFindings({ nodes: getLifeGraph(), now: new Date() });
+  } catch { /* ignore */ }
+
+  return { health, finance, location, inventory, mood, relationship, reading };
 }
 
 /** 汇聚当前所有域的「值得提示」判定(红旗/可关注),红旗优先。是 computeDomainFindings 的文本投影。 */
 export function gatherDomainInsights(): DomainInsight[] {
-  const { health, finance, location, inventory, mood, relationship } = computeDomainFindings();
+  const { health, finance, location, inventory, mood, relationship, reading } = computeDomainFindings();
   const out: DomainInsight[] = [];
 
   for (const f of health.findings) {
@@ -151,6 +159,9 @@ export function gatherDomainInsights(): DomainInsight[] {
   for (const f of relationship) {
     out.push({ domain: 'relationship', severity: f.severity as InsightSeverity, title: f.title[0], detail: f.detail[0] });
   }
+  for (const f of reading) {
+    out.push({ domain: 'reading', severity: f.severity as InsightSeverity, title: f.title[0], detail: f.detail[0] });
+  }
 
   const rank = (s: InsightSeverity) => (s === 'flag' ? 0 : 1);
   return out.sort((a, b) => rank(a.severity) - rank(b.severity));
@@ -164,7 +175,7 @@ export function gatherDomainInsights(): DomainInsight[] {
 export function domainInsightsContextBlock(max = 8): string {
   const insights = gatherDomainInsights().slice(0, max);
   if (!insights.length) return '';
-  const label: Record<InsightDomain, string> = { health: '健康', finance: '财务', location: '活动', inventory: '收纳', mood: '心情', relationship: '人缘' };
+  const label: Record<InsightDomain, string> = { health: '健康', finance: '财务', location: '活动', inventory: '收纳', mood: '心情', relationship: '人缘', reading: '阅读' };
   const lines = insights.map((i) => `• [${label[i.domain]}] ${i.title} —— ${i.detail}`);
   // 财务⑮:按当前财务判定的主题检索策展标准要点(带出处),让 AI 引用真标准而非编造
   try {

@@ -35,6 +35,7 @@ import {
   inventoryFindingsToGuidanceEvents,
   moodFindingsToGuidanceEvents,
   relationshipFindingsToGuidanceEvents,
+  readingFindingsToGuidanceEvents,
   crossRegionToGuidanceEvents,
   type WeatherSnapshot,
   decCardsToGuidanceEvents,
@@ -187,6 +188,7 @@ export function useTodayData(canUsePrivateData: boolean) {
               ...inventoryFindingsToGuidanceEvents(df.inventory),
               ...moodFindingsToGuidanceEvents(df.mood),
               ...relationshipFindingsToGuidanceEvents(df.relationship),
+              ...readingFindingsToGuidanceEvents(df.reading),
               // 跨区 P2:已过同意/新鲜度/可打断性/预算门的跨区关联,进七层管线主动投递
               ...crossRegionToGuidanceEvents(buildCrossRegionDeliverables(now)),
             ];
