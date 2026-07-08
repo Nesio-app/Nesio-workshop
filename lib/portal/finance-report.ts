@@ -129,11 +129,12 @@ export function buildMonthlyReport(
   // ── 资产小结 ──
   if (accounts.length) {
     lines.push('', `## ${L('资产小结', 'Assets')}`, '');
-    lines.push(L(`存款 ${formatMoney(assets.deposits)} · 投资 ${formatMoney(assets.investments)} · 信用卡欠款 ${formatMoney(assets.creditOwed)} · 净资产 ${assets.net < 0 ? '-' : ''}${formatMoney(Math.abs(assets.net))}`, `Cash ${formatMoney(assets.deposits)} · investments ${formatMoney(assets.investments)} · card debt ${formatMoney(assets.creditOwed)} · net ${formatMoney(assets.net)}`));
+    const loanSeg = assets.loanOwed > 0 ? L(` · 贷款 ${formatMoney(assets.loanOwed)}`, ` · loans ${formatMoney(assets.loanOwed)}`) : '';
+    lines.push(L(`存款 ${formatMoney(assets.deposits)} · 投资 ${formatMoney(assets.investments)} · 信用卡欠款 ${formatMoney(assets.creditOwed)}${loanSeg} · 净资产 ${assets.net < 0 ? '-' : ''}${formatMoney(Math.abs(assets.net))}`, `Cash ${formatMoney(assets.deposits)} · investments ${formatMoney(assets.investments)} · card debt ${formatMoney(assets.creditOwed)}${loanSeg} · net ${formatMoney(assets.net)}`));
     for (const a of accounts) {
       const tl = accountTypeLabel(a);
       const bal = a.balance != null ? formatMoney(a.balance, a.currency) : L('余额未知', 'balance n/a');
-      lines.push(`- ${[a.institution, a.name].filter(Boolean).join(' · ')}(${zh ? tl[0] : tl[1]}${a.mask ? ` ····${a.mask}` : ''}):${(a.type || '').toLowerCase() === 'credit' ? L(`欠款 ${bal}`, `owes ${bal}`) : bal}`);
+      lines.push(`- ${[a.institution, a.name].filter(Boolean).join(' · ')}(${zh ? tl[0] : tl[1]}${a.mask ? ` ····${a.mask}` : ''}):${['credit', 'loan'].includes((a.type || '').toLowerCase()) ? L(`欠款 ${bal}`, `owes ${bal}`) : bal}`);
     }
   }
 
