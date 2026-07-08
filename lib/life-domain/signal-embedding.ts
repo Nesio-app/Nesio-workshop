@@ -40,7 +40,9 @@ export async function embedTextRaw(text: string): Promise<SignalEmbeddingResult>
   const normalized = normalizeEmbeddingText(text);
   if (!normalized) return { ok: false, error: 'empty_embedding_text' };
   const apiKey = resolveAiKey('gemini');
-  if (!apiKey) return { ok: false, error: 'embedding_key_missing' };
+  // 问一问修复批:没有 Gemini key 时回退 OpenAI 嵌入(dimensions=768 与 Gemini 对齐)。
+  // 此前嵌入只接 Gemini,用户聊天模型配的是别家 key → 语义检索永远「缺 AI 配置」。
+  if (!apiKey) return embedTextOpenAi(normalized);
 
   const model = signalEmbeddingModel();
   try {
@@ -66,6 +68,31 @@ export async function embedTextRaw(text: string): Promise<SignalEmbeddingResult>
       return { ok: false, error: `embedding_dimension_${values.length}` };
     }
     return { ok: true, values, model, dimension: values.length };
+  } catch {
+    return { ok: false, error: 'embedding_provider_unreachable' };
+  }
+}
+
+const OPENAI_EMBEDDING_MODEL = 'text-embedding-3-small';
+
+/** OpenAI 嵌入回退:dimensions=768 与 Gemini 同维;模型名随结果返回供缓存做同源校验。 */
+async function embedTextOpenAi(normalized: string): Promise<SignalEmbeddingResult> {
+  const apiKey = resolveAiKey('openai');
+  if (!apiKey) return { ok: false, error: 'embedding_key_missing' };
+  try {
+    const response = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({ model: OPENAI_EMBEDDING_MODEL, input: normalized, dimensions: DEFAULT_DIMENSIONS }),
+      cache: 'no-store',
+    });
+    if (!response.ok) return { ok: false, error: `embedding_provider_${response.status}` };
+    const data = await response.json() as { data?: Array<{ embedding?: unknown }> };
+    const values = Array.isArray(data.data?.[0]?.embedding)
+      ? (data.data[0].embedding as unknown[]).filter((v): v is number => typeof v === 'number' && Number.isFinite(v))
+      : [];
+    if (values.length !== DEFAULT_DIMENSIONS) return { ok: false, error: `embedding_dimension_${values.length}` };
+    return { ok: true, values, model: OPENAI_EMBEDDING_MODEL, dimension: values.length };
   } catch {
     return { ok: false, error: 'embedding_provider_unreachable' };
   }

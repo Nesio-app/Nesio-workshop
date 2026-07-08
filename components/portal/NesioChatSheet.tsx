@@ -57,6 +57,7 @@ interface UiMessage {
   savedToMemory?: boolean;
   /** 🔴#2:这条回答时语义检索降级了(缺 AI 配置,只用了关键词匹配)。 */
   semanticDegraded?: boolean;
+  semanticReason?: string; // 未生效的具体原因(no_key/rate_limited/provider/network/auth)
 }
 
 /** 🔴#1:从模型回答里抽出它自报的【依据:#1,#3】,并把这行从展示文本里剥掉。
@@ -120,7 +121,7 @@ function fmtNode(n: LifeNode): string {
 
 interface RefCandidate { shortId: number; node: LifeNode }
 
-async function buildMemoryContext(query: string, convoHint = ''): Promise<{ context: string; refCandidates: RefCandidate[]; semanticDegraded: boolean }> {
+async function buildMemoryContext(query: string, convoHint = ''): Promise<{ context: string; refCandidates: RefCandidate[]; semanticDegraded: boolean; semanticReason: string }> {
   const graph = getLifeGraph();
   const temporal = parseTemporalQuery(query);
 
@@ -140,11 +141,14 @@ async function buildMemoryContext(query: string, convoHint = ''): Promise<{ cont
   // 🔴#2:语义检索没用上 embedding(缺 AI key / 端点挂了)= 静默降级,跨语言记录会被漏。
   // 但只在库里真的有"另一种语言"的记录时提示才有意义 —— 纯中文用户查纯中文库不该被
   // 无端提示"英文邮件可能没找全"。用 detectCrossLingualGap 精确判定,消除误报噪音。
-  const semanticDegraded = detectCrossLingualGap({
+  // 只有「真的出了问题」才算降级:候选太少(not_needed)本就无需语义,不该吓用户。
+  const realFailure = !reranked.semantic && reranked.reason !== 'not_needed';
+  const semanticDegraded = realFailure && detectCrossLingualGap({
     query,
     corpusTexts: graph.slice(0, 200).map((n) => `${n.name} ${n.rawInput || ''}`),
     embeddingsApplied: reranked.semantic,
   }).gap;
+  const semanticReason = reranked.reason;
 
   // Layer 3: upcoming 7-day events (always in context — temporal baseline)
   const now = Date.now();
@@ -174,13 +178,29 @@ async function buildMemoryContext(query: string, convoHint = ''): Promise<{ cont
     const t = new Date(s).getTime();
     return Number.isNaN(t) ? new Date(n.createdAt).getTime() : t;
   };
-  let emailNodes: LifeNode[] = [];
-  if (wantsEmail) {
-    const allEmail = graph.filter((n) => n.source === 'email');
-    emailNodes = (temporal.hasDate
+  const pickEmailNodes = (g: LifeNode[]): LifeNode[] => {
+    const allEmail = g.filter((n) => n.source === 'email');
+    return (temporal.hasDate
       ? allEmail.filter((n) => isInSpan(new Date(emailReceived(n)), temporal))
       : allEmail
     ).sort((a, b) => emailReceived(b) - emailReceived(a)).slice(0, 12);
+  };
+  let emailNodes: LifeNode[] = [];
+  if (wantsEmail) {
+    emailNodes = pickEmailNodes(graph);
+    // 问一问修复批:问到邮件但目标时段没有邮件节点(常见:「今天的邮件」但后台
+    // 还没轮到同步)→ 当场触发一次增量同步再重读,而不是回答「还没同步过来」。
+    // 15 秒兜底超时:同步太慢就先按现有数据回答,不吊死输入框。
+    if (emailNodes.length === 0) {
+      try {
+        const { runGmailSync } = await import('@/lib/portal/connector-sync');
+        const done = await Promise.race([
+          runGmailSync({ force: true }),
+          new Promise<null>((resolve) => { setTimeout(() => resolve(null), 15_000); }),
+        ]);
+        if (done && (done as { extracted?: number }).extracted) emailNodes = pickEmailNodes(getLifeGraph());
+      } catch { /* 同步失败按现有数据回答 */ }
+    }
   }
 
   // Assemble: date matches HEAD → email (if asked) → upcoming → search → recent
@@ -252,7 +272,7 @@ async function buildMemoryContext(query: string, convoHint = ''): Promise<{ cont
     parts.push('\n【回答规则】上面标了 [#编号] 的记忆是可引用来源。回答完后在最后单独一行注明依据:用到了哪几条就写「【依据:#编号,#编号】」,一条都没用到就写「【依据:无】」。这一行只放编号,不要写别的。');
   }
 
-  return { context: parts.join('\n'), refCandidates, semanticDegraded };
+  return { context: parts.join('\n'), refCandidates, semanticDegraded, semanticReason };
 }
 
 function buildCalendarContext(query: string): string {
@@ -682,7 +702,7 @@ export default function NesioChatSheet({
     try {
       // 🔴#3:把最近几条用户提问作为召回线索,让"第二封讲啥"这类追问仍能重新召回邮件。
       const convoHint = messages.filter((m) => m.role === 'user').slice(-2).map((m) => m.text).join(' ');
-      const { context: memoryContext, refCandidates, semanticDegraded } = await buildMemoryContext(text.trim(), convoHint);
+      const { context: memoryContext, refCandidates, semanticDegraded, semanticReason } = await buildMemoryContext(text.trim(), convoHint);
       const res = await fetch('/api/portal/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -717,6 +737,7 @@ export default function NesioChatSheet({
         sources: data.sources ?? [],
         refs: citedNodes.map((n) => ({ id: n.id, name: n.name, source: n.source })),
         semanticDegraded,
+        semanticReason,
       };
       // 函数式追加 + 用最终列表存档,别用可能已过期的 nextMsgs 快照覆盖并发消息。
       setMessages((prev) => { const next = [...prev, aiMsg]; saveHistory(next); return next; });
@@ -1033,7 +1054,14 @@ export default function NesioChatSheet({
                 {/* 🔴#2:语义检索降级的可见失败态 —— 明确区分"AI 未配置只用了关键词"与"真没数据" */}
                 {!isUser && msg.semanticDegraded && (
                   <p className="nesio-chat-degraded-hint">
-                    {L(dict, '语义检索未启用(缺 AI 配置),这次只用了关键词匹配 —— 跨语言的记录(如英文邮件)可能没找全。', 'Semantic search is off (AI not configured); only keyword matching was used — cross-language records (e.g. English email) may be missed.')}
+                    {(() => {
+                      // 按真实原因给话术 —— 「key 没配」和「key 好好的但这次限流/配额没成」是两回事
+                      const r = msg.semanticReason;
+                      if (r === 'rate_limited') return L(dict, '检索有点频繁,这次先用了关键词匹配(稍后自动恢复)—— 跨语言的记录可能没找全。', 'Search briefly rate-limited; used keyword matching this time — cross-language records may be missed.');
+                      if (r === 'provider' || r === 'network') return L(dict, '语义检索这次没连上(嵌入服务临时故障或配额),先用了关键词匹配 —— 跨语言的记录可能没找全。', 'Semantic search briefly unavailable (provider hiccup/quota); used keyword matching — cross-language records may be missed.');
+                      if (r === 'auth') return L(dict, '会话需要重新登录后语义检索才能生效,这次用了关键词匹配。', 'Sign in again to re-enable semantic search; used keyword matching this time.');
+                      return L(dict, '语义检索未启用(缺嵌入模型 key:Gemini 或 OpenAI 任一即可),这次只用了关键词匹配 —— 跨语言的记录(如英文邮件)可能没找全。', 'Semantic search is off (needs a Gemini or OpenAI key); only keyword matching was used — cross-language records may be missed.');
+                    })()}
                   </p>
                 )}
                 {/* 批次 38:引用卡 —— 模型自报引用的记忆,点开可回看/阅读/回复(邮件多一颗直达回复) */}

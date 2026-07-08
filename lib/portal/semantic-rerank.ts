@@ -19,7 +19,7 @@ const LEGACY_LS_KEY = 'nesio-node-embeddings-v1';
 const DB_NAME = 'nesio-vectors';
 const STORE = 'embeddings';
 
-interface CacheEntry { hash: number; vec: Float32Array }
+interface CacheEntry { hash: number; vec: Float32Array; model?: string } // model:嵌入同源校验(换模型后旧向量作废)
 
 function djb2(text: string): number {
   let h = 5381;
@@ -79,23 +79,36 @@ function cosine(a: ArrayLike<number>, b: ArrayLike<number>): number {
   return denom > 0 ? dot / denom : 0;
 }
 
-async function fetchVectors(texts: string[]): Promise<Array<number[] | null> | null> {
+/** 语义检索没生效的原因 —— UI 据此给准确提示,不再一律说「缺 AI 配置」。 */
+export type SemanticReason = 'ok' | 'not_needed' | 'no_key' | 'rate_limited' | 'auth' | 'provider' | 'network';
+
+type FetchVectorsResult = { vectors: Array<number[] | null>; model: string } | { failure: Exclude<SemanticReason, 'ok' | 'not_needed'> };
+
+async function fetchVectors(texts: string[]): Promise<FetchVectorsResult> {
   try {
     const res = await fetch('/api/portal/embed', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ texts }),
     });
-    if (!res.ok) return null;
-    const data = await res.json() as { ok?: boolean; vectors?: Array<number[] | null> };
-    return data.ok && Array.isArray(data.vectors) ? data.vectors : null;
-  } catch { return null; }
+    if (!res.ok) {
+      // 分诊:503=缺嵌入 key;429=限流;401=会话;其余=提供方故障(配额/临时)
+      if (res.status === 503) return { failure: 'no_key' };
+      if (res.status === 429) return { failure: 'rate_limited' };
+      if (res.status === 401) return { failure: 'auth' };
+      return { failure: 'provider' };
+    }
+    const data = await res.json() as { ok?: boolean; vectors?: Array<number[] | null>; model?: string };
+    return data.ok && Array.isArray(data.vectors) ? { vectors: data.vectors, model: data.model || '' } : { failure: 'provider' };
+  } catch { return { failure: 'network' }; }
 }
 
 export interface RerankResult {
   nodes: LifeNode[];
   /** true only when embeddings were actually fetched + applied; false = degraded to text order. */
   semantic: boolean;
+  /** 没生效时的具体原因(not_needed = 候选太少本就无需语义,不是故障)。 */
+  reason: SemanticReason;
 }
 
 /**
@@ -111,7 +124,7 @@ export async function semanticRerank(query: string, nodes: LifeNode[], topK = 12
  *  so callers can distinguish "semantic search off (AI not configured)" from "no data". */
 export async function semanticRerankMeta(query: string, nodes: LifeNode[], topK = 12): Promise<RerankResult> {
   const q = query.trim();
-  if (!q || nodes.length < 3) return { nodes, semantic: false };
+  if (!q || nodes.length < 3) return { nodes, semantic: false, reason: 'not_needed' }; // 候选太少不是故障,别吓用户
 
   const pool = nodes.slice(0, Math.min(nodes.length, 20));
   const db = await openDb();
@@ -130,18 +143,43 @@ export async function semanticRerankMeta(query: string, nodes: LifeNode[], topK 
 
   const texts = [q, ...missing.map((m) => m.text)];
   const fetched = await fetchVectors(texts);
-  if (!fetched || !fetched[0]) return { nodes, semantic: false }; // endpoint unavailable — keep text order
+  if ('failure' in fetched) return { nodes, semantic: false, reason: fetched.failure };
+  if (!fetched.vectors[0]) return { nodes, semantic: false, reason: 'provider' }; // 查询向量都没回来 = 提供方故障/配额
 
-  const queryVec = fetched[0];
+  const queryVec = fetched.vectors[0];
   const toStore: Array<[string, CacheEntry]> = [];
   missing.forEach((m, j) => {
-    const vec = fetched[j + 1];
+    const vec = fetched.vectors[j + 1];
     if (vec) {
       const typed = Float32Array.from(vec);
       nodeVecs[m.idx] = typed;
-      toStore.push([pool[m.idx].id, { hash: djb2(m.text), vec: typed }]);
+      toStore.push([pool[m.idx].id, { hash: djb2(m.text), vec: typed, model: fetched.model }]);
     }
   });
+  // 同源校验:缓存向量的模型与本次查询向量不同(服务端换了嵌入提供方)→ 不能混算 cosine,
+  // 补一轮重嵌入覆盖(一次性成本;旧条目无 model 视作 legacy-gemini)。
+  const staleIdx: number[] = [];
+  pool.forEach((n, i) => {
+    if (!nodeVecs[i]) return;
+    const hit = cached.get(n.id);
+    if (!hit || missing.some((m) => m.idx === i)) return;
+    const entryModel = hit.model || 'text-embedding-004';
+    if (fetched.model && entryModel !== fetched.model) staleIdx.push(i);
+  });
+  if (staleIdx.length) {
+    const refetch = await fetchVectors(staleIdx.map((i) => nodeEmbeddingText(pool[i])));
+    const refetchOk = !('failure' in refetch) ? refetch : null;
+    staleIdx.forEach((i, j) => {
+      const vec = refetchOk?.vectors[j];
+      if (vec) {
+        const typed = Float32Array.from(vec);
+        nodeVecs[i] = typed;
+        toStore.push([pool[i].id, { hash: djb2(nodeEmbeddingText(pool[i])), vec: typed, model: refetchOk?.model || fetched.model }]);
+      } else {
+        nodeVecs[i] = null; // 刷新失败:宁可不参与语义分,也不用错源向量
+      }
+    });
+  }
   if (db && toStore.length > 0) await idbPutMany(db, toStore);
 
   const scored = pool.map((node, i) => {
@@ -154,5 +192,6 @@ export async function semanticRerankMeta(query: string, nodes: LifeNode[], topK 
   return {
     nodes: [...reranked, ...nodes.slice(pool.length)].slice(0, Math.max(topK, reranked.length)),
     semantic: true,
+    reason: 'ok',
   };
 }

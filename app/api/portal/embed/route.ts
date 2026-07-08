@@ -24,7 +24,8 @@ export async function POST(req: NextRequest) {
   if (isRateLimited(req, 'embed', { limit: 30 })) {
     return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 });
   }
-  if (!resolveAiKey('gemini')) {
+  // 问一问修复批:Gemini 或 OpenAI 任一 key 即可(embedTextRaw 内部回退)
+  if (!resolveAiKey('gemini') && !resolveAiKey('openai')) {
     return NextResponse.json({ ok: false, error: 'embeddings_unavailable' }, { status: 503 });
   }
 
@@ -36,15 +37,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'no_texts' }, { status: 400 });
   }
 
+  let model = '';
+  let firstError = '';
   const vectors = await Promise.all(
     texts.map(async (t) => {
       const result = await embedTextRaw(t.slice(0, MAX_CHARS));
+      if (result.ok && result.model) model = result.model;
+      if (!result.ok && !firstError) firstError = result.error || 'provider_error';
       return result.ok && result.values ? result.values : null;
     }),
   );
+  // 全军覆没(提供方配额/故障)→ 明确报 502,客户端能区分「key 没配」与「key 好好的但这次没成」
+  if (vectors.every((v) => v === null)) {
+    return NextResponse.json({ ok: false, error: firstError || 'provider_error' }, { status: 502 });
+  }
 
   return NextResponse.json(
-    { ok: true, vectors },
+    { ok: true, vectors, model }, // model 供客户端向量缓存做同源校验(换嵌入模型后旧向量不混用)
     { headers: { 'Cache-Control': 'no-store, max-age=0' } },
   );
 }
