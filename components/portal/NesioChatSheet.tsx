@@ -89,6 +89,11 @@ function fmtEventDate(iso: string): string {
   return new Date(iso).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', weekday: 'short' });
 }
 
+// 物品·问一问记物品:像发消息一样记物品(「红色 Nike 鞋放鞋柜」)。
+// 门:记/加/收/买了 + 物品词,或「放在/放到/收进」;问句(哪/在哪/?/找)是找东西,走普通聊天。
+const INVENTORY_ADD_RE = /(记|加|收|添|买了).{0,8}(物品|东西|收纳|库存)|收纳[::]|放(在|到|进)|add (an? )?item/i;
+const INVENTORY_QUESTION_RE = /[??]|哪里|在哪|哪儿|找一?下|找找|去哪/;
+
 const SOURCE_LABEL: Record<string, string> = {
   email: 'Gmail',
   calendar: '日历',
@@ -697,6 +702,51 @@ export default function NesioChatSheet({
       .map((m) => ({ role: m.role as 'user' | 'model', text: m.text }));
 
     track('chat_send', { has_file: Boolean(fileContextRef.current) });
+
+    // ── 物品·问一问记物品:命中意图门 → AI 拆物品直接入库,气泡确认;
+    //    提取为空/失败 → 静默落回普通聊天(不打断,不报错)。
+    if (INVENTORY_ADD_RE.test(text) && !INVENTORY_QUESTION_RE.test(text)) {
+      try {
+        const invCtrl = new AbortController();
+        const invTimeout = setTimeout(() => invCtrl.abort(), 12_000);
+        const invRes = await fetch('/api/portal/inventory-extract', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: text.trim() }),
+          signal: invCtrl.signal,
+        });
+        clearTimeout(invTimeout);
+        const invData = await invRes.json() as { ok?: boolean; items?: Array<{ name: string; quantity?: number; location?: string; category?: string; tags?: string[]; price?: number; note?: string }> };
+        if (invData.ok && invData.items && invData.items.length) {
+          const { addInventoryItem } = await import('@/lib/portal/inventory');
+          const lines = invData.items.map((it) => {
+            addInventoryItem(it);
+            const bits = [it.quantity && it.quantity > 1 ? `×${it.quantity}` : '', it.location ? `→ ${it.location}` : '', it.price != null ? `$${it.price}` : ''].filter(Boolean).join(' ');
+            return `• ${it.name}${bits ? ` ${bits}` : ''}`;
+          });
+          const doneMsg: UiMessage = {
+            id: nextMsgId('a'),
+            role: 'model',
+            text: L(dict,
+              `已存进收纳 ${invData.items.length} 件:
+${lines.join('\n')}
+
+位置/估值想改的话,到「收纳」里点开就能编辑。`,
+              `Saved ${invData.items.length} item(s) to storage:
+${lines.join('\n')}
+
+Edit location/value anytime in Storage.`),
+            savedToMemory: true,
+          };
+          setMessages((prev) => { const next = [...prev, doneMsg]; saveHistory(next); return next; });
+          window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
+          setSending(false);
+          sendingRef.current = false;
+          return;
+        }
+      } catch { /* 落回普通聊天 */ }
+    }
+
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30000);
     try {
