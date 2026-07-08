@@ -762,7 +762,7 @@ export default function Portal() {
       } catch { /* localStorage unavailable */ }
     }
 
-    fetch('/api/portal/flomo?limit=48', { cache: 'no-store' }).catch(() => undefined);
+    fetch('/api/portal/flomo?limit=200', { cache: 'no-store' }).catch(() => undefined);
 
     return () => { mounted = false; };
   }, [canUsePrivateRuntime]);

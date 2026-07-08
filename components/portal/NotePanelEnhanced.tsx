@@ -11,7 +11,7 @@ import {
   type ProductionRuntimeProviderAction,
 } from '@/lib/portal/app-api-client';
 
-const FLOMO_MEMO_LIMIT = 48;
+const FLOMO_MEMO_LIMIT = 200;
 const MEMO_COLLAPSE_CHARS = 180;
 
 interface FlomoMemo {

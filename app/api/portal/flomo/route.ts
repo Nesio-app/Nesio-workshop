@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
   if (guard) return guard;
 
   const limitParam = req.nextUrl.searchParams.get('limit');
-  const limit = limitParam ? Number.parseInt(limitParam, 10) : 48;
+  const limit = limitParam ? Number.parseInt(limitParam, 10) : 200;
 
   const readConfigured = isFlomoReadConfigured();
   const writeConfigured = isFlomoWriteConfigured();
@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  const result = await fetchFlomoMemos(Number.isFinite(limit) ? limit : 48);
+  const result = await fetchFlomoMemos(Number.isFinite(limit) ? limit : 200);
   if (!result.ok) {
     return safeJson(result as unknown as Record<string, unknown>, result.configured ? 502 : 503);
   }
