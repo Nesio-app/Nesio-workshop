@@ -729,7 +729,7 @@ function LivingModelTab({
 }: {
   model: LivingModel | null;
   loading: boolean;
-  error: 'ai' | 'network' | null;
+  error: 'no-key' | 'ai-error' | 'network' | null;
   nodeCount: number;
   onRefresh: (perspectiveId?: string, perspectiveName?: string, perspectivePrompt?: string) => void;
   onFeedback: (insightId: string, verified: boolean) => void;
@@ -750,13 +750,27 @@ function LivingModelTab({
     );
   }
 
-  // ⑨ 生成失败的可见态(区分 AI 未配置/失败 vs 网络 vs 没数据);复用降级提示样式
+  // ⑨ 生成失败的可见态,三态分清 + 给可点的「重试」(而不是只写"稍后可重试")。
+  //   no-key   = 真没配 AI key(需去部署配置);ai-error = 配了但这次没调通(重试即可);network = 网络。
+  //   都强调「不是没有数据」,并把上次结果留在下面。
+  const errorMsg = error === 'no-key'
+    ? L(dict, '还没接上 AI —— 认知模型需要 AI 才能生成(去部署里配一个 AI key 即可)。不是没有数据,下面是上次的结果。', "AI isn't connected yet — the mind model needs it (set an AI key in your deployment). Not a lack of data; showing your last result.")
+    : error === 'network'
+      ? L(dict, '网络异常,认知模型没刷新出来 —— 不是没有数据。下面是上次的结果。', "Network issue — the mind model didn't refresh. Not a lack of data; showing your last result.")
+      : L(dict, '这次没生成出来(AI 忙或稍有波动)—— 不是没有数据。下面是上次的结果,点重试再试一次。', "Didn't generate this time (AI busy or a hiccup) — not a lack of data. Showing your last result; tap retry.");
   const errorBanner = error ? (
-    <p className="nesio-chat-degraded-hint" style={{ margin: '0 0 0.75rem' }}>
-      {error === 'ai'
-        ? L(dict, '认知模型这次没生成成功(AI 未配置或暂时不可用)——不是没有数据。下面是上次的结果,稍后可重试。', "Mind model didn't generate (AI not configured or temporarily unavailable) — not a lack of data. Showing your last result; retry later.")
-        : L(dict, '网络异常,认知模型没刷新出来——不是没有数据。下面是上次的结果。', "Network issue — the mind model didn't refresh. Not a lack of data; showing your last result.")}
-    </p>
+    <div className="nesio-chat-degraded-hint" style={{ margin: '0 0 0.75rem', display: 'flex', gap: '0.6rem', alignItems: 'flex-start' }}>
+      <span style={{ flex: 1 }}>{errorMsg}</span>
+      {error !== 'no-key' && (
+        <button
+          type="button"
+          onClick={() => onRefresh()}
+          style={{ flex: 'none', alignSelf: 'center', fontSize: '0.74rem', fontWeight: 600, padding: '0.28rem 0.7rem', borderRadius: 'var(--radius-sm, 12px)', border: '1px solid var(--portal-accent-border)', background: 'var(--portal-accent-soft)', color: 'var(--portal-accent)', cursor: 'pointer' }}
+        >
+          {L(dict, '重试', 'Retry')}
+        </button>
+      )}
+    </div>
   ) : null;
 
   const layerIds: LivingModelLayerId[] = ['identity', 'motivation', 'principles', 'patterns', 'blind_spots', 'evolution', 'prediction'];
@@ -977,7 +991,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = true, initi
   const [livingModel, setLivingModel] = useState<LivingModel | null>(null);
   const [livingLoading, setLivingLoading] = useState(false);
   // ⑨ 认知模型生成失败的可见态:区分「AI 未配置/失败」与「数据不够」(后者由 nodeCount 判)
-  const [livingError, setLivingError] = useState<'ai' | 'network' | null>(null);
+  const [livingError, setLivingError] = useState<'no-key' | 'ai-error' | 'network' | null>(null);
   const livingFetchedRef = useRef(false);
   const livingSeqRef = useRef(0); // 视角切换会并发发多次请求;只认最新一次的结果,防止旧视角内容错标
 
@@ -1063,8 +1077,12 @@ export default function InsightsSheet({ onClose, canUsePrivateData = true, initi
       if (mySeq !== livingSeqRef.current) return; // 已被更晚的视角请求取代 → 丢弃,避免错标/错存
       // 后端在 no_api_key / api_error 时返回 ok:true + 空层 + reason;只看 ok && layers 会把失败
       // 伪装成"没数据,点一下就好"。按 reason 区分真实失败态,不再静默当成功保存空模型。
-      if (data.reason === 'no_api_key' || data.reason === 'api_error') {
-        setLivingError('ai');
+      // 真没配 key 与「配了 key 但这次没调通」是两回事,文案要分清(修好窄读后 no_api_key 才是真无 key)。
+      if (data.reason === 'no_api_key') {
+        setLivingError('no-key');
+        if (cached) setLivingModel(cached);
+      } else if (data.reason === 'api_error') {
+        setLivingError('ai-error');
         if (cached) setLivingModel(cached);
       } else if (data.ok && data.layers) {
         // insufficient_data 也会带 fallback 空层,交给空态的"数据不够"文案(不算错误)。
@@ -1076,7 +1094,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = true, initi
         saveLivingModel(model);
         setLivingModel(model);
       } else {
-        setLivingError('ai');
+        setLivingError('ai-error');
         if (cached) setLivingModel(cached);
       }
     } catch {
