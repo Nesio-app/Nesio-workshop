@@ -12,15 +12,14 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { guardAiRoute } from '@/lib/portal/api-auth';
-import { notionRowToNode, notionDbTitle, type NotionRow } from '@/lib/portal/notion-map';
+import { notionRowToNode } from '@/lib/portal/notion-map';
+import { NOTION_API, NOTION_VERSION, notionHeaders, queryDataSourceRows, getSourceTitle } from '@/lib/portal/notion-api';
 import { completeText, aiProviderAvailable } from '@/lib/portal/ai-complete';
 import { getIntegrationTokenRefreshed } from '@/lib/portal/integrations';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
 
-const NOTION_API = 'https://api.notion.com/v1';
-const NOTION_VERSION = '2022-06-28';
 const MAX_DATABASES = 8;       // 一次最多同步几个表
 const MAX_ROWS_PER_DB = 100;   // 每个表最多取多少行(Notion 单页上限)
 const MAX_TOTAL_ROWS = 400;    // 总行数上限,防止灌爆记忆
@@ -98,31 +97,11 @@ ${docText.slice(0, 5000)}`;
   } catch { return { nodes: [], summary: '解析失败' }; }
 }
 
-const notionHeaders = (token: string) => ({
-  Authorization: `Bearer ${token}`,
-  'Notion-Version': NOTION_VERSION,
-  'Content-Type': 'application/json',
-});
-
-async function fetchDbTitle(token: string, dbId: string): Promise<string> {
+/** N-1:查询一个数据源的行,每行 → 一个记忆节点。走 data source 端点(老库自动回落)。 */
+async function queryOneSource(token: string, sourceId: string, title: string): Promise<object[]> {
   try {
-    const res = await fetch(`${NOTION_API}/databases/${dbId}`, { headers: notionHeaders(token) });
-    if (!res.ok) return 'Notion 表';
-    return notionDbTitle(await res.json() as { title?: unknown });
-  } catch { return 'Notion 表'; }
-}
-
-/** 查询一个数据库的行,每行 → 一个记忆节点(批次 38 的核心:row-as-node)。 */
-async function queryDatabaseRows(token: string, dbId: string, dbTitle: string): Promise<object[]> {
-  try {
-    const res = await fetch(`${NOTION_API}/databases/${dbId}/query`, {
-      method: 'POST',
-      headers: notionHeaders(token),
-      body: JSON.stringify({ page_size: MAX_ROWS_PER_DB }),
-    });
-    if (!res.ok) return [];
-    const data = await res.json() as { results?: NotionRow[] };
-    return (data.results || []).map((row) => notionRowToNode(row, dbTitle));
+    const rows = await queryDataSourceRows(token, sourceId, MAX_ROWS_PER_DB);
+    return rows.map((row) => notionRowToNode(row, title));
   } catch { return []; }
 }
 
@@ -146,13 +125,13 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 批次 38:用户选定了数据库 → 每行存成一条记忆(结构化,字段进属性/标签/日期)。
+  // 用户选定了数据源(N-1:databaseIds 现在承载 data_source_id,老库回落 database_id)→ 每行一条记忆。
   const databaseIds = Array.isArray(body.databaseIds) ? body.databaseIds.filter(Boolean) : [];
   if (databaseIds.length) {
     const nodes: object[] = [];
-    for (const dbId of databaseIds.slice(0, MAX_DATABASES)) {
-      const title = await fetchDbTitle(token, dbId);
-      const rows = await queryDatabaseRows(token, dbId, title);
+    for (const sourceId of databaseIds.slice(0, MAX_DATABASES)) {
+      const title = await getSourceTitle(token, sourceId);
+      const rows = await queryOneSource(token, sourceId, title);
       nodes.push(...rows);
       if (nodes.length >= MAX_TOTAL_ROWS) break;
     }
