@@ -49,6 +49,8 @@ Auth legend:
 | GET /api/portal/gmail | session / no-Supabase + OAuth token |
 | GET /api/portal/gmail-quick | session / no-Supabase + OAuth token |
 | GET /api/portal/calendar | session / no-Supabase (cloud mode fails closed) |
+| POST /api/portal/drive | Google OAuth token (drive.appdata) — 免费云备份到用户 Drive |
+| GET /api/portal/drive | Google OAuth token (drive.appdata) — 拉回云备份 |
 | GET /api/auth/session | open (reports session state) |
 
 ## OAuth flows (pre-auth by design)
@@ -78,6 +80,9 @@ open. If one of these starts touching AI or private data, move it up a table.
 
 ## OAuth (2026-07 审查)
 
+- **2026-07 免费最大化扩展**: 联合授权新增 `drive.appdata`(非敏感,免费云备份到用户
+  自己 Drive 的隐藏 App 文件夹)+ `tasks` + `contacts.readonly`(敏感 scope,生产需
+  Google OAuth 验证审核;验证前有未验证警告与 100 用户上限)。加 scope 后老用户重授权一次。
 - **Scopes 最小化 ✓**: 仅 `gmail.readonly` + `calendar.readonly`(联合授权,
   一次 consent 覆盖两个连接器)。无写权限、无 profile/contacts。
 - **撤销路径 ✓**: `POST /api/portal/oauth/disconnect` 调 Google revoke
