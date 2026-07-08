@@ -31,6 +31,6 @@ assert.ok(/discoverDatabases/.test(dbRoute) && /primaryDataSourceId/.test(dbRout
 assert.ok(/id:\s*primaryDataSourceId\(db\)/.test(dbRoute), 'databases route 返回的 id 是主数据源 id(查询用它)');
 assert.ok(/from ['"]@\/lib\/portal\/notion-api['"]/.test(notionRoute), 'notion route 引共享客户端');
 assert.ok(/queryDataSourceRows/.test(notionRoute), 'notion route 查询走 data source');
-assert.ok(/getSourceTitle/.test(notionRoute), 'notion route 用 getSourceTitle 取标题');
+assert.ok(/getDataSourceSchema/.test(notionRoute), 'notion route 拉 data source schema(供 N-3 折叠)');
 
 console.log('notion-datasource: OK');

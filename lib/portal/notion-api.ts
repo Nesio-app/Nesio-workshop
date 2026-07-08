@@ -13,6 +13,7 @@
  *   - queryDataSourceRows():优先 /data_sources/{id}/query,404 回落 /databases/{id}/query(兜底/老库)
  */
 import { notionDbTitle } from './notion-map';
+import type { NotionSourceSchema, NotionPropType } from './notion-classify';
 
 export const NOTION_API = 'https://api.notion.com/v1';
 /** 2025-09-03:data source 三级模型。改这里即全站切版本。 */
@@ -79,6 +80,30 @@ export function primaryDataSourceId(db: NotionDatabaseRef): string {
 }
 
 /**
+ * 取一个数据源的 schema(N-3 结构折叠用):列名 + 类型 + relation 目标。
+ * GET /v1/data_sources/{id};404 回落 /v1/databases/{id}(老库)。取不到返回 null。
+ * relation 目标读 relation.data_source_id(2025-09-03)或 database_id(老)。
+ */
+export async function getDataSourceSchema(token: string, sourceId: string): Promise<NotionSourceSchema | null> {
+  const fetchObj = async (path: string): Promise<Record<string, unknown> | null> => {
+    const res = await fetch(`${NOTION_API}/${path}/${sourceId}`, { headers: notionHeaders(token) });
+    if (!res.ok) return res.status === 404 ? null : {};
+    return (await res.json()) as Record<string, unknown>;
+  };
+  const obj = (await fetchObj('data_sources').catch(() => null)) || (await fetchObj('databases').catch(() => null));
+  if (!obj) return null;
+  const propsRaw = (obj.properties as Record<string, { type?: string; relation?: { data_source_id?: string; database_id?: string } }>) || {};
+  const properties = Object.entries(propsRaw).map(([name, def]) => ({
+    name,
+    type: (def?.type || 'rich_text') as NotionPropType,
+    ...(def?.type === 'relation'
+      ? { relationTargetId: def.relation?.data_source_id || def.relation?.database_id || undefined }
+      : {}),
+  }));
+  return { id: sourceId, title: (typeof obj.name === 'string' && obj.name) || notionDbTitle(obj as { title?: unknown }) || 'Notion 表', properties };
+}
+
+/**
  * 取一个数据源(或老库)的标题。优先 GET /v1/data_sources/{id};404 回落 GET /v1/databases/{id}。
  * data source 对象用 name 或 title 承载标题,老库用 title。取不到返回兜底名。
  */
@@ -98,6 +123,8 @@ export async function getSourceTitle(token: string, sourceId: string): Promise<s
 export interface NotionRow {
   id: string;
   url?: string;
+  /** 供 N-3 折叠 + 增量高水位。 */
+  last_edited_time?: string;
   properties?: Record<string, unknown>;
 }
 
