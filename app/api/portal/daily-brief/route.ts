@@ -16,7 +16,7 @@ interface BriefRequest {
   coachStyle?: string;
   uiLocale?: string;
   displayName: string;
-  weather?: { temperatureC?: number; condition?: string; forecastNote?: string; placeLabel?: string };
+  weather?: { temperatureC?: number; condition?: string; forecastNote?: string; placeLabel?: string; tempMaxC?: number; tempMinC?: number; precipProb?: number };
   /** Reverse-geocoded city label from the device, e.g. "Cary, NC" */
   location?: string;
   events?: Array<{ title: string; start: string; end?: string; location?: string; calendarName?: string }>;
@@ -50,8 +50,17 @@ export async function POST(req: NextRequest) {
   // ── Build context sections ──────────────────────────────────────────────────
 
   const placeLabel = location || weather?.placeLabel || '';
+  // 免费最大化·天气:有今日区间就报「X~Y度」,否则退当前温;高降水概率并入
+  const tempText = weather
+    ? (typeof weather.tempMinC === 'number' && typeof weather.tempMaxC === 'number'
+        ? `${weather.tempMinC}~${weather.tempMaxC}°C`
+        : `${weather.temperatureC}°C`)
+    : '';
+  const precipText = weather && typeof weather.precipProb === 'number' && weather.precipProb >= 50 && !weather.forecastNote
+    ? `，降水概率 ${weather.precipProb}%`
+    : '';
   const weatherText = weather
-    ? `${weather.temperatureC}°C，${weather.condition}${weather.forecastNote ? '，' + weather.forecastNote : ''}${placeLabel ? '（' + placeLabel + '）' : ''}`
+    ? `${tempText}，${weather.condition}${weather.forecastNote ? '，' + weather.forecastNote : precipText}${placeLabel ? '（' + placeLabel + '）' : ''}`
     : null;
 
   const todayEvents = (events || []).filter((e) => {

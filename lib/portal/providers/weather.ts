@@ -26,6 +26,11 @@ export interface WeatherSnapshot {
   placeLabel: string;
   forecastNote?: string;
   alert?: string;
+  // 免费最大化·天气:Open-Meteo daily(此前只请求 current+hourly weather_code)
+  tempMaxC?: number;     // 今日最高温
+  tempMinC?: number;     // 今日最低温
+  precipProb?: number;   // 今日降水概率 %(带伞判断)
+  uvMax?: number;        // 今日 UV 峰值
 }
 
 const FETCH_TIMEOUT_MS = 8_000;
@@ -168,7 +173,10 @@ export async function fetchWeatherAt(
   url.searchParams.set('longitude', String(lon));
   url.searchParams.set('current', 'temperature_2m,weather_code');
   url.searchParams.set('hourly', 'weather_code,temperature_2m');
+  // 免费最大化·天气:今日区间 + 降水概率 + UV(免费),进简报「今天X~Y度,降水Z%」
+  url.searchParams.set('daily', 'temperature_2m_max,temperature_2m_min,precipitation_probability_max,uv_index_max');
   url.searchParams.set('forecast_hours', '24');
+  url.searchParams.set('forecast_days', '1');
   url.searchParams.set('timezone', timezone);
 
   const [res, alert] = await Promise.all([
@@ -195,6 +203,21 @@ export async function fetchWeatherAt(
     }
   }
 
+  // 免费最大化·天气:daily 是数组(forecast_days=1 → 取 [0])
+  const num = (v: unknown): number | undefined => {
+    const n = Number(Array.isArray(v) ? v[0] : v);
+    return Number.isFinite(n) ? Math.round(n) : undefined;
+  };
+  const tempMaxC = num(data.daily?.temperature_2m_max);
+  const tempMinC = num(data.daily?.temperature_2m_min);
+  const precipProb = num(data.daily?.precipitation_probability_max);
+  const uvMax = num(data.daily?.uv_index_max);
+
+  // 降水概率高时,forecastNote 若无更具体转变提示,给「记得带伞」
+  if (!forecastNote && typeof precipProb === 'number' && precipProb >= 50) {
+    forecastNote = `今天有 ${precipProb}% 概率下雨,记得带伞`;
+  }
+
   const placeParts = fallbackPlace.split(',').map((s) => s.trim()).filter(Boolean);
   const placeName = placeParts[0] || fallbackPlace;
   const placeState = placeParts[1] || '';
@@ -208,6 +231,10 @@ export async function fetchWeatherAt(
     placeLabel: placeState ? `${placeName}, ${placeState}` : placeName,
     forecastNote,
     alert,
+    tempMaxC,
+    tempMinC,
+    precipProb,
+    uvMax,
   };
 }
 
