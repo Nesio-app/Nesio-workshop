@@ -9,7 +9,7 @@ import { normalizeSupabaseRuntimeUrl } from '@/lib/portal/production-runtime';
 import { envValue } from '@/lib/portal/env';
 import { getCloudConfig, getSignedInUser } from '@/lib/portal/cloud-server-runtime';
 
-export type IntegrationProvider = 'gmail' | 'calendar' | 'notion';
+export type IntegrationProvider = 'gmail' | 'calendar' | 'notion' | 'tesla';
 
 export interface IntegrationTokens {
   accessToken: string;
@@ -116,6 +116,7 @@ const COOKIE_PREFIX: Record<IntegrationProvider, string> = {
   gmail: 'nesio_gmail',
   calendar: 'nesio_google_calendar',
   notion: 'nesio_notion',
+  tesla: 'nesio_tesla',
 };
 
 export async function readTokensFromCookies(provider: IntegrationProvider): Promise<IntegrationTokens | null> {

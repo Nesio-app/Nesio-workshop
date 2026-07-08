@@ -61,7 +61,7 @@ const CONNECTORS: ConnectorDef[] = [
   { id: 'wechat_reading', name: '微信读书', nameEn: 'WeChat Reading', icon: <IconBookOpen />, iconBg: 'var(--chip-leaf)', method: 'file', description: '微信读书 App 导出笔记,粘进来解析成划线记忆', descriptionEn: 'Export notes from WeChat Reading and paste to parse highlights' },
   // 批次 22:微信公众号/视频收藏无 API —— 说明可用路径,不做假按钮
   { id: 'wechat_fav', name: '微信收藏 · 公众号/视频', nameEn: 'WeChat favorites', icon: <IconBook />, iconBg: 'var(--chip-mint)', method: 'file', dev: true, description: '公众号文章 / 视频号收藏没有开放接口。可用:① 打开文章 → 分享 → 复制链接 → 用「分享给 Nesio」或冷冻仓存入;② 关注 flomo 服务号,收藏自动进 flomo,再用 Flomo 同步。', descriptionEn: 'Official-account articles and Channels favorites have no public API. Options: ① copy the article link and use Share to Nesio; ② follow flomo\'s service account so favorites flow into flomo, then use Flomo sync.' },
-  { id: 'tesla', name: 'Tesla', icon: <IconCar />, iconBg: 'var(--chip-green)', method: 'oauth', description: '电量、行程信号，自动提醒充电', descriptionEn: 'Battery and trip signals; charging reminders', comingSoon: true, dev: true },
+  { id: 'tesla', name: 'Tesla', icon: <IconCar />, iconBg: 'var(--chip-green)', method: 'oauth', description: '只读接入:通勤/停放状态与充电记录(充电花费自动进财务),不发任何车控指令', descriptionEn: 'Read-only: commute/parked state and charging records (charging cost flows into finance); never sends vehicle commands' },
 ];
 
 const CONNECTORS_KEY = 'nesio-connectors-v1';
@@ -612,9 +612,37 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
 
 
   // ── OAuth sync (Gmail / Calendar 旧入口,google 合并后仅内部保留) ──
+  async function syncTesla() {
+    setSyncing('tesla');
+    try {
+      const res = await fetch('/api/portal/tesla', { cache: 'no-store' });
+      const data = await res.json() as { ok?: boolean; error?: string; drives?: unknown[]; charges?: unknown[] };
+      if (!data.ok) {
+        const reauth = data.error === 'not_connected' || data.error === 'token_expired';
+        showToast(reauth
+          ? L(dict, 'Tesla 授权已失效,点击重新连接', 'Tesla auth expired — tap to reconnect')
+          : L(dict, `Tesla 同步失败:${data.error || '未知'}`, `Tesla sync failed: ${data.error || 'unknown'}`), false);
+        setSyncing(null);
+        return;
+      }
+      // Reuse the payload we already fetched — no second (billed) Tesla call.
+      const { refreshTesla } = await import('@/lib/portal/connectors');
+      await refreshTesla({ drives: data.drives as never[], charges: data.charges as never[] });
+      const n = (data.drives?.length || 0) + (data.charges?.length || 0);
+      setCounts((p) => ({ ...p, tesla: n }));
+      saveConnectorState('tesla', true);
+      setConnected((p) => ({ ...p, tesla: true }));
+      showToast(L(dict, `Tesla 已同步:${data.drives?.length || 0} 行程 · ${data.charges?.length || 0} 充电`, `Tesla synced: ${data.drives?.length || 0} drives · ${data.charges?.length || 0} charges`), true);
+    } catch {
+      showToast(L(dict, '网络错误', 'Network error'), false);
+    }
+    setSyncing(null);
+  }
+
   async function syncOAuth(c: ConnectorDef) {
     if (c.id === 'google') { await syncGoogle(c); return; }
     if (c.id === 'plaid') { await syncPlaid(); return; }
+    if (c.id === 'tesla') { await syncTesla(); return; }
     setSyncing(c.id);
     setOauthSyncResult((p) => ({ ...p, [c.id]: { ok: true, msg: L(dict, '同步中…', 'Syncing…') } }));
     try {
@@ -728,6 +756,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     if (c.comingSoon) return;
     // 一次 Google 授权覆盖日历+邮件两个 scope(gmail/connect 请求全量 scope)
     if (c.id === 'google') { window.location.href = '/api/portal/gmail/connect'; return; }
+    if (c.id === 'tesla') { window.location.href = '/api/portal/tesla/connect'; return; }
     if (c.method === 'geo') {
       setSyncing(c.id);
       navigator.geolocation.getCurrentPosition(
@@ -910,6 +939,16 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     saveConnectorState(id, false);
     saveToken(id, '');
     setConnected((p) => ({ ...p, [id]: false }));
+
+    // Tesla — real revoke闭环: revoke the grant + clear token cookies server-side.
+    if (id === 'tesla') {
+      void fetch('/api/portal/tesla/disconnect', { method: 'POST' })
+        .then((r) => r.json() as Promise<{ ok?: boolean; revoked?: boolean }>)
+        .then((d) => showToast(d.revoked
+          ? L(dict, '已断开并撤销 Tesla 授权', 'Disconnected and revoked Tesla access')
+          : L(dict, '已断开并清除本地 token', 'Disconnected and cleared local tokens'), true))
+        .catch(() => showToast(L(dict, '已断开本地连接,撤销请求失败——可在 Tesla 账号里手动移除', 'Disconnected locally; revoke failed — remove it in your Tesla account'), false));
+    }
 
     // Google connectors share one OAuth consent — really revoke it at
     // Google and clear the HTTP-only token cookies (both providers).

@@ -93,6 +93,53 @@ export function normalizeTaskToSignal(input: { id?: string; title: string; dueAt
   };
 }
 
+export function normalizeTeslaDriveToSignal(input: { vehicleId: string; at: string; shiftState?: string; speedMph?: number | null; odometerMi?: number | null; displayName?: string }): CreateSignalInput {
+  const driving = input.shiftState === 'D' || (typeof input.speedMph === 'number' && (input.speedMph || 0) > 0);
+  return {
+    source: 'tesla',
+    type: driving ? 'vehicle.drive' : 'vehicle.state',
+    title: driving ? `${input.displayName || '车'}行驶中` : `${input.displayName || '车'}停放`,
+    payload: {
+      shiftState: input.shiftState || '',
+      speedMph: input.speedMph ?? null,
+      odometerMi: input.odometerMi ?? null,
+      vehicleId: input.vehicleId,
+    },
+    occurredAt: input.at,
+    confidence: 0.9,
+    retentionPolicy: 'Normal',
+    tags: ['出行', 'Tesla'],
+    externalId: `tesla-drive-${input.vehicleId}-${input.at}`,
+  };
+}
+
+export function normalizeTeslaChargeToSignal(input: { vehicleId: string; at: string; costUsd?: number | null; energyAddedKwh?: number | null; batteryLevel?: number | null; chargingState?: string; location?: string; displayName?: string }): CreateSignalInput {
+  const hasCost = typeof input.costUsd === 'number' && (input.costUsd || 0) > 0;
+  return {
+    source: 'tesla',
+    type: 'vehicle.charge',
+    title: hasCost
+      ? `充电 $${(input.costUsd as number).toFixed(2)}`
+      : `充电${typeof input.energyAddedKwh === 'number' ? ` +${input.energyAddedKwh}kWh` : ''}`,
+    payload: {
+      costUsd: input.costUsd ?? null,
+      energyAddedKwh: input.energyAddedKwh ?? null,
+      batteryLevel: input.batteryLevel ?? null,
+      chargingState: input.chargingState || '',
+      location: input.location || '',
+      vehicleId: input.vehicleId,
+    },
+    occurredAt: input.at,
+    confidence: 0.9,
+    // Charging cost is financial — tags '财务'/'finance' route it into the
+    // finance life-state dimension + financial sensitivity/retention.
+    sensitivity: hasCost ? 'financial' : 'normal',
+    retentionPolicy: hasCost ? 'LongLiving' : 'Normal',
+    tags: hasCost ? ['财务', 'finance', '充电', 'Tesla'] : ['充电', 'Tesla'],
+    externalId: `tesla-charge-${input.vehicleId}-${input.at}`,
+  };
+}
+
 export function normalizeWeatherToSignal(input: { temperatureC: number; condition: string; forecastNote?: string; placeName?: string; capturedAt?: string | Date }): CreateSignalInput {
   return {
     source: 'weather',

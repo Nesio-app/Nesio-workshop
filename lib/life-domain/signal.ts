@@ -33,6 +33,7 @@ export type SignalSource =
   | 'reminder'
   | 'keep'
   | 'wechat_reading'
+  | 'tesla'
   | 'device';
 
 export type SignalType = string;
