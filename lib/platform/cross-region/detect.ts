@@ -8,7 +8,7 @@
  */
 
 import { ensureFactJournal, readFactJournal } from '@/lib/platform/fact-journal';
-import { detectCrossRegion, DETECT_DEFAULTS } from './detect-core.mjs';
+import { detectCrossRegion, detectLeadLag, DETECT_DEFAULTS } from './detect-core.mjs';
 
 type Kind = 'continuous' | 'count';
 
@@ -46,7 +46,7 @@ const META = new Map(COLUMNS.map((c) => [c.key, c]));
 export interface CrossRegionInsight {
   /** 稳定 id(去重/冷却用):两列 + 类型,无序 */
   id: string;
-  kind: 'corr' | 'cooccur';
+  kind: 'corr' | 'cooccur' | 'leadlag';
   strength: number;
   pValue: number;
   n: number;
@@ -139,6 +139,54 @@ export function buildCrossRegionInsights(locale = 'zh', backfillDays = 90): Cros
     return {
       id: `${k1}~${k2}~${r.kind}`,
       kind: r.kind,
+      strength: r.strength,
+      pValue: r.pValue,
+      n: r.n,
+      differenced: r.differenced,
+      sensitive,
+      headline,
+      detail,
+      evidence,
+    };
+  });
+}
+
+/**
+ * 生成先后线索(P1.5 lead-lag)。「X 变化 → 约 k 天后 Y 跟着变」——先后不等于因果,
+ * 文案明示。同样只配跨域列、平稳化 + BH-FDR + 滞后须强于同期。
+ */
+export function buildLeadLagInsights(locale = 'zh', backfillDays = 90): CrossRegionInsight[] {
+  const zh = locale === 'zh';
+  ensureFactJournal(backfillDays);
+  const rows = readFactJournal(400);
+  if (rows.length < DETECT_DEFAULTS.minN + 1) return [];
+
+  const rels = detectLeadLag(
+    rows,
+    COLUMNS.map((c) => ({ key: c.key, domain: c.domain, kind: c.kind })),
+  ) as Array<{
+    leader: string; follower: string; a: string; b: string;
+    lag: number; strength: number; pValue: number; n: number; differenced: boolean;
+  }>;
+
+  return rels.map((r) => {
+    const lead = labelOf(r.leader, zh);
+    const foll = labelOf(r.follower, zh);
+    const sensitive = Boolean(META.get(r.a)?.sensitive || META.get(r.b)?.sensitive);
+    const positive = r.strength >= 0;
+    const [k1, k2] = [r.a, r.b].sort();
+    const headline = zh
+      ? `${lead} 变化后约 ${r.lag} 天,${foll} 常跟着变`
+      : `${foll} tends to shift ~${r.lag}d after ${lead}`;
+    const detail = zh
+      ? `数据里 ${lead} 的变化领先 ${foll} 约 ${r.lag} 天(${positive ? '同向' : '反向'},ρ=${r.strength})。这是先后线索,不是因果证明。`
+      : `${lead} changes lead ${foll} by ~${r.lag}d (${positive ? 'same' : 'opposite'} direction, ρ=${r.strength}). A lead-lag hint, not proof of causation.`;
+    const evidence = zh
+      ? `${r.n} 天数据 · 滞后 ${r.lag} 天 · ${pText(r.pValue)}${r.differenced ? ' · 已平稳化' : ''}`
+      : `${r.n} days · lag ${r.lag}d · ${pText(r.pValue)}${r.differenced ? ' · stationarized' : ''}`;
+    return {
+      id: `${k1}~${k2}~leadlag`,
+      kind: 'leadlag',
       strength: r.strength,
       pValue: r.pValue,
       n: r.n,

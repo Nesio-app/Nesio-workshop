@@ -137,6 +137,7 @@ deliverable(scored: ScoredInsight[], ctx: InterruptCtx): ScoredInsight[];
 - **单用户红利**:免 DP、免 CF、免重 embedding → 该更轻更可解释,别抄多用户 CDR 论文的重架构。
 - **隐私面变大**:跨 health×finance×location,**同意门必须一等公民**,统一导出/删除覆盖 journal + 反馈日志。
 - **PCMCI 偏重**:P1 可先只上「相关 + 共现 + 实体链接」,先后/因果留 P1.5。
+  - **P1.5 ✅已实现(2026-07-08)**:未上完整 PCMCI(tigramite 的条件独立检验在端上单用户日级数据不可行、收益存疑),改用**滞后互相关 lead-lag**(`detectLeadLag`,单测 `cross-region-leadlag.test.mjs`):先平稳化 → 扫滞后 1..τ_max 的 Spearman → **滞后关联须显著强于同期**(lagDominanceMargin,PCMCI 条件化的务实替身,挡同期相关拖影)→ 批量 BH-FDR。产出「先后线索」,`CrossRegionCard` 第二区块渲染,文案明示**先后≠因果**。真 PCMCI(多变量条件独立)若日后有证据触顶再上。
 - **冷启动**:前 2 周多数信号 cold,系统应诚实说「还在学你的水位」,不硬造洞察。
 
 ---
