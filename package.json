@@ -205,6 +205,7 @@
     "test:finance-recurring": "node scripts/finance-recurring.test.mjs",
     "test:backup-dest": "node scripts/backup-dest.test.mjs",
     "test:people-relationships": "node scripts/people-relationships.test.mjs",
+    "test:relationship-insight": "node scripts/relationship-insight.test.mjs",
     "test:plaid-multi-item": "node scripts/plaid-multi-item.test.mjs",
     "test:ics-timezone": "node scripts/ics-timezone.test.mjs",
     "test:embed-fallback": "node scripts/embed-fallback.test.mjs",
