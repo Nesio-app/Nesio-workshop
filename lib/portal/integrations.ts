@@ -56,20 +56,27 @@ async function supabaseRequest(method: string, path: string, userToken: string, 
   });
 }
 
-export async function readIntegrations(userId: string, userToken: string): Promise<IntegrationMap> {
-  if (!userId) return {};
+/**
+ * 读取某用户的 integrations map。
+ * 返回值区分「失败」与「空」——静默失败审计 #5:读失败必须返回哨兵 null(而非 {}),
+ * 否则 read-modify-write 的写侧会以「空」为基底覆写,静默清掉另一 provider 的 token。
+ *   - `null`  = 读取失败(网络/鉴权/5xx/解析异常),状态未知,调用方不得据此覆写。
+ *   - `{}`    = 请求成功但该用户确实没有任何 integration。
+ */
+export async function readIntegrations(userId: string, userToken: string): Promise<IntegrationMap | null> {
+  if (!userId) return null;
   try {
     const res = await supabaseRequest('GET', `user_profiles?user_id=eq.${userId}&select=integrations&limit=1`, userToken);
     if (!res.ok) {
       console.error('integrations_read_failed', res.status);
-      return {};
+      return null;
     }
     const rows = await res.json() as Array<{ integrations?: IntegrationMap | string | null }>;
     const raw = rows[0]?.integrations;
     if (!raw) return {};
     // jsonb 列返回对象;历史 JSON.stringify 双编码写入返回字符串,两者都吃
     return typeof raw === 'string' ? (JSON.parse(raw) as IntegrationMap) : raw;
-  } catch { return {}; }
+  } catch { return null; }
 }
 
 export async function writeIntegrations(userId: string, userToken: string, data: IntegrationMap): Promise<void> {
@@ -160,7 +167,7 @@ export async function getIntegrationToken(
     const userId = await getSupabaseUserId(supabaseToken);
     if (userId) {
       const map = await readIntegrations(userId, supabaseToken);
-      const t = map[provider];
+      const t = map?.[provider];
       if (t?.accessToken) return { accessToken: t.accessToken, refreshToken: t.refreshToken };
     }
   }
@@ -204,7 +211,7 @@ export async function getIntegrationTokenRefreshed(
   const serviceKey = envValue('SUPABASE_SERVICE_ROLE_KEY');
   if (!userId || !serviceKey) return null;
   const map = await readIntegrations(userId, serviceKey);
-  const t = map[provider];
+  const t = map?.[provider];
   return t?.accessToken ? { accessToken: t.accessToken, refreshToken: t.refreshToken } : null;
 }
 
@@ -223,6 +230,12 @@ export async function saveIntegrationTokenByUserId(
   if (!userId || !serviceKey) return false;
   const full: IntegrationTokens = { ...tokens, connectedAt: new Date().toISOString() };
   const existing = await readIntegrations(userId, serviceKey);
+  if (existing === null) {
+    // 读失败:基底未知,绝不以「空」覆写(会清掉另一 provider 的 token)。放弃本次云端回写,
+    // 让调用方走 cookie 兜底 / 稍后重试(静默失败审计 #5)。
+    console.error('integrations_save_aborted_read_failed', provider);
+    return false;
+  }
   existing[provider] = full;
   await writeIntegrations(userId, serviceKey, existing);
   return true;
@@ -244,8 +257,13 @@ export async function saveIntegrationToken(
     const userId = await getSupabaseUserId(supabaseToken);
     if (userId) {
       const existing = await readIntegrations(userId, supabaseToken);
-      existing[provider] = full;
-      await writeIntegrations(userId, supabaseToken, existing);
+      if (existing === null) {
+        // 读失败:不以「空」覆写云端(会清掉另一 provider 的 token)。跳过云写,cookie 仍写(下方)。
+        console.error('integrations_save_aborted_read_failed', provider);
+      } else {
+        existing[provider] = full;
+        await writeIntegrations(userId, supabaseToken, existing);
+      }
     }
   }
 

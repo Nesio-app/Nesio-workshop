@@ -22,12 +22,13 @@ export async function GET() {
   const cookieStore = await cookies();
   const supabaseToken = cookieStore.get('baohe_auth_access')?.value;
 
-  let integrationMap = {} as ReturnType<typeof readIntegrations> extends Promise<infer T> ? T : never;
+  let integrationMap: NonNullable<Awaited<ReturnType<typeof readIntegrations>>> = {};
   let userId: string | null = null;
 
   if (supabaseToken) {
     userId = await getSupabaseUserId(supabaseToken);
-    if (userId) integrationMap = await readIntegrations(userId, supabaseToken);
+    // 读失败(null)按「无 integration」展示,不影响 cookie 兜底合并
+    if (userId) integrationMap = (await readIntegrations(userId, supabaseToken)) ?? {};
   }
 
   // Merge cookie tokens for providers not in Supabase
@@ -77,8 +78,13 @@ export async function POST(req: NextRequest) {
     const userId = await getSupabaseUserId(supabaseToken);
     if (userId) {
       const existing = await readIntegrations(userId, supabaseToken);
-      existing[body.provider] = tokens;
-      await writeIntegrations(userId, supabaseToken, existing);
+      // 读失败:不以「空」覆写云端(会清掉另一 provider 的 token)。cookie 已写(上方),跳过云写。
+      if (existing) {
+        existing[body.provider] = tokens;
+        await writeIntegrations(userId, supabaseToken, existing);
+      } else {
+        console.error('integrations_save_aborted_read_failed', body.provider);
+      }
     }
   }
 
@@ -101,8 +107,13 @@ export async function DELETE(req: NextRequest) {
     const userId = await getSupabaseUserId(supabaseToken);
     if (userId) {
       const existing = await readIntegrations(userId, supabaseToken);
-      delete existing[provider];
-      await writeIntegrations(userId, supabaseToken, existing);
+      // 读失败:不以「空」覆写(会清掉另一 provider)。cookie 已删,云端断连稍后可重试。
+      if (existing) {
+        delete existing[provider];
+        await writeIntegrations(userId, supabaseToken, existing);
+      } else {
+        console.error('integrations_delete_aborted_read_failed', provider);
+      }
     }
   }
 
