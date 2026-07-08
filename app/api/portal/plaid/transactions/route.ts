@@ -174,15 +174,20 @@ export async function GET(req: NextRequest) {
       // 但只要 has_more 为真就继续,不再在 10 页处硬停。
       let cursor = typeof cursors[i] === 'string' ? cursors[i] : '';
       for (let page = 0; page < 50; page++) {
-        const data = await plaidPost('/transactions/sync', {
-          access_token: accessToken, cursor: cursor || undefined, count: 100,
-          // 免费最大化·Plaid B:开原始描述(默认关)+ 用 PFCv2 分类体系(都免费)
-          options: { include_original_description: true },
-          personal_finance_category_version: '2',
-        }) as {
+        type SyncResp = {
           added?: PlaidTx[]; modified?: PlaidTx[]; removed?: Array<{ transaction_id: string }>; accounts?: PlaidAccount[];
           next_cursor?: string; has_more?: boolean; error_code?: string; transactions_update_status?: string;
         };
+        // 免费最大化·Plaid B:附加富化参数 include_original_description(默认关,拿原始描述符)。
+        // 修断流回归:plaidPost 对 400 也照常返回 error 体,循环里 `if (data.error_code) break`
+        // 会因一个不被接受的附加参数**静默 break → 流水永远 0**。所以自愈——若 Plaid 判
+        // INVALID_*,去掉附加参数重试同一页,保证同步永不因富化参数中断。
+        // (此前误加的 PFCv2 顶层参数值非法,是流水返回 0 的真因,已移除。)
+        const syncBody = { access_token: accessToken, cursor: cursor || undefined, count: 100 };
+        let data = await plaidPost('/transactions/sync', { ...syncBody, options: { include_original_description: true } }) as SyncResp;
+        if (typeof data.error_code === 'string' && data.error_code.startsWith('INVALID')) {
+          data = await plaidPost('/transactions/sync', syncBody) as SyncResp;
+        }
         if (data.error_code === 'PRODUCT_NOT_READY' || data.transactions_update_status === 'NOT_READY') {
           pendingItems += 1; // 游标不动,下次同步从头再拉这家
           break;
