@@ -19,6 +19,7 @@ Auth legend:
 | Route | Auth | Rate limit |
 |---|---|---|
 | POST /api/portal/chat | guard | 20/min |
+| POST /api/portal/inventory-extract | guard | 20/min |
 | POST /api/portal/tts | guard | 10/min |
 | POST /api/portal/daily-brief | guard | 15/min |
 | POST /api/portal/guidance-language | guard | 20/min |
