@@ -56,14 +56,18 @@ async function requireAuthenticatedGmailAccess(req: NextRequest): Promise<NextRe
   );
 }
 
+// 免费最大化·Gmail:part 可嵌套(multipart/alternative 里再套 multipart);labelIds
+// 是消息资源顶层字段(metadata/full 都带),含 Gmail 系统分类 CATEGORY_PROMOTIONS 等。
+type GmailPart = { mimeType?: string; body?: { data?: string }; parts?: GmailPart[] };
 type GmailMessage = {
   id: string;
   snippet?: string;
+  labelIds?: string[];
   payload?: {
     headers?: Array<{ name: string; value: string }>;
-    parts?: Array<{ mimeType?: string; body?: { data?: string } }>;
+    parts?: GmailPart[];
     body?: { data?: string };
-  };
+  } & GmailPart;
 };
 
 function decodeBase64Url(str: string): string {
@@ -73,19 +77,48 @@ function decodeBase64Url(str: string): string {
   } catch { return ''; }
 }
 
+// 递归找第一个指定 mime 的 part 正文(此前只遍历一层 → 嵌套 multipart 的正文取不到)。
+function findPartData(part: GmailPart | undefined, mime: string): string {
+  if (!part) return '';
+  if (part.mimeType === mime && part.body?.data) return decodeBase64Url(part.body.data);
+  for (const p of part.parts || []) {
+    const found = findPartData(p, mime);
+    if (found) return found;
+  }
+  return '';
+}
+
+function stripHtml(html: string): string {
+  return html
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ').replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/\s+/g, ' ').trim();
+}
+
+// 修 HTML-only bug:优先递归取 text/plain;没有(大量通知/账单邮件只有 HTML)则取
+// text/html 剥标签;都没有再退顶层 body / snippet。
 function extractText(msg: GmailMessage): string {
-  const parts = msg.payload?.parts;
-  if (parts) {
-    for (const part of parts) {
-      if (part.mimeType === 'text/plain' && part.body?.data) {
-        return decodeBase64Url(part.body.data).slice(0, 1500);
-      }
-    }
-  }
-  if (msg.payload?.body?.data) {
-    return decodeBase64Url(msg.payload.body.data).slice(0, 1500);
-  }
+  const root = msg.payload;
+  const plain = findPartData(root, 'text/plain');
+  if (plain) return plain.slice(0, 1500);
+  const html = findPartData(root, 'text/html');
+  if (html) return stripHtml(html).slice(0, 1500);
+  if (root?.body?.data) return decodeBase64Url(root.body.data).slice(0, 1500);
   return msg.snippet?.slice(0, 400) || '';
+}
+
+// Gmail 系统分类标签 → 语义。CATEGORY_PROMOTIONS=广告(不进 AI 省钱)、
+// CATEGORY_UPDATES=通知类(账单/收据/快递)、IMPORTANT=Google 重要性预测。
+function isPromotion(msg: GmailMessage): boolean {
+  return (msg.labelIds || []).includes('CATEGORY_PROMOTIONS');
+}
+function mailCategory(msg: GmailMessage): 'promotions' | 'updates' | 'social' | 'forums' | 'personal' {
+  const l = msg.labelIds || [];
+  if (l.includes('CATEGORY_PROMOTIONS')) return 'promotions';
+  if (l.includes('CATEGORY_UPDATES')) return 'updates';
+  if (l.includes('CATEGORY_SOCIAL')) return 'social';
+  if (l.includes('CATEGORY_FORUMS')) return 'forums';
+  return 'personal';
 }
 
 function header(msg: GmailMessage, name: string): string {
@@ -150,9 +183,12 @@ async function fetchMessages(accessToken: string, max = 50, metadataOnly = true,
 }
 
 async function extractNodes(messages: GmailMessage[]): Promise<object[]> {
-  if (!aiProviderAvailable() || !messages.length) return [];
+  // 免费最大化·Gmail:广告(CATEGORY_PROMOTIONS)不喂 AI —— 占普通邮箱大头,
+  // 这一刀直接省掉一大块 completeText 成本,且广告本就不该进记忆。
+  const worth = messages.filter((m) => !isPromotion(m));
+  if (!aiProviderAvailable() || !worth.length) return [];
 
-  const emailTexts = messages.map((m) => {
+  const emailTexts = worth.map((m) => {
     const subject = header(m, 'subject');
     const from = header(m, 'from');
     const date = header(m, 'date');
@@ -294,20 +330,25 @@ export async function GET(req: NextRequest) {
 
   // Fallback: if AI extraction returned nothing (no Gemini key or all filtered),
   // create basic nodes directly from email metadata so LifeGraph always has data.
+  // 免费最大化·Gmail:兜底也跳过广告(和 AI 分支一致,不把促销塞进记忆)。
   if (includeBody && nodes.length === 0 && messages.length > 0) {
-    nodes = messages.map((m) => {
+    nodes = messages.filter((m) => !isPromotion(m)).map((m) => {
       const body = extractText(m); // 批次 25:邮件正文,供友好阅读器
+      const cat = mailCategory(m);
+      const important = (m.labelIds || []).includes('IMPORTANT');
       return {
         type: 'event' as const,
         name: header(m, 'subject') || 'Gmail 邮件',
         source: 'email' as const,
-        confidence: 0.7,
+        confidence: important ? 0.8 : 0.7,
         rawInput: `来自 ${header(m, 'from') || '未知'}: ${m.snippet?.slice(0, 120) || ''}`,
-        tags: ['邮件', 'Gmail'],
+        // 通知类(账单/收据/快递)标 tag,供 Today 卡按类挑；重要标记透传
+        tags: ['邮件', 'Gmail', ...(cat === 'updates' ? ['通知'] : []), ...(important ? ['重要'] : [])],
         attributes: {
           date: header(m, 'date'),
           from: header(m, 'from'),
           emailId: m.id,
+          mailCategory: cat,
           ...(body ? { article: body } : {}),
         },
         relations: [] as Array<{ targetId: string; relation: string }>,
