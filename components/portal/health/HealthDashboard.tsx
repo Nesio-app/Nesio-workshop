@@ -7,6 +7,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import FamilyDataCard from '../relationships/FamilyDataCard';
 import { loadHealthMetrics } from '@/lib/portal/health-store';
 import type { HealthMetric, HealthMetrics, GlucoseAnalysis, SleepStages, ActivityRings, MoodAnalysis } from '@/lib/portal/apple-health';
 import { L } from '@/lib/portal/i18n';
@@ -427,6 +428,7 @@ export default function HealthDashboard() {
             '还没有健康数据。到「设置 → 数据接入 → Apple Health」直接上传导出的 zip(或 export.xml),就会解析出步数、心率、睡眠、血氧、体重等指标。',
             'No health data yet. Go to Settings → Data sources → Apple Health and drop the exported zip (or export.xml) to parse steps, heart rate, sleep, SpO₂, weight and more.')}
         </p>
+        <FamilyDataCard kind="health" />
         <TrainingPlan />
       </div>
     );
@@ -440,6 +442,7 @@ export default function HealthDashboard() {
   return (
     <div className="nesio-health-dash">
       <p className="nesio-health-updated">{L(dict, `${data.metrics.length} 项指标 · 锻炼 ${data.workouts} 次 · 导入于 ${importedLabel}`, `${data.metrics.length} metrics · ${data.workouts} workouts · imported ${importedLabel}`)}</p>
+      <FamilyDataCard kind="health" />
       {data.profile && (data.profile.age || data.profile.sex || data.profile.bloodType) && (
         <p className="nesio-settings-option-hint" style={{ margin: '0.1rem 0 0' }}>
           {[data.profile.age ? L(dict, `${data.profile.age} 岁`, `${data.profile.age}y`) : '', data.profile.sex ? L(dict, ({ male: '男', female: '女' } as Record<string, string>)[data.profile.sex] || data.profile.sex, data.profile.sex) : '', data.profile.bloodType ? L(dict, `${data.profile.bloodType} 型`, data.profile.bloodType) : ''].filter(Boolean).join(' · ')}
