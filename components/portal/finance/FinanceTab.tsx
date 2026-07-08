@@ -13,7 +13,7 @@ import {
   accountMonth, formatMoney, ymOf, prevYm, txFlow, setFlowRule, TX_FLOW_LABELS,
   detectRecurring, upcomingRecurring, loadMerchantRules, loadFlowRules, setRecurRule,
   loadBankSyncedAt, excludedTxCount, internalAdjustmentIds, accountTypeLabel, assetSummary, expenseMerchants,
-  loadHoldings, setMerchantRuleFor, setFlowRuleFor, loadRuleLabels,
+  loadHoldings, holdingsGainLoss, setMerchantRuleFor, setFlowRuleFor, loadRuleLabels,
   type BankTx, type BankAccount, type TxFlow, type Holding,
 } from '@/lib/portal/bank-tx';
 // 风险预警与 Today/问一问 同读一份判定(financeFindings,Layer1 漂移收口)——此前 bank-tx 里
@@ -696,15 +696,20 @@ export default function FinanceTab() {
           <p className="nesio-insights-option-hint nesio-settings-option-hint" style={{ marginTop: 0 }}>{L(dict, '还没有账户信息。到「设置 → 数据接入」点银行「同步」一次,就会拉到你的卡/账户(余额、消费、退款分卡显示)。', 'No account info yet. Tap Sync on the bank connector once (Settings → Data sources) to pull your cards/accounts (per-card balance, spend, refunds).')}</p>
         ) : (
           <>
-            {/* 财务⑩:资产小结 —— 存款 + 投资 − 信用卡欠款 = 净资产(USD 口径) */}
+            {/* 财务⑩ + 免费最大化·Plaid A:资产小结 —— 存款 + 投资 − 信用卡欠款 − 贷款 = 净资产 */}
             {(() => {
               const s = assetSummary(accounts);
-              if (s.deposits === 0 && s.investments === 0 && s.creditOwed === 0) return null;
+              if (s.deposits === 0 && s.investments === 0 && s.creditOwed === 0 && s.loanOwed === 0) return null;
+              const gl = holdingsGainLoss(holdings); // 投资未实现盈亏
               return (
                 <div className="nesio-fin-assets">
                   <span className="nesio-fin-asset"><span className="nesio-fin-asset-l">{L(dict, '存款', 'Cash')}</span>{formatMoney(s.deposits)}</span>
                   {s.investments > 0 && <span className="nesio-fin-asset"><span className="nesio-fin-asset-l">{L(dict, '投资', 'Investments')}</span>{formatMoney(s.investments)}</span>}
-                  <span className="nesio-fin-asset"><span className="nesio-fin-asset-l">{L(dict, '信用卡欠款', 'Card debt')}</span>{formatMoney(s.creditOwed)}</span>
+                  {gl.cost > 0 && (
+                    <span className="nesio-fin-asset"><span className="nesio-fin-asset-l">{L(dict, '投资盈亏', 'Unrealized P/L')}</span>{`${gl.gain >= 0 ? '+' : '-'}${formatMoney(Math.abs(gl.gain))}（${gl.gain >= 0 ? '+' : ''}${gl.gainPct}%）`}</span>
+                  )}
+                  {s.creditOwed > 0 && <span className="nesio-fin-asset"><span className="nesio-fin-asset-l">{L(dict, '信用卡欠款', 'Card debt')}</span>{formatMoney(s.creditOwed)}</span>}
+                  {s.loanOwed > 0 && <span className="nesio-fin-asset"><span className="nesio-fin-asset-l">{L(dict, '贷款', 'Loans')}</span>{formatMoney(s.loanOwed)}</span>}
                   <span className="nesio-fin-asset"><span className="nesio-fin-asset-l">{L(dict, '净资产', 'Net worth')}</span>{s.net < 0 ? `-${formatMoney(-s.net)}` : formatMoney(s.net)}</span>
                 </div>
               );
@@ -724,7 +729,7 @@ export default function FinanceTab() {
                   <div className="nesio-fin-card-top">
                     <span className="nesio-fin-card-name"><AcctLogo a={a} /><span className="nesio-fin-card-name-t">{a.name}{a.mask ? ` ····${a.mask}` : ''}</span></span>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
-                      {a.balance != null && <span className="nesio-fin-card-bal">{(a.type || '').toLowerCase() === 'credit' ? L(dict, `欠款 ${formatMoney(a.balance, a.currency)}`, `owes ${formatMoney(a.balance, a.currency)}`) : formatMoney(a.balance, a.currency)}</span>}
+                      {a.balance != null && <span className="nesio-fin-card-bal">{['credit', 'loan'].includes((a.type || '').toLowerCase()) ? L(dict, `欠款 ${formatMoney(a.balance, a.currency)}`, `owes ${formatMoney(a.balance, a.currency)}`) : formatMoney(a.balance, a.currency)}</span>}
                       {/* 财务⑯:重复/失效副本手动移除兜底(仍在连接中的账户下次同步会回来) */}
                       <button type="button" className="nesio-fin-rule-x" onClick={() => { removeBankAccount(a.id); setRev((r) => r + 1); }} aria-label={L(dict, '移除此账户(重复或失效副本;仍连接的账户同步时会回来)', 'Remove this account (duplicates/stale; still-linked accounts return on sync)')} title={L(dict, '移除(重复/失效副本用;仍连接的账户同步会回来)', 'Remove (for duplicates; returns on sync if still linked)')}>✕</button>
                     </span>
