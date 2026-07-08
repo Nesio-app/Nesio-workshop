@@ -31,6 +31,7 @@ export function AnalystCard({ secret }: { secret: string }) {
   const [loading, setLoading] = useState(true);
   const [sent, setSent] = useState<string | null>(null);
   const [voted, setVoted] = useState<Record<string, string>>({});
+  const [voteSaved, setVoteSaved] = useState<Record<string, boolean>>({});
   const [weekly, setWeekly] = useState<Weekly | null>(null);
   const [weeklyBusy, setWeeklyBusy] = useState(false);
 
@@ -50,13 +51,19 @@ export function AnalystCard({ secret }: { secret: string }) {
 
   const vote = useCallback(async (alertType: string, reaction: 'useful' | 'dismiss' | 'wrong') => {
     setVoted((p) => ({ ...p, [alertType]: reaction }));
+    // 别静默吞掉「未持久化」:未配 Supabase 学习表时 route 回 { ok:true, saved:false },
+    // 反馈其实没存下(修静默失败审计 AnalystCard:54)。标出来,别让「已反馈✓」骗人。
+    let saved = false;
     try {
-      await fetch('/api/admin/analyst/feedback', {
+      const res = await fetch('/api/admin/analyst/feedback', {
         method: 'POST',
         headers: { ...headers(), 'content-type': 'application/json' },
         body: JSON.stringify({ alertType, reaction, date: report?.date }),
       });
-    } catch { /* 已乐观标记 */ }
+      const j = await res.json().catch(() => ({}));
+      saved = Boolean(j.ok && j.saved);
+    } catch { /* 网络失败 → saved 保持 false */ }
+    setVoteSaved((p) => ({ ...p, [alertType]: saved }));
   }, [headers, report?.date]);
 
   const loadWeekly = useCallback(async () => {
@@ -127,7 +134,7 @@ export function AnalystCard({ secret }: { secret: string }) {
               {a.explain && <div style={{ fontSize: '0.66rem', color: 'var(--portal-muted)', marginTop: 3 }}>依据:{a.explain}</div>}
               <div style={{ display: 'flex', gap: 5, marginTop: 5, alignItems: 'center' }}>
                 {voted[a.type]
-                  ? <span style={{ fontSize: '0.64rem', color: 'var(--portal-muted)' }}>已反馈 ✓ 分析师会据此调整</span>
+                  ? <span style={{ fontSize: '0.64rem', color: voteSaved[a.type] === false ? 'var(--status-risk)' : 'var(--portal-muted)' }}>{voteSaved[a.type] === false ? '反馈未保存(需配 Supabase 学习表)' : '已反馈 ✓ 分析师会据此调整'}</span>
                   : <>{voteBtn(a.type, 'useful', '有用')}{voteBtn(a.type, 'dismiss', '没用')}{voteBtn(a.type, 'wrong', '误报')}</>}
               </div>
             </div>
