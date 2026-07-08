@@ -11,6 +11,7 @@
  */
 
 import LifeReportCard from './insights/LifeReportCard';
+import CrossRegionCard from './insights/CrossRegionCard';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { MyExperimentWidget, loadExperiments, computeInsight } from '@/components/portal/NesioExperiment';
 import LifeCivilizationMap from '@/components/portal/LifeCivilizationMap';
@@ -1239,6 +1240,9 @@ export default function InsightsSheet({ onClose, canUsePrivateData = true, initi
 
             {/* 生活报告(回顾面,输出口定稿 §7):周报/月报/自定义区间 */}
             <LifeReportCard />
+
+            {/* 跨区洞察(跨区明细,输出口定稿 §7 + cross-region P1):统计跨域关联 */}
+            <CrossRegionCard />
 
             {/* Dynamic widgets */}
             {activeWidgets.length === 0 && (

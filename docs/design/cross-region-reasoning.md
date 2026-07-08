@@ -122,7 +122,7 @@ deliverable(scored: ScoredInsight[], ctx: InterruptCtx): ScoredInsight[];
 | 阶段 | 交付 | 依赖 | 说明 |
 |---|---|---|---|
 | **P0** | 反馈进事实库(event-sourcing)+ 每日快照 journal | 复用已 cutover 的 Signal 事实库 | 地基。没它后面全空转;不做 as-of join → AUC 虚高 5-20% |
-| **P1** | 检测层:通用算子 + BH-FDR + ADF/KPSS | P0 的 journal | **纯统计,零 ML**。先能"发现真跨区关系" |
+| **P1** ✅已实现(2026-07-08) | 检测层:Spearman + DF 平稳性 + 共现 + BH-FDR | P0 的 journal | **纯统计,零 ML**。`lib/platform/cross-region/detect-core.mjs`(引擎,单测 `cross-region-detect.test.mjs`)+ `detect.ts`(列元数据/接线)→ 洞察 tab `CrossRegionCard`。只配跨域列、\|ρ\|≥0.3、N≥14、非平稳先一阶差分、批量 BH-FDR(q=0.10);每条带样本天数 + p 值可复核。PCMCI 先后/因果推迟到 P1.5 |
 | **P2** | 门控 + 投递:同意门 + 软频控 + 可打断性 NB | P1 | 让洞察"该出才出、不刷屏" |
 | **P3** | 偏好层:LinUCB bandit + 反馈闭环 | P0 反馈日志 | 学"你在乎哪类跨区" |
 | **P4** | (远期可选)共享 embedding | 有证据说手写特征触顶 | 拿解释性换,加法不推倒 |
