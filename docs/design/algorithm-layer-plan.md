@@ -123,3 +123,28 @@
 - `system-layers.md`:输入/输出/中间层 stale 数已在本文 §0 修正;learner "11" 是含基线+衰减的口径,严格闭环是 6。
 - `personalization-capacity-proposal.md`:**B pilot(#48)已落但偏离蓝图**——落位 `lib/portal/learning/`(应 `lib/platform/personalization/`)、schema `{verdict,cardId}`(应 `{surface,dimension,key,reaction}`)、建了泛型 `createLearnerStore`(应三原语)、且迁了 ranker 存储(proposal 说 ranker 无需迁)。2a 开工时先返工对齐。
 - card-feedback 冗余存疑:2a 评估留/并,别给待删项建底座。
+
+---
+
+## 7. 输出口功能分配(2026-07-08 与用户定稿)
+
+§0 的「14 输出口」逐条归类 + 职责判据。判据沿用 HealthDashboard 先例:**决策面**(统一层筛过、
+有预算、会打扰)vs **明细面**(全谱、用户主动来看)。新增**回顾面**(低频 pull,承接低紧迫洞察)与
+**氛围/工具面**(不进决策预算)。
+
+| 类 | 口 | 职责 |
+|---|---|---|
+| **决策面(唯一)** | Today 引导卡(guidance 七层管线) | 唯一"主动打扰"出口。跨区洞察作为新 source adapter(`cross_insight` 卡型)进同一管线、同一预算;`cross-region-reasoning.md` 投递层的软频控/NB 可打断性 = 对现有打断/预算层的**升级**,不建第二套投递 |
+| 决策面(任务视角) | 今日焦点(attention)· 休眠复访卡 · routine 卡 | 任务/日程的聚焦与复访,attention/dormant 引擎管,不吃 guidance 预算 |
+| **对话面** | 问一问 | 被动全谱,不设预算;同一套域 findings 投影 + 引用证据 |
+| **明细面** | 洞察 widgets · 健康 Dashboard · 足迹 4 页 · 财务 Tab · 关系 · 认知 | 按域全谱展示,不做打扰决策。**「洞察」tab 未来承载跨区洞察明细区**(带 p 值/证据,人工可复核 = P1 里程碑判据) |
+| **回顾面** | 财务月报 · 健康月报(各自 tab 内)· 未来「生活月报」(洞察 tab 顶部,月初自动) | 低频 pull;跨区月度盘点放生活月报,不挤 Today |
+| **氛围/工具面(不进决策层)** | 金句卡 · 实验打卡卡 · 时间块 · 解冻提醒 | 不占 guidance 预算,不受跨区投递层管辖 |
+| 已下架 | 听简报 | 不复活为决策面;`context-briefing.md` 留作历史设计 |
+
+**数据面扩围(用户确认)**:跨区事实空间除 Signal 外必须含 **位置(place-trail)**、健康时序、银行流水、
+日历、天气(易逝,journal 当天采样)、心情、**实验打卡(n-of-1)**、routine/训练打卡、冷冻仓;
+邮件按 §1 的 bypass 归位路径处理,不单独进列。
+
+**对 proposal §2 的绑定**:统一反馈 schema 的 `surface` 枚举即上表(today_guidance / ask / detail:<tab> /
+report:<kind> / ambient:<widget>)。
