@@ -14161,3 +14161,4 @@ html[data-portal-theme="night"] .nesio-exp-card:hover {
 .nesio-xr-consent { display: flex; align-items: flex-start; gap: 0.5rem; width: 100%; margin-top: 0.8rem; padding: 0.5rem 0.1rem 0; background: none; border: none; text-align: left; cursor: pointer; font-size: 0.72rem; line-height: 1.4; color: var(--portal-muted); }
 .nesio-xr-consent-box { flex-shrink: 0; width: 1.05rem; height: 1.05rem; border: 1.5px solid var(--portal-line); border-radius: 5px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.72rem; color: var(--portal-blue-deep); }
 .nesio-xr-consent[aria-pressed="true"] .nesio-xr-consent-box { border-color: var(--portal-blue-deep); }
+.nesio-xr-learn { margin-top: 0.8rem; font-size: 0.7rem; line-height: 1.45; color: var(--portal-muted); opacity: 0.85; }
