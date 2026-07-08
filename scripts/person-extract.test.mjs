@@ -60,6 +60,17 @@ const route = fs.readFileSync(new URL('../app/api/portal/person-extract/route.ts
 assert.ok(route.includes("guardAiRoute(req, 'person-extract'"), '走 guardAiRoute(花钱/私密路由)');
 assert.ok(route.includes('completeText') && route.includes('parseJsonBlock'), '共享 AI 客户端 + JSON 解析');
 assert.ok(route.includes("'achievement'") && route.includes("'medication'"), '分类白名单');
+// 照片:接受 image、校验 data:image、限大小、传给 completeText
+assert.ok(route.includes('body?.image') && /data:image\\?\/\(png\|jpe\?g\|webp\|gif\)/.test(route), '接受并校验 data:image 照片');
+assert.ok(route.includes('8_000_000') || route.includes('8000000'), '照片大小上限(防打爆)');
+assert.ok(route.includes('image ? { image }') || route.includes('...(image ? { image }'), '照片传给 completeText');
+
+// ── 共享 AI 客户端加视觉(callClaude 图块 / Gemini inlineData / completeText 透传 image) ──
+const aic = fs.readFileSync(new URL('../lib/portal/ai-complete.ts', import.meta.url), 'utf8');
+assert.ok(aic.includes('parseDataUrl'), 'data URL 解析');
+assert.ok(aic.includes("type: 'image'") && aic.includes("type: 'base64'") && aic.includes('media_type'), 'Claude 图块(base64)');
+assert.ok(aic.includes('inlineData') && aic.includes('mimeType'), 'Gemini inlineData');
+assert.ok(/completeText[\s\S]{0,400}image\?: string/.test(aic), 'completeText 支持 image 参数');
 
 // docs
 const docs = fs.readFileSync(new URL('../docs/api-routes.md', import.meta.url), 'utf8');
@@ -70,5 +81,9 @@ const sheet = fs.readFileSync(new URL('../components/portal/relationships/Relati
 assert.ok(sheet.includes("fetch('/api/portal/person-extract'"), '详情页调 person-extract');
 assert.ok(sheet.includes('pending') && sheet.includes('savePending') && sheet.includes('addPersonRecord'), '预览 → 确认保存入档');
 assert.ok(sheet.includes('nlErr'), 'AI 失败有可见错误态(每个异步动作可见失败)');
+// 照片路径:拍/传照片 → 缩图 → 提取
+assert.ok(sheet.includes('onPickPhoto') && sheet.includes('imageToDataUrl'), '照片 → 缩图 → 提取');
+assert.ok(sheet.includes('photoRef') && sheet.includes("capture=\"environment\""), '拍照入口(调摄像头)');
+assert.ok(sheet.includes('doExtract({ image'), '照片走 person-extract');
 
 console.log('person-extract: OK');

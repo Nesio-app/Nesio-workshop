@@ -53,6 +53,31 @@ function downscaleToDataUrl(file: File, size = 200): Promise<string> {
   });
 }
 
+/** 把照片缩到长边 ≤maxSide 的 JPEG data URL(保比例,便于 OCR 又不过大)。 */
+function imageToDataUrl(file: File, maxSide = 1400): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('read_failed'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('decode_failed'));
+      img.onload = () => {
+        const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return reject(new Error('no_ctx'));
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', 0.85));
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 function initialOf(name: string): string {
   const t = name.trim();
   return t ? Array.from(t)[0].toUpperCase() : '·';
@@ -64,6 +89,7 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
   const [uploadErr, setUploadErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const photoRef = useRef<HTMLInputElement>(null);
   const [records, setRecords] = useState<PersonRecord[]>([]);
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState<{ category: PersonRecordCategory; title: string; detail: string; date: string; amount: string }>(
@@ -143,23 +169,37 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
   };
   const removeRecord = (id: string) => deletePersonRecord(id);
 
-  // 说一句 → AI 提取候选记录(不直接落库,先预览让你确认)
-  const runExtract = async () => {
-    const text = nlText.trim();
-    if (!text || nlBusy) return;
+  // 说一句 / 拍照片 → AI 提取候选记录(不直接落库,先预览让你确认)
+  const doExtract = async (payload: { text?: string; image?: string }) => {
     setNlErr(null); setNlBusy(true); setPending(null);
     try {
       const res = await fetch('/api/portal/person-extract', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
       });
       const data = await res.json().catch(() => null) as { ok?: boolean; records?: ExtractedRecord[] } | null;
       if (!res.ok || !data?.ok) throw new Error('extract_failed');
       const recs = Array.isArray(data.records) ? data.records : [];
-      if (!recs.length) { setNlErr(L(dict, '没认出可记录的信息,换句话说说看,或用下面的手动填。', "Couldn't find anything to log — rephrase, or add it manually below.")); return; }
+      if (!recs.length) { setNlErr(L(dict, '没认出可记录的信息,换个说法/清晰点的照片,或用下面手动填。', "Couldn't find anything to log — rephrase or use a clearer photo, or add it manually below.")); return; }
       setPending(recs);
     } catch {
       setNlErr(L(dict, '识别没成功,稍后再试,或手动填。', "Couldn't process that — try again, or add it manually."));
     } finally { setNlBusy(false); }
+  };
+  const runExtract = () => {
+    const text = nlText.trim();
+    if (!text || nlBusy) return;
+    void doExtract({ text });
+  };
+  const onPickPhoto = async (file: File | undefined) => {
+    if (!file || nlBusy) return;
+    setNlErr(null); setNlBusy(true); setPending(null);
+    try {
+      const image = await imageToDataUrl(file);
+      await doExtract({ image, ...(nlText.trim() ? { text: nlText.trim() } : {}) });
+    } catch {
+      setNlErr(L(dict, '这张图没能读取,换一张再试。', "Couldn't read that image — try another."));
+      setNlBusy(false);
+    }
   };
   const savePending = () => {
     if (!pending) return;
@@ -279,12 +319,24 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
                   placeholder={L(dict, '说一句,自动识别(如「期末年级第一 6月2日」「每天一片氨氯地平」)', 'Describe it (e.g. "1st in grade, Jun 2")')}
                   value={nlText} onChange={(e) => setNlText(e.target.value)}
                 />
-                <button
-                  type="button" className="nesio-today-btn nesio-today-btn--ghost"
-                  onClick={() => void runExtract()} disabled={nlBusy}
-                >
-                  {nlBusy ? L(dict, '识别中…', 'Reading…') : L(dict, '✨ 自动识别', '✨ Auto-detect')}
-                </button>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button
+                    type="button" className="nesio-today-btn nesio-today-btn--ghost" style={{ flex: 1 }}
+                    onClick={runExtract} disabled={nlBusy}
+                  >
+                    {nlBusy ? L(dict, '识别中…', 'Reading…') : L(dict, '✨ 说一句', '✨ From text')}
+                  </button>
+                  <button
+                    type="button" className="nesio-today-btn nesio-today-btn--ghost" style={{ flex: 1 }}
+                    onClick={() => photoRef.current?.click()} disabled={nlBusy}
+                  >
+                    {L(dict, '📷 拍/传照片', '📷 Photo')}
+                  </button>
+                </div>
+                <input
+                  ref={photoRef} type="file" accept="image/*" capture="environment" hidden
+                  onChange={(e) => { void onPickPhoto(e.target.files?.[0]); e.currentTarget.value = ''; }}
+                />
                 {nlErr && <p className="nesio-rel-detail-err" role="alert">{nlErr}</p>}
                 {pending && pending.length > 0 && (
                   <div className="nesio-rel-rec-list" style={{ marginTop: 0 }}>
