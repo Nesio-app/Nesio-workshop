@@ -20,11 +20,13 @@ import { usePortalLocale } from '../use-portal-locale';
 import RelationshipDetailSheet from './RelationshipDetailSheet';
 
 const GROUPS: Closeness[] = ['core', 'close', 'acquaintance'];
+const FAMILY_RE = /家人|家庭|family/i;
 
 export default function RelationshipsPanel() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [openKey, setOpenKey] = useState<string | null>(null);
+  const [activeGroup, setActiveGroup] = useState<string | null>(null);
 
   const rebuild = () => setContacts(buildRelationships(getLifeGraph()));
 
@@ -52,13 +54,30 @@ export default function RelationshipsPanel() {
     );
   }
 
-  const dueList = contacts.filter((c) => c.reachOut);
+  // Google 联系人分组(家人置顶),用于按组筛选
+  const allGroups = Array.from(new Set(contacts.flatMap((c) => c.groups)));
+  allGroups.sort((a, b) => (FAMILY_RE.test(b) ? 1 : 0) - (FAMILY_RE.test(a) ? 1 : 0) || a.localeCompare(b, 'zh'));
+  const shown = activeGroup ? contacts.filter((c) => c.groups.includes(activeGroup)) : contacts;
+  const dueList = shown.filter((c) => c.reachOut);
 
   return (
     <div className="nesio-health-dash">
       <p className="nesio-health-updated">
-        {L(dict, `${contacts.length} 个联系人 · ${dueList.length} 个该联系`, `${contacts.length} people · ${dueList.length} to reach out`)}
+        {L(dict, `${shown.length} 个联系人 · ${dueList.length} 个该联系`, `${shown.length} people · ${dueList.length} to reach out`)}
       </p>
+
+      {allGroups.length > 0 && (
+        <div className="nesio-rel-chips" role="tablist" aria-label={L(dict, '联系人分组', 'Contact groups')}>
+          <button type="button" role="tab" aria-selected={!activeGroup} className={`nesio-rel-chip${!activeGroup ? ' nesio-rel-chip--on' : ''}`} onClick={() => setActiveGroup(null)}>
+            {L(dict, '全部', 'All')}
+          </button>
+          {allGroups.map((g) => (
+            <button key={g} type="button" role="tab" aria-selected={activeGroup === g} className={`nesio-rel-chip${activeGroup === g ? ' nesio-rel-chip--on' : ''}`} onClick={() => setActiveGroup(g)}>
+              {FAMILY_RE.test(g) ? `👪 ${g}` : g}
+            </button>
+          ))}
+        </div>
+      )}
 
       {dueList.length > 0 && (
         <div className="nesio-fit-panel" style={{ marginTop: '0.4rem' }}>
@@ -83,7 +102,7 @@ export default function RelationshipsPanel() {
       )}
 
       {GROUPS.map((g) => {
-        const items = contacts.filter((c) => c.closeness === g);
+        const items = shown.filter((c) => c.closeness === g);
         if (!items.length) return null;
         return (
           <div key={g}>
@@ -100,7 +119,10 @@ export default function RelationshipsPanel() {
                   onClick={() => setOpenKey(c.key)}
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpenKey(c.key); } }}
                 >
-                  <span className="nesio-rel-name">{c.name}</span>
+                  <span className="nesio-rel-name">
+                    {c.groups.some((x) => FAMILY_RE.test(x)) && <span aria-label={L(dict, '家人', 'Family')}>👪 </span>}
+                    {c.name}
+                  </span>
                   <span className="nesio-rel-sub">{c.relation || (dict === 'en' ? `mentioned ${c.mentions}×` : `提到 ${c.mentions} 次`)}</span>
                   <span className="nesio-rel-last">{lastContactLabel(c, dict)}</span>
                   <button

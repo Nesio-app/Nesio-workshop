@@ -25,6 +25,7 @@ export interface Contact {
   cadenceDays: number;           // 期望联系节奏
   reachOut: boolean;             // 超期该联系
   overdueRatio: number;          // daysSince / cadence,排序用
+  groups: string[];              // Google 联系人分组(家人/同事/自建组),关系 tab 按此筛选
 }
 
 const CADENCE: Record<Closeness, number> = { core: 14, close: 30, acquaintance: 90 };
@@ -152,6 +153,7 @@ function closenessOf(a: Acc): Closeness {
 /** 从记忆图谱推出联系人清单。now 可注入以便测试。 */
 export function buildRelationships(nodes: LifeNode[], now = Date.now(), contactLog = loadContactLog()): Contact[] {
   const acc = new Map<string, Acc>();
+  const groupsByKey = new Map<string, Set<string>>();  // key → Google 分组名(排除内部标记)
   const bump = (rawName: string, rawKey: string, date: string | null, relation: string | null) => {
     const name = rawName.trim();
     const key = rawKey.trim().toLowerCase();
@@ -201,6 +203,14 @@ export function buildRelationships(nodes: LifeNode[], now = Date.now(), contactL
     // person 节点本身
     if (n.type === 'person' && n.name) {
       bump(n.name, n.name, nodeIso, null);
+      // 分组标签(排除内部「联系人」标记)→ 供关系 tab 按组筛选;名字与邮箱两个 key 都记
+      const gs = (n.tags || []).filter((t) => t && t !== '联系人');
+      if (gs.length) {
+        const addGroups = (k: string) => { const s = groupsByKey.get(k) || new Set<string>(); gs.forEach((g) => s.add(g)); groupsByKey.set(k, s); };
+        addGroups(n.name.trim().toLowerCase());
+        const em = typeof n.attributes?.email === 'string' ? n.attributes.email.toLowerCase() : '';
+        if (em) addGroups(em);
+      }
     }
 
     // relations:targetId 常是人名,relation 是关系词。但结构性关系(品牌架构/文档/
@@ -227,6 +237,7 @@ export function buildRelationships(nodes: LifeNode[], now = Date.now(), contactL
     out.push({
       key: a.key, name: a.name, relation: a.relation, closeness,
       mentions: a.mentions, lastContactAt: last, daysSince, cadenceDays, reachOut, overdueRatio,
+      groups: Array.from(groupsByKey.get(a.key) || []),
     });
   }
 

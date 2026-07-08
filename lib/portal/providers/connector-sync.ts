@@ -193,19 +193,21 @@ export async function runPeopleSync(): Promise<PeopleSyncResult> {
   try {
     const res = await fetch('/api/portal/people');
     if (res.status === 401) return { ok: false, error: 'not_connected', imported: 0, updated: 0 };
-    const data = await res.json().catch(() => null) as { ok?: boolean; contacts?: Array<{ name?: string; emails?: string[]; photo?: string; birthday?: string }> } | null;
+    const data = await res.json().catch(() => null) as { ok?: boolean; contacts?: Array<{ name?: string; emails?: string[]; photo?: string; birthday?: string; groups?: string[] }> } | null;
     if (!res.ok || !data?.ok) return { ok: false, error: 'people', imported: 0, updated: 0 };
     const contacts = Array.isArray(data.contacts) ? data.contacts : [];
     const { getLifeGraph, addLifeNode, updateLifeNode } = await import('@/lib/portal/life-graph');
 
-    // 既有 person 节点按邮箱/名字建索引,去重
-    const byEmail = new Map<string, { id: string; attributes: Record<string, string | number | boolean | null> }>();
-    const byName = new Map<string, { id: string; attributes: Record<string, string | number | boolean | null> }>();
+    // 既有 person 节点按邮箱/名字建索引,去重(带上 tags 以便分组标签合并)
+    type Idx = { id: string; attributes: Record<string, string | number | boolean | null>; tags?: string[] };
+    const byEmail = new Map<string, Idx>();
+    const byName = new Map<string, Idx>();
     for (const n of getLifeGraph()) {
       if (n.type !== 'person') continue;
+      const rec: Idx = { id: n.id, attributes: n.attributes, tags: n.tags };
       const email = typeof n.attributes?.email === 'string' ? n.attributes.email.toLowerCase() : '';
-      if (email) byEmail.set(email, n);
-      if (n.name) byName.set(n.name.toLowerCase(), n);
+      if (email) byEmail.set(email, rec);
+      if (n.name) byName.set(n.name.toLowerCase(), rec);
     }
 
     let imported = 0; let updated = 0;
@@ -217,12 +219,16 @@ export async function runPeopleSync(): Promise<PeopleSyncResult> {
       if (email) attrs.email = email;
       if (c.photo) attrs.photo = c.photo;
       if (c.birthday) attrs.birthday = c.birthday;
+      // 分组名进 tags(去重),关系 tab 据此按组筛选、置顶家庭
+      const groups = Array.isArray(c.groups) ? c.groups.filter((g): g is string => typeof g === 'string' && !!g) : [];
+      const tags = Array.from(new Set(['联系人', ...groups]));
       const existing = (email && byEmail.get(email)) || byName.get(name.toLowerCase());
       if (existing) {
-        updateLifeNode(existing.id, { attributes: { ...existing.attributes, ...attrs } });
+        const mergedTags = Array.from(new Set([...(existing.tags || []), ...tags]));
+        updateLifeNode(existing.id, { attributes: { ...existing.attributes, ...attrs }, tags: mergedTags });
         updated++;
       } else {
-        addLifeNode({ type: 'person', name: name || email, source: 'system', confidence: 0.9, attributes: attrs, relations: [], tags: ['联系人'] });
+        addLifeNode({ type: 'person', name: name || email, source: 'system', confidence: 0.9, attributes: attrs, relations: [], tags });
         imported++;
       }
     }

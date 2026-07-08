@@ -11776,6 +11776,15 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 .nesio-rel-card--due { border-color: color-mix(in srgb, var(--portal-cool-accent) 45%, transparent); }
 .nesio-rel-last { font-size: 0.74rem; color: var(--portal-muted); margin-top: 0.1rem; }
 
+/* ─── 联系人分组筛选(人缘㊃)─── */
+.nesio-rel-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.6rem 0 0.2rem; }
+.nesio-rel-chip {
+  font-size: 0.78rem; font-weight: 600; padding: 0.26rem 0.7rem; border-radius: 999px;
+  background: var(--glass-bg-solid); color: var(--portal-muted);
+  border: 1px solid var(--portal-line); cursor: pointer; transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.nesio-rel-chip--on { background: var(--portal-accent-soft-md); color: var(--portal-blue-deep); border-color: var(--portal-accent-border); }
+
 /* ─── 人物详情页(人缘㊁)─── */
 .nesio-rel-open { cursor: pointer; text-align: left; }
 button.nesio-rel-due-info { background: none; border: none; padding: 0; font: inherit; }
