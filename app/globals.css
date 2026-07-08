@@ -14039,3 +14039,12 @@ html[data-portal-theme="night"] .nesio-exp-card:hover {
 .nesio-tl-rhythm-rowlabel { font-size: 0.56rem; color: var(--portal-muted); height: 16px; display: flex; align-items: center; }
 .nesio-tl-rhythm-col--labels span:first-child { height: 14px; }
 .nesio-tl-rhythm-cell { height: 16px; border-radius: 4px; }
+
+/* ── 足迹·回顾页 + 时间线真地图 ────────────────────────────────────────── */
+.nesio-tl-records { display: flex; flex-direction: column; gap: 0.45rem; margin-top: 0.4rem; }
+.nesio-tl-record { display: flex; align-items: baseline; gap: 0.6rem; font-size: 0.78rem; }
+.nesio-tl-record-name { flex: 0 0 auto; color: var(--portal-muted); font-size: 0.68rem; }
+.nesio-tl-record-val { flex: 1; font-weight: 600; }
+.nesio-tl-record-date { flex: 0 0 auto; color: var(--portal-muted); font-size: 0.66rem; }
+.nesio-tl-months { display: flex; gap: 4px; align-items: flex-end; margin-top: 0.4rem; }
+.nesio-tl-months .nesio-tl-bucket { flex: 1; }

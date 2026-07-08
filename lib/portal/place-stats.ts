@@ -4,7 +4,7 @@
  * 全部从 buildPlaceTimeline 的段推导(时区已按事发地还原),纯本机。
  */
 
-import { buildPlaceTimeline, haversineKm, placeKey, type PlaceVisit } from './place-trail';
+import { buildPlaceTimeline, haversineKm, placeKey, loadPlaceGeo, type PlaceVisit } from './place-trail';
 import { dateKeyToLocalDate, wallHour } from './place-time.mjs';
 
 export interface MonthPlaceStats {
@@ -118,4 +118,96 @@ export function weekRhythm(visits: PlaceVisit[]): WeekRhythm {
   }
   const max = Math.max(1, ...grid.flat());
   return { grid, max };
+}
+
+export interface FootprintHighlights {
+  activeDays: number;
+  totalPlaces: number;
+  totalVisits: number;
+  totalKm: number;
+  countries: number;
+  cities: number;
+  busiestDay: { dateKey: string; visits: number } | null;
+  longestStay: { label: string; min: number; dateKey: string } | null;
+  farthestDay: { dateKey: string; km: number } | null;
+  /** 最长连续外出天数(当天有任意非家到访) */
+  maxStreak: number;
+  /** 最近 12 个有数据的月份:去过的地点数 */
+  monthly: Array<{ monthKey: string; places: number }>;
+}
+
+/** 回顾页:全历史的纪录与趋势(Wrapped 形态,纯本机推导)。 */
+export function footprintHighlights(visits: PlaceVisit[]): FootprintHighlights | null {
+  const days = buildPlaceTimeline(visits, 3650);
+  if (!days.length) return null;
+
+  const allPlaces = new Set<string>();
+  let totalVisits = 0;
+  let totalKm = 0;
+  let busiestDay: FootprintHighlights['busiestDay'] = null;
+  let longestStay: FootprintHighlights['longestStay'] = null;
+  let farthestDay: FootprintHighlights['farthestDay'] = null;
+  const monthPlaces = new Map<string, Set<string>>();
+
+  for (const day of days) {
+    const segs = day.segments;
+    if (!busiestDay || segs.length > busiestDay.visits) busiestDay = { dateKey: day.dateKey, visits: segs.length };
+    let dayKm = 0;
+    for (let i = 0; i < segs.length; i++) {
+      const s = segs[i];
+      const k = placeKey(s.label, s.lat, s.lon);
+      allPlaces.add(k);
+      totalVisits += 1;
+      const mk = monthOf(day.dateKey);
+      const set = monthPlaces.get(mk) || new Set<string>();
+      set.add(k);
+      monthPlaces.set(mk, set);
+      // 「最长停留」只认地点级纪录:排除家(在家过夜天然最长,没信息量)
+      if (s.category !== 'home' && (!longestStay || s.durationMin > longestStay.min)) {
+        longestStay = { label: s.label, min: s.durationMin, dateKey: day.dateKey };
+      }
+      const n = segs[i + 1];
+      if (n && s.lat != null && s.lon != null && n.lat != null && n.lon != null) {
+        const km = haversineKm(s.lat, s.lon, n.lat, n.lon);
+        if (km >= 0.05 && km < 2000) dayKm += km;
+      }
+    }
+    totalKm += dayKm;
+    if (dayKm > 0 && (!farthestDay || dayKm > farthestDay.km)) farthestDay = { dateKey: day.dateKey, km: Math.round(dayKm * 10) / 10 };
+  }
+
+  // 连续外出:当天有任意非家到访;按日历相邻天数连
+  const awayDays = days.filter((d) => d.segments.some((s) => s.category !== 'home')).map((d) => d.dateKey).sort();
+  let maxStreak = 0;
+  let run = 0;
+  let prevTime = 0;
+  for (const key of awayDays) {
+    const time = dateKeyToLocalDate(key).getTime();
+    run = prevTime && time - prevTime === 86_400_000 ? run + 1 : 1;
+    if (run > maxStreak) maxStreak = run;
+    prevTime = time;
+  }
+
+  const geo = loadPlaceGeo();
+  const countries = new Set(Object.values(geo).map((g) => g.country).filter(Boolean)).size;
+  const cities = new Set(Object.values(geo).map((g) => g.city).filter(Boolean)).size;
+
+  const monthly = [...monthPlaces.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .slice(-12)
+    .map(([monthKey, set]) => ({ monthKey, places: set.size }));
+
+  return {
+    activeDays: days.length,
+    totalPlaces: allPlaces.size,
+    totalVisits,
+    totalKm: Math.round(totalKm),
+    countries,
+    cities,
+    busiestDay,
+    longestStay,
+    farthestDay,
+    maxStreak,
+    monthly,
+  };
 }

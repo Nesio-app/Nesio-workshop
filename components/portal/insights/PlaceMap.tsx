@@ -30,7 +30,7 @@ function yWorld(lat: number, z: number): number {
   return ((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * TILE * 2 ** z;
 }
 
-export default function PlaceMap({ points, height = 200 }: { points: MapPoint[]; height?: number }) {
+export default function PlaceMap({ points, path, height = 200 }: { points: MapPoint[]; path?: Array<{ lat: number; lon: number }>; height?: number }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(340);
 
@@ -82,6 +82,14 @@ export default function PlaceMap({ points, height = 200 }: { points: MapPoint[];
         <img key={t.key} src={`https://tile.openstreetmap.org/${z}/${t.x}/${t.y}.png`} alt="" loading="lazy" draggable={false}
           style={{ position: 'absolute', left: t.px, top: t.py, width: TILE, height: TILE }} />
       ))}
+      {path && path.length >= 2 && (
+        <svg style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }} width={width} height={height} aria-hidden>
+          <path
+            d={path.map((p, i) => `${i ? 'L' : 'M'}${(xWorld(p.lon, z) - left).toFixed(1)},${(yWorld(p.lat, z) - top).toFixed(1)}`).join(' ')}
+            fill="none" stroke="var(--portal-accent)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" opacity="0.75"
+          />
+        </svg>
+      )}
       {pts.map((p, i) => {
         const r = 5 + Math.sqrt(p.weightMin / maxW) * 8;
         return (
