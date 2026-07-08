@@ -156,6 +156,40 @@ export function subscriptionLoad(txs: BankTx[], recurring: RecurringCharge[] = d
   };
 }
 
+/* ---------- 免费最大化·Plaid C:订阅涨价检测(免费替代付费 Recurring 的涨价信号) ----------
+   detectRecurring 早已算出每条流的 latestAmount(最近一笔)与 baselineAmount(此前中位),
+   但从没做减法呈现。有了 730 天历史后 baseline 更稳,涨价判定更可靠。
+   规则:最近一笔比基线高 > max($0.5, 5%)才报;水电气网类天然浮动(RENT_AND_UTILITIES)
+   不算「涨价」,排除;需要 ≥3 笔成熟流(baseline 有意义)。 */
+
+export interface PriceHike {
+  name: string;
+  key: string;
+  from: number;      // 基线金额
+  to: number;        // 最近金额
+  deltaPct: number;  // 涨幅 %
+  currency: string;
+}
+
+export function recurringPriceHikes(recurring: RecurringCharge[]): PriceHike[] {
+  const out: PriceHike[] = [];
+  for (const r of recurring) {
+    if (r.status !== 'mature') continue;              // 早识别流基线不稳,不报涨价
+    if (r.category === 'RENT_AND_UTILITIES') continue; // 水电账单金额天然浮动,不是涨价
+    const from = r.baselineAmount;
+    const to = r.latestAmount;
+    if (!(from > 0) || !(to > from)) continue;
+    const delta = to - from;
+    if (delta < 0.5 || delta / from < 0.05) continue;  // 噪音门:> $0.5 且 > 5%
+    out.push({
+      name: r.name, key: r.key, from, to,
+      deltaPct: Math.round((delta / from) * 100),
+      currency: r.currency,
+    });
+  }
+  return out.sort((a, b) => (b.to - b.from) - (a.to - a.from));
+}
+
 /* ---------- 余额投影(直接法:已知账单流出 + 发薪流入,逐日滚动) ---------- */
 
 export interface BalanceProjection {
