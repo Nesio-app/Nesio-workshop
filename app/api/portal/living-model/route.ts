@@ -18,6 +18,7 @@ import { LAYER_META } from '@/lib/platform/living-model';
 import { guardAiRoute } from '@/lib/portal/api-auth';
 import { envValue } from '@/lib/portal/env';
 import { completeText, aiProviderAvailable } from '@/lib/portal/ai-complete';
+import { parseJsonBlock } from '@/lib/extraction/extraction';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -104,21 +105,25 @@ ${prevStr}
 只输出 JSON，不加解释。如果某层证据不足，返回空数组 []。`;
 
   // 共享客户端:Claude(sonnet)优先,自动回落 Gemini;全别名解析 key。
-  // 修窄读 bug —— 此前只读 ANTHROPIC_API_KEY 且只调 Claude,部署配 Gemini 时认知模型误判「无 key」。
+  // 生成的是 7 层带证据的大 JSON —— 这里的三处是「no JSON in response」的真凶(与 key/provider 无关):
+  //   ① maxTokens 1500 装不下 7 层,输出被截断在第一个 { 之前 → 抠不出 JSON;抬到 4000。
+  //   ② temperature 默认 0.6 爱把「只输出 JSON」跑成大白话;结构化输出钉死 temperature 0。
+  //   ③ responseFormat:'json' 让 Gemini 强制吐合法 JSON(拍一拍等小输出没这个问题,是本路由自找的)。
   const { text: raw } = await completeText({
     prompt,
-    maxTokens: 1500,
+    maxTokens: 4000,
+    temperature: 0,
+    responseFormat: 'json',
     model: envValue('CLAUDE_MODEL') || 'claude-3-5-sonnet-latest',
   });
-  const match = raw.match(/\{[\s\S]*\}/);
-  if (!match) throw new Error('no JSON in response');
-
-  const parsed = JSON.parse(match[0]) as Record<string, Array<{
+  // 稳健解析(与拍一拍/物品同款 parseJsonBlock:容围栏 / 前后大白话 / 首个 {…} 兜底),不再用裸正则。
+  const parsed = parseJsonBlock<Record<string, Array<{
     content: string;
     confidence: number;
     evidenceRefs: string[];
     evidenceCount: number;
-  }>>;
+  }>>>(raw);
+  if (!parsed || typeof parsed !== 'object') throw new Error('no JSON in response');
 
   const layerIds: LivingModelLayerId[] = ['identity', 'motivation', 'principles', 'patterns', 'blind_spots', 'evolution', 'prediction'];
   const now = new Date().toISOString();
