@@ -8,7 +8,7 @@ import { PORTAL_CACHE_KEYS, writePortalCache, readPortalCache } from './prefetch
 import { getLifeGraph } from './life-graph';
 import type { CalendarEvent } from './types';
 import { createSignal } from '../life-domain/create-signal';
-import { normalizeCalendarToSignal, normalizeWeatherToSignal } from '../life-domain/normalizers';
+import { normalizeCalendarToSignal, normalizeWeatherToSignal, normalizeTeslaDriveToSignal, normalizeTeslaChargeToSignal } from '../life-domain/normalizers';
 import { recordLiveVisit } from './place-trail';
 
 // ── Weather ──────────────────────────────────────────────────────────────────
@@ -89,12 +89,68 @@ export async function refreshCalendar(): Promise<void> {
   } catch { /* offline */ }
 }
 
+// ── Tesla → Life Graph ───────────────────────────────────────────────────────
+
+type TeslaDriveDTO = Parameters<typeof normalizeTeslaDriveToSignal>[0];
+type TeslaChargeDTO = Parameters<typeof normalizeTeslaChargeToSignal>[0];
+
+/**
+ * Read the Tesla snapshot and write drive/charge signals (deduped by
+ * externalId). Accepts a prefetched payload so the sync button doesn't
+ * pay for a second Tesla API round-trip.
+ */
+export async function refreshTesla(
+  prefetched?: { drives?: TeslaDriveDTO[]; charges?: TeslaChargeDTO[] },
+): Promise<void> {
+  try {
+    let data = prefetched;
+    if (!data) {
+      const res = await fetch('/api/portal/tesla', { cache: 'no-store' });
+      if (!res.ok) return;
+      const json = await res.json() as { ok?: boolean; drives?: TeslaDriveDTO[]; charges?: TeslaChargeDTO[] };
+      if (!json.ok) return; // not_connected / token_expired — stay quiet
+      data = json;
+    }
+
+    const existing = new Set(getLifeGraph()
+      .map((n) => n.attributes['externalId'] as string)
+      .filter(Boolean));
+
+    (data.drives || []).forEach((d) => {
+      const id = `tesla-drive-${d.vehicleId}-${d.at}`;
+      if (existing.has(id)) return;
+      createSignal(normalizeTeslaDriveToSignal(d));
+    });
+    (data.charges || []).forEach((c) => {
+      const id = `tesla-charge-${c.vehicleId}-${c.at}`;
+      if (existing.has(id)) return;
+      createSignal(normalizeTeslaChargeToSignal(c));
+    });
+    window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
+  } catch { /* offline */ }
+}
+
 // ── Run all connectors ───────────────────────────────────────────────────────
+
+// Adaptive-polling nod (TezLab/TeslaMate lesson): don't ping Tesla on every
+// mount. Poll at most every 15 min — the source changes slowly and each call
+// costs API quota. Full sleep-aware backoff (tighten when moving, back off when
+// parked) is a later refinement; this fixed floor already avoids the worst waste.
+function shouldPollTesla(minMs = 15 * 60_000): boolean {
+  try {
+    const key = 'nesio-tesla-last-poll';
+    const last = Number(localStorage.getItem(key) || '0');
+    if (Date.now() - last < minMs) return false;
+    localStorage.setItem(key, String(Date.now()));
+    return true;
+  } catch { return true; }
+}
 
 export async function runConnectors(): Promise<void> {
   await Promise.allSettled([
     refreshWeather(),
     refreshCalendar(),
+    shouldPollTesla() ? refreshTesla() : Promise.resolve(),
   ]);
   window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
 }

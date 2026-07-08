@@ -7,7 +7,7 @@
 import { cookies } from 'next/headers';
 import { normalizeSupabaseRuntimeUrl } from '@/lib/portal/production-runtime';
 
-export type IntegrationProvider = 'gmail' | 'calendar';
+export type IntegrationProvider = 'gmail' | 'calendar' | 'tesla';
 
 export interface IntegrationTokens {
   accessToken: string;
@@ -84,6 +84,7 @@ export async function writeIntegrations(userId: string, userToken: string, data:
 const COOKIE_PREFIX: Record<IntegrationProvider, string> = {
   gmail: 'nesio_gmail',
   calendar: 'nesio_google_calendar',
+  tesla: 'nesio_tesla',
 };
 
 export async function readTokensFromCookies(provider: IntegrationProvider): Promise<IntegrationTokens | null> {
