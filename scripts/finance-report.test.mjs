@@ -53,12 +53,14 @@ const report = loadTs('../lib/portal/finance-report.ts', (p) =>
   : p === './finance-budget' ? budget
   : p === './tx-category' ? txCategory
   : p === './life-graph' ? lifeGraphStub : ({}));
+const visualKit = loadTs('../lib/portal/report-visual-kit.ts', () => ({}));
 const visual = loadTs('../lib/portal/finance-report-visual.ts', (p) =>
   p === './bank-tx' ? bank
   : p === './finance-features' ? features
   : p === './finance-insight' ? insight
   : p === './finance-risk' ? risk
   : p === './finance-budget' ? budget
+  : p === './report-visual-kit' ? visualKit
   : p === './tx-category' ? txCategory : ({}));
 
 const NOW = new Date('2026-07-02T12:00:00Z');

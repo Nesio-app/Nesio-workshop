@@ -23,52 +23,10 @@ import { computeFinanceScores } from './finance-risk';
 import { loadBudget, hasBudget, budgetProgress } from './finance-budget';
 import { categoryLabel, categoryDetailLabel } from './tx-category';
 
-/* 设计 token 的 day 值镜像(独立文档拿不到 app 的 CSS 变量;与 design-system/nesio 同源) */
-const INK = '#1e2a3a';
-const MUTED = '#5a6d82';
-const LINE = '#dfe6ef';
-const BG_SOFT = '#f4f8fd';
-const ACCENT = '#588ce3';
-const GO = '#5a9e7a';
-const GO_SOFT = '#d9ece1';
-const GENTLE = '#c9923f';
-const GENTLE_SOFT = '#f3e4cc';
-const RISK = '#cf6b6b';
-/* 分类调色板:蓝/橙/绿/紫/玫红/金/青(校验通过的固定顺序,不轮换);灰=「其他」 */
-const CAT_COLORS = ['#588ce3', '#e0954a', '#3d9f6e', '#7c6ee6', '#c25d7a', '#c98a2d', '#17a28b'];
-const OTHER_GRAY = '#9aa7b8';
-
-const esc = (x: string) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-const r1 = (v: number) => Math.round(v * 10) / 10;
-
-/** 顶部圆角(4px)、底边平直的柱形 path(规范:data-end 圆角、基线方角)。 */
-function roundedBar(x: number, y: number, w: number, h: number, color: string): string {
-  if (h <= 0.5) return '';
-  const r = Math.min(4, w / 2, h);
-  return `<path d="M${x} ${y + h}V${y + r}Q${x} ${y} ${x + r} ${y}H${x + w - r}Q${x + w} ${y} ${x + w} ${y + r}V${y + h}Z" fill="${color}"/>`;
-}
-
-/** 环形图(SVG stroke 法,切片间 2px 表面留缝)。 */
-function donutSvg(slices: Array<{ label: string; value: number; color: string }>, centerTop: string, centerVal: string): string {
-  const R = 54;
-  const C = 2 * Math.PI * R;
-  const total = slices.reduce((s, x) => s + x.value, 0);
-  if (total <= 0) return '';
-  const GAP = 2;
-  let acc = 0;
-  const segs: string[] = [];
-  for (const s of slices) {
-    const len = (s.value / total) * C;
-    const draw = Math.max(0, len - (slices.length > 1 ? GAP : 0));
-    segs.push(`<circle r="${R}" fill="none" stroke="${s.color}" stroke-width="17" stroke-dasharray="${r1(draw)} ${r1(C - draw)}" stroke-dashoffset="${r1(-acc)}"/>`);
-    acc += len;
-  }
-  return `<svg viewBox="0 0 150 150" width="150" height="150" role="img" aria-label="${esc(centerTop)}">
-<g transform="translate(75,75) rotate(-90)">${segs.join('')}</g>
-<text x="75" y="70" text-anchor="middle" font-size="9.5" fill="${MUTED}">${esc(centerTop)}</text>
-<text x="75" y="88" text-anchor="middle" font-size="15" font-weight="700" fill="${INK}">${esc(centerVal)}</text>
-</svg>`;
-}
+import {
+  INK, MUTED, LINE, ACCENT, GO, GO_SOFT, GENTLE, GENTLE_SOFT, RISK, RISK_SOFT,
+  CAT_COLORS, OTHER_GRAY, esc, r1, roundedBar, donutSvg, hbar, niceCeil, docShell,
+} from './report-visual-kit';
 
 /** 收入 vs 净支出 双系列柱形图(近 6 个月,hairline 网格 + 干净刻度)。 */
 function trendSvg(rows: Array<{ ym: string; income: number; net: number }>, zh: boolean): string {
@@ -77,9 +35,7 @@ function trendSvg(rows: Array<{ ym: string; income: number; net: number }>, zh: 
   const padL = 52; const padR = 8; const padT = 12; const padB = 24;
   const plotW = W - padL - padR; const plotH = H - padT - padB;
   const rawMax = Math.max(1, ...rows.map((r) => Math.max(r.income, r.net)));
-  // 干净刻度:1/2/2.5/5 × 10^k 向上取
-  const pow = Math.pow(10, Math.floor(Math.log10(rawMax)));
-  const niceMax = [1, 2, 2.5, 5, 10].map((m) => m * pow).find((m) => m >= rawMax) ?? rawMax;
+  const niceMax = niceCeil(rawMax);
   const y = (v: number) => padT + plotH * (1 - v / niceMax);
   const parts: string[] = [];
   for (const frac of [0, 0.5, 1]) {
@@ -101,14 +57,6 @@ function trendSvg(rows: Array<{ ym: string; income: number; net: number }>, zh: 
   return `<div class="legend">${legend}</div><svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto" role="img">${parts.join('')}</svg>`;
 }
 
-/** 水平占比条(预算进度/体检分数/组合结构共用;fill 数组按序渲染,2px 留缝)。 */
-function hbar(fills: Array<{ pct: number; color: string }>, track = BG_SOFT): string {
-  const segs = fills
-    .filter((f) => f.pct > 0)
-    .map((f) => `<i style="width:${Math.min(100, r1(f.pct))}%;background:${f.color}"></i>`)
-    .join('');
-  return `<span class="hbar" style="background:${track}">${segs}</span>`;
-}
 
 /** 财务月报 · 彩色图文 HTML(自包含;打印即 PDF)。 */
 export function reportRichHtml(
@@ -268,45 +216,9 @@ ${portfolio.concentrated ? `<p class="muted small">${esc(L(`${portfolio.concentr
 <li>${L('本报告由确定性规则在本机生成,不构成投资建议。', 'Deterministic rules, on-device data, not investment advice.')}</li>
 </ul></section>`);
 
-  return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>
-/* 打印默认剥掉背景色 → KPI 卡/进度条/色点全变黑白;exact 强制按屏幕配色出 PDF */
-*{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-body{font:14px/1.6 -apple-system,"Noto Sans SC",sans-serif;color:${INK};max-width:760px;margin:0 auto;padding:28px;background:#fff}
-h1{font-size:22px;margin:0}
-.sub{color:${MUTED};font-size:11.5px;margin:2px 0 18px}
-h2{font-size:14px;margin:0 0 10px;color:${INK};letter-spacing:.02em}
-h2::before{content:"";display:inline-block;width:4px;height:13px;border-radius:2px;background:${ACCENT};margin-right:7px;vertical-align:-2px}
-section{margin:0 0 22px;break-inside:avoid}
-.kpis{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}
-.kpi{flex:1;min-width:130px;background:${BG_SOFT};border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:2px}
-.kl{font-size:11px;color:${MUTED}}
-.kv{font-size:22px;font-weight:700}.kv.sm{font-size:17px}
-.delta{font-size:11px;font-weight:600}
-.hbar{display:flex;gap:2px;height:12px;border-radius:6px;overflow:hidden;margin:6px 0}
-.hbar i{display:block;height:100%;border-radius:2px}
-.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:${MUTED};margin:6px 0}
-.lg i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:5px;vertical-align:-.5px}
-.donutrow{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
-.donutrow table{flex:1;min-width:280px}
-table.clean{border-collapse:collapse;width:100%;font-size:12.5px}
-table.clean td{padding:5px 8px;border-bottom:1px solid ${LINE};vertical-align:middle}
-table.clean tr:last-child td{border-bottom:none}
-td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
-td.mname{max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.sw{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:7px;vertical-align:-1px}
-.muted{color:${MUTED}}.small{font-size:11.5px;margin:4px 0 0}
-.lede{color:${MUTED};font-size:12.5px;margin:0 0 8px}
-ul.dots{list-style:none;padding:0;margin:0;font-size:12.5px}
-ul.dots li{margin:6px 0;padding-left:16px;position:relative}
-.dot{position:absolute;left:0;top:5px;width:8px;height:8px;border-radius:50%}
-.score{margin:10px 0}
-.scoretop{display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:2px}
-ul.fine{color:${MUTED};font-size:11px;padding-left:16px;margin:0}
-ul.fine li{margin:3px 0}
-@media print{body{padding:0}section{break-inside:avoid}}
-</style></head><body>
-<h1>${esc(title)}</h1>
-<p class="sub">${L(`生成于 ${now.toISOString().slice(0, 10)} · 数据只存本机 · 确定性规则生成(非 LLM)`, `Generated ${now.toISOString().slice(0, 10)} · on-device data · deterministic rules (no LLM)`)}</p>
-${B.join('\n')}
-</body></html>`;
+  return docShell(
+    title,
+    L(`生成于 ${now.toISOString().slice(0, 10)} · 数据只存本机 · 确定性规则生成(非 LLM)`, `Generated ${now.toISOString().slice(0, 10)} · on-device data · deterministic rules (no LLM)`),
+    B.join('\n'),
+  );
 }
