@@ -18,6 +18,8 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import RelationshipDetailSheet from './RelationshipDetailSheet';
+import FamilySummary from './FamilySummary';
+import { buildFamilyDigest } from '@/lib/portal/family-digest';
 
 const GROUPS: Closeness[] = ['core', 'close', 'acquaintance'];
 const FAMILY_RE = /家人|家庭|family/i;
@@ -34,7 +36,11 @@ export default function RelationshipsPanel() {
     rebuild();
     const onUpdate = () => rebuild();
     window.addEventListener('nesio-life-graph-updated', onUpdate);
-    return () => window.removeEventListener('nesio-life-graph-updated', onUpdate);
+    window.addEventListener('nesio-person-records-updated', onUpdate);
+    return () => {
+      window.removeEventListener('nesio-life-graph-updated', onUpdate);
+      window.removeEventListener('nesio-person-records-updated', onUpdate);
+    };
   }, []);
 
   const onContacted = (key: string) => {
@@ -59,6 +65,7 @@ export default function RelationshipsPanel() {
   allGroups.sort((a, b) => (FAMILY_RE.test(b) ? 1 : 0) - (FAMILY_RE.test(a) ? 1 : 0) || a.localeCompare(b, 'zh'));
   const shown = activeGroup ? contacts.filter((c) => c.groups.includes(activeGroup)) : contacts;
   const dueList = shown.filter((c) => c.reachOut);
+  const familyDigest = buildFamilyDigest(contacts);
 
   return (
     <div className="nesio-health-dash">
@@ -78,6 +85,8 @@ export default function RelationshipsPanel() {
           ))}
         </div>
       )}
+
+      {!activeGroup && <FamilySummary digest={familyDigest} onOpen={setOpenKey} />}
 
       {dueList.length > 0 && (
         <div className="nesio-fit-panel" style={{ marginTop: '0.4rem' }}>
