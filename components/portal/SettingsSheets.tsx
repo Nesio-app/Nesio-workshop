@@ -273,6 +273,37 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
   const [cloudEntitled, setCloudEntitled] = useState(false);
   const [cloudRestoreState, setCloudRestoreState] = useState<'idle' | 'pulling' | 'error'>('idle');
   const [cloudRestoreError, setCloudRestoreError] = useState<CloudRestoreError | null>(null);
+  // 免费最大化·Google 扩展授权:免费云备份到用户自己的 Google Drive(appDataFolder)
+  const [driveState, setDriveState] = useState<'idle' | 'busy' | 'done' | 'error'>('idle');
+  const [driveMsg, setDriveMsg] = useState('');
+
+  async function handleDriveBackup() {
+    setDriveState('busy'); setDriveMsg('');
+    const { pushBackupToDrive } = await import('@/lib/portal/drive-backup');
+    const r = await pushBackupToDrive();
+    if (r.ok) { setDriveState('done'); setDriveMsg(L(dict, '✓ 已免费备份到你的 Google Drive', '✓ Backed up free to your Google Drive')); }
+    else {
+      setDriveState('error');
+      setDriveMsg(r.error === 'not_connected'
+        ? L(dict, '先在「数据接入」连接 Google（日历或 Gmail）再备份', 'Connect Google (Calendar or Gmail) under Connectors first')
+        : L(dict, '备份到 Drive 没成功 —— 稍后再试或用「导出完整备份」', "Drive backup didn't go through — try later or use Export full backup"));
+    }
+  }
+  async function handleDriveRestore() {
+    if (!confirm(L(dict, '从 Google Drive 恢复:把云端备份合并回本机(仅补缺,不覆盖已有)。完成后自动刷新。继续?', 'Restore from Google Drive: merges the backup into this device (fills gaps, keeps existing). Refreshes when done. Continue?'))) return;
+    setDriveState('busy'); setDriveMsg('');
+    const { pullBackupFromDrive } = await import('@/lib/portal/drive-backup');
+    const r = await pullBackupFromDrive('merge');
+    if (r.ok) { setDriveMsg(L(dict, '✓ 已从 Drive 恢复,正在刷新…', '✓ Restored from Drive, refreshing…')); setTimeout(() => window.location.reload(), 900); }
+    else {
+      setDriveState('error');
+      setDriveMsg(r.error === 'no_backup'
+        ? L(dict, '你的 Drive 里还没有备份 —— 先点上面「免费备份到 Google Drive」', 'No backup in your Drive yet — tap "Back up free to Google Drive" above first')
+        : r.error === 'not_connected'
+          ? L(dict, '先连接 Google 再恢复', 'Connect Google first')
+          : L(dict, '从 Drive 恢复没成功 —— 稍后再试', "Restore from Drive didn't go through — try later"));
+    }
+  }
 
   async function exportFullBackup() {
     // 与云备份用同一份枚举(localStorage durable + IDB blob),避免两处漂移。
@@ -489,6 +520,16 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
           {cloudRestoreErrorText(cloudRestoreError)}
         </p>
       )}
+
+      {/* 免费最大化·Google 扩展授权:免费备份到用户自己的 Google Drive(appDataFolder),
+          无需付费 entitlement。连了 Google 即可用;失败态可见(设计红线)。 */}
+      <button type="button" className="nesio-settings-action-btn" onClick={handleDriveBackup} disabled={driveState === 'busy'}>
+        {driveState === 'busy' ? L(dict, '正在备份到 Google Drive…', 'Backing up to Google Drive…') : L(dict, '免费备份到 Google Drive · 换机不丢', 'Back up free to Google Drive · survive a new phone')}
+      </button>
+      <button type="button" className="nesio-settings-action-btn" onClick={handleDriveRestore} disabled={driveState === 'busy'}>
+        {L(dict, '从 Google Drive 恢复', 'Restore from Google Drive')}
+      </button>
+      {driveMsg && <p style={{ fontSize: '0.75rem', marginTop: 4, color: driveState === 'error' ? 'var(--status-risk)' : 'var(--status-go)' }}>{driveMsg}</p>}
 
       <button type="button" className="nesio-settings-action-btn" onClick={() => importRef.current?.click()}>
         {L(dict, '导入备份', 'Import backup')}

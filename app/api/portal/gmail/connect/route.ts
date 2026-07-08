@@ -10,7 +10,10 @@ import { envValue } from '@/lib/portal/env';
 // and the resulting refresh token can serve either API.
 // 批次 36:加 gmail.send —— 支持在 Nesio 里直接回复/发送邮件(每封都由用户亲手写并点发送)。
 // 加了新 scope 后老用户会被 prompt=consent 要求重新授权一次,拿到发送权限。
-const GMAIL_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/calendar.readonly';
+// 免费最大化·Google 扩展授权:一次授权覆盖后续 Drive 免费云备份 / Tasks / People。
+// drive.appdata=非敏感(只碰 App 私有文件夹);tasks/contacts.readonly=敏感 scope
+// (生产需 Google OAuth 验证审核,验证前有未验证警告与 100 用户上限)。
+const GMAIL_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/tasks https://www.googleapis.com/auth/contacts.readonly';
 const STATE_COOKIE = 'nesio_gmail_oauth_state';
 
 function callbackUrl(req: NextRequest): string {
