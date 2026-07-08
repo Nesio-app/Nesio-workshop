@@ -55,7 +55,7 @@ const moment = load('../lib/portal/moment-analytics.ts', () => ({}));
 const energy = load('../lib/platform/energy-state.ts', (p) =>
   p === '@/lib/portal/life-graph' ? { getLifeGraph: () => graphNodes }
     : p === '@/lib/portal/moment-analytics' ? moment
-    : p === '@/lib/platform/personalization' ? baseline : ({}));
+    : p === '@/lib/platform/personalization' ? baseline : (idbMocks(p) ?? ({})));
 
 const momentNode = (value, at) => ({ attributes: { energyValue: value }, tags: ['moment'], createdAt: at });
 
@@ -100,7 +100,7 @@ const baseline2 = load('../lib/platform/personalization/baseline-store.ts', (p) 
 const energy2 = load('../lib/platform/energy-state.ts', (p) =>
   p === '@/lib/portal/life-graph' ? { getLifeGraph: () => graphNodes }
     : p === '@/lib/portal/moment-analytics' ? moment
-    : p === '@/lib/platform/personalization' ? baseline2 : ({}));
+    : p === '@/lib/platform/personalization' ? baseline2 : (idbMocks(p) ?? ({})));
 graphNodes.push(momentNode(45, '2026-01-10T09:00:00.000Z'));
 assert.equal(energy2.getEnergyState(now), 'unknown', '冷启动(<3 样本)→ unknown');
 assert.equal(baseline2.ewmaState('energy').n, 1, '先验起步、折入 1 样本');

@@ -98,7 +98,12 @@ export default function TodayFeed({
   }, []);
   void levelTick;
   const cardBudget = Math.min(TODAY_CARD_BUDGET, getProactiveCardBudget());
-  const activeProactiveCards = proactiveCards.filter((c) => !dismissedCardIds.has(c.id)).slice(0, cardBudget);
+  // 架构审查 #2:统一仲裁 —— 置顶抢占的节点,其引导卡不再重复出现
+  const [pinnedNodeId, setPinnedNodeId] = useState<string | null>(null);
+  const guidanceNodeIds = useMemo(() => proactiveCards.map((c) => c.nodeId).filter((x): x is string => Boolean(x)), [proactiveCards]);
+  const activeProactiveCards = proactiveCards
+    .filter((c) => !dismissedCardIds.has(c.id) && (!c.nodeId || c.nodeId !== pinnedNodeId))
+    .slice(0, cardBudget);
 
   // 未来预测区永远有内容(批次 3):管线空窗/全被划掉时,轮播兜底
   // (历史上的今天/记忆回顾/时间段建议/小技巧),每次打开随机一张。
@@ -174,6 +179,8 @@ export default function TodayFeed({
 
         {/* 今日焦点 — 重要安排 / 重要日子 / 重要提醒 */}
         <TodayFocusSection
+          guidanceNodeIds={guidanceNodeIds}
+          onPinnedResolved={setPinnedNodeId}
           focusNodes={focusNodes}
           calendarEvents={calendarEvents}
           specialDays={proactiveContext.upcomingSpecialDays}

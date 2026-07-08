@@ -7,6 +7,10 @@ import { nearestNodeDate } from '../node-dates';
 import { LEXICON } from '../keyword-lexicon';
 import { scheduleHint } from '../../portal/time-labels';
 
+
+// 架构审查 #9(读写分离):写操作已迁 today-commands.ts,这里 re-export 保调用方兼容。
+// 本文件此后是纯查询侧(view-model 只读),新写操作一律加在 today-commands。
+export { saveSubtasks, toggleSubtask, markFocusNodeDone, addMeetingNotes, addCommitmentNode } from './today-commands';
 export interface SubTask {
   id: string;
   name: string;
@@ -32,21 +36,7 @@ function parseSubtasks(attrs: Record<string, string | number | boolean | null>):
   try { return JSON.parse(raw) as SubTask[]; } catch { return undefined; }
 }
 
-export function saveSubtasks(nodeId: string, subtasks: SubTask[]): void {
-  const node = getLifeGraph().find((n) => n.id === nodeId);
-  if (!node) return;
-  updateLifeNode(nodeId, { attributes: { ...node.attributes, subtasksJson: JSON.stringify(subtasks) } });
-  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
-}
 
-export function toggleSubtask(nodeId: string, subtaskId: string): void {
-  const node = getLifeGraph().find((n) => n.id === nodeId);
-  if (!node) return;
-  const subtasks = parseSubtasks(node.attributes) ?? [];
-  const next = subtasks.map((s) => s.id === subtaskId ? { ...s, done: !s.done } : s);
-  updateLifeNode(nodeId, { attributes: { ...node.attributes, subtasksJson: JSON.stringify(next) } });
-  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
-}
 
 // ---- Focus node detection — "everything that deserves attention today" ----
 
@@ -112,42 +102,8 @@ function isFocusNode(node: LifeNode): boolean {
   return false;
 }
 
-export function markFocusNodeDone(id: string): void {
-  const node = getLifeGraph().find((n) => n.id === id);
-  if (!node) return;
-  updateLifeNode(id, { attributes: { ...node.attributes, done: true, doneAt: new Date().toISOString() } });
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
-  }
-}
 
-export function addMeetingNotes(meetingNodeId: string, meetingName: string, notes: string): void {
-  ingestLifeNode({
-    name: `会议记录 · ${meetingName}`,
-    type: 'commitment',
-    tags: ['会议记录', 'meeting-notes'],
-    attributes: {
-      meetingNodeId,
-      notes,
-      recordedAt: new Date().toISOString(),
-    },
-    rawInput: notes,
-    confidence: 1,
-    source: 'voice',
-    relations: [],
-  });
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
-  }
-}
 
-export function addCommitmentNode(name: string): FocusNode {
-  const node = ingestLifeNode({ name, type: 'commitment', source: 'manual', confidence: 1, tags: [], attributes: {}, relations: [] });
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
-  }
-  return { id: node.id, name: node.name, type: node.type, rawInput: node.rawInput, createdAt: node.createdAt, attributes: node.attributes };
-}
 
 export function focusTimeHint(node: FocusNode, locale: string = 'zh'): string {
   const now = new Date();

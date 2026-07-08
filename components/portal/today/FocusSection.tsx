@@ -6,7 +6,8 @@
  * DormantReviewCard(休眠复访)、NightTimeline(夜间空状态)。
  */
 
-import { useRef, useState } from 'react';
+import { arbitrateTodayPresence } from '@/lib/platform/today-arbiter';
+import { useEffect, useRef, useState } from 'react';
 import { focusTimeHint, markFocusNodeDone, addCommitmentNode, type FocusNode, type ProactiveContextItem } from '@/lib/platform/view-models/today-view-model';
 import type { CalendarEvent } from '@/lib/portal/types';
 import { scoreCalendarEvents, selectPinned } from '@/lib/platform/attention-engine';
@@ -100,6 +101,8 @@ export function TodayFocusSection({
   specialDays,
   allNodes: allNodesProp,
   dormantStore: dormantStoreProp,
+  guidanceNodeIds,
+  onPinnedResolved,
   onSetDormantStore,
   onOpenMemory,
   onOpenRecorder,
@@ -110,6 +113,10 @@ export function TodayFocusSection({
   specialDays: ProactiveContextItem[];
   allNodes: readonly FocusNode[];
   dormantStore: DormantStore;
+  /** 引导卡认领的节点 id(统一仲裁用) */
+  guidanceNodeIds?: readonly string[];
+  /** 置顶裁决回传(TodayFeed 据此隐藏被抢占的引导卡) */
+  onPinnedResolved?: (id: string | null) => void;
   onSetDormantStore: (s: DormantStore) => void;
   onOpenMemory?: () => void;
   onOpenRecorder?: (node: FocusNode) => void;
@@ -131,20 +138,29 @@ export function TodayFocusSection({
   const pinned = selectPinned(scored);
   const rest = scored.filter((o) => o.id !== pinned?.id);
 
-  // ── Dormant: one review card per day(先选,任务列表要据此排重)──
+  // ── Dormant: one review card per day(先选,交给统一仲裁器排重)──
   const [dormantDismissed, setDormantDismissed] = useState<Set<string>>(new Set());
   const dormantCandidate: DormantCandidate | null = selectReviewCandidate(allNodesProp, dormantStoreProp);
 
-  // ── Task nodes ──
-  // 架构审查 D4:单门防重出现 —— 进了复访卡的节点不再同时出现在任务列表
-  //(四套选择系统交汇处的唯一 presence 守卫)。
+  // ── 统一仲裁(架构审查 #2):同一节点只在一个槽位出现,优先级 置顶>复访>引导卡>列表 ──
   const allNodes = [...localNodes, ...focusNodes.filter((n) => !localNodes.some((l) => l.id === n.id))];
-  const taskNodes = allNodes.filter((n) => !dismissed.has(n.id) && n.type !== 'event' && !doneIds.has(n.id) && n.id !== dormantCandidate?.node.id);
+  const rawTaskNodes = allNodes.filter((n) => !dismissed.has(n.id) && n.type !== 'event' && !doneIds.has(n.id));
+  const verdict = arbitrateTodayPresence({
+    pinnedId: pinned?.id ?? null,
+    dormantCandidateId: dormantCandidate?.node.id ?? null,
+    taskIds: rawTaskNodes.map((n) => n.id),
+    guidanceClaims: guidanceNodeIds ?? [],
+  });
+  const taskNodes = rawTaskNodes.filter((n) => verdict.taskIds.includes(n.id));
+
+  // 置顶结果回传组合根(TodayFeed 隐藏被置顶抢占的引导卡)
+  const pinnedIdForReport = pinned?.id ?? null;
+  useEffect(() => { onPinnedResolved?.(pinnedIdForReport); }, [pinnedIdForReport, onPinnedResolved]);
 
   // ── Special days (today / tomorrow) ──
   const nearSpecialDays = specialDays.filter((d) => d.daysUntil <= 1);
 
-  const showDormant = dormantCandidate && !dormantDismissed.has(dormantCandidate.node.id);
+  const showDormant = verdict.showDormant && dormantCandidate && !dormantDismissed.has(dormantCandidate.node.id);
 
   const collapsedCount = rest.length + taskNodes.length + nearSpecialDays.length + (showDormant ? 1 : 0);
   const dormantNodeId = dormantCandidate?.node.id;

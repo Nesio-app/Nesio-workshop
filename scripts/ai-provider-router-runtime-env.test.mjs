@@ -25,7 +25,10 @@ assert.equal(geminiContract.providers.productionProviderEnabled, true);
 assert.deepEqual(geminiContract.providers.configured, ['gemini']);
 assert.equal(geminiContract.runtimeAiReadiness.providers.gemini.configured, true);
 assert.equal(geminiContract.runtimeAiReadiness.providers.gemini.enabled, true);
-assert.equal(geminiContract.runtimeAiReadiness.providers.gemini.startEndpoint, '/api/secretary/chat');
+assert.equal(geminiContract.runtimeAiReadiness.providers.gemini.startEndpoint, '/api/portal/chat');
+// #8:契约必须报告真实回退链(与 ai-complete 同源)
+assert.deepEqual([...geminiContract.runtimeAiReadiness.routing.completionChain], ['claude', 'gemini']);
+assert.equal(geminiContract.runtimeAiReadiness.routing.geminiModelFallbacks.length >= 2, true);
 assert.equal(geminiContract.runtimeAiReadiness.providers.gemini.secretsRedacted, true);
 assert.equal(geminiContract.runtimeAiReadiness.providers.chatgpt.enabled, false);
 assert.equal(geminiContract.summary.aiProviderConfiguredCount, 1);

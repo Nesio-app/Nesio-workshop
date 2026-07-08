@@ -14,6 +14,7 @@
  * 迁移前后折算轨迹逐字等价。对外 API(refreshEnergyBaseline/getEnergyState)不变。
  */
 
+import { createBlobStore } from '@/lib/portal/idb-blob-store';
 import { getLifeGraph } from '@/lib/portal/life-graph';
 import {
   defaultEnergyBaseline,
@@ -56,8 +57,18 @@ function ensureMigrated(): void {
   seedEwma(ENERGY_SIGNAL, { mean: prior.mean, varq: prior.variance, n: prior.sampleCount }); // 只补缺
 }
 
+// 存储完整性补遗:水位线也进 IDB(丢失会把最近 moments 重折进 EWMA,轻微双计)。
+// 注意 ensureMigrated 仍直读 localStorage 旧值做一次性 seed(blob store 的自动迁移
+// 也会搬同一个 key,两者幂等:seed 只补缺、搬运只发生一次)。
+const wmBlob = createBlobStore<{ lastFoldedAt?: string }>({
+  key: STORE_KEY, updateEvent: `${STORE_KEY}-updated`,
+  validate: (v) => typeof v === 'object' && v !== null, onWriteError: () => {},
+});
+
 function readWatermark(): string {
   if (typeof window === 'undefined') return '';
+  const v = wmBlob.load();
+  if (v && typeof v.lastFoldedAt === 'string') return v.lastFoldedAt;
   try {
     const raw = JSON.parse(localStorage.getItem(STORE_KEY) || 'null') as LegacyEnergyStore | null;
     return raw?.lastFoldedAt ?? '';
@@ -67,7 +78,7 @@ function readWatermark(): string {
 }
 
 function saveWatermark(lastFoldedAt: string): void {
-  try { localStorage.setItem(STORE_KEY, JSON.stringify({ lastFoldedAt })); } catch { /* ignore */ }
+  wmBlob.save({ lastFoldedAt });
 }
 
 /** Baseline 原语里的 energy 态,装配成域形态(EnergyBaseline)。 */

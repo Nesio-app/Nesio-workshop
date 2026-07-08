@@ -5,12 +5,12 @@
  * this deployment, instead of hard-coding one Gemini model. Server-only.
  */
 
+import { GEMINI_MODEL_FALLBACKS } from './ai-provider-chain.mjs';
 import { resolveAiKey } from '@/lib/portal/ai-keys';
 import { envValue } from '@/lib/portal/env';
 
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
-// Same fallback order as chat/analyze routes — 429/unavailable on one → try next.
-const GEMINI_MODEL_FALLBACKS = ['gemini-2.0-flash', 'gemini-flash-latest', 'gemini-2.5-flash'];
+// 回退链单一数据源(契约同读,防漂移):lib/portal/ai-provider-chain.mjs 顶部 import
 
 export function aiProviderAvailable(): boolean {
   // 统一别名解析:此前只认 GEMINI_API_KEY/GOOGLE_GENERATIVE_AI_API_KEY,漏了
