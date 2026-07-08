@@ -35,6 +35,22 @@ const CLOSE_RE = /朋友|挚友|好友|闺蜜|哥们|死党|friend|bestie|buddy/
 // 结构性/非人关系:这些 relation 的 targetId 不是人(品牌架构/文档/物品归属),不进联系人。
 const NON_PERSON_REL = /架构|品牌|文档|包含|定义|属于|归属|拥有|收纳|容器|owned_by|contains|part_of|belongs|includes|defines|architecture|brand|document|category|object/i;
 
+// 非人类「联系人」:邮件发件人里大量是机器人/机构/通知/账单/银行卡,不是你认识的人 ——
+// 关系管理只保留真人(用户实测:vercel[bot]、Platinum Card from American Express、Chase® Ink® 漏进列表)。
+// 显示名强信号(机器人标记/商标符/no-reply/通知/账单/多词银行卡品牌);单词银行名(Chase/Citi/Visa)
+// 是常见姓氏,不据此过滤,靠 ® / card / bank / 邮箱角色地址兜底,避免误杀真人。
+const NON_HUMAN_NAME = /\[bot\]|®|™|no[-\s.]?reply|do[-\s.]?not[-\s.]?reply|noreply|donotreply|\bnotifications?\b|\bnewsletter\b|\bstatements?\b|\breceipts?\b|\binvoice\b|mailer[-\s.]?daemon|postmaster|american express|capital one|wells fargo|mastercard|\bcard\b|\bbank\b/i;
+// 邮箱角色地址(local part):这些是机构群发/通知地址,不是个人。
+const NON_HUMAN_EMAIL_LOCAL = /^(no-?reply|do-?not-?reply|noreply|donotreply|notify|notifications?|alerts?|mailer-daemon|postmaster|bounce|info|support|hello|team|sales|news|newsletter|updates?|accounts?|billing|service|member|statements?|automated|system|admin|marketing|contact|receipts?|orders?)$/i;
+
+/** 判断一个候选联系人是否明显不是真人(机器人/机构/通知/账单发件人)。 */
+function isLikelyNonHuman(name: string, key: string): boolean {
+  if (NON_HUMAN_NAME.test(name)) return true;
+  const at = key.indexOf('@');
+  if (at > 0 && NON_HUMAN_EMAIL_LOCAL.test(key.slice(0, at))) return true;
+  return false;
+}
+
 /** 从 "Linda Smith <linda@x.com>" 或裸邮箱里取显示名 + 归一 key。 */
 export function parseContactFrom(from: string): { name: string; key: string } | null {
   const s = from.trim();
@@ -126,6 +142,8 @@ export function buildRelationships(nodes: LifeNode[], now = Date.now(), contactL
     if (!key || key.length < 2) return;
     // 过滤明显不是人的 key(纯数字/系统标记)
     if (/^\d+$/.test(key)) return;
+    // 过滤机器人/机构/通知/账单发件人 —— 关系管理只留真人
+    if (isLikelyNonHuman(name, key)) return;
     const cur = acc.get(key) || { key, name, relation: null, mentions: 0, last: null, relationHit: null, times: [] };
     cur.mentions += 1;
     cur.last = newer(cur.last, date);

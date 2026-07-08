@@ -44,6 +44,25 @@ const now = Date.parse('2026-07-08T00:00:00Z');
   assert.equal(contacts.find((c) => c.name === 'Bob')?.closeness, 'close', '朋友=亲近');
 }
 
+// ── 非人类发件人不进联系人:机器人/银行卡/机构通知(用户实测污染) ──
+{
+  const nodes = [
+    { id: 'e1', type: 'note', source: 'email', name: 'PR review', createdAt: '2026-07-08', attributes: { from: 'vercel[bot] <notifications@github.com>', date: '2026-07-08' }, relations: [] },
+    { id: 'e2', type: 'note', source: 'email', name: '账单', createdAt: '2026-07-08', attributes: { from: 'Platinum Card from American Express <AmericanExpress@welcome.aexp.com>', date: '2026-07-08' }, relations: [] },
+    { id: 'e3', type: 'note', source: 'email', name: '提醒', createdAt: '2026-07-08', attributes: { from: 'Chase® Ink® <no.reply.alerts@chase.com>', date: '2026-07-08' }, relations: [] },
+    { id: 'e4', type: 'note', source: 'email', name: 'support', createdAt: '2026-07-08', attributes: { from: 'support@acme.com', date: '2026-07-08' }, relations: [] },
+    // 真人不该被误杀:即便姓 Chase(单词银行名是常见姓氏,不据此过滤)
+    { id: 'p9', type: 'person', name: 'John Chase', source: 'system', createdAt: '2026-06-01', attributes: { email: 'john@personal.com' }, relations: [] },
+  ];
+  const contacts = rel.buildRelationships(nodes, now, {});
+  const names = contacts.map((c) => c.name);
+  assert.ok(!contacts.some((c) => /\[bot\]/.test(c.name)), '机器人发件人不进联系人');
+  assert.ok(!contacts.some((c) => /American Express|Card/.test(c.name)), '银行卡发件人不进联系人');
+  assert.ok(!contacts.some((c) => /®/.test(c.name)), '带商标符的机构不进联系人');
+  assert.ok(!contacts.some((c) => c.key === 'support@acme.com'), '角色地址(support@)不进联系人');
+  assert.ok(names.includes('John Chase'), '真人(姓 Chase)不被误杀');
+}
+
 // ── runPeopleSync:源码级(动态 import life-graph,vm 跑成本高) ──
 const cs = fs.readFileSync(new URL('../lib/portal/providers/connector-sync.ts', import.meta.url), 'utf8');
 assert.ok(/export async function runPeopleSync/.test(cs), 'runPeopleSync 存在');
