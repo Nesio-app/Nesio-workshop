@@ -17,6 +17,7 @@ import type { LivingModelLayer, LivingModelLayerId } from '@/lib/platform/living
 import { LAYER_META } from '@/lib/platform/living-model';
 import { guardAiRoute } from '@/lib/portal/api-auth';
 import { envValue } from '@/lib/portal/env';
+import { completeText, aiProviderAvailable } from '@/lib/portal/ai-complete';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -48,7 +49,7 @@ function buildFallbackModel(): LivingModelLayer[] {
   }));
 }
 
-async function generateWithClaude(apiKey: string, body: LivingModelRequest): Promise<LivingModelLayer[]> {
+async function generateModel(body: LivingModelRequest): Promise<LivingModelLayer[]> {
   const typeStr = Object.entries(body.typeBreakdown)
     .map(([t, c]) => `${t}:${c}`)
     .join(', ');
@@ -102,29 +103,13 @@ ${prevStr}
 
 只输出 JSON，不加解释。如果某层证据不足，返回空数组 []。`;
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: 'claude-3-5-sonnet-latest',
-      max_tokens: 1500,
-      messages: [{ role: 'user', content: prompt }],
-    }),
+  // 共享客户端:Claude(sonnet)优先,自动回落 Gemini;全别名解析 key。
+  // 修窄读 bug —— 此前只读 ANTHROPIC_API_KEY 且只调 Claude,部署配 Gemini 时认知模型误判「无 key」。
+  const { text: raw } = await completeText({
+    prompt,
+    maxTokens: 1500,
+    model: envValue('CLAUDE_MODEL') || 'claude-3-5-sonnet-latest',
   });
-
-  if (!res.ok) throw new Error(`Claude ${res.status}`);
-
-  const data = await res.json() as {
-    content?: Array<{ type: string; text?: string }>;
-    error?: { message: string };
-  };
-  if (data.error) throw new Error(data.error.message);
-
-  const raw = (data.content ?? []).find((c) => c.type === 'text')?.text ?? '';
   const match = raw.match(/\{[\s\S]*\}/);
   if (!match) throw new Error('no JSON in response');
 
@@ -175,13 +160,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, layers: fallback, reason: 'insufficient_data' });
   }
 
-  const apiKey = envValue('ANTHROPIC_API_KEY') || envValue('CLAUDE_API_KEY');
-  if (!apiKey) {
+  // 全 provider 认 key(Anthropic 或 Gemini 任一即可);共享客户端负责实际选路 + 回落。
+  if (!aiProviderAvailable()) {
     return NextResponse.json({ ok: true, layers: fallback, reason: 'no_api_key' });
   }
 
   try {
-    const layers = await generateWithClaude(apiKey, body);
+    const layers = await generateModel(body);
     return NextResponse.json({ ok: true, layers });
   } catch (err) {
     console.error('[living-model] error:', err instanceof Error ? err.message : err);

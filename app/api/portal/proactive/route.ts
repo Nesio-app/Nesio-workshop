@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { guardAiRoute } from '@/lib/portal/api-auth';
 import { envValue } from '@/lib/portal/env';
+import { completeText, aiProviderAvailable } from '@/lib/portal/ai-complete';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -44,8 +45,7 @@ interface ProactiveRequest {
   userName?: string;
 }
 
-async function callClaudeForCards(
-  apiKey: string,
+async function callAiForCards(
   triggers: ProactiveTrigger[],
   userName: string,
 ): Promise<ProactiveCard[]> {
@@ -56,17 +56,10 @@ async function callClaudeForCards(
     return `[${t.type}] ${dataStr}`;
   }).join('\n');
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: 'claude-3-5-haiku-latest',
-      max_tokens: 600,
-      system: `你是 Nesio，用户 ${userName || '婧'} 的贴身 AI 助手。
+  // 共享客户端:Claude(haiku)优先,自动回落 Gemini;全别名解析 key(修窄读 —— 部署配 Gemini 时也能用)。
+  const { text: raw } = await completeText({
+    prompt: `触发信号：\n${triggerLines}\n\n生成提醒卡片（JSON，最多2条）：`,
+    system: `你是 Nesio，用户 ${userName || '婧'} 的贴身 AI 助手。
 根据触发信号生成 1-2 条主动提醒卡片。规则：
 - 中文，口吻温暖自然，不夸张
 - 标题：8字内，有力
@@ -76,22 +69,9 @@ async function callClaudeForCards(
 - icon：1个emoji
 - 不编造没有数据支撑的内容
 只输出JSON数组：[{"id":"p1","title":"","body":"","confidence":85,"sourceTags":[],"icon":"","priority":1}]`,
-      messages: [{
-        role: 'user',
-        content: `触发信号：\n${triggerLines}\n\n生成提醒卡片（JSON，最多2条）：`,
-      }],
-    }),
+    maxTokens: 600,
+    model: envValue('CLAUDE_MODEL') || 'claude-3-5-haiku-latest',
   });
-
-  if (!res.ok) throw new Error(`Claude ${res.status}`);
-
-  const data = await res.json() as {
-    content?: Array<{ type: string; text?: string }>;
-    error?: { message: string };
-  };
-  if (data.error) throw new Error(data.error.message);
-
-  const raw = (data.content ?? []).find((c) => c.type === 'text')?.text ?? '';
   const match = raw.match(/\[[\s\S]*?\]/);
   if (!match) throw new Error('no JSON array in response');
 
@@ -115,13 +95,12 @@ export async function POST(req: NextRequest) {
     ...t.fallback,
   }));
 
-  const anthropicKey = envValue('ANTHROPIC_API_KEY') || envValue('CLAUDE_API_KEY');
-  if (!anthropicKey) {
+  if (!aiProviderAvailable()) {
     return NextResponse.json({ ok: true, cards: fallbackCards });
   }
 
   try {
-    const cards = await callClaudeForCards(anthropicKey, triggers, userName || '');
+    const cards = await callAiForCards(triggers, userName || '');
     return NextResponse.json({ ok: true, cards: cards.slice(0, 2) });
   } catch (err) {
     console.error('[proactive] Claude error:', err instanceof Error ? err.message : err);

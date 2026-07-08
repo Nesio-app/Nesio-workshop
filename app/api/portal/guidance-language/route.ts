@@ -17,6 +17,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { guardAiRoute } from '@/lib/portal/api-auth';
 import { envValue } from '@/lib/portal/env';
+import { completeText, aiProviderAvailable } from '@/lib/portal/ai-complete';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -42,8 +43,7 @@ interface LanguageRequest {
   userName?: string;
 }
 
-async function enhanceWithClaude(
-  apiKey: string,
+async function enhanceWithAi(
   cards: CardInput[],
   userName: string,
 ): Promise<CardOutput[]> {
@@ -51,17 +51,10 @@ async function enhanceWithClaude(
     `Card ${i + 1} [${c.type}]:\n  原标题: ${c.title}\n  原正文: ${c.body}\n  推荐动作: ${c.action.label}`,
   ).join('\n\n');
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: 'claude-3-5-haiku-latest',
-      max_tokens: 400,
-      system: `你是 Nesio，${userName || '用户'}的贴身 AI 助手。
+  // 共享客户端:Claude(haiku)优先,自动回落 Gemini;全别名解析 key(修窄读 —— 部署配 Gemini 时也能用)。
+  const { text: raw } = await completeText({
+    prompt: `请改写以下引导卡片的标题和正文：\n\n${cardDescriptions}\n\n输出 JSON 数组（${cards.length} 条）：`,
+    system: `你是 Nesio，${userName || '用户'}的贴身 AI 助手。
 你的任务是把系统生成的引导卡片语言改写成更自然、温和、具体的中文。
 
 规则：
@@ -73,22 +66,9 @@ async function enhanceWithClaude(
 
 只输出 JSON 数组，格式：[{"title":"","body":""}]
 数量必须和输入卡片完全相同。`,
-      messages: [{
-        role: 'user',
-        content: `请改写以下引导卡片的标题和正文：\n\n${cardDescriptions}\n\n输出 JSON 数组（${cards.length} 条）：`,
-      }],
-    }),
+    maxTokens: 400,
+    model: envValue('CLAUDE_MODEL') || 'claude-3-5-haiku-latest',
   });
-
-  if (!res.ok) throw new Error(`Claude ${res.status}`);
-
-  const data = await res.json() as {
-    content?: Array<{ type: string; text?: string }>;
-    error?: { message: string };
-  };
-  if (data.error) throw new Error(data.error.message);
-
-  const raw = (data.content ?? []).find((c) => c.type === 'text')?.text ?? '';
   const match = raw.match(/\[[\s\S]*?\]/);
   if (!match) throw new Error('no JSON array in response');
 
@@ -119,13 +99,12 @@ export async function POST(req: NextRequest) {
   // Always prepare fallback (rule-generated copy)
   const fallback: CardOutput[] = cards.map((c) => ({ ...c, aiEnhanced: false }));
 
-  const anthropicKey = envValue('ANTHROPIC_API_KEY') || envValue('CLAUDE_API_KEY');
-  if (!anthropicKey) {
+  if (!aiProviderAvailable()) {
     return NextResponse.json({ ok: true, cards: fallback });
   }
 
   try {
-    const enhanced = await enhanceWithClaude(anthropicKey, cards, userName ?? '');
+    const enhanced = await enhanceWithAi(cards, userName ?? '');
     return NextResponse.json({ ok: true, cards: enhanced });
   } catch (err) {
     console.error('[guidance-language] Claude error:', err instanceof Error ? err.message : err);
