@@ -9,6 +9,7 @@
 
 import { useEffect, useState } from 'react';
 import { buildCrossRegionInsights, buildLeadLagInsights, type CrossRegionInsight } from '@/lib/platform/cross-region/detect';
+import { getConsentedDomains, setDomainConsent, SENSITIVE_DELIVERY_DOMAINS } from '@/lib/platform/cross-region/consent';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -36,6 +37,15 @@ export default function CrossRegionCard() {
   const [ready, setReady] = useState(false);
   const [insights, setInsights] = useState<CrossRegionInsight[]>([]);
   const [leadLag, setLeadLag] = useState<CrossRegionInsight[]>([]);
+  const [pushSensitive, setPushSensitive] = useState(false);
+
+  useEffect(() => { setPushSensitive(SENSITIVE_DELIVERY_DOMAINS.every((d) => getConsentedDomains().has(d))); }, []);
+
+  function toggleSensitivePush() {
+    const next = !pushSensitive;
+    setPushSensitive(next);
+    for (const d of SENSITIVE_DELIVERY_DOMAINS) setDomainConsent(d, next);
+  }
 
   useEffect(() => {
     // ensureFactJournal 会读足迹/银行/心情等历史,放到 effect 里避免阻塞首屏渲染。
@@ -89,6 +99,16 @@ export default function CrossRegionCard() {
           </p>
           <InsightList items={leadLag} privateTip={privateTip} />
         </>
+      )}
+
+      {/* 同意门(P2 §2.2):默认只在这里能看;开启后才把涉及健康/财务/位置的跨区关联主动推到今天 */}
+      {ready && (insights.length > 0 || leadLag.length > 0) && (
+        <button type="button" className="nesio-xr-consent" onClick={toggleSensitivePush} aria-pressed={pushSensitive}>
+          <span className="nesio-xr-consent-box" aria-hidden>{pushSensitive ? '✓' : ''}</span>
+          <span>{L(dict,
+            '把涉及健康/财务/位置的跨区关联也主动推到「今天」(默认只在这里看)',
+            'Also surface health/finance/location cross-domain links on Today (off by default; view-only here)')}</span>
+        </button>
       )}
     </div>
   );

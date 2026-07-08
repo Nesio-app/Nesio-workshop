@@ -35,10 +35,12 @@ import {
   inventoryFindingsToGuidanceEvents,
   moodFindingsToGuidanceEvents,
   relationshipFindingsToGuidanceEvents,
+  crossRegionToGuidanceEvents,
   type WeatherSnapshot,
   decCardsToGuidanceEvents,
 } from '@/lib/platform/guidance-engine/source-adapters';
 import { computeDomainFindings } from '@/lib/portal/domain-insights';
+import { buildCrossRegionDeliverables } from '@/lib/platform/cross-region/deliver';
 import { cloudSignalRowsToSignals, type CloudSignalRow } from '@/lib/life-domain/signal-search';
 import { isProactiveCardDismissed, type ProactiveCardData, registerDecCards } from './proactive-types';
 
@@ -185,6 +187,8 @@ export function useTodayData(canUsePrivateData: boolean) {
               ...inventoryFindingsToGuidanceEvents(df.inventory),
               ...moodFindingsToGuidanceEvents(df.mood),
               ...relationshipFindingsToGuidanceEvents(df.relationship),
+              // 跨区 P2:已过同意/新鲜度/可打断性/预算门的跨区关联,进七层管线主动投递
+              ...crossRegionToGuidanceEvents(buildCrossRegionDeliverables(now)),
             ];
           })(),
         ];

@@ -43,6 +43,14 @@ const COLUMNS: ColumnMeta[] = [
 
 const META = new Map(COLUMNS.map((c) => [c.key, c]));
 
+/** 检测输入用的列三元组(key/domain/kind),投递层复用同一列表。 */
+export const CROSS_REGION_COLUMNS = COLUMNS.map((c) => ({ key: c.key, domain: c.domain, kind: c.kind }));
+
+/** 列的展示名(投递层成句复用,避免重复列表)。 */
+export function columnLabel(key: string, zh: boolean): string {
+  return labelOf(key, zh);
+}
+
 export interface CrossRegionInsight {
   /** 稳定 id(去重/冷却用):两列 + 类型,无序 */
   id: string;

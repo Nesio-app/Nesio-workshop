@@ -345,6 +345,11 @@ export function relationshipFindingsToGuidanceEvents(
   return insightsToGuidanceEvents('relationship', '🤝', '人缘', items);
 }
 
+// 跨区(cross-region P2):已过同意/新鲜度/可打断性/预算门的跨区关联 → 域洞察,经七层管线。
+export function crossRegionToGuidanceEvents(items: readonly DomainInsightItem[]): GuidanceEvent[] {
+  return insightsToGuidanceEvents('cross_region', '🔗', '跨区', items);
+}
+
 // ── Object context (物品关联情境) ─────────────────────────────────────────────
 
 // Context keywords to match against object names/tags
