@@ -257,6 +257,13 @@ html {
   scroll-behavior: smooth;
 }
 
+/* 全局横向漂移防线:页面永不超出手机屏宽。用 clip(非 hidden)——不建立滚动容器,
+   不影响 position: sticky / fixed 的底部导航。任何子元素误溢出都被裁掉而非把整页拉宽。 */
+html, body {
+  overflow-x: clip;
+  max-width: 100%;
+}
+
 body {
   @apply bg-cream text-charcoal antialiased;
 }
@@ -5037,6 +5044,7 @@ html[data-portal-theme="night"] .nesio-today-btn--ghost {
 .nesio-memory-scroll {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden; /* 竖向滚动容器绝不横滚:堵住「页面漂移/超出屏幕」 */
   padding: 0.5rem 1.1rem calc(5.5rem + env(safe-area-inset-bottom));
   -webkit-overflow-scrolling: touch;
 }
