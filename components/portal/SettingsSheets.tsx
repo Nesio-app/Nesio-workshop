@@ -276,19 +276,33 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
   // 免费最大化·Google 扩展授权:免费云备份到用户自己的 Google Drive(appDataFolder)
   const [driveState, setDriveState] = useState<'idle' | 'busy' | 'done' | 'error'>('idle');
   const [driveMsg, setDriveMsg] = useState('');
+  // 备份目的地选择器:'drive'=Google Drive(免费)/ 'nesio'=Nesio 云(兜底)。默认免费的 Drive。
+  const [backupDest, setBackupDest] = useState<'drive' | 'nesio'>('drive');
+  useEffect(() => {
+    try { const v = localStorage.getItem('nesio-backup-dest'); if (v === 'nesio' || v === 'drive') setBackupDest(v); } catch { /* ignore */ }
+  }, []);
+  const pickBackupDest = (d: 'drive' | 'nesio') => {
+    setBackupDest(d);
+    try { localStorage.setItem('nesio-backup-dest', d); } catch { /* ignore */ }
+  };
 
   async function handleDriveBackup() {
     setDriveState('busy'); setDriveMsg('');
     const { pushBackupToDrive } = await import('@/lib/portal/drive-backup');
     const r = await pushBackupToDrive();
     if (r.ok) { setDriveState('done'); setDriveMsg(L(dict, '✓ 已免费备份到你的 Google Drive', '✓ Backed up free to your Google Drive')); }
-    else {
+    else if (r.error === 'not_connected') {
+      // 兜底:没连 Google → 自动落回 Nesio 云(用户要求「我们的云兜底」)
+      setDriveState('idle'); setDriveMsg(L(dict, '未连接 Google,改用 Nesio 云…', 'Google not connected — using Nesio cloud…'));
+      await handleCloudBackup();
+    } else {
       setDriveState('error');
-      setDriveMsg(r.error === 'not_connected'
-        ? L(dict, '先在「数据接入」连接 Google（日历或 Gmail）再备份', 'Connect Google (Calendar or Gmail) under Connectors first')
-        : L(dict, '备份到 Drive 没成功 —— 稍后再试或用「导出完整备份」', "Drive backup didn't go through — try later or use Export full backup"));
+      setDriveMsg(L(dict, '备份到 Drive 没成功 —— 稍后再试或用「导出完整备份」', "Drive backup didn't go through — try later or use Export full backup"));
     }
   }
+  // 备份/恢复走用户选的目的地(Drive 失败自动兜底 Nesio 已在 handleDriveBackup 内)
+  const handleBackupChosen = () => (backupDest === 'drive' ? handleDriveBackup() : handleCloudBackup());
+  const handleRestoreChosen = () => (backupDest === 'drive' ? handleDriveRestore() : handleCloudRestore());
   async function handleDriveRestore() {
     if (!confirm(L(dict, '从 Google Drive 恢复:把云端备份合并回本机(仅补缺,不覆盖已有)。完成后自动刷新。继续?', 'Restore from Google Drive: merges the backup into this device (fills gaps, keeps existing). Refreshes when done. Continue?'))) return;
     setDriveState('busy'); setDriveMsg('');
@@ -488,16 +502,36 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
         {L(dict, '导出完整备份（含项目/情绪/设置等全部本地数据）', 'Export full backup (projects, moods, settings — all local data)')}
       </button>
 
-      {/* 云备份(付费,规划中):一键把本机全部 durable 数据推到你的云账户,换机不丢。
-          未解锁/未登录/超限都渲染明确失败态(设计红线:每个异步动作都要可见失败)。 */}
-      <button type="button" className="nesio-settings-action-btn" onClick={handleCloudBackup} disabled={cloudState === 'pushing'}>
-        {cloudState === 'pushing'
-          ? L(dict, '正在备份到云…', 'Backing up to cloud…')
-          : `${L(dict, '备份到云 · 换手机不丢', 'Back up to cloud · survive a new phone')}${cloudEntitled ? '' : L(dict, ' · 付费', ' · Paid')}`}
+      {/* 云备份:目的地选择器(Google Drive 免费 / Nesio 云兜底)。一键把本机全部 durable
+          数据推到所选云,换机不丢。每个异步动作都渲染明确失败态(设计红线)。 */}
+      <p style={{ fontSize: '0.78rem', color: 'var(--portal-muted)', margin: '0.6rem 0 0.3rem' }}>{L(dict, '备份到哪里', 'Back up to')}</p>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
+        {([['drive', L(dict, '☁ Google Drive · 免费', '☁ Google Drive · Free')], ['nesio', L(dict, `☁ Nesio 云${cloudEntitled ? '' : L(dict, ' · 付费', ' · Paid')}`, `☁ Nesio cloud${cloudEntitled ? '' : ' · Paid'}`)]] as const).map(([d, label]) => (
+          <button key={d} type="button" onClick={() => pickBackupDest(d)}
+            style={{ flex: 1, padding: '0.4rem 0.5rem', borderRadius: 10, fontSize: '0.8rem', cursor: 'pointer',
+              border: `1px solid ${backupDest === d ? 'var(--portal-accent-border)' : 'var(--portal-line)'}`,
+              background: backupDest === d ? 'var(--portal-accent-soft-md)' : 'transparent',
+              color: backupDest === d ? 'var(--portal-ink)' : 'var(--portal-muted)' }}>
+            {label}
+          </button>
+        ))}
+      </div>
+      <p style={{ fontSize: '0.7rem', color: 'var(--portal-muted)', margin: '0 0 0.4rem' }}>
+        {backupDest === 'drive'
+          ? L(dict, '存到你自己的 Google Drive(免费,私有文件夹);没连 Google 会自动改用 Nesio 云兜底。', 'Saved to your own Google Drive (free, private folder); falls back to Nesio cloud if Google isn\'t connected.')
+          : L(dict, '存到 Nesio 云(付费/规划中)。', 'Saved to Nesio cloud (paid/coming soon).')}
+      </p>
+
+      <button type="button" className="nesio-settings-action-btn" onClick={handleBackupChosen} disabled={cloudState === 'pushing' || driveState === 'busy'}>
+        {(cloudState === 'pushing' || driveState === 'busy') ? L(dict, '正在备份…', 'Backing up…') : L(dict, '备份 · 换机不丢', 'Back up · survive a new phone')}
       </button>
+      <button type="button" className="nesio-settings-action-btn" onClick={handleRestoreChosen} disabled={cloudRestoreState === 'pulling' || driveState === 'busy'}>
+        {(cloudRestoreState === 'pulling') ? L(dict, '正在恢复…', 'Restoring…') : L(dict, '从云恢复', 'Restore from cloud')}
+      </button>
+      {/* 状态:仅当前所用目的地会填充 */}
       {cloudState === 'done' && (
         <p style={{ fontSize: '0.75rem', marginTop: 4, color: 'var(--status-go)' }}>
-          {L(dict, '✓ 已备份到云', '✓ Backed up to cloud')}{cloudBackupAt ? ` · ${new Date(cloudBackupAt).toLocaleString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}` : ''}
+          {L(dict, '✓ 已备份到 Nesio 云', '✓ Backed up to Nesio cloud')}{cloudBackupAt ? ` · ${new Date(cloudBackupAt).toLocaleString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}` : ''}
         </p>
       )}
       {cloudState === 'error' && cloudError && (
@@ -505,30 +539,11 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
           {cloudErrorText(cloudError)}
         </p>
       )}
-      {cloudState === 'idle' && cloudBackupAt && (
-        <p style={{ fontSize: '0.7rem', marginTop: 4, color: 'var(--portal-muted)' }}>
-          {L(dict, '上次云备份', 'Last cloud backup')} · {new Date(cloudBackupAt).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'numeric', day: 'numeric' })}
-        </p>
-      )}
-
-      {/* 从云恢复:拉回最近一次云备份并合并回本机(IDB/localStorage 分流恢复,完成后 reload) */}
-      <button type="button" className="nesio-settings-action-btn" onClick={handleCloudRestore} disabled={cloudRestoreState === 'pulling'}>
-        {cloudRestoreState === 'pulling' ? L(dict, '正在从云恢复…', 'Restoring from cloud…') : L(dict, '从云恢复', 'Restore from cloud')}
-      </button>
       {cloudRestoreState === 'error' && cloudRestoreError && (
         <p style={{ fontSize: '0.75rem', marginTop: 4, color: cloudRestoreError === 'entitlement_required' || cloudRestoreError === 'no_backup' ? 'var(--portal-muted)' : 'var(--status-risk)' }}>
           {cloudRestoreErrorText(cloudRestoreError)}
         </p>
       )}
-
-      {/* 免费最大化·Google 扩展授权:免费备份到用户自己的 Google Drive(appDataFolder),
-          无需付费 entitlement。连了 Google 即可用;失败态可见(设计红线)。 */}
-      <button type="button" className="nesio-settings-action-btn" onClick={handleDriveBackup} disabled={driveState === 'busy'}>
-        {driveState === 'busy' ? L(dict, '正在备份到 Google Drive…', 'Backing up to Google Drive…') : L(dict, '免费备份到 Google Drive · 换机不丢', 'Back up free to Google Drive · survive a new phone')}
-      </button>
-      <button type="button" className="nesio-settings-action-btn" onClick={handleDriveRestore} disabled={driveState === 'busy'}>
-        {L(dict, '从 Google Drive 恢复', 'Restore from Google Drive')}
-      </button>
       {driveMsg && <p style={{ fontSize: '0.75rem', marginTop: 4, color: driveState === 'error' ? 'var(--status-risk)' : 'var(--status-go)' }}>{driveMsg}</p>}
 
       <button type="button" className="nesio-settings-action-btn" onClick={() => importRef.current?.click()}>

@@ -20,6 +20,7 @@ Auth legend:
 |---|---|---|
 | POST /api/portal/chat | guard | 20/min |
 | POST /api/portal/inventory-extract | guard | 20/min |
+| POST /api/portal/person-extract | guard | 20/min |
 | POST /api/portal/tts | guard | 10/min |
 | POST /api/portal/daily-brief | guard | 15/min |
 | POST /api/portal/guidance-language | guard | 20/min |
@@ -52,7 +53,7 @@ Auth legend:
 | POST /api/portal/drive | Google OAuth token (drive.appdata) — 免费云备份到用户 Drive |
 | GET /api/portal/drive | Google OAuth token (drive.appdata) — 拉回云备份 |
 | GET /api/portal/tasks | Google OAuth token (tasks) — 读 Google Tasks 待办 |
-| GET /api/portal/people | Google OAuth token (contacts.readonly) — 读通讯录(发件人富化) |
+| GET /api/portal/people | Google OAuth token (contacts.readonly) — 读通讯录→person 节点(人缘管理);runPeopleSync 消费 |
 | GET /api/auth/session | open (reports session state) |
 
 ## OAuth flows (pre-auth by design)

@@ -563,6 +563,21 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       }
     } catch { allOk = false; parts.push(L(dict, '邮件:网络错误', 'Mail: network error')); }
 
+    // 通讯录(People)→ 关系 tab 的 person 节点(人缘管理)
+    try {
+      const { runPeopleSync } = await import('@/lib/portal/connector-sync');
+      const p = await runPeopleSync();
+      if (p.ok) {
+        parts.push(L(dict, `通讯录:导入 ${p.imported}、更新 ${p.updated}`, `Contacts: +${p.imported}, updated ${p.updated}`));
+      } else if (p.error === 'not_connected') {
+        allOk = false; reauth = true;
+        parts.push(L(dict, '通讯录:授权不含通讯录权限,点「重新授权」勾上「查看通讯录」', 'Contacts: consent lacks contacts scope — reauthorize and check "See your contacts"'));
+      } else {
+        allOk = false;
+        parts.push(L(dict, '通讯录:没同步上(可能 People API 未启用,去 console 库里启用)', 'Contacts: not synced (enable People API in Google Cloud Library)'));
+      }
+    } catch { allOk = false; parts.push(L(dict, '通讯录:网络错误', 'Contacts: network error')); }
+
     saveConnectorState('google', true);
     setConnected((p) => ({ ...p, google: true }));
     setOauthSyncResult((p) => ({ ...p, google: { ok: allOk, msg: allOk ? L(dict, '同步成功', 'Synced') : L(dict, '部分同步失败', 'Partly failed'), detail: parts.join('\n'), needsReauth: reauth } }));

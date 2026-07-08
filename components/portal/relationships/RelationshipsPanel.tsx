@@ -17,12 +17,20 @@ import {
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
+import RelationshipDetailSheet from './RelationshipDetailSheet';
+import FamilySummary from './FamilySummary';
+import PersonExtractSheet from './PersonExtractSheet';
+import { buildFamilyDigest } from '@/lib/portal/family-digest';
 
 const GROUPS: Closeness[] = ['core', 'close', 'acquaintance'];
+const FAMILY_RE = /家人|家庭|family/i;
 
 export default function RelationshipsPanel() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [openKey, setOpenKey] = useState<string | null>(null);
+  const [activeGroup, setActiveGroup] = useState<string | null>(null);
+  const [extractOpen, setExtractOpen] = useState(false);
 
   const rebuild = () => setContacts(buildRelationships(getLifeGraph()));
 
@@ -30,7 +38,11 @@ export default function RelationshipsPanel() {
     rebuild();
     const onUpdate = () => rebuild();
     window.addEventListener('nesio-life-graph-updated', onUpdate);
-    return () => window.removeEventListener('nesio-life-graph-updated', onUpdate);
+    window.addEventListener('nesio-person-records-updated', onUpdate);
+    return () => {
+      window.removeEventListener('nesio-life-graph-updated', onUpdate);
+      window.removeEventListener('nesio-person-records-updated', onUpdate);
+    };
   }, []);
 
   const onContacted = (key: string) => {
@@ -50,25 +62,50 @@ export default function RelationshipsPanel() {
     );
   }
 
-  const dueList = contacts.filter((c) => c.reachOut);
+  // Google 联系人分组(家人置顶),用于按组筛选
+  const allGroups = Array.from(new Set(contacts.flatMap((c) => c.groups)));
+  allGroups.sort((a, b) => (FAMILY_RE.test(b) ? 1 : 0) - (FAMILY_RE.test(a) ? 1 : 0) || a.localeCompare(b, 'zh'));
+  const shown = activeGroup ? contacts.filter((c) => c.groups.includes(activeGroup)) : contacts;
+  const dueList = shown.filter((c) => c.reachOut);
+  const familyDigest = buildFamilyDigest(contacts);
 
   return (
     <div className="nesio-health-dash">
-      <p className="nesio-health-updated">
-        {L(dict, `${contacts.length} 个联系人 · ${dueList.length} 个该联系`, `${contacts.length} people · ${dueList.length} to reach out`)}
-      </p>
+      <div className="nesio-rel-head-row">
+        <p className="nesio-health-updated" style={{ margin: 0 }}>
+          {L(dict, `${shown.length} 个联系人 · ${dueList.length} 个该联系`, `${shown.length} people · ${dueList.length} to reach out`)}
+        </p>
+        <button type="button" className="nesio-rel-log-btn" onClick={() => setExtractOpen(true)}>
+          {L(dict, '📷 记给某人', '📷 Log to…')}
+        </button>
+      </div>
+
+      {allGroups.length > 0 && (
+        <div className="nesio-rel-chips" role="tablist" aria-label={L(dict, '联系人分组', 'Contact groups')}>
+          <button type="button" role="tab" aria-selected={!activeGroup} className={`nesio-rel-chip${!activeGroup ? ' nesio-rel-chip--on' : ''}`} onClick={() => setActiveGroup(null)}>
+            {L(dict, '全部', 'All')}
+          </button>
+          {allGroups.map((g) => (
+            <button key={g} type="button" role="tab" aria-selected={activeGroup === g} className={`nesio-rel-chip${activeGroup === g ? ' nesio-rel-chip--on' : ''}`} onClick={() => setActiveGroup(g)}>
+              {FAMILY_RE.test(g) ? `👪 ${g}` : g}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {!activeGroup && <FamilySummary digest={familyDigest} onOpen={setOpenKey} />}
 
       {dueList.length > 0 && (
         <div className="nesio-fit-panel" style={{ marginTop: '0.4rem' }}>
           <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>{L(dict, '该联系了', 'Time to reach out')}</p>
           {dueList.slice(0, 6).map((c) => (
             <div key={c.key} className="nesio-rel-due-row">
-              <div className="nesio-rel-due-info">
+              <button type="button" className="nesio-rel-due-info nesio-rel-open" onClick={() => setOpenKey(c.key)}>
                 <span className="nesio-rel-name">{c.name}</span>
                 <span className="nesio-rel-sub">
                   {c.relation ? `${c.relation} · ` : ''}{lastContactLabel(c, dict)}
                 </span>
-              </div>
+              </button>
               <button type="button" className="nesio-rel-touch-btn" onClick={() => onContacted(c.key)}>
                 {L(dict, '联系过了', 'Reached out')}
               </button>
@@ -81,7 +118,7 @@ export default function RelationshipsPanel() {
       )}
 
       {GROUPS.map((g) => {
-        const items = contacts.filter((c) => c.closeness === g);
+        const items = shown.filter((c) => c.closeness === g);
         if (!items.length) return null;
         return (
           <div key={g}>
@@ -90,11 +127,25 @@ export default function RelationshipsPanel() {
             </p>
             <div className="nesio-rel-grid">
               {items.map((c) => (
-                <div key={c.key} className={`nesio-rel-card${c.reachOut ? ' nesio-rel-card--due' : ''}`}>
-                  <span className="nesio-rel-name">{c.name}</span>
+                <div
+                  key={c.key}
+                  role="button"
+                  tabIndex={0}
+                  className={`nesio-rel-card nesio-rel-open${c.reachOut ? ' nesio-rel-card--due' : ''}`}
+                  onClick={() => setOpenKey(c.key)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpenKey(c.key); } }}
+                >
+                  <span className="nesio-rel-name">
+                    {c.groups.some((x) => FAMILY_RE.test(x)) && <span aria-label={L(dict, '家人', 'Family')}>👪 </span>}
+                    {c.name}
+                  </span>
                   <span className="nesio-rel-sub">{c.relation || (dict === 'en' ? `mentioned ${c.mentions}×` : `提到 ${c.mentions} 次`)}</span>
                   <span className="nesio-rel-last">{lastContactLabel(c, dict)}</span>
-                  <button type="button" className="nesio-rel-touch-btn nesio-rel-touch-btn--sm" onClick={() => onContacted(c.key)}>
+                  <button
+                    type="button"
+                    className="nesio-rel-touch-btn nesio-rel-touch-btn--sm"
+                    onClick={(e) => { e.stopPropagation(); onContacted(c.key); }}
+                  >
                     {L(dict, '联系过了', 'Reached out')}
                   </button>
                 </div>
@@ -107,6 +158,9 @@ export default function RelationshipsPanel() {
       <p className="nesio-settings-option-hint" style={{ marginTop: '1rem', textAlign: 'center' }}>
         {L(dict, '只存本机 · 从你的记忆和邮件推出,非 AI', 'On-device only · derived from your notes and email, not AI')}
       </p>
+
+      {openKey && <RelationshipDetailSheet contactKey={openKey} onClose={() => setOpenKey(null)} />}
+      <PersonExtractSheet open={extractOpen} onClose={() => setExtractOpen(false)} />
     </div>
   );
 }

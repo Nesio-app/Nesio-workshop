@@ -25,6 +25,7 @@ export interface Contact {
   cadenceDays: number;           // 期望联系节奏
   reachOut: boolean;             // 超期该联系
   overdueRatio: number;          // daysSince / cadence,排序用
+  groups: string[];              // Google 联系人分组(家人/同事/自建组),关系 tab 按此筛选
 }
 
 const CADENCE: Record<Closeness, number> = { core: 14, close: 30, acquaintance: 90 };
@@ -32,6 +33,40 @@ const CADENCE: Record<Closeness, number> = { core: 14, close: 30, acquaintance: 
 // 关系词 → 亲疏。中英混合匹配。
 const CORE_RE = /家人|亲人|配偶|伴侣|老婆|老公|妻|夫|父|母|爸|妈|儿|女|兄|弟|姐|妹|family|spouse|partner|wife|husband|mother|father|mom|dad|son|daughter|brother|sister|parent/i;
 const CLOSE_RE = /朋友|挚友|好友|闺蜜|哥们|死党|friend|bestie|buddy/i;
+// 结构性/非人关系:这些 relation 的 targetId 不是人(品牌架构/文档/物品归属),不进联系人。
+const NON_PERSON_REL = /架构|品牌|文档|包含|定义|属于|归属|拥有|收纳|容器|owned_by|contains|part_of|belongs|includes|defines|architecture|brand|document|category|object/i;
+
+// 非人类「联系人」:邮件发件人里大量是机器人/机构/通知/账单/银行卡,不是你认识的人 ——
+// 关系管理只保留真人(用户实测:vercel[bot]、Platinum Card from American Express、Chase® Ink® 漏进列表)。
+// 显示名强信号(机器人标记/商标符/no-reply/通知/账单/多词银行卡品牌);单词银行名(Chase/Citi/Visa)
+// 是常见姓氏,不据此过滤,靠 ® / card / bank / 邮箱角色地址兜底,避免误杀真人。
+// 显示名的公司/机构强信号:商标符、机器人、no-reply、账单、以及公司实体标记(.com/Inc/LLC/
+// 投资/日历/团队…)。用户实测:Calendar (Google Calendar)、Fidelity Investments、Amazon.com 漏进。
+const NON_HUMAN_NAME = /\[bot\]|®|™|no[-\s.]?reply|do[-\s.]?not[-\s.]?reply|noreply|donotreply|\bnotifications?\b|\bnewsletter\b|\bstatements?\b|\breceipts?\b|\binvoice\b|mailer[-\s.]?daemon|postmaster|american express|capital one|wells fargo|mastercard|\bcard\b|\bbank\b|\.com\b|\.net\b|\.org\b|\binc\b|\bllc\b|\bltd\b|\bcorp\b|investments?|\bcalendar\b|\bteam\b|\bstore\b/i;
+// 邮箱角色地址(local part):这些是机构群发/通知地址,不是个人。
+const NON_HUMAN_EMAIL_LOCAL = /^(no-?reply|do-?not-?reply|noreply|donotreply|notify|notifications?|alerts?|mailer-daemon|postmaster|bounce|info|support|hello|team|sales|news|newsletter|updates?|accounts?|billing|service|member|statements?|automated|system|admin|marketing|contact|receipts?|orders?)$/i;
+
+// 个人邮箱服务商:发件人若来自这些域,才把「未在通讯录里」的邮件发件人当新联系人 ——
+// 公司/机构域(fidelity.com / amazon.com / google.com …)的发件人不新建联系人(避免公司刷进人缘)。
+const PERSONAL_EMAIL_DOMAIN = new Set([
+  'gmail.com', 'googlemail.com', 'outlook.com', 'hotmail.com', 'live.com', 'msn.com',
+  'icloud.com', 'me.com', 'mac.com', 'yahoo.com', 'ymail.com', 'aol.com',
+  'qq.com', '163.com', '126.com', 'foxmail.com', 'sina.com', '139.com',
+  'proton.me', 'protonmail.com', 'gmx.com', 'zoho.com', 'hey.com',
+]);
+
+function emailDomain(key: string): string {
+  const at = key.indexOf('@');
+  return at > 0 ? key.slice(at + 1).toLowerCase() : '';
+}
+
+/** 判断一个候选联系人是否明显不是真人(机器人/机构/通知/账单/公司发件人)。 */
+function isLikelyNonHuman(name: string, key: string): boolean {
+  if (NON_HUMAN_NAME.test(name)) return true;
+  const at = key.indexOf('@');
+  if (at > 0 && NON_HUMAN_EMAIL_LOCAL.test(key.slice(0, at))) return true;
+  return false;
+}
 
 /** 从 "Linda Smith <linda@x.com>" 或裸邮箱里取显示名 + 归一 key。 */
 export function parseContactFrom(from: string): { name: string; key: string } | null {
@@ -118,12 +153,15 @@ function closenessOf(a: Acc): Closeness {
 /** 从记忆图谱推出联系人清单。now 可注入以便测试。 */
 export function buildRelationships(nodes: LifeNode[], now = Date.now(), contactLog = loadContactLog()): Contact[] {
   const acc = new Map<string, Acc>();
+  const groupsByKey = new Map<string, Set<string>>();  // key → Google 分组名(排除内部标记)
   const bump = (rawName: string, rawKey: string, date: string | null, relation: string | null) => {
     const name = rawName.trim();
     const key = rawKey.trim().toLowerCase();
     if (!key || key.length < 2) return;
     // 过滤明显不是人的 key(纯数字/系统标记)
     if (/^\d+$/.test(key)) return;
+    // 过滤机器人/机构/通知/账单发件人 —— 关系管理只留真人
+    if (isLikelyNonHuman(name, key)) return;
     const cur = acc.get(key) || { key, name, relation: null, mentions: 0, last: null, relationHit: null, times: [] };
     cur.mentions += 1;
     cur.last = newer(cur.last, date);
@@ -137,27 +175,52 @@ export function buildRelationships(nodes: LifeNode[], now = Date.now(), contactL
     acc.set(key, cur);
   };
 
+  // 预扫已知真人(person 节点)的身份 key —— 邮件发件人命中则允许富化(即便公司邮箱)。
+  const knownPersonKeys = new Set<string>();
+  for (const n of nodes) {
+    if (n.type === 'person' && n.name) {
+      knownPersonKeys.add(n.name.trim().toLowerCase());
+      const em = typeof n.attributes?.email === 'string' ? n.attributes.email.toLowerCase() : '';
+      if (em) knownPersonKeys.add(em);
+    }
+  }
+
   for (const n of nodes) {
     const nodeDate = n.lastConfirmedAt || (typeof n.attributes?.date === 'string' ? n.attributes.date : null) || n.createdAt;
     const nodeIso = toIso(nodeDate);
 
-    // email 节点:from = 对方
+    // email 节点:from = 对方。但邮件发件人大量是公司/机构 —— 只在「已是通讯录里的人」或
+    // 「来自个人邮箱服务商」时才当联系人;公司域(fidelity.com/amazon.com…)的陌生发件人不新建。
     if (n.source === 'email' && typeof n.attributes?.from === 'string') {
       const c = parseContactFrom(n.attributes.from);
-      if (c) bump(c.name, c.key, toIso(n.attributes.date) || nodeIso, null);
+      if (c && !isLikelyNonHuman(c.name, c.key)) {
+        const known = knownPersonKeys.has(c.key) || knownPersonKeys.has(c.name.trim().toLowerCase());
+        const personal = PERSONAL_EMAIL_DOMAIN.has(emailDomain(c.key));
+        if (known || personal) bump(c.name, c.key, toIso(n.attributes.date) || nodeIso, null);
+      }
     }
 
     // person 节点本身
     if (n.type === 'person' && n.name) {
       bump(n.name, n.name, nodeIso, null);
+      // 分组标签(排除内部「联系人」标记)→ 供关系 tab 按组筛选;名字与邮箱两个 key 都记
+      const gs = (n.tags || []).filter((t) => t && t !== '联系人');
+      if (gs.length) {
+        const addGroups = (k: string) => { const s = groupsByKey.get(k) || new Set<string>(); gs.forEach((g) => s.add(g)); groupsByKey.set(k, s); };
+        addGroups(n.name.trim().toLowerCase());
+        const em = typeof n.attributes?.email === 'string' ? n.attributes.email.toLowerCase() : '';
+        if (em) addGroups(em);
+      }
     }
 
-    // relations:targetId 常是人名,relation 是关系词
+    // relations:targetId 常是人名,relation 是关系词。但结构性关系(品牌架构/文档/
+    // 包含/定义/物品归属)的 targetId 不是人 —— 跳过,否则 demo 种子(Nesio 系统/
+    // TreasureBox/Nesio 指南)会漏成假联系人。
     for (const r of n.relations || []) {
       if (!r.targetId) continue;
-      // 只收指向人的关系(排除 owned_by 之类物品关系时,仍把人名收进来但不加亲疏)
       const rel = r.relation || '';
-      bump(r.targetId, r.targetId, nodeIso, rel && rel !== 'owned_by' ? rel : null);
+      if (NON_PERSON_REL.test(rel)) continue;
+      bump(r.targetId, r.targetId, nodeIso, rel ? rel : null);
     }
   }
 
@@ -174,6 +237,7 @@ export function buildRelationships(nodes: LifeNode[], now = Date.now(), contactL
     out.push({
       key: a.key, name: a.name, relation: a.relation, closeness,
       mentions: a.mentions, lastContactAt: last, daysSince, cadenceDays, reachOut, overdueRatio,
+      groups: Array.from(groupsByKey.get(a.key) || []),
     });
   }
 

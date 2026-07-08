@@ -180,17 +180,71 @@ export async function runGmailSync(opts?: { force?: boolean }): Promise<GmailSyn
 
 /* ---------- 全源同步(记忆页下拉刷新) ---------- */
 
-export interface SyncAllOutcome { id: 'calendar' | 'gmail' | 'flomo' | 'plaid'; ok: boolean; detail: [string, string] }
+export interface SyncAllOutcome { id: 'calendar' | 'gmail' | 'flomo' | 'plaid' | 'people'; ok: boolean; detail: [string, string] }
 
 /** 依次同步所有已接入源;每源一行结果(未配置/未连接也如实报,不静默)。 */
+/* ---------- Google 通讯录(People API)→ person 节点(人缘管理底料) ---------- */
+
+export interface PeopleSyncResult { ok: boolean; error?: string; imported: number; updated: number }
+
+/** 拉 Google 通讯录,灌成 life-graph person 节点(按邮箱/名字去重,已存在则补富化字段)。
+ *  关系 tab 读 person 节点即可显示;attributes 里带 email/photo/birthday 供人缘管理。 */
+export async function runPeopleSync(): Promise<PeopleSyncResult> {
+  try {
+    const res = await fetch('/api/portal/people');
+    if (res.status === 401) return { ok: false, error: 'not_connected', imported: 0, updated: 0 };
+    const data = await res.json().catch(() => null) as { ok?: boolean; contacts?: Array<{ name?: string; emails?: string[]; photo?: string; birthday?: string; groups?: string[] }> } | null;
+    if (!res.ok || !data?.ok) return { ok: false, error: 'people', imported: 0, updated: 0 };
+    const contacts = Array.isArray(data.contacts) ? data.contacts : [];
+    const { getLifeGraph, addLifeNode, updateLifeNode } = await import('@/lib/portal/life-graph');
+
+    // 既有 person 节点按邮箱/名字建索引,去重(带上 tags 以便分组标签合并)
+    type Idx = { id: string; attributes: Record<string, string | number | boolean | null>; tags?: string[] };
+    const byEmail = new Map<string, Idx>();
+    const byName = new Map<string, Idx>();
+    for (const n of getLifeGraph()) {
+      if (n.type !== 'person') continue;
+      const rec: Idx = { id: n.id, attributes: n.attributes, tags: n.tags };
+      const email = typeof n.attributes?.email === 'string' ? n.attributes.email.toLowerCase() : '';
+      if (email) byEmail.set(email, rec);
+      if (n.name) byName.set(n.name.toLowerCase(), rec);
+    }
+
+    let imported = 0; let updated = 0;
+    for (const c of contacts) {
+      const name = (c.name || '').trim();
+      const email = (c.emails?.[0] || '').toLowerCase();
+      if (!name && !email) continue;
+      const attrs: Record<string, string | number | boolean | null> = { contactSource: 'google' };
+      if (email) attrs.email = email;
+      if (c.photo) attrs.photo = c.photo;
+      if (c.birthday) attrs.birthday = c.birthday;
+      // 分组名进 tags(去重),关系 tab 据此按组筛选、置顶家庭
+      const groups = Array.isArray(c.groups) ? c.groups.filter((g): g is string => typeof g === 'string' && !!g) : [];
+      const tags = Array.from(new Set(['联系人', ...groups]));
+      const existing = (email && byEmail.get(email)) || byName.get(name.toLowerCase());
+      if (existing) {
+        const mergedTags = Array.from(new Set([...(existing.tags || []), ...tags]));
+        updateLifeNode(existing.id, { attributes: { ...existing.attributes, ...attrs }, tags: mergedTags });
+        updated++;
+      } else {
+        addLifeNode({ type: 'person', name: name || email, source: 'system', confidence: 0.9, attributes: attrs, relations: [], tags });
+        imported++;
+      }
+    }
+    return { ok: true, imported, updated };
+  } catch { return { ok: false, error: 'network', imported: 0, updated: 0 }; }
+}
+
 export async function syncAllConnectors(): Promise<SyncAllOutcome[]> {
   const out: SyncAllOutcome[] = [];
-  const [cal, mail, flomo, plaid] = await Promise.all([
-    runCalendarSync(), runGmailSync({ force: true }), runFlomoSync(), runPlaidSync(),
+  const [cal, mail, flomo, plaid, people] = await Promise.all([
+    runCalendarSync(), runGmailSync({ force: true }), runFlomoSync(), runPlaidSync(), runPeopleSync(),
   ]);
   out.push({ id: 'calendar', ok: cal.ok, detail: cal.ok ? [`日历 ${cal.count} 条(新进记忆 ${cal.added})`, `Calendar ${cal.count} (${cal.added} new)`] : ['日历未同步(未连接或出错)', 'Calendar not synced'] });
   out.push({ id: 'gmail', ok: mail.ok, detail: mail.ok ? [`邮件读 ${mail.read} 封,提取 ${mail.extracted} 条`, `Mail read ${mail.read}, extracted ${mail.extracted}`] : ['邮件未同步(未连接或出错)', 'Mail not synced'] });
   out.push({ id: 'flomo', ok: flomo.ok, detail: flomo.ok ? [`Flomo 新增 ${flomo.fresh} 条`, `Flomo +${flomo.fresh}`] : ['Flomo 未配置', 'Flomo not configured'] });
   out.push({ id: 'plaid', ok: plaid.ok, detail: plaid.ok ? [`银行新增 ${plaid.fresh} 笔(共 ${plaid.total})`, `Bank +${plaid.fresh} (${plaid.total} total)`] : ['银行未连接', 'Bank not linked'] });
+  out.push({ id: 'people', ok: people.ok, detail: people.ok ? [`联系人导入 ${people.imported}、更新 ${people.updated}`, `Contacts +${people.imported}, updated ${people.updated}`] : ['通讯录未同步(未连接 Google)', 'Contacts not synced'] });
   return out;
 }

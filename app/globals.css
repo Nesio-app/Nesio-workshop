@@ -11776,6 +11776,88 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 .nesio-rel-card--due { border-color: color-mix(in srgb, var(--portal-cool-accent) 45%, transparent); }
 .nesio-rel-last { font-size: 0.74rem; color: var(--portal-muted); margin-top: 0.1rem; }
 
+/* ─── 关系 tab 头 + 记给某人入口(人缘 1c)─── */
+.nesio-rel-head-row { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; margin-top: 0.9rem; }
+.nesio-rel-log-btn {
+  flex: none; font-size: 0.78rem; font-weight: 600; padding: 0.3rem 0.7rem; border-radius: 999px;
+  background: var(--portal-accent-soft-md); color: var(--portal-blue-deep); border: 1px solid var(--portal-accent-border); cursor: pointer;
+}
+.nesio-rel-log-btn:active { background: var(--portal-accent-border); }
+
+/* ─── 联系人分组筛选(人缘㊃)─── */
+.nesio-rel-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.6rem 0 0.2rem; }
+.nesio-rel-chip {
+  font-size: 0.78rem; font-weight: 600; padding: 0.26rem 0.7rem; border-radius: 999px;
+  background: var(--glass-bg-solid); color: var(--portal-muted);
+  border: 1px solid var(--portal-line); cursor: pointer; transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.nesio-rel-chip--on { background: var(--portal-accent-soft-md); color: var(--portal-blue-deep); border-color: var(--portal-accent-border); }
+
+/* ─── 按人分类的数据(人缘㊄)─── */
+.nesio-rel-rec-head { display: flex; align-items: center; justify-content: space-between; }
+.nesio-rel-rec-add { font-size: 0.78rem; font-weight: 600; color: var(--portal-blue-deep); background: none; border: none; cursor: pointer; padding: 0.2rem 0; }
+.nesio-rel-rec-form { display: flex; flex-direction: column; gap: 0.45rem; background: var(--glass-bg-solid); border: 1px solid var(--portal-line); border-radius: 0.75rem; padding: 0.7rem; margin: 0.5rem 0; }
+.nesio-rel-rec-input { font: inherit; font-size: 0.85rem; padding: 0.5rem 0.6rem; border: 1px solid var(--portal-line); border-radius: 0.55rem; background: var(--sheet-opaque, #fff); color: var(--portal-ink); width: 100%; }
+.nesio-rel-rec-sensitive { font-size: 0.74rem; color: var(--status-gentle); background: var(--status-gentle-soft); border-radius: 0.5rem; padding: 0.4rem 0.55rem; margin: 0; }
+.nesio-rel-rec-list { display: flex; flex-direction: column; margin-top: 0.5rem; }
+.nesio-rel-rec-row { display: flex; align-items: flex-start; gap: 0.55rem; padding: 0.45rem 0; border-bottom: 1px solid var(--portal-line); }
+.nesio-rel-rec-row:last-child { border-bottom: none; }
+.nesio-rel-rec-ic { font-size: 1.05rem; flex: none; line-height: 1.4; }
+.nesio-rel-rec-main { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.nesio-rel-rec-title { font-size: 0.88rem; font-weight: 600; color: var(--portal-ink); }
+.nesio-rel-rec-sub { font-size: 0.76rem; color: var(--portal-muted); }
+.nesio-rel-rec-del { font-size: 0.85rem; color: var(--faint, var(--portal-muted)); background: none; border: none; cursor: pointer; flex: none; padding: 0 0.2rem; }
+
+/* ─── 家庭汇总(人缘㊅)─── */
+.nesio-fam-summary { background: var(--portal-accent-soft); border: 1px solid var(--portal-line); border-radius: 0.9rem; padding: 0.8rem 0.85rem; margin: 0.7rem 0 0.2rem; }
+.nesio-fam-members { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.nesio-fam-chip { display: inline-flex; align-items: center; gap: 0.4rem; background: var(--sheet-opaque, #fff); border: 1px solid var(--portal-line); border-radius: 999px; padding: 0.3rem 0.65rem; cursor: pointer; }
+.nesio-fam-chip-name { font-size: 0.82rem; font-weight: 600; color: var(--portal-ink); }
+.nesio-fam-chip-cats { display: inline-flex; gap: 0.3rem; font-size: 0.74rem; color: var(--portal-muted); }
+.nesio-fam-tl-row { display: flex; gap: 0.7rem; width: 100%; text-align: left; background: none; border: none; padding: 0.32rem 0; border-bottom: 1px solid var(--portal-line); cursor: pointer; }
+.nesio-fam-tl-row:last-child { border-bottom: none; }
+.nesio-fam-tl-row .nesio-rel-tl-text { font-size: 0.82rem; color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ─── 人物详情页(人缘㊁)─── */
+.nesio-rel-open { cursor: pointer; text-align: left; }
+button.nesio-rel-due-info { background: none; border: none; padding: 0; font: inherit; }
+.nesio-rel-card.nesio-rel-open { transition: border-color 0.15s, transform 0.1s; }
+.nesio-rel-card.nesio-rel-open:hover { border-color: var(--portal-accent-border); }
+.nesio-rel-card.nesio-rel-open:active { transform: scale(0.99); }
+.nesio-rel-detail-head {
+  display: flex; align-items: center; gap: 0.8rem;
+  padding: 0.4rem 0.2rem 0.9rem; border-bottom: 1px solid var(--portal-line);
+}
+.nesio-rel-avatar {
+  position: relative; flex: none; width: 56px; height: 56px; border-radius: 50%;
+  border: none; padding: 0; cursor: pointer; overflow: visible;
+  background: linear-gradient(135deg, #7c6ee6, var(--portal-blue-deep));
+  display: grid; place-items: center;
+}
+.nesio-rel-avatar-img { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; display: block; }
+.nesio-rel-avatar-initial { color: #fff; font-size: 1.5rem; font-weight: 600; }
+.nesio-rel-avatar-edit {
+  position: absolute; right: -2px; bottom: -2px; width: 20px; height: 20px; border-radius: 50%;
+  background: var(--portal-blue-deep); color: #fff; font-size: 0.66rem; display: grid; place-items: center;
+  box-shadow: 0 0 0 2px var(--sheet-opaque, #fff);
+}
+.nesio-rel-detail-id { min-width: 0; flex: 1; }
+.nesio-rel-detail-pills { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.35rem; }
+.nesio-rel-pill { font-size: 0.7rem; font-weight: 600; padding: 0.14rem 0.5rem; border-radius: 999px; background: var(--portal-accent-soft); color: var(--portal-blue-deep); }
+.nesio-rel-pill--fam { background: var(--portal-accent-soft-md); }
+.nesio-rel-pill--rel { background: var(--glass-bg-solid); color: var(--portal-muted); }
+.nesio-rel-pill--due { background: var(--status-gentle-soft); color: var(--status-gentle); }
+.nesio-rel-detail-err { font-size: 0.8rem; color: var(--status-risk); background: var(--status-risk-soft); border-radius: 0.6rem; padding: 0.5rem 0.7rem; margin: 0 0 0.8rem; }
+.nesio-rel-detail-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr)); gap: 0.5rem; margin-top: 0.9rem; }
+.nesio-rel-detail-tile { display: flex; align-items: center; gap: 0.45rem; background: var(--glass-bg-solid); border-radius: 0.7rem; padding: 0.5rem 0.6rem; min-width: 0; }
+.nesio-rel-detail-tile-ic { font-size: 1rem; flex: none; }
+.nesio-rel-detail-tile-lab { font-size: 0.78rem; color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nesio-rel-timeline { display: flex; flex-direction: column; }
+.nesio-rel-tl-row { display: flex; gap: 0.7rem; font-size: 0.82rem; padding: 0.3rem 0; border-bottom: 1px solid var(--portal-line); }
+.nesio-rel-tl-row:last-child { border-bottom: none; }
+.nesio-rel-tl-date { flex: none; width: 3.4rem; color: var(--portal-muted); font-variant-numeric: tabular-nums; }
+.nesio-rel-tl-text { color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 /* 批次 27:地点足迹 · Google 时间线样式 */
 .nesio-pt { display: flex; flex-direction: column; gap: 1.1rem; }
 .nesio-pt-daylabel { margin: 0 0 0.5rem; font-size: 0.72rem; font-weight: 700; color: var(--portal-muted); text-transform: uppercase; letter-spacing: 0.04em; }

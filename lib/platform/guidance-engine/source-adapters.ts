@@ -19,6 +19,7 @@ import type { FinanceFinding } from '@/lib/portal/finance-insight';
 import type { PlaceFinding } from '@/lib/portal/place-insight';
 import type { InventoryFinding } from '@/lib/portal/inventory';
 import type { MoodFinding } from '@/lib/portal/mood-insight';
+import type { RelationshipFinding } from '@/lib/portal/relationship-insight';
 import type { GuidanceEvent, GuidanceEventType } from './types';
 
 // ── Calendar ──────────────────────────────────────────────────────────────────
@@ -329,6 +330,19 @@ export function moodFindingsToGuidanceEvents(
     .filter((f) => f.severity === 'flag' || f.severity === 'attention')
     .map((f) => ({ id: f.id, severity: f.severity as 'flag' | 'attention', title: f.title, body: f.detail, cta: MOOD_CTA }));
   return insightsToGuidanceEvents('mood', '🌤', '心情', items);
+}
+
+// 人缘:relationshipFindings(该联系了/生日临近,人际域从严只出 attention)→ 域洞察。
+// warm-coach:软提示、不催促,出口给足(跳过/稍后由卡片机制自带)。
+const RELATIONSHIP_CTA: [string, string] = ['来自你自己的联系人和记忆;发条消息或先记一笔,都算维系。', 'From your own contacts and notes — a quick message or a note both count as staying close.'];
+
+export function relationshipFindingsToGuidanceEvents(
+  findings: readonly RelationshipFinding[],
+): GuidanceEvent[] {
+  const items: DomainInsightItem[] = findings
+    .filter((f) => f.severity === 'flag' || f.severity === 'attention')
+    .map((f) => ({ id: f.id, severity: f.severity as 'flag' | 'attention', title: f.title, body: f.detail, cta: RELATIONSHIP_CTA }));
+  return insightsToGuidanceEvents('relationship', '🤝', '人缘', items);
 }
 
 // ── Object context (物品关联情境) ─────────────────────────────────────────────
