@@ -21,6 +21,8 @@ import { loadClinical, type StoredClinical } from '@/lib/portal/clinical-store';
 import { readLaunchSurfaceContextFromBrowser } from '@/lib/portal/launch-surface.mjs';
 import { evaluateHealthFindings, type Severity } from '@/lib/portal/health-clinical';
 import { computeRiskScores, type RiskCategory } from '@/lib/portal/health-risk';
+import { buildMonthlyHealthReport, persistHealthReportToMemory, autoPersistLastMonthHealthReport, healthMonths } from '@/lib/portal/health-report';
+import { healthReportRichHtml } from '@/lib/portal/health-report-visual';
 
 const TREND_HEADLINE: Record<FitnessInsight['trend'], [string, string]> = {
   up: ['体能上升中', 'Fitness rising'], flat: ['体能维持中', 'Holding steady'], down: ['体能下降中', 'Fitness dipping'], unknown: ['数据积累中', 'Gathering data'],
@@ -389,6 +391,18 @@ export default function HealthDashboard() {
   const [clinical, setClinical] = useState<StoredClinical | null>(null);
   const [labMode, setLabMode] = useState(false);
 
+  const [reportMsg, setReportMsg] = useState(''); // 健康月报动作反馈(可见状态,不静默)
+  // 月初自动补生成上月健康月报并存记忆(每设备每月一次,幂等)。
+  // ⚠️ hooks 必须全部在下面的空态早退之前(hook 数量随渲染变化会让 React 整页抛错)。
+  useEffect(() => {
+    if (!data?.daily?.length) return;
+    try {
+      const outcome = autoPersistLastMonthHealthReport(data, new Date(), dict);
+      if (outcome === 'created') setReportMsg(L(dict, '已自动生成上月健康月报并存入记忆', 'Auto-saved last month\u2019s health report to memory'));
+    } catch { /* 自动补失败静默,手动入口仍在 */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
+
   useEffect(() => {
     setData(loadHealthMetrics());
     const onUpdate = () => setData(loadHealthMetrics());
@@ -493,6 +507,47 @@ export default function HealthDashboard() {
           </div>
         );
       })}
+      {/* ── 健康月报(对齐财务页形态:下载彩色 HTML / 存记忆 / 打印存 PDF) ── */}
+      {(() => {
+        const ym = healthMonths(data.daily)[0] ?? new Date().toISOString().slice(0, 7);
+        return (
+          <>
+            <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '健康月报', 'Monthly report')}</p>
+            <div className="nesio-fin-budget-add">
+              <button type="button" className="nesio-fin-flowopt" onClick={() => {
+                try {
+                  const blob = new Blob([healthReportRichHtml(data, ym, dict)], { type: 'text/html;charset=utf-8' });
+                  const a = document.createElement('a');
+                  a.href = URL.createObjectURL(blob);
+                  a.download = `health-report-${ym}.html`;
+                  document.body.appendChild(a); a.click(); a.remove();
+                  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+                  setReportMsg(L(dict, `已下载 ${ym} 彩色健康月报(.html,双击打开)`, `Colorful health report for ${ym} downloaded (.html)`));
+                } catch { setReportMsg(L(dict, '月报生成失败,请重试', 'Report failed — try again')); }
+              }}>{L(dict, '下载彩色月报', 'Download report')}</button>
+              <button type="button" className="nesio-fin-flowopt" onClick={() => {
+                try {
+                  const outcome = persistHealthReportToMemory(buildMonthlyHealthReport(data, ym, dict));
+                  setReportMsg(outcome === 'created'
+                    ? L(dict, `已把 ${ym} 健康月报存入记忆,「问一问」可检索`, `Health report ${ym} saved to memory`)
+                    : L(dict, `已更新记忆里的 ${ym} 健康月报`, `Updated the ${ym} health report in memory`));
+                } catch { setReportMsg(L(dict, '存入记忆失败,请重试', 'Save to memory failed — try again')); }
+              }}>{L(dict, '存入记忆', 'Save to memory')}</button>
+              <button type="button" className="nesio-fin-flowopt" onClick={() => {
+                try {
+                  const w = window.open('', '_blank');
+                  if (!w) { setReportMsg(L(dict, '弹窗被拦截,请允许弹窗后重试', 'Popup blocked — allow popups and retry')); return; }
+                  w.document.write(healthReportRichHtml(data, ym, dict));
+                  w.document.close();
+                  setTimeout(() => { try { w.focus(); w.print(); } catch { /* 用户手动打印 */ } }, 350);
+                  setReportMsg(L(dict, '已打开打印视图(打印 → 存为 PDF)', 'Print view opened (Print → Save as PDF)'));
+                } catch { setReportMsg(L(dict, '打印视图打开失败,请重试', 'Print view failed — try again')); }
+              }}>{L(dict, '打印 / 存 PDF', 'Print / PDF')}</button>
+            </div>
+            {reportMsg && <p className="nesio-settings-option-hint">{reportMsg}</p>}
+          </>
+        );
+      })()}
       <p className="nesio-settings-option-hint" style={{ marginTop: '1rem', textAlign: 'center' }}>
         {L(dict, '数据只存本机 · 取最近导入的最新读数;要更全历史趋势可多导几次', 'On-device only · latest readings from your import')}
       </p>
