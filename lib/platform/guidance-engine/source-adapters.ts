@@ -20,6 +20,7 @@ import type { PlaceFinding } from '@/lib/portal/place-insight';
 import type { InventoryFinding } from '@/lib/portal/inventory';
 import type { MoodFinding } from '@/lib/portal/mood-insight';
 import type { RelationshipFinding } from '@/lib/portal/relationship-insight';
+import type { ReadingFinding } from '@/lib/portal/reading-domain';
 import type { GuidanceEvent, GuidanceEventType } from './types';
 
 // ── Calendar ──────────────────────────────────────────────────────────────────
@@ -343,6 +344,18 @@ export function relationshipFindingsToGuidanceEvents(
     .filter((f) => f.severity === 'flag' || f.severity === 'attention')
     .map((f) => ({ id: f.id, severity: f.severity as 'flag' | 'attention', title: f.title, body: f.detail, cta: RELATIONSHIP_CTA }));
   return insightsToGuidanceEvents('relationship', '🤝', '人缘', items);
+}
+
+// 阅读(N-4 阅读域):在读的书 + 最近划线(好数据,只 attention)→ 域洞察。
+const READING_CTA: [string, string] = ['来自你自己导入的读书划线;翻回书里看一眼就好。', 'From your own imported highlights — just dip back into the book.'];
+
+export function readingFindingsToGuidanceEvents(
+  findings: readonly ReadingFinding[],
+): GuidanceEvent[] {
+  const items: DomainInsightItem[] = findings
+    .filter((f) => f.severity === 'flag' || f.severity === 'attention')
+    .map((f) => ({ id: f.id, severity: f.severity as 'flag' | 'attention', title: f.title, body: f.detail, cta: READING_CTA }));
+  return insightsToGuidanceEvents('reading', '📖', '阅读', items);
 }
 
 // 跨区(cross-region P2):已过同意/新鲜度/可打断性/预算门的跨区关联 → 域洞察,经七层管线。
