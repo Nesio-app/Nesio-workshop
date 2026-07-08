@@ -19,6 +19,7 @@ import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import RelationshipDetailSheet from './RelationshipDetailSheet';
 import FamilySummary from './FamilySummary';
+import PersonExtractSheet from './PersonExtractSheet';
 import { buildFamilyDigest } from '@/lib/portal/family-digest';
 
 const GROUPS: Closeness[] = ['core', 'close', 'acquaintance'];
@@ -29,6 +30,7 @@ export default function RelationshipsPanel() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [activeGroup, setActiveGroup] = useState<string | null>(null);
+  const [extractOpen, setExtractOpen] = useState(false);
 
   const rebuild = () => setContacts(buildRelationships(getLifeGraph()));
 
@@ -69,9 +71,14 @@ export default function RelationshipsPanel() {
 
   return (
     <div className="nesio-health-dash">
-      <p className="nesio-health-updated">
-        {L(dict, `${shown.length} 个联系人 · ${dueList.length} 个该联系`, `${shown.length} people · ${dueList.length} to reach out`)}
-      </p>
+      <div className="nesio-rel-head-row">
+        <p className="nesio-health-updated" style={{ margin: 0 }}>
+          {L(dict, `${shown.length} 个联系人 · ${dueList.length} 个该联系`, `${shown.length} people · ${dueList.length} to reach out`)}
+        </p>
+        <button type="button" className="nesio-rel-log-btn" onClick={() => setExtractOpen(true)}>
+          {L(dict, '📷 记给某人', '📷 Log to…')}
+        </button>
+      </div>
 
       {allGroups.length > 0 && (
         <div className="nesio-rel-chips" role="tablist" aria-label={L(dict, '联系人分组', 'Contact groups')}>
@@ -153,6 +160,7 @@ export default function RelationshipsPanel() {
       </p>
 
       {openKey && <RelationshipDetailSheet contactKey={openKey} onClose={() => setOpenKey(null)} />}
+      <PersonExtractSheet open={extractOpen} onClose={() => setExtractOpen(false)} />
     </div>
   );
 }
