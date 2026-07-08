@@ -23,15 +23,17 @@ interface RawRec { category?: unknown; title?: unknown; detail?: unknown; date?:
 export interface ExtractedRecord { category: Category; title: string; detail?: string; date?: string; amount?: number }
 export interface PersonExtractResult { personName: string; records: ExtractedRecord[] }
 
-const PROMPT = `你是个人档案助手。把用户这句话拆成「要记在某个人名下」的记录,只输出 JSON(不要任何其他文字):
-{"personName":"这条是关于谁(原话里的人名/称呼,如「小美」「爸爸」;没提到留空字符串)",
+const PROMPT = `你是个人档案助手。把输入拆成「要记在某个人名下」的记录,只输出 JSON(不要任何其他文字):
+{"personName":"这条是关于谁(人名/称呼,如「小美」「爸爸」;照片上有名字(如成绩单/处方上的姓名)就用它;没有留空字符串)",
  "records":[{"category":"成绩=achievement,消费=spending,位置=location,医疗=medical,药物=medication,健康=health",
    "title":"必填,简短一句(如「期末年级第一」「氨氯地平 每天一片」)",
-   "detail":"补充(剂量/频次/疗程/备注,没有就省略)",
-   "date":"YYYY-MM-DD(用户提到日期才填,否则省略)",
+   "detail":"补充(剂量/频次/疗程/科目分数/备注,没有就省略)",
+   "date":"YYYY-MM-DD(提到日期才填,否则省略)",
    "amount":"消费金额,数字(仅 spending,提到才填)"}]}
-药物类把药名放 title、剂量频次疗程放 detail。如果这句话不是在记录某人的信息(提问/闲聊),records 输出 []。
-用户的话:`;
+药物类把药名放 title、剂量频次疗程放 detail。成绩单可拆成多条(总评一条 + 关注的单科)。
+如果这不是在记录某人的信息(提问/闲聊/无关图),records 输出 []。
+输入内容:`;
+const IMAGE_HINT = '(下面附了一张照片,请从图片里识别要记录的信息;文字是补充说明)';
 
 export function clampRecords(raw: unknown): PersonExtractResult {
   const obj = (raw && typeof raw === 'object') ? raw as { personName?: unknown; records?: unknown } : {};
@@ -56,11 +58,15 @@ export function clampRecords(raw: unknown): PersonExtractResult {
 export async function POST(req: NextRequest) {
   const guard = await guardAiRoute(req, 'person-extract', { limit: 20 });
   if (guard) return guard;
-  const body = await req.json().catch(() => null) as { text?: unknown } | null;
+  const body = await req.json().catch(() => null) as { text?: unknown; image?: unknown } | null;
   const text = typeof body?.text === 'string' ? body.text.trim().slice(0, 800) : '';
-  if (!text) return NextResponse.json({ ok: false, error: 'no_text' }, { status: 400 });
+  // 照片:data URL(data:image/...;base64,...);限 8MB base64,避免超大图打爆
+  const image = typeof body?.image === 'string' && /^data:image\/(png|jpe?g|webp|gif);base64,/.test(body.image) && body.image.length < 8_000_000
+    ? body.image : '';
+  if (!text && !image) return NextResponse.json({ ok: false, error: 'no_input' }, { status: 400 });
   try {
-    const { text: raw } = await completeText({ prompt: `${PROMPT}${text}`, maxTokens: 800, temperature: 0 });
+    const prompt = image ? `${PROMPT}${IMAGE_HINT}\n${text}` : `${PROMPT}${text}`;
+    const { text: raw } = await completeText({ prompt, maxTokens: 900, temperature: 0, ...(image ? { image } : {}) });
     const result = clampRecords(parseJsonBlock<unknown>(raw));
     return NextResponse.json({ ok: true, ...result }, { headers: { 'Cache-Control': 'no-store' } });
   } catch {

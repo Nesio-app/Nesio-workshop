@@ -18,7 +18,20 @@ export function aiProviderAvailable(): boolean {
   return Boolean(resolveAiKey('anthropic') || resolveAiKey('gemini'));
 }
 
-async function callClaude(apiKey: string, prompt: string, system: string, maxTokens: number, model?: string, temperature?: number): Promise<string> {
+/** 解析 data URL(data:image/jpeg;base64,...)→ { mimeType, base64 };非法返回 null。 */
+function parseDataUrl(dataUrl: string): { mimeType: string; base64: string } | null {
+  const m = /^data:([^;,]+);base64,(.+)$/.exec(dataUrl);
+  return m ? { mimeType: m[1], base64: m[2] } : null;
+}
+
+async function callClaude(apiKey: string, prompt: string, system: string, maxTokens: number, model?: string, temperature?: number, image?: string): Promise<string> {
+  const img = image ? parseDataUrl(image) : null;
+  const content = img
+    ? [
+        { type: 'image', source: { type: 'base64', media_type: img.mimeType, data: img.base64 } },
+        { type: 'text', text: prompt },
+      ]
+    : prompt;
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -31,7 +44,7 @@ async function callClaude(apiKey: string, prompt: string, system: string, maxTok
       max_tokens: maxTokens,
       ...(typeof temperature === 'number' ? { temperature } : {}),
       system,
-      messages: [{ role: 'user', content: prompt }],
+      messages: [{ role: 'user', content }],
     }),
   });
   const data = await res.json() as { content?: Array<{ type: string; text?: string }>; error?: { message: string } };
@@ -39,10 +52,14 @@ async function callClaude(apiKey: string, prompt: string, system: string, maxTok
   return (data.content ?? []).filter((c) => c.type === 'text' && c.text).map((c) => c.text!).join('').trim();
 }
 
-async function callGemini(apiKey: string, prompt: string, system: string, maxTokens: number, temperature?: number): Promise<string> {
+async function callGemini(apiKey: string, prompt: string, system: string, maxTokens: number, temperature?: number, image?: string): Promise<string> {
   const configuredModel = envValue('GEMINI_MODEL');
   const models = Array.from(new Set([configuredModel, ...GEMINI_MODEL_FALLBACKS].filter(Boolean)));
   let lastError = 'Gemini unavailable';
+  const img = image ? parseDataUrl(image) : null;
+  const parts = img
+    ? [{ inlineData: { mimeType: img.mimeType, data: img.base64 } }, { text: prompt }]
+    : [{ text: prompt }];
 
   for (const model of models) {
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -51,7 +68,7 @@ async function callGemini(apiKey: string, prompt: string, system: string, maxTok
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: system }] },
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          contents: [{ role: 'user', parts }],
           generationConfig: { temperature: temperature ?? 0.6, maxOutputTokens: maxTokens },
         }),
       });
@@ -90,15 +107,15 @@ async function callGemini(apiKey: string, prompt: string, system: string, maxTok
  * opts.temperature — applied to both providers (e.g. 0.85 for creative briefing copy).
  */
 export async function completeText(
-  { prompt, system = '', maxTokens = 1024, model, temperature }:
-  { prompt: string; system?: string; maxTokens?: number; model?: string; temperature?: number },
+  { prompt, system = '', maxTokens = 1024, model, temperature, image }:
+  { prompt: string; system?: string; maxTokens?: number; model?: string; temperature?: number; image?: string },
 ): Promise<{ text: string; provider: 'claude' | 'gemini' }> {
   const anthropicKey = resolveAiKey('anthropic');
   const geminiKey = resolveAiKey('gemini');
 
   if (anthropicKey) {
     try {
-      const text = await callClaude(anthropicKey, prompt, system, maxTokens, model, temperature);
+      const text = await callClaude(anthropicKey, prompt, system, maxTokens, model, temperature, image);
       if (text) return { text, provider: 'claude' };
     } catch (err) {
       // Fall through to Gemini when Claude errors (auth/quota/etc.).
@@ -106,7 +123,7 @@ export async function completeText(
     }
   }
   if (geminiKey) {
-    const text = await callGemini(geminiKey, prompt, system, maxTokens, temperature);
+    const text = await callGemini(geminiKey, prompt, system, maxTokens, temperature, image);
     return { text, provider: 'gemini' };
   }
   throw new Error('no_ai_provider');
