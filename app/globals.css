@@ -11800,6 +11800,16 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 .nesio-rel-rec-sub { font-size: 0.76rem; color: var(--portal-muted); }
 .nesio-rel-rec-del { font-size: 0.85rem; color: var(--faint, var(--portal-muted)); background: none; border: none; cursor: pointer; flex: none; padding: 0 0.2rem; }
 
+/* ─── 家庭汇总(人缘㊅)─── */
+.nesio-fam-summary { background: var(--portal-accent-soft); border: 1px solid var(--portal-line); border-radius: 0.9rem; padding: 0.8rem 0.85rem; margin: 0.7rem 0 0.2rem; }
+.nesio-fam-members { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.nesio-fam-chip { display: inline-flex; align-items: center; gap: 0.4rem; background: var(--sheet-opaque, #fff); border: 1px solid var(--portal-line); border-radius: 999px; padding: 0.3rem 0.65rem; cursor: pointer; }
+.nesio-fam-chip-name { font-size: 0.82rem; font-weight: 600; color: var(--portal-ink); }
+.nesio-fam-chip-cats { display: inline-flex; gap: 0.3rem; font-size: 0.74rem; color: var(--portal-muted); }
+.nesio-fam-tl-row { display: flex; gap: 0.7rem; width: 100%; text-align: left; background: none; border: none; padding: 0.32rem 0; border-bottom: 1px solid var(--portal-line); cursor: pointer; }
+.nesio-fam-tl-row:last-child { border-bottom: none; }
+.nesio-fam-tl-row .nesio-rel-tl-text { font-size: 0.82rem; color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 /* ─── 人物详情页(人缘㊁)─── */
 .nesio-rel-open { cursor: pointer; text-align: left; }
 button.nesio-rel-due-info { background: none; border: none; padding: 0; font: inherit; }
