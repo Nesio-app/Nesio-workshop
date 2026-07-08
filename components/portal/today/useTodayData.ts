@@ -98,6 +98,14 @@ async function loadEmailSignals(canUsePrivateData: boolean): Promise<EmailSignal
 }
 
 export function useTodayData(canUsePrivateData: boolean) {
+  // 跨区 P0:每日快照 journal(易逝上下文当天采样 + 历史回填)。空闲时跑,不阻塞首屏。
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      import('@/lib/platform/fact-journal').then((m) => m.ensureFactJournal()).catch(() => undefined);
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, []);
+
   const [displayName, setDisplayName] = useState('');
   const [memoryCount, setMemoryCount] = useState(0);
   const [memoryNotes, setMemoryNotes] = useState<readonly string[]>([]);
