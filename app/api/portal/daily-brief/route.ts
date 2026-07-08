@@ -167,9 +167,10 @@ ${memorySection}
 
   const startedAt = Date.now();
   try {
-    const { text: script } = await completeText({ prompt, maxTokens: 400, temperature: 0.85 });
+    // 成功路径的遥测(含真实 token/成本)由 completeText 内部按 route 记账,避免双计;
+    // 这里只在**失败/兜底**时补一条 fallback 事件。
+    const { text: script } = await completeText({ prompt, maxTokens: 400, temperature: 0.85, route: 'daily_brief' });
     if (script) {
-      reportAiCall('daily_brief', true, startedAt);
       return NextResponse.json({ ok: true, script });
     }
   } catch { /* fall through */ }
