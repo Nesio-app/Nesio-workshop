@@ -176,12 +176,43 @@ const RULES: ReadonlyArray<DomainRule<RelationshipInsightInput, RelationshipFind
       };
     },
   },
+
+  // ── 用药提醒:某人挂了「药物」→ Today 温和提醒按时吃/续药。 ──
+  // 隐私口径按用户 2026-07「全放开」决定:药物(敏感)可进 Today 提醒;医疗/健康仍不塞进
+  // 通用 Today(留在该人的健康视图),避免刷屏。取最近一条点名 + 其余计数。
+  {
+    id: 'medication-reminder',
+    run: (i) => {
+      const contacts = buildRelationships(i.nodes, i.now.getTime(), i.contactLog);
+      const nameByKey = new Map(contacts.map((c) => [c.key, c.name]));
+      const meds = (i.records || [])
+        .filter((r) => r.category === 'medication' && nameByKey.has(r.personKey))
+        .map((r) => ({ r, t: Date.parse(r.date || r.createdAt) || 0 }))
+        .sort((a, b) => b.t - a.t);
+      if (!meds.length) return null;
+      const top = meds[0].r;
+      const name = nameByKey.get(top.personKey) || top.personKey;
+      const dose = top.detail ? ` · ${top.detail}` : '';
+      const more = meds.length - 1;
+      const moreZh = more > 0 ? `(共 ${meds.length} 项在管)` : '';
+      const moreEn = more > 0 ? ` (${meds.length} in all)` : '';
+      return {
+        severity: 'attention',
+        title: ['用药提醒', 'Medication reminder'],
+        detail: [
+          `${name}:${top.title}${dose}${moreZh} —— 记得按时吃,快用完了早点续。`,
+          `${name}: ${top.title}${dose}${moreEn} — remember the dose and refill in time.`,
+        ],
+      };
+    },
+  },
 ];
 
 /** 人缘域 findings 总入口(确定性;人际域从严 —— 只轻提示、绝不出红)。 */
 export function relationshipFindings(input: RelationshipInsightInput): RelationshipFinding[] {
   if (!input.nodes.length) return [];
-  // records 缺省读本机 person-records;仅成绩/消费两类规则消费,敏感三类在规则里被排除。
+  // records 缺省读本机 person-records。消费:成绩/消费(非敏感)+ 药物(敏感,按 2026-07「全放开」
+  // 决定进 Today 用药提醒);医疗/健康两类不进通用 Today,留在该人的健康视图。
   const resolved: RelationshipInsightInput = { ...input, records: input.records ?? loadAllPersonRecords() };
   return evaluateRules(RULES, resolved);
 }

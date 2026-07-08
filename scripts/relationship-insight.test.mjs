@@ -95,8 +95,26 @@ assert.equal(relationshipFindings({ nodes: [], now, contactLog: {} }).length, 0,
   assert.ok(byId['family-spending-month'], '本月家人消费出洞察');
   assert.ok(byId['family-spending-month'].detail[0].includes('600'), '消费合计');
   // 隐私红线:医疗/复诊绝不出现在任何 finding
-  assert.ok(!f.some((x) => x.title.concat(x.detail).some((s) => s.includes('复诊') || s.includes('医疗'))), '医疗(敏感)绝不进洞察');
+  assert.ok(!f.some((x) => x.title.concat(x.detail).some((s) => s.includes('复诊') || s.includes('医疗'))), '医疗类不进通用 Today(留健康视图)');
   assert.ok(f.every((x) => x.severity !== 'flag'), '仍只出 attention');
+}
+
+// ── 药物 → Today 用药提醒(2026-07「全放开」:药物可进提醒;医疗仍不进通用 Today) ──
+{
+  const nodes = [
+    { id: 'n1', type: 'note', name: '和 爸爸', source: 'manual', createdAt: '2026-06-01', attributes: {}, relations: [{ targetId: '爸爸', relation: '爸爸' }] },
+    { id: 'p1', type: 'person', name: '爸爸', source: 'system', createdAt: '2026-06-01', attributes: {}, relations: [] },
+  ];
+  const records = [
+    { id: 'm1', personKey: '爸爸', category: 'medication', title: '氨氯地平', detail: '每天一片', date: '2026-07-01', createdAt: '2026-07-01' },
+    { id: 'md1', personKey: '爸爸', category: 'medical', title: '复诊记录', date: '2026-07-03', createdAt: '2026-07-03' },
+  ];
+  const f = relationshipFindings({ nodes, now, records, contactLog: {} });
+  const byId = Object.fromEntries(f.map((x) => [x.id, x]));
+  assert.ok(byId['medication-reminder'], '药物 → 用药提醒进 Today');
+  assert.ok(byId['medication-reminder'].detail[0].includes('氨氯地平') && byId['medication-reminder'].detail[0].includes('每天一片'), '点名药 + 剂量');
+  assert.equal(byId['medication-reminder'].severity, 'attention', '用药提醒仍只 attention');
+  assert.ok(!f.some((x) => x.title.concat(x.detail).some((s) => s.includes('复诊'))), '医疗记录不进通用 Today');
 }
 
 // 成绩太旧(>45 天)不提示
