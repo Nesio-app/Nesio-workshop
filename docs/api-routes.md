@@ -51,6 +51,8 @@ Auth legend:
 | GET /api/portal/calendar | session / no-Supabase (cloud mode fails closed) |
 | POST /api/portal/drive | Google OAuth token (drive.appdata) — 免费云备份到用户 Drive |
 | GET /api/portal/drive | Google OAuth token (drive.appdata) — 拉回云备份 |
+| GET /api/portal/tasks | Google OAuth token (tasks) — 读 Google Tasks 待办 |
+| GET /api/portal/people | Google OAuth token (contacts.readonly) — 读通讯录(发件人富化) |
 | GET /api/auth/session | open (reports session state) |
 
 ## OAuth flows (pre-auth by design)
