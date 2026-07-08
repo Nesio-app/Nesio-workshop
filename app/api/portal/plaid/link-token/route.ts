@@ -42,6 +42,10 @@ export async function POST(req: NextRequest) {
         products: ['transactions'],
         // 财务⑯:机构支持时顺带启用 investments(投资账户流水);不支持不影响连接
         optional_products: ['investments'],
+        // 免费最大化·Plaid A:历史窗口从默认 90 天抬到 730 天(2 年,免费)——
+        // 支撑真·同比、更准的订阅识别(Plaid 官方建议 Recurring 至少 180 天)。
+        // 仅对新建/重连的 Item 生效;已连账户需重连一次才拿到 2 年历史。
+        transactions: { days_requested: 730 },
         country_codes: ['US'],
         language: 'en',
       }),

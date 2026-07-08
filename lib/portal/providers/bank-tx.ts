@@ -476,9 +476,11 @@ export function accountTypeLabel(a: { type?: string; subtype?: string }): [strin
   return raw ? [raw, raw] : ['账户', 'Account'];
 }
 
-/** 资产小结(单币种口径):存款 + 投资 − 信用卡欠款 = 净资产。无余额的账户跳过。 */
-export function assetSummary(accounts: BankAccount[], currency = 'USD'): { deposits: number; investments: number; creditOwed: number; net: number } {
-  let deposits = 0, investments = 0, creditOwed = 0;
+/** 资产小结(单币种口径):存款 + 投资 − 信用卡欠款 − 贷款 = 净资产。无余额的账户跳过。
+ *  免费最大化·Plaid A:此前 loan 类型(房贷/学贷/车贷)完全没进公式 → 净资产虚高一整笔
+ *  贷款。现按负债计入(loanOwed),并从净资产里减掉。 */
+export function assetSummary(accounts: BankAccount[], currency = 'USD'): { deposits: number; investments: number; creditOwed: number; loanOwed: number; net: number } {
+  let deposits = 0, investments = 0, creditOwed = 0, loanOwed = 0;
   for (const a of accounts) {
     if ((a.currency || 'USD').toUpperCase() !== currency.toUpperCase()) continue;
     if (typeof a.balance !== 'number') continue;
@@ -486,8 +488,26 @@ export function assetSummary(accounts: BankAccount[], currency = 'USD'): { depos
     if (t === 'depository') deposits += a.balance;
     else if (t === 'investment' || t === 'brokerage') investments += a.balance;
     else if (t === 'credit') creditOwed += a.balance;
+    else if (t === 'loan') loanOwed += a.balance; // loan.balance = 剩余本金(欠款)
   }
-  return { deposits: round2(deposits), investments: round2(investments), creditOwed: round2(creditOwed), net: round2(deposits + investments - creditOwed) };
+  return {
+    deposits: round2(deposits), investments: round2(investments),
+    creditOwed: round2(creditOwed), loanOwed: round2(loanOwed),
+    net: round2(deposits + investments - creditOwed - loanOwed),
+  };
+}
+
+/** 免费最大化·Plaid A:投资组合未实现盈亏 = Σ市值 − Σ成本(有成本的持仓才计)。
+ *  value/costBasis 早已存了,只是从没做减法呈现。gainPct 相对成本。 */
+export function holdingsGainLoss(holdings: Holding[]): { value: number; cost: number; gain: number; gainPct: number } {
+  let value = 0, cost = 0;
+  for (const h of holdings) {
+    if (typeof h.costBasis !== 'number' || h.costBasis <= 0) continue; // 无成本口径不算(避免把市值当盈亏)
+    value += h.value || 0;
+    cost += h.costBasis;
+  }
+  const gain = value - cost;
+  return { value: round2(value), cost: round2(cost), gain: round2(gain), gainPct: cost > 0 ? round2((gain / cost) * 100) : 0 };
 }
 
 /** 某账户某月的消费/退款/笔数。 */
