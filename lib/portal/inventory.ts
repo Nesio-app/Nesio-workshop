@@ -47,6 +47,8 @@ export interface InventoryItem {
   note: string;
   price: number | null;
   hasPhoto: boolean;
+  category: string;      // 物品①:分类('' = 未分类)
+  tags: string[];        // 物品①:物品标签(node.tags 去掉域标「收纳」)
 }
 
 function str(v: unknown): string {
@@ -75,6 +77,8 @@ export function toInventoryItem(node: LifeNode): InventoryItem {
     note: str(a.note),
     price: num(a.price),
     hasPhoto: Boolean(node.assets?.some((as) => as.kind === 'image')),
+    category: str(a.category).trim(),
+    tags: (node.tags || []).filter((t) => t && t !== '收纳'),
   };
 }
 
@@ -93,6 +97,9 @@ export interface NewInventoryItem {
   quantity?: number;
   expiry?: string; // 'YYYY-MM-DD'
   note?: string;
+  category?: string; // 物品①:分类
+  tags?: string[];   // 物品①:标签
+  price?: number;    // 物品①:估值(单件)
 }
 
 export function addInventoryItem(input: NewInventoryItem): LifeNode {
@@ -101,6 +108,9 @@ export function addInventoryItem(input: NewInventoryItem): LifeNode {
   if (input.quantity != null && Number.isFinite(input.quantity)) attributes.quantity = input.quantity;
   if (input.expiry?.trim()) attributes.expiry = input.expiry.trim();
   if (input.note?.trim()) attributes.note = input.note.trim();
+  if (input.category?.trim()) attributes.category = input.category.trim();
+  if (input.price != null && Number.isFinite(input.price)) attributes.price = input.price;
+  const itemTags = (input.tags || []).map((t) => t.trim()).filter(Boolean);
   return addLifeNode({
     type: 'object',
     name: input.name.trim(),
@@ -108,14 +118,14 @@ export function addInventoryItem(input: NewInventoryItem): LifeNode {
     source: 'manual',
     confidence: 1,
     relations: [],
-    tags: ['收纳'],
+    tags: ['收纳', ...itemTags.filter((t) => t !== '收纳')],
   });
 }
 
 /** 更新物品属性(位置/数量/效期/备注)。 */
 export function updateInventoryItem(
   id: string,
-  patch: Partial<Pick<NewInventoryItem, 'location' | 'quantity' | 'expiry' | 'note'>> & { name?: string },
+  patch: Partial<Pick<NewInventoryItem, 'location' | 'quantity' | 'expiry' | 'note' | 'category' | 'tags' | 'price'>> & { name?: string },
 ): boolean {
   const node = getLifeGraph().find((n) => n.id === id);
   if (!node) return false;
@@ -136,7 +146,19 @@ export function updateInventoryItem(
     if (patch.note?.trim()) attributes.note = patch.note.trim();
     else delete attributes.note;
   }
+  if (patch.category !== undefined) {
+    if (patch.category?.trim()) attributes.category = patch.category.trim();
+    else delete attributes.category;
+  }
+  if (patch.price !== undefined) {
+    if (patch.price != null && Number.isFinite(patch.price)) attributes.price = patch.price;
+    else delete attributes.price;
+  }
   const nodePatch: Partial<LifeNode> = { attributes, lastConfirmedAt: new Date().toISOString() };
+  if (patch.tags !== undefined) {
+    const itemTags = (patch.tags || []).map((t) => t.trim()).filter((t) => t && t !== '收纳');
+    nodePatch.tags = ['收纳', ...itemTags];
+  }
   if (patch.name?.trim()) nodePatch.name = patch.name.trim();
   return updateLifeNode(id, nodePatch);
 }
@@ -163,6 +185,44 @@ export function expiryStatus(item: InventoryItem, now = new Date()): 'expired' |
   if (t < now.getTime()) return 'expired';
   if (t <= now.getTime() + 30 * 86_400_000) return 'soon';
   return null;
+}
+
+/* ---------- 物品①:库存统计(对标 Inventory Stats 页) ---------- */
+
+export interface InventoryStats {
+  spaces: number;        // 有物品的空间数
+  containers: number;    // 有物品的容器数(空间+容器组合去重)
+  count: number;         // 物品数(数量合计,缺数量按 1)
+  totalValue: number;    // 估值合计 = Σ 单价 ×(数量||1),缺价不计
+  byCategory: Array<{ category: string; count: number }>; // 计数降序;未分类归「未分类」
+  topTags: Array<{ tag: string; count: number }>;         // 前 12,计数降序
+}
+
+export function inventoryStats(items: InventoryItem[]): InventoryStats {
+  const spaces = new Set<string>();
+  const containers = new Set<string>();
+  const byCat = new Map<string, number>();
+  const byTag = new Map<string, number>();
+  let count = 0;
+  let totalValue = 0;
+  for (const i of items) {
+    const qty = i.quantity != null && i.quantity > 0 ? i.quantity : 1;
+    count += qty;
+    if (i.space) spaces.add(i.space);
+    if (i.space && i.container) containers.add(`${i.space}|${i.container}`);
+    if (i.price != null) totalValue += i.price * qty;
+    const cat = i.category || '未分类';
+    byCat.set(cat, (byCat.get(cat) || 0) + qty);
+    for (const t of i.tags) byTag.set(t, (byTag.get(t) || 0) + 1);
+  }
+  return {
+    spaces: spaces.size,
+    containers: containers.size,
+    count,
+    totalValue: Math.round(totalValue * 100) / 100,
+    byCategory: [...byCat.entries()].map(([category, c]) => ({ category, count: c })).sort((a, b) => b.count - a.count),
+    topTags: [...byTag.entries()].map(([tag, c]) => ({ tag, count: c })).sort((a, b) => b.count - a.count).slice(0, 12),
+  };
 }
 
 /* ---------- 域判定(接 Cross-Insight Reader / guidance)---------- */
