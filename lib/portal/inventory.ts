@@ -49,6 +49,7 @@ export interface InventoryItem {
   hasPhoto: boolean;
   category: string;      // 物品①:分类('' = 未分类)
   tags: string[];        // 物品①:物品标签(node.tags 去掉域标「收纳」)
+  forSale: boolean;      // 物品③:标记出售(进卖闲置堆)
 }
 
 function str(v: unknown): string {
@@ -79,6 +80,7 @@ export function toInventoryItem(node: LifeNode): InventoryItem {
     hasPhoto: Boolean(node.assets?.some((as) => as.kind === 'image')),
     category: str(a.category).trim(),
     tags: (node.tags || []).filter((t) => t && t !== '收纳'),
+    forSale: a.forSale === true,
   };
 }
 
@@ -100,6 +102,7 @@ export interface NewInventoryItem {
   category?: string; // 物品①:分类
   tags?: string[];   // 物品①:标签
   price?: number;    // 物品①:估值(单件)
+  forSale?: boolean; // 物品③:标记出售
 }
 
 export function addInventoryItem(input: NewInventoryItem): LifeNode {
@@ -110,6 +113,7 @@ export function addInventoryItem(input: NewInventoryItem): LifeNode {
   if (input.note?.trim()) attributes.note = input.note.trim();
   if (input.category?.trim()) attributes.category = input.category.trim();
   if (input.price != null && Number.isFinite(input.price)) attributes.price = input.price;
+  if (input.forSale) attributes.forSale = true; // 物品③
   const itemTags = (input.tags || []).map((t) => t.trim()).filter(Boolean);
   return addLifeNode({
     type: 'object',
@@ -125,7 +129,7 @@ export function addInventoryItem(input: NewInventoryItem): LifeNode {
 /** 更新物品属性(位置/数量/效期/备注)。 */
 export function updateInventoryItem(
   id: string,
-  patch: Partial<Pick<NewInventoryItem, 'location' | 'quantity' | 'expiry' | 'note' | 'category' | 'tags' | 'price'>> & { name?: string },
+  patch: Partial<Pick<NewInventoryItem, 'location' | 'quantity' | 'expiry' | 'note' | 'category' | 'tags' | 'price' | 'forSale'>> & { name?: string },
 ): boolean {
   const node = getLifeGraph().find((n) => n.id === id);
   if (!node) return false;
@@ -153,6 +157,10 @@ export function updateInventoryItem(
   if (patch.price !== undefined) {
     if (patch.price != null && Number.isFinite(patch.price)) attributes.price = patch.price;
     else delete attributes.price;
+  }
+  if (patch.forSale !== undefined) {
+    if (patch.forSale) attributes.forSale = true;
+    else delete attributes.forSale;
   }
   const nodePatch: Partial<LifeNode> = { attributes, lastConfirmedAt: new Date().toISOString() };
   if (patch.tags !== undefined) {
@@ -223,6 +231,21 @@ export function inventoryStats(items: InventoryItem[]): InventoryStats {
     byCategory: [...byCat.entries()].map(([category, c]) => ({ category, count: c })).sort((a, b) => b.count - a.count),
     topTags: [...byTag.entries()].map(([tag, c]) => ({ tag, count: c })).sort((a, b) => b.count - a.count).slice(0, 12),
   };
+}
+
+/* ---------- 物品③:卖闲置堆(对标 Build a sell pile) ---------- */
+
+export interface SellPile {
+  items: InventoryItem[]; // 标记出售的物品,估值(价×量)降序,无价在后
+  totalValue: number;     // 合计 = Σ 单价 ×(数量||1),缺价不计
+}
+
+export function sellPile(items: InventoryItem[]): SellPile {
+  const picked = items.filter((i) => i.forSale);
+  const worth = (i: InventoryItem) => (i.price != null ? i.price * (i.quantity != null && i.quantity > 0 ? i.quantity : 1) : -1);
+  picked.sort((a, b) => worth(b) - worth(a));
+  const totalValue = picked.reduce((s, i) => s + Math.max(0, worth(i)), 0);
+  return { items: picked, totalValue: Math.round(totalValue * 100) / 100 };
 }
 
 /* ---------- 域判定(接 Cross-Insight Reader / guidance)---------- */
