@@ -447,15 +447,9 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     if (!token && c.id !== 'notion') { setTokenInputFor(c.id); setTokenValue(''); return; }
     setSyncing(c.id);
     try {
-      // 批次 38:Notion 若已选定数据库,把行按结构化存进记忆(否则退回页面正文提取)。
+      // Notion 选定数据源 → N-3 结构折叠:一本书一条记忆(划线折进书里),丢日历/技术列。
+      // N-5:N-0 的暂停已撤销 —— 折叠管道上线后逐行倒的噪声问题已根治,恢复同步。
       const notionDbs = c.id === 'notion' ? loadNotionDbs() : [];
-      // N-0(收录重做):暂停旧的「按表逐行倒」—— 它把日历表/技术 ID 灌成噪声。
-      // 结构化导入正在按新范式(主表折叠 + 镜像幂等)重建,期间不再逐行入库,避免继续污染。
-      if (c.id === 'notion' && notionDbs.length) {
-        showToast(L(dict, '「按表逐行导入」正在升级重建,已暂停,避免继续灌入噪声。可先点下方「清除已导入的 Notion 记忆」清理旧数据。', 'Table-by-row import is being rebuilt and is paused to stop adding noise. Use "Clear imported Notion memories" below to clean up old data.'), false);
-        setSyncing(null);
-        return;
-      }
       const res = await fetch(c.syncEndpoint!, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -483,9 +477,13 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       saveConnectorState(c.id, true);
       setConnected((p) => ({ ...p, [c.id]: true }));
       setCounts((p) => ({ ...p, [c.id]: n.length }));
-      // 批次 31:Notion 没配 Gemini 时走标题/正文兜底,提示里说清是页面数
-      const suffix = c.id === 'notion' && data.aiUsed === false ? L(dict, '(未接 AI,已按页面标题/正文存入,可直接阅读)', '(no AI — saved by page title/text, readable directly)') : '';
-      showToast(L(dict, `已提取 ${n.length} 个节点${suffix}`, `Extracted ${n.length} nodes ${suffix}`), true);
+      // N-5:选了数据源走 N-3 结构折叠(书=一条记忆);否则页面正文提取(未配 AI 时走标题兜底)。
+      if (c.id === 'notion' && notionDbs.length) {
+        showToast(L(dict, `已按结构折叠成 ${n.length} 条记忆(子表已折进对应条目,日历/技术列已丢)`, `Folded into ${n.length} memories by structure (sub-tables nested, calendar/ID columns dropped)`), true);
+      } else {
+        const suffix = c.id === 'notion' && data.aiUsed === false ? L(dict, '(未接 AI,已按页面标题/正文存入,可直接阅读)', '(no AI — saved by page title/text, readable directly)') : '';
+        showToast(L(dict, `已提取 ${n.length} 个节点${suffix}`, `Extracted ${n.length} nodes ${suffix}`), true);
+      }
     } catch { showToast(L(dict, '网络错误', 'Network error'), false); }
     setSyncing(null);
   }
@@ -1060,11 +1058,11 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
                   </div>
                 )}
 
-                {/* Notion 数据库选择器 —— N-0:逐行导入暂停重建,选表仅记录偏好;附一键清除旧噪声 */}
+                {/* Notion 数据源选择器 —— N-5:选表 → 同步走 N-3 结构折叠(书=一条记忆,划线折进去);附一键重来 */}
                 {c.id === 'notion' && notionDbList && (
                   <div className="nesio-connector-token-box">
                     <p style={{ fontSize: '0.75rem', color: 'var(--portal-ink)', fontWeight: 600, marginBottom: '0.2rem' }}>{L(dict, '选择要同步的表', 'Pick tables to sync')}</p>
-                    <p style={{ fontSize: '0.68rem', color: 'var(--portal-muted)', marginBottom: '0.5rem', lineHeight: 1.5 }}>{L(dict, '正在把「逐行倒进记忆」升级成「按结构理解」(读书这类会自动把划线折进书里,丢掉日历/技术列)。升级期间逐行同步暂停,已选的表会记住。', 'We’re upgrading from “dump every row” to “understand the structure” (e.g. highlights fold into their book; calendar/ID columns dropped). Row sync is paused during the upgrade; your picks are remembered.')}</p>
+                    <p style={{ fontSize: '0.68rem', color: 'var(--portal-muted)', marginBottom: '0.5rem', lineHeight: 1.5 }}>{L(dict, '勾选后点上面「同步」:会按结构理解 —— 读书这类自动把划线折进书里(一本书=一条记忆),丢掉日历表和技术列。重复同步幂等,删了不会重复。', 'Check tables, then tap Sync above. We read the structure — e.g. highlights fold into their book (one book = one memory), calendar tables and ID columns dropped. Re-syncing is idempotent, no duplicates.')}</p>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', maxHeight: 220, overflowY: 'auto' }}>
                       {notionDbList.map((db) => (
                         <label key={db.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', color: 'var(--portal-ink)', cursor: 'pointer' }}>
