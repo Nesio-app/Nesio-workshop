@@ -39,11 +39,27 @@ const NON_PERSON_REL = /架构|品牌|文档|包含|定义|属于|归属|拥有|
 // 关系管理只保留真人(用户实测:vercel[bot]、Platinum Card from American Express、Chase® Ink® 漏进列表)。
 // 显示名强信号(机器人标记/商标符/no-reply/通知/账单/多词银行卡品牌);单词银行名(Chase/Citi/Visa)
 // 是常见姓氏,不据此过滤,靠 ® / card / bank / 邮箱角色地址兜底,避免误杀真人。
-const NON_HUMAN_NAME = /\[bot\]|®|™|no[-\s.]?reply|do[-\s.]?not[-\s.]?reply|noreply|donotreply|\bnotifications?\b|\bnewsletter\b|\bstatements?\b|\breceipts?\b|\binvoice\b|mailer[-\s.]?daemon|postmaster|american express|capital one|wells fargo|mastercard|\bcard\b|\bbank\b/i;
+// 显示名的公司/机构强信号:商标符、机器人、no-reply、账单、以及公司实体标记(.com/Inc/LLC/
+// 投资/日历/团队…)。用户实测:Calendar (Google Calendar)、Fidelity Investments、Amazon.com 漏进。
+const NON_HUMAN_NAME = /\[bot\]|®|™|no[-\s.]?reply|do[-\s.]?not[-\s.]?reply|noreply|donotreply|\bnotifications?\b|\bnewsletter\b|\bstatements?\b|\breceipts?\b|\binvoice\b|mailer[-\s.]?daemon|postmaster|american express|capital one|wells fargo|mastercard|\bcard\b|\bbank\b|\.com\b|\.net\b|\.org\b|\binc\b|\bllc\b|\bltd\b|\bcorp\b|investments?|\bcalendar\b|\bteam\b|\bstore\b/i;
 // 邮箱角色地址(local part):这些是机构群发/通知地址,不是个人。
 const NON_HUMAN_EMAIL_LOCAL = /^(no-?reply|do-?not-?reply|noreply|donotreply|notify|notifications?|alerts?|mailer-daemon|postmaster|bounce|info|support|hello|team|sales|news|newsletter|updates?|accounts?|billing|service|member|statements?|automated|system|admin|marketing|contact|receipts?|orders?)$/i;
 
-/** 判断一个候选联系人是否明显不是真人(机器人/机构/通知/账单发件人)。 */
+// 个人邮箱服务商:发件人若来自这些域,才把「未在通讯录里」的邮件发件人当新联系人 ——
+// 公司/机构域(fidelity.com / amazon.com / google.com …)的发件人不新建联系人(避免公司刷进人缘)。
+const PERSONAL_EMAIL_DOMAIN = new Set([
+  'gmail.com', 'googlemail.com', 'outlook.com', 'hotmail.com', 'live.com', 'msn.com',
+  'icloud.com', 'me.com', 'mac.com', 'yahoo.com', 'ymail.com', 'aol.com',
+  'qq.com', '163.com', '126.com', 'foxmail.com', 'sina.com', '139.com',
+  'proton.me', 'protonmail.com', 'gmx.com', 'zoho.com', 'hey.com',
+]);
+
+function emailDomain(key: string): string {
+  const at = key.indexOf('@');
+  return at > 0 ? key.slice(at + 1).toLowerCase() : '';
+}
+
+/** 判断一个候选联系人是否明显不是真人(机器人/机构/通知/账单/公司发件人)。 */
 function isLikelyNonHuman(name: string, key: string): boolean {
   if (NON_HUMAN_NAME.test(name)) return true;
   const at = key.indexOf('@');
@@ -157,14 +173,29 @@ export function buildRelationships(nodes: LifeNode[], now = Date.now(), contactL
     acc.set(key, cur);
   };
 
+  // 预扫已知真人(person 节点)的身份 key —— 邮件发件人命中则允许富化(即便公司邮箱)。
+  const knownPersonKeys = new Set<string>();
+  for (const n of nodes) {
+    if (n.type === 'person' && n.name) {
+      knownPersonKeys.add(n.name.trim().toLowerCase());
+      const em = typeof n.attributes?.email === 'string' ? n.attributes.email.toLowerCase() : '';
+      if (em) knownPersonKeys.add(em);
+    }
+  }
+
   for (const n of nodes) {
     const nodeDate = n.lastConfirmedAt || (typeof n.attributes?.date === 'string' ? n.attributes.date : null) || n.createdAt;
     const nodeIso = toIso(nodeDate);
 
-    // email 节点:from = 对方
+    // email 节点:from = 对方。但邮件发件人大量是公司/机构 —— 只在「已是通讯录里的人」或
+    // 「来自个人邮箱服务商」时才当联系人;公司域(fidelity.com/amazon.com…)的陌生发件人不新建。
     if (n.source === 'email' && typeof n.attributes?.from === 'string') {
       const c = parseContactFrom(n.attributes.from);
-      if (c) bump(c.name, c.key, toIso(n.attributes.date) || nodeIso, null);
+      if (c && !isLikelyNonHuman(c.name, c.key)) {
+        const known = knownPersonKeys.has(c.key) || knownPersonKeys.has(c.name.trim().toLowerCase());
+        const personal = PERSONAL_EMAIL_DOMAIN.has(emailDomain(c.key));
+        if (known || personal) bump(c.name, c.key, toIso(n.attributes.date) || nodeIso, null);
+      }
     }
 
     // person 节点本身

@@ -63,6 +63,31 @@ const now = Date.parse('2026-07-08T00:00:00Z');
   assert.ok(names.includes('John Chase'), '真人(姓 Chase)不被误杀');
 }
 
+// ── 公司邮件发件人不进联系人:公司名标记 + 陌生公司域;个人域/已知真人保留 ──
+{
+  const nodes = [
+    // 公司名标记(用户实测:Calendar/Investments/.com)
+    { id: 'c1', type: 'note', source: 'email', name: '日历', createdAt: '2026-07-08', attributes: { from: 'Calendar (Google Calendar) <calendar-notification@google.com>', date: '2026-07-08' }, relations: [] },
+    { id: 'c2', type: 'note', source: 'email', name: '对账单', createdAt: '2026-07-08', attributes: { from: 'Fidelity Investments <alerts@fidelity.com>', date: '2026-07-08' }, relations: [] },
+    { id: 'c3', type: 'note', source: 'email', name: '订单', createdAt: '2026-07-08', attributes: { from: 'Amazon.com <ship@amazon.com>', date: '2026-07-08' }, relations: [] },
+    // 人名 + 陌生公司域 + 不在通讯录 → 不新建(公司刷不进人缘)
+    { id: 'c4', type: 'note', source: 'email', name: 'x', createdAt: '2026-07-08', attributes: { from: 'Jane Roe <jane@fidelity.com>', date: '2026-07-08' }, relations: [] },
+    // 真人 + 个人邮箱域 → 进联系人
+    { id: 'c5', type: 'note', source: 'email', name: 'y', createdAt: '2026-07-08', attributes: { from: 'Emma Wu <emma@gmail.com>', date: '2026-07-08' }, relations: [] },
+    // 已知真人(通讯录里)即便公司邮箱也保留富化
+    { id: 'p8', type: 'person', name: 'Coworker Kim', source: 'system', createdAt: '2026-06-01', attributes: { email: 'kim@corp.com' }, relations: [] },
+    { id: 'c6', type: 'note', source: 'email', name: 'z', createdAt: '2026-07-08', attributes: { from: 'Coworker Kim <kim@corp.com>', date: '2026-07-08' }, relations: [] },
+  ];
+  const contacts = rel.buildRelationships(nodes, now, {});
+  const has = (frag) => contacts.some((c) => c.name.includes(frag) || c.key.includes(frag));
+  assert.ok(!has('Calendar') && !has('google.com'), '日历通知不进联系人');
+  assert.ok(!has('Fidelity') && !contacts.some((c) => c.key === 'alerts@fidelity.com'), '投资机构不进联系人');
+  assert.ok(!has('Amazon'), '电商不进联系人');
+  assert.ok(!contacts.some((c) => c.key === 'jane@fidelity.com'), '陌生人+公司域 不新建联系人');
+  assert.ok(contacts.some((c) => c.key === 'emma@gmail.com'), '真人+个人邮箱域 进联系人');
+  assert.ok(contacts.some((c) => c.name === 'Coworker Kim'), '已知真人(公司邮箱)保留');
+}
+
 // ── runPeopleSync:源码级(动态 import life-graph,vm 跑成本高) ──
 const cs = fs.readFileSync(new URL('../lib/portal/providers/connector-sync.ts', import.meta.url), 'utf8');
 assert.ok(/export async function runPeopleSync/.test(cs), 'runPeopleSync 存在');
