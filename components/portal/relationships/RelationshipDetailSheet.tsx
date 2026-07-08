@@ -25,6 +25,9 @@ interface Props {
   onClose: () => void;
 }
 
+/** person-extract 路由返回的一条候选记录(客户端预览用)。 */
+type ExtractedRecord = { category: PersonRecordCategory; title: string; detail?: string; date?: string; amount?: number };
+
 /** 把上传的图缩到 ≤200px 的方图,输出 data URI(避免整张原图塞进节点属性)。 */
 function downscaleToDataUrl(file: File, size = 200): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -66,6 +69,11 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
   const [form, setForm] = useState<{ category: PersonRecordCategory; title: string; detail: string; date: string; amount: string }>(
     { category: 'achievement', title: '', detail: '', date: '', amount: '' },
   );
+  // 「说一句自动识别」——AI 提取 → 预览 → 确认保存
+  const [nlText, setNlText] = useState('');
+  const [nlBusy, setNlBusy] = useState(false);
+  const [nlErr, setNlErr] = useState<string | null>(null);
+  const [pending, setPending] = useState<ExtractedRecord[] | null>(null);
 
   const rebuild = () => {
     if (!contactKey) { setProfile(null); setRecords([]); return; }
@@ -134,6 +142,34 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
     setAdding(false);
   };
   const removeRecord = (id: string) => deletePersonRecord(id);
+
+  // 说一句 → AI 提取候选记录(不直接落库,先预览让你确认)
+  const runExtract = async () => {
+    const text = nlText.trim();
+    if (!text || nlBusy) return;
+    setNlErr(null); setNlBusy(true); setPending(null);
+    try {
+      const res = await fetch('/api/portal/person-extract', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }),
+      });
+      const data = await res.json().catch(() => null) as { ok?: boolean; records?: ExtractedRecord[] } | null;
+      if (!res.ok || !data?.ok) throw new Error('extract_failed');
+      const recs = Array.isArray(data.records) ? data.records : [];
+      if (!recs.length) { setNlErr(L(dict, '没认出可记录的信息,换句话说说看,或用下面的手动填。', "Couldn't find anything to log — rephrase, or add it manually below.")); return; }
+      setPending(recs);
+    } catch {
+      setNlErr(L(dict, '识别没成功,稍后再试,或手动填。', "Couldn't process that — try again, or add it manually."));
+    } finally { setNlBusy(false); }
+  };
+  const savePending = () => {
+    if (!pending) return;
+    for (const r of pending) {
+      addPersonRecord({ personKey: p.key, category: r.category, title: r.title,
+        ...(r.detail ? { detail: r.detail } : {}), ...(r.date ? { date: r.date } : {}),
+        ...(typeof r.amount === 'number' ? { amount: r.amount } : {}) });
+    }
+    setPending(null); setNlText(''); setAdding(false);
+  };
 
   const c = p.contact;
   const tiles: Array<{ icon: string; label: string }> = [];
@@ -237,6 +273,44 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
 
             {adding && (
               <div className="nesio-rel-rec-form">
+                {/* 说一句 → 自动识别 */}
+                <textarea
+                  className="nesio-rel-rec-input" rows={2}
+                  placeholder={L(dict, '说一句,自动识别(如「期末年级第一 6月2日」「每天一片氨氯地平」)', 'Describe it (e.g. "1st in grade, Jun 2")')}
+                  value={nlText} onChange={(e) => setNlText(e.target.value)}
+                />
+                <button
+                  type="button" className="nesio-today-btn nesio-today-btn--ghost"
+                  onClick={() => void runExtract()} disabled={nlBusy}
+                >
+                  {nlBusy ? L(dict, '识别中…', 'Reading…') : L(dict, '✨ 自动识别', '✨ Auto-detect')}
+                </button>
+                {nlErr && <p className="nesio-rel-detail-err" role="alert">{nlErr}</p>}
+                {pending && pending.length > 0 && (
+                  <div className="nesio-rel-rec-list" style={{ marginTop: 0 }}>
+                    <p className="nesio-settings-option-hint" style={{ margin: 0 }}>
+                      {L(dict, `识别到以下,确认存到 ${p.displayName}:`, `Detected — save to ${p.displayName}?`)}
+                    </p>
+                    {pending.map((r, i) => {
+                      const meta = RECORD_CATEGORY_MAP[r.category];
+                      return (
+                        <div key={i} className="nesio-rel-rec-row">
+                          <span className="nesio-rel-rec-ic">{meta.icon}</span>
+                          <div className="nesio-rel-rec-main">
+                            <span className="nesio-rel-rec-title">{r.title}{typeof r.amount === 'number' ? ` · ${r.amount}` : ''}</span>
+                            {(r.detail || r.date) && <span className="nesio-rel-rec-sub">{r.date || ''}{r.detail ? `${r.date ? ' · ' : ''}${r.detail}` : ''}</span>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.4rem' }}>
+                      <button type="button" className="nesio-ob-primary-btn" style={{ flex: 1 }} onClick={savePending}>{L(dict, '保存这些', 'Save these')}</button>
+                      <button type="button" className="nesio-today-btn nesio-today-btn--ghost" style={{ flex: 1 }} onClick={() => setPending(null)}>{L(dict, '丢弃', 'Discard')}</button>
+                    </div>
+                  </div>
+                )}
+                <p className="nesio-settings-option-hint" style={{ margin: '0.2rem 0', textAlign: 'center' }}>{L(dict, '— 或手动填 —', '— or fill manually —')}</p>
+
                 <div className="nesio-rel-chips">
                   {RECORD_CATEGORIES.map((cat) => (
                     <button key={cat.key} type="button"
