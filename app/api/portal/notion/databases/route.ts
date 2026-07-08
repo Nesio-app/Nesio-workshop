@@ -8,13 +8,10 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { guardAiRoute } from '@/lib/portal/api-auth';
-import { notionDbTitle } from '@/lib/portal/notion-map';
+import { discoverDatabases, primaryDataSourceId } from '@/lib/portal/notion-api';
 import { getIntegrationTokenRefreshed } from '@/lib/portal/integrations';
 
 export const dynamic = 'force-dynamic';
-
-const NOTION_API = 'https://api.notion.com/v1';
-const NOTION_VERSION = '2022-06-28';
 
 export async function POST(req: NextRequest) {
   const guard = await guardAiRoute(req, 'notion-databases', { limit: 20 });
@@ -31,34 +28,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'not_connected' }, { status: 401 });
   }
 
-  let res: Response;
+  // N-1:discovery(2025-09-03)—— 枚举库并展开 data_sources[]。
+  let result: Awaited<ReturnType<typeof discoverDatabases>>;
   try {
-    res = await fetch(`${NOTION_API}/search`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Notion-Version': NOTION_VERSION,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        filter: { property: 'object', value: 'database' },
-        sort: { direction: 'descending', timestamp: 'last_edited_time' },
-        page_size: 50,
-      }),
-    });
+    result = await discoverDatabases(token);
   } catch {
     return NextResponse.json({ ok: false, error: 'notion_unreachable' }, { status: 502 });
   }
 
-  if (!res.ok) {
+  if (!result.ok) {
     return NextResponse.json(
-      { ok: false, error: res.status === 401 ? 'invalid_token' : `notion_${res.status}` },
-      { status: res.status === 401 ? 401 : 502 },
+      { ok: false, error: result.status === 401 ? 'invalid_token' : `notion_${result.status}` },
+      { status: result.status === 401 ? 401 : 502 },
     );
   }
 
-  const data = await res.json() as { results?: Array<{ id: string; title?: unknown }> };
-  const databases = (data.results || []).map((db) => ({ id: db.id, title: notionDbTitle(db) }));
+  // 返回给客户端的 id 用「主数据源 id」(2025-09-03 查询用它);databaseId 一并带上便于日后诊断。
+  const databases = result.databases.map((db) => ({
+    id: primaryDataSourceId(db),
+    databaseId: db.databaseId,
+    title: db.title,
+  }));
 
   // token 有效但没有共享任何数据库 —— 和页面同理,给准话
   if (databases.length === 0) {
