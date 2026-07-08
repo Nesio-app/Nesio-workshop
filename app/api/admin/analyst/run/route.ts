@@ -31,10 +31,11 @@ function isCronAuthorized(req: NextRequest): boolean {
 }
 
 async function runAnalyst(req: NextRequest) {
-  const { report, signals } = await computeDailyReport(req.nextUrl.origin, envValue('NESIO_ADMIN_SECRET'));
+  const { report, signals, sourcesOk } = await computeDailyReport(req.nextUrl.origin, envValue('NESIO_ADMIN_SECRET'));
 
-  // 存今日快照 —— 明天起就有历史给基线学习。
-  const saved = await saveDaily(report.date, signals);
+  // 存今日快照 —— 明天起就有历史给基线学习。数据源失败时**不存**,否则把「故障=0」的
+  // 假快照灌进 analyst_daily,永久污染 client_errors 等基线(修 analyst-runtime:33)。
+  const saved = sourcesOk ? await saveDaily(report.date, signals) : false;
 
   // 可选 AI 润色:只改文风,不改数字/结论;失败或未配置 → 确定性文本兜底。
   let narrative = '';
