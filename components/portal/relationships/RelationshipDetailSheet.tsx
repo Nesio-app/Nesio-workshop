@@ -11,6 +11,10 @@ import { useEffect, useRef, useState } from 'react';
 import { getLifeGraph, addLifeNode, updateLifeNode } from '@/lib/portal/life-graph';
 import { buildPersonProfile, type PersonProfile } from '@/lib/portal/relationship-profile';
 import { markContacted, lastContactLabel, CLOSENESS_META } from '@/lib/portal/relationships';
+import {
+  loadPersonRecords, addPersonRecord, deletePersonRecord,
+  RECORD_CATEGORIES, RECORD_CATEGORY_MAP, type PersonRecord, type PersonRecordCategory,
+} from '@/lib/portal/person-records';
 import RelationGraph from '../RelationGraph';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -57,17 +61,27 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
   const [uploadErr, setUploadErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [records, setRecords] = useState<PersonRecord[]>([]);
+  const [adding, setAdding] = useState(false);
+  const [form, setForm] = useState<{ category: PersonRecordCategory; title: string; detail: string; date: string; amount: string }>(
+    { category: 'achievement', title: '', detail: '', date: '', amount: '' },
+  );
 
   const rebuild = () => {
-    if (!contactKey) { setProfile(null); return; }
+    if (!contactKey) { setProfile(null); setRecords([]); return; }
     setProfile(buildPersonProfile(getLifeGraph(), contactKey));
+    setRecords(loadPersonRecords(contactKey));
   };
 
   useEffect(() => {
     rebuild();
     const onUpdate = () => rebuild();
     window.addEventListener('nesio-life-graph-updated', onUpdate);
-    return () => window.removeEventListener('nesio-life-graph-updated', onUpdate);
+    window.addEventListener('nesio-person-records-updated', onUpdate);
+    return () => {
+      window.removeEventListener('nesio-life-graph-updated', onUpdate);
+      window.removeEventListener('nesio-person-records-updated', onUpdate);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contactKey]);
 
@@ -107,6 +121,20 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
     }
   };
 
+  const saveRecord = () => {
+    const title = form.title.trim();
+    if (!title) return;
+    addPersonRecord({
+      personKey: p.key, category: form.category, title,
+      ...(form.detail.trim() ? { detail: form.detail.trim() } : {}),
+      ...(form.date ? { date: form.date } : {}),
+      ...(form.amount && !Number.isNaN(Number(form.amount)) ? { amount: Number(form.amount) } : {}),
+    });
+    setForm({ category: form.category, title: '', detail: '', date: '', amount: '' });
+    setAdding(false);
+  };
+  const removeRecord = (id: string) => deletePersonRecord(id);
+
   const c = p.contact;
   const tiles: Array<{ icon: string; label: string }> = [];
   if (p.birthday) {
@@ -118,6 +146,13 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
     tiles.push({ icon: '💬', label: L(dict, `提到 ${c.mentions} 次`, `${c.mentions} mentions`) });
   }
   if (p.email) tiles.push({ icon: '✉️', label: p.email });
+  // 挂在 TA 身上的分类数据计数瓦片
+  const counts: Partial<Record<PersonRecordCategory, number>> = {};
+  for (const r of records) counts[r.category] = (counts[r.category] || 0) + 1;
+  for (const cat of RECORD_CATEGORIES) {
+    const n = counts[cat.key];
+    if (n) tiles.push({ icon: cat.icon, label: L(dict, `${cat.zh} ${n}`, `${cat.en} ${n}`) });
+  }
 
   return (
     <div className="nesio-node-detail-overlay" role="dialog" aria-modal="true" aria-label={p.displayName}>
@@ -190,6 +225,69 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
               />
             </div>
           )}
+
+          {/* 按人分类的数据(成绩/消费/位置/医疗/药物/健康)*/}
+          <div style={{ marginTop: '1rem' }}>
+            <div className="nesio-rel-rec-head">
+              <p className="nesio-settings-section-label" style={{ margin: 0 }}>{L(dict, '挂在 TA 身上的信息', 'Attached info')}</p>
+              <button type="button" className="nesio-rel-rec-add" onClick={() => setAdding((v) => !v)}>
+                {adding ? L(dict, '取消', 'Cancel') : L(dict, '＋ 挂一条', '＋ Add')}
+              </button>
+            </div>
+
+            {adding && (
+              <div className="nesio-rel-rec-form">
+                <div className="nesio-rel-chips">
+                  {RECORD_CATEGORIES.map((cat) => (
+                    <button key={cat.key} type="button"
+                      className={`nesio-rel-chip${form.category === cat.key ? ' nesio-rel-chip--on' : ''}`}
+                      onClick={() => setForm((f) => ({ ...f, category: cat.key }))}>
+                      {cat.icon} {L(dict, cat.zh, cat.en)}
+                    </button>
+                  ))}
+                </div>
+                <input className="nesio-rel-rec-input" placeholder={L(dict, '标题(如「期末年级第一」)', 'Title')} value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
+                <input className="nesio-rel-rec-input" placeholder={L(dict, '备注(可选)', 'Note (optional)')} value={form.detail} onChange={(e) => setForm((f) => ({ ...f, detail: e.target.value }))} />
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <input className="nesio-rel-rec-input" type="date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} style={{ flex: 1 }} />
+                  {RECORD_CATEGORY_MAP[form.category].money && (
+                    <input className="nesio-rel-rec-input" type="number" inputMode="decimal" placeholder={L(dict, '金额', 'Amount')} value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} style={{ flex: 1 }} />
+                  )}
+                </div>
+                {RECORD_CATEGORY_MAP[form.category].sensitive && (
+                  <p className="nesio-rel-rec-sensitive">🔒 {L(dict, '敏感信息:只存本机,不进 AI、不上传', 'Sensitive — on-device only, never sent to AI')}</p>
+                )}
+                <button type="button" className="nesio-ob-primary-btn" style={{ width: '100%', marginTop: '0.4rem' }} onClick={saveRecord}>{L(dict, '保存', 'Save')}</button>
+              </div>
+            )}
+
+            {records.length > 0 ? (
+              <div className="nesio-rel-rec-list">
+                {records.map((r) => {
+                  const meta = RECORD_CATEGORY_MAP[r.category];
+                  return (
+                    <div key={r.id} className="nesio-rel-rec-row">
+                      <span className="nesio-rel-rec-ic" title={L(dict, meta.zh, meta.en)}>{meta.icon}</span>
+                      <div className="nesio-rel-rec-main">
+                        <span className="nesio-rel-rec-title">{r.title}{typeof r.amount === 'number' ? ` · ${r.amount}` : ''}</span>
+                        {(r.detail || r.date) && (
+                          <span className="nesio-rel-rec-sub">
+                            {r.date ? new Date(r.date).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { year: 'numeric', month: 'short', day: 'numeric' }) : ''}
+                            {r.detail ? `${r.date ? ' · ' : ''}${r.detail}` : ''}
+                          </span>
+                        )}
+                      </div>
+                      <button type="button" className="nesio-rel-rec-del" onClick={() => removeRecord(r.id)} aria-label={L(dict, '删除', 'Delete')}>✕</button>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : !adding && (
+              <p className="nesio-settings-option-hint" style={{ margin: '0.3rem 0 0' }}>
+                {L(dict, '把成绩、消费、位置,或医疗/药物/健康按人记在这里(敏感项只存本机)。', 'Attach achievements, spending, places — or medical/medication/health, per person (sensitive stays on-device).')}
+              </p>
+            )}
+          </div>
 
           {/* 时间线 */}
           {p.timeline.length > 0 && (
