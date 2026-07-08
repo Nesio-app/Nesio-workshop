@@ -20,6 +20,8 @@
  * Escalating message: snoozeCount 3+ → stronger prompt; 5+ → letting-go primary CTA.
  */
 
+import { createBlobStore } from '@/lib/portal/idb-blob-store';
+import { reportStorageDropped } from '@/lib/portal/storage-health';
 import type { FocusNode } from '@/lib/platform/view-models/today-view-model';
 import { firstNodeDate } from '@/lib/platform/node-dates';
 
@@ -154,15 +156,21 @@ function pickCandidate(candidates: FocusNode[], dateStr: string): FocusNode {
 
 // ── Storage ───────────────────────────────────────────────────────────────────
 
+// 存储完整性批:localStorage → IDB blob(同步缓存读 + 旧值自动迁移 + 备份/删除收口)。
+const blob = createBlobStore<DormantStore>({
+  key: STORE_KEY, updateEvent: `${STORE_KEY}-updated`,
+  validate: (v) => typeof v === 'object' && v !== null, onWriteError: reportStorageDropped,
+});
+
 export function loadDormantStore(): DormantStore {
   if (typeof window === 'undefined') return {};
-  try { return JSON.parse(localStorage.getItem(STORE_KEY) ?? '{}') as DormantStore; }
-  catch { return {}; }
+  const v = blob.load();
+  return v && typeof v === 'object' ? v : {};
 }
 
 function save(store: DormantStore): void {
   if (typeof window === 'undefined') return;
-  try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch {}
+  blob.save(store);
 }
 
 function getRecord(store: DormantStore, nodeId: string): DormantRecord {

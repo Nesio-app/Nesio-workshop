@@ -14048,3 +14048,11 @@ html[data-portal-theme="night"] .nesio-exp-card:hover {
 .nesio-tl-record-date { flex: 0 0 auto; color: var(--portal-muted); font-size: 0.66rem; }
 .nesio-tl-months { display: flex; gap: 4px; align-items: flex-end; margin-top: 0.4rem; }
 .nesio-tl-months .nesio-tl-bucket { flex: 1; }
+
+/* ── 生活报告卡(洞察 tab 顶部)──────────────────────────────────────── */
+.nesio-lr { margin-bottom: 1.1rem; }
+.nesio-lr-presets { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+.nesio-lr-custom { display: flex; gap: 0.4rem; align-items: center; margin-bottom: 0.5rem; }
+.nesio-lr-custom input { background: rgba(127,127,127,0.12); border: 1px solid var(--portal-hairline); border-radius: 8px; padding: 0.3rem 0.5rem; color: inherit; font-size: 0.78rem; }
+.nesio-lr-grid { grid-template-columns: repeat(3, 1fr); }
+.nesio-lr-actions { display: flex; gap: 0.6rem; align-items: center; margin-top: 0.6rem; }

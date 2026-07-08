@@ -32,7 +32,25 @@ function load(rel, requireImpl) {
   return ctx.module.exports;
 }
 
-const persist = load('../lib/platform/personalization/persist.ts', () => ({}));
+// 存储完整性批:persist/学习态迁 IDB blob —— 测试桩模拟真实语义
+// (创建即从假 localStorage 迁旧值,load 同步读内存缓存)。
+const blobMap = new Map();
+const idbStub = { createBlobStore: ({ key }) => {
+  if (!blobMap.has(key)) {
+    const raw = lsMap.has(key) ? lsMap.get(key) : null;
+    blobMap.set(key, raw != null ? JSON.parse(raw) : null);
+  }
+  return {
+    load: () => blobMap.get(key),
+    save: (v) => { blobMap.set(key, v); },
+    ready: async () => {},
+  };
+} };
+const idbMocks = (p) => (
+  p === '@/lib/portal/idb-blob-store' ? idbStub
+    : p === '@/lib/portal/storage-health' ? { reportStorageDropped() {} }
+    : null);
+const persist = load('../lib/platform/personalization/persist.ts', (p) => idbMocks(p) ?? ({}));
 const bus = load('../lib/platform/personalization/feedback-bus.ts', () => ({}));
 const pref = load('../lib/platform/personalization/preference-store.ts', (p) =>
   p === './persist' ? persist : p === './feedback-bus' ? bus : ({}));
@@ -47,7 +65,7 @@ lsMap.set('nesio-mirror-profile-v1', JSON.stringify({
 }));
 
 const mirror = load('../lib/portal/mirror-profile.ts', (p) =>
-  p === '@/lib/platform/personalization' ? pref : ({}));
+  p === '@/lib/platform/personalization' ? pref : (idbMocks(p) ?? ({})));
 
 // 1. 旧 blob 迁移:首次读把 domainWeights 灌进 Preference(真源)
 assert.equal(mirror.getDomainWeight('finance'), 0.9, '旧 blob 权重经迁移可读');
@@ -70,8 +88,8 @@ assert.equal(pref.getWeight('domain', 'finance'), before, 'not_now 不罚领域(
 mirror.learnFromFeedback('finance', 'too_much');
 assert.ok(Math.abs(pref.getWeight('domain', 'finance') - (before + 0.21 * (0 - before))) < 1e-9, 'too_much → 0,α×1.4');
 
-// 4. blob 副本携带最新权重(云往返不丢)
-const blob = JSON.parse(lsMap.get('nesio-mirror-profile-v1'));
+// 4. blob 副本携带最新权重(云往返不丢)—— 存储完整性批后副本在 IDB blob
+const blob = blobMap.get('nesio-mirror-profile-v1');
 assert.equal(blob.domainWeights.health, afterWrong, '保存的 blob 副本 = Preference 最新值');
 
 // 5. reset 连 Preference 一起清

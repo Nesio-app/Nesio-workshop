@@ -30,11 +30,22 @@ function load(rel, requireImpl) {
 }
 
 const bus = load('../lib/platform/personalization/feedback-bus.ts', () => ({}));
-const persist = load('../lib/platform/personalization/persist.ts', () => ({}));
 
-// feedback-log:IDB 后端用内存桩,storage-health 空实现
+// IDB 后端统一用内存桩(存储完整性批后 persist 也走 blob store),storage-health 空实现
 const idbCache = { v: null };
 const idbStub = { createBlobStore: () => ({ load: () => idbCache.v, save: (v) => { idbCache.v = v; }, ready: async () => {} }) };
+// persist:每个 key 一个独立内存 store(与真实语义一致)
+const persistStub = (() => {
+  const m = new Map();
+  return { createBlobStore: ({ key }) => ({
+    load: () => (m.has(key) ? m.get(key) : null),
+    save: (v) => { m.set(key, v); },
+    ready: async () => {},
+  }) };
+})();
+const persist = load('../lib/platform/personalization/persist.ts', (p) =>
+  p === '@/lib/portal/idb-blob-store' ? persistStub
+    : p === '@/lib/portal/storage-health' ? { reportStorageDropped() {} } : ({}));
 const log = load('../lib/platform/personalization/feedback-log.ts', (p) =>
   p === '@/lib/portal/idb-blob-store' ? idbStub
     : p === '@/lib/portal/storage-health' ? { reportStorageDropped() {} }

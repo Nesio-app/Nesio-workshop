@@ -13,6 +13,8 @@
  * 首次访问时一次性灌进 Preference(保留现 key,云回灌时同样回填)。
  */
 
+import { createBlobStore } from '@/lib/portal/idb-blob-store';
+import { reportStorageDropped } from '@/lib/portal/storage-health';
 import { getWeights, recordPreference, seedPreferenceWeights, resetPreferenceDimension, type Reaction } from '@/lib/platform/personalization';
 
 const MIRROR_KEY = 'nesio-mirror-profile-v1';
@@ -58,14 +60,15 @@ function ensureDomainWeightsMigrated(stored: MirrorProfile | null): void {
   }
 }
 
+// 存储完整性批:localStorage → IDB blob(同步缓存读 + 旧值自动迁移 + 备份/删除收口)。
+const blob = createBlobStore<MirrorProfile>({
+  key: MIRROR_KEY, updateEvent: `${MIRROR_KEY}-updated`,
+  validate: (v) => typeof v === 'object' && v !== null, onWriteError: reportStorageDropped,
+});
+
 function readStored(): MirrorProfile | null {
   if (typeof window === 'undefined') return null;
-  try {
-    const raw = localStorage.getItem(MIRROR_KEY);
-    return raw ? (JSON.parse(raw) as MirrorProfile) : null;
-  } catch {
-    return null;
-  }
+  return blob.load();
 }
 
 export function getMirrorProfile(): MirrorProfile {
@@ -78,11 +81,7 @@ export function getMirrorProfile(): MirrorProfile {
 
 function saveMirrorProfile(profile: MirrorProfile): void {
   if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(MIRROR_KEY, JSON.stringify(profile));
-  } catch {
-    /* ignore */
-  }
+  blob.save(profile);
 }
 
 export function resetMirrorProfile(): void {

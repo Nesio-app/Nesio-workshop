@@ -1,5 +1,7 @@
 'use client';
 
+import { createBlobStore } from '@/lib/portal/idb-blob-store';
+import { reportStorageDropped } from '@/lib/portal/storage-health';
 import { useState, useEffect, useCallback } from 'react';
 import { IconActivity, IconClock, IconTarget, IconTrendingDown, IconTrendingUp } from './icons';
 import { L } from '@/lib/portal/i18n';
@@ -39,17 +41,21 @@ export interface Experiment {
 
 const STORE_KEY = 'nesio-experiments-v2';
 
+// 存储完整性批:n-of-1 实验数据是用户亲手记的,localStorage 被清就全没 → IDB blob。
+const expStore = createBlobStore<Experiment[]>({
+  key: STORE_KEY, updateEvent: `${STORE_KEY}-updated`,
+  validate: (v) => Array.isArray(v), onWriteError: reportStorageDropped,
+});
+
 export function loadExperiments(): Experiment[] {
   if (typeof window === 'undefined') return [];
-  try {
-    const raw = localStorage.getItem(STORE_KEY);
-    return raw ? (JSON.parse(raw) as Experiment[]) : [];
-  } catch { return []; }
+  const v = expStore.load();
+  return Array.isArray(v) ? v : [];
 }
 
 export function saveExperiments(exps: Experiment[]): void {
   if (typeof window === 'undefined') return;
-  try { localStorage.setItem(STORE_KEY, JSON.stringify(exps)); } catch { /* ignore */ }
+  expStore.save(exps);
 }
 
 // ── Analysis ──────────────────────────────────────────────────────────────────

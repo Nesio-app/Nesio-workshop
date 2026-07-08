@@ -11,6 +11,8 @@
  * itself closes soon anyway.
  */
 
+import { createBlobStore } from '@/lib/portal/idb-blob-store';
+import { reportStorageDropped } from '@/lib/portal/storage-health';
 import type { WindowUrgency } from './types';
 
 const STORE_KEY = 'nesio-guidance-cooling';
@@ -32,10 +34,16 @@ interface CooldownEntry {
 
 export type CoolingStore = Record<string, CooldownEntry>;
 
+// 存储完整性批:localStorage → IDB blob(同步缓存读 + 旧值自动迁移 + 备份/删除收口)。
+const blob = createBlobStore<CoolingStore>({
+  key: STORE_KEY, updateEvent: `${STORE_KEY}-updated`,
+  validate: (v) => typeof v === 'object' && v !== null, onWriteError: reportStorageDropped,
+});
+
 export function loadCoolingStore(): CoolingStore {
   if (typeof window === 'undefined') return {};
-  try { return JSON.parse(localStorage.getItem(STORE_KEY) ?? '{}') as CoolingStore; }
-  catch { return {}; }
+  const v = blob.load();
+  return v && typeof v === 'object' ? v : {};
 }
 
 export function isOnCooldown(
@@ -83,5 +91,5 @@ export function recordDismissed(eventType: string, store: CoolingStore): Cooling
 
 export function saveCoolingStore(store: CoolingStore): void {
   if (typeof window === 'undefined') return;
-  try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch {}
+  blob.save(store);
 }

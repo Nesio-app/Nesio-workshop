@@ -31,7 +31,25 @@ function load(rel, requireImpl) {
   return ctx.module.exports;
 }
 
-const persist = load('../lib/platform/personalization/persist.ts', () => ({}));
+// 存储完整性批:persist/学习态迁 IDB blob —— 测试桩模拟真实语义
+// (创建即从假 localStorage 迁旧值,load 同步读内存缓存)。
+const blobMap = new Map();
+const idbStub = { createBlobStore: ({ key }) => {
+  if (!blobMap.has(key)) {
+    const raw = lsMap.has(key) ? lsMap.get(key) : null;
+    blobMap.set(key, raw != null ? JSON.parse(raw) : null);
+  }
+  return {
+    load: () => blobMap.get(key),
+    save: (v) => { blobMap.set(key, v); },
+    ready: async () => {},
+  };
+} };
+const idbMocks = (p) => (
+  p === '@/lib/portal/idb-blob-store' ? idbStub
+    : p === '@/lib/portal/storage-health' ? { reportStorageDropped() {} }
+    : null);
+const persist = load('../lib/platform/personalization/persist.ts', (p) => idbMocks(p) ?? ({}));
 const baseline = load('../lib/platform/personalization/baseline-store.ts', (p) => (p === './persist' ? persist : ({})));
 const moment = load('../lib/portal/moment-analytics.ts', () => ({}));
 const energy = load('../lib/platform/energy-state.ts', (p) =>
@@ -75,8 +93,9 @@ assert.equal(energy.getEnergyState(new Date('2026-01-11T12:00:00.000Z')), 'unkno
 
 // 4. 冷启动:无旧 blob、样本 <3 → unknown(先验在位但 sampleCount 起步 0)
 lsMap.clear();
+blobMap.clear(); // 存储完整性批后学习态在 blob 桩里,冷启动同样要清
 graphNodes = [];
-const persist2 = load('../lib/platform/personalization/persist.ts', () => ({}));
+const persist2 = load('../lib/platform/personalization/persist.ts', (p) => idbMocks(p) ?? ({}));
 const baseline2 = load('../lib/platform/personalization/baseline-store.ts', (p) => (p === './persist' ? persist2 : ({})));
 const energy2 = load('../lib/platform/energy-state.ts', (p) =>
   p === '@/lib/portal/life-graph' ? { getLifeGraph: () => graphNodes }

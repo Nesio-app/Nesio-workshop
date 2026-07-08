@@ -10,6 +10,7 @@
  * 设计原则：行为观测 > 自我声明；每条结论可溯源、可校正、可演化。
  */
 
+import LifeReportCard from './insights/LifeReportCard';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { MyExperimentWidget, loadExperiments, computeInsight } from '@/components/portal/NesioExperiment';
 import LifeCivilizationMap from '@/components/portal/LifeCivilizationMap';
@@ -1235,6 +1236,9 @@ export default function InsightsSheet({ onClose, canUsePrivateData = true, initi
             </div>
 
 
+
+            {/* 生活报告(回顾面,输出口定稿 §7):周报/月报/自定义区间 */}
+            <LifeReportCard />
 
             {/* Dynamic widgets */}
             {activeWidgets.length === 0 && (
