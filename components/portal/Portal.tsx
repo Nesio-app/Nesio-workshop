@@ -1,5 +1,6 @@
 'use client';
 
+import '@/lib/life-domain/node-fact-sink'; // 节点事实 sink:任何写入前武装
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import dynamic from 'next/dynamic';
@@ -210,6 +211,12 @@ function mergePortalConfigWithDecMetadata(
 }
 
 export default function Portal() {
+  // 架构审查 #4:向浏览器申请持久存储,降低 IDB/localStorage 被静默驱逐的风险
+  //(Safari/Chrome 对已安装 PWA 通常放行;拒绝也无害,云备份仍是兜底)。
+  useEffect(() => {
+    try { void navigator.storage?.persist?.(); } catch { /* 不支持则算了 */ }
+  }, []);
+
   const [config, setConfig] = useState<PortalConfig>(DEFAULT_PORTAL_CONFIG);
   const [decModules, setDecModules] = useState<Map<string, PortalDecMetadata>>(new Map());
   const [decShellRoutes, setDecShellRoutes] = useState<

@@ -131,16 +131,19 @@ export function TodayFocusSection({
   const pinned = selectPinned(scored);
   const rest = scored.filter((o) => o.id !== pinned?.id);
 
+  // ── Dormant: one review card per day(先选,任务列表要据此排重)──
+  const [dormantDismissed, setDormantDismissed] = useState<Set<string>>(new Set());
+  const dormantCandidate: DormantCandidate | null = selectReviewCandidate(allNodesProp, dormantStoreProp);
+
   // ── Task nodes ──
+  // 架构审查 D4:单门防重出现 —— 进了复访卡的节点不再同时出现在任务列表
+  //(四套选择系统交汇处的唯一 presence 守卫)。
   const allNodes = [...localNodes, ...focusNodes.filter((n) => !localNodes.some((l) => l.id === n.id))];
-  const taskNodes = allNodes.filter((n) => !dismissed.has(n.id) && n.type !== 'event' && !doneIds.has(n.id));
+  const taskNodes = allNodes.filter((n) => !dismissed.has(n.id) && n.type !== 'event' && !doneIds.has(n.id) && n.id !== dormantCandidate?.node.id);
 
   // ── Special days (today / tomorrow) ──
   const nearSpecialDays = specialDays.filter((d) => d.daysUntil <= 1);
 
-  // ── Dormant: one review card per day ──
-  const [dormantDismissed, setDormantDismissed] = useState<Set<string>>(new Set());
-  const dormantCandidate: DormantCandidate | null = selectReviewCandidate(allNodesProp, dormantStoreProp);
   const showDormant = dormantCandidate && !dormantDismissed.has(dormantCandidate.node.id);
 
   const collapsedCount = rest.length + taskNodes.length + nearSpecialDays.length + (showDormant ? 1 : 0);

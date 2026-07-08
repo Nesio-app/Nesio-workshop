@@ -730,6 +730,22 @@ export function prunePrivateExternalNodes(): number {
   return removed;
 }
 
+
+// ── 节点事实 sink(架构审查 #1 残留修复,2026-07-08)────────────────────────
+// updateLifeNode 此前只写投影(localStorage)+云,不写本地 IDB 事实库 ——
+// done/子任务/改名全是旁路写,rebuildLifeGraphFromSignals 会把它们丢掉,
+// 「投影可重建」名不副实。环依赖(life-domain/signal → life-graph)不允许
+// 这里直接 import 转换器,改为注册钩子:life-domain/node-fact-sink 在模块
+// 加载时注册,add/update/delete 三个写入点统一喂事实库(同 id 幂等覆盖 = upsert)。
+export interface NodeFactSink {
+  upsert(node: LifeNode): void;
+  remove(node: LifeNode): void;
+}
+let nodeFactSink: NodeFactSink | null = null;
+export function registerNodeFactSink(sink: NodeFactSink): void {
+  nodeFactSink = sink;
+}
+
 export function addLifeNode(node: Omit<LifeNode, 'id' | 'createdAt'>): LifeNode {
   const nodes = loadAll();
   const newNode: LifeNode = {
@@ -744,6 +760,7 @@ export function addLifeNode(node: Omit<LifeNode, 'id' | 'createdAt'>): LifeNode 
   if (typeof window !== 'undefined' && RECEIPT_SOURCES.has(newNode.source)) {
     window.dispatchEvent(new CustomEvent('nesio-memory-received', { detail: { node: newNode } }));
   }
+  nodeFactSink?.upsert(newNode);
   return newNode;
 }
 
@@ -753,6 +770,7 @@ export function updateLifeNode(id: string, patch: Partial<LifeNode>): boolean {
   if (idx < 0) return false;
   nodes[idx] = { ...nodes[idx], ...patch };
   saveAll(nodes);
+  nodeFactSink?.upsert(nodes[idx]);
   void syncLifeGraphUpsertToCloud(nodes[idx]);
   syncLifeNodeSignalToCloud(nodes[idx]);
   return true;
@@ -771,9 +789,11 @@ export function replaceLifeGraphProjection(nodes: LifeNode[]): void {
 export function deleteLifeNode(id: string): boolean {
   const nodes = loadAll();
   const deleted = nodes.find((n) => n.id === id);
+  const removed = loadAll().find((n) => n.id === id) ?? null;
   const filtered = nodes.filter((n) => n.id !== id);
   if (filtered.length === nodes.length) return false;
   saveAll(filtered);
+  if (removed) nodeFactSink?.remove(removed);
   // Cutover(2026-07-04):删除意图显式广播——本地事实库(signal-read-cache)
   // 据此删对应 Signal。事实库独立后不能再用「不在投影=删」推断。
   if (deleted && typeof window !== 'undefined') {

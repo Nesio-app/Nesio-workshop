@@ -1,3 +1,4 @@
+import './node-fact-sink';
 /**
  * ingestLifeNode — LifeNode 形状输入的统一写入口(Signal 迁移里程碑 1)。
  *
@@ -18,7 +19,6 @@
 import { addLifeNode, getLifeGraph, updateLifeNode, type LifeNode } from '@/lib/portal/life-graph';
 import { lifeNodeToSignal } from './signal';
 import { signalWriteMode, writeCloudSignal } from './create-signal';
-import { appendSignalIdb } from './signal-store-idb';
 
 export type IngestNodeInput = Omit<LifeNode, 'id' | 'createdAt'>;
 
@@ -48,8 +48,9 @@ export function ingestLifeNode(input: IngestNodeInput): LifeNode {
   } else {
     node = addLifeNode(input);
   }
+  // 本地事实追加已由 node-fact-sink 在 addLifeNode/updateLifeNode 写入点完成
+  //(架构审查 #1:写入点收口后这里不再重复 append,只管云镜像)。
   const signal = lifeNodeToSignal(node);
-  void appendSignalIdb(signal);
   if (signalWriteMode() === 'cloud_mirror_pending') {
     void writeCloudSignal(signal);
   }
