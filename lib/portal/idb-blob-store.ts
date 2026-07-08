@@ -104,6 +104,14 @@ export function isIdbBlobKey(key: string): boolean {
   return registeredBlobKeys.has(key);
 }
 
+/**
+ * 登记一个直接用 idbBackend(非 createBlobStore)持久化的 key，让备份/恢复/清理
+ * 把它当 IDB blob 处理。给 life-graph 这类需要「同步读 + IDB 大容量持久」的自管存储用。
+ */
+export function registerIdbBlobKey(key: string): void {
+  registeredBlobKeys.add(key);
+}
+
 /** 全部已登记的 IDB blob key。 */
 export function idbBlobKeys(): string[] {
   return [...registeredBlobKeys];

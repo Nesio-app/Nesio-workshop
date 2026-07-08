@@ -46,7 +46,8 @@ function makeCtx({ lsInit = {}, fbEntries = {}, idbBlobs = {}, fetchImpl, idbKey
       };
       if (p === './idb-blob-store') return {
         collectIdbBlobs: async () => ({ ...idbBlobs }),
-        isIdbBlobKey: (k) => idbKeys.includes(k),
+        isIdbBlobKey: (k) => idbKeys.includes(k) || k === 'nesio-life-graph-v1',
+        registerIdbBlobKey: (k) => { if (!idbKeys.includes(k)) idbKeys.push(k); },
         idbBackend,
       };
       return {};
@@ -142,10 +143,12 @@ const backupDoc = (entries) => ({ format: 'nesio-full-backup', version: 1, expor
 {
   const { mod, ctx } = makeCtx({ idbKeys: ['nesio-health-v1'] });
   const res = await mod.restoreCombinedBackup(backupDoc({ 'nesio-life-graph-v1': '[]', 'nesio-health-v1': '{"metrics":[1]}' }), 'replace');
-  assert.equal(JSON.stringify(ctx._lastRestore().entries), JSON.stringify({ 'nesio-life-graph-v1': '[]' }), 'localStorage 侧只含非 IDB key');
-  assert.equal(ctx._idbStore().get('nesio-health-v1'), '{"metrics":[1]}', 'IDB key 落 idbBackend');
-  assert.equal(res.idbRestored, 1);
-  assert.equal(res.restoredKeys, 1, 'localStorage 侧恢复 1 条');
+  // 图谱已迁 IDB(主存迁移):restore 把它路由到 idbBackend,不再落 localStorage
+  assert.equal(JSON.stringify(ctx._lastRestore().entries), JSON.stringify({}), 'life-graph 现走 IDB,localStorage 侧不含它');
+  assert.equal(ctx._idbStore().get('nesio-health-v1'), '{"metrics":[1]}', 'health 落 IDB');
+  assert.equal(ctx._idbStore().get('nesio-life-graph-v1'), '[]', 'life-graph 现落 IDB(主存迁移)');
+  assert.equal(res.idbRestored, 2, 'health + life-graph 两条落 IDB');
+  assert.equal(res.restoredKeys, 0, 'localStorage 侧无恢复');
 }
 
 // 7. merge 不覆盖已有 IDB;replace 覆盖(= 修复的坑)
@@ -181,9 +184,10 @@ const backupDoc = (entries) => ({ format: 'nesio-full-backup', version: 1, expor
   });
   const res = await mod.pullBackupFromCloud('merge');
   assert.equal(res.ok, true, '恢复成功');
-  assert.equal(res.idbRestored, 1, '健康 blob 落 IDB');
-  assert.equal(ctx._idbStore().get('nesio-health-v1'), '{"metrics":[]}', 'IDB 里有了');
-  assert.equal(JSON.stringify(ctx._lastRestore().entries), JSON.stringify({ 'nesio-life-graph-v1': '[]' }), '非 IDB key 走 localStorage 恢复');
+  assert.equal(res.idbRestored, 2, 'health + life-graph 两条落 IDB(图谱已迁 IDB)');
+  assert.equal(ctx._idbStore().get('nesio-health-v1'), '{"metrics":[]}', 'health 落 IDB');
+  assert.equal(ctx._idbStore().get('nesio-life-graph-v1'), '[]', 'life-graph merge-union 落 IDB');
+  assert.equal(JSON.stringify(ctx._lastRestore().entries), JSON.stringify({}), '图谱已迁 IDB,localStorage 侧不含它');
 }
 
 // 10. 云端 blob 不是有效备份 → invalid_backup,不动本机

@@ -517,41 +517,97 @@ export async function retryLifeGraphCloudSync(): Promise<{
   return { retriedCount, succeededCount, failedCount };
 }
 
-function loadAll(): LifeNode[] {
-  if (typeof window === 'undefined') return [];
+// ── 主存储迁 IndexedDB ──────────────────────────────────────────────────
+// localStorage ~5MB 全 origin 共享上限对记忆图谱太小(用户实测 761 条就撑爆);
+// IDB 可用设备存储的很大一部分(上百 G)。为保持「同步读」(getLifeGraph 首屏即读),
+// 用会话内存缓存:首次同步从 localStorage 播种(迁移源 + 消除水合空窗),IDB 异步
+// 水合。安全保证:① 当前有数据的设备,首访 memCache 同步拿到全量,迁移与读写全程
+// 有据,零丢失;② 已迁设备(localStorage 空),水合前 memCache 为空 → 期间无真删
+// 可能(列表为空删不了具体节点),写入用 union 与旧 IDB 合并(加安全、删不复活);
+// 水合完成派发 updated 让界面补齐。
+let memCache: LifeNode[] | null = null;
+let memDirty = false;
+let graphHydrated = false;
+
+function seedFromLocalStorage(): LifeNode[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    return JSON.parse(raw) as LifeNode[];
-  } catch {
-    return [];
+    const v = raw ? JSON.parse(raw) : [];
+    return Array.isArray(v) ? v : [];
+  } catch { return []; }
+}
+
+function unionNodesById(a: LifeNode[], b: LifeNode[]): LifeNode[] {
+  const byId = new Map<string, LifeNode>();
+  const stamp = (n: LifeNode) => String((n.attributes?.updatedAt as string) || n.createdAt || '');
+  for (const n of [...a, ...b]) {
+    if (!n?.id) continue;
+    const prev = byId.get(n.id);
+    if (!prev || stamp(n) >= stamp(prev)) byId.set(n.id, n);
   }
+  return Array.from(byId.values());
+}
+
+function persistGraphToIdb(nodes: LifeNode[]): void {
+  import('./idb-blob-store').then((mod) => {
+    const idb = mod.idbBackend;
+    if (!idb) return;
+    idb.set(STORAGE_KEY, JSON.stringify(nodes)).catch(() => {
+      import('./storage-health').then(({ STORAGE_FULL_EVENT, getStorageHealth }) => {
+        window.dispatchEvent(new CustomEvent(STORAGE_FULL_EVENT, { detail: getStorageHealth() }));
+      }).catch(() => {});
+    });
+  }).catch(() => {});
+}
+
+function hydrateGraphOnce(): void {
+  if (graphHydrated || typeof window === 'undefined') return;
+  graphHydrated = true; // 立即置位防重入;异步内校正 memCache
+  import('./idb-blob-store').then(async (mod) => {
+    const { idbBackend } = mod;
+    mod.registerIdbBlobKey?.(STORAGE_KEY); // 让备份/恢复/清理把图谱当 IDB blob
+    try {
+      const raw = await idbBackend.get(STORAGE_KEY);
+      const idbNodes = raw ? (JSON.parse(raw) as LifeNode[]) : null;
+      const seed = memCache ?? seedFromLocalStorage();
+      if (memDirty) {
+        // 本会话已写:memCache 最新,与旧 IDB union(补 IDB 独有,不复活已删)后回写
+        const merged = Array.isArray(idbNodes) ? unionNodesById(seed, idbNodes) : seed;
+        memCache = merged;
+        persistGraphToIdb(merged);
+      } else if (Array.isArray(idbNodes) && idbNodes.length) {
+        memCache = idbNodes; // 未写过 + IDB 有数据:IDB 权威
+      } else {
+        if (seed.length) persistGraphToIdb(seed); // IDB 空:首次迁移 localStorage → IDB
+        memCache = seed;
+      }
+      try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
+      window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
+    } catch { /* 水合失败:保持 localStorage 播种,不删 localStorage,下次重试 */ }
+  }).catch(() => {});
+}
+
+function loadAll(): LifeNode[] {
+  if (typeof window === 'undefined') return [];
+  if (memCache == null) {
+    memCache = seedFromLocalStorage();
+    hydrateGraphOnce();
+  }
+  return memCache;
 }
 
 function saveAll(nodes: LifeNode[]): void {
   if (typeof window === 'undefined') return;
-  // 首写前先把旧版胖 outbox 压缩掉,回收 localStorage(未登录设备的配额主凶)
   compactCloudSyncOutboxOnce();
-  const serialized = JSON.stringify(nodes);
-  try {
-    localStorage.setItem(STORAGE_KEY, serialized);
-    window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
-    // Warn proactively as the quota cliff approaches (throttled daily)
-    import('./storage-health').then(({ checkStorageWarning }) => checkStorageWarning());
-  } catch {
-    // 配额溢出:先腾出同步 outbox 占的空间(它与图谱重复),再重试一次写入
-    try {
-      localStorage.removeItem(CLOUD_SYNC_OUTBOX_KEY);
-      outboxCompacted = true;
-      localStorage.setItem(STORAGE_KEY, serialized);
-      window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
-      return;
-    } catch {
-      // 仍写不进 —— 写被丢弃,如实上报(此前静默 = 用户丢新记忆无感知)
-      import('./storage-health').then(({ STORAGE_FULL_EVENT, getStorageHealth }) => {
-        window.dispatchEvent(new CustomEvent(STORAGE_FULL_EVENT, { detail: getStorageHealth() }));
-      });
-    }
+  memCache = nodes;
+  const wasHydrated = graphHydrated;
+  memDirty = true;
+  window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
+  import('./storage-health').then(({ checkStorageWarning }) => checkStorageWarning());
+  if (wasHydrated) {
+    persistGraphToIdb(nodes);
+  } else {
+    hydrateGraphOnce(); // 未水合:reconcile(union 旧 IDB)后由水合回写,防覆盖旧数据
   }
 }
 

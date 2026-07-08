@@ -15,7 +15,35 @@
  */
 
 import { buildFullBackup, restoreFullBackup, isValidBackup, type FullBackup } from './full-backup';
-import { collectIdbBlobs, isIdbBlobKey, idbBackend } from './idb-blob-store';
+import { collectIdbBlobs, isIdbBlobKey, idbBackend, registerIdbBlobKey } from './idb-blob-store';
+
+/** 记忆图谱现主存 IDB(localStorage 5MB 太小)。登记后备份/恢复/清理把它当 IDB blob。 */
+const LIFE_GRAPH_KEY = 'nesio-life-graph-v1';
+registerIdbBlobKey(LIFE_GRAPH_KEY);
+
+interface GraphNodeLite { id?: string; createdAt?: string; attributes?: { updatedAt?: string } }
+
+/**
+ * 图谱 merge-恢复:两份 JSON 数组按节点 id union(新者胜)。备份侧(incoming)解析失败/
+ * 非数组 → 返回 null(不可用,调用方记 corrupt 并保留本机)。本机(current)损坏当空并入。
+ */
+function mergeGraphJson(currentRaw: string | null, incomingRaw: string): string | null {
+  const parse = (s: string | null): GraphNodeLite[] | null => {
+    try { const v = JSON.parse(s || '[]'); return Array.isArray(v) ? v : null; }
+    catch { return null; }
+  };
+  const incoming = parse(incomingRaw);
+  if (incoming === null) return null;
+  const current = parse(currentRaw) ?? [];
+  const stamp = (n: GraphNodeLite) => String(n.attributes?.updatedAt || n.createdAt || '');
+  const byId = new Map<string, GraphNodeLite>();
+  for (const n of [...current, ...incoming]) {
+    if (!n?.id) continue;
+    const prev = byId.get(n.id);
+    if (!prev || stamp(n) >= stamp(prev)) byId.set(n.id, n);
+  }
+  return JSON.stringify(Array.from(byId.values()));
+}
 
 /** 上次云备份记录(小,留 localStorage)。 */
 const LAST_CLOUD_BACKUP_KEY = 'nesio-cloud-backup-last-v1';
@@ -167,8 +195,18 @@ export async function restoreCombinedBackup(backup: FullBackup, mode: RestoreMod
 
   let idbRestored = 0;
   const idbFailedKeys: string[] = [];
+  const idbCorruptKeys: string[] = [];
   for (const [k, v] of Object.entries(idbEntries)) {
     try {
+      if (k === LIFE_GRAPH_KEY && mode === 'merge') {
+        // 图谱 merge = 按节点 id union(新者胜),不是「已有就跳过」——否则换机合并
+        // 拿不到备份里的记忆。备份该条损坏则记 corrupt、保留本机(不空覆盖)。
+        const merged = mergeGraphJson(await idbBackend.get(k), v);
+        if (merged == null) { idbCorruptKeys.push(k); continue; }
+        await idbBackend.set(k, merged);
+        idbRestored++;
+        continue;
+      }
       if (mode === 'merge' && (await idbBackend.get(k)) != null) continue; // merge:已有不覆盖
       await idbBackend.set(k, v);
       idbRestored++;
@@ -183,7 +221,7 @@ export async function restoreCombinedBackup(backup: FullBackup, mode: RestoreMod
     idbRestored,
     mergedNodes: ls.mergedNodes,
     skippedKeys: ls.skippedKeys,
-    corruptKeys: [...ls.corruptKeys, ...idbFailedKeys],
+    corruptKeys: [...ls.corruptKeys, ...idbFailedKeys, ...idbCorruptKeys],
   };
 }
 
