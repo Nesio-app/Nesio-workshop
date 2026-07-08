@@ -27,7 +27,7 @@ const PRODUCT_BACKEND_SURFACE_SPECS = [
     id: 'auth_session',
     label: 'Supabase Auth session',
     routeFile: 'app/api/auth/session/route.ts',
-    clientFile: 'lib/portal/auth-client.ts',
+    clientFile: 'lib/portal/auth/auth-client.ts',
     schemaTables: ['user_profiles'],
     postgresBacked: true,
     storageBacked: false,

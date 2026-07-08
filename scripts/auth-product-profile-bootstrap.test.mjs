@@ -97,7 +97,7 @@ assert.match(onboarding, /completeOnboardingAfterAuth\(\{\s*showTips:\s*false\s*
 assert.doesNotMatch(onboarding, /completeOnboardingAfterAuth\(\{\s*showTips:\s*!done\s*\}\)/s, 'PortalOnboarding must not bounce newly signed-in users into first-use tips based on onboarding done state.');
 assert.match(onboarding, /'authReady'[^]*'profileBootstrapBlocking'/s, 'PortalOnboarding must clear auth callback readiness markers after consuming them.');
 
-const authClient = fs.readFileSync(path.join(root, 'lib', 'portal', 'auth-client.ts'), 'utf8');
+const authClient = fs.readFileSync(path.join(root, 'lib', 'portal', 'auth', 'auth-client.ts'), 'utf8');
 assert.match(authClient, /NESIO_ONBOARDING_DONE_KEYS/s, 'auth client must expose shared onboarding completion keys.');
 assert.match(authClient, /NESIO_ONBOARDING_COMPLETE_EVENT/s, 'auth client must expose a shared onboarding completion event.');
 assert.match(authClient, /function markNesioOnboardingDoneForAuth/s, 'auth client must expose a helper to mark onboarding complete after auth.');

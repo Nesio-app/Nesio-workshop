@@ -9,7 +9,7 @@ function read(path) {
 }
 
 const importRoute = read('app/api/auth/import/route.ts');
-const authClient = read('lib/portal/auth-client.ts');
+const authClient = read('lib/portal/auth/auth-client.ts');
 const layout = read('app/layout.tsx');
 const authHashImportBridge = read('components/portal/AuthHashImportBridge.tsx');
 const portal = read('components/portal/Portal.tsx');
