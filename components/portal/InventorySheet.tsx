@@ -22,6 +22,7 @@ import {
   inventoryStats,
   listInventoryItems,
   removeInventoryItem,
+  sellPile,
   updateInventoryItem,
   type InventoryItem,
 } from '@/lib/portal/inventory';
@@ -39,7 +40,7 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [groupFilter, setGroupFilter] = useState<string>(ALL);
   const [query, setQuery] = useState('');
-  const [view, setView] = useState<'list' | 'add' | 'detail' | 'stats'>('list');
+  const [view, setView] = useState<'list' | 'add' | 'detail' | 'stats' | 'sell'>('list');
   const [detailId, setDetailId] = useState<string | null>(null);
   const [importMsg, setImportMsg] = useState(''); // 物品②:导入结果可见展示(不静默)
   const fileRef = useRef<HTMLInputElement>(null);
@@ -154,6 +155,9 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
               )}
               <button type="button" style={chip(false)} onClick={() => setView('stats')}>
                 📊 {L(dict, '统计', 'Stats')}
+              </button>
+              <button type="button" style={chip(false)} onClick={() => setView('sell')}>
+                💰 {L(dict, '卖闲置', 'Sell pile')}
               </button>
             </div>
 
@@ -313,8 +317,53 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
                   </div>
                 </>
               )}
+              {(() => {
+                const sp = sellPile(items);
+                if (!sp.items.length) return null;
+                return (
+                  <p style={{ margin: '1rem 0 0', fontSize: '0.82rem' }}>
+                    💰 {L(dict, `卖闲置堆:${sp.items.length} 件,约值 $${sp.totalValue.toLocaleString('en-US')}`, `Sell pile: ${sp.items.length} items ≈ $${sp.totalValue.toLocaleString('en-US')}`)}
+                  </p>
+                );
+              })()}
               {items.length === 0 && (
                 <p style={{ padding: '1.4rem 0', textAlign: 'center', color: 'var(--text-tertiary)' }}>{L(dict, '还没有物品,统计会随记录自动出现。', 'No items yet — stats appear as you add.')}</p>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* ── 物品③:卖闲置堆(对标 Build a sell pile:hero 合计 + 列表) ── */}
+        {view === 'sell' && (() => {
+          const sp = sellPile(items);
+          return (
+            <div style={{ maxHeight: '58vh', overflowY: 'auto' }}>
+              <div style={{ borderRadius: 14, padding: '1rem', textAlign: 'center', background: 'var(--glass-bg, rgba(255,255,255,0.05))', border: '1px solid var(--border-subtle, rgba(255,255,255,0.1))' }}>
+                <span style={{ display: 'block', fontSize: '1.6rem', fontWeight: 700 }}>${sp.totalValue.toLocaleString('en-US')}</span>
+                <span style={{ display: 'block', fontSize: '0.76rem', color: 'var(--text-tertiary)' }}>
+                  {sp.items.length
+                    ? L(dict, `这堆闲置约值这么多(${sp.items.length} 件)—— 挂出去就是零花钱`, `Your sell pile (${sp.items.length} items) — list them and it's pocket money`)
+                    : L(dict, '还没有标记出售的物品', 'Nothing marked for sale yet')}
+                </span>
+              </div>
+              {sp.items.length === 0 ? (
+                <p style={{ padding: '1.2rem 0', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '0.8rem' }}>
+                  {L(dict, '在物品详情里点「标记出售」,它就会进到这里,估值自动累计。', 'Tap "Mark for sale" on any item — it lands here and the total grows.')}
+                </p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: '0.7rem' }}>
+                  {sp.items.map((i) => (
+                    <button key={i.id} type="button" onClick={() => { setDetailId(i.id); setView('detail'); }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', width: '100%', padding: '0.6rem 0.7rem', borderRadius: 12, border: '1px solid var(--border-subtle, rgba(255,255,255,0.1))', background: 'var(--glass-bg, rgba(255,255,255,0.04))', color: 'var(--text-primary)' }}>
+                      <span style={{ fontSize: '1.05rem' }}>💰</span>
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ display: 'block', fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{i.name}{i.quantity != null ? ` ×${i.quantity}` : ''}</span>
+                        <span style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>{i.location || L(dict, '未归位', 'Unplaced')}</span>
+                      </span>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{i.price != null ? `$${(i.price * (i.quantity && i.quantity > 0 ? i.quantity : 1)).toLocaleString('en-US')}` : L(dict, '未估值', 'no est.')}</span>
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
           );
@@ -399,7 +448,14 @@ function ItemDetail({ item, dict, label, onChanged, onDeleted }: {
       <input className="nesio-ob-input" value={tags} onChange={(e) => setTags(e.target.value)} />
       <label style={label}>{L(dict, '备注', 'Note')}</label>
       <input className="nesio-ob-input" value={note} onChange={(e) => setNote(e.target.value)} />
-      <button type="button" className="nesio-freeze-primary-btn" style={{ width: '100%', marginTop: '1rem' }} onClick={save}>
+      <button
+        type="button"
+        style={{ width: '100%', marginTop: '1rem', padding: '0.55rem', borderRadius: 10, border: '1px solid var(--border-subtle, rgba(255,255,255,0.12))', background: item.forSale ? 'var(--accent-primary-dim, rgba(91,140,255,0.18))' : 'transparent', color: 'var(--text-primary)', fontSize: '0.85rem' }}
+        onClick={() => { updateInventoryItem(item.id, { forSale: !item.forSale }); onChanged(); }}
+      >
+        💰 {item.forSale ? L(dict, '已在卖闲置堆 · 点击取消', 'In sell pile · tap to remove') : L(dict, '标记出售(进卖闲置堆)', 'Mark for sale')}
+      </button>
+      <button type="button" className="nesio-freeze-primary-btn" style={{ width: '100%', marginTop: '0.6rem' }} onClick={save}>
         {L(dict, '保存', 'Save')}
       </button>
       <button

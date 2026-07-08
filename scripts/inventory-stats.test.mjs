@@ -58,10 +58,28 @@ assert.equal(st.topTags[0].count, 2);
 assert.equal(inv.inventoryStats([]).count, 0);
 assert.equal(inv.inventoryStats([]).totalValue, 0);
 
+// ── 物品③:卖闲置堆 ──
+nodes.length = 0; seq = 0;
+const s1 = inv.addInventoryItem({ name: '旧相机', price: 130, forSale: true });
+inv.addInventoryItem({ name: '闲置包', price: 65, quantity: 2, forSale: true });
+inv.addInventoryItem({ name: '不卖的', price: 999 });
+inv.addInventoryItem({ name: '没估值的', forSale: true });
+let pile = inv.sellPile(inv.listInventoryItems());
+assert.equal(pile.items.length, 3, '只收标记出售的');
+assert.equal(pile.totalValue, 260, '合计 = 130 + 65×2(无价不计)');
+assert.equal(pile.items[0].name, '旧相机', '按估值(价×量)降序…');
+assert.equal(pile.items[2].name, '没估值的', '…无价在最后');
+inv.updateInventoryItem(s1.id, { forSale: false });
+pile = inv.sellPile(inv.listInventoryItems());
+assert.equal(pile.items.length, 2, '取消出售即移出卖堆');
+assert.equal(pile.totalValue, 130);
+
 // ── 客户端接线(源码级):统计视图 + 表单三字段 ──
 const sheet = fs.readFileSync(new URL('../components/portal/InventorySheet.tsx', import.meta.url), 'utf8');
 assert.ok(sheet.includes("view === 'stats'"), '统计视图存在');
 assert.ok(sheet.includes('inventoryStats(items)'), '统计走纯函数');
 assert.ok(sheet.includes('fCategory') && sheet.includes('fTags') && sheet.includes('fPrice'), '添加表单三字段');
+assert.ok(sheet.includes("view === 'sell'") && sheet.includes('sellPile(items)'), '物品③:卖闲置视图走纯函数');
+assert.ok(sheet.includes('forSale: !item.forSale'), '详情页标记/取消出售');
 
 console.log('inventory-stats: OK');
