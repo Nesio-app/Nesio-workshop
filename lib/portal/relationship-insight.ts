@@ -13,6 +13,7 @@
 import type { LifeNode } from './life-graph';
 import { buildRelationships, type Closeness } from './relationships';
 import { evaluateRules, type DomainRule, type RuleSeverity } from './domain-rules';
+import { loadAllPersonRecords, RECORD_CATEGORY_MAP, type PersonRecord } from './person-records';
 
 export interface RelationshipFinding {
   id: string;
@@ -26,12 +27,16 @@ export interface RelationshipInsightInput {
   now: Date;
   /** 可注入「联系过了」打卡(单测用);默认由 buildRelationships 读本机 nesio-rel-contact-v1。 */
   contactLog?: Record<string, string>;
+  /** 可注入按人记录(单测用);默认读本机 person-records。仅消费非敏感类(成绩/消费),敏感三类绝不进。 */
+  records?: PersonRecord[];
 }
 
 const DAY_MS = 86_400_000;
 // 重点管理的亲疏层级:核心(家人)优先,亲近次之;泛泛之交(acquaintance)不主动催。
 const FOCUS_CLOSENESS: ReadonlyArray<Closeness> = ['core', 'close'];
 const BIRTHDAY_WINDOW = 7; // 生日提前 7 天提醒(够时间准备,又不过早)
+const ACHIEVEMENT_WINDOW = 45; // 成绩/好消息回看窗口(天)
+const FAMILY_RE = /家人|家庭|family/i;
 
 /** 从 person 节点的 birthday(--MM-DD / YYYY-MM-DD / MM-DD)算距下一次生日还有几天。无效返回 null。 */
 function daysUntilBirthday(raw: unknown, now: Date): { days: number; mmdd: string } | null {
@@ -112,10 +117,71 @@ const RULES: ReadonlyArray<DomainRule<RelationshipInsightInput, RelationshipFind
       };
     },
   },
+
+  // ── 好消息:近期有人挂了「成绩」(非敏感)—— 提醒你去给一句鼓励。绝不碰医疗/药物/健康。 ──
+  {
+    id: 'person-achievement',
+    run: (i) => {
+      const contacts = buildRelationships(i.nodes, i.now.getTime(), i.contactLog);
+      const nameByKey = new Map(contacts.map((c) => [c.key, c.name]));
+      const cutoff = i.now.getTime() - ACHIEVEMENT_WINDOW * DAY_MS;
+      const hits = (i.records || [])
+        // 只看成绩类,且再用 sensitive 标位兜底(双保险:敏感三类永不进洞察/AI)
+        .filter((r) => r.category === 'achievement' && !RECORD_CATEGORY_MAP[r.category]?.sensitive && nameByKey.has(r.personKey))
+        .map((r) => ({ r, t: Date.parse(r.date || r.createdAt) }))
+        .filter((x) => !Number.isNaN(x.t) && x.t >= cutoff && x.t <= i.now.getTime())
+        .sort((a, b) => b.t - a.t);
+      if (!hits.length) return null;
+      const top = hits[0].r;
+      const name = nameByKey.get(top.personKey) || top.personKey;
+      const more = hits.length - 1;
+      const moreZh = more > 0 ? `(近期还有 ${more} 条好消息)` : '';
+      const moreEn = more > 0 ? ` (+${more} more lately)` : '';
+      return {
+        severity: 'attention',
+        title: [`${name} 有件值得高兴的事`, `Good news for ${name}`],
+        detail: [
+          `${top.title}${top.date ? `(${top.date.slice(5)})` : ''}${moreZh} —— 要不要给 TA 一句鼓励?`,
+          `${top.title}${top.date ? ` (${top.date.slice(5)})` : ''}${moreEn} — maybe send a word of cheer?`,
+        ],
+      };
+    },
+  },
+
+  // ── 本月给家人的记账(非敏感·消费):温和汇总,方便回顾。绝不碰敏感三类。 ──
+  {
+    id: 'family-spending-month',
+    run: (i) => {
+      const contacts = buildRelationships(i.nodes, i.now.getTime(), i.contactLog);
+      const familyKeys = new Set(
+        contacts.filter((c) => c.closeness === 'core' || c.groups.some((g) => FAMILY_RE.test(g))).map((c) => c.key),
+      );
+      if (!familyKeys.size) return null;
+      const ym = `${i.now.getFullYear()}-${String(i.now.getMonth() + 1).padStart(2, '0')}`;
+      let total = 0; let count = 0;
+      for (const r of i.records || []) {
+        if (r.category !== 'spending' || !familyKeys.has(r.personKey)) continue;
+        if ((r.date || r.createdAt).slice(0, 7) !== ym) continue;
+        count += 1;
+        if (typeof r.amount === 'number') total += r.amount;
+      }
+      if (count === 0 || total <= 0) return null;
+      return {
+        severity: 'attention',
+        title: ['这个月给家人的记账', 'Family spending this month'],
+        detail: [
+          `本月为家人记了 ${count} 笔消费,合计 ${total}。想看是给谁的,点进去就有。`,
+          `${count} spending note${count > 1 ? 's' : ''} for family this month, ${total} total. Tap in to see who.`,
+        ],
+      };
+    },
+  },
 ];
 
 /** 人缘域 findings 总入口(确定性;人际域从严 —— 只轻提示、绝不出红)。 */
 export function relationshipFindings(input: RelationshipInsightInput): RelationshipFinding[] {
   if (!input.nodes.length) return [];
-  return evaluateRules(RULES, input);
+  // records 缺省读本机 person-records;仅成绩/消费两类规则消费,敏感三类在规则里被排除。
+  const resolved: RelationshipInsightInput = { ...input, records: input.records ?? loadAllPersonRecords() };
+  return evaluateRules(RULES, resolved);
 }
