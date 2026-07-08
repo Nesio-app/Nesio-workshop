@@ -113,9 +113,12 @@ async function refreshToken(refreshTk: string): Promise<string | null> {
 }
 
 // 批次 37:窗口从 7 天/10 封放宽到 30 天/50 封 —— 之前太窄,同步了也「问一问看不到几封」。
-async function fetchMessages(accessToken: string, max = 50, metadataOnly = true): Promise<GmailMessage[]> {
+// 连接器批②:准实时 —— afterTs(unix 秒)存在时用 Gmail 原生 after: 查询,只拉这个时刻
+// 之后的新邮件(高频轮询只分析增量,AI 成本不随频率线性涨;emailId 去重兜底重叠窗)。
+async function fetchMessages(accessToken: string, max = 50, metadataOnly = true, afterTs?: number): Promise<GmailMessage[]> {
+  const q = afterTs && afterTs > 0 ? `after:${Math.floor(afterTs)}` : 'newer_than:30d';
   const listRes = await fetch(
-    `${GMAIL_API}/users/me/messages?maxResults=${max}&q=newer_than:30d`,
+    `${GMAIL_API}/users/me/messages?maxResults=${max}&q=${q}`,
     { headers: { Authorization: `Bearer ${accessToken}` } },
   );
   if (!listRes.ok) {
@@ -180,6 +183,10 @@ export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const includeBody = url.searchParams.get('includeBody') === 'true';
   const shouldAnalyze = url.searchParams.get('analyze') === 'true';
+  // 连接器批②:增量游标(unix 秒)。带 afterTs 只拉该时刻之后的新邮件;不带 = 全量窗口(30 天)。
+  const afterTs = Number(url.searchParams.get('afterTs') || 0) || undefined;
+  // 全量窗口放宽到 100 封(增量轮询通常只有零星几封,同一上限不碍事)
+  const fetchMax = afterTs ? 50 : 100;
   const metadataOnly = !includeBody;
   // Get token for current user (Supabase → cookies fallback)
   let tokens = await getIntegrationToken('gmail');
@@ -230,7 +237,7 @@ export async function GET(req: NextRequest) {
     try {
       // accessToken may be '' when only a refresh token survives — 401s into the refresh path
       if (!cand.accessToken) throw new Error('gmail_list_401');
-      messages = await fetchMessages(cand.accessToken, 50, metadataOnly);
+      messages = await fetchMessages(cand.accessToken, fetchMax, metadataOnly, afterTs);
       winner = cand;
       break;
     } catch (err) {
@@ -240,7 +247,7 @@ export async function GET(req: NextRequest) {
       const newToken = await refreshToken(cand.refreshToken);
       if (!newToken) { sawAuthFailure = true; continue; }
       try {
-        messages = await fetchMessages(newToken, 50, metadataOnly);
+        messages = await fetchMessages(newToken, fetchMax, metadataOnly, afterTs);
         refreshedAccessToken = newToken;
         winner = cand;
         break;
