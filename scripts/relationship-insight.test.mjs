@@ -26,8 +26,10 @@ function run(js, requireShim) {
 const storageHealth = { reportStorageDropped() {} };
 const domainRules = run(compile('../lib/portal/domain-rules.ts'), () => ({}));
 const relationships = run(compile('../lib/portal/relationships.ts'), (p) => (p.includes('storage-health') ? storageHealth : {}));
+const personRecords = run(compile('../lib/portal/person-records.ts'), (p) => (p.includes('storage-health') ? storageHealth : {}));
 const relInsight = run(compile('../lib/portal/relationship-insight.ts'), (p) => {
   if (p.endsWith('domain-rules')) return domainRules;
+  if (p.endsWith('person-records')) return personRecords;
   if (p.endsWith('relationships')) return relationships;
   return {};
 });
@@ -73,6 +75,36 @@ assert.equal(relationshipFindings({ nodes: [], now, contactLog: {} }).length, 0,
   assert.ok(!f.some((x) => x.id === 'birthday-soon'), '生日在 7 天窗口外不提示');
   // 刚联系过(昨天),节奏内 → 不催
   assert.ok(!f.some((x) => x.id === 'reach-out-core'), '刚联系过不催');
+}
+
+// ── 好数据接进洞察:成绩/消费(非敏感)出 finding;医疗(敏感)绝不出(隐私红线) ──
+{
+  const nodes = [
+    { id: 'n1', type: 'note', name: '和 小美 吃饭', source: 'manual', createdAt: '2026-06-01', attributes: {}, relations: [{ targetId: '小美', relation: '妹妹' }] },
+    { id: 'p1', type: 'person', name: '小美', source: 'system', createdAt: '2026-06-01', attributes: {}, relations: [] },
+  ];
+  const records = [
+    { id: 'r1', personKey: '小美', category: 'achievement', title: '期末年级第一', date: '2026-07-02', createdAt: '2026-07-02' },
+    { id: 'r2', personKey: '小美', category: 'spending', title: '生日礼物', amount: 600, date: '2026-07-05', createdAt: '2026-07-05' },
+    { id: 'r3', personKey: '小美', category: 'medical', title: '复诊记录', date: '2026-07-03', createdAt: '2026-07-03' },
+  ];
+  const f = relationshipFindings({ nodes, now, records, contactLog: {} });
+  const byId = Object.fromEntries(f.map((x) => [x.id, x]));
+  assert.ok(byId['person-achievement'], '成绩(非敏感)出洞察');
+  assert.ok(byId['person-achievement'].detail[0].includes('期末年级第一'), '成绩点名内容');
+  assert.ok(byId['family-spending-month'], '本月家人消费出洞察');
+  assert.ok(byId['family-spending-month'].detail[0].includes('600'), '消费合计');
+  // 隐私红线:医疗/复诊绝不出现在任何 finding
+  assert.ok(!f.some((x) => x.title.concat(x.detail).some((s) => s.includes('复诊') || s.includes('医疗'))), '医疗(敏感)绝不进洞察');
+  assert.ok(f.every((x) => x.severity !== 'flag'), '仍只出 attention');
+}
+
+// 成绩太旧(>45 天)不提示
+{
+  const nodes = [{ id: 'p1', type: 'person', name: 'A', source: 'system', createdAt: '2026-01-01', attributes: { email: 'a@x.com' }, relations: [] }];
+  const old = [{ id: 'r', personKey: 'a', category: 'achievement', title: '旧事', date: '2026-01-01', createdAt: '2026-01-01' }];
+  const f = relationshipFindings({ nodes, now, records: old, contactLog: {} });
+  assert.ok(!f.some((x) => x.id === 'person-achievement'), '成绩超回看窗口不提示');
 }
 
 // ── 脊柱接线(源码级):computeDomainFindings 含人缘域 ──
