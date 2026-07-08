@@ -14,6 +14,8 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import LocationPicker from './LocationPicker';
+import { importInventoryCsv } from '@/lib/portal/inventory-import';
+import { useRef } from 'react';
 import {
   addInventoryItem,
   expiryStatus,
@@ -39,6 +41,8 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
   const [query, setQuery] = useState('');
   const [view, setView] = useState<'list' | 'add' | 'detail' | 'stats'>('list');
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [importMsg, setImportMsg] = useState(''); // 物品②:导入结果可见展示(不静默)
+  const fileRef = useRef<HTMLInputElement>(null);
 
   // 加物品表单
   const [fName, setFName] = useState('');
@@ -195,9 +199,39 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
               </div>
             )}
 
-            <button type="button" className="nesio-freeze-primary-btn" style={{ width: '100%', marginTop: '0.7rem' }} onClick={() => { resetForm(); setView('add'); }}>
-              ＋ {L(dict, '记一件', 'Add one')}
-            </button>
+            <div style={{ display: 'flex', gap: 8, marginTop: '0.7rem' }}>
+              <button type="button" className="nesio-freeze-primary-btn" style={{ flex: 2 }} onClick={() => { resetForm(); setView('add'); }}>
+                ＋ {L(dict, '记一件', 'Add one')}
+              </button>
+              {/* 物品②:CSV 批量导入(仅名称必填;同文件导两次会重复) */}
+              <button
+                type="button"
+                style={{ flex: 1, borderRadius: 12, border: '1px solid var(--border-subtle, rgba(255,255,255,0.12))', background: 'transparent', color: 'var(--text-secondary)', fontSize: '0.82rem' }}
+                onClick={() => fileRef.current?.click()}
+              >
+                📄 {L(dict, '导入 CSV', 'Import CSV')}
+              </button>
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".csv,text/csv"
+                style={{ display: 'none' }}
+                onChange={async (e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = '';
+                  if (!f) return;
+                  try {
+                    const r = importInventoryCsv(await f.text());
+                    refresh();
+                    const parts = [L(dict, `导入 ${r.imported} 件`, `Imported ${r.imported}`)];
+                    if (r.skipped) parts.push(L(dict, `跳过 ${r.skipped} 行(缺名称)`, `${r.skipped} skipped (no name)`));
+                    if (r.errors.length && r.imported === 0) parts.push(r.errors[0]);
+                    setImportMsg(parts.join(' · '));
+                  } catch { setImportMsg(L(dict, '导入失败:文件读取出错', 'Import failed: could not read file')); }
+                }}
+              />
+            </div>
+            {importMsg && <p style={{ margin: '0.45rem 0 0', fontSize: '0.75rem', color: 'var(--text-tertiary)', textAlign: 'center' }}>{importMsg}</p>}
           </>
         )}
 

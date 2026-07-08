@@ -24,7 +24,7 @@ import {
 // 「emoji 场所 · 房间 · 子位置」或自由文本)。收纳不再自建第二套位置表 ——
 // 相机识别归位与收纳手记用同一个 LocationPicker、写同一个 location 属性。
 
-const LOC_SEP = ' · ';
+export const LOC_SEP = ' · '; // 物品②:CSV 导入拼 location 复用同一分隔词
 
 /** 解析 location 为 {space(首段,浏览分组用), container(其余)}。自由文本整段落到 space。 */
 export function splitLocation(location: string): { space: string; container: string } {
