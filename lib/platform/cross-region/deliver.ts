@@ -11,6 +11,7 @@ import { detectCrossRegion, detectLeadLag, DETECT_DEFAULTS } from './detect-core
 import { gateDeliverables } from './deliver-core.mjs';
 import { CROSS_REGION_COLUMNS, columnLabel } from './detect';
 import { getConsentedDomains } from './consent';
+import { rankCrossRegionByBandit } from './bandit';
 import { currentAcceptProbability } from '@/lib/platform/interruptibility';
 import type { DomainInsightItem } from '@/lib/platform/guidance-engine/source-adapters';
 
@@ -86,6 +87,8 @@ export function buildCrossRegionDeliverables(now: Date = new Date()): DomainInsi
     cooldownLog: loadCooldown(),
     now,
     acceptProb: currentAcceptProbability(now),
+    // P3:LinUCB bandit 排序(学「你在乎哪类跨区」);冷启动=按强度(不更差)
+    rankFn: (filtered: RawRel[]) => rankCrossRegionByBandit(filtered as never, now) as never,
   }) as Array<RawRel & { id: string; cooldownBucket: string }>;
 
   if (survivors.length === 0) return [];

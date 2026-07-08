@@ -124,8 +124,8 @@ deliverable(scored: ScoredInsight[], ctx: InterruptCtx): ScoredInsight[];
 | **P0** | 反馈进事实库(event-sourcing)+ 每日快照 journal | 复用已 cutover 的 Signal 事实库 | 地基。没它后面全空转;不做 as-of join → AUC 虚高 5-20% |
 | **P1** ✅已实现(2026-07-08) | 检测层:Spearman + DF 平稳性 + 共现 + BH-FDR | P0 的 journal | **纯统计,零 ML**。`lib/platform/cross-region/detect-core.mjs`(引擎,单测 `cross-region-detect.test.mjs`)+ `detect.ts`(列元数据/接线)→ 洞察 tab `CrossRegionCard`。只配跨域列、\|ρ\|≥0.3、N≥14、非平稳先一阶差分、批量 BH-FDR(q=0.10);每条带样本天数 + p 值可复核。PCMCI 先后/因果推迟到 P1.5 |
 | **P2** ✅已实现(2026-07-08) | 门控 + 投递:同意门 + 软频控 + 可打断性 NB | P1 | 让洞察"该出才出、不刷屏"。同意门 `cross-region/consent.ts`(敏感域默认不主动推)+ 可打断性 NB `interruptibility-core.mjs`/`interruptibility.ts`(从 today 反馈学 P(受纳))+ 新鲜度去重/预算 `deliver-core.mjs` + 编排 `deliver.ts` → `crossRegionToGuidanceEvents` 进既有七层管线(软频控/时段门/预算细排复用)。单测 `cross-region-deliver.test.mjs` |
-| **P3** | 偏好层:LinUCB bandit + 反馈闭环 | P0 反馈日志 | 学"你在乎哪类跨区" |
-| **P4** | (远期可选)共享 embedding | 有证据说手写特征触顶 | 拿解释性换,加法不推倒 |
+| **P3** ✅已实现(2026-07-08) | 偏好层:LinUCB bandit + 反馈闭环 | P0 反馈日志 | 学"你在乎哪类跨区"。`bandit-core.mjs`(LinUCB:θᵀx+α√xᵀA⁻¹x、A/b 更新、高斯-约当求逆,单测 `cross-region-bandit.test.mjs`)+ `bandit.ts`(d=15 特征=bias/三类型 one-hot/strength/confidence/hourFit/8 域标志;冷启动 θ₀=强度主导 ⇒ 第一天≈按强度排;A/b 状态入 blob)。`deliver.ts` 把它当 rankFn 在预算封顶前排序;`cross_region` 卡反馈(useful/done→1、dismiss/wrong→0)经反馈总线 `applyCrossRegionBanditFeedback` 闭环更新 |
+| **P4** ⏸️ 不建(证据未触发,2026-07-08 评估) | (远期可选)共享 embedding | 有证据说手写特征触顶 | **决定不建**:设计已明示单用户免 CF/DP/重 embedding,深度对比学习端上单用户不可行且收益不确定。**触发条件**(满足才重估):P3 bandit 上线后长期反馈准确率停滞 + 手写特征(§2.3 那批)相互高度共线/无法进一步区分你的偏好。届时也是「加法不推倒、拿解释性换收益」,不抄多用户 CDR 重架构 |
 
 **里程碑判据**:P1 出的相关必须能人工复核(带证据+p 值);P3 上线前用 point-in-time 回放做离线评估(as-of join,防泄漏)。
 
