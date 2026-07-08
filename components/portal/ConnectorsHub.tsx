@@ -5,6 +5,7 @@ import { IconActivity, IconBook, IconBookOpen, IconCalendar, IconCar, IconCheckS
 import dynamic from 'next/dynamic';
 const WechatReadingImportSheet = dynamic(() => import('./WechatReadingImportSheet'), { ssr: false });
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
+import { runPlaidSync, runFlomoSync, saveCalendarEventsToMemory } from '@/lib/portal/connector-sync';
 import { type LifeNode } from '@/lib/portal/life-graph';
 import type { HealthMetrics, HealthNode } from '@/lib/portal/apple-health';
 import { readLaunchSurfaceContextFromBrowser } from '@/lib/portal/launch-surface.mjs';
@@ -385,66 +386,32 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
 
   async function syncPlaid(retry = 0) {
     setSyncing('plaid');
-    try {
-      // 财务㉑:富化回填 —— 老交易是增量游标同步的,不会自己带上商户 logo/实体id/细分类;
-      // 每设备做一次全量重拉,按 id 覆盖补齐,之后回到增量。
-      let full = false;
-      try { full = !localStorage.getItem('nesio-plaid-enrich-v1'); } catch { /* ignore */ }
-      const res = await fetch(`/api/portal/plaid/transactions${full ? '?full=1' : ''}`);
-      const data = await res.json() as { ok?: boolean; transactions?: Array<{ id: string; accountId?: string; date: string; name: string; amount: number; currency: string; category: string }>; removedIds?: string[]; accounts?: unknown[]; error?: string; pendingItems?: number; authoritative?: boolean };
-      // 批次 31:账户/卡片信息存本机,供财务「卡片」子分类分卡显示。
-      // 财务⑧:路由确认账户全量拉齐(authoritative)时整体替换,让重复授权的旧账户退场。
-      if (data.accounts?.length) { const { saveBankAccounts } = await import('@/lib/portal/bank-tx'); saveBankAccounts(data.accounts as Array<{ id: string; name: string; currency: string }>, { replace: data.authoritative === true }); }
-      // 财务㉗:持仓快照(非空才替换)
-      {
-        const h = (data as { holdings?: unknown[] }).holdings;
-        if (Array.isArray(h) && h.length) { const { saveHoldings } = await import('@/lib/portal/bank-tx'); saveHoldings(h as never); }
-      }
-      if (!data.ok) {
-        if (data.error === 'not_connected' || data.error === 'relink_required') {
-          showToast(L(dict, '需要(重新)连接银行', 'Bank needs (re)linking'), false);
-          void connectPlaid();
-        } else {
-          showToast(L(dict, `流水同步失败:${data.error || '未知'}`, `Sync failed: ${data.error || 'unknown'}`), false);
-        }
-        setSyncing(null);
-        return;
-      }
-      // 明细只存本机。增量同步:按 id upsert(added/modified 覆盖旧的)、删掉 removed,
-      // 再按日期降序保留最近 1000 笔(不是按到达顺序 —— 否则永远留着最旧那批)。
-      const { loadBankTx, saveBankTx } = await import('@/lib/portal/bank-tx');
-      type Tx = { id: string; accountId?: string; date: string; name: string; amount: number; currency: string; category: string };
-      const existing: Tx[] = loadBankTx();
-      const removed = new Set(data.removedIds || []);
-      const byId = new Map<string, Tx>();
-      for (const t of existing) if (!removed.has(t.id)) byId.set(t.id, t);
-      let freshCount = 0;
-      for (const t of (data.transactions || [])) { if (!byId.has(t.id)) freshCount++; byId.set(t.id, t); }
-      const merged = [...byId.values()]
-        .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)) // 日期降序
-        .slice(0, 5000); // 财务⑦:多家机构的历史会撑爆 1000,IDB 放得下,上限提到 5000
-      const fresh = { length: freshCount };
-      saveBankTx(merged); // 落 IndexedDB(批次 57)
-      try { localStorage.setItem('nesio-bank-synced-at', new Date().toISOString()); } catch { /* quota */ } // 时间戳小,仍留 localStorage
-      if (full) { try { localStorage.setItem('nesio-plaid-enrich-v1', '1'); } catch { /* quota */ } } // 回填只做一次
-      setCounts((p) => ({ ...p, plaid: merged.length }));
-      saveConnectorState('plaid', true);
-      setConnected((p) => ({ ...p, plaid: true }));
-      const acctCount = data.accounts?.length || 0;
-      // 财务⑦:新连接的机构流水在 Plaid 侧要准备几分钟——明示状态并自动再试,不静默空同步
-      const pending = data.pendingItems || 0;
-      if (pending > 0 && retry < 3) {
-        showToast(L(dict, `已同步 ${fresh.length} 笔;还有 ${pending} 家机构的流水在准备中(新连接约需几分钟),1 分钟后自动再试`, `Synced ${fresh.length}; ${pending} institution(s) still preparing transactions (takes a few minutes) — retrying in 1 min`), true);
-        setTimeout(() => { void syncPlaid(retry + 1); }, 60_000);
-      } else if (pending > 0) {
-        showToast(L(dict, `还有 ${pending} 家机构的流水仍在准备中,先保存已同步的,几分钟后再点「同步」即可`, `${pending} institution(s) still preparing — synced data saved; tap Sync again in a few minutes`), false);
+    // 数据核心在 connector-sync(与记忆页下拉全同步共用);这里只做 UI:toast/重试/引导重连
+    const r = await runPlaidSync();
+    if (!r.ok) {
+      if (r.error === 'not_connected' || r.error === 'relink_required') {
+        showToast(L(dict, '需要(重新)连接银行', 'Bank needs (re)linking'), false);
+        void connectPlaid();
+      } else if (r.error === 'network') {
+        showToast(L(dict, '网络错误', 'Network error'), false);
       } else {
-        // 财务㉒:富化覆盖诊断 —— 一眼分辨「数据没来」还是「UI 没显示」
-        const withLogo = merged.filter((t) => (t as { merchantLogo?: string }).merchantLogo).length;
-        showToast(L(dict, `流水同步完成:新增 ${fresh.length} 笔,共 ${merged.length} 笔,${acctCount} 个账户(商户 logo 覆盖 ${withLogo} 笔)。到「洞察 → 财务」看总览/预算/交易`, `Synced: ${fresh.length} new, ${merged.length} total, ${acctCount} accounts (${withLogo} tx with merchant logos). See Insights → Finance`), true);
+        showToast(L(dict, `流水同步失败:${r.error || '未知'}`, `Sync failed: ${r.error || 'unknown'}`), false);
       }
-    } catch {
-      showToast(L(dict, '网络错误', 'Network error'), false);
+      setSyncing(null);
+      return;
+    }
+    setCounts((p) => ({ ...p, plaid: r.total }));
+    saveConnectorState('plaid', true);
+    setConnected((p) => ({ ...p, plaid: true }));
+    // 财务⑦:新连接的机构流水在 Plaid 侧要准备几分钟——明示状态并自动再试,不静默空同步
+    if (r.pending > 0 && retry < 3) {
+      showToast(L(dict, `已同步 ${r.fresh} 笔;还有 ${r.pending} 家机构的流水在准备中(新连接约需几分钟),1 分钟后自动再试`, `Synced ${r.fresh}; ${r.pending} institution(s) still preparing transactions (takes a few minutes) — retrying in 1 min`), true);
+      setTimeout(() => { void syncPlaid(retry + 1); }, 60_000);
+    } else if (r.pending > 0) {
+      showToast(L(dict, `还有 ${r.pending} 家机构的流水仍在准备中,先保存已同步的,几分钟后再点「同步」即可`, `${r.pending} institution(s) still preparing — synced data saved; tap Sync again in a few minutes`), false);
+    } else {
+      // 财务㉒:富化覆盖诊断 —— 一眼分辨「数据没来」还是「UI 没显示」
+      showToast(L(dict, `流水同步完成:新增 ${r.fresh} 笔,共 ${r.total} 笔,${r.accounts} 个账户(商户 logo 覆盖 ${r.withLogo} 笔)。到「洞察 → 财务」看总览/预算/交易`, `Synced: ${r.fresh} new, ${r.total} total, ${r.accounts} accounts (${r.withLogo} tx with merchant logos). See Insights → Finance`), true);
     }
     setSyncing(null);
   }
@@ -530,34 +497,16 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
   // ── Server-configured sync (Flomo) ──
   async function syncFlomo(c: ConnectorDef) {
     setSyncing(c.id);
-    try {
-      const res = await fetch(c.syncEndpoint!);
-      const data = await res.json() as { ok?: boolean; memos?: Array<{ content: string; created_at: string; tags: string[]; slug?: string }>; error?: string };
-      if (!data.ok) { showToast(L(dict, `Flomo 未配置或同步失败`, 'Flomo not configured or sync failed'), false); setSyncing(null); return; }
-      const memos = data.memos || [];
-      // 批次 19:按 slug 去重——重复同步不再重复入库;取最新 50 条
-      const { getLifeGraph } = await import('@/lib/portal/life-graph');
-      const existingSlugs = new Set(
-        getLifeGraph().map((n) => n.attributes?.flomoSlug as string).filter(Boolean),
-      );
-      const fresh = memos.filter((m) => !existingSlugs.has((m as { slug?: string }).slug || ''));
-      // 全量导入:首次把整个 flomo 库拉进来(服务端翻页取全量),之后按 slug 去重只进增量。
-      // 写失败(配额等)由 storage-health 弹可见提示,不静默丢。
-      const nodes: Array<Omit<NodeInput, 'source'>> = fresh.map((m) => ({
-        type: 'preference' as const,
-        name: m.content.replace(/<[^>]+>/g, '').slice(0, 40),
-        attributes: { source: 'Flomo', created: m.created_at, flomoSlug: (m as { slug?: string }).slug || '' },
-        relations: [],
-        tags: ['Flomo', ...(m.tags || [])],
-        confidence: 0.9,
-        rawInput: m.content.replace(/<[^>]+>/g, '').slice(0, 200),
-      }));
-      saveNodes(nodes, 'manual');
-      saveConnectorState(c.id, true);
-      setConnected((p) => ({ ...p, [c.id]: true }));
-      setCounts((p) => ({ ...p, [c.id]: nodes.length }));
-      showToast(L(dict, nodes.length ? `已同步 ${nodes.length} 条 flomo 笔记(按 slug 去重,老笔记不重复入库)` : '没有新笔记 —— 已全部同步过', nodes.length ? `Synced ${nodes.length} flomo notes (deduped by slug)` : 'No new notes — everything already synced'), true);
-    } catch { showToast(L(dict, '网络错误', 'Network error'), false); }
+    const r = await runFlomoSync(); // 数据核心在 connector-sync,与记忆页下拉共用
+    if (!r.ok) {
+      showToast(L(dict, 'Flomo 未配置或同步失败', 'Flomo not configured or sync failed'), false);
+      setSyncing(null);
+      return;
+    }
+    saveConnectorState(c.id, true);
+    setConnected((p) => ({ ...p, [c.id]: true }));
+    setCounts((p) => ({ ...p, [c.id]: r.fresh }));
+    showToast(L(dict, r.fresh ? `已同步 ${r.fresh} 条 flomo 笔记(按 slug 去重,老笔记不重复入库)` : '没有新笔记 —— 已全部同步过', r.fresh ? `Synced ${r.fresh} flomo notes (deduped by slug)` : 'No new notes — everything already synced'), true);
     setSyncing(null);
   }
 
@@ -623,45 +572,6 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     setSyncing(null);
   }
 
-  async function saveCalendarEventsToMemory(events: Array<Record<string, unknown>>): Promise<number> {
-    const { getLifeGraph } = await import('@/lib/portal/life-graph');
-    const now = Date.now();
-    const windowEnd = now + 60 * 86_400_000;
-    const existingCalIds = new Set(
-      getLifeGraph().filter((n) => n.source === 'calendar')
-        .map((n) => n.attributes.calendarId as string).filter(Boolean),
-    );
-    let added = 0;
-    events.forEach((evAny) => {
-      const start = evAny.start as string | undefined;
-      const title = evAny.title as string | undefined;
-      if (!start || !title) return;
-      const t = new Date(start).getTime();
-      if (t < now - 86_400_000 || t > windowEnd) return;
-      const calId = (evAny.id as string) || `${title}-${start}`;
-      if (existingCalIds.has(calId)) return;
-      ingestLifeNode({
-        name: title,
-        type: 'event',
-        source: 'calendar',
-        confidence: 1,
-        rawInput: title,
-        tags: [(evAny.calendarName as string) || '日历'].filter(Boolean),
-        attributes: {
-          start,
-          ...(evAny.end ? { end: evAny.end as string } : {}),
-          ...(evAny.url ? { url: evAny.url as string } : {}),
-          ...(evAny.location ? { location: evAny.location as string } : {}),
-          ...(evAny.description ? { note: (evAny.description as string).slice(0, 300) } : {}),
-          calendarId: calId,
-          calendarName: (evAny.calendarName as string) || '',
-        },
-        relations: [],
-      });
-      added++;
-    });
-    return added;
-  }
 
   // ── OAuth sync (Gmail / Calendar 旧入口,google 合并后仅内部保留) ──
   async function syncOAuth(c: ConnectorDef) {
