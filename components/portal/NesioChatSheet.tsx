@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { getLifeGraph, searchLifeGraphFuzzy, type LifeNode } from '@/lib/portal/life-graph';
+import { canUsePaidCloudAi } from '@/lib/portal/entitlement';
 import { loadProfileSettings } from '@/lib/portal/profile';
 import { smartSearch } from '@/lib/portal/smart-search';
 import { domainInsightsContextBlock } from '@/lib/portal/domain-insights';
@@ -745,6 +746,23 @@ Edit location/value anytime in Storage.`),
           return;
         }
       } catch { /* 落回普通聊天 */ }
+    }
+
+    // 成本护栏(A):分层启用后,免费层不打付费云问答 —— 退成端上语义搜索 + 升级引导
+    //("问一问 → 搜一搜")。分层未启用(当前 PWA)→ canUsePaidCloudAi() 恒 true,此段不触发,
+    // 行为完全不变、当前用户无回归。
+    if (!canUsePaidCloudAi()) {
+      const hits = searchLifeGraphFuzzy(text.trim(), 6);
+      const body = hits.length
+        ? L(dict, `在你的记忆里找到 ${hits.length} 条:\n${hits.map((n) => `• ${n.name}`).join('\n')}`,
+            `Found ${hits.length} in your memory:\n${hits.map((n) => `• ${n.name}`).join('\n')}`)
+        : L(dict, '记忆库里没找到相关的。', 'Nothing matching in your memory yet.');
+      const upsell = L(dict, '\n\n升级 Pro 可用 AI 对话式问答。', '\n\nUpgrade to Pro for conversational AI answers.');
+      const aiMsg: UiMessage = { id: nextMsgId('a'), role: 'model', text: body + upsell };
+      setMessages((prev) => { const next = [...prev, aiMsg]; saveHistory(next); return next; });
+      setSending(false);
+      sendingRef.current = false;
+      return;
     }
 
     const controller = new AbortController();
