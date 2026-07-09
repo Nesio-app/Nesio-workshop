@@ -68,15 +68,18 @@ function applyTheme(choice: ThemeChoice) {
  */
 export function GeneralSheet({ open, onClose }: SheetProps) {
   const locale = usePortalLocale();
+  const dict = portalLocaleToDictionaryLocale(locale);
   const [tone, setTone] = useState<ToneStyle>('warm');
   const [interrupt, setInterrupt] = useState<InterruptLevel>('proactive');
   const [hapticsOn, setHapticsOn] = useState(true);
+  const [dailyReportOn, setDailyReportOn] = useState(false);
   const [theme, setTheme] = useState<ThemeChoice>('auto');
 
   useEffect(() => {
     if (!open) return;
     const p = loadProfileSettings();
     setTone((p.coachStyle as ToneStyle) || 'warm');
+    setDailyReportOn(p.dailyReportEnabled);
     try {
       const lvl = localStorage.getItem(PROACTIVE_LEVEL_KEY);
       setInterrupt(lvl === 'minimal' || lvl === 'silent' ? lvl : getMirrorProfile().interruptionStyle);
@@ -102,6 +105,13 @@ export function GeneralSheet({ open, onClose }: SheetProps) {
   }
   function pickLang(next: PortalLocale) {
     saveProfileSettings({ locale: next }); // PROFILE_UPDATED_EVENT → 全站即时切换
+  }
+  // 每日 AI 图文日报开关(即点即生效;存 profile,saveProfileSettings 已接 storage-health)。
+  function toggleDailyReport() {
+    setDailyReportOn((v) => {
+      saveProfileSettings({ dailyReportEnabled: !v });
+      return !v;
+    });
   }
   function toggleHaptics() {
     setHapticsOn((v) => {
@@ -186,6 +196,19 @@ export function GeneralSheet({ open, onClose }: SheetProps) {
         </div>
         <span className={`nesio-settings-space-check${hapticsOn ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>
           {hapticsOn ? '✓' : '○'}
+        </span>
+      </button>
+
+      <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '每日日报', 'Daily report')}</p>
+      <button type="button"
+        className={`nesio-settings-option${dailyReportOn ? ' nesio-settings-option--active' : ''}`}
+        onClick={toggleDailyReport}>
+        <div>
+          <span className="nesio-settings-option-label">{L(dict, '每日 AI 图文日报', 'Daily AI report')}</span>
+          <span className="nesio-settings-option-hint">{L(dict, '每天自动生成一份「今天的日程/提醒/天气」图文小结,存进记忆,并在今日的「未来预测」里给你。', 'Auto-builds a visual recap of your day — schedule, reminders, weather — saved to memory and surfaced under Today.')}</span>
+        </div>
+        <span className={`nesio-settings-space-check${dailyReportOn ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>
+          {dailyReportOn ? '✓' : '○'}
         </span>
       </button>
       </>)}
