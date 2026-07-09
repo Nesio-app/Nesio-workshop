@@ -44,6 +44,7 @@ export interface DailyReportSection {
 
 export interface DailyReport {
   date: string;                  // YYYY-MM-DD
+  title: string;                 // 「每日日报 · X月X日 周X」(存记忆 name / 历史列表标题)
   greeting: string;
   headline: string;              // 一句话概览(几个安排 + 天气)
   sections: DailyReportSection[];
@@ -143,7 +144,8 @@ export function buildDailyReport(input: DailyReportInput): DailyReport {
 
   // markdown(存记忆 / 展示;与月报同风格)
   const dateLabel = now.toLocaleDateString(locale === 'en' ? 'en-US' : 'zh-CN', { month: 'long', day: 'numeric', weekday: 'long' });
-  const md: string[] = [`# ${tt(locale, '每日日报', 'Daily report')} · ${dateLabel}`, '', `_${headline}_`, ''];
+  const title = `${tt(locale, '每日日报', 'Daily report')} · ${dateLabel}`;
+  const md: string[] = [`# ${title}`, '', `_${headline}_`, ''];
   for (const s of sections) {
     md.push(`## ${s.icon} ${s.title}`);
     for (const line of s.lines) md.push(`- ${line}`);
@@ -154,5 +156,5 @@ export function buildDailyReport(input: DailyReportInput): DailyReport {
   // 无天气、无今日/临近安排、无邮件、无记忆 → 空(自动预生成跳过)
   const empty = !wText && todayEvents.length === 0 && upcoming.length === 0 && emails.length === 0 && notes.length === 0;
 
-  return { date: dateKey(now), greeting, headline, sections, markdown, empty };
+  return { date: dateKey(now), title, greeting, headline, sections, markdown, empty };
 }

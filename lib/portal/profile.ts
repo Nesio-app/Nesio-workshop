@@ -39,6 +39,8 @@ export interface PortalProfileSettings {
   avatarStoragePath: string;
   locale: PortalLocale;
   coachStyle: PortalCoachStyle;
+  /** 每日 AI 图文日报:每天自动预生成 + 存记忆(默认关,设置里开)。 */
+  dailyReportEnabled: boolean;
 }
 
 const KEYS = {
@@ -47,6 +49,7 @@ const KEYS = {
   displayName: 'treasurebox-profile-name',
   locale: 'treasurebox-locale',
   coachStyle: 'treasurebox-coach-style',
+  dailyReportEnabled: 'nesio-daily-report-enabled',
 } as const;
 
 export const PROFILE_UPDATED_EVENT = 'treasurebox-profile-updated';
@@ -65,7 +68,7 @@ export function portalLocaleToDictionaryLocale(locale: PortalLocale): 'zh' | 'en
 
 export function loadProfileSettings(fallbackName = '我'): PortalProfileSettings {
   if (typeof window === 'undefined') {
-    return { displayName: fallbackName, avatarUrl: '', avatarStoragePath: '', locale: 'zh', coachStyle: 'warm' };
+    return { displayName: fallbackName, avatarUrl: '', avatarStoragePath: '', locale: 'zh', coachStyle: 'warm', dailyReportEnabled: false };
   }
   try {
     const localeRaw = localStorage.getItem(KEYS.locale);
@@ -79,9 +82,10 @@ export function loadProfileSettings(fallbackName = '我'): PortalProfileSettings
       avatarStoragePath: localStorage.getItem(KEYS.avatarStoragePath) || '',
       locale,
       coachStyle,
+      dailyReportEnabled: localStorage.getItem(KEYS.dailyReportEnabled) === '1',
     };
   } catch {
-    return { displayName: fallbackName, avatarUrl: '', avatarStoragePath: '', locale: 'zh', coachStyle: 'warm' };
+    return { displayName: fallbackName, avatarUrl: '', avatarStoragePath: '', locale: 'zh', coachStyle: 'warm', dailyReportEnabled: false };
   }
 }
 
@@ -105,6 +109,9 @@ export function saveProfileSettings(patch: Partial<PortalProfileSettings>) {
     }
     if (patch.coachStyle !== undefined) {
       localStorage.setItem(KEYS.coachStyle, patch.coachStyle);
+    }
+    if (patch.dailyReportEnabled !== undefined) {
+      localStorage.setItem(KEYS.dailyReportEnabled, patch.dailyReportEnabled ? '1' : '0');
     }
     window.dispatchEvent(new CustomEvent(PROFILE_UPDATED_EVENT));
   } catch { reportStorageDropped(); }

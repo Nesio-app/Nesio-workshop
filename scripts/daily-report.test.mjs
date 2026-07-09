@@ -43,7 +43,8 @@ const iso = (h, m = 0) => new Date(2026, 6, 9, h, m, 0).toISOString();
   assert.ok(r.sections.some((s) => s.id === 'email' && s.lines.length === 2), '邮件亮点分节');
   assert.ok(r.sections.some((s) => s.id === 'memory' && s.lines[0].includes('降压药')), '记忆提醒分节');
   assert.ok(/今天 2 个安排/.test(r.headline), 'headline 概览今日安排数(仅今天剩余的 2 个)');
-  assert.ok(r.markdown.startsWith('# 每日日报'), 'markdown 标题');
+  assert.ok(r.title.startsWith('每日日报'), 'title 字段');
+  assert.ok(r.markdown.startsWith(`# ${r.title}`), 'markdown 标题 = title');
   assert.ok(r.markdown.includes('## 📅 今日日程'), 'markdown 含日程节');
 }
 
@@ -65,6 +66,7 @@ const iso = (h, m = 0) => new Date(2026, 6, 9, h, m, 0).toISOString();
 {
   const r = buildDailyReport({ now: NOW, locale: 'en', displayName: 'Sam', weather: { temperatureC: 20, condition: 'Sunny' }, events: [{ title: 'Standup', start: iso(9, 30) }] });
   assert.ok(r.greeting.includes('Good morning') && r.greeting.includes('Sam'), 'en 问候');
+  assert.ok(r.title.startsWith('Daily report'), 'en title');
   assert.ok(r.markdown.startsWith('# Daily report'), 'en markdown 标题');
   assert.ok(/1 event today/.test(r.headline), 'en headline');
 }
