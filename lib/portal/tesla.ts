@@ -180,6 +180,10 @@ export interface TeslaDrive {
   shiftState?: string;
   speedMph?: number | null;
   odometerMi?: number | null;
+  // drive_state 本来就返回经纬度;之前丢了,足迹时间线拿不到位置。只读快照 = 同步时的
+  // 采样点(非连续轨迹),但配上充电站点已足够把「今天车去过哪」画进足迹。
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 export interface TeslaCharge {
@@ -227,12 +231,14 @@ export async function collectTeslaData(accessToken: string): Promise<{ status: n
     if (!vehicleId) continue;
     const displayName = v.display_name || undefined;
 
-    // Live drive + charge state. Uses vehicle_device_data scope.
-    const vd = await teslaGet(`/api/1/vehicles/${vehicleId}/vehicle_data?endpoints=${encodeURIComponent('drive_state;charge_state')}`, accessToken);
+    // Live drive + charge state. Uses vehicle_device_data scope. vehicle_state 带上
+    // 是为了拿 odometer(在 vehicle_state 里,不在 drive_state)——不然里程永远是 null。
+    const vd = await teslaGet(`/api/1/vehicles/${vehicleId}/vehicle_data?endpoints=${encodeURIComponent('drive_state;charge_state;vehicle_state')}`, accessToken);
     if (vd.status === 401) return { status: 401, drives, charges };
-    const resp = (vd.data as { response?: { drive_state?: Record<string, unknown>; charge_state?: Record<string, unknown> } })?.response;
+    const resp = (vd.data as { response?: { drive_state?: Record<string, unknown>; charge_state?: Record<string, unknown>; vehicle_state?: Record<string, unknown> } })?.response;
     const ds = resp?.drive_state;
     const cs = resp?.charge_state;
+    const vs = resp?.vehicle_state;
     const at = new Date().toISOString();
 
     if (ds) {
@@ -242,7 +248,9 @@ export async function collectTeslaData(accessToken: string): Promise<{ status: n
         at,
         shiftState: (ds.shift_state as string) || undefined,
         speedMph: (ds.speed as number | null) ?? null,
-        odometerMi: null,
+        odometerMi: (vs?.odometer as number | null) ?? null,
+        latitude: (ds.latitude as number | null) ?? null,
+        longitude: (ds.longitude as number | null) ?? null,
       });
     }
     if (cs) {

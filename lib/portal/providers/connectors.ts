@@ -9,7 +9,7 @@ import { getLifeGraph } from '../life-graph';
 import type { CalendarEvent } from '../types';
 import { createSignal } from '../../life-domain/create-signal';
 import { normalizeCalendarToSignal, normalizeWeatherToSignal, normalizeTeslaDriveToSignal, normalizeTeslaChargeToSignal } from '../../life-domain/normalizers';
-import { recordLiveVisit } from '../place-trail';
+import { recordLiveVisit, recordVisitAt } from '../place-trail';
 
 // ── Weather ──────────────────────────────────────────────────────────────────
 
@@ -126,6 +126,20 @@ export async function refreshTesla(
       if (existing.has(id)) return;
       createSignal(normalizeTeslaChargeToSignal(c));
     });
+
+    // 足迹接线(用户定案:位置进足迹,不单开 tab)。车「停放」的位置记进地点流水
+    // ——行驶中的瞬时点是路上噪声,不记;相邻停放点之间的驾驶腿由 buildDayJourney
+    // 自动推断(已有 'drive' 模式)。充电会话按站点名 + 真实时间进流水(花费另走财务信号)。
+    for (const d of (data.drives || [])) {
+      const driving = d.shiftState === 'D' || d.shiftState === 'R';
+      if (driving || d.latitude == null || d.longitude == null) continue;
+      let label = `${d.latitude.toFixed(3)},${d.longitude.toFixed(3)}`;
+      try { const g = await reverseGeocode(d.latitude, d.longitude); label = g.label || g.city || label; } catch { /* 坐标名兜底 */ }
+      recordLiveVisit(label, d.latitude, d.longitude);
+    }
+    for (const c of (data.charges || [])) {
+      if (c.location) recordVisitAt(c.location, c.at);
+    }
     window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
   } catch { /* offline */ }
 }

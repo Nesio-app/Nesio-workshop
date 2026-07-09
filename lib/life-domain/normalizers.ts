@@ -93,7 +93,7 @@ export function normalizeTaskToSignal(input: { id?: string; title: string; dueAt
   };
 }
 
-export function normalizeTeslaDriveToSignal(input: { vehicleId: string; at: string; shiftState?: string; speedMph?: number | null; odometerMi?: number | null; displayName?: string }): CreateSignalInput {
+export function normalizeTeslaDriveToSignal(input: { vehicleId: string; at: string; shiftState?: string; speedMph?: number | null; odometerMi?: number | null; latitude?: number | null; longitude?: number | null; displayName?: string }): CreateSignalInput {
   const driving = input.shiftState === 'D' || (typeof input.speedMph === 'number' && (input.speedMph || 0) > 0);
   return {
     source: 'tesla',
@@ -103,6 +103,8 @@ export function normalizeTeslaDriveToSignal(input: { vehicleId: string; at: stri
       shiftState: input.shiftState || '',
       speedMph: input.speedMph ?? null,
       odometerMi: input.odometerMi ?? null,
+      latitude: input.latitude ?? null,
+      longitude: input.longitude ?? null,
       vehicleId: input.vehicleId,
     },
     occurredAt: input.at,

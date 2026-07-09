@@ -57,6 +57,20 @@ export function recordLiveVisit(label: string, lat?: number, lon?: number): void
   save([{ ts: new Date().toISOString(), label, lat, lon, source: 'live' }, ...trail]);
 }
 
+/**
+ * 记录一次「发生在特定时间」的到访 —— 连接器给的历史事件(如 Tesla 充电会话)。
+ * 与 recordLiveVisit 的区别:ts 用事件真实时间,不是「现在」。按 label|ts 去重,
+ * 反复同步同一会话不会重复堆。source 记 'live'(不触发 import 那天让位粗粒度打点的逻辑)。
+ */
+export function recordVisitAt(label: string, tsISO: string, lat?: number, lon?: number): void {
+  if (!label || !tsISO) return;
+  const ts = new Date(tsISO).toISOString();
+  if (Number.isNaN(new Date(ts).getTime())) return;
+  const trail = loadPlaceTrail();
+  if (trail.some((v) => v.label === label && v.ts === ts)) return;
+  save([{ ts, label, lat, lon, source: 'live' }, ...trail]);
+}
+
 /** 批量并入导入的历史段(按 ts+label 去重)。返回新增条数。 */
 export function mergeImportedVisits(visits: PlaceVisit[]): number {
   const trail = loadPlaceTrail();
