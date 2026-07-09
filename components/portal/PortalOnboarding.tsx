@@ -151,7 +151,7 @@ function WelcomeStep({ onNext, locale, onLocale }: {
   return (
     <div className="nesio-ob-step">
       <div className="nesio-ob-logo-wrap">
-        <img src="/icons/treasurebox-pwa-192.png" alt="Nesio" className="nesio-ob-logo" />
+        <img src="/assets/logo/nesio-mark.svg" alt="Nesio" className="nesio-ob-logo" />
       </div>
       <h1 className="nesio-ob-brand">Nesio</h1>
       <p className="nesio-ob-tagline">Know Less. Live More.</p>

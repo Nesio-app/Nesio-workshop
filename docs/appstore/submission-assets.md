@@ -114,7 +114,10 @@ ITSAppUsesNonExemptEncryption = false   # 仅用标准 HTTPS,无自研加密
 
 - ⬜ 截图:iPhone 6.9"(iPhone 17 Pro Max 等)+ 6.5" 必需尺寸,每语言 3–10 张。**Shot list**:①今日聚焦首屏 ②拍一拍→自动打标 ③洞察卡 ④问一问 ⑤Pro 升级页。
 - ⬜ App 预览视频(可选,15–30s)。
-- ⬜ App 图标 1024×1024(检查现有 `/assets/logo` 是否达标)。
+- ✅ App 图标 1024×1024:`public/appstore/nesio-icon-1024.png`(**不透明**无 alpha,深蓝渐变底 +
+  发光立方,草稿可替换)。由 `node scripts/gen-appstore-icons.mjs` 从 `nesio-mark.svg` 生成,
+  同时刷新 PWA 图标(`/icons/nesio-pwa-{192,512,512-maskable}.png`、`nesio-apple-touch-180.png`)
+  与 manifest/layout 引用(此前仍指向旧 `treasurebox-*`)。
 - ⬜ "本次更新内容"文案(首发写产品简介)。
 
 ## 10. 提审前最终自查(与 appstore-v1-checklist 对齐)

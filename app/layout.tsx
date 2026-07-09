@@ -8,11 +8,11 @@ export const metadata: Metadata = {
   manifest: '/manifest.json',
   icons: {
     icon: [
-      { url: '/icons/treasurebox-favicon-32.png', sizes: '32x32', type: 'image/png' },
-      { url: '/icons/treasurebox-pwa-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icons/nesio-favicon-32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/icons/nesio-pwa-192.png', sizes: '192x192', type: 'image/png' },
     ],
     apple: [
-      { url: '/icons/treasurebox-pwa-180.png', sizes: '180x180', type: 'image/png' },
+      { url: '/icons/nesio-apple-touch-180.png', sizes: '180x180', type: 'image/png' },
     ],
   },
   appleWebApp: {

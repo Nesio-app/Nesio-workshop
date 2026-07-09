@@ -97,7 +97,7 @@ export default function LoginPageClient() {
       <div className="nesio-login-card">
         {/* Logo */}
         <div className="nesio-login-logo-row">
-          <img src="/icons/treasurebox-pwa-192.png" alt="Nesio" className="nesio-login-logo-img" />
+          <img src="/assets/logo/nesio-mark.svg" alt="Nesio" className="nesio-login-logo-img" />
           <span className="nesio-ob-brand" style={{ fontSize: '1.3rem' }}>Nesio</span>
         </div>
 
