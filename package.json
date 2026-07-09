@@ -253,6 +253,7 @@
     "test:cross-region-bandit": "node scripts/cross-region-bandit.test.mjs"
   },
   "dependencies": {
+    "@capacitor/core": "^8.4.1",
     "@zxing/browser": "^0.2.0",
     "fflate": "^0.8.3",
     "next": "^16.2.10",
@@ -261,6 +262,8 @@
     "recharts": "^3.9.2"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.4.1",
+    "@capacitor/ios": "^8.4.1",
     "@playwright/test": "^1.61.0",
     "@types/node": "^20.14.0",
     "@types/react": "^19.2.17",
