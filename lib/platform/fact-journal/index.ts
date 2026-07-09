@@ -27,6 +27,7 @@ import { readFeedbackLog } from '@/lib/platform/personalization';
 import { getLifeGraph } from '@/lib/portal/life-graph';
 import { getRecentMoments, emotionValence } from '@/lib/portal/moment-analytics';
 import { readPortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
+import { isFeatureEnabled } from '@/lib/portal/module-overrides';
 
 export interface JournalRow {
   dateKey: string;
@@ -71,9 +72,10 @@ function deriveHistoricalColumns(dateKeys: string[]): Map<string, Record<string,
     out.set(dk, row);
   };
 
-  // 位置:外出停留 / 移动 / 到访数(段已按事发地钟点对齐)
+  // 位置:外出停留 / 移动 / 到访数(段已按事发地钟点对齐)。
+  // 功能开关「关」= 该域数据不再进事实库 → 不参与跨区/洞察计算(不是只藏 UI)。
   try {
-    for (const day of buildPlaceTimeline(loadPlaceTrail(), 3650)) {
+    if (isFeatureEnabled('places')) for (const day of buildPlaceTimeline(loadPlaceTrail(), 3650)) {
       if (!want.has(day.dateKey)) continue;
       let away = 0, visits = 0, moveKm = 0;
       const segs = day.segments;
@@ -96,7 +98,7 @@ function deriveHistoricalColumns(dateKeys: string[]): Map<string, Record<string,
   // 银行:当日真实支出(txFlow 只认 expense,转账/收入/还款不算)
   try {
     const byDay = new Map<string, number>();
-    for (const t of loadBankTx()) {
+    if (isFeatureEnabled('finance')) for (const t of loadBankTx()) {
       const dk = String(t.date || '').slice(0, 10);
       if (!want.has(dk)) continue;
       if (txFlow(t) !== 'expense') continue;
@@ -125,7 +127,7 @@ function deriveHistoricalColumns(dateKeys: string[]): Map<string, Record<string,
 
   // 训练打卡:当日完成 session 数
   try {
-    const log = loadTrainingState().log || [];
+    const log = isFeatureEnabled('fitness') ? (loadTrainingState().log || []) : [];
     const byDay = new Map<string, number>();
     for (const s of log) {
       if (!want.has(s.date)) continue;
@@ -150,7 +152,7 @@ function deriveHistoricalColumns(dateKeys: string[]): Map<string, Record<string,
 
   // 健康:只认 latestDate 正好落在目标日的读数(月度 series 无日粒度,不硬造)
   try {
-    const metrics = loadHealthMetrics();
+    const metrics = isFeatureEnabled('health') ? loadHealthMetrics() : null;
     const HEALTH_COLS: Record<string, string> = { steps: 'steps', sleep: 'sleepMin', restingHR: 'restingHR', hrv: 'hrv' };
     for (const [key, col] of Object.entries(HEALTH_COLS)) {
       const metric = (metrics as Record<string, { latest?: number; latestDate?: string }> | null)?.[key];
