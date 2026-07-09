@@ -14,6 +14,7 @@ import LifeReportCard from './insights/LifeReportCard';
 import CrossRegionCard from './insights/CrossRegionCard';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { MyExperimentWidget, loadExperiments, computeInsight } from '@/components/portal/NesioExperiment';
+import { useFeatureEnabled } from '@/components/portal/use-feature-flag';
 import LifeCivilizationMap from '@/components/portal/LifeCivilizationMap';
 import RelationGraph from '@/components/portal/RelationGraph';
 import type { GNode, GEdge } from '@/lib/platform/graph-engine';
@@ -980,6 +981,11 @@ function LivingModelTab({
 export default function InsightsSheet({ onClose, canUsePrivateData = true, initialTab }: { onClose: () => void; canUsePrivateData?: boolean; initialTab?: MainTab }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [mainTab, setMainTab] = useState<MainTab>(initialTab ?? 'reflection');
+  // 功能开关中心:足迹(timeline tab)、我的实验(widget)可被用户关掉。
+  const showPlaces = useFeatureEnabled('places');
+  const showExperiment = useFeatureEnabled('experiment');
+  // 关掉足迹时若正停在该 tab,退回洞察,别卡在空白页。
+  useEffect(() => { if (!showPlaces && mainTab === 'timeline') setMainTab('reflection'); }, [showPlaces, mainTab]);
   const [period, setPeriod] = useState<Period>('week');
   const [profile, setProfile] = useState<MirrorProfile | null>(null);
   const [allNodes, setAllNodes] = useState<LifeNode[]>([]);
@@ -1150,7 +1156,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = true, initi
 
       {/* Main tabs */}
       <div className="nesio-insights-main-tabs">
-        {(['reflection', 'health', 'timeline', 'finance', 'relationships', 'living'] as MainTab[]).map((t) => (
+        {(['reflection', 'health', 'timeline', 'finance', 'relationships', 'living'] as MainTab[]).filter((t) => t !== 'timeline' || showPlaces).map((t) => (
           <button
             key={t}
             type="button"
@@ -1311,7 +1317,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = true, initi
               </div>
             )}
 
-            {activeWidgets.includes('my_experiment') && (
+            {activeWidgets.includes('my_experiment') && showExperiment && (
               <div className="nesio-insights-section">
                 <p className="nesio-insights-section-label">{L(dict, '我的实验', 'My experiment')}</p>
                 <MyExperimentWidget />
@@ -1321,7 +1327,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = true, initi
         )}
 
         {/* ── Tab: Timeline(批次 28,放分析后面)── */}
-        {mainTab === 'timeline' && (
+        {mainTab === 'timeline' && showPlaces && (
           <div className="nesio-analytics-tab">
             <TimelineTab />
           </div>

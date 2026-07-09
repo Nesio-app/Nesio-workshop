@@ -12,6 +12,7 @@ import { useRef } from 'react';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
+import { useFeatureEnabled } from './use-feature-flag';
 
 export type CaptureMode = 'camera' | 'voice' | 'share';
 
@@ -73,6 +74,7 @@ const FAN_BUTTONS: Array<{
 
 export default function TellNesioSheet({ open, onClose, onCapture }: TellNesioSheetProps) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
+  const showFreeze = useFeatureEnabled('freeze'); // 功能开关中心:冷冻仓可关
   const cameraInputRef = useRef<HTMLInputElement>(null);
   if (!open) return null;
 
@@ -140,7 +142,8 @@ export default function TellNesioSheet({ open, onClose, onCapture }: TellNesioSh
           <span className="nesio-tell-fan-label">{L(dict, '记录心情', 'How I feel')}</span>
         </button>
 
-        {/* 冻一下 —— 想买点东西先冻进冷冻仓(冲动购物防护 + 奖品仓库入口) */}
+        {/* 冻一下 —— 想买点东西先冻进冷冻仓(冲动购物防护 + 奖品仓库入口)。功能开关中心可关。 */}
+        {showFreeze && (
         <button
           type="button"
           className="nesio-tell-fan-btn nesio-tell-fan-btn--extra"
@@ -158,6 +161,7 @@ export default function TellNesioSheet({ open, onClose, onCapture }: TellNesioSh
           </span>
           <span className="nesio-tell-fan-label">{L(dict, '冻一下', 'Freeze it')}</span>
         </button>
+        )}
 
         {/* 收纳 —— 东西放哪了记一笔(原生 InventorySheet,life-graph object 节点视图) */}
         <button

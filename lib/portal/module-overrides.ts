@@ -15,18 +15,33 @@ export const MODULE_OVERRIDES_EVENT = 'nesio-module-overrides-updated';
  * 分享/问/洞察/预测/今日聚焦)是外壳常驻、不在此列。default = 该模块在默认 SKU 里是否
  * 对免费用户可见(仅供 UI 说明「跟随默认」时的实际效果)。
  */
-export interface ToggleableModule { id: string; zh: string; en: string; defaultPublic: boolean }
-// 只列**真有实现**、在 web 里能打开的工具模块(components/portal 里有组件)。
-// secretary / psychoanalysis / sanctuary / quiz / lifesim 是外部静态包或纯注册表占位,
-// web 端 0 组件、点了打不开,不放进来(免得开关是空壳,误导)。
-export const TOGGLEABLE_MODULES: readonly ToggleableModule[] = Object.freeze([
-  { id: 'inventory', zh: '物品收纳', en: 'Inventory', defaultPublic: true },
-  { id: 'plan', zh: '计划', en: 'Plans', defaultPublic: true },
-  { id: 'reading', zh: '阅读器', en: 'Reader', defaultPublic: false },
-  { id: 'fitness', zh: '健身', en: 'Fitness', defaultPublic: false },
-  { id: 'finance', zh: '财务', en: 'Finance', defaultPublic: false },
-  { id: 'health', zh: '健康', en: 'Health', defaultPublic: false },
+// 功能开关目录。两类:
+//  - module:工具箱竖向模块,经 launch-surface resolver 门控(moduleOverrides)。只列
+//    **真有实现**的(components/portal 有组件);secretary/心理/圣所/quiz/lifesim 是
+//    外部静态包或纯占位,web 端 0 组件、点了打不开,不放进来。
+//  - feature:核心之外的子功能(冷冻仓/实验/足迹),入口处 useFeatureEnabled 门控,默认开。
+// 真正核心(今日/洞察/记忆/问一问/拍/说/分享)是外壳常驻,不在此列、永远在。
+export type FeatureKind = 'module' | 'feature';
+export interface FeatureEntry { id: string; zh: string; en: string; kind: FeatureKind; defaultOn: boolean }
+export const FEATURE_CATALOG: readonly FeatureEntry[] = Object.freeze([
+  { id: 'inventory', zh: '物品收纳', en: 'Inventory', kind: 'module', defaultOn: true },
+  { id: 'plan', zh: '计划', en: 'Plans', kind: 'module', defaultOn: true },
+  { id: 'reading', zh: '阅读器', en: 'Reader', kind: 'module', defaultOn: false },
+  { id: 'fitness', zh: '健身', en: 'Fitness', kind: 'module', defaultOn: false },
+  { id: 'finance', zh: '财务', en: 'Finance', kind: 'module', defaultOn: false },
+  { id: 'health', zh: '健康', en: 'Health', kind: 'module', defaultOn: false },
+  { id: 'freeze', zh: '冷冻仓', en: 'Freeze vault', kind: 'feature', defaultOn: true },
+  { id: 'experiment', zh: '我的实验', en: 'Experiments', kind: 'feature', defaultOn: true },
+  { id: 'places', zh: '地点足迹', en: 'Footprints', kind: 'feature', defaultOn: true },
 ]);
+
+/** 子功能是否启用:显式覆盖优先,否则回落默认(子功能默认开)。入口处 gate 用。 */
+export function isFeatureEnabled(id: string, defaultOn = true): boolean {
+  const ov = loadModuleOverrides()[id];
+  if (ov === 'on') return true;
+  if (ov === 'off') return false;
+  return defaultOn;
+}
 
 export type ModuleOverride = 'on' | 'off';
 export type ModuleOverrideMap = Record<string, ModuleOverride>;
