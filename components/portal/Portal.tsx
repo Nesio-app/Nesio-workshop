@@ -34,6 +34,7 @@ import {
   resolveShellRuntimeTools,
   shouldShellOpenTool,
 } from '@/lib/portal/shell-runtime-resolver.mjs';
+import { loadModuleOverrides, MODULE_OVERRIDES_EVENT } from '@/lib/portal/module-overrides';
 import { buildPortalShellManifest } from '@/lib/portal/module-manifest';
 import {
   fetchDecModules,
@@ -291,7 +292,16 @@ export default function Portal() {
     viewerRole: 'public' as 'public' | 'tester' | 'personal_lab',
     testerAllowlist: [] as string[],
     testerCohort: null as string | null,
+    moduleOverrides: {} as Record<string, 'on' | 'off'>,
   });
+
+  // 逐模块本地开关:客户端加载 + 订阅更新(SSR 期为空,避免水合不一致,与 lab 旗一致)。
+  useEffect(() => {
+    const sync = () => setLaunchSurfaceContext((prev) => ({ ...prev, moduleOverrides: loadModuleOverrides() }));
+    sync();
+    window.addEventListener(MODULE_OVERRIDES_EVENT, sync);
+    return () => window.removeEventListener(MODULE_OVERRIDES_EVENT, sync);
+  }, []);
 
   const configWithDecMetadata = useMemo(
     () => mergePortalConfigWithDecMetadata(config, decModules),
@@ -319,7 +329,10 @@ export default function Portal() {
   const canUsePrivateRuntime = authReady && authSessionLoggedIn;
 
   useEffect(() => {
-    setLaunchSurfaceContext(normalizeLaunchSurfaceContext(readLaunchSurfaceContextFromBrowser()));
+    setLaunchSurfaceContext((prev) => ({
+      ...normalizeLaunchSurfaceContext(readLaunchSurfaceContextFromBrowser()),
+      moduleOverrides: prev.moduleOverrides, // 逐模块覆盖由独立 effect 维护,别被整包覆盖冲掉
+    }));
     setLocale(loadProfileSettings().locale);
   }, []);
 

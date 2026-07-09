@@ -17,6 +17,7 @@ import { deleteLifeNode, getLifeGraph } from '@/lib/portal/life-graph';
 import { purgeLocalData } from '@/lib/portal/storage-manifest';
 import { purgeIdbBlobs } from '@/lib/portal/idb-blob-store';
 import { purgeLocalImages } from '@/lib/portal/local-image-store';
+import { TOGGLEABLE_MODULES, loadModuleOverrides, setModuleOverride, MODULE_OVERRIDES_EVENT } from '@/lib/portal/module-overrides';
 import { isValidBackup } from '@/lib/portal/full-backup';
 import { buildCombinedBackup, pushBackupToCloud, pullBackupFromCloud, restoreCombinedBackup, hasCloudEntitlement, lastCloudBackup, type CloudBackupError, type CloudRestoreError } from '@/lib/portal/cloud-backup';
 
@@ -267,6 +268,7 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
   const [lastBackupAt, setLastBackupAt] = useState<string | null>(null);
   const [labOn, setLabOn] = useState(false);
   const [labMsg, setLabMsg] = useState<string | null>(null);
+  const [moduleOv, setModuleOv] = useState<Record<string, 'on' | 'off'>>({});
   const importRef = useRef<HTMLInputElement>(null);
   // 云备份(付费,规划中):状态机 idle→pushing→done/error,失败必可见(设计红线)。
   const [cloudState, setCloudState] = useState<'idle' | 'pushing' | 'done' | 'error'>('idle');
@@ -437,6 +439,15 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
     return () => window.removeEventListener('nesio-life-graph-updated', readCount);
   }, [open]);
 
+  // 逐模块开关:打开时读当前覆盖 + 订阅(工具箱会随覆盖实时变,不需 reload)。
+  useEffect(() => {
+    if (!open) return;
+    const sync = () => setModuleOv(loadModuleOverrides());
+    sync();
+    window.addEventListener(MODULE_OVERRIDES_EVENT, sync);
+    return () => window.removeEventListener(MODULE_OVERRIDES_EVENT, sync);
+  }, [open]);
+
   function toggleLab() {
     const turningOn = !labOn;
     try {
@@ -598,6 +609,38 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
           {labOn ? '✓' : '○'}
         </span>
       </button>
+
+      <p className="nesio-settings-section-label" style={{ marginTop: '1.5rem' }}>{L(dict, '功能模块', 'Feature modules')}</p>
+      <p className="nesio-settings-option-hint" style={{ margin: '0 0 0.6rem' }}>
+        {L(dict, '逐个控制工具模块。「默认」跟随公开版(拍一拍/说一句/分享/问一问/洞察/未来预测/今日聚焦 始终在)。改动即时生效,无需刷新。',
+          'Toggle tools one by one. "Default" follows the public build (snap / voice / share / ask / insights / forecast / today focus are always on). Changes apply instantly, no refresh.')}
+      </p>
+      {TOGGLEABLE_MODULES.map((m) => {
+        const cur = moduleOv[m.id] ?? null; // null = 跟随默认
+        const seg = (val: 'on' | 'off' | null, label: string) => (
+          <button
+            type="button"
+            onClick={() => setModuleOverride(m.id, val)}
+            style={{
+              flex: 1, padding: '0.3rem 0', fontSize: '0.72rem', borderRadius: 'var(--radius)',
+              border: '0.5px solid var(--portal-border)',
+              background: cur === val ? 'var(--portal-accent-soft, var(--portal-hover))' : 'transparent',
+              color: cur === val ? 'var(--portal-accent, var(--portal-fg))' : 'var(--portal-muted)',
+              fontWeight: cur === val ? 600 : 400,
+            }}
+          >{label}</button>
+        );
+        return (
+          <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0 0 0.4rem' }}>
+            <span style={{ flex: 1, fontSize: '0.82rem' }}>{dict === 'en' ? m.en : m.zh}</span>
+            <div style={{ display: 'flex', gap: '0.25rem', width: '9.5rem' }}>
+              {seg(null, L(dict, '默认', 'Default'))}
+              {seg('on', L(dict, '开', 'On'))}
+              {seg('off', L(dict, '关', 'Off'))}
+            </div>
+          </div>
+        );
+      })}
     </SheetWrap>
   );
 }

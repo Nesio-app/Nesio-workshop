@@ -149,4 +149,31 @@ assert.equal(reportFinance.visibleForPersonalLab, true);
 assert.equal(reportFinance.personalLabShellAction, 'open_lab_preview');
 assert.equal(reportFinance.approvalGateOverridesPaywallGate, true);
 
+// ── 逐模块本地覆盖(moduleOverrides)优先于默认 SKU/viewerRole ──
+{
+  // 关掉本来对公众可见的模块
+  const invOff = resolveLaunchSurfaceState({ id: 'inventory' }, { viewerRole: 'public', moduleOverrides: { inventory: 'off' } });
+  assert.equal(invOff.visible, false, 'override off 隐藏本来公开的 inventory');
+  assert.equal(invOff.reason, 'user_disabled');
+  assert.equal(invOff.userOverride, 'off');
+
+  // 开启本来对公众隐藏的门控模块(无需开 Lab 总闸)
+  const finOn = resolveLaunchSurfaceState({ id: 'finance' }, { viewerRole: 'public', moduleOverrides: { finance: 'on' } });
+  assert.equal(finOn.visible, true, 'override on 开启本来门控的 finance');
+  assert.equal(finOn.reason, 'user_enabled');
+  assert.equal(finOn.userOverride, 'on');
+
+  // 无覆盖 → 默认行为完全不变(既有契约不受影响)
+  const invDefault = resolveLaunchSurfaceState({ id: 'inventory' }, { viewerRole: 'public' });
+  assert.equal(invDefault.visible, true, '无覆盖:inventory 默认公开可见');
+  assert.equal(invDefault.userOverride, null);
+  const finDefault = resolveLaunchSurfaceState({ id: 'finance' }, { viewerRole: 'public' });
+  assert.equal(finDefault.visible, false, '无覆盖:finance 默认对公众隐藏');
+  assert.equal(finDefault.userOverride, null);
+
+  // 覆盖对 Lab 视角同样生效:Lab 全开时也能单独关掉某个不想要的工具
+  const invOffLab = resolveLaunchSurfaceState({ id: 'inventory' }, { viewerRole: 'personal_lab', moduleOverrides: { inventory: 'off' } });
+  assert.equal(invOffLab.visible, false, 'Lab 下 override off 仍隐藏该模块');
+}
+
 console.log('launch surface resolver tests passed');
