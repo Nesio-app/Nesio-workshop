@@ -59,6 +59,18 @@ export function reportStorageDropped(): void {
   window.dispatchEvent(new CustomEvent(STORAGE_FULL_EVENT, { detail: getStorageHealth() }));
 }
 
+/**
+ * 关键路径静默失败可观测(上线就绪 B3):把 catch{} 从"瞎着运营"变成可 grep 的一行。
+ * 最小成本 —— console.warn(生产 Vercel/浏览器日志可见),不引依赖、不阻塞业务。
+ * 关键路径(云同步、财务合并、删除、日报)吞异常时调它,别再哑吞。
+ */
+export function logDropped(context: string, detail?: unknown): void {
+  try {
+    const msg = detail instanceof Error ? detail.message : detail != null ? String(detail) : '';
+    console.warn(`[nesio:dropped] ${context}${msg ? ` — ${msg}` : ''}`);
+  } catch { /* never break the caller */ }
+}
+
 /** Call after significant writes; fires the warning event at most once a day. */
 export function checkStorageWarning(): void {
   if (typeof window === 'undefined') return;

@@ -13,6 +13,7 @@ import { addLifeNode, type LifeNode, type LifeNodeSource, type LifeNodeType } fr
 import { lifeNodeToSignal, type RetentionPolicy, type Signal, type SignalSensitivity, type SignalSource, type SignalType } from './signal';
 import type { SignalContext } from './context';
 import { appendSignalIdb } from './signal-store-idb';
+import { logDropped } from '../portal/storage-health';
 
 export const SIGNAL_SCHEMA_VERSION = 'Signal@v1';
 export type SignalWriteMode = 'local_first' | 'cloud_mirror_attempted' | 'cloud_mirror_pending';
@@ -137,7 +138,8 @@ export async function writeCloudSignal(signal: Signal): Promise<{ ok: boolean; s
     }
     if (!response.ok) return { ok: false, status: `http_${response.status}` };
     return { ok: true, status: 'cloud_mirror_attempted' };
-  } catch {
+  } catch (err) {
+    logDropped('signal.cloud_mirror', err); // B3 可观测:云镜像失败别哑吞
     return { ok: false, status: 'cloud_mirror_failed' };
   }
 }
@@ -168,7 +170,9 @@ export function createSignal(input: CreateSignalInput): Signal {
     rawInput: input.raw,
   });
   const signal = lifeNodeToSignal(node);
-  void appendSignalIdb(signal); // M2:IDB 事实库双写(读路径未切,见 signal-store-idb.ts)
+  // M2:IDB 事实库双写(读路径未切,见 signal-store-idb.ts)。B3:此前 fire-and-forget
+  // 无 catch → 写失败静默丢事实;加日志,别再哑吞(离线记的事实进不了库要看得见)。
+  void appendSignalIdb(signal).catch((err) => logDropped('signal.idb_write', err));
   if (signalWriteMode() === 'cloud_mirror_pending') {
     void writeCloudSignal(signal);
   }
