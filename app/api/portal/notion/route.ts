@@ -12,7 +12,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { guardAiRoute } from '@/lib/portal/api-auth';
-import { NOTION_API, NOTION_VERSION, notionHeaders, queryDataSourceRows, getDataSourceSchema } from '@/lib/portal/notion-api';
+import { NOTION_API, NOTION_VERSION, notionHeaders, queryDataSourceRows, getDataSourceSchema, discoverDatabases, primaryDataSourceId } from '@/lib/portal/notion-api';
 import { foldSourcesToMemories, type NotionPageRow } from '@/lib/portal/notion-fold';
 import type { NotionSourceSchema } from '@/lib/portal/notion-classify';
 import { completeText, aiProviderAvailable } from '@/lib/portal/ai-complete';
@@ -98,13 +98,28 @@ ${docText.slice(0, 5000)}`;
   } catch { return { nodes: [], summary: '解析失败' }; }
 }
 
-/** N-3:拉一个数据源的 schema + 行(rowCount 用实际行数,供 classify 判父子)。失败返回 null。 */
+/** 行里抽 title 列文本(供 titleSamples 判日历维度表)。 */
+function rowTitle(row: NotionPageRow): string {
+  const props = row.properties || {};
+  for (const value of Object.values(props)) {
+    const v = value as { type?: string; title?: Array<{ plain_text?: string }> };
+    if (v?.type === 'title' && Array.isArray(v.title)) return v.title.map((t) => t.plain_text || '').join('');
+  }
+  return '';
+}
+
+/**
+ * N-3:拉一个数据源的 schema + 行(rowCount 用实际行数,供 classify 判父子)。失败返回 null。
+ * 关键修:补 titleSamples —— 否则 looksCalendarDim 只能看表名,日期行标题的表漏判成 log,
+ * 每行倒成一张日期卡(用户实测的 2026-07-03 垃圾卡即此)。
+ */
 async function loadSource(token: string, sourceId: string): Promise<{ schema: NotionSourceSchema; rows: NotionPageRow[] } | null> {
   try {
     const schema = await getDataSourceSchema(token, sourceId);
     if (!schema) return null;
     const rows = await queryDataSourceRows(token, sourceId, MAX_ROWS_PER_DB);
-    return { schema: { ...schema, rowCount: rows.length }, rows };
+    const titleSamples = rows.slice(0, 12).map(rowTitle).filter(Boolean);
+    return { schema: { ...schema, rowCount: rows.length, titleSamples }, rows };
   } catch { return null; }
 }
 
@@ -128,31 +143,50 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 用户选定了数据源(databaseIds 承载 data_source_id)→ N-3:结构折叠。
-  // 拉每个源的 schema + 行 → classifyDatabase 认结构角色 → foldSourcesToMemories
-  // 把子表(划线/笔记)折进父表(书),一本书 = 一条记忆;日历/维度表和技术列丢。
-  const databaseIds = Array.isArray(body.databaseIds) ? body.databaseIds.filter(Boolean) : [];
-  if (databaseIds.length) {
+  // N-3 结构折叠是正路:拉每个源的 schema + 行 → classifyDatabase 认结构角色 →
+  // foldSourcesToMemories 把子表(划线/笔记)折进父表(书),一本书 = 一条记忆;日历/维度表和技术列丢。
+  //
+  // 关键修:折叠**不再只在用户成功「选表」时才走**。此前没选表就退回盲搜页面 /search,把日期行
+  //   页面倒成日期垃圾卡(用户实测症结),且「选表」按钮一旦不响应就彻底进不了折叠。
+  //   现在:没显式选表 → 自动 discovery 发现所有共享数据库、全量折叠(折叠本就需要父+子表同时在场,
+  //   自动加载全部比手选单表更对);只有一个库都没有时才回落页面搜(松散页面场景)。
+  const explicitIds = Array.isArray(body.databaseIds) ? body.databaseIds.filter(Boolean) : [];
+  let sourceIds = explicitIds;
+  if (!sourceIds.length) {
+    try {
+      const disc = await discoverDatabases(token);
+      if (disc.ok && disc.databases.length) {
+        sourceIds = disc.databases.map(primaryDataSourceId).slice(0, MAX_DATABASES);
+      }
+    } catch { /* 发现失败 → 落到下面页面搜兜底 */ }
+  }
+
+  if (sourceIds.length) {
     const schemas: NotionSourceSchema[] = [];
     const rowsBySource: Record<string, NotionPageRow[]> = {};
-    for (const sourceId of databaseIds.slice(0, MAX_DATABASES)) {
+    for (const sourceId of sourceIds.slice(0, MAX_DATABASES)) {
       const loaded = await loadSource(token, sourceId);
       if (!loaded) continue;
       schemas.push(loaded.schema);
       rowsBySource[loaded.schema.id] = loaded.rows;
     }
     const memories = foldSourcesToMemories(schemas, rowsBySource);
-    const capped = memories.slice(0, MAX_TOTAL_ROWS);
-    return NextResponse.json({
-      ok: true,
-      nodes: capped,
-      summary: `按结构折叠导入 ${capped.length} 条记忆(子表已折进父条目)`,
-      pageCount: capped.length,
-      aiUsed: false,
-    });
+    // 显式选表:即使折叠出 0 也返回(用户明确指定了,别再盲搜倒垃圾);
+    // 自动发现:折叠出 0(全被判成日历/维度丢弃)才回落页面搜(可能是松散页面库)。
+    if (explicitIds.length || memories.length) {
+      const capped = memories.slice(0, MAX_TOTAL_ROWS);
+      return NextResponse.json({
+        ok: true,
+        nodes: capped,
+        summary: `按结构折叠导入 ${capped.length} 条记忆(子表已折进父条目)`,
+        pageCount: capped.length,
+        aiUsed: false,
+        folded: true,
+      });
+    }
   }
 
-  // Search recently edited pages
+  // Search recently edited pages(兜底:一个数据库都没发现,或自动折叠为空)
   let searchRes: Response;
   try {
     searchRes = await fetch(`${NOTION_API}/search`, {
