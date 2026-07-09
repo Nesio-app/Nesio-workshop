@@ -413,6 +413,14 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       // 财务㉒:富化覆盖诊断 —— 一眼分辨「数据没来」还是「UI 没显示」
       showToast(L(dict, `流水同步完成:新增 ${r.fresh} 笔,共 ${r.total} 笔,${r.accounts} 个账户(商户 logo 覆盖 ${r.withLogo} 笔)。到「洞察 → 财务」看总览/预算/交易`, `Synced: ${r.fresh} new, ${r.total} total, ${r.accounts} accounts (${r.withLogo} tx with merchant logos). See Insights → Finance`), true);
     }
+    // 投资可见失败态:有投资账户但没拉到持仓/流水 —— 不再静默,给出原因 + 出路(多为需断开重连券商)。
+    const inv = r.investments;
+    if (inv && inv.accounts > 0 && inv.holdings === 0 && inv.transactions === 0) {
+      const relink = /CONSENT|NOT_SUPPORTED|PRODUCT/i.test(inv.error || '');
+      showToast(L(dict,
+        `识别到 ${inv.accounts} 个投资账户,但没拉到持仓/流水${inv.error ? `(${inv.error})` : ''}。${relink ? '多半是这个账户没授权 Plaid 的 investments 产品 —— 断开重连一次券商账户即可;若仍不行,是 Plaid 后台未开通 Investments 产品。' : '稍后再同步一次;持续为空则需断开重连券商账户。'}`,
+        `Found ${inv.accounts} investment account(s) but no holdings/transactions${inv.error ? ` (${inv.error})` : ''}. ${relink ? "Likely this item isn't authorized for Plaid's investments product — disconnect and re-link the brokerage. If it persists, enable the Investments product in the Plaid dashboard." : 'Try syncing again; if it stays empty, disconnect and re-link the brokerage.'}`), false);
+    }
     setSyncing(null);
   }
 

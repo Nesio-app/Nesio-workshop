@@ -67,39 +67,12 @@ function privateFeedAccessEnabled(): boolean {
   return envValue('CALENDAR_PRIVATE_FEEDS_ENABLED').toLowerCase() === 'true' || noSupabase;
 }
 
-function normalizeIcalUrl(raw: string): string {
-  const u = raw.trim();
-  if (u.startsWith('webcal://')) return `https://${u.slice('webcal://'.length)}`;
-  if (u.startsWith('http://')) return `https://${u.slice('http://'.length)}`;
-  return u;
-}
-
+// 静态 ICS 订阅已按用户要求移除(2026-07):此前从 env(GOOGLE_CALENDAR_ICS_URL /
+// FIDELITY / CALENDAR_ICAL_URLS 等)读一批 URL 自动订阅,会把外部日历(含带错时区的
+// 陌生事件,如误入的一条演示日程)灌进 Today。日历现在只走用户自己的 Google OAuth 同步
+// (/calendars/primary/events)。保留空实现以维持下方响应结构与鉴权门不变。
 function calendarFeeds(): Feed[] {
-  const feeds: Feed[] = [];
-  const add = (raw: string | undefined, label: string) => {
-    const v = raw?.trim();
-    if (!v || v === '""' || v === "''") return;
-    const url = normalizeIcalUrl(v);
-    if (!url.startsWith('https://')) return;
-    if (feeds.some((f) => f.url === url)) return;
-    feeds.push({ url, label });
-  };
-
-  add(process.env.GOOGLE_CALENDAR_ICAL_URL, 'Google');
-  add(process.env.GOOGLE_CALENDAR_ICS_URL, 'Google');
-  add(process.env.FIDELITY, 'Fidelity');
-  add(process.env.FIDELITY_ICAL_URL, 'Fidelity');
-  add(process.env.FIDELITY_CALENDAR_ICAL_URL, 'Fidelity');
-  add(process.env.GOOGLE_CALENDAR_FIDELITY_ICAL_URL, 'Fidelity');
-
-  const multi =
-    process.env.CALENDAR_ICAL_URLS?.trim() ||
-    process.env.GOOGLE_CALENDAR_ICAL_URLS?.trim();
-  if (multi) {
-    multi.split(',').forEach((part, i) => add(part, `Calendar ${i + 1}`));
-  }
-
-  return feeds;
+  return [];
 }
 
 async function fetchIcsEvents(url: string, fallbackLabel: string) {
@@ -324,7 +297,7 @@ export async function GET(req: NextRequest) {
       enabled,
       events: [],
       feeds: [],
-      message: 'Set GOOGLE_CALENDAR_ICAL_URL and FIDELITY on Vercel.',
+      message: 'Connect Google Calendar to sync your events.',
     });
   }
 
