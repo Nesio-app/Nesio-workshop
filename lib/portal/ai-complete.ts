@@ -72,7 +72,7 @@ async function callClaude(apiKey: string, prompt: string, system: string, maxTok
   };
 }
 
-async function callGemini(apiKey: string, prompt: string, system: string, maxTokens: number, temperature?: number, image?: string): Promise<CallResult> {
+async function callGemini(apiKey: string, prompt: string, system: string, maxTokens: number, temperature?: number, image?: string, responseFormat?: 'json'): Promise<CallResult> {
   const configuredModel = envValue('GEMINI_MODEL');
   const models = Array.from(new Set([configuredModel, ...GEMINI_MODEL_FALLBACKS].filter(Boolean)));
   let lastError = 'Gemini unavailable';
@@ -89,7 +89,12 @@ async function callGemini(apiKey: string, prompt: string, system: string, maxTok
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: system }] },
           contents: [{ role: 'user', parts }],
-          generationConfig: { temperature: temperature ?? 0.6, maxOutputTokens: maxTokens },
+          // responseFormat:'json' → 强制合法 JSON(修「大结构化输出被截断/跑成大白话 → no JSON」)。
+          generationConfig: {
+            temperature: temperature ?? 0.6,
+            maxOutputTokens: maxTokens,
+            ...(responseFormat === 'json' ? { responseMimeType: 'application/json' } : {}),
+          },
         }),
       });
       const data = await res.json() as {
@@ -153,8 +158,8 @@ function logAiCost(route: string, provider: 'claude' | 'gemini', startedAt: numb
  * opts.route       — telemetry 标签(默认 'complete'),用于 /admin 按路由归集真实 token 成本。
  */
 export async function completeText(
-  { prompt, system = '', maxTokens = 1024, model, temperature, image, route = 'complete' }:
-  { prompt: string; system?: string; maxTokens?: number; model?: string; temperature?: number; image?: string; route?: string },
+  { prompt, system = '', maxTokens = 1024, model, temperature, image, responseFormat, route = 'complete' }:
+  { prompt: string; system?: string; maxTokens?: number; model?: string; temperature?: number; image?: string; responseFormat?: 'json'; route?: string },
 ): Promise<{ text: string; provider: 'claude' | 'gemini'; usage?: AiUsage; model?: string }> {
   const anthropicKey = resolveAiKey('anthropic');
   const geminiKey = resolveAiKey('gemini');
@@ -173,7 +178,7 @@ export async function completeText(
     }
   }
   if (geminiKey) {
-    const r = await callGemini(geminiKey, prompt, system, maxTokens, temperature, image);
+    const r = await callGemini(geminiKey, prompt, system, maxTokens, temperature, image, responseFormat);
     logAiCost(route, 'gemini', startedAt, r);
     return { text: r.text, provider: 'gemini', usage: r.usage, model: r.model };
   }

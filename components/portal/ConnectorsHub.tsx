@@ -455,7 +455,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(notionDbs.length ? { token, databaseIds: notionDbs } : { token }),
       });
-      const data = await res.json() as { ok?: boolean; nodes?: NodeInput[]; error?: string; pageCount?: number; aiUsed?: boolean };
+      const data = await res.json() as { ok?: boolean; nodes?: NodeInput[]; error?: string; pageCount?: number; aiUsed?: boolean; folded?: boolean };
       if (!data.ok) {
         if (data.error === 'not_connected' && c.id === 'notion') {
           setSyncing(null);
@@ -477,9 +477,12 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       saveConnectorState(c.id, true);
       setConnected((p) => ({ ...p, [c.id]: true }));
       setCounts((p) => ({ ...p, [c.id]: n.length }));
-      // N-5:选了数据源走 N-3 结构折叠(书=一条记忆);否则页面正文提取(未配 AI 时走标题兜底)。
-      if (c.id === 'notion' && notionDbs.length) {
-        showToast(L(dict, `已按结构折叠成 ${n.length} 条记忆(子表已折进对应条目,日历/技术列已丢)`, `Folded into ${n.length} memories by structure (sub-tables nested, calendar/ID columns dropped)`), true);
+      // N-6:折叠现在默认就走(没选表也自动发现数据库折叠),按响应的 folded 标志判断,
+      //   不再靠「是否选了表」—— 否则自动折叠会误报「未接 AI 按页面存入」。
+      if (c.id === 'notion' && data.folded) {
+        showToast(n.length
+          ? L(dict, `已按结构折叠成 ${n.length} 条记忆(子表已折进对应条目,日历/技术列已丢)`, `Folded into ${n.length} memories by structure (sub-tables nested, calendar/ID columns dropped)`)
+          : L(dict, '这些库都是日历/维度表,已跳过(没有可折叠的书/项目等主表)。想导松散页面可在 Notion 里把页面共享给集成。', 'Those databases are all calendar/dimension tables — skipped. To import loose pages, share them with the integration in Notion.'), true);
       } else {
         const suffix = c.id === 'notion' && data.aiUsed === false ? L(dict, '(未接 AI,已按页面标题/正文存入,可直接阅读)', '(no AI — saved by page title/text, readable directly)') : '';
         showToast(L(dict, `已提取 ${n.length} 个节点${suffix}`, `Extracted ${n.length} nodes ${suffix}`), true);
