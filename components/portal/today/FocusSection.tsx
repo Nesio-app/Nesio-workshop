@@ -250,6 +250,8 @@ export function TodayFocusSection({
       {isEmpty ? (
         <div className="nesio-focus-empty">
           <p>{t(locale, 'todayFocusEmpty')}</p>
+          {/* 空状态引导:已翻译的 hint 之前没渲染,新用户只看到「暂无」的死路。补上引导 —— 前 5 分钟价值。 */}
+          <p className="nesio-focus-empty-hint" style={{ fontSize: '0.8rem', color: 'var(--portal-muted)', marginTop: '0.3rem' }}>{t(locale, 'todayFocusEmptyHint')}</p>
         </div>
       ) : (
         <div className="nesio-attention-layout">
