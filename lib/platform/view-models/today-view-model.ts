@@ -10,7 +10,7 @@ import { scheduleHint } from '../../portal/time-labels';
 
 // 架构审查 #9(读写分离):写操作已迁 today-commands.ts,这里 re-export 保调用方兼容。
 // 本文件此后是纯查询侧(view-model 只读),新写操作一律加在 today-commands。
-export { saveSubtasks, toggleSubtask, markFocusNodeDone, addMeetingNotes, addCommitmentNode } from './today-commands';
+export { saveSubtasks, toggleSubtask, markFocusNodeDone, deleteFocusNode, addMeetingNotes, addCommitmentNode } from './today-commands';
 export interface SubTask {
   id: string;
   name: string;

@@ -31,6 +31,7 @@ function CollapsedTaskItem({
   doneIds,
   onDone,
   onDismiss,
+  onDeleteNode,
   onOpenRecorder,
   onFocusMode,
 }: {
@@ -38,6 +39,7 @@ function CollapsedTaskItem({
   doneIds: Set<string>;
   onDone: (node: FocusNode) => void;
   onDismiss: (id: string) => void;
+  onDeleteNode?: (id: string) => void;
   onOpenRecorder?: () => void;
   onFocusMode?: () => void;
 }) {
@@ -71,6 +73,7 @@ function CollapsedTaskItem({
             onOpenRecorder={isMeeting && onOpenRecorder ? onOpenRecorder : undefined}
             onFocusMode={onFocusMode}
             focusModeLabel={t(locale, 'todayFocusModeBtn')}
+            onDelete={onDeleteNode ? () => { setExpanded(false); onDeleteNode(node.id); } : undefined}
           />
         </div>
       )}
@@ -107,6 +110,7 @@ export function TodayFocusSection({
   onOpenMemory,
   onOpenRecorder,
   onFocusMode,
+  onDeleteNode,
 }: {
   focusNodes: readonly FocusNode[];
   calendarEvents: CalendarEvent[];
@@ -121,6 +125,8 @@ export function TodayFocusSection({
   onOpenMemory?: () => void;
   onOpenRecorder?: (node: FocusNode) => void;
   onFocusMode?: (node: FocusNode) => void;
+  /** 真·删除焦点节点(经命令层 deleteFocusNode);今日表面不直连 life-graph。 */
+  onDeleteNode?: (id: string) => void;
 }) {
   const [dismissed, setDismissed] = useState<Set<string>>(() => loadDismissedToday());
   const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
@@ -207,6 +213,7 @@ export function TodayFocusSection({
         doneIds={doneIds}
         onDone={handleDone}
         onDismiss={(id) => setDismissed((prev) => { const next = new Set(prev); next.add(id); persistDismissed(next); return next; })}
+        onDeleteNode={onDeleteNode}
         onOpenRecorder={onOpenRecorder ? () => onOpenRecorder(node) : undefined}
         onFocusMode={onFocusMode ? () => onFocusMode(node) : undefined}
       />

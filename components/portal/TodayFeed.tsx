@@ -5,7 +5,7 @@ import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { useProfileAvatar } from './use-profile-avatar';
 import { usePortalLocale } from './use-portal-locale';
 import { L } from '@/lib/portal/i18n';
-import { buildTodayViewModel, focusTimeHint, markFocusNodeDone, addCommitmentNode, addMeetingNotes, saveSubtasks, toggleSubtask, type FocusNode, type SubTask, type ProactiveContext, type ProactiveContextItem } from '@/lib/platform/view-models/today-view-model';
+import { buildTodayViewModel, focusTimeHint, markFocusNodeDone, deleteFocusNode, addCommitmentNode, addMeetingNotes, saveSubtasks, toggleSubtask, type FocusNode, type SubTask, type ProactiveContext, type ProactiveContextItem } from '@/lib/platform/view-models/today-view-model';
 import type { CalendarEvent } from '@/lib/portal/types';
 import {
   loadDormantStore, evaluateDormancy, selectReviewCandidate, applyReviewAction,
@@ -190,6 +190,7 @@ export default function TodayFeed({
           onOpenMemory={onOpenMemory}
           onOpenRecorder={(node) => setMeetingRecorderNode(node)}
           onFocusMode={(node) => setFocusModeNode(node)}
+          onDeleteNode={(id) => deleteFocusNode(id)}
         />
 
         {/* 实验打卡(批次 8:按用户要求放到最下面) */}

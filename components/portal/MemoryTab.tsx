@@ -1066,8 +1066,8 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                   <div className="nesio-memory-type-filter" role="group" aria-label="按类型筛选">
                     <button
                       type="button"
-                      className={`nesio-type-chip${!typeFilter && !showObjectMap ? ' is-active' : ''}`}
-                      onClick={() => { setTypeFilter(null); setShowObjectMap(false); }}
+                      className={`nesio-type-chip${!typeFilter && !showObjectMap && !showRelationGraph ? ' is-active' : ''}`}
+                      onClick={() => { setTypeFilter(null); setShowObjectMap(false); setShowRelationGraph(false); }}
                     >
                       {copy.allTypes}
                       <span className="nesio-type-chip-count">{nodes.length}</span>
@@ -1076,8 +1076,8 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                       <button
                         key={t}
                         type="button"
-                        className={`nesio-type-chip${typeFilter === t && !showObjectMap ? ' is-active' : ''}`}
-                        onClick={() => { setTypeFilter((prev) => (prev === t ? null : t)); setShowObjectMap(false); }}
+                        className={`nesio-type-chip${typeFilter === t && !showObjectMap && !showRelationGraph ? ' is-active' : ''}`}
+                        onClick={() => { setTypeFilter((prev) => (prev === t ? null : t)); setShowObjectMap(false); setShowRelationGraph(false); }}
                       >
                         <NodeTypeIcon type={t} size={12} /> {typeLabel(t, dict)}
                         <span className="nesio-type-chip-count">{typeCounts[t]}</span>

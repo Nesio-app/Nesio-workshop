@@ -6,7 +6,7 @@
  */
 
 import { ingestLifeNode } from '../../life-domain/ingest-node';
-import { getLifeGraph, updateLifeNode } from '../../portal/life-graph';
+import { getLifeGraph, updateLifeNode, deleteLifeNode } from '../../portal/life-graph';
 import type { SubTask, FocusNode } from './today-view-model';
 
 function broadcast(): void {
@@ -40,6 +40,12 @@ export function markFocusNodeDone(id: string): void {
   if (!node) return;
   updateLifeNode(id, { attributes: { ...node.attributes, done: true, doneAt: new Date().toISOString() } });
   broadcast();
+}
+
+// 真·删除今日焦点节点(不是「从今日移除」的软隐藏)。今日表面组件不得直连 life-graph
+// (平台边界),删除必须走命令层——所以放这里,由 TodayFeed 以回调下传给焦点卡。
+export function deleteFocusNode(id: string): void {
+  if (deleteLifeNode(id)) broadcast();
 }
 
 export function addMeetingNotes(meetingNodeId: string, meetingName: string, notes: string): void {

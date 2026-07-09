@@ -419,7 +419,12 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
   useEffect(() => {
     if (!open) return;
     setDeleted(false);
-    setNodeCount(getLifeGraph().length);
+    // 图谱已迁 IDB(异步水合):首次 getLifeGraph() 在水合完成前返回空 seed。只读一次会把
+    // 「我的数据」定格成「0 条记忆」——用户来这核实隐私,却读到谎报的 0(洞察面板同源却因
+    // 晚开、水合已完成而正确)。订阅 nesio-life-graph-updated,水合/增删后重读,口径一致。
+    const readCount = () => setNodeCount(getLifeGraph().length);
+    readCount();
+    window.addEventListener('nesio-life-graph-updated', readCount);
     setCloudState('idle');
     setCloudError(null);
     setCloudEntitled(hasCloudEntitlement());
@@ -428,6 +433,7 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
       setLastBackupAt(localStorage.getItem('nesio-last-backup-at'));
       setLabOn(localStorage.getItem('baohe_personal_lab') === '1' || localStorage.getItem('baohe_lab_mode') === '1');
     } catch { /* ignore */ }
+    return () => window.removeEventListener('nesio-life-graph-updated', readCount);
   }, [open]);
 
   function toggleLab() {

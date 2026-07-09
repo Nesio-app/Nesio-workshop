@@ -107,15 +107,26 @@ function attr(node: LifeNode, ...keys: string[]): string {
   return '';
 }
 
+// 纯日期(YYYY-MM-DD)按**本地**日期解析,绝不做时区换算。JS 的 new Date("2026-07-15")
+// 会当成 UTC 零点,美区浏览器读本地小时就变「7月14日」+ 凭空 20:00 —— 截止日算错一天,
+// 对一个记 deadline 的工具是信任底线问题。日期-only 一律走这里,不经 UTC。
+function parseLocalDate(raw: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
+  const d = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(raw);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 function fmtDate(raw: string, dict: string = 'zh'): string {
   if (!raw) return '';
-  const d = new Date(raw);
-  if (Number.isNaN(d.getTime())) return raw;
+  const d = parseLocalDate(raw);
+  if (!d) return raw;
   return d.toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
 function fmtDateTime(raw: string, dict: string = 'zh'): string {
   if (!raw) return '';
+  // 纯日期没有时间分量 —— 只显示日期,绝不凭空造出「20:00」这类时区伪影。
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return fmtDate(raw, dict);
   const d = new Date(raw);
   if (Number.isNaN(d.getTime())) return raw;
   const hasTime = d.getHours() !== 0 || d.getMinutes() !== 0;
@@ -363,7 +374,9 @@ function CommitmentSection({ node, onToggleDone }: {
   const isDone = Boolean(node.attributes.done);
   const priorityInfo = priority ? PRIORITY_LABELS[priority] : null;
 
-  const dueMs = dueDate ? new Date(dueDate).getTime() - Date.now() : null;
+  // 同上:纯日期按本地解析,否则「今天截止」也会因 UTC 换算差一天。
+  const dueParsed = dueDate ? parseLocalDate(dueDate) : null;
+  const dueMs = dueParsed ? dueParsed.getTime() - Date.now() : null;
   const isOverdue = dueMs !== null && dueMs < 0 && !isDone;
   const dueSoon = dueMs !== null && dueMs >= 0 && dueMs < 24 * 3_600_000 && !isDone;
 

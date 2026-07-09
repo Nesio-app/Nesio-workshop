@@ -1160,7 +1160,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
           <div style={{ marginTop: '1rem', fontSize: '0.72rem', color: 'var(--portal-muted)', textAlign: 'center', lineHeight: 1.6 }}>
             {L(dict, '有 API 的（Google 日历+Gmail / Notion / Toggl / Flomo）直接连接；', 'API sources (Google Calendar+Gmail / Notion / Toggl / Flomo) connect directly;')}<br />
             {L(dict, '没有公开 API 的（提醒事项 / Keep / 微信读书）通过快捷指令推送。', 'no-API sources (Reminders / Keep / WeRead) push via Shortcuts.')}<br />
-            {L(dict, '所有数据仅在你的设备上处理和存储。', 'All data is processed and stored on your device only.')}
+            {L(dict, '抽取出的记录存在你的设备;连接邮箱 / 日历 / Notion / 银行等账号时,授权与数据拉取会经过对应服务商的服务器。', "Extracted records are stored on your device; connecting email / calendar / Notion / bank accounts routes authorization and fetching through those providers' servers.")}
           </div>
         </div>
       </div>
