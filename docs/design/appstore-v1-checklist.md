@@ -63,8 +63,12 @@
 
 ## 3. 审核合规(高频被拒)🔴
 
-- [ ] 🔴 Sign in with Apple(雷 1)
-- [ ] 🔴 **App 内账号删除**(2022 起强制 5.1.1;已有 `user-data/delete`,接到 App 内可达)
+- [x] 🔴 Sign in with Apple(雷 1)—— **代码侧完成**(663c163):`/api/auth/start` 支持 apple
+      provider(Supabase Apple OAuth),登录页仅 App Store 构建显示「通过 Apple 登录」按钮
+      (HIG 黑底)。⬜ **提审前**:Apple Services ID + Key + Supabase Apple provider 配置
+      (见 `docs/appstore/submission-assets.md` §7.1)。
+- [x] 🔴 **App 内账号删除**(5.1.1)—— **完成**(3759cf9):隐私与数据面板「删除账号与云端
+      数据」按钮 → `/api/user-data/delete` → 清本机 → 登出。云删失败如实报,不谎称成功。
 - [ ] 隐私营养标签(健康/财务/邮件 = 重点审)+ 隐私政策 URL
 - [ ] 🟠 给审核员 **Demo 账号 / Pro 解锁**(reviewer 得能测 Pro,否则退回)
 - [ ] 年龄分级问卷、内容权利声明
