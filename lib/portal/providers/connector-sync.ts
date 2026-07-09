@@ -11,6 +11,8 @@ export interface PlaidSyncResult {
   ok: boolean;
   error?: string;                 // 'not_connected' | 'relink_required' | 其他
   fresh: number; total: number; accounts: number; pending: number; withLogo: number;
+  // 投资拉取诊断(有投资账户但没数据时的可见失败态用)。
+  investments?: { accounts: number; holdings: number; transactions: number; error?: string };
 }
 
 export async function runPlaidSync(): Promise<PlaidSyncResult> {
@@ -24,6 +26,7 @@ export async function runPlaidSync(): Promise<PlaidSyncResult> {
       ok?: boolean; error?: string; pendingItems?: number; authoritative?: boolean;
       transactions?: Array<{ id: string; accountId?: string; date: string; name: string; amount: number; currency: string; category: string }>;
       removedIds?: string[]; accounts?: unknown[]; holdings?: unknown[];
+      investments?: { accounts?: number; holdings?: number; transactions?: number; error?: string };
     };
     if (data.accounts?.length) {
       const { saveBankAccounts } = await import('@/lib/portal/bank-tx');
@@ -51,7 +54,11 @@ export async function runPlaidSync(): Promise<PlaidSyncResult> {
     try { localStorage.setItem('nesio-bank-synced-at', new Date().toISOString()); } catch { /* quota */ }
     if (full) { try { localStorage.setItem('nesio-plaid-enrich-v1', '1'); } catch { /* quota */ } }
     const withLogo = merged.filter((t) => (t as { merchantLogo?: string }).merchantLogo).length;
-    return { ok: true, fresh, total: merged.length, accounts: data.accounts?.length || 0, pending: data.pendingItems || 0, withLogo };
+    const inv = data.investments;
+    return {
+      ok: true, fresh, total: merged.length, accounts: data.accounts?.length || 0, pending: data.pendingItems || 0, withLogo,
+      ...(inv ? { investments: { accounts: inv.accounts || 0, holdings: inv.holdings || 0, transactions: inv.transactions || 0, error: inv.error } } : {}),
+    };
   } catch { return fail('network'); }
 }
 

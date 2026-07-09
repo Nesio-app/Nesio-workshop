@@ -154,6 +154,11 @@ export async function GET(req: NextRequest) {
   const invAdded: PlaidInvTx[] = []; // 财务⑯:投资账户流水(独立产品拉取)
   // 财务㉗:持仓快照(holdings + securities join;失败不阻断,客户端仅在非空时替换)
   const holdingsOut: Array<{ accountId: string; name: string; ticker?: string; type?: string; quantity: number; value: number; costBasis?: number; currency: string }> = [];
+  // 免费最大化·Plaid:投资拉取诊断 —— 此前 investments 的两个 catch 全空吞错,
+  // 「有投资账户但没数据」既不显示也不进日志,连根因都看不到(违反可见失败态)。
+  // 记账:发现几个投资账户 + Plaid 回的 error_code,透出给前端 + 落日志。
+  let invAccountsTotal = 0;
+  let invErrorCode = '';
   const removedIds: string[] = [];
   const acctById = new Map<string, PlaidAccount>();
   let anyRelink = false;
@@ -216,6 +221,7 @@ export async function GET(req: NextRequest) {
       // 财务⑯:投资账户流水 —— transactions 产品不覆盖投资账户(Fidelity 此前全空),
       // 走 /investments/transactions/get(近 24 个月,按 id upsert 天然去重;失败不阻断)。
       const invAccounts = tokenAccounts.filter((a) => ['investment', 'brokerage'].includes((a.type || '').toLowerCase()));
+      invAccountsTotal += invAccounts.length;
       if (invAccounts.length) {
         try {
           const endDate = new Date().toISOString().slice(0, 10);
@@ -226,17 +232,21 @@ export async function GET(req: NextRequest) {
               access_token: accessToken, start_date: startDate, end_date: endDate,
               options: { count: 500, offset, account_ids: invAccounts.map((a) => a.account_id) },
             }) as { investment_transactions?: PlaidInvTx[]; total_investment_transactions?: number; error_code?: string };
-            if (inv.error_code || !Array.isArray(inv.investment_transactions)) break;
+            // 静默吞错的根:Plaid 回 error_code(如 PRODUCTS_NOT_SUPPORTED / ADDITIONAL_CONSENT_REQUIRED /
+            // 投资产品未在 dashboard 开通)时记下并落日志,不再当"没数据"糊弄过去。
+            if (inv.error_code) { invErrorCode ||= inv.error_code; console.error('[plaid] investments/transactions', inv.error_code); break; }
+            if (!Array.isArray(inv.investment_transactions)) break;
             invAdded.push(...inv.investment_transactions);
             offset += inv.investment_transactions.length;
             if (!inv.investment_transactions.length || offset >= (inv.total_investment_transactions ?? 0)) break;
           }
-        } catch { /* investments 产品不可用(机构不支持/未授权)→ 只有余额没有流水,保持现状 */ }
+        } catch (e) { invErrorCode ||= 'inv_tx_unreachable'; console.error('[plaid] investments/transactions threw', e instanceof Error ? e.message : e); }
         // 财务㉗:持仓明细(每只股票/基金:名称/代码/数量/市值/成本)
         try {
           const h = await plaidPost('/investments/holdings/get', {
             access_token: accessToken, options: { account_ids: invAccounts.map((a) => a.account_id) },
           }) as { holdings?: PlaidHolding[]; securities?: PlaidSecurity[]; error_code?: string };
+          if (h.error_code) { invErrorCode ||= h.error_code; console.error('[plaid] investments/holdings', h.error_code); }
           if (!h.error_code && Array.isArray(h.holdings)) {
             const secById = new Map((h.securities ?? []).map((sec) => [sec.security_id, sec]));
             for (const hd of h.holdings) {
@@ -253,7 +263,7 @@ export async function GET(req: NextRequest) {
               });
             }
           }
-        } catch { /* 持仓可缺,不阻断 */ }
+        } catch (e) { invErrorCode ||= 'inv_holdings_unreachable'; console.error('[plaid] investments/holdings threw', e instanceof Error ? e.message : e); }
       }
       // 财务⑧:机构元数据(item/get → institutions/get_by_id,按机构缓存;失败不阻断)。
       // 财务⑪:机构 id 与元数据解耦 —— 此前 get_by_id 一失败连 id 都丢,重复 item 判定
@@ -361,6 +371,15 @@ export async function GET(req: NextRequest) {
       removedIds,
       // 财务㉗:持仓快照(点时值;客户端整体替换,仅在非空时)
       holdings: holdingsOut.filter((h) => !staleAccountIds.has(h.accountId)),
+      // 投资拉取诊断:有几个投资账户 / 拉到几条持仓 / Plaid 回的错误码(用于前端可见失败态 + 客服)。
+      // 「有投资账户但 holdings=0 且有 error」= 多半是该 Item 未授权 investments 产品(需断开重连券商),
+      // 或 Plaid production 未开通 Investments 产品。
+      investments: {
+        accounts: invAccountsTotal,
+        holdings: holdingsOut.filter((h) => !staleAccountIds.has(h.accountId)).length,
+        transactions: invAdded.filter((t) => !(t.account_id && staleAccountIds.has(t.account_id))).length,
+        ...(invErrorCode ? { error: invErrorCode } : {}),
+      },
     });
     // 存回增量游标,下次从这里续拉(真增量,不再每次从最旧重来)。
     const secure = process.env.NODE_ENV === 'production';

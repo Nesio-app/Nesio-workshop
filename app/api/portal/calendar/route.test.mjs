@@ -191,79 +191,25 @@ async function testConfiguredFeedFailsClosedWithoutGate() {
   assert.doesNotMatch(JSON.stringify(response.body), /Sensitive Private Meeting/);
 }
 
-async function testLocalModeAllowsFeedsWithoutSession() {
-  // No Supabase configured → personal/local deployment: configured iCal
-  // subscriptions must keep working without a login session.
+// 静态 ICS 订阅已移除(用户 2026-07 要求):即使 env 里残留 ICS URL,也**绝不**去订阅/拉取,
+// 只走 Google OAuth。锁死回归:配了 ICAL_URL 也不发任何 fetch,响应 configured:false。
+async function testStaticIcsFeedSubscriptionRemoved() {
   clearCalendarEnv();
-  delete process.env.SUPABASE_URL;
+  delete process.env.SUPABASE_URL;   // 本地模式:鉴权门放行,确保是「无 feed」而非「被门挡住」
   delete process.env.SUPABASE_ANON_KEY;
   mockBaoheAuthCookie = '';
-  process.env.GOOGLE_CALENDAR_ICAL_URL = 'https://example.test/private.ics';
-  const mockIcs = fs.readFileSync(fixturePath, 'utf8');
-  global.fetch = async () => ({
-    ok: true,
-    async text() { return mockIcs; },
-  });
-
-  const { GET } = loadRoute();
-  const response = await GET(mockRequest());
-
-  assert.equal(response.body.ok, true);
-  assert.equal(response.body.enabled, true);
-  assert.equal(response.body.events.length > 0, true);
-}
-
-async function testConfiguredFeedUsesMockOnlyWhenGateEnabled() {
-  clearCalendarEnv();
-  mockBaoheAuthCookie = 'baohe-session';
+  mockCalendarAccessCookie = '';      // 无 OAuth,只有残留的 ICS env
   process.env.GOOGLE_CALENDAR_ICAL_URL = 'https://example.test/private.ics';
   process.env.CALENDAR_PRIVATE_FEEDS_ENABLED = 'true';
-  const mockIcs = fs.readFileSync(fixturePath, 'utf8');
-  const fetchedUrls = [];
-  global.fetch = async (url) => {
-    fetchedUrls.push(String(url));
-    return {
-      ok: true,
-      async text() {
-        return mockIcs;
-      },
-    };
-  };
+  let fetchCalled = false;
+  global.fetch = async () => { fetchCalled = true; throw new Error('must not subscribe to any ICS URL'); };
 
   const { GET } = loadRoute();
   const response = await GET(mockRequest());
 
-  assert.deepEqual(fetchedUrls, ['https://example.test/private.ics']);
-  assert.equal(response.body.ok, true);
-  assert.equal(response.body.configured, true);
-  assert.equal(response.body.enabled, true);
-  assert.equal(response.body.events[0].title, 'Sensitive Private Meeting');
-}
-
-async function testPrivateFeedGateAcceptsTrimmedVercelEnvValue() {
-  clearCalendarEnv();
-  mockBaoheAuthCookie = 'baohe-session';
-  process.env.GOOGLE_CALENDAR_ICAL_URL = 'https://example.test/private.ics';
-  process.env.CALENDAR_PRIVATE_FEEDS_ENABLED = ' TRUE \n';
-  const mockIcs = fs.readFileSync(fixturePath, 'utf8');
-  const fetchedUrls = [];
-  global.fetch = async (url) => {
-    fetchedUrls.push(String(url));
-    return {
-      ok: true,
-      async text() {
-        return mockIcs;
-      },
-    };
-  };
-
-  const { GET } = loadRoute();
-  const response = await GET(mockRequest());
-
-  assert.deepEqual(fetchedUrls, ['https://example.test/private.ics']);
-  assert.equal(response.body.ok, true);
-  assert.equal(response.body.enabled, true);
-  assert.equal(response.body.events[0].title, 'Sensitive Private Meeting');
+  assert.equal(fetchCalled, false, '不再订阅任何 URL 日历(即使 env 残留)');
+  assert.equal(response.body.configured, false, '无静态 feed → configured:false');
+  assert.equal(response.body.events.length, 0);
 }
 
 async function testOauthCookieReadsGoogleCalendarApiWithoutIcsEnv() {
@@ -429,9 +375,7 @@ async function testOauthRefreshCookieRecoversExpiredCalendarAccess() {
 const originalFetch = global.fetch;
 try {
   await testConfiguredFeedFailsClosedWithoutGate();
-  await testLocalModeAllowsFeedsWithoutSession();
-  await testConfiguredFeedUsesMockOnlyWhenGateEnabled();
-  await testPrivateFeedGateAcceptsTrimmedVercelEnvValue();
+  await testStaticIcsFeedSubscriptionRemoved();
   await testOauthCookieReadsGoogleCalendarApiWithoutIcsEnv();
   await testSupabaseTokenReadsCalendarCrossDeviceWithoutCookie();
   await testOauthRefreshCookieRecoversExpiredCalendarAccess();

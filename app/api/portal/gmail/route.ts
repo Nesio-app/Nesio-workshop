@@ -125,6 +125,30 @@ function header(msg: GmailMessage, name: string): string {
   return msg.payload?.headers?.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value || '';
 }
 
+/** 从 From 头(「名字 <a@b.com>」或裸地址)抠出邮箱地址(小写),作分类归并的稳定键。 */
+function emailAddrOf(s: string): string {
+  const m = /<([^>]+)>/.exec(s) || /([^\s<>@]+@[^\s<>@]+)/.exec(s);
+  return (m ? m[1] : '').trim().toLowerCase();
+}
+
+/** 按发件人邮箱汇 Gmail 系统分类(供 AI 提取的节点也能带上通知/重要/mailCategory,不再只在兜底打)。 */
+function mailClassBySender(msgs: GmailMessage[]): Map<string, { category: ReturnType<typeof mailCategory>; important: boolean }> {
+  const map = new Map<string, { category: ReturnType<typeof mailCategory>; important: boolean }>();
+  for (const m of msgs) {
+    const email = emailAddrOf(header(m, 'from'));
+    if (!email) continue;
+    const category = mailCategory(m);
+    const important = (m.labelIds || []).includes('IMPORTANT');
+    const cur = map.get(email);
+    map.set(email, {
+      // 同发件人多封:保留更有信息量的非 personal 分类;important 任一为真则真
+      category: cur && cur.category !== 'personal' ? cur.category : category,
+      important: Boolean(cur?.important) || important,
+    });
+  }
+  return map;
+}
+
 function parseHeaderDate(value: string): string | undefined {
   const time = Date.parse(value);
   return Number.isFinite(time) ? new Date(time).toISOString() : undefined;
@@ -199,7 +223,20 @@ async function extractNodes(messages: GmailMessage[]): Promise<object[]> {
   const prompt = buildEmailExtractionPrompt(emailTexts);
 
   const raw = (await completeText({ prompt, maxTokens: 2048 })).text || '[]';
-  return parseJsonBlock<object[]>(raw) ?? [];
+  const parsed = parseJsonBlock<Array<Record<string, unknown>>>(raw) ?? [];
+
+  // 免费最大化·Gmail:把 Gmail 系统分类叠加到 AI 提取的节点(此前只在兜底路径打,AI 正常出结果时丢了)。
+  // 按发件人邮箱归并 —— schema 要求节点 attributes 保留 source(发件人),据此可靠回填通知/重要/mailCategory。
+  const byEmail = mailClassBySender(worth);
+  return parsed.map((n) => {
+    const attrs = (n.attributes && typeof n.attributes === 'object') ? { ...(n.attributes as Record<string, unknown>) } : {};
+    const cls = byEmail.get(emailAddrOf(String(attrs.source ?? attrs.from ?? '')));
+    if (!cls) return n;
+    const tags = Array.isArray(n.tags) ? [...n.tags] : [];
+    if (cls.category === 'updates' && !tags.includes('通知')) tags.push('通知');
+    if (cls.important && !tags.includes('重要')) tags.push('重要');
+    return { ...n, tags, attributes: { ...attrs, mailCategory: cls.category } };
+  });
 }
 
 function metadataPreview(messages: GmailMessage[]) {

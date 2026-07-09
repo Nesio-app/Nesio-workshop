@@ -63,4 +63,37 @@ assert.equal(isPromotion({ labelIds: ['INBOX'] }), false);
 assert.equal(mailCategory({ labelIds: ['CATEGORY_UPDATES'] }), 'updates');
 assert.equal(mailCategory({ labelIds: ['INBOX'] }), 'personal');
 
+// ── 新:分类也叠加到 AI 提取的节点(此前只在兜底路径打)──
+assert.ok(src.includes('mailClassBySender'), 'AI 提取路径用 mailClassBySender 回填分类');
+assert.ok(/const byEmail = mailClassBySender\(worth\)/.test(src), 'extractNodes 按 worth 邮件建发件人分类表');
+assert.ok(/emailAddrOf\(String\(attrs\.source \?\? attrs\.from/.test(src), 'AI 节点按发件人邮箱归并分类');
+assert.ok(/cls\.category === 'updates'[\s\S]{0,60}'通知'/.test(src), 'AI 节点:updates → 通知 tag');
+assert.ok(/cls\.important[\s\S]{0,60}'重要'/.test(src), 'AI 节点:important → 重要 tag');
+assert.ok(/mailCategory: cls\.category/.test(src), 'AI 节点写 mailCategory 属性');
+
+// 纯函数:emailAddrOf + mailClassBySender
+vm.runInContext(
+  [grab('header'), grab('emailAddrOf'), grab('mailClassBySender'),
+    'globalThis.__y = { emailAddrOf, mailClassBySender };'].join('\n'),
+  sandbox,
+);
+const { emailAddrOf, mailClassBySender } = sandbox.__y;
+assert.equal(emailAddrOf('Chase <alerts@chase.com>'), 'alerts@chase.com', '从「名字 <地址>」抠邮箱');
+assert.equal(emailAddrOf('BARE@x.com'), 'bare@x.com', '裸地址小写');
+assert.equal(emailAddrOf('no email here'), '', '无地址返回空');
+{
+  const hdr = (v) => ({ payload: { headers: [{ name: 'From', value: v }] } });
+  const map = mailClassBySender([
+    { ...hdr('Chase <alerts@chase.com>'), labelIds: ['CATEGORY_UPDATES', 'IMPORTANT'] },
+    { ...hdr('Ann <ann@x.com>'), labelIds: ['INBOX'] },
+  ]);
+  // 跨 realm 对象不能 deepEqual(原型不同),逐字段断言。
+  const chase = map.get('alerts@chase.com');
+  assert.equal(chase.category, 'updates', '账单发件人 → updates');
+  assert.equal(chase.important, true, '账单发件人 → important');
+  const ann = map.get('ann@x.com');
+  assert.equal(ann.category, 'personal', '普通发件人 → personal');
+  assert.equal(ann.important, false, '普通发件人 → 非 important');
+}
+
 console.log('gmail-labels: OK');
