@@ -9,6 +9,7 @@ import MemoryTab from './MemoryTab';
 import TellNesioSheet, { type CaptureMode } from './TellNesioSheet';
 import PortalBottomNav from './PortalBottomNav';
 import PortalOnboarding from './PortalOnboarding';
+import InstallPrompt from './InstallPrompt';
 
 // Heavy sheets load on first open, not at boot — together they were ~3.5k
 // lines of first-paint JS for UI the user may never touch in a session.
@@ -929,6 +930,7 @@ export default function Portal() {
         </div>
       )}
       <PortalOnboarding />
+      <InstallPrompt locale={locale} />
     </>
   );
 }
