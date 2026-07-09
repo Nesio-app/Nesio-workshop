@@ -180,4 +180,23 @@ assert.equal(reportFinance.approvalGateOverridesPaywallGate, true);
   assert.equal(invOffLab.visible, false, 'Lab 下 override off 仍隐藏该模块');
 }
 
+// ── 提审构建(APPSTORE_BUILD=1):v1 隐藏集不可达,盖过 personal_lab / 用户强制开 ──
+{
+  process.env.NEXT_PUBLIC_APPSTORE_BUILD = '1';
+  try {
+    for (const id of ['finance', 'health', 'places', 'experiment', 'people']) {
+      const rLab = resolveLaunchSurfaceState({ id }, { viewerRole: 'personal_lab' });
+      assert.equal(rLab.visible, false, `提审构建:${id} 即便 personal_lab 也不可达`);
+      assert.equal(rLab.reason, 'appstore_hidden', `${id} reason=appstore_hidden`);
+      const rForce = resolveLaunchSurfaceState({ id }, { viewerRole: 'public', moduleOverrides: { [id]: 'on' } });
+      assert.equal(rForce.visible, false, `提审构建:${id} 用户强制开也盖不过`);
+    }
+    // 非隐藏集不受影响
+    const inv = resolveLaunchSurfaceState({ id: 'inventory' }, { viewerRole: 'public' });
+    assert.equal(inv.visible, true, '提审构建:inventory 仍公开可见');
+  } finally {
+    delete process.env.NEXT_PUBLIC_APPSTORE_BUILD;
+  }
+}
+
 console.log('launch surface resolver tests passed');

@@ -7,6 +7,8 @@
  * (你可以开 Lab 再单独关掉某个不想要的工具)。
  */
 
+import { isAppStoreBlocked } from './app-build.mjs';
+
 const KEY = 'nesio-module-overrides-v1';
 export const MODULE_OVERRIDES_EVENT = 'nesio-module-overrides-updated';
 
@@ -35,8 +37,9 @@ export const FEATURE_CATALOG: readonly FeatureEntry[] = Object.freeze([
   { id: 'places', zh: '地点足迹', en: 'Footprints', kind: 'feature', defaultOn: true },
 ]);
 
-/** 子功能是否启用:显式覆盖优先,否则回落默认(子功能默认开)。入口处 gate 用。 */
+/** 子功能是否启用:提审构建的 v1 隐藏集恒关(盖过一切);否则显式覆盖优先,再回落默认。 */
 export function isFeatureEnabled(id: string, defaultOn = true): boolean {
+  if (isAppStoreBlocked(id)) return false; // 提审构建里 v1 隐藏子功能不可达
   const ov = loadModuleOverrides()[id];
   if (ov === 'on') return true;
   if (ov === 'off') return false;

@@ -18,6 +18,7 @@ import { purgeLocalData } from '@/lib/portal/storage-manifest';
 import { purgeIdbBlobs } from '@/lib/portal/idb-blob-store';
 import { purgeLocalImages } from '@/lib/portal/local-image-store';
 import { FEATURE_CATALOG, loadModuleOverrides, setModuleOverride, MODULE_OVERRIDES_EVENT } from '@/lib/portal/module-overrides';
+import { isAppStoreBuild } from '@/lib/portal/app-build.mjs';
 import { isValidBackup } from '@/lib/portal/full-backup';
 import { buildCombinedBackup, pushBackupToCloud, pullBackupFromCloud, restoreCombinedBackup, hasCloudEntitlement, lastCloudBackup, type CloudBackupError, type CloudRestoreError } from '@/lib/portal/cloud-backup';
 
@@ -615,6 +616,8 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
         {L(dict, '彻底删除本机全部数据', 'Delete all local data')}
       </button>
 
+      {/* 提审构建:整个 Lab + 功能开关中心从设置里消失(合规:隐藏可达功能 = 2.3.1 违规)。 */}
+      {!isAppStoreBuild() && (<>
       <p className="nesio-settings-section-label" style={{ marginTop: '1.5rem' }}>{L(dict, '实验功能', 'Experimental')}</p>
       <button type="button"
         className={`nesio-settings-option${labOn ? ' nesio-settings-option--active' : ''}`}
@@ -676,6 +679,7 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
           </div>
         );
       })}
+      </>)}
     </SheetWrap>
   );
 }
