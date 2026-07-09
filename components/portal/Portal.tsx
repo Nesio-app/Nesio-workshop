@@ -385,8 +385,10 @@ export default function Portal() {
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | null = null;
     const onMemoryReceived = () => {
+      track('memory_saved'); // 激活漏斗:用户真的存下了一条记忆(每次都记,不只首条)
       try {
         if (localStorage.getItem(FIRST_MEMORY_RECEIPT_KEY) === '1') return;
+        track('first_memory'); // 激活里程碑:此设备第一条记忆(注册→激活转化)
         localStorage.setItem(FIRST_MEMORY_RECEIPT_KEY, '1');
         if (localStorage.getItem(HAPTIC_FEEDBACK_KEY) !== '0') {
           navigator.vibrate?.(18);
