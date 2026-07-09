@@ -266,6 +266,7 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
   const [restoreMsg, setRestoreMsg] = useState('');
   const [lastBackupAt, setLastBackupAt] = useState<string | null>(null);
   const [labOn, setLabOn] = useState(false);
+  const [labMsg, setLabMsg] = useState<string | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
   // 云备份(付费,规划中):状态机 idle→pushing→done/error,失败必可见(设计红线)。
   const [cloudState, setCloudState] = useState<'idle' | 'pushing' | 'done' | 'error'>('idle');
@@ -437,6 +438,7 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
   }, [open]);
 
   function toggleLab() {
+    const turningOn = !labOn;
     try {
       if (labOn) {
         localStorage.removeItem('baohe_personal_lab');
@@ -447,7 +449,13 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
         localStorage.setItem('baohe_personal_lab', '1');
       }
     } catch { /* ignore */ }
-    window.location.reload(); // launch-surface resolver 在加载时读取
+    // 需要 reload 让 launch-surface resolver 重读开关,但直接 reload 会让整个设置面板
+    // 「啪」地消失,像崩了(QA:突兀)。先把开关状态与一句「正在刷新」回给用户,再延迟刷新。
+    setLabOn(turningOn);
+    setLabMsg(turningOn
+      ? L(dict, 'Lab 模式已开启 · 正在刷新…', 'Lab mode on · refreshing…')
+      : L(dict, 'Lab 模式已关闭 · 正在刷新…', 'Lab mode off · refreshing…'));
+    setTimeout(() => window.location.reload(), 800); // launch-surface resolver 在加载时读取
   }
 
   function clearAllMemory() {
@@ -579,9 +587,11 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
         <div>
           <span className="nesio-settings-option-label">{L(dict, `Lab 模式 ${labOn ? '· 已开启' : ''}`, `Lab mode ${labOn ? '· on' : ''}`)}</span>
           <span className="nesio-settings-option-hint">
-            {labOn
-              ? L(dict, '实验工具和预览功能已解锁。关闭后回到公开版。', 'Experimental tools and previews unlocked. Turn off to return to the public build.')
-              : L(dict, '解锁实验工具和预览功能。之前需要 ?baohePersonal=1 参数,现在点这里就行。', 'Unlock experimental tools and previews. Used to need ?baohePersonal=1 — now just tap here.')}
+            {labMsg
+              ? labMsg
+              : labOn
+                ? L(dict, '实验工具和预览功能已解锁。关闭后回到公开版。', 'Experimental tools and previews unlocked. Turn off to return to the public build.')
+                : L(dict, '解锁实验工具和预览功能。之前需要 ?baohePersonal=1 参数,现在点这里就行。', 'Unlock experimental tools and previews. Used to need ?baohePersonal=1 — now just tap here.')}
           </span>
         </div>
         <span className={`nesio-settings-space-check${labOn ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>
