@@ -288,6 +288,7 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [nodeCount, setNodeCount] = useState(0);
   const [deleted, setDeleted] = useState(false);
+  const [deleteMsg, setDeleteMsg] = useState<string | null>(null);
   const [restoreMsg, setRestoreMsg] = useState('');
   const [lastBackupAt, setLastBackupAt] = useState<string | null>(null);
   const [labOn, setLabOn] = useState(false);
@@ -517,6 +518,33 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
     window.location.reload();
   }
 
+  // App Store 强制(Guideline 5.1.1):App 内可达的**账号删除**。之前 user-data/delete 路由
+  // 已实现(删云端全部数据+存储),但没接任何 UI → 上架会被拒。这里接上:确认 → 云删 →
+  // 清本机 → 登出 → 回首页。云删失败不谎称成功(如实提示)。
+  async function deleteAccountAndData() {
+    if (!confirm(L(dict,
+      '删除账号:将删除云端全部数据(记忆/资料/资产/事件)+ 本机数据,并退出登录,不可撤销。建议先导出备份。确认？',
+      'Delete account: removes ALL cloud data (memories/profile/assets/events) + local data, and signs you out. This cannot be undone — export a backup first. Continue?'))) return;
+    setDeleteMsg(L(dict, '正在删除云端账号数据…', 'Deleting cloud account data…'));
+    try {
+      const res = await fetch('/api/user-data/delete?dryRun=0', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirmation: 'DELETE_CLOUD_PRODUCT_DATA' }),
+      });
+      if (res.status === 401) { setDeleteMsg(null); clearAllLocalData(); return; } // 未登录 → 无云账号可删,退化本机删除
+      const data = await res.json().catch(() => null) as { ok?: boolean } | null;
+      if (!res.ok || !data?.ok) { setDeleteMsg(L(dict, '云端删除失败,未改动任何数据。请稍后重试。', 'Cloud deletion failed — nothing was changed. Please try again later.')); return; }
+    } catch { setDeleteMsg(L(dict, '网络错误,云端未删除。', 'Network error — cloud not deleted.')); return; }
+    // 云删成功 → 清本机 + 登出
+    try {
+      getLifeGraph().forEach((n) => deleteLifeNode(n.id));
+      purgeLocalData(localStorage); void purgeIdbBlobs(); void purgeLocalImages();
+      await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
+    } catch { /* ignore */ }
+    setDeleteMsg(L(dict, '✓ 账号与全部数据已删除,正在登出…', '✓ Account and all data deleted, signing out…'));
+    setTimeout(() => { try { window.location.href = '/'; } catch { /* ignore */ } }, 1200);
+  }
+
   return (
     <SheetWrap open={open} onClose={onClose} title={L(dict, '隐私与数据', 'Privacy & data')}>
       <p className="nesio-settings-sheet-desc">{L(dict, '只整理你放进来的内容。你可以看见它记住了什么、存在哪、也可以随时删除。', 'Only what you put in gets organized. You can see what it remembers, where it lives, and delete it anytime.')}</p>
@@ -615,6 +643,12 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
       <button type="button" className="nesio-settings-danger-btn" style={{ marginTop: '0.4rem', opacity: 0.85 }} onClick={clearAllLocalData}>
         {L(dict, '彻底删除本机全部数据', 'Delete all local data')}
       </button>
+
+      {/* App Store 5.1.1 强制:App 内账号删除(云端 + 本机 + 登出)。 */}
+      <button type="button" className="nesio-settings-danger-btn" style={{ marginTop: '0.4rem' }} onClick={deleteAccountAndData}>
+        {L(dict, '删除账号与云端数据', 'Delete account & cloud data')}
+      </button>
+      {deleteMsg && <p className="nesio-settings-option-hint" style={{ margin: '0.4rem 0 0', color: 'var(--status-risk)' }}>{deleteMsg}</p>}
 
       {/* 提审构建:整个 Lab + 功能开关中心从设置里消失(合规:隐藏可达功能 = 2.3.1 违规)。 */}
       {!isAppStoreBuild() && (<>
