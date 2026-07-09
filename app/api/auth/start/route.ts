@@ -9,10 +9,10 @@ import {
   type ProductionRuntimeSetupTask,
 } from '@/lib/portal/production-runtime';
 
-type AuthProvider = 'email' | 'google' | 'wechat' | 'phone';
+type AuthProvider = 'email' | 'google' | 'apple' | 'wechat' | 'phone';
 type AuthMode = 'login' | 'register';
 
-const AUTH_PROVIDERS: AuthProvider[] = ['email', 'google', 'wechat', 'phone'];
+const AUTH_PROVIDERS: AuthProvider[] = ['email', 'google', 'apple', 'wechat', 'phone'];
 const AUTH_MODES: AuthMode[] = ['login', 'register'];
 const DEFAULT_AUTH_CALLBACK_URL = 'https://www.nesio.app/api/auth/callback';
 
@@ -51,7 +51,8 @@ function safeJson(body: Record<string, unknown>, status = 200) {
   );
 }
 
-function getProviderGate(req: NextRequest, provider: AuthProvider): {
+// google/apple 走各自的早返回分支,不进这里;此门只处理有 providers 键的三家。
+function getProviderGate(req: NextRequest, provider: Exclude<AuthProvider, 'google' | 'apple'>): {
   providerStatus: ProductionRuntimeProviderStatus;
   setupTask?: ProductionRuntimeSetupTask;
 } {
@@ -210,6 +211,28 @@ export async function POST(req: NextRequest) {
         auditId,
         action: 'redirect',
         url: getSupabaseAuthorizeUrl('google', redirectTo),
+      });
+    }
+
+    // Sign in with Apple(App Store Guideline 4.8 强制:提供第三方登录就必须提供 Apple 登录)。
+    // 走 Supabase Apple OAuth,和 Google 同一 authorize 端点;上架前需在 Supabase 配好
+    // Apple Service ID + secret。同样只需 SUPABASE_URL + ANON_KEY,绕过 canonical-domain 门。
+    if (provider === 'apple') {
+      const supabaseUrl = normalizeSupabaseRuntimeUrl(process.env.SUPABASE_URL || '');
+      const supabaseKey = process.env.SUPABASE_ANON_KEY?.trim();
+      if (!supabaseUrl || !supabaseKey) {
+        logAuthStartAudit('auth_start_failure', { auditId, provider, reason: 'missing_supabase_config' });
+        return safeJson({ ok: false, error: 'provider_not_configured', provider, auditId }, 503);
+      }
+      logAuthStartAudit('auth_start_success', { auditId, provider, authMode, action: 'redirect' });
+      return safeJson({
+        ok: true,
+        provider,
+        authMode,
+        accountMode: authMode === 'register' ? 'create_or_sign_in' : 'sign_in_or_provider_match',
+        auditId,
+        action: 'redirect',
+        url: getSupabaseAuthorizeUrl('apple', redirectTo),
       });
     }
 

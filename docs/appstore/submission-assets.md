@@ -83,6 +83,22 @@ ITSAppUsesNonExemptEncryption = false   # 仅用标准 HTTPS,无自研加密
 > - 本地优先:核心数据存设备本机,不登录可用;登录仅用于可选云备份 + 邮件功能。
 > - Sign in with Apple 已提供(与 Google 登录并列)。
 
+### 7.1 Sign in with Apple —— 提交前必做的服务端配置(⬜)
+
+代码侧已完成:App Store 构建(`NEXT_PUBLIC_APPSTORE_BUILD=1`)的登录页顶部渲染
+「Sign in with Apple」按钮(HIG 黑底 + Apple logo),走 `/api/auth/start` 的 `apple`
+分支 → Supabase Apple OAuth authorize 端点(与 Google 同一路径)。Web PWA 构建不显示,
+避免暴露未配置的 provider。
+
+**上架前必须在 Apple + Supabase 两侧配置,否则点按钮会落到 Supabase 报错页:**
+- [ ] Apple Developer:建 **Services ID**(如 `app.nesio.signin`),开 Sign in with Apple,
+      Return URL 填 `https://<你的-supabase-ref>.supabase.co/auth/v1/callback`。
+- [ ] Apple Developer:建 **Key**(Sign in with Apple),下载 `.p8`,记 Key ID + Team ID。
+- [ ] Supabase Dashboard → Authentication → Providers → **Apple**:填 Services ID(client id)
+      + 用 .p8/Key ID/Team ID 生成的 client secret(JWT),启用。
+- [ ] 原生壳(Capacitor)内跑通 Apple OAuth 回跳(webview 内 redirect 流可用;若走原生
+      ASAuthorization 需另接插件,当前用 web-redirect 流即满足 4.8)。
+
 ## 8. URL
 
 | 字段 | 值 |

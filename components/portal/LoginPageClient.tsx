@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { loadProfileSettings, saveProfileSettings, type PortalLocale } from '@/lib/portal/profile';
 import { getAuthRedirectTo, importSupabaseHashSession } from '@/lib/portal/auth-client';
+import { isAppStoreBuild } from '@/lib/portal/app-build.mjs';
 
 type AuthState = 'idle' | 'loading' | 'email_sent' | 'error';
 type AuthMode = 'login' | 'register';
@@ -50,6 +51,9 @@ export default function LoginPageClient() {
   const [error, setError] = useState('');
   const [tab, setTab] = useState<'login' | 'register'>('login');
   const zh = locale === 'zh';
+  // App Store 构建强制显示 Sign in with Apple(Guideline 4.8:提供 Google 登录就必须提供
+  // Apple 登录)。Web PWA 暂不显示,等 Supabase 里 Apple Service ID 配好后再放开。
+  const appStore = isAppStoreBuild();
 
   useEffect(() => {
     setLocale(loadProfileSettings().locale);
@@ -68,6 +72,13 @@ export default function LoginPageClient() {
   async function handleGoogle() {
     setState('loading'); setError('');
     const r = await startAuth('google', tab);
+    if (r.ok && r.url) { window.location.href = r.url; }
+    else { setError(friendlyAuthError(r.error, zh)); setState('error'); }
+  }
+
+  async function handleApple() {
+    setState('loading'); setError('');
+    const r = await startAuth('apple', tab);
     if (r.ok && r.url) { window.location.href = r.url; }
     else { setError(friendlyAuthError(r.error, zh)); setState('error'); }
   }
@@ -116,6 +127,24 @@ export default function LoginPageClient() {
                 ? (zh ? '登录后，Memory 与 Today Feed 跨设备同步。' : 'Sign in to sync your Memory and Today across devices.')
                 : (zh ? '新用户创建账号。首次 Google 授权或邮件确认后，Nesio 会建立你的账户。' : 'Create a new account. Google or email confirmation creates your Nesio account.')}
             </p>
+
+            {/* Sign in with Apple —— 仅 App Store 构建(4.8)。HIG:与其他登录按钮同等醒目,置顶。 */}
+            {appStore && (
+              /* eslint-disable no-restricted-syntax -- Apple 品牌黑,HIG 固定值不随主题 */
+              <button
+                type="button"
+                className="nesio-ob-auth-btn"
+                style={{ background: '#000', color: '#fff', border: 'none' }}
+                onClick={handleApple}
+                disabled={state === 'loading'}
+              >
+                <svg viewBox="0 0 384 512" width="18" height="18" fill="#fff" aria-hidden>
+                  <path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zM255.6 68c30.6-36.3 27.8-69.4 26.9-81.3-26.9 1.6-58 18.4-75.7 39.1-19.5 22.2-31 49.7-28.5 79.1 29.1 2.3 55.6-12.7 77.3-36.9z"/>
+                </svg>
+                {state === 'loading' ? (zh ? '跳转中…' : 'Redirecting…') : (zh ? '通过 Apple 登录' : 'Sign in with Apple')}
+              </button>
+              /* eslint-enable no-restricted-syntax */
+            )}
 
             {/* Google */}
             <button type="button" className="nesio-ob-auth-btn nesio-ob-auth-btn--google" onClick={handleGoogle} disabled={state === 'loading'}>
