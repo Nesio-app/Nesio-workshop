@@ -103,9 +103,12 @@ ITSAppUsesNonExemptEncryption = false   # 仅用标准 HTTPS,无自研加密
 
 | 字段 | 值 |
 |---|---|
-| Support URL | https://www.nesio.app/support ⬜(页待建) |
+| Support URL | https://www.nesio.app/support ✅(`app/support/page.tsx`,双语 FAQ + 联系) |
 | Marketing URL | https://www.nesio.app |
-| Privacy Policy URL | https://www.nesio.app/privacy ⬜(需扩成完整隐私政策) |
+| Privacy Policy URL | https://www.nesio.app/privacy ✅(`app/privacy/page.tsx`,双语完整政策,与 §5 标签一致) |
+
+> ⬜ 提审前:`support@nesio.app` 需真实可收信箱(政策与支持页均用它);部署后确认
+> `/privacy` 与 `/support` 在 www.nesio.app 可公开打开(苹果/Google 会抓取)。
 
 ## 9. 需真机/人工产出(⬜)
 

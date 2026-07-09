@@ -194,6 +194,12 @@ export default function LoginPageClient() {
             <a href="/" className="nesio-ob-skip-btn" style={{ display: 'block', textAlign: 'center', marginTop: '0.5rem', textDecoration: 'none' }}>
               {zh ? '暂不登录，本地使用' : 'Skip — use locally'}
             </a>
+
+            <p style={{ textAlign: 'center', marginTop: '1rem', fontSize: '0.75rem', color: 'var(--portal-muted, #8a94a6)' }}>
+              <a href="/privacy" style={{ color: 'inherit' }}>{zh ? '隐私政策' : 'Privacy Policy'}</a>
+              <span style={{ margin: '0 0.4rem' }}>·</span>
+              <a href="/support" style={{ color: 'inherit' }}>{zh ? '支持' : 'Support'}</a>
+            </p>
           </>
         )}
       </div>
