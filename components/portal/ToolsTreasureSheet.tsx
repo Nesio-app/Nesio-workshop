@@ -13,6 +13,7 @@ import {
   type BaoheDataDepthItem,
 } from '@/lib/portal/personalization-insights';
 import { resolveShellRuntimeTools } from '@/lib/portal/shell-runtime-resolver.mjs';
+import { loadModuleOverrides, MODULE_OVERRIDES_EVENT } from '@/lib/portal/module-overrides';
 import { t } from '@/lib/portal/i18n';
 import type { PortalStringKey } from '@/lib/portal/i18n';
 import { formatStatusSummaryLine, type ToolForShellState } from './tool-state';
@@ -22,6 +23,8 @@ interface LaunchSurfaceContext {
   viewerRole: 'public' | 'tester' | 'personal_lab';
   testerAllowlist: string[];
   testerCohort?: string | null;
+  // 逐模块本地覆盖:此前工具箱**不读它** → 功能开关中心的开/关对工具箱无效(bug:开关不管用)。
+  moduleOverrides?: Record<string, 'on' | 'off'>;
 }
 
 function normalizeLaunchContext(raw: {
@@ -152,8 +155,20 @@ export default function ToolsTreasurePopup({
   const [selectedToolboxAction, setSelectedToolboxAction] = useState<ToolboxAction | null>(null);
 
   useEffect(() => {
-    setLaunchContext(normalizeLaunchContext(readLaunchSurfaceContextFromBrowser()));
+    // 每次读浏览器上下文时都带上逐模块覆盖 + lab 旗,工具箱才真正尊重功能开关中心。
+    const sync = () => setLaunchContext({
+      ...normalizeLaunchContext(readLaunchSurfaceContextFromBrowser()),
+      moduleOverrides: loadModuleOverrides(),
+    });
+    sync();
     setPersonalizationProfile(getBaohePersonalizationProfile(readBaohePersonalizationStage()));
+    // 开关中心切换 / Lab 切换后实时重算,不需刷新。
+    window.addEventListener(MODULE_OVERRIDES_EVENT, sync);
+    window.addEventListener('nesio-lab-mode-updated', sync);
+    return () => {
+      window.removeEventListener(MODULE_OVERRIDES_EVENT, sync);
+      window.removeEventListener('nesio-lab-mode-updated', sync);
+    };
   }, []);
 
   useLayoutEffect(() => {
