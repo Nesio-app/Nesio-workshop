@@ -752,12 +752,16 @@ function LivingModelTab({
 
   // ⑨ 生成失败的可见态,三态分清 + 给可点的「重试」(而不是只写"稍后可重试")。
   //   no-key   = 真没配 AI key(需去部署配置);ai-error = 配了但这次没调通(重试即可);network = 网络。
-  //   都强调「不是没有数据」,并把上次结果留在下面。
+  //   「下面是上次的结果」只在真有旧结果时说 —— 首次就失败(空态)别谎称有上次结果。
+  const hasPrior = !!model && model.layers.some((l) => l.insights.length > 0);
+  const priorTail = hasPrior
+    ? L(dict, '下面是上次的结果。', 'Showing your last result.')
+    : '';
   const errorMsg = error === 'no-key'
-    ? L(dict, '还没接上 AI —— 认知模型需要 AI 才能生成(去部署里配一个 AI key 即可)。不是没有数据,下面是上次的结果。', "AI isn't connected yet — the mind model needs it (set an AI key in your deployment). Not a lack of data; showing your last result.")
+    ? L(dict, `还没接上 AI —— 认知模型需要 AI 才能生成(去部署里配一个 AI key 即可)。不是没有数据。${priorTail}`, `AI isn't connected yet — the mind model needs it (set an AI key in your deployment). Not a lack of data. ${hasPrior ? 'Showing your last result.' : ''}`)
     : error === 'network'
-      ? L(dict, '网络异常,认知模型没刷新出来 —— 不是没有数据。下面是上次的结果。', "Network issue — the mind model didn't refresh. Not a lack of data; showing your last result.")
-      : L(dict, '这次没生成出来(AI 忙或稍有波动)—— 不是没有数据。下面是上次的结果,点重试再试一次。', "Didn't generate this time (AI busy or a hiccup) — not a lack of data. Showing your last result; tap retry.");
+      ? L(dict, `网络异常,认知模型没刷新出来 —— 不是没有数据。${priorTail}`, `Network issue — the mind model didn't refresh. Not a lack of data. ${hasPrior ? 'Showing your last result.' : ''}`)
+      : L(dict, `这次没生成出来(AI 忙或稍有波动)—— 不是没有数据,点重试再试一次。${priorTail}`, `Didn't generate this time (AI busy or a hiccup) — not a lack of data; tap retry. ${hasPrior ? 'Showing your last result.' : ''}`);
   const errorBanner = error ? (
     <div className="nesio-chat-degraded-hint" style={{ margin: '0 0 0.75rem', display: 'flex', gap: '0.6rem', alignItems: 'flex-start' }}>
       <span style={{ flex: 1 }}>{errorMsg}</span>
