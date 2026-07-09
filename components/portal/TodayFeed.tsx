@@ -31,6 +31,7 @@ import { buildRotatingFallback, dismissProactiveById, getProactiveCardBudget, is
 import { ProactiveGuidanceCard } from './today/ProactiveGuidanceCard';
 import { ExperimentCheckinCard } from './today/ExperimentCheckinCard';
 import { RoutineDueCards } from './today/RoutineDueCards';
+import { DailyReportCard } from './today/DailyReportCard';
 import { ThawedReminder } from './today/ThawedReminder';
 import { TodayFocusSection } from './today/FocusSection';
 import { NightTimeline } from './today/NightTimeline';
@@ -54,7 +55,7 @@ export default function TodayFeed({
 }) {
   const {
     displayName,
-    memoryCount, memoryNotes,
+    memoryCount, memoryNotes, todayReport,
     focusNodes, allNodes,
     dormantStore, setDormantStore,
     calendarEvents, proactiveContext,
@@ -145,6 +146,9 @@ export default function TodayFeed({
       <div className="nesio-today-scroll">
         {/* 季度 Wrapped 卡片 */}
         {showWrapped && <WrappedCard onDismiss={dismissWrapped} />}
+
+        {/* 每日图文日报(未来预测区首张;仅登录 + 开关开 + 有内容时,todayReport 已受私据门)*/}
+        {canUsePrivateData && <DailyReportCard report={todayReport} />}
 
         {/* 未来引导卡 — up to 2, each independently dismissable */}
         {activeProactiveCards.map((card) => (

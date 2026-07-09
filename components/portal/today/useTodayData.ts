@@ -10,6 +10,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { loadProfileSettings, portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
+import { buildDailyReport, type DailyReport } from '@/lib/portal/daily-report';
+import { autoPersistTodayReport } from '@/lib/portal/daily-report-persist';
 import { buildTodayViewModel, type FocusNode, type ProactiveContext } from '@/lib/platform/view-models/today-view-model';
 import { readPortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
 import type { CalendarEvent } from '@/lib/portal/types';
@@ -113,6 +115,7 @@ export function useTodayData(canUsePrivateData: boolean) {
   const [displayName, setDisplayName] = useState('');
   const [memoryCount, setMemoryCount] = useState(0);
   const [memoryNotes, setMemoryNotes] = useState<readonly string[]>([]);
+  const [todayReport, setTodayReport] = useState<DailyReport | null>(null);
   const [focusNodes, setFocusNodes] = useState<readonly FocusNode[]>([]);
   const [allNodes, setAllNodes] = useState<readonly FocusNode[]>([]);
   const [dormantStore, setDormantStore] = useState<DormantStore>({});
@@ -145,6 +148,7 @@ export function useTodayData(canUsePrivateData: boolean) {
       if (stale()) return;
       setMemoryCount(updated.memoryCount);
       setMemoryNotes(updated.memoryNotes);
+      if (!canUsePrivateData && !stale()) setTodayReport(null); // 登出:清私据派生的日报
       setFocusNodes(updated.focusNodes);
       setAllNodes(updated.allNodes);
       const store = loadDormantStore();
@@ -196,6 +200,24 @@ export function useTodayData(canUsePrivateData: boolean) {
         ];
 
         const uiLocale = portalLocaleToDictionaryLocale(loadProfileSettings().locale);
+
+        // 每日 AI 图文日报(块3):私据门已在此 if(canUsePrivateData) 内 —— 取材日历/邮件/记忆。
+        // 开着才生成 + 每日幂等自动存记忆(autoPersistTodayReport 内部再判开关/空/当天已生成)。
+        {
+          const profile = loadProfileSettings();
+          const reportInput = {
+            displayName: profile.displayName,
+            now,
+            locale: uiLocale,
+            weather: weather ? { temperatureC: weather.temperatureC, condition: weather.condition, forecastNote: weather.forecastNote } : undefined,
+            events: calEvents.map((e) => ({ title: e.title, start: e.start, end: e.end, location: e.location, calendarName: e.calendarName })),
+            emailHighlights: latestEmailSignals.map((s) => s.cardTitle || s.subject).filter(Boolean).slice(0, 3),
+            memoryNotes: updated.memoryNotes.slice(0, 3),
+          };
+          const report = buildDailyReport(reportInput);
+          if (!stale()) setTodayReport(profile.dailyReportEnabled && !report.empty ? report : null);
+          autoPersistTodayReport(reportInput, { enabled: profile.dailyReportEnabled, now });
+        }
         // deferred:出卡但先不写「已展示」(冷却/ranker),等确认这轮结果真的上屏再 commit
         // —— 否则慢轮被 runSeqRef 丢弃时,卡被记成已展示却从未出现,下一轮全被冷却拦掉。
         const { cards: guidanceCards, commitShown } = runGuidancePipelineDeferred({
@@ -348,7 +370,7 @@ export function useTodayData(canUsePrivateData: boolean) {
 
   return {
     displayName,
-    memoryCount, memoryNotes,
+    memoryCount, memoryNotes, todayReport,
     focusNodes, allNodes,
     dormantStore, setDormantStore,
     calendarEvents, proactiveContext,
