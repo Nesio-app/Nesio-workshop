@@ -460,13 +460,14 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
         localStorage.setItem('baohe_personal_lab', '1');
       }
     } catch { /* ignore */ }
-    // 需要 reload 让 launch-surface resolver 重读开关,但直接 reload 会让整个设置面板
-    // 「啪」地消失,像崩了(QA:突兀)。先把开关状态与一句「正在刷新」回给用户,再延迟刷新。
+    // 反应式:通知外壳重读角色,工具箱即时更新 —— 不再 reload。旧实现 reload 会把整个
+    // 设置面板连同页面一起刷掉(QA:点 Lab 闪退出设置),现在开关就地生效、面板不动。
     setLabOn(turningOn);
     setLabMsg(turningOn
-      ? L(dict, 'Lab 模式已开启 · 正在刷新…', 'Lab mode on · refreshing…')
-      : L(dict, 'Lab 模式已关闭 · 正在刷新…', 'Lab mode off · refreshing…'));
-    setTimeout(() => window.location.reload(), 800); // launch-surface resolver 在加载时读取
+      ? L(dict, 'Lab 模式已开启', 'Lab mode on')
+      : L(dict, 'Lab 模式已关闭', 'Lab mode off'));
+    try { window.dispatchEvent(new CustomEvent('nesio-lab-mode-updated')); } catch { /* ignore */ }
+    setTimeout(() => setLabMsg(null), 1800);
   }
 
   function clearAllMemory() {

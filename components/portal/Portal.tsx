@@ -303,6 +303,17 @@ export default function Portal() {
     return () => window.removeEventListener(MODULE_OVERRIDES_EVENT, sync);
   }, []);
 
+  // Lab 开关反应式:切换后重读浏览器上下文(含 lab 旗 → viewerRole),工具箱即时变,
+  // 不需 reload —— 修「点 Lab 闪退出设置」。保留逐模块覆盖不被整包覆盖冲掉。
+  useEffect(() => {
+    const sync = () => setLaunchSurfaceContext((prev) => ({
+      ...normalizeLaunchSurfaceContext(readLaunchSurfaceContextFromBrowser()),
+      moduleOverrides: prev.moduleOverrides,
+    }));
+    window.addEventListener('nesio-lab-mode-updated', sync);
+    return () => window.removeEventListener('nesio-lab-mode-updated', sync);
+  }, []);
+
   const configWithDecMetadata = useMemo(
     () => mergePortalConfigWithDecMetadata(config, decModules),
     [config, decModules],

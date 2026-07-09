@@ -16,6 +16,9 @@ export const MODULE_OVERRIDES_EVENT = 'nesio-module-overrides-updated';
  * 对免费用户可见(仅供 UI 说明「跟随默认」时的实际效果)。
  */
 export interface ToggleableModule { id: string; zh: string; en: string; defaultPublic: boolean }
+// 只列**真有实现**、在 web 里能打开的工具模块(components/portal 里有组件)。
+// secretary / psychoanalysis / sanctuary / quiz / lifesim 是外部静态包或纯注册表占位,
+// web 端 0 组件、点了打不开,不放进来(免得开关是空壳,误导)。
 export const TOGGLEABLE_MODULES: readonly ToggleableModule[] = Object.freeze([
   { id: 'inventory', zh: '物品收纳', en: 'Inventory', defaultPublic: true },
   { id: 'plan', zh: '计划', en: 'Plans', defaultPublic: true },
@@ -23,11 +26,6 @@ export const TOGGLEABLE_MODULES: readonly ToggleableModule[] = Object.freeze([
   { id: 'fitness', zh: '健身', en: 'Fitness', defaultPublic: false },
   { id: 'finance', zh: '财务', en: 'Finance', defaultPublic: false },
   { id: 'health', zh: '健康', en: 'Health', defaultPublic: false },
-  { id: 'secretary', zh: '秘书', en: 'Secretary', defaultPublic: false },
-  { id: 'psychoanalysis', zh: '心理分析', en: 'Psychoanalysis', defaultPublic: false },
-  { id: 'sanctuary', zh: '心灵圣所', en: 'Sanctuary', defaultPublic: false },
-  { id: 'quiz', zh: '测验', en: 'Quiz', defaultPublic: false },
-  { id: 'lifesim', zh: '人生模拟', en: 'Life sim', defaultPublic: false },
 ]);
 
 export type ModuleOverride = 'on' | 'off';
