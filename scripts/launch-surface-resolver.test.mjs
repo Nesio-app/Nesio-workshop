@@ -128,7 +128,11 @@ assert.equal(report.launchSurface.version, 'launch-surface-v0');
 assert.equal(report.launchSurface.summary.firstLaunchPromise, 'Shell + Inventory / purchase-memory + Todo');
 assert.deepEqual(report.launchSurface.summary.publicVisibleModuleIds, []);
 assert.equal(report.launchSurface.summary.publicVisibleModuleCount, 0);
-assert.equal(report.launchSurface.summary.personalLabVisibleModuleCount, report.summary.moduleCount);
+// 轻量退休:退休模块即便 personal_lab 也不露(治理声明仍在,只是运行时不 surface),
+// 所以 personal_lab 不再看到「全部」——可见数 = 总数 − 退休(lab 不可见)数。
+const labInvisibleCount = report.launchSurface.entries.filter((e) => e.visibleForPersonalLab === false).length;
+assert.ok(labInvisibleCount > 0, '应有退休模块使 personal_lab 不再看到全部');
+assert.equal(report.launchSurface.summary.personalLabVisibleModuleCount, report.summary.moduleCount - labInvisibleCount);
 assert.equal(report.launchSurface.summary.personalLabRealRuntimeEnabled, false);
 assert.ok(report.launchSurface.summary.testerVisibleSandboxModuleCount > 0, 'tester allowlist should expose sandbox tools in report');
 assert.equal(report.launchSurface.summary.testerVisibleSandboxModuleIds.includes('plan'), false);
