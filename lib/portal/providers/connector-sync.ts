@@ -197,6 +197,10 @@ export interface PeopleSyncResult { ok: boolean; error?: string; imported: numbe
 /** 拉 Google 通讯录,灌成 life-graph person 节点(按邮箱/名字去重,已存在则补富化字段)。
  *  关系 tab 读 person 节点即可显示;attributes 里带 email/photo/birthday 供人缘管理。 */
 export async function runPeopleSync(): Promise<PeopleSyncResult> {
+  // 批次 36:并发互斥 —— 开屏自动同步和手动同步同时跑时,两边都在写入前
+  // 构建了空的去重索引 → 各导一份(用户实锤 127×3=381)。在飞就复用同一承诺。
+  if (peopleSyncInFlight) return peopleSyncInFlight;
+  peopleSyncInFlight = (async () => {
   try {
     const res = await fetch('/api/portal/people');
     if (res.status === 401) return { ok: false, error: 'not_connected', imported: 0, updated: 0 };
@@ -239,8 +243,32 @@ export async function runPeopleSync(): Promise<PeopleSyncResult> {
         imported++;
       }
     }
-    return { ok: true, imported, updated };
+    // 自愈:历史并发导入留下的重复联系人(同邮箱或同名 + contactSource),保最早删其余
+    const removed = await dedupeImportedContacts();
+    return { ok: true, imported, updated, deduped: removed };
   } catch { return { ok: false, error: 'network', imported: 0, updated: 0 }; }
+  })();
+  try { return await peopleSyncInFlight; } finally { peopleSyncInFlight = null; }
+}
+
+let peopleSyncInFlight: Promise<{ ok: boolean; error?: string; imported: number; updated: number; deduped?: number }> | null = null;
+
+/** 清理重复导入的联系人:同 email(或无 email 时同名)的 contactSource person 只留最早一个。 */
+export async function dedupeImportedContacts(): Promise<number> {
+  const { getLifeGraph, deleteLifeNode } = await import('@/lib/portal/life-graph');
+  const seen = new Map<string, string>(); // key → keeper id
+  let removed = 0;
+  const persons = getLifeGraph()
+    .filter((n) => n.type === 'person' && n.attributes?.contactSource)
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  for (const n of persons) {
+    const email = typeof n.attributes?.email === 'string' ? n.attributes.email.toLowerCase() : '';
+    const key = email || `name:${(n.name || '').toLowerCase()}`;
+    if (!key || key === 'name:') continue;
+    if (seen.has(key)) { if (deleteLifeNode(n.id)) removed++; }
+    else seen.set(key, n.id);
+  }
+  return removed;
 }
 
 export async function syncAllConnectors(): Promise<SyncAllOutcome[]> {

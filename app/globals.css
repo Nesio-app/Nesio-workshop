@@ -12225,9 +12225,10 @@ html[data-portal-theme="night"] .nesio-section-title { color: #c8d8f0; }
   gap: 0.3rem;
   background: var(--glass-bg-solid);
   border: 1px solid var(--portal-line);
-  border-radius: 14px;
-  padding: 0.7rem 0.75rem;
-  width: 6rem;
+  border-radius: 1rem;
+  padding: 0.85rem 0.8rem;
+  /* 批次 36:与记忆卡同网格同尺寸(此前 6rem 小方块,三排大小各异) */
+  width: auto;
   aspect-ratio: 1 / 1;
   cursor: pointer;
   transition: border-color 0.15s, transform 0.12s;

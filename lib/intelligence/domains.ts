@@ -201,7 +201,9 @@ const familyDomain: DomainEngine = {
   domain: 'family',
   version: 1,
   provideInsights(ctx: DECContext): RecommendationCard[] {
-    const top = ctx.signals.find((s) => s.type === 'commitment' || s.type === 'observation' || s.type === 'event');
+    // 批次 36 QA:通讯录批量导入的联系人被当成"新记忆"推成家庭提醒(李冰冰卡)。
+    // 系统生成/批量导入(source=device)不是用户亲手记的,不进回忆候选。
+    const top = ctx.signals.find((s) => (s.type === 'commitment' || s.type === 'observation' || s.type === 'event') && s.source !== 'device');
     if (!top) return [];
     return one({
       id: `family-${top.id}`,

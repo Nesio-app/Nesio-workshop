@@ -1014,13 +1014,26 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                 <OnThisDayStrip nodes={onThisDayNodes} onOpen={openNodeDetail} />
               )}
 
-              {/* 收藏夹(批次 20):pin 的重要记忆,与我的项目并列 */}
-              {pinnedNodes.length > 0 && (
+              {/* 收藏夹 + 收纳(批次 36:收纳成方卡与收藏并排,三排同尺寸) */}
+              {hasNodes && (pinnedNodes.length > 0 || isFeatureEnabled('inventory')) && (
                 <div className="nesio-projects-section">
                   <div className="nesio-section-header">
                     <span className="nesio-section-title">{L(dict, '收藏夹', 'Pinned')}</span>
                   </div>
                   <div className="nesio-memory-grid">
+                    {isFeatureEnabled('inventory') && (
+                      <button
+                        type="button"
+                        className="nesio-memory-card nesio-inventory-card"
+                        onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-inventory'))}
+                      >
+                        <span className="nesio-memory-card-title">{L(dict, '物品收纳', 'Storage')}</span>
+                        <span className="nesio-memory-card-sub">{L(dict, '东西放哪了,一查就知道', 'Where things live — one tap away')}</span>
+                        <span className="nesio-memory-card-meta-row">
+                          <span className="nesio-memory-card-icon" style={{ background: 'var(--portal-accent-soft)' }}><IconBox size={13} /></span>
+                        </span>
+                      </button>
+                    )}
                     {pinnedNodes.map((n) => (
                       <MemoryCard
                         key={n.id}
@@ -1034,18 +1047,6 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                 </div>
               )}
 
-              {/* 收纳入口(批次 31 从扇形菜单迁入;批次 34:空库时藏起) */}
-              {hasNodes && isFeatureEnabled('inventory') && (
-                <button
-                  type="button"
-                  className="nesio-memory-inventory-entry"
-                  onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-inventory'))}
-                >
-                  <IconBox size={16} />
-                  <span>{L(dict, '物品收纳 · 东西放哪了', 'Storage · where things live')}</span>
-                  <span aria-hidden>›</span>
-                </button>
-              )}
 
               {/* My Projects(批次 34:空库时藏起) */}
               {hasNodes && (
@@ -1061,7 +1062,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                   </button>
                 </div>
                 {projects.length > 0 ? (
-                  <div className="nesio-projects-row">
+                  <div className="nesio-memory-grid">
                     {projects.filter((p) => p.status === 'active').map((p) => (
                       <ProjectCard
                         key={p.id}

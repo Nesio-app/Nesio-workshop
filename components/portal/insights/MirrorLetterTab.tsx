@@ -210,7 +210,7 @@ export default function MirrorLetterTab() {
               {errorText && <p className="nesio-mirror-error">{errorText}</p>}
               <button type="button" className="nesio-lm-perspective-btn" onClick={() => void generate()} disabled={nodeCount < 10 && !error}>
                 {nodeCount < 10 && !error
-                  ? L(dict, `已记录 ${nodeCount} / 10 条,记满后开写`, `${nodeCount} / 10 notes — the letter starts at 10`)
+                  ? L(dict, `已亲手记 ${nodeCount} / 10 条,记满后开写(通讯录等批量导入不算)`, `${nodeCount} / 10 hand-written notes — starts at 10 (bulk imports like contacts don't count)`)
                   : L(dict, '写这封信', 'Write the letter')}
               </button>
             </>
