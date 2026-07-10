@@ -220,11 +220,18 @@ export async function POST(req: NextRequest) {
   if (guard) return guard;
 
   const body = await req.json() as ChatRequest;
-  const { message, history = [], coachStyle, uiLocale, fileContext, memoryContext, calendarContext, environmentContext } = body;
+  const { message, history: rawHistory = [], coachStyle, uiLocale, fileContext, memoryContext, calendarContext, environmentContext } = body;
 
   if (!message?.trim()) {
     return NextResponse.json({ ok: false, error: 'empty message' }, { status: 400 });
   }
+
+  // 批次 46(生产日志实锤的自我强化死循环):配额兜底话术一旦存进对话历史,
+  // 用户再问同一个问题时,模型看到"上次这个问题就是这么答的"会**原样复读借口**
+  // (21:10:21 案例:Gemini 854ms"成功"返回的就是那句「云端脑子有点挤」)。
+  // 兜底/报错类助手消息一律不进模型上下文 —— 它们是系统状态,不是对话内容。
+  const FALLBACK_ECHO_RE = /云端脑子有点挤|cloud brain is a bit busy|AI 暂时不可用|找到了这些相关线索|API Key 配置有误|快速匹配,可能没找全/;
+  const history = rawHistory.filter((m) => !(m.role === 'model' && FALLBACK_ECHO_RE.test(m.text || '')));
 
   // Accept both ANTHROPIC_API_KEY and CLAUDE_API_KEY as aliases
   const anthropicKey = envValue('ANTHROPIC_API_KEY') || envValue('CLAUDE_API_KEY');
