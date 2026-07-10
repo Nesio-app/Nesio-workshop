@@ -28,6 +28,7 @@ export async function POST(req: NextRequest) {
     drill?: boolean;
     previousAction?: string;
     completedActions?: string[];
+    locale?: string;
   };
   const taskName = (body.taskName ?? '').trim();
   if (!taskName) {
@@ -35,6 +36,8 @@ export async function POST(req: NextRequest) {
   }
 
   const p: MomentumParams = {
+    // 修实 bug:客户端一直传 locale,路由此前把它丢了 → 英文用户也拿中文步骤
+    locale: body.locale,
     taskName,
     context: body.context,
     drill: body.drill ?? false,
@@ -43,7 +46,7 @@ export async function POST(req: NextRequest) {
   };
 
   try {
-    const { text } = await completeText({ prompt: buildMomentumPrompt(p), maxTokens: 300 });
+    const { text } = await completeText({ prompt: buildMomentumPrompt(p), maxTokens: 600 });
     const steps = extractStepsFromText(text);
     if (steps && steps.length > 0) return NextResponse.json({ ok: true, steps });
   } catch (err) {

@@ -15,7 +15,7 @@ import { usePortalLocale } from '../use-portal-locale';
 import { rememberAI, recallAI, sig } from '@/lib/portal/ai-cache';
 import { decomposeLocally } from '@/lib/portal/local-decompose';
 
-type Step = { name: string; emoji?: string };
+type Step = { name: string; emoji?: string; durationMin?: number };
 
 export const FOCUS_TYPE_LABEL: Record<string, string> = {
   commitment: '任务', event: '日程', object: '物品', person: '联系人',
@@ -33,6 +33,8 @@ interface MomentumAction {
   name: string;
   emoji: string;
   done: boolean;
+  /** 诚实时长(分钟);0/undefined = 不显示 */
+  durationMin?: number;
 }
 
 export function FocusCardDetail({
@@ -69,8 +71,8 @@ export function FocusCardDetail({
 
   // 应用一波步骤到 UI(来源:ai=记住并复用 / cache=复用上次AI / local=本地兜底)
   function applyWave(steps: Step[], source: 'ai' | 'cache' | 'local', cacheKey: string) {
-    const actions: MomentumAction[] = steps.slice(0, 3).map((s, i) => ({
-      id: `m-${Date.now()}-${i}`, name: s.name, emoji: s.emoji || '⚡', done: false,
+    const actions: MomentumAction[] = steps.slice(0, 6).map((s, i) => ({
+      id: `m-${Date.now()}-${i}`, name: s.name, emoji: s.emoji || '⚡', done: false, durationMin: s.durationMin,
     }));
     setWave(actions);
     setWaveIndex((w) => w + 1);
@@ -116,8 +118,8 @@ export function FocusCardDetail({
     setDrillingId(action.id);
     const cacheKey = sig(`drill:${action.name}`);
     const applyDrills = (steps: Step[], fromAI: boolean) => {
-      const drills: MomentumAction[] = steps.slice(0, 3).map((s, i) => ({
-        id: `d-${Date.now()}-${i}`, name: s.name, emoji: s.emoji || '▸', done: false,
+      const drills: MomentumAction[] = steps.slice(0, 4).map((s, i) => ({
+        id: `d-${Date.now()}-${i}`, name: s.name, emoji: s.emoji || '▸', done: false, durationMin: s.durationMin,
       }));
       setDrillMap((prev) => new Map(prev).set(action.id, drills));
       if (fromAI) rememberAI('decompose', cacheKey, steps);
@@ -229,6 +231,9 @@ export function FocusCardDetail({
     );
   }
 
+  // 参考竞品:整卡给一个诚实总时长(overall ~45 min);没有时长数据就不显示
+  const totalMin = wave.reduce((sum, a) => sum + (a.durationMin || 0), 0);
+
   return (
     <div className="nesio-momentum">
       {waveIndex > 1 && (
@@ -239,6 +244,11 @@ export function FocusCardDetail({
           {waveSource === 'cache'
             ? L(dict, 'AI 暂时离线 · 复用了上次给你的拆解', 'AI offline · reused its last breakdown for you')
             : L(dict, 'AI 暂时离线 · 这是本地拆的,够你先动起来', 'AI offline · a local breakdown to get you moving')}
+        </p>
+      )}
+      {totalMin > 0 && (
+        <p style={{ margin: '0 0 0.45rem', fontSize: '0.72rem', color: 'var(--portal-muted)', fontVariantNumeric: 'tabular-nums' }}>
+          {L(dict, `共约 ${totalMin} 分钟`, `overall ~${totalMin} min`)}
         </p>
       )}
       <ul className="nesio-momentum-list">
@@ -258,6 +268,11 @@ export function FocusCardDetail({
                 />
                 {/* 批次 14:emoji 不进 UI(红线);动作名本身就够了 */}
                 <span className="nesio-momentum-name">{a.name}</span>
+                {!!a.durationMin && (
+                  <span style={{ flexShrink: 0, fontSize: '0.7rem', color: 'var(--portal-muted)', fontVariantNumeric: 'tabular-nums' }}>
+                    {a.durationMin} min
+                  </span>
+                )}
                 {!a.done && !drills && !isDrilling && (
                   <button
                     type="button"
@@ -290,6 +305,11 @@ export function FocusCardDetail({
                       />
                       {/* 批次 14:同上,去 emoji */}
                       <span className="nesio-momentum-drill-name">{d.name}</span>
+                      {!!d.durationMin && (
+                        <span style={{ flexShrink: 0, fontSize: '0.66rem', color: 'var(--portal-muted)', fontVariantNumeric: 'tabular-nums' }}>
+                          {d.durationMin} min
+                        </span>
+                      )}
                     </li>
                   ))}
                 </ul>
