@@ -187,6 +187,16 @@ function computeReceipt(nodes: readonly LifeNode[]): TodayReceipt {
   return { realTotal: real.length, todayCount, yesterdayCount };
 }
 
+/** 文字简报的记忆素材(批次 30):近 N 条亲手记的(批量导入不计入)。 */
+export function recentBriefMemoryNotes(limit = 3): string[] {
+  return getLifeGraph()
+    .filter((n) => !isBulkImported(n))
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, limit)
+    .map((n) => n.name)
+    .filter(Boolean);
+}
+
 export interface TodayViewModel {
   readonly cards: RecommendationCard[];
   readonly memoryCount: number;

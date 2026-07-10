@@ -13,6 +13,7 @@ import {
   deleteLifeNode,
   getLifeGraph,
   getLifeGraphCloudSyncSummary,
+  isBulkImported,
   isPrivateExternalNode,
   mergeCloudMemorySnapshot,
   retryLifeGraphCloudSync,
@@ -218,7 +219,6 @@ function typeLabel(t: string, dict: DictLocale): string {
 }
 const TYPE_ORDER = ['person', 'object', 'place', 'event', 'commitment', 'health_state', 'preference'];
 
-const PROJECT_EMOJIS = ['📁', '🏠', '✈️', '🎯', '📚', '💪', '🎂', '🛠️', '🌱', '💡'];
 
 const COPY = {
   zh: {
@@ -284,25 +284,32 @@ function extractKeywords(text: string): string[] {
   return out;
 }
 
+/** 相关记忆只认真实信号(批次 30 QA:「洗衣服」的相关记忆里出现四个通讯录联系人)。
+ *  旧算法把「同一天创建 +2 / 同类型 +1」当关联,阈值 >0 —— 通讯录当天批量导入
+ *  127 人,人人都和当天任何记录"相关"。规则改为:
+ *  真实信号 = 显式 relations / 共享主题标签(系统标不算)/ 内容关键词重合;
+ *  批量导入的节点只有显式关系才算相关;一个真实信号都没有 → 不显示,不硬凑。 */
+const RELATED_SYSTEM_TAGS = new Set(['联系人', '手动记录', '月报', 'Voice', '手写']);
+
 function findRelatedNodes(target: LifeNode, allNodes: LifeNode[]): LifeNode[] {
   const targetWords = extractKeywords(`${target.name} ${target.rawInput || ''}`);
-  const targetTags = new Set(target.tags || []);
+  const targetTags = new Set((target.tags || []).filter((t) => !RELATED_SYSTEM_TAGS.has(t)));
   return allNodes
     .filter((n) => n.id !== target.id && !isWeatherNode(n))
     .map((node) => {
       let score = 0;
-      if (target.relations?.some((r) => r.targetId === node.id)) score += 10;
-      if (node.relations?.some((r) => r.targetId === target.id)) score += 10;
+      const explicit = Boolean(
+        target.relations?.some((r) => r.targetId === node.id) ||
+        node.relations?.some((r) => r.targetId === target.id),
+      );
+      if (explicit) score += 10;
       score += (node.tags || []).filter((t) => targetTags.has(t)).length * 3;
       const nodeWords = extractKeywords(`${node.name} ${node.rawInput || ''}`);
       score += targetWords.filter((w) => nodeWords.includes(w)).length * 2;
-      if (node.type === target.type) score += 1;
-      const daysDiff = Math.abs(new Date(node.createdAt).getTime() - new Date(target.createdAt).getTime()) / 86_400_000;
-      if (daysDiff <= 1) score += 2;
-      else if (daysDiff <= 7) score += 1;
+      if (!explicit && isBulkImported(node)) score = 0;
       return { node, score };
     })
-    .filter((s) => s.score > 0)
+    .filter((s) => s.score >= 2)
     .sort((a, b) => b.score - a.score)
     .slice(0, 5)
     .map((s) => s.node);
@@ -603,7 +610,7 @@ function ProjectCard({ project, allNodes, onClick }: { project: Project; allNode
     <button type="button" className="nesio-project-card" onClick={onClick}>
       <span className="nesio-project-card-name">{project.name}</span>
       <span className="nesio-project-card-meta">
-        <span className="nesio-project-card-emoji">{project.emoji}</span>
+        <span className="nesio-project-card-emoji"><IconFolder size={14} /></span>
         <span className="nesio-project-card-count">{count} {L(dict, '条', 'items')}</span>
       </span>
     </button>
@@ -631,7 +638,7 @@ function ProjectDetailSheet({
       <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label="关闭" />
       <div className="nesio-project-detail-sheet">
         <div className="nesio-project-detail-header">
-          <span className="nesio-project-detail-emoji">{project.emoji}</span>
+          <span className="nesio-project-detail-emoji"><IconFolder size={16} /></span>
           <span className="nesio-project-detail-name">{project.name}</span>
           <button type="button" className="nesio-voice-sheet-close" onClick={onClose}>✕</button>
         </div>
@@ -672,7 +679,7 @@ function CreateProjectSheet({
 }) {
   const dict = useDict();
   const [name, setName] = useState('');
-  const [emoji, setEmoji] = useState('📁');
+  const emoji = '📁'; // 数据层保留字段(旧项目兼容),显示层一律线性图标
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { setTimeout(() => inputRef.current?.focus(), 100); }, []);
@@ -684,18 +691,6 @@ function CreateProjectSheet({
         <div className="nesio-create-project-header">
           <span>{L(dict, '新建项目', 'New project')}</span>
           <button type="button" className="nesio-voice-sheet-close" onClick={onClose}>✕</button>
-        </div>
-        <div className="nesio-create-project-emoji-row">
-          {PROJECT_EMOJIS.map((e) => (
-            <button
-              key={e}
-              type="button"
-              className={`nesio-create-project-emoji-btn${emoji === e ? ' is-selected' : ''}`}
-              onClick={() => setEmoji(e)}
-            >
-              {e}
-            </button>
-          ))}
         </div>
         <input
           ref={inputRef}

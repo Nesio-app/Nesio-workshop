@@ -14397,3 +14397,11 @@ html[data-portal-theme="night"] .nesio-exp-card:hover {
   white-space: nowrap;
   align-self: center;
 }
+
+/* 批次 30 · 文字简报 */
+.nesio-daily-brief-text {
+  font-size: 0.98rem;
+  line-height: 1.85;
+  margin: 0;
+  white-space: pre-wrap;
+}

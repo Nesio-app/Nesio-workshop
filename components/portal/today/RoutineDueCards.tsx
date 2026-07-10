@@ -14,10 +14,13 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import { isFeatureEnabled } from '@/lib/portal/module-overrides';
+import { canUse } from '@/lib/portal/entitlement';
+import { DailyBriefSheet } from './DailyBriefSheet';
 
 export function RoutineDueCards() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [due, setDue] = useState<Routine[]>([]);
+  const [briefOpen, setBriefOpen] = useState(false);
 
   useEffect(() => {
     // P1-9:健身域关闭(用户开关 / 提审构建)时,健身 routine 卡不出 —— 否则「开始练」
@@ -57,14 +60,22 @@ export function RoutineDueCards() {
             <span className="nesio-proactive-card-icon"><IconClock size={18} /></span>
             <div className="nesio-proactive-card-text">
               <p className="nesio-proactive-card-title">{L(dict, '今日 AI 简报', "Today's AI brief")}</p>
-              <p className="nesio-proactive-card-body">{L(dict, `${r.time} · Nesio 把今天的日程、提醒、天气播给你听`, `${r.time} · Nesio reads out your day — schedule, reminders, weather`)}</p>
+              <p className="nesio-proactive-card-body">{L(dict, `${r.time} · 今天的日程、提醒、天气,一段话给你`, `${r.time} · Your day in one short read — schedule, reminders, weather`)}</p>
               <div className="nesio-proactive-card-actions">
                 <button
                   type="button"
                   className="nesio-proactive-action-btn"
-                  onClick={() => { window.dispatchEvent(new CustomEvent('nesio-play-brief')); track('routine_brief_play', {}); }}
+                  onClick={() => {
+                    // AI 例程是 Pro 整功能(试用期内可用);免费 → 升级引导
+                    if (!canUse('ai_routine')) {
+                      window.dispatchEvent(new CustomEvent('nesio-pro-gate', { detail: { feature: 'ai_routine' } }));
+                      return;
+                    }
+                    setBriefOpen(true);
+                    track('routine_brief_open', {});
+                  }}
                 >
-                  {L(dict, '收听', 'Listen')}
+                  {L(dict, '打开简报', 'Open brief')}
                 </button>
                 <button
                   type="button"
@@ -117,6 +128,7 @@ export function RoutineDueCards() {
           </div>
         </div>
       ))}
+      <DailyBriefSheet open={briefOpen} onClose={() => setBriefOpen(false)} />
     </>
   );
 }

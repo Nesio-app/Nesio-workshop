@@ -35,6 +35,7 @@ export const FEATURE_CATALOG: readonly FeatureEntry[] = Object.freeze([
   { id: 'freeze', zh: '冷冻仓', en: 'Freeze vault', kind: 'feature', defaultOn: true },
   { id: 'experiment', zh: '我的实验', en: 'Experiments', kind: 'feature', defaultOn: true },
   { id: 'places', zh: '地点足迹', en: 'Footprints', kind: 'feature', defaultOn: true },
+  { id: 'people', zh: '关系(联系人)', en: 'People', kind: 'feature', defaultOn: false },
 ]);
 
 export const LAB_MODE_EVENT = 'nesio-lab-mode-updated';
@@ -61,6 +62,18 @@ export function isFeatureEnabled(id: string, defaultOn = true): boolean {
   const ov = loadModuleOverrides()[id];
   if (ov === 'on') return true;
   if (ov === 'off') return false;
+  if (APPSTORE_HIDDEN_IDS.includes(id)) return isLabModeOn();
+  return defaultOn;
+}
+
+/** 该功能的默认态是否跟随 Lab 总闸(= v1 内测域)。给设置 UI 标「随 Lab」。 */
+export function followsLab(id: string): boolean {
+  return APPSTORE_HIDDEN_IDS.includes(id);
+}
+
+/** 「默认」在当下实际解析成什么(不看显式覆盖)—— 给设置 UI 标注「默认(现在:开/关)」。 */
+export function defaultResolvesTo(id: string, defaultOn: boolean): boolean {
+  if (isAppStoreBlocked(id)) return false;
   if (APPSTORE_HIDDEN_IDS.includes(id)) return isLabModeOn();
   return defaultOn;
 }

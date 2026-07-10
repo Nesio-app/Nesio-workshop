@@ -17,7 +17,7 @@ import { deleteLifeNode, getLifeGraph } from '@/lib/portal/life-graph';
 import { purgeLocalData } from '@/lib/portal/storage-manifest';
 import { purgeIdbBlobs } from '@/lib/portal/idb-blob-store';
 import { purgeLocalImages } from '@/lib/portal/local-image-store';
-import { FEATURE_CATALOG, loadModuleOverrides, setModuleOverride, MODULE_OVERRIDES_EVENT } from '@/lib/portal/module-overrides';
+import { FEATURE_CATALOG, loadModuleOverrides, setModuleOverride, MODULE_OVERRIDES_EVENT, defaultResolvesTo, followsLab } from '@/lib/portal/module-overrides';
 import { isAppStoreBuild } from '@/lib/portal/app-build.mjs';
 import { getTier, setProEntitlement, trialDaysLeft } from '@/lib/portal/entitlement';
 import { isValidBackup } from '@/lib/portal/full-backup';
@@ -680,7 +680,7 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
         <div>
           <span className="nesio-settings-option-label">{L(dict, `Pro 解锁(测试)${proOn ? '· 已开启' : ''}`, `Unlock Pro (testing) ${proOn ? '· on' : ''}`)}</span>
           <span className="nesio-settings-option-hint">
-            {L(dict, '仅供测试:本机置为 Pro,解锁冷冻仓等 Pro 功能。正式版由 App 内购买 + 服务端校验决定,本开关不影响线上用户。', 'Testing only: mark this device as Pro to unlock Freeze Vault etc. Real Pro comes from in-app purchase + server verification; this switch does not affect production users.')}
+            {L(dict, '仅供测试:本机置为 Pro。影响的是付费能力:冷冻仓 / AI 简报(例程) / 邮件直接回 / 多面镜月度信 / 深度云 AI —— 与下面「哪些模块可见」无关(那是 Lab 和开关中心管的)。正式版由 App 内购买 + 服务端校验决定。', 'Testing only: marks this device Pro. Controls paid abilities — Freeze Vault / AI brief (routines) / direct email reply / mirror letters / deep cloud AI. Unrelated to which modules are visible (Lab + switches below control that). Real Pro comes from in-app purchase + server verification.')}
           </span>
         </div>
         <span className={`nesio-settings-space-check${proOn ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>
@@ -690,8 +690,8 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
 
       <p className="nesio-settings-section-label" style={{ marginTop: '1.5rem' }}>{L(dict, '功能开关中心', 'Feature switches')}</p>
       <p className="nesio-settings-option-hint" style={{ margin: '0 0 0.6rem' }}>
-        {L(dict, '逐个控制功能。「默认」跟随公开版。核心(拍一拍/说一句/分享/问一问/洞察/未来预测/今日聚焦)始终在,不在此列。改动即时生效,无需刷新。',
-          'Toggle features one by one. "Default" follows the public build. Core (snap / voice / share / ask / insights / forecast / today focus) is always on and not listed. Changes apply instantly, no refresh.')}
+        {L(dict, '逐个控制功能可见性。优先级:这里的显式 开/关 最大;「默认」= 标了「随 Lab」的内测域跟随上面的 Lab 总闸,其余跟随公开版。核心(拍/说/分享/问一问/洞察/今日)始终在,不在此列。改动即时生效。',
+          'Controls feature visibility. Precedence: explicit On/Off here wins; "Default" follows the Lab switch above for rows tagged "Lab", otherwise the public build. Core (snap / voice / share / ask / insights / today) is always on and not listed. Applies instantly.')}
       </p>
       {(['module', 'feature'] as const).map((kind) => {
         const rows = FEATURE_CATALOG.filter((f) => f.kind === kind);
@@ -716,11 +716,19 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
                   }}
                 >{label}</button>
               );
+              const defOn = defaultResolvesTo(m.id, m.defaultOn); // labOn 变化触发重渲,这里即时反映
               return (
                 <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0 0 0.4rem' }}>
-                  <span style={{ flex: 1, fontSize: '0.82rem' }}>{dict === 'en' ? m.en : m.zh}</span>
-                  <div style={{ display: 'flex', gap: '0.25rem', width: '9.5rem' }}>
-                    {seg(null, L(dict, '默认', 'Default'))}
+                  <span style={{ flex: 1, fontSize: '0.82rem', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                    {dict === 'en' ? m.en : m.zh}
+                    {followsLab(m.id) && (
+                      <span style={{ fontSize: '0.6rem', color: 'var(--portal-muted)', border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-pill)', padding: '0 0.35rem' }}>
+                        {L(dict, '随 Lab', 'Lab')}
+                      </span>
+                    )}
+                  </span>
+                  <div style={{ display: 'flex', gap: '0.25rem', width: '11rem' }}>
+                    {seg(null, L(dict, `默认·${defOn ? '开' : '关'}`, `Default·${defOn ? 'on' : 'off'}`))}
                     {seg('on', L(dict, '开', 'On'))}
                     {seg('off', L(dict, '关', 'Off'))}
                   </div>
