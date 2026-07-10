@@ -121,7 +121,7 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
       const res = await fetch('/api/portal/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-baohe-access-mode': 'personal_lab' },
-        body: JSON.stringify({ type, content, imageBase64, mimeType }),
+        body: JSON.stringify({ type, content, imageBase64, mimeType, uiLocale: dict }),
       });
       const data = await res.json() as { ok?: boolean; nodes?: ParsedResult['nodes']; summary?: string; intent?: string; error?: string };
 

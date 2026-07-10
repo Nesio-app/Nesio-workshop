@@ -25,7 +25,7 @@ import {
 import { routeIntent } from '@/lib/portal/intent-router';
 import { DomainIcon, IconBox, IconClock, IconMapPin, IconUser } from './icons';
 import { L } from '@/lib/portal/i18n';
-import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
+import { loadProfileSettings, portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 
 interface VoiceInputSheetProps {
@@ -101,6 +101,7 @@ async function fetchAskResponse(query: string, candidates: LifeNode[]): Promise<
     headers: { 'Content-Type': 'application/json', 'x-baohe-access-mode': 'personal_lab' },
     body: JSON.stringify({
       type: 'ask',
+      uiLocale: loadProfileSettings().locale,
       content: JSON.stringify({
         query,
         totalNodeCount: candidates.length,
@@ -432,7 +433,7 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
       const res = await fetch('/api/portal/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'text', content: t }),
+        body: JSON.stringify({ type: 'text', content: t, uiLocale: dict }),
       });
       const data = await res.json() as {
         ok?: boolean;
@@ -495,7 +496,7 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
       payload: { note: d.cleanText, ...extraPayload },
       confidence: d.aiConfidence,
       context,
-      tags: mergeTags(['说一句', d.domain ? `domain:${d.domain}` : ''], d.inlineTags),
+      tags: mergeTags([dict === 'en' ? 'Voice' : '说一句', d.domain ? `domain:${d.domain}` : ''], d.inlineTags),
       raw: d.rawText,
     });
 
@@ -565,7 +566,7 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
                     onClick={() => setDraftDomain(meta.id)}
                     aria-pressed={draft.domain === meta.id}
                   >
-                    <DomainIcon domain={meta.id} size={12} /> {meta.label}
+                    <DomainIcon domain={meta.id} size={12} /> {dict === 'en' ? meta.labelEn : meta.label}
                   </button>
                 ))}
               </div>

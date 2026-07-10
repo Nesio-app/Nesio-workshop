@@ -18,7 +18,7 @@ import { NODE_TYPES, renderAttributeSchemaLines } from '@/lib/portal/node-schema
 export const NODE_SCHEMA_BLOCK = `Node schema (return ONLY these fields):
 {
   "type": ${NODE_TYPES.map((t) => `"${t}"`).join(' | ')},
-  "name": "concise Chinese name (translate if needed)",
+  "name": "concise name in the OUTPUT LANGUAGE (translate the input if needed)",
   "attributes": { "key": "value" },  // only standard keys — no 'context' or internal fields
   "relations": [{ "targetId": "name", "relation": "relation type" }],
   "tags": ["tag1"],
@@ -59,13 +59,29 @@ ${NODE_SCHEMA_BLOCK}
 ${CLASSIFICATION_RULES_BLOCK}
 
 Also return:
-- "summary": one Chinese sentence
+- "summary": one sentence in the OUTPUT LANGUAGE
 - "intent": "REMINDER" | "COMMITMENT" | "MEMORY_CAPTURE" | "HEALTH_LOG" | "EVENT_LOG" | "PREFERENCE"
 
 Respond ONLY with valid JSON: { "nodes": [...], "summary": "...", "intent": "..." }
 Do NOT include any field called "context". Do NOT invent information not in the input.
 For image: only extract visibly present things. Never use instruction text as node name.
 `;
+
+/**
+ * 输出语言指令 —— 追加到 system prompt 末尾(末尾指令权重高,压过示例里的中文)。
+ * 让 name/summary/tags 跟随 UI 语言,而不是永远中文(英文用户看到中文 = bug)。
+ */
+export function languageDirective(locale?: string): string {
+  const en = (locale || 'zh').toLowerCase().startsWith('en');
+  return en
+    ? '\n\nOUTPUT LANGUAGE: English. Every "name", "summary", and every value in "tags" MUST be written in natural English, even when the user input, image, or file content is in another language. Do NOT output any Chinese.'
+    : '\n\n输出语言:简体中文。所有 name / summary / tags 一律用简体中文。';
+}
+
+/** 带语言指令的抽取 system prompt(analyze / 拍照 / 说一句 / 分享 共用)。 */
+export function buildExtractionSystemPrompt(locale?: string): string {
+  return EXTRACTION_SYSTEM_PROMPT + languageDirective(locale);
+}
 
 // ── Source-hinted variant (the ingest route: shortcuts / reminders / exports) ─
 

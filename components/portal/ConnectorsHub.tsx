@@ -222,9 +222,10 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
           headers: { 'Content-Type': 'application/json', 'x-baohe-access-mode': 'personal_lab' },
           body: JSON.stringify({
             type: 'image',
-            content: '请只根据图片里真实可见的内容生成 Memory 节点:优先具体物品、文件、小票条目、场景;不要把指令当节点名。',
+            content: L(dict, '请只根据图片里真实可见的内容生成 Memory 节点:优先具体物品、文件、小票条目、场景;不要把指令当节点名。', 'Generate Memory nodes only from what is actually visible in the image: prefer concrete items, documents, receipt line-items, scenes; never use this instruction as a node name.'),
             imageBase64: base64,
             mimeType: 'image/jpeg',
+            uiLocale: dict,
           }),
         });
         const data = await res.json() as { ok?: boolean; nodes?: Array<Omit<NodeInput, 'source'>> };

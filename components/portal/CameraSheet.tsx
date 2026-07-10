@@ -75,18 +75,29 @@ async function compressImage(canvas: HTMLCanvasElement): Promise<string> {
   return dataUrl.split(',')[1]; // base64 only
 }
 
-const FULL_IMAGE_PROMPT = '请只根据图片里真实可见的内容生成 Memory 节点。如果是小票/收据：为每个购买条目单独生成一个 object 节点（名称用中文，如”草莓冰淇淋”、”蜂蜜柚子茶”），attributes 加 price 和 receiptDate；如果能识别出商家名称，将其加入每个节点的 attributes.store 字段；如果能识别出支付方式（如 AMEX、Visa、微信支付），将其加入 attributes.paymentMethod 字段；不要单独为商店生成 place 节点，不要生成收据汇总节点。其他情况：优先识别具体物品、文件、场景；除非图片里清楚有人，否则不要生成”人物”节点；不要把这段指令当成节点名称。';
-const CROP_PROMPT = '用户已圈选了图片中的特定区域（圈外已遮黑）。请只识别圈内最主要的1-2个物品，生成对应 Memory 节点。不要识别背景、黑色遮罩区域或其他无关物体。';
+// 图片指令随 UI 语言:节点名称不再硬编码「用中文」(那会让英文用户拿到中文节点)。
+function fullImagePrompt(en: boolean): string {
+  return en
+    ? 'Generate Memory nodes only from what is actually visible in the image. Receipts: create a separate object node per purchased item, add price and receiptDate to attributes; if a store name is visible add it to attributes.store; if a payment method is visible (AMEX/Visa/etc) add attributes.paymentMethod; do NOT create a place node for the store, do NOT create a receipt-summary node. Otherwise: prefer concrete items, documents, scenes; do NOT create a "person" node unless a person is clearly present; never use this instruction as a node name.'
+    : '请只根据图片里真实可见的内容生成 Memory 节点。如果是小票/收据：为每个购买条目单独生成一个 object 节点，attributes 加 price 和 receiptDate；如果能识别出商家名称，将其加入每个节点的 attributes.store 字段；如果能识别出支付方式（如 AMEX、Visa、微信支付），将其加入 attributes.paymentMethod 字段；不要单独为商店生成 place 节点，不要生成收据汇总节点。其他情况：优先识别具体物品、文件、场景；除非图片里清楚有人，否则不要生成"人物"节点；不要把这段指令当成节点名称。';
+}
+function cropPrompt(en: boolean): string {
+  return en
+    ? 'The user has circled a specific region of the image (outside is masked black). Recognize only the main 1-2 items inside the circle and generate Memory nodes. Ignore the background, the black mask, and unrelated objects.'
+    : '用户已圈选了图片中的特定区域（圈外已遮黑）。请只识别圈内最主要的1-2个物品，生成对应 Memory 节点。不要识别背景、黑色遮罩区域或其他无关物体。';
+}
 
 async function analyzeImage(base64: string, prompt?: string, dict: string = 'zh'): Promise<AnalysisResult> {
+  const en = dict.toLowerCase().startsWith('en');
   const res = await fetch('/api/portal/analyze', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-baohe-access-mode': 'personal_lab' },
     body: JSON.stringify({
       type: 'image',
-      content: prompt ?? FULL_IMAGE_PROMPT,
+      content: prompt ?? fullImagePrompt(en),
       imageBase64: base64,
       mimeType: 'image/jpeg',
+      uiLocale: dict,
     }),
   });
   const data = await res.json() as { ok?: boolean; nodes?: AnalyzedNode[]; summary?: string; error?: string };
@@ -458,7 +469,7 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
         const res2 = await fetch('/api/portal/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'file', content: text.slice(0, 4000) }),
+          body: JSON.stringify({ type: 'file', content: text.slice(0, 4000), uiLocale: dict }),
         });
         const data = await res2.json() as { ok?: boolean; nodes?: AnalyzedNode[]; summary?: string };
         const fileResult = { nodes: data.nodes || [], summary: data.summary || L(dict, '提取完成', 'Extraction done') };
@@ -705,7 +716,7 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
       setSelecting(false);
       setPhase('analyzing');
       try {
-        const res = await analyzeImage(base64, CROP_PROMPT, dict);
+        const res = await analyzeImage(base64, cropPrompt(dict.toLowerCase().startsWith('en')), dict);
         const newNodes = toEditedNodes(res.nodes);
         setResult((prev) => prev ? { ...prev, nodes: [...prev.nodes, ...res.nodes] } : res);
         setEditedNodes((prev) => {

@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSignal } from '@/lib/life-domain/create-signal';
 import { normalizePhotoToSignal, normalizeVoiceToSignal } from '@/lib/life-domain/normalizers';
-import { EXTRACTION_SYSTEM_PROMPT, parseJsonBlock } from '@/lib/extraction/extraction';
+import { EXTRACTION_SYSTEM_PROMPT, buildExtractionSystemPrompt, languageDirective, parseJsonBlock } from '@/lib/extraction/extraction';
 import { isRateLimited } from '@/lib/portal/api-auth';
 import { resolveAiKey } from '@/lib/portal/ai-keys';
 import { envValue } from '@/lib/portal/env';
@@ -225,16 +225,18 @@ async function analyzeWithOpenAI(content: string, isImage: boolean, imageBase64?
 }
 
 /** Gemini with Google Search Grounding — for questions needing real-world info */
-async function askWithGeminiWebSearch(query: string): Promise<{ answer: string; searchUsed: boolean }> {
+async function askWithGeminiWebSearch(query: string, uiLocale?: string): Promise<{ answer: string; searchUsed: boolean }> {
   const key = getGeminiKey();
   if (!key) throw new Error('no_gemini_key');
 
+  const isEn = (uiLocale || 'zh').toLowerCase().startsWith('en');
+  const prompt = isEn ? `Answer concisely in English: ${query}` : `请用中文简洁回答：${query}`;
   const res = await fetch(`${GEMINI_BASE_URL}/gemini-2.0-flash:generateContent?key=${key}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       tools: [{ google_search: {} }],
-      contents: [{ parts: [{ text: `请用中文简洁回答：${query}` }], role: 'user' }],
+      contents: [{ parts: [{ text: prompt }], role: 'user' }],
     }),
   });
 
@@ -346,11 +348,15 @@ export async function POST(req: NextRequest) {
       content: string;
       imageBase64?: string;
       mimeType?: string;
+      uiLocale?: string;
     };
 
     let raw = '';
     const isImage = body.type === 'image' && Boolean(body.imageBase64);
     const aiAllowed = isAnalyzeAiAllowed(req);
+    // 输出语言跟随 UI(英文用户不该拿到中文 name/summary/tags)。
+    const isEn = (body.uiLocale || 'zh').toLowerCase().startsWith('en');
+    const extractionPrompt = buildExtractionSystemPrompt(body.uiLocale);
 
     // 有鉴权但之前无限流:单个会话可无节流刷最贵的视觉/grounding 调用(每请求最多 4 次外部 AI)。
     if (aiAllowed && isRateLimited(req, 'analyze', { limit: 20 })) {
@@ -375,11 +381,12 @@ export async function POST(req: NextRequest) {
         parsedQuery = parsed.query || '';
       } catch { /* ok */ }
 
+      const askPrompt = ASK_SYSTEM_PROMPT + languageDirective(body.uiLocale);
       try {
-        raw = await analyzeWithClaude(body.content, false, undefined, undefined, ASK_SYSTEM_PROMPT);
+        raw = await analyzeWithClaude(body.content, false, undefined, undefined, askPrompt);
       } catch {
         try {
-          raw = await analyzeWithGemini(body.content, undefined, undefined, ASK_SYSTEM_PROMPT);
+          raw = await analyzeWithGemini(body.content, undefined, undefined, askPrompt);
         } catch {
           return NextResponse.json({ ok: false, error: 'ai_search_unavailable' }, { status: 503 });
         }
@@ -397,7 +404,7 @@ export async function POST(req: NextRequest) {
       let webSearchUsed = false;
       if (askResult.webSearchNeeded && parsedQuery) {
         try {
-          const ws = await askWithGeminiWebSearch(parsedQuery);
+          const ws = await askWithGeminiWebSearch(parsedQuery, body.uiLocale);
           webAnswer = ws.answer;
           webSearchUsed = ws.searchUsed;
         } catch {
@@ -406,8 +413,9 @@ export async function POST(req: NextRequest) {
       }
 
       const memAnswer = askResult.answer || '';
+      const webPrefix = isEn ? '🌐 From the web: ' : '🌐 来自网络：';
       const finalAnswer = webAnswer
-        ? `${memAnswer}${memAnswer ? '\n\n' : ''}🌐 来自网络：${webAnswer}`
+        ? `${memAnswer}${memAnswer ? '\n\n' : ''}${webPrefix}${webAnswer}`
         : memAnswer;
 
       return NextResponse.json({
@@ -423,17 +431,17 @@ export async function POST(req: NextRequest) {
       const providerErrors: string[] = [];
       const errMsg = (e: unknown) => (e instanceof Error ? e.message : 'unknown_error');
       try {
-        raw = await analyzeWithClaude(body.content, isImage, body.imageBase64, body.mimeType);
+        raw = await analyzeWithClaude(body.content, isImage, body.imageBase64, body.mimeType, extractionPrompt);
       } catch (claudeError) {
         providerErrors.push(`claude: ${errMsg(claudeError)}`);
         logAiProviderFailure('claude', errMsg(claudeError));
         try {
-          raw = await analyzeWithGemini(body.content, body.imageBase64, body.mimeType);
+          raw = await analyzeWithGemini(body.content, body.imageBase64, body.mimeType, extractionPrompt);
         } catch (geminiError) {
           providerErrors.push(`gemini: ${errMsg(geminiError)}`);
           logAiProviderFailure('gemini', errMsg(geminiError));
           try {
-            raw = await analyzeWithOpenAI(body.content, isImage, body.imageBase64, body.mimeType);
+            raw = await analyzeWithOpenAI(body.content, isImage, body.imageBase64, body.mimeType, extractionPrompt);
           } catch (openAiError) {
             providerErrors.push(`openai: ${errMsg(openAiError)}`);
             logAiProviderFailure('openai', errMsg(openAiError));
@@ -461,12 +469,12 @@ export async function POST(req: NextRequest) {
     const firstNode = Array.isArray(result.nodes) ? result.nodes[0] as Record<string, unknown> | undefined : undefined;
     const signalInput = body.type === 'image'
       ? normalizePhotoToSignal({
-          title: typeof firstNode?.name === 'string' ? firstNode.name : result.summary || '图片线索',
+          title: typeof firstNode?.name === 'string' ? firstNode.name : result.summary || (isEn ? 'Photo clue' : '图片线索'),
           summary: result.summary,
-          tags: ['拍一下', 'AI识别'],
+          tags: isEn ? ['Snap', 'AI'] : ['拍一下', 'AI识别'],
         })
       : normalizeVoiceToSignal({
-          text: body.content || result.summary || '记录',
+          text: body.content || result.summary || (isEn ? 'Note' : '记录'),
           tags: [result.intent || 'MEMORY_CAPTURE'],
         });
     const signal = createSignal(signalInput);

@@ -353,7 +353,7 @@ function getNodeTypeMeta(node: LifeNode, dict: DictLocale = 'zh') {
     case 'person': return { extra: str(a.relation) || str(a.role) || str(a.company) };
     case 'health_state': {
       const dateStr = str(a.date) || str(a.recordedAt);
-      const dateLabel = dateStr ? new Date(dateStr).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' }) : '';
+      const dateLabel = dateStr ? new Date(dateStr).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'short', day: 'numeric' }) : '';
       const status = str(a.status);
       const badgeColor = status.includes('恢复') ? 'var(--status-go)' : status.includes('注意') ? 'var(--status-gentle)' : 'var(--portal-cool-accent)';
       return { extra: dateLabel, badge: status || undefined, badgeColor: status ? badgeColor : undefined };
