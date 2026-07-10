@@ -14376,3 +14376,15 @@ html[data-portal-theme="night"] .nesio-exp-card:hover {
 }
 .nesio-mirror-writing { font-size: 0.82rem; color: var(--portal-muted); margin: 0.4rem 0; text-align: center; }
 .nesio-mirror-error { font-size: 0.76rem; color: var(--status-risk); margin: 0.2rem 0; }
+
+/* ── 批次 28 · Today §1:收据首行 + 捕获提示 ── */
+.nesio-today-receipt {
+  margin: 0.2rem 0.2rem 0.9rem;
+  font-size: 1.05rem;
+}
+.nesio-capture-hint {
+  margin: 1.4rem 0 0.6rem;
+  text-align: center;
+  font-size: 0.78rem;
+  color: var(--portal-muted);
+}

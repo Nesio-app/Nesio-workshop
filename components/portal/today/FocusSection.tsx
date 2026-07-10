@@ -7,8 +7,8 @@
  */
 
 import { arbitrateTodayPresence } from '@/lib/platform/today-arbiter';
-import { useEffect, useRef, useState } from 'react';
-import { focusTimeHint, markFocusNodeDone, addCommitmentNode, type FocusNode, type ProactiveContextItem } from '@/lib/platform/view-models/today-view-model';
+import { useEffect, useState } from 'react';
+import { focusTimeHint, markFocusNodeDone, type FocusNode, type ProactiveContextItem } from '@/lib/platform/view-models/today-view-model';
 import type { CalendarEvent } from '@/lib/portal/types';
 import { scoreCalendarEvents, selectPinned } from '@/lib/platform/attention-engine';
 import {
@@ -131,12 +131,10 @@ export function TodayFocusSection({
   const [dismissed, setDismissed] = useState<Set<string>>(() => loadDismissedToday());
   const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
   const [collapsed, setCollapsed] = useState(true);
-  const [quickAdd, setQuickAdd] = useState('');
   const [localNodes, setLocalNodes] = useState<FocusNode[]>([]);
   const [calRecorderEvent, setCalRecorderEvent] = useState<CalendarEvent | null>(null);
   const locale = usePortalLocale();
-  const inputRef = useRef<HTMLInputElement>(null);
-  const { flashNodes, triggerFlash, dismiss: dismissFlash } = useMemoryFlash();
+  const { flashNodes, dismiss: dismissFlash } = useMemoryFlash();
 
   // ── Attention Engine: score calendar events ──
   const now = new Date();
@@ -177,18 +175,6 @@ export function TodayFocusSection({
   function handleDone(node: FocusNode) {
     setDoneIds((prev) => { const next = new Set(prev); next.add(node.id); return next; });
     setTimeout(() => markFocusNodeDone(node.id), 600);
-  }
-
-  function handleQuickAdd(e: React.FormEvent) {
-    e.preventDefault();
-    const name = quickAdd.trim();
-    if (!name) return;
-    const node = addCommitmentNode(name);
-    setLocalNodes((prev) => [node, ...prev]);
-    setQuickAdd('');
-    setCollapsed(false);
-    inputRef.current?.blur();
-    triggerFlash({ id: node.id, name: node.name });
   }
 
   // 批次 32:今日聚焦「至多显示一个」—— 有置顶卡时它就是那一个,折叠区全收进「还有 N 项」;
@@ -250,8 +236,6 @@ export function TodayFocusSection({
       {isEmpty ? (
         <div className="nesio-focus-empty">
           <p>{t(locale, 'todayFocusEmpty')}</p>
-          {/* 空状态引导:已翻译的 hint 之前没渲染,新用户只看到「暂无」的死路。补上引导 —— 前 5 分钟价值。 */}
-          <p className="nesio-focus-empty-hint" style={{ fontSize: '0.8rem', color: 'var(--portal-muted)', marginTop: '0.3rem' }}>{t(locale, 'todayFocusEmptyHint')}</p>
         </div>
       ) : (
         <div className="nesio-attention-layout">
@@ -289,20 +273,6 @@ export function TodayFocusSection({
 
         </div>
       )}
-
-      <form className="nesio-focus-quick-add" onSubmit={handleQuickAdd}>
-        <input
-          ref={inputRef}
-          className="nesio-focus-quick-input"
-          type="text"
-          placeholder={t(locale, 'todayQuickAddPlaceholder')}
-          value={quickAdd}
-          onChange={(e) => setQuickAdd(e.target.value)}
-        />
-        {quickAdd.trim() && (
-          <button type="submit" className="nesio-focus-quick-btn">{t(locale, 'todayQuickAddSubmit')}</button>
-        )}
-      </form>
 
       {/* Calendar event meeting recorder */}
       <MeetingRecorderSheet

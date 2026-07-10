@@ -1,7 +1,7 @@
 import { generateTodayCards } from '../../intelligence';
 import { ingestLifeNode } from '../../life-domain/ingest-node';
 import type { Signal } from '../../life-domain/signal';
-import { getLifeGraph, getRecentNodes, updateLifeNode, type LifeNode } from '../../portal/life-graph';
+import { getLifeGraph, getRecentNodes, updateLifeNode, isBulkImported, type LifeNode } from '../../portal/life-graph';
 import type { RecommendationCard } from '../../portal/reasoning-engine';
 import { nearestNodeDate } from '../node-dates';
 import { LEXICON } from '../keyword-lexicon';
@@ -167,6 +167,26 @@ function buildProactiveContext(allNodes: LifeNode[]): ProactiveContext {
   return { upcomingSpecialDays, healthItems };
 }
 
+/** §1 ①收据首行的输入:纯本机计数(批量导入不计入)—— 绝不是同步/信号计数。 */
+export interface TodayReceipt {
+  readonly realTotal: number;
+  readonly todayCount: number;
+  readonly yesterdayCount: number;
+}
+
+function computeReceipt(nodes: readonly LifeNode[]): TodayReceipt {
+  const real = nodes.filter((n) => !isBulkImported(n));
+  const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
+  const yStart = new Date(dayStart.getTime() - 86_400_000);
+  let todayCount = 0, yesterdayCount = 0;
+  for (const n of real) {
+    const t = new Date(n.createdAt);
+    if (t >= dayStart) todayCount++;
+    else if (t >= yStart) yesterdayCount++;
+  }
+  return { realTotal: real.length, todayCount, yesterdayCount };
+}
+
 export interface TodayViewModel {
   readonly cards: RecommendationCard[];
   readonly memoryCount: number;
@@ -175,6 +195,7 @@ export interface TodayViewModel {
   /** All undone nodes — for dormant engine and other platform consumers. */
   readonly allNodes: readonly FocusNode[];
   readonly proactiveContext: ProactiveContext;
+  readonly receipt: TodayReceipt;
 }
 
 export function buildTodayViewModel(input: {
@@ -192,6 +213,8 @@ export function buildTodayViewModel(input: {
       focusNodes: [],
       allNodes: [],
       proactiveContext: emptyContext,
+      // 收据是本机数据的承诺(「都记着呢」),与私有云数据门无关 —— 匿名也要兑现
+      receipt: computeReceipt(getLifeGraph()),
     };
   }
 
@@ -223,5 +246,6 @@ export function buildTodayViewModel(input: {
     focusNodes,
     allNodes,
     proactiveContext: buildProactiveContext(lifeGraphNodes),
+    receipt: computeReceipt(lifeGraphNodes),
   };
 }

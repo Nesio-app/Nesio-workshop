@@ -27,7 +27,7 @@ import {
 } from '@/lib/platform/guidance-engine/source-adapters';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
 import dynamic from 'next/dynamic';
-import { buildRotatingFallback, dismissProactiveById, getProactiveCardBudget, isProactiveCardDismissed, type ProactiveCardData } from './today/proactive-types';
+import { dismissProactiveById, getProactiveCardBudget } from './today/proactive-types';
 import { ProactiveGuidanceCard } from './today/ProactiveGuidanceCard';
 import { ExperimentCheckinCard } from './today/ExperimentCheckinCard';
 import { RoutineDueCards } from './today/RoutineDueCards';
@@ -56,7 +56,7 @@ export default function TodayFeed({
   const {
     displayName,
     memoryCount, memoryNotes, todayReport,
-    focusNodes, allNodes,
+    focusNodes, allNodes, receipt,
     dormantStore, setDormantStore,
     calendarEvents, proactiveContext,
     proactiveCards, setProactiveCards,
@@ -100,7 +100,11 @@ export default function TodayFeed({
     return () => window.removeEventListener('nesio-proactive-level-changed', onLevel);
   }, []);
   void levelTick;
-  const cardBudget = Math.min(TODAY_CARD_BUDGET, getProactiveCardBudget());
+  // v1 规格 §1:回忆/引导 ≤1 张/天(晚间重心回忆,上限 2);没有强触发就整格消失,
+  // 不硬凑 —— 轮播兜底(历史上的今天/小技巧)已废除,「页面活着」由收据首行负责。
+  const hourNow = new Date().getHours();
+  const isEvening = hourNow >= 21;
+  const cardBudget = Math.min(TODAY_CARD_BUDGET, getProactiveCardBudget(), isEvening ? 2 : 1);
   // 架构审查 #2:统一仲裁 —— 置顶抢占的节点,其引导卡不再重复出现
   const [pinnedNodeId, setPinnedNodeId] = useState<string | null>(null);
   const guidanceNodeIds = useMemo(() => proactiveCards.map((c) => c.nodeId).filter((x): x is string => Boolean(x)), [proactiveCards]);
@@ -108,19 +112,25 @@ export default function TodayFeed({
     .filter((c) => !dismissedCardIds.has(c.id) && (!c.nodeId || c.nodeId !== pinnedNodeId))
     .slice(0, cardBudget);
 
-  // 未来预测区永远有内容(批次 3):管线空窗/全被划掉时,轮播兜底
-  // (历史上的今天/记忆回顾/时间段建议/小技巧),每次打开随机一张。
-  const [fallbackTick, setFallbackTick] = useState(0);
-  const fallbackCard = useMemo(
-    // 批次 22:确定性选卡(hourSeed + rotation),同一小时稳定不跳;
-    // fallbackTick 作为 rotation 传入,划掉才换下一张
-    () => buildRotatingFallback(new Date(), allNodes, uiLocale, fallbackTick),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [allNodes, fallbackTick, uiLocale],
-  );
-  const showFallback = activeProactiveCards.length === 0 && cardBudget > 0
-    && fallbackCard && !isProactiveCardDismissed(fallbackCard.id)
-    ? fallbackCard : null;
+  // §1 ①收据首行:每次打开先兑现一次承诺(纯本地事实,绝不显示同步计数);时段三态。
+  const receiptLine = useMemo(() => {
+    if (receipt.realTotal === 0) {
+      return L(uiLocale, '我在。记点什么,我替你记着。', "I'm here. Note anything — I'll hold it for you.");
+    }
+    if (hourNow < 11) {
+      return receipt.yesterdayCount > 0
+        ? L(uiLocale, `早。昨天的 ${receipt.yesterdayCount} 条都存着,想到什么随时说。`, `Morning. Yesterday's ${receipt.yesterdayCount} notes are safe — say anything, anytime.`)
+        : L(uiLocale, '早。都记着呢,想到什么随时说。', "Morning. Everything's kept — say anything, anytime.");
+    }
+    if (isEvening) {
+      return receipt.todayCount > 0
+        ? L(uiLocale, `今天的 ${receipt.todayCount} 条都收好了。可以放心把今天放下了。`, `Today's ${receipt.todayCount} notes are tucked away. You can let today go.`)
+        : L(uiLocale, '今天很安静。可以放心把今天放下了。', 'A quiet day. You can let it go now.');
+    }
+    return receipt.todayCount > 0
+      ? L(uiLocale, `都记着呢。今天 ${receipt.todayCount} 条,都收好了。`, `All kept. ${receipt.todayCount} today, safely stored.`)
+      : L(uiLocale, '都记着呢。想到什么,随时卸给我。', "All kept. Whatever comes to mind, hand it to me.");
+  }, [receipt, uiLocale, hourNow, isEvening]);
 
   return (
     <div className="nesio-today-root">
@@ -146,6 +156,9 @@ export default function TodayFeed({
       </header>
 
       <div className="nesio-today-scroll">
+        {/* §1 ①安心态收据(宋体 = Nesio 的声音):先兑现承诺,再看今天 */}
+        <p className="nesio-today-receipt nesio-serif-voice">{receiptLine}</p>
+
         {/* 季度 Wrapped 卡片 */}
         {showWrapped && <WrappedCard onDismiss={dismissWrapped} />}
 
@@ -169,17 +182,6 @@ export default function TodayFeed({
           />
         ))}
 
-        {showFallback && (
-          <ProactiveGuidanceCard
-            key={showFallback.id}
-            card={showFallback}
-            onDismiss={() => {
-              dismissProactiveById(showFallback.id);
-              setFallbackTick((v) => v + 1);
-            }}
-          />
-        )}
-
         {/* 冷冻到期提醒(批次 7:冷冻仓入口迁到拍一下,决定回路留在首屏) */}
         <ThawedReminder />
 
@@ -202,6 +204,13 @@ export default function TodayFeed({
         {/* 实验打卡(批次 8:按用户要求放到最下面) */}
         <RoutineDueCards />
         <ExperimentCheckinCard />
+
+        {/* §1 ④捕获提示:指向导航 FAB(唯一英雄动作),文案随时段变 */}
+        <p className="nesio-capture-hint">
+          {isEvening
+            ? L(uiLocale, '睡前想到什么,按住方块说一句,今天就能放下了', 'Anything left in your head — hold the cube, say it, and let today go')
+            : L(uiLocale, '想到什么,按住方块说一句就卸下', 'Anything on your mind — hold the cube and say it')}
+        </p>
       </div>
 
       {/* 聚焦模式 */}

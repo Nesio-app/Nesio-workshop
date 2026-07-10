@@ -573,7 +573,7 @@ const STRINGS = {
     /* ── Today 表面(REG-004)── */
     todayFocusTitle: '今日焦点',
     todayFocusAll: '全部 ›',
-    todayFocusEmpty: '今天暂无聚焦事项',
+    todayFocusEmpty: '✓ 没有到点的事',
     todayFocusEmptyHint: '说一句带时间的话（比如"周五有会议"），就会出现在这里。',
     todayCollapsedMoreTemplate: '还有 {count} 项',
     todayCollapse: '收起',
@@ -1297,7 +1297,7 @@ const STRINGS = {
     /* ── Today surface (REG-004) ── */
     todayFocusTitle: 'Focus',
     todayFocusAll: 'All ›',
-    todayFocusEmpty: 'Nothing in focus today',
+    todayFocusEmpty: '✓ Nothing due right now',
     todayFocusEmptyHint: 'Say something with a time ("meeting on Friday") and it will show up here.',
     todayCollapsedMoreTemplate: '{count} more',
     todayCollapse: 'Collapse',

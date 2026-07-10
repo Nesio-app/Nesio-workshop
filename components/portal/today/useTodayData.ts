@@ -12,7 +12,7 @@ import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { loadProfileSettings, portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { buildDailyReport, type DailyReport } from '@/lib/portal/daily-report';
 import { autoPersistTodayReport } from '@/lib/portal/daily-report-persist';
-import { buildTodayViewModel, type FocusNode, type ProactiveContext } from '@/lib/platform/view-models/today-view-model';
+import { buildTodayViewModel, type FocusNode, type ProactiveContext, type TodayReceipt } from '@/lib/platform/view-models/today-view-model';
 import { readPortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
 import type { CalendarEvent } from '@/lib/portal/types';
 import { scoreCalendarEvents } from '@/lib/platform/attention-engine';
@@ -118,6 +118,7 @@ export function useTodayData(canUsePrivateData: boolean) {
   const [todayReport, setTodayReport] = useState<DailyReport | null>(null);
   const [focusNodes, setFocusNodes] = useState<readonly FocusNode[]>([]);
   const [allNodes, setAllNodes] = useState<readonly FocusNode[]>([]);
+  const [receipt, setReceipt] = useState<TodayReceipt>({ realTotal: 0, todayCount: 0, yesterdayCount: 0 });
   const [dormantStore, setDormantStore] = useState<DormantStore>({});
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
   const [proactiveContext, setProactiveContext] = useState<ProactiveContext>({ upcomingSpecialDays: [], healthItems: [] });
@@ -151,6 +152,7 @@ export function useTodayData(canUsePrivateData: boolean) {
       if (!canUsePrivateData && !stale()) setTodayReport(null); // 登出:清私据派生的日报
       setFocusNodes(updated.focusNodes);
       setAllNodes(updated.allNodes);
+      setReceipt(updated.receipt);
       const store = loadDormantStore();
       const evaluated = evaluateDormancy(updated.allNodes, store);
       setDormantStore(evaluated);
@@ -371,7 +373,7 @@ export function useTodayData(canUsePrivateData: boolean) {
   return {
     displayName,
     memoryCount, memoryNotes, todayReport,
-    focusNodes, allNodes,
+    focusNodes, allNodes, receipt,
     dormantStore, setDormantStore,
     calendarEvents, proactiveContext,
     proactiveCards, setProactiveCards,

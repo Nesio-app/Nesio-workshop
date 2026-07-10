@@ -52,9 +52,9 @@ export function buildTimeFallback(now: Date, locale: string = 'zh'): ProactiveCa
 
 
 /**
- * 轮播兜底(批次 3 用户反馈:「希望未来预测一直有东西显示,每次打开都不一样」)。
- * 管线没有卡可出时,从内容池随机挑一张:时间段建议 / 历史上的今天 /
- * 记忆回顾 / 使用提示。安静模式(预算 0)下仍然不出。
+ * @deprecated v1 规格 §1(2026-07):Today 不再硬凑 —— TodayFeed 已停用本兜底,
+ * 「页面活着」由收据首行负责;「历史上的今天/随机回顾」内容迁到洞察「走走看」。
+ * 保留一版待金句偏好学习(quoteCategory)迁移后整体删除。
  */
 export interface FallbackNodeLike { id: string; name: string; createdAt: string; type?: string }
 

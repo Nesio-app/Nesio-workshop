@@ -6,8 +6,9 @@
  *    永远不能再以「今天截止」的任务口吻出现(用户原话:他要告诉我
  *    明天是 Holiday,有什么活动安排么)。
  * 2. holiday 卡不给任务式「开始」按钮,只给轻确认。
- * 3. 未来预测区永远有内容:管线空窗时走 buildRotatingFallback
- *    (历史上的今天 / 记忆回顾 / 时间段建议 / 小技巧),随机轮播。
+ * 3. (2026-07 v1 规格 §1 修订)回忆/引导区**不再硬凑**:轮播兜底废除,
+ *    没有强触发就整格消失;「页面活着」由收据首行(nesio-today-receipt)负责;
+ *    回忆卡日间 ≤1、晚间 ≤2,且尊重安静模式(预算 0 不出)。
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -41,15 +42,14 @@ assert.ok(holidayAction.length > 0, 'actionability must handle holiday before de
 assert.doesNotMatch(holidayAction, /开始/, 'Holiday action must not be a task-style 开始 button.');
 assert.match(actionWindow, /case 'holiday':/, 'action-window must open a window for holiday (today/tomorrow).');
 
-// ── 3. 未来预测永远有内容:轮播兜底 ──────────────────────────────────────────
-assert.match(proactiveTypes, /export function buildRotatingFallback/, 'proactive-types must export the rotating fallback builder.');
-assert.match(proactiveTypes, /历史上的今天/, 'Fallback pool must include on-this-day memories.');
-assert.match(proactiveTypes, /记忆回顾/, 'Fallback pool must include memory resurfacing.');
-// 批次 22:轮换由「hourSeed + rotation」确定性驱动(此前 Math.random 每次
-// re-render 重挑,视觉上「自己跳」)。同一小时稳定,划掉才换下一张。
-assert.match(proactiveTypes, /seededPick|hourSeed/, 'Fallback must rotate deterministically (stable per hour, advances on dismiss), not via Math.random.');
-assert.doesNotMatch(proactiveTypes, /Math\.random\(\)/, 'Fallback must not use Math.random (caused visual jumping on re-render).');
-assert.match(todayFeed, /buildRotatingFallback/, 'TodayFeed must render the rotating fallback when the pipeline is empty.');
-assert.match(todayFeed, /activeProactiveCards\.length === 0 && cardBudget > 0/, 'Fallback only fills真空窗,且尊重安静模式(预算 0 不出)。');
+// ── 3. v1 规格 §1:不硬凑 —— 轮播兜底废除,收据首行负责「页面活着」 ────────────
+assert.doesNotMatch(todayFeed, /buildRotatingFallback/, 'TodayFeed must NOT render the rotating fallback (v1 spec: no filler when nothing is due).');
+assert.match(todayFeed, /nesio-today-receipt/, 'TodayFeed must render the receipt line (①安心态:the page stays alive via the receipt, not filler cards).');
+assert.doesNotMatch(todayFeed, /cloudSyncSummary|getLifeGraphCloudSyncSummary|待同步/, 'Receipt must never surface sync counters (P0-1).');
+assert.match(todayFeed, /getProactiveCardBudget\(\)/, 'Memory/guidance cards must respect the quiet-mode budget.');
+assert.match(todayFeed, /isEvening \? 2 : 1/, 'Memory cards cap at 1 by day, 2 in the evening (§1.2).');
+assert.match(todayFeed, /nesio-capture-hint/, 'TodayFeed must render the capture hint pointing at the FAB (④,the only hero action).');
+// 兜底轮播的确定性纪律(builder 保留待删,若存在仍不得用 Math.random)
+assert.doesNotMatch(proactiveTypes, /Math\.random\(\)/, 'proactive-types must not use Math.random (visual jumping).');
 
-console.log('guidance holiday + rotating fallback contract OK');
+console.log('guidance holiday + today-receipt contract OK');
