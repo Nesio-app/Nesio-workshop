@@ -182,7 +182,7 @@ function LivingModelTab({
 }: {
   model: LivingModel | null;
   loading: boolean;
-  error: 'no-key' | 'ai-error' | 'network' | null;
+  error: 'no-key' | 'quota' | 'ai-error' | 'network' | null;
   nodeCount: number;
   onRefresh: () => void;
   onFeedback: (insightId: string, verified: boolean) => void;
@@ -205,6 +205,8 @@ function LivingModelTab({
     : '';
   const errorMsg = error === 'no-key'
     ? L(dict, `还没接上 AI —— 认知模型需要 AI 才能生成(去部署里配一个 AI key 即可)。不是没有数据。${priorTail}`, `AI isn't connected yet — the mind model needs it (set an AI key in your deployment). Not a lack of data. ${hasPrior ? 'Showing your last result.' : ''}`)
+    : error === 'quota'
+      ? L(dict, `AI 免费额度暂时用完了(服务端需配 ANTHROPIC_API_KEY 或 Gemini 付费)—— 不是你的问题。${priorTail}`, `The free AI quota is used up (server needs ANTHROPIC_API_KEY or paid Gemini) — not your fault. ${hasPrior ? 'Showing your last result.' : ''}`)
     : error === 'network'
       ? L(dict, `网络异常,认知模型没刷新出来 —— 不是没有数据。${priorTail}`, `Network issue — the mind model didn't refresh. Not a lack of data. ${hasPrior ? 'Showing your last result.' : ''}`)
       : L(dict, `这次没生成出来(AI 忙或稍有波动)—— 不是没有数据,点重试再试一次。${priorTail}`, `Didn't generate this time (AI busy or a hiccup) — not a lack of data; tap retry. ${hasPrior ? 'Showing your last result.' : ''}`);
@@ -399,7 +401,7 @@ export default function InsightsSheet({ onClose, initialTab }: { onClose: () => 
   // Living Model(Lab)
   const [livingModel, setLivingModel] = useState<LivingModel | null>(null);
   const [livingLoading, setLivingLoading] = useState(false);
-  const [livingError, setLivingError] = useState<'no-key' | 'ai-error' | 'network' | null>(null);
+  const [livingError, setLivingError] = useState<'no-key' | 'quota' | 'ai-error' | 'network' | null>(null);
   const livingFetchedRef = useRef(false);
   const livingSeqRef = useRef(0);
 
@@ -539,6 +541,9 @@ export default function InsightsSheet({ onClose, initialTab }: { onClose: () => 
       if (mySeq !== livingSeqRef.current) return;
       if (data.reason === 'no_api_key') {
         setLivingError('no-key');
+        if (cached) setLivingModel(cached);
+      } else if (data.reason === 'quota') {
+        setLivingError('quota');
         if (cached) setLivingModel(cached);
       } else if (data.reason === 'api_error') {
         setLivingError('ai-error');

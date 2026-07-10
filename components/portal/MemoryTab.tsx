@@ -1017,9 +1017,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
               {/* 收藏夹 + 收纳(批次 36:收纳成方卡与收藏并排,三排同尺寸) */}
               {hasNodes && (pinnedNodes.length > 0 || isFeatureEnabled('inventory')) && (
                 <div className="nesio-projects-section">
-                  <div className="nesio-section-header">
-                    <span className="nesio-section-title">{L(dict, '收藏夹', 'Pinned')}</span>
-                  </div>
+                  {/* 批次 40:「收藏夹」标题撤除 —— 首卡是收纳,标题错位;卡片自解释 */}
                   <div className="nesio-memory-grid">
                     {isFeatureEnabled('inventory') && (
                       <button

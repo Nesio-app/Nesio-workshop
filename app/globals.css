@@ -182,7 +182,7 @@
    portal 主题下 body 直接铺 portal 渐变,任何缺口都不再露色差。 */
 html[data-portal-theme] body {
   background: var(--portal-bg-gradient);
-  background-color: var(--portal-blue-mid); /* 批次 37:iOS 不认 attachment:fixed,渐变外露白 → 纯色打底 */
+  background-color: var(--portal-blue-deep); /* 批次 40:band 在底部,打底贴渐变深端才无缝 */
   background-attachment: fixed;
   overscroll-behavior-y: none;
 }
@@ -190,7 +190,7 @@ html[data-portal-theme] body {
    与页面渐变形成一条色带——html 直接铺同款渐变,状态栏区彻底一体 */
 html[data-portal-theme] {
   background: var(--portal-bg-gradient);
-  background-color: var(--portal-blue-mid);
+  background-color: var(--portal-blue-deep);
   background-attachment: fixed;
 }
 
@@ -7914,10 +7914,14 @@ html[data-portal-theme="night"] .nesio-connector-name { color: #e8eefa; }
 .nesio-insights-body {
   flex: 1;
   overflow-y: auto;
+  /* 批次 40:锁横滚 + 藏滚动条 —— Lab 关系图等定宽内容曾撑破页面(像网页会漂移) */
+  overflow-x: hidden;
+  scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
   padding-top: 0.75rem;
   padding-bottom: 1.5rem;
 }
+.nesio-insights-body::-webkit-scrollbar { display: none; }
 
 /* Narrative */
 .nesio-insights-narrative {

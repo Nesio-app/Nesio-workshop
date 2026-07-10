@@ -9,8 +9,8 @@ import assert from 'node:assert/strict';
 const src = fs.readFileSync(new URL('../components/portal/InsightsSheet.tsx', import.meta.url), 'utf8');
 
 // ── 三态类型 ──
-assert.ok(/'no-key' \| 'ai-error' \| 'network' \| null/.test(src), 'livingError 三态类型');
-assert.ok((src.match(/'no-key' \| 'ai-error' \| 'network' \| null/g) || []).length >= 2, 'prop 与 state 都用三态');
+assert.ok(/'no-key' \| 'quota' \| 'ai-error' \| 'network' \| null/.test(src), 'livingError 四态类型(批次 40 加 quota:配额耗尽给准话)');
+assert.ok((src.match(/'no-key' \| 'quota' \| 'ai-error' \| 'network' \| null/g) || []).length >= 2, 'prop 与 state 都用四态');
 
 // ── reason → 态 映射分清 ──
 assert.ok(/data\.reason === 'no_api_key'[\s\S]{0,80}setLivingError\('no-key'\)/.test(src), 'no_api_key → no-key');

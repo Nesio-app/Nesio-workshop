@@ -174,7 +174,9 @@ export async function POST(req: NextRequest) {
     const layers = await generateModel(body);
     return NextResponse.json({ ok: true, layers });
   } catch (err) {
-    console.error('[living-model] error:', err instanceof Error ? err.message : err);
-    return NextResponse.json({ ok: true, layers: fallback, reason: 'api_error' });
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[living-model] error:', msg);
+    const quota = msg.includes('quota') || msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED');
+    return NextResponse.json({ ok: true, layers: fallback, reason: quota ? 'quota' : 'api_error' });
   }
 }
