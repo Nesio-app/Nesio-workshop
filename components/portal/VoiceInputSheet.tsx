@@ -26,6 +26,7 @@ import { routeIntent } from '@/lib/portal/intent-router';
 import { DomainIcon, IconBox, IconClock, IconMapPin, IconUser } from './icons';
 import { L } from '@/lib/portal/i18n';
 import { loadProfileSettings, portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
+import { canUsePaidCloudAi } from '@/lib/portal/entitlement';
 import { usePortalLocale } from './use-portal-locale';
 
 interface VoiceInputSheetProps {
@@ -429,7 +430,11 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
 
     let title = cleanText.slice(0, 40);
     let aiConfidence = 0.7;
-    try {
+    // 成本护栏:免费层不打云理解 —— 规则抽取(extractContext 的人/地/物/域 + 规则标题)
+    // 本来就是离线兜底,免费层直接用它,零成本。分层未启用(当前 PWA)恒放行,不变。
+    if (!canUsePaidCloudAi()) {
+      /* skip cloud — rule-based title/entities below */
+    } else try {
       const res = await fetch('/api/portal/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

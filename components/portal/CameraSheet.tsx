@@ -8,6 +8,7 @@ import { matchNearestPlace, formatLocation, getNamedPlaces } from '@/lib/portal/
 import LocationPicker from './LocationPicker';
 import { IconBox, IconCamera, IconImage } from './icons';
 import { PurchaseCoolingPanel } from './PurchaseCoolingPanel';
+import { canUsePaidCloudAi } from '@/lib/portal/entitlement';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
@@ -88,6 +89,9 @@ function cropPrompt(en: boolean): string {
 }
 
 async function analyzeImage(base64: string, prompt?: string, dict: string = 'zh'): Promise<AnalysisResult> {
+  // 成本护栏:免费层不打云视觉 —— 照片照样保存(待确认线索,可手动加名/标签),
+  // AI 深识别归 Pro。分层未启用(当前 PWA)恒放行,不变。
+  if (!canUsePaidCloudAi()) throw new AnalyzeImageError('free_tier_local');
   const en = dict.toLowerCase().startsWith('en');
   const res = await fetch('/api/portal/analyze', {
     method: 'POST',
@@ -168,9 +172,11 @@ async function getCurrentLocation(): Promise<{ lat: number; lon: number } | null
 
 const ALL_TYPES = ['object', 'person', 'place', 'event', 'commitment', 'health_state', 'preference'] as const;
 
-function buildPendingImageResult(dict: string = 'zh'): AnalysisResult {
+function buildPendingImageResult(dict: string = 'zh', reason: 'auth' | 'free_tier' = 'auth'): AnalysisResult {
   return {
-    summary: L(dict, '已先保存为待确认图片线索。登录或 Lab 模式后可自动识别标签。', 'Saved as an unconfirmed image clue for now. Sign in or enable Lab mode for auto-tagging.'),
+    summary: reason === 'free_tier'
+      ? L(dict, '照片已记下,可以自己加名字和标签。升级 Pro 可用 AI 自动识别图中物品和场景。', 'Photo saved — add a name and tags yourself. Upgrade to Pro for AI recognition of objects and scenes.')
+      : L(dict, '已先保存为待确认图片线索。登录或 Lab 模式后可自动识别标签。', 'Saved as an unconfirmed image clue for now. Sign in or enable Lab mode for auto-tagging.'),
     nodes: [
       {
         type: 'object',
@@ -425,8 +431,9 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
       });
       if (Object.keys(similars).length > 0) setSimilarItems(similars);
     } catch (err: unknown) {
-      if (err instanceof AnalyzeImageError && err.code === 'ai_auth_required') {
-        const pending = buildPendingImageResult(dict);
+      if (err instanceof AnalyzeImageError && (err.code === 'ai_auth_required' || err.code === 'free_tier_local')) {
+        // 未登录 / 免费层:照片照样保存(待确认线索),不打云;文案分流(登录引导 vs Pro 升级)
+        const pending = buildPendingImageResult(dict, err.code === 'free_tier_local' ? 'free_tier' : 'auth');
         setResult(pending);
         setEditedNodes(toEditedNodes(pending.nodes));
         setIsReceipt(false);
@@ -465,6 +472,25 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
       // Non-image file: text analysis
       const text = await file.text().catch(() => file.name);
       setPhase('analyzing');
+      // 成本护栏:免费层文件不打云抽取 —— 确定性存档(文件名作标题 + 全文进 article,可读可搜)
+      if (!canUsePaidCloudAi()) {
+        const full = text.trim();
+        const fileAttrs: Record<string, string> = full.length >= 200 ? { article: full } : { note: full };
+        const fileResult = {
+          nodes: [{
+            type: 'preference' as const, name: (file.name || full.slice(0, 40)).slice(0, 60),
+            attributes: fileAttrs,
+            relations: [], tags: [L(dict, '文件', 'file')], confidence: 0.8, rawInput: full.slice(0, 200),
+            source: 'manual' as const,
+          }],
+          summary: L(dict, '文件已存档,可搜索可阅读。升级 Pro 可用 AI 提取要点。', 'File archived — searchable and readable. Upgrade to Pro for AI extraction.'),
+        };
+        setResult(fileResult);
+        setEditedNodes(toEditedNodes(fileResult.nodes));
+        setIsReceipt(false);
+        setPhase('result');
+        return;
+      }
       try {
         const res2 = await fetch('/api/portal/analyze', {
           method: 'POST',

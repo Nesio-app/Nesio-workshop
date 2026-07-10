@@ -15,6 +15,7 @@ import { updateLifeNode, type LifeNodeAsset } from '@/lib/portal/life-graph';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
+import { canUsePaidCloudAi } from '@/lib/portal/entitlement';
 import { usePortalLocale } from './use-portal-locale';
 import { NodeTypeIcon } from './icons';
 
@@ -111,10 +112,28 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
   }
 
   async function analyze(type: 'text' | 'file' | 'image', content: string, imageBase64?: string, mimeType?: string): Promise<boolean> {
-    // 纯链接 → 走文章抓取
+    // 纯链接 → 走文章抓取(确定性抓正文,不打 AI,免费层照走)
     if (type === 'text') {
       const urlMatch = content.trim().match(/^https?:\/\/\S+$/);
       if (urlMatch) return analyzeUrl(urlMatch[0]);
+    }
+    // 成本护栏:免费层分享不打云理解 —— 确定性存档:图片=待确认线索;文字=标题+全文
+    // (≥200字进 article 可读可搜)。分层未启用(当前 PWA)恒放行,不变。
+    if (!canUsePaidCloudAi()) {
+      if (type === 'image') { setParsed(buildPendingImageParsed()); return true; }
+      const full = content.trim();
+      setParsed({
+        title: full.slice(0, 40) || L(dict, '分享内容', 'Shared content'),
+        summary: L(dict, '已存档,可搜索可阅读。升级 Pro 可用 AI 自动整理要点。', 'Archived — searchable and readable. Upgrade to Pro for AI organizing.'),
+        intent: 'MEMORY_CAPTURE',
+        people: [],
+        nodes: [{
+          type: 'preference', name: full.slice(0, 40) || L(dict, '分享内容', 'Shared content'),
+          attributes: full.length >= 200 ? { article: full } : { note: full },
+          relations: [], tags: ['文章'], confidence: 0.8, rawInput: full.slice(0, 200),
+        }],
+      });
+      return true;
     }
     setAnalyzing(true); setError('');
     try {
