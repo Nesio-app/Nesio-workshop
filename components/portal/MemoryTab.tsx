@@ -39,7 +39,6 @@ import type { GNode, GEdge } from '@/lib/platform/graph-engine';
 import { DomainIcon, IconBox, IconCalendar, IconFolder, IconMapPin, IconUser, NodeTypeIcon, IconMap } from './icons';
 import { L, type DictLocale } from '@/lib/portal/i18n';
 import { displayNodeName } from '@/lib/portal/node-display';
-import { InfoTip } from './InfoTip';
 import { isPinned, loadPins, PINS_UPDATED_EVENT, togglePin } from '@/lib/portal/pins';
 import { usePortalLocale } from './use-portal-locale';
 
@@ -1174,21 +1173,16 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
             </button>
           )}
 
-          {/* Cloud sync status */}
-          {cloudSyncSummary.failedCount > 0 && (
+          {/* Cloud sync status —— 只对已登录用户显示,且默认安心措辞、绝不暴露裸计数。
+              匿名用户没有账号,同步不适用 → 什么都不显示(否则「N 待同步」吓人 + 暴露内部计数)。 */}
+          {canUsePrivateData && cloudSyncSummary.failedCount > 0 && (
             <div className="nesio-memory-sync-status">
-              {copy.syncFailed(cloudSyncSummary.failedCount)}
+              {L(dict, '部分记录还没同步到云端,联网后会自动重试。', "Some records aren't in the cloud yet — they'll retry automatically when you're online.")}
             </div>
           )}
-          {cloudSyncSummary.failedCount === 0 && cloudSyncSummary.pendingCount > 0 && (
+          {canUsePrivateData && cloudSyncSummary.failedCount === 0 && cloudSyncSummary.pendingCount > 0 && (
             <div className="nesio-memory-sync-status">
-              {copy.syncPending(cloudSyncSummary.pendingCount)}
-              <InfoTip text={L(dict, '这些记录已安全存在本机,还没备份到云端;登录且网络正常时会自动上传,不影响使用。', "These are safely stored on this device and not yet backed up to the cloud; they upload automatically when you're signed in and online.")} />
-            </div>
-          )}
-          {cloudSyncSummary.failedCount === 0 && cloudSyncSummary.pendingCount === 0 && cloudSyncSummary.syncedCount > 0 && (
-            <div className="nesio-memory-sync-status">
-              {copy.syncDone(cloudSyncSummary.syncedCount)}
+              {L(dict, '✓ 已保存在本机,联网后自动同步。', '✓ Saved on this device, syncs when online.')}
             </div>
           )}
 
