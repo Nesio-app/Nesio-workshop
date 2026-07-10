@@ -564,11 +564,20 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     let allOk = true;
     let reauth = false;
 
+    // 平台超时(504)回的是 HTML 不是 JSON —— 直接 res.json() 会炸进 catch,
+    // 用户只能看到笼统的「网络错误」。先安全解析,解析不动就把状态码如实带出。
+    const readJson = async <T,>(res: Response): Promise<T | null> => {
+      try { return JSON.parse(await res.text()) as T; } catch { return null; }
+    };
+
     // 日历
     try {
       const res = await fetch('/api/portal/calendar', { cache: 'no-store' });
-      const data = await res.json() as { ok?: boolean; events?: Array<Record<string, unknown>>; error?: string; message?: string };
-      if (data.ok && data.events?.length) {
+      const data = await readJson<{ ok?: boolean; events?: Array<Record<string, unknown>>; error?: string; message?: string }>(res);
+      if (!data) {
+        allOk = false;
+        parts.push(L(dict, `日历:服务器没接住(HTTP ${res.status}),稍等再点一次同步`, `Calendar: server hiccup (HTTP ${res.status}) — try again shortly`));
+      } else if (data.ok && data.events?.length) {
         const count = data.events.length;
         const { saveCalendarToLocal } = await import('@/lib/portal/calendar-local-store');
         saveCalendarToLocal(data.events as Parameters<typeof saveCalendarToLocal>[0]);
@@ -584,8 +593,11 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     // 邮件
     try {
       const res = await fetch('/api/portal/gmail?includeBody=true&analyze=true');
-      const data = await res.json() as { ok?: boolean; nodes?: NodeInput[]; error?: string; emailCount?: number; messages?: unknown[] };
-      if (data.ok) {
+      const data = await readJson<{ ok?: boolean; nodes?: NodeInput[]; error?: string; emailCount?: number; messages?: unknown[] }>(res);
+      if (!data) {
+        allOk = false;
+        parts.push(L(dict, `邮件:服务器没接住(HTTP ${res.status}),稍等再点一次同步`, `Mail: server hiccup (HTTP ${res.status}) — try again shortly`));
+      } else if (data.ok) {
         const nodeCount = data.nodes?.length ?? 0;
         if (nodeCount > 0) {
           data.nodes!.forEach((n) => ingestLifeNode({ ...n, source: 'email' } as NodeInput));

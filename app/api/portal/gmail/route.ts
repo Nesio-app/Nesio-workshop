@@ -17,7 +17,9 @@ import { completeText, aiProviderAvailable } from '@/lib/portal/ai-complete';
 import { envValue } from '@/lib/portal/env';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 30;
+// 全量同步 = 1 次列表 + 最多 100 封 full 拉取 + 一发大 prompt AI 提取,30s 顶得很紧;
+// 超时时 Vercel 回非 JSON 的 504,客户端只能报「网络错误」——给足余量。
+export const maxDuration = 60;
 
 const GMAIL_API = 'https://gmail.googleapis.com/gmail/v1';
 
@@ -363,7 +365,19 @@ export async function GET(req: NextRequest) {
   }, req);
 
   const shouldCreateSignals = includeBody && shouldAnalyze;
-  let nodes = shouldCreateSignals ? await extractNodes(messages) : [];
+  // AI 提取失败(配额 429/超时)不许炸掉整次同步 —— 未捕获会让路由回非 JSON 的
+  // 500,客户端只能报「网络错误」(间歇性:配额窗口偶尔放行)。捕获后走下面的
+  // 元数据兜底,邮件照样进记忆,AI 只是这一轮没帮上忙。
+  let nodes: object[] = [];
+  let aiExtractionFailed = false;
+  if (shouldCreateSignals) {
+    try {
+      nodes = await extractNodes(messages);
+    } catch (err) {
+      aiExtractionFailed = true;
+      console.error('[gmail] AI extraction failed, using metadata fallback:', err instanceof Error ? err.message : err);
+    }
+  }
 
   // Fallback: if AI extraction returned nothing (no Gemini key or all filtered),
   // create basic nodes directly from email metadata so LifeGraph always has data.
@@ -414,7 +428,7 @@ export async function GET(req: NextRequest) {
     includeBody,
     analyze: shouldAnalyze,
     bodyRead: includeBody,
-    aiAnalysisPerformed: includeBody && shouldAnalyze,
+    aiAnalysisPerformed: includeBody && shouldAnalyze && !aiExtractionFailed,
     messages: metadataPreview(messages),
     nodes,
     signalIds: signals.map((signal) => signal.id),
