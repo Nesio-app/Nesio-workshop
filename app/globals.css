@@ -7971,14 +7971,20 @@ html[data-portal-theme="night"] .nesio-insights-narrative { background: var(--po
   display: flex;
   /* P1-8:此前 flex:1 + nowrap + 0 横向 padding —— 英文标签(Footprints/Cognition…)
      比均分宽度长,nowrap 文本溢出叠进邻 tab("InsightsHealthFootprin…"粘连)。
-     改:自然宽度 + gap + 横向滚动,中英文都不叠。 */
-  gap: 0.9rem;
+     改:自然宽度 + gap + 横向滚动,中英文都不叠。
+     QA 回访:gap 0.9rem 让中文 6 tab 也溢出一屏,「认知」被推出屏外像被删了。
+     收紧 gap 让中文全放下;真溢出(英文)时右缘渐隐提示可滑。 */
+  gap: 0.55rem;
+  justify-content: space-between;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
   border-bottom: 1px solid var(--portal-line);
   margin-bottom: 0;
   flex-shrink: 0;
+  /* 右缘渐隐 = 「后面还有」的视觉提示;滚到底时 mask 仍在但内容已尽,无碍 */
+  mask-image: linear-gradient(90deg, #000 calc(100% - 18px), transparent);
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 18px), transparent);
 }
 .nesio-insights-main-tabs::-webkit-scrollbar { display: none; }
 .nesio-insights-main-tab {
