@@ -229,6 +229,8 @@ export default function Portal() {
     ReturnType<typeof parseDecShellRoutesFromModules>
   >(new Map());
   const [activeSurface, setActiveSurface] = useState<ActiveSurface>('today');
+  const [reliefBusy, setReliefBusy] = useState(false);
+  const [reliefMsg, setReliefMsg] = useState('');
   const [storageAlert, setStorageAlert] = useState<{ kind: 'full' | 'warning'; percent: number } | null>(null);
   const [captureMode, setCaptureMode] = useState<CaptureMode | null>(null);
 
@@ -935,10 +937,26 @@ export default function Portal() {
             }}
           >
             <span style={{ flex: 1 }}>
-              {storageAlert.kind === 'full'
+              {reliefMsg ? reliefMsg : storageAlert.kind === 'full'
                 ? L(dict, `本机空间紧张，新的记忆可能存不进来。先在设置里导出一份备份保底；登录后记忆会自动备份到云端并腾出本机空间。`, 'Local storage is tight — new memories may not save. Export a backup in Settings first; signing in backs memories up to the cloud and frees local space.')
                 : L(dict, `本机空间已用 ${storageAlert.percent}%。方便的时候导出一份备份，之后就不用惦记这件事了。`, `Local storage is ${storageAlert.percent}% used. Export a backup when convenient and stop worrying about it.`)}
             </span>
+            <button
+              type="button"
+              disabled={reliefBusy}
+              onClick={async () => {
+                setReliefBusy(true);
+                try {
+                  const { runStorageRelief } = await import('@/lib/portal/storage-relief');
+                  const r = await runStorageRelief();
+                  setReliefMsg(L(dict,
+                    `已腾出 ${Math.round(r.freedBytes / 1024)} KB(${r.percentBefore}% → ${r.percentAfter}%${r.dedupedContacts ? `,清理重复联系人 ${r.dedupedContacts} 个` : ''})`,
+                    `Freed ${Math.round(r.freedBytes / 1024)} KB (${r.percentBefore}% → ${r.percentAfter}%${r.dedupedContacts ? `, removed ${r.dedupedContacts} duplicate contacts` : ''})`));
+                  setTimeout(() => { setStorageAlert(null); setReliefMsg(''); }, 3500);
+                } finally { setReliefBusy(false); }
+              }}
+              style={{ flex: 'none', background: 'var(--status-risk)', color: '#fff', border: 'none', borderRadius: 999, padding: '0.3rem 0.7rem', fontSize: '0.74rem', fontWeight: 600, cursor: 'pointer', opacity: reliefBusy ? 0.6 : 1 }}
+            >{reliefBusy ? L(dict, '清理中…', 'Cleaning…') : L(dict, '一键腾空间', 'Free up space')}</button>
             <button
               type="button"
               onClick={() => setStorageAlert(null)}
