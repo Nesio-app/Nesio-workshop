@@ -37,7 +37,7 @@ import {
   resolveShellRuntimeTools,
   shouldShellOpenTool,
 } from '@/lib/portal/shell-runtime-resolver.mjs';
-import { loadModuleOverrides, MODULE_OVERRIDES_EVENT } from '@/lib/portal/module-overrides';
+import { applyLowSatTheme, loadModuleOverrides, MODULE_OVERRIDES_EVENT } from '@/lib/portal/module-overrides';
 import { buildPortalShellManifest } from '@/lib/portal/module-manifest';
 import {
   fetchDecModules,
@@ -555,6 +555,9 @@ export default function Portal() {
       window.removeEventListener(STORAGE_WARNING_EVENT, onWarning);
     };
   }, []);
+
+  // 批次 31:低饱和配色预览(Lab)—— 启动即按本机开关应用
+  useEffect(() => { applyLowSatTheme(); }, []);
 
   // Allow TodayFeed empty state / other surfaces to open Tell Nesio or capture directly
   useEffect(() => {

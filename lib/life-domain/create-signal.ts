@@ -77,7 +77,8 @@ function lifeNodeSource(source: SignalSource): LifeNodeSource {
 
 function lifeNodeType(input: CreateSignalInput): LifeNodeType {
   if (input.source === 'calendar' || input.type === 'event') return 'event';
-  if (input.source === 'task' || input.type === 'commitment' || String(input.type).startsWith('task.')) return 'commitment';
+  // 批次 31 QA:裸 'task'(说一句 growth 域)此前漏网落到 preference —— 「洗衣服」被拍成⭐偏好
+  if (input.source === 'task' || input.type === 'commitment' || input.type === 'task' || String(input.type).startsWith('task.')) return 'commitment';
   if (input.source === 'health' || String(input.type).startsWith('health.')) return 'health_state';
   if (String(input.type).includes('location')) return 'place';
   if (input.source === 'photo' || String(input.type).includes('object')) return 'object';

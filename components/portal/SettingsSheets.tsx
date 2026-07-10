@@ -17,7 +17,7 @@ import { deleteLifeNode, getLifeGraph } from '@/lib/portal/life-graph';
 import { purgeLocalData } from '@/lib/portal/storage-manifest';
 import { purgeIdbBlobs } from '@/lib/portal/idb-blob-store';
 import { purgeLocalImages } from '@/lib/portal/local-image-store';
-import { FEATURE_CATALOG, loadModuleOverrides, setModuleOverride, MODULE_OVERRIDES_EVENT, defaultResolvesTo, followsLab } from '@/lib/portal/module-overrides';
+import { FEATURE_CATALOG, loadModuleOverrides, setModuleOverride, MODULE_OVERRIDES_EVENT, defaultResolvesTo, followsLab, isLowSatThemeOn, setLowSatTheme } from '@/lib/portal/module-overrides';
 import { isAppStoreBuild } from '@/lib/portal/app-build.mjs';
 import { getTier, setProEntitlement, trialDaysLeft } from '@/lib/portal/entitlement';
 import { isValidBackup } from '@/lib/portal/full-backup';
@@ -293,6 +293,7 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
   const [restoreMsg, setRestoreMsg] = useState('');
   const [lastBackupAt, setLastBackupAt] = useState<string | null>(null);
   const [labOn, setLabOn] = useState(false);
+  const [lowSatOn, setLowSatOn] = useState(false);
   const [labMsg, setLabMsg] = useState<string | null>(null);
   const [proOn, setProOn] = useState(false); // Lab 内 Pro 测试解锁(正式版由 StoreKit 收据服务端校验写入)
   const [moduleOv, setModuleOv] = useState<Record<string, 'on' | 'off'>>({});
@@ -462,6 +463,7 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
     try {
       setLastBackupAt(localStorage.getItem('nesio-last-backup-at'));
       setLabOn(localStorage.getItem('baohe_personal_lab') === '1' || localStorage.getItem('baohe_lab_mode') === '1');
+      setLowSatOn(isLowSatThemeOn());
       setProOn(getTier() === 'pro');
     } catch { /* ignore */ }
     return () => window.removeEventListener('nesio-life-graph-updated', readCount);
@@ -685,6 +687,20 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
         </div>
         <span className={`nesio-settings-space-check${proOn ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>
           {proOn ? '✓' : '○'}
+        </span>
+      </button>
+
+      <button type="button"
+        className={`nesio-settings-option${lowSatOn ? ' nesio-settings-option--active' : ''}`}
+        onClick={() => { const next = !lowSatOn; setLowSatTheme(next); setLowSatOn(next); }}>
+        <div>
+          <span className="nesio-settings-option-label">{L(dict, `低饱和配色(预览)${lowSatOn ? '· 已开启' : ''}`, `Low-saturation palette (preview) ${lowSatOn ? '· on' : ''}`)}</span>
+          <span className="nesio-settings-option-hint">
+            {L(dict, '试穿新色卡:深灰蓝 / 柔青绿 / 浅雾蓝 / 鼠尾草绿 / 陶土橙。即时生效,关掉回默认蓝。', 'Try the new palette: slate blue / soft teal / misty blue / sage / terracotta. Applies instantly; turn off to restore the default blue.')}
+          </span>
+        </div>
+        <span className={`nesio-settings-space-check${lowSatOn ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>
+          {lowSatOn ? '✓' : '○'}
         </span>
       </button>
 

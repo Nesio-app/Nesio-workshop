@@ -63,6 +63,9 @@ export default function TodayFeed({
     dismissedCardIds, setDismissedCardIds,
   } = useTodayData(canUsePrivateData);
   const [mirrorOpen, setMirrorOpen] = useState(false);
+  // 批次 31:焦点下方快捷输入(用户新指令)
+  const [quickAdd, setQuickAdd] = useState('');
+  const [quickSaved, setQuickSaved] = useState(false);
   const [insightsTab, setInsightsTab] = useState<'reflection' | 'health'>('reflection');
 
   // 健身 routine 卡「开始练」→ 打开洞察的健康 tab(训练计划在那)
@@ -200,6 +203,45 @@ export default function TodayFeed({
           onFocusMode={(node) => setFocusModeNode(node)}
           onDeleteNode={(id) => deleteFocusNode(id)}
         />
+
+        {/* 批次 31(用户指令,回收 §1④ 的一部分):焦点下方快捷输入行 ——
+            只有输入功能:回车记下(像待办的进焦点),小话筒直达说一句。 */}
+        <form
+          className="nesio-focus-quick-add"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const name = quickAdd.trim();
+            if (!name) return;
+            addCommitmentNode(name);
+            setQuickAdd('');
+            setQuickSaved(true);
+            setTimeout(() => setQuickSaved(false), 1400);
+          }}
+        >
+          <input
+            className="nesio-focus-quick-input"
+            type="text"
+            placeholder={quickSaved ? L(uiLocale, '✓ 记下了', '✓ Noted') : L(uiLocale, '想到什么,记下来…', 'Anything on your mind…')}
+            value={quickAdd}
+            onChange={(e) => setQuickAdd(e.target.value)}
+          />
+          {quickAdd.trim() ? (
+            <button type="submit" className="nesio-focus-quick-btn">{L(uiLocale, '记下', 'Note it')}</button>
+          ) : (
+            <button
+              type="button"
+              className="nesio-focus-quick-mic"
+              aria-label={L(uiLocale, '语音输入', 'Voice input')}
+              onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-voice'))}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="18" height="18" aria-hidden>
+                <rect x="9" y="3" width="6" height="11" rx="3" />
+                <path d="M5 11a7 7 0 0 0 14 0" />
+                <line x1="12" y1="18" x2="12" y2="21" />
+              </svg>
+            </button>
+          )}
+        </form>
 
         {/* 实验打卡(批次 8:按用户要求放到最下面) */}
         <RoutineDueCards />

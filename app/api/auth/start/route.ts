@@ -210,7 +210,9 @@ export async function POST(req: NextRequest) {
         accountMode: authMode === 'register' ? 'create_or_sign_in' : 'sign_in_or_provider_match',
         auditId,
         action: 'redirect',
-        url: getSupabaseAuthorizeUrl('google', redirectTo),
+        // prompt=select_account:每次都弹 Google 账号选择器 —— 修「退出后想换账号,
+        // 点 Google 却自动进上一个账户」(GoTrue 会把额外参数转发给 provider)。
+        url: `${getSupabaseAuthorizeUrl('google', redirectTo)}&prompt=select_account`,
       });
     }
 

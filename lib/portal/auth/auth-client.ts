@@ -71,11 +71,14 @@ export async function importSupabaseHashSession(): Promise<AuthHashImportResult>
   const session = readSupabaseAuthHash(window.location.hash);
   if (!session) return { imported: false, ok: false };
 
+  let intent = '';
+  try { intent = localStorage.getItem('nesio-auth-intent-v1') || ''; localStorage.removeItem('nesio-auth-intent-v1'); } catch { /* ignore */ }
+
   try {
     const response = await fetch('/api/auth/import', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(session),
+      body: JSON.stringify({ ...session, intent }),
       cache: 'no-store',
     });
     const data = (await response.json().catch(() => null)) as {

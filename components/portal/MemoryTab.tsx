@@ -20,6 +20,7 @@ import {
   type LifeNode,
 } from '@/lib/portal/life-graph';
 import { DOMAINS } from '@/lib/life-domain';
+import { isFeatureEnabled } from '@/lib/portal/module-overrides';
 import { smartSearch, type SearchUnderstood } from '@/lib/portal/smart-search';
 import { semanticRerank } from '@/lib/portal/semantic-rerank';
 import { DEMO_SEED_NODES, isDemoNode } from '@/lib/portal/demo-seed';
@@ -1029,6 +1030,19 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                     ))}
                   </div>
                 </div>
+              )}
+
+              {/* 收纳入口(批次 31 从扇形菜单迁入:东西放哪了,属于记忆域) */}
+              {isFeatureEnabled('inventory') && (
+                <button
+                  type="button"
+                  className="nesio-memory-inventory-entry"
+                  onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-inventory'))}
+                >
+                  <IconBox size={16} />
+                  <span>{L(dict, '物品收纳 · 东西放哪了', 'Storage · where things live')}</span>
+                  <span aria-hidden>›</span>
+                </button>
               )}
 
               {/* My Projects */}

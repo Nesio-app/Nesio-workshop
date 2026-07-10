@@ -12,6 +12,10 @@ export default function AuthHashImportBridge() {
       const result = await importSupabaseHashSession();
       if (cancelled || !result.imported) return;
 
+      if (result.status === 'account_not_registered') {
+        window.location.replace('/login?reason=not_registered');
+        return;
+      }
       window.dispatchEvent(new CustomEvent('nesio-auth-session-imported', { detail: result }));
       if (result.ok && result.loggedIn) {
         window.dispatchEvent(new CustomEvent('nesio-auth-session-ready', { detail: result }));

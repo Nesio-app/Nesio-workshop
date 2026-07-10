@@ -300,25 +300,36 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
     if (!navigator.mediaDevices?.getUserMedia) { setPhase('no-camera'); return; }
     setPhase('live');
     await waitForVideoElement();
-    try {
-      const constraints: MediaStreamConstraints = {
-        video: {
-          facingMode: { ideal: facing },
-          width: { ideal: 1280 },
-          height: { ideal: 960 },
-        },
-        audio: false,
-      };
+
+    // iOS PWA(standalone)已知 bug:getUserMedia 流是活的(状态栏出相机指示,
+    // 用户误以为"开启了录屏")但 video 元素黑屏不上画。看门狗:先按理想约束试,
+    // videoWidth 迟迟为 0 → 换最简约束重试一次;仍黑 → 停流落到拍照/相册面板,
+    // 绝不留"黑屏 + 红点"给用户。
+    const attempt = async (constraints: MediaStreamConstraints): Promise<boolean> => {
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       streamRef.current = stream;
-      const attached = await attachStreamToVideo(stream);
-      if (!attached && streamRef.current === stream) {
-        window.setTimeout(() => {
-          if (streamRef.current === stream) {
-            void attachStreamToVideo(stream);
-          }
-        }, 120);
+      await attachStreamToVideo(stream);
+      const video = videoRef.current;
+      for (let i = 0; i < 10; i += 1) {
+        if (streamRef.current !== stream) return true; // 已被下一次调用接管
+        if (video && video.videoWidth > 0) return true;
+        await new Promise((r) => setTimeout(r, 120));
+        if (video) void attachStreamToVideo(stream);
       }
+      return Boolean(video && video.videoWidth > 0);
+    };
+
+    try {
+      const painting = await attempt({
+        video: { facingMode: { ideal: facing }, width: { ideal: 1280 }, height: { ideal: 960 } },
+        audio: false,
+      });
+      if (painting) return;
+      stopCamera();
+      const retryPainting = await attempt({ video: { facingMode: facing }, audio: false });
+      if (retryPainting) return;
+      stopCamera();
+      setPhase('no-camera'); // 黑屏兜底:给能用的按钮,别给死取景框
     } catch (err: unknown) {
       const name = err instanceof Error ? err.name : '';
       stopCamera();

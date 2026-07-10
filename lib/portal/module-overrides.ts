@@ -40,6 +40,23 @@ export const FEATURE_CATALOG: readonly FeatureEntry[] = Object.freeze([
 
 export const LAB_MODE_EVENT = 'nesio-lab-mode-updated';
 
+/** 批次 31:低饱和配色预览(Lab 试穿)。开 = html[data-lowsat=1],token 全站换装。 */
+const LOWSAT_KEY = 'nesio-theme-lowsat-v1';
+export function isLowSatThemeOn(): boolean {
+  if (typeof window === 'undefined') return false;
+  try { return localStorage.getItem(LOWSAT_KEY) === '1'; } catch { return false; }
+}
+export function setLowSatTheme(on: boolean): void {
+  if (typeof window === 'undefined') return;
+  try { localStorage.setItem(LOWSAT_KEY, on ? '1' : '0'); } catch { /* ignore */ }
+  applyLowSatTheme();
+}
+export function applyLowSatTheme(): void {
+  if (typeof document === 'undefined') return;
+  if (isLowSatThemeOn()) document.documentElement.setAttribute('data-lowsat', '1');
+  else document.documentElement.removeAttribute('data-lowsat');
+}
+
 /** Lab 模式(内测全解锁)是否开着。SSR 一律 false(= 公开面)。 */
 export function isLabModeOn(): boolean {
   if (typeof window === 'undefined') return false;

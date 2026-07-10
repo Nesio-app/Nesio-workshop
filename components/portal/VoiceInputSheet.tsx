@@ -25,6 +25,7 @@ import {
 import { routeIntent } from '@/lib/portal/intent-router';
 import { DomainIcon, IconBox, IconClock, IconMapPin, IconUser } from './icons';
 import { L } from '@/lib/portal/i18n';
+import { looksLikeTask } from '@/lib/portal/task-heuristics';
 import { loadProfileSettings, portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { canUsePaidCloudAi, isPro } from '@/lib/portal/entitlement';
 import { usePortalLocale } from './use-portal-locale';
@@ -495,9 +496,11 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
     if (d.recurring) extraPayload.recurring = d.recurring;
     if (d.priority) extraPayload.priority = d.priority;
 
+    // 批次 31:像待办的一律 task —— 「洗衣服下午」不再因无 domain 落成 preference
+    const taskLike = looksLikeTask(d.rawText) || looksLikeTask(d.title);
     createSignal({
       source: 'voice',
-      type: signalTypeForDomain(d.domain, hasPlaceOrObject),
+      type: taskLike ? 'task' : signalTypeForDomain(d.domain, hasPlaceOrObject),
       title: d.title,
       payload: { note: d.cleanText, ...extraPayload },
       confidence: d.aiConfidence,

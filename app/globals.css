@@ -4655,7 +4655,8 @@ html[data-portal-theme="night"] .nesio-bottom-nav-btn--active {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1rem 1.25rem 0.5rem;
+  /* 批次 31 QA:PWA standalone(viewport-fit=cover)整页上漂顶进状态栏 —— 补 safe-area */
+  padding: calc(1rem + env(safe-area-inset-top, 0px)) 1.25rem 0.5rem;
   flex-shrink: 0;
 }
 
@@ -5057,7 +5058,7 @@ html[data-portal-theme="night"] .nesio-today-btn--ghost {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden; /* 竖向滚动容器绝不横滚:堵住「页面漂移/超出屏幕」 */
-  padding: 0.5rem 1.1rem calc(5.5rem + env(safe-area-inset-bottom));
+  padding: calc(0.5rem + env(safe-area-inset-top, 0px)) 1.1rem calc(5.5rem + env(safe-area-inset-bottom));
   -webkit-overflow-scrolling: touch;
 }
 
@@ -14404,4 +14405,40 @@ html[data-portal-theme="night"] .nesio-exp-card:hover {
   line-height: 1.85;
   margin: 0;
   white-space: pre-wrap;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   批次 31 · 低饱和配色预览(用户提供的色卡,Lab 开关试穿)
+   #3A506B 深灰蓝 / #5BC0BE 柔青绿 / #CDEDF6 浅雾蓝 / #A8B59F 鼠尾草绿 / #C9A68B 陶土橙
+   只覆写 token,一处开关全站换装;关掉即回默认蓝。
+   ══════════════════════════════════════════════════════════════════ */
+html[data-lowsat="1"],
+html[data-lowsat="1"] .portal-root {
+  /* .portal-root 上有整套 token 的元素级再声明,必须一并压过 */
+  --portal-blue-deep: #3a506b;
+  --portal-blue-mid: #9fc3d4;
+  --portal-blue-light: #cdedf6;
+  --portal-bg-gradient:
+    radial-gradient(ellipse 85% 60% at 12% 0%, rgba(58, 80, 107, 0.20), transparent 55%),
+    radial-gradient(ellipse 70% 55% at 88% 6%, rgba(205, 237, 246, 0.65), transparent 50%),
+    linear-gradient(165deg, var(--portal-blue-light) 0%, var(--portal-blue-mid) 46%, var(--portal-blue-deep) 100%);
+  --portal-bg: #eef5f8;
+  --portal-line: rgba(58, 80, 107, 0.16);
+  --portal-cool: #e3eef3;
+  --portal-cool-accent: #3a506b;
+  --portal-warm: #eef3ee;
+  --portal-warm-accent: #52705e;
+  --portal-neutral: #e7edea;
+  --portal-neutral-accent: #a8b59f;
+  --portal-accent-soft: rgba(58, 80, 107, 0.10);
+  --portal-accent-soft-md: rgba(58, 80, 107, 0.18);
+  --portal-accent-soft-lg: rgba(58, 80, 107, 0.28);
+  --portal-accent-border: rgba(58, 80, 107, 0.25);
+  --status-go: #4c9a97;          /* 柔青绿(压深保对比度) */
+  --status-go-soft: #ddefee;
+  --status-gentle: #b08558;      /* 陶土橙(压深) */
+  --status-gentle-soft: #f0e5d8;
+  --status-calm: #a8b59f;        /* 鼠尾草绿 */
+  --status-calm-soft: #e9ede5;
+  --portal-muted: #5c6b78;
 }

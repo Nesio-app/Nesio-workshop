@@ -7,6 +7,7 @@ type SupabaseUserResponse = {
   id?: string;
   email?: string;
   phone?: string;
+  created_at?: string;
   app_metadata?: {
     provider?: string;
     providers?: string[];
@@ -105,6 +106,7 @@ export async function POST(req: NextRequest) {
     refreshToken?: unknown;
     expiresIn?: unknown;
     type?: unknown;
+    intent?: unknown;
   };
 
   try {
@@ -132,6 +134,19 @@ export async function POST(req: NextRequest) {
   const user = await fetchSupabaseUser(accessToken);
   if (!user?.id) {
     return safeJson({ ok: false, loggedIn: false, status: 'invalid_access_token' }, 401);
+  }
+
+  // 批次 31 QA:「登录」tab 走 Google/Apple,OAuth 对没注册过的账号也会静默建号 ——
+  // 用户要求:登录只认已注册账号,新账号提示先去注册。判据:意图=login + OAuth
+  // provider + 账号刚刚建立(created_at 在 10 分钟内 = 本次 OAuth 顺手创建的)。
+  // 不落 cookie,前端跳回登录页给「先创建账号」提示。
+  const intent = typeof body.intent === 'string' ? body.intent : '';
+  const oauthProvider = normalizeAuthProvider(user.app_metadata?.provider);
+  if (intent === 'login' && (oauthProvider === 'google' || oauthProvider === 'apple') && user.created_at) {
+    const ageMs = Date.now() - new Date(user.created_at).getTime();
+    if (Number.isFinite(ageMs) && ageMs >= 0 && ageMs < 10 * 60_000) {
+      return safeJson({ ok: false, loggedIn: false, status: 'account_not_registered', authProvider: oauthProvider });
+    }
   }
 
   const profileBootstrap = await bootstrapCloudAccountProfile(accessToken);

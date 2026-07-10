@@ -58,21 +58,30 @@ export default function LoginPageClient() {
 
   useEffect(() => {
     setLocale(loadProfileSettings().locale);
-    try { setReason(new URLSearchParams(window.location.search).get('reason') || ''); } catch { /* ignore */ }
+    try {
+      const q = new URLSearchParams(window.location.search).get('reason') || '';
+      setReason(q);
+      if (q === 'not_registered') setTab('register');
+    } catch { /* ignore */ }
   }, []);
 
   useEffect(() => {
     let cancelled = false;
     importSupabaseHashSession().then((result) => {
-      if (!cancelled && result.imported && result.ok) {
-        window.location.href = '/';
+      if (cancelled || !result.imported) return;
+      if (result.status === 'account_not_registered') {
+        setReason('not_registered');
+        setTab('register');
+        return;
       }
+      if (result.ok) window.location.href = '/';
     });
     return () => { cancelled = true; };
   }, []);
 
   async function handleGoogle() {
     setState('loading'); setError('');
+    try { localStorage.setItem('nesio-auth-intent-v1', tab); } catch { /* ignore */ }
     const r = await startAuth('google', tab);
     if (r.ok && r.url) { window.location.href = r.url; }
     else { setError(friendlyAuthError(r.error, zh)); setState('error'); }
@@ -80,6 +89,7 @@ export default function LoginPageClient() {
 
   async function handleApple() {
     setState('loading'); setError('');
+    try { localStorage.setItem('nesio-auth-intent-v1', tab); } catch { /* ignore */ }
     const r = await startAuth('apple', tab);
     if (r.ok && r.url) { window.location.href = r.url; }
     else { setError(friendlyAuthError(r.error, zh)); setState('error'); }
@@ -150,6 +160,11 @@ export default function LoginPageClient() {
               </button>
             </div>
 
+            {reason === 'not_registered' && (
+              <p className="nesio-ob-step-sub" style={{ textAlign: 'center', marginBottom: '0.75rem', color: 'var(--status-gentle, #c9923f)' }}>
+                {zh ? '这个 Google 账号还没注册过 Nesio。在下面用它「创建账号」即可。' : "This Google account isn't registered with Nesio yet. Use it to create an account below."}
+              </p>
+            )}
             {reason === 'connect_requires_account' && (
               <p className="nesio-ob-step-sub" style={{ textAlign: 'center', marginBottom: '0.75rem', color: 'var(--portal-accent, #588ce3)' }}>
                 {zh ? '连接邮箱 / 日历 / 银行等私有数据源,需要先登录账号。' : 'Connecting private sources (email, calendar, banks) requires an account.'}
