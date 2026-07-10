@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
-import { t } from '@/lib/portal/i18n';
+import { L, t } from '@/lib/portal/i18n';
 import {
   loadProfileSettings,
+  portalLocaleToDictionaryLocale,
   saveProfileSettings,
   type PortalLocale,
 } from '@/lib/portal/profile';
@@ -312,9 +313,14 @@ function AuthStep({ onDone, locale, displayName }: {
 
 export function FirstUseTips({ onDone, locale }: { onDone: () => void; locale: PortalLocale }) {
   const [step, setStep] = useState(0);
+  const dict = portalLocaleToDictionaryLocale(locale);
   const tips = [
     { emoji: '📋', title: t(locale, 'onboardingTipTodayTitle'), body: t(locale, 'onboardingTipTodayBody'), zone: 'today' as const },
+    // QA 新手引导补三招:粉碎任务 / 长按问一问 / 发送邮件
+    { emoji: '⚡', title: L(dict, '任务大?粉碎它', 'Big task? Shatter it'), body: L(dict, '今日焦点卡上点「拆一下」,把大事拆成 3 个立刻能动手的小步。', 'Tap "Break down" on a focus card — it splits into 3 steps you can start right now.'), zone: 'today' as const },
     { emoji: '💎', title: t(locale, 'onboardingTipCenterTitle'), body: t(locale, 'onboardingTipCenterBody'), zone: 'center' as const },
+    { emoji: '🔍', title: L(dict, '长按问一问', 'Hold to Ask'), body: L(dict, '长按中间按钮直接问:「护照放在哪」「上次买的药」,记过的都能找回。', 'Hold the center button and just ask: "Where is my passport?" — anything you noted comes back.'), zone: 'center' as const },
+    { emoji: '✉️', title: L(dict, '邮件直接回', 'Reply to email in place'), body: L(dict, '连接 Gmail 后,邮件记忆里点「回复」—— AI 起草,你过目、点发送。', 'Connect Gmail, then tap Reply on an email memory — AI drafts, you review and send.'), zone: 'memory' as const },
     { emoji: '🗂', title: t(locale, 'onboardingTipMemoryTitle'), body: t(locale, 'onboardingTipMemoryBody'), zone: 'memory' as const },
   ];
   const tip = tips[step];

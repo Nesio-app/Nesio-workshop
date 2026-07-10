@@ -94,6 +94,23 @@ export default function RoadmapSheet({ open, onClose }: { open: boolean; onClose
           <button type="button" className="nesio-voice-sheet-close" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}>✕</button>
         </div>
         <div className="nesio-settings-sheet-body">
+          {/* QA:投票 → 帮助与反馈。FAQ + 联系在前,功能投票保留在下方。 */}
+          <p className="nesio-settings-section-label">{L(dict, '常见问题', 'FAQ')}</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', fontSize: '0.82rem', lineHeight: 1.6, marginBottom: '0.9rem' }}>
+            {[
+              [L(dict, '不登录能用吗?', 'Does it work without an account?'), L(dict, '能。核心记录/搜索/回顾全部本地可用;登录只用于云同步和邮箱/日历连接。', 'Yes — capture, search, and review all work locally. Sign in only enables cloud sync and email/calendar.')],
+              [L(dict, '我的数据在哪?', 'Where is my data?'), L(dict, '默认只在你的设备上;登录并开同步后才备份到云端。设置→数据 可随时导出或删除。', 'On your device by default; backed up only after you sign in and enable sync. Export or delete anytime in Settings → Data.')],
+              [L(dict, 'AI 识别为什么要点按钮?', 'Why is AI a button?'), L(dict, '默认零等待零成本地先记下;想要 AI 自动识别再点「AI 识别」。Pro 自动执行。', 'Saving is instant and free by default; tap "AI recognize" when you want it. Pro runs it automatically.')],
+              [L(dict, '怎么联系你们?', 'How do I reach you?'), L(dict, '邮件 support@nesio.app,或直接在下面给功能投票留言。', 'Email support@nesio.app, or vote and comment on features below.')],
+            ].map(([q, a]) => (
+              <div key={q}>
+                <p style={{ margin: 0, fontWeight: 600, color: 'var(--portal-ink)' }}>{q}</p>
+                <p style={{ margin: '0.15rem 0 0', color: 'var(--portal-muted)' }}>{a}</p>
+              </div>
+            ))}
+          </div>
+
+          <p className="nesio-settings-section-label">{L(dict, '给未来功能投票', 'Vote on upcoming features')}</p>
           <p style={{ fontSize: '0.75rem', color: 'var(--portal-muted)', margin: '0 0 0.8rem' }}>
             {t(locale, 'roadmapHint')}
           </p>

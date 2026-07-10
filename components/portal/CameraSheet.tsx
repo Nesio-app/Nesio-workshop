@@ -351,11 +351,11 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
     setExtraTags('');
     setSourceFile(null);
 
-    // Native camera: opened by a user tap (iOS blocks programmatic file-input
-    // clicks outside a gesture). No getUserMedia → no persistent camera
-    // indicator, no black-screen retry loop, no permission roundabout.
-    // 扇形按钮已在同一手势里拍好照片 → 直接进识别流,不显示选择页。
+    // QA(用户定):打开即启动应用内取景框(getUserMedia live)—— 我们自己的 UI,
+    // 才能像原生相机一样在**左下角放相册入口**(web 调起的系统取景框不可定制)。
+    // getUserMedia 失败/无权限 → startCamera 自动落到 no-camera 选择页(拍照/相册按钮)。
     if (initialFile) void processFile(initialFile);
+    else void startCamera('environment');
     return () => {
       stopCamera();
     };
@@ -866,6 +866,26 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
             <span className="nesio-camera-corner nesio-camera-corner--tr"/>
             <span className="nesio-camera-corner nesio-camera-corner--bl"/>
             <span className="nesio-camera-corner nesio-camera-corner--br"/>
+          </div>
+        )}
+
+        {/* Live 取景控制:中央快门 + 左下角相册(和原生相机同位,QA 指定) */}
+        {phase === 'live' && (
+          <div style={{ position: 'absolute', bottom: 'calc(1.1rem + env(safe-area-inset-bottom, 0px))', left: 0, right: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+            <button
+              type="button"
+              onClick={handleGallery}
+              aria-label={L(dict, '从相册选', 'Photo library')}
+              style={{ pointerEvents: 'auto', position: 'absolute', left: '1.1rem', width: 46, height: 46, borderRadius: 10, border: '1px solid rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.1)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+            >
+              <IconImage size={20} />
+            </button>
+            <button
+              type="button"
+              onClick={capturePhoto}
+              aria-label={L(dict, '拍照', 'Shutter')}
+              style={{ pointerEvents: 'auto', width: 66, height: 66, borderRadius: '50%', border: '4px solid rgba(255,255,255,0.92)', background: 'rgba(255,255,255,0.25)', cursor: 'pointer' }}
+            />
           </div>
         )}
 

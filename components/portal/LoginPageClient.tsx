@@ -93,6 +93,32 @@ export default function LoginPageClient() {
     else { setError(friendlyAuthError(r.error, zh)); setState('error'); }
   }
 
+  // QA:「登录和注册功能一模一样」—— 邮箱此前只有魔法链接。补密码流:
+  // 注册=设密码建账号;登录=填密码直进。魔法链接保留作「忘记/无密码」备选。
+  const [password, setPassword] = useState('');
+  async function handlePassword() {
+    if (!email.trim() || !password) return;
+    setState('loading'); setError('');
+    try {
+      const res = await fetch('/api/auth/password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: tab, email: email.trim(), password }),
+      });
+      const data = await res.json() as { ok?: boolean; error?: string; needsEmailConfirm?: boolean };
+      if (data.ok && data.needsEmailConfirm) { setState('email_sent'); return; }
+      if (data.ok) { window.location.href = '/'; return; }
+      const msg = data.error === 'invalid_credentials'
+        ? (zh ? '邮箱或密码不对。忘了密码可以用下面的邮件链接登录。' : 'Wrong email or password. Forgot it? Use the email link below.')
+        : data.error === 'user_already_exists'
+          ? (zh ? '这个邮箱已经注册过,请切换到登录。' : 'This email already has an account — switch to sign in.')
+          : data.error === 'password_too_short'
+            ? (zh ? '密码至少 8 位。' : 'Password must be at least 8 characters.')
+            : friendlyAuthError(data.error, zh);
+      setError(msg); setState('error');
+    } catch { setError(friendlyAuthError('network', zh)); setState('error'); }
+  }
+
   return (
     <div className="nesio-login-root">
       <div className="nesio-login-bg" aria-hidden />
@@ -174,12 +200,32 @@ export default function LoginPageClient() {
               placeholder={zh ? '你的邮箱地址' : 'your@email.com'}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') handleEmail(); }}
               autoComplete="email"
             />
+            <input
+              type="password"
+              className="nesio-ob-input"
+              placeholder={tab === 'register' ? (zh ? '设置密码(至少 8 位)' : 'Set a password (8+ characters)') : (zh ? '密码' : 'Password')}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handlePassword(); }}
+              autoComplete={tab === 'register' ? 'new-password' : 'current-password'}
+            />
 
-            <button type="button" className="nesio-ob-primary-btn" onClick={handleEmail} disabled={state === 'loading' || !email.trim()}>
-              {state === 'loading' ? (zh ? '发送中…' : 'Sending…') : (zh ? `发送${tab === 'register' ? '注册' : '登录'}链接` : `Send ${tab === 'register' ? 'sign-up' : 'sign-in'} link`)}
+            <button type="button" className="nesio-ob-primary-btn" onClick={handlePassword} disabled={state === 'loading' || !email.trim() || !password}>
+              {state === 'loading'
+                ? (zh ? '请稍等…' : 'One moment…')
+                : tab === 'register' ? (zh ? '创建账号' : 'Create account') : (zh ? '登录' : 'Sign in')}
+            </button>
+
+            {/* 无密码备选:魔法链接(也兼作「忘记密码」的出路) */}
+            <button
+              type="button"
+              onClick={handleEmail}
+              disabled={state === 'loading' || !email.trim()}
+              style={{ width: '100%', marginTop: '0.5rem', background: 'none', border: 'none', color: 'var(--portal-muted, #8a94a6)', fontSize: '0.8rem', cursor: 'pointer', textDecoration: 'underline' }}
+            >
+              {zh ? (tab === 'register' ? '不设密码,用邮件链接注册' : '忘记密码?用邮件链接登录') : (tab === 'register' ? 'No password — sign up with an email link' : 'Forgot password? Sign in with an email link')}
             </button>
 
             {error && <p className="nesio-ob-error">{error}</p>}
@@ -203,6 +249,8 @@ export default function LoginPageClient() {
             </a>
 
             <p style={{ textAlign: 'center', marginTop: '1rem', fontSize: '0.75rem', color: 'var(--portal-muted, #8a94a6)' }}>
+              <a href="/terms" style={{ color: 'inherit' }}>{zh ? '服务条款' : 'Terms'}</a>
+              <span style={{ margin: '0 0.4rem' }}>·</span>
               <a href="/privacy" style={{ color: 'inherit' }}>{zh ? '隐私政策' : 'Privacy Policy'}</a>
               <span style={{ margin: '0 0.4rem' }}>·</span>
               <a href="/support" style={{ color: 'inherit' }}>{zh ? '支持' : 'Support'}</a>

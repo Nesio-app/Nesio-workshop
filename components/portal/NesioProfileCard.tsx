@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { clearProfileIdentity, loadProfileSettings, readAvatarFile, saveProfileSettings } from '@/lib/portal/profile';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
 import { useProfileAvatar } from './use-profile-avatar';
-import { GeneralSheet, DataSheet, PrivacySheet, SubscriptionSheet } from './SettingsSheets';
+import { AccountSheet, GeneralSheet, DataSheet, PrivacySheet, SubscriptionSheet } from './SettingsSheets';
 import ConnectorsHub from './ConnectorsHub';
 import RoadmapSheet from './RoadmapSheet';
 import RoutineSheet from './RoutineSheet';
@@ -14,7 +14,7 @@ import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import { IconDatabase, IconGear, IconStar as IconStarOutline, IconGift } from './icons';
 
-type ActiveSheet = 'mirror' | 'general' | 'data' | 'privacy' | 'subscription' | 'connectors' | 'roadmap' | 'routine' | null;
+type ActiveSheet = 'mirror' | 'account' | 'general' | 'data' | 'privacy' | 'subscription' | 'connectors' | 'roadmap' | 'routine' | null;
 
 export default function NesioProfileCard() {
   const [displayName, setDisplayName] = useState('Jessy');
@@ -83,6 +83,9 @@ export default function NesioProfileCard() {
   }
 
   const menuItems = [
+    { key: 'account' as ActiveSheet,
+      icon: <IconGear />,
+      iconBg: 'var(--chip-frost)', label: L(dict, '账户', 'Account'), sublabel: L(dict, '邮箱 · 密码 · 套餐 · 删除账号', 'Email · password · plan · delete') },
     { key: 'general' as ActiveSheet,
       icon: <IconGear />,
       iconBg: 'var(--chip-indigo)', label: t(locale, 'menuGeneral'), sublabel: t(locale, 'menuGeneralHint') },
@@ -91,13 +94,13 @@ export default function NesioProfileCard() {
       iconBg: 'var(--chip-green)', label: t(locale, 'menuData'), sublabel: t(locale, 'menuDataHint') },
     { key: 'subscription' as ActiveSheet,
       icon: <IconGift />,
-      iconBg: 'var(--chip-lemon)', label: t(locale, 'menuEarlyAccess'), sublabel: t(locale, 'menuEarlyAccessHint') },
+      iconBg: 'var(--chip-lemon)', label: L(dict, '会员与权益', 'Membership'), sublabel: L(dict, 'Pro 能做什么 · 21 天免费试用', 'What Pro unlocks · 21-day trial') },
     { key: 'routine' as ActiveSheet,
       icon: <IconClock />,
       iconBg: 'var(--chip-blue)', label: L(dict, '例行提醒', 'Routines'), sublabel: L(dict, '到点在 Today 出卡提醒', 'Due reminders appear on Today') },
     { key: 'roadmap' as ActiveSheet,
       icon: <IconStarOutline />,
-      iconBg: 'var(--chip-violet)', label: t(locale, 'menuRoadmap'), sublabel: t(locale, 'menuRoadmapHint') },
+      iconBg: 'var(--chip-violet)', label: L(dict, '帮助与反馈', 'Help & feedback'), sublabel: L(dict, '常见问题 · 联系我们 · 给功能投票', 'FAQ · contact · vote on features') },
   ];
 
   return (
@@ -162,6 +165,7 @@ export default function NesioProfileCard() {
       </div>
 
       {/* Sub-sheets */}
+      <AccountSheet open={activeSheet === 'account'} onClose={() => setActiveSheet(null)} onOpenPrivacy={() => setActiveSheet('privacy')} onOpenMembership={() => setActiveSheet('subscription')} />
       <GeneralSheet open={activeSheet === 'general'} onClose={() => setActiveSheet(null)} />
       <DataSheet open={activeSheet === 'data'} onClose={() => setActiveSheet(null)} onOpenMine={() => setActiveSheet('privacy')} onOpenConnect={() => setActiveSheet('connectors')} />
       <PrivacySheet open={activeSheet === 'privacy'} onClose={() => setActiveSheet(null)} />

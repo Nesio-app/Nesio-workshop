@@ -19,7 +19,7 @@ import { purgeIdbBlobs } from '@/lib/portal/idb-blob-store';
 import { purgeLocalImages } from '@/lib/portal/local-image-store';
 import { FEATURE_CATALOG, loadModuleOverrides, setModuleOverride, MODULE_OVERRIDES_EVENT } from '@/lib/portal/module-overrides';
 import { isAppStoreBuild } from '@/lib/portal/app-build.mjs';
-import { getTier, setProEntitlement } from '@/lib/portal/entitlement';
+import { getTier, setProEntitlement, trialDaysLeft } from '@/lib/portal/entitlement';
 import { isValidBackup } from '@/lib/portal/full-backup';
 import { buildCombinedBackup, pushBackupToCloud, pullBackupFromCloud, restoreCombinedBackup, hasCloudEntitlement, lastCloudBackup, type CloudBackupError, type CloudRestoreError } from '@/lib/portal/cloud-backup';
 
@@ -742,9 +742,11 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
 
 const PLAN_NOTIFY_KEY = 'nesio-plan-notify-optin-v1';
 
+// 定价占位(周/月/年):真实价格以 App 内购页为准;家庭版已按上架决策删除。
 const PLAN_PREVIEWS = [
-  { id: 'pro', name: 'Nesio Pro', nameEn: 'Nesio Pro', price: '¥18', cycle: '/ 月', cycleEn: '/ mo', desc: '跨设备同步 · 主动提醒 · AI 洞察报告', descEn: 'Cross-device sync · proactive reminders · AI insight reports' },
-  { id: 'family', name: '家庭版', nameEn: 'Family', price: '¥38', cycle: '/ 月', cycleEn: '/ mo', desc: '最多 5 人共享 · 家人动态 · 自动化动作', descEn: 'Up to 5 people · family updates · automated actions' },
+  { id: 'weekly', name: 'Pro · 按周', nameEn: 'Pro · Weekly', price: '¥6', cycle: '/ 周', cycleEn: '/ wk', desc: '想先试试的轻量选择', descEn: 'A light way to try it out' },
+  { id: 'monthly', name: 'Pro · 按月', nameEn: 'Pro · Monthly', price: '¥15', cycle: '/ 月', cycleEn: '/ mo', desc: '最灵活', descEn: 'Most flexible' },
+  { id: 'yearly', name: 'Pro · 按年', nameEn: 'Pro · Yearly', price: '¥99', cycle: '/ 年', cycleEn: '/ yr', desc: '相当于 ¥8.25/月,最划算', descEn: '≈ ¥8.25/mo — best value' },
 ];
 
 export function SubscriptionSheet({ open, onClose }: SheetProps) {
@@ -774,11 +776,46 @@ export function SubscriptionSheet({ open, onClose }: SheetProps) {
   }
 
   return (
-    <SheetWrap open={open} onClose={onClose} title={t(locale, 'subTitle')}>
-      <div className="nesio-sub-status-card">
-        <div className="nesio-sub-status-badge nesio-sub-status-badge--free">{t(locale, 'subBadgeFree')}</div>
-        <p className="nesio-sub-status-title">{t(locale, 'subFreeTitle')}</p>
-        <p className="nesio-sub-status-desc">{t(locale, 'subFreeDesc')}</p>
+    <SheetWrap open={open} onClose={onClose} title={L(dict, '会员与权益', 'Membership')}>
+      {(() => {
+        const days = trialDaysLeft();
+        const pro = getTier() === 'pro' && days <= 0; // 真 Pro(非试用)
+        return (
+          <div className="nesio-sub-status-card">
+            <div className="nesio-sub-status-badge nesio-sub-status-badge--free">
+              {pro ? 'PRO' : days > 0 ? L(dict, `免费试用 · 剩 ${days} 天`, `Free trial · ${days}d left`) : t(locale, 'subBadgeFree')}
+            </div>
+            <p className="nesio-sub-status-title">
+              {days > 0
+                ? L(dict, '前 21 天全功能免费', 'First 21 days, everything unlocked')
+                : t(locale, 'subFreeTitle')}
+            </p>
+            <p className="nesio-sub-status-desc">
+              {days > 0
+                ? L(dict, '3 周,刚好养成一个记录的好习惯。试用结束自动回到免费版,不扣费。', 'Three weeks — just long enough to build a note-taking habit. Afterwards you return to Free; nothing is charged.')
+                : t(locale, 'subFreeDesc')}
+            </p>
+          </div>
+        );
+      })()}
+
+      {/* Pro 权益清单(会员权益介绍) */}
+      <p className="nesio-settings-section-label" style={{ marginTop: '1.1rem' }}>{L(dict, 'Pro 能做什么', 'What Pro unlocks')}</p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.85rem', lineHeight: 1.6 }}>
+        {[
+          L(dict, 'AI 自动识别与整理(拍照 / 分享 / 文件)', 'AI recognition & organizing (photos / shares / files)'),
+          L(dict, '问一问深度回答(对话式检索)', 'Deep conversational answers in Ask'),
+          L(dict, 'AI 例程与日程建议', 'AI routines and schedule suggestions'),
+          L(dict, '邮件直接回复(AI 起草,你点发送)', 'Direct email replies (AI drafts, you send)'),
+          L(dict, '冷冻仓(冲动购买冷静期)', 'Freeze Vault (cooling-off for impulse buys)'),
+        ].map((b) => (
+          <div key={b} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+            <span style={{ color: 'var(--status-go)', flexShrink: 0 }}>✓</span><span>{b}</span>
+          </div>
+        ))}
+        <p style={{ fontSize: '0.75rem', color: 'var(--portal-muted)', margin: '0.35rem 0 0' }}>
+          {L(dict, '记录、搜索、手动标签永久免费。', 'Capturing, search, and manual tags stay free forever.')}
+        </p>
       </div>
 
       <p className="nesio-settings-section-label" style={{ marginTop: '1.1rem' }}>{t(locale, 'subFuturePlans')}</p>
@@ -800,6 +837,117 @@ export function SubscriptionSheet({ open, onClose }: SheetProps) {
       <button type="button" className="nesio-ob-primary-btn" style={{ marginTop: '1.2rem' }} onClick={optIn} disabled={notified}>
         {notified ? `✓ ${t(locale, 'subNotifyDone')}` : t(locale, 'subNotify')}
       </button>
+      <p style={{ fontSize: '0.72rem', color: 'var(--portal-muted)', textAlign: 'center', marginTop: '0.8rem' }}>
+        {L(dict, '付费随 App 版内购开放,价格以内购页为准。', 'Purchases open with the App Store version; in-app prices apply.')}
+        <br />
+        <a href="/terms" style={{ color: 'inherit' }}>{L(dict, '服务条款(含自动续费说明)', 'Terms (incl. auto-renewal)')}</a>
+        {' · '}
+        <a href="/privacy" style={{ color: 'inherit' }}>{L(dict, '隐私政策', 'Privacy Policy')}</a>
+      </p>
+    </SheetWrap>
+  );
+}
+
+/**
+ * AccountSheet — 账户管理页(QA:此前账号信息散落)。邮箱 / 套餐 / 修改密码 /
+ * 恢复购买(随 App 版开放)/ 删除账号(转隐私面板)/ 退出登录。
+ */
+export function AccountSheet({ open, onClose, onOpenPrivacy, onOpenMembership }: SheetProps & { onOpenPrivacy: () => void; onOpenMembership: () => void }) {
+  const locale = usePortalLocale();
+  const dict = portalLocaleToDictionaryLocale(locale);
+  const [email, setEmail] = useState('');
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [newPw, setNewPw] = useState('');
+  const [pwMsg, setPwMsg] = useState('');
+  const [pwBusy, setPwBusy] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    fetch('/api/auth/session', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((d: { loggedIn?: boolean; user?: { email?: string } }) => {
+        setLoggedIn(Boolean(d?.loggedIn));
+        setEmail(d?.user?.email || '');
+      })
+      .catch(() => {});
+  }, [open]);
+
+  async function changePassword() {
+    if (newPw.length < 8 || pwBusy) { setPwMsg(L(dict, '密码至少 8 位。', 'At least 8 characters.')); return; }
+    setPwBusy(true); setPwMsg('');
+    try {
+      const res = await fetch('/api/auth/password', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'change', newPassword: newPw }),
+      });
+      const data = await res.json() as { ok?: boolean; error?: string };
+      if (data.ok) { setPwMsg(L(dict, '✓ 密码已更新', '✓ Password updated')); setNewPw(''); }
+      else if (data.error === 'reauth_required') setPwMsg(L(dict, '登录状态过期了,请重新登录后再改。', 'Session expired — sign in again to change it.'));
+      else setPwMsg(L(dict, '没改成,稍后再试。', 'Could not change it — try again later.'));
+    } catch { setPwMsg(L(dict, '网络错误,稍后再试。', 'Network error — try again later.')); }
+    setPwBusy(false);
+  }
+
+  async function signOut() {
+    await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
+    window.location.href = '/';
+  }
+
+  const days = trialDaysLeft();
+  const tierLabel = getTier() === 'pro'
+    ? (days > 0 ? L(dict, `试用中 · 剩 ${days} 天`, `Trial · ${days}d left`) : 'Pro')
+    : L(dict, '免费版', 'Free');
+  const rowStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.7rem 0', borderBottom: '1px solid var(--portal-line)', fontSize: '0.9rem' };
+
+  return (
+    <SheetWrap open={open} onClose={onClose} title={L(dict, '账户', 'Account')}>
+      {!loggedIn ? (
+        <>
+          <p style={{ fontSize: '0.88rem', color: 'var(--portal-muted)', lineHeight: 1.6 }}>
+            {L(dict, '还没登录。登录后可跨设备同步、连接邮箱/日历。', 'Not signed in. Sign in to sync across devices and connect email/calendar.')}
+          </p>
+          <a href="/login" className="nesio-ob-primary-btn" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', marginTop: '0.8rem' }}>
+            {L(dict, '去登录', 'Sign in')}
+          </a>
+        </>
+      ) : (
+        <>
+          <div style={rowStyle}><span style={{ color: 'var(--portal-muted)' }}>{L(dict, '邮箱', 'E-mail')}</span><span>{email || '—'}</span></div>
+          <button type="button" onClick={onOpenMembership} style={{ ...rowStyle, width: '100%', background: 'none', border: 'none', borderBottom: '1px solid var(--portal-line)', color: 'inherit', cursor: 'pointer', textAlign: 'left' }}>
+            <span style={{ color: 'var(--portal-muted)' }}>{L(dict, '套餐', 'Plan')}</span>
+            <span>{tierLabel} ›</span>
+          </button>
+
+          <p className="nesio-settings-section-label" style={{ marginTop: '1.2rem' }}>{L(dict, '修改密码', 'Change password')}</p>
+          <input
+            type="password"
+            className="nesio-ob-input"
+            placeholder={L(dict, '新密码(至少 8 位)', 'New password (8+ characters)')}
+            value={newPw}
+            onChange={(e) => setNewPw(e.target.value)}
+            autoComplete="new-password"
+          />
+          <button type="button" className="nesio-ob-primary-btn" style={{ marginTop: '0.5rem' }} onClick={changePassword} disabled={pwBusy || newPw.length < 8}>
+            {pwBusy ? L(dict, '更新中…', 'Updating…') : L(dict, '更新密码', 'Update password')}
+          </button>
+          {pwMsg && <p style={{ fontSize: '0.78rem', color: 'var(--portal-muted)', marginTop: '0.4rem' }}>{pwMsg}</p>}
+
+          <p className="nesio-settings-section-label" style={{ marginTop: '1.2rem' }}>{L(dict, '购买', 'Purchases')}</p>
+          {/* 随 App 版 StoreKit 开放;disabled={true} 满足 no-inert-buttons 契约的显式禁用标注 */}
+          <button type="button" disabled={true} style={{ ...rowStyle, width: '100%', background: 'none', border: 'none', color: 'var(--portal-muted)', cursor: 'default', textAlign: 'left' }}>
+            <span>{L(dict, '恢复购买', 'Restore purchase')}</span>
+            <span style={{ fontSize: '0.72rem' }}>{L(dict, '随 App 版开放', 'Coming with the App version')}</span>
+          </button>
+
+          <p className="nesio-settings-section-label" style={{ marginTop: '1.2rem' }}>{L(dict, '危险区', 'Danger zone')}</p>
+          <button type="button" onClick={onOpenPrivacy} style={{ ...rowStyle, width: '100%', background: 'none', border: 'none', color: 'var(--status-risk)', cursor: 'pointer', textAlign: 'left' }}>
+            <span>{L(dict, '删除账号与数据…', 'Delete account & data…')}</span><span>›</span>
+          </button>
+          <button type="button" onClick={signOut} style={{ ...rowStyle, width: '100%', background: 'none', border: 'none', borderBottom: 'none', color: 'var(--status-risk)', cursor: 'pointer', textAlign: 'left' }}>
+            <span>{L(dict, '退出登录', 'Sign out')}</span>
+          </button>
+        </>
+      )}
     </SheetWrap>
   );
 }

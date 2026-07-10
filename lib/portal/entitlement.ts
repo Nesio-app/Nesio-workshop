@@ -44,11 +44,40 @@ export type ProFeature = typeof PRO_FEATURES[number];
 export const PRO_ONLY_FEATURES = Object.freeze(['ai_routine', 'email_reply', 'freeze'] as const);
 
 const PRO_KEY = 'nesio-pro-entitlement-v1';
+const TRIAL_START_KEY = 'nesio-trial-start-v1';
 export const TIER_UPDATED_EVENT = 'nesio-tier-updated';
+
+/** 免费试用期:21 天(3 周)—— 产品文案:刚好养成一个记录的好习惯。 */
+export const TRIAL_DAYS = 21;
+
+/** 首次调用时落试用起点(设备级;将来接账号后迁到服务端,防重装重置)。 */
+function trialStartMs(): number {
+  if (typeof window === 'undefined') return 0;
+  try {
+    const raw = localStorage.getItem(TRIAL_START_KEY);
+    if (raw) { const v = Number(raw); if (Number.isFinite(v) && v > 0) return v; }
+    const now = Date.now();
+    localStorage.setItem(TRIAL_START_KEY, String(now));
+    return now;
+  } catch { return 0; }
+}
+
+/** 试用剩余天数(0 = 已结束;分层未启用时仅用于展示)。 */
+export function trialDaysLeft(): number {
+  const start = trialStartMs();
+  if (!start) return 0;
+  const used = (Date.now() - start) / 86_400_000;
+  return Math.max(0, Math.ceil(TRIAL_DAYS - used));
+}
 
 export function getTier(): Tier {
   if (typeof window === 'undefined') return 'free';
-  try { return localStorage.getItem(PRO_KEY) === '1' ? 'pro' : 'free'; } catch { return 'free'; }
+  try {
+    if (localStorage.getItem(PRO_KEY) === '1') return 'pro';
+    // 试用期内按 Pro 对待(分层启用后生效;PWA 分层未启用本就全放行,无感)
+    if (trialDaysLeft() > 0) return 'pro';
+    return 'free';
+  } catch { return 'free'; }
 }
 
 export function isPro(): boolean {
