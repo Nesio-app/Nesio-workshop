@@ -25,6 +25,7 @@ Auth legend:
 | POST /api/portal/daily-brief | guard | 15/min |
 | POST /api/portal/guidance-language | guard | 20/min |
 | POST /api/portal/living-model | guard | 10/min |
+| POST /api/portal/mirror-letter | guard | 6/min |
 | POST /api/portal/insights | guard | 15/min |
 | POST /api/portal/proactive | guard | 20/min |
 | POST /api/portal/decompose-task | guard | 20/min |
