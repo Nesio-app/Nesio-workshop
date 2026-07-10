@@ -224,7 +224,12 @@ async function fetchGoogleOAuthEvents(accessToken: string) {
     },
     cache: 'no-store',
   });
-  if (!res.ok) throw new Error(`google calendar fetch failed: ${res.status}`);
+  if (!res.ok) {
+    // 批次 41:把 Google 的真实拒绝原因带出来(403 常见于 GCP 项目没启用 Calendar API)
+    const body = await res.json().catch(() => null) as { error?: { message?: string; status?: string } } | null;
+    const reason = body?.error?.status || body?.error?.message?.slice(0, 120) || '';
+    throw new Error(`calendar_http_${res.status}${reason ? `: ${reason}` : ''}`);
+  }
   const data = await res.json().catch(() => ({}));
   const rows = Array.isArray(data?.items) ? data.items : [];
   return rows.map((item: GoogleCalendarItem) => mapGoogleCalendarItem(item));
@@ -233,6 +238,7 @@ async function fetchGoogleOAuthEvents(accessToken: string) {
 export async function GET(req: NextRequest) {
   const authFailure = await requireAuthenticatedCalendarAccess(req);
   if (authFailure) return authFailure;
+  let lastOAuthError = '';
 
   let { accessToken, refreshToken } = await resolveCalendarTokens();
   // 批次 35 根因:合并授权(Google 日历+Gmail)是同一个 token,通讯录/邮件走
@@ -261,6 +267,7 @@ export async function GET(req: NextRequest) {
         { headers: { 'Cache-Control': 'no-store, max-age=0' } },
       );
     } catch (err) {
+      lastOAuthError = err instanceof Error ? err.message : String(err);
       const refreshedSession = await refreshGoogleCalendarSession(refreshToken);
       if (refreshedSession?.access_token) {
         try {
@@ -311,7 +318,7 @@ export async function GET(req: NextRequest) {
             },
             { headers: { 'Cache-Control': 'no-store, max-age=0' } },
           );
-        } catch { /* borrowed token also failed — fall to iCal below */ }
+        } catch (err2) { lastOAuthError = err2 instanceof Error ? err2.message : String(err2); /* fall to iCal below */ }
       }
       // OAuth failed — fall through to iCal subscription URL fallback below.
       // Do NOT return here; let the iCal path run so existing subscriptions still work.
@@ -328,7 +335,9 @@ export async function GET(req: NextRequest) {
       enabled,
       events: [],
       feeds: [],
-      message: 'Connect Google Calendar to sync your events.',
+      message: lastOAuthError
+        ? `日历接口被拒:${lastOAuthError} —— 若含 403/PERMISSION_DENIED,多半是 Google Cloud 项目没启用 Calendar API(console.cloud.google.com → API 库 → Google Calendar API → 启用)。`
+        : 'Connect Google Calendar to sync your events.',
     });
   }
 
