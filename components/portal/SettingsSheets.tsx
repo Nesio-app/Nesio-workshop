@@ -19,6 +19,7 @@ import { purgeIdbBlobs } from '@/lib/portal/idb-blob-store';
 import { purgeLocalImages } from '@/lib/portal/local-image-store';
 import { FEATURE_CATALOG, loadModuleOverrides, setModuleOverride, MODULE_OVERRIDES_EVENT } from '@/lib/portal/module-overrides';
 import { isAppStoreBuild } from '@/lib/portal/app-build.mjs';
+import { getTier, setProEntitlement } from '@/lib/portal/entitlement';
 import { isValidBackup } from '@/lib/portal/full-backup';
 import { buildCombinedBackup, pushBackupToCloud, pullBackupFromCloud, restoreCombinedBackup, hasCloudEntitlement, lastCloudBackup, type CloudBackupError, type CloudRestoreError } from '@/lib/portal/cloud-backup';
 
@@ -293,6 +294,7 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
   const [lastBackupAt, setLastBackupAt] = useState<string | null>(null);
   const [labOn, setLabOn] = useState(false);
   const [labMsg, setLabMsg] = useState<string | null>(null);
+  const [proOn, setProOn] = useState(false); // Lab 内 Pro 测试解锁(正式版由 StoreKit 收据服务端校验写入)
   const [moduleOv, setModuleOv] = useState<Record<string, 'on' | 'off'>>({});
   const importRef = useRef<HTMLInputElement>(null);
   // 云备份(付费,规划中):状态机 idle→pushing→done/error,失败必可见(设计红线)。
@@ -460,6 +462,7 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
     try {
       setLastBackupAt(localStorage.getItem('nesio-last-backup-at'));
       setLabOn(localStorage.getItem('baohe_personal_lab') === '1' || localStorage.getItem('baohe_lab_mode') === '1');
+      setProOn(getTier() === 'pro');
     } catch { /* ignore */ }
     return () => window.removeEventListener('nesio-life-graph-updated', readCount);
   }, [open]);
@@ -668,6 +671,20 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
         </div>
         <span className={`nesio-settings-space-check${labOn ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>
           {labOn ? '✓' : '○'}
+        </span>
+      </button>
+
+      <button type="button"
+        className={`nesio-settings-option${proOn ? ' nesio-settings-option--active' : ''}`}
+        onClick={() => { const next = !proOn; setProEntitlement(next); setProOn(next); }}>
+        <div>
+          <span className="nesio-settings-option-label">{L(dict, `Pro 解锁(测试)${proOn ? '· 已开启' : ''}`, `Unlock Pro (testing) ${proOn ? '· on' : ''}`)}</span>
+          <span className="nesio-settings-option-hint">
+            {L(dict, '仅供测试:本机置为 Pro,解锁冷冻仓等 Pro 功能。正式版由 App 内购买 + 服务端校验决定,本开关不影响线上用户。', 'Testing only: mark this device as Pro to unlock Freeze Vault etc. Real Pro comes from in-app purchase + server verification; this switch does not affect production users.')}
+          </span>
+        </div>
+        <span className={`nesio-settings-space-check${proOn ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>
+          {proOn ? '✓' : '○'}
         </span>
       </button>
 

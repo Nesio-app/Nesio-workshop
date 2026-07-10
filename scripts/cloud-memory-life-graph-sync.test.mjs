@@ -120,15 +120,22 @@ assert.match(
   /const onSyncUpdate = \(\) => setCloudSyncSummary\(getLifeGraphCloudSyncSummary\(\)\)/,
   'MemoryTab must refresh visible cloud sync summary when cloud sync status changes.',
 );
+// P0(信任):同步状态只对已登录用户显示,且**绝不暴露裸计数**(「1565 waiting to sync」吓人 +
+// 暴露内部信号计数)。失败仍要如实浮出(不藏后端故障),但措辞安心、且仅签入用户可见。
 assert.match(
   memoryTab,
-  /cloudSyncSummary\.failedCount > 0[\s\S]*copy\.syncFailed\(cloudSyncSummary\.failedCount\)/,
-  'MemoryTab must surface failed cloud Memory sync instead of hiding backend failures.',
+  /canUsePrivateData && cloudSyncSummary\.failedCount > 0/,
+  'MemoryTab must surface failed cloud Memory sync (signed-in only) instead of hiding backend failures.',
 );
 assert.match(
   memoryTab,
-  /cloudSyncSummary\.pendingCount > 0[\s\S]*copy\.syncPending\(cloudSyncSummary\.pendingCount\)/,
-  'MemoryTab must surface pending local-first Memory sync while offline or retrying.',
+  /canUsePrivateData && cloudSyncSummary\.failedCount === 0 && cloudSyncSummary\.pendingCount > 0/,
+  'MemoryTab must reassure (signed-in only) on pending local-first Memory sync, not scare with a raw count.',
+);
+assert.ok(
+  !/\{copy\.syncPending\(cloudSyncSummary\.pendingCount\)\}/.test(memoryTab) &&
+    !/\{copy\.syncFailed\(cloudSyncSummary\.failedCount\)\}/.test(memoryTab),
+  'MemoryTab must NOT render raw cloud-sync counts to users (internal counter; the scary "N waiting to sync").',
 );
 
 assert.match(

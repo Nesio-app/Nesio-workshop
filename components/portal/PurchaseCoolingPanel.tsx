@@ -15,6 +15,16 @@ import { IconSnowflake } from './icons';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
+import { canUse } from '@/lib/portal/entitlement';
+
+// 冷冻仓 = 整功能 Pro:免费/匿名打开 → 走 Portal 的升级引导,不直接开。
+function openFreezeVault(setOpen: (v: boolean) => void): void {
+  if (!canUse('freeze')) {
+    window.dispatchEvent(new CustomEvent('nesio-pro-gate', { detail: { feature: 'freeze' } }));
+    return;
+  }
+  setOpen(true);
+}
 
 const FreezeVaultSheet = dynamic(() => import('./FreezeVaultSheet'), { ssr: false });
 const BarcodeScanSheet = dynamic(() => import('./BarcodeScanSheet'), { ssr: false });
@@ -70,6 +80,11 @@ export function PurchaseCoolingPanel({ productName, similarCount, similarExample
   persuasion.push(L(dict, '冻 24 小时,明天还想要就买,大多数冲动过一晚就凉了。', 'Freeze it 24 hours. If you still want it tomorrow, buy it — most impulses cool overnight.'));
 
   function freeze() {
+    // 「冻 24 小时」= 冷冻仓写入,整功能 Pro:免费/匿名 → 升级引导,不真冻。
+    if (!canUse('freeze')) {
+      window.dispatchEvent(new CustomEvent('nesio-pro-gate', { detail: { feature: 'freeze' } }));
+      return;
+    }
     addToFreeze({ url: '', title: productName, price: price ? `¥${price}` : undefined, freezeHours: 24 });
     track('impulse_persuaded', { via: 'camera', frozen: true });
     setDecided('frozen');
@@ -83,7 +98,7 @@ export function PurchaseCoolingPanel({ productName, similarCount, similarExample
     return (
       <div className="nesio-cooling-panel">
         <p className="nesio-cooling-done">{L(dict, `已冻住「${productName.slice(0, 18)}」24 小时。解冻时 Today 会提醒你做决定。`, `"${productName.slice(0, 18)}" frozen for 24h. Today will remind you when it thaws.`)}</p>
-        <button type="button" className="nesio-cooling-link" onClick={() => setVaultOpen(true)}>{L(dict, '查看冷冻清单', 'View freeze list')}</button>
+        <button type="button" className="nesio-cooling-link" onClick={() => openFreezeVault(setVaultOpen)}>{L(dict, '查看冷冻清单', 'View freeze list')}</button>
         <FreezeVaultSheet open={vaultOpen} onClose={() => setVaultOpen(false)} />
       </div>
     );
@@ -166,7 +181,7 @@ export function PurchaseCoolingPanel({ productName, similarCount, similarExample
         <button type="button" className="nesio-cooling-freeze-btn" onClick={freeze}>{L(dict, '冻 24 小时', 'Freeze 24h')}</button>
         <button type="button" className="nesio-cooling-buy-btn" onClick={buyAnyway}>{L(dict, '还是要买', 'Buying anyway')}</button>
       </div>
-      <button type="button" className="nesio-cooling-link" onClick={() => setVaultOpen(true)}>{L(dict, '冷冻清单', 'Freeze list')}</button>
+      <button type="button" className="nesio-cooling-link" onClick={() => openFreezeVault(setVaultOpen)}>{L(dict, '冷冻清单', 'Freeze list')}</button>
       <FreezeVaultSheet open={vaultOpen} onClose={() => setVaultOpen(false)} />
       <BarcodeScanSheet
         open={scanOpen}

@@ -10,6 +10,7 @@ import TellNesioSheet, { type CaptureMode } from './TellNesioSheet';
 import PortalBottomNav from './PortalBottomNav';
 import PortalOnboarding from './PortalOnboarding';
 import InstallPrompt from './InstallPrompt';
+import { canUse } from '@/lib/portal/entitlement';
 
 // Heavy sheets load on first open, not at boot — together they were ~3.5k
 // lines of first-paint JS for UI the user may never touch in a session.
@@ -287,6 +288,7 @@ export default function Portal() {
   }, []);
   const [moodOpen, setMoodOpen] = useState(false);
   const [freezeOpen, setFreezeOpen] = useState(false);
+  const [proGate, setProGate] = useState<string | null>(null); // 非 null = 显示 Pro 升级引导(值=功能名)
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [workoutSession, setWorkoutSession] = useState<import('./fitness/WorkoutPlayer').PlayerSession | null>(null);
   const [launchSurfaceContext, setLaunchSurfaceContext] = useState({
@@ -519,9 +521,19 @@ export default function Portal() {
     const handler = () => setActiveSurface((s) => s === 'tell' ? 'today' : 'tell');
     const voiceHandler = () => { track('capture_voice_open'); setCaptureMode('voice'); };
     const moodHandler = () => { track('mood_open'); setMoodOpen(true); };
-    const freezeHandler = () => { track('freeze_open'); setFreezeOpen(true); };
+    const freezeHandler = () => {
+      // 冷冻仓是整功能 Pro 专属:免费/匿名 → 升级引导,不直接打开(付费墙从桩变真强制)。
+      if (!canUse('freeze')) { track('pro_gate_shown', { feature: 'freeze' }); setProGate('freeze'); return; }
+      track('freeze_open'); setFreezeOpen(true);
+    };
     const inventoryHandler = () => { track('inventory_open'); setInventoryOpen(true); };
     const workoutHandler = (e: Event) => { track('workout_start', {}); setWorkoutSession((e as CustomEvent).detail); };
+    const proGateHandler = (e: Event) => {
+      const feature = (e as CustomEvent).detail?.feature || 'pro';
+      track('pro_gate_shown', { feature });
+      setProGate(feature);
+    };
+    window.addEventListener('nesio-pro-gate', proGateHandler);
     window.addEventListener('nesio-open-tell', handler);
     window.addEventListener('nesio-open-voice', voiceHandler);
     window.addEventListener('nesio-open-mood', moodHandler);
@@ -529,6 +541,7 @@ export default function Portal() {
     window.addEventListener('nesio-open-inventory', inventoryHandler);
     window.addEventListener('nesio-start-workout', workoutHandler);
     return () => {
+      window.removeEventListener('nesio-pro-gate', proGateHandler);
       window.removeEventListener('nesio-open-tell', handler);
       window.removeEventListener('nesio-open-voice', voiceHandler);
       window.removeEventListener('nesio-open-mood', moodHandler);
@@ -919,6 +932,34 @@ export default function Portal() {
       <ShareSheet open={captureMode === 'share'} onClose={() => setCaptureMode(null)} />
       <MoodSheet open={moodOpen} onClose={() => setMoodOpen(false)} />
       <FreezeVaultSheet open={freezeOpen} onClose={() => setFreezeOpen(false)} initialTab="add" />
+      {proGate && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setProGate(null)}
+          style={{ position: 'fixed', inset: 0, zIndex: 90, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', background: 'rgba(4, 10, 22, 0.55)' }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ width: 'min(96vw, 460px)', margin: '0 0 max(1rem, env(safe-area-inset-bottom))', background: 'var(--sheet-opaque, #fff)', color: 'var(--portal-ink, #2c2c2c)', borderRadius: 20, padding: '1.4rem 1.25rem', boxShadow: '0 -8px 40px rgba(4,10,22,0.35)' }}
+          >
+            <p style={{ margin: 0, fontSize: '0.75rem', letterSpacing: '0.08em', color: 'var(--portal-accent, #588ce3)', fontWeight: 700 }}>PRO</p>
+            <h3 style={{ margin: '0.3rem 0 0.5rem', fontSize: '1.15rem', fontWeight: 700 }}>
+              {L(dict, '冷冻仓是 Pro 功能', 'Freeze Vault is a Pro feature')}
+            </h3>
+            <p style={{ margin: '0 0 1.1rem', lineHeight: 1.6, color: 'var(--portal-muted, #8a94a6)' }}>
+              {L(dict, '想冲动买的先冻起来,给自己一个冷静期。这项功能会随 Pro 订阅一起开放。', 'Freeze impulse buys and give yourself a cooling-off period. This unlocks with Pro when subscriptions go live.')}
+            </p>
+            <button
+              type="button"
+              onClick={() => setProGate(null)}
+              style={{ width: '100%', background: 'var(--portal-accent, #588ce3)', color: 'var(--portal-on-accent, #fff)', border: 'none', borderRadius: 999, padding: '0.7rem', fontSize: '0.95rem', fontWeight: 600, cursor: 'pointer' }}
+            >
+              {L(dict, '知道了', 'Got it')}
+            </button>
+          </div>
+        </div>
+      )}
       <InventorySheet open={inventoryOpen} onClose={() => setInventoryOpen(false)} />
       {workoutSession && <WorkoutPlayer session={workoutSession} onClose={() => setWorkoutSession(null)} />}
       <AskGuideSheet open={askGuideOpen} onClose={() => setAskGuideOpen(false)} onStart={openAskVoice} />

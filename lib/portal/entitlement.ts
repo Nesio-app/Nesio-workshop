@@ -35,6 +35,14 @@ export const PRO_FEATURES = Object.freeze([
 ] as const);
 export type ProFeature = typeof PRO_FEATURES[number];
 
+/**
+ * **整功能 Pro 专属**(免费点了 → 升级引导,不是能用)。
+ * 注意 photo_ai / ask_ai **不在**这里:拍一下、问一问是**免费核心**(端上/确定性基础版),
+ * 只有它们的**深度云版本**才 Pro —— 那层由 canUsePaidCloudAi() 在成本闸上分,不整功能锁。
+ * 整功能锁的只有:冷冻仓、AI 例程、邮件直接回复。
+ */
+export const PRO_ONLY_FEATURES = Object.freeze(['ai_routine', 'email_reply', 'freeze'] as const);
+
 const PRO_KEY = 'nesio-pro-entitlement-v1';
 export const TIER_UPDATED_EVENT = 'nesio-tier-updated';
 
@@ -47,11 +55,19 @@ export function isPro(): boolean {
   return getTier() === 'pro';
 }
 
-/** 该能力当前可用吗:分层未启用 → 全放行(当前 PWA 不变);启用后 Pro 能力仅 Pro 层。 */
+/**
+ * 该能力当前可用吗。**整功能 Pro 专属**(冷冻仓/AI例程/邮件回复)在 PWA + 原生**都强制** Pro
+ * (免费 → 升级引导);其余(含免费核心 拍一下/问一问 基础版)一律放行。深度云能力的免费/Pro
+ * 分层在 canUsePaidCloudAi() 上,不在这。
+ */
 export function canUse(feature: string): boolean {
-  if (!isTieringActive()) return true;
-  if (!(PRO_FEATURES as readonly string[]).includes(feature)) return true;
-  return isPro();
+  if ((PRO_ONLY_FEATURES as readonly string[]).includes(feature)) return isPro();
+  return true;
+}
+
+/** 是不是整功能 Pro 专属(给 UI 判「要不要显示升级锁」)。 */
+export function isProOnlyFeature(feature: string): boolean {
+  return (PRO_ONLY_FEATURES as readonly string[]).includes(feature);
 }
 
 /** 免费层能不能打付费云 AI —— 成本护栏总闸。分层未启用 → true;启用后 免费 false → 走兜底。 */
