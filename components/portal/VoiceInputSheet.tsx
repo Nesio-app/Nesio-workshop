@@ -431,27 +431,9 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
 
     let title = cleanText.slice(0, 40);
     let aiConfidence = 0.7;
-    // QA:默认不自动打 AI(免费期也一样)—— 规则抽取(extractContext 人/地/物/域 +
-    // 规则标题)是默认路径,零成本零等待;确认卡上有「AI 识别」按钮显式触发。
-    // Pro 自动跑(用户定的:"pro 版启动 ai 识别")。
-    if (!isPro()) {
-      /* skip cloud — rule-based title/entities below; AI via explicit button */
-    } else try {
-      const res = await fetch('/api/portal/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'text', content: t, uiLocale: dict }),
-      });
-      const data = await res.json() as {
-        ok?: boolean;
-        nodes?: Array<{ name?: string; confidence?: number }>;
-      };
-      const best = data.ok && data.nodes?.length ? data.nodes[0] : null;
-      if (best?.name) title = stripInlineTags(best.name) || title;
-      if (typeof best?.confidence === 'number') aiConfidence = best.confidence;
-    } catch {
-      /* offline — keep rule-based title/confidence */
-    }
+    // 批次 33 用户定案:**任何档位都不自动打 AI** —— 规则抽取是唯一默认路径,
+    // AI 识别永远是确认卡上的显式按钮(点了才花钱、才等待)。
+    // (旧的 Pro 自动云识别分支已删除 —— AI 只走确认卡上的「AI 识别」按钮)
 
     const pending: PendingDraft = {
       rawText: t,
@@ -575,7 +557,7 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
 
         <div className="nesio-voice-sheet-header">
           <h2 className="nesio-voice-sheet-title">{isAskMode ? L(dict, '问宝盒', 'Ask Nesio') : L(dict, '说一句', 'Say it')}</h2>
-          <button type="button" className="nesio-voice-sheet-close" onClick={onClose} aria-label="关闭">✕</button>
+          {/* 批次 33:右上角 ✕ 撤除(用户指令)—— 退出走背景点击/手柄下拉 */}
         </div>
 
         {/* Context confirm (§6.2 绝对控制优先) — AI suggested; you decide before it's trusted. */}
@@ -644,8 +626,22 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
               </div>
             )}
 
-            {/* 提醒/计划专属字段 — 点击日期按钮弹出日历 */}
-            {isCommitmentLike(draft) && (() => {
+            {/* 批次 33:标签手动编辑(存入时并进 tags) */}
+            <div className="nesio-voice-confirm-field">
+              <span className="nesio-voice-confirm-label">{L(dict, '标签(可选,逗号分隔)', 'Tags (optional, comma-separated)')}</span>
+              <input
+                className="nesio-ob-input"
+                value={draft.inlineTags.join(', ')}
+                placeholder={L(dict, '如:家务, 周末', 'e.g. chores, weekend')}
+                onChange={(e) => {
+                  const tags = e.target.value.split(/[,，\s]+/).map((x) => x.trim()).filter(Boolean);
+                  setDraft((d) => (d ? { ...d, inlineTags: tags, edited: true } : d));
+                }}
+              />
+            </div>
+
+            {/* 批次 33:时间/日期/重复对所有草稿开放(此前只有承诺类可设 —— 用户要求像设置提醒一样) */}
+            {(() => {
               const todayStr = new Date().toISOString().slice(0, 10);
               const dateStr = draft.dueDate ?? todayStr;
               const dateLabel = (() => {

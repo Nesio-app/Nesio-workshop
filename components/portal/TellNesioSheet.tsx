@@ -106,11 +106,10 @@ export default function TellNesioSheet({ open, onClose, onCapture }: TellNesioSh
             style={{ '--delay': `${i * 0.05}s` } as React.CSSProperties}
             onClick={() => {
               if (btn.mode === 'camera') {
-                // QA 回访:用户要能从拍一拍进图册 —— web 的 capture 相机里塞不进图库
-                // 按钮(原生取景框不可定制)。改为打开 CameraSheet 起始面板:
-                // 「拍一张」(capture 直开相机)+「从相册选」并排。拍照多一跳,图库有了。
-                onClose();
-                onCapture('camera');
+                // 批次 33:iPhone PWA 的 getUserMedia 取景框两次真机实锤黑屏不可用 ——
+                // 改回原生 capture input:同一手势内 click,iOS 系统相机直接全屏打开
+                // (用户要的"点一下直接开相机")。拍完回 CameraSheet 结果流;相册走分享。
+                cameraInputRef.current?.click();
                 return;
               }
               onClose();

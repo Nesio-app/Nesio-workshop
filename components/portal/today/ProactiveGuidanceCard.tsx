@@ -5,7 +5,7 @@
  * 含 TODAY-002 证据展开与 TODAY-004 反馈行。从 TodayFeed 拆出。
  */
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { recordCardFeedback } from '@/lib/portal/reasoning-engine';
 import { recordSignalFeedback } from '@/lib/life-domain/signal-feedback';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
@@ -45,6 +45,45 @@ export function ProactiveGuidanceCard({
   const [evidenceOpen, setEvidenceOpen] = useState(false);
   const [feedbackGiven, setFeedbackGiven] = useState(false);
   const [savedQuote, setSavedQuote] = useState(false);
+  // 批次 33 用户定案:按钮全撤,手势接管 —— 左滑=没用 / 右滑=稍后提醒 / 双击=有用
+  const [dx, setDx] = useState(0);
+  const [gestureAck, setGestureAck] = useState<'useful' | 'later' | null>(null);
+  const startRef = useRef<{ x: number; y: number } | null>(null);
+  const lastTapRef = useRef(0);
+
+  function onPointerDown(e: React.PointerEvent) {
+    startRef.current = { x: e.clientX, y: e.clientY };
+  }
+  function onPointerMove(e: React.PointerEvent) {
+    if (!startRef.current) return;
+    const ddx = e.clientX - startRef.current.x;
+    const ddy = e.clientY - startRef.current.y;
+    if (Math.abs(ddx) > Math.abs(ddy) && Math.abs(ddx) > 8) setDx(Math.max(-120, Math.min(120, ddx)));
+  }
+  function onPointerUp(e: React.PointerEvent) {
+    const start = startRef.current;
+    startRef.current = null;
+    const ddx = start ? e.clientX - start.x : 0;
+    setDx(0);
+    if (ddx < -64) { handleFeedback('wrong'); return; }               // 左滑 = 没用
+    if (ddx > 64) {                                                    // 右滑 = 稍后提醒
+      if (card.nodeId) snoozeOverdue(card.nodeId, 1);
+      setGestureAck('later');
+      setTimeout(onDismiss, 700);
+      return;
+    }
+    // 双击 = 有用(带确认提示)
+    if (Math.abs(ddx) < 8) {
+      const now = Date.now();
+      if (now - lastTapRef.current < 320) {
+        lastTapRef.current = 0;
+        setGestureAck('useful');
+        handleFeedback('useful');
+        return;
+      }
+      lastTapRef.current = now;
+    }
+  }
 
   function handleSaveQuote() {
     ingestLifeNode({
@@ -96,7 +135,14 @@ export function ProactiveGuidanceCard({
   }
 
   return (
-    <div className="nesio-proactive-card">
+    <div
+      className="nesio-proactive-card"
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={() => { startRef.current = null; setDx(0); }}
+      style={{ transform: dx ? `translateX(${dx}px)` : undefined, transition: dx ? 'none' : 'transform 0.2s ease', touchAction: 'pan-y' }}
+    >
       <div className="nesio-proactive-card-inner">
         {!isQuote && <span className="nesio-proactive-card-icon"><GuidanceIcon icon={card.icon} /></span>}
         <div className="nesio-proactive-card-text">
@@ -132,7 +178,8 @@ export function ProactiveGuidanceCard({
           )}
           {hasActions && (
             <div className="nesio-proactive-card-actions">
-              {card.actions!.map((a) => (
+              {/* 批次 33:「好的」这类纯收起按钮撤除(手势接管);只留真动作(完成/改天) */}
+              {card.actions!.filter((a) => a.actionType !== 'dismiss').map((a) => (
                 <button
                   key={a.actionType}
                   type="button"
@@ -144,29 +191,16 @@ export function ProactiveGuidanceCard({
               ))}
             </div>
           )}
-          {feedbackGiven || savedQuote ? (
+          {(feedbackGiven || savedQuote || gestureAck) ? (
             <p style={{ fontSize: '0.66rem', color: 'var(--status-go)', margin: '0.35rem 0 0' }}>
-              {savedQuote ? L(dict, '已存入 Memory', 'Saved to Memory') : t(locale, 'guidanceFeedbackAck')}
+              {savedQuote ? L(dict, '已存入 Memory', 'Saved to Memory')
+                : gestureAck === 'useful' ? L(dict, '✓ 有用,记住了 —— 会多来点这样的', '✓ Useful, noted — more like this')
+                : gestureAck === 'later' ? L(dict, '好,稍后再提醒你', 'OK — will remind you later')
+                : t(locale, 'guidanceFeedbackAck')}
             </p>
           ) : (
             <div style={{ display: 'flex', gap: '0.7rem', marginTop: '0.35rem' }}>
-              {(isQuote
-                ? [] // 金句不是预测,有用/不准的反馈没有意义
-                : ([
-                    ['useful', t(locale, 'guidanceFeedbackUseful')],
-                    ['wrong', t(locale, 'guidanceFeedbackWrong')],
-                    ['too_much', t(locale, 'guidanceFeedbackTooMuch')],
-                  ] as Array<['useful' | 'wrong' | 'too_much', string]>)
-              ).map(([fb, label]) => (
-                <button
-                  key={fb}
-                  type="button"
-                  onClick={() => handleFeedback(fb)}
-                  style={{ fontSize: '0.64rem', color: 'var(--portal-muted)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}
-                >
-                  {label}
-                </button>
-              ))}
+              {/* 批次 33:有用/不准/不再提醒 文字行撤除 —— 左滑没用 · 右滑稍后 · 双击有用 */}
               {isQuote && (
                 <>
                   <button
@@ -188,9 +222,7 @@ export function ProactiveGuidanceCard({
             </div>
           )}
         </div>
-        {!hasActions && (
-          <button type="button" className="nesio-proactive-card-dismiss" onClick={onDismiss} aria-label={t(locale, 'todayDismissAria')}>✕</button>
-        )}
+        {/* 批次 33:✕ 撤除,左滑即收起 */}
       </div>
     </div>
   );

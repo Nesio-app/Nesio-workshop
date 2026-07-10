@@ -201,8 +201,11 @@ export async function POST(req: NextRequest) {
   const geminiKey = resolveAiKey('gemini');
 
   if (!anthropicKey && !geminiKey) {
+    // 批次 33:技术性报错绝不给用户看(「只能感到更聪明」)。真实原因进服务端日志,
+    // 用户拿到的是人话 + 下方照常渲染的相关记忆(确定性检索兜底)。
+    console.error('[chat] no_provider_key');
     return NextResponse.json({
-      ok: true, response: '（AI 暂时不可用，请配置 ANTHROPIC_API_KEY 或 GEMINI_API_KEY）', sources: [],
+      ok: true, response: uiLocale === 'en' ? "My cloud brain is a bit busy right now. I've pulled the most relevant memories below — tap to open. Ask me again in a few minutes." : '我这会儿的云端脑子有点挤,先把记忆里最相关的翻出来放在下面了——点开就能看。过几分钟再问我一次。', sources: [],
     });
   }
 
@@ -251,9 +254,10 @@ export async function POST(req: NextRequest) {
         console.error('[chat] gemini_fallback_error:', fallbackMsg);
         const isQuotaError = fallbackMsg.includes('quota') || fallbackMsg.includes('429');
         if (isQuotaError) {
+          // 配额耗尽:运维原因进日志,用户只看到人话 + 相关记忆兜底
           return NextResponse.json({
             ok: true,
-            response: '（AI 暂时达到免费用量上限，请为 Gemini API 开通付费，或配置 ANTHROPIC_API_KEY）',
+            response: uiLocale === 'en' ? "My cloud brain is a bit busy right now. I've pulled the most relevant memories below — tap to open. Ask me again in a few minutes." : '我这会儿的云端脑子有点挤,先把记忆里最相关的翻出来放在下面了——点开就能看。过几分钟再问我一次。',
             sources: [],
           });
         }

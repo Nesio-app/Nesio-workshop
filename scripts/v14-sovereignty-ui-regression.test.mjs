@@ -200,8 +200,8 @@ assert.match(globals, /nesio-tell-fan-btn--left[\s\S]*translate\(-1\.45rem,\s*0\
 assert.doesNotMatch(globals, /nesio-tell-fan-btn--left[^{]*\{[^}]*rotate|nesio-tell-fan-btn--right[^{]*\{[^}]*rotate/, 'Center N fan icons/text should stay upright, not rotated.');
 assert.match(ingestRoute, /ingest_auth_required|isIngestAllowed|baohe_auth_access|NESIO_STAGE5_INVOCATION_SECRET/, 'Ingest endpoint must fail closed for anonymous public parsing.');
 assert.match(lifeGraph, /searchLifeGraphFuzzy[\s\S]*rawInput[\s\S]*tags[\s\S]*relations/, 'Life Graph fuzzy search should include raw input, tags, attributes, and relations.');
-// Evolved further: the pending image node no longer keeps originalFileName at all.
-assert.match(shareSheet, /buildPendingImageParsed[\s\S]*图片线索待确认/, 'Upload image fallback should show a confirmable image clue.');
+// Evolved further(批次 33):「待确认」措辞废除 —— 默认存成带时间的「照片 · …」,名字/标签由用户改。
+assert.match(shareSheet, /buildPendingImageParsed[\s\S]*照片 · /, 'Upload image fallback should save a named photo (no 待确认 wording).');
 assert.doesNotMatch(shareSheet, /originalFileName/, 'Pending image clue must not retain the photo filename.');
 assert.match(shareSheet, /analyze\('image'[\s\S]*根据这张图片里真实可见的内容/, 'Upload images should call the image analysis path.');
 assert.match(shareSheet, /x-baohe-access-mode['"]\s*:\s*['"]personal_lab/, 'Upload image analysis should request lab AI access like the camera path.');

@@ -176,16 +176,16 @@ function buildPendingImageResult(dict: string = 'zh', reason: 'auth' | 'free_tie
   return {
     summary: reason === 'free_tier'
       ? L(dict, '照片已记下,可以自己加名字和标签。升级 Pro 可用 AI 自动识别图中物品和场景。', 'Photo saved — add a name and tags yourself. Upgrade to Pro for AI recognition of objects and scenes.')
-      : L(dict, '已先保存为待确认图片线索。登录或 Lab 模式后可自动识别标签。', 'Saved as an unconfirmed image clue for now. Sign in or enable Lab mode for auto-tagging.'),
+      : L(dict, '照片已存好 —— 改个名字、加点标签更好找。', 'Photo saved — rename or tag it to find it later.'),
     nodes: [
       {
         type: 'object',
-        name: L(dict, '待确认图片线索', 'Unconfirmed image clue'),
-        attributes: { status: L(dict, '待确认', 'Unconfirmed'), note: L(dict, '图片已保存，标签等待你确认或登录后自动识别。', 'Image saved; tags await your confirmation or auto-recognition after sign-in.') },
+        name: L(dict, `照片 · ${new Date().toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`, `Photo · ${new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`),
+        attributes: {},
         relations: [],
-        tags: [L(dict, '图片', 'image'), L(dict, '待确认', 'unconfirmed')],
+        tags: [L(dict, '图片', 'image')],
         source: 'photo',
-        confidence: 0.45,
+        confidence: 0.9,
       },
     ],
   };
@@ -424,7 +424,7 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
     const manual: AnalysisResult = {
       summary: L(dict, '照片已就绪,填个名字(标签可选)就能存。', 'Photo ready — give it a name (tags optional) and save.'),
       nodes: [{
-        type: 'object', name: L(dict, '照片记录', 'Photo note'), attributes: {},
+        type: 'object', name: L(dict, `照片 · ${new Date().toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`, `Photo · ${new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`), attributes: {},
         relations: [], tags: [], source: 'photo', confidence: 1,
       }],
     };
@@ -854,14 +854,13 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
             <p className="nesio-camera-chooser-text">
               {phase === 'idle'
                 ? L(dict, '拍一张，Nesio 帮你识别并存入 Memory', 'Take a photo — Nesio recognizes it into Memory')
-                : L(dict, '此设备不支持相机，请从相册选择', 'No camera on this device — pick from Photos')}
+                : L(dict, '取景框没起来 —— 用系统相机照样拍,或从相册选择。', "The viewfinder didn't start — use the system camera or pick from Photos.")}
             </p>
             <div className="nesio-camera-chooser-actions">
-              {phase === 'idle' && (
-                <button type="button" className="nesio-camera-shoot-btn" onClick={openNativeCamera}>
-                  {L(dict, '拍照', 'Take photo')}
-                </button>
-              )}
+              {/* 批次 33:no-camera 也给「拍照」(原生 capture input 永远可用,iOS 系统相机直开) */}
+              <button type="button" className="nesio-camera-shoot-btn" onClick={openNativeCamera}>
+                {L(dict, '拍照', 'Take photo')}
+              </button>
               <button type="button" className="nesio-camera-pick-btn" onClick={handleGallery}>
                 <span className="nesio-camera-pick-btn-icon" aria-hidden><IconImage size={15} /></span>
                 {L(dict, '相册', 'Photos')}

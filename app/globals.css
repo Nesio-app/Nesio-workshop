@@ -14445,3 +14445,13 @@ html[data-lowsat="1"] .portal-root {
   --status-calm-soft: #e9ede5;
   --portal-muted: #5c6b78;
 }
+
+/* 批次 33 · 快捷输入话筒录音态 */
+.nesio-focus-quick-mic--rec {
+  color: var(--status-risk) !important;
+  animation: nesio-mic-pulse 1.2s ease-in-out infinite;
+}
+@keyframes nesio-mic-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}

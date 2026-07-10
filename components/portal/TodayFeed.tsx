@@ -66,6 +66,36 @@ export default function TodayFeed({
   // 批次 31:焦点下方快捷输入(用户新指令)
   const [quickAdd, setQuickAdd] = useState('');
   const [quickSaved, setQuickSaved] = useState(false);
+  // 批次 33:话筒 = 原地录音转文字直接入记忆(不跳说一句 sheet);无语音 API 才回落 sheet
+  const [micState, setMicState] = useState<'idle' | 'recording'>('idle');
+  const recogRef = useRef<{ stop: () => void } | null>(null);
+
+  function startQuickMic() {
+    type SR = { new (): { lang: string; interimResults: boolean; onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null; onend: (() => void) | null; onerror: (() => void) | null; start: () => void; stop: () => void } };
+    const w = window as unknown as { SpeechRecognition?: SR; webkitSpeechRecognition?: SR };
+    const Ctor = w.SpeechRecognition || w.webkitSpeechRecognition;
+    if (!Ctor) { window.dispatchEvent(new CustomEvent('nesio-open-voice')); return; }
+    if (micState === 'recording') { recogRef.current?.stop(); return; }
+    const recog = new Ctor();
+    recog.lang = uiLocale === 'en' ? 'en-US' : 'zh-CN';
+    recog.interimResults = false;
+    let text = '';
+    recog.onresult = (e) => { text = Array.from({ length: e.results.length }, (_, i) => e.results[i][0].transcript).join(''); };
+    recog.onend = () => {
+      setMicState('idle');
+      recogRef.current = null;
+      const name = text.trim();
+      if (!name) return;
+      addCommitmentNode(name);
+      setQuickAdd('');
+      setQuickSaved(true);
+      setTimeout(() => setQuickSaved(false), 1400);
+    };
+    recog.onerror = () => { setMicState('idle'); recogRef.current = null; };
+    recogRef.current = recog;
+    setMicState('recording');
+    recog.start();
+  }
   const [insightsTab, setInsightsTab] = useState<'reflection' | 'health'>('reflection');
 
   // 健身 routine 卡「开始练」→ 打开洞察的健康 tab(训练计划在那)
@@ -230,9 +260,9 @@ export default function TodayFeed({
           ) : (
             <button
               type="button"
-              className="nesio-focus-quick-mic"
-              aria-label={L(uiLocale, '语音输入', 'Voice input')}
-              onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-voice'))}
+              className={`nesio-focus-quick-mic${micState === 'recording' ? ' nesio-focus-quick-mic--rec' : ''}`}
+              aria-label={micState === 'recording' ? L(uiLocale, '说完了,点击保存', 'Done — tap to save') : L(uiLocale, '语音输入', 'Voice input')}
+              onClick={startQuickMic}
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="18" height="18" aria-hidden>
                 <rect x="9" y="3" width="6" height="11" rx="3" />

@@ -1138,7 +1138,7 @@ Edit location/value anytime in Storage.`),
                       // 按真实原因给话术 —— 「key 没配」和「key 好好的但这次限流/配额没成」是两回事
                       const r = msg.semanticReason;
                       if (r === 'rate_limited') return L(dict, '检索有点频繁,这次先用了关键词匹配(稍后自动恢复)—— 跨语言的记录可能没找全。', 'Search briefly rate-limited; used keyword matching this time — cross-language records may be missed.');
-                      if (r === 'provider' || r === 'network') return L(dict, '语义检索这次没连上(嵌入服务临时故障或配额),先用了关键词匹配 —— 跨语言的记录可能没找全。', 'Semantic search briefly unavailable (provider hiccup/quota); used keyword matching — cross-language records may be missed.');
+                      if (r === 'provider' || r === 'network') return L(dict, '这次先用了快速匹配,可能没找全 —— 等会儿再问一次会更准。', 'Semantic search briefly unavailable (provider hiccup/quota); used keyword matching — cross-language records may be missed.');
                       if (r === 'auth') return L(dict, '会话需要重新登录后语义检索才能生效,这次用了关键词匹配。', 'Sign in again to re-enable semantic search; used keyword matching this time.');
                       return L(dict, '语义检索未启用(缺嵌入模型 key:Gemini 或 OpenAI 任一即可),这次只用了关键词匹配 —— 跨语言的记录(如英文邮件)可能没找全。', 'Semantic search is off (needs a Gemini or OpenAI key); only keyword matching was used — cross-language records may be missed.');
                     })()}

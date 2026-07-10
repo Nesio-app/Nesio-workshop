@@ -49,22 +49,21 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
   function buildPendingImageParsed(): ParsedResult {
     // 批次 12:名称/摘要按保存时界面语言生成;tags/status 是数据层标记,维持中文
     return {
-      title: L(dict, '图片线索待确认', 'Image clue to confirm'),
+      title: L(dict, '照片已存好', 'Photo saved'),
       summary: L(dict, '已先整理为一条图片线索。登录或 Lab 模式后，Nesio 会自动识别图中物品、人物和场景。', 'Saved as an image clue for now. Sign in or use Lab mode and Nesio will recognize objects, people and scenes.'),
       intent: 'MEMORY_CAPTURE',
       people: [],
       nodes: [
         {
           type: 'object',
-          name: L(dict, '图片线索待确认', 'Image clue to confirm'),
+          name: L(dict, `照片 · ${new Date().toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`, `Photo · ${new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`),
           attributes: {
-            status: '待确认',
-            note: L(dict, '这张图片已保存为待确认线索。', 'This image is saved as a clue to confirm.'),
+            note: L(dict, '改个名字、加点标签更好找;想认内容点「AI 整理」。', 'Rename or tag it to find it later; tap "AI organize" to recognize content.'),
           },
           relations: [],
-          tags: ['图片', '待确认'],
+          tags: ['图片'],
           confidence: 0.45,
-          rawInput: L(dict, '图片待确认', 'Image to confirm'),
+          rawInput: L(dict, '照片', 'Photo'),
         },
       ],
     };
@@ -120,15 +119,15 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
       const urlMatch = content.trim().match(/^https?:\/\/\S+$/);
       if (urlMatch) return analyzeUrl(urlMatch[0]);
     }
-    // QA:默认不自动打 AI(免费期也一样)—— 确定性存档:图片=待确认线索;文字=标题+
-    // 全文(≥200字进 article 可读可搜)。「AI 整理」按钮显式触发(force);Pro 自动。
-    if (!force && !isPro()) {
+    // 批次 33 用户定案:**任何档位都不自动打 AI** —— 确定性存档是唯一默认路径,
+    // 「AI 整理」按钮显式触发(force=true)才打云。
+    if (!force) {
       setAiPayload({ type, content, imageBase64, mimeType });
       if (type === 'image') { setParsed(buildPendingImageParsed()); return true; }
       const full = content.trim();
       setParsed({
         title: full.slice(0, 40) || L(dict, '分享内容', 'Shared content'),
-        summary: L(dict, '已存档,可搜索可阅读。升级 Pro 可用 AI 自动整理要点。', 'Archived — searchable and readable. Upgrade to Pro for AI organizing.'),
+        summary: L(dict, '已存档,可搜索可阅读。想提炼要点点「AI 整理」。', 'Archived — searchable and readable. Tap "AI organize" to distill key points.'),
         intent: 'MEMORY_CAPTURE',
         people: [],
         nodes: [{
@@ -178,7 +177,7 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
       });
 
       setParsed({
-        title: nodes[0]?.name || (type === 'image' ? '图片线索待确认' : content.slice(0, 30)),
+        title: nodes[0]?.name || (type === 'image' ? '照片' : content.slice(0, 30)),
         summary: data.summary || '提取成功',
         intent: data.intent || 'MEMORY_CAPTURE',
         people: Array.from(new Set(people)),
@@ -287,7 +286,7 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
 
         <div className="nesio-share-header">
           <h2 className="nesio-share-title">{L(dict, '分享', 'Share')}</h2>
-          <button type="button" className="nesio-share-close" onClick={onClose} aria-label="关闭">✕</button>
+          {/* 批次 33:右上角 ✕ 撤除(用户指令)—— 退出走背景点击 */}
         </div>
 
         <p className="nesio-share-desc">
