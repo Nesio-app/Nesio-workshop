@@ -20,7 +20,6 @@ import { usePortalLocale } from '../use-portal-locale';
 const FONT_SCALES = [0.9, 1, 1.15, 1.3];
 const BM_KEY = 'nesio-reader-bookmarks-v1';
 type Mode = 'full' | 'focus';
-type TtsState = 'idle' | 'loading' | 'playing';
 interface Bookmark { p: number; text: string }
 
 const HEADING_RE = /^(第[一二三四五六七八九十百千零\d]+[章篇节部回]|chapter\s|part\s|#{1,3}\s|[#＃])/i;
@@ -32,6 +31,7 @@ export default function ReaderView({ book, rawText, onClose }: { book: ReaderBoo
   const [mode, setMode] = useState<Mode>('full');
   const [active, setActive] = useState(() => Math.min(getReaderProgress(book.id).line || 0, Math.max(0, lines.length - 1)));
   const [fontStep, setFontStep] = useState(1);
+  const [toolsOpen, setToolsOpen] = useState(false);
   const [mask, setMask] = useState(true);
   const [openBubble, setOpenBubble] = useState<number | null>(null);
   const [selText, setSelText] = useState('');
@@ -39,7 +39,6 @@ export default function ReaderView({ book, rawText, onClose }: { book: ReaderBoo
   const [tocOpen, setTocOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const [tts, setTts] = useState<TtsState>('idle');
   const [bookmarks, setBookmarks] = useState<Bookmark[]>(() => {
     try { return (JSON.parse(localStorage.getItem(BM_KEY) || '{}')[book.id] as Bookmark[]) || []; } catch { return []; }
   });
@@ -47,7 +46,6 @@ export default function ReaderView({ book, rawText, onClose }: { book: ReaderBoo
   const scrollRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number | null>(null);
   const restoredRef = useRef(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // 多功能版正文:优先原始文本(保留段落),否则从脱水书重组。
   const paras = useMemo(() => {
@@ -109,34 +107,8 @@ export default function ReaderView({ book, rawText, onClose }: { book: ReaderBoo
     });
   }, [mode, mask, commitActive]);
 
-  function stopTts() { audioRef.current?.pause(); audioRef.current = null; if (typeof window !== 'undefined') window.speechSynthesis?.cancel(); }
-  useEffect(() => () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); stopTts(); }, []);
-
-  function browserTts(text: string) {
-    if (typeof window === 'undefined' || !window.speechSynthesis) { setTts('idle'); return; }
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text.slice(0, 3000));
-    u.lang = /[一-鿿]/.test(text) ? 'zh-CN' : 'en-US';
-    u.onend = () => setTts('idle');
-    window.speechSynthesis.speak(u);
-    setTts('playing');
-  }
-  async function toggleTts() {
-    if (tts === 'playing') { stopTts(); setTts('idle'); return; }
-    setTts('loading');
-    const text = paras.join(' ').slice(0, 4000);
-    try {
-      const res = await fetch('/api/portal/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, voice: 'nova', speed: 1.05 }) });
-      if (res.ok && res.headers.get('content-type')?.includes('audio')) {
-        const url = URL.createObjectURL(await res.blob());
-        const a = new Audio(url); audioRef.current = a;
-        a.onended = () => { setTts('idle'); URL.revokeObjectURL(url); };
-        a.onerror = () => browserTts(text);
-        await a.play(); setTts('playing'); return;
-      }
-      browserTts(text);
-    } catch { browserTts(text); }
-  }
+  // 听(TTS)已按产品决策移除 —— 阅读器专注读。
+  useEffect(() => () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); }, []);
 
   function jumpToPara(i: number) {
     setTocOpen(false); setSearchOpen(false);
@@ -169,17 +141,24 @@ export default function ReaderView({ book, rawText, onClose }: { book: ReaderBoo
             {mode === 'full' ? L(dict, '多功能版 · 切聚焦', 'Full · to Focus') : L(dict, '聚焦版 · 切多功能', 'Focus · to Full')}
           </button>
         </div>
-        <div className="nesio-rd-tools">
-          <button type="button" className="nesio-rd-btn" onClick={() => setFontStep((v) => Math.max(0, v - 1))} aria-label={L(dict, '缩小字号', 'Smaller')}>A−</button>
-          <button type="button" className="nesio-rd-btn" onClick={() => setFontStep((v) => Math.min(FONT_SCALES.length - 1, v + 1))} aria-label={L(dict, '放大字号', 'Bigger')}>A+</button>
-          {mode === 'full' ? (
-            <>
-              <button type="button" className="nesio-rd-btn" onClick={() => { setTocOpen((v) => !v); setSearchOpen(false); }} aria-label={L(dict, '目录', 'Contents')}>☰</button>
-              <button type="button" className="nesio-rd-btn" onClick={() => { setSearchOpen((v) => !v); setTocOpen(false); }} aria-label={L(dict, '搜本书', 'Search')}>🔍</button>
-              <button type="button" className={`nesio-rd-btn${tts !== 'idle' ? ' is-active' : ''}`} onClick={toggleTts} aria-label={L(dict, '听', 'Listen')}>{tts === 'loading' ? '…' : tts === 'playing' ? '⏸' : L(dict, '听', 'Listen')}</button>
-            </>
-          ) : (
-            <button type="button" className={`nesio-rd-btn${mask ? ' is-active' : ''}`} onClick={() => setMask((v) => !v)} aria-pressed={mask}>{L(dict, '专注', 'Focus')}</button>
+        {/* QA:按钮太多 → 收进一个 Aa 菜单(字号/目录/搜本书/专注);听(TTS)按产品决策移除 */}
+        <div className="nesio-rd-tools" style={{ position: 'relative' }}>
+          <button type="button" className={`nesio-rd-btn${toolsOpen ? ' is-active' : ''}`} onClick={() => setToolsOpen((v) => !v)} aria-expanded={toolsOpen} aria-label={L(dict, '阅读选项', 'Reading options')}>Aa</button>
+          {toolsOpen && (
+            <div style={{ position: 'absolute', top: 'calc(100% + 0.4rem)', right: 0, zIndex: 30, background: 'var(--sheet-opaque, #fff)', border: '1px solid var(--portal-line, rgba(127,127,127,0.2))', borderRadius: 12, padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.35rem', minWidth: '9.5rem', boxShadow: '0 8px 30px rgba(4,10,22,0.3)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <button type="button" className="nesio-rd-btn" onClick={() => setFontStep((v) => Math.max(0, v - 1))} aria-label={L(dict, '缩小字号', 'Smaller')}>A−</button>
+                <button type="button" className="nesio-rd-btn" onClick={() => setFontStep((v) => Math.min(FONT_SCALES.length - 1, v + 1))} aria-label={L(dict, '放大字号', 'Bigger')}>A+</button>
+              </div>
+              {mode === 'full' ? (
+                <>
+                  <button type="button" className="nesio-rd-btn" style={{ width: '100%' }} onClick={() => { setTocOpen((v) => !v); setSearchOpen(false); setToolsOpen(false); }}>{L(dict, '目录', 'Contents')}</button>
+                  <button type="button" className="nesio-rd-btn" style={{ width: '100%' }} onClick={() => { setSearchOpen((v) => !v); setTocOpen(false); setToolsOpen(false); }}>{L(dict, '搜本书', 'Search')}</button>
+                </>
+              ) : (
+                <button type="button" className={`nesio-rd-btn${mask ? ' is-active' : ''}`} style={{ width: '100%' }} onClick={() => { setMask((v) => !v); setToolsOpen(false); }} aria-pressed={mask}>{L(dict, '专注', 'Focus')}</button>
+              )}
+            </div>
           )}
         </div>
       </div>

@@ -13,6 +13,8 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import { markBusy } from '@/lib/portal/app-busy';
+import { isPro } from '@/lib/portal/entitlement';
+import { isLabModeOn } from '@/lib/portal/module-overrides';
 
 interface ConnectorsHubProps { open: boolean; onClose: () => void; }
 
@@ -1026,7 +1028,17 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
         )}
 
         <div className="nesio-settings-sheet-body">
-          {CONNECTORS.filter((c) => !c.dev).map((c) => {
+          {/* 分层入口(用户定):免费只留 Google(日历+邮件)和 地理位置·天气;
+              Pro 加 Flomo(Google people/tasks 的 scope 已随 google 一次授权带上,无独立行);
+              Lab(内测)全量可见。 */}
+          {CONNECTORS.filter((c) => !c.dev)
+            .filter((c) => {
+              if (isLabModeOn()) return true;
+              const FREE = ['google', 'weather'];
+              const PRO = ['google', 'weather', 'flomo'];
+              return (isPro() ? PRO : FREE).includes(c.id);
+            })
+            .map((c) => {
             const isConn = c.id === 'google'
               ? Boolean(connected.google || connected.calendar || connected.gmail)
               : connected[c.id];

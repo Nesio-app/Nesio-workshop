@@ -1,12 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { deleteLifeNode, updateLifeNode, type LifeNode } from '@/lib/portal/life-graph';
+import { deleteLifeNode, getLifeGraph, updateLifeNode, type LifeNode } from '@/lib/portal/life-graph';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
 import LocationPicker from './LocationPicker';
-import RelationGraph from './RelationGraph';
 import EmailComposeSheet from './EmailComposeSheet';
-import type { GNode, GEdge } from '@/lib/platform/graph-engine';
 import { IconClock, IconLink, NodeTypeIcon, WeatherIcon } from './icons';
 import { L } from '@/lib/portal/i18n';
 import { displayNodeName } from '@/lib/portal/node-display';
@@ -483,55 +481,6 @@ interface EditFields {
 
 // ── Graph helpers ─────────────────────────────────────────────────────────────
 
-const NODE_COLOR: Record<string, string> = {
-  person:       'var(--portal-accent)',
-  object:       'var(--status-calm)',
-  place:        'var(--status-go)',
-  event:        'var(--status-gentle)',
-  commitment:   'var(--portal-cool-accent)',
-  health_state: 'var(--status-risk)',
-  preference:   'var(--portal-muted)',
-};
-
-function buildGraphNodes(focus: LifeNode, related: LifeNode[]): GNode[] {
-  const all = [focus, ...related];
-  const maxRel = Math.max(1, ...all.map(n => n.relations?.length ?? 0));
-  return all.map(n => ({
-    id: n.id,
-    label: n.name,
-    type: n.type,
-    weight: 0.3 + ((n.relations?.length ?? 0) / maxRel) * 0.7,
-    color: NODE_COLOR[n.type] ?? 'var(--portal-accent)',
-  }));
-}
-
-function buildGraphEdges(focus: LifeNode, related: LifeNode[]): GEdge[] {
-  const edges: GEdge[] = [];
-  const seen = new Set<string>();
-  const all = [focus, ...related];
-  const idSet = new Set(all.map(n => n.id));
-
-  for (const node of all) {
-    if (!node.relations?.length) continue;
-    for (const rel of node.relations) {
-      if (!idSet.has(rel.targetId)) continue;
-      const key = [node.id, rel.targetId].sort().join('|');
-      if (seen.has(key)) continue;
-      seen.add(key);
-      edges.push({ source: node.id, target: rel.targetId, label: rel.relation });
-    }
-  }
-  // Ensure focus node connects to at least direct neighbours
-  for (const r of related) {
-    const key = [focus.id, r.id].sort().join('|');
-    if (!seen.has(key)) {
-      seen.add(key);
-      edges.push({ source: focus.id, target: r.id, weight: 0.3 });
-    }
-  }
-  return edges;
-}
-
 export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNode }: MemoryNodeDetailProps) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [editing, setEditing] = useState(false);
@@ -860,12 +809,37 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
             </>
           )}
 
-          {/* Tags */}
-          {n.tags && n.tags.length > 0 && (
-            <div className="nesio-today-card-tags" style={{ marginTop: '0.75rem' }}>
-              {n.tags.map((t) => <span key={t} className="nesio-today-card-tag">{t}</span>)}
-            </div>
-          )}
+          {/* 标签三层重构:L2 语义标签(AI 冗余打的检索词,如 餐具/玻璃/水杯)不再上屏 ——
+              只进检索索引。唯一露面的是 L3「主题门」:同标签 ≥3 条记忆才出现,是门不是签
+              (可点,跳回记忆页搜该主题),每处最多 2 扇。 */}
+          {(() => {
+            if (!n.tags?.length) return null;
+            let graph: LifeNode[] = [];
+            try { graph = getLifeGraph(); } catch { /* ignore */ }
+            const doors = n.tags
+              .map((t) => ({ t, count: graph.filter((x) => x.id !== n.id && x.tags?.includes(t)).length + 1 }))
+              .filter((d) => d.count >= 3)
+              .sort((a, b) => b.count - a.count)
+              .slice(0, 2);
+            if (!doors.length) return null;
+            return (
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
+                {doors.map(({ t, count }) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      window.dispatchEvent(new CustomEvent('nesio-memory-search', { detail: { query: t } }));
+                    }}
+                    style={{ background: 'var(--portal-accent-soft, rgba(88,140,227,0.12))', border: 'none', borderRadius: 999, padding: '0.35rem 0.8rem', fontSize: '0.78rem', color: 'var(--portal-accent, #588ce3)', cursor: 'pointer' }}
+                  >
+                    {t} · {count} {L(dict, '条', '')} ›
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
 
           {/* 批次 39:去重 —— 物品/偏好节点顶部 Object/PreferenceSection 已展示首图作 hero,
               图片线索里跳过它,避免同一张图出现两次;只剩额外图时才显示本区。 */}
@@ -910,21 +884,26 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
 
           <p style={{ fontSize: '0.7rem', color: 'var(--portal-muted)', marginTop: '1rem' }}>{L(dict, '记录于', 'Noted on')} {createdDate}</p>
 
-          {/* Related memories — 关联地图 */}
+          {/* 标签三层重构:详情页的关联图撤下 —— 它把「同天创建/弱相似」画成箭头,
+              视觉上像因果实际是噪声(QA:「全是乱连接」)。换成诚实的「相关记忆」列表;
+              全景图谱仍在记忆页的「关联图」入口。 */}
           {relatedNodes && relatedNodes.length > 0 && (
             <div className="nesio-related-section">
-              <p className="nesio-settings-section-label">{L(dict, '关联地图', 'Connections')}</p>
-              <RelationGraph
-                nodes={buildGraphNodes(n, relatedNodes)}
-                edges={buildGraphEdges(n, relatedNodes)}
-                focusId={n.id}
-                height={220}
-                onNodeClick={(id) => {
-                  const target = relatedNodes.find(r => r.id === id);
-                  if (target) onOpenNode?.(target);
-                }}
-                emptyText={L(dict, '暂无关联记忆', 'No connections yet')}
-              />
+              <p className="nesio-settings-section-label">{L(dict, '相关记忆', 'Related memories')}</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                {relatedNodes.slice(0, 6).map((r) => (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => onOpenNode?.(r)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', padding: '0.5rem 0.7rem', borderRadius: '0.7rem', border: '1px solid var(--portal-line, rgba(127,127,127,0.18))', background: 'none', color: 'var(--portal-ink)', textAlign: 'left', cursor: 'pointer' }}
+                  >
+                    <NodeTypeIcon type={r.type} size={13} />
+                    <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.85rem' }}>{r.name}</span>
+                    <span style={{ color: 'var(--portal-muted)' }}>›</span>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 

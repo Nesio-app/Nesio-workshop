@@ -514,10 +514,28 @@ export default function Portal() {
   useEffect(() => {
     installErrorTracking();
     track('app_open');
+    // QA(白屏/卡死):新部署后旧标签页请求已被替换的 chunk → 404 → 懒加载组件挂掉,
+    // 表现为白屏/半死。捕获 ChunkLoadError 自动整页刷新一次(30s 冷却防循环)。
+    const onChunkError = (e: ErrorEvent | PromiseRejectionEvent) => {
+      const msg = String((e as PromiseRejectionEvent).reason?.message ?? (e as ErrorEvent).message ?? '');
+      if (!/ChunkLoadError|Loading chunk|Failed to fetch dynamically imported module|Importing a module script failed/i.test(msg)) return;
+      try {
+        const last = Number(sessionStorage.getItem('nesio-chunk-reload-at') || '0');
+        if (Date.now() - last < 30_000) return; // 冷却:别陷入刷新循环
+        sessionStorage.setItem('nesio-chunk-reload-at', String(Date.now()));
+      } catch { /* ignore */ }
+      window.location.reload();
+    };
+    window.addEventListener('error', onChunkError);
+    window.addEventListener('unhandledrejection', onChunkError);
     // Offline shell: data is local, so a cached shell = readable memories offline
     if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
       navigator.serviceWorker.register('/sw.js').catch(() => undefined);
     }
+    return () => {
+      window.removeEventListener('error', onChunkError);
+      window.removeEventListener('unhandledrejection', onChunkError);
+    };
   }, []);
 
   // Storage quota alerts — a dropped write must never be silent

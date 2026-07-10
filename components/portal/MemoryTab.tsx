@@ -18,7 +18,7 @@ import {
   retryLifeGraphCloudSync,
   type LifeNode,
 } from '@/lib/portal/life-graph';
-import { DOMAINS, nodeDomain, type FrontDomain } from '@/lib/life-domain';
+import { DOMAINS } from '@/lib/life-domain';
 import { smartSearch, type SearchUnderstood } from '@/lib/portal/smart-search';
 import { semanticRerank } from '@/lib/portal/semantic-rerank';
 import { DEMO_SEED_NODES, isDemoNode } from '@/lib/portal/demo-seed';
@@ -532,7 +532,6 @@ function MemoryCard({ node, onOpen, onDeleted, onLongPress }: { node: LifeNode; 
   const { extra, badge, badgeColor } = getNodeTypeMeta(node, dict);
   const isPerson = node.type === 'person';
   const { initials, bg: avatarBg } = isPerson ? getPersonInitials(node.name) : { initials: '', bg: '' };
-  const domain = nodeDomain(node);
 
   return (
     <button
@@ -577,12 +576,9 @@ function MemoryCard({ node, onOpen, onDeleted, onLongPress }: { node: LifeNode; 
             <NodeTypeIcon type={node.type} size={13} />
           </span>
         )}
-        {/* 批次 13:类型图标与领域图标相同(health_state/health 都是心形)时只留一个 */}
-        {domain && !(node.type === 'health_state' && domain === 'health') ? (
-          <span className="nesio-memory-card-icon" title={DOMAINS[domain].label} style={{ background: 'var(--chip-blue)' }}>
-            <DomainIcon domain={domain} size={13} />
-          </span>
-        ) : null}
+        {/* 标签三层重构 L1:domain 第二图标整个废除 —— 双图标是 type/domain 两套系统
+            映射撞车的产物(object=箱 + assets=也是箱 → 卡片双立方体)。每卡恰好 1 个
+            type 图标。批次 13 的 health 特判补丁随之退役。 */}
       </span>
     </button>
   );
@@ -767,6 +763,16 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
   const [cloudSyncSummary, setCloudSyncSummary] = useState(getLifeGraphCloudSyncSummary());
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProject, setActiveProject] = useState<Project | null>(null);
+
+  // 标签三层重构 L3:详情页的「主题门」点击后跳回记忆页搜该主题
+  useEffect(() => {
+    const onSearch = (e: Event) => {
+      const q = (e as CustomEvent).detail?.query;
+      if (typeof q === 'string' && q) { setSelectedNode(null); setQuery(q); }
+    };
+    window.addEventListener('nesio-memory-search', onSearch);
+    return () => window.removeEventListener('nesio-memory-search', onSearch);
+  }, []);
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [longPressNode, setLongPressNode] = useState<LifeNode | null>(null);
   // 下拉刷新 = 全源同步(日历/邮件/Flomo/银行,核心在 connector-sync,与设置页各同步按钮同一实现)

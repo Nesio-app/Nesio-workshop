@@ -21,7 +21,7 @@ export const NODE_SCHEMA_BLOCK = `Node schema (return ONLY these fields):
   "name": "concise name in the OUTPUT LANGUAGE (translate the input if needed)",
   "attributes": { "key": "value" },  // only standard keys — no 'context' or internal fields
   "relations": [{ "targetId": "name", "relation": "relation type" }],
-  "tags": ["tag1"],
+  "tags": ["tag1"],  // retrieval-only keywords, NEVER shown to the user — be generous, synonyms welcome (e.g. cup/glass/drinkware all fine)
   "confidence": 0.0-1.0,
   "rawInput": "original excerpt"
 }
