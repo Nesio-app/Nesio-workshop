@@ -6,6 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { GEMINI_MODEL_FALLBACKS } from '@/lib/portal/ai-provider-chain.mjs';
 import { createSignal } from '@/lib/life-domain/create-signal';
 import { normalizePhotoToSignal, normalizeVoiceToSignal } from '@/lib/life-domain/normalizers';
 import { EXTRACTION_SYSTEM_PROMPT, buildExtractionSystemPrompt, languageDirective, parseJsonBlock } from '@/lib/extraction/extraction';
@@ -16,9 +17,8 @@ import { envValue } from '@/lib/portal/env';
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
-// Current vision-capable models. gemini-1.5-flash was retired (404); use
-// gemini-flash-latest as an always-current alias plus explicit current models.
-const GEMINI_MODEL_FALLBACKS = ['gemini-2.0-flash', 'gemini-flash-latest', 'gemini-2.5-flash'];
+// Gemini 模型链共读单一数据源 ai-provider-chain.mjs(2.5 全系都带视觉);
+// gemini-1.5-flash 已 404 退役,gemini-2.0-flash 免费层 limit:0(批次 44 撤出)。
 const DEFAULT_OPENAI_MODEL = 'gpt-4o-mini';
 
 function getAnthropicKey(): string | undefined {
@@ -231,7 +231,8 @@ async function askWithGeminiWebSearch(query: string, uiLocale?: string): Promise
 
   const isEn = (uiLocale || 'zh').toLowerCase().startsWith('en');
   const prompt = isEn ? `Answer concisely in English: ${query}` : `请用中文简洁回答：${query}`;
-  const res = await fetch(`${GEMINI_BASE_URL}/gemini-2.0-flash:generateContent?key=${key}`, {
+  // 批次 44:2.0-flash 免费层 limit:0 必 429;搜索 grounding 换 2.5-flash(全系支持)
+  const res = await fetch(`${GEMINI_BASE_URL}/gemini-2.5-flash:generateContent?key=${key}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

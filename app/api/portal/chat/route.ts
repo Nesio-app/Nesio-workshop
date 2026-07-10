@@ -2,9 +2,10 @@
  * POST /api/portal/chat
  * Nesio AI chat.
  * Primary backend: Anthropic Claude (claude-3-5-haiku-latest) — fast, cheap, reliable.
- * Fallback: Gemini 2.0 Flash (requires GEMINI_API_KEY with valid quota).
+ * Fallback: Gemini(模型链见 ai-provider-chain.mjs 单一数据源,requires GEMINI_API_KEY).
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { GEMINI_MODEL_FALLBACKS } from '@/lib/portal/ai-provider-chain.mjs';
 import { buildChatContext } from '@/lib/portal/chat-context';
 import { guardAiRoute } from '@/lib/portal/api-auth';
 import { reportAiCall } from '@/lib/portal/ai-telemetry';
@@ -108,8 +109,7 @@ async function callClaude(
 // ── Gemini ────────────────────────────────────────────────────────────────────
 
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
-// Same fallback order as analyze route — 429 on one model → try next
-const GEMINI_MODEL_FALLBACKS = ['gemini-2.0-flash', 'gemini-flash-latest', 'gemini-2.5-flash'];
+// 批次 44:改共读单一数据源(此前这里硬编码一份旧链,与 ai-complete 漂移)
 
 async function callGemini(
   apiKey: string,
