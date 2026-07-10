@@ -14212,3 +14212,167 @@ html[data-portal-theme="night"] .nesio-exp-card:hover {
 .nesio-xr-consent-box { flex-shrink: 0; width: 1.05rem; height: 1.05rem; border: 1.5px solid var(--portal-line); border-radius: 5px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.72rem; color: var(--portal-blue-deep); }
 .nesio-xr-consent[aria-pressed="true"] .nesio-xr-consent-box { border-color: var(--portal-blue-deep); }
 .nesio-xr-learn { margin-top: 0.8rem; font-size: 0.7rem; line-height: 1.45; color: var(--portal-muted); opacity: 0.85; }
+
+/* ══════════════════════════════════════════════════════════════════
+   批次 27 · 洞察页 v1 规格(§2 + §4):免费四件套 + 多面镜月度信
+   冷暖物理学:过去/回忆 = 琥珀暖(主题门、信纸);数据/操作 = 冷蓝不变
+   ══════════════════════════════════════════════════════════════════ */
+
+/* Nesio 说话的声音:宋体(§4.2 双声道字体) */
+.nesio-serif-voice {
+  font-family: var(--font-portal-serif), Georgia, serif;
+  font-size: 1.02rem;
+  line-height: 1.6;
+  color: var(--portal-ink);
+  margin: 0 0 0.7rem;
+}
+
+/* ① 主题门:暖色门卡 —— 形态是门不是签(§3.2 L3) */
+.nesio-theme-doors { display: flex; flex-wrap: wrap; gap: 0.55rem; }
+.nesio-theme-door {
+  border: 1px solid color-mix(in srgb, var(--status-gentle) 38%, transparent);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--status-gentle) 12%, transparent), color-mix(in srgb, var(--status-gentle) 5%, transparent));
+  color: var(--portal-ink);
+  border-radius: 0.9rem;
+  padding: 0.6rem 0.95rem;
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: var(--tap-min);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.nesio-theme-door:active { transform: scale(0.97); }
+
+/* ② 没接上的线头 / 去年今天:一行可点,不做成卡 */
+.nesio-thread-row {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-left: 2px solid color-mix(in srgb, var(--status-gentle) 55%, transparent);
+  padding: 0.35rem 0 0.35rem 0.7rem;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: var(--portal-ink);
+  cursor: pointer;
+  min-height: var(--tap-min);
+}
+.nesio-thread-row:active { opacity: 0.7; }
+
+/* ③ 走走看 */
+.nesio-wander-card { display: flex; align-items: stretch; gap: 0.6rem; }
+.nesio-wander-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  text-align: left;
+  background: color-mix(in srgb, var(--status-gentle) 7%, transparent);
+  border: 1px solid color-mix(in srgb, var(--status-gentle) 25%, transparent);
+  border-radius: 0.9rem;
+  padding: 0.7rem 0.9rem;
+  cursor: pointer;
+  min-height: var(--tap-min);
+}
+.nesio-wander-name { font-size: 0.9rem; font-weight: 600; color: var(--portal-ink); }
+.nesio-wander-date { font-size: 0.7rem; color: var(--portal-muted); font-variant-numeric: tabular-nums; }
+.nesio-wander-reroll {
+  flex: none;
+  align-self: center;
+  background: none;
+  border: 1px solid var(--portal-line);
+  border-radius: var(--radius-pill);
+  padding: 0.4rem 0.8rem;
+  font-size: 0.76rem;
+  color: var(--portal-muted);
+  cursor: pointer;
+  min-height: var(--tap-min);
+}
+
+/* ④ 一行节律 */
+.nesio-rhythm-line {
+  margin: 0 0 0.6rem;
+  font-size: 0.88rem;
+  color: var(--portal-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 生命版图证据行(§2.2) */
+.nesio-insights-map-evidence {
+  margin: 0.4rem 0 0;
+  font-size: 0.7rem;
+  color: var(--portal-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 多面镜月度信(§2.3):暖色信纸 + 宋体 ── */
+.nesio-mirror-tab { display: flex; flex-direction: column; }
+.nesio-mirror-picker { display: flex; gap: 0.45rem; flex-wrap: wrap; }
+.nesio-mirror-chip {
+  background: none;
+  border: 1px solid var(--portal-line);
+  border-radius: var(--radius-pill);
+  padding: 0.4rem 0.85rem;
+  font-size: 0.8rem;
+  color: var(--portal-ink);
+  cursor: pointer;
+  min-height: var(--tap-min);
+}
+.nesio-mirror-chip--active {
+  border-color: color-mix(in srgb, var(--status-gentle) 60%, transparent);
+  background: color-mix(in srgb, var(--status-gentle) 12%, transparent);
+  font-weight: 600;
+}
+.nesio-mirror-chip-lock { font-size: 0.66rem; color: var(--portal-muted); margin-left: 2px; }
+.nesio-mirror-desc { margin: 0.55rem 0 0.9rem; font-size: 0.76rem; color: var(--portal-muted); }
+
+.nesio-mirror-letter {
+  background: linear-gradient(160deg, color-mix(in srgb, var(--status-gentle) 9%, var(--glass-bg-solid)), var(--glass-bg-solid) 70%);
+  border: 1px solid color-mix(in srgb, var(--status-gentle) 22%, transparent);
+  border-radius: 1.1rem;
+  padding: 1.1rem 1.15rem 0.9rem;
+}
+.nesio-mirror-letter-date {
+  margin: 0 0 0.8rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  color: var(--portal-muted);
+}
+.nesio-mirror-para { margin-bottom: 1rem; }
+.nesio-mirror-para-text {
+  font-family: var(--font-portal-serif), Georgia, serif;
+  font-size: 0.95rem;
+  line-height: 1.8;
+  color: var(--portal-ink);
+  margin: 0 0 0.45rem;
+}
+.nesio-mirror-evidence { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.35rem; }
+.nesio-mirror-evidence-chip {
+  font-size: 0.66rem;
+  color: var(--portal-muted);
+  border: 1px solid var(--portal-line);
+  border-radius: var(--radius-pill);
+  padding: 0.12rem 0.5rem;
+}
+.nesio-mirror-verdict { display: flex; gap: 0.4rem; }
+.nesio-mirror-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  border-top: 1px solid color-mix(in srgb, var(--status-gentle) 18%, transparent);
+  padding-top: 0.6rem;
+  font-size: 0.68rem;
+  color: var(--portal-muted);
+}
+.nesio-mirror-empty { padding: 1.4rem 0.4rem; text-align: center; display: flex; flex-direction: column; gap: 0.7rem; align-items: center; }
+.nesio-mirror-empty-line {
+  font-family: var(--font-portal-serif), Georgia, serif;
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: var(--portal-ink);
+  margin: 0;
+}
+.nesio-mirror-writing { font-size: 0.82rem; color: var(--portal-muted); margin: 0.4rem 0; text-align: center; }
+.nesio-mirror-error { font-size: 0.76rem; color: var(--status-risk); margin: 0.2rem 0; }

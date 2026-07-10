@@ -39,9 +39,9 @@ export type ProFeature = typeof PRO_FEATURES[number];
  * **整功能 Pro 专属**(免费点了 → 升级引导,不是能用)。
  * 注意 photo_ai / ask_ai **不在**这里:拍一下、问一问是**免费核心**(端上/确定性基础版),
  * 只有它们的**深度云版本**才 Pro —— 那层由 canUsePaidCloudAi() 在成本闸上分,不整功能锁。
- * 整功能锁的只有:冷冻仓、AI 例程、邮件直接回复。
+ * 整功能锁的只有:冷冻仓、AI 例程、邮件直接回复、多面镜月度信(老友视角免费试读,在 UI 层放行)。
  */
-export const PRO_ONLY_FEATURES = Object.freeze(['ai_routine', 'email_reply', 'freeze'] as const);
+export const PRO_ONLY_FEATURES = Object.freeze(['ai_routine', 'email_reply', 'freeze', 'mirror_letter'] as const);
 
 const PRO_KEY = 'nesio-pro-entitlement-v1';
 const TRIAL_START_KEY = 'nesio-trial-start-v1';

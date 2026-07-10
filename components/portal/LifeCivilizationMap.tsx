@@ -73,7 +73,8 @@ interface Bucket {
 }
 
 function buildStream(nodes: LifeNode[]): Bucket[] {
-  if (nodes.length === 0) return generateDemoData();
+  // v1 规格 §2.2:绝不以示例地形冒充 —— 数据不够就不画,门槛(90 天)由调用方把守。
+  if (nodes.length === 0) return [];
 
   const sorted = [...nodes].sort(
     (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
@@ -119,52 +120,10 @@ function buildStream(nodes: LifeNode[]): Bucket[] {
     }
   }
 
-  // Need at least 6 buckets for a good shape; pad with equal-weight phantoms if sparse
-  if (result.length < 6) return generateDemoData();
+  // 至少 2 个月才画得出河流;不够就不画,不再回落示例地形。
+  if (result.length < 2) return [];
 
   return result;
-}
-
-// Demo data for when there are too few nodes to show a meaningful stream
-function generateDemoData(): Bucket[] {
-  const months = 18;
-  const now = new Date();
-  const start = new Date(now.getFullYear() - 1, now.getMonth() - 6, 1);
-
-  const seed = [
-    [0.15, 0.40, 0.20, 0.15, 0.10], // relations, work, health, growth, self
-    [0.12, 0.42, 0.18, 0.18, 0.10],
-    [0.18, 0.35, 0.20, 0.17, 0.10],
-    [0.22, 0.30, 0.22, 0.18, 0.08],
-    [0.28, 0.25, 0.22, 0.17, 0.08],
-    [0.30, 0.22, 0.20, 0.18, 0.10],
-    [0.32, 0.20, 0.18, 0.20, 0.10],
-    [0.28, 0.22, 0.16, 0.24, 0.10],
-    [0.25, 0.20, 0.15, 0.28, 0.12],
-    [0.20, 0.18, 0.18, 0.30, 0.14],
-    [0.18, 0.20, 0.20, 0.28, 0.14],
-    [0.16, 0.22, 0.22, 0.26, 0.14],
-    [0.15, 0.25, 0.22, 0.24, 0.14],
-    [0.16, 0.24, 0.20, 0.24, 0.16],
-    [0.18, 0.22, 0.20, 0.22, 0.18],
-    [0.20, 0.20, 0.20, 0.20, 0.20],
-    [0.22, 0.18, 0.20, 0.20, 0.20],
-    [0.24, 0.16, 0.20, 0.20, 0.20],
-  ];
-
-  return Array.from({ length: months }, (_, i) => {
-    const d = new Date(start.getFullYear(), start.getMonth() + i, 1);
-    const weights = seed[Math.min(i, seed.length - 1)];
-    return {
-      date: d,
-      relations: weights[0],
-      work:      weights[1],
-      health:    weights[2],
-      growth:    weights[3],
-      self:      weights[4],
-      peakNodes: {},
-    };
-  });
 }
 
 // ── Insight generation ───────────────────────────────────────────────────────
@@ -211,10 +170,9 @@ function generateInsight(data: Bucket[], dict: string = 'zh'): string | null {
 
 interface Props {
   nodes: LifeNode[];
-  isDemo?: boolean;
 }
 
-export default function LifeCivilizationMap({ nodes, isDemo = false }: Props) {
+export default function LifeCivilizationMap({ nodes }: Props) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const svgRef = useRef<SVGSVGElement>(null);
   const [hovered, setHovered] = useState<DomainId | null>(null);
@@ -251,10 +209,10 @@ export default function LifeCivilizationMap({ nodes, isDemo = false }: Props) {
 
   const streamData = useMemo(() => buildStream(nodes), [nodes]);
   const insight    = useMemo(() => generateInsight(streamData, dict), [streamData, dict]);
-  const isShowingDemo = nodes.length < 6;
 
   // D3 computation (pure math, no DOM)
   const { paths, xTicks, domainCenters } = useMemo(() => {
+    if (streamData.length < 2) return { paths: [], xTicks: [], domainCenters: [] };
     const innerW = W - MARGIN.left - MARGIN.right;
     const innerH = HEIGHT - MARGIN.top - MARGIN.bottom;
 
@@ -310,22 +268,17 @@ export default function LifeCivilizationMap({ nodes, isDemo = false }: Props) {
     return { paths, xTicks, domainCenters: paths.map(p => ({ id: p.domainId, x: p.labelX, y: p.labelY })) };
   }, [streamData, W, HEIGHT]);
 
+  // 数据不满两个月:什么都不画(调用方负责显示"需要 90 天"的诚实说明)
+  if (streamData.length < 2) return null;
+
   return (
     <div className="life-civ-wrap">
-      {/* Insight banner —— demo 数据时不显示"重心迁移"这类确定断言(否则新用户看到
-          "2024年5月你的重心从事业迁移到关系"这种其实来自种子常量的假个人洞察)。 */}
-      {insight && !isShowingDemo && (
+      {/* 顶部解读:最大迁移标注(全部来自真实数据 —— 示例地形已废除) */}
+      {insight && (
         <div className="life-civ-insight">
           <span className="life-civ-insight-icon">◉</span>
           <span>{insight}</span>
         </div>
-      )}
-
-      {/* Demo notice */}
-      {isShowingDemo && (
-        <p className="life-civ-demo-note">
-          {L(dict, '以下为示例地形 · 记录更多内容后将展示你真实的生命版图', 'Sample terrain — record more and your real life map appears')}
-        </p>
       )}
 
       {/* Stream SVG */}

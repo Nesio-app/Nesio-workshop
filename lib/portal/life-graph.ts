@@ -69,6 +69,16 @@ export interface LifeGraphCloudSyncOutboxItem {
   // 图谱取回即可(与 backfill 一致)。
 }
 
+/**
+ * 批量导入的节点(通讯录、系统生成的报告等)不代表用户亲手记下的生活 ——
+ * 洞察统计与多面镜证据一律剔除,否则"镜子读到的是通讯录不是用户"(v1 规格 §2.3)。
+ */
+export function isBulkImported(node: LifeNode): boolean {
+  if (node.source === 'system') return true;
+  if (node.attributes?.contactSource) return true;
+  return (node.tags || []).includes('联系人');
+}
+
 const STORAGE_KEY = 'nesio-life-graph-v1';
 const CLOUD_SYNC_STATUS_KEY = 'nesio-life-graph-cloud-sync-v1';
 const CLOUD_SYNC_OUTBOX_KEY = 'nesio-life-graph-cloud-sync-outbox-v1';

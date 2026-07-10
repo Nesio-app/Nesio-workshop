@@ -573,6 +573,20 @@ export default function Portal() {
       track('pro_gate_shown', { feature });
       setProGate(feature);
     };
+    // 洞察页的主题门/线头/走走看点击后跳记忆页搜索:MemoryTab 只在 memory 面挂载,
+    // 事件比挂载先到会丢 —— 这里先切面,再把事件补发一次给刚挂上的 MemoryTab。
+    const memorySearchHandler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.resent) return; // 补发的那次别再切面/再补发
+      setActiveSurface((s) => {
+        if (s === 'memory') return s;
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('nesio-memory-search', { detail: { ...detail, resent: true } }));
+        }, 150);
+        return 'memory';
+      });
+    };
+    window.addEventListener('nesio-memory-search', memorySearchHandler);
     window.addEventListener('nesio-pro-gate', proGateHandler);
     window.addEventListener('nesio-open-tell', handler);
     window.addEventListener('nesio-open-voice', voiceHandler);
@@ -581,6 +595,7 @@ export default function Portal() {
     window.addEventListener('nesio-open-inventory', inventoryHandler);
     window.addEventListener('nesio-start-workout', workoutHandler);
     return () => {
+      window.removeEventListener('nesio-memory-search', memorySearchHandler);
       window.removeEventListener('nesio-pro-gate', proGateHandler);
       window.removeEventListener('nesio-open-tell', handler);
       window.removeEventListener('nesio-open-voice', voiceHandler);
