@@ -48,6 +48,18 @@ export default function EmailComposeSheet({ open, onClose, context }: EmailCompo
   const [error, setError] = useState('');
   // AI 离线时初稿的来源:'cache'=复用上次 AI 给的,'local'=本地骨架。null=AI 现写的。
   const [draftSource, setDraftSource] = useState<'cache' | 'local' | null>(null);
+  // 批次 32:发件身份预检 —— 发送走「数据接入」连接的 Gmail,可能 ≠ 登录账号,先亮出来
+  const [fromEmail, setFromEmail] = useState('');
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    fetch('/api/portal/gmail/send', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((d: { ok?: boolean; email?: string }) => { if (!cancelled && d.ok && d.email) setFromEmail(d.email); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [open]);
 
   // 每次打开都用原邮件重置字段
   useEffect(() => {
@@ -180,6 +192,11 @@ export default function EmailComposeSheet({ open, onClose, context }: EmailCompo
           </div>
         ) : (
           <div style={{ overflowY: 'auto', padding: '0 0.25rem 0.5rem' }}>
+            {fromEmail && (
+              <p style={{ fontSize: '0.72rem', color: 'var(--portal-muted)', margin: '0 0 0.5rem' }}>
+                {L(dict, `发件人:${fromEmail}(数据接入里连接的 Gmail)`, `From: ${fromEmail} (the Gmail connected in Data sources)`)}
+              </p>
+            )}
             <label style={label}>{L(dict, '收件人', 'To')}</label>
             <input className="nesio-ob-input" value={to} onChange={(e) => setTo(e.target.value)} placeholder="name@example.com" style={{ marginBottom: '0.6rem' }} />
 

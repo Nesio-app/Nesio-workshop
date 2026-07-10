@@ -35,6 +35,9 @@ export default function RoadmapSheet({ open, onClose }: { open: boolean; onClose
   const [error, setError] = useState('');
   const [wish, setWish] = useState('');
   const [wishSent, setWishSent] = useState(false);
+  // 批次 32:常见问题 / 未来功能各自折叠,页面不再一屏全铺
+  const [faqOpen, setFaqOpen] = useState(false);
+  const [voteOpen, setVoteOpen] = useState(false);
 
   // 自由许愿(批次 4):文本进遥测(props 上限 80 字)+ 云产品事件(payload 全文),
   // /admin Top 事件与 product_events 都能看到,和候选榜同池评审。
@@ -94,8 +97,13 @@ export default function RoadmapSheet({ open, onClose }: { open: boolean; onClose
           <button type="button" className="nesio-voice-sheet-close" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}>✕</button>
         </div>
         <div className="nesio-settings-sheet-body">
-          {/* QA:投票 → 帮助与反馈。FAQ + 联系在前,功能投票保留在下方。 */}
-          <p className="nesio-settings-section-label">{L(dict, '常见问题', 'FAQ')}</p>
+          {/* 批次 32:两个折叠区(常见问题 / 未来功能),点标题展开 */}
+          <button type="button" onClick={() => setFaqOpen((v) => !v)} aria-expanded={faqOpen}
+            style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', background: 'none', border: 'none', padding: '0.55rem 0', cursor: 'pointer' }}>
+            <span className="nesio-settings-section-label" style={{ margin: 0 }}>{L(dict, '常见问题', 'FAQ')}</span>
+            <span style={{ color: 'var(--portal-muted)' }}>{faqOpen ? '▴' : '▾'}</span>
+          </button>
+          {faqOpen && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', fontSize: '0.82rem', lineHeight: 1.6, marginBottom: '0.9rem' }}>
             {[
               [L(dict, '不登录能用吗?', 'Does it work without an account?'), L(dict, '能。核心记录/搜索/回顾全部本地可用;登录只用于云同步和邮箱/日历连接。', 'Yes — capture, search, and review all work locally. Sign in only enables cloud sync and email/calendar.')],
@@ -109,8 +117,14 @@ export default function RoadmapSheet({ open, onClose }: { open: boolean; onClose
               </div>
             ))}
           </div>
+          )}
 
-          <p className="nesio-settings-section-label">{L(dict, '给未来功能投票', 'Vote on upcoming features')}</p>
+          <button type="button" onClick={() => setVoteOpen((v) => !v)} aria-expanded={voteOpen}
+            style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', background: 'none', border: 'none', padding: '0.55rem 0', cursor: 'pointer' }}>
+            <span className="nesio-settings-section-label" style={{ margin: 0 }}>{L(dict, '给未来功能投票', 'Vote on upcoming features')}</span>
+            <span style={{ color: 'var(--portal-muted)' }}>{voteOpen ? '▴' : '▾'}</span>
+          </button>
+          {voteOpen && (<>
           <p style={{ fontSize: '0.75rem', color: 'var(--portal-muted)', margin: '0 0 0.8rem' }}>
             {t(locale, 'roadmapHint')}
           </p>
@@ -146,6 +160,8 @@ export default function RoadmapSheet({ open, onClose }: { open: boolean; onClose
               </div>
             );
           })}
+          </>)}
+          {voteOpen && (<>
           {/* 自由许愿输入(批次 4) */}
           <div style={{ borderTop: '1px solid var(--portal-line)', marginTop: '0.9rem', paddingTop: '0.9rem' }}>
             <p style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--portal-ink)', margin: '0 0 0.45rem' }}>{t(locale, 'wishLabel')}</p>
@@ -174,6 +190,7 @@ export default function RoadmapSheet({ open, onClose }: { open: boolean; onClose
             )}
           </div>
 
+          </>)}
           {error && <p style={{ fontSize: '0.74rem', color: 'var(--status-risk)', margin: '0.6rem 0 0' }}>{error}</p>}
         </div>
       </div>

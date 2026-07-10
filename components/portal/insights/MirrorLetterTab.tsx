@@ -29,7 +29,7 @@ import { track } from '@/lib/portal/telemetry';
 import { L } from '@/lib/portal/i18n';
 import { usePortalLocale } from '../use-portal-locale';
 
-type LetterError = 'auth' | 'no-key' | 'ai-error' | 'network' | 'thin' | null;
+type LetterError = 'auth' | 'no-key' | 'quota' | 'ai-error' | 'network' | 'thin' | null;
 
 const MONTHS_EN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -85,6 +85,7 @@ export default function MirrorLetterTab() {
       if (res.status === 401) { setError('auth'); return; }
       const data = await res.json() as { ok?: boolean; paragraphs?: Array<{ text: string; evidence: string[]; confidence: number }>; reason?: string };
       if (data.reason === 'no_api_key') { setError('no-key'); return; }
+      if (data.reason === 'quota') { setError('quota'); return; }
       if (data.reason === 'insufficient_data') { setError('thin'); return; }
       if (data.reason === 'api_error' || !data.ok || !data.paragraphs?.length) { setError('ai-error'); return; }
       const next: MirrorLetter = {
@@ -123,6 +124,8 @@ export default function MirrorLetterTab() {
     ? L(dict, '登录后,Nesio 每月给你写一封信。', 'Sign in and Nesio writes you a letter each month.')
     : error === 'no-key'
       ? L(dict, '还没接上 AI(部署里配一个 AI key 即可),信写不出来。', 'AI is not connected yet (set an AI key in your deployment).')
+      : error === 'quota'
+        ? L(dict, 'AI 免费额度暂时用完了(服务端需配 ANTHROPIC_API_KEY 或给 Gemini 开付费)——不是你的问题。', 'The free AI quota is used up for now (server needs ANTHROPIC_API_KEY or paid Gemini) — not your fault.')
       : error === 'thin'
         ? L(dict, '这个月能读到的还不多 —— 记满 10 条,信才有的可写。', 'Not much to read yet — the letter starts at 10 notes.')
         : error === 'network'

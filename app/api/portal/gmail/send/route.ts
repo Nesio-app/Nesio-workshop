@@ -56,6 +56,30 @@ async function fetchThreadingHeaders(accessToken: string, emailId: string): Prom
   } catch { return {}; }
 }
 
+/**
+ * GET:发件身份预检(批次 32 QA:登录 hanbingads@ 但发出去是 hanbing6228@ ——
+ * 发送走的是「数据接入」里连接的 Gmail,不是登录账号)。撰写页先显示真实发件人,
+ * 用户点发送前就知道信会以谁的名义发出。
+ */
+export async function GET(req: NextRequest) {
+  if (!(await hasNesioSession())) {
+    return NextResponse.json({ ok: false, error: 'auth_required' }, { status: 401 });
+  }
+  const accessToken = await resolveGmailAccessToken(req);
+  if (!accessToken) return NextResponse.json({ ok: false, error: 'gmail_not_connected' });
+  try {
+    const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/profile', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      cache: 'no-store',
+    });
+    if (!res.ok) return NextResponse.json({ ok: false, error: 'profile_failed' });
+    const data = await res.json() as { emailAddress?: string };
+    return NextResponse.json({ ok: true, email: data.emailAddress || '' });
+  } catch {
+    return NextResponse.json({ ok: false, error: 'network' });
+  }
+}
+
 export async function POST(req: NextRequest) {
   if (!(await hasNesioSession())) {
     return NextResponse.json({ ok: false, error: 'auth_required' }, { status: 401 });

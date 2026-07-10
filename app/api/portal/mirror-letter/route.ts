@@ -149,7 +149,10 @@ export async function POST(req: NextRequest) {
     const paragraphs = await generateLetter(body);
     return NextResponse.json({ ok: true, paragraphs });
   } catch (err) {
-    console.error('[mirror-letter] error:', err instanceof Error ? err.message : err);
-    return NextResponse.json({ ok: true, paragraphs: [], reason: 'api_error' });
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[mirror-letter] error:', msg);
+    // 配额耗尽单列:这不是"AI 忙",是服务端没配付费 key —— 给用户准话
+    const quota = msg.includes('quota') || msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED');
+    return NextResponse.json({ ok: true, paragraphs: [], reason: quota ? 'quota' : 'api_error' });
   }
 }

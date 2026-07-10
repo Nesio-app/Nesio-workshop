@@ -496,7 +496,8 @@ export default function InsightsSheet({ onClose, initialTab }: { onClose: () => 
     const oldest = Math.min(...realNodes.map((n) => new Date(n.createdAt).getTime()));
     return Math.floor((Date.now() - oldest) / DAY_MS);
   }, [realNodes]);
-  const mapEligible = realNodes.length >= 6 && mapDays >= 90;
+  // 批次 32 用户拍板:门槛 90 → 21 天(与 21 天试用同节奏,试用结束刚好看到自己的版图)
+  const mapEligible = realNodes.length >= 6 && mapDays >= 21;
 
   // 门/线头/走走看点进记忆页:关掉本 sheet 再广播(Portal 负责切到记忆面)
   const openInMemory = useCallback((query: string) => {
@@ -655,7 +656,7 @@ export default function InsightsSheet({ onClose, initialTab }: { onClose: () => 
                 </>
               ) : (
                 <p className="nesio-insights-empty">
-                  {L(dict, `需要 90 天的记录才能成形 · 已积累 ${mapDays} 天`, `Takes shape after 90 days of notes · ${mapDays} days so far`)}
+                  {L(dict, `需要 21 天的记录才能成形 · 已积累 ${mapDays} 天`, `Takes shape after 21 days of notes · ${mapDays} days so far`)}
                 </p>
               )}
             </div>

@@ -80,6 +80,13 @@ export function getTier(): Tier {
   } catch { return 'free'; }
 }
 
+/** 本机 Pro 覆盖位(测试开关)本身的开关状态 —— 与 getTier 区分:
+ *  试用期内 getTier 恒 'pro',用它初始化设置开关会出现「关不掉,自己跳回开」。 */
+export function hasProOverride(): boolean {
+  if (typeof window === 'undefined') return false;
+  try { return localStorage.getItem(PRO_KEY) === '1'; } catch { return false; }
+}
+
 export function isPro(): boolean {
   return getTier() === 'pro';
 }

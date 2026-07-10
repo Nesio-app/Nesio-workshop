@@ -19,7 +19,7 @@ import { purgeIdbBlobs } from '@/lib/portal/idb-blob-store';
 import { purgeLocalImages } from '@/lib/portal/local-image-store';
 import { FEATURE_CATALOG, loadModuleOverrides, setModuleOverride, MODULE_OVERRIDES_EVENT, defaultResolvesTo, followsLab, isLowSatThemeOn, setLowSatTheme } from '@/lib/portal/module-overrides';
 import { isAppStoreBuild } from '@/lib/portal/app-build.mjs';
-import { getTier, setProEntitlement, trialDaysLeft } from '@/lib/portal/entitlement';
+import { getTier, hasProOverride, setProEntitlement, trialDaysLeft } from '@/lib/portal/entitlement';
 import { isValidBackup } from '@/lib/portal/full-backup';
 import { buildCombinedBackup, pushBackupToCloud, pullBackupFromCloud, restoreCombinedBackup, hasCloudEntitlement, lastCloudBackup, type CloudBackupError, type CloudRestoreError } from '@/lib/portal/cloud-backup';
 
@@ -464,7 +464,7 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
       setLastBackupAt(localStorage.getItem('nesio-last-backup-at'));
       setLabOn(localStorage.getItem('baohe_personal_lab') === '1' || localStorage.getItem('baohe_lab_mode') === '1');
       setLowSatOn(isLowSatThemeOn());
-      setProOn(getTier() === 'pro');
+      setProOn(hasProOverride()); // 批次 32:显示覆盖位本身;试用期 getTier 恒 pro 会让开关关不掉
     } catch { /* ignore */ }
     return () => window.removeEventListener('nesio-life-graph-updated', readCount);
   }, [open]);
@@ -570,13 +570,6 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
         )}
       </div>
 
-      {/* 批次 18:「哪些内容不会被使用 / Memory 记录 / 云端同步」三行与顶部
-          数据主权卡重复(条数/云端/备份都在卡上),删除;说明收进卡标题 ?,
-          登录入口保留一行 */}
-      <a href="/login" className="nesio-settings-action-btn" style={{ display: 'block', textAlign: 'center', textDecoration: 'none' }}>
-        {L(dict, '登录,开启跨设备云同步', 'Sign in to sync across devices')}
-      </a>
-
       {/* Export */}
       <button type="button" className="nesio-settings-action-btn" onClick={() => {
         const data = JSON.stringify(getLifeGraph(), null, 2);
@@ -592,11 +585,14 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
         {L(dict, '导出完整备份（含项目/情绪/设置等全部本地数据）', 'Export full backup (projects, moods, settings — all local data)')}
       </button>
 
-      {/* 云备份:目的地选择器(Google Drive 免费 / Nesio 云兜底)。一键把本机全部 durable
-          数据推到所选云,换机不丢。每个异步动作都渲染明确失败态(设计红线)。 */}
+      {/* 批次 32:登录/备份/恢复是同一件事(云同步与备份),整合成一块 —— 登录行收进来 */}
+      <p className="nesio-settings-section-label" style={{ marginTop: '1.2rem' }}>{L(dict, '云同步与备份', 'Cloud sync & backup')}</p>
+      <a href="/login" style={{ display: 'block', fontSize: '0.78rem', color: 'var(--portal-accent)', textDecoration: 'none', margin: '0 0 0.5rem' }}>
+        {L(dict, '登录后开启跨设备云同步 ›', 'Sign in to sync across devices ›')}
+      </a>
       <p style={{ fontSize: '0.78rem', color: 'var(--portal-muted)', margin: '0.6rem 0 0.3rem' }}>{L(dict, '备份到哪里', 'Back up to')}</p>
       <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
-        {([['drive', L(dict, '☁ Google Drive · 免费', '☁ Google Drive · Free')], ['nesio', L(dict, `☁ Nesio 云${cloudEntitled ? '' : L(dict, ' · 付费', ' · Paid')}`, `☁ Nesio cloud${cloudEntitled ? '' : ' · Paid'}`)]] as const).map(([d, label]) => (
+        {([['drive', L(dict, '☁ Google Drive · 免费', '☁ Google Drive · Free')], ['nesio', L(dict, `☁ Nesio 云${cloudEntitled ? '' : ' · Pro 免费'}`, `☁ Nesio cloud${cloudEntitled ? '' : ' · free with Pro'}`)]] as const).map(([d, label]) => (
           <button key={d} type="button" onClick={() => pickBackupDest(d)}
             style={{ flex: 1, padding: '0.4rem 0.5rem', borderRadius: 10, fontSize: '0.8rem', cursor: 'pointer',
               border: `1px solid ${backupDest === d ? 'var(--portal-accent-border)' : 'var(--portal-line)'}`,
@@ -609,7 +605,7 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
       <p style={{ fontSize: '0.7rem', color: 'var(--portal-muted)', margin: '0 0 0.4rem' }}>
         {backupDest === 'drive'
           ? L(dict, '存到你自己的 Google Drive(免费,私有文件夹);没连 Google 会自动改用 Nesio 云兜底。', 'Saved to your own Google Drive (free, private folder); falls back to Nesio cloud if Google isn\'t connected.')
-          : L(dict, '存到 Nesio 云(付费/规划中)。', 'Saved to Nesio cloud (paid/coming soon).')}
+          : L(dict, '存到 Nesio 云(Pro 权益,试用期内可用)。', 'Saved to Nesio cloud (a Pro benefit; available during trial).')}
       </p>
 
       <button type="button" className="nesio-settings-action-btn" onClick={handleBackupChosen} disabled={cloudState === 'pushing' || driveState === 'busy'}>

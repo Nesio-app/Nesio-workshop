@@ -7842,7 +7842,9 @@ html[data-portal-theme="night"] .nesio-connector-name { color: #e8eefa; }
 
 /* ─── Insights Sheet ─── */
 .nesio-insights-sheet-card {
-  max-height: 88vh !important;
+  /* 批次 32:定高 —— 空 tab(足迹/健康无数据)时弹框忽大忽小,固定住 */
+  height: 88dvh !important;
+  max-height: 88dvh !important;
 }
 .nesio-insights-sheet {
   display: flex;
@@ -9608,7 +9610,8 @@ html[data-portal-theme="night"] .nesio-wechat-bubble--ai {
 }
 
 .nesio-wechat-bubble--user {
-  background: #07c160;
+  /* 批次 32:用户气泡从微信绿换成主题蓝 */
+  background: var(--portal-accent, #588ce3);
   border-radius: 0.75rem 0 0.75rem 0.75rem;
 }
 
@@ -9726,7 +9729,7 @@ html[data-portal-theme="night"] .nesio-wechat-bubble--ai {
   align-items: center;
   gap: 0.4rem;
   padding: 0.55rem 0.75rem;
-  padding-bottom: max(0.55rem, env(safe-area-inset-bottom));
+  padding-bottom: calc(0.55rem + env(safe-area-inset-bottom, 0px));
   background: rgba(246,246,246,0.98);
   border-top: 1px solid rgba(0,0,0,0.08);
   flex-shrink: 0;
