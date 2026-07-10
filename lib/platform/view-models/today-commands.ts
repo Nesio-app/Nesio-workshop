@@ -5,6 +5,7 @@
  * 每个命令负责自己的 UI 失效广播(nesio-life-graph-updated)。
  */
 
+import { emitFeedback } from '../personalization/feedback-bus';
 import { ingestLifeNode } from '../../life-domain/ingest-node';
 import { getLifeGraph, updateLifeNode, deleteLifeNode } from '../../portal/life-graph';
 import type { SubTask, FocusNode } from './today-view-model';
@@ -69,6 +70,9 @@ export function addMeetingNotes(meetingNodeId: string, meetingName: string, note
 
 export function addCommitmentNode(name: string): FocusNode {
   const node = ingestLifeNode({ name, type: 'commitment', source: 'manual', confidence: 1, tags: [], attributes: {}, relations: [] });
+  // 批次 37:用户亲手把事放进焦点 = 最强的正信号 —— 进统一反馈总线,
+  // ranker/偏好据此学「这类事对我重要」。
+  try { emitFeedback({ surface: 'today', dimension: 'manual_add', key: 'commitment', reaction: 'useful', at: new Date().toISOString() }); } catch { /* 反馈失败不拦记录 */ }
   broadcast();
   return { id: node.id, name: node.name, type: node.type, rawInput: node.rawInput, createdAt: node.createdAt, attributes: node.attributes };
 }

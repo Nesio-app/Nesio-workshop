@@ -89,6 +89,12 @@ function urgencyScore(node: LifeNode): number {
 
 function isFocusNode(node: LifeNode): boolean {
   if (node.attributes.done) return false;
+  // 批次 37:手动/语音亲手添加的待办,当天就进焦点 —— 用户主动放进来的事,
+  // 今天就是它的日子(此前无日期待办被拒之门外,「刚记的去哪了」)。
+  if (node.type === 'commitment' && (node.source === 'manual' || node.source === 'voice')) {
+    const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
+    if (new Date(node.createdAt).getTime() >= dayStart.getTime()) return true;
+  }
   const now = Date.now();
   const d = extractNearestDate(node);
   if (d) {

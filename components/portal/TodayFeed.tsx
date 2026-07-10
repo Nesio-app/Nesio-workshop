@@ -71,30 +71,42 @@ export default function TodayFeed({
   const recogRef = useRef<{ stop: () => void } | null>(null);
 
   function startQuickMic() {
-    type SR = { new (): { lang: string; interimResults: boolean; onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null; onend: (() => void) | null; onerror: (() => void) | null; start: () => void; stop: () => void } };
+    // 批次 37 重做:边说边把文字写进输入框(interim 实时可见),说完文字留在框里
+    // 由用户回车确认;识别起不来(iOS PWA 常见)立刻回落说一句 sheet,绝不装死。
+    type SR = { new (): { lang: string; interimResults: boolean; continuous: boolean; onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null; onend: (() => void) | null; onerror: (() => void) | null; start: () => void; stop: () => void } };
     const w = window as unknown as { SpeechRecognition?: SR; webkitSpeechRecognition?: SR };
     const Ctor = w.SpeechRecognition || w.webkitSpeechRecognition;
     if (!Ctor) { window.dispatchEvent(new CustomEvent('nesio-open-voice')); return; }
     if (micState === 'recording') { recogRef.current?.stop(); return; }
-    const recog = new Ctor();
+    let recog: InstanceType<SR>;
+    try { recog = new Ctor(); } catch { window.dispatchEvent(new CustomEvent('nesio-open-voice')); return; }
     recog.lang = uiLocale === 'en' ? 'en-US' : 'zh-CN';
-    recog.interimResults = false;
-    let text = '';
-    recog.onresult = (e) => { text = Array.from({ length: e.results.length }, (_, i) => e.results[i][0].transcript).join(''); };
+    recog.interimResults = true;
+    recog.continuous = false;
+    let got = false;
+    recog.onresult = (e) => {
+      got = true;
+      const text = Array.from({ length: e.results.length }, (_, i) => e.results[i][0].transcript).join('');
+      setQuickAdd(text); // 实时写进输入框,像在打字
+    };
     recog.onend = () => {
       setMicState('idle');
       recogRef.current = null;
-      const name = text.trim();
-      if (!name) return;
-      addCommitmentNode(name);
-      setQuickAdd('');
-      setQuickSaved(true);
-      setTimeout(() => setQuickSaved(false), 1400);
+      // 一个字都没听到(常见于权限/引擎没起来)→ 回落说一句 sheet
+      if (!got) window.dispatchEvent(new CustomEvent('nesio-open-voice'));
     };
-    recog.onerror = () => { setMicState('idle'); recogRef.current = null; };
+    recog.onerror = () => {
+      setMicState('idle');
+      recogRef.current = null;
+      window.dispatchEvent(new CustomEvent('nesio-open-voice'));
+    };
     recogRef.current = recog;
     setMicState('recording');
-    recog.start();
+    try { recog.start(); } catch {
+      setMicState('idle');
+      recogRef.current = null;
+      window.dispatchEvent(new CustomEvent('nesio-open-voice'));
+    }
   }
   const [insightsTab, setInsightsTab] = useState<'reflection' | 'health'>('reflection');
 

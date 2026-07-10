@@ -201,9 +201,14 @@ const familyDomain: DomainEngine = {
   domain: 'family',
   version: 1,
   provideInsights(ctx: DECContext): RecommendationCard[] {
-    // 批次 36 QA:通讯录批量导入的联系人被当成"新记忆"推成家庭提醒(李冰冰卡)。
-    // 系统生成/批量导入(source=device)不是用户亲手记的,不进回忆候选。
-    const top = ctx.signals.find((s) => (s.type === 'commitment' || s.type === 'observation' || s.type === 'event') && s.source !== 'device');
+    // 批次 36:批量导入(source=device)不进回忆候选。
+    // 批次 37:刚记的也不进 —— 回忆是"带回可能忘的",5 秒前记的不可能忘,
+    // 推回去只是复读噪音。候选最短年龄 24h。
+    const dayAgo = Date.now() - 24 * 3_600_000;
+    const top = ctx.signals.find((s) =>
+      (s.type === 'commitment' || s.type === 'observation' || s.type === 'event')
+      && s.source !== 'device'
+      && new Date(s.capturedAt).getTime() < dayAgo);
     if (!top) return [];
     return one({
       id: `family-${top.id}`,
