@@ -7,7 +7,7 @@
  * (你可以开 Lab 再单独关掉某个不想要的工具)。
  */
 
-import { isAppStoreBlocked } from './app-build.mjs';
+import { APPSTORE_HIDDEN_IDS, isAppStoreBlocked } from './app-build.mjs';
 
 const KEY = 'nesio-module-overrides-v1';
 export const MODULE_OVERRIDES_EVENT = 'nesio-module-overrides-updated';
@@ -37,12 +37,31 @@ export const FEATURE_CATALOG: readonly FeatureEntry[] = Object.freeze([
   { id: 'places', zh: '地点足迹', en: 'Footprints', kind: 'feature', defaultOn: true },
 ]);
 
-/** 子功能是否启用:提审构建的 v1 隐藏集恒关(盖过一切);否则显式覆盖优先,再回落默认。 */
+export const LAB_MODE_EVENT = 'nesio-lab-mode-updated';
+
+/** Lab 模式(内测全解锁)是否开着。SSR 一律 false(= 公开面)。 */
+export function isLabModeOn(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return localStorage.getItem('baohe_personal_lab') === '1' || localStorage.getItem('baohe_lab_mode') === '1';
+  } catch { return false; }
+}
+
+/**
+ * 子功能是否启用。优先级:
+ *  1. 提审构建 v1 隐藏集 → 恒关(盖过一切,合规)。
+ *  2. 功能开关中心显式 开/关 → 尊重(即使 Lab 关也可单独开某域,反之亦然)。
+ *  3. v1 隐藏集(健康/财务/足迹/关系/健身/实验室)默认跟随 **Lab 总闸**:
+ *     Lab 开 = 内测全功能;Lab 关 = 公开面,这些域消失 —— 在 PWA 上翻 Lab
+ *     即可实时预览提审/公开形态,不用打包(QA 需求)。
+ *  4. 其余回落 defaultOn。
+ */
 export function isFeatureEnabled(id: string, defaultOn = true): boolean {
   if (isAppStoreBlocked(id)) return false; // 提审构建里 v1 隐藏子功能不可达
   const ov = loadModuleOverrides()[id];
   if (ov === 'on') return true;
   if (ov === 'off') return false;
+  if (APPSTORE_HIDDEN_IDS.includes(id)) return isLabModeOn();
   return defaultOn;
 }
 
