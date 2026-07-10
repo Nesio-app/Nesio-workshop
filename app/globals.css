@@ -14388,3 +14388,12 @@ html[data-portal-theme="night"] .nesio-exp-card:hover {
   font-size: 0.78rem;
   color: var(--portal-muted);
 }
+
+/* 批次 29 · 标签三层 §3.3:Memory 卡片相对时间 */
+.nesio-memory-card-time {
+  margin-left: auto;
+  font-size: 0.64rem;
+  color: var(--portal-muted);
+  white-space: nowrap;
+  align-self: center;
+}

@@ -7,6 +7,7 @@ import LocationPicker from './LocationPicker';
 import EmailComposeSheet from './EmailComposeSheet';
 import { IconClock, IconLink, NodeTypeIcon, WeatherIcon } from './icons';
 import { L } from '@/lib/portal/i18n';
+import { relativePastLabel } from '@/lib/portal/time-labels';
 import { displayNodeName } from '@/lib/portal/node-display';
 import dynamicImport from 'next/dynamic';
 const ReaderSheetLazy = dynamicImport(() => import('./ArticleReaderSheet'), { ssr: false });
@@ -614,7 +615,15 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
     onClose();
   }
 
-  const createdDate = new Date(n.createdAt).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'long', day: 'numeric', year: 'numeric' });
+  // 标签三层 §3.3:「记录于 2026年7月9日」→ 相对时间(今天 12:34 / 昨天 / N 天前)
+  const createdDate = (() => {
+    const created = new Date(n.createdAt);
+    const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
+    const time = created.toLocaleTimeString(dict === 'en' ? 'en-US' : 'zh-CN', { hour: '2-digit', minute: '2-digit' });
+    if (created >= dayStart) return L(dict, `今天 ${time}`, `today ${time}`);
+    if (created >= new Date(dayStart.getTime() - 86_400_000)) return L(dict, `昨天 ${time}`, `yesterday ${time}`);
+    return relativePastLabel(created, Date.now(), dict);
+  })();
 
   // Remaining attributes not shown in type-specific sections
   const shownAttrs = Object.entries(n.attributes).filter(

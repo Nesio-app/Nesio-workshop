@@ -38,6 +38,7 @@ const RelationGraph = dynamic(() => import('./RelationGraph'), { ssr: false });
 import type { GNode, GEdge } from '@/lib/platform/graph-engine';
 import { DomainIcon, IconBox, IconCalendar, IconFolder, IconMapPin, IconUser, NodeTypeIcon, IconMap } from './icons';
 import { L, type DictLocale } from '@/lib/portal/i18n';
+import { relativePastLabel } from '@/lib/portal/time-labels';
 import { displayNodeName } from '@/lib/portal/node-display';
 import { isPinned, loadPins, PINS_UPDATED_EVENT, togglePin } from '@/lib/portal/pins';
 import { usePortalLocale } from './use-portal-locale';
@@ -569,6 +570,17 @@ function MemoryCard({ node, onOpen, onDeleted, onLongPress }: { node: LifeNode; 
       {/* 批次 8:只留符号不留文字 — 类型 chip 与领域 chip 等大;
           来源文字 chip(日历/Gmail)与类型图标重复,移除 */}
       <span className="nesio-memory-card-meta-row">
+        {(() => {
+          // 标签三层 §3.3:列表卡带相对时间(今天/昨天/N 天前),数据的"新鲜度"一眼可辨
+          const t = new Date(node.createdAt);
+          const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
+          const label = t >= dayStart
+            ? L(dict, '今天', 'Today')
+            : t >= new Date(dayStart.getTime() - 86_400_000)
+              ? L(dict, '昨天', 'Yesterday')
+              : relativePastLabel(t, Date.now(), dict);
+          return <span className="nesio-memory-card-time">{label}</span>;
+        })()}
         {isPerson ? (
           <span className="nesio-memory-card-avatar" style={{ background: avatarBg, width: '1.55rem', height: '1.55rem', fontSize: '0.7rem' }}>{initials}</span>
         ) : (
