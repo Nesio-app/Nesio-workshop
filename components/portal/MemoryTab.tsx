@@ -19,6 +19,7 @@ import {
   retryLifeGraphCloudSync,
   type LifeNode,
 } from '@/lib/portal/life-graph';
+import { pinNodeToTodayFocus } from '@/lib/platform/view-models/today-commands';
 import { DOMAINS } from '@/lib/life-domain';
 import { isFeatureEnabled } from '@/lib/portal/module-overrides';
 import { smartSearch, type SearchUnderstood } from '@/lib/portal/smart-search';
@@ -38,7 +39,7 @@ import dynamic from 'next/dynamic';
 const MemoryNodeDetail = dynamic(() => import('./MemoryNodeDetail'), { ssr: false });
 const RelationGraph = dynamic(() => import('./RelationGraph'), { ssr: false });
 import type { GNode, GEdge } from '@/lib/platform/graph-engine';
-import { DomainIcon, IconBox, IconCalendar, IconFolder, IconMapPin, IconUser, NodeTypeIcon, IconMap } from './icons';
+import { DomainIcon, IconBox, IconCalendar, IconFolder, IconMapPin, IconStar, IconUser, NodeTypeIcon, IconMap } from './icons';
 import { L, type DictLocale } from '@/lib/portal/i18n';
 import { relativePastLabel } from '@/lib/portal/time-labels';
 import { displayNodeName } from '@/lib/portal/node-display';
@@ -501,6 +502,14 @@ function LongPressSheet({
         {activeProjects.length === 0 && (
           <p className="nesio-longpress-no-projects">{L(dict, '还没有项目，先新建一个项目', 'No projects yet — create one first')}</p>
         )}
+        {/* 批次 50:把一条记忆亲手拉回今天的注意力 —— 进焦点 + 进训练总线 */}
+        <button
+          type="button"
+          className="nesio-longpress-share-btn"
+          onClick={() => { pinNodeToTodayFocus(node.id); onClose(); }}
+        >
+          {L(dict, '加入今日焦点', 'Add to today\'s focus')}
+        </button>
         <button
           type="button"
           className="nesio-longpress-share-btn"
@@ -823,6 +832,8 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
   const pinnedNodes = pinIds
     .map((id) => nodes.find((n) => n.id === id))
     .filter((n): n is LifeNode => Boolean(n));
+  // 批次 50:收藏夹收成单一容器卡,点开才展开全部收藏
+  const [favOpen, setFavOpen] = useState(false);
 
   const dict = portalLocaleToDictionaryLocale(locale);
   const copy = COPY[dict];
@@ -1032,16 +1043,38 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                         </span>
                       </button>
                     )}
-                    {pinnedNodes.map((n) => (
-                      <MemoryCard
-                        key={n.id}
-                        node={n}
-                        onOpen={() => openNodeDetail(n)}
-                        onDeleted={() => setNodes(getLifeGraph())}
-                        onLongPress={() => setLongPressNode(n)}
-                      />
-                    ))}
+                    {/* 批次 50:收藏不再各占一张方卡 —— 一张「收藏夹」容器卡,点开看全部 */}
+                    {pinnedNodes.length > 0 && (
+                      <button
+                        type="button"
+                        className="nesio-memory-card nesio-fav-card"
+                        onClick={() => setFavOpen((v) => !v)}
+                        aria-expanded={favOpen}
+                      >
+                        <span className="nesio-memory-card-title">{L(dict, '收藏夹', 'Favorites')}</span>
+                        <span className="nesio-memory-card-sub">
+                          {L(dict, `${pinnedNodes.length} 条收藏的记忆`, `${pinnedNodes.length} pinned ${pinnedNodes.length === 1 ? 'memory' : 'memories'}`)}
+                        </span>
+                        <span className="nesio-memory-card-meta-row">
+                          <span className="nesio-memory-card-icon" style={{ background: 'var(--portal-accent-soft)' }}><IconStar size={13} /></span>
+                          <span className="nesio-fav-card-hint">{favOpen ? '▴' : '▾'}</span>
+                        </span>
+                      </button>
+                    )}
                   </div>
+                  {favOpen && pinnedNodes.length > 0 && (
+                    <div className="nesio-memory-grid nesio-fav-expanded">
+                      {pinnedNodes.map((n) => (
+                        <MemoryCard
+                          key={n.id}
+                          node={n}
+                          onOpen={() => openNodeDetail(n)}
+                          onDeleted={() => setNodes(getLifeGraph())}
+                          onLongPress={() => setLongPressNode(n)}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 

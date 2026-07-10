@@ -14583,3 +14583,8 @@ html[data-portal-theme="night"] .nesio-collapsed-section {
   background: linear-gradient(180deg, rgba(22, 36, 60, 0.9), rgba(17, 28, 49, 0.85));
   border-color: rgba(127, 176, 238, 0.2);
 }
+
+/* ── 批次 50:收藏夹容器卡 + 展开区 ─────────────────────────────────────── */
+.nesio-fav-card { text-align: left; cursor: pointer; }
+.nesio-fav-card-hint { margin-left: auto; font-size: 0.7rem; color: var(--portal-muted); }
+.nesio-fav-expanded { margin-top: 0.6rem; }

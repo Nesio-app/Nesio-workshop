@@ -8,7 +8,7 @@
 import { emitFeedback } from '../personalization/feedback-bus';
 import { ingestLifeNode } from '../../life-domain/ingest-node';
 import { getLifeGraph, updateLifeNode, deleteLifeNode } from '../../portal/life-graph';
-import type { SubTask, FocusNode } from './today-view-model';
+import { localDayKey, type SubTask, type FocusNode } from './today-view-model';
 
 function broadcast(): void {
   if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
@@ -66,6 +66,18 @@ export function addMeetingNotes(meetingNodeId: string, meetingName: string, note
     relations: [],
   });
   broadcast();
+}
+
+/** 批次 50:记忆页长按「加入今日焦点」—— 钉进今天(明天自然过期)。
+ *  与 manual_add 同级的强正信号:用户亲手把一条记忆拉回今天的注意力,
+ *  ranker/偏好据此学「这类记忆值得主动浮现」。 */
+export function pinNodeToTodayFocus(nodeId: string): boolean {
+  const node = getLifeGraph().find((n) => n.id === nodeId);
+  if (!node) return false;
+  updateLifeNode(nodeId, { attributes: { ...node.attributes, focusPinnedOn: localDayKey(), done: false } });
+  try { emitFeedback({ surface: 'memory', dimension: 'pin_to_focus', key: node.type, reaction: 'useful', at: new Date().toISOString() }); } catch { /* 反馈失败不拦动作 */ }
+  broadcast();
+  return true;
 }
 
 export function addCommitmentNode(name: string): FocusNode {

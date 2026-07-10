@@ -87,8 +87,15 @@ function urgencyScore(node: LifeNode): number {
   return Date.now() - new Date(node.createdAt).getTime() + 30 * 86_400_000;
 }
 
+/** 本地日键(YYYY-MM-DD)—— 「加入今日焦点」的准入凭据按本地日自然过期 */
+export function localDayKey(d: Date = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function isFocusNode(node: LifeNode): boolean {
   if (node.attributes.done) return false;
+  // 批次 50:记忆页长按「加入今日焦点」钉进来的,今天无条件在场(明天自然过期)
+  if (node.attributes.focusPinnedOn === localDayKey()) return true;
   // 批次 37:手动/语音亲手添加的待办,当天就进焦点 —— 用户主动放进来的事,
   // 今天就是它的日子(此前无日期待办被拒之门外,「刚记的去哪了」)。
   if (node.type === 'commitment' && (node.source === 'manual' || node.source === 'voice')) {
