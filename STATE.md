@@ -2,8 +2,8 @@
 
 > Loop-engineering 原则:状态必须活在对话之外。任何 AI 会话或新协作者
 > **先读这个文件**,再动手。改动仓库重大状态时,同步更新这里。
-> 最后更新:2026-07-04(欠账清偿批次:Signal M1-M4 / FocusSection 二次拆分 /
-> hex token 化 / REG-004/006 i18n;PRD 偏差见 docs/prd-deltas-2026-07.md)
+> 最后更新:2026-07-10(v1 产品规格批次 27-29:洞察四件套+多面镜 / Today 收据 /
+> 标签相对时间;规格 = docs/design/v1-product-spec-2026-07.md)
 
 ## 当前纪元:两代产品交接中
 
@@ -77,6 +77,26 @@
   文案遵循设计系统"温暖教练"语音(禁感叹号/禁"逾期失败")。
 - 兄弟目录不是全是垃圾:adhd-flow-ios/web、health-web、storage-web、fitness/web、
   tools/secretary 是 bundle-toolbox 的**构建输入**。
+
+## v1 产品规格执行状态(2026-07-10)
+
+规格 = `docs/design/v1-product-spec-2026-07.md`(三公理:记→问→回溯 / 回溯>预测 / Calm≠Dead)。
+
+**已按规格落地(批次 27-29,commit e435b9a/cacae7e/7e76e64):**
+- §1 Today:收据首行(TodayViewModel.receipt,时段三态,绝不显示同步计数)、
+  FOCUS 空态一行收掉、回忆卡日 1/晚 2、轮播兜底废除(buildRotatingFallback 弃用待删)、
+  底部捕获输入框撤除(FAB 唯一英雄动作)、捕获提示行。
+- §2 洞察:免费四件套(主题门/线头/走走看/一行节律)、生命版图唯一图(90 天门槛、
+  示例地形废除、证据行)、认知=多面镜月度信(/api/portal/mirror-letter,5 镜,
+  老友免费试读,mirror_letter 入 PRO_ONLY_FEATURES,只回看不预测)、
+  旧 7 层模型+节点图移 Lab、批量导入不计入(life-graph.isBulkImported)。
+- §3 标签:L1 单图标(核对通过)、L2 tags 指令 retrieval-only、L3 主题门(详情页+洞察)、
+  相对时间(列表卡+详情)。
+- 契约同步:guidance-holiday-fallback §3 改守新公理(无兜底/收据必渲染/预算帽)。
+
+**规格内仍挂账:**列表卡照片缩略图、L3 真聚类(embedding 同义合并)、
+§4 冷暖进 token/宋体子集化/动效清单、§5 端上化(iOS 端上转写/视觉标签,依赖原生壳)、
+sensitivity/retention 枚举化(中期)。
 
 ## 已知欠账(按优先级)
 
