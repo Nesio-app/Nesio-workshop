@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
 import { mergeCalendarEvents } from '@/lib/portal/calendar-filters';
 import { parseIcsEvents, parseCalendarName } from '@/lib/portal/ics';
+import { resolveGmailAccessToken } from '@/lib/portal/providers/gmail-access';
 import { getIntegrationToken, saveIntegrationToken } from '@/lib/portal/integrations';
 import { pickCalendarTokens, shouldUseOAuth } from '@/lib/portal/calendar-token.mjs';
 import { envValue } from '@/lib/portal/env';
@@ -233,7 +234,15 @@ export async function GET(req: NextRequest) {
   const authFailure = await requireAuthenticatedCalendarAccess(req);
   if (authFailure) return authFailure;
 
-  const { accessToken, refreshToken } = await resolveCalendarTokens();
+  let { accessToken, refreshToken } = await resolveCalendarTokens();
+  // 批次 35 根因:合并授权(Google 日历+Gmail)是同一个 token,通讯录/邮件走
+  // resolveGmailAccessToken(整条借用链)能拿到,日历却只认自己名下的 —— 于是
+  // 「通讯录导入 127 成功、日历说没连接」。日历自己两手空空时,借同链 token
+  // (它带 calendar scope)。
+  if (!accessToken && !refreshToken) {
+    const borrowed = await resolveGmailAccessToken(req).catch(() => '');
+    if (borrowed) accessToken = borrowed;
+  }
   // access 可能过期但 refresh 仍在 → 只要有任一,就走 OAuth 路径(而非直接掉进 iCal)。
   if (shouldUseOAuth({ accessToken, refreshToken })) {
     try {

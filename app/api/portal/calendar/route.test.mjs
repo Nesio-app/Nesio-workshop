@@ -123,6 +123,11 @@ function loadRoute() {
           },
         };
       }
+      if (specifier === '@/lib/portal/providers/gmail-access') {
+        // 批次 35:日历两手空空时借共享 Google token 的链路。测试默认借不到(空串),
+        // fail-closed 行为不变;单独用例可覆写 sandbox.__borrowedToken。
+        return { resolveGmailAccessToken: async () => sandbox.__borrowedToken || '' };
+      }
       if (specifier === '@/lib/portal/env') {
         // 共享 env 助手(取代各路由本地 envValue);纯函数,忠实复制。
         return { envValue: (key) => (process.env[key] ?? '').trim() };

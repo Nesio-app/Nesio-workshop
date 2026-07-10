@@ -138,17 +138,7 @@ export default function NesioProfileCard() {
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14"><path d="M9 18l6-6-6-6"/></svg>
           </a>
         )}
-        {isSignedIn && (
-          <button type="button" className="nesio-profile-auth-banner" onClick={handleLogout}>
-            {/* P1-6:显示登录的是哪个账号 —— 之前只有「退出登录」,用户不知道当前身份 */}
-            <span>
-              {accountEmail
-                ? <>{accountEmail}<span style={{ opacity: 0.65, marginLeft: '0.5rem' }}>{L(dict, '· 退出登录', '· Sign out')}</span></>
-                : L(dict, '退出登录', 'Sign out')}
-            </span>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14"><path d="M15 18l6-6-6-6"/><path d="M21 12H9"/></svg>
-          </button>
-        )}
+        {/* 批次 35:顶部退出行删除 —— 邮箱与退出都在「账户」页里,重复入口去掉 */}
 
         {/* Menu */}
         <nav className="nesio-profile-menu" aria-label={L(dict, '设置菜单', 'Settings menu')}>

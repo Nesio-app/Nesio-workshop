@@ -14497,3 +14497,12 @@ html[data-lowsat="1"] .portal-root {
   line-height: 1.8;
   color: var(--portal-muted);
 }
+
+/* 批次 35 · 引导 caret:内容类提示朝上指向页面内容(此前恒朝下戳导航,像悬空图标) */
+.nesio-tips-card--content::after {
+  bottom: auto;
+  top: -0.42rem;
+  left: 50%;
+  transform: translateX(-50%) rotate(225deg);
+}
+.nesio-tips-hl--content { display: none; }

@@ -10,6 +10,7 @@ import { type LifeNode, pruneNotionNodes } from '@/lib/portal/life-graph';
 import type { HealthMetrics, HealthNode } from '@/lib/portal/apple-health';
 import { readLaunchSurfaceContextFromBrowser } from '@/lib/portal/launch-surface.mjs';
 import { L } from '@/lib/portal/i18n';
+import { InfoTip } from './InfoTip';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import { markBusy } from '@/lib/portal/app-busy';
@@ -1195,10 +1196,12 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
             {CONNECTORS.filter((c) => c.dev).map((c) => renderDevRow(c))}
           </details>
 
-          <div style={{ marginTop: '1rem', fontSize: '0.72rem', color: 'var(--portal-muted)', textAlign: 'center', lineHeight: 1.6 }}>
-            {L(dict, '有 API 的（Google 日历+Gmail / Notion / Toggl / Flomo）直接连接；', 'API sources (Google Calendar+Gmail / Notion / Toggl / Flomo) connect directly;')}<br />
-            {L(dict, '没有公开 API 的（提醒事项 / Keep / 微信读书）通过快捷指令推送。', 'no-API sources (Reminders / Keep / WeRead) push via Shortcuts.')}<br />
-            {L(dict, '抽取出的记录存在你的设备;连接邮箱 / 日历 / Notion / 银行等账号时,授权与数据拉取会经过对应服务商的服务器。', "Extracted records are stored on your device; connecting email / calendar / Notion / bank accounts routes authorization and fetching through those providers' servers.")}
+          {/* 批次 35:三行说明收进一个小信息符号 */}
+          <div style={{ marginTop: '1rem', textAlign: 'center', fontSize: '0.74rem', color: 'var(--portal-muted)' }}>
+            {L(dict, '连接方式与数据去向', 'How sources connect & where data lives')}
+            <InfoTip text={L(dict,
+              '有 API 的(Google 日历+Gmail / Notion / Toggl / Flomo)直接连接;没有公开 API 的(提醒事项 / Keep / 微信读书)通过快捷指令推送。抽取出的记录存在你的设备;连接邮箱/日历/Notion/银行等账号时,授权与数据拉取会经过对应服务商的服务器。',
+              "API sources (Google Calendar+Gmail / Notion / Toggl / Flomo) connect directly; no-API sources (Reminders / Keep / WeRead) push via Shortcuts. Extracted records live on your device; connecting email/calendar/Notion/bank accounts routes authorization and fetching through those providers' servers.")} />
           </div>
         </div>
       </div>
