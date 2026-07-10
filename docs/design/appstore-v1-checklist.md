@@ -79,13 +79,18 @@
 - [ ] 拍照 AI(免费端上 / Pro 云,门控正确)
 - [ ] 问问 AI(免费语义搜索 / Pro RAG 问答)
 - [ ] AI routine(完成 + 门控)
-- [ ] 邮件问问直接回复(**依赖 Gmail 发送权限的 Google 验证 → 今天启动**)
+- [ ] 邮件问问直接回复 —— **v1 决策:原生走系统写信卡(MFMailComposeViewController)**,
+      Nesio 内弹出、AI 预填、用户点发送:$0、**免 Google 受限 scope 验证**(从 v1 关键
+      路径移除,见 §5)。Pro 门挂在 AI 起草,不挂发送。原生插件必查 canSendMail(),
+      设备没配系统邮件账号 → 回退 mailto:/复制。web/PWA 继续走既有 Gmail send 路由。
 - [ ] 冷冻仓(完成 + 门控)
 - [ ] 每个 Pro 功能在免费用户点击时有干净的「升级 Pro」引导(**不是报错**)
 
 ## 5. 长周期第三方(今天启动,别卡末尾)🔴
 
-- [ ] 🔴 **Gmail 发送权限 Google 验证/OAuth 审核**(否则"邮件直接回复"上不了 · 数周)
+- [x] ~~🔴 Gmail 发送权限 Google 验证/OAuth 审核(数周)~~ —— **已从 v1 关键路径移除**:
+      原生用系统写信卡发送(见 §4),不碰 gmail.send 受限 scope。将来做「AI 自动发送」
+      (Pro 高级能力)时再启动此验证,不阻塞上架。
 - [ ] Apple Developer Program（$99/年,若没注册）
 - [ ] Pro 会打付费云 LLM → 确认后端/额度扛得住(成本护栏对**免费**;Pro 是真花钱那侧)
 

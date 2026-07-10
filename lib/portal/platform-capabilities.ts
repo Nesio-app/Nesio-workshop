@@ -73,6 +73,20 @@ export function camera(): CapabilityImpl {
   return 'none';
 }
 
+/**
+ * 发邮件。native: 系统写信卡(MFMailComposeViewController —— Nesio 内弹出、AI 预填、
+ * 用户点发送;$0 且免 Google 受限 scope 验证,v1 决策);web: Gmail API send
+ * (/api/portal/gmail/send,需已连接 Gmail);none: 回退 mailto:(会跳走)/复制正文。
+ * 原生插件必须先查 canSendMail() —— 设备没配系统邮件账号(只用 Gmail App 的用户)时
+ * composer 不可用,插件应报 'none' 让调用方走兜底,否则点「回复」没反应。
+ * Pro 门挂在 AI 起草上,不挂在发送上(发送是系统能力,成本在起草)。
+ */
+export function composeEmail(): CapabilityImpl {
+  if (hasNativePlugin('EmailComposer')) return 'native';
+  if (typeof window !== 'undefined') return 'web'; // Gmail send 路由;未连接由调用方引导
+  return 'none';
+}
+
 /** 一次性快照 —— 调试 / 分析(匿名,别带内容),看这台设备的能力矩阵。 */
 export function capabilitiesSnapshot(): Record<string, CapabilityImpl | boolean> {
   return {
@@ -83,5 +97,6 @@ export function capabilitiesSnapshot(): Record<string, CapabilityImpl | boolean>
     onDeviceLLM: onDeviceLLM(),
     push: push(),
     camera: camera(),
+    composeEmail: composeEmail(),
   };
 }

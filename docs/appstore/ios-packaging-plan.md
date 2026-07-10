@@ -46,6 +46,10 @@ iPhone 17 App(Capacitor 壳)
 - **StoreKit IAP**(Pro 订阅 + 恢复购买 + 服务端收据校验)→ 接 `entitlement.setProEntitlement`。见 appstore-v1-checklist §2。
 - **Sign in with Apple**:web 侧已就绪(`/api/auth/start` apple 分支);提审前配 Apple Services ID + Supabase Apple provider(submission-assets §7.1)。
 - **端上模型插件**(Apple Foundation Models):见 `ondevice-llm-routing-spec.md`。iOS 26 + iPhone 17 可跑;这时在真机量质量/延迟,再定路由阈值。
+- **邮件写信卡插件**(EmailComposer → MFMailComposeViewController):v1 发邮件路径。
+  Nesio 内弹系统写信卡、AI 预填、用户点发送 —— $0 + **免 Google 受限 scope 验证**
+  (已从上架关键路径移除)。必查 `canSendMail()`:没配系统邮件账号 → 报 'none',
+  web 层回退 mailto:/复制。检测点已备:`platform-capabilities.composeEmail()`。
 - **Info.plist 已在 CI 写**相机/麦克风/相册/出口合规;**不加**位置/健康(v1 构建期已关)。
 
 ## 注意
