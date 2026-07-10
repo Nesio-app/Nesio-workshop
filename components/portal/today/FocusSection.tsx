@@ -63,7 +63,7 @@ function CollapsedTaskItem({
           <span className="nesio-collapsed-title">{node.name}</span>
           {hint && <span className="nesio-collapsed-time">{hint}</span>}
         </button>
-        <button type="button" className="nesio-collapsed-dismiss" onClick={() => onDismiss(node.id)} aria-label={t(locale, 'todayDismissAria')}>✕</button>
+        {/* 批次 39:✕ 撤除(用户指令)—— 完成圈/左滑已够 */}
       </div>
       {expanded && (
         <div className="nesio-collapsed-detail">

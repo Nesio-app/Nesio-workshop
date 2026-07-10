@@ -192,7 +192,7 @@ export interface SyncAllOutcome { id: 'calendar' | 'gmail' | 'flomo' | 'plaid' |
 /** 依次同步所有已接入源;每源一行结果(未配置/未连接也如实报,不静默)。 */
 /* ---------- Google 通讯录(People API)→ person 节点(人缘管理底料) ---------- */
 
-export interface PeopleSyncResult { ok: boolean; error?: string; imported: number; updated: number }
+export interface PeopleSyncResult { ok: boolean; error?: string; imported: number; updated: number; deduped?: number; total?: number }
 
 /** 拉 Google 通讯录,灌成 life-graph person 节点(按邮箱/名字去重,已存在则补富化字段)。
  *  关系 tab 读 person 节点即可显示;attributes 里带 email/photo/birthday 供人缘管理。 */
@@ -245,13 +245,14 @@ export async function runPeopleSync(): Promise<PeopleSyncResult> {
     }
     // 自愈:历史并发导入留下的重复联系人(同邮箱或同名 + contactSource),保最早删其余
     const removed = await dedupeImportedContacts();
-    return { ok: true, imported, updated, deduped: removed };
+    const totalNow = getLifeGraph().filter((n) => n.type === 'person' && n.attributes?.contactSource).length;
+    return { ok: true, imported, updated, deduped: removed, total: totalNow };
   } catch { return { ok: false, error: 'network', imported: 0, updated: 0 }; }
   })();
   try { return await peopleSyncInFlight; } finally { peopleSyncInFlight = null; }
 }
 
-let peopleSyncInFlight: Promise<{ ok: boolean; error?: string; imported: number; updated: number; deduped?: number }> | null = null;
+let peopleSyncInFlight: Promise<{ ok: boolean; error?: string; imported: number; updated: number; deduped?: number; total?: number }> | null = null;
 
 /** 清理重复导入的联系人:同 email(或无 email 时同名)的 contactSource person 只留最早一个。 */
 export async function dedupeImportedContacts(): Promise<number> {
@@ -280,6 +281,6 @@ export async function syncAllConnectors(): Promise<SyncAllOutcome[]> {
   out.push({ id: 'gmail', ok: mail.ok, detail: mail.ok ? [`邮件读 ${mail.read} 封,提取 ${mail.extracted} 条`, `Mail read ${mail.read}, extracted ${mail.extracted}`] : ['邮件未同步(未连接或出错)', 'Mail not synced'] });
   out.push({ id: 'flomo', ok: flomo.ok, detail: flomo.ok ? [`Flomo 新增 ${flomo.fresh} 条`, `Flomo +${flomo.fresh}`] : ['Flomo 未配置', 'Flomo not configured'] });
   out.push({ id: 'plaid', ok: plaid.ok, detail: plaid.ok ? [`银行新增 ${plaid.fresh} 笔(共 ${plaid.total})`, `Bank +${plaid.fresh} (${plaid.total} total)`] : ['银行未连接', 'Bank not linked'] });
-  out.push({ id: 'people', ok: people.ok, detail: people.ok ? [`联系人导入 ${people.imported}、更新 ${people.updated}`, `Contacts +${people.imported}, updated ${people.updated}`] : ['通讯录未同步(未连接 Google)', 'Contacts not synced'] });
+  out.push({ id: 'people', ok: people.ok, detail: people.ok ? [`联系人导入 ${people.imported}、更新 ${people.updated}${(people.deduped ?? 0) > 0 ? `、清理重复 ${people.deduped}` : ''}(库中 ${people.total ?? '?'} 人)`, `Contacts +${people.imported}, updated ${people.updated}${(people.deduped ?? 0) > 0 ? `, deduped ${people.deduped}` : ''} (${people.total ?? '?'} total)`] : ['通讯录未同步(未连接 Google)', 'Contacts not synced'] });
   return out;
 }

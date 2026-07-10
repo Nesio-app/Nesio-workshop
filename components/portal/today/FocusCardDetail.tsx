@@ -14,6 +14,8 @@ import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import { rememberAI, recallAI, sig } from '@/lib/portal/ai-cache';
 import { decomposeLocally } from '@/lib/portal/local-decompose';
+import { matchTaskTemplate } from '@/lib/platform/local-task-templates';
+import { canUsePaidCloudAi } from '@/lib/portal/entitlement';
 
 type Step = { name: string; emoji?: string; durationMin?: number };
 
@@ -89,10 +91,30 @@ export function FocusCardDetail({
     applyWave(decomposeLocally(node.name, dict), 'local', cacheKey);
   }
 
-  async function fetchWave(previousAction?: string, history: string[] = []) {
-    setLoading(true);
+  // 批次 39 用户定案:粉碎任务**默认不打联网 AI**(慢、要网)—— 本地秒出:
+  // 常见任务命中模板(诚实步骤+真分钟) → 上次 AI 的缓存 → 通用骨架。
+  // 云 AI 只走下面的「AI 细化」按钮。
+  function fetchWave(previousAction?: string, _history: string[] = []) {
     setError(null);
     const cacheKey = sig(node.name + (previousAction ? `|next:${previousAction}` : ''));
+    const tpl = matchTaskTemplate(node.name, dict);
+    if (tpl && !previousAction) { applyWave(tpl, 'local', cacheKey); setWaveSource(null); return; }
+    const cached = recallAI<Step[]>('decompose', cacheKey);
+    if (cached?.length) { applyWave(cached, 'cache', cacheKey); setWaveSource(null); return; }
+    applyWave(decomposeLocally(node.name, dict), 'local', cacheKey);
+    setWaveSource(null); // 本地是默认引擎,不再当"降级"提示
+  }
+
+  // 「AI 细化」:显式打云重拆(canUsePaidCloudAi 门;失败给可见提示,本地步骤仍在)
+  const [aiRefining, setAiRefining] = useState(false);
+  async function aiRefineWave() {
+    if (aiRefining) return;
+    if (!canUsePaidCloudAi()) {
+      window.dispatchEvent(new CustomEvent('nesio-pro-gate', { detail: { feature: 'decompose_ai' } }));
+      return;
+    }
+    setAiRefining(true);
+    const cacheKey = sig(node.name);
     try {
       const res = await fetch('/api/portal/decompose-task', {
         method: 'POST',
@@ -100,18 +122,17 @@ export function FocusCardDetail({
         body: JSON.stringify({
           taskName: node.name,
           context: node.rawInput,
-          previousAction,
-          completedActions: history,
+          completedActions: completedActions,
           locale: dict,
         }),
       });
       const data = await res.json() as { ok?: boolean; steps?: Step[] };
       if (data.ok && data.steps?.length) applyWave(data.steps, 'ai', cacheKey);
-      else fallbackWave(cacheKey); // AI 没成功 → 缓存/本地兜底,不再整个失败
+      else setError(L(dict, 'AI 这次没拆出来 —— 本地步骤照用,稍后再试。', "AI couldn't refine this time — the local steps still work."));
     } catch {
-      fallbackWave(cacheKey); // 离线/网络异常 → 同上,不掉线
+      setError(L(dict, 'AI 这次没连上 —— 本地步骤照用。', "Couldn't reach AI — the local steps still work."));
     }
-    setLoading(false);
+    setAiRefining(false);
   }
 
   async function handleDrill(action: MomentumAction) {
@@ -124,18 +145,8 @@ export function FocusCardDetail({
       setDrillMap((prev) => new Map(prev).set(action.id, drills));
       if (fromAI) rememberAI('decompose', cacheKey, steps);
     };
-    try {
-      const res = await fetch('/api/portal/decompose-task', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskName: action.name, context: node.name, drill: true, locale: dict }),
-      });
-      const data = await res.json() as { ok?: boolean; steps?: Step[] };
-      if (data.ok && data.steps?.length) applyDrills(data.steps, true);
-      else applyDrills(recallAI<Step[]>('decompose', cacheKey) ?? decomposeLocally(action.name, dict), false);
-    } catch {
-      applyDrills(recallAI<Step[]>('decompose', cacheKey) ?? decomposeLocally(action.name, dict), false);
-    }
+    // 批次 39:钻取同样本地优先(秒出);上次 AI 给过就复用
+    applyDrills(recallAI<Step[]>('decompose', cacheKey) ?? matchTaskTemplate(action.name, dict) ?? decomposeLocally(action.name, dict), false);
     setDrillingId(null);
   }
 
@@ -246,11 +257,20 @@ export function FocusCardDetail({
             : L(dict, 'AI 暂时离线 · 这是本地拆的,够你先动起来', 'AI offline · a local breakdown to get you moving')}
         </p>
       )}
-      {totalMin > 0 && (
-        <p style={{ margin: '0 0 0.45rem', fontSize: '0.72rem', color: 'var(--portal-muted)', fontVariantNumeric: 'tabular-nums' }}>
-          {L(dict, `共约 ${totalMin} 分钟`, `overall ~${totalMin} min`)}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '0 0 0.45rem' }}>
+        <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--portal-muted)', fontVariantNumeric: 'tabular-nums' }}>
+          {totalMin > 0 ? L(dict, `共约 ${totalMin} 分钟`, `overall ~${totalMin} min`) : ''}
         </p>
-      )}
+        {/* 批次 39:云 AI 只走这颗显式按钮 —— 默认引擎是本地模板/骨架,秒出 */}
+        <button
+          type="button"
+          onClick={() => void aiRefineWave()}
+          disabled={aiRefining}
+          style={{ background: 'none', border: '1px solid var(--portal-line)', borderRadius: 999, padding: '0.2rem 0.6rem', fontSize: '0.68rem', color: 'var(--portal-accent)', cursor: 'pointer', opacity: aiRefining ? 0.6 : 1 }}
+        >
+          {aiRefining ? L(dict, 'AI 细化中…', 'Refining…') : L(dict, 'AI 细化', 'AI refine')}
+        </button>
+      </div>
       <ul className="nesio-momentum-list">
         {wave.map((a) => {
           const drills = drillMap.get(a.id);

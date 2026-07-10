@@ -140,7 +140,11 @@ function fmtNode(n: LifeNode): string {
 interface RefCandidate { shortId: number; node: LifeNode }
 
 async function buildMemoryContext(query: string, convoHint = ''): Promise<{ context: string; refCandidates: RefCandidate[]; semanticDegraded: boolean; semanticReason: string }> {
-  const graph = getLifeGraph();
+  // 批次 39:天气信号是环境数据不是用户记忆,从问一问候选整体剔除
+  const graph = getLifeGraph().filter((n) => {
+    const tags = n.tags || [];
+    return !(tags.includes('weather') || tags.includes('weather.forecast') || /天气信号$|^天气$/.test(n.name));
+  });
   const temporal = parseTemporalQuery(query);
 
   // Layer 1: date-matched nodes (attributes.start matches the parsed date)

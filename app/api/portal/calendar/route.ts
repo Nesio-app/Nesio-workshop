@@ -291,6 +291,28 @@ export async function GET(req: NextRequest) {
         }
       }
 
+      // 批次 39:自家 token 刷新也失败(陈死 refresh)→ 最后借一次共享 Google token
+      // (合并授权同一 token,通讯录能用它日历就能用)再落 iCal。
+      const borrowed = await resolveGmailAccessToken(req).catch(() => '');
+      if (borrowed && borrowed !== accessToken) {
+        try {
+          const events = await fetchGoogleOAuthEvents(borrowed);
+          return NextResponse.json(
+            {
+              ok: true,
+              configured: true,
+              enabled: true,
+              provider: 'google_calendar_oauth',
+              status: 'calendar_borrowed_token',
+              events,
+              feeds: [{ label: 'Google Calendar', ok: true, count: events.length }],
+              sources: ['Google Calendar'],
+              fetchedAt: new Date().toISOString(),
+            },
+            { headers: { 'Cache-Control': 'no-store, max-age=0' } },
+          );
+        } catch { /* borrowed token also failed — fall to iCal below */ }
+      }
       // OAuth failed — fall through to iCal subscription URL fallback below.
       // Do NOT return here; let the iCal path run so existing subscriptions still work.
     }
