@@ -178,20 +178,36 @@
   --container-pad: 1.25rem;
 }
 
-/* 批次 6:PWA 状态栏区域曾露出 body 的 cream 底(每页顶部一条白边)。
-   portal 主题下 body 直接铺 portal 渐变,任何缺口都不再露色差。 */
+/* 批次 48 · 底部白边根治(批次 6/20/37/40 全是打补丁,病根有两个):
+   ① --portal-bg-gradient 只定义在 .portal-root 上,CSS 变量不向上继承,
+     html/body 这里的 var() 一直解析为空 → 声明静默失效退化成纯色打底,
+     用户看到的"补丁色带"就是它;
+   ② iOS 根本不执行 background-attachment: fixed,渐变随文档走。
+   根治:day 渐变 token 提升到 html 级(夜间/低饱和本就在 html 级覆写,自动
+   跟随),真正的视口固定层用 body::before(position:fixed 在 iOS 是真的)——
+   任何页面/弹层/safe-area 没画到的地方露出的都是同一张视口渐变,永无色带。 */
+html[data-portal-theme] {
+  --portal-blue-deep: #588ce3;
+  --portal-blue-mid: #96c7f3;
+  --portal-blue-light: #cddefc;
+  --portal-bg-gradient:
+    radial-gradient(ellipse 85% 60% at 12% 0%, rgba(88, 140, 227, 0.22), transparent 55%),
+    radial-gradient(ellipse 70% 55% at 88% 6%, rgba(205, 222, 252, 0.65), transparent 50%),
+    linear-gradient(165deg, var(--portal-blue-light) 0%, var(--portal-blue-mid) 46%, var(--portal-blue-deep) 100%);
+  background-color: var(--portal-blue-deep);
+}
 html[data-portal-theme] body {
-  background: var(--portal-bg-gradient);
-  background-color: var(--portal-blue-deep); /* 批次 40:band 在底部,打底贴渐变深端才无缝 */
-  background-attachment: fixed;
+  background: none;
+  background-color: transparent;
   overscroll-behavior-y: none;
 }
-/* 批次 20:顶部 safe-area 露出的是 html 自身底色(day 白 / night 纯黑),
-   与页面渐变形成一条色带——html 直接铺同款渐变,状态栏区彻底一体 */
-html[data-portal-theme] {
+html[data-portal-theme] body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
   background: var(--portal-bg-gradient);
-  background-color: var(--portal-blue-deep);
-  background-attachment: fixed;
+  pointer-events: none;
 }
 
 html[data-portal-theme="night"] { --sheet-opaque: #141b2e; }
@@ -14514,3 +14530,45 @@ html[data-lowsat="1"] .portal-root {
   transform: translateX(-50%) rotate(225deg);
 }
 .nesio-tips-hl--content { display: none; }
+
+/* ── 批次 48:焦点区 UI 修正 ─────────────────────────────────────────────── */
+
+/* 日历项展开:两个小按钮并排(此前链接通栏胶囊+记录另起一行,且 emoji 在文案里) */
+.nesio-collapsed-actions { display: flex; gap: 0.5rem; margin-top: 0.45rem; }
+.nesio-collapsed-act-btn {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  font-size: 0.76rem; font-weight: 500; color: var(--portal-blue-deep);
+  background: var(--portal-accent-soft); border: none; border-radius: 999px;
+  padding: 0.32rem 0.75rem; cursor: pointer; text-decoration: none;
+  transition: background 0.15s;
+}
+.nesio-collapsed-act-btn:active { background: var(--portal-accent-soft-md); }
+
+/* 话筒收进「记下来」输入框内(用户设计稿) */
+.nesio-focus-quick-add { position: relative; gap: 0; }
+.nesio-focus-quick-input { width: 100%; padding-right: 3rem; }
+.nesio-focus-quick-mic,
+.nesio-focus-quick-btn {
+  position: absolute; right: 0.3rem; top: 50%; transform: translateY(-50%);
+}
+
+/* §4 冷暖物理学:现在/计划 = 冷蓝;过去/回忆 = 琥珀暖(卡底微暖渐变+暖金图标) */
+.nesio-proactive-card {
+  background: linear-gradient(180deg, rgba(232, 242, 252, 0.92), rgba(255, 255, 255, 0.85));
+  border-color: rgba(88, 140, 227, 0.18);
+}
+.nesio-dormant-card {
+  border-radius: 0.9rem;
+  border: 1px solid rgba(201, 169, 110, 0.3);
+  border-left: 2px solid #c9a96e;
+  background: linear-gradient(180deg, rgba(246, 237, 220, 0.9), rgba(255, 252, 246, 0.82));
+}
+.nesio-dormant-question { color: #a8823f; }
+html[data-portal-theme="night"] .nesio-proactive-card {
+  background: linear-gradient(180deg, rgba(22, 36, 60, 0.9), rgba(17, 28, 49, 0.85));
+  border-color: rgba(127, 176, 238, 0.2);
+}
+html[data-portal-theme="night"] .nesio-dormant-card {
+  background: rgba(201, 169, 110, 0.1);
+  border-color: rgba(201, 169, 110, 0.26);
+}

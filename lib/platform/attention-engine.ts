@@ -52,6 +52,13 @@ const TYPE_ORDER: Array<{ type: EventType; category: LexiconCategory }> = [
   { type: 'meeting',  category: 'meeting' },
 ];
 
+/** 全天事件的纯日期("2026-07-11")按本地日解析 —— new Date() 会按 UTC 午夜,
+ *  在西半球平移成前一天 20:00(EDT),生出假钟点、错日桶、幽灵倒计时。 */
+export function parseEventDate(start: string): Date {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(start || '');
+  return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(start);
+}
+
 export function inferEventType(event: CalendarEvent): EventType {
   const text = `${event.title} ${event.description ?? ''}`;
   for (const rule of TYPE_ORDER) {
@@ -133,7 +140,7 @@ export function scoreCalendarEvents(
   return events
     .filter((e) => {
       // Only include today + tomorrow events
-      const d = startOfDay(new Date(e.start));
+      const d = startOfDay(parseEventDate(e.start));
       return isSameDay(d, today) || isSameDay(d, tomorrow);
     })
     .map((e): AttentionObject => {
@@ -141,7 +148,7 @@ export function scoreCalendarEvents(
       const importance = TYPE_IMPORTANCE[eventType];
       const urgency = computeUrgency(e.start, e.allDay ?? false, now);
       const score = computeScore(importance, urgency);
-      const d = startOfDay(new Date(e.start));
+      const d = startOfDay(parseEventDate(e.start));
       const isToday = isSameDay(d, today);
       const isTomorrow = isSameDay(d, tomorrow);
 
@@ -150,7 +157,7 @@ export function scoreCalendarEvents(
 
       return { id: e.id, title: e.title, eventType, importance, urgency, score, pinnable, isToday, isTomorrow, event: e };
     })
-    .sort((a, b) => b.score - a.score || new Date(a.event.start).getTime() - new Date(b.event.start).getTime());
+    .sort((a, b) => b.score - a.score || parseEventDate(a.event.start).getTime() - parseEventDate(b.event.start).getTime());
 }
 
 // ── Pinned selection ──────────────────────────────────────────────────────────

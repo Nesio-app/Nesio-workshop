@@ -174,6 +174,9 @@ function mapGoogleCalendarItem(item: GoogleCalendarItem) {
     description: desc || undefined,
     start,
     end,
+    // 批次 48:全天事件(start.date 无 dateTime)必须带标记 —— 拍平后下游把
+    // "2026-07-11" 按 UTC 午夜解析,长出「20:00 · 2h后」的假钟点和假倒计时
+    allDay: !item.start?.dateTime,
     calendarName: 'Google Calendar',
     source: 'Google Calendar',
     // Meeting/Zoom link takes priority over generic htmlLink (Google Calendar page)

@@ -10,8 +10,9 @@ import type { CalendarEvent } from '@/lib/portal/types';
 import type { RecommendationCard } from '@/lib/portal/reasoning-engine';
 import type { EmailSignal } from '@/lib/platform/email-signals';
 import type { ProactiveContextItem, FocusNode } from '@/lib/platform/view-models/today-view-model';
-import { inferEventType } from '@/lib/platform/attention-engine';
+import { inferEventType, parseEventDate } from '@/lib/platform/attention-engine';
 import { nearestNodeDate } from '@/lib/platform/node-dates';
+import { LEXICON } from '@/lib/platform/keyword-lexicon';
 import type { LifeNode } from '@/lib/portal/life-graph';
 import type { ClinicalFinding } from '@/lib/portal/health-clinical';
 import type { RiskScore } from '@/lib/portal/health-risk';
@@ -55,7 +56,8 @@ export function calendarEventsToGuidanceEvents(
   const results: GuidanceEvent[] = [];
 
   for (const e of events) {
-    const scheduledAt = new Date(e.start);
+    // 全天事件的纯日期按本地日解析(UTC 平移会把明天的农历标签挪成今天 20:00)
+    const scheduledAt = parseEventDate(e.start);
     if (Number.isNaN(scheduledAt.getTime())) continue;
 
     const eventType = inferEventType(e);
@@ -147,6 +149,13 @@ export function focusNodesToGuidanceEvents(
 
     const daysUntil = (d.getTime() - now.getTime()) / 86_400_000;
     if (daysUntil < 0 || daysUntil > 2) continue; // dormant engine handles past-due
+
+    // 批次 48:订阅日历的全天条目(农历「廿七」/节气/纪念日标签)不是任务 ——
+    // 没有截止关键词就不出「今天截止·最后一天啦」卡(它照常留在焦点列表里)。
+    const attrs = node.attributes as Record<string, unknown>;
+    const dateOnlyStart = typeof attrs.start === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(attrs.start);
+    const isCalendarLabel = Boolean(attrs.calendarId) && (attrs.allDay === true || dateOnlyStart);
+    if (isCalendarLabel && !LEXICON.deadline.test(node.name) && !isHolidayTitle(node.name)) continue;
 
     results.push({
       id: `node-${node.id}`,

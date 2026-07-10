@@ -6,18 +6,24 @@
  * 与任务卡状态机无耦合。
  */
 
-import { useState } from 'react';
+import { useState, type ComponentType } from 'react';
 import type { CalendarEvent } from '@/lib/portal/types';
-import { EVENT_TYPE_ICON, EVENT_TYPE_LABEL, type AttentionObject } from '@/lib/platform/attention-engine';
+import { EVENT_TYPE_LABEL, parseEventDate, type AttentionObject, type EventType } from '@/lib/platform/attention-engine';
 import { safeExternalUrl } from './meeting-node';
 import { t } from '@/lib/portal/i18n';
 import type { PortalLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
-import { IconLink, IconMic, IconMapPin } from '../icons';
+import { IconLink, IconMic, IconMapPin, IconFlag, IconHeartPulse, IconNote, IconClock, IconStar, IconCalendar } from '../icons';
+
+// 批次 48:emoji 图标(📌✈️⏰…)违反图标纪律 → 线性 icon 映射
+const EVENT_TYPE_LINEAR_ICON: Record<EventType, ComponentType<{ size?: number }>> = {
+  flight: IconFlag, medical: IconHeartPulse, exam: IconNote, deadline: IconClock,
+  birthday: IconStar, travel: IconMapPin, meeting: IconCalendar, other: IconCalendar,
+};
 
 function formatEventTime(locale: PortalLocale, dateStr: string, allDay?: boolean): string {
   if (allDay) return t(locale, 'todayAllDay');
-  const d = new Date(dateStr);
+  const d = parseEventDate(dateStr);
   return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
 }
 
@@ -55,11 +61,11 @@ export function PinnedAttentionCard({
 }) {
   const locale = usePortalLocale();
   const [expanded, setExpanded] = useState(false);
-  const typeIcon = EVENT_TYPE_ICON[obj.eventType];
+  const TypeIcon = EVENT_TYPE_LINEAR_ICON[obj.eventType];
   const typeLabel = EVENT_TYPE_LABEL[obj.eventType];
   const timeStr = formatEventTime(locale, obj.event.start, obj.event.allDay);
-  const countdown = calendarCountdown(locale, new Date(obj.event.start), obj.event.allDay);
-  const isNow = eventIsNow(new Date(obj.event.start), obj.event.allDay);
+  const countdown = calendarCountdown(locale, parseEventDate(obj.event.start), obj.event.allDay);
+  const isNow = eventIsNow(parseEventDate(obj.event.start), obj.event.allDay);
   const meetingUrl = obj.event.url ? safeExternalUrl(obj.event.url) : null;
 
   return (
@@ -67,7 +73,7 @@ export function PinnedAttentionCard({
       {/* ── badge row ── */}
       <div className="nesio-pinned-badge-row">
         <span className="nesio-pinned-badge">{t(locale, 'todayPinnedBadge')}</span>
-        <span className="nesio-pinned-type-label">{typeIcon} {typeLabel}</span>
+        <span className="nesio-pinned-type-label"><TypeIcon size={12} /> {typeLabel}</span>
       </div>
 
       {/* ── main row ── */}
@@ -119,14 +125,15 @@ export function PinnedAttentionCard({
 export function CollapsedCalItem({ obj, onOpenRecorder }: { obj: AttentionObject; onOpenRecorder: () => void }) {
   const locale = usePortalLocale();
   const [expanded, setExpanded] = useState(false);
+  const TypeIcon = EVENT_TYPE_LINEAR_ICON[obj.eventType];
   const timeStr = obj.event.allDay ? t(locale, 'todayAllDay') : formatEventTime(locale, obj.event.start, false);
-  const countdown = calendarCountdown(locale, new Date(obj.event.start), obj.event.allDay);
+  const countdown = calendarCountdown(locale, parseEventDate(obj.event.start), obj.event.allDay);
   const dayTag = obj.isTomorrow ? t(locale, 'todayLabelTomorrow') : null;
 
   return (
     <li className="nesio-collapsed-item">
       <button type="button" className="nesio-collapsed-row" onClick={() => setExpanded((v) => !v)}>
-        <span className="nesio-collapsed-icon">{EVENT_TYPE_ICON[obj.eventType]}</span>
+        <span className="nesio-collapsed-icon"><TypeIcon size={14} /></span>
         <span className="nesio-collapsed-title">{obj.title}</span>
         <span className="nesio-collapsed-meta">
           {dayTag && <span className="nesio-collapsed-day-tag">{dayTag}</span>}
@@ -139,10 +146,17 @@ export function CollapsedCalItem({ obj, onOpenRecorder }: { obj: AttentionObject
         <div className="nesio-collapsed-detail">
           {obj.event.description && <p className="nesio-collapsed-desc">{obj.event.description.slice(0, 80)}{obj.event.description.length > 80 ? '…' : ''}</p>}
           {obj.event.location && <p className="nesio-collapsed-loc"><IconMapPin size={12} /> {obj.event.location}</p>}
-          {obj.event.url && (
-            <a href={safeExternalUrl(obj.event.url)} target="_blank" rel="noopener noreferrer" className="nesio-collapsed-link">{t(locale, 'todayLinkLabel')}</a>
-          )}
-          <button type="button" className="nesio-collapsed-record-btn" onClick={onOpenRecorder}>{t(locale, 'todayRecordBtn')}</button>
+          {/* 批次 48:两个小按钮并排(此前链接是通栏胶囊、记录另起一行) */}
+          <div className="nesio-collapsed-actions">
+            {obj.event.url && (
+              <a href={safeExternalUrl(obj.event.url)} target="_blank" rel="noopener noreferrer" className="nesio-collapsed-act-btn">
+                <IconLink size={13} /> {t(locale, 'todayLinkLabel')}
+              </a>
+            )}
+            <button type="button" className="nesio-collapsed-act-btn" onClick={onOpenRecorder}>
+              <IconMic size={13} /> {t(locale, 'todayRecordBtn')}
+            </button>
+          </div>
         </div>
       )}
     </li>

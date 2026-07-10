@@ -17,7 +17,10 @@ type AttrBag = Record<string, unknown>;
 
 function parseDateValue(v: unknown): Date | null {
   if (typeof v !== 'string' || v.length < 10) return null;
-  const d = new Date(v);
+  // 批次 48:纯日期("2026-07-11",全天事件)按**本地日**解析 —— new Date() 会按
+  // UTC 午夜,在西半球平移成前一天 20:00,节点被分错日桶、长出假钟点。
+  const dm = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
+  const d = dm ? new Date(Number(dm[1]), Number(dm[2]) - 1, Number(dm[3])) : new Date(v);
   if (Number.isNaN(d.getTime())) return null;
   // Reject garbage parses of non-date strings ("Room 12" etc.)
   if (d.getFullYear() <= 2020) return null;

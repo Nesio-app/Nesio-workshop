@@ -151,6 +151,7 @@ export async function saveCalendarEventsToMemory(events: Array<Record<string, un
       tags: [(evAny.calendarName as string) || '日历'].filter(Boolean),
       attributes: {
         start,
+        ...(evAny.allDay ? { allDay: true } : {}),
         ...(evAny.end ? { end: evAny.end as string } : {}),
         ...(evAny.url ? { url: evAny.url as string } : {}),
         ...(evAny.location ? { location: evAny.location as string } : {}),
