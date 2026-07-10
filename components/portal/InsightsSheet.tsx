@@ -984,8 +984,19 @@ export default function InsightsSheet({ onClose, canUsePrivateData = true, initi
   // 功能开关中心:足迹(timeline tab)、我的实验(widget)可被用户关掉。
   const showPlaces = useFeatureEnabled('places');
   const showExperiment = useFeatureEnabled('experiment');
-  // 关掉足迹时若正停在该 tab,退回洞察,别卡在空白页。
-  useEffect(() => { if (!showPlaces && mainTab === 'timeline') setMainTab('reflection'); }, [showPlaces, mainTab]);
+  // P1-9:健康/财务/关系 tab 与足迹接同一套闸(用户开关 + 提审构建 APPSTORE_HIDDEN 都走它)。
+  // 此前只有足迹接了闸 —— 提审构建里 健康(含健身训练计划/动作库)/财务/People 照样可达 = 2.3.1 风险。
+  const showHealth = useFeatureEnabled('health');
+  const showFinance = useFeatureEnabled('finance');
+  const showPeople = useFeatureEnabled('people');
+  const tabEnabled = (t: MainTab): boolean =>
+    t === 'timeline' ? showPlaces
+      : t === 'health' ? showHealth
+      : t === 'finance' ? showFinance
+      : t === 'relationships' ? showPeople
+      : true;
+  // 关掉某域时若正停在该 tab,退回洞察,别卡在空白页。
+  useEffect(() => { if (!tabEnabled(mainTab)) setMainTab('reflection'); }, [showPlaces, showHealth, showFinance, showPeople, mainTab]); // eslint-disable-line react-hooks/exhaustive-deps
   const [period, setPeriod] = useState<Period>('week');
   const [profile, setProfile] = useState<MirrorProfile | null>(null);
   const [allNodes, setAllNodes] = useState<LifeNode[]>([]);
@@ -1156,7 +1167,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = true, initi
 
       {/* Main tabs */}
       <div className="nesio-insights-main-tabs">
-        {(['reflection', 'health', 'timeline', 'finance', 'relationships', 'living'] as MainTab[]).filter((t) => t !== 'timeline' || showPlaces).map((t) => (
+        {(['reflection', 'health', 'timeline', 'finance', 'relationships', 'living'] as MainTab[]).filter(tabEnabled).map((t) => (
           <button
             key={t}
             type="button"
@@ -1334,13 +1345,13 @@ export default function InsightsSheet({ onClose, canUsePrivateData = true, initi
         )}
 
         {/* ── Tab: Finance(批次 29,放时间线后面)── */}
-        {mainTab === 'finance' && <FinanceTab />}
+        {mainTab === 'finance' && showFinance && <FinanceTab />}
 
-        {/* ── Tab: 健康 Dashboard(批次 39)── */}
-        {mainTab === 'health' && <HealthDashboard />}
+        {/* ── Tab: 健康 Dashboard(批次 39;含健身训练计划/动作库)── */}
+        {mainTab === 'health' && showHealth && <HealthDashboard />}
 
         {/* ── Tab: 关系管理(批次 41)── */}
-        {mainTab === 'relationships' && <RelationshipsPanel />}
+        {mainTab === 'relationships' && showPeople && <RelationshipsPanel />}
 
         {/* ── Tab 3: Living Model ── */}
         {mainTab === 'living' && (

@@ -13,13 +13,16 @@ import { track } from '@/lib/portal/telemetry';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
+import { isFeatureEnabled } from '@/lib/portal/module-overrides';
 
 export function RoutineDueCards() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [due, setDue] = useState<Routine[]>([]);
 
   useEffect(() => {
-    const read = () => setDue(dueRoutines());
+    // P1-9:健身域关闭(用户开关 / 提审构建)时,健身 routine 卡不出 —— 否则「开始练」
+    // 会把用户带向一个不可达的健康 tab。
+    const read = () => setDue(dueRoutines().filter((r) => r.category !== 'fitness' || isFeatureEnabled('fitness')));
     read();
     const timer = setInterval(read, 60_000);
     window.addEventListener(ROUTINES_UPDATED_EVENT, read);

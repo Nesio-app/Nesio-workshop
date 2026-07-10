@@ -723,7 +723,9 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
         <div className="nesio-sheet-handle" aria-hidden />
 
         {/* Type color strip */}
-        <div className="nesio-type-header-strip" style={{ background: typeBg }}>
+        {/* 类型色条:tint 走 CSS 变量,夜间由 CSS 混暗 —— 直接 inline background 会让
+            浅色 pastel 在夜间糊成一条白带(QA 截图「弹出框上侧白边」)。 */}
+        <div className="nesio-type-header-strip" style={{ ['--type-strip-bg' as string]: typeBg }}>
           <span className="nesio-type-header-icon"><NodeTypeIcon type={n.type} size={15} /></span>
           <span className="nesio-type-header-label">{(dict === 'en' ? TYPE_LABELS_EN : TYPE_LABELS_ZH)[n.type] || n.type}</span>
         </div>
