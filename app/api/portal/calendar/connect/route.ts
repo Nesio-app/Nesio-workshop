@@ -4,6 +4,7 @@ import {
   type ProductionRuntimeSetupTask,
 } from '@/lib/portal/production-runtime';
 import { envValue } from '@/lib/portal/env';
+import { isPortalRequestAuthorized } from '@/lib/portal/auth/api-auth';
 
 // Request gmail scope alongside calendar so one consent covers both connectors
 // and the resulting refresh token can serve either API.
@@ -55,6 +56,12 @@ function getGoogleCalendarSetupTask(req: NextRequest): ProductionRuntimeSetupTas
 }
 
 export async function GET(req: NextRequest) {
+  // P0 隐私:连接私有数据源(日历)必须先登录 —— 匿名授权 = 无主 token(见 gmail/connect)。
+  if (!(await isPortalRequestAuthorized(req))) {
+    const url = new URL(req.url);
+    return NextResponse.redirect(new URL('/login?reason=connect_requires_account', url.origin));
+  }
+
   const auditId = createCalendarOAuthAuditId();
   const clientId = envValue('GOOGLE_CLIENT_ID');
   const clientSecretConfigured = Boolean(envValue('GOOGLE_CLIENT_SECRET'));

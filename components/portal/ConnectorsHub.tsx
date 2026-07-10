@@ -105,6 +105,9 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
   const [wechatReadingOpen, setWechatReadingOpen] = useState(false);
   const [connected, setConnected] = useState<Record<string, boolean>>({});
   const [syncing, setSyncing] = useState<string | null>(null);
+  // P0 隐私:连接私有数据源(邮箱/日历/银行/Notion/Flomo)必须先登录 —— 匿名授权=无主
+  // token,换人用这台设备就能看到你的邮件。null=未知(网络失败不误伤),false 才拦。
+  const [signedIn, setSignedIn] = useState<boolean | null>(null);
   const [importPct, setImportPct] = useState<number | null>(null); // 健康大文件导入进度(0–100)
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
@@ -120,6 +123,11 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
 
   useEffect(() => {
     if (!open) return;
+    // 私有数据源连接门:查一次会话(失败=未知,不误伤)
+    fetch('/api/auth/session', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { loggedIn?: boolean } | null) => { if (d != null) setSignedIn(Boolean(d.loggedIn)); })
+      .catch(() => {});
     const savedConn = loadConnectors();
     // 批次 37:有 Notion token 就算已连接 —— 连接(token 有效)和有没有共享页面是两回事。
     // 之前只在「同步成功且返回了页面」才翻成已连接,导致 token 已存但没共享页面时按钮
@@ -763,9 +771,18 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     setSyncing(null);
   }
 
+  // 连接后产生「无主 token / 无主外部数据」的私有数据源 —— 必须先有账号。
+  // 本地文件导入(健康 zip/照片/时间轴)和设备定位不在此列(数据只进本机)。
+  const PRIVATE_SOURCE_IDS = new Set(['google', 'tesla', 'plaid', 'notion', 'flomo']);
+
   // ── OAuth / Geo / File ──
   function handleConnect(c: ConnectorDef) {
     if (c.comingSoon) return;
+    if (PRIVATE_SOURCE_IDS.has(c.id) && signedIn === false) {
+      showToast(L(dict, '连接邮箱/日历/银行等私有数据需要先登录账号。', 'Sign in first to connect private sources like email, calendar, or banks.'), false);
+      setTimeout(() => { window.location.href = '/login?reason=connect_requires_account'; }, 900);
+      return;
+    }
     // 一次 Google 授权覆盖日历+邮件两个 scope(gmail/connect 请求全量 scope)
     if (c.id === 'google') { window.location.href = '/api/portal/gmail/connect'; return; }
     if (c.id === 'tesla') { window.location.href = '/api/portal/tesla/connect'; return; }

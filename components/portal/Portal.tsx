@@ -11,6 +11,7 @@ import PortalBottomNav from './PortalBottomNav';
 import PortalOnboarding from './PortalOnboarding';
 import InstallPrompt from './InstallPrompt';
 import { canUse } from '@/lib/portal/entitlement';
+import { reconcileLocalOwner, claimLocalDataForUser, purgeAllLocalUserData, setLocalOwner } from '@/lib/portal/local-owner';
 
 // Heavy sheets load on first open, not at boot — together they were ~3.5k
 // lines of first-paint JS for UI the user may never touch in a session.
@@ -77,6 +78,7 @@ const ASK_GUIDE_KEY = 'nesio-ask-guide-seen-v1';
 type ActiveSurface = 'today' | 'tell' | 'memory';
 type AuthSessionPayload = {
   ok?: boolean;
+  user?: { id?: string; email?: string };
   loggedIn?: boolean;
   status?: string;
   authReady?: boolean;
@@ -289,6 +291,13 @@ export default function Portal() {
   const [moodOpen, setMoodOpen] = useState(false);
   const [freezeOpen, setFreezeOpen] = useState(false);
   const [proGate, setProGate] = useState<string | null>(null); // 非 null = 显示 Pro 升级引导(值=功能名)
+  // 跨账号本地数据冲突(P0 隐私):登录后本机数据归属与当前用户不符 → 阻断处理
+  const [ownerConflict, setOwnerConflict] = useState<
+    { kind: 'other_account'; prevEmail: string; userId: string; email: string }
+    | { kind: 'anonymous_data'; userId: string; email: string }
+    | null
+  >(null);
+  const [ownerBusy, setOwnerBusy] = useState(false);
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [workoutSession, setWorkoutSession] = useState<import('./fitness/WorkoutPlayer').PlayerSession | null>(null);
   const [launchSurfaceContext, setLaunchSurfaceContext] = useState({
@@ -417,6 +426,19 @@ export default function Portal() {
           const loggedIn = Boolean(data?.loggedIn);
           const sessionReady = loggedIn && data?.authReady !== false && data?.profileBootstrapBlocking !== true;
           setAuthSessionLoggedIn(loggedIn);
+          // P0 隐私:核对本机数据归属。换账号登录时,上一个人的记忆绝不能默默留给下一个人。
+          if (loggedIn && data?.user?.id) {
+            const verdict = reconcileLocalOwner(data.user.id, data.user.email || '');
+            if (verdict.kind !== 'ok') {
+              setOwnerConflict((cur) => cur ?? {
+                ...(verdict.kind === 'other_account'
+                  ? { kind: 'other_account' as const, prevEmail: verdict.prevEmail }
+                  : { kind: 'anonymous_data' as const }),
+                userId: data.user!.id!,
+                email: data.user!.email || '',
+              });
+            }
+          }
           // data 为 null(接口非 200)= 未知,不算「确定未登录」
           setAuthDefinitelyAnonymous(data != null && !loggedIn);
           if (sessionReady) {
@@ -932,6 +954,55 @@ export default function Portal() {
       <ShareSheet open={captureMode === 'share'} onClose={() => setCaptureMode(null)} />
       <MoodSheet open={moodOpen} onClose={() => setMoodOpen(false)} />
       <FreezeVaultSheet open={freezeOpen} onClose={() => setFreezeOpen(false)} initialTab="add" />
+      {ownerConflict && (
+        <div role="dialog" aria-modal="true" style={{ position: 'fixed', inset: 0, zIndex: 95, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(4, 10, 22, 0.72)', padding: '1rem' }}>
+          <div style={{ width: 'min(96vw, 440px)', background: 'var(--sheet-opaque, #fff)', color: 'var(--portal-ink, #2c2c2c)', borderRadius: 20, padding: '1.4rem 1.25rem', boxShadow: '0 12px 48px rgba(4,10,22,0.4)' }}>
+            <h3 style={{ margin: '0 0 0.5rem', fontSize: '1.1rem', fontWeight: 700 }}>
+              {ownerConflict.kind === 'other_account'
+                ? L(dict, '这台设备上有另一个账号的数据', 'This device holds another account’s data')
+                : L(dict, '把本机已有的记录归入这个账号?', 'Keep the records already on this device?')}
+            </h3>
+            <p style={{ margin: '0 0 1.1rem', lineHeight: 1.6, color: 'var(--portal-muted, #8a94a6)', fontSize: '0.9rem' }}>
+              {ownerConflict.kind === 'other_account'
+                ? L(dict,
+                    `本机保存着${ownerConflict.prevEmail ? `「${ownerConflict.prevEmail}」` : '上一个账号'}的记忆。为保护隐私,继续使用当前账号前需要先清除这些数据(已同步到云端的不受影响);或退出登录把设备还给原账号。`,
+                    `This device stores memories belonging to ${ownerConflict.prevEmail ? `"${ownerConflict.prevEmail}"` : 'a previous account'}. To protect their privacy, that data must be cleared before you continue (their cloud copies are unaffected) — or sign out to hand the device back.`)
+                : L(dict,
+                    '登录前这台设备上已经有一些未登录时的记录。归入这个账号后会随账号同步;也可以清除后从零开始。',
+                    'There are records made on this device before signing in. Keep them under this account (they will sync with it), or clear them and start fresh.')}
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {ownerConflict.kind === 'other_account' ? (
+                <>
+                  <button type="button" disabled={ownerBusy}
+                    onClick={async () => { setOwnerBusy(true); await purgeAllLocalUserData(); setLocalOwner(ownerConflict.userId, ownerConflict.email); window.location.reload(); }}
+                    style={{ width: '100%', background: 'var(--portal-accent, #588ce3)', color: 'var(--portal-on-accent, #fff)', border: 'none', borderRadius: 999, padding: '0.7rem', fontSize: '0.95rem', fontWeight: 600, cursor: 'pointer', opacity: ownerBusy ? 0.6 : 1 }}>
+                    {ownerBusy ? L(dict, '清除中…', 'Clearing…') : L(dict, '清除上一账号的数据并继续', 'Clear previous account’s data & continue')}
+                  </button>
+                  <button type="button" disabled={ownerBusy}
+                    onClick={async () => { setOwnerBusy(true); await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {}); window.location.reload(); }}
+                    style={{ width: '100%', background: 'none', color: 'var(--portal-muted, #8a94a6)', border: '1px solid var(--portal-line, #d7deea)', borderRadius: 999, padding: '0.7rem', fontSize: '0.95rem', cursor: 'pointer' }}>
+                    {L(dict, '退出登录', 'Sign out')}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button type="button" disabled={ownerBusy}
+                    onClick={() => { claimLocalDataForUser(ownerConflict.userId, ownerConflict.email); setOwnerConflict(null); }}
+                    style={{ width: '100%', background: 'var(--portal-accent, #588ce3)', color: 'var(--portal-on-accent, #fff)', border: 'none', borderRadius: 999, padding: '0.7rem', fontSize: '0.95rem', fontWeight: 600, cursor: 'pointer' }}>
+                    {L(dict, '归入这个账号', 'Keep them under this account')}
+                  </button>
+                  <button type="button" disabled={ownerBusy}
+                    onClick={async () => { setOwnerBusy(true); await purgeAllLocalUserData(); setLocalOwner(ownerConflict.userId, ownerConflict.email); window.location.reload(); }}
+                    style={{ width: '100%', background: 'none', color: 'var(--portal-muted, #8a94a6)', border: '1px solid var(--portal-line, #d7deea)', borderRadius: 999, padding: '0.7rem', fontSize: '0.95rem', cursor: 'pointer' }}>
+                    {ownerBusy ? L(dict, '清除中…', 'Clearing…') : L(dict, '清除本机数据,从零开始', 'Clear local data & start fresh')}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       {proGate && (
         <div
           role="dialog"

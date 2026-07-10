@@ -5,6 +5,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { envValue } from '@/lib/portal/env';
+import { isPortalRequestAuthorized } from '@/lib/portal/auth/api-auth';
 
 // Request calendar scope alongside gmail so one consent covers both connectors
 // and the resulting refresh token can serve either API.
@@ -24,6 +25,13 @@ function callbackUrl(req: NextRequest): string {
 }
 
 export async function GET(req: NextRequest) {
+  // P0 隐私:连接私有数据源(邮箱)必须先登录。匿名授权 = 无主 token,
+  // 挂在设备 cookie 上没法跨设备管理/撤销,下一个用这台设备的人能看到你的邮件。
+  if (!(await isPortalRequestAuthorized(req))) {
+    const url = new URL(req.url);
+    return NextResponse.redirect(new URL('/login?reason=connect_requires_account', url.origin));
+  }
+
   const clientId = envValue('GOOGLE_CLIENT_ID');
   const clientSecret = envValue('GOOGLE_CLIENT_SECRET');
 

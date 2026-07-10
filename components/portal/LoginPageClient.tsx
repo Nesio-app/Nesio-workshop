@@ -50,6 +50,7 @@ export default function LoginPageClient() {
   const [state, setState] = useState<AuthState>('idle');
   const [error, setError] = useState('');
   const [tab, setTab] = useState<'login' | 'register'>('login');
+  const [reason, setReason] = useState('');
   const zh = locale === 'zh';
   // App Store 构建强制显示 Sign in with Apple(Guideline 4.8:提供 Google 登录就必须提供
   // Apple 登录)。Web PWA 暂不显示,等 Supabase 里 Apple Service ID 配好后再放开。
@@ -57,6 +58,7 @@ export default function LoginPageClient() {
 
   useEffect(() => {
     setLocale(loadProfileSettings().locale);
+    try { setReason(new URLSearchParams(window.location.search).get('reason') || ''); } catch { /* ignore */ }
   }, []);
 
   useEffect(() => {
@@ -122,6 +124,11 @@ export default function LoginPageClient() {
               </button>
             </div>
 
+            {reason === 'connect_requires_account' && (
+              <p className="nesio-ob-step-sub" style={{ textAlign: 'center', marginBottom: '0.75rem', color: 'var(--portal-accent, #588ce3)' }}>
+                {zh ? '连接邮箱 / 日历 / 银行等私有数据源,需要先登录账号。' : 'Connecting private sources (email, calendar, banks) requires an account.'}
+              </p>
+            )}
             <p className="nesio-ob-step-sub" style={{ textAlign: 'center', marginBottom: '1.25rem' }}>
               {tab === 'login'
                 ? (zh ? '登录后，Memory 与 Today Feed 跨设备同步。' : 'Sign in to sync your Memory and Today across devices.')
