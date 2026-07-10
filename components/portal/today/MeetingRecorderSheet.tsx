@@ -110,7 +110,7 @@ export function MeetingRecorderSheet({ open, meetingNode, onClose }: {
   function saveNotes() {
     const finalText = transcript.trim() || L(dict, '（无内容）', '(empty)');
     const nowStr = new Date().toLocaleString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-    addMeetingNotes(meetingNode?.id || '', meetingNode?.name || nowStr, finalText);
+    addMeetingNotes(meetingNode?.id || '', meetingNode?.name || nowStr, finalText, dict);
     setSaved(true);
     setTimeout(() => onClose(), 1800);
   }

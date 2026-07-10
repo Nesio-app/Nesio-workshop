@@ -48,11 +48,12 @@ export function deleteFocusNode(id: string): void {
   if (deleteLifeNode(id)) broadcast();
 }
 
-export function addMeetingNotes(meetingNodeId: string, meetingName: string, notes: string): void {
+export function addMeetingNotes(meetingNodeId: string, meetingName: string, notes: string, locale: string = 'zh'): void {
+  const en = locale.toLowerCase().startsWith('en');
   ingestLifeNode({
-    name: `会议记录 · ${meetingName}`,
+    name: `${en ? 'Meeting notes' : '会议记录'} · ${meetingName}`,
     type: 'commitment',
-    tags: ['会议记录', 'meeting-notes'],
+    tags: [en ? 'Meeting notes' : '会议记录', 'meeting-notes'],
     attributes: {
       meetingNodeId,
       notes,
