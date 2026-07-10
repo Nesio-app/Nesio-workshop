@@ -62,13 +62,21 @@ interface UiMessage {
 }
 
 /** 🔴#1:从模型回答里抽出它自报的【依据:#1,#3】,并把这行从展示文本里剥掉。
- *  ids===null = 模型没写(不合规,回退);ids=[] = 明确"无"(不出引用卡);ids=[...] = 只引这些。 */
+ *  ids===null = 模型没写(不合规,回退);ids=[] = 明确"无"(不出引用卡);ids=[...] = 只引这些。
+ *  批次 47:弱模型会写错闭合符(实拍「【依据:#1,#5}」)—— 闭合放宽到 】)}]、
+ *  或干脆没闭合(到行尾);剥离后再兜底扫一遍,任何残留的【依据…片段都不许见人。 */
 function extractCitations(raw: string): { text: string; ids: number[] | null } {
-  const m = raw.match(/【依据[:：]?\s*([^】]*)】\s*$/) || raw.match(/【依据[:：]?\s*([^】]*)】/);
+  const m = raw.match(/[【\[（(]\s*依据\s*[:：]?\s*([^】\]）)}\n]*)[】\]）)}]?\s*$/)
+    || raw.match(/依据\s*[:：]\s*((?:#?\d+[,，、\s]*)+|无|none)\s*[】\]）)}]?\s*$/i)
+    || raw.match(/【依据[:：]?\s*([^】\n]*)[】\]）)}]/);
   if (!m) return { text: raw, ids: null };
   const inner = m[1] || '';
   const ids = /无|none/i.test(inner) ? [] : Array.from(inner.matchAll(/#?(\d+)/g)).map((x) => Number(x[1]));
-  return { text: raw.replace(m[0], '').trim(), ids };
+  const text = raw.replace(m[0], '')
+    // 兜底扫尾:剥离主匹配后若还挂着残缺的依据片段(嵌套/重复/断行),一并清掉
+    .replace(/[【\[（(]\s*依据[^】\]）)}\n]*[】\]）)}]?/g, '')
+    .trim();
+  return { text, ids };
 }
 
 // ─── Client-side context builder (3-layer hybrid retrieval) ──────────────────
@@ -827,6 +835,9 @@ Edit location/value anytime in Storage.`),
       const citedNodes: LifeNode[] = ids === null
         ? refCandidates.slice(0, 3).map((r) => r.node)
         : ids.map((id) => refCandidates.find((r) => r.shortId === id)?.node).filter((n): n is LifeNode => Boolean(n));
+      // 批次 47:「快速匹配可能没找全」只该出现在**兜底回复**旁 —— AI 真答成功时
+      // 挂一条降级警告,用户读作报错(客户只能感到更聪明)。真实原因照旧在 reason 里。
+      const isFallbackReply = /云端脑子有点挤|cloud brain is a bit busy/i.test(cleanResp);
       const aiMsg: UiMessage = {
         id: nextMsgId('a'),
         role: 'model',
@@ -834,7 +845,7 @@ Edit location/value anytime in Storage.`),
         text: cleanResp.replace(/\*\*/g, ''),
         sources: data.sources ?? [],
         refs: citedNodes.map((n) => ({ id: n.id, name: n.name, source: n.source })),
-        semanticDegraded,
+        semanticDegraded: semanticDegraded && isFallbackReply,
         semanticReason,
       };
       // 函数式追加 + 用最终列表存档,别用可能已过期的 nextMsgs 快照覆盖并发消息。
