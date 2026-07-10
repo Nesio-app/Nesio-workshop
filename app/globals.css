@@ -14455,3 +14455,45 @@ html[data-lowsat="1"] .portal-root {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.45; }
 }
+
+/* 批次 34 · 空白记忆页:居中话筒邀请卡(用户设计稿) */
+.nesio-memory-invite {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.8rem;
+  margin: 18vh auto 0;
+  padding: 2.2rem 1.6rem;
+  max-width: 320px;
+  border: 1px solid var(--portal-line);
+  border-radius: 1.4rem;
+  background: var(--glass-bg, rgba(255,255,255,0.42));
+  text-align: center;
+}
+.nesio-memory-invite-mic {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  border: none;
+  background: var(--portal-accent, #588ce3);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 8px 24px var(--portal-accent-soft-lg, rgba(88,140,227,0.28));
+}
+.nesio-memory-invite-mic:active { transform: scale(0.95); }
+.nesio-memory-invite-title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--portal-ink);
+}
+.nesio-memory-invite-sub {
+  margin: 0;
+  font-family: var(--font-portal-serif), Georgia, serif;
+  font-size: 0.88rem;
+  line-height: 1.8;
+  color: var(--portal-muted);
+}

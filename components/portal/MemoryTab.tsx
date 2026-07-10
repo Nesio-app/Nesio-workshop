@@ -965,7 +965,8 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
             </div>
           )}
 
-          {/* Search */}
+          {/* Search(批次 34:空库时藏起 —— 没东西可搜) */}
+          {hasNodes && (
           <div className="nesio-memory-search-wrap">
             <svg className="nesio-memory-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="18" height="18" aria-hidden>
               <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
@@ -981,6 +982,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
               <button type="button" onClick={() => setQuery('')} style={{ color: 'var(--portal-muted)', fontSize: '0.85rem' }} aria-label={copy.clear}>✕</button>
             )}
           </div>
+          )}
 
           {/* AI understood */}
           {isSearching && hasUnderstoodEntities && (
@@ -1032,8 +1034,8 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                 </div>
               )}
 
-              {/* 收纳入口(批次 31 从扇形菜单迁入:东西放哪了,属于记忆域) */}
-              {isFeatureEnabled('inventory') && (
+              {/* 收纳入口(批次 31 从扇形菜单迁入;批次 34:空库时藏起) */}
+              {hasNodes && isFeatureEnabled('inventory') && (
                 <button
                   type="button"
                   className="nesio-memory-inventory-entry"
@@ -1045,7 +1047,8 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                 </button>
               )}
 
-              {/* My Projects */}
+              {/* My Projects(批次 34:空库时藏起) */}
+              {hasNodes && (
               <div className="nesio-projects-section">
                 <div className="nesio-section-header">
                   <span className="nesio-section-title">{copy.myProjects}</span>
@@ -1072,6 +1075,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                   <p className="nesio-projects-empty">{L(dict, '创建项目，把相关记录聚在一起', 'Create a project to group related notes')}</p>
                 )}
               </div>
+              )}
 
               {/* Recent memories */}
               {hasNodes && (
@@ -1129,11 +1133,27 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                 </>
               )}
 
-              {/* Hero — empty state */}
+              {/* 批次 34 空态重设计(用户设计稿):居中大话筒邀请卡,替代文字堆砌 */}
               {!hasNodes && (
-                <div className="nesio-memory-hero">
-                  <h2 className="nesio-memory-hero-title">{copy.heroTitle}</h2>
-                  <p className="nesio-memory-hero-sub">{copy.heroSub}</p>
+                <div className="nesio-memory-invite">
+                  <button
+                    type="button"
+                    className="nesio-memory-invite-mic"
+                    aria-label={L(dict, '说一句', 'Say it')}
+                    onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-voice'))}
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="28" height="28" aria-hidden>
+                      <rect x="9" y="3" width="6" height="11" rx="3" />
+                      <path d="M5 11a7 7 0 0 0 14 0" />
+                      <line x1="12" y1="18" x2="12" y2="21" />
+                    </svg>
+                  </button>
+                  <p className="nesio-memory-invite-title">{L(dict, '试试说一句', 'Try saying one thing')}</p>
+                  <p className="nesio-memory-invite-sub">
+                    {L(dict, '比如「备用钥匙放在门厅抽屉」', 'e.g. "Spare keys are in the hallway drawer"')}
+                    <br />
+                    {L(dict, '记下之后,你就可以放心忘了', "Once it's noted, you can safely forget it")}
+                  </p>
                 </div>
               )}
             </>

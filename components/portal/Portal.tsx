@@ -11,7 +11,8 @@ import PortalBottomNav from './PortalBottomNav';
 import PortalOnboarding from './PortalOnboarding';
 import InstallPrompt from './InstallPrompt';
 import { canUse } from '@/lib/portal/entitlement';
-import { reconcileLocalOwner, claimLocalDataForUser, purgeAllLocalUserData, setLocalOwner } from '@/lib/portal/local-owner';
+import { reconcileLocalOwner, claimLocalDataForUser, purgeAllLocalUserData, setLocalOwner, getLocalOwner } from '@/lib/portal/local-owner';
+import { archiveCurrentSpace, restoreArchivedSpace } from '@/lib/portal/account-spaces';
 
 // Heavy sheets load on first open, not at boot — together they were ~3.5k
 // lines of first-paint JS for UI the user may never touch in a session.
@@ -1001,8 +1002,8 @@ export default function Portal() {
             <p style={{ margin: '0 0 1.1rem', lineHeight: 1.6, color: 'var(--portal-muted, #8a94a6)', fontSize: '0.9rem' }}>
               {ownerConflict.kind === 'other_account'
                 ? L(dict,
-                    `本机保存着${ownerConflict.prevEmail ? `「${ownerConflict.prevEmail}」` : '上一个账号'}的记忆。为保护隐私,继续使用当前账号前需要先清除这些数据(已同步到云端的不受影响);或退出登录把设备还给原账号。`,
-                    `This device stores memories belonging to ${ownerConflict.prevEmail ? `"${ownerConflict.prevEmail}"` : 'a previous account'}. To protect their privacy, that data must be cleared before you continue (their cloud copies are unaffected) — or sign out to hand the device back.`)
+                    `本机现在是${ownerConflict.prevEmail ? `「${ownerConflict.prevEmail}」` : '上一个账号'}的空间。切换后,ta 的记忆会先归档在本机 ta 的名下(不删除、不外泄),换回 ta 的账号时原样回来;你会进入自己的空间。`,
+                    `This device currently holds ${ownerConflict.prevEmail ? `"${ownerConflict.prevEmail}"` : 'the previous account'}'s space. Switching archives their memories on this device under their name (nothing deleted or exposed) — they come back when they sign in again. You'll enter your own space.`)
                 : L(dict,
                     '登录前这台设备上已经有一些未登录时的记录。归入这个账号后会随账号同步;也可以清除后从零开始。',
                     'There are records made on this device before signing in. Keep them under this account (they will sync with it), or clear them and start fresh.')}
@@ -1011,9 +1012,20 @@ export default function Portal() {
               {ownerConflict.kind === 'other_account' ? (
                 <>
                   <button type="button" disabled={ownerBusy}
-                    onClick={async () => { setOwnerBusy(true); await purgeAllLocalUserData(); setLocalOwner(ownerConflict.userId, ownerConflict.email); window.location.reload(); }}
+                    onClick={async () => {
+                      // 批次 34:不再逼用户清数据 —— 账号空间互换:
+                      // 上一账号本地数据整包归档(独立 IDB,按 userId 存),清场,
+                      // 恢复本账号归档(若有);没有则空场起步,云同步拉回。
+                      setOwnerBusy(true);
+                      const prev = getLocalOwner();
+                      if (prev?.userId) await archiveCurrentSpace(prev.userId);
+                      await purgeAllLocalUserData();
+                      await restoreArchivedSpace(ownerConflict.userId);
+                      setLocalOwner(ownerConflict.userId, ownerConflict.email);
+                      window.location.reload();
+                    }}
                     style={{ width: '100%', background: 'var(--portal-accent, #588ce3)', color: 'var(--portal-on-accent, #fff)', border: 'none', borderRadius: 999, padding: '0.7rem', fontSize: '0.95rem', fontWeight: 600, cursor: 'pointer', opacity: ownerBusy ? 0.6 : 1 }}>
-                    {ownerBusy ? L(dict, '清除中…', 'Clearing…') : L(dict, '清除上一账号的数据并继续', 'Clear previous account’s data & continue')}
+                    {ownerBusy ? L(dict, '正在切换空间…', 'Switching spaces…') : L(dict, '切换到我的空间', 'Switch to my space')}
                   </button>
                   <button type="button" disabled={ownerBusy}
                     onClick={async () => { setOwnerBusy(true); await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {}); window.location.reload(); }}
