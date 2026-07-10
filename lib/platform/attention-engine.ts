@@ -141,7 +141,11 @@ export function scoreCalendarEvents(
     .filter((e) => {
       // Only include today + tomorrow events
       const d = startOfDay(parseEventDate(e.start));
-      return isSameDay(d, today) || isSameDay(d, tomorrow);
+      if (!isSameDay(d, today) && !isSameDay(d, tomorrow)) return false;
+      // 批次 49(用户定案):订阅日历的全天标签(农历「廿六」/节气 —— 全天且
+      // 无任何类型关键词)不进焦点列表。生日/截止/节日等有类型的全天事件保留。
+      if (e.allDay && inferEventType(e) === 'other') return false;
+      return true;
     })
     .map((e): AttentionObject => {
       const eventType = inferEventType(e);
