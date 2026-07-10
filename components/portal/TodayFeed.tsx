@@ -79,8 +79,10 @@ export default function TodayFeed({
 
   const uiLocale = portalLocaleToDictionaryLocale(usePortalLocale());
   // 批次 13:profile store 的缺省名是 zh「我」,英文界面下按语言回落 Me
+  // P1-6:称呼是本机数据(引导里填的),显示不需要登录 —— 此前 canUsePrivateData 门
+  // 让匿名用户填了「J」头像还是「Me」(称呼存了但没接到显示)。
   const trimmedName = displayName.trim();
-  const initials = canUsePrivateData && trimmedName && trimmedName !== '我'
+  const initials = trimmedName && trimmedName !== '我'
     ? trimmedName.slice(0, 1)
     : L(uiLocale, '我', 'Me');
   const { shouldShow: showWrapped, dismiss: dismissWrapped } = useWrappedTrigger();
