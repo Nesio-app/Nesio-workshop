@@ -17,7 +17,7 @@ const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 export function aiProviderAvailable(): boolean {
   // 统一别名解析:此前只认 GEMINI_API_KEY/GOOGLE_GENERATIVE_AI_API_KEY,漏了
   // GOOGLE_AI_API_KEY / GOOGLE_API_KEY —— 共享客户端也曾中招同一个窄读 bug。
-  return Boolean(resolveAiKey('anthropic') || resolveAiKey('gemini'));
+  return Boolean(resolveAiKey('anthropic') || resolveAiKey('gemini') || resolveAiKey('openai'));
 }
 
 /** 解析 data URL(data:image/jpeg;base64,...)→ { mimeType, base64 };非法返回 null。 */
@@ -134,8 +134,44 @@ async function callGemini(apiKey: string, prompt: string, system: string, maxTok
   throw new Error(lastError);
 }
 
+async function callOpenAI(apiKey: string, prompt: string, system: string, maxTokens: number, temperature?: number, image?: string, responseFormat?: 'json'): Promise<CallResult> {
+  const img = image ? parseDataUrl(image) : null;
+  const userContent = img
+    ? [
+        { type: 'text', text: prompt },
+        { type: 'image_url', image_url: { url: image, detail: 'low' } },
+      ]
+    : prompt;
+  const usedModel = envValue('OPENAI_MODEL') || 'gpt-4o-mini';
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: usedModel,
+      max_tokens: maxTokens,
+      ...(typeof temperature === 'number' ? { temperature } : {}),
+      ...(responseFormat === 'json' ? { response_format: { type: 'json_object' } } : {}),
+      messages: [
+        ...(system ? [{ role: 'system', content: system }] : []),
+        { role: 'user', content: userContent },
+      ],
+    }),
+  });
+  const data = await res.json() as {
+    choices?: Array<{ message?: { content?: string } }>;
+    error?: { message?: string; type?: string };
+    usage?: { prompt_tokens?: number; completion_tokens?: number };
+  };
+  if (!res.ok || data.error) throw new Error(`OpenAI ${res.status}${data.error?.message ? `: ${data.error.message}` : ''}`);
+  return {
+    text: (data.choices?.[0]?.message?.content || '').trim(),
+    model: usedModel,
+    usage: { inputTokens: data.usage?.prompt_tokens || 0, outputTokens: data.usage?.completion_tokens || 0 },
+  };
+}
+
 /** 把一次 completeText 调用的真实 token + 估算成本落进现有 ai_route 遥测(server-only,best-effort)。 */
-function logAiCost(route: string, provider: 'claude' | 'gemini', startedAt: number, r: CallResult): void {
+function logAiCost(route: string, provider: 'claude' | 'gemini' | 'openai', startedAt: number, r: CallResult): void {
   const extra: Record<string, string | number | boolean> = {
     provider,
     model: r.model,
@@ -160,9 +196,10 @@ function logAiCost(route: string, provider: 'claude' | 'gemini', startedAt: numb
 export async function completeText(
   { prompt, system = '', maxTokens = 1024, model, temperature, image, responseFormat, route = 'complete' }:
   { prompt: string; system?: string; maxTokens?: number; model?: string; temperature?: number; image?: string; responseFormat?: 'json'; route?: string },
-): Promise<{ text: string; provider: 'claude' | 'gemini'; usage?: AiUsage; model?: string }> {
+): Promise<{ text: string; provider: 'claude' | 'gemini' | 'openai'; usage?: AiUsage; model?: string }> {
   const anthropicKey = resolveAiKey('anthropic');
   const geminiKey = resolveAiKey('gemini');
+  const openaiKey = resolveAiKey('openai');
   const startedAt = Date.now();
 
   if (anthropicKey) {
@@ -173,14 +210,25 @@ export async function completeText(
         return { text: r.text, provider: 'claude', usage: r.usage, model: r.model };
       }
     } catch (err) {
-      // Fall through to Gemini when Claude errors (auth/quota/etc.).
-      if (!geminiKey) throw err;
+      // Fall through when Claude errors (auth/quota/etc.).
+      if (!geminiKey && !openaiKey) throw err;
     }
   }
   if (geminiKey) {
-    const r = await callGemini(geminiKey, prompt, system, maxTokens, temperature, image, responseFormat);
-    logAiCost(route, 'gemini', startedAt, r);
-    return { text: r.text, provider: 'gemini', usage: r.usage, model: r.model };
+    try {
+      const r = await callGemini(geminiKey, prompt, system, maxTokens, temperature, image, responseFormat);
+      logAiCost(route, 'gemini', startedAt, r);
+      return { text: r.text, provider: 'gemini', usage: r.usage, model: r.model };
+    } catch (err) {
+      // 批次 45:Gemini 挂(免费层分钟限流)→ OpenAI 第三层。analyze 路由早就有
+      // 这层,chat/completeText 一直缺 —— 「图片识别能用、问一问不行」的根因。
+      if (!openaiKey) throw err;
+    }
+  }
+  if (openaiKey) {
+    const r = await callOpenAI(openaiKey, prompt, system, maxTokens, temperature, image, responseFormat);
+    logAiCost(route, 'openai', startedAt, r);
+    return { text: r.text, provider: 'openai', usage: r.usage, model: r.model };
   }
   throw new Error('no_ai_provider');
 }

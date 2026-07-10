@@ -26,8 +26,9 @@ assert.deepEqual(geminiContract.providers.configured, ['gemini']);
 assert.equal(geminiContract.runtimeAiReadiness.providers.gemini.configured, true);
 assert.equal(geminiContract.runtimeAiReadiness.providers.gemini.enabled, true);
 assert.equal(geminiContract.runtimeAiReadiness.providers.gemini.startEndpoint, '/api/portal/chat');
-// #8:契约必须报告真实回退链(与 ai-complete 同源)
-assert.deepEqual([...geminiContract.runtimeAiReadiness.routing.completionChain], ['claude', 'gemini']);
+// #8:契约必须报告真实回退链(与 ai-complete 同源)。批次 45 补 openai 第三层
+// (analyze 早有、chat/completeText 曾缺 —— 「图片识别能用、问一问不行」的根因)。
+assert.deepEqual([...geminiContract.runtimeAiReadiness.routing.completionChain], ['claude', 'gemini', 'openai']);
 assert.equal(geminiContract.runtimeAiReadiness.routing.geminiModelFallbacks.length >= 2, true);
 assert.equal(geminiContract.runtimeAiReadiness.providers.gemini.secretsRedacted, true);
 assert.equal(geminiContract.runtimeAiReadiness.providers.chatgpt.enabled, false);

@@ -111,6 +111,37 @@ async function callClaude(
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 // 批次 44:改共读单一数据源(此前这里硬编码一份旧链,与 ai-complete 漂移)
 
+// ── OpenAI(批次 45:第三层兜底,与 analyze 路由同构)─────────────────────────
+async function callOpenAI(
+  apiKey: string,
+  message: string,
+  history: ChatMessage[],
+  systemInstruction: string,
+): Promise<{ text: string; sources: Array<{ title: string; url: string }> }> {
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: envValue('OPENAI_MODEL') || 'gpt-4o-mini',
+      max_tokens: 1024,
+      messages: [
+        { role: 'system', content: systemInstruction },
+        ...history.filter((m) => m.text?.trim()).map((m) => ({
+          role: m.role === 'model' ? 'assistant' as const : 'user' as const,
+          content: m.text,
+        })),
+        { role: 'user', content: message },
+      ],
+    }),
+  });
+  const data = await res.json() as {
+    choices?: Array<{ message?: { content?: string } }>;
+    error?: { message?: string };
+  };
+  if (!res.ok || data.error) throw new Error(`OpenAI ${res.status}${data.error?.message ? `: ${data.error.message}` : ''}`);
+  return { text: (data.choices?.[0]?.message?.content || '').trim(), sources: [] };
+}
+
 async function callGemini(
   apiKey: string,
   message: string,
@@ -199,8 +230,9 @@ export async function POST(req: NextRequest) {
   const anthropicKey = envValue('ANTHROPIC_API_KEY') || envValue('CLAUDE_API_KEY');
   // 同时接受两种命名方式
   const geminiKey = resolveAiKey('gemini');
+  const openaiKey = resolveAiKey('openai');
 
-  if (!anthropicKey && !geminiKey) {
+  if (!anthropicKey && !geminiKey && !openaiKey) {
     // 批次 33:技术性报错绝不给用户看(「只能感到更聪明」)。真实原因进服务端日志,
     // 用户拿到的是人话 + 下方照常渲染的相关记忆(确定性检索兜底)。
     console.error('[chat] no_provider_key');
@@ -225,9 +257,11 @@ export async function POST(req: NextRequest) {
   try {
     const result = anthropicKey
       ? await callClaude(anthropicKey, message, history, systemInstruction)
-      : await callGemini(geminiKey!, message, history, systemInstruction);
+      : geminiKey
+        ? await callGemini(geminiKey, message, history, systemInstruction)
+        : await callOpenAI(openaiKey!, message, history, systemInstruction);
 
-    reportAiCall('chat', true, startedAt, { provider: anthropicKey ? 'claude' : 'gemini' });
+    reportAiCall('chat', true, startedAt, { provider: anthropicKey ? 'claude' : geminiKey ? 'gemini' : 'openai' });
     return NextResponse.json({
       ok: true,
       response: result.text || '我理解你的问题，但暂时没有找到确定的答案。',
@@ -239,8 +273,10 @@ export async function POST(req: NextRequest) {
 
     const isAuthError = msg.includes('invalid x-api-key') || msg.includes('authentication_error') || msg.includes('401');
 
-    // Claude 失败 → 尝试 Gemini 兜底（含 auth error 情况）
-    if (geminiKey) {
+    // Claude 失败 → Gemini → OpenAI(批次 45:与 analyze 同构的三层链 ——
+    // 此前 chat 缺第三层,造成「图片识别能用、问一问不行」的逻辑不一致)
+    let sawQuota = false;
+    if (geminiKey && anthropicKey) {
       try {
         const result = await callGemini(geminiKey, message, history, systemInstruction);
         reportAiCall('chat', true, startedAt, { provider: 'gemini_fallback' });
@@ -252,16 +288,31 @@ export async function POST(req: NextRequest) {
       } catch (fallbackErr) {
         const fallbackMsg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
         console.error('[chat] gemini_fallback_error:', fallbackMsg);
-        const isQuotaError = fallbackMsg.includes('quota') || fallbackMsg.includes('429');
-        if (isQuotaError) {
-          // 配额耗尽:运维原因进日志,用户只看到人话 + 相关记忆兜底
-          return NextResponse.json({
-            ok: true,
-            response: uiLocale === 'en' ? "My cloud brain is a bit busy right now. I've pulled the most relevant memories below — tap to open. Ask me again in a few minutes." : '我这会儿的云端脑子有点挤,先把记忆里最相关的翻出来放在下面了——点开就能看。过几分钟再问我一次。',
-            sources: [],
-          });
-        }
+        sawQuota = fallbackMsg.includes('quota') || fallbackMsg.includes('429');
       }
+    } else {
+      sawQuota = msg.includes('quota') || msg.includes('429');
+    }
+    if (openaiKey) {
+      try {
+        const result = await callOpenAI(openaiKey, message, history, systemInstruction);
+        reportAiCall('chat', true, startedAt, { provider: 'openai_fallback' });
+        return NextResponse.json({
+          ok: true,
+          response: result.text || '我理解你的问题，但暂时没有找到确定的答案。',
+          sources: result.sources,
+        });
+      } catch (openErr) {
+        console.error('[chat] openai_fallback_error:', openErr instanceof Error ? openErr.message : openErr);
+      }
+    }
+    if (sawQuota) {
+      // 配额耗尽:运维原因进日志,用户只看到人话 + 相关记忆兜底
+      return NextResponse.json({
+        ok: true,
+        response: uiLocale === 'en' ? "My cloud brain is a bit busy right now. I've pulled the most relevant memories below — tap to open. Ask me again in a few minutes." : '我这会儿的云端脑子有点挤,先把记忆里最相关的翻出来放在下面了——点开就能看。过几分钟再问我一次。',
+        sources: [],
+      });
     }
 
     reportAiCall('chat', false, startedAt, { error: isAuthError ? 'auth' : 'provider' });

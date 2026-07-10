@@ -27,21 +27,28 @@ const GEMINI_PRICES: Array<{ match: RegExp; price: AiPrice }> = [
   { match: /pro/i, price: { input: 1.25, output: 5 } },
   { match: /flash/i, price: { input: 0.075, output: 0.3 } },
 ];
-// 未知型号保守估:Claude 按 haiku(app 默认)、Gemini 按 flash。
+const OPENAI_PRICES: Array<{ match: RegExp; price: AiPrice }> = [
+  { match: /gpt-4o(?!-mini)/i, price: { input: 2.5, output: 10 } },
+  { match: /gpt-4o-mini/i, price: { input: 0.15, output: 0.6 } },
+];
+// 未知型号保守估:Claude 按 haiku(app 默认)、Gemini 按 flash、OpenAI 按 4o-mini。
 const DEFAULT_CLAUDE: AiPrice = { input: 0.8, output: 4 };
 const DEFAULT_GEMINI: AiPrice = { input: 0.075, output: 0.3 };
+const DEFAULT_OPENAI: AiPrice = { input: 0.15, output: 0.6 };
 
-export function priceFor(provider: 'claude' | 'gemini', model: string): AiPrice {
-  const table = provider === 'claude' ? CLAUDE_PRICES : GEMINI_PRICES;
+export type AiCostProvider = 'claude' | 'gemini' | 'openai';
+
+export function priceFor(provider: AiCostProvider, model: string): AiPrice {
+  const table = provider === 'claude' ? CLAUDE_PRICES : provider === 'openai' ? OPENAI_PRICES : GEMINI_PRICES;
   for (const { match, price } of table) if (match.test(model || '')) return price;
-  return provider === 'claude' ? DEFAULT_CLAUDE : DEFAULT_GEMINI;
+  return provider === 'claude' ? DEFAULT_CLAUDE : provider === 'openai' ? DEFAULT_OPENAI : DEFAULT_GEMINI;
 }
 
 /**
  * 估算单次调用美元成本。缓存命中读按 0.1x、缓存写入按 1.25x(Claude 计价规则);
  * Gemini 无缓存写概念,其 cacheReadTokens 也按 0.1x 近似。负数一律夹到 0。
  */
-export function estimateCostUsd(provider: 'claude' | 'gemini', model: string, usage: AiUsage): number {
+export function estimateCostUsd(provider: AiCostProvider, model: string, usage: AiUsage): number {
   const p = priceFor(provider, model);
   const M = 1_000_000;
   const nz = (n: number | undefined) => Math.max(0, n || 0);
