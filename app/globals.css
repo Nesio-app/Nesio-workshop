@@ -6847,6 +6847,10 @@ html[data-portal-theme="night"] .nesio-ob-auth-btn { color: #e8eefa; background:
   border-bottom: inherit;
   border-radius: 0.18rem;
 }
+/* QA:caret 此前永远居中,第一步指「今天」时戳在空白处。按目标图标位置分 zone:
+   底部导航三键约在卡片宽度的 18% / 50% / 82% 处。 */
+.nesio-tips-card--today::after { left: 18%; }
+.nesio-tips-card--memory::after { left: 82%; }
 
 html[data-portal-theme="night"] .nesio-tips-card {
   background: rgba(16, 26, 52, 0.94);
@@ -9573,6 +9577,12 @@ html[data-portal-theme="night"] .nesio-wechat-suggestion {
 .nesio-wechat-bubble--ai {
   background: #fff;
   border-radius: 0 0.75rem 0.75rem 0.75rem;
+  /* QA:AI 气泡的长按菜单是 JS(500ms→复制/存记忆),但上面 user-select:text 让 iOS
+     原生选词/放大镜同时启动(长按=全页蓝选+系统复制)。菜单里已有「复制」,
+     这里关掉原生选词不损失功能;用户自己的气泡(无菜单)仍可选。 */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 html[data-portal-theme="night"] .nesio-wechat-bubble--ai {
   background: #2a2d3e;
@@ -9670,6 +9680,10 @@ html[data-portal-theme="night"] .nesio-wechat-bubble--ai {
   border: 1px solid var(--portal-hairline, rgba(127,127,127,0.18));
   cursor: pointer;
   text-align: left;
+  /* 相关记忆 chip 是点按目标,iOS 长按不该触发选词(QA 截图里蓝色选柄落在它上面) */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 .nesio-wechat-ref-name {
   overflow: hidden;

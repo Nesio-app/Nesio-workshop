@@ -329,7 +329,9 @@ export function FirstUseTips({ onDone, locale }: { onDone: () => void; locale: P
   function saveFirstMemory() {
     const text = firstText.trim();
     if (!text) return;
-    const name = text.slice(0, 24);
+    // 一句话笔记的句子本身就是记忆 —— 24 字符会把 "hallway drawer" 截成 "ha",
+    // 问一问只能对着残句瞎猜(QA 实锤)。放宽到 60,超长再截。
+    const name = text.slice(0, 60);
     ingestLifeNode({
       name,
       type: 'object',
@@ -347,7 +349,8 @@ export function FirstUseTips({ onDone, locale }: { onDone: () => void; locale: P
   return (
     <div className="nesio-tips-overlay" role="dialog" aria-modal="false" aria-label={t(locale, 'onboardingTipsAriaLabel')}>
       <div className={`nesio-tips-hl nesio-tips-hl--${tip.zone}`} aria-hidden />
-      <div className="nesio-tips-card">
+      {/* zone 也挂到卡片上:caret 按目标图标(左=今天/中=中键/右=记忆)定位,不再永远居中 */}
+      <div className={`nesio-tips-card nesio-tips-card--${tip.zone}`}>
         <div className="nesio-tips-dots" aria-hidden>
           {tips.map((_, i) => <span key={i} className={`nesio-tips-dot${i === step ? ' nesio-tips-dot--active' : ''}`} />)}
         </div>

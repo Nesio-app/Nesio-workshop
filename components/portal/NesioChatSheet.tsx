@@ -122,7 +122,19 @@ function fmtNode(n: LifeNode): string {
     ? fmtEventDate(startStr)
     : new Date(n.createdAt).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
   const src = SOURCE_LABEL[n.source] || n.source;
-  return `• [${src}] ${n.name} (${dateLabel})`;
+  // QA 实锤:此前普通节点只喂 name —— 标题一截断("…in the ha"),AI 就对着残句瞎猜
+  // (handbag/hall closet)。补上原句 rawInput(与 name 不同才带)+ 关键属性
+  // (存放位置/备注/详情),AI 拿到的才是完整事实。
+  const extras: string[] = [];
+  const raw = (n.rawInput || '').replace(/\s+/g, ' ').trim();
+  if (raw && raw !== n.name) extras.push(`原句:${raw.slice(0, 140)}`);
+  for (const key of ['location', 'note', 'detail'] as const) {
+    const v = n.attributes[key];
+    if (typeof v === 'string' && v.trim()) {
+      extras.push(`${key === 'location' ? '位置' : key === 'note' ? '备注' : '详情'}:${v.trim().slice(0, 80)}`);
+    }
+  }
+  return `• [${src}] ${n.name} (${dateLabel})${extras.length ? ` · ${extras.join(' · ')}` : ''}`;
 }
 
 interface RefCandidate { shortId: number; node: LifeNode }
