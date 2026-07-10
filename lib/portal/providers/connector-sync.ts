@@ -98,11 +98,24 @@ export interface CalendarSyncResult { ok: boolean; count: number; added: number;
 
 /** 近 60 天窗口的日历事件进记忆;已存在(同 calendarId)但开始时间变了 → 原位更新(时区修复后自愈老数据)。 */
 export async function saveCalendarEventsToMemory(events: Array<Record<string, unknown>>): Promise<number> {
-  const { getLifeGraph, updateLifeNode } = await import('@/lib/portal/life-graph');
+  const { getLifeGraph, updateLifeNode, deleteLifeNode } = await import('@/lib/portal/life-graph');
   const now = Date.now();
   const windowEnd = now + 60 * 86_400_000;
+
+  // 批次 43:calendarId 机制之前入库的老日历节点没这个字段,byCalId 永远认不出
+  // 它们 → 每次同步都再灌一遍(「廿七」×2 的根因)。两步自愈:
+  // ① 已有的重复(同名+同 start 的 calendar 节点)保最早删其余;
+  // ② 幸存的老节点(无 calendarId)按 名字|start 认亲,同步时补上 calendarId 原位更新。
+  const calNodes = getLifeGraph().filter((n) => n.source === 'calendar');
+  const byNameStart = new Map<string, (typeof calNodes)[number]>();
+  for (const n of [...calNodes].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())) {
+    const key = `${n.name}|${typeof n.attributes.start === 'string' ? n.attributes.start : ''}`;
+    const first = byNameStart.get(key);
+    if (!first) { byNameStart.set(key, n); continue; }
+    deleteLifeNode(n.id);
+  }
   const byCalId = new Map(
-    getLifeGraph().filter((n) => n.source === 'calendar' && n.attributes.calendarId)
+    [...byNameStart.values()].filter((n) => n.attributes.calendarId)
       .map((n) => [n.attributes.calendarId as string, n] as const),
   );
   let added = 0;
@@ -113,7 +126,12 @@ export async function saveCalendarEventsToMemory(events: Array<Record<string, un
     const t = new Date(start).getTime();
     if (t < now - 86_400_000 || t > windowEnd) continue;
     const calId = (evAny.id as string) || `${title}-${start}`;
-    const existing = byCalId.get(calId);
+    const existing = byCalId.get(calId) || byNameStart.get(`${title}|${start}`);
+    if (existing && !existing.attributes.calendarId) {
+      // 老节点认亲:补 calendarId,下次同步走正常 upsert
+      updateLifeNode(existing.id, { attributes: { ...existing.attributes, calendarId: calId } });
+      existing.attributes = { ...existing.attributes, calendarId: calId };
+    }
     if (existing) {
       // 时间/标题有变 → 更新(TZID 修复后,老的错时区节点在下次同步自愈)
       if (existing.attributes.start !== start || existing.name !== title) {

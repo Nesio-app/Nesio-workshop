@@ -139,12 +139,18 @@ function fmtNode(n: LifeNode): string {
 
 interface RefCandidate { shortId: number; node: LifeNode }
 
+// 批次 39/43:天气信号是环境数据不是用户记忆,从问一问候选整体剔除。
+// 批次 43 加宽:老天气节点 tags 可能只有 '天气'(source/type 追加是后来的事),
+// 名字可能是「Cary 天气」;signalSource 是最可靠的身份标。
+function isWeatherNode(n: LifeNode): boolean {
+  const tags = n.tags || [];
+  return tags.includes('weather') || tags.includes('weather.forecast') || tags.includes('天气')
+    || n.attributes?.signalSource === 'weather'
+    || /天气信号|天气$/.test(n.name);
+}
+
 async function buildMemoryContext(query: string, convoHint = ''): Promise<{ context: string; refCandidates: RefCandidate[]; semanticDegraded: boolean; semanticReason: string }> {
-  // 批次 39:天气信号是环境数据不是用户记忆,从问一问候选整体剔除
-  const graph = getLifeGraph().filter((n) => {
-    const tags = n.tags || [];
-    return !(tags.includes('weather') || tags.includes('weather.forecast') || /天气信号$|^天气$/.test(n.name));
-  });
+  const graph = getLifeGraph().filter((n) => !isWeatherNode(n));
   const temporal = parseTemporalQuery(query);
 
   // Layer 1: date-matched nodes (attributes.start matches the parsed date)
@@ -157,7 +163,9 @@ async function buildMemoryContext(query: string, convoHint = ''): Promise<{ cont
 
   // Layer 2: text/entity search + semantic re-rank (embedding cosine blend;
   // falls back to pure text order when the embed endpoint is unavailable)
-  const textRanked = smartSearch(query, null).nodes.slice(0, 20);
+  // 批次 43:smartSearch 内部读的是未过滤全量图谱 —— 天气信号曾从这条路
+  // 漏进「相关记忆」引用卡(图谱级过滤只罩住了 dateNodes/upcoming)。
+  const textRanked = smartSearch(query, null).nodes.filter((n) => !isWeatherNode(n)).slice(0, 20);
   const reranked = await semanticRerankMeta(query, textRanked);
   const searchNodes = reranked.nodes.slice(0, 12);
   // 🔴#2:语义检索没用上 embedding(缺 AI key / 端点挂了)= 静默降级,跨语言记录会被漏。
@@ -249,6 +257,12 @@ async function buildMemoryContext(query: string, convoHint = ''): Promise<{ cont
   for (const n of [...dateNodes, ...emailNodes, ...searchNodes]) {
     if (refSeen.has(n.id)) continue;
     refSeen.add(n.id);
+    // 批次 43:同名+同一天的节点只出一张引用卡(日历老节点重复入库的历史遗留
+    // 会让「廿七」这类农历条目连出两张一模一样的 chip)
+    const day = typeof n.attributes.start === 'string' ? n.attributes.start.slice(0, 10) : '';
+    const dupKey = `${n.name}|${day}`;
+    if (refSeen.has(dupKey)) continue;
+    refSeen.add(dupKey);
     refCandidates.push({ shortId: refCandidates.length + 1, node: n });
     if (refCandidates.length >= 8) break;
   }
