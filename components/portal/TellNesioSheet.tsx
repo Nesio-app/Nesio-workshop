@@ -106,8 +106,11 @@ export default function TellNesioSheet({ open, onClose, onCapture }: TellNesioSh
             style={{ '--delay': `${i * 0.05}s` } as React.CSSProperties}
             onClick={() => {
               if (btn.mode === 'camera') {
-                // 同一手势内触发 input.click(),跳过第二次选择页
-                cameraInputRef.current?.click();
+                // QA 回访:用户要能从拍一拍进图册 —— web 的 capture 相机里塞不进图库
+                // 按钮(原生取景框不可定制)。改为打开 CameraSheet 起始面板:
+                // 「拍一张」(capture 直开相机)+「从相册选」并排。拍照多一跳,图库有了。
+                onClose();
+                onCapture('camera');
                 return;
               }
               onClose();

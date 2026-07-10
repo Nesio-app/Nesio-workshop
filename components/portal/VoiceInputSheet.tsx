@@ -26,7 +26,7 @@ import { routeIntent } from '@/lib/portal/intent-router';
 import { DomainIcon, IconBox, IconClock, IconMapPin, IconUser } from './icons';
 import { L } from '@/lib/portal/i18n';
 import { loadProfileSettings, portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
-import { canUsePaidCloudAi } from '@/lib/portal/entitlement';
+import { canUsePaidCloudAi, isPro } from '@/lib/portal/entitlement';
 import { usePortalLocale } from './use-portal-locale';
 
 interface VoiceInputSheetProps {
@@ -430,10 +430,11 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
 
     let title = cleanText.slice(0, 40);
     let aiConfidence = 0.7;
-    // 成本护栏:免费层不打云理解 —— 规则抽取(extractContext 的人/地/物/域 + 规则标题)
-    // 本来就是离线兜底,免费层直接用它,零成本。分层未启用(当前 PWA)恒放行,不变。
-    if (!canUsePaidCloudAi()) {
-      /* skip cloud — rule-based title/entities below */
+    // QA:默认不自动打 AI(免费期也一样)—— 规则抽取(extractContext 人/地/物/域 +
+    // 规则标题)是默认路径,零成本零等待;确认卡上有「AI 识别」按钮显式触发。
+    // Pro 自动跑(用户定的:"pro 版启动 ai 识别")。
+    if (!isPro()) {
+      /* skip cloud — rule-based title/entities below; AI via explicit button */
     } else try {
       const res = await fetch('/api/portal/analyze', {
         method: 'POST',
@@ -515,6 +516,35 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
   function setDraftDomain(domain: FrontDomain) {
     setDraft((d) => (d ? { ...d, domain: d.domain === domain ? null : domain, edited: true } : d));
   }
+
+  // 「AI 识别」按钮:显式触发云理解优化标题/置信度(默认路径是规则,零成本)。
+  // 分层启用后免费点它 → 升级引导;免费期(分层未启用)可用。
+  const [aiRefining, setAiRefining] = useState(false);
+  async function aiRefineDraft() {
+    if (!draft || aiRefining) return;
+    if (!canUsePaidCloudAi()) {
+      window.dispatchEvent(new CustomEvent('nesio-pro-gate', { detail: { feature: 'voice_ai' } }));
+      return;
+    }
+    setAiRefining(true);
+    try {
+      const res = await fetch('/api/portal/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'text', content: draft.rawText, uiLocale: dict }),
+      });
+      const data = await res.json() as { ok?: boolean; nodes?: Array<{ name?: string; confidence?: number }> };
+      const best = data.ok && data.nodes?.length ? data.nodes[0] : null;
+      if (best?.name) {
+        setDraft((d) => d ? {
+          ...d,
+          title: stripInlineTags(best.name!) || d.title,
+          aiConfidence: typeof best.confidence === 'number' ? best.confidence : d.aiConfidence,
+        } : d);
+      }
+    } catch { /* 失败保留规则结果,不打断 */ }
+    setAiRefining(false);
+  }
   function dropChip(kind: 'people' | 'places' | 'objects', value: string) {
     setDraft((d) => (d ? { ...d, [kind]: d[kind].filter((item) => item !== value), edited: true } : d));
   }
@@ -558,6 +588,15 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
                 onChange={(e) => setDraftTitle(e.target.value)}
                 aria-label="标题"
               />
+              {/* AI 显式按钮:默认规则标题零等待;想要 AI 优化就点这个 */}
+              <button
+                type="button"
+                onClick={aiRefineDraft}
+                disabled={aiRefining}
+                style={{ alignSelf: 'flex-start', marginTop: '0.35rem', background: 'none', border: '1px solid var(--portal-line, rgba(127,127,127,0.25))', borderRadius: 999, padding: '0.25rem 0.7rem', fontSize: '0.72rem', color: 'var(--portal-accent, #588ce3)', cursor: 'pointer', opacity: aiRefining ? 0.6 : 1 }}
+              >
+                {aiRefining ? L(dict, 'AI 识别中…', 'AI recognizing…') : L(dict, 'AI 识别', 'AI recognize')}
+              </button>
             </label>
 
             <div className="nesio-voice-confirm-field">

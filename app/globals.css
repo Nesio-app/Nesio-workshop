@@ -63,6 +63,18 @@
 .portal-root {
   --font-sans: var(--font-source-sans);
   --font-serif: var(--font-portal-serif);
+  /* QA(收纳暗色鬼色):storage 系移植组件(InventorySheet 等)用的旧 token
+     (text-primary/secondary/tertiary、accent-primary、border-subtle、status-warn)
+     在本表从未定义,无 fallback 的 var() 解析为空 → 文字继承出不可读的颜色。
+     别名映射到 portal 体系,昼夜自动跟随,一处修全站。 */
+  --text-primary: var(--portal-ink);
+  --text-secondary: var(--portal-muted);
+  --text-tertiary: var(--portal-muted);
+  --accent-primary: var(--portal-accent);
+  --accent-primary-dim: var(--portal-accent-soft);
+  --border-subtle: var(--portal-line);
+  --status-warn: var(--status-gentle);
+  --status-stop: var(--status-risk);
   --portal-blue-deep: #588ce3;
   --portal-blue-mid: #96c7f3;
   --portal-blue-light: #cddefc;
@@ -7978,8 +7990,9 @@ html[data-portal-theme="night"] .nesio-insights-narrative { background: var(--po
      改:自然宽度 + gap + 横向滚动,中英文都不叠。
      QA 回访:gap 0.9rem 让中文 6 tab 也溢出一屏,「认知」被推出屏外像被删了。
      收紧 gap 让中文全放下;真溢出(英文)时右缘渐隐提示可滑。 */
-  gap: 0.55rem;
-  justify-content: space-between;
+  /* QA 回访②:space-between 在只剩 2 个 tab(公开面)时把它们推到两端,难看。
+     左对齐 + 稍大 gap:2 个自然靠左,6 个也放得下。 */
+  gap: 1.1rem;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
@@ -8335,7 +8348,8 @@ html[data-portal-theme="night"] .nesio-mirror-title { color: #e8eefa; }
 .nesio-mirror-times { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 
 /* ─── Camera result panel (AI analysis output) ─── */
-/* Preview panel — shown after capture{
+/* Preview panel — shown after capture, before analysis */
+.nesio-camera-preview-panel {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -8348,9 +8362,13 @@ html[data-portal-theme="night"] .nesio-mirror-title { color: #e8eefa; }
   background: rgba(16,26,50,0.95);
   border-top: 1px solid rgba(88,140,227,0.2);
   padding: 0.85rem 1rem;
-  max-height: 40vh;
+  /* QA:40vh 太矮 —— 多条目+冷静面板时保存按钮被顶出可视区,看着像"卡死不能下拉"。
+     提高到 62dvh(dvh 吃准 iOS 动态工具栏)+ 底部安全区;溢出仍内滚。 */
+  max-height: 62dvh;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding-bottom: calc(0.85rem + env(safe-area-inset-bottom, 0px));
 }
 
 .nesio-camera-result-summary {

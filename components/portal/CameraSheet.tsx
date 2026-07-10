@@ -407,9 +407,30 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
     if (Object.keys(defaults).length > 0) setNodeLocations(defaults);
   }
 
+  // QA:不用 AI 直接存 —— 照片 + 自己填名字/标签。免费默认路径,零成本零等待。
+  function saveWithoutAi() {
+    setSelecting(false);
+    const manual: AnalysisResult = {
+      summary: L(dict, '照片已就绪,填个名字(标签可选)就能存。', 'Photo ready — give it a name (tags optional) and save.'),
+      nodes: [{
+        type: 'object', name: L(dict, '照片记录', 'Photo note'), attributes: {},
+        relations: [], tags: [], source: 'photo', confidence: 1,
+      }],
+    };
+    setResult(manual);
+    setEditedNodes(toEditedNodes(manual.nodes));
+    setIsReceipt(false);
+    setPhase('result');
+  }
+
   // Analyze the full captured image (called from selection overlay or result phase)
   async function analyzeFullImage() {
     if (!capturedBase64) return;
+    // AI 是显式按钮:分层启用后免费点它 → 升级引导;免费期(分层未启用)可用。
+    if (!canUsePaidCloudAi()) {
+      window.dispatchEvent(new CustomEvent('nesio-pro-gate', { detail: { feature: 'photo_ai' } }));
+      return;
+    }
     setSelecting(false);
     setPhase('analyzing');
     setError('');
@@ -686,6 +707,12 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
     e.preventDefault();
     const pts = selPointsRef.current;
     if (pts.length < 3 || !capturedPreview) { setSelecting(false); return; }
+    // 圈选 = AI 动作:分层启用后免费 → 升级引导(免费期可用)
+    if (!canUsePaidCloudAi()) {
+      window.dispatchEvent(new CustomEvent('nesio-pro-gate', { detail: { feature: 'photo_ai' } }));
+      selPointsRef.current = [];
+      return;
+    }
     const canvas = selectCanvasRef.current;
     if (!canvas) { setSelecting(false); return; }
 
@@ -884,6 +911,11 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
             <p className="nesio-camera-result-summary" style={{ margin: 0, flex: 1 }}>{result.summary}</p>
             {capturedPreview && (
+              <button type="button" className="nesio-camera-select-btn" onClick={analyzeFullImage}>
+                {L(dict, 'AI 识别', 'AI')}
+              </button>
+            )}
+            {capturedPreview && (
               <button type="button" className="nesio-camera-select-btn" onClick={openSelection}>
                 {L(dict, '圈选', 'Circle')}
               </button>
@@ -984,11 +1016,18 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
 
           <label className="nesio-camera-tag-field">
             <span>{L(dict, '标签', 'Tags')}</span>
+            {/* QA:iOS 把这个框当可自动填充字段,QuickType 糊一层白底(截图白块)。
+                全关 —— 标签不是联系人。 */}
             <input
               value={extraTags}
               onChange={(e) => setExtraTags(e.target.value)}
               placeholder={L(dict, '#钥匙 #门口 #Linda礼物', '#keys #entry #LindaGift')}
               aria-label={L(dict, '图片标签', 'Image tags')}
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              name="nesio-photo-tags"
             />
           </label>
 
@@ -1021,9 +1060,11 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
             onTouchMove={handleSelTouchMove}
             onTouchEnd={handleSelTouchEnd}
           />
-          <div className="nesio-select-hint">{L(dict, '用手指随意圈住要识别的区域', 'Circle the area to recognize with your finger')}</div>
+          <div className="nesio-select-hint">{L(dict, '圈住区域让 AI 识别;或直接存,自己填名字', 'Circle an area for AI, or save directly and name it yourself')}</div>
           <div className="nesio-select-overlay-actions">
-            <button type="button" className="nesio-select-action-btn" onClick={analyzeFullImage}>{L(dict, '🔍 全图', '🔍 Full image')}</button>
+            {/* QA:AI 不再是唯一出路 —— 「直接存」零 AI 零等待;AI 识别是明示按钮 */}
+            <button type="button" className="nesio-select-action-btn" onClick={saveWithoutAi}>{L(dict, '直接存', 'Save as-is')}</button>
+            <button type="button" className="nesio-select-action-btn" onClick={analyzeFullImage}>{L(dict, 'AI 识别全图', 'AI recognize')}</button>
             <button type="button" className="nesio-select-action-btn" onClick={retake}>{L(dict, '↩ 重拍', '↩ Retake')}</button>
           </div>
         </div>

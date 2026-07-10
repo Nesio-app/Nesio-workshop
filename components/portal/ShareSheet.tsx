@@ -15,7 +15,7 @@ import { updateLifeNode, type LifeNodeAsset } from '@/lib/portal/life-graph';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
-import { canUsePaidCloudAi } from '@/lib/portal/entitlement';
+import { canUsePaidCloudAi, isPro } from '@/lib/portal/entitlement';
 import { usePortalLocale } from './use-portal-locale';
 import { NodeTypeIcon } from './icons';
 
@@ -111,15 +111,19 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
     }
   }
 
-  async function analyze(type: 'text' | 'file' | 'image', content: string, imageBase64?: string, mimeType?: string): Promise<boolean> {
+  // 「AI 整理」按钮的重放载荷:默认确定性存档后,点按钮以 force=true 重跑云理解
+  const [aiPayload, setAiPayload] = useState<{ type: 'text' | 'file' | 'image'; content: string; imageBase64?: string; mimeType?: string } | null>(null);
+
+  async function analyze(type: 'text' | 'file' | 'image', content: string, imageBase64?: string, mimeType?: string, force = false): Promise<boolean> {
     // 纯链接 → 走文章抓取(确定性抓正文,不打 AI,免费层照走)
     if (type === 'text') {
       const urlMatch = content.trim().match(/^https?:\/\/\S+$/);
       if (urlMatch) return analyzeUrl(urlMatch[0]);
     }
-    // 成本护栏:免费层分享不打云理解 —— 确定性存档:图片=待确认线索;文字=标题+全文
-    // (≥200字进 article 可读可搜)。分层未启用(当前 PWA)恒放行,不变。
-    if (!canUsePaidCloudAi()) {
+    // QA:默认不自动打 AI(免费期也一样)—— 确定性存档:图片=待确认线索;文字=标题+
+    // 全文(≥200字进 article 可读可搜)。「AI 整理」按钮显式触发(force);Pro 自动。
+    if (!force && !isPro()) {
+      setAiPayload({ type, content, imageBase64, mimeType });
       if (type === 'image') { setParsed(buildPendingImageParsed()); return true; }
       const full = content.trim();
       setParsed({
@@ -385,12 +389,30 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
               </div>
             </div>
 
+            {/* AI 显式按钮:默认确定性存档零等待;想让 AI 整理要点就点这个 */}
+            {aiPayload && !saved && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (!canUsePaidCloudAi()) {
+                    window.dispatchEvent(new CustomEvent('nesio-pro-gate', { detail: { feature: 'share_ai' } }));
+                    return;
+                  }
+                  const p = aiPayload;
+                  setAiPayload(null);
+                  void analyze(p.type, p.content, p.imageBase64, p.mimeType, true);
+                }}
+                style={{ width: '100%', marginBottom: '0.5rem', background: 'none', border: '1px solid var(--portal-line, rgba(127,127,127,0.25))', borderRadius: 999, padding: '0.5rem', fontSize: '0.82rem', color: 'var(--portal-accent, #588ce3)', cursor: 'pointer' }}
+              >
+                {analyzing ? L(dict, 'AI 整理中…', 'AI organizing…') : L(dict, 'AI 整理(识别要点和分类)', 'AI organize (extract key points)')}
+              </button>
+            )}
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               <button type="button" className="nesio-share-save-btn" onClick={saveToMemory} style={{ flex: 1 }}>
                 {saved ? L(dict, '✓ 已存入 Memory', '✓ Saved to Memory') : L(dict, '存入 Memory', 'Save to Memory')}
               </button>
               <button type="button" className="nesio-today-btn nesio-today-btn--ghost" style={{ flex: 1, borderRadius: '999px' }}
-                onClick={() => { setParsed(null); setTextMode(false); }}>
+                onClick={() => { setParsed(null); setTextMode(false); setAiPayload(null); }}>
                 {L(dict, '重新分享', 'Share again')}
               </button>
             </div>

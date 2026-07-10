@@ -1016,10 +1016,14 @@ export default function Portal() {
           >
             <p style={{ margin: 0, fontSize: '0.75rem', letterSpacing: '0.08em', color: 'var(--portal-accent, #588ce3)', fontWeight: 700 }}>PRO</p>
             <h3 style={{ margin: '0.3rem 0 0.5rem', fontSize: '1.15rem', fontWeight: 700 }}>
-              {L(dict, '冷冻仓是 Pro 功能', 'Freeze Vault is a Pro feature')}
+              {proGate === 'freeze'
+                ? L(dict, '冷冻仓是 Pro 功能', 'Freeze Vault is a Pro feature')
+                : L(dict, 'AI 深度识别是 Pro 功能', 'AI recognition is a Pro feature')}
             </h3>
             <p style={{ margin: '0 0 1.1rem', lineHeight: 1.6, color: 'var(--portal-muted, #8a94a6)' }}>
-              {L(dict, '想冲动买的先冻起来,给自己一个冷静期。这项功能会随 Pro 订阅一起开放。', 'Freeze impulse buys and give yourself a cooling-off period. This unlocks with Pro when subscriptions go live.')}
+              {proGate === 'freeze'
+                ? L(dict, '想冲动买的先冻起来,给自己一个冷静期。这项功能会随 Pro 订阅一起开放。', 'Freeze impulse buys and give yourself a cooling-off period. This unlocks with Pro when subscriptions go live.')
+                : L(dict, '记录、搜索、手动标签永远免费。AI 自动识别与整理会随 Pro 订阅开放。', 'Capturing, search, and manual tags stay free forever. AI auto-recognition and organizing unlock with Pro.')}
             </p>
             <button
               type="button"
