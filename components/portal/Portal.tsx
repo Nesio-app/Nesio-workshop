@@ -265,6 +265,10 @@ export default function Portal() {
   const [cameraFile, setCameraFile] = useState<File | null>(null);
   // 批次 66(用户定案):所有入口的图片统一走「拍一下」同一识别界面 ——
   // 分享/上传选图派发此事件,EXIF 拍摄时间地点 + AI 识别 + 确认卡一条链路。
+  // 批次 70:行程↔确认邮件确定性自动挂钩(纯规则,图谱一变就去抖调和)
+  useEffect(() => {
+    void import('@/lib/portal/plan-links').then((m) => m.initPlanLinks()).catch(() => {});
+  }, []);
   useEffect(() => {
     const onRecog = (e: Event) => {
       const f = (e as CustomEvent<{ file?: File }>).detail?.file;

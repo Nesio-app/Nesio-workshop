@@ -796,6 +796,32 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
             </span>
           </div>
 
+          {/* 批次 70:关联链 —— 行程↔邮件自动挂钩、计划容器↔条目,点开跳转 */}
+          {(n.relations || []).length > 0 && (() => {
+            const g = getLifeGraph();
+            const REL_LABEL: Record<string, [string, string, string]> = {
+              confirmed_by_email: ['📩', '确认邮件', 'Confirmation email'],
+              confirms_plan: ['🧳', '对应行程', 'Linked plan'],
+              part_of_plan: ['🗂', '所属计划', 'Part of plan'],
+              plan_item: ['📌', '计划条目', 'Plan item'],
+            };
+            const live = (n.relations || [])
+              .map((r) => ({ r, node: g.find((x) => x.id === r.targetId) }))
+              .filter((x): x is { r: { targetId: string; relation: string }; node: LifeNode } => Boolean(x.node) && Boolean(REL_LABEL[x.r.relation]));
+            if (!live.length) return null;
+            return (
+              <div className="nesio-node-links">
+                {live.map(({ r, node: t }) => (
+                  <button key={`${r.relation}-${r.targetId}`} type="button" className="nesio-node-link-chip" onClick={() => onOpenNode?.(t)}>
+                    <span>{REL_LABEL[r.relation][0]}</span>
+                    <span className="nesio-node-link-kind">{L(dict, REL_LABEL[r.relation][1], REL_LABEL[r.relation][2])}</span>
+                    <span className="nesio-node-link-name">{t.name.slice(0, 24)}</span>
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
+
           {/* Type-specific section */}
           {n.type === 'person' && (
             <PersonSection node={n} relatedNodes={relatedNodes} onOpenNode={onOpenNode} />

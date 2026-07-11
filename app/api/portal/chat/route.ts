@@ -47,9 +47,9 @@ const SYSTEM_BASE = `你是 Nesio，用户的贴身 AI 助手，叫"小娜"。
 
 【动作协议 · 批次 68】你自己**没有任何写入记忆的能力**,绝不声称"已存入/已保存/已记下"——那是撒谎。
 要替用户保存内容,在回复最末尾追加一行动作块(用户看不见,客户端会渲染确认卡,用户点确认才真正入库):
-<<NESIO_ACTIONS>>{"planItems":[{"name":"RDU→KEF 航班","date":"2026-08-16","time":"18:30","place":"RDU","kind":"flight","note":"提前2小时到"}],"options":["整体行程框架","住宿推荐","美食攻略"]}
+<<NESIO_ACTIONS>>{"planTitle":"冰岛行程","planItems":[{"name":"RDU→KEF 航班","date":"2026-08-16","time":"18:30","place":"RDU","kind":"航班","note":"提前2小时到"}],"options":["整体行程框架","住宿推荐","美食攻略"]}
 规则:
-- 用户给出行程/计划/清单并想保存时:按天或按活动拆成 planItems。name 具体(「黄金圈:Þingvellir+Geysir+Gullfoss」),date 用 YYYY-MM-DD(按【实时环境】推断年份),时间不确定就省略 time,kind 只用 flight/hotel/activity/todo/note。正文只说"整理好了 N 条,点下面确认存入",不要在正文重复完整清单。
+- 用户给出行程/计划/清单并想保存时:按天或按活动拆成 planItems,并给 planTitle(计划名,如「冰岛行程」「搬家计划」,≤16字)。name 具体(「黄金圈:Þingvellir+Geysir+Gullfoss」);date 用 YYYY-MM-DD(按【实时环境】推断年份),没有日期就不填(模糊计划照样能存);时间不确定就省略 time;kind 是自由短词(航班/酒店/餐厅/门票/租车/会议/购物/复习/彩排…最贴切的那个,想不出就留空,待办类用 todo)。计划可精可粗:宏观计划就拆成几个大步骤,不要硬编细节。正文只说"整理好了 N 条,点下面确认存入",不要在正文重复完整清单。
 - 需要澄清时:每次只问**一个**最关键的问题,给 2-4 个短选项(≤12字)放进 options,不要一次抛一堆开放问题。
 - 普通问答不输出动作块。JSON 必须单行、合法、双引号。`;
 
@@ -224,9 +224,7 @@ async function callGemini(
 // ── 动作块解析(批次 68)────────────────────────────────────────────────────────
 
 export interface PlanItem { name: string; date?: string; time?: string; place?: string; kind?: string; note?: string }
-export interface ChatActions { options?: string[]; planItems?: PlanItem[] }
-
-const PLAN_KINDS = new Set(['flight', 'hotel', 'activity', 'todo', 'note']);
+export interface ChatActions { options?: string[]; planItems?: PlanItem[]; planTitle?: string }
 
 /** 从回复末尾剥出 <<NESIO_ACTIONS>>{...} 并校验;剥不出或不合法就当没有(纯文本照常)。 */
 export function parseChatActions(raw: string): { text: string; actions: ChatActions | null } {
@@ -234,7 +232,7 @@ export function parseChatActions(raw: string): { text: string; actions: ChatActi
   if (!m) return { text: raw.replace(/<<NESIO_ACTIONS>>[\s\S]*$/, '').trim(), actions: null };
   const text = raw.slice(0, m.index).trim();
   try {
-    const parsed = JSON.parse(m[1]) as { options?: unknown; planItems?: unknown };
+    const parsed = JSON.parse(m[1]) as { options?: unknown; planItems?: unknown; planTitle?: unknown };
     const actions: ChatActions = {};
     if (Array.isArray(parsed.options)) {
       const opts = parsed.options
@@ -253,13 +251,18 @@ export function parseChatActions(raw: string): { text: string; actions: ChatActi
           if (typeof it.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(it.date)) out.date = it.date;
           if (typeof it.time === 'string' && /^\d{1,2}:\d{2}$/.test(it.time)) out.time = it.time;
           if (typeof it.place === 'string' && it.place.trim()) out.place = it.place.trim().slice(0, 60);
-          if (typeof it.kind === 'string' && PLAN_KINDS.has(it.kind)) out.kind = it.kind;
+          // 批次 70(用户定案):kind 不再枚举白名单 —— 真实计划千姿百态,自由短词,
+          // 图标由客户端关键词回退;硬编五类只会增加错配。
+          if (typeof it.kind === 'string' && it.kind.trim()) out.kind = it.kind.trim().slice(0, 12);
           if (typeof it.note === 'string' && it.note.trim()) out.note = it.note.trim().slice(0, 200);
           return out;
         })
         .filter((it): it is PlanItem => it !== null)
         .slice(0, 20);
       if (items.length > 0) actions.planItems = items;
+    }
+    if (typeof parsed.planTitle === 'string' && parsed.planTitle.trim()) {
+      actions.planTitle = parsed.planTitle.trim().slice(0, 30);
     }
     return { text, actions: (actions.options || actions.planItems) ? actions : null };
   } catch {

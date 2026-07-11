@@ -14831,3 +14831,21 @@ html[data-portal-theme="night"] .nesio-memmap-canvas { background: #16243c; }
   top: calc(env(safe-area-inset-top, 0px) + 0.8rem);
   right: 0.9rem;
 }
+
+/* ── 批次 70:节点关联链芯片(确认邮件/所属计划/计划条目) ── */
+.nesio-node-links { display: flex; flex-direction: column; gap: 0.4rem; margin: 0.5rem 0 0.2rem; }
+.nesio-node-link-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: 1px solid var(--portal-line);
+  background: var(--glass-bg-solid);
+  border-radius: 0.7rem;
+  padding: 0.45rem 0.65rem;
+  font-size: 0.8rem;
+  color: var(--portal-ink);
+  cursor: pointer;
+  text-align: left;
+}
+.nesio-node-link-kind { color: var(--portal-muted); font-size: 0.68rem; flex-shrink: 0; }
+.nesio-node-link-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

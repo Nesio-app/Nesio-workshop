@@ -8,7 +8,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
-import { getLifeGraph, isBulkImported, searchLifeGraphFuzzy, type LifeNode } from '@/lib/portal/life-graph';
+import { getLifeGraph, isBulkImported, searchLifeGraphFuzzy, type LifeNode, updateLifeNode } from '@/lib/portal/life-graph';
 import { canUsePaidCloudAi } from '@/lib/portal/entitlement';
 import { loadProfileSettings } from '@/lib/portal/profile';
 import { smartSearch } from '@/lib/portal/smart-search';
@@ -53,6 +53,24 @@ export interface ChatPlanItem { name: string; date?: string; time?: string; plac
 
 const PLAN_KIND_ICON: Record<string, string> = { flight: '✈️', hotel: '🏨', activity: '📍', todo: '✅', note: '📝' };
 
+/** 批次 70:kind 是自由词 —— 关键词回退配图标,认不出就中性图钉(不硬编枚举)。 */
+function planKindIcon(kind?: string): string {
+  if (!kind) return '🗓';
+  if (PLAN_KIND_ICON[kind]) return PLAN_KIND_ICON[kind];
+  const k = kind.toLowerCase();
+  if (/航班|机票|飞|flight|plane/.test(k)) return '✈️';
+  if (/酒店|住宿|民宿|旅馆|hotel|stay|airbnb/.test(k)) return '🏨';
+  if (/餐|吃|饭|美食|food|dining|restaurant/.test(k)) return '🍽️';
+  if (/票|演出|门票|show|ticket|concert/.test(k)) return '🎟️';
+  if (/车|租车|火车|地铁|drive|train|transit|通勤/.test(k)) return '🚗';
+  if (/会议|会|meeting|面试|interview/.test(k)) return '🎙️';
+  if (/买|购|shop|采购/.test(k)) return '🛍️';
+  if (/学|复习|读|study|course|练/.test(k)) return '📚';
+  if (/todo|待办|任务/.test(k)) return '✅';
+  if (/备注|note|提醒/.test(k)) return '📝';
+  return '📌';
+}
+
 /** date(+time)→ start 属性:带时间给本地 ISO,只有日期保持 YYYY-MM-DD(全天语义,与日历一致)。 */
 function planItemStart(it: ChatPlanItem): string | undefined {
   if (!it.date) return undefined;
@@ -76,6 +94,7 @@ interface UiMessage {
   /** 批次 68:动作块 —— 澄清选项芯片 / 行程条目确认卡(点确认才真正入库) */
   options?: string[];
   planItems?: ChatPlanItem[];
+  planTitle?: string;
   planSaved?: boolean;
   /** 🔴#2:这条回答时语义检索降级了(缺 AI 配置,只用了关键词匹配)。 */
   semanticDegraded?: boolean;
@@ -860,7 +879,7 @@ Edit location/value anytime in Storage.`),
         signal: controller.signal,
       });
       clearTimeout(timeout);
-      const data = await res.json() as { ok?: boolean; response?: string; sources?: Array<{ title: string; url: string }>; actions?: { options?: string[]; planItems?: ChatPlanItem[] } };
+      const data = await res.json() as { ok?: boolean; response?: string; sources?: Array<{ title: string; url: string }>; actions?: { options?: string[]; planItems?: ChatPlanItem[]; planTitle?: string } };
       const rawResp = data.response?.trim() || L(dict, '（暂时没有找到相关信息）', '(Nothing relevant found)');
       // 🔴#1:只保留模型真正引用的记忆节点。ids===null(没自报)→ 回退到前 3 候选作"相关记忆";
       // ids=[](明确"无")→ 不出引用卡(修"模型说没记录、下面还渲染 6 张伪造依据卡")。
@@ -888,6 +907,7 @@ Edit location/value anytime in Storage.`),
         semanticReason,
         ...(data.actions?.options ? { options: data.actions.options } : {}),
         ...(data.actions?.planItems ? { planItems: data.actions.planItems } : {}),
+        ...(data.actions?.planTitle ? { planTitle: data.actions.planTitle } : {}),
       };
       // 函数式追加 + 用最终列表存档,别用可能已过期的 nextMsgs 快照覆盖并发消息。
       setMessages((prev) => { const next = [...prev, aiMsg]; saveHistory(next); return next; });
@@ -909,22 +929,39 @@ Edit location/value anytime in Storage.`),
   // 批次 68:行程确认卡 → 真正落库(带日期的自动进今日聚焦/引导卡;航班等类型由词典自动识别)
   function savePlanItems(msg: UiMessage) {
     if (!msg.planItems?.length || msg.planSaved) return;
+    // 批次 70:计划分层 —— 有计划名且多条时先立容器节点(宏观层),
+    // 条目双向 relations 挂进去;条目进今日聚焦后天然获得拆解卡(AI+本地双层)。
+    const container = msg.planTitle && msg.planItems.length > 1
+      ? ingestLifeNode({
+          name: msg.planTitle, type: 'event', source: 'manual', confidence: 0.9,
+          tags: ['行程', '计划'], relations: [], rawInput: msg.planTitle,
+          attributes: { planContainer: true },
+        })
+      : null;
+    const itemIds: string[] = [];
     for (const it of msg.planItems) {
       const start = planItemStart(it);
-      ingestLifeNode({
+      const saved = ingestLifeNode({
         name: it.name,
         type: it.kind === 'todo' ? 'commitment' : 'event',
         source: 'manual',
         confidence: 0.9,
         tags: ['行程'],
-        relations: [],
+        relations: container ? [{ targetId: container.id, relation: 'part_of_plan' }] : [],
         rawInput: [it.name, it.date, it.time, it.place, it.note].filter(Boolean).join(' · '),
         attributes: {
           ...(start ? { start } : {}),
           ...(it.place ? { location: it.place } : {}),
           ...(it.note ? { note: it.note } : {}),
+          ...(it.kind ? { planKind: it.kind } : {}),
           planImported: true,
         },
+      });
+      itemIds.push(saved.id);
+    }
+    if (container) {
+      updateLifeNode(container.id, {
+        relations: itemIds.map((id) => ({ targetId: id, relation: 'plan_item' })),
       });
     }
     setMessages((prev) => { const next = prev.map((m) => m.id === msg.id ? { ...m, planSaved: true } : m); saveHistory(next); return next; });
@@ -1266,7 +1303,7 @@ Edit location/value anytime in Storage.`),
                     <span className="nesio-chat-plan-title">{L(dict, `整理出 ${msg.planItems.length} 条 · 确认后存入记忆`, `${msg.planItems.length} items ready · confirm to save`)}</span>
                     {msg.planItems.map((it, i) => (
                       <div key={i} className="nesio-chat-plan-row">
-                        <span className="nesio-chat-plan-icon">{PLAN_KIND_ICON[it.kind || ''] || '🗓'}</span>
+                        <span className="nesio-chat-plan-icon">{planKindIcon(it.kind)}</span>
                         <div className="nesio-chat-plan-main">
                           <span className="nesio-chat-plan-name">{it.name}</span>
                           {(it.date || it.place) && (
