@@ -261,16 +261,16 @@ export default function MemoryMapSheet({ open, onClose }: { open: boolean; onClo
           <button type="button" onClick={() => zoomTo(-1)} aria-label={L(dict, '缩小', 'Zoom out')}>−</button>
         </div>
       </div>
-      {days.length > 1 && (
+      {days.length >= 1 && (
         <div className="nesio-memmap-timebar">
-          <input
+          {days.length > 1 && <input
             type="range"
             min={0}
             max={days.length - 1}
             value={activeIdx}
             onChange={(e) => { setDayIdxRaw(Number(e.target.value)); setPicked(null); }}
             aria-label={L(dict, '时间', 'Time')}
-          />
+          />}
           <span className="nesio-memmap-timebar-label">
             {(() => {
               const [y, m, d] = days[activeIdx].split('-').map(Number);

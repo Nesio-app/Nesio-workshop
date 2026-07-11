@@ -11,7 +11,7 @@ import {
   loadPlaceTrail, PLACE_TRAIL_UPDATED_EVENT,
   timelineDays, buildDayJourney, dayStats,
   clusterPlaces, categoryTimeShare,
-  displayLabel, setPlaceAlias, isGenericPlace,
+  displayLabel, setPlaceAlias, isGenericPlace, renamePlaceLabel, setPlaceGeo,
   placesByCategory, PLACE_CATEGORY_META, setPlaceCategory, worldByCountry,
   type PlaceVisit, type PlaceCategory, type JourneyItem, type PlaceCluster,
 } from '@/lib/portal/place-trail';
@@ -20,6 +20,7 @@ import { monthlyPlaceComparison, weekRhythm, footprintHighlights } from '@/lib/p
 import PlaceMap from './PlaceMap';
 import dynamic from 'next/dynamic';
 import { getLifeGraph, type LifeNode } from '@/lib/portal/life-graph';
+import { getLocalImage } from '@/lib/portal/local-image-store';
 import { createPortal } from 'react-dom';
 const MemoryMapSheet = dynamic(() => import('./MemoryMapSheet'), { ssr: false });
 const MemoryNodeDetail = dynamic(() => import('../MemoryNodeDetail'), { ssr: false });
@@ -55,6 +56,8 @@ export default function TimelineTab() {
   const [memMapOpen, setMemMapOpen] = useState(false); // 批次 59:地图上的记忆
   const [visitMems, setVisitMems] = useState<{ title: string; nodes: LifeNode[] } | null>(null); // 批次 61:点「记了 N 条」看具体记忆
   const [visitSel, setVisitSel] = useState<LifeNode | null>(null);
+  // 批次 62:地点纠正选择器(附近候选 + 手动命名,参考 Foursquare Where? 形态)
+  const [placePick, setPlacePick] = useState<{ raw: string; lat?: number; lon?: number } | null>(null);
 
   useEffect(() => {
     const read = () => setTrail(loadPlaceTrail());
@@ -167,7 +170,10 @@ export default function TimelineTab() {
               <div key={i} className="nesio-tl-item nesio-tl-item--visit">
                 <span className={`nesio-pt-dot nesio-pt-dot--${it.seg.category}`} aria-hidden />
                 <div className="nesio-tl-item-body">
-                  <div className="nesio-tl-item-top"><span className="nesio-tl-item-name">{displayLabel(it.seg.label)}</span><span className="nesio-tl-item-dur">{fmtDur(it.seg.durationMin)}</span></div>
+                  <div className="nesio-tl-item-top">
+                    <button type="button" className="nesio-tl-item-name nesio-tl-item-name--btn" onClick={() => setPlacePick({ raw: it.seg.label, lat: it.seg.lat, lon: it.seg.lon })}>{displayLabel(it.seg.label)}</button>
+                    <span className="nesio-tl-item-dur">{fmtDur(it.seg.durationMin)}</span>
+                  </div>
                   <span className="nesio-tl-item-time">
                     {hhmm(it.seg.start)}{it.seg.durationMin >= 1 ? ` – ${hhmm(it.seg.end)}` : ''}
                     {(() => {
@@ -181,6 +187,7 @@ export default function TimelineTab() {
                       );
                     })()}
                   </span>
+                  <VisitThumbs nodes={memNodesAtVisit(it.seg)} onOpen={(n) => setVisitSel(n)} />
                 </div>
               </div>
             ) : (
@@ -308,7 +315,7 @@ export default function TimelineTab() {
                 {editRaw === c.label ? (
                   <input className="nesio-tl-rename-input" value={editVal} autoFocus onChange={(e) => setEditVal(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') saveRename(); if (e.key === 'Escape') { setEditRaw(null); } }} onBlur={saveRename} placeholder={pretty(c)} />
                 ) : (
-                  <button type="button" className="nesio-tl-cluster-name nesio-tl-cluster-name--btn" onClick={() => { setEditRaw(c.label); setEditVal(displayLabel(c.label) === c.label ? '' : displayLabel(c.label)); }}>
+                  <button type="button" className="nesio-tl-cluster-name nesio-tl-cluster-name--btn" onClick={() => setPlacePick({ raw: c.label, lat: c.lat ?? undefined, lon: c.lon ?? undefined })}>
                     {pretty(c)}
                     {c.generic && displayLabel(c.label) === c.label && c.lat != null && <span className="nesio-tl-alias-orig"> · {c.lat.toFixed(2)},{c.lon!.toFixed(2)}</span>}
                   </button>
@@ -423,6 +430,23 @@ export default function TimelineTab() {
       {/* 批次 59:地图上的记忆(全屏可缩放) */}
       <MemoryMapSheet open={memMapOpen} onClose={() => setMemMapOpen(false)} />
 
+      {/* 批次 62:地点纠正选择器 */}
+      {placePick && typeof document !== 'undefined' && createPortal(
+        <PlacePickerSheet
+          raw={placePick.raw}
+          lat={placePick.lat}
+          lon={placePick.lon}
+          onClose={() => setPlacePick(null)}
+          onPicked={(name, kind) => {
+            renamePlaceLabel(placePick.raw, name);
+            if (kind) setPlaceCategory(name, kind as Parameters<typeof setPlaceCategory>[1]);
+            setPlaceGeo(name, { name, resolved: true, kind: kind as PlaceCategory | undefined });
+            setPlacePick(null);
+          }}
+        />,
+        document.body,
+      )}
+
       {/* 批次 61:该到访时段的具体记忆(点条目直接看详情,不去记忆库) */}
       {visitMems && typeof document !== 'undefined' && createPortal(
         <div className="nesio-visitmem-overlay" role="dialog" aria-modal="true">
@@ -442,6 +466,101 @@ export default function TimelineTab() {
         </div>,
         document.body,
       )}
+    </div>
+  );
+}
+
+/** 批次 62:到访时段照片小预览 —— 记忆里带图的,先给两张缩略图(点开进详情)。 */
+function VisitThumbs({ nodes, onOpen }: { nodes: LifeNode[]; onOpen: (n: LifeNode) => void }) {
+  const withImg = nodes
+    .map((n) => ({ n, asset: (n.assets || []).find((a) => a.kind === 'image') }))
+    .filter((x): x is { n: LifeNode; asset: NonNullable<LifeNode['assets']>[number] } => Boolean(x.asset))
+    .slice(0, 2);
+  const [urls, setUrls] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let cancelled = false;
+    withImg.forEach(({ asset }) => {
+      if (urls[asset.id]) return;
+      void getLocalImage(asset.id).then((u) => {
+        if (!cancelled && u) setUrls((prev) => ({ ...prev, [asset.id]: u }));
+      }).catch(() => {});
+    });
+    return () => { cancelled = true; };
+  }, [withImg.map((x) => x.asset.id).join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!withImg.length) return null;
+  return (
+    <div className="nesio-tl-thumbs">
+      {withImg.map(({ n, asset }) => (
+        urls[asset.id]
+          ? <button key={asset.id} type="button" className="nesio-tl-thumb" onClick={() => onOpen(n)} aria-label={n.name}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={urls[asset.id]} alt="" loading="lazy" />
+            </button>
+          : null
+      ))}
+    </div>
+  );
+}
+
+/** 批次 62:地点纠正选择器(参考 Foursquare Where? 形态)—— 手动命名 +
+ *  「附近的地方」候选列表(POST /api/portal/geocode nearby),城市里楼太近
+ *  机器分不清时,由用户点选;选中带分类(walmart→grocery)一并入库。 */
+function PlacePickerSheet({ raw, lat, lon, onClose, onPicked }: {
+  raw: string; lat?: number; lon?: number;
+  onClose: () => void;
+  onPicked: (name: string, kind?: string) => void;
+}) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
+  const [text, setText] = useState(displayLabel(raw) === raw ? '' : displayLabel(raw));
+  const [cands, setCands] = useState<Array<{ name: string; distanceM?: number; kind?: string }>>([]);
+  const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    if (typeof lat !== 'number' || typeof lon !== 'number') return;
+    let cancelled = false;
+    setLoading(true);
+    fetch('/api/portal/geocode', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lat, lon, nearby: true }),
+    })
+      .then((r) => r.json() as Promise<{ ok?: boolean; candidates?: Array<{ name: string; distanceM?: number; kind?: string }> }>)
+      .then((d) => { if (!cancelled && d.ok && d.candidates) setCands(d.candidates); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [lat, lon]);
+  return (
+    <div className="nesio-visitmem-overlay" role="dialog" aria-modal="true" aria-label={L(dict, '这是哪里?', 'Where was this?')}>
+      <button type="button" className="nesio-visitmem-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
+      <div className="nesio-visitmem-sheet">
+        <p className="nesio-memmap-list-title">{L(dict, '这是哪里?', 'Where was this?')} · {displayLabel(raw)}</p>
+        <form
+          className="nesio-placepick-row"
+          onSubmit={(e) => { e.preventDefault(); if (text.trim()) onPicked(text.trim()); }}
+        >
+          <input
+            className="nesio-tl-rename-input"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder={L(dict, '手动命名,比如「家」「公司」', 'Name it — Home, Office…')}
+          />
+          <button type="submit" className="nesio-fin-review-accept" disabled={!text.trim()}>{L(dict, '保存', 'Save')}</button>
+        </form>
+        <p className="nesio-memmap-list-title" style={{ marginTop: '0.7rem' }}>{L(dict, '附近的地方', 'Places nearby')}{loading ? ' …' : ''}</p>
+        <div className="nesio-memmap-list-scroll">
+          {!loading && cands.length === 0 && (
+            <p className="nesio-settings-option-hint">{L(dict, '附近没有候选(住宅区常见)—— 直接手动命名即可。', 'No nearby candidates (common in residential areas) — just name it above.')}</p>
+          )}
+          {cands.map((c, i) => (
+            <button key={i} type="button" className="nesio-memmap-item nesio-memmap-item--btn" onClick={() => onPicked(c.name, c.kind)}>
+              <span className="nesio-memmap-item-name">{c.name}</span>
+              <span className="nesio-memmap-item-time">
+                {typeof c.distanceM === 'number' ? `${c.distanceM}m` : ''}
+                {c.kind && PLACE_CATEGORY_META[c.kind as PlaceCategory] ? ` · ${L(dict, PLACE_CATEGORY_META[c.kind as PlaceCategory].zh, PLACE_CATEGORY_META[c.kind as PlaceCategory].en)}` : ''}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

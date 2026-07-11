@@ -34,7 +34,22 @@ const store = createBlobStore<PlaceVisit[]>({
   validate: (v) => Array.isArray(v), onWriteError: reportStorageDropped,
 });
 
+let coordAliasNormalized = false;
+/** 批次 62:存量归一 —— 批次 60 只给坐标条目做了显示别名,raw 仍是坐标,
+ *  聚合/时间线按 raw 分家(用户实测两行同名不合并)。开机把「坐标 raw + 有别名」
+ *  的条目就地改写成别名真名并清掉别名,连续同名停留自此天然合并。 */
+function normalizeCoordAliasesOnce(): void {
+  if (coordAliasNormalized || typeof window === 'undefined') return;
+  coordAliasNormalized = true;
+  try {
+    const aliases = loadPlaceAliases();
+    const coordKeys = Object.keys(aliases).filter((k) => /^-?\d+\.\d+,-?\d+\.\d+$/.test(k));
+    for (const k of coordKeys) renamePlaceLabel(k, aliases[k]);
+  } catch { /* 归一失败不拦读取 */ }
+}
+
 export function loadPlaceTrail(): PlaceVisit[] {
+  normalizeCoordAliasesOnce();
   const raw = store.load();
   return Array.isArray(raw) ? raw : [];
 }

@@ -79,7 +79,7 @@ interface FsqLocation {
   formatted_address?: string; address?: string;
   locality?: string; dma?: string; region?: string; country?: string; admin_region?: string;
 }
-interface FsqPlace { fsq_place_id?: string; fsq_id?: string; name?: string; categories?: FsqCategory[]; location?: FsqLocation }
+interface FsqPlace { fsq_place_id?: string; fsq_id?: string; name?: string; distance?: number; categories?: FsqCategory[]; location?: FsqLocation }
 
 // Foursquare location.country 有时是 ISO-2 代码(如 "US")。补一张常见国家小表,
 // 让足迹 World tab 显示全名而非代码;查不到就原样透传(仍能按值分组)。
@@ -114,6 +114,28 @@ async function foursquareReverse(lat: number, lon: number, token: string): Promi
   return { name, city, country, kind: kindFromFoursquare(cats) };
 }
 
+/** 批次 62:附近 POI 候选(地点纠正选择器)—— Foursquare 搜最近 8 个,
+ *  城市里楼挨楼分不清时由用户从列表里选;OSM reverse 作兜底候选。 */
+async function foursquareNearby(lat: number, lon: number, token: string): Promise<Array<{ name: string; distanceM?: number; kind?: string; city?: string; country?: string }>> {
+  const url = `https://places-api.foursquare.com/places/search?ll=${lat},${lon}&sort=DISTANCE&radius=300&limit=8`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}`, 'X-Places-Api-Version': '2025-02-05', Accept: 'application/json' },
+  });
+  if (!res.ok) return [];
+  const data = await res.json() as { results?: FsqPlace[] };
+  return (data.results || []).map((p) => {
+    const loc = p.location || {};
+    const cats = (p.categories || []).map((c) => c.name || c.short_name || '').filter(Boolean);
+    return {
+      name: (p.name || '').slice(0, 48),
+      distanceM: typeof p.distance === 'number' ? p.distance : undefined,
+      kind: kindFromFoursquare(cats),
+      city: (loc.locality || loc.region || '').slice(0, 40),
+      country: countryName(loc.country || ''),
+    };
+  }).filter((c) => c.name);
+}
+
 async function osmReverse(lat: number, lon: number): Promise<GeoResult | null> {
   const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`;
   const res = await fetch(url, { headers: { 'User-Agent': 'Nesio/1.0 (personal life kit; on-device reverse geocode)', 'Accept-Language': 'en' } });
@@ -133,7 +155,7 @@ export async function POST(req: NextRequest) {
   const guard = await guardAiRoute(req, 'geocode', { limit: 30 });
   if (guard) return guard;
 
-  const body = await req.json().catch(() => ({})) as { lat?: number; lon?: number };
+  const body = await req.json().catch(() => ({})) as { lat?: number; lon?: number; nearby?: boolean };
   const { lat, lon } = body;
   if (typeof lat !== 'number' || typeof lon !== 'number' || Math.abs(lat) > 90 || Math.abs(lon) > 180) {
     return NextResponse.json({ ok: false, error: 'bad_coords' }, { status: 400 });
@@ -141,6 +163,14 @@ export async function POST(req: NextRequest) {
 
   const fsqToken = envValue('FOURSQUARE_SERVICE_TOKEN');
   try {
+    if (body.nearby) {
+      const candidates = fsqToken ? await foursquareNearby(lat, lon, fsqToken) : [];
+      const osm = await osmReverse(lat, lon).catch(() => null);
+      if (osm?.name && !candidates.some((c) => c.name === osm.name)) {
+        candidates.push({ name: osm.name, kind: osm.kind, city: osm.city, country: osm.country });
+      }
+      return NextResponse.json({ ok: true, candidates });
+    }
     if (fsqToken) {
       const f = await foursquareReverse(lat, lon, fsqToken);
       if (f && (f.name || f.city || f.country)) return NextResponse.json({ ok: true, ...f, source: 'foursquare' });
