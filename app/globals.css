@@ -15094,3 +15094,29 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
   right: 1rem;
   z-index: 3;
 }
+
+/* ── 批次 88:视图切换(列表/地图/关联图)—— 与「分类筛选栏」分离,
+   小号中性,不与彩色类型 chip 抢视觉。 ── */
+.nesio-memory-view-toggle {
+  display: flex;
+  gap: 0.35rem;
+  margin: -0.4rem 0 0.85rem;
+  padding-bottom: 0.2rem;
+}
+.nesio-view-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: 1px solid var(--portal-line);
+  background: none;
+  color: var(--portal-muted);
+  border-radius: 999px;
+  padding: 0.25rem 0.7rem;
+  font-size: 0.74rem;
+  cursor: pointer;
+}
+.nesio-view-chip.is-active {
+  background: var(--glass-bg-solid);
+  color: var(--portal-ink);
+  border-color: var(--portal-accent);
+}

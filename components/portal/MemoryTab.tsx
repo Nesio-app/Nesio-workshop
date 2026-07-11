@@ -39,7 +39,7 @@ import dynamic from 'next/dynamic';
 const MemoryNodeDetail = dynamic(() => import('./MemoryNodeDetail'), { ssr: false });
 const RelationGraph = dynamic(() => import('./RelationGraph'), { ssr: false });
 import type { GNode, GEdge } from '@/lib/platform/graph-engine';
-import { DomainIcon, IconBox, IconCalendar, IconFolder, IconMapPin, IconStar, IconUser, NodeTypeIcon, IconMap } from './icons';
+import { DomainIcon, IconBox, IconCalendar, IconCheckSquare, IconFolder, IconLink, IconMapPin, IconStar, IconUser, NodeTypeIcon, IconMap } from './icons';
 import { L, type DictLocale } from '@/lib/portal/i18n';
 import { relativePastLabel } from '@/lib/portal/time-labels';
 import { displayNodeName } from '@/lib/portal/node-display';
@@ -941,15 +941,23 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
 
   const hasUnderstoodEntities = understood.people.length + understood.places.length + understood.objects.length > 0;
 
+  // 批次 88:计划/清单是属性派生的「虚拟分类」(facet:plan / facet:list)——
+  // 零 schema 迁移(全下游按真 type 过滤不动),有内容才在筛选栏露面。
+  const matchesFilter = (n: LifeNode, filter: string): boolean => {
+    if (filter === 'facet:plan') return Boolean(n.attributes?.planContainer || n.attributes?.planImported);
+    if (filter === 'facet:list') return Boolean(n.attributes?.checklist);
+    return n.type === filter;
+  };
+
   // Filtered nodes for browse mode
   const visibleNodes = useMemo(() => {
     let result = nodes;
-    if (typeFilter) result = result.filter((n) => n.type === typeFilter);
+    if (typeFilter) result = result.filter((n) => matchesFilter(n, typeFilter));
     return result;
   }, [nodes, typeFilter]);
 
   const results = query.trim()
-    ? visibleMemoryNodes(smartNodes, canUsePrivateData).filter((n) => !typeFilter || n.type === typeFilter)
+    ? visibleMemoryNodes(smartNodes, canUsePrivateData).filter((n) => !typeFilter || matchesFilter(n, typeFilter))
     : visibleNodes;
 
   const visibleItems = showAll || query ? results : results.slice(0, displayLimit);
@@ -958,6 +966,10 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
     acc[n.type] = (acc[n.type] ?? 0) + 1;
     return acc;
   }, {});
+  const facetCounts = {
+    'facet:plan': nodes.filter((n) => n.attributes?.planContainer || n.attributes?.planImported).length,
+    'facet:list': nodes.filter((n) => n.attributes?.checklist).length,
+  };
 
 
   const onThisDayNodes = useMemo(() => findOnThisDayNodes(nodes), [nodes]);
@@ -1135,12 +1147,13 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                     </div>
                   </div>
 
-                  {/* Type filter — secondary, below header */}
+                  {/* 批次 88:类型筛选栏 —— 只放「是什么」的分类(真类型 + 属性派生的
+                      计划/清单虚拟分类);地图/关联图是「怎么看」,已移到下方视图切换。 */}
                   <div className="nesio-memory-type-filter" role="group" aria-label="按类型筛选">
                     <button
                       type="button"
-                      className={`nesio-type-chip${!typeFilter && !showObjectMap && !showRelationGraph ? ' is-active' : ''}`}
-                      onClick={() => { setTypeFilter(null); setShowObjectMap(false); setShowRelationGraph(false); }}
+                      className={`nesio-type-chip${!typeFilter ? ' is-active' : ''}`}
+                      onClick={() => setTypeFilter(null)}
                     >
                       {copy.allTypes}
                       <span className="nesio-type-chip-count">{nodes.length}</span>
@@ -1149,28 +1162,60 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                       <button
                         key={t}
                         type="button"
-                        className={`nesio-type-chip${typeFilter === t && !showObjectMap && !showRelationGraph ? ' is-active' : ''}`}
-                        onClick={() => { setTypeFilter((prev) => (prev === t ? null : t)); setShowObjectMap(false); setShowRelationGraph(false); }}
+                        className={`nesio-type-chip${typeFilter === t ? ' is-active' : ''}`}
+                        onClick={() => setTypeFilter((prev) => (prev === t ? null : t))}
                       >
                         <NodeTypeIcon type={t} size={12} /> {typeLabel(t, dict)}
                         <span className="nesio-type-chip-count">{typeCounts[t]}</span>
                       </button>
                     ))}
+                    {facetCounts['facet:plan'] > 0 && (
+                      <button
+                        type="button"
+                        className={`nesio-type-chip${typeFilter === 'facet:plan' ? ' is-active' : ''}`}
+                        onClick={() => setTypeFilter((prev) => (prev === 'facet:plan' ? null : 'facet:plan'))}
+                      >
+                        <IconCalendar size={12} /> {L(dict, '计划', 'Plans')}
+                        <span className="nesio-type-chip-count">{facetCounts['facet:plan']}</span>
+                      </button>
+                    )}
+                    {facetCounts['facet:list'] > 0 && (
+                      <button
+                        type="button"
+                        className={`nesio-type-chip${typeFilter === 'facet:list' ? ' is-active' : ''}`}
+                        onClick={() => setTypeFilter((prev) => (prev === 'facet:list' ? null : 'facet:list'))}
+                      >
+                        <IconCheckSquare size={12} /> {L(dict, '清单', 'Lists')}
+                        <span className="nesio-type-chip-count">{facetCounts['facet:list']}</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* 批次 88:视图切换 —— 同一批数据的不同看法(列表/地图/关联图),
+                      与「分类」分离。地图仅在有物品时可用。 */}
+                  <div className="nesio-memory-view-toggle" role="group" aria-label={L(dict, '视图', 'View')}>
+                    <button
+                      type="button"
+                      className={`nesio-view-chip${!showObjectMap && !showRelationGraph ? ' is-active' : ''}`}
+                      onClick={() => { setShowObjectMap(false); setShowRelationGraph(false); }}
+                    >
+                      <IconBox size={12} /> {L(dict, '列表', 'List')}
+                    </button>
                     {(typeCounts['object'] ?? 0) > 0 && (
                       <button
                         type="button"
-                        className={`nesio-type-chip${showObjectMap ? ' is-active' : ''}`}
-                        onClick={() => { setShowObjectMap((prev) => !prev); setTypeFilter(null); setShowRelationGraph(false); }}
+                        className={`nesio-view-chip${showObjectMap ? ' is-active' : ''}`}
+                        onClick={() => { setShowObjectMap((prev) => !prev); setShowRelationGraph(false); }}
                       >
                         <IconMap size={12} /> {L(dict, '地图', 'Map')}
                       </button>
                     )}
                     <button
                       type="button"
-                      className={`nesio-type-chip${showRelationGraph ? ' is-active' : ''}`}
-                      onClick={() => { setShowRelationGraph(prev => !prev); setShowObjectMap(false); setTypeFilter(null); }}
+                      className={`nesio-view-chip${showRelationGraph ? ' is-active' : ''}`}
+                      onClick={() => { setShowRelationGraph((prev) => !prev); setShowObjectMap(false); }}
                     >
-                      ◎ {L(dict, '关联图', 'Graph')}
+                      <IconLink size={12} /> {L(dict, '关联图', 'Graph')}
                     </button>
                   </div>
                 </>
