@@ -980,7 +980,10 @@ Edit location/value anytime in Storage.`),
     for (const line of text.split('\n')) {
       const m = /^\s*(?:[-*·•]|\d+[.、)])\s*(.+)$/.exec(line);
       if (!m) continue;
-      const t = m[1].replace(/[**]/g, '').replace(/[::]\s*$/, '').trim();
+      const rawItem = m[1].replace(/[**]/g, '').trim();
+      // 批次 74(用户实锤):「重要证件与财务:」是分类标题不是待办项 —— 冒号结尾跳过
+      if (/[::]$/.test(rawItem)) continue;
+      const t = rawItem.trim();
       if (t.length >= 2 && t.length <= 60) items.push(t);
     }
     return items;

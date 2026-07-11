@@ -93,6 +93,26 @@ export function getLiveMemoryNode(id: string): LiveMemoryNode | null {
   return getLifeGraph().find((n) => n.id === id) ?? null;
 }
 
+/** 批次 74:聚焦卡直采关联清单 —— 「打包收拾行李」连着「旅行打包清单」时,
+ *  粉碎任务直接用清单条目当步骤,勾选写回清单本体(一份数据两处见)。 */
+export function getLinkedChecklist(nodeId: string): { nodeId: string; subtasks: SubTask[] } | null {
+  const g = getLifeGraph();
+  const n = g.find((x) => x.id === nodeId);
+  if (!n) return null;
+  const LINK_RELS = new Set(['has_checklist', 'related_plan', 'user_linked']);
+  for (const r of n.relations || []) {
+    if (!LINK_RELS.has(r.relation)) continue;
+    const t = g.find((x) => x.id === r.targetId);
+    const raw = t?.attributes?.subtasksJson;
+    if (typeof raw !== 'string') continue;
+    try {
+      const subtasks = JSON.parse(raw) as SubTask[];
+      if (Array.isArray(subtasks) && subtasks.length > 0) return { nodeId: t!.id, subtasks };
+    } catch { /* 坏 JSON 跳过 */ }
+  }
+  return null;
+}
+
 /** 本地日键(YYYY-MM-DD)—— 「加入今日焦点」的准入凭据按本地日自然过期 */
 export function localDayKey(d: Date = new Date()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;

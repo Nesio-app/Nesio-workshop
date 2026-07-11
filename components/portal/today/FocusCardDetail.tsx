@@ -5,9 +5,10 @@
  * 从 TodayFeed 拆出(工程 PRD 组件阈值整改)。
  */
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { getLiveMemoryNode, type LiveMemoryNode, type FocusNode, type SubTask } from '@/lib/platform/view-models/today-view-model';
+import { createPortal } from 'react-dom';
+import { getLiveMemoryNode, getLinkedChecklist, saveSubtasks, type LiveMemoryNode, type FocusNode, type SubTask } from '@/lib/platform/view-models/today-view-model';
 
 const MemoryNodeDetail = dynamic(() => import('../MemoryNodeDetail'), { ssr: false });
 import { isMeetingNode, getMeetingTime, getMeetingUrl, safeExternalUrl } from './meeting-node';
@@ -68,6 +69,8 @@ export function FocusCardDetail({
   // 可见失败纪律:AI 分解失败/为空时显式提示 + 重试,不静默退回起始态。
   const [error, setError] = useState<string | null>(null);
   const [memNode, setMemNode] = useState<LiveMemoryNode | null>(null); // 批次 72:定位回记忆详情
+  // 批次 74:wave 若来自清单(本体或关联),勾选要写回那份 subtasksJson
+  const checklistTargetRef = useRef<string | null>(null);
   // 批次 56:这波步骤来自哪里 —— AI / 复用上次AI(缓存) / 本地兜底。null=AI(不显)
   const [waveSource, setWaveSource] = useState<'cache' | 'local' | null>(null);
 
@@ -77,6 +80,7 @@ export function FocusCardDetail({
 
   // 应用一波步骤到 UI(来源:ai=记住并复用 / cache=复用上次AI / local=本地兜底)
   function applyWave(steps: Step[], source: 'ai' | 'cache' | 'local', cacheKey: string) {
+    checklistTargetRef.current = null; // 非清单 wave:勾选不写回 subtasksJson
     const actions: MomentumAction[] = steps.slice(0, 6).map((s, i) => ({
       id: `m-${Date.now()}-${i}`, name: s.name, emoji: s.emoji || '⚡', done: false, durationMin: s.durationMin,
     }));
@@ -104,15 +108,35 @@ export function FocusCardDetail({
     // 批次 73(用户定案):节点自带清单(存入的打包清单等)→ 直接显示条目
     // 本身,可勾选且状态落库 —— 不再用拆解引擎重新发明一遍。
     if (node.subtasks?.length && !previousAction) {
+      checklistTargetRef.current = node.id;
       setWave(node.subtasks.map((st, i) => ({ id: st.id || `st-${i}`, name: st.name, emoji: '☑', done: st.done, durationMin: st.durationMin })));
       setDrillMap(new Map()); setError(null); setWaveSource(null);
       return;
     }
+    // 批次 74:自己没清单,但关联着一份(打包收拾行李 → 旅行打包清单)→ 直采
+    if (!previousAction) {
+      const lc = getLinkedChecklist(node.id);
+      if (lc) {
+        checklistTargetRef.current = lc.nodeId;
+        setWave(lc.subtasks.map((st, i) => ({ id: st.id || `st-${i}`, name: st.name, emoji: '☑', done: st.done, durationMin: st.durationMin })));
+        setDrillMap(new Map()); setError(null); setWaveSource(null);
+        return;
+      }
+    }
+    checklistTargetRef.current = null;
     const tpl = matchTaskTemplate(node.name, dict);
     if (tpl && !previousAction) { applyWave(tpl, 'local', cacheKey); setWaveSource(null); return; }
     const cached = recallAI<Step[]>('decompose', cacheKey);
     if (cached?.length) { applyWave(cached, 'cache', cacheKey); setWaveSource(null); return; }
-    applyWave(decomposeLocally(node.name, dict), 'local', cacheKey);
+    const localSteps = decomposeLocally(node.name, dict);
+    // 批次 74(用户实锤「第 2 波」又是同一套起步三句):脚手架只此一轮,
+    // 做完就收尾 —— 不许自我复读。
+    if (previousAction && localSteps[0] && /摊在面前|Spend 2 minutes/i.test(localSteps[0].name)) {
+      applyWave([{ name: L(dict, '收尾:检查一遍,把整件事勾成完成', 'Wrap up: final check, then mark the task done'), emoji: '🏁', durationMin: 2 }], 'local', cacheKey);
+      setWaveSource(null);
+      return;
+    }
+    applyWave(localSteps, 'local', cacheKey);
     setWaveSource(null); // 本地是默认引擎,不再当"降级"提示
   }
 
@@ -164,9 +188,12 @@ export function FocusCardDetail({
   function toggleAction(actionId: string) {
     const next = wave.map((a) => a.id === actionId ? { ...a, done: !a.done } : a);
     setWave(next);
-    // 清单模式(wave 即节点 subtasks):勾选状态写回 subtasksJson,两处同步
-    if (node.subtasks?.length && next.length === node.subtasks.length && next.every((a, i) => a.name === node.subtasks![i].name)) {
-      onSubtasksChange(node.id, next.map((a) => ({ id: a.id, name: a.name, done: a.done, durationMin: a.durationMin })));
+    // 清单模式:勾选状态写回来源节点的 subtasksJson(本体或关联清单),两处同步
+    if (checklistTargetRef.current) {
+      const target = checklistTargetRef.current;
+      const subtasks = next.map((a) => ({ id: a.id, name: a.name, done: a.done, durationMin: a.durationMin }));
+      if (target === node.id) onSubtasksChange(node.id, subtasks);
+      else saveSubtasks(target, subtasks);
     }
     if (next.every((a) => a.done)) {
       const lastDone = next[next.length - 1].name;
@@ -363,7 +390,12 @@ export function FocusCardDetail({
           );
         })}
       </ul>
-      {memNode && <MemoryNodeDetail node={memNode} onClose={() => setMemNode(null)} />}
+      {/* 批次 74:portal 到 body —— 聚焦卡在带 transform 的容器里,fixed 详情会被
+          困住(半屏卡死无法滚动,用户实锤)。 */}
+      {memNode && typeof document !== 'undefined' && createPortal(
+        <MemoryNodeDetail node={memNode} onClose={() => setMemNode(null)} />,
+        document.body,
+      )}
     </div>
   );
 }

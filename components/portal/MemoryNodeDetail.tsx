@@ -160,6 +160,8 @@ const HIDDEN_ATTRIBUTE_KEYS = new Set([
   'calendarId', 'calendarName', 'description', 'emailId', 'messageId', 'htmlLink',
   // System / task internals
   'subtasksJson', 'done', 'doneAt', 'userTags', 'status', 'context', 'reminder',
+  // 批次 74:fullText 与原始记录重复,不再当属性平铺
+  'fullText', 'savedFromChat', 'checklist', 'planImported', 'planContainer', 'planKind',
   // Location (shown in PlaceSection)
   'lat', 'lon', 'address', 'location', 'room',
   // 批次 57:捕获位置戳 —— 裸坐标不见人,地名已并入「记录于 · 地点」行
@@ -523,6 +525,7 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
   const [addedRels, setAddedRels] = useState<Array<{ targetId: string; relation: string }>>([]);
   const [linkPicking, setLinkPicking] = useState(false);
   const [linkQuery, setLinkQuery] = useState('');
+  const [rawExpanded, setRawExpanded] = useState(false); // 批次 74:原始记录折叠
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [editing, setEditing] = useState(false);
   const [fields, setFields] = useState<EditFields>({
@@ -933,11 +936,18 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
             <PreferenceSection node={n} assetUrls={assetUrls} />
           )}
 
-          {/* Raw input */}
+          {/* Raw input —— 批次 74:长文默认折叠(清单类原文动辄上千字) */}
           {showRawInput && (
             <div className="nesio-node-raw" style={{ marginTop: '0.75rem' }}>
               <p className="nesio-settings-section-label">{L(dict, '原始记录', 'Original note')}</p>
-              <p style={{ fontSize: '0.88rem', color: 'var(--portal-muted)', fontStyle: 'italic' }}>&ldquo;{n.rawInput}&rdquo;</p>
+              <p style={{ fontSize: '0.88rem', color: 'var(--portal-muted)', fontStyle: 'italic' }}>
+                &ldquo;{rawExpanded || (n.rawInput || '').length <= 180 ? n.rawInput : `${(n.rawInput || '').slice(0, 180)}…`}&rdquo;
+              </p>
+              {(n.rawInput || '').length > 180 && (
+                <button type="button" className="nesio-node-link-add" onClick={() => setRawExpanded((v) => !v)}>
+                  {rawExpanded ? L(dict, '收起', 'Collapse') : L(dict, '展开全文', 'Show all')}
+                </button>
+              )}
             </div>
           )}
 

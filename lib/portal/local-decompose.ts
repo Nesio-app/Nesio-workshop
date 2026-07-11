@@ -49,17 +49,17 @@ function splitIfList(t: string): string[] | null {
 // 脚手架句 → 再拆时的确定性微步骤(中/英)。识别按前缀,宽松匹配。
 const SCAFFOLD_DRILLS: Array<{ zh: RegExp; en: RegExp; zhSteps: string[]; enSteps: string[] }> = [
   {
-    zh: /^先花 ?2 ?分钟/, en: /^Spend 2 minutes/i,
+    zh: /先花 ?2 ?分钟|摊在面前/, en: /^Spend 2 minutes|within reach/i,
     zhSteps: ['定一个 2 分钟的计时器', '把要用的东西放到手边', '关掉无关的窗口和通知'],
     enSteps: ['Set a 2-minute timer', 'Put what you need within reach', 'Close unrelated windows and notifications'],
   },
   {
-    zh: /^只做最小的一步/, en: /^Do just the smallest step/i,
+    zh: /只做最小|做完就算赢|做完最小/, en: /smallest step|done beats perfect/i,
     zhSteps: ['挑一个 5 分钟内能做完的小块', '开始做,不求完美', '做完给自己打个勾'],
     enSteps: ['Pick a piece you can finish in 5 minutes', 'Start — done beats perfect', 'Check it off when finished'],
   },
   {
-    zh: /^停下来看看进度/, en: /^Pause, check progress/i,
+    zh: /看看进度|再来一轮/, en: /check progress|another round/i,
     zhSteps: ['看一眼已经完成的部分', '还值得再来一轮吗?值得就再拆一波'],
     enSteps: ['Glance at what you already finished', 'Worth another round? If yes, break down the next wave'],
   },
