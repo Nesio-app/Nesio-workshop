@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useRef } from 'react';
-import { geoOrthographic, geoPath, geoGraticule10, geoCentroid } from 'd3-geo';
+import { geoOrthographic, geoPath, geoGraticule10, geoCentroid, geoCircle } from 'd3-geo';
 import type { GeoPermissibleObjects } from 'd3-geo';
 
 export interface GlobeCountry { name: string; count: number }
@@ -28,6 +28,16 @@ const NE_ALIAS: Record<string, string> = {
   '加拿大': 'Canada', '墨西哥': 'Mexico', '澳大利亚': 'Australia', '俄罗斯': 'Russia',
   '葡萄牙': 'Portugal', '希腊': 'Greece', '瑞士': 'Switzerland', '荷兰': 'Netherlands',
 };
+
+/** 太阳直射点(近似:赤纬余弦公式 + 平太阳时角,误差 <1° —— 画晨昏线足够)。 */
+function subsolarPoint(d: Date): [number, number] {
+  const start = Date.UTC(d.getUTCFullYear(), 0, 0);
+  const doy = (d.getTime() - start) / 86_400_000;
+  const declination = -23.44 * Math.cos((2 * Math.PI / 365) * (doy + 10));
+  const utcH = d.getUTCHours() + d.getUTCMinutes() / 60 + d.getUTCSeconds() / 3600;
+  const lon = 180 - utcH * 15;
+  return [declination, lon];
+}
 
 interface CountryFeature {
   type: 'Feature';
@@ -129,6 +139,13 @@ export default function Globe({ countries, size = 300, onTap }: {
       for (const f of feats) if (visitedRef.current.has(f.properties.name || '')) path(f as GeoPermissibleObjects);
       ctx.strokeStyle = 'rgba(120, 160, 40, 0.6)'; ctx.lineWidth = 0.6; ctx.stroke();
     }
+
+    // 5.5 晨昏线(批次 69,用户点名):真实太阳位置 → 夜半球加阴影,
+    // 一眼看出地球上哪里正是白天、哪里已经入夜。
+    const sun = subsolarPoint(new Date());
+    const night = geoCircle().center([sun[1] + 180, -sun[0]]).radius(90)();
+    ctx.beginPath(); path(night);
+    ctx.fillStyle = 'rgba(2, 6, 18, 0.5)'; ctx.fill();
 
     // 6. 高光 + 晨昏影(整球质感)
     const spec = ctx.createRadialGradient(C - R * 0.45, C - R * 0.5, 0, C - R * 0.45, C - R * 0.5, R * 0.9);

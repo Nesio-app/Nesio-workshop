@@ -112,7 +112,10 @@ export default function TimelineTab() {
     };
     const placeOf = (label: string) => {
       const g = geo[label];
-      return { name: displayLabel(label), sub: [g?.city, g?.country].filter(Boolean).join(' · ') };
+      const disp = displayLabel(label);
+      const base = disp.split(',')[0].trim() || disp; // 「名, 城, 国」变体只留名,后缀让位副行
+      const suffix = disp.slice(base.length).replace(/^\s*,\s*/, '').trim();
+      return { name: base, sub: [g?.city, g?.country].filter(Boolean).join(' · ') || suffix };
     };
     const pts = trail.filter((v): v is PlaceVisit & { lat: number; lon: number } => typeof v.lat === 'number' && typeof v.lon === 'number');
     if (pts.length) {
@@ -513,17 +516,20 @@ export default function TimelineTab() {
         />
       )}
 
-      {/* 批次 63:3D 地球全屏 */}
+      {/* 批次 63:3D 地球全屏;批次 69:真全屏(不透明深空,背后不透出) */}
       {globeFull && typeof document !== 'undefined' && createPortal(
-        <div className="nesio-imgzoom-overlay" role="dialog" aria-modal="true" aria-label={L(dict, '世界', 'World')}>
-          <button type="button" className="nesio-imgzoom-backdrop" onClick={() => setGlobeFull(false)} aria-label={L(dict, '关闭', 'Close')} />
-          <div className="nesio-globe-full">
-            <Globe
-              countries={world.map((g) => ({ name: g.country, count: g.placeCount }))}
-              size={Math.min(typeof window !== 'undefined' ? window.innerWidth - 32 : 360, 520)}
-            />
-            <button type="button" className="nesio-memmap-close" onClick={() => setGlobeFull(false)} style={{ position: 'absolute', top: '0.6rem', right: '0.6rem' }}>✕</button>
-          </div>
+        <div className="nesio-globe-fsov" role="dialog" aria-modal="true" aria-label={L(dict, '世界', 'World')}>
+          <p className="nesio-globe-stats">
+            {L(dict,
+              `${world.length} 国 · ${world.reduce((n, g) => n + g.cities.length, 0)} 城 · ${trail.length} 足迹`,
+              `${world.length} countries · ${world.reduce((n, g) => n + g.cities.length, 0)} cities · ${trail.length} footprints`)}
+          </p>
+          <Globe
+            countries={world.map((g) => ({ name: g.country, count: g.placeCount }))}
+            size={Math.min(typeof window !== 'undefined' ? window.innerWidth - 16 : 360, typeof window !== 'undefined' ? window.innerHeight - 200 : 520, 600)}
+          />
+          <span className="nesio-globe-stage-hint">{L(dict, '深色一侧是正处于黑夜的地区', 'The shaded side is currently in night')}</span>
+          <button type="button" className="nesio-memmap-close nesio-globe-fsov-close" onClick={() => setGlobeFull(false)}>✕</button>
         </div>,
         document.body,
       )}
@@ -548,7 +554,7 @@ export default function TimelineTab() {
               {visitMems.nodes.map((n) => (
                 <button key={n.id} type="button" className="nesio-memmap-item nesio-memmap-item--btn" onClick={() => setVisitSel(n)}>
                   <span className="nesio-memmap-item-name">{n.name}</span>
-                  <span className="nesio-memmap-item-time">{new Date(n.createdAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</span>
+                  <span className="nesio-memmap-item-time">{new Date(n.createdAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })}</span>
                 </button>
               ))}
             </div>

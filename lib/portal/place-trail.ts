@@ -61,7 +61,8 @@ function save(trail: PlaceVisit[]): void {
 }
 
 /** 实时记录:同一地点 2 小时内不重复记(定位轮询会反复命中同一地方)。 */
-export function recordLiveVisit(label: string, lat?: number, lon?: number): void {
+export function recordLiveVisit(rawLabel: string, lat?: number, lon?: number): void {
+  const label = canonicalPlaceLabel(rawLabel);
   if (!label) return;
   const trail = loadPlaceTrail();
   const now = Date.now();
@@ -77,7 +78,8 @@ export function recordLiveVisit(label: string, lat?: number, lon?: number): void
  * 与 recordLiveVisit 的区别:ts 用事件真实时间,不是「现在」。按 label|ts 去重,
  * 反复同步同一会话不会重复堆。source 记 'live'(不触发 import 那天让位粗粒度打点的逻辑)。
  */
-export function recordVisitAt(label: string, tsISO: string, lat?: number, lon?: number): void {
+export function recordVisitAt(rawLabel: string, tsISO: string, lat?: number, lon?: number): void {
+  const label = canonicalPlaceLabel(rawLabel);
   if (!label || !tsISO) return;
   const ts = new Date(tsISO).toISOString();
   if (Number.isNaN(new Date(ts).getTime())) return;
@@ -303,14 +305,47 @@ export function displayLabel(raw: string): string {
   return a && a.trim() ? a : raw;
 }
 
+// ── 批次 69:改名的持久记忆 —— 此前 renamePlaceLabel 只改历史本体,改完之后
+// **新**打点带着原始 geocode 名回来又分了家(用户实锤:家 与 Ethans Glen Court
+// 两行并存)。这里把 old→new 永久记住,recordLiveVisit/recordVisitAt 写入前先归一。
+const PLACE_RENAME_KEY = 'nesio-place-renames-v1';
+function loadPlaceRenames(): Record<string, string> {
+  if (typeof window === 'undefined') return {};
+  try { return JSON.parse(localStorage.getItem(PLACE_RENAME_KEY) || '{}') as Record<string, string>; } catch { return {}; }
+}
+function rememberRename(oldLabel: string, newLabel: string): void {
+  try {
+    const map = loadPlaceRenames();
+    map[oldLabel] = newLabel;
+    // geocode 标签常见「名字, 城市, 国家」变体 —— 基名也记一份,后缀变体一并认亲
+    const base = oldLabel.split(',')[0].trim();
+    if (base && base !== oldLabel) map[base] = newLabel;
+    // 链式改名(A→B 后 B→C):旧映射指向 oldLabel 的全部改指 newLabel
+    for (const k of Object.keys(map)) if (map[k] === oldLabel) map[k] = newLabel;
+    localStorage.setItem(PLACE_RENAME_KEY, JSON.stringify(map));
+  } catch { reportStorageDropped(); }
+}
+/** 写入前归一:改过名的地址(含「, 城市, 国家」后缀变体)一律用真名落库。 */
+export function canonicalPlaceLabel(label: string): string {
+  const map = loadPlaceRenames();
+  if (map[label]) return map[label];
+  const base = label.split(',')[0].trim();
+  if (base && base !== label && map[base]) return map[base];
+  return label;
+}
+
 /** 批次 61:把 raw label 就地改写成真名 —— 与别名不同,这里改的是存储本体,
  *  常去地点聚合/时间线合并/次数与停留统计全部天然归一(坐标名→真名认亲用)。 */
 export function renamePlaceLabel(oldLabel: string, newLabel: string): void {
   if (typeof window === 'undefined' || !oldLabel || !newLabel || oldLabel === newLabel) return;
+  rememberRename(oldLabel, newLabel);
   const trail = loadPlaceTrail();
+  const oldBase = oldLabel.split(',')[0].trim();
   let touched = false;
   const next = trail.map((v) => {
-    if (v.label !== oldLabel) return v;
+    // 后缀变体(「Ethans Glen Court, Cary, United States」)也一并认亲改写
+    const vBase = v.label.split(',')[0].trim();
+    if (v.label !== oldLabel && vBase !== oldLabel && vBase !== oldBase) return v;
     touched = true;
     return { ...v, label: newLabel };
   });
@@ -408,13 +443,17 @@ export function buildPlaceTimeline(visits: PlaceVisit[], maxDays = 14): Timeline
     }
     const end = clampEndToDay(v.ts, rawEnd);
     const last = segs[segs.length - 1];
-    const gapMs = last ? new Date(v.ts).getTime() - new Date(last.end).getTime() : Infinity;
     const sameDay = last && localDateKey(v.ts) === localDateKey(last.start);
-    // 同名还要同地:两家同名店(都叫 Starbucks)相邻到访不能并成一段
-    const nearSame = last && last.label === v.label
-      && (last.lat == null || v.lat == null || haversineKm(last.lat, last.lon ?? 0, v.lat, v.lon ?? 0) < 0.5);
-    if (last && sameDay && nearSame && gapMs < 3 * 3_600_000) {
+    // 同名还要同地:两家同名店(都叫 Starbucks)相邻到访不能并成一段。
+    // 批次 69:按基名比(「X, Cary, United States」后缀变体认亲);间隔不设上限 ——
+    // 用户定案:中间没有出现别的地点,就是一直在这个地方,合成一段。
+    const sameName = last && (last.label === v.label
+      || last.label.split(',')[0].trim() === v.label.split(',')[0].trim());
+    const nearSame = sameName
+      && (last.lat == null || v.lat == null || haversineKm(last.lat!, last.lon ?? 0, v.lat, v.lon ?? 0) < 0.5);
+    if (last && sameDay && nearSame) {
       if (end > last.end) last.end = end;
+      if (v.label.length < last.label.length) last.label = v.label; // 短基名优先(后缀变体不霸屏)
       if (last.lat == null && v.lat != null) { last.lat = v.lat; last.lon = v.lon; }
     } else {
       segs.push({ label: v.label, category: catFor(v.label), start: v.ts, end, durationMin: 0, source: v.source, lat: v.lat, lon: v.lon });

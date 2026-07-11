@@ -24,7 +24,7 @@ const EVENT_TYPE_LINEAR_ICON: Record<EventType, ComponentType<{ size?: number }>
 function formatEventTime(locale: PortalLocale, dateStr: string, allDay?: boolean): string {
   if (allDay) return t(locale, 'todayAllDay');
   const d = parseEventDate(dateStr);
-  return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
 /** 事件是否正在进行(2 小时窗口)— 与文案解耦,i18n 后不能再用字符串判断 */

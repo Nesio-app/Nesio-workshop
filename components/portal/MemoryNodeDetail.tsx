@@ -644,7 +644,7 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
   const createdDate = (() => {
     const created = new Date(n.createdAt);
     const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
-    const time = created.toLocaleTimeString(dict === 'en' ? 'en-US' : 'zh-CN', { hour: '2-digit', minute: '2-digit' });
+    const time = created.toLocaleTimeString(dict === 'en' ? 'en-US' : 'zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
     if (created >= dayStart) return L(dict, `今天 ${time}`, `today ${time}`);
     if (created >= new Date(dayStart.getTime() - 86_400_000)) return L(dict, `昨天 ${time}`, `yesterday ${time}`);
     return relativePastLabel(created, Date.now(), dict);

@@ -512,7 +512,7 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
                             style={{ textAlign: 'left', background: 'rgba(88,140,227,0.05)', border: '1px solid var(--portal-line)', borderRadius: '0.7rem', padding: '0.55rem 0.7rem', cursor: 'pointer' }}>
                             <p style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.68rem', color: 'var(--portal-muted)', margin: '0 0 0.25rem' }}>
                               {e.emotionColor && <span aria-hidden style={{ width: 8, height: 8, borderRadius: '50%', background: e.emotionColor, display: 'inline-block' }} />}
-                              {e.emotionLabel || ''} {e.date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+                              {e.emotionLabel || ''} {e.date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })}
                             </p>
                             {e.html && isOpen ? (
                               <div className="nesio-journal-history-html" style={{ fontSize: '0.82rem', color: 'var(--portal-ink)', lineHeight: 1.6 }}
