@@ -154,7 +154,8 @@ export default function TodayFeed({
   const [pinnedNodeId, setPinnedNodeId] = useState<string | null>(null);
   const guidanceNodeIds = useMemo(() => proactiveCards.map((c) => c.nodeId).filter((x): x is string => Boolean(x)), [proactiveCards]);
   const activeProactiveCards = proactiveCards
-    .filter((c) => !dismissedCardIds.has(c.id) && (!c.nodeId || c.nodeId !== pinnedNodeId))
+    .filter((c) => !dismissedCardIds.has(c.id) && (!c.nodeId || c.nodeId !== pinnedNodeId)
+      && (!c.expiresAt || new Date(c.expiresAt).getTime() > Date.now()))
     .slice(0, cardBudget);
 
   // §1 ①收据首行:每次打开先兑现一次承诺(纯本地事实,绝不显示同步计数);时段三态。

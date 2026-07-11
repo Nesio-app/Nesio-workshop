@@ -125,6 +125,41 @@ export function useTodayData(canUsePrivateData: boolean) {
   const [proactiveCards, setProactiveCards] = useState<ProactiveCardData[]>([]);
   const [dismissedCardIds, setDismissedCardIds] = useState<Set<string>>(new Set());
 
+  // 批次 79(用户定案「回顾和顶部卡片常驻」):卡片与划走记录按天落盘 ——
+  // 重开 App 当天原样恢复(此前只是届内常驻,重开即丢、冷却又拦着不再出)。
+  // 离场只有两条路:用户划走 / expiresAt 自然过期。
+  useEffect(() => {
+    try {
+      const day = `${new Date().getFullYear()}-${new Date().getMonth() + 1}-${new Date().getDate()}`;
+      const rawD = JSON.parse(localStorage.getItem('nesio-today-dismissed-v1') || 'null') as { day?: string; ids?: string[] } | null;
+      if (rawD?.day === day && Array.isArray(rawD.ids)) setDismissedCardIds(new Set(rawD.ids));
+      const rawC = JSON.parse(localStorage.getItem('nesio-today-cards-v1') || 'null') as { day?: string; cards?: ProactiveCardData[] } | null;
+      if (rawC?.day === day && Array.isArray(rawC.cards)) {
+        const now = Date.now();
+        const alive = rawC.cards.filter((c) => c && typeof c.id === 'string'
+          && (!c.expiresAt || new Date(c.expiresAt).getTime() > now));
+        if (alive.length) {
+          setProactiveCards((prev) => {
+            const seen = new Set(prev.map((c) => c.id));
+            return [...alive.filter((c) => !seen.has(c.id)), ...prev].slice(0, 8);
+          });
+        }
+      }
+    } catch { /* 恢复失败当没存过 */ }
+  }, []);
+  useEffect(() => {
+    try {
+      const day = `${new Date().getFullYear()}-${new Date().getMonth() + 1}-${new Date().getDate()}`;
+      localStorage.setItem('nesio-today-cards-v1', JSON.stringify({ day, cards: proactiveCards.slice(0, 8) }));
+    } catch { /* 配额满不拦渲染 */ }
+  }, [proactiveCards]);
+  useEffect(() => {
+    try {
+      const day = `${new Date().getFullYear()}-${new Date().getMonth() + 1}-${new Date().getDate()}`;
+      localStorage.setItem('nesio-today-dismissed-v1', JSON.stringify({ day, ids: [...dismissedCardIds] }));
+    } catch { /* 同上 */ }
+  }, [dismissedCardIds]);
+
   // 并发运行序号:初始加载 + 20 分轮询 + 多个 window 事件都会触发 applyViewModel,
   // 每次有多段 await。只有最新一次运行允许写 state,否则慢的旧运行会覆盖新结果。
   const runSeqRef = useRef(0);
