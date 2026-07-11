@@ -891,7 +891,11 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
             );
           })()}
 
-          <p style={{ fontSize: '0.7rem', color: 'var(--portal-muted)', marginTop: '1rem' }}>{L(dict, '记录于', 'Noted on')} {createdDate}</p>
+          <p style={{ fontSize: '0.7rem', color: 'var(--portal-muted)', marginTop: '1rem' }}>
+            {L(dict, '记录于', 'Noted on')} {createdDate}
+            {/* 批次 55:主动记忆自动盖位置戳 —— 记录于 时间 · 地点 */}
+            {typeof n.attributes?.capturedPlace === 'string' && n.attributes.capturedPlace ? ` · ${n.attributes.capturedPlace}` : ''}
+          </p>
 
           {/* 标签三层重构:详情页的关联图撤下 —— 它把「同天创建/弱相似」画成箭头,
               视觉上像因果实际是噪声(QA:「全是乱连接」)。换成诚实的「相关记忆」列表;

@@ -17,10 +17,31 @@ import './node-fact-sink';
  */
 
 import { addLifeNode, getLifeGraph, updateLifeNode, type LifeNode } from '@/lib/portal/life-graph';
+import { loadLastLocation, refreshLocation } from '@/lib/portal/location-store';
 import { lifeNodeToSignal } from './signal';
 import { signalWriteMode, writeCloudSignal } from './create-signal';
 
 export type IngestNodeInput = Omit<LifeNode, 'id' | 'createdAt'>;
+
+// 批次 55(用户点名):主动记下的每一条记忆(文字/图片/语音)自动盖上当时的
+// 位置戳。只盖捕获源 —— 导入类(email/calendar/system/device)的"当时"不是
+// 设备此刻,不盖。规则:读定位缓存,≤20 分钟才贴(宁缺毋错);已授权过
+// (有过缓存)才顺手异步刷新保温,绝不在捕获路径上弹权限打断记录。
+const CAPTURE_SOURCES = new Set<string>(['manual', 'voice', 'photo']);
+const CAPTURE_LOC_MAX_AGE = 20 * 60_000;
+
+function stampCaptureLocation(input: IngestNodeInput): IngestNodeInput {
+  if (typeof window === 'undefined' || !CAPTURE_SOURCES.has(input.source)) return input;
+  const attrs = input.attributes || {};
+  if (attrs.capturedPlace || attrs.capturedLat || attrs.location) return input; // 调用方已带位置
+  const loc = loadLastLocation();
+  if (loc) void refreshLocation().catch(() => {}); // 保温下一条;无缓存不主动请求权限
+  if (!loc || Date.now() - loc.ts > CAPTURE_LOC_MAX_AGE) return input;
+  return {
+    ...input,
+    attributes: { ...attrs, capturedPlace: loc.label, capturedLat: loc.lat, capturedLon: loc.lon },
+  };
+}
 
 /** ⑦ 外部稳定 id:邮件 messageId / Notion pageId / 通用 externalId(如健康锻炼 startISO+活动)。
  *  用于跨同步/重导入去重(同一封邮件、同一页、同一场锻炼只一条)。 */
@@ -33,6 +54,7 @@ function externalKey(attrs: IngestNodeInput['attributes'] | undefined): string |
 }
 
 export function ingestLifeNode(input: IngestNodeInput): LifeNode {
+  input = stampCaptureLocation(input);
   // ⑦ 去重下沉到唯一写入口:带外部 id 的输入(Gmail/Notion 重复同步)幂等 —— 命中就原地更新,
   //   不再生成重复节点。一处修掉此前 Gmail/Notion 各自没做去重的问题。
   const key = externalKey(input.attributes);
