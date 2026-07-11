@@ -14638,3 +14638,12 @@ html[data-portal-theme="night"] .nesio-collapsed-section {
 .nesio-tl-item-mem { color: var(--portal-accent); font-weight: 600; }
 html[data-portal-theme="night"] .nesio-memmap-overlay { background: var(--portal-bg, #0e1626); }
 html[data-portal-theme="night"] .nesio-memmap-canvas { background: #16243c; }
+
+/* ── 批次 60:记忆地图时间 bar ─────────────────────────────────────────── */
+.nesio-memmap-timebar {
+  display: flex; align-items: center; gap: 0.7rem;
+  padding: 0.55rem 1rem; background: var(--glass-bg-pop);
+  border-top: 1px solid var(--portal-line);
+}
+.nesio-memmap-timebar input[type='range'] { flex: 1; accent-color: var(--portal-accent); min-height: 1.6rem; }
+.nesio-memmap-timebar-label { font-size: 0.78rem; color: var(--portal-ink); font-weight: 600; white-space: nowrap; }

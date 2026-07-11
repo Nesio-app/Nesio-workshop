@@ -84,16 +84,14 @@ export function prefetchCaptureLocation(force = false): void {
       writeFixCache(fix);
       if (!fix.label && !labelInFlight) {
         labelInFlight = true;
-        reverseGeocode(fix.lat, fix.lon)
-          .then((geo) => {
-            if (geo.label) {
-              // 批次 57(用户定案):地名 = 城市, 州缩写, 国家(Cary, NC, US)
-              const label = geo.country ? `${geo.label}, ${geo.country}` : geo.label;
+        reverseGeocodeRobust(fix.lat, fix.lon)
+          .then((label) => {
+            if (label) {
               writeFixCache({ ...(readFixCache() ?? fix), label });
-              feedFootprints(label, fix.lat, fix.lon);
+              healCoordEntryOrFeed(label, fix.lat, fix.lon);
             } else {
-              // 反查空手:足迹先用坐标名记上(与 Tesla 连接器同款兜底,
-              // 可在足迹页改名);不写进 fix.label,下次仍会尝试真名。
+              // 两级反查都空手:足迹先用坐标名记上(可改名);不写进 fix.label,
+              // 下次仍会尝试真名,拿到后自动把坐标条目改名认亲。
               feedFootprints(coordLabel(fix.lat, fix.lon), fix.lat, fix.lon);
             }
           })
@@ -110,6 +108,48 @@ export function prefetchCaptureLocation(force = false): void {
 
 function coordLabel(lat: number, lon: number): string {
   return `${lat.toFixed(3)},${lon.toFixed(3)}`;
+}
+
+/** 批次 60:两级健壮反查 —— 天气链(open-meteo/BigDataCloud)空手时落到
+ *  服务端 /api/portal/geocode(OSM/Foursquare 代理,不受设备侧网络怪癖影响)。
+ *  返回人话地名(Cary, NC, US / 商户名, 城市, 国家),两级都空返回 ''。 */
+export async function reverseGeocodeRobust(lat: number, lon: number): Promise<string> {
+  try {
+    const geo = await reverseGeocode(lat, lon);
+    if (geo.label) return geo.country ? `${geo.label}, ${geo.country}` : geo.label;
+  } catch { /* 落到服务端 */ }
+  try {
+    const res = await fetch('/api/portal/geocode', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lat, lon }),
+    });
+    const d = await res.json() as { ok?: boolean; name?: string; city?: string; country?: string };
+    if (d.ok) {
+      const parts = [d.name, d.city && d.city !== d.name ? d.city : '', d.country].filter(Boolean) as string[];
+      if (parts.length) return parts.join(', ');
+    }
+  } catch { /* 两级全空 */ }
+  return '';
+}
+
+/** 批次 60:反查迟到时,先前用坐标名记下的足迹条目就地改名认亲(displayLabel
+ *  全站生效),同一停留窗内不再重复打点;没有坐标条目则正常记真名。 */
+function healCoordEntryOrFeed(label: string, lat: number, lon: number): void {
+  import('./place-trail')
+    .then((m) => {
+      const cl = coordLabel(lat, lon);
+      const now = Date.now();
+      const coordEntry = m.loadPlaceTrail().find(
+        (v) => v.label === cl && now - new Date(v.ts).getTime() < 2 * 3_600_000,
+      );
+      if (coordEntry) {
+        m.setPlaceAlias(cl, label);
+      } else {
+        m.recordLiveVisit(label, lat, lon);
+      }
+    })
+    .catch(() => {});
 }
 
 /** 批次 57:定位开关开着时,每次拿到定位顺手喂足迹(2h 同地去重在 place-trail 内),

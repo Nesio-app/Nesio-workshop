@@ -11,6 +11,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { getLifeGraph, type LifeNode } from '@/lib/portal/life-graph';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -81,6 +82,20 @@ export default function MemoryMapSheet({ open, onClose }: { open: boolean; onClo
 
   const all = useMemo(() => (open ? geoNodes() : []), [open]);
 
+  // 批次 60:时间 bar —— 左右拉,看记忆在地图上随月份长出来(累计到所选月)
+  const months = useMemo(() => {
+    const set = new Set(all.map((g) => new Date(g.node.createdAt).toISOString().slice(0, 7)));
+    return [...set].sort();
+  }, [all]);
+  const [monthIdx, setMonthIdx] = useState(-1); // -1 = 最新(全部)
+  const activeIdx = monthIdx < 0 ? months.length - 1 : monthIdx;
+  const visible = useMemo(() => {
+    if (months.length === 0 || activeIdx >= months.length - 1) return all;
+    const [y, m] = months[activeIdx].split('-').map(Number);
+    const cutoff = new Date(y, m, 1).getTime(); // 所选月的月末
+    return all.filter((g) => new Date(g.node.createdAt).getTime() < cutoff);
+  }, [all, months, activeIdx]);
+
   // 初始视野:装下全部点(单点给街区级)
   useEffect(() => {
     if (!open || view || all.length === 0) return;
@@ -109,7 +124,7 @@ export default function MemoryMapSheet({ open, onClose }: { open: boolean; onClo
 
   if (!open) return null;
 
-  const clusters = view ? clusterAtZoom(all, view.z) : [];
+  const clusters = view ? clusterAtZoom(visible, view.z) : [];
   const cx = view ? xWorld(view.lon, view.z) : 0;
   const cy = view ? yWorld(view.lat, view.z) : 0;
   const left = cx - size.w / 2 - (dragPx?.dx ?? 0);
@@ -148,7 +163,10 @@ export default function MemoryMapSheet({ open, onClose }: { open: boolean; onClo
     }
   };
 
-  return (
+  // 批次 60:createPortal 到 body —— 洞察 sheet 有 transform,position:fixed 会被
+  // 困在其内部(实测地图叠在 tab 下面而不是全屏)
+  if (typeof document === 'undefined') return null;
+  return createPortal(
     <div className="nesio-memmap-overlay" role="dialog" aria-modal="true" aria-label={L(dict, '地图上的记忆', 'Memories in maps')}>
       <div className="nesio-memmap-header">
         <span className="nesio-memmap-title">{L(dict, '地图上的记忆', 'Memories in maps')}</span>
@@ -175,12 +193,15 @@ export default function MemoryMapSheet({ open, onClose }: { open: boolean; onClo
           const px = xWorld(c.lon, view.z) - left;
           const py = yWorld(c.lat, view.z) - top;
           const r = Math.min(26, 13 + Math.sqrt(c.items.length) * 3);
+          // 热力色:记得越多越暖(hue 210 冷蓝 → 18 橙红)
+          const maxN = Math.max(1, ...clusters.map((x) => x.items.length));
+          const heat = 210 - Math.round(192 * Math.sqrt(c.items.length / maxN));
           return (
             <button
               key={i}
               type="button"
               className="nesio-memmap-bubble"
-              style={{ left: px - r, top: py - r, width: r * 2, height: r * 2 }}
+              style={{ left: px - r, top: py - r, width: r * 2, height: r * 2, background: `hsl(${heat} 76% 50%)` }}
               onClick={(e) => { e.stopPropagation(); setPicked(c); }}
               aria-label={L(dict, `这里记了 ${c.items.length} 条`, `${c.items.length} memories here`)}
             >{c.items.length}</button>
@@ -192,6 +213,25 @@ export default function MemoryMapSheet({ open, onClose }: { open: boolean; onClo
           <button type="button" onClick={() => zoomTo(-1)} aria-label={L(dict, '缩小', 'Zoom out')}>−</button>
         </div>
       </div>
+      {months.length > 1 && (
+        <div className="nesio-memmap-timebar">
+          <input
+            type="range"
+            min={0}
+            max={months.length - 1}
+            value={activeIdx}
+            onChange={(e) => { setMonthIdx(Number(e.target.value)); setPicked(null); }}
+            aria-label={L(dict, '时间', 'Time')}
+          />
+          <span className="nesio-memmap-timebar-label">
+            {(() => {
+              const [y, m] = months[activeIdx].split('-');
+              return L(dict, `${y} 年 ${Number(m)} 月`, `${new Date(Number(y), Number(m) - 1).toLocaleString('en-US', { month: 'short' })} ${y}`);
+            })()}
+            {' · '}{L(dict, `${visible.length} 条`, `${visible.length}`)}
+          </span>
+        </div>
+      )}
       {picked && (
         <div className="nesio-memmap-list">
           <p className="nesio-memmap-list-title">
@@ -214,6 +254,7 @@ export default function MemoryMapSheet({ open, onClose }: { open: boolean; onClo
           </div>
         </div>
       )}
-    </div>
+    </div>,
+    document.body,
   );
 }
