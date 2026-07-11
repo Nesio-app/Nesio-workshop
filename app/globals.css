@@ -14668,3 +14668,16 @@ html[data-portal-theme="night"] .nesio-memmap-canvas { background: #16243c; }
 .nesio-placepick-row .nesio-tl-rename-input { flex: 1; }
 .nesio-memmap-zoom { bottom: calc(env(safe-area-inset-bottom, 0px) + 1rem); }
 .nesio-memmap-canvas .nesio-tl-map-attr { bottom: calc(env(safe-area-inset-bottom, 0px) + 0.5rem); }
+
+/* ── 批次 63:分类 chips / 图片放大 / 3D 地球 ────────────────────────────── */
+.nesio-placepick-cats { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.55rem; }
+.nesio-placepick-cat {
+  font-size: 0.74rem; padding: 0.24rem 0.66rem; border-radius: 999px;
+  border: 1px solid var(--portal-line); background: none; color: var(--portal-muted); cursor: pointer;
+}
+.nesio-placepick-cat.is-on { background: var(--portal-accent-soft); color: var(--portal-blue-deep); border-color: var(--portal-blue-deep); font-weight: 600; }
+.nesio-imgzoom-overlay { position: fixed; inset: 0; z-index: 440; display: grid; place-items: center; }
+.nesio-imgzoom-backdrop { position: absolute; inset: 0; background: rgba(10, 16, 30, 0.82); border: none; cursor: pointer; }
+.nesio-imgzoom-img { position: relative; max-width: 94vw; max-height: 86dvh; border-radius: 0.8rem; box-shadow: 0 12px 48px rgba(0,0,0,0.5); }
+.nesio-globe-wrap { display: flex; flex-direction: column; align-items: center; margin: 0.5rem 0 0.75rem; }
+.nesio-globe-full { position: relative; display: grid; place-items: center; background: var(--glass-bg-pop); border-radius: 1.2rem; padding: 1.6rem; }

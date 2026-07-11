@@ -318,6 +318,27 @@ export function renamePlaceLabel(oldLabel: string, newLabel: string): void {
   // 旧别名指向该 raw 的一并清掉(本体已是真名)
   const aliases = loadPlaceAliases();
   if (aliases[oldLabel]) setPlaceAlias(oldLabel, '');
+  // 批次 63:全链归一 —— 城市/国家(World tab 数据源)与手动分类跟着新名走,
+  // 否则改名后世界页/类别统计瞬间"没数据"(用户实测)。
+  try {
+    const geo = loadPlaceGeo();
+    if (geo[oldLabel]) {
+      const merged = { ...geo[oldLabel], ...(geo[newLabel] || {}), name: newLabel };
+      const all = { ...geo, [newLabel]: merged };
+      delete all[oldLabel];
+      localStorage.setItem(PLACE_GEO_KEY, JSON.stringify(all));
+    }
+    const cats = loadPlaceCategories();
+    if (cats[oldLabel] && !cats[newLabel]) setPlaceCategory(newLabel, cats[oldLabel]);
+  } catch { /* 迁移失败不拦改名 */ }
+  // 记忆节点上的位置戳反向同步(记忆页与足迹用同一套地址库,用户定案)
+  void import('./life-graph').then(({ getLifeGraph, updateLifeNode }) => {
+    for (const n of getLifeGraph()) {
+      if (n.attributes?.capturedPlace === oldLabel) {
+        updateLifeNode(n.id, { attributes: { ...n.attributes, capturedPlace: newLabel } });
+      }
+    }
+  }).catch(() => {});
 }
 
 export function setPlaceAlias(raw: string, name: string): void {

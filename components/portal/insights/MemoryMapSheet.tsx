@@ -273,10 +273,13 @@ export default function MemoryMapSheet({ open, onClose }: { open: boolean; onClo
           />}
           <span className="nesio-memmap-timebar-label">
             {(() => {
+              // 批次 63:数字语义说清楚 —— 地图显示的是**累计到所选日**的版图,
+              // 标签同时给当天新增,不再让 14+2=16 看着像凭空多出来
               const [y, m, d] = days[activeIdx].split('-').map(Number);
-              return L(dict, `${m}月${d}日`, `${m}/${d}/${String(y).slice(2)}`);
+              const dayN = all.filter((g) => dayKey(new Date(g.node.createdAt)) === days[activeIdx]).length;
+              const dateStr = L(dict, `${m}月${d}日`, `${m}/${d}/${String(y).slice(2)}`);
+              return L(dict, `至 ${dateStr} · 共 ${visible.length} 条 · 当天 ${dayN} 条`, `Through ${dateStr} · ${visible.length} total · ${dayN} that day`);
             })()}
-            {' · '}{L(dict, `${visible.length} 条`, `${visible.length}`)}
           </span>
         </div>
       )}

@@ -11,6 +11,7 @@ import { relativePastLabel } from '@/lib/portal/time-labels';
 import { displayNodeName } from '@/lib/portal/node-display';
 import dynamicImport from 'next/dynamic';
 const ReaderSheetLazy = dynamicImport(() => import('./ArticleReaderSheet'), { ssr: false });
+const PlacePickerLazy = dynamicImport(() => import('./PlacePickerSheet'), { ssr: false });
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 const TYPE_BG_DETAIL: Record<string, string> = {
@@ -502,6 +503,7 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
   const [composeOpen, setComposeOpen] = useState(false);
   // 批次 57:有坐标没地名(反查当时没跑完/存量节点)→ 打开详情时自愈回填
   const [healedPlace, setHealedPlace] = useState('');
+  const [placePickOpen, setPlacePickOpen] = useState(false); // 批次 63:记忆页也能改地址(与足迹同库)
   useEffect(() => {
     setHealedPlace('');
     const attrs = node?.attributes;
@@ -916,10 +918,20 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
 
           <p style={{ fontSize: '0.7rem', color: 'var(--portal-muted)', marginTop: '1rem' }}>
             {L(dict, '记录于', 'Noted on')} {createdDate}
-            {/* 批次 55/57:主动记忆自动盖位置戳 —— 记录于 时间 · 城市, 州, 国家(自愈反查兜底) */}
+            {/* 批次 55/57/63:位置戳 —— 点地点可纠正(与足迹同一套地址库) */}
             {(() => {
-              const place = (typeof n.attributes?.capturedPlace === 'string' && n.attributes.capturedPlace) || healedPlace;
-              return place ? ` · ${place}` : '';
+              // healedPlace 优先:自愈反查/刚改名的结果 —— 节点 prop 是打开时的快照会滞后
+              const place = healedPlace || (typeof n.attributes?.capturedPlace === 'string' && n.attributes.capturedPlace) || '';
+              if (!place) return null;
+              return (
+                <>
+                  {' · '}
+                  <button type="button" onClick={() => setPlacePickOpen(true)}
+                    style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: 'inherit', cursor: 'pointer', textDecoration: 'underline dotted', textUnderlineOffset: 3 }}>
+                    {place}
+                  </button>
+                </>
+              );
             })()}
           </p>
 
@@ -955,7 +967,17 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
             </div>
           )}
 
-          {/* Actions */}
+          {placePickOpen && (
+        <PlacePickerLazy
+          raw={(typeof n.attributes?.capturedPlace === 'string' && n.attributes.capturedPlace) || healedPlace}
+          lat={typeof n.attributes?.capturedLat === 'number' ? n.attributes.capturedLat : undefined}
+          lon={typeof n.attributes?.capturedLon === 'number' ? n.attributes.capturedLon : undefined}
+          onClose={() => setPlacePickOpen(false)}
+          onRenamed={(name) => setHealedPlace(name)}
+        />
+      )}
+
+      {/* Actions */}
           <div style={{ display: 'flex', gap: '0.6rem', marginTop: '1.25rem' }}>
             {editing ? (
               <>

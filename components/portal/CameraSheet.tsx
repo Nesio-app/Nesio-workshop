@@ -236,6 +236,8 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
   const [saving, setSaving] = useState(false); // 批次 35:存入按钮即时反馈,避免「点了没反应」
   const [extraTags, setExtraTags] = useState('');
   const [sourceFile, setSourceFile] = useState<File | null>(null);
+  // 批次 63:相册照片的 EXIF 拍摄地/拍摄时间(压缩会剥 EXIF,必须在原始字节上读)
+  const [exifCap, setExifCap] = useState<{ lat: number | null; lon: number | null; takenAt: string | null } | null>(null);
   // Freehand selection state
   const [selecting, setSelecting] = useState(false);
   const selStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -489,6 +491,13 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
 
   async function processFile(file: File) {
     setSourceFile(file);
+    setExifCap(null);
+    if (file.type.startsWith('image/')) {
+      void import('@/lib/portal/exif-gps')
+        .then(({ readExifCapture }) => readExifCapture(file))
+        .then((cap) => { if (cap.lat != null || cap.takenAt) setExifCap(cap); })
+        .catch(() => {});
+    }
 
     const reader = new FileReader();
     reader.onload = () => {
@@ -576,6 +585,9 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
         attributes: {
           ...n.attributes,
           ...(loc ? { lat: loc.lat as number, lon: loc.lon as number } : {}),
+          // 批次 63:EXIF 拍摄地/拍摄时间 —— 批量导旧照也拿"当时在哪",不是上传地
+          ...(exifCap?.lat != null && exifCap.lon != null ? { capturedLat: exifCap.lat, capturedLon: exifCap.lon } : {}),
+          ...(exifCap?.takenAt ? { takenAt: exifCap.takenAt } : {}),
           ...(locationVal ? { location: locationVal as string } : {}),
           ...(n.note?.trim() ? { note: n.note.trim() as string } : {}),
           ...(n.expiry?.trim() ? { expiry: n.expiry.trim() as string } : {}),
@@ -600,6 +612,26 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
           });
         }
       } catch { /* 图片存本机是增强,失败不影响文字记忆 */ }
+    }
+
+    // 批次 63:照片带 EXIF 坐标 → 按**拍摄时间**记进足迹(扩充时间线),
+    // 地名反查到后回填节点 capturedPlace(与足迹同库)。
+    if (exifCap?.lat != null && exifCap.lon != null && savedNodes.length > 0) {
+      const { lat: exLat, lon: exLon, takenAt } = exifCap;
+      const nodeId = savedNodes[0].id;
+      void Promise.all([import('@/lib/portal/place-trail'), import('@/lib/portal/capture-location')])
+        .then(async ([trail, cap]) => {
+          const geo = await cap.reverseGeocodeRobust(exLat as number, exLon as number).catch(() => ({ label: '' }));
+          const label = geo.label || `${(exLat as number).toFixed(3)},${(exLon as number).toFixed(3)}`;
+          trail.recordVisitAt(label, takenAt || new Date().toISOString());
+          if (geo.label) {
+            const live = getLifeGraph().find((x) => x.id === nodeId);
+            if (live && !live.attributes.capturedPlace) {
+              updateLifeNode(nodeId, { attributes: { ...live.attributes, capturedPlace: geo.label } });
+            }
+          }
+        })
+        .catch(() => {});
     }
 
     let cloudAssets: Array<LifeNodeAsset & { nodeId?: string }> = [];

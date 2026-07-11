@@ -11,7 +11,7 @@ import {
   loadPlaceTrail, PLACE_TRAIL_UPDATED_EVENT,
   timelineDays, buildDayJourney, dayStats,
   clusterPlaces, categoryTimeShare,
-  displayLabel, setPlaceAlias, isGenericPlace, renamePlaceLabel, setPlaceGeo,
+  displayLabel, setPlaceAlias, isGenericPlace,
   placesByCategory, PLACE_CATEGORY_META, setPlaceCategory, worldByCountry,
   type PlaceVisit, type PlaceCategory, type JourneyItem, type PlaceCluster,
 } from '@/lib/portal/place-trail';
@@ -24,6 +24,8 @@ import { getLocalImage } from '@/lib/portal/local-image-store';
 import { createPortal } from 'react-dom';
 const MemoryMapSheet = dynamic(() => import('./MemoryMapSheet'), { ssr: false });
 const MemoryNodeDetail = dynamic(() => import('../MemoryNodeDetail'), { ssr: false });
+const PlacePickerSheet = dynamic(() => import('../PlacePickerSheet'), { ssr: false });
+const Globe = dynamic(() => import('./Globe'), { ssr: false });
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -56,6 +58,8 @@ export default function TimelineTab() {
   const [memMapOpen, setMemMapOpen] = useState(false); // 批次 59:地图上的记忆
   const [visitMems, setVisitMems] = useState<{ title: string; nodes: LifeNode[] } | null>(null); // 批次 61:点「记了 N 条」看具体记忆
   const [visitSel, setVisitSel] = useState<LifeNode | null>(null);
+  const [zoomImg, setZoomImg] = useState<{ url: string; name: string } | null>(null); // 批次 63:缩略图放大
+  const [globeFull, setGlobeFull] = useState(false); // 批次 63:3D 地球全屏
   // 批次 62:地点纠正选择器(附近候选 + 手动命名,参考 Foursquare Where? 形态)
   const [placePick, setPlacePick] = useState<{ raw: string; lat?: number; lon?: number } | null>(null);
 
@@ -187,7 +191,7 @@ export default function TimelineTab() {
                       );
                     })()}
                   </span>
-                  <VisitThumbs nodes={memNodesAtVisit(it.seg)} onOpen={(n) => setVisitSel(n)} />
+                  <VisitThumbs nodes={memNodesAtVisit(it.seg)} onZoom={(url, name) => setZoomImg({ url, name })} />
                 </div>
               </div>
             ) : (
@@ -388,7 +392,17 @@ export default function TimelineTab() {
       )}
 
       {/* ── 世界:按国家聚合(批次 40)+ 世界地图 ── */}
-      {sub === 'world' && mapPoints.length > 0 && <PlaceMap points={mapPoints} height={190} />}
+      {/* 批次 63:世界板块 = 3D 地球(拖拽旋转,到访国高亮;点一下全屏) */}
+      {sub === 'world' && (
+        <div className="nesio-globe-wrap">
+          <Globe
+            countries={world.map((g) => ({ name: g.country, count: g.placeCount }))}
+            size={300}
+            onTap={() => setGlobeFull(true)}
+          />
+          <span className="nesio-tl-map-open-hint" style={{ position: 'static', transform: 'none', marginTop: '0.3rem' }}>{L(dict, '拖动旋转 · 点一下全屏', 'Drag to spin · tap for fullscreen')}</span>
+        </div>
+      )}
       {sub === 'world' && (
         world.length === 0 ? (
           <p className="nesio-insights-empty">{L(dict, '还没有国家信息。开着「记忆自动定位」正常使用,地名和国家会随打点自动解析,这里就会按国家聚合。', 'No country data yet. Keep auto-locate on — places and countries resolve as you go, and countries gather here.')}</p>
@@ -430,20 +444,38 @@ export default function TimelineTab() {
       {/* 批次 59:地图上的记忆(全屏可缩放) */}
       <MemoryMapSheet open={memMapOpen} onClose={() => setMemMapOpen(false)} />
 
-      {/* 批次 62:地点纠正选择器 */}
-      {placePick && typeof document !== 'undefined' && createPortal(
+      {/* 批次 62/63:地点纠正选择器(共享组件,记忆页同用) */}
+      {placePick && (
         <PlacePickerSheet
           raw={placePick.raw}
           lat={placePick.lat}
           lon={placePick.lon}
           onClose={() => setPlacePick(null)}
-          onPicked={(name, kind) => {
-            renamePlaceLabel(placePick.raw, name);
-            if (kind) setPlaceCategory(name, kind as Parameters<typeof setPlaceCategory>[1]);
-            setPlaceGeo(name, { name, resolved: true, kind: kind as PlaceCategory | undefined });
-            setPlacePick(null);
-          }}
-        />,
+        />
+      )}
+
+      {/* 批次 63:3D 地球全屏 */}
+      {globeFull && typeof document !== 'undefined' && createPortal(
+        <div className="nesio-imgzoom-overlay" role="dialog" aria-modal="true" aria-label={L(dict, '世界', 'World')}>
+          <button type="button" className="nesio-imgzoom-backdrop" onClick={() => setGlobeFull(false)} aria-label={L(dict, '关闭', 'Close')} />
+          <div className="nesio-globe-full">
+            <Globe
+              countries={world.map((g) => ({ name: g.country, count: g.placeCount }))}
+              size={Math.min(typeof window !== 'undefined' ? window.innerWidth - 32 : 360, 520)}
+            />
+            <button type="button" className="nesio-memmap-close" onClick={() => setGlobeFull(false)} style={{ position: 'absolute', top: '0.6rem', right: '0.6rem' }}>✕</button>
+          </div>
+        </div>,
+        document.body,
+      )}
+
+      {/* 批次 63:缩略图放大查看 */}
+      {zoomImg && typeof document !== 'undefined' && createPortal(
+        <div className="nesio-imgzoom-overlay" role="dialog" aria-modal="true" aria-label={zoomImg.name}>
+          <button type="button" className="nesio-imgzoom-backdrop" onClick={() => setZoomImg(null)} aria-label={L(dict, '关闭', 'Close')} />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="nesio-imgzoom-img" src={zoomImg.url} alt={zoomImg.name} onClick={() => setZoomImg(null)} />
+        </div>,
         document.body,
       )}
 
@@ -471,7 +503,7 @@ export default function TimelineTab() {
 }
 
 /** 批次 62:到访时段照片小预览 —— 记忆里带图的,先给两张缩略图(点开进详情)。 */
-function VisitThumbs({ nodes, onOpen }: { nodes: LifeNode[]; onOpen: (n: LifeNode) => void }) {
+function VisitThumbs({ nodes, onZoom }: { nodes: LifeNode[]; onZoom: (url: string, name: string) => void }) {
   const withImg = nodes
     .map((n) => ({ n, asset: (n.assets || []).find((a) => a.kind === 'image') }))
     .filter((x): x is { n: LifeNode; asset: NonNullable<LifeNode['assets']>[number] } => Boolean(x.asset))
@@ -492,75 +524,12 @@ function VisitThumbs({ nodes, onOpen }: { nodes: LifeNode[]; onOpen: (n: LifeNod
     <div className="nesio-tl-thumbs">
       {withImg.map(({ n, asset }) => (
         urls[asset.id]
-          ? <button key={asset.id} type="button" className="nesio-tl-thumb" onClick={() => onOpen(n)} aria-label={n.name}>
+          ? <button key={asset.id} type="button" className="nesio-tl-thumb" onClick={() => onZoom(urls[asset.id], n.name)} aria-label={n.name}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={urls[asset.id]} alt="" loading="lazy" />
             </button>
           : null
       ))}
-    </div>
-  );
-}
-
-/** 批次 62:地点纠正选择器(参考 Foursquare Where? 形态)—— 手动命名 +
- *  「附近的地方」候选列表(POST /api/portal/geocode nearby),城市里楼太近
- *  机器分不清时,由用户点选;选中带分类(walmart→grocery)一并入库。 */
-function PlacePickerSheet({ raw, lat, lon, onClose, onPicked }: {
-  raw: string; lat?: number; lon?: number;
-  onClose: () => void;
-  onPicked: (name: string, kind?: string) => void;
-}) {
-  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
-  const [text, setText] = useState(displayLabel(raw) === raw ? '' : displayLabel(raw));
-  const [cands, setCands] = useState<Array<{ name: string; distanceM?: number; kind?: string }>>([]);
-  const [loading, setLoading] = useState(false);
-  useEffect(() => {
-    if (typeof lat !== 'number' || typeof lon !== 'number') return;
-    let cancelled = false;
-    setLoading(true);
-    fetch('/api/portal/geocode', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ lat, lon, nearby: true }),
-    })
-      .then((r) => r.json() as Promise<{ ok?: boolean; candidates?: Array<{ name: string; distanceM?: number; kind?: string }> }>)
-      .then((d) => { if (!cancelled && d.ok && d.candidates) setCands(d.candidates); })
-      .catch(() => {})
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [lat, lon]);
-  return (
-    <div className="nesio-visitmem-overlay" role="dialog" aria-modal="true" aria-label={L(dict, '这是哪里?', 'Where was this?')}>
-      <button type="button" className="nesio-visitmem-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
-      <div className="nesio-visitmem-sheet">
-        <p className="nesio-memmap-list-title">{L(dict, '这是哪里?', 'Where was this?')} · {displayLabel(raw)}</p>
-        <form
-          className="nesio-placepick-row"
-          onSubmit={(e) => { e.preventDefault(); if (text.trim()) onPicked(text.trim()); }}
-        >
-          <input
-            className="nesio-tl-rename-input"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder={L(dict, '手动命名,比如「家」「公司」', 'Name it — Home, Office…')}
-          />
-          <button type="submit" className="nesio-fin-review-accept" disabled={!text.trim()}>{L(dict, '保存', 'Save')}</button>
-        </form>
-        <p className="nesio-memmap-list-title" style={{ marginTop: '0.7rem' }}>{L(dict, '附近的地方', 'Places nearby')}{loading ? ' …' : ''}</p>
-        <div className="nesio-memmap-list-scroll">
-          {!loading && cands.length === 0 && (
-            <p className="nesio-settings-option-hint">{L(dict, '附近没有候选(住宅区常见)—— 直接手动命名即可。', 'No nearby candidates (common in residential areas) — just name it above.')}</p>
-          )}
-          {cands.map((c, i) => (
-            <button key={i} type="button" className="nesio-memmap-item nesio-memmap-item--btn" onClick={() => onPicked(c.name, c.kind)}>
-              <span className="nesio-memmap-item-name">{c.name}</span>
-              <span className="nesio-memmap-item-time">
-                {typeof c.distanceM === 'number' ? `${c.distanceM}m` : ''}
-                {c.kind && PLACE_CATEGORY_META[c.kind as PlaceCategory] ? ` · ${L(dict, PLACE_CATEGORY_META[c.kind as PlaceCategory].zh, PLACE_CATEGORY_META[c.kind as PlaceCategory].en)}` : ''}
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
     </div>
   );
 }
