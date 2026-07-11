@@ -14680,7 +14680,7 @@ html[data-portal-theme="night"] .nesio-memmap-canvas { background: #16243c; }
 .nesio-imgzoom-backdrop { position: absolute; inset: 0; background: rgba(10, 16, 30, 0.82); border: none; cursor: pointer; }
 .nesio-imgzoom-img { position: relative; max-width: 94vw; max-height: 86dvh; border-radius: 0.8rem; box-shadow: 0 12px 48px rgba(0,0,0,0.5); }
 .nesio-globe-wrap { display: flex; flex-direction: column; align-items: center; margin: 0.5rem 0 0.75rem; }
-.nesio-globe-full { position: relative; display: grid; place-items: center; background: var(--glass-bg-pop); border-radius: 1.2rem; padding: 1.6rem; }
+.nesio-globe-full { position: relative; display: grid; place-items: center; background: radial-gradient(circle at 50% 30%, #101d3c 0%, #070d1f 62%, #04070f 100%); border-radius: 1.2rem; padding: 1.6rem; }
 
 /* ── 批次 66:回顾角标 —— 回顾(翻旧事的问句)与提醒(今天要知道的事)一眼可辨 ── */
 .nesio-review-kicker {
@@ -14694,3 +14694,65 @@ html[data-portal-theme="night"] .nesio-memmap-canvas { background: #16243c; }
   padding: 0.05rem 0.45rem;
   margin-bottom: 0.15rem;
 }
+
+/* ── 批次 67:世界 tab 深空舞台 + 亮点卡(对标「一生足迹」) ── */
+.nesio-globe-stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0.5rem 0 0.75rem;
+  padding: 0.9rem 0.6rem 0.7rem;
+  border-radius: 1.2rem;
+  background:
+    radial-gradient(circle at 22% 16%, rgba(148, 189, 255, 0.14) 0 2px, transparent 3px),
+    radial-gradient(circle at 78% 30%, rgba(148, 189, 255, 0.12) 0 1.5px, transparent 2.5px),
+    radial-gradient(circle at 60% 82%, rgba(148, 189, 255, 0.1) 0 1.5px, transparent 2.5px),
+    radial-gradient(circle at 50% 28%, #101d3c 0%, #070d1f 62%, #04070f 100%);
+  overflow: hidden;
+}
+.nesio-globe-stats {
+  margin: 0;
+  padding: 0.28rem 0.85rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #eaf1ff;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+.nesio-globe-stage-hint {
+  color: rgba(214, 228, 255, 0.55);
+  font-size: 0.66rem;
+}
+.nesio-globe-hl-strip {
+  display: flex;
+  gap: 0.6rem;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding: 0.1rem 0.1rem 0.55rem;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.nesio-globe-hl-strip::-webkit-scrollbar { display: none; }
+.nesio-globe-hl-card {
+  flex: 0 0 auto;
+  min-width: 68%;
+  scroll-snap-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.18rem;
+  border-radius: 1rem;
+  padding: 0.85rem 1rem 0.9rem;
+  color: #fff;
+}
+.nesio-globe-hl-card--v0 { background: linear-gradient(135deg, #24427e, #101f45); }
+.nesio-globe-hl-card--v1 { background: linear-gradient(135deg, #7e2f3f, #3c1020); }
+.nesio-globe-hl-card--v2 { background: linear-gradient(135deg, #1f6355, #0a2b25); }
+.nesio-globe-hl-card--v3 { background: linear-gradient(135deg, #6b4d1c, #33230a); }
+.nesio-globe-hl-kicker { font-size: 0.66rem; color: rgba(255, 255, 255, 0.72); letter-spacing: 0.04em; }
+.nesio-globe-hl-main { font-size: 1.18rem; font-weight: 700; line-height: 1.25; word-break: break-word; }
+.nesio-globe-hl-sub { font-size: 0.72rem; color: rgba(255, 255, 255, 0.78); }
+.nesio-globe-hl-coord { font-size: 0.72rem; color: rgba(255, 255, 255, 0.62); font-variant-numeric: tabular-nums; letter-spacing: 0.05em; }

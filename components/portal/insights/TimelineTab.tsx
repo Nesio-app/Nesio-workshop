@@ -12,7 +12,7 @@ import {
   timelineDays, buildDayJourney, dayStats,
   clusterPlaces, categoryTimeShare,
   displayLabel, setPlaceAlias, isGenericPlace,
-  placesByCategory, PLACE_CATEGORY_META, setPlaceCategory, worldByCountry,
+  placesByCategory, PLACE_CATEGORY_META, setPlaceCategory, worldByCountry, loadPlaceGeo,
   type PlaceVisit, type PlaceCategory, type JourneyItem, type PlaceCluster,
 } from '@/lib/portal/place-trail';
 import { wallHHMM, dateKeyToLocalDate } from '@/lib/portal/place-time.mjs';
@@ -99,6 +99,48 @@ export default function TimelineTab() {
     .map((c) => ({ lat: c.lat!, lon: c.lon!, label: displayLabel(c.label), weightMin: c.totalMin, color: DOT_COLOR[c.category] })), [trail]);
   const placeCats = useMemo(() => placesByCategory(trail), [trail]); // 批次 39:Google 时间线风分类
   const world = useMemo(() => worldByCountry(trail), [trail]); // 批次 40:World tab 国家聚合
+  // 批次 67:世界 tab 亮点卡(参考「一生足迹」:最北/最南/最常去/最早,带度分坐标)
+  const worldHighlights = useMemo(() => {
+    const geo = loadPlaceGeo();
+    const out: Array<{ kicker: string; main: string; sub?: string; coord?: string }> = [];
+    const fmtCoord = (lat: number, lon: number) => {
+      const seg = (v: number, pos: string, neg: string) => {
+        const a = Math.abs(v); const deg = Math.floor(a); const min = Math.round((a - deg) * 60);
+        return `${v >= 0 ? pos : neg}${deg}°${String(min).padStart(2, '0')}′`;
+      };
+      return `${seg(lat, 'N', 'S')} ${seg(lon, 'E', 'W')}`;
+    };
+    const placeOf = (label: string) => {
+      const g = geo[label];
+      return { name: displayLabel(label), sub: [g?.city, g?.country].filter(Boolean).join(' · ') };
+    };
+    const pts = trail.filter((v): v is PlaceVisit & { lat: number; lon: number } => typeof v.lat === 'number' && typeof v.lon === 'number');
+    if (pts.length) {
+      const north = pts.reduce((a, b) => (b.lat > a.lat ? b : a));
+      const south = pts.reduce((a, b) => (b.lat < a.lat ? b : a));
+      const pn = placeOf(north.label);
+      out.push({ kicker: L(dict, '去过最北的地方', 'Northernmost footprint'), main: pn.name, sub: pn.sub, coord: fmtCoord(north.lat, north.lon) });
+      if (south.label !== north.label) {
+        const ps = placeOf(south.label);
+        out.push({ kicker: L(dict, '去过最南的地方', 'Southernmost footprint'), main: ps.name, sub: ps.sub, coord: fmtCoord(south.lat, south.lon) });
+      }
+    }
+    const clusters = clusterPlaces(trail, 99999).filter((c) => c.category !== 'home' && !c.generic);
+    if (clusters.length) {
+      const top = clusters.reduce((a, b) => (b.visits > a.visits ? b : a));
+      if (top.visits >= 2) {
+        const pt = placeOf(top.label);
+        out.push({ kicker: L(dict, '去过最多次的地方', 'Most visited'), main: pt.name, sub: [pt.sub, L(dict, `${top.visits} 次`, `${top.visits} visits`)].filter(Boolean).join(' · ') });
+      }
+    }
+    if (trail.length) {
+      const earliest = trail.reduce((a, b) => (new Date(b.ts) < new Date(a.ts) ? b : a));
+      const pe = placeOf(earliest.label);
+      const d0 = new Date(earliest.ts);
+      out.push({ kicker: L(dict, '最早的足迹', 'First footprint'), main: pe.name, sub: [pe.sub, L(dict, `${d0.getFullYear()}年${d0.getMonth() + 1}月${d0.getDate()}日`, d0.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }))].filter(Boolean).join(' · ') });
+    }
+    return out;
+  }, [trail, dict]);
   const [expandedCountry, setExpandedCountry] = useState<string | null>(null);
 
   if (trail.length === 0) {
@@ -394,13 +436,30 @@ export default function TimelineTab() {
       {/* ── 世界:按国家聚合(批次 40)+ 世界地图 ── */}
       {/* 批次 63:世界板块 = 3D 地球(拖拽旋转,到访国高亮;点一下全屏) */}
       {sub === 'world' && (
-        <div className="nesio-globe-wrap">
+        <div className="nesio-globe-stage">
+          <p className="nesio-globe-stats">
+            {L(dict,
+              `${world.length} 国 · ${world.reduce((n, g) => n + g.cities.length, 0)} 城 · ${trail.length} 足迹`,
+              `${world.length} countries · ${world.reduce((n, g) => n + g.cities.length, 0)} cities · ${trail.length} footprints`)}
+          </p>
           <Globe
             countries={world.map((g) => ({ name: g.country, count: g.placeCount }))}
             size={300}
             onTap={() => setGlobeFull(true)}
           />
-          <span className="nesio-tl-map-open-hint" style={{ position: 'static', transform: 'none', marginTop: '0.3rem' }}>{L(dict, '拖动旋转 · 点一下全屏', 'Drag to spin · tap for fullscreen')}</span>
+          <span className="nesio-globe-stage-hint">{L(dict, '拖动旋转 · 点一下全屏', 'Drag to spin · tap for fullscreen')}</span>
+        </div>
+      )}
+      {sub === 'world' && worldHighlights.length > 0 && (
+        <div className="nesio-globe-hl-strip">
+          {worldHighlights.map((h, i) => (
+            <div key={h.kicker} className={`nesio-globe-hl-card nesio-globe-hl-card--v${i % 4}`}>
+              <span className="nesio-globe-hl-kicker">{h.kicker}</span>
+              <span className="nesio-globe-hl-main">{h.main}</span>
+              {h.sub ? <span className="nesio-globe-hl-sub">{h.sub}</span> : null}
+              {h.coord ? <span className="nesio-globe-hl-coord">{h.coord}</span> : null}
+            </div>
+          ))}
         </div>
       )}
       {sub === 'world' && (
