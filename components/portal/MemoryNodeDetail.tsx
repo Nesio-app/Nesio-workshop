@@ -900,18 +900,27 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
             <div className="nesio-related-section">
               <p className="nesio-settings-section-label">{L(dict, '相关记忆', 'Related memories')}</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                {relatedNodes.slice(0, 6).map((r) => (
-                  <button
-                    key={r.id}
-                    type="button"
-                    onClick={() => onOpenNode?.(r)}
-                    style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', padding: '0.5rem 0.7rem', borderRadius: '0.7rem', border: '1px solid var(--portal-line, rgba(127,127,127,0.18))', background: 'none', color: 'var(--portal-ink)', textAlign: 'left', cursor: 'pointer' }}
-                  >
-                    <NodeTypeIcon type={r.type} size={13} />
-                    <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.85rem' }}>{r.name}</span>
-                    <span style={{ color: 'var(--portal-muted)' }}>›</span>
-                  </button>
-                ))}
+                {relatedNodes.slice(0, 6).map((r) => {
+                  // 批次 53:循环日历事件(每周 Sprint 计划)同名难辨 —— 行内带日期标签
+                  const rs = typeof r.attributes?.start === 'string' ? r.attributes.start : '';
+                  const rd = rs ? new Date(/^\d{4}-\d{2}-\d{2}$/.test(rs) ? `${rs}T00:00` : rs) : null;
+                  const dateTag = rd && !Number.isNaN(rd.getTime())
+                    ? L(dict, `${rd.getMonth() + 1}月${rd.getDate()}日`, `${rd.getMonth() + 1}/${rd.getDate()}`)
+                    : '';
+                  return (
+                    <button
+                      key={r.id}
+                      type="button"
+                      onClick={() => onOpenNode?.(r)}
+                      style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', padding: '0.5rem 0.7rem', borderRadius: '0.7rem', border: '1px solid var(--portal-line, rgba(127,127,127,0.18))', background: 'none', color: 'var(--portal-ink)', textAlign: 'left', cursor: 'pointer' }}
+                    >
+                      <NodeTypeIcon type={r.type} size={13} />
+                      <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.85rem' }}>{r.name}</span>
+                      {dateTag && <span style={{ color: 'var(--portal-muted)', fontSize: '0.74rem', flex: 'none' }}>{dateTag}</span>}
+                      <span style={{ color: 'var(--portal-muted)' }}>›</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}

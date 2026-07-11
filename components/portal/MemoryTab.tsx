@@ -312,7 +312,9 @@ function findRelatedNodes(target: LifeNode, allNodes: LifeNode[]): LifeNode[] {
       return { node, score };
     })
     .filter((s) => s.score >= 2)
-    .sort((a, b) => b.score - a.score)
+    // 批次 53:同分(循环日历的每一次 Sprint 计划分数一样)按日期升序,读起来是时间线
+    .sort((a, b) => b.score - a.score
+      || String(a.node.attributes?.start ?? a.node.createdAt).localeCompare(String(b.node.attributes?.start ?? b.node.createdAt)))
     .slice(0, 5)
     .map((s) => s.node);
 }

@@ -8,7 +8,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
-import { getLifeGraph, searchLifeGraphFuzzy, type LifeNode } from '@/lib/portal/life-graph';
+import { getLifeGraph, isBulkImported, searchLifeGraphFuzzy, type LifeNode } from '@/lib/portal/life-graph';
 import { canUsePaidCloudAi } from '@/lib/portal/entitlement';
 import { loadProfileSettings } from '@/lib/portal/profile';
 import { smartSearch } from '@/lib/portal/smart-search';
@@ -146,7 +146,9 @@ function fmtNode(n: LifeNode): string {
   return `• [${src}] ${n.name} (${dateLabel})${extras.length ? ` · ${extras.join(' · ')}` : ''}`;
 }
 
-interface RefCandidate { shortId: number; node: LifeNode }
+// layer:候选来自哪一层 —— date/email 是确定性命中(可辩护的"依据"),
+// search 是文本/语义弱匹配(模型没点名引用时不配当依据渲染,批次 53)。
+interface RefCandidate { shortId: number; node: LifeNode; layer: 'date' | 'email' | 'search' }
 
 // 批次 39/43:天气信号是环境数据不是用户记忆,从问一问候选整体剔除。
 // 批次 43 加宽:老天气节点 tags 可能只有 '天气'(source/type 追加是后来的事),
@@ -263,7 +265,12 @@ async function buildMemoryContext(query: string, convoHint = ''): Promise<{ cont
   // 而不是无条件把前 6 条当"依据"渲染(模型说"没这方面记录"时也不该出引用卡)。
   const refCandidates: RefCandidate[] = [];
   const refSeen = new Set<string>();
-  for (const n of [...dateNodes, ...emailNodes, ...searchNodes]) {
+  const layered: Array<[LifeNode, RefCandidate['layer']]> = [
+    ...dateNodes.map((n): [LifeNode, RefCandidate['layer']] => [n, 'date']),
+    ...emailNodes.map((n): [LifeNode, RefCandidate['layer']] => [n, 'email']),
+    ...searchNodes.map((n): [LifeNode, RefCandidate['layer']] => [n, 'search']),
+  ];
+  for (const [n, layer] of layered) {
     if (refSeen.has(n.id)) continue;
     refSeen.add(n.id);
     // 批次 43:同名+同一天的节点只出一张引用卡(日历老节点重复入库的历史遗留
@@ -272,7 +279,7 @@ async function buildMemoryContext(query: string, convoHint = ''): Promise<{ cont
     const dupKey = `${n.name}|${day}`;
     if (refSeen.has(dupKey)) continue;
     refSeen.add(dupKey);
-    refCandidates.push({ shortId: refCandidates.length + 1, node: n });
+    refCandidates.push({ shortId: refCandidates.length + 1, node: n, layer });
     if (refCandidates.length >= 8) break;
   }
   const idOf = new Map(refCandidates.map((r) => [r.node.id, r.shortId]));
@@ -838,8 +845,14 @@ Edit location/value anytime in Storage.`),
       // 🔴#1:只保留模型真正引用的记忆节点。ids===null(没自报)→ 回退到前 3 候选作"相关记忆";
       // ids=[](明确"无")→ 不出引用卡(修"模型说没记录、下面还渲染 6 张伪造依据卡")。
       const { text: cleanResp, ids } = extractCitations(rawResp);
+      // 批次 53:模型没自报引用(ids===null)时,只把**可辩护的依据**当"相关记忆"渲染:
+      // date/email 层是确定性命中;search 层是弱文本匹配(会把联系人/地点凑成伪依据,
+      // 用户实测:「今日总结」下面挂着张玉洋/李冰冰)。批量导入的联系人一律不当兜底依据。
       const citedNodes: LifeNode[] = ids === null
-        ? refCandidates.slice(0, 3).map((r) => r.node)
+        ? refCandidates
+            .filter((r) => r.layer !== 'search' && !(r.node.type === 'person' && isBulkImported(r.node)))
+            .slice(0, 3)
+            .map((r) => r.node)
         : ids.map((id) => refCandidates.find((r) => r.shortId === id)?.node).filter((n): n is LifeNode => Boolean(n));
       // 批次 47:「快速匹配可能没找全」只该出现在**兜底回复**旁 —— AI 真答成功时
       // 挂一条降级警告,用户读作报错(客户只能感到更聪明)。真实原因照旧在 reason 里。
