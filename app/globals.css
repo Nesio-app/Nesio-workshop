@@ -14915,3 +14915,26 @@ html[data-portal-theme="night"] .nesio-memmap-canvas { background: #16243c; }
   cursor: pointer;
   text-align: left;
 }
+
+/* ── 批次 75:气泡长按走自定义菜单,禁系统文本选择(iOS 乱选实锤) ── */
+.nesio-wechat-bubble { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+
+/* ── 批次 75:地点 tab 分类图标统一(中性底,不再彩色圆) ── */
+.nesio-tl-catcard-head .nesio-tl-catcard-ico,
+.nesio-tl-cat-ico {
+  background: var(--glass-bg-solid) !important;
+  border: 1px solid var(--portal-line);
+  font-size: 0.95rem;
+}
+
+/* ── 批次 75:白天主题的地球舞台(夜空只属于夜晚) ── */
+html[data-portal-theme='day'] .nesio-globe-stage,
+html[data-portal-theme='day'] .nesio-globe-fsov {
+  background: radial-gradient(circle at 50% 30%, #dbeafe 0%, #b6d3f2 60%, #93bbe8 100%);
+}
+html[data-portal-theme='day'] .nesio-globe-stats {
+  background: rgba(255, 255, 255, 0.65);
+  border-color: rgba(30, 64, 120, 0.15);
+  color: #1e3a5f;
+}
+html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 0.55); }

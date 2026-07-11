@@ -44,6 +44,14 @@ export function firstNodeDate(attributes: AttrBag): Date | null {
  * attribute (nodes from AI extraction sometimes park dates on ad-hoc keys).
  * Use for urgency ranking and focus selection.
  */
+// 批次 75(用户实锤「刚记完就已过期」):写入瞬间的系统戳(capturedAt/occurredAt…)
+// 是流水线元数据,不是"这件事发生的日子" —— 被全属性扫描当成节点日期后,
+// 渲染时已过去几秒 → 新记录秒变「已过期」还进了今日聚焦。
+const INTERNAL_TS_KEYS = new Set([
+  'occuredAt', 'occurredAt', 'capturedAt', 'receivedAt', 'updatedAt', 'syncedAt',
+  'doneAt', 'importedAt', 'createdAt', 'lastSeen', 'takenAt',
+]);
+
 export function nearestNodeDate(attributes: AttrBag, now: number = Date.now()): Date | null {
   let nearest: Date | null = null;
   const consider = (d: Date | null) => {
@@ -52,7 +60,10 @@ export function nearestNodeDate(attributes: AttrBag, now: number = Date.now()): 
     }
   };
   for (const key of NODE_DATE_KEYS) consider(parseDateValue(attributes[key]));
-  for (const v of Object.values(attributes)) consider(parseDateValue(v));
+  for (const [k, v] of Object.entries(attributes)) {
+    if (INTERNAL_TS_KEYS.has(k)) continue;
+    consider(parseDateValue(v));
+  }
   return nearest;
 }
 

@@ -34,6 +34,41 @@ const store = createBlobStore<PlaceVisit[]>({
   validate: (v) => Array.isArray(v), onWriteError: reportStorageDropped,
 });
 
+// 批次 75(用户三次实锤 家/Ethans Glen Court 分家):历史数据自愈 ——
+// 用户命名的地点(改名目标/手动分类为 home 的)坐标 150m 内的**街道后缀**
+// 原名(Court/St/Ave/Rd…,geocode 街名不是用户起的)一次性归并过去。
+// 只认"街名 → 人名"方向,绝不把两家真 POI 硬并。
+const HEAL_FLAG = 'nesio-place-heal-v1';
+const STREET_SUFFIX_RE = /\b(court|ct|street|st|avenue|ave|road|rd|drive|dr|lane|ln|way|blvd|boulevard|circle|cir|place|pl|trail|trl|terrace|ter|parkway|pkwy)\b\.?,?/i;
+export function healSplitPlacesOnce(): void {
+  if (typeof window === 'undefined') return;
+  try { if (localStorage.getItem(HEAL_FLAG)) return; localStorage.setItem(HEAL_FLAG, '1'); } catch { return; }
+  const trail = loadPlaceTrail();
+  const renames = loadPlaceRenames();
+  const cats = loadPlaceCategories();
+  // 用户命名集合:改名目标 + 手动标为 home 的标签
+  const named = new Set<string>([...Object.values(renames), ...Object.keys(cats).filter((k) => cats[k] === 'home')]);
+  if (!named.size) return;
+  const coordOf = new Map<string, { lat: number; lon: number }>();
+  for (const v of trail) {
+    if (v.lat != null && v.lon != null && !coordOf.has(v.label)) coordOf.set(v.label, { lat: v.lat, lon: v.lon });
+  }
+  let merges = 0;
+  for (const [label, c] of coordOf) {
+    if (merges >= 20) break;
+    if (named.has(label) || !STREET_SUFFIX_RE.test(label)) continue;
+    for (const target of named) {
+      const tc = coordOf.get(target);
+      if (!tc) continue;
+      if (haversineKm(c.lat, c.lon, tc.lat, tc.lon) <= 0.15) {
+        renamePlaceLabel(label, target);
+        merges += 1;
+        break;
+      }
+    }
+  }
+}
+
 let coordAliasNormalized = false;
 /** 批次 62:存量归一 —— 批次 60 只给坐标条目做了显示别名,raw 仍是坐标,
  *  聚合/时间线按 raw 分家(用户实测两行同名不合并)。开机把「坐标 raw + 有别名」
@@ -50,6 +85,7 @@ function normalizeCoordAliasesOnce(): void {
 
 export function loadPlaceTrail(): PlaceVisit[] {
   normalizeCoordAliasesOnce();
+  try { healSplitPlacesOnce(); } catch { /* 愈合失败不拦读取 */ }
   const raw = store.load();
   return Array.isArray(raw) ? raw : [];
 }

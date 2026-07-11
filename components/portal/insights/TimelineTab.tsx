@@ -37,7 +37,7 @@ const CAT: Record<PlaceCategory, [string, string]> = {
   food: ['餐饮', 'Food'], cafe: ['咖啡', 'Café'], fitness: ['运动', 'Sports'], park: ['公园', 'Park'],
   culture: ['文化', 'Culture'], education: ['学校', 'School'],
   entertainment: ['娱乐', 'Entertainment'], health: ['医疗', 'Health'], lodging: ['住宿', 'Lodging'],
-  transit: ['交通', 'Transit'], unknown: ['未知', 'Unknown'], place: ['地点', 'Place'],
+  transit: ['交通', 'Transit'], unknown: ['未知', 'Unknown'], place: ['其他地点', 'Other places'],
 };
 const DOT_COLOR: Record<PlaceCategory, string> = {
   home: '#588ce3', work: '#7b5ea7', grocery: '#4f9e57', shopping: '#e8888f', food: '#e0954a',

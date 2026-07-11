@@ -97,6 +97,27 @@ export default function Globe({ countries, size = 300, onTap }: {
 
     const C = size / 2;
     const R = size / 2 - 10;
+    // 批次 75(用户点名):颜色随主题色系 —— 白天亮蓝天色,夜晚深空色
+    const themeAttr = document.documentElement.getAttribute('data-portal-theme');
+    const isDay = themeAttr === 'day'
+      || (themeAttr !== 'night' && !(window.matchMedia?.('(prefers-color-scheme: dark)')?.matches ?? false));
+    const P = isDay
+      ? {
+          halo: 'rgba(37, 99, 235, 0.22)',
+          ocean: ['#8ec2f0', '#5590d6', '#31649f'] as const,
+          grat: 'rgba(255,255,255,0.22)',
+          land: '#c9d8c2',
+          landStroke: 'rgba(70, 100, 90, 0.45)',
+          night: 'rgba(15, 35, 75, 0.28)',
+        }
+      : {
+          halo: 'rgba(96, 165, 250, 0.28)',
+          ocean: ['#2e6cb8', '#17407e', '#0a1d40'] as const,
+          grat: 'rgba(255,255,255,0.07)',
+          land: '#31413f',
+          landStroke: 'rgba(10,20,35,0.55)',
+          night: 'rgba(2, 6, 18, 0.5)',
+        };
     const { yaw, pitch } = rotRef.current;
     const proj = geoOrthographic().translate([C, C]).scale(R).rotate([yaw, pitch]).clipAngle(90);
     const path = geoPath(proj, ctx);
@@ -104,28 +125,28 @@ export default function Globe({ countries, size = 300, onTap }: {
     // 1. 大气光晕(球外一圈)
     const halo = ctx.createRadialGradient(C, C, R * 0.92, C, C, R + 10);
     halo.addColorStop(0, 'rgba(96, 165, 250, 0)');
-    halo.addColorStop(0.75, 'rgba(96, 165, 250, 0.28)');
+    halo.addColorStop(0.75, P.halo);
     halo.addColorStop(1, 'rgba(96, 165, 250, 0)');
     ctx.beginPath(); ctx.arc(C, C, R + 10, 0, Math.PI * 2); ctx.fillStyle = halo; ctx.fill();
 
     // 2. 海洋球体(光源在左上)
     const ocean = ctx.createRadialGradient(C - R * 0.35, C - R * 0.4, R * 0.1, C, C, R);
-    ocean.addColorStop(0, '#2e6cb8');
-    ocean.addColorStop(0.55, '#17407e');
-    ocean.addColorStop(1, '#0a1d40');
+    ocean.addColorStop(0, P.ocean[0]);
+    ocean.addColorStop(0.55, P.ocean[1]);
+    ocean.addColorStop(1, P.ocean[2]);
     ctx.beginPath(); path({ type: 'Sphere' }); ctx.fillStyle = ocean; ctx.fill();
 
     // 3. 经纬网
     ctx.beginPath(); path(geoGraticule10());
-    ctx.strokeStyle = 'rgba(255,255,255,0.07)'; ctx.lineWidth = 0.6; ctx.stroke();
+    ctx.strokeStyle = P.grat; ctx.lineWidth = 0.6; ctx.stroke();
 
     const feats = featuresRef.current;
     if (feats) {
       // 4. 陆地(未到访:深色地块)
       ctx.beginPath();
       for (const f of feats) if (!visitedRef.current.has(f.properties.name || '')) path(f as GeoPermissibleObjects);
-      ctx.fillStyle = '#31413f'; ctx.fill();
-      ctx.strokeStyle = 'rgba(10,20,35,0.55)'; ctx.lineWidth = 0.5; ctx.stroke();
+      ctx.fillStyle = P.land; ctx.fill();
+      ctx.strokeStyle = P.landStroke; ctx.lineWidth = 0.5; ctx.stroke();
 
       // 5. 到访国(荧光黄绿 + 发光,参考「点亮足迹」)
       ctx.save();
@@ -145,7 +166,7 @@ export default function Globe({ countries, size = 300, onTap }: {
     const sun = subsolarPoint(new Date());
     const night = geoCircle().center([sun[1] + 180, -sun[0]]).radius(90)();
     ctx.beginPath(); path(night);
-    ctx.fillStyle = 'rgba(2, 6, 18, 0.5)'; ctx.fill();
+    ctx.fillStyle = P.night; ctx.fill();
 
     // 6. 高光 + 晨昏影(整球质感)
     const spec = ctx.createRadialGradient(C - R * 0.45, C - R * 0.5, 0, C - R * 0.45, C - R * 0.5, R * 0.9);
