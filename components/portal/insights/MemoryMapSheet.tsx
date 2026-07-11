@@ -78,23 +78,28 @@ export default function MemoryMapSheet({ open, onClose }: { open: boolean; onClo
   const [view, setView] = useState<{ lat: number; lon: number; z: number } | null>(null);
   const [dragPx, setDragPx] = useState<{ dx: number; dy: number } | null>(null);
   const dragStart = useRef<{ x: number; y: number } | null>(null);
+  // 批次 61:真双指缩放 —— 跟踪多指,两指时算 scale 做 CSS 预览,松手提交 z 并锚定中点
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const pinchStart = useRef<{ dist: number; midX: number; midY: number } | null>(null);
+  const [pinch, setPinch] = useState<{ scale: number; midX: number; midY: number } | null>(null);
   const [picked, setPicked] = useState<Cluster | null>(null);
 
   const all = useMemo(() => (open ? geoNodes() : []), [open]);
 
-  // 批次 60:时间 bar —— 左右拉,看记忆在地图上随月份长出来(累计到所选月)
-  const months = useMemo(() => {
-    const set = new Set(all.map((g) => new Date(g.node.createdAt).toISOString().slice(0, 7)));
+  // 批次 60/61:时间 bar —— 左右拉,看记忆在地图上随**天**长出来(累计到所选日)
+  const dayKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const days = useMemo(() => {
+    const set = new Set(all.map((g) => dayKey(new Date(g.node.createdAt))));
     return [...set].sort();
-  }, [all]);
-  const [monthIdx, setMonthIdx] = useState(-1); // -1 = 最新(全部)
-  const activeIdx = monthIdx < 0 ? months.length - 1 : monthIdx;
+  }, [all]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [dayIdxRaw, setDayIdxRaw] = useState(-1); // -1 = 最新(全部)
+  const activeIdx = dayIdxRaw < 0 ? days.length - 1 : dayIdxRaw;
   const visible = useMemo(() => {
-    if (months.length === 0 || activeIdx >= months.length - 1) return all;
-    const [y, m] = months[activeIdx].split('-').map(Number);
-    const cutoff = new Date(y, m, 1).getTime(); // 所选月的月末
+    if (days.length === 0 || activeIdx >= days.length - 1) return all;
+    const [y, m, d] = days[activeIdx].split('-').map(Number);
+    const cutoff = new Date(y, m - 1, d + 1).getTime(); // 所选日的次日零点
     return all.filter((g) => new Date(g.node.createdAt).getTime() < cutoff);
-  }, [all, months, activeIdx]);
+  }, [all, days, activeIdx]);
 
   // 初始视野:装下全部点(单点给街区级)
   useEffect(() => {
@@ -145,15 +150,56 @@ export default function MemoryMapSheet({ open, onClose }: { open: boolean; onClo
     setView((v) => (v ? { ...v, z: Math.max(MIN_Z, Math.min(MAX_Z, v.z + dz)) } : v));
   };
 
+  const canvasXY = (e: React.PointerEvent) => {
+    const r = wrapRef.current?.getBoundingClientRect();
+    return { x: e.clientX - (r?.left ?? 0), y: e.clientY - (r?.top ?? 0) };
+  };
   const onPointerDown = (e: React.PointerEvent) => {
-    dragStart.current = { x: e.clientX, y: e.clientY };
-    (e.target as Element).setPointerCapture?.(e.pointerId);
+    pointers.current.set(e.pointerId, canvasXY(e));
+    (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
+    if (pointers.current.size === 2) {
+      // 进入双指:取消单指拖拽,记录初始距离与中点
+      dragStart.current = null;
+      setDragPx(null);
+      const [a, b] = [...pointers.current.values()];
+      pinchStart.current = { dist: Math.max(24, Math.hypot(a.x - b.x, a.y - b.y)), midX: (a.x + b.x) / 2, midY: (a.y + b.y) / 2 };
+    } else if (pointers.current.size === 1) {
+      dragStart.current = { x: e.clientX, y: e.clientY };
+    }
   };
   const onPointerMove = (e: React.PointerEvent) => {
+    if (pointers.current.has(e.pointerId)) pointers.current.set(e.pointerId, canvasXY(e));
+    if (pointers.current.size >= 2 && pinchStart.current) {
+      const [a, b] = [...pointers.current.values()];
+      const dist = Math.max(24, Math.hypot(a.x - b.x, a.y - b.y));
+      setPinch({ scale: dist / pinchStart.current.dist, midX: pinchStart.current.midX, midY: pinchStart.current.midY });
+      return; // 双指期间不拖拽(此前第二根手指被当拖拽 → 闪屏乱跳)
+    }
     if (!dragStart.current) return;
     setDragPx({ dx: e.clientX - dragStart.current.x, dy: e.clientY - dragStart.current.y });
   };
-  const onPointerUp = () => {
+  const onPointerUp = (e: React.PointerEvent) => {
+    pointers.current.delete(e.pointerId);
+    if (pinchStart.current && pointers.current.size < 2) {
+      // 提交双指缩放:z 变整数级,几何锚定捏合中点
+      const ps = pinchStart.current;
+      const pv = pinch;
+      pinchStart.current = null;
+      setPinch(null);
+      if (pv && view && Math.abs(Math.log2(pv.scale)) >= 0.32) {
+        const dz = Math.max(-3, Math.min(3, Math.round(Math.log2(pv.scale))));
+        const z2 = Math.max(MIN_Z, Math.min(MAX_Z, view.z + dz));
+        if (z2 !== view.z) {
+          const lonMid = lonOfX(left + ps.midX, view.z);
+          const latMid = latOfY(top + ps.midY, view.z);
+          const cLon = lonOfX(xWorld(lonMid, z2) - ps.midX + size.w / 2, z2);
+          const cLat = latOfY(yWorld(latMid, z2) - ps.midY + size.h / 2, z2);
+          setPicked(null);
+          setView({ lat: cLat, lon: cLon, z: z2 });
+        }
+      }
+      return;
+    }
     if (!dragStart.current) return;
     const d = dragPx;
     dragStart.current = null;
@@ -184,6 +230,7 @@ export default function MemoryMapSheet({ open, onClose }: { open: boolean; onClo
         {all.length === 0 && (
           <p className="nesio-memmap-empty">{L(dict, '还没有带位置的记忆。开启「记忆自动定位」后,亲手记的每一条都会出现在这里。', 'No located memories yet. Turn on auto-locate and every capture lands here.')}</p>
         )}
+        <div style={pinch ? { position: 'absolute', inset: 0, transform: `scale(${pinch.scale})`, transformOrigin: `${pinch.midX}px ${pinch.midY}px` } : { position: 'absolute', inset: 0 }}>
         {tiles.map((t) => (
           // eslint-disable-next-line @next/next/no-img-element
           <img key={t.key} src={`https://tile.openstreetmap.org/${view!.z}/${t.x}/${t.y}.png`} alt="" loading="lazy" draggable={false}
@@ -207,26 +254,27 @@ export default function MemoryMapSheet({ open, onClose }: { open: boolean; onClo
             >{c.items.length}</button>
           );
         })}
+        </div>
         <a className="nesio-tl-map-attr" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap</a>
         <div className="nesio-memmap-zoom">
           <button type="button" onClick={() => zoomTo(1)} aria-label={L(dict, '放大', 'Zoom in')}>+</button>
           <button type="button" onClick={() => zoomTo(-1)} aria-label={L(dict, '缩小', 'Zoom out')}>−</button>
         </div>
       </div>
-      {months.length > 1 && (
+      {days.length > 1 && (
         <div className="nesio-memmap-timebar">
           <input
             type="range"
             min={0}
-            max={months.length - 1}
+            max={days.length - 1}
             value={activeIdx}
-            onChange={(e) => { setMonthIdx(Number(e.target.value)); setPicked(null); }}
+            onChange={(e) => { setDayIdxRaw(Number(e.target.value)); setPicked(null); }}
             aria-label={L(dict, '时间', 'Time')}
           />
           <span className="nesio-memmap-timebar-label">
             {(() => {
-              const [y, m] = months[activeIdx].split('-');
-              return L(dict, `${y} 年 ${Number(m)} 月`, `${new Date(Number(y), Number(m) - 1).toLocaleString('en-US', { month: 'short' })} ${y}`);
+              const [y, m, d] = days[activeIdx].split('-').map(Number);
+              return L(dict, `${m}月${d}日`, `${m}/${d}/${String(y).slice(2)}`);
             })()}
             {' · '}{L(dict, `${visible.length} 条`, `${visible.length}`)}
           </span>

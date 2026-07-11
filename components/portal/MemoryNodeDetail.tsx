@@ -510,7 +510,7 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
     // 批次 60:改用两级健壮反查(天气链空手落服务端 geocode)—— 设备侧
     // 直连第三方反查偶发全空,此前自愈会一直失败
     void import('@/lib/portal/capture-location').then(({ reverseGeocodeRobust }) =>
-      reverseGeocodeRobust(attrs.capturedLat as number, attrs.capturedLon as number).then((label) => {
+      reverseGeocodeRobust(attrs.capturedLat as number, attrs.capturedLon as number).then(({ label }) => {
         if (cancelled || !label) return;
         setHealedPlace(label);
         const live = getLifeGraph().find((x) => x.id === node.id);

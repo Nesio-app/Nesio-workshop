@@ -161,7 +161,7 @@ export function categoryOf(label: string): PlaceCategory {
   if (/\bpark\b|公园|\btrail\b|greenway|botanical|植物园|湖畔|绿道/.test(s)) return 'park';
   if (/school|university|college|campus|kindergarten|学校|大学|中学|小学|幼儿园/.test(s)) return 'education';
   // 短英文词一律加前后 \b 边界(否则 "Las Vegas" 含 gas、"Kmart"/"Stuttgart" 含 art 会误命中)。
-  if (/gym|fitness|健身|运动|yoga|瑜伽|sport|stadium|court|球场/.test(s)) return 'fitness';
+  if (/gym|fitness|健身|运动|yoga|瑜伽|sport|stadium|(?:tennis|basketball|badminton|pickleball|volleyball)[ -]?court|球场/.test(s)) return 'fitness';
   if (/restaurant|mcdonald|餐|饭|\bfood\b|dining|bakery|\bbar\b|grill|pizza|kitchen|饮/.test(s)) return 'food';
   if (/shop|mall|store|market|商场|购物|target|michaels|ulta|beauty|ikea|outlet|amazon/.test(s)) return 'shopping';
   if (/museum|library|图书馆|博物馆|gallery|theat(er|re)|剧院|cinema|movie|电影|\bart\b|church|temple|寺|教堂/.test(s)) return 'culture';
@@ -286,6 +286,23 @@ export function loadPlaceAliases(): Record<string, string> {
 export function displayLabel(raw: string): string {
   const a = loadPlaceAliases()[raw];
   return a && a.trim() ? a : raw;
+}
+
+/** 批次 61:把 raw label 就地改写成真名 —— 与别名不同,这里改的是存储本体,
+ *  常去地点聚合/时间线合并/次数与停留统计全部天然归一(坐标名→真名认亲用)。 */
+export function renamePlaceLabel(oldLabel: string, newLabel: string): void {
+  if (typeof window === 'undefined' || !oldLabel || !newLabel || oldLabel === newLabel) return;
+  const trail = loadPlaceTrail();
+  let touched = false;
+  const next = trail.map((v) => {
+    if (v.label !== oldLabel) return v;
+    touched = true;
+    return { ...v, label: newLabel };
+  });
+  if (touched) save(next);
+  // 旧别名指向该 raw 的一并清掉(本体已是真名)
+  const aliases = loadPlaceAliases();
+  if (aliases[oldLabel]) setPlaceAlias(oldLabel, '');
 }
 
 export function setPlaceAlias(raw: string, name: string): void {

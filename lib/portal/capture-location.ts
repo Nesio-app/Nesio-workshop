@@ -85,10 +85,18 @@ export function prefetchCaptureLocation(force = false): void {
       if (!fix.label && !labelInFlight) {
         labelInFlight = true;
         reverseGeocodeRobust(fix.lat, fix.lon)
-          .then((label) => {
+          .then((geo) => {
+            const label = geo.label;
             if (label) {
               writeFixCache({ ...(readFixCache() ?? fix), label });
               healCoordEntryOrFeed(label, fix.lat, fix.lon);
+              // 批次 61:城市/国家顺手入库(World tab 按国聚合的数据源,
+              // 手动「找真名」按钮已撤,这里就是它的自动化替身)
+              if (geo.city || geo.country) {
+                import('./place-trail')
+                  .then((m) => m.setPlaceGeo(label, { name: label, city: geo.city, country: geo.country, resolved: true }))
+                  .catch(() => {});
+              }
             } else {
               // 两级反查都空手:足迹先用坐标名记上(可改名);不写进 fix.label,
               // 下次仍会尝试真名,拿到后自动把坐标条目改名认亲。
@@ -113,10 +121,14 @@ function coordLabel(lat: number, lon: number): string {
 /** 批次 60:两级健壮反查 —— 天气链(open-meteo/BigDataCloud)空手时落到
  *  服务端 /api/portal/geocode(OSM/Foursquare 代理,不受设备侧网络怪癖影响)。
  *  返回人话地名(Cary, NC, US / 商户名, 城市, 国家),两级都空返回 ''。 */
-export async function reverseGeocodeRobust(lat: number, lon: number): Promise<string> {
+export interface RobustGeo { label: string; city?: string; country?: string }
+
+export async function reverseGeocodeRobust(lat: number, lon: number): Promise<RobustGeo> {
   try {
     const geo = await reverseGeocode(lat, lon);
-    if (geo.label) return geo.country ? `${geo.label}, ${geo.country}` : geo.label;
+    if (geo.label) {
+      return { label: geo.country ? `${geo.label}, ${geo.country}` : geo.label, city: geo.city, country: geo.country };
+    }
   } catch { /* 落到服务端 */ }
   try {
     const res = await fetch('/api/portal/geocode', {
@@ -127,10 +139,10 @@ export async function reverseGeocodeRobust(lat: number, lon: number): Promise<st
     const d = await res.json() as { ok?: boolean; name?: string; city?: string; country?: string };
     if (d.ok) {
       const parts = [d.name, d.city && d.city !== d.name ? d.city : '', d.country].filter(Boolean) as string[];
-      if (parts.length) return parts.join(', ');
+      if (parts.length) return { label: parts.join(', '), city: d.city, country: d.country };
     }
   } catch { /* 两级全空 */ }
-  return '';
+  return { label: '' };
 }
 
 /** 批次 60:反查迟到时,先前用坐标名记下的足迹条目就地改名认亲(displayLabel
@@ -144,7 +156,8 @@ function healCoordEntryOrFeed(label: string, lat: number, lon: number): void {
         (v) => v.label === cl && now - new Date(v.ts).getTime() < 2 * 3_600_000,
       );
       if (coordEntry) {
-        m.setPlaceAlias(cl, label);
+        // 批次 61:改写存储本体(不再只别名)—— 同名地点的次数/停留全站归一
+        m.renamePlaceLabel(cl, label);
       } else {
         m.recordLiveVisit(label, lat, lon);
       }

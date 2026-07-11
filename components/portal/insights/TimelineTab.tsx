@@ -11,7 +11,7 @@ import {
   loadPlaceTrail, PLACE_TRAIL_UPDATED_EVENT,
   timelineDays, buildDayJourney, dayStats,
   clusterPlaces, categoryTimeShare,
-  displayLabel, setPlaceAlias, isGenericPlace, loadGeocodeEnabled, setGeocodeEnabled,
+  displayLabel, setPlaceAlias, isGenericPlace,
   placesByCategory, PLACE_CATEGORY_META, setPlaceCategory, worldByCountry,
   type PlaceVisit, type PlaceCategory, type JourneyItem, type PlaceCluster,
 } from '@/lib/portal/place-trail';
@@ -19,8 +19,10 @@ import { wallHHMM, dateKeyToLocalDate } from '@/lib/portal/place-time.mjs';
 import { monthlyPlaceComparison, weekRhythm, footprintHighlights } from '@/lib/portal/place-stats';
 import PlaceMap from './PlaceMap';
 import dynamic from 'next/dynamic';
-import { getLifeGraph } from '@/lib/portal/life-graph';
+import { getLifeGraph, type LifeNode } from '@/lib/portal/life-graph';
+import { createPortal } from 'react-dom';
 const MemoryMapSheet = dynamic(() => import('./MemoryMapSheet'), { ssr: false });
+const MemoryNodeDetail = dynamic(() => import('../MemoryNodeDetail'), { ssr: false });
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -48,14 +50,11 @@ export default function TimelineTab() {
   const [sub, setSub] = useState<Sub>('timeline');
   const [editRaw, setEditRaw] = useState<string | null>(null);
   const [editVal, setEditVal] = useState('');
-  const [geoOn, setGeoOn] = useState(false);
-  const [geoBusy, setGeoBusy] = useState(false);
-  const [geoMsg, setGeoMsg] = useState('');
   const [expandedCat, setExpandedCat] = useState<string | null>(null); // 批次 39:地点分类展开
   const [catPickFor, setCatPickFor] = useState<string | null>(null); // 批次 40:给地点手动选类别
   const [memMapOpen, setMemMapOpen] = useState(false); // 批次 59:地图上的记忆
-
-  useEffect(() => { setGeoOn(loadGeocodeEnabled()); }, []);
+  const [visitMems, setVisitMems] = useState<{ title: string; nodes: LifeNode[] } | null>(null); // 批次 61:点「记了 N 条」看具体记忆
+  const [visitSel, setVisitSel] = useState<LifeNode | null>(null);
 
   useEffect(() => {
     const read = () => setTrail(loadPlaceTrail());
@@ -71,8 +70,8 @@ export default function TimelineTab() {
   const geoMems = useMemo(() => getLifeGraph()
     .map((n) => ({ n, lat: n.attributes?.capturedLat, lon: n.attributes?.capturedLon, t: new Date(n.createdAt).getTime() }))
     .filter((g): g is { n: typeof g.n; lat: number; lon: number; t: number } => typeof g.lat === 'number' && typeof g.lon === 'number'), [trail]);
-  const memAtVisit = (seg: { lat?: number; lon?: number; start: string; end: string }): number => {
-    if (typeof seg.lat !== 'number' || typeof seg.lon !== 'number') return 0;
+  const memNodesAtVisit = (seg: { lat?: number; lon?: number; start: string; end: string }): LifeNode[] => {
+    if (typeof seg.lat !== 'number' || typeof seg.lon !== 'number') return [];
     const t0 = new Date(seg.start).getTime() - 30 * 60_000;
     const t1 = new Date(seg.end).getTime() + 30 * 60_000;
     return geoMems.filter((g) => {
@@ -80,7 +79,7 @@ export default function TimelineTab() {
       const dLat = (g.lat - (seg.lat as number)) * 111_320;
       const dLon = (g.lon - (seg.lon as number)) * 111_320 * Math.cos(((seg.lat as number) * Math.PI) / 180);
       return Math.hypot(dLat, dLon) < 250;
-    }).length;
+    }).map((g) => g.n);
   };
   const stats = useMemo(() => dayStats(journey), [journey]);
   const clusters = useMemo(() => clusterPlaces(trail, 10), [trail]);
@@ -134,47 +133,6 @@ export default function TimelineTab() {
     if (c.generic) return L(dict, '未命名地点', 'Unnamed place');
     return d;
   }
-  function toggleGeo() { const next = !geoOn; setGeoOn(next); setGeocodeEnabled(next); setGeoMsg(''); }
-  async function findRealNames() {
-    // 批次 40:处理所有「有坐标但还没解析过」的地点(不再只限 generic-word),
-    // 同时存城市/国家(供 World tab)。已解析过(有 geo)的跳过,避免重复限速。
-    const { loadPlaceGeo, setPlaceGeo } = await import('@/lib/portal/place-trail');
-    const geoDone = loadPlaceGeo();
-    const withCoords = clusterPlaces(trail, 99999).filter((c) => c.lat != null && c.lon != null);
-    // 按"是否解析过"判重,而非"有无国家" —— 否则解析成功但没拿到国家的地点每次都被当未解析
-    // 反复重查,白白耗 Nominatim 限速额度。
-    const targets = withCoords.filter((c) => !geoDone[c.label]?.resolved);
-    if (!withCoords.length) { setGeoMsg(L(dict, '这些地点没有坐标,无法反查(需要带经纬度的足迹/Google 时间轴)', 'These places have no coordinates to resolve (need lat/lon from live trail / Google Timeline)')); return; }
-    if (!targets.length) { setGeoMsg(L(dict, '都解析过了 ✓', 'All resolved ✓')); return; }
-    setGeoBusy(true);
-    let done = 0;
-    let ok = 0;
-    let failed = 0; // 请求彻底失败(网络/服务)的次数,用于区分"解析成功但没国家"和"根本没请求成功"
-    for (const c of targets) {
-      setGeoMsg(L(dict, `正在解析… ${done}/${targets.length}(约 ${Math.ceil((targets.length - done) * 1.1)} 秒)`, `Resolving… ${done}/${targets.length}`));
-      try {
-        const res = await fetch('/api/portal/geocode', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lat: c.lat, lon: c.lon }) });
-        const data = await res.json() as { ok?: boolean; name?: string; city?: string; country?: string; kind?: string };
-        if (data.ok && (data.name || data.city || data.country || data.kind)) {
-          setPlaceGeo(c.label, { name: data.name, city: data.city, country: data.country, resolved: true, kind: data.kind as PlaceCategory | undefined });
-          if (data.name && c.generic && displayLabel(c.label) === c.label) setPlaceAlias(c.label, data.name);
-          if (data.country) ok += 1;
-        } else if (data.ok === false) {
-          failed += 1;
-        }
-      } catch { failed += 1; }
-      done += 1;
-      await new Promise((r) => setTimeout(r, 1100)); // Nominatim 限速 ~1/s
-    }
-    setGeoBusy(false);
-    // 可见失败纪律:全失败时明确说是服务/网络异常,而不是含糊的"完成 · 0 个"。
-    if (failed === targets.length) {
-      setGeoMsg(L(dict, '解析服务暂时不可用(网络或限流),请稍后重试', 'Geocoding service unavailable (network or rate limit) — please retry later'));
-    } else {
-      setGeoMsg(L(dict, `完成 · 解析 ${targets.length} 个,拿到国家的 ${ok} 个${failed ? `,${failed} 个失败` : ''}`, `Done · ${targets.length} places, ${ok} with country${failed ? `, ${failed} failed` : ''}`));
-    }
-  }
-
   // 当日路线上真地图:到访点 + 顺序折线(替代旧的"非真实街道"示意 SVG)
   const dayPts = journey.filter((it): it is Extract<JourneyItem, { kind: 'visit' }> => it.kind === 'visit').map((it) => it.seg).filter((s) => s.lat != null && s.lon != null);
   const dayMapPoints = dayPts.map((s) => ({ lat: s.lat!, lon: s.lon!, label: displayLabel(s.label), weightMin: Math.max(10, s.durationMin), color: DOT_COLOR[s.category] }));
@@ -212,7 +170,16 @@ export default function TimelineTab() {
                   <div className="nesio-tl-item-top"><span className="nesio-tl-item-name">{displayLabel(it.seg.label)}</span><span className="nesio-tl-item-dur">{fmtDur(it.seg.durationMin)}</span></div>
                   <span className="nesio-tl-item-time">
                     {hhmm(it.seg.start)}{it.seg.durationMin >= 1 ? ` – ${hhmm(it.seg.end)}` : ''}
-                    {(() => { const n = memAtVisit(it.seg); return n > 0 ? <span className="nesio-tl-item-mem"> · {L(dict, `记了 ${n} 条`, `${n} memories`)}</span> : null; })()}
+                    {(() => {
+                      const nodes = memNodesAtVisit(it.seg);
+                      if (!nodes.length) return null;
+                      return (
+                        <button type="button" className="nesio-tl-item-mem nesio-tl-item-mem--btn"
+                          onClick={() => setVisitMems({ title: displayLabel(it.seg.label), nodes })}>
+                          {' · '}{L(dict, `记了 ${nodes.length} 条`, `${nodes.length} memories`)}
+                        </button>
+                      );
+                    })()}
                   </span>
                 </div>
               </div>
@@ -332,15 +299,8 @@ export default function TimelineTab() {
           )}
 
           <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '常去地点 · 点名字可纠正', 'Frequent places · tap name to fix')}</p>
-          {/* 批次 33:无名占位地点找真名(反向地理编码,默认关,坐标会发外部地图) */}
-          <div className="nesio-tl-geo">
-            <label className="nesio-tl-geo-row">
-              <input type="checkbox" checked={geoOn} onChange={toggleGeo} />
-              <span>{L(dict, '用外部地图给「未命名地点」找真名(坐标会发给 OpenStreetMap)', 'Resolve unnamed places via external map (coords sent to OpenStreetMap)')}</span>
-            </label>
-            {geoOn && <button type="button" className="nesio-fin-review-accept" disabled={geoBusy} onClick={findRealNames}>{geoBusy ? '…' : L(dict, '找真名', 'Resolve names')}</button>}
-            {geoMsg && <span className="nesio-tl-geo-msg">{geoMsg}</span>}
-          </div>
+          {/* 批次 61:「找真名」手动卡撤除 —— 反查已两级自动化(天气链→服务端 geocode),
+              坐标名条目会在下一次定位时自动改名认亲,不再需要手动按钮 */}
           <div className="nesio-tl-clusters">
             {clusters.map((c) => (
               <div key={c.label} className="nesio-tl-cluster">
@@ -424,7 +384,7 @@ export default function TimelineTab() {
       {sub === 'world' && mapPoints.length > 0 && <PlaceMap points={mapPoints} height={190} />}
       {sub === 'world' && (
         world.length === 0 ? (
-          <p className="nesio-insights-empty">{L(dict, '还没有国家信息。到「分析」打开 geocode 并点「找真名」,把坐标解析成城市/国家后,这里会按国家聚合(点国家看城市)。', 'No country data yet. In Analytics, enable geocode and Resolve names — once coords become city/country, countries gather here (tap for cities).')}</p>
+          <p className="nesio-insights-empty">{L(dict, '还没有国家信息。开着「记忆自动定位」正常使用,地名和国家会随打点自动解析,这里就会按国家聚合。', 'No country data yet. Keep auto-locate on — places and countries resolve as you go, and countries gather here.')}</p>
         ) : (
           <>
             <p className="nesio-settings-option-hint" style={{ marginTop: 0 }}>{L(dict, `去过 ${world.length} 个国家/地区`, `${world.length} countries/regions visited`)}</p>
@@ -462,6 +422,26 @@ export default function TimelineTab() {
 
       {/* 批次 59:地图上的记忆(全屏可缩放) */}
       <MemoryMapSheet open={memMapOpen} onClose={() => setMemMapOpen(false)} />
+
+      {/* 批次 61:该到访时段的具体记忆(点条目直接看详情,不去记忆库) */}
+      {visitMems && typeof document !== 'undefined' && createPortal(
+        <div className="nesio-visitmem-overlay" role="dialog" aria-modal="true">
+          <button type="button" className="nesio-visitmem-backdrop" onClick={() => setVisitMems(null)} aria-label={L(dict, '关闭', 'Close')} />
+          <div className="nesio-visitmem-sheet">
+            <p className="nesio-memmap-list-title">{visitMems.title} · {L(dict, `${visitMems.nodes.length} 条记忆`, `${visitMems.nodes.length} memories`)}</p>
+            <div className="nesio-memmap-list-scroll">
+              {visitMems.nodes.map((n) => (
+                <button key={n.id} type="button" className="nesio-memmap-item nesio-memmap-item--btn" onClick={() => setVisitSel(n)}>
+                  <span className="nesio-memmap-item-name">{n.name}</span>
+                  <span className="nesio-memmap-item-time">{new Date(n.createdAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          {visitSel && <MemoryNodeDetail node={visitSel} onClose={() => setVisitSel(null)} />}
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }

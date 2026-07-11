@@ -14647,3 +14647,14 @@ html[data-portal-theme="night"] .nesio-memmap-canvas { background: #16243c; }
 }
 .nesio-memmap-timebar input[type='range'] { flex: 1; accent-color: var(--portal-accent); min-height: 1.6rem; }
 .nesio-memmap-timebar-label { font-size: 0.78rem; color: var(--portal-ink); font-weight: 600; white-space: nowrap; }
+
+/* ── 批次 61:到访记忆列表 ─────────────────────────────────────────────── */
+.nesio-tl-item-mem--btn { background: none; border: none; padding: 0; cursor: pointer; font-size: inherit; }
+.nesio-visitmem-overlay { position: fixed; inset: 0; z-index: 420; display: flex; flex-direction: column; justify-content: flex-end; }
+.nesio-visitmem-backdrop { position: absolute; inset: 0; background: var(--modal-backdrop-bg, rgba(16,28,54,0.25)); border: none; cursor: pointer; }
+.nesio-visitmem-sheet {
+  position: relative; background: var(--glass-bg-pop); border-radius: 1.1rem 1.1rem 0 0;
+  border-top: 1px solid var(--portal-line); max-height: 55dvh; overflow-y: auto;
+  padding: 0.9rem 1rem calc(env(safe-area-inset-bottom, 0px) + 0.9rem);
+}
+.nesio-memmap-item--btn { width: 100%; background: none; border: none; cursor: pointer; text-align: left; font-size: inherit; color: inherit; }
