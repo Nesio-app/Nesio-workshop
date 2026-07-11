@@ -14938,3 +14938,24 @@ html[data-portal-theme='day'] .nesio-globe-stats {
   color: #1e3a5f;
 }
 html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 0.55); }
+
+/* ── 批次 77:问卷卡(多题带选项一次提交) + 选中态 ── */
+.nesio-chat-quiz {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-top: 0.5rem;
+  padding: 0.8rem 0.85rem;
+  border-radius: 0.9rem;
+  border: 1px solid var(--portal-line);
+  background: var(--glass-bg-solid);
+  max-width: 92%;
+}
+.nesio-chat-quiz-q { display: flex; flex-direction: column; gap: 0.35rem; }
+.nesio-chat-quiz-title { margin: 0; font-size: 0.82rem; font-weight: 600; color: var(--portal-ink); }
+.nesio-chat-opt-chip.is-picked {
+  background: var(--portal-accent);
+  color: #fff;
+  border-color: var(--portal-accent);
+}
+.nesio-chat-plan-icon { display: inline-flex; align-items: center; color: var(--portal-accent); margin-top: 0.1rem; }

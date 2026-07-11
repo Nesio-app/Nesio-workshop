@@ -6,7 +6,7 @@
  * Long-press center button to open.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { getLifeGraph, isBulkImported, searchLifeGraphFuzzy, type LifeNode, updateLifeNode } from '@/lib/portal/life-graph';
 import { canUsePaidCloudAi } from '@/lib/portal/entitlement';
@@ -26,7 +26,7 @@ import { resolveAirport } from '@/lib/portal/airports';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import MemoryFlashBanner, { useMemoryFlash } from '@/components/portal/MemoryFlashBanner';
-import { IconCamera, IconFile, IconHistory, IconImage, IconKeyboard, IconLink, IconMic, IconSmile, NodeTypeIcon } from './icons';
+import { IconCamera, IconFile, IconHistory, IconImage, IconKeyboard, IconLink, IconMic, IconSmile, NodeTypeIcon, IconPlane, IconBed, IconUtensils, IconCar, IconCard, IconBook, IconCheckSquare, IconNote, IconMapPin, IconCalendar } from './icons';
 import EmailComposeSheet from './EmailComposeSheet';
 
 /** 从节点里取可读正文(供邮件回复的上下文参考)。 */
@@ -52,24 +52,21 @@ interface ChatMessage { role: 'user' | 'model'; text: string; }
 // 批次 68:问一问动作块 —— 行程条目(服务端已校验;客户端确认后 ingest 落库)。
 export interface ChatPlanItem { name: string; date?: string; time?: string; place?: string; kind?: string; note?: string }
 
-const PLAN_KIND_ICON: Record<string, string> = { flight: '✈️', hotel: '🏨', activity: '📍', todo: '✅', note: '📝' };
-
-/** 批次 70:kind 是自由词 —— 关键词回退配图标,认不出就中性图钉(不硬编枚举)。 */
-function planKindIcon(kind?: string): string {
-  if (!kind) return '🗓';
-  if (PLAN_KIND_ICON[kind]) return PLAN_KIND_ICON[kind];
-  const k = kind.toLowerCase();
-  if (/航班|机票|飞|flight|plane/.test(k)) return '✈️';
-  if (/酒店|住宿|民宿|旅馆|hotel|stay|airbnb/.test(k)) return '🏨';
-  if (/餐|吃|饭|美食|food|dining|restaurant/.test(k)) return '🍽️';
-  if (/票|演出|门票|show|ticket|concert/.test(k)) return '🎟️';
-  if (/车|租车|火车|地铁|drive|train|transit|通勤/.test(k)) return '🚗';
-  if (/会议|会|meeting|面试|interview/.test(k)) return '🎙️';
-  if (/买|购|shop|采购/.test(k)) return '🛍️';
-  if (/学|复习|读|study|course|练/.test(k)) return '📚';
-  if (/todo|待办|任务/.test(k)) return '✅';
-  if (/备注|note|提醒/.test(k)) return '📝';
-  return '📌';
+/** 批次 77(用户点名图标问题):emoji 图钉下岗 —— 关键词回退配设计系统线性图标。 */
+function planKindIcon(kind?: string): ReactNode {
+  const k = (kind || '').toLowerCase();
+  const size = 15;
+  if (/航班|机票|飞|flight|plane/.test(k)) return <IconPlane size={size} />;
+  if (/酒店|住宿|民宿|旅馆|hotel|stay|airbnb/.test(k)) return <IconBed size={size} />;
+  if (/餐|吃|饭|美食|food|dining|restaurant/.test(k)) return <IconUtensils size={size} />;
+  if (/车|租车|火车|地铁|drive|train|transit|通勤/.test(k)) return <IconCar size={size} />;
+  if (/会议|meeting|面试|interview/.test(k)) return <IconMic size={size} />;
+  if (/买|购|shop|采购/.test(k)) return <IconCard size={size} />;
+  if (/学|复习|读|study|course|练/.test(k)) return <IconBook size={size} />;
+  if (/todo|待办|任务/.test(k)) return <IconCheckSquare size={size} />;
+  if (/备注|note|提醒/.test(k)) return <IconNote size={size} />;
+  if (/景|游|逛|visit|tour|activity|玩/.test(k)) return <IconMapPin size={size} />;
+  return <IconCalendar size={size} />;
 }
 
 /** date(+time)→ start 属性:带时间给本地 ISO,只有日期保持 YYYY-MM-DD(全天语义,与日历一致)。 */
@@ -97,6 +94,9 @@ interface UiMessage {
   planItems?: ChatPlanItem[];
   planTitle?: string;
   planSaved?: boolean;
+  /** 批次 77:问卷式澄清(多题带选项,一次提交) */
+  questions?: Array<{ q: string; options: string[] }>;
+  questionsDone?: boolean;
   /** 🔴#2:这条回答时语义检索降级了(缺 AI 配置,只用了关键词匹配)。 */
   semanticDegraded?: boolean;
   semanticReason?: string; // 未生效的具体原因(no_key/rate_limited/provider/network/auth)
@@ -725,6 +725,8 @@ export default function NesioChatSheet({
   const [showCamera, setShowCamera] = useState(false);
   const [cameraAutoOpen, setCameraAutoOpen] = useState(false);
   const [menuMsg, setMenuMsg] = useState<UiMessage | null>(null);
+  // 批次 77:问卷选择(消息 id → 题号 → 选中项)
+  const [quizPicks, setQuizPicks] = useState<Record<string, Record<number, string>>>({});
   const [detailNode, setDetailNode] = useState<LifeNode | null>(null);
   const [replyNode, setReplyNode] = useState<LifeNode | null>(null); // 批次 38:引用卡直接回复邮件
   const [showHistory, setShowHistory] = useState(false);
@@ -880,7 +882,7 @@ Edit location/value anytime in Storage.`),
         signal: controller.signal,
       });
       clearTimeout(timeout);
-      const data = await res.json() as { ok?: boolean; response?: string; sources?: Array<{ title: string; url: string }>; actions?: { options?: string[]; planItems?: ChatPlanItem[]; planTitle?: string } };
+      const data = await res.json() as { ok?: boolean; response?: string; sources?: Array<{ title: string; url: string }>; actions?: { options?: string[]; planItems?: ChatPlanItem[]; planTitle?: string; questions?: Array<{ q: string; options: string[] }> } };
       const rawResp = data.response?.trim() || L(dict, '（暂时没有找到相关信息）', '(Nothing relevant found)');
       // 🔴#1:只保留模型真正引用的记忆节点。ids===null(没自报)→ 回退到前 3 候选作"相关记忆";
       // ids=[](明确"无")→ 不出引用卡(修"模型说没记录、下面还渲染 6 张伪造依据卡")。
@@ -909,6 +911,7 @@ Edit location/value anytime in Storage.`),
         ...(data.actions?.options ? { options: data.actions.options } : {}),
         ...(data.actions?.planItems ? { planItems: data.actions.planItems } : {}),
         ...(data.actions?.planTitle ? { planTitle: data.actions.planTitle } : {}),
+        ...(data.actions?.questions ? { questions: data.actions.questions } : {}),
       };
       // 函数式追加 + 用最终列表存档,别用可能已过期的 nextMsgs 快照覆盖并发消息。
       setMessages((prev) => { const next = [...prev, aiMsg]; saveHistory(next); return next; });
@@ -1363,6 +1366,44 @@ Edit location/value anytime in Storage.`),
                       {msg.planSaved
                         ? L(dict, '已存入 ✓ 带日期的会按时出现在今日聚焦', 'Saved ✓ dated items will surface in Today focus')
                         : L(dict, `存入记忆 · ${msg.planItems.length} 条`, `Save ${msg.planItems.length} to Memory`)}
+                    </button>
+                  </div>
+                )}
+                {/* 批次 77:问卷卡 —— 多题带选项,选完一键提交(参考小马AI形态,一轮收齐) */}
+                {!isUser && msg.questions && msg.questions.length > 0 && !msg.questionsDone && (
+                  <div className="nesio-chat-quiz">
+                    {msg.questions.map((qu, qi) => (
+                      <div key={qi} className="nesio-chat-quiz-q">
+                        <p className="nesio-chat-quiz-title">{qu.q}</p>
+                        <div className="nesio-chat-opts">
+                          {qu.options.map((o) => (
+                            <button
+                              key={o}
+                              type="button"
+                              className={`nesio-chat-opt-chip${quizPicks[msg.id]?.[qi] === o ? ' is-picked' : ''}`}
+                              onClick={() => setQuizPicks((prev) => ({ ...prev, [msg.id]: { ...prev[msg.id], [qi]: o } }))}
+                            >
+                              {o}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      className="nesio-chat-plan-save"
+                      disabled={!quizPicks[msg.id] || Object.keys(quizPicks[msg.id] || {}).length === 0}
+                      onClick={() => {
+                        const picks = quizPicks[msg.id] || {};
+                        const answer = msg.questions!
+                          .map((qu, qi) => (picks[qi] ? `${qu.q.replace(/[??]$/, '')}:${picks[qi]}` : null))
+                          .filter(Boolean)
+                          .join(';');
+                        setMessages((prev) => { const next = prev.map((m) => m.id === msg.id ? { ...m, questionsDone: true } : m); saveHistory(next); return next; });
+                        void sendMessage(answer);
+                      }}
+                    >
+                      {L(dict, '提交选择', 'Submit answers')}
                     </button>
                   </div>
                 )}

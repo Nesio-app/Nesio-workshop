@@ -78,6 +78,9 @@ export const IconBalloon = make(<><ellipse cx="12" cy="9" rx="6.5" ry="7.5" /><p
 export const IconCloud = make(<path d="M17.5 19a4.5 4.5 0 0 0 .4-9A7 7 0 0 0 4.3 12.4 4 4 0 0 0 6 20h11.5z" />);
 export const IconPlane = make(<path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z" />);
 export const IconGift = make(<><rect x="3" y="8" width="18" height="4" /><path d="M12 8v13M5 12v9h14v-9" /><path d="M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 0 1 0 5" /></>);
+export const IconBed = make(<><path d="M2 4v16M2 8h18a2 2 0 0 1 2 2v10" /><path d="M2 17h20M6 8v9" /><circle cx="7" cy="12" r="1.2" /></>);
+export const IconUtensils = make(<><path d="M3 2v7a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2V2M7 2v20" /><path d="M17 2c-1.7 0-3 2-3 5s1.3 5 3 5v10M17 2c1.7 0 3 2 3 5s-1.3 5-3 5" /></>);
+export const IconBriefcase = make(<><rect x="2" y="7" width="20" height="14" rx="2" /><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M2 13h20" /></>);
 export const IconBulb = make(<><path d="M9 18h6M10 22h4" /><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.4 1 2.3h6c0-.9.4-1.8 1-2.3A7 7 0 0 0 12 2z" /></>);
 export const IconRain = make(<><path d="M17.5 15a4.5 4.5 0 0 0 .4-9A7 7 0 0 0 4.3 8.4 4 4 0 0 0 6 16" /><path d="M8 19v2M12 18v3M16 19v2" /></>);
 

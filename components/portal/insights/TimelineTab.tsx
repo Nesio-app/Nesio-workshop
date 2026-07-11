@@ -6,7 +6,7 @@
  * 数据全部本机。地点名可手动纠正(Unknown → 对的名字),记住后各处都用对的。
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   loadPlaceTrail, PLACE_TRAIL_UPDATED_EVENT,
   timelineDays, buildDayJourney, dayStats,
@@ -18,6 +18,7 @@ import {
 import { wallHHMM, dateKeyToLocalDate } from '@/lib/portal/place-time.mjs';
 import { monthlyPlaceComparison, weekRhythm, footprintHighlights } from '@/lib/portal/place-stats';
 import PlaceMap from './PlaceMap';
+import { IconHome, IconUtensils, IconCard, IconActivity, IconBriefcase, IconPlane, IconBed, IconHeartPulse, IconBook, IconSun, IconStar, IconMapPin } from '../icons';
 import dynamic from 'next/dynamic';
 import { getLifeGraph, type LifeNode } from '@/lib/portal/life-graph';
 import { getLocalImage } from '@/lib/portal/local-image-store';
@@ -31,6 +32,25 @@ import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 
 type Sub = 'timeline' | 'analytics' | 'travel' | 'world';
+
+/** 批次 77(用户点名图标问题):类别 emoji 彩圈 → 设计系统线性图标 */
+function catIconSvg(cat: PlaceCategory): ReactNode {
+  const size = 15;
+  switch (cat) {
+    case 'home': return <IconHome size={size} />;
+    case 'food': return <IconUtensils size={size} />;
+    case 'shopping': return <IconCard size={size} />;
+    case 'fitness': return <IconActivity size={size} />;
+    case 'work': return <IconBriefcase size={size} />;
+    case 'transit': return <IconPlane size={size} />;
+    case 'lodging': return <IconBed size={size} />;
+    case 'health': return <IconHeartPulse size={size} />;
+    case 'culture': case 'education': return <IconBook size={size} />;
+    case 'park': return <IconSun size={size} />;
+    case 'entertainment': return <IconStar size={size} />;
+    default: return <IconMapPin size={size} />;
+  }
+}
 
 const CAT: Record<PlaceCategory, [string, string]> = {
   home: ['家', 'Home'], work: ['公司', 'Work'], grocery: ['超市', 'Grocery'], shopping: ['购物', 'Shopping'],
@@ -401,7 +421,7 @@ export default function TimelineTab() {
                 return (
                   <div key={g.category} className={`nesio-tl-catcard${open ? ' is-open' : ''}`}>
                     <button type="button" className="nesio-tl-catcard-head" onClick={() => setExpandedCat(open ? null : g.category)}>
-                      <span className="nesio-tl-catcard-sym" style={{ background: DOT_COLOR[g.category] }} aria-hidden>{meta.sym}</span>
+                      <span className="nesio-tl-catcard-sym" aria-hidden>{catIconSvg(g.category)}</span>
                       <span className="nesio-tl-catcard-name">{L(dict, meta.zh, meta.en)}</span>
                       <span className="nesio-tl-catcard-count">{L(dict, `${g.count} 个地点`, `${g.count} places`)}</span>
                       <span className="nesio-tl-catcard-chev">{open ? '▾' : '›'}</span>

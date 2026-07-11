@@ -5,7 +5,7 @@ import { deleteLifeNode, getLifeGraph, searchLifeGraphFuzzy, updateLifeNode, typ
 import { createAppApiClient } from '@/lib/portal/app-api-client';
 import LocationPicker from './LocationPicker';
 import EmailComposeSheet from './EmailComposeSheet';
-import { IconClock, IconLink, NodeTypeIcon, WeatherIcon } from './icons';
+import { IconClock, IconLink, NodeTypeIcon, WeatherIcon, IconMail, IconCalendar, IconFlag, IconCheckSquare } from './icons';
 import { L } from '@/lib/portal/i18n';
 import { relativePastLabel } from '@/lib/portal/time-labels';
 import { displayNodeName } from '@/lib/portal/node-display';
@@ -869,14 +869,15 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
               批次 73:手动增删关联(删除自动连线 = 反馈信号,本地留痕) */}
           {(() => {
             const g = getLifeGraph();
-            const REL_LABEL: Record<string, [string, string, string]> = {
-              confirmed_by_email: ['📩', '确认邮件', 'Confirmation email'],
-              confirms_plan: ['🧳', '对应行程', 'Linked plan'],
-              part_of_plan: ['🗂', '所属计划', 'Part of plan'],
-              plan_item: ['🗓', '计划条目', 'Plan item'],
-              related_plan: ['🔗', '相关计划', 'Related plan'],
-              has_checklist: ['☑️', '对应清单', 'Checklist'],
-              user_linked: ['🔗', '手动关联', 'Linked'],
+            // 批次 77(用户点名图标问题):emoji → 设计系统线性图标
+            const REL_LABEL: Record<string, [ReactNode, string, string]> = {
+              confirmed_by_email: [<IconMail key="i" size={13} />, '确认邮件', 'Confirmation email'],
+              confirms_plan: [<IconCalendar key="i" size={13} />, '对应行程', 'Linked plan'],
+              part_of_plan: [<IconFlag key="i" size={13} />, '所属计划', 'Part of plan'],
+              plan_item: [<IconCalendar key="i" size={13} />, '计划条目', 'Plan item'],
+              related_plan: [<IconLink key="i" size={13} />, '相关计划', 'Related plan'],
+              has_checklist: [<IconCheckSquare key="i" size={13} />, '对应清单', 'Checklist'],
+              user_linked: [<IconLink key="i" size={13} />, '手动关联', 'Linked'],
             };
             const rels = [
               ...(n.relations || []).filter((r) => !removedRels.has(`${r.relation}:${r.targetId}`)),

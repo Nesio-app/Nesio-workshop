@@ -50,7 +50,9 @@ const SYSTEM_BASE = `你是 Nesio，用户的贴身 AI 助手，叫"小娜"。
 <<NESIO_ACTIONS>>{"planTitle":"冰岛行程","planItems":[{"name":"RDU→KEF 航班","date":"2026-08-16","time":"18:30","place":"RDU","kind":"航班","note":"提前2小时到"}],"options":["整体行程框架","住宿推荐","美食攻略"]}
 规则:
 - 用户给出行程/计划/清单并想保存时:按天或按活动拆成 planItems,并给 planTitle(计划名,如「冰岛行程」「搬家计划」,≤16字)。name 具体(「黄金圈:Þingvellir+Geysir+Gullfoss」);date 用 YYYY-MM-DD(按【实时环境】推断年份),没有日期就不填(模糊计划照样能存);时间不确定就省略 time;kind 是自由短词(航班/酒店/餐厅/门票/租车/会议/购物/复习/彩排…最贴切的那个,想不出就留空,待办类用 todo)。计划可精可粗:宏观计划就拆成几个大步骤,不要硬编细节。正文只说"整理好了 N 条,点下面确认存入",不要在正文重复完整清单。
-- 需要澄清时:每次只问**一个**最关键的问题,给 2-4 个短选项(≤12字)放进 options。反例(禁止):正文里列出「1. 2. 3. 4. 5.」多个编号问题 —— 那是问题轰炸,必须改成一问+选项,逐轮推进。
+- 需要澄清时:优先用 questions 问卷 —— 一次给 2-4 个问题,每题带 2-4 个短选项(≤12字),用户点选后一次性提交,效率最高:
+  "questions":[{"q":"计划玩几天?","options":["3天内","4-5天","6天以上"]},{"q":"预算档位?","options":["经济","舒适","不设限"]}]
+  只有单个问题时才用 options。反例(禁止):正文里列出「1. 2. 3. 4. 5.」多个编号问题 —— 问题必须放进 questions/options 动作块,正文保持一句话。
 - 普通问答不输出动作块。JSON 必须单行、合法、双引号。`;
 
 const TONE_STYLE: Record<string, string> = {
@@ -224,7 +226,8 @@ async function callGemini(
 // ── 动作块解析(批次 68)────────────────────────────────────────────────────────
 
 export interface PlanItem { name: string; date?: string; time?: string; place?: string; kind?: string; note?: string }
-export interface ChatActions { options?: string[]; planItems?: PlanItem[]; planTitle?: string }
+export interface ChatQuestion { q: string; options: string[] }
+export interface ChatActions { options?: string[]; planItems?: PlanItem[]; planTitle?: string; questions?: ChatQuestion[] }
 
 /** 从回复末尾剥出 <<NESIO_ACTIONS>>{...} 并校验;剥不出或不合法就当没有(纯文本照常)。 */
 export function parseChatActions(raw: string): { text: string; actions: ChatActions | null } {
@@ -232,7 +235,7 @@ export function parseChatActions(raw: string): { text: string; actions: ChatActi
   if (!m) return { text: raw.replace(/<<NESIO_ACTIONS>>[\s\S]*$/, '').trim(), actions: null };
   const text = raw.slice(0, m.index).trim();
   try {
-    const parsed = JSON.parse(m[1]) as { options?: unknown; planItems?: unknown; planTitle?: unknown };
+    const parsed = JSON.parse(m[1]) as { options?: unknown; planItems?: unknown; planTitle?: unknown; questions?: unknown };
     const actions: ChatActions = {};
     if (Array.isArray(parsed.options)) {
       const opts = parsed.options
@@ -270,7 +273,21 @@ export function parseChatActions(raw: string): { text: string; actions: ChatActi
     if (typeof parsed.planTitle === 'string' && parsed.planTitle.trim()) {
       actions.planTitle = parsed.planTitle.trim().slice(0, 30);
     }
-    return { text, actions: (actions.options || actions.planItems) ? actions : null };
+    if (Array.isArray(parsed.questions)) {
+      const qs = parsed.questions
+        .filter((x): x is Record<string, unknown> => typeof x === 'object' && x !== null)
+        .map((x) => {
+          const q = typeof x.q === 'string' ? x.q.trim().slice(0, 40) : '';
+          const options = Array.isArray(x.options)
+            ? x.options.filter((o): o is string => typeof o === 'string').map((o) => o.trim()).filter((o) => o.length > 0 && o.length <= 16).slice(0, 4)
+            : [];
+          return q && options.length >= 2 ? { q, options } : null;
+        })
+        .filter((x): x is ChatQuestion => x !== null)
+        .slice(0, 4);
+      if (qs.length > 0) actions.questions = qs;
+    }
+    return { text, actions: (actions.options || actions.planItems || actions.questions) ? actions : null };
   } catch {
     return { text, actions: null };
   }
@@ -315,7 +332,7 @@ export async function POST(req: NextRequest) {
   // 本轮追加强制指令 —— 弱模型对通用协议记不牢,靠贴脸重申。
   const planIntent = /计划|行程|规划|旅行|旅游|出行|安排.{0,4}(旅行|行程|活动)|itinerary|trip|travel plan/i.test(message);
   const planReinforce = planIntent
-    ? '\n\n【本轮强制】用户在请求规划。若信息不足:只问一个最关键的问题,且必须在动作块 options 里给 2-4 个可点选项;严禁列出多个编号问题。若信息已够:直接给方案并按动作协议输出 planItems。'
+    ? '\n\n【本轮强制】用户在请求规划。若信息不足:用动作块 questions 一次给 2-4 个问题(每题带选项),正文只说一句话;严禁在正文列编号问题。若信息已够:直接给方案并按动作协议输出 planItems。'
     : '';
   const { systemContext } = buildChatContext(message, { memoryContext, calendarContext, environmentContext });
   const fileSection = fileContext
