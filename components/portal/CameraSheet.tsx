@@ -278,6 +278,7 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
   const [viewNode, setViewNode] = useState<LifeNode | null>(null);
   const [memSearch, setMemSearch] = useState<LifeNode[] | null>(null);
   const [qrCodes, setQrCodes] = useState<string[]>([]);
+  const [visualMatchIds, setVisualMatchIds] = useState<Set<string>>(new Set());
   // Freehand selection state
   const [selecting, setSelecting] = useState(false);
   const selStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -444,6 +445,8 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
     const base64 = await compressImage(canvas);
     setCapturedBase64(base64);
     setSelecting(true);
+    // 批次 87(对标苹果相机「即时」):直拍也立刻检测 QR,不等 AI
+    canvas.toBlob((b) => { if (b) void detectQr(b); }, 'image/jpeg', 0.9);
   }
 
   // Try to match current GPS to a named place and pre-fill location fields
@@ -476,16 +479,39 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
     setPhase('result');
   }
 
-  // 批次 84:识别结果 → 搜本地记忆库(smartSearch,纯查询)
+  // 批次 84:识别结果 → 搜本地记忆库;批次 87:先按图像指纹召回(以图搜图 v1),
+  // 视觉相似排前带徽标,文字匹配随后补足。
   function searchLocalMemory() {
     const q = [
       ...editedNodes.filter((n) => !n.deleted).map((n) => n.name),
       result?.summary || '',
     ].join(' ').trim().slice(0, 80);
-    if (!q) { setMemSearch([]); return; }
-    void import('@/lib/portal/smart-search').then(({ smartSearch }) => {
-      setMemSearch(smartSearch(q).nodes.slice(0, 8));
-    }).catch(() => setMemSearch([]));
+    void (async () => {
+      try {
+        const visual: LifeNode[] = [];
+        if (capturedPreview) {
+          const { computeDHash, searchByHash } = await import('@/lib/portal/image-hash');
+          const h = await computeDHash(capturedPreview);
+          if (h) {
+            const g = getLifeGraph();
+            for (const [nodeId] of searchByHash(h)) {
+              const n0 = g.find((x) => x.id === nodeId);
+              if (n0) visual.push(n0);
+            }
+          }
+        }
+        setVisualMatchIds(new Set(visual.map((n0) => n0.id)));
+        let textual: LifeNode[] = [];
+        if (q) {
+          const { smartSearch } = await import('@/lib/portal/smart-search');
+          textual = smartSearch(q).nodes;
+        }
+        const seen = new Set(visual.map((n0) => n0.id));
+        setMemSearch([...visual, ...textual.filter((n0) => !seen.has(n0.id))].slice(0, 8));
+      } catch {
+        setMemSearch([]);
+      }
+    })();
   }
 
   // 批次 84:照片内二维码(WebKit 原生 BarcodeDetector,特性检测,不支持就静默)
@@ -696,6 +722,13 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
         if (dataUrl) {
           const localAssetId = `img-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
           await putLocalImage(localAssetId, dataUrl);
+          // 批次 87(用户批准「以图搜图」):存图顺手算 dHash 指纹入索引
+          void import('@/lib/portal/image-hash')
+            .then(async ({ computeDHash, saveImageHash }) => {
+              const h = await computeDHash(dataUrl);
+              if (h) saveImageHash(savedNodes[0].id, h);
+            })
+            .catch(() => {});
           const existing = savedNodes[0].assets || [];
           updateLifeNode(savedNodes[0].id, {
             assets: [...existing, { id: localAssetId, kind: 'image', mimeType: 'image/jpeg', local: true, createdAt: new Date().toISOString() }],
@@ -930,6 +963,21 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
     startCamera(next);
   }
 
+  // 批次 87(对标苹果相机「即时」):QR 芯片在拍完/选图阶段就显示,不等 AI
+  const qrChips = qrCodes.length > 0 ? (
+    <div className="nesio-camera-qr-row">
+      {qrCodes.slice(0, 2).map((q, qi) => (
+        <div key={qi} className="nesio-camera-qr-chip">
+          <span className="nesio-camera-qr-text">{q.length > 42 ? `${q.slice(0, 42)}…` : q}</span>
+          {/^https?:\/\//i.test(q) && (
+            <a href={q} target="_blank" rel="noopener noreferrer">{L(dict, '打开', 'Open')}</a>
+          )}
+          <button type="button" onClick={() => { void navigator.clipboard?.writeText(q); }}>{L(dict, '复制', 'Copy')}</button>
+        </div>
+      ))}
+    </div>
+  ) : null;
+
   const viewNodePortal = viewNode && typeof document !== 'undefined'
     ? createPortal(<MemoryNodeDetailLazy node={viewNode} onClose={() => setViewNode(null)} />, document.body)
     : null;
@@ -1049,20 +1097,7 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
             </div>
           )}
 
-          {/* 批次 84(对标苹果相机):照片里的二维码 —— 打开/复制 */}
-          {qrCodes.length > 0 && (
-            <div className="nesio-camera-qr-row">
-              {qrCodes.slice(0, 2).map((q, qi) => (
-                <div key={qi} className="nesio-camera-qr-chip">
-                  <span className="nesio-camera-qr-text">{q.length > 42 ? `${q.slice(0, 42)}…` : q}</span>
-                  {/^https?:\/\//i.test(q) && (
-                    <a href={q} target="_blank" rel="noopener noreferrer">{L(dict, '打开', 'Open')}</a>
-                  )}
-                  <button type="button" onClick={() => { void navigator.clipboard?.writeText(q); }}>{L(dict, '复制', 'Copy')}</button>
-                </div>
-              ))}
-            </div>
-          )}
+          {qrChips}
 
           {/* Bounding-box selection button — top of result, next to summary */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
@@ -1094,6 +1129,7 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
               {memSearch.slice(0, 6).map((n0) => (
                 <button key={n0.id} type="button" className="nesio-camera-similar-item nesio-camera-similar-item--btn" onClick={() => setViewNode(n0)}>
                   <NodeTypeIcon type={n0.type} size={12} /> {n0.name}
+                  {visualMatchIds.has(n0.id) && <span className="nesio-camera-visual-badge">{L(dict, '图像相似', 'visual')}</span>}
                   <span style={{ marginLeft: 'auto', opacity: 0.6 }}>›</span>
                 </button>
               ))}
@@ -1256,6 +1292,8 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
             onTouchEnd={handleSelTouchEnd}
           />
           <div className="nesio-select-hint">{L(dict, '圈住区域让 AI 识别;或直接存,自己填名字', 'Circle an area for AI, or save directly and name it yourself')}</div>
+          {/* 批次 87:QR 拍完立刻可用 —— 不用等任何识别 */}
+          {qrChips && <div className="nesio-select-qr-slot">{qrChips}</div>}
           <div className="nesio-select-overlay-actions">
             {/* QA:AI 不再是唯一出路 —— 「直接存」零 AI 零等待;AI 识别是明示按钮 */}
             <button type="button" className="nesio-select-action-btn" onClick={saveWithoutAi}>{L(dict, '直接存', 'Save as-is')}</button>

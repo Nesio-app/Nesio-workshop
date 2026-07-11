@@ -15075,3 +15075,22 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
   width: 2rem !important;
   height: 2rem !important;
 }
+
+/* ── 批次 87:以图搜图徽标 + 圈选阶段 QR 槽位 ── */
+.nesio-camera-visual-badge {
+  flex-shrink: 0;
+  margin-left: 0.4rem;
+  font-size: 0.6rem;
+  padding: 0.08rem 0.4rem;
+  border-radius: 999px;
+  border: 1px solid rgba(140, 220, 160, 0.55);
+  color: #a9e8bc;
+  background: rgba(60, 160, 90, 0.18);
+}
+.nesio-select-qr-slot {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 3.4rem);
+  left: 1rem;
+  right: 1rem;
+  z-index: 3;
+}

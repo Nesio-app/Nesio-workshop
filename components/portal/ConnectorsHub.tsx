@@ -285,6 +285,13 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
             const dataUrl = await compressToDataUrl(list[i]);
             const imgId = `img-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 6)}`;
             await putLocalImage(imgId, dataUrl);
+            // 批次 87:批量导入也建视觉指纹(以图搜图索引)
+            void import('@/lib/portal/image-hash')
+              .then(async ({ computeDHash, saveImageHash }) => {
+                const h = await computeDHash(dataUrl);
+                if (h) saveImageHash(savedForThis[0].id, h);
+              })
+              .catch(() => {});
             const ex = savedForThis[0].assets || [];
             updateLifeNode(savedForThis[0].id, { assets: [...ex, { id: imgId, kind: 'image', mimeType: 'image/jpeg', local: true, createdAt: new Date().toISOString() }] });
           } catch { /* 图存本机失败不影响文字入库 */ }
