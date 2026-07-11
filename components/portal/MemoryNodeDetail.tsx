@@ -161,6 +161,8 @@ const HIDDEN_ATTRIBUTE_KEYS = new Set([
   'subtasksJson', 'done', 'doneAt', 'userTags', 'status', 'context', 'reminder',
   // Location (shown in PlaceSection)
   'lat', 'lon', 'address', 'location', 'room',
+  // 批次 57:捕获位置戳 —— 裸坐标不见人,地名已并入「记录于 · 地点」行
+  'capturedLat', 'capturedLon', 'capturedPlace',
   // Signal infrastructure — never user-visible
   'signalId', 'signalSource', 'signalType', 'signalVersion',
   'occuredAt', 'occurredAt', 'capturedAt', 'retentionPolicy', 'sensitivity',
@@ -498,6 +500,26 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
   const [readerOpen, setReaderOpen] = useState(false);
   // 批次 36:在 Nesio 内回复邮件
   const [composeOpen, setComposeOpen] = useState(false);
+  // 批次 57:有坐标没地名(反查当时没跑完/存量节点)→ 打开详情时自愈回填
+  const [healedPlace, setHealedPlace] = useState('');
+  useEffect(() => {
+    setHealedPlace('');
+    const attrs = node?.attributes;
+    if (!attrs || attrs.capturedPlace || typeof attrs.capturedLat !== 'number' || typeof attrs.capturedLon !== 'number') return;
+    let cancelled = false;
+    void import('@/lib/portal/weather').then(({ reverseGeocode }) =>
+      reverseGeocode(attrs.capturedLat as number, attrs.capturedLon as number).then((geo) => {
+        if (cancelled || !geo.label) return;
+        const label = geo.country ? `${geo.label}, ${geo.country}` : geo.label;
+        setHealedPlace(label);
+        const live = getLifeGraph().find((x) => x.id === node.id);
+        if (live && !live.attributes.capturedPlace) {
+          updateLifeNode(node.id, { attributes: { ...live.attributes, capturedPlace: label } });
+        }
+      }),
+    ).catch(() => {});
+    return () => { cancelled = true; };
+  }, [node]);
   useEffect(() => {
     const onView = (e: Event) => setViewImage((e as CustomEvent).detail);
     window.addEventListener('nesio-view-image', onView);
@@ -893,8 +915,11 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
 
           <p style={{ fontSize: '0.7rem', color: 'var(--portal-muted)', marginTop: '1rem' }}>
             {L(dict, '记录于', 'Noted on')} {createdDate}
-            {/* 批次 55:主动记忆自动盖位置戳 —— 记录于 时间 · 地点 */}
-            {typeof n.attributes?.capturedPlace === 'string' && n.attributes.capturedPlace ? ` · ${n.attributes.capturedPlace}` : ''}
+            {/* 批次 55/57:主动记忆自动盖位置戳 —— 记录于 时间 · 城市, 州, 国家(自愈反查兜底) */}
+            {(() => {
+              const place = (typeof n.attributes?.capturedPlace === 'string' && n.attributes.capturedPlace) || healedPlace;
+              return place ? ` · ${place}` : '';
+            })()}
           </p>
 
           {/* 标签三层重构:详情页的关联图撤下 —— 它把「同天创建/弱相似」画成箭头,

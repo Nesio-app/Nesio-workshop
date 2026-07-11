@@ -85,14 +85,30 @@ export function prefetchCaptureLocation(force = false): void {
       if (!fix.label && !labelInFlight) {
         labelInFlight = true;
         reverseGeocode(fix.lat, fix.lon)
-          .then((geo) => { if (geo.label) writeFixCache({ ...(readFixCache() ?? fix), label: geo.label }); })
+          .then((geo) => {
+            if (!geo.label) return;
+            // 批次 57(用户定案):地名 = 城市, 州缩写, 国家(Cary, NC, US)
+            const label = geo.country ? `${geo.label}, ${geo.country}` : geo.label;
+            writeFixCache({ ...(readFixCache() ?? fix), label });
+            feedFootprints(label, fix.lat, fix.lon);
+          })
           .catch(() => {})
           .finally(() => { labelInFlight = false; });
+      } else if (fix.label) {
+        feedFootprints(fix.label, fix.lat, fix.lon);
       }
     },
     () => { /* 拒绝/超时:保持旧缓存,盖章自然跳过 */ },
     { enableHighAccuracy: false, timeout: 8000, maximumAge: 120_000 },
   );
+}
+
+/** 批次 57:定位开关开着时,每次拿到定位顺手喂足迹(2h 同地去重在 place-trail 内),
+ *  修「足迹一直空」—— 不再只依赖天气链那条喂养路径。 */
+function feedFootprints(label: string, lat: number, lon: number): void {
+  import('./place-trail')
+    .then((m) => m.recordLiveVisit(label, lat, lon))
+    .catch(() => {});
 }
 
 function distMeters(a: { lat: number; lon: number }, b: { latitude: number; longitude: number }): number {

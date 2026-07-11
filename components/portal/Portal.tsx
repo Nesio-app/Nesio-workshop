@@ -571,6 +571,12 @@ export default function Portal() {
   // 批次 31:低饱和配色预览(Lab)—— 启动即按本机开关应用
   useEffect(() => { applyLowSatTheme(); }, []);
 
+  // 批次 57:「记忆自动定位」开着时,开屏预热一次手机定位 —— 顺手喂足迹
+  // (capture-location 内部:开关关/未授权都安全跳过,不弹框)
+  useEffect(() => {
+    void import('@/lib/portal/capture-location').then((m) => m.prefetchCaptureLocation()).catch(() => {});
+  }, []);
+
   // Allow TodayFeed empty state / other surfaces to open Tell Nesio or capture directly
   useEffect(() => {
     const handler = () => setActiveSurface((s) => s === 'tell' ? 'today' : 'tell');

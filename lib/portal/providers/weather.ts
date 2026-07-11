@@ -107,7 +107,7 @@ function formatStateCode(raw: string): string {
 async function reverseGeocodeOpenMeteo(
   lat: number,
   lon: number,
-): Promise<{ city: string; state: string; label: string } | null> {
+): Promise<{ city: string; state: string; label: string; country: string } | null> {
   try {
     const url = new URL('https://geocoding-api.open-meteo.com/v1/reverse');
     url.searchParams.set('latitude', String(lat));
@@ -122,8 +122,9 @@ async function reverseGeocodeOpenMeteo(
     if (!row) return null;
     const city = normalizeLocalPlaceName(String(row.name || ''));
     const state = formatStateCode(String(row.admin1 || ''));
+    const country = String(row.country_code || '').toUpperCase();
     const label = city && state ? `${city}, ${state}` : city || state;
-    return city ? { city, state, label } : null;
+    return city ? { city, state, label, country } : null;
   } catch {
     return null;
   }
@@ -132,7 +133,7 @@ async function reverseGeocodeOpenMeteo(
 export async function reverseGeocode(
   lat: number,
   lon: number,
-): Promise<{ city: string; state: string; label: string }> {
+): Promise<{ city: string; state: string; label: string; country: string }> {
   const openMeteo = await reverseGeocodeOpenMeteo(lat, lon);
   if (openMeteo) return openMeteo;
 
@@ -151,10 +152,11 @@ export async function reverseGeocode(
     const state = formatStateCode(
       String(data.principalSubdivisionCode || data.principalSubdivision || ''),
     );
+    const country = String(data.countryCode || '').toUpperCase();
     const label = city && state ? `${city}, ${state}` : city || state;
-    return { city, state, label };
+    return { city, state, label, country };
   } catch {
-    return { city: '', state: '', label: '' };
+    return { city: '', state: '', label: '', country: '' };
   }
 }
 
