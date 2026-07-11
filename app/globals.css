@@ -14988,3 +14988,49 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
   height: 100lvh;
   bottom: auto;
 }
+
+/* ── 批次 84:相机结果页 —— 搜记忆面板 / QR 芯片 / 相似行可点 ── */
+.nesio-camera-memsearch {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 0.8rem;
+  padding: 0.6rem 0.7rem;
+  margin: 0 0 0.6rem;
+}
+.nesio-camera-similar-item--btn {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  padding: 0.3rem 0;
+  cursor: pointer;
+  text-align: left;
+}
+.nesio-camera-qr-row { display: flex; flex-direction: column; gap: 0.4rem; margin: 0 0 0.5rem; }
+.nesio-camera-qr-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  border: 1px solid rgba(120, 200, 255, 0.4);
+  background: rgba(80, 150, 255, 0.12);
+  border-radius: 0.7rem;
+  padding: 0.45rem 0.65rem;
+  font-size: 0.78rem;
+  color: #dcecff;
+}
+.nesio-camera-qr-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nesio-camera-qr-chip a, .nesio-camera-qr-chip button {
+  flex-shrink: 0;
+  border: 1px solid rgba(120, 200, 255, 0.5);
+  background: none;
+  color: #9ecbff;
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.72rem;
+  text-decoration: none;
+  cursor: pointer;
+}

@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
+import { createPortal } from 'react-dom';
+import dynamicImport from 'next/dynamic';
+const MemoryNodeDetailLazy = dynamicImport(() => import('./MemoryNodeDetail'), { ssr: false });
 import { getLifeGraph, updateLifeNode, type LifeNode, type LifeNodeAsset } from '@/lib/portal/life-graph';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
 import { matchNearestPlace, formatLocation, getNamedPlaces } from '@/lib/portal/named-places';
 import LocationPicker from './LocationPicker';
-import { IconBox, IconCamera, IconImage } from './icons';
-import { PurchaseCoolingPanel } from './PurchaseCoolingPanel';
+import { IconBox, IconCamera, IconImage, NodeTypeIcon } from './icons';
 import { canUsePaidCloudAi } from '@/lib/portal/entitlement';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -272,6 +274,10 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
   const [sourceFile, setSourceFile] = useState<File | null>(null);
   // 批次 63:相册照片的 EXIF 拍摄地/拍摄时间(压缩会剥 EXIF,必须在原始字节上读)
   const [exifCap, setExifCap] = useState<{ lat: number | null; lon: number | null; takenAt: string | null } | null>(null);
+  // 批次 84:对标大厂相机 —— 本地记忆搜索(不必存)/ 已有节点详情 / 照片内 QR
+  const [viewNode, setViewNode] = useState<LifeNode | null>(null);
+  const [memSearch, setMemSearch] = useState<LifeNode[] | null>(null);
+  const [qrCodes, setQrCodes] = useState<string[]>([]);
   // Freehand selection state
   const [selecting, setSelecting] = useState(false);
   const selStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -470,6 +476,32 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
     setPhase('result');
   }
 
+  // 批次 84:识别结果 → 搜本地记忆库(smartSearch,纯查询)
+  function searchLocalMemory() {
+    const q = [
+      ...editedNodes.filter((n) => !n.deleted).map((n) => n.name),
+      result?.summary || '',
+    ].join(' ').trim().slice(0, 80);
+    if (!q) { setMemSearch([]); return; }
+    void import('@/lib/portal/smart-search').then(({ smartSearch }) => {
+      setMemSearch(smartSearch(q).nodes.slice(0, 8));
+    }).catch(() => setMemSearch([]));
+  }
+
+  // 批次 84:照片内二维码(WebKit 原生 BarcodeDetector,特性检测,不支持就静默)
+  async function detectQr(source: Blob) {
+    try {
+      const BD = (window as unknown as { BarcodeDetector?: new (opts: { formats: string[] }) => { detect: (img: ImageBitmap) => Promise<Array<{ rawValue: string }>> } }).BarcodeDetector;
+      if (!BD) return;
+      const detector = new BD({ formats: ['qr_code'] });
+      const bmp = await createImageBitmap(source);
+      const found = await detector.detect(bmp);
+      bmp.close?.();
+      const vals = [...new Set(found.map((f) => f.rawValue).filter(Boolean))];
+      if (vals.length) setQrCodes(vals);
+    } catch { /* 不支持/检测失败:功能静默缺席 */ }
+  }
+
   // Analyze the full captured image (called from selection overlay or result phase)
   async function analyzeFullImage() {
     if (!capturedBase64) return;
@@ -526,7 +558,9 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
   async function processFile(file: File) {
     setSourceFile(file);
     setExifCap(null);
+    setQrCodes([]); setMemSearch(null);
     if (file.type.startsWith('image/')) {
+      void detectQr(file);
       void import('@/lib/portal/exif-gps')
         .then(({ readExifCapture }) => readExifCapture(file))
         .then((cap) => { if (cap.lat != null || cap.takenAt) setExifCap(cap); })
@@ -896,6 +930,10 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
     startCamera(next);
   }
 
+  const viewNodePortal = viewNode && typeof document !== 'undefined'
+    ? createPortal(<MemoryNodeDetailLazy node={viewNode} onClose={() => setViewNode(null)} />, document.body)
+    : null;
+
   if (!open) return null;
 
   return (
@@ -1011,19 +1049,20 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
             </div>
           )}
 
-          {/* 购买冷静(批次 7):拍到想买的东西 → 已有类似 + 时薪换算 + 冻结 */}
-          {!isReceipt && editedNodes.some((n) => !n.deleted && n.type === 'object') && (() => {
-            const firstObjIdx = editedNodes.findIndex((n) => !n.deleted && n.type === 'object');
-            const firstObj = editedNodes[firstObjIdx];
-            const sims = similarItems[firstObjIdx] || [];
-            return (
-              <PurchaseCoolingPanel
-                productName={firstObj.name || L(dict, '这件东西', 'this item')}
-                similarCount={sims.length}
-                similarExample={sims[0]?.node.name}
-              />
-            );
-          })()}
+          {/* 批次 84(对标苹果相机):照片里的二维码 —— 打开/复制 */}
+          {qrCodes.length > 0 && (
+            <div className="nesio-camera-qr-row">
+              {qrCodes.slice(0, 2).map((q, qi) => (
+                <div key={qi} className="nesio-camera-qr-chip">
+                  <span className="nesio-camera-qr-text">{q.length > 42 ? `${q.slice(0, 42)}…` : q}</span>
+                  {/^https?:\/\//i.test(q) && (
+                    <a href={q} target="_blank" rel="noopener noreferrer">{L(dict, '打开', 'Open')}</a>
+                  )}
+                  <button type="button" onClick={() => { void navigator.clipboard?.writeText(q); }}>{L(dict, '复制', 'Copy')}</button>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Bounding-box selection button — top of result, next to summary */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
@@ -1038,7 +1077,28 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
                 {L(dict, '圈选', 'Circle')}
               </button>
             )}
+            {/* 批次 84(对标 Lens「点搜索」):识别结果直接搜本地记忆库 ——
+                纯查询,发现已有就不用存。 */}
+            <button type="button" className="nesio-camera-select-btn" onClick={searchLocalMemory}>
+              {L(dict, '搜记忆', 'Search')}
+            </button>
           </div>
+
+          {memSearch && (
+            <div className="nesio-camera-memsearch">
+              <p className="nesio-camera-similar-title" style={{ margin: '0 0 0.35rem' }}>
+                {memSearch.length
+                  ? L(dict, `记忆库里找到 ${memSearch.length} 条相似`, `${memSearch.length} similar in Memory`)
+                  : L(dict, '记忆库里没有相似的 —— 是新东西', 'Nothing similar in Memory — looks new')}
+              </p>
+              {memSearch.slice(0, 6).map((n0) => (
+                <button key={n0.id} type="button" className="nesio-camera-similar-item nesio-camera-similar-item--btn" onClick={() => setViewNode(n0)}>
+                  <NodeTypeIcon type={n0.type} size={12} /> {n0.name}
+                  <span style={{ marginLeft: 'auto', opacity: 0.6 }}>›</span>
+                </button>
+              ))}
+            </div>
+          )}
 
           <div className="nesio-camera-result-nodes">
             {editedNodes.map((node, i) => node.deleted ? null : (
@@ -1077,10 +1137,12 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
                     <div className="nesio-camera-similar-body">
                       <p className="nesio-camera-similar-title">{L(dict, '等等，你好像已经有了', 'Wait — you might already have this')}</p>
                       {similarItems[i].slice(0, 2).map((s) => (
-                        <p key={s.node.id} className="nesio-camera-similar-item">
-                          📦 {s.node.name}
+                        <button key={s.node.id} type="button" className="nesio-camera-similar-item nesio-camera-similar-item--btn"
+                          onClick={() => setViewNode(s.node)}>
+                          <IconBox size={12} /> {s.node.name}
                           {s.node.attributes?.location ? <span className="nesio-camera-similar-loc"> · {String(s.node.attributes.location)}</span> : null}
-                        </p>
+                          <span style={{ marginLeft: 'auto', opacity: 0.6 }}>›</span>
+                        </button>
                       ))}
                     </div>
                     <button
@@ -1211,6 +1273,7 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
         </div>
       )}
 
+      {viewNodePortal}
     </div>
   );
 }
