@@ -554,6 +554,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
   const [addedRels, setAddedRels] = useState<Array<{ targetId: string; relation: string }>>([]);
   const [linkPicking, setLinkPicking] = useState(false);
   const [linkQuery, setLinkQuery] = useState('');
+  const [linkError, setLinkError] = useState(''); // 批次 94:关联出错时可见,便于用户截图反馈
   const [rawExpanded, setRawExpanded] = useState(false); // 批次 74:原始记录折叠
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [editing, setEditing] = useState(false);
@@ -887,22 +888,33 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
             const live = rels
               .map((r) => ({ r, node: g.find((x) => x.id === r.targetId) }))
               .filter((x): x is { r: { targetId: string; relation: string }; node: LifeNode } => Boolean(x.node) && Boolean(REL_LABEL[x.r.relation]));
+            // 批次 94(用户实锤关联记忆闪退):onClick 里抛的错 React 错误边界
+            // 抓不到(只抓 render),会冒到全局 → 批次 85 处理器可能触发重载 =
+            // 看起来「闪退」。addRel/removeRel 全包 try/catch,任何异常只吞不炸。
             const removeRel = (r: { targetId: string; relation: string }) => {
-              setRemovedRels((prev) => new Set(prev).add(`${r.relation}:${r.targetId}`));
-              const liveN = g.find((x) => x.id === n.id);
-              if (liveN) updateLifeNode(n.id, { relations: (liveN.relations || []).filter((x) => !(x.targetId === r.targetId && x.relation === r.relation)) });
-              const t = g.find((x) => x.id === r.targetId);
-              if (t) updateLifeNode(t.id, { relations: (t.relations || []).filter((x) => x.targetId !== n.id) });
-              logLinkFeedback({ action: 'removed', relation: r.relation, from: n.id, to: r.targetId });
+              try {
+                setRemovedRels((prev) => new Set(prev).add(`${r.relation}:${r.targetId}`));
+                const liveN = g.find((x) => x.id === n.id);
+                if (liveN) updateLifeNode(n.id, { relations: (liveN.relations || []).filter((x) => !(x.targetId === r.targetId && x.relation === r.relation)) });
+                const t = g.find((x) => x.id === r.targetId);
+                if (t) updateLifeNode(t.id, { relations: (t.relations || []).filter((x) => x.targetId !== n.id) });
+                logLinkFeedback({ action: 'removed', relation: r.relation, from: n.id, to: r.targetId });
+              } catch (err) { console.error('[link] remove_failed', err); setLinkError(`解除出错:${err instanceof Error ? err.message : String(err)}`.slice(0, 120)); }
             };
             const addRel = (t: LifeNode) => {
-              if (t.id === n.id || rels.some((x) => x.targetId === t.id)) { setLinkPicking(false); return; }
-              const liveN = g.find((x) => x.id === n.id);
-              updateLifeNode(n.id, { relations: [...(liveN?.relations || []), { targetId: t.id, relation: 'user_linked' }] });
-              updateLifeNode(t.id, { relations: [...(t.relations || []), { targetId: n.id, relation: 'user_linked' }] });
-              setAddedRels((prev) => [...prev, { targetId: t.id, relation: 'user_linked' }]);
-              logLinkFeedback({ action: 'added', relation: 'user_linked', from: n.id, to: t.id });
-              setLinkPicking(false); setLinkQuery('');
+              try {
+                if (t.id === n.id || rels.some((x) => x.targetId === t.id)) { setLinkPicking(false); setLinkQuery(''); return; }
+                const liveN = g.find((x) => x.id === n.id);
+                updateLifeNode(n.id, { relations: [...(liveN?.relations || []), { targetId: t.id, relation: 'user_linked' }] });
+                updateLifeNode(t.id, { relations: [...((g.find((x) => x.id === t.id)?.relations) || []), { targetId: n.id, relation: 'user_linked' }] });
+                setAddedRels((prev) => [...prev, { targetId: t.id, relation: 'user_linked' }]);
+                logLinkFeedback({ action: 'added', relation: 'user_linked', from: n.id, to: t.id });
+              } catch (err) {
+                console.error('[link] add_failed', err);
+                setLinkError(`关联出错:${err instanceof Error ? err.message : String(err)}`.slice(0, 120));
+              } finally {
+                setLinkQuery('');
+              }
             };
             const candidates = linkPicking && linkQuery.trim().length >= 1
               ? searchLifeGraphFuzzy(linkQuery.trim(), 6).filter((x) => x.id !== n.id)
@@ -939,6 +951,9 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
                     ))}
                     <button type="button" className="nesio-node-link-add" onClick={() => { setLinkPicking(false); setLinkQuery(''); }}>{L(dict, '收起', 'Close')}</button>
                   </div>
+                )}
+                {linkError && (
+                  <p style={{ fontSize: '0.7rem', color: 'var(--status-risk)', margin: '0.3rem 0 0', wordBreak: 'break-all' }}>{linkError}</p>
                 )}
               </div>
             );
