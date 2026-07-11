@@ -18,6 +18,9 @@ import {
 import { wallHHMM, dateKeyToLocalDate } from '@/lib/portal/place-time.mjs';
 import { monthlyPlaceComparison, weekRhythm, footprintHighlights } from '@/lib/portal/place-stats';
 import PlaceMap from './PlaceMap';
+import dynamic from 'next/dynamic';
+import { getLifeGraph } from '@/lib/portal/life-graph';
+const MemoryMapSheet = dynamic(() => import('./MemoryMapSheet'), { ssr: false });
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -50,6 +53,7 @@ export default function TimelineTab() {
   const [geoMsg, setGeoMsg] = useState('');
   const [expandedCat, setExpandedCat] = useState<string | null>(null); // 批次 39:地点分类展开
   const [catPickFor, setCatPickFor] = useState<string | null>(null); // 批次 40:给地点手动选类别
+  const [memMapOpen, setMemMapOpen] = useState(false); // 批次 59:地图上的记忆
 
   useEffect(() => { setGeoOn(loadGeocodeEnabled()); }, []);
 
@@ -63,6 +67,21 @@ export default function TimelineTab() {
   const days = useMemo(() => timelineDays(trail), [trail]);
   const dateKey = days[dayIdx];
   const journey = useMemo(() => (dateKey ? buildDayJourney(trail, dateKey) : []), [trail, dateKey]);
+  // 批次 59:该到访地点/时段记了多少条记忆(capturedLat/Lon <250m 且时间落在停留窗 ±30min)
+  const geoMems = useMemo(() => getLifeGraph()
+    .map((n) => ({ n, lat: n.attributes?.capturedLat, lon: n.attributes?.capturedLon, t: new Date(n.createdAt).getTime() }))
+    .filter((g): g is { n: typeof g.n; lat: number; lon: number; t: number } => typeof g.lat === 'number' && typeof g.lon === 'number'), [trail]);
+  const memAtVisit = (seg: { lat?: number; lon?: number; start: string; end: string }): number => {
+    if (typeof seg.lat !== 'number' || typeof seg.lon !== 'number') return 0;
+    const t0 = new Date(seg.start).getTime() - 30 * 60_000;
+    const t1 = new Date(seg.end).getTime() + 30 * 60_000;
+    return geoMems.filter((g) => {
+      if (g.t < t0 || g.t > t1) return false;
+      const dLat = (g.lat - (seg.lat as number)) * 111_320;
+      const dLon = (g.lon - (seg.lon as number)) * 111_320 * Math.cos(((seg.lat as number) * Math.PI) / 180);
+      return Math.hypot(dLat, dLon) < 250;
+    }).length;
+  };
   const stats = useMemo(() => dayStats(journey), [journey]);
   const clusters = useMemo(() => clusterPlaces(trail, 10), [trail]);
   const catShare = useMemo(() => categoryTimeShare(trail), [trail]);
@@ -191,7 +210,10 @@ export default function TimelineTab() {
                 <span className={`nesio-pt-dot nesio-pt-dot--${it.seg.category}`} aria-hidden />
                 <div className="nesio-tl-item-body">
                   <div className="nesio-tl-item-top"><span className="nesio-tl-item-name">{displayLabel(it.seg.label)}</span><span className="nesio-tl-item-dur">{fmtDur(it.seg.durationMin)}</span></div>
-                  <span className="nesio-tl-item-time">{hhmm(it.seg.start)}{it.seg.durationMin >= 1 ? ` – ${hhmm(it.seg.end)}` : ''}</span>
+                  <span className="nesio-tl-item-time">
+                    {hhmm(it.seg.start)}{it.seg.durationMin >= 1 ? ` – ${hhmm(it.seg.end)}` : ''}
+                    {(() => { const n = memAtVisit(it.seg); return n > 0 ? <span className="nesio-tl-item-mem"> · {L(dict, `记了 ${n} 条`, `${n} memories`)}</span> : null; })()}
+                  </span>
                 </div>
               </div>
             ) : (
@@ -243,8 +265,13 @@ export default function TimelineTab() {
             </p>
           )}
 
-          {/* ── 真实地图概览:常去地点打点(大小=停留时长)── */}
-          {mapPoints.length > 0 && <PlaceMap points={mapPoints} height={200} />}
+          {/* ── 真实地图概览(批次 59:点一下进入可缩放的「地图上的记忆」)── */}
+          {mapPoints.length > 0 && (
+            <button type="button" className="nesio-tl-map-open" onClick={() => setMemMapOpen(true)} aria-label={L(dict, '打开地图上的记忆', 'Open memories in maps')}>
+              <PlaceMap points={mapPoints} height={200} />
+              <span className="nesio-tl-map-open-hint">{L(dict, '点开看地图上的记忆 · 可缩放', 'Tap for memories in maps · zoomable')}</span>
+            </button>
+          )}
 
           {/* ── 生活节奏:星期 × 时段外出热力 ── */}
           {rhythm.max > 1 && (
@@ -432,6 +459,9 @@ export default function TimelineTab() {
       )}
 
       <p className="nesio-place-trail-count">{L(dict, `共 ${trail.length} 个打点`, `${trail.length} points total`)}</p>
+
+      {/* 批次 59:地图上的记忆(全屏可缩放) */}
+      <MemoryMapSheet open={memMapOpen} onClose={() => setMemMapOpen(false)} />
     </div>
   );
 }

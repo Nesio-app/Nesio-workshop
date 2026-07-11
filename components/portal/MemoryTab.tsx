@@ -338,7 +338,14 @@ function cleanMemoryPreview(node: LifeNode, dict: DictLocale = 'zh'): string {
     const d = new Date(node.createdAt).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'numeric', day: 'numeric' });
     return L(dict, `一段 ${d} 的心情记录 · 点开查看`, `A mood entry from ${d} · tap to view`);
   }
-  const raw = node.rawInput || Object.values(node.attributes).join(' · ');
+  // 批次 59:属性兜底改走可见名单 —— 位置戳/信号基建/内部字段绝不上卡片面
+  // (此前 Object.values 全量拼接,capturedLat/Lon 裸坐标直接糊在卡片上)。
+  const PREVIEW_HIDDEN = /^(capturedLat|capturedLon|capturedPlace|lat|lon|signalId|signalSource|signalType|signalVersion|occurredAt|capturedAt|externalId|calendarId|calendarName|subtasksJson|done|doneAt|focusPinnedOn|retentionPolicy|sensitivity|schemaVersion|sourceNodeId|emailId|messageId|htmlLink|context|userTags|status)$/;
+  const attrPreview = Object.entries(node.attributes)
+    .filter(([k, v]) => !PREVIEW_HIDDEN.test(k) && typeof v === 'string' && v.trim())
+    .map(([, v]) => v as string)
+    .join(' · ');
+  const raw = node.rawInput || attrPreview;
   const cleaned = raw
     .replace(node.name, '')
     // 批次 24:剥掉链接与裸 URL 片段(flomo/导入节点常把 memo_id、模板路径

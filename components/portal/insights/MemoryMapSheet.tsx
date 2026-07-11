@@ -1,0 +1,219 @@
+'use client';
+
+/**
+ * MemoryMapSheet — 地图上的记忆(批次 59,用户愿景:Journal 的 Memories in Maps)。
+ *
+ * 全屏交互地图:PlaceMap 同款 Web Mercator + OSM 瓦片数学,加上
+ * 拖拽平移(pointer 事件,拖动时 CSS 位移、松手重排瓦片)与 ± 缩放。
+ * 数据 = 带 capturedLat/Lon 的记忆节点,按屏幕像素距离(<44px)聚簇,
+ * 气泡上直接显示「这里记了几条」;点气泡在底部列出该处记忆。
+ * 零依赖 —— 不引 Leaflet/Mapbox,CSP 不变。
+ */
+
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { getLifeGraph, type LifeNode } from '@/lib/portal/life-graph';
+import { L } from '@/lib/portal/i18n';
+import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
+import { usePortalLocale } from '../use-portal-locale';
+import { NodeTypeIcon } from '../icons';
+
+const TILE = 256;
+const MIN_Z = 3;
+const MAX_Z = 18;
+
+function xWorld(lon: number, z: number): number {
+  return ((lon + 180) / 360) * TILE * 2 ** z;
+}
+function yWorld(lat: number, z: number): number {
+  const r = (Math.max(-85, Math.min(85, lat)) * Math.PI) / 180;
+  return ((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * TILE * 2 ** z;
+}
+function lonOfX(x: number, z: number): number {
+  return (x / (TILE * 2 ** z)) * 360 - 180;
+}
+function latOfY(y: number, z: number): number {
+  const n = Math.PI - (2 * Math.PI * y) / (TILE * 2 ** z);
+  return (180 / Math.PI) * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)));
+}
+
+interface GeoNode { node: LifeNode; lat: number; lon: number }
+interface Cluster { lat: number; lon: number; items: GeoNode[] }
+
+function geoNodes(): GeoNode[] {
+  return getLifeGraph()
+    .map((node) => {
+      const lat = node.attributes?.capturedLat;
+      const lon = node.attributes?.capturedLon;
+      return typeof lat === 'number' && typeof lon === 'number' ? { node, lat, lon } : null;
+    })
+    .filter((g): g is GeoNode => g !== null);
+}
+
+/** 按当前缩放的屏幕像素距离聚簇(<44px 归一簇)—— 缩放越大簇越散。 */
+function clusterAtZoom(items: GeoNode[], z: number): Cluster[] {
+  const out: Array<Cluster & { px: number; py: number }> = [];
+  for (const g of items) {
+    const px = xWorld(g.lon, z);
+    const py = yWorld(g.lat, z);
+    const hit = out.find((c) => Math.hypot(c.px - px, c.py - py) < 44);
+    if (hit) {
+      hit.items.push(g);
+      // 簇心取均值,气泡随成员轻微居中
+      hit.px = (hit.px * (hit.items.length - 1) + px) / hit.items.length;
+      hit.py = (hit.py * (hit.items.length - 1) + py) / hit.items.length;
+      hit.lat = latOfY(hit.py, z);
+      hit.lon = lonOfX(hit.px, z);
+    } else {
+      out.push({ lat: g.lat, lon: g.lon, items: [g], px, py });
+    }
+  }
+  return out;
+}
+
+export default function MemoryMapSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState({ w: 360, h: 480 });
+  const [view, setView] = useState<{ lat: number; lon: number; z: number } | null>(null);
+  const [dragPx, setDragPx] = useState<{ dx: number; dy: number } | null>(null);
+  const dragStart = useRef<{ x: number; y: number } | null>(null);
+  const [picked, setPicked] = useState<Cluster | null>(null);
+
+  const all = useMemo(() => (open ? geoNodes() : []), [open]);
+
+  // 初始视野:装下全部点(单点给街区级)
+  useEffect(() => {
+    if (!open || view || all.length === 0) return;
+    const lats = all.map((g) => g.lat);
+    const lons = all.map((g) => g.lon);
+    const minLat = Math.min(...lats); const maxLat = Math.max(...lats);
+    const minLon = Math.min(...lons); const maxLon = Math.max(...lons);
+    let z = 15;
+    for (; z > MIN_Z; z--) {
+      const w = xWorld(maxLon, z) - xWorld(minLon, z);
+      const h = yWorld(minLat, z) - yWorld(maxLat, z);
+      if (w <= size.w - 80 && h <= size.h - 160) break;
+    }
+    setView({ lat: (minLat + maxLat) / 2, lon: (minLon + maxLon) / 2, z });
+  }, [open, view, all, size]);
+
+  useEffect(() => {
+    if (!open) { setView(null); setPicked(null); setDragPx(null); return; }
+    const el = wrapRef.current;
+    if (!el) return;
+    const update = () => setSize({ w: el.clientWidth || 360, h: el.clientHeight || 480 });
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, [open]);
+
+  if (!open) return null;
+
+  const clusters = view ? clusterAtZoom(all, view.z) : [];
+  const cx = view ? xWorld(view.lon, view.z) : 0;
+  const cy = view ? yWorld(view.lat, view.z) : 0;
+  const left = cx - size.w / 2 - (dragPx?.dx ?? 0);
+  const top = cy - size.h / 2 - (dragPx?.dy ?? 0);
+
+  const tiles: Array<{ key: string; x: number; y: number; px: number; py: number }> = [];
+  if (view) {
+    const n = 2 ** view.z;
+    for (let tx = Math.floor(left / TILE); tx * TILE < left + size.w; tx++) {
+      for (let ty = Math.max(0, Math.floor(top / TILE)); ty * TILE < top + size.h && ty < n; ty++) {
+        tiles.push({ key: `${view.z}-${tx}-${ty}`, x: ((tx % n) + n) % n, y: ty, px: tx * TILE - left, py: ty * TILE - top });
+      }
+    }
+  }
+
+  const zoomTo = (dz: number) => {
+    setPicked(null);
+    setView((v) => (v ? { ...v, z: Math.max(MIN_Z, Math.min(MAX_Z, v.z + dz)) } : v));
+  };
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    dragStart.current = { x: e.clientX, y: e.clientY };
+    (e.target as Element).setPointerCapture?.(e.pointerId);
+  };
+  const onPointerMove = (e: React.PointerEvent) => {
+    if (!dragStart.current) return;
+    setDragPx({ dx: e.clientX - dragStart.current.x, dy: e.clientY - dragStart.current.y });
+  };
+  const onPointerUp = () => {
+    if (!dragStart.current) return;
+    const d = dragPx;
+    dragStart.current = null;
+    setDragPx(null);
+    if (d && view && (Math.abs(d.dx) > 4 || Math.abs(d.dy) > 4)) {
+      setView({ ...view, lon: lonOfX(cx - d.dx, view.z), lat: latOfY(cy - d.dy, view.z) });
+    }
+  };
+
+  return (
+    <div className="nesio-memmap-overlay" role="dialog" aria-modal="true" aria-label={L(dict, '地图上的记忆', 'Memories in maps')}>
+      <div className="nesio-memmap-header">
+        <span className="nesio-memmap-title">{L(dict, '地图上的记忆', 'Memories in maps')}</span>
+        <span className="nesio-memmap-count">{L(dict, `${all.length} 条带位置`, `${all.length} located`)}</span>
+        <button type="button" className="nesio-memmap-close" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}>✕</button>
+      </div>
+      <div
+        ref={wrapRef}
+        className="nesio-memmap-canvas"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+      >
+        {all.length === 0 && (
+          <p className="nesio-memmap-empty">{L(dict, '还没有带位置的记忆。开启「记忆自动定位」后,亲手记的每一条都会出现在这里。', 'No located memories yet. Turn on auto-locate and every capture lands here.')}</p>
+        )}
+        {tiles.map((t) => (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img key={t.key} src={`https://tile.openstreetmap.org/${view!.z}/${t.x}/${t.y}.png`} alt="" loading="lazy" draggable={false}
+            style={{ position: 'absolute', left: t.px, top: t.py, width: TILE, height: TILE, pointerEvents: 'none' }} />
+        ))}
+        {view && clusters.map((c, i) => {
+          const px = xWorld(c.lon, view.z) - left;
+          const py = yWorld(c.lat, view.z) - top;
+          const r = Math.min(26, 13 + Math.sqrt(c.items.length) * 3);
+          return (
+            <button
+              key={i}
+              type="button"
+              className="nesio-memmap-bubble"
+              style={{ left: px - r, top: py - r, width: r * 2, height: r * 2 }}
+              onClick={(e) => { e.stopPropagation(); setPicked(c); }}
+              aria-label={L(dict, `这里记了 ${c.items.length} 条`, `${c.items.length} memories here`)}
+            >{c.items.length}</button>
+          );
+        })}
+        <a className="nesio-tl-map-attr" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap</a>
+        <div className="nesio-memmap-zoom">
+          <button type="button" onClick={() => zoomTo(1)} aria-label={L(dict, '放大', 'Zoom in')}>+</button>
+          <button type="button" onClick={() => zoomTo(-1)} aria-label={L(dict, '缩小', 'Zoom out')}>−</button>
+        </div>
+      </div>
+      {picked && (
+        <div className="nesio-memmap-list">
+          <p className="nesio-memmap-list-title">
+            {(() => {
+              const named = picked.items.find((g) => typeof g.node.attributes.capturedPlace === 'string' && g.node.attributes.capturedPlace);
+              const place = named ? String(named.node.attributes.capturedPlace) : `${picked.lat.toFixed(3)}, ${picked.lon.toFixed(3)}`;
+              return L(dict, `${place} · ${picked.items.length} 条记忆`, `${place} · ${picked.items.length} memories`);
+            })()}
+          </p>
+          <div className="nesio-memmap-list-scroll">
+            {picked.items.slice(0, 20).map(({ node }) => (
+              <div key={node.id} className="nesio-memmap-item">
+                <NodeTypeIcon type={node.type} size={13} />
+                <span className="nesio-memmap-item-name">{node.name}</span>
+                <span className="nesio-memmap-item-time">
+                  {new Date(node.createdAt).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'numeric', day: 'numeric' })}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

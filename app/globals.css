@@ -14588,3 +14588,53 @@ html[data-portal-theme="night"] .nesio-collapsed-section {
 .nesio-fav-card { text-align: left; cursor: pointer; }
 .nesio-fav-card-hint { margin-left: auto; font-size: 0.7rem; color: var(--portal-muted); }
 .nesio-fav-expanded { margin-top: 0.6rem; }
+
+/* ── 批次 59:地图上的记忆 ─────────────────────────────────────────────── */
+.nesio-tl-map-open { position: relative; display: block; width: 100%; padding: 0; border: none; background: none; cursor: pointer; text-align: left; }
+.nesio-tl-map-open-hint {
+  position: absolute; left: 50%; bottom: 0.55rem; transform: translateX(-50%);
+  font-size: 0.72rem; color: var(--portal-ink); background: var(--glass-bg-pop);
+  border: 1px solid var(--portal-line); border-radius: 999px; padding: 0.22rem 0.7rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12); white-space: nowrap; pointer-events: none;
+}
+.nesio-memmap-overlay {
+  position: fixed; inset: 0; z-index: 400; display: flex; flex-direction: column;
+  background: var(--portal-bg, #f4f8fd);
+}
+.nesio-memmap-header {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: calc(env(safe-area-inset-top, 0px) + 0.7rem) 1rem 0.7rem;
+  background: var(--glass-bg-pop); border-bottom: 1px solid var(--portal-line);
+}
+.nesio-memmap-title { font-weight: 700; font-size: 1rem; color: var(--portal-ink); }
+.nesio-memmap-count { font-size: 0.76rem; color: var(--portal-muted); flex: 1; }
+.nesio-memmap-close { border: none; background: none; font-size: 1.05rem; color: var(--portal-muted); cursor: pointer; padding: 0.2rem 0.4rem; }
+.nesio-memmap-canvas { position: relative; flex: 1; overflow: hidden; touch-action: none; background: #e8eef5; }
+.nesio-memmap-empty { position: absolute; inset: 0; display: grid; place-items: center; padding: 2rem; text-align: center; color: var(--portal-muted); font-size: 0.86rem; }
+.nesio-memmap-bubble {
+  position: absolute; display: grid; place-items: center; border-radius: 50%;
+  background: var(--portal-accent); color: #fff; font-weight: 700; font-size: 0.82rem;
+  border: 2.5px solid rgba(255,255,255,0.95); box-shadow: 0 2px 10px rgba(0,0,0,0.28);
+  cursor: pointer; padding: 0;
+}
+.nesio-memmap-zoom {
+  position: absolute; right: 0.8rem; bottom: 1rem; display: flex; flex-direction: column; gap: 0.4rem;
+}
+.nesio-memmap-zoom button {
+  width: 2.4rem; height: 2.4rem; border-radius: 0.7rem; border: 1px solid var(--portal-line);
+  background: var(--glass-bg-pop); color: var(--portal-ink); font-size: 1.2rem; font-weight: 700;
+  cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+.nesio-memmap-list {
+  max-height: 34dvh; overflow-y: auto; background: var(--glass-bg-pop);
+  border-top: 1px solid var(--portal-line);
+  padding: 0.7rem 1rem calc(env(safe-area-inset-bottom, 0px) + 0.8rem);
+}
+.nesio-memmap-list-title { font-size: 0.8rem; font-weight: 600; color: var(--portal-muted); margin: 0 0 0.5rem; }
+.nesio-memmap-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.42rem 0; border-bottom: 1px solid var(--portal-line); }
+.nesio-memmap-item:last-child { border-bottom: none; }
+.nesio-memmap-item-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.86rem; color: var(--portal-ink); }
+.nesio-memmap-item-time { font-size: 0.74rem; color: var(--portal-muted); flex: none; }
+.nesio-tl-item-mem { color: var(--portal-accent); font-weight: 600; }
+html[data-portal-theme="night"] .nesio-memmap-overlay { background: var(--portal-bg, #0e1626); }
+html[data-portal-theme="night"] .nesio-memmap-canvas { background: #16243c; }
