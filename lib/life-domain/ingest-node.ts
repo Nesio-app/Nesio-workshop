@@ -18,22 +18,63 @@ import './node-fact-sink';
 
 import { addLifeNode, getLifeGraph, updateLifeNode, type LifeNode } from '@/lib/portal/life-graph';
 import { loadLastLocation, refreshLocation } from '@/lib/portal/location-store';
+import { captureLocationEnabled, getFreshCaptureFix, prefetchCaptureLocation } from '@/lib/portal/capture-location';
 import { lifeNodeToSignal } from './signal';
 import { signalWriteMode, writeCloudSignal } from './create-signal';
 
 export type IngestNodeInput = Omit<LifeNode, 'id' | 'createdAt'>;
 
-// 批次 55(用户点名):主动记下的每一条记忆(文字/图片/语音)自动盖上当时的
+// 批次 55/56(用户点名):主动记下的每一条记忆(文字/图片/语音)自动盖上当时的
 // 位置戳。只盖捕获源 —— 导入类(email/calendar/system/device)的"当时"不是
-// 设备此刻,不盖。规则:读定位缓存,≤20 分钟才贴(宁缺毋错);已授权过
-// (有过缓存)才顺手异步刷新保温,绝不在捕获路径上弹权限打断记录。
+// 设备此刻,不盖。两档:
+//  ① 「记忆自动定位」开关开(批次 56):手机定位的精确坐标(捕获面打开时已预热,
+//    盖章只读 ≤5 分钟缓存,不等 GPS);地名没来得及反查的,回填钩子异步补。
+//  ② 开关关:维持保守老路 —— 天气链的城市级缓存,≤20 分钟才贴,
+//    已授权过才顺手刷新,绝不在捕获路径上弹权限打断记录。
 const CAPTURE_SOURCES = new Set<string>(['manual', 'voice', 'photo']);
 const CAPTURE_LOC_MAX_AGE = 20 * 60_000;
 
+let pendingLabelBackfill: ((nodeId: string) => void) | null = null;
+
 function stampCaptureLocation(input: IngestNodeInput): IngestNodeInput {
+  pendingLabelBackfill = null;
   if (typeof window === 'undefined' || !CAPTURE_SOURCES.has(input.source)) return input;
   const attrs = input.attributes || {};
   if (attrs.capturedPlace || attrs.capturedLat || attrs.location) return input; // 调用方已带位置
+
+  if (captureLocationEnabled()) {
+    const fix = getFreshCaptureFix();
+    prefetchCaptureLocation(); // 保温下一条(已授权,节流内不打扰)
+    if (!fix) return input;
+    if (!fix.label) {
+      // 坐标先落,地名反查到位后按坐标就近回填(300ms 轮询 ×10,反查慢就算了)
+      pendingLabelBackfill = (nodeId: string) => {
+        let tries = 0;
+        const tick = () => {
+          const fresh = getFreshCaptureFix(15 * 60_000);
+          if (fresh?.label) {
+            const node = getLifeGraph().find((n) => n.id === nodeId);
+            if (node && !node.attributes.capturedPlace) {
+              updateLifeNode(nodeId, { attributes: { ...node.attributes, capturedPlace: fresh.label } });
+            }
+            return;
+          }
+          if (++tries < 10) setTimeout(tick, 300);
+        };
+        setTimeout(tick, 300);
+      };
+    }
+    return {
+      ...input,
+      attributes: {
+        ...attrs,
+        ...(fix.label ? { capturedPlace: fix.label } : {}),
+        capturedLat: fix.lat,
+        capturedLon: fix.lon,
+      },
+    };
+  }
+
   const loc = loadLastLocation();
   if (loc) void refreshLocation().catch(() => {}); // 保温下一条;无缓存不主动请求权限
   if (!loc || Date.now() - loc.ts > CAPTURE_LOC_MAX_AGE) return input;
@@ -72,6 +113,8 @@ export function ingestLifeNode(input: IngestNodeInput): LifeNode {
   }
   // 本地事实追加已由 node-fact-sink 在 addLifeNode/updateLifeNode 写入点完成
   //(架构审查 #1:写入点收口后这里不再重复 append,只管云镜像)。
+  // 批次 56:定位盖章时地名还没反查到 → 异步回填 capturedPlace
+  if (pendingLabelBackfill) { pendingLabelBackfill(node.id); pendingLabelBackfill = null; }
   const signal = lifeNodeToSignal(node);
   if (signalWriteMode() === 'cloud_mirror_pending') {
     void writeCloudSignal(signal);

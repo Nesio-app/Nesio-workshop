@@ -12,6 +12,7 @@ import { L, t } from '@/lib/portal/i18n';
 import { usePortalLocale } from './use-portal-locale';
 import { IconChevronRight, IconHalfMoon, IconLink, IconLock, IconMoon, IconShield, IconSun } from './icons';
 import { InfoTip } from './InfoTip';
+import { captureLocationEnabled, setCaptureLocationEnabled } from '@/lib/portal/capture-location';
 import { PROACTIVE_LEVEL_KEY } from './today/proactive-types';
 import { deleteLifeNode, getLifeGraph } from '@/lib/portal/life-graph';
 import { purgeLocalData } from '@/lib/portal/storage-manifest';
@@ -77,6 +78,7 @@ export function GeneralSheet({ open, onClose }: SheetProps) {
   const [dailyReportOn, setDailyReportOn] = useState(false);
   const [theme, setTheme] = useState<ThemeChoice>('auto');
   const [themeSaveIssue, setThemeSaveIssue] = useState('');
+  const [captureLocOn, setCaptureLocOn] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -89,6 +91,7 @@ export function GeneralSheet({ open, onClose }: SheetProps) {
       setHapticsOn(localStorage.getItem(HAPTIC_FEEDBACK_KEY) !== '0');
       const th = localStorage.getItem(THEME_KEY);
       setTheme(th === 'day' || th === 'night' ? th : 'auto');
+      setCaptureLocOn(captureLocationEnabled());
     } catch { /* ignore */ }
   }, [open]);
 
@@ -232,6 +235,24 @@ export function GeneralSheet({ open, onClose }: SheetProps) {
         </span>
       </button>
       </>)}
+
+      {/* 批次 56:记忆自动定位 —— 开启即请求手机定位权限(权限时刻在这里,不在记录途中) */}
+      <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '记忆定位', 'Memory location')}</p>
+      <button type="button"
+        className={`nesio-settings-option${captureLocOn ? ' nesio-settings-option--active' : ''}`}
+        onClick={() => {
+          const next = !captureLocOn;
+          setCaptureLocOn(next);
+          setCaptureLocationEnabled(next);
+        }}>
+        <div>
+          <span className="nesio-settings-option-label">{L(dict, '记忆自动定位', 'Auto-locate memories')}</span>
+          <span className="nesio-settings-option-hint">{L(dict, '开启后,每条亲手记下的记忆(文字/照片/语音)自动带上当时的精确位置 —— 多一个回看和分析的维度。只存本机记忆里,导入的邮件/日历不会盖。', 'Every memory you capture (text, photo, voice) gets stamped with where you were — one more dimension to look back on. Stored with your local memories only; imported email/calendar items are never stamped.')}</span>
+        </div>
+        <span className={`nesio-settings-space-check${captureLocOn ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>
+          {captureLocOn ? '✓' : '○'}
+        </span>
+      </button>
 
       <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{t(locale, 'sectionAppearance')}<InfoTip text={t(locale, 'generalAutoHint')} /></p>
       <div style={{ display: 'flex', gap: '0.5rem' }}>

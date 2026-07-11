@@ -10,6 +10,7 @@
 
 import { useRef } from 'react';
 import { L } from '@/lib/portal/i18n';
+import { prefetchCaptureLocation } from '@/lib/portal/capture-location';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import { useFeatureEnabled } from './use-feature-flag';
@@ -77,6 +78,8 @@ export default function TellNesioSheet({ open, onClose, onCapture }: TellNesioSh
   const showFreeze = useFeatureEnabled('freeze'); // 功能开关中心:冷冻仓可关
   const cameraInputRef = useRef<HTMLInputElement>(null);
   if (!open) return null;
+  // 批次 56:捕获面一打开就预热手机定位(开关开着才动),盖章时坐标已就绪
+  prefetchCaptureLocation();
 
   return (
     <div className="nesio-tell-overlay" role="dialog" aria-modal="true" aria-label={L(dict, '告诉 Nesio', 'Tell Nesio')}>

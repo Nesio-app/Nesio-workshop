@@ -25,6 +25,7 @@ import {
 import { routeIntent } from '@/lib/portal/intent-router';
 import { DomainIcon, IconBox, IconClock, IconMapPin, IconUser } from './icons';
 import { L } from '@/lib/portal/i18n';
+import { prefetchCaptureLocation } from '@/lib/portal/capture-location';
 import { looksLikeTask } from '@/lib/portal/task-heuristics';
 import { loadProfileSettings, portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { canUsePaidCloudAi, isPro } from '@/lib/portal/entitlement';
@@ -312,6 +313,7 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
   const isAskMode = intent === 'ask';
 
   useEffect(() => {
+    if (open) prefetchCaptureLocation(); // 批次 56:说一句打开即预热定位
     if (!open) {
       setText(''); setSendState('idle'); setListening(false);
       setIntentLabel(''); setMicError(''); setSavedCount(0);

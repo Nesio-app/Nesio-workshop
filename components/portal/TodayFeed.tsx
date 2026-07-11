@@ -266,6 +266,7 @@ export default function TodayFeed({
             placeholder={quickSaved ? L(uiLocale, '✓ 记下了', '✓ Noted') : L(uiLocale, '想到什么,记下来…', 'Anything on your mind…')}
             value={quickAdd}
             onChange={(e) => setQuickAdd(e.target.value)}
+            onFocus={() => { void import('@/lib/portal/capture-location').then((m) => m.prefetchCaptureLocation()); }}
           />
           {quickAdd.trim() ? (
             <button type="submit" className="nesio-focus-quick-btn">{L(uiLocale, '记下', 'Note it')}</button>
