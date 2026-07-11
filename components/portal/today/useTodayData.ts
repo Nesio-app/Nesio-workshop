@@ -311,7 +311,15 @@ export function useTodayData(canUsePrivateData: boolean) {
         }
 
         if (!stale()) {
-          if (newProactiveCards.length > 0) setProactiveCards(newProactiveCards);
+          // 批次 76(用户定案「不要闪来闪去」):合并不替换 —— 已在场的卡届内常驻
+          // (冷却机制会让它们下一轮不再返回,旧逻辑整组替换 = 卡片闪没)。
+          // 移除只有两条路:用户亲手划走 / 卡片自然过期(cardExpiry)。
+          if (newProactiveCards.length > 0) {
+            setProactiveCards((prev) => {
+              const seen = new Set(prev.map((c) => c.id));
+              return [...prev, ...newProactiveCards.filter((c) => !seen.has(c.id))].slice(0, 6);
+            });
+          }
           commitShown(); // 这轮结果确认上屏,才记「已展示」(冷却 + ranker 特征)
         }
         // 管线空窗时的兜底轮播移到 TodayFeed 渲染层(buildRotatingFallback):

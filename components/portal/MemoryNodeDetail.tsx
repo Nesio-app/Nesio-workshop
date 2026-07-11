@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Component, useEffect, useState, type ReactNode } from 'react';
 import { deleteLifeNode, getLifeGraph, searchLifeGraphFuzzy, updateLifeNode, type LifeNode } from '@/lib/portal/life-graph';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
 import LocationPicker from './LocationPicker';
@@ -519,7 +519,36 @@ interface EditFields {
 
 // ── Graph helpers ─────────────────────────────────────────────────────────────
 
-export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNode }: MemoryNodeDetailProps) {
+// 批次 76(用户实锤「点关联记忆进入页面错误」):详情崩溃只崩这张卡,
+// 不再把整页打成错误页 —— 卡片级边界,给出关闭出口。
+class DetailErrorBoundary extends Component<{ onClose: () => void; children: ReactNode }, { err: boolean }> {
+  state = { err: false };
+  static getDerivedStateFromError() { return { err: true }; }
+  render() {
+    if (this.state.err) {
+      return (
+        <div className="nesio-node-detail-overlay" role="dialog" aria-modal="true">
+          <div className="nesio-node-detail-sheet" style={{ padding: '1.4rem 1.2rem', textAlign: 'center' }}>
+            <p style={{ margin: '0 0 0.4rem', fontSize: '1rem', fontWeight: 600 }}>这条记忆的详情没打开成功</p>
+            <p style={{ margin: '0 0 0.9rem', fontSize: '0.8rem', color: 'var(--portal-muted)' }}>数据没有丢。关闭后再试一次;若反复出现,请截图这条记忆的名字。</p>
+            <button type="button" className="nesio-fin-review-accept" onClick={this.props.onClose}>关闭</button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+export default function MemoryNodeDetail(props: MemoryNodeDetailProps) {
+  return (
+    <DetailErrorBoundary key={props.node?.id ?? 'none'} onClose={props.onClose}>
+      <MemoryNodeDetailInner {...props} />
+    </DetailErrorBoundary>
+  );
+}
+
+function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: MemoryNodeDetailProps) {
   // 批次 73:关联链手动管理(增/删即反馈)
   const [removedRels, setRemovedRels] = useState<Set<string>>(new Set());
   const [addedRels, setAddedRels] = useState<Array<{ targetId: string; relation: string }>>([]);

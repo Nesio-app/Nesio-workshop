@@ -130,6 +130,34 @@ export function reconcilePlanEmailLinks(): number {
   return linked;
 }
 
+// ── 批次 76:存量计划日期愈合 —— 年份自愈(批次 73)只管新数据,
+// 已存的 2025 错年条目还在「已过期」。规则同一把尺:计划天然朝前,
+// planImported 节点的 start 早于它自己的创建日 24h 以上 = 不可能的计划,
+// 年份滚到创建日之后。开机一次,幂等。 ──
+const PLAN_DATE_HEAL_FLAG = 'nesio-plan-date-heal-v1';
+export function healPlanDatesOnce(): number {
+  if (typeof window === 'undefined') return 0;
+  try { if (localStorage.getItem(PLAN_DATE_HEAL_FLAG)) return 0; localStorage.setItem(PLAN_DATE_HEAL_FLAG, '1'); } catch { return 0; }
+  let healed = 0;
+  for (const n of getLifeGraph()) {
+    if (n.attributes?.planImported !== true) continue;
+    const start = n.attributes?.start;
+    if (typeof start !== 'string') continue;
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(start);
+    if (!m) continue;
+    const createdMs = new Date(n.createdAt).getTime();
+    let y = Number(m[1]);
+    const mo = Number(m[2]); const d = Number(m[3]);
+    if (new Date(y, mo - 1, d).getTime() >= createdMs - 24 * 3_600_000) continue;
+    for (let guard = 0; guard < 3 && new Date(y, mo - 1, d).getTime() < createdMs - 24 * 3_600_000; guard++) y += 1;
+    const rest = start.slice(10); // 保留可能的时间部分
+    updateLifeNode(n.id, { attributes: { ...n.attributes, start: `${y}-${m[2]}-${m[3]}${rest}` } });
+    healed += 1;
+  }
+  if (healed > 0) window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
+  return healed;
+}
+
 // ── 去抖调和器:图谱一有变化(新邮件同步/新行程入库)静默补连线 ──
 let timer: ReturnType<typeof setTimeout> | null = null;
 let installed = false;
@@ -142,5 +170,6 @@ export function initPlanLinks(): void {
     timer = setTimeout(() => { timer = null; try { reconcilePlanEmailLinks(); } catch { /* 连线失败不打扰 */ } }, 4000);
   };
   window.addEventListener('nesio-life-graph-updated', kick);
+  try { healPlanDatesOnce(); } catch { /* 愈合失败不拦启动 */ }
   kick(); // 开机跑一轮,把历史数据也接上
 }

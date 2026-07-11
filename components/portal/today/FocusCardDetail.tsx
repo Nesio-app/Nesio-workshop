@@ -58,7 +58,6 @@ export function FocusCardDetail({
   // 信任修复:今日卡的 ✕ 只是「从今日移除」(软隐藏,记忆仍在),用户常误以为是删除。
   // 这里给一个真·删除入口(两步确认),点了「确认彻底删除」才 deleteLifeNode —— 想抹掉
   // 敏感/错误记录的人有明确、名副其实的出口,不必再猜 ✕ 到底删没删。
-  const [confirmDel, setConfirmDel] = useState(false);
   const [wave, setWave] = useState<MomentumAction[]>([]);
   const [loading, setLoading] = useState(false);
   const [drillMap, setDrillMap] = useState<Map<string, MomentumAction[]>>(new Map());
@@ -253,21 +252,14 @@ export function FocusCardDetail({
         <button type="button" className="nesio-momentum-ignite-btn" onClick={() => fetchWave()}>
           {error ? L(dict, '重试', 'Retry') : L(dict, '粉碎任务', 'Smash it')}
         </button>
-        {onFocusMode && (
-          <button type="button" className="nesio-collapsed-focus-btn" onClick={onFocusMode}>
-            {focusModeLabel ?? L(dict, '聚焦', 'Focus')}
-          </button>
-        )}
+        {/* 批次 76(用户定案):聚焦/删除撤下 —— 换「查看详情」直达记忆块
+            (编辑/删除/关联都在详情里,展开区不再堆危险按钮)。 */}
         <button
           type="button"
           className="nesio-collapsed-focus-btn"
-          style={{ color: 'var(--status-risk)' }}
-          onClick={() => {
-            if (!confirmDel) { setConfirmDel(true); return; }
-            onDelete?.();
-          }}
+          onClick={() => { const live = getLiveMemoryNode(node.id); if (live) setMemNode(live); }}
         >
-          {confirmDel ? L(dict, '确认彻底删除', 'Confirm delete') : L(dict, '删除', 'Delete')}
+          {L(dict, '查看详情', 'View details')}
         </button>
       </div>
     );
