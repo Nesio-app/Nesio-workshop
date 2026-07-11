@@ -3,7 +3,7 @@ import { ingestLifeNode } from '../../life-domain/ingest-node';
 import type { Signal } from '../../life-domain/signal';
 import { getLifeGraph, getRecentNodes, updateLifeNode, isBulkImported, type LifeNode } from '../../portal/life-graph';
 import type { RecommendationCard } from '../../portal/reasoning-engine';
-import { nearestNodeDate } from '../node-dates';
+import { nearestNodeDate, nodeExpiryDate } from '../node-dates';
 import { LEXICON } from '../keyword-lexicon';
 import { scheduleHint } from '../../portal/time-labels';
 
@@ -103,11 +103,18 @@ function isFocusNode(node: LifeNode): boolean {
     if (new Date(node.createdAt).getTime() >= dayStart.getTime()) return true;
   }
   const now = Date.now();
+  // 批次 65:有效期按"到当天结束"判定(纯日期零点解析会让今天到期的东西白天就消失)
+  const exp = nodeExpiryDate(node.attributes);
+  if (exp) {
+    const diff = exp.getTime() - now;
+    if (diff >= 0 && diff < 24 * 3_600_000) return true;
+  }
   const d = extractNearestDate(node);
   if (d) {
     const diff = d.getTime() - now;
-    // Today (0 → 48h) or tomorrow (48h window)
-    if (diff >= 0 && diff < 48 * 3_600_000) return true;
+    // 批次 65(用户定案):今日焦点只装 24h 内的事 —— 「明天 20:15 · 43h后」
+    // 不占今天的注意力,明天自然进场。(原 48h 窗把后天边缘的事也拉进来了)
+    if (diff >= 0 && diff < 24 * 3_600_000) return true;
   }
   // Explicit "今天/今日" in name or rawInput even without a date attribute
   const text = [node.name, node.rawInput || ''].join(' ');
@@ -121,6 +128,15 @@ function isFocusNode(node: LifeNode): boolean {
 export function focusTimeHint(node: FocusNode, locale: string = 'zh'): string {
   const now = new Date();
   const en = locale === 'en';
+  // 批次 65:有效期驱动的条目要把话说明白 ——「明天」不如「明天到期」
+  // (用户实测:牛奶行只有 title + 明天,看不出是快过期了)。
+  const exp = nodeExpiryDate(node.attributes);
+  if (exp) {
+    const diffH = (exp.getTime() - now.getTime()) / 3_600_000;
+    if (diffH >= 0 && diffH < 24) return en ? 'expires today' : '今天到期';
+    if (diffH >= 24 && diffH < 48) return en ? 'expires tomorrow' : '明天到期';
+    if (diffH < 0) return en ? 'expired' : '已过期';
+  }
   const d = nearestNodeDate(node.attributes, now.getTime());
   if (d) return scheduleHint(d, now, locale);
   const text = [node.name, node.rawInput || ''].join(' ').toLowerCase();

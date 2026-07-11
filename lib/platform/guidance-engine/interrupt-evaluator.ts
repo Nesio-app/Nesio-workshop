@@ -50,6 +50,7 @@ function timeSensitivityScore(urgency: WindowUrgency): number {
 const PREPARATION_VALUE: Record<GuidanceEventType, number> = {
   flight:       90,  // check-in window is time-gated; missing it costs real money
   deadline:     85,  // starting earlier always improves outcome (non-linear returns)
+  expiry:       70,  // 过了这天就浪费了 —— 提前知道才来得及用掉
   weather_cold: 80,  // can't add a layer after you've left home
   weather_rain: 80,
   travel:       75,  // earlier prep = less last-minute stress

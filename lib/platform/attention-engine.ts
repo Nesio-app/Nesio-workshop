@@ -142,6 +142,9 @@ export function scoreCalendarEvents(
       // Only include today + tomorrow events
       const d = startOfDay(parseEventDate(e.start));
       if (!isSameDay(d, today) && !isSameDay(d, tomorrow)) return false;
+      // 批次 65(用户定案):倒计时超过 24h 的不占今天的注意力 ——
+      // 「明天 20:15 · 43h后」明天自然进场;明早的航班今晚照常可见。
+      if (isSameDay(d, tomorrow) && parseEventDate(e.start).getTime() - now.getTime() >= 24 * 3_600_000) return false;
       // 批次 49(用户定案):订阅日历的全天标签(农历「廿六」/节气 —— 全天且
       // 无任何类型关键词)不进焦点列表。生日/截止/节日等有类型的全天事件保留。
       if (e.allDay && inferEventType(e) === 'other') return false;

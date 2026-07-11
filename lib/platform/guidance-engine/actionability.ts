@@ -67,6 +67,12 @@ export function buildAction(event: GuidanceEvent, urgency: WindowUrgency, locale
       if (urgency === 'medium')   return { label: l('明天截止，今天做好准备', 'Due tomorrow — prepare today'), cta: l('知道了', 'Got it'), actionType: 'dismiss' };
       return null;
 
+    case 'expiry':
+      // 批次 65:物品过期不是任务 —— 口吻是「用掉/处理」,不是催办
+      if (urgency === 'critical') return { label: l('今天把它用掉，或者直接处理掉', 'Use it up today, or just deal with it'), cta: l('处理了', 'Done'), actionType: 'dismiss' };
+      if (urgency === 'high')     return { label: l('明天过期，今天优先用它', 'Expires tomorrow — use it first today'), cta: l('知道了', 'Got it'), actionType: 'dismiss' };
+      return { label: l('快过期了，安排着用', 'Expiring soon — plan to use it'), cta: l('知道了', 'Got it'), actionType: 'dismiss' };
+
     case 'birthday':
     case 'anniversary': {
       const name = event.title.slice(0, 16);

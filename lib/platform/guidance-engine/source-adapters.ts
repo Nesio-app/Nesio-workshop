@@ -11,7 +11,7 @@ import type { RecommendationCard } from '@/lib/portal/reasoning-engine';
 import type { EmailSignal } from '@/lib/platform/email-signals';
 import type { ProactiveContextItem, FocusNode } from '@/lib/platform/view-models/today-view-model';
 import { inferEventType, parseEventDate } from '@/lib/platform/attention-engine';
-import { nearestNodeDate } from '@/lib/platform/node-dates';
+import { nearestNodeDate, nodeExpiryDate } from '@/lib/platform/node-dates';
 import { LEXICON } from '@/lib/platform/keyword-lexicon';
 import type { LifeNode } from '@/lib/portal/life-graph';
 import type { ClinicalFinding } from '@/lib/portal/health-clinical';
@@ -142,6 +142,25 @@ export function focusNodesToGuidanceEvents(
   const results: GuidanceEvent[] = [];
 
   for (const node of nodes) {
+    // 批次 65:有效期驱动的节点(牛奶等物品)不是任务截止 —— 专属 expiry 类型,
+    // 日期按"到当天结束"判定(零点解析曾让今天到期的卡当天白天就消失)。
+    const exp = nodeExpiryDate(node.attributes);
+    if (exp) {
+      const expDays = (exp.getTime() - now.getTime()) / 86_400_000;
+      if (expDays >= 0 && expDays <= 2) {
+        results.push({
+          id: `node-${node.id}`,
+          type: 'expiry',
+          title: node.name,
+          scheduledAt: exp,
+          source: 'memory',
+          confidence: 90,
+          payload: { nodeId: node.id, expiryDate: String(node.attributes.expiry ?? '') },
+        });
+        continue; // 同一节点不再出 deadline 卡(重复出现是用户点名 bug)
+      }
+    }
+
     // Unified key list (node-dates) — previously this adapter missed
     // 'start'/'datetime'/'remindAt', so start-only nodes never got cards.
     const d = nearestNodeDate(node.attributes, now.getTime());
@@ -452,7 +471,9 @@ export function objectContextEvents(
     const expiryDate = new Date(expiry);
     if (Number.isNaN(expiryDate.getTime())) continue;
     const diff = expiryDate.getTime() - now.getTime();
-    if (diff < 0 || diff > sevenDaysMs) continue;
+    // 批次 65:48h 内的过期由 focus 路径的 expiry 卡负责(语义完整、单处出现);
+    // 这里只做 2-7 天的提前吹风,不再和 expiry 卡同屏重复。
+    if (diff < 2 * 86_400_000 || diff > sevenDaysMs) continue;
 
     seenNodeIds.add(node.id);
     const loc = typeof node.attributes?.location === 'string' ? node.attributes.location : '';

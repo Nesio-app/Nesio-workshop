@@ -4,6 +4,7 @@ import type { GuidanceEventType, ConsequenceSeverity } from './types';
 const CONSEQUENCE: Record<GuidanceEventType, ConsequenceSeverity> = {
   flight:       3,  // miss the plane
   deadline:     3,  // miss deadline
+  expiry:       2,  // 食物/物品浪费 —— 有实际损失但不到误机级
   medical:      3,  // miss appointment
   meeting:      2,  // show up unprepared or miss it
   birthday:     2,  // forget to prepare / acknowledge

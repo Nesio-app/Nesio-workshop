@@ -56,6 +56,21 @@ export function nearestNodeDate(attributes: AttrBag, now: number = Date.now()): 
   return nearest;
 }
 
+/**
+ * 有效期语义(批次 65):`expiry` 不在 NODE_DATE_KEYS 里,此前靠"扫全部属性值"
+ * 兜进 nearestNodeDate,纯日期被解析成本地**零点** —— "今天到期"的东西当天白天
+ * 就掉出焦点窗口/引导窗口。有效期的正确含义是"到这一天**结束**都还有效",
+ * 所以纯日期统一落到当天 23:59:59。
+ */
+export function nodeExpiryDate(attributes: AttrBag): Date | null {
+  const d = parseDateValue(attributes.expiry);
+  if (!d) return null;
+  if (typeof attributes.expiry === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(attributes.expiry)) {
+    d.setHours(23, 59, 59, 0);
+  }
+  return d;
+}
+
 /** All distinct dates on known keys — for adapters that emit one event per date. */
 export function allNodeDates(attributes: AttrBag): Date[] {
   const seen = new Set<number>();

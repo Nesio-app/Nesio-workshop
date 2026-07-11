@@ -66,6 +66,8 @@ function computeExpiry(event: GuidanceEvent): Date | undefined {
       return new Date(t - 0.5 * 3_600_000);    // expires 30min before (too late to prep)
     case 'deadline':
       return new Date(t);                        // expires at the deadline itself
+    case 'expiry':
+      return new Date(t);                        // scheduledAt 已是当天 23:59(批次 65)
     case 'birthday':
     case 'anniversary':
     case 'holiday': {
@@ -82,6 +84,7 @@ const EVENT_ICON: Record<GuidanceEventType, string> = {
   flight:         '✈️',
   medical:        '🏥',
   deadline:       '⏰',
+  expiry:         '⏳',
   birthday:       '🎂',
   anniversary:    '💝',
   holiday:        '🎈',
@@ -121,6 +124,11 @@ function buildTitle(event: GuidanceEvent, urgency: WindowUrgency, locale: string
       if (urgency === 'critical') return l(`今天截止 · ${n}`, `Due today · ${n}`);
       if (urgency === 'high')     return l(`明天截止 · ${n}`, `Due tomorrow · ${n}`);
       return l(`截止日临近 · ${n}`, `Deadline approaching · ${n}`);
+    case 'expiry':
+      // 批次 65(用户点名):快过期要把话说明白,不是「截止」也不是光秃秃的 title
+      if (urgency === 'critical') return l(`今天过期 · ${n}`, `Expires today · ${n}`);
+      if (urgency === 'high')     return l(`明天过期 · ${n}`, `Expires tomorrow · ${n}`);
+      return l(`快过期了 · ${n}`, `Expiring soon · ${n}`);
     case 'birthday':
       if (urgency === 'critical') return l(`今天是 ${n} 的生日`, `Today is ${n}'s birthday`);
       if (urgency === 'high')     return l(`明天 · ${n}`, `Tomorrow · ${n}`);
@@ -168,6 +176,9 @@ function buildBody(event: GuidanceEvent, urgency: WindowUrgency, locale: string 
     case 'deadline':
       if (urgency === 'critical') return l('今天最后期限，哪怕完成第一步也比拖延好。', 'Final deadline today — even the first step beats stalling.');
       return l('明天到期，今天推进一下比明天临时抱佛脚轻松得多。', 'Due tomorrow — a push today is far easier than a scramble tomorrow.');
+    case 'expiry':
+      if (urgency === 'critical') return l('有效期到今天——记得用掉或处理，别浪费。', 'Valid through today — use it up or deal with it, don\'t let it go to waste.');
+      return l('明天就过期了，今天优先用它。', 'Expires tomorrow — use it first today.');
     case 'birthday':
     case 'anniversary':
       if (urgency === 'critical') return l('今天记得发条消息，哪怕一句话也能让人感到温暖。', 'Send a message today — even one line means a lot.');

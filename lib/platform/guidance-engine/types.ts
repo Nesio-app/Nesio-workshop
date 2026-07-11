@@ -7,6 +7,7 @@
 
 export type GuidanceEventType =
   | 'flight' | 'medical' | 'deadline' | 'birthday' | 'anniversary'
+  | 'expiry'           // 物品有效期(批次 65)—— 不是任务截止,口吻是「记得用掉」而非「完成第一步」
   | 'travel' | 'meeting' | 'holiday'
   | 'email_signal' | 'health_habit'
   | 'domain_insight'   // 各域判定(健康/财务/…)接地成的主动卡 — 全部 payload 驱动(domain/icon/severity/双语文案),新增域零管线改动

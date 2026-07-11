@@ -57,6 +57,13 @@ export function getActionWindow(event: GuidanceEvent, now: Date): WindowUrgency 
       if (daysUntil < 2) return 'medium';
       return 'closed';                           // 2+ days out: not yet
 
+    case 'expiry':
+      // scheduledAt = 有效期当天 23:59(批次 65)—— daysUntil<1 即「今天到期」
+      if (daysUntil < 0) return 'closed';        // 已过期 → 不再打扰,回顾的事
+      if (daysUntil < 1) return 'critical';      // 今天到期:今天就得用掉/处理
+      if (daysUntil < 2) return 'high';          // 明天到期
+      return 'closed';
+
     case 'birthday':
     case 'anniversary':
       if (daysUntil < 0) return 'closed';
