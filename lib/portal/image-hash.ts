@@ -94,3 +94,31 @@ export function searchByHash(hash: string, maxDist = 12): Array<[string, number]
   }
   return out.sort((a, b) => a[1] - b[1]).slice(0, 8);
 }
+
+/** 索引里已有的 nodeId 集合(回填时跳过已建的)。 */
+export function indexedNodeIds(): Set<string> {
+  return new Set(Object.keys(loadIndex()));
+}
+
+/**
+ * 存量回填(批次 89):批次 87 只给**新**存的照片建指纹 —— 老照片搜不到,
+ * 用户实测「以图搜图没用」。这里读已存的本地图片,补算指纹进索引。
+ * 依赖注入(不耦合 life-graph):调用方给「nodeId → 本地图 dataUrl」的列表。
+ * 分批 yield,不阻塞主线程;每台设备只需跑一次(已建的跳过)。
+ */
+export async function backfillImageHashes(
+  entries: Array<{ nodeId: string; dataUrl: string }>,
+  onProgress?: (done: number, total: number) => void,
+): Promise<number> {
+  const have = indexedNodeIds();
+  const todo = entries.filter((e) => e.nodeId && e.dataUrl && !have.has(e.nodeId));
+  let done = 0;
+  for (const e of todo) {
+    const h = await computeDHash(e.dataUrl);
+    if (h) saveImageHash(e.nodeId, h);
+    done += 1;
+    onProgress?.(done, todo.length);
+    if (done % 12 === 0) await new Promise((r) => setTimeout(r, 0)); // 让出主线程
+  }
+  return done;
+}

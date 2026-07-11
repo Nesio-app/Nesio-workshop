@@ -490,7 +490,22 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
       try {
         const visual: LifeNode[] = [];
         if (capturedPreview) {
-          const { computeDHash, searchByHash } = await import('@/lib/portal/image-hash');
+          const { computeDHash, searchByHash, backfillImageHashes, indexedNodeIds } = await import('@/lib/portal/image-hash');
+          // 批次 89:首次搜索前给存量本地图片回填指纹(老照片也能被图像召回)
+          const g0 = getLifeGraph();
+          const have = indexedNodeIds();
+          const pending = g0.filter((n) => !have.has(n.id) && (n.assets || []).some((a) => a.local && a.kind === 'image'));
+          if (pending.length) {
+            const { getLocalImage } = await import('@/lib/portal/local-image-store');
+            const entries: Array<{ nodeId: string; dataUrl: string }> = [];
+            for (const n of pending.slice(0, 400)) {
+              const asset = (n.assets || []).find((a) => a.local && a.kind === 'image');
+              if (!asset) continue;
+              const dataUrl = await getLocalImage(asset.id);
+              if (dataUrl) entries.push({ nodeId: n.id, dataUrl });
+            }
+            await backfillImageHashes(entries);
+          }
           const h = await computeDHash(capturedPreview);
           if (h) {
             const g = getLifeGraph();
@@ -514,18 +529,28 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
     })();
   }
 
-  // 批次 84:照片内二维码(WebKit 原生 BarcodeDetector,特性检测,不支持就静默)
+  // 批次 89(修批次84的硬错误):BarcodeDetector 在 iOS/WebKit 上**不存在**
+  // (Chrome 独有 API,Safari 从未实现)—— 之前 if(!BD)return 静默退出,
+  // QR 在 iPhone 上永远不触发。改用 @zxing/browser 的 canvas 解码(纯 JS,
+  // 跨平台,iOS 可用);惰性加载,只在拍/选图时拉一次。
   async function detectQr(source: Blob) {
     try {
-      const BD = (window as unknown as { BarcodeDetector?: new (opts: { formats: string[] }) => { detect: (img: ImageBitmap) => Promise<Array<{ rawValue: string }>> } }).BarcodeDetector;
-      if (!BD) return;
-      const detector = new BD({ formats: ['qr_code'] });
+      const { BrowserQRCodeReader } = await import('@zxing/browser');
       const bmp = await createImageBitmap(source);
-      const found = await detector.detect(bmp);
+      const canvas = document.createElement('canvas');
+      const maxDim = 1200; // QR 需要足够分辨率,又不能太大拖慢解码
+      const scale = Math.min(1, maxDim / Math.max(bmp.width, bmp.height));
+      canvas.width = Math.round(bmp.width * scale);
+      canvas.height = Math.round(bmp.height * scale);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { bmp.close?.(); return; }
+      ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
       bmp.close?.();
-      const vals = [...new Set(found.map((f) => f.rawValue).filter(Boolean))];
-      if (vals.length) setQrCodes(vals);
-    } catch { /* 不支持/检测失败:功能静默缺席 */ }
+      const reader = new BrowserQRCodeReader();
+      const result = reader.decodeFromCanvas(canvas); // 无码时抛 NotFoundException
+      const text = result?.getText?.();
+      if (text) setQrCodes([text]);
+    } catch { /* 无二维码 / 解码失败:静默,不打扰 */ }
   }
 
   // Analyze the full captured image (called from selection overlay or result phase)
