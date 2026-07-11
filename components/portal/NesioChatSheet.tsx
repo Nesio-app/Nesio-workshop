@@ -48,6 +48,22 @@ function NesioAvatar() {
 
 interface ChatMessage { role: 'user' | 'model'; text: string; }
 
+// 批次 68:问一问动作块 —— 行程条目(服务端已校验;客户端确认后 ingest 落库)。
+export interface ChatPlanItem { name: string; date?: string; time?: string; place?: string; kind?: string; note?: string }
+
+const PLAN_KIND_ICON: Record<string, string> = { flight: '✈️', hotel: '🏨', activity: '📍', todo: '✅', note: '📝' };
+
+/** date(+time)→ start 属性:带时间给本地 ISO,只有日期保持 YYYY-MM-DD(全天语义,与日历一致)。 */
+function planItemStart(it: ChatPlanItem): string | undefined {
+  if (!it.date) return undefined;
+  if (!it.time) return it.date;
+  const dm = /^(\d{4})-(\d{2})-(\d{2})$/.exec(it.date);
+  const tm = /^(\d{1,2}):(\d{2})$/.exec(it.time);
+  if (!dm || !tm) return it.date;
+  const d = new Date(Number(dm[1]), Number(dm[2]) - 1, Number(dm[3]), Number(tm[1]), Number(tm[2]));
+  return Number.isNaN(d.getTime()) ? it.date : d.toISOString();
+}
+
 // 批次 38:聊天引用卡 —— 存紧凑引用(id+名+来源),点击时再从 life-graph 取全节点做阅读/回复。
 interface MsgRef { id: string; name: string; source: LifeNode['source'] }
 interface UiMessage {
@@ -57,6 +73,10 @@ interface UiMessage {
   sources?: Array<{ title: string; url: string }>;
   refs?: MsgRef[];
   savedToMemory?: boolean;
+  /** 批次 68:动作块 —— 澄清选项芯片 / 行程条目确认卡(点确认才真正入库) */
+  options?: string[];
+  planItems?: ChatPlanItem[];
+  planSaved?: boolean;
   /** 🔴#2:这条回答时语义检索降级了(缺 AI 配置,只用了关键词匹配)。 */
   semanticDegraded?: boolean;
   semanticReason?: string; // 未生效的具体原因(no_key/rate_limited/provider/network/auth)
@@ -840,7 +860,7 @@ Edit location/value anytime in Storage.`),
         signal: controller.signal,
       });
       clearTimeout(timeout);
-      const data = await res.json() as { ok?: boolean; response?: string; sources?: Array<{ title: string; url: string }> };
+      const data = await res.json() as { ok?: boolean; response?: string; sources?: Array<{ title: string; url: string }>; actions?: { options?: string[]; planItems?: ChatPlanItem[] } };
       const rawResp = data.response?.trim() || L(dict, '（暂时没有找到相关信息）', '(Nothing relevant found)');
       // 🔴#1:只保留模型真正引用的记忆节点。ids===null(没自报)→ 回退到前 3 候选作"相关记忆";
       // ids=[](明确"无")→ 不出引用卡(修"模型说没记录、下面还渲染 6 张伪造依据卡")。
@@ -866,6 +886,8 @@ Edit location/value anytime in Storage.`),
         refs: citedNodes.map((n) => ({ id: n.id, name: n.name, source: n.source })),
         semanticDegraded: semanticDegraded && isFallbackReply,
         semanticReason,
+        ...(data.actions?.options ? { options: data.actions.options } : {}),
+        ...(data.actions?.planItems ? { planItems: data.actions.planItems } : {}),
       };
       // 函数式追加 + 用最终列表存档,别用可能已过期的 nextMsgs 快照覆盖并发消息。
       setMessages((prev) => { const next = [...prev, aiMsg]; saveHistory(next); return next; });
@@ -883,6 +905,31 @@ Edit location/value anytime in Storage.`),
     setSending(false);
     sendingRef.current = false;
   }, [messages]);
+
+  // 批次 68:行程确认卡 → 真正落库(带日期的自动进今日聚焦/引导卡;航班等类型由词典自动识别)
+  function savePlanItems(msg: UiMessage) {
+    if (!msg.planItems?.length || msg.planSaved) return;
+    for (const it of msg.planItems) {
+      const start = planItemStart(it);
+      ingestLifeNode({
+        name: it.name,
+        type: it.kind === 'todo' ? 'commitment' : 'event',
+        source: 'manual',
+        confidence: 0.9,
+        tags: ['行程'],
+        relations: [],
+        rawInput: [it.name, it.date, it.time, it.place, it.note].filter(Boolean).join(' · '),
+        attributes: {
+          ...(start ? { start } : {}),
+          ...(it.place ? { location: it.place } : {}),
+          ...(it.note ? { note: it.note } : {}),
+          planImported: true,
+        },
+      });
+    }
+    setMessages((prev) => { const next = prev.map((m) => m.id === msg.id ? { ...m, planSaved: true } : m); saveHistory(next); return next; });
+    window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
+  }
 
   function handleSave(msg: UiMessage) {
     const savedNode = ingestLifeNode({
@@ -1213,6 +1260,37 @@ Edit location/value anytime in Storage.`),
                     </div>
                   );
                 })()}
+                {/* 批次 68:行程确认卡 —— AI 只提议,用户点确认才入库(不再有"嘴上已存入") */}
+                {!isUser && msg.planItems && msg.planItems.length > 0 && (
+                  <div className="nesio-chat-plan-card">
+                    <span className="nesio-chat-plan-title">{L(dict, `整理出 ${msg.planItems.length} 条 · 确认后存入记忆`, `${msg.planItems.length} items ready · confirm to save`)}</span>
+                    {msg.planItems.map((it, i) => (
+                      <div key={i} className="nesio-chat-plan-row">
+                        <span className="nesio-chat-plan-icon">{PLAN_KIND_ICON[it.kind || ''] || '🗓'}</span>
+                        <div className="nesio-chat-plan-main">
+                          <span className="nesio-chat-plan-name">{it.name}</span>
+                          {(it.date || it.place) && (
+                            <span className="nesio-chat-plan-meta">{[it.date ? `${it.date}${it.time ? ' ' + it.time : ''}` : '', it.place || ''].filter(Boolean).join(' · ')}</span>
+                          )}
+                          {it.note ? <span className="nesio-chat-plan-note">{it.note}</span> : null}
+                        </div>
+                      </div>
+                    ))}
+                    <button type="button" className="nesio-chat-plan-save" disabled={msg.planSaved} onClick={() => savePlanItems(msg)}>
+                      {msg.planSaved
+                        ? L(dict, '已存入 ✓ 带日期的会按时出现在今日聚焦', 'Saved ✓ dated items will surface in Today focus')
+                        : L(dict, `存入记忆 · ${msg.planItems.length} 条`, `Save ${msg.planItems.length} to Memory`)}
+                    </button>
+                  </div>
+                )}
+                {/* 批次 68:澄清选项芯片(只挂在最新一条,点一下即回答) */}
+                {!isUser && msg.options && msg.options.length > 0 && msg.id === messages[messages.length - 1]?.id && !sending && (
+                  <div className="nesio-chat-opts">
+                    {msg.options.map((o) => (
+                      <button key={o} type="button" className="nesio-chat-opt-chip" onClick={() => void sendMessage(o)}>{o}</button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           );

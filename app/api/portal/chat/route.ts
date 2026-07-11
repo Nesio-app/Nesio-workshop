@@ -43,7 +43,15 @@ const SYSTEM_BASE = `你是 Nesio，用户的贴身 AI 助手，叫"小娜"。
 - 善用用户的个人记忆，自然地说"我记得你之前提到…"
 - 如果用户问"我的XX在哪"，先在记忆库里找
 - 如果提供了【实时环境】（位置/天气），直接用它回答"我在哪""天气怎么样"这类问题，不要再反问用户
-- 不编造用户没有记录的事实，不确定就直说`;
+- 不编造用户没有记录的事实，不确定就直说
+
+【动作协议 · 批次 68】你自己**没有任何写入记忆的能力**,绝不声称"已存入/已保存/已记下"——那是撒谎。
+要替用户保存内容,在回复最末尾追加一行动作块(用户看不见,客户端会渲染确认卡,用户点确认才真正入库):
+<<NESIO_ACTIONS>>{"planItems":[{"name":"RDU→KEF 航班","date":"2026-08-16","time":"18:30","place":"RDU","kind":"flight","note":"提前2小时到"}],"options":["整体行程框架","住宿推荐","美食攻略"]}
+规则:
+- 用户给出行程/计划/清单并想保存时:按天或按活动拆成 planItems。name 具体(「黄金圈:Þingvellir+Geysir+Gullfoss」),date 用 YYYY-MM-DD(按【实时环境】推断年份),时间不确定就省略 time,kind 只用 flight/hotel/activity/todo/note。正文只说"整理好了 N 条,点下面确认存入",不要在正文重复完整清单。
+- 需要澄清时:每次只问**一个**最关键的问题,给 2-4 个短选项(≤12字)放进 options,不要一次抛一堆开放问题。
+- 普通问答不输出动作块。JSON 必须单行、合法、双引号。`;
 
 const TONE_STYLE: Record<string, string> = {
   warm: '语气温暖，像老朋友聊天，不过分正式，偶尔幽默但不刻意卖萌。',
@@ -213,6 +221,52 @@ async function callGemini(
   throw new Error(lastError);
 }
 
+// ── 动作块解析(批次 68)────────────────────────────────────────────────────────
+
+export interface PlanItem { name: string; date?: string; time?: string; place?: string; kind?: string; note?: string }
+export interface ChatActions { options?: string[]; planItems?: PlanItem[] }
+
+const PLAN_KINDS = new Set(['flight', 'hotel', 'activity', 'todo', 'note']);
+
+/** 从回复末尾剥出 <<NESIO_ACTIONS>>{...} 并校验;剥不出或不合法就当没有(纯文本照常)。 */
+export function parseChatActions(raw: string): { text: string; actions: ChatActions | null } {
+  const m = raw.match(/<<NESIO_ACTIONS>>\s*(\{[\s\S]*\})\s*$/);
+  if (!m) return { text: raw.replace(/<<NESIO_ACTIONS>>[\s\S]*$/, '').trim(), actions: null };
+  const text = raw.slice(0, m.index).trim();
+  try {
+    const parsed = JSON.parse(m[1]) as { options?: unknown; planItems?: unknown };
+    const actions: ChatActions = {};
+    if (Array.isArray(parsed.options)) {
+      const opts = parsed.options
+        .filter((o): o is string => typeof o === 'string')
+        .map((o) => o.trim()).filter((o) => o.length > 0 && o.length <= 24)
+        .slice(0, 4);
+      if (opts.length >= 2) actions.options = opts;
+    }
+    if (Array.isArray(parsed.planItems)) {
+      const items = parsed.planItems
+        .filter((it): it is Record<string, unknown> => typeof it === 'object' && it !== null)
+        .map((it) => {
+          const name = typeof it.name === 'string' ? it.name.trim().slice(0, 60) : '';
+          if (!name) return null;
+          const out: PlanItem = { name };
+          if (typeof it.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(it.date)) out.date = it.date;
+          if (typeof it.time === 'string' && /^\d{1,2}:\d{2}$/.test(it.time)) out.time = it.time;
+          if (typeof it.place === 'string' && it.place.trim()) out.place = it.place.trim().slice(0, 60);
+          if (typeof it.kind === 'string' && PLAN_KINDS.has(it.kind)) out.kind = it.kind;
+          if (typeof it.note === 'string' && it.note.trim()) out.note = it.note.trim().slice(0, 200);
+          return out;
+        })
+        .filter((it): it is PlanItem => it !== null)
+        .slice(0, 20);
+      if (items.length > 0) actions.planItems = items;
+    }
+    return { text, actions: (actions.options || actions.planItems) ? actions : null };
+  } catch {
+    return { text, actions: null };
+  }
+}
+
 // ── Main handler ──────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
@@ -269,10 +323,12 @@ export async function POST(req: NextRequest) {
         : await callOpenAI(openaiKey!, message, history, systemInstruction);
 
     reportAiCall('chat', true, startedAt, { provider: anthropicKey ? 'claude' : geminiKey ? 'gemini' : 'openai' });
+    const fin = parseChatActions(result.text || '');
     return NextResponse.json({
       ok: true,
-      response: result.text || '我理解你的问题，但暂时没有找到确定的答案。',
+      response: fin.text || '我理解你的问题，但暂时没有找到确定的答案。',
       sources: result.sources,
+      ...(fin.actions ? { actions: fin.actions } : {}),
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -287,10 +343,12 @@ export async function POST(req: NextRequest) {
       try {
         const result = await callGemini(geminiKey, message, history, systemInstruction);
         reportAiCall('chat', true, startedAt, { provider: 'gemini_fallback' });
+        const fin = parseChatActions(result.text || '');
         return NextResponse.json({
           ok: true,
-          response: result.text || '我理解你的问题，但暂时没有找到确定的答案。',
+          response: fin.text || '我理解你的问题，但暂时没有找到确定的答案。',
           sources: result.sources,
+          ...(fin.actions ? { actions: fin.actions } : {}),
         });
       } catch (fallbackErr) {
         const fallbackMsg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
@@ -304,10 +362,12 @@ export async function POST(req: NextRequest) {
       try {
         const result = await callOpenAI(openaiKey, message, history, systemInstruction);
         reportAiCall('chat', true, startedAt, { provider: 'openai_fallback' });
+        const fin = parseChatActions(result.text || '');
         return NextResponse.json({
           ok: true,
-          response: result.text || '我理解你的问题，但暂时没有找到确定的答案。',
+          response: fin.text || '我理解你的问题，但暂时没有找到确定的答案。',
           sources: result.sources,
+          ...(fin.actions ? { actions: fin.actions } : {}),
         });
       } catch (openErr) {
         console.error('[chat] openai_fallback_error:', openErr instanceof Error ? openErr.message : openErr);
