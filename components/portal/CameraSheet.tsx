@@ -542,8 +542,22 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
       setSelecting(true);
     };
     if (file.type.startsWith('image/')) {
-      reader.readAsDataURL(file);
-    } else {
+      // 批次 82(用户实锤「全图识别必败,圈选才行」):原片 base64 动辄 5-10MB,
+      // 超过 API 路由请求体上限 → 全图分析 413/超时。识别载荷统一降采样
+      // (1400px/0.82,与存储同参);EXIF 已在上面从原始字节读过,不受影响。
+      void import('@/lib/portal/local-image-store')
+        .then(({ compressToDataUrl }) => compressToDataUrl(file))
+        .then((dataUrl) => {
+          if (!dataUrl) throw new Error('compress_failed');
+          setCapturedPreview(dataUrl);
+          setCapturedBase64(dataUrl.split(',')[1]);
+          setPhase('captured');
+          setSelecting(true);
+        })
+        .catch(() => reader.readAsDataURL(file)); // 压缩失败退回原图(至少小图还能走)
+      return;
+    }
+    {
       // Non-image file: text analysis
       const text = await file.text().catch(() => file.name);
       setPhase('analyzing');

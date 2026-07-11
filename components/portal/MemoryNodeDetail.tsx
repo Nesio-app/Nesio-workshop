@@ -1081,8 +1081,11 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
                 <>
                   {' · '}
                   <button type="button" onClick={() => setPlacePickOpen(true)}
+                    aria-label={L(dict, '纠正地点', 'Fix place')}
                     style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: 'inherit', cursor: 'pointer', textDecoration: 'underline dotted', textUnderlineOffset: 3 }}>
                     {place}
+                    {/* 批次 82:用户找不到改地址的入口 —— 可供性显性化(同足迹一套选择器) */}
+                    <span aria-hidden style={{ marginLeft: 4, fontSize: '0.82em', opacity: 0.55 }}>✎</span>
                   </button>
                 </>
               );

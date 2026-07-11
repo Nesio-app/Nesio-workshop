@@ -136,6 +136,54 @@ async function foursquareNearby(lat: number, lon: number, token: string): Promis
   }).filter((c) => c.name);
 }
 
+/** 批次 82(用户实锤:综合楼里附近候选为空):没配 Foursquare 时用
+ *  OSM Overpass 免费查 300m 内带名字的实体(商铺/餐饮/休闲/景点/办公),
+ *  按距离排序 —— 商场里也能列出「Apple / J.Crew / Mall」这种可选的真名。
+ *  公共 Overpass 实例有限速,4s 超时,失败静默(候选少而不是报错)。 */
+async function overpassNearby(lat: number, lon: number): Promise<Array<{ name: string; distanceM?: number; kind?: string }>> {
+  const q = `[out:json][timeout:4];(nwr(around:300,${lat},${lon})[name][shop];nwr(around:300,${lat},${lon})[name][amenity];nwr(around:300,${lat},${lon})[name][leisure];nwr(around:300,${lat},${lon})[name][tourism];nwr(around:300,${lat},${lon})[name][office];);out center 24;`;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 4500);
+  try {
+    const res = await fetch('https://overpass-api.de/api/interpreter', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `data=${encodeURIComponent(q)}`,
+      signal: ctrl.signal,
+    });
+    if (!res.ok) return [];
+    const data = await res.json() as { elements?: Array<{ lat?: number; lon?: number; center?: { lat: number; lon: number }; tags?: Record<string, string> }> };
+    const toRad = (v: number) => (v * Math.PI) / 180;
+    const dist = (la: number, lo: number) => {
+      const dLa = toRad(la - lat); const dLo = toRad(lo - lon);
+      const h = Math.sin(dLa / 2) ** 2 + Math.cos(toRad(lat)) * Math.cos(toRad(la)) * Math.sin(dLo / 2) ** 2;
+      return Math.round(6371000 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h)));
+    };
+    const seen = new Set<string>();
+    const out: Array<{ name: string; distanceM: number; kind?: string }> = [];
+    for (const e of data.elements || []) {
+      const name = (e.tags?.name || '').slice(0, 48);
+      const la = e.lat ?? e.center?.lat; const lo = e.lon ?? e.center?.lon;
+      if (!name || la == null || lo == null || seen.has(name)) continue;
+      seen.add(name);
+      const t = e.tags || {};
+      out.push({
+        name,
+        distanceM: dist(la, lo),
+        kind: kindFromOsm(
+          t.shop ? 'shop' : t.amenity ? 'amenity' : t.leisure ? 'leisure' : t.tourism ? 'tourism' : t.office ? 'office' : undefined,
+          t.shop || t.amenity || t.leisure || t.tourism || t.office,
+        ),
+      });
+    }
+    return out.sort((a, b) => a.distanceM - b.distanceM).slice(0, 10);
+  } catch {
+    return [];
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function osmReverse(lat: number, lon: number): Promise<GeoResult | null> {
   const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`;
   const res = await fetch(url, { headers: { 'User-Agent': 'Nesio/1.0 (personal life kit; on-device reverse geocode)', 'Accept-Language': 'en' } });
@@ -164,7 +212,15 @@ export async function POST(req: NextRequest) {
   const fsqToken = envValue('FOURSQUARE_SERVICE_TOKEN');
   try {
     if (body.nearby) {
-      const candidates = fsqToken ? await foursquareNearby(lat, lon, fsqToken) : [];
+      const candidates: Array<{ name: string; distanceM?: number; kind?: string; city?: string; country?: string }> =
+        fsqToken ? await foursquareNearby(lat, lon, fsqToken) : [];
+      // 批次 82:Foursquare 缺席/结果太薄时,Overpass 免费补足附近实体名
+      if (candidates.length < 3) {
+        const extra = await overpassNearby(lat, lon).catch(() => []);
+        for (const e of extra) {
+          if (!candidates.some((c) => c.name === e.name)) candidates.push(e);
+        }
+      }
       const osm = await osmReverse(lat, lon).catch(() => null);
       if (osm?.name && !candidates.some((c) => c.name === osm.name)) {
         candidates.push({ name: osm.name, kind: osm.kind, city: osm.city, country: osm.country });
