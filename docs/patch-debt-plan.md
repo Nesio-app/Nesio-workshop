@@ -43,3 +43,10 @@
 
 修法一体:AI/付费路由统一「验真 token + 验 tier」服务端中间层,与 P2
 (统一 provider 执行器)合并做 —— 一次手术三个病。
+
+## 性能附录(批次 90)
+
+识别 30s 慢的根因 = 串行兜底链无超时 + Gemini 逐模型 2s 重试。批次 90
+给 analyze 三 provider 加超时闸(10s)+ Gemini 重试 2s→0.6s。chat 路由
+同源问题(同一套复制粘贴的 provider 调用)未修 —— 随 P2 统一执行器一并
+加超时。真治仍是有效 Claude Haiku key(2-4s,兜底链不触发)。

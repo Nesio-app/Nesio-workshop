@@ -106,7 +106,7 @@ async function analyzeWithClaude(content: string, isImage: boolean, imageBase64?
     messages.push({ role: 'user', content });
   }
 
-  const res = await fetch(ANTHROPIC_API_URL, {
+  const res = await fetchWithTimeout(ANTHROPIC_API_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -119,11 +119,23 @@ async function analyzeWithClaude(content: string, isImage: boolean, imageBase64?
       messages,
       max_tokens: 1024,
     }),
-  });
+  }, 10_000);
 
   const data = await res.json() as { content?: Array<{ text?: string }>; error?: { message?: string } };
   if (!res.ok) throw new Error(data?.error?.message || `Claude ${res.status}`);
   return data.content?.map((c) => c.text).join('') || '';
+}
+
+// 批次 90(用户实锤识别 30s):给每个 provider fetch 套超时闸 —— 没有它,
+// 一个卡住的请求能吃掉整个 30s maxDuration,后面的 provider 都没机会跑。
+async function fetchWithTimeout(url: string, init: RequestInit, ms: number): Promise<Response> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(url, { ...init, signal: ctrl.signal });
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function logAiProviderFailure(provider: string, detail: string) {
@@ -148,13 +160,14 @@ async function analyzeWithGemini(content: string, imageBase64?: string, mimeType
   let lastError = 'Gemini unavailable';
 
   for (const model of models) {
-    // 429 时最多重试一次（等 2 秒），避免连续打爆免费配额
+    // 批次 90:限流重试等待 2s→0.6s(免费层限流是每分钟窗口,长等无意义,
+    // 只白白吃掉 30s 预算);超时 8s 一档。
     for (let attempt = 0; attempt < 2; attempt++) {
-      const res = await fetch(`${GEMINI_BASE_URL}/${model}:generateContent?key=${key}`, {
+      const res = await fetchWithTimeout(`${GEMINI_BASE_URL}/${model}:generateContent?key=${key}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contents: [{ parts }] }),
-      });
+      }, 10_000);
 
       const data = await res.json() as {
         candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
@@ -167,9 +180,9 @@ async function analyzeWithGemini(content: string, imageBase64?: string, mimeType
         logAiProviderFailure('gemini', lastError);
         break;
       }
-      // 429 速率限制：等待后重试一次
+      // 429 速率限制:短等一次即换下一个模型(别在同一限流模型上耗时)
       if (res.status === 429 && attempt === 0) {
-        await new Promise((r) => setTimeout(r, 2000));
+        await new Promise((r) => setTimeout(r, 600));
         continue;
       }
       lastError = `Gemini ${model} ${res.status}${data.error?.status ? ` ${data.error.status}` : ''}`;
@@ -200,7 +213,7 @@ async function analyzeWithOpenAI(content: string, isImage: boolean, imageBase64?
       ]
     : [{ type: 'text', text: prompt }];
 
-  const res = await fetch(OPENAI_API_URL, {
+  const res = await fetchWithTimeout(OPENAI_API_URL, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${key}`,
@@ -212,7 +225,7 @@ async function analyzeWithOpenAI(content: string, isImage: boolean, imageBase64?
       temperature: 0.2,
       max_tokens: 900,
     }),
-  });
+  }, 10_000);
 
   const data = await res.json() as {
     choices?: Array<{ message?: { content?: string } }>;
