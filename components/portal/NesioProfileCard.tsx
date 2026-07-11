@@ -27,6 +27,12 @@ export default function NesioProfileCard() {
   const [accountEmail, setAccountEmail] = useState('');
   const [avatarError, setAvatarError] = useState('');
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
+  // 批次 95:卡通头像生成
+  const cartoonInputRef = useRef<HTMLInputElement | null>(null);
+  const [cartoonBusy, setCartoonBusy] = useState(false);
+  const [cartoonPreview, setCartoonPreview] = useState('');   // 生成结果 dataURL(待接受)
+  const [cartoonSource, setCartoonSource] = useState('');     // 原图 dataURL(重新生成用)
+  const [cartoonMsg, setCartoonMsg] = useState('');
 
   useEffect(() => {
     const profile = loadProfileSettings();
@@ -82,6 +88,46 @@ export default function NesioProfileCard() {
     if (!localSaved) setAvatarError(L(dict, '头像没有保存，请选择一张较小的图片。', "Avatar wasn't saved — try a smaller image."));
   }
 
+  // 批次 95:照片 → app 主题色卡通头像(生成 → 预览 → 接受设为头像)
+  async function generateCartoon(dataUrl: string) {
+    setCartoonBusy(true);
+    setCartoonMsg('');
+    try {
+      const [meta, b64] = dataUrl.split(',');
+      const mimeType = /data:(.*?);/.exec(meta)?.[1] || 'image/jpeg';
+      const res = await fetch('/api/portal/avatarify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageBase64: b64, mimeType }),
+      });
+      const data = await res.json() as { ok?: boolean; dataUrl?: string; message?: string };
+      if (data.ok && data.dataUrl) setCartoonPreview(data.dataUrl);
+      else setCartoonMsg(data.message || L(dict, '生成失败，稍后再试。', 'Generation failed — try again later.'));
+    } catch {
+      setCartoonMsg(L(dict, '生成没连上，稍后再试。', "Couldn't reach the generator — try again later."));
+    }
+    setCartoonBusy(false);
+  }
+
+  async function handleCartoonFile(file: File | undefined) {
+    if (!file) return;
+    setCartoonPreview('');
+    try {
+      const { compressToDataUrl } = await import('@/lib/portal/local-image-store');
+      const dataUrl = await compressToDataUrl(file, 1024, 0.85);
+      setCartoonSource(dataUrl);
+      await generateCartoon(dataUrl);
+    } catch {
+      setCartoonMsg(L(dict, '这张图读不了,换一张试试。', "Couldn't read that image — try another."));
+    }
+  }
+
+  function acceptCartoon() {
+    if (!cartoonPreview) return;
+    saveProfileSettings({ avatarUrl: cartoonPreview });
+    setCartoonPreview(''); setCartoonSource(''); setCartoonMsg('');
+  }
+
   const menuItems = [
     { key: 'account' as ActiveSheet,
       icon: <IconGear />,
@@ -123,6 +169,22 @@ export default function NesioProfileCard() {
             className="nesio-visually-hidden"
             onChange={(event) => handleAvatarFile(event.currentTarget.files?.[0])}
           />
+          {/* 批次 95:卡通头像生成入口 */}
+          <input
+            ref={cartoonInputRef}
+            type="file"
+            accept="image/*"
+            className="nesio-visually-hidden"
+            onChange={(event) => { const f = event.currentTarget.files?.[0]; event.currentTarget.value = ''; void handleCartoonFile(f); }}
+          />
+          <button
+            type="button"
+            className="nesio-cartoon-cta"
+            onClick={() => cartoonInputRef.current?.click()}
+            disabled={cartoonBusy}
+          >
+            ✨ {L(dict, '生成卡通头像', 'Cartoon avatar')}
+          </button>
           {/* 批次 6:数字统计改「返回今天」——设置页最常见的下一步;
               洞察(原 mirror)从主页左上角 logo 进,不再从这里开 */}
           <a href="/" className="nesio-profile-stat" aria-label={L(dict, '返回今天', 'Back to Today')}>
@@ -153,6 +215,41 @@ export default function NesioProfileCard() {
           ))}
         </nav>
       </div>
+
+      {/* 批次 95:卡通头像 —— 生成中 / 预览接受 / 报错 */}
+      {(cartoonBusy || cartoonPreview || cartoonMsg) && (
+        <div className="nesio-cartoon-overlay" role="dialog" aria-modal="true">
+          <div className="nesio-cartoon-card">
+            {cartoonBusy ? (
+              <>
+                <div className="nesio-cartoon-spinner" aria-hidden />
+                <p className="nesio-cartoon-title">{L(dict, '正在生成你的卡通形象…', 'Drawing your cartoon avatar…')}</p>
+                <p className="nesio-cartoon-sub">{L(dict, '约需十几秒', 'Takes ~15 seconds')}</p>
+              </>
+            ) : cartoonPreview ? (
+              <>
+                <p className="nesio-cartoon-title">{L(dict, '喜欢这个吗?', 'Like this one?')}</p>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={cartoonPreview} alt="" className="nesio-cartoon-preview" draggable={false} />
+                <div className="nesio-cartoon-actions">
+                  <button type="button" className="nesio-cartoon-accept" onClick={acceptCartoon}>{L(dict, '用它做头像', 'Use it')}</button>
+                  <button type="button" className="nesio-cartoon-retry" onClick={() => { if (cartoonSource) void generateCartoon(cartoonSource); }}>{L(dict, '再生成一张', 'Regenerate')}</button>
+                  <button type="button" className="nesio-cartoon-cancel" onClick={() => { setCartoonPreview(''); setCartoonSource(''); }}>{L(dict, '不用了', 'Cancel')}</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="nesio-cartoon-title">{L(dict, '这次没成', 'Not this time')}</p>
+                <p className="nesio-cartoon-sub">{cartoonMsg}</p>
+                <div className="nesio-cartoon-actions">
+                  <button type="button" className="nesio-cartoon-retry" onClick={() => { if (cartoonSource) void generateCartoon(cartoonSource); }} disabled={!cartoonSource}>{L(dict, '重试', 'Retry')}</button>
+                  <button type="button" className="nesio-cartoon-cancel" onClick={() => setCartoonMsg('')}>{L(dict, '关闭', 'Close')}</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Sub-sheets */}
       <AccountSheet open={activeSheet === 'account'} onClose={() => setActiveSheet(null)} onOpenPrivacy={() => setActiveSheet('privacy')} onOpenMembership={() => setActiveSheet('subscription')} />

@@ -15120,3 +15120,84 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
   color: var(--portal-ink);
   border-color: var(--portal-accent);
 }
+
+/* ── 批次 95:卡通头像生成 —— 入口 CTA + 预览弹窗 ── */
+.nesio-cartoon-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.5rem;
+  border: 1px solid var(--portal-accent);
+  background: var(--glass-bg-solid);
+  color: var(--portal-accent);
+  border-radius: 999px;
+  padding: 0.3rem 0.85rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.nesio-cartoon-cta:disabled { opacity: 0.5; }
+.nesio-cartoon-overlay {
+  position: fixed;
+  inset: 0;
+  height: 100lvh;
+  z-index: 1500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.2rem;
+  background: rgba(10, 20, 45, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.nesio-cartoon-card {
+  width: 100%;
+  max-width: 340px;
+  background: var(--sheet-opaque, #fdfeff);
+  border-radius: 1.2rem;
+  padding: 1.3rem 1.2rem 1.1rem;
+  text-align: center;
+  box-shadow: var(--shadow-pop);
+}
+.nesio-cartoon-title { margin: 0 0 0.3rem; font-size: 1rem; font-weight: 700; color: var(--portal-ink); }
+.nesio-cartoon-sub { margin: 0 0 0.6rem; font-size: 0.78rem; color: var(--portal-muted); word-break: break-word; }
+.nesio-cartoon-preview {
+  width: 200px;
+  height: 200px;
+  object-fit: cover;
+  border-radius: 1rem;
+  margin: 0.3rem auto 0.9rem;
+  display: block;
+  border: 1px solid var(--portal-line);
+}
+.nesio-cartoon-actions { display: flex; flex-direction: column; gap: 0.5rem; }
+.nesio-cartoon-accept {
+  border: none;
+  border-radius: 0.8rem;
+  padding: 0.6rem;
+  background: var(--portal-accent);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.nesio-cartoon-retry, .nesio-cartoon-cancel {
+  border: 1px solid var(--portal-line);
+  border-radius: 0.8rem;
+  padding: 0.5rem;
+  background: none;
+  color: var(--portal-ink);
+  font-size: 0.84rem;
+  cursor: pointer;
+}
+.nesio-cartoon-retry:disabled { opacity: 0.5; }
+.nesio-cartoon-cancel { color: var(--portal-muted); }
+.nesio-cartoon-spinner {
+  width: 40px; height: 40px;
+  margin: 0.4rem auto 0.8rem;
+  border: 3px solid var(--portal-line);
+  border-top-color: var(--portal-accent);
+  border-radius: 50%;
+  animation: nesioSpin 0.8s linear infinite;
+}
+@keyframes nesioSpin { to { transform: rotate(360deg); } }
