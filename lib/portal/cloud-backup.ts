@@ -17,6 +17,17 @@
 import { buildFullBackup, restoreFullBackup, isValidBackup, type FullBackup } from './full-backup';
 import { collectIdbBlobs, isIdbBlobKey, idbBackend, registerIdbBlobKey } from './idb-blob-store';
 import { keyKind, isLocalOnly } from './storage-manifest';
+// 批次 54(足迹丢失根因加固):isIdbBlobKey 的登记随各模块**懒加载**发生 ——
+// 恢复流程若先于这些模块运行,place-trail(可达数 MB)等大 key 会被误路由进
+// localStorage,当场撞爆 5MB 配额被静默丢弃。恢复入口静态引入全部登记型 store,
+// 保证路由表在分流前是完整的。(import 即执行各自的 createBlobStore 登记。)
+import './place-trail';
+import './health-store';
+import './clinical-store';
+import './providers/bank-tx';
+import './ai-cache';
+import './providers/calendar-local-store';
+import './chat-store';
 import { collectLocalImages, restoreLocalImages } from './local-image-store';
 
 /** 备份里照片条目的键前缀(隐私审计:让导出/恢复覆盖记忆照片)。 */
@@ -205,9 +216,14 @@ export async function restoreCombinedBackup(backup: FullBackup, mode: RestoreMod
   const lsEntries: Record<string, string> = {};
   const idbEntries: Record<string, string> = {};
   const imageEntries: Record<string, string> = {};
+  // 批次 54 保险丝:登记表理论上已完整(顶部静态引入),但任何 >200KB 的条目
+  // 都绝不许进 localStorage —— 一条就能占掉配额的 4%,几条就复刻「存储满」惨案;
+  // IDB 对超额 key 是无害的(多存一份也能被各 store 的水合正常读走)。
+  const IDB_SIZE_FUSE = 200 * 1024;
   for (const [k, v] of Object.entries(backup.entries)) {
     if (k.startsWith(LOCAL_IMAGE_PREFIX)) imageEntries[k.slice(LOCAL_IMAGE_PREFIX.length)] = v;
-    else if (isIdbBlobKey(k)) idbEntries[k] = v; else lsEntries[k] = v;
+    else if (isIdbBlobKey(k) || (typeof v === 'string' && v.length > IDB_SIZE_FUSE)) idbEntries[k] = v;
+    else lsEntries[k] = v;
   }
   // 照片写回独立 IDB(nesio-images);替换/合并都直接写(图不可合并,按 assetId 覆盖)
   let imagesRestored = 0;
