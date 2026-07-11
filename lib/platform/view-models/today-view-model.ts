@@ -87,6 +87,12 @@ function urgencyScore(node: LifeNode): number {
   return Date.now() - new Date(node.createdAt).getTime() + 30 * 86_400_000;
 }
 
+/** 批次 72:今日面定位回记忆详情的正门 —— Today 组件不许直连 life-graph(泄漏门禁)。 */
+export type LiveMemoryNode = LifeNode;
+export function getLiveMemoryNode(id: string): LiveMemoryNode | null {
+  return getLifeGraph().find((n) => n.id === id) ?? null;
+}
+
 /** 本地日键(YYYY-MM-DD)—— 「加入今日焦点」的准入凭据按本地日自然过期 */
 export function localDayKey(d: Date = new Date()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;

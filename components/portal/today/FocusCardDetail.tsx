@@ -6,7 +6,10 @@
  */
 
 import { useState } from 'react';
-import type { FocusNode, SubTask } from '@/lib/platform/view-models/today-view-model';
+import dynamic from 'next/dynamic';
+import { getLiveMemoryNode, type LiveMemoryNode, type FocusNode, type SubTask } from '@/lib/platform/view-models/today-view-model';
+
+const MemoryNodeDetail = dynamic(() => import('../MemoryNodeDetail'), { ssr: false });
 import { isMeetingNode, getMeetingTime, getMeetingUrl, safeExternalUrl } from './meeting-node';
 import { IconBox, IconCalendar, IconFlag, IconHeartPulse, IconMapPin, IconStar, IconUser, IconLink, IconMic } from '../icons';
 import { L } from '@/lib/portal/i18n';
@@ -64,6 +67,7 @@ export function FocusCardDetail({
   const [unlocking, setUnlocking] = useState(false);
   // 可见失败纪律:AI 分解失败/为空时显式提示 + 重试,不静默退回起始态。
   const [error, setError] = useState<string | null>(null);
+  const [memNode, setMemNode] = useState<LiveMemoryNode | null>(null); // 批次 72:定位回记忆详情
   // 批次 56:这波步骤来自哪里 —— AI / 复用上次AI(缓存) / 本地兜底。null=AI(不显)
   const [waveSource, setWaveSource] = useState<'cache' | 'local' | null>(null);
 
@@ -261,15 +265,25 @@ export function FocusCardDetail({
         <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--portal-muted)', fontVariantNumeric: 'tabular-nums' }}>
           {totalMin > 0 ? L(dict, `共约 ${totalMin} 分钟`, `overall ~${totalMin} min`) : ''}
         </p>
-        {/* 批次 39:云 AI 只走这颗显式按钮 —— 默认引擎是本地模板/骨架,秒出 */}
-        <button
-          type="button"
-          onClick={() => void aiRefineWave()}
-          disabled={aiRefining}
-          style={{ background: 'none', border: '1px solid var(--portal-line)', borderRadius: 999, padding: '0.2rem 0.6rem', fontSize: '0.68rem', color: 'var(--portal-accent)', cursor: 'pointer', opacity: aiRefining ? 0.6 : 1 }}
-        >
-          {aiRefining ? L(dict, 'AI 细化中…', 'Refining…') : L(dict, 'AI 细化', 'AI refine')}
-        </button>
+        <div style={{ display: 'flex', gap: '0.4rem' }}>
+          {/* 批次 72(用户点名):从聚焦卡定位回记忆本体 —— 看详情/关联链/清单 */}
+          <button
+            type="button"
+            onClick={() => { const live = getLiveMemoryNode(node.id); if (live) setMemNode(live); }}
+            style={{ background: 'none', border: '1px solid var(--portal-line)', borderRadius: 999, padding: '0.2rem 0.6rem', fontSize: '0.68rem', color: 'var(--portal-muted)', cursor: 'pointer' }}
+          >
+            {L(dict, '查看详情', 'Details')}
+          </button>
+          {/* 批次 39:云 AI 只走这颗显式按钮 —— 默认引擎是本地模板/骨架,秒出 */}
+          <button
+            type="button"
+            onClick={() => void aiRefineWave()}
+            disabled={aiRefining}
+            style={{ background: 'none', border: '1px solid var(--portal-line)', borderRadius: 999, padding: '0.2rem 0.6rem', fontSize: '0.68rem', color: 'var(--portal-accent)', cursor: 'pointer', opacity: aiRefining ? 0.6 : 1 }}
+          >
+            {aiRefining ? L(dict, 'AI 细化中…', 'Refining…') : L(dict, 'AI 细化', 'AI refine')}
+          </button>
+        </div>
       </div>
       <ul className="nesio-momentum-list">
         {wave.map((a) => {
@@ -338,6 +352,7 @@ export function FocusCardDetail({
           );
         })}
       </ul>
+      {memNode && <MemoryNodeDetail node={memNode} onClose={() => setMemNode(null)} />}
     </div>
   );
 }

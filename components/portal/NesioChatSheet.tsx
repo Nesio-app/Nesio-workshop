@@ -974,12 +974,49 @@ Edit location/value anytime in Storage.`),
     window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
   }
 
+  // 批次 72:回答里的列表行(*/-/1. 开头)解析成可勾选清单项
+  function parseChecklist(text: string): string[] {
+    const items: string[] = [];
+    for (const line of text.split('\n')) {
+      const m = /^\s*(?:[-*·•]|\d+[.、)])\s*(.+)$/.exec(line);
+      if (!m) continue;
+      const t = m[1].replace(/[**]/g, '').replace(/[::]\s*$/, '').trim();
+      if (t.length >= 2 && t.length <= 60) items.push(t);
+    }
+    return items;
+  }
+
   function handleSave(msg: UiMessage) {
+    // 批次 72(用户定案):清单型回答存成**可勾选清单**,不是一坨文字。
+    // 名字优先取含「清单/list」的行;认亲:这条回答检索时引用过的记忆
+    // (msg.refs,比如「收拾行李」)自动连上 —— 引用即证据,确定性可解释。
+    const items = parseChecklist(msg.text);
+    const isChecklist = items.length >= 3;
+    const titleLine = msg.text.split('\n').map((l) => l.trim()).find((l) => /清单|list/i.test(l) && l.length <= 30 && !/^[-*·•\d]/.test(l));
+    const refRelations = (msg.refs || []).slice(0, 3).map((r) => ({ targetId: r.id, relation: 'related_plan' }));
     const savedNode = ingestLifeNode({
-      name: msg.text.slice(0, 60), type: 'event', source: 'manual', confidence: 0.9,
-      tags: ['宝盒对话'], attributes: { fullText: msg.text, savedFromChat: true },
-      relations: [], rawInput: msg.text,
+      name: isChecklist
+        ? (titleLine || L(dict, `清单 · ${items.length} 项`, `Checklist · ${items.length} items`))
+        : msg.text.slice(0, 60),
+      type: isChecklist ? 'commitment' : 'event',
+      source: 'manual', confidence: 0.9,
+      tags: isChecklist ? ['宝盒对话', '清单'] : ['宝盒对话'],
+      attributes: {
+        fullText: msg.text, savedFromChat: true,
+        ...(isChecklist ? {
+          checklist: true,
+          subtasksJson: JSON.stringify(items.slice(0, 20).map((name, i) => ({ id: `c-${Date.now()}-${i}`, name, done: false }))),
+        } : {}),
+      },
+      relations: refRelations, rawInput: msg.text,
     });
+    // 反向认亲:被引用的计划节点也指回这份清单
+    for (const r of refRelations) {
+      const live = getLifeGraph().find((x) => x.id === r.targetId);
+      if (live && !live.relations.some((x) => x.targetId === savedNode.id)) {
+        updateLifeNode(live.id, { relations: [...live.relations, { targetId: savedNode.id, relation: 'has_checklist' }] });
+      }
+    }
     setMessages((prev) => prev.map((m) => m.id === msg.id ? { ...m, savedToMemory: true } : m));
     window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
     triggerFlash(savedNode);
@@ -1499,8 +1536,8 @@ Edit location/value anytime in Storage.`),
         <BubbleMenu
           msg={menuMsg}
           onClose={() => setMenuMsg(null)}
-          onSave={() => handleSave(menuMsg)}
-          onCopy={() => handleCopy(menuMsg)}
+          onSave={() => { handleSave(menuMsg); setMenuMsg(null); }}
+          onCopy={() => { handleCopy(menuMsg); setMenuMsg(null); }}
         />
       )}
     </div>

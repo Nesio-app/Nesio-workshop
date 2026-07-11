@@ -382,8 +382,30 @@ function CommitmentSection({ node, onToggleDone }: {
   const isOverdue = dueMs !== null && dueMs < 0 && !isDone;
   const dueSoon = dueMs !== null && dueMs >= 0 && dueMs < 24 * 3_600_000 && !isDone;
 
+  // 批次 72:可勾选清单(subtasksJson)—— 存进来的打包清单在详情里直接打勾
+  const [checkItems, setCheckItems] = useState<Array<{ id: string; name: string; done: boolean }>>(() => {
+    try { return JSON.parse(String(node.attributes.subtasksJson || '[]')) as Array<{ id: string; name: string; done: boolean }>; } catch { return []; }
+  });
+  function toggleCheckItem(id: string) {
+    const next = checkItems.map((it) => (it.id === id ? { ...it, done: !it.done } : it));
+    setCheckItems(next);
+    updateLifeNode(node.id, { attributes: { ...node.attributes, subtasksJson: JSON.stringify(next) } });
+  }
+
   return (
     <div className="nesio-type-section">
+      {checkItems.length > 0 && (
+        <ul className="nesio-check-list">
+          {checkItems.map((it) => (
+            <li key={it.id}>
+              <button type="button" className={`nesio-check-item${it.done ? ' is-done' : ''}`} onClick={() => toggleCheckItem(it.id)}>
+                <span className="nesio-check-box">{it.done ? '✓' : ''}</span>
+                <span className="nesio-check-name">{it.name}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
       <div className="nesio-commitment-status-row">
         <button
           type="button"
@@ -804,6 +826,8 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
               confirms_plan: ['🧳', '对应行程', 'Linked plan'],
               part_of_plan: ['🗂', '所属计划', 'Part of plan'],
               plan_item: ['📌', '计划条目', 'Plan item'],
+              related_plan: ['🔗', '相关计划', 'Related plan'],
+              has_checklist: ['☑️', '对应清单', 'Checklist'],
             };
             const live = (n.relations || [])
               .map((r) => ({ r, node: g.find((x) => x.id === r.targetId) }))

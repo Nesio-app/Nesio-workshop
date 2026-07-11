@@ -14849,3 +14849,33 @@ html[data-portal-theme="night"] .nesio-memmap-canvas { background: #16243c; }
 }
 .nesio-node-link-kind { color: var(--portal-muted); font-size: 0.68rem; flex-shrink: 0; }
 .nesio-node-link-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── 批次 72:可勾选清单(记忆详情内) ── */
+.nesio-check-list { list-style: none; margin: 0 0 0.6rem; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; }
+.nesio-check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  width: 100%;
+  border: 1px solid var(--portal-line);
+  background: var(--glass-bg-solid);
+  border-radius: 0.7rem;
+  padding: 0.5rem 0.65rem;
+  font-size: 0.84rem;
+  color: var(--portal-ink);
+  cursor: pointer;
+  text-align: left;
+}
+.nesio-check-box {
+  flex-shrink: 0;
+  width: 1.1rem;
+  height: 1.1rem;
+  border: 1.5px solid var(--portal-line);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 0.7rem;
+  color: #fff;
+}
+.nesio-check-item.is-done .nesio-check-box { background: var(--portal-accent); border-color: var(--portal-accent); }
+.nesio-check-item.is-done .nesio-check-name { text-decoration: line-through; color: var(--portal-muted); }
