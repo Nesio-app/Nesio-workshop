@@ -269,6 +269,14 @@ export default function Portal() {
   useEffect(() => {
     void import('@/lib/portal/plan-links').then((m) => m.initPlanLinks()).catch(() => {});
   }, []);
+  // 批次 81(白边拔根的兜底半边):iOS standalone 键盘收起后 window 高度
+  // 偶发卡短(WebKit 老 bug),主页面 100dvh 布局随之缩水。焦点离开输入框
+  // 后滚回顶部,促使视口回弹;浮层已用 lvh 免疫,这里管的是主页面。
+  useEffect(() => {
+    const heal = () => setTimeout(() => window.scrollTo(0, 0), 60);
+    window.addEventListener('focusout', heal);
+    return () => window.removeEventListener('focusout', heal);
+  }, []);
   // 批次 78(补丁清偿 P1):「联网后自动重试」此前只在记忆页挂载期间成立
   // (online 监听挂在 MemoryTab)。移到应用根,承诺无条件兑现;
   // retryLifeGraphCloudSync 自带 cloudMemorySyncEnabled 门,匿名/关同步时是空转。

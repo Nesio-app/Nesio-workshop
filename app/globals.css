@@ -14969,3 +14969,22 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
   border-color: var(--portal-accent);
 }
 .nesio-chat-plan-icon { display: inline-flex; align-items: center; color: var(--portal-accent); margin-top: 0.1rem; }
+
+/* ── 批次 81:白边真拔根 —— iOS standalone 键盘收起后视口卡短,
+   fixed inset:0 家族集体够不到物理底部(机型缺口不同;批次 80 的
+   html 底色只是让缺口变色,用户实锤「蓝色补丁边」)。
+   全部全屏浮层统一顶锚 + 最大视口高度(lvh = 物理屏,免疫卡短);
+   老 WebKit 不认 lvh 时退回 100vh。bottom:auto 解除 inset 的双端约束。 ── */
+.nesio-settings-sheet-overlay, .nesio-wechat-fullscreen, .nesio-tell-overlay,
+.nesio-globe-fsov, .nesio-node-detail-overlay, .nesio-reader-overlay,
+.nesio-rd-overlay, .nesio-wp-overlay, .nesio-image-viewer, .nesio-mood-overlay,
+.nesio-ob-overlay, .nesio-focus-mode-overlay, .nesio-recorder-overlay,
+.nesio-voice-sheet, .nesio-share-overlay, .nesio-select-overlay,
+.nesio-dtp-overlay, .nesio-exp-conclude-overlay, .nesio-freeze-overlay,
+.nesio-camera-sheet, .nesio-widget-customizer-overlay, .nesio-ask-guide,
+.nesio-bubble-menu-backdrop, .nesio-barcode-overlay, .nesio-chat-history-panel,
+.nesio-imgzoom-overlay, .nesio-login-bg, .nesio-memmap-overlay, .nesio-visitmem-overlay {
+  height: 100vh;
+  height: 100lvh;
+  bottom: auto;
+}
