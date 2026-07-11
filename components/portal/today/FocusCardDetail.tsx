@@ -44,7 +44,7 @@ interface MomentumAction {
 
 export function FocusCardDetail({
   node,
-  onSubtasksChange: _onSubtasksChange,
+  onSubtasksChange,
   onOpenRecorder, onFocusMode, focusModeLabel, onDelete }: {
   node: FocusNode;
   onSubtasksChange: (nodeId: string, subtasks: SubTask[]) => void;
@@ -101,6 +101,13 @@ export function FocusCardDetail({
   function fetchWave(previousAction?: string, _history: string[] = []) {
     setError(null);
     const cacheKey = sig(node.name + (previousAction ? `|next:${previousAction}` : ''));
+    // 批次 73(用户定案):节点自带清单(存入的打包清单等)→ 直接显示条目
+    // 本身,可勾选且状态落库 —— 不再用拆解引擎重新发明一遍。
+    if (node.subtasks?.length && !previousAction) {
+      setWave(node.subtasks.map((st, i) => ({ id: st.id || `st-${i}`, name: st.name, emoji: '☑', done: st.done, durationMin: st.durationMin })));
+      setDrillMap(new Map()); setError(null); setWaveSource(null);
+      return;
+    }
     const tpl = matchTaskTemplate(node.name, dict);
     if (tpl && !previousAction) { applyWave(tpl, 'local', cacheKey); setWaveSource(null); return; }
     const cached = recallAI<Step[]>('decompose', cacheKey);
@@ -157,6 +164,10 @@ export function FocusCardDetail({
   function toggleAction(actionId: string) {
     const next = wave.map((a) => a.id === actionId ? { ...a, done: !a.done } : a);
     setWave(next);
+    // 清单模式(wave 即节点 subtasks):勾选状态写回 subtasksJson,两处同步
+    if (node.subtasks?.length && next.length === node.subtasks.length && next.every((a, i) => a.name === node.subtasks![i].name)) {
+      onSubtasksChange(node.id, next.map((a) => ({ id: a.id, name: a.name, done: a.done, durationMin: a.durationMin })));
+    }
     if (next.every((a) => a.done)) {
       const lastDone = next[next.length - 1].name;
       const allHistory = [...completedActions, ...next.map((a) => a.name)];

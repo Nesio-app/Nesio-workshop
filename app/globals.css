@@ -14879,3 +14879,39 @@ html[data-portal-theme="night"] .nesio-memmap-canvas { background: #16243c; }
 }
 .nesio-check-item.is-done .nesio-check-box { background: var(--portal-accent); border-color: var(--portal-accent); }
 .nesio-check-item.is-done .nesio-check-name { text-decoration: line-through; color: var(--portal-muted); }
+
+/* ── 批次 73:关联链手动管理 ── */
+.nesio-node-link-row { display: flex; align-items: center; gap: 0.35rem; }
+.nesio-node-link-row .nesio-node-link-chip { flex: 1; min-width: 0; }
+.nesio-node-link-x {
+  flex-shrink: 0;
+  width: 1.6rem; height: 1.6rem;
+  border: 1px solid var(--portal-line);
+  background: none;
+  border-radius: 50%;
+  color: var(--portal-muted);
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+.nesio-node-link-add {
+  border: 1px dashed var(--portal-line);
+  background: none;
+  border-radius: 0.7rem;
+  padding: 0.4rem 0.65rem;
+  font-size: 0.76rem;
+  color: var(--portal-muted);
+  cursor: pointer;
+  text-align: left;
+}
+.nesio-node-link-picker { display: flex; flex-direction: column; gap: 0.35rem; }
+.nesio-node-link-cand {
+  display: flex; align-items: center; gap: 0.4rem;
+  border: 1px solid var(--portal-line);
+  background: var(--glass-bg-solid);
+  border-radius: 0.7rem;
+  padding: 0.45rem 0.65rem;
+  font-size: 0.8rem;
+  color: var(--portal-ink);
+  cursor: pointer;
+  text-align: left;
+}

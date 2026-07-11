@@ -106,7 +106,12 @@ function isFocusNode(node: LifeNode): boolean {
   // 今天就是它的日子(此前无日期待办被拒之门外,「刚记的去哪了」)。
   if (node.type === 'commitment' && (node.source === 'manual' || node.source === 'voice')) {
     const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
-    if (new Date(node.createdAt).getTime() >= dayStart.getTime()) return true;
+    if (new Date(node.createdAt).getTime() >= dayStart.getTime()) {
+      // 批次 73:带**明确过去日期**的不硬塞进今天(年份写错/补录旧事,
+      // 「已过期」出现在今日聚焦不合理 —— 逾期归尘封回顾管)。
+      const d0 = extractNearestDate(node);
+      if (!d0 || d0.getTime() >= dayStart.getTime()) return true;
+    }
   }
   const now = Date.now();
   // 批次 65:有效期按"到当天结束"判定(纯日期零点解析会让今天到期的东西白天就消失)

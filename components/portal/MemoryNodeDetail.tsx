@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { deleteLifeNode, getLifeGraph, updateLifeNode, type LifeNode } from '@/lib/portal/life-graph';
+import { deleteLifeNode, getLifeGraph, searchLifeGraphFuzzy, updateLifeNode, type LifeNode } from '@/lib/portal/life-graph';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
 import LocationPicker from './LocationPicker';
 import EmailComposeSheet from './EmailComposeSheet';
@@ -489,6 +489,16 @@ function PreferenceSection({ node, assetUrls }: {
   );
 }
 
+// 批次 73:关联链的手动增删是最直接的反馈信号 —— 本地留痕(后续喂遥测/学习)。
+function logLinkFeedback(entry: Record<string, unknown>): void {
+  try {
+    const k = 'nesio-link-feedback-v1';
+    const arr = JSON.parse(localStorage.getItem(k) || '[]') as unknown[];
+    arr.unshift({ t: Date.now(), ...entry });
+    localStorage.setItem(k, JSON.stringify(arr.slice(0, 200)));
+  } catch { /* 留痕失败不拦操作 */ }
+}
+
 // ── Main component ──────────────────────────────────────────────────────────
 
 interface EditFields {
@@ -508,6 +518,11 @@ interface EditFields {
 // ── Graph helpers ─────────────────────────────────────────────────────────────
 
 export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNode }: MemoryNodeDetailProps) {
+  // 批次 73:关联链手动管理(增/删即反馈)
+  const [removedRels, setRemovedRels] = useState<Set<string>>(new Set());
+  const [addedRels, setAddedRels] = useState<Array<{ targetId: string; relation: string }>>([]);
+  const [linkPicking, setLinkPicking] = useState(false);
+  const [linkQuery, setLinkQuery] = useState('');
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [editing, setEditing] = useState(false);
   const [fields, setFields] = useState<EditFields>({
@@ -818,30 +833,79 @@ export default function MemoryNodeDetail({ node, onClose, relatedNodes, onOpenNo
             </span>
           </div>
 
-          {/* 批次 70:关联链 —— 行程↔邮件自动挂钩、计划容器↔条目,点开跳转 */}
-          {(n.relations || []).length > 0 && (() => {
+          {/* 批次 70:关联链 —— 行程↔邮件自动挂钩、计划容器↔条目,点开跳转;
+              批次 73:手动增删关联(删除自动连线 = 反馈信号,本地留痕) */}
+          {(() => {
             const g = getLifeGraph();
             const REL_LABEL: Record<string, [string, string, string]> = {
               confirmed_by_email: ['📩', '确认邮件', 'Confirmation email'],
               confirms_plan: ['🧳', '对应行程', 'Linked plan'],
               part_of_plan: ['🗂', '所属计划', 'Part of plan'],
-              plan_item: ['📌', '计划条目', 'Plan item'],
+              plan_item: ['🗓', '计划条目', 'Plan item'],
               related_plan: ['🔗', '相关计划', 'Related plan'],
               has_checklist: ['☑️', '对应清单', 'Checklist'],
+              user_linked: ['🔗', '手动关联', 'Linked'],
             };
-            const live = (n.relations || [])
+            const rels = [
+              ...(n.relations || []).filter((r) => !removedRels.has(`${r.relation}:${r.targetId}`)),
+              ...addedRels,
+            ];
+            const live = rels
               .map((r) => ({ r, node: g.find((x) => x.id === r.targetId) }))
               .filter((x): x is { r: { targetId: string; relation: string }; node: LifeNode } => Boolean(x.node) && Boolean(REL_LABEL[x.r.relation]));
-            if (!live.length) return null;
+            const removeRel = (r: { targetId: string; relation: string }) => {
+              setRemovedRels((prev) => new Set(prev).add(`${r.relation}:${r.targetId}`));
+              const liveN = g.find((x) => x.id === n.id);
+              if (liveN) updateLifeNode(n.id, { relations: (liveN.relations || []).filter((x) => !(x.targetId === r.targetId && x.relation === r.relation)) });
+              const t = g.find((x) => x.id === r.targetId);
+              if (t) updateLifeNode(t.id, { relations: (t.relations || []).filter((x) => x.targetId !== n.id) });
+              logLinkFeedback({ action: 'removed', relation: r.relation, from: n.id, to: r.targetId });
+            };
+            const addRel = (t: LifeNode) => {
+              if (t.id === n.id || rels.some((x) => x.targetId === t.id)) { setLinkPicking(false); return; }
+              const liveN = g.find((x) => x.id === n.id);
+              updateLifeNode(n.id, { relations: [...(liveN?.relations || []), { targetId: t.id, relation: 'user_linked' }] });
+              updateLifeNode(t.id, { relations: [...(t.relations || []), { targetId: n.id, relation: 'user_linked' }] });
+              setAddedRels((prev) => [...prev, { targetId: t.id, relation: 'user_linked' }]);
+              logLinkFeedback({ action: 'added', relation: 'user_linked', from: n.id, to: t.id });
+              setLinkPicking(false); setLinkQuery('');
+            };
+            const candidates = linkPicking && linkQuery.trim().length >= 1
+              ? searchLifeGraphFuzzy(linkQuery.trim(), 6).filter((x) => x.id !== n.id)
+              : [];
             return (
               <div className="nesio-node-links">
                 {live.map(({ r, node: t }) => (
-                  <button key={`${r.relation}-${r.targetId}`} type="button" className="nesio-node-link-chip" onClick={() => onOpenNode?.(t)}>
-                    <span>{REL_LABEL[r.relation][0]}</span>
-                    <span className="nesio-node-link-kind">{L(dict, REL_LABEL[r.relation][1], REL_LABEL[r.relation][2])}</span>
-                    <span className="nesio-node-link-name">{t.name.slice(0, 24)}</span>
-                  </button>
+                  <div key={`${r.relation}-${r.targetId}`} className="nesio-node-link-row">
+                    <button type="button" className="nesio-node-link-chip" onClick={() => onOpenNode?.(t)}>
+                      <span>{REL_LABEL[r.relation][0]}</span>
+                      <span className="nesio-node-link-kind">{L(dict, REL_LABEL[r.relation][1], REL_LABEL[r.relation][2])}</span>
+                      <span className="nesio-node-link-name">{t.name.slice(0, 24)}</span>
+                    </button>
+                    <button type="button" className="nesio-node-link-x" aria-label={L(dict, '解除关联', 'Unlink')} onClick={() => removeRel(r)}>✕</button>
+                  </div>
                 ))}
+                {!linkPicking ? (
+                  <button type="button" className="nesio-node-link-add" onClick={() => setLinkPicking(true)}>
+                    ＋ {L(dict, '关联一条记忆', 'Link a memory')}
+                  </button>
+                ) : (
+                  <div className="nesio-node-link-picker">
+                    <input
+                      className="nesio-tl-rename-input"
+                      value={linkQuery}
+                      onChange={(e) => setLinkQuery(e.target.value)}
+                      placeholder={L(dict, '搜记忆名字…', 'Search memories…')}
+                      autoFocus
+                    />
+                    {candidates.map((c) => (
+                      <button key={c.id} type="button" className="nesio-node-link-cand" onClick={() => addRel(c)}>
+                        <NodeTypeIcon type={c.type} size={12} /> {c.name.slice(0, 28)}
+                      </button>
+                    ))}
+                    <button type="button" className="nesio-node-link-add" onClick={() => { setLinkPicking(false); setLinkQuery(''); }}>{L(dict, '收起', 'Close')}</button>
+                  </div>
+                )}
               </div>
             );
           })()}

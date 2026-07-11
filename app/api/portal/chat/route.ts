@@ -248,7 +248,13 @@ export function parseChatActions(raw: string): { text: string; actions: ChatActi
           const name = typeof it.name === 'string' ? it.name.trim().slice(0, 60) : '';
           if (!name) return null;
           const out: PlanItem = { name };
-          if (typeof it.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(it.date)) out.date = it.date;
+          if (typeof it.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(it.date)) {
+            // 批次 73(用户实锤:模型把年份写成 2025 → 全部「已过期」):
+            // 计划天然朝前 —— 过去 36 小时以上的日期把年份滚到即将到来的那年。
+            let [y, mo, d] = it.date.split('-').map(Number);
+            for (let guard = 0; guard < 3 && new Date(y, mo - 1, d).getTime() < Date.now() - 36 * 3_600_000; guard++) y += 1;
+            out.date = `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+          }
           if (typeof it.time === 'string' && /^\d{1,2}:\d{2}$/.test(it.time)) out.time = it.time;
           if (typeof it.place === 'string' && it.place.trim()) out.place = it.place.trim().slice(0, 60);
           // 批次 70(用户定案):kind 不再枚举白名单 —— 真实计划千姿百态,自由短词,
@@ -307,7 +313,7 @@ export async function POST(req: NextRequest) {
 
   // 批次 72(用户实锤:「帮我订计划」仍被 5 个编号问题轰炸):检测规划意图,
   // 本轮追加强制指令 —— 弱模型对通用协议记不牢,靠贴脸重申。
-  const planIntent = /计划|行程|规划|安排.{0,4}(旅行|行程|活动)|itinerary|plan (a |my |the )?trip/i.test(message);
+  const planIntent = /计划|行程|规划|旅行|旅游|出行|安排.{0,4}(旅行|行程|活动)|itinerary|trip|travel plan/i.test(message);
   const planReinforce = planIntent
     ? '\n\n【本轮强制】用户在请求规划。若信息不足:只问一个最关键的问题,且必须在动作块 options 里给 2-4 个可点选项;严禁列出多个编号问题。若信息已够:直接给方案并按动作协议输出 planItems。'
     : '';
