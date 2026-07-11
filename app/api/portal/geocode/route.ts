@@ -136,14 +136,15 @@ async function foursquareNearby(lat: number, lon: number, token: string): Promis
   }).filter((c) => c.name);
 }
 
-/** 批次 82(用户实锤:综合楼里附近候选为空):没配 Foursquare 时用
- *  OSM Overpass 免费查 300m 内带名字的实体(商铺/餐饮/休闲/景点/办公),
- *  按距离排序 —— 商场里也能列出「Apple / J.Crew / Mall」这种可选的真名。
- *  公共 Overpass 实例有限速,4s 超时,失败静默(候选少而不是报错)。 */
+/** 批次 82/92(用户实锤:附近只出街道名):没配 Foursquare 时用 OSM Overpass
+ *  免费查 400m 内带名字的实体(商铺/餐饮/休闲/景点/办公/手作/医疗)。
+ *  批次 92 根因修:批次 82 用 5 个独立标签子句 + 服务端 timeout:4 + 客户端
+ *  4.5s abort,处理不完被掐死,只剩街道兜底(实测该位置 OSM 有 17 个真门店)。
+ *  改单条正则键子句(一次扫描,实测 1s)+ 服务端 timeout:12 + 客户端 12s。 */
 async function overpassNearby(lat: number, lon: number): Promise<Array<{ name: string; distanceM?: number; kind?: string }>> {
-  const q = `[out:json][timeout:4];(nwr(around:300,${lat},${lon})[name][shop];nwr(around:300,${lat},${lon})[name][amenity];nwr(around:300,${lat},${lon})[name][leisure];nwr(around:300,${lat},${lon})[name][tourism];nwr(around:300,${lat},${lon})[name][office];);out center 24;`;
+  const q = `[out:json][timeout:12];nwr(around:400,${lat},${lon})[name][~"^(shop|amenity|leisure|tourism|office|craft|healthcare)$"~"."];out center 30;`;
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 4500);
+  const timer = setTimeout(() => ctrl.abort(), 12_000);
   try {
     const res = await fetch('https://overpass-api.de/api/interpreter', {
       method: 'POST',
@@ -171,8 +172,8 @@ async function overpassNearby(lat: number, lon: number): Promise<Array<{ name: s
         name,
         distanceM: dist(la, lo),
         kind: kindFromOsm(
-          t.shop ? 'shop' : t.amenity ? 'amenity' : t.leisure ? 'leisure' : t.tourism ? 'tourism' : t.office ? 'office' : undefined,
-          t.shop || t.amenity || t.leisure || t.tourism || t.office,
+          t.shop ? 'shop' : t.amenity ? 'amenity' : t.leisure ? 'leisure' : t.tourism ? 'tourism' : t.office ? 'office' : t.healthcare ? 'amenity' : t.craft ? 'shop' : undefined,
+          t.shop || t.amenity || t.leisure || t.tourism || t.office || t.healthcare || t.craft,
         ),
       });
     }
