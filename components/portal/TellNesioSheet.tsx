@@ -76,7 +76,6 @@ const FAN_BUTTONS: Array<{
 export default function TellNesioSheet({ open, onClose, onCapture }: TellNesioSheetProps) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const showFreeze = useFeatureEnabled('freeze'); // 功能开关中心:冷冻仓可关
-  const cameraInputRef = useRef<HTMLInputElement>(null);
   if (!open) return null;
   // 批次 56:捕获面一打开就预热手机定位(开关开着才动),盖章时坐标已就绪
   prefetchCaptureLocation();
@@ -84,22 +83,6 @@ export default function TellNesioSheet({ open, onClose, onCapture }: TellNesioSh
   return (
     <div className="nesio-tell-overlay" role="dialog" aria-modal="true" aria-label={L(dict, '告诉 Nesio', 'Tell Nesio')}>
       <button type="button" className="nesio-tell-backdrop" aria-label={L(dict, '关闭', 'Close')} onClick={onClose} />
-      {/* 批次 39:改回 capture —— 点「拍一下」直接开相机(用户要直达取景框,不要中间菜单)。
-          从相册选走「分享」入口;取消拍摄则什么都不发生 */}
-      <input
-        ref={cameraInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        style={{ display: 'none' }}
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          e.target.value = '';
-          if (!file) return;
-          onClose();
-          onCapture('camera', file);
-        }}
-      />
       <div className="nesio-tell-fan">
         {FAN_BUTTONS.map((btn, i) => (
           <button
@@ -108,13 +91,10 @@ export default function TellNesioSheet({ open, onClose, onCapture }: TellNesioSh
             className={`nesio-tell-fan-btn nesio-tell-fan-btn--${btn.pos}`}
             style={{ '--delay': `${i * 0.05}s` } as React.CSSProperties}
             onClick={() => {
-              if (btn.mode === 'camera') {
-                // 批次 33:iPhone PWA 的 getUserMedia 取景框两次真机实锤黑屏不可用 ——
-                // 改回原生 capture input:同一手势内 click,iOS 系统相机直接全屏打开
-                // (用户要的"点一下直接开相机")。拍完回 CameraSheet 结果流;相册走分享。
-                cameraInputRef.current?.click();
-                return;
-              }
+              // 批次 91(用户批准,对标 Google Lens「实时取景 + 单击快门」):
+              // 拍一下开应用内 live 取景(CameraSheet 自带 getUserMedia + 快门 +
+              // QR 连扫),不再直接调系统相机 —— 少了「拍摄→use photo」那道确认。
+              // 黑屏/无权限时 CameraSheet 的看门狗会自动无缝退回系统相机(批次 91)。
               onClose();
               onCapture(btn.mode);
             }}

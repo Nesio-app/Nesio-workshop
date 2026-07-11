@@ -390,6 +390,41 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
     void attachStreamToVideo(stream);
   }, [attachStreamToVideo, phase]);
 
+  // 批次 91(对标苹果相机「对着 QR 就读」):live 取景每 ~700ms 采一帧 zxing
+  // 连扫二维码 —— 命中即显芯片,不用拍照。惰性加载 reader,组件级复用。
+  useEffect(() => {
+    if (phase !== 'live') return;
+    let alive = true;
+    let reader: { decodeFromCanvas: (c: HTMLCanvasElement) => { getText?: () => string } } | null = null;
+    const scanCanvas = document.createElement('canvas');
+    const loop = async () => {
+      if (!alive) return;
+      const video = videoRef.current;
+      if (video && video.videoWidth > 0) {
+        try {
+          if (!reader) {
+            const { BrowserQRCodeReader } = await import('@zxing/browser');
+            reader = new BrowserQRCodeReader() as unknown as typeof reader;
+          }
+          const maxDim = 900;
+          const scale = Math.min(1, maxDim / Math.max(video.videoWidth, video.videoHeight));
+          scanCanvas.width = Math.round(video.videoWidth * scale);
+          scanCanvas.height = Math.round(video.videoHeight * scale);
+          const ctx = scanCanvas.getContext('2d');
+          if (ctx && reader) {
+            ctx.drawImage(video, 0, 0, scanCanvas.width, scanCanvas.height);
+            const result = reader.decodeFromCanvas(scanCanvas); // 无码抛异常
+            const text = result?.getText?.();
+            if (text && alive) setQrCodes([text]);
+          }
+        } catch { /* 这一帧无码:静默,下一帧再试 */ }
+      }
+      if (alive) setTimeout(loop, 700);
+    };
+    const t = setTimeout(loop, 800);
+    return () => { alive = false; clearTimeout(t); };
+  }, [phase]);
+
   useEffect(() => {
     if (!open) {
       stopCamera();
@@ -1075,6 +1110,13 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
             <span className="nesio-camera-corner nesio-camera-corner--tr"/>
             <span className="nesio-camera-corner nesio-camera-corner--bl"/>
             <span className="nesio-camera-corner nesio-camera-corner--br"/>
+          </div>
+        )}
+
+        {/* 批次 91:live 取景里对着二维码就读到 —— 芯片浮在取景框上方 */}
+        {phase === 'live' && qrChips && (
+          <div style={{ position: 'absolute', top: 'calc(4rem + env(safe-area-inset-top, 0px))', left: '1rem', right: '1rem', zIndex: 4 }}>
+            {qrChips}
           </div>
         )}
 
