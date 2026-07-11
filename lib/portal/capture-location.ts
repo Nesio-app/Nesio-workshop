@@ -86,13 +86,18 @@ export function prefetchCaptureLocation(force = false): void {
         labelInFlight = true;
         reverseGeocode(fix.lat, fix.lon)
           .then((geo) => {
-            if (!geo.label) return;
-            // 批次 57(用户定案):地名 = 城市, 州缩写, 国家(Cary, NC, US)
-            const label = geo.country ? `${geo.label}, ${geo.country}` : geo.label;
-            writeFixCache({ ...(readFixCache() ?? fix), label });
-            feedFootprints(label, fix.lat, fix.lon);
+            if (geo.label) {
+              // 批次 57(用户定案):地名 = 城市, 州缩写, 国家(Cary, NC, US)
+              const label = geo.country ? `${geo.label}, ${geo.country}` : geo.label;
+              writeFixCache({ ...(readFixCache() ?? fix), label });
+              feedFootprints(label, fix.lat, fix.lon);
+            } else {
+              // 反查空手:足迹先用坐标名记上(与 Tesla 连接器同款兜底,
+              // 可在足迹页改名);不写进 fix.label,下次仍会尝试真名。
+              feedFootprints(coordLabel(fix.lat, fix.lon), fix.lat, fix.lon);
+            }
           })
-          .catch(() => {})
+          .catch(() => { feedFootprints(coordLabel(fix.lat, fix.lon), fix.lat, fix.lon); })
           .finally(() => { labelInFlight = false; });
       } else if (fix.label) {
         feedFootprints(fix.label, fix.lat, fix.lon);
@@ -101,6 +106,10 @@ export function prefetchCaptureLocation(force = false): void {
     () => { /* 拒绝/超时:保持旧缓存,盖章自然跳过 */ },
     { enableHighAccuracy: false, timeout: 8000, maximumAge: 120_000 },
   );
+}
+
+function coordLabel(lat: number, lon: number): string {
+  return `${lat.toFixed(3)},${lon.toFixed(3)}`;
 }
 
 /** 批次 57:定位开关开着时,每次拿到定位顺手喂足迹(2h 同地去重在 place-trail 内),
