@@ -75,6 +75,7 @@ const FAN_BUTTONS: Array<{
 
 export default function TellNesioSheet({ open, onClose, onCapture }: TellNesioSheetProps) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const showFreeze = useFeatureEnabled('freeze'); // 功能开关中心:冷冻仓可关
   if (!open) return null;
   // 批次 56:捕获面一打开就预热手机定位(开关开着才动),盖章时坐标已就绪
@@ -83,6 +84,23 @@ export default function TellNesioSheet({ open, onClose, onCapture }: TellNesioSh
   return (
     <div className="nesio-tell-overlay" role="dialog" aria-modal="true" aria-label={L(dict, '告诉 Nesio', 'Tell Nesio')}>
       <button type="button" className="nesio-tell-backdrop" aria-label={L(dict, '关闭', 'Close')} onClick={onClose} />
+      {/* 批次 93(撤批次91):getUserMedia 取景框在 iOS PWA 实锤黑屏 —— 拍一下
+          重新一下直达系统相机(同一手势内 click,iOS 全屏打开),不再先进
+          会黑屏的应用内取景框、再落到「上传图片」兜底页(那多一步)。 */}
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = '';
+          if (!file) return;
+          onClose();
+          onCapture('camera', file);
+        }}
+      />
       <div className="nesio-tell-fan">
         {FAN_BUTTONS.map((btn, i) => (
           <button
@@ -91,10 +109,12 @@ export default function TellNesioSheet({ open, onClose, onCapture }: TellNesioSh
             className={`nesio-tell-fan-btn nesio-tell-fan-btn--${btn.pos}`}
             style={{ '--delay': `${i * 0.05}s` } as React.CSSProperties}
             onClick={() => {
-              // 批次 91(用户批准,对标 Google Lens「实时取景 + 单击快门」):
-              // 拍一下开应用内 live 取景(CameraSheet 自带 getUserMedia + 快门 +
-              // QR 连扫),不再直接调系统相机 —— 少了「拍摄→use photo」那道确认。
-              // 黑屏/无权限时 CameraSheet 的看门狗会自动无缝退回系统相机(批次 91)。
+              if (btn.mode === 'camera') {
+                // 批次 93:iOS PWA getUserMedia 取景框实锤黑屏 —— 直达系统相机
+                // (一下打开,不进会黑屏的应用内取景)。拍完回 CameraSheet 结果流。
+                cameraInputRef.current?.click();
+                return;
+              }
               onClose();
               onCapture(btn.mode);
             }}

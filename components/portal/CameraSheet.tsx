@@ -443,8 +443,11 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
     // QA(用户定):打开即启动应用内取景框(getUserMedia live)—— 我们自己的 UI,
     // 才能像原生相机一样在**左下角放相册入口**(web 调起的系统取景框不可定制)。
     // getUserMedia 失败/无权限 → startCamera 自动落到 no-camera 选择页(拍照/相册按钮)。
+    // 批次 93:无文件打开时直接进选择页(拍照/相册)—— 不再先启动 iOS PWA
+    // 实锤黑屏的应用内取景框(那会先黑屏 1-2s 再落到「上传图片」兜底页)。
+    // live 取景基建保留,待原生壳(Capacitor)上架后才是真能用的实时相机场景。
     if (initialFile) void processFile(initialFile);
-    else void startCamera('environment');
+    else setPhase('idle');
     return () => {
       stopCamera();
     };
