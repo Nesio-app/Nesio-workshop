@@ -137,11 +137,45 @@ interface EditedNode {
   rawInput?: string;
   note?: string;
   expiry?: string;
+  price?: string;
   deleted: boolean;
 }
 
-function toEditedNodes(nodes: AnalyzedNode[]): EditedNode[] {
-  return nodes.map((n) => ({ ...n, tags: n.tags ?? [], note: '', expiry: '', deleted: false }));
+// 批次 64:识别退化的确定性兜底 —— 兜底模型(gpt-4o-mini)时代,能用规则接住的绝不指望模型。
+const NON_ITEM_RE = /^(销售税|消费税|税费?|小计|合计|总计|找零|小费|sales?\s*tax|tax|subtotal|total|change( due)?|tips?|balance)$/i;
+const EXPIRY_KEY_RE = /(有效期|保质期|销售日期|赏味|best\s*by|sell\s*by|use\s*by|exp(?:iry|ires|\.)?)/i;
+const DATE_RE = /(\d{4})\s*[年\/\-.]\s*(\d{1,2})\s*[月\/\-.]\s*(\d{1,2})|(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/;
+
+/** 文本里紧挨"有效期类关键词"的日期 → YYYY-MM-DD;没有则 ''。 */
+function extractExpiryFromText(text: string): string {
+  if (!text || !EXPIRY_KEY_RE.test(text)) return '';
+  const m = DATE_RE.exec(text);
+  if (!m) return '';
+  let y: number; let mo: number; let d: number;
+  if (m[1]) { y = Number(m[1]); mo = Number(m[2]); d = Number(m[3]); }
+  else { mo = Number(m[4]); d = Number(m[5]); y = Number(m[6]); if (y < 100) y += 2000; }
+  if (!y || mo < 1 || mo > 12 || d < 1 || d > 31) return '';
+  return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
+function toEditedNodes(nodes: AnalyzedNode[], summary = ''): EditedNode[] {
+  const kept = nodes.filter((n) => !NON_ITEM_RE.test((n.name || '').trim()));
+  const usable = kept.length ? kept : nodes; // 全被滤光就保底不丢
+  const summaryExpiry = usable.length <= 2 ? extractExpiryFromText(summary) : ''; // 小票(多条)不拿收据日期冒充有效期
+  return usable.map((n) => {
+    const a = n.attributes || {};
+    const attrExpiry = [a.expiry, a.expiryDate, a.bestBy, a.sellBy]
+      .find((v): v is string => typeof v === 'string' && Boolean(v)) || '';
+    const price = typeof a.price === 'string' || typeof a.price === 'number' ? String(a.price) : '';
+    return {
+      ...n,
+      tags: n.tags ?? [],
+      note: '',
+      expiry: extractExpiryFromText(attrExpiry ? `有效期 ${attrExpiry}` : '') || attrExpiry || summaryExpiry || '',
+      price,
+      deleted: false,
+    };
+  });
 }
 
 // ── Receipt detection ────────────────────────────────────────────────────────
@@ -449,7 +483,7 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
     setError('');
     try {
       const res = await analyzeImage(capturedBase64, undefined, dict);
-      const nodes = toEditedNodes(res.nodes);
+      const nodes = toEditedNodes(res.nodes, res.summary);
       setResult(res);
       setEditedNodes(nodes);
       setIsReceipt(detectReceipt(res));
@@ -469,7 +503,7 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
         // 未登录 / 免费层:照片照样保存(待确认线索),不打云;文案分流(登录引导 vs Pro 升级)
         const pending = buildPendingImageResult(dict, err.code === 'free_tier_local' ? 'free_tier' : 'auth');
         setResult(pending);
-        setEditedNodes(toEditedNodes(pending.nodes));
+        setEditedNodes(toEditedNodes(pending.nodes, pending.summary));
         setIsReceipt(false);
         setPhase('result');
         return;
@@ -527,7 +561,7 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
           summary: L(dict, '文件已存档,可搜索可阅读。升级 Pro 可用 AI 提取要点。', 'File archived — searchable and readable. Upgrade to Pro for AI extraction.'),
         };
         setResult(fileResult);
-        setEditedNodes(toEditedNodes(fileResult.nodes));
+        setEditedNodes(toEditedNodes(fileResult.nodes, fileResult.summary));
         setIsReceipt(false);
         setPhase('result');
         return;
@@ -591,6 +625,7 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
           ...(locationVal ? { location: locationVal as string } : {}),
           ...(n.note?.trim() ? { note: n.note.trim() as string } : {}),
           ...(n.expiry?.trim() ? { expiry: n.expiry.trim() as string } : {}),
+          ...(n.price?.trim() ? { price: n.price.trim() as string } : {}),
           ...(userTags.length ? { userTags: userTags.join(', ') as string } : {}),
         },
       });
@@ -1044,6 +1079,21 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
                       value={nodeLocations[i] ?? ''}
                       onChange={(v) => setNodeLocations((prev) => ({ ...prev, [i]: v }))}
                       className="nesio-camera-loc-picker"
+                    />
+                  </div>
+                )}
+
+                {/* 批次 64:价格 —— 小票条目/物品可见可改 */}
+                {(node.type === 'object' || isReceipt) && (
+                  <div className="nesio-camera-node-expiry-row">
+                    <span className="nesio-camera-node-expiry-label">{L(dict, '价格', 'Price')}</span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      className="nesio-camera-node-expiry-input"
+                      placeholder={L(dict, '如 24.99', 'e.g. 24.99')}
+                      value={node.price || ''}
+                      onChange={(e) => setEditedNodes((prev) => prev.map((n, j) => j === i ? { ...n, price: e.target.value } : n))}
                     />
                   </div>
                 )}
