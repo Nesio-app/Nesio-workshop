@@ -280,7 +280,12 @@ export default function Portal() {
   useEffect(() => {
     const onRecog = (e: Event) => {
       const f = (e as CustomEvent<{ file?: File }>).detail?.file;
-      if (f instanceof File) { setCameraFile(f); setCaptureMode('camera'); }
+      // 批次 80(用户实锤「分享图后闪退回首页」):ShareSheet 派发本事件后随即
+      // onClose → setCaptureMode(null),同一批次里把这里刚设的 'camera' 清掉,
+      // CameraSheet 一闪即关。延迟一拍,让关闭先落地再开相机。
+      if (f instanceof File) {
+        setTimeout(() => { setCameraFile(f); setCaptureMode('camera'); }, 80);
+      }
     };
     window.addEventListener('nesio-recognize-image', onRecog);
     return () => window.removeEventListener('nesio-recognize-image', onRecog);

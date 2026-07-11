@@ -158,25 +158,41 @@ export default function TodayFeed({
       && (!c.expiresAt || new Date(c.expiresAt).getTime() > Date.now()))
     .slice(0, cardBudget);
 
-  // §1 ①收据首行:每次打开先兑现一次承诺(纯本地事实,绝不显示同步计数);时段三态。
+  // §1 ①收据首行 → 批次 80(用户定案「都记着呢N条意义不大」):
+  // 称呼(首次设置的名字) + 时段问候 + **一条最有用的信息**
+  // (最近的带时点焦点事项/到期物);没有要紧事才落回承诺文案。
   const receiptLine = useMemo(() => {
+    // 默认兜底名(「我」/User)不是称呼 —— 只有用户亲自设置的名字才上问候语
+    const GENERIC_NAMES = new Set(['我', 'me', 'user', '用户', '朋友']);
+    const nameRaw = displayName.trim();
+    const name = nameRaw.length > 0 && nameRaw.length <= 12 && !GENERIC_NAMES.has(nameRaw.toLowerCase()) && !GENERIC_NAMES.has(nameRaw) ? nameRaw : '';
+    const hello = hourNow < 11
+      ? L(uiLocale, '早', 'Morning')
+      : isEvening ? L(uiLocale, '晚上好', 'Evening') : L(uiLocale, '下午好', 'Afternoon');
+    const prefix = name ? `${name},${hello}。` : `${hello}。`;
+
     if (receipt.realTotal === 0) {
-      return L(uiLocale, '我在。记点什么,我替你记着。', "I'm here. Note anything — I'll hold it for you.");
+      return `${prefix}${L(uiLocale, '记点什么,我替你记着。', "Note anything — I'll hold it for you.")}`;
     }
-    if (hourNow < 11) {
-      return receipt.yesterdayCount > 0
-        ? L(uiLocale, `早。昨天的 ${receipt.yesterdayCount} 条都存着,想到什么随时说。`, `Morning. Yesterday's ${receipt.yesterdayCount} notes are safe — say anything, anytime.`)
-        : L(uiLocale, '早。都记着呢,想到什么随时说。', "Morning. Everything's kept — say anything, anytime.");
+
+    // 最有用的一条:焦点里最近的、带真实时间提示的事(跳过刚记录/已过期)
+    let nextUp = '';
+    for (const n of focusNodes) {
+      const hint = focusTimeHint(n, uiLocale);
+      if (!hint || hint === L(uiLocale, '刚记录', 'just noted') || hint === L(uiLocale, '已过期', 'expired')) continue;
+      nextUp = `${hint} · ${n.name.slice(0, 14)}`;
+      break;
+    }
+    if (nextUp) {
+      return `${prefix}${L(uiLocale, `最近的一件事:${nextUp}。`, `Next up: ${nextUp}.`)}`;
     }
     if (isEvening) {
       return receipt.todayCount > 0
-        ? L(uiLocale, `今天的 ${receipt.todayCount} 条都收好了。可以放心把今天放下了。`, `Today's ${receipt.todayCount} notes are tucked away. You can let today go.`)
-        : L(uiLocale, '今天很安静。可以放心把今天放下了。', 'A quiet day. You can let it go now.');
+        ? `${prefix}${L(uiLocale, `今天的 ${receipt.todayCount} 条都收好了,可以放心把今天放下了。`, `Today's ${receipt.todayCount} notes are tucked away — you can let today go.`)}`
+        : `${prefix}${L(uiLocale, '今天很安静,可以放心把今天放下了。', 'A quiet day. You can let it go now.')}`;
     }
-    return receipt.todayCount > 0
-      ? L(uiLocale, `都记着呢。今天 ${receipt.todayCount} 条,都收好了。`, `All kept. ${receipt.todayCount} today, safely stored.`)
-      : L(uiLocale, '都记着呢。想到什么,随时卸给我。', "All kept. Whatever comes to mind, hand it to me.");
-  }, [receipt, uiLocale, hourNow, isEvening]);
+    return `${prefix}${L(uiLocale, '没有要紧的事,想到什么随时说。', "Nothing pressing — say anything, anytime.")}`;
+  }, [receipt, uiLocale, hourNow, isEvening, displayName, focusNodes]);
 
   return (
     <div className="nesio-today-root">

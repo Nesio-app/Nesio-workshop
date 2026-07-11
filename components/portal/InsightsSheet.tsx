@@ -422,18 +422,34 @@ export default function InsightsSheet({ onClose, initialTab }: { onClose: () => 
   // ① 主题门:近 30 天同标签 ≥3 条 → 一扇门(与详情页 L3 门同判据;真聚类挂账)
   const doors = useMemo(() => {
     const since = Date.now() - 30 * DAY_MS;
+    // 批次 80(用户实锤「邮件64/Gmail64 重复计数,分类不全」):
+    // ① 标签规范化(Gmail=邮件,Google Calendar=日历),同一节点同类只计一次;
+    // ② 来源补全:manual/voice/photo 等每个节点必有 source,类别天然全覆盖。
+    const CANON: Record<string, string> = {
+      'gmail': '邮件', '邮件': '邮件', 'email': '邮件',
+      'google calendar': '日历', 'calendar': '日历', '日历': '日历',
+      '通知': '通知', 'notification': '通知',
+    };
+    const SOURCE_LABEL: Record<string, string> = {
+      manual: '手记', voice: '语音', photo: '照片', email: '邮件',
+      calendar: '日历', notification: '通知', import: '导入',
+    };
     const freq = new Map<string, number>();
     for (const n of realNodes) {
       if (new Date(n.createdAt).getTime() < since) continue;
+      const seen = new Set<string>();
+      const srcLabel = SOURCE_LABEL[n.source] || '';
+      if (srcLabel) seen.add(srcLabel);
       for (const t of n.tags ?? []) {
         if (!t || SYSTEM_TAGS.has(t)) continue;
-        freq.set(t, (freq.get(t) ?? 0) + 1);
+        seen.add(CANON[t.toLowerCase()] || t);
       }
+      for (const k of seen) freq.set(k, (freq.get(k) ?? 0) + 1);
     }
     return Array.from(freq.entries())
       .filter(([, c]) => c >= 3)
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 4);
+      .slice(0, 6);
   }, [realNodes]);
 
   // ② 没接上的线头:>30 天没再碰、没完成的想法/承诺(person/place/健康是实体,不算线头)

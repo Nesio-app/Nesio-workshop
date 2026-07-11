@@ -205,12 +205,22 @@ html[data-portal-theme] body::before {
   content: '';
   position: fixed;
   inset: 0;
+  /* 批次 80(白边拔根):iOS 动态视口下 fixed 层只到可视视口,键盘收起/
+     橡皮筋回弹露出的是 html 底色 —— 用最大视口高度补满。 */
+  height: 100lvh;
+  width: 100vw;
   z-index: -1;
   background: var(--portal-bg-gradient);
   pointer-events: none;
 }
 
-html[data-portal-theme="night"] { --sheet-opaque: #141b2e; }
+/* 批次 80(白边拔根,真根因):html 的 background-color 此前只有白天深蓝,
+   夜间主题没覆盖 —— 一切 fixed 层画不到的缝隙(回弹/安全区/键盘)露出的
+   都是错误底色:夜间露白天蓝、白天衬白 sheet 成"白边"。底色必须随主题。 */
+html[data-portal-theme="night"] {
+  --sheet-opaque: #141b2e;
+  background-color: #0a1322;
+}
 
 html[data-portal-theme="night"],
 html[data-portal-theme="night"] .portal-root {
