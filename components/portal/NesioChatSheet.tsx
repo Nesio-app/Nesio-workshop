@@ -18,6 +18,7 @@ import { readPortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache'
 import { refreshLocation } from '@/lib/portal/location-store';
 import { formatEnvironmentContext, getCachedCalendarEvents } from '@/lib/portal/environment';
 import { semanticRerankMeta } from '@/lib/portal/semantic-rerank';
+import { loadChatHistoryRaw, saveChatHistoryRaw, loadChatSessionsRaw, saveChatSessionsRaw, CHAT_STORE_UPDATED_EVENT } from '@/lib/portal/chat-store';
 import { detectCrossLingualGap } from '@/lib/portal/cross-lingual-gap.mjs';
 import { track } from '@/lib/portal/telemetry';
 import { L } from '@/lib/portal/i18n';
@@ -363,17 +364,16 @@ function buildCalendarContext(query: string): string {
 }
 
 
-const CHAT_HISTORY_KEY = 'nesio-chat-history-v1';
-const CHAT_SESSIONS_KEY = 'nesio-chat-sessions-v1';
 const MAX_STORED = 60;
 const MAX_SESSIONS = 20;
 
 /** 归档的历史对话 — 「新对话」时把当前消息存档,历史记录里可回看 */
 interface ChatSession { id: string; title: string; at: string; messages: UiMessage[] }
 
+// 批次 52:对话持久化迁 IndexedDB(chat-store),localStorage 不再承载大件
 function loadSessions(): ChatSession[] {
   try {
-    return JSON.parse(localStorage.getItem(CHAT_SESSIONS_KEY) ?? '[]') as ChatSession[];
+    return loadChatSessionsRaw() as ChatSession[];
   } catch { return []; }
 }
 
@@ -389,7 +389,7 @@ function archiveSession(messages: UiMessage[]): void {
   };
   try {
     const next = [session, ...loadSessions()].slice(0, MAX_SESSIONS);
-    localStorage.setItem(CHAT_SESSIONS_KEY, JSON.stringify(next));
+    saveChatSessionsRaw(next);
   } catch { /* ignore */ }
 }
 const MAX_FILE_CHARS = 60_000; // ~15k tokens, safe for Haiku context
@@ -445,15 +445,14 @@ function truncate(s: string, max: number): string {
 
 function loadHistory(): UiMessage[] {
   try {
-    const raw = JSON.parse(localStorage.getItem(CHAT_HISTORY_KEY) ?? '[]') as UiMessage[];
+    const raw = loadChatHistoryRaw() as UiMessage[];
     // Filter out messages with empty text (from earlier bugs)
     return raw.filter((m) => m.text?.trim());
   } catch { return []; }
 }
 function saveHistory(msgs: UiMessage[]) {
   try {
-    localStorage.setItem(CHAT_HISTORY_KEY,
-      JSON.stringify(msgs.filter((m) => m.role !== 'status').slice(-MAX_STORED)));
+    saveChatHistoryRaw(msgs.filter((m) => m.role !== 'status').slice(-MAX_STORED));
   } catch { /* ignore */ }
 }
 
@@ -693,6 +692,13 @@ export default function NesioChatSheet({
   const fileContextRef = useRef<{ name: string; content: string } | null>(null);
 
   useEffect(() => { if (open) setMessages(loadHistory()); }, [open]);
+  // 批次 52:IDB 水合晚于打开时补齐历史(只在当前为空时,不覆盖进行中的对话)
+  useEffect(() => {
+    if (!open) return;
+    const onHydrated = () => setMessages((prev) => (prev.length ? prev : loadHistory()));
+    window.addEventListener(CHAT_STORE_UPDATED_EVENT, onHydrated);
+    return () => window.removeEventListener(CHAT_STORE_UPDATED_EVENT, onHydrated);
+  }, [open]);
   // 批次 23:接收节点详情传来的图片,自动跑识别问答
   useEffect(() => {
     if (!open) return;
@@ -1092,8 +1098,7 @@ Edit location/value anytime in Storage.`),
                   setMessages(s.messages);
                   saveHistory(s.messages);
                   try {
-                    localStorage.setItem(CHAT_SESSIONS_KEY,
-                      JSON.stringify(loadSessions().filter((x) => x.id !== s.id)));
+                    saveChatSessionsRaw(loadSessions().filter((x) => x.id !== s.id));
                   } catch { /* ignore */ }
                   setShowHistory(false);
                 }}

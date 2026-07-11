@@ -16,6 +16,7 @@
 
 import { buildFullBackup, restoreFullBackup, isValidBackup, type FullBackup } from './full-backup';
 import { collectIdbBlobs, isIdbBlobKey, idbBackend, registerIdbBlobKey } from './idb-blob-store';
+import { keyKind, isLocalOnly } from './storage-manifest';
 import { collectLocalImages, restoreLocalImages } from './local-image-store';
 
 /** 备份里照片条目的键前缀(隐私审计:让导出/恢复覆盖记忆照片)。 */
@@ -100,8 +101,13 @@ export function hasCloudEntitlement(): boolean {
  */
 export async function buildCombinedBackup(opts: { includeImages?: boolean } = {}): Promise<FullBackup> {
   const backup = buildFullBackup(localStorage);
-  // 收口:健康/临床/地点/银行已迁 IDB —— 合并 IDB blob,否则云备份漏这些大数据。
-  backup.entries = { ...backup.entries, ...(await collectIdbBlobs()) };
+  // 收口:健康/临床/地点/银行/聊天已迁 IDB —— 合并 IDB blob,否则云备份漏这些大数据。
+  // 批次 52:可再生缓存(ai-cache/日历缓存,manifest 归 cache 类)迁 IDB 后不进备份
+  // (与 localStorage 时代的 durable-only 口径一致);本机敏感 local-only 键同样不出门。
+  for (const [k, v] of Object.entries(await collectIdbBlobs())) {
+    if (keyKind(k) === 'cache' || isLocalOnly(k)) continue;
+    backup.entries[k] = v;
+  }
   // 隐私审计:记忆照片在独立 IDB(nesio-images),默认不入(云推送已单独同步为 cloud asset、控体积);
   // 本机导出 / Drive 全量备份传 includeImages 带上,否则「导出你的全部数据」漏图片。
   if (opts.includeImages) {

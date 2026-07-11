@@ -196,31 +196,103 @@ function cloudSyncRecordKey(resourceId: string, operation: CloudSyncOperation): 
   return `${operation}:${resourceId}`;
 }
 
+// ── 同步表迁 IndexedDB(批次 52「全迁出」)────────────────────────────────
+// outbox/状态记录按节点累积(数百条),与图谱主存同因同治:同步内存缓存承接
+// 同步读写,IDB 持久,首次水合把旧 localStorage 搬进 IDB 并删原 key。
+// 会话内已写(dirty)时与旧 IDB 按 key 合并,新 updatedAt 胜 —— 加安全,不丢标记。
+function createIdbSyncMap<T extends { updatedAt: string }>(opts: {
+  key: string;
+  parse: (raw: string) => Map<string, T>;
+  event?: string;
+}): { load(): Map<string, T>; save(m: Map<string, T>): void } {
+  let cache: Map<string, T> | null = null;
+  let hydrated = false;
+  let dirty = false;
+  const seed = (): Map<string, T> => {
+    try {
+      const raw = localStorage.getItem(opts.key);
+      return raw ? opts.parse(raw) : new Map();
+    } catch { return new Map(); }
+  };
+  const persist = (m: Map<string, T>): void => {
+    import('./idb-blob-store').then(({ idbBackend }) => {
+      idbBackend.set(opts.key, JSON.stringify(Array.from(m.values()))).catch(() => { /* 诊断数据,尽力而为 */ });
+    }).catch(() => {});
+  };
+  const emit = (): void => {
+    if (opts.event) window.dispatchEvent(new CustomEvent(opts.event));
+  };
+  const hydrateOnce = (): void => {
+    if (hydrated || typeof window === 'undefined') return;
+    hydrated = true;
+    import('./idb-blob-store').then(async (mod) => {
+      mod.registerIdbBlobKey(opts.key);
+      try {
+        const raw = await mod.idbBackend.get(opts.key);
+        const idbMap = raw ? opts.parse(raw) : null;
+        const cur = cache ?? seed();
+        if (dirty) {
+          const merged = new Map(idbMap ?? []);
+          for (const [k, v] of cur) {
+            const prev = merged.get(k);
+            if (!prev || String(v.updatedAt) >= String(prev.updatedAt)) merged.set(k, v);
+          }
+          cache = merged;
+          persist(merged);
+        } else if (idbMap && idbMap.size) {
+          cache = idbMap;
+        } else {
+          if (cur.size) persist(cur); // 首次迁移 localStorage → IDB
+          cache = cur;
+        }
+        try { localStorage.removeItem(opts.key); } catch { /* ignore */ }
+        emit();
+      } catch { /* 水合失败:保持种子,不删 localStorage,下次重试 */ }
+    }).catch(() => {});
+  };
+  return {
+    load(): Map<string, T> {
+      if (typeof window === 'undefined') return new Map();
+      if (cache == null) { cache = seed(); hydrateOnce(); }
+      return cache;
+    },
+    save(m: Map<string, T>): void {
+      if (typeof window === 'undefined') return;
+      cache = m;
+      dirty = true;
+      if (hydrated) persist(m); else hydrateOnce();
+      emit();
+    },
+  };
+}
+
+function parseOutboxRaw(raw: string): Map<string, LifeGraphCloudSyncOutboxItem> {
+  const items = JSON.parse(raw) as Array<LifeGraphCloudSyncOutboxItem & { node?: unknown; assets?: unknown }>;
+  if (!Array.isArray(items)) return new Map();
+  return new Map(
+    items
+      .filter((item) => item?.resourceId && item?.operation)
+      // 只保留瘦身字段;旧版遗留的 node/assets 在此丢弃(下次 save 落盘即瘦身)
+      .map((item) => [
+        cloudSyncRecordKey(item.resourceId, item.operation),
+        {
+          resourceId: item.resourceId,
+          operation: item.operation,
+          queuedAt: item.queuedAt || item.updatedAt || new Date().toISOString(),
+          updatedAt: item.updatedAt || new Date().toISOString(),
+          attempts: typeof item.attempts === 'number' ? item.attempts : 0,
+        } satisfies LifeGraphCloudSyncOutboxItem,
+      ]),
+  );
+}
+
+const outboxSyncMap = createIdbSyncMap<LifeGraphCloudSyncOutboxItem>({
+  key: CLOUD_SYNC_OUTBOX_KEY,
+  parse: parseOutboxRaw,
+});
+
 function loadCloudSyncOutboxMap(): Map<string, LifeGraphCloudSyncOutboxItem> {
-  if (typeof window === 'undefined') return new Map();
-  try {
-    const raw = localStorage.getItem(CLOUD_SYNC_OUTBOX_KEY);
-    if (!raw) return new Map();
-    const items = JSON.parse(raw) as Array<LifeGraphCloudSyncOutboxItem & { node?: unknown; assets?: unknown }>;
-    if (!Array.isArray(items)) return new Map();
-    return new Map(
-      items
-        .filter((item) => item?.resourceId && item?.operation)
-        // 只保留瘦身字段;旧版遗留的 node/assets 在此丢弃(下次 save 落盘即瘦身)
-        .map((item) => [
-          cloudSyncRecordKey(item.resourceId, item.operation),
-          {
-            resourceId: item.resourceId,
-            operation: item.operation,
-            queuedAt: item.queuedAt || item.updatedAt || new Date().toISOString(),
-            updatedAt: item.updatedAt || new Date().toISOString(),
-            attempts: typeof item.attempts === 'number' ? item.attempts : 0,
-          } satisfies LifeGraphCloudSyncOutboxItem,
-        ]),
-    );
-  } catch {
-    return new Map();
-  }
+  return outboxSyncMap.load();
 }
 
 /**
@@ -242,12 +314,7 @@ function compactCloudSyncOutboxOnce(): void {
 }
 
 function saveCloudSyncOutboxMap(items: Map<string, LifeGraphCloudSyncOutboxItem>): void {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(CLOUD_SYNC_OUTBOX_KEY, JSON.stringify(Array.from(items.values())));
-  } catch {
-    /* sync outbox is best-effort; local Memory remains authoritative offline. */
-  }
+  outboxSyncMap.save(items);
 }
 
 function queueCloudSyncOutboxItem(
@@ -289,31 +356,28 @@ function removeCloudSyncOutboxItem(resourceId: string, operation: CloudSyncOpera
   saveCloudSyncOutboxMap(items);
 }
 
+function parseSyncRecordsRaw(raw: string): Map<string, LifeGraphCloudSyncRecord> {
+  const records = JSON.parse(raw) as LifeGraphCloudSyncRecord[];
+  if (!Array.isArray(records)) return new Map();
+  return new Map(
+    records
+      .filter((record) => record?.resourceId && record?.operation && record?.status)
+      .map((record) => [cloudSyncRecordKey(record.resourceId, record.operation), record]),
+  );
+}
+
+const recordSyncMap = createIdbSyncMap<LifeGraphCloudSyncRecord>({
+  key: CLOUD_SYNC_STATUS_KEY,
+  parse: parseSyncRecordsRaw,
+  event: 'nesio-life-graph-cloud-sync-updated',
+});
+
 function loadCloudSyncRecordMap(): Map<string, LifeGraphCloudSyncRecord> {
-  if (typeof window === 'undefined') return new Map();
-  try {
-    const raw = localStorage.getItem(CLOUD_SYNC_STATUS_KEY);
-    if (!raw) return new Map();
-    const records = JSON.parse(raw) as LifeGraphCloudSyncRecord[];
-    if (!Array.isArray(records)) return new Map();
-    return new Map(
-      records
-        .filter((record) => record?.resourceId && record?.operation && record?.status)
-        .map((record) => [cloudSyncRecordKey(record.resourceId, record.operation), record]),
-    );
-  } catch {
-    return new Map();
-  }
+  return recordSyncMap.load();
 }
 
 function saveCloudSyncRecordMap(records: Map<string, LifeGraphCloudSyncRecord>): void {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(CLOUD_SYNC_STATUS_KEY, JSON.stringify(Array.from(records.values())));
-    window.dispatchEvent(new CustomEvent('nesio-life-graph-cloud-sync-updated'));
-  } catch {
-    /* sync status is diagnostic; local Memory must keep working if storage is full. */
-  }
+  recordSyncMap.save(records);
 }
 
 function cloudSyncErrorMessage(error: unknown): string {

@@ -55,6 +55,11 @@ function makeCtx({ lsInit = {}, fbEntries = {}, idbBlobs = {}, fetchImpl, idbKey
         collectLocalImages: async () => ({ ...localImages }),
         restoreLocalImages: async (m) => { restoredImages = { ...m }; return Object.keys(m).length; },
       };
+      // 批次 52:cache 类 IDB blob(ai-cache/日历缓存)不进备份 —— 与真 manifest 同语义的桩
+      if (p === './storage-manifest') return {
+        keyKind: (k) => (/nesio-ai-cache|nesio-calendar-local|(^|[-_])cache([-_]|$)/.test(k) ? 'cache' : 'durable'),
+        isLocalOnly: (k) => k === 'nesio-person-records-v1',
+      };
       return {};
     },
     _lastFetch: () => lastFetch,
@@ -85,14 +90,15 @@ const ok200 = () => ({ ok: true, status: 200, json: async () => ({ ok: true, sto
   const { mod, ctx, lsMap } = makeCtx({
     lsInit: { 'nesio-cloud-entitlement-v1': 'on' },
     fbEntries: { 'nesio-life-graph-v1': '[{"id":"n1"}]' },
-    idbBlobs: { 'nesio-health-v1': '{"metrics":[1]}', 'nesio-bank-tx-v1': '[]' },
+    // 批次 52 行为锁:cache 类 IDB blob(ai-cache)不进备份,durable 的照常进
+    idbBlobs: { 'nesio-health-v1': '{"metrics":[1]}', 'nesio-bank-tx-v1': '[]', 'nesio-ai-cache-v1': '{"chat":{}}' },
     fetchImpl: ok200,
   });
   assert.equal(mod.hasCloudEntitlement(), true, 'flag=on 解锁');
   const r = await mod.pushBackupToCloud();
   assert.equal(r.ok, true, '解锁后推送成功');
   assert.equal(r.storagePath, 'id/backup/1-abc.nesio-backup.json.txt');
-  assert.equal(r.entryCount, 3, '3 项:1 localStorage + 2 IDB');
+  assert.equal(r.entryCount, 3, '3 项:1 localStorage + 2 durable IDB(cache 类被排除)');
 
   // 上传的 payload 合并了两侧
   const form = ctx._lastFetch().init.body;

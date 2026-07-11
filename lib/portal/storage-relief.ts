@@ -10,37 +10,20 @@
 
 import { getStorageHealth, logDropped } from './storage-health';
 import { dedupeImportedContacts } from './providers/connector-sync';
+import { trimChatStores } from './chat-store';
+import { trimAiCache as trimAiCacheStore } from './ai-cache';
 
-const CHAT_HISTORY_KEY = 'nesio-chat-history-v1';
-const AI_CACHE_KEY = 'nesio-ai-cache-v1';
+// 批次 52:聊天/AI 缓存已迁 IndexedDB,修剪改走各自 store(不再直摸 localStorage)
 const CHAT_KEEP = 60;
+const SESSIONS_KEEP = 8;
 const AI_CACHE_KEEP_PER_SCOPE = 12;
 
 function trimChatHistory(): void {
-  try {
-    const raw = localStorage.getItem(CHAT_HISTORY_KEY);
-    if (!raw) return;
-    const parsed = JSON.parse(raw) as unknown;
-    if (Array.isArray(parsed) && parsed.length > CHAT_KEEP) {
-      localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(parsed.slice(-CHAT_KEEP)));
-    }
-  } catch (err) { logDropped('storage_relief.chat', err); }
+  try { trimChatStores(CHAT_KEEP, SESSIONS_KEEP); } catch (err) { logDropped('storage_relief.chat', err); }
 }
 
 function trimAiCache(): void {
-  try {
-    const raw = localStorage.getItem(AI_CACHE_KEY);
-    if (!raw) return;
-    const parsed = JSON.parse(raw) as Record<string, Record<string, { at?: number }>>;
-    if (!parsed || typeof parsed !== 'object') return;
-    for (const scope of Object.keys(parsed)) {
-      const entries = Object.entries(parsed[scope] ?? {});
-      if (entries.length <= AI_CACHE_KEEP_PER_SCOPE) continue;
-      entries.sort((a, b) => (b[1]?.at ?? 0) - (a[1]?.at ?? 0));
-      parsed[scope] = Object.fromEntries(entries.slice(0, AI_CACHE_KEEP_PER_SCOPE));
-    }
-    localStorage.setItem(AI_CACHE_KEY, JSON.stringify(parsed));
-  } catch (err) { logDropped('storage_relief.ai_cache', err); }
+  try { trimAiCacheStore(AI_CACHE_KEEP_PER_SCOPE); } catch (err) { logDropped('storage_relief.ai_cache', err); }
 }
 
 export interface ReliefResult {

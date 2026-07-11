@@ -5,8 +5,12 @@
  * 下次 AI 不在线(没网/没配 key/上游挂了)时,同样的输入直接复用上次 AI 的答案 ——
  * 用得越多,离线越顶得住,而且离线给的也是"真·AI 曾经给过的",不是本地瞎编。
  *
- * 纯本地(localStorage `nesio-ai-cache-v1`)· 每个 scope 一个 LRU(按最近命中时间淘汰)。
+ * 纯本地(IndexedDB `nesio-ai-cache-v1`,批次 52 迁出 localStorage)· 每个 scope
+ * 一个 LRU(按最近命中时间淘汰)。createBlobStore:同步缓存读 + IDB 持久,
+ * 首次水合自动把旧 localStorage 搬进 IDB 并删原 key(腾配额)。
  */
+
+import { createBlobStore } from './idb-blob-store';
 
 const KEY = 'nesio-ai-cache-v1';
 const PER_SCOPE_CAP = 60;
@@ -14,13 +18,33 @@ const PER_SCOPE_CAP = 60;
 interface Entry<T> { v: T; at: number }
 type Store = Record<string, Record<string, Entry<unknown>>>; // scope → sig → entry
 
+const blobStore = createBlobStore<Store>({
+  key: KEY,
+  updateEvent: 'nesio-ai-cache-updated',
+  validate: (v) => Boolean(v && typeof v === 'object' && !Array.isArray(v)),
+});
+
 function load(): Store {
   if (typeof window === 'undefined') return {};
-  try { const s = JSON.parse(localStorage.getItem(KEY) || '{}'); return s && typeof s === 'object' ? s : {}; } catch { return {}; }
+  return blobStore.load() ?? {};
 }
 function save(s: Store): void {
   if (typeof window === 'undefined') return;
-  try { localStorage.setItem(KEY, JSON.stringify(s)); } catch { /* quota */ }
+  blobStore.save(s);
+}
+
+/** 一键腾空间:每个 scope 只留最近 keepPerScope 条。 */
+export function trimAiCache(keepPerScope = 12): void {
+  const s = load();
+  let changed = false;
+  for (const scope of Object.keys(s)) {
+    const entries = Object.entries(s[scope] ?? {});
+    if (entries.length <= keepPerScope) continue;
+    entries.sort((a, b) => (b[1]?.at ?? 0) - (a[1]?.at ?? 0));
+    s[scope] = Object.fromEntries(entries.slice(0, keepPerScope));
+    changed = true;
+  }
+  if (changed) save(s);
 }
 
 /** 把输入压成稳定的短签名(忽略大小写/多余空白,截断)。 */
