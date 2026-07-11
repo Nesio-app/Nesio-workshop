@@ -269,6 +269,14 @@ export default function Portal() {
   useEffect(() => {
     void import('@/lib/portal/plan-links').then((m) => m.initPlanLinks()).catch(() => {});
   }, []);
+  // 批次 78(补丁清偿 P1):「联网后自动重试」此前只在记忆页挂载期间成立
+  // (online 监听挂在 MemoryTab)。移到应用根,承诺无条件兑现;
+  // retryLifeGraphCloudSync 自带 cloudMemorySyncEnabled 门,匿名/关同步时是空转。
+  useEffect(() => {
+    const retry = () => { void import('@/lib/portal/life-graph').then((m) => m.retryLifeGraphCloudSync()).catch(() => {}); };
+    window.addEventListener('online', retry);
+    return () => window.removeEventListener('online', retry);
+  }, []);
   useEffect(() => {
     const onRecog = (e: Event) => {
       const f = (e as CustomEvent<{ file?: File }>).detail?.file;
