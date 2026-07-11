@@ -50,6 +50,9 @@ export function firstNodeDate(attributes: AttrBag): Date | null {
 const INTERNAL_TS_KEYS = new Set([
   'occuredAt', 'occurredAt', 'capturedAt', 'receivedAt', 'updatedAt', 'syncedAt',
   'doneAt', 'importedAt', 'createdAt', 'lastSeen', 'takenAt',
+  // 批次 83:准入凭据「加入今日焦点的那天」不是事件日期 —— 它被扫成
+  // "离现在最近的日期"后,未来的计划条目照样挂「已过期」(第三个源头)。
+  'focusPinnedOn',
 ]);
 
 export function nearestNodeDate(attributes: AttrBag, now: number = Date.now()): Date | null {

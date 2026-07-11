@@ -5,7 +5,7 @@ import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { useProfileAvatar } from './use-profile-avatar';
 import { usePortalLocale } from './use-portal-locale';
 import { L } from '@/lib/portal/i18n';
-import { buildTodayViewModel, focusTimeHint, markFocusNodeDone, deleteFocusNode, addCommitmentNode, addMeetingNotes, saveSubtasks, toggleSubtask, type FocusNode, type SubTask, type ProactiveContext, type ProactiveContextItem } from '@/lib/platform/view-models/today-view-model';
+import { buildTodayViewModel, focusTimeHint, markFocusNodeDone, deleteFocusNode, addCommitmentNode, addMeetingNotes, saveSubtasks, toggleSubtask, type FocusNode, type SubTask, type ProactiveContext, type ProactiveContextItem, getLiveMemoryNode, type LiveMemoryNode } from '@/lib/platform/view-models/today-view-model';
 import type { CalendarEvent } from '@/lib/portal/types';
 import {
   loadDormantStore, evaluateDormancy, selectReviewCandidate, applyReviewAction,
@@ -27,6 +27,7 @@ import {
 } from '@/lib/platform/guidance-engine/source-adapters';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
 import dynamic from 'next/dynamic';
+import { createPortal } from 'react-dom';
 import { dismissProactiveById, getProactiveCardBudget } from './today/proactive-types';
 import { ProactiveGuidanceCard } from './today/ProactiveGuidanceCard';
 import { ExperimentCheckinCard } from './today/ExperimentCheckinCard';
@@ -41,6 +42,7 @@ import { MeetingRecorderSheet } from './today/MeetingRecorderSheet';
 
 // 1143-line analytics sheet — load on open, not at boot
 const InsightsSheet = dynamic(() => import('./InsightsSheet'), { ssr: false });
+const MemoryNodeDetailLazy = dynamic(() => import('./MemoryNodeDetail'), { ssr: false });
 import MemoryFlashBanner, { useMemoryFlash } from './MemoryFlashBanner';
 import WrappedCard, { useWrappedTrigger } from './WrappedCard';
 
@@ -63,6 +65,7 @@ export default function TodayFeed({
     dismissedCardIds, setDismissedCardIds,
   } = useTodayData(canUsePrivateData);
   const [mirrorOpen, setMirrorOpen] = useState(false);
+  const [guideDetailNode, setGuideDetailNode] = useState<LiveMemoryNode | null>(null); // 批次 83:引导卡点开详情
   // 批次 31:焦点下方快捷输入(用户新指令)
   const [quickAdd, setQuickAdd] = useState('');
   const [quickSaved, setQuickSaved] = useState(false);
@@ -232,6 +235,7 @@ export default function TodayFeed({
           <ProactiveGuidanceCard
             key={card.id}
             card={card}
+            onOpen={card.nodeId ? () => { const live = getLiveMemoryNode(card.nodeId!); if (live) setGuideDetailNode(live); } : undefined}
             onDismiss={() => {
               dismissProactiveById(card.id);
               // Record in cooling store so adaptive cooldown can kick in after repeated ignores
@@ -328,6 +332,12 @@ export default function TodayFeed({
         meetingNode={meetingRecorderNode}
         onClose={() => setMeetingRecorderNode(null)}
       />
+
+      {/* 批次 83:引导卡 → 记忆详情(portal 到 body,避 transform 祖先) */}
+      {guideDetailNode && typeof document !== 'undefined' && createPortal(
+        <MemoryNodeDetailLazy node={guideDetailNode} onClose={() => setGuideDetailNode(null)} />,
+        document.body,
+      )}
 
       {/* Insights mirror */}
       {mirrorOpen && (

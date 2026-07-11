@@ -73,6 +73,13 @@ export function FocusCardDetail({
   // 批次 56:这波步骤来自哪里 —— AI / 复用上次AI(缓存) / 本地兜底。null=AI(不显)
   const [waveSource, setWaveSource] = useState<'cache' | 'local' | null>(null);
 
+  // 批次 83(用户实锤「查看详情没反应,点粉碎才弹出来」):not-started 等
+  // 早退分支此前不带这个 portal —— setMemNode 设了状态却无处渲染;等按下
+  // 粉碎切到主分支才突然弹出。portal 抽成常量,所有 return 都带上。
+  const memNodePortal = memNode && typeof document !== 'undefined'
+    ? createPortal(<MemoryNodeDetail node={memNode} onClose={() => setMemNode(null)} />, document.body)
+    : null;
+
   const isMeeting = isMeetingNode(node);
   const meetingUrl = getMeetingUrl(node);
   const meetingTime = getMeetingTime(node);
@@ -126,8 +133,9 @@ export function FocusCardDetail({
     const tpl = matchTaskTemplate(node.name, dict);
     if (tpl && !previousAction) { applyWave(tpl, 'local', cacheKey); setWaveSource(null); return; }
     const cached = recallAI<Step[]>('decompose', cacheKey);
-    if (cached?.length) { applyWave(cached, 'cache', cacheKey); setWaveSource(null); return; }
-    const localSteps = decomposeLocally(node.name, dict);
+    // 批次 83:旧缓存里存过脚手架,从缓存出闸绕开了批次 74 的防复读 ——
+    // 统一先取步骤再过闸,来源不豁免。
+    const localSteps = cached?.length ? cached : decomposeLocally(node.name, dict);
     // 批次 74(用户实锤「第 2 波」又是同一套起步三句):脚手架只此一轮,
     // 做完就收尾 —— 不许自我复读。
     if (previousAction && localSteps[0] && /摊在面前|Spend 2 minutes/i.test(localSteps[0].name)) {
@@ -135,7 +143,7 @@ export function FocusCardDetail({
       setWaveSource(null);
       return;
     }
-    applyWave(localSteps, 'local', cacheKey);
+    applyWave(localSteps, cached?.length ? 'cache' : 'local', cacheKey);
     setWaveSource(null); // 本地是默认引擎,不再当"降级"提示
   }
 
@@ -149,10 +157,14 @@ export function FocusCardDetail({
     }
     setAiRefining(true);
     const cacheKey = sig(node.name);
+    // 批次 83(用户实锤「AI 细化中…」卡死):无超时的 fetch 挂起就永远转圈
+    const ctrl = new AbortController();
+    const timeout = setTimeout(() => ctrl.abort(), 25_000);
     try {
       const res = await fetch('/api/portal/decompose-task', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: ctrl.signal,
         body: JSON.stringify({
           taskName: node.name,
           context: node.rawInput,
@@ -166,6 +178,7 @@ export function FocusCardDetail({
     } catch {
       setError(L(dict, 'AI 这次没连上 —— 本地步骤照用。', "Couldn't reach AI — the local steps still work."));
     }
+    clearTimeout(timeout);
     setAiRefining(false);
   }
 
@@ -261,6 +274,7 @@ export function FocusCardDetail({
         >
           {L(dict, '查看详情', 'View details')}
         </button>
+        {memNodePortal}
       </div>
     );
   }
@@ -382,12 +396,7 @@ export function FocusCardDetail({
           );
         })}
       </ul>
-      {/* 批次 74:portal 到 body —— 聚焦卡在带 transform 的容器里,fixed 详情会被
-          困住(半屏卡死无法滚动,用户实锤)。 */}
-      {memNode && typeof document !== 'undefined' && createPortal(
-        <MemoryNodeDetail node={memNode} onClose={() => setMemNode(null)} />,
-        document.body,
-      )}
+      {memNodePortal}
     </div>
   );
 }

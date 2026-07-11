@@ -31,11 +31,13 @@ function QuoteBody({ body }: { body: string }) {
 }
 
 export function ProactiveGuidanceCard({
-  card, onDismiss, onMarkDone,
+  card, onDismiss, onMarkDone, onOpen,
 }: {
   card: ProactiveCardData;
   onDismiss: () => void;
   onMarkDone?: (nodeId: string) => void;
+  /** 批次 83:点卡片正文进对应记忆详情(有 nodeId 才有意义) */
+  onOpen?: () => void;
 }) {
   const locale = usePortalLocale();
   const dict = portalLocaleToDictionaryLocale(locale);
@@ -145,7 +147,7 @@ export function ProactiveGuidanceCard({
     >
       <div className="nesio-proactive-card-inner">
         {!isQuote && <span className="nesio-proactive-card-icon"><GuidanceIcon icon={card.icon} /></span>}
-        <div className="nesio-proactive-card-text">
+        <div className="nesio-proactive-card-text" onClick={() => { if (Math.abs(dx) < 6) onOpen?.(); }} style={onOpen ? { cursor: 'pointer' } : undefined}>
           <p className="nesio-proactive-card-title">{card.title}</p>
           {isQuote ? <QuoteBody body={card.body} /> : <p className="nesio-proactive-card-body">{card.body}</p>}
           {card.reason && (

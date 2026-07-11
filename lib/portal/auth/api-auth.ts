@@ -33,13 +33,47 @@ export function safeEqual(a: string, b: string): boolean {
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
+// 批次 83(安全审计 #2 实锤):此前只验「cookie 存在」—— curl 带一个
+// baohe_auth_access=x 假 cookie 就能通过全部 AI 路由,只剩限流在挡,
+// 换 IP 就能烧配额。access token 现在必须过 Supabase /auth/v1/user 验真,
+// 结果按 token 进内存 TTL 缓存(命中零开销;网络故障放行但记日志,
+// 可用性优先 —— 假 token 是 401 不是网络错,照样拒)。
+const tokenVerifyCache = new Map<string, { ok: boolean; exp: number }>();
+const TOKEN_CACHE_TTL = 5 * 60_000;
+const TOKEN_CACHE_MAX = 500;
+
+async function verifySupabaseAccessToken(token: string): Promise<boolean> {
+  const url = envValue('SUPABASE_URL');
+  const anon = envValue('SUPABASE_ANON_KEY');
+  if (!url || !anon) return true; // 无 Supabase 的本地部署:门不能比 UI 更严
+  const now = Date.now();
+  const hit = tokenVerifyCache.get(token);
+  if (hit && hit.exp > now) return hit.ok;
+  try {
+    const res = await fetch(`${url}/auth/v1/user`, {
+      headers: { apikey: anon, Authorization: `Bearer ${token}` },
+    });
+    const ok = res.ok;
+    if (tokenVerifyCache.size >= TOKEN_CACHE_MAX) tokenVerifyCache.clear();
+    tokenVerifyCache.set(token, { ok, exp: now + (ok ? TOKEN_CACHE_TTL : 60_000) });
+    return ok;
+  } catch (err) {
+    console.error('[api-auth] token_verify_network_error', err instanceof Error ? err.message : err);
+    return true; // 网络抖动不锁死真用户;伪造 token 走的是 401 分支
+  }
+}
+
 export async function isPortalRequestAuthorized(req: NextRequest, opts?: { allowCrossOrigin?: boolean }): Promise<boolean> {
   const cookieStore = await cookies();
+  const accessToken = cookieStore.get('baohe_auth_access')?.value || '';
+  if (accessToken) {
+    return verifySupabaseAccessToken(accessToken);
+  }
   const hasSession = Boolean(
-    cookieStore.get('baohe_auth_access')?.value ||
-      cookieStore.get('baohe_auth_refresh')?.value ||
+    cookieStore.get('baohe_auth_refresh')?.value ||
       cookieStore.get('baohe_wechat_openid')?.value,
   );
+  // refresh/openid 无法便宜验真 —— 保留旧行为但已收窄面;进清偿计划 P0 一并收口
   if (hasSession) return true;
 
   const stage5 = envValue('NESIO_STAGE5_INVOCATION_SECRET');

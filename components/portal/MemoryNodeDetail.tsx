@@ -527,8 +527,8 @@ class DetailErrorBoundary extends Component<{ onClose: () => void; children: Rea
   render() {
     if (this.state.err) {
       return (
-        <div className="nesio-node-detail-overlay" role="dialog" aria-modal="true">
-          <div className="nesio-node-detail-sheet" style={{ padding: '1.4rem 1.2rem', textAlign: 'center' }}>
+        <div className="nesio-node-detail-overlay" role="dialog" aria-modal="true" onClick={this.props.onClose}>
+          <div className="nesio-node-detail-sheet" style={{ padding: '1.4rem 1.2rem', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
             <p style={{ margin: '0 0 0.4rem', fontSize: '1rem', fontWeight: 600 }}>这条记忆的详情没打开成功</p>
             <p style={{ margin: '0 0 0.9rem', fontSize: '0.8rem', color: 'var(--portal-muted)' }}>数据没有丢。关闭后再试一次;若反复出现,请截图这条记忆的名字。</p>
             <button type="button" className="nesio-fin-review-accept" onClick={this.props.onClose}>关闭</button>
@@ -868,6 +868,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
           {/* 批次 70:关联链 —— 行程↔邮件自动挂钩、计划容器↔条目,点开跳转;
               批次 73:手动增删关联(删除自动连线 = 反馈信号,本地留痕) */}
           {(() => {
+            try {
             const g = getLifeGraph();
             // 批次 77(用户点名图标问题):emoji → 设计系统线性图标
             const REL_LABEL: Record<string, [ReactNode, string, string]> = {
@@ -941,6 +942,11 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
                 )}
               </div>
             );
+            } catch {
+              // 批次 83(用户实锤「添加关联闪退卡死」):关联块自身出错只藏本块,
+              // 不放大成整卡崩溃;等真机栈定点修根因。
+              return null;
+            }
           })()}
 
           {/* Type-specific section */}
