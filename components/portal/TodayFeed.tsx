@@ -287,7 +287,12 @@ export default function TodayFeed({
             placeholder={quickSaved ? L(uiLocale, '✓ 记下了', '✓ Noted') : L(uiLocale, '想到什么,记下来…', 'Anything on your mind…')}
             value={quickAdd}
             onChange={(e) => setQuickAdd(e.target.value)}
-            onFocus={() => { void import('@/lib/portal/capture-location').then((m) => m.prefetchCaptureLocation()); }}
+            onFocus={(e) => {
+              void import('@/lib/portal/capture-location').then((m) => m.prefetchCaptureLocation());
+              // 批次 86:键盘弹起后把输入框滚进可见区(iOS 常盖住底部输入)
+              const el = e.currentTarget;
+              setTimeout(() => el.scrollIntoView({ block: 'center', behavior: 'smooth' }), 300);
+            }}
           />
           {quickAdd.trim() ? (
             <button type="submit" className="nesio-focus-quick-btn">{L(uiLocale, '记下', 'Note it')}</button>

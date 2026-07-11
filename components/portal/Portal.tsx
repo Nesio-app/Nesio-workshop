@@ -292,6 +292,24 @@ export default function Portal() {
       window.removeEventListener('error', onError);
     };
   }, []);
+  // 批次 86(用户实锤「打字时看不到输入框」):批次 81 把浮层锚到物理屏后,
+  // 键盘弹起不再自动挤压布局 —— 用 visualViewport 实时把键盘高度写进
+  // --kb-inset,聊天/语音/底部 sheet 的输入区随它抬升。
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => {
+      const kb = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+      document.documentElement.style.setProperty('--kb-inset', `${kb}px`);
+    };
+    update();
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    return () => {
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+    };
+  }, []);
   // 批次 81(白边拔根的兜底半边):iOS standalone 键盘收起后 window 高度
   // 偶发卡短(WebKit 老 bug),主页面 100dvh 布局随之缩水。焦点离开输入框
   // 后滚回顶部,促使视口回弹;浮层已用 lvh 免疫,这里管的是主页面。

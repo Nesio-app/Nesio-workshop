@@ -1,5 +1,7 @@
 'use client';
 
+import { IconMic } from '../icons';
+
 /**
  * MeetingRecorderSheet — 会议记录 sheet:Web Speech 中文转写 + 手动输入,
  * 保存为会议纪要节点(addMeetingNotes)。从 FocusModeSheet 拆出。
@@ -137,7 +139,7 @@ export function MeetingRecorderSheet({ open, meetingNode, onClose }: {
         ) : (
           <>
             <div className="nesio-recorder-header">
-              <p className="nesio-recorder-title">{L(dict, '🎙 会议记录', '🎙 Meeting notes')}</p>
+              <p className="nesio-recorder-title"><IconMic size={16} /> {L(dict, '会议记录', 'Meeting notes')}</p>
               {meetingNode && <p className="nesio-recorder-meeting-name">{meetingNode.name}</p>}
             </div>
 
@@ -153,7 +155,7 @@ export function MeetingRecorderSheet({ open, meetingNode, onClose }: {
                     <span className="nesio-recorder-timer">{formatTime(seconds)}</span>
                   </>
                 ) : (
-                  <span className="nesio-recorder-mic-icon">🎙</span>
+                  <span className="nesio-recorder-mic-icon"><IconMic size={40} /></span>
                 )}
               </div>
 

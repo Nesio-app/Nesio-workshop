@@ -14663,9 +14663,13 @@ html[data-portal-theme="night"] .nesio-memmap-canvas { background: #16243c; }
 .nesio-visitmem-overlay { position: fixed; inset: 0; z-index: 420; display: flex; flex-direction: column; justify-content: flex-end; }
 .nesio-visitmem-backdrop { position: absolute; inset: 0; background: var(--modal-backdrop-bg, rgba(16,28,54,0.25)); border: none; cursor: pointer; }
 .nesio-visitmem-sheet {
-  position: relative; background: var(--glass-bg-pop); border-radius: 1.1rem 1.1rem 0 0;
-  border-top: 1px solid var(--portal-line); max-height: 55dvh; overflow-y: auto;
-  padding: 0.9rem 1rem calc(env(safe-area-inset-bottom, 0px) + 0.9rem);
+  position: relative;
+  /* 批次 86(用户实锤「UI 错位透底」):半透明底叠在时间线上像错位 —— 全不透明 */
+  background: var(--sheet-opaque, #fdfeff);
+  border-radius: 1.1rem 1.1rem 0 0;
+  border-top: 1px solid var(--portal-line);
+  max-height: 74lvh; overflow-y: auto;
+  padding: 0.9rem 1rem calc(env(safe-area-inset-bottom, 0px) + var(--kb-inset, 0px) + 0.9rem);
 }
 .nesio-memmap-item--btn { width: 100%; background: none; border: none; cursor: pointer; text-align: left; font-size: inherit; color: inherit; }
 
@@ -15033,4 +15037,41 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
   font-size: 0.72rem;
   text-decoration: none;
   cursor: pointer;
+}
+
+/* ── 批次 86:键盘高度变量 —— 带输入的全屏浮层底部随键盘抬升 ── */
+.nesio-wechat-fullscreen,
+.nesio-voice-sheet,
+.nesio-recorder-overlay {
+  padding-bottom: var(--kb-inset, 0px);
+}
+.nesio-settings-sheet-card {
+  margin-bottom: var(--kb-inset, 0px);
+}
+
+/* ── 批次 86:录音 sheet 底部被导航舱遮住 —— 加清空距 ── */
+.nesio-recorder-overlay .nesio-recorder-sheet,
+.nesio-recorder-sheet {
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 6rem) !important;
+}
+
+/* ── 批次 86:滑杆手感 —— 时间 bar / 能量 bar 拖不动且太低点不到 ── */
+.nesio-memmap-timebar {
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.9rem);
+}
+.nesio-memmap-timebar input[type='range'],
+.nesio-mood-slider-track {
+  touch-action: none;
+}
+.nesio-memmap-timebar input[type='range'] {
+  height: 2.2rem; /* 命中区加高,视觉轨道不变 */
+}
+.nesio-memmap-timebar input[type='range']::-webkit-slider-thumb {
+  width: 1.8rem;
+  height: 1.8rem;
+  margin-top: -0.75rem;
+}
+.nesio-mood-slider-thumb {
+  width: 2rem !important;
+  height: 2rem !important;
 }
