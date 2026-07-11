@@ -202,17 +202,10 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
     setSourceFile(file);
 
     if (file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const dataUrl = reader.result as string;
-        const base64 = dataUrl.split(',')[1];
-        const ok = await analyze('image', '请根据这张图片里真实可见的内容，整理出可确认的 Memory 线索。', base64, file.type);
-        if (!ok) {
-          setError('');
-          setParsed(buildPendingImageParsed());
-        }
-      };
-      reader.readAsDataURL(file);
+      // 批次 66(用户定案):分享/上传的图片不再走这里的直存流程 ——
+      // 转交「拍一下」同一识别界面(EXIF 拍摄时间地点 + AI 识别 + 确认卡 + 足迹)。
+      window.dispatchEvent(new CustomEvent('nesio-recognize-image', { detail: { file } }));
+      onClose();
     } else {
       try {
         const text = await file.text();

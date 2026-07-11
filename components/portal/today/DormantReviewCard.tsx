@@ -35,6 +35,7 @@ export function DormantReviewCard({
         <div className="nesio-collapsed-row">
           <span className="nesio-collapsed-icon">🕊️</span>
           <div className="nesio-dormant-content">
+            <span className="nesio-review-kicker">{locale === 'en' ? 'Looking back' : '回顾'}</span>
             <span className="nesio-dormant-question">{t(locale, 'dormantSoftArchiveQuestion')}</span>
             <span className="nesio-collapsed-title">{name}</span>
           </div>
@@ -57,6 +58,7 @@ export function DormantReviewCard({
         <div className="nesio-collapsed-row">
           <span className="nesio-collapsed-icon">⏰</span>
           <div className="nesio-dormant-content">
+            <span className="nesio-review-kicker">{locale === 'en' ? 'Looking back' : '回顾'}</span>
             <span className="nesio-dormant-question">
               {dueDateStr ? t(locale, 'dormantOverdueQuestionTemplate', { date: dueDateStr }) : t(locale, 'dormantOverdueQuestionNoDate')}
             </span>
@@ -83,6 +85,7 @@ export function DormantReviewCard({
       <div className="nesio-collapsed-row">
         <span className="nesio-collapsed-icon">🌿</span>
         <div className="nesio-dormant-content">
+            <span className="nesio-review-kicker">{locale === 'en' ? 'Looking back' : '回顾'}</span>
           <span className="nesio-dormant-question">{question}</span>
           <span className="nesio-collapsed-title">{name}</span>
         </div>

@@ -107,14 +107,14 @@ function isFocusNode(node: LifeNode): boolean {
   const exp = nodeExpiryDate(node.attributes);
   if (exp) {
     const diff = exp.getTime() - now;
-    if (diff >= 0 && diff < 24 * 3_600_000) return true;
+    if (diff >= 0 && diff < 48 * 3_600_000) return true;
   }
   const d = extractNearestDate(node);
   if (d) {
     const diff = d.getTime() - now;
-    // 批次 65(用户定案):今日焦点只装 24h 内的事 —— 「明天 20:15 · 43h后」
-    // 不占今天的注意力,明天自然进场。(原 48h 窗把后天边缘的事也拉进来了)
-    if (diff >= 0 && diff < 24 * 3_600_000) return true;
+    // 批次 66(用户修正定案):48h 窗口保留(今天+明天都可进焦点),
+    // 「不该早早出现」管的是倒计时文字 —— 超 12h 不显示倒计时(CalendarCards)。
+    if (diff >= 0 && diff < 48 * 3_600_000) return true;
   }
   // Explicit "今天/今日" in name or rawInput even without a date attribute
   const text = [node.name, node.rawInput || ''].join(' ');

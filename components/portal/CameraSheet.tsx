@@ -630,6 +630,13 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
         },
       });
     });
+    // 批次 66(用户定案):有 EXIF 拍摄时间的照片,记忆落到**拍摄那天**的时间线
+    // (旧照导入的意义就在这里;存储日期只是资料搬运日,不是生活发生日)。
+    if (exifCap?.takenAt) {
+      const takenAt = exifCap.takenAt;
+      for (const sn of savedNodes) updateLifeNode(sn.id, { createdAt: takenAt });
+    }
+
     // 批次 23:先把照片压缩存本机 IndexedDB,挂一条本地 asset——
     // 未登录/离线也能在节点详情看图、问一问也能拿到图。云端上传照旧(并行)。
     if (savedNodes.length > 0) {

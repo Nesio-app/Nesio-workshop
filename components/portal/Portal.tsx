@@ -263,6 +263,16 @@ export default function Portal() {
   }, []);
   // 拍一下直达:扇形按钮同手势调起原生相机,拍完的文件直接进 CameraSheet
   const [cameraFile, setCameraFile] = useState<File | null>(null);
+  // 批次 66(用户定案):所有入口的图片统一走「拍一下」同一识别界面 ——
+  // 分享/上传选图派发此事件,EXIF 拍摄时间地点 + AI 识别 + 确认卡一条链路。
+  useEffect(() => {
+    const onRecog = (e: Event) => {
+      const f = (e as CustomEvent<{ file?: File }>).detail?.file;
+      if (f instanceof File) { setCameraFile(f); setCaptureMode('camera'); }
+    };
+    window.addEventListener('nesio-recognize-image', onRecog);
+    return () => window.removeEventListener('nesio-recognize-image', onRecog);
+  }, []);
   const [voiceIntent, setVoiceIntent] = useState<'note' | 'ask'>('note');
   const [noteOpen, setNoteOpen] = useState(false);
   const [locale, setLocale] = useState<PortalLocale>('zh');

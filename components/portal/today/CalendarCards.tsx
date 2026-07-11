@@ -40,7 +40,9 @@ function calendarCountdown(locale: PortalLocale, startDate: Date, allDay?: boole
   if (diffMs < 0 && diffMs > -120 * 60_000) {
     return t(locale, 'todayInProgressTemplate', { mins: Math.round(-diffMs / 60_000) });
   }
-  if (diffMs > 0 && diffMs < 48 * 3600_000) {
+  // 批次 66(用户定案):倒计时文字最多提前 12h 出现 ——「43h40m后」这种
+  // 数字没有行动意义,超过 12h 只显示「明天 + 时间」,不显示倒计时。
+  if (diffMs > 0 && diffMs <= 12 * 3600_000) {
     const diffMin = Math.round(diffMs / 60_000);
     if (diffMin < 60) return t(locale, 'todayMinutesLaterTemplate', { mins: diffMin });
     const hh = Math.floor(diffMin / 60);

@@ -227,6 +227,9 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     for (let i = 0; i < list.length; i++) {
       showToast(L(dict, `识别中 ${i + 1} / ${list.length}…`, `Recognizing ${i + 1} / ${list.length}…`), true);
       try {
+        // 批次 66:压缩会剥 EXIF —— 先从原始字节读拍摄时间/拍摄地
+        const { readExifCapture } = await import('@/lib/portal/exif-gps');
+        const cap = await readExifCapture(list[i]);
         const base64 = await fileToJpegBase64(list[i]);
         const res = await fetch('/api/portal/analyze', {
           method: 'POST',
@@ -241,7 +244,39 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
         });
         const data = await res.json() as { ok?: boolean; nodes?: Array<Omit<NodeInput, 'source'>> };
         const nodes = (data.ok && data.nodes) || [];
-        const savedForThis = nodes.map((n) => ingestLifeNode({ ...n, source: 'photo', tags: [...(n.tags || []), '批量导入'] } as NodeInput));
+        const savedForThis = nodes.map((n) => ingestLifeNode({
+          ...n,
+          source: 'photo',
+          tags: [...(n.tags || []), '批量导入'],
+          attributes: {
+            ...(n as { attributes?: Record<string, string | number | boolean | null> }).attributes,
+            // EXIF 拍摄地优先于"上传时在哪"(带 capturedLat 时 ingest 不再盖现场定位)
+            ...(cap.lat != null && cap.lon != null ? { capturedLat: cap.lat, capturedLon: cap.lon } : {}),
+            ...(cap.takenAt ? { takenAt: cap.takenAt } : {}),
+          },
+        } as NodeInput));
+        // 批次 66:时间线落**拍摄那天**;拍摄地按拍摄时间记进足迹并回填地名
+        if (savedForThis.length > 0 && (cap.takenAt || (cap.lat != null && cap.lon != null))) {
+          const { updateLifeNode: patchNode, getLifeGraph: readGraph } = await import('@/lib/portal/life-graph');
+          if (cap.takenAt) for (const sn of savedForThis) patchNode(sn.id, { createdAt: cap.takenAt });
+          if (cap.lat != null && cap.lon != null) {
+            const exLat = cap.lat; const exLon = cap.lon; const takenAt = cap.takenAt;
+            const firstId = savedForThis[0].id;
+            void Promise.all([import('@/lib/portal/place-trail'), import('@/lib/portal/capture-location')])
+              .then(async ([trail, cl]) => {
+                const geo = await cl.reverseGeocodeRobust(exLat, exLon).catch(() => ({ label: '' }));
+                const label = geo.label || `${exLat.toFixed(3)},${exLon.toFixed(3)}`;
+                trail.recordVisitAt(label, takenAt || new Date().toISOString());
+                if (geo.label) {
+                  const live = readGraph().find((x) => x.id === firstId);
+                  if (live && !live.attributes.capturedPlace) {
+                    patchNode(firstId, { attributes: { ...live.attributes, capturedPlace: geo.label } });
+                  }
+                }
+              })
+              .catch(() => {});
+          }
+        }
         // 批次 23:每张导入的照片也存本机,挂到该照片的第一个节点上(可看图、可问一问)
         if (savedForThis.length > 0) {
           try {

@@ -203,7 +203,10 @@ assert.match(lifeGraph, /searchLifeGraphFuzzy[\s\S]*rawInput[\s\S]*tags[\s\S]*re
 // Evolved further(批次 33):「待确认」措辞废除 —— 默认存成带时间的「照片 · …」,名字/标签由用户改。
 assert.match(shareSheet, /buildPendingImageParsed[\s\S]*照片 · /, 'Upload image fallback should save a named photo (no 待确认 wording).');
 assert.doesNotMatch(shareSheet, /originalFileName/, 'Pending image clue must not retain the photo filename.');
-assert.match(shareSheet, /analyze\('image'[\s\S]*根据这张图片里真实可见的内容/, 'Upload images should call the image analysis path.');
+// 批次 66:上传/分享的图片统一转交「拍一下」识别界面(EXIF 拍摄时间地点 + AI + 确认卡)——
+// 意图不变(上传图必须被 AI 识别),实现升级为 hand-off:ShareSheet 派发事件,Portal 开 CameraSheet。
+assert.match(shareSheet, /nesio-recognize-image/, 'Upload images should hand off to the camera recognition flow.');
+assert.match(portal, /setCameraFile\(f\); setCaptureMode\('camera'\);[\s\S]*nesio-recognize-image/, 'Portal must open CameraSheet when an image is handed off.');
 assert.match(shareSheet, /x-baohe-access-mode['"]\s*:\s*['"]personal_lab/, 'Upload image analysis should request lab AI access like the camera path.');
 assert.match(shareSheet, /type === 'image' && nodes\.length === 0[\s\S]*ai_image_empty/, 'Upload image should not use the prompt or filename when AI returns no nodes.');
 assert.doesNotMatch(shareSheet, /title:\s*nodes\[0\]\?\.name \|\| content\.slice\(0,\s*30\)[\s\S]*file\.name,\s*base64/s, 'Upload image result must not fall back to the raw filename as the recognized title.');
