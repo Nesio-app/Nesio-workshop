@@ -8,7 +8,7 @@
 
 import { arbitrateTodayPresence } from '@/lib/platform/today-arbiter';
 import { useEffect, useState } from 'react';
-import { focusTimeHint, markFocusNodeDone, type FocusNode, type ProactiveContextItem } from '@/lib/platform/view-models/today-view-model';
+import { focusTimeHint, localDayKey, markFocusNodeDone, type FocusNode, type ProactiveContextItem } from '@/lib/platform/view-models/today-view-model';
 import type { CalendarEvent } from '@/lib/portal/types';
 import { scoreCalendarEvents, selectPinned } from '@/lib/platform/attention-engine';
 import {
@@ -148,7 +148,12 @@ export function TodayFocusSection({
 
   // ── 统一仲裁(架构审查 #2):同一节点只在一个槽位出现,优先级 置顶>复访>引导卡>列表 ──
   const allNodes = [...localNodes, ...focusNodes.filter((n) => !localNodes.some((l) => l.id === n.id))];
-  const rawTaskNodes = allNodes.filter((n) => !dismissed.has(n.id) && n.type !== 'event' && !doneIds.has(n.id));
+  // 批次 51:event 型此前整类排除(日历事件走 CalendarCards 渠道)—— 但邮件/照片/
+  // 日历生成的记忆多是 event 型,长按「加入今日焦点」钉进来的必须放行,
+  // 否则只有文字 note(commitment 型)钉得进来(用户实测抓出)。
+  const rawTaskNodes = allNodes.filter((n) =>
+    !dismissed.has(n.id) && !doneIds.has(n.id)
+    && (n.type !== 'event' || n.attributes.focusPinnedOn === localDayKey()));
   const verdict = arbitrateTodayPresence({
     pinnedId: pinned?.id ?? null,
     dormantCandidateId: dormantCandidate?.node.id ?? null,

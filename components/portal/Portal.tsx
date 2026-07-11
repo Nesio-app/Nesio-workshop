@@ -543,11 +543,20 @@ export default function Portal() {
 
   // Storage quota alerts — a dropped write must never be silent
   useEffect(() => {
+    // 批次 51:用户可以「先不管」打盹 24h(报警不能去不掉);存储满时 localStorage
+    // 自身可能写不进,落 sessionStorage 兜底(至少本次会话不再骚扰)。
+    const snoozedUntil = (): number => {
+      try {
+        return Number(localStorage.getItem('nesio-storage-alert-snooze-v1') || sessionStorage.getItem('nesio-storage-alert-snooze-v1') || 0);
+      } catch { return 0; }
+    };
     const onFull = (e: Event) => {
+      if (Date.now() < snoozedUntil()) return;
       const detail = (e as CustomEvent<{ percent?: number }>).detail;
       setStorageAlert({ kind: 'full', percent: detail?.percent ?? 100 });
     };
     const onWarning = (e: Event) => {
+      if (Date.now() < snoozedUntil()) return;
       const detail = (e as CustomEvent<{ percent?: number }>).detail;
       setStorageAlert((prev) => prev?.kind === 'full' ? prev : { kind: 'warning', percent: detail?.percent ?? 80 });
     };
@@ -959,7 +968,14 @@ export default function Portal() {
             >{reliefBusy ? L(dict, '清理中…', 'Cleaning…') : L(dict, '一键腾空间', 'Free up space')}</button>
             <button
               type="button"
-              onClick={() => setStorageAlert(null)}
+              onClick={() => {
+                // 批次 51:「去不掉」根因 —— 存储满时每次写入失败都重发事件,横幅秒回。
+                // 关闭 = 打盹 24h;localStorage 此刻可能写不进,sessionStorage 兜底。
+                const until = String(Date.now() + 24 * 3600_000);
+                try { localStorage.setItem('nesio-storage-alert-snooze-v1', until); } catch { /* 满了 */ }
+                try { sessionStorage.setItem('nesio-storage-alert-snooze-v1', until); } catch { /* ignore */ }
+                setStorageAlert(null);
+              }}
               style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: '1rem', padding: 0 }}
               aria-label={L(dict, '关闭存储警告', 'Dismiss storage warning')}
             >✕</button>

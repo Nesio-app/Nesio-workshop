@@ -76,6 +76,7 @@ export function GeneralSheet({ open, onClose }: SheetProps) {
   const [hapticsOn, setHapticsOn] = useState(true);
   const [dailyReportOn, setDailyReportOn] = useState(false);
   const [theme, setTheme] = useState<ThemeChoice>('auto');
+  const [themeSaveIssue, setThemeSaveIssue] = useState('');
 
   useEffect(() => {
     if (!open) return;
@@ -102,8 +103,25 @@ export function GeneralSheet({ open, onClose }: SheetProps) {
   }
   function pickTheme(next: ThemeChoice) {
     setTheme(next);
-    try { localStorage.setItem(THEME_KEY, next); } catch { /* ignore */ }
     applyTheme(next);
+    // 批次 51:存储满时 setItem 静默失败 → 当前页面看着切成功,下次加载 boot
+    // 脚本读不到选择又跳回「随系统」(用户实测:主页还是黑、设置回跳)。
+    // 失败先自动腾空间重试;仍不行就说真话,不装保存成功。
+    try {
+      localStorage.setItem(THEME_KEY, next);
+      setThemeSaveIssue('');
+    } catch {
+      void (async () => {
+        try {
+          const { runStorageRelief } = await import('@/lib/portal/storage-relief');
+          await runStorageRelief();
+          localStorage.setItem(THEME_KEY, next);
+          setThemeSaveIssue('');
+        } catch {
+          setThemeSaveIssue(L(dict, '本机空间满了,这个选择没能保存 —— 先回今天页点「一键腾空间」。', 'Local storage is full — this choice could not be saved. Tap "Free up space" on the Today page first.'));
+        }
+      })();
+    }
   }
   function pickLang(next: PortalLocale) {
     saveProfileSettings({ locale: next }); // PROFILE_UPDATED_EVENT → 全站即时切换
@@ -227,6 +245,9 @@ export function GeneralSheet({ open, onClose }: SheetProps) {
           </button>
         ))}
       </div>
+      {themeSaveIssue && (
+        <p style={{ marginTop: '0.4rem', fontSize: '0.76rem', color: 'var(--status-risk, #c0564f)' }}>{themeSaveIssue}</p>
+      )}
 
       <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{t(locale, 'sectionLanguage')}<InfoTip text={t(locale, 'langSoonHint')} /></p>
       {/* 批次 5:下拉选择,只开放字典已完成的语言(真实有效红线:不给不生效的选项) */}

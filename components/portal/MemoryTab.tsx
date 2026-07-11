@@ -633,12 +633,14 @@ function ProjectDetailSheet({
   onClose,
   onDelete,
   onOpenNode,
+  onLongPressNode,
 }: {
   project: Project;
   allNodes: LifeNode[];
   onClose: () => void;
   onDelete: () => void;
   onOpenNode: (n: LifeNode) => void;
+  onLongPressNode?: (n: LifeNode) => void;
 }) {
   const nodes = allNodes.filter((n) => project.nodeIds.includes(n.id));
   const dict = useDict();
@@ -662,7 +664,7 @@ function ProjectDetailSheet({
         ) : (
           <div className="nesio-memory-grid" style={{ padding: '0 1rem 1rem' }}>
             {nodes.map((n) => (
-              <MemoryCard key={n.id} node={n} onOpen={() => onOpenNode(n)} onDeleted={() => {}} onLongPress={undefined} />
+              <MemoryCard key={n.id} node={n} onOpen={() => onOpenNode(n)} onDeleted={() => {}} onLongPress={onLongPressNode ? () => onLongPressNode(n) : undefined} />
             ))}
           </div>
         )}
@@ -1287,6 +1289,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
           onClose={() => setActiveProject(null)}
           onDelete={() => deleteProject(activeProject.id)}
           onOpenNode={(n) => { setActiveProject(null); openNodeDetail(n); }}
+          onLongPressNode={(n) => setLongPressNode(n)}
         />
       )}
 
