@@ -25,8 +25,22 @@ function cleanStep(s: string): string {
 }
 
 function splitIfList(t: string): string[] | null {
+  // 批次 71(用户实锤):「列出必带清单(证件/充电器/药)」—— 括号里就是内容清单,
+  // 此前不认「/」分隔,整句拆不动 → 掉进通用脚手架三句(二级拆解看着很差)。
+  // 括号清单优先:每一项变成一个可勾的真步骤。
+  const paren = /[((]([^))]+)[))]/.exec(t);
+  if (paren) {
+    const inner = paren[1].split(/[/、,,]+/).map(cleanStep).filter((p) => p.length >= 1);
+    if (inner.length >= 2) {
+      const verb = cleanStep(t.slice(0, paren.index)) || '';
+      return inner.map((x) => (verb ? `${verb}:${x}` : x));
+    }
+  }
   const strong = t.split(STRONG_SPLIT_RE).map(cleanStep).filter((p) => p.length >= 2);
   if (strong.length >= 2) return strong;
+  // 斜杠列表:「证件/充电器/药」直接是并列项
+  const bySlash = t.split(/\s*\/\s*/).map(cleanStep).filter((p) => p.length >= 1);
+  if (bySlash.length >= 2 && bySlash.every((p) => p.length <= 12)) return bySlash;
   const byComma = t.split(COMMA_SPLIT_RE).map(cleanStep).filter((p) => p.length >= 2);
   if (byComma.length >= 3) return byComma; // 两段的逗号句当整句看,不劈
   return null;

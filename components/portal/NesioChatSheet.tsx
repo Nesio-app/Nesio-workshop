@@ -22,6 +22,7 @@ import { loadChatHistoryRaw, saveChatHistoryRaw, loadChatSessionsRaw, saveChatSe
 import { detectCrossLingualGap } from '@/lib/portal/cross-lingual-gap.mjs';
 import { track } from '@/lib/portal/telemetry';
 import { L } from '@/lib/portal/i18n';
+import { resolveAirport } from '@/lib/portal/airports';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import MemoryFlashBanner, { useMemoryFlash } from '@/components/portal/MemoryFlashBanner';
@@ -941,6 +942,9 @@ Edit location/value anytime in Storage.`),
     const itemIds: string[] = [];
     for (const it of msg.planItems) {
       const start = planItemStart(it);
+      // 批次 71(用户实锤 KEF 被地图定位到突尼斯 Kef 城):三字机场码确定性
+      // 解析成机场真名 + 坐标 —— 地图按坐标打开,不再靠文字搜索猜。
+      const airport = it.place ? resolveAirport(it.place) : null;
       const saved = ingestLifeNode({
         name: it.name,
         type: it.kind === 'todo' ? 'commitment' : 'event',
@@ -951,7 +955,9 @@ Edit location/value anytime in Storage.`),
         rawInput: [it.name, it.date, it.time, it.place, it.note].filter(Boolean).join(' · '),
         attributes: {
           ...(start ? { start } : {}),
-          ...(it.place ? { location: it.place } : {}),
+          ...(airport
+            ? { location: L(dict, airport.label, airport.labelEn), lat: airport.lat, lon: airport.lon }
+            : it.place ? { location: it.place } : {}),
           ...(it.note ? { note: it.note } : {}),
           ...(it.kind ? { planKind: it.kind } : {}),
           planImported: true,
