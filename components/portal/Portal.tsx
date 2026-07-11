@@ -269,6 +269,29 @@ export default function Portal() {
   useEffect(() => {
     void import('@/lib/portal/plan-links').then((m) => m.initPlanLinks()).catch(() => {});
   }, []);
+  // 批次 85:懒加载 chunk 跨部署失效的全局兜底(错误页之外的路径,
+  // 比如事件回调里的 dynamic import 被拒)—— 同一把 5 分钟防循环锁。
+  useEffect(() => {
+    const CHUNK_ERR_RE = /ChunkLoadError|Loading chunk|dynamically imported module|Importing a module script failed/i;
+    const heal = (msg: string) => {
+      if (!CHUNK_ERR_RE.test(msg)) return;
+      try {
+        const last = Number(sessionStorage.getItem('nesio-chunk-reload') || 0);
+        if (Date.now() - last > 5 * 60_000) {
+          sessionStorage.setItem('nesio-chunk-reload', String(Date.now()));
+          window.location.reload();
+        }
+      } catch { /* ignore */ }
+    };
+    const onRejection = (e: PromiseRejectionEvent) => heal(String(e.reason?.message || e.reason || ''));
+    const onError = (e: ErrorEvent) => heal(`${e.message || ''}`);
+    window.addEventListener('unhandledrejection', onRejection);
+    window.addEventListener('error', onError);
+    return () => {
+      window.removeEventListener('unhandledrejection', onRejection);
+      window.removeEventListener('error', onError);
+    };
+  }, []);
   // 批次 81(白边拔根的兜底半边):iOS standalone 键盘收起后 window 高度
   // 偶发卡短(WebKit 老 bug),主页面 100dvh 布局随之缩水。焦点离开输入框
   // 后滚回顶部,促使视口回弹;浮层已用 lvh 免疫,这里管的是主页面。
