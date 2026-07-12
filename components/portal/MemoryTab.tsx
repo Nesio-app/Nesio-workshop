@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   PROFILE_UPDATED_EVENT,
   loadProfileSettings,
@@ -39,7 +39,7 @@ import dynamic from 'next/dynamic';
 const MemoryNodeDetail = dynamic(() => import('./MemoryNodeDetail'), { ssr: false });
 const RelationGraph = dynamic(() => import('./RelationGraph'), { ssr: false });
 import type { GNode, GEdge } from '@/lib/platform/graph-engine';
-import { DomainIcon, IconBox, IconBookmark, IconCalendar, IconCheckSquare, IconFolder, IconLink, IconMapPin, IconStar, IconUser, NodeTypeIcon, IconMap } from './icons';
+import { DomainIcon, IconBox, IconBookmark, IconCalendar, IconCamera, IconCheckSquare, IconFolder, IconLink, IconMail, IconMapPin, IconMic, IconNote, IconStar, IconUser, NodeTypeIcon, IconMap } from './icons';
 import { L, type DictLocale } from '@/lib/portal/i18n';
 import { relativePastLabel } from '@/lib/portal/time-labels';
 import { displayNodeName } from '@/lib/portal/node-display';
@@ -389,20 +389,31 @@ function getNodeTypeMeta(node: LifeNode, dict: DictLocale = 'zh') {
   }
 }
 
-/** 来源徽章(批次 121·设计「分类为主,来源为辅」):来源退为右下小徽章。
- *  自己记的(manual)不标来源——那是噪音;外部来源(邮件/日历/拍照/Notion…)才标。 */
-function sourceBadge(node: LifeNode, dict: DictLocale): string | null {
+/** 来源徽章 · 6 种(批次 122·设计「来源徽章·6 种·左下角固定」):图标 + 名。
+ *  设计里手记(自己记的)也标「手记」,不再隐藏。位置类记忆标「位置」。 */
+function sourceMeta(node: LifeNode, dict: DictLocale): { label: string; icon: ReactNode } {
   const tags = node.tags || [];
-  if (tags.includes('notion')) return 'Notion';
-  if (tags.includes('keep')) return 'Keep';
+  const sz = 11;
+  if (tags.includes('notion')) return { label: 'Notion', icon: <IconNote size={sz} /> };
+  if (tags.includes('keep')) return { label: 'Keep', icon: <IconNote size={sz} /> };
+  if (node.type === 'place') return { label: L(dict, '位置', 'Place'), icon: <IconMapPin size={sz} /> };
   switch (node.source) {
-    case 'email': return L(dict, '邮件', 'Email');
-    case 'calendar': return L(dict, '日历', 'Calendar');
-    case 'photo': return L(dict, '拍照', 'Photo');
-    case 'voice': return L(dict, '语音', 'Voice');
-    case 'system': return L(dict, '系统', 'System');
-    default: return null;
+    case 'email': return { label: L(dict, '邮件', 'Email'), icon: <IconMail size={sz} /> };
+    case 'calendar': return { label: L(dict, '日历', 'Calendar'), icon: <IconCalendar size={sz} /> };
+    case 'photo': return { label: L(dict, '拍照', 'Photo'), icon: <IconCamera size={sz} /> };
+    case 'voice': return { label: L(dict, '语音', 'Voice'), icon: <IconMic size={sz} /> };
+    case 'system': return { label: L(dict, '系统', 'System'), icon: <IconNote size={sz} /> };
+    default: return { label: L(dict, '手记', 'Note'), icon: <IconNote size={sz} /> };
   }
+}
+
+/** 卡片分类名(设计:分类图标 + 分类名领头)。心情记录 → 情绪(不是「健康」)。 */
+function categoryLabelForCard(node: LifeNode, dict: DictLocale): string {
+  if (node.type === 'health_state') {
+    const tags = node.tags || [];
+    if (tags.includes('feeling') || tags.includes('moment')) return L(dict, '情绪', 'Mood');
+  }
+  return typeLabel(node.type, dict);
 }
 
 /** 不确定(AI 抽取的低置信项)→ 卡片标「待确认」(设计规范:不确定标 待确认)。 */
@@ -588,7 +599,8 @@ function MemoryCard({ node, onOpen, onDeleted, onLongPress }: { node: LifeNode; 
   const { extra, badge, badgeColor } = getNodeTypeMeta(node, dict);
   const isPerson = node.type === 'person';
   const { initials, bg: avatarBg } = isPerson ? getPersonInitials(node.name) : { initials: '', bg: '' };
-  const src = sourceBadge(node, dict);
+  const srcMeta = sourceMeta(node, dict);
+  const catLabel = categoryLabelForCard(node, dict);
   const uncertain = isNodeUncertain(node);
 
   return (
@@ -620,22 +632,25 @@ function MemoryCard({ node, onOpen, onDeleted, onLongPress }: { node: LifeNode; 
       onContextMenu={(e) => { e.preventDefault(); shareNode(); }}
       aria-label={`${node.name}${L(dict, ',左滑删除,长按分享', ' — swipe left to delete, long-press to share')}`}
     >
-      {/* 批次 121·设计统一卡片模板:分类图标领头(辅助色)—— 标明「这是什么」,分类为主。
-          人物用头像。每卡恰好 1 个 type 图标(批次 13 双图标已废)。 */}
-      {isPerson ? (
-        <span className="nesio-memory-card-lead nesio-memory-card-avatar" style={{ background: avatarBg }}>{initials}</span>
-      ) : (
-        <span className="nesio-memory-card-lead nesio-memory-card-icon" style={{ background: TYPE_BG[node.type] || 'var(--portal-accent-soft)' }}>
-          <NodeTypeIcon type={node.type} size={15} />
-        </span>
-      )}
+      {/* 批次 121→122·设计统一卡片模板:分类图标(辅助色)+ 分类名领头 —— 标明「这是什么」,
+          分类为主。人物用头像。每卡恰好 1 个 type 图标(批次 13 双图标已废)。 */}
+      <span className="nesio-memory-card-cat">
+        {isPerson ? (
+          <span className="nesio-memory-card-lead nesio-memory-card-avatar" style={{ background: avatarBg }}>{initials}</span>
+        ) : (
+          <span className="nesio-memory-card-lead nesio-memory-card-icon" style={{ background: TYPE_BG[node.type] || 'var(--portal-accent-soft)' }}>
+            <NodeTypeIcon type={node.type} size={14} />
+          </span>
+        )}
+        <span className="nesio-memory-card-cat-label">{catLabel}</span>
+      </span>
       <span className="nesio-memory-card-title" title={node.name}>{smartCardTitle(displayNodeName(node.name, dict))}</span>
       {extra && <span className="nesio-memory-card-extra">{extra}</span>}
       {badge && <span className="nesio-memory-card-status-badge" style={{ background: badgeColor }}>{badge}</span>}
       {!extra && !badge && <span className="nesio-memory-card-sub">{cleanMemoryPreview(node, dict)}</span>}
-      {/* 来源徽章 · 时间(设计「来源为辅」:右下小徽章;不确定标「待确认」) */}
+      {/* 来源徽章(图标 + 名,6 种,左下固定)· 待确认 · 时间(来源为辅) */}
       <span className="nesio-memory-card-meta-row">
-        {src && <span className="nesio-memory-card-source">{src}</span>}
+        <span className="nesio-memory-card-source">{srcMeta.icon}{srcMeta.label}</span>
         {uncertain && <span className="nesio-memory-card-pending">{L(dict, '待确认', 'Unconfirmed')}</span>}
         {(() => {
           // 标签三层 §3.3:列表卡带相对时间(今天/昨天/N 天前),数据的"新鲜度"一眼可辨
