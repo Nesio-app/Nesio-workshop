@@ -639,6 +639,7 @@ export default function InsightsSheet({ onClose, initialTab }: { onClose: () => 
             onClick={() => setMainTab(t)}
           >
             {t === 'reflection' ? L(dict, '洞察', 'Insights') : t === 'health' ? L(dict, '健康', 'Health') : t === 'timeline' ? L(dict, '足迹', 'Places') : t === 'finance' ? L(dict, '财务', 'Finance') : t === 'relationships' ? L(dict, '关系', 'People') : L(dict, '多面镜', 'Mirror')}
+            {t === 'living' && <sup style={{ marginLeft: '0.2rem', fontSize: '0.6em', fontWeight: 600, color: 'var(--portal-accent)' }}>Pro</sup>}
           </button>
         ))}
       </div>
@@ -649,30 +650,104 @@ export default function InsightsSheet({ onClose, initialTab }: { onClose: () => 
         {mainTab === 'reflection' && (
           <div className="nesio-reflection-tab">
 
-            {/* ① 你在想什么(主题门) */}
+            {/* 顶部刊物 kicker(设计:你的私人刊物 · X月) */}
+            <p className="nesio-insights-kicker" style={{ margin: '0 0 0.9rem', fontSize: '0.72rem', letterSpacing: '0.04em', color: 'var(--portal-muted)' }}>
+              {L(dict, `你的私人刊物 · ${monthNum} 月`, `Your private journal · ${MONTHS_EN[monthNum - 1]}`)}
+            </p>
+
+            {/* ① 主题门:你最近反复在想(门楣造型 chip) */}
             {doors.length > 0 && (
               <div className="nesio-insights-section">
-                <p className="nesio-serif-voice">
-                  {L(dict, `${monthNum} 月,占着你脑子的是 ——`, `${MONTHS_EN[monthNum - 1]} — what's been on your mind:`)}
-                </p>
-                <div className="nesio-theme-doors">
+                <div className="nesio-insights-section-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                  <p className="nesio-insights-section-label" style={{ margin: 0 }}>{L(dict, '你最近反复在想', 'On your mind lately')}</p>
+                  <span style={{ fontSize: '0.68rem', color: 'var(--portal-muted)' }}>{L(dict, '近 30 天', 'last 30 days')}</span>
+                </div>
+                <div className="nesio-theme-doors" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.55rem' }}>
                   {doors.map(([tag, count]) => (
-                    <button key={tag} type="button" className="nesio-theme-door" onClick={() => openInMemory(tag)}>
-                      {tag} · {count} {L(dict, '条', '')} ›
+                    <button key={tag} type="button" className="nesio-theme-door" onClick={() => openInMemory(tag)}
+                      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.15rem', padding: '0.55rem 0.9rem', borderRadius: '0 0 var(--radius-sm, 12px) var(--radius-sm, 12px)', borderTop: '2px solid var(--portal-accent-border)', border: '1px solid var(--portal-line)', borderTopWidth: '2px', borderTopColor: 'var(--portal-accent-border)', background: 'var(--portal-bg)', cursor: 'pointer', minWidth: '4.2rem' }}>
+                      <span style={{ fontWeight: 600, color: 'var(--portal-ink)', fontSize: '0.86rem' }}>{tag}</span>
+                      <span style={{ fontSize: '0.68rem', color: 'var(--portal-muted)' }}>{count}{L(dict, ' 次', '')}</span>
                     </button>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* 生命版图:唯一保留的图(§2.2)。≥90 天才出现,不满门槛只说实话,不放示例 */}
+            {/* ② 没接上的线头:书名号原话 + 右侧「拾起」轻动作(不催、只递) */}
+            {threads.length > 0 && (
+              <div className="nesio-insights-section">
+                <div className="nesio-insights-section-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                  <p className="nesio-insights-section-label" style={{ margin: 0 }}>{L(dict, '几个没接上的线头', 'A few loose threads')}</p>
+                  <span style={{ fontSize: '0.68rem', color: 'var(--portal-muted)' }}>{L(dict, '> 30 天', '> 30 days')}</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', marginTop: '0.55rem' }}>
+                  {threads.slice(0, 3).map((t) => {
+                    const days = Math.floor((Date.now() - new Date(t.createdAt).getTime()) / DAY_MS);
+                    return (
+                      <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.7rem' }}>
+                        <div style={{ minWidth: 0 }}>
+                          <p style={{ margin: 0, fontWeight: 600, color: 'var(--portal-ink)', fontSize: '0.84rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>「{t.name.slice(0, 22)}」</p>
+                          <p style={{ margin: '0.12rem 0 0', fontSize: '0.7rem', color: 'var(--portal-muted)' }}>{L(dict, `${days} 天前提过,没再碰`, `mentioned ${days}d ago, not since`)}</p>
+                        </div>
+                        <button type="button" onClick={() => openInMemory(t.name)}
+                          style={{ flex: 'none', fontSize: '0.74rem', fontWeight: 600, padding: '0.3rem 0.75rem', borderRadius: 'var(--radius-sm, 12px)', border: '1px solid var(--portal-accent-border)', background: 'var(--portal-accent-soft)', color: 'var(--portal-accent)', cursor: 'pointer' }}>
+                          {L(dict, '拾起', 'Pick up')}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* ③ 走走看:衬线引原话「去年今天,你写下 ——」+ 再翻一条(偶遇感) */}
+            {(yearAgoNode || wanderNode) && (() => {
+              const node = yearAgoNode ?? wanderNode!;
+              const isYearAgo = !!yearAgoNode;
+              return (
+                <div className="nesio-insights-section">
+                  <p className="nesio-insights-section-label">{L(dict, '走走看', 'Wander')}</p>
+                  <div className="nesio-wander-card" style={{ padding: '0.9rem', borderRadius: 'var(--radius-md, 16px)', background: 'var(--portal-bg)', border: '1px solid var(--portal-line)' }}>
+                    <p style={{ margin: 0, fontSize: '0.7rem', color: 'var(--portal-muted)' }}>
+                      {isYearAgo ? L(dict, '去年今天,你写下 ——', 'A year ago today, you wrote —') : L(dict, '翻到一条 ——', 'Turned up —')}
+                    </p>
+                    <button type="button" onClick={() => openInMemory(node.name)} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'transparent', border: 'none', padding: 0, margin: '0.45rem 0', cursor: 'pointer' }}>
+                      <span style={{ fontFamily: 'var(--font-serif)', fontSize: '0.98rem', lineHeight: 1.6, color: 'var(--portal-ink)' }}>「{node.name.slice(0, 60)}」</span>
+                    </button>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.68rem', color: 'var(--portal-muted)' }}>
+                        {new Date(node.createdAt).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { year: 'numeric', month: 'short', day: 'numeric' })}
+                      </span>
+                      <button type="button" onClick={() => setWanderSeed((s) => s + 1)} style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--portal-accent)', background: 'transparent', border: 'none', cursor: 'pointer' }}>
+                        {L(dict, '↻ 再翻一条', '↻ Another')}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* ④ 节律:一句话 + 迷你周柱(不做大图表) */}
+            <div className="nesio-insights-section">
+              <div className="nesio-insights-section-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                <p className="nesio-insights-section-label" style={{ margin: 0 }}>{L(dict, '节律', 'Rhythm')}</p>
+                <span style={{ fontSize: '0.68rem', color: 'var(--portal-muted)' }}>{L(dict, '本月', 'this month')}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '0.8rem', marginTop: '0.45rem' }}>
+                <p className="nesio-rhythm-line" style={{ margin: 0 }}>{rhythm.line}</p>
+                {realNodes.length > 0 && <WeekBarChart nodes={realNodes} />}
+              </div>
+            </div>
+
+            {/* 生命版图:唯一保留的图,移到底部(≥21 天才出现,不满门槛只说实话,不放示例) */}
             <div className="nesio-insights-section">
               <p className="nesio-insights-section-label">{L(dict, '生命版图', 'Life map')}<InfoTip text={L(dict, '五个领域(关系/事业/健康/成长/自我)的地形图:领土宽度由记录的意义密度决定(置信度+关联数+标签),不是数量;地形随时间演变,自动标出最大迁移。', 'A terrain of five domains (ties/work/health/growth/self). Territory width reflects meaning density (confidence + connections + tags), not count; it evolves over time and flags the biggest shift.')} /></p>
               {mapEligible ? (
                 <>
                   <LifeCivilizationMap nodes={realNodes} />
                   <p className="nesio-insights-map-evidence">
-                    {L(dict, `基于 ${realNodes.length} 条记录的意义密度`, `Meaning density from ${realNodes.length} notes`)}
+                    {L(dict, '意义密度 · 非数量', 'Meaning density · not counts')}
                   </p>
                 </>
               ) : (
@@ -680,48 +755,6 @@ export default function InsightsSheet({ onClose, initialTab }: { onClose: () => 
                   {L(dict, `需要 21 天的记录才能成形 · 已积累 ${mapDays} 天`, `Takes shape after 21 days of notes · ${mapDays} days so far`)}
                 </p>
               )}
-            </div>
-
-            {/* ② 没接上的线头 */}
-            {threads.length > 0 && threadOldest && (
-              <div className="nesio-insights-section">
-                <p className="nesio-insights-section-label">{L(dict, '没接上的线头', 'Loose threads')}</p>
-                <button type="button" className="nesio-thread-row" onClick={() => openInMemory(threadOldest.name)}>
-                  {L(dict,
-                    `${threads.length} 个想法没再碰,最老:${threadAgeLabel}「${threadOldest.name.slice(0, 18)}」›`,
-                    `${threads.length} ideas untouched — oldest: "${threadOldest.name.slice(0, 24)}" ${threadAgeLabel} ›`)}
-                </button>
-              </div>
-            )}
-
-            {/* ③ 走走看 */}
-            {wanderNode && (
-              <div className="nesio-insights-section">
-                <p className="nesio-insights-section-label">{L(dict, '走走看', 'Wander')}</p>
-                <div className="nesio-wander-card">
-                  <button type="button" className="nesio-wander-main" onClick={() => openInMemory(wanderNode.name)}>
-                    <span className="nesio-wander-name">{wanderNode.name}</span>
-                    <span className="nesio-wander-date">
-                      {new Date(wanderNode.createdAt).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { year: 'numeric', month: 'short', day: 'numeric' })}
-                    </span>
-                  </button>
-                  <button type="button" className="nesio-wander-reroll" onClick={() => setWanderSeed((s) => s + 1)}>
-                    {L(dict, '换一条', 'Another')}
-                  </button>
-                </div>
-                {yearAgoNode && (
-                  <button type="button" className="nesio-thread-row" style={{ marginTop: '0.45rem' }} onClick={() => openInMemory(yearAgoNode.name)}>
-                    {L(dict, `去年今天:「${yearAgoNode.name.slice(0, 18)}」›`, `A year ago today: "${yearAgoNode.name.slice(0, 24)}" ›`)}
-                  </button>
-                )}
-              </div>
-            )}
-
-            {/* ④ 一行节律 + 迷你柱线 */}
-            <div className="nesio-insights-section">
-              <p className="nesio-insights-section-label">{L(dict, '节律', 'Rhythm')}</p>
-              <p className="nesio-rhythm-line">{rhythm.line}</p>
-              {realNodes.length > 0 && <WeekBarChart nodes={realNodes} />}
             </div>
 
             {/* 我的实验(Lab 功能开关,与提审隐藏同闸) */}
