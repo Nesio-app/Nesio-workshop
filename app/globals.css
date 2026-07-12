@@ -4625,7 +4625,7 @@ html[data-portal-theme="night"] .nesio-bottom-nav {
 }
 
 html[data-portal-theme="night"] .nesio-bottom-nav-btn--active {
-  color: #96c7f3;
+  color: var(--portal-blue-deep);
 }
 
 .nesio-bottom-nav-icon {
@@ -4949,7 +4949,7 @@ html[data-portal-theme="night"] .nesio-today-btn--ghost {
 .nesio-today-night-kicker {
   font-size: 0.7rem;
   font-weight: 600;
-  color: #96c7f3;
+  color: var(--portal-blue-deep);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 0.6rem;
@@ -5049,7 +5049,7 @@ html[data-portal-theme="night"] .nesio-today-btn--ghost {
 
 .nesio-today-night-step--active .nesio-today-night-step-dot {
   background: var(--portal-blue-deep);
-  border-color: #96c7f3;
+  border-color: var(--portal-blue-deep);
   box-shadow: 0 0 0 4px rgba(88,140,227,0.2);
 }
 
@@ -5062,7 +5062,7 @@ html[data-portal-theme="night"] .nesio-today-btn--ghost {
 }
 
 .nesio-today-night-step--active .nesio-today-night-step-time {
-  color: #96c7f3;
+  color: var(--portal-blue-deep);
   font-weight: 700;
 }
 
@@ -5767,7 +5767,7 @@ html[data-portal-theme="night"] .nesio-voice-transcript { color: #e8eefa; backgr
   font-weight: 500;
 }
 
-html[data-portal-theme="night"] .nesio-voice-quick-btn { background: rgba(88,140,227,0.2); color: #96c7f3; }
+html[data-portal-theme="night"] .nesio-voice-quick-btn { background: var(--portal-accent-soft-md); color: var(--portal-blue-deep); }
 
 .nesio-voice-input-row {
   display: flex;
@@ -6042,7 +6042,7 @@ html[data-portal-theme="night"] .nesio-voice-confirm-chip {
   border-radius: 999px;
   padding: 0.3rem 0.85rem;
   font-size: 0.75rem;
-  color: #96c7f3;
+  color: var(--portal-blue-deep);
   display: flex;
   align-items: center;
   gap: 0.4rem;
@@ -6053,7 +6053,7 @@ html[data-portal-theme="night"] .nesio-voice-confirm-chip {
   width: 0.4rem;
   height: 0.4rem;
   border-radius: 50%;
-  background: #96c7f3;
+  background: var(--portal-blue-deep);
   animation: blink 1s ease-in-out infinite;
 }
 
@@ -7058,7 +7058,7 @@ html[data-portal-theme="night"] .nesio-login-card {
 
 html[data-portal-theme="night"] .nesio-login-tab--active {
   background: rgba(88,140,227,0.2);
-  color: #96c7f3;
+  color: var(--portal-blue-deep);
 }
 
 .nesio-login-divider {
@@ -7168,7 +7168,7 @@ html[data-portal-theme="night"] .nesio-settings-sheet-title { color: #e8eefa; }
 }
 
 html[data-portal-theme="night"] .nesio-settings-option { background: rgba(255,255,255,0.05); }
-html[data-portal-theme="night"] .nesio-settings-option--active { background: rgba(88,140,227,0.15); border-color: #96c7f3; }
+html[data-portal-theme="night"] .nesio-settings-option--active { background: var(--portal-accent-soft); border-color: var(--portal-blue-deep); }
 
 .nesio-settings-option-label {
   display: block;
@@ -7831,14 +7831,14 @@ html[data-portal-theme="night"] .nesio-type-action-btn { color: #93c5fd; }
   margin-bottom: 1rem;
   cursor: pointer;
 }
-html[data-portal-theme="night"] .nesio-profile-auth-banner { background: rgba(88,140,227,0.12); color: #96c7f3; }
+html[data-portal-theme="night"] .nesio-profile-auth-banner { background: var(--portal-accent-soft); color: var(--portal-blue-deep); }
 
 /* ─── VoiceInputSheet intent label ─── */
 .nesio-voice-intent-label {
   font-size: 0.73rem; color: var(--portal-blue-deep); margin: -0.15rem 0 0.6rem;
   display: flex; align-items: center; gap: 0.3rem;
 }
-html[data-portal-theme="night"] .nesio-voice-intent-label { color: #96c7f3; }
+html[data-portal-theme="night"] .nesio-voice-intent-label { color: var(--portal-blue-deep); }
 
 /* ─── ConnectorsHub ─── */
 .nesio-connector-row {
@@ -8412,7 +8412,7 @@ html[data-portal-theme="night"] .nesio-mirror-title { color: #e8eefa; }
 
 .nesio-camera-result-summary {
   font-size: 0.78rem;
-  color: #96c7f3;
+  color: var(--portal-blue-deep);
   margin-bottom: 0.65rem;
   font-weight: 500;
 }
@@ -8451,7 +8451,7 @@ html[data-portal-theme="night"] .nesio-mirror-title { color: #e8eefa; }
 
 .nesio-camera-result-node-type {
   font-size: 0.68rem;
-  color: #96c7f3;
+  color: var(--portal-blue-deep);
   margin-bottom: 0.15rem;
 }
 
@@ -9158,7 +9158,7 @@ html[data-portal-theme="night"] .nesio-brief-card {
   margin-bottom: 0.15rem;
 }
 
-html[data-portal-theme="night"] .nesio-brief-kicker { color: #96c7f3; }
+html[data-portal-theme="night"] .nesio-brief-kicker { color: var(--portal-blue-deep); }
 
 .nesio-brief-title {
   font-size: 1rem;
@@ -14476,7 +14476,7 @@ html[data-portal-theme="night"] .nesio-exp-card:hover {
    ══════════════════════════════════════════════════════════════════ */
 
 /* ① 蓝灰底 + 灰粉点睛 —— 冷调精致(默认皮肤) */
-html[data-palette="bluegray-rose"], html[data-palette="bluegray-rose"] .portal-root {
+html[data-palette="bluegray-rose"]:not([data-portal-theme="night"]), html[data-palette="bluegray-rose"]:not([data-portal-theme="night"]) .portal-root {
   --portal-blue-deep:#b06f68; --portal-blue-mid:#d9bdb8; --portal-blue-light:#f2ddd9;
   --portal-bg-gradient:
     radial-gradient(ellipse 85% 60% at 12% 0%, rgba(204,209,215,0.55), transparent 55%),
@@ -14496,7 +14496,7 @@ html[data-palette="bluegray-rose"], html[data-palette="bluegray-rose"] .portal-r
 }
 
 /* ② 沙米 / 奶茶暖调 —— 温润 muji */
-html[data-palette="milktea"], html[data-palette="milktea"] .portal-root {
+html[data-palette="milktea"]:not([data-portal-theme="night"]), html[data-palette="milktea"]:not([data-portal-theme="night"]) .portal-root {
   --portal-blue-deep:#a98f66; --portal-blue-mid:#cdbb9c; --portal-blue-light:#eae0cf;
   --portal-bg-gradient:
     radial-gradient(ellipse 85% 60% at 12% 0%, rgba(217,204,181,0.55), transparent 55%),
@@ -14516,7 +14516,7 @@ html[data-palette="milktea"], html[data-palette="milktea"] .portal-root {
 }
 
 /* ③ 雾霾蓝 · 柔 —— 保留品牌蓝(旧 lowsat 用户迁移到这套) */
-html[data-palette="haze-blue"], html[data-palette="haze-blue"] .portal-root {
+html[data-palette="haze-blue"]:not([data-portal-theme="night"]), html[data-palette="haze-blue"]:not([data-portal-theme="night"]) .portal-root {
   --portal-blue-deep:#5f7890; --portal-blue-mid:#a9c2d5; --portal-blue-light:#dceaf3;
   --portal-bg-gradient:
     radial-gradient(ellipse 85% 60% at 12% 0%, rgba(95,120,144,0.20), transparent 55%),
@@ -14536,7 +14536,7 @@ html[data-palette="haze-blue"], html[data-palette="haze-blue"] .portal-root {
 }
 
 /* ④ 灰绿 · 治愈 —— 自然疗愈 */
-html[data-palette="sage"], html[data-palette="sage"] .portal-root {
+html[data-palette="sage"]:not([data-portal-theme="night"]), html[data-palette="sage"]:not([data-portal-theme="night"]) .portal-root {
   --portal-blue-deep:#6f8b7f; --portal-blue-mid:#b6ccc2; --portal-blue-light:#e0ebe6;
   --portal-bg-gradient:
     radial-gradient(ellipse 85% 60% at 12% 0%, rgba(111,139,127,0.18), transparent 55%),
@@ -14553,6 +14553,76 @@ html[data-palette="sage"], html[data-palette="sage"] .portal-root {
   --status-gentle:#b0956a; --status-gentle-soft:#f0e9db;
   --status-calm:#93a897; --status-calm-soft:#e7ece8;
   --portal-muted:#64756b; --portal-ink:#33403a;
+}
+
+/* ══ 夜间 · 4 套色卡(批次 104)══
+   日间色卡块已加 :not([data-portal-theme="night"]) 隔离 —— 否则日间的浅底 token
+   会漏进夜间把夜屏搞成半亮。夜间结构(深底/浅字/玻璃/暗区)由夜间基座提供,
+   这里只覆写**强调色系**(品牌 ramp/accent/区强调/状态/软色 + 底纹微染),让 logo/
+   FAB/活动态/链接在夜里也跟皮肤走。双属性选择器 (0,2,1) 压过夜间基座 (0,1,1)。 */
+
+/* ① 蓝灰·灰粉 · 夜 */
+html[data-portal-theme="night"][data-palette="bluegray-rose"],
+html[data-portal-theme="night"][data-palette="bluegray-rose"] .portal-root {
+  --portal-blue-deep:#d49a94; --portal-blue-mid:#c08d87; --portal-blue-light:#4a3634;
+  --portal-accent:#d49a94;
+  --portal-bg-gradient:
+    radial-gradient(ellipse 70% 55% at 88% 6%, rgba(120,70,66,0.30), transparent 52%),
+    linear-gradient(165deg,#241a1b 0%,#1a1416 50%,#120e10 100%);
+  --portal-cool-accent:#9aa6b3; --portal-warm-accent:#d49a94; --portal-neutral-accent:#a9a5ad;
+  --portal-accent-soft:rgba(212,154,148,0.13); --portal-accent-soft-md:rgba(212,154,148,0.22);
+  --portal-accent-soft-lg:rgba(212,154,148,0.32); --portal-accent-border:rgba(212,154,148,0.30);
+  --status-go:#7fb39f; --status-go-soft:rgba(127,179,159,0.18);
+  --status-gentle:#d3a173; --status-gentle-soft:rgba(211,161,115,0.18);
+  --status-calm:#a3aec2; --status-calm-soft:rgba(163,174,194,0.16);
+}
+
+/* ② 沙米·奶茶 · 夜 */
+html[data-portal-theme="night"][data-palette="milktea"],
+html[data-portal-theme="night"][data-palette="milktea"] .portal-root {
+  --portal-blue-deep:#d3ba8c; --portal-blue-mid:#bda574; --portal-blue-light:#443a26;
+  --portal-accent:#d3ba8c;
+  --portal-bg-gradient:
+    radial-gradient(ellipse 70% 55% at 88% 6%, rgba(120,100,60,0.28), transparent 52%),
+    linear-gradient(165deg,#211d15 0%,#181510 50%,#100e0a 100%);
+  --portal-cool-accent:#9aa892; --portal-warm-accent:#d3ba8c; --portal-neutral-accent:#aca79a;
+  --portal-accent-soft:rgba(211,186,140,0.13); --portal-accent-soft-md:rgba(211,186,140,0.22);
+  --portal-accent-soft-lg:rgba(211,186,140,0.32); --portal-accent-border:rgba(211,186,140,0.30);
+  --status-go:#93b483; --status-go-soft:rgba(147,180,131,0.18);
+  --status-gentle:#cba46f; --status-gentle-soft:rgba(203,164,111,0.18);
+  --status-calm:#b3ae90; --status-calm-soft:rgba(179,174,144,0.16);
+}
+
+/* ③ 雾霾蓝 · 夜(≈ 默认夜蓝,保留品牌蓝) */
+html[data-portal-theme="night"][data-palette="haze-blue"],
+html[data-portal-theme="night"][data-palette="haze-blue"] .portal-root {
+  --portal-blue-deep:#8fb4de; --portal-blue-mid:#6f95c8; --portal-blue-light:#2c3f5a;
+  --portal-accent:#8fb4de;
+  --portal-bg-gradient:
+    radial-gradient(ellipse 70% 55% at 88% 6%, rgba(60,90,130,0.30), transparent 52%),
+    linear-gradient(165deg,#17233a 0%,#111c31 50%,#0a1322 100%);
+  --portal-cool-accent:#8fb4de; --portal-warm-accent:#93a7bd; --portal-neutral-accent:#9fb0c2;
+  --portal-accent-soft:rgba(143,180,222,0.13); --portal-accent-soft-md:rgba(143,180,222,0.22);
+  --portal-accent-soft-lg:rgba(143,180,222,0.32); --portal-accent-border:rgba(143,180,222,0.30);
+  --status-go:#6fb893; --status-go-soft:rgba(111,184,147,0.18);
+  --status-gentle:#d9ab63; --status-gentle-soft:rgba(217,171,99,0.18);
+  --status-calm:#9fb0c2; --status-calm-soft:rgba(159,176,194,0.16);
+}
+
+/* ④ 灰绿·治愈 · 夜 */
+html[data-portal-theme="night"][data-palette="sage"],
+html[data-portal-theme="night"][data-palette="sage"] .portal-root {
+  --portal-blue-deep:#9cc0b0; --portal-blue-mid:#82a494; --portal-blue-light:#2f4038;
+  --portal-accent:#9cc0b0;
+  --portal-bg-gradient:
+    radial-gradient(ellipse 70% 55% at 88% 6%, rgba(70,110,90,0.28), transparent 52%),
+    linear-gradient(165deg,#18231d 0%,#121a16 50%,#0b110e 100%);
+  --portal-cool-accent:#9cc0b0; --portal-warm-accent:#9ec090; --portal-neutral-accent:#a6b0a6;
+  --portal-accent-soft:rgba(156,192,176,0.13); --portal-accent-soft-md:rgba(156,192,176,0.22);
+  --portal-accent-soft-lg:rgba(156,192,176,0.32); --portal-accent-border:rgba(156,192,176,0.30);
+  --status-go:#86b7a3; --status-go-soft:rgba(134,183,163,0.18);
+  --status-gentle:#cba985; --status-gentle-soft:rgba(203,169,133,0.18);
+  --status-calm:#9fb3a6; --status-calm-soft:rgba(159,179,166,0.16);
 }
 
 /* 4 色卡选择器(设置 › 实验功能) */
