@@ -60,9 +60,9 @@ function CollapsedTaskItem({
           aria-label={t(locale, 'todayDoneAria')}
         />
         <button type="button" className="nesio-collapsed-task-body" onClick={() => { setExpanded((v) => !v); touchNode(node.id); }}>
-          {/* 批次 13:类型小图标(旗子等)按用户要求移除,行内只留标题 */}
+          {/* 批次 107→108:时间线节点 —— 时标作 kicker 在标题上方(现在/今晚/稍后) */}
+          {hint && <span className="nesio-collapsed-kicker">{hint}</span>}
           <span className="nesio-collapsed-title">{node.name}</span>
-          {hint && <span className="nesio-collapsed-time">{hint}</span>}
         </button>
         {/* 批次 39:✕ 撤除(用户指令)—— 完成圈/左滑已够 */}
       </div>

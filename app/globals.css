@@ -8786,42 +8786,47 @@ html[data-portal-theme="night"] .nesio-brief-strip {
   font-size: 0.9em;
 }
 
-/* 批次 107 · 今天页时间线 —— 心情作「现在」第一拍 + 竖轨节点 */
+/* 批次 107→108 · 今天页时间线 —— 心情 + 所有要紧事串成一条连续竖线(设计师定稿:
+   一条线穿过每个节点,现在=实心点、之后=空心点)。竖轨在 left:10px,各节点圆点心对齐它。 */
 .nesio-focus-timeline { position: relative; }
+.nesio-focus-timeline::before {
+  content: '';
+  position: absolute;
+  left: 10px; top: 8px; bottom: 12px;
+  width: 1.5px;
+  background: var(--portal-line);
+  z-index: 0;
+}
+.nesio-focus-timeline > *,
+.nesio-focus-timeline .nesio-attention-layout > * { position: relative; z-index: 1; }
+
+/* 心情第一拍节点 */
 .nesio-tl-node {
   display: grid;
-  grid-template-columns: 20px 1fr;
-  column-gap: 11px;
+  grid-template-columns: 21px 1fr;
+  column-gap: 10px;
   width: 100%;
   text-align: left;
   background: transparent;
   border: 0;
-  padding: 2px 2px 12px;
+  padding: 2px 2px 14px;
   cursor: pointer;
   position: relative;
 }
-/* 心情圆点 + 向下连线(接到下面的要紧事,时间线首拍) */
 .nesio-tl-dot--mood {
   grid-row: 1 / span 3;
   grid-column: 1;
   width: 13px; height: 13px;
-  margin: 3px 0 0 1px;
+  margin: 3px 0 0 3.5px;   /* 圆心 ≈ x10,压在竖轨上 */
   border-radius: 50%;
   align-self: start;
   border: 2px solid var(--status-calm);
-  background: var(--status-calm-soft);
+  background: var(--portal-bg);
+  box-shadow: 0 0 0 3px var(--portal-bg);  /* 遮住轨线,点坐在线上 */
 }
-.nesio-tl-dot--mood[data-tone="go"]     { border-color: var(--status-go);     background: var(--status-go-soft); }
-.nesio-tl-dot--mood[data-tone="gentle"] { border-color: var(--status-gentle); background: var(--status-gentle-soft); }
-.nesio-tl-dot--mood[data-tone="calm"]   { border-color: var(--status-calm);   background: var(--status-calm-soft); }
-.nesio-tl-node--mood::before,
-.nesio-tl-node--invite::before {
-  content: '';
-  position: absolute;
-  left: 7px; top: 20px; bottom: 0;
-  width: 1.5px;
-  background: linear-gradient(var(--portal-line), transparent);
-}
+.nesio-tl-dot--mood[data-tone="go"]     { border-color: var(--status-go); }
+.nesio-tl-dot--mood[data-tone="gentle"] { border-color: var(--status-gentle); }
+.nesio-tl-dot--mood[data-tone="calm"]   { border-color: var(--status-calm); }
 .nesio-tl-time {
   grid-column: 2;
   font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em;
@@ -11372,12 +11377,15 @@ html[data-portal-theme="night"] .nesio-otd-card-name { color: #d0d8f0; }
 .nesio-pinned-action-btn--primary:hover { background: #2f5fd8; }
 
 /* ── Collapsed section ── */
+/* 批次 108:折叠区不再是浮卡,而是时间线节点(挂在同一根竖轨上) */
 .nesio-collapsed-section {
-  border: 1px solid var(--portal-line, rgba(0,0,0,.09));
-  border-radius: 10px;
-  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+  background: transparent;
 }
 
+/* 「还有 N 件小事」= 时间线「稍后」节点(空心点 + 说明) */
 .nesio-collapsed-toggle {
   width: 100%;
   display: flex;
@@ -11385,16 +11393,27 @@ html[data-portal-theme="night"] .nesio-otd-card-name { color: #d0d8f0; }
   justify-content: space-between;
   background: none;
   border: none;
-  padding: 0.6rem 0.85rem;
+  padding: 2px 2px 12px 31px;
   cursor: pointer;
   text-align: left;
-  transition: background 0.12s;
+  position: relative;
+  transition: opacity 0.12s;
 }
-.nesio-collapsed-toggle:hover { background: var(--portal-line, rgba(0,0,0,.04)); }
+.nesio-collapsed-toggle::before {
+  content: '';
+  position: absolute;
+  left: 4.5px; top: 4px;
+  width: 11px; height: 11px;
+  border-radius: 50%;
+  border: 2px solid var(--portal-muted);
+  background: var(--portal-bg);
+  box-shadow: 0 0 0 3px var(--portal-bg);
+}
+.nesio-collapsed-toggle:hover { opacity: 0.8; }
 .nesio-collapsed-toggle-label {
-  font-size: 0.82rem;
-  color: var(--portal-muted);
-  font-weight: 500;
+  font-size: 0.86rem;
+  color: var(--portal-ink);
+  font-weight: 600;
 }
 .nesio-collapsed-toggle-chevron {
   font-size: 0.72rem;
@@ -11405,38 +11424,39 @@ html[data-portal-theme="night"] .nesio-otd-card-name { color: #d0d8f0; }
   list-style: none;
   margin: 0;
   padding: 0;
-  border-top: 1px solid var(--portal-line, rgba(0,0,0,.07));
+  border-top: 0;
 }
 .nesio-collapsed-item {
-  border-bottom: 1px solid var(--portal-line, rgba(0,0,0,.05));
+  border-bottom: 0;
 }
 .nesio-collapsed-item:last-child { border-bottom: none; }
 .nesio-collapsed-item--done { opacity: 0.45; }
 
 .nesio-collapsed-row {
   display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.55rem 0.85rem;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 2px 2px 14px 0;
   width: 100%;
   background: none;
   border: none;
   text-align: left;
   cursor: pointer;
 }
-.nesio-collapsed-row:hover { background: var(--portal-line, rgba(0,0,0,.03)); }
 
 .nesio-collapsed-check,
 .nesio-today-root button.nesio-collapsed-check {
   flex-shrink: 0;
-  /* 批次 8:视觉 20px(全局 44px 按钮规则在此例外),触控区由 ::before 补足 */
-  width: 20px;
-  height: 20px;
-  min-width: 20px;
-  min-height: 20px;
+  /* 批次 108:时间线圆点(压在竖轨上),圆心 ≈ x10。触控区由 ::before 补足 */
+  width: 17px;
+  height: 17px;
+  min-width: 17px;
+  min-height: 17px;
+  margin: 2px 0 0 1.5px;
   border-radius: 50%;
   border: 2px solid var(--portal-muted, rgba(0,0,0,.4));
-  background: var(--glass-bg-solid);
+  background: var(--portal-bg);
+  box-shadow: 0 0 0 3px var(--portal-bg);
   cursor: pointer;
   position: relative;
   transition: background 0.12s, border-color 0.12s;
@@ -11463,26 +11483,32 @@ html[data-portal-theme="night"] .nesio-otd-card-name { color: #d0d8f0; }
 .nesio-collapsed-task-body {
   flex: 1;
   display: flex;
-  align-items: center;
-  gap: 0.4rem;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
   background: none;
   border: none;
   text-align: left;
   cursor: pointer;
   min-width: 0;
 }
+/* 时标作 kicker(现在/今晚 20:15/明早…),标题上方,accent 色 */
+.nesio-collapsed-kicker {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--portal-accent);
+}
 .nesio-collapsed-icon { font-size: 0.95rem; flex-shrink: 0; color: var(--portal-ink); display: inline-flex; }
 /* 批次 10:夜间深底上类型图标看不清,显式提亮(勾选圈同理加亮边) */
 html[data-portal-theme="night"] .nesio-collapsed-icon { color: #cfe0f7; }
 html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check { border-color: rgba(207, 224, 247, 0.55); }
 .nesio-collapsed-title {
-  flex: 1;
-  font-size: 0.85rem;
-  font-weight: 500;
+  font-size: 0.96rem;
+  font-weight: 600;
   color: var(--portal-ink);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.35;
+  white-space: normal;
 }
 .nesio-collapsed-meta {
   display: flex;
@@ -14858,14 +14884,15 @@ html[data-portal-theme="night"] .nesio-dormant-card {
 }
 
 /* ── 批次 49:焦点面板对齐引导卡的淡色框(用户点名同款设计)────────────── */
+/* 批次 108:折叠区不再是浮卡 —— 时间线节点直接挂竖轨,去掉卡底/边框/圆角 */
 .nesio-collapsed-section {
-  background: linear-gradient(180deg, rgba(232, 242, 252, 0.92), rgba(255, 255, 255, 0.85));
-  border: 1px solid rgba(88, 140, 227, 0.18);
-  border-radius: 0.9rem;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
 }
 html[data-portal-theme="night"] .nesio-collapsed-section {
-  background: linear-gradient(180deg, rgba(22, 36, 60, 0.9), rgba(17, 28, 49, 0.85));
-  border-color: rgba(127, 176, 238, 0.2);
+  background: transparent;
+  border: 0;
 }
 
 /* ── 批次 50:收藏夹容器卡 + 展开区 ─────────────────────────────────────── */
