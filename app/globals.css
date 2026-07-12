@@ -8926,7 +8926,7 @@ html[data-portal-theme="night"] .nesio-brief-strip {
   text-align: left;
   background: transparent;
   border: 0;
-  padding: 2px 2px 14px;
+  padding: 2px 2px 14px 0;   /* 批次 131:左 padding 0,心情圆与其它节点同左对齐 */
   cursor: pointer;
   position: relative;
 }
@@ -8980,9 +8980,12 @@ html[data-portal-theme="night"] .nesio-tl-dot--mood {
   position: relative;
   z-index: 1;
 }
+.nesio-today-root button.nesio-tl-capture-mic,
 .nesio-tl-capture-mic {
   flex-shrink: 0;
+  /* 批次 131:显式 min override 全局 44px 触控最小值(否则 button 被撑成 44px,比别的节点大且出轨) */
   width: 26px; height: 26px;
+  min-width: 26px; min-height: 26px;
   margin: 0;                   /* 左缘 0,圆心 ≈ x13,坐轨上 */
   border-radius: 50%;
   border: 1.5px dashed color-mix(in srgb, var(--portal-accent) 55%, transparent);

@@ -287,21 +287,21 @@ export function TodayFocusSection({
         </div>
         )}
 
-        {/* 批次 128·新时间线规格:记一笔·话筒常驻末节点(虚线草稿位)。
-            点话筒=说一句(语音),点文字=打字。无输入框。 */}
+        {/* 批次 128→131·记一笔·话筒常驻末节点(虚线草稿位)。点话筒=原地录音、点文字=聚焦打字,
+            都内联,不开 sheet 不跳页(用户「极简化」)。复用底部快捷输入栏的内联机制。 */}
         <div className="nesio-tl-capture">
           <button
             type="button"
             className="nesio-tl-capture-mic"
             aria-label={L(dict, '说一句', 'Say something')}
-            onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-voice'))}
+            onClick={() => window.dispatchEvent(new CustomEvent('nesio-capture-mic'))}
           >
             <IconMic size={13} />
           </button>
           <button
             type="button"
             className="nesio-tl-capture-text"
-            onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-tell'))}
+            onClick={() => window.dispatchEvent(new CustomEvent('nesio-capture-focus'))}
           >
             {L(dict, '点话筒说一句,或记一下…', 'Tap the mic to speak, or jot…')}
           </button>

@@ -74,6 +74,7 @@ export default function TodayFeed({
   // 批次 33:话筒 = 原地录音转文字直接入记忆(不跳说一句 sheet);无语音 API 才回落 sheet
   const [micState, setMicState] = useState<'idle' | 'recording'>('idle');
   const recogRef = useRef<{ stop: () => void } | null>(null);
+  const quickInputRef = useRef<HTMLInputElement | null>(null);
 
   function startQuickMic() {
     // 批次 37 重做:边说边把文字写进输入框(interim 实时可见),说完文字留在框里
@@ -119,10 +120,24 @@ export default function TodayFeed({
   useEffect(() => {
     const openTraining = () => { setInsightsTab('health'); setMirrorOpen(true); };
     const openMoodTrend = () => { setInsightsTab('reflection'); setMirrorOpen(true); }; // 批次 107:心情第一拍→洞察
+    // 批次 131:时间线「记一笔·话筒」节点内联接管 —— 点话筒直接原地录音,点文字直接聚焦输入,
+    // 都不开 sheet 不跳页(用户「极简化」)。复用底部快捷输入栏的内联机制。
+    const captureMic = () => { quickInputRef.current?.focus(); startQuickMic(); };
+    const captureFocus = () => {
+      const el = quickInputRef.current;
+      if (el) { el.focus(); el.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+    };
     window.addEventListener('nesio-open-training', openTraining);
     window.addEventListener('nesio-open-mood-trend', openMoodTrend);
-    return () => { window.removeEventListener('nesio-open-training', openTraining); window.removeEventListener('nesio-open-mood-trend', openMoodTrend); };
-  }, []);
+    window.addEventListener('nesio-capture-mic', captureMic);
+    window.addEventListener('nesio-capture-focus', captureFocus);
+    return () => {
+      window.removeEventListener('nesio-open-training', openTraining);
+      window.removeEventListener('nesio-open-mood-trend', openMoodTrend);
+      window.removeEventListener('nesio-capture-mic', captureMic);
+      window.removeEventListener('nesio-capture-focus', captureFocus);
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Proactive cards: up to 2, each independently dismissable
   const [meetingRecorderNode, setMeetingRecorderNode] = useState<FocusNode | null>(null);
@@ -289,6 +304,7 @@ export default function TodayFeed({
           }}
         >
           <input
+            ref={quickInputRef}
             className="nesio-focus-quick-input"
             type="text"
             placeholder={quickSaved ? L(uiLocale, '✓ 记下了', '✓ Noted') : L(uiLocale, '想到什么,记下来…', 'Anything on your mind…')}

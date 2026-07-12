@@ -137,6 +137,13 @@
   ④温柔引导语「别急,拆小一点。只做下一步就好。」+ 进度条(进度 N/M);⑤「太难」→「太难 ↓」递归再拆
   (逻辑本就有)、「AI 细化」→「换一种拆法」。预览实测(咨询任务):引导语 + 进度条 1/3 + 白卡圆
   checkbox 步骤 + 太难↓ + 换一种拆法,与 mockup 一致。
+- [x] **批次 131 · 话筒节点尺寸修 + 内联接管(用户真机反馈)**:①**根因**:话筒是 `<button>` 被全局
+  44px 触控最小值撑成 44px(比别的节点大且出轨 cx40),别的节点有显式 min override 话筒漏了 —— 加
+  `.nesio-today-root button.nesio-tl-capture-mic { min:26px }` override,回到 26px/cx31 齐轨;顺带
+  `.nesio-tl-node` padding-left 2→0 修心情 2px 偏移。②**行为极简内联**:点话筒→原地录音、点文字→聚焦
+  底部快捷输入栏,都不开 sheet 不跳页(dispatch nesio-capture-mic/-focus,TodayFeed 复用 startQuickMic +
+  quickInputRef 内联)。实测:全节点 w26/cx31 齐轨、点文字聚焦 input 且无 sheet。**仍可议**:话筒节点提示
+  与底部输入栏两处 prompt 略冗余(设计只画了话筒节点),要不要合成一处待用户定。
 
 ## 已解决(逐页登记)
 
