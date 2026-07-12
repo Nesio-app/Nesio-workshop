@@ -2787,12 +2787,12 @@ html[data-portal-theme="night"] .portal-root{
   --portal-neutral:#141d30;    --portal-neutral-accent:#8fb0d8;
 }
 
-/* ── 2. 主页背景渐变（深蓝夜空） ── */
+/* ── 2. 主页背景渐变(夜) ── 批次 106:改用 --portal-bg-gradient token(此前硬编码冷蓝
+   直接盖在 .portal-root 上,特异性高过 token 背景 → 夜间选皮肤时底色永远冷蓝,盖掉暖色卡)。
+   默认夜(无皮肤)的 token 就是这套冷蓝(夜间基座),四皮肤各自暖底由 token 驱动。 */
 html[data-portal-theme="night"] .portal-root--home,
 html[data-portal-theme="night"] .portal-root{
-  background:
-    radial-gradient(ellipse 70% 55% at 88% 6%, rgba(40,70,120,.28), transparent 52%),
-    linear-gradient(165deg,#17233a 0%,#111c31 50%,#0a1322 100%);
+  background: var(--portal-bg-gradient);
 }
 html[data-portal-theme="night"] .portal-root--home::before{display:none}
 html[data-portal-theme="night"] .portal-grain{opacity:.5}
@@ -14604,9 +14604,12 @@ html[data-portal-theme="night"][data-palette="bluegray-rose"],
 html[data-portal-theme="night"][data-palette="bluegray-rose"] .portal-root {
   --portal-blue-deep:#d49a94; --portal-blue-mid:#c08d87; --portal-blue-light:#4a3634;
   --portal-accent:#d49a94;
+  /* 批次 106:深底带灰粉色温(泛红暖炭)+ 暖白字,不吃夜间基座的冷蓝中性。 */
+  --portal-bg:#1c1517; --portal-ink:#efe8e7; --portal-muted:rgba(239,232,231,0.56); --portal-line:rgba(212,154,148,0.15);
+  --portal-cool:#241b1d; --portal-warm:#281d1e; --portal-neutral:#221a1c; --sheet-opaque:#241a1d;
   --portal-bg-gradient:
-    radial-gradient(ellipse 70% 55% at 88% 6%, rgba(120,70,66,0.30), transparent 52%),
-    linear-gradient(165deg,#241a1b 0%,#1a1416 50%,#120e10 100%);
+    radial-gradient(ellipse 92% 66% at 70% 2%, rgba(170,104,98,0.40), transparent 60%),
+    linear-gradient(165deg,#312228 0%,#291c20 55%,#20161a 100%);
   --portal-cool-accent:#9aa6b3; --portal-warm-accent:#d49a94; --portal-neutral-accent:#a9a5ad;
   --portal-accent-soft:rgba(212,154,148,0.13); --portal-accent-soft-md:rgba(212,154,148,0.22);
   --portal-accent-soft-lg:rgba(212,154,148,0.32); --portal-accent-border:rgba(212,154,148,0.30);
@@ -14620,9 +14623,12 @@ html[data-portal-theme="night"][data-palette="milktea"],
 html[data-portal-theme="night"][data-palette="milktea"] .portal-root {
   --portal-blue-deep:#d3ba8c; --portal-blue-mid:#bda574; --portal-blue-light:#443a26;
   --portal-accent:#d3ba8c;
+  /* 批次 106:深底带奶茶色温(泛褐暖炭)+ 暖奶白字。 */
+  --portal-bg:#1d1811; --portal-ink:#f0eadf; --portal-muted:rgba(240,234,223,0.56); --portal-line:rgba(211,186,140,0.15);
+  --portal-cool:#201f16; --portal-warm:#241f15; --portal-neutral:#201d15; --sheet-opaque:#221c14;
   --portal-bg-gradient:
-    radial-gradient(ellipse 70% 55% at 88% 6%, rgba(120,100,60,0.28), transparent 52%),
-    linear-gradient(165deg,#211d15 0%,#181510 50%,#100e0a 100%);
+    radial-gradient(ellipse 92% 66% at 70% 2%, rgba(160,132,80,0.36), transparent 60%),
+    linear-gradient(165deg,#2e2417 0%,#251d12 55%,#1c160d 100%);
   --portal-cool-accent:#9aa892; --portal-warm-accent:#d3ba8c; --portal-neutral-accent:#aca79a;
   --portal-accent-soft:rgba(211,186,140,0.13); --portal-accent-soft-md:rgba(211,186,140,0.22);
   --portal-accent-soft-lg:rgba(211,186,140,0.32); --portal-accent-border:rgba(211,186,140,0.30);
@@ -14652,9 +14658,12 @@ html[data-portal-theme="night"][data-palette="sage"],
 html[data-portal-theme="night"][data-palette="sage"] .portal-root {
   --portal-blue-deep:#9cc0b0; --portal-blue-mid:#82a494; --portal-blue-light:#2f4038;
   --portal-accent:#9cc0b0;
+  /* 批次 106:深底带灰绿色温(泛绿暖炭)+ 微绿暖白字。 */
+  --portal-bg:#161c17; --portal-ink:#eaf0ec; --portal-muted:rgba(234,240,236,0.56); --portal-line:rgba(156,192,176,0.15);
+  --portal-cool:#1a221b; --portal-warm:#1b211a; --portal-neutral:#191f1a; --sheet-opaque:#182016;
   --portal-bg-gradient:
-    radial-gradient(ellipse 70% 55% at 88% 6%, rgba(70,110,90,0.28), transparent 52%),
-    linear-gradient(165deg,#18231d 0%,#121a16 50%,#0b110e 100%);
+    radial-gradient(ellipse 92% 66% at 70% 2%, rgba(104,150,124,0.32), transparent 60%),
+    linear-gradient(165deg,#202d24 0%,#18211b 55%,#101711 100%);
   --portal-cool-accent:#9cc0b0; --portal-warm-accent:#9ec090; --portal-neutral-accent:#a6b0a6;
   --portal-accent-soft:rgba(156,192,176,0.13); --portal-accent-soft-md:rgba(156,192,176,0.22);
   --portal-accent-soft-lg:rgba(156,192,176,0.32); --portal-accent-border:rgba(156,192,176,0.30);
@@ -14662,6 +14671,12 @@ html[data-portal-theme="night"][data-palette="sage"] .portal-root {
   --status-gentle:#cba985; --status-gentle-soft:rgba(203,169,133,0.18);
   --status-calm:#9fb3a6; --status-calm-soft:rgba(159,179,166,0.16);
 }
+
+/* 批次 106:夜间 html 兜底底色随皮肤 —— overscroll/安全区/键盘缝隙露出的底色不跑冷蓝。
+   只在 html 上,**不带 .portal-root**(否则盖住 body::before 的渐变层)。haze-blue 留冷蓝基座。 */
+html[data-portal-theme="night"][data-palette="bluegray-rose"] { background-color:#180f12; }
+html[data-portal-theme="night"][data-palette="milktea"]       { background-color:#150f09; }
+html[data-portal-theme="night"][data-palette="sage"]          { background-color:#0e130f; }
 
 /* 4 色卡选择器(设置 › 实验功能) */
 .nesio-palette-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:10px}
@@ -14772,8 +14787,9 @@ html[data-portal-theme="night"][data-palette="sage"] .portal-root {
 }
 .nesio-dormant-question { color: #a8823f; }
 html[data-portal-theme="night"] .nesio-proactive-card {
-  background: linear-gradient(180deg, rgba(22, 36, 60, 0.9), rgba(17, 28, 49, 0.85));
-  border-color: rgba(127, 176, 238, 0.2);
+  /* 批次 106:随皮肤 —— 此前硬编码冷蓝,在暖玫瑰/灰绿夜底上是蓝离群。改中性玻璃 + 皮肤色边。 */
+  background: linear-gradient(180deg, var(--glass-bg-raised), var(--glass-bg-solid));
+  border-color: var(--portal-accent-border);
 }
 html[data-portal-theme="night"] .nesio-dormant-card {
   background: rgba(201, 169, 110, 0.1);

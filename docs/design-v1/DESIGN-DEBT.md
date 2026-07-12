@@ -36,3 +36,8 @@
 - [x] **批次 104**:夜间皮肤跟色卡 —— 日间块主题隔离 + 4 组夜间色卡 token(含 .portal-root)
   + 夜间硬编码蓝(#96c7f3/rgba88,140,227)全 token 化。夜间半亮崩坏根治。
 - [x] **批次 105**:今天页回顾卡(去年今日)—— retrospect.ts + RetrospectCard,周年/月纪念优先。
+- [x] **批次 106**:夜间深底带皮肤色温(用户提供灰粉·夜 mockup)—— 每套夜版给暖/冷深底 +
+  暖白字 + 皮肤色 line/sheet/zone;根因修:`html[data-portal-theme="night"] .portal-root`
+  此前**硬编码冷蓝直接背景**(特异性高过 token 背景),改用 `var(--portal-bg-gradient)`,
+  否则夜间选皮肤底色永远冷蓝。proactive 卡硬编码冷蓝 → 中性玻璃 + 皮肤边。实测灰粉/灰绿
+  夜各自暖玫瑰/灰绿深底,零蓝离群。
