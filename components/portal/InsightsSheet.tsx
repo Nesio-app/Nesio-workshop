@@ -624,7 +624,7 @@ export default function InsightsSheet({ onClose, initialTab }: { onClose: () => 
       {/* Header */}
       <div className="nesio-insights-header">
         <div className="nesio-insights-title-row">
-          <h2 className="nesio-insights-title">{L(dict, '洞察', 'Insight')}</h2>
+          <h2 className="nesio-insights-title">{L(dict, '洞察', 'Insights')}</h2>
         </div>
         <button type="button" className="nesio-insights-close" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}>✕</button>
       </div>
@@ -638,7 +638,7 @@ export default function InsightsSheet({ onClose, initialTab }: { onClose: () => 
             className={`nesio-insights-main-tab${mainTab === t ? ' nesio-insights-main-tab--active' : ''}`}
             onClick={() => setMainTab(t)}
           >
-            {t === 'reflection' ? L(dict, '洞察', 'Insights') : t === 'health' ? L(dict, '健康', 'Health') : t === 'timeline' ? L(dict, '足迹', 'Footprints') : t === 'finance' ? L(dict, '财务', 'Finance') : t === 'relationships' ? L(dict, '关系', 'People') : L(dict, '认知', 'Cognition')}
+            {t === 'reflection' ? L(dict, '洞察', 'Insights') : t === 'health' ? L(dict, '健康', 'Health') : t === 'timeline' ? L(dict, '足迹', 'Places') : t === 'finance' ? L(dict, '财务', 'Finance') : t === 'relationships' ? L(dict, '关系', 'People') : L(dict, '多面镜', 'Mirror')}
           </button>
         ))}
       </div>
