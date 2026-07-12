@@ -1,0 +1,155 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:gn="http://www.goodnotes.com/gn-svg" width="430" height="900" viewBox="0 0 430 900">
+  <!-- Phone body -->
+  <rect x="5" y="5" width="420" height="890" rx="50" fill="#1a1a2e"/>
+  <rect x="1" y="150" width="4" height="35" rx="2" fill="#252550"/>
+  <rect x="1" y="196" width="4" height="55" rx="2" fill="#252550"/>
+  <rect x="425" y="168" width="4" height="65" rx="2" fill="#252550"/>
+  <!-- Screen -->
+  <rect x="20" y="20" width="390" height="860" rx="38" fill="#eef1fb"/>
+  <!-- Dynamic island -->
+  <rect x="155" y="28" width="120" height="30" rx="15" fill="#0a0a18"/>
+  <!-- Status bar -->
+  <text x="42" y="52" font-family="PingFang SC, sans-serif" font-size="12" font-weight="600" fill="#0f1733">9:41</text>
+  <rect x="358" y="44" width="22" height="11" rx="2" fill="none" stroke="#0f1733" stroke-width="1.5"/>
+  <rect x="360" y="46" width="16" height="7" rx="1" fill="#0f1733"/>
+  <rect x="381" y="47" width="3" height="5" rx="1" fill="#0f1733"/>
+
+  <!-- Screen header -->
+  <rect x="20" y="20" width="390" height="100" rx="38" fill="#ffffff"/>
+  <rect x="20" y="58" width="390" height="55" fill="#ffffff"/>
+  <rect x="20" y="113" width="390" height="1" fill="#e3e7f6"/>
+  <text x="215" y="83" font-family="PingFang SC, sans-serif" font-size="16" font-weight="600" fill="#0f1733" text-anchor="middle">工具</text>
+  <rect x="358" y="67" width="34" height="24" rx="8" fill="#edf0fd"/>
+  <text x="375" y="83" font-family="PingFang SC, sans-serif" font-size="11" fill="#4a6cf7" text-anchor="middle">编辑</text>
+
+  <!-- TOOL GRID Row 1 -->
+  <rect x="32" y="122" width="174" height="70" rx="14" fill="#ffffff"/>
+  <polygon points="60,135 50,145 70,145" fill="#4a6cf7"/>
+  <rect x="53" y="145" width="14" height="10" rx="1" fill="#4a6cf7"/>
+  <text x="84" y="141" font-family="PingFang SC, sans-serif" font-size="12" font-weight="600" fill="#0f1733">家居物品</text>
+  <text x="84" y="157" font-family="PingFang SC, sans-serif" font-size="10" fill="#9ba5c0">32 件物品</text>
+  <rect x="44" y="178" width="146" height="3" rx="1" fill="#e3e7f6"/>
+  <rect x="44" y="178" width="117" height="3" rx="1" fill="#4a6cf7"/>
+
+  <rect x="214" y="122" width="184" height="70" rx="14" fill="#ffffff"/>
+  <circle cx="238" cy="139" r="7" fill="none" stroke="#7c5af0" stroke-width="2"/>
+  <rect x="227" y="149" width="22" height="8" rx="4" fill="none" stroke="#7c5af0" stroke-width="2"/>
+  <text x="265" y="141" font-family="PingFang SC, sans-serif" font-size="12" font-weight="600" fill="#0f1733">联系人</text>
+  <text x="265" y="157" font-family="PingFang SC, sans-serif" font-size="10" fill="#9ba5c0">8 人</text>
+  <rect x="226" y="178" width="154" height="3" rx="1" fill="#e3e7f6"/>
+  <rect x="226" y="178" width="31" height="3" rx="1" fill="#7c5af0"/>
+
+  <!-- TOOL GRID Row 2 -->
+  <rect x="32" y="200" width="174" height="70" rx="14" fill="#ffffff"/>
+  <rect x="44" y="216" width="14" height="3" rx="1" fill="#19c37d"/>
+  <rect x="44" y="222" width="14" height="3" rx="1" fill="#19c37d"/>
+  <rect x="44" y="228" width="10" height="3" rx="1" fill="#c0c8df"/>
+  <text x="68" y="222" font-family="PingFang SC, sans-serif" font-size="12" font-weight="600" fill="#0f1733">任务清单</text>
+  <text x="68" y="238" font-family="PingFang SC, sans-serif" font-size="10" fill="#9ba5c0">今日 3 件</text>
+  <rect x="44" y="256" width="146" height="3" rx="1" fill="#e3e7f6"/>
+  <rect x="44" y="256" width="100" height="3" rx="1" fill="#19c37d"/>
+
+  <rect x="214" y="200" width="184" height="70" rx="14" fill="#ffffff"/>
+  <rect x="228" y="215" width="20" height="14" rx="3" fill="none" stroke="#e8923a" stroke-width="2"/>
+  <rect x="232" y="219" width="8" height="6" rx="1" fill="#e8923a"/>
+  <text x="262" y="222" font-family="PingFang SC, sans-serif" font-size="12" font-weight="600" fill="#0f1733">消费记录</text>
+  <text x="262" y="238" font-family="PingFang SC, sans-serif" font-size="10" fill="#9ba5c0">本月 ¥2,340</text>
+  <rect x="226" y="256" width="154" height="3" rx="1" fill="#e3e7f6"/>
+  <rect x="226" y="256" width="92" height="3" rx="1" fill="#e8923a"/>
+
+  <!-- TOOL GRID Row 3 -->
+  <rect x="32" y="278" width="174" height="70" rx="14" fill="#ffffff"/>
+  <circle cx="55" cy="305" r="11" fill="none" stroke="#e3e7f6" stroke-width="3"/>
+  <circle cx="55" cy="305" r="11" fill="none" stroke="#4a6cf7" stroke-width="3" stroke-dasharray="42 27"/>
+  <text x="76" y="303" font-family="PingFang SC, sans-serif" font-size="12" font-weight="600" fill="#0f1733">习惯追踪</text>
+  <text x="76" y="319" font-family="PingFang SC, sans-serif" font-size="10" fill="#9ba5c0">5 个习惯</text>
+  <rect x="44" y="334" width="146" height="3" rx="1" fill="#e3e7f6"/>
+  <rect x="44" y="334" width="73" height="3" rx="1" fill="#4a6cf7"/>
+
+  <rect x="214" y="278" width="184" height="70" rx="14" fill="#ffffff"/>
+  <rect x="232" y="300" width="14" height="4" rx="1" fill="#e05252"/>
+  <rect x="237" y="295" width="4" height="14" rx="1" fill="#e05252"/>
+  <text x="262" y="303" font-family="PingFang SC, sans-serif" font-size="12" font-weight="600" fill="#9ba5c0">健康数据</text>
+  <text x="262" y="319" font-family="PingFang SC, sans-serif" font-size="10" fill="#c0c8df">未接入</text>
+  <rect x="226" y="334" width="154" height="3" rx="1" fill="#e3e7f6"/>
+
+  <!-- DATA DEPTH SECTION -->
+  <rect x="20" y="360" width="390" height="1" fill="#e3e7f6"/>
+  <text x="32" y="382" font-family="PingFang SC, sans-serif" font-size="13" font-weight="700" fill="#0f1733">数据深度</text>
+  <text x="190" y="382" font-family="PingFang SC, sans-serif" font-size="11" fill="#9ba5c0">越丰富，宝盒越懂你</text>
+
+  <!-- Data health: 家居物品 80% -->
+  <rect x="32" y="394" width="366" height="36" rx="9" fill="#ffffff"/>
+  <text x="44" y="416" font-family="PingFang SC, sans-serif" font-size="11" fill="#5a6690">家居物品</text>
+  <rect x="108" y="409" width="190" height="6" rx="3" fill="#e3e7f6"/>
+  <rect x="108" y="409" width="152" height="6" rx="3" fill="#4a6cf7"/>
+  <text x="306" y="416" font-family="PingFang SC, sans-serif" font-size="10" font-weight="700" fill="#5a6690">80%</text>
+
+  <!-- Data health: 消费习惯 60% -->
+  <rect x="32" y="438" width="366" height="36" rx="9" fill="#ffffff"/>
+  <text x="44" y="460" font-family="PingFang SC, sans-serif" font-size="11" fill="#5a6690">消费习惯</text>
+  <rect x="108" y="453" width="190" height="6" rx="3" fill="#e3e7f6"/>
+  <rect x="108" y="453" width="114" height="6" rx="3" fill="#4a6cf7"/>
+  <text x="306" y="460" font-family="PingFang SC, sans-serif" font-size="10" font-weight="700" fill="#5a6690">60%</text>
+
+  <!-- Data health: 情绪节律 40% + unlock hint -->
+  <rect x="32" y="482" width="366" height="46" rx="9" fill="#ffffff"/>
+  <text x="44" y="502" font-family="PingFang SC, sans-serif" font-size="11" fill="#5a6690">情绪节律</text>
+  <rect x="108" y="497" width="190" height="6" rx="3" fill="#e3e7f6"/>
+  <rect x="108" y="497" width="76" height="6" rx="3" fill="#e8923a"/>
+  <text x="306" y="502" font-family="PingFang SC, sans-serif" font-size="10" font-weight="700" fill="#5a6690">40%</text>
+  <text x="44" y="520" font-family="PingFang SC, sans-serif" font-size="9" fill="#4a6cf7">→ 再记 5 次心情可解锁洞察</text>
+
+  <!-- Data health: 人际关系 20% + unlock hint -->
+  <rect x="32" y="536" width="366" height="46" rx="9" fill="#ffffff"/>
+  <text x="44" y="556" font-family="PingFang SC, sans-serif" font-size="11" fill="#5a6690">人际关系</text>
+  <rect x="108" y="551" width="190" height="6" rx="3" fill="#e3e7f6"/>
+  <rect x="108" y="551" width="38" height="6" rx="3" fill="#e8923a"/>
+  <text x="306" y="556" font-family="PingFang SC, sans-serif" font-size="10" font-weight="700" fill="#5a6690">20%</text>
+  <text x="44" y="574" font-family="PingFang SC, sans-serif" font-size="9" fill="#4a6cf7">→ 添加重要联系人后解锁</text>
+
+  <!-- Data health: 健康数据 0% + unlock hint -->
+  <rect x="32" y="590" width="366" height="46" rx="9" fill="#ffffff"/>
+  <text x="44" y="610" font-family="PingFang SC, sans-serif" font-size="11" fill="#c0c8df">健康数据</text>
+  <rect x="108" y="605" width="190" height="6" rx="3" fill="#e3e7f6"/>
+  <text x="306" y="610" font-family="PingFang SC, sans-serif" font-size="10" font-weight="700" fill="#c0c8df">0%</text>
+  <text x="44" y="628" font-family="PingFang SC, sans-serif" font-size="9" fill="#9ba5c0">→ 接入后可推算最佳状态时段</text>
+
+  <!-- Insight teaser card -->
+  <rect x="32" y="648" width="366" height="52" rx="13" fill="#eeeaff"/>
+  <rect x="32" y="648" width="366" height="52" rx="13" fill="none" stroke="#c0acf0" stroke-width="1"/>
+  <circle cx="54" cy="674" r="7" fill="none" stroke="#7c5af0" stroke-width="2"/>
+  <line x1="59" y1="679" x2="66" y2="686" stroke="#7c5af0" stroke-width="2"/>
+  <text x="76" y="670" font-family="PingFang SC, sans-serif" font-size="11" font-weight="600" fill="#7c5af0">数据越多，宝盒洞察越精准</text>
+  <text x="76" y="686" font-family="PingFang SC, sans-serif" font-size="10" fill="#9ba5c0">情绪 + 消费双域达标后解锁关联洞察</text>
+
+  <!-- Bottom nav -->
+  <rect x="20" y="826" width="390" height="54" fill="#ffffff"/>
+  <rect x="20" y="826" width="390" height="1" fill="#e3e7f6"/>
+  <!-- 宝盒 -->
+  <polygon points="64,836 56,844 72,844" fill="#c0c8df"/>
+  <rect x="59" y="844" width="10" height="9" rx="1" fill="#c0c8df"/>
+  <text x="64" y="865" font-family="PingFang SC, sans-serif" font-size="9" fill="#9ba5c0" text-anchor="middle">宝盒</text>
+  <!-- 工具 (active) -->
+  <rect x="114" y="832" width="60" height="30" rx="7" fill="#edf0fd"/>
+  <rect x="126" y="838" width="5" height="5" rx="1" fill="#4a6cf7"/>
+  <rect x="133" y="838" width="5" height="5" rx="1" fill="#4a6cf7"/>
+  <rect x="126" y="845" width="5" height="5" rx="1" fill="#4a6cf7"/>
+  <rect x="133" y="845" width="5" height="5" rx="1" fill="#4a6cf7"/>
+  <text x="144" y="865" font-family="PingFang SC, sans-serif" font-size="9" font-weight="600" fill="#4a6cf7" text-anchor="middle">工具</text>
+  <!-- 记录 -->
+  <rect x="200" y="837" width="14" height="3" rx="1" fill="#c0c8df"/>
+  <rect x="200" y="843" width="11" height="3" rx="1" fill="#c0c8df"/>
+  <rect x="200" y="849" width="14" height="3" rx="1" fill="#c0c8df"/>
+  <text x="207" y="865" font-family="PingFang SC, sans-serif" font-size="9" fill="#9ba5c0" text-anchor="middle">记录</text>
+  <!-- 记账 -->
+  <rect x="272" y="837" width="18" height="13" rx="2" fill="none" stroke="#c0c8df" stroke-width="1.5"/>
+  <rect x="276" y="841" width="7" height="5" rx="1" fill="#c0c8df"/>
+  <text x="281" y="865" font-family="PingFang SC, sans-serif" font-size="9" fill="#9ba5c0" text-anchor="middle">记账</text>
+  <!-- 我 -->
+  <circle cx="356" cy="841" r="5" fill="none" stroke="#c0c8df" stroke-width="1.5"/>
+  <rect x="344" y="849" width="24" height="8" rx="4" fill="none" stroke="#c0c8df" stroke-width="1.5"/>
+  <text x="356" y="865" font-family="PingFang SC, sans-serif" font-size="9" fill="#9ba5c0" text-anchor="middle">我</text>
+  <!-- Home indicator -->
+  <rect x="165" y="866" width="100" height="4" rx="2" fill="#c8cce0"/>
+</svg>

@@ -1,0 +1,118 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600;700&display=swap');
+:root{--bg1:#f9faf5;--bg2:#e4e7ea;--brand:#c07f79;--deep:#b06f68;--ink:#3a3c43;--body:#6f727a;--muted:#a2a3ab;--line:rgba(120,125,135,.22);
+ --amber:#c0906f;--sage:#8ba58f;--blue:#7d8a9c;--mauve:#a08b9c;--gray:#b9bcc2}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
+body{font-family:"PingFang SC","Hiragino Sans GB",system-ui,sans-serif;background:#e9e9e8;padding:36px;display:flex;gap:34px;justify-content:center;align-items:flex-start}
+.cell .cap{font-size:15px;font-weight:800;color:#2c2f36;margin:0 0 3px 3px}
+.cell .sub{font-size:12px;font-weight:600;color:#9a9ca3;margin:0 0 10px 3px}
+.phone{width:388px;height:824px;border-radius:32px;position:relative;padding:0 18px;overflow:hidden;
+ background:linear-gradient(180deg,var(--bg1) 0%,#e3e6e9 100%);box-shadow:0 14px 34px rgba(0,0,0,.13);color:var(--ink)}
+.sb{display:flex;justify-content:space-between;align-items:center;padding:14px 3px 2px;font-size:11px;font-weight:700}
+.serif{font-family:"Noto Serif SC",serif}
+.title{font-size:23px;font-weight:800;margin-top:9px}
+.tabs{display:flex;gap:16px;margin-top:9px;border-bottom:1px solid var(--line);font-size:13px}
+.tab{font-weight:700;color:var(--muted);padding-bottom:8px;position:relative}
+.tab.on{color:var(--ink)}.tab.on:after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--brand);border-radius:2px}
+.subs{display:flex;gap:7px;margin-top:12px}
+.subt{font-size:11.5px;font-weight:700;color:var(--body);background:rgba(255,255,255,.5);border:1px solid var(--line);border-radius:9px;padding:5px 10px}
+.subt.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.foot{position:absolute;left:18px;right:18px;bottom:14px;font-size:10.5px;color:var(--muted);font-weight:600;text-align:center}
+/* segmented 周月年 */
+.seg{display:flex;background:rgba(255,255,255,.5);border:1px solid var(--line);border-radius:11px;padding:3px;margin-top:14px;width:190px}
+.seg span{flex:1;text-align:center;font-size:12.5px;font-weight:800;color:var(--body);padding:6px 0;border-radius:8px}
+.seg span.on{background:#fff;color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.08)}
+/* donut */
+.donutwrap{display:flex;align-items:center;gap:20px;margin-top:22px}
+.donut{width:150px;height:150px;border-radius:50%;flex-shrink:0;position:relative;
+ background:conic-gradient(var(--amber) 0 34%,var(--sage) 34% 56%,var(--blue) 56% 74%,var(--mauve) 74% 88%,var(--gray) 88% 100%)}
+.donut:after{content:"";position:absolute;inset:34px;border-radius:50%;background:#f4f5f4}
+.donut .ctr{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:2}
+.donut .ctr b{font-size:26px;font-weight:800}.donut .ctr small{font-size:10.5px;color:var(--muted);font-weight:700}
+.legend{flex:1}
+.lg{display:flex;align-items:center;gap:8px;margin-bottom:9px;font-size:12.5px;font-weight:700}
+.lg .d{width:10px;height:10px;border-radius:3px}
+.lg .p{margin-left:auto;color:var(--muted);font-weight:800}
+.rank-h{font-size:12.5px;font-weight:800;color:var(--body);margin:20px 2px 10px}
+.rk{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.5);border:1px solid var(--line);border-radius:11px;padding:9px 12px;margin-bottom:7px}
+.rk .d{width:9px;height:9px;border-radius:50%}
+.rk .n{flex:1;font-size:13px;font-weight:700}.rk .v{font-size:11px;color:var(--muted);font-weight:700}
+/* world country/city cards */
+.whead{font-size:17px;font-weight:800;margin:14px 2px 3px}
+.wsub{font-size:11.5px;color:var(--muted);font-weight:600;margin:0 2px 12px}
+.ccard{display:flex;align-items:center;gap:0;border-radius:15px;overflow:hidden;background:#fff;border:1px solid var(--line);margin-bottom:11px;box-shadow:0 5px 15px rgba(0,0,0,.06)}
+.ccimg{width:104px;height:84px;flex-shrink:0;position:relative}
+.ccb{flex:1;padding:0 14px}
+.ccflag{position:absolute;left:8px;top:8px;font-size:11px}
+.ccn{font-size:16px;font-weight:800;display:flex;align-items:baseline;gap:6px}
+.ccn small{font-size:11px;color:var(--muted);font-weight:700}
+.ccs{font-size:11.5px;color:var(--body);margin-top:3px;font-family:"Noto Serif SC",serif}
+.cchev{padding-right:14px;color:var(--muted);font-size:18px;font-weight:700}
+.cctag{display:inline-block;font-size:9.5px;font-weight:800;color:var(--deep);background:rgba(192,127,121,.12);border-radius:6px;padding:1px 7px;margin-top:5px}
+/* city header (点开) */
+.chd{display:flex;align-items:center;gap:9px;margin-top:14px}
+.chd .bk{font-size:18px;color:var(--muted);font-weight:800}
+.chd .t{font-size:19px;font-weight:800}.chd .c{font-size:12px;color:var(--muted);font-weight:700}
+.citycard{border-radius:14px;overflow:hidden;background:#fff;border:1px solid var(--line);margin-bottom:10px;box-shadow:0 5px 14px rgba(0,0,0,.05)}
+.ciimg{height:96px;position:relative}
+.citag{position:absolute;left:10px;top:10px;font-size:9.5px;font-weight:800;color:var(--ink);background:rgba(255,255,255,.85);border-radius:7px;padding:2px 8px}
+.cib{padding:10px 13px 12px}
+.cin{font-size:14.5px;font-weight:800}
+.cis{font-size:11px;color:var(--body);margin-top:2px;font-family:"Noto Serif SC",serif}
+</style></head><body>
+
+<!-- ③ 地点:饼图 + 周月年 -->
+<div class="cell"><div class="cap">③ 地点 · 饼图 + 周/月/年</div><div class="sub">这段时间去的地方按类占比</div>
+ <div class="phone">
+  <div class="sb"><span>4:01</span><span>5G+ ▪</span></div>
+  <div class="title">足迹</div>
+  <div class="tabs"><span class="tab">洞察</span><span class="tab">多面镜</span><span class="tab on">足迹</span><span class="tab" style="opacity:.5">关系</span></div>
+  <div class="subs"><span class="subt">时间线</span><span class="subt">分析</span><span class="subt on">地点</span><span class="subt">世界</span></div>
+  <div class="seg"><span>周</span><span class="on">月</span><span>年</span></div>
+  <div class="donutwrap">
+    <div class="donut"><div class="ctr"><b>14</b><small>本月地点</small></div></div>
+    <div class="legend">
+      <div class="lg"><span class="d" style="background:var(--amber)"></span>餐饮<span class="p">34%</span></div>
+      <div class="lg"><span class="d" style="background:var(--sage)"></span>运动·自然<span class="p">22%</span></div>
+      <div class="lg"><span class="d" style="background:var(--blue)"></span>交通<span class="p">18%</span></div>
+      <div class="lg"><span class="d" style="background:var(--mauve)"></span>购物<span class="p">14%</span></div>
+      <div class="lg"><span class="d" style="background:var(--gray)"></span>其他<span class="p">12%</span></div>
+    </div>
+  </div>
+  <div class="rank-h">这个月最常去</div>
+  <div class="rk"><span class="d" style="background:var(--blue)"></span><span class="n">公司</span><span class="v">21 次 · 132h</span></div>
+  <div class="rk"><span class="d" style="background:var(--amber)"></span><span class="n">楼下面馆</span><span class="v">12 次</span></div>
+  <div class="rk"><span class="d" style="background:var(--sage)"></span><span class="n">城西健身房</span><span class="v">9 次</span></div>
+  <div class="foot">切周/月/年 · 饼图与排行随时段变</div>
+ </div></div>
+
+<!-- ④ 世界 · 国家 -->
+<div class="cell"><div class="cap">④ 世界 · 先国家</div><div class="sub">国家卡,点 › 进城市</div>
+ <div class="phone">
+  <div class="sb"><span>4:01</span><span>5G+ ▪</span></div>
+  <div class="title">足迹</div>
+  <div class="tabs"><span class="tab">洞察</span><span class="tab">多面镜</span><span class="tab on">足迹</span><span class="tab" style="opacity:.5">关系</span></div>
+  <div class="subs"><span class="subt">时间线</span><span class="subt">分析</span><span class="subt">地点</span><span class="subt on">世界</span></div>
+  <div class="whead">去过 8 国 · 32 城</div>
+  <div class="wsub serif">从 2016 到现在</div>
+  <div class="ccard"><div class="ccimg" style="background:linear-gradient(150deg,#d9b89a,#b8895f)"><span class="ccflag">🇨🇳</span></div><div class="ccb"><div class="ccn">中国 <small>12 城</small></div><div class="ccs">一半的记忆都在这。</div><span class="cctag">最常去</span></div><span class="cchev">›</span></div>
+  <div class="ccard"><div class="ccimg" style="background:linear-gradient(150deg,#d8c2c6,#b0868f)"><span class="ccflag">🇯🇵</span></div><div class="ccb"><div class="ccn">日本 <small>6 城</small></div><div class="ccs">最早出国的地方。</div><span class="cctag">最早 · 2016</span></div><span class="cchev">›</span></div>
+  <div class="ccard"><div class="ccimg" style="background:linear-gradient(150deg,#aebbd0,#5f6f8e)"><span class="ccflag">🇮🇸</span></div><div class="ccb"><div class="ccn">冰岛 <small>1 城</small></div><div class="ccs">看过极光。</div><span class="cctag">最北 · 64°N</span></div><span class="cchev">›</span></div>
+  <div class="ccard"><div class="ccimg" style="background:linear-gradient(150deg,#c7d4c9,#8aa593)"><span class="ccflag">🇸🇬</span></div><div class="ccb"><div class="ccn">新加坡 <small>1 城</small></div><div class="ccs">最南的一站。</div><span class="cctag">最南 · 1°N</span></div><span class="cchev">›</span></div>
+  <div class="foot">点国家 › 展开城市</div>
+ </div></div>
+
+<!-- ④ 世界 · 点开城市 -->
+<div class="cell"><div class="cap">④ 世界 · 点开城市</div><div class="sub">进某国 → 城市明信片</div>
+ <div class="phone">
+  <div class="sb"><span>4:01</span><span>5G+ ▪</span></div>
+  <div class="chd"><span class="bk">‹</span><div><div class="t">日本 🇯🇵</div><div class="c">6 城 · 最早 2016·4</div></div></div>
+  <div style="margin-top:14px"></div>
+  <div class="citycard"><div class="ciimg" style="background:linear-gradient(160deg,#d8c2c6,#a8808a)"><svg width="100%" height="96" viewBox="0 0 340 96" preserveAspectRatio="none"><path d="M30 80V44h30v36M90 80V30h40v50M160 80V52h26v28M220 80V36h34v44M290 80V56h30v24" stroke="#fff" stroke-width="2" fill="none" opacity=".38"/></svg><span class="citag">最早到访</span></div><div class="cib"><div class="cin">东京</div><div class="cis">2016·4 · 第一次出国,一切都很新。</div></div></div>
+  <div class="citycard"><div class="ciimg" style="background:linear-gradient(160deg,#d3c7bb,#a89075)"><svg width="100%" height="96" viewBox="0 0 340 96" preserveAspectRatio="none"><path d="M40 82 L110 40 L180 60 L250 34 L310 52" stroke="#fff" stroke-width="2.5" fill="none" opacity=".4"/></svg><span class="citag">3 次</span></div><div class="cib"><div class="cin">京都</div><div class="cis">秋天的寺庙,记了 6 条。</div></div></div>
+  <div class="citycard"><div class="ciimg" style="background:linear-gradient(160deg,#c9cdd6,#8b93a4)"><svg width="100%" height="96" viewBox="0 0 340 96" preserveAspectRatio="none"><path d="M50 82V50h26v32M110 82V38h30v44M180 82V56h24v26M240 82V44h30v38" stroke="#fff" stroke-width="2" fill="none" opacity=".35"/></svg><span class="citag">2 次</span></div><div class="cib"><div class="cin">大阪</div><div class="cis">吃了很多。</div></div></div>
+  <div class="foot">城市卡按到访/记忆数排序 · 有照片用照片</div>
+ </div></div>
+
+</body></html>

@@ -1,0 +1,79 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600;700&display=swap');
+:root{--bg1:#f4f5f2;--bg2:#e6e9ea;--ink:#3a3c43;--body:#6f727a;--muted:#a2a3ab;--line:rgba(120,125,135,.18);--deep:#b06f68;--brand:#c07f79;--sage:#8ba58f}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
+body{font-family:"PingFang SC","Hiragino Sans GB",system-ui,sans-serif;background:#e9e9e8;padding:36px;display:flex;gap:34px;justify-content:center;align-items:flex-start}
+.side{width:280px;font-size:13px;line-height:1.85;color:#54575e}
+.side h3{font-size:15.5px;color:#2c2f36;margin:0 0 12px}
+.side b{color:var(--deep)}
+.side .m{margin-bottom:13px;padding-left:11px;border-left:2px solid var(--line)}
+.cell .cap{font-size:14.5px;font-weight:800;color:#2c2f36;margin:0 0 3px 3px}
+.cell .sub{font-size:11.5px;font-weight:600;color:#9a9ca3;margin:0 0 10px 3px}
+.phone{width:392px;height:830px;border-radius:32px;position:relative;overflow:hidden;color:var(--ink);
+ background:linear-gradient(180deg,var(--bg1),#e4e7ea);box-shadow:0 14px 34px rgba(0,0,0,.13);padding:0 20px}
+.sb{display:flex;justify-content:space-between;align-items:center;padding:14px 3px 2px;font-size:11px;font-weight:700}
+.serif{font-family:"Noto Serif SC",serif}
+.top{display:flex;align-items:center;gap:9px;margin-top:8px}
+.top .bk{font-size:19px;color:var(--muted);font-weight:800}
+.tt{font-size:22px;font-weight:800}
+.due{font-size:11px;font-weight:800;color:var(--body);background:rgba(255,255,255,.6);border:1px solid var(--line);border-radius:8px;padding:3px 9px;margin-left:auto}
+.intro{font-size:14.5px;line-height:1.7;color:var(--body);font-family:"Noto Serif SC",serif;margin-top:14px}
+.intro b{color:var(--deep)}
+.prog{display:flex;align-items:center;gap:9px;margin:18px 2px 12px;font-size:12px;font-weight:800;color:var(--muted)}
+.prog .bar{flex:1;height:5px;border-radius:3px;background:rgba(0,0,0,.06)}
+.prog .fill{height:5px;border-radius:3px;background:var(--brand);width:20%}
+/* step */
+.step{background:#fff;border:1px solid var(--line);border-radius:14px;padding:13px 14px;margin-bottom:10px}
+.st-h{display:flex;align-items:flex-start;gap:11px}
+.cb{width:22px;height:22px;border-radius:50%;border:2px solid #cfd2d6;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center}
+.cb.done{background:var(--sage);border-color:var(--sage)}
+.st-t{flex:1;font-size:14.5px;font-weight:700;line-height:1.45}
+.st-t.done{color:var(--muted);text-decoration:line-through}
+.hard{font-size:11px;font-weight:800;color:var(--body);border:1px solid var(--line);border-radius:8px;padding:4px 9px;white-space:nowrap;flex-shrink:0}
+.subcount{font-size:10.5px;font-weight:800;color:var(--deep);background:rgba(192,127,121,.1);border-radius:6px;padding:2px 7px;flex-shrink:0}
+/* sub steps */
+.subs{margin:11px 0 2px 12px;padding-left:14px;border-left:2px solid var(--line)}
+.sub{display:flex;align-items:center;gap:10px;padding:7px 0}
+.cb-s{width:18px;height:18px;border-radius:50%;border:2px solid #cfd2d6;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.cb-s.done{background:var(--sage);border-color:var(--sage)}
+.sub-t{font-size:13px;font-weight:600}
+.sub-t.done{color:var(--muted);text-decoration:line-through}
+.foot-btn{margin-top:8px;width:100%;text-align:center;background:rgba(255,255,255,.6);border:1px solid var(--line);color:var(--body);font-size:13px;font-weight:800;padding:12px;border-radius:13px}
+</style></head><body>
+
+<div class="side">
+  <h3>点开任务 → AI 细化</h3>
+  <div class="m"><b>治的是</b>:大任务让人卡住不敢动。AI 把它<b>拆成能立刻做的微步骤</b>,只盯下一步。</div>
+  <div class="m"><b>重画</b>:去掉亮蓝大按钮和层层套框,换成<b>克制清单</b>——圆checkbox、子步骤缩进用细线、完成划掉。</div>
+  <div class="m"><b>「太难」还能再拆</b>:任一步觉得难,点「太难」它就地再碎成更小的(递归)。</div>
+  <div class="m"><b>语气温柔</b>:"只做下一步就好""做完最小一步就算赢",给 ADHD 减压不加压。</div>
+</div>
+
+<div class="cell"><div class="cap">任务点开 · AI 细化(重画)</div><div class="sub">微步骤 + 太难再拆</div>
+ <div class="phone">
+  <div class="sb"><span>4:01</span><span>5G+ ▪</span></div>
+  <div class="top"><span class="bk">‹</span><span class="tt">吃饭</span><span class="due">后天</span></div>
+  <div class="intro">别急,拆小一点。<b>只做下一步就好。</b></div>
+  <div class="prog"><span>进度</span><span class="bar"><span class="fill"></span></span><span>1 / 5</span></div>
+
+  <!-- step 1 with subs -->
+  <div class="step">
+    <div class="st-h"><span class="cb"></span><span class="st-t">先花 2 分钟,把「吃饭」需要的东西摊在面前</span><span class="subcount">0/3</span></div>
+    <div class="subs">
+      <div class="sub"><span class="cb-s done"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-11"/></svg></span><span class="sub-t done">定一个 2 分钟的计时器</span></div>
+      <div class="sub"><span class="cb-s"></span><span class="sub-t">把要用的东西放到手边</span></div>
+      <div class="sub"><span class="cb-s"></span><span class="sub-t">关掉无关的窗口和通知</span></div>
+    </div>
+  </div>
+
+  <!-- step 2 -->
+  <div class="step"><div class="st-h"><span class="cb"></span><span class="st-t">只做最小的一步,做完就算赢</span><span class="hard">太难 ↓</span></div></div>
+
+  <!-- step 3 -->
+  <div class="step"><div class="st-h"><span class="cb"></span><span class="st-t">停下来看看进度,决定要不要再来一轮</span><span class="hard">太难 ↓</span></div></div>
+
+  <div class="foot-btn">↻ 换一种拆法</div>
+ </div></div>
+
+</body></html>

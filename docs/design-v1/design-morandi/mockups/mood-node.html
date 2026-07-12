@@ -1,0 +1,96 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600;700&display=swap');
+:root{--bg1:#f6f7f5;--bg2:#dfe3e6;--ink:#3a3c43;--body:#6f727a;--muted:#a2a3ab;--line:rgba(120,125,135,.2);--deep:#b06f68;--brand:#c07f79;--mauve:#a08b9c;--blue:#7d8a9c;--sage:#8ba58f}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
+body{font-family:"PingFang SC","Hiragino Sans GB",system-ui,sans-serif;background:#e9e9e8;padding:36px;display:flex;gap:28px;justify-content:center;align-items:flex-start}
+.side{width:250px;font-size:13px;line-height:1.85;color:#54575e}
+.side h3{font-size:15px;color:#2c2f36;margin:0 0 12px}
+.side b{color:var(--deep)}
+.side .m{margin-bottom:13px;padding-left:11px;border-left:2px solid var(--line)}
+.side .m .t{font-weight:800;color:#2c2f36}
+.cell .cap{font-size:14px;font-weight:800;color:#2c2f36;margin:0 0 3px 3px}
+.cell .sub{font-size:11px;font-weight:600;color:#9a9ca3;margin:0 0 10px 3px}
+.phone{width:344px;height:712px;border-radius:30px;position:relative;overflow:hidden;color:var(--ink);
+ background:linear-gradient(178deg,var(--bg1),#dfe4e7);box-shadow:0 14px 34px rgba(0,0,0,.13);padding:0 20px}
+.sb{display:flex;justify-content:space-between;align-items:center;padding:14px 3px 2px;font-size:11px;font-weight:700}
+.head{display:flex;justify-content:space-between;align-items:center;margin-top:14px}
+.cube{width:34px;height:34px}
+.avatar{width:36px;height:36px;border-radius:50%;background:radial-gradient(circle at 60% 35%,#f2efe9,#dcd6cd)}
+.greet{margin-top:22px;font-size:22px;font-weight:800;font-family:"Noto Serif SC",serif}
+.rv{display:flex;gap:12px;align-items:center;background:rgba(255,255,255,.5);border:1px solid var(--line);border-radius:15px;padding:12px 14px;margin-top:20px}
+.rv-orb{width:24px;height:24px;border-radius:50%;flex-shrink:0;background:radial-gradient(circle at 42% 38%,#fdfdfb,#f4f3ef 60%,#e4ede8 100%);border:1px solid rgba(255,255,255,.6);box-shadow:0 0 8px rgba(139,165,143,.4)}
+.rv-k{font-size:10px;font-weight:800;color:var(--muted)}.rv-t{font-size:13.5px;font-weight:700;margin-top:2px;font-family:"Noto Serif SC",serif}
+.rv-x{margin-left:auto;color:var(--muted);font-size:14px}
+.sec{font-size:11px;font-weight:800;color:var(--muted);margin:20px 2px 13px}
+.tl{position:relative;padding-left:26px}
+.tl:before{content:"";position:absolute;left:6px;top:8px;bottom:6px;width:2px;background:var(--line)}
+.tln{position:relative;margin-bottom:16px}
+.tld{position:absolute;left:-24px;top:2px;width:10px;height:10px;border-radius:50%;background:var(--bg1);border:2.5px solid var(--muted);left:-23px}
+.tld.now{background:var(--brand);border-color:var(--brand)}
+/* 心情节点：专属符号(情绪波纹) —— 方形软图标而非圆点 */
+.mnode{position:absolute;left:-31px;top:-3px;width:26px;height:26px;border-radius:9px;
+ background:radial-gradient(circle at 40% 34%,#fff,#f4eef3 70%,#ede2ec);border:1px solid #d9c9d6;
+ box-shadow:0 0 8px rgba(160,139,156,.45);display:flex;align-items:center;justify-content:center;color:#a08b9c}
+.tl-tm{font-size:11px;font-weight:800;color:var(--muted)}
+.tl-t{font-size:15px;font-weight:800;margin-top:2px}
+.tl-t.ask{color:var(--deep)}
+.tl-s{font-size:11px;color:var(--body);margin-top:1px}
+.mrow{padding-left:4px}
+</style></head><body>
+
+<div class="side">
+  <h3>B · 现在第一拍 + 专属符号</h3>
+  <div class="m"><span class="t">符号</span>:日程用<b>圆点</b>(时间/待办),心情用<b>圆角方块 + 情绪波纹</b>。形状不同,一眼分得清"这不是日程,是问你自己"。</div>
+  <div class="m"><span class="t">未记</span>:波纹符 + "此刻,你感觉——",淡紫。</div>
+  <div class="m"><span class="t">记了</span>:方块染上当天情绪色,标题变"平静 · 能量中",点开看趋势。</div>
+  <div class="m"><span class="t">位置</span>:永远排时间线<b>第一行</b>,一天的起点,不占任何多余空间。</div>
+</div>
+
+<!-- 未记 -->
+<div class="cell"><div class="cap">还没记 · 邀请态</div><div class="sub">波纹符号 = 问自己</div>
+ <div class="phone">
+  <div class="sb"><span>4:01</span><span>5G+ ▪</span></div>
+  <div class="head">
+    <svg class="cube" viewBox="0 0 40 40"><path d="M20 4 35 12.5 20 21 5 12.5Z" fill="#c07f79" fill-opacity=".82"/><path d="M5 12.5 20 21 20 37 5 28.5Z" fill="#c07f79" fill-opacity=".46"/><path d="M35 12.5 20 21 20 37 35 28.5Z" fill="#c07f79" fill-opacity=".63"/></svg>
+    <div class="avatar"></div>
+  </div>
+  <div class="greet">小汉,下午好。</div>
+  <div class="rv">
+    <span class="rv-orb"></span>
+    <div><div class="rv-k">回顾 · 一年前的今天</div><div class="rv-t">第一次一个人去看海</div></div>
+    <span class="rv-x">›</span>
+  </div>
+  <div class="sec">接下来 · 今天要紧的几件</div>
+  <div class="tl">
+    <div class="tln mrow"><span class="mnode"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 13c2 0 2.4-4 3.8-4s1.9 6 3.8 6 2.4-8 3.8-8 1.9 5 3.8 5"/></svg></span><div class="tl-tm">现在</div><div class="tl-t ask">此刻,你感觉——</div><div class="tl-s">滑一下记 5 秒 · 今天还没记 ›</div></div>
+    <div class="tln"><span class="tld now"></span><div class="tl-tm">接着</div><div class="tl-t">先喝掉那盒牛奶</div><div class="tl-s">冰箱里 · 明天过期</div></div>
+    <div class="tln"><span class="tld"></span><div class="tl-tm">今晚 20:15 · 还有 1h58m</div><div class="tl-t">咨询</div><div class="tl-s">核心科目突围</div></div>
+    <div class="tln"><span class="tld"></span><div class="tl-tm">稍后</div><div class="tl-t">还有 4 件小事</div><div class="tl-s">我先替你收着,不急 ›</div></div>
+  </div>
+ </div></div>
+
+<!-- 记了 -->
+<div class="cell"><div class="cap">记过了 · 染上情绪色</div><div class="sub">符号成为今天的心情色卡</div>
+ <div class="phone">
+  <div class="sb"><span>4:01</span><span>5G+ ▪</span></div>
+  <div class="head">
+    <svg class="cube" viewBox="0 0 40 40"><path d="M20 4 35 12.5 20 21 5 12.5Z" fill="#c07f79" fill-opacity=".82"/><path d="M5 12.5 20 21 20 37 5 28.5Z" fill="#c07f79" fill-opacity=".46"/><path d="M35 12.5 20 21 20 37 35 28.5Z" fill="#c07f79" fill-opacity=".63"/></svg>
+    <div class="avatar"></div>
+  </div>
+  <div class="greet">小汉,下午好。</div>
+  <div class="rv">
+    <span class="rv-orb"></span>
+    <div><div class="rv-k">回顾 · 一年前的今天</div><div class="rv-t">第一次一个人去看海</div></div>
+    <span class="rv-x">›</span>
+  </div>
+  <div class="sec">接下来 · 今天要紧的几件</div>
+  <div class="tl">
+    <div class="tln mrow"><span class="mnode" style="background:radial-gradient(circle at 40% 34%,#fff,#eef3ef 68%,#dae7de);border-color:#c1d4c7;box-shadow:0 0 8px rgba(139,165,143,.5);color:#7f9b8f"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 13c2 0 2.4-4 3.8-4s1.9 6 3.8 6 2.4-8 3.8-8 1.9 5 3.8 5"/></svg></span><div class="tl-tm">今天</div><div class="tl-t">平静 · 能量中</div><div class="tl-s">14:20 记录 · 点开看这周趋势 ›</div></div>
+    <div class="tln"><span class="tld now"></span><div class="tl-tm">现在</div><div class="tl-t">先喝掉那盒牛奶</div><div class="tl-s">冰箱里 · 明天过期</div></div>
+    <div class="tln"><span class="tld"></span><div class="tl-tm">今晚 20:15 · 还有 1h58m</div><div class="tl-t">咨询</div><div class="tl-s">核心科目突围</div></div>
+    <div class="tln"><span class="tld"></span><div class="tl-tm">稍后</div><div class="tl-t">还有 4 件小事</div><div class="tl-s">我先替你收着,不急 ›</div></div>
+  </div>
+ </div></div>
+
+</body></html>

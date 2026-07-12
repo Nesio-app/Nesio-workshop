@@ -1,0 +1,57 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<style>
+:root{--bg1:#f4f5f2;--bg2:#e6e9ea;--ink:#3a3c43;--body:#6f727a;--muted:#a2a3ab;--line:rgba(120,125,135,.16);--deep:#b06f68;--brand:#c07f79}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
+body{font-family:"PingFang SC","Hiragino Sans GB",system-ui,sans-serif;background:#e9e9e8;padding:36px;display:flex;justify-content:center}
+.cell .cap{font-size:14.5px;font-weight:800;color:#2c2f36;margin:0 0 3px 3px}
+.cell .sub{font-size:11.5px;font-weight:600;color:#9a9ca3;margin:0 0 10px 3px}
+.phone{width:396px;height:800px;border-radius:32px;position:relative;overflow:hidden;color:var(--ink);
+ background:linear-gradient(180deg,var(--bg1),#e4e7ea);box-shadow:0 14px 34px rgba(0,0,0,.13);padding:0 18px}
+.sb{display:flex;justify-content:space-between;align-items:center;padding:14px 4px 2px;font-size:11px;font-weight:700}
+.top{display:flex;align-items:center;gap:8px;margin-top:8px}
+.top .bk{font-size:19px;color:var(--muted);font-weight:800}.top .t{font-size:20px;font-weight:800}
+.glabel{font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.5px;margin:22px 6px 11px}
+.glabel .h{margin-left:6px;color:#bcbec4;font-weight:600}
+/* 配色 swatches */
+.pgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.pc{background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:10px;display:flex;align-items:center;gap:11px}
+.pc.on{border-color:var(--ink)}
+.sw{width:44px;height:44px;border-radius:11px;position:relative;flex-shrink:0;border:1px solid rgba(0,0,0,.05)}
+.sw .dot{position:absolute;right:5px;bottom:5px;width:12px;height:12px;border-radius:50%;box-shadow:0 0 0 2px #fff}
+.pc-b{flex:1;min-width:0}
+.pc-n{font-size:13px;font-weight:800}
+.pc-d{font-size:10px;color:var(--muted);font-weight:600;margin-top:1px}
+.pc-ck{width:18px;height:18px;border-radius:50%;border:1.5px solid #d2d4d8;flex-shrink:0}
+.pc.on .pc-ck{border-color:var(--ink);background:var(--ink);box-shadow:inset 0 0 0 3px #fff}
+/* 明暗 */
+.seg{display:flex;background:#eef0f0;border:1px solid var(--line);border-radius:12px;padding:3px}
+.seg span{flex:1;text-align:center;font-size:12.5px;font-weight:800;color:var(--muted);padding:10px 0;border-radius:9px;display:flex;align-items:center;justify-content:center;gap:5px}
+.seg span.on{background:#fff;color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.note{font-size:11px;color:var(--muted);font-weight:600;margin:9px 6px 0;line-height:1.5}
+.group{background:#fff;border:1px solid var(--line);border-radius:16px;overflow:hidden;margin-top:10px}
+.row{display:flex;align-items:center;gap:12px;padding:14px 15px}
+.r-b{flex:1}.r-t{font-size:14.5px;font-weight:700}.r-v{font-size:13px;color:var(--body);font-weight:600}
+</style></head><body>
+
+<div class="cell"><div class="cap">外观 · 配色(4) + 明暗(3)</div><div class="sub">先选配色皮肤,再选明暗</div>
+ <div class="phone">
+  <div class="sb"><span>4:01</span><span>5G+ ▪</span></div>
+  <div class="top"><span class="bk">‹</span><span class="t">外观</span></div>
+
+  <div class="glabel">配色主题 <span class="h">· 4 套低饱和</span></div>
+  <div class="pgrid">
+    <div class="pc on"><span class="sw" style="background:linear-gradient(135deg,#f9faf5,#ccd1d7)"><span class="dot" style="background:#cf8f89"></span></span><div class="pc-b"><div class="pc-n">蓝灰·灰粉</div><div class="pc-d">冷调精致</div></div><span class="pc-ck"></span></div>
+    <div class="pc"><span class="sw" style="background:linear-gradient(135deg,#f2ece0,#d9ccb5)"><span class="dot" style="background:#a98f66"></span></span><div class="pc-b"><div class="pc-n">沙米·奶茶</div><div class="pc-d">温润 muji</div></div><span class="pc-ck"></span></div>
+    <div class="pc"><span class="sw" style="background:linear-gradient(135deg,#e6f0f6,#9fbcd4)"><span class="dot" style="background:#6f88a0"></span></span><div class="pc-b"><div class="pc-n">雾霾蓝</div><div class="pc-d">保留品牌蓝</div></div><span class="pc-ck"></span></div>
+    <div class="pc"><span class="sw" style="background:linear-gradient(135deg,#eef3f0,#c0d3c8)"><span class="dot" style="background:#7f9b8f"></span></span><div class="pc-b"><div class="pc-n">灰绿</div><div class="pc-d">自然疗愈</div></div><span class="pc-ck"></span></div>
+  </div>
+
+  <div class="glabel">明暗 <span class="h">· 每套配色都有明暗版</span></div>
+  <div class="seg"><span class="on"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg>日</span><span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18" fill="currentColor" opacity=".25"/></svg>随系统</span><span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M20 14a8 8 0 1 1-9.9-9.9A7 7 0 0 0 20 14Z"/></svg>夜</span></div>
+  <div class="note">当前:蓝灰·灰粉 · 日 —— 换配色/明暗即时生效,全站换装。</div>
+
+  <div class="glabel">语言</div>
+  <div class="group"><div class="row"><div class="r-b"><div class="r-t">语言 / Language</div></div><span class="r-v">简体中文 ⌄</span></div></div>
+ </div></div>
+
+</body></html>

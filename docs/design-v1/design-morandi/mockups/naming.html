@@ -1,0 +1,75 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600;700&display=swap');
+:root{--bg:#f4f5f2;--ink:#2c2f36;--body:#5a5d64;--muted:#a2a3ab;--line:rgba(120,125,135,.16);--deep:#b06f68;--brand:#c07f79;--sage:#8ba58f;--blue:#7d8a9c}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
+body{font-family:"PingFang SC","Hiragino Sans GB",system-ui,sans-serif;background:#e9e9e8;padding:40px;display:flex;justify-content:center}
+.sheet{width:760px;background:linear-gradient(180deg,#f7f8f5,#eceeec);border-radius:26px;padding:34px 36px;box-shadow:0 16px 40px rgba(0,0,0,.12)}
+.h1{font-size:24px;font-weight:800;font-family:"Noto Serif SC",serif;color:var(--ink)}
+.h1 .en{font-size:13px;color:var(--muted);font-weight:600;margin-left:10px;font-family:system-ui}
+.lead{font-size:13px;color:var(--body);line-height:1.7;margin-top:10px}
+.rules{display:flex;gap:10px;margin:18px 0 26px}
+.rule{flex:1;background:#fff;border:1px solid var(--line);border-radius:13px;padding:12px 14px}
+.rule .n{font-size:10px;font-weight:800;color:var(--deep)}
+.rule .t{font-size:12.5px;font-weight:800;color:var(--ink);margin-top:4px}
+.rule .d{font-size:11px;color:var(--muted);font-weight:600;margin-top:3px;line-height:1.5}
+.grp{margin-bottom:22px}
+.glabel{font-size:12px;font-weight:800;color:var(--body);margin-bottom:11px;display:flex;align-items:center;gap:8px}
+.glabel:before{content:"";width:16px;height:2px;background:var(--deep);border-radius:1px}
+.row{display:grid;grid-template-columns:150px 26px 150px 1fr;align-items:center;gap:10px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:11px 15px;margin-bottom:7px}
+.old{font-size:14px;color:var(--muted);font-weight:700;text-decoration:line-through;text-decoration-color:rgba(160,160,168,.5)}
+.old.keep{text-decoration:none;color:var(--body)}
+.arr{color:#c8c9ce;font-size:15px;text-align:center}
+.newn{font-size:16px;font-weight:800;color:var(--ink)}
+.newn.same{color:var(--sage)}
+.why{font-size:11.5px;color:var(--body);font-weight:600;line-height:1.45}
+.why b{color:var(--deep)}
+.tag{display:inline-block;font-size:9.5px;font-weight:800;color:var(--blue);background:rgba(125,138,156,.12);border-radius:5px;padding:1px 6px;margin-left:6px;vertical-align:middle}
+.tag.k{color:var(--sage);background:rgba(139,165,143,.14)}
+.foot{font-size:11.5px;color:var(--muted);font-weight:600;line-height:1.7;margin-top:8px;border-top:1px solid var(--line);padding-top:16px}
+.foot b{color:var(--deep)}
+</style></head><body>
+
+<div class="sheet">
+  <div class="h1">宝盒 · 命名系统<span class="en">naming system</span></div>
+  <div class="lead">大多数名字其实够好,问题是<b style="color:var(--deep)">不成体系</b>。先定 3 条规则,再只改不合规的那几个——<b style="color:var(--deep)">绿色=保留,深色=升级</b>。</div>
+
+  <div class="rules">
+    <div class="rule"><div class="n">规则 1 · 动作</div><div class="t">轻动词,同菜单同语法</div><div class="d">捕捉类统一成「V + 一下/一句」,口语但不幼稚。</div></div>
+    <div class="rule"><div class="n">规则 2 · 版块</div><div class="t">意象名词,不用术语</div><div class="d">一看即懂,不需解释;避开「认知」这类教科书词。</div></div>
+    <div class="rule"><div class="n">规则 3 · 视角</div><div class="t">站在宝盒这边</div><div class="d">它替你收、替你记;用「收进来」而非系统词「分享」。</div></div>
+  </div>
+
+  <!-- 动作 -->
+  <div class="grp">
+    <div class="glabel">记一笔 · 捕捉动作</div>
+    <div class="row"><span class="old">拍一拍</span><span class="arr">→</span><span class="newn">拍一下</span><span class="why">与「说一句」对齐成 V+一+X;<b>叠词略幼,收成一下</b></span></div>
+    <div class="row"><span class="old keep">说一句</span><span class="arr">→</span><span class="newn same">说一句 <span class="tag k">保留</span></span><span class="why">已经最好,拿它当基准</span></div>
+    <div class="row"><span class="old">分享</span><span class="arr">→</span><span class="newn">收进来</span><span class="why"><b>「分享」是别处的系统词</b>;宝盒是替你收着,视角要对</span></div>
+    <div class="row"><span class="old">记录心情</span><span class="arr">→</span><span class="newn">记心情</span><span class="why">收短,和其他动作等长齐整</span></div>
+  </div>
+
+  <!-- 版块 -->
+  <div class="grp">
+    <div class="glabel">主导航 · 版块</div>
+    <div class="row"><span class="old keep">今天</span><span class="arr">→</span><span class="newn same">今天 <span class="tag k">保留</span></span><span class="why">具体、当下、无需解释,别动</span></div>
+    <div class="row"><span class="old keep">记忆</span><span class="arr">→</span><span class="newn same">记忆 <span class="tag k">保留</span></span><span class="why">核心资产,最准的词</span></div>
+    <div class="row"><span class="old keep">问一问</span><span class="arr">→</span><span class="newn same">问一问 <span class="tag k">保留</span></span><span class="why">与「说一句」同口吻,亲切</span></div>
+    <div class="row"><span class="old keep">洞察</span><span class="arr">→</span><span class="newn same">洞察 <span class="tag k">保留</span></span><span class="why">专业又不高冷<span class="tag">暖备选:它看见的</span></span></div>
+    <div class="row"><span class="old">认知 / 多面镜</span><span class="arr">→</span><span class="newn">多面镜</span><span class="why"><b>「认知」太教科书</b>;多面镜有画面感,照见另一面的自己</span></div>
+    <div class="row"><span class="old keep">足迹</span><span class="arr">→</span><span class="newn same">足迹 <span class="tag k">保留</span></span><span class="why">已经好<span class="tag">口语备选:去过的地方</span></span></div>
+  </div>
+
+  <!-- 记忆罐 -->
+  <div class="grp">
+    <div class="glabel">记忆罐 · 集合</div>
+    <div class="row"><span class="old">物品收纳</span><span class="arr">→</span><span class="newn">收纳</span><span class="why"><b>「物品」冗余</b>,收纳本就是收东西,两字够</span></div>
+    <div class="row"><span class="old">收藏夹</span><span class="arr">→</span><span class="newn">收藏</span><span class="why">去掉「夹」,更轻;和「收纳」成一对</span></div>
+    <div class="row"><span class="old keep">核心记忆</span><span class="arr">→</span><span class="newn same">核心记忆 <span class="tag k">保留</span></span><span class="why">定义你的那几条<span class="tag">私人备选:关于我</span></span></div>
+    <div class="row"><span class="old keep">项目</span><span class="arr">→</span><span class="newn same">项目 <span class="tag k">保留</span></span><span class="why">通用清楚,别动</span></div>
+  </div>
+
+  <div class="foot">一句话总结:真正升级的只有 6 个——<b>拍一下 · 收进来 · 记心情 · 多面镜 · 收纳 · 收藏</b>;其余保留。整套读下来,动作都是「V 一下/一句」,版块都是干净名词,视角始终站在宝盒这边。</div>
+</div>
+
+</body></html>

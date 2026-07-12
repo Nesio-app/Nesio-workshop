@@ -1,0 +1,115 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;600;700&display=swap');
+:root{--bg1:#f9faf5;--bg2:#e4e7ea;--brand:#c07f79;--deep:#b06f68;--ink:#3a3c43;--body:#6f727a;--muted:#a2a3ab;--line:rgba(120,125,135,.22);
+ --paper:#f6efe4;--paper-line:rgba(150,120,90,.18);--paper-ink:#43403a;--mauve:#a08b9c}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
+body{font-family:"PingFang SC","Hiragino Sans GB",system-ui,sans-serif;background:#e9e9e8;padding:40px;display:flex;gap:40px;align-items:flex-start;justify-content:center}
+.side{width:290px;font-size:13.5px;line-height:1.9;color:#54575e}
+.side h3{font-size:16px;color:#2c2f36;margin-bottom:12px}
+.side b{color:var(--deep)}
+.side .mod{margin-bottom:15px;padding-left:12px;border-left:2px solid var(--line)}
+.phone{width:392px;flex-shrink:0;height:812px;border-radius:34px;position:relative;padding:0 22px 24px;
+  background:linear-gradient(180deg,var(--bg1) 0%,#e3e6e9 100%);box-shadow:0 16px 40px rgba(0,0,0,.14);color:var(--ink);overflow:hidden}
+.sb{display:flex;justify-content:space-between;align-items:center;padding:15px 3px 2px;font-size:12px;font-weight:700}
+.serif{font-family:"Noto Serif SC",Georgia,serif}
+/* header row with 往期 button */
+.hrow{display:flex;justify-content:space-between;align-items:flex-end;margin-top:12px}
+.kicker{font-size:12.5px;font-weight:600;color:var(--muted);font-family:"Noto Serif SC",serif}
+.title{font-size:26px;font-weight:800;margin-top:2px}
+.arc-btn{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:var(--ink);background:rgba(255,255,255,.55);border:1px solid var(--line);border-radius:20px;padding:7px 13px}
+.arc-btn .c{font-size:10px;font-weight:800;color:#fff;background:var(--brand);border-radius:9px;padding:1px 6px}
+.tabs{display:flex;gap:22px;margin-top:14px;border-bottom:1px solid var(--line)}
+.tab{font-size:15px;font-weight:700;color:var(--muted);padding-bottom:10px;position:relative}
+.tab.on{color:var(--ink)}
+.tab.on:after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--brand);border-radius:2px}
+/* filter: 镜子也是 filter */
+.filter{display:flex;gap:8px;margin-top:16px;align-items:center;flex-wrap:wrap}
+.fchip{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:800;color:var(--ink);background:rgba(255,255,255,.6);border:1px solid var(--line);border-radius:11px;padding:8px 13px}
+.fchip.lens{border-color:var(--deep);color:var(--deep)}
+.fchip .cv{color:var(--muted);font-size:10px;font-weight:700}
+.fchip.cat .dot{width:8px;height:8px;border-radius:50%;background:var(--mauve)}
+.fchip.cat{color:var(--mauve)}
+/* letter — 唯一主体,给足呼吸 */
+.letter{background:var(--paper);border:1px solid var(--paper-line);border-radius:18px;padding:26px 24px 22px;margin-top:18px;box-shadow:0 8px 24px rgba(150,120,90,.12)}
+.lt-hi{font-family:"Noto Serif SC",serif;font-size:18px;font-weight:700;color:var(--paper-ink);margin-bottom:16px}
+.lt-p{font-family:"Noto Serif SC",serif;font-size:16px;line-height:2.05;color:var(--paper-ink)}
+.lt-p .u{border-bottom:1.5px solid var(--brand);padding-bottom:1px;font-weight:700}
+.ev{display:flex;flex-wrap:wrap;gap:6px;margin:11px 0 5px}
+.ev-chip{font-size:11px;font-weight:600;color:#8a7355;background:rgba(150,120,90,.1);border:1px solid var(--paper-line);border-radius:7px;padding:3px 9px}
+.fb{display:flex;gap:16px;margin:3px 0 18px}
+.fb span{font-size:12px;font-weight:700;color:#a8977f}.fb .yes{color:#7d8f6e}
+.para-div{height:1px;background:var(--paper-line);margin:0 0 18px}
+.sign{font-family:"Noto Serif SC",serif;font-size:14.5px;color:#a8977f;text-align:right;margin-top:8px}
+/* actions */
+.acts{display:flex;gap:10px;margin-top:16px}
+.act{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;font-size:14px;font-weight:800;padding:13px;border-radius:14px}
+.act.save{background:var(--brand);color:#fff}
+.act.ghost{background:rgba(255,255,255,.5);border:1px solid var(--line);color:var(--ink)}
+.foot{font-size:11px;color:var(--muted);font-weight:600;text-align:center;margin-top:16px}
+/* archive sheet (折叠态示意,右侧小图) */
+.sheet{width:300px;flex-shrink:0;margin-top:80px}
+.sheet-cap{font-size:13px;color:#9a9ca3;font-weight:700;margin-bottom:10px}
+.sheetbox{background:#fff;border-radius:20px 20px 8px 8px;padding:18px 16px;box-shadow:0 12px 30px rgba(0,0,0,.12)}
+.sh-hd{font-size:16px;font-weight:800;margin-bottom:14px;display:flex;justify-content:space-between}
+.sh-hd .x{color:#c2c4c9}
+.arc{display:flex;align-items:center;gap:11px;padding:10px 0;border-bottom:1px solid #eee}
+.arc:last-child{border-bottom:none}
+.arc-ico{width:30px;height:30px;border-radius:8px;background:var(--paper);border:1px solid var(--paper-line);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:14px}
+.arc-t{font-size:13.5px;font-weight:700;color:var(--ink)}.arc-s{font-size:11px;color:var(--muted);margin-top:1px}
+.arc-r{margin-left:auto;font-size:11px;color:var(--muted);font-weight:600}
+</style></head><body>
+
+<div class="side">
+  <h3>「多面镜」Tab · 收拢</h3>
+  <div class="mod"><b>镜子也变 filter</b>:不再占一大排,收成一颗 <b>荣格 ▾</b>,和时段/分类三颗并列。</div>
+  <div class="mod"><b>往期折叠成一个按钮</b>,放右上角(带数字角标)。点开是右边这张存档抽屉。</div>
+  <div class="mod"><b>整屏只留一封信</b>:信是唯一主体,给足留白,读感像真的在读一封信。</div>
+  <div class="mod">存入记忆 / 重写 在信下方;只回看不预测保留。</div>
+</div>
+
+<div class="phone">
+  <div class="sb"><span>4:01</span><span>5G+ ▪</span></div>
+  <div class="hrow">
+    <div><div class="kicker serif">念念 · 给你的信</div><div class="title">多面镜</div></div>
+    <div class="arc-btn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 7h18v4H3zM5 11v8h14v-8M9 15h6"/></svg>往期 <span class="c">6</span></div>
+  </div>
+  <div class="tabs"><span class="tab">洞察</span><span class="tab on">多面镜</span><span class="tab" style="opacity:.55">关系</span><span class="tab" style="opacity:.55">健康</span></div>
+
+  <div class="filter">
+    <span class="fchip lens">◑ 荣格 <span class="cv">▾</span></span>
+    <span class="fchip">七月 <span class="cv">▾</span></span>
+    <span class="fchip cat"><span class="dot"></span>情绪 <span class="cv">▾</span></span>
+  </div>
+
+  <div class="letter">
+    <div class="lt-hi">小汉,</div>
+    <div class="lt-p">这个月你反复写到"海"——七月你去看海,去年今天也是海。海对你像一个可以喘气的地方:大、空、不要求你什么。</div>
+    <div class="ev"><span class="ev-chip">「去年今天 · 看海」</span><span class="ev-chip">「7·6 想请假去海边」</span></div>
+    <div class="fb"><span class="yes">✓ 说得对</span><span>✗ 不像我</span></div>
+    <div class="para-div"></div>
+    <div class="lt-p">你几乎从不写"父亲"。提到家人,总是妈妈。<span class="u">你回避的,往往比你记下的更重要</span>。</div>
+    <div class="ev"><span class="ev-chip">「妈妈 · 8 次」</span><span class="ev-chip">「父亲 · 0 次」</span></div>
+    <div class="fb"><span class="yes">✓ 说得对</span><span>✗ 不像我</span></div>
+    <div class="sign">—— 荣格 · 七月 · 情绪</div>
+  </div>
+
+  <div class="acts">
+    <div class="act save"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linejoin="round"><path d="M12 3 20 7.5 12 12 4 7.5Z"/><path d="M4 7.5v9L12 21l8-4.5v-9"/><path d="M12 12v9"/></svg>存入记忆</div>
+    <div class="act ghost"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 12a8 8 0 1 1 2.5 5.8M4 18v-4h4"/></svg>重写</div>
+  </div>
+  <div class="foot">◷ 只回看,不预测 · 任意时段都能生成</div>
+</div>
+
+<div class="sheet">
+  <div class="sheet-cap">点「往期」→ 存档抽屉</div>
+  <div class="sheetbox">
+    <div class="sh-hd">往期的信 · 6 封 <span class="x">✕</span></div>
+    <div class="arc"><div class="arc-ico">✉</div><div><div class="arc-t">七月 · 荣格 · 情绪</div><div class="arc-s">当前这封</div></div><span class="arc-r">7·11</span></div>
+    <div class="arc"><div class="arc-ico">✉</div><div><div class="arc-t">六月 · 荣格 · 全部</div><div class="arc-s">"你在学着对自己松一点。"</div></div><span class="arc-r">6·30</span></div>
+    <div class="arc"><div class="arc-ico">✉</div><div><div class="arc-t">五月 · 盲区侦探 · 关系</div><div class="arc-s">"你很少记下让你开心的人。"</div></div><span class="arc-r">5·31</span></div>
+    <div class="arc"><div class="arc-ico">✉</div><div><div class="arc-t">春季 · 老友 · 全部</div><div class="arc-s">"这三个月,你熬过来了。"</div></div><span class="arc-r">Q1</span></div>
+  </div>
+</div>
+
+</body></html>

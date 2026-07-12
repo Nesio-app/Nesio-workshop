@@ -1,0 +1,45 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<style>
+:root{--ink:#3a3c43;--body:#6f727a;--muted:#a2a3ab;--deep:#b06f68;--brand:#c07f79}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
+body{font-family:"PingFang SC","Hiragino Sans GB",system-ui,sans-serif;background:#e9e9e8;padding:36px;display:flex;gap:34px;justify-content:center;align-items:flex-start}
+.side{width:250px;font-size:13px;line-height:1.85;color:#54575e}
+.side h3{font-size:15px;color:#2c2f36;margin:0 0 12px}
+.side b{color:var(--deep)}
+.side .m{margin-bottom:13px;padding-left:11px;border-left:2px solid rgba(120,125,135,.2)}
+.side .m .t{font-weight:800;color:#2c2f36}
+.cell .cap{font-size:14px;font-weight:800;color:#2c2f36;margin:0 0 3px 3px}
+.cell .sub{font-size:11px;font-weight:600;color:#9a9ca3;margin:0 0 10px 3px}
+.phone{width:372px;height:770px;border-radius:30px;position:relative;overflow:hidden;background:linear-gradient(180deg,#e7e2da,#d6d0c4)}
+.scrim{position:absolute;inset:0;background:rgba(58,55,50,.52);backdrop-filter:blur(3px)}
+.cube{position:absolute;left:50%;bottom:34px;transform:translateX(-50%);width:62px;height:62px;border-radius:50%;background:var(--brand);display:flex;align-items:center;justify-content:center;box-shadow:0 10px 26px rgba(192,127,121,.5);z-index:3}
+.bub{position:absolute;display:flex;flex-direction:column;align-items:center;gap:11px;z-index:3;transform:translate(-50%,-50%)}
+.bb{width:66px;height:66px;border-radius:50%;background:#faf8f4;display:flex;align-items:center;justify-content:center;color:var(--deep);box-shadow:0 8px 22px rgba(0,0,0,.26)}
+.bl{font-size:12.5px;font-weight:800;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.4)}
+.hint{position:absolute;left:0;right:0;bottom:112px;text-align:center;font-size:12px;color:rgba(255,255,255,.85);font-weight:700;z-index:3}
+</style></head><body>
+
+<div class="side">
+  <h3>记一笔 · 3 项</h3>
+  <div class="m"><span class="t">瘦回 3 个</span>:<b>拍一下 · 说一句 · 收进来</b>。都是"往里丢内容"。</div>
+  <div class="m"><span class="t">记心情去哪了</span>:它是"跟自己 check-in",已移到<b>今天页</b>时间线的「现在」第一拍,不在这个菜单。</div>
+  <div class="m"><span class="t">收进来</span>:从别的 App 分享 / 存东西进宝盒——盒子替你收着,所以叫"收进来"而非"分享"。</div>
+  <div class="m"><span class="t">均匀弧</span>:三颗等距展开,不挤。</div>
+</div>
+
+<div class="cell"><div class="cap">记一笔 · 均匀弧(3 项)</div><div class="sub">拍一下 / 说一句 / 收进来</div>
+ <div class="phone">
+  <div class="scrim"></div>
+  <div class="hint">记一笔 · 想到什么先丢进来</div>
+
+  <!-- 拍一下 (左) -->
+  <div class="bub" style="left:92px;top:560px"><div class="bb"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 8h3l1.5-2h7L18 8h2v11H4z"/><circle cx="12" cy="13" r="3.2"/></svg></div><div class="bl">拍一下</div></div>
+  <!-- 说一句 (中·最高) -->
+  <div class="bub" style="left:186px;top:512px"><div class="bb"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4"/></svg></div><div class="bl">说一句</div></div>
+  <!-- 收进来 (右) -->
+  <div class="bub" style="left:280px;top:560px"><div class="bb"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 13v6a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-6M12 3v10M8 9l4 4 4-4"/></svg></div><div class="bl">收进来</div></div>
+
+  <div class="cube"><svg width="30" height="30" viewBox="0 0 64 64"><polygon points="32,10 54,23 32,36 10,23" fill="#fff" fill-opacity=".92"/><polygon points="10,23 32,36 32,58 10,45" fill="#fff" fill-opacity=".58"/><polygon points="54,23 32,36 32,58 54,45" fill="#fff" fill-opacity=".76"/></svg></div>
+ </div></div>
+
+</body></html>

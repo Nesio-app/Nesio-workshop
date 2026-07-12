@@ -1,0 +1,520 @@
+<title>宝盒设计规范 · Nesio Design System</title>
+<style>
+:root{
+  --paper:#f4f5f2; --paper2:#eceeeb; --card:#ffffff; --card2:#fbfbf9;
+  --ink:#2c2f36; --body:#585b62; --muted:#9a9ca3; --line:rgba(120,125,135,.16); --line2:rgba(120,125,135,.28);
+  --accent:#b06f68; --accent2:#c07f79; --accent-wash:rgba(192,127,121,.10);
+  --sage:#8ba58f; --blue:#7d8a9c; --mauve:#a08b9c; --amber:#c0906f;
+  --serif:"Songti SC","STSong","Noto Serif SC",Georgia,serif;
+  --sans:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,-apple-system,sans-serif;
+  --maxw:940px;
+}
+@media (prefers-color-scheme:dark){:root{
+  --paper:#1a1c20; --paper2:#202227; --card:#25272c; --card2:#2b2d33;
+  --ink:#e9eae7; --body:#b6b9bf; --muted:#82858c; --line:rgba(170,175,185,.14); --line2:rgba(170,175,185,.24);
+  --accent:#cf9a94; --accent2:#c98c86; --accent-wash:rgba(201,140,134,.14);
+}}
+:root[data-theme="dark"]{
+  --paper:#1a1c20; --paper2:#202227; --card:#25272c; --card2:#2b2d33;
+  --ink:#e9eae7; --body:#b6b9bf; --muted:#82858c; --line:rgba(170,175,185,.14); --line2:rgba(170,175,185,.24);
+  --accent:#cf9a94; --accent2:#c98c86; --accent-wash:rgba(201,140,134,.14);
+}
+:root[data-theme="light"]{
+  --paper:#f4f5f2; --paper2:#eceeeb; --card:#ffffff; --card2:#fbfbf9;
+  --ink:#2c2f36; --body:#585b62; --muted:#9a9ca3; --line:rgba(120,125,135,.16); --line2:rgba(120,125,135,.28);
+  --accent:#b06f68; --accent2:#c07f79; --accent-wash:rgba(192,127,121,.10);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{background:var(--paper);color:var(--body);font-family:var(--sans);line-height:1.6;-webkit-font-smoothing:antialiased;
+  background-image:radial-gradient(circle at 82% -8%,var(--accent-wash),transparent 42%);}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 26px}
+.layout{display:grid;grid-template-columns:1fr;gap:0}
+@media(min-width:1120px){.layout{grid-template-columns:212px 1fr;gap:44px;max-width:1180px;margin:0 auto;padding:0 26px}}
+
+/* nav */
+nav.toc{display:none}
+@media(min-width:1120px){
+  nav.toc{display:block;position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;padding:38px 0 40px}
+  .toc .brandmini{font-family:var(--serif);font-size:19px;font-weight:700;color:var(--ink);margin-bottom:3px}
+  .toc .brandmini small{display:block;font-family:var(--sans);font-size:10px;letter-spacing:2px;color:var(--muted);font-weight:600;margin-top:5px}
+  .toc ol{list-style:none;margin-top:26px;counter-reset:s}
+  .toc li{counter-increment:s;margin:2px 0}
+  .toc a{display:flex;gap:9px;align-items:baseline;text-decoration:none;color:var(--muted);font-size:12.5px;font-weight:600;padding:6px 10px;border-radius:8px;border-left:2px solid transparent;transition:color .15s}
+  .toc a:before{content:counter(s,decimal-leading-zero);font-size:10px;color:var(--line2);font-variant-numeric:tabular-nums;min-width:16px}
+  .toc a:hover{color:var(--body)}
+  .toc a.on{color:var(--accent);border-left-color:var(--accent);background:var(--accent-wash)}
+  .toc a.on:before{color:var(--accent)}
+}
+
+main{padding:0 0 90px;min-width:0}
+
+/* hero */
+.hero{padding:76px 0 46px;border-bottom:1px solid var(--line)}
+.eyebrow{font-size:11px;letter-spacing:3.5px;font-weight:700;color:var(--accent);text-transform:uppercase}
+.hero h1{font-family:var(--serif);font-weight:700;color:var(--ink);font-size:clamp(38px,7vw,62px);line-height:1.02;margin:20px 0 0;text-wrap:balance;letter-spacing:.5px}
+.hero .lede{font-size:16px;max-width:60ch;margin-top:22px;color:var(--body)}
+.hero .lede b{color:var(--accent);font-weight:600}
+.hero .meta{display:flex;flex-wrap:wrap;gap:10px 26px;margin-top:30px;font-size:12px;color:var(--muted);font-weight:600}
+.hero .meta b{color:var(--body);font-weight:700}
+
+/* section scaffolding */
+section{padding:64px 0;border-bottom:1px solid var(--line);scroll-margin-top:24px}
+.shead{display:flex;align-items:center;gap:14px;margin-bottom:8px}
+.snum{font-family:var(--serif);font-size:13px;color:var(--accent);font-weight:700;font-variant-numeric:tabular-nums}
+.shead h2{font-family:var(--serif);font-weight:700;color:var(--ink);font-size:clamp(24px,4vw,32px);letter-spacing:.5px}
+.sdesc{font-size:14px;color:var(--body);max-width:64ch;margin:0 0 30px}
+.sdesc b{color:var(--accent)}
+h3.sub{font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);font-weight:800;margin:34px 0 15px;display:flex;align-items:center;gap:9px}
+h3.sub:before{content:"";width:18px;height:2px;background:var(--accent);border-radius:1px}
+
+/* orb marker */
+.orb{width:34px;height:34px;border-radius:50%;flex-shrink:0;position:relative;
+  background:radial-gradient(circle at 36% 30%,#fff,rgba(255,255,255,.35) 45%,var(--t,rgba(160,139,156,.42)) 100%);
+  border:1px solid rgba(255,255,255,.75);box-shadow:0 8px 13px -6px var(--sh,rgba(160,139,156,.5)),inset -4px -5px 10px var(--t,rgba(160,139,156,.4))}
+.orb:before{content:"";position:absolute;left:26%;top:17%;width:24%;height:16%;border-radius:50%;background:rgba(255,255,255,.9);filter:blur(1.4px)}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px 22px}
+.grid{display:grid;gap:12px}
+.g2{grid-template-columns:repeat(2,1fr)} .g3{grid-template-columns:repeat(3,1fr)} .g4{grid-template-columns:repeat(4,1fr)}
+@media(max-width:680px){.g3,.g4{grid-template-columns:repeat(2,1fr)}}
+
+/* principle cards */
+.pr{padding:18px 20px}
+.pr .t{font-family:var(--serif);font-size:18px;color:var(--ink);font-weight:700}
+.pr .d{font-size:12.5px;color:var(--body);margin-top:7px;line-height:1.55}
+
+/* palette */
+.pal{border-radius:15px;overflow:hidden;border:1px solid var(--line)}
+.pal .band{height:66px;display:flex;position:relative}
+.pal .dot{position:absolute;right:12px;bottom:-13px;width:30px;height:30px;border-radius:50%;border:3px solid var(--card);box-shadow:0 2px 7px rgba(0,0,0,.14)}
+.pal .info{padding:20px 15px 14px;background:var(--card)}
+.pal .nm{font-size:13.5px;font-weight:800;color:var(--ink)}
+.pal .mt{font-size:11px;color:var(--muted);font-weight:600;margin-top:2px}
+.pal .hex{font-size:10px;color:var(--muted);font-weight:600;margin-top:9px;font-variant-numeric:tabular-nums;letter-spacing:.2px}
+.default-tag{display:inline-block;font-size:9px;font-weight:800;color:var(--accent);background:var(--accent-wash);border-radius:5px;padding:1px 7px;margin-left:6px;vertical-align:middle}
+
+/* token chips */
+.toks{display:flex;flex-wrap:wrap;gap:9px}
+.tok{display:flex;align-items:center;gap:9px;background:var(--card);border:1px solid var(--line);border-radius:11px;padding:8px 12px 8px 8px}
+.tok .sw{width:26px;height:26px;border-radius:7px;border:1px solid rgba(0,0,0,.06)}
+.tok .tn{font-size:12px;font-weight:800;color:var(--ink)}
+.tok .th{font-size:10px;color:var(--muted);font-weight:600;font-variant-numeric:tabular-nums}
+
+/* segmented sample */
+.seg{display:inline-flex;background:var(--paper2);border:1px solid var(--line);border-radius:11px;padding:3px;gap:2px}
+.seg span{font-size:12px;font-weight:800;color:var(--muted);padding:7px 15px;border-radius:8px}
+.seg span.on{background:var(--card);color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.07)}
+
+/* type spec */
+.typerow{display:flex;align-items:baseline;gap:18px;padding:15px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.typerow:last-child{border-bottom:0}
+.typerow .lab{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-weight:800;width:120px;flex-shrink:0}
+.samp-serif{font-family:var(--serif);color:var(--ink)}
+.samp-sans{font-family:var(--sans);color:var(--ink)}
+.typerow .spec{margin-left:auto;font-size:11px;color:var(--muted);font-weight:600;font-variant-numeric:tabular-nums}
+
+/* icons */
+.icrow{display:flex;flex-wrap:wrap;gap:10px}
+.ic{display:flex;flex-direction:column;align-items:center;gap:8px;width:84px;background:var(--card);border:1px solid var(--line);border-radius:13px;padding:15px 6px}
+.ic svg{color:var(--accent)}
+.ic .l{font-size:11px;font-weight:700;color:var(--body)}
+.ic.src svg{color:var(--muted)}
+
+/* memory card sample */
+.mc{background:var(--card);border:1px solid var(--line);border-radius:15px;padding:14px 15px;max-width:340px}
+.mc .cat{display:flex;align-items:center;gap:6px;font-size:10px;font-weight:800;margin-bottom:8px}
+.mc .cat .ci{width:20px;height:20px;border-radius:6px;display:flex;align-items:center;justify-content:center}
+.mc .mt{font-size:15px;font-weight:800;color:var(--ink);line-height:1.35}
+.mc .ms{font-size:12px;color:var(--body);margin-top:4px;line-height:1.5}
+.mc .meta{display:flex;align-items:center;justify-content:space-between;margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
+.mc .src{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:800;color:var(--body)}
+.mc .tm{font-size:10px;color:var(--muted);font-weight:700}
+.pend{font-size:9px;font-weight:800;color:var(--amber);background:rgba(192,144,111,.14);border-radius:5px;padding:1px 6px;margin-left:5px}
+.callout{display:grid;grid-template-columns:auto 1fr;gap:11px 13px;margin-top:16px}
+.callout .k{font-size:11px;font-weight:800;color:var(--accent);text-align:right;font-variant-numeric:tabular-nums}
+.callout .v{font-size:12.5px;color:var(--body)}
+.callout .v b{color:var(--ink)}
+
+/* mood colors */
+.moods{display:flex;flex-wrap:wrap;gap:9px}
+.moodc{display:flex;align-items:center;gap:9px;background:var(--card);border:1px solid var(--line);border-radius:20px;padding:6px 13px 6px 7px}
+.moodc .d{width:20px;height:20px;border-radius:50%}
+.moodc .n{font-size:12px;font-weight:800;color:var(--ink)}
+.moodc .h{font-size:9.5px;color:var(--muted);font-weight:600;font-variant-numeric:tabular-nums}
+
+/* naming table */
+.nt{width:100%;border-collapse:collapse;font-size:13px}
+.nt th{text-align:left;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-weight:800;padding:0 12px 11px;border-bottom:1px solid var(--line2)}
+.nt td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+.nt .cnm{color:var(--muted);font-weight:600}
+.nt .to{color:var(--ink);font-weight:800;font-size:14px}
+.nt .en{color:var(--accent);font-weight:800;font-family:var(--sans)}
+.nt tr:hover td{background:var(--card2)}
+.wrapx{overflow-x:auto}
+
+/* page list */
+.pg{display:flex;gap:14px;padding:15px 0;border-bottom:1px solid var(--line)}
+.pg:last-child{border-bottom:0}
+.pg .nm{font-family:var(--serif);font-size:16px;font-weight:700;color:var(--ink);width:120px;flex-shrink:0}
+.pg .nm small{display:block;font-family:var(--sans);font-size:10px;color:var(--muted);font-weight:600;letter-spacing:.5px;margin-top:2px}
+.pg .d{font-size:12.5px;color:var(--body);line-height:1.6}
+.pg .d b{color:var(--accent)}
+
+/* voice */
+.qsamp{background:var(--card);border:1px solid var(--line);border-left:2px solid var(--accent);border-radius:0 12px 12px 0;padding:13px 16px}
+.qsamp .t{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-weight:800}
+.qsamp .q{font-family:var(--serif);font-size:15px;color:var(--ink);margin-top:6px;line-height:1.5}
+.do-dont{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}
+@media(max-width:600px){.do-dont,.callout{grid-template-columns:1fr}.callout .k{text-align:left}}
+.dd{border-radius:12px;padding:14px 16px;font-size:12.5px;line-height:1.6}
+.dd.do{background:rgba(139,165,143,.10);border:1px solid rgba(139,165,143,.3)}
+.dd.dont{background:rgba(176,111,104,.08);border:1px solid rgba(176,111,104,.26)}
+.dd .h{font-weight:800;font-size:11px;letter-spacing:1px;text-transform:uppercase;margin-bottom:7px}
+.dd.do .h{color:var(--sage)} .dd.dont .h{color:var(--accent)}
+.dd ul{list-style:none} .dd li{padding:3px 0 3px 16px;position:relative;color:var(--body)}
+.dd li:before{position:absolute;left:0;top:3px;font-weight:800}
+.dd.do li:before{content:"·";color:var(--sage)} .dd.dont li:before{content:"·";color:var(--accent)}
+
+/* embedded shots */
+figure.shot{margin:22px 0 4px;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--card2)}
+figure.shot img{display:block;width:100%;height:auto}
+figure.shot figcaption{font-size:11.5px;color:var(--muted);font-weight:600;padding:11px 15px;border-top:1px solid var(--line);background:var(--card)}
+figure.shot figcaption b{color:var(--body)}
+.gallery{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-top:26px}
+@media(max-width:680px){.gallery{grid-template-columns:1fr}}
+.gallery figure.shot{margin:0}
+footer{padding:44px 0 20px;color:var(--muted);font-size:12px;text-align:center}
+footer b{color:var(--body)}
+.theme-note{font-size:11px;color:var(--muted);margin-top:6px}
+</style>
+
+<div class="layout">
+  <nav class="toc" aria-label="目录">
+    <div class="brandmini">宝盒<small>NESIO · SPEC v1</small></div>
+    <ol id="toc-list">
+      <li><a href="#overview">总览</a></li>
+      <li><a href="#principles">设计原则</a></li>
+      <li><a href="#nessa">品牌与念念</a></li>
+      <li><a href="#color">色彩系统</a></li>
+      <li><a href="#type">字体</a></li>
+      <li><a href="#icon">图标</a></li>
+      <li><a href="#signature">标志性元素</a></li>
+      <li><a href="#cards">卡片与来源</a></li>
+      <li><a href="#mood">心情系统</a></li>
+      <li><a href="#naming">命名</a></li>
+      <li><a href="#pages">页面布局</a></li>
+      <li><a href="#voice">语气</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <header class="hero" id="overview">
+      <div class="eyebrow">Design System · 设计规范</div>
+      <h1>宝盒设计规范</h1>
+      <p class="lede">一份把这一轮所有设计决定收拢到一处的交付文档——<b>配色、字体、图标、标志性元素、卡片、心情系统、命名、页面与语气</b>。给设计与开发一份可对照落地的单一依据。</p>
+      <div class="meta">
+        <span><b>产品</b> 宝盒 / Nesio · 本地优先的个人记忆</span>
+        <span><b>助理</b> 念念 / Nessa</span>
+        <span><b>基调</b> 莫兰迪低饱和 · 冷静而温暖</span>
+        <span><b>版本</b> v1</span>
+      </div>
+    </header>
+
+    <!-- PRINCIPLES -->
+    <section id="principles">
+      <div class="shead"><span class="snum">01</span><h2>设计原则</h2></div>
+      <p class="sdesc">六条贯穿全局的判断标准。任何新界面拿不准时,回到这里对齐。</p>
+      <div class="grid g3">
+        <div class="card pr"><div class="t">回溯,不预测</div><div class="d">把你存过的、感受过的,在对的时候轻轻翻给你;不替你决定未来。这是产品的立身之本。</div></div>
+        <div class="card pr"><div class="t">冷静而温暖</div><div class="d">像个理性可靠、又记得你一切的老友。不煽情、不催促、不营销腔。</div></div>
+        <div class="card pr"><div class="t">少即是多</div><div class="d">留白、克制、层级清楚。宁可少一个元素,不多一分噪音。</div></div>
+        <div class="card pr"><div class="t">无 emoji</div><div class="d">统一的线性图标语言承载所有符号,不用彩色 emoji,保持高级与一致。</div></div>
+        <div class="card pr"><div class="t">分类为主,来源为辅</div><div class="d">记忆先按含义分类呈现,来源(手记/邮件/Notion…)退为辅助徽章。</div></div>
+        <div class="card pr"><div class="t">站在盒子这边</div><div class="d">文案视角始终是"念念替你收着、替你记着",而非系统功能自述。</div></div>
+      </div>
+    </section>
+
+    <!-- NESSA -->
+    <section id="nessa">
+      <div class="shead"><span class="snum">02</span><h2>品牌与念念</h2></div>
+      <p class="sdesc">产品叫 <b>宝盒 / Nesio</b>;助理叫 <b>念念 / Nessa</b>。对话入口<b>直接以她命名</b>(原「问一问」→「念念」);首页问候、回溯与洞察里所有"它说的话",也都是念念的口吻。</p>
+      <div class="card" style="display:flex;gap:22px;align-items:center;flex-wrap:wrap">
+        <div class="orb" style="width:88px;height:88px;display:flex;align-items:center;justify-content:center">
+          <span style="font-family:var(--serif);font-size:32px;font-weight:700;color:#8f7a8c;position:relative;z-index:2">念</span>
+        </div>
+        <div style="flex:1;min-width:240px">
+          <div style="font-family:var(--serif);font-size:30px;font-weight:700;color:var(--ink)">念念 <span style="color:var(--line2)">/</span> Nessa</div>
+          <p style="font-size:13px;color:var(--body);margin-top:10px;line-height:1.6">
+            <b style="color:var(--ink)">念念</b>——"念念不忘",把你的事都放在心上的那一个。<br>
+            <b style="color:var(--ink)">Nessa</b>——Nesio × 记忆女神 Mnemosyne 的混血,字面即"记忆的那一个",与品牌同声同源。
+          </p>
+        </div>
+      </div>
+      <h3 class="sub">她的脸</h3>
+      <p class="sdesc" style="margin-bottom:14px">头像那颗<b>哑光小球</b>就是念念的脸——白核 + 淡彩光晕(见「标志性元素」)。同一颗球也用于记忆罐的收藏。</p>
+      <h3 class="sub">口吻示例</h3>
+      <div class="grid g4" style="gap:10px">
+        <div class="qsamp"><div class="t">被叫到</div><div class="q">"在的。想找什么,我替你翻。"</div></div>
+        <div class="qsamp"><div class="t">回溯</div><div class="q">"一年前的今天,你去看了海——还记得吗?"</div></div>
+        <div class="qsamp"><div class="t">收下</div><div class="q">"收好了,不急,我替你记着。"</div></div>
+        <div class="qsamp"><div class="t">问心情</div><div class="q">"此刻,你感觉——?"</div></div>
+      </div>
+      <!--SHOT:nessa-->
+    </section>
+
+    <!-- COLOR -->
+    <section id="color">
+      <div class="shead"><span class="snum">03</span><h2>色彩系统</h2></div>
+      <p class="sdesc">两个维度:<b>4 套配色皮肤</b> × <b>明暗</b>。用户在「外观」里先选皮肤,再选明暗,全站即时换装。以下为默认皮肤①的核心 token。</p>
+
+      <h3 class="sub">四套皮肤 · 低饱和莫兰迪</h3>
+      <div class="grid g4">
+        <div class="pal"><div class="band" style="background:linear-gradient(135deg,#f9faf5,#ccd1d7)"><span class="dot" style="background:#cf8f89"></span></div><div class="info"><div class="nm">蓝灰·灰粉<span class="default-tag">默认</span></div><div class="mt">冷调精致</div><div class="hex">#F9FAF5 → #CCD1D7 · #CF8F89</div></div></div>
+        <div class="pal"><div class="band" style="background:linear-gradient(135deg,#f2ece0,#d9ccb5)"><span class="dot" style="background:#a98f66"></span></div><div class="info"><div class="nm">沙米·奶茶</div><div class="mt">温润 muji</div><div class="hex">#F2ECE0 → #D9CCB5 · #A98F66</div></div></div>
+        <div class="pal"><div class="band" style="background:linear-gradient(135deg,#e6f0f6,#9fbcd4)"><span class="dot" style="background:#6f88a0"></span></div><div class="info"><div class="nm">雾霾蓝</div><div class="mt">保留品牌蓝</div><div class="hex">#E6F0F6 → #9FBCD4 · #6F88A0</div></div></div>
+        <div class="pal"><div class="band" style="background:linear-gradient(135deg,#eef3f0,#c0d3c8)"><span class="dot" style="background:#7f9b8f"></span></div><div class="info"><div class="nm">灰绿</div><div class="mt">自然疗愈</div><div class="hex">#EEF3F0 → #C0D3C8 · #7F9B8F</div></div></div>
+      </div>
+
+      <h3 class="sub">明暗 · 每套皮肤都有明暗版</h3>
+      <div class="seg"><span class="on">日</span><span>随系统</span><span>夜</span></div>
+
+      <h3 class="sub">核心 Token(皮肤①·日)</h3>
+      <div class="toks">
+        <div class="tok"><span class="sw" style="background:#3a3c43"></span><div><div class="tn">ink 主文字</div><div class="th">#3A3C43</div></div></div>
+        <div class="tok"><span class="sw" style="background:#6f727a"></span><div><div class="tn">body 正文</div><div class="th">#6F727A</div></div></div>
+        <div class="tok"><span class="sw" style="background:#a2a3ab"></span><div><div class="tn">muted 次要</div><div class="th">#A2A3AB</div></div></div>
+        <div class="tok"><span class="sw" style="background:#c07f79"></span><div><div class="tn">brand 品牌</div><div class="th">#C07F79</div></div></div>
+        <div class="tok"><span class="sw" style="background:#b06f68"></span><div><div class="tn">deep 强调</div><div class="th">#B06F68</div></div></div>
+      </div>
+      <h3 class="sub">辅助色 · 分类语义</h3>
+      <div class="toks">
+        <div class="tok"><span class="sw" style="background:#8ba58f"></span><div><div class="tn">sage 物品/完成</div><div class="th">#8BA58F</div></div></div>
+        <div class="tok"><span class="sw" style="background:#7d8a9c"></span><div><div class="tn">blue 事件</div><div class="th">#7D8A9C</div></div></div>
+        <div class="tok"><span class="sw" style="background:#a08b9c"></span><div><div class="tn">mauve 情绪</div><div class="th">#A08B9C</div></div></div>
+        <div class="tok"><span class="sw" style="background:#c0906f"></span><div><div class="tn">amber 消费/待确认</div><div class="th">#C0906F</div></div></div>
+      </div>
+      <!--SHOT:appearance-->
+    </section>
+
+    <!-- TYPE -->
+    <section id="type">
+      <div class="shead"><span class="snum">04</span><h2>字体</h2></div>
+      <p class="sdesc">两种角色:<b>衬线</b>承载温度与"念念的声音",<b>无衬线</b>承载 UI 与数据。二者分工清晰,不混用。</p>
+      <div class="card">
+        <div class="typerow"><span class="lab">衬线 · 显示</span><span class="samp-serif" style="font-size:30px;font-weight:700">此刻,你感觉——</span><span class="spec">Noto Serif SC / Songti · 大标题 · 问候 · 信件体 · 念念口吻</span></div>
+        <div class="typerow"><span class="lab">无衬线 · 标题</span><span class="samp-sans" style="font-size:22px;font-weight:800">接下来 · 今天要紧的几件</span><span class="spec">PingFang SC · 区块标题 · 列表标题</span></div>
+        <div class="typerow"><span class="lab">无衬线 · 正文</span><span class="samp-sans" style="font-size:15px">先喝掉那盒牛奶 · 冰箱里,明天过期</span><span class="spec">PingFang SC · 15/13px · 卡片内容</span></div>
+        <div class="typerow"><span class="lab">无衬线 · 标注</span><span class="samp-sans" style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-weight:800">MEMORY · 383 条</span><span class="spec">10–11px · 字距 1px · 徽章 · 时间戳 · 数字用 tabular</span></div>
+      </div>
+    </section>
+
+    <!-- ICON -->
+    <section id="icon">
+      <div class="shead"><span class="snum">05</span><h2>图标</h2></div>
+      <p class="sdesc">统一线性图标:描边 <b>1.7–1.9</b>、圆角圆头、无填充(品牌标记除外)、无 emoji。分类图标用辅助色,来源图标用 muted 灰。</p>
+      <h3 class="sub">分类</h3>
+      <div class="icrow">
+        <div class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 13c2 0 2.5-4 4-4s2 6 4 6 2.5-8 4-8 2 5 4 5"/></svg><span class="l">情绪</span></div>
+        <div class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/></svg><span class="l">消费</span></div>
+        <div class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg><span class="l">待办</span></div>
+        <div class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 8l8-4 8 4v8l-8 4-8-4Z"/><path d="M4 8l8 4 8-4M12 12v8"/></svg><span class="l">物品</span></div>
+        <div class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/></svg><span class="l">事件</span></div>
+      </div>
+      <h3 class="sub">来源 · 6 类</h3>
+      <div class="icrow">
+        <div class="ic src"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20h4l10-10-4-4L4 16z"/></svg><span class="l">手记</span></div>
+        <div class="ic src"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4"/></svg><span class="l">语音</span></div>
+        <div class="ic src"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 8h3l1.5-2h7L18 8h2v11H4z"/><circle cx="12" cy="13" r="3"/></svg><span class="l">拍照</span></div>
+        <div class="ic src"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg><span class="l">邮件</span></div>
+        <div class="ic src"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/></svg><span class="l">日历</span></div>
+        <div class="ic src"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 21s7-5.5 7-11a7 7 0 0 0-14 0c0 5.5 7 11 7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg><span class="l">位置</span></div>
+      </div>
+      <p class="sdesc" style="margin-top:16px">外部 API 来源(<b>Notion · Flomo · 微信</b>等)用<b>单色徽章</b>,不引入各家原色,保持列表统一。</p>
+    </section>
+
+    <!-- SIGNATURE -->
+    <section id="signature">
+      <div class="shead"><span class="snum">06</span><h2>标志性元素</h2></div>
+      <p class="sdesc">三个专属视觉,让宝盒一眼可认。</p>
+
+      <h3 class="sub">水晶球 · 记忆罐</h3>
+      <div class="card" style="display:flex;gap:22px;align-items:center;flex-wrap:wrap">
+        <div style="display:flex;gap:18px">
+          <div class="orb" style="width:72px;height:72px;--t:rgba(200,162,115,.42);--sh:rgba(200,162,115,.4)"></div>
+          <div class="orb" style="width:72px;height:72px;--t:rgba(201,140,134,.4);--sh:rgba(201,140,134,.4)"></div>
+          <div class="orb" style="width:72px;height:72px;--t:rgba(139,165,143,.4);--sh:rgba(139,165,143,.4)"></div>
+        </div>
+        <div style="flex:1;min-width:240px">
+          <p style="font-size:13px;color:var(--body);line-height:1.65"><b style="color:var(--ink)">质感</b>:哑光白核 + 淡彩光晕,轻盈通透。白色径向渐变作核,边缘染一层皮肤辅助色,左上一点高光。<br><b style="color:var(--ink)">用途</b>:记忆罐的收藏(核心记忆/收藏/项目),以及念念的头像。<b style="color:var(--ink)">不用于</b>普通记忆卡片——保持珍藏感。</p>
+        </div>
+      </div>
+      <!--SHOT:orbs-->
+
+      <h3 class="sub">心情波纹符号</h3>
+      <div class="card" style="display:flex;gap:20px;align-items:center;flex-wrap:wrap">
+        <span style="width:40px;height:40px;border-radius:12px;background:radial-gradient(circle at 40% 34%,#fff,#eef3f4 66%,#d6e2e5);border:1px solid #bcd0d4;box-shadow:0 0 9px rgba(143,170,176,.5);display:flex;align-items:center;justify-content:center;color:#7f9ba1;flex-shrink:0"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 13c2 0 2.4-4 3.8-4s1.9 6 3.8 6 2.4-8 3.8-8 1.9 5 3.8 5"/></svg></span>
+        <div style="flex:1;min-width:240px"><p style="font-size:13px;color:var(--body);line-height:1.65"><b style="color:var(--ink)">圆角方块 + 波纹</b>,专用于心情。刻意区别于日程的圆点——形状不同,一眼看出"这不是日程,是问你自己"。方块底色与波纹随当天情绪色变化。</p></div>
+      </div>
+
+      <h3 class="sub">玻璃透视 · App 图标</h3>
+      <p class="sdesc" style="margin-bottom:0">App 图标<b>沿用现有的玻璃立方体</b>:等距、顶面透亮、内 3 条白线撑出立体、柔光落地。保持不变。</p>
+      <!--SHOT:logo-->
+    </section>
+
+    <!-- CARDS -->
+    <section id="cards">
+      <div class="shead"><span class="snum">07</span><h2>卡片与来源</h2></div>
+      <p class="sdesc">所有记忆走<b>同一张卡片模板</b>,消除此前各类型样式不一的问题。标题由 AI 归一化,不露原始邮件头等噪音。</p>
+      <div style="display:flex;gap:26px;flex-wrap:wrap;align-items:flex-start">
+        <div class="mc">
+          <div class="cat" style="color:var(--sage)"><span class="ci" style="background:rgba(139,165,143,.14)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--sage)" stroke-width="2" stroke-linejoin="round"><path d="M4 8l8-4 8 4v8l-8 4-8-4Z"/><path d="M4 8l8 4 8-4M12 12v8"/></svg></span>物品</div>
+          <div class="mt">Amazon 退货</div>
+          <div class="ms">退款将在 7·12 前到账</div>
+          <div class="meta"><span class="src"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.9"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>邮件<span class="pend">待确认</span></span><span class="tm">今天</span></div>
+        </div>
+        <div style="flex:1;min-width:260px">
+          <div class="callout">
+            <div class="k">1</div><div class="v"><b>分类图标</b> · 辅助色,标明这是什么</div>
+            <div class="k">2</div><div class="v"><b>干净标题</b> · AI 归一化,人话,无系统噪音</div>
+            <div class="k">3</div><div class="v"><b>摘要</b> · 一句话交代要点</div>
+            <div class="k">4</div><div class="v"><b>来源徽章 · 时间</b> · 来源退为辅助;不确定标 <span class="pend">待确认</span></div>
+          </div>
+        </div>
+      </div>
+      <p class="sdesc" style="margin-top:22px"><b>分类为主,来源为辅</b>:列表先按含义分类,来源只做右下角小徽章。长按任一记忆 → 放进项目 / 收藏 / 今日聚焦。</p>
+      <!--SHOT:cards-->
+    </section>
+
+    <!-- MOOD -->
+    <section id="mood">
+      <div class="shead"><span class="snum">08</span><h2>心情系统</h2></div>
+      <p class="sdesc">一套 <b>12 色情绪</b>贯穿情绪盘、首页与历史。此表为唯一标准,任何地方的情绪色都取自这里。</p>
+      <h3 class="sub">12 色 · 定稿</h3>
+      <div class="moods">
+        <div class="moodc"><span class="d" style="background:#d9a24e"></span><span class="n">开心</span><span class="h">#D9A24E</span></div>
+        <div class="moodc"><span class="d" style="background:#cf8f5f"></span><span class="n">兴奋</span><span class="h">#CF8F5F</span></div>
+        <div class="moodc"><span class="d" style="background:#cf9a86"></span><span class="n">感动</span><span class="h">#CF9A86</span></div>
+        <div class="moodc"><span class="d" style="background:#8faab0"></span><span class="n">平静</span><span class="h">#8FAAB0</span></div>
+        <div class="moodc"><span class="d" style="background:#97b195"></span><span class="n">满足</span><span class="h">#97B195</span></div>
+        <div class="moodc"><span class="d" style="background:#a9b58f"></span><span class="n">感激</span><span class="h">#A9B58F</span></div>
+        <div class="moodc"><span class="d" style="background:#9aa0b0"></span><span class="n">疲惫</span><span class="h">#9AA0B0</span></div>
+        <div class="moodc"><span class="d" style="background:#a7a9ae"></span><span class="n">空洞</span><span class="h">#A7A9AE</span></div>
+        <div class="moodc"><span class="d" style="background:#8391a8"></span><span class="n">难过</span><span class="h">#8391A8</span></div>
+        <div class="moodc"><span class="d" style="background:#b58f8a"></span><span class="n">焦虑</span><span class="h">#B58F8A</span></div>
+        <div class="moodc"><span class="d" style="background:#c08f6f"></span><span class="n">烦躁</span><span class="h">#C08F6F</span></div>
+        <div class="moodc"><span class="d" style="background:#b57670"></span><span class="n">生气</span><span class="h">#B57670</span></div>
+      </div>
+      <div class="grid g2" style="margin-top:26px">
+        <div class="card pr"><div class="t">情绪盘</div><div class="d">Russell 四象限布局,滑选。中心大圈<b style="color:var(--accent)">填当前情绪色</b>(滑到哪变哪色,兼作实时预览),环收紧不留大片空白。长按中心可直接写下来。</div></div>
+        <div class="card pr"><div class="t">落位 · 首页第一拍</div><div class="d">心情是一天时间线的<b style="color:var(--accent)">「现在」第一拍</b>,不占额外空间。用心情波纹方块作节点,标题文字取盘里对应色——一列排下就是你的情绪光谱。</div></div>
+      </div>
+      <!--SHOT:wheel-->
+      <p class="sdesc" style="margin-top:20px">往下还有:能量条(蔫→满电)、一句话/展开写(journal-lite)、留住的时刻(历史时间线)。情绪与能量喂给「洞察 → 一周能量 / 情绪回暖」。</p>
+      <!--SHOT:moodlayers-->
+    </section>
+
+    <!-- NAMING -->
+    <section id="naming">
+      <div class="shead"><span class="snum">09</span><h2>命名</h2></div>
+      <p class="sdesc">三条规则:动作用轻动词(同菜单同语法)、版块用干净名词(不用术语)、视角站在盒子这边。中英各一套,品牌名保持 Nesio。</p>
+      <div class="wrapx">
+      <table class="nt">
+        <thead><tr><th>类别</th><th>中文</th><th>English</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td class="cnm">记一笔 · 捕捉</td><td class="to">拍一下</td><td class="en">Snap</td><td class="cnm">与"说一句"对齐</td></tr>
+          <tr><td class="cnm"></td><td class="to">说一句</td><td class="en">Say</td><td class="cnm">语音记</td></tr>
+          <tr><td class="cnm"></td><td class="to">收进来</td><td class="en">Keep</td><td class="cnm">盒子替你收着,不用"分享"</td></tr>
+          <tr><td class="cnm"></td><td class="to">记心情</td><td class="en">Mood</td><td class="cnm">收短对齐</td></tr>
+          <tr><td class="cnm">主导航</td><td class="to">今天</td><td class="en">Today</td><td class="cnm">首页 · 时间线</td></tr>
+          <tr><td class="cnm"></td><td class="to">记忆</td><td class="en">Memory</td><td class="cnm">核心资产</td></tr>
+          <tr><td class="cnm"></td><td class="to">念念</td><td class="en">Nessa</td><td class="cnm">对话入口 · 直接用助理名(原「问一问」)</td></tr>
+          <tr><td class="cnm"></td><td class="to">洞察</td><td class="en">Insights</td><td class="cnm">不用临床味的 Cognition</td></tr>
+          <tr><td class="cnm"></td><td class="to">多面镜</td><td class="en">Mirror</td><td class="cnm">照见另一面的你(原"认知")</td></tr>
+          <tr><td class="cnm"></td><td class="to">足迹</td><td class="en">Places</td><td class="cnm">去过的地方</td></tr>
+          <tr><td class="cnm">记忆罐</td><td class="to">收纳</td><td class="en">Things</td><td class="cnm">去掉冗余的"物品"</td></tr>
+          <tr><td class="cnm"></td><td class="to">收藏</td><td class="en">Favorites</td><td class="cnm">去掉"夹"</td></tr>
+          <tr><td class="cnm"></td><td class="to">核心记忆</td><td class="en">Core</td><td class="cnm">定义你的那几条</td></tr>
+          <tr><td class="cnm"></td><td class="to">项目</td><td class="en">Projects</td><td class="cnm">通用清楚</td></tr>
+          <tr><td class="cnm">助理</td><td class="to">念念</td><td class="en">Nessa</td><td class="cnm">产品的声音 · 也是对话入口名</td></tr>
+        </tbody>
+      </table>
+      </div>
+      <!--SHOT:naming-->
+      <!--SHOT:namingen-->
+    </section>
+
+    <!-- PAGES -->
+    <section id="pages">
+      <div class="shead"><span class="snum">10</span><h2>页面布局</h2></div>
+      <p class="sdesc">各页的结构要点。详见对应设计稿。</p>
+      <div class="card" style="padding:6px 22px">
+        <div class="pg"><div class="nm">今天<small>TODAY</small></div><div class="d">问候(念念口吻) → <b>回顾</b>卡(去年今日/一段旧记忆) → <b>接下来</b>时间线。每个节点带具体时间与倒计时;心情作「现在」第一拍。处处可点开。</div></div>
+        <div class="pg"><div class="nm">记忆<small>MEMORY</small></div><div class="d">搜索 → <b>记忆罐</b>(3 水晶球:核心记忆/收藏/项目) → <b>收纳</b>实用入口条(40 件·估值) → 全部记忆(统一卡片瀑布流)。</div></div>
+        <div class="pg"><div class="nm">洞察<small>INSIGHTS</small></div><div class="d">多 Tab。含"存入记忆"、可选角度/月/周/任意时段/分类的 filter;历史信可折叠存档回看,每屏一封。</div></div>
+        <div class="pg"><div class="nm">多面镜<small>MIRROR</small></div><div class="d">照见另一面的自己——认知/人格切片,以卡片与信件体呈现。</div></div>
+        <div class="pg"><div class="nm">足迹<small>PLACES</small></div><div class="d">四分类。地点=饼图 + 周/月/年 filter;世界=先国家后城市,用可含图文的 card。</div></div>
+        <div class="pg"><div class="nm">念念<small>NESSA</small></div><div class="d">跟念念对话(原「问一问」)。历史记录、新对话按钮、深问模式开关;长按消息 → 存入记忆/复制/以此为题继续问。</div></div>
+        <div class="pg"><div class="nm">心情<small>MOOD</small></div><div class="d">四层:情绪盘(12 色) → 能量条 → 一句话/展开写 → 留住的时刻(历史)。</div></div>
+        <div class="pg"><div class="nm">设置<small>SETTINGS</small></div><div class="d">档案(温暖) vs 账户(冷静)分开;外观 = 配色(4) + 明暗(3)。去掉旧的"了解你/语气/提醒程度"等项。</div></div>
+        <div class="pg"><div class="nm">记一笔<small>CAPTURE</small></div><div class="d">中心盒子 → 均匀弧展开 <b>3 个</b>:拍一下/说一句/收进来。记心情已移至今天页,不在此。</div></div>
+      </div>
+      <div class="gallery">
+        <!--SHOT:today-->
+        <!--SHOT:memory-->
+        <!--SHOT:insights-->
+        <!--SHOT:mirror-->
+        <!--SHOT:places-->
+        <!--SHOT:ask-->
+        <!--SHOT:settings-->
+        <!--SHOT:capture-->
+        <!--SHOT:decompose-->
+      </div>
+    </section>
+
+    <!-- VOICE -->
+    <section id="voice">
+      <div class="shead"><span class="snum">11</span><h2>语气</h2></div>
+      <p class="sdesc">念念说话的方式:冷静、温暖、克制。以下是标尺。</p>
+      <div class="do-dont">
+        <div class="dd do"><div class="h">要</div><ul>
+          <li>像老友:"我先替你收着,不急。"</li>
+          <li>回溯用回忆口吻:"还记得吗?"</li>
+          <li>给 ADHD 减压:"只做下一步就好。"</li>
+          <li>短句、留白、具体</li>
+        </ul></div>
+        <div class="dd dont"><div class="h">不要</div><ul>
+          <li>营销腔、感叹号轰炸</li>
+          <li>预测/替你决定未来</li>
+          <li>系统功能自述:"已同步 3 条数据"</li>
+          <li>emoji、彩色、催促</li>
+        </ul></div>
+      </div>
+      <p class="sdesc" style="margin-top:22px">一句话:<b>产品里所有"它说的话",都是念念在跟你说。</b></p>
+    </section>
+
+    <footer>
+      <div><b>宝盒 · Nesio</b> 设计规范 v1 — 配色 · 字体 · 图标 · 水晶球 · 卡片 · 心情 · 命名 · 页面 · 语气</div>
+      <div class="theme-note">本页随系统明暗切换 · 可用右上角主题按钮切换</div>
+    </footer>
+  </main>
+</div>
+
+<script>
+(function(){
+  var links=[].slice.call(document.querySelectorAll('.toc a'));
+  var map={};links.forEach(function(a){map[a.getAttribute('href').slice(1)]=a;});
+  var secs=[].slice.call(document.querySelectorAll('section[id],header[id]'));
+  if(!('IntersectionObserver' in window))return;
+  var io=new IntersectionObserver(function(es){
+    es.forEach(function(e){
+      if(e.isIntersecting){
+        links.forEach(function(l){l.classList.remove('on');});
+        var a=map[e.target.id];if(a)a.classList.add('on');
+      }
+    });
+  },{rootMargin:'-45% 0px -50% 0px'});
+  secs.forEach(function(s){io.observe(s);});
+})();
+</script>

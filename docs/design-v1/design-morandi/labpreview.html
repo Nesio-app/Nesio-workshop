@@ -1,0 +1,94 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
+body{font-family:"PingFang SC","Hiragino Sans GB",system-ui,sans-serif;background:#ececeb;padding:30px}
+.stage{display:flex;gap:34px;align-items:flex-start;max-width:1500px;margin:0 auto}
+/* 设置面板 */
+.sheet{width:430px;flex-shrink:0;background:#fff;border-radius:26px;padding:22px 20px;box-shadow:0 12px 34px rgba(0,0,0,.1)}
+.sec-lbl{font-size:13px;font-weight:800;color:#8a8d96;letter-spacing:.5px;margin:2px 4px 12px}
+.opt{border:1px solid #e7e8ea;border-radius:16px;padding:15px 16px;margin-bottom:11px;display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.opt-l{font-size:16px;font-weight:800;color:#22252b}
+.opt-h{font-size:12.5px;line-height:1.5;color:#8a8d96;margin-top:4px;font-weight:500}
+.radio{width:20px;height:20px;border-radius:50%;border:2px solid #cfd2d6;flex-shrink:0;margin-top:2px}
+.pv-title{font-size:16px;font-weight:800;color:#22252b}
+.pv-sub{font-size:12.5px;color:#8a8d96;margin-top:4px;font-weight:500}
+.cards{margin-top:14px;display:flex;flex-direction:column;gap:10px}
+.pcard{border:1.5px solid #e7e8ea;border-radius:15px;padding:11px 12px;display:flex;align-items:center;gap:12px;cursor:pointer}
+.pcard.on{border-color:#3a3c43;background:#fafafa}
+.sw{width:56px;height:34px;border-radius:9px;flex-shrink:0;position:relative;overflow:hidden;border:1px solid rgba(0,0,0,.06)}
+.sw .dot{position:absolute;right:5px;bottom:5px;width:12px;height:12px;border-radius:50%;box-shadow:0 0 0 2px #fff}
+.pc-body{flex:1;min-width:0}
+.pc-n{font-size:14px;font-weight:800;color:#2a2d33}
+.pc-d{font-size:11px;color:#9a9ca3;margin-top:1px;font-weight:600}
+.pc-r{width:19px;height:19px;border-radius:50%;border:2px solid #cfd2d6;flex-shrink:0}
+.pcard.on .pc-r{border-color:#3a3c43;background:#3a3c43;box-shadow:inset 0 0 0 3px #fff}
+/* 右侧手机预览组 */
+.phones{display:grid;grid-template-columns:repeat(2,1fr);gap:22px;flex:1}
+.pcell .pcap{font-size:13px;font-weight:800;color:#54575e;margin:0 0 7px 3px}
+.phone{border-radius:28px;overflow:hidden;position:relative;height:500px;padding:0 15px;box-shadow:0 10px 26px rgba(0,0,0,.12)}
+.sb{display:flex;justify-content:space-between;align-items:center;padding:12px 3px 2px;font-size:11px;font-weight:700}
+.hd{display:flex;justify-content:space-between;align-items:center;margin-top:14px}
+.cube{width:32px;height:32px}.avatar{width:32px;height:32px;border-radius:50%}
+.h1{margin-top:12px;font-size:16px;line-height:1.38;font-weight:800}
+.card{border-radius:15px;padding:12px;margin-top:12px;backdrop-filter:blur(12px)}
+.rmd{display:flex;gap:8px}.rmd-t{font-size:12px;font-weight:800;margin-bottom:3px}.rmd-b{font-size:10.5px;line-height:1.4;font-weight:500}
+.sec{display:flex;justify-content:space-between;align-items:center;margin:15px 3px 8px}
+.sec-t{font-size:13px;font-weight:800}.sec-a{font-size:11px;font-weight:600}
+.fc-top{display:flex;align-items:center;gap:7px}.fc-t{font-size:12.5px;font-weight:700;flex:1;display:flex;align-items:center;gap:7px}
+.tag{font-size:9.5px;font-weight:700;padding:2px 7px;border-radius:6px}.fc-time{font-size:11.5px;font-weight:600;margin-left:5px}
+.fc-div{height:1px;margin:10px -3px}.fc-more{display:flex;justify-content:space-between;align-items:center;font-size:11.5px;font-weight:600}
+.nav{position:absolute;left:15px;right:15px;bottom:13px;height:48px;border-radius:18px;backdrop-filter:blur(12px);display:flex;align-items:center;justify-content:space-around}
+.nav-i{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:9px;font-weight:700}
+.nav-c{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-top:-17px}
+</style></head><body>
+<div class="stage">
+  <div class="sheet">
+    <div class="sec-lbl">实验功能</div>
+    <div class="opt"><div><div class="opt-l">Lab 模式</div><div class="opt-h">解锁实验工具和预览功能。</div></div><div class="radio"></div></div>
+    <div class="opt" style="border-color:#3a3c43">
+      <div style="flex:1">
+        <div class="pv-title">低饱和配色(预览)· 4 套色卡</div>
+        <div class="pv-sub">点一张即时全站换装,再点「默认蓝」还原。</div>
+        <div class="cards" id="cards"></div>
+      </div>
+    </div>
+  </div>
+  <div class="phones" id="phones"></div>
+</div>
+<script>
+function hx(h){h=h.replace('#','');return[parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)];}
+function mix(a,b,t){const A=hx(a),B=hx(b);return`rgb(${A.map((v,i)=>Math.round(v+(B[i]-v)*t)).join(',')})`;}
+const glass='background:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.65)';
+const P=[
+ {id:'bluegray-rose',n:'① 蓝灰 · 灰粉点睛',d:'冷调精致',bg1:'#f9faf5',bg2:'#ccd1d7',brand:'#c8817b',tagbg:'#f2ddd9',ink:'#3a3c43',body:'#71737b',muted:'#a2a3ab',deep:'#b06f68'},
+ {id:'milktea',n:'② 沙米 · 奶茶暖调',d:'温润 muji',bg1:'#f2ece0',bg2:'#d9ccb5',brand:'#a98f66',tagbg:'#eae0cf',ink:'#3c3a35',body:'#74716a',muted:'#a5a29a',deep:'#8a6f48'},
+ {id:'haze-blue',n:'③ 雾霾蓝 · 柔',d:'保留品牌蓝',bg1:'#e6f0f6',bg2:'#9fbcd4',brand:'#5f7890',tagbg:'#dcebf3',ink:'#2f3743',body:'#647585',muted:'#93a3b2',deep:'#4a6079'},
+ {id:'sage',n:'④ 灰绿 · 治愈',d:'自然疗愈',bg1:'#eef3f0',bg2:'#c0d3c8',brand:'#7f9b8f',tagbg:'#dfeae4',ink:'#33403a',body:'#64756b',muted:'#93a897',deep:'#6f8b7f'},
+];
+const cube=b=>`<svg class="cube" viewBox="0 0 40 40"><path d="M20 4 35 12.5 20 21 5 12.5Z" fill="${b}" fill-opacity=".85"/><path d="M5 12.5 20 21 20 37 5 28.5Z" fill="${b}" fill-opacity=".47"/><path d="M35 12.5 20 21 20 37 35 28.5Z" fill="${b}" fill-opacity=".64"/></svg>`;
+function phone(t){const {bg1,bg2,brand,tagbg,ink,body,muted,deep}=t;
+ return `<div class="phone" style="background:linear-gradient(162deg,${bg1} 0%,${bg2} 122%)">
+  <div class="sb" style="color:${ink}"><span>4:01</span><span>5G+ ▪</span></div>
+  <div class="hd">${cube(brand)}<div class="avatar" style="background:radial-gradient(circle at 60% 35%,#fff9,${bg1})"></div></div>
+  <div class="h1" style="color:${ink}">下午好。最近的一件事:明天·核心科目突围。</div>
+  <div class="card rmd" style="${glass}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${ink}" stroke-width="1.8"><rect x="4" y="3" width="16" height="18" rx="2.5"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
+   <div><div class="rmd-t" style="color:${ink}">牛奶快到期啦</div><div class="rmd-b" style="color:${body}">这盒牛奶明天就过期了,今天喝完吧!</div></div></div>
+  <div class="sec"><span class="sec-t" style="color:${ink}">今日焦点</span><span class="sec-a" style="color:${muted}">全部 ›</span></div>
+  <div class="card" style="${glass}"><div class="fc-top"><div class="fc-t" style="color:${ink}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="${ink}" stroke-width="1.8"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/></svg>咨询</div>
+    <span class="tag" style="background:${tagbg};color:${deep}">明天</span><span class="fc-time" style="color:${ink}">20:15</span></div>
+   <div class="fc-div" style="background:rgba(0,0,0,.07)"></div>
+   <div class="fc-more" style="color:${body}"><span>还有 4 项</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="${muted}" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></div></div>
+  <div class="nav" style="${glass}">
+   <div class="nav-i" style="color:${deep}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>今天</div>
+   <div class="nav-c" style="background:${brand};box-shadow:0 6px 15px ${mix(brand,'#fff',.3)}"><svg width="17" height="17" viewBox="0 0 26 26"><path d="M13 4 22 9 13 14 4 9Z" fill="#fff" fill-opacity=".95"/><path d="M4 9 13 14 13 23 4 18Z" fill="#fff" fill-opacity=".7"/><path d="M22 9 13 14 13 23 22 18Z" fill="#fff" fill-opacity=".82"/></svg></div>
+   <div class="nav-i" style="color:${muted}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3 20 7.5 12 12 4 7.5Z"/><path d="M4 7.5V16.5L12 21 20 16.5V7.5"/><path d="M12 12v9"/></svg>记忆</div></div>
+ </div>`;}
+const cards=document.getElementById('cards'), phones=document.getElementById('phones');
+P.forEach((t,i)=>{
+ cards.insertAdjacentHTML('beforeend',`<div class="pcard${i===0?' on':''}">
+   <div class="sw" style="background:linear-gradient(135deg,${t.bg1},${t.bg2})"><span class="dot" style="background:${t.brand}"></span></div>
+   <div class="pc-body"><div class="pc-n">${t.n}</div><div class="pc-d">${t.d}</div></div>
+   <div class="pc-r"></div></div>`);
+ phones.insertAdjacentHTML('beforeend',`<div class="pcell"><div class="pcap">${t.n} · ${t.d}</div>${phone(t)}</div>`);
+});
+</script></body></html>

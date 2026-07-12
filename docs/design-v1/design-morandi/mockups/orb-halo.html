@@ -1,0 +1,67 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
+body{font-family:"PingFang SC","Hiragino Sans GB",system-ui,sans-serif;background:#e9e9e8;padding:44px;display:flex;gap:40px;justify-content:center;align-items:flex-start;flex-wrap:wrap}
+.col{width:440px}
+.h{font-size:16px;font-weight:800;color:#2c2f36;margin-bottom:4px}
+.sub{font-size:12px;color:#9a9ca3;font-weight:600;margin-bottom:16px}
+.panel{border-radius:26px;padding:30px 24px 36px;box-shadow:0 12px 30px rgba(0,0,0,.1)}
+.light{background:linear-gradient(180deg,#f7f8f5,#e6e9ea)}
+.dark{background:radial-gradient(120% 80% at 20% 0%,#3a3550 0%,transparent 55%),linear-gradient(180deg,#2b2f3e,#242834)}
+.lbl{font-size:12px;font-weight:800;margin-bottom:26px;display:flex}
+.lbl .n{margin-left:auto;font-size:10.5px;font-weight:700}
+.light .lbl{color:#6f727a}.light .lbl .n{color:#a2a3ab}
+.dark .lbl{color:#c3c6d3}.dark .lbl .n{color:#8b8fa1}
+.balls{display:flex;justify-content:space-around}
+.wrap{position:relative;width:94px;height:94px;display:flex;align-items:center;justify-content:center}
+/* 彩色光晕:在球后面一圈 */
+.wrap:before{content:"";position:absolute;inset:-10px;border-radius:50%;background:var(--halo);filter:blur(11px);z-index:0}
+.orb{width:94px;height:94px;border-radius:50%;position:relative;z-index:1;display:flex;align-items:center;justify-content:center}
+.orb:after{content:"";position:absolute;left:22%;top:15%;width:44%;height:36%;border-radius:50%;filter:blur(8px);z-index:1}
+/* 白天:低饱和白哑光,边缘只透一点点色 */
+.light .orb{border:1px solid rgba(255,255,255,.55);
+ background:radial-gradient(circle at 42% 38%,#fdfdfb 0%,#f4f3ef 54%,var(--rim) 100%);
+ box-shadow:0 12px 22px -9px var(--ls)}
+.light .orb:after{background:rgba(255,255,255,.5)}
+/* 暗色:低饱和白雾 + 彩色光晕 */
+.dark .orb{border:1px solid rgba(255,255,255,.16);
+ background:radial-gradient(circle at 40% 36%,rgba(255,255,255,.2),rgba(255,255,255,.08) 55%,var(--rimD) 100%);
+ box-shadow:inset 0 0 16px rgba(255,255,255,.06)}
+.dark .orb:after{background:rgba(255,255,255,.22)}
+.o-warm{--rim:#efe7d8;--rimD:rgba(210,190,155,.22);--halo:radial-gradient(circle,rgba(200,178,140,.42),transparent 70%);--ls:rgba(170,150,115,.3)}
+.o-rose{--rim:#f2e4e0;--rimD:rgba(210,170,162,.22);--halo:radial-gradient(circle,rgba(205,160,152,.42),transparent 70%);--ls:rgba(170,125,118,.3)}
+.o-sage{--rim:#e4ede8;--rimD:rgba(170,196,182,.22);--halo:radial-gradient(circle,rgba(158,188,172,.42),transparent 70%);--ls:rgba(120,145,128,.3)}
+.sym{position:relative;z-index:2}
+.note{font-size:12.5px;line-height:1.7;font-weight:600;margin-top:24px;color:#6f727a}
+.note b{color:#3a3c43}
+</style></head><body>
+
+<div class="col">
+  <div class="h">白天 · 低饱和白 + 彩色光晕</div>
+  <div class="sub">球是哑光的白,色只是一圈晕</div>
+  <div class="panel light">
+    <div class="lbl">记忆罐 <span class="n">你的收藏与项目</span></div>
+    <div class="balls">
+      <div class="wrap o-warm"><div class="orb"><svg class="sym" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#9a8258" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.9L19 9.5l-4 3.4 1.3 5.1L12 15.6 7.7 18l1.3-5.1-4-3.4 5.2-1.6z"/></svg></div></div>
+      <div class="wrap o-rose"><div class="orb"><svg class="sym" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#b07d75" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10v16l-5-3.5L7 20z"/></svg></div></div>
+      <div class="wrap o-sage"><div class="orb"><svg class="sym" width="33" height="33" viewBox="0 0 24 24" fill="none" stroke="#6d8f7e" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div></div>
+    </div>
+  </div>
+  <div class="note"><b>白打底、色作晕</b>:球身是哑光低饱和的白,只有<b>后面一圈柔和的彩色光晕</b>+ 边缘一丝透色 + 同色符号。干净、通透、有一点点色的呼吸。</div>
+</div>
+
+<div class="col">
+  <div class="h">暗色 · 白雾 + 彩色光晕</div>
+  <div class="sub">同逻辑,深底上更透</div>
+  <div class="panel dark">
+    <div class="lbl">记忆罐 <span class="n">你的收藏与项目</span></div>
+    <div class="balls">
+      <div class="wrap o-warm"><div class="orb"><svg class="sym" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#e6d3ac" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.9L19 9.5l-4 3.4 1.3 5.1L12 15.6 7.7 18l1.3-5.1-4-3.4 5.2-1.6z"/></svg></div></div>
+      <div class="wrap o-rose"><div class="orb"><svg class="sym" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#e8c2bb" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10v16l-5-3.5L7 20z"/></svg></div></div>
+      <div class="wrap o-sage"><div class="orb"><svg class="sym" width="33" height="33" viewBox="0 0 24 24" fill="none" stroke="#c6d8cd" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div></div>
+    </div>
+  </div>
+  <div class="note">白雾球 + 一圈彩色光晕,深底把光晕衬得更明显,灰调不刺眼。</div>
+</div>
+
+</body></html>

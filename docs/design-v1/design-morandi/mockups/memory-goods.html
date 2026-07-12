@@ -1,0 +1,122 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600;700&display=swap');
+:root{--bg1:#f7f8f5;--bg2:#e6e9ea;--ink:#3a3c43;--body:#6f727a;--muted:#a2a3ab;--line:rgba(120,125,135,.18);--deep:#b06f68;
+ --rose:#c98c86;--amber:#c0906f;--sage:#8ba58f;--blue:#7d8a9c;--mauve:#a08b9c;--warm:#c8a273}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
+body{font-family:"PingFang SC","Hiragino Sans GB",system-ui,sans-serif;background:#e9e9e8;padding:36px;display:flex;gap:26px;justify-content:center;align-items:flex-start}
+.side{width:250px;font-size:13px;line-height:1.85;color:#54575e}
+.side h3{font-size:15px;color:#2c2f36;margin:0 0 12px}
+.side b{color:var(--deep)}
+.side .m{margin-bottom:13px;padding-left:11px;border-left:2px solid var(--line)}
+.side .m .t{font-weight:800;color:#2c2f36}
+.cell .cap{font-size:14px;font-weight:800;color:#2c2f36;margin:0 0 3px 3px}
+.cell .sub{font-size:11px;font-weight:600;color:#9a9ca3;margin:0 0 10px 3px}
+.phone{width:372px;height:788px;border-radius:30px;position:relative;overflow:hidden;color:var(--ink);
+ background:linear-gradient(180deg,var(--bg1),#e4e7ea);box-shadow:0 14px 34px rgba(0,0,0,.13)}
+.sbar{display:flex;justify-content:space-between;align-items:center;padding:14px 20px 2px;font-size:11px;font-weight:700}
+.pad{padding:0 16px}
+.title{font-size:23px;font-weight:800;margin-top:8px;padding:0 4px}
+.search{background:rgba(255,255,255,.6);border:1px solid var(--line);border-radius:13px;padding:11px 14px;font-size:12.5px;color:var(--muted);font-weight:500;margin:12px 4px 0;display:flex;justify-content:space-between}
+.lbl{font-size:12px;font-weight:800;color:var(--body);margin:18px 4px 13px;display:flex;align-items:center}
+.lbl .n{margin-left:auto;font-size:10.5px;color:var(--muted);font-weight:700}
+/* orbs */
+.balls{display:flex;justify-content:space-around;padding:0 2px}
+.balls.four{justify-content:space-between;padding:0 4px}
+.ball{display:flex;flex-direction:column;align-items:center;gap:11px}
+.orb{width:78px;height:78px;border-radius:50%;position:relative;
+ background:radial-gradient(circle at 35% 28%,rgba(255,255,255,.95),rgba(255,255,255,.35) 44%,var(--tint) 100%);
+ border:1px solid rgba(255,255,255,.8);
+ box-shadow:0 16px 22px -8px var(--sh),inset 0 0 18px rgba(255,255,255,.55),inset -6px -8px 14px var(--tint);
+ display:flex;align-items:center;justify-content:center}
+.orb.sm{width:70px;height:70px}
+.orb:before{content:"";position:absolute;left:24%;top:15%;width:24%;height:17%;border-radius:50%;background:rgba(255,255,255,.9);filter:blur(1.5px)}
+.o-warm{--tint:rgba(200,162,115,.42);--sh:rgba(200,162,115,.4)}
+.o-rose{--tint:rgba(201,140,134,.4);--sh:rgba(201,140,134,.4)}
+.o-sage{--tint:rgba(139,165,143,.4);--sh:rgba(139,165,143,.4)}
+.o-blue{--tint:rgba(125,138,156,.4);--sh:rgba(125,138,156,.4)}
+.orb .gl{color:rgba(80,80,86,.5);position:relative;z-index:2}
+.ball .bt{font-size:12.5px;font-weight:800;text-align:center}
+.ball .bs{font-size:10px;color:var(--muted);font-weight:600}
+/* 实用入口 tile */
+.goods{display:flex;align-items:center;gap:13px;background:rgba(255,255,255,.62);border:1px solid var(--line);border-radius:16px;padding:14px 15px;margin:0 4px;box-shadow:0 4px 12px rgba(0,0,0,.04)}
+.g-ic{width:44px;height:44px;border-radius:13px;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+ background:radial-gradient(circle at 38% 30%,#fff,#eef2ee 66%,#dbe6de);border:1px solid #c9d7cf;color:#7f9b8f}
+.g-b{flex:1;min-width:0}
+.g-t{font-size:15px;font-weight:800}
+.g-s{font-size:11px;color:var(--muted);font-weight:600;margin-top:2px}
+.g-stat{text-align:right;flex-shrink:0}
+.g-num{font-size:15px;font-weight:800;color:var(--sage)}
+.g-cur{font-size:10px;color:var(--muted);font-weight:700;margin-top:1px}
+.g-x{color:var(--muted);font-size:16px;margin-left:4px}
+.masonry{columns:2;column-gap:9px;margin-top:2px}
+.mc{break-inside:avoid;background:#fff;border:1px solid var(--line);border-radius:14px;padding:11px;margin-bottom:9px}
+.mc-cat{display:flex;align-items:center;gap:5px;font-size:9.5px;font-weight:800;margin-bottom:6px}
+.mc-cat .ci{width:18px;height:18px;border-radius:6px;display:flex;align-items:center;justify-content:center}
+.mc-t{font-size:13.5px;font-weight:800;line-height:1.35}
+.mc-s{font-size:11px;color:var(--body);margin-top:3px;line-height:1.5}
+</style></head><body>
+
+<div class="side">
+  <h3>物品收纳 放哪</h3>
+  <div class="m"><span class="t">定性</span>:它是一个能<b>走进去的世界</b>(空间/容器/估值/位置),不是"承诺 22"那种统计数字。所以从统计格挪到「记忆罐」这一区。</div>
+  <div class="m"><span class="t">A · 做第 4 颗球</span>:和收藏/项目并排,球里放盒子符号。统一、干净,但球=珍贵记忆,塞个实用清单略稀释那份"珍藏感"。</div>
+  <div class="m"><span class="t">B · 独立实用入口(推荐)</span>:球下面一条<b>整宽入口条</b>,盒子图标 + 右侧亮出关键数(40 件 · $556)。它本来就偏工具属性,给它自己的位置,还能一眼看到有用的数。</div>
+  <div class="m"><span class="t">我的票</span>:<b>B</b>。球留 3 颗珍藏,物品做实用入口,各归其位。</div>
+</div>
+
+<!-- A: 4th orb -->
+<div class="cell"><div class="cap">A · 物品 = 第 4 颗球</div><div class="sub">与收藏/项目并排</div>
+ <div class="phone">
+  <div class="sbar"><span>8:56</span><span>5G+ ▪</span></div>
+  <div class="pad">
+    <div class="title">记忆</div>
+    <div class="search">搜你记过的一切… <span>⌕</span></div>
+    <div class="lbl">记忆罐 <span class="n">你的收藏 · 项目 · 物品</span></div>
+    <div class="balls four">
+      <div class="ball"><span class="orb sm o-warm"></span><span class="bt">核心记忆</span><span class="bs">定义你 · 5</span></div>
+      <div class="ball"><span class="orb sm o-rose"></span><span class="bt">收藏夹</span><span class="bs">手动收 · 12</span></div>
+      <div class="ball"><span class="orb sm o-sage"></span><span class="bt">项目·装修</span><span class="bs">进行 · 34</span></div>
+      <div class="ball"><span class="orb sm o-blue"><span class="gl"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 8l8-4 8 4v8l-8 4-8-4Z"/><path d="M4 8l8 4 8-4M12 12v8"/></svg></span></span><span class="bt">物品收纳</span><span class="bs">40 件 · $556</span></div>
+    </div>
+    <div class="lbl">全部记忆 <span class="n">383 条 · 可搜</span></div>
+    <div class="masonry">
+      <div class="mc"><div class="mc-cat" style="color:var(--mauve)"><span class="ci" style="background:rgba(160,139,156,.14)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--mauve)" stroke-width="2" stroke-linecap="round"><path d="M4 13c2 0 2.5-4 4-4s2 6 4 6 2.5-8 4-8 2 5 4 5"/></svg></span>情绪</div><div class="mc-t">此刻 · 满足</div><div class="mc-s">精力 high · 在家</div></div>
+      <div class="mc"><div class="mc-cat" style="color:var(--amber)"><span class="ci" style="background:rgba(192,144,111,.14)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/></svg></span>消费</div><div class="mc-t">花旗 $25.74</div><div class="mc-s">一笔交易</div></div>
+      <div class="mc"><div class="mc-cat" style="color:var(--sage)"><span class="ci" style="background:rgba(139,165,143,.14)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--sage)" stroke-width="2" stroke-linejoin="round"><path d="M4 8l8-4 8 4v8l-8 4-8-4Z"/><path d="M4 8l8 4 8-4M12 12v8"/></svg></span>物品</div><div class="mc-t">毛衣 / 外套</div><div class="mc-s">TJ Maxx · $24</div></div>
+      <div class="mc"><div class="mc-cat" style="color:var(--blue)"><span class="ci" style="background:rgba(125,138,156,.14)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/></svg></span>事件</div><div class="mc-t">退款已处理</div><div class="mc-s">预计 7·12 到账</div></div>
+    </div>
+  </div>
+ </div></div>
+
+<!-- B: dedicated tile -->
+<div class="cell"><div class="cap">B · 物品 = 独立实用入口(推荐)</div><div class="sub">球留 3 颗,物品单开一条</div>
+ <div class="phone">
+  <div class="sbar"><span>8:56</span><span>5G+ ▪</span></div>
+  <div class="pad">
+    <div class="title">记忆</div>
+    <div class="search">搜你记过的一切… <span>⌕</span></div>
+    <div class="lbl">记忆罐 <span class="n">你的收藏与项目</span></div>
+    <div class="balls">
+      <div class="ball"><span class="orb o-warm"></span><span class="bt">核心记忆</span><span class="bs">定义你 · 5</span></div>
+      <div class="ball"><span class="orb o-rose"></span><span class="bt">收藏夹</span><span class="bs">手动收 · 12</span></div>
+      <div class="ball"><span class="orb o-sage"></span><span class="bt">项目·装修</span><span class="bs">进行 · 34</span></div>
+    </div>
+    <div class="lbl">收纳 <span class="n">东西放哪了,一查就知道</span></div>
+    <div class="goods">
+      <span class="g-ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 8l8-4 8 4v8l-8 4-8-4Z"/><path d="M4 8l8 4 8-4M12 12v8"/></svg></span>
+      <div class="g-b"><div class="g-t">物品收纳</div><div class="g-s">1 空间 · 39 件未归位</div></div>
+      <div class="g-stat"><div class="g-num">40 件</div><div class="g-cur">估值 $556</div></div>
+      <span class="g-x">›</span>
+    </div>
+    <div class="lbl">全部记忆 <span class="n">383 条 · 可搜</span></div>
+    <div class="masonry">
+      <div class="mc"><div class="mc-cat" style="color:var(--mauve)"><span class="ci" style="background:rgba(160,139,156,.14)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--mauve)" stroke-width="2" stroke-linecap="round"><path d="M4 13c2 0 2.5-4 4-4s2 6 4 6 2.5-8 4-8 2 5 4 5"/></svg></span>情绪</div><div class="mc-t">此刻 · 满足</div><div class="mc-s">精力 high · 在家</div></div>
+      <div class="mc"><div class="mc-cat" style="color:var(--amber)"><span class="ci" style="background:rgba(192,144,111,.14)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/></svg></span>消费</div><div class="mc-t">花旗 $25.74</div><div class="mc-s">一笔交易</div></div>
+      <div class="mc"><div class="mc-cat" style="color:var(--rose)"><span class="ci" style="background:rgba(201,140,134,.14)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--rose)" stroke-width="2" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg></span>待办</div><div class="mc-t">吃饭</div><div class="mc-s">截止 7月12日</div></div>
+      <div class="mc"><div class="mc-cat" style="color:var(--blue)"><span class="ci" style="background:rgba(125,138,156,.14)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/></svg></span>事件</div><div class="mc-t">退款已处理</div><div class="mc-s">预计 7·12 到账</div></div>
+    </div>
+  </div>
+ </div></div>
+
+</body></html>

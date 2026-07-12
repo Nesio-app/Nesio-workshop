@@ -1,0 +1,133 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600;700&display=swap');
+:root{--bg1:#f7f8f5;--bg2:#e6e9ea;--ink:#3a3c43;--body:#6f727a;--muted:#a2a3ab;--line:rgba(120,125,135,.18);
+ --rose:#c98c86;--amber:#c0906f;--sage:#8ba58f;--blue:#7d8a9c;--mauve:#a08b9c;--deep:#b06f68}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
+body{font-family:"PingFang SC","Hiragino Sans GB",system-ui,sans-serif;background:#e9e9e8;padding:38px;display:flex;gap:32px;justify-content:center;align-items:flex-start}
+.side{width:300px;font-size:13px;line-height:1.85;color:#54575e}
+.side h3{font-size:15.5px;color:#2c2f36;margin:0 0 12px}
+.side h4{font-size:13px;color:#2c2f36;margin:18px 0 8px}
+.side b{color:var(--deep)}
+.side .m{margin-bottom:12px;padding-left:11px;border-left:2px solid var(--line)}
+.legend{display:flex;flex-direction:column;gap:7px;margin-top:6px}
+.lg{display:flex;align-items:center;gap:9px;font-size:12.5px;font-weight:700;color:var(--ink)}
+.lg .sb{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:800;color:var(--body);background:#fff;border:1px solid var(--line);border-radius:8px;padding:3px 9px}
+.lg .sb svg{color:var(--muted)}
+.lg small{color:var(--muted);font-weight:600;font-size:11px}
+.cell .cap{font-size:14.5px;font-weight:800;color:#2c2f36;margin:0 0 3px 3px}
+.cell .sub{font-size:11.5px;font-weight:600;color:#9a9ca3;margin:0 0 9px 3px}
+.phone{width:390px;height:800px;border-radius:30px;position:relative;overflow:hidden;color:var(--ink);
+ background:linear-gradient(180deg,var(--bg1),#e4e7ea);box-shadow:0 12px 30px rgba(0,0,0,.13)}
+.sb{display:flex;justify-content:space-between;align-items:center;padding:13px 18px 2px;font-size:11px;font-weight:700}
+.serif{font-family:"Noto Serif SC",serif}
+.pad{padding:0 16px}
+.title{font-size:23px;font-weight:800;margin-top:8px;padding:0 4px}
+.chips{display:flex;gap:7px;margin:12px 4px 4px;flex-wrap:wrap}
+.chip{font-size:11px;font-weight:700;color:var(--body);background:rgba(255,255,255,.55);border:1px solid var(--line);border-radius:10px;padding:4px 10px}
+.chip.on{background:var(--ink);color:#fff;border-color:transparent}
+/* 统一卡片 */
+.masonry{columns:2;column-gap:11px;margin-top:12px}
+.mc{break-inside:avoid;background:#fff;border:1px solid var(--line);border-radius:15px;padding:13px;margin-bottom:11px;box-shadow:0 3px 10px rgba(0,0,0,.04)}
+.mc-cat{display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:800;margin-bottom:8px}
+.mc-cat .ci{width:20px;height:20px;border-radius:7px;display:flex;align-items:center;justify-content:center}
+.mc-t{font-size:14.5px;font-weight:800;line-height:1.35}
+.mc-s{font-size:11.5px;color:var(--body);margin-top:5px;line-height:1.5}
+.mc-photo{height:76px;border-radius:10px;margin:9px 0 2px;background:linear-gradient(150deg,#d9cbb8,#bfa07d)}
+.mc-meta{display:flex;align-items:center;justify-content:space-between;margin-top:11px;padding-top:9px;border-top:1px solid var(--line)}
+.src{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:800;color:var(--body)}
+.src svg{color:var(--muted)}
+.mc-time{font-size:10px;color:var(--muted);font-weight:700}
+.pend{font-size:9px;font-weight:800;color:var(--amber);background:rgba(192,144,111,.12);border-radius:5px;padding:1px 6px;margin-left:5px}
+</style></head><body>
+
+<div class="side">
+  <h3>统一规范</h3>
+  <div class="m"><b>一套卡片模板</b>,所有来源共用:<br>分类图标 → 干净标题 → 一句摘要 →〔来源徽章 · 时间〕。位置永远固定。</div>
+  <div class="m"><b>标题永远干净</b>:AI 规范化,<b>绝不甩原始邮件头</b>(不再出现 "return@amazon.com" &lt;…&gt;)。原文收进详情页「原始记录」折叠区。</div>
+  <div class="m"><b>可信度统一</b>:默认不显示;只有 AI 没把握时标一个 <span class="pend">待确认</span> —— 取代乱七八糟的"比较确定 / 可能相关"。</div>
+  <h4>来源徽章 · 6 种(左下角固定)</h4>
+  <div class="legend">
+    <div class="lg"><span class="sb"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M4 20h4l10-10-4-4L4 16z"/></svg>手记</span><small>手动打字</small></div>
+    <div class="lg"><span class="sb"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4"/></svg>语音</span><small>说一句</small></div>
+    <div class="lg"><span class="sb"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M4 8h3l1.5-2h7L18 8h2v11H4z"/><circle cx="12" cy="13" r="3"/></svg>拍照</span><small>拍一下/收据</small></div>
+    <div class="lg"><span class="sb"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>邮件</span><small>Gmail 汇入</small></div>
+    <div class="lg"><span class="sb"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/></svg>日历</span><small>日程</small></div>
+    <div class="lg"><span class="sb"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11Z"/><circle cx="12" cy="10" r="2.4"/></svg>位置</span><small>足迹</small></div>
+  </div>
+</div>
+
+<div class="cell"><div class="cap">统一后的记忆卡片</div><div class="sub">同一模板 · 不同来源长一样</div>
+ <div class="phone">
+  <div class="sb"><span>4:01</span><span>5G+ ▪</span></div>
+  <div class="pad">
+    <div class="title">记忆</div>
+    <div class="chips"><span class="chip on">全部 383</span><span class="chip">人物 131</span><span class="chip">物品 40</span></div>
+    <div class="masonry">
+
+      <div class="mc"><div class="mc-cat" style="color:var(--mauve)"><span class="ci" style="background:rgba(160,139,156,.14)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--mauve)" stroke-width="2" stroke-linecap="round"><path d="M4 13c2 0 2.5-4 4-4s2 6 4 6 2.5-8 4-8 2 5 4 5"/></svg></span>情绪</div>
+        <div class="mc-t">此刻 · 满足</div><div class="mc-s">精力 high · 在家</div>
+        <div class="mc-meta"><span class="src"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M4 20h4l10-10-4-4L4 16z"/></svg>手记</span><span class="mc-time">今天 16:40</span></div></div>
+
+      <div class="mc"><div class="mc-cat" style="color:var(--rose)"><span class="ci" style="background:rgba(201,140,134,.14)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--rose)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg></span>待办</div>
+        <div class="mc-t">吃饭</div><div class="mc-s">截止 7月12日</div>
+        <div class="mc-meta"><span class="src"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M4 20h4l10-10-4-4L4 16z"/></svg>手记</span><span class="mc-time">今天</span></div></div>
+
+      <div class="mc"><div class="mc-cat" style="color:var(--sage)"><span class="ci" style="background:rgba(139,165,143,.14)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--sage)" stroke-width="2" stroke-linejoin="round"><path d="M4 8l8-4 8 4v8l-8 4-8-4Z"/><path d="M4 8l8 4 8-4M12 12v8"/></svg></span>物品</div>
+        <div class="mc-t">Amazon 退货</div><div class="mc-s">退款将在 7·12 前到账</div>
+        <div class="mc-meta"><span class="src"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>邮件<span class="pend">待确认</span></span><span class="mc-time">今天</span></div></div>
+
+      <div class="mc"><div class="mc-cat" style="color:var(--amber)"><span class="ci" style="background:rgba(192,144,111,.14)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linecap="round"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/></svg></span>消费</div>
+        <div class="mc-t">花旗 $25.74 消费</div><div class="mc-s">一笔交易 · info6.citi.com</div>
+        <div class="mc-meta"><span class="src"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>邮件</span><span class="mc-time">今天</span></div></div>
+
+      <div class="mc"><div class="mc-cat" style="color:var(--sage)"><span class="ci" style="background:rgba(139,165,143,.14)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--sage)" stroke-width="2" stroke-linejoin="round"><path d="M4 8l8-4 8 4v8l-8 4-8-4Z"/><path d="M4 8l8 4 8-4M12 12v8"/></svg></span>物品</div>
+        <div class="mc-t">毛衣 / 外套</div>
+        <div class="mc-photo"></div>
+        <div class="mc-s">TJ Maxx · $24.00 · 7·11</div>
+        <div class="mc-meta"><span class="src"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M4 8h3l1.5-2h7L18 8h2v11H4z"/><circle cx="12" cy="13" r="3"/></svg>拍照</span><span class="mc-time">今天</span></div></div>
+
+      <div class="mc"><div class="mc-cat" style="color:var(--blue)"><span class="ci" style="background:rgba(125,138,156,.14)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/></svg></span>事件</div>
+        <div class="mc-t">退款已处理</div><div class="mc-s">预计 7·12 到账</div>
+        <div class="mc-meta"><span class="src"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>邮件</span><span class="mc-time">今天</span></div></div>
+
+    </div>
+  </div>
+ </div></div>
+
+<!-- 统一详情 -->
+<div class="cell"><div class="cap">统一详情页</div><div class="sub">来源一行 · 原文折叠</div>
+ <div class="phone">
+  <div class="sb"><span>4:01</span><span>5G+ ▪</span></div>
+  <div style="padding:14px 20px">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:800;color:var(--blue)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/></svg>事件</span>
+      <span style="color:var(--muted);font-size:16px">✕</span>
+    </div>
+    <div style="font-size:22px;font-weight:800;margin-top:14px">你的订单已发货</div>
+    <!-- 统一来源一行 -->
+    <div style="display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--body);font-weight:700;margin-top:8px">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.9"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
+      来自 <b style="color:var(--ink)">邮件 · Gmail</b> · 7·11 15:18
+    </div>
+    <div style="display:flex;gap:9px;margin-top:16px">
+      <span style="flex:1;text-align:center;font-size:13px;font-weight:800;color:#fff;background:var(--brand,#c07f79);border-radius:11px;padding:11px">阅读原文</span>
+      <span style="flex:1;text-align:center;font-size:13px;font-weight:800;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:11px;padding:11px">回复</span>
+    </div>
+    <div style="border:1px dashed var(--line);border-radius:12px;padding:11px 14px;margin-top:16px;font-size:13px;color:var(--body);font-weight:700">＋ 关联一条记忆</div>
+    <!-- 规范化字段 -->
+    <div style="font-size:12px;font-weight:800;color:var(--muted);margin:20px 0 10px">关键信息</div>
+    <div style="display:flex;flex-direction:column;gap:11px;font-size:13.5px">
+      <div style="display:flex;justify-content:space-between"><span style="color:var(--body)">商家</span><b>Thorne</b></div>
+      <div style="display:flex;justify-content:space-between"><span style="color:var(--body)">类型</span><b>发货通知</b></div>
+      <div style="display:flex;justify-content:space-between"><span style="color:var(--body)">预计到货</span><b>7·15</b></div>
+    </div>
+    <!-- 原始记录折叠 -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:20px;padding:12px 14px;background:rgba(255,255,255,.55);border:1px solid var(--line);border-radius:12px;font-size:12.5px;font-weight:700;color:var(--body)"><span>原始记录 · 邮件原文</span><span style="color:var(--muted)">展开 ⌄</span></div>
+    <div style="font-size:11px;color:var(--muted);margin-top:8px;padding-left:2px">from: Thorne &lt;no-reply@info.thorne.com&gt; —— 原始头信息藏在这里,不再污染卡片</div>
+    <div style="font-size:12px;font-weight:800;color:var(--muted);margin:20px 0 10px">相关记忆 · 同一商家</div>
+    <div style="background:rgba(255,255,255,.55);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:13px;font-weight:700;display:flex;justify-content:space-between">Thorne 订阅确认 <span style="color:var(--muted)">›</span></div>
+  </div>
+ </div></div>
+
+</body></html>

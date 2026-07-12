@@ -1,0 +1,70 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600;700&display=swap');
+:root{--bg:#f4f5f2;--ink:#2c2f36;--body:#5a5d64;--muted:#a2a3ab;--line:rgba(120,125,135,.16);--deep:#b06f68;--brand:#c07f79;--sage:#8ba58f;--blue:#7d8a9c}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
+body{font-family:"PingFang SC","Hiragino Sans GB",system-ui,sans-serif;background:#e9e9e8;padding:40px;display:flex;justify-content:center}
+.sheet{width:770px;background:linear-gradient(180deg,#f7f8f5,#eceeec);border-radius:26px;padding:34px 36px;box-shadow:0 16px 40px rgba(0,0,0,.12)}
+.h1{font-size:24px;font-weight:800;font-family:"Noto Serif SC",serif;color:var(--ink)}
+.h1 .en{font-size:13px;color:var(--muted);font-weight:600;margin-left:10px;font-family:system-ui}
+.lead{font-size:13px;color:var(--body);line-height:1.7;margin-top:10px}
+.lead b{color:var(--deep)}
+.rules{display:flex;gap:10px;margin:18px 0 26px}
+.rule{flex:1;background:#fff;border:1px solid var(--line);border-radius:13px;padding:12px 14px}
+.rule .n{font-size:10px;font-weight:800;color:var(--deep)}
+.rule .t{font-size:12.5px;font-weight:800;color:var(--ink);margin-top:4px}
+.rule .d{font-size:11px;color:var(--muted);font-weight:600;margin-top:3px;line-height:1.5}
+.grp{margin-bottom:22px}
+.glabel{font-size:12px;font-weight:800;color:var(--body);margin-bottom:11px;display:flex;align-items:center;gap:8px}
+.glabel:before{content:"";width:16px;height:2px;background:var(--deep);border-radius:1px}
+.row{display:grid;grid-template-columns:96px 22px 128px 1fr;align-items:center;gap:12px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:11px 15px;margin-bottom:7px}
+.cn{font-size:14px;color:var(--body);font-weight:800}
+.arr{color:#c8c9ce;font-size:15px;text-align:center}
+.en2{font-size:17px;font-weight:800;color:var(--ink);letter-spacing:-.2px}
+.why{font-size:11.5px;color:var(--body);font-weight:600;line-height:1.45}
+.why b{color:var(--deep)}
+.tag{display:inline-block;font-size:9.5px;font-weight:800;color:var(--blue);background:rgba(125,138,156,.12);border-radius:5px;padding:1px 6px;margin-left:6px;vertical-align:middle;font-family:system-ui}
+.foot{font-size:11.5px;color:var(--muted);font-weight:600;line-height:1.7;margin-top:8px;border-top:1px solid var(--line);padding-top:16px}
+.foot b{color:var(--deep)}
+</style></head><body>
+
+<div class="sheet">
+  <div class="h1">Nesio · Naming (EN)<span class="en">宝盒 英文命名</span></div>
+  <div class="lead">Same 3 rules, tuned to how English UI reads: actions are <b>one strong verb</b>, sections are <b>one plain noun</b>, voice stays warm. Primary pick in bold, <span class="tag">alt</span> where a second option is worth a look.</div>
+
+  <div class="rules">
+    <div class="rule"><div class="n">Rule 1 · Actions</div><div class="t">One verb, imperative</div><div class="d">Snap / Say / Keep — same length, same grammar.</div></div>
+    <div class="rule"><div class="n">Rule 2 · Sections</div><div class="t">Plain noun, no jargon</div><div class="d">"Insights," never "Cognition." Reads at a glance.</div></div>
+    <div class="rule"><div class="n">Rule 3 · Voice</div><div class="t">From the box's side</div><div class="d">"Keep" it for you — not the OS word "Share."</div></div>
+  </div>
+
+  <div class="grp">
+    <div class="glabel">Jot · capture actions</div>
+    <div class="row"><span class="cn">拍一下</span><span class="arr">→</span><span class="en2">Snap</span><span class="why">One tap, a photo<span class="tag">alt: Photo</span></span></div>
+    <div class="row"><span class="cn">说一句</span><span class="arr">→</span><span class="en2">Say</span><span class="why">A quick voice note<span class="tag">alt: Speak</span></span></div>
+    <div class="row"><span class="cn">收进来</span><span class="arr">→</span><span class="en2">Keep</span><span class="why"><b>The box keeps it for you</b> — not "Share"<span class="tag">alt: Save in</span></span></div>
+    <div class="row"><span class="cn">记心情</span><span class="arr">→</span><span class="en2">Mood</span><span class="why">Tap to check in<span class="tag">alt: Check-in</span></span></div>
+  </div>
+
+  <div class="grp">
+    <div class="glabel">Main nav · sections</div>
+    <div class="row"><span class="cn">今天</span><span class="arr">→</span><span class="en2">Today</span><span class="why">Concrete, present, no explaining</span></div>
+    <div class="row"><span class="cn">记忆</span><span class="arr">→</span><span class="en2">Memory</span><span class="why">The core asset<span class="tag">alt: Memories</span></span></div>
+    <div class="row"><span class="cn">问一问</span><span class="arr">→</span><span class="en2">Ask</span><span class="why">Warm, one syllable, matches Say</span></div>
+    <div class="row"><span class="cn">洞察</span><span class="arr">→</span><span class="en2">Insights</span><span class="why">Clear, not clinical<span class="tag">alt: Patterns</span></span></div>
+    <div class="row"><span class="cn">多面镜</span><span class="arr">→</span><span class="en2">Mirror</span><span class="why"><b>Sees another side of you</b><span class="tag">alt: Facets</span></span></div>
+    <div class="row"><span class="cn">足迹</span><span class="arr">→</span><span class="en2">Places</span><span class="why">Where you've been<span class="tag">alt: Trails</span></span></div>
+  </div>
+
+  <div class="grp">
+    <div class="glabel">Memory jar · collections</div>
+    <div class="row"><span class="cn">收纳</span><span class="arr">→</span><span class="en2">Things</span><span class="why">Plainly "my things"<span class="tag">alt: Stash</span></span></div>
+    <div class="row"><span class="cn">收藏</span><span class="arr">→</span><span class="en2">Favorites</span><span class="why">Hand-starred<span class="tag">alt: Saved</span></span></div>
+    <div class="row"><span class="cn">核心记忆</span><span class="arr">→</span><span class="en2">Core</span><span class="why">What defines you<span class="tag">alt: About me</span></span></div>
+    <div class="row"><span class="cn">项目</span><span class="arr">→</span><span class="en2">Projects</span><span class="why">Plain and clear</span></div>
+  </div>
+
+  <div class="foot">Read together: actions are all one-verb (<b>Snap · Say · Keep · Mood</b>), sections are all plain nouns, and the voice stays on the box's side. App / brand stays <b>Nesio</b>.</div>
+</div>
+
+</body></html>

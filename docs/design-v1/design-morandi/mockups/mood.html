@@ -1,0 +1,137 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600;700&display=swap');
+:root{--brand:#c07f79;--deep:#b06f68;--ink:#3a3c43;--body:#6f727a;--muted:#a2a3ab;--line:rgba(120,125,135,.2);--paper:#f6efe4;--paper-line:rgba(150,120,90,.18)}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
+body{font-family:"PingFang SC","Hiragino Sans GB",system-ui,sans-serif;background:#e9e9e8;padding:34px;display:flex;gap:30px;justify-content:center;align-items:flex-start;flex-wrap:wrap}
+.cell{width:372px}
+.cell .cap{font-size:14.5px;font-weight:800;color:#2c2f36;margin:0 0 3px 3px}
+.cell .sub{font-size:11.5px;font-weight:600;color:#9a9ca3;margin:0 0 9px 3px}
+.phone{width:372px;height:768px;border-radius:30px;position:relative;overflow:hidden;box-shadow:0 12px 30px rgba(0,0,0,.13);
+ background:linear-gradient(180deg,#c6dbf6 0%,#a9c6ef 40%);color:var(--ink)}
+.dim{position:absolute;inset:0;background:rgba(30,32,40,.32)}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:#faf9f7;border-radius:26px 26px 0 0;padding:16px 20px 22px;box-shadow:0 -10px 40px rgba(0,0,0,.2)}
+.grip{width:38px;height:4px;border-radius:2px;background:#d8d8d6;margin:0 auto 14px}
+.sh-t{font-size:19px;font-weight:800;font-family:"Noto Serif SC",serif;text-align:center}
+.sh-s{font-size:12px;color:var(--muted);font-weight:600;text-align:center;margin-top:5px}
+/* ── wheel ── */
+.wheel{position:relative;width:270px;height:270px;margin:22px auto 8px}
+.axh{position:absolute;font-size:10px;font-weight:800;color:var(--muted)}
+.emo{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:3px}
+.emo .dt{width:26px;height:26px;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,.12)}
+.emo .lb{font-size:11.5px;font-weight:700;color:var(--body)}
+.emo.sel .dt{outline:3px solid #fff;box-shadow:0 0 0 5px var(--deep),0 4px 10px rgba(0,0,0,.2);transform:scale(1.15)}
+.emo.sel .lb{color:var(--ink);font-weight:800}
+.wc{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:96px;height:96px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:inset 0 0 0 1px var(--line)}
+.wc b{font-size:17px;font-weight:800;font-family:"Noto Serif SC",serif}
+.wc small{font-size:10px;color:var(--muted);font-weight:700;margin-top:2px}
+.wtip{text-align:center;font-size:11.5px;color:var(--muted);font-weight:600;margin-top:6px}
+.wtip b{color:var(--deep)}
+/* ── energy ── */
+.selchip{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:800;background:#fff;border:1px solid var(--line);border-radius:20px;padding:6px 13px;margin:0 auto;display:flex;width:fit-content;margin-top:2px}
+.selchip .d{width:12px;height:12px;border-radius:50%}
+.etrack{height:14px;border-radius:8px;margin:34px 4px 0;position:relative;
+ background:linear-gradient(90deg,#7d8a9c,#9a8ba6 52%,#c7b07f)}
+.ehandle{position:absolute;top:50%;transform:translate(-50%,-50%);width:34px;height:34px;border-radius:50%;background:#fff;border:3px solid #9a8ba6;box-shadow:0 4px 12px rgba(0,0,0,.18)}
+.escale{display:flex;justify-content:space-between;margin:12px 4px 0;font-size:11px;font-weight:700;color:var(--muted)}
+.elabel{text-align:center;margin-top:22px}
+.elabel b{font-size:22px;font-weight:800}
+.elabel .s{font-size:12.5px;color:var(--body);font-weight:600;margin-top:3px;font-family:"Noto Serif SC",serif}
+/* ── journal ── */
+.thought{background:#fff;border:1px solid var(--line);border-radius:14px;padding:13px 15px;font-size:14px;color:var(--muted);font-weight:500;margin-top:20px;display:flex;justify-content:space-between}
+.jarea{background:#fff;border:1px solid var(--line);border-radius:14px;padding:15px;margin-top:12px;min-height:150px}
+.j-tool{display:flex;gap:16px;font-size:14px;font-weight:800;color:var(--muted);border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:11px}
+.j-body{font-size:14.5px;line-height:1.85;color:var(--ink);font-family:"Noto Serif SC",serif}
+.j-body .b{font-weight:800}
+.save{margin-top:16px;width:100%;background:var(--brand);color:#fff;font-size:15px;font-weight:800;padding:14px;border-radius:14px;text-align:center}
+.savehint{text-align:center;font-size:11px;color:var(--muted);font-weight:600;margin-top:9px}
+/* ── history ── */
+.h-search{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 13px;font-size:12.5px;color:var(--muted);font-weight:500;margin-top:16px;display:flex;justify-content:space-between}
+.h-day{font-size:11px;font-weight:800;color:var(--muted);margin:16px 2px 9px}
+.h-item{display:flex;gap:11px;padding:11px 12px;background:#fff;border:1px solid var(--line);border-radius:13px;margin-bottom:8px}
+.h-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0;margin-top:3px}
+.h-t{font-size:13.5px;font-weight:700}.h-t small{font-weight:700;color:var(--muted);font-size:11px;margin-left:6px}
+.h-s{font-size:11.5px;color:var(--body);margin-top:2px;font-family:"Noto Serif SC",serif}
+.h-r{margin-left:auto;font-size:10.5px;color:var(--muted);font-weight:600}
+</style></head><body>
+
+<!-- L1 情绪盘 -->
+<div class="cell"><div class="cap">① 情绪盘 · 无 emoji</div><div class="sub">12 情绪 · Russell 四象限 · 滑选</div>
+ <div class="phone"><div class="dim"></div>
+  <div class="sheet" style="height:74%">
+    <div class="grip"></div>
+    <div class="sh-t">此刻,你感觉——</div>
+    <div class="sh-s">滑一下就好,5 秒 · 后面都可选</div>
+    <div class="wheel">
+      <div class="axh" style="top:-2px;left:50%;transform:translateX(-50%)">有劲</div>
+      <div class="axh" style="bottom:-2px;left:50%;transform:translateX(-50%)">平和</div>
+      <div class="axh" style="left:-6px;top:50%;transform:translateY(-50%)">低落</div>
+      <div class="axh" style="right:-6px;top:50%;transform:translateY(-50%)">愉悦</div>
+      <!-- 12 情绪 -->
+      <div class="emo" style="left:50%;top:6%"><span class="dt" style="background:#d9a24e"></span><span class="lb">开心</span></div>
+      <div class="emo" style="left:72%;top:12%"><span class="dt" style="background:#cf8f5f"></span><span class="lb">兴奋</span></div>
+      <div class="emo" style="left:88%;top:30%"><span class="dt" style="background:#cf9a86"></span><span class="lb">感动</span></div>
+      <div class="emo sel" style="left:94%;top:50%"><span class="dt" style="background:#8faab0"></span><span class="lb">平静</span></div>
+      <div class="emo" style="left:88%;top:70%"><span class="dt" style="background:#97b195"></span><span class="lb">满足</span></div>
+      <div class="emo" style="left:72%;top:88%"><span class="dt" style="background:#a9b58f"></span><span class="lb">感激</span></div>
+      <div class="emo" style="left:50%;top:94%"><span class="dt" style="background:#9aa0b0"></span><span class="lb">疲惫</span></div>
+      <div class="emo" style="left:28%;top:88%"><span class="dt" style="background:#a7a9ae"></span><span class="lb">空洞</span></div>
+      <div class="emo" style="left:12%;top:70%"><span class="dt" style="background:#8391a8"></span><span class="lb">难过</span></div>
+      <div class="emo" style="left:6%;top:50%"><span class="dt" style="background:#b58f8a"></span><span class="lb">焦虑</span></div>
+      <div class="emo" style="left:12%;top:30%"><span class="dt" style="background:#c08f6f"></span><span class="lb">烦躁</span></div>
+      <div class="emo" style="left:28%;top:12%"><span class="dt" style="background:#b57670"></span><span class="lb">生气</span></div>
+      <div class="wc"><b>平静</b><small>此刻</small></div>
+    </div>
+    <div class="wtip">松手即存 · 长按中心 <b>直接写下来 →</b></div>
+  </div>
+ </div></div>
+
+<!-- L2 能量 -->
+<div class="cell"><div class="cap">② 能量 · 内感受</div><div class="sub">横拖把手,蓝→紫→金</div>
+ <div class="phone"><div class="dim"></div>
+  <div class="sheet" style="height:56%">
+    <div class="grip"></div>
+    <div class="sh-t">身体里的劲儿呢?</div>
+    <div class="selchip"><span class="d" style="background:#8faab0"></span>平静</div>
+    <div class="etrack"><span class="ehandle" style="left:52%"></span></div>
+    <div class="escale"><span>低 · 蔫</span><span>中</span><span>高 · 满电</span></div>
+    <div class="elabel"><b style="color:#9a8ba6">中</b><div class="s">撑得住,但也不满电。</div></div>
+    <div class="savehint">滑到位就好,不用点保存 · 想细说 ↓ 展开写</div>
+  </div>
+ </div></div>
+
+<!-- L3 一句话 + Journal -->
+<div class="cell"><div class="cap">③ 一句话 / 展开写</div><div class="sub">Level 3 = Journal 富文本-lite</div>
+ <div class="phone"><div class="dim"></div>
+  <div class="sheet" style="height:78%">
+    <div class="grip"></div>
+    <div class="sh-t">留住这一刻</div>
+    <div class="sh-s">平静 · 能量中 · 傍晚 · 在家</div>
+    <div class="thought">此刻想说一句…(可选) <span>＋</span></div>
+    <div class="jarea">
+      <div class="j-tool"><span>B</span><span>•</span><span style="margin-left:auto;color:var(--muted);font-weight:600;font-size:11px">自动带上情绪与能量</span></div>
+      <div class="j-body">忙完这周,终于坐下来。<br><span class="b">窗外在下雨</span>,泡了杯茶。<br>没什么大事,就是想留住这份安静。</div>
+    </div>
+    <div class="save">留住这一刻</div>
+    <div class="savehint">存进记忆 · 以后「走走看」会把它翻给你</div>
+  </div>
+ </div></div>
+
+<!-- L4 历史 -->
+<div class="cell"><div class="cap">④ 留住的时刻 · 历史</div><div class="sub">时间线 + 搜索,情绪色点</div>
+ <div class="phone"><div class="dim"></div>
+  <div class="sheet" style="height:82%">
+    <div class="grip"></div>
+    <div class="sh-t">留住的时刻</div>
+    <div class="h-search">搜索心情与手记… <span>⌕</span></div>
+    <div class="h-day">今天</div>
+    <div class="h-item"><span class="h-dot" style="background:#8faab0"></span><div><div class="h-t">平静 <small>能量中 · 傍晚</small></div><div class="h-s">忙完这周,终于坐下来。窗外在下雨…</div></div><span class="h-r">18:40</span></div>
+    <div class="h-day">这周</div>
+    <div class="h-item"><span class="h-dot" style="background:#b58f8a"></span><div><div class="h-t">焦虑 <small>能量高 · 深夜</small></div><div class="h-s">睡不着,一直在想合伙的事。</div></div><span class="h-r">周三</span></div>
+    <div class="h-item"><span class="h-dot" style="background:#d9a24e"></span><div><div class="h-t">开心 <small>能量高 · 中午</small></div><div class="h-s">项目过了,请团队吃了饭。</div></div><span class="h-r">周一</span></div>
+    <div class="h-item"><span class="h-dot" style="background:#9aa0b0"></span><div><div class="h-t">疲惫 <small>能量低</small></div><div class="h-s">（只记了情绪,没写字）</div></div><span class="h-r">上周日</span></div>
+    <div class="savehint" style="margin-top:14px">情绪与能量喂「洞察 → 一周能量 / 情绪回暖」</div>
+  </div>
+ </div></div>
+
+</body></html>

@@ -1,0 +1,97 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600;700&display=swap');
+:root{--bg1:#f4f5f2;--bg2:#e6e9ea;--ink:#3a3c43;--body:#6f727a;--muted:#a2a3ab;--line:rgba(120,125,135,.16);--deep:#b06f68;--brand:#c07f79;--warn:#b47f77;
+ --rose:#c98c86;--amber:#c0906f;--sage:#8ba58f;--blue:#7d8a9c;--mauve:#a08b9c}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
+body{font-family:"PingFang SC","Hiragino Sans GB",system-ui,sans-serif;background:#e9e9e8;padding:36px;display:flex;gap:40px;justify-content:center;align-items:flex-start}
+.cell .cap{font-size:14.5px;font-weight:800;color:#2c2f36;margin:0 0 3px 3px}
+.cell .sub{font-size:11.5px;font-weight:600;color:#9a9ca3;margin:0 0 10px 3px}
+.phone{width:392px;height:820px;border-radius:32px;position:relative;overflow:hidden;color:var(--ink);
+ background:linear-gradient(180deg,var(--bg1),#e4e7ea);box-shadow:0 14px 34px rgba(0,0,0,.13);padding:0 18px}
+.sb{display:flex;justify-content:space-between;align-items:center;padding:14px 4px 2px;font-size:11px;font-weight:700}
+.serif{font-family:"Noto Serif SC",serif}
+.top{display:flex;align-items:center;gap:8px;margin-top:8px}
+.top .bk{font-size:19px;color:var(--muted);font-weight:800}
+.top .t{font-size:20px;font-weight:800}
+.glabel{font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.5px;margin:22px 6px 9px}
+.group{background:#fff;border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.row{display:flex;align-items:center;gap:12px;padding:14px 15px;border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:none}
+.r-t{font-size:14.5px;font-weight:700}.r-b{flex:1}
+.r-v{font-size:13px;color:var(--body);font-weight:600}
+.chev{color:var(--muted);font-size:15px;font-weight:700}
+.row.warn .r-t{color:var(--warn)}
+.pill{font-size:12px;color:var(--deep);font-weight:700;background:rgba(192,127,121,.1);padding:3px 10px;border-radius:8px}
+/* profile hero */
+.hero{display:flex;flex-direction:column;align-items:center;margin-top:14px}
+.av{width:88px;height:88px;border-radius:50%;background:radial-gradient(circle at 60% 35%,#f2efe9,#dcd6cd);position:relative}
+.av .cam{position:absolute;right:2px;bottom:2px;width:26px;height:26px;border-radius:50%;background:#fff;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--body)}
+.name{font-size:22px;font-weight:800;margin-top:12px;font-family:"Noto Serif SC",serif}
+.days{font-size:12px;color:var(--muted);font-weight:600;margin-top:4px}
+/* 宝盒对你的了解 */
+.prog{background:#fff;border:1px solid var(--line);border-radius:14px;padding:13px 15px;margin-top:2px;display:flex;align-items:center;gap:12px}
+.prog-b{flex:1}
+.prog-t{font-size:13px;font-weight:700}
+.prog-track{height:5px;border-radius:3px;background:rgba(0,0,0,.06);margin-top:7px}
+.prog-fill{height:5px;border-radius:3px;background:var(--brand);width:68%}
+.prog-n{font-size:18px;font-weight:800;color:var(--deep)}
+.know{display:flex;align-items:center;gap:11px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px}
+.k-tag{font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:6px;flex-shrink:0}
+.k-t{flex:1;font-size:13px;font-weight:600}
+.dots{display:flex;gap:3px}
+.d{width:6px;height:6px;border-radius:50%}
+.pwd{background:#fff;border:1px solid var(--line);border-radius:12px;padding:13px 15px;font-size:13.5px;color:var(--muted);font-weight:500;margin-top:2px}
+.pwd-btn{margin-top:9px;width:100%;text-align:center;background:var(--brand);color:#fff;font-size:14px;font-weight:800;padding:12px;border-radius:12px}
+</style></head><body>
+
+<!-- 点小汉 → 个人资料 -->
+<div class="cell"><div class="cap">点「小汉」→ 个人资料</div><div class="sub">你是谁 · 宝盒眼中的你(暖)</div>
+ <div class="phone">
+  <div class="sb"><span>4:01</span><span>5G+ ▪</span></div>
+  <div class="top"><span class="bk">‹</span><span class="t">个人资料</span></div>
+  <div class="hero">
+    <div class="av"><span class="cam"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 8h3l1.5-2h7L18 8h2v11H4z"/><circle cx="12" cy="13" r="3"/></svg></span></div>
+    <div class="name">小汉</div>
+    <div class="days">第 34 天 · 一直在记着你</div>
+  </div>
+  <div class="glabel">宝盒对你的了解</div>
+  <div class="prog"><div class="prog-b"><div class="prog-t">已了解 23 件事 · 持续成长</div><div class="prog-track"><div class="prog-fill"></div></div></div><div class="prog-n">68%</div></div>
+  <div style="margin-top:11px">
+    <div class="know"><span class="k-tag" style="background:rgba(125,138,156,.14);color:var(--blue)">节律</span><span class="k-t">晚上 10–11 点最活跃</span><span class="dots"><span class="d" style="background:var(--blue)"></span><span class="d" style="background:var(--blue)"></span><span class="d" style="background:rgba(125,138,156,.3)"></span></span></div>
+    <div class="know"><span class="k-tag" style="background:rgba(160,139,156,.14);color:var(--mauve)">情绪</span><span class="k-t">近两周偏蓝,在慢慢回暖</span><span class="dots"><span class="d" style="background:var(--mauve)"></span><span class="d" style="background:var(--mauve)"></span><span class="d" style="background:rgba(160,139,156,.3)"></span></span></div>
+    <div class="know"><span class="k-tag" style="background:rgba(192,144,111,.14);color:var(--amber)">习惯</span><span class="k-t">周一低效,周五产出高</span><span class="dots"><span class="d" style="background:var(--amber)"></span><span class="d" style="background:var(--amber)"></span><span class="d" style="background:var(--amber)"></span></span></div>
+    <div class="know"><span class="k-tag" style="background:rgba(139,165,143,.14);color:var(--sage)">在意</span><span class="k-t">最在意妈妈和几个老朋友</span><span class="dots"><span class="d" style="background:var(--sage)"></span><span class="d" style="background:var(--sage)"></span><span class="d" style="background:rgba(139,165,143,.3)"></span></span></div>
+  </div>
+  <div style="text-align:center;font-size:12.5px;color:var(--deep);font-weight:700;margin-top:8px">查看全部学习进展 ›</div>
+ </div></div>
+
+<!-- 点账户 → 账户 -->
+<div class="cell"><div class="cap">点「账户」→ 登录与账单</div><div class="sub">邮箱 · 密码 · 订阅 · 危险区(冷)</div>
+ <div class="phone">
+  <div class="sb"><span>4:01</span><span>5G+ ▪</span></div>
+  <div class="top"><span class="bk">‹</span><span class="t">账户</span></div>
+
+  <div class="glabel">登录</div>
+  <div class="group">
+    <div class="row"><span class="r-t">邮箱</span><span class="r-b"></span><span class="r-v">hanbing6228@gmail.com</span></div>
+    <div class="row"><span class="r-t">套餐</span><span class="r-b"></span><span class="pill">试用中 · 剩 20 天</span><span class="chev" style="margin-left:8px">›</span></div>
+  </div>
+
+  <div class="glabel">修改密码</div>
+  <div class="pwd">新密码(至少 8 位)</div>
+  <div class="pwd-btn">更新密码</div>
+
+  <div class="glabel">购买</div>
+  <div class="group">
+    <div class="row"><span class="r-t">恢复购买</span><span class="r-b"></span><span class="r-v">随 App 版开放</span></div>
+  </div>
+
+  <div class="glabel" style="color:var(--warn)">危险区</div>
+  <div class="group">
+    <div class="row warn"><span class="r-t">删除账号与数据…</span><span class="r-b"></span><span class="chev">›</span></div>
+    <div class="row warn"><span class="r-t">退出登录</span><span class="r-b"></span></div>
+  </div>
+ </div></div>
+
+</body></html>
