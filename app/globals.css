@@ -5,19 +5,20 @@
 :root {
   --sheet-opaque: #fdfeff;
   /* Moment-capture emotion wheel (Russell quadrants) — data palette, theme-stable */
-  /* 批次 3 高级化:降饱和的莫兰迪调,白字标签可读,象限语义不变 */
-  --emotion-joy: #DBAE55;
-  --emotion-excited: #D9975B;
-  --emotion-moved: #CC8396;
-  --emotion-calm: #74A98F;
-  --emotion-content: #5F9E80;
-  --emotion-grateful: #8FB8A0;
-  --emotion-tired: #82A3C9;
-  --emotion-empty: #9AA9BD;
-  --emotion-sad: #7189B0;
-  --emotion-anxious: #A088BE;
-  --emotion-frustrated: #CC7F62;
-  --emotion-angry: #C4645B;
+  /* 批次 119「12 色定稿」(design-spec.html):情绪盘与首页第一拍严格取同一组莫兰迪色,
+     联动一致。关键:平静=蓝灰 #8FAAB0(不再是绿)、满足=柔莎草绿、焦虑=灰玫瑰,整体更低饱和。 */
+  --emotion-joy: #D9A24E;
+  --emotion-excited: #CF8F5F;
+  --emotion-moved: #CF9A86;
+  --emotion-calm: #8FAAB0;
+  --emotion-content: #97B195;
+  --emotion-grateful: #A9B58F;
+  --emotion-tired: #9AA0B0;
+  --emotion-empty: #A7A9AE;
+  --emotion-sad: #8391A8;
+  --emotion-anxious: #B58F8A;
+  --emotion-frustrated: #C08F6F;
+  --emotion-angry: #B57670;
 
   /* Chip pastels(节点类型底色/连接器图标底)— data palette, theme-stable */
   --chip-indigo: #e0e7ff;
@@ -8813,9 +8814,12 @@ html[data-portal-theme="night"] .nesio-brief-strip {
   cursor: pointer;
   position: relative;
 }
-/* 批次 115:心情节点 = 波纹方块(设计规范「心情波纹方块作节点」),不是圆点。
-   比要紧事的 14px 圆点略大的圆角方块,内嵌波纹符号,底/边/波纹描边都取当天心情色。 */
+/* 批次 115→119:心情节点 = 波纹方块(设计规范「心情波纹方块作节点」),不是圆点。
+   批次 119 按 12 色定稿 + 记忆球同质感重做:哑光低饱和白核 + 当天情绪色(--mood-c)光晕(有光韵),
+   边缘一丝透色(情绪色)而非白边,内嵌单曲线波纹取同一情绪色。--mood-c 由 MoodBeat 按记录的情绪注入。 */
 .nesio-tl-dot--mood {
+  /* 注意:不在此声明 --mood-c 默认值,否则会盖掉从 .nesio-tl-node--mood 内联样式继承的情绪色
+     (自身声明的自定义属性优先于继承)。默认走各处 color-mix 里的 fallback。 */
   grid-row: 1 / span 3;
   grid-column: 1;
   width: 22px; height: 22px;
@@ -8823,17 +8827,32 @@ html[data-portal-theme="night"] .nesio-brief-strip {
   border-radius: 7px;
   align-self: start;
   display: grid; place-items: center;
-  /* 批次 118(用户「没有白边」):去掉发白描边(旧 color-mix 55% transparent 在浅底上泛白)。
-     方块只留当天情绪色软底 + 单曲线波纹,竖轨从背后穿过、软底就地挡轨,不留白圈白边。 */
-  border: none;
-  background: var(--status-calm-soft);
-  color: var(--status-calm);
+  /* 哑光白核 → 情绪色浅晕边(白天);边缘一丝透色;情绪色柔光晕(光韵)。都不是白边。 */
+  background: radial-gradient(circle at 40% 34%,
+    #fff,
+    color-mix(in srgb, var(--mood-c, var(--portal-muted)) 10%, #fff) 66%,
+    color-mix(in srgb, var(--mood-c, var(--portal-muted)) 22%, #fff));
+  border: 1px solid color-mix(in srgb, var(--mood-c, var(--portal-muted)) 30%, transparent);
+  box-shadow: 0 0 9px color-mix(in srgb, var(--mood-c, var(--portal-muted)) 42%, transparent);
+  color: var(--mood-c, var(--portal-muted));
   box-sizing: border-box;
 }
-.nesio-tl-dot--mood[data-tone="go"]     { background: var(--status-go-soft);     color: var(--status-go); }
-.nesio-tl-dot--mood[data-tone="gentle"] { background: var(--status-gentle-soft); color: var(--status-gentle); }
-.nesio-tl-dot--mood[data-tone="calm"]   { background: var(--status-calm-soft);   color: var(--status-calm); }
+/* 未记·邀请态:淡紫「问你自己」(--mood-c 设在符号本体上,邀请态无标题词) */
+.nesio-tl-dot--mood-invite { --mood-c: #9a90c8; }
+/* 暗色:白雾球 + 情绪色光晕(深底把光晕衬得更明显,灰调不刺眼)——图 5 逻辑 */
+html[data-portal-theme="night"] .nesio-tl-dot--mood {
+  background: radial-gradient(circle at 40% 34%,
+    rgba(255,255,255,0.16),
+    color-mix(in srgb, var(--mood-c, var(--portal-muted)) 18%, rgba(255,255,255,0.05)) 68%,
+    color-mix(in srgb, var(--mood-c, var(--portal-muted)) 28%, transparent));
+  border-color: color-mix(in srgb, var(--mood-c, var(--portal-muted)) 42%, transparent);
+  box-shadow: 0 0 11px color-mix(in srgb, var(--mood-c, var(--portal-muted)) 55%, transparent);
+}
 .nesio-mood-ripple { display: block; }
+/* 标题:情绪词染当天情绪色(与盘/符号同一色),能量描述保持中性 muted。
+   混一点文字色保证浅底/深底两边都够对比度。 */
+.nesio-tl-node--mood .nesio-mood-word { color: color-mix(in srgb, var(--mood-c, var(--portal-ink)) 72%, var(--portal-ink)); font-weight: 700; }
+.nesio-tl-node--mood .nesio-mood-energy { color: var(--portal-muted); font-weight: 600; }
 .nesio-tl-time {
   grid-column: 2;
   font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em;
