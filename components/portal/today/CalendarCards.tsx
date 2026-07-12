@@ -134,14 +134,12 @@ export function CollapsedCalItem({ obj, onOpenRecorder }: { obj: AttentionObject
 
   return (
     <li className="nesio-collapsed-item">
+      {/* 批次 111:日历项也做成时间线节点 —— 空心圆点在轨上 + 时标 kicker + 标题(去掉旧的图标+右侧 meta) */}
       <button type="button" className="nesio-collapsed-row" onClick={() => setExpanded((v) => !v)}>
-        <span className="nesio-collapsed-icon"><TypeIcon size={14} /></span>
-        <span className="nesio-collapsed-title">{obj.title}</span>
-        <span className="nesio-collapsed-meta">
-          {dayTag && <span className="nesio-collapsed-day-tag">{dayTag}</span>}
-          <span className="nesio-collapsed-time">{timeStr}</span>
-          {/* 批次 33:日历/提醒也显示倒计时(含明天) */}
-          {countdown && <span className="nesio-collapsed-countdown">{countdown}</span>}
+        <span className="nesio-collapsed-dot" aria-hidden />
+        <span className="nesio-collapsed-task-body">
+          <span className="nesio-collapsed-kicker">{[dayTag, timeStr, countdown].filter(Boolean).join(' · ')}</span>
+          <span className="nesio-collapsed-title">{obj.title}</span>
         </span>
       </button>
       {expanded && (

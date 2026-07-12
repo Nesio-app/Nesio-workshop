@@ -22,7 +22,7 @@ import { FocusCardDetail, FOCUS_TYPE_ICON } from './FocusCardDetail';
 import { MeetingRecorderSheet } from './MeetingRecorderSheet';
 import MemoryFlashBanner, { useMemoryFlash } from '../MemoryFlashBanner';
 import MoodBeat from '../MoodBeat';
-import { t } from '@/lib/portal/i18n';
+import { t, L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import { IconCalendar, IconGift, IconNote } from '../icons';
@@ -191,10 +191,13 @@ export function TodayFocusSection({
     )),
     ...nearSpecialDays.map((item) => (
       <li key={item.nodeId} className="nesio-collapsed-item">
+        {/* 批次 111:纪念日也做成时间线节点(圆点在轨上 + 日期 kicker) */}
         <div className="nesio-collapsed-row">
-          <span className="nesio-collapsed-icon"><IconGift size={15} /></span>
-          <span className="nesio-collapsed-title">{item.name}</span>
-          <span className="nesio-collapsed-day-tag">{item.daysUntil === 0 ? t(locale, 'todayLabelToday') : t(locale, 'todayLabelTomorrow')}</span>
+          <span className="nesio-collapsed-dot" aria-hidden />
+          <span className="nesio-collapsed-task-body">
+            <span className="nesio-collapsed-kicker">{item.daysUntil === 0 ? t(locale, 'todayLabelToday') : t(locale, 'todayLabelTomorrow')}</span>
+            <span className="nesio-collapsed-title">{item.name}</span>
+          </span>
         </div>
       </li>
     )),
@@ -221,9 +224,12 @@ export function TodayFocusSection({
       />
     )] : []),
   ];
-  const peekN = pinned ? 0 : 1;
-  const peeked = collapsedNodes.slice(0, peekN);
-  const hiddenNodes = collapsedNodes.slice(peekN);
+  // 批次 111(设计师定「不折叠」):时间线直接铺开要紧事,不再「至多露一条 + 收起/展开」。
+  // 上限 CAP 条直接上轨,多出来的收成一个「稍后 · 还有 N 件小事」节点(点→全部记忆)。
+  const CAP = 4;
+  const shownNodes = collapsedNodes.slice(0, CAP);
+  const restCount = collapsedNodes.length - shownNodes.length;
+  const dict = portalLocaleToDictionaryLocale(locale);
 
   return (
     <div className="nesio-focus-section">
@@ -260,25 +266,19 @@ export function TodayFocusSection({
             />
           )}
 
-          {/* ── Slot 2: 折叠区(批次 32:至多露一条,其余收进「还有 N 项」)── */}
+          {/* ── Slot 2: 时间线要紧事(批次 111:铺开不折叠,尾部收「稍后·还有 N 件小事」)── */}
           {collapsedNodes.length > 0 && (
             <div className="nesio-collapsed-section">
-              {peeked.length > 0 && <ul className="nesio-collapsed-list">{peeked}</ul>}
-              {hiddenNodes.length > 0 && (
-                <>
-                  <button
-                    type="button"
-                    className="nesio-collapsed-toggle"
-                    onClick={() => setCollapsed((v) => !v)}
-                    aria-expanded={!collapsed}
-                  >
-                    <span className="nesio-collapsed-toggle-label">
-                      {collapsed ? t(locale, 'todayCollapsedMoreTemplate', { count: hiddenNodes.length }) : t(locale, 'todayCollapse')}
-                    </span>
-                    <span className="nesio-collapsed-toggle-chevron">{collapsed ? '▾' : '▴'}</span>
-                  </button>
-                  {!collapsed && <ul className="nesio-collapsed-list">{hiddenNodes}</ul>}
-                </>
+              <ul className="nesio-collapsed-list">{shownNodes}</ul>
+              {restCount > 0 && (
+                <button type="button" className="nesio-collapsed-row nesio-tl-more" onClick={onOpenMemory}>
+                  <span className="nesio-collapsed-dot nesio-collapsed-dot--soft" aria-hidden />
+                  <span className="nesio-collapsed-task-body">
+                    <span className="nesio-collapsed-kicker">{L(dict, '稍后', 'Later')}</span>
+                    <span className="nesio-collapsed-title">{L(dict, `还有 ${restCount} 件小事`, `${restCount} more small things`)}</span>
+                    <span className="nesio-tl-more-sub">{L(dict, '我先替你收着,不急 ›', "I'll keep them — no rush ›")}</span>
+                  </span>
+                </button>
               )}
             </div>
           )}

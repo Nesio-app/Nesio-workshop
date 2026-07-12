@@ -8816,13 +8816,14 @@ html[data-portal-theme="night"] .nesio-brief-strip {
 .nesio-tl-dot--mood {
   grid-row: 1 / span 3;
   grid-column: 1;
-  width: 13px; height: 13px;
-  margin: 3px 0 0 3.5px;   /* 圆心 ≈ x10,压在竖轨上 */
+  width: 14px; height: 14px;   /* 批次 111:全时间线圆点统一 14px */
+  margin: 3px 0 0 3px;         /* 圆心 ≈ x10,压在竖轨上 */
   border-radius: 50%;
   align-self: start;
   border: 2px solid var(--status-calm);
   background: var(--portal-bg);
   box-shadow: 0 0 0 3px var(--portal-bg);  /* 遮住轨线,点坐在线上 */
+  box-sizing: border-box;
 }
 .nesio-tl-dot--mood[data-tone="go"]     { border-color: var(--status-go); }
 .nesio-tl-dot--mood[data-tone="gentle"] { border-color: var(--status-gentle); }
@@ -11269,11 +11270,12 @@ html[data-portal-theme="night"] .nesio-otd-card-name { color: #d0d8f0; }
 .nesio-pinned-card::before {
   content: '';
   position: absolute;
-  left: -24px; top: 15px;
-  width: 13px; height: 13px;
+  left: -27px; top: 15px;
+  width: 14px; height: 14px;
   border-radius: 50%;
   background: var(--portal-accent);
   box-shadow: 0 0 0 3px var(--portal-bg);
+  box-sizing: border-box;
 }
 .nesio-pinned-card--now::before { background: var(--status-gentle); }
 
@@ -11458,24 +11460,39 @@ html[data-portal-theme="night"] .nesio-otd-card-name { color: #d0d8f0; }
 .nesio-collapsed-check,
 .nesio-today-root button.nesio-collapsed-check {
   flex-shrink: 0;
-  /* 批次 108:时间线圆点(压在竖轨上),圆心 ≈ x10。触控区由 ::before 补足 */
-  width: 17px;
-  height: 17px;
-  min-width: 17px;
-  min-height: 17px;
-  margin: 2px 0 0 1.5px;
+  /* 批次 108→111:时间线圆点统一 14px(压在竖轨上,圆心 ≈ x10)。触控区由 ::before 补足 */
+  width: 14px;
+  height: 14px;
+  min-width: 14px;
+  min-height: 14px;
+  margin: 3px 0 0 3px;
   border-radius: 50%;
   border: 2px solid var(--portal-muted, rgba(0,0,0,.4));
   background: var(--portal-bg);
   box-shadow: 0 0 0 3px var(--portal-bg);
   cursor: pointer;
   position: relative;
+  box-sizing: border-box;
   transition: background 0.12s, border-color 0.12s;
 }
+/* 日历项/稍后节点的非交互圆点(与勾选圈同尺寸同位置,坐轨上) */
+.nesio-collapsed-dot {
+  flex-shrink: 0;
+  width: 14px; height: 14px;
+  margin: 3px 0 0 3px;
+  border-radius: 50%;
+  border: 2px solid var(--portal-muted);
+  background: var(--portal-bg);
+  box-shadow: 0 0 0 3px var(--portal-bg);
+  box-sizing: border-box;
+}
+.nesio-collapsed-dot--soft { border-color: color-mix(in srgb, var(--portal-muted) 60%, transparent); }
+.nesio-tl-more { align-items: flex-start; }
+.nesio-tl-more-sub { font-size: 0.74rem; color: var(--portal-muted); margin-top: 1px; }
 .nesio-collapsed-check::before {
   content: '';
   position: absolute;
-  inset: -12px; /* 20 + 12*2 = 44px 命中区,满足触控红线 */
+  inset: -15px; /* 14 + 15*2 = 44px 命中区,满足触控红线 */
 }
 .nesio-collapsed-check--done {
   background: var(--portal-blue-deep);
