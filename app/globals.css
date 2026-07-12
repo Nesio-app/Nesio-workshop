@@ -7685,6 +7685,36 @@ html[data-portal-theme="night"] .nesio-mood-circle {
   color: var(--portal-muted);
 }
 
+/* 批次 124·设计来源行:图标 + 「来自 …·时间」中性 muted;没把握标琥珀「待确认」 */
+.nesio-node-source-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.9rem;
+}
+.nesio-node-source-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--portal-muted);
+  flex-shrink: 0;
+}
+.nesio-node-source-text {
+  font-size: 0.76rem;
+  color: var(--portal-muted);
+  font-weight: 500;
+}
+.nesio-node-pending {
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: #c8862f;
+  padding: 0.06rem 0.44rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, #c8862f 16%, transparent);
+  white-space: nowrap;
+}
+html[data-portal-theme="night"] .nesio-node-pending { color: #e0a850; }
+
 .nesio-node-raw { margin-bottom: 0.85rem; }
 
 .nesio-node-attr-row {

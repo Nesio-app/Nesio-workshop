@@ -5,7 +5,7 @@ import { deleteLifeNode, getLifeGraph, searchLifeGraphFuzzy, updateLifeNode, typ
 import { createAppApiClient } from '@/lib/portal/app-api-client';
 import LocationPicker from './LocationPicker';
 import EmailComposeSheet from './EmailComposeSheet';
-import { IconClock, IconLink, NodeTypeIcon, WeatherIcon, IconMail, IconCalendar, IconFlag, IconCheckSquare } from './icons';
+import { IconClock, IconLink, NodeTypeIcon, WeatherIcon, IconMail, IconCalendar, IconCamera, IconMic, IconNote, IconMapPin, IconFlag, IconCheckSquare } from './icons';
 import { L } from '@/lib/portal/i18n';
 import { relativePastLabel } from '@/lib/portal/time-labels';
 import { displayNodeName } from '@/lib/portal/node-display';
@@ -738,6 +738,30 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
   const emailId = typeof readableAttrs.emailId === 'string' ? readableAttrs.emailId : '';
   const isEmailNode = n.source === 'email' && Boolean(emailFrom);
 
+  // 批次 124·设计来源行:图标 + 「来自 {来源} · {provider} · {时间}」。可信度统一——只在 AI 没把握时标「待确认」。
+  const SRC = (() => {
+    const sz = 14;
+    const tags = n.tags || [];
+    if (tags.includes('notion')) return { icon: <IconNote size={sz} />, label: 'Notion', provider: '' };
+    if (tags.includes('keep')) return { icon: <IconNote size={sz} />, label: 'Keep', provider: '' };
+    if (n.type === 'place') return { icon: <IconMapPin size={sz} />, label: L(dict, '位置', 'Place'), provider: '' };
+    switch (n.source) {
+      case 'email': return { icon: <IconMail size={sz} />, label: L(dict, '邮件', 'Email'), provider: 'Gmail' };
+      case 'calendar': return { icon: <IconCalendar size={sz} />, label: L(dict, '日历', 'Calendar'), provider: L(dict, 'Google 日历', 'Google Calendar') };
+      case 'photo': return { icon: <IconCamera size={sz} />, label: L(dict, '拍照', 'Photo'), provider: '' };
+      case 'voice': return { icon: <IconMic size={sz} />, label: L(dict, '语音', 'Voice'), provider: '' };
+      case 'system': return { icon: <IconNote size={sz} />, label: L(dict, '系统', 'System'), provider: '' };
+      default: return { icon: <IconNote size={sz} />, label: L(dict, '手记', 'Note'), provider: '' };
+    }
+  })();
+  const srcTimeRaw = (typeof readableAttrs.date === 'string' && readableAttrs.date) ? readableAttrs.date : n.createdAt;
+  const srcTime = (() => {
+    const d = new Date(srcTimeRaw);
+    if (isNaN(d.getTime())) return '';
+    return `${d.getMonth() + 1}·${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  })();
+  const srcUncertain = n.confidence > 0 && n.confidence < 0.6;
+
   return (
     <div className="nesio-node-detail-overlay" role="dialog" aria-modal="true" aria-label={n.name}>
       {readerOpen && readableText && (
@@ -856,14 +880,14 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
         )}
 
         <div className="nesio-settings-sheet-body">
-          {/* Source / confidence */}
-          <div className="nesio-node-meta-row">
-            <span className="nesio-node-source">
-              {(dict === 'en' ? { manual: 'Manual', photo: 'Photo', voice: 'Voice', calendar: 'Calendar', email: 'Email', system: 'System' } : { manual: '手动', photo: '拍照', voice: '语音', calendar: '日历', email: '邮件', system: '系统' } as Record<string, string>)[n.source] || n.source}
+          {/* 批次 124·设计来源行:来自 {来源}·{provider} · {时间}(带图标)。
+              可信度统一:默认不显示;只有 AI 没把握时标一个「待确认」(取代 比较确定/可能相关/建议确认)。 */}
+          <div className="nesio-node-source-row">
+            <span className="nesio-node-source-icon" aria-hidden>{SRC.icon}</span>
+            <span className="nesio-node-source-text">
+              {L(dict, '来自 ', 'From ')}{SRC.label}{SRC.provider ? ` · ${SRC.provider}` : ''}{srcTime ? ` · ${srcTime}` : ''}
             </span>
-            <span className="nesio-node-confidence">
-              {n.confidence >= 0.82 ? L(dict, '比较确定', 'Confident') : n.confidence >= 0.58 ? L(dict, '可能相关', 'Likely') : L(dict, '建议确认', 'Please confirm')}
-            </span>
+            {srcUncertain && <span className="nesio-node-pending">{L(dict, '待确认', 'Unconfirmed')}</span>}
           </div>
 
           {/* 批次 70:关联链 —— 行程↔邮件自动挂钩、计划容器↔条目,点开跳转;
