@@ -247,6 +247,205 @@ export function GeneralSheet({ open, onClose }: SheetProps) {
 // 兼容旧引用(契约/历史调用点):ToneSheet 即 GeneralSheet
 export const ToneSheet = GeneralSheet;
 
+// ── 档案(批次 138·设计「档案与账户分开」):昵称 + 头像,从账户拆出 ──
+export function ProfileSheet({ open, onClose, onPickAvatar }: SheetProps & { onPickAvatar: () => void }) {
+  const locale = usePortalLocale();
+  const dict = portalLocaleToDictionaryLocale(locale);
+  const [name, setName] = useState('');
+  const [savedTip, setSavedTip] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const p = loadProfileSettings();
+    setName(p.displayName && p.displayName !== '我' ? p.displayName : '');
+    setSavedTip(false);
+  }, [open]);
+
+  function saveName() {
+    saveProfileSettings({ displayName: name.trim() || '我' }); // PROFILE_UPDATED_EVENT → 全站头像/称呼即时更新
+    setSavedTip(true);
+  }
+
+  return (
+    <SheetWrap open={open} onClose={onClose} title={L(dict, '档案', 'Profile')}>
+      <p className="nesio-settings-section-label">{L(dict, '资料', 'Profile')}</p>
+      <input
+        type="text"
+        className="nesio-ob-input"
+        placeholder={L(dict, '念念这样称呼你', 'What Nessa calls you')}
+        value={name}
+        maxLength={24}
+        aria-label={L(dict, '昵称', 'Nickname')}
+        onChange={(e) => { setName(e.target.value); setSavedTip(false); }}
+        onBlur={saveName}
+      />
+      <button type="button" className="nesio-ob-primary-btn" style={{ marginTop: '0.5rem' }} onClick={saveName}>
+        {savedTip ? L(dict, '✓ 已保存', '✓ Saved') : L(dict, '保存昵称', 'Save nickname')}
+      </button>
+
+      <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '头像', 'Avatar')}</p>
+      <button type="button" className="nesio-settings-option" onClick={onPickAvatar}>
+        <div>
+          <span className="nesio-settings-option-label">{L(dict, '更换头像', 'Change avatar')}</span>
+          <span className="nesio-settings-option-hint">{L(dict, '上传照片 · 自动画成卡通形象', 'Upload a photo · auto-drawn as a cartoon')}</span>
+        </div>
+        <span aria-hidden style={{ color: 'var(--portal-muted)' }}>›</span>
+      </button>
+    </SheetWrap>
+  );
+}
+
+// ── 外观与语言(批次 138:从通用拆出;明暗 + 语言。配色仍在「数据与隐私·实验功能」预览门控下)──
+export function AppearanceSheet({ open, onClose }: SheetProps) {
+  const locale = usePortalLocale();
+  const dict = portalLocaleToDictionaryLocale(locale);
+  const [theme, setTheme] = useState<ThemeChoice>('auto');
+  const [themeSaveIssue, setThemeSaveIssue] = useState('');
+
+  useEffect(() => {
+    if (!open) return;
+    try {
+      const th = localStorage.getItem(THEME_KEY);
+      setTheme(th === 'day' || th === 'night' ? th : 'auto');
+    } catch { /* ignore */ }
+  }, [open]);
+
+  function pickTheme(next: ThemeChoice) {
+    setTheme(next);
+    applyTheme(next);
+    try {
+      localStorage.setItem(THEME_KEY, next);
+      setThemeSaveIssue('');
+    } catch {
+      void (async () => {
+        try {
+          const { runStorageRelief } = await import('@/lib/portal/storage-relief');
+          await runStorageRelief();
+          localStorage.setItem(THEME_KEY, next);
+          setThemeSaveIssue('');
+        } catch {
+          setThemeSaveIssue(L(dict, '本机空间满了,这个选择没能保存 —— 先回今天页点「一键腾空间」。', 'Local storage is full — this choice could not be saved. Tap "Free up space" on the Today page first.'));
+        }
+      })();
+    }
+  }
+  function pickLang(next: PortalLocale) {
+    saveProfileSettings({ locale: next }); // PROFILE_UPDATED_EVENT → 全站即时切换
+  }
+  const themeOpts: Array<{ id: ThemeChoice; label: string; icon: React.ReactNode }> = [
+    { id: 'day', label: t(locale, 'themeDay'), icon: <IconSun size={16} /> },
+    { id: 'auto', label: t(locale, 'themeAuto'), icon: <IconHalfMoon size={16} /> },
+    { id: 'night', label: t(locale, 'themeNight'), icon: <IconMoon size={16} /> },
+  ];
+
+  return (
+    <SheetWrap open={open} onClose={onClose} title={L(dict, '外观与语言', 'Appearance & language')}>
+      <p className="nesio-settings-section-label">{t(locale, 'sectionAppearance')}<InfoTip text={t(locale, 'generalAutoHint')} /></p>
+      <div style={{ display: 'flex', gap: '0.5rem' }}>
+        {themeOpts.map((opt) => (
+          <button key={opt.id} type="button"
+            className={`nesio-settings-option${theme === opt.id ? ' nesio-settings-option--active' : ''}`}
+            style={{ flex: 1, justifyContent: 'center', gap: '0.35rem' }}
+            onClick={() => pickTheme(opt.id)}>
+            {opt.icon}
+            <span className="nesio-settings-option-label">{opt.label}</span>
+          </button>
+        ))}
+      </div>
+      {themeSaveIssue && (
+        <p style={{ marginTop: '0.4rem', fontSize: '0.76rem', color: 'var(--status-risk, #c0564f)' }}>{themeSaveIssue}</p>
+      )}
+
+      <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{t(locale, 'sectionLanguage')}<InfoTip text={t(locale, 'langSoonHint')} /></p>
+      <select
+        value={locale}
+        onChange={(e) => pickLang(e.target.value as PortalLocale)}
+        aria-label={t(locale, 'sectionLanguage')}
+        style={{ width: '100%', minHeight: 'var(--tap-min)', borderRadius: '0.75rem', border: '1.5px solid var(--portal-line)', background: 'var(--glass-bg-solid)', color: 'var(--portal-ink)', fontSize: '0.88rem', padding: '0.55rem 0.75rem', outline: 'none', fontFamily: 'inherit' }}
+      >
+        <optgroup label={t(locale, 'langGroupReady')}>
+          {PORTAL_LOCALE_OPTIONS.filter(([code]) => READY_LOCALES.has(code)).map(([code, label]) => (
+            <option key={code} value={code}>{label}</option>
+          ))}
+        </optgroup>
+        <optgroup label={t(locale, 'langGroupSoon')}>
+          {PORTAL_LOCALE_OPTIONS.filter(([code]) => !READY_LOCALES.has(code)).map(([code, label]) => (
+            <option key={code} value={code} disabled>{label}</option>
+          ))}
+        </optgroup>
+      </select>
+    </SheetWrap>
+  );
+}
+
+// ── 记录习惯(批次 138:从通用拆出;开关 + 数据接入入口)──
+export function HabitsSheet({ open, onClose, onOpenConnect }: SheetProps & { onOpenConnect: () => void }) {
+  const locale = usePortalLocale();
+  const dict = portalLocaleToDictionaryLocale(locale);
+  const [hapticsOn, setHapticsOn] = useState(true);
+  const [dailyReportOn, setDailyReportOn] = useState(false);
+  const [captureLocOn, setCaptureLocOn] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const p = loadProfileSettings();
+    setDailyReportOn(p.dailyReportEnabled);
+    try {
+      setHapticsOn(localStorage.getItem(HAPTIC_FEEDBACK_KEY) !== '0');
+      setCaptureLocOn(captureLocationEnabled());
+    } catch { /* ignore */ }
+  }, [open]);
+
+  function toggleDailyReport() {
+    setDailyReportOn((v) => { saveProfileSettings({ dailyReportEnabled: !v }); return !v; });
+  }
+  function toggleHaptics() {
+    setHapticsOn((v) => { try { localStorage.setItem(HAPTIC_FEEDBACK_KEY, v ? '0' : '1'); } catch { /* ignore */ } return !v; });
+  }
+
+  return (
+    <SheetWrap open={open} onClose={onClose} title={L(dict, '记录习惯', 'Capture habits')}>
+      <p className="nesio-settings-section-label">{L(dict, '开关', 'Switches')}</p>
+      <button type="button"
+        className={`nesio-settings-option${dailyReportOn ? ' nesio-settings-option--active' : ''}`}
+        onClick={toggleDailyReport}>
+        <div>
+          <span className="nesio-settings-option-label">{L(dict, '每日 AI 图文日报', 'Daily AI report')}</span>
+          <span className="nesio-settings-option-hint">{L(dict, '每天存进记忆 · 首页回顾里给你', 'Saved to memory daily · surfaced under Today')}</span>
+        </div>
+        <span className={`nesio-settings-space-check${dailyReportOn ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>{dailyReportOn ? '✓' : '○'}</span>
+      </button>
+      <button type="button"
+        className={`nesio-settings-option${hapticsOn ? ' nesio-settings-option--active' : ''}`}
+        onClick={toggleHaptics}>
+        <div>
+          <span className="nesio-settings-option-label">{L(dict, '触感反馈', 'Haptics')}</span>
+          <span className="nesio-settings-option-hint">{L(dict, '记录成功/找到/长按录音时轻震', 'Gentle buzz on save, find, hold-to-record')}</span>
+        </div>
+        <span className={`nesio-settings-space-check${hapticsOn ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>{hapticsOn ? '✓' : '○'}</span>
+      </button>
+      <button type="button"
+        className={`nesio-settings-option${captureLocOn ? ' nesio-settings-option--active' : ''}`}
+        onClick={() => { const next = !captureLocOn; setCaptureLocOn(next); setCaptureLocationEnabled(next); }}>
+        <div>
+          <span className="nesio-settings-option-label">{L(dict, '记忆自动定位', 'Auto-locate memories')}</span>
+          <span className="nesio-settings-option-hint">{L(dict, '亲手记的带上位置 · 只存本机', 'Your captures get located · stored on-device only')}</span>
+        </div>
+        <span className={`nesio-settings-space-check${captureLocOn ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>{captureLocOn ? '✓' : '○'}</span>
+      </button>
+
+      <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '数据接入', 'Connect data')}</p>
+      <button type="button" className="nesio-settings-option" onClick={onOpenConnect}>
+        <div>
+          <span className="nesio-settings-option-label">{L(dict, '连接数据源', 'Connected sources')}</span>
+          <span className="nesio-settings-option-hint">{L(dict, 'Gmail · 日历 · Notion · 健康 · 银行 …', 'Gmail · Calendar · Notion · Health · Bank …')}</span>
+        </div>
+        <span aria-hidden style={{ color: 'var(--portal-muted)' }}>›</span>
+      </button>
+    </SheetWrap>
+  );
+}
+
 // ── 数据(二级菜单:我的数据 / 数据接入)──────────────
 
 export function DataSheet({ open, onClose, onOpenMine, onOpenConnect }: SheetProps & {
@@ -543,7 +742,7 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
   }
 
   return (
-    <SheetWrap open={open} onClose={onClose} title={L(dict, '隐私与数据', 'Privacy & data')}>
+    <SheetWrap open={open} onClose={onClose} title={L(dict, '数据与隐私', 'Data & privacy')}>
       <p className="nesio-settings-sheet-desc">{L(dict, '只整理你放进来的内容。你可以看见它记住了什么、存在哪、也可以随时删除。', 'Only what you put in gets organized. You can see what it remembers, where it lives, and delete it anytime.')}</p>
 
       {/* 数据主权面板 — local-first 从架构卖点变成可感知的安全感 */}
@@ -877,7 +1076,7 @@ export function SubscriptionSheet({ open, onClose }: SheetProps) {
  * AccountSheet — 账户管理页(QA:此前账号信息散落)。邮箱 / 套餐 / 修改密码 /
  * 恢复购买(随 App 版开放)/ 删除账号(转隐私面板)/ 退出登录。
  */
-export function AccountSheet({ open, onClose, onOpenPrivacy, onOpenMembership }: SheetProps & { onOpenPrivacy: () => void; onOpenMembership: () => void }) {
+export function AccountSheet({ open, onClose, onOpenMembership }: SheetProps & { onOpenMembership: () => void }) {
   const locale = usePortalLocale();
   const dict = portalLocaleToDictionaryLocale(locale);
   const [email, setEmail] = useState('');
@@ -964,10 +1163,8 @@ export function AccountSheet({ open, onClose, onOpenPrivacy, onOpenMembership }:
             <span style={{ fontSize: '0.72rem' }}>{L(dict, '随 App 版开放', 'Coming with the App version')}</span>
           </button>
 
-          <p className="nesio-settings-section-label" style={{ marginTop: '1.2rem' }}>{L(dict, '危险区', 'Danger zone')}</p>
-          <button type="button" onClick={onOpenPrivacy} style={{ ...rowStyle, width: '100%', background: 'none', border: 'none', color: 'var(--status-risk)', cursor: 'pointer', textAlign: 'left' }}>
-            <span>{L(dict, '删除账号与数据…', 'Delete account & data…')}</span><span>›</span>
-          </button>
+          {/* 批次 138:删除账号入口收口到「数据与隐私」(去掉散落重复);此处只留退出。 */}
+          <p className="nesio-settings-section-label" style={{ marginTop: '1.2rem' }}>{L(dict, '会话', 'Session')}</p>
           <button type="button" onClick={signOut} style={{ ...rowStyle, width: '100%', background: 'none', border: 'none', borderBottom: 'none', color: 'var(--status-risk)', cursor: 'pointer', textAlign: 'left' }}>
             <span>{L(dict, '退出登录', 'Sign out')}</span>
           </button>

@@ -6620,6 +6620,47 @@ html[data-portal-theme="night"] .nesio-profile-menu-label { color: #e8eefa; }
   flex-shrink: 0;
 }
 
+/* 批次 138:分组设置菜单 + 底部次要行 */
+.nesio-profile-menu-group { display: flex; flex-direction: column; gap: 0.6rem; }
+.nesio-profile-menu-group-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--portal-muted);
+  margin: 0.55rem 0.3rem 0.05rem;
+}
+.nesio-profile-menu-group:first-child .nesio-profile-menu-group-label { margin-top: 0.15rem; }
+
+.nesio-profile-menu-bottom {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0.95rem 0 0;
+}
+.nesio-profile-menu-bottom-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.32rem;
+  background: var(--glass-bg-solid);
+  border: 1px solid var(--portal-line);
+  border-radius: 0.85rem;
+  padding: 0.7rem 0.4rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+html[data-portal-theme="night"] .nesio-profile-menu-bottom-item { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.1); }
+.nesio-profile-menu-bottom-item:active { background: rgba(88,140,227,0.08); }
+.nesio-profile-menu-bottom-icon { display: flex; align-items: center; justify-content: center; color: var(--portal-blue-deep); }
+.nesio-profile-menu-bottom-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--portal-ink);
+  text-align: center;
+  line-height: 1.2;
+}
+html[data-portal-theme="night"] .nesio-profile-menu-bottom-label { color: #e8eefa; }
+
 /* Settings legacy accordion */
 .nesio-settings-legacy {
   margin: 1.5rem 1.1rem 0;
