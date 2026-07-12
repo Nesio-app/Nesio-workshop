@@ -22,6 +22,15 @@ export const dynamic = 'force-dynamic';
 // 沃尔玛就是超市,不再靠名字猜。
 export interface GeoResult { name: string; city: string; country: string; kind?: string }
 
+// 批次 101:Foursquare Places API 版本头。旧值 2025-02-05 偏早 —— 换当前已知可用版本
+// (官方 curl 示例用 2025-06-17)。版本头无效会让整个请求被拒 → 静默回落 OSM =
+// 「配了 key 也看不出变化」。一处常量,两个调用共用。
+const FSQ_API_VERSION = '2025-06-17';
+
+// 批次 101:Foursquare 调用诊断 —— 别再静默回落。'off'=没配 key;'err_<状态>'=调用
+// 被拒(401 多半是旧版 v3 key 而非新版 Service Key,400 多半版本/参数);'ok_<数>'=正常。
+export type FsqDiag = 'off' | `err_${number}` | `ok_${number}`;
+
 /** OSM jsonv2 的 category/type → 足迹类别。 */
 function kindFromOsm(category?: string, type?: string): string | undefined {
   const c = category || '';
@@ -95,35 +104,41 @@ function countryName(raw: string): string {
   return v.slice(0, 40);
 }
 
-async function foursquareReverse(lat: number, lon: number, token: string): Promise<GeoResult | null> {
+async function foursquareReverse(lat: number, lon: number, token: string): Promise<{ result: GeoResult | null; status: number }> {
   // 取最近一个 POI:sort=DISTANCE + limit=1。radius 收窄防抓到几百米外的店。
   const url = `https://places-api.foursquare.com/places/search?ll=${lat},${lon}&sort=DISTANCE&radius=120&limit=1`;
   const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}`, 'X-Places-Api-Version': '2025-02-05', Accept: 'application/json' },
+    headers: { Authorization: `Bearer ${token}`, 'X-Places-Api-Version': FSQ_API_VERSION, Accept: 'application/json' },
   });
-  if (!res.ok) return null;
+  if (!res.ok) {
+    console.error(`[geocode] foursquare reverse ${res.status} ${(await res.text().catch(() => '')).slice(0, 140)}`);
+    return { result: null, status: res.status };
+  }
   const data = await res.json() as { results?: FsqPlace[] };
   const p = data.results?.[0];
-  if (!p) return null;
+  if (!p) return { result: null, status: 200 };
   const loc = p.location || {};
   const cats = (p.categories || []).map((c) => c.name || c.short_name || '').filter(Boolean);
   const name = (p.name || loc.formatted_address?.split(',')[0] || loc.address || '').slice(0, 40);
   const city = (loc.locality || loc.dma || loc.region || loc.admin_region || '').slice(0, 40);
   const country = countryName(loc.country || '');
-  if (!name && !city && !country) return null;
-  return { name, city, country, kind: kindFromFoursquare(cats) };
+  if (!name && !city && !country) return { result: null, status: 200 };
+  return { result: { name, city, country, kind: kindFromFoursquare(cats) }, status: 200 };
 }
 
 /** 批次 62:附近 POI 候选(地点纠正选择器)—— Foursquare 搜最近 8 个,
  *  城市里楼挨楼分不清时由用户从列表里选;OSM reverse 作兜底候选。 */
-async function foursquareNearby(lat: number, lon: number, token: string): Promise<Array<{ name: string; distanceM?: number; kind?: string; city?: string; country?: string }>> {
+async function foursquareNearby(lat: number, lon: number, token: string): Promise<{ candidates: Array<{ name: string; distanceM?: number; kind?: string; city?: string; country?: string }>; status: number }> {
   const url = `https://places-api.foursquare.com/places/search?ll=${lat},${lon}&sort=DISTANCE&radius=300&limit=8`;
   const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}`, 'X-Places-Api-Version': '2025-02-05', Accept: 'application/json' },
+    headers: { Authorization: `Bearer ${token}`, 'X-Places-Api-Version': FSQ_API_VERSION, Accept: 'application/json' },
   });
-  if (!res.ok) return [];
+  if (!res.ok) {
+    console.error(`[geocode] foursquare nearby ${res.status} ${(await res.text().catch(() => '')).slice(0, 140)}`);
+    return { candidates: [], status: res.status };
+  }
   const data = await res.json() as { results?: FsqPlace[] };
-  return (data.results || []).map((p) => {
+  const candidates = (data.results || []).map((p) => {
     const loc = p.location || {};
     const cats = (p.categories || []).map((c) => c.name || c.short_name || '').filter(Boolean);
     return {
@@ -134,6 +149,7 @@ async function foursquareNearby(lat: number, lon: number, token: string): Promis
       country: countryName(loc.country || ''),
     };
   }).filter((c) => c.name);
+  return { candidates, status: 200 };
 }
 
 /** 批次 82/92(用户实锤:附近只出街道名):没配 Foursquare 时用 OSM Overpass
@@ -191,9 +207,12 @@ async function osmReverse(lat: number, lon: number): Promise<GeoResult | null> {
   if (!res.ok) return null;
   const data = await res.json() as { name?: string; display_name?: string; address?: Record<string, string>; category?: string; type?: string };
   const a = data.address || {};
+  // 批次 101:门牌号根治。此前直接用 a.road("Main St")丢了 a.house_number →
+  // 「只有路名没门牌」。有门牌就拼成「123 Main St」,精确到建筑。
+  const streetAddr = a.house_number && a.road ? `${a.house_number} ${a.road}` : (a.road || '');
   const name = (data.name
     || a.shop || a.amenity || a.building || a.office || a.leisure || a.tourism
-    || a.road || a.neighbourhood || a.suburb || a.city || a.town || a.village
+    || streetAddr || a.neighbourhood || a.suburb || a.city || a.town || a.village
     || (data.display_name ? data.display_name.split(',')[0] : '')).slice(0, 40);
   const city = (a.city || a.town || a.village || a.municipality || a.county || '').slice(0, 40);
   const country = (a.country || '').slice(0, 40);
@@ -213,8 +232,14 @@ export async function POST(req: NextRequest) {
   const fsqToken = envValue('FOURSQUARE_SERVICE_TOKEN');
   try {
     if (body.nearby) {
-      const candidates: Array<{ name: string; distanceM?: number; kind?: string; city?: string; country?: string }> =
-        fsqToken ? await foursquareNearby(lat, lon, fsqToken) : [];
+      // 批次 101:Foursquare 状态显式化 —— 别再静默回落到「看不出变化」。
+      let diag: FsqDiag = 'off';
+      let candidates: Array<{ name: string; distanceM?: number; kind?: string; city?: string; country?: string }> = [];
+      if (fsqToken) {
+        const fsq = await foursquareNearby(lat, lon, fsqToken);
+        candidates = fsq.candidates;
+        diag = fsq.status === 200 ? (`ok_${fsq.candidates.length}` as FsqDiag) : (`err_${fsq.status}` as FsqDiag);
+      }
       // 批次 82:Foursquare 缺席/结果太薄时,Overpass 免费补足附近实体名
       if (candidates.length < 3) {
         const extra = await overpassNearby(lat, lon).catch(() => []);
@@ -226,16 +251,22 @@ export async function POST(req: NextRequest) {
       if (osm?.name && !candidates.some((c) => c.name === osm.name)) {
         candidates.push({ name: osm.name, kind: osm.kind, city: osm.city, country: osm.country });
       }
-      return NextResponse.json({ ok: true, candidates });
+      return NextResponse.json({ ok: true, candidates, diag });
     }
     if (fsqToken) {
       const f = await foursquareReverse(lat, lon, fsqToken);
-      if (f && (f.name || f.city || f.country)) return NextResponse.json({ ok: true, ...f, source: 'foursquare' });
-      // Foursquare 没给结果(如纯住宅坐标附近无 POI)就回落 OSM 取地址/区域名
+      const diag: FsqDiag = f.status === 200 ? (f.result ? 'ok_1' : 'ok_0') : (`err_${f.status}` as FsqDiag);
+      if (f.result && (f.result.name || f.result.city || f.result.country)) {
+        return NextResponse.json({ ok: true, ...f.result, source: 'foursquare', diag });
+      }
+      // Foursquare 没给结果(如纯住宅坐标附近无 POI)或调用被拒 → 回落 OSM,但带上 diag
+      const osm = await osmReverse(lat, lon);
+      if (osm) return NextResponse.json({ ok: true, ...osm, source: 'osm', diag });
+      return NextResponse.json({ ok: false, error: 'no_result', diag }, { status: 200 });
     }
     const osm = await osmReverse(lat, lon);
-    if (osm) return NextResponse.json({ ok: true, ...osm, source: 'osm' });
-    return NextResponse.json({ ok: false, error: 'no_result' }, { status: 200 });
+    if (osm) return NextResponse.json({ ok: true, ...osm, source: 'osm', diag: 'off' as FsqDiag });
+    return NextResponse.json({ ok: false, error: 'no_result', diag: 'off' as FsqDiag }, { status: 200 });
   } catch {
     return NextResponse.json({ ok: false, error: 'geocode_unreachable' }, { status: 502 });
   }

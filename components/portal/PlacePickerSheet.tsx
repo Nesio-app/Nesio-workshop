@@ -32,6 +32,9 @@ export default function PlacePickerSheet({ raw, lat, lon, onClose, onRenamed }: 
   const [kindPick, setKindPick] = useState<PlaceCategory | ''>('');
   const [cands, setCands] = useState<Candidate[]>([]);
   const [loading, setLoading] = useState(false);
+  // 批次 101:Foursquare 调用状态可见 —— 「配了 key 看不出变化」时,一眼看出是
+  // key 没生效(off)、被拒(err_401 旧版 key / err_429 超额)、还是正常但附近无 POI。
+  const [diag, setDiag] = useState<string>('');
 
   useEffect(() => {
     if (typeof lat !== 'number' || typeof lon !== 'number') return;
@@ -41,12 +44,23 @@ export default function PlacePickerSheet({ raw, lat, lon, onClose, onRenamed }: 
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ lat, lon, nearby: true }),
     })
-      .then((r) => r.json() as Promise<{ ok?: boolean; candidates?: Candidate[] }>)
-      .then((d) => { if (!cancelled && d.ok && d.candidates) setCands(d.candidates); })
+      .then((r) => r.json() as Promise<{ ok?: boolean; candidates?: Candidate[]; diag?: string }>)
+      .then((d) => { if (!cancelled) { if (d.ok && d.candidates) setCands(d.candidates); setDiag(d.diag || ''); } })
       .catch(() => {})
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [lat, lon]);
+
+  // 诊断码 → 人话(只在非正常时提示,正常有 POI 时不打扰)
+  function diagHint(code: string): string | null {
+    if (!code || code.startsWith('ok_') && code !== 'ok_0') return null;
+    if (code === 'off') return L(dict, 'Foursquare 未生效(在用免费地图源)—— 检查 Vercel 是否配了 FOURSQUARE_SERVICE_TOKEN 并重新部署。', 'Foursquare not active (using free source). Check the FOURSQUARE_SERVICE_TOKEN env on Vercel and redeploy.');
+    if (code === 'err_401' || code === 'err_403') return L(dict, `Foursquare key 被拒(${code.slice(4)})—— 多半是旧版 v3 key,新 API 要「Service Key」。`, `Foursquare key rejected (${code.slice(4)}) — likely a legacy v3 key; the new API needs a Service Key.`);
+    if (code === 'err_429') return L(dict, 'Foursquare 额度用尽(429)—— 今天的免费额度到顶了。', 'Foursquare quota exhausted (429) — free tier maxed for now.');
+    if (code.startsWith('err_')) return L(dict, `Foursquare 请求出错(${code.slice(4)})—— 已回落免费源。`, `Foursquare request error (${code.slice(4)}) — fell back to free source.`);
+    if (code === 'ok_0') return L(dict, 'Foursquare 正常,但这个坐标附近没有它收录的 POI(住宅区常见)。', 'Foursquare OK, but no POIs it indexes near this point (common in residential areas).');
+    return null;
+  }
 
   function commit(name: string, kind?: string, city?: string, country?: string) {
     const trimmed = name.trim();
@@ -85,6 +99,11 @@ export default function PlacePickerSheet({ raw, lat, lon, onClose, onRenamed }: 
           ))}
         </div>
         <p className="nesio-memmap-list-title" style={{ marginTop: '0.7rem' }}>{L(dict, '附近的地方', 'Places nearby')}{loading ? ' …' : ''}</p>
+        {!loading && diagHint(diag) && (
+          <p className="nesio-settings-option-hint" style={{ color: diag.startsWith('err_') || diag === 'off' ? 'var(--status-gentle)' : 'var(--portal-muted)', margin: '0 0 0.3rem' }}>
+            {diagHint(diag)}
+          </p>
+        )}
         <div className="nesio-memmap-list-scroll">
           {!loading && cands.length === 0 && (
             <p className="nesio-settings-option-hint">{L(dict, '附近没有候选(住宅区常见)—— 直接手动命名即可。', 'No nearby candidates (common in residential areas) — just name it above.')}</p>
