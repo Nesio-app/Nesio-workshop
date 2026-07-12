@@ -63,57 +63,53 @@ export function PinnedAttentionCard({
 }) {
   const locale = usePortalLocale();
   const [expanded, setExpanded] = useState(false);
-  const TypeIcon = EVENT_TYPE_LINEAR_ICON[obj.eventType];
   const typeLabel = EVENT_TYPE_LABEL[obj.eventType];
   const timeStr = formatEventTime(locale, obj.event.start, obj.event.allDay);
   const countdown = calendarCountdown(locale, parseEventDate(obj.event.start), obj.event.allDay);
   const isNow = eventIsNow(parseEventDate(obj.event.start), obj.event.allDay);
   const meetingUrl = obj.event.url ? safeExternalUrl(obj.event.url) : null;
 
+  // 批次 117(用户「白色框去掉」):置顶卡不再是白卡,做成时间线裸节点 ——
+  // 实心 accent 圆点坐轨上 + kicker(绝不能错过小旗 · 类型 · 时间)+ 标题 + 倒计时副行,
+  // 与折叠区节点同构、同轨。展开细节沿用 .nesio-collapsed-detail。
   return (
-    <div className={`nesio-pinned-card${isNow ? ' nesio-pinned-card--now' : ''}`}>
-      {/* ── badge row ── */}
-      <div className="nesio-pinned-badge-row">
-        <span className="nesio-pinned-badge">{t(locale, 'todayPinnedBadge')}</span>
-        <span className="nesio-pinned-type-label"><TypeIcon size={12} /> {typeLabel}</span>
-      </div>
-
-      {/* ── main row ── */}
+    <div className={`nesio-collapsed-item nesio-pinned-node${isNow ? ' nesio-pinned-node--now' : ''}`}>
       <button
         type="button"
-        className="nesio-pinned-main"
+        className="nesio-collapsed-row"
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
       >
-        <span className="nesio-pinned-title">{obj.title}</span>
-        <span className="nesio-pinned-meta">
-          {!obj.event.allDay && <span className="nesio-pinned-time">{timeStr}</span>}
+        <span className="nesio-collapsed-dot nesio-collapsed-dot--pinned" aria-hidden />
+        <span className="nesio-collapsed-task-body">
+          <span className="nesio-collapsed-kicker">
+            <span className="nesio-pinned-flag">{t(locale, 'todayPinnedBadge')}</span>
+            {` · ${typeLabel}`}{!obj.event.allDay ? ` · ${timeStr}` : ''}
+          </span>
+          <span className="nesio-collapsed-title">{obj.title}</span>
           {countdown && (
-            <span className={`nesio-pinned-countdown${isNow ? ' nesio-pinned-countdown--now' : ''}`}>
-              {countdown}
-            </span>
+            <span className={`nesio-collapsed-sub${isNow ? ' nesio-collapsed-sub--now' : ''}`}>{countdown}</span>
           )}
-          <span className="nesio-pinned-chevron">{expanded ? '▴' : '▾'}</span>
         </span>
       </button>
 
-      {/* ── expanded detail ── */}
+      {/* ── expanded detail(裸节点缩进,复用折叠区细节样式)── */}
       {expanded && (
-        <div className="nesio-pinned-detail">
+        <div className="nesio-collapsed-detail">
           {obj.event.description && (
-            <p className="nesio-pinned-desc">{obj.event.description.slice(0, 120)}{obj.event.description.length > 120 ? '…' : ''}</p>
+            <p className="nesio-collapsed-desc">{obj.event.description.slice(0, 120)}{obj.event.description.length > 120 ? '…' : ''}</p>
           )}
           {obj.event.location && (
-            <p className="nesio-pinned-location"><IconMapPin size={13} /> {obj.event.location}</p>
+            <p className="nesio-collapsed-loc"><IconMapPin size={13} /> {obj.event.location}</p>
           )}
-          <div className="nesio-pinned-actions">
+          <div className="nesio-collapsed-actions">
             {meetingUrl && (
-              <a href={meetingUrl} target="_blank" rel="noopener noreferrer" className="nesio-pinned-action-btn nesio-pinned-action-btn--primary">
-                <IconLink size={15} /> {t(locale, 'todayLinkLabel')}
+              <a href={meetingUrl} target="_blank" rel="noopener noreferrer" className="nesio-collapsed-act-btn">
+                <IconLink size={13} /> {t(locale, 'todayLinkLabel')}
               </a>
             )}
-            <button type="button" className="nesio-pinned-action-btn" onClick={onOpenRecorder}>
-              <IconMic size={15} /> {t(locale, 'todayRecordBtn')}
+            <button type="button" className="nesio-collapsed-act-btn" onClick={onOpenRecorder}>
+              <IconMic size={13} /> {t(locale, 'todayRecordBtn')}
             </button>
           </div>
         </div>

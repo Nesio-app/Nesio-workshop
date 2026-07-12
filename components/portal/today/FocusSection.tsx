@@ -224,9 +224,9 @@ export function TodayFocusSection({
       />
     )] : []),
   ];
-  // 批次 111(设计师定「不折叠」):时间线直接铺开要紧事,不再「至多露一条 + 收起/展开」。
-  // 上限 CAP 条直接上轨,多出来的收成一个「稍后 · 还有 N 件小事」节点(点→全部记忆)。
-  const CAP = 4;
+  // 批次 117(用户定「除心情最多显示 2 个」):时间线心情 + 至多 2 个要紧事,
+  // 置顶卡算 1 个(有置顶卡则折叠区只露 1)。多出来的收成「稍后 · 还有 N 件」+ 号节点。
+  const CAP = pinned ? 1 : 2;
   const shownNodes = collapsedNodes.slice(0, CAP);
   const restCount = collapsedNodes.length - shownNodes.length;
   const dict = portalLocaleToDictionaryLocale(locale);
@@ -272,7 +272,7 @@ export function TodayFocusSection({
               <ul className="nesio-collapsed-list">{shownNodes}</ul>
               {restCount > 0 && (
                 <button type="button" className="nesio-collapsed-row nesio-tl-more" onClick={onOpenMemory}>
-                  <span className="nesio-collapsed-dot nesio-collapsed-dot--soft" aria-hidden />
+                  <span className="nesio-collapsed-dot nesio-tl-more-plus" aria-hidden>+</span>
                   <span className="nesio-collapsed-task-body">
                     <span className="nesio-collapsed-kicker">{L(dict, '稍后', 'Later')}</span>
                     <span className="nesio-collapsed-title">{L(dict, `还有 ${restCount} 件小事`, `${restCount} more small things`)}</span>

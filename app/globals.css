@@ -8826,7 +8826,8 @@ html[data-portal-theme="night"] .nesio-brief-strip {
   border: 1.5px solid color-mix(in srgb, var(--status-calm) 55%, transparent);
   background: var(--status-calm-soft);
   color: var(--status-calm);
-  box-shadow: 0 0 0 3px var(--portal-bg);  /* 遮住轨线,坐在线上 */
+  /* 批次 117(用户「实心点去掉白色边」):不再用 --portal-bg 描白环遮轨,
+     竖轨直接从符号背后穿过,符号自身不透明底色就地挡住轨线,不留白圈。 */
   box-sizing: border-box;
 }
 .nesio-tl-dot--mood[data-tone="go"]     { border-color: color-mix(in srgb, var(--status-go) 55%, transparent);     background: var(--status-go-soft);     color: var(--status-go); }
@@ -11474,7 +11475,6 @@ html[data-portal-theme="night"] .nesio-otd-card-name { color: #d0d8f0; }
   border-radius: 50%;
   border: 2px solid var(--portal-muted, rgba(0,0,0,.4));
   background: var(--portal-bg);
-  box-shadow: 0 0 0 3px var(--portal-bg);
   cursor: pointer;
   position: relative;
   box-sizing: border-box;
@@ -11488,17 +11488,46 @@ html[data-portal-theme="night"] .nesio-otd-card-name { color: #d0d8f0; }
   border-radius: 50%;
   border: 2px solid var(--portal-muted);
   background: var(--portal-bg);
-  box-shadow: 0 0 0 3px var(--portal-bg);
   box-sizing: border-box;
 }
 .nesio-collapsed-dot--soft { border-color: color-mix(in srgb, var(--portal-muted) 60%, transparent); }
-/* 批次 115:「现在」= 时间线首个要紧事(日历/纪念日节点),实心 accent 点;其余空心 */
-.nesio-collapsed-list .nesio-collapsed-item:first-child .nesio-collapsed-dot {
+/* 批次 117:置顶「绝不能错过」节点 = 实心 accent 点(此刻要紧事,坐轨上) */
+.nesio-collapsed-dot--pinned {
+  background: var(--portal-accent);
+  border-color: var(--portal-accent);
+}
+/* 批次 117(用户「第三个符号可以是个小加号」):尾节点「稍后·还有 N 件」用虚线圈 + 号 */
+.nesio-tl-more-plus {
+  display: grid;
+  place-items: center;
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--portal-muted) 60%, transparent);
+  background: transparent;
+  color: var(--portal-muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1;
+}
+/* 批次 115→117:「现在」= 时间线首个要紧事实心 accent 点;但有置顶卡时它才是「现在」,
+   折叠区首项应为空心(未来项),故仅在无置顶节点时给折叠区首项填色。 */
+.nesio-attention-layout:not(:has(.nesio-pinned-node)) .nesio-collapsed-list .nesio-collapsed-item:first-child .nesio-collapsed-dot {
   background: var(--portal-accent);
   border-color: var(--portal-accent);
 }
 .nesio-tl-more { align-items: flex-start; }
 .nesio-tl-more-sub { font-size: 0.74rem; color: var(--portal-muted); margin-top: 1px; }
+/* 批次 117:置顶节点「绝不能错过」accent 小旗 + 倒计时副行(此刻=暖橙) */
+.nesio-pinned-flag {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--portal-accent) 16%, transparent);
+  color: var(--portal-accent);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.nesio-collapsed-sub { font-size: 0.78rem; color: var(--portal-muted); margin-top: 1px; }
+.nesio-collapsed-sub--now { color: #f0a040; font-weight: 600; }
 .nesio-collapsed-check::before {
   content: '';
   position: absolute;

@@ -5,10 +5,19 @@
 
 ## 待最后一期解决
 
-- [ ] **今天页 · 置顶卡上轨(批次 109 写了 CSS 但未验证)**:PinnedAttentionCard 给了 margin-left:30px
-  + 左侧实心 accent 圆点(::before)让它坐上竖轨,但**本地无日历事件、没法实测**(pinned 卡来自
-  Google Calendar 同步,不是 life-graph 节点,种不出来)。等有日历数据的真机验证圆点对齐 + 缩进
-  是否 OK;若偏了微调 left/top/margin。
+- [x] **今天页 · 置顶卡上轨 + 去白框(批次 117,用户「白色框去掉」)**:PinnedAttentionCard 从白卡
+  彻底重构成时间线**裸节点** —— 复用 `.nesio-collapsed-row`/`.nesio-collapsed-dot--pinned`(实心
+  accent 点、无 box-shadow 白环),「绝不能错过」变 accent 小旗(`.nesio-pinned-flag`)作 kicker 前缀,
+  倒计时进 `.nesio-collapsed-sub`(进行中=暖橙 #f0a040)。与折叠区节点同构同轨,自动对齐(不再靠
+  margin-left:30px + ::before)。**本地仍无日历事件、pinned 分支没实测**(来自 Google Calendar 同步,
+  非 life-graph);等真机(用户有日历数据)确认圆点对齐 + 小旗/倒计时排版。旧 `.nesio-pinned-card*`
+  CSS 成死代码(无害,留待清理)。
+- [x] **今天页 · 时间线除心情最多 2 项 + 加号尾节点 + 实心点去白边(批次 117,用户三连反馈)**:
+  ①CAP 从 4 改 `pinned ? 1 : 2`(心情 + 至多 2 要紧事,置顶算 1);②尾节点「稍后·还有 N 件」符号
+  改虚线圈 + 号(`.nesio-tl-more-plus`);③所有节点圆点/复选圈/心情方块去掉 `box-shadow: 0 0 0 3px
+  var(--portal-bg)` 白环 —— 竖轨(z-index:0)从节点(z-index:1,不透明底)背后穿过,是「线穿珠」不留
+  白圈;④首项实心「现在」用 `:not(:has(.nesio-pinned-node))` 门控(有置顶卡时首折叠项应空心)。
+  预览实测(haze-blue):心情波纹 → 空心复选圈×2 → 稍后+号,轨线连续、无白环、+ 号居中渲染。
 
 - [x] **回顾卡(去年今日)—— 批次 105 已做**。用户定案「整年整月纪念日优先」:周年(同月同日
   ±3,≥1 年)>月纪念(同 day-of-month ±3,≥3 月)>兜底(一年前这一周 ±7);带心情/照片/地点/
