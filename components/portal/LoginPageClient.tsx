@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import NesioMark from './NesioMark';
 import { loadProfileSettings, saveProfileSettings, type PortalLocale } from '@/lib/portal/profile';
 import { getAuthRedirectTo, importSupabaseHashSession } from '@/lib/portal/auth-client';
 import { isAppStoreBuild } from '@/lib/portal/app-build.mjs';
@@ -135,7 +136,7 @@ export default function LoginPageClient() {
       <div className="nesio-login-card">
         {/* Logo */}
         <div className="nesio-login-logo-row">
-          <img src="/assets/logo/nesio-mark.svg" alt="Nesio" className="nesio-login-logo-img" />
+          <NesioMark className="nesio-login-logo-img" />
           <span className="nesio-ob-brand" style={{ fontSize: '1.3rem' }}>Nesio</span>
         </div>
 

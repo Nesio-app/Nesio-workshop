@@ -7,6 +7,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import NesioMark from './NesioMark';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { getLifeGraph, isBulkImported, searchLifeGraphFuzzy, type LifeNode, updateLifeNode } from '@/lib/portal/life-graph';
 import { canUsePaidCloudAi } from '@/lib/portal/entitlement';
@@ -41,8 +42,7 @@ function NesioAvatar() {
   return (
     <span className="nesio-wechat-avatar nesio-wechat-avatar--logo">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/assets/logo/nesio-mark.svg" alt="" width={30} height={30} draggable={false} className="nesio-logo-day" />
-      <img src="/assets/logo/nesio-mark-night.svg" alt="" width={30} height={30} draggable={false} className="nesio-logo-night" />
+      <NesioMark size={30} />
     </span>
   );
 }
@@ -1265,8 +1265,7 @@ Edit location/value anytime in Storage.`),
           <div className="nesio-wechat-empty">
             <p className="nesio-wechat-empty-icon">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/assets/logo/nesio-mark.svg" alt="" width={52} height={52} draggable={false} className="nesio-logo-day" />
-              <img src="/assets/logo/nesio-mark-night.svg" alt="" width={52} height={52} draggable={false} className="nesio-logo-night" />
+              <NesioMark size={52} />
             </p>
             <p className="nesio-wechat-empty-title">{L(dict, '我是念念', "I'm Nessa")}</p>
             {/* 批次 99:助理拟人化 —— 空态由念念自我介绍(设计规范 命名 NAME LOCKED)。

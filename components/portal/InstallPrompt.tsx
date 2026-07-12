@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import NesioMark from './NesioMark';
 import type { PortalLocale } from '@/lib/portal/profile';
 import { isAppStoreBuild } from '@/lib/portal/app-build.mjs';
 
@@ -98,7 +99,7 @@ export default function InstallPrompt({ locale = 'zh' }: { locale?: PortalLocale
       boxShadow: '0 8px 30px rgba(15, 30, 60, 0.18)', padding: '0.9rem 1rem',
       display: 'flex', alignItems: 'center', gap: '0.75rem',
     }}>
-      <img src="/assets/logo/nesio-mark.svg" alt="" aria-hidden width={34} height={34} style={{ flexShrink: 0 }} />
+      <NesioMark size={34} style={{ flexShrink: 0 }} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <p style={{ margin: 0, fontWeight: 600, fontSize: '0.92rem' }}>
           {zh ? '把 Nesio 装到主屏' : 'Add Nesio to your Home Screen'}

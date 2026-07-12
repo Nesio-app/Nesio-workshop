@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { useProfileAvatar } from './use-profile-avatar';
+import NesioMark from './NesioMark';
 import { usePortalLocale } from './use-portal-locale';
 import { L } from '@/lib/portal/i18n';
 import { buildTodayViewModel, focusTimeHint, markFocusNodeDone, deleteFocusNode, addCommitmentNode, addMeetingNotes, saveSubtasks, toggleSubtask, type FocusNode, type SubTask, type ProactiveContext, type ProactiveContextItem, getLiveMemoryNode, type LiveMemoryNode } from '@/lib/platform/view-models/today-view-model';
@@ -206,8 +207,7 @@ export default function TodayFeed({
           aria-label={L(uiLocale, '打开 Nesio 洞察', "Open Nesio insights")}
           onClick={() => { setInsightsTab('reflection'); setMirrorOpen(true); }}
         >
-          <img src="/assets/logo/nesio-mark.svg" alt="Nesio" className="nesio-today-brand-icon nesio-logo-day" />
-          <img src="/assets/logo/nesio-mark-night.svg" alt="" aria-hidden className="nesio-today-brand-icon nesio-logo-night" />
+          <NesioMark className="nesio-today-brand-icon" />
         </button>
         <div className="nesio-today-header-tools">
           {/* 批次 39:听简报暂时收进「设置 → 路线图」(还在打磨);记录心情移到中央「+」扇形菜单 */}

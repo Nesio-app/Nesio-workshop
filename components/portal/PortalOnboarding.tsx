@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import NesioMark from './NesioMark';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { L, t } from '@/lib/portal/i18n';
 import { IconBox } from './icons';
@@ -153,7 +154,7 @@ function WelcomeStep({ onNext, locale, onLocale }: {
   return (
     <div className="nesio-ob-step">
       <div className="nesio-ob-logo-wrap">
-        <img src="/assets/logo/nesio-mark.svg" alt="Nesio" className="nesio-ob-logo" />
+        <NesioMark className="nesio-ob-logo" />
       </div>
       <h1 className="nesio-ob-brand">Nesio</h1>
       <p className="nesio-ob-tagline">Know Less. Live More.</p>

@@ -128,7 +128,7 @@ assert.match(memoryTab, /showAll|visibleItems|slice\(0,\s*6\)|更多线索/s, 'M
 assert.match(memoryTab, /deleteLifeNode|左滑删除|长按分享|navigator\.share|clipboard/, 'Memory cards should support left-swipe delete and long-press share.');
 assert.doesNotMatch(memoryTab, /nesio-today-header[\s\S]*nesio-memory-brand-icon|aria-label="我的设置"/, 'Memory page should not show the top logo/settings buttons.');
 // Logo swapped to the design-system mark (user decision 2026-07-04); intent unchanged: transparent SVG, not the light-background PWA png.
-assert.match(todayFeed, /\/assets\/logo\/nesio-mark\.svg/, 'Today logo should use the transparent SVG brand asset instead of the light-background PWA icon.');
+assert.match(todayFeed, /<NesioMark\b/, 'Today logo should use the token-driven inline <NesioMark /> vector (批次 102: 随皮肤/主题自适应,取代昼夜双 img).');
 assert.doesNotMatch(todayFeed, /nesio-today-brand-name">Nesio/, 'Today header should not render the Nesio word next to the logo.');
 // Long-press handler renamed startLongPress → startPress; hint moved to aria-label.
 assert.match(bottomNav, /onPointerDown=\{startPress\}/, 'Center N button must expose long-press ask behavior.');

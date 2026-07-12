@@ -20,13 +20,13 @@ function assertEqual(actual, expected, message) {
 
 // 导航已重设计为三键(Today / 中央记录 / Memory):图标为内联描边 SVG
 // (design-system 线性图标语言)+ 品牌矢量中键。
-// 批次 13:中键从带白底方块的 PWA PNG 换成无底色矢量 logo(昼夜双资产),
-// 守住:必须是品牌 mark 资产,不是临时字符或白底位图。
+// 批次 13:中键从带白底方块的 PWA PNG 换成无底色矢量 logo。
+// 批次 102:昼夜双 img 资产升级为内联 <NesioMark />(token 驱动,随皮肤/主题自适应),
+// 守住:必须是品牌矢量中键,不是临时字符或白底位图。
 assert(
   component.includes('nesio-bottom-nav-icon') &&
-    component.includes('/assets/logo/nesio-mark.svg') &&
-    component.includes('/assets/logo/nesio-mark-night.svg'),
-  'PortalBottomNav must render design-system stroke icons and the brand vector center marks.',
+    component.includes('<NesioMark'),
+  'PortalBottomNav must render design-system stroke icons and the brand vector center mark (NesioMark).',
 );
 assert(
   !component.includes('/icons/treasurebox-pwa-192.png'),

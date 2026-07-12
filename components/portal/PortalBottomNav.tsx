@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef } from 'react';
+import NesioMark from './NesioMark';
 import type { PortalLocale } from '@/lib/portal/profile';
 import { L, t } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -78,8 +79,7 @@ export default function PortalBottomNav({
         onContextMenu={(e) => e.preventDefault()}
       >
         {/* 批次 13:白底 PWA PNG 换成无底色矢量 logo,昼夜双资产 */}
-        <img src="/assets/logo/nesio-mark.svg" alt="" className="nesio-bottom-nav-center-icon nesio-logo-day" aria-hidden draggable={false} />
-        <img src="/assets/logo/nesio-mark-night.svg" alt="" className="nesio-bottom-nav-center-icon nesio-logo-night" aria-hidden draggable={false} />
+        <NesioMark className="nesio-bottom-nav-center-icon" />
       </button>
 
       {/* Memory */}
