@@ -39,7 +39,7 @@ import dynamic from 'next/dynamic';
 const MemoryNodeDetail = dynamic(() => import('./MemoryNodeDetail'), { ssr: false });
 const RelationGraph = dynamic(() => import('./RelationGraph'), { ssr: false });
 import type { GNode, GEdge } from '@/lib/platform/graph-engine';
-import { DomainIcon, IconBox, IconCalendar, IconCheckSquare, IconFolder, IconLink, IconMapPin, IconStar, IconUser, NodeTypeIcon, IconMap } from './icons';
+import { DomainIcon, IconBox, IconBookmark, IconCalendar, IconCheckSquare, IconFolder, IconLink, IconMapPin, IconStar, IconUser, NodeTypeIcon, IconMap } from './icons';
 import { L, type DictLocale } from '@/lib/portal/i18n';
 import { relativePastLabel } from '@/lib/portal/time-labels';
 import { displayNodeName } from '@/lib/portal/node-display';
@@ -1064,12 +1064,12 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
               {hasNodes && (
                 <div className="nesio-mem-jars">
                   <button type="button" className="nesio-mem-jar" onClick={() => setCoreOpen((v) => !v)}>
-                    <span className="nesio-mem-jar-ball" data-halo="core" aria-hidden />
+                    <span className="nesio-mem-jar-ball" data-halo="core" aria-hidden><IconStar size={26} /></span>
                     <span className="nesio-mem-jar-name">{L(dict, '核心记忆', 'Core')}</span>
                     <span className="nesio-mem-jar-sub">{L(dict, `定义你 · ${coreNodes.length}`, `defines you · ${coreNodes.length}`)}</span>
                   </button>
                   <button type="button" className="nesio-mem-jar" onClick={() => setFavOpen((v) => !v)}>
-                    <span className="nesio-mem-jar-ball" data-halo="fav" aria-hidden />
+                    <span className="nesio-mem-jar-ball" data-halo="fav" aria-hidden><IconBookmark size={24} /></span>
                     <span className="nesio-mem-jar-name">{L(dict, '收藏夹', 'Saved')}</span>
                     <span className="nesio-mem-jar-sub">{L(dict, `手动收 · ${pinnedNodes.length}`, `pinned · ${pinnedNodes.length}`)}</span>
                   </button>
@@ -1083,7 +1083,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                       else document.querySelector('.nesio-projects-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     }}
                   >
-                    <span className="nesio-mem-jar-ball" data-halo="project" aria-hidden />
+                    <span className="nesio-mem-jar-ball" data-halo="project" aria-hidden><IconFolder size={24} /></span>
                     <span className="nesio-mem-jar-name">{L(dict, '项目', 'Projects')}</span>
                     <span className="nesio-mem-jar-sub">{L(dict, `进行 · ${projects.filter((p) => p.status === 'active').length}`, `active · ${projects.filter((p) => p.status === 'active').length}`)}</span>
                   </button>

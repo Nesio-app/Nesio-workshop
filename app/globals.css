@@ -12453,32 +12453,49 @@ html[data-portal-theme="night"] .nesio-section-title { color: #c8d8f0; }
   cursor: pointer;
   padding: 0.3rem 0.2rem;
 }
+/* 批次 120(用户「记忆球用图 5」):白打底、色作晕 —— 球身哑光低饱和白,颜色只在
+   后面一圈柔和光晕 + 边缘一丝透色 + 同色符号。不再把光晕色灌进球身(旧 radial 到 100% jar-halo)。 */
 .nesio-mem-jar-ball {
   width: 76px; height: 76px;
   border-radius: 50%;
   position: relative;
+  display: grid; place-items: center;
+  /* 哑光白核 —— 球身几乎全白,边缘一丝透色 */
   background:
-    radial-gradient(circle at 36% 30%, #ffffff, rgba(255,255,255,0.55) 42%, var(--jar-halo) 100%);
+    radial-gradient(circle at 38% 32%, #ffffff, #fafaf9 60%, color-mix(in srgb, var(--jar-halo) 12%, #f4f3f1) 100%);
+  /* 后面一圈柔和彩色光晕(光韵)+ 轻立体 */
   box-shadow:
-    0 14px 26px -8px color-mix(in srgb, var(--jar-halo) 55%, transparent),
-    inset -7px -9px 18px rgba(60,40,50,0.18);
-  border: 1px solid rgba(255,255,255,0.75);
+    0 0 20px 1px color-mix(in srgb, var(--jar-halo) 42%, transparent),
+    0 10px 20px -8px color-mix(in srgb, var(--jar-halo) 30%, transparent),
+    inset -4px -6px 13px rgba(70,60,60,0.05);
+  border: 1px solid color-mix(in srgb, var(--jar-halo) 20%, rgba(255,255,255,0.85));
+  color: var(--jar-halo);          /* 同色符号 */
   transition: transform 0.18s var(--ease-soft, ease);
 }
 .nesio-mem-jar:active .nesio-mem-jar-ball { transform: scale(0.94); }
 .nesio-mem-jar-ball::before {
   content: '';
   position: absolute;
-  left: 26%; top: 17%;
-  width: 24%; height: 17%;
+  left: 26%; top: 15%;
+  width: 22%; height: 15%;
   border-radius: 50%;
   background: rgba(255,255,255,0.92);
-  filter: blur(2px);
+  filter: blur(2.5px);
 }
-.nesio-mem-jar-ball[data-halo="core"]    { --jar-halo: var(--status-gentle); }
-.nesio-mem-jar-ball[data-halo="fav"]     { --jar-halo: var(--portal-accent); }
-.nesio-mem-jar-ball[data-halo="project"] { --jar-halo: var(--status-go); }
-.nesio-mem-jar-ball[data-halo="all"]     { --jar-halo: var(--status-gentle); }
+/* 暗色:白雾球 + 一圈彩色光晕(深底把光晕衬得更明显,灰调不刺眼)—— 图 5 逻辑 */
+html[data-portal-theme="night"] .nesio-mem-jar-ball {
+  background:
+    radial-gradient(circle at 38% 32%, rgba(255,255,255,0.9), rgba(240,242,246,0.6) 55%, color-mix(in srgb, var(--jar-halo) 22%, rgba(255,255,255,0.26)) 100%);
+  box-shadow:
+    0 0 24px 2px color-mix(in srgb, var(--jar-halo) 58%, transparent),
+    0 10px 22px -8px rgba(0,0,0,0.45);
+  border-color: color-mix(in srgb, var(--jar-halo) 38%, transparent);
+}
+/* 类别识别色(图 5:星·金 / 书签·暗红 / 文件夹·绿)—— 取 12 色定稿里的语义色,稳定不随皮肤 */
+.nesio-mem-jar-ball[data-halo="core"]    { --jar-halo: var(--emotion-joy); }
+.nesio-mem-jar-ball[data-halo="fav"]     { --jar-halo: var(--emotion-angry); }
+.nesio-mem-jar-ball[data-halo="project"] { --jar-halo: var(--emotion-content); }
+.nesio-mem-jar-ball[data-halo="all"]     { --jar-halo: var(--emotion-calm); }
 .nesio-mem-jar-name {
   font-size: 0.86rem; font-weight: 700; color: var(--portal-ink);
 }
