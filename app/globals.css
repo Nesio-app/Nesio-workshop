@@ -5454,6 +5454,38 @@ html[data-portal-theme="night"] .nesio-type-chip {
   max-width: fit-content;
 }
 
+/* 批次 121·设计统一卡片模板 —— 分类图标/头像领头(置顶左),标明「这是什么」,分类为主。
+   放在 icon/avatar 规则之后,靠源序覆盖它们的尺寸。 */
+.nesio-memory-card-lead {
+  align-self: flex-start;
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 0.5rem;
+  font-size: 0.72rem;
+  flex-shrink: 0;
+}
+.nesio-memory-card-lead.nesio-memory-card-avatar { border-radius: 50%; }
+/* 来源徽章(设计「来源为辅」:右下小徽章,中性 muted);不确定用注意色标「待确认」 */
+.nesio-memory-card-source {
+  font-size: 0.64rem;
+  font-weight: 600;
+  color: var(--portal-muted);
+  padding: 0.06rem 0.4rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--portal-muted) 13%, transparent);
+  white-space: nowrap;
+}
+.nesio-memory-card-pending {
+  font-size: 0.64rem;
+  font-weight: 700;
+  color: #c8862f;
+  padding: 0.06rem 0.4rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, #c8862f 16%, transparent);
+  white-space: nowrap;
+}
+html[data-portal-theme="night"] .nesio-memory-card-pending { color: #e0a850; }
+
 /* ── Memory receipt ────────────────────────────────────────────────────── */
 .nesio-memory-receipt {
   position: fixed;

@@ -389,6 +389,27 @@ function getNodeTypeMeta(node: LifeNode, dict: DictLocale = 'zh') {
   }
 }
 
+/** 来源徽章(批次 121·设计「分类为主,来源为辅」):来源退为右下小徽章。
+ *  自己记的(manual)不标来源——那是噪音;外部来源(邮件/日历/拍照/Notion…)才标。 */
+function sourceBadge(node: LifeNode, dict: DictLocale): string | null {
+  const tags = node.tags || [];
+  if (tags.includes('notion')) return 'Notion';
+  if (tags.includes('keep')) return 'Keep';
+  switch (node.source) {
+    case 'email': return L(dict, '邮件', 'Email');
+    case 'calendar': return L(dict, '日历', 'Calendar');
+    case 'photo': return L(dict, '拍照', 'Photo');
+    case 'voice': return L(dict, '语音', 'Voice');
+    case 'system': return L(dict, '系统', 'System');
+    default: return null;
+  }
+}
+
+/** 不确定(AI 抽取的低置信项)→ 卡片标「待确认」(设计规范:不确定标 待确认)。 */
+function isNodeUncertain(node: LifeNode): boolean {
+  return typeof node.confidence === 'number' && node.confidence > 0 && node.confidence < 0.6;
+}
+
 /** 卡片标题智能截断:整段原文取首个分句,一眼读完(批次 4)。 */
 function smartCardTitle(name: string): string {
   // 显示层剥 emoji:批次 3 前的旧记录名字里带表情(如「Journal · 😊满足」)
@@ -567,6 +588,8 @@ function MemoryCard({ node, onOpen, onDeleted, onLongPress }: { node: LifeNode; 
   const { extra, badge, badgeColor } = getNodeTypeMeta(node, dict);
   const isPerson = node.type === 'person';
   const { initials, bg: avatarBg } = isPerson ? getPersonInitials(node.name) : { initials: '', bg: '' };
+  const src = sourceBadge(node, dict);
+  const uncertain = isNodeUncertain(node);
 
   return (
     <button
@@ -597,13 +620,23 @@ function MemoryCard({ node, onOpen, onDeleted, onLongPress }: { node: LifeNode; 
       onContextMenu={(e) => { e.preventDefault(); shareNode(); }}
       aria-label={`${node.name}${L(dict, ',左滑删除,长按分享', ' — swipe left to delete, long-press to share')}`}
     >
+      {/* 批次 121·设计统一卡片模板:分类图标领头(辅助色)—— 标明「这是什么」,分类为主。
+          人物用头像。每卡恰好 1 个 type 图标(批次 13 双图标已废)。 */}
+      {isPerson ? (
+        <span className="nesio-memory-card-lead nesio-memory-card-avatar" style={{ background: avatarBg }}>{initials}</span>
+      ) : (
+        <span className="nesio-memory-card-lead nesio-memory-card-icon" style={{ background: TYPE_BG[node.type] || 'var(--portal-accent-soft)' }}>
+          <NodeTypeIcon type={node.type} size={15} />
+        </span>
+      )}
       <span className="nesio-memory-card-title" title={node.name}>{smartCardTitle(displayNodeName(node.name, dict))}</span>
       {extra && <span className="nesio-memory-card-extra">{extra}</span>}
       {badge && <span className="nesio-memory-card-status-badge" style={{ background: badgeColor }}>{badge}</span>}
       {!extra && !badge && <span className="nesio-memory-card-sub">{cleanMemoryPreview(node, dict)}</span>}
-      {/* 批次 8:只留符号不留文字 — 类型 chip 与领域 chip 等大;
-          来源文字 chip(日历/Gmail)与类型图标重复,移除 */}
+      {/* 来源徽章 · 时间(设计「来源为辅」:右下小徽章;不确定标「待确认」) */}
       <span className="nesio-memory-card-meta-row">
+        {src && <span className="nesio-memory-card-source">{src}</span>}
+        {uncertain && <span className="nesio-memory-card-pending">{L(dict, '待确认', 'Unconfirmed')}</span>}
         {(() => {
           // 标签三层 §3.3:列表卡带相对时间(今天/昨天/N 天前),数据的"新鲜度"一眼可辨
           const t = new Date(node.createdAt);
@@ -615,16 +648,6 @@ function MemoryCard({ node, onOpen, onDeleted, onLongPress }: { node: LifeNode; 
               : relativePastLabel(t, Date.now(), dict);
           return <span className="nesio-memory-card-time">{label}</span>;
         })()}
-        {isPerson ? (
-          <span className="nesio-memory-card-avatar" style={{ background: avatarBg, width: '1.55rem', height: '1.55rem', fontSize: '0.7rem' }}>{initials}</span>
-        ) : (
-          <span className="nesio-memory-card-icon" style={{ background: TYPE_BG[node.type] || 'var(--portal-accent-soft)' }}>
-            <NodeTypeIcon type={node.type} size={13} />
-          </span>
-        )}
-        {/* 标签三层重构 L1:domain 第二图标整个废除 —— 双图标是 type/domain 两套系统
-            映射撞车的产物(object=箱 + assets=也是箱 → 卡片双立方体)。每卡恰好 1 个
-            type 图标。批次 13 的 health 特判补丁随之退役。 */}
       </span>
     </button>
   );
