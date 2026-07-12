@@ -13,6 +13,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
+import { relativePastLabel } from '@/lib/portal/time-labels';
+import { IconMapPin, IconClock, IconCamera, IconNote } from './icons';
 import LocationPicker from './LocationPicker';
 import { importInventoryCsv } from '@/lib/portal/inventory-import';
 import { useRef } from 'react';
@@ -35,6 +37,14 @@ interface InventorySheetProps {
 
 const ALL = '__all__';
 const UNPLACED = '__unplaced__';
+
+// 批次 133·预览图占位色(设计:每条物品有预览图;真图缩略未加载时用柔和莫兰迪色块占位,确定性取色)
+const PREVIEW_COLORS = ['#d3b0ac', '#d3b79a', '#a9bcd0', '#b6c7ac', '#c8b3c6', '#cdbfa6', '#b0c4c0'];
+function previewColor(name: string): string {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return PREVIEW_COLORS[h % PREVIEW_COLORS.length];
+}
 
 export default function InventorySheet({ open, onClose }: InventorySheetProps) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
@@ -94,6 +104,7 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
   }, [items, groupFilter, query]);
 
   const unplacedCount = useMemo(() => items.filter((i) => !i.space).length, [items]);
+  const st = useMemo(() => inventoryStats(items), [items]);
   const detail = detailId ? items.find((i) => i.id === detailId) ?? null : null;
 
   if (!open) return null;
@@ -176,8 +187,16 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
   return (
     <div className="nesio-freeze-overlay" onClick={onClose}>
       <div className="nesio-freeze-sheet" onClick={(e) => e.stopPropagation()}>
+        {/* 批次 133·设计:标题 + 统计收成标题旁一行小字(去掉抽象方块统计) */}
         <div className="nesio-freeze-header">
-          <span className="nesio-freeze-title">📦 {L(dict, '收纳', 'Storage')}</span>
+          <span className="nesio-freeze-title">{L(dict, '收纳', 'Storage')}</span>
+          {view === 'list' && items.length > 0 && (
+            <span style={{ marginLeft: 'auto', marginRight: '0.6rem', fontSize: '0.72rem', color: 'var(--text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>
+              {L(dict, `${st.count} 件`, `${st.count}`)}
+              {st.totalValue > 0 ? ` · ${L(dict, '估值', '~')} $${Math.round(st.totalValue).toLocaleString('en-US')}` : ''}
+              {unplacedCount > 0 ? ` · ${unplacedCount} ${L(dict, '未归位', 'unplaced')}` : ''}
+            </span>
+          )}
           <button type="button" className="nesio-freeze-close" onClick={view === 'list' ? onClose : () => { setView('list'); setDetailId(null); }}>
             {view === 'list' ? '✕' : '‹'}
           </button>
@@ -220,40 +239,72 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
                   : L(dict, '还没有物品。点下面「记一件」,或用「拍一下」拍张照直接识别。', 'No items yet. Tap "Add one" below, or snap a photo to recognize.')}
               </p>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '46vh', overflowY: 'auto', paddingBottom: 4 }}>
-                {visible.map((i) => {
-                  const exp = expiryStatus(i);
-                  return (
-                    <button
-                      key={i.id}
-                      type="button"
-                      onClick={() => { setDetailId(i.id); setView('detail'); }}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', width: '100%',
-                        padding: '0.6rem 0.7rem', borderRadius: 12,
-                        border: '1px solid var(--border-subtle, rgba(255,255,255,0.1))',
-                        background: 'var(--glass-bg, rgba(255,255,255,0.04))', color: 'var(--text-primary)',
-                      }}
-                    >
-                      <span style={{ fontSize: '1.15rem' }}>{i.isContainer ? '🗃' : i.hasPhoto ? '🖼️' : '📦'}</span>
-                      <span style={{ flex: 1, minWidth: 0 }}>
-                        <span style={{ display: 'block', fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {i.name}{i.quantity != null ? ` ×${i.quantity}` : ''}
+              <>
+                {/* 批次 133·设计:物品·最近更新在前 */}
+                <p style={{ margin: '0.2rem 0 0.5rem', fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>
+                  {L(dict, '物品 · 最近更新在前', 'Items · latest first')}
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '44vh', overflowY: 'auto', paddingBottom: 4 }}>
+                  {visible.map((i) => {
+                    const exp = expiryStatus(i);
+                    const src = i.node.source === 'photo' ? L(dict, '拍照', 'Photo') : i.node.source === 'email' ? L(dict, '邮件', 'Email') : L(dict, '手记', 'Note');
+                    const updated = relativePastLabel(i.node.createdAt, Date.now(), dict);
+                    return (
+                      <button
+                        key={i.id}
+                        type="button"
+                        onClick={() => { setDetailId(i.id); setView('detail'); }}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left', width: '100%',
+                          padding: '0.6rem 0.7rem', borderRadius: 14,
+                          border: '1px solid var(--border-subtle, rgba(255,255,255,0.1))',
+                          background: 'var(--glass-bg, rgba(255,255,255,0.04))', color: 'var(--text-primary)',
+                        }}
+                      >
+                        {/* 预览图(设计:一眼认出是什么;真图缩略未加载 → 柔和色块占位) */}
+                        <span aria-hidden style={{
+                          flexShrink: 0, width: 46, height: 46, borderRadius: 11,
+                          background: `linear-gradient(135deg, ${previewColor(i.name)}, color-mix(in srgb, ${previewColor(i.name)} 70%, #000))`,
+                        }} />
+                        <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                          <span style={{ fontSize: '0.92rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {i.name}{i.quantity != null ? ` ×${i.quantity}` : ''}
+                          </span>
+                          {/* 一级存放位置 */}
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.75rem', color: i.location ? 'var(--text-secondary)' : 'var(--accent-primary, #c08f6f)' }}>
+                            <IconMapPin size={12} />
+                            {i.location || L(dict, '未归位 · 点开设位置', 'Unplaced · tap to set')}
+                          </span>
+                          {/* 最后更新多久前 · 来源 */}
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>
+                            <IconClock size={12} />
+                            {L(dict, `${updated}更新`, `updated ${updated}`)} · {src}
+                          </span>
                         </span>
-                        <span style={{ display: 'block', fontSize: '0.74rem', color: 'var(--text-tertiary)' }}>
-                          {i.location || L(dict, '未归位 · 点开设置位置', 'Unplaced · tap to set')}
-                          {i.isContainer ? ` · ${L(dict, `装了 ${i.containedCount} 件`, `holds ${i.containedCount}`)}` : ''}
-                        </span>
-                      </span>
-                      {exp && (
-                        <span style={{ fontSize: '0.7rem', color: exp === 'expired' ? 'var(--status-stop, #ef4444)' : 'var(--status-warn, #f59e0b)' }}>
-                          {exp === 'expired' ? L(dict, '已过期', 'Expired') : L(dict, '临期', 'Soon')}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
+                        {exp && (
+                          <span style={{ flexShrink: 0, fontSize: '0.7rem', color: exp === 'expired' ? 'var(--status-stop, #ef4444)' : 'var(--status-warn, #f59e0b)' }}>
+                            {exp === 'expired' ? L(dict, '已过期', 'Expired') : L(dict, '临期', 'Soon')}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* 批次 133·设计:常用标签(点开筛该标签)*/}
+                {st.topTags.length > 0 && (
+                  <>
+                    <p style={{ margin: '0.9rem 0 0.4rem', fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>{L(dict, '常用标签', 'Top tags')}</p>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {st.topTags.slice(0, 6).map((t) => (
+                        <button key={t.tag} type="button" style={chip(query === t.tag)} onClick={() => setQuery(query === t.tag ? '' : t.tag)}>
+                          {t.tag} <span style={{ color: 'var(--text-tertiary)' }}>{t.count}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </>
             )}
 
             <div style={{ display: 'flex', gap: 8, marginTop: '0.7rem' }}>
