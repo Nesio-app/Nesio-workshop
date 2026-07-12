@@ -62,7 +62,7 @@ export default function MoodBeat() {
         className="nesio-tl-node nesio-tl-node--invite"
         onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-mood'))}
       >
-        <span className="nesio-tl-dot nesio-tl-dot--mood" data-tone="calm" aria-hidden />
+        <span className="nesio-tl-dot nesio-tl-dot--mood" data-tone="calm" aria-hidden><MoodRipple /></span>
         <span className="nesio-tl-time">{L(dict, '现在', 'Now')}</span>
         <span className="nesio-tl-title">{L(dict, '现在感觉如何?', 'How do you feel?')}</span>
         <span className="nesio-tl-sub">{L(dict, '记一下,今天的第一拍', "Log it — today's first beat")}</span>
@@ -72,10 +72,20 @@ export default function MoodBeat() {
 
   return (
     <button type="button" className="nesio-tl-node nesio-tl-node--mood" onClick={onOpenTrend}>
-      <span className="nesio-tl-dot nesio-tl-dot--mood" data-tone={beat.tone} aria-hidden />
+      <span className="nesio-tl-dot nesio-tl-dot--mood" data-tone={beat.tone} aria-hidden><MoodRipple /></span>
       <span className="nesio-tl-time">{L(dict, '今天', 'Today')}</span>
       <span className="nesio-tl-title">{beat.name}</span>
       <span className="nesio-tl-sub">{beat.time} · {L(dict, '记录 · 点开看这周趋势', 'logged · tap for this week')}</span>
     </button>
+  );
+}
+
+/** 心情波纹符号(设计规范:心情节点用波纹,不用圆点) */
+function MoodRipple() {
+  return (
+    <svg className="nesio-mood-ripple" viewBox="0 0 22 22" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
+      <path d="M2 8 Q 5 4.5, 8 8 T 14 8 T 20 8" />
+      <path d="M2 14 Q 5 10.5, 8 14 T 14 14 T 20 14" />
+    </svg>
   );
 }

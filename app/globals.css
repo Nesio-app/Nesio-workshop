@@ -8813,21 +8813,26 @@ html[data-portal-theme="night"] .nesio-brief-strip {
   cursor: pointer;
   position: relative;
 }
+/* 批次 115:心情节点 = 波纹方块(设计规范「心情波纹方块作节点」),不是圆点。
+   比要紧事的 14px 圆点略大的圆角方块,内嵌波纹符号,底/边/波纹描边都取当天心情色。 */
 .nesio-tl-dot--mood {
   grid-row: 1 / span 3;
   grid-column: 1;
-  width: 14px; height: 14px;   /* 批次 111:全时间线圆点统一 14px */
-  margin: 3px 0 0 3px;         /* 圆心 ≈ x10,压在竖轨上 */
-  border-radius: 50%;
+  width: 22px; height: 22px;
+  margin: 0 0 0 -1px;          /* 中心 ≈ x10,压在竖轨上 */
+  border-radius: 7px;
   align-self: start;
-  border: 2px solid var(--status-calm);
-  background: var(--portal-bg);
-  box-shadow: 0 0 0 3px var(--portal-bg);  /* 遮住轨线,点坐在线上 */
+  display: grid; place-items: center;
+  border: 1.5px solid color-mix(in srgb, var(--status-calm) 55%, transparent);
+  background: var(--status-calm-soft);
+  color: var(--status-calm);
+  box-shadow: 0 0 0 3px var(--portal-bg);  /* 遮住轨线,坐在线上 */
   box-sizing: border-box;
 }
-.nesio-tl-dot--mood[data-tone="go"]     { border-color: var(--status-go); }
-.nesio-tl-dot--mood[data-tone="gentle"] { border-color: var(--status-gentle); }
-.nesio-tl-dot--mood[data-tone="calm"]   { border-color: var(--status-calm); }
+.nesio-tl-dot--mood[data-tone="go"]     { border-color: color-mix(in srgb, var(--status-go) 55%, transparent);     background: var(--status-go-soft);     color: var(--status-go); }
+.nesio-tl-dot--mood[data-tone="gentle"] { border-color: color-mix(in srgb, var(--status-gentle) 55%, transparent); background: var(--status-gentle-soft); color: var(--status-gentle); }
+.nesio-tl-dot--mood[data-tone="calm"]   { border-color: color-mix(in srgb, var(--status-calm) 55%, transparent);   background: var(--status-calm-soft);   color: var(--status-calm); }
+.nesio-mood-ripple { display: block; }
 .nesio-tl-time {
   grid-column: 2;
   font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em;
@@ -11487,6 +11492,11 @@ html[data-portal-theme="night"] .nesio-otd-card-name { color: #d0d8f0; }
   box-sizing: border-box;
 }
 .nesio-collapsed-dot--soft { border-color: color-mix(in srgb, var(--portal-muted) 60%, transparent); }
+/* 批次 115:「现在」= 时间线首个要紧事(日历/纪念日节点),实心 accent 点;其余空心 */
+.nesio-collapsed-list .nesio-collapsed-item:first-child .nesio-collapsed-dot {
+  background: var(--portal-accent);
+  border-color: var(--portal-accent);
+}
 .nesio-tl-more { align-items: flex-start; }
 .nesio-tl-more-sub { font-size: 0.74rem; color: var(--portal-muted); margin-top: 1px; }
 .nesio-collapsed-check::before {
