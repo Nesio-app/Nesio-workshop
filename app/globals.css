@@ -4644,8 +4644,10 @@ html[data-portal-theme="night"] .nesio-bottom-nav-btn--active {
   width: 3.2rem;
   height: 3.2rem;
   border-radius: 50%;
-  background: linear-gradient(135deg, #6ea8f0 0%, #588ce3 60%, #3d6dd4 100%);
-  box-shadow: 0 4px 16px rgba(88,140,227,0.4);
+  /* 批次 100:中心水晶球随皮肤走(此前硬编码蓝,灰粉皮肤下是唯一跳蓝的元素)。
+     用 --portal-* 品牌 ramp:灰粉皮肤=玫瑰渐变,默认蓝皮肤=原来的蓝。 */
+  background: linear-gradient(135deg, var(--portal-blue-mid) 0%, var(--portal-accent) 55%, var(--portal-blue-deep) 100%);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--portal-blue-deep) 42%, transparent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4664,8 +4666,8 @@ html[data-portal-theme="night"] .nesio-bottom-nav-btn--active {
 }
 
 .nesio-bottom-nav-center--active {
-  background: linear-gradient(135deg, #7bb5f4, #4a80e8);
-  box-shadow: 0 0 0 4px rgba(88,140,227,0.25), 0 4px 16px rgba(88,140,227,0.45);
+  background: linear-gradient(135deg, var(--portal-blue-mid), var(--portal-blue-deep));
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--portal-accent) 26%, transparent), 0 4px 16px color-mix(in srgb, var(--portal-blue-deep) 45%, transparent);
 }
 
 .nesio-bottom-nav-center-icon {
@@ -8765,12 +8767,13 @@ html[data-portal-theme="night"] .nesio-brief-strip {
   margin-bottom: 0.6rem;
 }
 
+/* 批次 100:区块标注 = 无衬线小字距标签(设计规范 §4:10–11px · 字距 1px · muted)。 */
 .nesio-focus-title {
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 700;
   color: var(--portal-muted);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.12em;
 }
 
 .nesio-focus-all-btn {
@@ -14431,9 +14434,14 @@ html[data-portal-theme="night"] .nesio-exp-card:hover {
 .nesio-mirror-error { font-size: 0.76rem; color: var(--status-risk); margin: 0.2rem 0; }
 
 /* ── 批次 28 · Today §1:收据首行 + 捕获提示 ── */
+/* 批次 100:念念的问候 = 衬线「显示」嗓音(设计规范 §4 字体:问候用大标题衬线)。
+   给它真正的存在感与留白,读起来是她在说话,不是一行状态文案。 */
 .nesio-today-receipt {
-  margin: 0.2rem 0.2rem 0.9rem;
-  font-size: 1.05rem;
+  margin: 0.9rem 0.15rem 1.15rem;
+  font-size: 1.22rem;
+  line-height: 1.55;
+  letter-spacing: 0.005em;
+  color: var(--portal-ink);
 }
 .nesio-capture-hint {
   margin: 1.4rem 0 0.6rem;
