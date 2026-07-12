@@ -27,7 +27,7 @@ import { resolveAirport } from '@/lib/portal/airports';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import MemoryFlashBanner, { useMemoryFlash } from '@/components/portal/MemoryFlashBanner';
-import { IconCamera, IconFile, IconHistory, IconImage, IconKeyboard, IconLink, IconMic, IconSmile, NodeTypeIcon, IconPlane, IconBed, IconUtensils, IconCar, IconCard, IconBook, IconCheckSquare, IconNote, IconMapPin, IconCalendar } from './icons';
+import { IconCamera, IconFile, IconHistory, IconImage, IconKeyboard, IconLink, IconMic, IconSmile, NodeTypeIcon, IconPlane, IconBed, IconUtensils, IconCar, IconCard, IconBook, IconCheckSquare, IconNote, IconMapPin, IconCalendar, IconBox, IconHelpCircle } from './icons';
 import EmailComposeSheet from './EmailComposeSheet';
 
 /** 从节点里取可读正文(供邮件回复的上下文参考)。 */
@@ -512,22 +512,26 @@ type SR = new () => {
 };
 
 // ─── Bubble context menu ───────────────────────────────────────────────────────
-function BubbleMenu({ msg, onClose, onSave, onCopy }: {
-  msg: UiMessage; onClose: () => void; onSave: () => void; onCopy: () => void;
+function BubbleMenu({ msg, onClose, onSave, onCopy, onContinue }: {
+  msg: UiMessage; onClose: () => void; onSave: () => void; onCopy: () => void; onContinue: () => void;
 }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   return (
     <>
       <button type="button" className="nesio-bubble-menu-backdrop" onClick={onClose} aria-label="关闭" />
       <div className="nesio-bubble-menu">
-        <button type="button" className="nesio-bubble-menu-item" onClick={() => { onCopy(); onClose(); }}>
-          <span className="nesio-bubble-menu-icon">⎘</span>{L(dict, '复制', 'Copy')}
-        </button>
+        {/* 批次 135·设计长按菜单:存入记忆 / 复制 / 以此为题继续问 */}
         {!msg.savedToMemory && (
           <button type="button" className="nesio-bubble-menu-item" onClick={() => { onSave(); onClose(); }}>
-            <span className="nesio-bubble-menu-icon">＋</span>{L(dict, '存入记忆', 'Save to Memory')}
+            <span className="nesio-bubble-menu-icon"><IconBox size={15} /></span>{L(dict, '存入记忆', 'Save to Memory')}
           </button>
         )}
+        <button type="button" className="nesio-bubble-menu-item" onClick={() => { onCopy(); onClose(); }}>
+          <span className="nesio-bubble-menu-icon"><IconLink size={15} /></span>{L(dict, '复制', 'Copy')}
+        </button>
+        <button type="button" className="nesio-bubble-menu-item" onClick={() => { onContinue(); onClose(); }}>
+          <span className="nesio-bubble-menu-icon"><IconHelpCircle size={15} /></span>{L(dict, '以此为题继续问', 'Continue on this')}
+        </button>
         <button type="button" className="nesio-bubble-menu-item nesio-bubble-menu-item--cancel" onClick={onClose}>{L(dict, '取消', 'Cancel')}</button>
       </div>
     </>
@@ -1586,6 +1590,14 @@ Edit location/value anytime in Storage.`),
           onClose={() => setMenuMsg(null)}
           onSave={() => { handleSave(menuMsg); setMenuMsg(null); }}
           onCopy={() => { handleCopy(menuMsg); setMenuMsg(null); }}
+          onContinue={() => {
+            // 批次 135·以此为题继续问:把这条内容作话题预填输入框,聚焦让用户接着追问(不跳页)
+            const full = (menuMsg.text || '').replace(/\s+/g, ' ').trim();
+            const snip = full.slice(0, 20);
+            setInput(L(dict, `关于「${snip}${full.length > 20 ? '…' : ''}」,`, `About "${snip}${full.length > 20 ? '…' : ''}": `));
+            setMenuMsg(null);
+            setTimeout(() => inputRef.current?.focus(), 50);
+          }}
         />
       )}
     </div>
