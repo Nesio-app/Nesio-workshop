@@ -13,11 +13,28 @@ const MOMENT_EMOTIONS: Array<[zh: string, en: string]> = [
   ['难过', 'Sad'], ['焦虑', 'Anxious'], ['烦躁', 'Restless'], ['生气', 'Angry'],
 ];
 
-/** 显示层节点名:此刻 · X ↔ This moment · X(双向,仅精确匹配生成模式)。 */
+/**
+ * 剥标题里的系统噪音(批次 126·设计「标题永远干净,绝不甩原始邮件头」):
+ * 尖括号邮件头片段 <no-reply@…>、裸邮件地址 return@amazon.com、Re:/Fwd:/回复: 前缀。
+ * 原文本身不动(存储是历史事实、详情页「原始记录」折叠区仍看得到);只清显示层标题。
+ */
+export function cleanTitleNoise(name: string): string {
+  const s = name
+    .replace(/<[^>]*>/g, ' ')                              // <no-reply@info.thorne.com>
+    .replace(/\b[\w.+-]+@[\w.-]+\.\w{2,}\b/g, ' ')          // return@amazon.com
+    .replace(/^\s*(?:re|fwds?|fw|回复|答复|转发)\s*[:：]\s*/i, '') // Re: / Fwd: / 回复:
+    .replace(/\s{2,}/g, ' ')
+    .replace(/^[\s:：·,\-—、|]+|[\s:：·,\-—、|]+$/g, '')     // 剥净后遗留的首尾标点
+    .trim();
+  return s || name; // 全被剥空 → 退回原名(至少不空)
+}
+
+/** 显示层节点名:先剥噪音,再做 此刻 · X ↔ This moment · X 语言转换。 */
 export function displayNodeName(name: string, dict: string): string {
+  const cleaned = cleanTitleNoise(name);
   for (const [zh, en] of MOMENT_EMOTIONS) {
-    if (name === `此刻 · ${zh}`) return dict === 'en' ? `This moment · ${en}` : name;
-    if (name === `This moment · ${en}`) return dict === 'zh' ? `此刻 · ${zh}` : name;
+    if (cleaned === `此刻 · ${zh}`) return dict === 'en' ? `This moment · ${en}` : cleaned;
+    if (cleaned === `This moment · ${en}`) return dict === 'zh' ? `此刻 · ${zh}` : cleaned;
   }
-  return name;
+  return cleaned;
 }
