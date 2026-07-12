@@ -12354,6 +12354,12 @@ html[data-portal-theme="night"] .nesio-narrator-body { color: #e8eefa; }
   color: var(--portal-text);
   letter-spacing: 0.01em;
 }
+/* 批次 112:区块标题后的计数副标(全部记忆 · N 条 · 可搜) */
+.nesio-section-title-sub {
+  font-weight: 500;
+  color: var(--portal-muted);
+  font-size: 0.9em;
+}
 
 html[data-portal-theme="night"] .nesio-section-title { color: #c8d8f0; }
 

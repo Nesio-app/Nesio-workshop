@@ -1171,7 +1171,11 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
               {hasNodes && (
                 <>
                   <div className="nesio-section-header" style={{ marginTop: '0.25rem' }}>
-                    <span className="nesio-section-title">{copy.recent}</span>
+                    {/* 批次 112:对齐 mockup —— 「全部记忆 · N 条 · 可搜」 */}
+                    <span className="nesio-section-title">
+                      {L(dict, '全部记忆', 'All memories')}
+                      <span className="nesio-section-title-sub"> · {L(dict, `${nodes.length} 条 · 可搜`, `${nodes.length} · search`)}</span>
+                    </span>
                     <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
                       {typeFilter && (
                         <button type="button" className="nesio-section-action" onClick={() => setTypeFilter(null)}>
