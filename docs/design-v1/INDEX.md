@@ -5,7 +5,7 @@
 
 ## 目录
 
-- **`design-morandi/design-spec.html`** — 完整设计规范(自包含,内嵌全部截图,浏览器直接打开)
+- **`design-morandi/design-spec.html`** — 完整设计规范(自包含,内嵌全部截图,浏览器直接打开)。**已刷新到新版(artifact fd4a799e)**:把旧版笼统的「卡片与来源 / 页面布局」两节,拆成逐页详规 **今天 / 记忆 / 洞察 / 心情 / 念念 / 收纳 / 设置**,每页内嵌 mockup 截图
 - **`design-morandi/mockups/`** — 各页最终设计稿(HTML 源 + PNG):今天 / 记忆 / 洞察 / 多面镜 / 足迹 / 念念 / 心情 / 设置 / 记一笔 / 卡片 / 水晶球 / 命名 / 定名 …
 - **`design-morandi/spec.html` + `embed.js` + `shot.js`** — 规范源文件与生成脚本
 - **`design-morandi/PATCH-4palettes-lab.md`** — 4 色卡落地补丁说明(待落到代码)
