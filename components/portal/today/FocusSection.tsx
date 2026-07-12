@@ -193,7 +193,8 @@ export function TodayFocusSection({
       <li key={item.nodeId} className="nesio-collapsed-item">
         {/* 批次 111:纪念日也做成时间线节点(圆点在轨上 + 日期 kicker) */}
         <div className="nesio-collapsed-row">
-          <span className="nesio-collapsed-dot" aria-hidden />
+          {/* 批次 129:纪念日节点圆内嵌礼物符号 */}
+          <span className="nesio-collapsed-dot nesio-collapsed-dot--clock" aria-hidden><IconGift size={13} /></span>
           <span className="nesio-collapsed-task-body">
             <span className="nesio-collapsed-kicker">{item.daysUntil === 0 ? t(locale, 'todayLabelToday') : t(locale, 'todayLabelTomorrow')}</span>
             <span className="nesio-collapsed-title">{item.name}</span>
@@ -272,7 +273,7 @@ export function TodayFocusSection({
               <ul className="nesio-collapsed-list">{shownNodes}</ul>
               {restCount > 0 && (
                 <button type="button" className="nesio-collapsed-row nesio-tl-more" onClick={onOpenMemory}>
-                  <span className="nesio-collapsed-dot nesio-tl-more-plus" aria-hidden>+</span>
+                  <span className="nesio-collapsed-dot nesio-tl-more-plus" aria-hidden>…</span>
                   <span className="nesio-collapsed-task-body">
                     <span className="nesio-collapsed-kicker">{L(dict, '稍后', 'Later')}</span>
                     <span className="nesio-collapsed-title">{L(dict, `还有 ${restCount} 件小事`, `${restCount} more small things`)}</span>

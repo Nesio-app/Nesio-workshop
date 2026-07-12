@@ -133,7 +133,7 @@ function EnergyRing({ level }: { level: string }) {
 /** 心情波纹符号(设计规范 mood-node.html 权威:一道情绪波纹曲线,不是双波、不用圆点) */
 function MoodRipple() {
   return (
-    <svg className="nesio-mood-ripple" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg className="nesio-mood-ripple" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M4 13c2 0 2.4-4 3.8-4s1.9 6 3.8 6 2.4-8 3.8-8 1.9 5 3.8 5" />
     </svg>
   );

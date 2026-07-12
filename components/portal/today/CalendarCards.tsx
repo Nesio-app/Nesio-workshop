@@ -80,7 +80,7 @@ export function PinnedAttentionCard({
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
       >
-        <span className="nesio-collapsed-dot nesio-collapsed-dot--pinned" aria-hidden />
+        <span className="nesio-collapsed-dot nesio-collapsed-dot--pinned" aria-hidden><IconStar size={13} /></span>
         <span className="nesio-collapsed-task-body">
           <span className="nesio-collapsed-kicker">
             <span className="nesio-pinned-flag">{t(locale, 'todayPinnedBadge')}</span>
@@ -132,7 +132,10 @@ export function CollapsedCalItem({ obj, onOpenRecorder }: { obj: AttentionObject
     <li className="nesio-collapsed-item">
       {/* 批次 111:日历项也做成时间线节点 —— 空心圆点在轨上 + 时标 kicker + 标题(去掉旧的图标+右侧 meta) */}
       <button type="button" className="nesio-collapsed-row" onClick={() => setExpanded((v) => !v)}>
-        <span className="nesio-collapsed-dot" aria-hidden />
+        {/* 批次 129·定时·钟:有具体时间的日历项圆内嵌钟;全天事件用素圆 */}
+        <span className={`nesio-collapsed-dot${obj.event.allDay ? '' : ' nesio-collapsed-dot--clock'}`} aria-hidden>
+          {!obj.event.allDay && <IconClock size={13} />}
+        </span>
         <span className="nesio-collapsed-task-body">
           <span className="nesio-collapsed-kicker">{[dayTag, timeStr, countdown].filter(Boolean).join(' · ')}</span>
           <span className="nesio-collapsed-title">{obj.title}</span>

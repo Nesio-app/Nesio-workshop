@@ -8908,7 +8908,8 @@ html[data-portal-theme="night"] .nesio-brief-strip {
 .nesio-focus-timeline::before {
   content: '';
   position: absolute;
-  left: 10px; top: 8px; bottom: 12px;
+  /* 批次 129·新规格:所有节点 26px 圆,左缘 0、圆心 ≈ x13,竖轨对齐圆心 */
+  left: 13px; top: 8px; bottom: 12px;
   width: 1.5px;
   background: var(--portal-line);
   z-index: 0;
@@ -8919,7 +8920,7 @@ html[data-portal-theme="night"] .nesio-brief-strip {
 /* 心情第一拍节点 */
 .nesio-tl-node {
   display: grid;
-  grid-template-columns: 21px 1fr;
+  grid-template-columns: 26px 1fr;
   column-gap: 10px;
   width: 100%;
   text-align: left;
@@ -8937,9 +8938,9 @@ html[data-portal-theme="night"] .nesio-brief-strip {
      (自身声明的自定义属性优先于继承)。默认走各处 color-mix 里的 fallback。 */
   grid-row: 1 / span 3;
   grid-column: 1;
-  width: 22px; height: 22px;
-  margin: 0 0 0 -1px;          /* 中心 ≈ x10,压在竖轨上 */
-  border-radius: 7px;
+  width: 26px; height: 26px;   /* 批次 129·新规格:统一 26px 圆(方块→圆) */
+  margin: 0;                    /* 左缘 0,圆心 ≈ x13,压在竖轨上 */
+  border-radius: 50%;
   align-self: start;
   display: grid; place-items: center;
   /* 哑光白核 → 情绪色浅晕边(白天);边缘一丝透色;情绪色柔光晕(光韵)。都不是白边。 */
@@ -8981,8 +8982,8 @@ html[data-portal-theme="night"] .nesio-tl-dot--mood {
 }
 .nesio-tl-capture-mic {
   flex-shrink: 0;
-  width: 22px; height: 22px;
-  margin: 0 0 0 -1px;          /* 中心 ≈ x10,坐轨上 */
+  width: 26px; height: 26px;
+  margin: 0;                   /* 左缘 0,圆心 ≈ x13,坐轨上 */
   border-radius: 50%;
   border: 1.5px dashed color-mix(in srgb, var(--portal-accent) 55%, transparent);
   background: var(--portal-bg);
@@ -11633,12 +11634,12 @@ html[data-portal-theme="night"] .nesio-otd-card-name { color: #d0d8f0; }
 .nesio-collapsed-check,
 .nesio-today-root button.nesio-collapsed-check {
   flex-shrink: 0;
-  /* 批次 108→111:时间线圆点统一 14px(压在竖轨上,圆心 ≈ x10)。触控区由 ::before 补足 */
-  width: 14px;
-  height: 14px;
-  min-width: 14px;
-  min-height: 14px;
-  margin: 3px 0 0 3px;
+  /* 批次 129·新规格:时间线节点统一 26px 圆(左缘 0、圆心 ≈ x13,坐竖轨上)。触控区由 ::before 补足 */
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  min-height: 26px;
+  margin: 0;
   border-radius: 50%;
   border: 2px solid var(--portal-muted, rgba(0,0,0,.4));
   background: var(--portal-bg);
@@ -11647,23 +11648,28 @@ html[data-portal-theme="night"] .nesio-otd-card-name { color: #d0d8f0; }
   box-sizing: border-box;
   transition: background 0.12s, border-color 0.12s;
 }
-/* 日历项/稍后节点的非交互圆点(与勾选圈同尺寸同位置,坐轨上) */
+/* 日历项/稍后节点的圆(与勾选圈同尺寸同位置);内嵌符号(钟/星/…)居中 */
 .nesio-collapsed-dot {
   flex-shrink: 0;
-  width: 14px; height: 14px;
-  margin: 3px 0 0 3px;
+  width: 26px; height: 26px;
+  margin: 0;
   border-radius: 50%;
   border: 2px solid var(--portal-muted);
   background: var(--portal-bg);
   box-sizing: border-box;
+  display: grid; place-items: center;
+  color: var(--portal-muted);
 }
 .nesio-collapsed-dot--soft { border-color: color-mix(in srgb, var(--portal-muted) 60%, transparent); }
-/* 批次 117:置顶「绝不能错过」节点 = 实心 accent 点(此刻要紧事,坐轨上) */
+/* 批次 129·定时·钟:有具体时间的日历项,圆内嵌钟符号 */
+.nesio-collapsed-dot--clock { color: var(--portal-accent); border-color: color-mix(in srgb, var(--portal-accent) 45%, transparent); }
+/* 批次 117→129:置顶「绝不能错过」= 关键·星,琥珀实心圆 + 白星符号 */
 .nesio-collapsed-dot--pinned {
   background: var(--portal-accent);
   border-color: var(--portal-accent);
+  color: #fff;
 }
-/* 批次 117(用户「第三个符号可以是个小加号」):尾节点「稍后·还有 N 件」用虚线圈 + 号 */
+/* 批次 117→129:尾节点「稍后·还有 N 件」= 折叠·…,虚线圈内嵌省略号 */
 .nesio-tl-more-plus {
   display: grid;
   place-items: center;
@@ -11671,16 +11677,13 @@ html[data-portal-theme="night"] .nesio-otd-card-name { color: #d0d8f0; }
   border-color: color-mix(in srgb, var(--portal-muted) 60%, transparent);
   background: transparent;
   color: var(--portal-muted);
-  font-size: 0.8rem;
+  font-size: 1rem;
   font-weight: 700;
   line-height: 1;
+  padding-bottom: 4px;   /* 省略号「…」在圆内偏下,视觉居中 */
 }
-/* 批次 115→117:「现在」= 时间线首个要紧事实心 accent 点;但有置顶卡时它才是「现在」,
-   折叠区首项应为空心(未来项),故仅在无置顶节点时给折叠区首项填色。 */
-.nesio-attention-layout:not(:has(.nesio-pinned-node)) .nesio-collapsed-list .nesio-collapsed-item:first-child .nesio-collapsed-dot {
-  background: var(--portal-accent);
-  border-color: var(--portal-accent);
-}
+/* 批次 129:新规格靠符号 + 颜色区分节点,不再给折叠区首项填 accent 底色
+   (会盖住内嵌的钟/礼物符号)。「现在/关键」由置顶星节点承担。 */
 .nesio-tl-more { align-items: flex-start; }
 .nesio-tl-more-sub { font-size: 0.74rem; color: var(--portal-muted); margin-top: 1px; }
 /* 批次 117:置顶节点「绝不能错过」accent 小旗 + 倒计时副行(此刻=暖橙) */
@@ -11698,7 +11701,7 @@ html[data-portal-theme="night"] .nesio-otd-card-name { color: #d0d8f0; }
 .nesio-collapsed-check::before {
   content: '';
   position: absolute;
-  inset: -15px; /* 14 + 15*2 = 44px 命中区,满足触控红线 */
+  inset: -9px; /* 26 + 9*2 = 44px 命中区,满足触控红线 */
 }
 .nesio-collapsed-check--done {
   background: var(--portal-blue-deep);
@@ -11707,9 +11710,9 @@ html[data-portal-theme="night"] .nesio-otd-card-name { color: #d0d8f0; }
 .nesio-collapsed-check--done::after {
   content: '';
   position: absolute;
-  top: 2px; left: 4px;
-  width: 5px; height: 8px;
-  border: 1.5px solid #fff;
+  top: 6px; left: 9px;      /* 批次 129:26px 圆内居中的勾 */
+  width: 6px; height: 11px;
+  border: 2px solid #fff;
   border-top: none; border-left: none;
   transform: rotate(45deg);
 }
