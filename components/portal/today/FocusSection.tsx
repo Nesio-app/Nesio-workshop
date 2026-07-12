@@ -7,7 +7,7 @@
  */
 
 import { arbitrateTodayPresence } from '@/lib/platform/today-arbiter';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type RefObject } from 'react';
 import { focusTimeHint, localDayKey, markFocusNodeDone, type FocusNode, type ProactiveContextItem } from '@/lib/platform/view-models/today-view-model';
 import type { CalendarEvent } from '@/lib/portal/types';
 import { scoreCalendarEvents, selectPinned } from '@/lib/platform/attention-engine';
@@ -112,6 +112,7 @@ export function TodayFocusSection({
   onOpenRecorder,
   onFocusMode,
   onDeleteNode,
+  capture,
 }: {
   focusNodes: readonly FocusNode[];
   calendarEvents: CalendarEvent[];
@@ -128,6 +129,15 @@ export function TodayFocusSection({
   onFocusMode?: (node: FocusNode) => void;
   /** 真·删除焦点节点(经命令层 deleteFocusNode);今日表面不直连 life-graph。 */
   onDeleteNode?: (id: string) => void;
+  /** 批次 132:记一笔·话筒节点内联输入(逻辑在 TodayFeed,这里只渲染)。删了底部输入栏。 */
+  capture?: {
+    value: string;
+    onChange: (v: string) => void;
+    onSubmit: () => void;
+    onMic: () => void;
+    recording: boolean;
+    inputRef: RefObject<HTMLInputElement | null>;
+  };
 }) {
   const [dismissed, setDismissed] = useState<Set<string>>(() => loadDismissedToday());
   const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
@@ -287,25 +297,33 @@ export function TodayFocusSection({
         </div>
         )}
 
-        {/* 批次 128→131·记一笔·话筒常驻末节点(虚线草稿位)。点话筒=原地录音、点文字=聚焦打字,
-            都内联,不开 sheet 不跳页(用户「极简化」)。复用底部快捷输入栏的内联机制。 */}
-        <div className="nesio-tl-capture">
-          <button
-            type="button"
-            className="nesio-tl-capture-mic"
-            aria-label={L(dict, '说一句', 'Say something')}
-            onClick={() => window.dispatchEvent(new CustomEvent('nesio-capture-mic'))}
-          >
-            <IconMic size={13} />
-          </button>
-          <button
-            type="button"
-            className="nesio-tl-capture-text"
-            onClick={() => window.dispatchEvent(new CustomEvent('nesio-capture-focus'))}
-          >
-            {L(dict, '点话筒说一句,或记一下…', 'Tap the mic to speak, or jot…')}
-          </button>
-        </div>
+        {/* 批次 128→132·记一笔·话筒常驻末节点(虚线草稿位)= 唯一极简输入入口(底部输入栏已删)。
+            点话筒=原地录音(实时转文字写进这里)、点文字直接打字,都内联不跳页。回车 → 生成一条实线节点。 */}
+        {capture && (
+          <div className={`nesio-tl-capture${capture.recording ? ' nesio-tl-capture--rec' : ''}`}>
+            <button
+              type="button"
+              className="nesio-tl-capture-mic"
+              aria-label={capture.recording ? L(dict, '说完了,点击保存', 'Done — tap to save') : L(dict, '说一句', 'Say something')}
+              onClick={capture.onMic}
+            >
+              <IconMic size={13} />
+            </button>
+            <form
+              className="nesio-tl-capture-form"
+              onSubmit={(e) => { e.preventDefault(); capture.onSubmit(); }}
+            >
+              <input
+                ref={capture.inputRef}
+                className="nesio-tl-capture-input"
+                type="text"
+                value={capture.value}
+                onChange={(e) => capture.onChange(e.target.value)}
+                placeholder={L(dict, '点话筒说一句,或记一下…', 'Tap the mic to speak, or jot…')}
+              />
+            </form>
+          </div>
+        )}
       </div>
 
       {/* Calendar event meeting recorder */}

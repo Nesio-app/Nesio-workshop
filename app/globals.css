@@ -8995,15 +8995,25 @@ html[data-portal-theme="night"] .nesio-tl-dot--mood {
   cursor: pointer;
   box-sizing: border-box;
 }
-.nesio-tl-capture-text {
+/* 批次 132·话筒节点内联输入(唯一极简输入,底部栏已删):无框透明,像提示语本身可打字 */
+.nesio-tl-capture-form { flex: 1; display: flex; }
+.nesio-tl-capture-input {
   flex: 1;
-  text-align: left;
+  min-width: 0;
   background: none;
   border: none;
+  outline: none;
   font-size: 0.9rem;
-  color: var(--portal-muted);
-  cursor: pointer;
+  color: var(--portal-ink);
   padding: 0;
+}
+.nesio-tl-capture-input::placeholder { color: var(--portal-muted); }
+/* 录音中:话筒高亮(实心 + 声波感)——设计「说话中:话筒高亮 + 声波」 */
+.nesio-tl-capture--rec .nesio-tl-capture-mic {
+  background: var(--portal-accent);
+  border-style: solid;
+  color: #fff;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--portal-accent) 20%, transparent);
 }
 .nesio-tl-time {
   grid-column: 2;

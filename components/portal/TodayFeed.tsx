@@ -120,24 +120,13 @@ export default function TodayFeed({
   useEffect(() => {
     const openTraining = () => { setInsightsTab('health'); setMirrorOpen(true); };
     const openMoodTrend = () => { setInsightsTab('reflection'); setMirrorOpen(true); }; // 批次 107:心情第一拍→洞察
-    // 批次 131:时间线「记一笔·话筒」节点内联接管 —— 点话筒直接原地录音,点文字直接聚焦输入,
-    // 都不开 sheet 不跳页(用户「极简化」)。复用底部快捷输入栏的内联机制。
-    const captureMic = () => { quickInputRef.current?.focus(); startQuickMic(); };
-    const captureFocus = () => {
-      const el = quickInputRef.current;
-      if (el) { el.focus(); el.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
-    };
     window.addEventListener('nesio-open-training', openTraining);
     window.addEventListener('nesio-open-mood-trend', openMoodTrend);
-    window.addEventListener('nesio-capture-mic', captureMic);
-    window.addEventListener('nesio-capture-focus', captureFocus);
     return () => {
       window.removeEventListener('nesio-open-training', openTraining);
       window.removeEventListener('nesio-open-mood-trend', openMoodTrend);
-      window.removeEventListener('nesio-capture-mic', captureMic);
-      window.removeEventListener('nesio-capture-focus', captureFocus);
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // Proactive cards: up to 2, each independently dismissable
   const [meetingRecorderNode, setMeetingRecorderNode] = useState<FocusNode | null>(null);
@@ -287,53 +276,25 @@ export default function TodayFeed({
           onOpenRecorder={(node) => setMeetingRecorderNode(node)}
           onFocusMode={(node) => setFocusModeNode(node)}
           onDeleteNode={(id) => deleteFocusNode(id)}
+          capture={{
+            value: quickAdd,
+            onChange: setQuickAdd,
+            onSubmit: () => {
+              const name = quickAdd.trim();
+              if (!name) return;
+              addCommitmentNode(name);
+              setQuickAdd('');
+              setQuickSaved(true);
+              setTimeout(() => setQuickSaved(false), 1400);
+            },
+            onMic: startQuickMic,
+            recording: micState === 'recording',
+            inputRef: quickInputRef,
+          }}
         />
 
-        {/* 批次 31(用户指令,回收 §1④ 的一部分):焦点下方快捷输入行 ——
-            只有输入功能:回车记下(像待办的进焦点),小话筒直达说一句。 */}
-        <form
-          className="nesio-focus-quick-add"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const name = quickAdd.trim();
-            if (!name) return;
-            addCommitmentNode(name);
-            setQuickAdd('');
-            setQuickSaved(true);
-            setTimeout(() => setQuickSaved(false), 1400);
-          }}
-        >
-          <input
-            ref={quickInputRef}
-            className="nesio-focus-quick-input"
-            type="text"
-            placeholder={quickSaved ? L(uiLocale, '✓ 记下了', '✓ Noted') : L(uiLocale, '想到什么,记下来…', 'Anything on your mind…')}
-            value={quickAdd}
-            onChange={(e) => setQuickAdd(e.target.value)}
-            onFocus={(e) => {
-              void import('@/lib/portal/capture-location').then((m) => m.prefetchCaptureLocation());
-              // 批次 86:键盘弹起后把输入框滚进可见区(iOS 常盖住底部输入)
-              const el = e.currentTarget;
-              setTimeout(() => el.scrollIntoView({ block: 'center', behavior: 'smooth' }), 300);
-            }}
-          />
-          {quickAdd.trim() ? (
-            <button type="submit" className="nesio-focus-quick-btn">{L(uiLocale, '记下', 'Note it')}</button>
-          ) : (
-            <button
-              type="button"
-              className={`nesio-focus-quick-mic${micState === 'recording' ? ' nesio-focus-quick-mic--rec' : ''}`}
-              aria-label={micState === 'recording' ? L(uiLocale, '说完了,点击保存', 'Done — tap to save') : L(uiLocale, '语音输入', 'Voice input')}
-              onClick={startQuickMic}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="18" height="18" aria-hidden>
-                <rect x="9" y="3" width="6" height="11" rx="3" />
-                <path d="M5 11a7 7 0 0 0 14 0" />
-                <line x1="12" y1="18" x2="12" y2="21" />
-              </svg>
-            </button>
-          )}
-        </form>
+        {/* 批次 132(用户「底部输入口需要删除」):独立快捷输入栏已删 ——
+            记一笔输入内联进时间线「记一笔·话筒」节点(唯一极简输入入口)。 */}
 
         {/* 实验打卡(批次 8:按用户要求放到最下面) */}
         <RoutineDueCards />
