@@ -27,12 +27,12 @@ export default function NesioProfileCard() {
   const [accountEmail, setAccountEmail] = useState('');
   const [avatarError, setAvatarError] = useState('');
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
-  // 批次 95:卡通头像生成
-  const cartoonInputRef = useRef<HTMLInputElement | null>(null);
+  // 批次 95/96:上传头像自动卡通化
   const [cartoonBusy, setCartoonBusy] = useState(false);
   const [cartoonPreview, setCartoonPreview] = useState('');   // 生成结果 dataURL(待接受)
   const [cartoonSource, setCartoonSource] = useState('');     // 原图 dataURL(重新生成用)
   const [cartoonMsg, setCartoonMsg] = useState('');
+  const [avatarSourceFile, setAvatarSourceFile] = useState<File | null>(null);
 
   useEffect(() => {
     const profile = loadProfileSettings();
@@ -64,28 +64,39 @@ export default function NesioProfileCard() {
     window.location.href = '/';
   }
 
+  // 把 dataURL 存成头像(本地永久 + 云端跨设备)
+  async function commitAvatar(dataUrl: string, file?: File) {
+    let localSaved = false;
+    try { saveProfileSettings({ avatarUrl: dataUrl }); localSaved = true; } catch { /* 存不下退云端 */ }
+    if (file) {
+      try {
+        const client = createAppApiClient();
+        const result = await client.uploadCloudAsset({ file, purpose: 'avatar' });
+        if (result.ok && result.storagePath) {
+          await client.saveCloudProfileSettings({ avatarStoragePath: result.storagePath });
+          saveProfileSettings({ avatarStoragePath: result.storagePath });
+        }
+      } catch { /* 云端是增强,本地已显示 */ }
+    }
+    if (!localSaved) setAvatarError(L(dict, '头像没有保存，请选择一张较小的图片。', "Avatar wasn't saved — try a smaller image."));
+  }
+
+  // 批次 96(用户定案):上传头像后**自动**卡通化 —— 不再单独按钮。
+  // 生成中弹窗;预览可「用卡通头像 / 用原照片 / 取消」;失败给原图兜底。
   async function handleAvatarFile(file: File | undefined) {
     if (!file) return;
     setAvatarError('');
-    // 批次 34:头像「时不时消失」根治 —— 先存一份永久本地 data: 头像(不会像签名 URL 那样过期),
-    // 立即显示且不再随过期消失;云端上传只用来存 storagePath 做跨设备,不覆盖本地永久头像。
-    let localSaved = false;
+    let originalDataUrl = '';
     try {
-      const avatar = await readAvatarFile(file);
-      saveProfileSettings({ avatarUrl: avatar });
-      localSaved = true;
-    } catch { /* 本地存不下就退到只云端 */ }
-    try {
-      const client = createAppApiClient();
-      const result = await client.uploadCloudAsset({ file, purpose: 'avatar' });
-      if (result.ok && result.storagePath) {
-        await client.saveCloudProfileSettings({ avatarStoragePath: result.storagePath });
-        saveProfileSettings({ avatarStoragePath: result.storagePath }); // 只补 storagePath,保留本地 data: 头像
-      }
+      const { compressToDataUrl } = await import('@/lib/portal/local-image-store');
+      originalDataUrl = await compressToDataUrl(file, 1024, 0.85);
     } catch {
-      // 云端是跨设备增强;本地永久头像已经能显示。
+      try { originalDataUrl = await readAvatarFile(file); } catch { /* ignore */ }
     }
-    if (!localSaved) setAvatarError(L(dict, '头像没有保存，请选择一张较小的图片。', "Avatar wasn't saved — try a smaller image."));
+    if (!originalDataUrl) { setAvatarError(L(dict, '这张图读不了,换一张试试。', "Couldn't read that image — try another.")); return; }
+    setCartoonSource(originalDataUrl);
+    setAvatarSourceFile(file);
+    await generateCartoon(originalDataUrl);
   }
 
   // 批次 95:照片 → app 主题色卡通头像(生成 → 预览 → 接受设为头像)
@@ -109,23 +120,20 @@ export default function NesioProfileCard() {
     setCartoonBusy(false);
   }
 
-  async function handleCartoonFile(file: File | undefined) {
-    if (!file) return;
-    setCartoonPreview('');
-    try {
-      const { compressToDataUrl } = await import('@/lib/portal/local-image-store');
-      const dataUrl = await compressToDataUrl(file, 1024, 0.85);
-      setCartoonSource(dataUrl);
-      await generateCartoon(dataUrl);
-    } catch {
-      setCartoonMsg(L(dict, '这张图读不了,换一张试试。', "Couldn't read that image — try another."));
-    }
-  }
-
   function acceptCartoon() {
     if (!cartoonPreview) return;
-    saveProfileSettings({ avatarUrl: cartoonPreview });
-    setCartoonPreview(''); setCartoonSource(''); setCartoonMsg('');
+    void commitAvatar(cartoonPreview);
+    setCartoonPreview(''); setCartoonSource(''); setCartoonMsg(''); setAvatarSourceFile(null);
+  }
+
+  function useOriginalPhoto() {
+    if (!cartoonSource) return;
+    void commitAvatar(cartoonSource, avatarSourceFile || undefined);
+    setCartoonPreview(''); setCartoonSource(''); setCartoonMsg(''); setAvatarSourceFile(null);
+  }
+
+  function cancelCartoon() {
+    setCartoonPreview(''); setCartoonSource(''); setCartoonMsg(''); setAvatarSourceFile(null);
   }
 
   const menuItems = [
@@ -169,22 +177,7 @@ export default function NesioProfileCard() {
             className="nesio-visually-hidden"
             onChange={(event) => handleAvatarFile(event.currentTarget.files?.[0])}
           />
-          {/* 批次 95:卡通头像生成入口 */}
-          <input
-            ref={cartoonInputRef}
-            type="file"
-            accept="image/*"
-            className="nesio-visually-hidden"
-            onChange={(event) => { const f = event.currentTarget.files?.[0]; event.currentTarget.value = ''; void handleCartoonFile(f); }}
-          />
-          <button
-            type="button"
-            className="nesio-cartoon-cta"
-            onClick={() => cartoonInputRef.current?.click()}
-            disabled={cartoonBusy}
-          >
-            ✨ {L(dict, '生成卡通头像', 'Cartoon avatar')}
-          </button>
+
           {/* 批次 6:数字统计改「返回今天」——设置页最常见的下一步;
               洞察(原 mirror)从主页左上角 logo 进,不再从这里开 */}
           <a href="/" className="nesio-profile-stat" aria-label={L(dict, '返回今天', 'Back to Today')}>
@@ -232,18 +225,20 @@ export default function NesioProfileCard() {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={cartoonPreview} alt="" className="nesio-cartoon-preview" draggable={false} />
                 <div className="nesio-cartoon-actions">
-                  <button type="button" className="nesio-cartoon-accept" onClick={acceptCartoon}>{L(dict, '用它做头像', 'Use it')}</button>
+                  <button type="button" className="nesio-cartoon-accept" onClick={acceptCartoon}>{L(dict, '用卡通头像', 'Use cartoon')}</button>
                   <button type="button" className="nesio-cartoon-retry" onClick={() => { if (cartoonSource) void generateCartoon(cartoonSource); }}>{L(dict, '再生成一张', 'Regenerate')}</button>
-                  <button type="button" className="nesio-cartoon-cancel" onClick={() => { setCartoonPreview(''); setCartoonSource(''); }}>{L(dict, '不用了', 'Cancel')}</button>
+                  <button type="button" className="nesio-cartoon-retry" onClick={useOriginalPhoto}>{L(dict, '用原照片', 'Use original')}</button>
+                  <button type="button" className="nesio-cartoon-cancel" onClick={cancelCartoon}>{L(dict, '不用了', 'Cancel')}</button>
                 </div>
               </>
             ) : (
               <>
-                <p className="nesio-cartoon-title">{L(dict, '这次没成', 'Not this time')}</p>
+                <p className="nesio-cartoon-title">{L(dict, '卡通化没成', "Couldn't cartoonify")}</p>
                 <p className="nesio-cartoon-sub">{cartoonMsg}</p>
                 <div className="nesio-cartoon-actions">
-                  <button type="button" className="nesio-cartoon-retry" onClick={() => { if (cartoonSource) void generateCartoon(cartoonSource); }} disabled={!cartoonSource}>{L(dict, '重试', 'Retry')}</button>
-                  <button type="button" className="nesio-cartoon-cancel" onClick={() => setCartoonMsg('')}>{L(dict, '关闭', 'Close')}</button>
+                  <button type="button" className="nesio-cartoon-accept" onClick={useOriginalPhoto} disabled={!cartoonSource}>{L(dict, '就用原照片', 'Use original photo')}</button>
+                  <button type="button" className="nesio-cartoon-retry" onClick={() => { if (cartoonSource) void generateCartoon(cartoonSource); }} disabled={!cartoonSource}>{L(dict, '重试卡通化', 'Retry')}</button>
+                  <button type="button" className="nesio-cartoon-cancel" onClick={cancelCartoon}>{L(dict, '取消', 'Cancel')}</button>
                 </div>
               </>
             )}

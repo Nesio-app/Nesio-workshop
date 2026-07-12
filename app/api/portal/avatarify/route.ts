@@ -28,14 +28,16 @@ function withTimeout(ms: number): { signal: AbortSignal; done: () => void } {
   return { signal: ctrl.signal, done: () => clearTimeout(t) };
 }
 
-/** Gemini 图像生成(image-to-image):返回 dataURL 或 null。 */
-async function geminiAvatar(key: string, imageBase64: string, mimeType: string): Promise<string | null> {
+/** Gemini 图像生成(image-to-image):返回 { dataUrl } 或 { error }(透出真因)。 */
+async function geminiAvatar(key: string, imageBase64: string, mimeType: string): Promise<{ dataUrl?: string; error?: string }> {
   const models = [
     envValue('GEMINI_IMAGE_MODEL'),
+    'gemini-2.5-flash-image-preview',
     'gemini-2.5-flash-image',
     'gemini-2.0-flash-preview-image-generation',
   ].filter(Boolean) as string[];
 
+  let lastErr = '';
   for (const model of models) {
     const { signal, done } = withTimeout(40_000);
     try {
@@ -45,35 +47,39 @@ async function geminiAvatar(key: string, imageBase64: string, mimeType: string):
         body: JSON.stringify({
           contents: [{
             parts: [
-              { inline_data: { mime_type: mimeType || 'image/jpeg', data: imageBase64 } },
               { text: STYLE_PROMPT },
+              { inline_data: { mime_type: mimeType || 'image/jpeg', data: imageBase64 } },
             ],
           }],
-          generationConfig: { responseModalities: ['IMAGE', 'TEXT'] },
+          // Google 规范:文本在前,IMAGE 也要列出才会回图
+          generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
         }),
         signal,
       });
       done();
-      if (!res.ok) continue;
       const data = await res.json() as {
         candidates?: Array<{ content?: { parts?: Array<{ inlineData?: { data?: string; mimeType?: string }; inline_data?: { data?: string; mime_type?: string } }> } }>;
+        error?: { message?: string; status?: string };
       };
+      if (!res.ok) { lastErr = `${model} ${res.status} ${data.error?.status || ''} ${(data.error?.message || '').slice(0, 80)}`.trim(); continue; }
       const parts = data.candidates?.[0]?.content?.parts || [];
       for (const p of parts) {
         const inline = p.inlineData || p.inline_data;
         const d = inline?.data;
         const mt = (inline as { mimeType?: string; mime_type?: string })?.mimeType || (inline as { mime_type?: string })?.mime_type || 'image/png';
-        if (d) return `data:${mt};base64,${d}`;
+        if (d) return { dataUrl: `data:${mt};base64,${d}` };
       }
-    } catch {
+      lastErr = `${model} 无图像返回`;
+    } catch (err) {
       done();
+      lastErr = `${model} ${err instanceof Error ? err.name : 'error'}`;
     }
   }
-  return null;
+  return { error: lastErr || 'gemini_no_image' };
 }
 
 /** OpenAI gpt-image-1 编辑(输入图 → 风格化):返回 dataURL 或 null。 */
-async function openaiAvatar(key: string, imageBase64: string, mimeType: string): Promise<string | null> {
+async function openaiAvatar(key: string, imageBase64: string, mimeType: string): Promise<{ dataUrl?: string; error?: string }> {
   const { signal, done } = withTimeout(40_000);
   try {
     const form = new FormData();
@@ -89,13 +95,13 @@ async function openaiAvatar(key: string, imageBase64: string, mimeType: string):
       signal,
     });
     done();
-    if (!res.ok) return null;
-    const data = await res.json() as { data?: Array<{ b64_json?: string }> };
+    const data = await res.json() as { data?: Array<{ b64_json?: string }>; error?: { message?: string } };
+    if (!res.ok) return { error: `openai ${res.status} ${(data.error?.message || '').slice(0, 80)}`.trim() };
     const b64 = data.data?.[0]?.b64_json;
-    return b64 ? `data:image/png;base64,${b64}` : null;
-  } catch {
+    return b64 ? { dataUrl: `data:image/png;base64,${b64}` } : { error: 'openai 无图像返回' };
+  } catch (err) {
     done();
-    return null;
+    return { error: `openai ${err instanceof Error ? err.name : 'error'}` };
   }
 }
 
@@ -118,13 +124,24 @@ export async function POST(req: NextRequest) {
   }
 
   // Gemini 免费层优先(用户侧成本低),失败落 OpenAI gpt-image-1
-  let dataUrl: string | null = null;
-  if (geminiKey) dataUrl = await geminiAvatar(geminiKey, body.imageBase64, body.mimeType || 'image/jpeg');
-  if (!dataUrl && openaiKey) dataUrl = await openaiAvatar(openaiKey, body.imageBase64, body.mimeType || 'image/jpeg');
+  const errs: string[] = [];
+  let dataUrl: string | undefined;
+  if (geminiKey) {
+    const g = await geminiAvatar(geminiKey, body.imageBase64, body.mimeType || 'image/jpeg');
+    dataUrl = g.dataUrl;
+    if (g.error) errs.push(g.error);
+  }
+  if (!dataUrl && openaiKey) {
+    const o = await openaiAvatar(openaiKey, body.imageBase64, body.mimeType || 'image/jpeg');
+    dataUrl = o.dataUrl;
+    if (o.error) errs.push(o.error);
+  }
 
   if (!dataUrl) {
+    const detail = errs.join(' · ').slice(0, 160);
+    console.error('[avatarify] generate_failed', detail);
     return NextResponse.json(
-      { ok: false, error: 'generate_failed', message: '这次没生成成功(模型忙或配额限制),过一会儿再试一次。' },
+      { ok: false, error: 'generate_failed', message: `这次没生成成功:${detail || '模型忙或配额限制'}` },
       { status: 502 },
     );
   }

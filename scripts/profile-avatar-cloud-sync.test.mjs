@@ -29,12 +29,12 @@ assert.match(
   /uploadCloudAsset\(\{\s*file,\s*purpose:\s*['"]avatar['"]/s,
   'Avatar upload must call /api/cloud/assets with purpose=avatar for cross-device storage.',
 );
-// 批次 34:上传必须先落一份永久本地 data: 头像(readAvatarFile → saveProfileSettings avatarUrl),
-// 这样签名 URL 过期也不会「头像消失」。
+// 批次 34/96:上传必须落一份永久本地 data: 头像 —— 批次 96 重构为 commitAvatar
+// (saveProfileSettings avatarUrl:dataUrl),自动卡通化接受/用原图都经它持久化。
 assert.match(
   profileCard,
-  /readAvatarFile\(file\)[\s\S]{0,200}saveProfileSettings\(\{\s*avatarUrl:\s*avatar\s*\}\)/s,
-  'Avatar upload must persist a permanent local data-URL avatar so it never expires.',
+  /saveProfileSettings\(\{\s*avatarUrl:\s*dataUrl\s*\}\)/s,
+  'Avatar commit must persist a permanent local data-URL avatar so it never expires.',
 );
 // 云端 storagePath 必须持久化(供跨设备),本地也存一份 storagePath 供 hook 换签名。
 assert.match(
