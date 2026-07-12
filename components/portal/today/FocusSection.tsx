@@ -25,7 +25,7 @@ import MoodBeat from '../MoodBeat';
 import { t, L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
-import { IconCalendar, IconGift, IconNote } from '../icons';
+import { IconCalendar, IconGift, IconNote, IconMic } from '../icons';
 
 function CollapsedTaskItem({
   node,
@@ -285,6 +285,26 @@ export function TodayFocusSection({
 
         </div>
         )}
+
+        {/* 批次 128·新时间线规格:记一笔·话筒常驻末节点(虚线草稿位)。
+            点话筒=说一句(语音),点文字=打字。无输入框。 */}
+        <div className="nesio-tl-capture">
+          <button
+            type="button"
+            className="nesio-tl-capture-mic"
+            aria-label={L(dict, '说一句', 'Say something')}
+            onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-voice'))}
+          >
+            <IconMic size={13} />
+          </button>
+          <button
+            type="button"
+            className="nesio-tl-capture-text"
+            onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-tell'))}
+          >
+            {L(dict, '点话筒说一句,或记一下…', 'Tap the mic to speak, or jot…')}
+          </button>
+        </div>
       </div>
 
       {/* Calendar event meeting recorder */}

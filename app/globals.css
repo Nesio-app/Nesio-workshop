@@ -8968,6 +8968,39 @@ html[data-portal-theme="night"] .nesio-tl-dot--mood {
    混一点文字色保证浅底/深底两边都够对比度。 */
 .nesio-tl-node--mood .nesio-mood-word { color: color-mix(in srgb, var(--mood-c, var(--portal-ink)) 72%, var(--portal-ink)); font-weight: 700; }
 .nesio-tl-node--mood .nesio-mood-energy { color: var(--portal-muted); font-weight: 600; }
+/* 批次 128·环形能量表:情绪词后缀,弧长=能量高低,色随情绪(--mood-c) */
+.nesio-tl-node--mood .nesio-mood-ring { display: inline-block; vertical-align: -2px; margin-left: 6px; color: var(--mood-c, var(--portal-muted)); }
+/* 批次 128·记一笔·话筒常驻末节点(虚线草稿位):点话筒=说一句,点文字=打字 */
+.nesio-tl-capture {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 2px 2px 0;
+  position: relative;
+  z-index: 1;
+}
+.nesio-tl-capture-mic {
+  flex-shrink: 0;
+  width: 22px; height: 22px;
+  margin: 0 0 0 -1px;          /* 中心 ≈ x10,坐轨上 */
+  border-radius: 50%;
+  border: 1.5px dashed color-mix(in srgb, var(--portal-accent) 55%, transparent);
+  background: var(--portal-bg);
+  color: var(--portal-accent);
+  display: grid; place-items: center;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+.nesio-tl-capture-text {
+  flex: 1;
+  text-align: left;
+  background: none;
+  border: none;
+  font-size: 0.9rem;
+  color: var(--portal-muted);
+  cursor: pointer;
+  padding: 0;
+}
 .nesio-tl-time {
   grid-column: 2;
   font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em;

@@ -13,7 +13,7 @@
 
 import { useEffect, useState } from 'react';
 import { getLifeGraph } from '@/lib/portal/life-graph';
-import { L, type DictLocale } from '@/lib/portal/i18n';
+import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 
@@ -63,12 +63,6 @@ function readLatestMoodToday(): Beat | null {
   }
 }
 
-function energyWord(level: string, dict: DictLocale): string {
-  if (level === 'high') return L(dict, '能量高', 'high energy');
-  if (level === 'low') return L(dict, '能量低', 'low energy');
-  return L(dict, '能量中', 'steady energy');
-}
-
 export default function MoodBeat() {
   const onOpenTrend = () => window.dispatchEvent(new CustomEvent('nesio-open-mood-trend'));
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
@@ -111,12 +105,28 @@ export default function MoodBeat() {
     >
       <span className="nesio-tl-dot nesio-tl-dot--mood" aria-hidden><MoodRipple /></span>
       <span className="nesio-tl-time">{L(dict, '今天', 'Today')}</span>
+      {/* 批次 128·新时间线规格:情绪词后缀环形能量表(弧长=高低,替掉「能量高/中/低」文字) */}
       <span className="nesio-tl-title">
         <span className="nesio-mood-word">{L(dict, beat.label, beat.labelEn)}</span>
-        {beat.hasEmotion && <span className="nesio-mood-energy"> · {energyWord(beat.energyLevel, dict)}</span>}
+        {beat.hasEmotion && <EnergyRing level={beat.energyLevel} />}
       </span>
       <span className="nesio-tl-sub">{beat.time} · {L(dict, '记录 · 点开看这周趋势', 'logged · tap for this week')}</span>
     </button>
+  );
+}
+
+/** 环形能量表(批次 128·新时间线规格):替掉「能量高/中/低」文字 —— 弧长=高低,色随情绪。
+ *  低≈30% · 中≈58% · 高≈88%。环绕在心情波纹符号外。 */
+function EnergyRing({ level }: { level: string }) {
+  const pct = level === 'high' ? 0.88 : level === 'low' ? 0.30 : 0.58;
+  const r = 6.4;
+  const c = 2 * Math.PI * r;
+  return (
+    <svg className="nesio-mood-ring" viewBox="0 0 16 16" width="15" height="15" fill="none" aria-hidden>
+      <circle cx="8" cy="8" r={r} stroke="currentColor" strokeWidth="1.8" strokeOpacity="0.16" />
+      <circle cx="8" cy="8" r={r} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"
+        strokeDasharray={`${(c * pct).toFixed(1)} ${c.toFixed(1)}`} transform="rotate(-90 8 8)" />
+    </svg>
   );
 }
 
