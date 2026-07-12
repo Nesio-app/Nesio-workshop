@@ -12427,6 +12427,38 @@ html[data-portal-theme="night"] .nesio-section-title { color: #c8d8f0; }
   font-size: 0.71rem; color: var(--portal-muted);
 }
 
+/* 批次 113 · 收纳横条卡(物品收纳 · 空间/未归位 · 件数/估值 · ›) */
+.nesio-storage-section { margin-bottom: 1.25rem; }
+.nesio-storage-card {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.8rem 0.95rem;
+  border: 1px solid var(--portal-line);
+  border-radius: 14px;
+  background: var(--portal-neutral);
+  cursor: pointer;
+  transition: background 0.15s var(--ease-soft, ease);
+}
+.nesio-storage-card:active { background: var(--portal-accent-soft); }
+.nesio-storage-icon {
+  flex-shrink: 0;
+  width: 2.4rem; height: 2.4rem;
+  border-radius: 11px;
+  display: grid; place-items: center;
+  background: var(--portal-accent-soft);
+  color: var(--portal-accent);
+}
+.nesio-storage-main { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.nesio-storage-title { font-size: 0.95rem; font-weight: 700; color: var(--portal-ink); }
+.nesio-storage-sub { font-size: 0.74rem; color: var(--portal-muted); }
+.nesio-storage-stat { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; flex-shrink: 0; }
+.nesio-storage-count { font-size: 0.92rem; font-weight: 800; color: var(--portal-accent); font-variant-numeric: tabular-nums; }
+.nesio-storage-value { font-size: 0.71rem; color: var(--portal-muted); }
+.nesio-storage-chevron { flex-shrink: 0; color: var(--portal-muted); font-size: 1.15rem; line-height: 1; }
+
 .nesio-projects-row {
   display: flex;
   gap: 0.6rem;

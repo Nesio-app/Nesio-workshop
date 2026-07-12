@@ -44,6 +44,7 @@ import { L, type DictLocale } from '@/lib/portal/i18n';
 import { relativePastLabel } from '@/lib/portal/time-labels';
 import { displayNodeName } from '@/lib/portal/node-display';
 import { isPinned, loadPins, PINS_UPDATED_EVENT, togglePin } from '@/lib/portal/pins';
+import { listInventoryItems, inventoryStats } from '@/lib/portal/inventory';
 import { usePortalLocale } from './use-portal-locale';
 
 /** 组件内取字典语言(批次 9 全量双语的局部 hook)。 */
@@ -973,6 +974,11 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
 
 
   const onThisDayNodes = useMemo(() => findOnThisDayNodes(nodes), [nodes]);
+  // 批次 113:收纳卡真数据(空间/未归位/件数/估值),随节点变化重算
+  const invStats = useMemo(() => {
+    const items = listInventoryItems();
+    return { ...inventoryStats(items), unfiled: items.filter((i) => !i.space).length };
+  }, [nodes]);
 
   function openNodeDetail(node: LifeNode) {
     setSelectedNode(node);
@@ -1083,43 +1089,42 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                 <OnThisDayStrip nodes={onThisDayNodes} onOpen={openNodeDetail} />
               )}
 
-              {/* 收藏夹 + 收纳(批次 36:收纳成方卡与收藏并排,三排同尺寸) */}
-              {hasNodes && (pinnedNodes.length > 0 || isFeatureEnabled('inventory')) && (
-                <div className="nesio-projects-section">
-                  {/* 批次 40:「收藏夹」标题撤除 —— 首卡是收纳,标题错位;卡片自解释 */}
-                  <div className="nesio-memory-grid">
-                    {isFeatureEnabled('inventory') && (
-                      <button
-                        type="button"
-                        className="nesio-memory-card nesio-inventory-card"
-                        onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-inventory'))}
-                      >
-                        <span className="nesio-memory-card-title">{L(dict, '物品收纳', 'Storage')}</span>
-                        <span className="nesio-memory-card-sub">{L(dict, '东西放哪了,一查就知道', 'Where things live — one tap away')}</span>
-                        <span className="nesio-memory-card-meta-row">
-                          <span className="nesio-memory-card-icon" style={{ background: 'var(--portal-accent-soft)' }}><IconBox size={13} /></span>
-                        </span>
-                      </button>
-                    )}
-                    {/* 批次 50:收藏不再各占一张方卡 —— 一张「收藏夹」容器卡,点开看全部 */}
-                    {pinnedNodes.length > 0 && (
-                      <button
-                        type="button"
-                        className="nesio-memory-card nesio-fav-card"
-                        onClick={() => setFavOpen((v) => !v)}
-                        aria-expanded={favOpen}
-                      >
-                        <span className="nesio-memory-card-title">{L(dict, '收藏夹', 'Favorites')}</span>
-                        <span className="nesio-memory-card-sub">
-                          {L(dict, `${pinnedNodes.length} 条收藏的记忆`, `${pinnedNodes.length} pinned ${pinnedNodes.length === 1 ? 'memory' : 'memories'}`)}
-                        </span>
-                        <span className="nesio-memory-card-meta-row">
-                          <span className="nesio-memory-card-icon" style={{ background: 'var(--portal-accent-soft)' }}><IconStar size={13} /></span>
-                          <span className="nesio-fav-card-hint">{favOpen ? '▴' : '▾'}</span>
-                        </span>
-                      </button>
-                    )}
+              {/* 批次 113:收纳区对齐 mockup —— 独立「收纳」段 + 横条卡(空间/未归位/件数/估值)。
+                  收藏夹已上移成记忆罐水晶球,不再在此放方卡;点收藏球 → favOpen 展开在下方。 */}
+              {hasNodes && isFeatureEnabled('inventory') && (
+                <div className="nesio-storage-section">
+                  <div className="nesio-section-header">
+                    <span className="nesio-section-title">
+                      {L(dict, '收纳', 'Storage')}
+                      <span className="nesio-section-title-sub"> · {L(dict, '东西放哪了,一查就知道', 'where things live')}</span>
+                    </span>
                   </div>
+                  <button
+                    type="button"
+                    className="nesio-storage-card"
+                    onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-inventory'))}
+                  >
+                    <span className="nesio-storage-icon"><IconBox size={20} /></span>
+                    <span className="nesio-storage-main">
+                      <span className="nesio-storage-title">{L(dict, '物品收纳', 'Storage')}</span>
+                      <span className="nesio-storage-sub">
+                        {L(dict, `${invStats.spaces} 空间 · ${invStats.unfiled} 件未归位`, `${invStats.spaces} spaces · ${invStats.unfiled} unfiled`)}
+                      </span>
+                    </span>
+                    <span className="nesio-storage-stat">
+                      <span className="nesio-storage-count">{L(dict, `${invStats.count} 件`, `${invStats.count} items`)}</span>
+                      {invStats.totalValue > 0 && (
+                        <span className="nesio-storage-value">{L(dict, `估值 $${Math.round(invStats.totalValue)}`, `~$${Math.round(invStats.totalValue)}`)}</span>
+                      )}
+                    </span>
+                    <span className="nesio-storage-chevron" aria-hidden>›</span>
+                  </button>
+                </div>
+              )}
+
+              {/* 收藏夹展开(记忆罐收藏球触发)*/}
+              {hasNodes && pinnedNodes.length > 0 && (
+                <div className="nesio-projects-section">
                   {favOpen && pinnedNodes.length > 0 && (
                     <div className="nesio-memory-grid nesio-fav-expanded">
                       {pinnedNodes.map((n) => (
