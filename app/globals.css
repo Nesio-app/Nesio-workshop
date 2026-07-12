@@ -7704,6 +7704,42 @@ html[data-portal-theme="night"] .nesio-mood-circle {
   color: var(--portal-muted);
   font-weight: 500;
 }
+.nesio-node-source-name { color: var(--portal-ink); font-weight: 700; }
+html[data-portal-theme="night"] .nesio-node-source-name { color: #e8eefa; }
+/* 批次 125·设计:阅读原文/回复 显眼按钮排 —— 阅读原文=实心强调,回复=描边 */
+.nesio-node-action-row {
+  display: flex;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+.nesio-node-action-primary,
+.nesio-node-action-secondary {
+  flex: 1;
+  min-height: 44px;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.12s, opacity 0.12s;
+}
+.nesio-node-action-primary:active,
+.nesio-node-action-secondary:active { transform: scale(0.98); }
+.nesio-node-action-primary {
+  border: none;
+  background: var(--portal-accent);
+  color: #fff;
+}
+.nesio-node-action-secondary {
+  border: 1px solid var(--portal-line);
+  background: var(--glass-bg-solid, #fff);
+  color: var(--portal-ink);
+}
+html[data-portal-theme="night"] .nesio-node-action-secondary {
+  background: rgba(255,255,255,0.07);
+  color: #e8eefa;
+}
+/* 关键信息段标(设计:结构化类型核心属性区领头)*/
+.nesio-node-keyinfo-label { margin-top: 0.5rem; }
 .nesio-node-pending {
   font-size: 0.66rem;
   font-weight: 700;

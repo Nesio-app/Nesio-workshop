@@ -818,18 +818,8 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
           ) : (
             <h2 className="nesio-settings-sheet-title" title={n.name}>{displayTitle(displayNodeName(n.name, dict))}</h2>
           )}
-          {/* 批次 31/37:顶部放「阅读」「回复」并排替换 ✕(背景点击仍可关闭) */}
-          <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
-            {!editing && readableText && (
-              <button type="button" className="nesio-node-read-top" onClick={() => setReaderOpen(true)}>{L(dict, '阅读', 'Read')}</button>
-            )}
-            {!editing && isEmailNode && (
-              <button type="button" className="nesio-node-read-top" onClick={() => setComposeOpen(true)}>{L(dict, '回复', 'Reply')}</button>
-            )}
-            {(editing || (!readableText && !isEmailNode)) && (
-              <button type="button" className="nesio-voice-sheet-close" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}>✕</button>
-            )}
-          </div>
+          {/* 批次 125(设计详情页):右上恒为 ✕;阅读原文/回复 挪到来源行下方做显眼按钮排 */}
+          <button type="button" className="nesio-voice-sheet-close" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}>✕</button>
         </div>
 
         {/* Expanded edit form — type-specific fields */}
@@ -880,15 +870,33 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
         )}
 
         <div className="nesio-settings-sheet-body">
-          {/* 批次 124·设计来源行:来自 {来源}·{provider} · {时间}(带图标)。
-              可信度统一:默认不显示;只有 AI 没把握时标一个「待确认」(取代 比较确定/可能相关/建议确认)。 */}
+          {/* 批次 124→125·设计来源行:来自 {来源}·{provider}(加粗) · {时间}(带图标)。
+              可信度统一:默认不显示;只有 AI 没把握时标一个「待确认」。 */}
           <div className="nesio-node-source-row">
             <span className="nesio-node-source-icon" aria-hidden>{SRC.icon}</span>
             <span className="nesio-node-source-text">
-              {L(dict, '来自 ', 'From ')}{SRC.label}{SRC.provider ? ` · ${SRC.provider}` : ''}{srcTime ? ` · ${srcTime}` : ''}
+              {L(dict, '来自 ', 'From ')}
+              <b className="nesio-node-source-name">{SRC.label}{SRC.provider ? ` · ${SRC.provider}` : ''}</b>
+              {srcTime ? ` · ${srcTime}` : ''}
             </span>
             {srcUncertain && <span className="nesio-node-pending">{L(dict, '待确认', 'Unconfirmed')}</span>}
           </div>
+
+          {/* 批次 125·设计:阅读原文/回复 显眼按钮排(阅读原文=实心强调,回复=描边) */}
+          {!editing && (readableText || isEmailNode) && (
+            <div className="nesio-node-action-row">
+              {readableText && (
+                <button type="button" className="nesio-node-action-primary" onClick={() => setReaderOpen(true)}>
+                  {L(dict, '阅读原文', 'Read original')}
+                </button>
+              )}
+              {isEmailNode && (
+                <button type="button" className="nesio-node-action-secondary" onClick={() => setComposeOpen(true)}>
+                  {L(dict, '回复', 'Reply')}
+                </button>
+              )}
+            </div>
+          )}
 
           {/* 批次 70:关联链 —— 行程↔邮件自动挂钩、计划容器↔条目,点开跳转;
               批次 73:手动增删关联(删除自动连线 = 反馈信号,本地留痕) */}
@@ -988,6 +996,11 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
             }
           })()}
 
+          {/* 批次 125·设计:关键信息段标(结构化类型的核心属性区领头) */}
+          {(['object', 'event', 'commitment', 'person', 'place'] as string[]).includes(n.type) && (
+            <p className="nesio-settings-section-label nesio-node-keyinfo-label">{L(dict, '关键信息', 'Key info')}</p>
+          )}
+
           {/* Type-specific section */}
           {n.type === 'person' && (
             <PersonSection node={n} relatedNodes={relatedNodes} onOpenNode={onOpenNode} />
@@ -1014,7 +1027,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
           {/* Raw input —— 批次 74:长文默认折叠(清单类原文动辄上千字) */}
           {showRawInput && (
             <div className="nesio-node-raw" style={{ marginTop: '0.75rem' }}>
-              <p className="nesio-settings-section-label">{L(dict, '原始记录', 'Original note')}</p>
+              <p className="nesio-settings-section-label">{isEmailNode ? L(dict, '原始记录 · 邮件原文', 'Original · email') : L(dict, '原始记录', 'Original note')}</p>
               <p style={{ fontSize: '0.88rem', color: 'var(--portal-muted)', fontStyle: 'italic' }}>
                 &ldquo;{rawExpanded || (n.rawInput || '').length <= 180 ? n.rawInput : `${(n.rawInput || '').slice(0, 180)}…`}&rdquo;
               </p>
