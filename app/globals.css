@@ -12355,6 +12355,55 @@ html[data-portal-theme="night"] .nesio-section-title { color: #c8d8f0; }
   margin-bottom: 1.25rem;
 }
 
+/* 批次 110 · 记忆罐 —— 三颗水晶球(白珍珠核 + 皮肤色光晕),深底夜间更通透。 */
+.nesio-mem-jars {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.4rem;
+  margin: 0.3rem 0 1.4rem;
+}
+.nesio-mem-jar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  padding: 0.3rem 0.2rem;
+}
+.nesio-mem-jar-ball {
+  width: 76px; height: 76px;
+  border-radius: 50%;
+  position: relative;
+  background:
+    radial-gradient(circle at 36% 30%, #ffffff, rgba(255,255,255,0.55) 42%, var(--jar-halo) 100%);
+  box-shadow:
+    0 14px 26px -8px color-mix(in srgb, var(--jar-halo) 55%, transparent),
+    inset -7px -9px 18px rgba(60,40,50,0.18);
+  border: 1px solid rgba(255,255,255,0.75);
+  transition: transform 0.18s var(--ease-soft, ease);
+}
+.nesio-mem-jar:active .nesio-mem-jar-ball { transform: scale(0.94); }
+.nesio-mem-jar-ball::before {
+  content: '';
+  position: absolute;
+  left: 26%; top: 17%;
+  width: 24%; height: 17%;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.92);
+  filter: blur(2px);
+}
+.nesio-mem-jar-ball[data-halo="fav"]     { --jar-halo: var(--portal-accent); }
+.nesio-mem-jar-ball[data-halo="project"] { --jar-halo: var(--status-go); }
+.nesio-mem-jar-ball[data-halo="all"]     { --jar-halo: var(--status-gentle); }
+.nesio-mem-jar-name {
+  font-size: 0.86rem; font-weight: 700; color: var(--portal-ink);
+}
+.nesio-mem-jar-sub {
+  font-size: 0.71rem; color: var(--portal-muted);
+}
+
 .nesio-projects-row {
   display: flex;
   gap: 0.6rem;

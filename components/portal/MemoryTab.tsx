@@ -1034,6 +1034,41 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
           {/* ── Browse mode (not searching) ─────────────────────────────── */}
           {!isSearching && (
             <>
+              {/* 批次 110:记忆罐 —— 收藏夹/项目/全部 三颗水晶球(设计规范记忆页 hero)。
+                  「核心记忆」概念数据里暂无,按用户定的现有数据映射:收藏(pinned)/项目/全部。 */}
+              {hasNodes && (
+                <div className="nesio-mem-jars">
+                  <button type="button" className="nesio-mem-jar" onClick={() => setFavOpen((v) => !v)}>
+                    <span className="nesio-mem-jar-ball" data-halo="fav" aria-hidden />
+                    <span className="nesio-mem-jar-name">{L(dict, '收藏夹', 'Saved')}</span>
+                    <span className="nesio-mem-jar-sub">{L(dict, `手动收 · ${pinnedNodes.length}`, `pinned · ${pinnedNodes.length}`)}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="nesio-mem-jar"
+                    onClick={() => {
+                      const act = projects.filter((p) => p.status === 'active');
+                      if (act.length === 1) setActiveProject(act[0]);
+                      else if (act.length === 0) setShowCreateProject(true);
+                      else document.querySelector('.nesio-projects-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }}
+                  >
+                    <span className="nesio-mem-jar-ball" data-halo="project" aria-hidden />
+                    <span className="nesio-mem-jar-name">{L(dict, '项目', 'Projects')}</span>
+                    <span className="nesio-mem-jar-sub">{L(dict, `进行 · ${projects.filter((p) => p.status === 'active').length}`, `active · ${projects.filter((p) => p.status === 'active').length}`)}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="nesio-mem-jar"
+                    onClick={() => { (document.querySelector('.nesio-memory-search') as HTMLInputElement | null)?.focus(); }}
+                  >
+                    <span className="nesio-mem-jar-ball" data-halo="all" aria-hidden />
+                    <span className="nesio-mem-jar-name">{L(dict, '全部记忆', 'All')}</span>
+                    <span className="nesio-mem-jar-sub">{L(dict, `${nodes.length} 条 · 可搜`, `${nodes.length} · search`)}</span>
+                  </button>
+                </div>
+              )}
+
               {/* Narrator cards */}
               {narratorCards.length > 0 && (
                 <div className="nesio-narrator-section">
