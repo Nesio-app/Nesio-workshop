@@ -118,8 +118,10 @@ export default function TodayFeed({
   // 健身 routine 卡「开始练」→ 打开洞察的健康 tab(训练计划在那)
   useEffect(() => {
     const openTraining = () => { setInsightsTab('health'); setMirrorOpen(true); };
+    const openMoodTrend = () => { setInsightsTab('reflection'); setMirrorOpen(true); }; // 批次 107:心情第一拍→洞察
     window.addEventListener('nesio-open-training', openTraining);
-    return () => window.removeEventListener('nesio-open-training', openTraining);
+    window.addEventListener('nesio-open-mood-trend', openMoodTrend);
+    return () => { window.removeEventListener('nesio-open-training', openTraining); window.removeEventListener('nesio-open-mood-trend', openMoodTrend); };
   }, []);
 
   // Proactive cards: up to 2, each independently dismissable

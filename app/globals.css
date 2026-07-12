@@ -8777,6 +8777,67 @@ html[data-portal-theme="night"] .nesio-brief-strip {
   letter-spacing: 0.12em;
 }
 
+/* 批次 107 · 「接下来」副标题(区块标注后的说明,正常字重不跟大写字距) */
+.nesio-focus-subtitle {
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 500;
+  color: var(--portal-muted);
+  font-size: 0.9em;
+}
+
+/* 批次 107 · 今天页时间线 —— 心情作「现在」第一拍 + 竖轨节点 */
+.nesio-focus-timeline { position: relative; }
+.nesio-tl-node {
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  column-gap: 11px;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  padding: 2px 2px 12px;
+  cursor: pointer;
+  position: relative;
+}
+/* 心情圆点 + 向下连线(接到下面的要紧事,时间线首拍) */
+.nesio-tl-dot--mood {
+  grid-row: 1 / span 3;
+  grid-column: 1;
+  width: 13px; height: 13px;
+  margin: 3px 0 0 1px;
+  border-radius: 50%;
+  align-self: start;
+  border: 2px solid var(--status-calm);
+  background: var(--status-calm-soft);
+}
+.nesio-tl-dot--mood[data-tone="go"]     { border-color: var(--status-go);     background: var(--status-go-soft); }
+.nesio-tl-dot--mood[data-tone="gentle"] { border-color: var(--status-gentle); background: var(--status-gentle-soft); }
+.nesio-tl-dot--mood[data-tone="calm"]   { border-color: var(--status-calm);   background: var(--status-calm-soft); }
+.nesio-tl-node--mood::before,
+.nesio-tl-node--invite::before {
+  content: '';
+  position: absolute;
+  left: 7px; top: 20px; bottom: 0;
+  width: 1.5px;
+  background: linear-gradient(var(--portal-line), transparent);
+}
+.nesio-tl-time {
+  grid-column: 2;
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em;
+  color: var(--portal-accent);
+}
+.nesio-tl-title {
+  grid-column: 2;
+  font-size: 0.98rem; font-weight: 600; color: var(--portal-ink); line-height: 1.35;
+  margin-top: 1px;
+}
+.nesio-tl-sub {
+  grid-column: 2;
+  font-size: 0.76rem; color: var(--portal-muted); margin-top: 2px;
+}
+.nesio-focus-empty--tl { margin-left: 31px; }
+
 .nesio-focus-all-btn {
   font-size: 0.74rem;
   color: var(--portal-muted);

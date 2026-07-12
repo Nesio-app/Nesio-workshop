@@ -21,6 +21,7 @@ import { isMeetingNode } from './meeting-node';
 import { FocusCardDetail, FOCUS_TYPE_ICON } from './FocusCardDetail';
 import { MeetingRecorderSheet } from './MeetingRecorderSheet';
 import MemoryFlashBanner, { useMemoryFlash } from '../MemoryFlashBanner';
+import MoodBeat from '../MoodBeat';
 import { t } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -229,7 +230,10 @@ export function TodayFocusSection({
       <MemoryFlashBanner nodes={flashNodes} onDismiss={dismissFlash} />
 
       <div className="nesio-focus-header">
-        <h2 className="nesio-focus-title">{t(locale, 'todayFocusTitle')}</h2>
+        <h2 className="nesio-focus-title">
+          {t(locale, 'todayFocusTitle')}
+          <span className="nesio-focus-subtitle"> · {t(locale, 'todayFocusSubtitle')}</span>
+        </h2>
         <div className="nesio-focus-header-right">
           {doneToday > 0 && <span className="nesio-focus-done-badge">✓ {doneToday}</span>}
           {onOpenMemory && (
@@ -238,12 +242,15 @@ export function TodayFocusSection({
         </div>
       </div>
 
-      {isEmpty ? (
-        <div className="nesio-focus-empty">
-          <p>{t(locale, 'todayFocusEmpty')}</p>
-        </div>
-      ) : (
-        <div className="nesio-attention-layout">
+      {/* 批次 107:时间线 —— 心情作「现在」第一拍 + 竖轨串起下面的要紧事(设计规范今天页) */}
+      <div className="nesio-focus-timeline">
+        <MoodBeat />
+        {isEmpty ? (
+          <div className="nesio-focus-empty nesio-focus-empty--tl">
+            <p>{t(locale, 'todayFocusEmpty')}</p>
+          </div>
+        ) : (
+          <div className="nesio-attention-layout">
 
           {/* ── Slot 1: Must Not Miss ── */}
           {pinned && (
@@ -277,7 +284,8 @@ export function TodayFocusSection({
           )}
 
         </div>
-      )}
+        )}
+      </div>
 
       {/* Calendar event meeting recorder */}
       <MeetingRecorderSheet

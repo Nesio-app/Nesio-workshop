@@ -571,7 +571,8 @@ const STRINGS = {
     automationExternalAuthStatus: '关闭',
     automationExternalAuthDetail: '付费或连接不等于可以安全执行；外部授权和自动执行仍需 CEO Gate。',
     /* ── Today 表面(REG-004)── */
-    todayFocusTitle: '今日焦点',
+    todayFocusTitle: '接下来',
+    todayFocusSubtitle: '今天要紧的几件',
     todayFocusAll: '全部 ›',
     todayFocusEmpty: '✓ 没有到点的事',
     todayFocusEmptyHint: '说一句带时间的话（比如"周五有会议"），就会出现在这里。',
@@ -1295,7 +1296,8 @@ const STRINGS = {
     automationExternalAuthStatus: 'Off',
     automationExternalAuthDetail: 'Payment or connection does not mean safe execution; external authorization and automation still require CEO Gate.',
     /* ── Today surface (REG-004) ── */
-    todayFocusTitle: 'Focus',
+    todayFocusTitle: 'Next up',
+    todayFocusSubtitle: "today's few that matter",
     todayFocusAll: 'All ›',
     todayFocusEmpty: '✓ Nothing due right now',
     todayFocusEmptyHint: 'Say something with a time ("meeting on Friday") and it will show up here.',

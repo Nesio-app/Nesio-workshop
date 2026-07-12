@@ -10,9 +10,13 @@
   旅行的加权;没有符合的不渲染。lib/portal/retrospect.ts 纯函数 + RetrospectCard 自读 life-graph,
   放问候下面,点开复用 MemoryNodeDetail。实测(种 2025-07-12 记忆)「去年今天」正确翻出、
   衬线卡片、玫瑰色、点开进详情。
-- [ ] **今天页剩余结构性**:①心情作时间线「现在」第一拍(今天页做成时间线,心情第一格);
-  ②「今日焦点」是否改叫「接下来」(spec 用「接下来」,但当前区块是优先项不是时间线,
-  语义待定)。这两项是更大的 IA 重构,留待产品确认。
+- [x] **今天页时间线 + 心情第一拍 + 接下来(批次 107,用户「直接做」)**:今日焦点→「接下来·
+  今天要紧的几件」;MoodBeat 组件读今天最近心情作时间线「现在/今天」第一拍(能量→色调,
+  点开进洞察趋势;没记则邀请),竖轨连线串起下面的要紧事。**踩坑**:MoodBeat 原放
+  components/portal/today/ 触发 platform-leak(today 面不许直接 import life-graph,要走
+  TodayViewModel)——移到 components/portal/(同 RetrospectCard)即可直连。**预览种记忆**:
+  要同时写 localStorage['nesio-life-graph-v1'] **和** IDB nesio-blobs/blobs/同键(hydration
+  权威源,IDB 有数据就压 localStorage;只种 localStorage 会被异步水合清掉)。
 - [x] **夜间皮肤不跟色卡(批次 104 已做)**。核实发现比想的更严重:夜间+皮肤是**半亮崩坏**
   (日间浅底 token 漏进夜间)——因日间色卡块没做主题隔离,同特异性下靠后覆盖了夜间深底。
   修:①日间色卡 4 块全加 `:not([data-portal-theme="night"])` 隔离;②加 4 组
