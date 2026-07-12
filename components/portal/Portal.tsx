@@ -103,20 +103,20 @@ function AskGuideSheet({
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   if (!open) return null;
   return (
-    <div className="nesio-ask-guide" role="dialog" aria-modal="true" aria-label={L(dict, '问宝盒', 'Ask Nesio')}>
-      <button type="button" className="nesio-ask-guide-backdrop" onClick={onClose} aria-label={L(dict, '关闭问宝盒引导', 'Close Ask Nesio guide')} />
+    <div className="nesio-ask-guide" role="dialog" aria-modal="true" aria-label={L(dict, '问念念', 'Ask Nessa')}>
+      <button type="button" className="nesio-ask-guide-backdrop" onClick={onClose} aria-label={L(dict, '关闭问念念引导', 'Close Ask Nessa guide')} />
       <div className="nesio-ask-guide-card">
         <div className="nesio-sheet-handle" aria-hidden />
         <p className="nesio-ask-guide-kicker">{L(dict, '长按中间按钮', 'Long-press the center button')}</p>
-        <h2>{L(dict, '问宝盒', 'Ask Nesio')}</h2>
-        <p>{L(dict, '找东西、找线索，也可以问下一步。比如：钥匙在哪里？生日快到了该买什么礼物？', "Find things, find clues, or ask what's next. Like: where are my keys? What gift before the birthday?")}</p>
-        <div className="nesio-ask-guide-examples" aria-label={L(dict, '问宝盒示例', 'Ask Nesio examples')}>
+        <h2>{L(dict, '问念念', 'Ask Nessa')}</h2>
+        <p>{L(dict, '念念替你记得 —— 找东西、找线索，也可以问下一步。比如：钥匙在哪里？生日快到了该买什么礼物？', "Nessa remembers for you — find things, find clues, or ask what's next. Like: where are my keys? What gift before the birthday?")}</p>
+        <div className="nesio-ask-guide-examples" aria-label={L(dict, '问念念示例', 'Ask Nessa examples')}>
           <span>{L(dict, '钥匙在哪里', 'Where are my keys')}</span>
           <span>{L(dict, 'Linda 生日买什么', "What to buy for Linda's birthday")}</span>
           <span>{L(dict, '上次买的药还有吗', 'Any of that medicine left')}</span>
         </div>
         <div className="nesio-ask-guide-actions">
-          <button type="button" className="nesio-ob-primary-btn" onClick={onStart}>{L(dict, '开始问宝盒', 'Start asking')}</button>
+          <button type="button" className="nesio-ob-primary-btn" onClick={onStart}>{L(dict, '开始问念念', 'Start asking')}</button>
           <button type="button" className="nesio-ask-guide-later" onClick={onClose}>{L(dict, '稍后', 'Later')}</button>
         </div>
       </div>

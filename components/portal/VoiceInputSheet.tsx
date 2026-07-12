@@ -552,13 +552,13 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
 
   return (
     <>
-    <div className="nesio-voice-sheet" role="dialog" aria-modal="true" aria-label={isAskMode ? L(dict, '问宝盒', 'Ask Nesio') : L(dict, '说一句', 'Say it')}>
+    <div className="nesio-voice-sheet" role="dialog" aria-modal="true" aria-label={isAskMode ? L(dict, '问念念', 'Ask Nessa') : L(dict, '说一句', 'Say it')}>
       <div className="nesio-voice-sheet-backdrop" onClick={onClose} />
       <div className="nesio-voice-sheet-card">
         <div className="nesio-sheet-handle" aria-hidden />
 
         <div className="nesio-voice-sheet-header">
-          <h2 className="nesio-voice-sheet-title">{isAskMode ? L(dict, '问宝盒', 'Ask Nesio') : L(dict, '说一句', 'Say it')}</h2>
+          <h2 className="nesio-voice-sheet-title">{isAskMode ? L(dict, '问念念', 'Ask Nessa') : L(dict, '说一句', 'Say it')}</h2>
           {/* 批次 33:右上角 ✕ 撤除(用户指令)—— 退出走背景点击/手柄下拉 */}
         </div>
 
@@ -697,7 +697,7 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
           <input
             ref={inputRef}
             className="nesio-voice-input"
-            placeholder={isAskMode ? L(dict, '打字问宝盒,或点麦克风说…', 'Type your question, or tap the mic…') : L(dict, '说一句,或直接打字…', 'Say it, or just type…')}
+            placeholder={isAskMode ? L(dict, '打字问念念,或点麦克风说…', 'Type your question, or tap the mic…') : L(dict, '说一句,或直接打字…', 'Say it, or just type…')}
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
@@ -816,7 +816,7 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
           </div>
         ) : text.trim() && sendState !== 'confirm' ? (
           <button type="button" className="nesio-voice-send-btn" onClick={handleSend}>
-            {isAskMode ? L(dict, '问宝盒', 'Ask') : L(dict, '告诉 Nesio', 'Tell Nesio')}
+            {isAskMode ? L(dict, '问念念', 'Ask') : L(dict, '告诉 Nesio', 'Tell Nesio')}
           </button>
         ) : null}
       </div>

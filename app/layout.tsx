@@ -32,7 +32,10 @@ export const viewport: Viewport = {
   themeColor: '#588ce3',
 };
 
-const THEME_BOOT = `(function(){try{var c=localStorage.getItem('treasurebox-theme')||'auto';var dark=window.matchMedia('(prefers-color-scheme: dark)').matches;var h=new Date().getHours();var t=c==='night'?'night':c==='day'?'day':((dark||h<6||h>=19)?'night':'day');document.documentElement.setAttribute('data-portal-theme',t);}catch(e){}})();`;
+// 批次 99:防闪。主题(日/夜)+ 莫兰迪皮肤都在 paint 前落 data 属性 —— 皮肤逻辑
+// 必须与 module-overrides.getPalette 保持一致:键缺省=新默认「蓝灰·灰粉」;''=显式默认蓝;
+// 旧 lowsat 用户迁移到雾霾蓝。否则新默认皮肤会先闪一下原来的蓝再跳灰粉。
+const THEME_BOOT = `(function(){try{var c=localStorage.getItem('treasurebox-theme')||'auto';var dark=window.matchMedia('(prefers-color-scheme: dark)').matches;var h=new Date().getHours();var t=c==='night'?'night':c==='day'?'day':((dark||h<6||h>=19)?'night':'day');document.documentElement.setAttribute('data-portal-theme',t);var pv=localStorage.getItem('nesio-theme-palette-v1');var pid;if(pv===null){pid=(localStorage.getItem('nesio-theme-lowsat-v1')==='1')?'haze-blue':'bluegray-rose';}else if(pv===''){pid='';}else if(['bluegray-rose','milktea','haze-blue','sage'].indexOf(pv)>=0){pid=pv;}else{pid='bluegray-rose';}if(pid){document.documentElement.setAttribute('data-palette',pid);}}catch(e){}})();`;
 
 export default function RootLayout({
   children,

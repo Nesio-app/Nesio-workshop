@@ -1268,7 +1268,12 @@ Edit location/value anytime in Storage.`),
               <img src="/assets/logo/nesio-mark.svg" alt="" width={52} height={52} draggable={false} className="nesio-logo-day" />
               <img src="/assets/logo/nesio-mark-night.svg" alt="" width={52} height={52} draggable={false} className="nesio-logo-night" />
             </p>
-            <p className="nesio-wechat-empty-title">{L(dict, '问我任何事', 'Ask me anything')}</p>
+            <p className="nesio-wechat-empty-title">{L(dict, '我是念念', "I'm Nessa")}</p>
+            {/* 批次 99:助理拟人化 —— 空态由念念自我介绍(设计规范 命名 NAME LOCKED)。
+                导航仍叫「问一问」(动作名),念念是她本人。 */}
+            <p className="nesio-wechat-empty-sub">
+              {L(dict, '替你记得的那一个。不预测,只在对的时候,把你存过的轻轻翻给你。', 'The one who remembers for you — no predictions, just your own moments handed back at the right time.')}
+            </p>
             <div className="nesio-wechat-suggestions">
               {[L(dict, '我的护照放在哪里', 'Where did I put my passport?'), L(dict, '今天该吃什么', 'What should I eat today?'), L(dict, '帮我总结这周做了什么', 'Summarize my week')].map((s) => (
                 <button key={s} type="button" className="nesio-wechat-suggestion" onClick={() => void sendMessage(s)}>{s}</button>

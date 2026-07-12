@@ -134,9 +134,9 @@ assert.doesNotMatch(todayFeed, /nesio-today-brand-name">Nesio/, 'Today header sh
 assert.match(bottomNav, /onPointerDown=\{startPress\}/, 'Center N button must expose long-press ask behavior.');
 assert.match(bottomNav, /问一问|长按/, 'Center N button must document the long-press ask affordance.');
 assert.match(bottomNav, /draggable=\{false\}|onContextMenu=\{\(e\) => e\.preventDefault\(\)\}/, 'Center N image must suppress iOS image callout/share sheet during long press.');
-// Fan label evolved 上传 → 分析文件 → 分享(批次 11 用户两次点名要「分享」;
-// 原「防与向外分享混淆」的意图改由 ShareSheet 内文案承担)。
-assert.match(tellSheet, /label:\s*'分享'/, 'Center N third fan action should say 分享 (batch-11 product decision).');
+// Fan label evolved 上传 → 分析文件 → 分享 → 收进来(批次 99 设计规范 v1 命名:
+// 「分享」是别处的系统词,宝盒是替你收着 —— 视角站在盒子这边,收成「收进来/Keep」)。
+assert.match(tellSheet, /label:\s*'收进来'/, 'Center N third fan action should say 收进来 (design-spec v1 naming; 分享 was the OS word).');
 // Design evolved: 说一句 is the primary capture action and carries an
 // explicit accent (accent: true). Guarded intent now: at most ONE accent.
 assert.match(tellSheet, /accent: true/, 'Fan actions may accent exactly the primary capture action.');

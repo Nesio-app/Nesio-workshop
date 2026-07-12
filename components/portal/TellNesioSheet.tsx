@@ -58,8 +58,8 @@ const FAN_BUTTONS: Array<{
   },
   {
     mode: 'share',
-    label: '分享',
-    labelEn: 'Share',
+    label: '收进来',
+    labelEn: 'Keep',
     pos: 'right',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="26" height="26">
@@ -144,7 +144,7 @@ export default function TellNesioSheet({ open, onClose, onCapture }: TellNesioSh
               <line x1="15" y1="9" x2="15.01" y2="9" />
             </svg>
           </span>
-          <span className="nesio-tell-fan-label">{L(dict, '记录心情', 'How I feel')}</span>
+          <span className="nesio-tell-fan-label">{L(dict, '记心情', 'Mood')}</span>
         </button>
 
         {/* 冻一下 —— 想买点东西先冻进冷冻仓(冲动购物防护 + 奖品仓库入口)。功能开关中心可关。 */}

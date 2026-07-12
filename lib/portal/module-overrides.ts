@@ -55,15 +55,22 @@ export const PALETTES: { id: Exclude<PaletteId, ''>; zh: string; en: string; hin
   { id: 'sage',          zh: '灰绿 · 治愈',     en: 'Sage',         hint: '自然疗愈' },
 ];
 
+/**
+ * 批次 99:默认皮肤改为莫兰迪「蓝灰·灰粉」(设计规范 v1 定的默认)。
+ * 键**缺省**(从没选过)→ 新默认 bluegray-rose;显式存 '' → 用户主动选了「默认蓝」;
+ * 旧 lowsat 用户 → 雾霾蓝。此处逻辑必须与 layout.tsx THEME_BOOT 防闪脚本一致。
+ */
 export function getPalette(): PaletteId {
-  if (typeof window === 'undefined') return '';
+  if (typeof window === 'undefined') return 'bluegray-rose';
   try {
-    const v = localStorage.getItem(PALETTE_KEY);
-    if (v && PALETTES.some((p) => p.id === v)) return v as PaletteId;
-    // 旧用户迁移:老的 lowsat 单套 → 映射到雾霾蓝(保留品牌蓝,最不突兀)
-    if (localStorage.getItem(LEGACY_LOWSAT_KEY) === '1') return 'haze-blue';
+    const v = localStorage.getItem(PALETTE_KEY); // 从没设过 = null;显式默认蓝 = ''
+    if (v === null) {
+      return localStorage.getItem(LEGACY_LOWSAT_KEY) === '1' ? 'haze-blue' : 'bluegray-rose';
+    }
+    if (v === '') return '';
+    if (PALETTES.some((p) => p.id === v)) return v as PaletteId;
   } catch { /* ignore */ }
-  return '';
+  return 'bluegray-rose';
 }
 export function setPalette(id: PaletteId): void {
   if (typeof window === 'undefined') return;

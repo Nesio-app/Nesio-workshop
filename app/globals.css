@@ -9494,7 +9494,22 @@ html[data-portal-theme="night"] .nesio-wechat-header {
   text-align: center;
 }
 .nesio-wechat-empty-icon { font-size: 2.2rem; opacity: 0.5; }
-.nesio-wechat-empty-title { font-size: 1rem; font-weight: 600; color: var(--portal-muted); }
+/* 批次 99:念念自我介绍 —— 名字用衬线嗓音(设计规范),简介低饱和克制。 */
+.nesio-wechat-empty-title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--portal-ink);
+  font-family: "Noto Serif SC", "Songti SC", serif;
+  letter-spacing: 0.02em;
+}
+.nesio-wechat-empty-sub {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--portal-muted);
+  line-height: 1.65;
+  max-width: 17rem;
+  margin: 0.1rem 0 0.3rem;
+}
 .nesio-wechat-suggestions {
   display: flex;
   flex-direction: column;
