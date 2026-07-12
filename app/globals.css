@@ -11259,12 +11259,23 @@ html[data-portal-theme="night"] .nesio-otd-card-name { color: #d0d8f0; }
 .nesio-pinned-card {
   background: var(--portal-surface, #fff);
   border: 1.5px solid var(--portal-line, rgba(0,0,0,.1));
-  border-left: 3px solid var(--portal-blue-deep);
   border-radius: 12px;
   padding: 0.7rem 0.85rem 0.65rem;
   box-shadow: 0 1px 4px rgba(0,0,0,.06);
+  /* 批次 108:上时间线轨 —— 让位左侧竖线,「现在」= 实心 accent 圆点坐在轨上 */
+  margin-left: 30px;
+  position: relative;
 }
-.nesio-pinned-card--now { border-left-color: #f0a040; }
+.nesio-pinned-card::before {
+  content: '';
+  position: absolute;
+  left: -24px; top: 15px;
+  width: 13px; height: 13px;
+  border-radius: 50%;
+  background: var(--portal-accent);
+  box-shadow: 0 0 0 3px var(--portal-bg);
+}
+.nesio-pinned-card--now::before { background: var(--status-gentle); }
 
 .nesio-pinned-badge-row {
   display: flex;
@@ -14861,10 +14872,11 @@ html[data-portal-theme="night"][data-palette="sage"]          { background-color
   position: absolute; right: 0.3rem; top: 50%; transform: translateY(-50%);
 }
 
-/* §4 冷暖物理学:现在/计划 = 冷蓝;过去/回忆 = 琥珀暖(卡底微暖渐变+暖金图标) */
+/* §4 冷暖物理学:现在/计划 = 冷调;过去/回忆 = 暖调。批次 108:冷调用皮肤的 --portal-cool
+   (灰粉皮肤下是冷灰、灰绿下是冷绿灰…),不再硬编码浅蓝,否则在莫兰迪皮肤上偏蓝离群。 */
 .nesio-proactive-card {
-  background: linear-gradient(180deg, rgba(232, 242, 252, 0.92), rgba(255, 255, 255, 0.85));
-  border-color: rgba(88, 140, 227, 0.18);
+  background: linear-gradient(180deg, var(--portal-cool), color-mix(in srgb, var(--portal-cool) 45%, transparent));
+  border-color: var(--portal-line);
 }
 .nesio-dormant-card {
   border-radius: 0.9rem;
