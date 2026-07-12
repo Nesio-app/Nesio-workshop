@@ -12417,6 +12417,7 @@ html[data-portal-theme="night"] .nesio-section-title { color: #c8d8f0; }
   background: rgba(255,255,255,0.92);
   filter: blur(2px);
 }
+.nesio-mem-jar-ball[data-halo="core"]    { --jar-halo: var(--status-gentle); }
 .nesio-mem-jar-ball[data-halo="fav"]     { --jar-halo: var(--portal-accent); }
 .nesio-mem-jar-ball[data-halo="project"] { --jar-halo: var(--status-go); }
 .nesio-mem-jar-ball[data-halo="all"]     { --jar-halo: var(--status-gentle); }

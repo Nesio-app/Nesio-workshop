@@ -43,8 +43,10 @@
   收藏夹(pinned)/ 项目(active projects)/ 全部记忆(total)。用户定「现有数据映射」,
   「核心记忆」概念暂不做(数据里只有一级 pin)。CSS `.nesio-mem-jar*`,halo 走
   --portal-accent/--status-go/--status-gentle。点:收藏夹→展开收藏、项目→开/滚项目、全部→聚焦搜索。
-- [ ] **记忆页剩余**:①「核心记忆」若要单独一颗球,需加「标为核心」机制(数据模型,待定)。
-  ②收纳区 + 全部记忆卡片按 mockup 再精修(次要,现有 收纳卡/类型筛选列表已在)。
+- [x] **批次 113**:收纳区对齐 mockup —— 独立「收纳」段 + 横条卡(空间/未归位/件数/估值,inventoryStats)。
+- [x] **批次 114**:核心记忆 —— pins.ts 加平行 core store(loadCore/isCore/toggleCore/CORE_UPDATED_EVENT);
+  长按记忆卡加「标为核心记忆」;记忆罐改 核心记忆(amber·定义你)/收藏夹/项目,点核心球展开核心记忆;
+  全部记忆挪到下方区块。实测标核心 → 球计数 0→1 响应。
 
 ## 已解决(逐页登记)
 

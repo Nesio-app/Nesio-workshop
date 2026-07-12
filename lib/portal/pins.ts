@@ -25,3 +25,25 @@ export function togglePin(nodeId: string): boolean {
   window.dispatchEvent(new CustomEvent(PINS_UPDATED_EVENT));
   return next.includes(nodeId);
 }
+
+/**
+ * 核心记忆(批次 114)——「定义你」的记忆,比收藏更高一档。记忆罐第一颗球。
+ * 独立 store,与收藏(pins)平行;长按记忆卡「标为核心」。同样随备份的 nesio- 前缀纳入。
+ */
+const CORE_KEY = 'nesio-core-memories-v1';
+export const CORE_UPDATED_EVENT = 'nesio-core-updated';
+
+export function loadCore(): string[] {
+  if (typeof window === 'undefined') return [];
+  try { return JSON.parse(localStorage.getItem(CORE_KEY) || '[]') as string[]; } catch { return []; }
+}
+export function isCore(nodeId: string): boolean {
+  return loadCore().includes(nodeId);
+}
+export function toggleCore(nodeId: string): boolean {
+  const core = loadCore();
+  const next = core.includes(nodeId) ? core.filter((id) => id !== nodeId) : [nodeId, ...core];
+  try { localStorage.setItem(CORE_KEY, JSON.stringify(next.slice(0, 100))); } catch { reportStorageDropped(); }
+  window.dispatchEvent(new CustomEvent(CORE_UPDATED_EVENT));
+  return next.includes(nodeId);
+}

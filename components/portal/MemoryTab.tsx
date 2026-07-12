@@ -43,7 +43,7 @@ import { DomainIcon, IconBox, IconCalendar, IconCheckSquare, IconFolder, IconLin
 import { L, type DictLocale } from '@/lib/portal/i18n';
 import { relativePastLabel } from '@/lib/portal/time-labels';
 import { displayNodeName } from '@/lib/portal/node-display';
-import { isPinned, loadPins, PINS_UPDATED_EVENT, togglePin } from '@/lib/portal/pins';
+import { isPinned, loadPins, PINS_UPDATED_EVENT, togglePin, isCore, toggleCore, loadCore, CORE_UPDATED_EVENT } from '@/lib/portal/pins';
 import { listInventoryItems, inventoryStats } from '@/lib/portal/inventory';
 import { usePortalLocale } from './use-portal-locale';
 
@@ -523,6 +523,13 @@ function LongPressSheet({
         <button
           type="button"
           className="nesio-longpress-share-btn"
+          onClick={() => { toggleCore(node.id); onClose(); }}
+        >
+          {isCore(node.id) ? L(dict, '取消核心记忆', 'Remove from core') : L(dict, '标为核心记忆', 'Mark as core')}
+        </button>
+        <button
+          type="button"
+          className="nesio-longpress-share-btn"
           onClick={() => { togglePin(node.id); onClose(); }}
         >
           {isPinned(node.id) ? L(dict, '取消收藏', 'Unpin') : L(dict, '收藏到首页', 'Pin to home')}
@@ -844,8 +851,20 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
   const pinnedNodes = pinIds
     .map((id) => nodes.find((n) => n.id === id))
     .filter((n): n is LifeNode => Boolean(n));
+  // 核心记忆(批次 114):与收藏平行的更高一档,记忆罐第一颗球
+  const [coreIds, setCoreIds] = useState<string[]>([]);
+  useEffect(() => {
+    const read = () => setCoreIds(loadCore());
+    read();
+    window.addEventListener(CORE_UPDATED_EVENT, read);
+    return () => window.removeEventListener(CORE_UPDATED_EVENT, read);
+  }, []);
+  const coreNodes = coreIds
+    .map((id) => nodes.find((n) => n.id === id))
+    .filter((n): n is LifeNode => Boolean(n));
   // 批次 50:收藏夹收成单一容器卡,点开才展开全部收藏
   const [favOpen, setFavOpen] = useState(false);
+  const [coreOpen, setCoreOpen] = useState(false);
 
   const dict = portalLocaleToDictionaryLocale(locale);
   const copy = COPY[dict];
@@ -1040,10 +1059,15 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
           {/* ── Browse mode (not searching) ─────────────────────────────── */}
           {!isSearching && (
             <>
-              {/* 批次 110:记忆罐 —— 收藏夹/项目/全部 三颗水晶球(设计规范记忆页 hero)。
-                  「核心记忆」概念数据里暂无,按用户定的现有数据映射:收藏(pinned)/项目/全部。 */}
+              {/* 批次 110→114:记忆罐 —— 核心记忆/收藏夹/项目 三颗水晶球(设计规范记忆页 hero)。
+                  核心记忆(定义你,长按记忆卡「标为核心」)= 第一颗;全部记忆挪到下方区块。 */}
               {hasNodes && (
                 <div className="nesio-mem-jars">
+                  <button type="button" className="nesio-mem-jar" onClick={() => setCoreOpen((v) => !v)}>
+                    <span className="nesio-mem-jar-ball" data-halo="core" aria-hidden />
+                    <span className="nesio-mem-jar-name">{L(dict, '核心记忆', 'Core')}</span>
+                    <span className="nesio-mem-jar-sub">{L(dict, `定义你 · ${coreNodes.length}`, `defines you · ${coreNodes.length}`)}</span>
+                  </button>
                   <button type="button" className="nesio-mem-jar" onClick={() => setFavOpen((v) => !v)}>
                     <span className="nesio-mem-jar-ball" data-halo="fav" aria-hidden />
                     <span className="nesio-mem-jar-name">{L(dict, '收藏夹', 'Saved')}</span>
@@ -1063,16 +1087,23 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                     <span className="nesio-mem-jar-name">{L(dict, '项目', 'Projects')}</span>
                     <span className="nesio-mem-jar-sub">{L(dict, `进行 · ${projects.filter((p) => p.status === 'active').length}`, `active · ${projects.filter((p) => p.status === 'active').length}`)}</span>
                   </button>
-                  <button
-                    type="button"
-                    className="nesio-mem-jar"
-                    onClick={() => { (document.querySelector('.nesio-memory-search') as HTMLInputElement | null)?.focus(); }}
-                  >
-                    <span className="nesio-mem-jar-ball" data-halo="all" aria-hidden />
-                    <span className="nesio-mem-jar-name">{L(dict, '全部记忆', 'All')}</span>
-                    <span className="nesio-mem-jar-sub">{L(dict, `${nodes.length} 条 · 可搜`, `${nodes.length} · search`)}</span>
-                  </button>
                 </div>
+              )}
+
+              {/* 核心记忆展开(点核心球)*/}
+              {hasNodes && coreOpen && coreNodes.length > 0 && (
+                <div className="nesio-projects-section">
+                  <div className="nesio-memory-grid nesio-fav-expanded">
+                    {coreNodes.map((n) => (
+                      <MemoryCard key={n.id} node={n} onOpen={() => openNodeDetail(n)} onDeleted={() => setNodes(getLifeGraph())} onLongPress={() => setLongPressNode(n)} />
+                    ))}
+                  </div>
+                </div>
+              )}
+              {hasNodes && coreOpen && coreNodes.length === 0 && (
+                <p className="nesio-settings-option-hint" style={{ margin: '0 0 1rem', textAlign: 'center' }}>
+                  {L(dict, '还没有核心记忆。长按任意记忆卡 → 标为核心记忆。', 'No core memories yet. Long-press a memory card → Mark as core.')}
+                </p>
               )}
 
               {/* Narrator cards */}
