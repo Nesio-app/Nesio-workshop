@@ -903,6 +903,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
   // 批次 50:收藏夹收成单一容器卡,点开才展开全部收藏
   const [favOpen, setFavOpen] = useState(false);
   const [coreOpen, setCoreOpen] = useState(false);
+  const [projOpen, setProjOpen] = useState(false);
 
   const dict = portalLocaleToDictionaryLocale(locale);
   const copy = COPY[dict];
@@ -1111,15 +1112,11 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                     <span className="nesio-mem-jar-name">{L(dict, '收藏夹', 'Saved')}</span>
                     <span className="nesio-mem-jar-sub">{L(dict, `手动收 · ${pinnedNodes.length}`, `pinned · ${pinnedNodes.length}`)}</span>
                   </button>
+                  {/* 批次 123(用户「项目挪进球里,那个 section 删了」):点球内联展开项目,同核心/收藏球 */}
                   <button
                     type="button"
                     className="nesio-mem-jar"
-                    onClick={() => {
-                      const act = projects.filter((p) => p.status === 'active');
-                      if (act.length === 1) setActiveProject(act[0]);
-                      else if (act.length === 0) setShowCreateProject(true);
-                      else document.querySelector('.nesio-projects-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    }}
+                    onClick={() => setProjOpen((v) => !v)}
                   >
                     <span className="nesio-mem-jar-ball" data-halo="project" aria-hidden><IconFolder size={24} /></span>
                     <span className="nesio-mem-jar-name">{L(dict, '项目', 'Projects')}</span>
@@ -1142,6 +1139,28 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                 <p className="nesio-settings-option-hint" style={{ margin: '0 0 1rem', textAlign: 'center' }}>
                   {L(dict, '还没有核心记忆。长按任意记忆卡 → 标为核心记忆。', 'No core memories yet. Long-press a memory card → Mark as core.')}
                 </p>
+              )}
+
+              {/* 项目展开(点项目球)—— 批次 123:项目挪进球里,不再有独立「我的项目」section */}
+              {hasNodes && projOpen && (
+                <div className="nesio-projects-section">
+                  {projects.filter((p) => p.status === 'active').length > 0 ? (
+                    <div className="nesio-memory-grid nesio-fav-expanded">
+                      {projects.filter((p) => p.status === 'active').map((p) => (
+                        <ProjectCard key={p.id} project={p} allNodes={nodes} onClick={() => setActiveProject(p)} />
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="nesio-projects-empty">{L(dict, '还没有项目,创建一个把相关记录聚在一起', 'No projects yet — create one to group related notes')}</p>
+                  )}
+                  <button
+                    type="button"
+                    className="nesio-mem-jar-create"
+                    onClick={() => setShowCreateProject(true)}
+                  >
+                    {copy.newProject}
+                  </button>
+                </div>
               )}
 
               {/* Narrator cards */}
@@ -1211,35 +1230,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
               )}
 
 
-              {/* My Projects(批次 34:空库时藏起) */}
-              {hasNodes && (
-              <div className="nesio-projects-section">
-                <div className="nesio-section-header">
-                  <span className="nesio-section-title">{copy.myProjects}</span>
-                  <button
-                    type="button"
-                    className="nesio-section-action"
-                    onClick={() => setShowCreateProject(true)}
-                  >
-                    {copy.newProject}
-                  </button>
-                </div>
-                {projects.length > 0 ? (
-                  <div className="nesio-memory-grid">
-                    {projects.filter((p) => p.status === 'active').map((p) => (
-                      <ProjectCard
-                        key={p.id}
-                        project={p}
-                        allNodes={nodes}
-                        onClick={() => setActiveProject(p)}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <p className="nesio-projects-empty">{L(dict, '创建项目，把相关记录聚在一起', 'Create a project to group related notes')}</p>
-                )}
-              </div>
-              )}
+              {/* 批次 123:「我的项目」独立 section 已删 —— 项目挪进记忆罐「项目」球(点球内联展开) */}
 
               {/* Recent memories */}
               {hasNodes && (

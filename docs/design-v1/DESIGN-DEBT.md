@@ -98,6 +98,14 @@
   **待续(设计还有)**:节点详情页富结构(关键信息 key-value / 原始记录折叠 / 相关记忆·同一商家)、
   命名对齐(特办/多面镜/足迹…)、标题 AI 归一化绝不甩邮件头。
 
+- [x] **批次 123 · 记忆页删统计卡 + 项目挪进球(用户圈红 X)**:①**删「承诺/最近」统计数字卡**——
+  memory-narrator.ts 的 buildCommitmentCard/buildActivityCard(title 承诺/最近、body=count)是设计明说要
+  去掉的「统计格数字」,删掉;buildNarratorCards 只留 remember(念念叙事,非统计,用户没 X);顺手清死
+  代码(DOMAIN_EN/topDomain/nodeDomain/relativeFutureLabel/now() 全删)。②**删「我的项目」独立 section**——
+  项目挪进记忆罐「项目」球:点球 setProjOpen 内联展开(同核心/收藏球),展开区含项目卡 + 「+新建」入口
+  (.nesio-mem-jar-create)。记忆页现为设计布局:搜索 → 记忆罐 3 球 → 收纳条 → 全部记忆。预览实测:
+  统计卡消失、我的项目 header 无、项目球点击内联展开 + 新建按钮可见。
+
 ## 已解决(逐页登记)
 
 - [x] **批次 100**:今天页问候升衬线显示嗓音 + 区块标注收紧 + FAB 中心水晶球随皮肤。

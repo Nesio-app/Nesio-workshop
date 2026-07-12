@@ -12663,6 +12663,20 @@ html[data-portal-theme="night"] .nesio-project-card-name { color: #d8e8ff; }
   color: var(--portal-muted);
   padding: 0.4rem 0;
 }
+/* 批次 123:项目球展开区的「+新建」入口(项目挪进球后,创建走这里) */
+.nesio-mem-jar-create {
+  display: block;
+  margin: 0.5rem auto 0.2rem;
+  padding: 0.4rem 1rem;
+  min-height: 40px;
+  border-radius: 999px;
+  border: 1px solid var(--portal-accent-border, var(--portal-line));
+  background: var(--portal-accent-soft);
+  color: var(--portal-accent);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
 
 /* ── Project detail sheet ───────────────────────────────────────────────── */
 .nesio-project-detail-sheet {
