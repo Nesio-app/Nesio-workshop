@@ -124,6 +124,27 @@ function AskGuideSheet({
   );
 }
 
+// 批次 116:localStorage 键 → 人话(存储报警诊断「哪里占空间」)。
+function storageKeyLabel(key: string, dict: Parameters<typeof L>[0]): string {
+  const MAP: Record<string, [string, string]> = {
+    'treasurebox-profile-avatar': ['头像图片', 'Avatar image'],
+    'nesio-life-graph-v1': ['记忆本体(未上云)', 'Memories (not synced)'],
+    'nesio-bank-tx-v1': ['银行流水', 'Bank transactions'],
+    'nesio-bank-accounts-v1': ['银行账户', 'Bank accounts'],
+    'nesio-place-trail-v1': ['足迹轨迹', 'Place trail'],
+    'nesio-img-hash-v1': ['图片指纹索引', 'Image index'],
+    'nesio-health-v1': ['健康数据', 'Health data'],
+    'nesio-experiments-v2': ['实验数据', 'Experiments'],
+    'nesio-rewards-v1': ['奖品仓库', 'Rewards'],
+  };
+  const hit = MAP[key];
+  if (hit) return L(dict, hit[0], hit[1]);
+  if (/chat/i.test(key)) return L(dict, '聊天记录', 'Chat history');
+  if (/cache/i.test(key)) return L(dict, '缓存', 'Cache');
+  if (/embed/i.test(key)) return L(dict, '语义索引', 'Embeddings');
+  return key.replace(/^(nesio-|treasurebox-)/, '').replace(/-v\d+$/, '');
+}
+
 function normalizeLaunchSurfaceContext(raw: {
   viewerRole?: unknown;
   testerAllowlist?: unknown;
@@ -231,7 +252,7 @@ export default function Portal() {
   const [activeSurface, setActiveSurface] = useState<ActiveSurface>('today');
   const [reliefBusy, setReliefBusy] = useState(false);
   const [reliefMsg, setReliefMsg] = useState('');
-  const [storageAlert, setStorageAlert] = useState<{ kind: 'full' | 'warning'; percent: number } | null>(null);
+  const [storageAlert, setStorageAlert] = useState<{ kind: 'full' | 'warning'; percent: number; largest?: Array<{ key: string; bytes: number }> } | null>(null);
   const [captureMode, setCaptureMode] = useState<CaptureMode | null>(null);
 
   // 批次 7:iOS PWA 后台驻留页面从不重载,用户会停在几天前的旧 UI。
@@ -628,13 +649,13 @@ export default function Portal() {
     };
     const onFull = (e: Event) => {
       if (Date.now() < snoozedUntil()) return;
-      const detail = (e as CustomEvent<{ percent?: number }>).detail;
-      setStorageAlert({ kind: 'full', percent: detail?.percent ?? 100 });
+      const detail = (e as CustomEvent<{ percent?: number; largestKeys?: Array<{ key: string; bytes: number }> }>).detail;
+      setStorageAlert({ kind: 'full', percent: detail?.percent ?? 100, largest: detail?.largestKeys });
     };
     const onWarning = (e: Event) => {
       if (Date.now() < snoozedUntil()) return;
-      const detail = (e as CustomEvent<{ percent?: number }>).detail;
-      setStorageAlert((prev) => prev?.kind === 'full' ? prev : { kind: 'warning', percent: detail?.percent ?? 80 });
+      const detail = (e as CustomEvent<{ percent?: number; largestKeys?: Array<{ key: string; bytes: number }> }>).detail;
+      setStorageAlert((prev) => prev?.kind === 'full' ? prev : { kind: 'warning', percent: detail?.percent ?? 80, largest: detail?.largestKeys });
     };
     window.addEventListener(STORAGE_FULL_EVENT, onFull);
     window.addEventListener(STORAGE_WARNING_EVENT, onWarning);
@@ -1027,10 +1048,21 @@ export default function Portal() {
               color: 'var(--status-risk, #d33)', display: 'flex', alignItems: 'center', gap: 8,
             }}
           >
-            <span style={{ flex: 1 }}>
-              {reliefMsg ? reliefMsg : storageAlert.kind === 'full'
-                ? L(dict, `本机空间紧张，新的记忆可能存不进来。先在设置里导出一份备份保底；登录后记忆会自动备份到云端并腾出本机空间。`, 'Local storage is tight — new memories may not save. Export a backup in Settings first; signing in backs memories up to the cloud and frees local space.')
-                : L(dict, `本机空间已用 ${storageAlert.percent}%。方便的时候导出一份备份，之后就不用惦记这件事了。`, `Local storage is ${storageAlert.percent}% used. Export a backup when convenient and stop worrying about it.`)}
+            <span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span>
+                {reliefMsg ? reliefMsg : storageAlert.kind === 'full'
+                  ? L(dict, `本机空间紧张，新的记忆可能存不进来。先在设置里导出一份备份保底；登录后记忆会自动备份到云端并腾出本机空间。`, 'Local storage is tight — new memories may not save. Export a backup in Settings first; signing in backs memories up to the cloud and frees local space.')
+                  : L(dict, `本机空间已用 ${storageAlert.percent}%。方便的时候导出一份备份，之后就不用惦记这件事了。`, `Local storage is ${storageAlert.percent}% used. Export a backup when convenient and stop worrying about it.`)}
+              </span>
+              {/* 批次 116:占用最多的几项(诊断「哪里占空间」),按皮肤中性色显示 */}
+              {!reliefMsg && storageAlert.largest && storageAlert.largest.length > 0 && (
+                <span style={{ fontSize: '0.72rem', opacity: 0.88 }}>
+                  {L(dict, '占用最多：', 'Biggest: ')}
+                  {storageAlert.largest.slice(0, 3).map((k) =>
+                    `${storageKeyLabel(k.key, dict)} ${k.bytes >= 1048576 ? `${(k.bytes / 1048576).toFixed(1)}M` : `${Math.round(k.bytes / 1024)}K`}`
+                  ).join(' · ')}
+                </span>
+              )}
             </span>
             <button
               type="button"
