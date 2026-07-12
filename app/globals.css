@@ -14900,6 +14900,44 @@ html[data-portal-theme="night"] .nesio-exp-card:hover {
   font-variant-numeric: tabular-nums;
 }
 
+/* ── 生命版图 · 领土条(设计 §2:唯一保留的图,五领域按意义密度切宽度)── */
+.nesio-territory-bar {
+  display: flex;
+  height: 74px;
+  margin-top: 0.55rem;
+  border: 1px solid var(--portal-line);
+  border-radius: var(--radius-md, 16px);
+  overflow: hidden;
+}
+.nesio-territory-terr {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 1px;
+  padding: 0.5rem 0.45rem;
+  color: #fff;
+  min-width: 0;
+  overflow: hidden;
+}
+.nesio-territory-terr small {
+  font-size: 0.625rem;
+  font-weight: 700;
+  opacity: 0.95;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nesio-territory-terr b { font-size: 0.75rem; font-weight: 800; }
+.nesio-territory-note {
+  display: flex;
+  align-items: center;
+  gap: 0.32rem;
+  margin: 0.55rem 0 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--portal-cool-accent);
+}
+
 /* ── 多面镜月度信(§2.3):暖色信纸 + 宋体 ── */
 .nesio-mirror-tab { display: flex; flex-direction: column; }
 .nesio-mirror-picker { display: flex; gap: 0.45rem; flex-wrap: wrap; }

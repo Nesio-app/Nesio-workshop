@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MyExperimentWidget } from '@/components/portal/NesioExperiment';
 import { useFeatureEnabled } from '@/components/portal/use-feature-flag';
-import LifeCivilizationMap from '@/components/portal/LifeCivilizationMap';
+import { computeTerritory } from '@/lib/portal/life-territory';
 import RelationGraph from '@/components/portal/RelationGraph';
 import type { GNode, GEdge } from '@/lib/platform/graph-engine';
 import { getLifeGraph, isBulkImported } from '@/lib/portal/life-graph';
@@ -37,7 +37,7 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import { InfoTip } from './InfoTip';
-import { IconRefresh } from './icons';
+import { IconRefresh, IconTrendingUp } from './icons';
 import TimelineTab from './insights/TimelineTab';
 import MirrorLetterTab from './insights/MirrorLetterTab';
 import FinanceTab from './finance/FinanceTab';
@@ -517,6 +517,8 @@ export default function InsightsSheet({ onClose, initialTab }: { onClose: () => 
   }, [realNodes]);
   // 批次 32 用户拍板:门槛 90 → 21 天(与 21 天试用同节奏,试用结束刚好看到自己的版图)
   const mapEligible = realNodes.length >= 6 && mapDays >= 21;
+  // 生命版图 = 轻量领土条(设计稿 §2:唯一保留的图,少即是多)——纯本地统计,无 d3
+  const territory = useMemo(() => computeTerritory(realNodes), [realNodes]);
 
   // 门/线头/走走看点进记忆页:关掉本 sheet 再广播(Portal 负责切到记忆面)
   const openInMemory = useCallback((query: string) => {
@@ -613,12 +615,6 @@ export default function InsightsSheet({ onClose, initialTab }: { onClose: () => 
   }, [fetchLivingModel]);
 
   const monthNum = new Date().getMonth() + 1;
-  const threadOldest = threads[0];
-  const threadAgeLabel = threadOldest ? (() => {
-    const days = Math.floor((Date.now() - new Date(threadOldest.createdAt).getTime()) / DAY_MS);
-    const months = Math.floor(days / 30);
-    return months >= 1 ? L(dict, `${months} 个月前`, `${months} mo ago`) : L(dict, `${days} 天前`, `${days} d ago`);
-  })() : '';
 
   return (
     <div className="nesio-insights-sheet">
@@ -743,13 +739,31 @@ export default function InsightsSheet({ onClose, initialTab }: { onClose: () => 
 
             {/* 生命版图:唯一保留的图,移到底部(≥21 天才出现,不满门槛只说实话,不放示例) */}
             <div className="nesio-insights-section">
-              <p className="nesio-insights-section-label">{L(dict, '生命版图', 'Life map')}<InfoTip text={L(dict, '五个领域(关系/事业/健康/成长/自我)的地形图:领土宽度由记录的意义密度决定(置信度+关联数+标签),不是数量;地形随时间演变,自动标出最大迁移。', 'A terrain of five domains (ties/work/health/growth/self). Territory width reflects meaning density (confidence + connections + tags), not count; it evolves over time and flags the biggest shift.')} /></p>
-              {mapEligible ? (
+              <div className="nesio-insights-section-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                <p className="nesio-insights-section-label" style={{ margin: 0 }}>{L(dict, '生命版图', 'Life map')}<InfoTip text={L(dict, '五个领域(关系/事业/成长/健康/自我)按记录的意义密度(置信度+关联数+标签,不是数量)切分领土宽度;下方标出近来占比涨得最多的一域。', 'Five domains (ties/work/growth/health/self) split by meaning density (confidence + connections + tags, not count); below flags the domain whose share grew the most lately.')} /></p>
+                <span style={{ fontSize: '0.68rem', color: 'var(--portal-muted)' }}>{L(dict, '意义密度 · 非数量', 'Meaning density · not counts')}</span>
+              </div>
+              {mapEligible && territory.slices.length ? (
                 <>
-                  <LifeCivilizationMap nodes={realNodes} />
-                  <p className="nesio-insights-map-evidence">
-                    {L(dict, '意义密度 · 非数量', 'Meaning density · not counts')}
-                  </p>
+                  <div className="nesio-territory-bar">
+                    {territory.slices.map((s) => (
+                      <div
+                        key={s.id}
+                        className="nesio-territory-terr"
+                        style={{ width: `${s.pct}%`, background: `var(${s.cssVar})` }}
+                        title={`${L(dict, s.label, s.labelEn)} ${s.pct}%`}
+                      >
+                        <small>{L(dict, s.label, s.labelEn)}</small>
+                        <b>{s.pct}%</b>
+                      </div>
+                    ))}
+                  </div>
+                  {territory.shift && (
+                    <p className="nesio-territory-note">
+                      <IconTrendingUp size={13} />
+                      {L(dict, `最近,「${territory.shift.label}」在扩张`, `Lately, "${territory.shift.labelEn}" is expanding`)}
+                    </p>
+                  )}
                 </>
               ) : (
                 <p className="nesio-insights-empty">
