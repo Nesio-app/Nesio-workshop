@@ -28,6 +28,17 @@ export const MIRRORS: MirrorDef[] = [
   { id: 'stoic',     name: '斯多葛',   nameEn: 'Stoic',          desc: '你惦记的事里哪些真的可控', descEn: 'Of the things on your mind, which are truly in your control' },
 ];
 
+/** 主题镜(把信聚焦到某一面生活;'all' = 不设限)。收成 filter,与镜子/月份并列。 */
+export interface MirrorTopic { id: string; name: string; nameEn: string; }
+export const MIRROR_TOPICS: MirrorTopic[] = [
+  { id: 'all',       name: '全部', nameEn: 'All' },
+  { id: 'emotion',   name: '情绪', nameEn: 'Emotion' },
+  { id: 'relations', name: '关系', nameEn: 'Ties' },
+  { id: 'work',      name: '事业', nameEn: 'Work' },
+  { id: 'growth',    name: '成长', nameEn: 'Growth' },
+  { id: 'health',    name: '健康', nameEn: 'Health' },
+];
+
 export interface MirrorParagraph {
   id: string;
   text: string;
@@ -39,6 +50,8 @@ export interface MirrorLetter {
   mirrorId: MirrorId;
   /** 'YYYY-MM' */
   month: string;
+  /** 主题镜 id(默认 'all');进档案标题、署名、幂等键。 */
+  topic: string;
   paragraphs: MirrorParagraph[];
   generatedAt: string;
 }
@@ -51,6 +64,21 @@ export function currentMonthKey(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
+/** 近 n 个月的月键(含本月),新到旧 —— 月份 filter 的选项。「任意时段都能生成」。 */
+export function recentMonthKeys(n = 6, now: Date = new Date()): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < n; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  }
+  return out;
+}
+
+/** 信在缓存/档案里的唯一键:月 + 镜 + 主题(三者任一变 = 另一封信)。 */
+export function mirrorLetterKey(month: string, mirrorId: MirrorId, topic = 'all'): string {
+  return `${month}:${mirrorId}:${topic}`;
+}
+
 function loadAllLetters(): Record<string, MirrorLetter> {
   if (typeof window === 'undefined') return {};
   try {
@@ -58,20 +86,27 @@ function loadAllLetters(): Record<string, MirrorLetter> {
   } catch { return {}; }
 }
 
-export function loadMirrorLetter(month: string, mirrorId: MirrorId): MirrorLetter | null {
-  return loadAllLetters()[`${month}:${mirrorId}`] ?? null;
+export function loadMirrorLetter(month: string, mirrorId: MirrorId, topic = 'all'): MirrorLetter | null {
+  return loadAllLetters()[mirrorLetterKey(month, mirrorId, topic)] ?? null;
 }
 
 export function saveMirrorLetter(letter: MirrorLetter): void {
   if (typeof window === 'undefined') return;
   try {
     const all = loadAllLetters();
-    all[`${letter.month}:${letter.mirrorId}`] = letter;
-    // 只留最近 12 封,别让信堆爆配额
-    const keys = Object.keys(all).sort();
-    while (keys.length > 12) { delete all[keys.shift() as string]; }
+    all[mirrorLetterKey(letter.month, letter.mirrorId, letter.topic)] = letter;
+    // 只留最近 12 封(按生成时间),别让信堆爆配额
+    const entries = Object.entries(all).sort((a, b) => (a[1].generatedAt < b[1].generatedAt ? -1 : 1));
+    while (entries.length > 12) { delete all[entries.shift()![0]]; }
     localStorage.setItem(LETTERS_KEY, JSON.stringify(all));
   } catch { /* 配额满就不缓存,下次重新生成 */ }
+}
+
+/** 往期的信(档案抽屉):所有已存的信,新到旧。 */
+export function listMirrorLetters(): MirrorLetter[] {
+  return Object.values(loadAllLetters())
+    .filter((l) => l && Array.isArray(l.paragraphs) && l.paragraphs.length > 0)
+    .sort((a, b) => (a.generatedAt < b.generatedAt ? 1 : a.generatedAt > b.generatedAt ? -1 : 0));
 }
 
 export type MirrorVerdict = 'yes' | 'no';
