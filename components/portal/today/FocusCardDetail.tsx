@@ -263,7 +263,7 @@ export function FocusCardDetail({
         )}
         {error && <p className="nesio-momentum-error" style={{ color: 'var(--status-risk)', fontSize: '0.8rem', margin: '0 0 0.5rem' }}>{error}</p>}
         <button type="button" className="nesio-momentum-ignite-btn" onClick={() => fetchWave()}>
-          {error ? L(dict, '重试', 'Retry') : L(dict, '粉碎任务', 'Smash it')}
+          {error ? L(dict, '重试', 'Retry') : L(dict, '拆成小步', 'Break it into steps')}
         </button>
         {/* 批次 76(用户定案):聚焦/删除撤下 —— 换「查看详情」直达记忆块
             (编辑/删除/关联都在详情里,展开区不再堆危险按钮)。 */}
@@ -305,7 +305,21 @@ export function FocusCardDetail({
             : L(dict, 'AI 暂时离线 · 这是本地拆的,够你先动起来', 'AI offline · a local breakdown to get you moving')}
         </p>
       )}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '0 0 0.45rem' }}>
+      {/* 批次 130·克制清单(设计):温柔引导语 + 进度条,给 ADHD 减压不加压 */}
+      <p className="nesio-momentum-intro">{L(dict, '别急,拆小一点。只做下一步就好。', 'Easy does it — break it smaller. Just the next step.')}</p>
+      {(() => {
+        const doneN = wave.filter((a) => a.done).length;
+        return (
+          <div className="nesio-momentum-progress">
+            <span className="nesio-momentum-progress-label">{L(dict, '进度', 'Progress')}</span>
+            <div className="nesio-momentum-progress-track">
+              <div className="nesio-momentum-progress-fill" style={{ width: `${wave.length ? (doneN / wave.length) * 100 : 0}%` }} />
+            </div>
+            <span className="nesio-momentum-progress-count">{doneN} / {wave.length}</span>
+          </div>
+        );
+      })()}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '0.5rem 0 0.45rem' }}>
         <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--portal-muted)', fontVariantNumeric: 'tabular-nums' }}>
           {totalMin > 0 ? L(dict, `共约 ${totalMin} 分钟`, `overall ~${totalMin} min`) : ''}
         </p>
@@ -325,7 +339,7 @@ export function FocusCardDetail({
             disabled={aiRefining}
             style={{ background: 'none', border: '1px solid var(--portal-line)', borderRadius: 999, padding: '0.2rem 0.6rem', fontSize: '0.68rem', color: 'var(--portal-accent)', cursor: 'pointer', opacity: aiRefining ? 0.6 : 1 }}
           >
-            {aiRefining ? L(dict, 'AI 细化中…', 'Refining…') : L(dict, 'AI 细化', 'AI refine')}
+            {aiRefining ? L(dict, '换一种拆法中…', 'Reworking…') : L(dict, '换一种拆法', 'Rework it')}
           </button>
         </div>
       </div>
@@ -357,7 +371,7 @@ export function FocusCardDetail({
                     className="nesio-momentum-hard-btn"
                     onClick={() => handleDrill(a)}
                   >
-                    太难
+                    {L(dict, '太难 ↓', 'Too hard ↓')}
                   </button>
                 )}
                 {isDrilling && <span className="nesio-momentum-drilling">⋯</span>}

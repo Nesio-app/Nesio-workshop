@@ -11211,13 +11211,13 @@ html[data-portal-theme="night"] .nesio-otd-card-name { color: #d0d8f0; }
   padding: 0.2rem 0 0.4rem;
 }
 .nesio-momentum-ignite-btn {
-  /* 批次 8:紫渐变→设计 token;与「聚焦」同型同排 */
+  /* 批次 130·设计「去掉亮蓝大按钮」:实心蓝 → 克制的 accent-soft 描边 */
   flex: 1;
   min-height: var(--tap-min, 44px);
   border-radius: 999px;
-  border: none;
-  background: var(--portal-blue-deep);
-  color: #fff;
+  border: 1px solid var(--portal-accent-border, var(--portal-line));
+  background: var(--portal-accent-soft);
+  color: var(--portal-accent);
   font-size: 0.84rem;
   font-weight: 700;
   cursor: pointer;
@@ -11257,28 +11257,63 @@ html[data-portal-theme="night"] .nesio-otd-card-name { color: #d0d8f0; }
   margin-bottom: 0.5rem;
 }
 
+/* 批次 130·克制清单:温柔引导语 + 进度条(给 ADHD 减压) */
+.nesio-momentum-intro {
+  margin: 0 0 0.5rem;
+  font-size: 0.82rem;
+  color: var(--portal-muted);
+  line-height: 1.5;
+}
+.nesio-momentum-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.1rem;
+}
+.nesio-momentum-progress-label { font-size: 0.72rem; color: var(--portal-muted); flex-shrink: 0; }
+.nesio-momentum-progress-track {
+  flex: 1;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--portal-line);
+  overflow: hidden;
+}
+.nesio-momentum-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--portal-accent);
+  transition: width 0.3s ease;
+}
+.nesio-momentum-progress-count { font-size: 0.72rem; color: var(--portal-muted); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+
 .nesio-momentum-list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.5rem;
 }
 
+/* 批次 130·克制清单(设计「去掉亮蓝大按钮和层层套框」):步骤=干净白卡,子步骤在卡内细线缩进 */
 .nesio-momentum-item {
-  border-radius: 8px;
+  border-radius: 12px;
+  background: var(--glass-bg-solid, #fff);
+  border: 1px solid var(--portal-line);
+  padding: 0.15rem 0.35rem 0.35rem;
   transition: opacity 0.2s;
 }
-.nesio-momentum-item--done { opacity: 0.45; }
+html[data-portal-theme="night"] .nesio-momentum-item { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.09); }
+.nesio-momentum-item--done { opacity: 0.6; }
+.nesio-momentum-item--done .nesio-momentum-name { text-decoration: line-through; }  /* 完成划掉 */
 
 .nesio-momentum-row {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
-  padding: 0.55rem 0.6rem;
-  background: var(--portal-surface-2, rgba(0,0,0,.04));
-  border-radius: 8px;
+  gap: 0.5rem;
+  padding: 0.5rem 0.45rem;
+  background: none;             /* 去掉套框 */
+  border-radius: 0;
   cursor: default;
 }
 
@@ -11304,9 +11339,10 @@ html[data-portal-theme="night"] .nesio-otd-card-name { color: #d0d8f0; }
   position: absolute;
   inset: -12px;
 }
+/* 批次 130·完成 = 绿勾(设计克制清单) */
 .nesio-momentum-check--done {
-  background: var(--portal-blue-deep);
-  border-color: var(--portal-blue-deep);
+  background: var(--status-go);
+  border-color: var(--status-go);
 }
 .nesio-momentum-check--done::after {
   content: '';
@@ -11361,14 +11397,17 @@ html[data-portal-theme="night"] .nesio-otd-card-name { color: #d0d8f0; }
 }
 .nesio-momentum-drill-badge--done { color: var(--portal-blue-deep); background: var(--portal-accent-soft); }
 
+/* 批次 130·子步骤在卡内细线缩进(设计克制清单) */
 .nesio-momentum-drill-list {
   list-style: none;
-  margin: 0.3rem 0 0 2rem;
-  padding: 0;
+  margin: 0.15rem 0 0.35rem 1.15rem;
+  padding: 0.1rem 0 0 0.75rem;
+  border-left: 1.5px solid var(--portal-line);
   display: flex;
   flex-direction: column;
-  gap: 0.22rem;
+  gap: 0.15rem;
 }
+.nesio-momentum-drill-item--done .nesio-momentum-drill-name { text-decoration: line-through; }
 .nesio-momentum-drill-item {
   display: flex;
   align-items: center;
@@ -11400,8 +11439,8 @@ html[data-portal-theme="night"] .nesio-otd-card-name { color: #d0d8f0; }
   inset: -12px;
 }
 .nesio-momentum-drill-check--done {
-  background: #5b8ff9;
-  border-color: #5b8ff9;
+  background: var(--status-go);
+  border-color: var(--status-go);
 }
 .nesio-momentum-drill-check--done::after {
   content: '';
