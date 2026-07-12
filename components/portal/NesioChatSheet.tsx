@@ -7,7 +7,11 @@
  */
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import dynamic from 'next/dynamic';
 import NesioMark from './NesioMark';
+
+// 批次 139:统一「打开详情」—— 聊天引用卡与记忆页/今天页共用同一个完整详情组件
+const MemoryNodeDetail = dynamic(() => import('./MemoryNodeDetail'), { ssr: false });
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { getLifeGraph, isBulkImported, searchLifeGraphFuzzy, type LifeNode, updateLifeNode } from '@/lib/portal/life-graph';
 import { canUsePaidCloudAi } from '@/lib/portal/entitlement';
@@ -539,37 +543,6 @@ function BubbleMenu({ msg, onClose, onSave, onCopy, onContinue }: {
 }
 
 // ─── Memory detail ─────────────────────────────────────────────────────────────
-function MemoryDetail({ node, onClose }: { node: LifeNode; onClose: () => void }) {
-  const attrs = Object.entries(node.attributes)
-    .filter(([k, v]) => v !== null && !['subtasksJson', 'context', 'done', 'doneAt', 'savedFromChat', 'fullText'].includes(k));
-  return (
-    <div className="nesio-memory-detail">
-      <div className="nesio-memory-detail-header">
-        <button type="button" className="nesio-wechat-back-btn" onClick={onClose}>←</button>
-        <span className="nesio-wechat-title">记忆详情</span>
-        <span />
-      </div>
-      <div className="nesio-memory-detail-body">
-        <h3 className="nesio-memory-detail-name">{node.name}</h3>
-        <p className="nesio-memory-detail-meta">{node.type} · {new Date(node.createdAt).toLocaleDateString('zh-CN')}</p>
-        {node.rawInput && <p className="nesio-memory-detail-raw">{node.rawInput}</p>}
-        {attrs.length > 0 && (
-          <ul className="nesio-memory-detail-attrs">
-            {attrs.map(([k, v]) => (
-              <li key={k}><span className="nesio-memory-detail-key">{k}</span><span className="nesio-memory-detail-val">{String(v)}</span></li>
-            ))}
-          </ul>
-        )}
-        {(node.tags ?? []).length > 0 && (
-          <div className="nesio-memory-detail-tags">
-            {(node.tags ?? []).map((t) => <span key={t} className="nesio-focus-card-hint">{t}</span>)}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 // ─── Camera view ──────────────────────────────────────────────────────────────
 function CameraView({ onResult, onClose, autoOpen = false }: {
   onResult: (label: string, nodes: LifeNode[]) => void;
@@ -1182,10 +1155,14 @@ Edit location/value anytime in Storage.`),
   }
 
   if (detailNode) {
+    // 批次 139:统一「打开详情」—— 用与记忆页/今天页同一个完整 MemoryNodeDetail
+    // (友好分类 + 来源行 + 阅读原文/回复 + 关键信息 + 分类型 section),不再用聊天内裸简版。
     return (
-      <div className="nesio-wechat-fullscreen" role="dialog" aria-label="记忆详情">
-        <MemoryDetail node={detailNode} onClose={() => setDetailNode(null)} />
-      </div>
+      <MemoryNodeDetail
+        node={detailNode}
+        onClose={() => setDetailNode(null)}
+        onOpenNode={(n) => setDetailNode(n)}
+      />
     );
   }
 

@@ -277,17 +277,23 @@ export function TodayFocusSection({
             />
           )}
 
-          {/* ── Slot 2: 时间线要紧事(批次 111:铺开不折叠,尾部收「稍后·还有 N 件小事」)── */}
+          {/* ── Slot 2: 时间线要紧事 —— 批次 139:「还有 N 件小事」就地展开/收起(复活折叠事件,
+                此前 onClick 跳记忆页、collapsed state 成孤儿,点了没有折叠反应)。去记忆页仍走顶部「全部」。 */}
           {collapsedNodes.length > 0 && (
             <div className="nesio-collapsed-section">
-              <ul className="nesio-collapsed-list">{shownNodes}</ul>
+              <ul className="nesio-collapsed-list">{collapsed ? shownNodes : collapsedNodes}</ul>
               {restCount > 0 && (
-                <button type="button" className="nesio-collapsed-row nesio-tl-more" onClick={onOpenMemory}>
-                  <span className="nesio-collapsed-dot nesio-tl-more-plus" aria-hidden>…</span>
+                <button
+                  type="button"
+                  className="nesio-collapsed-row nesio-tl-more"
+                  aria-expanded={!collapsed}
+                  onClick={() => setCollapsed((v) => !v)}
+                >
+                  <span className="nesio-collapsed-dot nesio-tl-more-plus" aria-hidden>{collapsed ? '…' : '−'}</span>
                   <span className="nesio-collapsed-task-body">
-                    <span className="nesio-collapsed-kicker">{L(dict, '稍后', 'Later')}</span>
-                    <span className="nesio-collapsed-title">{L(dict, `还有 ${restCount} 件小事`, `${restCount} more small things`)}</span>
-                    <span className="nesio-tl-more-sub">{L(dict, '我先替你收着,不急 ›', "I'll keep them — no rush ›")}</span>
+                    <span className="nesio-collapsed-kicker">{collapsed ? L(dict, '稍后', 'Later') : L(dict, '摊开了', 'Expanded')}</span>
+                    <span className="nesio-collapsed-title">{collapsed ? L(dict, `还有 ${restCount} 件小事`, `${restCount} more small things`) : L(dict, '收起', 'Collapse')}</span>
+                    <span className="nesio-tl-more-sub">{collapsed ? L(dict, '点开看看,我先替你收着 ›', "Tap to see them — I've kept them ›") : L(dict, '收回折叠', 'Fold back')}</span>
                   </span>
                 </button>
               )}
