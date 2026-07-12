@@ -44,6 +44,7 @@ import { MeetingRecorderSheet } from './today/MeetingRecorderSheet';
 
 // 1143-line analytics sheet — load on open, not at boot
 const InsightsSheet = dynamic(() => import('./InsightsSheet'), { ssr: false });
+const MoodTrendSheet = dynamic(() => import('./MoodTrendSheet'), { ssr: false });
 const MemoryNodeDetailLazy = dynamic(() => import('./MemoryNodeDetail'), { ssr: false });
 import MemoryFlashBanner, { useMemoryFlash } from './MemoryFlashBanner';
 import WrappedCard, { useWrappedTrigger } from './WrappedCard';
@@ -67,6 +68,7 @@ export default function TodayFeed({
     dismissedCardIds, setDismissedCardIds,
   } = useTodayData(canUsePrivateData);
   const [mirrorOpen, setMirrorOpen] = useState(false);
+  const [moodTrendOpen, setMoodTrendOpen] = useState(false);
   const [guideDetailNode, setGuideDetailNode] = useState<LiveMemoryNode | null>(null); // 批次 83:引导卡点开详情
   // 批次 31:焦点下方快捷输入(用户新指令)
   const [quickAdd, setQuickAdd] = useState('');
@@ -119,7 +121,7 @@ export default function TodayFeed({
   // 健身 routine 卡「开始练」→ 打开洞察的健康 tab(训练计划在那)
   useEffect(() => {
     const openTraining = () => { setInsightsTab('health'); setMirrorOpen(true); };
-    const openMoodTrend = () => { setInsightsTab('reflection'); setMirrorOpen(true); }; // 批次 107:心情第一拍→洞察
+    const openMoodTrend = () => setMoodTrendOpen(true); // 批次 136:心情第一拍「看趋势」→ 情绪趋势 sheet
     window.addEventListener('nesio-open-training', openTraining);
     window.addEventListener('nesio-open-mood-trend', openMoodTrend);
     return () => {
@@ -338,6 +340,9 @@ export default function TodayFeed({
           </div>
         </div>
       )}
+
+      {/* 批次 136:情绪趋势(心情第一拍「看趋势」进来) */}
+      <MoodTrendSheet open={moodTrendOpen} onClose={() => setMoodTrendOpen(false)} />
     </div>
   );
 }
