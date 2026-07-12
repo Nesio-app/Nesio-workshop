@@ -14451,6 +14451,44 @@ html[data-portal-theme="night"] .nesio-exp-card:hover {
   color: var(--portal-muted);
 }
 
+/* 批次 105 · 回顾卡(去年今日)—— 念念翻出旧记忆。暖调、克制、衬线人名。 */
+.nesio-retro-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  width: 100%;
+  text-align: left;
+  margin: 0 0 1rem;
+  padding: 0.85rem 1rem 0.9rem;
+  border: 1px solid var(--portal-accent-border);
+  border-left: 2.5px solid var(--portal-accent);
+  border-radius: 14px;
+  background: var(--portal-accent-soft);
+  cursor: pointer;
+  transition: background 0.18s var(--ease-soft, ease);
+}
+.nesio-retro-card:active { background: var(--portal-accent-soft-md); }
+.nesio-retro-kicker {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--portal-accent);
+}
+.nesio-retro-name {
+  font-family: var(--font-portal-serif), Georgia, serif;
+  font-size: 1.08rem;
+  font-weight: 600;
+  color: var(--portal-ink);
+  line-height: 1.4;
+}
+.nesio-retro-hint {
+  font-size: 0.78rem;
+  color: var(--portal-muted);
+  margin-top: 0.1rem;
+}
+
 /* 批次 29 · 标签三层 §3.3:Memory 卡片相对时间 */
 .nesio-memory-card-time {
   margin-left: auto;

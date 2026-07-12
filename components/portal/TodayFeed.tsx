@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { useProfileAvatar } from './use-profile-avatar';
 import NesioMark from './NesioMark';
+import RetrospectCard from './RetrospectCard';
 import { usePortalLocale } from './use-portal-locale';
 import { L } from '@/lib/portal/i18n';
 import { buildTodayViewModel, focusTimeHint, markFocusNodeDone, deleteFocusNode, addCommitmentNode, addMeetingNotes, saveSubtasks, toggleSubtask, type FocusNode, type SubTask, type ProactiveContext, type ProactiveContextItem, getLiveMemoryNode, type LiveMemoryNode } from '@/lib/platform/view-models/today-view-model';
@@ -223,6 +224,10 @@ export default function TodayFeed({
       <div className="nesio-today-scroll">
         {/* §1 ①安心态收据(宋体 = Nesio 的声音):先兑现承诺,再看今天 */}
         <p className="nesio-today-receipt nesio-serif-voice">{receiptLine}</p>
+
+        {/* 批次 105:回顾卡(去年今日)—— 念念翻出一条旧记忆,放问候下面(设计规范今天页第 2 段)。
+            周年/月纪念优先;没有符合的不渲染。点开复用 MemoryNodeDetail。 */}
+        <RetrospectCard onOpen={(id) => { const live = getLiveMemoryNode(id); if (live) setGuideDetailNode(live); }} />
 
         {/* 季度 Wrapped 卡片 */}
         {showWrapped && <WrappedCard onDismiss={dismissWrapped} />}
