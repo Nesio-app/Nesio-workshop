@@ -163,81 +163,31 @@ export function GeneralSheet({ open, onClose }: SheetProps) {
   return (
     <SheetWrap open={open} onClose={onClose} title={t(locale, 'generalTitle')} tip={t(locale, 'generalDesc')}>
 
-      {/* 偏好组(批次 10:语气/示例/提醒程度/触感全部折叠进偏好,头部显示当前值) */}
-      <button type="button" className="nesio-settings-option" onClick={() => setPrefsOpen((v) => !v)} aria-expanded={prefsOpen}>
-        <div>
-          <span className="nesio-settings-option-label">{t(locale, 'sectionPreferences')}</span>
-          <span className="nesio-settings-option-hint">
-            {toneOpts.find((o) => o.id === tone)?.label} · {levelOpts.find((o) => o.id === interrupt)?.label}
-          </span>
-        </div>
-        <span aria-hidden style={{ display: 'inline-flex', color: 'var(--portal-muted)', transform: prefsOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}><IconChevronRight size={16} /></span>
-      </button>
-      {prefsOpen && (<>
-      <p className="nesio-settings-option-hint" style={{ margin: '0.35rem 0 0.6rem' }}>{t(locale, 'sectionPreferencesHint')}</p>
-
-      <p className="nesio-settings-section-label">{t(locale, 'sectionTone')}</p>
-      {toneOpts.map((opt) => (
-        <button key={opt.id} type="button"
-          className={`nesio-settings-option${tone === opt.id ? ' nesio-settings-option--active' : ''}`}
-          onClick={() => pickTone(opt.id)}>
-          <div>
-            <span className="nesio-settings-option-label">{opt.label}</span>
-            <span className="nesio-settings-option-hint">{opt.hint}</span>
-          </div>
-          {tone === opt.id && <span className="nesio-settings-option-check">✓</span>}
-        </button>
-      ))}
-      {/* 实时示例:让人一眼看出三种语气的差别 */}
-      <div style={{ background: 'rgba(88,140,227,0.06)', border: '1px solid var(--portal-line)', borderRadius: '0.75rem', padding: '0.55rem 0.75rem', marginTop: '0.35rem' }}>
-        <p style={{ fontSize: '0.66rem', color: 'var(--portal-muted)', margin: '0 0 0.2rem' }}>{t(locale, 'toneExampleLabel')}</p>
-        <p style={{ fontSize: '0.78rem', color: 'var(--portal-ink)', margin: 0, lineHeight: 1.55 }}>
-          {tone === 'warm' ? t(locale, 'toneExampleWarm') : tone === 'direct' ? t(locale, 'toneExampleDirect') : t(locale, 'toneExampleMinimal')}
-        </p>
-      </div>
-
-      <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{t(locale, 'sectionReminders')}</p>
-      {levelOpts.map((opt) => (
-        <button key={opt.id} type="button"
-          className={`nesio-settings-option${interrupt === opt.id ? ' nesio-settings-option--active' : ''}`}
-          onClick={() => pickInterrupt(opt.id)}>
-          <div>
-            <span className="nesio-settings-option-label">{opt.label}</span>
-            <span className="nesio-settings-option-hint">{opt.hint}</span>
-          </div>
-          {interrupt === opt.id && <span className="nesio-settings-option-check">✓</span>}
-        </button>
-      ))}
-
-      <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{t(locale, 'sectionHaptics')}</p>
-      <button type="button"
-        className={`nesio-settings-option${hapticsOn ? ' nesio-settings-option--active' : ''}`}
-        onClick={toggleHaptics}>
-        <div>
-          <span className="nesio-settings-option-label">{t(locale, 'hapticsLabel')}</span>
-          <span className="nesio-settings-option-hint">{t(locale, 'hapticsHint')}</span>
-        </div>
-        <span className={`nesio-settings-space-check${hapticsOn ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>
-          {hapticsOn ? '✓' : '○'}
-        </span>
-      </button>
-
-      <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '每日日报', 'Daily report')}</p>
+      {/* 批次 134·设计「通用·精简」:去掉「语气 + 主动提醒程度」和偏好折叠;开关组直接铺开。 */}
+      <p className="nesio-settings-section-label">{L(dict, '开关', 'Switches')}</p>
       <button type="button"
         className={`nesio-settings-option${dailyReportOn ? ' nesio-settings-option--active' : ''}`}
         onClick={toggleDailyReport}>
         <div>
           <span className="nesio-settings-option-label">{L(dict, '每日 AI 图文日报', 'Daily AI report')}</span>
-          <span className="nesio-settings-option-hint">{L(dict, '每天自动生成一份「今天的日程/提醒/天气」图文小结,存进记忆,并在今日的「未来预测」里给你。', 'Auto-builds a visual recap of your day — schedule, reminders, weather — saved to memory and surfaced under Today.')}</span>
+          <span className="nesio-settings-option-hint">{L(dict, '每天存进记忆 · 首页回顾里给你', 'Saved to memory daily · surfaced under Today')}</span>
         </div>
         <span className={`nesio-settings-space-check${dailyReportOn ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>
           {dailyReportOn ? '✓' : '○'}
         </span>
       </button>
-      </>)}
-
+      <button type="button"
+        className={`nesio-settings-option${hapticsOn ? ' nesio-settings-option--active' : ''}`}
+        onClick={toggleHaptics}>
+        <div>
+          <span className="nesio-settings-option-label">{L(dict, '触感反馈', 'Haptics')}</span>
+          <span className="nesio-settings-option-hint">{L(dict, '记录成功/找到/长按录音时轻震', 'Gentle buzz on save, find, hold-to-record')}</span>
+        </div>
+        <span className={`nesio-settings-space-check${hapticsOn ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>
+          {hapticsOn ? '✓' : '○'}
+        </span>
+      </button>
       {/* 批次 56:记忆自动定位 —— 开启即请求手机定位权限(权限时刻在这里,不在记录途中) */}
-      <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '记忆定位', 'Memory location')}</p>
       <button type="button"
         className={`nesio-settings-option${captureLocOn ? ' nesio-settings-option--active' : ''}`}
         onClick={() => {
@@ -247,7 +197,7 @@ export function GeneralSheet({ open, onClose }: SheetProps) {
         }}>
         <div>
           <span className="nesio-settings-option-label">{L(dict, '记忆自动定位', 'Auto-locate memories')}</span>
-          <span className="nesio-settings-option-hint">{L(dict, '开启后,每条亲手记下的记忆(文字/照片/语音)自动带上当时的精确位置 —— 多一个回看和分析的维度。只存本机记忆里,导入的邮件/日历不会盖。', 'Every memory you capture (text, photo, voice) gets stamped with where you were — one more dimension to look back on. Stored with your local memories only; imported email/calendar items are never stamped.')}</span>
+          <span className="nesio-settings-option-hint">{L(dict, '亲手记的带上位置 · 只存本机', 'Your captures get located · stored on-device only')}</span>
         </div>
         <span className={`nesio-settings-space-check${captureLocOn ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>
           {captureLocOn ? '✓' : '○'}
