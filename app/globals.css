@@ -6670,12 +6670,13 @@ html[data-portal-theme="night"] .nesio-ob-card {
   width: 4rem;
   height: 4rem;
   border-radius: 1.1rem;
-  background: linear-gradient(135deg, #6ea8f0, #3d6dd4);
+  /* 批次 102:引导页 logo 底托随皮肤(此前硬编码蓝,现在包着的是玫瑰水晶 logo) */
+  background: linear-gradient(135deg, var(--portal-blue-mid), var(--portal-blue-deep));
   display: flex;
   align-items: center;
   justify-content: center;
   margin-bottom: 0.85rem;
-  box-shadow: 0 8px 24px rgba(88, 140, 227, 0.35);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--portal-blue-deep) 35%, transparent);
 }
 
 .nesio-ob-logo {
