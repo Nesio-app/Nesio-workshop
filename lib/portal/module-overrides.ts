@@ -40,22 +40,52 @@ export const FEATURE_CATALOG: readonly FeatureEntry[] = Object.freeze([
 
 export const LAB_MODE_EVENT = 'nesio-lab-mode-updated';
 
-/** 批次 31:低饱和配色预览(Lab 试穿)。开 = html[data-lowsat=1],token 全站换装。 */
-const LOWSAT_KEY = 'nesio-theme-lowsat-v1';
-export function isLowSatThemeOn(): boolean {
-  if (typeof window === 'undefined') return false;
-  try { return localStorage.getItem(LOWSAT_KEY) === '1'; } catch { return false; }
+/**
+ * 批次 31→98:低饱和配色预览。单开关升级为莫兰迪 4 选 1 色卡(设计规范 v1)。
+ * '' = 默认蓝;机制不变 —— 只覆写 `--portal-*` token,一处切换全站换装。
+ */
+export type PaletteId = '' | 'bluegray-rose' | 'milktea' | 'haze-blue' | 'sage';
+const PALETTE_KEY = 'nesio-theme-palette-v1';
+const LEGACY_LOWSAT_KEY = 'nesio-theme-lowsat-v1';
+
+export const PALETTES: { id: Exclude<PaletteId, ''>; zh: string; en: string; hint: string }[] = [
+  { id: 'bluegray-rose', zh: '蓝灰 · 灰粉点睛', en: 'Slate + rose', hint: '冷调精致' },
+  { id: 'milktea',       zh: '沙米 · 奶茶暖调', en: 'Milk tea',     hint: '温润 muji' },
+  { id: 'haze-blue',     zh: '雾霾蓝 · 柔',     en: 'Haze blue',    hint: '保留品牌蓝' },
+  { id: 'sage',          zh: '灰绿 · 治愈',     en: 'Sage',         hint: '自然疗愈' },
+];
+
+export function getPalette(): PaletteId {
+  if (typeof window === 'undefined') return '';
+  try {
+    const v = localStorage.getItem(PALETTE_KEY);
+    if (v && PALETTES.some((p) => p.id === v)) return v as PaletteId;
+    // 旧用户迁移:老的 lowsat 单套 → 映射到雾霾蓝(保留品牌蓝,最不突兀)
+    if (localStorage.getItem(LEGACY_LOWSAT_KEY) === '1') return 'haze-blue';
+  } catch { /* ignore */ }
+  return '';
 }
-export function setLowSatTheme(on: boolean): void {
+export function setPalette(id: PaletteId): void {
   if (typeof window === 'undefined') return;
-  try { localStorage.setItem(LOWSAT_KEY, on ? '1' : '0'); } catch { /* ignore */ }
-  applyLowSatTheme();
+  try {
+    localStorage.setItem(PALETTE_KEY, id);
+    localStorage.removeItem(LEGACY_LOWSAT_KEY); // 清理旧键
+  } catch { /* ignore */ }
+  applyPalette();
 }
-export function applyLowSatTheme(): void {
+export function applyPalette(): void {
   if (typeof document === 'undefined') return;
-  if (isLowSatThemeOn()) document.documentElement.setAttribute('data-lowsat', '1');
-  else document.documentElement.removeAttribute('data-lowsat');
+  const id = getPalette();
+  const root = document.documentElement;
+  if (id) root.setAttribute('data-palette', id);
+  else root.removeAttribute('data-palette');
+  root.removeAttribute('data-lowsat'); // 旧属性不再使用
 }
+
+// ── 向后兼容:保留旧导出名,避免别处引用报错(Portal 水合仍调 applyLowSatTheme) ──
+export function isLowSatThemeOn(): boolean { return getPalette() !== ''; }
+export function setLowSatTheme(on: boolean): void { setPalette(on ? 'haze-blue' : ''); }
+export const applyLowSatTheme = applyPalette;
 
 /** Lab 模式(内测全解锁)是否开着。SSR 一律 false(= 公开面)。 */
 export function isLabModeOn(): boolean {

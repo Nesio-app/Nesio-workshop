@@ -18,7 +18,7 @@ import { deleteLifeNode, getLifeGraph } from '@/lib/portal/life-graph';
 import { purgeLocalData } from '@/lib/portal/storage-manifest';
 import { purgeIdbBlobs } from '@/lib/portal/idb-blob-store';
 import { purgeLocalImages } from '@/lib/portal/local-image-store';
-import { FEATURE_CATALOG, loadModuleOverrides, setModuleOverride, MODULE_OVERRIDES_EVENT, defaultResolvesTo, followsLab, isLowSatThemeOn, setLowSatTheme } from '@/lib/portal/module-overrides';
+import { FEATURE_CATALOG, loadModuleOverrides, setModuleOverride, MODULE_OVERRIDES_EVENT, defaultResolvesTo, followsLab, getPalette, setPalette, PALETTES, type PaletteId } from '@/lib/portal/module-overrides';
 import { isAppStoreBuild } from '@/lib/portal/app-build.mjs';
 import { getTier, hasProOverride, setProEntitlement, trialDaysLeft } from '@/lib/portal/entitlement';
 import { isValidBackup } from '@/lib/portal/full-backup';
@@ -335,7 +335,7 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
   const [restoreMsg, setRestoreMsg] = useState('');
   const [lastBackupAt, setLastBackupAt] = useState<string | null>(null);
   const [labOn, setLabOn] = useState(false);
-  const [lowSatOn, setLowSatOn] = useState(false);
+  const [palette, setPaletteState] = useState<PaletteId>('');
   const [labMsg, setLabMsg] = useState<string | null>(null);
   const [proOn, setProOn] = useState(false); // Lab 内 Pro 测试解锁(正式版由 StoreKit 收据服务端校验写入)
   const [moduleOv, setModuleOv] = useState<Record<string, 'on' | 'off'>>({});
@@ -505,7 +505,7 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
     try {
       setLastBackupAt(localStorage.getItem('nesio-last-backup-at'));
       setLabOn(localStorage.getItem('baohe_personal_lab') === '1' || localStorage.getItem('baohe_lab_mode') === '1');
-      setLowSatOn(isLowSatThemeOn());
+      setPaletteState(getPalette());
       setProOn(hasProOverride()); // 批次 32:显示覆盖位本身;试用期 getTier 恒 pro 会让开关关不掉
     } catch { /* ignore */ }
     return () => window.removeEventListener('nesio-life-graph-updated', readCount);
@@ -728,19 +728,32 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
         </span>
       </button>
 
-      <button type="button"
-        className={`nesio-settings-option${lowSatOn ? ' nesio-settings-option--active' : ''}`}
-        onClick={() => { const next = !lowSatOn; setLowSatTheme(next); setLowSatOn(next); }}>
-        <div>
-          <span className="nesio-settings-option-label">{L(dict, `低饱和配色(预览)${lowSatOn ? '· 已开启' : ''}`, `Low-saturation palette (preview) ${lowSatOn ? '· on' : ''}`)}</span>
-          <span className="nesio-settings-option-hint">
-            {L(dict, '试穿新色卡:深灰蓝 / 柔青绿 / 浅雾蓝 / 鼠尾草绿 / 陶土橙。即时生效,关掉回默认蓝。', 'Try the new palette: slate blue / soft teal / misty blue / sage / terracotta. Applies instantly; turn off to restore the default blue.')}
-          </span>
-        </div>
-        <span className={`nesio-settings-space-check${lowSatOn ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>
-          {lowSatOn ? '✓' : '○'}
+      <div className="nesio-settings-option" style={{ display: 'block' }}>
+        <span className="nesio-settings-option-label">
+          {L(dict, `低饱和配色(预览)${palette ? ' · 已开启' : ''}`, `Low-saturation palette (preview)${palette ? ' · on' : ''}`)}
         </span>
-      </button>
+        <span className="nesio-settings-option-hint">
+          {L(dict, '莫兰迪 4 套色卡,点一张即时全站换装,再点「默认蓝」还原。', 'Four Morandi palettes — tap a card to reskin instantly; tap Default blue to restore.')}
+        </span>
+        <div className="nesio-palette-grid">
+          {/* 默认蓝 */}
+          <button type="button"
+            className={`nesio-palette-card${palette === '' ? ' nesio-palette-card--on' : ''}`}
+            onClick={() => { setPalette(''); setPaletteState(''); }}>
+            <span className="nesio-palette-sw" data-p="default" />
+            <span className="nesio-palette-name">{L(dict, '默认蓝', 'Default blue')}</span>
+          </button>
+          {PALETTES.map((p) => (
+            <button key={p.id} type="button"
+              className={`nesio-palette-card${palette === p.id ? ' nesio-palette-card--on' : ''}`}
+              onClick={() => { setPalette(p.id); setPaletteState(p.id); }}>
+              <span className="nesio-palette-sw" data-p={p.id} />
+              <span className="nesio-palette-name">{L(dict, p.zh, p.en)}</span>
+              <span className="nesio-palette-hint">{p.hint}</span>
+            </button>
+          ))}
+        </div>
+      </div>
 
       <p className="nesio-settings-section-label" style={{ marginTop: '1.5rem' }}>{L(dict, '功能开关中心', 'Feature switches')}</p>
       <p className="nesio-settings-option-hint" style={{ margin: '0 0 0.6rem' }}>
