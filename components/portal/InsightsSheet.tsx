@@ -37,6 +37,7 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import { InfoTip } from './InfoTip';
+import { IconRefresh } from './icons';
 import TimelineTab from './insights/TimelineTab';
 import MirrorLetterTab from './insights/MirrorLetterTab';
 import FinanceTab from './finance/FinanceTab';
@@ -719,8 +720,8 @@ export default function InsightsSheet({ onClose, initialTab }: { onClose: () => 
                       <span style={{ fontSize: '0.68rem', color: 'var(--portal-muted)' }}>
                         {new Date(node.createdAt).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { year: 'numeric', month: 'short', day: 'numeric' })}
                       </span>
-                      <button type="button" onClick={() => setWanderSeed((s) => s + 1)} style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--portal-accent)', background: 'transparent', border: 'none', cursor: 'pointer' }}>
-                        {L(dict, '↻ 再翻一条', '↻ Another')}
+                      <button type="button" onClick={() => setWanderSeed((s) => s + 1)} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.28rem', fontSize: '0.72rem', fontWeight: 600, color: 'var(--portal-accent)', background: 'transparent', border: 'none', cursor: 'pointer' }}>
+                        <IconRefresh size={13} />{L(dict, '再翻一条', 'Another')}
                       </button>
                     </div>
                   </div>
