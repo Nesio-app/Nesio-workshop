@@ -8823,16 +8823,16 @@ html[data-portal-theme="night"] .nesio-brief-strip {
   border-radius: 7px;
   align-self: start;
   display: grid; place-items: center;
-  border: 1.5px solid color-mix(in srgb, var(--status-calm) 55%, transparent);
+  /* 批次 118(用户「没有白边」):去掉发白描边(旧 color-mix 55% transparent 在浅底上泛白)。
+     方块只留当天情绪色软底 + 单曲线波纹,竖轨从背后穿过、软底就地挡轨,不留白圈白边。 */
+  border: none;
   background: var(--status-calm-soft);
   color: var(--status-calm);
-  /* 批次 117(用户「实心点去掉白色边」):不再用 --portal-bg 描白环遮轨,
-     竖轨直接从符号背后穿过,符号自身不透明底色就地挡住轨线,不留白圈。 */
   box-sizing: border-box;
 }
-.nesio-tl-dot--mood[data-tone="go"]     { border-color: color-mix(in srgb, var(--status-go) 55%, transparent);     background: var(--status-go-soft);     color: var(--status-go); }
-.nesio-tl-dot--mood[data-tone="gentle"] { border-color: color-mix(in srgb, var(--status-gentle) 55%, transparent); background: var(--status-gentle-soft); color: var(--status-gentle); }
-.nesio-tl-dot--mood[data-tone="calm"]   { border-color: color-mix(in srgb, var(--status-calm) 55%, transparent);   background: var(--status-calm-soft);   color: var(--status-calm); }
+.nesio-tl-dot--mood[data-tone="go"]     { background: var(--status-go-soft);     color: var(--status-go); }
+.nesio-tl-dot--mood[data-tone="gentle"] { background: var(--status-gentle-soft); color: var(--status-gentle); }
+.nesio-tl-dot--mood[data-tone="calm"]   { background: var(--status-calm-soft);   color: var(--status-calm); }
 .nesio-mood-ripple { display: block; }
 .nesio-tl-time {
   grid-column: 2;

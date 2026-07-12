@@ -80,12 +80,11 @@ export default function MoodBeat() {
   );
 }
 
-/** 心情波纹符号(设计规范:心情节点用波纹,不用圆点) */
+/** 心情波纹符号(设计规范 mood-node.html 权威:一道情绪波纹曲线,不是双波、不用圆点) */
 function MoodRipple() {
   return (
-    <svg className="nesio-mood-ripple" viewBox="0 0 22 22" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
-      <path d="M2 8 Q 5 4.5, 8 8 T 14 8 T 20 8" />
-      <path d="M2 14 Q 5 10.5, 8 14 T 14 14 T 20 14" />
+    <svg className="nesio-mood-ripple" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M4 13c2 0 2.4-4 3.8-4s1.9 6 3.8 6 2.4-8 3.8-8 1.9 5 3.8 5" />
     </svg>
   );
 }
