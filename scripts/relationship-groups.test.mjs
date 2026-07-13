@@ -52,6 +52,7 @@ assert.ok(cs.includes('mergedTags') || cs.includes('new Set([...'), 'groups 去�
 const panel = fs.readFileSync(new URL('../components/portal/relationships/RelationshipsPanel.tsx', import.meta.url), 'utf8');
 assert.ok(panel.includes('nesio-rel-chips') && panel.includes('setActiveGroup'), '分组筛选 chips');
 assert.ok(panel.includes('allGroups') && panel.includes('c.groups.includes(activeGroup)'), '按选中组筛选');
-assert.ok(/FAMILY_RE.*test/.test(panel) && panel.includes('👪'), '家人置顶 + 家人徽章');
+// 家人置顶 = FAMILY_RE 排序 + FamilySummary 顶部摘要区(徽章从 👪 emoji 改为摘要区,去 emoji 设计)
+assert.ok(/FAMILY_RE.*test/.test(panel) && panel.includes('FamilySummary'), '家人置顶 + 家人摘要区');
 
 console.log('relationship-groups: OK');
