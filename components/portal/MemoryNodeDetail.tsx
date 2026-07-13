@@ -321,9 +321,12 @@ function EventSection({ node }: {
   return (
     <div className="nesio-type-section">
       {start && (
-        <div className="nesio-type-event-time">
-          <span className="nesio-type-event-time-icon"><IconClock size={15} /></span>
-          <span>{fmtDateTime(start, dict)}{end ? ` — ${fmtDateTime(end, dict)}` : ''}</span>
+        <div className="nesio-node-attr-row">
+          {/* 批次 144:事件时间统一成「时间 → 值」行(钟图标随值,和别类关键信息一致) */}
+          <span className="nesio-node-attr-key">{L(dict, '时间', 'Time')}</span>
+          <span className="nesio-node-attr-val" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+            <IconClock size={13} />{fmtDateTime(start, dict)}{end ? ` — ${fmtDateTime(end, dict)}` : ''}
+          </span>
         </div>
       )}
       {location && (
@@ -397,6 +400,7 @@ function CommitmentSection({ node, onToggleDone }: {
           ))}
         </ul>
       )}
+      {/* 批次 144:完成 toggle 是关键交互,保留;优先级从并排 badge 收进「优先级 → 值」统一行 */}
       <div className="nesio-commitment-status-row">
         <button
           type="button"
@@ -405,12 +409,15 @@ function CommitmentSection({ node, onToggleDone }: {
         >
           {isDone ? L(dict, '✓ 已完成', '✓ Done') : L(dict, '○ 待完成', '○ To do')}
         </button>
-        {priorityInfo && (
-          <span className="nesio-type-priority-badge" style={{ color: priorityInfo.color }}>
+      </div>
+      {priorityInfo && (
+        <div className="nesio-node-attr-row">
+          <span className="nesio-node-attr-key">{L(dict, '优先级', 'Priority')}</span>
+          <span className="nesio-node-attr-val" style={{ color: priorityInfo.color, fontWeight: 700 }}>
             {L(dict, priorityInfo.label, priorityInfo.labelEn)}
           </span>
-        )}
-      </div>
+        </div>
+      )}
       {dueDate && (
         <div className={`nesio-node-attr-row${isOverdue ? ' nesio-attr-overdue' : dueSoon ? ' nesio-attr-due-soon' : ''}`}>
           <span className="nesio-node-attr-key">{L(dict, '截止日期', 'Due')}</span>
