@@ -61,13 +61,14 @@ function renderMdLite(text: string): React.ReactNode {
   });
 }
 
-interface JournalEntry { id: string; date: Date; text: string; html?: string; emotionColor?: string; emotionLabel?: string }
+interface JournalEntry { id: string; date: Date; text: string; html?: string; emotionColor?: string; emotionLabel?: string; energyLevel?: EnergyLevel }
 
 function loadJournalEntries(): JournalEntry[] {
   return getLifeGraph()
     .filter((n: LifeNode) => (n.tags ?? []).includes('journal') && typeof n.attributes.journalText === 'string' && n.attributes.journalText)
     .map((n: LifeNode) => {
       const em = typeof n.attributes.emotion === 'string' ? EMOTIONS.find((e) => e.id === n.attributes.emotion) : undefined;
+      const lvl = n.attributes.energyLevel;
       return {
         id: n.id,
         date: new Date(n.createdAt),
@@ -75,6 +76,7 @@ function loadJournalEntries(): JournalEntry[] {
         html: typeof n.attributes.journalHtml === 'string' ? n.attributes.journalHtml : undefined,
         emotionColor: em?.color,
         emotionLabel: em?.label,
+        energyLevel: (lvl === 'high' || lvl === 'mid' || lvl === 'low' ? lvl : undefined) as EnergyLevel | undefined,
       };
     })
     .sort((a, b) => b.date.getTime() - a.date.getTime());
@@ -163,10 +165,24 @@ function energyColor(v: number): string {
   return `rgb(${r},${g},${b})`;
 }
 
-function energyLabel(v: number, dict: DictLocale = 'zh'): string {
-  if (v >= 67) return L(dict, '充沛', 'Charged');
-  if (v >= 34) return L(dict, '一般', 'OK');
-  return L(dict, '没电', 'Drained');
+// 批次 141·设计心情节:能量词(满电/中/蔫)、一句身体感受、时段 —— 供能量层 + 一句话上下文 + 历史用
+function energyWord(lvl: EnergyLevel, dict: DictLocale = 'zh'): string {
+  return lvl === 'high' ? L(dict, '满电', 'charged') : lvl === 'low' ? L(dict, '蔫', 'drained') : L(dict, '中', 'mid');
+}
+function energyDesc(lvl: EnergyLevel, dict: DictLocale = 'zh'): string {
+  return lvl === 'high' ? L(dict, '劲儿正足,趁手做点事。', 'Full charge — ride it while it lasts.')
+    : lvl === 'low' ? L(dict, '电量不多了,先歇会儿。', 'Running low — take a breather.')
+      : L(dict, '撑得住,但也不满电。', 'Holding up, but not full either.');
+}
+function timeOfDay(dict: DictLocale = 'zh', d: Date = new Date()): string {
+  const h = d.getHours();
+  if (h < 5) return L(dict, '深夜', 'late night');
+  if (h < 8) return L(dict, '清晨', 'early morning');
+  if (h < 11) return L(dict, '上午', 'morning');
+  if (h < 13) return L(dict, '中午', 'noon');
+  if (h < 17) return L(dict, '下午', 'afternoon');
+  if (h < 19) return L(dict, '傍晚', 'evening');
+  return L(dict, '夜里', 'night');
 }
 
 // ── Rotating prompts ──────────────────────────────────────────────────────────
@@ -453,12 +469,11 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
 
           {journalTab === 'write' ? (
             <>
-              {selectedEm && (
-                <p style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.76rem', color: 'var(--portal-muted)', margin: '0 0 0.3rem' }}>
-                  <span aria-hidden style={{ width: 9, height: 9, borderRadius: '50%', background: selectedEm.color, display: 'inline-block' }} />
-                  {emLabel(selectedEm, dict)}
-                </p>
-              )}
+              {/* 批次 141:展开写也带情绪·能量·时段上下文 */}
+              <p className="nesio-mood-moment-context">
+                {selectedEm && <span aria-hidden style={{ width: 9, height: 9, borderRadius: '50%', background: selectedEm.color, display: 'inline-block' }} />}
+                {selectedEm ? `${emLabel(selectedEm, dict)} · ` : ''}{L(dict, '能量', 'energy ')}{energyWord(energyLevel(energyVal), dict)} · {timeOfDay(dict)}
+              </p>
               <p className="nesio-mood-journal-prompt">{journalPromptRef.current}</p>
               {/* 富文本-lite 工具条:加粗 / 列表 */}
               <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.4rem' }}>
@@ -486,7 +501,7 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
               <input
                 value={journalQuery}
                 onChange={(e) => setJournalQuery(e.target.value)}
-                placeholder={L(dict, '搜索日记…', 'Search journal…')}
+                placeholder={L(dict, '搜索心情与手记…', 'Search moods & notes…')}
                 className="nesio-mood-note"
                 style={{ marginBottom: '0.6rem' }}
               />
@@ -512,7 +527,7 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
                             style={{ textAlign: 'left', background: 'rgba(88,140,227,0.05)', border: '1px solid var(--portal-line)', borderRadius: '0.7rem', padding: '0.55rem 0.7rem', cursor: 'pointer' }}>
                             <p style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.68rem', color: 'var(--portal-muted)', margin: '0 0 0.25rem' }}>
                               {e.emotionColor && <span aria-hidden style={{ width: 8, height: 8, borderRadius: '50%', background: e.emotionColor, display: 'inline-block' }} />}
-                              {e.emotionLabel || ''} {e.date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })}
+                              {[e.emotionLabel || '', e.energyLevel ? `${L(dict, '能量', 'energy ')}${energyWord(e.energyLevel, dict)}` : '', timeOfDay(dict, e.date), e.date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })].filter(Boolean).join(' · ')}
                             </p>
                             {e.html && isOpen ? (
                               <div className="nesio-journal-history-html" style={{ fontSize: '0.82rem', color: 'var(--portal-ink)', lineHeight: 1.6 }}
@@ -527,6 +542,8 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
                   </div>
                 ))}
               </div>
+              {/* 批次 141·设计心情节:历史底部说明去处 —— 情绪与能量喂洞察 */}
+              <p className="nesio-mood-history-foot">{L(dict, '情绪与能量都喂给「洞察 → 一周能量 / 情绪回暖」', 'Mood & energy feed Insights → weekly energy / warming trend')}</p>
             </>
           )}
         </div>
@@ -542,12 +559,12 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
           <div className="nesio-mood-handle" aria-hidden />
           <p className="nesio-mood-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
             {selectedEm && <span aria-hidden style={{ width: 9, height: 9, borderRadius: '50%', background: selectedEm.color, display: 'inline-block' }} />}
-            {emLabel(selectedEm, dict)} · {L(dict, '现在精力怎么样？', 'How is your energy?')}
+            {emLabel(selectedEm, dict)} · {L(dict, '身体里的劲儿呢？', "How's your energy?")}
           </p>
           <div className="nesio-mood-slider-wrap">
             <div className="nesio-mood-slider-labels">
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><IconMoon size={12} /> {L(dict, '没电', 'Drained')}</span>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><IconZap size={12} /> {L(dict, '充沛', 'Charged')}</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><IconMoon size={12} /> {L(dict, '低 · 蔫', 'Low · drained')}</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><IconZap size={12} /> {L(dict, '高 · 满电', 'High · charged')}</span>
             </div>
             <div ref={sliderRef} className="nesio-mood-slider-track"
               onMouseDown={onSliderStart} onTouchStart={onSliderStart}>
@@ -557,11 +574,13 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
                 style={{ left: `${energyVal}%`, backgroundColor: eColor, boxShadow: `0 0 0 4px ${eColor}33` }}
                 role="slider" aria-valuenow={energyVal} aria-valuemin={0} aria-valuemax={100} />
             </div>
-            <p className="nesio-mood-slider-label" style={{ color: eColor }}>{energyLabel(energyVal, dict)}</p>
+            <p className="nesio-mood-slider-label" style={{ color: eColor }}>{energyWord(energyLevel(energyVal), dict)}</p>
+            <p className="nesio-mood-energy-desc">{energyDesc(energyLevel(energyVal), dict)}</p>
           </div>
+          <p className="nesio-mood-energy-hint">{L(dict, '滑到位就好,不用点保存 · 想细说 ↓ 展开写', 'Just slide — no need to save · say more ↓')}</p>
           <div className="nesio-mood-energy-actions">
             <button type="button" className="nesio-mood-save-btn nesio-mood-save-btn--ready"
-              onClick={() => setPhase('thought')}>{L(dict, '再说一句', 'One more line')} →</button>
+              onClick={() => setPhase('thought')}>{L(dict, '展开写', 'Say more')} ↓</button>
             <button type="button" className="nesio-mood-skip-btn"
               onClick={() => handleSave()}>{L(dict, '留住这一刻', 'Keep this moment')}</button>
           </div>
@@ -576,12 +595,17 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
         <div className="nesio-mood-backdrop" onClick={() => handleSave()} />
         <div className="nesio-mood-card">
           <div className="nesio-mood-handle" aria-hidden />
-          <p className="nesio-mood-title">{thoughtPromptRef.current}</p>
+          <p className="nesio-mood-title">{L(dict, '留住这一刻', 'Keep this moment')}</p>
+          {/* 批次 141·设计心情节:一句话层带情绪·能量·时段上下文(自动带上,不用手填) */}
+          <p className="nesio-mood-moment-context">
+            {selectedEm && <span aria-hidden style={{ width: 9, height: 9, borderRadius: '50%', background: selectedEm.color, display: 'inline-block' }} />}
+            {selectedEm ? `${emLabel(selectedEm, dict)} · ` : ''}{L(dict, '能量', 'energy ')}{energyWord(energyLevel(energyVal), dict)} · {timeOfDay(dict)}
+          </p>
           <input ref={thoughtRef} type="text" className="nesio-mood-note nesio-mood-note--large"
-            placeholder={L(dict, '一句话也好…', 'Even one line…')} value={thought}
+            placeholder={L(dict, '此刻想说一句…(可选)', 'One line, if you like… (optional)')} value={thought}
             onChange={(e) => { setThought(e.target.value); cancelAutoClose(); }}
             onKeyDown={(e) => { if (e.key === 'Enter') handleSave(); }} maxLength={80} />
-          <p className="nesio-mood-auto-hint">{L(dict, '4 秒无输入自动保存', 'Auto-saves after 4s of no typing')}</p>
+          <p className="nesio-mood-auto-hint">{L(dict, '自动带上情绪与能量 · 4 秒无输入自动留住', 'Mood & energy attached · auto-keeps after 4s')}</p>
           <div className="nesio-mood-thought-actions">
             <button type="button" className="nesio-mood-save-btn nesio-mood-save-btn--ready"
               onClick={() => handleSave()}>{L(dict, '留住这一刻', 'Keep this moment')}</button>

@@ -7570,6 +7570,37 @@ html[data-portal-theme="night"] .nesio-mood-title { color: #8899bb; }
 }
 .nesio-mood-energy-actions { display: flex; flex-direction: column; gap: 0; }
 
+/* 批次 141·心情四层:能量身体感受句 + 提示 + 一句话上下文 + 历史脚注 */
+.nesio-mood-energy-desc {
+  text-align: center;
+  font-family: var(--font-portal-serif, var(--font-serif, Georgia, serif));
+  font-size: 0.9rem;
+  color: var(--portal-ink);
+  margin: 0.35rem 0 0;
+}
+.nesio-mood-energy-hint {
+  text-align: center;
+  font-size: 0.68rem;
+  color: var(--portal-muted);
+  margin: 0.55rem 0 0.7rem;
+  opacity: 0.75;
+}
+.nesio-mood-moment-context {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.74rem;
+  color: var(--portal-muted);
+  margin: 0 0 0.5rem;
+}
+.nesio-mood-history-foot {
+  font-size: 0.68rem;
+  color: var(--portal-muted);
+  text-align: center;
+  margin: 0.7rem 0 0;
+  opacity: 0.7;
+}
+
 /* Thought phase */
 .nesio-mood-note--large { font-size: 1rem; padding: 0.85rem 1rem; min-height: 3.5rem; }
 .nesio-mood-auto-hint {
