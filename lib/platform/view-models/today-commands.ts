@@ -49,9 +49,28 @@ export function deleteFocusNode(id: string): void {
   if (deleteLifeNode(id)) broadcast();
 }
 
-export function addMeetingNotes(meetingNodeId: string, meetingName: string, notes: string, locale: string = 'zh'): void {
+// 批次 154:会议行动项抽取结果(meeting-notes 路由返回)。To do=显式指派(可带截止日),
+// Inferred=隐含推断(无日期)。
+export interface MeetingExtraction {
+  summary?: string;
+  todo?: Array<{ text: string; deadline?: string | null }>;
+  inferred?: string[];
+  people?: string[];
+}
+
+export function addMeetingNotes(
+  meetingNodeId: string,
+  meetingName: string,
+  notes: string,
+  locale: string = 'zh',
+  extraction?: MeetingExtraction,
+): void {
   const en = locale.toLowerCase().startsWith('en');
-  ingestLifeNode({
+  const inferred = (extraction?.inferred ?? []).filter((s) => s.trim());
+  const people = (extraction?.people ?? []).filter((s) => s.trim());
+
+  // ① 会议记录节点:留转写原文,并把总结/推断项/人名收进 attributes(详情页可读)。
+  const record = ingestLifeNode({
     name: `${en ? 'Meeting notes' : '会议记录'} · ${meetingName}`,
     type: 'commitment',
     tags: [en ? 'Meeting notes' : '会议记录', 'meeting-notes'],
@@ -59,12 +78,38 @@ export function addMeetingNotes(meetingNodeId: string, meetingName: string, note
       meetingNodeId,
       notes,
       recordedAt: new Date().toISOString(),
+      ...(extraction?.summary ? { summary: extraction.summary } : {}),
+      ...(inferred.length ? { inferredJson: JSON.stringify(inferred) } : {}),
+      ...(people.length ? { people: people.join(en ? ', ' : '、') } : {}),
     },
     rawInput: notes,
     confidence: 1,
     source: 'voice',
     relations: [],
   });
+
+  // ② To do(显式指派)→ 各成一条 commitment 节点,钉进今天页;承诺了截止日的带 date(走倒计时)。
+  const today = localDayKey();
+  for (const t of extraction?.todo ?? []) {
+    const text = (t.text || '').trim();
+    if (!text) continue;
+    const deadline = typeof t.deadline === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(t.deadline) ? t.deadline : null;
+    ingestLifeNode({
+      name: text,
+      type: 'commitment',
+      tags: [en ? 'Meeting to-do' : '会议待办', 'meeting-todo'],
+      attributes: {
+        fromMeeting: meetingName,
+        meetingRecordId: record.id,
+        focusPinnedOn: today, // 刚开完会,行动项直接进今天页注意力
+        ...(deadline ? { date: deadline } : {}),
+      },
+      rawInput: text,
+      confidence: 1, // 显式指派 = 高置信,不进「待确认」
+      source: 'voice',
+      relations: record.id ? [{ targetId: record.id, relation: en ? 'from meeting' : '来自会议' }] : [],
+    });
+  }
   broadcast();
 }
 

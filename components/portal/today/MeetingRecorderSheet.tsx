@@ -8,7 +8,7 @@ import { IconMic } from '../icons';
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { addMeetingNotes, type FocusNode } from '@/lib/platform/view-models/today-view-model';
+import { addMeetingNotes, type FocusNode, type MeetingExtraction } from '@/lib/platform/view-models/today-view-model';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -34,6 +34,9 @@ export function MeetingRecorderSheet({ open, meetingNode, onClose }: {
   const [recording, setRecording] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [saved, setSaved] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+  // 批次 154:会议行动项抽取结果(To do / Inferred),保存后在完成页展示。
+  const [extraction, setExtraction] = useState<MeetingExtraction | null>(null);
   const [seconds, setSeconds] = useState(0);
   // 可见失败纪律:不支持语音转写的浏览器不显示假录音波形,如实提示改用手动输入。
   const [speechSupported, setSpeechSupported] = useState(true);
@@ -51,6 +54,8 @@ export function MeetingRecorderSheet({ open, meetingNode, onClose }: {
       setRecording(false);
       setTranscript('');
       setSaved(false);
+      setAnalyzing(false);
+      setExtraction(null);
       setSeconds(0);
       if (recognitionRef.current) { recognitionRef.current.stop(); recognitionRef.current = null; }
       if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
@@ -109,12 +114,35 @@ export function MeetingRecorderSheet({ open, meetingNode, onClose }: {
     if (recognitionRef.current) { recognitionRef.current.stop(); recognitionRef.current = null; }
   }
 
-  function saveNotes() {
+  async function saveNotes() {
     const finalText = transcript.trim() || L(dict, '（无内容）', '(empty)');
     const nowStr = new Date().toLocaleString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-    addMeetingNotes(meetingNode?.id || '', meetingNode?.name || nowStr, finalText, dict);
+    const meetingName = meetingNode?.name || nowStr;
+
+    // 批次 154:先让 AI 从转写里抽 To do / Inferred;抽到就分层入库(To do→今天页),
+    // 抽不到/无 AI/出错则降级为只存转写原文(旧行为),不因抽取失败丢记录。
+    setAnalyzing(true);
+    let extracted: MeetingExtraction | null = null;
+    if (transcript.trim()) {
+      try {
+        const res = await fetch('/api/portal/meeting-notes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ transcript: finalText, duration: formatTime(seconds), calendarEvent: meetingNode?.name || '' }),
+        });
+        const data = await res.json() as { ok?: boolean; summary?: string; todo?: MeetingExtraction['todo']; inferred?: string[]; people?: string[] };
+        if (res.ok && data.ok && ((data.todo?.length ?? 0) > 0 || (data.inferred?.length ?? 0) > 0)) {
+          extracted = { summary: data.summary, todo: data.todo, inferred: data.inferred, people: data.people };
+        }
+      } catch { /* 网络/解析失败 → 降级只存原文 */ }
+    }
+
+    addMeetingNotes(meetingNode?.id || '', meetingName, finalText, dict, extracted ?? undefined);
+    setExtraction(extracted);
+    setAnalyzing(false);
     setSaved(true);
-    setTimeout(() => onClose(), 1800);
+    // 抽到行动项就多停一会儿让用户看清 To do;没抽到走原来的快关。
+    setTimeout(() => onClose(), extracted && (extracted.todo?.length || extracted.inferred?.length) ? 4200 : 1800);
   }
 
   const formatTime = (s: number) =>
@@ -134,7 +162,39 @@ export function MeetingRecorderSheet({ open, meetingNode, onClose }: {
           <div className="nesio-recorder-saved">
             <span className="nesio-recorder-saved-icon">📝</span>
             <p className="nesio-recorder-saved-title">{L(dict, '会议记录已保存', 'Meeting notes saved')}</p>
-            <p className="nesio-recorder-saved-hint">{L(dict, '已存入记忆，和会议条目关联', 'Saved to memory, linked to the meeting entry')}</p>
+            {extraction && (extraction.todo?.length || extraction.inferred?.length) ? (
+              <div className="nesio-recorder-actions-result">
+                {extraction.todo && extraction.todo.length > 0 && (
+                  <div className="nesio-recorder-ai-group">
+                    <p className="nesio-recorder-ai-label">{L(dict, '要做的事 · 已加入今天', 'To do · added to today')}</p>
+                    <ul className="nesio-recorder-ai-list">
+                      {extraction.todo.map((t, i) => (
+                        <li key={i} className="nesio-recorder-ai-item">
+                          <span className="nesio-recorder-ai-dot" aria-hidden />
+                          <span className="nesio-recorder-ai-text">{t.text}</span>
+                          {t.deadline && <span className="nesio-recorder-ai-due">{t.deadline}</span>}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {extraction.inferred && extraction.inferred.length > 0 && (
+                  <div className="nesio-recorder-ai-group">
+                    <p className="nesio-recorder-ai-label nesio-recorder-ai-label--muted">{L(dict, '可能还需要 · 推断', 'Might need to · inferred')}</p>
+                    <ul className="nesio-recorder-ai-list">
+                      {extraction.inferred.map((s, i) => (
+                        <li key={i} className="nesio-recorder-ai-item nesio-recorder-ai-item--muted">
+                          <span className="nesio-recorder-ai-dot nesio-recorder-ai-dot--muted" aria-hidden />
+                          <span className="nesio-recorder-ai-text">{s}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="nesio-recorder-saved-hint">{L(dict, '已存入记忆，和会议条目关联', 'Saved to memory, linked to the meeting entry')}</p>
+            )}
           </div>
         ) : (
           <>
@@ -195,11 +255,15 @@ export function MeetingRecorderSheet({ open, meetingNode, onClose }: {
 
               <button
                 type="button"
-                className={`nesio-recorder-save-btn${transcript.trim() ? ' nesio-recorder-save-btn--ready' : ''}`}
+                className={`nesio-recorder-save-btn${transcript.trim() && !analyzing ? ' nesio-recorder-save-btn--ready' : ''}`}
                 onClick={saveNotes}
-                disabled={recording || !transcript.trim()}
+                disabled={recording || analyzing || !transcript.trim()}
               >
-                {transcript.trim() ? L(dict, '保存会议记录', 'Save meeting notes') : L(dict, '先录音或输入笔记', 'Record or type notes first')}
+                {analyzing
+                  ? L(dict, '正在提炼行动项…', 'Pulling out action items…')
+                  : transcript.trim()
+                    ? L(dict, '保存并提炼行动项', 'Save & extract action items')
+                    : L(dict, '先录音或输入笔记', 'Record or type notes first')}
               </button>
             </div>
           </>
