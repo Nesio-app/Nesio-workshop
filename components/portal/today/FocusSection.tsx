@@ -327,21 +327,24 @@ export function TodayFocusSection({
               className="nesio-tl-capture-form"
               onSubmit={(e) => { e.preventDefault(); capture.onSubmit(); }}
             >
-              <textarea
-                ref={capture.inputRef}
-                className="nesio-tl-capture-input"
-                rows={1}
-                value={capture.value}
-                onChange={(e) => { capture.onChange(e.target.value); growJot(); }}
-                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); capture.onSubmit(); } }}
-                placeholder={L(dict, '点话筒说一句,或记一下…', 'Tap the mic to speak, or jot…')}
-              />
-              {capture.value.trim() && (
-                <div className="nesio-tl-capture-actions">
-                  <button type="button" className="nesio-tl-capture-expand" aria-label={L(dict, '放大', 'Expand')} onClick={() => setJotFull(true)}>⤢</button>
-                  <button type="submit" className="nesio-tl-capture-save">{L(dict, '记下', 'Jot')}</button>
-                </div>
-              )}
+              {/* 批次 166:动作按钮放进输入框里(右下角),不再另起一行 */}
+              <div className={`nesio-tl-capture-box${capture.value.trim() ? ' nesio-tl-capture-box--filled' : ''}`}>
+                <textarea
+                  ref={capture.inputRef}
+                  className="nesio-tl-capture-input"
+                  rows={1}
+                  value={capture.value}
+                  onChange={(e) => { capture.onChange(e.target.value); growJot(); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); capture.onSubmit(); } }}
+                  placeholder={L(dict, '点话筒说一句,或记一下…', 'Tap the mic to speak, or jot…')}
+                />
+                {capture.value.trim() && (
+                  <div className="nesio-tl-capture-actions">
+                    <button type="button" className="nesio-tl-capture-expand" aria-label={L(dict, '放大', 'Expand')} onClick={() => setJotFull(true)}>⤢</button>
+                    <button type="submit" className="nesio-tl-capture-save">{L(dict, '记下', 'Jot')}</button>
+                  </div>
+                )}
+              </div>
             </form>
           </div>
         )}

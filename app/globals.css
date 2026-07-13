@@ -9065,9 +9065,9 @@ html[data-portal-theme="night"] .nesio-tl-dot--mood {
   min-width: 26px; min-height: 26px;
   margin: 0;                   /* 左缘 0,圆心 ≈ x13,坐轨上 */
   border-radius: 50%;
-  /* 批次 164:唯一虚线节点 = 记一笔草稿位(规格);粗细 2px 与其它节点统一,满 accent 色 */
-  border: 2px dashed var(--portal-accent);
-  background: var(--portal-bg);
+  /* 批次 166·话筒 = 实线圈 + 灰粉背景(用户规格;164 误做成虚线,复原实线并加软填充) */
+  border: 2px solid var(--portal-accent);
+  background: var(--portal-accent-soft);
   color: var(--portal-accent);
   display: grid; place-items: center;
   cursor: pointer;
@@ -9095,8 +9095,15 @@ html[data-portal-theme="night"] .nesio-tl-dot--mood {
 .nesio-tl-capture-input:focus,
 .nesio-tl-capture--filled .nesio-tl-capture-input { border-color: color-mix(in srgb, var(--portal-accent) 45%, var(--portal-line)); }
 .nesio-tl-capture-input::placeholder { color: var(--portal-muted); }
-/* 有字才出现的动作行:放大(浅灰)+ 记下(主色) */
-.nesio-tl-capture-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+/* 批次 166:动作按钮放进输入框里(右下角浮层),不再另起一行 */
+.nesio-tl-capture-box { position: relative; }
+.nesio-tl-capture-box--filled .nesio-tl-capture-input { padding-bottom: 36px; }
+.nesio-tl-capture-actions {
+  position: absolute;
+  right: 8px;
+  bottom: 7px;
+  display: flex; align-items: center; justify-content: flex-end; gap: 6px;
+}
 .nesio-tl-capture-expand {
   border: none; background: none; cursor: pointer;
   color: var(--portal-muted); font-size: 1rem; line-height: 1;
@@ -12012,7 +12019,8 @@ html[data-portal-theme="night"] .nesio-momentum-item { background: rgba(255,255,
   min-height: 26px;
   margin: 0;
   border-radius: 50%;
-  border: 2px solid var(--portal-muted, rgba(0,0,0,.4));
+  /* 批次 166:默认勾选圈 = 浅灰色(与其它默认节点一致) */
+  border: 2px solid color-mix(in srgb, var(--portal-muted) 42%, transparent);
   background: var(--portal-bg);
   cursor: pointer;
   position: relative;
@@ -12025,11 +12033,12 @@ html[data-portal-theme="night"] .nesio-momentum-item { background: rgba(255,255,
   width: 26px; height: 26px;
   margin: 0;
   border-radius: 50%;
-  border: 2px solid var(--portal-muted);
+  /* 批次 166:默认圈 = 浅灰色(用户规格;此前 muted 偏深) */
+  border: 2px solid color-mix(in srgb, var(--portal-muted) 42%, transparent);
   background: var(--portal-bg);
   box-sizing: border-box;
   display: grid; place-items: center;
-  color: var(--portal-muted);
+  color: color-mix(in srgb, var(--portal-muted) 70%, transparent);
 }
 /* 批次 164·统一节点规格:同尺寸 26px 圆 + 2px 实线描边 + 符号+色区分,不靠填充。
    唯一虚线 = 记一笔话筒(草稿位);其余全实线。颜色:中性=muted,类型化=accent。 */
@@ -12037,8 +12046,9 @@ html[data-portal-theme="night"] .nesio-momentum-item { background: rgba(255,255,
 /* 定时·钟:accent 描边 + accent 钟符号(不填充) */
 .nesio-collapsed-dot--clock { color: var(--portal-accent); border-color: var(--portal-accent); }
 /* 置顶「绝不能错过」= 关键·星:accent 描边 + accent 星符号(不再实心填充,与其它节点统一靠符号+色区分) */
+/* 批次 166·绝不能错过 = 五角星 + 灰粉背景(用户精确规格;164 误去填充,复原为灰粉软填充) */
 .nesio-collapsed-dot--pinned {
-  background: var(--portal-bg);
+  background: var(--portal-accent-soft);
   border-color: var(--portal-accent);
   color: var(--portal-accent);
 }

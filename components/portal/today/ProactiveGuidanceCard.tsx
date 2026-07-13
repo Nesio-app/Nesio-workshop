@@ -53,19 +53,21 @@ export function ProactiveGuidanceCard({
   const startRef = useRef<{ x: number; y: number } | null>(null);
   const lastTapRef = useRef(0);
 
-  function onPointerDown(e: React.PointerEvent) {
-    startRef.current = { x: e.clientX, y: e.clientY };
+  // 批次 166:抽成坐标级逻辑,Pointer + Touch 双绑 —— iOS PWA 的 Pointer Events 对水平
+  // 手势不稳(用户实锤「向右滑动还是失败」),补 Touch 事件兜底。
+  function beginSwipe(x: number, y: number) {
+    startRef.current = { x, y };
   }
-  function onPointerMove(e: React.PointerEvent) {
+  function moveSwipe(x: number, y: number) {
     if (!startRef.current) return;
-    const ddx = e.clientX - startRef.current.x;
-    const ddy = e.clientY - startRef.current.y;
+    const ddx = x - startRef.current.x;
+    const ddy = y - startRef.current.y;
     if (Math.abs(ddx) > Math.abs(ddy) && Math.abs(ddx) > 8) setDx(Math.max(-120, Math.min(120, ddx)));
   }
-  function onPointerUp(e: React.PointerEvent) {
+  function endSwipe(x: number) {
     const start = startRef.current;
     startRef.current = null;
-    const ddx = start ? e.clientX - start.x : 0;
+    const ddx = start ? x - start.x : 0;
     setDx(0);
     if (ddx < -64) { handleFeedback('wrong'); return; }               // 左滑 = 没用
     if (ddx > 64) {                                                    // 右滑 = 稍后提醒
@@ -139,10 +141,13 @@ export function ProactiveGuidanceCard({
   return (
     <div
       className="nesio-proactive-card"
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
+      onPointerDown={(e) => beginSwipe(e.clientX, e.clientY)}
+      onPointerMove={(e) => moveSwipe(e.clientX, e.clientY)}
+      onPointerUp={(e) => endSwipe(e.clientX)}
       onPointerCancel={() => { startRef.current = null; setDx(0); }}
+      onTouchStart={(e) => { const t = e.touches[0]; if (t) beginSwipe(t.clientX, t.clientY); }}
+      onTouchMove={(e) => { const t = e.touches[0]; if (t) moveSwipe(t.clientX, t.clientY); }}
+      onTouchEnd={(e) => endSwipe(e.changedTouches[0]?.clientX ?? startRef.current?.x ?? 0)}
       style={{ transform: dx ? `translateX(${dx}px)` : undefined, transition: dx ? 'none' : 'transform 0.2s ease', touchAction: 'pan-y' }}
     >
       {/* 批次 165:滑动提示 —— 拖动时露出这一滑会做什么(左滑=没用 / 右滑=稍后),过阈值高亮=松手即执行 */}
