@@ -85,9 +85,25 @@ async function withClient<T>(bearer: string, fn: (client: Client) => Promise<T>)
   }
 }
 
+// 从 get_meetings 输出解析每场会议的 AI 摘要(<meeting id …>…<summary>…</summary>…</meeting>)。
+export function parseMeetingSummaries(xml: string): Map<string, string> {
+  const map = new Map<string, string>();
+  const re = /<meeting\b([^>]*)>([\s\S]*?)<\/meeting>/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(xml))) {
+    const id = /\bid="([^"]+)"/.exec(m[1])?.[1];
+    if (!id) continue;
+    const summary = /<summary>([\s\S]*?)<\/summary>/.exec(m[2])?.[1]?.trim();
+    if (summary) map.set(id, decodeEntities(summary));
+  }
+  return map;
+}
+
 /**
- * 拉一批会议(列表 + 逐个转写)。skipIds 跳过已入库的会议;maxTranscripts 限流
- * (Granola 约 100 req/min,单场会议 = 1 次 transcript 调用)。
+ * 拉一批会议(列表 + AI 摘要)。skipIds 跳过已入库的会议;max 限批(get_meetings 单次 ≤10)。
+ *
+ * 内容源用 get_meetings 的 AI 摘要,不用 get_meeting_transcript ——
+ * 逐字转写仅付费档可用(免费档报错);摘要免费能拿、已提炼、且一次批量取更省配额。
  */
 export async function fetchGranolaMeetings(bearer: string, opts?: {
   timeRange?: GranolaTimeRange;
@@ -95,23 +111,26 @@ export async function fetchGranolaMeetings(bearer: string, opts?: {
   skipIds?: Set<string>;
 }): Promise<GranolaMeetingFull[]> {
   const timeRange = opts?.timeRange ?? 'last_30_days';
-  const maxTranscripts = Math.max(1, Math.min(opts?.maxTranscripts ?? 10, 20));
+  const max = Math.max(1, Math.min(opts?.maxTranscripts ?? 10, 10)); // get_meetings 单次上限 10
   const skipIds = opts?.skipIds ?? new Set<string>();
 
   return withClient(bearer, async (client) => {
     const listRes = await client.callTool({ name: 'list_meetings', arguments: { time_range: timeRange } }) as ToolResult;
     const metas = parseMeetingList(textOf(listRes));
-    const fresh = metas.filter((m) => !skipIds.has(m.id)).slice(0, maxTranscripts);
+    const fresh = metas.filter((m) => !skipIds.has(m.id)).slice(0, max);
+    if (!fresh.length) return [];
+
+    // 一次批量取摘要(≤10),而非逐场调用。
+    const detRes = await client.callTool({
+      name: 'get_meetings',
+      arguments: { meeting_ids: fresh.map((m) => m.id) },
+    }) as ToolResult;
+    const summaries = parseMeetingSummaries(textOf(detRes));
 
     const out: GranolaMeetingFull[] = [];
     for (const meta of fresh) {
-      try {
-        const tRes = await client.callTool({ name: 'get_meeting_transcript', arguments: { meeting_id: meta.id } }) as ToolResult;
-        const transcript = textOf(tRes).trim();
-        if (transcript) out.push({ ...meta, transcript });
-      } catch {
-        // 单场会议取转写失败 → 跳过它,继续其余(不整批失败)。
-      }
+      const content = summaries.get(meta.id)?.trim();
+      if (content) out.push({ ...meta, transcript: content });
     }
     return out;
   });
