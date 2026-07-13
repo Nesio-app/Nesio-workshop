@@ -58,26 +58,38 @@ export interface MeetingExtraction {
   people?: string[];
 }
 
-export function addMeetingNotes(
+// 批次 155:会议来源溯源 —— 让批次154 的抽取对「任何外部会议源」可复用(麦克风 / Granola / …)。
+interface MeetingProvenance {
+  granolaMeetingId?: string;   // 去重锚:同一场 Granola 会议不重复入库
+  recordedAt?: string;         // 会议真实日期(ISO);缺省用现在
+  extraTags?: string[];        // 追加标签,如 ['Granola']
+}
+
+// 共享写入:会议记录节点 + To do 各成 commitment 节点。麦克风保存与 Granola 同步都走这里。
+function writeMeetingExtraction(
   meetingNodeId: string,
   meetingName: string,
   notes: string,
-  locale: string = 'zh',
+  locale: string,
   extraction?: MeetingExtraction,
+  prov?: MeetingProvenance,
 ): void {
   const en = locale.toLowerCase().startsWith('en');
   const inferred = (extraction?.inferred ?? []).filter((s) => s.trim());
   const people = (extraction?.people ?? []).filter((s) => s.trim());
+  const extraTags = prov?.extraTags ?? [];
+  const recordedAt = prov?.recordedAt || new Date().toISOString();
 
   // ① 会议记录节点:留转写原文,并把总结/推断项/人名收进 attributes(详情页可读)。
   const record = ingestLifeNode({
     name: `${en ? 'Meeting notes' : '会议记录'} · ${meetingName}`,
     type: 'commitment',
-    tags: [en ? 'Meeting notes' : '会议记录', 'meeting-notes'],
+    tags: [en ? 'Meeting notes' : '会议记录', 'meeting-notes', ...extraTags],
     attributes: {
       meetingNodeId,
       notes,
-      recordedAt: new Date().toISOString(),
+      recordedAt,
+      ...(prov?.granolaMeetingId ? { granolaMeetingId: prov.granolaMeetingId } : {}),
       ...(extraction?.summary ? { summary: extraction.summary } : {}),
       ...(inferred.length ? { inferredJson: JSON.stringify(inferred) } : {}),
       ...(people.length ? { people: people.join(en ? ', ' : '、') } : {}),
@@ -97,11 +109,12 @@ export function addMeetingNotes(
     ingestLifeNode({
       name: text,
       type: 'commitment',
-      tags: [en ? 'Meeting to-do' : '会议待办', 'meeting-todo'],
+      tags: [en ? 'Meeting to-do' : '会议待办', 'meeting-todo', ...extraTags],
       attributes: {
         fromMeeting: meetingName,
         meetingRecordId: record.id,
         focusPinnedOn: today, // 刚开完会,行动项直接进今天页注意力
+        ...(prov?.granolaMeetingId ? { granolaMeetingId: prov.granolaMeetingId } : {}),
         ...(deadline ? { date: deadline } : {}),
       },
       rawInput: text,
@@ -111,6 +124,58 @@ export function addMeetingNotes(
     });
   }
   broadcast();
+}
+
+export function addMeetingNotes(
+  meetingNodeId: string,
+  meetingName: string,
+  notes: string,
+  locale: string = 'zh',
+  extraction?: MeetingExtraction,
+): void {
+  writeMeetingExtraction(meetingNodeId, meetingName, notes, locale, extraction);
+}
+
+// 批次 155:Granola 会议落地函数 —— 原生连接器(下一步)拿到转写后调这只手。
+// 去重(granolaMeetingId)→ 调批次154 抽取(To do/Inferred)→ 写入。抽取失败降级只存原文。
+export interface GranolaMeetingInput {
+  id: string;            // Granola meeting UUID(去重锚)
+  title: string;
+  transcript: string;
+  startedAt?: string;    // ISO,会议真实时间
+}
+
+export async function ingestGranolaMeeting(
+  meeting: GranolaMeetingInput,
+  locale: string = 'zh',
+): Promise<'created' | 'skipped' | 'stored_raw'> {
+  const id = (meeting.id || '').trim();
+  const transcript = (meeting.transcript || '').trim();
+  if (!id || !transcript) return 'skipped';
+
+  // 去重:同一场会议已入库就跳过(重复同步不再造重节点)。
+  if (getLifeGraph().some((n) => n.attributes?.granolaMeetingId === id)) return 'skipped';
+
+  // 批次154 抽取:把转写喂 meeting-notes 路由拿 To do/Inferred。会议真实日期作截止日锚点。
+  let extraction: MeetingExtraction | undefined;
+  try {
+    const res = await fetch('/api/portal/meeting-notes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ transcript, duration: '', calendarEvent: meeting.title, meetingDate: meeting.startedAt || '' }),
+    });
+    const data = await res.json() as { ok?: boolean; summary?: string; todo?: MeetingExtraction['todo']; inferred?: string[]; people?: string[] };
+    if (res.ok && data.ok) {
+      extraction = { summary: data.summary, todo: data.todo, inferred: data.inferred, people: data.people };
+    }
+  } catch { /* 抽取失败 → 降级只存原文,不丢会议 */ }
+
+  writeMeetingExtraction('', meeting.title, transcript, locale, extraction, {
+    granolaMeetingId: id,
+    recordedAt: meeting.startedAt,
+    extraTags: ['Granola'],
+  });
+  return extraction ? 'created' : 'stored_raw';
 }
 
 /** 批次 50:记忆页长按「加入今日焦点」—— 钉进今天(明天自然过期)。
