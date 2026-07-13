@@ -97,6 +97,22 @@ function hasAuthReadyCallbackSuccess(): boolean {
     params.get('profileBootstrapBlocking') !== 'true';
 }
 
+// 设置页「预览引导」用 ?preview=tour|welcome 强制重放,绕过登录态的短路(否则永不出现)。
+function readPreviewParam(): 'tour' | 'welcome' | null {
+  if (typeof window === 'undefined') return null;
+  const v = new URLSearchParams(window.location.search).get('preview');
+  return v === 'tour' || v === 'welcome' ? v : null;
+}
+
+function clearPreviewParam() {
+  if (typeof window === 'undefined') return;
+  const url = new URL(window.location.href);
+  if (url.searchParams.has('preview')) {
+    url.searchParams.delete('preview');
+    window.history.replaceState(null, document.title, `${url.pathname}${url.search}${url.hash}`);
+  }
+}
+
 function clearAuthCallbackParams() {
   if (typeof window === 'undefined') return;
   const url = new URL(window.location.href);
@@ -474,6 +490,11 @@ export default function PortalOnboarding() {
         if (cancelled) return;
         setDisplayName(profile.displayName || '');
         setLocale(profile.locale || 'zh');
+
+        // 「预览引导」强制重放:在登录态短路之前判定,否则已登录用户永远看不到引导。
+        const preview = readPreviewParam();
+        if (preview === 'tour') { clearPreviewParam(); setShowTips(true); return; }
+        if (preview === 'welcome') { clearPreviewParam(); setStep('welcome'); setVisible(true); return; }
 
         const done = localStorage.getItem(ONBOARDING_DONE_KEY) === '1' ||
           localStorage.getItem(LEGACY_ONBOARDING_DONE_KEY) === '1';

@@ -28,7 +28,7 @@ export default function PreviewGuidesSheet({ open, onClose }: { open: boolean; o
 
   if (!open) return null;
 
-  const goHome = () => { window.location.href = '/'; };
+  const goHome = (query = '') => { window.location.href = `/${query}`; };
 
   function toggleSample() {
     try {
@@ -47,8 +47,9 @@ export default function PreviewGuidesSheet({ open, onClose }: { open: boolean; o
   }
 
   function replayTour() {
+    // ?preview=tour 强制重放导览 —— 已登录用户靠清 flag 不够(hydrate 会被登录态短路吞掉)。
     try { localStorage.removeItem(TIPS_SHOWN_KEY); } catch { /* ignore */ }
-    goHome();
+    goHome('?preview=tour');
   }
 
   function replayWelcome() {
@@ -56,7 +57,7 @@ export default function PreviewGuidesSheet({ open, onClose }: { open: boolean; o
       NESIO_ONBOARDING_DONE_KEYS.forEach((k) => localStorage.removeItem(k));
       localStorage.removeItem(TIPS_SHOWN_KEY);
     } catch { /* ignore */ }
-    goHome();
+    goHome('?preview=welcome');
   }
 
   function simulateReengage() {
