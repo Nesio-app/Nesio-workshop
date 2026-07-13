@@ -27,8 +27,18 @@ function hasLabAccess(req: NextRequest): boolean {
 type GmailListItem = { id: string };
 type GmailMeta = {
   id: string;
+  // 批次 152:Gmail 系统分类标签(format=metadata 顶层字段)—— 据此决定「要不要推荐」。
+  labelIds?: string[];
   payload?: { headers?: Array<{ name: string; value: string }> };
 };
+
+// 批次 152(用户定案):邮件都进记忆(走 gmail 同步路由),但推荐门只放行值得打扰你的类别。
+// 广告/社交/论坛 = 不推荐(不出今天页引导卡);账单/收据/快递(UPDATES)与个人邮件 = 可推荐。
+const NO_RECOMMEND_CATEGORIES = new Set(['CATEGORY_PROMOTIONS', 'CATEGORY_SOCIAL', 'CATEGORY_FORUMS']);
+function isRecommendable(msg: GmailMeta): boolean {
+  const labels = msg.labelIds || [];
+  return !labels.some((l) => NO_RECOMMEND_CATEGORIES.has(l));
+}
 
 function hdr(msg: GmailMeta, name: string): string {
   return msg.payload?.headers?.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value || '';
@@ -112,6 +122,8 @@ export async function GET(req: NextRequest) {
     const from = hdr(msg, 'from');
     const date = hdr(msg, 'date');
     if (!subject) continue;
+    // 批次 152:Gmail 分类门 —— 广告/社交/论坛类邮件仍入库,但不打扰你(不出今天页推荐卡)。
+    if (!isRecommendable(msg)) continue;
 
     const signal = buildEmailSignal(msg.id, subject, from, date);
     if (!signal || seen.has(signal.type)) continue;
