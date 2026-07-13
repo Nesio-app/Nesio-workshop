@@ -501,9 +501,18 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
   const [driveMsg, setDriveMsg] = useState('');
   // 备份目的地选择器:'drive'=Google Drive(免费)/ 'nesio'=Nesio 云(兜底)。默认免费的 Drive。
   const [backupDest, setBackupDest] = useState<'drive' | 'nesio'>('drive');
+  // 批次 151(QA #8):云状态此前写死「0 · 未登录」,不读真实登录态。取真会话,如实显示。
+  const [signedIn, setSignedIn] = useState(false);
   useEffect(() => {
     try { const v = localStorage.getItem('nesio-backup-dest'); if (v === 'nesio' || v === 'drive') setBackupDest(v); } catch { /* ignore */ }
   }, []);
+  useEffect(() => {
+    if (!open) return;
+    fetch('/api/auth/session', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((d: { loggedIn?: boolean }) => setSignedIn(Boolean(d?.loggedIn)))
+      .catch(() => {});
+  }, [open]);
   const pickBackupDest = (d: 'drive' | 'nesio') => {
     setBackupDest(d);
     try { localStorage.setItem('nesio-backup-dest', d); } catch { /* ignore */ }
@@ -750,7 +759,7 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
         <p style={{ fontSize: '0.72rem', fontWeight: 600, margin: '0 0 0.4rem', color: 'var(--portal-blue-deep)', display: 'flex', alignItems: 'center', gap: 6 }}><IconLock size={14} /> {L(dict, '你的数据在哪里', 'Where your data lives')}<InfoTip text={L(dict, '记忆存在本设备 localStorage;未登录、未授权或未选择接入的日历、邮件、健康和文件内容永远不会被加载;登录后才开启跨设备云同步。', "Memories live in this device's localStorage. Calendar, mail, health and files are never loaded unless you sign in, authorize and connect them. Cross-device cloud sync starts only after sign-in.")} /></p>
         <div style={{ display: 'flex', gap: '1.2rem', fontSize: '0.7rem', lineHeight: 1.6 }}>
           <div><span style={{ fontSize: '1rem', fontWeight: 700 }}>{nodeCount}</span><br />{L(dict, '条记忆,全在本机', 'memories, all on this device')}</div>
-          <div><span style={{ fontSize: '1rem', fontWeight: 700 }}>0</span><br />{L(dict, '条在云端(未登录)', 'in the cloud (signed out)')}</div>
+          <div><span style={{ fontSize: '1rem', fontWeight: 700 }}>{signedIn ? '✓' : '0'}</span><br />{signedIn ? L(dict, '已登录 · 云同步已开', 'signed in · cloud sync on') : L(dict, '未登录 · 仅本机', 'signed out · on-device only')}</div>
           <div>
             <span style={{ fontSize: '1rem', fontWeight: 700 }}>{lastBackupAt ? new Date(lastBackupAt).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'numeric', day: 'numeric' }) : L(dict, '还没有', 'never')}</span><br />
             {lastBackupAt ? L(dict, '上次备份', 'last backup') : L(dict, '备份过', 'backed up')}
