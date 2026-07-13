@@ -7074,6 +7074,53 @@ html[data-portal-theme="night"] .nesio-tips-body { color: #8fa3c0; }
   padding: 0.35rem 0.45rem;
   font-size: 0.72rem;
 }
+.nesio-tips-count { font-size: 0.72rem; color: var(--portal-muted); margin-right: auto; font-variant-numeric: tabular-nums; }
+
+/* ── 聚光式 coach-mark(定位到真实 UI,高亮 + 气泡指过去)── */
+.nesio-coach-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  pointer-events: auto;
+}
+.nesio-coach-overlay--dim { background: rgba(20, 22, 30, 0.55); }
+/* 高亮框:巨大 box-shadow 把四周压暗,只留目标亮着;随步平滑移动 */
+.nesio-coach-spot {
+  position: fixed;
+  box-shadow: 0 0 0 9999px rgba(20, 22, 30, 0.55);
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  pointer-events: none;
+  transition: left 0.3s var(--ease-out, cubic-bezier(0.4, 0, 0.2, 1)), top 0.3s var(--ease-out, cubic-bezier(0.4, 0, 0.2, 1)), width 0.3s var(--ease-out, cubic-bezier(0.4, 0, 0.2, 1)), height 0.3s var(--ease-out, cubic-bezier(0.4, 0, 0.2, 1)), border-radius 0.3s var(--ease-out, cubic-bezier(0.4, 0, 0.2, 1));
+}
+.nesio-coach-bubble {
+  position: fixed;
+  pointer-events: auto;
+  background: rgba(255, 255, 255, 0.97);
+  border-radius: 18px;
+  padding: 0.75rem 0.9rem 0.85rem;
+  box-shadow: 0 18px 48px rgba(20, 30, 60, 0.32);
+  animation: coachBubbleIn 0.22s var(--ease-out);
+}
+.nesio-coach-bubble--center {
+  left: 50% !important;
+  top: 50% !important;
+  transform: translate(-50%, -50%);
+  width: min(20rem, calc(100vw - 2rem)) !important;
+}
+html[data-portal-theme="night"] .nesio-coach-bubble {
+  background: rgba(20, 30, 52, 0.97);
+  border: 1px solid rgba(120, 158, 229, 0.24);
+}
+.nesio-coach-caret {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  background: inherit;
+  border: inherit;
+  transform: translateX(-50%) rotate(45deg);
+}
+.nesio-coach-bubble--above .nesio-coach-caret { bottom: -7px; border-top: none; border-left: none; }
+.nesio-coach-bubble--below .nesio-coach-caret { top: -7px; border-bottom: none; border-right: none; }
 
 /* ─────────────────────────────────────────────
    Login page

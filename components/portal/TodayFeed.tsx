@@ -213,6 +213,7 @@ export default function TodayFeed({
       <header className="nesio-today-header">
         <button
           type="button"
+          data-tour="insights"
           className="nesio-today-brand"
           aria-label={L(uiLocale, '打开 Nesio 洞察', "Open Nesio insights")}
           onClick={() => { setInsightsTab('reflection'); setMirrorOpen(true); }}

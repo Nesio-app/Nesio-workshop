@@ -261,7 +261,7 @@ export function TodayFocusSection({
 
       {/* 批次 107:时间线 —— 心情作「现在」第一拍 + 竖轨串起下面的要紧事(设计规范今天页) */}
       <div className="nesio-focus-timeline">
-        <MoodBeat />
+        <div data-tour="mood"><MoodBeat /></div>
         {isEmpty ? (
           <div className="nesio-focus-empty nesio-focus-empty--tl">
             <p>{t(locale, 'todayFocusEmpty')}</p>
