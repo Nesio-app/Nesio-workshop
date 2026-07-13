@@ -12470,6 +12470,146 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 /* 批次 39:健康 Dashboard */
 .nesio-health-dash { display: flex; flex-direction: column; }
 .nesio-health-updated { font-size: 0.72rem; color: var(--portal-muted); margin: 0 0 0.25rem; }
+
+/* ── 健康 Pro:概览/分析 二级切换 ── */
+.nesio-health-subtabs {
+  display: flex;
+  padding: 3px;
+  gap: 3px;
+  border-radius: var(--radius-pill, 999px);
+  background: var(--portal-surface-2, rgba(127, 127, 127, 0.08));
+  margin: 0 0 0.85rem;
+}
+.nesio-health-subtab {
+  flex: 1;
+  padding: 0.5rem 0;
+  border-radius: var(--radius-pill, 999px);
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--portal-muted);
+}
+.nesio-health-subtab.is-active {
+  background: var(--sheet-opaque, #fff);
+  color: var(--portal-ink);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+/* 隐私横条 */
+.nesio-health-privacy {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.8rem;
+  border-radius: 12px;
+  background: var(--portal-surface-2, rgba(127, 127, 127, 0.07));
+  color: var(--portal-muted);
+  font-size: 0.74rem;
+  margin-bottom: 0.7rem;
+}
+
+/* 念念安抚小结 */
+.nesio-health-nen {
+  display: flex;
+  gap: 0.6rem;
+  padding: 0.85rem 0.9rem;
+  border-radius: 16px;
+  background: var(--status-go-soft, #d9ece1);
+  margin-bottom: 0.9rem;
+}
+.nesio-health-nen-avatar {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--status-go, #5a9e7a);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+.nesio-health-nen-text {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.6;
+  color: var(--portal-ink);
+}
+
+/* 今日精选 2×2 */
+.nesio-health-picks {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+  margin: 0.35rem 0 1rem;
+}
+.nesio-health-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.85rem 0.9rem;
+  border-radius: 14px;
+  border: 1px solid var(--portal-line);
+  background: var(--glass-bg-solid);
+  text-align: left;
+}
+.nesio-health-pick:active { transform: scale(0.98); }
+.nesio-health-pick-top {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  color: var(--portal-muted);
+}
+.nesio-health-pick-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.nesio-health-pick-chev { margin-left: auto; color: var(--portal-muted); }
+.nesio-health-pick-val {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--portal-ink);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.nesio-health-pick-val small { font-size: 0.8rem; font-weight: 600; margin-left: 2px; }
+.nesio-health-pick-sub { font-size: 0.72rem; color: var(--portal-muted); }
+
+/* 最要紧的一条 */
+.nesio-health-topfind {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  width: 100%;
+  padding: 0.85rem 0.9rem;
+  border-radius: 14px;
+  border: 1px solid var(--portal-line);
+  background: var(--glass-bg-solid);
+  text-align: left;
+  margin-bottom: 1rem;
+}
+.nesio-health-topfind:active { transform: scale(0.99); }
+.nesio-health-topfind-badge { flex-shrink: 0; min-width: 3.6rem; font-size: 0.68rem; font-weight: 700; padding-top: 0.1rem; }
+.nesio-health-topfind-body { font-size: 0.84rem; line-height: 1.5; color: var(--portal-ink); }
+.nesio-health-topfind-src { display: block; margin-top: 0.2rem; font-size: 0.66rem; color: var(--portal-muted); }
+
+/* 念念发现的关系 */
+.nesio-health-rel {
+  padding: 0.8rem 0.9rem;
+  border-radius: 14px;
+  background: var(--portal-surface-2, rgba(127, 127, 127, 0.06));
+  margin-bottom: 1rem;
+}
+.nesio-health-rel-tag { font-size: 0.66rem; font-weight: 700; margin-right: 0.5rem; }
+.nesio-health-rel-text { font-size: 0.84rem; color: var(--portal-ink); line-height: 1.5; }
+.nesio-health-rel-note { display: block; margin-top: 0.3rem; font-size: 0.66rem; color: var(--portal-muted); }
+
+/* 去「分析」 */
+.nesio-health-goanalysis {
+  align-self: center;
+  padding: 0.6rem 1.4rem;
+  color: var(--portal-blue-deep);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
 .nesio-health-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin-top: 0.5rem; }
 .nesio-health-card { display: flex; flex-direction: column; gap: 0.3rem; padding: 0.85rem 0.9rem; border: 1px solid var(--portal-line); border-radius: 14px; background: var(--glass-bg-solid); }
 .nesio-health-card-label { font-size: 0.75rem; color: var(--portal-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
