@@ -37,7 +37,6 @@ export interface DailyReportInput {
 
 export interface DailyReportSection {
   id: 'weather' | 'calendar' | 'email' | 'memory';
-  icon: string;
   title: string;
   lines: string[];
 }
@@ -119,7 +118,7 @@ export function buildDailyReport(input: DailyReportInput): DailyReport {
   const notes = (input.memoryNotes || []).filter(Boolean).slice(0, 3);
 
   const sections: DailyReportSection[] = [];
-  if (wText) sections.push({ id: 'weather', icon: '🌤️', title: tt(locale, '天气', 'Weather'), lines: [wText] });
+  if (wText) sections.push({ id: 'weather', title: tt(locale, '天气', 'Weather'), lines: [wText] });
 
   const calLines = todayEvents.length
     ? todayEvents.map((e) => fmtEvent(e, locale))
@@ -127,10 +126,10 @@ export function buildDailyReport(input: DailyReportInput): DailyReport {
       ? [tt(locale, '今天日历上没有安排。', 'Nothing on today’s calendar.'),
          `${tt(locale, '下一个:', 'Next: ')}${fmtEvent(upcoming[0], locale)}`]
       : [tt(locale, '今天没有日历安排,可以专注深度工作。', 'No calendar events today — a good day for deep work.')];
-  sections.push({ id: 'calendar', icon: '📅', title: tt(locale, '今日日程', 'Today’s schedule'), lines: calLines });
+  sections.push({ id: 'calendar', title: tt(locale, '今日日程', 'Today’s schedule'), lines: calLines });
 
-  if (emails.length) sections.push({ id: 'email', icon: '✉️', title: tt(locale, '邮件亮点', 'Email highlights'), lines: emails });
-  if (notes.length) sections.push({ id: 'memory', icon: '🧠', title: tt(locale, '记忆提醒', 'From your memory'), lines: notes });
+  if (emails.length) sections.push({ id: 'email', title: tt(locale, '邮件亮点', 'Email highlights'), lines: emails });
+  if (notes.length) sections.push({ id: 'memory', title: tt(locale, '记忆提醒', 'From your memory'), lines: notes });
 
   // 一句话概览
   const headlineParts: string[] = [];
@@ -147,7 +146,7 @@ export function buildDailyReport(input: DailyReportInput): DailyReport {
   const title = `${tt(locale, '每日日报', 'Daily report')} · ${dateLabel}`;
   const md: string[] = [`# ${title}`, '', `_${headline}_`, ''];
   for (const s of sections) {
-    md.push(`## ${s.icon} ${s.title}`);
+    md.push(`## ${s.title}`);
     for (const line of s.lines) md.push(`- ${line}`);
     md.push('');
   }

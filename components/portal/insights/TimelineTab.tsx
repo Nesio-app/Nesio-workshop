@@ -59,6 +59,12 @@ const CAT: Record<PlaceCategory, [string, string]> = {
   entertainment: ['娱乐', 'Entertainment'], health: ['医疗', 'Health'], lodging: ['住宿', 'Lodging'],
   transit: ['交通', 'Transit'], unknown: ['未知', 'Unknown'], place: ['其他地点', 'Other places'],
 };
+// 地点饼图配色:走设计 token(莫兰迪辅助色),top5 + 其他循环取用,不硬编码色值。
+const CAT_PIE_COLORS = [
+  'var(--status-gentle)', 'var(--status-go)', 'var(--status-calm)',
+  'var(--portal-cool-accent)', 'var(--portal-accent)', 'var(--portal-muted)',
+];
+
 const DOT_COLOR: Record<PlaceCategory, string> = {
   home: '#588ce3', work: '#7b5ea7', grocery: '#4f9e57', shopping: '#e8888f', food: '#e0954a',
   cafe: '#a5713f', fitness: '#d6559e', park: '#3e9e7e', culture: '#8a6fd0', education: '#5a7bd0',
@@ -71,6 +77,8 @@ export default function TimelineTab() {
   const [trail, setTrail] = useState<PlaceVisit[]>([]);
   const [dayIdx, setDayIdx] = useState(0);
   const [sub, setSub] = useState<Sub>('timeline');
+  const [placePeriod, setPlacePeriod] = useState<'week' | 'month' | 'year'>('month'); // 地点饼图时段
+  const [worldCountry, setWorldCountry] = useState<string | null>(null); // 世界:点进某国看城市明信片
   const [editRaw, setEditRaw] = useState<string | null>(null);
   const [editVal, setEditVal] = useState('');
   const [expandedCat, setExpandedCat] = useState<string | null>(null); // 批次 39:地点分类展开
@@ -119,6 +127,28 @@ export default function TimelineTab() {
     .map((c) => ({ lat: c.lat!, lon: c.lon!, label: displayLabel(c.label), weightMin: c.totalMin, color: DOT_COLOR[c.category] })), [trail]);
   const placeCats = useMemo(() => placesByCategory(trail), [trail]); // 批次 39:Google 时间线风分类
   const world = useMemo(() => worldByCountry(trail), [trail]); // 批次 40:World tab 国家聚合
+
+  // ── 地点 tab(设计稿③):饼图 + 周/月/年 + 最常去,全随时段变 ──
+  const placePeriodTrail = useMemo(() => {
+    const now = Date.now();
+    const d0 = new Date(now);
+    return trail.filter((v) => {
+      const t = new Date(v.ts);
+      if (Number.isNaN(t.getTime())) return false;
+      if (placePeriod === 'week') return now - t.getTime() <= 7 * 86_400_000;
+      if (placePeriod === 'month') return t.getFullYear() === d0.getFullYear() && t.getMonth() === d0.getMonth();
+      return t.getFullYear() === d0.getFullYear();
+    });
+  }, [trail, placePeriod]);
+  const placeShare = useMemo(() => {
+    const raw = categoryTimeShare(placePeriodTrail).filter((c) => c.pct > 0);
+    const top = raw.slice(0, 5).map((c, i) => ({ label: L(dict, CAT[c.category][0], CAT[c.category][1]), pct: c.pct, color: CAT_PIE_COLORS[i] }));
+    const restPct = raw.slice(5).reduce((s, c) => s + c.pct, 0);
+    if (restPct > 0) top.push({ label: L(dict, '其他', 'Other'), pct: restPct, color: CAT_PIE_COLORS[5] });
+    return top;
+  }, [placePeriodTrail, dict]);
+  const placeRanking = useMemo(() => clusterPlaces(placePeriodTrail, 6).slice().sort((a, b) => b.visits - a.visits).slice(0, 5), [placePeriodTrail]);
+  const placeDistinct = useMemo(() => clusterPlaces(placePeriodTrail, 99999).length, [placePeriodTrail]);
   // 批次 67:世界 tab 亮点卡(参考「一生足迹」:最北/最南/最常去/最早,带度分坐标)
   const worldHighlights = useMemo(() => {
     const geo = loadPlaceGeo();
@@ -164,7 +194,39 @@ export default function TimelineTab() {
     }
     return out;
   }, [trail, dict]);
-  const [expandedCountry, setExpandedCountry] = useState<string | null>(null);
+  // 世界 tab(设计稿④):每国一枚真数据 tag(最常去 / 最早 / 最北 / 最南)。
+  const worldCountryTags = useMemo(() => {
+    const geo = loadPlaceGeo();
+    type Agg = { visits: number; earliest: number; maxLat: number; minLat: number };
+    const byC = new Map<string, Agg>();
+    for (const v of trail) {
+      const g = geo[v.label];
+      if (!g?.country) continue;
+      const t = new Date(v.ts).getTime();
+      const a = byC.get(g.country) || { visits: 0, earliest: Infinity, maxLat: -Infinity, minLat: Infinity };
+      a.visits += 1;
+      if (Number.isFinite(t)) a.earliest = Math.min(a.earliest, t);
+      if (typeof v.lat === 'number') { a.maxLat = Math.max(a.maxLat, v.lat); a.minLat = Math.min(a.minLat, v.lat); }
+      byC.set(g.country, a);
+    }
+    const entries = [...byC.entries()];
+    if (!entries.length) return new Map<string, { text: string }>();
+    const pick = (fn: (a: Agg) => number, dir: 1 | -1) =>
+      entries.reduce((best, e) => (dir === 1 ? fn(e[1]) > fn(best[1]) : fn(e[1]) < fn(best[1])) ? e : best)[0];
+    const mostVisited = pick((a) => a.visits, 1);
+    const earliest = pick((a) => a.earliest, -1);
+    const north = pick((a) => a.maxLat, 1);
+    const south = pick((a) => a.minLat, -1);
+    const tags = new Map<string, { text: string }>();
+    // 优先级:最常去 > 最早 > 最北 > 最南(每国至多一枚)
+    tags.set(mostVisited, { text: L(dict, '最常去', 'Most visited') });
+    if (!tags.has(earliest)) tags.set(earliest, { text: L(dict, `最早 · ${new Date(byC.get(earliest)!.earliest).getFullYear()}`, `First · ${new Date(byC.get(earliest)!.earliest).getFullYear()}`) });
+    if (!tags.has(north) && Number.isFinite(byC.get(north)!.maxLat)) tags.set(north, { text: L(dict, `最北 · ${Math.round(byC.get(north)!.maxLat)}°N`, `North · ${Math.round(byC.get(north)!.maxLat)}°N`) });
+    if (!tags.has(south) && Number.isFinite(byC.get(south)!.minLat)) tags.set(south, { text: L(dict, `最南 · ${Math.round(Math.abs(byC.get(south)!.minLat))}°${byC.get(south)!.minLat >= 0 ? 'N' : 'S'}`, `South · ${Math.round(Math.abs(byC.get(south)!.minLat))}°${byC.get(south)!.minLat >= 0 ? 'N' : 'S'}`) });
+    return tags;
+  }, [trail, dict]);
+  // 稳定挑一条渐变(0–4)给国家/城市卡,按名字散列 —— 色值全走 CSS token 类。
+  const gradIdx = (s: string) => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return h % 5; };
 
   if (trail.length === 0) {
     return <p className="nesio-insights-empty">{L(dict, '还没有足迹。授权位置后自动积累;也可在数据接入导入 Google 时间轴。', 'No trail yet. It builds automatically once location is granted; you can also import Google Timeline under Data sources.')}</p>;
@@ -407,13 +469,72 @@ export default function TimelineTab() {
         </>
       )}
 
-      {/* ── 地点:Google Timeline 风分类(批次 39)── */}
+      {/* ── 地点(设计稿③):饼图 + 周/月/年 + 最常去,随时段变 ── */}
       {sub === 'travel' && (
         placeCats.length === 0 ? (
           <p className="nesio-insights-empty">{L(dict, '还没有地点。多授权定位、或导入 Google 时间轴,这里会按类别攒出你去过的地方。', 'No places yet. Grant location or import Google Timeline and your visited places gather here by category.')}</p>
         ) : (
           <>
-            <p className="nesio-settings-option-hint" style={{ marginTop: 0 }}>{L(dict, `去过 ${placeCats.reduce((s, g) => s + g.count, 0)} 个地方 · ${placeCats.length} 类`, `${placeCats.reduce((s, g) => s + g.count, 0)} places · ${placeCats.length} categories`)}</p>
+            {/* 周/月/年 segmented */}
+            <div className="nesio-tl-seg" role="tablist" aria-label={L(dict, '时段', 'Period')}>
+              {(['week', 'month', 'year'] as const).map((p) => (
+                <button key={p} type="button" role="tab" aria-selected={placePeriod === p}
+                  className={`nesio-tl-seg-opt${placePeriod === p ? ' is-on' : ''}`}
+                  onClick={() => setPlacePeriod(p)}>
+                  {L(dict, p === 'week' ? '周' : p === 'month' ? '月' : '年', p === 'week' ? 'Week' : p === 'month' ? 'Month' : 'Year')}
+                </button>
+              ))}
+            </div>
+
+            {placeShare.length === 0 ? (
+              <p className="nesio-insights-empty" style={{ marginTop: '1rem' }}>{L(dict, '这段时间还没有地点记录 —— 换个时段看看。', 'No places in this period — try another range.')}</p>
+            ) : (
+              <>
+                {/* 饼图 + 图例 */}
+                <div className="nesio-tl-donutwrap">
+                  <div className="nesio-tl-donut" style={{ background: `conic-gradient(${(() => {
+                    const total = placeShare.reduce((s, x) => s + x.pct, 0) || 1;
+                    let acc = 0;
+                    return placeShare.map((x) => { const from = (acc / total) * 100; acc += x.pct; return `${x.color} ${from.toFixed(1)}% ${((acc / total) * 100).toFixed(1)}%`; }).join(', ');
+                  })()})` }}>
+                    <div className="nesio-tl-donut-ctr">
+                      <b>{placeDistinct}</b>
+                      <small>{L(dict, placePeriod === 'week' ? '本周地点' : placePeriod === 'month' ? '本月地点' : '本年地点', placePeriod === 'week' ? 'this week' : placePeriod === 'month' ? 'this month' : 'this year')}</small>
+                    </div>
+                  </div>
+                  <div className="nesio-tl-legend">
+                    {placeShare.map((x) => (
+                      <div key={x.label} className="nesio-tl-legend-row">
+                        <span className="nesio-tl-legend-dot" style={{ background: x.color }} />
+                        <span className="nesio-tl-legend-name">{x.label}</span>
+                        <span className="nesio-tl-legend-pct">{x.pct}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 最常去排行 */}
+                {placeRanking.length > 0 && (
+                  <>
+                    <p className="nesio-tl-rank-h">{L(dict, placePeriod === 'week' ? '这周最常去' : placePeriod === 'month' ? '这个月最常去' : '今年最常去', placePeriod === 'week' ? 'Most visited this week' : placePeriod === 'month' ? 'Most visited this month' : 'Most visited this year')}</p>
+                    <div className="nesio-tl-rank">
+                      {placeRanking.map((c) => (
+                        <div key={c.label} className="nesio-tl-rank-row">
+                          <span className={`nesio-pt-dot nesio-pt-dot--${c.category}`} aria-hidden style={{ position: 'static', boxShadow: 'none' }} />
+                          <span className="nesio-tl-rank-name">{displayLabel(c.label)}</span>
+                          <span className="nesio-tl-rank-val">
+                            {L(dict, `${c.visits} 次`, `${c.visits}×`)}{c.totalMin >= 120 ? ` · ${Math.round(c.totalMin / 60)}h` : ''}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+
+            {/* 按类别浏览(保留纠正分类工具,作饼图下钻)*/}
+            <p className="nesio-settings-section-label" style={{ marginTop: '1.4rem' }}>{L(dict, '按类别浏览 · 点地点可纠正分类', 'Browse by category · tap to reclassify')}</p>
             <div className="nesio-tl-catgrid">
               {placeCats.map((g) => {
                 const meta = PLACE_CATEGORY_META[g.category];
@@ -458,7 +579,7 @@ export default function TimelineTab() {
 
       {/* ── 世界:按国家聚合(批次 40)+ 世界地图 ── */}
       {/* 批次 63:世界板块 = 3D 地球(拖拽旋转,到访国高亮;点一下全屏) */}
-      {sub === 'world' && (
+      {sub === 'world' && !worldCountry && (
         <div className="nesio-globe-stage">
           <p className="nesio-globe-stats">
             {L(dict,
@@ -473,7 +594,7 @@ export default function TimelineTab() {
           <span className="nesio-globe-stage-hint">{L(dict, '拖动旋转 · 点一下全屏', 'Drag to spin · tap for fullscreen')}</span>
         </div>
       )}
-      {sub === 'world' && worldHighlights.length > 0 && (
+      {sub === 'world' && !worldCountry && worldHighlights.length > 0 && (
         <div className="nesio-globe-hl-strip">
           {worldHighlights.map((h, i) => (
             <div key={h.kicker} className={`nesio-globe-hl-card nesio-globe-hl-card--v${i % 4}`}>
@@ -485,41 +606,66 @@ export default function TimelineTab() {
           ))}
         </div>
       )}
-      {sub === 'world' && (
-        world.length === 0 ? (
-          <p className="nesio-insights-empty">{L(dict, '还没有国家信息。开着「记忆自动定位」正常使用,地名和国家会随打点自动解析,这里就会按国家聚合。', 'No country data yet. Keep auto-locate on — places and countries resolve as you go, and countries gather here.')}</p>
-        ) : (
-          <>
-            <p className="nesio-settings-option-hint" style={{ marginTop: 0 }}>{L(dict, `去过 ${world.length} 个国家/地区`, `${world.length} countries/regions visited`)}</p>
-            <div className="nesio-tl-catgrid">
-              {world.map((g) => {
-                const open = expandedCountry === g.country;
-                return (
-                  <div key={g.country} className={`nesio-tl-catcard${open ? ' is-open' : ''}`}>
-                    <button type="button" className="nesio-tl-catcard-head" onClick={() => setExpandedCountry(open ? null : g.country)}>
-                      <span className="nesio-tl-catcard-sym" style={{ background: '#3d9f6e' }} aria-hidden>🌍</span>
-                      <span className="nesio-tl-catcard-name">{g.country}</span>
-                      <span className="nesio-tl-catcard-count">{L(dict, `${g.cities.length} 城 · ${g.placeCount} 地`, `${g.cities.length} cities · ${g.placeCount} places`)}</span>
-                      <span className="nesio-tl-catcard-chev">{open ? '▾' : '›'}</span>
-                    </button>
-                    {open && (
-                      <div className="nesio-tl-catcard-list">
-                        {g.cities.length === 0 && <p className="nesio-tl-catplace-more">{L(dict, '(没解析到城市)', '(no city resolved)')}</p>}
-                        {g.cities.map((c) => (
-                          <div key={c.city} className="nesio-tl-catplace" style={{ cursor: 'default' }}>
-                            <span className="nesio-tl-catplace-name">{c.city}</span>
-                            <span className="nesio-tl-catplace-meta">{L(dict, `${c.count} 个地点`, `${c.count} places`)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </>
-        )
+      {/* ── 世界(设计稿④):先国家卡,点 › 进城市明信片 ── */}
+      {sub === 'world' && world.length === 0 && (
+        <p className="nesio-insights-empty">{L(dict, '还没有国家信息。开着「记忆自动定位」正常使用,地名和国家会随打点自动解析,这里就会按国家聚合。', 'No country data yet. Keep auto-locate on — places and countries resolve as you go, and countries gather here.')}</p>
       )}
+      {sub === 'world' && world.length > 0 && !worldCountry && (
+        <>
+          <p className="nesio-tl-world-head">
+            {L(dict, `去过 ${world.length} 国 · ${world.reduce((n, g) => n + g.cities.length, 0)} 城`, `${world.length} countries · ${world.reduce((n, g) => n + g.cities.length, 0)} cities`)}
+          </p>
+          {(() => {
+            const first = trail.reduce((a, b) => (new Date(b.ts) < new Date(a.ts) ? b : a), trail[0]);
+            const y = new Date(first.ts).getFullYear();
+            return Number.isFinite(y) ? <p className="nesio-tl-world-sub">{L(dict, `从 ${y} 到现在`, `From ${y} to now`)}</p> : null;
+          })()}
+          <div className="nesio-tl-ccards">
+            {world.map((g) => {
+              const tag = worldCountryTags.get(g.country);
+              return (
+                <button key={g.country} type="button" className="nesio-tl-ccard" onClick={() => setWorldCountry(g.country)}>
+                  <span className={`nesio-tl-ccard-img nesio-tl-cc-g${gradIdx(g.country)}`} aria-hidden />
+                  <span className="nesio-tl-ccard-body">
+                    <span className="nesio-tl-ccard-name">{g.country}<small>{L(dict, `${g.cities.length} 城`, `${g.cities.length} cities`)}</small></span>
+                    {tag && <span className="nesio-tl-ccard-tag">{tag.text}</span>}
+                  </span>
+                  <span className="nesio-tl-ccard-chev" aria-hidden>›</span>
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+      {sub === 'world' && worldCountry && (() => {
+        const g = world.find((x) => x.country === worldCountry);
+        const cities = (g?.cities ?? []).slice().sort((a, b) => b.count - a.count);
+        return (
+          <>
+            <div className="nesio-tl-city-head">
+              <button type="button" className="nesio-tl-city-back" onClick={() => setWorldCountry(null)} aria-label={L(dict, '返回', 'Back')}>‹</button>
+              <div>
+                <div className="nesio-tl-city-title">{worldCountry}</div>
+                <div className="nesio-tl-city-sub">{L(dict, `${cities.length} 城 · ${g?.placeCount ?? 0} 地`, `${cities.length} cities · ${g?.placeCount ?? 0} places`)}</div>
+              </div>
+            </div>
+            {cities.length === 0 ? (
+              <p className="nesio-tl-catplace-more">{L(dict, '(还没解析到城市)', '(no city resolved yet)')}</p>
+            ) : (
+              <div className="nesio-tl-citycards">
+                {cities.map((c) => (
+                  <div key={c.city} className="nesio-tl-citycard">
+                    <span className={`nesio-tl-citycard-img nesio-tl-cc-g${gradIdx(c.city)}`} aria-hidden>
+                      <span className="nesio-tl-citycard-tag">{L(dict, `${c.count} 个地点`, `${c.count} places`)}</span>
+                    </span>
+                    <span className="nesio-tl-citycard-name">{c.city}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        );
+      })()}
 
       <p className="nesio-place-trail-count">{L(dict, `共 ${trail.length} 个打点`, `${trail.length} points total`)}</p>
 

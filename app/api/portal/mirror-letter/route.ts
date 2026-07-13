@@ -52,6 +52,8 @@ interface MirrorLetterRequest {
   mirrorId: string;
   locale?: string;
   monthLabel?: string;
+  /** 主题镜:把整封信聚焦到某一面生活(情绪/关系/事业/成长/健康);'全部' 或空 = 不设限。 */
+  focusTopic?: string;
   nodeCount: number;
   typeBreakdown: Record<string, number>;
   topDomains: Array<{ domain: string; count: number }>;
@@ -75,14 +77,19 @@ async function generateLetter(body: MirrorLetterRequest): Promise<RawParagraph[]
     .map((f) => `「${f.text}」→ ${f.verdict === 'yes' ? '用户确认说得对' : '用户说不像我'}`)
     .join('\n') || '无';
 
+  const focus = body.focusTopic && body.focusTopic !== '全部' && body.focusTopic.toLowerCase() !== 'all'
+    ? body.focusTopic
+    : '';
+
   const prompt = `${persona}
 
 ## 你要给谁写信
-${body.userName ? `对方叫 ${body.userName}。` : ''}这是 ta 最近记录的生活档案摘要(批量导入的数据已剔除,以下全部是 ta 亲手记的):
+${body.userName ? `对方叫 ${body.userName}。` : ''}这是 ta ${body.monthLabel ? `${body.monthLabel}` : '最近'}记录的生活档案摘要(批量导入的数据已剔除,以下全部是 ta 亲手记的):
 - 总记录:${body.nodeCount} 条;类型分布:${typeStr}
 - 最活跃领域:${domainStr || '暂无'}
 - 最近记录样本:${sampleStr || '暂无'}
 - 承诺完成率:${body.completionRate}%;最常记录的时段:${body.topHour} 点前后
+${focus ? `\n## 本封信的主题镜\n只从与「${focus}」相关的记录里取证、只谈这一面;与该主题无关的观察一律不写。若这个主题在档案里几乎没有痕迹,就诚实地只写 1 段说清「这个月关于${focus}你几乎没留下什么」,不硬凑。` : ''}
 
 ## 过往信件的读者反馈(写作时尊重这些校正)
 ${fbStr}

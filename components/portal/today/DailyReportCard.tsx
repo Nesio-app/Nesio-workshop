@@ -7,10 +7,18 @@
  * 颜色全用设计 token;温暖教练文案;可折叠展开各节。
  */
 import { useState } from 'react';
-import type { DailyReport } from '@/lib/portal/daily-report';
+import type { DailyReport, DailyReportSection } from '@/lib/portal/daily-report';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
+import { IconNote, IconCloudSun, IconCalendar, IconMail, IconBook } from '../icons';
+
+const SECTION_ICON: Record<DailyReportSection['id'], React.ComponentType<{ size?: number }>> = {
+  weather: IconCloudSun,
+  calendar: IconCalendar,
+  email: IconMail,
+  memory: IconBook,
+};
 
 export function DailyReportCard({ report }: { report: DailyReport | null }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
@@ -23,7 +31,7 @@ export function DailyReportCard({ report }: { report: DailyReport | null }) {
       style={{ borderColor: 'var(--portal-accent-border)', background: 'var(--portal-accent-soft)' }}
     >
       <div className="nesio-proactive-card-inner">
-        <span className="nesio-proactive-card-icon" aria-hidden>📋</span>
+        <span className="nesio-proactive-card-icon" aria-hidden><IconNote size={18} /></span>
         <div className="nesio-proactive-card-text" style={{ width: '100%' }}>
           <p className="nesio-proactive-card-title">{L(dict, '今日日报', 'Daily report')}</p>
           <p className="nesio-proactive-card-body">{report.headline}</p>
@@ -44,16 +52,18 @@ export function DailyReportCard({ report }: { report: DailyReport | null }) {
 
           {open && (
             <div style={{ marginTop: '0.6rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-              {report.sections.map((s) => (
+              {report.sections.map((s) => {
+                const SectionIcon = SECTION_ICON[s.id];
+                return (
                 <div key={s.id}>
-                  <p style={{ margin: 0, fontSize: '0.76rem', fontWeight: 600, color: 'var(--portal-ink)' }}>
-                    {s.icon} {s.title}
+                  <p style={{ margin: 0, fontSize: '0.76rem', fontWeight: 600, color: 'var(--portal-ink)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <SectionIcon size={15} /> {s.title}
                   </p>
                   <ul style={{ margin: '0.2rem 0 0', paddingLeft: '1.1rem', color: 'var(--portal-muted)', fontSize: '0.76rem', lineHeight: 1.55 }}>
                     {s.lines.map((line, i) => <li key={i}>{line}</li>)}
                   </ul>
                 </div>
-              ))}
+              );})}
               <p style={{ margin: 0, fontSize: '0.68rem', color: 'var(--portal-muted)' }}>
                 {L(dict, '已存进记忆 · 在「记忆」里可回看', 'Saved to memory — revisit it under Memory')}
               </p>

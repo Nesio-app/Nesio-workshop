@@ -12535,6 +12535,83 @@ button.nesio-rel-due-info { background: none; border: none; padding: 0; font: in
 .nesio-tl-cluster-meta { flex-shrink: 0; font-size: 0.72rem; color: var(--portal-muted); }
 .nesio-tl-cats { display: flex; flex-direction: column; gap: 0.7rem; }
 .nesio-tl-cat-top { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 0.35rem; font-size: 0.82rem; color: var(--portal-ink); }
+
+/* ── 地点 tab(设计稿③):周/月/年 segmented + 饼图 + 图例 + 最常去排行 ── */
+.nesio-tl-seg {
+  display: flex; width: 12rem; margin-top: 0.9rem; padding: 3px;
+  background: color-mix(in srgb, var(--portal-ink) 4%, transparent);
+  border: 1px solid var(--portal-line); border-radius: 0.7rem;
+}
+.nesio-tl-seg-opt {
+  flex: 1; text-align: center; padding: 0.38rem 0; border: none; background: none;
+  font-size: 0.8rem; font-weight: 700; color: var(--portal-muted); cursor: pointer; border-radius: 0.52rem;
+}
+.nesio-tl-seg-opt.is-on { background: var(--glass-bg-solid); color: var(--portal-ink); box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+.nesio-tl-donutwrap { display: flex; align-items: center; gap: 1.25rem; margin-top: 1.3rem; }
+.nesio-tl-donut {
+  width: 9.4rem; height: 9.4rem; border-radius: 50%; flex-shrink: 0; position: relative;
+}
+.nesio-tl-donut::after {
+  content: ''; position: absolute; inset: 2.1rem; border-radius: 50%; background: var(--portal-bg);
+}
+.nesio-tl-donut-ctr {
+  position: absolute; inset: 0; z-index: 2;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.nesio-tl-donut-ctr b { font-size: 1.6rem; font-weight: 800; color: var(--portal-ink); }
+.nesio-tl-donut-ctr small { font-size: 0.66rem; font-weight: 700; color: var(--portal-muted); }
+.nesio-tl-legend { flex: 1; min-width: 0; }
+.nesio-tl-legend-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.55rem; font-size: 0.8rem; font-weight: 700; color: var(--portal-ink); }
+.nesio-tl-legend-dot { width: 0.65rem; height: 0.65rem; border-radius: 3px; flex-shrink: 0; }
+.nesio-tl-legend-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nesio-tl-legend-pct { margin-left: auto; color: var(--portal-muted); font-weight: 800; font-variant-numeric: tabular-nums; }
+.nesio-tl-rank-h { font-size: 0.8rem; font-weight: 800; color: var(--portal-muted); margin: 1.3rem 0.1rem 0.65rem; }
+.nesio-tl-rank { display: flex; flex-direction: column; gap: 0.45rem; }
+.nesio-tl-rank-row {
+  display: flex; align-items: center; gap: 0.65rem;
+  background: color-mix(in srgb, var(--portal-ink) 3%, transparent);
+  border: 1px solid var(--portal-line); border-radius: 0.7rem; padding: 0.6rem 0.8rem;
+}
+.nesio-tl-rank-name { flex: 1; min-width: 0; font-size: 0.85rem; font-weight: 700; color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nesio-tl-rank-val { font-size: 0.72rem; color: var(--portal-muted); font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* ── 世界 tab(设计稿④):国家卡 → 城市明信片 ── */
+.nesio-tl-world-head { font-size: 1.05rem; font-weight: 800; color: var(--portal-ink); margin: 0.9rem 0.1rem 0.15rem; }
+.nesio-tl-world-sub { font-family: var(--font-portal-serif), Georgia, serif; font-size: 0.72rem; color: var(--portal-muted); margin: 0 0.1rem 0.9rem; }
+/* 装饰渐变(占位图,色值走 token 混色,非语义强调色)*/
+.nesio-tl-cc-g0 { background: linear-gradient(150deg, color-mix(in srgb, var(--status-gentle) 55%, #fff), var(--status-gentle)); }
+.nesio-tl-cc-g1 { background: linear-gradient(150deg, color-mix(in srgb, var(--portal-accent) 45%, #fff), var(--portal-accent)); }
+.nesio-tl-cc-g2 { background: linear-gradient(150deg, color-mix(in srgb, var(--status-calm) 50%, #fff), var(--status-calm)); }
+.nesio-tl-cc-g3 { background: linear-gradient(150deg, color-mix(in srgb, var(--status-go) 50%, #fff), var(--status-go)); }
+.nesio-tl-cc-g4 { background: linear-gradient(150deg, color-mix(in srgb, var(--portal-cool-accent) 50%, #fff), var(--portal-cool-accent)); }
+.nesio-tl-ccards { display: flex; flex-direction: column; gap: 0.7rem; }
+.nesio-tl-ccard {
+  display: flex; align-items: center; gap: 0; width: 100%; text-align: left; cursor: pointer;
+  background: var(--glass-bg-solid); border: 1px solid var(--portal-line);
+  border-radius: 0.95rem; overflow: hidden; box-shadow: 0 4px 14px rgba(0,0,0,.05); padding: 0;
+}
+.nesio-tl-ccard-img { width: 5.5rem; height: 4.6rem; flex-shrink: 0; }
+.nesio-tl-ccard-body { flex: 1; min-width: 0; padding: 0 0.9rem; display: flex; flex-direction: column; gap: 0.3rem; }
+.nesio-tl-ccard-name { font-size: 0.95rem; font-weight: 800; color: var(--portal-ink); display: flex; align-items: baseline; gap: 0.4rem; }
+.nesio-tl-ccard-name small { font-size: 0.68rem; color: var(--portal-muted); font-weight: 700; }
+.nesio-tl-ccard-tag {
+  align-self: flex-start; font-size: 0.6rem; font-weight: 800; color: var(--status-gentle);
+  background: color-mix(in srgb, var(--status-gentle) 12%, transparent); border-radius: 0.4rem; padding: 0.1rem 0.45rem;
+}
+.nesio-tl-ccard-chev { padding-right: 0.9rem; color: var(--portal-muted); font-size: 1.15rem; font-weight: 700; }
+.nesio-tl-city-head { display: flex; align-items: center; gap: 0.6rem; margin: 0.9rem 0.1rem 0.9rem; }
+.nesio-tl-city-back { background: none; border: none; font-size: 1.35rem; font-weight: 800; color: var(--portal-muted); cursor: pointer; line-height: 1; padding: 0 0.2rem; }
+.nesio-tl-city-title { font-size: 1.2rem; font-weight: 800; color: var(--portal-ink); }
+.nesio-tl-city-sub { font-size: 0.72rem; color: var(--portal-muted); font-weight: 700; }
+.nesio-tl-citycards { display: flex; flex-direction: column; gap: 0.7rem; }
+.nesio-tl-citycard { background: var(--glass-bg-solid); border: 1px solid var(--portal-line); border-radius: 0.85rem; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,.05); }
+.nesio-tl-citycard-img { display: block; height: 5.4rem; position: relative; }
+.nesio-tl-citycard-tag {
+  position: absolute; left: 0.55rem; top: 0.55rem;
+  font-size: 0.6rem; font-weight: 800; color: var(--portal-ink);
+  background: color-mix(in srgb, #fff 78%, transparent); border-radius: 0.4rem; padding: 0.12rem 0.5rem;
+}
+.nesio-tl-citycard-name { display: block; padding: 0.6rem 0.8rem 0.7rem; font-size: 0.9rem; font-weight: 800; color: var(--portal-ink); }
 .nesio-tl-catbar--home { background: #588ce3; }
 .nesio-tl-catbar--work { background: #7b5ea7; }
 .nesio-tl-catbar--shopping { background: #e8888f; }
@@ -15005,6 +15082,44 @@ html[data-portal-theme="night"] .nesio-exp-card:hover {
   font-variant-numeric: tabular-nums;
 }
 
+/* ── 生命版图 · 领土条(设计 §2:唯一保留的图,五领域按意义密度切宽度)── */
+.nesio-territory-bar {
+  display: flex;
+  height: 74px;
+  margin-top: 0.55rem;
+  border: 1px solid var(--portal-line);
+  border-radius: var(--radius-md, 16px);
+  overflow: hidden;
+}
+.nesio-territory-terr {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 1px;
+  padding: 0.5rem 0.45rem;
+  color: #fff;
+  min-width: 0;
+  overflow: hidden;
+}
+.nesio-territory-terr small {
+  font-size: 0.625rem;
+  font-weight: 700;
+  opacity: 0.95;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nesio-territory-terr b { font-size: 0.75rem; font-weight: 800; }
+.nesio-territory-note {
+  display: flex;
+  align-items: center;
+  gap: 0.32rem;
+  margin: 0.55rem 0 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--portal-cool-accent);
+}
+
 /* ── 多面镜月度信(§2.3):暖色信纸 + 宋体 ── */
 .nesio-mirror-tab { display: flex; flex-direction: column; }
 .nesio-mirror-picker { display: flex; gap: 0.45rem; flex-wrap: wrap; }
@@ -15075,6 +15190,140 @@ html[data-portal-theme="night"] .nesio-exp-card:hover {
 }
 .nesio-mirror-writing { font-size: 0.82rem; color: var(--portal-muted); margin: 0.4rem 0; text-align: center; }
 .nesio-mirror-error { font-size: 0.76rem; color: var(--status-risk); margin: 0.2rem 0; }
+
+/* ── 多面镜:顶栏 filter + 往期按钮(设计稿「念念 · 给你的信」)── */
+.nesio-mirror-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.9rem;
+}
+.nesio-mirror-filters { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.nesio-mirror-filter { position: relative; }
+.nesio-mirror-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: none;
+  border: 1px solid var(--portal-line);
+  border-radius: var(--radius-pill);
+  padding: 0.34rem 0.7rem;
+  font-size: 0.78rem;
+  color: var(--portal-ink);
+  cursor: pointer;
+  min-height: var(--tap-min);
+}
+.nesio-mirror-filter-btn--open { border-color: color-mix(in srgb, var(--status-gentle) 55%, transparent); }
+.nesio-mirror-filter-dot {
+  width: 0.6rem; height: 0.6rem; border-radius: 50%;
+  background: conic-gradient(var(--status-gentle) 0 50%, transparent 50% 100%);
+  border: 1px solid var(--status-gentle);
+}
+.nesio-mirror-filter-caret { font-size: 0.6rem; color: var(--portal-muted); }
+.nesio-mirror-filter-backdrop {
+  position: fixed; inset: 0; z-index: 40;
+  background: none; border: none; cursor: default;
+}
+.nesio-mirror-filter-menu {
+  position: absolute; top: calc(100% + 0.35rem); left: 0; z-index: 41;
+  min-width: 9rem; max-width: 15rem;
+  display: flex; flex-direction: column;
+  background: var(--glass-bg-solid);
+  border: 1px solid var(--portal-line);
+  border-radius: var(--radius-md, 14px);
+  box-shadow: var(--shadow-pop, 0 10px 28px rgba(0,0,0,.14));
+  padding: 0.3rem;
+  max-height: 15rem; overflow-y: auto;
+}
+.nesio-mirror-filter-opt {
+  display: flex; align-items: baseline; gap: 0.4rem;
+  text-align: left; background: none; border: none; cursor: pointer;
+  padding: 0.42rem 0.5rem; border-radius: 0.55rem;
+  font-size: 0.8rem; color: var(--portal-ink);
+}
+.nesio-mirror-filter-opt:hover { background: var(--portal-accent-soft); }
+.nesio-mirror-filter-opt--on { background: color-mix(in srgb, var(--status-gentle) 12%, transparent); font-weight: 600; }
+.nesio-mirror-filter-hint {
+  font-size: 0.66rem; color: var(--portal-muted);
+  margin-left: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 8rem;
+}
+.nesio-mirror-archive-btn {
+  display: inline-flex; align-items: center; gap: 0.32rem;
+  background: none; border: 1px solid var(--portal-line);
+  border-radius: var(--radius-pill); padding: 0.34rem 0.7rem;
+  font-size: 0.76rem; color: var(--portal-muted); cursor: pointer; min-height: var(--tap-min);
+}
+.nesio-mirror-archive-count {
+  min-width: 1.15rem; height: 1.15rem; padding: 0 0.28rem;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 999px; font-size: 0.66rem; font-weight: 700;
+  color: #fff; background: var(--status-gentle);
+}
+
+/* 逐段可反驳:说得对 / 不像我(取代裸 ✓✗)*/
+.nesio-mirror-verdict-btn {
+  background: none; border: 1px solid var(--portal-line);
+  border-radius: var(--radius-pill); padding: 0.22rem 0.62rem;
+  font-size: 0.7rem; color: var(--portal-muted); cursor: pointer;
+}
+.nesio-mirror-verdict-btn--yes { border-color: color-mix(in srgb, var(--status-go) 55%, transparent); color: var(--status-go); font-weight: 600; }
+.nesio-mirror-verdict-btn--no { border-color: color-mix(in srgb, var(--status-gentle) 55%, transparent); color: var(--status-gentle); font-weight: 600; }
+
+.nesio-mirror-sign {
+  margin: 0.5rem 0 0; text-align: right;
+  font-family: var(--font-portal-serif), Georgia, serif;
+  font-size: 0.78rem; color: var(--portal-muted); letter-spacing: 0.02em;
+}
+
+/* 信下方动作:存入记忆 / 重写 */
+.nesio-mirror-actions { display: flex; gap: 0.6rem; margin-top: 0.85rem; }
+.nesio-mirror-action {
+  flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
+  background: none; border: 1px solid var(--portal-line);
+  border-radius: var(--radius-sm, 12px); padding: 0.7rem 0.8rem;
+  font-size: 0.82rem; font-weight: 600; color: var(--portal-ink); cursor: pointer;
+  min-height: var(--tap-min);
+}
+.nesio-mirror-action:disabled { opacity: 0.55; cursor: default; }
+.nesio-mirror-action--primary {
+  background: var(--status-gentle); border-color: var(--status-gentle); color: #fff;
+}
+.nesio-mirror-note { margin: 0.75rem 0 0; font-size: 0.68rem; color: var(--portal-muted); text-align: center; }
+
+/* 往期存档抽屉 */
+.nesio-mirror-drawer-scrim { position: fixed; inset: 0; z-index: 60; background: rgba(20,22,28,.28); border: none; cursor: pointer; }
+.nesio-mirror-drawer {
+  position: fixed; z-index: 61; left: 50%; bottom: 0; transform: translateX(-50%);
+  width: min(30rem, 100%);
+  background: var(--glass-bg-solid);
+  border: 1px solid var(--portal-line); border-bottom: none;
+  border-radius: var(--radius-xl, 28px) var(--radius-xl, 28px) 0 0;
+  padding: 1rem 1.1rem 1.4rem;
+  box-shadow: var(--shadow-pop, 0 -8px 30px rgba(0,0,0,.16));
+  max-height: 72vh; overflow-y: auto;
+}
+.nesio-mirror-drawer-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.7rem; }
+.nesio-mirror-drawer-title { font-size: 0.92rem; font-weight: 700; color: var(--portal-ink); }
+.nesio-mirror-drawer-close {
+  width: 1.9rem; height: 1.9rem; border-radius: 50%;
+  background: none; border: 1px solid var(--portal-line); color: var(--portal-muted);
+  font-size: 1.1rem; line-height: 1; cursor: pointer;
+}
+.nesio-mirror-drawer-empty { font-size: 0.8rem; color: var(--portal-muted); text-align: center; padding: 1rem 0; margin: 0; }
+.nesio-mirror-drawer-list { display: flex; flex-direction: column; }
+.nesio-mirror-drawer-item {
+  display: flex; align-items: center; gap: 0.6rem;
+  background: none; border: none; border-bottom: 1px solid var(--portal-line);
+  padding: 0.7rem 0.15rem; text-align: left; cursor: pointer; width: 100%;
+}
+.nesio-mirror-drawer-item:last-child { border-bottom: none; }
+.nesio-mirror-drawer-item-icon { color: var(--status-gentle); display: inline-flex; }
+.nesio-mirror-drawer-item-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.nesio-mirror-drawer-item-title { font-size: 0.82rem; font-weight: 700; color: var(--portal-ink); }
+.nesio-mirror-drawer-item-snip { font-size: 0.7rem; color: var(--portal-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nesio-mirror-drawer-item-date { font-size: 0.7rem; color: var(--portal-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 /* ── 批次 28 · Today §1:收据首行 + 捕获提示 ── */
 /* 批次 100:念念的问候 = 衬线「显示」嗓音(设计规范 §4 字体:问候用大标题衬线)。

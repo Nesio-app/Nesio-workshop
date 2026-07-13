@@ -45,7 +45,8 @@ const iso = (h, m = 0) => new Date(2026, 6, 9, h, m, 0).toISOString();
   assert.ok(/今天 2 个安排/.test(r.headline), 'headline 概览今日安排数(仅今天剩余的 2 个)');
   assert.ok(r.title.startsWith('每日日报'), 'title 字段');
   assert.ok(r.markdown.startsWith(`# ${r.title}`), 'markdown 标题 = title');
-  assert.ok(r.markdown.includes('## 📅 今日日程'), 'markdown 含日程节');
+  assert.ok(r.markdown.includes('## 今日日程'), 'markdown 含日程节');
+  assert.ok(!/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(r.markdown), 'markdown 无 emoji');
 }
 
 // ── 空日程:给"专注深度工作"文案,不算空(只要有天气/邮件之一就非空)──
