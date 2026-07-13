@@ -145,6 +145,16 @@ export function ProactiveGuidanceCard({
       onPointerCancel={() => { startRef.current = null; setDx(0); }}
       style={{ transform: dx ? `translateX(${dx}px)` : undefined, transition: dx ? 'none' : 'transform 0.2s ease', touchAction: 'pan-y' }}
     >
+      {/* 批次 165:滑动提示 —— 拖动时露出这一滑会做什么(左滑=没用 / 右滑=稍后),过阈值高亮=松手即执行 */}
+      {dx !== 0 && (
+        <span
+          className={`nesio-swipe-hint nesio-swipe-hint--${dx > 0 ? 'right' : 'left'}${Math.abs(dx) > 64 ? ' nesio-swipe-hint--ready' : ''}`}
+          aria-hidden
+          style={{ opacity: Math.min(1, Math.abs(dx) / 64) }}
+        >
+          {dx > 0 ? L(dict, '稍后提醒', 'Remind later') : L(dict, '先不看', 'Not useful')}
+        </span>
+      )}
       <div className="nesio-proactive-card-inner">
         {!isQuote && <span className="nesio-proactive-card-icon"><GuidanceIcon icon={card.icon} /></span>}
         <div className="nesio-proactive-card-text" onClick={() => { if (Math.abs(dx) < 6) onOpen?.(); }} style={onOpen ? { cursor: 'pointer' } : undefined}>
