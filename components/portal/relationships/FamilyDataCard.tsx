@@ -10,7 +10,8 @@ import { useEffect, useState } from 'react';
 import { getLifeGraph } from '@/lib/portal/life-graph';
 import { buildRelationships } from '@/lib/portal/relationships';
 import { buildFamilyDigest, type FamilyDigest } from '@/lib/portal/family-digest';
-import { RECORD_CATEGORY_MAP, type PersonRecordCategory } from '@/lib/portal/person-records';
+import { type PersonRecordCategory } from '@/lib/portal/person-records';
+import { RecordCatIcon } from './record-icons';
 import RelationshipDetailSheet from './RelationshipDetailSheet';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -45,8 +46,8 @@ export default function FamilyDataCard({ kind }: { kind: 'health' | 'spend' }) {
 
   const recent = digest.recent.filter((r) => catSet.has(r.record.category)).slice(0, 5);
   const title = kind === 'health'
-    ? L(dict, '👪 家人健康 · 用药', '👪 Family health')
-    : L(dict, '👪 家人消费', '👪 Family spending');
+    ? L(dict, '家人健康 · 用药', 'Family health')
+    : L(dict, '家人消费', 'Family spending');
 
   return (
     <div className="nesio-fit-panel" style={{ marginTop: '0.6rem' }}>
@@ -56,7 +57,7 @@ export default function FamilyDataCard({ kind }: { kind: 'health' | 'spend' }) {
           <button key={m.key} type="button" className="nesio-fam-chip" onClick={() => setOpenKey(m.key)}>
             <span className="nesio-fam-chip-name">{m.name}</span>
             <span className="nesio-fam-chip-cats">
-              {cats.map((c) => (m.counts[c] ? <span key={c}>{RECORD_CATEGORY_MAP[c].icon}{m.counts[c]}</span> : null))}
+              {cats.map((c) => (m.counts[c] ? <span key={c} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.15rem' }}><RecordCatIcon category={c} size={12} />{m.counts[c]}</span> : null))}
             </span>
           </button>
         ))}
@@ -64,13 +65,12 @@ export default function FamilyDataCard({ kind }: { kind: 'health' | 'spend' }) {
       {recent.length > 0 && (
         <div className="nesio-rel-timeline" style={{ marginTop: '0.5rem' }}>
           {recent.map((item) => {
-            const meta = RECORD_CATEGORY_MAP[item.record.category];
             const d = item.record.date || item.record.createdAt;
             return (
               <button key={item.record.id} type="button" className="nesio-fam-tl-row" onClick={() => setOpenKey(item.personKey)}>
                 <span className="nesio-rel-tl-date">{new Date(d).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'short', day: 'numeric' })}</span>
-                <span className="nesio-rel-tl-text">
-                  {meta.icon} <b>{item.personName}</b> · {item.record.title}{typeof item.record.amount === 'number' ? ` · ${item.record.amount}` : ''}
+                <span className="nesio-rel-tl-text" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                  <RecordCatIcon category={item.record.category} size={13} /> <b>{item.personName}</b> · {item.record.title}{typeof item.record.amount === 'number' ? ` · ${item.record.amount}` : ''}
                 </span>
               </button>
             );

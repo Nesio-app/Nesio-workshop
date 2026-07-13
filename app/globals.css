@@ -12666,6 +12666,22 @@ button.nesio-rel-due-info { background: none; border: none; padding: 0; font: in
 .nesio-rel-detail-tile { display: flex; align-items: center; gap: 0.45rem; background: var(--glass-bg-solid); border-radius: 0.7rem; padding: 0.5rem 0.6rem; min-width: 0; }
 .nesio-rel-detail-tile-ic { font-size: 1rem; flex: none; }
 .nesio-rel-detail-tile-lab { font-size: 0.78rem; color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 人物页 3-stats(设计稿:上次联系 / 提到 / 认识)*/
+.nesio-rel-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin-top: 0.9rem; }
+.nesio-rel-stat { display: flex; flex-direction: column; gap: 0.15rem; background: color-mix(in srgb, var(--portal-ink) 3%, transparent); border: 1px solid var(--portal-line); border-radius: 0.7rem; padding: 0.55rem 0.6rem; min-width: 0; }
+.nesio-rel-stat-label { font-size: 0.66rem; font-weight: 700; color: var(--portal-muted); }
+.nesio-rel-stat-value { font-size: 0.95rem; font-weight: 800; color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 挂在 TA 身上:敏感记录的「本机」徽章 */
+.nesio-rel-rec-local { display: inline-flex; align-items: center; gap: 0.18rem; flex: none; font-size: 0.62rem; font-weight: 800; color: var(--status-go); background: var(--status-go-soft); border-radius: 0.4rem; padding: 0.12rem 0.4rem; }
+/* 念念提醒卡(列表顶部,给最该联系的人一句暖话)*/
+.nesio-rel-nudge { display: flex; gap: 0.6rem; align-items: flex-start; background: var(--status-go-soft); border: 1px solid color-mix(in srgb, var(--status-go) 22%, transparent); border-radius: var(--radius-md, 14px); padding: 0.75rem 0.85rem; margin: 0.5rem 0 0.2rem; }
+.nesio-rel-nudge-ic { flex: none; width: 1.7rem; height: 1.7rem; border-radius: 50%; display: grid; place-items: center; color: var(--status-go); background: color-mix(in srgb, var(--status-go) 16%, transparent); }
+.nesio-rel-nudge-body { flex: 1; min-width: 0; }
+.nesio-rel-nudge-text { margin: 0; font-size: 0.85rem; line-height: 1.5; color: var(--portal-ink); }
+.nesio-rel-nudge-btn { margin-top: 0.4rem; background: none; border: 0; padding: 0; font-size: 0.78rem; font-weight: 700; color: var(--status-go); cursor: pointer; }
+.nesio-rel-touch-btn--due { background: var(--portal-accent-soft); color: var(--portal-accent); }
+
 .nesio-rel-timeline { display: flex; flex-direction: column; }
 .nesio-rel-tl-row { display: flex; gap: 0.7rem; font-size: 0.82rem; padding: 0.3rem 0; border-bottom: 1px solid var(--portal-line); }
 .nesio-rel-tl-row:last-child { border-bottom: none; }

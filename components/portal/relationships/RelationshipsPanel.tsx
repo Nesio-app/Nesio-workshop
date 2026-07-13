@@ -15,6 +15,7 @@ import {
   CLOSENESS_META, type Contact, type Closeness,
 } from '@/lib/portal/relationships';
 import { getLocalOwner } from '@/lib/portal/local-owner';
+import { IconCamera, IconHelpCircle } from '../icons';
 import { L } from '@/lib/portal/i18n';
 import { loadProfileSettings, portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -84,8 +85,8 @@ export default function RelationshipsPanel() {
         <p className="nesio-health-updated" style={{ margin: 0 }}>
           {L(dict, `${shown.length} 个联系人 · ${dueList.length} 个该联系`, `${shown.length} people · ${dueList.length} to reach out`)}
         </p>
-        <button type="button" className="nesio-rel-log-btn" onClick={() => setExtractOpen(true)}>
-          {L(dict, '📷 记给某人', '📷 Log to…')}
+        <button type="button" className="nesio-rel-log-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }} onClick={() => setExtractOpen(true)}>
+          <IconCamera size={14} />{L(dict, '记给某人', 'Log to…')}
         </button>
       </div>
 
@@ -96,9 +97,27 @@ export default function RelationshipsPanel() {
           </button>
           {allGroups.map((g) => (
             <button key={g} type="button" role="tab" aria-selected={activeGroup === g} className={`nesio-rel-chip${activeGroup === g ? ' nesio-rel-chip--on' : ''}`} onClick={() => setActiveGroup(g)}>
-              {FAMILY_RE.test(g) ? `👪 ${g}` : g}
+              {g}
             </button>
           ))}
+        </div>
+      )}
+
+      {/* 念念提醒:给最该联系的人一句暖话(设计稿)—— 帮你起个头 = 开聊天预填草稿 */}
+      {dueList.length > 0 && (
+        <div className="nesio-rel-nudge">
+          <span className="nesio-rel-nudge-ic" aria-hidden><IconHelpCircle size={16} /></span>
+          <div className="nesio-rel-nudge-body">
+            <p className="nesio-rel-nudge-text">
+              {L(dict,
+                `你有 ${lastContactLabel(dueList[0], dict)}没跟 ${dueList[0].name} 聊了。要不要今晚发条消息?`,
+                `It's been ${lastContactLabel(dueList[0], 'en')} since you talked to ${dueList[0].name}. Message them tonight?`)}
+            </p>
+            <button type="button" className="nesio-rel-nudge-btn"
+              onClick={() => window.dispatchEvent(new CustomEvent('nesio-ask-text', { detail: { text: L(dict, `帮我给 ${dueList[0].name} 写一条问候消息`, `Help me write a message to ${dueList[0].name}`) } }))}>
+              {L(dict, '帮你起个头 ›', 'Draft it for me ›')}
+            </button>
+          </div>
         </div>
       )}
 
@@ -144,18 +163,15 @@ export default function RelationshipsPanel() {
                   onClick={() => setOpenKey(c.key)}
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpenKey(c.key); } }}
                 >
-                  <span className="nesio-rel-name">
-                    {c.groups.some((x) => FAMILY_RE.test(x)) && <span aria-label={L(dict, '家人', 'Family')}>👪 </span>}
-                    {c.name}
-                  </span>
+                  <span className="nesio-rel-name">{c.name}</span>
                   <span className="nesio-rel-sub">{c.relation || (dict === 'en' ? `mentioned ${c.mentions}×` : `提到 ${c.mentions} 次`)}</span>
                   <span className="nesio-rel-last">{lastContactLabel(c, dict)}</span>
                   <button
                     type="button"
-                    className="nesio-rel-touch-btn nesio-rel-touch-btn--sm"
+                    className={`nesio-rel-touch-btn nesio-rel-touch-btn--sm${c.reachOut ? ' nesio-rel-touch-btn--due' : ''}`}
                     onClick={(e) => { e.stopPropagation(); onContacted(c.key); }}
                   >
-                    {L(dict, '联系过了', 'Reached out')}
+                    {c.reachOut ? L(dict, '该问候了', 'Say hi') : L(dict, '联系过了', 'Reached out')}
                   </button>
                 </div>
               ))}

@@ -17,6 +17,8 @@ import {
 } from '@/lib/portal/person-records';
 import { imageToDataUrl } from '@/lib/portal/image-util';
 import RelationGraph from '../RelationGraph';
+import { RecordCatIcon } from './record-icons';
+import { IconLock, IconMic, IconCamera } from '../icons';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -188,23 +190,16 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
   };
 
   const c = p.contact;
-  const tiles: Array<{ icon: string; label: string }> = [];
-  if (p.birthday) {
-    const mmdd = p.birthday.match(/(\d{1,2})-(\d{1,2})\s*$/);
-    tiles.push({ icon: '🎂', label: L(dict, `生日 ${mmdd ? `${mmdd[1]}-${mmdd[2]}` : p.birthday}`, `Birthday ${mmdd ? `${mmdd[1]}-${mmdd[2]}` : p.birthday}`) });
-  }
-  if (c) {
-    tiles.push({ icon: '🕰', label: L(dict, `上次 ${lastContactLabel(c, dict)}`, `Last ${lastContactLabel(c, 'en')}`) });
-    tiles.push({ icon: '💬', label: L(dict, `提到 ${c.mentions} 次`, `${c.mentions} mentions`) });
-  }
-  if (p.email) tiles.push({ icon: '✉️', label: p.email });
-  // 挂在 TA 身上的分类数据计数瓦片
-  const counts: Partial<Record<PersonRecordCategory, number>> = {};
-  for (const r of records) counts[r.category] = (counts[r.category] || 0) + 1;
-  for (const cat of RECORD_CATEGORIES) {
-    const n = counts[cat.key];
-    if (n) tiles.push({ icon: cat.icon, label: L(dict, `${cat.zh} ${n}`, `${cat.en} ${n}`) });
-  }
+  // 3 stats(设计稿):上次联系 / 提到 N次 / 认识 N天。认识天数 = 距最早往来记录的天数。
+  const knownDays = (() => {
+    const times = p.timeline.map((t) => (t.at ? Date.parse(t.at) : NaN)).filter((n) => Number.isFinite(n));
+    if (!times.length) return null;
+    return Math.max(0, Math.floor((Date.now() - Math.min(...times)) / 86_400_000));
+  })();
+  const stats: Array<{ label: string; value: string }> = [];
+  if (c) stats.push({ label: L(dict, '上次联系', 'Last'), value: lastContactLabel(c, dict) });
+  if (c) stats.push({ label: L(dict, '提到', 'Mentions'), value: L(dict, `${c.mentions} 次`, `${c.mentions}×`) });
+  if (knownDays != null) stats.push({ label: L(dict, '认识', 'Known'), value: L(dict, `${knownDays} 天`, `${knownDays}d`) });
 
   return (
     <div className="nesio-node-detail-overlay" role="dialog" aria-modal="true" aria-label={p.displayName}>
@@ -225,7 +220,9 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
               // eslint-disable-next-line @next/next/no-img-element
               ? <img src={avatarSrc} alt={p.displayName} className="nesio-rel-avatar-img" draggable={false} />
               : <span className="nesio-rel-avatar-initial">{initialOf(p.displayName)}</span>}
-            <span className="nesio-rel-avatar-edit" aria-hidden>{busy ? '…' : '✎'}</span>
+            <span className="nesio-rel-avatar-edit" aria-hidden>{busy ? '…' : (
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>
+            )}</span>
           </button>
           <input
             ref={fileRef} type="file" accept="image/*" hidden
@@ -234,7 +231,7 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
           <div className="nesio-rel-detail-id">
             <h2 className="nesio-settings-sheet-title" style={{ margin: 0 }}>{p.displayName}</h2>
             <div className="nesio-rel-detail-pills">
-              {p.isFamily && <span className="nesio-rel-pill nesio-rel-pill--fam">👪 {L(dict, '家庭', 'Family')}</span>}
+              {p.isFamily && <span className="nesio-rel-pill nesio-rel-pill--fam">{L(dict, '家庭', 'Family')}</span>}
               {c && <span className="nesio-rel-pill">{L(dict, CLOSENESS_META[c.closeness].zh, CLOSENESS_META[c.closeness].en)}</span>}
               {c?.relation && <span className="nesio-rel-pill nesio-rel-pill--rel">{c.relation}</span>}
               {c?.reachOut && <span className="nesio-rel-pill nesio-rel-pill--due">{L(dict, '该联系了', 'Reach out')}</span>}
@@ -252,13 +249,13 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
             </button>
           )}
 
-          {/* 关键事实瓦片 */}
-          {tiles.length > 0 && (
-            <div className="nesio-rel-detail-tiles">
-              {tiles.map((t, i) => (
-                <div key={i} className="nesio-rel-detail-tile">
-                  <span className="nesio-rel-detail-tile-ic">{t.icon}</span>
-                  <span className="nesio-rel-detail-tile-lab">{t.label}</span>
+          {/* 3 stats:上次联系 / 提到 / 认识(设计稿) */}
+          {stats.length > 0 && (
+            <div className="nesio-rel-stats">
+              {stats.map((s, i) => (
+                <div key={i} className="nesio-rel-stat">
+                  <span className="nesio-rel-stat-label">{s.label}</span>
+                  <span className="nesio-rel-stat-value">{s.value}</span>
                 </div>
               ))}
             </div>
@@ -297,16 +294,16 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
                 />
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                   <button
-                    type="button" className="nesio-today-btn nesio-today-btn--ghost" style={{ flex: 1 }}
+                    type="button" className="nesio-today-btn nesio-today-btn--ghost" style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
                     onClick={runExtract} disabled={nlBusy}
                   >
-                    {nlBusy ? L(dict, '识别中…', 'Reading…') : L(dict, '✨ 说一句', '✨ From text')}
+                    <IconMic size={15} />{nlBusy ? L(dict, '识别中…', 'Reading…') : L(dict, '说一句', 'From text')}
                   </button>
                   <button
-                    type="button" className="nesio-today-btn nesio-today-btn--ghost" style={{ flex: 1 }}
+                    type="button" className="nesio-today-btn nesio-today-btn--ghost" style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
                     onClick={() => photoRef.current?.click()} disabled={nlBusy}
                   >
-                    {L(dict, '📷 拍/传照片', '📷 Photo')}
+                    <IconCamera size={15} />{L(dict, '拍/传', 'Photo')}
                   </button>
                 </div>
                 <input
@@ -323,7 +320,7 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
                       const meta = RECORD_CATEGORY_MAP[r.category];
                       return (
                         <div key={i} className="nesio-rel-rec-row">
-                          <span className="nesio-rel-rec-ic">{meta.icon}</span>
+                          <span className="nesio-rel-rec-ic"><RecordCatIcon category={r.category} size={16} /></span>
                           <div className="nesio-rel-rec-main">
                             <span className="nesio-rel-rec-title">{r.title}{typeof r.amount === 'number' ? ` · ${r.amount}` : ''}</span>
                             {(r.detail || r.date) && <span className="nesio-rel-rec-sub">{r.date || ''}{r.detail ? `${r.date ? ' · ' : ''}${r.detail}` : ''}</span>}
@@ -343,8 +340,9 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
                   {RECORD_CATEGORIES.map((cat) => (
                     <button key={cat.key} type="button"
                       className={`nesio-rel-chip${form.category === cat.key ? ' nesio-rel-chip--on' : ''}`}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
                       onClick={() => setForm((f) => ({ ...f, category: cat.key }))}>
-                      {cat.icon} {L(dict, cat.zh, cat.en)}
+                      <RecordCatIcon category={cat.key} size={13} /> {L(dict, cat.zh, cat.en)}
                     </button>
                   ))}
                 </div>
@@ -357,7 +355,7 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
                   )}
                 </div>
                 {RECORD_CATEGORY_MAP[form.category].sensitive && (
-                  <p className="nesio-rel-rec-sensitive">🔒 {L(dict, '敏感信息:只存本机,不进 AI、不上传', 'Sensitive — on-device only, never sent to AI')}</p>
+                  <p className="nesio-rel-rec-sensitive" style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><IconLock size={12} />{L(dict, '敏感信息:只存本机,不进 AI、不上传', 'Sensitive — on-device only, never sent to AI')}</p>
                 )}
                 <button type="button" className="nesio-ob-primary-btn" style={{ width: '100%', marginTop: '0.4rem' }} onClick={saveRecord}>{L(dict, '保存', 'Save')}</button>
               </div>
@@ -369,16 +367,19 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
                   const meta = RECORD_CATEGORY_MAP[r.category];
                   return (
                     <div key={r.id} className="nesio-rel-rec-row">
-                      <span className="nesio-rel-rec-ic" title={L(dict, meta.zh, meta.en)}>{meta.icon}</span>
+                      <span className="nesio-rel-rec-ic" title={L(dict, meta.zh, meta.en)}><RecordCatIcon category={r.category} size={16} /></span>
                       <div className="nesio-rel-rec-main">
                         <span className="nesio-rel-rec-title">{r.title}{typeof r.amount === 'number' ? ` · ${r.amount}` : ''}</span>
-                        {(r.detail || r.date) && (
-                          <span className="nesio-rel-rec-sub">
-                            {r.date ? new Date(r.date).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { year: 'numeric', month: 'short', day: 'numeric' }) : ''}
-                            {r.detail ? `${r.date ? ' · ' : ''}${r.detail}` : ''}
-                          </span>
-                        )}
+                        <span className="nesio-rel-rec-sub">
+                          {L(dict, meta.zh, meta.en)}
+                          {r.date ? ` · ${new Date(r.date).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'short', day: 'numeric' })}` : ''}
+                          {r.detail ? ` · ${r.detail}` : ''}
+                          {meta.sensitive ? L(dict, ' · 只存本机', ' · on-device') : ''}
+                        </span>
                       </div>
+                      {meta.sensitive && (
+                        <span className="nesio-rel-rec-local" title={L(dict, '只存本机', 'On-device only')}><IconLock size={11} />{L(dict, '本机', 'Local')}</span>
+                      )}
                       <button type="button" className="nesio-rel-rec-del" onClick={() => removeRecord(r.id)} aria-label={L(dict, '删除', 'Delete')}>✕</button>
                     </div>
                   );
