@@ -25,6 +25,7 @@ import { isFeatureEnabled } from '@/lib/portal/module-overrides';
 import { smartSearch, type SearchUnderstood } from '@/lib/portal/smart-search';
 import { semanticRerank } from '@/lib/portal/semantic-rerank';
 import { DEMO_SEED_NODES, isDemoNode } from '@/lib/portal/demo-seed';
+import { seedSampleData, clearSampleData, hasSampleData } from '@/lib/portal/sample-data';
 import {
   getProjects,
   createProject,
@@ -1063,6 +1064,19 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
               <span>{L(dict, '这些是示例数据,让你看看 Nesio 记东西的样子。', 'Sample data to show how Nesio remembers. ')}<a href="/login" style={{ color: 'inherit', fontWeight: 600 }}>{L(dict, '登录', 'Sign in')}</a>{L(dict, '或直接开始记录,就会换成你自己的。', ' or just start noting — it becomes yours.')}</span>
             </div>
           )}
+          {/* 登录后灌入的样例数据(可一键清)—— 与游客只读 demo 分家 */}
+          {canUsePrivateData && hasSampleData(nodes) && (
+            <div style={{ background: 'var(--portal-accent-soft, rgba(88,140,227,0.1))', borderRadius: 12, padding: '0.55rem 0.9rem', margin: '0 0 0.6rem', fontSize: '0.72rem', color: 'var(--portal-blue-deep)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+              <span>{L(dict, '这些是样例,帮你先看看各功能的样子。', 'These are samples — a peek at what each feature looks like.')}</span>
+              <button
+                type="button"
+                onClick={() => { clearSampleData(); setNodes(readNodes()); }}
+                style={{ flexShrink: 0, color: 'var(--portal-blue-deep)', fontWeight: 600, textDecoration: 'underline' }}
+              >
+                {L(dict, '清除样例', 'Clear samples')}
+              </button>
+            </div>
+          )}
 
           {/* Search(批次 34:空库时藏起 —— 没东西可搜) */}
           {hasNodes && (
@@ -1352,6 +1366,15 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                     <br />
                     {L(dict, '记下之后,你就可以放心忘了', "Once it's noted, you can safely forget it")}
                   </p>
+                  {canUsePrivateData && (
+                    <button
+                      type="button"
+                      className="nesio-memory-sample-seed"
+                      onClick={() => { seedSampleData(); setNodes(readNodes()); }}
+                    >
+                      {L(dict, '先看看样例', 'Peek at samples')}
+                    </button>
+                  )}
                 </div>
               )}
             </>
