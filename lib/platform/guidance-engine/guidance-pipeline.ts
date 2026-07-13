@@ -142,7 +142,11 @@ function buildTitle(event: GuidanceEvent, urgency: WindowUrgency, locale: string
       return l(`${n} 快到了`, `${n} is coming up`);
     case 'weather_cold': return l('今天很冷，记得加件衣', "It's cold today — layer up");
     case 'weather_rain': return l('今天有雨，记得带伞', 'Rain today — bring an umbrella');
-    case 'email_signal': return l('邮件需要关注', 'An email needs attention');
+    case 'email_signal':
+      // 具体标题优先(email-signals 的 cardTitle,如「有快递待签收」);缺才退通用文案。
+      return typeof event.payload.cardTitle === 'string' && event.payload.cardTitle
+        ? event.payload.cardTitle
+        : l('邮件需要关注', 'An email needs attention');
     case 'health_habit': return l('今天的健康打卡', "Today's health check-in");
     case 'object_context': {
       const itemName = String(event.payload.itemName ?? event.title);

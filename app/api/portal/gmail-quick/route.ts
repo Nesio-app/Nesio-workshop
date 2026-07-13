@@ -1,14 +1,19 @@
 /**
  * GET /api/portal/gmail-quick
  * HTTP adapter for the Email Signal Engine (lib/platform/email-signals).
- * Fetches Gmail metadata only (no body), classifies subjects with regex, no AI.
- * Designed for 20-min polling; extremely cheap.
+ * Fetches Gmail metadata only (no body). Three-stage recommendation gate:
+ *   ① 正则粗筛(email-signals):主题匹配「可能需行动」的关键词
+ *   ② Gmail 标签门(批次 152):广告/社交/论坛不推荐
+ *   ③ AI 可执行性判定(批次 153):对已过粗筛的候选逐条判「值不值得今天打扰你」
+ * Designed for 20-min polling; AI 只看已过①②的几封(≤8),一次调用批量判。
  * Output: { ok, signals: EmailSignal[] }
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { getIntegrationToken } from '@/lib/portal/integrations';
 import { cookies } from 'next/headers';
 import { buildEmailSignal, type EmailSignal } from '@/lib/platform/email-signals';
+import { completeText, aiProviderAvailable } from '@/lib/portal/ai-complete';
+import { parseJsonBlock } from '@/lib/extraction/extraction';
 import { envValue } from '@/lib/portal/env';
 
 export const dynamic = 'force-dynamic';
@@ -81,6 +86,42 @@ async function fetchMetadata(accessToken: string): Promise<GmailMeta[]> {
   return msgs.filter((m): m is GmailMeta => m !== null);
 }
 
+// ── AI 可执行性门(批次 153,用户定案「正则之上加 AI 可执行性判定」)──────────────
+// 正则+标签门只是粗筛;再让模型对候选逐条判「值不值得今天打扰你」—— 不是每封
+// UPDATES 都该出卡(『账单已生成』不必扰,『账单明天到期』要)。只看已过粗筛的
+// 几封(≤8),一次调用批量判;仅用主题+发件人(不读正文,保持隐私与低成本)。
+// 降级原则:AI 无 key / 超时 / 解析失败 → 全放行(退回纯规则,不因 AI 抽风漏提醒)。
+const AI_JUDGE_TIMEOUT_MS = 6000;
+
+async function filterByAiActionability(candidates: EmailSignal[]): Promise<EmailSignal[]> {
+  if (candidates.length === 0 || !aiProviderAvailable()) return candidates;
+
+  const list = candidates
+    .map((s, i) => `${i}. [${s.type}] 主题：${s.subject}　发件人：${s.from}`)
+    .join('\n');
+  const prompt = `下面是几封已初步匹配「可能需要行动」的邮件(仅主题与发件人)。判断每封是否真的值得今天作为一张待办卡片提醒用户。
+只保留需要用户去做或决定某件事、且有时效的:要赶的航班、要确认的预约、要付且临近的账单、要签收的快递、真正的截止日期。
+排除:纯通知/回执/自动确认、账户或账单「已生成/已出账」这类无需动作的摘要、营销、社交、验证码之外无需处理的系统邮件。
+邮件:
+${list}
+
+只返回 JSON 数组,元素为值得出卡的邮件序号(从 0 开始),如 [0,2]。都不值得则返回 []。`;
+
+  try {
+    const judged = await Promise.race([
+      completeText({ prompt, maxTokens: 200, responseFormat: 'json', route: 'gmail-quick-actionability' }),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), AI_JUDGE_TIMEOUT_MS)),
+    ]);
+    if (!judged) return candidates; // 超时 → 降级全放行
+    const keep = parseJsonBlock<number[]>(judged.text || '[]');
+    if (!Array.isArray(keep)) return candidates; // 解析失败 → 降级全放行
+    const keepSet = new Set(keep.map(Number));
+    return candidates.filter((_, i) => keepSet.has(i)); // AI 返回 [] = 都不值得,尊重它
+  } catch {
+    return candidates; // AI 出错 → 降级全放行
+  }
+}
+
 // ── Handler ───────────────────────────────────────────────────────────────────
 
 export async function GET(req: NextRequest) {
@@ -131,6 +172,8 @@ export async function GET(req: NextRequest) {
     signals.push(signal);
   }
 
-  signals.sort((a, b) => b.priority - a.priority);
-  return NextResponse.json({ ok: true, signals });
+  // ③ AI 可执行性门:对已过正则+标签的候选逐条判「值不值得今天出卡」(降级见 helper)。
+  const surfaced = await filterByAiActionability(signals);
+  surfaced.sort((a, b) => b.priority - a.priority);
+  return NextResponse.json({ ok: true, signals: surfaced });
 }

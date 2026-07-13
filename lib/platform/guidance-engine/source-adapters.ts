@@ -104,6 +104,7 @@ export function emailSignalsToGuidanceEvents(signals: EmailSignal[]): GuidanceEv
         subject: s.subject,
         from: s.from,
         icon: s.icon,
+        cardTitle: s.cardTitle,
         cardBody: s.cardBody,
       },
     }));
