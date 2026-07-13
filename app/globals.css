@@ -9865,6 +9865,40 @@ html[data-portal-theme="night"] .nesio-wechat-header {
   background: var(--portal-accent-soft, rgba(88,140,227,0.12));
 }
 
+/* 批次 148:端上/深问 Pro 分段 */
+.nesio-wechat-mode-seg {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.9rem 0;
+  flex-wrap: wrap;
+}
+.nesio-wechat-mode-seg-btn {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.22rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--portal-line);
+  background: transparent;
+  color: var(--portal-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.nesio-wechat-mode-seg-btn--on {
+  background: var(--portal-accent-soft, rgba(88,140,227,0.12));
+  color: var(--portal-blue-deep);
+  border-color: var(--portal-blue-deep);
+}
+.nesio-wechat-mode-seg-pro { font-size: 0.6rem; font-weight: 800; opacity: 0.8; }
+.nesio-wechat-mode-seg-hint {
+  font-size: 0.62rem;
+  color: var(--portal-muted);
+  opacity: 0.72;
+  flex: 1;
+  text-align: right;
+  min-width: 60px;
+}
+
 .nesio-wechat-more-btn {
   font-size: 0.78rem;
   color: var(--portal-muted);

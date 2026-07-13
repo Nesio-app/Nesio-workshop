@@ -689,6 +689,9 @@ export default function NesioChatSheet({
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [input, setInput] = useState('');
+  // 批次 148·设计念念节:显式「端上 / 深问 Pro」分段。默认深问(有权益时,答复质量不降);
+  // 手动选端上 = 走本机记忆搜索(快/免费/弱),诚实不偷偷打云。无权益时深问锁,点了引导升级。
+  const [deepMode, setDeepMode] = useState(() => canUsePaidCloudAi());
   const [sending, setSending] = useState(false);
   // 同步的发送闭锁:setSending 是异步的,快速两次 Enter 两个闭包都读到 sending===false → 双发。
   const sendingRef = useRef(false);
@@ -823,14 +826,18 @@ Edit location/value anytime in Storage.`),
     // 成本护栏(A):分层启用后,免费层不打付费云问答 —— 退成端上语义搜索 + 升级引导
     //("问一问 → 搜一搜")。分层未启用(当前 PWA)→ canUsePaidCloudAi() 恒 true,此段不触发,
     // 行为完全不变、当前用户无回归。
-    if (!canUsePaidCloudAi()) {
+    // 批次 148:端上模式(用户手动选)或免费层 → 本机记忆搜索,不打云。深问 + 有权益才走云。
+    if (!deepMode || !canUsePaidCloudAi()) {
       const hits = searchLifeGraphFuzzy(text.trim(), 6);
       const body = hits.length
         ? L(dict, `在你的记忆里找到 ${hits.length} 条:\n${hits.map((n) => `• ${n.name}`).join('\n')}`,
             `Found ${hits.length} in your memory:\n${hits.map((n) => `• ${n.name}`).join('\n')}`)
         : L(dict, '记忆库里没找到相关的。', 'Nothing matching in your memory yet.');
-      const upsell = L(dict, '\n\n升级 Pro 可用 AI 对话式问答。', '\n\nUpgrade to Pro for conversational AI answers.');
-      const aiMsg: UiMessage = { id: nextMsgId('a'), role: 'model', text: body + upsell, answerMode: 'onDevice' };
+      // 免费层引导升级;有权益却手动选端上的(已是 Pro)只提示可切深问,不推销。
+      const hint = !canUsePaidCloudAi()
+        ? L(dict, '\n\n升级 Pro 可用 AI 对话式问答。', '\n\nUpgrade to Pro for conversational AI answers.')
+        : L(dict, '\n\n想让我认真综合一遍?切「深问」。', '\n\nWant a fuller take? Switch to Deep.');
+      const aiMsg: UiMessage = { id: nextMsgId('a'), role: 'model', text: body + hint, answerMode: 'onDevice' };
       setMessages((prev) => { const next = [...prev, aiMsg]; saveHistory(next); return next; });
       setSending(false);
       sendingRef.current = false;
@@ -1196,7 +1203,7 @@ Edit location/value anytime in Storage.`),
         <div className="nesio-wechat-brand">
           <span className="nesio-wechat-title">{L(dict, '念念', 'Nessa')}</span>
           <span className="nesio-wechat-brand-mode">
-            {canUsePaidCloudAi()
+            {deepMode && canUsePaidCloudAi()
               ? L(dict, '深问 · 云端 · Pro', 'Deep · cloud · Pro')
               : L(dict, '端上简答 · 免费', 'On-device · free')}
           </span>
@@ -1484,6 +1491,30 @@ Edit location/value anytime in Storage.`),
           e.target.value = '';
         }}
       />
+
+      {/* 批次 148·设计念念节:显式「端上 / 深问 Pro」分段 —— 复杂题才切深问,免费够用大多数时候。
+          端上=本机记忆搜索(免费/快);深问=云端认真综合(Pro)。答复徽章按真实来路诚实标。 */}
+      <div className="nesio-wechat-mode-seg" role="tablist" aria-label={L(dict, '回答模式', 'Answer mode')}>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={!deepMode}
+          className={`nesio-wechat-mode-seg-btn${!deepMode ? ' nesio-wechat-mode-seg-btn--on' : ''}`}
+          onClick={() => setDeepMode(false)}
+        >
+          ◐ {L(dict, '端上', 'On-device')}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={deepMode}
+          className={`nesio-wechat-mode-seg-btn${deepMode ? ' nesio-wechat-mode-seg-btn--on' : ''}`}
+          onClick={() => setDeepMode(true)}
+        >
+          ✦ {L(dict, '深问', 'Deep')} <span className="nesio-wechat-mode-seg-pro">Pro</span>
+        </button>
+        <span className="nesio-wechat-mode-seg-hint">{L(dict, '复杂题才需要 · 免费够用大多数时候', 'Only for hard ones · free covers most')}</span>
+      </div>
 
       {/* Input bar */}
       <div className="nesio-wechat-input-bar">

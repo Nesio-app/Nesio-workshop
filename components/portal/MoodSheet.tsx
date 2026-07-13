@@ -660,19 +660,31 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
                 </g>
               );
             })}
+            {/* 批次 149·设计 mood-wheel2:中心大圈染成当前(滑到的)情绪色,名字压白字 —— 中心不再空、
+                成了实时预览;没滑时回落「此刻 · 滑动换色」。 */}
             <circle cx={CX} cy={CY} r={R_IN - 3}
-              fill={longPressing ? 'var(--portal-accent-soft)' : 'var(--mood-card-bg, #fff)'}
-              stroke="var(--portal-line)" strokeWidth="1"
-              style={{ cursor: 'pointer', transition: 'fill 0.3s' }} />
-            <text x={CX} y={CY - 7} textAnchor="middle" fontSize="10"
-              fill={longPressing ? 'var(--portal-cool-accent)' : 'var(--portal-muted)'} fontWeight="600"
-              style={{ userSelect: 'none', pointerEvents: 'none' }}>
-              {longPressing ? L(dict, '放开写 Journal', 'Release to journal') : L(dict, '此刻', 'Now')}
-            </text>
-            <text x={CX} y={CY + 8} textAnchor="middle" fontSize="8.5" fill="var(--portal-muted)"
-              style={{ userSelect: 'none', pointerEvents: 'none' }}>
-              {longPressing ? 'Journal' : L(dict, '滑动选择', 'Slide to pick')}
-            </text>
+              fill={longPressing ? 'var(--portal-accent-soft)' : (hoveredEm ? hoveredEm.color : 'var(--mood-card-bg, #fff)')}
+              stroke={hoveredEm && !longPressing ? 'rgba(255,255,255,0.72)' : 'var(--portal-line)'}
+              strokeWidth={hoveredEm && !longPressing ? 1.5 : 1}
+              style={{ cursor: 'pointer', transition: 'fill 0.2s' }} />
+            {hoveredEm && !longPressing ? (
+              <text x={CX} y={CY + 1} textAnchor="middle" dominantBaseline="middle" fontSize="15" fontWeight="800"
+                fill="#fff" style={{ userSelect: 'none', pointerEvents: 'none', letterSpacing: '0.06em' }}>
+                {emLabel(hoveredEm, dict)}
+              </text>
+            ) : (
+              <>
+                <text x={CX} y={CY - 7} textAnchor="middle" fontSize="10"
+                  fill={longPressing ? 'var(--portal-cool-accent)' : 'var(--portal-muted)'} fontWeight="600"
+                  style={{ userSelect: 'none', pointerEvents: 'none' }}>
+                  {longPressing ? L(dict, '放开写 Journal', 'Release to journal') : L(dict, '此刻', 'Now')}
+                </text>
+                <text x={CX} y={CY + 8} textAnchor="middle" fontSize="8.5" fill="var(--portal-muted)"
+                  style={{ userSelect: 'none', pointerEvents: 'none' }}>
+                  {longPressing ? 'Journal' : L(dict, '滑动换色', 'Slide to preview')}
+                </text>
+              </>
+            )}
           </svg>
         </div>
         <p className="nesio-mood-hint-text">{L(dict, '滑过一种感觉，松手即记录 · 长按中心写 Journal', 'Slide over a feeling and release to log · long-press center to journal')}</p>
