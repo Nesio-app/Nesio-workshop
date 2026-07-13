@@ -64,6 +64,7 @@ function readLatestMoodToday(): Beat | null {
 }
 
 export default function MoodBeat() {
+  const onOpenMood = () => window.dispatchEvent(new CustomEvent('nesio-open-mood'));
   const onOpenTrend = () => window.dispatchEvent(new CustomEvent('nesio-open-mood-trend'));
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [beat, setBeat] = useState<Beat | null>(null);
@@ -94,24 +95,32 @@ export default function MoodBeat() {
     );
   }
 
-  // 已记:符号 + 标题都染上当天情绪色(取盘里同一 var(--emotion-<id>))
+  // 已记:符号 + 标题都染上当天情绪色(取盘里同一 var(--emotion-<id>))。
+  // 主区点击 = 再记一次心情(恢复入口 + 支持一天多记:每记一次是新节点,第一拍显示最新);
+  // 「看这周趋势」降为 sub 行次级链接(避免嵌套按钮,外层用 div)。
   const moodC = beat.emotionId ? `var(--emotion-${beat.emotionId})` : 'var(--portal-muted)';
   return (
-    <button
-      type="button"
-      className="nesio-tl-node nesio-tl-node--mood"
-      onClick={onOpenTrend}
+    <div
+      className="nesio-tl-node nesio-tl-node--mood nesio-tl-node--mood-logged"
       style={{ ['--mood-c']: moodC } as React.CSSProperties}
     >
       <span className="nesio-tl-dot nesio-tl-dot--mood" aria-hidden><MoodRipple /></span>
-      <span className="nesio-tl-time">{L(dict, '今天', 'Today')}</span>
-      {/* 批次 128·新时间线规格:情绪词后缀环形能量表(弧长=高低,替掉「能量高/中/低」文字) */}
-      <span className="nesio-tl-title">
-        <span className="nesio-mood-word">{L(dict, beat.label, beat.labelEn)}</span>
-        {beat.hasEmotion && <EnergyRing level={beat.energyLevel} />}
+      <button type="button" className="nesio-tl-mood-main" onClick={onOpenMood}
+        aria-label={L(dict, '再记一次心情', 'Log mood again')}>
+        <span className="nesio-tl-time">{L(dict, '今天', 'Today')}</span>
+        {/* 批次 128·新时间线规格:情绪词后缀环形能量表(弧长=高低,替掉「能量高/中/低」文字) */}
+        <span className="nesio-tl-title">
+          <span className="nesio-mood-word">{L(dict, beat.label, beat.labelEn)}</span>
+          {beat.hasEmotion && <EnergyRing level={beat.energyLevel} />}
+        </span>
+      </button>
+      <span className="nesio-tl-sub nesio-tl-sub--mood">
+        {beat.time} · {L(dict, '记录', 'logged')} ·{' '}
+        <button type="button" className="nesio-tl-mood-again" onClick={onOpenMood}>{L(dict, '再记一次', 'log again')}</button>
+        {' · '}
+        <button type="button" className="nesio-tl-mood-trend" onClick={onOpenTrend}>{L(dict, '这周趋势 ›', 'this week ›')}</button>
       </span>
-      <span className="nesio-tl-sub">{beat.time} · {L(dict, '记录 · 点开看这周趋势', 'logged · tap for this week')}</span>
-    </button>
+    </div>
   );
 }
 

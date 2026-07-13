@@ -9143,6 +9143,22 @@ html[data-portal-theme="night"] .nesio-trend-chart-card { background: rgba(255,2
   grid-column: 2;
   font-size: 0.76rem; color: var(--portal-muted); margin-top: 2px;
 }
+/* 心情已记态:外层 div(非 button),主区按钮=再记,sub 行带「再记 / 趋势」两枚链接。 */
+.nesio-tl-node--mood-logged { cursor: default; }
+.nesio-tl-mood-main {
+  grid-column: 2;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
+  background: none; border: 0; padding: 0; text-align: left; cursor: pointer;
+  width: 100%; min-height: var(--tap-min);
+}
+.nesio-tl-sub--mood { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.15rem; }
+.nesio-tl-mood-again,
+.nesio-tl-mood-trend {
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font-size: 0.76rem; font-weight: 700;
+}
+.nesio-tl-mood-again { color: var(--mood-c, var(--portal-accent)); }
+.nesio-tl-mood-trend { color: var(--portal-muted); }
 .nesio-focus-empty--tl { margin-left: 31px; }
 
 .nesio-focus-all-btn {
