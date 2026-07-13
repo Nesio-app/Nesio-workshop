@@ -136,10 +136,29 @@ export async function fetchGranolaMeetings(bearer: string, opts?: {
   });
 }
 
-/** 只拉列表(不取转写),供 UI 让用户勾选要同步哪些会议。 */
+/** 只拉列表(不取摘要),供 UI 让用户勾选要同步哪些会议(批次160 隐私门)。 */
 export async function listGranolaMeetings(bearer: string, timeRange: GranolaTimeRange = 'last_30_days'): Promise<GranolaMeetingMeta[]> {
   return withClient(bearer, async (client) => {
     const listRes = await client.callTool({ name: 'list_meetings', arguments: { time_range: timeRange } }) as ToolResult;
     return parseMeetingList(textOf(listRes));
+  });
+}
+
+/** 只取用户勾选的会议(批次160)。get_meetings 一次批量(≤10),输出含 title/date/summary。 */
+export async function fetchGranolaMeetingsByIds(bearer: string, ids: string[]): Promise<GranolaMeetingFull[]> {
+  const wanted = ids.filter(Boolean).slice(0, 10);
+  if (!wanted.length) return [];
+  return withClient(bearer, async (client) => {
+    const detRes = await client.callTool({ name: 'get_meetings', arguments: { meeting_ids: wanted } }) as ToolResult;
+    const text = textOf(detRes);
+    const summaries = parseMeetingSummaries(text);
+    const metaById = new Map(parseMeetingList(text).map((m) => [m.id, m]));
+    const out: GranolaMeetingFull[] = [];
+    for (const id of wanted) {
+      const content = summaries.get(id)?.trim();
+      const meta = metaById.get(id);
+      if (content && meta) out.push({ ...meta, transcript: content });
+    }
+    return out;
   });
 }

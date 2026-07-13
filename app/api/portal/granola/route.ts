@@ -12,7 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { getIntegrationToken } from '@/lib/portal/integrations';
-import { fetchGranolaMeetings, type GranolaTimeRange } from '@/lib/portal/granola-mcp';
+import { fetchGranolaMeetings, fetchGranolaMeetingsByIds, listGranolaMeetings, type GranolaTimeRange } from '@/lib/portal/granola-mcp';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -42,11 +42,24 @@ export async function GET(req: NextRequest) {
   const rangeParam = url.searchParams.get('range') || 'last_30_days';
   const range: GranolaTimeRange = (VALID_RANGES as string[]).includes(rangeParam) ? rangeParam as GranolaTimeRange : 'last_30_days';
   const max = Number(url.searchParams.get('max') || 10) || 10;
+  const listOnly = url.searchParams.get('listOnly') === '1'; // 批次160:隐私门 —— 只列会议供勾选
+  const ids = (url.searchParams.get('ids') || '').split(',').map((s) => s.trim()).filter(Boolean);
   const skipIds = new Set(
     (url.searchParams.get('skip') || '').split(',').map((s) => s.trim()).filter(Boolean),
   );
 
   try {
+    // ① 只列表(隐私门第一步):返回会议标题/日期,不取任何内容
+    if (listOnly) {
+      const list = await listGranolaMeetings(tokens.accessToken, range);
+      return NextResponse.json({ ok: true, list });
+    }
+    // ② 只取勾选的会议(隐私门第二步)
+    if (ids.length) {
+      const meetings = await fetchGranolaMeetingsByIds(tokens.accessToken, ids);
+      return NextResponse.json({ ok: true, meetings });
+    }
+    // ③ 默认:列表 + 去重后批量取(不勾选时的全量同步)
     const meetings = await fetchGranolaMeetings(tokens.accessToken, { timeRange: range, maxTranscripts: max, skipIds });
     return NextResponse.json({ ok: true, meetings });
   } catch (err) {

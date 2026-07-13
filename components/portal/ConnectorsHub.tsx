@@ -65,6 +65,8 @@ const CONNECTORS: ConnectorDef[] = [
   { id: 'keep', name: 'Keep 健康', nameEn: 'Keep fitness', icon: <IconActivity />, iconBg: 'var(--chip-green)', method: 'shortcuts', ingestSource: 'keep', description: '通过快捷指令推送运动数据（点设置看步骤）', descriptionEn: 'Push workout data via Shortcuts (tap Set up for steps)' },
   // 批次 22:微信读书无开放 API —— App 内导出笔记,粘贴文本解析入库
   { id: 'wechat_reading', name: '微信读书', nameEn: 'WeChat Reading', icon: <IconBookOpen />, iconBg: 'var(--chip-leaf)', method: 'file', description: '微信读书 App 导出笔记,粘进来解析成划线记忆', descriptionEn: 'Export notes from WeChat Reading and paste to parse highlights' },
+  // 批次 161:微信读书自动同步(cookie 方案,非官方接口,cookie 会过期需重粘)
+  { id: 'weread', name: '微信读书 · 自动同步', nameEn: 'WeChat Reading · auto', icon: <IconBookOpen />, iconBg: 'var(--chip-leaf)', method: 'token', syncEndpoint: '/api/portal/weread', tokenHint: '电脑浏览器登录 weread.qq.com → F12 开发者工具 → Network 里任一请求 → 复制 Request Headers 的 Cookie 整串粘进来。cookie 数小时会过期,过期重粘一次即可。', tokenHintEn: 'Log into weread.qq.com on desktop → DevTools → Network → copy the full Cookie request header. The cookie expires after hours — re-paste when it does.', description: '粘贴微信读书 cookie,自动同步有笔记的书的划线(非官方接口,cookie 会过期)', descriptionEn: 'Paste a WeChat Reading cookie to auto-sync highlights from books with notes (unofficial; cookie expires)' },
   // 批次 22:微信公众号/视频收藏无 API —— 说明可用路径,不做假按钮
   { id: 'wechat_fav', name: '微信收藏 · 公众号/视频', nameEn: 'WeChat favorites', icon: <IconBook />, iconBg: 'var(--chip-mint)', method: 'file', dev: true, description: '公众号文章 / 视频号收藏没有开放接口。可用:① 打开文章 → 分享 → 复制链接 → 用「分享给 Nesio」或冷冻仓存入;② 关注 flomo 服务号,收藏自动进 flomo,再用 Flomo 同步。', descriptionEn: 'Official-account articles and Channels favorites have no public API. Options: ① copy the article link and use Share to Nesio; ② follow flomo\'s service account so favorites flow into flomo, then use Flomo sync.' },
   { id: 'tesla', name: 'Tesla', icon: <IconCar />, iconBg: 'var(--chip-green)', method: 'oauth', description: '只读接入:通勤/停放状态与充电记录(充电花费自动进财务),不发任何车控指令', descriptionEn: 'Read-only: commute/parked state and charging records (charging cost flows into finance); never sends vehicle commands' },
@@ -122,6 +124,10 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
   const [shortcutsFor, setShortcutsFor] = useState<string | null>(null);
   const [ingestUrl, setIngestUrl] = useState('');
   const [oauthSyncResult, setOauthSyncResult] = useState<Record<string, SyncResult>>({});
+  // 批次 160:Granola 同步前的会议勾选(隐私门)。granolaList=null 时不显示选择器。
+  const [granolaList, setGranolaList] = useState<Array<{ id: string; title: string; date?: string }> | null>(null);
+  const [granolaSel, setGranolaSel] = useState<Set<string>>(new Set());
+  const [granolaKnown, setGranolaKnown] = useState<Set<string>>(new Set());
   // 批次 38:Notion 数据库选择器
   const [notionDbLoading, setNotionDbLoading] = useState(false);
   const [notionDbList, setNotionDbList] = useState<Array<{ id: string; title: string }> | null>(null);
@@ -730,34 +736,48 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     setSyncing(null);
   }
 
-  // 批次 158:Granola 同步 —— 服务端 MCP 客户端拉会议转写,浏览器过批次154 抽取落库(本地优先)。
+  // 批次 160:Granola 同步 = 隐私门。点「同步」先列会议(免费档 list_meetings 只出标题/日期,
+  // 不碰内容),让用户勾选哪些再拉 —— 你列表里有很私密的会议,不默认全拉。
   async function syncGranola() {
     setSyncing('granola');
-    setOauthSyncResult((p) => ({ ...p, granola: { ok: true, msg: L(dict, '同步中…', 'Syncing…') } }));
     try {
-      // 源头去重:把已入库的 Granola 会议 id 传给服务端,不重复取转写(省 Granola 配额)。
-      const { getLifeGraph } = await import('@/lib/portal/life-graph');
-      const known = new Set(
-        getLifeGraph()
-          .map((n) => n.attributes?.granolaMeetingId)
-          .filter((v): v is string => typeof v === 'string' && v.length > 0),
-      );
-      const skip = Array.from(known).slice(0, 60).join(',');
-      const res = await fetch(
-        `/api/portal/granola?range=last_30_days&max=10${skip ? `&skip=${encodeURIComponent(skip)}` : ''}`,
-        { cache: 'no-store' },
-      );
-      const data = await res.json() as {
-        ok?: boolean; error?: string; connectUrl?: string;
-        meetings?: Array<{ id: string; title: string; transcript: string; date?: string }>;
-      };
+      const res = await fetch('/api/portal/granola?listOnly=1&range=last_30_days', { cache: 'no-store' });
+      const data = await res.json() as { ok?: boolean; error?: string; list?: Array<{ id: string; title: string; date?: string }> };
       if (!data.ok) {
         const reauth = data.error === 'token_expired' || data.error === 'not_connected';
-        const detail = reauth
-          ? L(dict, 'Granola 授权已失效,请重新连接', 'Granola auth expired — reconnect')
-          : L(dict, `同步失败:${data.error || '未知'}`, `Sync failed: ${data.error || 'unknown'}`);
-        setOauthSyncResult((p) => ({ ...p, granola: { ok: false, msg: reauth ? L(dict, '需要重新授权', 'Reauth needed') : L(dict, '同步失败', 'Sync failed'), detail, needsReauth: reauth } }));
-        showToast(detail, false);
+        showToast(reauth ? L(dict, 'Granola 授权已失效,请重新连接', 'Granola auth expired — reconnect') : L(dict, `拉取会议列表失败:${data.error || '未知'}`, `Failed to list meetings: ${data.error || 'unknown'}`), false);
+        return;
+      }
+      const { getLifeGraph } = await import('@/lib/portal/life-graph');
+      const known = new Set(
+        getLifeGraph().map((n) => n.attributes?.granolaMeetingId).filter((v): v is string => typeof v === 'string' && v.length > 0),
+      );
+      const list = data.list || [];
+      setGranolaKnown(known);
+      setGranolaList(list);
+      // 默认勾选还没同步过的;已同步的不预选(避免重复,用户仍可手动勾)。
+      setGranolaSel(new Set(list.map((m) => m.id).filter((id) => !known.has(id))));
+    } catch (err) {
+      showToast(L(dict, `拉取会议列表失败:${err instanceof Error ? err.message : ''}`, 'Failed to list meetings'), false);
+    } finally {
+      setSyncing(null);
+    }
+  }
+
+  // 只提炼用户勾选的会议(≤10),过批次154 抽取落今天页。
+  async function syncGranolaSelected(ids: string[]) {
+    const picked = ids.slice(0, 10);
+    if (!picked.length) { setGranolaList(null); return; }
+    setGranolaList(null);
+    setSyncing('granola');
+    setOauthSyncResult((p) => ({ ...p, granola: { ok: true, msg: L(dict, '提炼中…', 'Distilling…') } }));
+    try {
+      const res = await fetch(`/api/portal/granola?ids=${encodeURIComponent(picked.join(','))}`, { cache: 'no-store' });
+      const data = await res.json() as { ok?: boolean; error?: string; meetings?: Array<{ id: string; title: string; transcript: string; date?: string }> };
+      if (!data.ok) {
+        const reauth = data.error === 'token_expired' || data.error === 'not_connected';
+        setOauthSyncResult((p) => ({ ...p, granola: { ok: false, msg: reauth ? L(dict, '需要重新授权', 'Reauth needed') : L(dict, '同步失败', 'Sync failed'), detail: data.error, needsReauth: reauth } }));
+        showToast(reauth ? L(dict, 'Granola 授权已失效,请重新连接', 'Granola auth expired — reconnect') : L(dict, `同步失败:${data.error || '未知'}`, `Sync failed: ${data.error || 'unknown'}`), false);
         return;
       }
       const meetings = data.meetings || [];
@@ -769,9 +789,9 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       setCounts((p) => ({ ...p, granola: created }));
       window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
       window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
-      const detail = L(dict, `拉取 ${meetings.length} 场会议 · 新增 ${created}`, `Pulled ${meetings.length} meetings · ${created} new`);
+      const detail = L(dict, `提炼 ${meetings.length} 场 · 新增 ${created}`, `Distilled ${meetings.length} · ${created} new`);
       setOauthSyncResult((p) => ({ ...p, granola: { ok: true, msg: L(dict, '同步成功', 'Synced'), detail } }));
-      showToast(created > 0 ? detail : L(dict, '没有新的会议', 'No new meetings'), true);
+      showToast(created > 0 ? detail : L(dict, '没有新的行动项', 'No new action items'), true);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setOauthSyncResult((p) => ({ ...p, granola: { ok: false, msg: L(dict, '同步失败', 'Sync failed'), detail: msg } }));
@@ -1326,6 +1346,42 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
           </div>
         </div>
       </div>
+      {/* 批次 160:Granola 会议勾选(隐私门)—— 同步前选哪些会议再提炼 */}
+      {granolaList && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 70, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.4)' }} onClick={() => setGranolaList(null)} />
+          <div style={{ position: 'relative', width: '100%', maxWidth: 560, maxHeight: '80vh', background: 'var(--glass-bg-solid, #fff)', borderRadius: '1rem 1rem 0 0', display: 'flex', flexDirection: 'column', paddingBottom: 'env(safe-area-inset-bottom)' }}>
+            <div style={{ padding: '1rem 1.1rem 0.6rem' }}>
+              <p style={{ margin: 0, fontWeight: 700, color: 'var(--portal-ink)' }}>{L(dict, '选择要提炼的会议', 'Pick meetings to distill')}</p>
+              <p style={{ margin: '.25rem 0 0', fontSize: '.76rem', color: 'var(--portal-muted)' }}>{L(dict, '只提炼你勾选的(每次最多 10 场)。灰色=已同步过。', 'Only the ones you check are distilled (max 10). Grey = already synced.')}</p>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '0.25rem 1.1rem' }}>
+              {granolaList.map((m) => {
+                const done = granolaKnown.has(m.id);
+                const checked = granolaSel.has(m.id);
+                return (
+                  <label key={m.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '.6rem', padding: '.55rem 0', borderBottom: '1px solid var(--portal-line)', cursor: 'pointer', opacity: done ? .55 : 1 }}>
+                    <input type="checkbox" checked={checked} onChange={(e) => setGranolaSel((prev) => { const n = new Set(prev); if (e.target.checked) n.add(m.id); else n.delete(m.id); return n; })} style={{ marginTop: '.2rem', flexShrink: 0 }} />
+                    <span style={{ flex: 1 }}>
+                      <span style={{ display: 'block', fontSize: '.86rem', color: 'var(--portal-ink)' }}>{m.title || L(dict, '(无标题)', '(untitled)')}</span>
+                      {(m.date || done) && (
+                        <span style={{ fontSize: '.72rem', color: 'var(--portal-muted)' }}>
+                          {m.date ? new Date(m.date).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'short', day: 'numeric' }) : ''}{done ? L(dict, ' · 已同步', ' · synced') : ''}
+                        </span>
+                      )}
+                    </span>
+                  </label>
+                );
+              })}
+              {!granolaList.length && <p style={{ fontSize: '.8rem', color: 'var(--portal-muted)', padding: '1rem 0' }}>{L(dict, '最近 30 天没有会议', 'No meetings in the last 30 days')}</p>}
+            </div>
+            <div style={{ display: 'flex', gap: '.5rem', padding: '.7rem 1.1rem 1rem', borderTop: '1px solid var(--portal-line)' }}>
+              <button type="button" className="nesio-connector-disconnect" onClick={() => setGranolaList(null)} style={{ flex: 1 }}>{L(dict, '取消', 'Cancel')}</button>
+              <button type="button" className="nesio-connector-connect" onClick={() => syncGranolaSelected(Array.from(granolaSel))} disabled={granolaSel.size === 0} style={{ flex: 2 }}>{L(dict, `同步选中 (${granolaSel.size})`, `Sync selected (${granolaSel.size})`)}</button>
+            </div>
+          </div>
+        </div>
+      )}
       <WechatReadingImportSheet open={wechatReadingOpen} onClose={() => setWechatReadingOpen(false)} />
     </div>
   );
