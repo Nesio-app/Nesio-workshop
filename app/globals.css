@@ -9097,7 +9097,7 @@ html[data-portal-theme="night"] .nesio-tl-dot--mood {
 .nesio-tl-capture-input::placeholder { color: var(--portal-muted); }
 /* 批次 166:动作按钮放进输入框里(右下角浮层),不再另起一行 */
 .nesio-tl-capture-box { position: relative; }
-.nesio-tl-capture-box--filled .nesio-tl-capture-input { padding-bottom: 36px; }
+.nesio-tl-capture-box--filled .nesio-tl-capture-input { padding-bottom: 44px; }
 .nesio-tl-capture-actions {
   position: absolute;
   right: 8px;
@@ -9117,6 +9117,27 @@ html[data-portal-theme="night"] .nesio-tl-dot--mood {
   padding: 5px 16px; border-radius: 999px;
 }
 .nesio-tl-capture-save:active { filter: brightness(0.94); }
+/* 批次 167:记下 = 圆形 ↑ 按钮(对齐话筒圈)。失焦=实心主题色;聚焦打字=虚线浅色 */
+.nesio-tl-capture-send {
+  flex-shrink: 0;
+  width: 30px; height: 30px;
+  min-width: 30px; min-height: 30px;
+  border-radius: 50%;
+  border: 2px solid var(--portal-accent);
+  background: var(--portal-accent);
+  color: #fff;
+  font-size: 1rem; line-height: 1;
+  display: grid; place-items: center;
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+.nesio-tl-capture-send--typing {
+  border-style: dashed;
+  background: var(--portal-accent-soft);
+  color: var(--portal-accent);
+}
+.nesio-tl-capture-send:active { filter: brightness(0.94); }
 
 /* 批次 163·记一笔全屏放大态 */
 .nesio-jot-full {
@@ -12057,12 +12078,12 @@ html[data-portal-theme="night"] .nesio-momentum-item { background: rgba(255,255,
   display: grid;
   place-items: center;
   background: var(--portal-bg);
-  color: var(--portal-muted);
-  border-color: var(--portal-muted);
+  /* 批次 167:⋯ 圈同默认浅灰;⋯(中线省略号)天然居中,去掉 padding-bottom 偏移 */
+  color: color-mix(in srgb, var(--portal-muted) 70%, transparent);
+  border-color: color-mix(in srgb, var(--portal-muted) 42%, transparent);
   font-size: 1rem;
   font-weight: 700;
   line-height: 1;
-  padding-bottom: 4px;   /* 省略号「…」在圆内偏下,视觉居中 */
 }
 /* 批次 129:新规格靠符号 + 颜色区分节点,不再给折叠区首项填 accent 底色
    (会盖住内嵌的钟/礼物符号)。「现在/关键」由置顶星节点承担。 */
@@ -15965,6 +15986,8 @@ html[data-portal-theme="night"] .nesio-exp-card:hover {
 }
 
 /* 批次 105 · 回顾卡(去年今日)—— 念念翻出旧记忆。暖调、克制、衬线人名。 */
+/* 批次 167:回顾卡右滑收起的定位基准 + 滑动提示 */
+.nesio-retro-wrap { position: relative; }
 .nesio-retro-card {
   display: flex;
   flex-direction: column;

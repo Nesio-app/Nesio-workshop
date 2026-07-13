@@ -148,6 +148,7 @@ export function TodayFocusSection({
   const { flashNodes, dismiss: dismissFlash } = useMemoryFlash();
   // 批次 163:记一笔输入框 —— 全屏放大态 + 随字增高。
   const [jotFull, setJotFull] = useState(false);
+  const [jotFocused, setJotFocused] = useState(false); // 批次 167:聚焦态决定 ↑ 按钮虚线/实线
   const growJot = () => {
     const el = capture?.inputRef.current;
     if (el) { el.style.height = 'auto'; el.style.height = `${Math.min(el.scrollHeight, 160)}px`; }
@@ -297,7 +298,7 @@ export function TodayFocusSection({
                   aria-expanded={!collapsed}
                   onClick={() => setCollapsed((v) => !v)}
                 >
-                  <span className="nesio-collapsed-dot nesio-tl-more-plus" aria-hidden>{collapsed ? '…' : '−'}</span>
+                  <span className="nesio-collapsed-dot nesio-tl-more-plus" aria-hidden>{collapsed ? '⋯' : '−'}</span>
                   <span className="nesio-collapsed-task-body">
                     <span className="nesio-collapsed-kicker">{collapsed ? L(dict, '稍后', 'Later') : L(dict, '摊开了', 'Expanded')}</span>
                     <span className="nesio-collapsed-title">{collapsed ? L(dict, `还有 ${restCount} 件小事`, `${restCount} more small things`) : L(dict, '收起', 'Collapse')}</span>
@@ -336,12 +337,24 @@ export function TodayFocusSection({
                   value={capture.value}
                   onChange={(e) => { capture.onChange(e.target.value); growJot(); }}
                   onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); capture.onSubmit(); } }}
+                  onFocus={(e) => {
+                    setJotFocused(true);
+                    // 批次 167:键盘错位修复 —— 聚焦后等键盘升起,把输入框滚到可见区(否则被键盘挡住)
+                    const el = e.currentTarget;
+                    setTimeout(() => { try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch { /* ignore */ } }, 320);
+                  }}
+                  onBlur={() => setJotFocused(false)}
                   placeholder={L(dict, '点话筒说一句,或记一下…', 'Tap the mic to speak, or jot…')}
                 />
                 {capture.value.trim() && (
                   <div className="nesio-tl-capture-actions">
                     <button type="button" className="nesio-tl-capture-expand" aria-label={L(dict, '放大', 'Expand')} onClick={() => setJotFull(true)}>⤢</button>
-                    <button type="submit" className="nesio-tl-capture-save">{L(dict, '记下', 'Jot')}</button>
+                    {/* 批次 167:记下 = 圆形 ↑ 按钮(对齐话筒圈);聚焦打字=虚线浅色,失焦=实线主题色 */}
+                    <button
+                      type="submit"
+                      className={`nesio-tl-capture-send${jotFocused ? ' nesio-tl-capture-send--typing' : ''}`}
+                      aria-label={L(dict, '记下', 'Jot')}
+                    >↑</button>
                   </div>
                 )}
               </div>
