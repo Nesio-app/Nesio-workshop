@@ -59,10 +59,29 @@ export default function RouteError({
       >
         重试
       </button>
-      {/* QA 诊断线:下次截图就能看到真实错误名(灰字,不吓人) */}
-      <p style={{ fontSize: '0.62rem', opacity: 0.4, margin: '6px 0 0', maxWidth: 280, wordBreak: 'break-all' }}>
-        {String(error.name || 'Error')}: {String(error.message || '').slice(0, 90)}
-      </p>
+      {/* 批次 162:诊断做响可复制 —— 反复闪退时用户能把确切错误发回来定根因(此前 opacity 0.4 太小看不清) */}
+      {!isChunkErr && (
+        <div style={{ marginTop: 14, width: '100%', maxWidth: 320 }}>
+          <p style={{
+            fontSize: '0.72rem', color: 'var(--status-risk, #c0392b)', margin: '0 0 6px',
+            padding: '8px 10px', borderRadius: 8, textAlign: 'left', wordBreak: 'break-all',
+            background: 'rgba(192,57,43,0.08)', border: '1px solid rgba(192,57,43,0.25)', userSelect: 'text',
+          }}>
+            {String(error.name || 'Error')}: {String(error.message || '').slice(0, 160)}
+            {error.digest ? ` · #${error.digest}` : ''}
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              const text = `${error.name || 'Error'}: ${error.message || ''}${error.digest ? ` · #${error.digest}` : ''}`;
+              try { navigator.clipboard?.writeText(text); } catch { /* 剪贴板不可用就让用户手抄 */ }
+            }}
+            style={{ fontSize: '0.72rem', padding: '0.3rem 0.9rem', borderRadius: 999, border: '1px solid var(--portal-line, #ccc)', background: 'transparent', cursor: 'pointer' }}
+          >
+            复制错误信息
+          </button>
+        </div>
+      )}
     </div>
   );
 }

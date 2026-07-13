@@ -538,17 +538,33 @@ interface EditFields {
 
 // 批次 76(用户实锤「点关联记忆进入页面错误」):详情崩溃只崩这张卡,
 // 不再把整页打成错误页 —— 卡片级边界,给出关闭出口。
-class DetailErrorBoundary extends Component<{ onClose: () => void; children: ReactNode }, { err: boolean }> {
-  state = { err: false };
-  static getDerivedStateFromError() { return { err: true }; }
+class DetailErrorBoundary extends Component<{ onClose: () => void; children: ReactNode }, { err: boolean; msg: string }> {
+  state = { err: false, msg: '' };
+  static getDerivedStateFromError(e: unknown) {
+    return { err: true, msg: e instanceof Error ? `${e.name}: ${e.message}` : String(e) };
+  }
+  // 批次 162:捕获真实错误文案,反复闪退时用户能复制发回来定根因(此前只显示通用文案,没法定位)。
+  componentDidCatch(error: unknown) { console.error('[MemoryNodeDetail] crashed:', error); }
   render() {
     if (this.state.err) {
       return (
         <div className="nesio-node-detail-overlay" role="dialog" aria-modal="true" onClick={this.props.onClose}>
           <div className="nesio-node-detail-sheet" style={{ padding: '1.4rem 1.2rem', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
             <p style={{ margin: '0 0 0.4rem', fontSize: '1rem', fontWeight: 600 }}>这条记忆的详情没打开成功</p>
-            <p style={{ margin: '0 0 0.9rem', fontSize: '0.8rem', color: 'var(--portal-muted)' }}>数据没有丢。关闭后再试一次;若反复出现,请截图这条记忆的名字。</p>
-            <button type="button" className="nesio-fin-review-accept" onClick={this.props.onClose}>关闭</button>
+            <p style={{ margin: '0 0 0.9rem', fontSize: '0.8rem', color: 'var(--portal-muted)' }}>数据没有丢。关闭后再试一次。若反复出现,把下面这行错误复制发回来就能定位。</p>
+            {this.state.msg && (
+              <p style={{
+                fontSize: '0.72rem', color: 'var(--status-risk, #c0392b)', margin: '0 auto 0.8rem', maxWidth: 300,
+                padding: '8px 10px', borderRadius: 8, textAlign: 'left', wordBreak: 'break-all', userSelect: 'text',
+                background: 'rgba(192,57,43,0.08)', border: '1px solid rgba(192,57,43,0.25)',
+              }}>{this.state.msg.slice(0, 200)}</p>
+            )}
+            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+              {this.state.msg && (
+                <button type="button" className="nesio-connector-disconnect" onClick={() => { try { navigator.clipboard?.writeText(this.state.msg); } catch { /* 手抄 */ } }}>复制错误</button>
+              )}
+              <button type="button" className="nesio-fin-review-accept" onClick={this.props.onClose}>关闭</button>
+            </div>
           </div>
         </div>
       );
