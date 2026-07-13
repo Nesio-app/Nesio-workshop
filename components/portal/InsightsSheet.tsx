@@ -379,7 +379,7 @@ function LivingModelTab({
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 
-export default function InsightsSheet({ onClose, initialTab }: { onClose: () => void; canUsePrivateData?: boolean; initialTab?: MainTab }) {
+export default function InsightsSheet({ onClose, canUsePrivateData = false, initialTab }: { onClose: () => void; canUsePrivateData?: boolean; initialTab?: MainTab }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [mainTab, setMainTab] = useState<MainTab>(initialTab ?? 'reflection');
   const showPlaces = useFeatureEnabled('places');
@@ -407,8 +407,10 @@ export default function InsightsSheet({ onClose, initialTab }: { onClose: () => 
   const livingSeqRef = useRef(0);
 
   useEffect(() => {
+    // 私据门:非私有运行态不把私人记录读进内存(纵深防御,配合下方 fail-closed 渲染门)
+    if (!canUsePrivateData) { setAllNodes([]); return; }
     setAllNodes(getLifeGraph());
-  }, []);
+  }, [canUsePrivateData]);
 
   useEffect(() => {
     const sync = () => setLabOn(isLabModeOn());
@@ -615,6 +617,29 @@ export default function InsightsSheet({ onClose, initialTab }: { onClose: () => 
   }, [fetchLivingModel]);
 
   const monthNum = new Date().getMonth() + 1;
+
+  // 私据门(fail-closed):洞察全部内容都来自你的私人记录(关系/健康/足迹/财务/多面镜/reflection)。
+  // 非私有运行态(未登录 / 账户未确认)一律不渲染任何私据 —— 与 TodayFeed/DailyReportCard 同一契约,
+  // 补上此前 InsightsSheet 收了 canUsePrivateData 却没用的门(哪怕 Lab 功能,也只给本人看本人)。
+  if (!canUsePrivateData) {
+    return (
+      <div className="nesio-insights-sheet">
+        <div className="nesio-insights-header">
+          <div className="nesio-insights-title-row">
+            <h2 className="nesio-insights-title">{L(dict, '洞察', 'Insights')}</h2>
+          </div>
+          <button type="button" className="nesio-insights-close" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}>✕</button>
+        </div>
+        <div className="nesio-insights-body">
+          <p className="nesio-insights-empty" style={{ marginTop: '2.5rem' }}>
+            {L(dict,
+              '登录后,这里只对你显示你自己的洞察 —— 关系、健康、足迹、财务、多面镜都来自你的私人记录,只给本人看。',
+              'Sign in to see your own insights here — relationships, health, places, finance and mirror all come from your private records, visible only to you.')}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="nesio-insights-sheet">

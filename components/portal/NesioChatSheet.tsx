@@ -756,6 +756,19 @@ export default function NesioChatSheet({
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+  // 阅读器划词「问念念」→ 把引用预填进输入框(不自动发送,等用户补问题)
+  useEffect(() => {
+    if (!open) return;
+    let quote = '';
+    try {
+      quote = sessionStorage.getItem('nesio-pending-ask-text') || '';
+      if (quote) sessionStorage.removeItem('nesio-pending-ask-text');
+    } catch { /* ignore */ }
+    if (!quote) return;
+    const snippet = quote.length > 120 ? `${quote.slice(0, 120)}…` : quote;
+    setInput(L(dict, `关于「${snippet}」，`, `About “${snippet}”, `));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
   // Opportunistically refresh device location so 问一问 knows where the user is.
   useEffect(() => { if (open) void refreshLocation(); }, [open]);
   useEffect(() => {

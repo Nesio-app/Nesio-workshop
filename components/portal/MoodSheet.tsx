@@ -106,48 +106,37 @@ function emLabel(em: { label: string; labelEn: string } | null | undefined, dict
 type EmotionId = typeof EMOTIONS[number]['id'];
 type EnergyLevel = 'high' | 'mid' | 'low';
 
-// ── SVG geometry ──────────────────────────────────────────────────────────────
+// ── SVG geometry（设计稿 mood-wheel2:圆点环 + 中心大圈,不再是扇形饼)──────────
 const N = EMOTIONS.length;
 const CX = 150, CY = 150;
-const R_IN = 52, R_OUT = 130;
-const R_LABEL = 91;
-const GAP = 1.5;
+const R_DOT = 104;    // 圆点所在环半径
+const DOT_R = 15;     // 圆点半径(设计稿 30px)
+const CENTER_R = 64;  // 中心大圈半径(设计稿 132px,染当前情绪色)
+const LABEL_GAP = 11; // 圆点下方标签间距
 
 function rad(d: number) { return (d * Math.PI) / 180; }
 
-function sliceAngles(i: number): [number, number] {
-  const step = 360 / N;
-  return [rad(i * step + GAP - 90), rad((i + 1) * step - GAP - 90)];
+/** 开心在正上方,顺时针排布(与 EMOTIONS 顺序、设计稿落位一致)。 */
+function dotAngleDeg(i: number): number { return (i * 360) / N - 90; }
+
+function dotPos(i: number): [number, number] {
+  const a = rad(dotAngleDeg(i));
+  return [CX + R_DOT * Math.cos(a), CY + R_DOT * Math.sin(a)];
 }
 
-function sectorPath(i: number): string {
-  const [s, e] = sliceAngles(i);
-  const x1 = CX + R_OUT * Math.cos(s), y1 = CY + R_OUT * Math.sin(s);
-  const x2 = CX + R_OUT * Math.cos(e), y2 = CY + R_OUT * Math.sin(e);
-  const x3 = CX + R_IN  * Math.cos(e), y3 = CY + R_IN  * Math.sin(e);
-  const x4 = CX + R_IN  * Math.cos(s), y4 = CY + R_IN  * Math.sin(s);
-  return `M${x1} ${y1} A${R_OUT} ${R_OUT} 0 0 1 ${x2} ${y2} L${x3} ${y3} A${R_IN} ${R_IN} 0 0 0 ${x4} ${y4}Z`;
-}
-
-function midAngle(i: number): number { return ((i + 0.5) * 360) / N - 90; }
-
-function labelPos(i: number): [number, number] {
-  const a = rad(midAngle(i));
-  return [CX + R_LABEL * Math.cos(a), CY + R_LABEL * Math.sin(a)];
-}
-
-function sectorAtPoint(svgX: number, svgY: number): number | null {
+/** 环带内按角度就近命中一个圆点(滑过换色的手感);中心/环外返回 null。 */
+function nearestDot(svgX: number, svgY: number): number | null {
   const dx = svgX - CX, dy = svgY - CY;
   const dist = Math.sqrt(dx * dx + dy * dy);
-  if (dist < R_IN - 4 || dist > R_OUT + 8) return null;
+  if (dist < CENTER_R - 2 || dist > R_DOT + DOT_R + 20) return null;
   let angle = (Math.atan2(dy, dx) * 180) / Math.PI + 90;
   if (angle < 0) angle += 360;
-  return Math.floor(angle / (360 / N)) % N;
+  return Math.round(angle / (360 / N)) % N;
 }
 
 function isCenterHit(svgX: number, svgY: number): boolean {
   const dx = svgX - CX, dy = svgY - CY;
-  return Math.sqrt(dx * dx + dy * dy) < R_IN - 4;
+  return Math.sqrt(dx * dx + dy * dy) < CENTER_R - 2;
 }
 
 // ── Energy: value 0–100, derive level and color ───────────────────────────────
@@ -335,7 +324,7 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
     if (phase !== 'wheel') return;
     const coords = svgCoords(e);
     if (!coords) return;
-    setHovered(sectorAtPoint(coords[0], coords[1]));
+    setHovered(nearestDot(coords[0], coords[1]));
   }
 
   function onSvgEnd(e: React.MouseEvent | React.TouchEvent) {
@@ -345,7 +334,7 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
     const coords = svgCoords(e);
     if (!coords) return;
     if (isCenterHit(coords[0], coords[1])) return;
-    const idx = sectorAtPoint(coords[0], coords[1]);
+    const idx = nearestDot(coords[0], coords[1]);
     if (idx !== null) pickEmotion(idx);
     setHovered(null);
   }
@@ -640,46 +629,55 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
             onTouchMove={(e) => { e.preventDefault(); onSvgMove(e); }}
             onTouchEnd={(e) => { e.preventDefault(); onSvgEnd(e); }}
             style={{ touchAction: 'none' }}>
+            {/* 圆点环:12 情绪各一枚色点,标签在点下方;悬停/滑到的点放大 + 白描边(设计稿 mood-wheel2)*/}
             {EMOTIONS.map((em, i) => {
               const isHov = hovered === i;
-              const [lx, ly] = labelPos(i);
+              const [dx, dy] = dotPos(i);
               return (
                 <g key={em.id} role="button" aria-label={em.label} tabIndex={0}
                   onClick={() => pickEmotion(i)}
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') pickEmotion(i); }}
                   style={{ cursor: 'pointer' }}>
-                  <path d={sectorPath(i)} fill={em.color} opacity={isHov ? 1 : 0.88}
-                    stroke="var(--mood-card-bg, #fff)" strokeWidth="2.5" strokeLinejoin="round"
-                    style={{ transition: 'opacity 0.12s' }} />
-                  {isHov && <path d={sectorPath(i)} fill="none" stroke={em.color}
-                    strokeWidth="6" opacity="0.45" style={{ filter: 'blur(5px)' }} />}
-                  <text x={lx} y={ly} textAnchor="middle" dominantBaseline="middle"
-                    fontSize={isHov ? '10.5' : '9.5'} fontWeight={isHov ? '800' : '650'}
-                    fill="#fff" opacity={isHov ? 1 : 0.92}
-                    style={{ pointerEvents: 'none', userSelect: 'none', transition: 'font-size 0.12s', letterSpacing: '0.05em' }}>{emLabel(em, dict)}</text>
+                  {isHov && <circle cx={dx} cy={dy} r={DOT_R + 6} fill={em.color} opacity={0.3} style={{ filter: 'blur(3px)' }} />}
+                  <circle cx={dx} cy={dy} r={isHov ? DOT_R + 2 : DOT_R} fill={em.color}
+                    stroke={isHov ? '#fff' : 'rgba(255,255,255,0.55)'} strokeWidth={isHov ? 2.5 : 1}
+                    style={{ transition: 'r 0.12s' }} />
+                  <text x={dx} y={dy + DOT_R + LABEL_GAP} textAnchor="middle" dominantBaseline="middle"
+                    fontSize={isHov ? '10' : '9'} fontWeight={isHov ? '800' : '650'}
+                    fill={isHov ? 'var(--portal-ink)' : 'var(--portal-muted)'}
+                    style={{ pointerEvents: 'none', userSelect: 'none', transition: 'font-size 0.12s' }}>{emLabel(em, dict)}</text>
                 </g>
               );
             })}
-            {/* 批次 149·设计 mood-wheel2:中心大圈染成当前(滑到的)情绪色,名字压白字 —— 中心不再空、
-                成了实时预览;没滑时回落「此刻 · 滑动换色」。 */}
-            <circle cx={CX} cy={CY} r={R_IN - 3}
+            {/* 中心大圈:染成当前(滑到的)情绪色,名字压白字 —— 实时预览;没滑时「此刻 · 滑动换色」。 */}
+            <circle cx={CX} cy={CY} r={CENTER_R}
               fill={longPressing ? 'var(--portal-accent-soft)' : (hoveredEm ? hoveredEm.color : 'var(--mood-card-bg, #fff)')}
-              stroke={hoveredEm && !longPressing ? 'rgba(255,255,255,0.72)' : 'var(--portal-line)'}
-              strokeWidth={hoveredEm && !longPressing ? 1.5 : 1}
-              style={{ cursor: 'pointer', transition: 'fill 0.2s' }} />
+              stroke={hoveredEm && !longPressing ? 'rgba(255,255,255,0.6)' : 'var(--portal-line)'}
+              strokeWidth={hoveredEm && !longPressing ? 4 : 1.5}
+              style={{ cursor: 'pointer', transition: 'fill 0.25s' }} />
+            {/* 珠光高光:让中心像一颗有质感的珠子(设计稿 inset 白环 + 顶光)*/}
+            {hoveredEm && !longPressing && (
+              <ellipse cx={CX - 15} cy={CY - 22} rx={24} ry={14} fill="#fff" opacity={0.2} style={{ pointerEvents: 'none' }} />
+            )}
             {hoveredEm && !longPressing ? (
-              <text x={CX} y={CY + 1} textAnchor="middle" dominantBaseline="middle" fontSize="15" fontWeight="800"
-                fill="#fff" style={{ userSelect: 'none', pointerEvents: 'none', letterSpacing: '0.06em' }}>
-                {emLabel(hoveredEm, dict)}
-              </text>
+              <>
+                <text x={CX} y={CY - 3} textAnchor="middle" dominantBaseline="middle" fontSize="21" fontWeight="800"
+                  fill="#fff" style={{ userSelect: 'none', pointerEvents: 'none', fontFamily: 'var(--font-portal-serif), Georgia, serif' }}>
+                  {emLabel(hoveredEm, dict)}
+                </text>
+                <text x={CX} y={CY + 18} textAnchor="middle" fontSize="8.5" fill="#fff" opacity={0.9}
+                  style={{ userSelect: 'none', pointerEvents: 'none' }}>
+                  {L(dict, '此刻 · 滑动换色', 'Now · slide')}
+                </text>
+              </>
             ) : (
               <>
-                <text x={CX} y={CY - 7} textAnchor="middle" fontSize="10"
-                  fill={longPressing ? 'var(--portal-cool-accent)' : 'var(--portal-muted)'} fontWeight="600"
-                  style={{ userSelect: 'none', pointerEvents: 'none' }}>
+                <text x={CX} y={CY - 7} textAnchor="middle" fontSize="12"
+                  fill={longPressing ? 'var(--portal-cool-accent)' : 'var(--portal-muted)'} fontWeight="700"
+                  style={{ userSelect: 'none', pointerEvents: 'none', fontFamily: 'var(--font-portal-serif), Georgia, serif' }}>
                   {longPressing ? L(dict, '放开写 Journal', 'Release to journal') : L(dict, '此刻', 'Now')}
                 </text>
-                <text x={CX} y={CY + 8} textAnchor="middle" fontSize="8.5" fill="var(--portal-muted)"
+                <text x={CX} y={CY + 11} textAnchor="middle" fontSize="8.5" fill="var(--portal-muted)"
                   style={{ userSelect: 'none', pointerEvents: 'none' }}>
                   {longPressing ? 'Journal' : L(dict, '滑动换色', 'Slide to preview')}
                 </text>

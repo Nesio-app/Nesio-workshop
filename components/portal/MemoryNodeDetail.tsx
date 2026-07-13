@@ -779,10 +779,17 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
   })();
   const srcUncertain = n.confidence > 0 && n.confidence < 0.6;
 
+  // 阅读器多功能版元信息:头部来源+日期、标签(去系统标)。cover/相关记忆 交给有数据的调用方。
+  const readerMeta = {
+    kicker: [SRC.label, srcTime].filter(Boolean).join(' · '),
+    subtitle: SRC.provider || undefined,
+    tags: (n.tags || []).filter((t) => !['notion', 'keep', 'moment', 'journal', 'feeling', '手动记录', '联系人'].includes(t)).slice(0, 5),
+  };
+
   return (
     <div className="nesio-node-detail-overlay" role="dialog" aria-modal="true" aria-label={n.name}>
       {readerOpen && readableText && (
-        <ReaderSheetLazy title={n.name} article={readableText} onClose={() => setReaderOpen(false)} />
+        <ReaderSheetLazy title={n.name} article={readableText} meta={readerMeta} onClose={() => setReaderOpen(false)} />
       )}
       {isEmailNode && (
         <EmailComposeSheet

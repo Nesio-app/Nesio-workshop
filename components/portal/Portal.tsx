@@ -388,6 +388,18 @@ export default function Portal() {
     window.addEventListener('nesio-ask-image', onAskImage);
     return () => window.removeEventListener('nesio-ask-image', onAskImage);
   }, []);
+  // 阅读器划词「问念念」→ 开聊天并把选中文作为引用喂进输入框(仿 ask-image)
+  useEffect(() => {
+    const onAskText = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { text?: string };
+      const text = (detail?.text || '').trim();
+      if (!text) return;
+      try { sessionStorage.setItem('nesio-pending-ask-text', text); } catch { /* ignore */ }
+      setChatOpen(true);
+    };
+    window.addEventListener('nesio-ask-text', onAskText);
+    return () => window.removeEventListener('nesio-ask-text', onAskText);
+  }, []);
   const [moodOpen, setMoodOpen] = useState(false);
   const [freezeOpen, setFreezeOpen] = useState(false);
   const [proGate, setProGate] = useState<string | null>(null); // 非 null = 显示 Pro 升级引导(值=功能名)

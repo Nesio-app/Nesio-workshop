@@ -10,6 +10,8 @@ import { useMemo, useRef, useState } from 'react';
 import { getLifeGraph } from '@/lib/portal/life-graph';
 import { buildRelationships } from '@/lib/portal/relationships';
 import { addPersonRecord, RECORD_CATEGORY_MAP, type PersonRecordCategory } from '@/lib/portal/person-records';
+import { RecordCatIcon } from './record-icons';
+import { IconMic, IconCamera } from '../icons';
 import { imageToDataUrl } from '@/lib/portal/image-util';
 import { matchPerson } from '@/lib/portal/person-match';
 import { L } from '@/lib/portal/i18n';
@@ -82,11 +84,11 @@ export default function PersonExtractSheet({ open, onClose }: { open: boolean; o
               value={text} onChange={(e) => setText(e.target.value)}
             />
             <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button type="button" className="nesio-today-btn nesio-today-btn--ghost" style={{ flex: 1 }} onClick={runText} disabled={busy}>
-                {busy ? L(dict, '识别中…', 'Reading…') : L(dict, '✨ 说一句', '✨ From text')}
+              <button type="button" className="nesio-today-btn nesio-today-btn--ghost" style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }} onClick={runText} disabled={busy}>
+                <IconMic size={15} />{busy ? L(dict, '识别中…', 'Reading…') : L(dict, '说一句', 'From text')}
               </button>
-              <button type="button" className="nesio-today-btn nesio-today-btn--ghost" style={{ flex: 1 }} onClick={() => photoRef.current?.click()} disabled={busy}>
-                {L(dict, '📷 拍/传照片', '📷 Photo')}
+              <button type="button" className="nesio-today-btn nesio-today-btn--ghost" style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }} onClick={() => photoRef.current?.click()} disabled={busy}>
+                <IconCamera size={15} />{L(dict, '拍/传', 'Photo')}
               </button>
             </div>
             <input ref={photoRef} type="file" accept="image/*" capture="environment" hidden
@@ -108,10 +110,14 @@ export default function PersonExtractSheet({ open, onClose }: { open: boolean; o
                   const meta = RECORD_CATEGORY_MAP[r.category];
                   return (
                     <div key={i} className="nesio-rel-rec-row">
-                      <span className="nesio-rel-rec-ic">{meta.icon}</span>
+                      <span className="nesio-rel-rec-ic"><RecordCatIcon category={r.category} size={16} /></span>
                       <div className="nesio-rel-rec-main">
                         <span className="nesio-rel-rec-title">{r.title}{typeof r.amount === 'number' ? ` · ${r.amount}` : ''}</span>
-                        {(r.detail || r.date) && <span className="nesio-rel-rec-sub">{r.date || ''}{r.detail ? `${r.date ? ' · ' : ''}${r.detail}` : ''}</span>}
+                        <span className="nesio-rel-rec-sub">
+                          {L(dict, meta.zh, meta.en)}
+                          {r.date ? ` · ${r.date}` : ''}{r.detail ? ` · ${r.detail}` : ''}
+                          {meta.sensitive ? L(dict, ' · 只存本机', ' · on-device') : ''}
+                        </span>
                       </div>
                     </div>
                   );
