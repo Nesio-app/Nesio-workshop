@@ -281,7 +281,13 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
 
         <div className="nesio-share-header">
           <h2 className="nesio-share-title">{L(dict, '分享', 'Share')}</h2>
-          {/* 批次 33:右上角 ✕ 撤除(用户指令)—— 退出走背景点击 */}
+          {/* 批次 150(QA #5):右上角 ✕ 加回来 —— 与其它弹窗一致(此前批次33撤过,QA 反馈不一致) */}
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={L(dict, '关闭', 'Close')}
+            style={{ position: 'absolute', top: 12, right: 14, width: 32, height: 32, borderRadius: 999, border: 'none', background: 'rgba(120,140,180,0.14)', color: 'var(--portal-muted)', fontSize: '0.95rem', cursor: 'pointer', lineHeight: 1 }}
+          >✕</button>
         </div>
 
         <p className="nesio-share-desc">

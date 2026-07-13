@@ -15264,7 +15264,10 @@ html[data-portal-theme="night"] .nesio-exp-card:hover {
   position: absolute; top: calc(100% + 0.35rem); left: 0; z-index: 41;
   min-width: 9rem; max-width: 15rem;
   display: flex; flex-direction: column;
-  background: var(--glass-bg-solid);
+  /* 批次 150(QA #1):glass-bg-solid 夜间只有 0.07 透明度 → 选项与背景重叠看不清。
+     换近乎不透明的 pop 底 + 毛玻璃兜底,展开时文字清晰可辨。 */
+  background: var(--glass-bg-pop, var(--glass-bg-solid));
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
   border: 1px solid var(--portal-line);
   border-radius: var(--radius-md, 14px);
   box-shadow: var(--shadow-pop, 0 10px 28px rgba(0,0,0,.14));

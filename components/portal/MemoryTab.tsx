@@ -1103,12 +1103,13 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                   核心记忆(定义你,长按记忆卡「标为核心」)= 第一颗;全部记忆挪到下方区块。 */}
               {hasNodes && (
                 <div className="nesio-mem-jars">
-                  <button type="button" className="nesio-mem-jar" onClick={() => setCoreOpen((v) => !v)}>
+                  {/* 批次 150(QA #3):三球展开互斥 —— 开一个自动收起其余,空状态不再叠加。 */}
+                  <button type="button" className="nesio-mem-jar" onClick={() => { setCoreOpen((v) => !v); setFavOpen(false); setProjOpen(false); }}>
                     <span className="nesio-mem-jar-ball" data-halo="core" aria-hidden><IconStar size={26} /></span>
                     <span className="nesio-mem-jar-name">{L(dict, '核心记忆', 'Core')}</span>
                     <span className="nesio-mem-jar-sub">{L(dict, `定义你 · ${coreNodes.length}`, `defines you · ${coreNodes.length}`)}</span>
                   </button>
-                  <button type="button" className="nesio-mem-jar" onClick={() => setFavOpen((v) => !v)}>
+                  <button type="button" className="nesio-mem-jar" onClick={() => { setFavOpen((v) => !v); setCoreOpen(false); setProjOpen(false); }}>
                     <span className="nesio-mem-jar-ball" data-halo="fav" aria-hidden><IconBookmark size={24} /></span>
                     <span className="nesio-mem-jar-name">{L(dict, '收藏夹', 'Saved')}</span>
                     <span className="nesio-mem-jar-sub">{L(dict, `手动收 · ${pinnedNodes.length}`, `pinned · ${pinnedNodes.length}`)}</span>
@@ -1117,7 +1118,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                   <button
                     type="button"
                     className="nesio-mem-jar"
-                    onClick={() => setProjOpen((v) => !v)}
+                    onClick={() => { setProjOpen((v) => !v); setCoreOpen(false); setFavOpen(false); }}
                   >
                     <span className="nesio-mem-jar-ball" data-halo="project" aria-hidden><IconFolder size={24} /></span>
                     <span className="nesio-mem-jar-name">{L(dict, '项目', 'Projects')}</span>
@@ -1211,10 +1212,10 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                 </div>
               )}
 
-              {/* 收藏夹展开(记忆罐收藏球触发)*/}
-              {hasNodes && pinnedNodes.length > 0 && (
+              {/* 收藏夹展开(记忆罐收藏球触发)—— 批次 150(QA #3):点开必给反馈,空时也显空状态,与核心/项目一致 */}
+              {hasNodes && favOpen && (
                 <div className="nesio-projects-section">
-                  {favOpen && pinnedNodes.length > 0 && (
+                  {pinnedNodes.length > 0 ? (
                     <div className="nesio-memory-grid nesio-fav-expanded">
                       {pinnedNodes.map((n) => (
                         <MemoryCard
@@ -1226,6 +1227,10 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                         />
                       ))}
                     </div>
+                  ) : (
+                    <p className="nesio-settings-option-hint" style={{ margin: '0 0 1rem', textAlign: 'center' }}>
+                      {L(dict, '还没有收藏。长按任意记忆卡 → 收藏到首页。', 'Nothing saved yet. Long-press a memory card → Pin to home.')}
+                    </p>
                   )}
                 </div>
               )}
@@ -1364,7 +1369,8 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
 
           {/* Relation graph view */}
           {showRelationGraph && !isSearching && (
-            <div style={{ padding: '0.5rem 0 1rem' }}>
+            /* 批次 150(QA #4):底部留出导航栏高度,关联图下缘不被固定「今天/记忆」栏遮挡 */
+            <div style={{ padding: '0.5rem 0 calc(5.5rem + env(safe-area-inset-bottom))' }}>
               <RelationGraph
                 nodes={buildMemGraphNodes(nodes)}
                 edges={buildMemGraphEdges(nodes)}

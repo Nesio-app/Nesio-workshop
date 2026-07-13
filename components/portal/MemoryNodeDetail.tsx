@@ -158,6 +158,9 @@ function safeExternalUrl(url: string): string {
 const HIDDEN_ATTRIBUTE_KEYS = new Set([
   // Internal / calendar
   'calendarId', 'calendarName', 'description', 'emailId', 'messageId', 'htmlLink',
+  // 批次 150(QA #9):日历/外部集成内部 ID 与技术字段,绝不该露给终端用户
+  'externalId', 'iCalUID', 'recurringEventId', 'sequence', 'etag', 'organizer', 'creator',
+  'notionPageId', 'sourceApp', 'source', 'dayOfWeek', 'aiConfidence',
   // System / task internals
   'subtasksJson', 'done', 'doneAt', 'userTags', 'status', 'context', 'reminder',
   // 批次 74:fullText 与原始记录重复,不再当属性平铺
@@ -833,7 +836,9 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
             <h2 className="nesio-settings-sheet-title" title={n.name}>{displayTitle(displayNodeName(n.name, dict))}</h2>
           )}
           {/* 批次 125(设计详情页):右上恒为 ✕;阅读原文/回复 挪到来源行下方做显眼按钮排 */}
-          <button type="button" className="nesio-voice-sheet-close" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}>✕</button>
+          {/* 批次 150(QA #2):X 点不掉 —— 有透明元素盖在其上拦点击。抬 z-index + 关闭形自成栈,保证最上层可点。 */}
+          <button type="button" className="nesio-voice-sheet-close" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}
+            style={{ position: 'relative', zIndex: 5, flexShrink: 0 }}>✕</button>
         </div>
 
         {/* Expanded edit form — type-specific fields */}
