@@ -76,7 +76,15 @@ export default function TodayFeed({
   // 批次 33:话筒 = 原地录音转文字直接入记忆(不跳说一句 sheet);无语音 API 才回落 sheet
   const [micState, setMicState] = useState<'idle' | 'recording'>('idle');
   const recogRef = useRef<{ stop: () => void } | null>(null);
-  const quickInputRef = useRef<HTMLInputElement | null>(null);
+  const quickInputRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // 批次 163:记一笔草稿持久化 —— 没点记下就退出 App,下次进来这条还在。
+  useEffect(() => {
+    try { const d = localStorage.getItem('nesio-jot-draft-v1'); if (d) setQuickAdd(d); } catch { /* ignore */ }
+  }, []);
+  useEffect(() => {
+    try { if (quickAdd) localStorage.setItem('nesio-jot-draft-v1', quickAdd); else localStorage.removeItem('nesio-jot-draft-v1'); } catch { /* ignore */ }
+  }, [quickAdd]);
 
   function startQuickMic() {
     // 批次 37 重做:边说边把文字写进输入框(interim 实时可见),说完文字留在框里

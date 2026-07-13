@@ -9046,12 +9046,13 @@ html[data-portal-theme="night"] .nesio-tl-dot--mood {
 /* 批次 128·记一笔·话筒常驻末节点(虚线草稿位):点话筒=说一句,点文字=打字 */
 .nesio-tl-capture {
   display: flex;
-  align-items: center;
+  align-items: flex-start; /* 批次 163:多行 textarea 时话筒顶对齐 */
   gap: 10px;
   padding: 6px 2px 2px 0;
   position: relative;
   z-index: 1;
 }
+.nesio-tl-capture-mic { margin-top: 4px; } /* 批次 163:框有内边距,话筒下移贴齐首行 */
 .nesio-today-root button.nesio-tl-capture-mic,
 .nesio-tl-capture-mic {
   flex-shrink: 0;
@@ -9067,19 +9068,68 @@ html[data-portal-theme="night"] .nesio-tl-dot--mood {
   cursor: pointer;
   box-sizing: border-box;
 }
-/* 批次 132·话筒节点内联输入(唯一极简输入,底部栏已删):无框透明,像提示语本身可打字 */
-.nesio-tl-capture-form { flex: 1; display: flex; }
+/* 批次 163·记一笔输入框(用户实锤「看不到」)—— 从无框透明改成可见输入框,随字增高 */
+.nesio-tl-capture-form { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .nesio-tl-capture-input {
-  flex: 1;
+  width: 100%;
+  box-sizing: border-box;
   min-width: 0;
-  background: none;
-  border: none;
+  background: var(--glass-bg-solid, #fff);
+  border: 1px solid var(--portal-line);
+  border-radius: 12px;
   outline: none;
   font-size: 0.9rem;
+  line-height: 1.45;
   color: var(--portal-ink);
-  padding: 0;
+  padding: 8px 12px;
+  resize: none;
+  overflow: hidden;           /* 高度由 JS 按 scrollHeight 撑,自增高 */
+  font-family: inherit;
+  transition: border-color .15s ease;
 }
+.nesio-tl-capture-input:focus,
+.nesio-tl-capture--filled .nesio-tl-capture-input { border-color: color-mix(in srgb, var(--portal-accent) 45%, var(--portal-line)); }
 .nesio-tl-capture-input::placeholder { color: var(--portal-muted); }
+/* 有字才出现的动作行:放大(浅灰)+ 记下(主色) */
+.nesio-tl-capture-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.nesio-tl-capture-expand {
+  border: none; background: none; cursor: pointer;
+  color: var(--portal-muted); font-size: 1rem; line-height: 1;
+  padding: 4px 8px; border-radius: 8px;
+}
+.nesio-tl-capture-expand:active { background: var(--portal-line); }
+.nesio-tl-capture-save {
+  border: none; cursor: pointer;
+  background: var(--portal-accent); color: #fff;
+  font-size: 0.82rem; font-weight: 600;
+  padding: 5px 16px; border-radius: 999px;
+}
+.nesio-tl-capture-save:active { filter: brightness(0.94); }
+
+/* 批次 163·记一笔全屏放大态 */
+.nesio-jot-full {
+  position: fixed; inset: 0; z-index: 90;
+  background: var(--portal-bg);
+  display: flex; flex-direction: column;
+  padding: calc(env(safe-area-inset-top) + 8px) 16px calc(env(safe-area-inset-bottom) + 12px);
+}
+.nesio-jot-full-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.nesio-jot-full-title { font-size: 0.9rem; font-weight: 600; color: var(--portal-ink); }
+.nesio-jot-full-close { border: none; background: none; color: var(--portal-muted); font-size: 0.9rem; cursor: pointer; padding: 6px 4px; }
+.nesio-jot-full-save {
+  border: none; cursor: pointer;
+  background: var(--portal-accent); color: #fff;
+  font-size: 0.85rem; font-weight: 600;
+  padding: 6px 18px; border-radius: 999px;
+}
+.nesio-jot-full-save:disabled { opacity: 0.45; }
+.nesio-jot-full-input {
+  flex: 1; width: 100%; box-sizing: border-box;
+  background: none; border: none; outline: none; resize: none;
+  font-size: 1.05rem; line-height: 1.6; color: var(--portal-ink);
+  font-family: inherit;
+}
+.nesio-jot-full-input::placeholder { color: var(--portal-muted); }
 /* 录音中:话筒高亮(实心 + 声波感)——设计「说话中:话筒高亮 + 声波」 */
 .nesio-tl-capture--rec .nesio-tl-capture-mic {
   background: var(--portal-accent);
