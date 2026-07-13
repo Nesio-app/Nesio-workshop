@@ -15144,6 +15144,58 @@ html[data-portal-theme="night"] .nesio-exp-card:hover {
   white-space: nowrap;
 }
 
+/* 回访再触达提醒卡(Part 3:某功能没碰过 → 轻轻探一句,三个出口) */
+.nesio-reengage-card {
+  width: calc(100% - 2rem);
+  margin: 0 1rem 0.75rem;
+  padding: 0.85rem 0.95rem;
+  border-radius: var(--radius-md, 16px);
+  border: 1px solid var(--portal-accent-border, rgba(88,140,227,0.25));
+  background: var(--portal-accent-soft, rgba(88,140,227,0.1));
+}
+.nesio-reengage-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.35rem;
+}
+.nesio-reengage-icon {
+  display: inline-flex;
+  color: var(--portal-blue-deep);
+}
+.nesio-reengage-title {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: var(--weight-semibold, 600);
+  color: var(--portal-ink);
+}
+.nesio-reengage-body {
+  margin: 0 0 0.65rem;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: var(--portal-muted);
+}
+.nesio-reengage-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.nesio-reengage-cta {
+  padding: 0.4rem 1rem;
+  border-radius: var(--radius-pill, 999px);
+  background: var(--portal-blue-deep);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: var(--weight-semibold, 600);
+}
+.nesio-reengage-cta:active { transform: scale(0.96); }
+.nesio-reengage-ghost {
+  padding: 0.4rem 0.6rem;
+  color: var(--portal-muted);
+  font-size: 0.78rem;
+}
+.nesio-reengage-ghost:last-child { margin-left: auto; }
+
 
 /* Journal 富文本编辑器(批次 8:所见即所得,不露 markdown 记号) */
 .nesio-journal-editor {

@@ -66,6 +66,7 @@ import { pruneDisposableSignals } from '@/lib/life-domain';
 import { hydrateSignalFactStore } from '@/lib/life-domain/signal-read-cache';
 import { prunePrivateExternalNodes } from '@/lib/portal/life-graph';
 import { STORAGE_FULL_EVENT, STORAGE_WARNING_EVENT } from '@/lib/portal/storage-health';
+import { recordAppOpen } from '@/lib/portal/feature-usage';
 import { track, installErrorTracking } from '@/lib/portal/telemetry';
 import type { PortalConfig, PortalDecMetadata, PortalTool } from '@/lib/portal/types';
 import { type ToolForShellState } from './tool-state';
@@ -242,6 +243,8 @@ export default function Portal() {
   //(Safari/Chrome 对已安装 PWA 通常放行;拒绝也无害,云备份仍是兜底)。
   useEffect(() => {
     try { void navigator.storage?.persist?.(); } catch { /* 不支持则算了 */ }
+    // 记一次应用打开(会话/活跃天),供回访再触达提醒判定「不是第一次登录」
+    try { recordAppOpen(); } catch { /* 本机偏好,失败不影响使用 */ }
   }, []);
 
   const [config, setConfig] = useState<PortalConfig>(DEFAULT_PORTAL_CONFIG);
