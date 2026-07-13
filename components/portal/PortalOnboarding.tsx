@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import NesioMark from './NesioMark';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { L, t } from '@/lib/portal/i18n';
-import { IconBox } from './icons';
+import { IconBox, IconTarget, IconSmile, IconMic, IconZap, IconStar, IconUser, IconBulb, IconCheckCircle, IconMail, IconLock } from './icons';
 import {
   loadProfileSettings,
   portalLocaleToDictionaryLocale,
@@ -20,7 +20,7 @@ import {
 } from '@/lib/portal/auth-client';
 
 const [ONBOARDING_DONE_KEY, LEGACY_ONBOARDING_DONE_KEY] = NESIO_ONBOARDING_DONE_KEYS;
-const TIPS_SHOWN_KEY = 'nesio-tips-shown-v1';
+export const TIPS_SHOWN_KEY = 'nesio-tips-shown-v1';
 
 type Step = 'welcome' | 'name' | 'auth';
 type AuthMode = 'login' | 'register';
@@ -182,7 +182,7 @@ function NameStep({ onNext, locale }: { onNext: (name: string) => void; locale: 
 
   return (
     <div className="nesio-ob-step">
-      <div className="nesio-ob-step-icon" aria-hidden>👋</div>
+      <div className="nesio-ob-step-icon" aria-hidden><IconSmile size={30} /></div>
       <h2 className="nesio-ob-step-title">{t(locale, 'onboardingNameLabel')}</h2>
       <p className="nesio-ob-step-sub">{t(locale, 'onboardingNameNote')}</p>
       <input
@@ -248,7 +248,7 @@ function AuthStep({ onDone, locale, displayName }: {
 
   if (sent) return (
     <div className="nesio-ob-step">
-      <div className="nesio-ob-step-icon" aria-hidden>📬</div>
+      <div className="nesio-ob-step-icon" aria-hidden><IconMail size={30} /></div>
       <h2 className="nesio-ob-step-title">{t(locale, 'onboardingAuthCheckEmailTitle')}</h2>
       <p className="nesio-ob-step-sub">{t(locale, 'onboardingAuthLinkSentTemplate', { email })}</p>
       <button type="button" className="nesio-ob-primary-btn" onClick={onDone}>{t(locale, 'onboardingAuthContinueLocal')}</button>
@@ -257,7 +257,7 @@ function AuthStep({ onDone, locale, displayName }: {
 
   return (
     <div className="nesio-ob-step">
-      <div className="nesio-ob-step-icon" aria-hidden>🔐</div>
+      <div className="nesio-ob-step-icon" aria-hidden><IconLock size={30} /></div>
       <h2 className="nesio-ob-step-title">{t(locale, 'onboardingAuthHelloTemplate', { name: displayName })}</h2>
       <p className="nesio-ob-step-sub">
         {t(locale, 'onboardingAuthBenefit')}
@@ -316,18 +316,19 @@ function AuthStep({ onDone, locale, displayName }: {
 export function FirstUseTips({ onDone, locale }: { onDone: () => void; locale: PortalLocale }) {
   const [step, setStep] = useState(0);
   const dict = portalLocaleToDictionaryLocale(locale);
+  // 无 emoji:每步用线性图标(设计规范)。覆盖用户点名的各面:三个键 · 今天快速输入 ·
+  // 输入心情 · 长按中键问一问 · 粉碎人物 / 整理物品 · 长按记忆归核心/项目 · 洞察。
   const tips = [
-    { emoji: '📋', title: t(locale, 'onboardingTipTodayTitle'), body: t(locale, 'onboardingTipTodayBody'), zone: 'content' as const },
-    // QA 新手引导补三招:粉碎任务 / 长按问一问 / 发送邮件
-    { emoji: '⚡', title: L(dict, '任务大?粉碎它', 'Big task? Shatter it'), body: L(dict, '今日焦点卡上点「拆一下」,把大事拆成 3 个立刻能动手的小步。', 'Tap "Break down" on a focus card — it splits into 3 steps you can start right now.'), zone: 'content' as const },
-    // 批次 33:提醒卡手势(按钮已撤,手势接管)
-    { emoji: '👆', title: L(dict, '提醒卡用手势', 'Cards speak gesture'), body: L(dict, '提醒卡片:左滑=没用,右滑=稍后提醒,双击=有用。你的每次反馈都让它更懂你。', 'Reminder cards: swipe left = not useful, swipe right = remind me later, double-tap = useful. Every gesture teaches it.'), zone: 'content' as const },
-    { emoji: '💎', title: t(locale, 'onboardingTipCenterTitle'), body: t(locale, 'onboardingTipCenterBody'), zone: 'center' as const },
-    { emoji: '🔍', title: L(dict, '长按问一问', 'Hold to Ask'), body: L(dict, '长按中间按钮直接问:「护照放在哪」「上次买的药」,记过的都能找回。', 'Hold the center button and just ask: "Where is my passport?" — anything you noted comes back.'), zone: 'center' as const },
-    { emoji: '✉️', title: L(dict, '邮件直接回', 'Reply to email in place'), body: L(dict, '连接 Gmail 后,邮件记忆里点「回复」—— AI 起草,你过目、点发送。', 'Connect Gmail, then tap Reply on an email memory — AI drafts, you review and send.'), zone: 'memory' as const },
-    { emoji: '🗂', title: t(locale, 'onboardingTipMemoryTitle'), body: t(locale, 'onboardingTipMemoryBody'), zone: 'memory' as const },
+    { Icon: IconTarget, title: t(locale, 'onboardingTipTodayTitle'), body: t(locale, 'onboardingTipTodayBody'), zone: 'today' as const },
+    { Icon: IconSmile, title: L(dict, '今天第一拍:心情', "Today's first beat: mood"), body: L(dict, '今天页顶上点一下心情球,记下此刻的情绪和精力 —— 后面洞察会把它连成规律。', 'Tap the mood orb at the top of Today to log how you feel and your energy — Insights weaves it into patterns later.'), zone: 'today' as const },
+    { Icon: IconMic, title: t(locale, 'onboardingTipCenterTitle'), body: t(locale, 'onboardingTipCenterBody'), zone: 'center' as const },
+    { Icon: IconZap, title: L(dict, '长按问一问', 'Hold to Ask'), body: L(dict, '长按中间按钮直接问:「护照放在哪」「上次买的药」,记过的都能找回。', 'Hold the center button and just ask: "Where is my passport?" — anything you noted comes back.'), zone: 'center' as const },
+    { Icon: IconUser, title: L(dict, '一句话,拆出人和物', 'One line → people & things'), body: L(dict, '把一段话丢给念念:「和老王开会,买了台显示器」—— 自动记成人物「老王」和物品「显示器」,整理归位。', 'Drop a line to Nesio: "Met Wang, bought a monitor" — it files a person "Wang" and an item "monitor" automatically.'), zone: 'center' as const },
+    { Icon: IconStar, title: t(locale, 'onboardingTipMemoryTitle'), body: L(dict, '记忆页里长按任意卡片:标为核心记忆(定义你的那些),或加进某个项目归拢起来。', 'On Memory, long-press any card: mark it Core (the ones that define you), or add it into a Project.'), zone: 'memory' as const },
+    { Icon: IconBulb, title: L(dict, '洞察:把点连成线', 'Insights: connect the dots'), body: L(dict, '记得越多,念念越懂你 —— 洞察会把心情、关系、足迹、花销连成规律,轻轻提醒。', 'The more you note, the more Nesio gets you — Insights links mood, people, places and spending into gentle patterns.'), zone: 'memory' as const },
   ];
   const tip = tips[step];
+  const StepIcon = tip.Icon;
   const isLast = step === tips.length - 1;
 
   // 激活式最后一步:真的存进第一条记忆,并当场找回 —— 引导结束时
@@ -364,7 +365,7 @@ export function FirstUseTips({ onDone, locale }: { onDone: () => void; locale: P
         <div className="nesio-tips-dots" aria-hidden>
           {tips.map((_, i) => <span key={i} className={`nesio-tips-dot${i === step ? ' nesio-tips-dot--active' : ''}`} />)}
         </div>
-        <div className="nesio-tips-emoji" aria-hidden>{isLast && activatePhase === 'found' ? '✨' : tip.emoji}</div>
+        <div className="nesio-tips-emoji" aria-hidden>{isLast && activatePhase === 'found' ? <IconCheckCircle size={26} /> : <StepIcon size={26} />}</div>
         {isLast ? (
           activatePhase === 'input' ? (
             <>

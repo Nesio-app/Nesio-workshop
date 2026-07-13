@@ -129,6 +129,8 @@
   --portal-ink:   #1e2a3a;
   --portal-muted: #5a6d82;
   --portal-line:  rgba(88, 140, 227, 0.14);
+  /* 足迹分享成就卡的卡底(暖近白,不吃 app 冷蓝底;夜间块翻成深炭) */
+  --share-card-surface: #faf7f6;
   /* ── Zone tones ── */
   --portal-cool:           #e8f2fc;
   --portal-cool-accent:    #588ce3;
@@ -249,6 +251,8 @@ html[data-portal-theme="night"] .portal-root {
   --portal-ink:   #e7eefb;
   --portal-muted: rgba(200, 217, 245, 0.6);
   --portal-line:  rgba(127, 176, 245, 0.16);
+  /* 分享卡夜版卡底:深炭(不用 app 夜蓝底,成就卡要更黑更聚焦) */
+  --share-card-surface: #1a1a1e;
   /* Night zones */
   --portal-cool:           #16243c;
   --portal-cool-accent:    #7fb0ee;
@@ -12734,6 +12738,39 @@ button.nesio-rel-due-info { background: none; border: none; padding: 0; font: in
 .nesio-rel-nudge-btn { margin-top: 0.4rem; background: none; border: 0; padding: 0; font-size: 0.78rem; font-weight: 700; color: var(--status-go); cursor: pointer; }
 .nesio-rel-touch-btn--due { background: var(--portal-accent-soft); color: var(--portal-accent); }
 
+/* ── 挂一条(设计稿:挂在 TA 身上 · 起手 + 确认卡)── */
+.nesio-hang-card { max-width: 30rem; }
+.nesio-hang-head { display: flex; align-items: center; gap: 0.6rem; padding: 0.2rem 0 0.9rem; border-bottom: 1px solid var(--portal-line); }
+.nesio-hang-avatar { flex: none; width: 2.4rem; height: 2.4rem; border-radius: 0.7rem; display: grid; place-items: center; font-size: 0.95rem; font-weight: 800; color: #fff; background: var(--portal-accent); }
+.nesio-hang-head-id { flex: 1; min-width: 0; }
+.nesio-hang-head-title { margin: 0; font-size: 0.95rem; font-weight: 800; color: var(--portal-ink); }
+.nesio-hang-head-sub { margin: 1px 0 0; font-size: 0.72rem; font-weight: 700; color: var(--portal-muted); }
+.nesio-hang-body { display: flex; flex-direction: column; gap: 0.6rem; padding-top: 0.9rem; }
+.nesio-hang-nessa { display: block; font-size: 0.88rem; line-height: 1.55; color: var(--portal-ink); border-left: 2px solid var(--portal-accent-border); padding: 0.15rem 0 0.15rem 0.7rem; margin: 0.9rem 0 0; }
+.nesio-hang-nessa-kicker { display: inline-flex; align-items: center; font-size: 0.68rem; font-weight: 800; color: var(--portal-accent); margin-right: 0.4rem; }
+.nesio-hang-input-card { background: var(--glass-bg-solid); border: 1px solid var(--portal-line); border-radius: var(--radius-md, 16px); padding: 0.7rem; box-shadow: 0 4px 14px rgba(0,0,0,.05); }
+.nesio-hang-input { width: 100%; border: 0; background: none; resize: none; font-size: 0.9rem; color: var(--portal-ink); font-family: inherit; }
+.nesio-hang-input::placeholder { color: var(--portal-muted); }
+.nesio-hang-cap-row { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+.nesio-hang-cap { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; padding: 0.7rem; border-radius: var(--radius-sm, 12px); border: 1px solid var(--portal-line); background: var(--portal-bg); font-size: 0.85rem; font-weight: 700; color: var(--portal-ink); cursor: pointer; min-height: var(--tap-min); }
+.nesio-hang-cap:disabled { opacity: 0.55; cursor: default; }
+.nesio-hang-cap--primary { background: var(--portal-accent); border-color: var(--portal-accent); color: #fff; }
+.nesio-hang-lock { display: flex; align-items: center; gap: 0.32rem; font-size: 0.72rem; font-weight: 600; color: var(--status-go); }
+.nesio-hang-lock--foot { justify-content: center; color: var(--portal-muted); margin-top: 0.2rem; }
+.nesio-hang-redo { align-self: center; background: none; border: 0; font-size: 0.78rem; font-weight: 600; color: var(--portal-muted); cursor: pointer; padding: 0.3rem; margin-top: 0.2rem; }
+/* 确认卡 */
+.nesio-hang-confirm { background: var(--glass-bg-solid); border: 1px solid var(--portal-line); border-radius: var(--radius-md, 16px); padding: 0.85rem 0.9rem; margin-top: 0.8rem; box-shadow: 0 4px 14px rgba(0,0,0,.05); }
+.nesio-hang-confirm-badge { display: inline-flex; align-items: center; font-size: 0.66rem; font-weight: 800; color: var(--portal-muted); background: color-mix(in srgb, var(--portal-ink) 6%, transparent); border-radius: 0.45rem; padding: 0.14rem 0.5rem; }
+.nesio-hang-confirm-title { margin: 0.5rem 0 0; font-size: 1.25rem; font-weight: 800; color: var(--portal-ink); line-height: 1.25; }
+.nesio-hang-confirm-tagline { margin: 0.6rem 0 0.4rem; font-size: 0.68rem; font-weight: 700; color: var(--portal-muted); }
+.nesio-hang-tags { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.nesio-hang-tag { display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.72rem; font-weight: 700; color: var(--portal-accent); background: var(--portal-accent-soft); border: 0; border-radius: 0.5rem; padding: 0.24rem 0.55rem; cursor: default; }
+.nesio-hang-tag--cat { cursor: pointer; }
+.nesio-hang-tag--cat.is-sensitive { color: var(--status-go); background: var(--status-go-soft); }
+.nesio-hang-confirm .nesio-hang-lock { margin-top: 0.6rem; }
+.nesio-hang-primary { width: 100%; margin-top: 1rem; }
+.nesio-hang-saved { text-align: center; font-size: 0.95rem; font-weight: 700; color: var(--status-go); padding: 2rem 0; }
+
 .nesio-rel-timeline { display: flex; flex-direction: column; }
 .nesio-rel-tl-row { display: flex; gap: 0.7rem; font-size: 0.82rem; padding: 0.3rem 0; border-bottom: 1px solid var(--portal-line); }
 .nesio-rel-tl-row:last-child { border-bottom: none; }
@@ -12830,6 +12867,21 @@ button.nesio-rel-due-info { background: none; border: none; padding: 0; font: in
 
 /* ── 世界 tab(设计稿④):国家卡 → 城市明信片 ── */
 .nesio-tl-world-head { font-size: 1.05rem; font-weight: 800; color: var(--portal-ink); margin: 0.9rem 0.1rem 0.15rem; }
+.nesio-tl-world-headrow { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.nesio-tl-world-share {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  padding: 0.34rem 0.85rem;
+  border-radius: var(--radius-pill, 999px);
+  border: 1px solid var(--portal-accent-border, rgba(88, 140, 227, 0.25));
+  background: var(--portal-accent-soft, rgba(88, 140, 227, 0.1));
+  color: var(--portal-blue-deep, #b06f68);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.nesio-tl-world-share:active { transform: scale(0.96); }
 .nesio-tl-world-sub { font-family: var(--font-portal-serif), Georgia, serif; font-size: 0.72rem; color: var(--portal-muted); margin: 0 0.1rem 0.9rem; }
 /* 装饰渐变(占位图,色值走 token 混色,非语义强调色)*/
 .nesio-tl-cc-g0 { background: linear-gradient(150deg, color-mix(in srgb, var(--status-gentle) 55%, #fff), var(--status-gentle)); }
@@ -15163,6 +15215,291 @@ html[data-portal-theme="night"] .nesio-exp-card:hover {
   white-space: nowrap;
 }
 
+/* 回访再触达提醒卡(Part 3:某功能没碰过 → 轻轻探一句,三个出口) */
+.nesio-reengage-card {
+  width: calc(100% - 2rem);
+  margin: 0 1rem 0.75rem;
+  padding: 0.85rem 0.95rem;
+  border-radius: var(--radius-md, 16px);
+  border: 1px solid var(--portal-accent-border, rgba(88,140,227,0.25));
+  background: var(--portal-accent-soft, rgba(88,140,227,0.1));
+}
+.nesio-reengage-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.35rem;
+}
+.nesio-reengage-icon {
+  display: inline-flex;
+  color: var(--portal-blue-deep);
+}
+.nesio-reengage-title {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: var(--weight-semibold, 600);
+  color: var(--portal-ink);
+}
+.nesio-reengage-body {
+  margin: 0 0 0.65rem;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: var(--portal-muted);
+}
+.nesio-reengage-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.nesio-reengage-cta {
+  padding: 0.4rem 1rem;
+  border-radius: var(--radius-pill, 999px);
+  background: var(--portal-blue-deep);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: var(--weight-semibold, 600);
+}
+.nesio-reengage-cta:active { transform: scale(0.96); }
+.nesio-reengage-ghost {
+  padding: 0.4rem 0.6rem;
+  color: var(--portal-muted);
+  font-size: 0.78rem;
+}
+.nesio-reengage-ghost:last-child { margin-left: auto; }
+
+/* 预览引导 / 模拟运行 —— 设置页每行:图标 + 说明 + 触发按钮 */
+.nesio-preview-guide-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--portal-line, rgba(88,140,227,0.14));
+}
+.nesio-preview-guide-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--portal-blue-deep);
+}
+.nesio-preview-guide-text { flex: 1; min-width: 0; }
+.nesio-preview-guide-title {
+  margin: 0;
+  font-size: 0.86rem;
+  font-weight: var(--weight-semibold, 600);
+  color: var(--portal-ink);
+}
+.nesio-preview-guide-sub {
+  margin: 0.15rem 0 0;
+  font-size: 0.74rem;
+  line-height: 1.5;
+  color: var(--portal-muted);
+}
+.nesio-preview-guide-cta {
+  flex-shrink: 0;
+  padding: 0.4rem 0.85rem;
+  border-radius: var(--radius-pill, 999px);
+  border: 1px solid var(--portal-accent-border, rgba(88,140,227,0.25));
+  background: var(--portal-accent-soft, rgba(88,140,227,0.1));
+  color: var(--portal-blue-deep);
+  font-size: 0.76rem;
+  font-weight: var(--weight-semibold, 600);
+  white-space: nowrap;
+}
+.nesio-preview-guide-cta:active { transform: scale(0.96); }
+.nesio-preview-guide-msg {
+  margin: 0.8rem 0 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 10px;
+  background: var(--status-go-soft, #d9ece1);
+  color: var(--status-go, #5a9e7a);
+  font-size: 0.78rem;
+}
+
+/* ── 足迹成就卡分享:预览层 ───────────────────────────────── */
+.nesio-placeshare-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+}
+.nesio-placeshare-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(20, 22, 30, 0.72);
+  border: none;
+}
+.nesio-placeshare-body {
+  position: relative;
+  width: min(92vw, 360px);
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+.nesio-placeshare-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.nesio-placeshare-seg {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: var(--radius-pill, 999px);
+  background: rgba(255, 255, 255, 0.16);
+}
+.nesio-placeshare-seg-btn {
+  padding: 0.32rem 0.9rem;
+  border-radius: var(--radius-pill, 999px);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.78);
+}
+.nesio-placeshare-seg-btn.is-active {
+  background: #fff;
+  color: var(--portal-ink, #222);
+}
+.nesio-placeshare-x {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+.nesio-placeshare-cardwrap {
+  width: 100%;
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+}
+.nesio-placeshare-cta {
+  align-self: center;
+  min-width: 60%;
+  padding: 0.75rem 1.5rem;
+  border-radius: var(--radius-pill, 999px);
+  background: var(--portal-blue-deep, #b06f68);
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+.nesio-placeshare-cta:active { transform: scale(0.97); }
+
+/* ── 「分享到」目的地面板 ─────────────────────────────────── */
+.nesio-shareto-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.nesio-shareto-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(20, 22, 30, 0.4);
+  border: none;
+}
+.nesio-shareto-card {
+  position: relative;
+  width: min(100%, 480px);
+  background: var(--sheet-opaque, #fff);
+  border-radius: 24px 24px 0 0;
+  padding: 0.5rem 1.1rem calc(1.2rem + env(safe-area-inset-bottom));
+  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.2);
+  animation: coachBubbleIn 0.22s var(--ease-out, ease-out);
+}
+.nesio-shareto-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0.2rem 0 0.9rem;
+}
+.nesio-shareto-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--portal-ink);
+}
+.nesio-shareto-close {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--portal-surface-2, rgba(127, 127, 127, 0.1));
+  color: var(--portal-muted);
+}
+.nesio-shareto-row { display: flex; gap: 0.7rem; }
+.nesio-shareto-row--scroll {
+  overflow-x: auto;
+  padding-bottom: 0.3rem;
+  scrollbar-width: none;
+}
+.nesio-shareto-row--scroll::-webkit-scrollbar { display: none; }
+.nesio-shareto-row--wide { margin-top: 0.8rem; }
+.nesio-shareto-dest {
+  flex: 0 0 auto;
+  width: 68px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+}
+.nesio-shareto-ico {
+  width: 54px;
+  height: 54px;
+  border-radius: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--portal-surface-2, rgba(127, 127, 127, 0.1));
+  color: var(--portal-ink);
+}
+.nesio-shareto-ico--primary {
+  background: var(--portal-blue-deep, #b06f68);
+  color: #fff;
+}
+.nesio-shareto-dest:active .nesio-shareto-ico { transform: scale(0.94); }
+.nesio-shareto-dest:disabled { opacity: 0.5; }
+.nesio-shareto-label {
+  font-size: 0.72rem;
+  color: var(--portal-muted);
+  white-space: nowrap;
+}
+.nesio-shareto-wide {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.7rem;
+  border-radius: 14px;
+  background: var(--portal-surface-2, rgba(127, 127, 127, 0.1));
+  color: var(--portal-ink);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.nesio-shareto-wide:active { transform: scale(0.98); }
+.nesio-shareto-wide:disabled { opacity: 0.5; }
+.nesio-shareto-msg {
+  margin: 0.8rem 0 0;
+  font-size: 0.78rem;
+  color: var(--status-go, #5a9e7a);
+  text-align: center;
+}
+.nesio-shareto-msg--err { color: var(--status-risk, #cf6b6b); }
+.nesio-shareto-privacy {
+  margin: 0.9rem 0 0;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--portal-muted);
+  text-align: center;
+}
+
 
 /* Journal 富文本编辑器(批次 8:所见即所得,不露 markdown 记号) */
 .nesio-journal-editor {
@@ -15890,6 +16227,18 @@ html[data-portal-theme="night"][data-palette="sage"]          { background-color
   line-height: 1.8;
   color: var(--portal-muted);
 }
+/* 冷启动「先看看样例」—— 登录后一键灌样例(可一键清) */
+.nesio-memory-sample-seed {
+  margin-top: 0.4rem;
+  padding: 0.5rem 1.2rem;
+  border-radius: var(--radius-pill, 999px);
+  border: 1px solid var(--portal-accent-border, rgba(88, 140, 227, 0.25));
+  background: var(--portal-accent-soft, rgba(88, 140, 227, 0.1));
+  color: var(--portal-blue-deep, #588ce3);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.nesio-memory-sample-seed:active { transform: scale(0.96); }
 
 /* 批次 35 · 引导 caret:内容类提示朝上指向页面内容(此前恒朝下戳导航,像悬空图标) */
 .nesio-tips-card--content::after {

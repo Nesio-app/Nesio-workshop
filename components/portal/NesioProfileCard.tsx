@@ -8,13 +8,14 @@ import { AccountSheet, ProfileSheet, AppearanceSheet, HabitsSheet, PrivacySheet,
 import ConnectorsHub from './ConnectorsHub';
 import RoadmapSheet from './RoadmapSheet';
 import RoutineSheet from './RoutineSheet';
+import PreviewGuidesSheet from './PreviewGuidesSheet';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
-import { IconClock, IconGear, IconGift, IconUser, IconSun, IconMapPin, IconShield, IconHelpCircle } from './icons';
+import { IconClock, IconGear, IconGift, IconUser, IconSun, IconMapPin, IconShield, IconHelpCircle, IconRefresh } from './icons';
 
 // 批次 138 设计「设置重组」:档案/账户拆开 · 通用拆成外观语言+记录习惯 · 底部次要行
-type ActiveSheet = 'profile' | 'account' | 'appearance' | 'habits' | 'privacy' | 'subscription' | 'connectors' | 'roadmap' | 'routine' | null;
+type ActiveSheet = 'profile' | 'account' | 'appearance' | 'habits' | 'privacy' | 'subscription' | 'connectors' | 'roadmap' | 'routine' | 'preview' | null;
 
 export default function NesioProfileCard() {
   const [displayName, setDisplayName] = useState('Jessy');
@@ -152,6 +153,7 @@ export default function NesioProfileCard() {
     { key: 'subscription', icon: <IconGift />, label: L(dict, '会员 · Pro', 'Membership · Pro') },
     { key: 'routine', icon: <IconClock />, label: L(dict, '例行提醒', 'Routines') },
     { key: 'roadmap', icon: <IconHelpCircle />, label: L(dict, '帮助与反馈', 'Help & feedback') },
+    { key: 'preview', icon: <IconRefresh />, label: L(dict, '预览引导', 'Preview guides') },
   ];
 
   return (
@@ -269,6 +271,7 @@ export default function NesioProfileCard() {
       <ConnectorsHub open={activeSheet === 'connectors'} onClose={() => setActiveSheet(null)} />
       <RoadmapSheet open={activeSheet === 'roadmap'} onClose={() => setActiveSheet(null)} />
       <RoutineSheet open={activeSheet === 'routine'} onClose={() => setActiveSheet(null)} />
+      <PreviewGuidesSheet open={activeSheet === 'preview'} onClose={() => setActiveSheet(null)} />
     </>
   );
 }

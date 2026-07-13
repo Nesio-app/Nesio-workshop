@@ -36,6 +36,7 @@ import { ExperimentCheckinCard } from './today/ExperimentCheckinCard';
 import { RoutineDueCards } from './today/RoutineDueCards';
 import { DailyReportCard } from './today/DailyReportCard';
 import { ThawedReminder } from './today/ThawedReminder';
+import { ReengageNudgeCard } from './today/ReengageNudgeCard';
 import { TodayFocusSection } from './today/FocusSection';
 import { NightTimeline } from './today/NightTimeline';
 import { useTodayData } from './today/useTodayData';
@@ -250,6 +251,14 @@ export default function TodayFeed({
 
         {/* 每日图文日报(未来预测区首张;仅登录 + 开关开 + 有内容时,todayReport 已受私据门)*/}
         {canUsePrivateData && <DailyReportCard report={todayReport} />}
+
+        {/* 回访再触达:来过好几回但某功能没碰过 → 轻轻探一句(全局两天一条,可稍后/不再提醒)*/}
+        {canUsePrivateData && (
+          <ReengageNudgeCard
+            nodes={allNodes}
+            onOpenInsights={() => { setInsightsTab('reflection'); setMirrorOpen(true); }}
+          />
+        )}
 
         {/* 未来引导卡 — up to 2, each independently dismissable */}
         {activeProactiveCards.map((card) => (

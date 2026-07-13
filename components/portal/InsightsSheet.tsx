@@ -18,6 +18,7 @@ import RelationGraph from '@/components/portal/RelationGraph';
 import type { GNode, GEdge } from '@/lib/platform/graph-engine';
 import { getLifeGraph, isBulkImported } from '@/lib/portal/life-graph';
 import type { LifeNode } from '@/lib/portal/life-graph';
+import { markFeatureUsed } from '@/lib/portal/feature-usage';
 import { getMirrorProfile } from '@/lib/portal/mirror-profile';
 import { loadProfileSettings } from '@/lib/portal/profile';
 import { isLabModeOn, LAB_MODE_EVENT } from '@/lib/portal/module-overrides';
@@ -405,6 +406,9 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
   const [livingError, setLivingError] = useState<'no-key' | 'quota' | 'ai-error' | 'network' | null>(null);
   const livingFetchedRef = useRef(false);
   const livingSeqRef = useRef(0);
+
+  // 打开洞察即视为「用过洞察」,回访再触达提醒不再叨扰这一项(仅登录态记)
+  useEffect(() => { if (canUsePrivateData) markFeatureUsed('insights'); }, [canUsePrivateData]);
 
   useEffect(() => {
     // 私据门:非私有运行态不把私人记录读进内存(纵深防御,配合下方 fail-closed 渲染门)
