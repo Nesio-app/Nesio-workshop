@@ -432,7 +432,9 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
     const context = extractContext(cleanText);
 
     let title = cleanText.slice(0, 40);
-    let aiConfidence = 0.7;
+    // 批次 146:用规则分类的真实置信度(零命中→0.25),不再硬编码 0.7。
+    // 低置信落成节点时 isNodeUncertain 会标「待确认」,而不是把猜的当准的。
+    let aiConfidence = context.confidence?.ai ?? 0.7;
     // 批次 33 用户定案:**任何档位都不自动打 AI** —— 规则抽取是唯一默认路径,
     // AI 识别永远是确认卡上的显式按钮(点了才花钱、才等待)。
     // (旧的 Pro 自动云识别分支已删除 —— AI 只走确认卡上的「AI 识别」按钮)

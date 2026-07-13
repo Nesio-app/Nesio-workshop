@@ -25,10 +25,26 @@ const DOMAIN_KEYWORDS: Array<{ domain: FrontDomain; words: RegExp }> = [
   { domain: 'life', words: /(生日|礼物|旅行|朋友|妈妈|爸爸|家人|聚餐|约会|纪念日)/ },
 ];
 
-function classifyDomain(text: string): { domain: FrontDomain; secondary: FrontDomain[] } {
-  const hits = DOMAIN_KEYWORDS.filter((k) => k.words.test(text)).map((k) => k.domain);
-  if (hits.length === 0) return { domain: 'life', secondary: [] };
-  return { domain: hits[0], secondary: hits.slice(1) };
+// 批次 146:分类不准的根 —— 旧逻辑「首个命中赢 + 零命中一律默认 life + 置信度硬编码 0.7」,
+// 连「洗澡」这种零关键词的都自信标成 life。改成:按「命中关键词数」给每个域打分取最高,
+// 并返回真实置信度(零命中压到很低,让下游标『待确认』而不是装懂)。
+function countHits(text: string, re: RegExp): number {
+  const g = new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g');
+  return (text.match(g) || []).length;
+}
+function classifyDomain(text: string): { domain: FrontDomain; secondary: FrontDomain[]; confidence: number } {
+  const scored = DOMAIN_KEYWORDS
+    .map((k) => ({ domain: k.domain, hits: countHits(text, k.words) }))
+    .filter((s) => s.hits > 0)
+    .sort((a, b) => b.hits - a.hits);
+  if (scored.length === 0) {
+    // 一个关键词都没命中 —— 别装懂:life 只作兜底,置信度压到很低 → isNodeUncertain 标「待确认」。
+    return { domain: 'life', secondary: [], confidence: 0.25 };
+  }
+  const secondary = scored.slice(1).map((s) => s.domain);
+  // 唯一命中、或明显领先第二名 → 高置信;多域并列 → 中(仍可能要人确认)。
+  const clear = scored.length === 1 || scored[0].hits > (scored[1]?.hits ?? 0);
+  return { domain: scored[0].domain, secondary, confidence: clear ? 0.85 : 0.55 };
 }
 
 // ── Entity extraction ───────────────────────────────────────────────────────
@@ -76,7 +92,7 @@ function inferIntent(text: string, domain: FrontDomain): string {
 
 export function extractContext(text: string, opts?: { aiConfidence?: number }): SignalContext {
   const trimmed = text.trim();
-  const { domain, secondary } = classifyDomain(trimmed);
+  const { domain, secondary, confidence: domainConf } = classifyDomain(trimmed);
 
   const people = extractPeople(trimmed);
   const places = dedupe(matchAll(trimmed, PLACE_WORDS, 0));
@@ -91,7 +107,9 @@ export function extractContext(text: string, opts?: { aiConfidence?: number }): 
     objects: objects.length ? objects : undefined,
     intent,
     confidence: {
-      ai: opts?.aiConfidence ?? 0.7,
+      // 批次 146:有 AI 置信度就用 AI 的,否则用规则分类的真实置信度(不再硬编码 0.7 —— 那正是
+      // 「零命中也标 0.7」的病根)。低置信 → 下游 isNodeUncertain 标「待确认」交人核对。
+      ai: opts?.aiConfidence ?? domainConf,
       userConfirmed: false, // suggestion only until the user confirms (§6.2)
       userEdited: false,
     },
