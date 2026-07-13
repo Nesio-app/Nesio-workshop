@@ -9801,6 +9801,39 @@ html[data-portal-theme="night"] .nesio-wechat-header {
   letter-spacing: -0.01em;
 }
 
+/* 批次 140:念念头部品牌行 + 模式副标 */
+.nesio-wechat-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  line-height: 1.12;
+}
+.nesio-wechat-brand-mode {
+  font-size: 0.64rem;
+  font-weight: 600;
+  color: var(--portal-muted);
+  letter-spacing: 0.02em;
+}
+/* 气泡模式徽章 —— 答复来路诚实标(端上=绿 · 云端=蓝) */
+.nesio-wechat-mode-badge {
+  align-self: flex-start;
+  margin-top: 0.3rem;
+  font-size: 0.64rem;
+  font-weight: 700;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  letter-spacing: 0.01em;
+}
+.nesio-wechat-mode-badge--onDevice {
+  color: var(--status-go, #5a9e7a);
+  background: var(--status-go-soft, rgba(90,158,122,0.14));
+}
+.nesio-wechat-mode-badge--cloud {
+  color: var(--portal-blue-deep);
+  background: var(--portal-accent-soft, rgba(88,140,227,0.12));
+}
+
 .nesio-wechat-more-btn {
   font-size: 0.78rem;
   color: var(--portal-muted);

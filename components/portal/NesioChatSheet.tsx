@@ -93,6 +93,8 @@ interface UiMessage {
   sources?: Array<{ title: string; url: string }>;
   refs?: MsgRef[];
   savedToMemory?: boolean;
+  /** 批次 140:这条答复的真实来路 —— 云端 AI(深问)还是本机记忆搜索(端上)。气泡徽章据此诚实标注。 */
+  answerMode?: 'onDevice' | 'cloud';
   /** 批次 68:动作块 —— 澄清选项芯片 / 行程条目确认卡(点确认才真正入库) */
   options?: string[];
   planItems?: ChatPlanItem[];
@@ -828,7 +830,7 @@ Edit location/value anytime in Storage.`),
             `Found ${hits.length} in your memory:\n${hits.map((n) => `• ${n.name}`).join('\n')}`)
         : L(dict, '记忆库里没找到相关的。', 'Nothing matching in your memory yet.');
       const upsell = L(dict, '\n\n升级 Pro 可用 AI 对话式问答。', '\n\nUpgrade to Pro for conversational AI answers.');
-      const aiMsg: UiMessage = { id: nextMsgId('a'), role: 'model', text: body + upsell };
+      const aiMsg: UiMessage = { id: nextMsgId('a'), role: 'model', text: body + upsell, answerMode: 'onDevice' };
       setMessages((prev) => { const next = [...prev, aiMsg]; saveHistory(next); return next; });
       setSending(false);
       sendingRef.current = false;
@@ -879,6 +881,7 @@ Edit location/value anytime in Storage.`),
       const aiMsg: UiMessage = {
         id: nextMsgId('a'),
         role: 'model',
+        answerMode: 'cloud', // 批次 140:走了 /api/portal/chat 云端 —— 徽章诚实标「深问·云端」
         // 兜底剥掉 markdown 强调记号 — 气泡是纯文本,裸 ** 很出戏
         text: cleanResp.replace(/\*\*/g, ''),
         sources: data.sources ?? [],
@@ -1189,7 +1192,15 @@ Edit location/value anytime in Storage.`),
       {/* Header */}
       <div className="nesio-wechat-header">
         <button type="button" className="nesio-wechat-back-btn" onClick={onClose} aria-label="关闭">←</button>
-        <span className="nesio-wechat-title">{L(dict, '问一问', 'Ask')}</span>
+        {/* 批次 140·设计念念节:头部品牌行 —— 念念 + 当前模式副标(按 entitlement 诚实:分层未启用即深问·云端) */}
+        <div className="nesio-wechat-brand">
+          <span className="nesio-wechat-title">{L(dict, '念念', 'Nessa')}</span>
+          <span className="nesio-wechat-brand-mode">
+            {canUsePaidCloudAi()
+              ? L(dict, '深问 · 云端 · Pro', 'Deep · cloud · Pro')
+              : L(dict, '端上简答 · 免费', 'On-device · free')}
+          </span>
+        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.15rem' }}>
           <button
             type="button"
@@ -1286,6 +1297,14 @@ Edit location/value anytime in Storage.`),
                   <p className="nesio-wechat-bubble-text">{msg.text}</p>
                   {msg.savedToMemory && <p className="nesio-wechat-saved-badge">✓ {L(dict, '已存入记忆', 'Saved to Memory')}</p>}
                 </div>
+                {/* 批次 140·设计念念节:气泡模式徽章 —— 按这条答复的真实来路诚实标(不追溯旧消息) */}
+                {!isUser && msg.answerMode && (
+                  <span className={`nesio-wechat-mode-badge nesio-wechat-mode-badge--${msg.answerMode}`}>
+                    {msg.answerMode === 'onDevice'
+                      ? L(dict, '◐ 端上答的 · 免费', '◐ On-device · free')
+                      : L(dict, '✦ 深问 · 云端', '✦ Deep · cloud')}
+                  </span>
+                )}
                 {msg.sources && msg.sources.length > 0 && (
                   <div className="nesio-wechat-sources">
                     {/* 只渲染 http(s) 链接 —— 模型返回的 URL 未必可信,挡 javascript:/data: 等伪协议 */}
