@@ -9061,7 +9061,8 @@ html[data-portal-theme="night"] .nesio-tl-dot--mood {
   min-width: 26px; min-height: 26px;
   margin: 0;                   /* 左缘 0,圆心 ≈ x13,坐轨上 */
   border-radius: 50%;
-  border: 1.5px dashed color-mix(in srgb, var(--portal-accent) 55%, transparent);
+  /* 批次 164:唯一虚线节点 = 记一笔草稿位(规格);粗细 2px 与其它节点统一,满 accent 色 */
+  border: 2px dashed var(--portal-accent);
   background: var(--portal-bg);
   color: var(--portal-accent);
   display: grid; place-items: center;
@@ -12007,23 +12008,24 @@ html[data-portal-theme="night"] .nesio-momentum-item { background: rgba(255,255,
   display: grid; place-items: center;
   color: var(--portal-muted);
 }
-.nesio-collapsed-dot--soft { border-color: color-mix(in srgb, var(--portal-muted) 60%, transparent); }
-/* 批次 129·定时·钟:有具体时间的日历项,圆内嵌钟符号 */
-.nesio-collapsed-dot--clock { color: var(--portal-accent); border-color: color-mix(in srgb, var(--portal-accent) 45%, transparent); }
-/* 批次 117→129:置顶「绝不能错过」= 关键·星,琥珀实心圆 + 白星符号 */
+/* 批次 164·统一节点规格:同尺寸 26px 圆 + 2px 实线描边 + 符号+色区分,不靠填充。
+   唯一虚线 = 记一笔话筒(草稿位);其余全实线。颜色:中性=muted,类型化=accent。 */
+.nesio-collapsed-dot--soft { border-color: var(--portal-muted); }
+/* 定时·钟:accent 描边 + accent 钟符号(不填充) */
+.nesio-collapsed-dot--clock { color: var(--portal-accent); border-color: var(--portal-accent); }
+/* 置顶「绝不能错过」= 关键·星:accent 描边 + accent 星符号(不再实心填充,与其它节点统一靠符号+色区分) */
 .nesio-collapsed-dot--pinned {
-  background: var(--portal-accent);
+  background: var(--portal-bg);
   border-color: var(--portal-accent);
-  color: #fff;
+  color: var(--portal-accent);
 }
-/* 批次 117→129:尾节点「稍后·还有 N 件」= 折叠·…,虚线圈内嵌省略号 */
+/* 尾节点「稍后·还有 N 件」= 折叠·…:真节点(小事已存在)→ 实线圈内嵌省略号,不用虚线 */
 .nesio-tl-more-plus {
   display: grid;
   place-items: center;
-  border-style: dashed;
-  border-color: color-mix(in srgb, var(--portal-muted) 60%, transparent);
-  background: transparent;
+  background: var(--portal-bg);
   color: var(--portal-muted);
+  border-color: var(--portal-muted);
   font-size: 1rem;
   font-weight: 700;
   line-height: 1;
