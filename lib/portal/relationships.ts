@@ -60,6 +60,31 @@ function emailDomain(key: string): string {
   return at > 0 ? key.slice(at + 1).toLowerCase() : '';
 }
 
+/** 邮箱归一:小写、去 +别名;Gmail 再去本地部分的点号。用于把自己的各种别名收敛成一个身份。 */
+export function normalizeEmail(email: string): string {
+  const e = email.trim().toLowerCase();
+  const at = e.indexOf('@');
+  if (at < 0) return e;
+  let local = e.slice(0, at);
+  const domain = e.slice(at + 1);
+  const plus = local.indexOf('+');
+  if (plus >= 0) local = local.slice(0, plus);
+  if (domain === 'gmail.com' || domain === 'googlemail.com') local = local.replace(/\./g, '');
+  return `${local}@${domain}`;
+}
+
+/** 账户本人身份键集合:归一后的邮箱 + 小写名字。用来把「自己」从联系人里剔除。 */
+export function selfIdentityKeys(self?: { emails?: string[]; names?: string[] }): { emails: Set<string>; names: Set<string> } {
+  const emails = new Set<string>();
+  const names = new Set<string>();
+  for (const em of self?.emails ?? []) { const n = normalizeEmail(em); if (n.includes('@')) emails.add(n); }
+  for (const nm of self?.names ?? []) { const t = nm.trim().toLowerCase(); if (t.length >= 2) names.add(t); }
+  return { emails, names };
+}
+
+/** 一次性会议与会人:只当过一次「participant/attendee」、无分组、无联系记录 → 噪声,不列入关系。 */
+const PARTICIPANT_REL = /participant|attendee|invitee|与会|参会|受邀|列席/i;
+
 /** 判断一个候选联系人是否明显不是真人(机器人/机构/通知/账单/公司发件人)。 */
 function isLikelyNonHuman(name: string, key: string): boolean {
   if (NON_HUMAN_NAME.test(name)) return true;
@@ -151,15 +176,24 @@ function closenessOf(a: Acc): Closeness {
 }
 
 /** 从记忆图谱推出联系人清单。now 可注入以便测试。 */
-export function buildRelationships(nodes: LifeNode[], now = Date.now(), contactLog = loadContactLog()): Contact[] {
+export function buildRelationships(
+  nodes: LifeNode[],
+  now = Date.now(),
+  contactLog = loadContactLog(),
+  self?: { emails?: string[]; names?: string[] },
+): Contact[] {
   const acc = new Map<string, Acc>();
   const groupsByKey = new Map<string, Set<string>>();  // key → Google 分组名(排除内部标记)
+  const selfIds = selfIdentityKeys(self);
   const bump = (rawName: string, rawKey: string, date: string | null, relation: string | null) => {
     const name = rawName.trim();
     const key = rawKey.trim().toLowerCase();
     if (!key || key.length < 2) return;
     // 过滤明显不是人的 key(纯数字/系统标记)
     if (/^\d+$/.test(key)) return;
+    // 账户本人不是联系人:自己的邮箱(含 +别名/点号归一)或名字命中即剔除 —— 修「自己的
+    // hanbing6228+cc 被当成联系人」。
+    if (selfIds.emails.has(normalizeEmail(key)) || selfIds.names.has(key) || selfIds.names.has(name.trim().toLowerCase())) return;
     // 过滤机器人/机构/通知/账单发件人 —— 关系管理只留真人
     if (isLikelyNonHuman(name, key)) return;
     const cur = acc.get(key) || { key, name, relation: null, mentions: 0, last: null, relationHit: null, times: [] };
@@ -227,6 +261,9 @@ export function buildRelationships(nodes: LifeNode[], now = Date.now(), contactL
   const out: Contact[] = [];
   for (const a of acc.values()) {
     const logged = contactLog[a.key] || null;
+    const groups = Array.from(groupsByKey.get(a.key) || []);
+    // 一次性会议与会人降噪:只当过一次 participant、无分组、无联系记录 → 不列入(路人不是关系)。
+    if (a.mentions <= 1 && a.relation && PARTICIPANT_REL.test(a.relation) && groups.length === 0 && !logged) continue;
     const last = newer(a.last, logged);
     const closeness = closenessOf(a);
     // 学到的真实节奏优先;学不出(联系次数<3)才用按亲疏的固定桶。
@@ -237,7 +274,7 @@ export function buildRelationships(nodes: LifeNode[], now = Date.now(), contactL
     out.push({
       key: a.key, name: a.name, relation: a.relation, closeness,
       mentions: a.mentions, lastContactAt: last, daysSince, cadenceDays, reachOut, overdueRatio,
-      groups: Array.from(groupsByKey.get(a.key) || []),
+      groups,
     });
   }
 

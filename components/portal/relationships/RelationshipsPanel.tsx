@@ -14,8 +14,9 @@ import {
   buildRelationships, markContacted, lastContactLabel,
   CLOSENESS_META, type Contact, type Closeness,
 } from '@/lib/portal/relationships';
+import { getLocalOwner } from '@/lib/portal/local-owner';
 import { L } from '@/lib/portal/i18n';
-import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
+import { loadProfileSettings, portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import RelationshipDetailSheet from './RelationshipDetailSheet';
 import FamilySummary from './FamilySummary';
@@ -32,7 +33,15 @@ export default function RelationshipsPanel() {
   const [activeGroup, setActiveGroup] = useState<string | null>(null);
   const [extractOpen, setExtractOpen] = useState(false);
 
-  const rebuild = () => setContacts(buildRelationships(getLifeGraph()));
+  const rebuild = () => {
+    const owner = getLocalOwner();
+    const displayName = loadProfileSettings().displayName;
+    const self = {
+      emails: owner?.email ? [owner.email] : [],
+      names: [displayName].filter((s) => s && s !== '我'),
+    };
+    setContacts(buildRelationships(getLifeGraph(), Date.now(), undefined, self));
+  };
 
   useEffect(() => {
     rebuild();
