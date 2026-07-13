@@ -20,7 +20,7 @@ import {
 } from '@/lib/portal/auth-client';
 
 const [ONBOARDING_DONE_KEY, LEGACY_ONBOARDING_DONE_KEY] = NESIO_ONBOARDING_DONE_KEYS;
-const TIPS_SHOWN_KEY = 'nesio-tips-shown-v1';
+export const TIPS_SHOWN_KEY = 'nesio-tips-shown-v1';
 
 type Step = 'welcome' | 'name' | 'auth';
 type AuthMode = 'login' | 'register';

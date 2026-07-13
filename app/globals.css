@@ -15196,6 +15196,53 @@ html[data-portal-theme="night"] .nesio-exp-card:hover {
 }
 .nesio-reengage-ghost:last-child { margin-left: auto; }
 
+/* 预览引导 / 模拟运行 —— 设置页每行:图标 + 说明 + 触发按钮 */
+.nesio-preview-guide-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--portal-line, rgba(88,140,227,0.14));
+}
+.nesio-preview-guide-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--portal-blue-deep);
+}
+.nesio-preview-guide-text { flex: 1; min-width: 0; }
+.nesio-preview-guide-title {
+  margin: 0;
+  font-size: 0.86rem;
+  font-weight: var(--weight-semibold, 600);
+  color: var(--portal-ink);
+}
+.nesio-preview-guide-sub {
+  margin: 0.15rem 0 0;
+  font-size: 0.74rem;
+  line-height: 1.5;
+  color: var(--portal-muted);
+}
+.nesio-preview-guide-cta {
+  flex-shrink: 0;
+  padding: 0.4rem 0.85rem;
+  border-radius: var(--radius-pill, 999px);
+  border: 1px solid var(--portal-accent-border, rgba(88,140,227,0.25));
+  background: var(--portal-accent-soft, rgba(88,140,227,0.1));
+  color: var(--portal-blue-deep);
+  font-size: 0.76rem;
+  font-weight: var(--weight-semibold, 600);
+  white-space: nowrap;
+}
+.nesio-preview-guide-cta:active { transform: scale(0.96); }
+.nesio-preview-guide-msg {
+  margin: 0.8rem 0 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 10px;
+  background: var(--status-go-soft, #d9ece1);
+  color: var(--status-go, #5a9e7a);
+  font-size: 0.78rem;
+}
+
 
 /* Journal 富文本编辑器(批次 8:所见即所得,不露 markdown 记号) */
 .nesio-journal-editor {

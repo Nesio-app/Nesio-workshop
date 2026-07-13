@@ -127,6 +127,20 @@ export function isReturningUser(session: AppSessionState = loadAppSessions()): b
   return session.sessionCount >= RETURNING_MIN_SESSIONS || session.activeDays.length >= RETURNING_MIN_DAYS;
 }
 
+/**
+ * 预览/模拟运行:把状态改成「回访用户 + 清掉所有已用/冷却/黑名单」,
+ * 让下一次进今天页时再触达提醒必然浮现(设置页「预览引导」用)。
+ */
+export function primeReengagementPreview(now = Date.now()): void {
+  write(SESSION_KEY, {
+    firstOpenAt: now - 7 * 86_400_000,
+    lastOpenAt: now - 86_400_000,
+    sessionCount: RETURNING_MIN_SESSIONS,
+    activeDays: [],
+  } satisfies AppSessionState);
+  write(USAGE_KEY, emptyUsage());
+}
+
 // ── 功能目录(仅指向已存在的入口;功能以现有为准) ──
 type FeatureDef = {
   key: string;
