@@ -474,6 +474,30 @@ function PreferenceSection({ node, assetUrls }: {
   );
 }
 
+// 批次 143:note = 外部笔记/文章/收藏(Notion/Flomo/公众号…)。统一格式:关键信息最小几行,
+// 正文走详情已有的「阅读原文 / 原始记录」。preference 不再当笔记垃圾桶。
+function NoteSection({ node }: { node: LifeNode }) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
+  const sourceApp = attr(node, 'sourceApp', 'source');
+  const category = attr(node, 'category');
+  const date = attr(node, 'date');
+  const url = attr(node, 'url');
+  return (
+    <div className="nesio-type-section">
+      <InfoRow label={L(dict, '来源应用', 'From app')} value={sourceApp} />
+      <InfoRow label={L(dict, '分类', 'Type')} value={category} />
+      <InfoRow label={L(dict, '记录时间', 'Noted on')} value={fmtDate(date, dict)} />
+      {url && (
+        <div style={{ marginTop: '0.75rem' }}>
+          <a href={safeExternalUrl(url)} target="_blank" rel="noopener noreferrer" className="nesio-type-action-btn">
+            <IconLink size={13} /> {L(dict, '打开原文', 'Open source')}
+          </a>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // 批次 73:关联链的手动增删是最直接的反馈信号 —— 本地留痕(后续喂遥测/学习)。
 function logLinkFeedback(entry: Record<string, unknown>): void {
   try {
@@ -980,7 +1004,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
           })()}
 
           {/* 批次 125·设计:关键信息段标(结构化类型的核心属性区领头) */}
-          {(['object', 'event', 'commitment', 'person', 'place', 'health_state', 'preference'] as string[]).includes(n.type) && (
+          {(['object', 'event', 'commitment', 'person', 'place', 'health_state', 'preference', 'note'] as string[]).includes(n.type) && (
             <p className="nesio-settings-section-label nesio-node-keyinfo-label">{L(dict, '关键信息', 'Key info')}</p>
           )}
 
@@ -1005,6 +1029,9 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
           )}
           {n.type === 'preference' && (
             <PreferenceSection node={n} assetUrls={assetUrls} />
+          )}
+          {n.type === 'note' && (
+            <NoteSection node={n} />
           )}
 
           {/* Raw input —— 批次 74:长文默认折叠(清单类原文动辄上千字) */}

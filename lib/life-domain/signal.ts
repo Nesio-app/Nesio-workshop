@@ -94,6 +94,7 @@ const NODE_TYPE_TO_SIGNAL: Record<LifeNodeType, SignalType> = {
   person: 'observation',
   place: 'location',
   preference: 'observation',
+  note: 'observation',
 };
 
 const NODE_SOURCE_TO_SIGNAL: Record<LifeNodeSource, SignalSource> = {
@@ -218,7 +219,7 @@ const SIGNAL_SOURCE_TO_NODE: Partial<Record<SignalSource, LifeNodeSource>> = {
   voice: 'voice',
 };
 
-const NODE_TYPES: ReadonlySet<string> = new Set(['event', 'commitment', 'health_state', 'object', 'person', 'place', 'preference']);
+const NODE_TYPES: ReadonlySet<string> = new Set(['event', 'commitment', 'health_state', 'object', 'person', 'place', 'preference', 'note']);
 const NODE_SOURCES: ReadonlySet<string> = new Set(['manual', 'photo', 'calendar', 'email', 'system', 'voice']);
 
 /**

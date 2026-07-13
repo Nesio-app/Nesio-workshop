@@ -95,6 +95,7 @@ export function NodeTypeIcon({ type, size = 16 }: { type: string; size?: number 
     case 'commitment': return <IconFlag size={size} />;
     case 'health_state': return <IconHeartPulse size={size} />;
     case 'preference': return <IconStar size={size} />;
+    case 'note': return <IconNote size={size} />;
     default: return <IconNote size={size} />;
   }
 }

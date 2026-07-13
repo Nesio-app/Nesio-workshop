@@ -242,9 +242,10 @@ export async function POST(req: NextRequest) {
   //(source + notionPageId)幂等 upsert,重复点"同步"不再成倍入库。
   // (AI 提取路径每页可能产出多个实体,无法用单个 pageId 作幂等键,故仅兜底路径去重。)
   const finalNodes = nodes.length ? nodes : contentPages.map((p) => ({
-    type: 'preference',
+    // 批次 143:外部笔记落 note 类型(不再挤进 preference 大杂烩)
+    type: 'note',
     name: (p.title || 'Notion').slice(0, 60),
-    attributes: { source: 'Notion', notionPageId: p.id, ...(p.url ? { url: p.url } : {}), ...(p.text ? { article: p.text } : {}) },
+    attributes: { source: 'Notion', sourceApp: 'notion', notionPageId: p.id, ...(p.url ? { url: p.url } : {}), ...(p.text ? { article: p.text } : {}) },
     relations: [],
     tags: ['Notion'],
     confidence: 0.7,

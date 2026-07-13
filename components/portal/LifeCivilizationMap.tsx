@@ -29,6 +29,7 @@ const TYPE_TO_DOMAIN: Record<LifeNodeType, DomainId> = {
   preference:   'self',
   place:        'growth',
   object:       'self',
+  note:         'growth',
 };
 
 const TAG_KEYWORDS: Record<DomainId, string[]> = {

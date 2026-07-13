@@ -60,6 +60,14 @@ export const NODE_ATTRIBUTE_SCHEMA: Record<LifeNodeType, AttributeSpec[]> = {
     { key: 'category', hint: '' },
     { key: 'note', hint: '' },
   ],
+  // 批次 143:note = 外部笔记软件/收藏(Notion / Flomo / 微信收藏…)的正文型记忆。
+  // 正文走 rawInput/article,关键信息只留最小几项;preference 不再当笔记垃圾桶。
+  note: [
+    { key: 'category', hint: '' },
+    { key: 'sourceApp', hint: 'notion/flomo/wechat/web' },
+    { key: 'date', hint: 'ISO' },
+    { key: 'url', hint: '' },
+  ],
 };
 
 export const NODE_TYPES = Object.keys(NODE_ATTRIBUTE_SCHEMA) as LifeNodeType[];

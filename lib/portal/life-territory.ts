@@ -35,6 +35,7 @@ const TYPE_TO_DOMAIN: Record<LifeNodeType, TerritoryDomainId> = {
   preference:   'self',
   place:        'growth',
   object:       'self',
+  note:         'growth',
 };
 
 const TAG_KEYWORDS: Record<TerritoryDomainId, string[]> = {

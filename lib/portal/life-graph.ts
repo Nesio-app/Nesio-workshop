@@ -11,7 +11,8 @@ export type LifeNodeType =
   | 'event'
   | 'commitment'
   | 'health_state'
-  | 'preference';
+  | 'preference'
+  | 'note';
 
 export type LifeNodeSource = 'manual' | 'photo' | 'calendar' | 'email' | 'system' | 'voice';
 
@@ -110,6 +111,7 @@ const LIFE_NODE_TYPES = new Set<LifeNodeType>([
   'commitment',
   'health_state',
   'preference',
+  'note',
 ]);
 const LIFE_NODE_SOURCES = new Set<LifeNodeSource>(['manual', 'photo', 'calendar', 'email', 'system', 'voice']);
 

@@ -208,19 +208,20 @@ function ObjectMap({ nodes, onOpenNode }: { nodes: LifeNode[]; onOpenNode: (n: L
 const TYPE_BG: Record<string, string> = {
   person: 'var(--chip-indigo)', object: 'var(--chip-blue)', place: 'var(--chip-green)',
   event: 'var(--chip-amber)', commitment: 'var(--chip-violet)', health_state: 'var(--chip-pink)', preference: 'var(--chip-mint)',
+  note: 'var(--chip-lemon)', // 批次 143
 };
 const TYPE_LABEL_ZH: Record<string, string> = {
   person: '人物', object: '物品', place: '地点',
-  event: '事件', commitment: '承诺', health_state: '健康', preference: '偏好',
+  event: '事件', commitment: '承诺', health_state: '健康', preference: '偏好', note: '笔记',
 };
 const TYPE_LABEL_EN: Record<string, string> = {
   person: 'People', object: 'Items', place: 'Places',
-  event: 'Events', commitment: 'Promises', health_state: 'Health', preference: 'Tastes',
+  event: 'Events', commitment: 'Promises', health_state: 'Health', preference: 'Tastes', note: 'Notes',
 };
 function typeLabel(t: string, dict: DictLocale): string {
   return (dict === 'en' ? TYPE_LABEL_EN : TYPE_LABEL_ZH)[t] ?? t;
 }
-const TYPE_ORDER = ['person', 'object', 'place', 'event', 'commitment', 'health_state', 'preference'];
+const TYPE_ORDER = ['person', 'object', 'place', 'event', 'commitment', 'health_state', 'preference', 'note'];
 
 
 const COPY = {

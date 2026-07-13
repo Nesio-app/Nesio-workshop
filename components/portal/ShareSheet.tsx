@@ -88,10 +88,12 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
         intent: 'MEMORY_CAPTURE',
         people: [],
         nodes: [{
-          type: 'preference',
+          // 批次 143:抓来的文章 = note 类(不再进 preference)
+          type: 'note',
           name: title.slice(0, 60),
           attributes: {
             url,
+            sourceApp: 'web',
             ...(article ? { article } : {}),
             ...(data.image ? { image: data.image } : {}),
           },
