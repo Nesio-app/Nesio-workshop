@@ -27,9 +27,11 @@ const MemoryMapSheet = dynamic(() => import('./MemoryMapSheet'), { ssr: false })
 const MemoryNodeDetail = dynamic(() => import('../MemoryNodeDetail'), { ssr: false });
 const PlacePickerSheet = dynamic(() => import('../PlacePickerSheet'), { ssr: false });
 const Globe = dynamic(() => import('./Globe'), { ssr: false });
+const PlacesShareSheet = dynamic(() => import('../PlacesShareSheet'), { ssr: false });
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
+import { computePlacesShareStats, type PlacesShareStats } from '@/lib/portal/places-share';
 
 type Sub = 'timeline' | 'analytics' | 'travel' | 'world';
 
@@ -90,6 +92,7 @@ export default function TimelineTab() {
   const [globeFull, setGlobeFull] = useState(false); // 批次 63:3D 地球全屏
   // 批次 62:地点纠正选择器(附近候选 + 手动命名,参考 Foursquare Where? 形态)
   const [placePick, setPlacePick] = useState<{ raw: string; lat?: number; lon?: number } | null>(null);
+  const [shareStats, setShareStats] = useState<PlacesShareStats | null>(null); // 足迹成就卡分享
 
   useEffect(() => {
     const read = () => setTrail(loadPlaceTrail());
@@ -612,9 +615,22 @@ export default function TimelineTab() {
       )}
       {sub === 'world' && world.length > 0 && !worldCountry && (
         <>
-          <p className="nesio-tl-world-head">
-            {L(dict, `去过 ${world.length} 国 · ${world.reduce((n, g) => n + g.cities.length, 0)} 城`, `${world.length} countries · ${world.reduce((n, g) => n + g.cities.length, 0)} cities`)}
-          </p>
+          <div className="nesio-tl-world-headrow">
+            <p className="nesio-tl-world-head">
+              {L(dict, `去过 ${world.length} 国 · ${world.reduce((n, g) => n + g.cities.length, 0)} 城`, `${world.length} countries · ${world.reduce((n, g) => n + g.cities.length, 0)} cities`)}
+            </p>
+            <button
+              type="button"
+              className="nesio-tl-world-share"
+              onClick={() => setShareStats(computePlacesShareStats(trail, world.map((g) => g.country)))}
+            >
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
+                <path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4" />
+              </svg>
+              {L(dict, '分享', 'Share')}
+            </button>
+          </div>
           {(() => {
             const first = trail.reduce((a, b) => (new Date(b.ts) < new Date(a.ts) ? b : a), trail[0]);
             const y = new Date(first.ts).getFullYear();
@@ -680,6 +696,12 @@ export default function TimelineTab() {
           lon={placePick.lon}
           onClose={() => setPlacePick(null)}
         />
+      )}
+
+      {/* 足迹成就卡分享(原创卡 + 分享到)—— portal 到 body,不被洞察面板裁切 */}
+      {shareStats && typeof document !== 'undefined' && createPortal(
+        <PlacesShareSheet stats={shareStats} onClose={() => setShareStats(null)} />,
+        document.body,
       )}
 
       {/* 批次 63:3D 地球全屏;批次 69:真全屏(不透明深空,背后不透出) */}
