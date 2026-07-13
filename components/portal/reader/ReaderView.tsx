@@ -1,18 +1,23 @@
 'use client';
 
 /**
- * ReaderView — 阅读器(批次 26 起,批次 32 加「多功能版」)。
+ * ReaderView — 内置阅读器(批次 26 起;设计稿「阅读器·多功能版/聚焦版」对齐重做)。
  *
- * 两种模式,顶部一键切:
- *  · 多功能版(默认)—— 正常段落排版 + 目录 + 听(TTS)+ 书签 + 搜本书 + 字号(像微信读书)
- *  · 聚焦版 —— 神经友好瀑布流:每行一个要点 + 卡拉OK 焦点遮罩
- * 两种模式都能划词「存为笔记」进记忆。邮件正文经引擎脱水后同样能读。
+ * 两种模式,头部一键切:
+ *  · 多功能版(默认)—— 暖纸宋体正文 + 封面图/来源徽章/署名/标签/相关记忆 + 底部动作栏(圈选/问念念/收进记忆)。
+ *  · 聚焦版(沉浸)—— 只剩正文:去封面/标签/相关/底栏,字更大行更疏,左侧一道细进度,点一下唤出最小控制。
+ * 划词浮层:收进记忆 / 问念念 / 高亮 / 复制。「圈选」= 进入选读:划到哪高亮到哪。
+ *
+ * 功能以现有为准:收进记忆=ingestLifeNode、问念念=聊天(nesio-ask-text)、复制=剪贴板、
+ * 高亮=本地标记(reader-highlights)、字号/目录/搜本书 沿用。
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { flatLines, type FlatLine, type ReaderBook } from '@/lib/portal/adhd-reader';
+import { type ReaderBook } from '@/lib/portal/adhd-reader';
 import { getReaderProgress, setReaderProgress } from '@/lib/portal/reader-store-idb';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
+import { loadHighlights, toggleHighlight, addHighlight, segmentParagraph, READER_HIGHLIGHTS_EVENT } from '@/lib/portal/reader-highlights';
+import { IconBox, IconTarget, IconHelpCircle } from '../icons';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -22,32 +27,45 @@ const BM_KEY = 'nesio-reader-bookmarks-v1';
 type Mode = 'full' | 'focus';
 interface Bookmark { p: number; text: string }
 
+/** 阅读器可选元信息(多功能版用):来源徽章 / 署名 / 标签 / 相关记忆 / 封面。 */
+export interface ReaderMeta {
+  kicker?: string;        // 头部小标题「每日日报 · 07/13」
+  subtitle?: string;      // 头部副标「念念写的 · 收进来」
+  byline?: string;        // 署名行(不给则按字数估阅读时长)
+  coverGradient?: string; // 封面占位渐变(给了才显示封面)
+  coverBadge?: string;    // 封面徽章「邮件 · Your Day Ahead」
+  tags?: string[];
+  related?: Array<{ text: string }>;
+}
+
 const HEADING_RE = /^(第[一二三四五六七八九十百千零\d]+[章篇节部回]|chapter\s|part\s|#{1,3}\s|[#＃])/i;
 
-export default function ReaderView({ book, rawText, onClose }: { book: ReaderBook; rawText?: string; onClose: () => void }) {
+export default function ReaderView({ book, rawText, meta, onClose }: {
+  book: ReaderBook; rawText?: string; meta?: ReaderMeta; onClose: () => void;
+}) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
-  const lines = useMemo<FlatLine[]>(() => flatLines(book), [book]);
+  const docId = book.id;
 
   const [mode, setMode] = useState<Mode>('full');
-  const [active, setActive] = useState(() => Math.min(getReaderProgress(book.id).line || 0, Math.max(0, lines.length - 1)));
   const [fontStep, setFontStep] = useState(1);
   const [toolsOpen, setToolsOpen] = useState(false);
-  const [mask, setMask] = useState(true);
-  const [openBubble, setOpenBubble] = useState<number | null>(null);
   const [selText, setSelText] = useState('');
-  const [noteSaved, setNoteSaved] = useState(false);
+  const [selPos, setSelPos] = useState<{ x: number; y: number } | null>(null);
+  const [toast, setToast] = useState('');
   const [tocOpen, setTocOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [markMode, setMarkMode] = useState(false);      // 圈选:选读模式(划到哪高亮到哪)
+  const [controls, setControls] = useState(false);      // 聚焦版:点一下唤出最小控制
+  const [scrollPct, setScrollPct] = useState(0);
+  const [highlights, setHighlights] = useState<string[]>([]);
   const [bookmarks, setBookmarks] = useState<Bookmark[]>(() => {
-    try { return (JSON.parse(localStorage.getItem(BM_KEY) || '{}')[book.id] as Bookmark[]) || []; } catch { return []; }
+    try { return (JSON.parse(localStorage.getItem(BM_KEY) || '{}')[docId] as Bookmark[]) || []; } catch { return []; }
   });
 
   const scrollRef = useRef<HTMLDivElement>(null);
-  const rafRef = useRef<number | null>(null);
-  const restoredRef = useRef(false);
 
-  // 多功能版正文:优先原始文本(保留段落),否则从脱水书重组。
+  // 正文:优先原始文本(保留段落),否则从脱水书重组。
   const paras = useMemo(() => {
     const text = (rawText || book.chapters.flatMap((ch) => [ch.title, ...ch.sections.flatMap((s) => s.lines.filter((l) => l.text).map((l) => l.text as string))]).join('\n\n')).trim();
     const byDouble = text.split(/\n{2,}/).map((s) => s.trim()).filter(Boolean);
@@ -60,55 +78,108 @@ export default function ReaderView({ book, rawText, onClose }: { book: ReaderBoo
     return q.length < 2 ? [] : paras.map((b, i) => ({ i, b })).filter((x) => x.b.toLowerCase().includes(q)).slice(0, 50);
   }, [query, paras]);
 
+  // 阅读时长估算(中文 ~ 400 字/分),给默认署名行。
+  const readMin = useMemo(() => Math.max(1, Math.round(paras.join('').length / 400)), [paras]);
+  const byline = meta?.byline || L(dict, `${readMin} 分钟读完`, `${readMin} min read`);
+
+  useEffect(() => {
+    const load = () => setHighlights(loadHighlights(docId));
+    load();
+    window.addEventListener(READER_HIGHLIGHTS_EVENT, load);
+    return () => window.removeEventListener(READER_HIGHLIGHTS_EVENT, load);
+  }, [docId]);
+
+  // 恢复上次滚动百分比(尽力而为)。
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const p = getReaderProgress(docId).percent || 0;
+    if (p > 2) requestAnimationFrame(() => { el.scrollTop = (el.scrollHeight - el.clientHeight) * (p / 100); });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [docId]);
+
   const readSelection = useCallback(() => {
     const s = typeof window !== 'undefined' ? window.getSelection() : null;
     const t = s && !s.isCollapsed ? s.toString().trim() : '';
-    setSelText(t.length >= 2 ? t : '');
-  }, []);
+    if (t.length < 2) { setSelText(''); setSelPos(null); return; }
+    // 选读模式:直接高亮,不弹菜单
+    if (markMode) {
+      setHighlights(addHighlight(docId, t));
+      s?.removeAllRanges();
+      setSelText(''); setSelPos(null);
+      flash(L(dict, '已高亮', 'Highlighted'));
+      return;
+    }
+    let pos: { x: number; y: number } | null = null;
+    try {
+      const r = s!.getRangeAt(0).getBoundingClientRect();
+      pos = { x: r.left + r.width / 2, y: r.top };
+    } catch { pos = null; }
+    setSelText(t);
+    setSelPos(pos);
+  }, [markMode, docId, dict]);
 
-  function saveNote() {
+  function flash(msg: string) { setToast(msg); setTimeout(() => setToast(''), 1500); }
+  function clearSel() { window.getSelection()?.removeAllRanges(); setSelText(''); setSelPos(null); }
+
+  // ── 划词浮层动作(选中态)──
+  function saveSelectionToMemory() {
     const text = selText.trim();
     if (!text) return;
     ingestLifeNode({
       name: text.slice(0, 60), type: 'preference', source: 'manual', confidence: 1, rawInput: text,
       tags: ['笔记', '摘录', book.title.slice(0, 24)], attributes: { origin: '阅读摘录', fromArticle: book.title }, relations: [],
     });
-    setNoteSaved(true);
-    window.getSelection()?.removeAllRanges();
-    setSelText('');
-    setTimeout(() => setNoteSaved(false), 1600);
+    clearSel(); flash(L(dict, '已收进记忆', 'Saved to memory'));
+  }
+  function askSelection() {
+    const text = selText.trim();
+    if (!text) return;
+    window.dispatchEvent(new CustomEvent('nesio-ask-text', { detail: { text } }));
+    clearSel();
+  }
+  function highlightSelection() {
+    const text = selText.trim();
+    if (!text) return;
+    const { on } = toggleHighlight(docId, text);
+    setHighlights(loadHighlights(docId));
+    clearSel(); flash(on ? L(dict, '已高亮', 'Highlighted') : L(dict, '取消高亮', 'Highlight removed'));
+  }
+  function copySelection() {
+    const text = selText.trim();
+    if (!text) return;
+    try { void navigator.clipboard?.writeText(text); } catch { /* ignore */ }
+    clearSel(); flash(L(dict, '已复制', 'Copied'));
   }
 
-  const commitActive = useCallback((idx: number) => {
-    setActive(idx);
-    setReaderProgress(book.id, { line: idx, percent: lines.length ? Math.round((idx / lines.length) * 100) : 0 });
-  }, [book.id, lines.length]);
-
-  useEffect(() => {
-    if (restoredRef.current || !scrollRef.current || mode !== 'focus') return;
-    restoredRef.current = true;
-    scrollRef.current.querySelector<HTMLElement>(`[data-line="${active}"]`)?.scrollIntoView({ block: 'center' });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode]);
+  // ── 底部动作栏(文档级)──
+  function saveDocToMemory() {
+    const text = paras.join('\n\n').trim();
+    if (!text) return;
+    ingestLifeNode({
+      name: book.title.slice(0, 60) || L(dict, '一篇阅读', 'A read'),
+      type: 'preference', source: 'manual', confidence: 1, rawInput: text,
+      tags: ['笔记', '阅读', book.title.slice(0, 24)],
+      attributes: { origin: '阅读收藏', externalId: `read-${docId}` }, relations: [],
+    });
+    flash(L(dict, '已收进记忆', 'Saved to memory'));
+  }
+  function askDoc() {
+    window.dispatchEvent(new CustomEvent('nesio-ask-text', { detail: { text: book.title } }));
+  }
+  function toggleMarkMode() {
+    setMarkMode((v) => { const nv = !v; flash(nv ? L(dict, '选读:划到哪高亮到哪', 'Mark mode: select to highlight') : L(dict, '退出选读', 'Mark mode off')); return nv; });
+  }
 
   const onScroll = useCallback(() => {
-    if (mode !== 'focus' || !mask || rafRef.current) return;
-    rafRef.current = requestAnimationFrame(() => {
-      rafRef.current = null;
-      const container = scrollRef.current;
-      if (!container) return;
-      const anchor = container.getBoundingClientRect().top + 120;
-      let best = 0, minD = Infinity;
-      container.querySelectorAll<HTMLElement>('[data-line]').forEach((el) => {
-        const d = Math.abs(el.getBoundingClientRect().top - anchor);
-        if (d < minD) { minD = d; best = Number(el.dataset.line); }
-      });
-      commitActive(best);
-    });
-  }, [mode, mask, commitActive]);
-
-  // 听(TTS)已按产品决策移除 —— 阅读器专注读。
-  useEffect(() => () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); }, []);
+    const el = scrollRef.current;
+    if (!el) return;
+    const max = el.scrollHeight - el.clientHeight;
+    const pct = max > 0 ? Math.min(100, Math.round((el.scrollTop / max) * 100)) : 0;
+    setScrollPct(pct);
+    setReaderProgress(docId, { line: 0, percent: pct });
+    if (selPos) clearSel();
+  }, [docId, selPos]);
 
   function jumpToPara(i: number) {
     setTocOpen(false); setSearchOpen(false);
@@ -126,48 +197,68 @@ export default function ReaderView({ book, rawText, onClose }: { book: ReaderBoo
     if (bookmarks.some((b) => b.p === best)) return;
     const next = [...bookmarks, { p: best, text: (paras[best] || '').slice(0, 30) }].sort((a, b) => a.p - b.p);
     setBookmarks(next);
-    try { const all = JSON.parse(localStorage.getItem(BM_KEY) || '{}'); all[book.id] = next; localStorage.setItem(BM_KEY, JSON.stringify(all)); } catch { /* ignore */ }
+    try { const all = JSON.parse(localStorage.getItem(BM_KEY) || '{}'); all[docId] = next; localStorage.setItem(BM_KEY, JSON.stringify(all)); } catch { /* ignore */ }
   }
 
-  const percent = lines.length ? Math.round((active / lines.length) * 100) : 0;
+  /** 渲染一个段落:按高亮片段切段套 <mark>。 */
+  const renderPara = (p: string) => {
+    if (!highlights.length) return p;
+    return segmentParagraph(p, highlights).map((seg, j) => seg.mark
+      ? <mark key={j} className="nesio-rd-mark">{seg.text}</mark>
+      : <span key={j}>{seg.text}</span>);
+  };
+
+  const isFull = mode === 'full';
 
   return (
-    <div className="nesio-rd-overlay" role="dialog" aria-modal="true" aria-label={book.title} style={{ ['--nesio-rd-scale' as string]: String(FONT_SCALES[fontStep]) }}>
+    <div
+      className={`nesio-rd-overlay nesio-rd-overlay--${mode}`}
+      role="dialog" aria-modal="true" aria-label={book.title}
+      style={{ ['--nesio-rd-scale' as string]: String(FONT_SCALES[fontStep]) }}
+    >
+      {/* ── 头部 ── */}
       <div className="nesio-rd-topbar">
         <button type="button" className="nesio-rd-btn" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}>✕</button>
         <div className="nesio-rd-head-mid">
-          <p className="nesio-rd-head-title">{book.title}</p>
-          <button type="button" className="nesio-rd-mode" onClick={() => setMode((m) => (m === 'full' ? 'focus' : 'full'))}>
-            {mode === 'full' ? L(dict, '多功能版 · 切聚焦', 'Full · to Focus') : L(dict, '聚焦版 · 切多功能', 'Focus · to Full')}
-          </button>
+          {isFull && (meta?.kicker || meta?.subtitle) ? (
+            <>
+              {meta?.kicker && <p className="nesio-rd-head-kicker">{meta.kicker}</p>}
+              {meta?.subtitle && <p className="nesio-rd-head-sub">{meta.subtitle}</p>}
+            </>
+          ) : (
+            !isFull ? null : <p className="nesio-rd-head-title">{book.title}</p>
+          )}
         </div>
-        {/* QA:按钮太多 → 收进一个 Aa 菜单(字号/目录/搜本书/专注);听(TTS)按产品决策移除 */}
-        <div className="nesio-rd-tools" style={{ position: 'relative' }}>
-          <button type="button" className={`nesio-rd-btn${toolsOpen ? ' is-active' : ''}`} onClick={() => setToolsOpen((v) => !v)} aria-expanded={toolsOpen} aria-label={L(dict, '阅读选项', 'Reading options')}>Aa</button>
-          {toolsOpen && (
-            <div style={{ position: 'absolute', top: 'calc(100% + 0.4rem)', right: 0, zIndex: 30, background: 'var(--sheet-opaque, #fff)', border: '1px solid var(--portal-line, rgba(127,127,127,0.2))', borderRadius: 12, padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.35rem', minWidth: '9.5rem', boxShadow: '0 8px 30px rgba(4,10,22,0.3)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <button type="button" className="nesio-rd-btn" onClick={() => setFontStep((v) => Math.max(0, v - 1))} aria-label={L(dict, '缩小字号', 'Smaller')}>A−</button>
-                <button type="button" className="nesio-rd-btn" onClick={() => setFontStep((v) => Math.min(FONT_SCALES.length - 1, v + 1))} aria-label={L(dict, '放大字号', 'Bigger')}>A+</button>
-              </div>
-              {mode === 'full' ? (
-                <>
-                  <button type="button" className="nesio-rd-btn" style={{ width: '100%' }} onClick={() => { setTocOpen((v) => !v); setSearchOpen(false); setToolsOpen(false); }}>{L(dict, '目录', 'Contents')}</button>
+        <div className="nesio-rd-head-right">
+          <button type="button" className="nesio-rd-mode" onClick={() => setMode((m) => (m === 'full' ? 'focus' : 'full'))}>
+            {isFull ? L(dict, '切聚焦', 'Focus') : L(dict, '切多功能', 'Full')}
+          </button>
+          {isFull && (
+            <div className="nesio-rd-tools" style={{ position: 'relative' }}>
+              <button type="button" className={`nesio-rd-btn${toolsOpen ? ' is-active' : ''}`} onClick={() => setToolsOpen((v) => !v)} aria-expanded={toolsOpen} aria-label={L(dict, '阅读选项', 'Reading options')}>Aa</button>
+              {toolsOpen && (
+                <div className="nesio-rd-tools-menu">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <button type="button" className="nesio-rd-btn" onClick={() => setFontStep((v) => Math.max(0, v - 1))} aria-label={L(dict, '缩小字号', 'Smaller')}>A−</button>
+                    <button type="button" className="nesio-rd-btn" onClick={() => setFontStep((v) => Math.min(FONT_SCALES.length - 1, v + 1))} aria-label={L(dict, '放大字号', 'Bigger')}>A+</button>
+                  </div>
+                  <button type="button" className="nesio-rd-btn" style={{ width: '100%' }} onClick={() => { setTocOpen((v) => !v); setSearchOpen(false); setToolsOpen(false); }}>{L(dict, '目录 / 书签', 'Contents')}</button>
                   <button type="button" className="nesio-rd-btn" style={{ width: '100%' }} onClick={() => { setSearchOpen((v) => !v); setTocOpen(false); setToolsOpen(false); }}>{L(dict, '搜本书', 'Search')}</button>
-                </>
-              ) : (
-                <button type="button" className={`nesio-rd-btn${mask ? ' is-active' : ''}`} style={{ width: '100%' }} onClick={() => { setMask((v) => !v); setToolsOpen(false); }} aria-pressed={mask}>{L(dict, '专注', 'Focus')}</button>
+                </div>
               )}
             </div>
           )}
         </div>
       </div>
 
-      <div className="nesio-rd-progress"><div className="nesio-rd-progress-fill" style={{ width: `${percent}%` }} /></div>
+      {/* 进度:多功能=顶部一道;聚焦=左侧一道细进度 */}
+      {isFull
+        ? <div className="nesio-rd-progress"><div className="nesio-rd-progress-fill" style={{ width: `${scrollPct}%` }} /></div>
+        : <div className="nesio-rd-progress-left"><div className="nesio-rd-progress-left-fill" style={{ height: `${scrollPct}%` }} /></div>}
 
-      {searchOpen && mode === 'full' && (
+      {searchOpen && isFull && (
         <div className="nesio-rd-search">
-          <input className="nesio-rd-search-input" value={query} autoFocus placeholder={L(dict, '在本书里搜…', 'Search this book…')} onChange={(e) => setQuery(e.target.value)} />
+          <input className="nesio-rd-search-input" value={query} autoFocus placeholder={L(dict, '在本篇里搜…', 'Search…')} onChange={(e) => setQuery(e.target.value)} />
           {matches.length > 0 && <span className="nesio-rd-search-cnt">{matches.length}</span>}
         </div>
       )}
@@ -179,38 +270,68 @@ export default function ReaderView({ book, rawText, onClose }: { book: ReaderBoo
         </div>
       )}
 
-      <div className="nesio-rd-scroll" ref={scrollRef} onScroll={onScroll} onMouseUp={readSelection} onTouchEnd={readSelection}>
-        {mode === 'full' ? (
-          <div className="nesio-rd-fullcol">
-            {paras.map((p, i) => isHeading(p)
-              ? <h3 key={i} data-p={i} className="nesio-rd-h">{p.replace(/^[#＃]+\s*/, '')}</h3>
-              : <p key={i} data-p={i} className="nesio-rd-p">{p}</p>)}
-            <div className="nesio-rd-end">{L(dict, '— 读完了 —', '— End —')}</div>
-          </div>
-        ) : (
-          <div className={`nesio-rd-col${mask ? ' has-mask' : ''}`}>
-            {lines.map((line, i) => {
-              const state = !mask ? '' : i < active ? ' is-dim' : i === active ? ' is-act' : '';
-              if (line.kind === 'formula') {
-                return <div key={i} data-line={i} className={`nesio-rd-line${state}`} onClick={() => commitActive(i)}><div className="nesio-rd-math"><div className="nesio-rd-math-lbl">{L(dict, '公式', 'Formula')}</div>{line.formula || ''}</div></div>;
-              }
-              return (
-                <div key={i} data-line={i} className={`nesio-rd-line${state}`}>
-                  <div className="nesio-rd-lt" onClick={() => { if (window.getSelection && !window.getSelection()?.isCollapsed) return; if (line.bubble) { setOpenBubble((v) => (v === i ? null : i)); return; } commitActive(i); }}>
-                    {line.tag && <span className="nesio-rd-tag">{line.tag}</span>}
-                    {line.text}
-                  </div>
-                  {line.bubble && openBubble === i && <div className="nesio-rd-bubble"><div className="nesio-rd-bubble-tag">{L(dict, '前情提要', 'Recall')}</div>{line.bubble}</div>}
-                </div>
-              );
-            })}
-            <div className="nesio-rd-end">{L(dict, '— 读完了 —', '— End —')}</div>
-          </div>
-        )}
+      {/* ── 正文 ── */}
+      <div
+        className={`nesio-rd-scroll${markMode ? ' is-marking' : ''}`}
+        ref={scrollRef} onScroll={onScroll} onMouseUp={readSelection} onTouchEnd={readSelection}
+        onClick={() => { if (!isFull && (typeof window === 'undefined' || (window.getSelection()?.isCollapsed ?? true))) setControls((v) => !v); }}
+      >
+        <div className={`nesio-rd-doc${isFull ? '' : ' nesio-rd-doc--focus'}`}>
+          {/* 封面(仅多功能且给了渐变) */}
+          {isFull && meta?.coverGradient && (
+            <div className="nesio-rd-cover" style={{ background: meta.coverGradient }}>
+              {meta.coverBadge && <span className="nesio-rd-cover-badge">{meta.coverBadge}</span>}
+            </div>
+          )}
+          {/* 标题 + 署名(多功能;聚焦只留标题,大字) */}
+          <h1 className="nesio-rd-title">{book.title}</h1>
+          {isFull && <p className="nesio-rd-byline">{byline}</p>}
+
+          {paras.map((p, i) => isHeading(p)
+            ? <h3 key={i} data-p={i} className="nesio-rd-h">{p.replace(/^[#＃]+\s*/, '')}</h3>
+            : <p key={i} data-p={i} className="nesio-rd-p">{renderPara(p)}</p>)}
+
+          {/* 标签 + 相关记忆(仅多功能) */}
+          {isFull && meta?.tags && meta.tags.length > 0 && (
+            <div className="nesio-rd-tags">
+              {meta.tags.map((t, i) => <span key={i} className="nesio-rd-tag-chip"># {t}</span>)}
+            </div>
+          )}
+          {isFull && meta?.related && meta.related.length > 0 && (
+            <div className="nesio-rd-related">
+              <p className="nesio-rd-related-h">{L(dict, `相关记忆 · ${meta.related.length}`, `Related · ${meta.related.length}`)}</p>
+              {meta.related.slice(0, 3).map((r, i) => (
+                <p key={i} className="nesio-rd-related-item"><span className="nesio-rd-related-dot" aria-hidden />{r.text}</p>
+              ))}
+            </div>
+          )}
+
+          <div className="nesio-rd-end">{L(dict, '— 读完了 —', '— End —')}</div>
+        </div>
       </div>
 
+      {/* ── 底部动作栏:多功能常驻;聚焦点一下才唤出最小控制 ── */}
+      {(isFull || controls) && (
+        <div className={`nesio-rd-actionbar${isFull ? '' : ' nesio-rd-actionbar--focus'}`}>
+          <button type="button" className={`nesio-rd-action${markMode ? ' is-on' : ''}`} onClick={toggleMarkMode}>
+            <span className="nesio-rd-action-ico" aria-hidden><IconTarget size={16} /></span>{L(dict, '圈选', 'Mark')}
+          </button>
+          <button type="button" className="nesio-rd-action" onClick={askDoc}>
+            <span className="nesio-rd-action-ico" aria-hidden><IconHelpCircle size={16} /></span>{L(dict, '问念念', 'Ask')}
+          </button>
+          <button type="button" className="nesio-rd-action nesio-rd-action--primary" onClick={saveDocToMemory}>
+            <span className="nesio-rd-action-ico" aria-hidden><IconBox size={16} /></span>{L(dict, '收进记忆', 'Save')}
+          </button>
+          {!isFull && (
+            <button type="button" className="nesio-rd-action" onClick={() => setFontStep((v) => (v + 1) % FONT_SCALES.length)}>
+              <span className="nesio-rd-action-ico" aria-hidden>Aa</span>
+            </button>
+          )}
+        </div>
+      )}
+
       {/* 目录 / 书签抽屉 */}
-      {tocOpen && mode === 'full' && (
+      {tocOpen && isFull && (
         <div className="nesio-rd-drawer">
           <button type="button" className="nesio-rd-drawer-backdrop" onClick={() => setTocOpen(false)} aria-label={L(dict, '关闭', 'Close')} />
           <div className="nesio-rd-drawer-panel">
@@ -232,13 +353,17 @@ export default function ReaderView({ book, rawText, onClose }: { book: ReaderBoo
         </div>
       )}
 
-      {(selText || noteSaved) && (
-        <div className="nesio-rd-notebar">
-          {noteSaved
-            ? <span className="nesio-rd-notebar-ok">{L(dict, '✓ 已存入记忆', '✓ Saved to Memory')}</span>
-            : <><span className="nesio-rd-notebar-text">{selText.length > 40 ? `${selText.slice(0, 40)}…` : selText}</span><button type="button" className="nesio-rd-notebar-btn" onClick={saveNote}>{L(dict, '存为笔记', 'Save note')}</button></>}
+      {/* ── 划词浮层:收进记忆 / 问念念 / 高亮 / 复制 ── */}
+      {selText && selPos && (
+        <div className="nesio-rd-selmenu" style={{ left: `${selPos.x}px`, top: `${Math.max(56, selPos.y - 8)}px` }} role="menu">
+          <button type="button" className="nesio-rd-selmenu-item" onClick={saveSelectionToMemory}>{L(dict, '收进记忆', 'Save')}</button>
+          <button type="button" className="nesio-rd-selmenu-item" onClick={askSelection}>{L(dict, '问念念', 'Ask')}</button>
+          <button type="button" className="nesio-rd-selmenu-item" onClick={highlightSelection}>{L(dict, '高亮', 'Highlight')}</button>
+          <button type="button" className="nesio-rd-selmenu-item" onClick={copySelection}>{L(dict, '复制', 'Copy')}</button>
         </div>
       )}
+
+      {toast && <div className="nesio-rd-toast">{toast}</div>}
     </div>
   );
 }

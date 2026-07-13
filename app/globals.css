@@ -12184,7 +12184,7 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 .nesio-rd-btn.is-active { border-color: var(--portal-accent); color: var(--portal-accent); background: var(--portal-accent-soft); }
 .nesio-rd-progress { height: 3px; background: var(--portal-line); }
 .nesio-rd-progress-fill { height: 100%; background: var(--portal-accent); transition: width 0.3s ease; }
-.nesio-rd-scroll { flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; padding: 1rem 0.4rem calc(45vh + env(safe-area-inset-bottom)); }
+.nesio-rd-scroll { flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; padding: 0.6rem 0.4rem calc(6rem + env(safe-area-inset-bottom)); }
 .nesio-rd-col { max-width: min(40rem, 100%); margin: 0 auto; }
 .nesio-rd-line { padding: 0.6rem 0.85rem; cursor: pointer; position: relative; transition: background 0.25s, margin 0.25s, padding 0.25s; }
 /* 批次 28:长串/无空格文本必须能换行,否则横向溢出、页面左右漂移 */
@@ -12212,6 +12212,93 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 .nesio-rd-fullcol { max-width: 42rem; margin: 0 auto; padding: 0.5rem 0.9rem; }
 .nesio-rd-p { font-size: calc(1.04rem * var(--nesio-rd-scale, 1)); line-height: 1.95; color: var(--portal-ink); margin: 0 0 1.2rem; overflow-wrap: anywhere; word-break: break-word; }
 .nesio-rd-h { font-size: calc(1.15rem * var(--nesio-rd-scale, 1)); font-weight: 700; color: var(--portal-ink); margin: 1.4rem 0 0.7rem; scroll-margin-top: 1rem; }
+
+/* ══ 阅读器 · 多功能版 / 聚焦版(设计稿对齐:暖纸宋体 + 划词浮层 + 底部动作栏)══ */
+.nesio-rd-overlay--full { background: color-mix(in srgb, var(--status-gentle) 5%, var(--glass-bg-solid)); }
+.nesio-rd-overlay--focus { background: color-mix(in srgb, var(--status-gentle) 9%, var(--glass-bg-solid)); }
+.nesio-rd-overlay--focus .nesio-rd-topbar { border-bottom: none; background: transparent; }
+.nesio-rd-head-mid { flex: 1; min-width: 0; text-align: center; }
+.nesio-rd-head-kicker { margin: 0; font-size: 0.82rem; font-weight: 800; color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nesio-rd-head-sub { margin: 1px 0 0; font-size: 0.66rem; font-weight: 700; color: var(--portal-accent); }
+.nesio-rd-head-right { display: flex; align-items: center; gap: 0.45rem; }
+.nesio-rd-mode {
+  display: inline-flex; margin: 0; border: 1px solid var(--portal-accent-border);
+  background: var(--portal-accent-soft); color: var(--portal-accent);
+  font-size: 0.72rem; font-weight: 700; cursor: pointer; padding: 0.3rem 0.7rem; border-radius: var(--radius-pill); white-space: nowrap;
+}
+.nesio-rd-tools-menu {
+  position: absolute; top: calc(100% + 0.4rem); right: 0; z-index: 30;
+  background: var(--glass-bg-solid); border: 1px solid var(--portal-line); border-radius: 12px;
+  padding: 0.5rem; display: flex; flex-direction: column; gap: 0.35rem; min-width: 9.5rem;
+  box-shadow: var(--shadow-pop, 0 8px 30px rgba(4,10,22,0.3));
+}
+/* 聚焦版:左侧一道细进度 */
+.nesio-rd-progress-left { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: transparent; z-index: 5; }
+.nesio-rd-progress-left-fill { width: 100%; background: var(--portal-accent); transition: height 0.3s ease; }
+/* 文档列 */
+.nesio-rd-doc { max-width: 42rem; margin: 0 auto; padding: 0.5rem 1.1rem; }
+.nesio-rd-doc--focus { max-width: 34rem; padding: 1.4rem 1.5rem; }
+.nesio-rd-cover { height: 9.5rem; border-radius: var(--radius-md, 16px); position: relative; margin-bottom: 1rem; overflow: hidden; }
+.nesio-rd-cover-badge {
+  position: absolute; left: 0.7rem; bottom: 0.7rem;
+  font-size: 0.72rem; font-weight: 700; color: #fff;
+  background: rgba(40,42,50,0.55); border-radius: 0.5rem; padding: 0.22rem 0.6rem; backdrop-filter: blur(4px);
+}
+.nesio-rd-title {
+  font-size: calc(1.55rem * var(--nesio-rd-scale, 1)); font-weight: 800; line-height: 1.3;
+  color: var(--portal-ink); margin: 0.2rem 0 0.35rem; letter-spacing: 0.01em;
+}
+.nesio-rd-doc--focus .nesio-rd-title { font-family: var(--font-portal-serif), Georgia, serif; font-size: calc(1.7rem * var(--nesio-rd-scale, 1)); margin-bottom: 1.4rem; }
+.nesio-rd-byline { font-size: 0.76rem; color: var(--portal-muted); margin: 0 0 1.3rem; font-weight: 600; }
+/* 正文:暖纸宋体 */
+.nesio-rd-doc .nesio-rd-p { font-family: var(--font-portal-serif), Georgia, serif; }
+.nesio-rd-doc--focus .nesio-rd-p { font-size: calc(1.16rem * var(--nesio-rd-scale, 1)); line-height: 2.15; margin-bottom: 1.5rem; }
+.nesio-rd-mark { background: color-mix(in srgb, var(--status-gentle) 30%, transparent); border-radius: 3px; padding: 0 1px; color: inherit; }
+/* 标签 + 相关记忆 */
+.nesio-rd-tags { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.4rem 0 1rem; }
+.nesio-rd-tag-chip { font-size: 0.72rem; font-weight: 700; color: var(--portal-accent); background: var(--portal-accent-soft); border-radius: 0.5rem; padding: 0.2rem 0.6rem; }
+.nesio-rd-related { border: 1px solid var(--portal-line); border-radius: var(--radius-md, 14px); padding: 0.75rem 0.9rem; margin-top: 0.6rem; }
+.nesio-rd-related-h { margin: 0 0 0.4rem; font-size: 0.72rem; font-weight: 700; color: var(--portal-muted); }
+.nesio-rd-related-item { display: flex; align-items: baseline; gap: 0.45rem; margin: 0.25rem 0; font-size: 0.86rem; font-weight: 600; color: var(--portal-ink); }
+.nesio-rd-related-dot { width: 0.4rem; height: 0.4rem; border-radius: 50%; background: var(--status-go); flex-shrink: 0; }
+/* 底部动作栏 */
+.nesio-rd-actionbar {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 6;
+  display: flex; align-items: center; gap: 0.5rem; justify-content: space-between;
+  padding: 0.6rem 0.9rem calc(0.6rem + env(safe-area-inset-bottom));
+  background: linear-gradient(180deg, transparent, var(--glass-bg-solid) 30%);
+}
+.nesio-rd-actionbar--focus {
+  left: 50%; right: auto; transform: translateX(-50%); bottom: calc(0.9rem + env(safe-area-inset-bottom));
+  background: var(--portal-ink); border-radius: var(--radius-pill); padding: 0.4rem 0.5rem; gap: 0.2rem; box-shadow: 0 8px 26px rgba(0,0,0,0.24);
+}
+.nesio-rd-action {
+  flex: 1; display: inline-flex; flex-direction: column; align-items: center; gap: 0.15rem;
+  background: none; border: 0; cursor: pointer; padding: 0.35rem 0.5rem; border-radius: 0.7rem;
+  font-size: 0.68rem; font-weight: 700; color: var(--portal-muted); min-height: var(--tap-min);
+}
+.nesio-rd-action.is-on { color: var(--portal-accent); background: var(--portal-accent-soft); }
+.nesio-rd-action--primary { color: #fff; background: var(--portal-accent); flex: 1.3; }
+.nesio-rd-actionbar--focus .nesio-rd-action { color: rgba(255,255,255,0.82); flex-direction: row; gap: 0.3rem; padding: 0.4rem 0.7rem; }
+.nesio-rd-actionbar--focus .nesio-rd-action--primary { color: #fff; background: var(--portal-accent); }
+.nesio-rd-action-ico { display: inline-flex; align-items: center; justify-content: center; }
+/* 划词浮层 */
+.nesio-rd-selmenu {
+  position: fixed; transform: translate(-50%, -100%); z-index: 40;
+  display: flex; background: var(--portal-ink); border-radius: 0.7rem; overflow: hidden;
+  box-shadow: 0 8px 26px rgba(0,0,0,0.3); animation: nesio-rd-pop 0.14s ease;
+}
+.nesio-rd-selmenu-item {
+  background: none; border: 0; border-right: 1px solid rgba(255,255,255,0.12); cursor: pointer;
+  color: #fff; font-size: 0.8rem; font-weight: 600; padding: 0.55rem 0.85rem; white-space: nowrap;
+}
+.nesio-rd-selmenu-item:last-child { border-right: none; }
+.nesio-rd-scroll.is-marking { cursor: crosshair; }
+.nesio-rd-toast {
+  position: fixed; left: 50%; bottom: calc(5.5rem + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 42;
+  background: var(--portal-ink); color: #fff; font-size: 0.8rem; font-weight: 600;
+  padding: 0.5rem 1rem; border-radius: var(--radius-pill); box-shadow: 0 6px 20px rgba(0,0,0,0.25); animation: nesio-rd-pop 0.16s ease;
+}
 .nesio-rd-search { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.9rem; border-bottom: 1px solid var(--portal-line); }
 .nesio-rd-search-input { flex: 1; border: 1px solid var(--portal-line); border-radius: 10px; background: var(--glass-bg-solid); color: var(--portal-ink); font-size: 0.85rem; padding: 0.4rem 0.7rem; }
 .nesio-rd-search-cnt { font-size: 0.72rem; color: var(--portal-muted); }

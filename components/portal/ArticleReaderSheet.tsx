@@ -13,7 +13,7 @@ import { textToAdhdBook, type ReaderBook } from '@/lib/portal/adhd-reader';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
-import ReaderView from './reader/ReaderView';
+import ReaderView, { type ReaderMeta } from './reader/ReaderView';
 
 /** 由标题派生稳定 id,让同一篇文章重开时能恢复阅读进度。 */
 function stableId(title: string, article: string): string {
@@ -23,9 +23,10 @@ function stableId(title: string, article: string): string {
   return `article-${Math.abs(h).toString(36)}`;
 }
 
-export default function ArticleReaderSheet({ title, article, onClose }: {
+export default function ArticleReaderSheet({ title, article, meta, onClose }: {
   title: string;
   article: string;
+  meta?: ReaderMeta;
   onClose: () => void;
 }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
@@ -54,5 +55,5 @@ export default function ArticleReaderSheet({ title, article, onClose }: {
     );
   }
 
-  return <ReaderView book={book} rawText={article} onClose={onClose} />;
+  return <ReaderView book={book} rawText={article} meta={meta} onClose={onClose} />;
 }
