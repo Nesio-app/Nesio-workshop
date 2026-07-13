@@ -5,6 +5,7 @@ import { IconActivity, IconBook, IconBookOpen, IconCalendar, IconCar, IconCheckS
 import dynamic from 'next/dynamic';
 const WechatReadingImportSheet = dynamic(() => import('./WechatReadingImportSheet'), { ssr: false });
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
+import { ingestGranolaMeeting } from '@/lib/platform/view-models/today-view-model';
 import { runPlaidSync, runFlomoSync, saveCalendarEventsToMemory } from '@/lib/portal/connector-sync';
 import { type LifeNode, pruneNotionNodes } from '@/lib/portal/life-graph';
 import type { HealthMetrics, HealthNode } from '@/lib/portal/apple-health';
@@ -56,6 +57,8 @@ const CONNECTORS: ConnectorDef[] = [
   { id: 'flomo', name: 'Flomo', icon: <IconNote />, iconBg: 'var(--chip-indigo)', method: 'server', syncEndpoint: '/api/portal/flomo?limit=5000', description: '同步 flomo 笔记，提取想法与记录', descriptionEn: 'Sync flomo notes; extract ideas and records' },
   // 批次 18:Notion 转正 —— OAuth 一键授权(像 flomo 那样选页面),内部 token 流保留为回退
   { id: 'notion', name: 'Notion', icon: <IconBook />, iconBg: 'var(--chip-gray)', method: 'token', syncEndpoint: '/api/portal/notion', tokenHint: 'notion.so/my-integrations → 新建集成(Internal)→ 复制 Internal Integration Secret(ntn_… 或 secret_…)→ 在要同步的 Notion 页面右上角「…」→ 连接 → 选中这个集成', tokenHintEn: 'notion.so/my-integrations → New internal integration → copy the secret (ntn_… / secret_…) → on each page: ••• → Connections → add this integration', description: '粘贴内部集成 token,同步共享给它的页面(提取项目与想法)', descriptionEn: 'Paste an internal integration token to sync the pages you shared with it' },
+  // 批次 158:Granola 会议 —— Nesio 作为其远程 MCP 客户端(OAuth 2.0 DCR)。转写自动提炼成 To do/推断项。
+  { id: 'granola', name: 'Granola 会议', nameEn: 'Granola meetings', icon: <IconBookOpen />, iconBg: 'var(--chip-leaf)', method: 'oauth', description: '连接 Granola,会议转写自动提炼成 To do(带截止日)和推断项,直接进今天页', descriptionEn: 'Connect Granola — meeting transcripts distill into dated to-dos and inferred items, straight to Today' },
   { id: 'toggl', name: 'Toggl Track', icon: <IconTimer />, iconBg: 'var(--chip-red)', method: 'token', syncEndpoint: '/api/portal/toggl', tokenHint: 'track.toggl.com → Profile → API Token', tokenHintEn: 'track.toggl.com → Profile → API Token', description: '同步时间记录，了解你的专注分布', descriptionEn: 'Sync time entries to see where your focus goes', dev: true },
   { id: 'health', name: 'Apple Health 导出', nameEn: 'Apple Health export', icon: <IconHeartPulse />, iconBg: 'var(--chip-pink)', method: 'file', description: '直接传导出的 zip 或 export.xml,提取步数、睡眠、心率、锻炼', descriptionEn: 'Drop the exported zip or export.xml — extracts steps, sleep, heart rate, workouts' },
   { id: 'reminder', name: 'Apple 提醒事项', nameEn: 'Apple Reminders', icon: <IconCheckSquare />, iconBg: 'var(--chip-amber)', method: 'shortcuts', ingestSource: 'reminder', description: '通过快捷指令推送提醒，自动转为承诺', descriptionEn: 'Push reminders via Shortcuts; they become commitments', dev: true },
@@ -157,6 +160,17 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       saveConnectorState('notion', true);
       setConnected((p) => ({ ...p, notion: true }));
       showToast(L(dict, 'Notion 已授权,点「同步」拉取你选择的页面', 'Notion authorized — tap Sync to pull the pages you granted'), true);
+    }
+    // 批次 158:Granola OAuth 回参
+    const granolaParam = params.get('granola');
+    if (granolaParam === 'connected') {
+      saveConnectorState('granola', true);
+      setConnected((p) => ({ ...p, granola: true }));
+      showToast(L(dict, 'Granola 已连接,点「同步」提炼会议行动项', 'Granola connected — tap Sync to distill meeting action items'), true);
+    } else if (granolaParam === 'login_required') {
+      showToast(L(dict, '请先登录 Nesio 再连接 Granola', 'Sign in to Nesio first, then connect Granola'), false);
+    } else if (granolaParam === 'connect_failed') {
+      showToast(L(dict, `Granola 连接失败:${params.get('reason') || '未知'}`, `Granola connect failed: ${params.get('reason') || 'unknown'}`), false);
     }
     if (err === 'notion_not_configured') {
       showToast(L(dict,
@@ -716,8 +730,60 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     setSyncing(null);
   }
 
+  // 批次 158:Granola 同步 —— 服务端 MCP 客户端拉会议转写,浏览器过批次154 抽取落库(本地优先)。
+  async function syncGranola() {
+    setSyncing('granola');
+    setOauthSyncResult((p) => ({ ...p, granola: { ok: true, msg: L(dict, '同步中…', 'Syncing…') } }));
+    try {
+      // 源头去重:把已入库的 Granola 会议 id 传给服务端,不重复取转写(省 Granola 配额)。
+      const { getLifeGraph } = await import('@/lib/portal/life-graph');
+      const known = new Set(
+        getLifeGraph()
+          .map((n) => n.attributes?.granolaMeetingId)
+          .filter((v): v is string => typeof v === 'string' && v.length > 0),
+      );
+      const skip = Array.from(known).slice(0, 60).join(',');
+      const res = await fetch(
+        `/api/portal/granola?range=last_30_days&max=10${skip ? `&skip=${encodeURIComponent(skip)}` : ''}`,
+        { cache: 'no-store' },
+      );
+      const data = await res.json() as {
+        ok?: boolean; error?: string; connectUrl?: string;
+        meetings?: Array<{ id: string; title: string; transcript: string; date?: string }>;
+      };
+      if (!data.ok) {
+        const reauth = data.error === 'token_expired' || data.error === 'not_connected';
+        const detail = reauth
+          ? L(dict, 'Granola 授权已失效,请重新连接', 'Granola auth expired — reconnect')
+          : L(dict, `同步失败:${data.error || '未知'}`, `Sync failed: ${data.error || 'unknown'}`);
+        setOauthSyncResult((p) => ({ ...p, granola: { ok: false, msg: reauth ? L(dict, '需要重新授权', 'Reauth needed') : L(dict, '同步失败', 'Sync failed'), detail, needsReauth: reauth } }));
+        showToast(detail, false);
+        return;
+      }
+      const meetings = data.meetings || [];
+      let created = 0;
+      for (const m of meetings) {
+        const r = await ingestGranolaMeeting({ id: m.id, title: m.title, transcript: m.transcript, startedAt: m.date }, dict);
+        if (r !== 'skipped') created += 1;
+      }
+      setCounts((p) => ({ ...p, granola: created }));
+      window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
+      window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
+      const detail = L(dict, `拉取 ${meetings.length} 场会议 · 新增 ${created}`, `Pulled ${meetings.length} meetings · ${created} new`);
+      setOauthSyncResult((p) => ({ ...p, granola: { ok: true, msg: L(dict, '同步成功', 'Synced'), detail } }));
+      showToast(created > 0 ? detail : L(dict, '没有新的会议', 'No new meetings'), true);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setOauthSyncResult((p) => ({ ...p, granola: { ok: false, msg: L(dict, '同步失败', 'Sync failed'), detail: msg } }));
+      showToast(L(dict, `Granola 同步失败:${msg}`, `Granola sync failed: ${msg}`), false);
+    } finally {
+      setSyncing(null);
+    }
+  }
+
   async function syncOAuth(c: ConnectorDef) {
     if (c.id === 'google') { await syncGoogle(c); return; }
+    if (c.id === 'granola') { await syncGranola(); return; }
     if (c.id === 'plaid') { await syncPlaid(); return; }
     if (c.id === 'tesla') { await syncTesla(); return; }
     setSyncing(c.id);
@@ -842,6 +908,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     }
     // 一次 Google 授权覆盖日历+邮件两个 scope(gmail/connect 请求全量 scope)
     if (c.id === 'google') { window.location.href = '/api/portal/gmail/connect'; return; }
+    if (c.id === 'granola') { window.location.href = '/api/portal/granola/connect'; return; }
     if (c.id === 'tesla') { window.location.href = '/api/portal/tesla/connect'; return; }
     if (c.method === 'geo') {
       setSyncing(c.id);
