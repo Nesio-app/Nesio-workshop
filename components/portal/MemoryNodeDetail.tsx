@@ -210,13 +210,8 @@ function PersonSection({ node }: {
 
   return (
     <div className="nesio-type-section">
-      {category && (
-        <div className="nesio-type-badge-row">
-          <span className="nesio-type-category-pill">
-            {(dict === 'en' ? PERSON_CATEGORIES_EN : PERSON_CATEGORIES)[category] || category}
-          </span>
-        </div>
-      )}
+      {/* 批次 142·详情页统一(image 1):分类不再用彩色 pill,统一成 关键信息 里的 label→值 行 */}
+      <InfoRow label={L(dict, '关系', 'Relation')} value={category ? ((dict === 'en' ? PERSON_CATEGORIES_EN : PERSON_CATEGORIES)[category] || category) : ''} />
       <InfoRow label={L(dict, '上次见面', 'Last seen')} value={fmtDate(lastSeen, dict)} />
       <InfoRow label={L(dict, '生日', 'Birthday')} value={fmtDate(birthday, dict)} />
       <InfoRow label={L(dict, '备注', 'Note')} value={note} />
@@ -283,13 +278,7 @@ function PlaceSection({ node }: {
 
   return (
     <div className="nesio-type-section">
-      {category && (
-        <div className="nesio-type-badge-row">
-          <span className="nesio-type-category-pill">
-            {(dict === 'en' ? PLACE_CATEGORIES_EN : PLACE_CATEGORIES)[category] || category}
-          </span>
-        </div>
-      )}
+      <InfoRow label={L(dict, '分类', 'Type')} value={category ? ((dict === 'en' ? PLACE_CATEGORIES_EN : PLACE_CATEGORIES)[category] || category) : ''} />
       {address && (
         <div className="nesio-node-attr-row">
           <span className="nesio-node-attr-key">{L(dict, '地址', 'Address')}</span>
@@ -450,9 +439,7 @@ function HealthSection({ node }: { node: LifeNode }) {
 
   return (
     <div className="nesio-type-section">
-      <div className="nesio-type-badge-row">
-        <span className="nesio-type-category-pill nesio-type-category-pill--health">{typeLabel}</span>
-      </div>
+      <InfoRow label={L(dict, '类型', 'Type')} value={typeLabel} />
       <InfoRow label={L(dict, '时间', 'Time')} value={fmtDateTime(date, dict)} />
       {value && <InfoRow label={L(dict, '数值', 'Value')} value={unit ? `${value} ${unit}` : value} />}
       <InfoRow label={L(dict, '备注', 'Note')} value={note} />
@@ -480,11 +467,7 @@ function PreferenceSection({ node, assetUrls }: {
           role="button" tabIndex={0} style={{ cursor: 'zoom-in' }}
           onClick={() => window.dispatchEvent(new CustomEvent('nesio-view-image', { detail: { url: previewUrl, name: node.name } }))} />
       )}
-      {category && (
-        <div className="nesio-type-badge-row">
-          <span className="nesio-type-category-pill">{category}</span>
-        </div>
-      )}
+      <InfoRow label={L(dict, '分类', 'Type')} value={category} />
       <InfoRow label={L(dict, '记录时间', 'Noted on')} value={fmtDate(date, dict)} />
       <InfoRow label={L(dict, '备注', 'Note')} value={note} />
     </div>
@@ -997,7 +980,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
           })()}
 
           {/* 批次 125·设计:关键信息段标(结构化类型的核心属性区领头) */}
-          {(['object', 'event', 'commitment', 'person', 'place'] as string[]).includes(n.type) && (
+          {(['object', 'event', 'commitment', 'person', 'place', 'health_state', 'preference'] as string[]).includes(n.type) && (
             <p className="nesio-settings-section-label nesio-node-keyinfo-label">{L(dict, '关键信息', 'Key info')}</p>
           )}
 
