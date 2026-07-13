@@ -69,9 +69,16 @@ const purged = sm.purgeLocalData(storageLike);
 assert.ok(purged.keys.includes('nesio-person-records-v1'), '删除数据清掉按人数据');
 
 // ── 详情页接线(源码级) ──
+// 批次:「挂一条」抽成独立确认卡弹窗 HangNoteSheet。详情页负责 读/删 + 打开挂一条;
+// 新增(addPersonRecord)+ 分类选择 + 敏感本机 迁到 HangNoteSheet。
 const sheet = fs.readFileSync(new URL('../components/portal/relationships/RelationshipDetailSheet.tsx', import.meta.url), 'utf8');
-assert.ok(sheet.includes('addPersonRecord') && sheet.includes('deletePersonRecord') && sheet.includes('loadPersonRecords'), '详情页增删读记录');
-assert.ok(sheet.includes('挂一条') && sheet.includes('RECORD_CATEGORIES'), '「挂一条信息」+ 分类选择');
+assert.ok(sheet.includes('deletePersonRecord') && sheet.includes('loadPersonRecords'), '详情页删/读记录');
+assert.ok(sheet.includes('挂一条') && sheet.includes('HangNoteSheet'), '详情页开「挂一条」弹窗');
 assert.ok(sheet.includes('sensitive') && sheet.includes('只存本机'), '敏感项本机提示');
+
+const hang = fs.readFileSync(new URL('../components/portal/relationships/HangNoteSheet.tsx', import.meta.url), 'utf8');
+assert.ok(hang.includes('addPersonRecord') && hang.includes('RECORD_CATEGORIES'), '挂一条:新增记录 + 分类选择');
+assert.ok(hang.includes('sensitive') && hang.includes('只存本机'), '挂一条:敏感项只存本机');
+assert.ok(hang.includes('person-extract'), '挂一条:AI 提取走 person-extract');
 
 console.log('person-records: OK');

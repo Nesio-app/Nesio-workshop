@@ -12682,6 +12682,39 @@ button.nesio-rel-due-info { background: none; border: none; padding: 0; font: in
 .nesio-rel-nudge-btn { margin-top: 0.4rem; background: none; border: 0; padding: 0; font-size: 0.78rem; font-weight: 700; color: var(--status-go); cursor: pointer; }
 .nesio-rel-touch-btn--due { background: var(--portal-accent-soft); color: var(--portal-accent); }
 
+/* ── 挂一条(设计稿:挂在 TA 身上 · 起手 + 确认卡)── */
+.nesio-hang-card { max-width: 30rem; }
+.nesio-hang-head { display: flex; align-items: center; gap: 0.6rem; padding: 0.2rem 0 0.9rem; border-bottom: 1px solid var(--portal-line); }
+.nesio-hang-avatar { flex: none; width: 2.4rem; height: 2.4rem; border-radius: 0.7rem; display: grid; place-items: center; font-size: 0.95rem; font-weight: 800; color: #fff; background: var(--portal-accent); }
+.nesio-hang-head-id { flex: 1; min-width: 0; }
+.nesio-hang-head-title { margin: 0; font-size: 0.95rem; font-weight: 800; color: var(--portal-ink); }
+.nesio-hang-head-sub { margin: 1px 0 0; font-size: 0.72rem; font-weight: 700; color: var(--portal-muted); }
+.nesio-hang-body { display: flex; flex-direction: column; gap: 0.6rem; padding-top: 0.9rem; }
+.nesio-hang-nessa { display: block; font-size: 0.88rem; line-height: 1.55; color: var(--portal-ink); border-left: 2px solid var(--portal-accent-border); padding: 0.15rem 0 0.15rem 0.7rem; margin: 0.9rem 0 0; }
+.nesio-hang-nessa-kicker { display: inline-flex; align-items: center; font-size: 0.68rem; font-weight: 800; color: var(--portal-accent); margin-right: 0.4rem; }
+.nesio-hang-input-card { background: var(--glass-bg-solid); border: 1px solid var(--portal-line); border-radius: var(--radius-md, 16px); padding: 0.7rem; box-shadow: 0 4px 14px rgba(0,0,0,.05); }
+.nesio-hang-input { width: 100%; border: 0; background: none; resize: none; font-size: 0.9rem; color: var(--portal-ink); font-family: inherit; }
+.nesio-hang-input::placeholder { color: var(--portal-muted); }
+.nesio-hang-cap-row { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+.nesio-hang-cap { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; padding: 0.7rem; border-radius: var(--radius-sm, 12px); border: 1px solid var(--portal-line); background: var(--portal-bg); font-size: 0.85rem; font-weight: 700; color: var(--portal-ink); cursor: pointer; min-height: var(--tap-min); }
+.nesio-hang-cap:disabled { opacity: 0.55; cursor: default; }
+.nesio-hang-cap--primary { background: var(--portal-accent); border-color: var(--portal-accent); color: #fff; }
+.nesio-hang-lock { display: flex; align-items: center; gap: 0.32rem; font-size: 0.72rem; font-weight: 600; color: var(--status-go); }
+.nesio-hang-lock--foot { justify-content: center; color: var(--portal-muted); margin-top: 0.2rem; }
+.nesio-hang-redo { align-self: center; background: none; border: 0; font-size: 0.78rem; font-weight: 600; color: var(--portal-muted); cursor: pointer; padding: 0.3rem; margin-top: 0.2rem; }
+/* 确认卡 */
+.nesio-hang-confirm { background: var(--glass-bg-solid); border: 1px solid var(--portal-line); border-radius: var(--radius-md, 16px); padding: 0.85rem 0.9rem; margin-top: 0.8rem; box-shadow: 0 4px 14px rgba(0,0,0,.05); }
+.nesio-hang-confirm-badge { display: inline-flex; align-items: center; font-size: 0.66rem; font-weight: 800; color: var(--portal-muted); background: color-mix(in srgb, var(--portal-ink) 6%, transparent); border-radius: 0.45rem; padding: 0.14rem 0.5rem; }
+.nesio-hang-confirm-title { margin: 0.5rem 0 0; font-size: 1.25rem; font-weight: 800; color: var(--portal-ink); line-height: 1.25; }
+.nesio-hang-confirm-tagline { margin: 0.6rem 0 0.4rem; font-size: 0.68rem; font-weight: 700; color: var(--portal-muted); }
+.nesio-hang-tags { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.nesio-hang-tag { display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.72rem; font-weight: 700; color: var(--portal-accent); background: var(--portal-accent-soft); border: 0; border-radius: 0.5rem; padding: 0.24rem 0.55rem; cursor: default; }
+.nesio-hang-tag--cat { cursor: pointer; }
+.nesio-hang-tag--cat.is-sensitive { color: var(--status-go); background: var(--status-go-soft); }
+.nesio-hang-confirm .nesio-hang-lock { margin-top: 0.6rem; }
+.nesio-hang-primary { width: 100%; margin-top: 1rem; }
+.nesio-hang-saved { text-align: center; font-size: 0.95rem; font-weight: 700; color: var(--status-go); padding: 2rem 0; }
+
 .nesio-rel-timeline { display: flex; flex-direction: column; }
 .nesio-rel-tl-row { display: flex; gap: 0.7rem; font-size: 0.82rem; padding: 0.3rem 0; border-bottom: 1px solid var(--portal-line); }
 .nesio-rel-tl-row:last-child { border-bottom: none; }
