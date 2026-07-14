@@ -12686,6 +12686,52 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 .nesio-fin-assets { display: flex; flex-wrap: wrap; gap: 0.5rem 1.2rem; padding: 0.8rem 1rem; margin-bottom: 0.9rem; border: 1px solid var(--portal-line); border-radius: var(--radius-md, 16px); background: var(--portal-accent-soft); }
 .nesio-fin-asset { display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.9rem; font-weight: 600; color: var(--portal-ink); font-variant-numeric: tabular-nums; }
 .nesio-fin-asset-l { font-size: 0.68rem; font-weight: 400; color: var(--portal-muted); }
+
+/* 设计对齐:Plaid 只存本机 chip / 念念一句话 / 消费×人 / 卡片页分组 */
+.nesio-fin-plaidchip {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  font-size: 0.72rem; color: var(--portal-muted);
+  background: var(--portal-accent-soft); border: 1px solid var(--portal-line);
+  border-radius: var(--radius-pill, 999px); padding: 0.28rem 0.7rem; margin-bottom: 0.7rem;
+}
+.nesio-fin-nessa {
+  display: flex; gap: 0.55rem; align-items: flex-start;
+  background: var(--status-gentle-soft); border-radius: var(--radius-md, 16px);
+  padding: 0.7rem 0.85rem; margin-bottom: 0.9rem; font-size: 0.86rem; line-height: 1.55; color: var(--portal-ink);
+}
+.nesio-fin-nessa-kicker {
+  flex-shrink: 0; width: 1.5rem; height: 1.5rem; border-radius: 50%;
+  display: grid; place-items: center; font-size: 0.78rem; font-weight: 700;
+  background: var(--status-gentle); color: #fff;
+}
+.nesio-fin-personspend { display: flex; flex-direction: column; margin-bottom: 0.5rem; }
+.nesio-fin-person-row { display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem 0.1rem; border-bottom: 1px solid var(--portal-line); }
+.nesio-fin-person-row:last-child { border-bottom: none; }
+.nesio-fin-person-av { flex-shrink: 0; width: 1.9rem; height: 1.9rem; border-radius: 0.55rem; display: grid; place-items: center; font-size: 0.82rem; font-weight: 700; background: var(--portal-accent-soft-md); color: var(--portal-blue-deep); }
+.nesio-fin-person-name { flex: 1; min-width: 0; font-size: 0.88rem; font-weight: 600; color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nesio-fin-person-amt { font-size: 0.88rem; font-weight: 700; color: var(--portal-ink); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+
+/* 卡片页:净资产黑卡 + 分组标题 + 账户行 */
+.nesio-fin-networth {
+  display: flex; flex-direction: column; gap: 0.15rem;
+  background: var(--portal-ink); color: #fff;
+  border-radius: var(--radius-md, 16px); padding: 1.1rem 1.2rem; margin-bottom: 1.1rem;
+}
+html[data-portal-theme="night"] .nesio-fin-networth { background: #10151f; border: 1px solid rgba(255,255,255,0.08); }
+.nesio-fin-networth-l { font-size: 0.74rem; opacity: 0.75; }
+.nesio-fin-networth-v { font-size: 1.9rem; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.nesio-fin-networth-sub { font-size: 0.72rem; opacity: 0.7; font-variant-numeric: tabular-nums; }
+.nesio-fin-group-h { font-size: 0.7rem; font-weight: 700; color: var(--portal-muted); text-transform: uppercase; letter-spacing: 0.05em; margin: 1rem 0.15rem 0.5rem; }
+.nesio-fin-acctgroup { border: 1px solid var(--portal-line); border-radius: var(--radius-md, 16px); background: var(--glass-bg-solid); overflow: hidden; }
+html[data-portal-theme="night"] .nesio-fin-acctgroup { background: rgba(255,255,255,0.04); }
+.nesio-fin-acctrow { display: flex; align-items: center; gap: 0.7rem; padding: 0.7rem 0.85rem; border-bottom: 1px solid var(--portal-line); }
+.nesio-fin-acctrow:last-child { border-bottom: none; }
+.nesio-fin-acctrow-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.1rem; }
+.nesio-fin-acctrow-name { font-size: 0.9rem; font-weight: 700; color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nesio-fin-acctrow-sub { font-size: 0.7rem; color: var(--portal-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nesio-fin-acctrow-bal { font-size: 0.95rem; font-weight: 800; color: var(--portal-ink); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.nesio-fin-acctrow-bal.is-neg { color: var(--status-risk); }
+
 /* 批次 31:总览 KPI + 预警 + 趋势;交易审核;分卡 */
 /* 财务㉕:三列窄卡防截断 —— 标签不折行、金额可断行不裁切、字号收敛 */
 .nesio-fin-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.45rem; margin-bottom: 1rem; }
