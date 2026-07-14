@@ -14,7 +14,9 @@ function loadRel() {
   vm.runInNewContext(js, {
     module: mod, exports: mod.exports, console, JSON, Object, Array, String, Number, Math, Date, Map, Set, RegExp,
     window: undefined,
-    require: (p) => p.includes('storage-health') ? { reportStorageDropped: () => {} } : ({}),
+    require: (p) => p.includes('storage-health') ? { reportStorageDropped: () => {} }
+      : p.includes('relationship-overrides') ? { loadRelationshipOverrides: () => ({}) }
+      : ({}),
   });
   return mod.exports;
 }

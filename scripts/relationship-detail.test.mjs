@@ -23,7 +23,7 @@ function run(js, requireShim) {
 }
 
 const storageHealth = { reportStorageDropped() {} };
-const relationships = run(compile('../lib/portal/relationships.ts'), (p) => (p.includes('storage-health') ? storageHealth : {}));
+const relationships = run(compile('../lib/portal/relationships.ts'), (p) => (p.includes('storage-health') ? storageHealth : p.includes('relationship-overrides') ? { loadRelationshipOverrides: () => ({}) } : {}));
 const profileMod = run(compile('../lib/portal/relationship-profile.ts'), (p) => (p.endsWith('relationships') ? relationships : {}));
 const { buildPersonProfile } = profileMod;
 assert.equal(typeof buildPersonProfile, 'function', 'buildPersonProfile 导出');

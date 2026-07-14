@@ -16,7 +16,7 @@ function loadRel() {
   const mod = { exports: {} };
   vm.runInNewContext(js, {
     module: mod, exports: mod.exports, console, JSON, Object, Array, String, Number, Math, Date, Map, Set, RegExp,
-    window: undefined, require: (p) => (p.includes('storage-health') ? { reportStorageDropped: () => {} } : {}),
+    window: undefined, require: (p) => (p.includes('storage-health') ? { reportStorageDropped: () => {} } : p.includes('relationship-overrides') ? { loadRelationshipOverrides: () => ({}) } : {}),
   });
   return mod.exports;
 }
@@ -51,7 +51,8 @@ assert.ok(cs.includes('mergedTags') || cs.includes('new Set([...'), 'groups 去�
 // ── 关系 tab:分组筛选 chips + 家庭置顶 + 家人徽章(源码级) ──
 const panel = fs.readFileSync(new URL('../components/portal/relationships/RelationshipsPanel.tsx', import.meta.url), 'utf8');
 assert.ok(panel.includes('nesio-rel-chips') && panel.includes('setActiveGroup'), '分组筛选 chips');
-assert.ok(panel.includes('allGroups') && panel.includes('c.groups.includes(activeGroup)'), '按选中组筛选');
-assert.ok(/FAMILY_RE.*test/.test(panel) && panel.includes('👪'), '家人置顶 + 家人徽章');
+// 整理后:固定桶(家人/朋友/同事/业务/重要)+ 更多… 归并原始标签;桶或原始组都能筛
+assert.ok(panel.includes('presentBuckets') && panel.includes('c.groups.includes(activeGroup)'), '按选中桶/组筛选');
+assert.ok(panel.includes("id: 'family'") && panel.includes('家人') && panel.includes('nesio-rel-av'), '家人桶 + 分层字母块头像');
 
 console.log('relationship-groups: OK');

@@ -40,7 +40,7 @@ assert.ok(panel.includes('记给某人'), '顶部入口按钮');
 // ── imageToDataUrl 抽成共享工具,两处复用 ──
 const util = fs.readFileSync(new URL('../lib/portal/image-util.ts', import.meta.url), 'utf8');
 assert.ok(util.includes('export function imageToDataUrl'), '共享缩图工具');
-const detail = fs.readFileSync(new URL('../components/portal/relationships/RelationshipDetailSheet.tsx', import.meta.url), 'utf8');
-assert.ok(detail.includes("from '@/lib/portal/image-util'"), '详情页复用共享缩图工具(不重复实现)');
+const hang = fs.readFileSync(new URL('../components/portal/relationships/HangNoteSheet.tsx', import.meta.url), 'utf8');
+assert.ok(hang.includes("from '@/lib/portal/image-util'"), '挂一条复用共享缩图工具(不重复实现)');
 
 console.log('person-extract-sheet: OK');

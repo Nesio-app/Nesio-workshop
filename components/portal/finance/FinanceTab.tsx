@@ -172,7 +172,8 @@ export default function FinanceTab() {
   // 财务④:上月净支出不足 $50 时环比是小基数噪音(+786% 之类),不出百分比
   const netDelta = prevSummary.net >= 50 ? Math.round(((summary.net - prevSummary.net) / prevSummary.net) * 100) : null;
   const idx = months.indexOf(ym);
-  const SUBS: Array<[Sub, string, string]> = [['overview', '总览', 'Overview'], ['budget', '预算', 'Budget'], ['tx', '交易', 'Transactions'], ['recurring', '定期', 'Recurring'], ['invest', '投资', 'Investing'], ['cards', '账户', 'Accounts']];
+  // 设计:4 个子页 —— 总览 / 支出 / 交易 / 卡片。预算并入总览,定期并入交易,投资并入卡片。
+  const SUBS: Array<[Sub, string, string]> = [['overview', '总览', 'Overview'], ['spending', '支出', 'Spending'], ['tx', '交易', 'Transactions'], ['cards', '卡片', 'Cards']];
   function markNotRecurring(key: string) { setRecurRule(key, 'no'); setRev((r) => r + 1); } // 财务㉚:传流的 merchantKey,改名不丢
   function removeMerchantRule(name: string) { setMerchantRule(name, ''); setRev((r) => r + 1); }
   function removeFlowRule(name: string) { setFlowRule(name, ''); setRev((r) => r + 1); }
@@ -246,22 +247,6 @@ export default function FinanceTab() {
           })()}
           <p className="nesio-fin-alert-note" style={{ textAlign: 'left', marginTop: '-0.5rem', marginBottom: '0.8rem' }}>{L(dict, '收入 / 转账 / 信用卡还款 不计入收支;分错了到「交易」点类型改。', 'Income / transfers / card payments are excluded; fix any mislabels under Transactions.')}</p>
 
-          {/* 批次 40:分类支出环形图 */}
-          {cats.length > 0 && (
-            <div className="nesio-fin-donut-wrap">
-              <FinanceDonut slices={cats} centerTop={L(dict, '本月支出', 'This month')} centerVal={formatMoney(cats.reduce((s, c) => s + c.total, 0), summary.currency)} />
-              <div className="nesio-fin-donut-legend">
-                {cats.filter((c) => c.pct >= 1).slice(0, 6).map((c, i) => (
-                  <div key={c.category} className="nesio-fin-donut-leg">
-                    <span className="nesio-fin-donut-dot" style={{ background: DONUT_COLORS[i % DONUT_COLORS.length] }} />
-                    <span className="nesio-fin-donut-cat">{categoryLabel(c.category, dict)}</span>
-                    <span className="nesio-fin-donut-pct">{c.pct}%</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           {(findings.length > 0 || review.length > 0) && (
             <>
               <p className="nesio-settings-section-label">{L(dict, '风险预警', 'Risk alerts')}</p>
@@ -322,15 +307,6 @@ export default function FinanceTab() {
             </>
           )}
 
-          <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '全部分类', 'All categories')}</p>
-          <div className="nesio-fin-cats">
-            {cats.map((c) => (
-              <div key={c.category} className="nesio-fin-cat">
-                <div className="nesio-fin-cat-top"><span className="nesio-fin-cat-name">{categoryLabel(c.category, dict)}</span><span className="nesio-fin-cat-amt">{formatMoney(c.total, summary.currency)} <span style={{ color: 'var(--portal-muted)', fontWeight: 400 }}>{c.pct}%</span>{c.deltaPct !== null ? <span className={`nesio-fin-delta${c.deltaPct > 0 ? ' up' : ' down'}`}>{c.deltaPct > 0 ? '+' : ''}{c.deltaPct}%</span> : c.isNew ? <span className="nesio-fin-delta is-new">{L(dict, '新增', 'new')}</span> : null}</span></div>
-                <div className="nesio-fin-bar"><div className="nesio-fin-bar-fill" style={{ width: `${Math.max(3, c.pct)}%` }} /></div>
-              </div>
-            ))}
-          </div>
           {/* 财务㉓:月报 —— 报告级 Markdown,可下载 / 存入记忆(问一问可检索) */}
           <div className="nesio-fin-budget-add" style={{ marginTop: '1.25rem' }}>
             <button type="button" className="nesio-fin-flowopt" onClick={() => {
@@ -367,13 +343,66 @@ export default function FinanceTab() {
             }}>{L(dict, '打印 / 存 PDF', 'Print / PDF')}</button>
           </div>
           {reportMsg && <p className="nesio-settings-option-hint">{reportMsg}</p>}
+        </>
+      )}
 
-          <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '商户 Top', 'Top merchants')}</p>
-          <div className="nesio-fin-merchants">
-            {merchants.map((m) => (
-              <div key={m.name} className="nesio-fin-merchant"><span className="nesio-fin-merchant-name">{m.logo && <MLogo src={m.logo} />}{m.name}</span><span className="nesio-fin-merchant-right"><span className="nesio-fin-merchant-amt">{formatMoney(m.total, summary.currency)}</span><span className="nesio-fin-merchant-cnt">{L(dict, `${m.count} 笔`, `${m.count}×`)}</span></span></div>
-            ))}
-          </div>
+      {/* ── 支出:分类 + 商户 Top + 收入来源 ── */}
+      {sub === 'spending' && (
+        <>
+          {cats.length > 0 ? (
+            <>
+              {/* 分类支出环形图 */}
+              <div className="nesio-fin-donut-wrap">
+                <FinanceDonut slices={cats} centerTop={L(dict, '本月支出', 'This month')} centerVal={formatMoney(cats.reduce((s, c) => s + c.total, 0), summary.currency)} />
+                <div className="nesio-fin-donut-legend">
+                  {cats.filter((c) => c.pct >= 1).slice(0, 6).map((c, i) => (
+                    <div key={c.category} className="nesio-fin-donut-leg">
+                      <span className="nesio-fin-donut-dot" style={{ background: DONUT_COLORS[i % DONUT_COLORS.length] }} />
+                      <span className="nesio-fin-donut-cat">{categoryLabel(c.category, dict)}</span>
+                      <span className="nesio-fin-donut-pct">{c.pct}%</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, `支出分类 · 共 ${formatMoney(cats.reduce((s, c) => s + c.total, 0), summary.currency)}`, `Spending · ${formatMoney(cats.reduce((s, c) => s + c.total, 0), summary.currency)}`)}</p>
+              <div className="nesio-fin-cats">
+                {cats.map((c) => (
+                  <div key={c.category} className="nesio-fin-cat">
+                    <div className="nesio-fin-cat-top"><span className="nesio-fin-cat-name">{categoryLabel(c.category, dict)}</span><span className="nesio-fin-cat-amt">{formatMoney(c.total, summary.currency)} <span style={{ color: 'var(--portal-muted)', fontWeight: 400 }}>{c.pct}%</span>{c.deltaPct !== null ? <span className={`nesio-fin-delta${c.deltaPct > 0 ? ' up' : ' down'}`}>{c.deltaPct > 0 ? '+' : ''}{c.deltaPct}%</span> : c.isNew ? <span className="nesio-fin-delta is-new">{L(dict, '新增', 'new')}</span> : null}</span></div>
+                    <div className="nesio-fin-bar"><div className="nesio-fin-bar-fill" style={{ width: `${Math.max(3, c.pct)}%` }} /></div>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <p className="nesio-settings-option-hint" style={{ marginTop: 0 }}>{L(dict, '这个月还没有可统计的支出。', 'No spending to break down this month yet.')}</p>
+          )}
+
+          {merchants.length > 0 && (<>
+            <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '商户 Top', 'Top merchants')}</p>
+            <div className="nesio-fin-merchants">
+              {merchants.map((m) => (
+                <div key={m.name} className="nesio-fin-merchant"><span className="nesio-fin-merchant-name">{m.logo && <MLogo src={m.logo} />}{m.name}</span><span className="nesio-fin-merchant-right"><span className="nesio-fin-merchant-amt">{formatMoney(m.total, summary.currency)}</span><span className="nesio-fin-merchant-cnt">{L(dict, `${m.count} 笔`, `${m.count}×`)}</span></span></div>
+              ))}
+            </div>
+          </>)}
+
+          {/* 收入来源(按 Plaid 细分类分桶) */}
+          {summary.income > 0 && (() => {
+            const ib = incomeBreakdown(txs, ym);
+            if (!ib.length) return null;
+            return (<>
+              <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '收入来源', 'Income sources')}</p>
+              <div className="nesio-fin-merchants">
+                {ib.map((s) => (
+                  <div key={s.detail} className="nesio-fin-merchant">
+                    <span className="nesio-fin-merchant-name">{categoryDetailLabel(s.detail, dict) || L(dict, '其他收入', 'Other income')}</span>
+                    <span className="nesio-fin-merchant-right"><span className="nesio-fin-merchant-amt" style={{ color: 'var(--status-go)' }}>+{formatMoney(s.total, summary.currency)}</span></span>
+                  </div>
+                ))}
+              </div>
+            </>);
+          })()}
         </>
       )}
 
@@ -500,8 +529,8 @@ export default function FinanceTab() {
         </>
       )}
 
-      {/* ── 定期:账单识别(批次 39)── */}
-      {sub === 'recurring' && (
+      {/* ── 交易续:识别到的定期账单(并入交易页)── */}
+      {sub === 'tx' && (
         <>
           {upcoming.items.length > 0 && (
             <div className="nesio-fin-recur-hero">
@@ -530,8 +559,8 @@ export default function FinanceTab() {
         </>
       )}
 
-      {/* ── 财务㉒:预算 ── */}
-      {sub === 'budget' && (() => {
+      {/* ── 预算(并入总览页)── */}
+      {sub === 'overview' && (() => {
         const patchBudget = (next: BudgetConfig) => { saveBudget(next); setRev((r) => r + 1); };
         if (!hasBudget(budget)) {
           return (
@@ -633,73 +662,7 @@ export default function FinanceTab() {
         );
       })()}
 
-      {/* ── 财务㉗:投资(持仓明细 + 组合结构 + 集中度) ── */}
-      {sub === 'invest' && (() => {
-        const hasInvestAcct = accounts.some((a) => (a.type || '').toLowerCase() === 'investment');
-        if (!portfolio) {
-          return (
-            <p className="nesio-settings-option-hint" style={{ marginTop: 0 }}>{hasInvestAcct
-              ? L(dict, '已看到投资账户,但还没拉到持仓明细 —— 到「设置 → 数据接入」再点一次「同步」,持仓(股票/基金/现金仓位)会跟着回来。', 'Investment accounts found, but no holdings yet — tap Sync once more (Settings → Data sources) to pull positions (stocks/funds/cash).')
-              : L(dict, '还没有投资账户。连接券商/退休金账户(Fidelity、Robinhood 等)后,这里会展示持仓明细、组合结构和浮动盈亏。', 'No investment accounts yet. Connect a brokerage/retirement account (Fidelity, Robinhood, …) to see positions, allocation and unrealized gains here.')}</p>
-          );
-        }
-        const fmtGain = (g: number) => (g >= 0 ? `+${formatMoney(g)}` : `-${formatMoney(-g)}`);
-        const gainColor = (g: number) => (g >= 0 ? 'var(--status-go)' : 'var(--status-gentle)');
-        // 本月投资收益(分红/利息)——与收入细分同一口径
-        const invIncome = incomeBreakdown(txs, ym).filter((s) => s.detail === 'INCOME_DIVIDENDS' || s.detail === 'INCOME_INTEREST_EARNED');
-        const invIncomeTotal = invIncome.reduce((s, x) => s + x.total, 0);
-        return (
-          <>
-            <div className="nesio-fin-assets">
-              <span className="nesio-fin-asset"><span className="nesio-fin-asset-l">{L(dict, '总市值', 'Market value')}</span>{formatMoney(portfolio.totalValue)}</span>
-              {portfolio.gain !== null && (
-                <span className="nesio-fin-asset"><span className="nesio-fin-asset-l">{L(dict, '浮动盈亏', 'Unrealized')}</span><span style={{ color: gainColor(portfolio.gain) }}>{fmtGain(portfolio.gain)}{portfolio.gainPct !== null ? ` (${portfolio.gainPct >= 0 ? '+' : ''}${portfolio.gainPct}%)` : ''}</span></span>
-              )}
-              <span className="nesio-fin-asset"><span className="nesio-fin-asset-l">{L(dict, '持仓', 'Positions')}</span>{portfolio.positions.length}</span>
-            </div>
-            {portfolio.concentrated && (
-              <p className="nesio-fin-score-hint" style={{ marginTop: '0.6rem' }}>{L(dict,
-                `${portfolio.concentrated.ticker || portfolio.concentrated.name} 占了组合的 ${portfolio.concentrated.pct}% —— 集中不是错,只是波动会更贴着这一只走;有空可以想想要不要分散一点。`,
-                `${portfolio.concentrated.ticker || portfolio.concentrated.name} is ${portfolio.concentrated.pct}% of the portfolio — concentration isn't wrong, but volatility will track this one closely; worth a think when you have a moment.`)}</p>
-            )}
-            <p className="nesio-settings-section-label" style={{ marginTop: '1rem' }}>{L(dict, '组合结构', 'Allocation')}</p>
-            <div className="nesio-fin-cats">
-              {portfolio.byType.map((s) => (
-                <div key={s.label} className="nesio-fin-cat">
-                  <div className="nesio-fin-cat-top">
-                    <span className="nesio-fin-cat-name">{s.label}</span>
-                    <span className="nesio-fin-cat-amt">{formatMoney(s.value)} · {s.pct}%</span>
-                  </div>
-                  <div className="nesio-fin-bar"><div className="nesio-fin-bar-fill" style={{ width: `${Math.min(100, s.pct)}%` }} /></div>
-                </div>
-              ))}
-            </div>
-            <p className="nesio-settings-section-label" style={{ marginTop: '1rem' }}>{L(dict, '持仓明细', 'Positions')}</p>
-            <div className="nesio-fin-recurlist">
-              {portfolio.positions.map((p) => (
-                <div key={`${p.ticker || p.name}`} className="nesio-fin-recur">
-                  <div className="nesio-fin-recur-main">
-                    <span className="nesio-fin-recur-name">{p.ticker ? `${p.ticker} · ` : ''}{p.name}</span>
-                    <span className="nesio-fin-recur-meta">{p.typeLabel} · {L(dict, `${p.quantity} 份`, `${p.quantity} sh`)} · {p.pct}%</span>
-                  </div>
-                  <span className="nesio-fin-recur-amt" style={{ textAlign: 'right' }}>
-                    {formatMoney(p.value)}
-                    {p.gain !== null && <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: gainColor(p.gain) }}>{fmtGain(p.gain)}</span>}
-                  </span>
-                </div>
-              ))}
-            </div>
-            {invIncomeTotal > 0 && (
-              <p className="nesio-fin-score-hint" style={{ marginTop: '0.8rem' }}>{L(dict,
-                `${monthLabel(ym, dict)} 投资收益 ${formatMoney(invIncomeTotal)}(${invIncome.map((s) => `${categoryDetailLabel(s.detail, dict)} ${formatMoney(s.total)}`).join(' · ')})`,
-                `${monthLabel(ym, dict)} investment income ${formatMoney(invIncomeTotal)} (${invIncome.map((s) => `${categoryDetailLabel(s.detail, dict)} ${formatMoney(s.total)}`).join(' · ')})`)}</p>
-            )}
-            <p className="nesio-fin-alert-note">{L(dict, '持仓与成本来自券商快照,盈亏为未实现浮动值;缺成本数据的持仓不显示盈亏。以上不构成投资建议。', 'Positions & cost basis come from broker snapshots; gains are unrealized. Positions missing cost basis show no gain. Not investment advice.')}</p>
-          </>
-        );
-      })()}
-
-      {/* ── 卡片:分卡 ── */}
+      {/* ── 卡片:净资产 + 分卡 + 投资 ── */}
       {sub === 'cards' && (
         accounts.length === 0 ? (
           <p className="nesio-insights-option-hint nesio-settings-option-hint" style={{ marginTop: 0 }}>{L(dict, '还没有账户信息。到「设置 → 数据接入」点银行「同步」一次,就会拉到你的卡/账户(余额、消费、退款分卡显示)。', 'No account info yet. Tap Sync on the bank connector once (Settings → Data sources) to pull your cards/accounts (per-card balance, spend, refunds).')}</p>
@@ -753,6 +716,65 @@ export default function FinanceTab() {
           </>
         )
       )}
+
+      {/* ── 投资(持仓明细 + 组合结构 + 集中度;并入卡片页,净资产之后)── */}
+      {sub === 'cards' && portfolio && (() => {
+        const fmtGain = (g: number) => (g >= 0 ? `+${formatMoney(g)}` : `-${formatMoney(-g)}`);
+        const gainColor = (g: number) => (g >= 0 ? 'var(--status-go)' : 'var(--status-gentle)');
+        // 本月投资收益(分红/利息)——与收入细分同一口径
+        const invIncome = incomeBreakdown(txs, ym).filter((s) => s.detail === 'INCOME_DIVIDENDS' || s.detail === 'INCOME_INTEREST_EARNED');
+        const invIncomeTotal = invIncome.reduce((s, x) => s + x.total, 0);
+        return (
+          <>
+            <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '投资', 'Investing')}</p>
+            <div className="nesio-fin-assets">
+              <span className="nesio-fin-asset"><span className="nesio-fin-asset-l">{L(dict, '总市值', 'Market value')}</span>{formatMoney(portfolio.totalValue)}</span>
+              {portfolio.gain !== null && (
+                <span className="nesio-fin-asset"><span className="nesio-fin-asset-l">{L(dict, '浮动盈亏', 'Unrealized')}</span><span style={{ color: gainColor(portfolio.gain) }}>{fmtGain(portfolio.gain)}{portfolio.gainPct !== null ? ` (${portfolio.gainPct >= 0 ? '+' : ''}${portfolio.gainPct}%)` : ''}</span></span>
+              )}
+              <span className="nesio-fin-asset"><span className="nesio-fin-asset-l">{L(dict, '持仓', 'Positions')}</span>{portfolio.positions.length}</span>
+            </div>
+            {portfolio.concentrated && (
+              <p className="nesio-fin-score-hint" style={{ marginTop: '0.6rem' }}>{L(dict,
+                `${portfolio.concentrated.ticker || portfolio.concentrated.name} 占了组合的 ${portfolio.concentrated.pct}% —— 集中不是错,只是波动会更贴着这一只走;有空可以想想要不要分散一点。`,
+                `${portfolio.concentrated.ticker || portfolio.concentrated.name} is ${portfolio.concentrated.pct}% of the portfolio — concentration isn't wrong, but volatility will track this one closely; worth a think when you have a moment.`)}</p>
+            )}
+            <p className="nesio-settings-section-label" style={{ marginTop: '1rem' }}>{L(dict, '组合结构', 'Allocation')}</p>
+            <div className="nesio-fin-cats">
+              {portfolio.byType.map((s) => (
+                <div key={s.label} className="nesio-fin-cat">
+                  <div className="nesio-fin-cat-top">
+                    <span className="nesio-fin-cat-name">{s.label}</span>
+                    <span className="nesio-fin-cat-amt">{formatMoney(s.value)} · {s.pct}%</span>
+                  </div>
+                  <div className="nesio-fin-bar"><div className="nesio-fin-bar-fill" style={{ width: `${Math.min(100, s.pct)}%` }} /></div>
+                </div>
+              ))}
+            </div>
+            <p className="nesio-settings-section-label" style={{ marginTop: '1rem' }}>{L(dict, '持仓明细', 'Positions')}</p>
+            <div className="nesio-fin-recurlist">
+              {portfolio.positions.map((p) => (
+                <div key={`${p.ticker || p.name}`} className="nesio-fin-recur">
+                  <div className="nesio-fin-recur-main">
+                    <span className="nesio-fin-recur-name">{p.ticker ? `${p.ticker} · ` : ''}{p.name}</span>
+                    <span className="nesio-fin-recur-meta">{p.typeLabel} · {L(dict, `${p.quantity} 份`, `${p.quantity} sh`)} · {p.pct}%</span>
+                  </div>
+                  <span className="nesio-fin-recur-amt" style={{ textAlign: 'right' }}>
+                    {formatMoney(p.value)}
+                    {p.gain !== null && <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: gainColor(p.gain) }}>{fmtGain(p.gain)}</span>}
+                  </span>
+                </div>
+              ))}
+            </div>
+            {invIncomeTotal > 0 && (
+              <p className="nesio-fin-score-hint" style={{ marginTop: '0.8rem' }}>{L(dict,
+                `${monthLabel(ym, dict)} 投资收益 ${formatMoney(invIncomeTotal)}(${invIncome.map((s) => `${categoryDetailLabel(s.detail, dict)} ${formatMoney(s.total)}`).join(' · ')})`,
+                `${monthLabel(ym, dict)} investment income ${formatMoney(invIncomeTotal)} (${invIncome.map((s) => `${categoryDetailLabel(s.detail, dict)} ${formatMoney(s.total)}`).join(' · ')})`)}</p>
+            )}
+            <p className="nesio-fin-alert-note">{L(dict, '持仓与成本来自券商快照,盈亏为未实现浮动值;缺成本数据的持仓不显示盈亏。以上不构成投资建议。', 'Positions & cost basis come from broker snapshots; gains are unrealized. Positions missing cost basis show no gain. Not investment advice.')}</p>
+          </>
+        );
+      })()}
 
       <p className="nesio-settings-option-hint" style={{ marginTop: '1rem', textAlign: 'center' }}>{L(dict, '流水明细只存本机', 'Details stay on-device')}</p>
     </div>
