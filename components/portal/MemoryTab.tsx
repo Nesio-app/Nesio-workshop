@@ -684,6 +684,100 @@ function ProjectCard({ project, allNodes, onClick }: { project: Project; allNode
   );
 }
 
+// 批次 168:收藏夹维度 —— 手动收藏的记忆按类型归到 价值/习惯/节律/关系(尽力映射)。
+type FavDim = 'all' | 'value' | 'habit' | 'rhythm' | 'relation';
+function favDimensionOf(n: LifeNode): Exclude<FavDim, 'all'> | 'other' {
+  if (n.type === 'person') return 'relation';
+  if (n.type === 'preference' || n.type === 'note') return 'value';
+  if (n.type === 'commitment' || n.type === 'health_state') return 'habit';
+  if (n.type === 'event') return 'rhythm';
+  return 'other';
+}
+
+// 批次 168:收藏夹独立页 —— 手动收藏的记忆 + 维度 filter(全部/价值/习惯/节律/关系)。
+function FavoritesSheet({ pinnedNodes, onClose, onOpenNode, onLongPressNode }: {
+  pinnedNodes: LifeNode[];
+  onClose: () => void;
+  onOpenNode: (n: LifeNode) => void;
+  onLongPressNode?: (n: LifeNode) => void;
+}) {
+  const dict = useDict();
+  const [dim, setDim] = useState<FavDim>('all');
+  const DIMS: Array<[FavDim, string, string]> = [
+    ['all', '全部', 'All'], ['value', '价值', 'Values'], ['habit', '习惯', 'Habits'],
+    ['rhythm', '节律', 'Rhythm'], ['relation', '关系', 'Relationships'],
+  ];
+  const shown = dim === 'all' ? pinnedNodes : pinnedNodes.filter((n) => favDimensionOf(n) === dim);
+  return (
+    <>
+      <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
+      <div className="nesio-project-detail-sheet">
+        <div className="nesio-project-detail-header">
+          <span className="nesio-project-detail-emoji"><IconBookmark size={16} /></span>
+          <span className="nesio-project-detail-name">{L(dict, '收藏夹', 'Saved')}</span>
+          <button type="button" className="nesio-voice-sheet-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="nesio-fav-filter">
+          {DIMS.map(([k, zh, en]) => (
+            <button key={k} type="button" className={`nesio-fav-chip${dim === k ? ' nesio-fav-chip--on' : ''}`} onClick={() => setDim(k)}>
+              {L(dict, zh, en)}
+            </button>
+          ))}
+        </div>
+        {shown.length === 0 ? (
+          <p className="nesio-project-detail-empty">
+            {dim === 'all'
+              ? L(dict, '还没有收藏。长按记忆卡 → 收藏到首页。', 'Nothing saved yet. Long-press a card → Pin.')
+              : L(dict, '这个维度还没有收藏', 'Nothing in this dimension yet')}
+          </p>
+        ) : (
+          <div className="nesio-memory-grid" style={{ padding: '0 1rem 1rem' }}>
+            {shown.map((n) => (
+              <MemoryCard key={n.id} node={n} onOpen={() => onOpenNode(n)} onDeleted={() => {}} onLongPress={onLongPressNode ? () => onLongPressNode(n) : undefined} />
+            ))}
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+// 批次 168:项目独立页 —— 进行中项目列表,点开进项目详情。
+function ProjectsSheet({ projects, allNodes, onClose, onOpenProject, onCreate }: {
+  projects: Project[];
+  allNodes: LifeNode[];
+  onClose: () => void;
+  onOpenProject: (p: Project) => void;
+  onCreate: () => void;
+}) {
+  const dict = useDict();
+  const active = projects.filter((p) => p.status === 'active');
+  return (
+    <>
+      <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
+      <div className="nesio-project-detail-sheet">
+        <div className="nesio-project-detail-header">
+          <span className="nesio-project-detail-emoji"><IconFolder size={16} /></span>
+          <span className="nesio-project-detail-name">{L(dict, '项目', 'Projects')}</span>
+          <button type="button" className="nesio-voice-sheet-close" onClick={onClose}>✕</button>
+        </div>
+        {active.length > 0 ? (
+          <div className="nesio-memory-grid nesio-fav-expanded" style={{ padding: '0 1rem 0.5rem' }}>
+            {active.map((p) => (
+              <ProjectCard key={p.id} project={p} allNodes={allNodes} onClick={() => onOpenProject(p)} />
+            ))}
+          </div>
+        ) : (
+          <p className="nesio-project-detail-empty">{L(dict, '还没有项目,创建一个把相关记录聚在一起', 'No projects yet — create one to group related notes')}</p>
+        )}
+        <button type="button" className="nesio-mem-jar-create" style={{ margin: '0 1rem 1rem' }} onClick={onCreate}>
+          {L(dict, '新建项目', 'New project')}
+        </button>
+      </div>
+    </>
+  );
+}
+
 function ProjectDetailSheet({
   project,
   allNodes,
@@ -902,10 +996,10 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
   const coreNodes = coreIds
     .map((id) => nodes.find((n) => n.id === id))
     .filter((n): n is LifeNode => Boolean(n));
-  // 批次 50:收藏夹收成单一容器卡,点开才展开全部收藏
-  const [favOpen, setFavOpen] = useState(false);
-  const [coreOpen, setCoreOpen] = useState(false);
-  const [projOpen, setProjOpen] = useState(false);
+  // 批次 168(用户定案):三球各自开独立页(不再就地展开)。收藏夹=手动收藏+维度 filter,
+  // 物品收纳=中间球开收纳,项目=项目页。去掉核心记忆球。
+  const [favPageOpen, setFavPageOpen] = useState(false);
+  const [projPageOpen, setProjPageOpen] = useState(false);
 
   const dict = portalLocaleToDictionaryLocale(locale);
   const copy = COPY[dict];
@@ -1117,23 +1211,20 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                   核心记忆(定义你,长按记忆卡「标为核心」)= 第一颗;全部记忆挪到下方区块。 */}
               {hasNodes && (
                 <div className="nesio-mem-jars">
-                  {/* 批次 150(QA #3):三球展开互斥 —— 开一个自动收起其余,空状态不再叠加。 */}
-                  <button type="button" className="nesio-mem-jar" onClick={() => { setCoreOpen((v) => !v); setFavOpen(false); setProjOpen(false); }}>
-                    <span className="nesio-mem-jar-ball" data-halo="core" aria-hidden><IconStar size={26} /></span>
-                    <span className="nesio-mem-jar-name">{L(dict, '核心记忆', 'Core')}</span>
-                    <span className="nesio-mem-jar-sub">{L(dict, `定义你 · ${coreNodes.length}`, `defines you · ${coreNodes.length}`)}</span>
-                  </button>
-                  <button type="button" className="nesio-mem-jar" onClick={() => { setFavOpen((v) => !v); setCoreOpen(false); setProjOpen(false); }}>
+                  {/* 批次 168:收藏夹(手动收藏)→ 独立页 + 维度 filter */}
+                  <button type="button" className="nesio-mem-jar" onClick={() => setFavPageOpen(true)}>
                     <span className="nesio-mem-jar-ball" data-halo="fav" aria-hidden><IconBookmark size={24} /></span>
                     <span className="nesio-mem-jar-name">{L(dict, '收藏夹', 'Saved')}</span>
                     <span className="nesio-mem-jar-sub">{L(dict, `手动收 · ${pinnedNodes.length}`, `pinned · ${pinnedNodes.length}`)}</span>
                   </button>
-                  {/* 批次 123(用户「项目挪进球里,那个 section 删了」):点球内联展开项目,同核心/收藏球 */}
-                  <button
-                    type="button"
-                    className="nesio-mem-jar"
-                    onClick={() => { setProjOpen((v) => !v); setCoreOpen(false); setFavOpen(false); }}
-                  >
+                  {/* 批次 168:物品收纳放中间 → 开收纳 */}
+                  <button type="button" className="nesio-mem-jar" onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-inventory'))}>
+                    <span className="nesio-mem-jar-ball" data-halo="storage" aria-hidden><IconBox size={24} /></span>
+                    <span className="nesio-mem-jar-name">{L(dict, '物品收纳', 'Storage')}</span>
+                    <span className="nesio-mem-jar-sub">{L(dict, `${invStats.count} 件`, `${invStats.count} items`)}</span>
+                  </button>
+                  {/* 批次 168:项目 → 独立页 */}
+                  <button type="button" className="nesio-mem-jar" onClick={() => setProjPageOpen(true)}>
                     <span className="nesio-mem-jar-ball" data-halo="project" aria-hidden><IconFolder size={24} /></span>
                     <span className="nesio-mem-jar-name">{L(dict, '项目', 'Projects')}</span>
                     <span className="nesio-mem-jar-sub">{L(dict, `进行 · ${projects.filter((p) => p.status === 'active').length}`, `active · ${projects.filter((p) => p.status === 'active').length}`)}</span>
@@ -1141,43 +1232,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                 </div>
               )}
 
-              {/* 核心记忆展开(点核心球)*/}
-              {hasNodes && coreOpen && coreNodes.length > 0 && (
-                <div className="nesio-projects-section">
-                  <div className="nesio-memory-grid nesio-fav-expanded">
-                    {coreNodes.map((n) => (
-                      <MemoryCard key={n.id} node={n} onOpen={() => openNodeDetail(n)} onDeleted={() => setNodes(getLifeGraph())} onLongPress={() => setLongPressNode(n)} />
-                    ))}
-                  </div>
-                </div>
-              )}
-              {hasNodes && coreOpen && coreNodes.length === 0 && (
-                <p className="nesio-settings-option-hint" style={{ margin: '0 0 1rem', textAlign: 'center' }}>
-                  {L(dict, '还没有核心记忆。长按任意记忆卡 → 标为核心记忆。', 'No core memories yet. Long-press a memory card → Mark as core.')}
-                </p>
-              )}
-
-              {/* 项目展开(点项目球)—— 批次 123:项目挪进球里,不再有独立「我的项目」section */}
-              {hasNodes && projOpen && (
-                <div className="nesio-projects-section">
-                  {projects.filter((p) => p.status === 'active').length > 0 ? (
-                    <div className="nesio-memory-grid nesio-fav-expanded">
-                      {projects.filter((p) => p.status === 'active').map((p) => (
-                        <ProjectCard key={p.id} project={p} allNodes={nodes} onClick={() => setActiveProject(p)} />
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="nesio-projects-empty">{L(dict, '还没有项目,创建一个把相关记录聚在一起', 'No projects yet — create one to group related notes')}</p>
-                  )}
-                  <button
-                    type="button"
-                    className="nesio-mem-jar-create"
-                    onClick={() => setShowCreateProject(true)}
-                  >
-                    {copy.newProject}
-                  </button>
-                </div>
-              )}
+              {/* 批次 168:核心/项目就地展开区已删 —— 改成点球开独立页(FavoritesSheet / ProjectsSheet) */}
 
               {/* Narrator cards */}
               {narratorCards.length > 0 && (
@@ -1193,61 +1248,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                 <OnThisDayStrip nodes={onThisDayNodes} onOpen={openNodeDetail} />
               )}
 
-              {/* 批次 113:收纳区对齐 mockup —— 独立「收纳」段 + 横条卡(空间/未归位/件数/估值)。
-                  收藏夹已上移成记忆罐水晶球,不再在此放方卡;点收藏球 → favOpen 展开在下方。 */}
-              {hasNodes && isFeatureEnabled('inventory') && (
-                <div className="nesio-storage-section">
-                  <div className="nesio-section-header">
-                    <span className="nesio-section-title">
-                      {L(dict, '收纳', 'Storage')}
-                      <span className="nesio-section-title-sub"> · {L(dict, '东西放哪了,一查就知道', 'where things live')}</span>
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    className="nesio-storage-card"
-                    onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-inventory'))}
-                  >
-                    <span className="nesio-storage-icon"><IconBox size={20} /></span>
-                    <span className="nesio-storage-main">
-                      <span className="nesio-storage-title">{L(dict, '物品收纳', 'Storage')}</span>
-                      <span className="nesio-storage-sub">
-                        {L(dict, `${invStats.spaces} 空间 · ${invStats.unfiled} 件未归位`, `${invStats.spaces} spaces · ${invStats.unfiled} unfiled`)}
-                      </span>
-                    </span>
-                    <span className="nesio-storage-stat">
-                      <span className="nesio-storage-count">{L(dict, `${invStats.count} 件`, `${invStats.count} items`)}</span>
-                      {invStats.totalValue > 0 && (
-                        <span className="nesio-storage-value">{L(dict, `估值 $${Math.round(invStats.totalValue)}`, `~$${Math.round(invStats.totalValue)}`)}</span>
-                      )}
-                    </span>
-                    <span className="nesio-storage-chevron" aria-hidden>›</span>
-                  </button>
-                </div>
-              )}
-
-              {/* 收藏夹展开(记忆罐收藏球触发)—— 批次 150(QA #3):点开必给反馈,空时也显空状态,与核心/项目一致 */}
-              {hasNodes && favOpen && (
-                <div className="nesio-projects-section">
-                  {pinnedNodes.length > 0 ? (
-                    <div className="nesio-memory-grid nesio-fav-expanded">
-                      {pinnedNodes.map((n) => (
-                        <MemoryCard
-                          key={n.id}
-                          node={n}
-                          onOpen={() => openNodeDetail(n)}
-                          onDeleted={() => setNodes(getLifeGraph())}
-                          onLongPress={() => setLongPressNode(n)}
-                        />
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="nesio-settings-option-hint" style={{ margin: '0 0 1rem', textAlign: 'center' }}>
-                      {L(dict, '还没有收藏。长按任意记忆卡 → 收藏到首页。', 'Nothing saved yet. Long-press a memory card → Pin to home.')}
-                    </p>
-                  )}
-                </div>
-              )}
+              {/* 批次 168:收纳段 + 收藏夹就地展开区已删 —— 物品收纳=中间球开收纳,收藏夹=球开独立页 */}
 
 
               {/* 批次 123:「我的项目」独立 section 已删 —— 项目挪进记忆罐「项目」球(点球内联展开) */}
@@ -1478,6 +1479,27 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
           onDelete={() => deleteProject(activeProject.id)}
           onOpenNode={(n) => { setActiveProject(null); openNodeDetail(n); }}
           onLongPressNode={(n) => setLongPressNode(n)}
+        />
+      )}
+
+      {/* 批次 168:收藏夹独立页(维度 filter + 手动收藏卡) */}
+      {favPageOpen && (
+        <FavoritesSheet
+          pinnedNodes={pinnedNodes}
+          onClose={() => setFavPageOpen(false)}
+          onOpenNode={(n) => { setFavPageOpen(false); openNodeDetail(n); }}
+          onLongPressNode={(n) => setLongPressNode(n)}
+        />
+      )}
+
+      {/* 批次 168:项目独立页 */}
+      {projPageOpen && (
+        <ProjectsSheet
+          projects={projects}
+          allNodes={nodes}
+          onClose={() => setProjPageOpen(false)}
+          onOpenProject={(p) => { setProjPageOpen(false); setActiveProject(p); }}
+          onCreate={() => { setProjPageOpen(false); setShowCreateProject(true); }}
         />
       )}
 

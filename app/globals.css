@@ -13397,6 +13397,31 @@ html[data-portal-theme="night"] .nesio-project-card-name { color: #d8e8ff; }
   padding: 0.4rem 0;
 }
 /* 批次 123:项目球展开区的「+新建」入口(项目挪进球后,创建走这里) */
+/* 批次 168:收藏夹维度 filter chips(全部/价值/习惯/节律/关系) */
+.nesio-fav-filter {
+  display: flex;
+  gap: 0.4rem;
+  overflow-x: auto;
+  padding: 0.2rem 1rem 0.7rem;
+  -webkit-overflow-scrolling: touch;
+}
+.nesio-fav-filter::-webkit-scrollbar { display: none; }
+.nesio-fav-chip {
+  flex-shrink: 0;
+  padding: 0.32rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid var(--portal-line);
+  background: transparent;
+  color: var(--portal-muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.nesio-fav-chip--on {
+  background: var(--portal-accent);
+  border-color: var(--portal-accent);
+  color: #fff;
+}
 .nesio-mem-jar-create {
   display: block;
   margin: 0.5rem auto 0.2rem;
