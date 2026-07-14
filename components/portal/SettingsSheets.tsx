@@ -24,7 +24,7 @@ import { FEATURE_CATALOG, loadModuleOverrides, setModuleOverride, MODULE_OVERRID
 import { isAppStoreBuild } from '@/lib/portal/app-build.mjs';
 import { canUse, getTier, hasProOverride, setProEntitlement, trialDaysLeft } from '@/lib/portal/entitlement';
 import { isValidBackup } from '@/lib/portal/full-backup';
-import { pushBackupToCloud, pullBackupFromCloud, restoreCombinedBackup, hasCloudEntitlement, lastCloudBackup, type CloudBackupError, type CloudRestoreError } from '@/lib/portal/cloud-backup';
+import { pushBackupToCloud, pullBackupFromCloud, restoreCombinedBackup, buildCombinedBackup, hasCloudEntitlement, lastCloudBackup, type CloudBackupError, type CloudRestoreError } from '@/lib/portal/cloud-backup';
 
 interface SheetProps { open: boolean; onClose: () => void; }
 
@@ -372,6 +372,7 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
   const [deleted, setDeleted] = useState(false);
   const [deleteMsg, setDeleteMsg] = useState<string | null>(null);
   const [restoreMsg, setRestoreMsg] = useState('');
+  const [exportBusy, setExportBusy] = useState(false);
   const [lastBackupAt, setLastBackupAt] = useState<string | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
   // 云备份(付费,规划中):状态机 idle→pushing→done/error,失败必可见(设计红线)。
@@ -476,6 +477,31 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
     } else {
       setCloudRestoreState('error');
       setCloudRestoreError(result.error || 'network');
+    }
+  }
+
+  // 数据审计 #8:兑现「随时导出你的全部数据」—— 直接下载一份完整备份 JSON 到本机
+  // (localStorage + IDB blob + 照片),与「导入备份」对称、无需上云。每个异步动作都有可见失败态。
+  async function handleExportLocal() {
+    if (exportBusy) return;
+    setExportBusy(true);
+    setRestoreMsg('');
+    try {
+      const backup = await buildCombinedBackup({ includeImages: true });
+      const blob = new Blob([JSON.stringify(backup)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `nesio-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      setRestoreMsg(L(dict, '✓ 已导出到本机', '✓ Exported to your device'));
+    } catch {
+      setRestoreMsg(L(dict, '导出失败,请重试', 'Export failed — please try again'));
+    } finally {
+      setExportBusy(false);
     }
   }
 
@@ -658,6 +684,9 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
       )}
       {driveMsg && <p style={{ fontSize: '0.75rem', marginTop: 4, color: driveState === 'error' ? 'var(--status-risk)' : 'var(--status-go)' }}>{driveMsg}</p>}
 
+      <button type="button" className="nesio-settings-action-btn" onClick={handleExportLocal} disabled={exportBusy}>
+        {exportBusy ? L(dict, '正在导出…', 'Exporting…') : L(dict, '导出到本机(下载 JSON)', 'Export to device (download JSON)')}
+      </button>
       <button type="button" className="nesio-settings-action-btn" onClick={() => importRef.current?.click()}>
         {L(dict, '导入备份', 'Import backup')}
       </button>
