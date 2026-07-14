@@ -16493,6 +16493,19 @@ html[data-portal-theme="night"] .nesio-exp-card:hover {
   color: var(--portal-cool-accent);
 }
 
+/* 批次190:跨域关联(真皮尔逊 r) */
+.nesio-xdom-list { list-style: none; margin: 0.5rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.nesio-xdom-item {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 0.6rem;
+  padding: 0.55rem 0.7rem; border-radius: 12px;
+  background: var(--portal-surface-2, rgba(127,127,127,0.06));
+  border: 1px solid var(--portal-line, rgba(127,127,127,0.16));
+  border-left: 3px solid var(--portal-cool-accent, #7ea8ee);
+}
+.nesio-xdom-item.is-strong { border-left-color: var(--portal-accent, #588ce3); }
+.nesio-xdom-text { font-size: 0.82rem; line-height: 1.5; color: var(--portal-ink); }
+.nesio-xdom-meta { flex: none; font-size: 0.68rem; color: var(--portal-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
 /* ── 多面镜月度信(§2.3):暖色信纸 + 宋体 ── */
 .nesio-mirror-tab { display: flex; flex-direction: column; }
 .nesio-mirror-picker { display: flex; gap: 0.45rem; flex-wrap: wrap; }

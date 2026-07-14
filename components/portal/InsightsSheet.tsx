@@ -45,6 +45,8 @@ import FinanceTab from './finance/FinanceTab';
 import HealthDashboard from './health/HealthDashboard';
 import RelationshipsPanel from './relationships/RelationshipsPanel';
 import LearningStatusPanel from './LearningStatusPanel';
+import { mineCrossDomain } from '@/lib/portal/cross-domain-correlations';
+import { readFactJournal, ensureFactJournal } from '@/lib/platform/fact-journal';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -605,6 +607,8 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
   const mapEligible = realNodes.length >= 6 && mapDays >= 21;
   // 生命版图 = 轻量领土条(设计稿 §2:唯一保留的图,少即是多)——纯本地统计,无 d3
   const territory = useMemo(() => computeTerritory(realNodes), [realNodes]);
+  // 批次190:跨域关联 —— 真皮尔逊 r(mood×spend / steps×mood …),固定假设+证据门,非因果。
+  const crossDomain = useMemo(() => { try { ensureFactJournal(); return mineCrossDomain(readFactJournal(120)); } catch { return []; } }, []);
 
   // 门/线头/走走看点进记忆页:关掉本 sheet 再广播(Portal 负责切到记忆面)
   const openInMemory = useCallback((query: string) => {
@@ -861,6 +865,24 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
                 </p>
               )}
             </div>
+
+            {/* 批次190:跨域关联 —— 真统计(皮尔逊 r),非 LLM 叙事。数据不足自动不显示,绝不编数字。 */}
+            {crossDomain.length > 0 && (
+              <div className="nesio-insights-section">
+                <div className="nesio-insights-section-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                  <p className="nesio-insights-section-label" style={{ margin: 0 }}>{L(dict, '跨域关联', 'Cross-domain links')}<InfoTip text={L(dict, '在你每日对齐的记录(情绪/花费/步数/睡眠/外出/日程/天气)上算皮尔逊相关,只跑一小组有生活意义的固定假设对,样本≥14 天、|r|≥0.3 才显示。统计相关,非因果。', 'Pearson correlation on your day-aligned records (mood/spend/steps/sleep/outings/schedule/weather); only a small fixed set of meaningful hypotheses, shown when n≥14 and |r|≥0.3. Correlation, not causation.')} /></p>
+                  <span style={{ fontSize: '0.68rem', color: 'var(--portal-muted)' }}>{L(dict, '统计相关 · 非因果', 'Correlation · not causation')}</span>
+                </div>
+                <ul className="nesio-xdom-list">
+                  {crossDomain.map((c) => (
+                    <li key={c.key} className={`nesio-xdom-item${c.strength === 'strong' ? ' is-strong' : ''}`}>
+                      <span className="nesio-xdom-text">{dict === 'en' ? c.insight[1] : c.insight[0]}</span>
+                      <span className="nesio-xdom-meta">{L(dict, `样本 ${c.n} 天`, `${c.n} days`)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {/* 我的实验(Lab 功能开关,与提审隐藏同闸) */}
             {showExperiment && (

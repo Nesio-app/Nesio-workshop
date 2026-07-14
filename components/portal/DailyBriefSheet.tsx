@@ -51,6 +51,21 @@ export function DailyBriefSheet({ open, onClose }: { open: boolean; onClose: () 
       const profile = loadProfileSettings();
       // ① 同一套检索算法(与问一问共用 buildMemoryContext)
       const { context: memoryContext, refCandidates } = await buildMemoryContext(dict === 'en' ? BRIEF_QUERY.en : BRIEF_QUERY.zh);
+      // 批次190:把**真·跨域相关**(真实皮尔逊 r)喂进简报上下文 —— 让简报引真数字,
+      // 不再让模型在聚合块上瞎编「外卖多 40%」。统计相关非因果,原样引用不改动。
+      let briefContext = memoryContext;
+      try {
+        const { mineCrossDomain } = await import('@/lib/portal/cross-domain-correlations');
+        const { readFactJournal, ensureFactJournal } = await import('@/lib/platform/fact-journal');
+        ensureFactJournal();
+        const corr = mineCrossDomain(readFactJournal(120)).slice(0, 2);
+        if (corr.length) {
+          const lines = corr.map((c) => `- ${(dict === 'en' ? c.insight[1] : c.insight[0])}(样本 ${c.n} 天)`).join('\n');
+          briefContext += `\n\n${dict === 'en'
+            ? 'Cross-domain stats (from the user\'s own records; correlation not causation; quote the r value verbatim, do not invent numbers):'
+            : '跨域统计(基于用户真实记录;统计相关非因果;可原样引用 r 值,严禁编造数字):'}\n${lines}`;
+        }
+      } catch { /* 无 journal 数据不影响简报 */ }
       // ② 同一个对话端点生成一段话(只是提示词让它写成简报)
       const res = await fetch('/api/portal/chat', {
         method: 'POST',
@@ -60,7 +75,7 @@ export function DailyBriefSheet({ open, onClose }: { open: boolean; onClose: () 
           history: [],
           coachStyle: profile.coachStyle || 'warm',
           uiLocale: dict,
-          memoryContext,
+          memoryContext: briefContext,
           environmentContext: formatEnvironmentContext(),
         }),
       });
