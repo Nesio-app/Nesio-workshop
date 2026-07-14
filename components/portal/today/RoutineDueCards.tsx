@@ -14,12 +14,10 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import { canUse } from '@/lib/portal/entitlement';
-import { DailyBriefSheet } from './DailyBriefSheet';
 
 export function RoutineDueCards() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [due, setDue] = useState<Routine[]>([]);
-  const [briefOpen, setBriefOpen] = useState(false);
 
   useEffect(() => {
     // 批次 175:健身链先不做 —— 健身 routine 卡一律不出(老健身例行静默隐藏,数据保留不删)。
@@ -69,7 +67,7 @@ export function RoutineDueCards() {
                       window.dispatchEvent(new CustomEvent('nesio-pro-gate', { detail: { feature: 'ai_routine' } }));
                       return;
                     }
-                    setBriefOpen(true);
+                    window.dispatchEvent(new CustomEvent('nesio-open-brief'));
                     track('routine_brief_open', {});
                   }}
                 >
@@ -126,7 +124,6 @@ export function RoutineDueCards() {
           </div>
         </div>
       ))}
-      <DailyBriefSheet open={briefOpen} onClose={() => setBriefOpen(false)} />
     </>
   );
 }

@@ -819,6 +819,19 @@ export function LabSheet({ open, onClose, onOpenPreview }: SheetProps & { onOpen
         </span>
       </button>
 
+      {/* 批次 176:每日简报 demo —— 用「问一问」同一套检索生成,预览上线后每早推给你的那张 */}
+      <button type="button"
+        className="nesio-settings-option"
+        onClick={() => { window.dispatchEvent(new CustomEvent('nesio-open-brief')); onClose(); }}>
+        <div>
+          <span className="nesio-settings-option-label">{L(dict, '看每日简报 demo', 'Preview daily brief')}</span>
+          <span className="nesio-settings-option-hint">
+            {L(dict, '用「问一问」同一套检索,把今天的安排/提醒写成一段话 + 相关记忆链接 —— 就是上线后每天早晨推给你的那张。', "Runs the same retrieval as Ask to sum up today into one paragraph with memory links — the card you'll get each morning once live.")}
+          </span>
+        </div>
+        <span className="nesio-settings-option-hint" aria-hidden style={{ fontSize: '1.1rem' }}>›</span>
+      </button>
+
       <div className="nesio-settings-option" style={{ display: 'block' }}>
         <span className="nesio-settings-option-label">
           {L(dict, `低饱和配色(预览)${palette ? ' · 已开启' : ''}`, `Low-saturation palette (preview)${palette ? ' · on' : ''}`)}

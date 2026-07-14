@@ -73,14 +73,16 @@ const rerank = fs.readFileSync(new URL('../lib/portal/semantic-rerank.ts', impor
 assert.ok(rerank.includes('model?: string'), '向量缓存条目带 model');
 assert.ok(rerank.includes("entryModel !== fetched.model"), '换嵌入提供方后旧向量不混算(重嵌入覆盖)');
 const chat = fs.readFileSync(new URL('../components/portal/NesioChatSheet.tsx', import.meta.url), 'utf8');
-assert.ok(chat.includes('runGmailSync({ force: true })'), '问到邮件但时段为空 → 当场触发同步');
-assert.ok(chat.includes('15_000'), '同步带兜底超时,不吊死回答');
+// 批次 176:buildMemoryContext 抽到 lib/portal/memory-retrieval.ts 供问一问 + 每日简报共用。
+const retrieval = fs.readFileSync(new URL('../lib/portal/memory-retrieval.ts', import.meta.url), 'utf8');
+assert.ok(retrieval.includes('runGmailSync({ force: true })'), '问到邮件但时段为空 → 当场触发同步');
+assert.ok(retrieval.includes('15_000'), '同步带兜底超时,不吊死回答');
 
 // ── 问一问琥珀提示分诊(用户实测:key 没变却被提示「缺 AI 配置」)──
 // 候选 <3 条(not_needed)不是故障,绝不能触发降级提示;429/502/503 各给准确话术。
 assert.ok(rerank.includes("reason: 'not_needed'"), '候选太少 = not_needed,不算降级');
 assert.ok(rerank.includes("failure: 'rate_limited'") && rerank.includes("failure: 'no_key'"), '429/503 分诊');
-assert.ok(chat.includes("reason !== 'not_neede" + "d'"), '聊天提示只在真实故障时出现');
+assert.ok(retrieval.includes("reason !== 'not_neede" + "d'"), '语义降级分诊只在真实故障时出现');
 assert.ok(chat.includes('rate_limited') && chat.includes('稍后自动恢复'), '限流话术不再冤枉 key');
 assert.ok(route.includes("status: 502"), '提供方全军覆没报 502(与缺 key 的 503 可区分)');
 

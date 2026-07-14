@@ -26,6 +26,7 @@ const NesioChatSheet = dynamic(() => import('./NesioChatSheet'), { ssr: false })
 const NotePanelEnhanced = dynamic(() => import('./NotePanelEnhanced'), { ssr: false });
 const ToolsTreasurePopup = dynamic(() => import('./ToolsTreasureSheet'), { ssr: false });
 const InventorySheet = dynamic(() => import('./InventorySheet'), { ssr: false });
+const DailyBriefSheet = dynamic(() => import('./DailyBriefSheet').then((m) => m.DailyBriefSheet), { ssr: false });
 import { DEFAULT_PORTAL_CONFIG } from '@/lib/portal/defaults';
 import { openToolHref } from '@/lib/portal/open-tool';
 import {
@@ -404,6 +405,7 @@ export default function Portal() {
     return () => window.removeEventListener('nesio-ask-text', onAskText);
   }, []);
   const [moodOpen, setMoodOpen] = useState(false);
+  const [briefOpen, setBriefOpen] = useState(false); // 批次 176:每日简报全局挂载(例行卡 + Lab demo 都派 nesio-open-brief 打开)
   const [freezeOpen, setFreezeOpen] = useState(false);
   const [proGate, setProGate] = useState<string | null>(null); // 非 null = 显示 Pro 升级引导(值=功能名)
   // 跨账号本地数据冲突(P0 隐私):登录后本机数据归属与当前用户不符 → 阻断处理
@@ -700,6 +702,7 @@ export default function Portal() {
       track('freeze_open'); setFreezeOpen(true);
     };
     const inventoryHandler = () => { track('inventory_open'); setInventoryOpen(true); };
+    const briefHandler = () => { track('brief_open', {}); setBriefOpen(true); };
     const workoutHandler = (e: Event) => { track('workout_start', {}); setWorkoutSession((e as CustomEvent).detail); };
     const proGateHandler = (e: Event) => {
       const feature = (e as CustomEvent).detail?.feature || 'pro';
@@ -726,6 +729,7 @@ export default function Portal() {
     window.addEventListener('nesio-open-mood', moodHandler);
     window.addEventListener('nesio-open-freeze', freezeHandler);
     window.addEventListener('nesio-open-inventory', inventoryHandler);
+    window.addEventListener('nesio-open-brief', briefHandler);
     window.addEventListener('nesio-start-workout', workoutHandler);
     return () => {
       window.removeEventListener('nesio-memory-search', memorySearchHandler);
@@ -735,6 +739,7 @@ export default function Portal() {
       window.removeEventListener('nesio-open-mood', moodHandler);
       window.removeEventListener('nesio-open-freeze', freezeHandler);
       window.removeEventListener('nesio-open-inventory', inventoryHandler);
+      window.removeEventListener('nesio-open-brief', briefHandler);
       window.removeEventListener('nesio-start-workout', workoutHandler);
     };
   }, []);
@@ -1248,6 +1253,7 @@ export default function Portal() {
       )}
       <InventorySheet open={inventoryOpen} onClose={() => setInventoryOpen(false)} />
       {workoutSession && <WorkoutPlayer session={workoutSession} onClose={() => setWorkoutSession(null)} />}
+      {briefOpen && <DailyBriefSheet open={briefOpen} onClose={() => setBriefOpen(false)} />}
       <AskGuideSheet open={askGuideOpen} onClose={() => setAskGuideOpen(false)} onStart={openAskVoice} />
 
       <NesioChatSheet open={chatOpen} onClose={() => setChatOpen(false)} canUsePrivateData={canUsePrivateRuntime} />

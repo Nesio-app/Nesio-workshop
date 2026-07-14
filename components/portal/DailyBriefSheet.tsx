@@ -1,0 +1,153 @@
+'use client';
+
+/**
+ * DailyBriefSheet — 今日文字简报(批次 30 起;批次 176 重构)。
+ *
+ * 用户定案:简报的内容必须和「问一问」同一套算法 —— 不单独攒数据,只是排版漂亮。
+ * 于是:buildMemoryContext(今天的安排/提醒)→ 同一个 /api/portal/chat 生成一段话
+ *       → extractCitations 抽出「相关记忆」挂成可点链接(点开即回看那条记忆)。
+ * 属 AI 例程(ai_routine),Pro 整功能(试用期内可用)。
+ */
+
+import { useCallback, useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
+import { buildMemoryContext, extractCitations } from '@/lib/portal/memory-retrieval';
+import { getLifeGraph, type LifeNode } from '@/lib/portal/life-graph';
+import { formatEnvironmentContext } from '@/lib/portal/environment';
+import { loadProfileSettings, portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
+import { L } from '@/lib/portal/i18n';
+import { usePortalLocale } from './use-portal-locale';
+import { NodeTypeIcon } from './icons';
+
+const MemoryNodeDetail = dynamic(() => import('./MemoryNodeDetail'), { ssr: false });
+
+// 简报走的就是问一问:同一句「今天有什么」检索,同一个对话端点生成。
+const BRIEF_QUERY = { zh: '今天有哪些安排、提醒和要注意的事', en: "what's on for me today" };
+const BRIEF_MSG = {
+  zh: '给我今天的简报:把我今天的安排、提醒和值得注意的事,用温暖、简洁的一段话说给我听。没有安排就如实说今天很空,别编。',
+  en: 'Give me my brief for today: sum up my schedule, reminders and anything worth noting in one warm, concise paragraph. If nothing is scheduled, say the day is clear — do not invent.',
+};
+
+function greetingFor(hour: number, dict: 'zh' | 'en', name: string): string {
+  const g = hour < 5 ? L(dict, '凌晨好', 'Good early morning')
+    : hour < 12 ? L(dict, '早上好', 'Good morning')
+    : hour < 18 ? L(dict, '下午好', 'Good afternoon')
+    : L(dict, '晚上好', 'Good evening');
+  return name ? (dict === 'en' ? `${g}, ${name}` : `${g},${name}`) : g;
+}
+
+export function DailyBriefSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
+  const [script, setScript] = useState('');
+  const [refs, setRefs] = useState<LifeNode[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<'auth' | 'network' | null>(null);
+  const [detailNode, setDetailNode] = useState<LifeNode | null>(null);
+
+  const fetchBrief = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const profile = loadProfileSettings();
+      // ① 同一套检索算法(与问一问共用 buildMemoryContext)
+      const { context: memoryContext, refCandidates } = await buildMemoryContext(dict === 'en' ? BRIEF_QUERY.en : BRIEF_QUERY.zh);
+      // ② 同一个对话端点生成一段话(只是提示词让它写成简报)
+      const res = await fetch('/api/portal/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: dict === 'en' ? BRIEF_MSG.en : BRIEF_MSG.zh,
+          history: [],
+          coachStyle: profile.coachStyle || 'warm',
+          uiLocale: dict,
+          memoryContext,
+          environmentContext: formatEnvironmentContext(),
+        }),
+      });
+      if (res.status === 401) { setError('auth'); return; }
+      const data = await res.json() as { ok?: boolean; response?: string };
+      if (data.ok && data.response) {
+        // ③ 同一套引用解析:把模型自报的【依据】剥掉,cited 节点挂成「相关记忆」链接
+        const { text, ids } = extractCitations(data.response.trim());
+        setScript(text.replace(/\*\*/g, ''));
+        const cited: LifeNode[] = ids === null
+          ? refCandidates.filter((r) => r.layer !== 'search').slice(0, 4).map((r) => r.node)
+          : ids.map((id) => refCandidates.find((r) => r.shortId === id)?.node).filter((n): n is LifeNode => Boolean(n));
+        setRefs(cited);
+      } else {
+        setError('network');
+      }
+    } catch {
+      setError('network');
+    } finally {
+      setLoading(false);
+    }
+  }, [dict]);
+
+  useEffect(() => {
+    if (open && !script && !loading) void fetchBrief();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 打开时取一次,重取走「换个说法」
+  }, [open]);
+
+  if (!open) return null;
+  const now = new Date();
+  const profile = loadProfileSettings();
+  const dateLabel = now.toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'long', day: 'numeric', weekday: 'long' });
+  // 详情浮层打开时,让底层引用卡 live 化(点开的可能是被改过的节点)
+  const liveRefs = refs.map((r) => getLifeGraph().find((n) => n.id === r.id) || r);
+
+  return (
+    <div className="nesio-settings-sheet-overlay" role="dialog" aria-modal="true" aria-label={L(dict, '今日简报', "Today's brief")}>
+      <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
+      <div className="nesio-settings-sheet-card nesio-brief-card">
+        <div className="nesio-sheet-handle" aria-hidden />
+        <div className="nesio-brief-head">
+          <div>
+            <p className="nesio-brief-greeting">{greetingFor(now.getHours(), dict, profile.displayName || '')}</p>
+            <p className="nesio-brief-date">{dateLabel}</p>
+          </div>
+          <button type="button" className="nesio-voice-sheet-close" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}>✕</button>
+        </div>
+        <div className="nesio-settings-sheet-body">
+          {loading && <p className="nesio-mirror-writing">{L(dict, 'Nesio 正在整理今天…', 'Nesio is putting today together…')}</p>}
+          {!loading && script && (
+            <>
+              <p className="nesio-daily-brief-text nesio-serif-voice">{script}</p>
+              {liveRefs.length > 0 && (
+                <div className="nesio-brief-refs">
+                  <span className="nesio-brief-refs-label">{L(dict, '相关记忆 · 点开看看', 'From your memory · tap to open')}</span>
+                  {liveRefs.map((n) => (
+                    <button key={n.id} type="button" className="nesio-brief-ref-chip" onClick={() => setDetailNode(n)}>
+                      <NodeTypeIcon type={n.type} size={12} />
+                      <span className="nesio-brief-ref-name">{n.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              <button type="button" className="nesio-lm-perspective-btn" style={{ marginTop: '0.9rem' }} onClick={() => void fetchBrief()}>
+                {L(dict, '换个说法', 'Say it differently')}
+              </button>
+            </>
+          )}
+          {!loading && !script && error && (
+            <>
+              <p className="nesio-mirror-error">
+                {error === 'auth'
+                  ? L(dict, '登录后就能看每日简报。', 'Sign in to get your daily brief.')
+                  : L(dict, '这次没生成出来,点重试。', 'Did not generate this time — tap retry.')}
+              </p>
+              {error !== 'auth' && (
+                <button type="button" className="nesio-lm-perspective-btn" onClick={() => void fetchBrief()}>
+                  {L(dict, '重试', 'Retry')}
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+      {detailNode && (
+        <MemoryNodeDetail node={detailNode} onClose={() => setDetailNode(null)} onOpenNode={(n) => setDetailNode(n)} />
+      )}
+    </div>
+  );
+}
