@@ -33,6 +33,7 @@ export type FeatureUsageState = {
   snoozedUntil: Record<string, number>;
   never: string[];
   lastNudgeAt?: number;
+  previewForce?: boolean; // 预览/模拟运行:下一次今天页强制弹一条(绕过已用/就绪门),一次性
 };
 
 export type AppSessionState = {
@@ -116,10 +117,11 @@ export function dismissNudgeForever(key: string): void {
   if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(FEATURE_USAGE_EVENT));
 }
 
-/** 记下「刚弹过一次提醒」,支撑全局冷却。 */
+/** 记下「刚弹过一次提醒」,支撑全局冷却。预览强制标记是一次性的,弹过即清。 */
 export function markNudgeShown(now = Date.now()): void {
   const u = loadFeatureUsage();
   u.lastNudgeAt = now;
+  delete u.previewForce;
   write(USAGE_KEY, u);
 }
 
@@ -138,7 +140,8 @@ export function primeReengagementPreview(now = Date.now()): void {
     sessionCount: RETURNING_MIN_SESSIONS,
     activeDays: [],
   } satisfies AppSessionState);
-  write(USAGE_KEY, emptyUsage());
+  // previewForce:真机上就算已有数据(每个功能都被 infer 成「用过」)也强制弹一条,否则按钮看着没反应。
+  write(USAGE_KEY, { ...emptyUsage(), previewForce: true });
 }
 
 // ── 功能目录(仅指向已存在的入口;功能以现有为准) ──
@@ -216,14 +219,17 @@ export function pickReengagementNudge(opts: {
   const session = opts.session ?? loadAppSessions();
   const usage = opts.usage ?? loadFeatureUsage();
 
-  if (!isReturningUser(session)) return null;
-  if (usage.lastNudgeAt && now - usage.lastNudgeAt < GLOBAL_NUDGE_COOLDOWN) return null;
+  const force = usage.previewForce === true; // 预览/模拟运行:绕过冷却与「已用/就绪」门,必弹一条
+  if (!force && !isReturningUser(session)) return null;
+  if (!force && usage.lastNudgeAt && now - usage.lastNudgeAt < GLOBAL_NUDGE_COOLDOWN) return null;
 
   for (const def of featureCatalog(zh)) {
     if (usage.never.includes(def.key)) continue;
     if (usage.snoozedUntil[def.key] && now < usage.snoozedUntil[def.key]) continue;
-    if (isUsed(def, usage, nodes)) continue;
-    if (def.readyWhen && !def.readyWhen(nodes)) continue;
+    if (!force) {
+      if (isUsed(def, usage, nodes)) continue;
+      if (def.readyWhen && !def.readyWhen(nodes)) continue;
+    }
     return { key: def.key, title: def.title, body: def.body, ctaLabel: def.ctaLabel, openEvent: def.openEvent };
   }
   return null;
