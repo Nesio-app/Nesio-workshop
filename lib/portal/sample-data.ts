@@ -43,7 +43,7 @@ function buildSampleNodesZh(): IngestNodeInput[] {
     { type: 'person', name: '妈妈', source: 'manual', confidence: 1, relations: [],
       tags: t(['家人', '联系人']),
       attributes: { externalId: 'sample-mom', category: 'family', relation: '家人', note: '喜欢散步、爱操心' } },
-    { type: 'person', name: 'Linda', source: 'manual', confidence: 1, relations: [],
+    { type: 'person', name: '发小', source: 'manual', confidence: 1, relations: [],
       tags: t(['朋友', '联系人']),
       attributes: { externalId: 'sample-linda', category: 'friend', relation: '朋友', birthday: iso(6), note: '喜欢蓝色' } },
     { type: 'person', name: '老王', source: 'manual', confidence: 1, relations: [],
@@ -55,9 +55,9 @@ function buildSampleNodesZh(): IngestNodeInput[] {
       relations: [{ targetId: '妈妈', relation: '家人' }],
       tags: t(['关系']), rawInput: '晚上给妈妈打了电话,聊了快一个小时',
       attributes: { externalId: 'sample-call-mom', date: iso(-1, 20) } },
-    { type: 'note', name: '想给 Linda 挑个生日礼物', source: 'manual', confidence: 1,
-      relations: [{ targetId: 'Linda', relation: '朋友' }],
-      tags: t(['关系', '提醒']), rawInput: 'Linda 生日快到了,她喜欢蓝色的东西',
+    { type: 'note', name: '想给发小挑个生日礼物', source: 'manual', confidence: 1,
+      relations: [{ targetId: '发小', relation: '朋友' }],
+      tags: t(['关系', '提醒']), rawInput: '发小生日快到了,她喜欢蓝色的东西',
       attributes: { externalId: 'sample-linda-gift' } },
 
     // ── 邮件(记忆页来源=邮件)──
