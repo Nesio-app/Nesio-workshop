@@ -13,7 +13,6 @@ import { track } from '@/lib/portal/telemetry';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
-import { isFeatureEnabled } from '@/lib/portal/module-overrides';
 import { canUse } from '@/lib/portal/entitlement';
 import { DailyBriefSheet } from './DailyBriefSheet';
 
@@ -23,9 +22,8 @@ export function RoutineDueCards() {
   const [briefOpen, setBriefOpen] = useState(false);
 
   useEffect(() => {
-    // P1-9:健身域关闭(用户开关 / 提审构建)时,健身 routine 卡不出 —— 否则「开始练」
-    // 会把用户带向一个不可达的健康 tab。
-    const read = () => setDue(dueRoutines().filter((r) => r.category !== 'fitness' || isFeatureEnabled('fitness')));
+    // 批次 175:健身链先不做 —— 健身 routine 卡一律不出(老健身例行静默隐藏,数据保留不删)。
+    const read = () => setDue(dueRoutines().filter((r) => r.category !== 'fitness'));
     read();
     const timer = setInterval(read, 60_000);
     window.addEventListener(ROUTINES_UPDATED_EVENT, read);

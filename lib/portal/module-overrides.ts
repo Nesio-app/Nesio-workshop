@@ -29,7 +29,7 @@ export const FEATURE_CATALOG: readonly FeatureEntry[] = Object.freeze([
   { id: 'inventory', zh: '物品收纳', en: 'Inventory', kind: 'module', defaultOn: true },
   { id: 'plan', zh: '计划', en: 'Plans', kind: 'module', defaultOn: true },
   { id: 'reading', zh: '阅读器', en: 'Reader', kind: 'module', defaultOn: false },
-  { id: 'fitness', zh: '健身', en: 'Fitness', kind: 'module', defaultOn: false },
+  // 批次 175:健身/打卡积分链先不做 —— 从设置开关中心移除 fitness trigger(仍留在 APPSTORE_HIDDEN_IDS,恒关)。
   { id: 'finance', zh: '财务', en: 'Finance', kind: 'module', defaultOn: false },
   { id: 'health', zh: '健康', en: 'Health', kind: 'module', defaultOn: false },
   { id: 'freeze', zh: '冷冻仓', en: 'Freeze vault', kind: 'feature', defaultOn: true },

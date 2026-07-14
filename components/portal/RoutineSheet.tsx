@@ -17,9 +17,10 @@ import { usePortalLocale } from './use-portal-locale';
 const WEEKDAYS = [1, 2, 3, 4, 5];
 const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
 
+// 批次 175:健身链先不做 —— 移除「健身」分类(避免建了 fitness 例行却因 fitness 域关而永不出卡)。
+// CAT_LABEL 保留 fitness 键,老的健身例行仍能显示标签。
 const CATS: Array<{ key: RoutineCategory; zh: string; en: string }> = [
   { key: 'general', zh: '自定义', en: 'Custom' },
-  { key: 'fitness', zh: '健身', en: 'Fitness' },
   { key: 'chore', zh: '家务', en: 'Chores' },
   { key: 'meds', zh: '吃药', en: 'Meds' },
 ];
