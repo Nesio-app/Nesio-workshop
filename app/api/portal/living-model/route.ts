@@ -152,7 +152,7 @@ ${prevStr}
 }
 
 export async function POST(req: NextRequest) {
-  const guard = await guardAiRoute(req, 'living_model', { limit: 10 });
+  const guard = await guardAiRoute(req, 'living_model', { limit: 10, requirePaidCloudAi: true });
   if (guard) return guard;
 
   const body = await req.json() as LivingModelRequest;

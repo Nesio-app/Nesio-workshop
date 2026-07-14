@@ -28,7 +28,8 @@ import { buildMonthlyReport, persistReportToMemory, autoPersistLastMonthReport }
 import { reportRichHtml } from '@/lib/portal/finance-report-visual';
 import { categoryLabel, categoryDetailLabel, COMMON_EXPENSE_CATEGORIES } from '@/lib/portal/tx-category';
 import { loadAllPersonRecords } from '@/lib/portal/person-records';
-import { IconLock } from '../icons';
+import { IconLock, IconSnowflake } from '../icons';
+import { isFreezeLaunched } from '@/lib/portal/entitlement';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -252,6 +253,14 @@ export default function FinanceTab() {
       {sub === 'overview' && (
         <>
           <div className="nesio-fin-plaidchip"><IconLock size={12} /> {L(dict, 'Plaid 流水 · 只存本机', 'Plaid feed · on-device only')}</div>
+          {/* 冷冻仓入口:未上线时不渲染(免费/Pro 都不上);点击统一走 Portal 的 nesio-open-freeze 门 */}
+          {isFreezeLaunched() && (
+            <button type="button" className="nesio-fin-freeze-entry" onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-freeze'))}>
+              <IconSnowflake size={14} />
+              <span>{L(dict, '想冲动买的,先冻起来 · 冷静期', 'Freeze an impulse buy · cool-off')}</span>
+              <span aria-hidden style={{ marginLeft: 'auto', color: 'var(--portal-muted)' }}>›</span>
+            </button>
+          )}
           <FamilyDataCard kind="spend" />
           {/* 数据新鲜度 + 被排除的其他币种笔数(如实告知,不假装是最新完整月/全部交易) */}
           {(() => {

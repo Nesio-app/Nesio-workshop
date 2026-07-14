@@ -86,7 +86,7 @@ async function enhanceWithAi(
 }
 
 export async function POST(req: NextRequest) {
-  const guard = await guardAiRoute(req, 'guidance_language', { limit: 20 });
+  const guard = await guardAiRoute(req, 'guidance_language', { limit: 20, requirePaidCloudAi: true });
   if (guard) return guard;
 
   const body = await req.json() as LanguageRequest;

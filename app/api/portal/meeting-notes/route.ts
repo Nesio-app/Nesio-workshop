@@ -10,7 +10,7 @@ import { completeText, aiProviderAvailable } from '@/lib/portal/ai-complete';
 
 export const maxDuration = 30;
 export async function POST(req: NextRequest) {
-  const guard = await guardAiRoute(req, 'meeting_notes', { limit: 15 });
+  const guard = await guardAiRoute(req, 'meeting_notes', { limit: 15, requirePaidCloudAi: true });
   if (guard) return guard;
 
   const { transcript, duration, calendarEvent, meetingDate } = await req.json() as {

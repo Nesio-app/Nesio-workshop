@@ -22,6 +22,7 @@ import { cookies } from 'next/headers';
 import { timingSafeEqual } from 'node:crypto';
 import { envValue } from '@/lib/portal/env';
 import { AUTH_SIG_COOKIE, WECHAT_SIG_COOKIE, verifySessionValue } from './session-sig';
+import { guardServerEntitlement } from './server-entitlement';
 
 /** 常量时间比较两个密钥(避免用 === 短路比较带来的计时侧信道)。空/不等长直接判否。 */
 export function safeEqual(a: string, b: string): boolean {
@@ -177,7 +178,7 @@ export function isRateLimited(
 export async function guardAiRoute(
   req: NextRequest,
   routeId: string,
-  opts?: { limit?: number; windowMs?: number; allowCrossOrigin?: boolean },
+  opts?: { limit?: number; windowMs?: number; allowCrossOrigin?: boolean; requirePaidCloudAi?: boolean },
 ): Promise<NextResponse | null> {
   if (!(await isPortalRequestAuthorized(req, opts))) {
     return NextResponse.json(
@@ -190,6 +191,14 @@ export async function guardAiRoute(
       { ok: false, error: 'rate_limited', retryAfterMs: 30_000 },
       { status: 429, headers: { 'Retry-After': '30' } },
     );
+  }
+  // 安全审计 #1:付费云 AI 路由的服务端权益强制。默认 inert(真源未接 → fail-open 放行);
+  // 真源接上 + 总闸开后,免费用户 → 402。客户端门(guardPaidCloudAi)是纵深,这是唯一强制点。
+  if (opts?.requirePaidCloudAi) {
+    const cookieStore = await cookies();
+    const accessToken = cookieStore.get('baohe_auth_access')?.value || null;
+    const gate = await guardServerEntitlement(accessToken, routeId);
+    if (gate) return gate;
   }
   return null;
 }

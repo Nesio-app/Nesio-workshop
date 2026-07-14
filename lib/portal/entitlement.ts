@@ -106,6 +106,21 @@ export function isProOnlyFeature(feature: string): boolean {
   return (PRO_ONLY_FEATURES as readonly string[]).includes(feature);
 }
 
+/**
+ * 冷冻仓(freeze)上线开关(安全审计:freeze 此前「卖了但不存在」—— 门死、写入口零引用、
+ * 新用户进不去,却列在会员页权益里)。现在把功能走闭环 + 统一 gate,但**先不上线**:
+ * 未上线 → 免费和 Pro **都进不去**(点了走「会随 Pro 开放」引导);上线只需把这里改成读
+ * 真开关(launch-surface / 远程配置)。改这一处即全站生效。
+ */
+export function isFreezeLaunched(): boolean {
+  return false;
+}
+
+/** 冷冻仓当前是否可打开:未上线 → 免费/Pro 都不上;上线后 → Pro 专属(试用期内按 Pro)。 */
+export function canOpenFreeze(): boolean {
+  return isFreezeLaunched() && canUse('freeze');
+}
+
 /** 免费层能不能打付费云 AI —— 成本护栏总闸。分层未启用 → true;启用后 免费 false → 走兜底。 */
 export function canUsePaidCloudAi(): boolean {
   if (!isTieringActive()) return true;

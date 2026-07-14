@@ -47,7 +47,7 @@ function clampItems(raw: unknown): ExtractedItem[] {
 }
 
 export async function POST(req: NextRequest) {
-  const guard = await guardAiRoute(req, 'inventory-extract', { limit: 20 });
+  const guard = await guardAiRoute(req, 'inventory-extract', { limit: 20, requirePaidCloudAi: true });
   if (guard) return guard;
   const body = await req.json().catch(() => null) as { text?: unknown } | null;
   const text = typeof body?.text === 'string' ? body.text.trim().slice(0, 800) : '';
