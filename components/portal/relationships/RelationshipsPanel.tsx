@@ -25,6 +25,9 @@ import PersonExtractSheet from './PersonExtractSheet';
 import { buildFamilyDigest } from '@/lib/portal/family-digest';
 
 const GROUPS: Closeness[] = ['core', 'close', 'acquaintance'];
+// 单层最多先渲染这么多行,其余「显示全部」再展开 —— 防「导入了几千个 Google 联系人 →
+// 一次性铺几千行 DOM 把主线程/合成器打死」的整机卡死(用户实锤:关系页打开即卡死需重启)。
+const TIER_CAP = 50;
 
 // 图/设计:干净筛选 —— 固定桶(家人/朋友/同事/业务/重要),把杂乱的原始英文标签归并进去;
 // 归不进的塞进「更多…」。桶按 关系词 + 分组标签 一起判定。
@@ -56,6 +59,7 @@ export default function RelationshipsPanel() {
   const [activeGroup, setActiveGroup] = useState<string | null>(null); // null=全部;桶 id 或原始分组名
   const [showMore, setShowMore] = useState(false);
   const [extractOpen, setExtractOpen] = useState(false);
+  const [expandedTiers, setExpandedTiers] = useState<Record<Closeness, boolean>>({ core: false, close: false, acquaintance: false });
 
   const rebuild = () => {
     const owner = getLocalOwner();
@@ -169,6 +173,9 @@ export default function RelationshipsPanel() {
       {GROUPS.map((g) => {
         const items = shown.filter((c) => c.closeness === g);
         if (!items.length) return null;
+        // 大列表先只铺 TIER_CAP 行(其余点「显示全部」再渲染)—— 关键:不把几千行一次性挂上去。
+        const expanded = expandedTiers[g];
+        const visible = expanded ? items : items.slice(0, TIER_CAP);
         return (
           <div key={g}>
             <p className="nesio-rel-tier-h">
@@ -176,7 +183,7 @@ export default function RelationshipsPanel() {
               {L(dict, CLOSENESS_META[g].zh, CLOSENESS_META[g].en)} · {items.length}
             </p>
             <div className="nesio-rel-list">
-              {items.map((c) => (
+              {visible.map((c) => (
                 <div
                   key={c.key}
                   role="button"
@@ -202,6 +209,12 @@ export default function RelationshipsPanel() {
                 </div>
               ))}
             </div>
+            {items.length > TIER_CAP && !expanded && (
+              <button type="button" className="nesio-rel-showall"
+                onClick={() => setExpandedTiers((s) => ({ ...s, [g]: true }))}>
+                {L(dict, `显示全部 ${items.length} 位`, `Show all ${items.length}`)}
+              </button>
+            )}
           </div>
         );
       })}

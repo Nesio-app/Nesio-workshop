@@ -13094,6 +13094,7 @@ html[data-portal-theme="night"] .nesio-fin-acctgroup { background: rgba(255,255,
 .nesio-rel-tier-dot--acquaintance { background: var(--portal-muted); }
 
 .nesio-rel-list { display: flex; flex-direction: column; }
+.nesio-rel-showall { display: block; margin: 0.5rem auto 0; padding: 0.35rem 0.9rem; background: none; border: 1px solid var(--portal-line); border-radius: var(--radius-pill); font-size: 0.76rem; font-weight: 600; color: var(--portal-accent); cursor: pointer; }
 .nesio-rel-row {
   display: flex; align-items: center; gap: 0.8rem; width: 100%; text-align: left;
   background: none; border: none; border-bottom: 1px solid var(--portal-line);
