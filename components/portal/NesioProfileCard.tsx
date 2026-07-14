@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { clearProfileIdentity, loadProfileSettings, readAvatarFile, saveProfileSettings } from '@/lib/portal/profile';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
 import { useProfileAvatar } from './use-profile-avatar';
-import { AccountSheet, ProfileSheet, AppearanceSheet, HabitsSheet, PrivacySheet, SubscriptionSheet } from './SettingsSheets';
+import { AccountSheet, ProfileSheet, AppearanceSheet, PrivacySheet, SubscriptionSheet, LabSheet } from './SettingsSheets';
 import ConnectorsHub from './ConnectorsHub';
 import RoadmapSheet from './RoadmapSheet';
 import RoutineSheet from './RoutineSheet';
@@ -12,10 +12,10 @@ import PreviewGuidesSheet from './PreviewGuidesSheet';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
-import { IconClock, IconGear, IconGift, IconUser, IconSun, IconMapPin, IconShield, IconHelpCircle, IconRefresh } from './icons';
+import { IconClock, IconGear, IconGift, IconUser, IconSun, IconShield, IconHelpCircle, IconBulb } from './icons';
 
-// 批次 138 设计「设置重组」:档案/账户拆开 · 通用拆成外观语言+记录习惯 · 底部次要行
-type ActiveSheet = 'profile' | 'account' | 'appearance' | 'habits' | 'privacy' | 'subscription' | 'connectors' | 'roadmap' | 'routine' | 'preview' | null;
+// 批次 138 设计「设置重组」;图1:记录习惯并入隐私,Lab 独立成底部入口
+type ActiveSheet = 'profile' | 'account' | 'appearance' | 'privacy' | 'subscription' | 'connectors' | 'roadmap' | 'routine' | 'preview' | 'lab' | null;
 
 export default function NesioProfileCard() {
   const [displayName, setDisplayName] = useState('Jessy');
@@ -145,15 +145,15 @@ export default function NesioProfileCard() {
     ] },
     { label: L(dict, '偏好', 'Preferences'), items: [
       { key: 'appearance', icon: <IconSun />, iconBg: 'var(--chip-indigo)', label: L(dict, '外观与语言', 'Appearance & language'), sublabel: L(dict, '明暗 · 语言', 'Theme · language') },
-      { key: 'habits', icon: <IconMapPin />, iconBg: 'var(--chip-green)', label: L(dict, '记录习惯', 'Capture habits'), sublabel: L(dict, '日报 · 触感 · 定位 · 数据接入', 'Report · haptics · location · sources') },
-      { key: 'privacy', icon: <IconShield />, iconBg: 'var(--chip-blue)', label: L(dict, '数据与隐私', 'Data & privacy'), sublabel: L(dict, '我的数据 · 备份恢复 · 删除区', 'Your data · backup · delete zone') },
+      { key: 'privacy', icon: <IconShield />, iconBg: 'var(--chip-blue)', label: L(dict, '数据与隐私', 'Data & privacy'), sublabel: L(dict, '数据接入 · 备份恢复 · 删除区', 'Sources · backup · delete zone') },
     ] },
   ];
+  // 图1:Lab(实验功能 + 新手提醒/预览引导)从隐私里独立成底部入口
   const bottomItems: Array<{ key: ActiveSheet; icon: ReactNode; label: string }> = [
     { key: 'subscription', icon: <IconGift />, label: L(dict, '会员 · Pro', 'Membership · Pro') },
     { key: 'routine', icon: <IconClock />, label: L(dict, '例行提醒', 'Routines') },
     { key: 'roadmap', icon: <IconHelpCircle />, label: L(dict, '帮助与反馈', 'Help & feedback') },
-    { key: 'preview', icon: <IconRefresh />, label: L(dict, '预览引导', 'Preview guides') },
+    { key: 'lab', icon: <IconBulb />, label: 'Lab' },
   ];
 
   return (
@@ -265,12 +265,12 @@ export default function NesioProfileCard() {
       <ProfileSheet open={activeSheet === 'profile'} onClose={() => setActiveSheet(null)} onPickAvatar={() => { setActiveSheet(null); setTimeout(() => avatarInputRef.current?.click(), 80); }} />
       <AccountSheet open={activeSheet === 'account'} onClose={() => setActiveSheet(null)} onOpenMembership={() => setActiveSheet('subscription')} />
       <AppearanceSheet open={activeSheet === 'appearance'} onClose={() => setActiveSheet(null)} />
-      <HabitsSheet open={activeSheet === 'habits'} onClose={() => setActiveSheet(null)} onOpenConnect={() => setActiveSheet('connectors')} />
-      <PrivacySheet open={activeSheet === 'privacy'} onClose={() => setActiveSheet(null)} />
+      <PrivacySheet open={activeSheet === 'privacy'} onClose={() => setActiveSheet(null)} onOpenConnect={() => setActiveSheet('connectors')} />
       <SubscriptionSheet open={activeSheet === 'subscription'} onClose={() => setActiveSheet(null)} />
       <ConnectorsHub open={activeSheet === 'connectors'} onClose={() => setActiveSheet(null)} />
       <RoadmapSheet open={activeSheet === 'roadmap'} onClose={() => setActiveSheet(null)} />
       <RoutineSheet open={activeSheet === 'routine'} onClose={() => setActiveSheet(null)} />
+      <LabSheet open={activeSheet === 'lab'} onClose={() => setActiveSheet(null)} onOpenPreview={() => setActiveSheet('preview')} />
       <PreviewGuidesSheet open={activeSheet === 'preview'} onClose={() => setActiveSheet(null)} />
     </>
   );

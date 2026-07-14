@@ -25,7 +25,8 @@ function fmtKm(km: number): string {
 const PlacesShareCard = forwardRef<SVGSVGElement, {
   stats: PlacesShareStats;
   colors: ShareCardColors;
-}>(function PlacesShareCard({ stats, colors }, ref) {
+  zh?: boolean;                          // 卡片文案随设置语言(默认英文编辑体)
+}>(function PlacesShareCard({ stats, colors, zh = false }, ref) {
   const { accent, ink, sub, mutedDot, line, cardBg, onAccent } = colors;
   const cells = worldDotCells();
 
@@ -35,8 +36,14 @@ const PlacesShareCard = forwardRef<SVGSVGElement, {
   const dotR = 2.6;
   const visited = new Set(stats.visitedContinents);
 
-  const countryWord = stats.countries === 1 ? 'country' : 'countries';
-  const contWord = stats.continents === 1 ? 'continent' : 'continents';
+  const kicker = zh ? `去过的地方 · ${stats.year}` : `WHERE I'VE BEEN · ${stats.year}`;
+  const bigNum = zh ? `${stats.countries} 国` : `${stats.countries}`;
+  const bigWord = zh ? '' : (stats.countries === 1 ? 'country' : 'countries');
+  const subLine = zh
+    ? `${stats.continents} 洲 · 占世界 ${stats.worldPct}%`
+    : `${stats.continents} ${stats.continents === 1 ? 'continent' : 'continents'} · ${stats.worldPct}% of the world`;
+  const streakLabel = zh ? '连续天数' : 'DAY STREAK';
+  const furthestLabel = stats.furthest ? (zh ? `最远 · ${fmtKm(stats.furthest.km)} 公里` : `FURTHEST · ${fmtKm(stats.furthest.km)} KM`) : '';
 
   return (
     <svg
@@ -45,23 +52,23 @@ const PlacesShareCard = forwardRef<SVGSVGElement, {
       viewBox={`0 0 ${SHARE_CARD_W} ${SHARE_CARD_H}`}
       width="100%"
       role="img"
-      aria-label={`WHERE I'VE BEEN ${stats.year}: ${stats.countries} ${countryWord}`}
+      aria-label={`${kicker}: ${bigNum}`}
       style={{ display: 'block', borderRadius: 24 }}
     >
       <rect x="0" y="0" width={SHARE_CARD_W} height={SHARE_CARD_H} rx="24" fill={cardBg} />
 
       {/* kicker */}
       <text x="28" y="64" fill={accent} fontFamily={SANS} fontSize="13" fontWeight="700"
-        letterSpacing="2.5">{`WHERE I'VE BEEN · ${stats.year}`}</text>
+        letterSpacing={zh ? '0.5' : '2.5'}>{kicker}</text>
 
       {/* 大数字 */}
       <text x="26" y="120" fill={ink} fontFamily={SERIF} fontSize="44" fontWeight="700">
-        {stats.countries} <tspan fontSize="40">{countryWord}</tspan>
+        {bigNum}{bigWord && <tspan fontSize="40"> {bigWord}</tspan>}
       </text>
 
       {/* 副行 */}
       <text x="28" y="150" fill={sub} fontFamily={SANS} fontSize="17" fontWeight="500">
-        {stats.continents} {contWord} · {stats.worldPct}% of the world
+        {subLine}
       </text>
 
       {/* 点阵世界地图 */}
@@ -86,14 +93,14 @@ const PlacesShareCard = forwardRef<SVGSVGElement, {
 
       {/* 连续天数 */}
       <text x="28" y="388" fill={ink} fontFamily={SERIF} fontSize="28" fontWeight="700">{stats.dayStreak}</text>
-      <text x="28" y="406" fill={sub} fontFamily={SANS} fontSize="11" fontWeight="600" letterSpacing="1.5">DAY STREAK</text>
+      <text x="28" y="406" fill={sub} fontFamily={SANS} fontSize="11" fontWeight="600" letterSpacing={zh ? '0.5' : '1.5'}>{streakLabel}</text>
 
       {/* 最远的地方 */}
       {stats.furthest && (
         <>
           <text x="150" y="386" fill={ink} fontFamily={SERIF} fontSize="22" fontWeight="700">{stats.furthest.name}</text>
-          <text x="150" y="405" fill={sub} fontFamily={SANS} fontSize="11" fontWeight="600" letterSpacing="1.2">
-            {`FURTHEST · ${fmtKm(stats.furthest.km)} KM`}
+          <text x="150" y="405" fill={sub} fontFamily={SANS} fontSize="11" fontWeight="600" letterSpacing={zh ? '0.5' : '1.2'}>
+            {furthestLabel}
           </text>
         </>
       )}

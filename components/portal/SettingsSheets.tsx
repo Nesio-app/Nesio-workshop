@@ -22,7 +22,7 @@ import { FEATURE_CATALOG, loadModuleOverrides, setModuleOverride, MODULE_OVERRID
 import { isAppStoreBuild } from '@/lib/portal/app-build.mjs';
 import { getTier, hasProOverride, setProEntitlement, trialDaysLeft } from '@/lib/portal/entitlement';
 import { isValidBackup } from '@/lib/portal/full-backup';
-import { buildCombinedBackup, pushBackupToCloud, pullBackupFromCloud, restoreCombinedBackup, hasCloudEntitlement, lastCloudBackup, type CloudBackupError, type CloudRestoreError } from '@/lib/portal/cloud-backup';
+import { pushBackupToCloud, pullBackupFromCloud, restoreCombinedBackup, hasCloudEntitlement, lastCloudBackup, type CloudBackupError, type CloudRestoreError } from '@/lib/portal/cloud-backup';
 
 interface SheetProps { open: boolean; onClose: () => void; }
 
@@ -378,74 +378,6 @@ export function AppearanceSheet({ open, onClose }: SheetProps) {
   );
 }
 
-// ── 记录习惯(批次 138:从通用拆出;开关 + 数据接入入口)──
-export function HabitsSheet({ open, onClose, onOpenConnect }: SheetProps & { onOpenConnect: () => void }) {
-  const locale = usePortalLocale();
-  const dict = portalLocaleToDictionaryLocale(locale);
-  const [hapticsOn, setHapticsOn] = useState(true);
-  const [dailyReportOn, setDailyReportOn] = useState(false);
-  const [captureLocOn, setCaptureLocOn] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    const p = loadProfileSettings();
-    setDailyReportOn(p.dailyReportEnabled);
-    try {
-      setHapticsOn(localStorage.getItem(HAPTIC_FEEDBACK_KEY) !== '0');
-      setCaptureLocOn(captureLocationEnabled());
-    } catch { /* ignore */ }
-  }, [open]);
-
-  function toggleDailyReport() {
-    setDailyReportOn((v) => { saveProfileSettings({ dailyReportEnabled: !v }); return !v; });
-  }
-  function toggleHaptics() {
-    setHapticsOn((v) => { try { localStorage.setItem(HAPTIC_FEEDBACK_KEY, v ? '0' : '1'); } catch { /* ignore */ } return !v; });
-  }
-
-  return (
-    <SheetWrap open={open} onClose={onClose} title={L(dict, '记录习惯', 'Capture habits')}>
-      <p className="nesio-settings-section-label">{L(dict, '开关', 'Switches')}</p>
-      <button type="button"
-        className={`nesio-settings-option${dailyReportOn ? ' nesio-settings-option--active' : ''}`}
-        onClick={toggleDailyReport}>
-        <div>
-          <span className="nesio-settings-option-label">{L(dict, '每日 AI 图文日报', 'Daily AI report')}</span>
-          <span className="nesio-settings-option-hint">{L(dict, '每天存进记忆 · 首页回顾里给你', 'Saved to memory daily · surfaced under Today')}</span>
-        </div>
-        <span className={`nesio-settings-space-check${dailyReportOn ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>{dailyReportOn ? '✓' : '○'}</span>
-      </button>
-      <button type="button"
-        className={`nesio-settings-option${hapticsOn ? ' nesio-settings-option--active' : ''}`}
-        onClick={toggleHaptics}>
-        <div>
-          <span className="nesio-settings-option-label">{L(dict, '触感反馈', 'Haptics')}</span>
-          <span className="nesio-settings-option-hint">{L(dict, '记录成功/找到/长按录音时轻震', 'Gentle buzz on save, find, hold-to-record')}</span>
-        </div>
-        <span className={`nesio-settings-space-check${hapticsOn ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>{hapticsOn ? '✓' : '○'}</span>
-      </button>
-      <button type="button"
-        className={`nesio-settings-option${captureLocOn ? ' nesio-settings-option--active' : ''}`}
-        onClick={() => { const next = !captureLocOn; setCaptureLocOn(next); setCaptureLocationEnabled(next); }}>
-        <div>
-          <span className="nesio-settings-option-label">{L(dict, '记忆自动定位', 'Auto-locate memories')}</span>
-          <span className="nesio-settings-option-hint">{L(dict, '亲手记的带上位置 · 只存本机', 'Your captures get located · stored on-device only')}</span>
-        </div>
-        <span className={`nesio-settings-space-check${captureLocOn ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>{captureLocOn ? '✓' : '○'}</span>
-      </button>
-
-      <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '数据接入', 'Connect data')}</p>
-      <button type="button" className="nesio-settings-option" onClick={onOpenConnect}>
-        <div>
-          <span className="nesio-settings-option-label">{L(dict, '连接数据源', 'Connected sources')}</span>
-          <span className="nesio-settings-option-hint">{L(dict, 'Gmail · 日历 · Notion · 健康 · 银行 …', 'Gmail · Calendar · Notion · Health · Bank …')}</span>
-        </div>
-        <span aria-hidden style={{ color: 'var(--portal-muted)' }}>›</span>
-      </button>
-    </SheetWrap>
-  );
-}
-
 // ── 数据(二级菜单:我的数据 / 数据接入)──────────────
 
 export function DataSheet({ open, onClose, onOpenMine, onOpenConnect }: SheetProps & {
@@ -476,18 +408,13 @@ export function DataSheet({ open, onClose, onOpenMine, onOpenConnect }: SheetPro
 // ── 隐私与数据 ────────────────────────────────────────
 
 
-export function PrivacySheet({ open, onClose }: SheetProps) {
+export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { onOpenConnect: () => void }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [nodeCount, setNodeCount] = useState(0);
   const [deleted, setDeleted] = useState(false);
   const [deleteMsg, setDeleteMsg] = useState<string | null>(null);
   const [restoreMsg, setRestoreMsg] = useState('');
   const [lastBackupAt, setLastBackupAt] = useState<string | null>(null);
-  const [labOn, setLabOn] = useState(false);
-  const [palette, setPaletteState] = useState<PaletteId>('');
-  const [labMsg, setLabMsg] = useState<string | null>(null);
-  const [proOn, setProOn] = useState(false); // Lab 内 Pro 测试解锁(正式版由 StoreKit 收据服务端校验写入)
-  const [moduleOv, setModuleOv] = useState<Record<string, 'on' | 'off'>>({});
   const importRef = useRef<HTMLInputElement>(null);
   // 云备份(付费,规划中):状态机 idle→pushing→done/error,失败必可见(设计红线)。
   const [cloudState, setCloudState] = useState<'idle' | 'pushing' | 'done' | 'error'>('idle');
@@ -549,21 +476,6 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
           ? L(dict, '先连接 Google 再恢复', 'Connect Google first')
           : L(dict, '从 Drive 恢复没成功 —— 稍后再试', "Restore from Drive didn't go through — try later"));
     }
-  }
-
-  async function exportFullBackup() {
-    // 与云备份用同一份枚举(localStorage durable + IDB blob),避免两处漂移。
-    // 本机导出带上照片(includeImages):这是「拿走你的全部数据」的完整出口。
-    const backup = await buildCombinedBackup({ includeImages: true });
-    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `nesio-backup-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    try { localStorage.setItem('nesio-last-backup-at', new Date().toISOString()); } catch { /* ignore */ }
-    setLastBackupAt(new Date().toISOString());
   }
 
   function cloudErrorText(err: CloudBackupError): string {
@@ -662,43 +574,9 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
     setCloudBackupAt(lastCloudBackup()?.at ?? null);
     try {
       setLastBackupAt(localStorage.getItem('nesio-last-backup-at'));
-      setLabOn(localStorage.getItem('baohe_personal_lab') === '1' || localStorage.getItem('baohe_lab_mode') === '1');
-      setPaletteState(getPalette());
-      setProOn(hasProOverride()); // 批次 32:显示覆盖位本身;试用期 getTier 恒 pro 会让开关关不掉
     } catch { /* ignore */ }
     return () => window.removeEventListener('nesio-life-graph-updated', readCount);
   }, [open]);
-
-  // 逐模块开关:打开时读当前覆盖 + 订阅(工具箱会随覆盖实时变,不需 reload)。
-  useEffect(() => {
-    if (!open) return;
-    const sync = () => setModuleOv(loadModuleOverrides());
-    sync();
-    window.addEventListener(MODULE_OVERRIDES_EVENT, sync);
-    return () => window.removeEventListener(MODULE_OVERRIDES_EVENT, sync);
-  }, [open]);
-
-  function toggleLab() {
-    const turningOn = !labOn;
-    try {
-      if (labOn) {
-        localStorage.removeItem('baohe_personal_lab');
-        localStorage.removeItem('baohe_lab_mode');
-        sessionStorage.removeItem('baohe_personal_lab');
-        sessionStorage.removeItem('baohe_lab_mode');
-      } else {
-        localStorage.setItem('baohe_personal_lab', '1');
-      }
-    } catch { /* ignore */ }
-    // 反应式:通知外壳重读角色,工具箱即时更新 —— 不再 reload。旧实现 reload 会把整个
-    // 设置面板连同页面一起刷掉(QA:点 Lab 闪退出设置),现在开关就地生效、面板不动。
-    setLabOn(turningOn);
-    setLabMsg(turningOn
-      ? L(dict, 'Lab 模式已开启', 'Lab mode on')
-      : L(dict, 'Lab 模式已关闭', 'Lab mode off'));
-    try { window.dispatchEvent(new CustomEvent('nesio-lab-mode-updated')); } catch { /* ignore */ }
-    setTimeout(() => setLabMsg(null), 1800);
-  }
 
   function clearAllMemory() {
     if (!confirm(L(dict, '删除后，Nesio 不再用这些记忆提醒你。确认继续？', 'After deleting, Nesio will no longer use these memories to remind you. Continue?'))) return;
@@ -752,7 +630,6 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
 
   return (
     <SheetWrap open={open} onClose={onClose} title={L(dict, '数据与隐私', 'Data & privacy')}>
-      <p className="nesio-settings-sheet-desc">{L(dict, '只整理你放进来的内容。你可以看见它记住了什么、存在哪、也可以随时删除。', 'Only what you put in gets organized. You can see what it remembers, where it lives, and delete it anytime.')}</p>
 
       {/* 数据主权面板 — local-first 从架构卖点变成可感知的安全感 */}
       <div style={{ background: 'var(--portal-accent-soft, rgba(88,140,227,0.08))', borderRadius: 14, padding: '0.8rem 1rem', marginBottom: '0.9rem' }}>
@@ -770,27 +647,18 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
         )}
       </div>
 
-      {/* Export */}
-      <button type="button" className="nesio-settings-action-btn" onClick={() => {
-        const data = JSON.stringify(getLifeGraph(), null, 2);
-        const blob = new Blob([data], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = 'nesio-memory.json'; a.click();
-      }}>
-        {L(dict, '导出 Memory 数据（JSON）', 'Export Memory data (JSON)')}
+      {/* 图5:数据接入从「记录习惯」并入这里 —— 连接数据源(ConnectorsHub) */}
+      <p className="nesio-settings-section-label">{L(dict, '数据接入', 'Connect data')}</p>
+      <button type="button" className="nesio-settings-option" onClick={onOpenConnect}>
+        <div>
+          <span className="nesio-settings-option-label">{L(dict, '连接数据源', 'Connected sources')}</span>
+          <span className="nesio-settings-option-hint">{L(dict, 'Gmail · 日历 · Notion · 健康 · 银行 …', 'Gmail · Calendar · Notion · Health · Bank …')}</span>
+        </div>
+        <span aria-hidden style={{ color: 'var(--portal-muted)' }}>›</span>
       </button>
 
-      <button type="button" className="nesio-settings-action-btn" onClick={exportFullBackup}>
-        {L(dict, '导出完整备份（含项目/情绪/设置等全部本地数据）', 'Export full backup (projects, moods, settings — all local data)')}
-      </button>
-
-      {/* 批次 32:登录/备份/恢复是同一件事(云同步与备份),整合成一块 —— 登录行收进来 */}
-      <p className="nesio-settings-section-label" style={{ marginTop: '1.2rem' }}>{L(dict, '云同步与备份', 'Cloud sync & backup')}</p>
-      <a href="/login" style={{ display: 'block', fontSize: '0.78rem', color: 'var(--portal-accent)', textDecoration: 'none', margin: '0 0 0.5rem' }}>
-        {L(dict, '登录后开启跨设备云同步 ›', 'Sign in to sync across devices ›')}
-      </a>
-      <p style={{ fontSize: '0.78rem', color: 'var(--portal-muted)', margin: '0.6rem 0 0.3rem' }}>{L(dict, '备份到哪里', 'Back up to')}</p>
+      {/* 备份与恢复(图2:去掉「云同步与备份」标题与登录同步行,直接进备份目的地) */}
+      <p style={{ fontSize: '0.78rem', color: 'var(--portal-muted)', margin: '1.2rem 0 0.3rem' }}>{L(dict, '备份到哪里', 'Back up to')}</p>
       <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
         {([['drive', L(dict, '☁ Google Drive · 免费', '☁ Google Drive · Free')], ['nesio', L(dict, `☁ Nesio 云${cloudEntitled ? '' : ' · Pro 免费'}`, `☁ Nesio cloud${cloudEntitled ? '' : ' · free with Pro'}`)]] as const).map(([d, label]) => (
           <button key={d} type="button" onClick={() => pickBackupDest(d)}
@@ -809,7 +677,7 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
       </p>
 
       <button type="button" className="nesio-settings-action-btn" onClick={handleBackupChosen} disabled={cloudState === 'pushing' || driveState === 'busy'}>
-        {(cloudState === 'pushing' || driveState === 'busy') ? L(dict, '正在备份…', 'Backing up…') : L(dict, '备份 · 换机不丢', 'Back up · survive a new phone')}
+        {(cloudState === 'pushing' || driveState === 'busy') ? L(dict, '正在备份…', 'Backing up…') : L(dict, '备份', 'Back up')}
       </button>
       <button type="button" className="nesio-settings-action-btn" onClick={handleRestoreChosen} disabled={cloudRestoreState === 'pulling' || driveState === 'busy'}>
         {(cloudRestoreState === 'pulling') ? L(dict, '正在恢复…', 'Restoring…') : L(dict, '从云恢复', 'Restore from cloud')}
@@ -851,7 +719,72 @@ export function PrivacySheet({ open, onClose }: SheetProps) {
       </button>
       {deleteMsg && <p className="nesio-settings-option-hint" style={{ margin: '0.4rem 0 0', color: 'var(--status-risk)' }}>{deleteMsg}</p>}
 
-      {/* 提审构建:整个 Lab + 功能开关中心从设置里消失(合规:隐藏可达功能 = 2.3.1 违规)。 */}
+      {/* 图3:原顶部说明整段挪到最下面收尾 */}
+      <p className="nesio-settings-sheet-desc" style={{ marginTop: '1.5rem', marginBottom: 0 }}>{L(dict, '只整理你放进来的内容。你可以看见它记住了什么、存在哪、也可以随时删除。', 'Only what you put in gets organized. You can see what it remembers, where it lives, and delete it anytime.')}</p>
+    </SheetWrap>
+  );
+}
+
+// ── Lab（图1:实验功能 + 功能开关中心从「数据与隐私」独立成菜单入口;新手提醒/预览引导也收进来）──
+export function LabSheet({ open, onClose, onOpenPreview }: SheetProps & { onOpenPreview: () => void }) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
+  const [labOn, setLabOn] = useState(false);
+  const [labMsg, setLabMsg] = useState<string | null>(null);
+  const [palette, setPaletteState] = useState<PaletteId>('');
+  const [proOn, setProOn] = useState(false); // Lab 内 Pro 测试解锁(正式版由 StoreKit 收据服务端校验写入)
+  const [moduleOv, setModuleOv] = useState<Record<string, 'on' | 'off'>>({});
+
+  useEffect(() => {
+    if (!open) return;
+    try {
+      setLabOn(localStorage.getItem('baohe_personal_lab') === '1' || localStorage.getItem('baohe_lab_mode') === '1');
+      setPaletteState(getPalette());
+      setProOn(hasProOverride()); // 批次 32:显示覆盖位本身;试用期 getTier 恒 pro 会让开关关不掉
+    } catch { /* ignore */ }
+  }, [open]);
+
+  // 逐模块开关:打开时读当前覆盖 + 订阅(工具箱会随覆盖实时变,不需 reload)。
+  useEffect(() => {
+    if (!open) return;
+    const sync = () => setModuleOv(loadModuleOverrides());
+    sync();
+    window.addEventListener(MODULE_OVERRIDES_EVENT, sync);
+    return () => window.removeEventListener(MODULE_OVERRIDES_EVENT, sync);
+  }, [open]);
+
+  function toggleLab() {
+    const turningOn = !labOn;
+    try {
+      if (labOn) {
+        localStorage.removeItem('baohe_personal_lab');
+        localStorage.removeItem('baohe_lab_mode');
+        sessionStorage.removeItem('baohe_personal_lab');
+        sessionStorage.removeItem('baohe_lab_mode');
+      } else {
+        localStorage.setItem('baohe_personal_lab', '1');
+      }
+    } catch { /* ignore */ }
+    // 反应式:通知外壳重读角色,工具箱即时更新 —— 不再 reload。旧实现 reload 会把整个
+    // 设置面板连同页面一起刷掉(QA:点 Lab 闪退出设置),现在开关就地生效、面板不动。
+    setLabOn(turningOn);
+    setLabMsg(turningOn ? L(dict, 'Lab 模式已开启', 'Lab mode on') : L(dict, 'Lab 模式已关闭', 'Lab mode off'));
+    try { window.dispatchEvent(new CustomEvent('nesio-lab-mode-updated')); } catch { /* ignore */ }
+    setTimeout(() => setLabMsg(null), 1800);
+  }
+
+  return (
+    <SheetWrap open={open} onClose={onClose} title="Lab">
+      {/* 图1:新手提醒/预览引导收进 Lab */}
+      <p className="nesio-settings-section-label">{L(dict, '新手提醒', 'Onboarding')}</p>
+      <button type="button" className="nesio-settings-option" onClick={onOpenPreview}>
+        <div>
+          <span className="nesio-settings-option-label">{L(dict, '预览引导 · 模拟运行', 'Preview guides · Dry run')}</span>
+          <span className="nesio-settings-option-hint">{L(dict, '重放欢迎/导览、灌样例、模拟回访 —— 真机自查冷启动', 'Replay welcome/tour, seed samples, simulate re-engagement')}</span>
+        </div>
+        <span aria-hidden style={{ color: 'var(--portal-muted)' }}>›</span>
+      </button>
+
+      {/* 提审构建:整个 Lab + 功能开关中心不可达(合规:隐藏可达功能 = 2.3.1 违规)。 */}
       {!isAppStoreBuild() && (<>
       <p className="nesio-settings-section-label" style={{ marginTop: '1.5rem' }}>{L(dict, '实验功能', 'Experimental')}</p>
       <button type="button"

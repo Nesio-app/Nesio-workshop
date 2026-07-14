@@ -37,19 +37,23 @@ export interface ShareToSheetProps {
   link: string;
   /** 存图文件名(不含扩展)。 */
   fileBase?: string;
+  /** 图片 MIME(默认 png;足迹卡传 image/jpeg 存相册)。 */
+  mime?: string;
 }
 
-export default function ShareToSheet({ open, onClose, getBlob, shareText, link, fileBase = 'nesio-places' }: ShareToSheetProps) {
+export default function ShareToSheet({ open, onClose, getBlob, shareText, link, fileBase = 'nesio-places', mime = 'image/png' }: ShareToSheetProps) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [busy, setBusy] = useState<string>('');
   const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
 
   if (!open) return null;
 
+  const ext = mime === 'image/jpeg' ? 'jpg' : 'png';
+
   async function toFile(): Promise<File | null> {
     const blob = await getBlob();
     if (!blob) return null;
-    return new File([blob], `${fileBase}.png`, { type: 'image/png' });
+    return new File([blob], `${fileBase}.${ext}`, { type: mime });
   }
 
   function download(file: File) {
@@ -65,9 +69,17 @@ export default function ShareToSheet({ open, onClose, getBlob, shareText, link, 
     try {
       const file = await toFile();
       if (!file) throw new Error('no-image');
-      download(file);
-      setMsg({ kind: 'ok', text: L(dict, '成就卡已存到相册 / 下载。', 'Saved your card to Photos / Downloads.') });
-    } catch {
+      // 优先系统分享(iOS 有「存储图像」→ 直接进相机胶卷);桌面 / 不支持则下载。
+      const nav = navigator as Navigator & { canShare?: (d: ShareData & { files?: File[] }) => boolean };
+      if (nav.canShare?.({ files: [file] }) && navigator.share) {
+        await navigator.share({ files: [file] });
+        setMsg({ kind: 'ok', text: L(dict, '选「存储图像」就进相册了。', 'Choose "Save Image" to add it to Photos.') });
+      } else {
+        download(file);
+        setMsg({ kind: 'ok', text: L(dict, '成就卡已下载(.jpg)。', 'Card downloaded (.jpg).') });
+      }
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'AbortError') { setBusy(''); return; }
       setMsg({ kind: 'err', text: L(dict, '存图没成功,请重试。', "Couldn't save the image — try again.") });
     } finally { setBusy(''); }
   }

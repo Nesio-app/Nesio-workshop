@@ -253,7 +253,7 @@ export function TodayFocusSection({
     <div className="nesio-focus-section">
       <MemoryFlashBanner nodes={flashNodes} onDismiss={dismissFlash} />
 
-      <div className="nesio-focus-header">
+      <div className="nesio-focus-header" data-tour="breakdown">
         <h2 className="nesio-focus-title">
           {t(locale, 'todayFocusTitle')}
           <span className="nesio-focus-subtitle"> · {t(locale, 'todayFocusSubtitle')}</span>

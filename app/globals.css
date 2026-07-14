@@ -7188,6 +7188,24 @@ html[data-portal-theme="night"] .nesio-tips-body { color: #8fa3c0; }
   pointer-events: auto;
 }
 .nesio-coach-overlay--dim { background: rgba(20, 22, 30, 0.55); }
+/* 可交互步:浮层放行点击,让用户真的点/长按高亮的目标(气泡本身仍可点) */
+.nesio-coach-overlay--pass { pointer-events: none; }
+.nesio-coach-overlay--pass .nesio-coach-bubble { pointer-events: auto; }
+/* 「点一下/长按试试」高亮提示 */
+.nesio-coach-taphint {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.15rem 0 0.5rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: var(--radius-pill, 999px);
+  background: var(--portal-accent-soft, rgba(88, 140, 227, 0.12));
+  color: var(--portal-blue-deep);
+  font-size: 0.76rem;
+  font-weight: 700;
+  animation: nesioTapPulse 1.4s ease-in-out infinite;
+}
+@keyframes nesioTapPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
 /* 高亮框:巨大 box-shadow 把四周压暗,只留目标亮着;随步平滑移动 */
 .nesio-coach-spot {
   position: fixed;
@@ -13202,6 +13220,19 @@ button.nesio-rel-due-info { background: none; border: none; padding: 0; font: in
 .nesio-tl-donut2-ctr b { font-size: 1.7rem; font-weight: 800; color: var(--portal-ink); line-height: 1.1; }
 .nesio-tl-donut2-ctr small { font-size: 0.68rem; font-weight: 700; color: var(--portal-muted); }
 .nesio-tl-donut2-ctr-name { color: var(--portal-ink) !important; font-size: 0.8rem !important; margin: 0.1rem 0; }
+/* 图例贴饼里:图标 + 时长 */
+.nesio-tl-donut2-slice {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  color: #fff;
+  pointer-events: none;
+}
+.nesio-tl-donut2-dur { font-size: 0.6rem; font-weight: 700; line-height: 1; white-space: nowrap; }
+.nesio-tl-donut2-q { color: var(--portal-muted); font-size: 1rem; font-weight: 800; }
 .nesio-tl-legend { flex: 1; min-width: 0; }
 .nesio-tl-legend-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.55rem; font-size: 0.8rem; font-weight: 700; color: var(--portal-ink); }
 .nesio-tl-legend-dot { width: 0.65rem; height: 0.65rem; border-radius: 3px; flex-shrink: 0; }
@@ -13247,7 +13278,17 @@ button.nesio-rel-due-info { background: none; border: none; padding: 0; font: in
   background: var(--glass-bg-solid); border: 1px solid var(--portal-line);
   border-radius: 0.95rem; overflow: hidden; box-shadow: 0 4px 14px rgba(0,0,0,.05); padding: 0;
 }
-.nesio-tl-ccard-img { width: 5.5rem; height: 4.6rem; flex-shrink: 0; }
+.nesio-tl-ccard-img { width: 5.5rem; height: 4.6rem; flex-shrink: 0; position: relative; border: none; padding: 0; cursor: pointer; background-color: var(--portal-surface-2, rgba(127,127,127,0.08)); }
+.nesio-tl-ccard-img.has-photo, .nesio-tl-citycard-img.has-photo { background-size: cover; background-position: center; }
+.nesio-tl-ccard-nav { flex: 1; min-width: 0; display: flex; align-items: center; background: none; border: none; padding: 0; text-align: left; cursor: pointer; }
+/* 换封面小徽章(右下角相机) */
+.nesio-tl-photo-edit {
+  position: absolute; right: 4px; bottom: 4px;
+  width: 18px; height: 18px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: rgba(20, 22, 30, 0.5); color: #fff;
+}
+.nesio-tl-citycard-img { position: relative; border: none; padding: 0; cursor: pointer; width: 100%; background-color: var(--portal-surface-2, rgba(127,127,127,0.08)); }
 .nesio-tl-ccard-body { flex: 1; min-width: 0; padding: 0 0.9rem; display: flex; flex-direction: column; gap: 0.3rem; }
 .nesio-tl-ccard-name { font-size: 0.95rem; font-weight: 800; color: var(--portal-ink); display: flex; align-items: baseline; gap: 0.4rem; }
 .nesio-tl-ccard-name small { font-size: 0.68rem; color: var(--portal-muted); font-weight: 700; }
@@ -15767,23 +15808,7 @@ html[data-portal-theme="night"] .nesio-exp-card:hover {
   align-items: center;
   justify-content: space-between;
 }
-.nesio-placeshare-seg {
-  display: inline-flex;
-  padding: 3px;
-  border-radius: var(--radius-pill, 999px);
-  background: rgba(255, 255, 255, 0.16);
-}
-.nesio-placeshare-seg-btn {
-  padding: 0.32rem 0.9rem;
-  border-radius: var(--radius-pill, 999px);
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.78);
-}
-.nesio-placeshare-seg-btn.is-active {
-  background: #fff;
-  color: var(--portal-ink, #222);
-}
+.nesio-placeshare-hint { font-size: 0.78rem; color: rgba(255, 255, 255, 0.82); }
 .nesio-placeshare-x {
   width: 34px;
   height: 34px;
@@ -15794,12 +15819,28 @@ html[data-portal-theme="night"] .nesio-exp-card:hover {
   background: rgba(255, 255, 255, 0.16);
   color: #fff;
 }
-.nesio-placeshare-cardwrap {
+/* 横滑模版轮播 */
+.nesio-placeshare-cards {
+  display: flex;
   width: 100%;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  gap: 0;
+  border-radius: 24px;
+}
+.nesio-placeshare-cards::-webkit-scrollbar { display: none; }
+.nesio-placeshare-slide {
+  flex: 0 0 100%;
+  scroll-snap-align: center;
   border-radius: 24px;
   overflow: hidden;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
 }
+.nesio-placeshare-dots { display: flex; justify-content: center; gap: 6px; }
+.nesio-placeshare-dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255, 255, 255, 0.35); }
+.nesio-placeshare-dot.is-on { background: #fff; width: 18px; border-radius: 3px; }
 .nesio-placeshare-cta {
   align-self: center;
   min-width: 60%;
@@ -16093,6 +16134,10 @@ html[data-portal-theme="night"] .nesio-exp-card:hover {
 .nesio-rhythm-heat-row { display: flex; align-items: center; gap: 3px; }
 .nesio-rhythm-heat-dow { width: 1rem; flex-shrink: 0; font-size: 0.6rem; color: var(--portal-muted); text-align: center; }
 .nesio-rhythm-heat-cell { flex: 1; aspect-ratio: 1; border-radius: 3px; min-width: 0; }
+/* 置顶紧凑版:缩小、无侧栏文字 */
+.nesio-rhythm-heat--compact { gap: 2px; margin: 0 0 0.9rem; }
+.nesio-rhythm-heat--compact .nesio-rhythm-heat-row { gap: 2px; }
+.nesio-rhythm-heat--compact .nesio-rhythm-heat-cell { flex: 0 0 auto; width: 10px; height: 10px; border-radius: 2px; aspect-ratio: auto; }
 
 /* 生命版图证据行(§2.2) */
 .nesio-insights-map-evidence {
