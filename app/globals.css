@@ -11959,6 +11959,10 @@ html[data-portal-theme="night"] .nesio-otd-card-name { color: #d0d8f0; }
   color: var(--portal-muted);
   line-height: 1.5;
 }
+/* 批次 182:拆解卡精简头 —— 进度小饼图 + 查看详情/换一种拆法 */
+.nesio-momentum-head { display: flex; align-items: center; gap: 0.5rem; margin: 0 0 0.5rem; }
+.nesio-momentum-pie { display: inline-flex; align-items: center; gap: 0.35rem; }
+.nesio-momentum-pie-count { font-size: 0.72rem; color: var(--portal-muted); font-variant-numeric: tabular-nums; }
 .nesio-momentum-progress {
   display: flex;
   align-items: center;

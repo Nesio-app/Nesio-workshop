@@ -289,21 +289,34 @@ export function TodayFocusSection({
           {collapsedNodes.length > 0 && (
             <div className="nesio-collapsed-section">
               <ul className="nesio-collapsed-list">{collapsed ? shownNodes : collapsedNodes}</ul>
-              {restCount > 0 && (
+              {restCount > 0 && (collapsed ? (
                 <button
                   type="button"
                   className="nesio-collapsed-row nesio-tl-more"
-                  aria-expanded={!collapsed}
-                  onClick={() => setCollapsed((v) => !v)}
+                  aria-expanded={false}
+                  onClick={() => setCollapsed(false)}
                 >
-                  <span className="nesio-collapsed-dot nesio-tl-more-plus" aria-hidden>{collapsed ? '⋯' : '−'}</span>
+                  <span className="nesio-collapsed-dot nesio-tl-more-plus" aria-hidden>⋯</span>
                   <span className="nesio-collapsed-task-body">
-                    <span className="nesio-collapsed-kicker">{collapsed ? L(dict, '稍后', 'Later') : L(dict, '摊开了', 'Expanded')}</span>
-                    <span className="nesio-collapsed-title">{collapsed ? L(dict, `还有 ${restCount} 件小事`, `${restCount} more small things`) : L(dict, '收起', 'Collapse')}</span>
-                    <span className="nesio-tl-more-sub">{collapsed ? L(dict, '点开看看,我先替你收着 ›', "Tap to see them — I've kept them ›") : L(dict, '收回折叠', 'Fold back')}</span>
+                    <span className="nesio-collapsed-kicker">{L(dict, '稍后', 'Later')}</span>
+                    <span className="nesio-collapsed-title">{L(dict, `还有 ${restCount} 件小事`, `${restCount} more small things`)}</span>
+                    <span className="nesio-tl-more-sub">{L(dict, '点开看看,我先替你收着 ›', "Tap to see them — I've kept them ›")}</span>
                   </span>
                 </button>
-              )}
+              ) : (
+                /* 批次 182(用户实锤):摊开后只留一个向上箭头收起,字全删 */
+                <button
+                  type="button"
+                  className="nesio-collapsed-row nesio-tl-fold"
+                  aria-expanded
+                  aria-label={L(dict, '收起', 'Collapse')}
+                  onClick={() => setCollapsed(true)}
+                >
+                  <span className="nesio-collapsed-dot nesio-tl-more-plus" aria-hidden>
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="M6 15l6-6 6 6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  </span>
+                </button>
+              ))}
             </div>
           )}
 

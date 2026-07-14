@@ -182,6 +182,32 @@ export function FocusCardDetail({
     setAiRefining(false);
   }
 
+  // 批次 182(用户实锤「换一种拆法的算法用到第一次拆」):第一次拆就用好算法。
+  // 保留清单直采 / curated 模板 / 上次AI缓存这些早返回;只把"本会出通用骨架"那一步
+  // 换成 AI 拆(和「换一种拆法」同引擎),loading 转圈;AI 没成/无网退本地骨架,永远给得出。
+  async function firstBreakdown() {
+    if (!canUsePaidCloudAi() || node.subtasks?.length || getLinkedChecklist(node.id)) { fetchWave(); return; }
+    const cacheKey = sig(node.name);
+    const tpl = matchTaskTemplate(node.name, dict);
+    if (tpl) { applyWave(tpl, 'local', cacheKey); return; }          // curated 模板:比 AI 还稳,直接用
+    const cached = recallAI<Step[]>('decompose', cacheKey);
+    if (cached?.length) { applyWave(cached, 'cache', cacheKey); return; } // 上次 AI 拆过 → 复用
+    setLoading(true);
+    const ctrl = new AbortController();
+    const timeout = setTimeout(() => ctrl.abort(), 25_000);
+    try {
+      const res = await fetch('/api/portal/decompose-task', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctrl.signal,
+        body: JSON.stringify({ taskName: node.name, context: node.rawInput, completedActions: [], locale: dict }),
+      });
+      const data = await res.json() as { ok?: boolean; steps?: Step[] };
+      clearTimeout(timeout);
+      if (data.ok && data.steps?.length) { applyWave(data.steps, 'ai', cacheKey); setLoading(false); return; }
+    } catch { clearTimeout(timeout); }
+    setLoading(false);
+    applyWave(decomposeLocally(node.name, dict), 'local', cacheKey); // AI 没成 → 本地兜底
+  }
+
   async function handleDrill(action: MomentumAction) {
     setDrillingId(action.id);
     const cacheKey = sig(`drill:${action.name}`);
@@ -262,7 +288,7 @@ export function FocusCardDetail({
           </a>
         )}
         {error && <p className="nesio-momentum-error" style={{ color: 'var(--status-risk)', fontSize: '0.8rem', margin: '0 0 0.5rem' }}>{error}</p>}
-        <button type="button" className="nesio-momentum-ignite-btn" onClick={() => fetchWave()}>
+        <button type="button" className="nesio-momentum-ignite-btn" onClick={() => void firstBreakdown()}>
           {error ? L(dict, '重试', 'Retry') : L(dict, '拆成小步', 'Break it into steps')}
         </button>
         {/* 批次 76(用户定案):聚焦/删除撤下 —— 换「查看详情」直达记忆块
@@ -290,9 +316,6 @@ export function FocusCardDetail({
     );
   }
 
-  // 参考竞品:整卡给一个诚实总时长(overall ~45 min);没有时长数据就不显示
-  const totalMin = wave.reduce((sum, a) => sum + (a.durationMin || 0), 0);
-
   return (
     <div className="nesio-momentum">
       {waveIndex > 1 && (
@@ -305,40 +328,30 @@ export function FocusCardDetail({
             : L(dict, 'AI 暂时离线 · 这是本地拆的,够你先动起来', 'AI offline · a local breakdown to get you moving')}
         </p>
       )}
-      {/* 批次 130·克制清单(设计):温柔引导语 + 进度条,给 ADHD 减压不加压 */}
-      <p className="nesio-momentum-intro">{L(dict, '别急,拆小一点。只做下一步就好。', 'Easy does it — break it smaller. Just the next step.')}</p>
-      {(() => {
-        const doneN = wave.filter((a) => a.done).length;
-        return (
-          <div className="nesio-momentum-progress">
-            <span className="nesio-momentum-progress-label">{L(dict, '进度', 'Progress')}</span>
-            <div className="nesio-momentum-progress-track">
-              <div className="nesio-momentum-progress-fill" style={{ width: `${wave.length ? (doneN / wave.length) * 100 : 0}%` }} />
+      {/* 批次 182(用户实锤):去掉「别急/进度条/共约X分钟」头,进度改小饼图;只留 查看详情 + 换一种拆法 */}
+      <div className="nesio-momentum-head">
+        {(() => {
+          const doneN = wave.filter((a) => a.done).length;
+          const pct = wave.length ? doneN / wave.length : 0;
+          const R = 9, C = 2 * Math.PI * R;
+          return (
+            <div className="nesio-momentum-pie" aria-label={L(dict, `进度 ${doneN}/${wave.length}`, `Progress ${doneN}/${wave.length}`)}>
+              <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden>
+                <circle cx="12" cy="12" r={R} fill="none" stroke="var(--portal-line)" strokeWidth="3" />
+                <circle cx="12" cy="12" r={R} fill="none" stroke="var(--portal-accent)" strokeWidth="3" strokeLinecap="round"
+                  strokeDasharray={C} strokeDashoffset={C * (1 - pct)} transform="rotate(-90 12 12)" />
+              </svg>
+              <span className="nesio-momentum-pie-count">{doneN}/{wave.length}</span>
             </div>
-            <span className="nesio-momentum-progress-count">{doneN} / {wave.length}</span>
-          </div>
-        );
-      })()}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '0.5rem 0 0.45rem' }}>
-        <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--portal-muted)', fontVariantNumeric: 'tabular-nums' }}>
-          {totalMin > 0 ? L(dict, `共约 ${totalMin} 分钟`, `overall ~${totalMin} min`) : ''}
-        </p>
-        <div style={{ display: 'flex', gap: '0.4rem' }}>
-          {/* 批次 72(用户点名):从聚焦卡定位回记忆本体 —— 看详情/关联链/清单 */}
-          <button
-            type="button"
-            onClick={() => { const live = getLiveMemoryNode(node.id); if (live) setMemNode(live); }}
-            style={{ background: 'none', border: '1px solid var(--portal-line)', borderRadius: 999, padding: '0.2rem 0.6rem', fontSize: '0.68rem', color: 'var(--portal-muted)', cursor: 'pointer' }}
-          >
+          );
+        })()}
+        <div style={{ display: 'flex', gap: '0.4rem', marginLeft: 'auto' }}>
+          <button type="button" onClick={() => { const live = getLiveMemoryNode(node.id); if (live) setMemNode(live); }}
+            style={{ background: 'none', border: '1px solid var(--portal-line)', borderRadius: 999, padding: '0.2rem 0.6rem', fontSize: '0.68rem', color: 'var(--portal-muted)', cursor: 'pointer' }}>
             {L(dict, '查看详情', 'Details')}
           </button>
-          {/* 批次 39:云 AI 只走这颗显式按钮 —— 默认引擎是本地模板/骨架,秒出 */}
-          <button
-            type="button"
-            onClick={() => void aiRefineWave()}
-            disabled={aiRefining}
-            style={{ background: 'none', border: '1px solid var(--portal-line)', borderRadius: 999, padding: '0.2rem 0.6rem', fontSize: '0.68rem', color: 'var(--portal-accent)', cursor: 'pointer', opacity: aiRefining ? 0.6 : 1 }}
-          >
+          <button type="button" onClick={() => void aiRefineWave()} disabled={aiRefining}
+            style={{ background: 'none', border: '1px solid var(--portal-line)', borderRadius: 999, padding: '0.2rem 0.6rem', fontSize: '0.68rem', color: 'var(--portal-accent)', cursor: 'pointer', opacity: aiRefining ? 0.6 : 1 }}>
             {aiRefining ? L(dict, '换一种拆法中…', 'Reworking…') : L(dict, '换一种拆法', 'Rework it')}
           </button>
         </div>

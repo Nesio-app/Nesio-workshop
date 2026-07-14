@@ -1322,16 +1322,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                         <span className="nesio-type-chip-count">{typeCounts[t]}</span>
                       </button>
                     ))}
-                    {facetCounts['facet:plan'] > 0 && (
-                      <button
-                        type="button"
-                        className={`nesio-type-chip${typeFilter === 'facet:plan' ? ' is-active' : ''}`}
-                        onClick={() => setTypeFilter((prev) => (prev === 'facet:plan' ? null : 'facet:plan'))}
-                      >
-                        <IconCalendar size={12} /> {L(dict, '计划', 'Plans')}
-                        <span className="nesio-type-chip-count">{facetCounts['facet:plan']}</span>
-                      </button>
-                    )}
+                    {/* 批次 182(用户实锤):「计划」筛选取消,与「项目」合并(项目球即入口) */}
                     {facetCounts['facet:list'] > 0 && (
                       <button
                         type="button"
