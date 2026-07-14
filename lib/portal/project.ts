@@ -8,7 +8,8 @@
 
 import type { LifeNode } from './life-graph';
 
-export type ProjectStatus = 'active' | 'completed' | 'archived';
+// 批次 178:加 'planned'(计划中)—— 项目聚合统计按 进行中/计划中/已完成 分。'archived' 保留兼容旧数据。
+export type ProjectStatus = 'active' | 'planned' | 'completed' | 'archived';
 
 export interface Project {
   id: string;

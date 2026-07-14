@@ -206,7 +206,9 @@ export default function TodayFeed({
       break;
     }
     if (nextUp) {
-      return `${prefix}${L(uiLocale, `最近的一件事:${nextUp}。`, `Next up: ${nextUp}.`)}`;
+      // 批次 178:nextUp 是**未来/临近**事项(hint 恒为「今天/明天/N天后」,已跳过过期/刚记录),
+      // 原文案「最近的一件事」是过去时态,与未来内容打架 —— 改成前向表述,与英文 Next up 对齐。
+      return `${prefix}${L(uiLocale, `接下来:${nextUp}。`, `Next up: ${nextUp}.`)}`;
     }
     if (isEvening) {
       return receipt.todayCount > 0

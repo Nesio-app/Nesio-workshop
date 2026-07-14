@@ -13754,11 +13754,12 @@ html[data-portal-theme="night"] .nesio-project-card-name { color: #d8e8ff; }
 .nesio-fav-sheet { min-height: 62vh; }
 /* 批次 170:收纳头部 —— 去标题,统计居中方块徽章,关闭钮绝对右 */
 .nesio-inv-header { position: relative; justify-content: center; min-height: 34px; }
-.nesio-inv-stats { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+/* 批次 178:收纳统计三连排(件/估值/未归位)—— grid 三等分,不换行 */
+.nesio-inv-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 /* 批次 173:统计框变大 */
 .nesio-inv-stat {
   font-size: 0.92rem; font-weight: 600; font-variant-numeric: tabular-nums;
-  padding: 8px 16px; border-radius: 12px;
+  padding: 8px 10px; border-radius: 12px; text-align: center;
   background: var(--portal-accent-soft, rgba(0,0,0,0.06));
   color: var(--text-secondary, var(--portal-muted));
 }
@@ -13772,14 +13773,6 @@ html[data-portal-theme="night"] .nesio-project-card-name { color: #d8e8ff; }
   font-size: 0.72rem; color: var(--portal-muted);
 }
 .nesio-proj-stat b { display: block; font-size: 1.1rem; color: var(--portal-ink); font-weight: 700; }
-/* 批次 173:项目详情状态选择器(进行中/已完成/已归档) */
-.nesio-proj-status-seg { display: flex; gap: 6px; padding: 0.2rem 1rem 0.5rem; }
-.nesio-proj-status-btn {
-  flex: 1; padding: 6px 4px; border-radius: 999px;
-  border: 1px solid var(--portal-line); background: transparent;
-  color: var(--portal-muted); font-size: 0.78rem; cursor: pointer;
-}
-.nesio-proj-status-btn--on { background: var(--portal-accent); border-color: var(--portal-accent); color: #fff; }
 /* 批次 168:收藏夹维度 filter chips(全部/价值/习惯/节律/关系) */
 .nesio-fav-filter {
   display: flex;
