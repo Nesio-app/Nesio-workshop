@@ -7188,6 +7188,24 @@ html[data-portal-theme="night"] .nesio-tips-body { color: #8fa3c0; }
   pointer-events: auto;
 }
 .nesio-coach-overlay--dim { background: rgba(20, 22, 30, 0.55); }
+/* 可交互步:浮层放行点击,让用户真的点/长按高亮的目标(气泡本身仍可点) */
+.nesio-coach-overlay--pass { pointer-events: none; }
+.nesio-coach-overlay--pass .nesio-coach-bubble { pointer-events: auto; }
+/* 「点一下/长按试试」高亮提示 */
+.nesio-coach-taphint {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.15rem 0 0.5rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: var(--radius-pill, 999px);
+  background: var(--portal-accent-soft, rgba(88, 140, 227, 0.12));
+  color: var(--portal-blue-deep);
+  font-size: 0.76rem;
+  font-weight: 700;
+  animation: nesioTapPulse 1.4s ease-in-out infinite;
+}
+@keyframes nesioTapPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
 /* 高亮框:巨大 box-shadow 把四周压暗,只留目标亮着;随步平滑移动 */
 .nesio-coach-spot {
   position: fixed;

@@ -2,9 +2,8 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import NesioMark from './NesioMark';
-import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { L, t } from '@/lib/portal/i18n';
-import { IconBox, IconTarget, IconSmile, IconMic, IconZap, IconStar, IconUser, IconBulb, IconCheckCircle, IconMail, IconLock } from './icons';
+import { IconTarget, IconSmile, IconMic, IconZap, IconStar, IconBulb, IconMail, IconLock } from './icons';
 import {
   loadProfileSettings,
   portalLocaleToDictionaryLocale,
@@ -333,34 +332,29 @@ type TourStep = {
   Icon: React.ComponentType<{ size?: number }>;
   title: string;
   body: string;
-  target: string | null;                 // data-tour 值;null = 居中(激活步)
+  target: string | null;                 // data-tour 值;null = 居中
   place?: 'above' | 'below' | 'auto';
   round?: boolean;                        // 圆形高亮(中键)
+  tap?: boolean;                          // 可交互:让用户真的点/长按目标(浮层放行点击)
+  longpress?: boolean;                    // tap 提示写「长按」
 };
 
 export function FirstUseTips({ onDone, locale }: { onDone: () => void; locale: PortalLocale }) {
   const [step, setStep] = useState(0);
   const dict = portalLocaleToDictionaryLocale(locale);
-  // 真正的聚光式 coach-mark:每步定位到对应 UI(data-tour),高亮它 + 气泡指过去,不再原地不动。
+  // 聚光式 coach-mark:每步定位到对应 UI(data-tour),高亮 + 气泡指过去;中键步可真实点/长按。
   const steps: TourStep[] = [
     { Icon: IconTarget, title: t(locale, 'onboardingTipTodayTitle'), body: t(locale, 'onboardingTipTodayBody'), target: 'today', place: 'above' },
     { Icon: IconSmile, title: L(dict, '今天第一拍:心情', "Today's first beat: mood"), body: L(dict, '这里点一下心情,记下此刻的情绪和精力 —— 后面洞察会把它连成规律。', 'Tap here to log how you feel and your energy — Insights weaves it into patterns later.'), target: 'mood', place: 'auto' },
-    { Icon: IconMic, title: t(locale, 'onboardingTipCenterTitle'), body: t(locale, 'onboardingTipCenterBody'), target: 'center', place: 'above', round: true },
-    { Icon: IconZap, title: L(dict, '长按问一问', 'Hold to Ask'), body: L(dict, '长按这个中间按钮直接问:「护照放在哪」「上次买的药」,记过的都能找回。', 'Hold this center button and just ask: "Where is my passport?" — anything you noted comes back.'), target: 'center', place: 'above', round: true },
-    { Icon: IconUser, title: L(dict, '一句话,拆出人和物', 'One line → people & things'), body: L(dict, '把一段话丢给念念:「和老王开会,买了台显示器」—— 自动记成人物「老王」和物品「显示器」,整理归位。', 'Drop a line to Nesio: "Met Wang, bought a monitor" — it files a person "Wang" and an item "monitor" automatically.'), target: 'center', place: 'above', round: true },
+    { Icon: IconMic, title: t(locale, 'onboardingTipCenterTitle'), body: t(locale, 'onboardingTipCenterBody'), target: 'center', place: 'above', round: true, tap: true },
+    { Icon: IconZap, title: L(dict, '任务太大?拆一下', 'Too big? Break it down'), body: L(dict, '今天要紧的事上点「拆一下」—— 把一件大事拆成 3 个立刻能动手的小步。', 'On a focus item, tap "Break down" — a big task becomes 3 steps you can start right now.'), target: 'breakdown', place: 'below' },
     { Icon: IconStar, title: t(locale, 'onboardingTipMemoryTitle'), body: L(dict, '你记过的一切都在「记忆」里。长按任意卡片:标为核心记忆,或加进某个项目。', 'Everything you noted lives in Memory. Long-press any card: mark it Core, or add it to a Project.'), target: 'memory', place: 'above' },
     { Icon: IconBulb, title: L(dict, '洞察:把点连成线', 'Insights: connect the dots'), body: L(dict, '点左上角这个晶体进洞察 —— 心情、关系、足迹、花销会被连成规律,轻轻提醒。', 'Tap this crystal top-left for Insights — mood, people, places and spending linked into gentle patterns.'), target: 'insights', place: 'below' },
-    { Icon: IconCheckCircle, title: '', body: '', target: null }, // 激活步:居中
+    { Icon: IconMic, title: L(dict, '长按这里有惊喜', 'Long-press here for a surprise'), body: L(dict, '长按中间按钮松手,直接问念念「护照放哪」「上次买的药」—— 记过的都能找回。', 'Long-press & release the center button to ask Nessa "Where’s my passport?" — anything noted comes back.'), target: 'center', place: 'above', round: true, tap: true, longpress: true },
   ];
   const cur = steps[step];
   const StepIcon = cur.Icon;
   const isLast = step === steps.length - 1;
-
-  // 激活式最后一步:真的存进第一条记忆,并当场找回 —— 引导结束时
-  // 用户已经亲历过一次「扔进来 → 找得到」,而不是只被告知过。
-  const [firstText, setFirstText] = useState(t(locale, 'onboardingActivatePlaceholderDefault'));
-  const [activatePhase, setActivatePhase] = useState<'input' | 'found'>('input');
-  const [savedName, setSavedName] = useState('');
 
   // 目标元素的位置(每步/尺寸变化重测;元素还没布好用 rAF 重试)
   const [rect, setRect] = useState<DOMRect | null>(null);
@@ -383,65 +377,30 @@ export function FirstUseTips({ onDone, locale }: { onDone: () => void; locale: P
     return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', onChange); window.removeEventListener('scroll', onChange, true); };
   }, [step, cur.target]);
 
-  function saveFirstMemory() {
-    const text = firstText.trim();
-    if (!text) return;
-    const name = text.slice(0, 60);
-    ingestLifeNode({
-      name, type: 'object', source: 'manual', confidence: 1, rawInput: text,
-      tags: [t(locale, 'onboardingActivateFirstTag')], attributes: {}, relations: [],
-    });
-    setSavedName(name);
-    setActivatePhase('found');
-  }
-
   const dots = (
     <div className="nesio-tips-dots" aria-hidden>
       {steps.map((_, i) => <span key={i} className={`nesio-tips-dot${i === step ? ' nesio-tips-dot--active' : ''}`} />)}
     </div>
   );
 
-  const content = isLast ? (
-    activatePhase === 'input' ? (
-      <>
-        {dots}
-        <div className="nesio-tips-emoji" aria-hidden><StepIcon size={26} /></div>
-        <h3 className="nesio-tips-title">{t(locale, 'onboardingActivateTryTitle')}</h3>
-        <p className="nesio-tips-body">{t(locale, 'onboardingActivateTryBody')}</p>
-        <input className="nesio-ob-input" value={firstText}
-          onChange={(e) => setFirstText(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') saveFirstMemory(); }} style={{ marginTop: '0.5rem' }} />
-        <div className="nesio-tips-actions">
-          <button type="button" className="nesio-ob-primary-btn" onClick={saveFirstMemory} disabled={!firstText.trim()}>{t(locale, 'onboardingActivateSave')}</button>
-          <button type="button" className="nesio-ob-skip-btn" onClick={onDone}>{t(locale, 'onboardingActivateSkip')}</button>
-        </div>
-      </>
-    ) : (
-      <>
-        {dots}
-        <div className="nesio-tips-emoji" aria-hidden><IconCheckCircle size={26} /></div>
-        <h3 className="nesio-tips-title">{t(locale, 'onboardingActivateFoundTitle')}</h3>
-        <p className="nesio-tips-body">{t(locale, 'onboardingActivateFoundBody')}</p>
-        <div style={{ background: 'var(--portal-accent-soft, rgba(88,140,227,0.1))', borderRadius: 12, padding: '0.7rem 0.9rem', margin: '0.5rem 0', textAlign: 'left' }}>
-          <p style={{ fontSize: '0.76rem', margin: 0, color: 'var(--portal-muted)' }}>{t(locale, 'onboardingActivateAskExample')}</p>
-          <p style={{ fontSize: '0.82rem', margin: '0.35rem 0 0', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5 }}><IconBox size={14} /> {savedName}</p>
-        </div>
-        <p className="nesio-tips-body">{t(locale, 'onboardingActivateSummary')}</p>
-        <div className="nesio-tips-actions">
-          <button type="button" className="nesio-ob-primary-btn" onClick={onDone}>{t(locale, 'onboardingActivateStart')}</button>
-        </div>
-      </>
-    )
-  ) : (
+  const content = (
     <>
       {dots}
       <div className="nesio-tips-emoji" aria-hidden><StepIcon size={26} /></div>
       <h3 className="nesio-tips-title">{cur.title}</h3>
       <p className="nesio-tips-body">{cur.body}</p>
+      {cur.tap && (
+        <div className="nesio-coach-taphint" aria-hidden>
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11V6a2 2 0 014 0v5" /><path d="M13 8a2 2 0 014 0v3" /><path d="M17 9a2 2 0 014 0v4a7 7 0 01-7 7h-2a7 7 0 01-6-4l-1.5-3a1.6 1.6 0 012.7-1.6L9 13" /></svg>
+          {cur.longpress ? L(dict, '长按这个按钮试试', 'Long-press this button') : L(dict, '点一下这个按钮试试', 'Tap this button to try')}
+        </div>
+      )}
       <div className="nesio-tips-actions">
         <span className="nesio-tips-count">{step + 1}/{steps.length}</span>
         <button type="button" className="nesio-ob-skip-btn" onClick={onDone}>{t(locale, 'onboardingSkip')}</button>
-        <button type="button" className="nesio-ob-primary-btn" onClick={() => setStep(step + 1)}>{t(locale, 'onboardingTipNext')}</button>
+        <button type="button" className="nesio-ob-primary-btn" onClick={() => (isLast ? onDone() : setStep(step + 1))}>
+          {isLast ? L(dict, '开始使用', 'Start') : t(locale, 'onboardingTipNext')}
+        </button>
       </div>
     </>
   );
@@ -459,8 +418,15 @@ export function FirstUseTips({ onDone, locale }: { onDone: () => void; locale: P
     return { VH, bw, gap, pad, place, left, caretX };
   })();
 
+  // 可交互步:浮层放行点击(pointer-events:none),让用户真的点/长按目标;其余步照旧遮挡。
+  const overlayCls = [
+    'nesio-coach-overlay',
+    geo ? '' : 'nesio-coach-overlay--dim',
+    cur.tap ? 'nesio-coach-overlay--pass' : '',
+  ].filter(Boolean).join(' ');
+
   return (
-    <div className={`nesio-coach-overlay${geo ? '' : ' nesio-coach-overlay--dim'}`} role="dialog" aria-modal="true" aria-label={t(locale, 'onboardingTipsAriaLabel')}>
+    <div className={overlayCls} role="dialog" aria-modal="true" aria-label={t(locale, 'onboardingTipsAriaLabel')}>
       {geo && rect && (
         <div className="nesio-coach-spot" aria-hidden
           style={{ left: rect.left - geo.pad, top: rect.top - geo.pad, width: rect.width + geo.pad * 2, height: rect.height + geo.pad * 2, borderRadius: cur.round ? '50%' : 16 }} />
@@ -488,6 +454,8 @@ export default function PortalOnboarding() {
   const [step, setStep] = useState<Step>('welcome');
   const [displayName, setDisplayName] = useState('');
   const [locale, setLocale] = useState<PortalLocale>('zh');
+  // 预览模式(设置页「预览引导」触发):此时别让登录态事件把强制显示的引导关掉。
+  const previewModeRef = useRef(false);
 
   function syncProfileFromSession(session: AuthSessionResult) {
     const name = deriveDisplayNameFromSession(session);
@@ -542,9 +510,11 @@ export default function PortalOnboarding() {
         setLocale(profile.locale || 'zh');
 
         // 「预览引导」强制重放:在登录态短路之前判定,否则已登录用户永远看不到引导。
+        // 不在这里清 URL 参数 —— hydrate 可能被 React 双调用/重挂,清早了第二次就读不到、
+        // 强制显示丢失(welcome 尤其明显)。留到用户看完/跳过时再清,保证每次 hydrate 同解。
         const preview = readPreviewParam();
-        if (preview === 'tour') { clearPreviewParam(); setShowTips(true); return; }
-        if (preview === 'welcome') { clearPreviewParam(); setStep('welcome'); setVisible(true); return; }
+        if (preview === 'tour') { previewModeRef.current = true; setShowTips(true); return; }
+        if (preview === 'welcome') { previewModeRef.current = true; setStep('welcome'); setVisible(true); return; }
 
         const done = localStorage.getItem(ONBOARDING_DONE_KEY) === '1' ||
           localStorage.getItem(LEGACY_ONBOARDING_DONE_KEY) === '1';
@@ -580,6 +550,7 @@ export default function PortalOnboarding() {
     }
 
     function handleAuthReady(event: Event) {
+      if (previewModeRef.current) return; // 预览强制显示中,别被登录态事件关掉
       const detail = (event as CustomEvent<AuthReadyEventDetail>).detail;
       if ((!detail?.ok && !detail?.loggedIn && detail?.authReady !== true) || detail?.profileBootstrapBlocking === true) return;
       readAuthSession().then((session) => {
@@ -617,6 +588,8 @@ export default function PortalOnboarding() {
   }
 
   function finish() {
+    clearPreviewParam();
+    previewModeRef.current = false;
     markOnboardingDone();
     setVisible(false);
     setShowTips(true);
@@ -624,6 +597,8 @@ export default function PortalOnboarding() {
   }
 
   function handleTipsDone() {
+    clearPreviewParam();
+    previewModeRef.current = false;
     try { localStorage.setItem(TIPS_SHOWN_KEY, '1'); } catch { /* ignore */ }
     setShowTips(false);
   }
