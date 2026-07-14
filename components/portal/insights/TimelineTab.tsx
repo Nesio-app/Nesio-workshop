@@ -88,7 +88,11 @@ function donutSeg(cx: number, cy: number, rO: number, rI: number, a0: number, a1
   return `M${x0} ${y0} A${rO} ${rO} 0 ${large} 1 ${x1} ${y1} L${x2} ${y2} A${rI} ${rI} 0 ${large} 0 ${x3} ${y3} Z`;
 }
 
-type PlaceSeg = { key: string; label: string; pct: number; min: number; color: string };
+type PlaceSeg = { key: string; category: PlaceCategory; label: string; pct: number; min: number; count: number; color: string };
+function fmtDur(min: number): string {
+  const h = Math.floor(min / 60), m = Math.round(min % 60);
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
 function PlaceDonut({ segments, selected, onSelect, centerCount, centerLabel, dict }: {
   segments: PlaceSeg[]; selected: string | null; onSelect: (k: string | null) => void;
   centerCount: number; centerLabel: string; dict: string;
@@ -102,29 +106,41 @@ function PlaceDonut({ segments, selected, onSelect, centerCount, centerLabel, di
     const a1 = (acc / totalPct) * 360;
     return { s, a0, a1, mid: (a0 + a1) / 2 };
   });
+  // 点任何空白处 → 恢复未选中彩图态
   return (
-    <div className="nesio-tl-donut2wrap">
+    <div className="nesio-tl-donut2wrap" onClick={() => onSelect(null)}>
       <div className="nesio-tl-donut2">
         <svg viewBox="0 0 100 100" width="100%" height="100%" role="img" aria-label={L(dict, '地点类别占比(点扇形看详情)', 'Place category share (tap a slice)')}>
-          {arcs.map(({ s, a0, a1, mid }) => {
+          {arcs.map(({ s, a0, a1 }) => {
             const dim = selected != null && selected !== s.key;
-            const [lx, ly] = polar(50, 50, 35.5, mid);
+            const uncat = s.category === 'unknown';
             return (
-              <g key={s.key} style={{ cursor: 'pointer' }} onClick={() => onSelect(selected === s.key ? null : s.key)}>
-                <path d={donutSeg(50, 50, 44, 27, a0, Math.max(a0 + 0.5, a1))} fill={s.color} opacity={dim ? 0.32 : 1} stroke="var(--sheet-opaque, #fff)" strokeWidth="0.8" />
-                {s.pct >= 8 && (
-                  <text x={lx} y={ly} textAnchor="middle" dominantBaseline="middle" fontSize="6.2" fontWeight="700" fill="#fff" opacity={dim ? 0.4 : 0.95} style={{ pointerEvents: 'none' }}>{s.pct}%</text>
-                )}
-              </g>
+              <path key={s.key} d={donutSeg(50, 50, 44, 27, a0, Math.max(a0 + 0.5, a1))}
+                fill={s.color} opacity={dim ? 0.32 : 1}
+                stroke={uncat ? 'var(--portal-line)' : 'var(--sheet-opaque, #fff)'} strokeWidth="0.8"
+                style={{ cursor: 'pointer' }}
+                onClick={(e) => { e.stopPropagation(); onSelect(selected === s.key ? null : s.key); }} />
             );
           })}
         </svg>
+        {/* 图例贴饼里:每片显示图标 + 时长(无分类=问号);HTML 叠层,不吃点击 */}
+        {arcs.filter(({ s }) => s.pct >= 7).map(({ s, mid }) => {
+          const [lx, ly] = polar(50, 50, 35.5, mid);
+          const dim = selected != null && selected !== s.key;
+          return (
+            <div key={s.key} className="nesio-tl-donut2-slice" style={{ left: `${lx}%`, top: `${ly}%`, opacity: dim ? 0.35 : 1 }}>
+              {s.category === 'unknown'
+                ? <span className="nesio-tl-donut2-q">?</span>
+                : <>{catIconSvg(s.category)}<span className="nesio-tl-donut2-dur">{fmtDur(s.min)}</span></>}
+            </div>
+          );
+        })}
         <div className="nesio-tl-donut2-ctr" aria-live="polite">
           {sel ? (
             <>
-              <b>{sel.pct}%</b>
+              <b>{sel.count}</b>
               <small className="nesio-tl-donut2-ctr-name">{sel.label}</small>
-              <small>{sel.min >= 60 ? L(dict, `${Math.round(sel.min / 60)} 小时`, `${Math.round(sel.min / 60)}h`) : L(dict, `${sel.min} 分钟`, `${sel.min}m`)}</small>
+              <small>{L(dict, '个地点', sel.count === 1 ? 'place' : 'places')} · {fmtDur(sel.min)}</small>
             </>
           ) : (
             <>
@@ -211,10 +227,18 @@ export default function TimelineTab() {
   }, [trail, placePeriod]);
   const placeShare = useMemo(() => {
     const raw = categoryTimeShare(placePeriodTrail).filter((c) => c.pct > 0);
-    const top = raw.slice(0, 5).map((c, i) => ({ key: String(c.category), label: L(dict, CAT[c.category][0], CAT[c.category][1]), pct: c.pct, min: c.totalMin, color: CAT_PIE_COLORS[i] }));
+    const catCount = new Map<PlaceCategory, number>();
+    for (const c of clusterPlaces(placePeriodTrail, 99999)) catCount.set(c.category, (catCount.get(c.category) || 0) + 1);
+    const top = raw.slice(0, 5).map((c, i) => ({
+      key: String(c.category), category: c.category,
+      label: L(dict, CAT[c.category][0], CAT[c.category][1]),
+      pct: c.pct, min: c.totalMin, count: catCount.get(c.category) || 0,
+      // 无分类(unknown)用白填充 + 中间问号;其余走莫兰迪 token 环。
+      color: c.category === 'unknown' ? 'var(--sheet-opaque, #fff)' : CAT_PIE_COLORS[i],
+    }));
     const rest = raw.slice(5);
     const restPct = rest.reduce((s, c) => s + c.pct, 0);
-    if (restPct > 0) top.push({ key: 'other', label: L(dict, '其他', 'Other'), pct: restPct, min: rest.reduce((s, c) => s + c.totalMin, 0), color: CAT_PIE_COLORS[5] });
+    if (restPct > 0) top.push({ key: 'other', category: 'place' as PlaceCategory, label: L(dict, '其他', 'Other'), pct: restPct, min: rest.reduce((s, c) => s + c.totalMin, 0), count: rest.reduce((s, c) => s + (catCount.get(c.category) || 0), 0), color: CAT_PIE_COLORS[5] });
     return top;
   }, [placePeriodTrail, dict]);
   const placeRanking = useMemo(() => clusterPlaces(placePeriodTrail, 6).slice().sort((a, b) => b.visits - a.visits).slice(0, 5), [placePeriodTrail]);
@@ -342,7 +366,8 @@ export default function TimelineTab() {
   const dayMapPoints = dayPts.map((s) => ({ lat: s.lat!, lon: s.lon!, label: displayLabel(s.label), weightMin: Math.max(10, s.durationMin), color: DOT_COLOR[s.category] }));
   const dayPath = dayPts.map((s) => ({ lat: s.lat!, lon: s.lon! }));
 
-  const SUBS: Array<[Sub, string, string]> = [['timeline', '时间线', 'Timeline'], ['analytics', '分析', 'Analytics'], ['travel', '地点', 'Places'], ['world', '世界', 'World']];
+  // 「分析」并入「地点」—— 地点页先看月度概览,再看类别甜甜圈 + 最常去。
+  const SUBS: Array<[Sub, string, string]> = [['timeline', '时间线', 'Timeline'], ['travel', '地点', 'Places'], ['world', '世界', 'World']];
 
   return (
     <div className="nesio-tl">
@@ -402,9 +427,9 @@ export default function TimelineTab() {
       )}
 
       {/* ── 分析:聚类 + 地点纠正 ── */}
-      {sub === 'analytics' && (
+      {sub === 'travel' && (
         <>
-          {/* ── 月度概览(Google Timeline Insights 形态):数字 + 环比 ── */}
+          {/* ── 月度概览(Google Timeline Insights 形态):数字 + 环比 ── 「分析」并入 */}
           {monthly && (
             <div className="nesio-tl-month">
               <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>
