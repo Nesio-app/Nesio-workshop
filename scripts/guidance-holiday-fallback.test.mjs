@@ -48,7 +48,7 @@ assert.match(todayFeed, /nesio-today-receipt/, 'TodayFeed must render the receip
 assert.doesNotMatch(todayFeed, /cloudSyncSummary|getLifeGraphCloudSyncSummary|待同步/, 'Receipt must never surface sync counters (P0-1).');
 assert.match(todayFeed, /getProactiveCardBudget\(\)/, 'Memory/guidance cards must respect the quiet-mode budget.');
 assert.match(todayFeed, /isEvening \? 2 : 1/, 'Memory cards cap at 1 by day, 2 in the evening (§1.2).');
-assert.match(todayFeed, /nesio-capture-hint/, 'TodayFeed must render the capture hint pointing at the FAB (④,the only hero action).');
+// 批次 169:用户定案去掉底部「想到什么…」捕获提示行(记一笔输入框已接管入口),契约随之撤这条。
 // 兜底轮播的确定性纪律(builder 保留待删,若存在仍不得用 Math.random)
 assert.doesNotMatch(proactiveTypes, /Math\.random\(\)/, 'proactive-types must not use Math.random (visual jumping).');
 

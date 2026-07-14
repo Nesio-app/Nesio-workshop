@@ -146,9 +146,7 @@ export function TodayFocusSection({
   const [calRecorderEvent, setCalRecorderEvent] = useState<CalendarEvent | null>(null);
   const locale = usePortalLocale();
   const { flashNodes, dismiss: dismissFlash } = useMemoryFlash();
-  // 批次 163:记一笔输入框 —— 全屏放大态 + 随字增高。
-  const [jotFull, setJotFull] = useState(false);
-  const [jotFocused, setJotFocused] = useState(false); // 批次 167:聚焦态决定 ↑ 按钮虚线/实线
+  // 批次 163→169:记一笔输入框随字增高(去掉全屏/虚线态)。
   const growJot = () => {
     const el = capture?.inputRef.current;
     if (el) { el.style.height = 'auto'; el.style.height = `${Math.min(el.scrollHeight, 160)}px`; }
@@ -338,23 +336,16 @@ export function TodayFocusSection({
                   onChange={(e) => { capture.onChange(e.target.value); growJot(); }}
                   onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); capture.onSubmit(); } }}
                   onFocus={(e) => {
-                    setJotFocused(true);
                     // 批次 167:键盘错位修复 —— 聚焦后等键盘升起,把输入框滚到可见区(否则被键盘挡住)
                     const el = e.currentTarget;
                     setTimeout(() => { try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch { /* ignore */ } }, 320);
                   }}
-                  onBlur={() => setJotFocused(false)}
                   placeholder={L(dict, '点话筒说一句,或记一下…', 'Tap the mic to speak, or jot…')}
                 />
                 {capture.value.trim() && (
                   <div className="nesio-tl-capture-actions">
-                    <button type="button" className="nesio-tl-capture-expand" aria-label={L(dict, '放大', 'Expand')} onClick={() => setJotFull(true)}>⤢</button>
-                    {/* 批次 167:记下 = 圆形 ↑ 按钮(对齐话筒圈);聚焦打字=虚线浅色,失焦=实线主题色 */}
-                    <button
-                      type="submit"
-                      className={`nesio-tl-capture-send${jotFocused ? ' nesio-tl-capture-send--typing' : ''}`}
-                      aria-label={L(dict, '记下', 'Jot')}
-                    >↑</button>
+                    {/* 批次 169:记下 = 小号实心 ↑ 圆钮(去掉全屏/虚线态) */}
+                    <button type="submit" className="nesio-tl-capture-send" aria-label={L(dict, '记下', 'Jot')}>↑</button>
                   </div>
                 )}
               </div>
@@ -362,28 +353,6 @@ export function TodayFocusSection({
           </div>
         )}
 
-        {/* 批次 163:记一笔全屏放大态(打字时点「放大」进入,慢慢写) */}
-        {jotFull && capture && (
-          <div className="nesio-jot-full" role="dialog" aria-modal="true">
-            <div className="nesio-jot-full-head">
-              <button type="button" className="nesio-jot-full-close" onClick={() => setJotFull(false)}>{L(dict, '收起', 'Collapse')}</button>
-              <span className="nesio-jot-full-title">{L(dict, '记一笔', 'Jot')}</span>
-              <button
-                type="button"
-                className="nesio-jot-full-save"
-                disabled={!capture.value.trim()}
-                onClick={() => { capture.onSubmit(); setJotFull(false); }}
-              >{L(dict, '记下', 'Jot')}</button>
-            </div>
-            <textarea
-              className="nesio-jot-full-input"
-              value={capture.value}
-              onChange={(e) => capture.onChange(e.target.value)}
-              placeholder={L(dict, '慢慢写…', 'Take your time…')}
-              autoFocus
-            />
-          </div>
-        )}
       </div>
 
       {/* Calendar event meeting recorder */}

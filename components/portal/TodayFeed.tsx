@@ -319,12 +319,7 @@ export default function TodayFeed({
         <RoutineDueCards />
         <ExperimentCheckinCard />
 
-        {/* §1 ④捕获提示:指向导航 FAB(唯一英雄动作),文案随时段变 */}
-        <p className="nesio-capture-hint">
-          {isEvening
-            ? L(uiLocale, '睡前想到什么,按住方块说一句,今天就能放下了', 'Anything left in your head — hold the cube, say it, and let today go')
-            : L(uiLocale, '想到什么,按住方块说一句就卸下', 'Anything on your mind — hold the cube and say it')}
-        </p>
+        {/* 批次 169:用户实锤去掉底部「想到什么…」提示行 */}
       </div>
 
       {/* 聚焦模式 */}

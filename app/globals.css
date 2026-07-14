@@ -9083,7 +9083,8 @@ html[data-portal-theme="night"] .nesio-tl-dot--mood {
   border: 1px solid var(--portal-line);
   border-radius: 12px;
   outline: none;
-  font-size: 0.9rem;
+  /* 批次 169:字体随系统(16px)—— 之前 0.9rem 偏小,且 <16px 会触发 iOS 自动缩放 */
+  font-size: 1rem;
   line-height: 1.45;
   color: var(--portal-ink);
   padding: 8px 12px;
@@ -9095,13 +9096,14 @@ html[data-portal-theme="night"] .nesio-tl-dot--mood {
 .nesio-tl-capture-input:focus,
 .nesio-tl-capture--filled .nesio-tl-capture-input { border-color: color-mix(in srgb, var(--portal-accent) 45%, var(--portal-line)); }
 .nesio-tl-capture-input::placeholder { color: var(--portal-muted); }
-/* 批次 166:动作按钮放进输入框里(右下角浮层),不再另起一行 */
+/* 批次 166→169:动作按钮进输入框(右侧竖直居中);框单行紧凑,换行才随字增高 */
 .nesio-tl-capture-box { position: relative; }
-.nesio-tl-capture-box--filled .nesio-tl-capture-input { padding-bottom: 44px; }
+.nesio-tl-capture-box--filled .nesio-tl-capture-input { padding-right: 42px; } /* 给右侧按钮留位,不再撑高 */
 .nesio-tl-capture-actions {
   position: absolute;
   right: 8px;
-  bottom: 7px;
+  top: 50%;
+  transform: translateY(-50%);
   display: flex; align-items: center; justify-content: flex-end; gap: 6px;
 }
 .nesio-tl-capture-expand {
@@ -9117,25 +9119,19 @@ html[data-portal-theme="night"] .nesio-tl-dot--mood {
   padding: 5px 16px; border-radius: 999px;
 }
 .nesio-tl-capture-save:active { filter: brightness(0.94); }
-/* 批次 167:记下 = 圆形 ↑ 按钮(对齐话筒圈)。失焦=实心主题色;聚焦打字=虚线浅色 */
+/* 批次 169:记下 = 小号实心 ↑ 圆钮(去掉虚线态,缩小到 24px) */
 .nesio-tl-capture-send {
   flex-shrink: 0;
-  width: 30px; height: 30px;
-  min-width: 30px; min-height: 30px;
+  width: 24px; height: 24px;
+  min-width: 24px; min-height: 24px;
   border-radius: 50%;
-  border: 2px solid var(--portal-accent);
+  border: none;
   background: var(--portal-accent);
   color: #fff;
-  font-size: 1rem; line-height: 1;
+  font-size: 0.9rem; line-height: 1;
   display: grid; place-items: center;
   cursor: pointer;
   box-sizing: border-box;
-  transition: background .15s ease, border-color .15s ease, color .15s ease;
-}
-.nesio-tl-capture-send--typing {
-  border-style: dashed;
-  background: var(--portal-accent-soft);
-  color: var(--portal-accent);
 }
 .nesio-tl-capture-send:active { filter: brightness(0.94); }
 
