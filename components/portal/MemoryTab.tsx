@@ -711,7 +711,7 @@ function FavoritesSheet({ pinnedNodes, onClose, onOpenNode, onLongPressNode }: {
   return (
     <>
       <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
-      <div className="nesio-project-detail-sheet">
+      <div className="nesio-project-detail-sheet nesio-fav-sheet">
         <div className="nesio-project-detail-header">
           <span className="nesio-project-detail-emoji"><IconBookmark size={16} /></span>
           <span className="nesio-project-detail-name">{L(dict, '收藏夹', 'Saved')}</span>

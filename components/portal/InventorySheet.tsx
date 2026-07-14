@@ -45,6 +45,13 @@ function previewColor(name: string): string {
   for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
   return PREVIEW_COLORS[h % PREVIEW_COLORS.length];
 }
+// 批次 170:去 emoji —— 位置/分组名里残留的 🏠 等图形字符全清掉(设计:一律线性,无 emoji)
+function stripEmoji(s: string): string {
+  return s
+    .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE00}-\u{FE0F}\u{1F1E6}-\u{1F1FF}\u{200D}]/gu, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
 
 export default function InventorySheet({ open, onClose }: InventorySheetProps) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
@@ -105,6 +112,25 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
 
   const unplacedCount = useMemo(() => items.filter((i) => !i.space).length, [items]);
   const st = useMemo(() => inventoryStats(items), [items]);
+
+  // 批次 170:物品左侧占位符 —— 该物品记忆有图就显示真图(取本机 IndexedDB 图,离线也能看)
+  const [thumbs, setThumbs] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    (async () => {
+      const { getLocalImage } = await import('@/lib/portal/local-image-store');
+      for (const i of visible) {
+        if (thumbs[i.id]) continue;
+        const asset = (i.node.assets || []).find((a) => a.kind === 'image' || a.mimeType?.startsWith('image/'));
+        if (!asset?.id) continue;
+        const url = await getLocalImage(asset.id);
+        if (url && !cancelled) setThumbs((prev) => ({ ...prev, [i.id]: url }));
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, visible]);
   const detail = detailId ? items.find((i) => i.id === detailId) ?? null : null;
 
   if (!open) return null;
@@ -187,17 +213,16 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
   return (
     <div className="nesio-freeze-overlay" onClick={onClose}>
       <div className="nesio-freeze-sheet" onClick={(e) => e.stopPropagation()}>
-        {/* 批次 133·设计:标题 + 统计收成标题旁一行小字(去掉抽象方块统计) */}
-        <div className="nesio-freeze-header">
-          <span className="nesio-freeze-title">{L(dict, '收纳', 'Storage')}</span>
-          {view === 'list' && items.length > 0 && (
-            <span style={{ marginLeft: 'auto', marginRight: '0.6rem', fontSize: '0.72rem', color: 'var(--text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>
-              {L(dict, `${st.count} 件`, `${st.count}`)}
-              {st.totalValue > 0 ? ` · ${L(dict, '估值', '~')} $${Math.round(st.totalValue).toLocaleString('en-US')}` : ''}
-              {unplacedCount > 0 ? ` · ${unplacedCount} ${L(dict, '未归位', 'unplaced')}` : ''}
-            </span>
-          )}
-          <button type="button" className="nesio-freeze-close" onClick={view === 'list' ? onClose : () => { setView('list'); setDetailId(null); }}>
+        {/* 批次 170:去「收纳」标题;统计挪中间上方,方块容器徽章 */}
+        <div className="nesio-freeze-header nesio-inv-header">
+          {view === 'list' && items.length > 0 ? (
+            <div className="nesio-inv-stats">
+              <span className="nesio-inv-stat">{st.count} {L(dict, '件', 'items')}</span>
+              {st.totalValue > 0 && <span className="nesio-inv-stat">≈ ${Math.round(st.totalValue).toLocaleString('en-US')}</span>}
+              {unplacedCount > 0 && <span className="nesio-inv-stat">{unplacedCount} {L(dict, '未归位', 'unplaced')}</span>}
+            </div>
+          ) : <span />}
+          <button type="button" className="nesio-freeze-close nesio-inv-close" onClick={view === 'list' ? onClose : () => { setView('list'); setDetailId(null); }}>
             {view === 'list' ? '✕' : '‹'}
           </button>
         </div>
@@ -216,7 +241,7 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
               <button type="button" style={chip(groupFilter === ALL)} onClick={() => setGroupFilter(ALL)}>{L(dict, '全部', 'All')} {items.length}</button>
               {groups.map(([name, n]) => (
                 <button key={name} type="button" style={chip(groupFilter === name)} onClick={() => setGroupFilter(name)}>
-                  {name} {n}
+                  {stripEmoji(name) || name} {n}
                 </button>
               ))}
               {unplacedCount > 0 && (
@@ -225,10 +250,10 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
                 </button>
               )}
               <button type="button" style={chip(false)} onClick={() => setView('stats')}>
-                📊 {L(dict, '统计', 'Stats')}
+                {L(dict, '统计', 'Stats')}
               </button>
               <button type="button" style={chip(false)} onClick={() => setView('sell')}>
-                💰 {L(dict, '卖闲置', 'Sell pile')}
+                {L(dict, '卖闲置', 'Sell pile')}
               </button>
             </div>
 
@@ -261,11 +286,17 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
                           background: 'var(--glass-bg, rgba(255,255,255,0.04))', color: 'var(--text-primary)',
                         }}
                       >
-                        {/* 预览图(设计:一眼认出是什么;真图缩略未加载 → 柔和色块占位) */}
-                        <span aria-hidden style={{
-                          flexShrink: 0, width: 46, height: 46, borderRadius: 11,
-                          background: `linear-gradient(135deg, ${previewColor(i.name)}, color-mix(in srgb, ${previewColor(i.name)} 70%, #000))`,
-                        }} />
+                        {/* 预览图:该物品记忆有图就显示真图(批次170);否则柔和色块占位 */}
+                        {thumbs[i.id] ? (
+                          <img src={thumbs[i.id]} alt={i.name} aria-hidden draggable={false} style={{
+                            flexShrink: 0, width: 46, height: 46, borderRadius: 11, objectFit: 'cover',
+                          }} />
+                        ) : (
+                          <span aria-hidden style={{
+                            flexShrink: 0, width: 46, height: 46, borderRadius: 11,
+                            background: `linear-gradient(135deg, ${previewColor(i.name)}, color-mix(in srgb, ${previewColor(i.name)} 70%, #000))`,
+                          }} />
+                        )}
                         <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
                           <span style={{ fontSize: '0.92rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {i.name}{i.quantity != null ? ` ×${i.quantity}` : ''}
@@ -273,7 +304,7 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
                           {/* 一级存放位置 */}
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.75rem', color: i.location ? 'var(--text-secondary)' : 'var(--accent-primary, #c08f6f)' }}>
                             <IconMapPin size={12} />
-                            {i.location || L(dict, '未归位 · 点开设位置', 'Unplaced · tap to set')}
+                            {(i.location && stripEmoji(i.location)) || i.location || L(dict, '未归位 · 点开设位置', 'Unplaced · tap to set')}
                           </span>
                           {/* 最后更新多久前 · 来源 */}
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>

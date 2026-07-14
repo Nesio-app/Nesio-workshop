@@ -13565,6 +13565,8 @@ html[data-portal-theme="night"] .nesio-mem-jar-ball {
 .nesio-mem-jar-ball[data-halo="fav"]     { --jar-halo: var(--emotion-angry); }
 .nesio-mem-jar-ball[data-halo="project"] { --jar-halo: var(--emotion-content); }
 .nesio-mem-jar-ball[data-halo="all"]     { --jar-halo: var(--emotion-calm); }
+/* 批次 170:物品收纳中间球也要水晶球 halo(用户实锤「和以前一样是个球」) */
+.nesio-mem-jar-ball[data-halo="storage"] { --jar-halo: var(--emotion-calm); }
 .nesio-mem-jar-name {
   font-size: 0.86rem; font-weight: 700; color: var(--portal-ink);
 }
@@ -13684,6 +13686,18 @@ html[data-portal-theme="night"] .nesio-project-card-name { color: #d8e8ff; }
   padding: 0.4rem 0;
 }
 /* 批次 123:项目球展开区的「+新建」入口(项目挪进球后,创建走这里) */
+/* 批次 170:收藏夹卡固定高度 —— 不管有没有内容都一样大(用户实锤空维度时缩小) */
+.nesio-fav-sheet { min-height: 62vh; }
+/* 批次 170:收纳头部 —— 去标题,统计居中方块徽章,关闭钮绝对右 */
+.nesio-inv-header { position: relative; justify-content: center; min-height: 34px; }
+.nesio-inv-stats { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.nesio-inv-stat {
+  font-size: 0.74rem; font-variant-numeric: tabular-nums;
+  padding: 3px 10px; border-radius: 8px;
+  background: var(--portal-accent-soft, rgba(0,0,0,0.06));
+  color: var(--text-secondary, var(--portal-muted));
+}
+.nesio-inv-close { position: absolute; right: 0; top: 50%; transform: translateY(-50%); }
 /* 批次 168:收藏夹维度 filter chips(全部/价值/习惯/节律/关系) */
 .nesio-fav-filter {
   display: flex;
