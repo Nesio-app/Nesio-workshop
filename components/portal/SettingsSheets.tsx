@@ -13,6 +13,7 @@ import { usePortalLocale } from './use-portal-locale';
 import { IconChevronRight, IconHalfMoon, IconLink, IconLock, IconMoon, IconShield, IconSun } from './icons';
 import { InfoTip } from './InfoTip';
 import { useSheetDrag } from './use-sheet-drag';
+import { DailyBriefSheet } from './today/DailyBriefSheet';
 import { captureLocationEnabled, setCaptureLocationEnabled } from '@/lib/portal/capture-location';
 import { PROACTIVE_LEVEL_KEY } from './today/proactive-types';
 import { deleteLifeNode, getLifeGraph } from '@/lib/portal/life-graph';
@@ -690,6 +691,7 @@ export function LabSheet({ open, onClose, onOpenPreview }: SheetProps & { onOpen
   const [palette, setPaletteState] = useState<PaletteId>('');
   const [proOn, setProOn] = useState(false); // Lab 内 Pro 测试解锁(正式版由 StoreKit 收据服务端校验写入)
   const [moduleOv, setModuleOv] = useState<Record<string, 'on' | 'off'>>({});
+  const [briefOpen, setBriefOpen] = useState(false); // 图2:每日简报 demo 预览
 
   useEffect(() => {
     if (!open) return;
@@ -776,6 +778,17 @@ export function LabSheet({ open, onClose, onOpenPreview }: SheetProps & { onOpen
         </span>
       </button>
 
+      {/* 图2:每日简报 demo —— 点开就地读文字简报(此前该入口是死按钮,现直连 DailyBriefSheet) */}
+      <button type="button" className="nesio-settings-option" onClick={() => setBriefOpen(true)}>
+        <div>
+          <span className="nesio-settings-option-label">{L(dict, '看每日简报 demo', 'Preview daily brief')}</span>
+          <span className="nesio-settings-option-hint">
+            {L(dict, '用「问一问」同一套检索,把今天的安排/提醒写成一段话 + 相关记忆 —— 就是上线后每天早晨推给你的那张。', 'Same retrieval as Ask — turns today’s schedule/reminders into a short brief plus related memories, the card pushed each morning.')}
+          </span>
+        </div>
+        <span aria-hidden style={{ color: 'var(--portal-muted)' }}>›</span>
+      </button>
+
       <div className="nesio-settings-option" style={{ display: 'block' }}>
         <span className="nesio-settings-option-label">
           {L(dict, `低饱和配色(预览)${palette ? ' · 已开启' : ''}`, `Low-saturation palette (preview)${palette ? ' · on' : ''}`)}
@@ -854,6 +867,7 @@ export function LabSheet({ open, onClose, onOpenPreview }: SheetProps & { onOpen
         );
       })}
       </>)}
+      <DailyBriefSheet open={briefOpen} onClose={() => setBriefOpen(false)} />
     </SheetWrap>
   );
 }
@@ -982,6 +996,7 @@ export function AccountSheet({ open, onClose, onOpenMembership, onPickAvatar }: 
   const [loggedIn, setLoggedIn] = useState(false);
   const [name, setName] = useState('');
   const [savedTip, setSavedTip] = useState(false);
+  const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -997,9 +1012,14 @@ export function AccountSheet({ open, onClose, onOpenMembership, onPickAvatar }: 
       .catch(() => {});
   }, [open]);
 
+  useEffect(() => () => { if (savedTimer.current) clearTimeout(savedTimer.current); }, []);
+
   function saveName() {
     saveProfileSettings({ displayName: name.trim() || '我' }); // PROFILE_UPDATED_EVENT → 全站头像/称呼即时更新
     setSavedTip(true);
+    // 2.5s 后按钮恢复可点态,让下一次改名也有明确的「已保存」反馈(否则一直显示已保存,像卡住)
+    if (savedTimer.current) clearTimeout(savedTimer.current);
+    savedTimer.current = setTimeout(() => setSavedTip(false), 2500);
   }
 
   async function signOut() {
@@ -1025,11 +1045,17 @@ export function AccountSheet({ open, onClose, onOpenMembership, onPickAvatar }: 
         maxLength={24}
         aria-label={L(dict, '昵称', 'Nickname')}
         onChange={(e) => { setName(e.target.value); setSavedTip(false); }}
+        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); saveName(); (e.target as HTMLInputElement).blur(); } }}
         onBlur={saveName}
       />
       <button type="button" className="nesio-ob-primary-btn" style={{ marginTop: '0.5rem' }} onClick={saveName}>
         {savedTip ? L(dict, '✓ 已保存', '✓ Saved') : L(dict, '保存昵称', 'Save nickname')}
       </button>
+      {savedTip && (
+        <p className="nesio-settings-option-hint" aria-live="polite" style={{ margin: '0.35rem 0 0', color: 'var(--status-go)' }}>
+          {L(dict, `念念以后叫你「${name.trim() || '我'}」`, `Nessa will call you "${name.trim() || 'me'}" from now on`)}
+        </p>
+      )}
       <button type="button" className="nesio-settings-option" style={{ marginTop: '0.6rem' }} onClick={onPickAvatar}>
         <span className="nesio-settings-option-label">{L(dict, '更换头像', 'Change avatar')}</span>
         <span aria-hidden style={{ color: 'var(--portal-muted)' }}>›</span>
