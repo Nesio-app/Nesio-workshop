@@ -31,8 +31,10 @@ import {
   getProjects,
   createProject,
   deleteProject,
+  updateProject,
   addNodeToProject,
   type Project,
+  type ProjectStatus,
 } from '@/lib/portal/project';
 import { buildNarratorCards, type NarratorCard } from '@/lib/portal/memory-narrator';
 import dynamic from 'next/dynamic';
@@ -788,6 +790,7 @@ function ProjectDetailSheet({
   allNodes,
   onClose,
   onDelete,
+  onSetStatus,
   onOpenNode,
   onLongPressNode,
 }: {
@@ -795,11 +798,16 @@ function ProjectDetailSheet({
   allNodes: LifeNode[];
   onClose: () => void;
   onDelete: () => void;
+  onSetStatus: (status: ProjectStatus) => void;
   onOpenNode: (n: LifeNode) => void;
   onLongPressNode?: (n: LifeNode) => void;
 }) {
   const nodes = allNodes.filter((n) => project.nodeIds.includes(n.id));
   const dict = useDict();
+  // 批次 173:项目状态选择器(用户实锤「项目文件夹里加状态按钮供选择」)
+  const STATUSES: Array<[ProjectStatus, string, string]> = [
+    ['active', '进行中', 'Active'], ['completed', '已完成', 'Done'], ['archived', '已归档', 'Archived'],
+  ];
 
   return (
     <>
@@ -809,6 +817,13 @@ function ProjectDetailSheet({
           <span className="nesio-project-detail-emoji"><IconFolder size={16} /></span>
           <span className="nesio-project-detail-name">{project.name}</span>
           <button type="button" className="nesio-voice-sheet-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="nesio-proj-status-seg">
+          {STATUSES.map(([k, zh, en]) => (
+            <button key={k} type="button" className={`nesio-proj-status-btn${project.status === k ? ' nesio-proj-status-btn--on' : ''}`} onClick={() => onSetStatus(k)}>
+              {L(dict, zh, en)}
+            </button>
+          ))}
         </div>
         <div className="nesio-project-detail-stats">
           <span>{nodes.length} {L(dict, '条记录', 'entries')}</span>
@@ -1482,6 +1497,12 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
           allNodes={nodes}
           onClose={() => setActiveProject(null)}
           onDelete={() => deleteProject(activeProject.id)}
+          onSetStatus={(status) => {
+            updateProject(activeProject.id, { status });
+            const next = getProjects();
+            setProjects(next);
+            setActiveProject(next.find((p) => p.id === activeProject.id) ?? null);
+          }}
           onOpenNode={(n) => { setActiveProject(null); openNodeDetail(n); }}
           onLongPressNode={(n) => setLongPressNode(n)}
         />

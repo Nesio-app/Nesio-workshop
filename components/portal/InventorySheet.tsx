@@ -14,7 +14,7 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import { relativePastLabel } from '@/lib/portal/time-labels';
-import { IconMapPin, IconClock, IconCamera, IconNote } from './icons';
+import { IconMapPin, IconClock, IconCamera, IconNote, IconBox } from './icons';
 import LocationPicker from './LocationPicker';
 import { importInventoryCsv } from '@/lib/portal/inventory-import';
 import { useRef } from 'react';
@@ -229,7 +229,7 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
 
         {view === 'list' && (
           <>
-            <p className="nesio-freeze-hint">{L(dict, '东西放哪了,记一笔;要找时问一问也能搜到', 'Note where things live — Ask can find them too')}</p>
+            {/* 批次 173:用户实锤删掉「东西放哪了…」小字行 */}
             <input
               className="nesio-ob-input"
               value={query}
@@ -286,7 +286,7 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
                           background: 'var(--glass-bg, rgba(255,255,255,0.04))', color: 'var(--text-primary)',
                         }}
                       >
-                        {/* 预览图:该物品记忆有图就显示真图(批次170);否则柔和色块占位 */}
+                        {/* 预览图:有图显真图(批次170);无图 → 浅灰底 + 居中收纳图标(批次173) */}
                         {thumbs[i.id] ? (
                           <img src={thumbs[i.id]} alt={i.name} aria-hidden draggable={false} style={{
                             flexShrink: 0, width: 46, height: 46, borderRadius: 11, objectFit: 'cover',
@@ -294,8 +294,9 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
                         ) : (
                           <span aria-hidden style={{
                             flexShrink: 0, width: 46, height: 46, borderRadius: 11,
-                            background: `linear-gradient(135deg, ${previewColor(i.name)}, color-mix(in srgb, ${previewColor(i.name)} 70%, #000))`,
-                          }} />
+                            background: 'var(--portal-line, rgba(0,0,0,0.06))',
+                            display: 'grid', placeItems: 'center', color: 'var(--portal-muted)',
+                          }}><IconBox size={22} /></span>
                         )}
                         <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
                           <span style={{ fontSize: '0.92rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
