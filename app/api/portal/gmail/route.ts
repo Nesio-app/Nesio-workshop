@@ -15,6 +15,7 @@ import { buildEmailExtractionPrompt, parseJsonBlock } from '@/lib/extraction/ext
 import { cookies } from 'next/headers';
 import { completeText, aiProviderAvailable } from '@/lib/portal/ai-complete';
 import { envValue } from '@/lib/portal/env';
+import { hasVerifiedSessionCookie } from '@/lib/portal/api-auth';
 
 export const dynamic = 'force-dynamic';
 // 全量同步 = 1 次列表 + 最多 100 封 full 拉取 + 一发大 prompt AI 提取,30s 顶得很紧;
@@ -31,12 +32,8 @@ function hasStage5LabAccess(req: NextRequest): boolean {
 }
 
 async function requireAuthenticatedGmailAccess(req: NextRequest): Promise<NextResponse | null> {
-  const cookieStore = await cookies();
-  const hasNesioSession = Boolean(
-    cookieStore.get('baohe_auth_access')?.value ||
-      cookieStore.get('baohe_auth_refresh')?.value ||
-      cookieStore.get('baohe_wechat_openid')?.value,
-  );
+  // 数据审计 P0 同源:session 门改走验签(伪造 refresh/openid 不算「有会话」)。
+  const hasNesioSession = await hasVerifiedSessionCookie();
   const noSupabase = !envValue('SUPABASE_URL') || !envValue('SUPABASE_ANON_KEY');
   if (hasNesioSession || hasStage5LabAccess(req) || noSupabase) return null;
 

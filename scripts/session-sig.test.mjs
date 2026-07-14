@@ -51,6 +51,30 @@ const sig = loadTs('../lib/portal/auth/session-sig.ts', (p) =>
   SECRET = 'unit-test-secret-key';
 }
 
+// ── verifiedWechatOpenid:只有签名匹配才返回 openid,否则 ''(数据审计 P0) ──
+{
+  const openid = 'oABC123';
+  const s = sig.signSessionValue(openid);
+  assert.equal(sig.verifiedWechatOpenid(openid, s), openid, '签名匹配 → 返回 openid');
+  assert.equal(sig.verifiedWechatOpenid(openid, undefined), '', '无签名(伪造)→ ""');
+  assert.equal(sig.verifiedWechatOpenid('oEVIL', s), '', '换个 openid 配旧签名 → ""(伪造越权被拒)');
+  assert.equal(sig.verifiedWechatOpenid(undefined, s), '', '无 openid → ""');
+}
+
+// ── 数据审计 P0:据 openid 生成身份的服务端路径都必须走验签 ──
+{
+  const runtime = fs.readFileSync(new URL('../lib/portal/cloud-server-runtime.ts', import.meta.url), 'utf8');
+  assert.ok(runtime.includes('verifiedWechatOpenid'), 'cloud-server-runtime 用 verifiedWechatOpenid(不再裸信 openid cookie)');
+  const sessionRoute = fs.readFileSync(new URL('../app/api/auth/session/route.ts', import.meta.url), 'utf8');
+  assert.ok(sessionRoute.includes('verifiedWechatOpenid'), '/api/auth/session 用 verifiedWechatOpenid');
+  // gmail 等自有 session 门改走验签 helper,不再裸 Boolean(access||refresh||openid)
+  for (const f of ['lib/portal/providers/gmail-access.ts', 'app/api/portal/gmail/route.ts', 'app/api/portal/gmail-quick/route.ts']) {
+    const src = fs.readFileSync(new URL('../' + f, import.meta.url), 'utf8');
+    assert.ok(src.includes('hasVerifiedSessionCookie'), `${f} 走 hasVerifiedSessionCookie`);
+    assert.ok(!/Boolean\(\s*[\s\S]*?baohe_wechat_openid'\)\?\.value,?\s*\)/.test(src), `${f} 不再裸信 openid presence`);
+  }
+}
+
 // ── 源码级:guard 回退分支已用验签,不再「看 cookie 存在即放行」 ──
 {
   const guard = fs.readFileSync(new URL('../lib/portal/auth/api-auth.ts', import.meta.url), 'utf8');

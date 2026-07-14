@@ -100,7 +100,8 @@ sensitivity/retention 枚举化(中期)。
 
 ## 已知欠账(按优先级)
 
-- ~~restore-from-cloud~~ **已做**(2026-07-07):见上「进行中的迁移 ③」——推 + 拉都通了,云备份端到端闭环。
+- ~~restore-from-cloud~~ **已做**(2026-07-07):见上「进行中的迁移 ③」——推 + 拉都通了,云备份**往返闭环**
+  (注:是「往返打通」,**非端到端加密 E2E**;云端为应用层明文 + service-role,别用「端到端」措辞误导。数据审计 §4)。
 - **云备份付费桩转真**:hasCloudEntitlement 现读本地 flag;支付/StoreKit/账户 plan 字段
   接上后换成真权益读取(推送机制本身不用动)。(2026-07-07 记)
 - **服务端权益强制:骨架已落、待接真源**(2026-07-14 记,安全审计 #1):
@@ -115,6 +116,13 @@ sensitivity/retention 枚举化(中期)。
 - **客户端 getTier 优先信 serverTier(待做)**(2026-07-14 记):真源接上后,`entitlement.getTier()`
   应优先读 `/api/entitlements` 的 `serverTier`、localStorage 只作离线兜底,消除「本地置 1 即 Pro」。
   当前仍是本地桩(服务端强制已能兜底,这步是把客户端展示也对齐)。
+- **数据全维度审计遗留(2026-07-14 记)**:已修 P0 越权(伪造 openid 跨用户读写云记忆 —— 所有
+  据 openid 生成身份/会话的路径改走 `verifiedWechatOpenid`/`hasVerifiedSessionCookie` 验签)。
+  仍开(按报告严重度):① 云备份非 E2E(应用层明文 + service-role,敏感标签不拦上云)→ 落
+  客户端 WebCrypto 或修正隐私文案;② 云同步 last-write-wins(多设备并发丢更新)→ 至少比 updated_at;
+  ③ 无实体解析(记忆是「半图」非知识图谱,同名实体不收敛)→ 实体唯一化 + 别名归一;
+  ④ 被遗忘权残留(telemetry 按 device_id 逃逸账号删除、无 TTL;云删单节点是软删 deleted_at;
+  auth.users 未删)→ 补 device 级删除 + 保留 TTL + 软删 GC;⑤ 无「导出到本地文件」按钮(现只推云)。
 
 **契约测试提示**:`test:contracts`(100+ 套,CI 只跑 test:security 的 18 套)
 在 2026-07-04 全量修复过一轮——历史重构造成的 15 处 marker 漂移已对齐,

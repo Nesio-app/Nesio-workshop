@@ -21,8 +21,21 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { timingSafeEqual } from 'node:crypto';
 import { envValue } from '@/lib/portal/env';
-import { AUTH_SIG_COOKIE, WECHAT_SIG_COOKIE, verifySessionValue } from './session-sig';
+import { AUTH_SIG_COOKIE, WECHAT_SIG_COOKIE, verifySessionValue, verifiedWechatOpenid } from './session-sig';
 import { guardServerEntitlement } from './server-entitlement';
+
+/**
+ * 轻量会话存在判定(供 gmail 等自带门的路由复用)—— access token 存在(真伪由下游取数据时
+ * 验)/ 签名验真的 refresh / 签名验真的 openid,三者其一。数据审计 P0 同源:收口可伪造的
+ * refresh/openid presence 门(此前 `Boolean(access||refresh||openid)` 只看存在,伪造即过)。
+ */
+export async function hasVerifiedSessionCookie(): Promise<boolean> {
+  const c = await cookies();
+  if (c.get('baohe_auth_access')?.value) return true;
+  const refresh = c.get('baohe_auth_refresh')?.value || '';
+  if (refresh && verifySessionValue(refresh, c.get(AUTH_SIG_COOKIE)?.value)) return true;
+  return Boolean(verifiedWechatOpenid(c.get('baohe_wechat_openid')?.value, c.get(WECHAT_SIG_COOKIE)?.value));
+}
 
 /** 常量时间比较两个密钥(避免用 === 短路比较带来的计时侧信道)。空/不等长直接判否。 */
 export function safeEqual(a: string, b: string): boolean {

@@ -42,3 +42,13 @@ export function verifySessionValue(value: string, sig: string | undefined): bool
   if (a.length !== b.length) return false;
   return timingSafeEqual(a, b);
 }
+
+/**
+ * 取「经签名验真」的 wechat openid —— 只有签名匹配才返回该 openid,否则 ''。
+ * 数据审计 P0:任何据 openid 生成身份(`wechat_openid:${x}` identityKey / 会话 / 连接器
+ * token 查找)的地方都必须走这里,杜绝伪造 openid 越权。用法:
+ *   const openid = verifiedWechatOpenid(store.get('baohe_wechat_openid')?.value, store.get(WECHAT_SIG_COOKIE)?.value);
+ */
+export function verifiedWechatOpenid(openid: string | undefined, sig: string | undefined): string {
+  return openid && verifySessionValue(openid, sig) ? openid : '';
+}
