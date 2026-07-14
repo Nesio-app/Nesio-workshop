@@ -286,6 +286,8 @@ export default function TimelineTab() {
     return top;
   }, [placePeriodTrail, dict]);
   const placeRanking = useMemo(() => clusterPlaces(placePeriodTrail, 6).slice().sort((a, b) => b.visits - a.visits).slice(0, 5), [placePeriodTrail]);
+  // 图2:点饼图某类别 → 下面「最常去」只出这个类别的地点明细(全量按次数排,不止前 5)
+  const placeRankingAll = useMemo(() => clusterPlaces(placePeriodTrail, 99999).slice().sort((a, b) => b.visits - a.visits), [placePeriodTrail]);
   // 地点封面照:带图 + 有定位的记忆节点,按国家/城市聚到就近坐标。
   const imageNodes = useMemo<GeoImageNode[]>(() => getLifeGraph()
     .map((n) => ({ n, asset: (n.assets || []).find((a) => a.kind === 'image') }))
@@ -660,14 +662,20 @@ export default function TimelineTab() {
                   dict={dict}
                 />
 
-                {/* 最常去排行 */}
-                {placeRanking.length > 0 && (
+                {/* 最常去排行(选了类别就只出该类别的地点明细,可点饼图空白复位) */}
+                {(() => {
+                  const selCat = pieSel as PlaceCategory | null;
+                  const rankRows = selCat ? placeRankingAll.filter((c) => c.category === selCat) : placeRanking;
+                  if (rankRows.length === 0) return null;
+                  const catMeta = selCat ? PLACE_CATEGORY_META[selCat] : null;
+                  const periodH = L(dict,
+                    placePeriod === 'day' ? '今天最常去' : placePeriod === 'week' ? '这周最常去' : placePeriod === 'month' ? '这个月最常去' : '今年最常去',
+                    placePeriod === 'day' ? 'Most visited today' : placePeriod === 'week' ? 'Most visited this week' : placePeriod === 'month' ? 'Most visited this month' : 'Most visited this year');
+                  return (
                   <>
-                    <p className="nesio-tl-rank-h">{L(dict,
-                      placePeriod === 'day' ? '今天最常去' : placePeriod === 'week' ? '这周最常去' : placePeriod === 'month' ? '这个月最常去' : '今年最常去',
-                      placePeriod === 'day' ? 'Most visited today' : placePeriod === 'week' ? 'Most visited this week' : placePeriod === 'month' ? 'Most visited this month' : 'Most visited this year')}</p>
+                    <p className="nesio-tl-rank-h">{catMeta ? `${L(dict, catMeta.zh, catMeta.en)} · ${L(dict, '最常去', 'most visited')}` : periodH}</p>
                     <div className="nesio-tl-rank">
-                      {placeRanking.map((c) => (
+                      {rankRows.map((c) => (
                         <div key={c.label} className="nesio-tl-rank-row">
                           <span className={`nesio-pt-dot nesio-pt-dot--${c.category}`} aria-hidden style={{ position: 'static', boxShadow: 'none' }} />
                           <span className="nesio-tl-rank-name">{displayLabel(c.label)}</span>
@@ -678,7 +686,8 @@ export default function TimelineTab() {
                       ))}
                     </div>
                   </>
-                )}
+                  );
+                })()}
               </>
             )}
 

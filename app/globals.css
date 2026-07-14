@@ -7290,6 +7290,16 @@ html[data-portal-theme="night"] .nesio-tips-body { color: #8fa3c0; }
 /* 可交互步:浮层放行点击,让用户真的点/长按高亮的目标(气泡本身仍可点) */
 .nesio-coach-overlay--pass { pointer-events: none; }
 .nesio-coach-overlay--pass .nesio-coach-bubble { pointer-events: auto; }
+/* 可交互步的透明命中区:盖在高亮目标上,点它=完成这步进下一步(不触发真实按钮) */
+.nesio-coach-hit {
+  position: fixed;
+  z-index: 2;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
 /* 「点一下/长按试试」高亮提示 */
 .nesio-coach-taphint {
   display: inline-flex;
@@ -13310,9 +13320,10 @@ button.nesio-rel-due-info { background: none; border: none; padding: 0; font: in
 .nesio-tl-city-back { background: none; border: none; font-size: 1.35rem; font-weight: 800; color: var(--portal-muted); cursor: pointer; line-height: 1; padding: 0 0.2rem; }
 .nesio-tl-city-title { font-size: 1.2rem; font-weight: 800; color: var(--portal-ink); }
 .nesio-tl-city-sub { font-size: 0.72rem; color: var(--portal-muted); font-weight: 700; }
-.nesio-tl-citycards { display: flex; flex-direction: column; gap: 0.7rem; }
-.nesio-tl-citycard { background: var(--glass-bg-solid); border: 1px solid var(--portal-line); border-radius: 0.85rem; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,.05); }
-.nesio-tl-citycard-img { display: block; height: 5.4rem; position: relative; }
+/* 图1:城市卡一排 2 个,方便呈现照片 */
+.nesio-tl-citycards { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem; }
+.nesio-tl-citycard { background: var(--glass-bg-solid); border: 1px solid var(--portal-line); border-radius: 0.85rem; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,.05); min-width: 0; }
+.nesio-tl-citycard-img { display: block; height: 6rem; position: relative; }
 .nesio-tl-citycard-tag {
   position: absolute; left: 0.55rem; top: 0.55rem;
   font-size: 0.6rem; font-weight: 800; color: var(--portal-ink);

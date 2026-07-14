@@ -418,11 +418,11 @@ export function FirstUseTips({ onDone, locale }: { onDone: () => void; locale: P
     return { VH, bw, gap, pad, place, left, caretX };
   })();
 
-  // 可交互步:浮层放行点击(pointer-events:none),让用户真的点/长按目标;其余步照旧遮挡。
+  // 可交互步:不再放行点真实按钮(会打开拍/说/收把导览盖住、卡在原步),改为在高亮处盖一个
+  // 透明命中区,点它=完成这步直接进下一步/收尾。既有「点一下试试」的手感,又保证能往下走。
   const overlayCls = [
     'nesio-coach-overlay',
     geo ? '' : 'nesio-coach-overlay--dim',
-    cur.tap ? 'nesio-coach-overlay--pass' : '',
   ].filter(Boolean).join(' ');
 
   return (
@@ -430,6 +430,12 @@ export function FirstUseTips({ onDone, locale }: { onDone: () => void; locale: P
       {geo && rect && (
         <div className="nesio-coach-spot" aria-hidden
           style={{ left: rect.left - geo.pad, top: rect.top - geo.pad, width: rect.width + geo.pad * 2, height: rect.height + geo.pad * 2, borderRadius: cur.round ? '50%' : 16 }} />
+      )}
+      {cur.tap && geo && rect && (
+        <button type="button" className="nesio-coach-hit"
+          aria-label={cur.longpress ? L(dict, '长按这个按钮试试', 'Long-press this button') : L(dict, '点一下这个按钮试试', 'Tap this button')}
+          style={{ left: rect.left - geo.pad, top: rect.top - geo.pad, width: rect.width + geo.pad * 2, height: rect.height + geo.pad * 2, borderRadius: cur.round ? '50%' : 16 }}
+          onClick={() => (isLast ? onDone() : setStep(step + 1))} />
       )}
       {geo && rect ? (
         <div key={step} className={`nesio-coach-bubble nesio-coach-bubble--${geo.place}`}
