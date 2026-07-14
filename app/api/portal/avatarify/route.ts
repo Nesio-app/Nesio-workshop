@@ -30,14 +30,15 @@ function withTimeout(ms: number): { signal: AbortSignal; done: () => void } {
 
 /** Gemini 图像生成(image-to-image):返回 { dataUrl } 或 { error }(透出真因)。 */
 async function geminiAvatar(key: string, imageBase64: string, mimeType: string): Promise<{ dataUrl?: string; error?: string }> {
+  // GA 的 gemini-2.5-flash-image(Nano Banana)优先;preview 别名兜底。旧的
+  // 2.0-preview-image-generation 已下线(用户实测 404),不再排队,免得错误信息只剩它。
   const models = [
     envValue('GEMINI_IMAGE_MODEL'),
-    'gemini-2.5-flash-image-preview',
     'gemini-2.5-flash-image',
-    'gemini-2.0-flash-preview-image-generation',
+    'gemini-2.5-flash-image-preview',
   ].filter(Boolean) as string[];
 
-  let lastErr = '';
+  const errs: string[] = [];
   for (const model of models) {
     const { signal, done } = withTimeout(40_000);
     try {
@@ -61,7 +62,7 @@ async function geminiAvatar(key: string, imageBase64: string, mimeType: string):
         candidates?: Array<{ content?: { parts?: Array<{ inlineData?: { data?: string; mimeType?: string }; inline_data?: { data?: string; mime_type?: string } }> } }>;
         error?: { message?: string; status?: string };
       };
-      if (!res.ok) { lastErr = `${model} ${res.status} ${data.error?.status || ''} ${(data.error?.message || '').slice(0, 80)}`.trim(); continue; }
+      if (!res.ok) { errs.push(`${model} ${res.status} ${data.error?.status || ''} ${(data.error?.message || '').slice(0, 60)}`.trim()); continue; }
       const parts = data.candidates?.[0]?.content?.parts || [];
       for (const p of parts) {
         const inline = p.inlineData || p.inline_data;
@@ -69,13 +70,14 @@ async function geminiAvatar(key: string, imageBase64: string, mimeType: string):
         const mt = (inline as { mimeType?: string; mime_type?: string })?.mimeType || (inline as { mime_type?: string })?.mime_type || 'image/png';
         if (d) return { dataUrl: `data:${mt};base64,${d}` };
       }
-      lastErr = `${model} 无图像返回`;
+      errs.push(`${model} 无图像返回`);
     } catch (err) {
       done();
-      lastErr = `${model} ${err instanceof Error ? err.name : 'error'}`;
+      errs.push(`${model} ${err instanceof Error ? err.name : 'error'}`);
     }
   }
-  return { error: lastErr || 'gemini_no_image' };
+  // 逐模型错误全带上(旧实现只留最后一个,诊断时看不出 2.5 到底试没试)
+  return { error: errs.join(' · ') || 'gemini_no_image' };
 }
 
 /** OpenAI gpt-image-1 编辑(输入图 → 风格化):返回 dataURL 或 null。 */

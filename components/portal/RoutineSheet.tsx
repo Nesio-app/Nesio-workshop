@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react';
 import { addRoutine, deleteRoutine, loadRoutines, ROUTINES_UPDATED_EVENT, updateRoutine, type Routine, type RoutineCategory } from '@/lib/portal/routines';
 import { PROTOCOL_LIBRARY, startProtocol } from '@/lib/platform/training-protocol-engine';
 import { InfoTip } from './InfoTip';
+import { useSheetDrag } from './use-sheet-drag';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
@@ -35,6 +36,7 @@ export default function RoutineSheet({ open, onClose }: { open: boolean; onClose
   const [days, setDays] = useState<number[]>(ALL_DAYS);
   const [category, setCategory] = useState<RoutineCategory>('general');
   const [protocolId, setProtocolId] = useState<string | undefined>(undefined);
+  const { handleProps, cardStyle, expanded } = useSheetDrag(onClose);
 
   useEffect(() => {
     if (!open) return;
@@ -67,14 +69,13 @@ export default function RoutineSheet({ open, onClose }: { open: boolean; onClose
   return (
     <div className="nesio-settings-sheet-overlay" role="dialog" aria-modal="true" aria-label={L(dict, '例行提醒', 'Routines')}>
       <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
-      <div className="nesio-settings-sheet-card">
-        <div className="nesio-sheet-handle" aria-hidden />
+      <div className={`nesio-settings-sheet-card${expanded ? ' nesio-settings-sheet-card--expanded' : ''}`} style={cardStyle}>
+        <div className="nesio-sheet-handle" {...handleProps} />
         <div className="nesio-settings-sheet-header">
           <h2 className="nesio-settings-sheet-title">
             {L(dict, '例行提醒', 'Routines')}
             <InfoTip text={L(dict, '到点后提醒会出现在 Today 首屏,完成或跳过后当天不再出现,次日自动恢复。锁屏推送需要 App Store 原生版,上架后自动升级。', "When due, the reminder appears on Today. Done/skip hides it for the day; it returns tomorrow. Lock-screen push needs the native App Store build and will upgrade automatically once it ships.")} />
           </h2>
-          <button type="button" className="nesio-voice-sheet-close" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}>✕</button>
         </div>
         <div className="nesio-settings-sheet-body">
 

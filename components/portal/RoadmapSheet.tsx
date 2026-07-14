@@ -13,6 +13,7 @@ import { createAppApiClient } from '@/lib/portal/app-api-client';
 import { L, t } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
+import { useSheetDrag } from './use-sheet-drag';
 
 const DEVICE_KEY = 'nesio-telemetry-device-v1';
 
@@ -38,6 +39,7 @@ export default function RoadmapSheet({ open, onClose }: { open: boolean; onClose
   // 批次 32:常见问题 / 未来功能各自折叠,页面不再一屏全铺
   const [faqOpen, setFaqOpen] = useState(false);
   const [voteOpen, setVoteOpen] = useState(false);
+  const { handleProps, cardStyle, expanded } = useSheetDrag(onClose);
 
   // 自由许愿(批次 4):文本进遥测(props 上限 80 字)+ 云产品事件(payload 全文),
   // /admin Top 事件与 product_events 都能看到,和候选榜同池评审。
@@ -90,11 +92,10 @@ export default function RoadmapSheet({ open, onClose }: { open: boolean; onClose
   return (
     <div className="nesio-settings-sheet-overlay" role="dialog" aria-modal="true" aria-label={t(locale, 'roadmapTitle')}>
       <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
-      <div className="nesio-settings-sheet-card">
-        <div className="nesio-sheet-handle" aria-hidden />
+      <div className={`nesio-settings-sheet-card${expanded ? ' nesio-settings-sheet-card--expanded' : ''}`} style={cardStyle}>
+        <div className="nesio-sheet-handle" {...handleProps} />
         <div className="nesio-settings-sheet-header">
           <h2 className="nesio-settings-sheet-title">{t(locale, 'roadmapTitle')}</h2>
-          <button type="button" className="nesio-voice-sheet-close" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}>✕</button>
         </div>
         <div className="nesio-settings-sheet-body">
           {/* 批次 32:两个折叠区(常见问题 / 未来功能),点标题展开 */}

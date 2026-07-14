@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useSheetDrag } from './use-sheet-drag';
 import { IconActivity, IconBook, IconBookOpen, IconCalendar, IconCar, IconCheckSquare, IconCloudSun, IconHeartPulse, IconMail, IconNote, IconTimer , IconImage, IconMapPin, IconCard } from './icons';
 import dynamic from 'next/dynamic';
 const WechatReadingImportSheet = dynamic(() => import('./WechatReadingImportSheet'), { ssr: false });
@@ -126,6 +127,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
   const [notionDbLoading, setNotionDbLoading] = useState(false);
   const [notionDbList, setNotionDbList] = useState<Array<{ id: string; title: string }> | null>(null);
   const [notionDbSel, setNotionDbSel] = useState<string[]>([]);
+  const { handleProps, cardStyle, expanded } = useSheetDrag(onClose);
 
   useEffect(() => {
     if (!open) return;
@@ -1135,11 +1137,10 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       <input ref={photosRef} type="file" accept="image/*" multiple hidden onChange={(e) => { void handleBatchPhotos(e.target.files); e.target.value = ''; }} />
       <input ref={timelineRef} type="file" accept="application/json,.json" hidden onChange={(e) => { void handleTimelineFile(e.target.files); e.target.value = ''; }} />
       <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
-      <div className="nesio-settings-sheet-card">
-        <div className="nesio-sheet-handle" aria-hidden />
+      <div className={`nesio-settings-sheet-card${expanded ? ' nesio-settings-sheet-card--expanded' : ''}`} style={cardStyle}>
+        <div className="nesio-sheet-handle" {...handleProps} />
         <div className="nesio-settings-sheet-header">
           <h2 className="nesio-settings-sheet-title">{L(dict, '数据接入', 'Data sources')}</h2>
-          <button type="button" className="nesio-voice-sheet-close" onClick={onClose}>✕</button>
         </div>
         <p className="nesio-settings-sheet-desc">{L(dict, '连接外部信号源，让 Today Feed 出现真实数据驱动的建议。', 'Connect outside signals so Today runs on real data.')}</p>
 
