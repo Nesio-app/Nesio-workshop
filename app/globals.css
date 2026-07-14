@@ -13178,7 +13178,17 @@ button.nesio-rel-due-info { background: none; border: none; padding: 0; font: in
   background: var(--glass-bg-solid); border: 1px solid var(--portal-line);
   border-radius: 0.95rem; overflow: hidden; box-shadow: 0 4px 14px rgba(0,0,0,.05); padding: 0;
 }
-.nesio-tl-ccard-img { width: 5.5rem; height: 4.6rem; flex-shrink: 0; }
+.nesio-tl-ccard-img { width: 5.5rem; height: 4.6rem; flex-shrink: 0; position: relative; border: none; padding: 0; cursor: pointer; background-color: var(--portal-surface-2, rgba(127,127,127,0.08)); }
+.nesio-tl-ccard-img.has-photo, .nesio-tl-citycard-img.has-photo { background-size: cover; background-position: center; }
+.nesio-tl-ccard-nav { flex: 1; min-width: 0; display: flex; align-items: center; background: none; border: none; padding: 0; text-align: left; cursor: pointer; }
+/* 换封面小徽章(右下角相机) */
+.nesio-tl-photo-edit {
+  position: absolute; right: 4px; bottom: 4px;
+  width: 18px; height: 18px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: rgba(20, 22, 30, 0.5); color: #fff;
+}
+.nesio-tl-citycard-img { position: relative; border: none; padding: 0; cursor: pointer; width: 100%; background-color: var(--portal-surface-2, rgba(127,127,127,0.08)); }
 .nesio-tl-ccard-body { flex: 1; min-width: 0; padding: 0 0.9rem; display: flex; flex-direction: column; gap: 0.3rem; }
 .nesio-tl-ccard-name { font-size: 0.95rem; font-weight: 800; color: var(--portal-ink); display: flex; align-items: baseline; gap: 0.4rem; }
 .nesio-tl-ccard-name small { font-size: 0.68rem; color: var(--portal-muted); font-weight: 700; }
