@@ -21,6 +21,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { timingSafeEqual } from 'node:crypto';
 import { envValue } from '@/lib/portal/env';
+import { AUTH_SIG_COOKIE, WECHAT_SIG_COOKIE, verifySessionValue } from './session-sig';
 
 /** 常量时间比较两个密钥(避免用 === 短路比较带来的计时侧信道)。空/不等长直接判否。 */
 export function safeEqual(a: string, b: string): boolean {
@@ -69,12 +70,13 @@ export async function isPortalRequestAuthorized(req: NextRequest, opts?: { allow
   if (accessToken) {
     return verifySupabaseAccessToken(accessToken);
   }
-  const hasSession = Boolean(
-    cookieStore.get('baohe_auth_refresh')?.value ||
-      cookieStore.get('baohe_wechat_openid')?.value,
-  );
-  // refresh/openid 无法便宜验真 —— 保留旧行为但已收窄面;进清偿计划 P0 一并收口
-  if (hasSession) return true;
+  // access 过期后的回退分支(安全审计 #8):cookie 是客户端可写的,只看「存在」= 伪造
+  // baohe_auth_refresh=x 即可白嫖云 AI(denial-of-wallet)。改为要求配套 HMAC 签名匹配 ——
+  // 只有服务端能产出合法签名,伪造/无签名的 cookie 一律拒。签发处见 session-sig 的调用方。
+  const refresh = cookieStore.get('baohe_auth_refresh')?.value || '';
+  if (refresh && verifySessionValue(refresh, cookieStore.get(AUTH_SIG_COOKIE)?.value)) return true;
+  const wechatOpenid = cookieStore.get('baohe_wechat_openid')?.value || '';
+  if (wechatOpenid && verifySessionValue(wechatOpenid, cookieStore.get(WECHAT_SIG_COOKIE)?.value)) return true;
 
   const stage5 = envValue('NESIO_STAGE5_INVOCATION_SECRET');
   const provided = req.headers.get('x-nesio-stage5-secret')?.trim() || '';

@@ -4,6 +4,7 @@ import { buildUserDataExportResponse } from '@/lib/portal/contracts/app-api-cont
 import { deriveCloudIdentity } from '@/lib/portal/cloud-identity';
 import { normalizeSupabaseRuntimeUrl } from '@/lib/portal/production-runtime';
 import { envValue } from '@/lib/portal/env';
+import { AUTH_SIG_COOKIE, signSessionValue } from '@/lib/portal/auth/session-sig';
 
 type SupabaseUserResponse = {
   id?: string;
@@ -111,6 +112,8 @@ function setRefreshedAuthCookies(response: NextResponse, session?: SupabaseToken
       path: '/',
       maxAge: 60 * 60 * 24 * 30,
     });
+    const sig = signSessionValue(session.refresh_token); // 安全审计 #8:refresh 配套签名
+    if (sig) response.cookies.set(AUTH_SIG_COOKIE, sig, { httpOnly: true, sameSite: 'lax', secure, path: '/', maxAge: 60 * 60 * 24 * 30 });
   }
   return response;
 }

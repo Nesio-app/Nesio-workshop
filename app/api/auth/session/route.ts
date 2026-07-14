@@ -7,6 +7,7 @@ import {
 } from '@/lib/portal/cloud-account-profile';
 import { normalizeSupabaseRuntimeUrl } from '@/lib/portal/production-runtime';
 import { envValue } from '@/lib/portal/env';
+import { AUTH_SIG_COOKIE, signSessionValue } from '@/lib/portal/auth/session-sig';
 
 type SupabaseUserResponse = {
   id?: string;
@@ -55,6 +56,9 @@ function setRefreshedAuthCookies(response: NextResponse, session: SupabaseTokenR
       path: '/',
       maxAge: 60 * 60 * 24 * 30,
     });
+    // 安全审计 #8:刷新时同步刷新配套 HMAC 签名(否则 access 过期后回退分支验签失败)。
+    const sig = signSessionValue(session.refresh_token);
+    if (sig) response.cookies.set(AUTH_SIG_COOKIE, sig, { httpOnly: true, sameSite: 'lax', secure, path: '/', maxAge: 60 * 60 * 24 * 30 });
   }
 
   return response;

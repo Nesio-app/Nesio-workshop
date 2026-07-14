@@ -23,6 +23,8 @@ function expireAuthCookie(
     | 'baohe_wechat_openid'
     | 'baohe_wechat_unionid'
     | 'baohe_wechat_refresh'
+    | 'baohe_auth_sig'
+    | 'baohe_wechat_sig'
     | 'nesio_google_calendar_access'
     | 'nesio_google_calendar_refresh',
 ) {
@@ -71,6 +73,8 @@ export async function POST() {
   expireAuthCookie(response, 'baohe_wechat_openid');
   expireAuthCookie(response, 'baohe_wechat_unionid');
   expireAuthCookie(response, 'baohe_wechat_refresh');
+  expireAuthCookie(response, 'baohe_auth_sig'); // 安全审计 #8:配套签名 cookie 一并清
+  expireAuthCookie(response, 'baohe_wechat_sig');
   expireAuthCookie(response, 'nesio_google_calendar_access');
   expireAuthCookie(response, 'nesio_google_calendar_refresh');
 

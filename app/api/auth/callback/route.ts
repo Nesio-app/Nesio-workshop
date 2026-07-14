@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { bootstrapCloudAccountProfile, buildCloudAccountProfileBootstrapMeta } from '@/lib/portal/cloud-account-profile';
 import { normalizeSupabaseRuntimeUrl } from '@/lib/portal/production-runtime';
 import { envValue } from '@/lib/portal/env';
+import { AUTH_SIG_COOKIE, WECHAT_SIG_COOKIE, signSessionValue } from '@/lib/portal/auth/session-sig';
 
 type SupabaseTokenResponse = {
   access_token?: string;
@@ -51,6 +52,9 @@ function setAuthCookies(response: NextResponse, session: SupabaseTokenResponse) 
       path: '/',
       maxAge: 60 * 60 * 24 * 30,
     });
+    // 安全审计 #8:配套 HMAC 签名,让 guardAiRoute 的回退分支能验真、拒伪造 refresh cookie。
+    const sig = signSessionValue(session.refresh_token);
+    if (sig) response.cookies.set(AUTH_SIG_COOKIE, sig, { httpOnly: true, sameSite: 'lax', secure, path: '/', maxAge: 60 * 60 * 24 * 30 });
   }
 }
 
@@ -74,6 +78,9 @@ function setWechatCookies(response: NextResponse, session: WechatTokenResponse) 
       path: '/',
       maxAge,
     });
+    // 安全审计 #8:openid 是回退鉴权标记,配套 HMAC 签名防伪造。
+    const sig = signSessionValue(session.openid);
+    if (sig) cookies.set(WECHAT_SIG_COOKIE, sig, { httpOnly: true, sameSite: 'lax', secure, path: '/', maxAge });
   }
   if (session.unionid) {
     cookies.set('baohe_wechat_unionid', session.unionid, {
