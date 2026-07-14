@@ -5937,6 +5937,33 @@ html[data-portal-theme="night"] .nesio-voice-input { color: #e8eefa; }
   padding: 0.5rem;
 }
 
+/* 批次189:说一句 —— 贴图片 / 详情折叠 / 加入日历 */
+.nesio-voice-extras { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem; }
+.nesio-voice-extra-btn {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  font-size: 0.76rem; font-weight: 600; color: var(--portal-muted);
+  background: var(--portal-surface-2, rgba(127,127,127,0.08));
+  border: 1px solid var(--portal-line, rgba(127,127,127,0.22));
+  border-radius: 999px; padding: 0.32rem 0.7rem; cursor: pointer;
+}
+.nesio-voice-extra-btn.is-on { color: var(--portal-accent, #588ce3); border-color: var(--portal-accent, #588ce3); }
+.nesio-voice-extra-caret { font-size: 0.7rem; opacity: 0.7; }
+.nesio-voice-imgchip { position: relative; display: inline-flex; }
+.nesio-voice-imgchip img { width: 40px; height: 40px; object-fit: cover; border-radius: 8px; display: block; }
+.nesio-voice-imgchip button {
+  position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 50%;
+  background: var(--portal-ink, #1e2a3a); color: #fff; font-size: 0.7rem; line-height: 1; cursor: pointer; border: none;
+}
+.nesio-voice-saved-wrap { display: flex; flex-direction: column; gap: 0.6rem; }
+.nesio-voice-cal { display: flex; align-items: center; gap: 0.5rem; justify-content: center; flex-wrap: wrap; }
+.nesio-voice-cal-btn {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  font-size: 0.8rem; font-weight: 600; color: var(--portal-accent, #588ce3);
+  border: 1px solid var(--portal-line, rgba(127,127,127,0.25)); border-radius: 999px; padding: 0.4rem 0.85rem;
+}
+.nesio-voice-cal-btn--primary { color: #fff; background: var(--portal-blue-deep, #356fc5); border-color: transparent; }
+.nesio-voice-cal-done { font-size: 0.8rem; font-weight: 600; color: var(--portal-muted); background: none; border: none; padding: 0.4rem 0.6rem; cursor: pointer; }
+
 /* ─── Context confirm (§6.2 绝对控制优先) ─── */
 .nesio-voice-confirm {
   display: flex;

@@ -148,6 +148,12 @@ export async function writeCloudSignal(signal: Signal): Promise<{ ok: boolean; s
 }
 
 export function createSignal(input: CreateSignalInput): Signal {
+  return createSignalWithNode(input).signal;
+}
+
+// 批次189:与 createSignal 同一条写入路径,额外回传新建的 LifeNode id ——
+// 说一句「贴图片」需要拿到节点 id 把本地图挂上去(与拍照同一套 local-image-store)。
+export function createSignalWithNode(input: CreateSignalInput): { signal: Signal; nodeId: string } {
   const occurredAt = iso(input.occurredAt);
   const capturedAt = iso(input.capturedAt);
   const signalId = buildSignalId({ ...input, occurredAt });
@@ -179,5 +185,5 @@ export function createSignal(input: CreateSignalInput): Signal {
   if (signalWriteMode() === 'cloud_mirror_pending') {
     void writeCloudSignal(signal);
   }
-  return signal;
+  return { signal, nodeId: node.id };
 }

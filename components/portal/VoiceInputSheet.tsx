@@ -10,23 +10,21 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { getRecentNodes, isPrivateExternalNode, searchLifeGraphFuzzy, type LifeNode } from '@/lib/portal/life-graph';
+import { getRecentNodes, getLifeGraph, updateLifeNode, isPrivateExternalNode, searchLifeGraphFuzzy, type LifeNode } from '@/lib/portal/life-graph';
 import { signalToLifeNode } from '@/lib/life-domain';
 import { searchSignalsSemantically } from '@/lib/life-domain/signal-search';
 import {
-  createSignal,
+  createSignalWithNode,
   extractContext,
-  hasContext,
   type FrontDomain,
   type SignalContext,
 } from '@/lib/life-domain';
 import { routeIntent } from '@/lib/portal/intent-router';
-import { IconBox, IconClock, IconMapPin, IconUser } from './icons';
+import { IconBox, IconCalendar, IconCamera, IconClock, IconMapPin, IconUser } from './icons';
 import { L } from '@/lib/portal/i18n';
 import { prefetchCaptureLocation } from '@/lib/portal/capture-location';
 import { looksLikeTask } from '@/lib/portal/task-heuristics';
 import { loadProfileSettings, portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
-import { canUsePaidCloudAi, isPro } from '@/lib/portal/entitlement';
 import { usePortalLocale } from './use-portal-locale';
 import { useSheetDrag } from './use-sheet-drag';
 
@@ -43,6 +41,38 @@ const QUICK_INTENTS = [
   { zh: '提醒我…', en: 'Remind me…', prefixZh: '提醒我 ', prefixEn: 'Remind me ' },
   { zh: '我今天…', en: 'Today I…', prefixZh: '我今天 ', prefixEn: 'Today I ' },
 ];
+
+// 批次189(图3):把带时间的记忆一键加进系统日历。
+// iOS 上打开 data:text/calendar 会直接弹苹果原生「New Event」(截图那个);Google 链接则开 Google 日历。
+function icsStamp(date: string, time?: string): { value: string; allDay: boolean } {
+  const ymd = date.replace(/-/g, '');
+  const m = time && /^(\d{1,2}):(\d{2})$/.exec(time);
+  if (m) return { value: `${ymd}T${m[1].padStart(2, '0')}${m[2]}00`, allDay: false };
+  return { value: ymd, allDay: true };
+}
+function buildIcsDataUri(title: string, date: string, time?: string): string {
+  const { value, allDay } = icsStamp(date, time);
+  const esc = (s: string) => s.replace(/([,;\\])/g, '\\$1').replace(/\n/g, '\\n');
+  const dtstart = allDay ? `DTSTART;VALUE=DATE:${value}` : `DTSTART:${value}`;
+  const ics = [
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Nesio//念念//ZH', 'BEGIN:VEVENT',
+    `UID:nesio-${Date.now()}@nesio.app`, `SUMMARY:${esc(title)}`, dtstart, 'END:VEVENT', 'END:VCALENDAR',
+  ].join('\r\n');
+  return `data:text/calendar;charset=utf-8,${encodeURIComponent(ics)}`;
+}
+function buildGoogleCalUrl(title: string, date: string, time?: string): string {
+  const ymd = date.replace(/-/g, '');
+  const m = time && /^(\d{1,2}):(\d{2})$/.exec(time);
+  let dates: string;
+  if (m) {
+    const start = `${ymd}T${m[1].padStart(2, '0')}${m[2]}00`;
+    const end = `${ymd}T${String((Number(m[1]) + 1) % 24).padStart(2, '0')}${m[2]}00`;
+    dates = `${start}/${end}`;
+  } else {
+    dates = `${ymd}/${ymd}`;
+  }
+  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${dates}`;
+}
 
 type SendState = 'idle' | 'analyzing' | 'confirm' | 'saved' | 'error';
 type AskResult = Pick<LifeNode, 'id' | 'name'> & { source: string; reason?: string };
@@ -305,11 +335,14 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
   const [askAnswer, setAskAnswer] = useState('');
   const [askAggregations, setAskAggregations] = useState<AskAggregation[]>([]);
   const [webSearchUsed, setWebSearchUsed] = useState(false);
-  const [draft, setDraft] = useState<PendingDraft | null>(null);
+  // 批次189:说一句直接存 —— 删确认卡。日期/重复收进折叠「详情」;可贴一张图;存完带时间的给「加入日历」。
   const [showDatePicker, setShowDatePicker] = useState(false);
-  // 确认卡默认「一眼收进记忆」;点「改一下」才展开详细字段编辑(设计:默认一眼,复杂改一下)
-  const [confirmView, setConfirmView] = useState<'card' | 'edit'>('card');
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detail, setDetail] = useState<{ date?: string; time?: string; recurring?: string; priority?: string }>({});
+  const [imageDataUrl, setImageDataUrl] = useState('');
+  const [savedEvent, setSavedEvent] = useState<{ title: string; date: string; time?: string } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const imgInputRef = useRef<HTMLInputElement>(null);
   const recRef = useRef<{ stop: () => void } | null>(null);
   const isAskMode = intent === 'ask';
   const { handleProps, cardStyle, expanded } = useSheetDrag(onClose);
@@ -320,7 +353,7 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
       setText(''); setSendState('idle'); setListening(false);
       setIntentLabel(''); setMicError(''); setSavedCount(0);
       setAskResults([]); setAskAnswer(''); setAskAggregations([]); setWebSearchUsed(false);
-      setDraft(null);
+      setDetail({}); setDetailOpen(false); setImageDataUrl(''); setSavedEvent(null); setShowDatePicker(false);
       recRef.current?.stop();
     } else {
       setTimeout(() => inputRef.current?.focus(), 120);
@@ -452,22 +485,19 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
       people: context.people ?? [],
       places: context.places ?? [],
       objects: context.objects ?? [],
-      edited: false,
+      edited: Boolean(detail.date || detail.recurring || detail.priority),
+      // 批次189:折叠「详情」里手设的日期/重复/优先级并入草稿(用户亲手设=可信)
+      dueDate: detail.date,
+      dueTime: detail.time,
+      recurring: detail.recurring,
+      priority: detail.priority,
     };
 
-    // §6.2 绝对控制优先: AI only SUGGESTS. If it found something worth confirming
-    // (a domain or any entity), show it for confirmation/edit before it becomes a
-    // trusted fact. If there's nothing to confirm, write straight through.
-    if (hasContext(context)) {
-      setDraft(pending);
-      setConfirmView('card');
-      setSendState('confirm');
-      return;
-    }
-    writeSignalFromDraft(pending, false);
+    // 批次189(用户实锤:删确认卡):告诉念念 = 规则抽取**直接存**,不再中间拦一张卡、不再有 AI 识别。
+    void writeSignalFromDraft(pending, false);
   }
 
-  function writeSignalFromDraft(d: PendingDraft, userConfirmed: boolean) {
+  async function writeSignalFromDraft(d: PendingDraft, userConfirmed: boolean) {
     const hasPlaceOrObject = d.places.length > 0 || d.objects.length > 0;
     const context: SignalContext = {
       ...d.baseContext,
@@ -487,7 +517,7 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
 
     // 批次 31:像待办的一律 task —— 「洗衣服下午」不再因无 domain 落成 preference
     const taskLike = looksLikeTask(d.rawText) || looksLikeTask(d.title);
-    createSignal({
+    const { nodeId } = createSignalWithNode({
       source: 'voice',
       type: taskLike ? 'task' : signalTypeForDomain(d.domain, hasPlaceOrObject),
       title: d.title,
@@ -501,56 +531,41 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
       raw: d.rawText,
     });
 
-    setSavedCount(1);
-    setDraft(null);
-    setSendState('saved');
-    setTimeout(() => { onClose(); setText(''); setSendState('idle'); }, 1100);
-  }
-
-  // Confirm-panel editors — each edit flips `edited` so provenance records it (§6.2).
-
-  // 「AI 识别」按钮:显式触发云理解优化标题/置信度(默认路径是规则,零成本)。
-  // 分层启用后免费点它 → 升级引导;免费期(分层未启用)可用。
-  const [aiRefining, setAiRefining] = useState(false);
-  async function aiRefineDraft() {
-    if (!draft || aiRefining) return;
-    if (!canUsePaidCloudAi()) {
-      window.dispatchEvent(new CustomEvent('nesio-pro-gate', { detail: { feature: 'voice_ai' } }));
-      return;
+    // 批次189:贴的图片挂到这条记忆(与拍照同一套本地图仓 local-image-store)
+    if (imageDataUrl) {
+      try {
+        const { putLocalImage } = await import('@/lib/portal/local-image-store');
+        const localAssetId = `img-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        await putLocalImage(localAssetId, imageDataUrl);
+        const node = getLifeGraph().find((n) => n.id === nodeId);
+        updateLifeNode(nodeId, {
+          assets: [...(node?.assets || []), { id: localAssetId, kind: 'image', mimeType: 'image/jpeg', local: true, createdAt: new Date().toISOString() }],
+        });
+      } catch { /* 图挂失败不挡存文字 */ }
     }
-    setAiRefining(true);
-    try {
-      const res = await fetch('/api/portal/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'text', content: draft.rawText, uiLocale: dict }),
-      });
-      const data = await res.json() as { ok?: boolean; nodes?: Array<{ name?: string; confidence?: number }> };
-      const best = data.ok && data.nodes?.length ? data.nodes[0] : null;
-      if (best?.name) {
-        setDraft((d) => d ? {
-          ...d,
-          title: stripInlineTags(best.name!) || d.title,
-          aiConfidence: typeof best.confidence === 'number' ? best.confidence : d.aiConfidence,
-        } : d);
-      }
-    } catch { /* 失败保留规则结果,不打断 */ }
-    setAiRefining(false);
-  }
-  function dropChip(kind: 'people' | 'places' | 'objects', value: string) {
-    setDraft((d) => (d ? { ...d, [kind]: d[kind].filter((item) => item !== value), edited: true } : d));
-  }
-  function setDraftTitle(title: string) {
-    setDraft((d) => (d ? { ...d, title, edited: true } : d));
-  }
-  function setDraftDTP(v: DTPValue) {
-    setDraft((d) => d ? { ...d, dueDate: v.date || undefined, dueTime: v.time, recurring: v.recurring, priority: v.priority, edited: true } : d);
+
+    setSavedCount(1);
+    setSendState('saved');
+    // 批次189(图3):带时间的 → 停在 saved 态给「加入日历」,不自动关;否则照旧 1.1s 自动关。
+    if (d.dueDate) {
+      setSavedEvent({ title: d.title, date: d.dueDate, time: d.dueTime });
+    } else {
+      setTimeout(() => { onClose(); setText(''); setSendState('idle'); }, 1100);
+    }
   }
 
-  // 判断是否是提醒/计划类型（需要显示时间相关字段）
-  function isCommitmentLike(d: PendingDraft): boolean {
-    return d.domain === 'growth' ||
-      /提醒|提醒我|安排|计划|任务|待办|记得|别忘|remind|todo|schedule|plan/i.test(d.rawText);
+  // 批次189:折叠「详情」里的日期/重复/优先级选择,写进 detail(存入时并进草稿)。
+  function setDetailDTP(v: DTPValue) {
+    setDetail({ date: v.date || undefined, time: v.time, recurring: v.recurring, priority: v.priority });
+  }
+
+  // 批次189:「贴图片」—— 选图后压缩成 dataURL 存 state,存入时挂到记忆节点。
+  async function pickImage(file: File | undefined) {
+    if (!file) return;
+    try {
+      const { compressToDataUrl } = await import('@/lib/portal/local-image-store');
+      setImageDataUrl(await compressToDataUrl(file));
+    } catch { /* 压缩失败忽略,不挡记文字 */ }
   }
 
   if (!open) return null;
@@ -567,158 +582,7 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
           {/* 批次 33:右上角 ✕ 撤除(用户指令)—— 退出走背景点击/手柄下拉 */}
         </div>
 
-        {/* 确认卡(默认一眼收进):念念的话在上 + 正在成形的记忆卡 + 收进记忆/改一下 */}
-        {sendState === 'confirm' && draft && confirmView === 'card' && (() => {
-          const taskLike = draft.domain === 'growth' || Boolean(draft.dueDate);
-          const whenLabel = (() => {
-            if (!draft.dueDate) return '';
-            const todayStr = new Date().toISOString().slice(0, 10);
-            const d = new Date(draft.dueDate + 'T00:00:00');
-            const today = new Date(todayStr + 'T00:00:00');
-            const diff = Math.round((d.getTime() - today.getTime()) / 86400000);
-            const base = diff === 0 ? L(dict, '今天', 'today') : diff === 1 ? L(dict, '明天', 'tomorrow') : `${d.getMonth() + 1}/${d.getDate()}`;
-            return `${base}${draft.dueTime ? ` ${draft.dueTime}` : ''}`;
-          })();
-          return (
-            <div className="nesio-cfm">
-              {/* 批次 179:删去念念开场白两行 + 「说一句·刚刚」徽章 + 标签/领域 chips(用户实锤) */}
-              {/* 正在成形的记忆卡 */}
-              <div className="nesio-cfm-card">
-                <div className="nesio-cfm-cardhead nesio-cfm-cardhead--editonly">
-                  <button type="button" className="nesio-cfm-editicon" aria-label={L(dict, '改一下', 'Edit')} onClick={() => setConfirmView('edit')}>
-                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z" /></svg>
-                  </button>
-                </div>
-
-                <input className="nesio-cfm-title" value={draft.title} onChange={(e) => setDraftTitle(e.target.value)} aria-label={L(dict, '标题', 'Title')} />
-
-                {/* 一个可选项(提醒) */}
-                {(draft.dueDate || taskLike) && (
-                  <button type="button" className="nesio-cfm-opt" onClick={() => setShowDatePicker(true)}>
-                    <IconClock size={14} />
-                    <span className="nesio-cfm-opt-main">{draft.dueDate ? L(dict, `${whenLabel} 提醒`, `Remind ${whenLabel}`) : L(dict, '加个提醒', 'Add a reminder')}</span>
-                    <span className="nesio-cfm-opt-hint">{L(dict, '点开可改', 'tap to edit')}</span>
-                  </button>
-                )}
-                {showDatePicker && (
-                  <DateTimePicker
-                    value={{ date: draft.dueDate ?? new Date().toISOString().slice(0, 10), time: draft.dueTime, recurring: draft.recurring, priority: draft.priority }}
-                    onChange={(v) => setDraftDTP(v)}
-                    onClose={() => setShowDatePicker(false)}
-                  />
-                )}
-              </div>
-
-              <div className="nesio-cfm-actions">
-                <button type="button" className="nesio-cfm-save" onClick={() => draft && writeSignalFromDraft(draft, true)}>
-                  {L(dict, '收进记忆', 'Keep it')}<span className="nesio-cfm-save-sub">{L(dict, '存进你的第 2 大脑', 'into your second brain')}</span>
-                </button>
-                <button type="button" className="nesio-cfm-edit" onClick={() => setConfirmView('edit')}>{L(dict, '改一下', 'Tweak')} ›</button>
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* Context confirm (§6.2 绝对控制优先) — AI suggested; you decide before it's trusted. */}
-        {sendState === 'confirm' && draft && confirmView === 'edit' && (
-          <div className="nesio-voice-confirm">
-            <p className="nesio-voice-confirm-lead">{L(dict, '先确认一下，再存入 Memory', 'Confirm first, then it enters Memory')}</p>
-
-            <label className="nesio-voice-confirm-field">
-              <span className="nesio-voice-confirm-label">{L(dict, '这条叫什么', 'Call this…')}</span>
-              <input
-                className="nesio-voice-confirm-input"
-                value={draft.title}
-                onChange={(e) => setDraftTitle(e.target.value)}
-                aria-label="标题"
-              />
-              {/* AI 显式按钮:默认规则标题零等待;想要 AI 优化就点这个 */}
-              <button
-                type="button"
-                onClick={aiRefineDraft}
-                disabled={aiRefining}
-                style={{ alignSelf: 'flex-start', marginTop: '0.35rem', background: 'none', border: '1px solid var(--portal-line, rgba(127,127,127,0.25))', borderRadius: 999, padding: '0.25rem 0.7rem', fontSize: '0.72rem', color: 'var(--portal-accent, #588ce3)', cursor: 'pointer', opacity: aiRefining ? 0.6 : 1 }}
-              >
-                {aiRefining ? L(dict, 'AI 识别中…', 'AI recognizing…') : L(dict, 'AI 识别', 'AI recognize')}
-              </button>
-            </label>
-
-            {/* 批次 179:删「属于哪个领域」手选器(domain 改后端自动派生,不劳用户手选) */}
-
-            {(['people', 'places', 'objects'] as const).some((k) => draft[k].length > 0) && (
-              <div className="nesio-voice-confirm-field">
-                <span className="nesio-voice-confirm-label">{L(dict, '识别到的线索（点 × 去掉不对的）', 'Detected clues (tap × to remove wrong ones)')}</span>
-                <div className="nesio-voice-confirm-chips">
-                  {([
-                    ['people', <IconUser key="p" size={12} />],
-                    ['places', <IconMapPin key="l" size={12} />],
-                    ['objects', <IconBox key="o" size={12} />],
-                  ] as const).flatMap(([kind, icon]) =>
-                    draft[kind].map((value) => (
-                      <button
-                        key={`${kind}-${value}`}
-                        type="button"
-                        className="nesio-voice-confirm-chip"
-                        onClick={() => dropChip(kind, value)}
-                        aria-label={`去掉 ${value}`}
-                      >
-                        {icon} {value} <span className="nesio-voice-confirm-chip-x">✕</span>
-                      </button>
-                    )),
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* 批次 179:删「标签」手动输入(不再用标签) */}
-
-            {/* 批次 33:时间/日期/重复对所有草稿开放(此前只有承诺类可设 —— 用户要求像设置提醒一样) */}
-            {(() => {
-              const todayStr = new Date().toISOString().slice(0, 10);
-              const dateStr = draft.dueDate ?? todayStr;
-              const dateLabel = (() => {
-                const d = new Date(dateStr + 'T00:00:00');
-                const today = new Date(todayStr + 'T00:00:00');
-                const diff = Math.round((d.getTime() - today.getTime()) / 86400000);
-                const wds = ['日','一','二','三','四','五','六'];
-                const base = `${d.getMonth()+1}月${d.getDate()}日 周${wds[d.getDay()]}`;
-                if (diff === 0) return `今天 · ${base}`;
-                if (diff === 1) return `明天 · ${base}`;
-                if (diff === -1) return `昨天 · ${base}`;
-                return base;
-              })();
-              return (
-                <div className="nesio-voice-confirm-field">
-                  <span className="nesio-voice-confirm-label">{L(dict, '截止日期 / 提醒时间', 'Due date / reminder')}</span>
-                  <button
-                    type="button"
-                    className="nesio-dtp-trigger"
-                    onClick={() => setShowDatePicker(true)}
-                  >
-                    <span>{dateLabel}</span>
-                    {draft.dueTime && <span className="nesio-dtp-trigger-time" style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><IconClock size={12} /> {draft.dueTime}</span>}
-                    {draft.recurring && <span className="nesio-dtp-trigger-badge">{draft.recurring}</span>}
-                    {draft.priority && <span className="nesio-dtp-trigger-badge"><span aria-hidden style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: draft.priority === '高' ? 'var(--status-risk)' : draft.priority === '中' ? 'var(--status-gentle)' : 'var(--status-go)', marginRight: 3 }} /> {draft.priority}</span>}
-                  </button>
-                  {showDatePicker && (
-                    <DateTimePicker
-                      value={{ date: dateStr, time: draft.dueTime, recurring: draft.recurring, priority: draft.priority }}
-                      onChange={(v) => setDraftDTP(v)}
-                      onClose={() => setShowDatePicker(false)}
-                    />
-                  )}
-                </div>
-              );
-            })()}
-
-            <div className="nesio-voice-confirm-actions">
-              <button type="button" className="nesio-voice-confirm-back" onClick={() => { setDraft(null); setSendState('idle'); }}>
-                {L(dict, '返回修改', 'Back to edit')}
-              </button>
-              <button type="button" className="nesio-voice-send-btn nesio-voice-confirm-save" onClick={() => draft && writeSignalFromDraft(draft, true)}>{L(dict, '确认存入 Memory', 'Confirm & save')}</button>
-            </div>
-          </div>
-        )}
+        {/* 批次189:确认卡 + 编辑卡整块删除 —— 告诉念念直接存,日期/重复移到输入区折叠「详情」。 */}
 
         {/* Text input fallback */}
         {sendState !== 'confirm' && (
@@ -746,6 +610,36 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
         </div>
         )}
 
+
+        {/* 批次189:贴图片 + 详情(日期/重复)折叠 —— 只在「说一句」模式,问一问不需要 */}
+        {!isAskMode && sendState !== 'confirm' && sendState !== 'saved' && (
+          <div className="nesio-voice-extras">
+            <input ref={imgInputRef} type="file" accept="image/*" hidden onChange={(e) => { void pickImage(e.target.files?.[0]); e.target.value = ''; }} />
+            {imageDataUrl ? (
+              <span className="nesio-voice-imgchip">
+                <img src={imageDataUrl} alt="" />
+                <button type="button" onClick={() => setImageDataUrl('')} aria-label={L(dict, '去掉图片', 'Remove image')}>✕</button>
+              </span>
+            ) : (
+              <button type="button" className="nesio-voice-extra-btn" onClick={() => imgInputRef.current?.click()}>
+                <IconCamera size={14} /> {L(dict, '贴图片', 'Photo')}
+              </button>
+            )}
+            <button type="button" className={`nesio-voice-extra-btn${detailOpen || detail.date ? ' is-on' : ''}`} onClick={() => setDetailOpen((o) => !o)}>
+              <IconClock size={14} /> {detail.date
+                ? `${new Date(detail.date + 'T00:00:00').getMonth() + 1}/${new Date(detail.date + 'T00:00:00').getDate()}${detail.time ? ` ${detail.time}` : ''}`
+                : L(dict, '详情', 'Details')}
+              <span className="nesio-voice-extra-caret" aria-hidden>{detailOpen ? '▴' : '▾'}</span>
+            </button>
+          </div>
+        )}
+        {!isAskMode && detailOpen && sendState !== 'saved' && (
+          <DateTimePicker
+            value={{ date: detail.date ?? new Date().toISOString().slice(0, 10), time: detail.time, recurring: detail.recurring, priority: detail.priority }}
+            onChange={setDetailDTP}
+            onClose={() => setDetailOpen(false)}
+          />
+        )}
 
         {/* Intent label — 批次 184:聊天意图变成可点链接,跳「问一问」并带上这句话(不再是死标签) */}
         {!isAskMode && intentLabel && sendState !== 'confirm' && (
@@ -847,7 +741,23 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
             </button>
           </div>
         ) : sendState === 'saved' ? (
-          <div className="nesio-voice-saved">✓ {L(dict, `已存入 Memory（${savedCount} 条）`, `Saved to Memory (${savedCount})`)}</div>
+          <div className="nesio-voice-saved-wrap">
+            <div className="nesio-voice-saved">✓ {L(dict, `已存入 Memory（${savedCount} 条）`, `Saved to Memory (${savedCount})`)}</div>
+            {/* 批次189(图3):带时间的记忆 → 一键加进系统日历(iOS 走 .ics 直接开苹果原生;另给 Google 链接) */}
+            {savedEvent && (
+              <div className="nesio-voice-cal">
+                <a className="nesio-voice-cal-btn nesio-voice-cal-btn--primary" href={buildIcsDataUri(savedEvent.title, savedEvent.date, savedEvent.time)} download={`${savedEvent.title.slice(0, 24) || 'event'}.ics`}>
+                  <IconCalendar size={14} /> {L(dict, '加入日历', 'Add to calendar')}
+                </a>
+                <a className="nesio-voice-cal-btn" href={buildGoogleCalUrl(savedEvent.title, savedEvent.date, savedEvent.time)} target="_blank" rel="noopener noreferrer">
+                  {L(dict, 'Google 日历', 'Google')}
+                </a>
+                <button type="button" className="nesio-voice-cal-done" onClick={() => { onClose(); setText(''); setSendState('idle'); }}>
+                  {L(dict, '完成', 'Done')}
+                </button>
+              </div>
+            )}
+          </div>
         ) : sendState === 'analyzing' ? (
           <div className="nesio-voice-send-btn" style={{ opacity: 0.6, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
             <span className="nesio-camera-recognizing-dot" style={{ background: '#fff' }} />{isAskMode ? L(dict, '正在搜索记忆…', 'Searching memory…') : L(dict, '念念正在整理…', 'Nessa is sorting…')}
