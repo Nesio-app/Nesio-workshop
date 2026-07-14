@@ -25,7 +25,8 @@ function run(js, requireShim) {
 // ── 编译依赖链:domain-rules → relationships → relationship-insight ──
 const storageHealth = { reportStorageDropped() {} };
 const domainRules = run(compile('../lib/portal/domain-rules.ts'), () => ({}));
-const relationships = run(compile('../lib/portal/relationships.ts'), (p) => (p.includes('storage-health') ? storageHealth : p.includes('relationship-overrides') ? { loadRelationshipOverrides: () => ({}) } : {}));
+const relationships = run(compile('../lib/portal/relationships.ts'), (p) => (p.includes('storage-health') ? storageHealth : p.includes('entity-resolution') ? { resolveEntityKey: (x) => String(x).trim().toLowerCase(), loadEntityAliases: () => ({}) }
+      : p.includes('relationship-overrides') ? { loadRelationshipOverrides: () => ({}) } : {}));
 const personRecords = run(compile('../lib/portal/person-records.ts'), (p) => (p.includes('storage-health') ? storageHealth : {}));
 const relInsight = run(compile('../lib/portal/relationship-insight.ts'), (p) => {
   if (p.endsWith('domain-rules')) return domainRules;

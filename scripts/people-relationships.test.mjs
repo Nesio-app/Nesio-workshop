@@ -18,6 +18,7 @@ function loadRel() {
     module: mod, exports: mod.exports, console, JSON, Object, Array, String, Number, Math, Date, Map, RegExp,
     window: undefined,
     require: (p) => p.includes('storage-health') ? { reportStorageDropped: () => {} }
+      : p.includes('entity-resolution') ? { resolveEntityKey: (x) => String(x).trim().toLowerCase(), loadEntityAliases: () => ({}) }
       : p.includes('relationship-overrides') ? { loadRelationshipOverrides: () => ({}) }
       : ({}),
   });
