@@ -17,13 +17,11 @@ import {
   createSignal,
   extractContext,
   hasContext,
-  ALL_DOMAINS,
-  DOMAINS,
   type FrontDomain,
   type SignalContext,
 } from '@/lib/life-domain';
 import { routeIntent } from '@/lib/portal/intent-router';
-import { DomainIcon, IconBox, IconClock, IconMapPin, IconUser } from './icons';
+import { IconBox, IconClock, IconMapPin, IconUser } from './icons';
 import { L } from '@/lib/portal/i18n';
 import { prefetchCaptureLocation } from '@/lib/portal/capture-location';
 import { looksLikeTask } from '@/lib/portal/task-heuristics';
@@ -492,7 +490,10 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
       type: taskLike ? 'task' : signalTypeForDomain(d.domain, hasPlaceOrObject),
       title: d.title,
       payload: { note: d.cleanText, ...extraPayload },
-      confidence: d.aiConfidence,
+      // 批次 179:用户亲口说 + 亲手经此 sheet 存入 = 用户授权,置信拉满 → 不再标「待确认」。
+      // 「待确认」只该留给系统自动抽取(邮件/日历)未经用户过目的条目。与时间线记一笔(手打=可信)一致。
+      // 原始 AI 结构置信仍保留在 context.confidence.ai 供溯源。
+      confidence: Math.max(d.aiConfidence, 0.9),
       context,
       tags: mergeTags([dict === 'en' ? 'Voice' : '说一句', d.domain ? `domain:${d.domain}` : ''], d.inlineTags),
       raw: d.rawText,
@@ -505,9 +506,6 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
   }
 
   // Confirm-panel editors — each edit flips `edited` so provenance records it (§6.2).
-  function setDraftDomain(domain: FrontDomain) {
-    setDraft((d) => (d ? { ...d, domain: d.domain === domain ? null : domain, edited: true } : d));
-  }
 
   // 「AI 识别」按钮:显式触发云理解优化标题/置信度(默认路径是规则,零成本)。
   // 分层启用后免费点它 → 升级引导;免费期(分层未启用)可用。
@@ -569,8 +567,6 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
 
         {/* 确认卡(默认一眼收进):念念的话在上 + 正在成形的记忆卡 + 收进记忆/改一下 */}
         {sendState === 'confirm' && draft && confirmView === 'card' && (() => {
-          const domMeta = ALL_DOMAINS.find((m) => m.id === draft.domain);
-          const domLabel = domMeta ? (dict === 'en' ? domMeta.labelEn : domMeta.label) : L(dict, '生活', 'life');
           const taskLike = draft.domain === 'growth' || Boolean(draft.dueDate);
           const whenLabel = (() => {
             if (!draft.dueDate) return '';
@@ -581,59 +577,18 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
             const base = diff === 0 ? L(dict, '今天', 'today') : diff === 1 ? L(dict, '明天', 'tomorrow') : `${d.getMonth() + 1}/${d.getDate()}`;
             return `${base}${draft.dueTime ? ` ${draft.dueTime}` : ''}`;
           })();
-          const entityChips: Array<{ kind: 'people' | 'places' | 'objects'; value: string }> = [
-            ...draft.people.map((v) => ({ kind: 'people' as const, value: v })),
-            ...draft.places.map((v) => ({ kind: 'places' as const, value: v })),
-            ...draft.objects.map((v) => ({ kind: 'objects' as const, value: v })),
-          ];
           return (
             <div className="nesio-cfm">
-              {/* 念念的话(引文体) */}
-              <div className="nesio-cfm-lead">
-                <span className="nesio-cfm-lead-nen"><span aria-hidden>✦</span> {L(dict, '念念', 'Nessa')}</span>
-                <p className="nesio-cfm-lead-text">
-                  {L(dict, '记下了。像件', 'Noted. Feels like a little ')}
-                  <span className="nesio-cfm-lead-hi">{domLabel}</span>
-                  {draft.dueDate
-                    ? L(dict, '里的小事 —— 要不要按时提醒你一下?', ' thing — want a reminder?')
-                    : L(dict, '里的小事 —— 帮你收进第二大脑。', ' thing — I’ll keep it in your second brain.')}
-                </p>
-              </div>
-
+              {/* 批次 179:删去念念开场白两行 + 「说一句·刚刚」徽章 + 标签/领域 chips(用户实锤) */}
               {/* 正在成形的记忆卡 */}
               <div className="nesio-cfm-card">
-                <div className="nesio-cfm-cardhead">
-                  <span className="nesio-cfm-badge">
-                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden><path d="M12 2a3 3 0 00-3 3v6a3 3 0 006 0V5a3 3 0 00-3-3z" /><path d="M18 11a6 6 0 01-12 0M12 17v3" /></svg>
-                    {L(dict, '说一句', 'Said')} · {L(dict, '刚刚', 'just now')}
-                  </span>
+                <div className="nesio-cfm-cardhead nesio-cfm-cardhead--editonly">
                   <button type="button" className="nesio-cfm-editicon" aria-label={L(dict, '改一下', 'Edit')} onClick={() => setConfirmView('edit')}>
                     <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z" /></svg>
                   </button>
                 </div>
 
                 <input className="nesio-cfm-title" value={draft.title} onChange={(e) => setDraftTitle(e.target.value)} aria-label={L(dict, '标题', 'Title')} />
-
-                <p className="nesio-cfm-tagslabel">— {L(dict, '念念贴的', 'Nessa tagged')}</p>
-                <div className="nesio-cfm-chips">
-                  {draft.domain && domMeta && (
-                    <button type="button" className="nesio-cfm-chip nesio-cfm-chip--domain" onClick={() => setDraftDomain(domMeta.id)}>
-                      {domLabel} <span className="nesio-cfm-chip-x" aria-hidden>✕</span>
-                    </button>
-                  )}
-                  {draft.inlineTags.map((tag) => (
-                    <button key={`t-${tag}`} type="button" className="nesio-cfm-chip nesio-cfm-chip--tag"
-                      onClick={() => setDraft((d) => (d ? { ...d, inlineTags: d.inlineTags.filter((x) => x !== tag), edited: true } : d))}>
-                      # {tag} <span className="nesio-cfm-chip-x" aria-hidden>✕</span>
-                    </button>
-                  ))}
-                  {entityChips.map(({ kind, value }) => (
-                    <button key={`${kind}-${value}`} type="button" className="nesio-cfm-chip nesio-cfm-chip--tag" onClick={() => dropChip(kind, value)}>
-                      # {value} <span className="nesio-cfm-chip-x" aria-hidden>✕</span>
-                    </button>
-                  ))}
-                  <button type="button" className="nesio-cfm-chip-add" onClick={() => setConfirmView('edit')}>+ {L(dict, '标签', 'tag')}</button>
-                </div>
 
                 {/* 一个可选项(提醒) */}
                 {(draft.dueDate || taskLike) && (
@@ -686,22 +641,7 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
               </button>
             </label>
 
-            <div className="nesio-voice-confirm-field">
-              <span className="nesio-voice-confirm-label">{L(dict, '属于哪个领域', 'Which area of life')}</span>
-              <div className="nesio-voice-confirm-domains">
-                {ALL_DOMAINS.map((meta) => (
-                  <button
-                    key={meta.id}
-                    type="button"
-                    className={`nesio-voice-confirm-domain${draft.domain === meta.id ? ' is-active' : ''}`}
-                    onClick={() => setDraftDomain(meta.id)}
-                    aria-pressed={draft.domain === meta.id}
-                  >
-                    <DomainIcon domain={meta.id} size={12} /> {dict === 'en' ? meta.labelEn : meta.label}
-                  </button>
-                ))}
-              </div>
-            </div>
+            {/* 批次 179:删「属于哪个领域」手选器(domain 改后端自动派生,不劳用户手选) */}
 
             {(['people', 'places', 'objects'] as const).some((k) => draft[k].length > 0) && (
               <div className="nesio-voice-confirm-field">
@@ -728,19 +668,7 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
               </div>
             )}
 
-            {/* 批次 33:标签手动编辑(存入时并进 tags) */}
-            <div className="nesio-voice-confirm-field">
-              <span className="nesio-voice-confirm-label">{L(dict, '标签(可选,逗号分隔)', 'Tags (optional, comma-separated)')}</span>
-              <input
-                className="nesio-ob-input"
-                value={draft.inlineTags.join(', ')}
-                placeholder={L(dict, '如:家务, 周末', 'e.g. chores, weekend')}
-                onChange={(e) => {
-                  const tags = e.target.value.split(/[,，\s]+/).map((x) => x.trim()).filter(Boolean);
-                  setDraft((d) => (d ? { ...d, inlineTags: tags, edited: true } : d));
-                }}
-              />
-            </div>
+            {/* 批次 179:删「标签」手动输入(不再用标签) */}
 
             {/* 批次 33:时间/日期/重复对所有草稿开放(此前只有承诺类可设 —— 用户要求像设置提醒一样) */}
             {(() => {

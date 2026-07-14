@@ -40,6 +40,13 @@ const UNPLACED = '__unplaced__';
 
 // 批次 133·预览图占位色(设计:每条物品有预览图;真图缩略未加载时用柔和莫兰迪色块占位,确定性取色)
 const PREVIEW_COLORS = ['#d3b0ac', '#d3b79a', '#a9bcd0', '#b6c7ac', '#c8b3c6', '#cdbfa6', '#b0c4c0'];
+// 批次 179:物品分类改下拉预设 + 自定义(用户实锤「下拉框选项,客户可以自定义」)
+const CATEGORY_PRESETS: Array<[string, string]> = [
+  ['日用品', 'Household'], ['护肤', 'Skincare'], ['电子', 'Electronics'], ['服饰', 'Apparel'],
+  ['食品', 'Food'], ['文具', 'Stationery'], ['工具', 'Tools'], ['药品', 'Meds'],
+  ['母婴', 'Baby'], ['收藏', 'Collectible'],
+];
+const CAT_CUSTOM = '__custom__';
 function previewColor(name: string): string {
   let h = 0;
   for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
@@ -73,6 +80,7 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
   const [fExpiry, setFExpiry] = useState('');
   const [fNote, setFNote] = useState('');
   const [fCategory, setFCategory] = useState(''); // 物品①
+  const [catCustom, setCatCustom] = useState(false); // 批次 179:分类选了「自定义」→ 显示文本框
   const [fTags, setFTags] = useState('');         // 逗号分隔
   const [fPrice, setFPrice] = useState('');
 
@@ -135,7 +143,7 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
 
   if (!open) return null;
 
-  const resetForm = () => { setFName(''); setFLocation(''); setFQty(''); setFExpiry(''); setFNote(''); setFCategory(''); setFTags(''); setFPrice(''); setPasteMsg(''); };
+  const resetForm = () => { setFName(''); setFLocation(''); setFQty(''); setFExpiry(''); setFNote(''); setFCategory(''); setCatCustom(false); setFTags(''); setFPrice(''); setPasteMsg(''); };
 
   // 物品⑤:粘贴商品信息(商品页标题/描述/链接文本)→ AI 识别预填表单;失败可见,不静默
   const pasteRecognize = async () => {
@@ -376,7 +384,8 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
         )}
 
         {view === 'add' && (
-          <div style={{ maxHeight: '58vh', overflowY: 'auto' }}>
+          // 批次 179:键盘弹起时底部让出 --kb-inset,焦点输入可滚到键盘上方(修物品表单键盘漂移)
+          <div style={{ maxHeight: '58vh', overflowY: 'auto', paddingBottom: 'var(--kb-inset, 0px)' }}>
             {/* 物品⑤:从商品页复制标题/描述,一键识别预填 */}
             <button
               type="button"
@@ -404,7 +413,38 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
             <div style={{ display: 'flex', gap: 10 }}>
               <div style={{ flex: 1.2 }}>
                 <label style={label}>{L(dict, '分类(可选)', 'Category (optional)')}</label>
-                <input className="nesio-ob-input" value={fCategory} onChange={(e) => setFCategory(e.target.value)} placeholder={L(dict, '例:日用品、护肤、电子', 'e.g. household, skincare')} />
+                {(() => {
+                  const isPreset = CATEGORY_PRESETS.some(([zh]) => zh === fCategory);
+                  const showCustom = catCustom || (!!fCategory && !isPreset);
+                  return (
+                    <>
+                      <select
+                        className="nesio-ob-input"
+                        value={showCustom ? CAT_CUSTOM : fCategory}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          if (v === CAT_CUSTOM) { setCatCustom(true); setFCategory(''); }
+                          else { setCatCustom(false); setFCategory(v); }
+                        }}
+                      >
+                        <option value="">{L(dict, '未分类', 'None')}</option>
+                        {CATEGORY_PRESETS.map(([zh, en]) => (
+                          <option key={zh} value={zh}>{L(dict, zh, en)}</option>
+                        ))}
+                        <option value={CAT_CUSTOM}>{L(dict, '自定义…', 'Custom…')}</option>
+                      </select>
+                      {showCustom && (
+                        <input
+                          className="nesio-ob-input"
+                          style={{ marginTop: 6 }}
+                          value={fCategory}
+                          onChange={(e) => setFCategory(e.target.value)}
+                          placeholder={L(dict, '自定义分类', 'Custom category')}
+                        />
+                      )}
+                    </>
+                  );
+                })()}
               </div>
               <div style={{ flex: 1 }}>
                 <label style={label}>{L(dict, '估值 $(可选)', 'Value $ (optional)')}</label>

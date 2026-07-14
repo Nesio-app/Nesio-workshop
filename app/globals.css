@@ -6413,7 +6413,9 @@ html[data-portal-theme="night"] .nesio-ask-guide-examples span {
   background: var(--glass-bg-pop);
   border-top-left-radius: 1.5rem;
   border-top-right-radius: 1.5rem;
-  padding: 0 1.25rem calc(2.5rem + env(safe-area-inset-bottom));
+  /* 批次 179:键盘弹起时底部让出 --kb-inset,粘贴框上移到键盘上方(修分享 sheet 键盘漂移) */
+  padding: 0 1.25rem calc(2.5rem + env(safe-area-inset-bottom) + var(--kb-inset, 0px));
+  transition: padding-bottom 0.22s var(--ease-out, ease);
   box-shadow: 0 -8px 40px rgba(0,0,0,0.15);
   animation: sheetSlideUp 0.28s var(--ease-out);
 }

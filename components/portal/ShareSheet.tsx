@@ -116,10 +116,15 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
   const [aiPayload, setAiPayload] = useState<{ type: 'text' | 'file' | 'image'; content: string; imageBase64?: string; mimeType?: string } | null>(null);
 
   async function analyze(type: 'text' | 'file' | 'image', content: string, imageBase64?: string, mimeType?: string, force = false): Promise<boolean> {
-    // 纯链接 → 走文章抓取(确定性抓正文,不打 AI,免费层照走)
+    // 链接 → 走文章抓取(确定性抓正文,不打 AI,免费层照走)
+    // 批次 179:放宽 —— 不再要求整段就是 URL。含 URL 且 URL 是主体(纯链接 / 「标题+链接」/
+    // 带跟踪参数)就抽正文;长笔记里夹带链接则仍按文本存(保住笔记不被链接顶替)。
     if (type === 'text') {
-      const urlMatch = content.trim().match(/^https?:\/\/\S+$/);
-      if (urlMatch) return analyzeUrl(urlMatch[0]);
+      const trimmed = content.trim();
+      const urlMatch = trimmed.match(/https?:\/\/\S+/);
+      if (urlMatch && (trimmed.startsWith('http') || trimmed.replace(urlMatch[0], '').trim().length < 30)) {
+        return analyzeUrl(urlMatch[0]);
+      }
     }
     // 批次 33 用户定案:**任何档位都不自动打 AI** —— 确定性存档是唯一默认路径,
     // 「AI 整理」按钮显式触发(force=true)才打云。
