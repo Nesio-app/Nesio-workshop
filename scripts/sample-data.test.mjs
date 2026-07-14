@@ -70,4 +70,35 @@ assert.equal(sd.hasSampleData([{ tags: ['样例'] }]), true, 'hasSampleData 命�
 assert.equal(sd.hasSampleData([{ tags: ['别的'] }]), false, 'hasSampleData 不误判');
 assert.equal(sd.hasSampleData([]), false, 'hasSampleData 空库为假');
 
+// ── 英文样例(locale='en'):同样锁八域/幂等/关系完整 + 无杜撰人名 + 导览三条 ──
+const en = sd.buildSampleNodes('en');
+assert.ok(en.length >= 8, '英文样例至少八条');
+for (const n of en) {
+  assert.ok((n.tags || []).includes(sd.SAMPLE_TAG), `${n.name} 盖样例 tag`);
+  assert.ok(typeof n.attributes?.externalId === 'string' && n.attributes.externalId.startsWith('sample-'), `${n.name} 带 sample- externalId`);
+}
+const enIds = en.map((n) => n.attributes.externalId);
+assert.equal(new Set(enIds).size, enIds.length, '英文 externalId 无重复');
+const enTypes = new Set(en.map((n) => n.type));
+for (const ty of ['person', 'commitment', 'place', 'health_state']) assert.ok(enTypes.has(ty), `英文有 ${ty}`);
+assert.ok(en.some((n) => n.source === 'email'), '英文有邮件来源');
+assert.ok(en.some((n) => n.source === 'calendar'), '英文有日历来源');
+const enPlace = en.find((n) => n.type === 'place');
+assert.ok(typeof enPlace.attributes.lat === 'number' && typeof enPlace.attributes.lon === 'number', '英文位置带经纬度');
+const enMood = en.find((n) => n.type === 'health_state');
+assert.ok(enMood.attributes.emotion && enMood.attributes.emotionLabel, '英文心情带情绪标签');
+assert.ok((enMood.tags || []).includes('feeling'), '英文心情带 feeling tag');
+// 关系 targetId 落在英文样例人物内
+const enPersonNames = new Set(en.filter((n) => n.type === 'person').map((n) => n.name));
+for (const n of en) for (const r of n.relations || []) assert.ok(enPersonNames.has(r.targetId), `英文关系 targetId「${r.targetId}」是样例人物`);
+// 不出现 Linda 这类杜撰人名(整份数据的名字/正文都不含)
+const enBlob = JSON.stringify(en);
+assert.ok(!/\blinda\b/i.test(enBlob), '英文样例不含 Linda');
+// 导览三条(洞察页 / 头像进设置 / 提醒卡手势)都在
+for (const id of ['sample-en-guide-insights', 'sample-en-guide-avatar', 'sample-en-guide-gestures']) {
+  assert.ok(en.some((n) => n.attributes.externalId === id), `英文导览含 ${id}`);
+}
+// 内容确为英文(至少人物 Mom 是角色名,非中文姓名)
+assert.ok(enPersonNames.has('Mom'), '英文人物用角色名 Mom');
+
 console.log('sample-data: OK');

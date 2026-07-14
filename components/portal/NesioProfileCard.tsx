@@ -145,12 +145,13 @@ export default function NesioProfileCard() {
     { key: 'appearance', icon: <IconSun />, iconBg: 'var(--chip-indigo)', label: L(dict, '外观与语言', 'Appearance & language') },
     { key: 'privacy', icon: <IconShield />, iconBg: 'var(--chip-blue)', label: L(dict, '数据与隐私', 'Data & privacy') },
   ];
-  // 图1:Lab(实验功能 + 新手提醒/预览引导)从隐私里独立成底部入口
-  const bottomItems: Array<{ key: ActiveSheet; icon: ReactNode; label: string }> = [
-    { key: 'subscription', icon: <IconGift />, label: L(dict, '会员 · Pro', 'Membership · Pro') },
-    { key: 'routine', icon: <IconClock />, label: L(dict, '例行提醒', 'Routines') },
-    { key: 'roadmap', icon: <IconHelpCircle />, label: L(dict, '帮助与反馈', 'Help & feedback') },
-    { key: 'lab', icon: <IconBulb />, label: 'Lab' },
+  // 图1:Lab(实验功能 + 新手提醒/预览引导)从隐私里独立成底部入口。
+  // 用户要求:这几项与上面两张卡同形态 —— 合进同一套整行卡(图标块 + 名称 + 箭头)。
+  const bottomItems: Array<{ key: ActiveSheet; icon: ReactNode; iconBg: string; label: string }> = [
+    { key: 'subscription', icon: <IconGift />, iconBg: 'var(--chip-amber)', label: L(dict, '会员 · Pro', 'Membership · Pro') },
+    { key: 'routine', icon: <IconClock />, iconBg: 'var(--chip-mint)', label: L(dict, '例行提醒', 'Routines') },
+    { key: 'roadmap', icon: <IconHelpCircle />, iconBg: 'var(--chip-periwinkle)', label: L(dict, '帮助与反馈', 'Help & feedback') },
+    { key: 'lab', icon: <IconBulb />, iconBg: 'var(--chip-violet)', label: 'Lab' },
   ];
 
   return (
@@ -197,8 +198,9 @@ export default function NesioProfileCard() {
         )}
 
         {/* 图4:菜单去掉分组标题与每行小灰字,只留图标 + 名称 + 箭头 */}
+        {/* 用户要求:会员/例行提醒/帮助反馈/Lab 与上面两张同形态,合进同一套整行卡 */}
         <nav className="nesio-profile-menu" aria-label={L(dict, '设置菜单', 'Settings menu')}>
-          {menuItems.map((item) => (
+          {[...menuItems, ...bottomItems].map((item) => (
             <button key={String(item.key)} type="button" className="nesio-profile-menu-item" onClick={() => setActiveSheet(item.key)}>
               <span className="nesio-profile-menu-icon" style={{ background: item.iconBg }}>{item.icon}</span>
               <div className="nesio-profile-menu-text">
@@ -208,16 +210,6 @@ export default function NesioProfileCard() {
             </button>
           ))}
         </nav>
-
-        {/* 批次 138:次要入口收进底部一行,主菜单更清爽 */}
-        <div className="nesio-profile-menu-bottom">
-          {bottomItems.map((item) => (
-            <button key={String(item.key)} type="button" className="nesio-profile-menu-bottom-item" onClick={() => setActiveSheet(item.key)}>
-              <span className="nesio-profile-menu-bottom-icon" aria-hidden>{item.icon}</span>
-              <span className="nesio-profile-menu-bottom-label">{item.label}</span>
-            </button>
-          ))}
-        </div>
       </div>
 
       {/* 批次 95:卡通头像 —— 生成中 / 预览接受 / 报错 */}
