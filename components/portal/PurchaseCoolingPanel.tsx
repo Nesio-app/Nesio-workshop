@@ -15,11 +15,11 @@ import { IconSnowflake } from './icons';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
-import { canUse } from '@/lib/portal/entitlement';
+import { canOpenFreeze } from '@/lib/portal/entitlement';
 
-// 冷冻仓 = 整功能 Pro:免费/匿名打开 → 走 Portal 的升级引导,不直接开。
+// 冷冻仓:未上线 → 免费/Pro 都不上(升级引导);上线后 Pro 专属。与全站同一道门。
 function openFreezeVault(setOpen: (v: boolean) => void): void {
-  if (!canUse('freeze')) {
+  if (!canOpenFreeze()) {
     window.dispatchEvent(new CustomEvent('nesio-pro-gate', { detail: { feature: 'freeze' } }));
     return;
   }
@@ -80,8 +80,8 @@ export function PurchaseCoolingPanel({ productName, similarCount, similarExample
   persuasion.push(L(dict, '冻 24 小时,明天还想要就买,大多数冲动过一晚就凉了。', 'Freeze it 24 hours. If you still want it tomorrow, buy it — most impulses cool overnight.'));
 
   function freeze() {
-    // 「冻 24 小时」= 冷冻仓写入,整功能 Pro:免费/匿名 → 升级引导,不真冻。
-    if (!canUse('freeze')) {
+    // 「冻 24 小时」= 冷冻仓写入:未上线 → 免费/Pro 都不上(升级引导);上线后 Pro 专属。
+    if (!canOpenFreeze()) {
       window.dispatchEvent(new CustomEvent('nesio-pro-gate', { detail: { feature: 'freeze' } }));
       return;
     }

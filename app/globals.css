@@ -12665,6 +12665,15 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
   background: var(--portal-accent-soft); border: 1px solid var(--portal-line);
   border-radius: var(--radius-pill, 999px); padding: 0.28rem 0.7rem; margin-bottom: 0.7rem;
 }
+/* 冷冻仓入口(财务总览);未上线时组件层不渲染 */
+.nesio-fin-freeze-entry {
+  display: flex; align-items: center; gap: 0.5rem; width: 100%;
+  font-size: 0.85rem; font-weight: 600; color: var(--portal-ink);
+  background: var(--glass-bg-solid); border: 1px solid var(--portal-line);
+  border-radius: var(--radius-md, 16px); padding: 0.7rem 0.85rem; margin-bottom: 0.8rem;
+  cursor: pointer; box-shadow: var(--shadow-card);
+}
+.nesio-fin-freeze-entry:active { background: var(--portal-accent-soft); }
 .nesio-fin-nessa {
   display: flex; gap: 0.55rem; align-items: flex-start;
   background: var(--status-gentle-soft); border-radius: var(--radius-md, 16px);

@@ -10,7 +10,7 @@ import TellNesioSheet, { type CaptureMode } from './TellNesioSheet';
 import PortalBottomNav from './PortalBottomNav';
 import PortalOnboarding from './PortalOnboarding';
 import InstallPrompt from './InstallPrompt';
-import { canUse } from '@/lib/portal/entitlement';
+import { canUse, canOpenFreeze } from '@/lib/portal/entitlement';
 import { reconcileLocalOwner, claimLocalDataForUser, purgeAllLocalUserData, setLocalOwner, getLocalOwner } from '@/lib/portal/local-owner';
 import { archiveCurrentSpace, restoreArchivedSpace } from '@/lib/portal/account-spaces';
 
@@ -695,8 +695,8 @@ export default function Portal() {
     const voiceHandler = () => { track('capture_voice_open'); setCaptureMode('voice'); };
     const moodHandler = () => { track('mood_open'); setMoodOpen(true); };
     const freezeHandler = () => {
-      // 冷冻仓是整功能 Pro 专属:免费/匿名 → 升级引导,不直接打开(付费墙从桩变真强制)。
-      if (!canUse('freeze')) { track('pro_gate_shown', { feature: 'freeze' }); setProGate('freeze'); return; }
+      // 冷冻仓:未上线 → 免费/Pro 都不上(走「会随 Pro 开放」引导);上线后 Pro 专属。唯一开门点。
+      if (!canOpenFreeze()) { track('pro_gate_shown', { feature: 'freeze' }); setProGate('freeze'); return; }
       track('freeze_open'); setFreezeOpen(true);
     };
     const inventoryHandler = () => { track('inventory_open'); setInventoryOpen(true); };

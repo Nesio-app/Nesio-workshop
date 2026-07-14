@@ -1,5 +1,5 @@
 -- Nesio Supabase Backend v1 Bundle
--- Generated at 2026-07-14T22:20:47.058Z
+-- Generated at 2026-07-14T22:39:20.645Z
 -- Apply manually in Supabase SQL Editor after CEO-approved production data operation window.
 -- This file contains schema only. It does not contain secrets. It creates the private Storage bucket contract.
 
