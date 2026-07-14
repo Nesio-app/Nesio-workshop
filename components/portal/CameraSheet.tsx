@@ -9,7 +9,7 @@ import { getLifeGraph, updateLifeNode, type LifeNode, type LifeNodeAsset } from 
 import { createAppApiClient } from '@/lib/portal/app-api-client';
 import { matchNearestPlace, formatLocation, getNamedPlaces } from '@/lib/portal/named-places';
 import LocationPicker from './LocationPicker';
-import { IconBox, IconCamera, IconImage, NodeTypeIcon } from './icons';
+import { IconCamera, IconImage, NodeTypeIcon } from './icons';
 import { canUsePaidCloudAi } from '@/lib/portal/entitlement';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -293,7 +293,6 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
   const [nodeLocations, setNodeLocations] = useState<Record<number, string>>({});
   // Similarity check result (per node index)
   const [similarItems, setSimilarItems] = useState<Record<number, SimilarItem[]>>({});
-  const [dismissedSimilar, setDismissedSimilar] = useState<Set<number>>(new Set());
 
   const stopCamera = useCallback(() => {
     const video = videoRef.current;
@@ -864,7 +863,7 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
     setResult(null); setEditedNodes([]); setIsReceipt(false);
     setCapturedPreview(''); setCapturedBase64(''); setError(''); setExtraTags(''); setSourceFile(null);
     setNodeLocations({}); setDetectedPlaceId('');
-    setSimilarItems({}); setDismissedSimilar(new Set());
+    setSimilarItems({});
     setPhase('idle');
     openNativeCamera();
   }
@@ -1052,7 +1051,7 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
   if (!open) return null;
 
   return (
-    <div className="nesio-camera-sheet" role="dialog" aria-modal="true" aria-label={L(dict, '拍一下', 'Snap')}>
+    <div className={`nesio-camera-sheet${phase === 'result' ? ' nesio-camera-sheet--result' : ''}`} role="dialog" aria-modal="true" aria-label={L(dict, '拍一下', 'Snap')}>
       <canvas ref={canvasRef} style={{ display: 'none' }} />
       {/* Native camera — opens the iOS system camera directly (reliable, no
           persistent stream/indicator). Triggered by a user tap. */}
@@ -1193,22 +1192,34 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
             </button>
           </div>
 
-          {memSearch && (
-            <div className="nesio-camera-memsearch">
-              <p className="nesio-camera-similar-title" style={{ margin: '0 0 0.35rem' }}>
-                {memSearch.length
-                  ? L(dict, `记忆库里找到 ${memSearch.length} 条相似`, `${memSearch.length} similar in Memory`)
-                  : L(dict, '记忆库里没有相似的 —— 是新东西', 'Nothing similar in Memory — looks new')}
-              </p>
-              {memSearch.slice(0, 6).map((n0) => (
-                <button key={n0.id} type="button" className="nesio-camera-similar-item nesio-camera-similar-item--btn" onClick={() => setViewNode(n0)}>
-                  <NodeTypeIcon type={n0.type} size={12} /> {n0.name}
-                  {visualMatchIds.has(n0.id) && <span className="nesio-camera-visual-badge">{L(dict, '图像相似', 'visual')}</span>}
-                  <span style={{ marginLeft: 'auto', opacity: 0.6 }}>›</span>
-                </button>
-              ))}
-            </div>
-          )}
+          {/* 批次 181:合并两处相似提示 —— 自动逐条查重(similarItems)+ 手动「搜记忆」(memSearch)
+              去重合成一个「相似记忆」段(此前分散成顶部列表 + 逐条「你好像已经有了」两处重复)。 */}
+          {(() => {
+            const seen = new Set<string>();
+            const similarNodes: LifeNode[] = [];
+            for (const arr of Object.values(similarItems)) for (const s of arr) { if (!seen.has(s.node.id)) { seen.add(s.node.id); similarNodes.push(s.node); } }
+            for (const n0 of memSearch || []) { if (!seen.has(n0.id)) { seen.add(n0.id); similarNodes.push(n0); } }
+            const capped = similarNodes.slice(0, 8);
+            if (capped.length === 0) {
+              // 手动搜过但空 → 报「是新东西」;没搜过(memSearch===null)就不占位
+              return memSearch !== null
+                ? <p className="nesio-camera-similar-empty">{L(dict, '记忆库里没有相似的 —— 是新东西', 'Nothing similar in Memory — looks new')}</p>
+                : null;
+            }
+            return (
+              <div className="nesio-camera-similar-merged">
+                <p className="nesio-camera-similar-title">{L(dict, '相似记忆 · 你可能已经有了,点开回看', 'Similar in Memory — you may already have these, tap to open')}</p>
+                {capped.map((n0) => (
+                  <button key={n0.id} type="button" className="nesio-camera-similar-item nesio-camera-similar-item--btn" onClick={() => setViewNode(n0)}>
+                    <NodeTypeIcon type={n0.type} size={13} /> {n0.name}
+                    {n0.attributes?.location ? <span className="nesio-camera-similar-loc"> · {String(n0.attributes.location)}</span> : null}
+                    {visualMatchIds.has(n0.id) && <span className="nesio-camera-visual-badge">{L(dict, '图像相似', 'visual')}</span>}
+                    <span style={{ marginLeft: 'auto', opacity: 0.6 }}>›</span>
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
 
           <div className="nesio-camera-result-nodes">
             {editedNodes.map((node, i) => node.deleted ? null : (
@@ -1241,28 +1252,7 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
                 />
 
                 {/* Similarity alert */}
-                {similarItems[i] && !dismissedSimilar.has(i) && (
-                  <div className="nesio-camera-similar-alert">
-                    <span className="nesio-camera-similar-icon"><IconBox size={14} /></span>
-                    <div className="nesio-camera-similar-body">
-                      <p className="nesio-camera-similar-title">{L(dict, '等等，你好像已经有了', 'Wait — you might already have this')}</p>
-                      {similarItems[i].slice(0, 2).map((s) => (
-                        <button key={s.node.id} type="button" className="nesio-camera-similar-item nesio-camera-similar-item--btn"
-                          onClick={() => setViewNode(s.node)}>
-                          <IconBox size={12} /> {s.node.name}
-                          {s.node.attributes?.location ? <span className="nesio-camera-similar-loc"> · {String(s.node.attributes.location)}</span> : null}
-                          <span style={{ marginLeft: 'auto', opacity: 0.6 }}>›</span>
-                        </button>
-                      ))}
-                    </div>
-                    <button
-                      type="button"
-                      className="nesio-camera-similar-dismiss"
-                      onClick={() => setDismissedSimilar((prev) => new Set(Array.from(prev).concat(i)))}
-                      aria-label={L(dict, '忽略', 'Dismiss')}
-                    >✕</button>
-                  </div>
-                )}
+                {/* 批次 181:逐条「你好像已经有了」已并入顶部统一「相似记忆」段,这里不再重复 */}
 
                 {/* Location — shown for objects, hierarchical picker */}
                 {node.type === 'object' && (

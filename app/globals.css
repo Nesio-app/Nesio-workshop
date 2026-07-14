@@ -6168,6 +6168,44 @@ html[data-portal-theme="night"] .nesio-voice-confirm-chip {
   touch-action: manipulation;
 }
 
+/* 批次 181:识别结果页浅色重绘 —— 取景/拍摄仍深色,识别出结果后整页翻成莫兰迪浅色,
+   与全站一致(此前深色底 + 深色 token 文字对比差、与设计标准不符)。 */
+.nesio-camera-sheet--result { background: var(--portal-bg); }
+.nesio-camera-sheet--result .nesio-camera-header { background: var(--portal-bg); }
+.nesio-camera-sheet--result .nesio-camera-title { color: var(--portal-ink); }
+.nesio-camera-sheet--result .nesio-camera-close { background: var(--portal-line); color: var(--portal-ink); }
+/* 结果态:照片收成顶部小预览,把空间让给结果面板(此前照片占大半、内容挤) */
+.nesio-camera-sheet--result .nesio-camera-viewfinder {
+  flex: none; height: 24vh; background: var(--portal-card, #ece8e2);
+}
+.nesio-camera-sheet--result .nesio-camera-result-panel {
+  background: var(--portal-bg); border-top: 1px solid var(--portal-line);
+  max-height: none; flex: 1;
+}
+.nesio-camera-sheet--result .nesio-camera-result-summary { color: var(--portal-muted); }
+.nesio-camera-sheet--result .nesio-camera-select-btn { border-color: var(--portal-line); color: var(--portal-accent); }
+.nesio-camera-sheet--result .nesio-camera-result-node {
+  background: var(--portal-card, rgba(0,0,0,0.03)); border-color: var(--portal-line);
+}
+.nesio-camera-sheet--result .nesio-camera-node-name-input {
+  background: var(--portal-card, #fff); border-color: var(--portal-line); color: var(--portal-ink);
+}
+.nesio-camera-sheet--result .nesio-camera-node-note-input { color: var(--portal-muted); border-bottom-color: var(--portal-line); }
+.nesio-camera-sheet--result .nesio-camera-save-btn { background: var(--portal-accent); box-shadow: none; }
+/* 相似记忆(合并后)浅色:深字浅底 —— 盖掉批次180给深底加的亮字 */
+.nesio-camera-sheet--result .nesio-camera-similar-item,
+.nesio-camera-sheet--result .nesio-camera-similar-item--btn { color: var(--portal-ink); }
+.nesio-camera-sheet--result .nesio-camera-similar-loc { color: var(--portal-muted); }
+.nesio-camera-sheet--result .nesio-camera-similar-title { color: var(--portal-muted); }
+
+/* 批次 181:合并后的统一「相似记忆」段容器 + 空态 */
+.nesio-camera-similar-merged {
+  background: var(--portal-card, rgba(0,0,0,0.03));
+  border: 1px solid var(--portal-line);
+  border-radius: 0.7rem; padding: 0.55rem 0.7rem; margin-bottom: 0.65rem;
+}
+.nesio-camera-similar-empty { font-size: 0.78rem; color: var(--portal-muted); margin: 0.2rem 0 0.6rem; }
+
 .nesio-camera-header {
   display: flex;
   align-items: center;
