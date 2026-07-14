@@ -8367,6 +8367,8 @@ html[data-portal-theme="night"] .nesio-profile-auth-banner { background: var(--p
   display: flex; align-items: center; gap: 0.3rem;
 }
 html[data-portal-theme="night"] .nesio-voice-intent-label { color: var(--portal-blue-deep); }
+/* 批次 184:聊天意图 = 可点链接跳问一问 */
+.nesio-voice-intent-link { background: none; border: none; padding: 0; cursor: pointer; color: var(--portal-accent); font-weight: 600; }
 
 /* ─── ConnectorsHub ─── */
 .nesio-connector-row {

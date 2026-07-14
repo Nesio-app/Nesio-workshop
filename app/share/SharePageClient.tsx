@@ -8,13 +8,15 @@
 
 import { useEffect, useState } from 'react';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
+import { getLifeGraph, updateLifeNode } from '@/lib/portal/life-graph';
 import { addToFreeze } from '@/lib/platform/impulse-guard';
 import { track } from '@/lib/portal/telemetry';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '@/components/portal/use-portal-locale';
 
-interface Parsed { title: string; price?: string; image?: string; store?: string }
+// 批次 184:分享链接也抓正文(article)—— 存成可读文章,不再只是跳转链接
+interface Parsed { title: string; price?: string; image?: string; store?: string; article?: string; description?: string }
 
 function firstUrl(...candidates: string[]): string {
   for (const c of candidates) {
@@ -46,8 +48,8 @@ export default function SharePageClient() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url: sharedUrl }),
     })
-      .then((r) => r.json() as Promise<{ ok?: boolean; title?: string; price?: string; image?: string; store?: string }>)
-      .then((d) => setParsed({ title: (d.ok && d.title) || sharedText || sharedUrl, price: d.price, image: d.image, store: d.store }))
+      .then((r) => r.json() as Promise<{ ok?: boolean; title?: string; price?: string; image?: string; store?: string; article?: string; description?: string }>)
+      .then((d) => setParsed({ title: (d.ok && d.title) || sharedText || sharedUrl, price: d.price, image: d.image, store: d.store, article: d.article, description: d.description }))
       .catch(() => setParsed({ title: sharedText || sharedUrl }))
       .finally(() => setParsing(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -56,18 +58,34 @@ export default function SharePageClient() {
   const displayTitle = parsed?.title || sharedText || sharedUrl;
 
   function saveToMemory() {
+    const article = (parsed?.article || '').trim();
+    const attributes: Record<string, string> = {
+      ...(sharedUrl ? { url: sharedUrl, sourceApp: 'web' } : {}),
+      ...(article ? { article } : {}),
+      ...(parsed?.price ? { price: parsed.price } : {}),
+      ...(parsed?.store ? { store: parsed.store } : {}),
+      ...(parsed?.image ? { image: parsed.image } : {}),
+    };
+    // 批次 184:同一 URL 已存过 → 补正文/更新,不再重复建卡(修满屏重复的 Google 网站)
+    if (sharedUrl) {
+      const dup = getLifeGraph().find((n) => n.attributes?.url === sharedUrl);
+      if (dup) {
+        updateLifeNode(dup.id, { attributes: { ...dup.attributes, ...attributes } });
+        track('share_save', { frozen: false });
+        setDone(L(dict, '这条已经在记忆里了,已更新', 'Already in Memory — updated'));
+        setTimeout(() => { window.location.href = '/'; }, 900);
+        return;
+      }
+    }
     ingestLifeNode({
+      // 批次 184:分享链接 = note(可读文章),不再是 object;纯文本也 note(不再 preference)
       name: (displayTitle || L(dict, '分享内容', 'Shared item')).slice(0, 60),
-      type: sharedUrl ? 'object' : 'preference',
+      type: 'note',
       source: 'manual',
       confidence: 0.9,
-      rawInput: sharedText || sharedUrl,
-      tags: ['分享'],
-      attributes: {
-        ...(sharedUrl ? { url: sharedUrl } : {}),
-        ...(parsed?.price ? { price: parsed.price } : {}),
-        ...(parsed?.store ? { store: parsed.store } : {}),
-      },
+      rawInput: article ? article.slice(0, 200) : (sharedText || sharedUrl),
+      tags: sharedUrl ? ['分享', '文章'] : ['分享'],
+      attributes,
       relations: [],
     });
     track('share_save', { frozen: false });

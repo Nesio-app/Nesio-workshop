@@ -188,7 +188,9 @@ assert.match(voiceSheet, /fetchAskResponse[\s\S]*setText\(''\)/, 'Ask mode shoul
 assert.match(voiceSheet, /searchLifeGraphFuzzy/, 'Ask mode should use fuzzy local memory search instead of only exact title search.');
 assert.match(voiceSheet, /\/api\/portal\/analyze[\s\S]*type:\s*'ask'[\s\S]*searchLifeGraphFuzzy/, 'Ask mode should try AI semantic search before falling back to local fuzzy search.');
 assert.doesNotMatch(voiceSheet, /isAskMode \? '输入完成 · 点「问宝盒」查找线索'/, 'Ask mode should not show the extra duplicate helper line above the answer.');
-assert.match(voiceSheet, /text && !isAskMode[\s\S]*识别完成 · 点「告诉 Nesio」保存/, 'Ask mode should not show the non-ask save helper line.');
+// 批次 184(用户实锤):删掉「识别完成 · 点告诉Nesio保存」引导字 —— 该提示行整体移除,
+// 断言改为确认它不再出现(不在任何模式)。
+assert.doesNotMatch(voiceSheet, /识别完成 · 点「告诉 Nesio」保存/, 'The save-helper guide line was removed entirely.');
 // TODAY-004 landed: guidance cards carry the feedback row writing back to
 // the store the DEC filters on next run.
 assert.match(todayFeed, /recordCardFeedback/, 'Today cards must write feedback back so 稍后/不再提醒 has a visible result.');

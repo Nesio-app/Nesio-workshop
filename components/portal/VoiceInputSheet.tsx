@@ -747,11 +747,21 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
         )}
 
 
-        {/* Intent label */}
+        {/* Intent label — 批次 184:聊天意图变成可点链接,跳「问一问」并带上这句话(不再是死标签) */}
         {!isAskMode && intentLabel && sendState !== 'confirm' && (
-          <div className="nesio-voice-intent-label">
-            <span>✦</span> {intentLabel}
-          </div>
+          intentLabel === '和念念聊聊' ? (
+            <button
+              type="button"
+              className="nesio-voice-intent-label nesio-voice-intent-link"
+              onClick={() => { const t = text.trim(); onClose(); if (t) window.dispatchEvent(new CustomEvent('nesio-ask-text', { detail: { text: t } })); }}
+            >
+              <span>✦</span> {L(dict, '和念念聊聊', 'Chat with Nessa')} ›
+            </button>
+          ) : (
+            <div className="nesio-voice-intent-label">
+              <span>✦</span> {intentLabel}
+            </div>
+          )
         )}
 
         {/* Waveform / status */}
@@ -771,8 +781,6 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
             </>
           ) : micError ? (
             <span style={{ fontSize: '0.73rem', color: 'var(--status-risk)', textAlign: 'center', lineHeight: 1.4 }}>{micError}</span>
-          ) : text && !isAskMode ? (
-            <span style={{ fontSize: '0.72rem', color: 'var(--portal-muted)' }}>{L(dict, '识别完成 · 点「告诉 Nesio」保存', 'Got it · tap "Tell Nesio" to save')}</span>
           ) : null}
         </div>
         )}
@@ -842,11 +850,11 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
           <div className="nesio-voice-saved">✓ {L(dict, `已存入 Memory（${savedCount} 条）`, `Saved to Memory (${savedCount})`)}</div>
         ) : sendState === 'analyzing' ? (
           <div className="nesio-voice-send-btn" style={{ opacity: 0.6, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
-            <span className="nesio-camera-recognizing-dot" style={{ background: '#fff' }} />{isAskMode ? L(dict, '正在搜索记忆…', 'Searching memory…') : L(dict, 'Nesio 正在分析…', 'Nesio is analyzing…')}
+            <span className="nesio-camera-recognizing-dot" style={{ background: '#fff' }} />{isAskMode ? L(dict, '正在搜索记忆…', 'Searching memory…') : L(dict, '念念正在整理…', 'Nessa is sorting…')}
           </div>
         ) : text.trim() && sendState !== 'confirm' ? (
           <button type="button" className="nesio-voice-send-btn" onClick={handleSend}>
-            {isAskMode ? L(dict, '问念念', 'Ask') : L(dict, '告诉 Nesio', 'Tell Nesio')}
+            {isAskMode ? L(dict, '问念念', 'Ask') : L(dict, '告诉念念', 'Tell Nessa')}
           </button>
         ) : null}
       </div>

@@ -54,5 +54,5 @@ export function routeIntent(input: string, hasImage = false): IntentResult {
     return { intent: 'SHARE_PARSE', confidence: 0.9, extractedText: t, suggestedAction: '提取关键信息存入 Memory' };
   }
 
-  return { intent: 'COMPANION_CHAT', confidence: 0.7, extractedText: t, suggestedAction: '和 Nesio 聊聊' };
+  return { intent: 'COMPANION_CHAT', confidence: 0.7, extractedText: t, suggestedAction: '和念念聊聊' };
 }
