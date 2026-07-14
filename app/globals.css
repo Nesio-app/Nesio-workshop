@@ -5892,6 +5892,110 @@ html[data-portal-theme="night"] .nesio-voice-input { color: #e8eefa; }
   gap: 0.85rem;
   padding: 0.25rem 0 0.5rem;
 }
+
+/* ── 确认卡(说/拍/收共用):念念的话 + 正在成形的记忆卡 + 收进记忆/改一下 ── */
+.nesio-cfm { display: flex; flex-direction: column; gap: 0.9rem; padding: 0.25rem 0 0.4rem; }
+.nesio-cfm-lead { padding-left: 0.9rem; border-left: 2px solid var(--portal-accent-border, rgba(88,140,227,0.3)); }
+.nesio-cfm-lead-nen { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.72rem; font-weight: 700; color: var(--portal-blue-deep); }
+.nesio-cfm-lead-text {
+  margin: 0.25rem 0 0;
+  font-family: var(--font-portal-serif), Georgia, serif;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--portal-ink);
+}
+.nesio-cfm-lead-hi { color: var(--portal-blue-deep); font-weight: 600; }
+
+.nesio-cfm-card {
+  background: var(--sheet-opaque, #fff);
+  border: 1px solid var(--portal-line);
+  border-radius: 18px;
+  padding: 0.9rem 1rem 1rem;
+  box-shadow: 0 8px 28px rgba(20,30,60,0.08);
+}
+.nesio-cfm-cardhead { display: flex; align-items: center; justify-content: space-between; }
+.nesio-cfm-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: var(--radius-pill, 999px);
+  background: var(--portal-surface-2, rgba(127,127,127,0.1));
+  color: var(--portal-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+.nesio-cfm-editicon {
+  width: 30px; height: 30px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--portal-surface-2, rgba(127,127,127,0.08));
+  color: var(--portal-muted);
+}
+.nesio-cfm-title {
+  width: 100%;
+  margin: 0.7rem 0 0.2rem;
+  border: none;
+  background: none;
+  font-family: var(--font-portal-serif), Georgia, serif;
+  font-size: 1.7rem;
+  font-weight: 700;
+  color: var(--portal-ink);
+  padding: 0;
+}
+.nesio-cfm-title:focus { outline: none; }
+.nesio-cfm-tagslabel { margin: 0.85rem 0 0.4rem; font-size: 0.7rem; color: var(--portal-muted); }
+.nesio-cfm-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.nesio-cfm-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.32rem 0.7rem;
+  border-radius: var(--radius-pill, 999px);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.nesio-cfm-chip--domain { background: var(--portal-blue-deep); color: #fff; }
+.nesio-cfm-chip--tag { background: var(--portal-accent-soft, rgba(88,140,227,0.1)); color: var(--portal-blue-deep); }
+.nesio-cfm-chip-x { opacity: 0.7; font-size: 0.66rem; }
+.nesio-cfm-chip-add {
+  padding: 0.32rem 0.7rem;
+  border-radius: var(--radius-pill, 999px);
+  border: 1px dashed var(--portal-line);
+  color: var(--portal-muted);
+  font-size: 0.78rem;
+}
+.nesio-cfm-opt {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  margin-top: 0.9rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 12px;
+  background: var(--portal-surface-2, rgba(127,127,127,0.06));
+  color: var(--portal-ink);
+  text-align: left;
+}
+.nesio-cfm-opt-main { font-size: 0.85rem; font-weight: 600; }
+.nesio-cfm-opt-hint { margin-left: auto; font-size: 0.72rem; color: var(--portal-muted); }
+
+.nesio-cfm-actions { display: flex; flex-direction: column; align-items: center; gap: 0.55rem; margin-top: 0.4rem; }
+.nesio-cfm-save {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.95rem;
+  border-radius: 16px;
+  background: var(--portal-blue-deep, #b06f68);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 700;
+}
+.nesio-cfm-save:active { transform: scale(0.99); }
+.nesio-cfm-save-sub { font-size: 0.72rem; font-weight: 500; opacity: 0.85; }
+.nesio-cfm-edit { padding: 0.4rem 1rem; color: var(--portal-muted); font-size: 0.85rem; }
 .nesio-voice-confirm-lead {
   font-size: 0.92rem;
   font-weight: 700;
