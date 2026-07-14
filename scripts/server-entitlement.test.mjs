@@ -85,7 +85,7 @@ const se = loadTs('../lib/portal/auth/server-entitlement.ts', (p) =>
 {
   const guard = fs.readFileSync(new URL('../lib/portal/auth/api-auth.ts', import.meta.url), 'utf8');
   assert.ok(guard.includes('requirePaidCloudAi') && guard.includes('guardServerEntitlement'), 'guardAiRoute 接服务端权益守卫');
-  const PAID = ['meeting-notes', 'avatarify', 'person-extract', 'inventory-extract', 'living-model', 'health-insight', 'daily-brief'];
+  const PAID = ['meeting-notes', 'avatarify', 'person-extract', 'inventory-extract', 'living-model', 'health-insight', 'daily-brief', 'guidance-language', 'life-state'];
   for (const r of PAID) {
     const src = fs.readFileSync(new URL(`../app/api/portal/${r}/route.ts`, import.meta.url), 'utf8');
     assert.ok(/requirePaidCloudAi:\s*true/.test(src), `${r} 传 requirePaidCloudAi`);
