@@ -57,39 +57,35 @@ const SYSTEM_TAGS = new Set(['联系人', '手动记录', '月报', 'Voice', '�
 
 const MONTHS_EN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-// ── Widget: mini week bars(一行节律的迷你柱线)────────────────────────────────
+// ── Widget: 节律热力图(周×星期,记录密度)────────────────────────────────
 
-function WeekBarChart({ nodes }: { nodes: LifeNode[] }) {
+function RhythmHeatmap({ nodes }: { nodes: LifeNode[] }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
-  const now = Date.now();
-  const buckets: { label: string; count: number }[] = [];
-
-  for (let i = 7; i >= 0; i--) {
-    const weekStart = new Date(now - i * 7 * DAY_MS);
-    weekStart.setHours(0, 0, 0, 0);
-    const weekEnd = new Date(weekStart.getTime() + 7 * DAY_MS);
-    const label = `${weekStart.getMonth() + 1}/${weekStart.getDate()}`;
-    const count = nodes.filter((n) => {
-      const t = new Date(n.createdAt).getTime();
-      return t >= weekStart.getTime() && t < weekEnd.getTime();
-    }).length;
-    buckets.push({ label, count });
+  const WEEKS = 10;
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  const thisWeekStart = new Date(now.getTime() - now.getDay() * DAY_MS); // 本周日 0 点
+  const gridStart = new Date(thisWeekStart.getTime() - (WEEKS - 1) * 7 * DAY_MS);
+  // grid[dow][week]
+  const grid: number[][] = Array.from({ length: 7 }, () => Array(WEEKS).fill(0));
+  for (const n of nodes) {
+    const t = new Date(n.createdAt).getTime();
+    if (Number.isNaN(t) || t < gridStart.getTime()) continue;
+    const col = Math.floor((t - gridStart.getTime()) / (7 * DAY_MS));
+    if (col < 0 || col >= WEEKS) continue;
+    grid[new Date(t).getDay()][col] += 1;
   }
-
-  const maxCount = Math.max(...buckets.map((b) => b.count), 1);
-
+  const max = Math.max(1, ...grid.flat());
+  const dowLabels = dict === 'en' ? ['S', 'M', 'T', 'W', 'T', 'F', 'S'] : ['日', '一', '二', '三', '四', '五', '六'];
+  const cellColor = (c: number) => (c === 0 ? 'var(--portal-surface-2, rgba(127,127,127,0.08))' : `color-mix(in srgb, var(--portal-blue-deep) ${Math.round(22 + 68 * (c / max))}%, transparent)`);
   return (
-    <div className="nesio-week-bar-chart">
-      {buckets.map((b, i) => (
-        <div key={i} className="nesio-week-bar-col">
-          <div className="nesio-week-bar-track">
-            <div
-              className="nesio-week-bar-fill"
-              style={{ height: `${Math.round((b.count / maxCount) * 100)}%` }}
-              title={L(dict, `${b.label}: ${b.count} 条`, `${b.label}: ${b.count}`)}
-            />
-          </div>
-          <span className="nesio-week-bar-label">{b.label}</span>
+    <div className="nesio-rhythm-heat" role="img" aria-label={L(dict, '记录节律热力图', 'Capture rhythm heatmap')}>
+      {grid.map((row, dow) => (
+        <div key={dow} className="nesio-rhythm-heat-row">
+          <span className="nesio-rhythm-heat-dow">{dowLabels[dow]}</span>
+          {row.map((c, wi) => (
+            <span key={wi} className="nesio-rhythm-heat-cell" style={{ background: cellColor(c) }}
+              title={c > 0 ? L(dict, `${c} 条`, `${c}`) : ''} />
+          ))}
         </div>
       ))}
     </div>
@@ -760,10 +756,8 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
                 <p className="nesio-insights-section-label" style={{ margin: 0 }}>{L(dict, '节律', 'Rhythm')}</p>
                 <span style={{ fontSize: '0.68rem', color: 'var(--portal-muted)' }}>{L(dict, '本月', 'this month')}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '0.8rem', marginTop: '0.45rem' }}>
-                <p className="nesio-rhythm-line" style={{ margin: 0 }}>{rhythm.line}</p>
-                {realNodes.length > 0 && <WeekBarChart nodes={realNodes} />}
-              </div>
+              <p className="nesio-rhythm-line" style={{ margin: '0.45rem 0 0' }}>{rhythm.line}</p>
+              {realNodes.length > 0 && <RhythmHeatmap nodes={realNodes} />}
             </div>
 
             {/* 生命版图:唯一保留的图,移到底部(≥21 天才出现,不满门槛只说实话,不放示例) */}
