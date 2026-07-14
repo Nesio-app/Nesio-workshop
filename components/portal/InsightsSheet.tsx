@@ -59,7 +59,7 @@ const MONTHS_EN = ['January', 'February', 'March', 'April', 'May', 'June', 'July
 
 // ── Widget: 节律热力图(周×星期,记录密度)────────────────────────────────
 
-function RhythmHeatmap({ nodes }: { nodes: LifeNode[] }) {
+function RhythmHeatmap({ nodes, compact = false }: { nodes: LifeNode[]; compact?: boolean }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const WEEKS = 10;
   const now = new Date(); now.setHours(0, 0, 0, 0);
@@ -78,10 +78,10 @@ function RhythmHeatmap({ nodes }: { nodes: LifeNode[] }) {
   const dowLabels = dict === 'en' ? ['S', 'M', 'T', 'W', 'T', 'F', 'S'] : ['日', '一', '二', '三', '四', '五', '六'];
   const cellColor = (c: number) => (c === 0 ? 'var(--portal-surface-2, rgba(127,127,127,0.08))' : `color-mix(in srgb, var(--portal-blue-deep) ${Math.round(22 + 68 * (c / max))}%, transparent)`);
   return (
-    <div className="nesio-rhythm-heat" role="img" aria-label={L(dict, '记录节律热力图', 'Capture rhythm heatmap')}>
+    <div className={`nesio-rhythm-heat${compact ? ' nesio-rhythm-heat--compact' : ''}`} role="img" aria-label={L(dict, '记录节律热力图', 'Capture rhythm heatmap')}>
       {grid.map((row, dow) => (
         <div key={dow} className="nesio-rhythm-heat-row">
-          <span className="nesio-rhythm-heat-dow">{dowLabels[dow]}</span>
+          {!compact && <span className="nesio-rhythm-heat-dow">{dowLabels[dow]}</span>}
           {row.map((c, wi) => (
             <span key={wi} className="nesio-rhythm-heat-cell" style={{ background: cellColor(c) }}
               title={c > 0 ? L(dict, `${c} 条`, `${c}`) : ''} />
@@ -673,9 +673,12 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
           <div className="nesio-reflection-tab">
 
             {/* 顶部刊物 kicker(设计:你的私人刊物 · X月) */}
-            <p className="nesio-insights-kicker" style={{ margin: '0 0 0.9rem', fontSize: '0.72rem', letterSpacing: '0.04em', color: 'var(--portal-muted)' }}>
+            <p className="nesio-insights-kicker" style={{ margin: '0 0 0.6rem', fontSize: '0.72rem', letterSpacing: '0.04em', color: 'var(--portal-muted)' }}>
               {L(dict, `你的私人刊物 · ${monthNum} 月`, `Your private journal · ${MONTHS_EN[monthNum - 1]}`)}
             </p>
+
+            {/* 节律热力图(缩小、无侧栏文字,置顶) */}
+            {realNodes.length > 0 && <RhythmHeatmap nodes={realNodes} compact />}
 
             {/* ① 主题门:你最近反复在想(门楣造型 chip) */}
             {doors.length > 0 && (
@@ -757,7 +760,6 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
                 <span style={{ fontSize: '0.68rem', color: 'var(--portal-muted)' }}>{L(dict, '本月', 'this month')}</span>
               </div>
               <p className="nesio-rhythm-line" style={{ margin: '0.45rem 0 0' }}>{rhythm.line}</p>
-              {realNodes.length > 0 && <RhythmHeatmap nodes={realNodes} />}
             </div>
 
             {/* 生命版图:唯一保留的图,移到底部(≥21 天才出现,不满门槛只说实话,不放示例) */}

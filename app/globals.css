@@ -15612,23 +15612,7 @@ html[data-portal-theme="night"] .nesio-exp-card:hover {
   align-items: center;
   justify-content: space-between;
 }
-.nesio-placeshare-seg {
-  display: inline-flex;
-  padding: 3px;
-  border-radius: var(--radius-pill, 999px);
-  background: rgba(255, 255, 255, 0.16);
-}
-.nesio-placeshare-seg-btn {
-  padding: 0.32rem 0.9rem;
-  border-radius: var(--radius-pill, 999px);
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.78);
-}
-.nesio-placeshare-seg-btn.is-active {
-  background: #fff;
-  color: var(--portal-ink, #222);
-}
+.nesio-placeshare-hint { font-size: 0.78rem; color: rgba(255, 255, 255, 0.82); }
 .nesio-placeshare-x {
   width: 34px;
   height: 34px;
@@ -15639,12 +15623,28 @@ html[data-portal-theme="night"] .nesio-exp-card:hover {
   background: rgba(255, 255, 255, 0.16);
   color: #fff;
 }
-.nesio-placeshare-cardwrap {
+/* 横滑模版轮播 */
+.nesio-placeshare-cards {
+  display: flex;
   width: 100%;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  gap: 0;
+  border-radius: 24px;
+}
+.nesio-placeshare-cards::-webkit-scrollbar { display: none; }
+.nesio-placeshare-slide {
+  flex: 0 0 100%;
+  scroll-snap-align: center;
   border-radius: 24px;
   overflow: hidden;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
 }
+.nesio-placeshare-dots { display: flex; justify-content: center; gap: 6px; }
+.nesio-placeshare-dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255, 255, 255, 0.35); }
+.nesio-placeshare-dot.is-on { background: #fff; width: 18px; border-radius: 3px; }
 .nesio-placeshare-cta {
   align-self: center;
   min-width: 60%;
@@ -15938,6 +15938,10 @@ html[data-portal-theme="night"] .nesio-exp-card:hover {
 .nesio-rhythm-heat-row { display: flex; align-items: center; gap: 3px; }
 .nesio-rhythm-heat-dow { width: 1rem; flex-shrink: 0; font-size: 0.6rem; color: var(--portal-muted); text-align: center; }
 .nesio-rhythm-heat-cell { flex: 1; aspect-ratio: 1; border-radius: 3px; min-width: 0; }
+/* 置顶紧凑版:缩小、无侧栏文字 */
+.nesio-rhythm-heat--compact { gap: 2px; margin: 0 0 0.9rem; }
+.nesio-rhythm-heat--compact .nesio-rhythm-heat-row { gap: 2px; }
+.nesio-rhythm-heat--compact .nesio-rhythm-heat-cell { flex: 0 0 auto; width: 10px; height: 10px; border-radius: 2px; aspect-ratio: auto; }
 
 /* 生命版图证据行(§2.2) */
 .nesio-insights-map-evidence {
