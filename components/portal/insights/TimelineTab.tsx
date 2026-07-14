@@ -542,6 +542,12 @@ export default function TimelineTab() {
                   </div>
                 ))}
               </div>
+              {/* 图5:说清「到访」计的是什么(用户反馈「8 次到访指哪个数据不清晰」) */}
+              <p className="nesio-settings-option-hint" style={{ margin: '0.5rem 0 0' }}>
+                {L(dict,
+                  '地点=去过的不同地方;到访=停留计次(同一地方去多次分开算);移动=路上里程。',
+                  'Places = distinct spots visited; Visits = stop count (repeat trips counted separately); km moved = distance on the road.')}
+              </p>
             </div>
           )}
 
