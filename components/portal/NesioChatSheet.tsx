@@ -39,7 +39,7 @@ function nodeReadableText(n: LifeNode): string {
     .find((v): v is string => typeof v === 'string' && v.trim().length > 20) || n.rawInput || n.name;
 }
 
-/** 小娜头像 — Nesio logo,替代 ✦ 占位 */
+/** 念念头像 — Nesio logo,替代 ✦ 占位 */
 function NesioAvatar() {
   return (
     <span className="nesio-wechat-avatar nesio-wechat-avatar--logo">

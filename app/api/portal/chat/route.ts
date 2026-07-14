@@ -25,7 +25,7 @@ interface ChatRequest {
   history?: ChatMessage[];
   personalityId?: string;
   coachStyle?: string;
-  /** 界面语言(zh/en)— 小娜的回答语言跟随界面(批次 9)。 */
+  /** 界面语言(zh/en)— 念念的回答语言跟随界面(批次 9)。 */
   uiLocale?: string;
   fileContext?: { name: string; content: string };
   /** Pre-built context strings from client (has localStorage + sessionStorage access) */
@@ -34,7 +34,7 @@ interface ChatRequest {
   environmentContext?: string;
 }
 
-const SYSTEM_BASE = `你是 Nesio，用户的贴身 AI 助手，叫"小娜"。
+const SYSTEM_BASE = `你是 Nesio，用户的贴身 AI 助手，叫"念念"（英文名 Nessa）。
 你的品牌性格：记性极好、懂生活的贴心朋友——专业、克制、温和。不讨好、不卖萌、不油腻。
 - 默认不用任何 emoji、颜文字和箭头符号（用户在设置里选的语气只改变说话方式，不加表情）
 - 纯文本回答：不用 Markdown 记号（**、#、* 列表等），界面不会渲染它们；要点用「1. 2. 3.」或自然分段

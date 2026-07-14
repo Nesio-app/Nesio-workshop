@@ -42,6 +42,11 @@ const HYPOTHESES: Hypothesis[] = [
   { key: 'calendar→mood', a: col('calendarEvents'), b: col('moodValence'), lag: 0, labelA: ['日程密度', 'schedule load'], labelB: ['情绪', 'mood'] },
   { key: 'weather→mood', a: col('weatherTempC'), b: col('moodValence'), lag: 0, labelA: ['气温', 'temperature'], labelB: ['情绪', 'mood'] },
   { key: 'calendar→spend', a: col('calendarEvents'), b: col('spend'), lag: 0, labelA: ['日程密度', 'schedule load'], labelB: ['花费', 'spending'] },
+  // 批次191:第二批假设对(用户点名 trainingSessions→mood、spend→sleep)。
+  { key: 'training→mood', a: col('trainingSessions'), b: col('moodValence'), lag: 0, labelA: ['训练次数', 'workouts'], labelB: ['情绪', 'mood'] },
+  { key: 'spend→sleep', a: col('spend'), b: col('sleepMin'), lag: 0, labelA: ['花费', 'spending'], labelB: ['睡眠时长', 'sleep'] },
+  { key: 'weather→outings', a: col('weatherTempC'), b: col('placeVisits'), lag: 0, labelA: ['气温', 'temperature'], labelB: ['外出次数', 'outings'] },
+  { key: 'calendar→sleep', a: col('calendarEvents'), b: col('sleepMin'), lag: 0, labelA: ['日程密度', 'schedule load'], labelB: ['睡眠时长', 'sleep'] },
 ];
 
 const MIN_N = 14;          // 少于两周有效配对不下结论

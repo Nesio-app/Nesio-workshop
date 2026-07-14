@@ -10,7 +10,7 @@
  * 只回统计数字,不回原始行。
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { isSameOriginRequest, isRateLimited } from '@/lib/portal/api-auth';
+import { isSameOriginRequest, isRateLimited, safeEqual } from '@/lib/portal/api-auth';
 import { normalizeSupabaseRuntimeUrl } from '@/lib/portal/production-runtime';
 import { ROADMAP_ITEMS } from '@/lib/portal/roadmap';
 import { EXPERIMENTS } from '@/lib/portal/experiments';
@@ -59,7 +59,8 @@ export async function GET(req: NextRequest) {
       );
     }
     const provided = req.headers.get('x-nesio-admin-secret')?.trim() || '';
-    if (provided !== secret) {
+    // 批次191:admin 密钥用常量时间比较(safeEqual),避免 === 短路的计时侧信道。
+    if (!safeEqual(provided, secret)) {
       return NextResponse.json({ ok: false, error: 'admin_secret_required' }, { status: 401 });
     }
   }
