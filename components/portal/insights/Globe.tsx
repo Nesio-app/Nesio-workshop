@@ -101,21 +101,30 @@ export default function Globe({ countries, size = 300, onTap }: {
     const themeAttr = document.documentElement.getAttribute('data-portal-theme');
     const isDay = themeAttr === 'day'
       || (themeAttr !== 'night' && !(window.matchMedia?.('(prefers-color-scheme: dark)')?.matches ?? false));
+    // Canvas 不认 CSS 变量 —— 按设计系统例外,用 getComputedStyle 读官方 token 后使用。
+    // 海洋走品牌 ramp(灰粉皮肤下=陶棕系),随皮肤/主题自动变,不再硬编码蓝。
+    const cs = getComputedStyle(document.documentElement);
+    const tok = (n: string, fb: string) => (cs.getPropertyValue(n).trim() || fb);
+    const deep = tok('--portal-blue-deep', isDay ? '#5f7890' : '#8fb4de');
+    const mid = tok('--portal-blue-mid', isDay ? '#a9c2d5' : '#6f95c8');
+    const lightC = tok('--portal-blue-light', isDay ? '#dceaf3' : '#2c3f5a');
+    const neutral = tok('--portal-neutral', isDay ? '#e6eef9' : '#16243c');
+    const line = tok('--portal-line', 'rgba(127,127,127,0.16)');
     const P = isDay
       ? {
-          halo: 'rgba(37, 99, 235, 0.22)',
-          ocean: ['#8ec2f0', '#5590d6', '#31649f'] as const,
-          grat: 'rgba(255,255,255,0.22)',
-          land: '#c9d8c2',
-          landStroke: 'rgba(70, 100, 90, 0.45)',
-          night: 'rgba(15, 35, 75, 0.28)',
+          halo: `color-mix(in srgb, ${deep} 22%, transparent)`,
+          ocean: [lightC, mid, deep] as const,
+          grat: 'rgba(255,255,255,0.28)',
+          land: neutral,
+          landStroke: line,
+          night: 'rgba(40,40,50,0.12)',
         }
       : {
-          halo: 'rgba(96, 165, 250, 0.28)',
-          ocean: ['#2e6cb8', '#17407e', '#0a1d40'] as const,
-          grat: 'rgba(255,255,255,0.07)',
-          land: '#31413f',
-          landStroke: 'rgba(10,20,35,0.55)',
+          halo: `color-mix(in srgb, ${deep} 30%, transparent)`,
+          ocean: [lightC, mid, deep] as const,
+          grat: 'rgba(255,255,255,0.08)',
+          land: neutral,
+          landStroke: line,
           night: 'rgba(2, 6, 18, 0.5)',
         };
     const { yaw, pitch } = rotRef.current;

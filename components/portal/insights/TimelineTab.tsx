@@ -74,12 +74,77 @@ const DOT_COLOR: Record<PlaceCategory, string> = {
   lodging: '#5a8fc2', transit: '#3aa6a0', place: '#4a7c5f', unknown: '#9aa7b8',
 };
 
+// ── 可交互甜甜圈:图例贴在饼里(%),点扇形高亮 + 中心出详情 ──
+function polar(cx: number, cy: number, r: number, angDeg: number): [number, number] {
+  const a = ((angDeg - 90) * Math.PI) / 180;
+  return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+}
+function donutSeg(cx: number, cy: number, rO: number, rI: number, a0: number, a1: number): string {
+  const large = a1 - a0 > 180 ? 1 : 0;
+  const [x0, y0] = polar(cx, cy, rO, a0);
+  const [x1, y1] = polar(cx, cy, rO, a1);
+  const [x2, y2] = polar(cx, cy, rI, a1);
+  const [x3, y3] = polar(cx, cy, rI, a0);
+  return `M${x0} ${y0} A${rO} ${rO} 0 ${large} 1 ${x1} ${y1} L${x2} ${y2} A${rI} ${rI} 0 ${large} 0 ${x3} ${y3} Z`;
+}
+
+type PlaceSeg = { key: string; label: string; pct: number; min: number; color: string };
+function PlaceDonut({ segments, selected, onSelect, centerCount, centerLabel, dict }: {
+  segments: PlaceSeg[]; selected: string | null; onSelect: (k: string | null) => void;
+  centerCount: number; centerLabel: string; dict: string;
+}) {
+  const totalPct = segments.reduce((s, x) => s + x.pct, 0) || 1;
+  const sel = selected ? segments.find((s) => s.key === selected) ?? null : null;
+  let acc = 0;
+  const arcs = segments.map((s) => {
+    const a0 = (acc / totalPct) * 360;
+    acc += s.pct;
+    const a1 = (acc / totalPct) * 360;
+    return { s, a0, a1, mid: (a0 + a1) / 2 };
+  });
+  return (
+    <div className="nesio-tl-donut2wrap">
+      <div className="nesio-tl-donut2">
+        <svg viewBox="0 0 100 100" width="100%" height="100%" role="img" aria-label={L(dict, '地点类别占比(点扇形看详情)', 'Place category share (tap a slice)')}>
+          {arcs.map(({ s, a0, a1, mid }) => {
+            const dim = selected != null && selected !== s.key;
+            const [lx, ly] = polar(50, 50, 35.5, mid);
+            return (
+              <g key={s.key} style={{ cursor: 'pointer' }} onClick={() => onSelect(selected === s.key ? null : s.key)}>
+                <path d={donutSeg(50, 50, 44, 27, a0, Math.max(a0 + 0.5, a1))} fill={s.color} opacity={dim ? 0.32 : 1} stroke="var(--sheet-opaque, #fff)" strokeWidth="0.8" />
+                {s.pct >= 8 && (
+                  <text x={lx} y={ly} textAnchor="middle" dominantBaseline="middle" fontSize="6.2" fontWeight="700" fill="#fff" opacity={dim ? 0.4 : 0.95} style={{ pointerEvents: 'none' }}>{s.pct}%</text>
+                )}
+              </g>
+            );
+          })}
+        </svg>
+        <div className="nesio-tl-donut2-ctr" aria-live="polite">
+          {sel ? (
+            <>
+              <b>{sel.pct}%</b>
+              <small className="nesio-tl-donut2-ctr-name">{sel.label}</small>
+              <small>{sel.min >= 60 ? L(dict, `${Math.round(sel.min / 60)} 小时`, `${Math.round(sel.min / 60)}h`) : L(dict, `${sel.min} 分钟`, `${sel.min}m`)}</small>
+            </>
+          ) : (
+            <>
+              <b>{centerCount}</b>
+              <small>{centerLabel}</small>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function TimelineTab() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [trail, setTrail] = useState<PlaceVisit[]>([]);
   const [dayIdx, setDayIdx] = useState(0);
   const [sub, setSub] = useState<Sub>('timeline');
-  const [placePeriod, setPlacePeriod] = useState<'week' | 'month' | 'year'>('month'); // 地点饼图时段
+  const [placePeriod, setPlacePeriod] = useState<'day' | 'week' | 'month' | 'year'>('month'); // 地点饼图时段
+  const [pieSel, setPieSel] = useState<string | null>(null); // 可交互饼图:选中的类别
   const [worldCountry, setWorldCountry] = useState<string | null>(null); // 世界:点进某国看城市明信片
   const [editRaw, setEditRaw] = useState<string | null>(null);
   const [editVal, setEditVal] = useState('');
@@ -138,6 +203,7 @@ export default function TimelineTab() {
     return trail.filter((v) => {
       const t = new Date(v.ts);
       if (Number.isNaN(t.getTime())) return false;
+      if (placePeriod === 'day') return t.getFullYear() === d0.getFullYear() && t.getMonth() === d0.getMonth() && t.getDate() === d0.getDate();
       if (placePeriod === 'week') return now - t.getTime() <= 7 * 86_400_000;
       if (placePeriod === 'month') return t.getFullYear() === d0.getFullYear() && t.getMonth() === d0.getMonth();
       return t.getFullYear() === d0.getFullYear();
@@ -145,9 +211,10 @@ export default function TimelineTab() {
   }, [trail, placePeriod]);
   const placeShare = useMemo(() => {
     const raw = categoryTimeShare(placePeriodTrail).filter((c) => c.pct > 0);
-    const top = raw.slice(0, 5).map((c, i) => ({ label: L(dict, CAT[c.category][0], CAT[c.category][1]), pct: c.pct, color: CAT_PIE_COLORS[i] }));
-    const restPct = raw.slice(5).reduce((s, c) => s + c.pct, 0);
-    if (restPct > 0) top.push({ label: L(dict, '其他', 'Other'), pct: restPct, color: CAT_PIE_COLORS[5] });
+    const top = raw.slice(0, 5).map((c, i) => ({ key: String(c.category), label: L(dict, CAT[c.category][0], CAT[c.category][1]), pct: c.pct, min: c.totalMin, color: CAT_PIE_COLORS[i] }));
+    const rest = raw.slice(5);
+    const restPct = rest.reduce((s, c) => s + c.pct, 0);
+    if (restPct > 0) top.push({ key: 'other', label: L(dict, '其他', 'Other'), pct: restPct, min: rest.reduce((s, c) => s + c.totalMin, 0), color: CAT_PIE_COLORS[5] });
     return top;
   }, [placePeriodTrail, dict]);
   const placeRanking = useMemo(() => clusterPlaces(placePeriodTrail, 6).slice().sort((a, b) => b.visits - a.visits).slice(0, 5), [placePeriodTrail]);
@@ -478,13 +545,15 @@ export default function TimelineTab() {
           <p className="nesio-insights-empty">{L(dict, '还没有地点。多授权定位、或导入 Google 时间轴,这里会按类别攒出你去过的地方。', 'No places yet. Grant location or import Google Timeline and your visited places gather here by category.')}</p>
         ) : (
           <>
-            {/* 周/月/年 segmented */}
-            <div className="nesio-tl-seg" role="tablist" aria-label={L(dict, '时段', 'Period')}>
-              {(['week', 'month', 'year'] as const).map((p) => (
+            {/* 日/周/月/年 —— 四段平分一整行 */}
+            <div className="nesio-tl-seg nesio-tl-seg--4" role="tablist" aria-label={L(dict, '时段', 'Period')}>
+              {(['day', 'week', 'month', 'year'] as const).map((p) => (
                 <button key={p} type="button" role="tab" aria-selected={placePeriod === p}
                   className={`nesio-tl-seg-opt${placePeriod === p ? ' is-on' : ''}`}
-                  onClick={() => setPlacePeriod(p)}>
-                  {L(dict, p === 'week' ? '周' : p === 'month' ? '月' : '年', p === 'week' ? 'Week' : p === 'month' ? 'Month' : 'Year')}
+                  onClick={() => { setPlacePeriod(p); setPieSel(null); }}>
+                  {L(dict,
+                    p === 'day' ? '日' : p === 'week' ? '周' : p === 'month' ? '月' : '年',
+                    p === 'day' ? 'Day' : p === 'week' ? 'Week' : p === 'month' ? 'Month' : 'Year')}
                 </button>
               ))}
             </div>
@@ -493,33 +562,24 @@ export default function TimelineTab() {
               <p className="nesio-insights-empty" style={{ marginTop: '1rem' }}>{L(dict, '这段时间还没有地点记录 —— 换个时段看看。', 'No places in this period — try another range.')}</p>
             ) : (
               <>
-                {/* 饼图 + 图例 */}
-                <div className="nesio-tl-donutwrap">
-                  <div className="nesio-tl-donut" style={{ background: `conic-gradient(${(() => {
-                    const total = placeShare.reduce((s, x) => s + x.pct, 0) || 1;
-                    let acc = 0;
-                    return placeShare.map((x) => { const from = (acc / total) * 100; acc += x.pct; return `${x.color} ${from.toFixed(1)}% ${((acc / total) * 100).toFixed(1)}%`; }).join(', ');
-                  })()})` }}>
-                    <div className="nesio-tl-donut-ctr">
-                      <b>{placeDistinct}</b>
-                      <small>{L(dict, placePeriod === 'week' ? '本周地点' : placePeriod === 'month' ? '本月地点' : '本年地点', placePeriod === 'week' ? 'this week' : placePeriod === 'month' ? 'this month' : 'this year')}</small>
-                    </div>
-                  </div>
-                  <div className="nesio-tl-legend">
-                    {placeShare.map((x) => (
-                      <div key={x.label} className="nesio-tl-legend-row">
-                        <span className="nesio-tl-legend-dot" style={{ background: x.color }} />
-                        <span className="nesio-tl-legend-name">{x.label}</span>
-                        <span className="nesio-tl-legend-pct">{x.pct}%</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                {/* 可交互甜甜圈:图例贴在饼里,点扇形高亮 + 中心出详情 */}
+                <PlaceDonut
+                  segments={placeShare}
+                  selected={pieSel}
+                  onSelect={setPieSel}
+                  centerCount={placeDistinct}
+                  centerLabel={L(dict,
+                    placePeriod === 'day' ? '今天地点' : placePeriod === 'week' ? '本周地点' : placePeriod === 'month' ? '本月地点' : '本年地点',
+                    placePeriod === 'day' ? 'today' : placePeriod === 'week' ? 'this week' : placePeriod === 'month' ? 'this month' : 'this year')}
+                  dict={dict}
+                />
 
                 {/* 最常去排行 */}
                 {placeRanking.length > 0 && (
                   <>
-                    <p className="nesio-tl-rank-h">{L(dict, placePeriod === 'week' ? '这周最常去' : placePeriod === 'month' ? '这个月最常去' : '今年最常去', placePeriod === 'week' ? 'Most visited this week' : placePeriod === 'month' ? 'Most visited this month' : 'Most visited this year')}</p>
+                    <p className="nesio-tl-rank-h">{L(dict,
+                      placePeriod === 'day' ? '今天最常去' : placePeriod === 'week' ? '这周最常去' : placePeriod === 'month' ? '这个月最常去' : '今年最常去',
+                      placePeriod === 'day' ? 'Most visited today' : placePeriod === 'week' ? 'Most visited this week' : placePeriod === 'month' ? 'Most visited this month' : 'Most visited this year')}</p>
                     <div className="nesio-tl-rank">
                       {placeRanking.map((c) => (
                         <div key={c.label} className="nesio-tl-rank-row">

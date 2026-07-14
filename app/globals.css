@@ -13189,6 +13189,19 @@ button.nesio-rel-due-info { background: none; border: none; padding: 0; font: in
 }
 .nesio-tl-donut-ctr b { font-size: 1.6rem; font-weight: 800; color: var(--portal-ink); }
 .nesio-tl-donut-ctr small { font-size: 0.66rem; font-weight: 700; color: var(--portal-muted); }
+/* 四段平分一整行 */
+.nesio-tl-seg--4 { width: 100%; }
+/* 可交互甜甜圈:图例贴饼里 + 点扇形出详情 */
+.nesio-tl-donut2wrap { display: flex; justify-content: center; margin-top: 1.3rem; }
+.nesio-tl-donut2 { position: relative; width: 12.5rem; height: 12.5rem; }
+.nesio-tl-donut2-ctr {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  pointer-events: none; text-align: center; padding: 0 3.2rem;
+}
+.nesio-tl-donut2-ctr b { font-size: 1.7rem; font-weight: 800; color: var(--portal-ink); line-height: 1.1; }
+.nesio-tl-donut2-ctr small { font-size: 0.68rem; font-weight: 700; color: var(--portal-muted); }
+.nesio-tl-donut2-ctr-name { color: var(--portal-ink) !important; font-size: 0.8rem !important; margin: 0.1rem 0; }
 .nesio-tl-legend { flex: 1; min-width: 0; }
 .nesio-tl-legend-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.55rem; font-size: 0.8rem; font-weight: 700; color: var(--portal-ink); }
 .nesio-tl-legend-dot { width: 0.65rem; height: 0.65rem; border-radius: 3px; flex-shrink: 0; }
@@ -15712,7 +15725,7 @@ html[data-portal-theme="night"] .nesio-exp-card:hover {
 .nesio-placeshare-overlay {
   position: fixed;
   inset: 0;
-  z-index: 90;
+  z-index: 720; /* 高过洞察弹窗(设置 sheet 400),否则分享卡渲染在其后=点了没反应 */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -15785,7 +15798,7 @@ html[data-portal-theme="night"] .nesio-exp-card:hover {
 .nesio-shareto-overlay {
   position: fixed;
   inset: 0;
-  z-index: 95;
+  z-index: 730;
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -16057,6 +16070,11 @@ html[data-portal-theme="night"] .nesio-exp-card:hover {
   color: var(--portal-ink);
   font-variant-numeric: tabular-nums;
 }
+/* 节律热力图(周×星期) */
+.nesio-rhythm-heat { display: flex; flex-direction: column; gap: 3px; margin-top: 0.7rem; }
+.nesio-rhythm-heat-row { display: flex; align-items: center; gap: 3px; }
+.nesio-rhythm-heat-dow { width: 1rem; flex-shrink: 0; font-size: 0.6rem; color: var(--portal-muted); text-align: center; }
+.nesio-rhythm-heat-cell { flex: 1; aspect-ratio: 1; border-radius: 3px; min-width: 0; }
 
 /* 生命版图证据行(§2.2) */
 .nesio-insights-map-evidence {
@@ -16869,10 +16887,11 @@ html[data-portal-theme="night"] .nesio-memmap-canvas { background: #16243c; }
   padding: 0.85rem 1rem 0.9rem;
   color: #fff;
 }
-.nesio-globe-hl-card--v0 { background: linear-gradient(135deg, #24427e, #101f45); }
-.nesio-globe-hl-card--v1 { background: linear-gradient(135deg, #7e2f3f, #3c1020); }
-.nesio-globe-hl-card--v2 { background: linear-gradient(135deg, #1f6355, #0a2b25); }
-.nesio-globe-hl-card--v3 { background: linear-gradient(135deg, #6b4d1c, #33230a); }
+/* 亮点卡走官方 token(从 accent/语义色向 ink 深挖,白字够对比),随皮肤自动变 */
+.nesio-globe-hl-card--v0 { background: linear-gradient(135deg, var(--portal-blue-deep), color-mix(in srgb, var(--portal-blue-deep) 45%, var(--portal-ink))); }
+.nesio-globe-hl-card--v1 { background: linear-gradient(135deg, var(--status-calm), color-mix(in srgb, var(--status-calm) 45%, var(--portal-ink))); }
+.nesio-globe-hl-card--v2 { background: linear-gradient(135deg, var(--status-go), color-mix(in srgb, var(--status-go) 45%, var(--portal-ink))); }
+.nesio-globe-hl-card--v3 { background: linear-gradient(135deg, var(--status-gentle), color-mix(in srgb, var(--status-gentle) 45%, var(--portal-ink))); }
 .nesio-globe-hl-kicker { font-size: 0.66rem; color: rgba(255, 255, 255, 0.72); letter-spacing: 0.04em; }
 .nesio-globe-hl-main { font-size: 0.98rem; font-weight: 700; line-height: 1.3; word-break: break-word; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .nesio-globe-hl-sub { font-size: 0.72rem; color: rgba(255, 255, 255, 0.78); }
