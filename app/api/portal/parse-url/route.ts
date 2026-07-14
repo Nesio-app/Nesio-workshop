@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import dns from 'node:dns/promises';
 import { Agent } from 'undici';
 import { guardAiRoute } from '@/lib/portal/api-auth';
+import { extractArticleText } from '@/lib/portal/readability';
 
 export const dynamic = 'force-dynamic';
 
@@ -149,38 +150,6 @@ function inferStore(url: string): string {
   try { return new URL(url).hostname.replace('www.', ''); } catch { return ''; }
 }
 
-/**
- * 提取文章正文(批次 24)。优先微信公众号 js_content / rich_media_content,
- * 再退到 <article>,最后取最大文本块。去标签、压空白,封顶 12000 字。
- */
-function extractArticleText(html: string): string {
-  const pick = (re: RegExp): string => {
-    const m = html.match(re);
-    return m ? m[1] : '';
-  };
-  let body =
-    pick(/<div[^>]*id=["']js_content["'][^>]*>([\s\S]*?)<\/div>\s*(?:<script|<div[^>]*id=["']js_)/i) ||
-    pick(/<div[^>]*class=["'][^"']*rich_media_content[^"']*["'][^>]*>([\s\S]*?)<\/div>\s*(?:<script|<div[^>]*id=)/i) ||
-    pick(/<article[^>]*>([\s\S]*?)<\/article>/i);
-
-  if (!body) {
-    // 兜底:所有 <p> 拼起来
-    const paras = html.match(/<p[^>]*>([\s\S]*?)<\/p>/gi) || [];
-    body = paras.join('\n');
-  }
-
-  const text = body
-    .replace(/<(script|style)[\s\S]*?<\/\1>/gi, '')
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/(p|div|h[1-6]|li)>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
-    .replace(/[ \t]+/g, ' ')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-
-  return text.length >= 40 ? text.slice(0, 12000) : '';
-}
 
 export async function POST(req: NextRequest): Promise<NextResponse<ParseResult>> {
   const guard = await guardAiRoute(req, 'parse-url', { limit: 30 });
@@ -211,8 +180,8 @@ export async function POST(req: NextRequest): Promise<NextResponse<ParseResult>>
     const description = extractMeta(html, 'og:description') || extractMeta(html, 'description');
     const price = extractPrice(html, url);
     const store = inferStore(url);
-    // 批次 24:文章正文提取(微信公众号 / 通用),供 Memory 存文 + ADHD 阅读器
-    const article = extractArticleText(html);
+    // 批次 24/193:文章正文提取(Readability-lite:去广告去无关,留正文 + 关键图片行内 marker)
+    const article = extractArticleText(html, url);
 
     return NextResponse.json({ ok: true, title, image, price, store, description, article });
   } catch (e) {

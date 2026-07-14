@@ -12671,6 +12671,8 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 .nesio-rd-mode { display: block; margin: 0.1rem auto 0; border: none; background: none; color: var(--portal-accent); font-size: 0.66rem; font-weight: 600; cursor: pointer; padding: 0; }
 .nesio-rd-fullcol { max-width: 42rem; margin: 0 auto; padding: 0.5rem 0.9rem; }
 .nesio-rd-p { font-size: calc(1.04rem * var(--nesio-rd-scale, 1)); line-height: 1.95; color: var(--portal-ink); margin: 0 0 1.2rem; overflow-wrap: anywhere; word-break: break-word; }
+/* 批次193:阅读器里的关键图片(parse-url 提取的正文配图) */
+.nesio-rd-img { display: block; max-width: 100%; height: auto; border-radius: 12px; margin: 0.6rem auto 1.4rem; }
 .nesio-rd-h { font-size: calc(1.15rem * var(--nesio-rd-scale, 1)); font-weight: 700; color: var(--portal-ink); margin: 1.4rem 0 0.7rem; scroll-margin-top: 1rem; }
 
 /* ══ 阅读器 · 多功能版 / 聚焦版(设计稿对齐:暖纸宋体 + 划词浮层 + 底部动作栏)══ */

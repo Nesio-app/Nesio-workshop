@@ -287,9 +287,18 @@ export default function ReaderView({ book, rawText, meta, onClose }: {
           <h1 className="nesio-rd-title">{book.title}</h1>
           {isFull && <p className="nesio-rd-byline">{byline}</p>}
 
-          {paras.map((p, i) => isHeading(p)
-            ? <h3 key={i} data-p={i} className="nesio-rd-h">{p.replace(/^[#＃]+\s*/, '')}</h3>
-            : <p key={i} data-p={i} className="nesio-rd-p">{renderPara(p)}</p>)}
+          {paras.map((p, i) => {
+            // 批次193:parse-url 提取的关键图片以 `![](url)` marker 单独成段 → 渲染成图片。
+            const im = /^!\[[^\]]*\]\((https?:\/\/[^)\s]+|data:image\/[^)\s]+)\)$/.exec(p);
+            if (im) return (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img key={i} data-p={i} className="nesio-rd-img" src={im[1]} alt="" loading="lazy"
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
+            );
+            return isHeading(p)
+              ? <h3 key={i} data-p={i} className="nesio-rd-h">{p.replace(/^[#＃]+\s*/, '')}</h3>
+              : <p key={i} data-p={i} className="nesio-rd-p">{renderPara(p)}</p>;
+          })}
 
           {/* 标签 + 相关记忆(仅多功能) */}
           {isFull && meta?.tags && meta.tags.length > 0 && (
