@@ -198,10 +198,14 @@ export default function TodayFeed({
     }
 
     // 最有用的一条:焦点里最近的、带真实时间提示的事(跳过刚记录/已过期)
+    // 批次 180:问候语跳过「别人的请假/OOO/节假日」这类日历噪音 —— 它们不是你要做的一件事
+    // (用户实锤:问候里冒出「Sindhu OOO」)。这类通常是他人日历的全天多日事件。
+    const GREETING_NOISE_RE = /\bOOO\b|out[\s-]?of[\s-]?office|\bPTO\b|请假|休假|年假|调休|vacation|holiday|公休|放假/i;
     let nextUp = '';
     for (const n of focusNodes) {
       const hint = focusTimeHint(n, uiLocale);
       if (!hint || hint === L(uiLocale, '刚记录', 'just noted') || hint === L(uiLocale, '已过期', 'expired')) continue;
+      if (GREETING_NOISE_RE.test(n.name)) continue; // 别人的 OOO/请假不当"你的一件事"
       nextUp = `${hint} · ${n.name.slice(0, 14)}`;
       break;
     }

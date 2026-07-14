@@ -187,8 +187,11 @@ const RECEIPT_KEYWORDS = ['小票', '收据', 'receipt', '发票', '结账', '�
 function detectReceipt(result: AnalysisResult): boolean {
   const text = [result.summary, ...result.nodes.map((n) => n.name + ' ' + JSON.stringify(n.attributes))].join(' ').toLowerCase();
   const keywordHit = RECEIPT_KEYWORDS.some((k) => text.includes(k));
-  const manyObjects = result.nodes.length >= 3 && result.nodes.filter((n) => n.type === 'object').length >= result.nodes.length - 1;
-  return keywordHit || manyObjects;
+  // 批次 180:光「多物品」不算小票(一张鼠标+垫子+桌面的普通照片曾误判)。
+  // 真小票的条目都带价格 —— 多物品必须**多数带 price**才当小票。
+  const manyPriced = result.nodes.length >= 3
+    && result.nodes.filter((n) => n.type === 'object' && n.attributes?.price != null && n.attributes?.price !== '').length >= result.nodes.length - 1;
+  return keywordHit || manyPriced;
 }
 
 // ── Location helper ──────────────────────────────────────────────────────────

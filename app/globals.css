@@ -10522,7 +10522,8 @@ html[data-portal-theme="night"] .nesio-wechat-input { background: #2a2d3e; borde
   padding: 0 0.9rem;
   height: 2.2rem;
   border-radius: 1.1rem;
-  background: #07c160;
+  /* 批次 180:发送键改主题色(原微信绿 #07c160 与莫兰迪主题冲突) */
+  background: var(--portal-accent);
   color: #fff;
   font-size: 0.85rem;
   font-weight: 600;
@@ -13701,6 +13702,19 @@ html[data-portal-theme="night"] .nesio-mem-jar-ball {
   transition: border-color 0.15s, transform 0.12s;
   flex-shrink: 0;
 }
+/* 批次 180:项目卡内可点区 + 底部状态段控 */
+.nesio-project-card-open {
+  flex: 1; display: flex; flex-direction: column; align-items: flex-start;
+  justify-content: space-between; gap: 0.3rem; width: 100%;
+  background: none; border: none; padding: 0; cursor: pointer; text-align: left;
+}
+.nesio-proj-card-status { display: flex; gap: 3px; width: 100%; margin-top: 0.4rem; }
+.nesio-proj-card-statbtn {
+  flex: 1; padding: 3px 0; border-radius: 7px; font-size: 0.62rem;
+  border: 1px solid var(--portal-line); background: transparent;
+  color: var(--portal-muted); cursor: pointer; white-space: nowrap;
+}
+.nesio-proj-card-statbtn--on { background: var(--portal-accent); border-color: var(--portal-accent); color: #fff; }
 .nesio-project-card-name {
   font-size: 0.82rem;
   font-weight: 700;
@@ -14319,9 +14333,10 @@ html[data-portal-theme="night"] .nesio-create-project-input {
 }
 .nesio-camera-similar-icon { font-size: 1rem; flex-shrink: 0; margin-top: 0.05rem; }
 .nesio-camera-similar-body { flex: 1; }
-.nesio-camera-similar-title { font-size: 0.78rem; font-weight: 600; color: var(--status-gentle); margin-bottom: 0.2rem; }
-.nesio-camera-similar-item { font-size: 0.74rem; color: var(--portal-ink); margin: 0.1rem 0; }
-.nesio-camera-similar-loc { color: var(--portal-muted); }
+.nesio-camera-similar-title { font-size: 0.82rem; font-weight: 600; color: var(--status-gentle); margin-bottom: 0.35rem; }
+/* 批次 180:相机页是深色底,相似项原用 --portal-ink(深)= 深字压深底看不清 → 改亮字 */
+.nesio-camera-similar-item { font-size: 0.82rem; color: rgba(255,255,255,0.94); margin: 0.1rem 0; }
+.nesio-camera-similar-loc { color: rgba(255,255,255,0.6); }
 .nesio-camera-similar-dismiss {
   background: none; border: none; color: var(--portal-muted); cursor: pointer;
   font-size: 0.75rem; padding: 0.1rem; flex-shrink: 0;
@@ -17219,9 +17234,9 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
   width: 100%;
   background: none;
   border: none;
-  color: inherit;
+  color: rgba(255,255,255,0.94); /* 批次 180:相机深底 → 亮字(原 inherit 盖掉基类亮色致看不清) */
   font: inherit;
-  padding: 0.3rem 0;
+  padding: 0.35rem 0;
   cursor: pointer;
   text-align: left;
 }
