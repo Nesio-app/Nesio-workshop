@@ -5,6 +5,7 @@ import { deriveCloudIdentity } from '@/lib/portal/cloud-identity';
 import { normalizeSupabaseRuntimeUrl } from '@/lib/portal/production-runtime';
 import { envValue } from '@/lib/portal/env';
 import { AUTH_SIG_COOKIE, signSessionValue } from '@/lib/portal/auth/session-sig';
+import { decryptField } from '@/lib/portal/cloud/field-encryption';
 
 type SupabaseUserResponse = {
   id?: string;
@@ -227,7 +228,7 @@ async function buildCloudUserDataExportResponse(auditId: string) {
     return null;
   }
 
-  const [accountProfiles, profileSettings, nodes, edges, assets, productEvents] = await Promise.all([
+  const [accountProfiles, profileSettings, rawNodes, rawEdges, rawAssets, productEvents] = await Promise.all([
     readCloudRows(config, 'user_profiles', cloudIdentity.identityKey),
     readCloudRows(config, 'profile_settings', cloudIdentity.identityKey),
     readCloudRows(config, 'memory_nodes', cloudIdentity.identityKey),
@@ -235,6 +236,14 @@ async function buildCloudUserDataExportResponse(auditId: string) {
     readCloudRows(config, 'memory_assets', cloudIdentity.identityKey),
     readCloudRows(config, 'product_events', cloudIdentity.identityKey),
   ]);
+  // 静态加密(数据审计 #2):导出是用户取回自己的数据,还原成明文;逐列探测,
+  // 旧明文行原样透传(混合模式)。storagePath 提取也需先解密 asset。
+  const decryptBlob = (rows: unknown[], key: string) => (rows as Array<Record<string, unknown>>).map(
+    (row) => (key in row ? { ...row, [key]: decryptField(row[key]) } : row),
+  );
+  const nodes = decryptBlob(rawNodes, 'node');
+  const edges = decryptBlob(rawEdges, 'evidence');
+  const assets = decryptBlob(rawAssets, 'asset');
   const storageObjects = collectStorageObjects({
     assets,
     profileSettings,

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { deriveCloudIdentity } from '@/lib/portal/cloud-identity';
 import * as cloudRuntime from '@/lib/portal/cloud-server-runtime';
+import { encryptField, decryptField } from '@/lib/portal/cloud/field-encryption';
 
 type CloudMemoryNode = {
   id: string;
@@ -250,10 +251,11 @@ function edgeRowsForNode(identityKey: string, userId: string | null, node: Cloud
     source_node_local_id: node.id,
     target_node_local_id: relation.targetId,
     relation: relation.relation,
-    evidence: {
+    // evidence 含 sourceNodeName(人名等),静态加密(数据审计 #2);休眠时原样。
+    evidence: encryptField({
       source: node.source,
       sourceNodeName: node.name,
-    },
+    }),
     updated_at: updatedAt,
     deleted_at: null,
   }));
@@ -290,12 +292,15 @@ async function readMemorySnapshot(config: ReturnType<typeof getCloudConfig>, ide
   const nodeRows = (await nodesResponse.json()) as Array<{ node?: unknown; updated_at?: string }>;
   const edgeRows = (await edgesResponse.json()) as Array<Record<string, unknown>>;
   const assetRows = (await assetsResponse.json()) as Array<{ asset?: unknown; updated_at?: string }>;
-  const nodes = nodeRows.map((row) => sanitizeMemoryNode(row.node)).filter((node): node is CloudMemoryNode => Boolean(node));
-  const assets = assetRows.map((row) => sanitizeMemoryAsset(row.asset)).filter((asset): asset is CloudMemoryAsset => Boolean(asset));
+  // 静态加密(数据审计 #2):node/asset/edge.evidence 落库为密文信封,读回先解密。
+  // 逐值探测,旧明文行原样透传(混合模式,无需回填历史)。
+  const nodes = nodeRows.map((row) => sanitizeMemoryNode(decryptField(row.node))).filter((node): node is CloudMemoryNode => Boolean(node));
+  const assets = assetRows.map((row) => sanitizeMemoryAsset(decryptField(row.asset))).filter((asset): asset is CloudMemoryAsset => Boolean(asset));
+  const edges = edgeRows.map((row) => ('evidence' in row ? { ...row, evidence: decryptField(row.evidence) } : row));
 
   return {
     nodes,
-    edges: edgeRows,
+    edges,
     assets,
     updatedAt: nodeRows[0]?.updated_at || assetRows[0]?.updated_at || null,
   };
@@ -390,10 +395,12 @@ export async function POST(request: NextRequest) {
           local_id: node.id,
           schema_version: MEMORY_NODE_SCHEMA_VERSION,
           source: node.source,
-          node: {
+          // node 内容整块静态加密(数据审计 #2);休眠时原样。local_id/source/
+          // updated_at 等元数据列保持明文,供查询与边派生。
+          node: encryptField({
             ...node,
             updatedAt: node.updatedAt || updatedAt,
-          },
+          }),
           updated_at: node.updatedAt || updatedAt,
           deleted_at: null,
         }))),
@@ -431,10 +438,11 @@ export async function POST(request: NextRequest) {
           user_id: cloudIdentity.userId,
           local_id: asset.id,
           node_local_id: asset.nodeId || null,
-          asset: {
+          // asset 内容整块静态加密(含 label/analysisSummary,数据审计 #2);休眠时原样。
+          asset: encryptField({
             ...asset,
             updatedAt: asset.updatedAt || updatedAt,
-          },
+          }),
           updated_at: asset.updatedAt || updatedAt,
           deleted_at: null,
         }))),

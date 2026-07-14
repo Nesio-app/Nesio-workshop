@@ -127,8 +127,17 @@ sensitivity/retention 枚举化(中期)。
   `signal.modifiedAt`;(b) DB 端 `supabase-signals-conflict-guard-v1.sql` BEFORE UPDATE 触发器
   拒绝严格更旧的写入(RETURN OLD),race-free 永不丢新编辑 —— **须在 Supabase 手动执行一次**(inert until applied)。
   契约 `test:cloud-conflict`。
-  仍开(按报告严重度):① 云备份非 E2E(应用层明文 + service-role,敏感标签不拦上云)→ 落
-  客户端 WebCrypto 或修正隐私文案;④ 被遗忘权残留(telemetry 按 device_id 逃逸账号删除、无 TTL;
+  **① 云端敏感字段静态加密**(2026-07-14 做):选型「应用层字段加密」而非真 E2E ——
+  服务端语义检索(pgvector)需要明文嵌入,和真 E2E 冲突(需整体搬客户端重写,风险大)。
+  密钥服务端托管,服务端仍能解密 → 检索不受影响;防的是 DB 转储/快照泄露(拖库拿密文,
+  无应用密钥读不出原文),**不防**服务端自身攻陷。实现 `lib/portal/cloud/field-encryption.ts`
+  (AES-256-GCM 信封,休眠 passthrough,逐值探测混合模式,篡改/错钥 fail-closed)。接线:
+  signals 内容列(title/payload/entities/evidence/embedding_text 写加密/读解密,元数据列与
+  embedding_vector 保持明文可检索)+ memory 路由(node/asset/edge.evidence 整块)+ 导出路由
+  (取回还原明文)。默认休眠现网零变化;部署侧置 `NESIO_FIELD_ENCRYPTION=1`+
+  `NESIO_FIELD_ENCRYPTION_KEY` 并执行 `supabase-field-encryption-v1.sql`(放宽 jsonb 内容列
+  CHECK 兼容密文)即启用。契约 `test:field-encryption`。隐私文案已如实(未虚假宣称 E2E),不改。
+  仍开(按报告严重度):④ 被遗忘权残留(telemetry 按 device_id 逃逸账号删除、无 TTL;
   云删单节点是软删 deleted_at;auth.users 未删)→ 补 device 级删除 + 保留 TTL + 软删 GC。
 
 **契约测试提示**:`test:contracts`(100+ 套,CI 只跑 test:security 的 18 套)

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { deriveCloudIdentity } from '@/lib/portal/cloud-identity';
 import * as cloudRuntime from '@/lib/portal/cloud-server-runtime';
 import { embedSignalText, signalEmbeddingModel, signalVectorSearchEnabled } from '@/lib/life-domain/signal-embedding';
+import { encryptSignalRowColumns, decryptSignalRowColumns } from '@/lib/portal/cloud/field-encryption';
 import type { Signal, SignalSensitivity, SignalSource, RetentionPolicy } from '@/lib/life-domain/signal';
 
 const SIGNAL_SCHEMA_VERSION = 'Signal@v1';
@@ -208,7 +209,8 @@ function sanitizeSignals(input: unknown): { signals: Signal[]; rejectedCount: nu
 async function signalRow(identityKey: string, userId: string | null, signal: Signal) {
   const embeddingText = buildSignalSearchText(signal);
   const embedding = await embedSignalText(embeddingText);
-  return {
+  // 敏感内容列静态加密(数据审计 #2);休眠时原样返回。
+  return encryptSignalRowColumns({
     identity_key: identityKey,
     user_id: userId,
     signal_id: signal.id,
@@ -231,7 +233,7 @@ async function signalRow(identityKey: string, userId: string | null, signal: Sig
     feedback: {},
     updated_at: new Date().toISOString(),
     deleted_at: null,
-  };
+  });
 }
 
 async function searchRowsByVector(
@@ -285,14 +287,17 @@ export async function GET(request: NextRequest) {
   if (query) {
     vectorSearch = await searchRowsByVector(config, cloudIdentity.identityKey, query, resultLimit);
   }
+  // 敏感内容列静态加密(数据审计 #2):读回后先解密再评分/返回 —— 服务端持密钥,
+  // 故文本回退检索、向量结果都能正常工作。旧明文行逐列探测原样透传(混合模式)。
   let signals: Array<Record<string, unknown>>;
   if (vectorSearch.ok) {
-    signals = vectorSearch.rows;
+    signals = vectorSearch.rows.map((row) => decryptSignalRowColumns(row));
   } else {
     const response = await fetch(url.toString(), { headers: restHeaders(config), cache: 'no-store' });
     if (!response.ok) return safeJson({ ok: false, error: 'cloud_read_failed', readsCloud: false, writesCloud: false }, 502);
     const rows = await response.json() as Array<Record<string, unknown>>;
-    signals = sortRowsForQuery(rows, query, resultLimit);
+    const decrypted = rows.map((row) => decryptSignalRowColumns(row));
+    signals = sortRowsForQuery(decrypted, query, resultLimit);
   }
   return setRefreshedAuthCookies(safeJson({
     ok: true,
