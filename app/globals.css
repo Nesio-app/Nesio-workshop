@@ -16170,16 +16170,29 @@ html[data-portal-theme="night"] .nesio-exp-card:hover {
 .nesio-rhythm-heat--compact .nesio-rhythm-heat-cell { flex: 1 1 0; width: auto; height: 8px; border-radius: 2px; aspect-ratio: auto; }
 
 /* 图5:反复在想 —— 饼图 + 图例 */
-.nesio-mindpie { display: flex; align-items: center; gap: 1rem; margin-top: 0.6rem; }
-.nesio-mindpie-svg { width: 6.2rem; height: 6.2rem; flex-shrink: 0; }
-.nesio-mindpie-num { font-size: 20px; font-weight: 800; fill: var(--portal-ink); }
-.nesio-mindpie-lbl { font-size: 8px; fill: var(--portal-muted); }
-html[data-portal-theme="night"] .nesio-mindpie-num { fill: #e8eefa; }
-.nesio-mindpie-legend { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.3rem; }
-.nesio-mindpie-leg { display: flex; align-items: center; gap: 0.5rem; width: 100%; background: none; border: none; padding: 0.1rem 0; cursor: pointer; text-align: left; }
-.nesio-mindpie-dot { width: 0.6rem; height: 0.6rem; border-radius: 50%; flex-shrink: 0; }
-.nesio-mindpie-leg-name { flex: 1; min-width: 0; font-size: 0.82rem; font-weight: 600; color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nesio-mindpie-leg-val { font-size: 0.72rem; color: var(--portal-muted); font-weight: 600; flex-shrink: 0; }
+/* 「反复在想」可交互甜甜圈(对齐足迹地点饼图 .nesio-tl-donut2) */
+.nesio-mindpie2wrap { display: flex; justify-content: center; margin-top: 0.7rem; }
+.nesio-mindpie2 { position: relative; width: 11rem; height: 11rem; }
+.nesio-mindpie2-ctr {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  pointer-events: none; text-align: center; padding: 0 2.6rem;
+}
+.nesio-mindpie2-ctr > b { font-size: 1.6rem; font-weight: 800; color: var(--portal-ink); line-height: 1.1; }
+.nesio-mindpie2-ctr > small { font-size: 0.68rem; font-weight: 700; color: var(--portal-muted); }
+.nesio-mindpie2-open {
+  pointer-events: auto; background: none; border: none; cursor: pointer; padding: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 0.05rem;
+}
+.nesio-mindpie2-open b { font-size: 1.6rem; font-weight: 800; color: var(--portal-ink); line-height: 1.1; }
+.nesio-mindpie2-ctr-name { color: var(--portal-ink); font-size: 0.82rem; font-weight: 700; margin: 0.08rem 0; max-width: 5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nesio-mindpie2-go { font-size: 0.66rem; font-weight: 700; color: var(--portal-accent); }
+.nesio-mindpie2-slice {
+  position: absolute; transform: translate(-50%, -50%);
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  color: #fff; pointer-events: none;
+}
+.nesio-mindpie2-cnt { font-size: 0.62rem; font-weight: 800; line-height: 1; }
 
 /* 图3:多面镜自定义时段的日期选择 */
 .nesio-mirror-range { display: flex; align-items: center; gap: 0.5rem; margin: 0.4rem 0 0.2rem; }

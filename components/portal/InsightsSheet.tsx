@@ -10,7 +10,7 @@
  * 健康/足迹/财务/关系 tab 走功能开关(提审构建不可达)。
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { MyExperimentWidget } from '@/components/portal/NesioExperiment';
 import { useFeatureEnabled } from '@/components/portal/use-feature-flag';
 import { computeTerritory } from '@/lib/portal/life-territory';
@@ -38,7 +38,7 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import { InfoTip } from './InfoTip';
-import { IconRefresh, IconTrendingUp } from './icons';
+import { IconRefresh, IconTrendingUp, IconMail, IconCalendar, IconCamera, IconMic, IconNote, IconDownload, IconAlertTriangle, IconBookmark } from './icons';
 import TimelineTab from './insights/TimelineTab';
 import MirrorLetterTab from './insights/MirrorLetterTab';
 import FinanceTab from './finance/FinanceTab';
@@ -55,7 +55,6 @@ const DAY_MS = 86_400_000;
 /** 系统标记(normalizer 系统标 / 导入标),不是主题,永不成门。 */
 const SYSTEM_TAGS = new Set(['联系人', '手动记录', '月报', 'Voice', '手写']);
 
-const MONTHS_EN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 // ── Widget: 节律热力图(周×星期,记录密度)────────────────────────────────
 
@@ -92,38 +91,86 @@ function RhythmHeatmap({ nodes, compact = false }: { nodes: LifeNode[]; compact?
   );
 }
 
-// 图5:「你最近反复在想」用饼图呈现(类别 × 次数),点图例进记忆
+// 图5:「反复在想」的类别占比 —— 可交互甜甜圈(对齐足迹地点饼图形态)。
+// 无标题/无图例;每片扇形内嵌来源符号 + 次数,点扇形高亮 + 中心出详情可进记忆。
 const MIND_PIE_COLORS = ['var(--portal-blue-deep)', 'var(--status-gentle)', 'var(--status-go)', 'var(--status-calm)', 'var(--portal-cool-accent)', 'var(--status-risk)'];
+// 门标签 → 记忆来源符号(与记忆卡来源图标一致);非来源标签回落书签图标
+function mindIcon(label: string): ReactNode {
+  const sz = 14;
+  switch (label) {
+    case '邮件': return <IconMail size={sz} />;
+    case '日历': return <IconCalendar size={sz} />;
+    case '照片': return <IconCamera size={sz} />;
+    case '语音': return <IconMic size={sz} />;
+    case '手记': return <IconNote size={sz} />;
+    case '通知': return <IconAlertTriangle size={sz} />;
+    case '导入': return <IconDownload size={sz} />;
+    default: return <IconBookmark size={sz} />;
+  }
+}
+function mindPolar(cx: number, cy: number, r: number, angDeg: number): [number, number] {
+  const a = ((angDeg - 90) * Math.PI) / 180;
+  return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+}
+function mindSeg(cx: number, cy: number, rO: number, rI: number, a0: number, a1: number): string {
+  const large = a1 - a0 > 180 ? 1 : 0;
+  const [x0, y0] = mindPolar(cx, cy, rO, a0);
+  const [x1, y1] = mindPolar(cx, cy, rO, a1);
+  const [x2, y2] = mindPolar(cx, cy, rI, a1);
+  const [x3, y3] = mindPolar(cx, cy, rI, a0);
+  return `M${x0} ${y0} A${rO} ${rO} 0 ${large} 1 ${x1} ${y1} L${x2} ${y2} A${rI} ${rI} 0 ${large} 0 ${x3} ${y3} Z`;
+}
 function MindPie({ items, onPick, dict }: { items: Array<[string, number]>; onPick: (tag: string) => void; dict: string }) {
+  const [sel, setSel] = useState<string | null>(null);
   const top = items.slice(0, 6);
   const total = top.reduce((s, [, c]) => s + c, 0) || 1;
-  const R = 40, C = 50, CIRC = 2 * Math.PI * R;
   let acc = 0;
+  const arcs = top.map(([tag, c], i) => {
+    const a0 = (acc / total) * 360;
+    acc += c;
+    const a1 = (acc / total) * 360;
+    return { tag, c, i, a0, a1, mid: (a0 + a1) / 2 };
+  });
+  const selArc = sel ? arcs.find((a) => a.tag === sel) ?? null : null;
   return (
-    <div className="nesio-mindpie">
-      <svg viewBox="0 0 100 100" className="nesio-mindpie-svg" role="img" aria-label={L(dict, '反复在想的类别占比', 'What is on your mind, by share')}>
-        {top.map(([tag, c], i) => {
-          const dash = (c / total) * CIRC;
-          const el = (
-            <circle key={tag} cx={C} cy={C} r={R} fill="none"
-              stroke={MIND_PIE_COLORS[i % MIND_PIE_COLORS.length]} strokeWidth={16}
-              strokeDasharray={`${dash} ${CIRC}`} strokeDashoffset={-acc}
-              transform={`rotate(-90 ${C} ${C})`} />
+    <div className="nesio-mindpie2wrap" onClick={() => setSel(null)}>
+      <div className="nesio-mindpie2">
+        <svg viewBox="0 0 100 100" width="100%" height="100%" role="img" aria-label={L(dict, '反复在想的类别占比(点扇形看详情)', 'What is on your mind, by share (tap a slice)')}>
+          {arcs.map(({ tag, i, a0, a1 }) => {
+            const dim = sel != null && sel !== tag;
+            return (
+              <path key={tag} d={mindSeg(50, 50, 44, 27, a0, Math.max(a0 + 0.5, a1))}
+                fill={MIND_PIE_COLORS[i % MIND_PIE_COLORS.length]} opacity={dim ? 0.32 : 1}
+                stroke="var(--sheet-opaque, #fff)" strokeWidth="0.8"
+                style={{ cursor: 'pointer' }}
+                onClick={(e) => { e.stopPropagation(); setSel(sel === tag ? null : tag); }} />
+            );
+          })}
+        </svg>
+        {/* 符号 + 次数嵌在扇形里(占比≥7% 才放得下);HTML 叠层,不吃点击 */}
+        {arcs.filter(({ c }) => c / total >= 0.07).map(({ tag, c, mid }) => {
+          const [lx, ly] = mindPolar(50, 50, 35.5, mid);
+          const dim = sel != null && sel !== tag;
+          return (
+            <div key={tag} className="nesio-mindpie2-slice" style={{ left: `${lx}%`, top: `${ly}%`, opacity: dim ? 0.35 : 1 }}>
+              {mindIcon(tag)}<span className="nesio-mindpie2-cnt">{c}</span>
+            </div>
           );
-          acc += dash;
-          return el;
         })}
-        <text x={C} y={C - 1} textAnchor="middle" className="nesio-mindpie-num">{total}</text>
-        <text x={C} y={C + 12} textAnchor="middle" className="nesio-mindpie-lbl">{L(dict, '次', 'times')}</text>
-      </svg>
-      <div className="nesio-mindpie-legend">
-        {top.map(([tag, c], i) => (
-          <button key={tag} type="button" className="nesio-mindpie-leg" onClick={() => onPick(tag)}>
-            <span className="nesio-mindpie-dot" style={{ background: MIND_PIE_COLORS[i % MIND_PIE_COLORS.length] }} aria-hidden />
-            <span className="nesio-mindpie-leg-name">{tag}</span>
-            <span className="nesio-mindpie-leg-val">{c}{L(dict, ' 次', '')}</span>
-          </button>
-        ))}
+        <div className="nesio-mindpie2-ctr" aria-live="polite">
+          {selArc ? (
+            <button type="button" className="nesio-mindpie2-open" onClick={(e) => { e.stopPropagation(); onPick(selArc.tag); }}>
+              <b>{selArc.c}</b>
+              <small className="nesio-mindpie2-ctr-name">{selArc.tag}</small>
+              <small className="nesio-mindpie2-go">{L(dict, '查看记忆 ›', 'View ›')}</small>
+            </button>
+          ) : (
+            <>
+              <b>{total}</b>
+              <small>{L(dict, '次', 'times')}</small>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -653,8 +700,6 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
     void fetchLivingModel(true);
   }, [fetchLivingModel]);
 
-  const monthNum = new Date().getMonth() + 1;
-
   // 私据门(fail-closed):洞察全部内容都来自你的私人记录(关系/健康/足迹/财务/多面镜/reflection)。
   // 非私有运行态(未登录 / 账户未确认)一律不渲染任何私据 —— 与 TodayFeed/DailyReportCard 同一契约,
   // 补上此前 InsightsSheet 收了 canUsePrivateData 却没用的门(哪怕 Lab 功能,也只给本人看本人)。
@@ -709,22 +754,12 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
         {mainTab === 'reflection' && (
           <div className="nesio-reflection-tab">
 
-            {/* 顶部刊物 kicker(设计:你的私人刊物 · X月) */}
-            <p className="nesio-insights-kicker" style={{ margin: '0 0 0.6rem', fontSize: '0.72rem', letterSpacing: '0.04em', color: 'var(--portal-muted)' }}>
-              {L(dict, `你的私人刊物 · ${monthNum} 月`, `Your private journal · ${MONTHS_EN[monthNum - 1]}`)}
-            </p>
-
             {/* 节律热力图(缩小、无侧栏文字,置顶) */}
             {realNodes.length > 0 && <RhythmHeatmap nodes={realNodes} compact />}
 
-            {/* ① 主题门:你最近反复在想(门楣造型 chip) */}
+            {/* ① 主题门:反复在想的类别占比(可交互饼图,无标题/图例;点扇形选中,中心可进记忆) */}
             {doors.length > 0 && (
               <div className="nesio-insights-section">
-                <div className="nesio-insights-section-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                  <p className="nesio-insights-section-label" style={{ margin: 0 }}>{L(dict, '你最近反复在想', 'On your mind lately')}</p>
-                  <span style={{ fontSize: '0.68rem', color: 'var(--portal-muted)' }}>{L(dict, '近 30 天', 'last 30 days')}</span>
-                </div>
-                {/* 图5:改用饼图呈现「反复在想」的类别占比,点图例进记忆 */}
                 <MindPie items={doors} onPick={openInMemory} dict={dict} />
               </div>
             )}
