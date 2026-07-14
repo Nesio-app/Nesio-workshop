@@ -1281,7 +1281,7 @@ Edit location/value anytime in Storage.`),
         >
           ✦ {L(dict, '深问', 'Deep')} <span className="nesio-wechat-mode-seg-pro">Pro</span>
         </button>
-        <span className="nesio-wechat-mode-seg-hint">{L(dict, '复杂题才需要 · 免费够用大多数时候', 'Only for hard ones · free covers most')}</span>
+        {/* 批次188(用户实锤):删「复杂题才需要·免费够用」提示行 —— 分段本身已自解释 */}
       </div>
 
       {/* Input bar */}

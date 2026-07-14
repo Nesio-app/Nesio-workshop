@@ -389,20 +389,38 @@ function CommitmentSection({ node, onToggleDone }: {
     setCheckItems(next);
     updateLifeNode(node.id, { attributes: { ...node.attributes, subtasksJson: JSON.stringify(next) } });
   }
+  // 批次188(用户问「同一个 list 能重复用吗」):清单本是就地勾选、勾了长存 —— 打包/采购这类
+  // 周期清单没法复用。加「全部重置」:一键清空所有勾,同一条清单下次旅行/采购直接重用。
+  function resetCheckItems() {
+    const next = checkItems.map((it) => ({ ...it, done: false }));
+    setCheckItems(next);
+    updateLifeNode(node.id, { attributes: { ...node.attributes, subtasksJson: JSON.stringify(next) } });
+  }
+  const checkDoneCount = checkItems.filter((it) => it.done).length;
 
   return (
     <div className="nesio-type-section">
       {checkItems.length > 0 && (
-        <ul className="nesio-check-list">
-          {checkItems.map((it) => (
-            <li key={it.id}>
-              <button type="button" className={`nesio-check-item${it.done ? ' is-done' : ''}`} onClick={() => toggleCheckItem(it.id)}>
-                <span className="nesio-check-box">{it.done ? '✓' : ''}</span>
-                <span className="nesio-check-name">{it.name}</span>
+        <>
+          <div className="nesio-check-head">
+            <span className="nesio-check-progress">{L(dict, `已勾 ${checkDoneCount}/${checkItems.length}`, `${checkDoneCount}/${checkItems.length} done`)}</span>
+            {checkDoneCount > 0 && (
+              <button type="button" className="nesio-check-reset" onClick={resetCheckItems}>
+                {L(dict, '全部重置', 'Reset all')}
               </button>
-            </li>
-          ))}
-        </ul>
+            )}
+          </div>
+          <ul className="nesio-check-list">
+            {checkItems.map((it) => (
+              <li key={it.id}>
+                <button type="button" className={`nesio-check-item${it.done ? ' is-done' : ''}`} onClick={() => toggleCheckItem(it.id)}>
+                  <span className="nesio-check-box">{it.done ? '✓' : ''}</span>
+                  <span className="nesio-check-name">{it.name}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
       {/* 批次 144:完成 toggle 是关键交互,保留;优先级从并排 badge 收进「优先级 → 值」统一行 */}
       <div className="nesio-commitment-status-row">

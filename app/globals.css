@@ -17385,6 +17385,15 @@ html[data-portal-theme="night"] .nesio-memmap-canvas { background: #16243c; }
 .nesio-node-link-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ── 批次 72:可勾选清单(记忆详情内) ── */
+/* 批次188:清单头 —— 进度 + 「全部重置」(让打包/采购清单可复用) */
+.nesio-check-head { display: flex; align-items: center; justify-content: space-between; margin: 0 0 0.4rem; }
+.nesio-check-progress { font-size: 0.72rem; font-weight: 600; color: var(--portal-muted); }
+.nesio-check-reset {
+  font-size: 0.72rem; font-weight: 600; color: var(--portal-accent, #588ce3);
+  background: none; border: 1px solid var(--portal-line, rgba(127,127,127,0.25));
+  border-radius: 999px; padding: 0.16rem 0.62rem; cursor: pointer;
+}
+.nesio-check-reset:active { opacity: 0.6; }
 .nesio-check-list { list-style: none; margin: 0 0 0.6rem; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; }
 .nesio-check-item {
   display: flex;
