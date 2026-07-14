@@ -108,7 +108,6 @@ export function TodayFocusSection({
   guidanceNodeIds,
   onPinnedResolved,
   onSetDormantStore,
-  onOpenMemory,
   onOpenRecorder,
   onFocusMode,
   onDeleteNode,
@@ -124,6 +123,7 @@ export function TodayFocusSection({
   /** 置顶裁决回传(TodayFeed 据此隐藏被抢占的引导卡) */
   onPinnedResolved?: (id: string | null) => void;
   onSetDormantStore: (s: DormantStore) => void;
+  /** @deprecated 顶部「全部」入口已移除;prop 暂留以兼容调用方 */
   onOpenMemory?: () => void;
   onOpenRecorder?: (node: FocusNode) => void;
   onFocusMode?: (node: FocusNode) => void;
@@ -260,9 +260,6 @@ export function TodayFocusSection({
         </h2>
         <div className="nesio-focus-header-right">
           {doneToday > 0 && <span className="nesio-focus-done-badge">✓ {doneToday}</span>}
-          {onOpenMemory && (
-            <button type="button" className="nesio-focus-all-btn" onClick={onOpenMemory}>{t(locale, 'todayFocusAll')}</button>
-          )}
         </div>
       </div>
 

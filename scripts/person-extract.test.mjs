@@ -76,11 +76,11 @@ assert.ok(/completeText[\s\S]{0,400}image\?: string/.test(aic), 'completeText �
 const docs = fs.readFileSync(new URL('../docs/api-routes.md', import.meta.url), 'utf8');
 assert.ok(docs.includes('/api/portal/person-extract'), 'person-extract 进 api-routes 文档');
 
-// ── 挂一条:说一句→预览→确认保存(源码级)。批次:抽成独立 HangNoteSheet(原在详情页内联)──
+// ── 挂一条(说一句→预览→确认保存)源码级 —— 该流程已从详情页抽到 HangNoteSheet ──
 const sheet = fs.readFileSync(new URL('../components/portal/relationships/HangNoteSheet.tsx', import.meta.url), 'utf8');
 assert.ok(sheet.includes("fetch('/api/portal/person-extract'"), '挂一条调 person-extract');
 assert.ok(sheet.includes('pending') && sheet.includes('savePending') && sheet.includes('addPersonRecord'), '预览 → 确认保存入档');
-assert.ok(sheet.includes('setErr'), 'AI 失败有可见错误态(每个异步动作可见失败)');
+assert.ok(sheet.includes('setErr') && sheet.includes('role="alert"'), 'AI 失败有可见错误态(每个异步动作可见失败)');
 // 照片路径:拍/传照片 → 缩图 → 提取
 assert.ok(sheet.includes('onPickPhoto') && sheet.includes('imageToDataUrl'), '照片 → 缩图 → 提取');
 assert.ok(sheet.includes('photoRef') && sheet.includes("capture=\"environment\""), '拍照入口(调摄像头)');

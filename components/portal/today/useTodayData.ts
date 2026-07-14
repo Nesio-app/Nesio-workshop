@@ -9,7 +9,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
-import { loadProfileSettings, portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
+import { loadProfileSettings, portalLocaleToDictionaryLocale, PROFILE_UPDATED_EVENT } from '@/lib/portal/profile';
 import { buildDailyReport, type DailyReport } from '@/lib/portal/daily-report';
 import { autoPersistTodayReport } from '@/lib/portal/daily-report-persist';
 import { buildTodayViewModel, type FocusNode, type ProactiveContext, type TodayReceipt } from '@/lib/platform/view-models/today-view-model';
@@ -395,11 +395,17 @@ export function useTodayData(canUsePrivateData: boolean) {
       }
       refresh();
     };
+    // 图1:改昵称后要立刻在今天页称呼上生效 —— 否则「改了名却处处没变」被当成保存失败。
+    const onProfile = () => {
+      if (canUsePrivateData) setDisplayName(loadProfileSettings().displayName || '');
+      refresh();
+    };
     window.addEventListener('nesio-life-graph-updated', refresh);
     window.addEventListener('nesio-connectors-refreshed', refresh);
     window.addEventListener('nesio-weather-updated', refresh);
     window.addEventListener('nesio-calendar-updated', refresh);
     window.addEventListener('nesio-feedback-recorded', onFeedback);
+    window.addEventListener(PROFILE_UPDATED_EVENT, onProfile);
 
     return () => {
       cancelled = true;
@@ -410,6 +416,7 @@ export function useTodayData(canUsePrivateData: boolean) {
       window.removeEventListener('nesio-weather-updated', refresh);
       window.removeEventListener('nesio-calendar-updated', refresh);
       window.removeEventListener('nesio-feedback-recorded', onFeedback);
+      window.removeEventListener(PROFILE_UPDATED_EVENT, onProfile);
     };
   }, [canUsePrivateData]);
 

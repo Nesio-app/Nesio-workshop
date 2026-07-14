@@ -53,10 +53,8 @@ assert.ok(cs.includes('mergedTags') || cs.includes('new Set([...'), 'groups 去�
 // ── 关系 tab:分组筛选 chips + 家庭置顶 + 家人徽章(源码级) ──
 const panel = fs.readFileSync(new URL('../components/portal/relationships/RelationshipsPanel.tsx', import.meta.url), 'utf8');
 assert.ok(panel.includes('nesio-rel-chips') && panel.includes('setActiveGroup'), '分组筛选 chips');
-// 批次 180:agent 关系列表重构 —— 扁平 allGroups 换成 BUCKETS(桶)+「更多」原始组;筛选仍按 c.groups.includes(activeGroup)
-assert.ok(panel.includes('BUCKETS') && panel.includes('c.groups.includes(activeGroup)'), '按选中组筛选(桶+原始组)');
-// 批次 180:agent 重构 —— 家人识别从 FAMILY_RE 改为 BUCKETS 里的 family 桶正则 + buildFamilyDigest;
-// FamilySummary 顶部摘要区不变(徽章从 👪 emoji 改为摘要区,去 emoji 设计)
-assert.ok(panel.includes("id: 'family'") && panel.includes('buildFamilyDigest') && panel.includes('FamilySummary'), '家人桶 + 家人摘要区');
+// 整理后:固定桶(家人/朋友/同事/业务/重要)+ 更多… 归并原始标签;桶或原始组都能筛
+assert.ok(panel.includes('presentBuckets') && panel.includes('c.groups.includes(activeGroup)'), '按选中桶/组筛选');
+assert.ok(panel.includes("id: 'family'") && panel.includes('家人') && panel.includes('nesio-rel-av'), '家人桶 + 分层字母块头像');
 
 console.log('relationship-groups: OK');
