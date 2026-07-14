@@ -14,6 +14,7 @@ import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import { useSheetDismiss } from '@/lib/portal/use-sheet-dismiss';
 import { useSheetDrag } from '../use-sheet-drag';
+import { guardPaidCloudAi } from '@/lib/portal/entitlement';
 
 type SpeechRecAPI = {
   continuous: boolean;
@@ -124,7 +125,8 @@ export function MeetingRecorderSheet({ open, meetingNode, onClose }: {
     // 抽不到/无 AI/出错则降级为只存转写原文(旧行为),不因抽取失败丢记录。
     setAnalyzing(true);
     let extracted: MeetingExtraction | null = null;
-    if (transcript.trim()) {
+    // 安全审计 #2:AI 抽取是付费云,免费(分层启用后)→ 跳过抽取、只存转写原文(既有降级路径)+ 升级引导。
+    if (transcript.trim() && guardPaidCloudAi('meeting_notes')) {
       try {
         const res = await fetch('/api/portal/meeting-notes', {
           method: 'POST',

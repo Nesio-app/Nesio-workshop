@@ -112,6 +112,21 @@ export function canUsePaidCloudAi(): boolean {
   return isPro();
 }
 
+/**
+ * 付费云 AI 的**用户触发**入口统一闸(安全审计 #2):放行返回 true;拦截时派发升级引导事件
+ * 并返回 false,调用方据此走兜底/收手。给此前「连名义门都没有」的九路云 AI 面补门 ——
+ * 分层未启用(当前 Web)时 canUsePaidCloudAi 恒 true → 无行为变化;分层开启后免费即被拦,
+ * 不再成为成本泄漏。**后台被动增强**(引导语/生活状态)别用它(无用户动作),直接判
+ * canUsePaidCloudAi() 静默跳过即可。
+ */
+export function guardPaidCloudAi(feature: string): boolean {
+  if (canUsePaidCloudAi()) return true;
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('nesio-pro-gate', { detail: { feature } }));
+  }
+  return false;
+}
+
 /** 由 StoreKit 收据服务端校验后调用,设/清 Pro 权益。别在客户端凭空置(防篡改靠服务端)。 */
 export function setProEntitlement(on: boolean): void {
   if (typeof window === 'undefined') return;

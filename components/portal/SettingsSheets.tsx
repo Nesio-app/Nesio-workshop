@@ -22,7 +22,7 @@ import { purgeIdbBlobs } from '@/lib/portal/idb-blob-store';
 import { purgeLocalImages } from '@/lib/portal/local-image-store';
 import { FEATURE_CATALOG, loadModuleOverrides, setModuleOverride, MODULE_OVERRIDES_EVENT, defaultResolvesTo, followsLab, getPalette, setPalette, PALETTES, type PaletteId } from '@/lib/portal/module-overrides';
 import { isAppStoreBuild } from '@/lib/portal/app-build.mjs';
-import { getTier, hasProOverride, setProEntitlement, trialDaysLeft } from '@/lib/portal/entitlement';
+import { canUse, getTier, hasProOverride, setProEntitlement, trialDaysLeft } from '@/lib/portal/entitlement';
 import { isValidBackup } from '@/lib/portal/full-backup';
 import { pushBackupToCloud, pullBackupFromCloud, restoreCombinedBackup, hasCloudEntitlement, lastCloudBackup, type CloudBackupError, type CloudRestoreError } from '@/lib/portal/cloud-backup';
 
@@ -778,8 +778,12 @@ export function LabSheet({ open, onClose, onOpenPreview }: SheetProps & { onOpen
         </span>
       </button>
 
-      {/* 图2:每日简报 demo —— 点开就地读文字简报(此前该入口是死按钮,现直连 DailyBriefSheet) */}
-      <button type="button" className="nesio-settings-option" onClick={() => setBriefOpen(true)}>
+      {/* 图2:每日简报 demo —— 点开就地读文字简报(此前该入口是死按钮,现直连 DailyBriefSheet)。
+          安全审计 #5:简报=AI 例程(Pro 整功能),与 RoutineDueCards 同门 —— 免费走升级引导,不旁路。 */}
+      <button type="button" className="nesio-settings-option" onClick={() => {
+        if (!canUse('ai_routine')) { window.dispatchEvent(new CustomEvent('nesio-pro-gate', { detail: { feature: 'ai_routine' } })); return; }
+        setBriefOpen(true);
+      }}>
         <div>
           <span className="nesio-settings-option-label">{L(dict, '看每日简报 demo', 'Preview daily brief')}</span>
           <span className="nesio-settings-option-hint">

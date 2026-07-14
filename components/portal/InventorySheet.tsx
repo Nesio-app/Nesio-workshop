@@ -14,6 +14,7 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import { useSheetDrag } from './use-sheet-drag';
+import { guardPaidCloudAi } from '@/lib/portal/entitlement';
 import { relativePastLabel } from '@/lib/portal/time-labels';
 import { IconMapPin, IconClock, IconCamera, IconNote } from './icons';
 import LocationPicker from './LocationPicker';
@@ -120,6 +121,7 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
     try { text = (await navigator.clipboard.readText()).trim(); }
     catch { setPasteMsg(L(dict, '读不到剪贴板 —— 请允许粘贴权限,或直接手动填写', 'Clipboard unavailable — allow paste permission or fill in manually')); return; }
     if (!text) { setPasteMsg(L(dict, '剪贴板是空的 —— 先去商品页复制标题或描述', 'Clipboard is empty — copy a product title or description first')); return; }
+    if (!guardPaidCloudAi('inventory_extract')) { setPasteBusy(false); return; } // 安全审计 #2:AI 抽取付费云
     setPasteBusy(true);
     try {
       const res = await fetch('/api/portal/inventory-extract', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) });
