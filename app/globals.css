@@ -9322,8 +9322,9 @@ html[data-portal-theme="night"] .nesio-tl-dot--mood {
   min-width: 26px; min-height: 26px;
   margin: 0;                   /* 左缘 0,圆心 ≈ x13,坐轨上 */
   border-radius: 50%;
-  border: 1.5px dashed color-mix(in srgb, var(--portal-accent) 55%, transparent);
-  background: var(--portal-bg);
+  /* 背景填充略突出(accent 软色),不再用页底色 —— 否则在雾霾蓝等浅底配色下和背景同色看不见 */
+  border: 1.5px dashed color-mix(in srgb, var(--portal-accent) 70%, transparent);
+  background: var(--portal-accent-soft-md);
   color: var(--portal-accent);
   display: grid; place-items: center;
   cursor: pointer;
