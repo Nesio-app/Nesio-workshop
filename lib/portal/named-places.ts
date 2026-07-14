@@ -90,3 +90,20 @@ export function formatLocation(placeId: string, room: string, subRoom: string): 
   if (subRoom) parts.push(subRoom);
   return parts.join(' · ');
 }
+
+/**
+ * 批次192(存放位置闭环):把物品存的位置解析成**当前**显示串。
+ * 有稳定 placeId → 用当前命名地点重建(命名地点改名后自动传导到所有物品);
+ * 没有 placeId(自由文本/老数据)→ 回退存的 location 字符串。
+ */
+export function displayStoredLocation(attrs: Record<string, unknown> | null | undefined): string {
+  const pid = typeof attrs?.placeId === 'string' ? attrs.placeId : '';
+  if (pid && getNamedPlaces().some((p) => p.id === pid)) {
+    return formatLocation(
+      pid,
+      typeof attrs?.placeRoom === 'string' ? attrs.placeRoom : '',
+      typeof attrs?.placeSubRoom === 'string' ? attrs.placeSubRoom : '',
+    );
+  }
+  return typeof attrs?.location === 'string' ? attrs.location : '';
+}

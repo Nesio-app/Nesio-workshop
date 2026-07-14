@@ -25,7 +25,11 @@ function loadTs(path, requireImpl) {
   vm.runInNewContext(js, { module: mod, exports: mod.exports, require: requireImpl, process: { env: {} }, console, Date, Math, Set, Map, JSON, Number, Array, Object, String });
   return mod.exports;
 }
-const inv = loadTs('../lib/portal/inventory.ts', (p) => (p.includes('life-graph') ? lifeGraphStub : ({})));
+const inv = loadTs('../lib/portal/inventory.ts', (p) => (
+  p.includes('life-graph') ? lifeGraphStub
+  // 批次192:inventory 现在从 named-places 引 displayStoredLocation(placeId 解析);测试用字符串样例,回退 location。
+  : p.includes('named-places') ? { displayStoredLocation: (a) => (a && typeof a.location === 'string' ? a.location : '') }
+  : ({})));
 
 // ── 字段回路:add → 投影 → update → 清空 ──
 const n1 = inv.addInventoryItem({ name: 'Lancome Toner', location: '🏠 家 · 卫生间', category: '护肤', tags: ['skincare', 'pink', '收纳'], price: 55, quantity: 1 });

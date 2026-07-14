@@ -1,14 +1,18 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getNamedPlaces, type NamedPlace } from '@/lib/portal/named-places';
+import { getNamedPlaces, upsertNamedPlace, type NamedPlace } from '@/lib/portal/named-places';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 
+// 批次192(存放位置闭环):除了显示串,再把稳定 placeId + room/subRoom 抛出来 ——
+// 存的一方据此存 placeId(命名地点改名后自动传导);自由文本时 meta=undefined(清掉 placeId)。
+export interface LocationMeta { placeId?: string; room?: string; subRoom?: string }
+
 interface LocationPickerProps {
   value: string;
-  onChange: (value: string) => void;
+  onChange: (value: string, meta?: LocationMeta) => void;
   className?: string;
 }
 
@@ -70,7 +74,27 @@ export default function LocationPicker({ value, onChange, className }: LocationP
   }, [value]);
 
   function emitChange(place: NamedPlace | null, room: string, subRoom: string) {
-    onChange(buildDisplayValue(place, room, subRoom));
+    onChange(
+      buildDisplayValue(place, room, subRoom),
+      place ? { placeId: place.id, room: room || undefined, subRoom: subRoom || undefined } : undefined,
+    );
+  }
+
+  // 批次192:把当前自由文本「存为新地点」—— 变成可复用的命名地点(拿到稳定 placeId)。
+  function saveAsPlace() {
+    const name = freeText.trim();
+    if (!name) return;
+    const np: NamedPlace = {
+      id: `place-${Date.now().toString(36)}`,
+      name, emoji: '📍', lat: 0, lon: 0, radiusMeters: 150, rooms: [], subRooms: {},
+    };
+    upsertNamedPlace(np);
+    setPlaces(getNamedPlaces());
+    setMode('named');
+    setSelectedPlace(np);
+    setSelectedRoom('');
+    setSelectedSubRoom('');
+    emitChange(np, '', '');
   }
 
   function handlePlaceChange(id: string) {
@@ -141,9 +165,15 @@ export default function LocationPicker({ value, onChange, className }: LocationP
           placeholder={L(dict, '输入位置…', 'Enter a place…')}
           onChange={(e) => { setFreeText(e.target.value); onChange(e.target.value); }}
         />
+        {/* 批次192:自由文本 → 存为可复用命名地点(下次直接选,改名自动传导到所有物品) */}
+        {freeText.trim() && (
+          <button type="button" className="nesio-loc-switch-btn" onClick={saveAsPlace}>
+            ➕ {L(dict, '存为新地点', 'Save as place')}
+          </button>
+        )}
         {places.length > 0 && (
           <button type="button" className="nesio-loc-switch-btn" onClick={() => setMode('named')}>
-            📍 选命名地点
+            📍 {L(dict, '选命名地点', 'Pick a place')}
           </button>
         )}
       </div>

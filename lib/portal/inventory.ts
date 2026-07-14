@@ -18,6 +18,7 @@ import {
   updateLifeNode,
   type LifeNode,
 } from './life-graph';
+import { displayStoredLocation } from './named-places';
 
 /* ---------- location 规范 ---------- */
 // 位置词汇的唯一真相是 named-places(场所→房间→子位置,LocationPicker 输出
@@ -66,7 +67,8 @@ function num(v: unknown): number | null {
 
 export function toInventoryItem(node: LifeNode): InventoryItem {
   const a = node.attributes || {};
-  const location = str(a.location).trim();
+  // 批次192:优先用稳定 placeId 解析成**当前**命名地点名(改名自动传导),没有再回退存的字符串。
+  const location = displayStoredLocation(a).trim();
   const { space, container } = splitLocation(location);
   return {
     node,
@@ -154,6 +156,8 @@ export function updateInventoryItem(
   if (patch.location !== undefined) {
     if (patch.location.trim()) attributes.location = patch.location.trim();
     else delete attributes.location;
+    // 批次192:收纳表单改位置=重设字符串,清掉旧 placeId 免得解析器显示错名(去同步)。
+    delete attributes.placeId; delete attributes.placeRoom; delete attributes.placeSubRoom;
   }
   if (patch.quantity !== undefined) {
     if (patch.quantity != null && Number.isFinite(patch.quantity)) attributes.quantity = patch.quantity;

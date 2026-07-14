@@ -25,7 +25,11 @@ function loadTs(path, requireImpl) {
   vm.runInNewContext(js, { module: mod, exports: mod.exports, require: requireImpl, process: { env: {} }, console, Date, Math, Set, Map, JSON, Number, Array, Object, String });
   return mod.exports;
 }
-const inv = loadTs('../lib/portal/inventory.ts', (p) => (p.includes('life-graph') ? lifeGraphStub : ({})));
+const inv = loadTs('../lib/portal/inventory.ts', (p) => (
+  p.includes('life-graph') ? lifeGraphStub
+  // 批次192:同上,补 named-places.displayStoredLocation stub(字符串样例回退 location)。
+  : p.includes('named-places') ? { displayStoredLocation: (a) => (a && typeof a.location === 'string' ? a.location : '') }
+  : ({})));
 const imp = loadTs('../lib/portal/inventory-import.ts', (p) => (p === './inventory' ? inv : ({})));
 
 // ── parseCsv:引号/转义/引号内逗号与换行/BOM ──

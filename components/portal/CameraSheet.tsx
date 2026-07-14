@@ -291,6 +291,8 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
   const [detectedPlaceId, setDetectedPlaceId] = useState<string>('');
   // Per-node location overrides (index → formatted location string)
   const [nodeLocations, setNodeLocations] = useState<Record<number, string>>({});
+  // 批次192(存放位置闭环):同步存每条选中的稳定 placeId/room/subRoom,存入时写节点(改名自动传导)。
+  const [nodePlaceMeta, setNodePlaceMeta] = useState<Record<number, { placeId?: string; room?: string; subRoom?: string }>>({});
   // Similarity check result (per node index)
   const [similarItems, setSimilarItems] = useState<Record<number, SimilarItem[]>>({});
 
@@ -731,7 +733,7 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
     try {
       await doSave(nodesToSave);
       setPhase('saved');
-      setTimeout(() => { onClose(); setPhase('idle'); setResult(null); setExtraTags(''); setSourceFile(null); setNodeLocations({}); setDetectedPlaceId(''); setSaving(false); }, 1200);
+      setTimeout(() => { onClose(); setPhase('idle'); setResult(null); setExtraTags(''); setSourceFile(null); setNodeLocations({}); setNodePlaceMeta({}); setDetectedPlaceId(''); setSaving(false); }, 1200);
     } catch {
       setSaving(false);
       setError(L(dict, '存入失败，请重试', 'Save failed — please try again'));
@@ -748,6 +750,7 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
     const savedNodes = nodesToSave.map((n, i) => {
       const origIdx = editedNodes.indexOf(n);
       const locationVal = nodeLocations[origIdx] ?? '';
+      const pm = nodePlaceMeta[origIdx];
       return ingestLifeNode({
         name: n.name.trim() || L(dict, '未命名条目', 'Untitled item'),
         type: n.type as LifeNode['type'],
@@ -763,6 +766,10 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
           ...(exifCap?.lat != null && exifCap.lon != null ? { capturedLat: exifCap.lat, capturedLon: exifCap.lon } : {}),
           ...(exifCap?.takenAt ? { takenAt: exifCap.takenAt } : {}),
           ...(locationVal ? { location: locationVal as string } : {}),
+          // 批次192:存稳定 placeId/room/subRoom —— 命名地点改名后,物品位置自动跟着变。
+          ...(pm?.placeId ? { placeId: pm.placeId } : {}),
+          ...(pm?.room ? { placeRoom: pm.room } : {}),
+          ...(pm?.subRoom ? { placeSubRoom: pm.subRoom } : {}),
           ...(n.note?.trim() ? { note: n.note.trim() as string } : {}),
           ...(n.expiry?.trim() ? { expiry: n.expiry.trim() as string } : {}),
           ...(n.price?.trim() ? { price: n.price.trim() as string } : {}),
@@ -862,7 +869,7 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
     setSelecting(false);
     setResult(null); setEditedNodes([]); setIsReceipt(false);
     setCapturedPreview(''); setCapturedBase64(''); setError(''); setExtraTags(''); setSourceFile(null);
-    setNodeLocations({}); setDetectedPlaceId('');
+    setNodeLocations({}); setNodePlaceMeta({}); setDetectedPlaceId('');
     setSimilarItems({});
     setPhase('idle');
     openNativeCamera();
@@ -1257,7 +1264,10 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
                     <span className="nesio-camera-node-expiry-label">{L(dict, '存放位置', 'Stored at')}</span>
                     <LocationPicker
                       value={nodeLocations[i] ?? ''}
-                      onChange={(v) => setNodeLocations((prev) => ({ ...prev, [i]: v }))}
+                      onChange={(v, meta) => {
+                        setNodeLocations((prev) => ({ ...prev, [i]: v }));
+                        setNodePlaceMeta((prev) => ({ ...prev, [i]: meta || {} }));
+                      }}
                       className="nesio-camera-loc-picker"
                     />
                   </div>

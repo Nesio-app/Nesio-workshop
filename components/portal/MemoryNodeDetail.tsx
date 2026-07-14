@@ -2,6 +2,8 @@
 
 import { Component, useEffect, useState, type ReactNode } from 'react';
 import { deleteLifeNode, getLifeGraph, searchLifeGraphFuzzy, updateLifeNode, type LifeNode } from '@/lib/portal/life-graph';
+import { displayStoredLocation } from '@/lib/portal/named-places';
+import type { LocationMeta } from './LocationPicker';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
 import LocationPicker from './LocationPicker';
 import EmailComposeSheet from './EmailComposeSheet';
@@ -228,7 +230,8 @@ function ObjectSection({ node, assetUrls }: {
   assetUrls: Record<string, string>;
 }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
-  const location = attr(node, 'location', 'room');
+  // 批次192:优先用稳定 placeId 解析成当前命名地点名(改名自动传导),否则回退存的字符串/room。
+  const location = displayStoredLocation(node.attributes) || attr(node, 'location', 'room');
   const purchaseDate = attr(node, 'purchaseDate');
   const price = attr(node, 'price');
   const expiry = attr(node, 'expiry');
@@ -622,6 +625,8 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
   const [rawExpanded, setRawExpanded] = useState(false); // 批次 74:原始记录折叠
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [editing, setEditing] = useState(false);
+  // 批次192:编辑存放位置时,从 LocationPicker 捕获稳定 placeId/room/subRoom(存入时写节点/清空)。
+  const [editPlaceMeta, setEditPlaceMeta] = useState<LocationMeta | null>(null);
   const [fields, setFields] = useState<EditFields>({
     name: '', location: '', price: '', purchaseDate: '', expiry: '',
     dueDate: '', priority: '', owner: '', recurring: '',
@@ -727,7 +732,13 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
     if (!fields.name.trim()) return;
     const extra: Record<string, string | null> = {};
     if (n.type === 'object') {
-      if (fields.location !== attr(n, 'location', 'room')) extra.location = fields.location || null;
+      if (fields.location !== attr(n, 'location', 'room')) {
+        extra.location = fields.location || null;
+        // 批次192:位置一改就同步 placeId(选了命名地点就存,自由文本/清空则删)—— 避免残留旧 placeId 显示错名。
+        extra.placeId = editPlaceMeta?.placeId || null;
+        extra.placeRoom = editPlaceMeta?.room || null;
+        extra.placeSubRoom = editPlaceMeta?.subRoom || null;
+      }
       if (fields.price !== attr(n, 'price')) extra.price = fields.price || null;
       if (fields.purchaseDate !== attr(n, 'purchaseDate')) extra.purchaseDate = fields.purchaseDate || null;
       if (fields.expiry !== attr(n, 'expiry')) extra.expiry = fields.expiry || null;
@@ -899,7 +910,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
             {n.type === 'object' && (<>
               <div className="nesio-edit-row">
                 <span>{L(dict, '存放位置', 'Stored at')}</span>
-                <LocationPicker value={field('location')} onChange={(v) => setField('location', v)} />
+                <LocationPicker value={field('location')} onChange={(v, meta) => { setField('location', v); setEditPlaceMeta(meta ?? null); }} />
               </div>
               <label className="nesio-edit-row"><span>{L(dict, '价格', 'Price')}</span><input value={field('price')} onChange={(e) => setField('price', e.target.value)} placeholder="$12.99" /></label>
               <label className="nesio-edit-row"><span>{L(dict, '购买日期', 'Bought on')}</span><input type="date" value={field('purchaseDate')} onChange={(e) => setField('purchaseDate', e.target.value)} /></label>
