@@ -108,7 +108,7 @@ async function openaiAvatar(key: string, imageBase64: string, mimeType: string):
 }
 
 export async function POST(req: NextRequest) {
-  const guard = await guardAiRoute(req, 'avatarify', { limit: 10 });
+  const guard = await guardAiRoute(req, 'avatarify', { limit: 10, requirePaidCloudAi: true });
   if (guard) return guard;
 
   const body = await req.json().catch(() => ({})) as { imageBase64?: string; mimeType?: string };

@@ -103,6 +103,15 @@ sensitivity/retention 枚举化(中期)。
 - ~~restore-from-cloud~~ **已做**(2026-07-07):见上「进行中的迁移 ③」——推 + 拉都通了,云备份端到端闭环。
 - **云备份付费桩转真**:hasCloudEntitlement 现读本地 flag;支付/StoreKit/账户 plan 字段
   接上后换成真权益读取(推送机制本身不用动)。(2026-07-07 记)
+- **服务端权益强制:骨架已落、待接真源**(2026-07-14 记,安全审计 #1):
+  `lib/portal/auth/server-entitlement.ts` 提供 `readServerTier` / `guardServerEntitlement`,
+  已接进 `guardAiRoute({ requirePaidCloudAi:true })`,七路付费云 AI 路由(meeting-notes /
+  avatarify / person-extract / inventory-extract / living-model / health-insight / daily-brief)
+  已挂。**默认 inert**(真源未接 → fail-open 放行,线上行为不变)。**接真源(部署侧)**:
+  ① Supabase 建 `user_entitlements(user_id, plan)` + RLS(仅本人读 / service_role 写);
+  ② StoreKit/支付回调服务端校验收据 → upsert plan;
+  ③ 置环境变量 `NESIO_SERVER_ENTITLEMENT=1`、`NESIO_ENTITLEMENT_TABLE=user_entitlements`。
+  无需改代码,骨架即从 inert 转强制。`/api/entitlements` 已附 `serverTier`/`serverEntitlementEnforced`。
 
 **契约测试提示**:`test:contracts`(100+ 套,CI 只跑 test:security 的 18 套)
 在 2026-07-04 全量修复过一轮——历史重构造成的 15 处 marker 漂移已对齐,

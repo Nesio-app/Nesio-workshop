@@ -56,7 +56,7 @@ export function clampRecords(raw: unknown): PersonExtractResult {
 }
 
 export async function POST(req: NextRequest) {
-  const guard = await guardAiRoute(req, 'person-extract', { limit: 20 });
+  const guard = await guardAiRoute(req, 'person-extract', { limit: 20, requirePaidCloudAi: true });
   if (guard) return guard;
   const body = await req.json().catch(() => null) as { text?: unknown; image?: unknown } | null;
   const text = typeof body?.text === 'string' ? body.text.trim().slice(0, 800) : '';
