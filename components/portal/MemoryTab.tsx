@@ -43,7 +43,7 @@ import dynamic from 'next/dynamic';
 const MemoryNodeDetail = dynamic(() => import('./MemoryNodeDetail'), { ssr: false });
 const RelationGraph = dynamic(() => import('./RelationGraph'), { ssr: false });
 import type { GNode, GEdge } from '@/lib/platform/graph-engine';
-import { DomainIcon, IconBox, IconBookmark, IconCalendar, IconCamera, IconCheckSquare, IconFolder, IconLink, IconMail, IconMapPin, IconMic, IconNote, IconStar, IconUser, NodeTypeIcon, IconMap } from './icons';
+import { DomainIcon, IconBox, IconBookmark, IconCalendar, IconCamera, IconCheckSquare, IconFolder, IconMail, IconMapPin, IconMic, IconNote, IconStar, IconUser, NodeTypeIcon, IconMap } from './icons';
 import { L, type DictLocale } from '@/lib/portal/i18n';
 import { relativePastLabel } from '@/lib/portal/time-labels';
 import { displayNodeName } from '@/lib/portal/node-display';
@@ -1270,7 +1270,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                   {/* 批次 168:物品收纳放中间 → 开收纳 */}
                   <button type="button" className="nesio-mem-jar" onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-inventory'))}>
                     <span className="nesio-mem-jar-ball" data-halo="storage" aria-hidden><IconBox size={24} /></span>
-                    <span className="nesio-mem-jar-name">{L(dict, '物品收纳', 'Storage')}</span>
+                    <span className="nesio-mem-jar-name">{L(dict, '收纳', 'Storage')}</span>
                     <span className="nesio-mem-jar-sub">{L(dict, `${invStats.count} 件`, `${invStats.count} items`)}</span>
                   </button>
                   {/* 批次 168:项目 → 独立页 */}
@@ -1357,25 +1357,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                     )}
                   </div>
 
-                  {/* 批次 88:视图切换 —— 同一批数据的不同看法(列表/地图/关联图),
-                      与「分类」分离。地图仅在有物品时可用。 */}
-                  <div className="nesio-memory-view-toggle" role="group" aria-label={L(dict, '视图', 'View')}>
-                    <button
-                      type="button"
-                      className={`nesio-view-chip${!showObjectMap && !showRelationGraph ? ' is-active' : ''}`}
-                      onClick={() => { setShowObjectMap(false); setShowRelationGraph(false); }}
-                    >
-                      <IconBox size={12} /> {L(dict, '列表', 'List')}
-                    </button>
-                    {/* 批次 183(用户实锤):地图视图删除 */}
-                    <button
-                      type="button"
-                      className={`nesio-view-chip${showRelationGraph ? ' is-active' : ''}`}
-                      onClick={() => { setShowRelationGraph((prev) => !prev); setShowObjectMap(false); }}
-                    >
-                      <IconLink size={12} /> {L(dict, '关联图', 'Graph')}
-                    </button>
-                  </div>
+                  {/* 批次 183/186(用户实锤):地图、关联图视图均删除 —— 记忆页只保留列表。 */}
                 </>
               )}
 
